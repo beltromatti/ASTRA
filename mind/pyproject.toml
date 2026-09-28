@@ -1,0 +1,21 @@
+[project]
+name = "astra-mind"
+version = "0.1.0"
+description = "ASTRA — servizio AI: gateway dei modelli, agenti dell'equipaggio, Regista della guerra"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx[http2]>=0.28",
+    "pydantic>=2.9",
+    "lingua-language-detector>=2.0",
+    "websockets>=14",
+]
+
+[project.scripts]
+astra-bench = "astra_mind.bench.run:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["astra_mind"]
