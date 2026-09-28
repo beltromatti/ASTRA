@@ -436,6 +436,8 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	}
 	S->SetArrayField(TEXT("damage"), Dmg);
 	S->SetStringField(TEXT("damage_control"), FString::Printf(TEXT("%d teams, %d free"), NumDamageTeams, NumDamageTeams - Busy));
+	S->SetStringField(TEXT("casualties"), Wounded + Killed ? FString::Printf(TEXT("%d wounded (in the medbay), %d killed"), Wounded, Killed)
+	                                                     : FString(TEXT("none")));
 	float Sum = 0.f;
 	for (const auto& KV : PowerPct) { Sum += KV.Value; }
 	S->SetStringField(TEXT("power_budget"), FString::Printf(TEXT("%.0f%% of %.0f%% allocated (six systems at 100%% = 600%%)"), Sum, PowerBudget));
@@ -660,6 +662,19 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 			D.System = Systems[FMath::RandRange(0, 3)];
 		}
 		Where = FString::Printf(TEXT("%s: %s%s"), *D.Where(), *D.Kind, D.System.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s power -20%%)"), *D.System));
+		// people were in that compartment
+		const float Roll2 = FMath::FRand();
+		int32 W = 0, K = 0;
+		if (D.Kind == TEXT("hull breach")) { W = Roll2 < 0.4f ? FMath::RandRange(1, 3) : 0; K = Roll2 < 0.1f ? 1 : 0; }
+		else if (D.Kind == TEXT("fire")) { W = Roll2 < 0.35f ? FMath::RandRange(1, 2) : 0; }
+		else { W = Roll2 < 0.1f ? 1 : 0; }
+		Wounded += W;
+		Killed += K;
+		if (W || K)
+		{
+			Where += FString::Printf(TEXT(" — casualties: %s%s%s"), W ? *FString::Printf(TEXT("%d wounded"), W) : TEXT(""), (W && K) ? TEXT(", ") : TEXT(""),
+			                         K ? *FString::Printf(TEXT("%d killed"), K) : TEXT(""));
+		}
 		if (!Damage.ContainsByPredicate([&D](const FAstraDamage& X) { return X.Deck == D.Deck && X.Section == D.Section && X.Kind == D.Kind; }))
 		{
 			Damage.Add(D);

@@ -79,11 +79,12 @@ Tiberius with deuterium refineries, the Ceres Belt, the scorched planet Vulcan. 
 Everyone wears a neural translator implant, "the Interpreter": people hear each other in their own language."""
 
 
-def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str]) -> str:
+def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None) -> str:
     lang_name = LANG_NAMES.get(lang, lang)
     roster = "\n".join(
         f"- {o.id}: {o.title}, {o.role}. Duties: {o.duties}. Character: {o.personality}." for o in CREW.values())
     events = "\n".join(f"- {e}" for e in recent_events[-8:]) or "- (none)"
+    story = "\n".join(f"- {c}" for c in (campaign or [])[-10:]) or "- (the patrol has just begun)"
     return f"""You are the bridge crew of the ASN Aquila. The player is the ship's Captain, standing on the bridge.
 You voice every officer on duty. The ship simulation is the truth: you change the ship only through the ship tools,
 and you know only what the ship state and the reports below tell you.
@@ -119,6 +120,9 @@ Tools
 - `speak` holds only natural spoken words: never tool names, ids in brackets or argument lists.
 - Ships move: to close on, chase or engage a contact use `intercept` (the course keeps following it); `set_course`
   is for a fixed heading. Weapons assigned beyond their range open fire by themselves once the target closes.
+
+The war so far (the crew lived it; remember the Captain's choices and their consequences)
+{story}
 
 Recent events
 {events}

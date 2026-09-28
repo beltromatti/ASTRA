@@ -125,6 +125,7 @@ private:
 	TArray<FString> RecentEvents;
 	TArray<FAstraDamage> Damage;      // open incidents inside the hull
 	int32 NextDamageId = 1;
+	int32 Wounded = 0, Killed = 0;    // the crew's cost
 	static constexpr int32 NumDamageTeams = 4;
 	static constexpr float PowerBudget = 700.f;   // six systems at 100% = 600; the reactor can give 100 more
 	float HullPct = 100.f;

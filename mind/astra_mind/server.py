@@ -191,6 +191,7 @@ class Mind:
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander)
+        self.agent.campaign = lambda: self.director.campaign
         self.turns: asyncio.Queue = asyncio.Queue()
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.lang_file = REPO_ROOT / "mind" / ".cache" / "captain_lang.txt"
@@ -227,6 +228,9 @@ class Mind:
         ship = self.game if (self.game and self.game.state) else None
         if ship is None:
             return {"ok": True, "detail": "(no game)"}
+        if name == "enemy_order":
+            who = COMMANDERS.get(self.enemy.contact, {}).get("name", "the Mandate commander")
+            self.director.note(f"{who} decided: {args.get('order')} ({args.get('reason', '')})")
         return await ship.execute(name, args, self.enemy.speaker)
 
     def _battle_state(self) -> dict[str, Any]:
@@ -330,6 +334,9 @@ class Mind:
                     r = await route(self.llm, text, COMMANDERS.get(self.enemy.contact, {}).get("name", "the enemy commander"))
                     log.info("channel open, routed (%s): crew=%r enemy=%r", r.how, r.crew[:60], r.enemy[:60])
                     to_enemy = r.enemy
+                    if r.enemy:
+                        who = COMMANDERS.get(self.enemy.contact, {}).get("name", "the Mandate commander")
+                        self.director.note(f"the Captain to {who} over the channel: {r.enemy}")
                     if not r.crew:
                         await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {to_enemy}", lang, self._battle_state())
                         continue

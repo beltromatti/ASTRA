@@ -50,6 +50,7 @@ class BridgeAgent:
         self.history_turns = history_turns
         self.spent = 0.0
         self._ev = 0                     # ids for event-report tool calls in the history
+        self.campaign = lambda: []       # the war director's log (set by the server)
 
     def _trim_history(self) -> None:
         """Keep the last `history_turns` turns (a turn starts at a user message)."""
@@ -58,7 +59,7 @@ class BridgeAgent:
             self.history = self.history[starts[-self.history_turns]:]
 
     def _messages(self, text: str, lang: str) -> list[dict[str, Any]]:
-        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events())}]
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign())}]
         msgs += self.history
         msgs.append({"role": "user", "content": f"Captain: {text}"})
         return msgs
@@ -101,7 +102,7 @@ class BridgeAgent:
         t0 = time.perf_counter()
         pending: list[tuple[ToolCall, asyncio.Task]] = []
         user = f"[Ship systems event, not the Captain speaking] {event}"
-        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events())}]
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign())}]
         msgs += self.history
         msgs.append({"role": "user", "content": user + "\n" + (ask or EVENT_ASK)})
         on_call = self._on_call(turn, lang, t0, pending, allowed=INITIATIVE)
