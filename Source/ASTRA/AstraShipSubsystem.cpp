@@ -246,6 +246,21 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			GEngine->Exec(GetWorld(), TEXT("ProfileGPU"));
 		}), 25.f, false);
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("astra_decisive")))
+	{
+		// testing (performance runs): a decisive battle in front of the bridge — two ASTRA destroyers join, eight Mandate
+		// ships (three capital ships with their fighters) come in close, and it starts at once
+		FTimerHandle H;
+		InWorld.GetTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			GEngine->Exec(GetWorld(), TEXT("astra.cmd director_beat {'beat':{'type':'reinforcements','granted':true,'range_km':6,'bearing_deg':200,")
+			                          TEXT("'ships':[{'class':'vigilant','name':'ASN Resolute'},{'class':'vigilant','name':'ASN Constant'}]}}"));
+			GEngine->Exec(GetWorld(), TEXT("astra.cmd director_beat {'beat':{'type':'raid','hail':false,'range_km':16,'bearing_deg':25,")
+			                          TEXT("'ships':[{'class':'acheron','name':'KMS Charon'},{'class':'styx','name':'KMS Persephone'},")
+			                          TEXT("{'class':'styx','name':'KMS Tartarus'},{'class':'lethe','name':'KMS Cocytus'},{'class':'lethe','name':'KMS Phlegethon'},")
+			                          TEXT("{'class':'lethe','name':'KMS Asphodel'},{'class':'lethe','name':'KMS Lethe'},{'class':'lethe','name':'KMS Acheron Minor'}]}}"));
+		}), 4.f, false);
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("astra_mess")))
 	{
 		// testing (performance runs): the Captain in the Mess Hall a few seconds in, looking down the tables
