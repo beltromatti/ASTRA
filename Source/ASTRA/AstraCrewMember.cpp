@@ -6,6 +6,7 @@
 #include "Animation/AnimSequence.h"
 #include "Components/AudioComponent.h"
 #include "Components/PoseableMeshComponent.h"
+#include "Materials/MaterialInterface.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -67,6 +68,19 @@ void AAstraCrewMember::BeginPlay()
 		}
 	}
 	Phase = FMath::FRand() * 10.f;
+	// uniforms on the placeholder bodies: navy trousers, the jacket in the department's colour (docs/STILE.md §3)
+	const FString Dept = StationId == TEXT("tactical") ? TEXT("Security") : StationId == TEXT("sensors") ? TEXT("Science")
+	                   : StationId == TEXT("engineering") ? TEXT("Engineering") : StationId == TEXT("flight") ? TEXT("Flight") : TEXT("Command");
+	UMaterialInterface* Uniform = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Uniform.MI_Crew_Uniform"));
+	UMaterialInterface* Jacket = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_%s.MI_Crew_Dept_%s"), *Dept, *Dept));
+	for (USkinnedMeshComponent* C : {static_cast<USkinnedMeshComponent*>(Body), static_cast<USkinnedMeshComponent*>(Seated)})
+	{
+		if (C && C->GetSkinnedAsset() && Uniform && Jacket && C->GetNumMaterials() >= 2)
+		{
+			C->SetMaterial(0, Uniform);   // head and legs
+			C->SetMaterial(1, Jacket);    // torso and arms
+		}
+	}
 	// voice: spatialised, audible across the bridge, natural falloff
 	USoundAttenuation* Att = NewObject<USoundAttenuation>(this);
 	Att->Attenuation.bAttenuate = true;
