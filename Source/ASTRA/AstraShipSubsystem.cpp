@@ -60,6 +60,11 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Mark0 = MarkDeg;
 	CollectSceneRefs(InWorld);
 	UpdateAttitudeVisuals();
+	// the bridge at rest: reactor hum through the deck, air handling, far electronics (a seamless loop)
+	if (USoundBase* Amb = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Bridge_Ambience.SW_Bridge_Ambience")))
+	{
+		UGameplayStatics::SpawnSound2D(&InWorld, Amb, 0.5f);
+	}
 	UE_LOG(LogASTRA, Log, TEXT("[Ship] online: sky %s, sun %s, %d ship lights"), SkyMID ? TEXT("yes") : TEXT("no"),
 	       Sun ? TEXT("yes") : TEXT("no"), ShipLights.Num());
 }

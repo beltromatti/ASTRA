@@ -306,6 +306,19 @@ void UAstraMindSubsystem::HandleCommand(const TSharedPtr<FJsonObject>& Msg)
 		}
 	}
 	UE_LOG(LogASTRA, Log, TEXT("[Ship] %s -> %s: %s"), *Name, bOk ? TEXT("ok") : TEXT("FAILED"), *Detail);
+	FString By;
+	if (bOk && Msg->TryGetStringField(TEXT("by"), By))
+	{
+		// the officer's console acknowledges the input (a soft chirp at the station)
+		if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), By))
+		{
+			if (USoundBase* Chirp = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Console_Chirp.SW_Console_Chirp")))
+			{
+				UGameplayStatics::PlaySoundAtLocation(Crew, Chirp, Crew->GetActorLocation() + Crew->GetActorForwardVector() * 60.f + FVector(0, 0, 80.f), 0.45f,
+				                                      FMath::FRandRange(0.97f, 1.03f));
+			}
+		}
+	}
 	TSharedRef<FJsonObject> R = MakeShared<FJsonObject>();
 	R->SetStringField(TEXT("type"), TEXT("command_result"));
 	R->SetStringField(TEXT("id"), Id);

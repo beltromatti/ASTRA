@@ -615,6 +615,10 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 				--Channels;
 				S.PDT = 0.5f;
 				AddBeam(S.Pos + (Pr.Pos - S.Pos).GetSafeNormal() * S.Radius * 0.6, Pr.Pos, 0.12f, FLinearColor(1.f, 0.85f, 0.5f));
+				if (S.bPlayer)
+				{
+					HullSound(TEXT("SW_PD_Burst"), 0.4f, 0.6f);
+				}
 				if (FMath::FRand() < (S.bPlayer ? 0.32f : 0.25f) * (Pr.bTorpedo ? 0.8f : 1.f))
 				{
 					Pr.bDead = true;
@@ -822,6 +826,7 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 		}
 		P.Missiles -= N;
 		P.MissileT = P.MissileCd;
+		HullSound(TEXT("SW_VLS_Launch"), 0.85f, 0.2f);
 		OutDetail = FString::Printf(TEXT("%d missiles away at %s, %d left in the VLS, time to target about %.0f s"), N, *T->ContactId,
 		                            P.Missiles, Dist / 1400.0 + 2.0);
 	}
@@ -1021,6 +1026,7 @@ void UAstraBattleSubsystem::TickPlayerFire(FAstraBattleShip& P, float Dt)
 	if (P.RailVolleys > 0 && P.RailT <= 0.f && Dist <= P.RailRange)
 	{
 		P.RailT = P.RailCd / FMath::Max(0.25f, P.WeaponPower);   // capacitor recharge follows weapons power
+		HullSound(TEXT("SW_Rail_Fire"), 0.9f, 0.3f);
 		--P.RailVolleys;
 		for (int32 i = 0; i < P.RailSlugs; ++i)
 		{
@@ -1835,6 +1841,7 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		C.OrbitPhase = FMath::FRand() * 2.f * PI;
 		C.Mode = EAstraShipMode::Cruise;
 		SpawnVisual(C);
+		HullSound(TEXT("SW_Catapult"), 0.75f, 0.9f);
 		if (Q.ToLaunch == 0 && !Q.bAirborneReported)
 		{
 			Q.bAirborneReported = true;
@@ -2402,5 +2409,25 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 		                       VClass.Contains(TEXT("Guild")) ? *VClass : *(TEXT("Free Guilds ") + VClass), *VName, *VId, Range, Bearing,
 		                       Attackers.IsEmpty() ? TEXT("unknown attackers") : *Attackers));
 		(void)LeaderIdx;
+	}
+}
+
+void UAstraBattleSubsystem::HullSound(const TCHAR* Name, float Volume, float MinInterval)
+{
+	const FName Key(Name);
+	const float RealTime = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.f;
+	if (const float* Last = SoundLast.Find(Key); Last && RealTime - *Last < MinInterval)
+	{
+		return;
+	}
+	TObjectPtr<USoundBase>& S = Sounds.FindOrAdd(Key);
+	if (!S)
+	{
+		S = LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Audio/%s.%s"), Name, Name));
+	}
+	if (S)
+	{
+		SoundLast.Add(Key, RealTime);
+		UGameplayStatics::PlaySound2D(GetWorld(), S, Volume, FMath::FRandRange(0.95f, 1.05f));
 	}
 }

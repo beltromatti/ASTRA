@@ -13,6 +13,7 @@ class AStaticMeshActor;
 class UMaterialInstanceDynamic;
 class UPointLightComponent;
 class UStaticMesh;
+class USoundBase;
 
 UENUM()
 enum class EAstraSide : uint8
@@ -346,6 +347,10 @@ private:
 	void AddBeam(const FVector& A, const FVector& B, float Life, const FLinearColor& Color);
 	void Explode(FAstraBattleShip& S);    // secondary blasts, shockwave, debris, and the hulk left behind
 	void TickWrecks(float Dt);
+	/** Our own guns and launchers, felt through the hull (rate-limited per sound). */
+	void HullSound(const TCHAR* Name, float Volume, float MinInterval);
+	UPROPERTY() TMap<FName, TObjectPtr<USoundBase>> Sounds;
+	TMap<FName, float> SoundLast;
 
 	FVector ToWorld(const FVector& SystemPos) const;      // system frame (m) -> world (cm)
 	FQuat ToWorldRot(const FQuat& SystemRot) const;
