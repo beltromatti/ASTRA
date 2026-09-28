@@ -49,3 +49,6 @@ tools/models/
 
 # ===================== macOS =====================
 .DS_Store
+
+# Stato locale delle sessioni di lavoro di Claude
+.astra/
