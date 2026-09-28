@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-28 · **Traguardo corrente:** M1 — La nave che si cammina (M0 completato salvo i test di prestazioni, che faccio sul primo livello vero)
+**Ultimo aggiornamento:** 2026-09-28 (notte) · **Traguardo corrente:** M1 — La nave che si cammina
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -31,15 +31,34 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Guida di stile (docs/STILE.md) + Bibbia di ASTRA (docs/BIBBIA.md) — bozze v0.1
 - [x] Benchmark modelli AI → scelta: DeepSeek V4.1 Flash (Modal + Together in doppio canale) per ufficiali/equipaggio; Ling 3.0 Flash per chiacchiere; MiniMax-M3 candidato per capitani/ammiragli (docs/bench/)
 - [x] Catena vocale di base verificata: Pocket TTS italiano 60 ms al primo audio (×8 tempo reale, CPU), WhisperKit 0,6 s su un ordine di 4 s con lingua automatica e glossario (docs/bench/voce_2026-09-28.md). Labiale e voci su misura → M3
-- [ ] Test di prestazioni automatici (CsvProfile) con gate
+- [x] Test di prestazioni automatici (CsvProfile): `tools/perf/run_perf.sh` (gate automatico ancora da agganciare)
+
+## M1 — La nave che si cammina (in corso)
+- [x] Materiali master ASTRA (M_ASTRA_Hard/Emissive/Glass) + 11 istanze dalla palette; texture CC0 ambientCG impacchettate (`tools/art/pack_textures.py`)
+- [x] Kit del corridoio v2 (`art/blender/kit_corridor.py`): gusci a prismi, 7 pannelli a varianti, canaletta tecnica sotto griglia, strisce di reparto, finestrone
+- [x] Livello `L_CorridorTest` (24,5 m, paratia, finestrone) — 58 fps a 1080p col profilo A (docs/bench/prestazioni_2026-09-28.md)
+- [x] Plancia v1 dai dati (`data/ship/aquila_bridge.json` → `art/blender/bridge.py` → `L_Bridge`): pozzo del timone, pedana, 9 postazioni, cupola, finestrone a 6 facce
+- [x] Cielo di Aurelia: stelle NASA + nebulosa Teal Veil procedurale 8K (`art/blender/sky_aurelia.py`), stella Aurelia nel materiale del cielo, orientamento pilotabile
+- [ ] Plancia v2: pavimento scuro, soffitto a cassettoni, poltrone rifatte, schermi con interfacce, ologramma sul tavolo
+- [ ] Esterno della Aquila (almeno la prua visibile dalla plancia), pianeta New Ravenna
+- [ ] Movimento in prima persona nella nave, ascensore, segnaletica/decalcomanie
 
 ## Prossimi passi
-1. M1: pipeline artistica (Blender procedurale): kit modulare interni ASTRA + blockout della nave Aquila.
-2. Livello di prova "Aquila_Nucleo" in Unreal + test di prestazioni automatici (CsvProfile) con gate.
-3. Scaricare fondali stellari NASA e nebulose per il cielo di Aurelia.
+1. Plancia v2 (arte) — breve.
+2. **Anello equipaggio AI (nucleo di M3)**: servizio `mind/` (WebSocket) con STT locale → DeepSeek V4.1 Flash con strumenti → TTS locale; in Unreal: sottosistema C++ di connessione, cattura microfono (push-to-talk), voce spazializzata, stato nave con comandi (allerta, rotta, scudi…) che cambiano davvero la nave (luci di allerta).
+3. Simulazione nave (M2) e poi battaglia (M4).
+
+## Note operative
+- Editor: avviarlo con `tools/avvia_editor.sh` (modalità unattended: niente limite a 3 fps a schermo bloccato). Tenere `t.MaxFPS 30` quando idle, 4 durante i test di prestazioni.
+- Il gioco standalone scrive i CSV in `~/Library/Application Support/Epic/UnrealEngine/5.8/Saved/Profiling/CSV`.
+- `astra_editor.save()` salva sempre (EditorAssetLibrary saltava gli asset "non sporchi").
+- Cubemap long-lat in Unreal: centro immagine = mondo -Y, u=0,75 = +X, alto = +Z.
 
 ## Registro decisioni
 - 2026-09-28 — Modelli: DeepSeek V4.1 Flash @Modal (98% ordini corretti, 100% lingua, primo comando 0,52 s, frase 1,02 s) e @Together (95%, 0,46 s) in doppio canale; scartati gpt-oss (55%), GPT-6 Luna e Groq (errori). DeepSeek diretto e GLM bloccati dalle impostazioni privacy dell'account OpenRouter (non servono).
 - 2026-09-28 — Intenti istantanei: multilingual-e5-small (MIT) invece di EmbeddingGemma (accesso Google su approvazione manuale).
 - 2026-09-28 — Progetto sulla Scrivania (richiesta utente); lavoro sempre su `main`.
 - 2026-09-28 — Contenuti di terzi grezzi e MetaHuman generati esclusi da git (quota LFS gratuita 10 GiB); si riscaricano/rigenerano dagli script.
+- 2026-09-28 — Cielo: nebulosa dipinta sulla sfera (shader world Cycles) invece che volumetrica: più controllabile, 8K in 14 s, strutture nitide.
+- 2026-09-28 — Geometria: gusci dei moduli costruiti a prismi per lato (niente booleane sui gusci: la Manifold lasciava facce spurie).
+- 2026-09-28 — Esposizione: cielo con compensazione parziale dell'adattamento (stelle visibili anche da interni illuminati, scelta artistica).
