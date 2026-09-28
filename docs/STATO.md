@@ -225,6 +225,17 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
   - poi `astra.planet go` (a piedi al campo), oppure Falcon + `astra.fly.face planet` + `AstraDescend`;
   - misure: `tools/perf/run_perf.sh /Game/ASTRA/Maps/L_Bridge 1500 1920 1080 -astra_world=Cassia+blue_white+ice+Cassia_Prime`.
 
+## Scafi: luci di navigazione e nome
+- [x] **Luci di navigazione** su ogni nave e velivolo (`UAstraNavLights`):
+  - posizioni lette dalla forma vera di ogni scafo (`tools/ue_scripts/extract_nav_lights.py` → `data/ship/nav_lights.json`);
+  - rossa a babordo, verde a dritta, bianca a poppa, lampeggiatore bianco doppio in cima, rosso pulsante sotto;
+  - il Mandate viaggia al buio con una sola luce rossa pulsante;
+  - le luci restano grandi qualche pixel anche lontano, così una flotta si legge contro le stelle.
+- [x] **Nome sullo scafo dell'Aquila**:
+  - «ASN AQUILA · CVC-01» con l'emblema della ASTRA Navy, su entrambi i fianchi verso prua, sotto la fascia blu;
+  - decal `M_ASTRA_HullDecal`/`MI_HULL_Name_Aquila`, texture da `tools/art/hull_markings.py` (Barlow Condensed, OFL), `tools/ue_scripts/make_hull_decals.py`;
+  - due lezioni: un decal di UE stende la larghezza della texture lungo il suo asse Z (va ruotato di un quarto di giro); una texture usata solo da decal creati a runtime va resa residente (`SetForceMipLevelsToBeResident`), altrimenti resta al mip più sfocato.
+
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
 - [x] Vice Admiral Adrian Rourke, comandante della Settima Flotta: trasmette gli ordini, risponde quando l'Aquila chiama la flotta, può concedere rinforzi o rifornimento
@@ -240,7 +251,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] **Umore dell'equipaggio**: a ogni svolta il regista scrive come si sente la plancia e perché, nominando gli ufficiali (lutto per i caduti, orgoglio, stanchezza, dubbi su un ordine, rabbia), e lo fa evolvere di beat in beat (salvato in `story.json`). Colora il modo in cui gli ufficiali parlano senza mai dichiararlo, e affiora nei momenti di quiete. Esempio reale dopo la prima battaglia: *«Exhausted but proud… Grief for the Vigilant sits under everything — Mensah's repair gangs work in silence, Price counts seven Hammers where there were eight»*; alla domanda sul morale Serra risponde «stanchi, ma orgogliosi di aver tenuto Aurelia. Il dolore per il Vigilant è ancora aperto…»
 
 ## Prossimi passi
-1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
+1. Dettagli sugli scafi: nomi sulle navi di scorta, segni di battaglia (bruciature come decal), caccia visti dall'hangar.
 2. Altri ponti: mensa (l'equipaggio fuori servizio), armeria; ufficiali che vengono a parlare col Capitano in cabina; volti veri per l'equipaggio (MetaHuman); esterno della plancia (scatola e corridoi ancora grezzi da fuori).
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
 4. Mondi generati oltre: guarnigioni a terra (mezzi visibili, cattura), edifici più vari e luci della città; preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.

@@ -104,6 +104,8 @@ La frontiera tra i Core Worlds e gli Outer Worlds. Undici sistemi, ognuno con il
 
 ## 6. La tua nave: ASN Aquila
 - **Classe:** *Aquila*-class carrier cruiser, la prima della classe. Lunga 780 m, 12 ponti.
+- **Numero di scafo:** **CVC-01** (carrier cruiser, prima unità). Sui fianchi, verso prua e sotto la fascia blu della livrea: l'emblema della ASTRA Navy, «ASN AQUILA» e il numero.
+- **Luci di navigazione:** rossa a babordo e verde a dritta, bianca a poppa, rossa pulsante sotto la chiglia (sull'Aquila niente lampeggiatore in cima: sta sopra la plancia). Le navi del Mandate viaggiano al buio, con una sola luce rossa pulsante.
 - **Equipaggio:** 420 persone, più 60 piloti e 80 fanti di marina.
 - **Armamento:**
   - 4 twin railgun turrets

@@ -10,6 +10,9 @@
 #include "AstraQuarters.h"
 #include "AstraWorldGen.h"
 #include "AstraWorldSurface.h"
+#include "AstraNavLights.h"
+#include "Components/DecalComponent.h"
+#include "Engine/Texture2D.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -316,6 +319,41 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 			if (Slot != INDEX_NONE && !RadiatorGlow)
 			{
 				RadiatorGlow = C->CreateDynamicMaterialInstance(Slot);   // her radiators glow with her heat (TickHeat)
+			}
+			if (!It->FindComponentByClass<UAstraNavLights>())
+			{
+				// her running lights (no strobe over the bridge: the Captain looks out of it)
+				UAstraNavLights* NL = NewObject<UAstraNavLights>(*It);
+				NL->SetupAttachment(It->GetRootComponent());
+				NL->RegisterComponent();
+				NL->Setup(M->GetName(), M->GetName().Contains(TEXT("MANDATE")), M->GetName() == TEXT("SM_SHIP_ASTRA_Aquila"));
+			}
+			if (M->GetName() == TEXT("SM_SHIP_ASTRA_Aquila") && !It->FindComponentByClass<UDecalComponent>())
+			{
+				// her name and hull number on both flanks, forward of amidships where the plating runs flat and
+				// vertical (x 150-210 m, 50.5 m out, under the blue livery band; tools/art/hull_markings.py,
+				// tools/ue_scripts/make_hull_decals.py)
+				if (UMaterialInterface* NameMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/Instances/MI_HULL_Name_Aquila.MI_HULL_Name_Aquila")))
+				{
+					// the streamer does not see decals made at run time: without this the name stays at its blurriest mip
+					if (UTexture2D* Tex = LoadObject<UTexture2D>(nullptr, TEXT("/Game/ASTRA/Materials/Textures/T_HULL_Name_Aquila.T_HULL_Name_Aquila")))
+					{
+						Tex->SetForceMipLevelsToBeResident(1.0e7f);
+					}
+					for (const float Side : {-1.f, 1.f})
+					{
+						UDecalComponent* D = NewObject<UDecalComponent>(*It);
+						D->SetupAttachment(It->GetRootComponent());
+						D->SetDecalMaterial(NameMat);
+						// a decal projects along its X and lays the texture's width along its Z: rolled a quarter turn so
+						// the name runs along the hull, read the right way up from outside (bow to stern on the port side)
+						D->DecalSize = FVector(400.f, 875.f, 3500.f);   // 8 m deep, 17.5 m high, 70 m long
+						D->SetRelativeLocation(FVector(18000.f, Side * 5050.f, -800.f));   // under the livery band
+						D->SetRelativeRotation(FRotator(0.f, Side < 0.f ? 90.f : -90.f, 90.f));
+						D->SetFadeScreenSize(0.f);
+						D->RegisterComponent();
+					}
+				}
 			}
 		}
 	}

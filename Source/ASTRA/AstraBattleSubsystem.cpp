@@ -3,6 +3,7 @@
 #include "AstraBattleSubsystem.h"
 
 #include "ASTRA.h"
+#include "AstraNavLights.h"
 #include "AstraShipSubsystem.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -223,6 +224,12 @@ void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 	C->SetCastShadow(false);          // km-scale shadows are invisible and cost VSM pages
 	C->bAffectDynamicIndirectLighting = false;
 	C->SetLightingChannels(true, true, false);   // outside the hull: the planet's light reaches it too
+	{
+		UAstraNavLights* NL = NewObject<UAstraNavLights>(S.Actor);
+		NL->SetupAttachment(S.Actor->GetRootComponent());
+		NL->RegisterComponent();
+		NL->Setup(S.Mesh, S.Side == EAstraSide::Mandate);
+	}
 	if (SphereMesh && ShellMat && !S.bCraft)
 	{
 		S.ShieldBubble = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, P);
