@@ -2,6 +2,8 @@
 
 #include "AstraMindSubsystem.h"
 
+#include "Camera/PlayerCameraManager.h"
+
 #include "ASTRA.h"
 #include "AstraCrewMember.h"
 #include "AstraShipSubsystem.h"
@@ -297,12 +299,27 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 	else if (Type == TEXT("audio_begin"))
 	{
 		const int32 Id = (int32)Msg->GetNumberField(TEXT("line"));
-		if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Msg->GetStringField(TEXT("speaker"))))
+		AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Msg->GetStringField(TEXT("speaker")));
+		// an officer the Captain can hear in person speaks from their station; one far away (the Captain on the flight
+		// deck, in a Falcon, down on New Ravenna) comes over the intercom or the radio
+		bool bNear = false;
+		if (Crew)
+		{
+			if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(GameWorld(), 0))
+			{
+				bNear = FVector::Dist(Cam->GetCameraLocation(), Crew->GetActorLocation()) < 2500.f;
+			}
+		}
+		if (Crew && bNear)
 		{
 			Crew->BeginLine(Id, (int32)Msg->GetNumberField(TEXT("rate")));
 		}
 		else
 		{
+			if (Crew)
+			{
+				LineSpeakers.Remove(Id);   // not a spoken line at the station: its audio goes to the radio
+			}
 			BeginChannelLine(Id, (int32)Msg->GetNumberField(TEXT("rate")));
 		}
 	}
