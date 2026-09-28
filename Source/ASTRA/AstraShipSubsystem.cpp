@@ -699,6 +699,10 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	{
 		return Battle ? Battle->PlayerCeaseFire(OutDetail) : false;
 	}
+	if (Name == TEXT("fleet_request"))
+	{
+		return Battle ? Battle->FleetRequest(Str(TEXT("ship")), Str(TEXT("request")), Str(TEXT("target")), OutDetail) : false;
+	}
 	if (Name == TEXT("mandate_tactics"))
 	{
 		return Battle ? Battle->EnemyTactics(Args, OutDetail) : false;

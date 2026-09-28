@@ -85,6 +85,15 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "message": {"type": "string", "description": "What we transmit, in English (the Interpreter translates)"}},
         ["contact_id", "intent", "message"]),
     _fn("end_transmission", "Communications: close the open channel (e.g. with an enemy commander).", {}, []),
+    _fn("fleet_request", "Communications: pass the Captain's request to the friendly warships in company (the 7th "
+                         "Fleet ships on the plot) by fleet datalink; they acknowledge and act at once.", {
+        "ship": {"type": "string", "description": "contact id of one friendly warship (e.g. T-01) or 'all'"},
+        "request": {"type": "string", "enum": ["focus_fire", "engage_freely", "cover_us", "close_in", "stand_off", "hold_fire"],
+                    "description": "focus_fire: concentrate on the target; engage_freely: pick their own targets; "
+                                   "cover_us: stay between the Aquila and the enemy; close_in: knife-fight range; "
+                                   "stand_off: hold at railgun range, out of the enemy's lasers; hold_fire: cease fire"},
+        "target": {"type": "string", "description": "focus_fire: the contact id to concentrate on"}},
+        ["ship", "request"]),
     _fn("holo_display", "Science & Sensors: what the holo table in the middle of the bridge shows — the tactical plot "
                         "(the battle around the Aquila) or the sector map (the systems of the March, who holds them, "
                         "the gate links, where the Aquila is).", {

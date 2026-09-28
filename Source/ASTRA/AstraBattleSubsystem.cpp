@@ -650,14 +650,15 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 		S.TargetId = T ? T->Id : -1;
 		S.Mode = T ? EAstraShipMode::Attack : EAstraShipMode::Cruise;
 	}
-	// the commander's focus of fire (datalink orders) wins over "the nearest"
-	if (S.Side == EAstraSide::Mandate && S.OrderTarget >= 0 && S.Mode == EAstraShipMode::Attack)
+	// the commander's focus of fire (datalink orders; the fleet: the Captain's request) wins over "the nearest"
+	if ((S.Side == EAstraSide::Mandate || bFleet) && S.OrderTarget >= 0 && (S.Mode == EAstraShipMode::Attack || S.Mode == EAstraShipMode::Cruise))
 	{
 		FAstraBattleShip* F = FindById(S.OrderTarget);
 		if (F && Engageable(*F))
 		{
 			T = F;
 			S.TargetId = F->Id;
+			S.Mode = EAstraShipMode::Attack;
 		}
 		else
 		{
@@ -695,6 +696,12 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 			const FVector Weak = !T->ShieldFacing.IsNearlyZero() ? T->Att.RotateVector(-T->ShieldFacing.GetSafeNormal())
 			                                                     : T->Att.GetRightVector() * ((S.Id % 2) ? 1.f : -1.f);
 			Goal = T->Pos + Weak * Pref;
+		}
+		else if (S.Stance == 4 && bFleet)
+		{
+			// cover the Aquila: between her and the enemy, off her beam
+			const FVector Out = (T->Pos - Ships[0].Pos).GetSafeNormal();
+			Goal = Ships[0].Pos + Out * 2.2f * OneKm + FVector::CrossProduct(Out, FVector::UpVector).GetSafeNormal() * ((S.Id % 2) ? 0.9f : -0.9f) * OneKm;
 		}
 		else if (S.Stance == 4)
 		{
@@ -1416,6 +1423,65 @@ bool UAstraBattleSubsystem::EnemyTactics(const TSharedPtr<FJsonObject>& Args, FS
 	                            Salvo ? *FString::Printf(TEXT(" (%d in the salvo)"), Salvo) : TEXT(""),
 	                            Launched ? *FString::Printf(TEXT(", %d fighters launching"), Launched) : TEXT(""));
 	UE_LOG(LogASTRA, Log, TEXT("[Battle] Mandate tactics: %s"), *OutDetail);
+	return true;
+}
+
+bool UAstraBattleSubsystem::FleetRequest(const FString& Ship, const FString& Request, const FString& Target, FString& OutDetail)
+{
+	const FString R = Request.ToLower();
+	const bool bAll = Ship.IsEmpty() || Ship.Equals(TEXT("all"), ESearchCase::IgnoreCase);
+	TArray<FAstraBattleShip*> Fleet;
+	for (FAstraBattleShip& S : Ships)
+	{
+		if (S.bAlive && S.Side == EAstraSide::Astra && !S.bPlayer && !S.bCraft &&
+		    (bAll || S.ContactId.Equals(Ship, ESearchCase::IgnoreCase) || S.Name.Contains(Ship, ESearchCase::IgnoreCase)))
+		{
+			Fleet.Add(&S);
+		}
+	}
+	if (Fleet.Num() == 0)
+	{
+		OutDetail = bAll ? TEXT("no friendly warship in company") : FString::Printf(TEXT("no friendly warship '%s' in company"), *Ship);
+		return false;
+	}
+	const FAstraBattleShip* T = nullptr;
+	if (R == TEXT("focus_fire"))
+	{
+		T = FindByContact(Target.ToUpper());
+		if (!T || !T->bAlive || !T->bHostile || T->bCraft)
+		{
+			OutDetail = FString::Printf(TEXT("focus fire needs a hostile warship on the plot ('%s' is not one)"), *Target);
+			return false;
+		}
+	}
+	for (FAstraBattleShip* S : Fleet)
+	{
+		if (R == TEXT("focus_fire")) { S->OrderTarget = T->Id; S->bHoldFire = false; }
+		else if (R == TEXT("engage_freely")) { S->OrderTarget = -1; S->Stance = 0; S->bHoldFire = false; }
+		else if (R == TEXT("cover_us")) { S->Stance = 4; S->bHoldFire = false; }
+		else if (R == TEXT("close_in")) { S->Stance = 1; S->bHoldFire = false; }
+		else if (R == TEXT("stand_off")) { S->Stance = 2; S->bHoldFire = false; }
+		else if (R == TEXT("hold_fire")) { S->bHoldFire = true; S->OrderTarget = -1; }
+		else
+		{
+			OutDetail = FString::Printf(TEXT("unknown request '%s'"), *Request);
+			return false;
+		}
+		if (!S->bHoldFire && S->Mode == EAstraShipMode::Cruise && (T || R != TEXT("engage_freely")))
+		{
+			S->Mode = EAstraShipMode::Attack;
+		}
+	}
+	TArray<FString> Names;
+	for (const FAstraBattleShip* S : Fleet) { Names.Add(S->Name); }
+	const FString What = R == TEXT("focus_fire") ? FString::Printf(TEXT("shifting fire to the %s (%s)"), *T->Name, *T->ContactId)
+	                   : R == TEXT("engage_freely") ? FString(TEXT("engaging targets of opportunity"))
+	                   : R == TEXT("cover_us") ? FString(TEXT("moving to cover the Aquila, between us and the enemy"))
+	                   : R == TEXT("close_in") ? FString(TEXT("closing to knife-fight range"))
+	                   : R == TEXT("stand_off") ? FString(TEXT("holding at railgun range, out of their lasers"))
+	                   : FString(TEXT("holding fire"));
+	OutDetail = FString::Printf(TEXT("%s acknowledge%s: %s"), *FString::Join(Names, TEXT(" and ")), Names.Num() == 1 ? TEXT("s") : TEXT(""), *What);
+	UE_LOG(LogASTRA, Log, TEXT("[Battle] fleet request: %s"), *OutDetail);
 	return true;
 }
 

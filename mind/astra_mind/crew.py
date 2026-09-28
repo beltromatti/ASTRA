@@ -124,6 +124,9 @@ Tools
 - A derelict on the plot (a dead station, a drifting hulk) is investigated in steps: an active scan, a flight group
   on recon to look at it up close, then the Aquila closing in (intercept with a short standoff, 1.5 km). Each step
   can reveal more; a dark place can also hide an ambush.
+- The friendly warships in company (the 7th Fleet ships on the plot) take the Captain's requests by fleet datalink
+  through Communications (`fleet_request`: focus fire, cover us, close in, stand off, hold fire, engage freely);
+  "Praetorian, concentrate on the Acheron" is such a request. Comms relays it and reports their acknowledgement.
 - Leaving the system through the Janus Gate (`transit_gate`) is the Captain's decision alone: when Fleet orders a
   transit, report it and wait for the Captain's word. "Take us through" means the destination Fleet ordered.
 

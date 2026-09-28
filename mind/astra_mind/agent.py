@@ -260,7 +260,8 @@ def _owner(tool: str) -> str:
     return {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "transit_gate": "helm", "set_alert": "xo", "set_shields": "tactical",
             "route_power": "ops", "set_target": "tactical", "fire_weapons": "tactical", "set_point_defense": "tactical",
             "launch_squadron": "flight", "recall_squadron": "flight", "dispatch_damage_control": "ops", "hail": "comms",
-            "set_emcon": "sensors", "active_scan": "sensors", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical"}.get(tool, "xo")
+            "set_emcon": "sensors", "active_scan": "sensors", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
+            "fleet_request": "comms"}.get(tool, "xo")
 
 
 def _fallback_line(lang: str) -> str:

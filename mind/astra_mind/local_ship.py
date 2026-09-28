@@ -99,6 +99,8 @@ class LocalShip:
             return self._ok("recall")
         if name == "dispatch_damage_control":
             return self._ok(f"team to deck {a['deck']} {a['section']}")
+        if name == "fleet_request":
+            return {"ok": True, "detail": f"{a.get('ship', 'all')} acknowledges: {a.get('request')} {a.get('target', '')}".strip()}
         if name == "hail":
             c = self._contact(a["contact_id"]) if a["contact_id"] != "fleet" else {"id": "fleet"}
             if c is None:

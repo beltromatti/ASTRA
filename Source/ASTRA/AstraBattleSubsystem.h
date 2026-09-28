@@ -93,9 +93,9 @@ struct FAstraBattleShip
 	bool bLeader = false;                // leads its group (the commander on the channel)
 	bool bDerelict = false;              // a dead station or hulk to investigate: no power, tumbling slowly
 	float SpinDeg = 0.f;
-	// the Mandate commander's tactical orders, by datalink: where the fire goes, how to fight, the missiles
+	// tactical orders by datalink (the Mandate commander's to their ships, the Captain's requests to the fleet)
 	int32 OrderTarget = -1;              // ship id to concentrate on (-1: the nearest)
-	uint8 Stance = 0;                    // 0 standard, 1 close, 2 standoff, 3 flank, 4 screen
+	uint8 Stance = 0;                    // 0 standard, 1 close, 2 standoff, 3 flank, 4 screen (the fleet: cover the Aquila)
 	bool bSalvo = false;                 // empty the cells at the next chance (all together: saturate point defence)
 	bool bConserve = false;              // fire missiles sparingly
 
@@ -289,6 +289,9 @@ public:
 	 *  (standard | close | standoff | flank | screen), missiles (normal | salvo | conserve), fighters (launch | hold),
 	 *  optionally only some ships. What the Aquila's sensors can see of it is reported to the bridge. */
 	bool EnemyTactics(const TSharedPtr<FJsonObject>& Args, FString& OutDetail);
+	/** The Captain's request to the friendly warships in company (by fleet datalink): focus_fire (target), engage_freely,
+	 *  cover_us, close_in, stand_off, hold_fire. Ship: a contact id or "all". */
+	bool FleetRequest(const FString& Ship, const FString& Request, const FString& Target, FString& OutDetail);
 	/** Contact id of the ship whose captain commands the Mandate forces now: the group leader, else the biggest ship left. */
 	FString MandateCommander() const;
 	/** The war director's next beat (from the mind): raid | distress | reinforcements | resupply | calm. Contact ids are

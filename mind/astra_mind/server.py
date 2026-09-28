@@ -91,7 +91,7 @@ _CREW_ADDRESS = _re.compile(
     r"^\W*(serra|ferri|tanaka|voss|martin|nair|mensah|price|numero uno|primo ufficiale|xo|comandante|timon\w*|helm\w*|"
     r"tattic\w*|tactical|ops|operazion\w*|operations|comunicazion\w*|comms?|sensor\w*|scienz\w*|ingegner\w*|"
     r"engineering|volo|flight|plancia|bridge|number one|chiud\w* (il )?canale|close (the )?channel|fine trasmissione|"
-    r"end transmission)\b", _re.I)
+    r"end transmission|praetorian|vigilant|flotta|fleet|scorta|escort)\b", _re.I)
 
 
 def addressed_to_crew(text: str) -> bool:
