@@ -486,11 +486,152 @@ def tactical_strip():
     return s.save("Tactical")
 
 
+# ---------------------------------------------------------------- the Medbay (Deck 6)
+TEAL = DEPT["medical"]
+YELLOW = (240, 214, 90)
+
+
+def _trace(s: Screen, x0, y0, w, h, kind, rate, color, rng, gap=0.62, width=2, irregular=0.0):
+    """A monitor waveform sweeping left to right, the fresh part bright and a short blank gap where the sweep is."""
+    pts = []
+    beat = 1.0 / rate
+    t = 0.0
+    phase = rng.random()
+    for i in range(int(w)):
+        u = i / w
+        t = u * 4.0 + phase                       # four seconds across the screen
+        b = (t % beat) / beat
+        if kind == "ecg":
+            jit = 1.0 + irregular * math.sin(7.3 * math.floor(t / beat))
+            b = min(1.0, b * jit)
+            v = (0.12 * math.exp(-((b - 0.16) / 0.035) ** 2) - 0.14 * math.exp(-((b - 0.285) / 0.012) ** 2)
+                 + 1.0 * math.exp(-((b - 0.305) / 0.012) ** 2) - 0.25 * math.exp(-((b - 0.33) / 0.013) ** 2)
+                 + 0.28 * math.exp(-((b - 0.56) / 0.06) ** 2))
+        elif kind == "pleth":
+            v = 0.9 * math.exp(-((b - 0.25) / 0.09) ** 2) + 0.35 * math.exp(-((b - 0.5) / 0.08) ** 2) + 0.1
+        else:   # respiration: slow, a sine that breathes
+            v = 0.5 + 0.45 * math.sin(2 * math.pi * t / (beat * 1.0))
+        pts.append((x0 + i, y0 + h * (0.78 - 0.62 * v)))
+    cut = int(gap * len(pts))
+    s.line(pts[:cut], fill=color, width=width)
+    dim = tuple(int(c * 0.55) for c in color)
+    if cut + 18 < len(pts):
+        s.line(pts[cut + 18:], fill=dim, width=width)
+
+
+def med_vitals(critical=False):
+    """The bedside monitor of a patient: ECG, pleth, respiration; the numbers on the right (a critical patient: alarms)."""
+    s = Screen(w=1024, h=640, dept="medical", seed=301 if not critical else 302)
+    s.d.rectangle(s.P(0, 0, 1024, 640), fill=(2, 5, 8))
+    s.d.rectangle(s.P(0, 0, 1024, 40), fill=(40, 6, 6) if critical else (5, 16, 18))
+    s.text(18, 8, "PATIENT MONITOR", F_TITLE(24), fill=TEXT)
+    s.text(1006, 12, "MEDBAY · DECK 6 · ASN AQUILA", F_MONO(14), fill=TEAL, anchor="ra")
+    if critical:
+        s.d.rectangle(s.P(360, 6, 700, 34), fill=(200, 30, 20))
+        s.text(530, 8, "!! ALARM · HR HIGH · SPO2 LOW", F_MONO_B(17), fill=(255, 235, 225), anchor="ma")
+    hr, spo2, rr = (131, 88, 26) if critical else (78, 97, 15)
+    rows = [("II", "ecg", hr / 60.0, GREEN), ("PLETH", "pleth", hr / 60.0, CYAN), ("RESP", "resp", rr / 60.0, YELLOW)]
+    for k, (lab, kind, rate, col) in enumerate(rows):
+        y = 58 + k * 188
+        s.text(16, y, lab, F_MONO(15), fill=col)
+        s.line([(16, y + 176), (690, y + 176)], fill=(14, 30, 34))
+        _trace(s, 16, y + 18, 674, 150, kind, rate, col, s.rng, gap=0.58 + 0.08 * k, width=3 if kind == "ecg" else 2,
+               irregular=0.35 if (critical and kind == "ecg") else 0.0)
+    s.line([(706, 50), (706, 620)], fill=(14, 30, 34), width=2)
+    red = (255, 70, 50)
+    nums = [("HR", "bpm", str(hr), red if critical else GREEN, 96), ("SpO2", "%", str(spo2), red if critical else CYAN, 84),
+            ("NIBP", "mmHg", "86/50" if critical else "118/76", TEXT, 52), ("RR", "rpm", str(rr), AMBER if critical else YELLOW, 52),
+            ("TEMP", "°C", "38.9" if critical else "37.2", AMBER if critical else TEXT, 44)]
+    y = 54
+    for lab, unit, val, col, size in nums:
+        s.text(724, y, lab, F_LABEL(20), fill=col)
+        s.text(1006, y + 4, unit, F_MONO(13), fill=DIM, anchor="ra")
+        s.text(1006, y + 22, val, F_MONO_B(size), fill=col, anchor="ra")
+        y += 30 + int(size * 1.15)
+    s.footer("VENTILATED · SEDATED · ESCALATE TO SURGEON" if critical else "MONITORING · ALARMS ARMED", color=red if critical else GREEN)
+    return s.save("Med_VitalsCritical" if critical else "Med_Vitals")
+
+
+def med_standby():
+    s = Screen(w=1024, h=640, dept="medical", seed=303)
+    s.d.rectangle(s.P(0, 0, 1024, 640), fill=(2, 5, 8))
+    cx, cy = 512, 260
+    s.d.rectangle(s.P(cx - 22, cy - 70, cx + 22, cy + 70), fill=(14, 60, 58))     # the medical cross, dim
+    s.d.rectangle(s.P(cx - 70, cy - 22, cx + 70, cy + 22), fill=(14, 60, 58))
+    s.text(cx, 380, "BED READY", F_TITLE(46), fill=(60, 130, 125), anchor="ma")
+    s.text(cx, 446, "MEDBAY · DECK 6 · SECTION C", F_MONO(18), fill=(30, 70, 70), anchor="ma")
+    return s.save("Med_Standby")
+
+
+def med_ward():
+    """The ward's board on the central console: casualties by deck, triage, blood and supplies, the watch."""
+    s = Screen(w=2048, h=640, dept="medical", title="Medbay · Ward Board", sub="DECK 6 · SECTION C · 12 BEDS · 1 THEATRE", seed=304)
+    s.panel(24, 64, 700, 600, "Casualties by deck")
+    for d in range(1, 13):
+        y = 104 + (d - 1) * 40
+        s.text(44, y, f"DECK {d:02d}", F_MONO(16), fill=TEXT)
+        n = [0, 0, 1, 0, 2, 0, 1, 3, 1, 0, 2, 0][d - 1]
+        for k in range(n):
+            s.d.rectangle(s.P(160 + k * 34, y + 2, 188 + k * 34, y + 24), fill=[RED, AMBER, GREEN][(d + k) % 3])
+        s.line([(160, y + 30), (680, y + 30)], fill=(16, 34, 44))
+    s.panel(724, 64, 1324, 600, "Triage")
+    for k, (lab, col, note) in enumerate((("CRITICAL", RED, "THEATRE / VENTILATOR"), ("SERIOUS", AMBER, "BEDSIDE CARE"),
+                                          ("STABLE", GREEN, "OBSERVATION"), ("RETURNED TO DUTY", CYAN, "CLEARED BY CMO"))):
+        y = 110 + k * 116
+        s.d.rectangle(s.P(748, y, 764, y + 76), fill=col)
+        s.text(784, y + 2, lab, F_TITLE(34), fill=TEXT)
+        s.text(784, y + 48, note, F_MONO(15), fill=DIM)
+    s.panel(1348, 64, 2024, 600, "Blood · supplies · watch")
+    items = [("WHOLE BLOOD O-", 0.62), ("PLASMA", 0.8), ("SYNTH-SKIN (BURNS)", 0.41), ("NANO-SUTURE", 0.73), ("ANALGESIA", 0.55),
+             ("OXYGEN", 0.9)]
+    for k, (lab, f) in enumerate(items):
+        s.bar(1372, 108 + k * 70, 628, 16, f, lab, f"{int(f * 100)} %", color=TEAL, warn=2, crit=2)
+    s.text(1372, 540, "ON WATCH  CMO LINDQVIST · 3 NURSES · 2 MEDICS", F_MONO(16), fill=TEAL)
+    s.footer("THEATRE READY · STERILE FIELD OK", color=GREEN)
+    return s.save("Med_Ward")
+
+
+def med_scan():
+    """The diagnostic scanner's display: a body in outline, the scan band, findings."""
+    s = Screen(w=1024, h=640, dept="medical", title="Diagnostic Scanner", sub="FULL BODY · TOMOGRAPHIC", seed=305)
+    cx = 300
+    # a body in outline (front view): the right half from the neck down to the crotch, mirrored
+    half = [(16, 150), (18, 168), (60, 180), (84, 196), (96, 230), (104, 300), (110, 360), (118, 420), (122, 446),
+            (116, 470), (102, 452), (96, 420), (88, 360), (80, 300), (72, 250), (66, 238), (64, 280), (58, 330), (64, 380),
+            (68, 410), (62, 470), (54, 530), (48, 580), (52, 600), (22, 600), (24, 580), (22, 520), (14, 450), (0, 424)]
+    outline = [(cx + x, y) for x, y in half] + [(cx - x, y) for x, y in reversed(half[:-1])]
+    s.d.polygon([(x * S, y * S) for x, y in outline], fill=(6, 34, 36), outline=TEAL)
+    s.line(outline + [outline[0]], fill=TEAL, width=2)
+    s.d.ellipse(s.P(cx - 34, 74, cx + 34, 150), fill=(6, 34, 36), outline=TEAL, width=2 * S)             # the head
+    s.line([(cx, 170), (cx, 410)], fill=(20, 110, 105), width=2)                                          # the spine
+    for k in range(6):                                                                                    # the ribs
+        y = 206 + k * 18
+        s.d.arc(s.P(cx - 52 + k * 2, y - 12, cx + 52 - k * 2, y + 26), 200, 340, fill=(20, 110, 105), width=S)
+    s.d.rectangle(s.P(cx - 150, 262, cx + 150, 268), fill=(40, 180, 170))                             # the scan band
+    s.d.ellipse(s.P(cx + 18, 214, cx + 50, 246), outline=AMBER, width=3 * S)                          # a finding
+    s.d.ellipse(s.P(cx - 116, 356, cx - 88, 384), outline=AMBER, width=3 * S)
+    s.panel(560, 64, 1004, 600, "Findings")
+    for k, (lab, val, col) in enumerate((("SKELETAL", "2 FRACTURES", AMBER), ("THORAX", "CONTUSION · NO PNEUMO", AMBER),
+                                          ("CRANIAL", "NO BLEED", GREEN), ("BURNS", "12 % TBSA", AMBER), ("TOXICOLOGY", "CO 9 %", AMBER),
+                                          ("IMPLANT", "INTERPRETER OK", GREEN))):
+        y = 108 + k * 78
+        s.text(584, y, lab, F_LABEL(20), fill=TEXT)
+        s.text(984, y + 28, val, F_MONO(17), fill=col, anchor="ra")
+        s.line([(584, y + 62), (984, y + 62)], fill=(16, 34, 44))
+    s.footer("SCAN 3 OF 3 · REVIEW BY SURGEON", color=TEAL)
+    return s.save("Med_Scan")
+
+
 if __name__ == "__main__":
+    import sys
+    if sys.argv[1:] == ["med"]:   # only the Medbay's screens
+        print("UI_OK", [med_vitals(), med_vitals(critical=True), med_standby(), med_ward(), med_scan()])
+        raise SystemExit
     made = []
     made += helm() + ops() + comms() + sensors() + engineering() + flight()
     for st, dept in (("Helm", "command"), ("Ops", "command"), ("Comms", "command"), ("Sensors", "science"), ("Eng", "engineering"),
                      ("Flight", "flight")):
         made.append(touch_pad(f"{st}_Touch", dept))
     made += [master_display(), holo_plot(), tactical_strip()]
+    made += [med_vitals(), med_vitals(critical=True), med_standby(), med_ward(), med_scan()]
     print("UI_OK", len(made), made)

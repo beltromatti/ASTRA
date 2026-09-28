@@ -135,9 +135,9 @@ La frontiera tra i Core Worlds e gli Outer Worlds. Undici sistemi, ognuno con il
 | Tactical | Lieutenant Commander **Sara Voss** | Nata su un Outer World e disertrice del Mandate. Leale ma tormentata: conosce il nemico meglio di chiunque. |
 | Operations | Lieutenant **Yuki Tanaka** | Precisa, parla per numeri, detesta le sorprese. |
 | Communications | Ensign **Leo Martin** | Giovane al primo imbarco: impara, sbaglia, cresce. |
-| Chief Engineer | Chief Petty Officer **Rashid "Old Man" Okonkwo** | Ha visto tre guerre, parla con il reattore, non lascia mai indietro nessuno. |
+| Chief Engineer | Lieutenant Commander **Emeka "Old Man" Okonkwo** | Ha visto tre guerre, parla con il reattore, non lascia mai indietro nessuno. |
 | CAG (Commander Air Group) | Lieutenant Commander **Ada Kovač**, callsign **"Hex"** | Asso del Falcon, feroce con i suoi piloti. |
-| Chief Medical Officer | **Dr. Irene Lindqvist** | Pragmatica, dice sempre la verità, anche quella che non vuoi sentire. |
+| Chief Medical Officer | Surgeon Commander **Dr. Irene Lindqvist** | Pragmatica, dice sempre la verità, anche quella che non vuoi sentire. |
 | Security & Marines | Major **Tomás Reyes** | Protettivo, diffidente verso Voss. |
 
 **Nemico ricorrente:** l'Archon **Varek Solm**, comandante della flotta d'invasione. Ha perso la famiglia durante il Silence; con lui si può parlare, ma non si può ingannarlo.

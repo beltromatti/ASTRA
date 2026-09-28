@@ -29,16 +29,23 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector HangarLanding = FVector(250.f, 0.f, 20.f);
 
-	/** Main Engineering's landing (world, cm; zero = no third stop). */
+	/** Main Engineering's landing (world, cm; zero = no such stop). */
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector EngineeringLanding = FVector::ZeroVector;
 
-	/** The lift network: which landing the pawn stands at (0 the bridge, 1 the flight deck, 2 Main Engineering, -1 none),
-	 *  and the ride to another (fade, the car's hum, the other deck). */
+	/** The Medbay's landing (world, cm; zero = no such stop). */
+	UPROPERTY(EditAnywhere, Category = "Hangar")
+	FVector MedbayLanding = FVector::ZeroVector;
+
+	/** The lift network: which landing the pawn stands at (0 the bridge, 1 the flight deck, 2 Main Engineering, 3 the
+	 *  Medbay, -1 none), and the ride to another (fade, the car's hum, the other deck). */
+	static constexpr int32 MaxLandings = 4;
 	int32 LiftLandingNear(const APawn* Pawn) const;
 	bool RideLift(APawn* Pawn, int32 ToLanding);
-	int32 NumLandings() const { return EngineeringLanding.IsNearlyZero() ? 2 : 3; }
+	bool HasLanding(int32 Index) const { return Index >= 0 && Index < MaxLandings && !LandingWorld(Index).IsNearlyZero(); }
+	int32 NumLandings() const;
 	bool IsPawnInEngineering(const APawn* Pawn) const;
+	bool IsPawnInMedbay(const APawn* Pawn) const;
 
 	/** The lift call: the Captain is near a landing and presses E. Returns false when no landing is near. */
 	bool TryUseLift(APawn* Pawn);
@@ -65,7 +72,9 @@ private:
 	TMap<FString, TArray<FParked>> Parked;   // squadron -> its craft, in bay order
 	UPROPERTY() TArray<TObjectPtr<ALight>> ZoneLights;
 	UPROPERTY() TArray<TObjectPtr<ALight>> EngLights;
+	UPROPERTY() TArray<TObjectPtr<ALight>> MedLights;
 	bool bEngLightsOn = true;
+	bool bMedLightsOn = true;
 	int32 RideToLanding = -1;
 	FVector LandingWorld(int32 Index) const;
 	UPROPERTY() TObjectPtr<USoundBase> CatapultSound;

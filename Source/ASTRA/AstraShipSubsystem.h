@@ -170,6 +170,9 @@ public:
 	TSharedRef<FJsonObject> SaveJson() const;
 	void ResumeFrom(const TSharedPtr<FJsonObject>& Save);
 
+	/** Testing the Medbay: "admit" N wounded from random hits, or let the doctors' "care" run N minutes. */
+	void TestMedbay(const FString& What, int32 N);
+
 	/** One of our manned aircraft was shot down: who was flying it (for the flight report). */
 	FString AircrewLost() { return Roster.AircrewLost(CasualtyRng); }
 	const FAstraCrewRoster& GetRoster() const { return Roster; }
@@ -210,6 +213,10 @@ private:
 	void CaptureHomeSky();
 	int32 NextDamageId = 1;
 	FAstraCrewRoster Roster;          // the 560 aboard, by name: the crew's cost
+	float CareT = 0.f;                // the Medbay's rounds: every minute the wounded's conditions move on
+	float WardSyncT = 0.f;
+	int32 WardRev = -1;
+	void SyncWard();                  // the beds in the Medbay follow the roster
 	UPROPERTY() TObjectPtr<class AAstraBridgeFX> BridgeFX;   // sparks and arcs on the bridge when we are hit hard
 	FRandomStream CasualtyRng;
 	static constexpr int32 NumDamageTeams = 4;

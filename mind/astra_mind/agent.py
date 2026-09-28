@@ -132,8 +132,8 @@ class BridgeAgent:
             args = call.arguments() or {}
             if call.name == "speak":
                 speaker = args.get("speaker", "xo")
-                if speaker not in CREW:
-                    speaker = "xo"
+                if speaker not in CREW and speaker not in _patients(self.ship.snapshot()):
+                    speaker = "doctor" if str(speaker).startswith("patient") else "xo"
                 line = (args.get("text") or "").strip()
                 if _looks_like_tool(line):
                     log.warning("speak contained a tool invocation, not voiced: %s", line)
@@ -254,6 +254,11 @@ def _parse_prose(content: str) -> tuple[str, str]:
     if m and m.group(1).lower() in CREW:
         return m.group(1).lower(), m.group(2).strip().strip('"«»')
     return "xo", c.strip('"«»')
+
+
+def _patients(state: dict[str, Any]) -> set[str]:
+    """The Medbay's occupied beds (their speaker ids)."""
+    return {p.get("speaker", "") for p in ((state or {}).get("medbay") or {}).get("patients", [])}
 
 
 def _owner(tool: str) -> str:

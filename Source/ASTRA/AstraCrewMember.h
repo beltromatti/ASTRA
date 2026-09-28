@@ -17,7 +17,9 @@ enum class EAstraCrewPosture : uint8
 {
 	Standing,       // idle animation (at a rail, walking later)
 	SeatedConsole,  // on a chair, hands on the console in front
-	SeatedArmchair  // on a chair without a console (XO): forearms on the armrests
+	SeatedArmchair, // on a chair without a console (XO): forearms on the armrests
+	Lying           // in a medbay bed, the backrest raised: the actor's origin is the backrest's hinge on the mattress,
+	                // its +X towards the head of the bed
 };
 
 UCLASS()
@@ -43,6 +45,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "ASTRA")
 	float SeatHipHeight = 62.f;
 
+	/** A woman's body (the placeholder mannequins: Quinn rather than Manny). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ASTRA")
+	bool bFemaleBody = false;
+
+	/** Lying: the backrest's angle (degrees). */
+	UPROPERTY(EditAnywhere, Category = "ASTRA")
+	float ReclineDeg = 20.f;
+
 	/** Starts a new spoken line; PCM16 mono chunks follow through QueueVoice. */
 	void BeginLine(int32 LineId, int32 SampleRate);
 	void QueueVoice(int32 LineId, const uint8* Pcm, int32 NumBytes);
@@ -54,6 +64,10 @@ public:
 
 	/** Something burst right in front of them (their console shorted out): they recoil and shield their face. */
 	void Startle(float Strength);
+
+	/** The placeholder body (a mannequin until the MetaHuman crew), its uniform and its pose; called again when a
+	 *  patient's bed changes hands. */
+	void SetBody(bool bFemale);
 
 protected:
 	virtual void BeginPlay() override;
@@ -90,7 +104,9 @@ private:
 	TArray<FTransform> RefCS;
 	TArray<int32> Parent;
 	FVector Fwd = FVector::YAxisVector, Right = FVector::XAxisVector;
+	bool bBodyFemale = false;
 	void InitSeated();
 	void UpdateSeated(float DeltaSeconds);
+	void ApplyUniform();
 	int32 Bone(const TCHAR* Name) const;
 };

@@ -34,8 +34,13 @@ for path in eal.list_assets(DST, recursive=False, include_folder=False):
     if not isinstance(asset, unreal.StaticMesh) or asset.get_name() not in imported:
         continue
     ns = asset.get_editor_property("nanite_settings")
-    is_glass = "Glass" in asset.get_name()
-    ns.enabled = NANITE and not is_glass  # translucent glass stays non-Nanite
+    # Nanite draws only opaque and masked materials: a mesh with a translucent slot (glass) stays a classic mesh (as a
+    # Nanite mesh it would be drawn from its coarse fallback)
+    slots_mi = [m.get_editor_property("material_interface") for m in asset.get_editor_property("static_materials")]
+    translucent = any(mi and mi.get_base_material().get_editor_property("blend_mode") not in
+                      (unreal.BlendMode.BLEND_OPAQUE, unreal.BlendMode.BLEND_MASKED) for mi in slots_mi)
+    is_glass = "Glass" in asset.get_name() or translucent
+    ns.enabled = NANITE and not is_glass
     asset.set_editor_property("nanite_settings", ns)
     body = asset.get_editor_property("body_setup")
     if body:

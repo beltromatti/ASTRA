@@ -12,8 +12,11 @@ def _fn(name: str, desc: str, props: dict[str, Any], required: list[str]) -> dic
         "type": "object", "properties": props, "required": required, "additionalProperties": False}}}
 
 
-SPEAK = _fn("speak", "An officer speaks aloud on the bridge (one call per line, in speaking order).", {
-    "speaker": {"type": "string", "enum": list(CREW)},
+PATIENTS = [f"patient{i}" for i in range(1, 13)]   # the Medbay's twelve beds (the wounded speak as their bed)
+
+SPEAK = _fn("speak", "Someone aboard speaks aloud: an officer, or a wounded crewman in the Medbay (one call per line, in "
+                     "speaking order).", {
+    "speaker": {"type": "string", "enum": list(CREW) + PATIENTS},
     "text": {"type": "string", "description": "The spoken line, in the Captain's language, max ~25 words"},
     "tone": {"type": "string", "enum": ["calm", "focused", "urgent", "tense", "alarmed", "warm", "dry"]}},
     ["speaker", "text", "tone"])

@@ -35,6 +35,9 @@ SETS = {
     "Meadow": "Ground037",
     "Sand": "Ground054",
     "Snow": "Snow010A",
+    # the medbay's cloth: blankets and curtains (a coarse linen), sheets, pillows and gowns (a fine cotton)
+    "Linen": "Fabric036",
+    "Cotton": "Fabric032",
 }
 
 

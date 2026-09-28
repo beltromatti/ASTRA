@@ -119,6 +119,7 @@ void AASTRAPlayerController::SetupInputComponent()
 		Deck(EKeys::One, 1);
 		Deck(EKeys::Two, 2);
 		Deck(EKeys::Three, 3);
+		Deck(EKeys::Four, 4);
 	}
 
 	// only add IMCs for local player controllers
@@ -297,7 +298,10 @@ namespace
 		TEXT("  WASD, mouse     walk and look\n")
 		TEXT("  Esc             pause · save · menu\n")
 		TEXT("\n")
-		TEXT("ON THE FLIGHT DECK (the lift at the end of the port corridor)\n")
+		TEXT("THE LIFT (at the end of the port corridor)\n")
+		TEXT("  E, then 1-4     Bridge · Medbay · Main Engineering · Flight Deck\n")
+		TEXT("\n")
+		TEXT("ON THE FLIGHT DECK\n")
 		TEXT("  E               beside a Falcon of Alpha: climb in\n")
 		TEXT("  W               on the catapult: launch\n")
 		TEXT("\n")
@@ -317,9 +321,12 @@ namespace
 
 namespace
 {
-	// the lift's decks, by the number on its panel: 1 the bridge (landing 0), 2 Main Engineering (2), 3 the flight deck (1)
-	const int32 DeckLanding[4] = {-1, 0, 2, 1};
-	const TCHAR* DeckName[4] = {TEXT(""), TEXT("BRIDGE  ·  DECK 1"), TEXT("MAIN ENGINEERING  ·  DECK 7"), TEXT("FLIGHT DECK  ·  DECK 9")};
+	// the lift's decks, top to bottom, by the number on its panel: 1 the bridge (landing 0), 2 the Medbay (3), 3 Main
+	// Engineering (2), 4 the flight deck (1)
+	constexpr int32 NumDecks = 4;
+	const int32 DeckLanding[NumDecks + 1] = {-1, 0, 3, 2, 1};
+	const TCHAR* DeckName[NumDecks + 1] = {TEXT(""), TEXT("BRIDGE  ·  DECK 1"), TEXT("MEDBAY  ·  DECK 6"), TEXT("MAIN ENGINEERING  ·  DECK 7"),
+	                                       TEXT("FLIGHT DECK  ·  DECK 9")};
 }
 
 void AASTRAPlayerController::ShowLiftMenu(AAstraHangar* Hangar, int32 From)
@@ -339,8 +346,12 @@ void AASTRAPlayerController::ShowLiftMenu(AAstraHangar* Hangar, int32 From)
 		[
 			SNew(STextBlock).Font(Small).ColorAndOpacity(FLinearColor(0.55f, 0.75f, 1.f)).Text(FText::FromString(TEXT("LIFT  ·  ASN AQUILA")))
 		];
-	for (int32 N = 1; N <= 3; ++N)
+	for (int32 N = 1; N <= NumDecks; ++N)
 	{
+		if (!Hangar->HasLanding(DeckLanding[N]))
+		{
+			continue;
+		}
 		const bool bHere = DeckLanding[N] == From;
 		List->AddSlot().AutoHeight().Padding(0, 4)
 		[
@@ -376,7 +387,7 @@ void AASTRAPlayerController::ChooseDeck(int32 Number)
 {
 	AAstraHangar* H = LiftHangar.Get();
 	CloseLiftMenu();
-	if (H && GetPawn() && Number >= 1 && Number <= 3)
+	if (H && GetPawn() && Number >= 1 && Number <= NumDecks)
 	{
 		H->RideLift(GetPawn(), DeckLanding[Number]);
 	}

@@ -21,6 +21,7 @@ namespace
 {
 	const FName ZoneTag(TEXT("ASTRA.Zone.Hangar"));
 	const FName EngZoneTag(TEXT("ASTRA.Zone.Engineering"));
+	const FName MedZoneTag(TEXT("ASTRA.Zone.Medbay"));
 	const FName CraftTag(TEXT("ASTRA.Hangar.Craft"));
 	constexpr float HangarLength = 16000.f, HangarHalfWidth = 2900.f, HangarHeight = 2200.f;   // cm, with the tubes
 	constexpr float TrackStartX = 4600.f, TubeEndX = 16200.f, TubeY = 1490.f;
@@ -52,6 +53,13 @@ void AAstraHangar::BeginPlay()
 			if (ALight* L = Cast<ALight>(*It))
 			{
 				EngLights.Add(L);
+			}
+		}
+		else if (It->ActorHasTag(MedZoneTag))
+		{
+			if (ALight* L = Cast<ALight>(*It))
+			{
+				MedLights.Add(L);
 			}
 		}
 		else if (It->ActorHasTag(CraftTag))
@@ -116,7 +124,24 @@ void AAstraHangar::SetZoneLights(bool bOn)
 
 FVector AAstraHangar::LandingWorld(int32 Index) const
 {
-	return Index == 0 ? BridgeLanding : (Index == 1 ? GetActorTransform().TransformPosition(HangarLanding) : EngineeringLanding);
+	switch (Index)
+	{
+	case 0: return BridgeLanding;
+	case 1: return GetActorTransform().TransformPosition(HangarLanding);
+	case 2: return EngineeringLanding;
+	case 3: return MedbayLanding;
+	default: return FVector::ZeroVector;
+	}
+}
+
+int32 AAstraHangar::NumLandings() const
+{
+	int32 N = 0;
+	for (int32 i = 0; i < MaxLandings; ++i)
+	{
+		N += HasLanding(i) ? 1 : 0;
+	}
+	return N;
 }
 
 int32 AAstraHangar::LiftLandingNear(const APawn* Pawn) const
@@ -126,8 +151,12 @@ int32 AAstraHangar::LiftLandingNear(const APawn* Pawn) const
 		return -1;
 	}
 	const FVector P = Pawn->GetActorLocation();
-	for (int32 i = 0; i < NumLandings(); ++i)
+	for (int32 i = 0; i < MaxLandings; ++i)
 	{
+		if (!HasLanding(i))
+		{
+			continue;
+		}
 		const FVector L = LandingWorld(i);
 		if (FVector::Dist2D(P, L) < 320.f && FMath::Abs(P.Z - L.Z) < 400.f)
 		{
@@ -147,10 +176,20 @@ bool AAstraHangar::IsPawnInEngineering(const APawn* Pawn) const
 	return D.X < 800.f && D.X > -5000.f && FMath::Abs(D.Y) < 1600.f && D.Z > -600.f && D.Z < 1800.f;
 }
 
+bool AAstraHangar::IsPawnInMedbay(const APawn* Pawn) const
+{
+	if (!Pawn || MedbayLanding.IsNearlyZero())
+	{
+		return false;
+	}
+	const FVector D = Pawn->GetActorLocation() - MedbayLanding;
+	return D.X < 400.f && D.X > -2900.f && FMath::Abs(D.Y) < 950.f && D.Z > -300.f && D.Z < 600.f;
+}
+
 bool AAstraHangar::RideLift(APawn* Pawn, int32 ToLanding)
 {
 	const int32 From = LiftLandingNear(Pawn);
-	if (From < 0 || ToLanding < 0 || ToLanding >= NumLandings() || ToLanding == From)
+	if (From < 0 || !HasLanding(ToLanding) || ToLanding == From)
 	{
 		return false;
 	}
@@ -271,7 +310,8 @@ void AAstraHangar::Tick(float DeltaTime)
 			Rider->SetActorLocation(RideTo + FVector(0, 0, Half), false, nullptr, ETeleportType::TeleportPhysics);
 			if (AController* Ctl = Rider->GetController())
 			{
-				Ctl->SetControlRotation(FRotator(0.f, RideToLanding == 2 ? 180.f : (RideTo.Z < -1000.f ? GetActorRotation().Yaw : 0.f), 0.f));
+				// out of the car facing into the deck: aft into Main Engineering and the Medbay, forward on the others
+				Ctl->SetControlRotation(FRotator(0.f, RideToLanding >= 2 ? 180.f : (RideToLanding == 1 ? GetActorRotation().Yaw : 0.f), 0.f));
 			}
 			SetZoneLights(IsPawnInHangar(Rider.Get()));
 			if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
@@ -293,18 +333,23 @@ void AAstraHangar::Tick(float DeltaTime)
 	{
 		CheckT = 0.25f;
 		SetZoneLights(IsPawnInHangar(UGameplayStatics::GetPlayerPawn(this, 0)));
-		const bool bEng = IsPawnInEngineering(UGameplayStatics::GetPlayerPawn(this, 0));
-		if (bEng != bEngLightsOn)
+		const APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0);
+		auto Zone = [](TArray<TObjectPtr<ALight>>& Lights, bool& bOnNow, bool bIn)
 		{
-			bEngLightsOn = bEng;
-			for (ALight* L : EngLights)
+			if (bIn != bOnNow)
 			{
-				if (L && L->GetLightComponent())
+				bOnNow = bIn;
+				for (ALight* L : Lights)
 				{
-					L->GetLightComponent()->SetVisibility(bEng);
+					if (L && L->GetLightComponent())
+					{
+						L->GetLightComponent()->SetVisibility(bIn);
+					}
 				}
 			}
-		}
+		};
+		Zone(EngLights, bEngLightsOn, IsPawnInEngineering(Me));
+		Zone(MedLights, bMedLightsOn, IsPawnInMedbay(Me));
 		SyncSquadrons();
 	}
 	for (auto& KV : Parked)

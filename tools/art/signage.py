@@ -69,12 +69,12 @@ def emblem(size: int, color=ICE, bg=None) -> Image.Image:
     return img
 
 
-def plate(w: int, h: int, title: str, code: str, accent=(60, 130, 230)) -> Image.Image:
+def plate(w: int, h: int, title: str, code: str, accent=(60, 130, 230), title_scale: float = 0.56) -> Image.Image:
     img = Image.new("RGBA", (w, h), (*PLATE, 255))
     d = ImageDraw.Draw(img)
     d.rectangle((0, 0, w - 1, h - 1), outline=(40, 46, 56, 255), width=4)
     d.rectangle((0, 0, int(h * 0.09), h), fill=(*accent, 255))           # the department's colour bar
-    ft = font(TITLE, int(h * 0.56))
+    ft = font(TITLE, int(h * title_scale))
     fm = font(MONO, int(h * 0.16))
     d.text((int(h * 0.3), h * 0.44), title, font=ft, fill=(*ICE, 255), anchor="lm")
     d.text((w - int(h * 0.18), h * 0.8), code, font=fm, fill=(*DIM, 255), anchor="rm")
@@ -111,8 +111,17 @@ def main():
         pd.polygon(pts, fill=(*ICE, 255))
         p.save(os.path.join(OUT, f"T_SIGN_Door_{side}.png"))
     # the lift between the bridge and the flight deck, and the flight deck's own wall sign
-    for name, title, code in (("Lift_Bridge", "LIFT", "FLIGHT DECK · DECK 9 · PRESS TO CALL"), ("Lift_Hangar", "LIFT", "BRIDGE · DECK 1 · PRESS TO CALL")):
-        plate(1024, 256, title, code, (240, 170, 40)).save(os.path.join(OUT, f"T_SIGN_{name}.png"))
+    for name in ("Lift_Bridge", "Lift_Hangar"):
+        plate(1024, 256, "LIFT", "DECKS 1 · 6 · 7 · 9 · PRESS TO CALL", (240, 170, 40)).save(os.path.join(OUT, f"T_SIGN_{name}.png"))
+    # the rooms the lift opens into: their names over the doors
+    plate(1024, 256, "MAIN ENGINEERING", "DECK 7 · SECTION F", (240, 170, 40), title_scale=0.42).save(os.path.join(OUT, "T_SIGN_Room_Engineering.png"))
+    med = plate(1024, 256, "MEDBAY", "DECK 6 · SECTION C", (46, 196, 182))
+    md = ImageDraw.Draw(med)
+    cx, cy, a, b = 1024 - 150, 100, 20, 62            # the medical cross: universal, white on teal
+    md.rectangle((cx - 78, cy - 78, cx + 78, cy + 78), fill=(46, 196, 182, 255))
+    md.rectangle((cx - a, cy - b, cx + a, cy + b), fill=(*ICE, 255))
+    md.rectangle((cx - b, cy - a, cx + b, cy + a), fill=(*ICE, 255))
+    med.save(os.path.join(OUT, "T_SIGN_Room_Medbay.png"))
     w2, h2 = 2048, 512
     fd = Image.new("RGBA", (w2, h2), (*PLATE, 255))
     dd = ImageDraw.Draw(fd)

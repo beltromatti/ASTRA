@@ -1,0 +1,32 @@
+{
+  "id": "aquila_medbay",
+  "name": "Medbay · Deck 6 · Section C",
+  "signage": "DECK 6 · SECTION C · MEDBAY",
+  "frame": "Unreal convention: X forward, Y starboard, Z up; metres; origin = deck level at the centre of the forward wall, where the lift opens; the ward runs aft (negative x)",
+  "world_origin": [-232.0, 0.0, -54.0],
+  "world_note": "inside the Aquila's lower hull (hull frame x -60, z +8), forward of Main Engineering and one deck above it; the lift joins it to the bridge corridor, Main Engineering and the flight deck",
+  "length": 30.0,
+  "half_width": 9.0,
+  "height": 4.2,
+  "lift": {"y": 0.0, "width": 3.0, "height": 3.2},
+  "duty_desk": {"x": -3.6, "y": 5.2, "length": 4.2, "depth": 1.1},
+  "supply_wall": {"x0": -1.2, "x1": -5.2, "side": -1},
+  "beds": {
+    "x": [-6.8, -9.8, -12.8, -15.8, -18.8, -21.8],
+    "y": 7.45,
+    "length": 2.2,
+    "width": 1.05,
+    "mattress_top": 0.64,
+    "hinge_y": 7.6,
+    "recline_deg": 20.0,
+    "note": "six beds a side, the head against the wall; bed k (1-12): port row first, forward to aft (bed 1 at x -6.8 port), then the starboard row"
+  },
+  "central_console": {"x0": -10.2, "x1": -18.4, "half_width": 0.75},
+  "partition": {"x": -23.8, "door_half_width": 1.1},
+  "surgery": {"table": [-27.2, 0.0], "scanner": [-27.0, -5.4], "cabinets_x": -29.6},
+  "crew": [
+    {"station": "doctor", "x": -9.45, "y": 0.35, "yaw": 0.0, "name": "Surgeon Commander Irene Lindqvist", "female": true},
+    {"station": "med_tech1", "x": -3.4, "y": 6.45, "yaw": -90.0, "female": false},
+    {"station": "med_tech2", "x": -16.85, "y": -7.2, "yaw": 0.0, "female": true}
+  ]
+}

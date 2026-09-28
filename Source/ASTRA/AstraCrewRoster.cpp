@@ -58,6 +58,51 @@ namespace
 		return X < 0.45f ? TEXT("Crewman") : X < 0.75f ? TEXT("Petty Officer") : X < 0.83f ? TEXT("Chief Petty Officer")
 		     : X < 0.91f ? TEXT("Ensign") : X < 0.98f ? TEXT("Lieutenant") : TEXT("Lieutenant Commander");
 	}
+
+	// what a hit does to the people in the compartment (the doctors' words): the injury and how bad it usually is
+	struct FRosterInjury { const TCHAR* Text; uint8 Severity; };
+	const FRosterInjury InjBreach[] = {
+		{TEXT("decompression injuries: a collapsed lung, on oxygen"), 2},
+		{TEXT("barotrauma from the breach: burst eardrums and bruised lungs"), 1},
+		{TEXT("struck by debris when the bulkhead failed: a broken leg"), 1},
+		{TEXT("hypoxia from the decompression, now breathing on their own"), 0},
+		{TEXT("a deep scalp wound and a concussion from the blast"), 1},
+		{TEXT("frostbite on both hands from the exposed hull"), 0},
+		{TEXT("thrown against a bulkhead: cracked ribs and internal bleeding"), 2},
+		{TEXT("a crushed hand, caught in a closing pressure door"), 1}};
+	const FRosterInjury InjFire[] = {
+		{TEXT("second-degree burns on the arms and hands"), 1},
+		{TEXT("smoke inhalation and burns to the face"), 1},
+		{TEXT("burns across the back from a burning conduit"), 2},
+		{TEXT("a burned hand and smoke in the lungs"), 0},
+		{TEXT("third-degree burns on both legs"), 2},
+		{TEXT("smoke inhalation, found unconscious at a hatch"), 1}};
+	const FRosterInjury InjConduit[] = {
+		{TEXT("an electrical burn from a shorted conduit"), 0},
+		{TEXT("a heart arrhythmia after a power surge, on the monitor"), 1},
+		{TEXT("coolant burns on the hands and forearms"), 0},
+		{TEXT("a broken wrist, thrown by an arcing conduit"), 0}};
+	const FRosterInjury InjEjection[] = {
+		{TEXT("ejected under fire: a broken arm and cold exposure"), 1},
+		{TEXT("ejected: two compressed vertebrae from the seat, and a concussion"), 1},
+		{TEXT("ejected from a burning cockpit: burns on the neck and a dislocated shoulder"), 1},
+		{TEXT("picked up after an hour adrift: hypothermia and a broken ankle"), 0},
+		{TEXT("ejected at high speed: a fractured pelvis"), 2}};
+	const FRosterInjury InjOther[] = {
+		{TEXT("shrapnel wounds in the side"), 1},
+		{TEXT("a broken arm and heavy bruising"), 0},
+		{TEXT("a concussion and a cut above the eye"), 0}};
+
+	template <int32 N>
+	const FRosterInjury& RosterPickInjury(const FRosterInjury (&Table)[N], FRandomStream& R) { return Table[R.RandHelper(N)]; }
+
+	uint8 RosterConditionFor(uint8 Severity, FRandomStream& R)
+	{
+		int32 C = Severity;
+		const float X = R.FRand();
+		C += X < 0.2f ? 1 : (X > 0.75f ? -1 : 0);
+		return (uint8)FMath::Clamp(C, 0, 2);
+	}
 }
 
 void FAstraCrewRoster::Generate(int32 Seed)
@@ -65,6 +110,7 @@ void FAstraCrewRoster::Generate(int32 Seed)
 	People.Reset();
 	Fallen.Reset();
 	Hurt.Reset();
+	++Rev;
 	FRandomStream R(Seed);
 	TSet<FString> Used;
 	int32 Call = 0;
@@ -73,15 +119,19 @@ void FAstraCrewRoster::Generate(int32 Seed)
 		for (int32 n = 0; n < D.Count; ++n)
 		{
 			FAstraCrewman P;
+			int32 FirstIdx = 0;
 			for (int32 Try = 0; Try < 20; ++Try)
 			{
-				P.First = FirstNames[R.RandHelper(UE_ARRAY_COUNT(FirstNames))];
+				FirstIdx = R.RandHelper(UE_ARRAY_COUNT(FirstNames));
+				P.First = FirstNames[FirstIdx];
 				P.Last = LastNames[R.RandHelper(UE_ARRAY_COUNT(LastNames))];
 				if (!Used.Contains(P.First + P.Last))
 				{
 					break;
 				}
 			}
+			// the first names alternate women's and men's (from "Min-jun", index 76, men's first)
+			P.bFemale = (FirstIdx < 76) == (FirstIdx % 2 == 0);
 			Used.Add(P.First + P.Last);
 			P.Rank = RankFor(D.Kind, R);
 			P.Dept = D.Name;
@@ -96,10 +146,66 @@ void FAstraCrewRoster::Generate(int32 Seed)
 	}
 }
 
-FString FAstraCrewRoster::Casualties(int32 Deck, int32 W, int32 K, FRandomStream& R)
+int32 FAstraCrewRoster::FreeBed() const
+{
+	for (int32 B = 0; B < NumBeds; ++B)
+	{
+		if (InBed(B) < 0)
+		{
+			return B;
+		}
+	}
+	return -1;
+}
+
+int32 FAstraCrewRoster::InBed(int32 Bed) const
+{
+	for (const int32 i : Hurt)
+	{
+		if (People[i].Status == 1 && People[i].Bed == Bed)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+void FAstraCrewRoster::Admit(int32 Index, const FString& Injury, uint8 Condition)
+{
+	FAstraCrewman& P = People[Index];
+	P.Status = 1;
+	P.Injury = Injury;
+	P.Condition = Condition;
+	P.CareMinutes = 0.f;
+	P.Bed = FreeBed();
+	Hurt.AddUnique(Index);
+	++Rev;
+}
+
+void FAstraCrewRoster::Leave(int32 Index)
+{
+	FAstraCrewman& P = People[Index];
+	const int32 Freed = P.Bed;
+	P.Bed = -1;
+	Hurt.Remove(Index);
+	if (Freed >= 0)   // the first one on a cot in the passage gets the bed
+	{
+		for (const int32 j : Hurt)
+		{
+			if (People[j].Status == 1 && People[j].Bed < 0)
+			{
+				People[j].Bed = Freed;
+				break;
+			}
+		}
+	}
+	++Rev;
+}
+
+FString FAstraCrewRoster::Casualties(int32 Deck, int32 W, int32 K, FRandomStream& R, const FString& Cause)
 {
 	TArray<FString> Dead, Injured;
-	auto Pick = [&](int32 Want, uint8 NewStatus, TArray<FString>& Out, TArray<int32>& List)
+	auto Pick = [&](int32 Want, uint8 NewStatus, TArray<FString>& Out)
 	{
 		for (int32 n = 0; n < Want; ++n)
 		{
@@ -117,16 +223,26 @@ FString FAstraCrewRoster::Casualties(int32 Deck, int32 W, int32 K, FRandomStream
 				if (Cand.Num())
 				{
 					const int32 i = Cand[R.RandHelper(Cand.Num())];
-					People[i].Status = NewStatus;
-					List.Add(i);
+					if (NewStatus == 2)
+					{
+						People[i].Status = 2;
+						Fallen.Add(i);
+						++Rev;
+					}
+					else
+					{
+						const FRosterInjury& J = Cause == TEXT("hull breach") ? RosterPickInjury(InjBreach, R) : Cause == TEXT("fire") ? RosterPickInjury(InjFire, R)
+						                 : Cause == TEXT("conduit damage") ? RosterPickInjury(InjConduit, R) : RosterPickInjury(InjOther, R);
+						Admit(i, J.Text, RosterConditionFor(J.Severity, R));
+					}
 					Out.Add(FString::Printf(TEXT("%s (%s, from %s)"), *People[i].Name(), *People[i].Dept, *People[i].Home));
 					break;
 				}
 			}
 		}
 	};
-	Pick(K, 2, Dead, Fallen);
-	Pick(W, 1, Injured, Hurt);
+	Pick(K, 2, Dead);
+	Pick(W, 1, Injured);
 	TArray<FString> Parts;
 	if (Dead.Num())
 	{
@@ -155,9 +271,65 @@ FString FAstraCrewRoster::AircrewLost(FRandomStream& R)
 	}
 	const int32 i = Cand[R.RandHelper(Cand.Num())];
 	const bool bKilled = R.FRand() < 0.55f;
-	People[i].Status = bKilled ? 2 : 1;
-	(bKilled ? Fallen : Hurt).Add(i);
+	if (bKilled)
+	{
+		People[i].Status = 2;
+		Fallen.Add(i);
+		++Rev;
+	}
+	else
+	{
+		const FRosterInjury& J = RosterPickInjury(InjEjection, R);
+		Admit(i, J.Text, RosterConditionFor(J.Severity, R));
+	}
 	return FString::Printf(TEXT("%s %s"), *People[i].Name(), bKilled ? TEXT("killed") : TEXT("ejected, recovered wounded by search and rescue"));
+}
+
+void FAstraCrewRoster::Care(float Minutes, FRandomStream& R, TArray<FNews>& OutNews)
+{
+	const TArray<int32> Ward = Hurt;
+	for (const int32 i : Ward)
+	{
+		FAstraCrewman& P = People[i];
+		if (P.Status != 1)
+		{
+			continue;
+		}
+		P.CareMinutes += Minutes;
+		const float X = R.FRand();
+		const FString Who = FString::Printf(TEXT("%s (%s, from %s)"), *P.Name(), *P.Dept, *P.Home);
+		if (P.Condition >= 2 && P.CareMinutes >= 3.f)
+		{
+			if (X < 0.05f * Minutes)
+			{
+				P.Status = 2;
+				Fallen.Add(i);
+				Leave(i);
+				OutNews.Add({FString::Printf(TEXT("medbay: %s has died of wounds (%s), despite everything the medical team did"), *Who, *P.Injury), true});
+			}
+			else if (X < 0.27f * Minutes)
+			{
+				P.Condition = 1;
+				P.CareMinutes = 0.f;
+				++Rev;
+				OutNews.Add({FString::Printf(TEXT("medbay: %s is out of danger, now serious but stable"), *Who), false});
+			}
+		}
+		else if (P.Condition == 1 && P.CareMinutes >= 4.f && X < 0.25f * Minutes)
+		{
+			P.Condition = 0;
+			P.CareMinutes = 0.f;
+			++Rev;
+			OutNews.Add({FString::Printf(TEXT("medbay: %s is stable and recovering"), *Who), false});
+		}
+		else if (P.Condition == 0 && P.CareMinutes >= 5.f && X < 0.2f * Minutes)
+		{
+			P.Status = 0;
+			P.Injury.Empty();
+			Leave(i);
+			OutNews.Add({FString::Printf(TEXT("medbay: %s discharged, back to duty"), *Who), false});
+		}
+	}
 }
 
 void FAstraCrewRoster::Restore(const TArray<int32>& InFallen, const TArray<int32>& InHurt)
@@ -165,6 +337,10 @@ void FAstraCrewRoster::Restore(const TArray<int32>& InFallen, const TArray<int32
 	for (FAstraCrewman& P : People)
 	{
 		P.Status = 0;
+		P.Bed = -1;
+		P.Injury.Empty();
+		P.Condition = 0;
+		P.CareMinutes = 0.f;
 	}
 	Fallen.Reset();
 	Hurt.Reset();
@@ -180,10 +356,34 @@ void FAstraCrewRoster::Restore(const TArray<int32>& InFallen, const TArray<int32
 	{
 		if (People.IsValidIndex(i) && People[i].Status == 0)
 		{
-			People[i].Status = 1;
-			Hurt.Add(i);
+			Admit(i, TEXT("wounds from the last battle"), 1);
 		}
 	}
+	++Rev;
+}
+
+void FAstraCrewRoster::RestoreCare(int32 Index, const FString& Injury, uint8 Condition, int32 Bed)
+{
+	if (!People.IsValidIndex(Index) || People[Index].Status != 1)
+	{
+		return;
+	}
+	FAstraCrewman& P = People[Index];
+	if (!Injury.IsEmpty())
+	{
+		P.Injury = Injury;
+	}
+	P.Condition = (uint8)FMath::Clamp((int32)Condition, 0, 2);
+	if (Bed >= 0 && Bed < NumBeds && Bed != P.Bed)
+	{
+		const int32 Other = InBed(Bed);   // swap with whoever the order of admission put there
+		if (Other >= 0)
+		{
+			People[Other].Bed = P.Bed;
+		}
+		P.Bed = Bed;
+	}
+	++Rev;
 }
 
 int32 FAstraCrewRoster::NumWounded() const
@@ -202,7 +402,13 @@ FString FAstraCrewRoster::Summary() const
 	{
 		return TEXT("none");
 	}
-	FString Out = FString::Printf(TEXT("%d wounded in the medbay, %d killed"), NumWounded(), NumKilled());
+	int32 ByCond[3] = {0, 0, 0};
+	for (const int32 i : Hurt)
+	{
+		++ByCond[FMath::Min<int32>(People[i].Condition, 2)];
+	}
+	FString Out = FString::Printf(TEXT("%d wounded in the medbay (%d critical, %d serious, %d stable), %d killed"),
+	                              NumWounded(), ByCond[2], ByCond[1], ByCond[0], NumKilled());
 	if (Fallen.Num())
 	{
 		TArray<FString> Names;

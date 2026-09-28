@@ -6,6 +6,7 @@
 #include "AstraBattleSubsystem.h"
 #include "AstraBridgeFX.h"
 #include "AstraHangar.h"
+#include "AstraPatient.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -74,6 +75,35 @@ namespace
 			{
 				P->SetActorLocation(FVector(-300.0, 0.0, 120.0), false, nullptr, ETeleportType::TeleportPhysics);
 			}
+		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdMedbay(TEXT("astra.medbay"),
+		TEXT("Testing: astra.medbay admit <n> (n wounded from random hits) | care <minutes> (the doctors' rounds) | go (to the ward)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			if (!Ship || A.Num() < 1)
+			{
+				return;
+			}
+			if (A[0].Equals(TEXT("go"), ESearchCase::IgnoreCase))
+			{
+				for (TActorIterator<AAstraHangar> It(World); It; ++It)
+				{
+					if (!It->MedbayLanding.IsNearlyZero())
+					{
+						if (APawn* P = UGameplayStatics::GetPlayerPawn(World, 0))
+						{
+							P->SetActorLocation(It->MedbayLanding + FVector(0, 0, 100), false, nullptr, ETeleportType::TeleportPhysics);
+							if (APlayerController* PC = Cast<APlayerController>(P->GetController()))
+							{
+								PC->SetControlRotation(FRotator(0.f, 180.f, 0.f));
+							}
+						}
+					}
+				}
+				return;
+			}
+			Ship->TestMedbay(A[0], A.Num() > 1 ? FCString::Atoi(*A[1]) : 3);
 		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdShip(TEXT("astra.cmd"),
 		TEXT("Run a ship command (testing): astra.cmd <name> <json args, ' for \">, e.g. astra.cmd director_beat {'beat':{'type':'transit','system_name':'Meridian'}}"),
@@ -148,6 +178,16 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		InWorld.GetTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
 		{
 			GEngine->Exec(GetWorld(), TEXT("astra.planet go"));
+		}), 4.f, false);
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("astra_medbay")))
+	{
+		// testing (performance runs): the Captain in the Medbay among eight wounded a few seconds in
+		FTimerHandle H;
+		InWorld.GetTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			GEngine->Exec(GetWorld(), TEXT("astra.medbay admit 8"));
+			GEngine->Exec(GetWorld(), TEXT("astra.medbay go"));
 		}), 4.f, false);
 	}
 	UE_LOG(LogASTRA, Log, TEXT("[Ship] online: sky %s, sun %s, %d ship lights"), SkyMID ? TEXT("yes") : TEXT("no"),
@@ -399,6 +439,18 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::SaveJson() const
 	for (const int32 i : Roster.GetHurt()) { W.Add(MakeShared<FJsonValueNumber>(i)); }
 	O->SetArrayField(TEXT("fallen"), K);
 	O->SetArrayField(TEXT("wounded"), W);
+	TArray<TSharedPtr<FJsonValue>> Care;
+	for (const int32 i : Roster.GetHurt())
+	{
+		const FAstraCrewman& P = Roster.Get()[i];
+		TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
+		C->SetNumberField(TEXT("i"), i);
+		C->SetStringField(TEXT("injury"), P.Injury);
+		C->SetNumberField(TEXT("condition"), P.Condition);
+		C->SetNumberField(TEXT("bed"), P.Bed);
+		Care.Add(MakeShared<FJsonValueObject>(C));
+	}
+	O->SetArrayField(TEXT("medbay"), Care);
 	O->SetStringField(TEXT("casualties"), Roster.Summary());
 	return O;
 }
@@ -414,6 +466,18 @@ void UAstraShipSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 	if (Save->TryGetArrayField(TEXT("fallen"), A)) { for (const auto& V : *A) { K.Add((int32)V->AsNumber()); } }
 	if (Save->TryGetArrayField(TEXT("wounded"), A)) { for (const auto& V : *A) { W.Add((int32)V->AsNumber()); } }
 	Roster.Restore(K, W);
+	if (Save->TryGetArrayField(TEXT("medbay"), A))
+	{
+		for (const auto& V : *A)
+		{
+			const TSharedPtr<FJsonObject>* C = nullptr;
+			if (V->TryGetObject(C) && C && C->IsValid())
+			{
+				Roster.RestoreCare((int32)(*C)->GetNumberField(TEXT("i")), (*C)->GetStringField(TEXT("injury")),
+				                   (uint8)(*C)->GetNumberField(TEXT("condition")), (int32)(*C)->GetNumberField(TEXT("bed")));
+			}
+		}
+	}
 	FString Sys = TEXT("Aurelia");
 	Save->TryGetStringField(TEXT("system"), Sys);
 	ApplySystem(ChartSystem(Sys));
@@ -455,6 +519,56 @@ void UAstraShipSubsystem::DriveExternally(float Heading, float Mark, float Speed
 	UpdateAttitudeVisuals();
 }
 
+void UAstraShipSubsystem::TestMedbay(const FString& What, int32 N)
+{
+	if (What.Equals(TEXT("admit"), ESearchCase::IgnoreCase))
+	{
+		static const TCHAR* Causes[] = {TEXT("hull breach"), TEXT("fire"), TEXT("conduit damage")};
+		for (int32 k = 0; k < N; ++k)
+		{
+			const FString Who = Roster.Casualties(FMath::RandRange(2, 11), 1, 0, CasualtyRng, Causes[FMath::RandRange(0, 2)]);
+			UE_LOG(LogASTRA, Log, TEXT("[Medbay] admitted: %s"), *Who);
+		}
+	}
+	else if (What.Equals(TEXT("care"), ESearchCase::IgnoreCase))
+	{
+		for (int32 m = 0; m < N; ++m)
+		{
+			TArray<FAstraCrewRoster::FNews> News;
+			Roster.Care(1.f, CasualtyRng, News);
+			for (const FAstraCrewRoster::FNews& Nw : News)
+			{
+				UE_LOG(LogASTRA, Log, TEXT("[Medbay] %s"), *Nw.Text);
+				Event(Nw.Text, Nw.bReport);
+			}
+		}
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Medbay] %s"), *Roster.Summary());
+	SyncWard();
+}
+
+void UAstraShipSubsystem::SyncWard()
+{
+	if (WardRev == Roster.Version() || !GetWorld())
+	{
+		return;
+	}
+	WardRev = Roster.Version();
+	for (TActorIterator<AAstraPatient> It(GetWorld()); It; ++It)
+	{
+		const int32 i = Roster.InBed(It->BedNumber() - 1);
+		if (i >= 0)
+		{
+			const FAstraCrewman& P = Roster.Get()[i];
+			It->SetOccupant(P.Name(), P.bFemale, P.Condition);
+		}
+		else if (It->IsOccupied())
+		{
+			It->SetEmpty();
+		}
+	}
+}
+
 FString UAstraShipSubsystem::CaptainAboard() const
 {
 	if (!CaptainPlanetside.IsEmpty())
@@ -470,6 +584,12 @@ FString UAstraShipSubsystem::CaptainAboard() const
 			{
 				return TEXT("in Main Engineering (Deck 7), face to face with Chief Okonkwo and the engineering watch; the XO has the conn "
 				            "on the bridge and the bridge officers speak by intercom");
+			}
+			if (It->IsPawnInMedbay(P))
+			{
+				return TEXT("in the Medbay (Deck 6), among the wounded, face to face with Dr. Lindqvist and the medical staff; the "
+				            "patients in their beds can hear and answer the Captain; the XO has the conn on the bridge and the bridge "
+				            "officers speak by intercom");
 			}
 		}
 	}
@@ -924,6 +1044,37 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	S->SetArrayField(TEXT("damage"), Dmg);
 	S->SetStringField(TEXT("damage_control"), FString::Printf(TEXT("%d teams, %d free"), NumDamageTeams, NumDamageTeams - Busy));
 	S->SetStringField(TEXT("casualties"), Roster.Summary());
+	if (Roster.GetHurt().Num())
+	{
+		// the Medbay's ward: who lies in which bed (their `speaker` id when the Captain talks to them there)
+		TArray<TSharedPtr<FJsonValue>> Ward;
+		int32 Cots = 0;
+		for (const int32 i : Roster.GetHurt())
+		{
+			const FAstraCrewman& Pt = Roster.Get()[i];
+			if (Pt.Bed < 0)
+			{
+				++Cots;
+				continue;
+			}
+			TSharedRef<FJsonObject> Bed = MakeShared<FJsonObject>();
+			Bed->SetStringField(TEXT("speaker"), FString::Printf(TEXT("patient%d"), Pt.Bed + 1));
+			Bed->SetStringField(TEXT("name"), Pt.Name());
+			Bed->SetStringField(TEXT("gender"), Pt.bFemale ? TEXT("f") : TEXT("m"));
+			Bed->SetStringField(TEXT("dept"), Pt.Dept);
+			Bed->SetStringField(TEXT("home"), Pt.Home);
+			Bed->SetStringField(TEXT("injury"), Pt.Injury);
+			Bed->SetStringField(TEXT("condition"), Pt.Condition >= 2 ? TEXT("critical: sedated, cannot speak") : Pt.ConditionName());
+			Ward.Add(MakeShared<FJsonValueObject>(Bed));
+		}
+		TSharedRef<FJsonObject> Med = MakeShared<FJsonObject>();
+		Med->SetArrayField(TEXT("patients"), Ward);
+		if (Cots)
+		{
+			Med->SetStringField(TEXT("overflow"), FString::Printf(TEXT("%d more wounded on cots in the passage: the ward's %d beds are full"), Cots, FAstraCrewRoster::NumBeds));
+		}
+		S->SetObjectField(TEXT("medbay"), Med);
+	}
 	float Sum = 0.f;
 	for (const auto& KV : PowerPct) { Sum += KV.Value; }
 	S->SetStringField(TEXT("power_budget"), FString::Printf(TEXT("%.0f%% of %.0f%% allocated (six systems at 100%% = 600%%)"), Sum, PowerBudget));
@@ -932,6 +1083,23 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 
 void UAstraShipSubsystem::Tick(float DeltaTime)
 {
+	// the Medbay: the doctors' rounds every minute (conditions change, the healed go back to duty, some die), the beds
+	// follow the roster
+	if ((CareT += DeltaTime) >= 60.f)
+	{
+		CareT = 0.f;
+		TArray<FAstraCrewRoster::FNews> News;
+		Roster.Care(1.f, CasualtyRng, News);
+		for (const FAstraCrewRoster::FNews& N : News)
+		{
+			Event(N.Text, N.bReport);
+		}
+	}
+	if ((WardSyncT -= DeltaTime) <= 0.f)
+	{
+		WardSyncT = 1.f;
+		SyncWard();
+	}
 	if (bLaneControl)   // the Janus lane drives attitude and speed (DriveExternally)
 	{
 		TickDamage(DeltaTime);
@@ -1247,7 +1415,7 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 		if (D.Kind == TEXT("hull breach")) { W = Roll2 < 0.4f ? FMath::RandRange(1, 3) : 0; K = Roll2 < 0.1f ? 1 : 0; }
 		else if (D.Kind == TEXT("fire")) { W = Roll2 < 0.35f ? FMath::RandRange(1, 2) : 0; }
 		else { W = Roll2 < 0.1f ? 1 : 0; }
-		const FString Names = (W || K) ? Roster.Casualties(D.Deck, W, K, CasualtyRng) : FString();
+		const FString Names = (W || K) ? Roster.Casualties(D.Deck, W, K, CasualtyRng, D.Kind) : FString();
 		if (!Names.IsEmpty())
 		{
 			Where += TEXT(" — casualties: ") + Names;

@@ -223,10 +223,20 @@ def export_fbx(obj: bpy.types.Object, path: str) -> None:
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
+    # n-gons (bevels leave them) are triangulated here, not by the FBX importer: its triangulation of polygons with
+    # collinear vertices drops triangles (holes at the corners); custom normals are kept, tangents can be exported
+    tri = obj.modifiers.new("ExportTriangulate", "TRIANGULATE") if obj.type == "MESH" else None
+    if tri:
+        tri.min_vertices = 5
+        tri.quad_method = "BEAUTY"
+        tri.ngon_method = "BEAUTY"
+        tri.keep_custom_normals = True
     bpy.ops.export_scene.fbx(
         filepath=path, use_selection=True, apply_unit_scale=True, apply_scale_options="FBX_SCALE_UNITS",
         axis_forward="-Z", axis_up="Y", mesh_smooth_type="FACE", use_tspace=True,
         use_mesh_modifiers=True, add_leaf_bones=False, bake_anim=False, path_mode="STRIP")
+    if tri:
+        obj.modifiers.remove(tri)
 
 
 def stats(obj: bpy.types.Object) -> dict:

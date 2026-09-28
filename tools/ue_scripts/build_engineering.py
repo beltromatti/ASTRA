@@ -124,7 +124,7 @@ s.set_actor_scale3d(unreal.Vector(1.0, 2.2, 0.55))
 smc = s.get_component_by_class(unreal.StaticMeshComponent)
 for i, sm in enumerate(plate.get_editor_property("static_materials")):
     if str(sm.get_editor_property("material_slot_name")).startswith("MI_SIGN_Face"):
-        smc.set_material(i, eal.load_asset(f"{MI_DIR}/MI_SIGN_Engineering"))
+        smc.set_material(i, eal.load_asset(f"{MI_DIR}/MI_SIGN_Room_Engineering"))
 smc.set_editor_property("cast_shadow", False)
 s.set_actor_label("Engineering_Sign")
 s.set_folder_path("Engineering/Lift")

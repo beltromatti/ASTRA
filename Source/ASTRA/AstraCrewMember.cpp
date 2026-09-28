@@ -42,44 +42,11 @@ void AAstraCrewMember::BeginPlay()
 {
 	Super::BeginPlay();
 	RestRotation = GetActorRotation();
+	Phase = FMath::FRand() * 10.f;
 	if (!Body->GetSkeletalMeshAsset())
 	{
-		// placeholder body until the MetaHuman crew (M3): Epic's mannequin, idle loop
-		const bool bFemale = StationId == TEXT("xo") || StationId == TEXT("ops") || StationId == TEXT("tactical") || StationId == TEXT("sensors");
-		USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, bFemale
-			? TEXT("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple")
-			: TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
-		if (Mesh && Posture != EAstraCrewPosture::Standing)
-		{
-			Seated->SetSkinnedAssetAndUpdate(Mesh);
-			Seated->SetVisibility(true);
-			// seated crew face the actor's +X; the mannequin faces its own +Y, hence the -90 degrees
-			Seated->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
-			InitSeated();
-		}
-		else if (Mesh)
-		{
-			Body->SetSkeletalMeshAsset(Mesh);
-			if (UAnimSequence* Idle = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle")))
-			{
-				Body->PlayAnimation(Idle, true);
-				Body->SetPlayRate(FMath::FRandRange(0.85f, 1.1f));
-			}
-		}
-	}
-	Phase = FMath::FRand() * 10.f;
-	// uniforms on the placeholder bodies: navy trousers, the jacket in the department's colour (docs/STILE.md §3)
-	const FString Dept = StationId == TEXT("tactical") ? TEXT("Security") : StationId == TEXT("sensors") ? TEXT("Science")
-	                   : StationId == TEXT("engineering") ? TEXT("Engineering") : StationId == TEXT("flight") ? TEXT("Flight") : TEXT("Command");
-	UMaterialInterface* Uniform = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Uniform.MI_Crew_Uniform"));
-	UMaterialInterface* Jacket = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_%s.MI_Crew_Dept_%s"), *Dept, *Dept));
-	for (USkinnedMeshComponent* C : {static_cast<USkinnedMeshComponent*>(Body), static_cast<USkinnedMeshComponent*>(Seated)})
-	{
-		if (C && C->GetSkinnedAsset() && Uniform && Jacket && C->GetNumMaterials() >= 2)
-		{
-			C->SetMaterial(0, Uniform);   // head and legs
-			C->SetMaterial(1, Jacket);    // torso and arms
-		}
+		// placeholder body until the MetaHuman crew (M3): Epic's mannequin
+		SetBody(bFemaleBody || StationId == TEXT("xo") || StationId == TEXT("ops") || StationId == TEXT("tactical") || StationId == TEXT("sensors"));
 	}
 	// voice: spatialised, audible across the bridge, natural falloff
 	USoundAttenuation* Att = NewObject<USoundAttenuation>(this);
@@ -91,6 +58,70 @@ void AAstraCrewMember::BeginPlay()
 	Att->Attenuation.dBAttenuationAtMax = -18.f;
 	Voice->AttenuationSettings = Att;
 	NameTag->SetText(FText::FromString(DisplayName.IsEmpty() ? StationId : DisplayName));
+}
+
+void AAstraCrewMember::SetBody(bool bFemale)
+{
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, bFemale
+		? TEXT("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple")
+		: TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
+	if (!Mesh)
+	{
+		return;
+	}
+	bBodyFemale = bFemale;
+	if (Posture != EAstraCrewPosture::Standing)
+	{
+		Seated->SetSkinnedAssetAndUpdate(Mesh);
+		Seated->SetVisibility(true);
+		if (Posture == EAstraCrewPosture::Lying)
+		{
+			// the body's own frame (head +Z, face +Y) laid on the bed: head towards the actor's +X, face up, then the
+			// backrest raises the head end about the hinge (the actor's origin)
+			const FQuat Lay = FMatrix(FPlane(0, 1, 0, 0), FPlane(0, 0, 1, 0), FPlane(1, 0, 0, 0), FPlane(0, 0, 0, 1)).ToQuat();
+			Seated->SetRelativeRotation(FQuat(FRotator(ReclineDeg, 0.f, 0.f)) * Lay);
+			Seated->SetRelativeLocation(FVector::ZeroVector);
+			Voice->SetRelativeLocation(FVector(62.f, 0.f, 42.f));   // from the pillow
+		}
+		else
+		{
+			// seated crew face the actor's +X; the mannequin faces its own +Y, hence the -90 degrees
+			Seated->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+		}
+		InitSeated();
+	}
+	else
+	{
+		Body->SetSkeletalMeshAsset(Mesh);
+		if (UAnimSequence* Idle = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle")))
+		{
+			Body->PlayAnimation(Idle, true);
+			Body->SetPlayRate(FMath::FRandRange(0.85f, 1.1f));
+		}
+	}
+	ApplyUniform();
+}
+
+void AAstraCrewMember::ApplyUniform()
+{
+	// uniforms on the placeholder bodies: navy trousers, the jacket in the department's colour (docs/STILE.md §3); the
+	// wounded in the medbay wear a hospital gown
+	const FString Dept = StationId == TEXT("tactical") ? TEXT("Security") : StationId == TEXT("sensors") ? TEXT("Science")
+	                   : (StationId == TEXT("engineering") || StationId == TEXT("chief") || StationId.StartsWith(TEXT("eng_"))) ? TEXT("Engineering")
+	                   : StationId == TEXT("flight") ? TEXT("Flight")
+	                   : (StationId == TEXT("doctor") || StationId.StartsWith(TEXT("med_"))) ? TEXT("Medical") : TEXT("Command");
+	UMaterialInterface* Uniform = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Uniform.MI_Crew_Uniform"));
+	UMaterialInterface* Jacket = StationId.StartsWith(TEXT("patient"))
+		? LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Gown.MI_Crew_Gown"))
+		: LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_%s.MI_Crew_Dept_%s"), *Dept, *Dept));
+	for (USkinnedMeshComponent* C : {static_cast<USkinnedMeshComponent*>(Body), static_cast<USkinnedMeshComponent*>(Seated)})
+	{
+		if (C && C->GetSkinnedAsset() && Uniform && Jacket && C->GetNumMaterials() >= 2)
+		{
+			C->SetMaterial(0, Uniform);   // head and legs
+			C->SetMaterial(1, Jacket);    // torso and arms
+		}
+	}
 }
 
 void AAstraCrewMember::BeginLine(int32 LineId, int32 SampleRate)
@@ -259,73 +290,137 @@ void AAstraCrewMember::UpdateSeated(float DeltaSeconds)
 			LookYaw = FMath::Lerp(LookYaw, FMath::Clamp(Yaw, -75.f, 75.f), FacingBlend);
 		}
 	}
-	// spine: a slight lean towards the console, breathing on top
-	const float Lean = (bConsole ? 1.f : 0.45f) - 1.6f * Recoil;
-	const float Breath = 0.9f * FMath::Sin(T * 2.f * PI / 4.3f);
 	const FVector Side = FVector::CrossProduct(Up, Fwd).GetSafeNormal();   // lean axis (pitch forward)
 	const float Sgn = FVector::DotProduct(Side, Right) >= 0.f ? 1.f : -1.f;
 	const FVector PitchAxis = Right * Sgn;                                  // positive angle = forward
-	Turn(TEXT("spine_01"), PitchAxis, 3.f * Lean);
-	Turn(TEXT("spine_02"), PitchAxis, 6.f * Lean);
-	Turn(TEXT("spine_03"), PitchAxis, 9.f * Lean + Breath);
-	const FQuat ShoulderTurn(Up, FMath::DegreesToRadians(LookYaw * 0.25f));
-	if (const int32 B = Bone(TEXT("spine_04")); B != INDEX_NONE)
+	FVector PelvisLoc;
+	if (Posture == EAstraCrewPosture::Lying)
 	{
-		Rot.Add(B, ShoulderTurn * FQuat(PitchAxis, FMath::DegreesToRadians(11.f * Lean + Breath * 0.6f)) * RefCS[B].GetRotation());
-	}
-	if (const int32 B = Bone(TEXT("spine_05")); B != INDEX_NONE)
-	{
-		Rot.Add(B, ShoulderTurn * FQuat(PitchAxis, FMath::DegreesToRadians(12.f * Lean)) * RefCS[B].GetRotation());
-	}
-	LookYaw += 38.f * Recoil * (FMath::Sin(Phase * 7.f) >= 0.f ? 1.f : -1.f);   // turn the face away from the burst
-	const FQuat HeadTurn(Up, FMath::DegreesToRadians(LookYaw));
-	if (const int32 B = Bone(TEXT("neck_01")); B != INDEX_NONE)
-	{
-		Rot.Add(B, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.55f)) * FQuat(PitchAxis, FMath::DegreesToRadians(4.f * Lean)) * RefCS[B].GetRotation());
-	}
-	if (const int32 B = Bone(TEXT("head")); B != INDEX_NONE)
-	{
-		Rot.Add(B, HeadTurn * FQuat(PitchAxis, FMath::DegreesToRadians(-2.f + 1.5f * FMath::Sin(T * 0.53f))) * RefCS[B].GetRotation());
-	}
-	// legs: thighs forward and a little down and apart, shins down, feet flat
-	for (int32 k = 0; k < 2; ++k)
-	{
-		const float S = k ? 1.f : -1.f;   // right : left
-		const TCHAR* Thigh = k ? TEXT("thigh_r") : TEXT("thigh_l");
-		const TCHAR* Calf = k ? TEXT("calf_r") : TEXT("calf_l");
-		const TCHAR* Foot = k ? TEXT("foot_r") : TEXT("foot_l");
-		Aim(Thigh, Calf, Fwd * 0.96f - Up * 0.2f + Right * (0.11f * S));
-		Aim(Calf, Foot, -Up * 0.97f + Fwd * 0.14f + Right * (0.03f * S));
-		if (const int32 B = Bone(Foot); B != INDEX_NONE)
+		// in a medbay bed: the torso on the backrest (the component carries the recline), the hips flexed by as much so
+		// the legs lie flat, the arms on the blanket, slow deep breathing; the head on the pillow turns to the Captain
+		const float Breath = 1.1f * FMath::Sin(T * 2.f * PI / 5.2f);
+		const float Recl = FMath::DegreesToRadians(ReclineDeg);
+		Turn(TEXT("spine_03"), PitchAxis, Breath);
+		Turn(TEXT("spine_04"), PitchAxis, 0.5f * Breath);
+		float LookDown = 8.f;   // the pillow tips the chin down a little
+		if (FacingBlend > 0.001f)
 		{
-			Rot.Add(B, RefCS[B].GetRotation());
+			if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+			{
+				const int32 HeadB = Bone(TEXT("head")), PelvisB = Bone(TEXT("pelvis"));
+				const FVector HeadCS = (HeadB != INDEX_NONE && PelvisB != INDEX_NONE)
+					? RefCS[HeadB].GetLocation() - RefCS[PelvisB].GetLocation() + Fwd * 11.f : Up * 65.f;
+				const FVector D = Seated->GetComponentTransform().InverseTransformPosition(Cam->GetCameraLocation()) - HeadCS;
+				const float Down = FMath::RadiansToDegrees(FMath::Atan2(-FVector::DotProduct(D, Up), FMath::Max(1.f, FVector::DotProduct(D, Fwd))));
+				LookDown = FMath::Lerp(LookDown, FMath::Clamp(Down, 0.f, 38.f), FacingBlend);
+			}
 		}
-		// arms: to the console (hands working on the desk) or resting on the armrests
-		const TCHAR* UpperArm = k ? TEXT("upperarm_r") : TEXT("upperarm_l");
-		const TCHAR* LowerArm = k ? TEXT("lowerarm_r") : TEXT("lowerarm_l");
-		const TCHAR* Hand = k ? TEXT("hand_r") : TEXT("hand_l");
-		const TCHAR* Finger = k ? TEXT("middle_metacarpal_r") : TEXT("middle_metacarpal_l");
-		const float Work = bConsole ? (1.f - 0.7f * FacingBlend) : 0.f;
-		const float Tap = Work * (2.5f * FMath::Sin(T * 4.1f + k * 1.7f) * FMath::Max(0.f, FMath::Sin(T * 0.8f + k)));
-		const bool bShield = Recoil > 0.01f && (k == 1) == (FMath::Sin(Phase * 7.f) >= 0.f);
-		if (bShield)
+		if (const int32 B = Bone(TEXT("neck_01")); B != INDEX_NONE)
 		{
-			// forearm up across the face
-			Aim(UpperArm, LowerArm, FMath::Lerp(Fwd * 0.45f - Up * 0.85f + Right * (0.16f * S), Fwd * 0.75f + Up * 0.25f + Right * (0.25f * S), Recoil));
-			Aim(LowerArm, Hand, FMath::Lerp(Fwd * 0.97f - Right * (0.26f * S), Up * 0.85f - Right * (0.55f * S) + Fwd * 0.1f, Recoil));
+			Rot.Add(B, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.5f)) * FQuat(PitchAxis, FMath::DegreesToRadians(LookDown * 0.45f)) * RefCS[B].GetRotation());
 		}
-		else if (bConsole)
+		if (const int32 B = Bone(TEXT("head")); B != INDEX_NONE)
 		{
-			Aim(UpperArm, LowerArm, Fwd * 0.45f - Up * 0.85f + Right * (0.16f * S));
-			Aim(LowerArm, Hand, Fwd * 0.97f + Up * (-0.05f + Tap * 0.01f) - Right * (0.26f * S));
-			Aim(Hand, Bone(Finger) != INDEX_NONE ? Finger : (k ? TEXT("middle_01_r") : TEXT("middle_01_l")), Fwd * 0.9f - Up * 0.4f - Right * (0.05f * S));
+			Rot.Add(B, FQuat(Up, FMath::DegreesToRadians(LookYaw)) * FQuat(PitchAxis, FMath::DegreesToRadians(LookDown)) * RefCS[B].GetRotation());
 		}
-		else
+		const bool bHandsOnBelly = FMath::Frac(Phase * 0.37f) < 0.6f;
+		for (int32 k = 0; k < 2; ++k)
 		{
-			Aim(UpperArm, LowerArm, Fwd * 0.18f - Up * 0.97f + Right * (0.2f * S));
-			Aim(LowerArm, Hand, Fwd * 0.93f - Up * 0.22f + Right * (0.08f * S));
-			Aim(Hand, Bone(Finger) != INDEX_NONE ? Finger : (k ? TEXT("middle_01_r") : TEXT("middle_01_l")), Fwd * 0.85f - Up * 0.5f);
+			const float S = k ? 1.f : -1.f;   // right : left
+			const FVector Leg = -Up * FMath::Cos(Recl) + Fwd * FMath::Sin(Recl) + Right * (0.045f * S);
+			Aim(k ? TEXT("thigh_r") : TEXT("thigh_l"), k ? TEXT("calf_r") : TEXT("calf_l"), Leg);
+			Aim(k ? TEXT("calf_r") : TEXT("calf_l"), k ? TEXT("foot_r") : TEXT("foot_l"), Leg + Fwd * 0.03f);
+			if (const int32 B = Bone(k ? TEXT("foot_r") : TEXT("foot_l")); B != INDEX_NONE)
+			{
+				Rot.Add(B, RefCS[B].GetRotation());   // toes up (the recline tips them towards the foot of the bed)
+			}
+			const TCHAR* UpperArm = k ? TEXT("upperarm_r") : TEXT("upperarm_l");
+			const TCHAR* LowerArm = k ? TEXT("lowerarm_r") : TEXT("lowerarm_l");
+			const TCHAR* Hand = k ? TEXT("hand_r") : TEXT("hand_l");
+			const TCHAR* Finger = Bone(k ? TEXT("middle_metacarpal_r") : TEXT("middle_metacarpal_l")) != INDEX_NONE
+				? (k ? TEXT("middle_metacarpal_r") : TEXT("middle_metacarpal_l")) : (k ? TEXT("middle_01_r") : TEXT("middle_01_l"));
+			Aim(UpperArm, LowerArm, -Up * 0.93f + Right * (0.28f * S) + Fwd * 0.1f);
+			if (bHandsOnBelly)
+			{
+				Aim(LowerArm, Hand, -Right * (0.85f * S) + Fwd * 0.35f + Up * 0.1f);
+				Aim(Hand, Finger, -Right * (0.85f * S) + Fwd * 0.12f - Up * 0.1f);
+			}
+			else
+			{
+				Aim(LowerArm, Hand, -Up * 0.92f + Fwd * 0.3f + Right * (0.04f * S));
+				Aim(Hand, Finger, -Up * 0.85f + Fwd * 0.05f);
+			}
 		}
+		PelvisLoc = Fwd * 11.f;   // the back on the mattress
+	}
+	else
+	{
+		// spine: a slight lean towards the console, breathing on top
+		const float Lean = (bConsole ? 1.f : 0.45f) - 1.6f * Recoil;
+		const float Breath = 0.9f * FMath::Sin(T * 2.f * PI / 4.3f);
+		Turn(TEXT("spine_01"), PitchAxis, 3.f * Lean);
+		Turn(TEXT("spine_02"), PitchAxis, 6.f * Lean);
+		Turn(TEXT("spine_03"), PitchAxis, 9.f * Lean + Breath);
+		const FQuat ShoulderTurn(Up, FMath::DegreesToRadians(LookYaw * 0.25f));
+		if (const int32 B = Bone(TEXT("spine_04")); B != INDEX_NONE)
+		{
+			Rot.Add(B, ShoulderTurn * FQuat(PitchAxis, FMath::DegreesToRadians(11.f * Lean + Breath * 0.6f)) * RefCS[B].GetRotation());
+		}
+		if (const int32 B = Bone(TEXT("spine_05")); B != INDEX_NONE)
+		{
+			Rot.Add(B, ShoulderTurn * FQuat(PitchAxis, FMath::DegreesToRadians(12.f * Lean)) * RefCS[B].GetRotation());
+		}
+		LookYaw += 38.f * Recoil * (FMath::Sin(Phase * 7.f) >= 0.f ? 1.f : -1.f);   // turn the face away from the burst
+		const FQuat HeadTurn(Up, FMath::DegreesToRadians(LookYaw));
+		if (const int32 B = Bone(TEXT("neck_01")); B != INDEX_NONE)
+		{
+			Rot.Add(B, FQuat(Up, FMath::DegreesToRadians(LookYaw * 0.55f)) * FQuat(PitchAxis, FMath::DegreesToRadians(4.f * Lean)) * RefCS[B].GetRotation());
+		}
+		if (const int32 B = Bone(TEXT("head")); B != INDEX_NONE)
+		{
+			Rot.Add(B, HeadTurn * FQuat(PitchAxis, FMath::DegreesToRadians(-2.f + 1.5f * FMath::Sin(T * 0.53f))) * RefCS[B].GetRotation());
+		}
+		// legs: thighs forward and a little down and apart, shins down, feet flat
+		for (int32 k = 0; k < 2; ++k)
+		{
+			const float S = k ? 1.f : -1.f;   // right : left
+			const TCHAR* Thigh = k ? TEXT("thigh_r") : TEXT("thigh_l");
+			const TCHAR* Calf = k ? TEXT("calf_r") : TEXT("calf_l");
+			const TCHAR* Foot = k ? TEXT("foot_r") : TEXT("foot_l");
+			Aim(Thigh, Calf, Fwd * 0.96f - Up * 0.2f + Right * (0.11f * S));
+			Aim(Calf, Foot, -Up * 0.97f + Fwd * 0.14f + Right * (0.03f * S));
+			if (const int32 B = Bone(Foot); B != INDEX_NONE)
+			{
+				Rot.Add(B, RefCS[B].GetRotation());
+			}
+			// arms: to the console (hands working on the desk) or resting on the armrests
+			const TCHAR* UpperArm = k ? TEXT("upperarm_r") : TEXT("upperarm_l");
+			const TCHAR* LowerArm = k ? TEXT("lowerarm_r") : TEXT("lowerarm_l");
+			const TCHAR* Hand = k ? TEXT("hand_r") : TEXT("hand_l");
+			const TCHAR* Finger = k ? TEXT("middle_metacarpal_r") : TEXT("middle_metacarpal_l");
+			const float Work = bConsole ? (1.f - 0.7f * FacingBlend) : 0.f;
+			const float Tap = Work * (2.5f * FMath::Sin(T * 4.1f + k * 1.7f) * FMath::Max(0.f, FMath::Sin(T * 0.8f + k)));
+			const bool bShield = Recoil > 0.01f && (k == 1) == (FMath::Sin(Phase * 7.f) >= 0.f);
+			if (bShield)
+			{
+				// forearm up across the face
+				Aim(UpperArm, LowerArm, FMath::Lerp(Fwd * 0.45f - Up * 0.85f + Right * (0.16f * S), Fwd * 0.75f + Up * 0.25f + Right * (0.25f * S), Recoil));
+				Aim(LowerArm, Hand, FMath::Lerp(Fwd * 0.97f - Right * (0.26f * S), Up * 0.85f - Right * (0.55f * S) + Fwd * 0.1f, Recoil));
+			}
+			else if (bConsole)
+			{
+				Aim(UpperArm, LowerArm, Fwd * 0.45f - Up * 0.85f + Right * (0.16f * S));
+				Aim(LowerArm, Hand, Fwd * 0.97f + Up * (-0.05f + Tap * 0.01f) - Right * (0.26f * S));
+				Aim(Hand, Bone(Finger) != INDEX_NONE ? Finger : (k ? TEXT("middle_01_r") : TEXT("middle_01_l")), Fwd * 0.9f - Up * 0.4f - Right * (0.05f * S));
+			}
+			else
+			{
+				Aim(UpperArm, LowerArm, Fwd * 0.18f - Up * 0.97f + Right * (0.2f * S));
+				Aim(LowerArm, Hand, Fwd * 0.93f - Up * 0.22f + Right * (0.08f * S));
+				Aim(Hand, Bone(Finger) != INDEX_NONE ? Finger : (k ? TEXT("middle_01_r") : TEXT("middle_01_l")), Fwd * 0.85f - Up * 0.5f);
+			}
+		}
+		PelvisLoc = Fwd * 4.f + Up * (SeatHipHeight + 0.4f * Breath);
 	}
 	// assemble the component-space pose (bones are ordered parent first) and write it back as local transforms
 	const int32 Pelvis = Bone(TEXT("pelvis"));
@@ -341,7 +436,7 @@ void AAstraCrewMember::UpdateSeated(float DeltaSeconds)
 		CS[i] = Parent[i] >= 0 ? RefLocal[i] * CS[Parent[i]] : RefLocal[i];
 		if (i == Pelvis)
 		{
-			CS[i].SetLocation(Fwd * 4.f + Up * (SeatHipHeight + 0.4f * Breath));
+			CS[i].SetLocation(PelvisLoc);
 		}
 		if (const FQuat* Q = Rot.Find(i))
 		{

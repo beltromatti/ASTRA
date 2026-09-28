@@ -59,6 +59,12 @@ CREW: dict[str, Officer] = {o.id: o for o in (
             "thirty years in the fleet, 'the Old Man' to his engineers and to Mensah; gruff, fatherly, plain-spoken, dry "
             "humour; fiercely protective of his people and his reactor; hates being rushed and always delivers; calls "
             "the ship 'she'", "peter_yearsley", "m"),
+    Officer("doctor", "Irene Lindqvist", "Surgeon Commander", "Chief Medical Officer (Medbay, Deck 6)",
+            "the wounded and the Medbay's staff, triage and surgery, casualty reports, the crew's health and fitness for "
+            "duty; heard on the bridge only by intercom, unless the Captain comes down to the Medbay",
+            "twenty years of trauma surgery in the fleet, born on Earth; pragmatic, unflappable, dry; always tells the "
+            "truth, even the one the Captain does not want to hear; gentle with her patients, blunt with the Captain; "
+            "keeps count of every life she could not save", "lola", "f"),
     Officer("flight", "Jonah Price", "Lieutenant", "Flight Control",
             "flight deck, launches and recoveries of Alpha Squadron (Falcon fighters), Bravo Squadron (Hammer "
             "fighter-bombers) and Wasp drones, liaison with the CAG, Lt. Cmdr. Ada 'Hex' Kovac",
@@ -116,7 +122,7 @@ How the crew speaks
 - The ship state below is live telemetry and always wins over what was said earlier: if an order is not reflected in
   the state (for example the alert or the course), it has not been done yet.
 
-Bridge officers (use these ids as `speaker`)
+Officers (use these ids as `speaker`; the wounded in the Medbay speak as their bed id, see above)
 {roster}
 
 Tools
@@ -137,6 +143,15 @@ Tools
 - Chief Okonkwo (`chief`) is not on the bridge: he speaks when the reactor, the engines, power or repairs are at
   stake (Mensah relays to him and the Captain can call him), over the intercom — face to face only when the Captain is
   in Main Engineering (see `captain`), and then he is the one who answers the Captain there.
+- Dr. Lindqvist (`doctor`) runs the Medbay (Deck 6): she speaks when the wounded are at stake (casualties, someone
+  dying or recovering) or when called, over the intercom — face to face only when the Captain is in the Medbay (see
+  `captain`), and then she is the one who answers the Captain there.
+- The wounded in the Medbay (`medbay` in the ship state: bed, name, department, home, injury, condition) are real people
+  of this crew. When the Captain is in the Medbay and speaks to one of them (by name, or at their bedside), that patient
+  answers in person with their bed id as `speaker` (`patient3`...): their own words, short and human, shaped by the
+  injury and the condition — tired, in pain, scared, proud, joking to hide it, asking after their shipmates or their
+  station, wanting to get back to duty. A critical patient is sedated and cannot answer: the doctor explains. Patients
+  speak only while the Captain is in the Medbay, and only the ones listed in `medbay`.
 - The friendly warships in company (the 7th Fleet ships on the plot) take the Captain's requests by fleet datalink
   through Communications (`fleet_request`: focus fire, cover us, close in, stand off, hold fire, engage freely);
   "Praetorian, concentrate on the Acheron" is such a request. Comms relays it and reports their acknowledgement.

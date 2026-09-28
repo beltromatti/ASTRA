@@ -85,12 +85,14 @@ class GameShip:
 EXTERNAL_SPEAKERS = {c["key"]: (f'{c["name"]} ({c["ship"]})', c["voice"]) for c in COMMANDERS.values()}
 EXTERNAL_SPEAKERS[ADMIRAL["key"]] = (f'{ADMIRAL["name"]} ({ADMIRAL["ship"]})', ADMIRAL["voice"])
 from .port import PORT as PORT_CONTROL, PortControl, for_port, stimulus_for  # noqa: E402
+from .medbay import patient_voice  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
 import re as _re
 _CREW_ADDRESS = _re.compile(
-    r"^\W*(serra|ferri|tanaka|voss|martin|nair|mensah|price|okonkwo|capo|chief|numero uno|primo ufficiale|xo|comandante|timon\w*|helm\w*|"
+    r"^\W*(serra|ferri|tanaka|voss|martin|nair|mensah|price|okonkwo|capo|chief|lindqvist|dottor\w*|doctor|doc|"
+    r"numero uno|primo ufficiale|xo|comandante|timon\w*|helm\w*|"
     r"tattic\w*|tactical|ops|operazion\w*|operations|comunicazion\w*|comms?|sensor\w*|scienz\w*|ingegner\w*|"
     r"engineering|volo|flight|plancia|bridge|number one|chiud\w* (il )?canale|close (the )?channel|fine trasmissione|"
     r"end transmission|praetorian|vigilant|flotta|fleet|scorta|escort)\b", _re.I)
@@ -538,6 +540,8 @@ class Mind:
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
+                    for p_ in ((self.game.state.get("medbay") or {}).get("patients") or []):
+                        EXTERNAL_SPEAKERS[p_["speaker"]] = (p_.get("name", p_["speaker"]), patient_voice(p_))
                 elif kind == "event":
                     text = msg.get("text", "")
                     self.game.events.append(text)
@@ -678,7 +682,11 @@ if __name__ == "__main__":
 
 
 def _fallen(text: str) -> list[str]:
-    """Names of the crew killed in a report ("... Petty Officer Amara Diallo (weapons, from Mars) and ... killed; ...")."""
+    """Names of the crew killed in a report ("... Petty Officer Amara Diallo (weapons, from Mars) and ... killed; ...",
+    or the Medbay's "Petty Officer Amara Diallo (weapons, from Mars) has died of wounds")."""
+    died = _re.match(r"medbay: (.+?) \([^)]*\) has died of wounds", text)
+    if died:
+        return [died.group(1)]
     out: list[str] = []
     for seg in _re.split(r"[;—]", text):
         seg = seg.strip()

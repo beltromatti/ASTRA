@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-28 (pomeriggio) · **Traguardo corrente:** M7 — Pianeti (discesa su New Ravenna)
+**Ultimo aggiornamento:** 2026-09-28 (sera) · **Traguardo corrente:** M1/M7 — ponti della nave percorribili (infermeria) e pianeti
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -14,6 +14,7 @@
 | 2026-09-28 | 10,00 $ | 0,63 $ | squadroni, regista della guerra, ammiraglio (≈0,002 $ per decisione del regista) |
 | 2026-09-28 | 10,00 $ | 0,77 $ | transiti nel Janus Gate, ordini della Flotta, prove complete del regista |
 | 2026-09-28 | 10,00 $ | 1,16 $ | indagini sui relitti, campagne complete di prova, consigliere tattico, umore dell'equipaggio |
+| 2026-09-28 | 10,00 $ | 1,44 $ | diario del capitano, tattica del Mandato, Port Aurelius Control, sala macchine, infermeria (dialoghi con medico e feriti) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -143,6 +144,16 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] **Ascensore a tre ponti**: E alle porte apre il pannello (1 plancia · Deck 1, 2 sala macchine · Deck 7, 3 ponte di volo · Deck 9); l'equipaggio sa dove si trova il Capitano
 - [x] Quando il Capitano è lontano dalla plancia (ponte di volo, sala macchine, Falcon, New Ravenna) le voci degli ufficiali arrivano via interfono/radio
 
+## Infermeria (Deck 6) e ascensore a quattro ponti
+- [x] **Medbay** (`art/blender/medbay.py`, `tools/ue_scripts/build_medbay.py`, dati in `data/ship/aquila_medbay.json`): reparto di 30 × 18 m nello scafo inferiore, un ponte sopra la sala macchine. Pavimento chiaro in resina, pareti bianche a pannelli con lesene, corrimano paracolpi, luce indiretta a sguscio; **12 letti** con schienale rialzato di 20°, materasso e cuscino, sponde, testaletto a parete (gas medicali, luce, chiamata), **monitor dei parametri vitali** su braccio e asta della flebo; **tende a pieghe** tirate tra i letti e raccolte sul corridoio (binari a soffitto); banco di guardia con schermi, armadi delle scorte a vetrina, lavabo, **tabellone del reparto**; bancone centrale con schermi su due lati e il terminale del medico; **sala operatoria** dietro una vetrata con porta scorrevole: tavolo operatorio, due lampade scialitiche, carrello d'anestesia, carrelli dei ferri, **scanner diagnostico ad anello**, armadi e display con la scansione; croci mediche luminose. Tessuti CC0 ambientCG (Fabric036 lino, Fabric032 cotone), schermi medici disegnati (`tools/art/ui_screens.py med`: monitor normale e d'allarme, standby, tabellone, scanner). Luci di zona accese solo quando il Capitano è lì
+- [x] **I feriti veri del ruolino nei letti**: ogni ferito ha una **ferita** coerente con ciò che ha colpito il compartimento (breccia: decompressione, barotrauma, schegge; incendio: ustioni, fumo; condotti: folgorazioni, aritmie; eiezione dei piloti: fratture, ipotermia), una **condizione** (stabile, grave, critico) e un **letto** (oltre 12: brande nel passaggio). Le condizioni evolvono col giro dei medici ogni minuto: i critici migliorano o, raramente, **muoiono per le ferite** (lo riferisce il medico, il regista lo ricorda), i gravi si stabilizzano, gli stabili tornano in servizio. Tutto salvato nella campagna
+- [x] Nei letti ci sono i **pazienti** (`AAstraPatient`): manichini sdraiati con posa procedurale nuova (`Lying`: schiena sullo schienale, gambe distese, mani sul ventre o lungo i fianchi, respiro lento, la testa si gira e si china verso il Capitano quando parla), camice, **coperta modellata sul corpo** fino alla vita con il risvolto del lenzuolo, monitor acceso (con allarmi se critico); letti vuoti rifatti con la coperta piegata e il monitor in standby
+- [x] **Surgeon Commander Irene Lindqvist**, medico di bordo (dalla bibbia): ufficiale dell'equipaggio con voce propria, pragmatica e brutalmente sincera; in infermeria risponde di persona, altrimenti via interfono. Esempio reale: «Nove feriti, Capitano. Tre critici… La Fujita è la peggiore: ustioni di terzo grado su entrambe le gambe. Se non regge le prossime ore, le amputo sotto il ginocchio.»
+- [x] **I feriti parlano**: in infermeria il Capitano può rivolgersi a un paziente per nome; risponde lui, con una voce sua (scelta per genere tra le voci libere) e parole sue, secondo ferita e condizione (i critici sono sedati: spiega il medico). Esempio reale (1,3 s): «Bruciature di secondo grado su braccia e mani, Capitano. Un condotto è saltato in batteria… La dottoressa dice che le dita tornano. Non è la prima volta che mi brucio, e la batteria due è ancora mia.»
+- [x] **Ascensore a quattro ponti**: 1 plancia · Deck 1, 2 infermeria · Deck 6, 3 sala macchine · Deck 7, 4 ponte di volo · Deck 9 (tasti 1-4). Targhe nuove sopra le porte (MEDBAY con la croce, MAIN ENGINEERING che prima prendeva in prestito una targa di plancia)
+- Prove: `astra.medbay admit 8` (feriti da colpi casuali), `astra.medbay care 10` (dieci minuti di cure), `astra.medbay go` (nel reparto); avvio con `-astra_medbay` per le misure
+- Prestazioni (standalone 1080p, profilo A): 19,0 ms di GPU in infermeria, come la plancia (erano 25,3 ms con 32 luci di cui 10 con ombre: ora 11 luci lunghe, 3 con ombre)
+
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
 - [x] Vice Admiral Adrian Rourke, comandante della Settima Flotta: trasmette gli ordini, risponde quando l'Aquila chiama la flotta, può concedere rinforzi o rifornimento
@@ -159,7 +170,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 
 ## Prossimi passi
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
-2. Altri ponti: infermeria (i feriti del ruolino e il medico di bordo), alloggi del Capitano (diario, riposo).
+2. Altri ponti: alloggi del Capitano (diario, riposo), mensa (l'equipaggio fuori servizio), armeria; volti veri per l'equipaggio (MetaHuman).
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
 4. Simulazione di calore (M2); M7 seconda parte (spazioporto, città, altri pianeti); preparazione al multigiocatore (M8: autorità del server, comandi come RPC).
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
@@ -171,11 +182,14 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 4. La battaglia parte da sola (dopo ~80 s si sveglia la fregata, dopo ~170 s arriva il gruppo d'attacco). Per accelerare: `astra.battle.time 168`, `astra.battle.timescale 3`.
 5. Quando l'Archon Solm chiama, parlagli direttamente (canale aperto): tutto ciò che non inizia con il nome/ruolo di un ufficiale va a lui. «Comunicazioni, chiudete il canale» per chiuderlo.
 6. Da terminale: `tools/ue.py pie start|stop` e `tools/ue.py pie cmd 'astra.say ...'` per provare senza toccare l'editor.
-7. Pilotare: scendi con l'ascensore (E davanti alle porte in fondo al corridoio di babordo), avvicinati a un Falcon di Alpha (lato sinistro dell'hangar) e premi E; W per il lancio. Rientro: torna alla bocca di prua sinistra dell'Aquila, rallenta e premi F.
-8. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.
+7. Infermeria: ascensore (E alle porte in fondo al corridoio di babordo) → tasto 2. Parla con la dottoressa («Dottoressa, come stanno i feriti?») o con un ferito per nome. Senza battaglia i letti sono vuoti: `astra.medbay admit 8`.
+8. Pilotare: scendi con l'ascensore (E davanti alle porte in fondo al corridoio di babordo), avvicinati a un Falcon di Alpha (lato sinistro dell'hangar) e premi E; W per il lancio. Rientro: torna alla bocca di prua sinistra dell'Aquila, rallenta e premi F.
+9. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.
 
 ## Note operative
 - Prestazioni (2026-09-28, standalone 1080p, battaglia): ~19 ms di mediana (≈52 fps), limitate dalla GPU (~18,5 ms: luci 2,6, ombre 2,0, Lumen 1,6, traslucenza 1,4). Gli "scatti" da ~31 ms ogni ~12 frame non sono lavoro in più: la CPU, più veloce della GPU, si blocca in attesa delle query di occlusione (trovato con Unreal Insights da riga di comando: `-trace=cpu,frame` e `UnrealInsights -NoUI -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimingEvents ..."`). Per scendere serve ridurre il costo GPU. Diagnostica schermi: `astra.screens.profile 1`
+- **Nanite, lezioni dall'infermeria**: (1) un mesh Nanite con anche un solo slot traslucido (vetro) viene disegnato dalla sua *fallback* grossolana (errore ~1% delle dimensioni: 34 cm sul reparto: pannelli del soffitto esagonali, anelli "a punte"); `import_kit.py` ora lascia classici questi mesh, e reimportare non basta (gli slot vecchi restano): cancellare e reimportare. (2) I poligoni con più di 4 lati si triangolano all'esportazione (`astra_bpy.export_fbx`): l'importatore FBX perde triangoli sui poligoni con vertici allineati. (3) I materiali assegnati a runtime a mesh Nanite devono avere il flag d'uso Nanite (impostato su M_ASTRA_Screen/Hard/Emissive). Verifica: `r.Nanite.Visualize Triangles` (nero = non Nanite) e il log (`Invalid material ... Nanite`)
+- Le prestazioni si misurano solo col gioco standalone (`tools/perf/run_perf.sh <mappa> 1500 1920 1080 [-astra_medbay|-astra_planet]`): nel PIE l'editor usa la qualità Epic (Lumen alto, ~70 ms). Il riepilogo legge anche i CSV con l'intestazione in fondo (`[HasHeaderRowAtEnd]`, quando nuove statistiche compaiono durante la cattura)
 - Ricompilare il C++: `tools/ricompila.sh` (salva, chiude editor e menti, compila, riapre e aspetta l'MCP; log in Saved/Logs/build_last.log).
 - Console di prova: `astra.cmd <comando> <json con ' al posto di ">` esegue qualsiasi comando di bordo come farebbe l'equipaggio.
 - La sfera del cielo è opaca e ricentrata sulla camera: il suo raggio (≈490 km, scala 12000 di SM_SkySphere) è la distanza massima visibile. Prima era 16 km e nascondeva le navi lontane.
