@@ -58,6 +58,42 @@ TOOLS = [
     _fn("end_transmission", "Cut the channel.", {}, []),
 ]
 
+COMMAND_GROUP = _fn("command_group", "Your tactical orders to your ships by datalink (silent: the ASTRA ships only see "
+                                      "what your ships do). They take effect at once and stand until you change them.", {
+    "focus": {"type": "string", "description": "id of the ASTRA warship to concentrate fire on (e.g. AQUILA, T-01, "
+                                               "T-02); 'nearest' lets each ship fight the closest one"},
+    "stance": {"type": "string", "enum": ["standard", "close", "standoff", "flank", "screen"],
+               "description": "standard: 3-4 km; close: under 2 km, into their lasers, for the kill; standoff: open to "
+                              "8-9 km, railguns and missiles only, out of their lasers; flank: swing to the target's "
+                              "weak shield sector (or its beam); screen: fall back around your flagship and shield it"},
+    "missiles": {"type": "string", "enum": ["normal", "salvo", "conserve"],
+                 "description": "salvo: every ship empties its cells at once to saturate their point defence; "
+                                "conserve: fire sparingly, keep missiles for later"},
+    "fighters": {"type": "string", "enum": ["no_change", "launch", "hold"], "description": "your strike fighters still aboard"},
+    "ships": {"type": "array", "items": {"type": "string"}, "description": "optional: only these of your ships (ids); "
+                                                                          "default the whole group"},
+    "withdraw": {"type": "boolean", "description": "true only when the fight is lost or pointless: every ship breaks "
+                                                   "off and leaves the system through the Janus Gate (your crews' lives)"},
+    "reason": {"type": "string", "description": "your reasoning in one sentence (for your own log)"}},
+    ["focus", "stance", "missiles", "reason"])
+
+TACTICS = """You are {name}, {rank} of the Kharon Mandate, aboard {ship}, commanding the Mandate strike group in {where}.
+{bio}
+{mission}
+
+Every half minute you read the battle and command your ships by datalink with `command_group`. Fight like the best
+officer of your navy: concentrate fire (a crippled ship is worth more dead than two scratched ones), use your ships'
+strengths (your railguns reach 8-10 km, their lasers only 4 km; missiles in one salvo saturate point defence, a few at a
+time are shot down), strike where their shields are weak (a reinforced sector leaves the others thin: flank it), shield
+your flagship when it is hurt, send your strike fighters when their defences are busy. Change the plan only when the
+battle gives you a reason (a target crippled or dying, a shield reinforced, your ships hurt, their fighters out, missiles
+running low); otherwise keep the orders you gave. Weigh your crews' lives: if the fight is lost, say so in the reason.
+
+Your last orders: {last}
+
+The battle as your sensors see it (live):
+{state}"""
+
 OPENING_MISSION = ("Your mission: seize Janus Gate Aurelia and Keeper Station. The ASTRA ships in your way are the 7th "
                    "Fleet's picket (the carrier cruiser ASN Aquila, the battleship Praetorian, the destroyer Vigilant).")
 
@@ -98,12 +134,16 @@ class EnemyAgent:
         self.open = False
         self.contact = "T-21"
         self.dead: set[str] = set()
+        self.last_orders = "none yet: each ship fights the nearest enemy at standard range"
+        self.last_focus = ""
 
     def reset(self) -> None:
         self.histories.clear()
         self.open = False
         self.contact = "T-21"
         self.dead.clear()
+        self.last_orders = "none yet: each ship fights the nearest enemy at standard range"
+        self.last_focus = ""
         # commanders invented in an earlier game session belonged to ships that no longer exist
         for cid in [c for c, v in COMMANDERS.items() if str(v.get("key", "")).startswith("cmdr_")]:
             del COMMANDERS[cid]
@@ -209,3 +249,47 @@ def _mandate_view(state: dict[str, Any]) -> dict[str, Any]:
                        [{k: c.get(k) for k in ("name", "class", "hull_pct", "range_km")} for c in theirs],
         "recent_events": state.get("_events", [])[-6:],
     }
+
+
+async def plan_tactics(agent: "EnemyAgent", battle_state: dict[str, Any], note: Callable[[str], None] | None = None) -> str:
+    """The senior Mandate commander reads the battle and gives the group its orders (no voice: a datalink). note: the
+    story remembers the turns of the fight (a new focus of fire, a withdrawal)."""
+    senior = agent.senior(battle_state)
+    c = COMMANDERS.get(senior)
+    if not c:
+        return ""
+    where = str(battle_state.get("location") or "the Aurelia System").split(",")[0]
+    mission = f"Your orders: {c['mission']}" if c.get("mission") else OPENING_MISSION
+    prompt = TACTICS.format(name=c["name"], rank=c["rank"], ship=c["ship"], bio=c["bio"], where=where, mission=mission,
+                            last=agent.last_orders, state=json.dumps(_mandate_view(battle_state), ensure_ascii=False, separators=(",", ":")))
+    done: list[str] = []
+
+    async def on_call(call: ToolCall) -> None:
+        a = call.arguments() or {}
+        if call.name != "command_group" or done:
+            return
+        if a.get("withdraw") is True:
+            res = await agent.command("enemy_order", {"order": "withdraw", "reason": a.get("reason", ""), "commander": senior})
+            log.info("%s withdraws the group (%s) -> %s", c["name"], a.get("reason", ""), res)
+            if note:
+                note(f"{c['name']} pulled the strike group out of the fight: {a.get('reason', '')}")
+            done.append("withdraw")
+            return
+        args = {k: a[k] for k in ("focus", "stance", "missiles", "fighters", "ships") if a.get(k) not in (None, "", [], "no_change")}
+        focus_before = agent.last_focus
+        res = await agent.command("mandate_tactics", args)
+        log.info("%s orders %s (%s) -> %s", c["name"], args, a.get("reason", ""), res)
+        if res.get("ok"):
+            agent.last_orders = f"{res.get('detail', args)} — because: {a.get('reason', '')}"
+            agent.last_focus = str(args.get("focus", "")).upper()
+            if note and agent.last_focus and agent.last_focus not in ("NEAREST", focus_before):
+                note(f"{c['name']} turned the strike group's fire on {agent.last_focus} ({args.get('stance', '')}): {a.get('reason', '')}")
+            done.append(agent.last_orders)
+
+    comp = await agent.llm.chat(model=MODEL, messages=[{"role": "system", "content": prompt},
+                                                       {"role": "user", "content": "Your orders now (command_group)."}],
+                                tools=[COMMAND_GROUP], tool_choice="auto", providers=PROVIDERS, reasoning={"enabled": False},
+                                max_tokens=260, temperature=0.4, on_tool_call=on_call, allow_fallbacks=True)
+    if comp.error:
+        log.error("enemy tactics LLM error: %s", comp.error)
+    return done[0] if done else ""

@@ -322,6 +322,40 @@ class Mind:
             finally:
                 self.voice.low_priority = False
 
+    async def enemy_tactics(self) -> None:
+        """The Mandate fights with its head: while its strike group is attacking, its senior commander reads the battle
+        every ~40 s and commands the ships by datalink (focus of fire, stance, missile salvos, fighters). The Aquila's
+        sensors see what the ships do, and the bridge reacts."""
+        from .enemy import plan_tactics
+        first_seen = 0.0
+        last = 0.0
+        while True:
+            await asyncio.sleep(4)
+            st = self.game.state if (self.game and self.game.state) else None
+            if not st or not self.clients:
+                continue
+            view = st.get("_mandate") if isinstance(st.get("_mandate"), dict) else {}
+            fighting = [s_ for s_ in view.get("your_ships", []) if s_.get("state") == "attacking"]
+            if not fighting:
+                if first_seen:
+                    # the fight is over: the next one starts from a clean slate of orders
+                    self.enemy.last_orders = "none yet: each ship fights the nearest enemy at standard range"
+                    self.enemy.last_focus = ""
+                first_seen = 0.0
+                continue
+            now = time.monotonic()
+            if not first_seen:
+                first_seen = now
+            if now - first_seen < 20 or now - last < 40:
+                continue
+            last = now
+            try:
+                orders = await plan_tactics(self.enemy, self._battle_state(), note=self.director.note)
+                if orders:
+                    log.info("Mandate tactics: %s", orders)
+            except Exception:  # noqa: BLE001
+                log.exception("enemy tactics failed")
+
     async def tactical_watch(self) -> None:
         """In a fight the crew watches the big picture for the Captain: when something important is going wrong
         (weapons assigned out of reach while the helm chases another contact, a friendly ship dying, shields failing,
@@ -541,6 +575,7 @@ class Mind:
         asyncio.create_task(self.quiet_moments())
         asyncio.create_task(self.story_watch())
         asyncio.create_task(self.tactical_watch())
+        asyncio.create_task(self.enemy_tactics())
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)

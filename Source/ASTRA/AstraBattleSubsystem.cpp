@@ -650,6 +650,20 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 		S.TargetId = T ? T->Id : -1;
 		S.Mode = T ? EAstraShipMode::Attack : EAstraShipMode::Cruise;
 	}
+	// the commander's focus of fire (datalink orders) wins over "the nearest"
+	if (S.Side == EAstraSide::Mandate && S.OrderTarget >= 0 && S.Mode == EAstraShipMode::Attack)
+	{
+		FAstraBattleShip* F = FindById(S.OrderTarget);
+		if (F && Engageable(*F))
+		{
+			T = F;
+			S.TargetId = F->Id;
+		}
+		else
+		{
+			S.OrderTarget = -1;   // gone: back to the nearest
+		}
+	}
 	// neutral freighter: run from any close hostile
 	if (S.Side == EAstraSide::Neutral)
 	{
@@ -664,13 +678,33 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 	}
 	if (S.Mode == EAstraShipMode::Attack && T)
 	{
-		// hold a preferred engagement range, circling at an angle; break off when badly hurt
-		const float Pref = S.Radius > 200.f ? 4 * OneKm : 3 * OneKm;
+		// hold a preferred engagement range, circling at an angle; break off when badly hurt. The commander's stance
+		// changes the fight: close (lasers, knife range), standoff (out of the lasers, railguns and missiles), flank
+		// (onto the target's weak shield sector, or its beam), screen (between the target and the flagship)
+		float Pref = S.Radius > 200.f ? 4 * OneKm : 3 * OneKm;
+		if (S.Stance == 1) { Pref = 1.8f * OneKm; }
+		else if (S.Stance == 2) { Pref = FMath::Clamp(S.RailRange * 0.9f, 5.f * OneKm, 9.f * OneKm); }
 		const FVector ToT = T->Pos - S.Pos;
 		const double Dist = ToT.Size();
 		const FVector Dir = ToT / FMath::Max(1.0, Dist);
 		const FVector Side = FVector::CrossProduct(Dir, FVector::UpVector).GetSafeNormal();
 		FVector Goal = T->Pos - Dir * Pref + Side * Pref * 0.35;
+		if (S.Stance == 3)
+		{
+			// away from a reinforced sector, else onto the beam (half the group each side)
+			const FVector Weak = !T->ShieldFacing.IsNearlyZero() ? T->Att.RotateVector(-T->ShieldFacing.GetSafeNormal())
+			                                                     : T->Att.GetRightVector() * ((S.Id % 2) ? 1.f : -1.f);
+			Goal = T->Pos + Weak * Pref;
+		}
+		else if (S.Stance == 4)
+		{
+			const FAstraBattleShip* Flag = FindByContact(MandateCommander());
+			if (Flag && Flag != &S && Flag->bAlive)
+			{
+				const FVector Out = (T->Pos - Flag->Pos).GetSafeNormal();
+				Goal = Flag->Pos + Out * 2.5f * OneKm + FVector::CrossProduct(Out, FVector::UpVector).GetSafeNormal() * ((S.Id % 2) ? 1.2f : -1.2f) * OneKm;
+			}
+		}
 		DesiredVel = (Goal - S.Pos).GetClampedToMaxSize(S.CruiseSpeed * 1.0) ;
 		if (Dist < Pref * 1.4)
 		{
@@ -800,10 +834,12 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 			FireRail(S, *T, (0.0012f + Dist / 30e6) * (S.bJammed ? 3.f : 1.f));
 		}
 	}
-	if (S.Missiles > 0 && S.MissileT <= 0.f && Dist < S.MissileRange && Dist > 2.5 * OneKm && T->Side != EAstraSide::Neutral)
+	if (S.Missiles > 0 && (S.MissileT <= 0.f || S.bSalvo) && Dist < S.MissileRange && Dist > 2.5 * OneKm && T->Side != EAstraSide::Neutral)
 	{
-		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f);
-		const int32 N = FMath::Min(S.Missiles, S.Radius > 200.f ? 4 : 2);
+		// a massed salvo empties the ready cells (6 on a cruiser, 3 on a destroyer): the cells then reload for longer
+		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f) * (S.bConserve ? 2.2f : 1.f) * (S.bSalvo ? 2.f : 1.f);
+		const int32 N = FMath::Min(S.Missiles, S.bSalvo ? (S.Radius > 200.f ? 6 : 3) : (S.Radius > 200.f ? 4 : 2));
+		S.bSalvo = false;
 		for (int32 i = 0; i < N; ++i)
 		{
 			FireMissile(S, *T);
@@ -1251,6 +1287,136 @@ FString UAstraBattleSubsystem::MandateCommander() const
 		}
 	}
 	return Best ? Best->ContactId : FString();
+}
+
+bool UAstraBattleSubsystem::EnemyTactics(const TSharedPtr<FJsonObject>& Args, FString& OutDetail)
+{
+	FString Focus, StanceName, Missiles, Fighters;
+	Args->TryGetStringField(TEXT("focus"), Focus);
+	Args->TryGetStringField(TEXT("stance"), StanceName);
+	Args->TryGetStringField(TEXT("missiles"), Missiles);
+	Args->TryGetStringField(TEXT("fighters"), Fighters);
+	TArray<FString> Only;
+	Args->TryGetStringArrayField(TEXT("ships"), Only);
+	for (FString& O : Only) { O = O.ToUpper(); }
+	StanceName = StanceName.ToLower();
+	static const TCHAR* Stances[] = {TEXT("standard"), TEXT("close"), TEXT("standoff"), TEXT("flank"), TEXT("screen")};
+	int32 Stance = -1;
+	for (int32 i = 0; i < 5; ++i) { if (StanceName == Stances[i]) { Stance = i; } }
+	// the focus: an ASTRA warship still in the fight ("" or "nearest": each ship its own)
+	const FAstraBattleShip* F = nullptr;
+	if (!Focus.IsEmpty() && !Focus.Equals(TEXT("nearest"), ESearchCase::IgnoreCase))
+	{
+		F = Focus.Contains(TEXT("AQUILA"), ESearchCase::IgnoreCase) ? &Ships[0] : FindByContact(Focus.ToUpper());
+		if (!F)
+		{
+			for (const FAstraBattleShip& X : Ships)
+			{
+				if (X.bAlive && X.Side == EAstraSide::Astra && X.Name.Contains(Focus, ESearchCase::IgnoreCase)) { F = &X; }
+			}
+		}
+		if (!F || !F->bAlive || F->Side != EAstraSide::Astra || F->bCraft)
+		{
+			OutDetail = FString::Printf(TEXT("no ASTRA warship '%s' in the fight"), *Focus);
+			return false;
+		}
+	}
+	TArray<FAstraBattleShip*> Group;
+	bool bFocusChanged = false, bStanceChanged = false;
+	int32 Salvo = 0;
+	for (FAstraBattleShip& S : Ships)
+	{
+		if (!S.bAlive || S.Side != EAstraSide::Mandate || !S.bHostile || S.bCraft || S.bFleeing || S.bHoldFire || S.bCold ||
+		    (Only.Num() && !Only.Contains(S.ContactId)))
+		{
+			continue;
+		}
+		Group.Add(&S);
+		const int32 NewTarget = F ? F->Id : -1;
+		bFocusChanged |= NewTarget >= 0 && S.OrderTarget != NewTarget;
+		S.OrderTarget = NewTarget;
+		if (Stance >= 0)
+		{
+			bStanceChanged |= S.Stance != Stance;
+			S.Stance = (uint8)Stance;
+		}
+		if (Missiles.Equals(TEXT("salvo"), ESearchCase::IgnoreCase) && S.Missiles > 0)
+		{
+			S.bSalvo = true;
+			S.bConserve = false;
+			Salvo += FMath::Min(S.Missiles, S.Radius > 200.f ? 6 : 3);
+		}
+		else if (Missiles.Equals(TEXT("conserve"), ESearchCase::IgnoreCase)) { S.bConserve = true; }
+		else if (Missiles.Equals(TEXT("normal"), ESearchCase::IgnoreCase)) { S.bConserve = false; }
+		if (S.Mode != EAstraShipMode::Attack && S.Mode != EAstraShipMode::Evade)
+		{
+			S.Mode = EAstraShipMode::Attack;
+		}
+	}
+	if (Group.Num() == 0)
+	{
+		OutDetail = TEXT("no ship of the strike group is fighting");
+		return false;
+	}
+	// the Mandate's strike fighters: launch now, or keep them aboard
+	int32 Launched = 0;
+	for (FAstraSquadron& Q : Squadrons)
+	{
+		if (Q.Side != EAstraSide::Mandate)
+		{
+			continue;
+		}
+		if (Fighters.Equals(TEXT("launch"), ESearchCase::IgnoreCase) && Q.ToLaunch > 0)
+		{
+			Q.LaunchT = FMath::Min(Q.LaunchT, 2.f);
+			Q.TargetId = F ? F->Id : Q.TargetId;
+			Launched += Q.ToLaunch;
+		}
+		else if (Fighters.Equals(TEXT("hold"), ESearchCase::IgnoreCase) && Q.ToLaunch > 0)
+		{
+			Q.LaunchT = FMath::Max(Q.LaunchT, 90.f);
+		}
+	}
+	// what the Aquila's sensors see of it (the fire shifting, ships swinging wide, opening or closing the range)
+	const FString Who = Group.Num() > 1 ? FString(TEXT("the Mandate ships")) : FString::Printf(TEXT("%s (%s)"), *Group[0]->Name, *Group[0]->ContactId);
+	const FString Them = F ? (F->bPlayer ? FString(TEXT("us")) : FString::Printf(TEXT("the %s (%s)"), *F->Name.Replace(TEXT("ASN "), TEXT("")), *F->ContactId)) : FString();
+	TArray<FString> Seen;
+	if (bFocusChanged && F)
+	{
+		Seen.Add(FString::Printf(TEXT("%s are shifting their fire onto %s"), *Who, *Them));
+	}
+	if (bStanceChanged)
+	{
+		switch (Stance)
+		{
+		case 1: Seen.Add(FString::Printf(TEXT("%s are closing hard, to knife-fight range"), *Who)); break;
+		case 2: Seen.Add(FString::Printf(TEXT("%s are opening the range to about %.0f km, out of laser reach"), *Who, FMath::Clamp(Group[0]->RailRange * 0.9f, 5000.f, 9000.f) / 1000.f)); break;
+		case 3:
+		{
+			const FAstraBattleShip& T = F ? *F : Ships[0];
+			Seen.Add(FString::Printf(TEXT("%s are swinging wide to flank %s%s"), *Who, T.bPlayer ? TEXT("us") : *FString::Printf(TEXT("the %s"), *T.Name),
+			                         !T.ShieldFacing.IsNearlyZero() ? TEXT(", away from the reinforced shield sector") : TEXT("")));
+			break;
+		}
+		case 4: Seen.Add(FString::Printf(TEXT("%s are pulling back to screen their flagship"), *Who)); break;
+		default: break;
+		}
+	}
+	if (Launched > 0)
+	{
+		Seen.Add(TEXT("launch bays opening on the Mandate carrier"));
+	}
+	if (Seen.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: %s"), *FString::Join(Seen, TEXT("; "))), true);
+	}
+	OutDetail = FString::Printf(TEXT("%d ship%s: focus %s, stance %s, missiles %s%s%s"), Group.Num(), Group.Num() == 1 ? TEXT("") : TEXT("s"),
+	                            F ? *F->ContactId : TEXT("nearest"), Stance >= 0 ? Stances[Stance] : TEXT("unchanged"),
+	                            Missiles.IsEmpty() ? TEXT("unchanged") : *Missiles.ToLower(),
+	                            Salvo ? *FString::Printf(TEXT(" (%d in the salvo)"), Salvo) : TEXT(""),
+	                            Launched ? *FString::Printf(TEXT(", %d fighters launching"), Launched) : TEXT(""));
+	UE_LOG(LogASTRA, Log, TEXT("[Battle] Mandate tactics: %s"), *OutDetail);
+	return true;
 }
 
 bool UAstraBattleSubsystem::EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail)
@@ -1733,6 +1899,14 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 				O->SetNumberField(TEXT("shields_pct"), FMath::RoundToDouble(100.0 * S.Shield / S.ShieldMax));
 				O->SetNumberField(TEXT("missiles_left"), S.Missiles);
 				O->SetNumberField(TEXT("range_to_aquila_km"), FMath::RoundToDouble(FVector::Dist(S.Pos, Aquila) / 100.0) / 10.0);
+				if (const FAstraBattleShip* T = FindById(S.TargetId); T && T->bAlive && !S.bFleeing)
+				{
+					O->SetStringField(TEXT("engaging"), T->bPlayer ? FString(TEXT("AQUILA")) : T->ContactId);
+					O->SetNumberField(TEXT("range_to_target_km"), FMath::RoundToDouble(FVector::Dist(S.Pos, T->Pos) / 100.0) / 10.0);
+				}
+				static const TCHAR* StanceNames[] = {TEXT("standard"), TEXT("close"), TEXT("standoff"), TEXT("flank"), TEXT("screen")};
+				O->SetStringField(TEXT("stance"), StanceNames[FMath::Min<int32>(S.Stance, 4)]);
+				if (S.bConserve) { O->SetBoolField(TEXT("conserving_missiles"), true); }
 				if (S.ContactId == Cmd)
 				{
 					O->SetBoolField(TEXT("commands_the_strike_group"), true);
@@ -1742,12 +1916,22 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 		}
 		else if (S.Side == EAstraSide::Astra && S.bAlive && !S.bCraft)
 		{
+			O->SetStringField(TEXT("id"), S.bPlayer ? FString(TEXT("AQUILA")) : S.ContactId);
 			if (S.bPlayer)
 			{
-				O->SetStringField(TEXT("name"), TEXT("ASN Aquila (the ship on the channel)"));
+				O->SetStringField(TEXT("name"), TEXT("ASN Aquila (the carrier cruiser, the ship on the channel)"));
 			}
 			O->SetNumberField(TEXT("hull_pct"), FMath::RoundToDouble(100.0 * S.Hull / S.HullMax));
 			O->SetNumberField(TEXT("shields_pct"), FMath::RoundToDouble(100.0 * S.Shield / S.ShieldMax));
+			// what their sensors read of the shield: a reinforced sector is stronger, the others weaker
+			const FVector Fz = S.ShieldFacing;
+			O->SetStringField(TEXT("shields"), Fz.IsNearlyZero() ? TEXT("balanced")
+			                  : FString::Printf(TEXT("reinforced %s (the other sectors weaker)"), Fz.X > 0.5f ? TEXT("forward") : Fz.X < -0.5f ? TEXT("aft")
+			                                    : Fz.Y > 0.5f ? TEXT("starboard") : Fz.Y < -0.5f ? TEXT("port") : Fz.Z > 0.5f ? TEXT("dorsal") : TEXT("ventral")));
+			if (const FAstraBattleShip* Flag = FindByContact(Cmd); Flag && Flag->bAlive)
+			{
+				O->SetNumberField(TEXT("range_from_your_flagship_km"), FMath::RoundToDouble(FVector::Dist(S.Pos, Flag->Pos) / 100.0) / 10.0);
+			}
 			Foe.Add(MakeShared<FJsonValueObject>(O));
 		}
 	}
@@ -1765,6 +1949,12 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 		Ours += (S.bCraft && S.bAlive && S.Side == EAstraSide::Mandate) ? 1 : 0;
 	}
 	V->SetNumberField(TEXT("your_strike_fighters_airborne"), Ours);
+	int32 Ready = 0;
+	for (const FAstraSquadron& Q : Squadrons)
+	{
+		Ready += Q.Side == EAstraSide::Mandate ? Q.ToLaunch : 0;
+	}
+	V->SetNumberField(TEXT("your_strike_fighters_still_aboard"), Ready);
 	return V;
 }
 

@@ -93,6 +93,11 @@ struct FAstraBattleShip
 	bool bLeader = false;                // leads its group (the commander on the channel)
 	bool bDerelict = false;              // a dead station or hulk to investigate: no power, tumbling slowly
 	float SpinDeg = 0.f;
+	// the Mandate commander's tactical orders, by datalink: where the fire goes, how to fight, the missiles
+	int32 OrderTarget = -1;              // ship id to concentrate on (-1: the nearest)
+	uint8 Stance = 0;                    // 0 standard, 1 close, 2 standoff, 3 flank, 4 screen
+	bool bSalvo = false;                 // empty the cells at the next chance (all together: saturate point defence)
+	bool bConserve = false;              // fire missiles sparingly
 
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> ShieldBubble = nullptr;
@@ -280,6 +285,10 @@ public:
 	/** A Mandate commander's decision (from their mind): continue_attack | hold_fire | withdraw | accept_surrender.
 	 *  The senior surviving commander orders the whole strike group; any other captain only their own ship. */
 	bool EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail);
+	/** The senior Mandate commander's tactical orders (from their mind, by datalink): focus of fire (focus), stance
+	 *  (standard | close | standoff | flank | screen), missiles (normal | salvo | conserve), fighters (launch | hold),
+	 *  optionally only some ships. What the Aquila's sensors can see of it is reported to the bridge. */
+	bool EnemyTactics(const TSharedPtr<FJsonObject>& Args, FString& OutDetail);
 	/** Contact id of the ship whose captain commands the Mandate forces now: the group leader, else the biggest ship left. */
 	FString MandateCommander() const;
 	/** The war director's next beat (from the mind): raid | distress | reinforcements | resupply | calm. Contact ids are
@@ -410,6 +419,8 @@ private:
 	              const FVector& Pos, float HeadingDeg, float Speed, float Radius, float Hull, float Shield);
 	FAstraBattleShip* FindByContact(const FString& Contact);
 	FAstraBattleShip* FindById(int32 Id);
+	const FAstraBattleShip* FindByContact(const FString& Contact) const { return const_cast<UAstraBattleSubsystem*>(this)->FindByContact(Contact); }
+	const FAstraBattleShip* FindById(int32 Id) const { return const_cast<UAstraBattleSubsystem*>(this)->FindById(Id); }
 	void SpawnVisual(FAstraBattleShip& S);
 
 	void TickPlayer(float Dt);
