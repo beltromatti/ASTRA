@@ -125,6 +125,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 7. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.
 
 ## Note operative
+- Prestazioni (2026-09-28, standalone 1080p, battaglia): ~19 ms di mediana (≈52 fps), limitate dalla GPU (~18,5 ms: luci 2,6, ombre 2,0, Lumen 1,6, traslucenza 1,4). Gli "scatti" da ~31 ms ogni ~12 frame non sono lavoro in più: la CPU, più veloce della GPU, si blocca in attesa delle query di occlusione (trovato con Unreal Insights da riga di comando: `-trace=cpu,frame` e `UnrealInsights -NoUI -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimingEvents ..."`). Per scendere serve ridurre il costo GPU. Diagnostica schermi: `astra.screens.profile 1`
 - Ricompilare il C++: `tools/ricompila.sh` (salva, chiude editor e menti, compila, riapre e aspetta l'MCP; log in Saved/Logs/build_last.log).
 - Console di prova: `astra.cmd <comando> <json con ' al posto di ">` esegue qualsiasi comando di bordo come farebbe l'equipaggio.
 - La sfera del cielo è opaca e ricentrata sulla camera: il suo raggio (≈490 km, scala 12000 di SM_SkySphere) è la distanza massima visibile. Prima era 16 km e nascondeva le navi lontane.

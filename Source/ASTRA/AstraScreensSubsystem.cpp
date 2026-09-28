@@ -15,9 +15,12 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Materials/MaterialInstance.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "RenderingThread.h"
 
 namespace
 {
+	// diagnostics: time each page's redraw including the render thread's work (blocks the game thread while on)
+	TAutoConsoleVariable<int32> CVarScreensProfile(TEXT("astra.screens.profile"), 0, TEXT("Log the cost of each bridge screen redraw"));
 	FLinearColor RGB(uint8 R, uint8 G, uint8 B, float A = 1.f)
 	{
 		FLinearColor C(FColor(R, G, B));
@@ -264,12 +267,35 @@ void UAstraScreensSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 void UAstraScreensSubsystem::Tick(float DeltaTime)
 {
 	Time += DeltaTime;
+	// one screen redrawn per frame at most (the most overdue one): drawing them all in the same frame was a
+	// 12 ms hitch four times a second
+	UAstraScreenPage* Due = nullptr;
 	for (UAstraScreenPage* P : Pages)
 	{
-		if ((P->Wait -= DeltaTime) <= 0.f)
+		P->Wait -= DeltaTime;
+		if (P->Wait <= 0.f && (!Due || P->Wait < Due->Wait))
 		{
-			P->Wait += P->Interval;
-			P->Target->UpdateResource();   // -> Draw()
+			Due = P;
+		}
+	}
+	if (Due)
+	{
+		Due->Wait = FMath::Max(Due->Wait + Due->Interval, Due->Interval * 0.5f);
+		const bool bProfile = CVarScreensProfile.GetValueOnGameThread() != 0;
+		TSharedPtr<double> RT0 = MakeShared<double>(0.0);
+		if (bProfile)
+		{
+			ENQUEUE_RENDER_COMMAND(AstraScreenT0)([RT0](FRHICommandListImmediate&) { *RT0 = FPlatformTime::Seconds(); });
+		}
+		const double T0 = FPlatformTime::Seconds();
+		Due->Target->FastUpdateResource();   // repaint only (UpdateResource re-creates the texture every time)
+		if (bProfile)
+		{
+			const double GameMs = (FPlatformTime::Seconds() - T0) * 1000.0;
+			ENQUEUE_RENDER_COMMAND(AstraScreenT1)([RT0, GameMs, Name = Due->Name](FRHICommandListImmediate&)
+			{
+				UE_LOG(LogASTRA, Log, TEXT("[Screens] %s: game %.2f ms, render %.2f ms"), *Name, GameMs, (FPlatformTime::Seconds() - *RT0) * 1000.0);
+			});
 		}
 	}
 }

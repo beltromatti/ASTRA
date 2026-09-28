@@ -178,14 +178,14 @@ for st in DATA["stations"]:
     c.set_folder_path("Bridge/Crew")
 
 # --- lights: dome downlight + rect lights along the ceiling beams + holo glow (no shadows) + station spots
-def rect(x, y, z, w, h, lumens, temp, label, shadows=True, pitch=-90.0, yaw=0.0):
+def rect(x, y, z, w, h, lumens, temp, label, shadows=True, pitch=-90.0, yaw=0.0, radius=1500.0):
     a = eas.spawn_actor_from_class(unreal.RectLight, V(x * M, y * M, z * M), R(pitch=pitch, yaw=yaw))
     c = a.get_component_by_class(unreal.RectLightComponent)
     c.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
     c.set_editor_property("intensity", lumens)
     c.set_editor_property("source_width", w * M)
     c.set_editor_property("source_height", h * M)
-    c.set_editor_property("attenuation_radius", 1500.0)
+    c.set_editor_property("attenuation_radius", radius)
     c.set_editor_property("use_temperature", True)
     c.set_editor_property("temperature", temp)
     c.set_editor_property("cast_shadows", shadows)
@@ -196,9 +196,9 @@ def rect(x, y, z, w, h, lumens, temp, label, shadows=True, pitch=-90.0, yaw=0.0)
 
 
 dc = DATA["ceiling"]["dome_center"]
-rect(dc[0], dc[1], DATA["ceiling"]["dome_height"] - 0.05, 2.0, 2.0, 9000, 5200, "Dome_Downlight")
+rect(dc[0], dc[1], DATA["ceiling"]["dome_height"] - 0.05, 2.0, 2.0, 9000, 5200, "Dome_Downlight", shadows=False)  # perf: behind the Captain
 for i, (x, y) in enumerate(((0.0, 0.0), (5.6, 0.0), (0.5, -5.8), (0.5, 5.8), (-3.0, -5.6), (-3.0, 5.6))):
-    rect(x, y, DATA["ceiling"]["height"] - 0.36, 1.6, 0.4, 3500, 4800, f"Ceiling_{i}", shadows=(i < 2))
+    rect(x, y, DATA["ceiling"]["height"] - 0.36, 1.6, 0.4, 3500, 4800, f"Ceiling_{i}", shadows=(i < 2), radius=1500.0 if i < 2 else 1000.0)
 
 pl = eas.spawn_actor_from_class(unreal.PointLight, V(ht["pos"][0] * M, ht["pos"][1] * M, (ht["height"] + 0.35) * M), R())
 plc = pl.get_component_by_class(unreal.PointLightComponent)
