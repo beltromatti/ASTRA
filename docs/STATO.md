@@ -8,6 +8,7 @@
 | Data | Credito totale | Speso | Note |
 |---|---|---|---|
 | 2026-09-28 | 10,00 $ | 0,00 $ | ricarica iniziale dell'utente |
+| 2026-09-28 | 10,00 $ | 0,10 $ | benchmark modelli (9 configurazioni × 40 ordini) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -23,18 +24,22 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 
 ## M0 — Fondamenta
 - [x] Cartella progetto `~/Desktop/ASTRA`, documenti spostati, `.env` protetto (gitignore + hook anti-segreti)
-- [ ] Repository git + LFS, repo privato GitHub `beltromatti/ASTRA`, primo push
-- [ ] Plugin Claude Code ufficiale Epic (skill Unreal)
-- [ ] Progetto Unreal C++ ASTRA dal template First Person, configurato per M4 16 GB (SM6, niente RT hardware, pool di memoria, Lumen Lite, TSR)
-- [ ] MCP ufficiale attivo + toolset `AgentPythonTools` (Python arbitrario) + client MCP da terminale; verifica con catture
-- [ ] Guida di stile ASTRA + Bibbia di ASTRA (bozza)
-- [ ] Benchmark modelli AI via OpenRouter (latenza dall'Italia, tool calling, italiano/multilingua) → scelta finale
+- [x] Repository git + LFS, repo privato GitHub `beltromatti/ASTRA`, push
+- [x] Plugin Claude Code ufficiale Epic (skill Unreal) v3.1.1
+- [x] Progetto Unreal C++ ASTRA dal template First Person, configurato per M4 16 GB (SM6, niente RT hardware, Substrate spento, pool di memoria)
+- [x] MCP ufficiale attivo + toolset `AstraAgentTools` (Python arbitrario) + client `tools/ue.py`; verifica con catture (docs/progressi/)
+- [x] Guida di stile (docs/STILE.md) + Bibbia di ASTRA (docs/BIBBIA.md) — bozze v0.1
+- [x] Benchmark modelli AI → scelta: DeepSeek V4.1 Flash (Modal + Together in doppio canale) per ufficiali/equipaggio; Ling 3.0 Flash per chiacchiere; MiniMax-M3 candidato per capitani/ammiragli (docs/bench/)
 - [ ] Servizio voce di base (Parakeet/WhisperKit + Pocket TTS + labiale) e prova end-to-end
 - [ ] Test di prestazioni automatici (CsvProfile) con gate
 
 ## Prossimi passi
-1. Git + GitHub, poi progetto Unreal.
+1. Servizio voce: Pocket TTS (italiano, CPU) + riconoscimento vocale (WhisperKit/Parakeet sul chip neurale) + prova andata-ritorno.
+2. Test di prestazioni automatici (CsvProfile) con gate.
+3. M1: kit modulare ASTRA (Blender procedurale) e nucleo della nave Aquila.
 
 ## Registro decisioni
+- 2026-09-28 — Modelli: DeepSeek V4.1 Flash @Modal (98% ordini corretti, 100% lingua, primo comando 0,52 s, frase 1,02 s) e @Together (95%, 0,46 s) in doppio canale; scartati gpt-oss (55%), GPT-6 Luna e Groq (errori). DeepSeek diretto e GLM bloccati dalle impostazioni privacy dell'account OpenRouter (non servono).
+- 2026-09-28 — Intenti istantanei: multilingual-e5-small (MIT) invece di EmbeddingGemma (accesso Google su approvazione manuale).
 - 2026-09-28 — Progetto sulla Scrivania (richiesta utente); lavoro sempre su `main`.
 - 2026-09-28 — Contenuti di terzi grezzi e MetaHuman generati esclusi da git (quota LFS gratuita 10 GiB); si riscaricano/rigenerano dagli script.
