@@ -151,6 +151,12 @@ def build(name: str):
         yb = side * 0.75                                                                 # twin fins
         K.slab(b, -11.84, -8.6, K.chamfer_rect(0.1, 0.97, 0.2), K.chamfer_rect(0.08, 0.38, 0.2), PLATE, AX + 1.4, AX + 1.68,
                yb + side * 0.2, yb + side * 0.5)
+    # landing gear: a nose strut and two mains, pads on the ground 2.6 m under the eye
+    for (gx, gy) in ((3.2, 0.0), (-4.6, 1.5), (-4.6, -1.5)):
+        b.cylinder((gx, gy, -2.0), (gx, gy, -2.52), 0.09, FRAME, segments=10)
+        b.cylinder((gx - 0.25, gy, -1.95), (gx, gy, -2.3), 0.05, FRAME, segments=8)      # the drag brace
+        b.box((gx, gy, -2.56), (0.9, 0.35, 0.08), FRAME)                                  # the pad
+        b.box((gx + 0.1, gy, -2.0), (0.7, 0.5, 0.12), TUB)                                # the bay door
     for i in range(2):                                                                   # engines
         yy = (i - 0.5) * 1.55
         r = L * 0.04

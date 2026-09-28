@@ -130,7 +130,7 @@ LERP = unreal.MaterialExpressionLinearInterpolate
 # =========================================================================================== the ground
 m = fresh("M_ASTRA_Terrain")
 wp = E(m, unreal.MaterialExpressionWorldPosition, -2600, 0)
-op = E(m, unreal.MaterialExpressionObjectPositionWS, -2600, 120)
+op = E(m, unreal.MaterialExpressionActorPositionWS, -2600, 120)          # the zone's origin (sea level): every tile shares it
 local = binop(m, unreal.MaterialExpressionSubtract, wp, "", op, "", -2450, 60)
 loc_m = binop(m, M, local, "", const(m, 0.01, -2450, 160), "", -2300, 60)          # metres, terrain frame
 nrm = E(m, unreal.MaterialExpressionVertexNormalWS, -2600, 300)
@@ -183,8 +183,8 @@ return c * tone * lerp(1.0, 0.55, wet);
 """, [("N", (nrm, "")), ("RockXY", (S["Rock"]["BC"], "RGB")), ("RockXZ", (rock_xz, "RGB")), ("RockYZ", (rock_yz, "RGB")),
       ("Sand", (S["Sand"]["BC"], "RGB")), ("Snow", (S["Snow"]["BC"], "RGB")), ("Meadow", (S["Meadow"]["BC"], "RGB")),
       ("Grass", (S["Grass"]["BC"], "RGB")), ("W", (weights, "")), ("Mc", (macro, "RGB")), ("P", (loc_m, "")),
-      ("GrassTint", (vector(m, "GrassTint", (0.72, 1.0, 0.62, 1), -1000, 600), "RGB")),
-      ("MeadowTint", (vector(m, "MeadowTint", (0.85, 1.0, 0.7, 1), -1000, 700), "RGB"))], -700, 900,
+      ("GrassTint", (vector(m, "GrassTint", (0.5, 0.66, 0.4, 1), -1000, 600), "RGB")),
+      ("MeadowTint", (vector(m, "MeadowTint", (0.7, 0.78, 0.58, 1), -1000, 700), "RGB"))], -700, 900,
       unreal.CustomMaterialOutputType.CMOT_FLOAT3)
 tint = binop(m, M, shade, "", vector(m, "Tint", (1, 1, 1, 1), -700, 800), "RGB", -450, 900)
 mel.connect_material_property(tint, "", unreal.MaterialProperty.MP_BASE_COLOR)
@@ -277,5 +277,31 @@ def mi(name, parent):
 
 mi("MI_NR_Terrain", m)
 mi("MI_NR_Ocean", o)
+
+
+def mi_params(name, parent, scalars=None, vectors=None):
+    inst = mi(name, parent)
+    for k, v in (scalars or {}).items():
+        mel.set_material_instance_scalar_parameter_value(inst, k, v)
+    for k, v in (vectors or {}).items():
+        mel.set_material_instance_vector_parameter_value(inst, k, unreal.LinearColor(*v, 1.0))
+    mel.update_material_instance(inst)
+    eal.save_loaded_asset(inst, only_if_is_dirty=False)
+
+
+# Port Aurelius: concrete, painted markings, curtain-wall glass, building panels
+hard = eal.load_asset(f"{MAT}/M_ASTRA_Hard")
+hull = eal.load_asset(f"{MAT}/M_ASTRA_Hull")
+mi_params("MI_NR_Concrete", hard, {"RoughnessMin": 0.7, "RoughnessMax": 0.92, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.6,
+                                   "MacroBrightness": 0.12, "UVScale": 3.0, "NormalStrength": 0.5}, {"Tint": (0.36, 0.35, 0.33)})
+mi_params("MI_NR_Paint", hard, {"RoughnessMin": 0.5, "RoughnessMax": 0.7, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.3,
+                                "NormalStrength": 0.3}, {"Tint": (0.75, 0.52, 0.04)})
+mi_params("MI_NR_Glass", hard, {"RoughnessMin": 0.03, "RoughnessMax": 0.08, "MetallicFromMap": 0.0, "MetallicBias": 0.7,
+                                "BaseColorMapInfluence": 0.0, "NormalStrength": 0.0, "MacroBrightness": 0.05}, {"Tint": (0.08, 0.12, 0.16)})
+mi_params("MI_NR_Dark", hard, {"RoughnessMin": 0.6, "RoughnessMax": 0.8, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.2},
+          {"Tint": (0.03, 0.03, 0.035)})
+mi_params("MI_NR_Facade", hull, {"PanelTone": 0.12, "PanelCavity": 0.8, "PanelRoughness": 0.1, "RoughnessMin": 0.45, "RoughnessMax": 0.7,
+                                 "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.4, "UVScale": 2.0, "PanelScale": 0.6},
+          {"Tint": (0.55, 0.53, 0.5)})
 log.append("instances")
 print(json.dumps(log))

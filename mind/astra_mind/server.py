@@ -84,6 +84,8 @@ class GameShip:
 
 EXTERNAL_SPEAKERS = {c["key"]: (f'{c["name"]} ({c["ship"]})', c["voice"]) for c in COMMANDERS.values()}
 EXTERNAL_SPEAKERS[ADMIRAL["key"]] = (f'{ADMIRAL["name"]} ({ADMIRAL["ship"]})', ADMIRAL["voice"])
+from .port import PORT as PORT_CONTROL, PortControl, for_port, stimulus_for  # noqa: E402
+EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
 import re as _re
@@ -191,6 +193,7 @@ class Mind:
         self.voice = Voice(self.tts, self._sink)
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
+        self.port = PortControl(self.llm, self._say_external)
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander,
                                  news=self._fleet_news)
         # the Captain's log is private: the story reads it, the crew does not
@@ -240,6 +243,14 @@ class Mind:
             await self.game.execute("log_entry", {"text": entry[:200]}, "captain")
         except Exception:  # noqa: BLE001
             log.warning("the game did not acknowledge the log entry")
+
+    async def _port_call(self, cue: str, delay: float) -> None:
+        """Port Aurelius Control speaks up (after the entry's glow has faded, or as Eagle touches down)."""
+        await asyncio.sleep(delay)
+        try:
+            await self.port.respond(cue, self.lang, self._battle_state(), self.director.war.brief(detail=False))
+        except Exception:  # noqa: BLE001
+            log.exception("port control failed")
 
     async def _fleet_news(self, text: str) -> None:
         """War news from elsewhere in the March reaches the bridge over the fleet net (comms relays it)."""
@@ -457,6 +468,11 @@ class Mind:
                     # the Captain dictates the log: recorded (a chirp from the console), remembered by the story
                     self.record_log(entry)
                     continue
+                st_now = self.game.state if (self.game and self.game.state) else {}
+                if "New Ravenna" in str(st_now.get("captain", "")) and for_port(text):
+                    self.director.note(f"the Captain to Port Aurelius Control: {text}")
+                    await self.port.respond(f"[Eagle on the radio]: {text}", lang, self._battle_state(), self.director.war.brief(detail=False))
+                    continue
                 to_enemy = ""
                 if self.enemy.open:
                     # a channel is open: the words meant for the enemy go over it, the orders stay on the bridge
@@ -504,6 +520,7 @@ class Mind:
                     # a new game session: the crew starts a fresh conversation (the ship state is new too)
                     self.agent.history.clear()
                     self.enemy.reset()
+                    self.port.reset()
                     log.info("new game session: conversation reset (the war waits for the Captain's choice)")
                 elif kind == "campaign":
                     # the Captain chose in the title menu: a new war, or the saved one
@@ -528,6 +545,9 @@ class Mind:
                         asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
                     elif text.startswith("story:"):
                         self.director.note(text.split(":", 1)[1].strip())   # remembered, no new beat
+                    port_cue = stimulus_for(text)
+                    if port_cue:
+                        asyncio.create_task(self._port_call(port_cue, 6.0 if "left the plot" in text else 1.5))
                     fallen = _fallen(text)
                     if fallen:
                         self.director.note("fallen: " + "; ".join(fallen))

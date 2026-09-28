@@ -50,7 +50,7 @@ log.append("terrain")
 # ---- the sea
 plane = eal.load_asset("/Engine/BasicShapes/Plane")
 sea = eas.spawn_actor_from_object(plane, ZONE, unreal.Rotator())
-sea.set_actor_scale3d(unreal.Vector(4000.0, 4000.0, 1.0))          # 400 km
+sea.set_actor_scale3d(unreal.Vector(400000.0, 400000.0, 1.0))      # the engine plane is 1 m: 400 km
 sea.static_mesh_component.set_material(0, eal.load_asset("/Game/ASTRA/Materials/Instances/MI_NR_Ocean"))
 sea.static_mesh_component.set_editor_property("cast_shadow", False)
 sea.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.QUERY_ONLY)
@@ -79,7 +79,7 @@ tagged(cloud, "NR_Clouds", "NewRavenna/Sky")
 
 fog = eas.spawn_actor_from_class(unreal.ExponentialHeightFog, ZONE + unreal.Vector(0, 0, 0), unreal.Rotator())
 fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
-fc.set_editor_property("fog_density", 0.004)
+fc.set_editor_property("fog_density", 0.0012)
 fc.set_editor_property("fog_height_falloff", 0.12)
 fc.set_editor_property("fog_inscattering_luminance", unreal.LinearColor(0.35, 0.5, 0.75, 1.0))
 fc.set_visibility(False)
@@ -96,6 +96,48 @@ tagged(sky, "NR_SkyLight", "NewRavenna/Sky")
 log.append("sky")
 
 sites = json.load(open(os.path.join(ROOT, "art", "export", "newravenna", "nr_sites.json")))
-log.append(f"sites: field at ({sites['field']['x']}, {sites['field']['y']}), {len(sites['city'])} city blocks")
+port = json.load(open(os.path.join(ROOT, "art", "export", "newravenna_port", "nr_port.json")))
+PORT = KIT + "/Port"
+
+
+def ue(x, y, z):
+    """The generators' frame (Blender, +y north) to the zone's (the FBX import mirrors y)."""
+    return V(x, -y, z)
+
+
+def V(x, y, z):
+    return unreal.Vector(ZONE.x + x * 100.0, ZONE.y + y * 100.0, ZONE.z + z * 100.0)
+
+
+def piece(mesh_name, pos, yaw=0.0, scale=(1.0, 1.0, 1.0), label="", folder="NewRavenna/Port"):
+    mesh = eal.load_asset(f"{PORT}/{mesh_name}")
+    a = eas.spawn_actor_from_object(mesh, pos, unreal.Rotator(roll=0, pitch=0, yaw=yaw))
+    a.set_actor_scale3d(unreal.Vector(*scale))
+    a.static_mesh_component.set_collision_enabled(unreal.CollisionEnabled.QUERY_ONLY)
+    return tagged(a, label or mesh_name, folder)
+
+
+# ---- Port Aurelius Field: the apron, the pads, the tower, the hangars, the terminal
+f = sites["field"]
+for k, (dx, dy, dz) in enumerate(port["apron"]):
+    piece("SM_NR_Apron", ue(f["x"] + dx, f["y"] + dy, f["z"] + dz), label=f"NR_Apron_{k}")
+for k, (dx, dy, dz) in enumerate(port["pads"]):
+    piece("SM_NR_Pad", ue(f["x"] + dx, f["y"] + dy, f["z"] + dz), label=f"NR_Pad_{k + 1}")
+for k, (dx, dy, dz) in enumerate(port["tower"]):
+    piece("SM_NR_Tower", ue(f["x"] + dx, f["y"] + dy, f["z"] + dz), yaw=-90.0, label="NR_Tower")
+for k, (dx, dy, dz) in enumerate(port["hangars"]):
+    piece("SM_NR_Hangar", ue(f["x"] + dx, f["y"] + dy, f["z"] + dz), yaw=90.0, label=f"NR_Hangar_{k + 1}")
+for k, (dx, dy, dz) in enumerate(port["terminal"]):
+    piece("SM_NR_Terminal", ue(f["x"] + dx, f["y"] + dy, f["z"] + dz), label="NR_Terminal")
+log.append(f"port: {len(port['pads'])} pads")
+
+# ---- the city of Port Aurelius (the blocks the terrain generator found room for)
+VARIANTS = {"A": (120.0, 30.0, 30.0), "B": (40.0, 44.0, 22.0), "C": (70.0, 32.0, 32.0)}
+for k, blk in enumerate(sites["city"]):
+    v = "A" if blk["h"] >= 90 else ("C" if blk["h"] >= 45 else "B")
+    H, W, D = VARIANTS[v]
+    piece(f"SM_NR_Bldg_{v}", ue(blk["x"], blk["y"], blk["z"] - 1.0), yaw=-blk["yaw"],
+          scale=(blk["w"] / W, blk["d"] / D, blk["h"] / H), label=f"NR_City_{k:03d}", folder="NewRavenna/City")
+log.append(f"city: {len(sites['city'])} blocks")
 unreal.EditorLevelLibrary.save_current_level()
 print(json.dumps(log))

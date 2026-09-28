@@ -1033,7 +1033,7 @@ void UAstraShipSubsystem::SetPlanetside(bool bOn)
 		{
 			SpaceEV = PS.AutoExposureMinBrightness;
 		}
-		PS.AutoExposureMinBrightness = PS.AutoExposureMaxBrightness = bOn ? 7.9f : SpaceEV;
+		PS.AutoExposureMinBrightness = PS.AutoExposureMaxBrightness = bOn ? 8.3f : SpaceEV;
 	}
 	if (!bOn)
 	{
