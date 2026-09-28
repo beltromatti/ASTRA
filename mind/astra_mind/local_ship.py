@@ -67,6 +67,9 @@ class LocalShip:
             return self._ok(f"intercepting {c['id']}: bearing {c['bearing_deg']:03d}, range {c['range_km']} km")
         if name == "cease_fire":
             return self._ok("all offensive fire stopped; point defense stays on")
+        if name == "holo_display":
+            s["holo_table"] = a.get("mode", "tactical")
+            return self._ok(f"holo table: {s['holo_table']}")
         if name == "transit_gate":
             dest = (a.get("system_name") or "").strip()
             if not dest:

@@ -271,6 +271,8 @@ public:
 	bool IsInLane() const { return GateRun == EAstraGateRun::Lane; }
 	/** Where the system's Janus Gate is, Fleet's orders, the transit under way (for the crew and the screens). */
 	FString GateStatus() const;
+	/** The system the gate is tuned to: the run under way, else Fleet's orders ("" = none). */
+	FString GetGateDestination() const { return GateRun != EAstraGateRun::None ? GateDest : FleetOrderedDest; }
 	/** Where a live contact is from the Aquila, aimed at its lead point (for the helm's intercept). */
 	bool ContactGeometry(const FString& ContactId, double& OutBearing, double& OutMark, double& OutRangeKm) const;
 	void SetPlayerShields(bool bUp) { if (Ships.Num()) { Ships[0].bShieldsUp = bUp; } }

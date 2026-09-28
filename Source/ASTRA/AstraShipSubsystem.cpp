@@ -190,16 +190,8 @@ void UAstraShipSubsystem::CaptureHomeSky()
 	Systems.Add(Home.Name, Home);
 }
 
-FAstraSystemLook UAstraShipSubsystem::ChartSystem(const FString& InName, const FString& Star, const FString& Planet, const FString& PlanetName)
+FAstraSystemLook UAstraShipSubsystem::MakeLook(const FString& Name, const FString& Star, const FString& Planet, const FString& PlanetName) const
 {
-	const FString Name = InName.TrimStartAndEnd();
-	for (const auto& KV : Systems)
-	{
-		if (KV.Key.Equals(Name, ESearchCase::IgnoreCase))
-		{
-			return KV.Value;
-		}
-	}
 	static const TCHAR* Stars[] = {TEXT("red_dwarf"), TEXT("red_dwarf"), TEXT("orange"), TEXT("orange"), TEXT("yellow"), TEXT("blue_white")};
 	static const TCHAR* Worlds[] = {TEXT("barren"), TEXT("barren"), TEXT("desert"), TEXT("ice"), TEXT("gas_giant"), TEXT("gas_giant"), TEXT("ocean"), TEXT("lava")};
 	auto Valid = [](const FString& V, const TCHAR* const* List, int32 N)
@@ -224,8 +216,27 @@ FAstraSystemLook UAstraShipSubsystem::ChartSystem(const FString& InName, const F
 	L.NebulaHue = R.FRandRange(-1.2f, 1.2f);
 	L.NebulaSat = R.FRandRange(0.6f, 1.3f);
 	L.Seed = R.FRandRange(0.f, 50.f);
+	return L;
+}
+
+FAstraSystemLook UAstraShipSubsystem::ChartSystem(const FString& InName, const FString& Star, const FString& Planet, const FString& PlanetName)
+{
+	const FString Name = InName.TrimStartAndEnd();
+	for (const auto& KV : Systems)
+	{
+		if (KV.Key.Equals(Name, ESearchCase::IgnoreCase))
+		{
+			return KV.Value;
+		}
+	}
+	const FAstraSystemLook L = MakeLook(Name, Star, Planet, PlanetName);
 	Systems.Add(Name, L);
 	return L;
+}
+
+const FAstraSectorSystem* UAstraShipSubsystem::FindSector(const FString& Name) const
+{
+	return Sector.FindByPredicate([&Name](const FAstraSectorSystem& S) { return S.Name.Equals(Name.TrimStartAndEnd(), ESearchCase::IgnoreCase); });
 }
 
 FString UAstraShipSubsystem::KnownSystemsLine() const
@@ -300,6 +311,64 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	if (Name == TEXT("transit_gate"))
 	{
 		return Battle ? Battle->BeginGateRun(Args, OutDetail) : false;
+	}
+	if (Name == TEXT("holo_display"))
+	{
+		const FString M = Str(TEXT("mode")).ToLower();
+		if (M != TEXT("tactical") && M != TEXT("sector"))
+		{
+			OutDetail = TEXT("the holo table shows either the tactical plot or the sector map");
+			return false;
+		}
+		if (M == TEXT("sector") && Sector.Num() == 0)
+		{
+			OutDetail = TEXT("no sector data from the fleet yet");
+			return false;
+		}
+		HoloMode = M;
+		OutDetail = M == TEXT("sector") ? TEXT("holo table: the sector map (the March, who holds what, the gate links)")
+		                                : TEXT("holo table: tactical plot");
+		return true;
+	}
+	if (Name == TEXT("sector"))
+	{
+		// the war map from the mind: every system's look is charted (Aurelia keeps the level's sky), links and owners kept
+		const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+		if (!Args->TryGetArrayField(TEXT("systems"), List))
+		{
+			OutDetail = TEXT("no systems");
+			return false;
+		}
+		Sector.Reset();
+		for (const TSharedPtr<FJsonValue>& V : *List)
+		{
+			const TSharedPtr<FJsonObject> O = V.IsValid() ? V->AsObject() : nullptr;
+			if (!O.IsValid())
+			{
+				continue;
+			}
+			FAstraSectorSystem X;
+			O->TryGetStringField(TEXT("name"), X.Name);
+			O->TryGetStringField(TEXT("owner"), X.Owner);
+			double T = 0.0, PX = 0.0, PY = 0.0;
+			O->TryGetNumberField(TEXT("threat"), T);
+			O->TryGetNumberField(TEXT("x"), PX);
+			O->TryGetNumberField(TEXT("y"), PY);
+			X.Threat = (int32)T;
+			X.Pos = FVector2D(PX, PY);
+			O->TryGetStringArrayField(TEXT("links"), X.Links);
+			FString Star, Planet, World;
+			O->TryGetStringField(TEXT("star_class"), Star);
+			O->TryGetStringField(TEXT("planet_type"), Planet);
+			O->TryGetStringField(TEXT("planet_name"), World);
+			if (!X.Name.IsEmpty() && !X.Name.Equals(TEXT("Aurelia"), ESearchCase::IgnoreCase))
+			{
+				Systems.Add(X.Name, MakeLook(X.Name, Star, Planet, World));
+			}
+			Sector.Add(X);
+		}
+		OutDetail = FString::Printf(TEXT("sector charted: %d systems"), Sector.Num());
+		return true;
 	}
 	if ((Name == TEXT("intercept") || Name == TEXT("set_course")) && Battle && Battle->IsInLane())
 	{
@@ -569,6 +638,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	S->SetObjectField(TEXT("weapons"), W);
 	S->SetStringField(TEXT("target"), TargetId);
 	S->SetStringField(TEXT("emcon"), Emcon);
+	S->SetStringField(TEXT("holo_table"), HoloMode);
 	const UAstraBattleSubsystem* Flight = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
 	if (Flight)
 	{
@@ -593,7 +663,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	{
 		S->SetStringField(TEXT("janus_gate"), Battle->GateStatus());
 	}
-	S->SetStringField(TEXT("known_systems"), KnownSystemsLine());
+	if (Sector.Num() == 0)   // otherwise the mind's war map tells the crew about the sector
+	{
+		S->SetStringField(TEXT("known_systems"), KnownSystemsLine());
+	}
 	S->SetStringField(TEXT("bearing_convention"), TEXT("bearings are true bearings in the system plane, like headings: steer to a contact's bearing to point at it"));
 	TArray<TSharedPtr<FJsonValue>> Dmg;
 	int32 Busy = 0;

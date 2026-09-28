@@ -32,8 +32,8 @@ SHIP_TOOLS: list[dict[str, Any]] = [
                         "gate's field takes the ship and draws her through the ring: once in the lane there is no turning "
                         "back. Everything in this system (enemies, allies, wrecks) stays behind. Only on the Captain's "
                         "explicit order. A set_course or intercept before the lane cancels the approach.", {
-        "system_name": {"type": "string", "description": "destination system, English name (known_systems in the state, "
-                                                         "Fleet's orders, or any system the Captain names)"}},
+        "system_name": {"type": "string", "description": "destination system: one the gate here is bound to (see "
+                                                         "janus_gate and the March), usually the one Fleet ordered"}},
         ["system_name"]),
     _fn("set_throttle", "Helm: main drive throttle in percent (0 = all stop, 33 = one third, 50 = half, 100 = full = 480 m/s).", {
         "percent": {"type": "number", "minimum": 0, "maximum": 100}}, ["percent"]),
@@ -85,6 +85,10 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "message": {"type": "string", "description": "What we transmit, in English (the Interpreter translates)"}},
         ["contact_id", "intent", "message"]),
     _fn("end_transmission", "Communications: close the open channel (e.g. with an enemy commander).", {}, []),
+    _fn("holo_display", "Science & Sensors: what the holo table in the middle of the bridge shows — the tactical plot "
+                        "(the battle around the Aquila) or the sector map (the systems of the March, who holds them, "
+                        "the gate links, where the Aquila is).", {
+        "mode": {"type": "string", "enum": ["tactical", "sector"]}}, ["mode"]),
     _fn("set_emcon", "Science & Sensors: emission control (silent = passive sensors only).", {
         "level": {"type": "string", "enum": ["silent", "restricted", "full"]}}, ["level"]),
     _fn("active_scan", "Science & Sensors: active radar/lidar ping or focused scan of a contact (reveals our position).", {

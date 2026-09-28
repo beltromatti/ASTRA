@@ -2850,6 +2850,18 @@ bool UAstraBattleSubsystem::BeginGateRun(const TSharedPtr<FJsonObject>& Args, FS
 		OutDetail = FString::Printf(TEXT("the Aquila is already in the %s system"), *Ship->GetSystemName());
 		return false;
 	}
+	// a Gate is bound to a few others only: Keeper Station can tune it to one of those
+	if (const FAstraSectorSystem* Here = Ship->FindSector(Ship->GetSystemName()))
+	{
+		const FString* Dest = Here->Links.FindByPredicate([&Name](const FString& L) { return L.Equals(Name, ESearchCase::IgnoreCase); });
+		if (!Dest)
+		{
+			OutDetail = FString::Printf(TEXT("the Janus Gate in %s is bound only to %s: Keeper Station cannot reach %s from here"),
+			                            *Here->Name, *FString::Join(Here->Links, TEXT(", ")), *Name);
+			return false;
+		}
+		Name = *Dest;
+	}
 	const FAstraSystemLook L = Ship->ChartSystem(Name, Star, Planet, PName);
 	TransitBeat = MakeShared<FJsonObject>();
 	TransitBeat->SetStringField(TEXT("system_name"), L.Name);
@@ -2894,6 +2906,13 @@ FString UAstraBattleSubsystem::GateStatus() const
 	const FAstraBattleShip& P = Ships[0];
 	FString Out = FString::Printf(TEXT("Janus Gate: bearing %03.0f mark %.0f, %.1f km"), BearingDeg(P.Pos, G.Pos), MarkDeg(P.Pos, G.Pos),
 	                              FVector::Dist(P.Pos, G.Pos) / Km);
+	if (const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr)
+	{
+		if (const FAstraSectorSystem* Here = Ship->FindSector(Ship->GetSystemName()))
+		{
+			Out += FString::Printf(TEXT(", bound to %s"), *FString::Join(Here->Links, TEXT(", ")));
+		}
+	}
 	if (GateRun == EAstraGateRun::Approach)
 	{
 		const FVector Aim = G.Pos + G.Att.GetForwardVector() * GateSide * LaneEntryKm * Km;

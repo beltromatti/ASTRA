@@ -94,7 +94,9 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Il transito è una manovra vera, decisa dal Capitano («Timoniere, portaci attraverso il Gate verso Cassia»): rotta automatica a tutta forza verso la corsia d'avvicinamento, poi il campo del Gate cattura la nave (timone bloccato) e la porta nel cuore dell'anello lungo una corsia di anelli di luce, sempre più veloce, fino al lampo; all'uscita l'anello è alle spalle e la nave scivola via a ~2 km/s. Una nuova rotta prima della corsia annulla la manovra
 - [x] Il regista non teletrasporta: il beat "transit" sono **ordini della Flotta** (il Gate viene sintonizzato, l'equipaggio riferisce e aspetta il Capitano). Registro dei sistemi esplorati (stesso nome = stesso posto: universo con seme); tornare ad Aurelia ripristina il cielo di casa. Se la storia resta ferma 7 minuti, il regista interviene (Rourke sollecita o la guerra arriva)
   Prove: `astra.battle.gatejump` (30 km davanti al Gate) poi `astra.battle.transit Cassia`; `astra.cmd director_beat {'beat':{'type':'transit','system_name':'Meridian'}}`
-- [ ] Mappa strategica della guerra (sistemi, fronti, fazioni), conseguenze a lungo termine, salvataggio della campagna
+- [x] Mappa strategica della guerra: il settore **Aurelia March** (11 sistemi, Gate legati a pochi altri, fazioni, minaccia), in `mind/astra_mind/war.py`, salvata in `Saved/Campaign/war.json` a ogni cambiamento. Il regista la legge e la fa evolvere (`war_news`: sistemi che cadono o vengono ripresi, notizie sulla rete della flotta riferite dalle comunicazioni); i transiti vanno solo verso sistemi collegati; l'equipaggio la conosce
+- [x] Tavolo olografico in modalità **settore** («Sensori, mappa del settore sul tavolo»): sistemi colorati per fazione, collegamenti dei Gate, anello dell'Aquila, rotta di transito che pulsa, sistemi minacciati con alone; la mappa si gira verso chi la guarda
+- [ ] Riprendere una campagna salvata all'avvio (oggi ogni partita riparte dalla battaglia d'apertura; la mappa salvata è già pronta)
 
 ## Prossimi passi
 1. Plancia v2 secondo passaggio (dettagli, segnaletica), navi v2, scie dei missili.

@@ -3,6 +3,7 @@
 #include "AstraHoloTable.h"
 
 #include "AstraBattleSubsystem.h"
+#include "AstraShipSubsystem.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -32,6 +33,24 @@ namespace
 	FString RangeText(float Km)
 	{
 		return Km < 10.f ? FString::Printf(TEXT("%.1f km"), Km) : FString::Printf(TEXT("%.0f km"), Km);
+	}
+
+	FLinearColor OwnerColor(const FString& Owner)
+	{
+		if (Owner == TEXT("astra")) { return ColAstra; }
+		if (Owner == TEXT("mandate")) { return ColHostile; }
+		if (Owner == TEXT("guilds")) { return ColNeutral; }
+		if (Owner == TEXT("contested")) { return ColHolding; }
+		return ColUnknown;
+	}
+
+	const TCHAR* OwnerTag(const FString& Owner)
+	{
+		if (Owner == TEXT("astra")) { return TEXT("ASTRA"); }
+		if (Owner == TEXT("mandate")) { return TEXT("MANDATE"); }
+		if (Owner == TEXT("guilds")) { return TEXT("FREE GUILDS"); }
+		if (Owner == TEXT("contested")) { return TEXT("CONTESTED"); }
+		return TEXT("NO CONTACT");
 	}
 }
 
@@ -175,6 +194,142 @@ void AAstraHoloTable::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Time += DeltaTime;
+	FVector ViewerLocal = FVector(-300.f, 0.f, 170.f);
+	if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+	{
+		ViewerLocal = GetActorTransform().InverseTransformPosition(Cam->GetCameraLocation());
+	}
+	// the plot the crew put up: the battle around the Aquila, or the sector at war (a quick cross-fade between them)
+	const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+	const bool bSector = Ship && Ship->GetHoloMode() == TEXT("sector") && Ship->GetSector().Num() > 0;
+	SectorBlend = FMath::FInterpConstantTo(SectorBlend, bSector ? 1.f : 0.f, DeltaTime, 2.5f);
+	const float TacticalFade = FMath::Clamp(1.f - 2.f * SectorBlend, 0.f, 1.f);
+	const float SectorFade = FMath::Clamp(2.f * SectorBlend - 1.f, 0.f, 1.f);
+	if (TacticalFade > 0.f)
+	{
+		TickTactical(DeltaTime, ViewerLocal, TacticalFade);
+	}
+	else
+	{
+		HideTactical();
+	}
+	if (SectorFade > 0.f)
+	{
+		TickSector(DeltaTime, ViewerLocal, SectorFade);
+	}
+	else
+	{
+		HideSector();
+	}
+}
+
+void AAstraHoloTable::HideTactical()
+{
+	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders})
+	{
+		HideFrom(*Pool, 0);
+	}
+	HideTextFrom(Labels, 0);
+	HideTextFrom(RingLabels, 0);
+}
+
+void AAstraHoloTable::HideSector()
+{
+	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&SectorNodes, &SectorLinks, &SectorMarks})
+	{
+		HideFrom(*Pool, 0);
+	}
+	HideTextFrom(SectorLabels, 0);
+}
+
+void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, float Fade)
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	const TArray<FAstraSectorSystem>& Sector = Ship->GetSector();
+	// fit the whole sector on the disc: west (the Core) to the viewer's left, north away from them
+	FBox2D Box(ForceInit);
+	for (const FAstraSectorSystem& S : Sector)
+	{
+		Box += S.Pos;
+	}
+	const FVector2D Centre = Box.GetCenter();
+	const float Half = FMath::Max(1.f, 0.5f * (float)FMath::Max(Box.GetSize().X, Box.GetSize().Y));
+	const float Scale = PlotRadius * 0.84f / Half;
+	// the map turns (slowly) so that its south faces the viewer: east to their right, north away from them
+	const float WantYaw = FMath::RadiansToDegrees(FMath::Atan2(ViewerLocal.Y, ViewerLocal.X));
+	SectorYaw = SectorBlend < 0.05f ? WantYaw : SectorYaw + FMath::Clamp(FMath::FindDeltaAngleDegrees(SectorYaw, WantYaw), -60.f * DeltaTime, 60.f * DeltaTime);
+	const FVector South = FRotator(0.f, SectorYaw, 0.f).Vector();
+	const FVector North = -South;
+	const FVector East = FVector::CrossProduct(FVector::UpVector, North);
+	const float Z = 9.f;   // just above the table top
+	auto Where = [&](const FAstraSectorSystem& S)
+	{
+		const FVector2D D = S.Pos - Centre;
+		return North * (D.Y * Scale) + East * (D.X * Scale) + FVector(0, 0, Z);
+	};
+	const FString Here = Ship->GetSystemName();
+	const FString Dest = Battle ? Battle->GetGateDestination() : FString();
+	const float Pulse = 0.5f + 0.5f * FMath::Sin(Time * 4.f);
+	int32 NL = 0, NN = 0, NM = 0, NT = 0;
+	// gate links (each once), the one the Aquila is taking alive with light
+	for (int32 i = 0; i < Sector.Num(); ++i)
+	{
+		for (const FString& L : Sector[i].Links)
+		{
+			const int32 j = Sector.IndexOfByPredicate([&L](const FAstraSectorSystem& X) { return X.Name == L; });
+			if (j <= i)
+			{
+				continue;
+			}
+			const FVector A = Where(Sector[i]), B = Where(Sector[j]);
+			const bool bRoute = !Dest.IsEmpty() && ((Sector[i].Name == Here && Sector[j].Name == Dest) || (Sector[j].Name == Here && Sector[i].Name == Dest));
+			const bool bSame = Sector[i].Owner == Sector[j].Owner;
+			UStaticMeshComponent* Line = Pooled(SectorLinks, NL++, LineMesh);
+			Line->SetRelativeLocationAndRotation(A, (B - A).Rotation());
+			Line->SetRelativeScale3D(FVector((B - A).Size() / 100.f, bRoute ? 0.45f : 0.28f, bRoute ? 0.45f : 0.28f));
+			SetColor(Line, bRoute ? ColAquila : (bSame ? OwnerColor(Sector[i].Owner) * 0.8f : ColUnknown * 0.7f),
+			         Fade * (bRoute ? 12.f + 16.f * Pulse : 6.f));
+		}
+	}
+	for (const FAstraSectorSystem& S : Sector)
+	{
+		const FVector P = Where(S);
+		const FLinearColor Col = OwnerColor(S.Owner);
+		const bool bHere = S.Name == Here;
+		// the star: brighter where the Aquila is, pulsing where the fighting is
+		UStaticMeshComponent* Node = Pooled(SectorNodes, NN++, SphereMesh);
+		Node->SetRelativeLocation(P);
+		Node->SetRelativeScale3D(FVector((bHere ? 4.2f : 3.2f) / 100.f));
+		const float Threat = S.Threat >= 2 ? 0.6f + 0.4f * FMath::Sin(Time * (S.Threat >= 3 ? 7.f : 4.f)) : 1.f;
+		SetColor(Node, Col, Fade * (bHere ? 60.f : 34.f) * Threat);
+		// the Aquila's system ringed, the threatened ones haloed
+		if (bHere || S.Threat >= 2)
+		{
+			UStaticMeshComponent* Mark = Pooled(SectorMarks, NM++, RingMesh);
+			Mark->SetRelativeLocationAndRotation(P, FRotator::ZeroRotator);
+			const float R = bHere ? 7.f + 0.8f * Pulse : 5.f + 2.5f * FMath::Frac(Time * 0.7f);
+			Mark->SetRelativeScale3D(FVector(R / 100.f, R / 100.f, 1.f));
+			SetColor(Mark, bHere ? ColAquila : ColHostile, Fade * (bHere ? 22.f : 14.f * (1.f - FMath::Frac(Time * 0.7f))));
+		}
+		UTextRenderComponent* T = PooledText(SectorLabels, NT++);
+		FString Sub = OwnerTag(S.Owner);
+		if (bHere) { Sub = TEXT("ASN AQUILA  ·  ") + Sub; }
+		if (S.Name == Dest) { Sub += TEXT("  ·  TRANSIT"); }
+		T->SetText(FText::FromString(S.Name.ToUpper() + TEXT("<br>") + Sub));
+		T->SetTextRenderColor((Col * FMath::Max(0.25f, Fade)).ToFColor(true));
+		T->SetWorldSize(bHere ? 5.6f : 4.6f);
+		T->SetRelativeLocation(P + FVector(0, 0, 3.2f));
+		FaceViewer(T, ViewerLocal);
+	}
+	HideFrom(SectorLinks, NL);
+	HideFrom(SectorNodes, NN);
+	HideFrom(SectorMarks, NM);
+	HideTextFrom(SectorLabels, NT);
+}
+
+void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, float Fade)
+{
 	const UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
 	TArray<FAstraHoloBlip> Blips;
 	if (Battle)
@@ -201,12 +356,6 @@ void AAstraHoloTable::Tick(float DeltaTime)
 		}
 	}
 	RangeKm = FMath::Exp(FMath::FInterpTo(FMath::Loge(RangeKm), FMath::Loge(TargetRangeKm), DeltaTime, 1.8f));
-
-	FVector ViewerLocal = FVector(-300.f, 0.f, 170.f);
-	if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
-	{
-		ViewerLocal = GetActorTransform().InverseTransformPosition(Cam->GetCameraLocation());
-	}
 
 	// range rings: the plotted range, half and quarter
 	for (int32 i = 0; i < 3; ++i)

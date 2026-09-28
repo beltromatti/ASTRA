@@ -79,7 +79,8 @@ Tiberius with deuterium refineries, the Ceres Belt, the scorched planet Vulcan. 
 Everyone wears a neural translator implant, "the Interpreter": people hear each other in their own language."""
 
 
-def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None) -> str:
+def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None,
+                  war: str = "") -> str:
     lang_name = LANG_NAMES.get(lang, lang)
     roster = "\n".join(
         f"- {o.id}: {o.title}, {o.role}. Duties: {o.duties}. Character: {o.personality}." for o in CREW.values())
@@ -125,6 +126,9 @@ Tools
 
 The war so far (the crew lived it; remember the Captain's choices and their consequences)
 {story}
+
+The Aurelia March (what the fleet knows of the sector)
+{war or "(no news from the fleet)"}
 
 Recent events
 {events}

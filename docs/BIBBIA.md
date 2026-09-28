@@ -60,7 +60,7 @@ Quando i Gates si riaprirono, nel 2450, i Core Worlds tornarono a commerciare co
 ## 4. Regole della tecnologia (valgono per simulazione e AI)
 | Tecnologia (nome in gioco) | Regola |
 |---|---|
-| **Janus Gates** | Salto istantaneo tra due Gates collegati. Chi controlla la stazione di un Gate può sigillarlo (servono codici e tempo). |
+| **Janus Gates** | Ogni Gate è legato a pochi altri Gate (da uno a quattro): la sua **Keeper Station** lo sintonizza su uno di essi e il salto è istantaneo. Si entra da una **corsia d'avvicinamento** segnata da anelli di luce: a 25 km il campo del Gate prende la nave e la porta nel cuore dell'anello (da lì non si torna indietro). Chi controlla la stazione di un Gate può sigillarlo (servono codici e tempo). |
 | **Torch drives** | Motori a fusione con inerzia reale; il computer di volo esegue le manovre ordinate dall'ufficiale al timone. In crociera un sistema si attraversa in minuti (compressione di gioco). |
 | **Inertial dampers & gravity plating** | Assorbono le accelerazioni fino a un limite. Oltre, l'equipaggio viene sbalzato e ferito e gli oggetti volano. |
 | **Flux shields** | Settori: fore, aft, port, starboard, dorsal, ventral. Forti contro l'energia, più deboli contro i proiettili pesanti; consumano energia e scaldano. |
@@ -84,6 +84,23 @@ Quando i Gates si riaprirono, nel 2450, i Core Worlds tornarono a commerciare co
 | **Vulcan** (pianeta I) | Roccia ustionata vicina alla stella | Posto d'ascolto, rifugio dal calore dei sensori |
 
 **Inizio della guerra:** una flotta del Mandate esce dal Janus Gate sotto un segnale di soccorso falso. La **7th Fleet** difende Aurelia, e la ASN Aquila arriva nel mezzo.
+
+## 5b. Il settore in guerra: the Aurelia March
+La frontiera tra i Core Worlds e gli Outer Worlds. Undici sistemi, ognuno con il suo Janus Gate legato ad altri (tra parentesi). La mappa vive nel gioco (tavolo olografico, modalità settore) e cambia con la guerra; si salva in `Saved/Campaign/war.json`.
+
+| Sistema | Gate verso | Chi lo tiene all'inizio | Cosa conta |
+|---|---|---|---|
+| **Concordia** (stella gialla, mondo oceanico Concord) | Meridian | ASTRA | La capitale: Senato e Ammiragliato, lontana dal fronte |
+| **Meridian** (gialla, oceanico Halcyon) | Concordia, Aurelia, Veyra | ASTRA | Il granaio della March |
+| **Aurelia** (arancione, oceanico New Ravenna) | Meridian, Cassia, Thule | ASTRA | Casa della 7th Fleet, Aurelia Arsenal, raffinerie di Tiberius |
+| **Cassia** (bianco-azzurra, ghiacciato Cassia Prime) | Aurelia, Veyra, Thule | ASTRA | Miniere di ghiaccio e deuterio, piccoli cantieri; poco difesa |
+| **Veyra** (arancione, desertico Sabel) | Meridian, Cassia, Nemet | Free Guilds (neutrale) | La Guildhall: commercio, spie, contrabbando |
+| **Thule** (nana rossa, roccioso Hollow) | Aurelia, Cassia, Ophir, Erebus | silenzio | Thule Watch, posto d'ascolto ASTRA muto da due giorni: da qui è passato il Mandate |
+| **Ophir** (nana rossa, desertico Ophir) | Thule, Niflheim, Kharon | Mandate | Mondo della carestia, bacino di reclutamento |
+| **Erebus** (nana rossa, vulcanico Pyre) | Thule, Nemet, Kharon | Mandate | Erebus Anchorage, base avanzata delle flotte d'attacco |
+| **Nemet** (arancione, oceanico Nemet) | Veyra, Erebus, Niflheim | Mandate | Città sommerse, inquieta sotto il Mandate |
+| **Niflheim** (arancione, ghiacciato Niflheim) | Ophir, Nemet, Kharon | Mandate | Colonie di ghiaccio, gli sfasciacarrozze del Mandate |
+| **Kharon** (nana rossa, roccioso Asphodel) | Ophir, Erebus, Niflheim | Mandate | La capitale del Mandate, la Hall of the Ferried |
 
 ## 6. La tua nave: ASN Aquila
 - **Classe:** *Aquila*-class carrier cruiser, la prima della classe. Lunga 780 m, 12 ponti.

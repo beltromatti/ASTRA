@@ -64,6 +64,16 @@ struct FAstraSystemLook
 	float Seed = 0.f;
 };
 
+/** A system of the sector at war as the fleet knows it (sent by the mind's war map): owner, place on the plot, gates. */
+struct FAstraSectorSystem
+{
+	FString Name;
+	FString Owner;              // astra | mandate | guilds | contested | silent
+	int32 Threat = 0;           // 0 quiet .. 3 front line
+	FVector2D Pos = FVector2D::ZeroVector;   // light-years on the sector plot
+	TArray<FString> Links;      // the systems its Janus Gate is bound to
+};
+
 DECLARE_MULTICAST_DELEGATE_TwoParams(FAstraShipEvent, const FString& /*Text*/, bool /*bReport: worth telling the Captain*/);
 DECLARE_MULTICAST_DELEGATE_OneParam(FAstraAlertChanged, EAstraAlert /*NewAlert*/);
 
@@ -121,6 +131,11 @@ public:
 	                             const FString& PlanetName = FString());
 	/** "Aurelia (orange star, ocean world New Ravenna); Cassia (...)" for the crew. */
 	FString KnownSystemsLine() const;
+	/** The sector at war (from the mind): gate links for the helm, the plot for the holo table. */
+	const TArray<FAstraSectorSystem>& GetSector() const { return Sector; }
+	const FAstraSectorSystem* FindSector(const FString& Name) const;
+	/** What the holo table shows: "tactical" (the battle around the Aquila) or "sector" (the war map). */
+	FString GetHoloMode() const { return HoloMode; }
 	/** Autopilot (the Janus approach): the helm steers to a heading without the usual turn reports. */
 	void SteerTo(float Heading, float Mark);
 	void SetThrottle(float Pct) { ThrottlePct = FMath::Clamp(Pct, 0.f, 100.f); }
@@ -160,6 +175,9 @@ private:
 	FString LocationName = TEXT("Aurelia System, en route to New Ravenna high orbit");
 	FString SystemName = TEXT("Aurelia");
 	TMap<FString, FAstraSystemLook> Systems;   // charted systems
+	TArray<FAstraSectorSystem> Sector;         // the sector at war (empty until the mind sends it)
+	FString HoloMode = TEXT("tactical");
+	FAstraSystemLook MakeLook(const FString& Name, const FString& Star, const FString& Planet, const FString& PlanetName) const;
 	bool bLaneControl = false;                 // the Janus lane drives the ship
 	bool bAutoHelm = false;                    // the gate approach autopilot steers (no turn reports)
 	// the home sky as the level sets it, restored when the Aquila comes back to Aurelia

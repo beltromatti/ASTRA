@@ -47,6 +47,11 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Blasts;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Leaders;   // icon -> raised label
 	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> Labels;
+	// the sector plot (the war map): systems, gate links, names
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorNodes;
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorLinks;
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorMarks;
+	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> SectorLabels;
 
 	UPROPERTY() TObjectPtr<UStaticMesh> ShipMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> UnknownMesh;
@@ -70,4 +75,10 @@ private:
 	FVector PlotPoint(const FVector& RelCm) const;   // battle-relative cm -> actor-local plot point
 	float PlotRadiusOf(float Km) const;              // logarithmic radial scale: detail near the Aquila, context far out
 	void FaceViewer(USceneComponent* C, const FVector& ViewerLocal) const;
+	float SectorBlend = 0.f;      // 0 tactical .. 1 sector (cross-fade)
+	float SectorYaw = 0.f;        // the sector map turns to face whoever looks at it (south towards the viewer)
+	void TickTactical(float DeltaTime, const FVector& ViewerLocal, float Fade);
+	void TickSector(float DeltaTime, const FVector& ViewerLocal, float Fade);
+	void HideTactical();
+	void HideSector();
 };

@@ -190,8 +190,10 @@ class Mind:
         self.voice = Voice(self.tts, self._sink)
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
-        self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander)
+        self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander,
+                                 news=self._fleet_news)
         self.agent.campaign = lambda: self.director.campaign
+        self.agent.war = lambda: self.director.war.crew_view()
         self.turns: asyncio.Queue = asyncio.Queue()
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.lang_file = REPO_ROOT / "mind" / ".cache" / "captain_lang.txt"
@@ -213,6 +215,20 @@ class Mind:
             who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
             self.game.events.append(f"over the radio, {who}: {text}")
         await self.voice.say(speaker, text, lang, tone)
+
+    async def _fleet_news(self, text: str) -> None:
+        """War news from elsewhere in the March reaches the bridge over the fleet net (comms relays it)."""
+        self.last_activity = time.monotonic()
+        await self.turns.put(("\x00event:comms: fleet net news — " + text, self.lang))
+        await self._send_sector()          # owners and threats changed: the holo table follows
+
+    async def _send_sector(self) -> None:
+        """The game learns the March: gate links, the look of each system, the plot for the holo table."""
+        try:
+            res = await self.game.execute("sector", self.director.war.game_payload(), "director")
+            log.info("sector sent to the game: %s", res.get("detail", res))
+        except Exception:  # noqa: BLE001
+            log.exception("could not send the sector")
 
     async def _director_command(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         if not (self.game and self.game.state):
@@ -394,6 +410,7 @@ class Mind:
                     self.agent.history.clear()
                     self.enemy.reset()
                     self.director.reset()
+                    asyncio.create_task(self._send_sector())
                     log.info("new game session: conversation reset")
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
