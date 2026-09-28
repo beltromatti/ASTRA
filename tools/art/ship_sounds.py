@@ -109,6 +109,19 @@ def chirp():
     return norm(np.concatenate(parts + [np.zeros(int(0.05 * SR))]), 0.5)
 
 
+def door(opening=True):
+    """A pressure door: the seal releasing (hiss), the leaves' motor, the soft stop (or the seal closing)."""
+    t = t_(0.9)
+    hiss = bp(rng.normal(0, 1, len(t)), 2500, 7500) * np.exp(-t * (7 if opening else 11)) * 0.5
+    f = (260 + 220 * np.clip(t / 0.55, 0, 1)) if opening else (480 - 220 * np.clip(t / 0.55, 0, 1))
+    motor = (np.sin(2 * np.pi * np.cumsum(f) / SR) * 0.25 + np.sin(4 * np.pi * np.cumsum(f) / SR) * 0.08) * (t < 0.58) * np.clip(t / 0.05, 0, 1)
+    stop_t = np.maximum(t - 0.58, 0)
+    stop = np.sin(2 * np.pi * 62 * stop_t) * np.exp(-stop_t * 22) * (t >= 0.58) * (0.5 if opening else 0.9)
+    seal = bp(rng.normal(0, 1, len(t)), 300, 1500) * np.exp(-stop_t * 30) * (t >= 0.58) * (0.0 if opening else 0.4)
+    x = (hiss if opening else hiss * 0.4) + motor + stop + seal
+    return norm(np.tanh(1.3 * x), 0.8)
+
+
 def bridge_ambience(dur=24.0):
     """The bridge at rest: the reactor's deep hum through the deck, air handling, and far electronics (loopable)."""
     t = t_(dur)
@@ -133,6 +146,6 @@ def bridge_ambience(dur=24.0):
 os.makedirs(OUT, exist_ok=True)
 for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("SW_Torpedo_Launch", lambda: vls_launch(True)),
                  ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp),
-                 ("SW_Bridge_Ambience", bridge_ambience)):
+                 ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False))):
     sf.write(os.path.join(OUT, name + ".wav"), fn().astype(np.float32), SR, subtype="PCM_16")
 print("SHIP_SOUNDS_OK", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

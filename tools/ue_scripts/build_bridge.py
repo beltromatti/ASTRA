@@ -49,14 +49,80 @@ place("SM_BRG_HoloTable", ht["pos"][0], ht["pos"][1], 0.0, label="HoloTable")
 plot = eas.spawn_actor_from_class(unreal.AstraHoloTable, V(ht["pos"][0] * M, ht["pos"][1] * M, (ht["height"] + 0.01) * M), R())
 plot.set_actor_label("HoloTable_Plot")
 plot.set_folder_path("Bridge")
-# closed doors in the back wall (the corridors beyond are another level for now)
+# sliding pressure doors in the back wall (AAstraDoor: they open when you come near, into the wall)
 for d in DATA["doors"]:
     dx, dy = d["pos"]
-    sy, sz = d["width"] / 1.43, d["height"] / 2.3
-    for sgn, lab in ((1.0, "A"), (-1.0, "B")):
-        leaf = place("/Game/ASTRA/Kit/Interior/Corridor/SM_COR_DoorLeaf", dx - 0.15, dy, 0.0, 0.0,
-                     label=f"Door_{d['id']}_{lab}", folder="Bridge/Doors")
-        leaf.set_actor_scale3d(V(1.0, sgn * sy, sz))
+    door = eas.spawn_actor_from_class(unreal.AstraDoor, V((dx - 0.15) * M, dy * M, 0.0), R())
+    door.set_editor_property("width", d["width"] * M)
+    door.set_editor_property("height", d["height"] * M)
+    door.set_actor_label(f"Door_{d['id']}")
+    door.set_folder_path("Bridge/Doors")
+
+# --- corridors behind the doors: 12 m runs of the corridor kit going aft, a window module on the hull side
+import random  # noqa: E402
+
+CK = "/Game/ASTRA/Kit/Interior/Corridor"
+WALL_T = 0.3                      # bridge back wall thickness (art/blender/bridge.py)
+X_END = DATA["walls"]["back_x"] - WALL_T
+BAYS = ((0.14, 1.86), (2.14, 3.86))
+LOW = [("SM_COR_PanelLow_Plain", 0.6), ("SM_COR_PanelLow_Access", 0.2), ("SM_COR_PanelLow_Vent", 0.2)]
+UP = [("SM_COR_PanelUp_Plain", 0.55), ("SM_COR_PanelUp_Screen", 0.25), ("SM_COR_PanelUp_Vent", 0.2)]
+crng = random.Random(11)
+
+
+def pick(options):
+    r, acc = crng.random(), 0.0
+    for name, w in options:
+        acc += w
+        if r <= acc:
+            return name
+    return options[-1][0]
+
+
+def corridor_panels(xm, yc, window_side, tag):
+    for side in (-1, 1):
+        for bi, (b0, b1) in enumerate(BAYS):
+            items = [("SM_COR_PanelLowShort_Plain", 0.22)] if window_side == side else [(pick(LOW), 0.22), (pick(UP), 1.32)]
+            for name, z in items:
+                if side == -1:
+                    place(f"{CK}/{name}", xm + b0, yc - 1.6, z, 0.0, label=f"{tag}_{bi}_{name[7:]}_L", folder="Corridors/Panels")
+                else:
+                    place(f"{CK}/{name}", xm + b1, yc + 1.6, z, 180.0, label=f"{tag}_{bi}_{name[7:]}_R", folder="Corridors/Panels")
+
+
+for d in DATA["doors"]:
+    yc = d["pos"][1]
+    outer = -1 if yc < 0 else 1           # the hull side of this corridor (windows)
+    tag = "Port" if yc < 0 else "Stbd"
+    mods = [X_END - 12.0, X_END - 8.0, X_END - 4.0]
+    for i, xm in enumerate(mods):
+        if i == 1:
+            # window module: the kit's window is on its -Y side; rotated for the starboard corridor
+            if outer < 0:
+                place(f"{CK}/SM_COR_ShellWindow_4m", xm, yc, 0.0, 0.0, label=f"Corr{tag}_Window", folder="Corridors")
+                place(f"{CK}/SM_COR_WindowGlass", xm, yc, 0.0, 0.0, label=f"Corr{tag}_Glass", folder="Corridors")
+            else:
+                place(f"{CK}/SM_COR_ShellWindow_4m", xm + 4.0, yc, 0.0, 180.0, label=f"Corr{tag}_Window", folder="Corridors")
+                place(f"{CK}/SM_COR_WindowGlass", xm + 4.0, yc, 0.0, 180.0, label=f"Corr{tag}_Glass", folder="Corridors")
+            corridor_panels(xm, yc, outer, f"Corr{tag}{i}")
+        else:
+            place(f"{CK}/SM_COR_Shell_4m", xm, yc, 0.0, 0.0, label=f"Corr{tag}_Shell{i}", folder="Corridors")
+            corridor_panels(xm, yc, None, f"Corr{tag}{i}")
+        lt = eas.spawn_actor_from_class(unreal.RectLight, V((xm + 2.0) * M, yc * M, 2.9 * M), R(pitch=-90.0))
+        lc = lt.get_component_by_class(unreal.RectLightComponent)
+        lc.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
+        lc.set_editor_property("intensity", 3500.0)
+        lc.set_editor_property("source_width", 340.0)
+        lc.set_editor_property("source_height", 14.0)
+        lc.set_editor_property("attenuation_radius", 800.0)
+        lc.set_editor_property("use_temperature", True)
+        lc.set_editor_property("temperature", 4800.0)
+        lc.set_editor_property("cast_shadows", False)
+        lt.set_actor_rotation(R(pitch=-90.0, yaw=0.0, roll=90.0), False)
+        lt.set_actor_label(f"Corr{tag}_Light{i}")
+        lt.set_folder_path("Lighting")
+        lt.tags = [unreal.Name("ASTRA.ShipLight")]
+    place(f"{CK}/SM_COR_EndCap", mods[0], yc, 0.0, 180.0, label=f"Corr{tag}_EndCap", folder="Corridors")
 md = DATA["master_display"]
 place("SM_BRG_MasterDisplay", md["pos"][0], md["pos"][1], 0.0, label="MasterDisplay")
 
