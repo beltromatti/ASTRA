@@ -1353,6 +1353,7 @@ void UAstraBattleSubsystem::TickPlayerFire(FAstraBattleShip& P, float Dt)
 		PlayerSinceFired = 0.f;
 		if (Heat)
 		{
+			Heat->RailgunDraw();   // the capacitors pull on the ship's power: the lights sag for a moment
 			Heat->AddHeat(4.0f);   // eight slugs out of the rails: the capacitors and the barrels dump their heat
 		}
 		for (int32 i = 0; i < P.RailSlugs; ++i)

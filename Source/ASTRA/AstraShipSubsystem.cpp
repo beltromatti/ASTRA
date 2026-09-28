@@ -2495,6 +2495,13 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 		FlickerTime -= DeltaTime;
 		LightLevel *= 0.35f + 0.65f * (FMath::FRand() > 0.45f ? 1.f : 0.f);
 	}
+	if (RailDraw > 0.f)
+	{
+		// the rails charge: a quick sag (to about 60%) and a slower recovery over half a second
+		const float Sag = RailDraw > 0.8f ? (1.f - RailDraw) / 0.2f : RailDraw / 0.8f;
+		LightLevel *= 1.f - 0.4f * Sag;
+		RailDraw = FMath::Max(0.f, RailDraw - DeltaTime / 0.55f);
+	}
 	const FLinearColor AlertColor = FMath::Lerp(FLinearColor(1.f, 0.62f, 0.1f), FLinearColor(1.f, 0.04f, 0.02f), AlertBlend);
 	const float Mix = FMath::Max(AlertBlend, YellowBlend);
 	if (ShipMPC)

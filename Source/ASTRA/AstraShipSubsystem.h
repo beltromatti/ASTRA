@@ -209,6 +209,8 @@ public:
 	bool StartAbandon(bool bOrdered, FString& OutDetail);
 	void ReactorFailing() { FString D; if (!bAbandon) { StartAbandon(false, D); } }
 	bool IsAbandoning() const { return bAbandon && !bShipLost; }
+	/** A railgun volley: the capacitors' draw makes the ship's lights sag for a moment (the power is visible). */
+	void RailgunDraw() { RailDraw = 1.f; }
 	bool IsShipLost() const { return bShipLost; }
 	bool BoardLifepod(class AAstraLifepodHatch* Hatch, APlayerController* PC, bool bHauled = false);
 	/** The way from an officer's place to the Captain's quarters (world cm, deck level); OutWaitAt: the point at the
@@ -320,6 +322,7 @@ private:
 	float HullPct = 100.f;
 	double LastHitReport = -100.0;
 	float FlickerTime = 0.f;
+	float RailDraw = 0.f;              // 1 at a railgun volley, fading: the lights sag
 	bool bTurning = false;
 	// helm intercept: the course follows a contact; at the standoff range the ship turns broadside and holds it
 	FString InterceptId;
