@@ -36,27 +36,34 @@ def mi(name, parent, scalars=None, vectors=None, textures=None):
     return inst
 
 
-hard = eal.load_asset(f"{MAT}/M_ASTRA_Hard")
+hard = eal.load_asset(f"{MAT}/M_ASTRA_Hull")      # the hull master (make_hull_material.py): the plating at ship scale
 emi = eal.load_asset(f"{MAT}/M_ASTRA_Emissive")
 PAINT = {"BaseColorMap": "T_PanelPaint_BC", "NormalMap": "T_PanelPaint_N", "ORMMap": "T_PanelPaint_ORM"}
 GUN = {"BaseColorMap": "T_Gunmetal_BC", "NormalMap": "T_Gunmetal_N", "ORMMap": "T_Gunmetal_ORM"}
 BRUSH = {"BaseColorMap": "T_Brushed_BC", "NormalMap": "T_Brushed_N", "ORMMap": "T_Brushed_ORM"}
-# UV unit = 8 m on hulls: textures tile 4x per unit so plating reads at ship scale; strong macro variation
-HULL = {"UVScale": 4.0, "MacroScale": 0.6, "MacroBrightness": 0.16, "RoughnessVariation": 0.18}
+# Paints stay out of the white in full sun (fixed exposure EV100 6.6, stars of 650-2200 lux): plates at ~0.5 albedo at
+# most, so the tone of each plate and the seams still read. UV unit = 8 m on hulls: detail textures tile 4x per unit (2 m), the plating tile every 4 units (32 m); strong macro
+# variation. Each part weathers differently: painted plates show their tone, bare frames and engines less so.
+HULL = {"UVScale": 4.0, "MacroScale": 0.6, "MacroBrightness": 0.16, "RoughnessVariation": 0.18, "PanelScale": 0.25}
+PLATING = {"plate": dict(PanelTone=0.3, PanelCavity=1.0, PanelRoughness=0.3, PanelNormalStrength=1.0),
+           "frame": dict(PanelTone=0.08, PanelCavity=0.6, PanelRoughness=0.1, PanelNormalStrength=0.6),
+           "livery": dict(PanelTone=0.18, PanelCavity=0.9, PanelRoughness=0.2, PanelNormalStrength=1.0),
+           "engine": dict(PanelTone=0.04, PanelCavity=0.5, PanelRoughness=0.06, PanelNormalStrength=0.4),
+           "radiator": dict(PanelTone=0.05, PanelCavity=0.7, PanelRoughness=0.06, PanelNormalStrength=0.8)}
 FACTIONS = {
-    "A": dict(plate=("#E6E1D6", PAINT, 0.0, 0.3, 0.55), frame=("#4A4F55", GUN, 0.0, 0.3, 0.6), livery=("#1F3A6B", PAINT, 0.0, 0.3, 0.5),
+    "A": dict(plate=("#BCBAB4", PAINT, 0.0, 0.18, 0.5), frame=("#4A4F55", GUN, 0.0, 0.3, 0.6), livery=("#1F3A6B", PAINT, 0.0, 0.3, 0.5),
               glow=(0.55, 0.78, 1.0, 90.0), lights=(1.0, 0.9, 0.75, 40.0), radiator=("#2A2D31", GUN, 0.0, 0.4, 0.7, None)),
     "M": dict(plate=("#5E5852", GUN, 0.0, 0.35, 0.7), frame=("#1A1B1E", GUN, 0.0, 0.3, 0.6), livery=("#8C5A2B", BRUSH, 0.85, 0.3, 0.55),
               glow=(1.0, 0.42, 0.28, 90.0), lights=(1.0, 0.68, 0.25, 40.0), radiator=("#2A1A10", GUN, 0.0, 0.4, 0.7, (1.0, 0.33, 0.07, 14.0))),
-    "G": dict(plate=("#B8AE95", PAINT, 0.0, 0.4, 0.75), frame=("#44484C", GUN, 0.0, 0.3, 0.7), livery=("#B8651E", PAINT, 0.0, 0.4, 0.7),
+    "G": dict(plate=("#938A74", PAINT, 0.0, 0.35, 0.75), frame=("#44484C", GUN, 0.0, 0.3, 0.7), livery=("#A2561B", PAINT, 0.0, 0.4, 0.7),
               glow=(0.9, 0.9, 1.0, 60.0), lights=(1.0, 0.95, 0.85, 30.0), radiator=("#303236", GUN, 0.0, 0.4, 0.7, None)),
 }
 for f, d in FACTIONS.items():
     for part in ("plate", "frame", "livery"):
         col, tex, metal, rmin, rmax = d[part]
-        mi(f"MI_HULL_{f}_{part.capitalize()}", hard, scalars=dict(HULL, MetallicFromMap=0.0, MetallicBias=metal,
+        mi(f"MI_HULL_{f}_{part.capitalize()}", hard, scalars=dict(HULL, **PLATING[part], MetallicFromMap=0.0, MetallicBias=metal,
            RoughnessMin=rmin, RoughnessMax=rmax, BaseColorMapInfluence=0.5), vectors={"Tint": lin(col)}, textures=tex)
-    mi(f"MI_HULL_{f}_Engine", hard, scalars=dict(HULL, MetallicFromMap=1.0, RoughnessMin=0.3, RoughnessMax=0.5),
+    mi(f"MI_HULL_{f}_Engine", hard, scalars=dict(HULL, **PLATING["engine"], MetallicFromMap=1.0, RoughnessMin=0.3, RoughnessMax=0.5),
        vectors={"Tint": [0.35, 0.35, 0.37]}, textures=BRUSH)
     r, g, b, i = d["glow"]
     mi(f"MI_HULL_{f}_Glow", emi, scalars={"Intensity": i, "AlertColorWeight": 0.0, "LightDimWeight": 0.0}, vectors={"EmissiveColor": [r, g, b]})
@@ -68,7 +75,7 @@ for f, d in FACTIONS.items():
         mi(f"MI_HULL_{f}_Radiator", emi, scalars={"Intensity": i, "AlertColorWeight": 0.0, "LightDimWeight": 0.0, "Roughness": 0.6},
            vectors={"EmissiveColor": [r, g, b], "BaseColor": lin(col)})
     else:
-        mi(f"MI_HULL_{f}_Radiator", hard, scalars=dict(HULL, MetallicFromMap=0.0, RoughnessMin=rmin, RoughnessMax=rmax),
+        mi(f"MI_HULL_{f}_Radiator", hard, scalars=dict(HULL, **PLATING["radiator"], MetallicFromMap=0.0, RoughnessMin=rmin, RoughnessMax=rmax),
            vectors={"Tint": lin(col)}, textures=tex)
 log.append("hull instances ok")
 

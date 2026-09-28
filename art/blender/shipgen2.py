@@ -532,6 +532,129 @@ def listening_post(name: str, seed: int = 31):
     return obj
 
 
+# =================================================================================================== Free Guilds
+def guild_freighter(name: str, length: float = 340.0, seed: int = 5):
+    """Free Guilds bulk freighter: a blunt crew section at the bow (a raised bridge with a lit visor, habitat decks,
+    a docking collar), a square truss spine carrying bays of cargo pods in the Guilds' mismatched colours (some bays
+    half empty so the truss shows, some carrying bulk tanks), a drive section with radiator wings and fins, four big
+    bells. Built to read at 20 km as a long working ship, and up close as a lived-in one."""
+    rng = random.Random(seed)
+    b = A.Builder()
+    s = length / 340.0
+    x_bow, x_st = length / 2, -length / 2
+    # --- the crew section
+    cx0, cx1 = x_bow - 64 * s, x_bow
+    st = [(cx0 + t * (cx1 - cx0), K.chamfer_rect(w * s, h * s, 0.3, top=0.85, bottom=0.8), z * s)
+          for t, w, h, z in ((0.0, 9, 8, 0), (0.12, 13, 11, 0), (0.55, 13, 12, 1), (0.82, 11, 10, 1.5), (1.0, 6, 5, 1.0))]
+    crew = K.Hull(b, st, PLATE, cell=4.0 * s)
+    crew.plate(rng, depth=(0.15 * s, 0.5 * s), recess=0.3 * s, margin=0.25 * s, skip=0.2, max_run=(2, 2), mats={LIVERY: 0.16, FRAME: 0.1})
+    bx = x_bow - 20 * s                      # the bridge: a raised block with a wide lit visor
+    K.slab(b, bx - 16 * s, bx + 5 * s, K.chamfer_rect(8 * s, 3.2 * s, 0.35, top=0.7), K.chamfer_rect(6.5 * s, 2.4 * s, 0.35, top=0.55),
+           PLATE, 14.0 * s, 14.6 * s)
+    b.box((bx + 5 * s + 0.15 * s, 0, 15.2 * s), (0.4 * s, 9.5 * s, 1.1 * s), LIGHTS)
+    for side in (-1, 1):
+        K.window_band(b, cx0 + 8 * s, x_bow - 14 * s, side * 13.6 * s, -5 * s, 3, rng, LIGHTS, pitch=2.6 * s, lit=0.6)
+        livery_band(b, cx0 + 6 * s, x_bow - 12 * s, side * 13.55 * s, 4.5 * s, 2.2 * s, rng, s)
+    K.mast(b, bx - 20 * s, 0, 13.5 * s, 14 * s, FRAME, LIGHTS, dish=5 * s)
+    K.mast(b, bx - 8 * s, 5 * s, 17.6 * s, 6 * s, FRAME, LIGHTS)
+    b.cylinder((x_bow, 0, 1 * s), (x_bow + 2.5 * s, 0, 1 * s), 3.4 * s, FRAME, segments=16)      # docking collar
+    b.cylinder((x_bow + 2.5 * s, 0, 1 * s), (x_bow + 2.8 * s, 0, 1 * s), 2.6 * s, LIGHTS, segments=16)
+    b.cylinder((cx0 - 8 * s, 0, 0), (cx0 + 1 * s, 0, 0), 6.0 * s, FRAME, segments=12)              # the neck
+    # --- the spine: a square truss with flank bracing
+    xs0, xs1 = x_st + 64 * s, cx0 - 6 * s
+    t = 3.6 * s
+    for sy in (-1, 1):
+        for sz in (-1, 1):
+            b.cylinder((xs0, sy * t, sz * t), (xs1, sy * t, sz * t), 0.6 * s, FRAME, segments=8)
+    n = max(4, int((xs1 - xs0) / (9 * s)))
+    for k in range(n + 1):
+        x = xs0 + k * (xs1 - xs0) / n
+        for (y0, z0, y1, z1) in ((-t, -t, t, -t), (-t, t, t, t), (-t, -t, -t, t), (t, -t, t, t)):
+            b.cylinder((x, y0, z0), (x, y1, z1), 0.35 * s, FRAME, segments=6)
+        if k < n:
+            x2 = xs0 + (k + 1) * (xs1 - xs0) / n
+            za, zb = (-t, t) if k % 2 == 0 else (t, -t)
+            for sy in (-1, 1):
+                b.cylinder((x, sy * t, za), (x2, sy * t, zb), 0.28 * s, FRAME, segments=6)
+    # --- the cargo: bays of pods (20 x 9 x 9 m) clamped around the spine, bulk tanks, a few empty cradles
+    colours = [(PLATE, 0.34), (LIVERY, 0.28), (ENGINE, 0.2), (FRAME, 0.1), (RADIATOR, 0.08)]
+
+    def pick():
+        r, acc = rng.random(), 0.0
+        for m, p in colours:
+            acc += p
+            if r < acc:
+                return m
+        return PLATE
+
+    pitch = 23.0 * s
+    bays = int((xs1 - xs0 - 4 * s) / pitch)
+    x_first = xs0 + (xs1 - xs0 - bays * pitch) / 2 + pitch / 2
+    kinds = ["pods"] * bays
+    for k in rng.sample(range(bays), 2):
+        kinds[k] = "tanks"
+    kinds[rng.choice([k for k in range(bays) if kinds[k] == "pods"])] = "cradle"
+    off = t + 4.5 * s + 0.5 * s
+    for k in range(bays):
+        x = x_first + k * pitch
+        if kinds[k] == "tanks":
+            for (ty, tz) in ((11.6, 0), (-11.6, 0), (0, 11.6), (0, -11.6)):
+                y, z, r = ty * s, tz * s, 7.2 * s
+                b.cylinder((x - 8.5 * s, y, z), (x + 8.5 * s, y, z), r, PLATE if rng.random() < 0.6 else ENGINE, segments=24)
+                for sx in (-1, 1):
+                    b.cylinder((x + sx * 8.5 * s, y, z), (x + sx * 10.2 * s, y, z), r, PLATE, segments=24, radius2=r * 0.55)
+                for dx in (-6.0, 0.0, 6.0):
+                    b.cylinder((x + (dx - 0.4) * s, y, z), (x + (dx + 0.4) * s, y, z), r + 0.3 * s, FRAME, segments=24)
+                b.box((x, y * 0.42, z * 0.42), (3 * s, 2.4 * s + abs(y) * 0.2, 2.4 * s + abs(z) * 0.2), FRAME)
+            continue
+        slots = [(sy * off, sz * off, 0.85) for sy in (-1, 1) for sz in (-1, 1)]
+        slots += [(sy * (off + 9.4 * s), sz * off, 0.55) for sy in (-1, 1) for sz in (-1, 1)]
+        for (y, z, p) in slots:
+            outer = abs(y) > off + 1
+            if kinds[k] == "cradle" and rng.random() < 0.75:
+                # an empty cradle: the clamps and the rails without their pod
+                b.box((x, y, z - math.copysign(4.6 * s, z)), (20 * s, 0.5 * s, 0.5 * s), FRAME)
+                continue
+            if rng.random() > p:
+                continue
+            m = pick()
+            K.block(b, (x, y, z), (20 * s, 9 * s, 9 * s), m, c=0.07)
+            for sx in (-1, 1):
+                b.box((x + sx * 9.75 * s, y, z), (0.6 * s, 9.4 * s, 9.4 * s), FRAME)
+            for dx in (-3.4, 3.4):
+                b.box((x + dx * s, y, z), (0.35 * s, 9.15 * s, 9.15 * s), FRAME)
+            if not outer:
+                for sx in (-1, 1):   # clamps to the spine's corner
+                    b.box((x + sx * 6.5 * s, math.copysign(t + 0.25 * s, y), math.copysign(t + 0.25 * s, z)), (2.4 * s, 1.4 * s, 1.4 * s), FRAME)
+            if rng.random() < 0.18:
+                K.running_lights(b, [(x + 10.1 * s, y + math.copysign(4.4 * s, y), z + math.copysign(4.4 * s, z))], 0.5 * s, LIGHTS)
+    # --- the drive section: reactor and tanks, radiators, the thrust frame and four big bells
+    dx0, dx1 = x_st + 8 * s, xs0 + 6 * s
+    st = [(dx0 + t_ * (dx1 - dx0), K.chamfer_rect(w * s, h * s, 0.3), 0.0)
+          for t_, w, h in ((0.0, 16, 14), (0.15, 17, 15), (0.7, 16, 14), (1.0, 10, 9))]
+    drive = K.Hull(b, st, PLATE, cell=5.0 * s)
+    drive.plate(rng, depth=(0.2 * s, 0.6 * s), recess=0.3 * s, margin=0.3 * s, skip=0.15, max_run=(2, 2), mats={LIVERY: 0.25, FRAME: 0.15})
+    for side in (-1, 1):
+        b.cylinder((dx0 + 12 * s, side * 8 * s, 15.5 * s), (dx1 - 12 * s, side * 8 * s, 15.5 * s), 3.2 * s, ENGINE, segments=16)   # tanks
+        b.cylinder((dx0 + 12 * s, side * 8 * s, -15.5 * s), (dx1 - 12 * s, side * 8 * s, -15.5 * s), 3.2 * s, ENGINE, segments=16)
+        livery_band(b, dx0 + 4 * s, dx1 - 6 * s, side * 17.5 * s, 7 * s, 2.4 * s, rng, s)
+        K.window_band(b, dx0 + 10 * s, dx1 - 10 * s, side * 17.6 * s, -9 * s, 1, rng, LIGHTS, pitch=2.6 * s, lit=0.5)
+    radiator_wings(b, dx0 + 10 * s, dx1 - 8 * s, 17.0 * s, 0.0, 20 * s, 12.0, 2, s)
+    K.fins(b, dx0 + 6 * s, dx1 - 12 * s, 0.0, 15.2 * s, 9 * s, 8, RADIATOR, thick=0.45 * s)
+    for k in range(8):
+        x = dx0 + 6 * s + k * (dx1 - 18 * s - dx0) / 7
+        b.box((x, 0.0, -15.2 * s - 4.5 * s), (0.45 * s, 5.4 * s, 9 * s), RADIATOR)
+    K.slab(b, x_st + 2 * s, dx0 + 1 * s, K.chamfer_rect(15 * s, 15 * s, 0.3), K.chamfer_rect(16 * s, 14 * s, 0.3), FRAME)
+    K.engine_bank(b, x_st + 2 * s, 0, 0, 5.4 * s, 2, 2, 13 * s, FRAME, ENGINE, GLOW)
+    K.running_lights(b, [(x_bow - 4 * s, sy * 7.5 * s, 4 * s) for sy in (-1, 1)] +
+                     [(dx0 + 3 * s, sy * 17.2 * s, 11 * s) for sy in (-1, 1)] + [(x_st + 4 * s, 0, 15.3 * s)], 1.1 * s, LIGHTS)
+    obj = b.to_object(name)
+    if os.environ.get("NOBEVEL") != "1":
+        A.finish(obj, bevel=0.06, segments=1)
+    A.box_uv(obj, texel_m=8.0)
+    return obj
+
+
 SHIPS = {
     "SM_CRAFT_ASTRA_Falcon": (craft2, dict(kind="fighter", seed=21)),
     "SM_CRAFT_ASTRA_Hammer": (craft2, dict(kind="bomber", seed=23)),
@@ -544,11 +667,14 @@ SHIPS = {
     "SM_SHIP_MANDATE_Acheron": (mandate_acheron, dict(length=460.0, seed=11)),
     "SM_SHIP_MANDATE_Styx": (mandate_styx, dict(length=260.0, seed=13)),
     "SM_SHIP_MANDATE_Lethe": (mandate_lethe, dict(length=160.0, seed=17)),
+    "SM_SHIP_GUILD_Freighter": (guild_freighter, dict(length=340.0, seed=5)),
 }
 
 PREVIEW = {  # faction colours for the workbench previews
     "M": {"Plate": (0.2, 0.19, 0.18), "Frame": (0.07, 0.07, 0.08), "Livery": (0.45, 0.26, 0.12), "Engine": (0.25, 0.25, 0.27),
           "Glow": (1.0, 0.45, 0.25), "Lights": (1.0, 0.7, 0.3), "Radiator": (0.9, 0.35, 0.1)},
+    "G": {"Plate": (0.48, 0.42, 0.3), "Frame": (0.06, 0.06, 0.07), "Livery": (0.48, 0.13, 0.01), "Engine": (0.35, 0.35, 0.37),
+          "Glow": (0.9, 0.9, 1.0), "Lights": (1.0, 0.95, 0.85), "Radiator": (0.05, 0.05, 0.06)},
     "A": {"Plate": (0.8, 0.78, 0.72), "Frame": (0.25, 0.27, 0.3), "Livery": (0.1, 0.2, 0.45), "Engine": (0.3, 0.3, 0.32),
           "Glow": (0.55, 0.8, 1.0), "Lights": (1.0, 0.9, 0.7), "Radiator": (0.18, 0.19, 0.2)},
 }
