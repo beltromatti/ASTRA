@@ -104,6 +104,32 @@ class Builder:
             f.material_index = idx
         bmesh.ops.recalc_face_normals(self.bm, faces=faces)
 
+    def screen(self, matrix, mat: str, u_range=(0.0, 1.0), v_range=(0.0, 1.0)) -> None:
+        """Unit cube transformed by `matrix` (local X = thickness/normal, Y = width, Z = height) with UVs mapped
+        from its local (y, z) to u_range x v_range, so a UI texture fills the screen exactly."""
+        import bmesh as _bm
+        custom = self._custom_uv_layer()          # create layers first: adding a layer invalidates element refs
+        uv = self.bm.loops.layers.uv.verify()
+        geom = _bm.ops.create_cube(self.bm, size=1.0, matrix=matrix)
+        idx = self.mi(mat)
+        inv = matrix.inverted()
+        faces = list({f for v in geom["verts"] for f in v.link_faces})
+        _bm.ops.recalc_face_normals(self.bm, faces=faces)      # negative scales (mirrored UVs) invert the winding
+        for f in faces:
+            f.material_index = idx
+            for loop in f.loops:
+                lc = inv @ loop.vert.co
+                u = u_range[0] + (lc.y + 0.5) * (u_range[1] - u_range[0])
+                v = v_range[0] + (lc.z + 0.5) * (v_range[1] - v_range[0])
+                loop[uv].uv = (u, v)
+            f[custom] = 1
+
+    def _custom_uv_layer(self):
+        lay = self.bm.faces.layers.int.get("custom_uv")
+        if lay is None:
+            lay = self.bm.faces.layers.int.new("custom_uv")
+        return lay
+
     def to_object(self, name: str) -> bpy.types.Object:
         mesh = bpy.data.meshes.new(name)
         self.bm.normal_update()
@@ -166,7 +192,10 @@ def box_uv(obj: bpy.types.Object, texel_m: float = 1.0) -> None:
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     uv = bm.loops.layers.uv.verify()
+    custom = bm.faces.layers.int.get("custom_uv")
     for face in bm.faces:
+        if custom is not None and face[custom]:
+            continue
         n = face.normal
         ax = max(range(3), key=lambda i: abs(n[i]))
         for loop in face.loops:
@@ -259,3 +288,106 @@ def render_preview(objects: Sequence[bpy.types.Object], path: str, size: int = 9
     bpy.ops.render.render(write_still=True)
     bpy.data.objects.remove(cam, do_unlink=True)
     return path
+
+
+MAT_FLOOR_BRIDGE = "MI_ASTRA_FloorBridge"   # dark bridge deck
+MAT_LEATHER = "MI_ASTRA_Leather"            # seat upholstery
+
+
+def rounded_box(name: str, center, size, radius: float, mat: str, segments: int = 4,
+                cuts: tuple[int, int, int] = (0, 0, 0)) -> bpy.types.Object:
+    """Box with all edges rounded (radius), optionally pre-subdivided (cuts per axis) so it can be bent."""
+    b = Builder()
+    import bmesh as _bm
+    geom = _bm.ops.create_cube(b.bm, size=1.0, matrix=Matrix.Diagonal((*size, 1.0)))
+    b._assign(geom["verts"], mat)
+    for axis, n in enumerate(cuts):
+        if n <= 0:
+            continue
+        edges = [e for e in b.bm.edges
+                 if abs((e.verts[0].co - e.verts[1].co)[axis]) > 1e-6
+                 and all(abs((e.verts[0].co - e.verts[1].co)[k]) < 1e-6 for k in range(3) if k != axis)]
+        _bm.ops.subdivide_edges(b.bm, edges=edges, cuts=n, use_grid_fill=True)
+    obj = b.to_object(name)
+    bev = obj.modifiers.new("Round", "BEVEL")
+    bev.width = radius
+    bev.segments = segments
+    bev.limit_method = "ANGLE"
+    bev.angle_limit = math.radians(30)
+    bev.use_clamp_overlap = True
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=bev.name)
+    obj.location = center
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))
+    return obj
+
+
+def bend(obj: bpy.types.Object, angle_deg: float, axis: str = "Z", origin=(0.0, 0.0, 0.0)) -> None:
+    """Bend an object with SimpleDeform around `axis` through `origin`."""
+    empty = bpy.data.objects.new("bend_origin", None)
+    bpy.context.scene.collection.objects.link(empty)
+    empty.location = origin
+    mod = obj.modifiers.new("Bend", "SIMPLE_DEFORM")
+    mod.deform_method = "BEND"
+    mod.deform_axis = axis
+    mod.angle = math.radians(angle_deg)
+    mod.origin = empty
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.data.objects.remove(empty, do_unlink=True)
+
+
+def transform(obj: bpy.types.Object, loc=(0.0, 0.0, 0.0), rot_deg=(0.0, 0.0, 0.0)) -> bpy.types.Object:
+    """Apply a rotation (degrees, XYZ Euler) then a translation to the mesh data."""
+    from mathutils import Euler
+    m = Matrix.Translation(loc) @ Euler(tuple(math.radians(a) for a in rot_deg), "XYZ").to_matrix().to_4x4()
+    obj.data.transform(m)
+    obj.data.update()
+    return obj
+
+
+def arc_slab(name: str, width: float, height: float, thickness: float, curvature_radius: float, mat: str,
+             segments: int = 12, round_radius: float = 0.012) -> bpy.types.Object:
+    """Curved slab (backrests, wall screens): cross-section is an arc in the XY plane, concave towards +X
+    (centre of curvature at +X), centred on the origin, extruded along Z from 0 to `height`."""
+    import bmesh as _bm
+    b = Builder()
+    idx = b.mi(mat)
+    R = curvature_radius
+    phi = (width / 2) / R
+    inner, outer = [], []
+    for i in range(segments + 1):
+        a = -phi + 2 * phi * i / segments
+        for (lst, r) in ((inner, R), (outer, R + thickness)):
+            x = R - r * math.cos(a)
+            y = r * math.sin(a)
+            lst.append((x, y))
+    ring = inner + list(reversed(outer))
+    lo = [b.bm.verts.new((x, y, 0.0)) for x, y in ring]
+    hi = [b.bm.verts.new((x, y, height)) for x, y in ring]
+    faces = [b.bm.faces.new(list(reversed(lo))), b.bm.faces.new(hi)]
+    n = len(ring)
+    for i in range(n):
+        j = (i + 1) % n
+        faces.append(b.bm.faces.new((lo[i], lo[j], hi[j], hi[i])))
+    for f in faces:
+        f.material_index = idx
+    _bm.ops.recalc_face_normals(b.bm, faces=faces)
+    obj = b.to_object(name)
+    if round_radius > 0:
+        bev = obj.modifiers.new("Round", "BEVEL")
+        bev.width = round_radius
+        bev.segments = 3
+        bev.limit_method = "ANGLE"
+        bev.angle_limit = math.radians(40)
+        bev.use_clamp_overlap = True
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_apply(modifier=bev.name)
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))
+    return obj

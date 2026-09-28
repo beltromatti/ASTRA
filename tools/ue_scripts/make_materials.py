@@ -10,7 +10,7 @@ TEX_SRC = ROOT + "/art/_cache/textures"
 TEX_DST = "/Game/ASTRA/Materials/Textures"
 MAT_DST = "/Game/ASTRA/Materials"
 MI_DST = "/Game/ASTRA/Materials/Instances"
-KIT = globals().get("KIT", "/Game/ASTRA/Kit/Interior/Corridor")
+KIT = globals().get("KIT", "/Game/ASTRA/Kit/Bridge")
 
 eal = unreal.EditorAssetLibrary
 mel = unreal.MaterialEditingLibrary
@@ -335,6 +335,17 @@ def build_instances(hard, emi, glass):
         scalars={"RoughnessMin": 0.55, "RoughnessMax": 0.8, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.5,
                  "MacroBrightness": 0.08, "NormalStrength": 0.5, "ScratchRoughness": 0.0},
         vectors={"Tint": [0.045, 0.047, 0.05]},
+        textures={"BaseColorMap": "T_DeckRubber_BC", "NormalMap": "T_DeckRubber_N", "ORMMap": "T_DeckRubber_ORM"})
+    mis["MI_ASTRA_FloorBridge"] = make_mi("MI_ASTRA_FloorBridge", hard,
+        scalars={"RoughnessMin": 0.5, "RoughnessMax": 0.82, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.85,
+                 "MacroBrightness": 0.1, "RoughnessVariation": 0.1, "ScratchRoughness": -0.1, "NormalStrength": 0.8},
+        vectors={"Tint": [0.35, 0.38, 0.46]},
+        textures={"BaseColorMap": "T_DeckRubber_BC", "NormalMap": "T_DeckRubber_N", "ORMMap": "T_DeckRubber_ORM"})
+    mis["MI_ASTRA_Leather"] = make_mi("MI_ASTRA_Leather", hard,
+        scalars={"RoughnessMin": 0.34, "RoughnessMax": 0.52, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.3,
+                 "MacroBrightness": 0.06, "RoughnessVariation": 0.1, "ScratchRoughness": 0.05, "NormalStrength": 0.35,
+                 "UVScale": 3.0},
+        vectors={"Tint": [0.035, 0.042, 0.055]},
         textures={"BaseColorMap": "T_DeckRubber_BC", "NormalMap": "T_DeckRubber_N", "ORMMap": "T_DeckRubber_ORM"})
     command_blue = srgb_to_linear("#3E7BFA")
     mis["MI_ASTRA_Accent"] = make_mi("MI_ASTRA_Accent", emi,

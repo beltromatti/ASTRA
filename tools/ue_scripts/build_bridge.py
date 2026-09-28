@@ -57,7 +57,11 @@ for st in DATA["stations"]:
     elif kind == "tactical_rail":
         place("SM_BRG_TacticalRail", x, y, z, yaw, label=f"Station_{lab}_Rail", folder="Bridge/Stations")
     elif kind == "console_seated":
-        place("SM_BRG_ConsoleSeated", x, y, z, yaw, label=f"Station_{lab}_Console", folder="Bridge/Stations")
+        con = place("SM_BRG_ConsoleSeated", x, y, z, yaw, label=f"Station_{lab}_Console", folder="Bridge/Stations")
+        prefix = {"helm": "Helm", "ops": "Ops", "comms": "Comms", "sensors": "Sensors", "engineering": "Eng", "flight": "Flight"}[lab]
+        smc_c = con.get_component_by_class(unreal.StaticMeshComponent)
+        for slot in ("A", "B", "C", "Touch"):
+            smc_c.set_material_by_name(f"MI_ASTRA_Screen{slot}", eal.load_asset(f"/Game/ASTRA/UI/Materials/MI_UI_{prefix}_{slot}"))
         place("SM_BRG_ChairCrew", x, y, z, yaw, label=f"Station_{lab}_Chair", folder="Bridge/Stations")
 
 # --- lights: dome downlight + rect lights along the ceiling beams + holo glow (no shadows) + station spots
@@ -93,12 +97,12 @@ pl.set_actor_label("HoloTable_Glow")
 pl.set_folder_path("Lighting")
 
 # --- space: Aurelia sun ahead-left of the bow, stars
-fwd = V(-0.55, 0.35, -0.25)
+fwd = V(-0.5, -0.6, -0.45)          # light travels from the star (ahead, starboard, high) into the ship
 yaw = math.degrees(math.atan2(fwd.y, fwd.x))
 pitch = math.degrees(math.asin(fwd.z / math.sqrt(fwd.x ** 2 + fwd.y ** 2 + fwd.z ** 2)))
 sun = eas.spawn_actor_from_class(unreal.DirectionalLight, V(0, 0, 1500), R(pitch=pitch, yaw=yaw))
 sc = sun.get_component_by_class(unreal.DirectionalLightComponent)
-sc.set_editor_property("intensity", 2500.0)
+sc.set_editor_property("intensity", 1200.0)
 sc.set_editor_property("use_temperature", True)
 sc.set_editor_property("temperature", 4300.0)
 sc.set_editor_property("light_source_angle", 0.35)
@@ -131,6 +135,10 @@ ps = eas.spawn_actor_from_class(unreal.PlayerStart, V(-1.0 * M, 0.9 * M, 1.0 * M
 ps.set_folder_path("Gameplay")
 unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).set_level_viewport_camera_info(
     V(-7.2 * M, -1.2 * M, 1.75 * M), R(pitch=-4.0, yaw=4.0))
+import importlib  # noqa: E402
+import astra_editor  # noqa: E402
+importlib.reload(astra_editor)
+log.append(astra_editor.setup_space(84.0))
 les.save_current_level()
 log.append(f"actors: {len(eas.get_all_level_actors())}")
 print(json.dumps(log))

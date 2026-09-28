@@ -109,7 +109,7 @@ def shell(name: str):
     b = A.Builder()
     yw = side_wall_y(WELL_X, 1)
     # --- floors: upper deck, side wings, well, dais
-    slab(b, [(BACK_X, -BACK_HW), (WELL_X, -yw), (WELL_X, yw), (BACK_X, BACK_HW)], FLOOR_BOTTOM, UPPER, A.MAT_FLOOR)
+    slab(b, [(BACK_X, -BACK_HW), (WELL_X, -yw), (WELL_X, yw), (BACK_X, BACK_HW)], FLOOR_BOTTOM, UPPER, A.MAT_FLOOR_BRIDGE)
     # the well edge line y = +-WELL_HW meets the window facet between 20 and 40 degrees
     a20, a40 = arc(ANG[4]), arc(ANG[5])
     t = (WELL_HW - a20[1]) / (a40[1] - a20[1])
@@ -117,14 +117,14 @@ def shell(name: str):
     for s in (1, -1):
         wing = [(WELL_X, s * WELL_HW), (xe, s * WELL_HW), (arc(ANG[5])[0], s * arc(ANG[5])[1]),
                 (FRONT_S[0], s * FRONT_S[1]), (WELL_X, s * yw)]
-        slab(b, wing, FLOOR_BOTTOM, UPPER, A.MAT_FLOOR)
+        slab(b, wing, FLOOR_BOTTOM, UPPER, A.MAT_FLOOR_BRIDGE)
     well = [(WELL_X, -WELL_HW), (xe, -WELL_HW), arc(ANG[2]), arc(ANG[3]), arc(ANG[4]), (xe, WELL_HW), (WELL_X, WELL_HW)]
-    slab(b, well, FLOOR_BOTTOM, WELL, A.MAT_FLOOR)
+    slab(b, well, FLOOR_BOTTOM, WELL, A.MAT_FLOOR_BRIDGE)
     # stairs into the well (three risers of 0.2 m)
     sw = D["well"]["stair_width"]
     for yc in D["well"]["stairs_y"]:
-        lbox(b, (WELL_X, yc - sw / 2, WELL), (WELL_X + 0.35, yc + sw / 2, -0.2), A.MAT_FLOOR)
-        lbox(b, (WELL_X + 0.35, yc - sw / 2, WELL), (WELL_X + 0.70, yc + sw / 2, -0.4), A.MAT_FLOOR)
+        lbox(b, (WELL_X, yc - sw / 2, WELL), (WELL_X + 0.35, yc + sw / 2, -0.2), A.MAT_FLOOR_BRIDGE)
+        lbox(b, (WELL_X + 0.35, yc - sw / 2, WELL), (WELL_X + 0.70, yc + sw / 2, -0.4), A.MAT_FLOOR_BRIDGE)
         for k, x in enumerate((WELL_X, WELL_X + 0.35)):     # step nosings with guide lights
             z = -0.2 * (k + 1)
             lbox(b, (x - 0.03, yc - sw / 2, z - 0.03), (x + 0.02, yc + sw / 2, z + 0.004), A.MAT_TRIM)
@@ -137,7 +137,7 @@ def shell(name: str):
     for k in range(24):
         a = 2 * math.pi * k / 24
         dais.append((1.25 * math.cos(a), 2.9 * math.sin(a)))
-    slab(b, dais, UPPER - 0.05, DAIS, A.MAT_FLOOR)
+    slab(b, dais, UPPER - 0.05, DAIS, A.MAT_FLOOR_BRIDGE)
     ring_out = [(1.29 * math.cos(2 * math.pi * k / 24), 2.94 * math.sin(2 * math.pi * k / 24)) for k in range(24)]
     slab(b, ring_out, DAIS - 0.03, DAIS - 0.01, A.MAT_GUIDE)   # thin light line under the dais lip
 
@@ -214,7 +214,7 @@ def shell(name: str):
     outline += [arc(a, R_WIN + 0.35) for a in ANG]
     outline += [(FRONT_S[0], FRONT_S[1] + WALL_T), (BACK_X - WALL_T, BACK_HW + WALL_T)]
     cb = A.Builder()
-    slab(cb, outline, CEIL, CEIL + 0.3, A.MAT_PANEL)
+    slab(cb, outline, CEIL, CEIL + 0.3, A.MAT_STRUCTURE)
     ceiling = cb.to_object(name + "_ceiling")
     dc = D["ceiling"]["dome_center"]
     dr = D["ceiling"]["dome_radius"]
@@ -234,6 +234,30 @@ def shell(name: str):
              for k in range(8)], dh, dh + 0.2, A.MAT_PANEL)
     slab(b, [(dc[0] + 1.1 * math.cos(2 * math.pi * k / 16), dc[1] + 1.1 * math.sin(2 * math.pi * k / 16)) for k in range(16)],
          dh - 0.02, dh, A.MAT_LIGHT)
+    # coffered ceiling: 1.2 m ivory panels on a 1.26 m grid (dark gaps), inside the outline and clear of the dome
+    def inside(px, py):
+        n = len(outline)
+        sign = 0
+        for i in range(n):
+            (ax, ay), (bx, by) = outline[i], outline[(i + 1) % n]
+            c = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+            if abs(c) < 1e-9:
+                continue
+            if sign == 0:
+                sign = 1 if c > 0 else -1
+            elif (c > 0) != (sign > 0):
+                return False
+        return True
+    pitch, size = 1.26, 1.2
+    for i in range(-8, 9):
+        for j in range(-8, 9):
+            cx, cy = dc[0] + i * pitch, j * pitch
+            corners = [(cx + sx * size / 2, cy + sy * size / 2) for sx in (-1, 1) for sy in (-1, 1)]
+            if not all(inside(px, py) for px, py in corners):
+                continue
+            if math.hypot(cx - dc[0], cy - dc[1]) < dr + 1.0:
+                continue
+            lbox(b, (cx - size / 2, cy - size / 2, CEIL - 0.025), (cx + size / 2, cy + size / 2, CEIL), A.MAT_PANEL)
     # radial beams from the dome towards the window mullions and the walls
     for a in ANG[1:-1]:
         p_in = (dc[0] + (dr + 0.1) * math.cos(a), dc[1] + (dr + 0.1) * math.sin(a))
@@ -304,77 +328,86 @@ def console_seated(name: str):
     for f in faces:
         f.material_index = idx
     bmesh.ops.recalc_face_normals(bm, faces=faces)
-    # touch surface inlay on the desk
+    # touch surface inlay on the desk (local frame: X normal up, Y across, Z along the desk towards the screens)
     ang = math.atan2(0.08, 0.62)
-    m = (Matrix.Translation(U(x0 + 0.3, 0.0, 0.775)) @ Matrix.Rotation(-ang, 4, "Y")
-         @ Matrix.Diagonal((0.42, 1.1, 0.01, 1.0)))
-    geom = bmesh.ops.create_cube(bm, size=1.0, matrix=m)
-    b._assign(geom["verts"], A.MAT_SCREEN)
+    m = (Matrix.Translation(U(x0 + 0.3, 0.0, 0.8045)) @ Matrix.Rotation(-ang, 4, "Y") @ Matrix.Rotation(math.radians(-90), 4, "Y")
+         @ Matrix.Diagonal((0.006, -1.1, -0.42, 1.0)))
+    b.screen(m, "MI_ASTRA_ScreenTouch")
     # three screens on a spine, angled towards the officer
     lbox(b, (x0 + 0.6, -0.06, 0.8), (x0 + 0.7, 0.06, 1.05), A.MAT_STRUCTURE)
-    for yc, yaw in ((-0.56, 22.0), (0.0, 0.0), (0.56, -22.0)):
-        m = (Matrix.Translation(U(x0 + 0.68 - abs(yc) * 0.25, yc, 1.2)) @ Matrix.Rotation(math.radians(-yaw), 4, "Z")
+    for (yc, yaw, slot) in ((-0.56, 22.0, "MI_ASTRA_ScreenA"), (0.0, 0.0, "MI_ASTRA_ScreenB"), (0.56, -22.0, "MI_ASTRA_ScreenC")):
+        # layout y (starboard) -> Blender -y; the screen faces the officer (-X)
+        m = (Matrix.Translation(U(x0 + 0.68 - abs(yc) * 0.25, yc, 1.2)) @ Matrix.Rotation(math.radians(yaw), 4, "Z")
              @ Matrix.Rotation(math.radians(-12), 4, "Y"))
-        for (sx, sy, sz, off, mat) in ((0.05, 0.56, 0.36, 0.0, A.MAT_STRUCTURE), (0.01, 0.52, 0.32, -0.026, A.MAT_SCREEN)):
-            geom = bmesh.ops.create_cube(bm, size=1.0, matrix=m @ Matrix.Translation((off, 0, 0)) @ Matrix.Diagonal((sx, sy, sz, 1.0)))
-            b._assign(geom["verts"], mat)
+        geom = bmesh.ops.create_cube(bm, size=1.0, matrix=m @ Matrix.Diagonal((0.05, 0.56, 0.36, 1.0)))
+        b._assign(geom["verts"], A.MAT_STRUCTURE)
+        # screen: its local +Y must run towards the officer's right (Blender -Y) so the image is not mirrored
+        b.screen(m @ Matrix.Translation((-0.026, 0, 0)) @ Matrix.Diagonal((0.01, -0.52, 0.32, 1.0)), slot)
     # status light strip on the desk edge
     lbox(b, (x0 - 0.03, -w / 2 + 0.1, 0.735), (x0 - 0.02, w / 2 - 0.1, 0.75), A.MAT_ACCENT)
     return A.finish(b.to_object(name), bevel=0.006)
 
 
-def _chair(b: A.Builder, scale: float = 1.0, captain: bool = False):
-    s = scale
-    # base: star foot + column
-    for k in range(5):
-        a = 2 * math.pi * k / 5
-        b.cylinder(U(0, 0, 0.05), U(0.32 * s * math.cos(a), 0.32 * s * math.sin(a), 0.03), 0.028, A.MAT_TRIM, segments=10)
-    b.cylinder(U(0, 0, 0.0), U(0, 0, 0.42), 0.05 * s, A.MAT_STRUCTURE, segments=16)
-    b.cylinder(U(0, 0, 0.0), U(0, 0, 0.06), 0.16 * s, A.MAT_STRUCTURE, segments=24)
-    # seat, backrest, headrest as rounded boxes (subdivided cages)
-    parts = []
-    seat = A.Builder()
-    seat.box(U(0.02, 0, 0.47), (0.5 * s, 0.5 * s, 0.1), A.MAT_RUBBER)
-    parts.append(seat.to_object("seat"))
-    back = A.Builder()
-    m = Matrix.Translation(U(-0.25 * s, 0, 0.82)) @ Matrix.Rotation(math.radians(-10), 4, "Y") @ Matrix.Diagonal((0.1, 0.48 * s, 0.62, 1.0))
-    geom = bmesh.ops.create_cube(back.bm, size=1.0, matrix=m)
-    back._assign(geom["verts"], A.MAT_RUBBER)
-    parts.append(back.to_object("back"))
-    head = A.Builder()
-    m = Matrix.Translation(U(-0.33 * s, 0, 1.2 if not captain else 1.28)) @ Matrix.Rotation(math.radians(-10), 4, "Y") @ Matrix.Diagonal((0.1, 0.3 * s, 0.16, 1.0))
-    geom = bmesh.ops.create_cube(head.bm, size=1.0, matrix=m)
-    head._assign(geom["verts"], A.MAT_RUBBER)
-    parts.append(head.to_object("head"))
-    for p in parts:
-        A.subsurf(p, 2)
-    # shell behind the backrest and armrests
-    shell_b = A.Builder()
-    m = Matrix.Translation(U(-0.31 * s, 0, 0.86)) @ Matrix.Rotation(math.radians(-10), 4, "Y") @ Matrix.Diagonal((0.04, 0.54 * s, 0.78, 1.0))
-    geom = bmesh.ops.create_cube(shell_b.bm, size=1.0, matrix=m)
-    shell_b._assign(geom["verts"], A.MAT_PANEL)
-    for side in (1, -1):
-        y = side * 0.3 * s
-        shell_b.box(U(0.02, y, 0.64), (0.46 * s, 0.07, 0.05), A.MAT_PANEL)
-        shell_b.box(U(-0.08, y, 0.56), (0.05, 0.05, 0.14), A.MAT_TRIM)
-        if captain:
-            # armrest consoles with small screens and controls
-            shell_b.box(U(0.12, y, 0.68), (0.34, 0.14, 0.04), A.MAT_STRUCTURE)
-            m = Matrix.Translation(U(0.15, y, 0.705)) @ Matrix.Rotation(math.radians(8), 4, "Y") @ Matrix.Diagonal((0.2, 0.1, 0.005, 1.0))
-            geom = bmesh.ops.create_cube(shell_b.bm, size=1.0, matrix=m)
-            shell_b._assign(geom["verts"], A.MAT_SCREEN)
-    shell_b.box(U(0.0, 0, 0.415), (0.44 * s, 0.44 * s, 0.03), A.MAT_TRIM)
-    sh = shell_b.to_object("shell")
-    A.bevel_and_normals(sh, width=0.006, segments=2)
-    return parts + [sh]
-
-
 def chair(name: str, captain: bool = False):
-    b = A.Builder()
-    others = _chair(b, 1.12 if captain else 1.0, captain)
-    base = b.to_object(name + "_base")
-    A.bevel_and_normals(base, width=0.004, segments=2)
-    obj = A.join([base] + others, name)
+    """Bridge chair: five-star base (crew) or plinth (captain), rounded seat and backrest cushions on ivory shells,
+    curved backrest, headrest, armrests (captain: armrest consoles with screens). Faces +X, origin on the floor."""
+    k = 1.12 if captain else 1.0
+    parts = []
+    base = A.Builder()
+    if captain:
+        base.cylinder((0, 0, 0.0), (0, 0, 0.08), 0.34, A.MAT_STRUCTURE, segments=40)
+        base.cylinder((0, 0, 0.08), (0, 0, 0.36), 0.12, A.MAT_TRIM, segments=32)
+        base.cylinder((0, 0, 0.078), (0, 0, 0.086), 0.345, A.MAT_GUIDE, segments=40)
+    else:
+        for i in range(5):
+            a = 2 * math.pi * i / 5
+            base.cylinder((0.03 * math.cos(a), 0.03 * math.sin(a), 0.07), (0.30 * math.cos(a), 0.30 * math.sin(a), 0.045),
+                          0.024, A.MAT_STRUCTURE, segments=10)
+            base.cylinder((0.30 * math.cos(a), 0.30 * math.sin(a), 0.0), (0.30 * math.cos(a), 0.30 * math.sin(a), 0.05),
+                          0.026, A.MAT_RUBBER, segments=12)
+        base.cylinder((0, 0, 0.04), (0, 0, 0.1), 0.07, A.MAT_STRUCTURE, segments=24)
+        base.cylinder((0, 0, 0.1), (0, 0, 0.4), 0.032, A.MAT_TRIM, segments=20)
+    base.box((0.0, 0, 0.415), (0.3, 0.3, 0.04), A.MAT_STRUCTURE)
+    parts.append(A.finish(base.to_object(name + "_base"), bevel=0.004))
+    # seat
+    seat_shell = A.rounded_box(name + "_seatshell", (0.02, 0, 0.45), (0.53 * k, 0.53 * k, 0.05), 0.02, A.MAT_PANEL)
+    seat = A.rounded_box(name + "_seat", (0.035, 0, 0.505), (0.49 * k, 0.49 * k, 0.075), 0.034, A.MAT_LEATHER,
+                         cuts=(3, 3, 0))
+    A.transform(seat, rot_deg=(0, -3.0, 0))
+    parts += [seat_shell, seat]
+    # backrest: curved slabs (concave towards the sitter), reclined 12 degrees
+    def back_part(nm, thick, width, height, mat, dx, rr):
+        o = A.arc_slab(nm, width, height, thick, 0.62 if captain else 0.7, mat, segments=14, round_radius=rr)
+        A.transform(o, loc=(dx, 0, -height / 2))
+        A.transform(o, rot_deg=(0, -12.0, 0))
+        A.transform(o, loc=(-0.25 * k, 0, 0.83 * k + 0.02))
+        return o
+    parts.append(back_part(name + "_backshell", 0.03, 0.54 * k, 0.68 * k, A.MAT_PANEL, -0.058, 0.012))
+    parts.append(back_part(name + "_back", 0.05, 0.48 * k, 0.6 * k, A.MAT_LEATHER, 0.0, 0.022))
+    # headrest on two posts
+    hz = 1.24 * k
+    head = A.rounded_box(name + "_head", (-0.345 * k, 0, hz), (0.075, 0.3 * k, 0.15), 0.03, A.MAT_LEATHER, cuts=(0, 2, 0))
+    parts.append(head)
+    posts = A.Builder()
+    for sy in (-0.08, 0.08):
+        posts.cylinder((-0.36 * k, sy * k, hz - 0.2), (-0.36 * k, sy * k, hz - 0.03), 0.011, A.MAT_TRIM, segments=10)
+    parts.append(A.finish(posts.to_object(name + "_posts"), bevel=0.0))
+    # armrests
+    for side in (1, -1):
+        y = side * 0.305 * k
+        arm = A.rounded_box(name + f"_arm{side}", (0.0, y, 0.665), (0.4 * k, (0.13 if captain else 0.075), 0.045), 0.018,
+                            A.MAT_LEATHER if not captain else A.MAT_STRUCTURE)
+        parts.append(arm)
+        sup = A.Builder()
+        sup.box((-0.12, y, 0.55), (0.05, 0.035, 0.2), A.MAT_TRIM)
+        sup.box((0.0, y, 0.44), (0.3, 0.035, 0.03), A.MAT_TRIM)
+        if captain:
+            m = Matrix.Translation((0.06, y, 0.69)) @ Matrix.Rotation(math.radians(10), 4, "Y") @ Matrix.Diagonal((0.2, 0.09, 0.006, 1.0))
+            geom = bmesh.ops.create_cube(sup.bm, size=1.0, matrix=m)
+            sup._assign(geom["verts"], A.MAT_SCREEN)
+            sup.box((0.2, y, 0.69), (0.03, 0.1, 0.012), A.MAT_ACCENT)
+        parts.append(A.finish(sup.to_object(name + f"_sup{side}"), bevel=0.003))
+    obj = A.join(parts, name)
     A.box_uv(obj)
     return obj
 
@@ -404,9 +437,8 @@ def tactical_rail(name: str):
         cym = (mid_in[1] * 0.35 + mid_out[1] * 0.65)
         yaw = math.atan2(-(mid_out[1] - mid_in[1]), mid_out[0] - mid_in[0])
         m = (Matrix.Translation(U(cxm, cym, 1.02)) @ Matrix.Rotation(yaw, 4, "Z") @ Matrix.Rotation(math.radians(-20), 4, "Y")
-             @ Matrix.Diagonal((0.3, seg * 0.96, 0.012, 1.0)))
-        geom = bmesh.ops.create_cube(b.bm, size=1.0, matrix=m)
-        b._assign(geom["verts"], A.MAT_SCREEN)
+             @ Matrix.Rotation(math.radians(-90), 4, "Y") @ Matrix.Diagonal((0.012, -seg * 0.96, 0.3, 1.0)))
+        b.screen(m, "MI_ASTRA_ScreenTactical", u_range=(k / n, (k + 1) / n))
     # front face light line
     return A.finish(b.to_object(name), bevel=0.006)
 
@@ -420,7 +452,8 @@ def holo_table(name: str):
     slab(b, circle(r * 0.7), 0.0, 0.08, A.MAT_TRIM)                       # foot
     slab(b, circle(r), h - 0.12, h - 0.02, A.MAT_PANEL)                   # table rim body
     slab(b, circle(r + 0.03), h - 0.03, h + 0.02, A.MAT_TRIM)             # rim
-    slab(b, circle(r - 0.12), h + 0.005, h + 0.012, A.MAT_SCREEN)          # projection surface
+    b.screen(Matrix.Translation(U(0, 0, h + 0.009)) @ Matrix.Rotation(math.radians(-90), 4, "Y")
+             @ Matrix.Diagonal((0.006, -2 * (r - 0.12), -2 * (r - 0.12), 1.0)), "MI_ASTRA_ScreenHolo")   # projection surface
     slab(b, circle(r * 0.56, 48), h - 0.3, h - 0.26, A.MAT_ACCENT)        # glow ring under the top
     return A.finish(b.to_object(name), bevel=0.006)
 
@@ -430,7 +463,7 @@ def master_display(name: str):
     b = A.Builder()
     w, h, z0 = md["width"], md["height"], md["bottom"]
     lbox(b, (0.0, -w / 2 - 0.12, z0 - 0.12), (0.12, w / 2 + 0.12, z0 + h + 0.12), A.MAT_STRUCTURE)
-    lbox(b, (0.12, -w / 2, z0), (0.13, w / 2, z0 + h), A.MAT_SCREEN)
+    b.screen(Matrix.Translation(U(0.125, 0.0, z0 + h / 2)) @ Matrix.Diagonal((0.01, w, h, 1.0)), "MI_ASTRA_ScreenMaster")
     lbox(b, (0.1, -w / 2 - 0.12, z0 - 0.16), (0.16, w / 2 + 0.12, z0 - 0.12), A.MAT_ACCENT)
     return A.finish(b.to_object(name), bevel=0.008)
 
