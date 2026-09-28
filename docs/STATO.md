@@ -83,6 +83,13 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Distruzioni: lampo, palla di fuoco (M_FX_Blast), esplosioni secondarie, onda d'urto, detriti, relitto annerito alla deriva
 - [ ] Navi v2 (sagome e dettagli più belli), scie dei missili, colpi sugli scudi più ricchi
 
+## Aspetto degli scafi (piastre, luce del pianeta)
+- [x] **Piastre di scafo a scala nave** su tutte le navi: trama procedurale piastrellabile di 32 m (`tools/art/hull_panels.py`: tono di ogni piastra, giunture, rivetti, portelli, griglie, pezze, sporco nelle giunture) nel nuovo master `M_ASTRA_Hull` (`tools/ue_scripts/make_hull_material.py`) sopra il livello di dettaglio; pesi per parte in `make_ship_materials.py` (vernici forti sulle piastre, meno su telai e motori). Vernici abbassate perché al sole (EV fisso 6,6) non brucino nel bianco
+- [x] **Luce riflessa dal pianeta** (earthshine): una seconda luce direzionale dal pianeta, colorata dal suo tipo, intensità secondo fase e grandezza nel cielo; senza ombre e solo sul canale di illuminazione 1 (scafi, Gate, detriti: gli interni non la ricevono). Il fianco in ombra delle navi prende l'azzurro di New Ravenna
+- [x] Bagliori dei motori morbidi (`M_FX_Flare`) e dimensionati sulla telecamera
+- [x] **Mercantile v2** delle Free Guilds (portacontainer a traliccio: sezione equipaggio, baie di container colorati, cisterne, sezione motori con ali radianti)
+- Costo: ~+0,4 ms a 1080p in battaglia (mediana 19,7 ms)
+
 ## Plancia: segnaletica
 - [x] Emblema della ASTRA Navy (stella a otto punte in doppio anello, "ASTRA NAVY", "CONCORD · LAW · LIGHT"), insegna "ASN AQUILA · CVC-01" sopra lo schermo principale, targhe retroilluminate delle stazioni col colore del reparto, cartelli "CORRIDOR 1-A" sopra le porte, emblema intarsiato nel pavimento del pozzo, chevron di sicurezza sul bordo. Rigenerare: `uv run --with pillow python tools/art/signage.py`, `blender ... art/blender/signs.py`, `tools/ue.py pyfile tools/ue_scripts/place_signage.py`
 
@@ -129,7 +136,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] **Umore dell'equipaggio**: a ogni svolta il regista scrive come si sente la plancia e perché, nominando gli ufficiali (lutto per i caduti, orgoglio, stanchezza, dubbi su un ordine, rabbia), e lo fa evolvere di beat in beat (salvato in `story.json`). Colora il modo in cui gli ufficiali parlano senza mai dichiararlo, e affiora nei momenti di quiete. Esempio reale dopo la prima battaglia: *«Exhausted but proud… Grief for the Vigilant sits under everything — Mensah's repair gangs work in silence, Price counts seven Hammers where there were eight»*; alla domanda sul morale Serra risponde «stanchi, ma orgogliosi di aver tenuto Aurelia. Il dolore per il Vigilant è ancora aperto…»
 
 ## Prossimi passi
-1. Mercantile v2 (è ancora il v1) e trama di pannelli per gli scafi (normal map).
+1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
 2. Altri ponti raggiungibili con l'ascensore: sala macchine con il capo Okonkwo, infermeria (i feriti del ruolino), alloggi.
 3. Pilotare un caccia in prima persona dal ponte di volo.
 4. Simulazione di calore (M2); discesa sul pianeta (M7); preparazione al multigiocatore (M8: autorità del server, comandi come RPC).
