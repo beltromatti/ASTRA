@@ -72,6 +72,13 @@ protected:
 	void OpenMenu();
 	/** The Captain climbs into a Falcon of Alpha on the flight deck: the cockpit on the port catapult. */
 	void BoardFalcon(class AAstraHangar* Hangar, APawn* Walker);
+	/** F1: the controls card (shown for a while at the start of a campaign as a hint). */
+	void ToggleHelp();
+	UFUNCTION(Exec) void AstraHelp() { ToggleHelp(); }
+	void ShowHelp(bool bShow);
+	TSharedPtr<class SWidget> HelpWidget;
+	TSharedPtr<class SWidget> HintWidget;
+	FTimerHandle HintTimer;
 
 public:
 	/** Console twin of the E key (the lift, the captain's chair): for tests and accessibility. */

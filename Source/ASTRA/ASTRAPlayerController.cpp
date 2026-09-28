@@ -2,6 +2,12 @@
 
 
 #include "ASTRAPlayerController.h"
+#include "Styling/CoreStyle.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SBox.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/Font.h"
 #include "AstraCampaign.h"
 #include "AstraFighterPawn.h"
 #include "AstraHangar.h"
@@ -30,6 +36,36 @@ AASTRAPlayerController::AASTRAPlayerController()
 void AASTRAPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	if (IsLocalPlayerController())
+	{
+		GetWorldTimerManager().SetTimerForNextTick([this]()
+		{
+			UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+			if (!VC || HintWidget.IsValid())
+			{
+				return;
+			}
+			UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+			HintWidget = SNew(SBox).HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 28, 22))
+			[
+				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.7f))
+				.Padding(FMargin(14, 8))
+				[
+					SNew(STextBlock).Font(Mono ? FSlateFontInfo(Mono, 13) : FCoreStyle::GetDefaultFontStyle("Mono", 13))
+					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  hold V  talk to the crew")))
+				]
+			];
+			VC->AddViewportWidgetContent(HintWidget.ToSharedRef(), 5);
+			GetWorldTimerManager().SetTimer(HintTimer, [this]()
+			{
+				if (HintWidget.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
+				{
+					GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
+					HintWidget.Reset();
+				}
+			}, 45.f, false);
+		});
+	}
 	if (IsLocalPlayerController() && bStartSeated)
 	{
 		// the Captain starts in the chair (the pawn is possessed right after BeginPlay)
@@ -70,6 +106,7 @@ void AASTRAPlayerController::SetupInputComponent()
 		// the campaign menu (the game pauses behind it)
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
 		InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
+		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
 	}
 
 	// only add IMCs for local player controllers
@@ -210,6 +247,70 @@ void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
 		{
 			Ship->PublishEvent(TEXT("flight: the Captain has climbed into a Falcon of Alpha on the port catapult"), true);
 		}
+	}
+}
+
+namespace
+{
+	const TCHAR* HelpCard =
+		TEXT("ON THE BRIDGE\n")
+		TEXT("  V (hold)        talk to the crew, in any language\n")
+		TEXT("  E               stand up / sit down · doors · the lift\n")
+		TEXT("  WASD, mouse     walk and look\n")
+		TEXT("  Esc             pause · save · menu\n")
+		TEXT("\n")
+		TEXT("ON THE FLIGHT DECK (the lift at the end of the port corridor)\n")
+		TEXT("  E               beside a Falcon of Alpha: climb in\n")
+		TEXT("  W               on the catapult: launch\n")
+		TEXT("\n")
+		TEXT("IN A FALCON\n")
+		TEXT("  mouse           the stick (pitch, yaw)      A / D    roll\n")
+		TEXT("  W / S           throttle (X: cut)           Shift    afterburner\n")
+		TEXT("  Q / E           slide left / right          Space / Ctrl   up / down\n")
+		TEXT("  left mouse      cannons                     right mouse    missile (locked)\n")
+		TEXT("  C               decoys                      Alt      look around\n")
+		TEXT("  F               near the Aquila's port bow tube, slow: recover\n")
+		TEXT("  V (hold)        talk to the bridge by radio\n")
+		TEXT("\n")
+		TEXT("F1  this card");
+}
+
+void AASTRAPlayerController::ToggleHelp()
+{
+	ShowHelp(!HelpWidget.IsValid());
+}
+
+void AASTRAPlayerController::ShowHelp(bool bShow)
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC)
+	{
+		return;
+	}
+	if (HintWidget.IsValid())
+	{
+		VC->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
+		HintWidget.Reset();
+	}
+	if (!bShow && HelpWidget.IsValid())
+	{
+		VC->RemoveViewportWidgetContent(HelpWidget.ToSharedRef());
+		HelpWidget.Reset();
+		return;
+	}
+	if (bShow && !HelpWidget.IsValid())
+	{
+		UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+		const FSlateFontInfo Font = Mono ? FSlateFontInfo(Mono, 14) : FCoreStyle::GetDefaultFontStyle("Mono", 14);
+		HelpWidget = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.85f))
+			.Padding(FMargin(40, 30))
+			[
+				SNew(STextBlock).Font(Font).ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f)).Text(FText::FromString(HelpCard))
+			]
+		];
+		VC->AddViewportWidgetContent(HelpWidget.ToSharedRef(), 40);
 	}
 }
 
