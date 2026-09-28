@@ -332,7 +332,11 @@ public:
 	/** The Captain's Falcon clears the bow tube: from now on the battle flies it with the pilot's input and moves the pawn
 	 *  with the rest of the world (the same frame as every ship). World pose where it leaves the tube, speed relative
 	 *  to the Aquila. */
-	bool LaunchPiloted(AActor* Pawn, const FVector& WorldPos, const FQuat& WorldRot, float SpeedMps);
+	bool LaunchPiloted(AActor* Pawn, const FVector& WorldPos, const FQuat& WorldRot, float SpeedMps, bool bFromPlanet = false);
+	/** The Captain's Falcon leaves the fleet's plot for New Ravenna's atmosphere (it stays the Captain's, off the plot). */
+	void LeavePiloted();
+	/** The Captain's Falcon was lost down on the planet (one Falcon fewer in Alpha). */
+	void FalconLostPlanetside();
 	void SetPilotInput(const FAstraPilotInput& In) { Pilot = In; }
 	void GetPilotStatus(FAstraPilotStatus& Out) const;
 	/** Recovered through the bow tube (bLanded) or the pod picked up after an ejection: the craft leaves the battle. */

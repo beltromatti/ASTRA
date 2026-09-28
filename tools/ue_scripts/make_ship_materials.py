@@ -88,6 +88,8 @@ def fx_material(name, fresnel, soft=False):
     if eal.does_asset_exist(p):
         m = eal.load_asset(p)
         mel.delete_all_material_expressions(m)
+        for e in mel.get_material_expressions(m):   # what delete_all leaves behind
+            mel.delete_material_expression(m, e)
     else:
         m = tools.create_asset(name, MAT, unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)

@@ -214,11 +214,27 @@ def missile_warning():
     return norm(np.tanh(3 * np.sin(ph)) * 0.8, 0.55)
 
 
+def entry_plasma(dur=10.0):
+    """Atmospheric entry heard from the cockpit: a rising roar of air and plasma on the hull, buffeting, crackle, then
+    easing off as the Falcon slows (the game starts it at the entry interface)."""
+    t = t_(dur)
+    env = np.clip(t / 3.0, 0, 1) ** 1.5 * np.clip((dur - t) / 3.5, 0, 1)
+    roar = lp(hp(rng.normal(0, 1, len(t)), 30), 500, order=3) * 1.6
+    hiss = bp(rng.normal(0, 1, len(t)), 1200, 5000) * 0.35
+    buffet = 1 + 0.35 * np.sin(2 * np.pi * (3.1 + 1.5 * np.sin(t * 0.7)) * t) * np.sin(2 * np.pi * 0.43 * t)
+    crackle = np.zeros_like(t)
+    for _ in range(260):
+        i = rng.integers(0, len(t) - 400)
+        crackle[i:i + 400] += np.exp(-np.arange(400) / 45.0) * rng.normal(0, 1, 400) * 0.6
+    x = (roar + hiss) * buffet * env + crackle * env ** 2
+    return norm(np.tanh(1.3 * x), 0.85)
+
+
 os.makedirs(OUT, exist_ok=True)
 for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("SW_Torpedo_Launch", lambda: vls_launch(True)),
                  ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp),
                  ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False)), ("SW_Transit", transit),
                  ("SW_Sparks", sparks), ("SW_Falcon_Engine", falcon_engine), ("SW_Lock_Beep", lock_beep), ("SW_Lock_Solid", lock_solid),
-                 ("SW_Missile_Warning", missile_warning)):
+                 ("SW_Missile_Warning", missile_warning), ("SW_Entry_Plasma", entry_plasma)):
     sf.write(os.path.join(OUT, name + ".wav"), fn().astype(np.float32), SR, subtype="PCM_16")
 print("SHIP_SOUNDS_OK", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

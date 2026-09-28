@@ -10,6 +10,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/Light.h"
+#include "Engine/PostProcessVolume.h"
+#include "Engine/SkyLight.h"
+#include "Components/SkyLightComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "EngineUtils.h"
@@ -193,6 +196,24 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 	}
 	SetPlanetFill(TEXT("ocean"));
 	UE_LOG(LogASTRA, Log, TEXT("[Ship] planet light %s, %d exterior meshes"), PlanetLight ? TEXT("on") : TEXT("missing"), Exterior);
+	// New Ravenna's surface zone, and the space sky and sky light it replaces when the Captain goes down
+	static const FName TagPlanet(TEXT("ASTRA.Planet.NewRavenna"));
+	for (TActorIterator<AActor> It(&InWorld); It; ++It)
+	{
+		if (It->ActorHasTag(TagPlanet))
+		{
+			PlanetActors.Add(*It);
+		}
+		else if (It->ActorHasTag(TagSky))
+		{
+			SpaceSkyActor = *It;
+		}
+		else if (It->IsA(ASkyLight::StaticClass()))
+		{
+			SpaceSkyLight = *It;
+		}
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Ship] New Ravenna surface zone: %d actors"), PlanetActors.Num());
 	CaptureHomeSky();
 }
 
@@ -222,6 +243,7 @@ void UAstraShipSubsystem::UpdatePlanetLight(const FVector& SunNow, const FVector
 	{
 		return;
 	}
+	PlanetDirNow = Dir;
 	// how much of its lit face we see (full when the star is behind us), how big it is in the sky; a touch more than
 	// physics (x3) so the night side of a hull is not a hole
 	const float Phase = 0.5f * (1.f - FVector::DotProduct(SunNow.GetSafeNormal(), Dir));
@@ -395,6 +417,10 @@ void UAstraShipSubsystem::DriveExternally(float Heading, float Mark, float Speed
 
 FString UAstraShipSubsystem::CaptainAboard() const
 {
+	if (!CaptainPlanetside.IsEmpty())
+	{
+		return CaptainPlanetside;
+	}
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (P && P->GetActorLocation().Z < -3000.f)
 	{
@@ -939,10 +965,81 @@ void UAstraShipSubsystem::UpdateAttitudeVisuals()
 		                         FVector(Cols[0][2], Cols[1][2], Cols[2][2])};
 		UpdatePlanetLight(SunNow, Axes);
 	}
-	if (Sun)
+	if (Sun && !bPlanetside)
 	{
 		Sun->SetActorRotation((-Delta.UnrotateVector(SunDir0)).Rotation());
 	}
+}
+
+void UAstraShipSubsystem::SetPlanetside(bool bOn)
+{
+	if (bOn == bPlanetside)
+	{
+		return;
+	}
+	bPlanetside = bOn;
+	if (SpaceSkyActor)
+	{
+		SpaceSkyActor->SetActorHiddenInGame(bOn);
+	}
+	if (SpaceSkyLight)
+	{
+		if (USkyLightComponent* SL = SpaceSkyLight->FindComponentByClass<USkyLightComponent>())
+		{
+			SL->SetVisibility(!bOn);
+		}
+	}
+	for (AActor* A : PlanetActors)
+	{
+		if (!A)
+		{
+			continue;
+		}
+		A->SetActorHiddenInGame(!bOn);
+		TInlineComponentArray<USceneComponent*> Cs(A);
+		for (USceneComponent* C : Cs)
+		{
+			C->SetVisibility(bOn);
+		}
+		if (bOn)
+		{
+			if (USkyLightComponent* SL = A->FindComponentByClass<USkyLightComponent>())
+			{
+				SL->RecaptureSky();
+			}
+		}
+	}
+	if (PlanetLight && PlanetLight->GetLightComponent())
+	{
+		PlanetLight->GetLightComponent()->SetVisibility(!bOn);
+	}
+	if (Sun)
+	{
+		if (bOn)
+		{
+			// mid-afternoon over Port Aurelius: the sun high in the south-west, over the sea
+			Sun->SetActorRotation(FRotator(-38.f, 60.f, 0.f));
+		}
+		else
+		{
+			UpdateAttitudeVisuals();
+		}
+	}
+	// a sunlit world wants a little less exposure than a bridge lit by its own lamps
+	for (TActorIterator<APostProcessVolume> It(GetWorld()); It; ++It)
+	{
+		FPostProcessSettings& PS = It->Settings;
+		if (bOn)
+		{
+			SpaceEV = PS.AutoExposureMinBrightness;
+		}
+		PS.AutoExposureMinBrightness = PS.AutoExposureMaxBrightness = bOn ? 7.9f : SpaceEV;
+	}
+	if (!bOn)
+	{
+		CaptainPlanetside.Reset();
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Ship] planetside %s"), bOn ? TEXT("on: New Ravenna") : TEXT("off: space"));
 }
 
 void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)

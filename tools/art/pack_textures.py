@@ -29,6 +29,12 @@ SETS = {
     "DeckRubber": "Rubber004",
     "Walkway": "MetalWalkway013",
     "Brushed": "Metal032",
+    # New Ravenna's ground (the terrain material blends them by slope and height)
+    "Rock": "Rock035",
+    "Grass": "Grass004",
+    "Meadow": "Ground037",
+    "Sand": "Ground054",
+    "Snow": "Snow010A",
 }
 
 

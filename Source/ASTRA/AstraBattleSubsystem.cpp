@@ -3921,7 +3921,7 @@ void UAstraBattleSubsystem::ReturnFalcon()
 	}
 }
 
-bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos, const FQuat& WorldRot, float SpeedMps)
+bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos, const FQuat& WorldRot, float SpeedMps, bool bFromPlanet)
 {
 	if (Ships.Num() == 0 || PilotedId >= 0)
 	{
@@ -3955,8 +3955,33 @@ bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos,
 	PilotDecoys = 4;
 	Pilot = FAstraPilotInput();
 	Pilot.Throttle = 0.6f;
-	Report(TEXT("flight: the Captain is off the catapult in a Falcon of Alpha, callsign Eagle — the XO has the conn"), true);
+	Report(bFromPlanet ? TEXT("flight: Eagle is back in orbit from New Ravenna, climbing to rejoin the Aquila")
+	                   : TEXT("flight: the Captain is off the catapult in a Falcon of Alpha, callsign Eagle — the XO has the conn"), true);
 	return true;
+}
+
+void UAstraBattleSubsystem::FalconLostPlanetside()
+{
+	for (FAstraSquadron& Q : Squadrons)
+	{
+		if (Q.Side == EAstraSide::Astra && Q.Name == TEXT("alpha"))
+		{
+			Q.Total = FMath::Max(0, Q.Total - 1);
+		}
+	}
+}
+
+void UAstraBattleSubsystem::LeavePiloted()
+{
+	if (FAstraBattleShip* S = FindById(PilotedId))
+	{
+		S->bAlive = false;
+		S->Mode = EAstraShipMode::Dead;
+		S->ContactId = FString::Printf(TEXT("EAGLE-%d"), S->Id);
+	}
+	PilotedId = -1;
+	PilotActor = nullptr;
+	Report(TEXT("flight: Eagle has left the plot — the Captain is descending into New Ravenna's atmosphere"), true);
 }
 
 void UAstraBattleSubsystem::EndPiloted(bool bLanded)
@@ -4012,6 +4037,13 @@ void UAstraBattleSubsystem::TickPiloted(FAstraBattleShip& S, float Dt)
 		if (T)
 		{
 			S.Att = FRotationMatrix::MakeFromX((T->Pos - S.Pos).GetSafeNormal()).ToQuat();
+		}
+		else if (GFaceRequest == TEXT("PLANET"))
+		{
+			if (const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+			{
+				S.Att = FRotationMatrix::MakeFromX(Ships[0].Att.RotateVector(Ship->PlanetDirectionWorld())).ToQuat();
+			}
 		}
 		GFaceRequest.Reset();
 	}

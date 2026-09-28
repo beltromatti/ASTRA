@@ -4,6 +4,7 @@
 
 #include "ASTRA.h"
 #include "AstraHangar.h"
+#include "AstraShipSubsystem.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/AudioComponent.h"
@@ -49,6 +50,9 @@ public:
 		FVector2D HomePos = FVector2D::ZeroVector;
 		float HomeEdgeAngle = 0.f;
 		FString HomeText;
+		float Plasma = 0.f;          // the entry's glow over everything
+		bool bPlanet = false;        // over New Ravenna: altitude instead of weapons
+		float Alt = 0.f, AGL = 0.f;
 	};
 	FData Data;
 
@@ -100,6 +104,38 @@ public:
 				Lines({Corner - FVector2D(Sg.X * L, 0), Corner, Corner - FVector2D(0, Sg.Y * L)}, Col);
 			}
 		};
+		if (Data.Plasma > 0.001f)
+		{
+			// the entry: the air burning around the canopy — rings of glow crowding in from the edges, orange turning
+			// white, until at its height the whole view is fire
+			const FSlateBrush* White = FCoreStyle::Get().GetBrush("WhiteBrush");
+			const FLinearColor Glow = FMath::Lerp(FLinearColor(1.f, 0.42f, 0.12f, 1.f), FLinearColor(1.f, 0.88f, 0.75f, 1.f), Data.Plasma);
+			const int32 Rings = 14;
+			for (int32 k = 0; k < Rings; ++k)
+			{
+				const float In0 = 0.5f * k / Rings, In1 = 0.5f * (k + 1) / Rings;
+				const float A = Data.Plasma * FMath::Square(1.f - (float)k / Rings) * 0.55f;
+				if (A < 0.01f)
+				{
+					continue;
+				}
+				const FVector2D P0 = Size * In0, P1 = Size * (1.f - In0), Q0 = Size * In1, Q1 = Size * (1.f - In1);
+				const FLinearColor Cc(Glow.R, Glow.G, Glow.B, A);
+				auto Rect = [&](const FVector2D& From, const FVector2D& To)
+				{
+					FSlateDrawElement::MakeBox(Out, Layer, G.ToPaintGeometry(To - From, FSlateLayoutTransform(From)), White, ESlateDrawEffect::None, Cc);
+				};
+				Rect(P0, FVector2D(P1.X, Q0.Y));                  // top band
+				Rect(FVector2D(P0.X, Q1.Y), P1);                  // bottom band
+				Rect(FVector2D(P0.X, Q0.Y), FVector2D(Q0.X, Q1.Y));   // left
+				Rect(FVector2D(Q1.X, Q0.Y), FVector2D(P1.X, Q1.Y));   // right
+			}
+			const float Core = FMath::Clamp((Data.Plasma - 0.55f) * 2.2f, 0.f, 1.f);
+			if (Core > 0.f)
+			{
+				FSlateDrawElement::MakeBox(Out, Layer, G.ToPaintGeometry(), White, ESlateDrawEffect::None, FLinearColor(Glow.R, Glow.G, Glow.B, Core));
+			}
+		}
 		if (!Data.Hint.IsEmpty())
 		{
 			const bool bAlarm = Data.Hint.StartsWith(TEXT("MISSILE")) || Data.Hint.StartsWith(TEXT("HULL"));
@@ -174,6 +210,12 @@ public:
 		Lines({LB + FVector2D(0, 30) * U, LB + FVector2D(120, 30) * U}, Dim, 4.f);
 		Lines({LB + FVector2D(0, 30) * U, LB + FVector2D(120.f * Data.Throttle, 30.f) * U}, Ink, 4.f);
 		Text(LB + FVector2D(0, 38) * U, TEXT("THR"), Dim, true);
+		if (Data.bPlanet)
+		{
+			Text(RB, FString::Printf(TEXT("ALT %6.0f m"), Data.Alt), Ink);
+			Text(RB + FVector2D(0, 22) * U, FString::Printf(TEXT("AGL %6.0f m"), FMath::Min(Data.AGL, 99999.f)), Data.AGL < 60.f ? Warn : Ink);
+			return Layer + 3;
+		}
 		const FLinearColor HullCol = Data.Hull < 35.f ? Warn : Ink;
 		Text(RB, FString::Printf(TEXT("HULL %3.0f%%"), Data.Hull), HullCol);
 		Text(RB + FVector2D(0, 22) * U, FString::Printf(TEXT("SHLD %3.0f%%"), Data.Shield), Data.Shield < 20.f ? Warn : Ink);
@@ -255,7 +297,7 @@ void AAstraFighterPawn::StopSounds()
 
 void AAstraFighterPawn::UpdateSounds(const FAstraPilotStatus& St, float Dt)
 {
-	const bool bFlying = Phase == EPhase::Flying && St.bFlying;
+	const bool bFlying = (Phase == EPhase::Flying && St.bFlying) || Phase == EPhase::Atmosphere;
 	if (EngineAudio)
 	{
 		// the lever and the afterburner in the airframe; the catapult's run pushes it up too
@@ -323,12 +365,18 @@ void AAstraFighterPawn::SetupPlayerInputComponent(UInputComponent* IC)
 	Flag(EKeys::LeftMouseButton, [this](bool b) { In.bGuns = b; });
 	Flag(EKeys::RightMouseButton, [this](bool b) { In.bMissile = b; });
 	Flag(EKeys::C, [this](bool b) { In.bDecoy = b; });
+	IC->BindKey(EKeys::G, IE_Pressed, this, &AAstraFighterPawn::Descend);
 	Flag(EKeys::X, [this](bool b) { if (b) { In.Throttle = 0.f; } });   // X: cut the throttle
 	IC->BindKey(EKeys::F, IE_Pressed, this, &AAstraFighterPawn::Land);
 }
 
 bool AAstraFighterPawn::ClimbOut()
 {
+	if (Phase == EPhase::Landed)
+	{
+		ClimbOutPlanetside();
+		return true;
+	}
 	if (Phase != EPhase::Catapult)
 	{
 		return false;
@@ -359,6 +407,20 @@ void AAstraFighterPawn::MouseY(float V)
 
 void AAstraFighterPawn::Land()
 {
+	if (Phase == EPhase::Atmosphere)
+	{
+		FVector Ground;
+		const float AGL = TraceAGL(&Ground);
+		if (AGL < 90.f && AirVel.Size() < 7500.f)
+		{
+			Phase = EPhase::Settling;
+			PhaseT = 0.f;
+			SettleFrom = GetActorLocation();
+			SettleTo = Ground + FVector(0.f, 0.f, 260.f);   // the eye 2.6 m over the ground, as on the deck
+			SettleRot = FRotator(0.f, GetActorRotation().Yaw, 0.f);
+		}
+		return;
+	}
 	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 	if (Phase != EPhase::Flying || !Battle)
 	{
@@ -468,6 +530,61 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 			return;
 		}
 		break;
+	case EPhase::Entry:
+		TickEntryExit(DeltaTime, true);
+		if (!bSwitched && Battle)
+		{
+			Battle->GetPilotStatus(St);
+		}
+		else
+		{
+			St = PlanetStatus();
+		}
+		break;
+	case EPhase::Exit:
+		TickEntryExit(DeltaTime, false);
+		St = PlanetStatus();
+		break;
+	case EPhase::Atmosphere:
+		TickAtmosphere(DeltaTime);
+		St = PlanetStatus();
+		break;
+	case EPhase::Settling:
+	{
+		// touching down: level off and sink onto the ground over two and a half seconds
+		PhaseT += DeltaTime;
+		const float T = FMath::SmoothStep(0.f, 1.f, FMath::Min(1.f, PhaseT / 2.5f));
+		SetActorLocationAndRotation(FMath::Lerp(SettleFrom, SettleTo, T), FQuat::Slerp(GetActorQuat(), SettleRot.Quaternion(), FMath::Min(1.f, DeltaTime * 3.f)));
+		In.Throttle = 0.f;
+		if (PhaseT >= 2.5f)
+		{
+			Phase = EPhase::Landed;
+			AirVel = FVector::ZeroVector;
+			if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+			{
+				Ship->SetCaptainPlanetside(TEXT("landed on New Ravenna near Port Aurelius, in a Falcon of Alpha; the XO has the conn"));
+				Ship->PublishEvent(TEXT("flight: Eagle has landed on New Ravenna, near Port Aurelius"), true);
+			}
+		}
+		St = PlanetStatus();
+		break;
+	}
+	case EPhase::Landed:
+		// on the ground: W lifts off, E climbs out
+		if (In.Throttle > 0.2f)
+		{
+			Phase = EPhase::Atmosphere;
+			AirVel = GetActorUpVector() * 1500.f;
+			In.Throttle = 0.15f;
+			if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+			{
+				Ship->SetCaptainPlanetside(TEXT("flying a Falcon over New Ravenna near Port Aurelius; the XO has the conn"));
+			}
+		}
+		St = PlanetStatus();
+		break;
+	case EPhase::Parked:
+		return;
 	}
 	if (Phase == EPhase::Flying && St.bFlying)
 	{
@@ -559,7 +676,11 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	}
 	SAstraFlightHud::FData& D = Hud->Data;
 	D = SAstraFlightHud::FData();
-	D.bFlying = Phase == EPhase::Flying && St.bFlying;
+	const bool bAir = Phase == EPhase::Atmosphere || Phase == EPhase::Settling || Phase == EPhase::Landed ||
+	                  ((Phase == EPhase::Entry || Phase == EPhase::Exit) && bSwitched == (Phase == EPhase::Entry));
+	D.bFlying = (Phase == EPhase::Flying && St.bFlying) || bAir || Phase == EPhase::Entry || Phase == EPhase::Exit;
+	D.bPlanet = bAir;
+	D.Plasma = Plasma;
 	D.Stick = Stick;
 	D.Throttle = In.Throttle;
 	D.bBoost = In.bBoost;
@@ -567,6 +688,27 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	{
 		D.Hint = TEXT("ON ALPHA'S CATAPULT  ·  W: THROTTLE UP TO LAUNCH  ·  E: CLIMB OUT");
 		return;
+	}
+	if (bAir)
+	{
+		D.Alt = (GetActorLocation().Z - UAstraShipSubsystem::PlanetZone().Z) / 100.f;
+		D.AGL = GroundAGL;
+		if (Phase == EPhase::Landed)
+		{
+			D.Hint = TEXT("ON THE GROUND  ·  W: LIFT OFF  ·  E: CLIMB OUT");
+		}
+		else if (Phase == EPhase::Atmosphere && GroundAGL < 90.f && St.SpeedMps < 75.f)
+		{
+			D.Hint = TEXT("F: SET HER DOWN");
+		}
+		else if (Phase == EPhase::Atmosphere && D.Alt > 9000.f && AirVel.Z > 0.f)
+		{
+			D.Hint = TEXT("KEEP CLIMBING: ORBIT PAST 14 KM");
+		}
+	}
+	else if (CanDescend())
+	{
+		D.Hint = TEXT("NEW RAVENNA BELOW  ·  G: BEGIN DESCENT");
 	}
 	if (!D.bFlying)
 	{
@@ -622,7 +764,8 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 		D.LockText = FString::Printf(TEXT("%s  %.1f km%s"), *St.LockName.ToUpper(), St.LockRangeKm, D.bLockOn ? TEXT("  LOCK") : TEXT(""));
 		D.bLead = Project(St.LeadWorld, D.LeadPos);
 	}
-	D.HomeText = FString::Printf(TEXT("AQUILA %.1f km%s"), St.HomeRangeKm, St.bCanLand ? TEXT("  ·  F: RECOVER") : TEXT(""));
+	D.HomeText = bAir ? FString::Printf(TEXT("PORT AURELIUS FIELD %.1f km"), St.HomeRangeKm)
+	                  : FString::Printf(TEXT("AQUILA %.1f km%s"), St.HomeRangeKm, St.bCanLand ? TEXT("  ·  F: RECOVER") : TEXT(""));
 	if (Project(St.HomeWorld, D.HomePos))
 	{
 		D.bHomeOn = true;
@@ -632,6 +775,10 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 		const FVector Local = Camera->GetComponentTransform().InverseTransformPosition(St.HomeWorld);
 		D.bHomeEdge = true;
 		D.HomeEdgeAngle = FMath::Atan2(-Local.Z, Local.Y);
+	}
+	if (bAir)
+	{
+		return;
 	}
 	if (St.Incoming > 0)
 	{
@@ -645,4 +792,286 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	{
 		D.Hint = TEXT("HULL CRITICAL  ·  RETURN TO THE AQUILA");
 	}
+}
+
+// ------------------------------------------------------------------------------------------------ New Ravenna
+namespace
+{
+	// the planet's zone: where the Falcon comes out of the entry (over the sea south of the bay, heading north for the
+	// coast) and where Port Aurelius Field is (the zone's frame: +X east, -Y north, metres; the terrain generator's
+	// y is mirrored by the import)
+	const FVector EntryStart(0.0, 17000.0, 8500.0);
+	const FVector FieldSpot(1800.0, -1400.0, 191.4);   // nr_sites.json (y mirrored)
+	constexpr float OrbitAltitude = 14000.f;   // climbing past this takes the Falcon back up
+}
+
+void AAstraFighterPawn::AstraFacePlanet(float X, float Y, float Z)
+{
+	const FVector Target = UAstraShipSubsystem::PlanetZone() + FVector(X, Y, Z) * 100.0;
+	const FRotator R = (Target - GetActorLocation()).Rotation();
+	SetActorRotation(R);
+	AirVel = R.Vector() * AirVel.Size();
+}
+
+bool AAstraFighterPawn::CanDescend() const
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	if (Phase != EPhase::Flying || !Ship || !Ship->HasSurface())
+	{
+		return false;
+	}
+	// the nose on the world (within 25 degrees)
+	return FVector::DotProduct(GetActorForwardVector(), Ship->PlanetDirectionWorld()) > FMath::Cos(FMath::DegreesToRadians(25.f));
+}
+
+void AAstraFighterPawn::Descend()
+{
+	if (!CanDescend())
+	{
+		return;
+	}
+	Phase = EPhase::Entry;
+	PhaseT = 0.f;
+	bSwitched = false;
+	if (USoundBase* S = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Entry_Plasma.SW_Entry_Plasma")))
+	{
+		PlasmaAudio = UGameplayStatics::CreateSound2D(this, S, 0.9f, 1.f, 0.f, nullptr, false, false);
+		if (PlasmaAudio)
+		{
+			PlasmaAudio->Play();
+		}
+	}
+	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	{
+		Ship->PublishEvent(TEXT("flight: Eagle is starting a descent to New Ravenna — entry interface in a few seconds"), true);
+	}
+}
+
+void AAstraFighterPawn::TickEntryExit(float Dt, bool bEntry)
+{
+	// the plasma builds for four seconds (the view goes orange-white), the worlds swap at its height, then it fades
+	PhaseT += Dt;
+	const float Peak = bEntry ? 4.f : 2.5f, End = bEntry ? 9.f : 6.f;
+	Plasma = PhaseT < Peak ? FMath::Pow(PhaseT / Peak, 1.6f) : FMath::Clamp(1.f - (PhaseT - Peak) / (End - Peak), 0.f, 1.f);
+	HitJolt = FMath::Max(HitJolt, Plasma * 0.55f);
+	Camera->SetFieldOfView(88.f - 8.f * Plasma);
+	UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	if (!bSwitched && PhaseT >= Peak && Ship && Battle)
+	{
+		bSwitched = true;
+		if (bEntry)
+		{
+			// off the fleet's plot, into the planet's zone: over the sea, nose down a little, heading for the coast
+			Battle->LeavePiloted();
+			Ship->SetPlanetside(true);
+			Ship->SetCaptainPlanetside(TEXT("flying a Falcon through New Ravenna's atmosphere toward Port Aurelius; the XO has the conn"));
+			const FRotator Heading(-10.f, -90.f, 0.f);
+			SetActorLocationAndRotation(UAstraShipSubsystem::PlanetZone() + EntryStart * 100.0, Heading);
+			AirVel = Heading.Vector() * 32000.f;
+			In.Throttle = 0.45f;
+			Cockpit->SetLightingChannels(true, false, false);
+		}
+		else
+		{
+			// back above the atmosphere: the Aquila 4 km off, and the battle flies the Falcon again
+			Ship->SetPlanetside(false);
+			const FVector Pos(-2000.0 * 100.0, -4000.0 * 100.0, 300.0 * 100.0);
+			const FQuat Rot = (FVector::ZeroVector - Pos).GetSafeNormal().Rotation().Quaternion();
+			if (Battle->LaunchPiloted(this, Pos, Rot, 150.f, true))
+			{
+				In.Throttle = 0.3f;
+			}
+			Cockpit->SetLightingChannels(true, true, false);
+		}
+	}
+	if (bEntry && bSwitched)
+	{
+		TickAtmosphere(Dt);   // already flying down there under the glow
+	}
+	else if (bEntry)
+	{
+		// still in space: the battle keeps flying the Falcon
+		if (Battle)
+		{
+			Battle->SetPilotInput(In);
+		}
+	}
+	if (PhaseT >= End)
+	{
+		Plasma = 0.f;
+		Camera->SetFieldOfView(88.f);
+		if (PlasmaAudio)
+		{
+			PlasmaAudio->FadeOut(1.5f, 0.f);
+		}
+		Phase = bEntry ? EPhase::Atmosphere : EPhase::Flying;
+	}
+}
+
+float AAstraFighterPawn::TraceAGL(FVector* OutGround) const
+{
+	FHitResult Hit;
+	const FVector From = GetActorLocation();
+	const FVector To = From - FVector(0.f, 0.f, 2.0e6f);   // 20 km down
+	FCollisionQueryParams Q(TEXT("FalconAGL"), false, this);
+	if (GetWorld()->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Q))
+	{
+		if (OutGround)
+		{
+			*OutGround = Hit.ImpactPoint;
+		}
+		return (From.Z - Hit.ImpactPoint.Z) / 100.f;
+	}
+	if (OutGround)
+	{
+		*OutGround = To;
+	}
+	return 1e6f;
+}
+
+void AAstraFighterPawn::TickAtmosphere(float Dt)
+{
+	// the stick and the lever as in space, in the air: 330 m/s at full throttle, softer acceleration, a little drag
+	const FRotator Turn(In.Pitch * 55.f * Dt, In.Yaw * 40.f * Dt, In.Roll * 110.f * Dt);
+	const FQuat Att = (GetActorQuat() * Turn.Quaternion()).GetNormalized();
+	const float MaxV = In.bBoost ? 52000.f : 33000.f;
+	const FVector Want = Att.RotateVector(FVector(In.Throttle * MaxV, In.Strafe.Y * 1500.f, In.Strafe.Z * 1500.f));
+	AirVel += (Want - AirVel).GetClampedToMaxSize((In.bBoost ? 9000.f : 5500.f) * Dt);
+	const FVector From = GetActorLocation();
+	const FVector To = From + AirVel * Dt;
+	// the ground and the sea stop the Falcon: slowly and nearly level is a (rough) landing, anything else a crash
+	FHitResult Hit;
+	FCollisionQueryParams Q(TEXT("FalconMove"), false, this);
+	if (GetWorld()->SweepSingleByChannel(Hit, From, To, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(250.f), Q))
+	{
+		const bool bSoft = AirVel.Size() < 3500.f && FVector::DotProduct(Att.GetUpVector(), FVector::UpVector) > 0.85f && Hit.ImpactNormal.Z > 0.85f;
+		if (bSoft)
+		{
+			Phase = EPhase::Settling;
+			PhaseT = 1.8f;
+			SettleFrom = Hit.Location;
+			SettleTo = Hit.ImpactPoint + FVector(0.f, 0.f, 260.f);
+			SettleRot = FRotator(0.f, Att.Rotator().Yaw, 0.f);
+			SetActorLocation(Hit.Location);
+			return;
+		}
+		Crash();
+		return;
+	}
+	SetActorLocationAndRotation(To, Att);
+	GroundAGL = TraceAGL();
+	// far above: the Falcon climbs out of the atmosphere, back to orbit
+	const float Alt = (To.Z - UAstraShipSubsystem::PlanetZone().Z) / 100.f;
+	if (Phase == EPhase::Atmosphere && Alt > OrbitAltitude && AirVel.Z > 0.f)
+	{
+		Phase = EPhase::Exit;
+		PhaseT = 0.f;
+		bSwitched = false;
+		if (USoundBase* S = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Entry_Plasma.SW_Entry_Plasma")))
+		{
+			PlasmaAudio = UGameplayStatics::CreateSound2D(this, S, 0.6f, 1.2f, 3.0f, nullptr, false, false);
+			if (PlasmaAudio)
+			{
+				PlasmaAudio->Play(3.0f);
+			}
+		}
+		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+		{
+			Ship->PublishEvent(TEXT("flight: Eagle is climbing out of New Ravenna's atmosphere, back to orbit"), true);
+		}
+	}
+}
+
+void AAstraFighterPawn::Crash()
+{
+	// into the ground or the sea: the Falcon is lost; a Port Aurelius rescue craft picks the Captain up and a shuttle
+	// brings the Captain back to the Aquila's flight deck
+	Phase = EPhase::Ending;
+	PhaseT = 0.f;
+	bLandedEnd = false;
+	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+	{
+		Cam->StartCameraFade(0.f, 1.f, 0.2f, FLinearColor(1.f, 0.85f, 0.7f), false, true);
+	}
+	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	{
+		Ship->PublishEvent(TEXT("flight: Eagle went down on New Ravenna — the Captain ejected and a Port Aurelius rescue craft is bringing the Captain up to the Aquila; the Falcon is lost"), true);
+		Ship->SetPlanetside(false);
+	}
+	if (UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>())
+	{
+		Battle->FalconLostPlanetside();
+	}
+}
+
+void AAstraFighterPawn::ClimbOutPlanetside()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	APawn* W = Walker.Get();
+	if (!PC || !W)
+	{
+		return;
+	}
+	// down the ladder on the port side, on the ground beside the Falcon
+	const FVector Side = GetActorLocation() - GetActorRightVector() * 450.f + FVector(0.f, 0.f, 400.f);
+	FHitResult Hit;
+	FCollisionQueryParams Q(TEXT("ClimbDown"), false, this);
+	FVector Feet = Side - FVector(0.f, 0.f, 600.f);
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Side, Side - FVector(0.f, 0.f, 5000.f), ECC_Visibility, Q))
+	{
+		Feet = Hit.ImpactPoint;
+	}
+	W->SetActorLocation(Feet + FVector(0.f, 0.f, 110.f), false, nullptr, ETeleportType::TeleportPhysics);
+	W->SetActorHiddenInGame(false);
+	W->SetActorEnableCollision(true);
+	ShowHud(false);
+	if (EngineAudio)
+	{
+		EngineAudio->Stop();
+	}
+	Phase = EPhase::Parked;
+	PC->Possess(W);
+	PC->SetControlRotation(FRotator(0.f, GetActorRotation().Yaw + 90.f, 0.f));
+	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	{
+		Ship->SetCaptainPlanetside(TEXT("on foot on New Ravenna near Port Aurelius, beside a landed Falcon of Alpha; the XO has the conn"));
+	}
+}
+
+void AAstraFighterPawn::Reboard(APawn* InWalker)
+{
+	APlayerController* PC = Cast<APlayerController>(InWalker ? InWalker->GetController() : nullptr);
+	if (Phase != EPhase::Parked || !PC)
+	{
+		return;
+	}
+	Walker = InWalker;
+	InWalker->SetActorHiddenInGame(true);
+	InWalker->SetActorEnableCollision(false);
+	PC->Possess(this);
+	Phase = EPhase::Landed;
+	In = FAstraPilotInput();
+	ShowHud(true);
+	if (EngineAudio)
+	{
+		EngineAudio->Play();
+	}
+	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	{
+		Ship->SetCaptainPlanetside(TEXT("in a landed Falcon on New Ravenna near Port Aurelius; the XO has the conn"));
+	}
+}
+
+FAstraPilotStatus AAstraFighterPawn::PlanetStatus() const
+{
+	FAstraPilotStatus St;
+	St.bFlying = true;
+	St.SpeedMps = AirVel.Size() / 100.f;
+	St.Throttle = In.Throttle;
+	St.HullPct = 100.f;
+	St.ShieldPct = 100.f;
+	St.HomeWorld = UAstraShipSubsystem::PlanetZone() + FieldSpot * 100.0;
+	St.HomeRangeKm = FVector::Dist(GetActorLocation(), St.HomeWorld) / 100000.f;
+	return St;
 }

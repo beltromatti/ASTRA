@@ -163,6 +163,18 @@ void AASTRAPlayerController::ToggleSeat()
 		F->ClimbOut();
 		return;
 	}
+	// on New Ravenna: back into the parked Falcon
+	if (APawn* Me = GetPawn())
+	{
+		for (TActorIterator<AAstraFighterPawn> It(GetWorld()); It; ++It)
+		{
+			if (It->IsParkedPlanetside() && FVector::Dist(It->GetActorLocation(), Me->GetActorLocation()) < 900.f)
+			{
+				It->Reboard(Me);
+				return;
+			}
+		}
+	}
 	// the lift to the flight deck (or back up) when standing at one of its landings; a Falcon of Alpha on the deck
 	if (APawn* Me = GetPawn())
 	{

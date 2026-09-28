@@ -153,6 +153,17 @@ public:
 	/** Where the Captain is aboard, for the crew ("on the bridge", "on the flight deck"...). */
 	FString CaptainAboard() const;
 
+	/** The Captain is on (or over) New Ravenna: the surface zone's sky, sky light, clouds and ground replace space
+	 *  (the war goes on up there). The zone lies 1000 km below the bridge in the same world. */
+	void SetPlanetside(bool bOn);
+	bool IsPlanetside() const { return bPlanetside; }
+	static FVector PlanetZone() { return FVector(0.0, 0.0, -1.0e8); }
+	/** What the Captain is doing down there, for the crew (empty when back in space). */
+	void SetCaptainPlanetside(const FString& What) { CaptainPlanetside = What; }
+	/** Where the system's main world is, seen from the bridge now (world direction, unit). */
+	FVector PlanetDirectionWorld() const { return PlanetDirNow; }
+	bool HasSurface() const { return SystemName.Equals(TEXT("Aurelia"), ESearchCase::IgnoreCase) && PlanetActors.Num() > 0; }
+
 	/** The battle simulation reports a hit on our hull: compartments, lights, reports. */
 	void OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir);
 	/** The campaign save: the system the Aquila is in, the crew's losses. */
@@ -228,6 +239,14 @@ private:
 	// the star's light thrown back by the planet (earthshine): a soft fill from the planet on everything outside the
 	// hull (lighting channel 1: it casts no shadow, so it must never reach inside)
 	UPROPERTY() TObjectPtr<ADirectionalLight> PlanetLight;
+	// New Ravenna's surface zone (tag ASTRA.Planet.NewRavenna) and what it replaces while the Captain is down there
+	UPROPERTY() TArray<TObjectPtr<AActor>> PlanetActors;
+	UPROPERTY() TObjectPtr<AActor> SpaceSkyActor;
+	UPROPERTY() TObjectPtr<AActor> SpaceSkyLight;
+	bool bPlanetside = false;
+	float SpaceEV = 6.6f;
+	FString CaptainPlanetside;
+	FVector PlanetDirNow = FVector::DownVector;
 	FLinearColor PlanetFill = FLinearColor(0.42f, 0.6f, 1.f);
 	float PlanetFillGain = 1.f;
 	void SetPlanetFill(const FString& PlanetType);

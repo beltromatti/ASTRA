@@ -103,6 +103,8 @@ path = f"{MAT}/M_ASTRA_Hull"
 if eal.does_asset_exist(path):
     m = eal.load_asset(path)
     mel.delete_all_material_expressions(m)
+    for e in mel.get_material_expressions(m):   # what delete_all leaves behind (custom nodes, parameters)
+        mel.delete_material_expression(m, e)
 else:
     m = tools.create_asset("M_ASTRA_Hull", MAT, unreal.Material, unreal.MaterialFactoryNew())
 

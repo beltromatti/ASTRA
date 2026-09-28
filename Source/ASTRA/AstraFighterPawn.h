@@ -36,15 +36,24 @@ public:
 	UFUNCTION(Exec) void AstraGuns(int32 On) { In.bGuns = On != 0; }
 	UFUNCTION(Exec) void AstraMissile() { In.bMissile = true; MissilePulse = 0.2f; }
 	UFUNCTION(Exec) void AstraLand() { Land(); }
+	UFUNCTION(Exec) void AstraDescend() { Descend(); }
+	/** Testing: over New Ravenna, point the nose at a spot of the zone (metres; default: 300 m over Port Aurelius Field). */
+	UFUNCTION(Exec) void AstraFacePlanet(float X = 1800.f, float Y = -1400.f, float Z = 491.f);
 	/** The walker the Captain was before boarding (restored when the flight ends). */
 	APawn* GetWalker() const { return Walker.Get(); }
+	/** Parked on New Ravenna with the Captain outside: E beside it climbs back in. */
+	bool IsParkedPlanetside() const { return Phase == EPhase::Parked; }
+	void Reboard(APawn* InWalker);
 
 private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USceneComponent> Root;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Cockpit;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UCameraComponent> Camera;
 
-	enum class EPhase : uint8 { Catapult, Launching, Flying, Ending };
+	// Catapult, Launching, Flying (space, the battle flies it), Ending (recovery / ejection),
+	// Entry (through the atmosphere), Atmosphere (flying over New Ravenna), Settling (touching down), Landed,
+	// Parked (the Captain outside), Exit (climbing back to orbit)
+	enum class EPhase : uint8 { Catapult, Launching, Flying, Ending, Entry, Atmosphere, Settling, Landed, Parked, Exit };
 	EPhase Phase = EPhase::Catapult;
 	TWeakObjectPtr<AAstraHangar> Hangar;
 	TWeakObjectPtr<APawn> Walker;
@@ -80,4 +89,21 @@ private:
 	void MouseX(float V);
 	void MouseY(float V);
 	void Land();
+
+	// --- New Ravenna: the Falcon flies itself in the planet's zone (the battle is up in space)
+	FVector AirVel = FVector::ZeroVector;      // cm/s, world
+	float Plasma = 0.f;                        // the entry's glow (0..1)
+	bool bSwitched = false;                    // the zone swap happened during this entry / exit
+	FVector SettleFrom = FVector::ZeroVector, SettleTo = FVector::ZeroVector;
+	FRotator SettleRot = FRotator::ZeroRotator;
+	float GroundAGL = 1e6f;                    // metres above what is under the Falcon
+	UPROPERTY() TObjectPtr<class UAudioComponent> PlasmaAudio;
+	void Descend();
+	bool CanDescend() const;
+	void TickAtmosphere(float Dt);
+	void TickEntryExit(float Dt, bool bEntry);
+	void ClimbOutPlanetside();
+	void Crash();
+	float TraceAGL(FVector* OutGround = nullptr) const;
+	FAstraPilotStatus PlanetStatus() const;
 };
