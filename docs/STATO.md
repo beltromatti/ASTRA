@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-28 (notte) · **Traguardo corrente:** M1 — La nave che si cammina
+**Ultimo aggiornamento:** 2026-09-28 (mattina) · **Traguardo corrente:** M4 — La battaglia (poi tavolo olografico)
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -10,6 +10,7 @@
 | 2026-09-28 | 10,00 $ | 0,00 $ | ricarica iniziale dell'utente |
 | 2026-09-28 | 10,00 $ | 0,10 $ | benchmark modelli (9 configurazioni × 40 ordini) |
 | 2026-09-28 | 10,00 $ | 0,13 $ | sviluppo dell'equipaggio AI (≈0,0005 $ a turno di plancia) |
+| 2026-09-28 | 10,00 $ | 0,40 $ | battaglie di prova complete con comandanti nemici (≈0,001–0,002 $ a turno) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -56,11 +57,18 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] `UAstraBattleSubsystem`: navi nel sistema (doppia precisione) disegnate attorno alla Aquila, IA d'ingaggio/fuga, railgun con anticipo, missili guidati, laser, difesa di punto, scudi, scafo, esplosioni, bagliori dei motori
 - [x] Scenario «Aurelia patrol»: fregata dormiente T-11 → gruppo d'attacco dell'Archon Varek Solm (Acheron + 2 Styx) → vittoria/sconfitta/ritirata
 - [x] Equipaggio collegato: contatti reali, ordini di fuoco/scansione/chiamata sulla simulazione, rapporti di danno per ponte e sezione, scossoni e luci che sfarfallano ai colpi
-- [ ] Tavolo olografico con la situazione tattica viva, comunicazioni con il comandante nemico (voce e mente di Varek Solm), squadre di controllo danni visibili, bilanciamento
+- [x] Comandanti nemici con mente e voce radio propria: Archon Varek Solm (Acheron), Ferryman Kade (Styx), Vael (Cocytus), Quill (Phlegethon), Warden Hale (Lethe). Leggono la battaglia dal loro lato (vista privata `_mandate`), trattano davvero e decidono: continuare, cessate il fuoco, ritirata, accettare una resa
+- [x] Catena di comando del Mandato: il comandante più anziano sopravvissuto ordina a tutto il gruppo; se l'ammiraglia cade o lascia il sistema il successore apre un canale con l'Aquila
+- [x] Tregua: la flotta ASTRA non spara su chi ha cessato il fuoco o si ritira; se l'Aquila spara durante una tregua il Mandato torna all'attacco e chiama furioso. Esiti: vittoria, ritirata negoziata, tregua, resa accettata, Aquila fuori combattimento
+- [x] Controllo del tiro reale: salve a cadenza, ingaggio che resta assegnato fuori portata, VLS con ciclo di ricarica, `cease_fire`; intercettazione continua del timone (`intercept`, distanza d'ingaggio e virata a bordata)
+- [x] Sistemi dell'Aquila: budget del reattore (700%) con effetti reali (scudi = rigenerazione e assorbimento, armi = cadenza, motori = velocità), scudi a settore che contano, danni per ponte/sezione con 4 squadre di controllo danni che arrivano e riparano; incendi non presidiati che si estendono
+- [x] Equipaggio più credibile: rilettura obbligatoria degli ordini eseguiti con i dati veri, iniziativa entro la propria autorità (squadre, scudi, difesa di punto), mai azioni dichiarate e non fatte; voci che non si sovrappongono e rapporti che aspettano il silenzio (raggruppati; scartati quando parla il capitano)
+- [x] Bilanciamento: gruppo d'attacco di 4 navi; esiti variabili nelle prove (da vittoria con ritirata nemica a Praetorian e Vigilant perduti, Aquila al 5%)
+- [ ] Tavolo olografico con la situazione tattica viva, squadre di controllo danni visibili sugli schermi
 - [ ] Navi v2 (sagome e dettagli più belli), effetti visivi migliori (scie, esplosioni volumetriche)
 
 ## Prossimi passi
-1. Tavolo olografico tattico vivo + comunicazioni con il nemico (Varek Solm, persona AI).
+1. Tavolo olografico tattico vivo (navi, missili, rotte, settori degli scudi) e schermi di plancia con dati veri.
 2. Equipaggio: schermi vivi, comportamento dei corpi (posture sedute, gesti), poi MetaHuman + labiale.
 3. Navi v2 e effetti; simulazione di energia/calore (M2); hangar e caccia (M5).
 
@@ -69,6 +77,8 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 2. Il servizio delle menti parte da solo al primo avvio della partita (oppure `cd mind && uv run astra-mind`).
 3. Premi Play; tieni premuto **V** e parla al ponte in qualsiasi lingua (al primo uso macOS chiede il permesso del microfono), oppure dalla console (`) scrivi `astra.say Allarme rosso!`.
 4. La battaglia parte da sola (dopo ~80 s si sveglia la fregata, dopo ~170 s arriva il gruppo d'attacco). Per accelerare: `astra.battle.time 168`, `astra.battle.timescale 3`.
+5. Quando l'Archon Solm chiama, parlagli direttamente (canale aperto): tutto ciò che non inizia con il nome/ruolo di un ufficiale va a lui. «Comunicazioni, chiudete il canale» per chiuderlo.
+6. Da terminale: `tools/ue.py pie start|stop` e `tools/ue.py pie cmd 'astra.say ...'` per provare senza toccare l'editor.
 
 ## Note operative
 - Editor: avviarlo con `tools/avvia_editor.sh` (modalità unattended: niente limite a 3 fps a schermo bloccato). Tenere `t.MaxFPS 30` quando idle, 4 durante i test di prestazioni.

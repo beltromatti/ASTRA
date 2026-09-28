@@ -33,6 +33,22 @@ struct FAstraContact
 	UPROPERTY(BlueprintReadOnly) float BearingDeg = 0.f;
 };
 
+/** One incident inside the hull (a hit's consequences) and the damage-control team working on it. */
+struct FAstraDamage
+{
+	int32 Id = 0;
+	int32 Deck = 1;
+	TCHAR Section = TEXT('A');
+	FString Kind;               // "hull breach" | "fire" | "conduit damage"
+	FString System;             // conduit damage: the system that loses power through it
+	int32 Team = -1;            // damage-control team on it (0..3), -1 = unattended
+	float Travel = 0.f;         // s until the team is on scene
+	float Work = 30.f;          // s of work on scene
+	float Progress = 0.f;       // 0..1
+	float SpreadT = 25.f;       // fires: next chance to spread / burn the structure
+	FString Where() const { return FString::Printf(TEXT("deck %d section %c"), Deck, Section); }
+};
+
 DECLARE_MULTICAST_DELEGATE_TwoParams(FAstraShipEvent, const FString& /*Text*/, bool /*bReport: worth telling the Captain*/);
 DECLARE_MULTICAST_DELEGATE_OneParam(FAstraAlertChanged, EAstraAlert /*NewAlert*/);
 
@@ -63,6 +79,9 @@ public:
 	float GetMarkDeg() const { return MarkDeg; }
 	float GetSpeedMps() const { return SpeedMps; }
 	bool AreShieldsUp() const { return bShieldsUp; }
+	FString GetShieldMode() const { return ShieldMode; }
+	/** Effective power of a system as a fraction of nominal: the allocation, minus what damaged conduits lose (0..1.5). */
+	float PowerFactor(const FString& System) const;
 
 	/** Anything that happens to or around the ship; bReport = worth telling the Captain (the crew decides the words). */
 	void PublishEvent(const FString& Text, bool bReport) { Event(Text, bReport); }
@@ -77,7 +96,7 @@ private:
 	// --- state
 	EAstraAlert Alert = EAstraAlert::Green;
 	float HeadingDeg = 45.f, MarkDeg = 0.f, TargetHeadingDeg = 45.f, TargetMarkDeg = 0.f;
-	float ThrottlePct = 60.f, SpeedMps = 412.f, ReactorPct = 78.f;
+	float ThrottlePct = 60.f, SpeedMps = 288.f, ReactorPct = 78.f;
 	TMap<FString, float> PowerPct;
 	FString ShieldMode = TEXT("balanced");
 	bool bShieldsUp = true;
@@ -88,15 +107,27 @@ private:
 	TMap<FString, FString> Squadrons;
 	TArray<FAstraContact> Contacts;
 	TArray<FString> RecentEvents;
-	TArray<FString> DamageLog;        // "deck 6 section C: hull breach (10 cm), fire" ...
+	TArray<FAstraDamage> Damage;      // open incidents inside the hull
+	int32 NextDamageId = 1;
+	static constexpr int32 NumDamageTeams = 4;
+	static constexpr float PowerBudget = 700.f;   // six systems at 100% = 600; the reactor can give 100 more
 	float HullPct = 100.f;
 	double LastHitReport = -100.0;
 	float FlickerTime = 0.f;
 	bool bTurning = false;
+	// helm intercept: the course follows a contact; at the standoff range the ship turns broadside and holds it
+	FString InterceptId;
+	float InterceptStandoffKm = 6.f;
+	float InterceptRetargetT = 0.f;
+	bool bBroadside = false;
+	double InterceptRangeKm = 0.0;
 
 	void Event(const FString& Text, bool bReport = false);
 	const FAstraContact* FindContact(const FString& Id) const;
 	void SetAlert(EAstraAlert NewAlert);
+	void TickDamage(float DeltaTime);
+	int32 FreeDamageTeam() const;
+	FString DamageSummary() const;
 
 	// --- visuals
 	UPROPERTY() TObjectPtr<UMaterialParameterCollection> ShipMPC;

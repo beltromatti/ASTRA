@@ -145,8 +145,28 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	auto Num = [&Args](const TCHAR* K, double Def = 0.0) { double V = Def; Args->TryGetNumberField(K, V); return V; };
 	auto Str = [&Args](const TCHAR* K) { FString V; Args->TryGetStringField(K, V); return V; };
 
+	if (Name == TEXT("intercept"))
+	{
+		const FString Id = Str(TEXT("contact_id")).ToUpper();
+		double Brg = 0.0, Mk = 0.0, Rng = 0.0;
+		if (!Battle || !Battle->ContactGeometry(Id, Brg, Mk, Rng))
+		{
+			OutDetail = FString::Printf(TEXT("no contact %s to intercept"), *Id);
+			return false;
+		}
+		InterceptId = Id;
+		InterceptStandoffKm = FMath::Clamp((float)Num(TEXT("standoff_km"), 6.0), 1.f, 30.f);
+		InterceptRetargetT = 0.f;
+		bBroadside = false;
+		InterceptRangeKm = Rng;
+		OutDetail = FString::Printf(TEXT("intercepting %s: bearing %03.0f mark %.0f, range %.1f km, throttle %.0f%%; at %.0f km the helm turns "
+		                                 "broadside and holds the range (course follows the target)"),
+		                            *Id, Brg, Mk, Rng, ThrottlePct, InterceptStandoffKm);
+		return true;
+	}
 	if (Name == TEXT("set_course"))
 	{
+		InterceptId.Empty();
 		TargetHeadingDeg = WrapDeg((float)Num(TEXT("heading_deg"), HeadingDeg));
 		TargetMarkDeg = FMath::Clamp((float)Num(TEXT("mark_deg"), MarkDeg), -90.f, 90.f);
 		bTurning = true;
@@ -194,8 +214,20 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 			OutDetail = FString::Printf(TEXT("unknown system %s"), *Sys);
 			return false;
 		}
-		PowerPct[Sys] = FMath::Clamp((float)Num(TEXT("percent"), 100.0), 0.f, 150.f);
-		OutDetail = FString::Printf(TEXT("%s at %.0f%% of nominal"), *Sys, PowerPct[Sys]);
+		const float Want = FMath::Clamp((float)Num(TEXT("percent"), 100.0), 0.f, 150.f);
+		float Sum = 0.f;
+		for (const auto& KV : PowerPct) { Sum += KV.Key == Sys ? Want : KV.Value; }
+		if (Sum > PowerBudget + 0.5f)
+		{
+			FString Now;
+			for (const auto& KV : PowerPct) { Now += FString::Printf(TEXT("%s%s %.0f"), Now.IsEmpty() ? TEXT("") : TEXT(", "), *KV.Key, KV.Value); }
+			OutDetail = FString::Printf(TEXT("reactor budget exceeded: that would allocate %.0f%% of the %.0f%% available — cut another system first (now: %s)"),
+			                            Sum, PowerBudget, *Now);
+			return false;
+		}
+		PowerPct[Sys] = Want;
+		ReactorPct = 78.f + FMath::Max(0.f, Sum - 600.f) * 0.13f;
+		OutDetail = FString::Printf(TEXT("%s at %.0f%% of nominal; reactor at %.0f%%, %.0f%% of the %.0f%% budget allocated"), *Sys, Want, ReactorPct, Sum, PowerBudget);
 		return true;
 	}
 	if (Name == TEXT("set_target"))
@@ -251,7 +283,42 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	}
 	if (Name == TEXT("dispatch_damage_control"))
 	{
-		OutDetail = FString::Printf(TEXT("damage control team en route to deck %d section %s"), (int32)Num(TEXT("deck"), 1), *Str(TEXT("section")));
+		const int32 Deck = (int32)Num(TEXT("deck"), 0);
+		FString Sec = Str(TEXT("section")).ToUpper().TrimStartAndEnd();
+		Sec.RemoveFromStart(TEXT("SECTION "));
+		const TCHAR SecC = Sec.Len() ? Sec[0] : TEXT('?');
+		FAstraDamage* D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC; });
+		if (D && D->Team >= 0)
+		{
+			OutDetail = FString::Printf(TEXT("team %d is already on the %s at %s (%s)"), D->Team + 1, *D->Kind, *D->Where(),
+			                            D->Travel > 0.f ? *FString::Printf(TEXT("on scene in %.0f s"), D->Travel)
+			                                            : *FString::Printf(TEXT("%.0f%% done"), 100.f * D->Progress));
+			return true;
+		}
+		if (!D)
+		{
+			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Team < 0; });
+		}
+		if (!D)
+		{
+			OutDetail = FString::Printf(TEXT("no damage reported at deck %d section %c; open incidents: %s"), Deck, SecC, *DamageSummary());
+			return false;
+		}
+		const int32 Team = FreeDamageTeam();
+		if (Team < 0)
+		{
+			OutDetail = FString::Printf(TEXT("all %d damage-control teams are committed: %s"), NumDamageTeams, *DamageSummary());
+			return false;
+		}
+		const FString Priority = Str(TEXT("priority")).ToLower();
+		const float Speed = Priority == TEXT("critical") ? 0.8f : (Priority == TEXT("low") ? 1.2f : 1.f);
+		D->Team = Team;
+		D->Travel = (6.f + FMath::Abs(D->Deck - 6) * 1.5f) * Speed;
+		D->Work = (D->Kind == TEXT("fire") ? 30.f : (D->Kind == TEXT("hull breach") ? 40.f : 25.f)) * Speed;
+		int32 Busy = 0;
+		for (const FAstraDamage& X : Damage) { Busy += X.Team >= 0 ? 1 : 0; }
+		OutDetail = FString::Printf(TEXT("team %d en route to the %s at %s: on scene in %.0f s, about %.0f s of work; %d teams still free"),
+		                            Team + 1, *D->Kind, *D->Where(), D->Travel, D->Work, NumDamageTeams - Busy);
 		return true;
 	}
 	if (Name == TEXT("hail"))
@@ -300,7 +367,13 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	S->SetStringField(TEXT("alert"), AlertName(Alert));
 	S->SetNumberField(TEXT("heading_deg"), FMath::RoundToInt(HeadingDeg));
 	S->SetNumberField(TEXT("mark_deg"), FMath::RoundToInt(MarkDeg));
-	if (bTurning)
+	if (!InterceptId.IsEmpty())
+	{
+		S->SetStringField(TEXT("helm"), FString::Printf(TEXT("intercepting %s, range %.1f km, %s (standoff %.0f km); course follows the target"),
+		                                                *InterceptId, InterceptRangeKm, bBroadside ? TEXT("broadside, holding the range") : TEXT("closing"),
+		                                                InterceptStandoffKm));
+	}
+	else if (bTurning)
 	{
 		S->SetStringField(TEXT("helm"), FString::Printf(TEXT("turning to %03.0f mark %.0f"), TargetHeadingDeg, TargetMarkDeg));
 	}
@@ -341,13 +414,57 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	}
 	S->SetStringField(TEXT("bearing_convention"), TEXT("bearings are true bearings in the Aurelia system plane, like headings: steer to a contact's bearing to point at it"));
 	TArray<TSharedPtr<FJsonValue>> Dmg;
-	for (const FString& D : DamageLog) { Dmg.Add(MakeShared<FJsonValueString>(D)); }
+	int32 Busy = 0;
+	for (const FAstraDamage& D : Damage)
+	{
+		Busy += D.Team >= 0 ? 1 : 0;
+		FString Line = FString::Printf(TEXT("%s: %s"), *D.Where(), *D.Kind);
+		if (!D.System.IsEmpty())
+		{
+			Line += FString::Printf(TEXT(" (%s power -20%%)"), *D.System);
+		}
+		Line += D.Team < 0 ? FString(TEXT(" — unattended")) :
+		        (D.Travel > 0.f ? FString::Printf(TEXT(" — team %d on the way (%.0f s)"), D.Team + 1, D.Travel)
+		                        : FString::Printf(TEXT(" — team %d working, %.0f%% done"), D.Team + 1, 100.f * D.Progress));
+		Dmg.Add(MakeShared<FJsonValueString>(Line));
+	}
 	S->SetArrayField(TEXT("damage"), Dmg);
+	S->SetStringField(TEXT("damage_control"), FString::Printf(TEXT("%d teams, %d free"), NumDamageTeams, NumDamageTeams - Busy));
+	float Sum = 0.f;
+	for (const auto& KV : PowerPct) { Sum += KV.Value; }
+	S->SetStringField(TEXT("power_budget"), FString::Printf(TEXT("%.0f%% of %.0f%% allocated (six systems at 100%% = 600%%)"), Sum, PowerBudget));
 	return S;
 }
 
 void UAstraShipSubsystem::Tick(float DeltaTime)
 {
+	// helm intercept: re-aim at the target's lead point twice a second; broadside inside the standoff (with hysteresis)
+	if (!InterceptId.IsEmpty() && (InterceptRetargetT -= DeltaTime) <= 0.f)
+	{
+		InterceptRetargetT = 0.5f;
+		double Brg = 0.0, Mk = 0.0, Rng = 0.0;
+		const UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+		if (Battle && Battle->ContactGeometry(InterceptId, Brg, Mk, Rng))
+		{
+			InterceptRangeKm = Rng;
+			bBroadside = bBroadside ? Rng < InterceptStandoffKm + 1.5 : Rng < InterceptStandoffKm;
+			float H = (float)Brg, M = (float)Mk;
+			if (bBroadside)
+			{
+				const float A = WrapDeg(H + 90.f), B = WrapDeg(H - 90.f);
+				H = FMath::Abs(DeltaDeg(HeadingDeg, A)) < FMath::Abs(DeltaDeg(HeadingDeg, B)) ? A : B;
+				M = 0.f;
+			}
+			TargetHeadingDeg = WrapDeg(H);
+			TargetMarkDeg = FMath::Clamp(M, -60.f, 60.f);
+			bTurning = true;
+		}
+		else
+		{
+			Event(FString::Printf(TEXT("helm: intercept of %s ended, the contact is gone — steady on course %03.0f"), *InterceptId, HeadingDeg), true);
+			InterceptId.Empty();
+		}
+	}
 	// helm: coordinated turn at a capital-ship rate, pitch at half of it
 	if (bTurning)
 	{
@@ -361,12 +478,17 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 			HeadingDeg = TargetHeadingDeg;
 			MarkDeg = TargetMarkDeg;
 			bTurning = false;
-			Event(FString::Printf(TEXT("helm: turn complete, steady on course %03.0f mark %.0f"), HeadingDeg, MarkDeg), true);
+			if (InterceptId.IsEmpty())
+			{
+				Event(FString::Printf(TEXT("helm: turn complete, steady on course %03.0f mark %.0f"), HeadingDeg, MarkDeg), true);
+			}
 		}
 		UpdateAttitudeVisuals();
 	}
-	// drive: speed follows the throttle (max 700 m/s in this system, compressed game scale)
-	SpeedMps = FMath::FInterpTo(SpeedMps, ThrottlePct * 7.f, DeltaTime, 0.2f);
+	// drive: speed follows the throttle (max 480 m/s at nominal engine power: a carrier cruiser, a little faster than
+	// Mandate destroyers at cruise; engine power scales it)
+	SpeedMps = FMath::FInterpTo(SpeedMps, ThrottlePct * 4.8f * (0.6f + 0.4f * PowerFactor(TEXT("engines"))), DeltaTime, 0.2f);
+	TickDamage(DeltaTime);
 	UpdateAlertVisuals(DeltaTime);
 }
 
@@ -430,18 +552,116 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 	}
 }
 
+float UAstraShipSubsystem::PowerFactor(const FString& System) const
+{
+	const float* P = PowerPct.Find(System);
+	float F = (P ? *P : 100.f) / 100.f;
+	for (const FAstraDamage& D : Damage)
+	{
+		F *= D.System == System ? 0.8f : 1.f;
+	}
+	return F;
+}
+
+int32 UAstraShipSubsystem::FreeDamageTeam() const
+{
+	for (int32 T = 0; T < NumDamageTeams; ++T)
+	{
+		if (!Damage.ContainsByPredicate([T](const FAstraDamage& D) { return D.Team == T; }))
+		{
+			return T;
+		}
+	}
+	return -1;
+}
+
+FString UAstraShipSubsystem::DamageSummary() const
+{
+	FString Out;
+	for (const FAstraDamage& D : Damage)
+	{
+		Out += FString::Printf(TEXT("%s%s %s%s"), Out.IsEmpty() ? TEXT("") : TEXT("; "), *D.Where(), *D.Kind,
+		                       D.Team >= 0 ? *FString::Printf(TEXT(" (team %d)"), D.Team + 1) : TEXT(" (unattended)"));
+	}
+	return Out.IsEmpty() ? TEXT("none") : Out;
+}
+
+void UAstraShipSubsystem::TickDamage(float DeltaTime)
+{
+	UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	for (int32 i = Damage.Num() - 1; i >= 0; --i)
+	{
+		FAstraDamage& D = Damage[i];
+		if (D.Team >= 0)
+		{
+			if (D.Travel > 0.f)
+			{
+				D.Travel -= DeltaTime;
+				continue;
+			}
+			D.Progress += DeltaTime / D.Work;
+			if (D.Progress >= 1.f)
+			{
+				const FString Done = D.Kind == TEXT("fire") ? TEXT("is out") : (D.Kind == TEXT("hull breach") ? TEXT("is sealed") : TEXT("is repaired, power restored"));
+				const bool bSay = D.Kind != TEXT("conduit damage");
+				const FString Text = FString::Printf(TEXT("damage control: the %s at %s %s (team %d free again)"), *D.Kind, *D.Where(), *Done, D.Team + 1);
+				Damage.RemoveAt(i);
+				Event(Text, bSay);
+			}
+		}
+		else if (D.Kind == TEXT("fire") && (D.SpreadT -= DeltaTime) <= 0.f)
+		{
+			// an unattended fire eats the structure and may spread to the next section
+			D.SpreadT = 25.f;
+			if (Battle)
+			{
+				Battle->PlayerInternalDamage(20.f);
+			}
+			if (FMath::FRand() < 0.4f && D.Section < TEXT('H'))
+			{
+				FAstraDamage N;
+				N.Id = NextDamageId++;
+				N.Deck = D.Deck;
+				N.Section = D.Section + 1;
+				N.Kind = TEXT("fire");
+				const FString Text = FString::Printf(TEXT("damage report: the unattended fire at %s has spread to section %c"), *D.Where(), N.Section);
+				if (!Damage.ContainsByPredicate([&N](const FAstraDamage& X) { return X.Deck == N.Deck && X.Section == N.Section; }))
+				{
+					Damage.Add(N);
+					Event(Text, true);
+				}
+			}
+		}
+	}
+}
+
 void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir)
 {
 	FlickerTime = 0.6f;
+	FString Where;
 	if (HullDamage > 8.f)
 	{
-		// where did it land? pick a compartment on the struck side (decks 1-12, sections A-H)
-		const int32 Deck = FMath::RandRange(2, 11);
-		const TCHAR Section = TEXT("ABCDEFGH")[FMath::RandRange(0, 7)];
+		// where did it land? a compartment (decks 1-12, sections A-H) and what it does there
+		FAstraDamage D;
+		D.Id = NextDamageId++;
+		D.Deck = FMath::RandRange(2, 11);
+		D.Section = TEXT("ABCDEFGH")[FMath::RandRange(0, 7)];
 		const float Roll = FMath::FRand();
-		const FString What = Roll < 0.35f ? TEXT("hull breach, compartment venting") : (Roll < 0.65f ? TEXT("fire") : TEXT("conduit damage, power fluctuations"));
-		DamageLog.Add(FString::Printf(TEXT("deck %d section %c: %s"), Deck, Section, *What));
-		if (DamageLog.Num() > 8) { DamageLog.RemoveAt(0); }
+		D.Kind = Roll < 0.35f ? TEXT("hull breach") : (Roll < 0.65f ? TEXT("fire") : TEXT("conduit damage"));
+		if (D.Kind == TEXT("conduit damage"))
+		{
+			static const TCHAR* Systems[] = {TEXT("shields"), TEXT("weapons"), TEXT("engines"), TEXT("sensors")};
+			D.System = Systems[FMath::RandRange(0, 3)];
+		}
+		Where = FString::Printf(TEXT("%s: %s%s"), *D.Where(), *D.Kind, D.System.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s power -20%%)"), *D.System));
+		if (!Damage.ContainsByPredicate([&D](const FAstraDamage& X) { return X.Deck == D.Deck && X.Section == D.Section && X.Kind == D.Kind; }))
+		{
+			Damage.Add(D);
+			if (Damage.Num() > 16)
+			{
+				Damage.RemoveAt(0);
+			}
+		}
 	}
 	const double Now = GetWorld()->GetTimeSeconds();
 	if (Now - LastHitReport > 6.0)
@@ -450,8 +670,8 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 		const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 		const int32 Sh = Battle ? FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()) : 0;
 		const int32 Hu = Battle ? FMath::RoundToInt(100.f * Battle->PlayerHullFraction()) : 100;
-		Event(HullDamage > 8.f
-			? FString::Printf(TEXT("damage report: we've been hit — %s; shields %d%%, hull %d%%"), *DamageLog.Last(), Sh, Hu)
+		Event(!Where.IsEmpty()
+			? FString::Printf(TEXT("damage report: we've been hit — %s; shields %d%%, hull %d%%"), *Where, Sh, Hu)
 			: FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), true);
 	}
 }

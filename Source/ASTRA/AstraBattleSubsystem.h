@@ -85,6 +85,9 @@ struct FAstraBattleShip
 	UPROPERTY() TObjectPtr<AStaticMeshActor> DriveFlare = nullptr;   // engine plume, kept visible at long range
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> ShieldMID = nullptr;
 	float ShieldFlash = 0.f;
+	FVector ShieldFacing = FVector::ZeroVector;   // reinforced sector in the ship's frame (zero = balanced)
+	float ShieldPower = 1.f;                       // power factor (the player's allocation and damage)
+	float WeaponPower = 1.f;
 };
 
 UENUM()
@@ -153,7 +156,11 @@ public:
 	bool EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail);
 	/** Contact id of the ship whose captain commands the Mandate forces now (Acheron, then Styx, Cocytus, Lethe). */
 	FString MandateCommander() const;
+	/** Where a live contact is from the Aquila, aimed at its lead point (for the helm's intercept). */
+	bool ContactGeometry(const FString& ContactId, double& OutBearing, double& OutMark, double& OutRangeKm) const;
 	void SetPlayerShields(bool bUp) { if (Ships.Num()) { Ships[0].bShieldsUp = bUp; } }
+	/** Structure damage from inside (fires): hull points, no shields. */
+	void PlayerInternalDamage(float Hull) { if (Ships.Num()) { Ships[0].Hull = FMath::Max(1.f, Ships[0].Hull - Hull); } }
 
 	float PlayerHullFraction() const { return Ships.Num() ? Ships[0].Hull / Ships[0].HullMax : 1.f; }
 	float PlayerShieldFraction() const { return Ships.Num() ? Ships[0].Shield / Ships[0].ShieldMax : 1.f; }
@@ -182,6 +189,7 @@ private:
 	int32 StageDone = 0;
 	bool bScenarioOver = false;
 	float TransmissionAt = -1.f;
+	bool bSurrenderAccepted = false;    // the Mandate accepted the Aquila's surrender
 	FString TransmissionText;           // "T-21 — ...": who opens a channel to the Aquila, and why
 
 	int32 AddShip(const FString& Contact, const FString& Name, const FString& Class, const FString& Mesh, EAstraSide Side,
@@ -205,6 +213,8 @@ private:
 	void ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos);
 	void Destroy(FAstraBattleShip& S);
 	void BreakCeasefire(const FAstraBattleShip& Victim);
+	/** The Mandate commander's ship is gone (destroyed or jumped out): the next captain in line takes over and calls. */
+	void OnCommanderLost(const FAstraBattleShip& Old, const TCHAR* How);
 	void AddFlash(const FVector& Pos, float Size, float Life, const FLinearColor& Color, float Intensity);
 	void AddBeam(const FVector& A, const FVector& B, float Life, const FLinearColor& Color);
 

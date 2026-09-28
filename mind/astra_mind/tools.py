@@ -22,14 +22,22 @@ SHIP_TOOLS: list[dict[str, Any]] = [
     _fn("set_course", "Helm: new heading (0-359, relative to the Aurelia system plane) and mark/pitch (-90..90).", {
         "heading_deg": {"type": "number", "minimum": 0, "maximum": 359.99},
         "mark_deg": {"type": "number", "minimum": -90, "maximum": 90}}, ["heading_deg", "mark_deg"]),
-    _fn("set_throttle", "Helm: main drive throttle in percent (0 = all stop, 33 = one third, 50 = half, 100 = full).", {
+    _fn("intercept", "Helm: continuous intercept of a contact — the course follows it; at the standoff range the ship "
+                     "turns broadside (all turrets bear) and holds that range. A set_course cancels it.", {
+        "contact_id": {"type": "string"},
+        "standoff_km": {"type": "number", "minimum": 1, "maximum": 30,
+                        "description": "range to hold: railguns reach 10 km, lasers 4 km"}}, ["contact_id", "standoff_km"]),
+    _fn("set_throttle", "Helm: main drive throttle in percent (0 = all stop, 33 = one third, 50 = half, 100 = full = 480 m/s).", {
         "percent": {"type": "number", "minimum": 0, "maximum": 100}}, ["percent"]),
     _fn("set_alert", "Set the ship's alert condition (lighting, stations, doors follow it).", {
         "level": {"type": "string", "enum": ["green", "yellow", "red"]}}, ["level"]),
-    _fn("set_shields", "Tactical: raise/lower shields or focus them on a sector.", {
+    _fn("set_shields", "Tactical: raise/lower shields or reinforce one sector (hits on that side cost the shields far less, "
+                       "hits elsewhere more; balanced = even). Face the sector towards the enemy's fire.", {
         "mode": {"type": "string", "enum": ["balanced", "forward", "aft", "port", "starboard", "dorsal", "ventral", "off"]}},
         ["mode"]),
-    _fn("route_power", "Operations: power allocation of a system in percent of nominal (100 = nominal, max 150).", {
+    _fn("route_power", "Operations: power allocation of a system in percent of nominal (100 = nominal, max 150). The six "
+                        "systems share a reactor budget of 700% (all at 100 = 600): boosting beyond it needs a cut elsewhere "
+                        "first. Shields power = regeneration and stopping power; weapons = railgun cadence; engines = speed.", {
         "system": {"type": "string", "enum": ["shields", "weapons", "engines", "sensors", "life_support", "flight_deck"]},
         "percent": {"type": "number", "minimum": 0, "maximum": 150}}, ["system", "percent"]),
     _fn("set_target", "Tactical: designate the current target (a contact id from the state).", {
@@ -52,7 +60,8 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         ["squadron", "mission", "contact_id"]),
     _fn("recall_squadron", "Flight Control: recall a flight group to the flight deck.", {
         "squadron": {"type": "string", "enum": ["alpha", "bravo", "drones"]}}, ["squadron"]),
-    _fn("dispatch_damage_control", "Operations: send a damage-control team.", {
+    _fn("dispatch_damage_control", "Operations: send one of the 4 damage-control teams to an incident in the ship state's "
+                                    "damage list (deck + section letter). Unattended fires spread and burn the structure.", {
         "deck": {"type": "integer", "minimum": 1, "maximum": 12}, "section": {"type": "string"},
         "task": {"type": "string", "enum": ["repair", "firefight", "seal_breach", "rescue"]},
         "priority": {"type": "string", "enum": ["low", "normal", "high", "critical"]}},

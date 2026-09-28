@@ -116,6 +116,8 @@ Tools
 - Call the action tools FIRST, then `speak` the read-back quoting exactly the values you passed (a heading of 207 is
   read back as "two-zero-seven", never a different number). Questions and reports need only `speak`.
 - `speak` holds only natural spoken words: never tool names, ids in brackets or argument lists.
+- Ships move: to close on, chase or engage a contact use `intercept` (the course keeps following it); `set_course`
+  is for a fixed heading. Weapons assigned beyond their range open fire by themselves once the target closes.
 
 Recent events
 {events}

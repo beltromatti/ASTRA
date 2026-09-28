@@ -82,7 +82,7 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 	// the Aquila first (index 0): the player's ship, heading 045 mark 10 like the helm
 	const int32 P = AddShip(TEXT("AQUILA"), TEXT("ASN Aquila"), TEXT("Aquila-class carrier cruiser"), TEXT(""), EAstraSide::Astra,
-	                        FVector::ZeroVector, 45.f, 419.f, 330.f, 3000.f, 1100.f);
+	                        FVector::ZeroVector, 45.f, 288.f, 330.f, 3000.f, 1100.f);
 	Ships[P].bPlayer = true;
 	Ships[P].RailCd = 7.f;
 	Ships[P].RailSlugs = 4;              // four twin turrets
@@ -96,12 +96,12 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 	const FVector A0 = FVector::ZeroVector;
 	int32 I = AddShip(TEXT("T-01"), TEXT("ASN Praetorian"), TEXT("ASTRA battleship (7th Fleet flagship)"), TEXT("SM_SHIP_ASTRA_Praetorian"),
-	                  EAstraSide::Astra, A0 + Polar(4.5 * Km, 25, 3), 45.f, 419.f, 420.f, 3200.f, 1200.f);
+	                  EAstraSide::Astra, A0 + Polar(4.5 * Km, 25, 3), 45.f, 288.f, 420.f, 3200.f, 1200.f);
 	Ships[I].RailDamage = 90.f;
 	Ships[I].RailCd = 9.f;
 	Ships[I].PDChannels = 3;
 	I = AddShip(TEXT("T-02"), TEXT("ASN Vigilant"), TEXT("ASTRA destroyer"), TEXT("SM_SHIP_ASTRA_Vigilant"), EAstraSide::Astra,
-	            A0 + Polar(3 * Km, 70, 2), 45.f, 419.f, 140.f, 900.f, 380.f);
+	            A0 + Polar(3 * Km, 70, 2), 45.f, 288.f, 140.f, 900.f, 380.f);
 	I = AddShip(TEXT("T-07"), TEXT("Brightwater"), TEXT("Free Guilds freighter"), TEXT("SM_SHIP_GUILD_Freighter"), EAstraSide::Neutral,
 	            A0 + Polar(22 * Km, 15, 4), 120.f, 180.f, 170.f, 700.f, 60.f);
 	Ships[I].RailDamage = 0.f;
@@ -264,7 +264,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		TickWeapons(S, Dt);
 		if (S.bShieldsUp)
 		{
-			S.Shield = FMath::Min(S.ShieldMax, S.Shield + S.ShieldRegen * Dt);
+			S.Shield = FMath::Min(S.ShieldMax, S.Shield + S.ShieldRegen * S.ShieldPower * Dt);
 		}
 		S.ShieldFlash = FMath::Max(0.f, S.ShieldFlash - Dt * 2.5f);
 	}
@@ -280,7 +280,13 @@ void UAstraBattleSubsystem::TickPlayer(float Dt)
 	{
 		P.Att = HeadingQuat(Ship->GetHeadingDeg(), Ship->GetMarkDeg());
 		P.Vel = P.Att.GetForwardVector() * Ship->GetSpeedMps();
-		P.bShieldsUp = Ship->AreShieldsUp();
+		P.bShieldsUp = Ship->AreShieldsUp() && Ship->PowerFactor(TEXT("shields")) > 0.05f;
+		P.ShieldPower = Ship->PowerFactor(TEXT("shields"));
+		P.WeaponPower = Ship->PowerFactor(TEXT("weapons"));
+		const FString M = Ship->GetShieldMode();
+		P.ShieldFacing = M == TEXT("forward") ? FVector(1, 0, 0) : M == TEXT("aft") ? FVector(-1, 0, 0)
+		               : M == TEXT("port") ? FVector(0, -1, 0) : M == TEXT("starboard") ? FVector(0, 1, 0)
+		               : M == TEXT("dorsal") ? FVector(0, 0, 1) : M == TEXT("ventral") ? FVector(0, 0, -1) : FVector::ZeroVector;
 	}
 	P.Pos += P.Vel * Dt;
 }
@@ -363,17 +369,25 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	// outcome
 	if (!bScenarioOver && StageDone == 2)
 	{
-		bool bAnyHostile = false;
+		int32 Fighting = 0, Truce = 0;
 		for (const FAstraBattleShip& S : Ships)
 		{
-			bAnyHostile |= (S.bAlive && S.bHostile && !S.bFleeing);
+			if (S.bAlive && S.bHostile)
+			{
+				Fighting += (!S.bFleeing && !S.bHoldFire) ? 1 : 0;
+				Truce += S.bNegotiated ? 1 : 0;
+			}
 		}
-		if (!bAnyHostile)
+		if (bSurrenderAccepted)
 		{
 			bScenarioOver = true;
-			const bool bTerms = Ships.ContainsByPredicate([](const FAstraBattleShip& S) { return S.bAlive && S.bNegotiated; });
-			Report(bTerms ? TEXT("tactical: the Mandate strike group is withdrawing under the terms agreed over the channel — the attack on Aurelia is over")
-			              : TEXT("tactical: no hostile ship left in the engagement zone — the Mandate attack on Aurelia has been repelled"));
+			Report(TEXT("tactical: the Mandate has accepted our surrender and ceased fire — their ships are closing to board the Aquila; the battle for Aurelia is lost"));
+		}
+		else if (Fighting == 0)
+		{
+			bScenarioOver = true;
+			Report(Truce > 0 ? TEXT("tactical: no Mandate ship is fighting any more — they hold fire or withdraw under the terms agreed over the channel; the battle for Aurelia is over")
+			                 : TEXT("tactical: no hostile ship left in the engagement zone — the Mandate attack on Aurelia has been repelled"));
 		}
 		else if (Ships[0].Hull / Ships[0].HullMax < 0.08f)
 		{
@@ -449,13 +463,22 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 			Report(FString::Printf(TEXT("sensors: %s (%s) is badly damaged and breaking off, heading away from the fight"), *S.Name, *S.ContactId));
 		}
 	}
+	if (S.bHoldFire && !S.bFleeing)
+	{
+		DesiredVel = FVector::ZeroVector;   // ceasefire: hold station, guns trained
+	}
 	if (S.Mode == EAstraShipMode::Evade)
 	{
 		DesiredVel = (S.Pos - Ships[0].Pos).GetSafeNormal() * S.CruiseSpeed * 1.3f;
 		Face = DesiredVel.GetSafeNormal();
 		if (FVector::Dist(S.Pos, Ships[0].Pos) > 160 * Km && S.bAlive)
 		{
+			const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
 			S.bAlive = false;   // out of the theatre (jumped away)
+			if (bWasCommander)
+			{
+				OnCommanderLost(S, TEXT("jumped out of the system"));
+			}
 			if (S.Actor) { S.Actor->Destroy(); }
 			if (S.ShieldBubble) { S.ShieldBubble->Destroy(); }
 			if (S.DriveFlare) { S.DriveFlare->Destroy(); }
@@ -760,9 +783,13 @@ void UAstraBattleSubsystem::TickPlayerFire(FAstraBattleShip& P, float Dt)
 	}
 	const double Dist = FVector::Dist(P.Pos, T->Pos);
 	// out of range: the assignment stands and the guns wait for the target to close
+	if (P.WeaponPower < 0.05f)
+	{
+		return;   // no power to the weapons
+	}
 	if (P.RailVolleys > 0 && P.RailT <= 0.f && Dist <= P.RailRange)
 	{
-		P.RailT = P.RailCd;
+		P.RailT = P.RailCd / FMath::Max(0.25f, P.WeaponPower);   // capacitor recharge follows weapons power
 		--P.RailVolleys;
 		for (int32 i = 0; i < P.RailSlugs; ++i)
 		{
@@ -789,6 +816,26 @@ bool UAstraBattleSubsystem::PlayerScan(const FString& ContactId, FString& OutDet
 	OutDetail = T ? FString::Printf(TEXT("scan of %s: %s, hull %.0f%%, shields %.0f%%"), *T->ContactId, *T->Class,
 	                                 100.f * T->Hull / T->HullMax, 100.f * T->Shield / T->ShieldMax)
 	              : TEXT("full active sweep: no new contacts inside 150 km");
+	return true;
+}
+
+bool UAstraBattleSubsystem::ContactGeometry(const FString& ContactId, double& OutBearing, double& OutMark, double& OutRangeKm) const
+{
+	const FAstraBattleShip* T = Ships.FindByPredicate([&ContactId](const FAstraBattleShip& S)
+	{
+		return !S.bPlayer && S.bAlive && S.ContactId.Equals(ContactId, ESearchCase::IgnoreCase);
+	});
+	if (!T || Ships.Num() == 0)
+	{
+		return false;
+	}
+	const FAstraBattleShip& P = Ships[0];
+	const double D = FVector::Dist(P.Pos, T->Pos);
+	const double Lead = FMath::Min(D / FMath::Max((double)P.Vel.Size(), 100.0), 60.0) * 0.5;
+	const FVector Aim = T->Pos + T->Vel * Lead;
+	OutBearing = BearingDeg(P.Pos, Aim);
+	OutMark = MarkDeg(P.Pos, Aim);
+	OutRangeKm = D / Km;
 	return true;
 }
 
@@ -849,6 +896,7 @@ bool UAstraBattleSubsystem::EnemyOrder(const FString& Order, const FString& Reas
 			S.bNegotiated = true;
 		}
 	}
+	bSurrenderAccepted |= (O == TEXT("accept_surrender") && bGroup);
 	const FAstraBattleShip& First = *Own;
 	if (O == TEXT("withdraw"))
 	{
@@ -886,6 +934,8 @@ void UAstraBattleSubsystem::BreakCeasefire(const FAstraBattleShip& Victim)
 			S.TargetId = Ships[0].Id;
 		}
 	}
+	bScenarioOver = false;
+	bSurrenderAccepted = false;
 	Report(FString::Printf(TEXT("tactical: we fired on the %s (%s) during the ceasefire — the Mandate ships are coming about and re-engaging"),
 	                       *Victim.Name, *Victim.ContactId));
 	const FString Cmd = MandateCommander();
@@ -919,9 +969,17 @@ void UAstraBattleSubsystem::ApplyHit(FAstraBattleShip& To, const FVector& FromDi
 	float ToHull = Damage;
 	if (To.bShieldsUp && To.Shield > 0.f)
 	{
-		const float Absorb = FMath::Min(To.Shield, Damage * 0.85f);
-		To.Shield -= Absorb;
-		ToHull = Damage - Absorb;
+		// a reinforced sector spends less shield per point stopped, the others more; power sets how much gets through
+		float Cost = 1.f;
+		if (!To.ShieldFacing.IsNearlyZero())
+		{
+			const FVector From = To.Att.UnrotateVector(-FromDir).GetSafeNormal();
+			Cost = FVector::DotProduct(From, To.ShieldFacing) > 0.5f ? 0.6f : 1.5f;
+		}
+		const float Stop = FMath::Clamp(0.85f * (0.7f + 0.3f * To.ShieldPower), 0.5f, 0.95f);
+		const float Absorbed = FMath::Min(To.Shield / Cost, Damage * Stop);
+		To.Shield = FMath::Max(0.f, To.Shield - Absorbed * Cost);
+		ToHull = Damage - Absorbed;
 		To.ShieldFlash = 1.f;
 	}
 	To.Hull -= ToHull;
@@ -958,14 +1016,23 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S)
 	{
 		Report(FString::Printf(TEXT("tactical: %s (%s, %s) destroyed"), *S.Name, *S.ContactId, *S.Class));
 	}
-	if (bWasCommander && StageDone >= 2)
+	if (bWasCommander)
 	{
-		if (const FAstraBattleShip* Next = FindByContact(MandateCommander()))
-		{
-			TransmissionText = FString::Printf(TEXT("%s — the %s (%s), now leading what is left of the strike group after the loss of the %s, hails the Aquila"),
-			                                   *Next->ContactId, *Next->Name, *Next->Class, *S.Name);
-			TransmissionAt = Time + 9.f;
-		}
+		OnCommanderLost(S, TEXT("was destroyed"));
+	}
+}
+
+void UAstraBattleSubsystem::OnCommanderLost(const FAstraBattleShip& Old, const TCHAR* How)
+{
+	if (StageDone < 2)
+	{
+		return;
+	}
+	if (const FAstraBattleShip* Next = FindByContact(MandateCommander()))
+	{
+		TransmissionText = FString::Printf(TEXT("%s — the %s (%s) now leads what is left of the strike group, because the %s %s; it hails the Aquila"),
+		                                   *Next->ContactId, *Next->Name, *Next->Class, *Old.Name, How);
+		TransmissionAt = Time + 9.f;
 	}
 }
 

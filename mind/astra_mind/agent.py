@@ -12,7 +12,7 @@ from typing import Any, Awaitable, Callable, Protocol
 
 from .crew import CREW, system_prompt
 from .openrouter import OpenRouter, ToolCall
-from .tools import ALL_TOOLS, SHIP_TOOL_NAMES, SPEAK
+from .tools import ALL_TOOLS, SHIP_TOOL_NAMES, SHIP_TOOLS, SPEAK
 
 log = logging.getLogger("astra.agent")
 
@@ -67,28 +67,7 @@ class BridgeAgent:
         turn = Turn(text=text, lang=lang)
         t0 = time.perf_counter()
         pending: list[tuple[ToolCall, asyncio.Task]] = []
-
-        async def on_call(call: ToolCall) -> None:
-            args = call.arguments() or {}
-            if call.name == "speak":
-                speaker = args.get("speaker", "xo")
-                if speaker not in CREW:
-                    speaker = "xo"
-                line = (args.get("text") or "").strip()
-                if _looks_like_tool(line):
-                    log.warning("speak contained a tool invocation, not voiced: %s", line)
-                    line = ""
-                if len(line) >= 4:
-                    if turn.t_first_line is None:
-                        turn.t_first_line = time.perf_counter() - t0
-                    turn.lines.append((speaker, line))
-                    await self.say(speaker, line, lang, args.get("tone", "calm"))
-            elif call.name in SHIP_TOOL_NAMES:
-                by = _owner(call.name)
-                pending.append((call, asyncio.create_task(_safe_execute(self.ship, call.name, args, by))))
-            else:
-                log.warning("unknown tool %s", call.name)
-
+        on_call = self._on_call(turn, lang, t0, pending, allowed=SHIP_TOOL_NAMES)
         msgs = self._messages(text, lang)
         comp = await self.llm.chat(model=MODEL, messages=msgs, tools=ALL_TOOLS, tool_choice="auto", providers=PROVIDERS,
                                    reasoning={"enabled": False}, max_tokens=450, temperature=0.4, on_tool_call=on_call,
@@ -99,111 +78,142 @@ class BridgeAgent:
         if not comp.error and not turn.lines and comp.content.strip():
             # the model answered in prose instead of calling speak: salvage it as the XO's (or tagged officer's) line
             log.warning("no speak call, salvaging content: %s", comp.content[:200])
-            spk, line = _parse_prose(comp.content)
-            turn.lines.append((spk, line))
-            await self.say(spk, line, lang, "calm")
+            await self._salvage(comp.content, turn, lang, max_lines=3)
         if comp.error:
             turn.error = comp.error
             log.error("LLM error: %s", comp.error)
             await self.say("xo", _fallback_line(lang), lang, "calm")
-        # results of the actions (the simulation is the truth)
-        failures = []
+        results = await self._collect(pending, turn)
+        main_lines = len(turn.lines)
+        failures = [a for a in turn.actions if not a[2].get("ok", False)]
+        if turn.actions and not turn.lines and not comp.error:
+            await self._follow_up(msgs, turn, lang, readback=True)      # orders carried out in silence: read them back
+        elif failures:
+            await self._follow_up(msgs, turn, lang, readback=False)
+        self._record(f"Captain: {text}", comp.tool_calls, results, turn, main_lines)
+        turn.t_end = time.perf_counter() - t0
+        self.spent += turn.cost
+        return turn
+
+    async def handle_event(self, event: str, lang: str) -> Turn:
+        """A ship event (not the Captain): the responsible officer reports it, and may act within their own authority."""
+        turn = Turn(text=f"[event] {event}", lang=lang)
+        t0 = time.perf_counter()
+        pending: list[tuple[ToolCall, asyncio.Task]] = []
+        user = f"[Ship systems event, not the Captain speaking] {event}"
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events())}]
+        msgs += self.history
+        msgs.append({"role": "user", "content": user + "\n" + EVENT_ASK})
+        on_call = self._on_call(turn, lang, t0, pending, allowed=INITIATIVE)
+        comp = await self.llm.chat(model=MODEL, messages=msgs, tools=[SPEAK] + INITIATIVE_TOOLS, tool_choice="auto",
+                                   providers=PROVIDERS, reasoning={"enabled": False}, max_tokens=360, temperature=0.4,
+                                   on_tool_call=on_call, allow_fallbacks=True)
+        turn.cost += comp.cost
+        if not turn.lines and not comp.error and comp.content.strip():
+            # the report came back as prose ("sensors: ...") instead of a speak call: voice it anyway, officer by officer
+            log.info("event report salvaged from prose: %s", comp.content[:160])
+            await self._salvage(comp.content, turn, lang, max_lines=2)
+        results = await self._collect(pending, turn)
+        if turn.lines or turn.actions:
+            self._record(user, comp.tool_calls, results, turn, len(turn.lines))
+        turn.t_end = time.perf_counter() - t0
+        self.spent += turn.cost
+        return turn
+
+    # ------------------------------------------------------------------------------------------------ internals
+    def _on_call(self, turn: Turn, lang: str, t0: float, pending: list, allowed: set[str]):
+        async def on_call(call: ToolCall) -> None:
+            args = call.arguments() or {}
+            if call.name == "speak":
+                speaker = args.get("speaker", "xo")
+                if speaker not in CREW:
+                    speaker = "xo"
+                line = (args.get("text") or "").strip()
+                if _looks_like_tool(line):
+                    log.warning("speak contained a tool invocation, not voiced: %s", line)
+                    line = ""
+                if len(line) >= 4:                               # never voice fragments of a cut-off reply
+                    if turn.t_first_line is None:
+                        turn.t_first_line = time.perf_counter() - t0
+                    turn.lines.append((speaker, line))
+                    await self.say(speaker, line, lang, args.get("tone", "calm"))
+            elif call.name in allowed:
+                pending.append((call, asyncio.create_task(_safe_execute(self.ship, call.name, args, _owner(call.name)))))
+            else:
+                log.warning("tool %s not allowed here", call.name)
+        return on_call
+
+    async def _salvage(self, content: str, turn: Turn, lang: str, max_lines: int) -> None:
+        for raw in [l for l in content.strip().splitlines() if l.strip()][:max_lines]:
+            spk, line = _parse_prose(raw)
+            if len(line) >= 4 and not _looks_like_tool(line):
+                turn.lines.append((spk, line))
+                await self.say(spk, line, lang, "focused")
+
+    async def _collect(self, pending: list, turn: Turn) -> dict[int, dict[str, Any]]:
+        """Results of the actions (the simulation is the truth)."""
+        results: dict[int, dict[str, Any]] = {}
         for call, task in pending:
             try:
                 res = await asyncio.wait_for(task, timeout=3.0)
             except asyncio.TimeoutError:
                 res = {"ok": False, "detail": "no response from ship systems"}
             turn.actions.append((call.name, call.arguments() or {}, res))
-            if not res.get("ok", False):
-                failures.append((call, res))
-        if failures:
-            await self._report_failures(msgs, comp.tool_calls, failures, lang, turn)
-        # history in the native tool-calling format: the model keeps answering through tools (a text summary of past
-        # turns made it drift into prose after a few turns)
-        results = {id(c): r for (c, _), (_, _, r) in zip(pending, turn.actions)}
-        calls = [c for c in comp.tool_calls if c.name]
-        self.history.append({"role": "user", "content": f"Captain: {text}"})
-        if calls:
-            self.history.append({"role": "assistant", "content": None, "tool_calls": [
-                {"id": c.id or f"call_{i}", "type": "function", "function": {"name": c.name, "arguments": c.arguments_raw or "{}"}}
-                for i, c in enumerate(calls)]})
-            for i, c in enumerate(calls):
-                r = results.get(id(c))
-                content = "spoken" if c.name == "speak" else (
-                    ("ok: " if r and r.get("ok") else "FAILED: ") + str((r or {}).get("detail", "")))
-                self.history.append({"role": "tool", "tool_call_id": c.id or f"call_{i}", "content": content})
-        else:
-            self.history.append({"role": "assistant", "content": " ".join(t for _, t in turn.lines) or "(no reply)"})
-        self._trim_history()
-        turn.t_end = time.perf_counter() - t0
-        self.spent += turn.cost
-        return turn
+            results[id(call)] = res
+        return results
 
-    async def handle_event(self, event: str, lang: str) -> Turn:
-        """A ship event (not the Captain): the responsible officer reports it if it is worth saying aloud."""
-        turn = Turn(text=f"[event] {event}", lang=lang)
-        t0 = time.perf_counter()
-        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events())}]
-        msgs += self.history
-        msgs.append({"role": "user", "content": f"[Ship systems event, not the Captain speaking] {event}\n"
-                                                "The Captain should hear this: the responsible officer reports it now, in one "
-                                                "short line with speak (in the Captain's language). Call no tool only if it "
-                                                "merely repeats what was reported in the last few seconds."})
-
-        async def on_call(call: ToolCall) -> None:
-            args = call.arguments() or {}
-            text = (args.get("text") or "").strip()
-            if call.name == "speak" and len(text) >= 4:          # never voice fragments of a cut-off reply
-                spk = args.get("speaker") if args.get("speaker") in CREW else "xo"
-                turn.lines.append((spk, text))
-                if turn.t_first_line is None:
-                    turn.t_first_line = time.perf_counter() - t0
-                await self.say(spk, text, lang, args.get("tone", "focused"))
-
-        comp = await self.llm.chat(model=MODEL, messages=msgs, tools=[SPEAK], tool_choice="auto", providers=PROVIDERS,
-                                   reasoning={"enabled": False}, max_tokens=320, temperature=0.4, on_tool_call=on_call,
-                                   allow_fallbacks=True)
-        turn.cost += comp.cost
-        if not turn.lines and not comp.error and comp.content.strip():
-            # the report came back as prose ("sensors: ...") instead of a speak call: voice it anyway, officer by officer
-            for raw in [l for l in comp.content.strip().splitlines() if l.strip()][:2]:
-                spk, line = _parse_prose(raw)
-                if len(line) >= 4 and not _looks_like_tool(line):
-                    turn.lines.append((spk, line))
-                    await self.say(spk, line, lang, "focused")
-            log.info("event report salvaged from prose: %s", comp.content[:160])
-        if turn.lines:
-            # native tool-call history (prose history teaches the model to answer in prose)
-            self.history.append({"role": "user", "content": f"[Ship systems event, not the Captain speaking] {event}"})
-            self.history.append({"role": "assistant", "content": None, "tool_calls": [
-                {"id": f"ev{self._ev}_{i}", "type": "function", "function": {"name": "speak", "arguments": json.dumps(
-                    {"speaker": spk, "text": line, "tone": "focused"}, ensure_ascii=False)}} for i, (spk, line) in enumerate(turn.lines)]})
-            for i in range(len(turn.lines)):
-                self.history.append({"role": "tool", "tool_call_id": f"ev{self._ev}_{i}", "content": "spoken"})
-            self._ev += 1
-            self._trim_history()
-        turn.t_end = time.perf_counter() - t0
-        self.spent += turn.cost
-        return turn
-
-    async def _report_failures(self, msgs, calls, failures, lang, turn: Turn) -> None:
-        notes = "\n".join(f"- {c.name}({c.arguments_raw}) FAILED: {r.get('detail', 'unknown')}" for c, r in failures)
+    async def _follow_up(self, msgs, turn: Turn, lang: str, readback: bool) -> None:
+        notes = "\n".join(f"- {n}({json.dumps(a, ensure_ascii=False)}) {'ok' if r.get('ok') else 'FAILED'}: {r.get('detail', '')}"
+                          for n, a, r in turn.actions if readback or not r.get("ok", False))
+        ask = ("The officers who acted now report to the Captain in speaking order, one short line each: what was done, "
+               "with the exact values; for anything that FAILED, why, and an alternative." if readback else
+               "The responsible officer now tells the Captain briefly what failed and why, and proposes an alternative "
+               "if there is one.")
         follow = msgs + [
-            {"role": "assistant", "content": " ".join(f"[{s}] {t}" for s, t in turn.lines) or "(acknowledged)"},
-            {"role": "user", "content": f"[Ship systems report]\n{notes}\nThe responsible officer now tells the Captain "
-                                        f"briefly what failed and why, and proposes an alternative if there is one. Use speak."}]
-
-        async def on_call(call: ToolCall) -> None:
-            args = call.arguments() or {}
-            if call.name == "speak" and args.get("text"):
-                spk = args.get("speaker", "xo") if args.get("speaker") in CREW else "xo"
-                turn.lines.append((spk, args["text"]))
-                await self.say(spk, args["text"], lang, args.get("tone", "focused"))
-
+            {"role": "assistant", "content": " ".join(f"[{s}] {t}" for s, t in turn.lines) or "(orders executed)"},
+            {"role": "user", "content": f"[Ship systems report]\n{notes}\n{ask} Use speak."}]
+        t0 = time.perf_counter()
         comp = await self.llm.chat(model=MODEL, messages=follow, tools=[SPEAK], tool_choice="auto", providers=PROVIDERS,
-                                   reasoning={"enabled": False}, max_tokens=200, temperature=0.4, on_tool_call=on_call,
-                                   allow_fallbacks=True)
+                                   reasoning={"enabled": False}, max_tokens=320, temperature=0.4,
+                                   on_tool_call=self._on_call(turn, lang, t0, [], allowed=set()), allow_fallbacks=True)
         turn.cost += comp.cost
+        if not comp.error and comp.content.strip() and not any(True for _ in comp.tool_calls):
+            await self._salvage(comp.content, turn, lang, max_lines=3)
+
+    def _record(self, user: str, calls: list[ToolCall], results: dict[int, dict[str, Any]], turn: Turn, main_lines: int) -> None:
+        """History in the native tool-calling format: the model keeps answering through tools (a text summary of past
+        turns made it drift into prose after a few turns). Lines voiced outside tool calls become synthetic speak calls."""
+        self.history.append({"role": "user", "content": user})
+        calls = [c for c in calls if c.name]
+        extra = turn.lines[main_lines:] if calls else turn.lines
+        if calls:
+            self._append_calls([(c.id or f"call_{i}", c.name, c.arguments_raw or "{}",
+                                 "spoken" if c.name == "speak" else (("ok: " if results.get(id(c), {}).get("ok") else "FAILED: ")
+                                                                     + str(results.get(id(c), {}).get("detail", ""))))
+                                for i, c in enumerate(calls)])
+        if extra:
+            self._ev += 1
+            self._append_calls([(f"syn{self._ev}_{i}", "speak", json.dumps({"speaker": spk, "text": line, "tone": "focused"},
+                                                                          ensure_ascii=False), "spoken")
+                                for i, (spk, line) in enumerate(extra)])
+        if not calls and not extra:
+            self.history.append({"role": "assistant", "content": "(no reply)"})
+        self._trim_history()
+
+    def _append_calls(self, items: list[tuple[str, str, str, str]]) -> None:
+        self.history.append({"role": "assistant", "content": None, "tool_calls": [
+            {"id": cid, "type": "function", "function": {"name": name, "arguments": args}} for cid, name, args, _ in items]})
+        for cid, _, _, result in items:
+            self.history.append({"role": "tool", "tool_call_id": cid, "content": result})
+
+
+EVENT_ASK = ("The Captain should hear this: the responsible officer reports it now, in one short line with speak (in the "
+             "Captain's language). Within their own authority an officer may also act at once and say so (Operations: "
+             "damage-control teams; Tactical: shield facing and point defense); anything else (course, weapons, alert, "
+             "power) waits for the Captain's order: propose it instead. Never claim an action you did not take with a "
+             "tool. Call no tool only if this merely repeats what was reported in the last few seconds.")
+INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense"}
+INITIATIVE_TOOLS = [t for t in SHIP_TOOLS if t["function"]["name"] in INITIATIVE]
 
 
 _TOOLISH = None
@@ -241,7 +251,7 @@ def _parse_prose(content: str) -> tuple[str, str]:
 
 
 def _owner(tool: str) -> str:
-    return {"set_course": "helm", "set_throttle": "helm", "set_alert": "xo", "set_shields": "tactical",
+    return {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "set_alert": "xo", "set_shields": "tactical",
             "route_power": "ops", "set_target": "tactical", "fire_weapons": "tactical", "set_point_defense": "tactical",
             "launch_squadron": "flight", "recall_squadron": "flight", "dispatch_damage_control": "ops", "hail": "comms",
             "set_emcon": "sensors", "active_scan": "sensors", "end_transmission": "comms", "cease_fire": "tactical"}.get(tool, "xo")

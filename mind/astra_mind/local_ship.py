@@ -59,6 +59,12 @@ class LocalShip:
         if name == "route_power":
             s["power_pct"][a["system"]] = a["percent"]
             return self._ok(f"{a['system']} at {a['percent']}%")
+        if name == "intercept":
+            c = self._contact(a.get("contact_id"))
+            if c is None:
+                return {"ok": False, "detail": f"no contact {a.get('contact_id')} to intercept"}
+            s["helm"] = f"intercepting {c['id']}, standoff {a.get('standoff_km', 6)} km"
+            return self._ok(f"intercepting {c['id']}: bearing {c['bearing_deg']:03d}, range {c['range_km']} km")
         if name == "cease_fire":
             return self._ok("all offensive fire stopped; point defense stays on")
         if name in ("set_target", "fire_weapons"):
