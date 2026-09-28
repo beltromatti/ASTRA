@@ -451,16 +451,21 @@ void AASTRAPlayerController::EnsureStoryWidget()
 		]
 		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 		[
-			SNew(SVerticalBox)
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 14)
+			SNew(SBox).MaxDesiredWidth(1100.f)
 			[
-				SAssignNew(StoryTitle, STextBlock).Font(Title ? FSlateFontInfo(Title, 46) : FCoreStyle::GetDefaultFontStyle("Bold", 46))
-				.ColorAndOpacity(FLinearColor(0.75f, 0.88f, 1.f, 0.f)).Justification(ETextJustify::Center)
-			]
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
-			[
-				SAssignNew(StorySub, STextBlock).Font(Mono ? FSlateFontInfo(Mono, 17) : FCoreStyle::GetDefaultFontStyle("Mono", 17))
-				.ColorAndOpacity(FLinearColor(0.45f, 0.55f, 0.66f, 0.f)).Justification(ETextJustify::Center)
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 14)
+				[
+					SAssignNew(StoryTitle, STextBlock).Font(Title ? FSlateFontInfo(Title, 46) : FCoreStyle::GetDefaultFontStyle("Bold", 46))
+					.ColorAndOpacity(FLinearColor(0.75f, 0.88f, 1.f, 0.f)).Justification(ETextJustify::Center).AutoWrapText(true)
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+				[
+					// an epilogue line can be long: it wraps, and reads as prose
+					SAssignNew(StorySub, STextBlock).Font(Mono ? FSlateFontInfo(Mono, 17) : FCoreStyle::GetDefaultFontStyle("Mono", 17))
+					.ColorAndOpacity(FLinearColor(0.45f, 0.55f, 0.66f, 0.f)).Justification(ETextJustify::Center).AutoWrapText(true)
+					.LineHeightPercentage(1.25f)
+				]
 			]
 		];
 	VC->AddViewportWidgetContent(StoryWidget.ToSharedRef(), 60);

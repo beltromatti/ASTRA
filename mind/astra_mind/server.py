@@ -89,6 +89,7 @@ from .medbay import patient_voice  # noqa: E402
 from .mess import MessTalk  # noqa: E402
 from .visits import VisitPlanner  # noqa: E402
 from .loss import Aftermath  # noqa: E402
+from .finale import Finale  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
@@ -205,6 +206,7 @@ class Mind:
         self.visits = VisitPlanner(self.llm, self._director_command, self.director.note)
         self.aftermath = Aftermath(self.llm, self._say_external, self._director_command, self._register_voice, self.director,
                                    self.voice.busy_s)
+        self.director.finale = Finale(self.llm, self._say_external, self._director_command, self.voice.busy_s)
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
         self.agent.war = lambda: self.director.war.crew_view()
@@ -622,7 +624,14 @@ class Mind:
                                       f"war_news, then the first beat for the new ship")
                         else:
                             resume = f"director: campaign resumed — the Aquila is back on patrol in the {self.director.war.current} system"
-                        asyncio.create_task(self.director.on_event(resume, self.lang, self._battle_state()))
+                        if new_command and self.director.decisive:
+                            # the Aquila was lost in the decisive battle: that battle's outcome ends the arc first
+                            self.director.decisive = False
+                            asyncio.create_task(self.director._end_arc(
+                                f"engagement over — the decisive battle was fought on without the Aquila, lost in it ({new_command})",
+                                self.lang, self._battle_state()))
+                        else:
+                            asyncio.create_task(self.director.on_event(resume, self.lang, self._battle_state()))
                     else:
                         self.director.reset()
                         log.info("new campaign")

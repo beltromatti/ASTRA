@@ -51,7 +51,10 @@ POI = {"type": "object", "properties": {
     "kind": {"type": "string", "enum": ["listening_post", "derelict_warship", "derelict_freighter"]},
     "name": {"type": "string", "description": "e.g. Thule Watch, the freighter Silver Kestrel, ASN Resolve"}}, "required": ["kind", "name"]}
 BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulation.", {
-    "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit", "investigate"]},
+    "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit", "investigate", "decisive"]},
+    "act": {"type": "integer", "minimum": 1, "maximum": 3, "description": "the act of the arc this beat belongs to: the current "
+            "one, or the next when this beat is the story's turning point into it"},
+    "allies": {"type": "array", "items": SHIP, "description": "decisive: the ASTRA ships that join the Aquila for it (1-3)"},
     "poi": {**POI, "description": "investigate: the place to search (on the plot at once, dark and tumbling)"},
     "findings": {"type": "array", "items": {"type": "string"}, "description": "investigate: what the crew learns there, in "
                  "order — 1) the active scan, 2) a flight group reaches it or the Aquila closes in, 3) alongside. Concrete "
@@ -62,7 +65,8 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "delay_s": {"type": "number", "description": "seconds before it happens (raids and distress: 60-300; calm: 90-240)"},
     "bearing_deg": {"type": "number", "description": "true bearing from the Aquila where they appear (0-359)"},
     "range_km": {"type": "number", "description": "distance from the Aquila (raid 20-40, distress 25-45, reinforcements 15-30)"},
-    "ships": {"type": "array", "items": SHIP, "description": "raid: the Mandate ships (first = leader); reinforcements: ASTRA ships"},
+    "ships": {"type": "array", "items": SHIP, "description": "raid: the Mandate ships (first = leader); reinforcements: ASTRA ships; "
+              "decisive: the Mandate's main fleet (4-8 ships, the leader first, an acheron among them)"},
     "attackers": {"type": "array", "items": SHIP, "description": "distress: the Mandate raiders (styx or lethe)"},
     "ship": {"type": "object", "properties": {"name": {"type": "string"}, "class": {"type": "string"}},
              "description": "distress: the ship calling for help (a Free Guilds freighter)"},
@@ -111,6 +115,10 @@ Rules
 - Pacing: after a hard fight (hull below 50% or ships lost) prefer resupply or calm; escalate step by step; a raid is
   1-4 Mandate ships sized to what the Aquila and her escorts can fight; distress calls are Free Guilds freighters hunted
   by 1-2 raiders; reinforcements are 1-2 ASTRA destroyers (vigilant), rarely a battleship.
+- decisive: the battle this arc was building to (Act III only, once the forces are gathered): the Mandate's main
+  fleet in `ships` (4-8, an acheron leading) against the Aquila and the `allies` that join her (1-3 ASTRA ships), where
+  the Aquila is and where the arc says it must be fought (the Mandate's assault on Aurelia, or the 7th Fleet's strike
+  at Erebus Anchorage...). It MUST include `commander`. Its outcome ends the arc.
 - A raid or distress MUST include `commander` for its leader: invent a person (English name, rank, a bio with a reason
   to fight and a way of speaking). Recurring characters are welcome when the story justifies it.
 - Never reuse the name of a ship that is still on the plot (see contacts) for a new ship.
@@ -141,6 +149,9 @@ Rules
 - The Captain's own log entries ("captain's log: …" in the campaign log) are the player telling you what they
   think, fear and want: let the story answer them (a suspicion confirmed or proven wrong, a hope rewarded or tested).
 - Keep the whole thing coherent with the map, the campaign log below and the live state.
+
+The shape of the story (arc {arc} of the war)
+{arc_text}
 
 The Aurelia March (the sector at war; each system's Janus Gate is bound to the ones in brackets)
 {war}
@@ -196,6 +207,11 @@ class Director:
         self.last_event_t = time.monotonic()   # the last time the story moved (a director event or a beat)
         self.mood = ""                          # how the bridge crew feels (the director's latest word on it)
         self.bonds: dict[str, str] = {}          # officer id -> how they stand with the Captain (the director keeps it)
+        self.arc = 1                             # the arcs of the war: three acts each, ending in a decisive battle
+        self.act = 1
+        self.act_beats = 0
+        self.decisive = False                    # the decisive battle is being fought
+        self.finale = None                       # the arc's ending (finale.Finale, set by the server)
         self.standing: list[dict[str, str]] = []   # the Captain's standing orders (shared with the bridge agent)
 
     def reset(self) -> None:
@@ -206,6 +222,7 @@ class Director:
         self.mood = ""
         self.bonds = {}
         self.standing.clear()
+        self.arc, self.act, self.act_beats, self.decisive = 1, 1, 0, False
         self.busy = False
         self.granted = False
         self.admiral_history.clear()
@@ -223,6 +240,8 @@ class Director:
             self.mood = str(d.get("mood", ""))
             self.bonds = {str(k): str(v) for k, v in (d.get("bonds") or {}).items()}
             self.standing[:] = [o for o in (d.get("standing") or []) if isinstance(o, dict) and o.get("department") and o.get("order")]
+            self.arc, self.act = int(d.get("arc", 1)), int(d.get("act", 1))
+            self.act_beats, self.decisive = int(d.get("act_beats", 0)), bool(d.get("decisive", False))
         except (OSError, ValueError):
             self.campaign.clear()
             self.mood = ""
@@ -243,11 +262,28 @@ class Director:
             tmp = self._story_path() + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds,
-                           "standing": self.standing}, f,
+                           "standing": self.standing, "arc": self.arc, "act": self.act, "act_beats": self.act_beats,
+                           "decisive": self.decisive}, f,
                           ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:
             log.exception("could not save the story")
+
+    ACTS = {1: "Act I — the storm gathers: the Mandate tests the March (raids, a silence to investigate, a distress call); "
+               "the enemy's plan shows itself piece by piece; the Captain earns the crew. About 4-6 beats, then a turning "
+               "point opens Act II (a system falls, a plan is uncovered, a blow lands).",
+            2: "Act II — the March burns: the offensive in the open; systems change hands on the fleet net; the Aquila goes "
+               "where she is needed (gates), meets again the commanders she spared or wronged; losses and choices pile up. "
+               "About 6-10 beats, then a turning point opens Act III.",
+            3: "Act III — the gate: both sides gather for the decisive battle (the Mandate's assault on Aurelia, or the 7th "
+               "Fleet's strike at Erebus Anchorage: whichever the war map and the Captain's choices make right). Two or three "
+               "beats of gathering (reinforcements, resupply, a last intelligence), then the `decisive` beat. Its outcome "
+               "ends the arc."}
+
+    def arc_text(self) -> str:
+        return (f"{self.ACTS[1]}\n{self.ACTS[2]}\n{self.ACTS[3]}\nNOW: Act {self.act}, {self.act_beats} beat(s) into it"
+                + (" — the decisive battle is being fought" if self.decisive else "")
+                + (f". (This is arc {self.arc}: the war went on after the earlier arcs, see the campaign log.)" if self.arc > 1 else "."))
 
     def note(self, text: str) -> None:
         self.campaign.append(text)
@@ -269,6 +305,11 @@ class Director:
             self.war.arrived(arrived.group(1))
         if "engagement over" in text:
             self.granted = False
+            if self.decisive and self.finale is not None:
+                self.decisive = False
+                self.save()
+                asyncio.create_task(self._end_arc(text, lang, state))
+                return
         if self.busy:
             return
         self.busy = True
@@ -283,6 +324,7 @@ class Director:
     async def _next_beat(self, lang: str, state: dict[str, Any]) -> None:
         t0 = time.perf_counter()
         prompt = DIRECTOR_PROMPT.format(world=WORLD, lang_name=LANG_NAMES.get(lang, lang), war=self.war.brief(),
+                                        arc=self.arc, arc_text=self.arc_text(),
                                         mood=self.mood or "not yet set: the patrol has just begun",
                                         bonds="; ".join(self.bonds_lines()) or "(nothing yet: a new ship, a new crew, a new captain)",
                                         campaign="\n".join(f"- {c}" for c in self.campaign) or "- (the war has just begun)",
@@ -327,6 +369,17 @@ class Director:
             self.mood = mood[:400]
             log.info("crew mood: %s", self.mood)
             self.save()
+        try:
+            act = int(beat.pop("act", self.act) or self.act)
+        except (TypeError, ValueError):
+            act = self.act
+        if act > self.act and act <= 3:
+            self.act, self.act_beats = act, 0
+            self.note(f"ACT {'I' * act if act < 3 else 'III'} of arc {self.arc} begins: {beat.get('why', '')}")
+            log.info("act %d begins", act)
+        self.act_beats += 1
+        if beat.get("type") == "decisive":
+            return await self._decisive(beat, lang, state, t0)
         if beat.get("type") == "transit":
             dest = self.war.find(beat.get("system_name", ""))
             if not dest or not self.war.linked(self.war.current, dest):
@@ -359,6 +412,57 @@ class Director:
         for line in speech[:2]:
             await self.say("admiral", line, lang, "measured")
             self.note(f"Rourke to the Aquila: {line}")
+
+    async def _decisive(self, beat: dict[str, Any], lang: str, state: dict[str, Any], t0: float) -> None:
+        """The battle the arc was building to: the allies join the Aquila, then the Mandate's main fleet comes."""
+        on_plot = {str(c.get("name") or "").lower() for c in (state or {}).get("contacts", []) or []}
+        allies = [a for a in (beat.get("allies") or []) if not any(str(a.get("name", "")).lower() in n for n in on_plot if n)]
+        if allies:
+            res = await self.command("director_beat", {"beat": {"type": "reinforcements", "ships": allies[:3], "granted": True,
+                                                                 "bearing_deg": (float(beat.get("bearing_deg", 90)) + 180) % 360,
+                                                                 "range_km": 12, "why": "the fleet gathers for the decisive battle"}})
+            log.info("decisive: allies -> %s", res)
+        raid = {k: v for k, v in beat.items() if k not in ("why", "commander", "allies")}
+        try:
+            rng = float(beat.get("range_km", 40))
+        except (TypeError, ValueError):
+            rng = 40.0
+        raid.update(type="raid", ships=(beat.get("ships") or [])[:8], hail=True, range_km=min(max(rng, 25.0), 50.0))
+        res = await self.command("director_beat", {"beat": raid})
+        log.info("director %.2fs: DECISIVE %s -> %s", time.perf_counter() - t0, json.dumps(beat, ensure_ascii=False)[:400], res)
+        if not res.get("ok"):
+            self.note(f"(the decisive battle could not begin: {res.get('detail')})")
+            return
+        self.decisive = True
+        self.note(f"THE DECISIVE BATTLE of arc {self.arc}: {beat.get('why', '')} ({res.get('detail', '')})")
+        cmd = beat.get("commander") or {}
+        ids = _ids(res.get("detail", ""))
+        if ids and cmd.get("name"):
+            first = (beat.get("ships") or [{}])[0]
+            self.register(ids[0], {"name": cmd["name"], "rank": cmd.get("rank", "Archon"), "bio": cmd.get("bio", ""),
+                                   "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),
+                                   "voice": COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
+                                   "mission": cmd.get("orders") or beat.get("why", "")})
+            self.voice_i += 1
+            self.note(f"{cmd['name']} ({cmd.get('rank', '')}) leads the Mandate's fleet, aboard {first.get('name', '?')} ({ids[0]})")
+        for line in (await self._brief_line(beat, res.get("detail", ""), lang, state))[:2]:
+            await self.say("admiral", line, lang, "measured")
+            self.note(f"Rourke to the Aquila: {line}")
+
+    async def _end_arc(self, result: str, lang: str, state: dict[str, Any]) -> None:
+        """The decisive battle is over: the arc's ending is told, then a new arc begins."""
+        self.busy = True
+        try:
+            await asyncio.sleep(16.0)                   # the bridge reports the outcome first
+            await self.finale.run(self, result.split(":", 1)[-1].strip(), lang)
+            self.arc, self.act, self.act_beats = self.arc + 1, 1, 0
+            self.save()
+            await asyncio.sleep(20.0)
+            await self._next_beat(lang, state)
+        except Exception:  # noqa: BLE001
+            log.exception("the arc's ending failed")
+        finally:
+            self.busy = False
 
     async def _brief_line(self, beat: dict[str, Any], detail: str, lang: str, state: dict[str, Any]) -> list[str]:
         """The director forgot Rourke's briefing: he gives it now (one short transmission)."""

@@ -216,6 +216,24 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
   - il salvataggio viene riscritto: nave nuova, santabarbara e gruppo aereo pieni, i caduti restano caduti, i feriti sono guariti. Il livello riparte, l'XO dà il benvenuto a bordo e il regista racconta cosa è cambiato nella Marca.
 - Prove: `astra.cmd abandon_ship {}`, poi al portello `AstraUse` (o **E**); `slomo 5` per accelerare. Il dopo si prova anche fuori dal gioco, con un gioco finto e risposte scritte del Capitano.
 
+## La forma della guerra: atti, battaglia decisiva, finale
+- [x] **Tre atti per arco** (`director.py`: `arc`, `act`, `act_beats`, salvati con la storia):
+  - I, *la tempesta si addensa*: il Mandato mette alla prova la Marca, il suo piano si scopre a pezzi;
+  - II, *la Marca brucia*: l'offensiva allo scoperto, sistemi che cambiano mano, comandanti già incontrati che ritornano;
+  - III, *il cancello*: le forze si radunano per la battaglia decisiva.
+
+  Il regista sa in che atto è e quando una svolta apre il successivo.
+- [x] **La battaglia decisiva** (nuovo tipo di scena `decisive`):
+  - la flotta principale del Mandato (4-8 navi, un Acheron in testa, fino a 8 per ondata, con i caccia delle capitali) contro l'Aquila e i suoi alleati (1-3 navi ASTRA che si uniscono);
+  - si combatte dove lo dicono la mappa e le scelte del Capitano: l'assalto del Mandato ad Aurelia, oppure l'attacco della 7ª Flotta all'Ancoraggio di Erebus;
+  - prova reale: la Warden-General Isolde Marrow arriva da Thule con otto navi; Rourke: «la 7ª Flotta la incontra al gate di Aurelia, come avevate detto», ripreso dal diario del Capitano.
+- [x] **Il finale dell'arco** (`finale.py`):
+  - l'esito è calcolato dai fatti: prima il risultato della battaglia, poi la mappa della guerra, poi le scelte del Capitano (clemenza, promesse mantenute o infrante, ufficiali ascoltati o scavalcati). Può essere vittoria, sconfitta, stallo o armistizio (solo se la storia se l'è guadagnato);
+  - Rourke parla sulla rete di flotta, poi i cartelli su schermo nero: il nome della battaglia, cosa ha deciso, 4-6 righe di epilogo sui destini delle persone come li hanno fatti i legami col Capitano, e infine «THE WAR GOES ON»;
+  - la mappa della guerra viene ridisegnata e comincia un nuovo arco;
+  - se l'Aquila va perduta nella battaglia decisiva, il finale si racconta dopo il nuovo comando;
+  - prova reale: «The Battle of the Aurelia Gate»: vittoria col 41 % di scafo e il Resolute perduto. Nell'epilogo Voss rilegge l'ordine del drone; Lindqvist «smise di contare i vivi e cominciò a nominare i morti»; il Capitano lascia andare le navi mutilate «come era stata lasciata andare la Lethe»; i feriti di Varek riconsegnati a Veyra: «il Capitano mantiene la parola, una reputazione pericolosa in questa guerra».
+
 ## M2 (prima versione) — Calore e furtività
 - [x] **Calore della nave** (`UAstraShipSubsystem::TickHeat`): il reattore (secondo la potenza assegnata), il motore (manetta), le salve dei railgun, i laser, i missili, gli scudi che si ricaricano e l'energia che fermano scaldano la nave; lo scafo irradia di base e i **radiatori** portano via calore, di più quanto più è caldo. Tarato: crociera ~15 %, battaglia tipica con radiatori retratti ~60-70 %, battaglia lunga e dura oltre il 100 %; con i radiatori estesi 30-50 %
 - [x] **Effetti**: sopra il 70 % cadenza delle armi e rigenerazione degli scudi calano (fino al 55 % a pieno calore), sopra il 90 % anche il motore; oltre il 92 % i **condotti cedono** (incidenti veri da riparare, −20 % di potenza) e qualcuno in sala macchine si ustiona (ruolino e infermeria)
