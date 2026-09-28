@@ -89,6 +89,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
 - [x] Vice Admiral Adrian Rourke, comandante della Settima Flotta: trasmette gli ordini, risponde quando l'Aquila chiama la flotta, può concedere rinforzi o rifornimento
+- [x] Transito attraverso i Janus Gate verso nuovi sistemi (beat "transit" del regista): conto alla rovescia, lampo, scossone e suono; nuovo cielo con stella (nana rossa, arancione, gialla, bianco-azzurra), luce di plancia coerente, mondo principale (oceanico, desertico, ghiacciato, vulcanico con lava, gigante gassoso, roccioso) e nebulosa virata; il Gate alle spalle. Prova: `astra.battle.transit Cassia blue_white ice Cassia_Prime 20`
 - [ ] Mappa strategica della guerra (sistemi, fronti, fazioni), conseguenze a lungo termine, salvataggio della campagna
 
 ## Prossimi passi

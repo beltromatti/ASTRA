@@ -95,8 +95,28 @@ link(axes[2], "", ap2, "B")
 samp = E(unreal.MaterialExpressionTextureSampleParameterCube, -800, 250, parameter_name="SkyCubemap", texture=cube, group="Sky")
 link(ap2, "", samp, "UVs")
 bright = sparam("SkyBrightness", 3.0, -800, 480)
+hue = E(unreal.MaterialExpressionCustom, -650, 380)
+hue.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+hue.set_editor_property("code", """
+// each star system tints the same deep sky differently (YIQ hue rotation + saturation)
+float3x3 toYIQ = float3x3(0.299, 0.587, 0.114, 0.596, -0.274, -0.322, 0.211, -0.523, 0.312);
+float3x3 toRGB = float3x3(1.0, 0.956, 0.621, 1.0, -0.272, -0.647, 1.0, -1.106, 1.703);
+float3 yiq = mul(toYIQ, C);
+float cs = cos(H), sn = sin(H);
+float2 iq = float2(yiq.y * cs - yiq.z * sn, yiq.y * sn + yiq.z * cs) * Sat;
+return max(mul(toRGB, float3(yiq.x, iq)), 0.0);
+""")
+hins = []
+for nm in ("C", "H", "Sat"):
+    ci = unreal.CustomInput()
+    ci.set_editor_property("input_name", nm)
+    hins.append(ci)
+hue.set_editor_property("inputs", hins)
+link(samp, "RGB", hue, "C")
+link(sparam("NebulaHue", 0.0, -900, 560), "", hue, "H")
+link(sparam("NebulaSaturation", 1.0, -900, 640), "", hue, "Sat")
 sky = E(unreal.MaterialExpressionMultiply, -550, 300)
-link(samp, "RGB", sky, "A")
+link(hue, "", sky, "A")
 link(bright, "", sky, "B")
 
 # the star: disk + corona around SunDirection (world)
@@ -191,7 +211,7 @@ float3 s = normalize(S);
 float sr = sin(R);
 float b = dot(d, c);
 float disc = b * b - (1.0 - sr * sr);
-float3 atm = float3(0.32, 0.58, 1.0);
+float3 atm = AtmC;
 if (disc < 0.0)
 {
     // thin blue halo of the atmosphere just outside the limb, brighter towards the sun
@@ -205,20 +225,35 @@ float3 nrm = normalize(d * t - c);
 // planet-fixed frame: a slow spin about the planet's axis (sky Z)
 float sp = T * 0.003;
 float3 q = float3(nrm.x * cos(sp) - nrm.y * sin(sp), nrm.x * sin(sp) + nrm.y * cos(sp), nrm.z);
-float cont = F.fbm(q * 2.2 + 11.0);
-float land = smoothstep(0.515, 0.535, cont);
-float coast = smoothstep(0.47, 0.515, cont) * (1.0 - land);
-float biome = F.fbm(q * 4.0 + 3.0);
+float cont = F.fbm(q * 2.2 + 11.0 + Seed);
+float land = smoothstep(Sea, Sea + 0.02, cont);
+float coast = smoothstep(Sea - 0.045, Sea, cont) * (1.0 - land);
+float biome = F.fbm(q * 4.0 + 3.0 + Seed);
 float lat = abs(q.z);
-float ice = smoothstep(0.80, 0.86, lat + (F.n(q * 9.0) - 0.5) * 0.08);
-float3 ocean = lerp(float3(0.006, 0.03, 0.09), float3(0.02, 0.11, 0.17), coast);
-float3 ground = lerp(float3(0.06, 0.13, 0.05), float3(0.26, 0.22, 0.13), smoothstep(0.45, 0.62, biome));
-ground = lerp(ground, float3(0.38, 0.33, 0.22), smoothstep(0.62, 0.72, biome) * (1.0 - lat));
+float ice = smoothstep(IceLat, IceLat + 0.06, lat + (F.n(q * 9.0) - 0.5) * 0.08);
+float3 ocean = lerp(OceanA, OceanB, coast);
+float3 ground = lerp(LandA, LandB, smoothstep(0.45, 0.62, biome));
+ground = lerp(ground, LandC, smoothstep(0.62, 0.72, biome) * (1.0 - lat));
 float3 albedo = lerp(ocean, ground, land);
-albedo = lerp(albedo, float3(0.8, 0.84, 0.88), ice);
-float cl = F.fbm(q * 4.6 + float3(T * 0.0012, 0.0, T * 0.0005) + F.n(q * 11.0) * 0.35);
-float clouds = smoothstep(0.54, 0.74, cl) * 0.95;
-albedo = lerp(albedo, float3(0.92, 0.93, 0.95), clouds);
+if (Gas > 0.5)
+{
+    // gas giant: latitude bands stirred by storms, no surface
+    float stir = F.fbm(q * float3(3.0, 3.0, 1.2) + float3(T * 0.002, 0.0, 0.0) + Seed) * 3.5;
+    float bands = 0.5 + 0.5 * sin(q.z * 22.0 + stir);
+    float broad = 0.5 + 0.5 * sin(q.z * 7.0 + stir * 0.4 + Seed);
+    albedo = lerp(LandA, LandB, saturate(bands * 0.7 + broad * 0.5 - 0.1));
+    albedo = lerp(albedo, LandC, smoothstep(0.62, 0.8, F.fbm(q * 6.0 + Seed + 7.0)) * 0.6);
+    // one great oval storm
+    float3 sc = normalize(float3(0.7, 0.4, -0.35));
+    float spot = saturate(1.0 - length((q - sc) * float3(1.0, 1.0, 2.2)) * 5.0);
+    albedo = lerp(albedo, LandB * float3(1.3, 0.8, 0.6), smoothstep(0.0, 0.6, spot));
+    land = 0.0;
+    ice = 0.0;
+}
+albedo = lerp(albedo, IceC, ice);
+float cl = F.fbm(q * 4.6 + float3(T * 0.0012, 0.0, T * 0.0005) + F.n(q * 11.0) * 0.35 + Seed * 0.5);
+float clouds = smoothstep(0.54 + (1.0 - CloudAmt) * 0.3, 0.74 + (1.0 - CloudAmt) * 0.3, cl) * 0.95 * step(Gas, 0.5);
+albedo = lerp(albedo, CloudC, clouds);
 float ndl = dot(nrm, s);
 float day = smoothstep(-0.06, 0.25, ndl) * saturate(ndl + 0.15);
 float3 lit = albedo * day * Bright;
@@ -227,19 +262,32 @@ float3 rr = reflect(-s, nrm);
 lit += pow(saturate(dot(rr, -d)), 80.0) * (1.0 - land) * (1.0 - clouds) * (1.0 - ice) * Bright * 0.6;
 // city lights on the night side
 float night = smoothstep(0.02, -0.12, ndl);
-float city = step(0.965, F.n(q * 140.0)) * step(0.5, F.n(q * 18.0 + 5.0)) * land * (1.0 - ice) * (1.0 - clouds * 0.8);
+float city = step(0.965, F.n(q * 140.0)) * step(0.5, F.n(q * 18.0 + 5.0)) * land * (1.0 - ice) * (1.0 - clouds * 0.8) * Cities;
 lit += float3(1.0, 0.68, 0.32) * city * night * Bright * 0.35;
+// lava worlds: molten cracks glowing through the crust
+float crack = pow(saturate(1.0 - abs(F.fbm(q * 7.0 + Seed) - 0.5) * 14.0), 3.0) * Lava;
+lit += float3(1.0, 0.35, 0.06) * crack * Bright * (0.12 + 0.88 * night);
 // atmosphere: rim haze, lit side stronger
 float rim = pow(1.0 - saturate(dot(nrm, -d)), 3.0);
 lit += atm * rim * (saturate(ndl + 0.3)) * Bright * 0.55;
 return lit;
 """)
 ins = []
-for nm in ("D", "S", "P", "R", "T", "Base", "Bright"):
+PLANET_INPUTS = ("D", "S", "P", "R", "T", "Base", "Bright", "OceanA", "OceanB", "LandA", "LandB", "LandC", "IceC", "CloudC", "AtmC",
+                 "Sea", "IceLat", "CloudAmt", "Gas", "Cities", "Lava", "Seed")
+for nm in PLANET_INPUTS:
     ci = unreal.CustomInput()
     ci.set_editor_property("input_name", nm)
     ins.append(ci)
 planet.set_editor_property("inputs", ins)
+# New Ravenna by default; every system sets its own palette (UAstraBattleSubsystem transit)
+y0 = 2300
+for i, (nm, v) in enumerate((("OceanA", (0.006, 0.03, 0.09, 1)), ("OceanB", (0.02, 0.11, 0.17, 1)), ("LandA", (0.06, 0.13, 0.05, 1)),
+                              ("LandB", (0.26, 0.22, 0.13, 1)), ("LandC", (0.38, 0.33, 0.22, 1)), ("IceC", (0.8, 0.84, 0.88, 1)),
+                              ("CloudC", (0.92, 0.93, 0.95, 1)), ("AtmC", (0.32, 0.58, 1.0, 1)))):
+    link(mask3(vparam(f"Planet{nm}", v, -500, y0 + 90 * i, "Planet"), -350, y0 + 90 * i), "", planet, nm)
+for i, (nm, v) in enumerate((("Sea", 0.515), ("IceLat", 0.8), ("CloudAmt", 1.0), ("Gas", 0.0), ("Cities", 1.0), ("Lava", 0.0), ("Seed", 0.0))):
+    link(sparam(f"Planet{nm}", v, -500, y0 + 800 + 80 * i, "Planet"), "", planet, nm)
 link(ap2, "", planet, "D")
 link(s2, "", planet, "S")
 link(mask3(vparam("PlanetDirection", (0.75, -0.55, -0.3, 0), -300, 1950, "Planet"), -150, 1950), "", planet, "P")

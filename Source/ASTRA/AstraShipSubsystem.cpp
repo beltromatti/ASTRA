@@ -361,7 +361,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 {
 	TSharedRef<FJsonObject> S = MakeShared<FJsonObject>();
 	S->SetStringField(TEXT("ship"), TEXT("ASN Aquila"));
-	S->SetStringField(TEXT("location"), TEXT("Aurelia System, en route to New Ravenna high orbit"));
+	S->SetStringField(TEXT("location"), LocationName);
 	S->SetStringField(TEXT("alert"), AlertName(Alert));
 	S->SetNumberField(TEXT("heading_deg"), FMath::RoundToInt(HeadingDeg));
 	S->SetNumberField(TEXT("mark_deg"), FMath::RoundToInt(MarkDeg));
@@ -707,4 +707,98 @@ void UAstraShipSubsystem::PlayAlertSound(EAstraAlert NewAlert)
 	{
 		UGameplayStatics::PlaySound2D(GetWorld(), S, 0.8f);
 	}
+}
+
+// ----------------------------------------------------------------------------------------------- star systems
+namespace
+{
+	void PlanetPalette(UMaterialInstanceDynamic* M, const FString& Type)
+	{
+		auto V = [M](const TCHAR* N, float R, float G, float B) { M->SetVectorParameterValue(N, FLinearColor(R, G, B, 1.f)); };
+		auto S = [M](const TCHAR* N, float X) { M->SetScalarParameterValue(N, X); };
+		// defaults: an ocean world like New Ravenna
+		V(TEXT("PlanetOceanA"), 0.006f, 0.03f, 0.09f); V(TEXT("PlanetOceanB"), 0.02f, 0.11f, 0.17f);
+		V(TEXT("PlanetLandA"), 0.06f, 0.13f, 0.05f); V(TEXT("PlanetLandB"), 0.26f, 0.22f, 0.13f); V(TEXT("PlanetLandC"), 0.38f, 0.33f, 0.22f);
+		V(TEXT("PlanetIceC"), 0.8f, 0.84f, 0.88f); V(TEXT("PlanetCloudC"), 0.92f, 0.93f, 0.95f); V(TEXT("PlanetAtmC"), 0.32f, 0.58f, 1.f);
+		S(TEXT("PlanetSea"), 0.515f); S(TEXT("PlanetIceLat"), 0.8f); S(TEXT("PlanetCloudAmt"), 1.f); S(TEXT("PlanetGas"), 0.f);
+		S(TEXT("PlanetCities"), 1.f); S(TEXT("PlanetLava"), 0.f);
+		if (Type == TEXT("desert"))
+		{
+			S(TEXT("PlanetSea"), 0.25f); V(TEXT("PlanetOceanA"), 0.05f, 0.08f, 0.1f); V(TEXT("PlanetOceanB"), 0.1f, 0.14f, 0.14f);
+			V(TEXT("PlanetLandA"), 0.42f, 0.27f, 0.14f); V(TEXT("PlanetLandB"), 0.6f, 0.43f, 0.24f); V(TEXT("PlanetLandC"), 0.74f, 0.6f, 0.4f);
+			S(TEXT("PlanetIceLat"), 0.93f); S(TEXT("PlanetCloudAmt"), 0.25f); V(TEXT("PlanetAtmC"), 0.85f, 0.62f, 0.42f); S(TEXT("PlanetCities"), 0.4f);
+		}
+		else if (Type == TEXT("ice"))
+		{
+			S(TEXT("PlanetSea"), 0.6f); V(TEXT("PlanetOceanA"), 0.02f, 0.05f, 0.08f); V(TEXT("PlanetOceanB"), 0.1f, 0.2f, 0.26f);
+			V(TEXT("PlanetLandA"), 0.55f, 0.6f, 0.66f); V(TEXT("PlanetLandB"), 0.7f, 0.75f, 0.8f); V(TEXT("PlanetLandC"), 0.62f, 0.66f, 0.7f);
+			S(TEXT("PlanetIceLat"), 0.05f); V(TEXT("PlanetIceC"), 0.86f, 0.9f, 0.95f); S(TEXT("PlanetCloudAmt"), 0.55f);
+			V(TEXT("PlanetAtmC"), 0.6f, 0.8f, 1.f); S(TEXT("PlanetCities"), 0.15f);
+		}
+		else if (Type == TEXT("lava"))
+		{
+			S(TEXT("PlanetSea"), 0.35f); V(TEXT("PlanetOceanA"), 0.2f, 0.04f, 0.01f); V(TEXT("PlanetOceanB"), 0.35f, 0.08f, 0.02f);
+			V(TEXT("PlanetLandA"), 0.04f, 0.035f, 0.035f); V(TEXT("PlanetLandB"), 0.1f, 0.07f, 0.06f); V(TEXT("PlanetLandC"), 0.18f, 0.11f, 0.08f);
+			S(TEXT("PlanetIceLat"), 2.f); S(TEXT("PlanetCloudAmt"), 0.35f); V(TEXT("PlanetCloudC"), 0.22f, 0.2f, 0.19f);
+			V(TEXT("PlanetAtmC"), 0.95f, 0.42f, 0.2f); S(TEXT("PlanetCities"), 0.f); S(TEXT("PlanetLava"), 1.f);
+		}
+		else if (Type == TEXT("gas_giant"))
+		{
+			S(TEXT("PlanetGas"), 1.f); V(TEXT("PlanetLandA"), 0.86f, 0.72f, 0.52f); V(TEXT("PlanetLandB"), 0.42f, 0.25f, 0.14f);
+			V(TEXT("PlanetLandC"), 0.9f, 0.86f, 0.78f); V(TEXT("PlanetAtmC"), 0.9f, 0.8f, 0.62f); S(TEXT("PlanetCities"), 0.f);
+		}
+		else if (Type == TEXT("barren"))
+		{
+			S(TEXT("PlanetSea"), -1.f); V(TEXT("PlanetLandA"), 0.22f, 0.21f, 0.2f); V(TEXT("PlanetLandB"), 0.34f, 0.32f, 0.3f);
+			V(TEXT("PlanetLandC"), 0.46f, 0.44f, 0.41f); S(TEXT("PlanetIceLat"), 2.f); S(TEXT("PlanetCloudAmt"), 0.f);
+			V(TEXT("PlanetAtmC"), 0.f, 0.f, 0.f); S(TEXT("PlanetCities"), 0.f);
+		}
+	}
+}
+
+void UAstraShipSubsystem::ApplySystem(const FAstraSystemLook& L)
+{
+	LocationName = FString::Printf(TEXT("%s System, just through the Janus Gate%s"), *L.Name,
+	                               L.PlanetName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", the %s world %s ahead"), *L.PlanetType.Replace(TEXT("_"), TEXT(" ")), *L.PlanetName));
+	const FQuat Delta(FRotator(MarkDeg - Mark0, HeadingDeg - Heading0, 0.f));
+	SunDir0 = Delta.RotateVector(L.SunWorld.GetSafeNormal());
+	float Lux = 1200.f, Kelvin = 4300.f, Size = 0.0075f, PlanetLight = 6.f;
+	FLinearColor StarC(1.f, 0.6f, 0.3f);
+	if (L.StarClass == TEXT("red_dwarf")) { Lux = 650.f; Kelvin = 3100.f; Size = 0.013f; StarC = FLinearColor(1.f, 0.32f, 0.16f); PlanetLight = 2.2f; }
+	else if (L.StarClass == TEXT("yellow")) { Lux = 1600.f; Kelvin = 5600.f; Size = 0.0068f; StarC = FLinearColor(1.f, 0.86f, 0.62f); PlanetLight = 4.f; }
+	else if (L.StarClass == TEXT("blue_white")) { Lux = 2200.f; Kelvin = 9000.f; Size = 0.0048f; StarC = FLinearColor(0.72f, 0.84f, 1.f); PlanetLight = 3.5f; }
+	// bright worlds (ice, gas, desert) reflect far more than an ocean world: keep them out of the white
+	if (L.PlanetType == TEXT("gas_giant") || L.PlanetType == TEXT("ice") || L.PlanetType == TEXT("desert"))
+	{
+		PlanetLight *= 0.5f;
+	}
+	if (SkyMID)
+	{
+		SkyMID->SetVectorParameterValue(TEXT("StarColor"), StarC);
+		SkyMID->SetScalarParameterValue(TEXT("StarAngularRadius"), Size);
+		SkyMID->SetScalarParameterValue(TEXT("NebulaHue"), L.NebulaHue);
+		SkyMID->SetScalarParameterValue(TEXT("NebulaSaturation"), L.NebulaSat);
+		SkyMID->SetScalarParameterValue(TEXT("PlanetAngularRadius"), L.PlanetSize);
+		SkyMID->SetScalarParameterValue(TEXT("PlanetBrightness"), PlanetLight);
+		SkyMID->SetScalarParameterValue(TEXT("PlanetSeed"), L.Seed);
+		PlanetPalette(SkyMID, L.PlanetType);
+		// the planet's direction lives in the sky frame: express the wanted world direction with the current sky basis
+		FLinearColor AX, AY, AZ;
+		SkyMID->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("SkyAxisX")), AX);
+		SkyMID->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("SkyAxisY")), AY);
+		SkyMID->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("SkyAxisZ")), AZ);
+		const FVector W = L.PlanetWorld.GetSafeNormal();
+		const FVector P(FVector::DotProduct(W, FVector(AX.R, AX.G, AX.B)), FVector::DotProduct(W, FVector(AY.R, AY.G, AY.B)),
+		                FVector::DotProduct(W, FVector(AZ.R, AZ.G, AZ.B)));
+		SkyMID->SetVectorParameterValue(TEXT("PlanetDirection"), FLinearColor(P.X, P.Y, P.Z, 0.f));
+	}
+	if (Sun)
+	{
+		if (ULightComponent* LC = Sun->GetLightComponent())
+		{
+			LC->SetIntensity(Lux);
+			LC->SetTemperature(Kelvin);
+		}
+	}
+	UpdateAttitudeVisuals();
 }

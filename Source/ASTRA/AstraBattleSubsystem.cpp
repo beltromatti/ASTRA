@@ -9,6 +9,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Sound/SoundBase.h"
 
@@ -31,6 +32,10 @@ namespace
 	struct FSpawnRequest { FString Kind; float RangeKm; float RelBearing; };
 	TArray<FSpawnRequest> GSpawnRequests;
 	TArray<FString> GKillRequests;
+	TArray<TArray<FString>> GTransitRequests;
+	FAutoConsoleCommand CmdBattleTransit(TEXT("astra.battle.transit"),
+		TEXT("Janus transit (testing): astra.battle.transit <system_name> <red_dwarf|orange|yellow|blue_white> <ocean|desert|ice|lava|gas_giant|barren> <planet_name> [delay_s]"),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num() >= 3) { GTransitRequests.Add(A); } }));
 	FAutoConsoleCommand CmdBattleKill(TEXT("astra.battle.kill"), TEXT("Destroy a contact at once (testing effects): astra.battle.kill <contact id>"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num()) { GKillRequests.Add(A[0].ToUpper()); } }));
 	FAutoConsoleCommand CmdBattleSpawn(TEXT("astra.battle.spawn"),
@@ -297,6 +302,19 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		}
 	}
 	GKillRequests.Reset();
+	for (const TArray<FString>& A : GTransitRequests)
+	{
+		TSharedPtr<FJsonObject> B = MakeShared<FJsonObject>();
+		B->SetStringField(TEXT("type"), TEXT("transit"));
+		B->SetStringField(TEXT("system_name"), A[0].Replace(TEXT("_"), TEXT(" ")));
+		B->SetStringField(TEXT("star_class"), A[1]);
+		B->SetStringField(TEXT("planet_type"), A[2]);
+		B->SetStringField(TEXT("planet_name"), A.IsValidIndex(3) ? A[3].Replace(TEXT("_"), TEXT(" ")) : FString());
+		B->SetNumberField(TEXT("delay_s"), A.IsValidIndex(4) ? FCString::Atof(*A[4]) : 20.0);
+		FString Detail;
+		StartBeat(B, Detail);
+	}
+	GTransitRequests.Reset();
 	TickPlayer(Dt);
 	TickScenario(Dt);
 	TickSquadrons(Dt);
@@ -458,6 +476,11 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 				Report(TEXT("director: beat complete — resupply"), false);
 			}
 		}
+	}
+	if (TransitAt > 0.f && Time >= TransitAt)
+	{
+		TransitAt = -1.f;
+		DoTransit(TransitBeat);
 	}
 	if (CalmUntil > 0.f && Time >= CalmUntil)
 	{
@@ -2476,6 +2499,17 @@ bool UAstraBattleSubsystem::StartBeat(const TSharedPtr<FJsonObject>& Beat, FStri
 		OutDetail = FString::Printf(TEXT("quiet period of %.0f s"), Delay);
 		return true;
 	}
+	if (Type == TEXT("transit"))
+	{
+		FString Name = TEXT("an unknown");
+		Beat->TryGetStringField(TEXT("system_name"), Name);
+		const double D = FMath::Clamp(Delay, 20.0, 120.0);
+		TransitAt = Time + (float)D;
+		TransitBeat = Beat;
+		Report(FString::Printf(TEXT("helm: Janus transit to the %s system in %.0f seconds — the gate is spinning up, all hands to transit stations"), *Name, D));
+		OutDetail = FString::Printf(TEXT("transit to the %s system in %.0f s"), *Name, D);
+		return true;
+	}
 	if (Type != TEXT("raid") && Type != TEXT("distress") && Type != TEXT("reinforcements"))
 	{
 		OutDetail = FString::Printf(TEXT("unknown beat type %s"), *Type);
@@ -2681,4 +2715,109 @@ void UAstraBattleSubsystem::HullSound(const TCHAR* Name, float Volume, float Min
 		SoundLast.Add(Key, RealTime);
 		UGameplayStatics::PlaySound2D(GetWorld(), S, Volume, FMath::FRandRange(0.95f, 1.05f));
 	}
+}
+
+// ---------------------------------------------------------------------------------------------- Janus transit
+void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
+{
+	if (!Beat.IsValid() || Ships.Num() == 0)
+	{
+		return;
+	}
+	FString Name = TEXT("Unknown"), Star = TEXT("yellow"), Planet = TEXT("barren"), PName;
+	Beat->TryGetStringField(TEXT("system_name"), Name);
+	Beat->TryGetStringField(TEXT("star_class"), Star);
+	Beat->TryGetStringField(TEXT("planet_type"), Planet);
+	Beat->TryGetStringField(TEXT("planet_name"), PName);
+	// the gate's flash and the jolt through the hull
+	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+	{
+		Cam->StartCameraFade(1.f, 0.f, 3.5f, FLinearColor::White, false, false);
+	}
+	Shake = 1.f;
+	HullSound(TEXT("SW_Transit"), 1.f, 0.f);
+	// everything left behind in the old system (our own aircraft come aboard first)
+	for (int32 i = Ships.Num() - 1; i >= 1; --i)
+	{
+		FAstraBattleShip& S = Ships[i];
+		if (S.bCraft && S.bAlive && S.Side == EAstraSide::Astra && Squadrons.IsValidIndex(S.Squadron))
+		{
+			++Squadrons[S.Squadron].OnDeck;
+		}
+		if (S.Actor) { S.Actor->Destroy(); }
+		if (S.ShieldBubble) { S.ShieldBubble->Destroy(); }
+		if (S.DriveFlare) { S.DriveFlare->Destroy(); }
+	}
+	Ships.SetNum(1);
+	Squadrons.RemoveAll([](const FAstraSquadron& Q) { return Q.Side != EAstraSide::Astra; });
+	for (FAstraSquadron& Q : Squadrons)
+	{
+		Q.ToLaunch = 0;
+		Q.Mission = TEXT("recall");
+	}
+	for (FAstraProjectile& Pr : Projectiles)
+	{
+		if (Pr.Actor) { Pr.Actor->Destroy(); }
+		if (Pr.Trail) { Pr.Trail->Destroy(); }
+	}
+	Projectiles.Reset();
+	for (FAstraFlash& F : Flashes)
+	{
+		if (F.Actor) { F.Actor->Destroy(); }
+	}
+	Flashes.Reset();
+	for (TArray<FAstraWreck>* List : {&Wrecks, &Landmarks})
+	{
+		for (FAstraWreck& W : *List)
+		{
+			if (W.Actor) { W.Actor->Destroy(); }
+		}
+		List->Reset();
+	}
+	PendingBeats.Reset();
+	TransmissionAt = -1.f;
+	bEngagementActive = false;
+	bScenarioOver = false;
+	bSurrenderAccepted = false;
+	StageDone = 3;
+	Ships[0].Pos = FVector::ZeroVector;
+	// the gate we came through, behind us
+	if (UStaticMesh* GateMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Space/SM_JANUS_Gate.SM_JANUS_Gate")))
+	{
+		FAstraWreck G;
+		G.Pos = Ships[0].Pos - Ships[0].Att.GetForwardVector() * 22 * Km;
+		G.Att = FRotationMatrix::MakeFromX((Ships[0].Pos - G.Pos).GetSafeNormal()).ToQuat();
+		FActorSpawnParameters GP;
+		GP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		G.Actor = GetWorld()->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, GP);
+		G.Actor->SetMobility(EComponentMobility::Movable);
+		UStaticMeshComponent* GC = G.Actor->GetStaticMeshComponent();
+		GC->SetStaticMesh(GateMesh);
+		GC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		GC->SetCastShadow(false);
+		GC->bAffectDistanceFieldLighting = false;
+		Landmarks.Add(G);
+	}
+	// the new sky: star, main world, nebula tint (stable for a given system name)
+	FRandomStream R((int32)GetTypeHash(Name));
+	FAstraSystemLook L;
+	L.Name = Name;
+	L.StarClass = Star;
+	L.PlanetType = Planet;
+	L.PlanetName = PName;
+	L.SunWorld = FVector(R.FRandRange(-0.3f, 0.9f), R.FRandRange(-0.9f, 0.9f), R.FRandRange(0.1f, 0.6f));
+	L.PlanetWorld = FVector(1.f, R.FRandRange(-0.7f, 0.7f), R.FRandRange(-0.22f, 0.12f));
+	L.PlanetSize = Planet == TEXT("gas_giant") ? R.FRandRange(0.35f, 0.5f) : R.FRandRange(0.16f, 0.3f);
+	L.NebulaHue = R.FRandRange(-1.2f, 1.2f);
+	L.NebulaSat = R.FRandRange(0.6f, 1.3f);
+	L.Seed = R.FRandRange(0.f, 50.f);
+	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	{
+		Ship->ApplySystem(L);
+	}
+	SyncVisuals();
+	Report(FString::Printf(TEXT("helm: transit complete — the Aquila is through the gate into the %s system (%s star)%s"), *Name,
+	                       *Star.Replace(TEXT("_"), TEXT(" ")),
+	                       PName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("; the %s world %s ahead"), *Planet.Replace(TEXT("_"), TEXT(" ")), *PName)));
+	Report(FString::Printf(TEXT("director: beat complete — transit into the %s system (%s star, %s world %s)"), *Name, *Star, *Planet, *PName), false);
 }

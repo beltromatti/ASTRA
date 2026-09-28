@@ -298,6 +298,9 @@ private:
 	float RepairUntil = -1.f, RepairHullPerSec = 0.f;
 	int32 RepairMissiles = 0;
 	float CalmUntil = -1.f;
+	float TransitAt = -1.f;             // a Janus transit is counting down
+	TSharedPtr<FJsonObject> TransitBeat;
+	void DoTransit(const TSharedPtr<FJsonObject>& Beat);
 	void ArriveBeat(const TSharedPtr<FJsonObject>& Beat);
 	int32 SpawnClass(const FString& Class, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;

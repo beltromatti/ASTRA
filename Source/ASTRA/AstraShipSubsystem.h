@@ -49,6 +49,21 @@ struct FAstraDamage
 	FString Where() const { return FString::Printf(TEXT("deck %d section %c"), Deck, Section); }
 };
 
+/** How a star system looks from the ship: its star, its main world, the tint of its sky (set on a Janus transit). */
+struct FAstraSystemLook
+{
+	FString Name = TEXT("Aurelia");
+	FString StarClass = TEXT("orange");     // red_dwarf | orange | yellow | blue_white
+	FString PlanetType = TEXT("ocean");     // ocean | desert | ice | lava | gas_giant | barren
+	FString PlanetName = TEXT("New Ravenna");
+	FVector SunWorld = FVector(0.5f, 0.6f, 0.45f);      // where the star is, seen from the bridge now
+	FVector PlanetWorld = FVector(0.8f, -0.5f, -0.1f);
+	float PlanetSize = 0.28f;                           // angular radius (rad)
+	float NebulaHue = 0.f;
+	float NebulaSat = 1.f;
+	float Seed = 0.f;
+};
+
 DECLARE_MULTICAST_DELEGATE_TwoParams(FAstraShipEvent, const FString& /*Text*/, bool /*bReport: worth telling the Captain*/);
 DECLARE_MULTICAST_DELEGATE_OneParam(FAstraAlertChanged, EAstraAlert /*NewAlert*/);
 
@@ -96,6 +111,10 @@ public:
 	FString GetPointDefense() const { return PointDefense; }
 	int32 GetNumDamageTeams() const { return NumDamageTeams; }
 	float GetPowerBudget() const { return PowerBudget; }
+	/** A new star system around the ship (Janus transit): star, sun light, planet, sky tint, location name. */
+	void ApplySystem(const FAstraSystemLook& Look);
+	FString GetLocationName() const { return LocationName; }
+
 	/** Effective power of a system as a fraction of nominal: the allocation, minus what damaged conduits lose (0..1.5). */
 	float PowerFactor(const FString& System) const;
 
@@ -124,6 +143,7 @@ private:
 	TArray<FAstraContact> Contacts;
 	TArray<FString> RecentEvents;
 	TArray<FAstraDamage> Damage;      // open incidents inside the hull
+	FString LocationName = TEXT("Aurelia System, en route to New Ravenna high orbit");
 	int32 NextDamageId = 1;
 	int32 Wounded = 0, Killed = 0;    // the crew's cost
 	static constexpr int32 NumDamageTeams = 4;

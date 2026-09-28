@@ -44,7 +44,7 @@ COMMANDER = {"type": "object", "properties": {
     "required": ["name", "rank", "bio"]}
 
 BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulation.", {
-    "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm"]},
+    "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit"]},
     "delay_s": {"type": "number", "description": "seconds before it happens (raids and distress: 60-300; calm: 90-240)"},
     "bearing_deg": {"type": "number", "description": "true bearing from the Aquila where they appear (0-359)"},
     "range_km": {"type": "number", "description": "distance from the Aquila (raid 20-40, distress 25-45, reinforcements 15-30)"},
@@ -57,6 +57,10 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "hull_pct": {"type": "number", "description": "resupply: hull integrity restored up to this percent"},
     "missiles": {"type": "integer", "description": "resupply: missiles brought aboard"},
     "duration_s": {"type": "number", "description": "resupply: how long it takes (60-300)"},
+    "system_name": {"type": "string", "description": "transit: the star system on the other side of the gate (English name)"},
+    "star_class": {"type": "string", "enum": ["red_dwarf", "orange", "yellow", "blue_white"], "description": "transit"},
+    "planet_type": {"type": "string", "enum": ["ocean", "desert", "ice", "lava", "gas_giant", "barren"], "description": "transit"},
+    "planet_name": {"type": "string", "description": "transit: the main world seen on arrival"},
     "why": {"type": "string", "description": "the story reason, one sentence (for the campaign log)"}},
     ["type", "why"])
 TRANSMIT = _fn("transmit", "Vice Admiral Rourke speaks to the Aquila over the fleet net.", {
@@ -78,6 +82,9 @@ Rules
 - A raid or distress MUST include `commander` for its leader: invent a person (English name, rank, a bio with a reason
   to fight and a way of speaking). Recurring characters are welcome when the story justifies it.
 - Never reuse the name of a ship that is still on the plot (see contacts) for a new ship.
+- transit sends the Aquila through the Janus Gate into another star system (delay 30-90 s for the countdown): use it
+  when the story moves on — chasing the enemy through the gate, a mission on another front, a system that needs
+  help — at most every few beats. Invent the system and its main world (English names), coherent with the war.
 - Keep the whole thing coherent with the campaign log below and with the live state.
 
 Campaign log (oldest first)

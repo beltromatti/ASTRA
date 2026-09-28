@@ -122,6 +122,20 @@ def door(opening=True):
     return norm(np.tanh(1.3 * x), 0.8)
 
 
+def transit():
+    """A Janus transit felt through the hull: a rising drone, the gate's crack, the long ring of the frame."""
+    t = t_(5.0)
+    rise = np.clip(t / 2.2, 0, 1)
+    f = 30 + 90 * rise ** 2
+    drone = (np.sin(2 * np.pi * np.cumsum(f) / SR) + 0.4 * np.sin(4 * np.pi * np.cumsum(f) / SR)) * rise * (t < 2.3)
+    hiss = bp(rng.normal(0, 1, len(t)), 400, 5000) * rise ** 3 * (t < 2.3) * 0.5
+    bt = np.maximum(t - 2.3, 0)
+    boom = (np.sin(2 * np.pi * (28 + 40 * np.exp(-bt * 6)) * bt) * np.exp(-bt * 1.6) * 1.6
+            + lp(rng.normal(0, 1, len(t)), 300) * np.exp(-bt * 2.5) * 1.2) * (t >= 2.3)
+    ring = frame_ring(bt, 0.9, 5) * (t >= 2.3)
+    return norm(np.tanh(1.2 * (drone + hiss + boom + ring)))
+
+
 def bridge_ambience(dur=24.0):
     """The bridge at rest: the reactor's deep hum through the deck, air handling, and far electronics (loopable)."""
     t = t_(dur)
@@ -146,6 +160,6 @@ def bridge_ambience(dur=24.0):
 os.makedirs(OUT, exist_ok=True)
 for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("SW_Torpedo_Launch", lambda: vls_launch(True)),
                  ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp),
-                 ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False))):
+                 ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False)), ("SW_Transit", transit)):
     sf.write(os.path.join(OUT, name + ".wav"), fn().astype(np.float32), SR, subtype="PCM_16")
 print("SHIP_SOUNDS_OK", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))
