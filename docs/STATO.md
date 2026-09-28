@@ -51,15 +51,24 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Prova: in plancia «Allarme rosso! Timoniere, virare a zero-nove-zero» → la XO conferma, il timoniere ripete l'ordine, la nave va in condizione rossa e vira; «fuoco sulla Praetorian» → Voss rifiuta (nave amica)
 - [ ] Rapporti spontanei dagli eventi (rotta raggiunta, contatti), schermi con dati vivi, gesti/sguardo verso il capitano, MetaHuman e labiale
 
+## M4 (prima versione) — Battaglia
+- [x] Generatore di astronavi (`art/blender/shipgen.py`): ASTRA (Aquila, Praetorian, Vigilant), Kharon Mandate (Acheron, Styx, Lethe), mercantile delle Gilde; livree per fazione
+- [x] `UAstraBattleSubsystem`: navi nel sistema (doppia precisione) disegnate attorno alla Aquila, IA d'ingaggio/fuga, railgun con anticipo, missili guidati, laser, difesa di punto, scudi, scafo, esplosioni, bagliori dei motori
+- [x] Scenario «Aurelia patrol»: fregata dormiente T-11 → gruppo d'attacco dell'Archon Varek Solm (Acheron + 2 Styx) → vittoria/sconfitta/ritirata
+- [x] Equipaggio collegato: contatti reali, ordini di fuoco/scansione/chiamata sulla simulazione, rapporti di danno per ponte e sezione, scossoni e luci che sfarfallano ai colpi
+- [ ] Tavolo olografico con la situazione tattica viva, comunicazioni con il comandante nemico (voce e mente di Varek Solm), squadre di controllo danni visibili, bilanciamento
+- [ ] Navi v2 (sagome e dettagli più belli), effetti visivi migliori (scie, esplosioni volumetriche)
+
 ## Prossimi passi
-1. Plancia v2 (arte) — fatto in gran parte; restano ologramma, porte, esterno.
-2. Equipaggio: rapporti spontanei dagli eventi della simulazione, schermi vivi, comportamento dei corpi (sguardo, gesti), poi MetaHuman + labiale.
-3. Simulazione nave (M2) e poi battaglia (M4).
+1. Tavolo olografico tattico vivo + comunicazioni con il nemico (Varek Solm, persona AI).
+2. Equipaggio: schermi vivi, comportamento dei corpi (posture sedute, gesti), poi MetaHuman + labiale.
+3. Navi v2 e effetti; simulazione di energia/calore (M2); hangar e caccia (M5).
 
 ## Come provarlo (per l'utente)
 1. `tools/avvia_editor.sh` (o apri ASTRA.uproject); il livello iniziale è la plancia (`L_Bridge`).
 2. Il servizio delle menti parte da solo al primo avvio della partita (oppure `cd mind && uv run astra-mind`).
 3. Premi Play; tieni premuto **V** e parla al ponte in qualsiasi lingua (al primo uso macOS chiede il permesso del microfono), oppure dalla console (`) scrivi `astra.say Allarme rosso!`.
+4. La battaglia parte da sola (dopo ~80 s si sveglia la fregata, dopo ~170 s arriva il gruppo d'attacco). Per accelerare: `astra.battle.time 168`, `astra.battle.timescale 3`.
 
 ## Note operative
 - Editor: avviarlo con `tools/avvia_editor.sh` (modalità unattended: niente limite a 3 fps a schermo bloccato). Tenere `t.MaxFPS 30` quando idle, 4 durante i test di prestazioni.
