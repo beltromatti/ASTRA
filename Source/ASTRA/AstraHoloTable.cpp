@@ -90,6 +90,7 @@ UStaticMeshComponent* AAstraHoloTable::Pooled(TArray<TObjectPtr<UStaticMeshCompo
 		C->RegisterComponent();
 		C->SetStaticMesh(Mesh);
 		C->CreateDynamicMaterialInstance(0, HoloMat);
+		C->SetVisibility(false);   // only the requested index is shown below
 		Pool.Add(C);
 	}
 	UStaticMeshComponent* C = Pool[Index];
@@ -256,13 +257,21 @@ void AAstraHoloTable::Tick(float DeltaTime)
 
 			// velocity vector: 500 m/s = 12 cm
 			UStaticMeshComponent* Vec = Pooled(Vectors, NI, LineMesh);
-			const float L = FMath::Clamp(B.Speed / 500.f * 12.f, 0.f, 24.f);
+			const float L = FMath::Clamp(B.Speed / 500.f * (B.bCraft ? 3.f : 12.f), 0.f, 24.f);
 			Vec->SetVisibility(L > 0.8f && !B.VelDir.IsNearlyZero());
 			Vec->SetRelativeLocationAndRotation(P, B.VelDir.Rotation());
 			Vec->SetRelativeScale3D(FVector(L / 100.f, 0.18f, 0.18f));
 			SetColor(Vec, Col, 7.f);
 			++NI;
 
+			if (B.bNoLabel)
+			{
+				if (Leaders.IsValidIndex(NI - 1))
+				{
+					Leaders[NI - 1]->SetVisibility(false);
+				}
+				continue;
+			}
 			UTextRenderComponent* T = PooledText(Labels, NL++);
 			const FString Title = B.bPlayer ? FString(TEXT("ASN AQUILA"))
 			                    : (B.Name.IsEmpty() ? FString::Printf(TEXT("%s  UNKNOWN"), *B.Contact) : FString::Printf(TEXT("%s  %s"), *B.Name.ToUpper(), *B.Contact));

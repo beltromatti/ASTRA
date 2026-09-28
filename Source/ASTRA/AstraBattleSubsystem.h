@@ -78,6 +78,16 @@ struct FAstraBattleShip
 	bool bAlive = true;
 	bool bFleeing = false;
 	bool bHoldFire = false;              // ceasefire ordered by its commander
+	// small craft (fighters, bombers, drones) launched from a carrier
+	bool bCraft = false;
+	int32 Squadron = -1;                 // index in Squadrons
+	int32 CraftKind = 0;                 // 0 fighter, 1 bomber, 2 drone
+	FString Mission;                     // cap | strike | escort | ew | recon | recall
+	int32 MissionTarget = -1;            // ship id (strike/escort/ew/recon)
+	int32 Torpedoes = 0;
+	float GunT = 0.f;
+	float OrbitPhase = 0.f;
+	bool bJammed = false;                // an EW drone is degrading its fire control
 	bool bNegotiated = false;            // holding fire / withdrawing under terms agreed over the channel
 
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
@@ -109,6 +119,8 @@ struct FAstraProjectile
 	int32 Target = -1;
 	float Damage = 50.f;
 	float Life = 10.f;
+	float MaxSpeed = 1600.f;             // guided weapons: missiles 1600 m/s, torpedoes 900 m/s
+	bool bTorpedo = false;
 	bool bDead = false;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 };
@@ -127,6 +139,32 @@ struct FAstraFlash
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> MID = nullptr;
 };
 
+/** A flight group of the Aquila (Flight Control). */
+USTRUCT()
+struct FAstraSquadron
+{
+	GENERATED_BODY()
+
+	FString Name;            // alpha | bravo | drones (the crew's tool ids)
+	FString CallSign;        // Falcon | Hammer | Wasp
+	FString Mesh;
+	int32 Kind = 0;          // 0 fighter, 1 bomber, 2 drone
+	int32 Total = 0;         // aircraft still existing
+	int32 OnDeck = 0;        // aircraft on the flight deck
+	int32 ToLaunch = 0;      // queued for the current launch
+	float LaunchT = 0.f;
+	FString Mission;
+	int32 TargetId = -1;
+	float RearmT = 0.f;      // rearming after recovery
+	int32 LostSinceReport = 0;
+	float LastLossReport = -100.f;
+	bool bAirborneReported = false;
+	int32 Launched = 0;      // aircraft launched in this sortie
+	int32 TorpedoesAway = 0; // released since the last report (one spoken report per torpedo run)
+	float TorpedoReportAt = -1.f;
+	FString TorpedoTarget;
+};
+
 /** What the tactical plot shows of one object (the holo table draws these; positions in the Aquila's frame). */
 struct FAstraHoloBlip
 {
@@ -142,6 +180,8 @@ struct FAstraHoloBlip
 	bool bRetreating = false;
 	bool bHoldFire = false;
 	bool bTargeted = false;                 // our fire control is on it
+	bool bCraft = false;                    // fighter / bomber / drone
+	bool bNoLabel = false;                  // only a flight group's leader is labelled
 	float Size = 1.f;                       // 1 capital, ~0.7 escort, ~0.55 small
 	float Fade = 1.f;
 	float RangeKm = 0.f;
@@ -171,6 +211,11 @@ public:
 	bool PlayerScan(const FString& ContactId, FString& OutDetail);
 	bool PlayerHail(const FString& ContactId, FString& OutDetail);
 	bool PlayerCeaseFire(FString& OutDetail);
+	/** Flight Control: launch (or re-task an airborne) flight group on a mission; recall it to the flight deck. */
+	bool LaunchSquadron(const FString& Name, const FString& Mission, const FString& ContactId, FString& OutDetail);
+	bool RecallSquadron(const FString& Name, FString& OutDetail);
+	/** Status line per flight group, for the crew's telemetry and the screens. */
+	TSharedRef<FJsonObject> SquadronsJson() const;
 	/** The Aquila's weapons as fire control reports them (live: assignments, volleys left, VLS cycle, ammunition). */
 	TSharedRef<FJsonObject> PlayerWeaponsJson() const;
 	/** Everything the tactical plot should draw right now. */
@@ -211,6 +256,7 @@ private:
 	UPROPERTY() TArray<FAstraBattleShip> Ships;
 	UPROPERTY() TArray<FAstraProjectile> Projectiles;
 	UPROPERTY() TArray<FAstraFlash> Flashes;
+	UPROPERTY() TArray<FAstraSquadron> Squadrons;
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> GlowMat;
@@ -228,6 +274,8 @@ private:
 	bool bScenarioOver = false;
 	float TransmissionAt = -1.f;
 	bool bSurrenderAccepted = false;    // the Mandate accepted the Aquila's surrender
+	FVector LastWreckPos = FVector::ZeroVector;   // the last ASTRA ship lost (search and rescue)
+	FString LastWreckName;
 	FString TransmissionText;           // "T-21 — ...": who opens a channel to the Aquila, and why
 
 	int32 AddShip(const FString& Contact, const FString& Name, const FString& Class, const FString& Mesh, EAstraSide Side,
@@ -240,6 +288,10 @@ private:
 	void TickScenario(float Dt);
 	void TickAI(FAstraBattleShip& S, float Dt);
 	void TickWeapons(FAstraBattleShip& S, float Dt);
+	void TickSquadrons(float Dt);
+	void TickCraft(FAstraBattleShip& S, float Dt);
+	int32 AirborneCount(int32 Squadron) const;
+	void FireTorpedo(FAstraBattleShip& From, FAstraBattleShip& To);
 	void TickPlayerFire(FAstraBattleShip& P, float Dt);
 	void TickProjectiles(float Dt);
 	void TickFlashes(float Dt);

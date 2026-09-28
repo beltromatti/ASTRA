@@ -256,30 +256,13 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		OutDetail = FString::Printf(TEXT("point defense %s"), *PointDefense);
 		return true;
 	}
-	if (Name == TEXT("launch_squadron") || Name == TEXT("recall_squadron"))
+	if (Name == TEXT("launch_squadron"))
 	{
-		const FString Sq = Str(TEXT("squadron"));
-		if (!Squadrons.Contains(Sq))
-		{
-			OutDetail = FString::Printf(TEXT("no squadron %s"), *Sq);
-			return false;
-		}
-		if (Name == TEXT("recall_squadron"))
-		{
-			Squadrons[Sq] = TEXT("recovering to the flight deck");
-			OutDetail = FString::Printf(TEXT("%s recalled"), *Sq);
-			return true;
-		}
-		if (!Squadrons[Sq].Contains(TEXT("ready")))
-		{
-			OutDetail = FString::Printf(TEXT("%s not ready: %s"), *Sq, *Squadrons[Sq]);
-			return false;
-		}
-		const FString Mission = Str(TEXT("mission"));
-		Squadrons[Sq] = FString::Printf(TEXT("launched: %s %s"), *Mission, *Str(TEXT("contact_id")));
-		OutDetail = FString::Printf(TEXT("%s launching for %s"), *Sq, *Mission);
-		Event(OutDetail);
-		return true;
+		return Battle ? Battle->LaunchSquadron(Str(TEXT("squadron")), Str(TEXT("mission")), Str(TEXT("contact_id")), OutDetail) : false;
+	}
+	if (Name == TEXT("recall_squadron"))
+	{
+		return Battle ? Battle->RecallSquadron(Str(TEXT("squadron")), OutDetail) : false;
 	}
 	if (Name == TEXT("dispatch_damage_control"))
 	{
@@ -317,8 +300,8 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		D->Work = (D->Kind == TEXT("fire") ? 30.f : (D->Kind == TEXT("hull breach") ? 40.f : 25.f)) * Speed;
 		int32 Busy = 0;
 		for (const FAstraDamage& X : Damage) { Busy += X.Team >= 0 ? 1 : 0; }
-		OutDetail = FString::Printf(TEXT("team %d en route to the %s at %s: on scene in %.0f s, about %.0f s of work; %d teams still free"),
-		                            Team + 1, *D->Kind, *D->Where(), D->Travel, D->Work, NumDamageTeams - Busy);
+		OutDetail = FString::Printf(TEXT("team %d en route to the %s at %s: on scene in %.0f s, about %.0f s of work; %d team%s still free"),
+		                            Team + 1, *D->Kind, *D->Where(), D->Travel, D->Work, NumDamageTeams - Busy, NumDamageTeams - Busy == 1 ? TEXT("") : TEXT("s"));
 		return true;
 	}
 	if (Name == TEXT("hail"))
@@ -401,9 +384,17 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	S->SetObjectField(TEXT("weapons"), W);
 	S->SetStringField(TEXT("target"), TargetId);
 	S->SetStringField(TEXT("emcon"), Emcon);
-	TSharedRef<FJsonObject> Q = MakeShared<FJsonObject>();
-	for (const auto& KV : Squadrons) { Q->SetStringField(KV.Key, KV.Value); }
-	S->SetObjectField(TEXT("squadrons"), Q);
+	const UAstraBattleSubsystem* Flight = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	if (Flight)
+	{
+		S->SetObjectField(TEXT("squadrons"), Flight->SquadronsJson());
+	}
+	else
+	{
+		TSharedRef<FJsonObject> Q = MakeShared<FJsonObject>();
+		for (const auto& KV : Squadrons) { Q->SetStringField(KV.Key, KV.Value); }
+		S->SetObjectField(TEXT("squadrons"), Q);
+	}
 	const UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
 	if (Battle)
 	{

@@ -114,8 +114,11 @@ class BridgeAgent:
             log.info("event report salvaged from prose: %s", comp.content[:160])
             await self._salvage(comp.content, turn, lang, max_lines=2)
         results = await self._collect(pending, turn)
+        main_lines = len(turn.lines)
+        if turn.actions and not turn.lines and not comp.error:
+            await self._follow_up(msgs, turn, lang, readback=True)   # acted on initiative in silence: say so
         if turn.lines or turn.actions:
-            self._record(user, comp.tool_calls, results, turn, len(turn.lines))
+            self._record(user, comp.tool_calls, results, turn, main_lines)
         turn.t_end = time.perf_counter() - t0
         self.spent += turn.cost
         return turn

@@ -289,6 +289,52 @@ def freighter(name: str, length: float, seed: int):
     return obj
 
 
+# ------------------------------------------------------------------ small craft (fighters, bombers, drones)
+def craft(name: str, length: float, kind: str, seed: int, mandate: bool = False):
+    """Small craft along +X: a lofted fuselage, wings, engines with glow, a lit canopy. kind: fighter|bomber|drone."""
+    rng = random.Random(seed)
+    b = A.Builder()
+    L = length
+    w = L * (0.09 if kind != "bomber" else 0.12)
+    h = L * (0.07 if kind != "bomber" else 0.09)
+    sec = (lambda ww, hh: section_mandate(ww, hh, 0.12)) if mandate else section_astra
+    stations = []
+    for k in range(7):
+        t = k / 6
+        wf = profile(t, [(0, 0.55), (0.15, 0.9), (0.55, 1.0), (0.85, 0.6), (1.0, 0.12)])
+        hf = profile(t, [(0, 0.6), (0.2, 0.9), (0.55, 1.0), (0.85, 0.7), (1.0, 0.15)])
+        stations.append((-L / 2 + t * L, sec(w * wf, h * hf), h * 0.1 * t))
+    loft(b, stations, PLATE)
+    # canopy (lit from inside) on fighters and bombers
+    if kind != "drone":
+        b.box((L * 0.2, 0, h * 0.95), (L * 0.16, w * 0.7, h * 0.35), LIGHTS)
+    # wings: swept for fighters, straight and thick for bombers, three short vanes for drones
+    if kind == "drone":
+        for ang in (90, 210, 330):
+            a = math.radians(ang)
+            b.box((-L * 0.1, math.cos(a) * w * 1.6, math.sin(a) * w * 1.6), (L * 0.35, w * (2.2 if ang == 90 else 1.4), L * 0.02), FRAME)
+    else:
+        span = L * (0.75 if kind == "fighter" else 0.9)
+        chord = L * (0.3 if kind == "fighter" else 0.36)
+        for sy in (-1, 1):
+            m = (Matrix.Translation((-L * 0.12, sy * span * 0.28, -h * 0.2)) @ Matrix.Rotation(math.radians(sy * (28 if kind == "fighter" else 8)), 4, "Z")
+                 @ Matrix.Diagonal((chord, span * 0.56, L * 0.025, 1.0)))
+            geom = bmesh.ops.create_cube(b.bm, size=1.0, matrix=m)
+            b._assign(geom["verts"], PLATE)
+            b.box((-L * 0.12 - chord * 0.35, sy * span * 0.5, -h * 0.2), (chord * 0.3, L * 0.05, L * 0.03), LIVERY)
+            if kind == "bomber":   # torpedo pods under the wings
+                b.cylinder((-L * 0.05, sy * span * 0.3, -h * 0.75), (L * 0.28, sy * span * 0.3, -h * 0.75), L * 0.035, FRAME, segments=12)
+    # engines
+    ne = 1 if kind == "drone" else 2
+    for i in range(ne):
+        yy = 0.0 if ne == 1 else (i - 0.5) * w * 1.1
+        engine_cluster(b, -L * 0.47, yy, 0.0, L * (0.045 if kind != "bomber" else 0.05))
+    obj = b.to_object(name)
+    A.finish(obj, bevel=0.02, segments=1)
+    A.box_uv(obj, texel_m=2.0)
+    return obj
+
+
 SHIPS = {
     # name: (builder, kwargs)
     "SM_SHIP_ASTRA_Aquila": (astra_ship, dict(length=780.0, seed=1, carrier=True, beam=0.14, turrets=4)),
@@ -298,6 +344,10 @@ SHIPS = {
     "SM_SHIP_MANDATE_Styx": (mandate_ship, dict(length=260.0, seed=13, beam=0.16, turrets=2)),
     "SM_SHIP_MANDATE_Lethe": (mandate_ship, dict(length=160.0, seed=17, beam=0.15, turrets=1)),
     "SM_SHIP_GUILD_Freighter": (freighter, dict(length=340.0, seed=5)),
+    "SM_CRAFT_ASTRA_Falcon": (craft, dict(length=18.0, kind="fighter", seed=21)),
+    "SM_CRAFT_ASTRA_Hammer": (craft, dict(length=26.0, kind="bomber", seed=23)),
+    "SM_CRAFT_ASTRA_Wasp": (craft, dict(length=8.0, kind="drone", seed=25)),
+    "SM_CRAFT_MANDATE_Harpy": (craft, dict(length=16.0, kind="fighter", seed=27, mandate=True)),
 }
 
 

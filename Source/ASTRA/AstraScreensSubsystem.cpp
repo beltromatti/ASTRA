@@ -421,7 +421,7 @@ void UAstraScreensSubsystem::DrawMaster(UCanvas* C, int32 W, int32 H)
 		for (const FAstraHoloBlip& B : Blips)
 		{
 			Hostiles += (B.Kind == 0 && B.bHostile && !B.bRetreating) ? 1 : 0;
-			Friends += (B.Kind == 0 && !B.bPlayer && B.Side == EAstraSide::Astra) ? 1 : 0;
+			Friends += (B.Kind == 0 && !B.bPlayer && !B.bCraft && B.Side == EAstraSide::Astra) ? 1 : 0;
 		}
 	}
 	P.Text(RX, 766, FString::Printf(TEXT("CONTACTS  %d HOSTILE  ·  %d FRIENDLY"), Hostiles, Friends), true, 18, Hostiles ? RED : TEXTC);
@@ -675,9 +675,9 @@ void UAstraScreensSubsystem::DrawSensors(UCanvas* C, int32 W, int32 H, const FSt
 			const FVector2D Q = FVector2D(CX, CY) + Dir.GetSafeNormal() * FMath::Min(Rad(Km), R);
 			const FLinearColor Col = B.Kind == 1 ? (B.Side == EAstraSide::Astra ? CYAN : RED)
 			                       : (B.bUnknown ? DIM : (B.Side == EAstraSide::Astra ? CYAN : (B.bHostile ? (B.bHoldFire ? AMBER : RED) : YELLOW)));
-			if (B.Kind == 1)
+			if (B.Kind == 1 || B.bCraft)
 			{
-				P.Rect(Q.X - 2, Q.Y - 2, 4, 4, Col);
+				P.Rect(Q.X - 2, Q.Y - 2, 4, 4, B.bCraft ? CYAN : Col);
 				continue;
 			}
 			P.Frame(Q.X - 7, Q.Y - 7, 14, 14, Col, 2.f);
@@ -696,7 +696,7 @@ void UAstraScreensSubsystem::DrawSensors(UCanvas* C, int32 W, int32 H, const FSt
 	Blips.Sort([](const FAstraHoloBlip& A, const FAstraHoloBlip& B) { return A.RangeKm < B.RangeKm; });
 	for (const FAstraHoloBlip& B : Blips)
 	{
-		if (B.Kind != 0 || B.bPlayer || Row >= 11)
+		if (B.Kind != 0 || B.bPlayer || B.bCraft || Row >= 11)
 		{
 			continue;
 		}
