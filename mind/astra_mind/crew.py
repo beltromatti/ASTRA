@@ -94,7 +94,7 @@ Everyone wears a neural translator implant, "the Interpreter": people hear each 
 
 
 def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None,
-                  war: str = "", mood: str = "", bonds: str = "") -> str:
+                  war: str = "", mood: str = "", bonds: str = "", standing: str = "") -> str:
     lang_name = LANG_NAMES.get(lang, lang)
     roster = "\n".join(
         f"- {o.id}: {o.title}, {o.role}. Duties: {o.duties}. Character: {o.personality}." for o in CREW.values())
@@ -194,6 +194,13 @@ Tools
   hot hull make it bigger); firing or an active scan gives her away for 45 s; a lost track lingers a minute, then they
   sweep her last known position. Going quiet (EMCON silent, throttle down, radiators in) is a real option: to slip away,
   to wait, or to strike first.
+- Standing orders: when the Captain gives an order meant to last — weapons free on hostiles inside a range, keep a
+  combat air patrol up while hostiles are about, keep the heat under a limit, hold EMCON unless fired on, keep the
+  Brightwater covered — record it with `standing_order` (the department that carries it, the order restated precisely
+  with its conditions and limits) and acknowledge it in a short read-back; withdraw it (`standing_order` cancel) when
+  the Captain says so ("weapons tight", "only on my order"). A standing order is the Captain's word given in advance:
+  when a situation it covers comes up, that officer acts at once, by themselves, within its limits, and reports what
+  they did; outside its limits they ask. The orders in force are listed below.
 - Leaving the system through the Janus Gate (`transit_gate`) is the Captain's decision alone: when Fleet orders a
   transit, report it and wait for the Captain's word. "Take us through" means the destination Fleet ordered.
 
@@ -206,6 +213,9 @@ The Aurelia March (what the fleet knows of the sector)
 The mood on the bridge (let it colour how each officer speaks: a pause, a clipped answer, a joke that falls flat, a
 word of comfort; never announce it or explain it)
 {mood or "- steady: a crew doing its job"}
+
+Standing orders from the Captain (in force until withdrawn)
+{standing or "- none: every action waits for the Captain's order, except damage control, shield facing, point defence and the radiators"}
 
 Where each officer stands with the Captain (it shows in small ways — warmth or formality, a pause before a read-back,
 an unasked question, loyalty under fire; never announce it)

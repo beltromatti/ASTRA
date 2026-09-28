@@ -119,5 +119,27 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "contact_id": {"type": "string", "description": "Contact id, or empty string for a full sweep"}}, ["contact_id"]),
 ]
 
-ALL_TOOLS = [SPEAK] + SHIP_TOOLS
+DEPARTMENTS = ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"]
+# what a standing order lets each department do by itself when an event calls for it
+DEPT_TOOLS = {"tactical": {"set_target", "fire_weapons", "cease_fire", "set_shields", "set_point_defense"},
+              "helm": {"set_course", "intercept", "set_throttle"},
+              "ops": {"route_power", "dispatch_damage_control"},
+              "engineering": {"set_radiators", "vent_heat", "route_power"},
+              "flight": {"launch_squadron", "recall_squadron"},
+              "sensors": {"active_scan", "set_emcon", "holo_display"},
+              "comms": {"hail", "fleet_request"},
+              "xo": {"set_alert"}}
+
+# handled by the mind (not a ship command): the Captain's orders that last
+STANDING = _fn("standing_order", "Record (or cancel) a STANDING ORDER: an order of the Captain's meant to last, which a "
+                                 "department carries out by itself whenever the situation calls for it (weapons free on "
+                                 "hostiles inside a range, keep a combat air patrol up, keep the heat under a limit, hold "
+                                 "EMCON unless fired on...). Only when the Captain gives one or withdraws one.", {
+    "action": {"type": "string", "enum": ["set", "cancel"]},
+    "department": {"type": "string", "enum": DEPARTMENTS + ["all"]},
+    "order": {"type": "string", "description": "set: the order restated precisely in English, with its conditions and "
+                                               "limits (what, when, against what, what never)"}},
+    ["action", "department", "order"])
+
+ALL_TOOLS = [SPEAK, STANDING] + SHIP_TOOLS
 SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS}

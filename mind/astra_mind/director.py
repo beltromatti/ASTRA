@@ -196,6 +196,7 @@ class Director:
         self.last_event_t = time.monotonic()   # the last time the story moved (a director event or a beat)
         self.mood = ""                          # how the bridge crew feels (the director's latest word on it)
         self.bonds: dict[str, str] = {}          # officer id -> how they stand with the Captain (the director keeps it)
+        self.standing: list[dict[str, str]] = []   # the Captain's standing orders (shared with the bridge agent)
 
     def reset(self) -> None:
         """A new campaign: the war begins again at Aurelia."""
@@ -204,6 +205,7 @@ class Director:
         self.campaign.clear()
         self.mood = ""
         self.bonds = {}
+        self.standing.clear()
         self.busy = False
         self.granted = False
         self.admiral_history.clear()
@@ -220,6 +222,7 @@ class Director:
             self.voice_i = int(d.get("voice_i", 0))
             self.mood = str(d.get("mood", ""))
             self.bonds = {str(k): str(v) for k, v in (d.get("bonds") or {}).items()}
+            self.standing[:] = [o for o in (d.get("standing") or []) if isinstance(o, dict) and o.get("department") and o.get("order")]
         except (OSError, ValueError):
             self.campaign.clear()
             self.mood = ""
@@ -239,7 +242,8 @@ class Director:
             os.makedirs(os.path.dirname(self._story_path()), exist_ok=True)
             tmp = self._story_path() + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds}, f,
+                json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds,
+                           "standing": self.standing}, f,
                           ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:

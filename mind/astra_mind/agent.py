@@ -12,7 +12,7 @@ from typing import Any, Awaitable, Callable, Protocol
 
 from .crew import CREW, system_prompt
 from .openrouter import OpenRouter, ToolCall
-from .tools import ALL_TOOLS, SHIP_TOOL_NAMES, SHIP_TOOLS, SPEAK
+from .tools import ALL_TOOLS, DEPT_TOOLS, SHIP_TOOL_NAMES, SHIP_TOOLS, SPEAK
 
 log = logging.getLogger("astra.agent")
 
@@ -54,6 +54,7 @@ class BridgeAgent:
         self.war = lambda: ""            # the sector as the fleet knows it (set by the server)
         self.mood = lambda: ""           # how the crew feels (the director's word, set by the server)
         self.bonds = lambda: ""          # how each officer stands with the Captain (the director's, set by the server)
+        self.standing: list[dict[str, str]] = []   # the Captain's standing orders (the director saves them with the story)
 
     def _trim_history(self) -> None:
         """Keep the last `history_turns` turns (a turn starts at a user message)."""
@@ -62,10 +63,36 @@ class BridgeAgent:
             self.history = self.history[starts[-self.history_turns]:]
 
     def _messages(self, text: str, lang: str) -> list[dict[str, Any]]:
-        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign(), self.war(), self.mood(), self.bonds())}]
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign(), self.war(), self.mood(), self.bonds(), self.standing_lines())}]
         msgs += self.history
         msgs.append({"role": "user", "content": f"Captain: {text}"})
         return msgs
+
+    def standing_lines(self) -> str:
+        return "\n".join(f"- {o['department']}: {o['order']}" for o in self.standing)
+
+    async def _standing_order(self, args: dict[str, Any]) -> dict[str, Any]:
+        """The Captain's orders that last: recorded, or withdrawn (a department's, or all of them)."""
+        dept, order = str(args.get("department", "")).lower(), str(args.get("order", "")).strip()
+        if args.get("action") == "cancel":
+            before = len(self.standing)
+            self.standing[:] = [o for o in self.standing if dept not in ("all", o["department"])]
+            log.info("standing orders cancelled (%s): %d left", dept, len(self.standing))
+            return {"ok": True, "detail": f"{before - len(self.standing)} standing order(s) withdrawn"}
+        if dept not in DEPT_TOOLS or not order:
+            return {"ok": False, "detail": "a standing order needs a department and the order"}
+        self.standing[:] = [o for o in self.standing if o["department"] != dept or o["order"].lower() != order.lower()][-11:]
+        self.standing.append({"department": dept, "order": order[:300]})
+        log.info("standing order for %s: %s", dept, order)
+        return {"ok": True, "detail": f"standing order recorded for {dept}"}
+
+    def initiative(self) -> set[str]:
+        """What the crew may do by itself at an event: the usual (damage control, shields, point defence, radiators)
+        and whatever the standing orders put in a department's hands."""
+        allowed = set(INITIATIVE)
+        for o in self.standing:
+            allowed |= DEPT_TOOLS.get(o["department"], set())
+        return allowed
 
     async def handle(self, text: str, lang: str) -> Turn:
         turn = Turn(text=text, lang=lang)
@@ -105,11 +132,12 @@ class BridgeAgent:
         t0 = time.perf_counter()
         pending: list[tuple[ToolCall, asyncio.Task]] = []
         user = f"[Ship systems event, not the Captain speaking] {event}"
-        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign(), self.war(), self.mood(), self.bonds())}]
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign(), self.war(), self.mood(), self.bonds(), self.standing_lines())}]
         msgs += self.history
-        msgs.append({"role": "user", "content": user + "\n" + (ask or EVENT_ASK)})
-        on_call = self._on_call(turn, lang, t0, pending, allowed=INITIATIVE)
-        comp = await self.llm.chat(model=MODEL, messages=msgs, tools=[SPEAK] + INITIATIVE_TOOLS, tool_choice="auto",
+        msgs.append({"role": "user", "content": user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing else "")})
+        allowed = self.initiative()
+        on_call = self._on_call(turn, lang, t0, pending, allowed=allowed)
+        comp = await self.llm.chat(model=MODEL, messages=msgs, tools=[SPEAK] + [t for t in SHIP_TOOLS if t["function"]["name"] in allowed], tool_choice="auto",
                                    providers=PROVIDERS, reasoning={"enabled": False}, max_tokens=360, temperature=0.4,
                                    on_tool_call=on_call, allow_fallbacks=True)
         turn.cost += comp.cost
@@ -145,6 +173,8 @@ class BridgeAgent:
                         turn.t_first_line = time.perf_counter() - t0
                     turn.lines.append((speaker, line))
                     await self.say(speaker, line, lang, args.get("tone", "calm"))
+            elif call.name == "standing_order" and allowed is SHIP_TOOL_NAMES:
+                pending.append((call, asyncio.create_task(self._standing_order(args))))     # the mind's own, not the ship's
             elif call.name in allowed:
                 pending.append((call, asyncio.create_task(_safe_execute(self.ship, call.name, args, _owner(call.name)))))
             else:
@@ -219,8 +249,12 @@ EVENT_ASK = ("The Captain should hear this: the responsible officer reports it n
              "Captain's language). Within their own authority an officer may also act at once (Operations: damage-control "
              "teams; Tactical: shield facing and point defense; Engineering: the radiators): to act, CALL the tool in this "
              "same turn, then say what was done — saying it without the tool call does nothing and misleads the Captain. "
-             "Anything else (course, weapons, alert, power, venting coolant) waits for the Captain's order: propose it "
-             "instead. Call no tool only if this merely repeats what was reported in the last few seconds.")
+             "Anything else (course, weapons, alert, power, venting coolant) waits for the Captain's order — propose it "
+             "instead — unless a standing order in force covers it. Call no tool only if this merely repeats what was "
+             "reported in the last few seconds.")
+STANDING_ASK = (" Standing orders in force (see them in the rules) are the Captain's orders given in advance: when this "
+                "event is what one is about, that officer carries it out now, fully (weapons free means firing: fire_weapons, "
+                "not just a target), with the tool calls in this same turn, and says what was done.")
 INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators"}
 INITIATIVE_TOOLS = [t for t in SHIP_TOOLS if t["function"]["name"] in INITIATIVE]
 

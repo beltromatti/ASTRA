@@ -210,6 +210,7 @@ class Mind:
         self.agent.war = lambda: self.director.war.crew_view()
         self.agent.mood = lambda: self.director.mood
         self.agent.bonds = lambda: "\n".join(f"- {line}" for line in self.director.bonds_lines())
+        self.agent.standing = self.director.standing        # one list: the agent keeps it, the story saves it
         self.turns: asyncio.Queue = asyncio.Queue()
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.captain_t = 0.0                     # the last time the Captain spoke
@@ -817,8 +818,9 @@ VISIT_ASK = ("An officer has just come to the Captain's quarters in person (the 
 TACTICAL_ASK = ("A tactical check of the fight (the facts above come from the plot, they are true now). The XO, or the "
                 "officer whose station it concerns, tells the Captain the single most important problem in one short "
                 "sentence and recommends a concrete order the Captain could give (a course or intercept, a target, a "
-                "flight group, shields). Do not act on your own and do not repeat what was said in the last minute. If "
-                "nothing here really needs the Captain now, reply with the word SILENT and call no tool.")
+                "flight group, shields). Do not act on your own — unless a standing order in force covers the problem: "
+                "then that officer carries it out now and reports it — and do not repeat what was said in the last "
+                "minute. If nothing here really needs the Captain now, reply with the word SILENT and call no tool.")
 
 
 def tactical_flags(st: dict) -> list[str]:
