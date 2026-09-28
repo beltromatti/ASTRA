@@ -109,6 +109,21 @@ public:
 	// --- read access for the bridge screens
 	float GetThrottlePct() const { return ThrottlePct; }
 	float GetReactorPct() const { return ReactorPct; }
+
+	// --- heat (M2): the ship's thermal load, 0..100 % of what she can hold (a little more before things break)
+	float GetHeatPct() const { return HeatPct; }
+	float GetHeatRate() const { return HeatRate; }         // %/s, smoothed
+	bool AreRadiatorsOut() const { return bRadiatorsOut; }
+	float GetRadiatorHealth() const { return RadiatorHealth; }
+	int32 GetCoolantVents() const { return CoolantVents; }
+	/** Heat from the battle: weapons fired, hits soaked by the shields, the drive (units: % of the capacity). */
+	void AddHeat(float Pct) { HeatPct = FMath::Clamp(HeatPct + Pct, 0.f, 110.f); }   // (negative only from the test console)
+	/** How hot systems still work: 1 up to 70 %, down to 0.55 at 100 % (weapons cadence, shield regeneration). */
+	float HeatFactor() const;
+	/** The radiators shed heat and glow: extended or the vent's plume make the Aquila easier to find (enemy detection). */
+	float SignatureBoost() const { return (bRadiatorsOut ? 0.35f : 0.f) + (VentPlumeT > 0.f ? 1.f : 0.f); }
+	/** A hit on the flanks while the radiators are out may tear one of them. */
+	void RadiatorHit();
 	const TMap<FString, float>& GetPowerPct() const { return PowerPct; }
 	const TArray<FAstraDamage>& GetDamage() const { return Damage; }
 	const TArray<FString>& GetRecentEvents() const { return RecentEvents; }
@@ -213,6 +228,18 @@ private:
 	void CaptureHomeSky();
 	int32 NextDamageId = 1;
 	FAstraCrewRoster Roster;          // the 560 aboard, by name: the crew's cost
+	// heat
+	float HeatPct = 12.f;
+	float HeatRate = 0.f;
+	float HeatPrev = 12.f;
+	bool bRadiatorsOut = false;
+	float RadiatorHealth = 1.f;       // 1 intact .. 0.25 (torn by hits), repaired by damage control
+	int32 CoolantVents = 3;
+	float VentPlumeT = 0.f;           // seconds the vent's plume still shows
+	int32 HeatStage = 0;              // 0 nominal, 1 hot (70 %), 2 critical (90 %): reported once, with hysteresis
+	float HeatHarmT = 0.f;            // at critical: the next conduit failure / burn
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> RadiatorGlow;
+	void TickHeat(float DeltaTime);
 	float CareT = 0.f;                // the Medbay's rounds: every minute the wounded's conditions move on
 	float WardSyncT = 0.f;
 	int32 WardRev = -1;

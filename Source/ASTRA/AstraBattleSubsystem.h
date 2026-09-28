@@ -303,6 +303,12 @@ public:
 	/** The player's ship fires on a contact. */
 	bool PlayerFire(const FString& Weapon, const FString& ContactId, int32 Salvo, FString& OutDetail);
 	bool PlayerScan(const FString& ContactId, FString& OutDetail);
+
+	/** The Mandate's picture of the Aquila (M2): they can engage her only while they hold a track — one of their ships
+	 *  inside her signature (EMCON, the drive, radiators out, a coolant plume, a hot hull), or she fired or pinged in the
+	 *  last 45 s; a lost track lingers 60 s (dead reckoning), then they search her last known position. */
+	float PlayerSignatureKm() const;
+	bool IsPlayerTracked() const { return bPlayerTracked; }
 	bool PlayerHail(const FString& ContactId, FString& OutDetail);
 	bool PlayerCeaseFire(FString& OutDetail);
 	/** Flight Control: launch (or re-task an airborne) flight group on a mission; recall it to the flight deck. */
@@ -460,6 +466,12 @@ private:
 	FVector BridgeOffset = FVector(172.0, 0.0, 62.0);
 
 	float Time = 0.f;
+	bool bPlayerTracked = true;
+	bool bPlayerEverTracked = false;   // since hostiles appeared: "lost" needs a track first
+	float PlayerTrackT = 0.f;
+	float PlayerSinceFired = 999.f;
+	FVector PlayerLastKnown = FVector::ZeroVector;
+	void TickDetection(float Dt);
 	float Shake = 0.f;
 	int32 InboundSinceReport = 0;       // missiles launched at us since the last spoken report
 	float LastInboundReport = -100.f;

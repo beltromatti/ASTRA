@@ -215,11 +215,12 @@ class BridgeAgent:
 
 
 EVENT_ASK = ("The Captain should hear this: the responsible officer reports it now, in one short line with speak (in the "
-             "Captain's language). Within their own authority an officer may also act at once and say so (Operations: "
-             "damage-control teams; Tactical: shield facing and point defense); anything else (course, weapons, alert, "
-             "power) waits for the Captain's order: propose it instead. Never claim an action you did not take with a "
-             "tool. Call no tool only if this merely repeats what was reported in the last few seconds.")
-INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense"}
+             "Captain's language). Within their own authority an officer may also act at once (Operations: damage-control "
+             "teams; Tactical: shield facing and point defense; Engineering: the radiators): to act, CALL the tool in this "
+             "same turn, then say what was done — saying it without the tool call does nothing and misleads the Captain. "
+             "Anything else (course, weapons, alert, power, venting coolant) waits for the Captain's order: propose it "
+             "instead. Call no tool only if this merely repeats what was reported in the last few seconds.")
+INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators"}
 INITIATIVE_TOOLS = [t for t in SHIP_TOOLS if t["function"]["name"] in INITIATIVE]
 
 
@@ -267,7 +268,7 @@ def _owner(tool: str) -> str:
             "route_power": "ops", "set_target": "tactical", "fire_weapons": "tactical", "set_point_defense": "tactical",
             "launch_squadron": "flight", "recall_squadron": "flight", "dispatch_damage_control": "ops", "hail": "comms",
             "set_emcon": "sensors", "active_scan": "sensors", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
-            "fleet_request": "comms"}.get(tool, "xo")
+            "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering"}.get(tool, "xo")
 
 
 def _fallback_line(lang: str) -> str:

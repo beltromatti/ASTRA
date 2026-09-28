@@ -106,6 +106,16 @@ namespace
 			}
 			Ship->TestMedbay(A[0], A.Num() > 1 ? FCString::Atoi(*A[1]) : 3);
 		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdHeat(TEXT("astra.heat"),
+		TEXT("Testing: astra.heat <percent> sets the ship's thermal load"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			if (UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr)
+			{
+				Ship->AddHeat(A.Num() ? FCString::Atof(*A[0]) - Ship->GetHeatPct() : 0.f);
+				UE_LOG(LogASTRA, Log, TEXT("[Heat] %.0f %%"), Ship->GetHeatPct());
+			}
+		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdShip(TEXT("astra.cmd"),
 		TEXT("Run a ship command (testing): astra.cmd <name> <json args, ' for \">, e.g. astra.cmd director_beat {'beat':{'type':'transit','system_name':'Meridian'}}"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
@@ -274,6 +284,11 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 		{
 			C->SetLightingChannels(true, true, false);
 			++Exterior;
+			const int32 Slot = M->GetName() == TEXT("SM_SHIP_ASTRA_Aquila") ? C->GetMaterialIndex(TEXT("MI_HULL_A_Radiator")) : INDEX_NONE;
+			if (Slot != INDEX_NONE && !RadiatorGlow)
+			{
+				RadiatorGlow = C->CreateDynamicMaterialInstance(Slot);   // her radiators glow with her heat (TickHeat)
+			}
 		}
 	}
 	SetPlanetFill(TEXT("ocean"));
@@ -453,6 +468,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::SaveJson() const
 		Care.Add(MakeShared<FJsonValueObject>(C));
 	}
 	O->SetArrayField(TEXT("medbay"), Care);
+	O->SetNumberField(TEXT("heat_pct"), HeatPct);
+	O->SetBoolField(TEXT("radiators_out"), bRadiatorsOut);
+	O->SetNumberField(TEXT("radiator_health"), RadiatorHealth);
+	O->SetNumberField(TEXT("coolant_vents"), CoolantVents);
 	O->SetStringField(TEXT("casualties"), Roster.Summary());
 	return O;
 }
@@ -480,6 +499,11 @@ void UAstraShipSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 			}
 		}
 	}
+	double Num = 0.0;
+	if (Save->TryGetNumberField(TEXT("heat_pct"), Num)) { HeatPct = HeatPrev = FMath::Clamp((float)Num, 0.f, 110.f); }
+	if (Save->TryGetNumberField(TEXT("radiator_health"), Num)) { RadiatorHealth = FMath::Clamp((float)Num, 0.25f, 1.f); }
+	if (Save->TryGetNumberField(TEXT("coolant_vents"), Num)) { CoolantVents = FMath::Clamp((int32)Num, 0, 3); }
+	Save->TryGetBoolField(TEXT("radiators_out"), bRadiatorsOut);
 	FString Sys = TEXT("Aurelia");
 	Save->TryGetStringField(TEXT("system"), Sys);
 	ApplySystem(ChartSystem(Sys));
@@ -519,6 +543,130 @@ void UAstraShipSubsystem::DriveExternally(float Heading, float Mark, float Speed
 	SpeedMps = Speed;
 	bTurning = false;
 	UpdateAttitudeVisuals();
+}
+
+float UAstraShipSubsystem::HeatFactor() const
+{
+	const float H = HeatPct / 100.f;
+	if (H < 0.7f)
+	{
+		return 1.f;
+	}
+	if (H < 0.9f)
+	{
+		return FMath::Lerp(1.f, 0.8f, (H - 0.7f) / 0.2f);
+	}
+	return FMath::Lerp(0.8f, 0.55f, FMath::Clamp((H - 0.9f) / 0.1f, 0.f, 1.f));
+}
+
+void UAstraShipSubsystem::RadiatorHit()
+{
+	if (!bRadiatorsOut || RadiatorHealth < 0.3f || FMath::FRand() > 0.3f)
+	{
+		return;
+	}
+	// a wing torn: an incident damage control can repair (each repair gives back a quarter of the radiators)
+	FAstraDamage D;
+	D.Id = NextDamageId++;
+	D.Deck = 5;
+	D.Kind = TEXT("radiator damage");
+	for (const TCHAR Sec : {TEXT('E'), TEXT('F'), TEXT('G')})
+	{
+		if (!Damage.ContainsByPredicate([Sec](const FAstraDamage& X) { return X.Kind == TEXT("radiator damage") && X.Section == Sec; }))
+		{
+			D.Section = Sec;
+			RadiatorHealth = FMath::Max(0.25f, RadiatorHealth - 0.25f);
+			Damage.Add(D);
+			if (Damage.Num() > 16)
+			{
+				Damage.RemoveAt(0);
+			}
+			Event(FString::Printf(TEXT("engineering: a radiator wing torn by the hit at %s — the radiators shed %.0f %% of their heat until "
+			                           "damage control repairs them"), *D.Where(), 100.f * RadiatorHealth), true);
+			return;
+		}
+	}
+}
+
+void UAstraShipSubsystem::TickHeat(float DeltaTime)
+{
+	if (DeltaTime <= 0.f)
+	{
+		return;
+	}
+	float Sum = 0.f;
+	for (const auto& KV : PowerPct)
+	{
+		Sum += KV.Value;
+	}
+	// what the ship makes by herself: the reactor (by the power drawn), the drive (by the throttle and the engines' power);
+	// the battle adds the rest (weapons fired, hits soaked, shields recharging: AddHeat)
+	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (ThrottlePct / 100.f) * PowerFactor(TEXT("engines"));
+	// what she sheds: the hull's own glow, plus the radiators, more the hotter she is (retracted: a cruise settles near 15 %,
+	// a typical fight near 70 %, a long heavy one beyond 100 %; extended they shed 2.6 times as much, torn ones less)
+	const float B = bRadiatorsOut ? 0.5f + (1.3f - 0.5f) * RadiatorHealth : 0.5f;
+	HeatPct = FMath::Clamp(HeatPct + (Gen - 0.205f - B * HeatPct / 100.f) * DeltaTime, 0.f, 110.f);
+	VentPlumeT = FMath::Max(0.f, VentPlumeT - DeltaTime);
+	HeatRate = FMath::FInterpTo(HeatRate, (HeatPct - HeatPrev) / DeltaTime, DeltaTime, 0.5f);
+	HeatPrev = HeatPct;
+	// the crew hears when she runs hot and when she goes critical (once each, with some hysteresis)
+	const int32 Stage = HeatPct >= 90.f ? 2 : (HeatPct >= 70.f ? 1 : 0);
+	if (Stage > HeatStage)
+	{
+		HeatStage = Stage;
+		Event(Stage == 2
+			? FString::Printf(TEXT("engineering: heat critical, %.0f %% — weapons and shields throttled to %.0f %%, the drive slowed, conduits "
+			                       "failing, Main Engineering sweltering (radiators %s, %d coolant vents)%s"), HeatPct, 100.f * HeatFactor(),
+			                  bRadiatorsOut ? TEXT("extended") : TEXT("retracted"), CoolantVents,
+			                  bRadiatorsOut ? TEXT("") : TEXT("; extending the radiators is Engineering's own call (set_radiators)"))
+			: FString::Printf(TEXT("engineering: the ship is running hot, %.0f %% and rising — weapons cadence and shield regeneration "
+			                       "start to drop (radiators %s, %d coolant vents)"), HeatPct, bRadiatorsOut ? TEXT("extended") : TEXT("retracted"),
+			                  CoolantVents), true);
+	}
+	else if (HeatStage == 2 && HeatPct < 82.f)
+	{
+		HeatStage = 1;
+	}
+	else if (HeatStage >= 1 && HeatPct < 60.f)
+	{
+		HeatStage = 0;
+		Event(FString::Printf(TEXT("engineering: heat back down to %.0f %%, systems nominal"), HeatPct), false);
+	}
+	// critical: conduits give way, people in the engine spaces get burned
+	if (HeatPct >= 92.f)
+	{
+		if ((HeatHarmT -= DeltaTime) <= 0.f)
+		{
+			HeatHarmT = FMath::FRandRange(10.f, 16.f);
+			static const TCHAR* Sys[] = {TEXT("shields"), TEXT("weapons"), TEXT("engines"), TEXT("sensors")};
+			FAstraDamage D;
+			D.Id = NextDamageId++;
+			D.Deck = FMath::RandRange(7, 10);
+			D.Section = TEXT("ABCDEFGH")[FMath::RandRange(0, 7)];
+			D.Kind = TEXT("conduit damage");
+			D.System = Sys[FMath::RandRange(0, 3)];
+			const FString Burns = FMath::FRand() < 0.35f ? Roster.Casualties(D.Deck, 1, 0, CasualtyRng, TEXT("fire")) : FString();
+			if (!Damage.ContainsByPredicate([&D](const FAstraDamage& X) { return X.Deck == D.Deck && X.Section == D.Section && X.Kind == D.Kind; }))
+			{
+				Damage.Add(D);
+				if (Damage.Num() > 16)
+				{
+					Damage.RemoveAt(0);
+				}
+			}
+			Event(FString::Printf(TEXT("engineering: a power conduit overheated and failed at %s (%s power -20%%)%s"), *D.Where(), *D.System,
+			                      Burns.IsEmpty() ? TEXT("") : *(FString(TEXT(" — casualties: ")) + Burns)), true);
+		}
+	}
+	else
+	{
+		HeatHarmT = 6.f;
+	}
+	// the Aquila's radiator panels glow with her heat (dull red when hot, bright when critical)
+	if (RadiatorGlow)
+	{
+		RadiatorGlow->SetScalarParameterValue(TEXT("Intensity"), 28.f * FMath::SmoothStep(0.45f, 1.05f, HeatPct / 100.f) * (bRadiatorsOut ? 1.f : 0.6f));
+	}
 }
 
 void UAstraShipSubsystem::TestMedbay(const FString& What, int32 N)
@@ -955,6 +1103,38 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		OutDetail = FString::Printf(TEXT("emissions %s"), *Emcon);
 		return true;
 	}
+	if (Name == TEXT("set_radiators"))
+	{
+		const FString St = Str(TEXT("state")).ToLower();
+		if (St != TEXT("extended") && St != TEXT("retracted"))
+		{
+			OutDetail = TEXT("state must be extended or retracted");
+			return false;
+		}
+		bRadiatorsOut = St == TEXT("extended");
+		OutDetail = bRadiatorsOut
+			? FString::Printf(TEXT("radiators extended: heat %.0f %%, now shedding it almost three times faster; the hot panels show on "
+			                       "enemy sensors and can be hit"), HeatPct)
+			: FString::Printf(TEXT("radiators retracted and shielded: heat %.0f %%, shedding it slowly"), HeatPct);
+		Event(FString::Printf(TEXT("engineering: radiators %s"), bRadiatorsOut ? TEXT("extended") : TEXT("retracted")), false);
+		return true;
+	}
+	if (Name == TEXT("vent_heat"))
+	{
+		if (CoolantVents <= 0)
+		{
+			OutDetail = TEXT("no coolant charges left to vent");
+			return false;
+		}
+		--CoolantVents;
+		const float Was = HeatPct;
+		HeatPct *= 0.62f;
+		VentPlumeT = 30.f;
+		OutDetail = FString::Printf(TEXT("coolant vented: heat from %.0f %% to %.0f %%; a plume every sensor can see for half a minute; "
+		                                 "%d charges left"), Was, HeatPct, CoolantVents);
+		Event(FString::Printf(TEXT("engineering: coolant vented, heat down to %.0f %%"), HeatPct), false);
+		return true;
+	}
 	if (Name == TEXT("active_scan"))
 	{
 		return Battle ? Battle->PlayerScan(Str(TEXT("contact_id")), OutDetail) : false;
@@ -1009,6 +1189,32 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	S->SetObjectField(TEXT("weapons"), W);
 	S->SetStringField(TEXT("target"), TargetId);
 	S->SetStringField(TEXT("emcon"), Emcon);
+	if (const UAstraBattleSubsystem* B = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+	{
+		// how far out the Mandate can find us, and whether they have us now
+		S->SetStringField(TEXT("signature"), FString::Printf(TEXT("about %.0f km (EMCON %s, the drive, radiators %s%s)%s"), B->PlayerSignatureKm(), *Emcon,
+		                  bRadiatorsOut ? TEXT("out") : TEXT("in"), VentPlumeT > 0.f ? TEXT(", a coolant plume") : TEXT(""),
+		                  B->IsPlayerTracked() ? TEXT("") : TEXT(" — the Mandate has lost our track")));
+	}
+	{
+		TSharedRef<FJsonObject> Th = MakeShared<FJsonObject>();
+		Th->SetNumberField(TEXT("heat_pct"), FMath::RoundToInt(HeatPct));
+		Th->SetStringField(TEXT("trend"), FMath::Abs(HeatRate) < 0.05f ? FString(TEXT("steady"))
+		                   : FString::Printf(TEXT("%s%.1f %%/s"), HeatRate > 0.f ? TEXT("+") : TEXT(""), HeatRate));
+		Th->SetStringField(TEXT("radiators"), FString(bRadiatorsOut ? TEXT("extended") : TEXT("retracted"))
+		                   + (RadiatorHealth < 0.99f ? FString::Printf(TEXT(", damaged: %.0f %% effective"), 100.f * RadiatorHealth) : FString()));
+		Th->SetNumberField(TEXT("coolant_vents"), CoolantVents);
+		const float HF = HeatFactor();
+		Th->SetStringField(TEXT("status"), HeatPct >= 90.f
+			? FString::Printf(TEXT("critical: weapons and shields at %.0f %%, the drive slowed, conduits failing, Main Engineering sweltering"), 100.f * HF)
+			: (HeatPct >= 70.f ? FString::Printf(TEXT("running hot: weapons cadence and shield regeneration at %.0f %%"), 100.f * HF)
+			                   : FString(TEXT("nominal"))));
+		if (VentPlumeT > 0.f)
+		{
+			Th->SetStringField(TEXT("vent_plume"), FString::Printf(TEXT("visible to every sensor for %.0f s more"), VentPlumeT));
+		}
+		S->SetObjectField(TEXT("thermal"), Th);
+	}
 	S->SetStringField(TEXT("holo_table"), HoloMode);
 	const UAstraBattleSubsystem* Flight = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
 	if (Flight)
@@ -1103,6 +1309,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 
 void UAstraShipSubsystem::Tick(float DeltaTime)
 {
+	TickHeat(DeltaTime);
 	// the Medbay: the doctors' rounds every minute (conditions change, the healed go back to duty, some die), the beds
 	// follow the roster
 	if ((CareT += DeltaTime) >= 60.f)
@@ -1175,7 +1382,8 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 	}
 	// drive: speed follows the throttle (max 480 m/s at nominal engine power: a carrier cruiser, a little faster than
 	// Mandate destroyers at cruise; engine power scales it)
-	SpeedMps = FMath::FInterpTo(SpeedMps, ThrottlePct * 4.8f * (0.6f + 0.4f * PowerFactor(TEXT("engines"))), DeltaTime, 0.2f);
+	SpeedMps = FMath::FInterpTo(SpeedMps, ThrottlePct * 4.8f * (0.6f + 0.4f * PowerFactor(TEXT("engines"))) * (HeatPct > 90.f ? 0.85f : 1.f),
+	                            DeltaTime, 0.2f);
 	TickDamage(DeltaTime);
 	UpdateAlertVisuals(DeltaTime);
 }
@@ -1364,7 +1572,12 @@ void UAstraShipSubsystem::TickDamage(float DeltaTime)
 			D.Progress += DeltaTime / D.Work;
 			if (D.Progress >= 1.f)
 			{
-				const FString Done = D.Kind == TEXT("fire") ? TEXT("is out") : (D.Kind == TEXT("hull breach") ? TEXT("is sealed") : TEXT("is repaired, power restored"));
+				const FString Done = D.Kind == TEXT("fire") ? TEXT("is out") : (D.Kind == TEXT("hull breach") ? TEXT("is sealed")
+				                   : (D.Kind == TEXT("radiator damage") ? TEXT("is repaired, the panel sheds heat again") : TEXT("is repaired, power restored")));
+				if (D.Kind == TEXT("radiator damage"))
+				{
+					RadiatorHealth = FMath::Min(1.f, RadiatorHealth + 0.25f);
+				}
 				const bool bSay = D.Kind != TEXT("conduit damage");
 				const FString Text = FString::Printf(TEXT("damage control: the %s at %s %s (team %d free again)"), *D.Kind, *D.Where(), *Done, D.Team + 1);
 				Damage.RemoveAt(i);
@@ -1413,6 +1626,10 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 		{
 			BridgeFX->RandomBurst(Strength * 0.7f);
 		}
+	}
+	if (HullDamage > 5.f)
+	{
+		RadiatorHit();
 	}
 	if (HullDamage > 8.f)
 	{

@@ -75,12 +75,14 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "why": {"type": "string", "description": "the story reason, one sentence (for the campaign log)"},
     "officers": {"type": "object", "additionalProperties": {"type": "string"},
                  "description": "only for officers whose bond with the Captain changed because of what happened (keys: "
-                 "xo, helm, ops, tactical, comms, sensors, engineering, chief, doctor, flight): one sentence in English — "
+                 "xo Serra she, helm Ferri he, ops Tanaka she, tactical Voss she, comms Martin he, sensors Nair she, "
+                 "engineering Mensah he, chief Okonkwo he, doctor Lindqvist she, flight Price he): one sentence in English — "
                  "how they now see the Captain and why (trust earned or lost, loyalty, doubt about an order, resentment, "
                  "admiration, a debt), and what they carry. Omit everyone else: their bond carries over"},
     "crew_mood": {"type": "string", "description": "how the Aquila's bridge crew feels now and why, in English, 1-2 "
-                  "sentences naming officers where it matters (Serra XO, Ferri helm, Tanaka ops, Voss tactical, Martin "
-                  "comms, Nair sensors, Mensah engineering, Price flight): grief for the fallen, pride, fatigue, anger, "
+                  "sentences naming officers where it matters (Serra XO she, Ferri helm he, Tanaka ops she, Voss tactical "
+                  "she, Martin comms he, Nair sensors she, Mensah engineering he, Price flight he, Chief Okonkwo he, Dr. "
+                  "Lindqvist she): grief for the fallen, pride, fatigue, anger, "
                   "doubt about an order, hope. It colours how they speak until the next beat"}},
     ["type", "why", "crew_mood"])
 WAR_NEWS = _fn("war_news", "Something happens elsewhere in the March, and the fleet net reports it (the crew hears it). "

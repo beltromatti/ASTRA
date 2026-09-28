@@ -763,9 +763,19 @@ void UAstraScreensSubsystem::DrawEngineering(UCanvas* C, int32 W, int32 H, const
 		{
 			Sum += KV.Value;
 		}
-		P.Bar(40, 360, W - 80, 26, Sum / Ship->GetPowerBudget(), TEXT("Allocation"), FString::Printf(TEXT("%.0f / %.0f %%"), Sum, Ship->GetPowerBudget()),
+		P.Bar(40, 340, W - 80, 26, Sum / Ship->GetPowerBudget(), TEXT("Allocation"), FString::Printf(TEXT("%.0f / %.0f %%"), Sum, Ship->GetPowerBudget()),
 		      Sum > 660.f ? AMBER : CYAN);
-		P.Footer(W, H, TEXT("CONTAINMENT STABLE · COOLANT NOMINAL"), GREEN);
+		// the heat: load, radiators, coolant
+		const float Heat = Ship->GetHeatPct();
+		const FLinearColor HeatC = Heat >= 90.f ? RED : (Heat >= 70.f ? AMBER : CYAN);
+		P.Bar(40, 420, W - 80, 26, FMath::Min(1.f, Heat / 100.f), TEXT("Thermal load"), FString::Printf(TEXT("%.0f %%  %s"), Heat,
+		      Ship->GetHeatRate() > 0.05f ? TEXT("RISING") : (Ship->GetHeatRate() < -0.05f ? TEXT("FALLING") : TEXT("STEADY"))), HeatC);
+		P.Text(40, 500, FString::Printf(TEXT("RADIATORS %s%s"), Ship->AreRadiatorsOut() ? TEXT("EXTENDED") : TEXT("RETRACTED"),
+		       Ship->GetRadiatorHealth() < 0.99f ? *FString::Printf(TEXT(" · %.0f %% EFFECTIVE"), 100.f * Ship->GetRadiatorHealth()) : TEXT("")),
+		       true, 22, Ship->GetRadiatorHealth() < 0.99f ? AMBER : TEXTC, 0, true);
+		P.Text(W - 40, 500, FString::Printf(TEXT("COOLANT VENTS %d / 3"), Ship->GetCoolantVents()), true, 22, Ship->GetCoolantVents() ? TEXTC : AMBER, 2, true);
+		P.Footer(W, H, Heat >= 90.f ? TEXT("HEAT CRITICAL · CONDUITS AT RISK") : (Heat >= 70.f ? TEXT("RUNNING HOT · SYSTEMS THROTTLED")
+		         : TEXT("CONTAINMENT STABLE · COOLANT NOMINAL")), Heat >= 90.f ? RED : (Heat >= 70.f ? AMBER : GREEN));
 		return;
 	}
 	P.Header(W, TEXT("Engineering · Power Conduits"), TEXT("DAMAGE TO THE GRID"), ENGINEERING);

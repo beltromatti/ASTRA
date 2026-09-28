@@ -51,10 +51,12 @@ CREW: dict[str, Officer] = {o.id: o for o in (
             "sensor contacts, identification, scans, emissions control, astrometrics",
             "curious, analytical, quietly witty; qualifies uncertainty with confidence levels", "mary", "f"),
     Officer("engineering", "Kofi Mensah", "Lieutenant Junior Grade", "Engineering (bridge station)",
-            "liaison with Main Engineering and Chief Okonkwo, reactor and propulsion health, repairs",
+            "liaison with Main Engineering and Chief Okonkwo, reactor and propulsion health, the ship's heat (radiators, "
+            "coolant vents), repairs",
             "steady, practical, loyal to 'the Old Man' Okonkwo; calm under pressure", "daan", "m"),
     Officer("chief", "Emeka Okonkwo", "Lieutenant Commander", "Chief Engineer (Main Engineering, Deck 7)",
-            "the reactor, propulsion and the power plant, the damage-control teams and every repair aboard; he runs Main "
+            "the reactor, propulsion and the power plant, the ship's heat, the damage-control teams and every repair "
+            "aboard; he runs Main "
             "Engineering and is heard on the bridge only by intercom, unless the Captain comes down to Main Engineering",
             "thirty years in the fleet, 'the Old Man' to his engineers and to Mensah; gruff, fatherly, plain-spoken, dry "
             "humour; fiercely protective of his people and his reactor; hates being rushed and always delivers; calls "
@@ -158,6 +160,15 @@ Tools
 - The friendly warships in company (the 7th Fleet ships on the plot) take the Captain's requests by fleet datalink
   through Communications (`fleet_request`: focus fire, cover us, close in, stand off, hold fire, engage freely);
   "Praetorian, concentrate on the Acheron" is such a request. Comms relays it and reports their acknowledgement.
+- Heat (`thermal` in the state) is the ship's other limit: the reactor, railgun volleys, lasers, shields soaking
+  hits and engines at full all heat her. Above 70% the weapons and shields slow down, above 90% conduits fail and
+  people in Main Engineering get burned. Engineering manages it: radiators out (they shed heat fast but betray the ship
+  and can be shot away), a coolant vent (three charges, a plume every sensor sees), or less power to weapons and engines.
+- Stealth (`signature` in the state): the Mandate can fire only on what it tracks. Their ships find the Aquila inside
+  her signature (EMCON silent ~12 km, restricted ~30, full ~60, times the drive; radiators out, a coolant plume and a
+  hot hull make it bigger); firing or an active scan gives her away for 45 s; a lost track lingers a minute, then they
+  sweep her last known position. Going quiet (EMCON silent, throttle down, radiators in) is a real option: to slip away,
+  to wait, or to strike first.
 - Leaving the system through the Janus Gate (`transit_gate`) is the Captain's decision alone: when Fleet orders a
   transit, report it and wait for the Captain's word. "Take us through" means the destination Fleet ordered.
 

@@ -14,6 +14,7 @@ INITIAL: dict[str, Any] = {
     "weapons": {"railguns": "ready (4 twin turrets)", "lasers": "ready (12 batteries)", "missiles": "ready (96 in VLS)",
                 "torpedoes": "ready (2 loaded)", "point_defense": "auto"},
     "target": None, "emcon": "restricted",
+    "thermal": {"heat_pct": 12, "trend": "steady", "radiators": "retracted", "coolant_vents": 3, "status": "nominal"},
     "squadrons": {"alpha": "on deck, ready (8 Falcons)", "bravo": "on deck, ready (7 of 8 Hammers)", "drones": "ready (12 Wasps)"},
     "damage": [],
     "contacts": [
@@ -111,6 +112,16 @@ class LocalShip:
             return self._ok(f"emcon {a['level']}")
         if name == "active_scan":
             return self._ok("scan running")
+        if name == "set_radiators":
+            s["thermal"]["radiators"] = a["state"]
+            return self._ok(f"radiators {a['state']}")
+        if name == "vent_heat":
+            t = s["thermal"]
+            if t["coolant_vents"] <= 0:
+                return {"ok": False, "detail": "no coolant charges left"}
+            t["coolant_vents"] -= 1
+            t["heat_pct"] = max(0, int(t["heat_pct"] * 0.65))
+            return self._ok(f"coolant vented: heat {t['heat_pct']}%, {t['coolant_vents']} charges left")
         return {"ok": False, "detail": f"unknown tool {name}"}
 
     def _ok(self, detail: str) -> dict[str, Any]:

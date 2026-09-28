@@ -82,6 +82,12 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "task": {"type": "string", "enum": ["repair", "firefight", "seal_breach", "rescue"]},
         "priority": {"type": "string", "enum": ["low", "normal", "high", "critical"]}},
         ["deck", "section", "task", "priority"]),
+    _fn("set_radiators", "Engineering: extend or retract the radiator wings. Extended they shed heat almost three times "
+                          "faster, but the hot panels make the Aquila easier to detect (even under silent EMCON) and they "
+                          "can be shot away (damaged radiators shed less until repaired).", {
+        "state": {"type": "string", "enum": ["extended", "retracted"]}}, ["state"]),
+    _fn("vent_heat", "Engineering: emergency coolant dump — sheds a third of the heat at once (three charges aboard); "
+                     "the plume gives the ship away to every sensor for half a minute.", {}, []),
     _fn("hail", "Communications: open a channel to a contact (or 'fleet' for the 7th Fleet net).", {
         "contact_id": {"type": "string"},
         "intent": {"type": "string", "enum": ["identify", "warn", "demand_surrender", "request_support", "negotiate", "report"]},
