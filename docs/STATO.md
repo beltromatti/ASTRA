@@ -63,6 +63,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Unreal: `UAstraMindSubsystem` (collegamento), `UAstraShipSubsystem` (stato e comandi reali: rotta/virata che ruota cielo e stella, allerta con luci, materiali e klaxon), `AAstraCrewMember` (voce spazializzata dalla postazione)
 - [x] Prova: in plancia «Allarme rosso! Timoniere, virare a zero-nove-zero» → la XO conferma, il timoniere ripete l'ordine, la nave va in condizione rossa e vira; «fuoco sulla Praetorian» → Voss rifiuta (nave amica)
 - [x] Rapporti spontanei dagli eventi (rotta raggiunta, contatti, danni), schermi con dati vivi
+- [x] **Ordini scritti** (la voce non è mai obbligatoria): **T** apre una riga in basso («CAPTAIN · to the crew, in any language · Enter sends · Esc cancels»), Invio la manda all'equipaggio come se fosse detta (stessa lingua automatica), Esc annulla; funziona ovunque, anche in volo. La riga tiene il fuoco finché è aperta. Prova automatica attraverso Slate stesso: `AstraTypeTest "testo"` (apre, digita tasto per tasto, preme Invio)
 - [x] Equipaggio seduto alle postazioni con posa procedurale (calcolata dallo scheletro: niente animazioni esterne): mani sulla console, respiro, micro-movimenti, testa e spalle che si girano verso il capitano quando parla; la tattica resta in piedi alla ringhiera
 - [x] Uniformi di reparto sui corpi provvisori (comando blu, sicurezza rossa, scienze viola, ingegneria ambra, volo giallo)
 - [x] Momenti di quiete: due ufficiali chiacchierano quando la plancia è calma (casa, la Lunga Notte, la nave, i piloti...)
@@ -287,7 +288,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 ## Come provarlo (per l'utente)
 1. `tools/avvia_editor.sh` (o apri ASTRA.uproject); il livello iniziale è la plancia (`L_Bridge`).
 2. Il servizio delle menti parte da solo al primo avvio della partita (oppure `cd mind && uv run astra-mind`).
-3. Premi Play: sei seduto sulla poltrona del capitano (**E** per alzarti e camminare, di nuovo **E** vicino alla poltrona per sederti; le porte in fondo portano ai corridoi). Tieni premuto **V** e parla al ponte in qualsiasi lingua (al primo uso macOS chiede il permesso del microfono), oppure dalla console (`) scrivi `astra.say Allarme rosso!`.
+3. Premi Play: sei seduto sulla poltrona del capitano (**E** per alzarti e camminare, di nuovo **E** vicino alla poltrona per sederti; le porte in fondo portano ai corridoi). Tieni premuto **V** e parla al ponte in qualsiasi lingua (al primo uso macOS chiede il permesso del microfono), oppure premi **T** e scrivi l'ordine (Invio per mandarlo).
 4. La battaglia parte da sola (dopo ~80 s si sveglia la fregata, dopo ~170 s arriva il gruppo d'attacco). Per accelerare: `astra.battle.time 168`, `astra.battle.timescale 3`.
 5. Quando l'Archon Solm chiama, parlagli direttamente (canale aperto): tutto ciò che non inizia con il nome/ruolo di un ufficiale va a lui. «Comunicazioni, chiudete il canale» per chiuderlo.
 6. Da terminale: `tools/ue.py pie start|stop` e `tools/ue.py pie cmd 'astra.say ...'` per provare senza toccare l'editor.

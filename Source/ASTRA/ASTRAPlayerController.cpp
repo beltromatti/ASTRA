@@ -7,6 +7,8 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Font.h"
 #include "AstraCampaign.h"
@@ -54,7 +56,7 @@ void AASTRAPlayerController::BeginPlay()
 				.Padding(FMargin(14, 8))
 				[
 					SNew(STextBlock).Font(Mono ? FSlateFontInfo(Mono, 13) : FCoreStyle::GetDefaultFontStyle("Mono", 13))
-					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  hold V  talk to the crew")))
+					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  hold V  talk to the crew  ·  T  type")))
 				]
 			];
 			VC->AddViewportWidgetContent(HintWidget.ToSharedRef(), 5);
@@ -109,6 +111,7 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
 		InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
+		InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AASTRAPlayerController::OnTypePressed);
 		// the lift's panel (only while it is open)
 		auto Deck = [this](const FKey& K, int32 N)
 		{
@@ -307,6 +310,7 @@ namespace
 	const TCHAR* HelpCard =
 		TEXT("ON THE BRIDGE\n")
 		TEXT("  V (hold)        talk to the crew, in any language\n")
+		TEXT("  T               type to the crew instead (Enter sends, Esc cancels)\n")
 		TEXT("  E               stand up / sit down · doors · the lift\n")
 		TEXT("  WASD, mouse     walk and look\n")
 		TEXT("  Esc             pause · save · menu\n")
@@ -406,6 +410,125 @@ void AASTRAPlayerController::ChooseDeck(int32 Number)
 	{
 		H->RideLift(GetPawn(), DeckLanding[Number]);
 	}
+}
+
+void AASTRAPlayerController::OnTypePressed()
+{
+	GetWorldTimerManager().SetTimerForNextTick(this, &AASTRAPlayerController::OpenOrderLine);
+}
+
+void AASTRAPlayerController::AstraTypeTest(const FString& Text)
+{
+	OpenOrderLine();
+	GetWorldTimerManager().SetTimerForNextTick([this, Text]()
+	{
+		FSlateApplication& App = FSlateApplication::Get();
+		for (const TCHAR Ch : Text)
+		{
+			App.ProcessKeyCharEvent(FCharacterEvent(Ch, FModifierKeysState(), 0, false));
+		}
+		UE_LOG(LogASTRA, Log, TEXT("[Order line] typed: %s"), OrderBox.IsValid() ? *OrderBox->GetText().ToString() : TEXT("(no box)"));
+		FTimerHandle H;
+		GetWorldTimerManager().SetTimer(H, []()
+		{
+			FSlateApplication::Get().ProcessKeyDownEvent(FKeyEvent(EKeys::Enter, FModifierKeysState(), 0, false, 13, 13));
+			FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(EKeys::Enter, FModifierKeysState(), 0, false, 13, 13));
+		}, 1.5f, false);
+	});
+}
+
+void AASTRAPlayerController::OpenOrderLine()
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC || OrderLine.IsValid() || LiftMenu.IsValid())
+	{
+		return;
+	}
+	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	const FSlateFontInfo Font = Mono ? FSlateFontInfo(Mono, 16) : FCoreStyle::GetDefaultFontStyle("Mono", 16);
+	const FSlateFontInfo Small = Mono ? FSlateFontInfo(Mono, 11) : FCoreStyle::GetDefaultFontStyle("Mono", 11);
+	OrderLine = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 0, 150))
+	[
+		SNew(SBox).WidthOverride(900.f)
+		[
+			SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.82f))
+			.Padding(FMargin(16, 10))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
+				[
+					SNew(STextBlock).Font(Small).ColorAndOpacity(FLinearColor(1.f, 0.84f, 0.47f, 0.9f))
+					.Text(FText::FromString(TEXT("CAPTAIN  ·  to the crew, in any language  ·  Enter sends  ·  Esc cancels")))
+				]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SAssignNew(OrderBox, SEditableTextBox).Font(Font)
+					.BackgroundColor(FLinearColor(0.02f, 0.03f, 0.045f, 1.f))
+					.ForegroundColor(FLinearColor(0.9f, 0.94f, 1.f))
+					.ClearKeyboardFocusOnCommit(false)
+					.OnKeyDownHandler_Lambda([this](const FGeometry&, const FKeyEvent& Key)
+					{
+						// Esc cancels the line (unhandled, it would climb to the game and open the menu)
+						if (Key.GetKey() == EKeys::Escape)
+						{
+							GetWorldTimerManager().SetTimerForNextTick(this, &AASTRAPlayerController::CloseOrderLine);
+							return FReply::Handled();
+						}
+						return FReply::Unhandled();
+					})
+					.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type How)
+					{
+						// only Enter sends and closes (a focus change keeps the line open: it takes the focus back)
+						if (How != ETextCommit::OnEnter)
+						{
+							return;
+						}
+						const FString Line = Text.ToString().TrimStartAndEnd();
+						if (!Line.IsEmpty())
+						{
+							if (UAstraMindSubsystem* Mind = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr)
+							{
+								Mind->SayText(Line);
+							}
+						}
+						// closed on the next tick: Slate is still inside the box's own event
+						GetWorldTimerManager().SetTimerForNextTick(this, &AASTRAPlayerController::CloseOrderLine);
+					})
+				]
+			]
+		]
+	];
+	VC->AddViewportWidgetContent(OrderLine.ToSharedRef(), 50);
+	FInputModeUIOnly Mode;
+	Mode.SetWidgetToFocus(OrderBox);
+	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+	SetInputMode(Mode);
+	FSlateApplication::Get().SetKeyboardFocus(OrderBox, EFocusCause::SetDirectly);
+	GetWorldTimerManager().SetTimer(OrderFocusTimer, [this]()
+	{
+		if (OrderBox.IsValid() && !OrderBox->HasKeyboardFocus())
+		{
+			FSlateApplication::Get().SetKeyboardFocus(OrderBox, EFocusCause::SetDirectly);
+		}
+	}, 0.1f, true);
+}
+
+void AASTRAPlayerController::CloseOrderLine()
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!OrderLine.IsValid())
+	{
+		return;             // already closed (removing the box commits it a second time, as focus lost)
+	}
+	if (VC)
+	{
+		VC->RemoveViewportWidgetContent(OrderLine.ToSharedRef());
+	}
+	GetWorldTimerManager().ClearTimer(OrderFocusTimer);
+	OrderLine.Reset();
+	OrderBox.Reset();
+	SetInputMode(FInputModeGameOnly());
+	UE_LOG(LogASTRA, Log, TEXT("[Order line] closed"));
 }
 
 void AASTRAPlayerController::ToggleHelp()

@@ -84,6 +84,15 @@ protected:
 	/** Console: pick a deck on the open lift panel (1 bridge, 2 engineering, 3 flight deck). */
 	UFUNCTION(Exec) void AstraDeck(int32 N) { if (LiftMenu.IsValid()) { ChooseDeck(N); } }
 	void ShowHelp(bool bShow);
+	/** T: a line typed to the crew instead of spoken (the voice is never required); Enter sends it, Esc cancels. */
+	void OnTypePressed();   // opens the line on the next tick (the T itself must not land in the box)
+	/** Test of the typed line through Slate itself: opens it, types the text key by key, presses Enter. */
+	UFUNCTION(Exec) void AstraTypeTest(const FString& Text);
+	void OpenOrderLine();
+	void CloseOrderLine();
+	TSharedPtr<class SWidget> OrderLine;
+	TSharedPtr<class SEditableTextBox> OrderBox;
+	FTimerHandle OrderFocusTimer;
 	TSharedPtr<class SWidget> HelpWidget;
 	TSharedPtr<class SWidget> HintWidget;
 	FTimerHandle HintTimer;
