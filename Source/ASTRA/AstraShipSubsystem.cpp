@@ -352,6 +352,17 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	{
 		return Battle ? Battle->BeginGateRun(Args, OutDetail) : false;
 	}
+	if (Name == TEXT("log_entry"))
+	{
+		// the Captain dictated the log: the chair's console takes it (a chirp), the ship's record keeps it
+		if (USoundBase* Chirp = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Console_Chirp.SW_Console_Chirp")))
+		{
+			UGameplayStatics::PlaySound2D(GetWorld(), Chirp, 0.5f, 0.92f);
+		}
+		Event(TEXT("log: captain's log entry recorded"), false);
+		OutDetail = TEXT("captain's log entry recorded");
+		return true;
+	}
 	if (Name == TEXT("holo_display"))
 	{
 		const FString M = Str(TEXT("mode")).ToLower();

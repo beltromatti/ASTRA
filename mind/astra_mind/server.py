@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import struct
 import sys
 import time
@@ -192,8 +193,10 @@ class Mind:
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander,
                                  news=self._fleet_news)
-        self.agent.campaign = lambda: self.director.campaign
+        # the Captain's log is private: the story reads it, the crew does not
+        self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
         self.agent.war = lambda: self.director.war.crew_view()
+        self.agent.mood = lambda: self.director.mood
         self.turns: asyncio.Queue = asyncio.Queue()
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.captain_t = 0.0                     # the last time the Captain spoke
@@ -216,6 +219,27 @@ class Mind:
             who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
             self.game.events.append(f"over the radio, {who}: {text}")
         await self.voice.say(speaker, text, lang, tone)
+
+    def record_log(self, entry: str) -> None:
+        """A captain's log entry: kept in Saved/Campaign/captains_log.md, noted for the director, acknowledged."""
+        path = os.path.join(os.path.dirname(self.director.war.save_path), "captains_log.md")
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"- {time.strftime('%Y-%m-%d %H:%M')} · {self.director.war.current}: {entry}\n")
+        except OSError:
+            log.exception("could not write the captain's log")
+        self.director.note(f"captain's log: {entry}")
+        asyncio.create_task(self._ack_log(entry))
+        log.info("captain's log: %s", entry)
+
+    async def _ack_log(self, entry: str) -> None:
+        if not (self.game and self.game.state):
+            return
+        try:
+            await self.game.execute("log_entry", {"text": entry[:200]}, "captain")
+        except Exception:  # noqa: BLE001
+            log.warning("the game did not acknowledge the log entry")
 
     async def _fleet_news(self, text: str) -> None:
         """War news from elsewhere in the March reaches the bridge over the fleet net (comms relays it)."""
@@ -280,6 +304,8 @@ class Mind:
             last_chat = time.monotonic()
             pair = random.sample(["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"], 2)
             topic = random.choice(self.QUIET_TOPICS)
+            if self.director.mood and random.random() < 0.35:   # what weighs on them now surfaces in the quiet
+                topic = f"what is on their minds now (the mood aboard: {self.director.mood})"
             fallen = str(st.get("casualties", "")).split("the fallen: ", 1)
             if len(fallen) == 2 and random.random() < 0.5:   # every loss has a name: they remember them
                 who = fallen[1].split("), ")[0].rstrip(")") + ")"
@@ -392,6 +418,11 @@ class Mind:
                     self.lang = lang
                     self.lang_file.parent.mkdir(parents=True, exist_ok=True)
                     self.lang_file.write_text(lang)
+                entry = captains_log_entry(text)
+                if entry is not None:
+                    # the Captain dictates the log: recorded (a chirp from the console), remembered by the story
+                    self.record_log(entry)
+                    continue
                 to_enemy = ""
                 if self.enemy.open:
                     # a channel is open: the words meant for the enemy go over it, the orders stay on the bridge
@@ -651,3 +682,15 @@ def tactical_flags(st: dict) -> list[str]:
     if isinstance(hull, (int, float)) and hull < 40:
         flags.append(f"our hull {int(hull)}%")
     return flags[:3]
+
+
+_LOG_START = _re.compile(r"^\s*(diario (?:di bordo )?del capitano|captain'?s log|journal (?:de bord )?du capitaine|diario del capit[aá]n|"
+                         r"bit[aá]cora del capit[aá]n|logbuch des kapit[aä]ns|kapit[aä]nslogbuch)\b[\s,.:;-]*", _re.IGNORECASE)
+
+
+def captains_log_entry(text: str) -> str | None:
+    """'Diario del capitano: ...' -> the entry (None if the Captain is not dictating the log)."""
+    m = _LOG_START.match(text or "")
+    if not m:
+        return None
+    return text[m.end():].strip() or "(no entry)"

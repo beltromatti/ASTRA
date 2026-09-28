@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-28 (mattina) · **Traguardo corrente:** M4 — La battaglia (poi tavolo olografico)
+**Ultimo aggiornamento:** 2026-09-28 (pomeriggio) · **Traguardo corrente:** M6 — La campagna (regista, diario, umore dell'equipaggio)
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -13,6 +13,7 @@
 | 2026-09-28 | 10,00 $ | 0,40 $ | battaglie di prova complete con comandanti nemici (≈0,001–0,002 $ a turno) |
 | 2026-09-28 | 10,00 $ | 0,63 $ | squadroni, regista della guerra, ammiraglio (≈0,002 $ per decisione del regista) |
 | 2026-09-28 | 10,00 $ | 0,77 $ | transiti nel Janus Gate, ordini della Flotta, prove complete del regista |
+| 2026-09-28 | 10,00 $ | 1,16 $ | indagini sui relitti, campagne complete di prova, consigliere tattico, umore dell'equipaggio |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -124,12 +125,15 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Tavolo olografico in modalità **settore** («Sensori, mappa del settore sul tavolo»): sistemi colorati per fazione, collegamenti dei Gate, anello dell'Aquila, rotta di transito che pulsa, sistemi minacciati con alone; la mappa si gira verso chi la guarda
 - [x] Nuovo beat del regista **investigate**: un luogo da esplorare dove si trova l'Aquila (stazione d'ascolto muta come Thule Watch, nave da guerra o mercantile alla deriva), buio e in lenta rotazione; le **scoperte** scritte dal regista arrivano a tappe (scansione attiva; squadriglia in ricognizione o Aquila a 5 km; affiancamento a 2 km) e restano nel registro della storia; un'eventuale **imboscata** di navi del Mandato a motori spenti si accende quando l'Aquila si avvicina, e il suo comandante chiama. Nuova mesh SM_STATION_ASTRA_Watch
 - [x] **Campagna salvata e ripresa**: menu iniziale (Slate, in inglese) con CONTINUE (riepilogo: sistema, scafo, caduti, ora), NEW CAMPAIGN (con conferma se c'è un salvataggio), QUIT; Esc/F10 in partita apre il menu e mette in pausa. Salvataggio automatico ogni minuto e a ogni svolta della storia: `Saved/Campaign/ship.json` (gioco: sistema, scafo, missili, squadriglie, caduti e feriti del ruolino), `war.json` e `story.json` (mente: mappa della guerra e registro della storia). Alla ripresa: la nave è in pattuglia nel sistema salvato col suo cielo, l'XO dà il bentornato con i dati veri, il regista decide subito cosa succede. Test: `tools/ue.py pie start` (nuova campagna automatica), `--continue`, `--menu`; console `astra.campaign new|continue`
+- [x] **Diario del capitano**: «Diario del capitano: …» (anche *Captain's log*, *Journal du capitaine*, *Diario del capitán*, *Logbuch des Kapitäns*) viene registrato dalla console della poltrona (cinguettio) e aggiunto a `Saved/Campaign/captains_log.md` con data e sistema; l'equipaggio non lo sente (è privato), il **regista lo legge** e la storia risponde a ciò che il Capitano pensa, teme e vuole
+- [x] **Umore dell'equipaggio**: a ogni svolta il regista scrive come si sente la plancia e perché, nominando gli ufficiali (lutto per i caduti, orgoglio, stanchezza, dubbi su un ordine, rabbia), e lo fa evolvere di beat in beat (salvato in `story.json`). Colora il modo in cui gli ufficiali parlano senza mai dichiararlo, e affiora nei momenti di quiete. Esempio reale dopo la prima battaglia: *«Exhausted but proud… Grief for the Vigilant sits under everything — Mensah's repair gangs work in silence, Price counts seven Hammers where there were eight»*; alla domanda sul morale Serra risponde «stanchi, ma orgogliosi di aver tenuto Aurelia. Il dolore per il Vigilant è ancora aperto…»
 
 ## Prossimi passi
-1. Plancia v2 secondo passaggio (dettagli, segnaletica), trama di pannelli per gli scafi (normal map), mercantile e caccia v2.
-2. Corridoi collegati alla plancia (porte che si aprono), hangar camminabile.
-3. Equipaggio: MetaHuman + labiale, gesti.
-4. Simulazione di calore (M2); caccia nemici; mappa strategica della guerra (M6); pianeta (M7).
+1. Mercantile v2 (è ancora il v1) e trama di pannelli per gli scafi (normal map).
+2. Altri ponti raggiungibili con l'ascensore: sala macchine con il capo Okonkwo, infermeria (i feriti del ruolino), alloggi.
+3. Pilotare un caccia in prima persona dal ponte di volo.
+4. Simulazione di calore (M2); discesa sul pianeta (M7); preparazione al multigiocatore (M8: autorità del server, comandi come RPC).
+5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
 
 ## Come provarlo (per l'utente)
 1. `tools/avvia_editor.sh` (o apri ASTRA.uproject); il livello iniziale è la plancia (`L_Bridge`).

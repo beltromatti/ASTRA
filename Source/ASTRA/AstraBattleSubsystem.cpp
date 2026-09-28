@@ -15,7 +15,7 @@
 
 namespace
 {
-	const double Km = 1000.0;
+	const double OneKm = 1000.0;
 	// ASTRA classes (the Mandate's are set where they spawn)
 	void BattleshipStats(FAstraBattleShip& S)
 	{
@@ -142,17 +142,17 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	// the picket: the flagship battleship is the strongest ship on the field (six triple turrets); with its destroyer it
 	// can trade blows with the Mandate strike group, but the fight is won only if the Aquila joins in
 	int32 I = AddShip(TEXT("T-01"), TEXT("ASN Praetorian"), TEXT("ASTRA battleship (7th Fleet flagship)"), TEXT("SM_SHIP_ASTRA_Praetorian"),
-	                  EAstraSide::Astra, A0 + Polar(4.5 * Km, 25, 3), 45.f, 288.f, 460.f, 5200.f, 2000.f);
+	                  EAstraSide::Astra, A0 + Polar(4.5 * OneKm, 25, 3), 45.f, 288.f, 460.f, 5200.f, 2000.f);
 	BattleshipStats(Ships[I]);
 	I = AddShip(TEXT("T-02"), TEXT("ASN Vigilant"), TEXT("ASTRA destroyer"), TEXT("SM_SHIP_ASTRA_Vigilant"), EAstraSide::Astra,
-	            A0 + Polar(3 * Km, 70, 2), 45.f, 288.f, 140.f, 1200.f, 500.f);
+	            A0 + Polar(3 * OneKm, 70, 2), 45.f, 288.f, 140.f, 1200.f, 500.f);
 	DestroyerStats(Ships[I]);
 	I = AddShip(TEXT("T-07"), TEXT("Brightwater"), TEXT("Free Guilds freighter"), TEXT("SM_SHIP_GUILD_Freighter"), EAstraSide::Neutral,
-	            A0 + Polar(22 * Km, 15, 4), 120.f, 180.f, 170.f, 700.f, 60.f);
+	            A0 + Polar(22 * OneKm, 15, 4), 120.f, 180.f, 170.f, 700.f, 60.f);
 	Ships[I].RailDamage = 0.f;
 	Ships[I].Missiles = 0;
 	I = AddShip(TEXT("T-11"), TEXT("Lethe"), TEXT("Kharon Mandate frigate, Lethe class"), TEXT("SM_SHIP_MANDATE_Lethe"), EAstraSide::Mandate,
-	            A0 + Polar(30 * Km, 200, -3), 30.f, 0.f, 90.f, 520.f, 220.f);
+	            A0 + Polar(30 * OneKm, 200, -3), 30.f, 0.f, 90.f, 520.f, 220.f);
 	Ships[I].bCold = true;
 	Ships[I].bIdentified = false;
 	Ships[I].Missiles = 8;
@@ -182,7 +182,7 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	// Janus Gate Aurelia: 110 km out on bearing 070 (where the Mandate comes from), its ring facing us
 	{
-		const FVector GPos = Ships[0].Pos + Polar(110 * Km, 70, 3);
+		const FVector GPos = Ships[0].Pos + Polar(110 * OneKm, 70, 3);
 		SpawnGate(GPos, FRotationMatrix::MakeFromX((Ships[0].Pos - GPos).GetSafeNormal()).ToQuat() * FQuat(FVector::XAxisVector, 0.3f));
 	}
 	SyncVisuals();
@@ -309,7 +309,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	for (const FSpawnRequest& R : GSpawnRequests)
 	{
 		const FRotator Bow = Ships[0].Att.Rotator();
-		const FVector Pos = Ships[0].Pos + Polar(R.RangeKm * Km, Bow.Yaw + R.RelBearing, Bow.Pitch + 2.0);
+		const FVector Pos = Ships[0].Pos + Polar(R.RangeKm * OneKm, Bow.Yaw + R.RelBearing, Bow.Pitch + 2.0);
 		const bool bBig = R.Kind == TEXT("acheron");
 		const FString Mesh = bBig ? TEXT("SM_SHIP_MANDATE_Acheron") : (R.Kind == TEXT("lethe") ? TEXT("SM_SHIP_MANDATE_Lethe") : TEXT("SM_SHIP_MANDATE_Styx"));
 		// broadside to us: its heading is perpendicular to our line of sight
@@ -351,7 +351,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 				const FAstraBattleShip* T = FindById(S.TargetId);
 				UE_LOG(LogASTRA, Log, TEXT("[Status] t=%.0f %s %-12s %s hull %4.0f/%4.0f shield %4.0f/%4.0f target %s range %.1f km mode %d%s%s"), Time,
 				       *S.ContactId, *S.Name, S.bAlive ? TEXT("alive") : TEXT("DEAD "), S.Hull, S.HullMax, S.Shield, S.ShieldMax,
-				       T ? *T->ContactId : TEXT("-"), T ? FVector::Dist(S.Pos, T->Pos) / Km : 0.0, (int32)S.Mode,
+				       T ? *T->ContactId : TEXT("-"), T ? FVector::Dist(S.Pos, T->Pos) / OneKm : 0.0, (int32)S.Mode,
 				       S.bHoldFire ? TEXT(" HOLD") : TEXT(""), S.bFleeing ? TEXT(" FLEE") : TEXT(""));
 			}
 		}
@@ -362,7 +362,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		const FAstraWreck& G = Landmarks[GateLandmark];
 		const FVector Axis = G.Att.GetForwardVector();
 		const float Side = FVector::DotProduct(Ships[0].Pos - G.Pos, Axis) >= 0.0 ? 1.f : -1.f;
-		Ships[0].Pos = G.Pos + Axis * Side * 30 * Km;
+		Ships[0].Pos = G.Pos + Axis * Side * 30 * OneKm;
 		const FVector Dir = -Axis * Side;
 		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 		{
@@ -457,15 +457,15 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	if (StageDone == 1 && Time > 170.f)
 	{
 		StageDone = 2;
-		const FVector C = Ships[0].Pos + Polar(25 * Km, 70, 4);
+		const FVector C = Ships[0].Pos + Polar(25 * OneKm, 70, 4);
 		const int32 A = AddShip(TEXT("T-21"), TEXT("Acheron"), TEXT("Kharon Mandate cruiser (flagship of Archon Varek Solm)"),
 		                        TEXT("SM_SHIP_MANDATE_Acheron"), EAstraSide::Mandate, C, 70.f, 500.f, 240.f, 3600.f, 1500.f);
 		const int32 B = AddShip(TEXT("T-22"), TEXT("Styx"), TEXT("Kharon Mandate destroyer, Styx class"), TEXT("SM_SHIP_MANDATE_Styx"),
-		                        EAstraSide::Mandate, C + Polar(4 * Km, 340, 1), 70.f, 550.f, 130.f, 1300.f, 500.f);
+		                        EAstraSide::Mandate, C + Polar(4 * OneKm, 340, 1), 70.f, 550.f, 130.f, 1300.f, 500.f);
 		const int32 D = AddShip(TEXT("T-23"), TEXT("Cocytus"), TEXT("Kharon Mandate destroyer, Styx class"), TEXT("SM_SHIP_MANDATE_Styx"),
-		                        EAstraSide::Mandate, C + Polar(4 * Km, 160, -2), 70.f, 550.f, 130.f, 1300.f, 500.f);
+		                        EAstraSide::Mandate, C + Polar(4 * OneKm, 160, -2), 70.f, 550.f, 130.f, 1300.f, 500.f);
 		const int32 E = AddShip(TEXT("T-24"), TEXT("Phlegethon"), TEXT("Kharon Mandate destroyer, Styx class"), TEXT("SM_SHIP_MANDATE_Styx"),
-		                        EAstraSide::Mandate, C + Polar(5 * Km, 250, 3), 70.f, 550.f, 130.f, 1300.f, 500.f);
+		                        EAstraSide::Mandate, C + Polar(5 * OneKm, 250, 3), 70.f, 550.f, 130.f, 1300.f, 500.f);
 		for (int32 Idx : {A, B, D, E})
 		{
 			FAstraBattleShip& S = Ships[Idx];
@@ -653,7 +653,7 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 	{
 		for (const FAstraBattleShip& O : Ships)
 		{
-			if (O.bAlive && O.bHostile && FVector::Dist(S.Pos, O.Pos) < 40 * Km)
+			if (O.bAlive && O.bHostile && FVector::Dist(S.Pos, O.Pos) < 40 * OneKm)
 			{
 				DesiredVel = (S.Pos - O.Pos).GetSafeNormal() * 260.f;
 				Face = DesiredVel.GetSafeNormal();
@@ -663,7 +663,7 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 	if (S.Mode == EAstraShipMode::Attack && T)
 	{
 		// hold a preferred engagement range, circling at an angle; break off when badly hurt
-		const float Pref = S.Radius > 200.f ? 4 * Km : 3 * Km;
+		const float Pref = S.Radius > 200.f ? 4 * OneKm : 3 * OneKm;
 		const FVector ToT = T->Pos - S.Pos;
 		const double Dist = ToT.Size();
 		const FVector Dir = ToT / FMath::Max(1.0, Dist);
@@ -690,7 +690,7 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 	{
 		DesiredVel = (S.Pos - Ships[0].Pos).GetSafeNormal() * S.CruiseSpeed * 1.3f;
 		Face = DesiredVel.GetSafeNormal();
-		if (FVector::Dist(S.Pos, Ships[0].Pos) > 160 * Km && S.bAlive)
+		if (FVector::Dist(S.Pos, Ships[0].Pos) > 160 * OneKm && S.bAlive)
 		{
 			const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
 			S.bAlive = false;   // out of the theatre (jumped away)
@@ -798,7 +798,7 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 			FireRail(S, *T, (0.0012f + Dist / 30e6) * (S.bJammed ? 3.f : 1.f));
 		}
 	}
-	if (S.Missiles > 0 && S.MissileT <= 0.f && Dist < S.MissileRange && Dist > 2.5 * Km && T->Side != EAstraSide::Neutral)
+	if (S.Missiles > 0 && S.MissileT <= 0.f && Dist < S.MissileRange && Dist > 2.5 * OneKm && T->Side != EAstraSide::Neutral)
 	{
 		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f);
 		const int32 N = FMath::Min(S.Missiles, S.Radius > 200.f ? 4 : 2);
@@ -825,7 +825,7 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 			}
 		}
 	}
-	if (Dist < 4 * Km && FMath::FRand() < Dt * 0.6f)
+	if (Dist < 4 * OneKm && FMath::FRand() < Dt * 0.6f)
 	{
 		FireLaser(S, *T);
 	}
@@ -939,7 +939,7 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 		P.RailVolleys = FMath::Clamp(Salvo, 1, 12);
 		OutDetail = Dist > P.RailRange
 			? FString::Printf(TEXT("railguns assigned to %s, now at %.0f km: they open fire by themselves once it is inside %.0f km (%d volleys)"),
-			                  *T->ContactId, Dist / Km, P.RailRange / Km, P.RailVolleys)
+			                  *T->ContactId, Dist / OneKm, P.RailRange / OneKm, P.RailVolleys)
 			: FString::Printf(TEXT("railguns engaging %s: %d volleys of %d slugs, one every %.0f s, time of flight %.1f s"),
 			                  *T->ContactId, P.RailVolleys, P.RailSlugs, P.RailCd, Dist / 12000.0);
 	}
@@ -970,7 +970,7 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 	{
 		P.FireTarget = T->Id;
 		P.LaserShots = FMath::Clamp(Salvo, 1, 12) * 2;
-		OutDetail = Dist > 4 * Km ? FString::Printf(TEXT("lasers assigned to %s, now at %.1f km: they fire once it is inside 4 km"), *T->ContactId, Dist / Km)
+		OutDetail = Dist > 4 * OneKm ? FString::Printf(TEXT("lasers assigned to %s, now at %.1f km: they fire once it is inside 4 km"), *T->ContactId, Dist / OneKm)
 		                          : FString::Printf(TEXT("laser batteries firing on %s"), *T->ContactId);
 	}
 	else
@@ -1015,7 +1015,7 @@ UAstraBattleSubsystem::FFireControl UAstraBattleSubsystem::GetFireControl() cons
 		if (P.RailVolleys > 0 || P.LaserShots > 0)
 		{
 			F.Target = T->ContactId;
-			F.TargetRangeKm = FVector::Dist(P.Pos, T->Pos) / Km;
+			F.TargetRangeKm = FVector::Dist(P.Pos, T->Pos) / OneKm;
 		}
 	}
 	F.RailVolleys = P.RailVolleys;
@@ -1067,7 +1067,7 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		B.bHoldFire = S.bHoldFire;
 		B.bTargeted = !S.bPlayer && (P.FireTarget == S.Id) && (P.RailVolleys > 0 || P.LaserShots > 0);
 		B.Size = S.Radius >= 300.f ? 1.f : (S.Radius >= 200.f ? 0.85f : (S.Radius >= 130.f ? 0.7f : 0.55f));
-		B.RangeKm = FVector::Dist(S.Pos, P.Pos) / Km;
+		B.RangeKm = FVector::Dist(S.Pos, P.Pos) / OneKm;
 		B.Name = S.bIdentified ? S.Name : FString();
 		B.Contact = S.ContactId;
 		if (S.bCraft && Squadrons.IsValidIndex(S.Squadron))
@@ -1125,9 +1125,9 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::PlayerWeaponsJson() const
 	const double Dist = T ? FVector::Dist(P.Pos, T->Pos) : 0.0;
 	W->SetStringField(TEXT("railguns"), (T && P.RailVolleys > 0)
 		? (Dist > P.RailRange ? FString::Printf(TEXT("assigned to %s, waiting for it to close inside %.0f km (now %.0f km), %d volleys queued"),
-		                                        *T->ContactId, P.RailRange / Km, Dist / Km, P.RailVolleys)
+		                                        *T->ContactId, P.RailRange / OneKm, Dist / OneKm, P.RailVolleys)
 		                      : FString::Printf(TEXT("engaging %s, %d volleys left, next in %.0f s"), *T->ContactId, P.RailVolleys, P.RailT))
-		: FString::Printf(TEXT("ready, 4 twin turrets, range %.0f km, one volley every %.0f s"), P.RailRange / Km, P.RailCd));
+		: FString::Printf(TEXT("ready, 4 twin turrets, range %.0f km, one volley every %.0f s"), P.RailRange / OneKm, P.RailCd));
 	W->SetStringField(TEXT("lasers"), (T && P.LaserShots > 0) ? FString::Printf(TEXT("assigned to %s, %d shots queued"), *T->ContactId, P.LaserShots)
 	                                                          : FString(TEXT("ready, 12 batteries, range 4 km")));
 	int32 InFlight = 0;
@@ -1169,7 +1169,7 @@ void UAstraBattleSubsystem::TickPlayerFire(FAstraBattleShip& P, float Dt)
 			FireRail(P, *T, 0.001f + Dist / 30e6);
 		}
 	}
-	if (P.LaserShots > 0 && P.LaserT <= 0.f && Dist <= 4 * Km)
+	if (P.LaserShots > 0 && P.LaserT <= 0.f && Dist <= 4 * OneKm)
 	{
 		P.LaserT = 0.5f;
 		--P.LaserShots;
@@ -1226,7 +1226,7 @@ bool UAstraBattleSubsystem::ContactGeometry(const FString& ContactId, double& Ou
 	const FVector Aim = T->Pos + T->Vel * Lead;
 	OutBearing = BearingDeg(P.Pos, Aim);
 	OutMark = MarkDeg(P.Pos, Aim);
-	OutRangeKm = D / Km;
+	OutRangeKm = D / OneKm;
 	return true;
 }
 
@@ -1834,7 +1834,7 @@ FString UAstraBattleSubsystem::EnemyCraftSummary() const
 			Nearest = FMath::Min(Nearest, (double)FVector::Dist(S.Pos, Ships[0].Pos));
 		}
 	}
-	return N ? FString::Printf(TEXT("%d Harpy strike fighters airborne (rockets and guns), the nearest %.1f km from us"), N, Nearest / Km)
+	return N ? FString::Printf(TEXT("%d Harpy strike fighters airborne (rockets and guns), the nearest %.1f km from us"), N, Nearest / OneKm)
 	         : FString(TEXT("none"));
 }
 
@@ -2188,7 +2188,7 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 				if (S.DriveFlare) { S.DriveFlare->Destroy(); S.DriveFlare = nullptr; }
 				return;
 			}
-			if (FVector::Dist(S.Pos, Ships[0].Pos) > 80 * Km)
+			if (FVector::Dist(S.Pos, Ships[0].Pos) > 80 * OneKm)
 			{
 				S.bAlive = false;
 				if (S.Actor) { S.Actor->Destroy(); S.Actor = nullptr; }
@@ -2534,7 +2534,7 @@ void UAstraBattleSubsystem::TickWrecks(float Dt)
 		W.Age += Dt;
 		W.Pos += W.Vel * Dt;
 		W.Att = FQuat(W.SpinAxis, FMath::DegreesToRadians(W.SpinDeg * Dt)) * W.Att;
-		if (!W.Actor || (W.Life > 0.f && W.Age > W.Life) || FVector::Dist(W.Pos, Ships[0].Pos) > 200 * Km)
+		if (!W.Actor || (W.Life > 0.f && W.Age > W.Life) || FVector::Dist(W.Pos, Ships[0].Pos) > 200 * OneKm)
 		{
 			if (W.Actor) { W.Actor->Destroy(); }
 			Wrecks.RemoveAtSwap(i);
@@ -2668,7 +2668,7 @@ bool UAstraBattleSubsystem::StartBeat(const TSharedPtr<FJsonObject>& Beat, FStri
 		Beat->TryGetNumberField(TEXT("bearing_deg"), Brg);
 		Beat->TryGetNumberField(TEXT("range_km"), Rng);
 		Rng = FMath::Clamp(Rng, 12.0, 60.0);
-		const FVector Pos = Ships[0].Pos + Polar(Rng * Km, Brg, FMath::FRandRange(-4.f, 4.f));
+		const FVector Pos = Ships[0].Pos + Polar(Rng * OneKm, Brg, FMath::FRandRange(-4.f, 4.f));
 		const FString Cid = FString::Printf(TEXT("T-%d"), NextContact++);
 		const bool bStation = Kind.Contains(TEXT("post")) || Kind.Contains(TEXT("station"));
 		const bool bWarship = Kind.Contains(TEXT("warship"));
@@ -2709,7 +2709,7 @@ bool UAstraBattleSubsystem::StartBeat(const TSharedPtr<FJsonObject>& Beat, FStri
 				FString Cls = TEXT("styx"), Nm = TEXT("Unknown");
 				if (O.IsValid()) { O->TryGetStringField(TEXT("class"), Cls); O->TryGetStringField(TEXT("name"), Nm); }
 				const FString AId = FString::Printf(TEXT("T-%d"), NextContact++);
-				const FVector APos = Pos + Polar(FMath::FRandRange(3.f, 6.5f) * Km, FMath::FRandRange(0.f, 359.f), FMath::FRandRange(-6.f, 6.f));
+				const FVector APos = Pos + Polar(FMath::FRandRange(3.f, 6.5f) * OneKm, FMath::FRandRange(0.f, 359.f), FMath::FRandRange(-6.f, 6.f));
 				const int32 J = SpawnClass(Cls, AId, Nm, APos, FMath::FRandRange(0.f, 360.f));
 				FAstraBattleShip& A = Ships[J];
 				A.bCold = true;           // lying dark: drives off, no emissions
@@ -2786,7 +2786,7 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 	int32 NextIdx = 0;
 	auto TakeId = [&]() { return Ids.IsValidIndex(NextIdx) ? Ids[NextIdx++] : FString::Printf(TEXT("T-%d"), NextContact++); };
 	const int32 PlayerId = Ships[0].Id;                  // copies: spawning may reallocate Ships
-	const FVector Centre = Ships[0].Pos + Polar(Range * Km, Bearing, FMath::FRandRange(-3.f, 5.f));
+	const FVector Centre = Ships[0].Pos + Polar(Range * OneKm, Bearing, FMath::FRandRange(-3.f, 5.f));
 	const float Facing = (float)FMath::Fmod(Bearing + 180.0, 360.0);   // they come towards us
 	auto ShipSpecs = [&Beat](const TCHAR* Field) -> TArray<TSharedPtr<FJsonObject>>
 	{
@@ -2820,7 +2820,7 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			Spec->TryGetStringField(TEXT("class"), Class);
 			Spec->TryGetStringField(TEXT("name"), Name);
 			const FString Id = TakeId();
-			const FVector Pos = Centre + Polar(k == 0 ? 0.0 : 3.5 * Km, Bearing + 90.0 + 70.0 * k, (k % 2) ? 2.0 : -2.0);
+			const FVector Pos = Centre + Polar(k == 0 ? 0.0 : 3.5 * OneKm, Bearing + 90.0 + 70.0 * k, (k % 2) ? 2.0 : -2.0);
 			const int32 I = SpawnClass(Type == TEXT("reinforcements") && !Class.ToLower().Contains(TEXT("praetorian")) ? TEXT("vigilant") : Class, Id,
 			                           Name.IsEmpty() ? Id : Name, Pos, Facing);
 			if (Type == TEXT("raid") && Ships[I].Radius >= 200.f)
@@ -2899,7 +2899,7 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			const FString Id = TakeId();
 			// the raiders come from further out, behind their prey
 			const int32 I = SpawnClass(Class.IsEmpty() ? TEXT("lethe") : Class, Id, Name.IsEmpty() ? Id : Name,
-			                           Centre + Polar(11.0 * Km, Bearing + FMath::FRandRange(-25.f, 25.f), 1.0), Facing);
+			                           Centre + Polar(11.0 * OneKm, Bearing + FMath::FRandRange(-25.f, 25.f), 1.0), Facing);
 			Ships[I].TargetId = Ships[V].Id;
 			if (k == 0)
 			{
@@ -3066,12 +3066,12 @@ bool UAstraBattleSubsystem::BeginGateRun(const TSharedPtr<FJsonObject>& Args, FS
 	GateRun = EAstraGateRun::Approach;
 	GateSteerT = 0.f;
 	Ship->SetThrottle(100.f);
-	const FVector Aim = G.Pos + Axis * GateSide * LaneEntryKm * Km;
+	const FVector Aim = G.Pos + Axis * GateSide * LaneEntryKm * OneKm;
 	const double D = FVector::Dist(Ships[0].Pos, Aim);
 	OutDetail = FString::Printf(TEXT("course laid in for the Janus Gate (bearing %03.0f, %.0f km); Keeper Station tunes it to the %s system (%s star). "
 	                                 "Full ahead to the approach lane %.0f km off the ring, where the gate's field takes the ship and draws her "
 	                                 "through (no turning back once in the lane); transit in about %s%s"),
-	                            BearingDeg(Ships[0].Pos, G.Pos), FVector::Dist(Ships[0].Pos, G.Pos) / Km, *L.Name, *L.StarClass.Replace(TEXT("_"), TEXT("-")),
+	                            BearingDeg(Ships[0].Pos, G.Pos), FVector::Dist(Ships[0].Pos, G.Pos) / OneKm, *L.Name, *L.StarClass.Replace(TEXT("_"), TEXT("-")),
 	                            LaneEntryKm, *EtaText(D / 480.0 + 22.0), bEngagementActive ? TEXT(" — the engagement will be left behind") : TEXT(""));
 	Report(FString::Printf(TEXT("helm: Janus approach to the %s system begun"), *L.Name), false);
 	return true;
@@ -3147,7 +3147,7 @@ void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 		}
 	}
 	// the system's gate, some way off the bow
-	const FVector GPos = P.Pos + Polar(70 * Km, P.Att.Rotator().Yaw + 35.0, 2.0);
+	const FVector GPos = P.Pos + Polar(70 * OneKm, P.Att.Rotator().Yaw + 35.0, 2.0);
 	SpawnGate(GPos, FRotationMatrix::MakeFromX((P.Pos - GPos).GetSafeNormal()).ToQuat() * FQuat(FVector::XAxisVector, 0.8f));
 	SyncVisuals();
 	bStarted = true;
@@ -3186,7 +3186,7 @@ void UAstraBattleSubsystem::TickPOIs(float Dt)
 		}
 		const double D = FVector::Dist(Ships[0].Pos, S->Pos);
 		// the ambush wakes when the Aquila is close enough to be sure of her
-		if (!Poi.bAmbushSprung && Poi.Ambush.Num() && D < Poi.AmbushKm * Km)
+		if (!Poi.bAmbushSprung && Poi.Ambush.Num() && D < Poi.AmbushKm * OneKm)
 		{
 			Poi.bAmbushSprung = true;
 			int32 N = 0;
@@ -3226,7 +3226,7 @@ void UAstraBattleSubsystem::TickPOIs(float Dt)
 		{
 			bCraftThere |= C.bAlive && C.bCraft && C.Side == EAstraSide::Astra && FVector::Dist(C.Pos, S->Pos) < 1500.0;
 		}
-		if ((Poi.Revealed == 0 && D < 8 * Km) || (Poi.Revealed == 1 && (D < 5 * Km || bCraftThere)) || (Poi.Revealed == 2 && D < 2 * Km))
+		if ((Poi.Revealed == 0 && D < 8 * OneKm) || (Poi.Revealed == 1 && (D < 5 * OneKm || bCraftThere)) || (Poi.Revealed == 2 && D < 2 * OneKm))
 		{
 			RevealPOI(Poi);
 		}
@@ -3249,7 +3249,7 @@ int32 UAstraBattleSubsystem::HostilesFighting(double WithinKm) const
 	int32 N = 0;
 	for (const FAstraBattleShip& S : Ships)
 	{
-		if (S.bAlive && S.bHostile && !S.bCraft && !S.bFleeing && !S.bHoldFire && FVector::Dist(S.Pos, Ships[0].Pos) < WithinKm * Km)
+		if (S.bAlive && S.bHostile && !S.bCraft && !S.bFleeing && !S.bHoldFire && FVector::Dist(S.Pos, Ships[0].Pos) < WithinKm * OneKm)
 		{
 			++N;
 		}
@@ -3266,7 +3266,7 @@ FString UAstraBattleSubsystem::GateStatus() const
 	const FAstraWreck& G = Landmarks[GateLandmark];
 	const FAstraBattleShip& P = Ships[0];
 	FString Out = FString::Printf(TEXT("Janus Gate: bearing %03.0f mark %.0f, %.1f km"), BearingDeg(P.Pos, G.Pos), MarkDeg(P.Pos, G.Pos),
-	                              FVector::Dist(P.Pos, G.Pos) / Km);
+	                              FVector::Dist(P.Pos, G.Pos) / OneKm);
 	if (const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr)
 	{
 		if (const FAstraSectorSystem* Here = Ship->FindSector(Ship->GetSystemName()))
@@ -3276,9 +3276,9 @@ FString UAstraBattleSubsystem::GateStatus() const
 	}
 	if (GateRun == EAstraGateRun::Approach)
 	{
-		const FVector Aim = G.Pos + G.Att.GetForwardVector() * GateSide * LaneEntryKm * Km;
+		const FVector Aim = G.Pos + G.Att.GetForwardVector() * GateSide * LaneEntryKm * OneKm;
 		const double D = FVector::Dist(P.Pos, Aim);
-		Out += FString::Printf(TEXT("; Janus approach to the %s system under way: %.0f km to the lane, transit in about %s"), *GateDest, D / Km,
+		Out += FString::Printf(TEXT("; Janus approach to the %s system under way: %.0f km to the lane, transit in about %s"), *GateDest, D / OneKm,
 		                       *EtaText(D / FMath::Max(150.0, (double)P.Vel.Size()) + 22.0));
 	}
 	else if (GateRun == EAstraGateRun::Lane)
@@ -3367,7 +3367,7 @@ void UAstraBattleSubsystem::TickGateRun(float Dt)
 		const double R = (Rel - N * A).Size();
 		const FVector F = P.Att.GetForwardVector();
 		// inside the approach cone, bow towards the ring: the lane field takes the ship
-		if (A > 3 * Km && A < 2 * LaneEntryKm * Km && R < 0.5 * A + 4 * Km && FVector::DotProduct(F, -N) > 0.35)
+		if (A > 3 * OneKm && A < 2 * LaneEntryKm * OneKm && R < 0.5 * A + 4 * OneKm && FVector::DotProduct(F, -N) > 0.35)
 		{
 			GateRun = EAstraGateRun::Lane;
 			LaneT = 0.0;
@@ -3387,7 +3387,7 @@ void UAstraBattleSubsystem::TickGateRun(float Dt)
 		if ((GateSteerT -= Dt) <= 0.f)
 		{
 			GateSteerT = 0.5f;
-			const FVector Aim = G.Pos + N * LaneEntryKm * Km;
+			const FVector Aim = G.Pos + N * LaneEntryKm * OneKm;
 			Ship->SteerTo((float)BearingDeg(P.Pos, Aim), (float)MarkDeg(P.Pos, Aim));
 		}
 		return;
@@ -3506,7 +3506,7 @@ void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
 	// out of the destination's gate: its ring right behind us, the ship still carrying the lane's speed
 	const FVector Bow = Ships[0].Att.GetForwardVector();
 	GateLandmark = INDEX_NONE;
-	SpawnGate(Ships[0].Pos - Bow * 1.5 * Km, FRotationMatrix::MakeFromX(Bow).ToQuat() * FQuat(FVector::XAxisVector, FMath::FRandRange(0.f, 1.f)));
+	SpawnGate(Ships[0].Pos - Bow * 1.5 * OneKm, FRotationMatrix::MakeFromX(Bow).ToQuat() * FQuat(FVector::XAxisVector, FMath::FRandRange(0.f, 1.f)));
 	GateHeat = 1.f;
 	GateRun = EAstraGateRun::None;
 	FleetOrderedDest.Empty();

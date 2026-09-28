@@ -72,8 +72,12 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "missiles": {"type": "integer", "description": "resupply: missiles brought aboard"},
     "duration_s": {"type": "number", "description": "resupply: how long it takes (60-300)"},
     "system_name": {"type": "string", "description": "transit: the system Fleet sends the Aquila to — one the gate here reaches"},
-    "why": {"type": "string", "description": "the story reason, one sentence (for the campaign log)"}},
-    ["type", "why"])
+    "why": {"type": "string", "description": "the story reason, one sentence (for the campaign log)"},
+    "crew_mood": {"type": "string", "description": "how the Aquila's bridge crew feels now and why, in English, 1-2 "
+                  "sentences naming officers where it matters (Serra XO, Ferri helm, Tanaka ops, Voss tactical, Martin "
+                  "comms, Nair sensors, Mensah engineering, Price flight): grief for the fallen, pride, fatigue, anger, "
+                  "doubt about an order, hope. It colours how they speak until the next beat"}},
+    ["type", "why", "crew_mood"])
 WAR_NEWS = _fn("war_news", "Something happens elsewhere in the March, and the fleet net reports it (the crew hears it). "
                            "It may change who holds a system or how threatened it is. Use it to keep the war alive "
                            "beyond the Aquila: consequences of her victories and failures, the enemy's moves, the "
@@ -118,6 +122,11 @@ Rules
   consequence of what happened and of the enemy's plans. Mandate ships never appear deep in ASTRA space without a
   reason (a gate they hold, a breakthrough reported first).
 - If the Captain has not acted on Fleet's orders for a long while, Rourke may press them, or the war may come to them.
+- `crew_mood`: the people aboard live this war. Losses (the casualties in the live state), close calls, victories,
+  the Captain's choices (mercy, ruthlessness, retreats, promises kept or broken) and long waits change how the crew
+  feels; carry it from beat to beat and let it evolve (the mood before this beat: {mood}).
+- The Captain's own log entries ("captain's log: …" in the campaign log) are the player telling you what they
+  think, fear and want: let the story answer them (a suspicion confirmed or proven wrong, a hope rewarded or tested).
 - Keep the whole thing coherent with the map, the campaign log below and the live state.
 
 The Aurelia March (the sector at war; each system's Janus Gate is bound to the ones in brackets)
@@ -172,12 +181,14 @@ class Director:
         self.voice_i = 0
         self.admiral_history: list[dict[str, Any]] = []
         self.last_event_t = time.monotonic()   # the last time the story moved (a director event or a beat)
+        self.mood = ""                          # how the bridge crew feels (the director's latest word on it)
 
     def reset(self) -> None:
         """A new campaign: the war begins again at Aurelia."""
         self.war.reset()
         self.war.save()
         self.campaign.clear()
+        self.mood = ""
         self.busy = False
         self.granted = False
         self.admiral_history.clear()
@@ -192,8 +203,10 @@ class Director:
                 d = json.load(f)
             self.campaign[:] = d.get("campaign", [])[-30:]
             self.voice_i = int(d.get("voice_i", 0))
+            self.mood = str(d.get("mood", ""))
         except (OSError, ValueError):
             self.campaign.clear()
+            self.mood = ""
         self.busy = False
         self.granted = False
         self.admiral_history.clear()
@@ -209,7 +222,7 @@ class Director:
             os.makedirs(os.path.dirname(self._story_path()), exist_ok=True)
             tmp = self._story_path() + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"campaign": self.campaign, "voice_i": self.voice_i}, f, ensure_ascii=False, indent=1)
+                json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood}, f, ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:
             log.exception("could not save the story")
@@ -243,6 +256,7 @@ class Director:
     async def _next_beat(self, lang: str, state: dict[str, Any]) -> None:
         t0 = time.perf_counter()
         prompt = DIRECTOR_PROMPT.format(world=WORLD, lang_name=LANG_NAMES.get(lang, lang), war=self.war.brief(),
+                                        mood=self.mood or "not yet set: the patrol has just begun",
                                         campaign="\n".join(f"- {c}" for c in self.campaign) or "- (the war has just begun)",
                                         state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
         beat: dict[str, Any] = {}
@@ -272,6 +286,11 @@ class Director:
         if comp.error or not beat:
             log.error("director produced no beat: %s %r", comp.error, comp.content[:200])
             return
+        mood = (beat.pop("crew_mood", "") or "").strip()
+        if mood:
+            self.mood = mood[:400]
+            log.info("crew mood: %s", self.mood)
+            self.save()
         if beat.get("type") == "transit":
             dest = self.war.find(beat.get("system_name", ""))
             if not dest or not self.war.linked(self.war.current, dest):
