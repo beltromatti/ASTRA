@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-28 · **Traguardo corrente:** M0 — Fondamenta (in corso)
+**Ultimo aggiornamento:** 2026-09-28 · **Traguardo corrente:** M1 — La nave che si cammina (M0 completato salvo i test di prestazioni, che faccio sul primo livello vero)
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -14,7 +14,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 
 ## Preparazione (checklist dell'utente) — completata 2026-09-28
 - [x] Chiavi nel `.env`: OpenRouter, Sketchfab, Blendkit (recuperata da me), Hugging Face, Freesound, api.data.gov — tutte verificate con chiamate reali.
-- [x] DeepSeek diretto: **non usato** (scelta dell'utente) → DeepSeek V4.1 Flash via OpenRouter, doppio canale tra due provider (Fireworks + Together).
+- [x] DeepSeek diretto: **non usato** (scelta dell'utente) → DeepSeek V4.1 Flash via OpenRouter, doppio canale tra due provider (Modal + Together).
 - [x] ElevenLabs: non usato per ora (voce locale).
 - [x] GitHub: gh CLI autenticato via SSH come `beltromatti`.
 - [x] Accessi nel browser integrato: Fab, Sketchfab, Blendkit, Hugging Face, Freesound, Mixamo, GitHub, OpenRouter.
@@ -30,13 +30,13 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] MCP ufficiale attivo + toolset `AstraAgentTools` (Python arbitrario) + client `tools/ue.py`; verifica con catture (docs/progressi/)
 - [x] Guida di stile (docs/STILE.md) + Bibbia di ASTRA (docs/BIBBIA.md) — bozze v0.1
 - [x] Benchmark modelli AI → scelta: DeepSeek V4.1 Flash (Modal + Together in doppio canale) per ufficiali/equipaggio; Ling 3.0 Flash per chiacchiere; MiniMax-M3 candidato per capitani/ammiragli (docs/bench/)
-- [ ] Servizio voce di base (Parakeet/WhisperKit + Pocket TTS + labiale) e prova end-to-end
+- [x] Catena vocale di base verificata: Pocket TTS italiano 60 ms al primo audio (×8 tempo reale, CPU), WhisperKit 0,6 s su un ordine di 4 s con lingua automatica e glossario (docs/bench/voce_2026-09-28.md). Labiale e voci su misura → M3
 - [ ] Test di prestazioni automatici (CsvProfile) con gate
 
 ## Prossimi passi
-1. Servizio voce: Pocket TTS (italiano, CPU) + riconoscimento vocale (WhisperKit/Parakeet sul chip neurale) + prova andata-ritorno.
-2. Test di prestazioni automatici (CsvProfile) con gate.
-3. M1: kit modulare ASTRA (Blender procedurale) e nucleo della nave Aquila.
+1. M1: pipeline artistica (Blender procedurale): kit modulare interni ASTRA + blockout della nave Aquila.
+2. Livello di prova "Aquila_Nucleo" in Unreal + test di prestazioni automatici (CsvProfile) con gate.
+3. Scaricare fondali stellari NASA e nebulose per il cielo di Aurelia.
 
 ## Registro decisioni
 - 2026-09-28 — Modelli: DeepSeek V4.1 Flash @Modal (98% ordini corretti, 100% lingua, primo comando 0,52 s, frase 1,02 s) e @Together (95%, 0,46 s) in doppio canale; scartati gpt-oss (55%), GPT-6 Luna e Groq (errori). DeepSeek diretto e GLM bloccati dalle impostazioni privacy dell'account OpenRouter (non servono).
