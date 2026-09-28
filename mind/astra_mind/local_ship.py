@@ -7,7 +7,7 @@ from typing import Any
 
 INITIAL: dict[str, Any] = {
     "ship": "ASN Aquila", "location": "Aurelia System, 180,000 km from New Ravenna, en route to high orbit",
-    "alert": "green", "heading_deg": 45, "mark_deg": 10, "throttle_pct": 60, "speed_mps": 412,
+    "alert": "green", "heading_deg": 45, "mark_deg": 0, "throttle_pct": 60, "speed_mps": 412,
     "reactor_pct": 78,
     "power_pct": {"shields": 100, "weapons": 100, "engines": 100, "sensors": 100, "life_support": 100, "flight_deck": 100},
     "shields": {"state": "up", "mode": "balanced", "fore": 100, "aft": 100, "port": 100, "starboard": 100, "dorsal": 100, "ventral": 100},

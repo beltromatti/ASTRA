@@ -156,6 +156,15 @@ sky.set_actor_label("SpaceSky")
 sky.set_folder_path("Space")
 sky.set_editor_property("tags", ["ASTRA.Sky"])
 
+# ambient light of space (stars, Milky Way, the Teal Veil): keeps the unlit sides of ships readable
+skyl = eas.spawn_actor_from_class(unreal.SkyLight, V(0, 0, 800), R())
+slc = skyl.get_component_by_class(unreal.SkyLightComponent)
+slc.set_editor_property("source_type", unreal.SkyLightSourceType.SLS_SPECIFIED_CUBEMAP)
+slc.set_editor_property("cubemap", eal.load_asset("/Game/ASTRA/Space/T_Sky_Aurelia_8k"))
+slc.set_editor_property("intensity", 4.0)
+skyl.set_actor_label("SkyLight_Space")
+skyl.set_folder_path("Space")
+
 pp = eas.spawn_actor_from_class(unreal.PostProcessVolume, V(0, 0, 0), R())
 pp.set_editor_property("unbound", True)
 s = pp.get_editor_property("settings")

@@ -126,7 +126,8 @@ class Mind:
         self.voice = Voice(self.tts, self._sink)
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
         self.turns: asyncio.Queue = asyncio.Queue()
-        self.lang = "en"            # the Captain's language (last detected)
+        self.lang_file = REPO_ROOT / "mind" / ".cache" / "captain_lang.txt"
+        self.lang = self.lang_file.read_text().strip() if self.lang_file.exists() else "en"   # the Captain's language
 
     async def _sink(self, kind: str, payload: Any) -> None:
         dead = []
@@ -144,10 +145,25 @@ class Mind:
             try:
                 self.agent.ship = self.game if (self.game and self.game.state) else self.local
                 if text.startswith("\x00event:"):
-                    t = await self.agent.handle_event(text[len("\x00event:"):], self.lang)
+                    # coalesce: everything that happened while the crew was talking becomes one report turn;
+                    # the Captain's own words are never merged or delayed behind events
+                    events = [text[len("\x00event:"):]]
+                    pending = []
+                    while not self.turns.empty():
+                        nxt = self.turns.get_nowait()
+                        (events if nxt[0].startswith("\x00event:") else pending).append(
+                            nxt[0][len("\x00event:"):] if nxt[0].startswith("\x00event:") else nxt)
+                    for p in pending:
+                        await self.turns.put(p)
+                    if pending:
+                        continue          # the Captain spoke: answer first, the events stay in the state/history
+                    t = await self.agent.handle_event(" | ".join(events), self.lang)
                     log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
                     continue
-                self.lang = lang
+                if lang != self.lang:
+                    self.lang = lang
+                    self.lang_file.parent.mkdir(parents=True, exist_ok=True)
+                    self.lang_file.write_text(lang)
                 t = await self.agent.handle(text, lang)
                 await self._sink("json", {"type": "turn_end", "first_line_s": t.t_first_line, "total_s": round(t.t_end, 3),
                                           "cost": t.cost, "actions": [[n, a, r] for n, a, r in t.actions], "error": t.error})

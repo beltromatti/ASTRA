@@ -3,6 +3,7 @@
 #include "AstraShipSubsystem.h"
 
 #include "ASTRA.h"
+#include "AstraBattleSubsystem.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
@@ -140,6 +141,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		OutDetail = TEXT("invalid arguments");
 		return false;
 	}
+	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 	auto Num = [&Args](const TCHAR* K, double Def = 0.0) { double V = Def; Args->TryGetNumberField(K, V); return V; };
 	auto Str = [&Args](const TCHAR* K) { FString V; Args->TryGetStringField(K, V); return V; };
 
@@ -178,6 +180,10 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 			ShieldMode = M.IsEmpty() ? TEXT("balanced") : M;
 			OutDetail = FString::Printf(TEXT("shields up, %s"), *ShieldMode);
 		}
+		if (Battle)
+		{
+			Battle->SetPlayerShields(bShieldsUp);
+		}
 		return true;
 	}
 	if (Name == TEXT("route_power"))
@@ -192,28 +198,25 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		OutDetail = FString::Printf(TEXT("%s at %.0f%% of nominal"), *Sys, PowerPct[Sys]);
 		return true;
 	}
-	if (Name == TEXT("set_target") || Name == TEXT("fire_weapons"))
+	if (Name == TEXT("set_target"))
 	{
-		const FAstraContact* C = FindContact(Str(TEXT("contact_id")));
-		if (!C)
-		{
-			OutDetail = FString::Printf(TEXT("no contact %s on the plot"), *Str(TEXT("contact_id")));
-			return false;
-		}
-		if (Name == TEXT("set_target"))
-		{
-			TargetId = C->Id;
-			OutDetail = FString::Printf(TEXT("target designated %s"), *C->Id);
-			return true;
-		}
-		if (C->Status.StartsWith(TEXT("friendly")))
-		{
-			OutDetail = TEXT("weapons interlock: target is a friendly vessel");
-			return false;
-		}
-		OutDetail = FString::Printf(TEXT("%s salvo of %d away at %s"), *Str(TEXT("weapon")), (int32)Num(TEXT("salvo"), 1), *C->Id);
-		Event(OutDetail);
+		TargetId = Str(TEXT("contact_id"));
+		OutDetail = FString::Printf(TEXT("target designated %s, fire control solution building"), *TargetId);
 		return true;
+	}
+	if (Name == TEXT("fire_weapons"))
+	{
+		if (!Battle)
+		{
+			OutDetail = TEXT("fire control offline");
+			return false;
+		}
+		const bool bOk = Battle->PlayerFire(Str(TEXT("weapon")), Str(TEXT("contact_id")), (int32)Num(TEXT("salvo"), 1), OutDetail);
+		if (bOk)
+		{
+			TargetId = Str(TEXT("contact_id"));
+		}
+		return bOk;
 	}
 	if (Name == TEXT("set_point_defense"))
 	{
@@ -254,14 +257,12 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	if (Name == TEXT("hail"))
 	{
 		const FString Id = Str(TEXT("contact_id"));
-		if (!Id.Equals(TEXT("fleet"), ESearchCase::IgnoreCase) && !FindContact(Id))
+		if (Id.Equals(TEXT("fleet"), ESearchCase::IgnoreCase))
 		{
-			OutDetail = FString::Printf(TEXT("no contact %s to hail"), *Id);
-			return false;
+			OutDetail = TEXT("7th Fleet net: message sent to the flagship ASN Praetorian");
+			return true;
 		}
-		OutDetail = FString::Printf(TEXT("channel open to %s, message sent"), *Id);
-		Event(OutDetail);
-		return true;
+		return Battle ? Battle->PlayerHail(Id, OutDetail) : false;
 	}
 	if (Name == TEXT("set_emcon"))
 	{
@@ -271,8 +272,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	}
 	if (Name == TEXT("active_scan"))
 	{
-		OutDetail = TEXT("active sweep running, results in about 20 seconds");
-		return true;
+		return Battle ? Battle->PlayerScan(Str(TEXT("contact_id")), OutDetail) : false;
 	}
 	OutDetail = FString::Printf(TEXT("unknown command %s"), *Name);
 	return false;
@@ -309,20 +309,16 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	TSharedRef<FJsonObject> Q = MakeShared<FJsonObject>();
 	for (const auto& KV : Squadrons) { Q->SetStringField(KV.Key, KV.Value); }
 	S->SetObjectField(TEXT("squadrons"), Q);
-	TArray<TSharedPtr<FJsonValue>> Cs;
-	for (const FAstraContact& C : Contacts)
+	const UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	if (Battle)
 	{
-		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
-		O->SetStringField(TEXT("id"), C.Id);
-		O->SetStringField(TEXT("class"), C.Class);
-		if (!C.Name.IsEmpty()) { O->SetStringField(TEXT("name"), C.Name); }
-		O->SetStringField(TEXT("status"), C.Status);
-		O->SetNumberField(TEXT("range_km"), C.RangeKm);
-		O->SetNumberField(TEXT("bearing_deg"), C.BearingDeg);
-		Cs.Add(MakeShared<FJsonValueObject>(O));
+		S->SetArrayField(TEXT("contacts"), Battle->ContactsJson());
+		S->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(100.f * Battle->PlayerHullFraction()));
+		Sh->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()));
 	}
-	S->SetArrayField(TEXT("contacts"), Cs);
+	S->SetStringField(TEXT("bearing_convention"), TEXT("bearings are true bearings in the Aurelia system plane, like headings: steer to a contact's bearing to point at it"));
 	TArray<TSharedPtr<FJsonValue>> Dmg;
+	for (const FString& D : DamageLog) { Dmg.Add(MakeShared<FJsonValueString>(D)); }
 	S->SetArrayField(TEXT("damage"), Dmg);
 	return S;
 }
@@ -385,7 +381,12 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 	const float TargetYellow = Alert == EAstraAlert::Yellow ? 1.f : 0.f;
 	AlertBlend = FMath::FInterpTo(AlertBlend, TargetRed, DeltaTime, 3.f);
 	YellowBlend = FMath::FInterpTo(YellowBlend, TargetYellow, DeltaTime, 3.f);
-	const float LightLevel = FMath::Lerp(1.f, 0.45f, AlertBlend) * FMath::Lerp(1.f, 0.85f, YellowBlend);
+	float LightLevel = FMath::Lerp(1.f, 0.45f, AlertBlend) * FMath::Lerp(1.f, 0.85f, YellowBlend);
+	if (FlickerTime > 0.f)
+	{
+		FlickerTime -= DeltaTime;
+		LightLevel *= 0.35f + 0.65f * (FMath::FRand() > 0.45f ? 1.f : 0.f);
+	}
 	const FLinearColor AlertColor = FMath::Lerp(FLinearColor(1.f, 0.62f, 0.1f), FLinearColor(1.f, 0.04f, 0.02f), AlertBlend);
 	const float Mix = FMath::Max(AlertBlend, YellowBlend);
 	if (ShipMPC)
@@ -403,6 +404,32 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 			LC->SetIntensity(ShipLightBase[i] * LightLevel);
 			LC->SetLightColor(FMath::Lerp(ShipLightColorBase[i], FLinearColor(1.f, 0.55f, 0.5f), AlertBlend * 0.35f));
 		}
+	}
+}
+
+void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir)
+{
+	FlickerTime = 0.6f;
+	if (HullDamage > 8.f)
+	{
+		// where did it land? pick a compartment on the struck side (decks 1-12, sections A-H)
+		const int32 Deck = FMath::RandRange(2, 11);
+		const TCHAR Section = TEXT("ABCDEFGH")[FMath::RandRange(0, 7)];
+		const float Roll = FMath::FRand();
+		const FString What = Roll < 0.35f ? TEXT("hull breach, compartment venting") : (Roll < 0.65f ? TEXT("fire") : TEXT("conduit damage, power fluctuations"));
+		DamageLog.Add(FString::Printf(TEXT("deck %d section %c: %s"), Deck, Section, *What));
+		if (DamageLog.Num() > 8) { DamageLog.RemoveAt(0); }
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now - LastHitReport > 6.0)
+	{
+		LastHitReport = Now;
+		const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+		const int32 Sh = Battle ? FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()) : 0;
+		const int32 Hu = Battle ? FMath::RoundToInt(100.f * Battle->PlayerHullFraction()) : 100;
+		Event(HullDamage > 8.f
+			? FString::Printf(TEXT("damage report: we've been hit — %s; shields %d%%, hull %d%%"), *DamageLog.Last(), Sh, Hu)
+			: FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), true);
 	}
 }
 

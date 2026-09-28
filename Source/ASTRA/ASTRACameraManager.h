@@ -19,4 +19,11 @@ public:
 
 	/** Constructor */
 	AASTRACameraManager();
+
+protected:
+	/** Hull hits shake the view (the ship lurches); amplitude comes from the battle simulation. */
+	virtual void UpdateViewTarget(FTViewTarget& OutVT, float DeltaTime) override;
+
+private:
+	float ShakeTime = 0.f;
 };

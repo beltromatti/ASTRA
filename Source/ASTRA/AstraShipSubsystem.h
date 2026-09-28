@@ -59,6 +59,16 @@ public:
 	TSharedRef<FJsonObject> Snapshot() const;
 
 	EAstraAlert GetAlert() const { return Alert; }
+	float GetHeadingDeg() const { return HeadingDeg; }
+	float GetMarkDeg() const { return MarkDeg; }
+	float GetSpeedMps() const { return SpeedMps; }
+	bool AreShieldsUp() const { return bShieldsUp; }
+
+	/** Anything that happens to or around the ship; bReport = worth telling the Captain (the crew decides the words). */
+	void PublishEvent(const FString& Text, bool bReport) { Event(Text, bReport); }
+
+	/** The battle simulation reports a hit on our hull: compartments, lights, reports. */
+	void OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir);
 
 	FAstraShipEvent OnShipEvent;
 	FAstraAlertChanged OnAlertChanged;
@@ -66,7 +76,7 @@ public:
 private:
 	// --- state
 	EAstraAlert Alert = EAstraAlert::Green;
-	float HeadingDeg = 45.f, MarkDeg = 10.f, TargetHeadingDeg = 45.f, TargetMarkDeg = 10.f;
+	float HeadingDeg = 45.f, MarkDeg = 0.f, TargetHeadingDeg = 45.f, TargetMarkDeg = 0.f;
 	float ThrottlePct = 60.f, SpeedMps = 412.f, ReactorPct = 78.f;
 	TMap<FString, float> PowerPct;
 	FString ShieldMode = TEXT("balanced");
@@ -78,6 +88,10 @@ private:
 	TMap<FString, FString> Squadrons;
 	TArray<FAstraContact> Contacts;
 	TArray<FString> RecentEvents;
+	TArray<FString> DamageLog;        // "deck 6 section C: hull breach (10 cm), fire" ...
+	float HullPct = 100.f;
+	double LastHitReport = -100.0;
+	float FlickerTime = 0.f;
 	bool bTurning = false;
 
 	void Event(const FString& Text, bool bReport = false);
@@ -93,7 +107,7 @@ private:
 	TArray<FLinearColor> ShipLightColorBase;
 	FVector SkyAxis0[3];
 	FVector SunDir0 = FVector::ForwardVector;
-	float Heading0 = 45.f, Mark0 = 10.f;
+	float Heading0 = 45.f, Mark0 = 0.f;
 	float AlertBlend = 0.f;   // 0 green .. 1 red (smoothed)
 	float YellowBlend = 0.f;
 	float AlertTime = 0.f;

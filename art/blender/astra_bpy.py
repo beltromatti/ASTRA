@@ -282,7 +282,11 @@ def render_preview(objects: Sequence[bpy.types.Object], path: str, size: int = 9
     palette = {MAT_PANEL: (0.78, 0.74, 0.66, 1), MAT_STRUCTURE: (0.08, 0.085, 0.095, 1), MAT_FLOOR: (0.2, 0.2, 0.21, 1),
                MAT_GRATE: (0.3, 0.3, 0.32, 1), MAT_TRIM: (0.45, 0.46, 0.48, 1), MAT_LIGHT: (1, 1, 0.95, 1),
                MAT_ACCENT: (0.1, 0.3, 1, 1), MAT_GUIDE: (0.7, 0.9, 1, 1), MAT_SCREEN: (0.05, 0.2, 0.45, 1),
-               MAT_GLASS: (0.5, 0.7, 0.8, 1), MAT_RUBBER: (0.03, 0.03, 0.03, 1)}
+               MAT_GLASS: (0.5, 0.7, 0.8, 1), MAT_RUBBER: (0.03, 0.03, 0.03, 1),
+               "MI_HULL_Plate": (0.78, 0.76, 0.7, 1), "MI_HULL_Frame": (0.12, 0.13, 0.14, 1),
+               "MI_HULL_Livery": (0.08, 0.15, 0.35, 1), "MI_HULL_Engine": (0.3, 0.3, 0.32, 1),
+               "MI_HULL_Glow": (0.5, 0.8, 1.0, 1), "MI_HULL_Lights": (1.0, 0.9, 0.6, 1),
+               "MI_HULL_Radiator": (0.35, 0.2, 0.1, 1)}
     for m in bpy.data.materials:
         m.diffuse_color = palette.get(m.name, (0.6, 0.6, 0.6, 1))
     bpy.ops.render.render(write_still=True)

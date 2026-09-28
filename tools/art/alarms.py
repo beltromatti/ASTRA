@@ -54,7 +54,22 @@ def chime(freqs, dur=0.55, gap=0.08):
     return room(np.concatenate(parts), t60=0.7, mix=0.2)
 
 
+def impact():
+    """A hit felt through the hull: sub-bass thump, metallic ring of the frame, rattling debris."""
+    n = int(2.2 * SR)
+    t = np.arange(n) / SR
+    rng = np.random.default_rng(3)
+    thump = np.sin(2 * np.pi * (38 + 25 * np.exp(-t * 6)) * t) * np.exp(-t * 3.5)
+    ring = sum(np.sin(2 * np.pi * f * t + rng.uniform(0, 6)) * np.exp(-t * d) * a
+               for f, d, a in ((173, 2.5, 0.25), (231, 3.0, 0.18), (389, 4.0, 0.12), (611, 6.0, 0.08)))
+    noise = rng.normal(0, 1, n) * np.exp(-t * 7) * 0.35
+    rattle = rng.normal(0, 1, n) * (rng.random(n) < 0.004) * np.exp(-t * 2.5) * 0.8
+    x = np.tanh(1.8 * (thump * 1.1 + ring + noise + rattle))
+    return x / np.max(np.abs(x)) * 0.95
+
+
 os.makedirs(OUT, exist_ok=True)
+sf.write(os.path.join(OUT, "SW_Impact.wav"), impact().astype(np.float32), SR, subtype="PCM_16")
 sf.write(os.path.join(OUT, "SW_Alert_Red.wav"), whoop().astype(np.float32), SR, subtype="PCM_16")
 sf.write(os.path.join(OUT, "SW_Alert_Yellow.wav"), chime([880, 660, 880, 660]).astype(np.float32), SR, subtype="PCM_16")
 sf.write(os.path.join(OUT, "SW_Alert_Clear.wav"), chime([660, 880, 1100]).astype(np.float32), SR, subtype="PCM_16")

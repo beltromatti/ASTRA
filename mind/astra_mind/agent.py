@@ -74,7 +74,10 @@ class BridgeAgent:
                 if speaker not in CREW:
                     speaker = "xo"
                 line = (args.get("text") or "").strip()
-                if line:
+                if _looks_like_tool(line):
+                    log.warning("speak contained a tool invocation, not voiced: %s", line)
+                    line = ""
+                if len(line) >= 4:
                     if turn.t_first_line is None:
                         turn.t_first_line = time.perf_counter() - t0
                     turn.lines.append((speaker, line))
@@ -147,15 +150,16 @@ class BridgeAgent:
 
         async def on_call(call: ToolCall) -> None:
             args = call.arguments() or {}
-            if call.name == "speak" and args.get("text"):
+            text = (args.get("text") or "").strip()
+            if call.name == "speak" and len(text) >= 4:          # never voice fragments of a cut-off reply
                 spk = args.get("speaker") if args.get("speaker") in CREW else "xo"
-                turn.lines.append((spk, args["text"]))
+                turn.lines.append((spk, text))
                 if turn.t_first_line is None:
                     turn.t_first_line = time.perf_counter() - t0
-                await self.say(spk, args["text"], lang, args.get("tone", "focused"))
+                await self.say(spk, text, lang, args.get("tone", "focused"))
 
         comp = await self.llm.chat(model=MODEL, messages=msgs, tools=[SPEAK], tool_choice="auto", providers=PROVIDERS,
-                                   reasoning={"enabled": False}, max_tokens=160, temperature=0.4, on_tool_call=on_call,
+                                   reasoning={"enabled": False}, max_tokens=320, temperature=0.4, on_tool_call=on_call,
                                    allow_fallbacks=True)
         turn.cost += comp.cost
         if turn.lines:
@@ -184,6 +188,19 @@ class BridgeAgent:
                                    reasoning={"enabled": False}, max_tokens=200, temperature=0.4, on_tool_call=on_call,
                                    allow_fallbacks=True)
         turn.cost += comp.cost
+
+
+_TOOLISH = None
+
+
+def _looks_like_tool(text: str) -> bool:
+    """A 'speak' whose text is a tool invocation (e.g. "set_alert red") must never be voiced."""
+    global _TOOLISH
+    if _TOOLISH is None:
+        import re
+        from .tools import SHIP_TOOL_NAMES
+        _TOOLISH = re.compile(r"^\s*\[?(%s)\b" % "|".join(sorted(SHIP_TOOL_NAMES)))
+    return bool(_TOOLISH.match(text))
 
 
 async def _safe_execute(ship: ShipLink, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
