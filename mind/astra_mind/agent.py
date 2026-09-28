@@ -111,7 +111,7 @@ class BridgeAgent:
                                    providers=PROVIDERS, reasoning={"enabled": False}, max_tokens=360, temperature=0.4,
                                    on_tool_call=on_call, allow_fallbacks=True)
         turn.cost += comp.cost
-        if not turn.lines and not comp.error and comp.content.strip():
+        if not turn.lines and not comp.error and comp.content.strip() and not comp.content.strip().upper().startswith("SILENT"):
             # the report came back as prose ("sensors: ...") instead of a speak call: voice it anyway, officer by officer
             log.info("event report salvaged from prose: %s", comp.content[:160])
             await self._salvage(comp.content, turn, lang, max_lines=2)

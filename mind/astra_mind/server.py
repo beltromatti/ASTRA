@@ -196,6 +196,7 @@ class Mind:
         self.agent.war = lambda: self.director.war.crew_view()
         self.turns: asyncio.Queue = asyncio.Queue()
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
+        self.captain_t = 0.0                     # the last time the Captain spoke
         self.lang_file = REPO_ROOT / "mind" / ".cache" / "captain_lang.txt"
         self.lang = self.lang_file.read_text().strip() if self.lang_file.exists() else "en"   # the Captain's language
 
@@ -295,6 +296,29 @@ class Mind:
             finally:
                 self.voice.low_priority = False
 
+    async def tactical_watch(self) -> None:
+        """In a fight the crew watches the big picture for the Captain: when something important is going wrong
+        (weapons assigned out of reach while the helm chases another contact, a friendly ship dying, shields failing,
+        hostiles close and untouched, magazines running dry) the XO or the officer concerned says so, once, with a
+        recommendation. The problems are found here, from the telemetry; the officer only phrases them."""
+        last_t, last_key = 0.0, ""
+        while True:
+            await asyncio.sleep(5)
+            st = self.game.state if (self.game and self.game.state) else None
+            if not st or not self.clients:
+                continue
+            flags = tactical_flags(st)
+            now = time.monotonic()
+            # in a fight the bridge is never silent: only the Captain's own words hold the check back
+            key = "|".join(sorted(f.split(":", 1)[0] for f in flags))
+            # (the event queue itself waits for a gap in the voices before the officer speaks)
+            if not flags or now - self.captain_t < 10 or now - last_t < 40 or (key == last_key and now - last_t < 100):
+                continue
+            last_t, last_key = now, key
+            log.info("tactical check: %s", flags)
+            self.last_activity = now
+            await self.turns.put(("\x00event:bridge: tactical check — " + "; ".join(flags), self.lang))
+
     async def story_watch(self) -> None:
         """The war never stalls: when nothing has moved the story for a long while (no fight, no transit under way),
         the director decides what happens — Rourke presses the Captain, or the war comes to the Aquila."""
@@ -355,7 +379,8 @@ class Mind:
                         continue
                     self.voice.low_priority = True
                     try:
-                        t = await self.agent.handle_event(" | ".join(events), self.lang)
+                        ask = TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else None
+                        t = await self.agent.handle_event(" | ".join(events), self.lang, ask=ask)
                     finally:
                         self.voice.low_priority = False
                     log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
@@ -448,7 +473,7 @@ class Mind:
                 elif kind == "command_result":
                     self.game.resolve(msg)
                 elif kind == "player_text":
-                    self.last_activity = time.monotonic()
+                    self.last_activity = self.captain_t = time.monotonic()
                     text = msg.get("text", "").strip()
                     if text:
                         await self.turns.put((text, msg.get("lang") or detect_lang(text)))
@@ -470,6 +495,7 @@ class Mind:
         t0 = time.perf_counter()
         text, lang = await self.stt.transcribe(pcm)
         log.info("STT %.2fs [%s] %s", time.perf_counter() - t0, lang, text)
+        self.captain_t = time.monotonic()
         await self._sink("json", {"type": "transcript", "text": text, "lang": lang})
         if text:
             await self.turns.put((text, lang))
@@ -481,6 +507,7 @@ class Mind:
         asyncio.create_task(self.turn_worker())
         asyncio.create_task(self.quiet_moments())
         asyncio.create_task(self.story_watch())
+        asyncio.create_task(self.tactical_watch())
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
@@ -575,3 +602,50 @@ def _fallen(text: str) -> list[str]:
             if name:
                 out.append(name)
     return out
+
+
+TACTICAL_ASK = ("A tactical check of the fight (the facts above come from the plot, they are true now). The XO, or the "
+                "officer whose station it concerns, tells the Captain the single most important problem in one short "
+                "sentence and recommends a concrete order the Captain could give (a course or intercept, a target, a "
+                "flight group, shields). Do not act on your own and do not repeat what was said in the last minute. If "
+                "nothing here really needs the Captain now, reply with the word SILENT and call no tool.")
+
+
+def tactical_flags(st: dict) -> list[str]:
+    """What is going wrong in the fight, from the telemetry (short English facts for the crew)."""
+    contacts = st.get("contacts", []) or []
+    hostile = [c for c in contacts if str(c.get("status", "")) == "hostile"]
+    if not hostile:
+        return []
+    flags = []
+    weapons = st.get("weapons", {}) or {}
+    rail = str(weapons.get("railguns", ""))
+    helm = str(st.get("helm", ""))
+    m_int = _re.search(r"intercepting (T-\d+)", helm)
+    m_fire = _re.search(r"assigned to (T-\d+), waiting for it to close inside (\d+) km \(now (\d+) km\)", rail)
+    if m_fire and (not m_int or m_int.group(1) != m_fire.group(1)):
+        flags.append(f"out of reach: the railguns wait for {m_fire.group(1)} to close inside {m_fire.group(2)} km (now "
+                     f"{m_fire.group(3)} km) but the helm is {('intercepting ' + m_int.group(1)) if m_int else 'not closing on it'}")
+    for c in contacts:
+        stt = str(c.get("status", ""))
+        if stt not in ("friendly", "neutral"):
+            continue
+        hp = c.get("hull_pct")
+        if isinstance(hp, (int, float)) and hp < 45:
+            who = "friendly" if stt == "friendly" else "civilian"
+            flags.append(f"{who} in trouble: {c.get('name', c.get('id'))} ({c.get('id')}) hull {int(hp)}%, {c.get('range_km')} km "
+                         f"bearing {int(c.get('bearing_deg', 0)):03d}")
+    sh = (st.get("shields") or {}).get("strength_pct")
+    if isinstance(sh, (int, float)) and sh < 35:
+        flags.append(f"shields low: {int(sh)}% ({(st.get('shields') or {}).get('mode', '')})")
+    near = [c for c in hostile if isinstance(c.get("range_km"), (int, float)) and c["range_km"] < 9.0]
+    if near and "engaging" not in rail and "assigned" not in rail:
+        c = min(near, key=lambda x: x["range_km"])
+        flags.append(f"hostile close and untouched: {c.get('name', c.get('id'))} ({c.get('id')}) at {c['range_km']} km, our railguns idle")
+    mm = _re.match(r"(\d+) in the VLS", str(weapons.get("missiles", "")))
+    if mm and int(mm.group(1)) < 16:
+        flags.append(f"magazines: {mm.group(1)} missiles left")
+    hull = st.get("hull_pct")
+    if isinstance(hull, (int, float)) and hull < 40:
+        flags.append(f"our hull {int(hull)}%")
+    return flags[:3]

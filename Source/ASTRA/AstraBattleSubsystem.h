@@ -330,6 +330,7 @@ private:
 	bool bStarted = false;              // the campaign has begun (menu choice)
 	bool bEngagementActive = false;     // a fight is on: the outcome is evaluated
 	float EngagementEndedAt = -1.f;
+	float TruceSince = -1.f;            // every hostile holds fire since then (a truce, not yet peace)
 	int32 NextContact = 40;             // contact ids for ships the director brings in
 	TArray<TPair<float, TSharedPtr<FJsonObject>>> PendingBeats;
 	float RepairUntil = -1.f, RepairHullPerSec = 0.f;

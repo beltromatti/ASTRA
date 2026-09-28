@@ -16,6 +16,26 @@
 namespace
 {
 	const double Km = 1000.0;
+	// ASTRA classes (the Mandate's are set where they spawn)
+	void BattleshipStats(FAstraBattleShip& S)
+	{
+		S.RailSlugs = 4;          // six triple turrets firing in pairs: four heavy slugs per volley
+		S.RailDamage = 72.f;
+		S.RailCd = 9.f;
+		S.RailRange = 10000.f;
+		S.Missiles = 24;
+		S.PDChannels = 4;
+		S.ShieldRegen = 8.f;
+	}
+	void DestroyerStats(FAstraBattleShip& S)
+	{
+		S.RailSlugs = 2;
+		S.RailDamage = 55.f;
+		S.RailCd = 7.f;
+		S.Missiles = 12;
+		S.PDChannels = 2;
+		S.ShieldRegen = 5.f;
+	}
 	FVector Polar(double RangeM, double BearingDeg, double MarkDeg)
 	{
 		const double B = FMath::DegreesToRadians(BearingDeg), M = FMath::DegreesToRadians(MarkDeg);
@@ -36,6 +56,9 @@ namespace
 	FAutoConsoleCommand CmdBattleTransit(TEXT("astra.battle.transit"),
 		TEXT("Janus transit (testing; the helm flies to the gate): astra.battle.transit <system_name> [red_dwarf|orange|yellow|blue_white] [ocean|desert|ice|lava|gas_giant|barren] [planet_name]"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num() >= 1) { GTransitRequests.Add(A); } }));
+	bool GStatusRequest = false;
+	FAutoConsoleCommand CmdBattleStatus(TEXT("astra.battle.status"), TEXT("Log every ship's hull, shields, target and mode (balancing)"),
+		FConsoleCommandDelegate::CreateLambda([]() { GStatusRequest = true; }));
 	bool GGateJump = false;
 	FAutoConsoleCommand CmdBattleGateJump(TEXT("astra.battle.gatejump"), TEXT("Testing: put the Aquila 30 km in front of the Janus Gate, bow on"),
 		FConsoleCommandDelegate::CreateLambda([]() { GGateJump = true; }));
@@ -116,13 +139,14 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Ships[P].Att = HeadingQuat(45.0, 0.0);
 
 	const FVector A0 = FVector::ZeroVector;
+	// the picket: the flagship battleship is the strongest ship on the field (six triple turrets); with its destroyer it
+	// can trade blows with the Mandate strike group, but the fight is won only if the Aquila joins in
 	int32 I = AddShip(TEXT("T-01"), TEXT("ASN Praetorian"), TEXT("ASTRA battleship (7th Fleet flagship)"), TEXT("SM_SHIP_ASTRA_Praetorian"),
-	                  EAstraSide::Astra, A0 + Polar(4.5 * Km, 25, 3), 45.f, 288.f, 420.f, 3200.f, 1200.f);
-	Ships[I].RailDamage = 90.f;
-	Ships[I].RailCd = 9.f;
-	Ships[I].PDChannels = 3;
+	                  EAstraSide::Astra, A0 + Polar(4.5 * Km, 25, 3), 45.f, 288.f, 460.f, 5200.f, 2000.f);
+	BattleshipStats(Ships[I]);
 	I = AddShip(TEXT("T-02"), TEXT("ASN Vigilant"), TEXT("ASTRA destroyer"), TEXT("SM_SHIP_ASTRA_Vigilant"), EAstraSide::Astra,
-	            A0 + Polar(3 * Km, 70, 2), 45.f, 288.f, 140.f, 900.f, 380.f);
+	            A0 + Polar(3 * Km, 70, 2), 45.f, 288.f, 140.f, 1200.f, 500.f);
+	DestroyerStats(Ships[I]);
 	I = AddShip(TEXT("T-07"), TEXT("Brightwater"), TEXT("Free Guilds freighter"), TEXT("SM_SHIP_GUILD_Freighter"), EAstraSide::Neutral,
 	            A0 + Polar(22 * Km, 15, 4), 120.f, 180.f, 170.f, 700.f, 60.f);
 	Ships[I].RailDamage = 0.f;
@@ -317,6 +341,21 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		UE_LOG(LogASTRA, Log, TEXT("[Battle] transit request: %s"), *Detail);
 	}
 	GTransitRequests.Reset();
+	if (GStatusRequest)
+	{
+		GStatusRequest = false;
+		for (const FAstraBattleShip& S : Ships)
+		{
+			if (!S.bCraft)
+			{
+				const FAstraBattleShip* T = FindById(S.TargetId);
+				UE_LOG(LogASTRA, Log, TEXT("[Status] t=%.0f %s %-12s %s hull %4.0f/%4.0f shield %4.0f/%4.0f target %s range %.1f km mode %d%s%s"), Time,
+				       *S.ContactId, *S.Name, S.bAlive ? TEXT("alive") : TEXT("DEAD "), S.Hull, S.HullMax, S.Shield, S.ShieldMax,
+				       T ? *T->ContactId : TEXT("-"), T ? FVector::Dist(S.Pos, T->Pos) / Km : 0.0, (int32)S.Mode,
+				       S.bHoldFire ? TEXT(" HOLD") : TEXT(""), S.bFleeing ? TEXT(" FLEE") : TEXT(""));
+			}
+		}
+	}
 	if (GGateJump && Landmarks.IsValidIndex(GateLandmark))
 	{
 		GGateJump = false;
@@ -505,26 +544,44 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	// outcome
 	if (bEngagementActive)
 	{
-		int32 Fighting = 0, Truce = 0;
+		int32 Fighting = 0, Holding = 0, Withdrawing = 0, AgreedWithdraw = 0;
 		for (const FAstraBattleShip& S : Ships)
 		{
 			if (S.bAlive && S.bHostile)
 			{
 				Fighting += (!S.bFleeing && !S.bHoldFire) ? 1 : 0;
-				Truce += S.bNegotiated ? 1 : 0;
+				Holding += (S.bHoldFire && !S.bFleeing) ? 1 : 0;
+				Withdrawing += S.bFleeing ? 1 : 0;
+				AgreedWithdraw += (S.bFleeing && S.bNegotiated) ? 1 : 0;
 			}
 		}
+		// a ceasefire is a truce, not an end: the fight is over only when it has held for two minutes
+		TruceSince = (Fighting == 0 && Holding > 0) ? (TruceSince < 0.f ? Time : TruceSince) : -1.f;
 		FString Result;
 		if (bSurrenderAccepted)
 		{
 			Result = TEXT("surrender accepted by the Mandate");
 			Report(TEXT("tactical: the Mandate has accepted our surrender and ceased fire — their ships are closing to board the Aquila"));
 		}
-		else if (Fighting == 0)
+		else if (Fighting == 0 && Holding > 0 && Time - TruceSince > 120.f)
 		{
-			Result = Truce > 0 ? TEXT("the enemy withdrew or holds fire under negotiated terms") : TEXT("victory: no hostile ship left fighting");
-			Report(Truce > 0 ? TEXT("tactical: no Mandate ship is fighting any more — they hold fire or withdraw under the terms agreed over the channel; the engagement is over")
-			                 : TEXT("tactical: no hostile ship left fighting in the engagement zone — the engagement is over"));
+			Result = TEXT("a truce holds: the Mandate ships hold fire under the terms spoken over the channel and pull back");
+			Report(TEXT("tactical: two minutes without a shot — the truce with the Mandate holds; their ships are pulling back towards the Janus Gate"));
+			for (FAstraBattleShip& S : Ships)
+			{
+				if (S.bAlive && S.bHostile && S.bHoldFire)
+				{
+					S.bFleeing = true;   // a standoff does not last: under the truce they withdraw
+					S.Mode = EAstraShipMode::Evade;
+				}
+			}
+		}
+		else if (Fighting == 0 && Holding == 0)
+		{
+			Result = AgreedWithdraw > 0 ? TEXT("the enemy withdrew under the terms agreed over the channel")
+			       : (Withdrawing > 0 ? TEXT("victory: the surviving enemy ships broke off and withdrew") : TEXT("victory: no hostile ship left"));
+			Report(AgreedWithdraw > 0 ? TEXT("tactical: the Mandate ships are withdrawing as agreed over the channel; the engagement is over")
+			                          : TEXT("tactical: no hostile ship left fighting in the engagement zone — the engagement is over"));
 		}
 		else if (Ships[0].Hull / Ships[0].HullMax < 0.08f)
 		{
@@ -1961,6 +2018,11 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		{
 			continue;
 		}
+		if (Q.Side != EAstraSide::Astra && bMandateStandDown())
+		{
+			Q.LaunchT = 3.f;   // their commander holds fire: the strike wing waits on deck
+			continue;
+		}
 		const FAstraBattleShip* Carrier = FindById(Q.CarrierId);
 		if (!Carrier || !Carrier->bAlive)
 		{
@@ -2470,12 +2532,13 @@ int32 UAstraBattleSubsystem::SpawnClass(const FString& Class, const FString& Con
 	}
 	else if (C.Contains(TEXT("praetorian")) || C.Contains(TEXT("battleship")))
 	{
-		I = AddShip(Contact, Name, TEXT("ASTRA battleship"), TEXT("SM_SHIP_ASTRA_Praetorian"), EAstraSide::Astra, Pos, HeadingDeg, 300.f, 420.f, 3200.f, 1200.f);
-		Ships[I].RailDamage = 90.f; Ships[I].RailCd = 9.f; Ships[I].PDChannels = 3;
+		I = AddShip(Contact, Name, TEXT("ASTRA battleship"), TEXT("SM_SHIP_ASTRA_Praetorian"), EAstraSide::Astra, Pos, HeadingDeg, 300.f, 460.f, 5200.f, 2000.f);
+		BattleshipStats(Ships[I]);
 	}
 	else if (C.Contains(TEXT("vigilant")) || C.Contains(TEXT("astra")))
 	{
-		I = AddShip(Contact, Name, TEXT("ASTRA destroyer"), TEXT("SM_SHIP_ASTRA_Vigilant"), EAstraSide::Astra, Pos, HeadingDeg, 300.f, 140.f, 900.f, 380.f);
+		I = AddShip(Contact, Name, TEXT("ASTRA destroyer"), TEXT("SM_SHIP_ASTRA_Vigilant"), EAstraSide::Astra, Pos, HeadingDeg, 300.f, 140.f, 1200.f, 500.f);
+		DestroyerStats(Ships[I]);
 	}
 	else if (C.Contains(TEXT("freighter")) || C.Contains(TEXT("guild")))
 	{
