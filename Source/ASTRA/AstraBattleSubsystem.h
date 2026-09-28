@@ -89,6 +89,7 @@ struct FAstraBattleShip
 	float OrbitPhase = 0.f;
 	bool bJammed = false;                // an EW drone is degrading its fire control
 	bool bNegotiated = false;            // holding fire / withdrawing under terms agreed over the channel
+	bool bLeader = false;                // leads its group (the commander on the channel)
 
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> ShieldBubble = nullptr;
@@ -243,8 +244,11 @@ public:
 	/** A Mandate commander's decision (from their mind): continue_attack | hold_fire | withdraw | accept_surrender.
 	 *  The senior surviving commander orders the whole strike group; any other captain only their own ship. */
 	bool EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail);
-	/** Contact id of the ship whose captain commands the Mandate forces now (Acheron, then Styx, Cocytus, Lethe). */
+	/** Contact id of the ship whose captain commands the Mandate forces now: the group leader, else the biggest ship left. */
 	FString MandateCommander() const;
+	/** The war director's next beat (from the mind): raid | distress | reinforcements | resupply | calm. Contact ids are
+	 *  assigned now (so the mind can give the new commanders a persona before they arrive). */
+	bool StartBeat(const TSharedPtr<FJsonObject>& Beat, FString& OutDetail);
 	/** Where a live contact is from the Aquila, aimed at its lead point (for the helm's intercept). */
 	bool ContactGeometry(const FString& ContactId, double& OutBearing, double& OutMark, double& OutRangeKm) const;
 	void SetPlayerShields(bool bUp) { if (Ships.Num()) { Ships[0].bShieldsUp = bUp; } }
@@ -282,6 +286,14 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialInterface> BlastMat;
 	UPROPERTY() TObjectPtr<UStaticMesh> CubeMesh;
 	bool bBriefed = false;
+	bool bEngagementActive = false;     // a fight is on: the outcome is evaluated
+	int32 NextContact = 40;             // contact ids for ships the director brings in
+	TArray<TPair<float, TSharedPtr<FJsonObject>>> PendingBeats;
+	float RepairUntil = -1.f, RepairHullPerSec = 0.f;
+	int32 RepairMissiles = 0;
+	float CalmUntil = -1.f;
+	void ArriveBeat(const TSharedPtr<FJsonObject>& Beat);
+	int32 SpawnClass(const FString& Class, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> GlowMat;

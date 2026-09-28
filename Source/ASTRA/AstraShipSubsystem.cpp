@@ -309,10 +309,20 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		const FString Id = Str(TEXT("contact_id"));
 		if (Id.Equals(TEXT("fleet"), ESearchCase::IgnoreCase))
 		{
-			OutDetail = TEXT("7th Fleet net: message sent to the flagship ASN Praetorian");
+			OutDetail = TEXT("7th Fleet net open: Vice Admiral Adrian Rourke, 7th Fleet commander, is on the line (reply expected)");
 			return true;
 		}
 		return Battle ? Battle->PlayerHail(Id, OutDetail) : false;
+	}
+	if (Name == TEXT("director_beat"))
+	{
+		const TSharedPtr<FJsonObject>* Beat = nullptr;
+		if (!Battle || !Args->TryGetObjectField(TEXT("beat"), Beat))
+		{
+			OutDetail = TEXT("no beat");
+			return false;
+		}
+		return Battle->StartBeat(*Beat, OutDetail);
 	}
 	if (Name == TEXT("cease_fire"))
 	{

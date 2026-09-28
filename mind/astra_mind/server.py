@@ -28,6 +28,7 @@ from .audio_in import PushToTalk
 from .crew import CREW
 from .enemy import COMMANDERS, EnemyAgent
 from .router import route
+from .director import ADMIRAL, Director
 from .env import REPO_ROOT
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
@@ -81,6 +82,7 @@ class GameShip:
 
 
 EXTERNAL_SPEAKERS = {c["key"]: (f'{c["name"]} ({c["ship"]})', c["voice"]) for c in COMMANDERS.values()}
+EXTERNAL_SPEAKERS[ADMIRAL["key"]] = (f'{ADMIRAL["name"]} ({ADMIRAL["ship"]})', ADMIRAL["voice"])
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
 import re as _re
@@ -187,7 +189,8 @@ class Mind:
         self.game: GameShip | None = None
         self.voice = Voice(self.tts, self._sink)
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
-        self.enemy = EnemyAgent(self.llm, self.voice.say, self._enemy_command)
+        self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
+        self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander)
         self.turns: asyncio.Queue = asyncio.Queue()
         self.lang_file = REPO_ROOT / "mind" / ".cache" / "captain_lang.txt"
         self.lang = self.lang_file.read_text().strip() if self.lang_file.exists() else "en"   # the Captain's language
@@ -201,6 +204,23 @@ class Mind:
                 dead.append(ws)
         for ws in dead:
             self.clients.discard(ws)
+
+    async def _say_external(self, speaker: str, text: str, lang: str, tone: str) -> None:
+        """Voices from outside the bridge (enemy commanders, the admiral): heard by the crew too."""
+        if self.game is not None:
+            who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
+            self.game.events.append(f"over the radio, {who}: {text}")
+        await self.voice.say(speaker, text, lang, tone)
+
+    async def _director_command(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        if not (self.game and self.game.state):
+            return {"ok": False, "detail": "no game"}
+        return await self.game.execute(name, args, "director")
+
+    def _register_commander(self, contact: str, persona: dict[str, Any]) -> None:
+        key = self.enemy.register(contact, persona)
+        EXTERNAL_SPEAKERS[key] = (f'{persona.get("name")} ({persona.get("ship")})', persona.get("voice", "stuart_bell"))
+        log.info("new enemy commander %s on %s: %s", persona.get("name"), contact, persona.get("bio", "")[:120])
 
     async def _enemy_command(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         ship = self.game if (self.game and self.game.state) else None
@@ -239,6 +259,15 @@ class Mind:
                     for tr in transmissions:
                         # "transmission: T-22 — why": that captain calls the Aquila (arrival, succession, broken ceasefire)
                         m = _re.match(r"transmission:\s*(T-\d+)\s*—\s*(.*)", tr)
+                        if m and m.group(1) not in COMMANDERS:
+                            # nobody gave this captain a mind yet: a Mandate officer with the ship's name on the call sign
+                            ship = _re.search(r"aboard the ([\w' -]+)", m.group(2))
+                            self._register_commander(m.group(1), {
+                                "name": f"the commander of the {ship.group(1) if ship else 'raid group'}",
+                                "rank": "Ferryman (ship captain)", "ship": f"the {ship.group(1) if ship else 'Mandate warship'}",
+                                "bio": "A hard, tired officer of the Outer Worlds who has lost friends to the Core's guns and "
+                                       "wants the Gates for his people; proud, laconic, honest.",
+                                "voice": "stuart_bell"})
                         if m and self.enemy.open_channel(m.group(1)):
                             await self.enemy.respond(f"[Situation: {m.group(2)}. You are the one opening this channel: make "
                                                      "your transmission to the Aquila's captain.]", self.lang, self._battle_state())
@@ -272,6 +301,8 @@ class Mind:
                 for name, args_, res in t.actions:
                     if name == "end_transmission":
                         self.enemy.open = False
+                    if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() == "fleet":
+                        await self.director.admiral_reply(str(args_.get("message", "")), lang, self._battle_state())
                     if name == "hail" and res.get("ok") and "Mandate" in str(res.get("detail", "")) \
                             and self.enemy.open_channel(str(args_.get("contact_id", "")).upper()):
                         await self.enemy.respond(f"[The ASTRA ship hails you. Their message: {args_.get('message', '')}]",
@@ -300,12 +331,15 @@ class Mind:
                     # a new game session: the crew starts a fresh conversation (the ship state is new too)
                     self.agent.history.clear()
                     self.enemy.reset()
+                    self.director.reset()
                     log.info("new game session: conversation reset")
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
                 elif kind == "event":
                     text = msg.get("text", "")
                     self.game.events.append(text)
+                    if text.startswith("director:"):
+                        asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
                     gone = _re.search(r"\((T-\d+)[,)]", text)
                     if gone and ("destroyed" in text or "left sensor range" in text):
                         self.enemy.ship_destroyed(gone.group(1))   # nobody left on that ship to answer a hail

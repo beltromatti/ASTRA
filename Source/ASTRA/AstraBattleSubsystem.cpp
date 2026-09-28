@@ -397,6 +397,8 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		}
 		TransmissionAt = Time + 12.f;
 		TransmissionText = TEXT("T-21 — Archon Varek Solm hails the Aquila on an open channel");
+		Ships[A].bLeader = true;
+		bEngagementActive = true;
 		Report(TEXT("sensors: four new contacts at 25 km, bearing 070 — Kharon Mandate strike group: cruiser Acheron (T-21) "
 		            "and three Styx-class destroyers (T-22 Styx, T-23 Cocytus, T-24 Phlegethon), closing at 450 m/s; the 7th Fleet is moving to engage"));
 	}
@@ -412,8 +414,38 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 			Report(TEXT("transmission: ") + TransmissionText);
 		}
 	}
+	// the director's beats: arrivals when their time comes, repairs, quiet periods
+	for (int32 i = PendingBeats.Num() - 1; i >= 0; --i)
+	{
+		if (Time >= PendingBeats[i].Key)
+		{
+			const TSharedPtr<FJsonObject> B = PendingBeats[i].Value;
+			PendingBeats.RemoveAt(i);
+			ArriveBeat(B);
+		}
+	}
+	if (RepairUntil > 0.f)
+	{
+		FAstraBattleShip& P = Ships[0];
+		P.Hull = FMath::Min(P.HullMax, P.Hull + RepairHullPerSec * Dt);
+		if (Time >= RepairUntil)
+		{
+			RepairUntil = -1.f;
+			P.Missiles += RepairMissiles;
+			Report(FString::Printf(TEXT("engineering: repairs and resupply complete — hull at %.0f%%, %d missiles in the VLS"), 100.f * P.Hull / P.HullMax, P.Missiles));
+			if (!bEngagementActive)
+			{
+				Report(TEXT("director: beat complete — resupply"), false);
+			}
+		}
+	}
+	if (CalmUntil > 0.f && Time >= CalmUntil)
+	{
+		CalmUntil = -1.f;
+		Report(TEXT("director: beat complete — calm"), false);
+	}
 	// outcome
-	if (!bScenarioOver && StageDone == 2)
+	if (bEngagementActive)
 	{
 		int32 Fighting = 0, Truce = 0;
 		for (const FAstraBattleShip& S : Ships)
@@ -424,21 +456,39 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 				Truce += S.bNegotiated ? 1 : 0;
 			}
 		}
+		FString Result;
 		if (bSurrenderAccepted)
 		{
-			bScenarioOver = true;
-			Report(TEXT("tactical: the Mandate has accepted our surrender and ceased fire — their ships are closing to board the Aquila; the battle for Aurelia is lost"));
+			Result = TEXT("surrender accepted by the Mandate");
+			Report(TEXT("tactical: the Mandate has accepted our surrender and ceased fire — their ships are closing to board the Aquila"));
 		}
 		else if (Fighting == 0)
 		{
-			bScenarioOver = true;
-			Report(Truce > 0 ? TEXT("tactical: no Mandate ship is fighting any more — they hold fire or withdraw under the terms agreed over the channel; the battle for Aurelia is over")
-			                 : TEXT("tactical: no hostile ship left in the engagement zone — the Mandate attack on Aurelia has been repelled"));
+			Result = Truce > 0 ? TEXT("the enemy withdrew or holds fire under negotiated terms") : TEXT("victory: no hostile ship left fighting");
+			Report(Truce > 0 ? TEXT("tactical: no Mandate ship is fighting any more — they hold fire or withdraw under the terms agreed over the channel; the engagement is over")
+			                 : TEXT("tactical: no hostile ship left fighting in the engagement zone — the engagement is over"));
 		}
 		else if (Ships[0].Hull / Ships[0].HullMax < 0.08f)
 		{
-			bScenarioOver = true;
+			Result = TEXT("the Aquila is crippled and cannot stay in the fight");
 			Report(TEXT("engineering: hull integrity critical, main reactor containment failing — the Aquila cannot stay in the fight"));
+		}
+		if (!Result.IsEmpty())
+		{
+			bScenarioOver = true;
+			bEngagementActive = false;
+			FString Fleet;
+			int32 MandateLost = 0;
+			for (const FAstraBattleShip& S : Ships)
+			{
+				if (!S.bCraft && !S.bPlayer && S.Side == EAstraSide::Astra)
+				{
+					Fleet += FString::Printf(TEXT("%s%s %s"), Fleet.IsEmpty() ? TEXT("") : TEXT(", "), *S.Name, S.bAlive ? TEXT("in action") : TEXT("lost"));
+				}
+				MandateLost += (S.Side == EAstraSide::Mandate && S.Mode == EAstraShipMode::Dead) ? 1 : 0;
+			}
+			Report(FString::Printf(TEXT("director: engagement over — %s; Aquila hull %.0f%%, %d missiles; our fleet: %s; Mandate ships destroyed so far: %d"),
+			                       *Result, 100.f * Ships[0].Hull / Ships[0].HullMax, Ships[0].Missiles, *Fleet, MandateLost), false);
 		}
 	}
 }
@@ -620,7 +670,7 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 			FireRail(S, *T, (0.0012f + Dist / 30e6) * (S.bJammed ? 3.f : 1.f));
 		}
 	}
-	if (S.Missiles > 0 && S.MissileT <= 0.f && Dist < S.MissileRange && Dist > 2.5 * Km)
+	if (S.Missiles > 0 && S.MissileT <= 0.f && Dist < S.MissileRange && Dist > 2.5 * Km && T->Side != EAstraSide::Neutral)
 	{
 		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f);
 		const int32 N = FMath::Min(S.Missiles, S.Radius > 200.f ? 4 : 2);
@@ -1022,15 +1072,23 @@ bool UAstraBattleSubsystem::ContactGeometry(const FString& ContactId, double& Ou
 
 FString UAstraBattleSubsystem::MandateCommander() const
 {
-	for (const TCHAR* C : {TEXT("T-21"), TEXT("T-22"), TEXT("T-23"), TEXT("T-24"), TEXT("T-11")})
+	const FAstraBattleShip* Best = nullptr;
+	for (const FAstraBattleShip& S : Ships)
 	{
-		const FAstraBattleShip* S = Ships.FindByPredicate([C](const FAstraBattleShip& X) { return X.ContactId == C; });
-		if (S && S->bAlive && S->bHostile)
+		if (!S.bAlive || !S.bHostile || S.bCraft || S.Side != EAstraSide::Mandate)
 		{
-			return C;
+			continue;
+		}
+		if (S.bLeader)
+		{
+			return S.ContactId;
+		}
+		if (!Best || S.Radius > Best->Radius)
+		{
+			Best = &S;   // no leader left: the biggest ship's captain takes over
 		}
 	}
-	return FString();
+	return Best ? Best->ContactId : FString();
 }
 
 bool UAstraBattleSubsystem::EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail)
@@ -1117,6 +1175,7 @@ void UAstraBattleSubsystem::BreakCeasefire(const FAstraBattleShip& Victim)
 	}
 	bScenarioOver = false;
 	bSurrenderAccepted = false;
+	bEngagementActive = true;
 	Report(FString::Printf(TEXT("tactical: we fired on the %s (%s) during the ceasefire — the Mandate ships are coming about and re-engaging"),
 	                       *Victim.Name, *Victim.ContactId));
 	const FString Cmd = MandateCommander();
@@ -1222,7 +1281,7 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S)
 
 void UAstraBattleSubsystem::OnCommanderLost(const FAstraBattleShip& Old, const TCHAR* How)
 {
-	if (StageDone < 2)
+	if (!bEngagementActive)
 	{
 		return;
 	}
@@ -1747,14 +1806,15 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		--Q.ToLaunch;
 		--Q.OnDeck;
 		++Q.Launched;
-		const FAstraBattleShip& P = Ships[0];
+		const FVector CarrierPos = Ships[0].Pos, CarrierVel = Ships[0].Vel;   // copies: AddShip may reallocate Ships
+		const FQuat CarrierAtt = Ships[0].Att;
 		const float Side = (Q.Launched % 2) ? 1.f : -1.f;
-		const FVector Pos = P.Pos + P.Att.RotateVector(FVector(-60.0, Side * 40.0, -30.0));
+		const FVector Pos = CarrierPos + CarrierAtt.RotateVector(FVector(-60.0, Side * 40.0, -30.0));
 		const float Radius = Q.Kind == 1 ? 14.f : (Q.Kind == 2 ? 5.f : 10.f);
 		const float Hull = Q.Kind == 1 ? 110.f : (Q.Kind == 2 ? 25.f : 60.f);
 		const TCHAR* Role = Q.Kind == 1 ? TEXT("torpedo bomber") : (Q.Kind == 2 ? TEXT("drone") : TEXT("fighter"));
 		const int32 I = AddShip(FString::Printf(TEXT("%s-%d"), *Q.CallSign.ToUpper(), Q.Launched), FString::Printf(TEXT("%s %d"), *Q.CallSign, Q.Launched),
-		                        FString::Printf(TEXT("ASTRA %s (%s)"), Role, *Q.CallSign), Q.Mesh, EAstraSide::Astra, Pos, P.Att.Rotator().Yaw, 200.f,
+		                        FString::Printf(TEXT("ASTRA %s (%s)"), Role, *Q.CallSign), Q.Mesh, EAstraSide::Astra, Pos, CarrierAtt.Rotator().Yaw, 200.f,
 		                        Radius, Hull, Q.Kind == 2 ? 0.f : 20.f);
 		FAstraBattleShip& C = Ships[I];
 		C.bCraft = true;
@@ -1768,7 +1828,7 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		C.PDRange = 0.f;
 		C.PDChannels = 0;
 		C.bShieldsUp = C.Shield > 0.f;
-		C.Vel = P.Vel + P.Att.RotateVector(FVector(120.0, Side * 80.0, -40.0));
+		C.Vel = CarrierVel + CarrierAtt.RotateVector(FVector(120.0, Side * 80.0, -40.0));
 		C.CruiseSpeed = Q.Kind == 1 ? 650.f : (Q.Kind == 2 ? 900.f : 850.f);
 		C.MaxAccel = 160.f;
 		C.MaxTurnDeg = 45.f;
@@ -2082,5 +2142,265 @@ void UAstraBattleSubsystem::TickWrecks(float Dt)
 			continue;
 		}
 		W.Actor->SetActorLocationAndRotation(ToWorld(W.Pos), ToWorldRot(W.Att));
+	}
+}
+
+// ---------------------------------------------------------------------------------------------- the war director
+int32 UAstraBattleSubsystem::SpawnClass(const FString& Class, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg)
+{
+	const FString C = Class.ToLower();
+	int32 I = INDEX_NONE;
+	if (C.Contains(TEXT("acheron")) || C.Contains(TEXT("cruiser")))
+	{
+		I = AddShip(Contact, Name, TEXT("Kharon Mandate cruiser, Acheron class"), TEXT("SM_SHIP_MANDATE_Acheron"), EAstraSide::Mandate, Pos, HeadingDeg, 450.f, 240.f, 3600.f, 1500.f);
+		Ships[I].RailDamage = 85.f; Ships[I].RailSlugs = 3; Ships[I].RailCd = 8.f; Ships[I].Missiles = 32; Ships[I].PDChannels = 3;
+	}
+	else if (C.Contains(TEXT("lethe")) || C.Contains(TEXT("frigate")))
+	{
+		I = AddShip(Contact, Name, TEXT("Kharon Mandate frigate, Lethe class"), TEXT("SM_SHIP_MANDATE_Lethe"), EAstraSide::Mandate, Pos, HeadingDeg, 500.f, 90.f, 520.f, 220.f);
+		Ships[I].Missiles = 8;
+	}
+	else if (C.Contains(TEXT("praetorian")) || C.Contains(TEXT("battleship")))
+	{
+		I = AddShip(Contact, Name, TEXT("ASTRA battleship"), TEXT("SM_SHIP_ASTRA_Praetorian"), EAstraSide::Astra, Pos, HeadingDeg, 300.f, 420.f, 3200.f, 1200.f);
+		Ships[I].RailDamage = 90.f; Ships[I].RailCd = 9.f; Ships[I].PDChannels = 3;
+	}
+	else if (C.Contains(TEXT("vigilant")) || C.Contains(TEXT("astra")))
+	{
+		I = AddShip(Contact, Name, TEXT("ASTRA destroyer"), TEXT("SM_SHIP_ASTRA_Vigilant"), EAstraSide::Astra, Pos, HeadingDeg, 300.f, 140.f, 900.f, 380.f);
+	}
+	else if (C.Contains(TEXT("freighter")) || C.Contains(TEXT("guild")))
+	{
+		I = AddShip(Contact, Name, TEXT("Free Guilds freighter"), TEXT("SM_SHIP_GUILD_Freighter"), EAstraSide::Neutral, Pos, HeadingDeg, 180.f, 170.f, 700.f, 60.f);
+		Ships[I].RailDamage = 0.f; Ships[I].Missiles = 0;
+	}
+	else
+	{
+		I = AddShip(Contact, Name, TEXT("Kharon Mandate destroyer, Styx class"), TEXT("SM_SHIP_MANDATE_Styx"), EAstraSide::Mandate, Pos, HeadingDeg, 450.f, 130.f, 1300.f, 500.f);
+		Ships[I].RailDamage = 60.f; Ships[I].RailCd = 9.f; Ships[I].Missiles = 16;
+	}
+	if (Ships[I].Side == EAstraSide::Mandate)
+	{
+		Ships[I].bHostile = true;
+		Ships[I].Mode = EAstraShipMode::Attack;
+		Ships[I].CruiseSpeed = 450.f;
+	}
+	SpawnVisual(Ships[I]);
+	return I;
+}
+
+bool UAstraBattleSubsystem::StartBeat(const TSharedPtr<FJsonObject>& Beat, FString& OutDetail)
+{
+	if (!Beat.IsValid() || Ships.Num() == 0)
+	{
+		OutDetail = TEXT("no beat");
+		return false;
+	}
+	FString Type;
+	Beat->TryGetStringField(TEXT("type"), Type);
+	Type = Type.ToLower();
+	double Delay = 60.0;
+	Beat->TryGetNumberField(TEXT("delay_s"), Delay);
+	Delay = FMath::Clamp(Delay, 5.0, 900.0);
+	if (Type == TEXT("resupply"))
+	{
+		double Dur = 120.0, HullTo = 85.0, Missiles = 24.0;
+		Beat->TryGetNumberField(TEXT("duration_s"), Dur);
+		Beat->TryGetNumberField(TEXT("hull_pct"), HullTo);
+		Beat->TryGetNumberField(TEXT("missiles"), Missiles);
+		Dur = FMath::Clamp(Dur, 30.0, 600.0);
+		const FAstraBattleShip& P = Ships[0];
+		RepairUntil = Time + Dur;
+		RepairHullPerSec = FMath::Max(0.f, (float)(FMath::Clamp(HullTo, 0.0, 100.0) / 100.0 * P.HullMax - P.Hull)) / (float)Dur;
+		RepairMissiles = FMath::Clamp((int32)Missiles, 0, 96);
+		OutDetail = FString::Printf(TEXT("resupply under way for %.0f s: hull to %.0f%%, %d missiles"), Dur, HullTo, RepairMissiles);
+		return true;
+	}
+	if (Type == TEXT("calm"))
+	{
+		CalmUntil = Time + Delay;
+		OutDetail = FString::Printf(TEXT("quiet period of %.0f s"), Delay);
+		return true;
+	}
+	if (Type != TEXT("raid") && Type != TEXT("distress") && Type != TEXT("reinforcements"))
+	{
+		OutDetail = FString::Printf(TEXT("unknown beat type %s"), *Type);
+		return false;
+	}
+	// contact ids now, so the new commanders can be given a mind before they arrive
+	TArray<FString> Ids;
+	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+	int32 N = 0;
+	if (Beat->TryGetArrayField(TEXT("ships"), List))
+	{
+		N += List->Num();
+	}
+	if (Beat->TryGetArrayField(TEXT("attackers"), List))
+	{
+		N += List->Num();
+	}
+	if (Type == TEXT("distress"))
+	{
+		++N;   // the ship calling for help comes first
+	}
+	N = FMath::Clamp(N, 1, 8);
+	TArray<TSharedPtr<FJsonValue>> IdValues;
+	for (int32 i = 0; i < N; ++i)
+	{
+		Ids.Add(FString::Printf(TEXT("T-%d"), NextContact++));
+		IdValues.Add(MakeShared<FJsonValueString>(Ids.Last()));
+	}
+	Beat->SetArrayField(TEXT("_ids"), IdValues);
+	PendingBeats.Add(TPair<float, TSharedPtr<FJsonObject>>(Time + (float)Delay, Beat));
+	OutDetail = FString::Printf(TEXT("%s scheduled in %.0f s; contact ids %s; the first is the group's leader"), *Type, Delay, *FString::Join(Ids, TEXT(", ")));
+	return true;
+}
+
+void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
+{
+	FString Type;
+	Beat->TryGetStringField(TEXT("type"), Type);
+	Type = Type.ToLower();
+	double Bearing = FMath::FRandRange(0.f, 360.f), Range = 25.0;
+	Beat->TryGetNumberField(TEXT("bearing_deg"), Bearing);
+	Beat->TryGetNumberField(TEXT("range_km"), Range);
+	Range = FMath::Clamp(Range, 6.0, 120.0);
+	TArray<FString> Ids;
+	const TArray<TSharedPtr<FJsonValue>>* IdList = nullptr;
+	if (Beat->TryGetArrayField(TEXT("_ids"), IdList))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *IdList)
+		{
+			Ids.Add(V->AsString());
+		}
+	}
+	int32 NextIdx = 0;
+	auto TakeId = [&]() { return Ids.IsValidIndex(NextIdx) ? Ids[NextIdx++] : FString::Printf(TEXT("T-%d"), NextContact++); };
+	const int32 PlayerId = Ships[0].Id;                  // copies: spawning may reallocate Ships
+	const FVector Centre = Ships[0].Pos + Polar(Range * Km, Bearing, FMath::FRandRange(-3.f, 5.f));
+	const float Facing = (float)FMath::Fmod(Bearing + 180.0, 360.0);   // they come towards us
+	auto ShipSpecs = [&Beat](const TCHAR* Field) -> TArray<TSharedPtr<FJsonObject>>
+	{
+		TArray<TSharedPtr<FJsonObject>> Out;
+		const TArray<TSharedPtr<FJsonValue>>* L = nullptr;
+		if (Beat->TryGetArrayField(Field, L))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *L)
+			{
+				if (V->Type == EJson::Object)
+				{
+					Out.Add(V->AsObject());
+				}
+			}
+		}
+		return Out;
+	};
+	FString Listing;
+	if (Type == TEXT("raid") || Type == TEXT("reinforcements"))
+	{
+		const TArray<TSharedPtr<FJsonObject>> Specs = ShipSpecs(TEXT("ships"));
+		int32 k = 0;
+		int32 LeaderIdx = INDEX_NONE;
+		for (const TSharedPtr<FJsonObject>& Spec : Specs)
+		{
+			if (k >= 8)
+			{
+				break;
+			}
+			FString Class, Name;
+			Spec->TryGetStringField(TEXT("class"), Class);
+			Spec->TryGetStringField(TEXT("name"), Name);
+			const FString Id = TakeId();
+			const FVector Pos = Centre + Polar(k == 0 ? 0.0 : 3.5 * Km, Bearing + 90.0 + 70.0 * k, (k % 2) ? 2.0 : -2.0);
+			const int32 I = SpawnClass(Type == TEXT("reinforcements") && !Class.ToLower().Contains(TEXT("praetorian")) ? TEXT("vigilant") : Class, Id,
+			                           Name.IsEmpty() ? Id : Name, Pos, Facing);
+			if (Type == TEXT("raid"))
+			{
+				Ships[I].TargetId = (k == 0 || Ships.Num() < 3) ? PlayerId : Ships[FMath::RandRange(0, 2)].Id;
+				if (k == 0)
+				{
+					Ships[I].bLeader = true;
+					LeaderIdx = I;
+				}
+			}
+			else
+			{
+				Ships[I].Mode = EAstraShipMode::Cruise;
+			}
+			Listing += FString::Printf(TEXT("%s%s (%s, %s)"), Listing.IsEmpty() ? TEXT("") : TEXT(", "), *Ships[I].Name, *Id, *Ships[I].Class);
+			++k;
+		}
+		if (Type == TEXT("raid"))
+		{
+			bEngagementActive = true;
+			bScenarioOver = false;
+			bSurrenderAccepted = false;
+			Report(FString::Printf(TEXT("sensors: %d new contacts at %.0f km, bearing %03.0f — Kharon Mandate raid group: %s; closing at 450 m/s"),
+			                       k, Range, Bearing, *Listing));
+			bool bHail = true;
+			Beat->TryGetBoolField(TEXT("hail"), bHail);
+			if (bHail && LeaderIdx != INDEX_NONE)
+			{
+				TransmissionText = FString::Printf(TEXT("%s — the commander of the raid group, aboard the %s, hails the Aquila"), *Ships[LeaderIdx].ContactId, *Ships[LeaderIdx].Name);
+				TransmissionAt = Time + 14.f;
+			}
+		}
+		else
+		{
+			Report(FString::Printf(TEXT("sensors: friendly contacts at %.0f km, bearing %03.0f — %s, joining the 7th Fleet picket"), Range, Bearing, *Listing));
+			bool bGranted = false;
+			Beat->TryGetBoolField(TEXT("granted"), bGranted);
+			if (!bGranted && !bEngagementActive)
+			{
+				Report(FString::Printf(TEXT("director: beat complete — reinforcements arrived (%s)"), *Listing), false);
+			}
+		}
+		return;
+	}
+	if (Type == TEXT("distress"))
+	{
+		FString VName = TEXT("Morning Star"), VClass = TEXT("freighter");
+		const TSharedPtr<FJsonObject>* Victim = nullptr;
+		if (Beat->TryGetObjectField(TEXT("ship"), Victim))
+		{
+			(*Victim)->TryGetStringField(TEXT("name"), VName);
+			(*Victim)->TryGetStringField(TEXT("class"), VClass);
+		}
+		const FString VId = TakeId();
+		const int32 V = SpawnClass(TEXT("freighter"), VId, VName, Centre, Facing);
+		Ships[V].Vel = Ships[V].Att.GetForwardVector() * 200.f;
+		Ships[V].Hull = Ships[V].HullMax = 1500.f;   // a big hauler takes a while to die: time for the Aquila to get there
+		Ships[V].Shield = Ships[V].ShieldMax = 200.f;
+		int32 k = 0;
+		FString Attackers;
+		int32 LeaderIdx = INDEX_NONE;
+		for (const TSharedPtr<FJsonObject>& Spec : ShipSpecs(TEXT("attackers")))
+		{
+			if (k >= 6)
+			{
+				break;
+			}
+			FString Class, Name;
+			Spec->TryGetStringField(TEXT("class"), Class);
+			Spec->TryGetStringField(TEXT("name"), Name);
+			const FString Id = TakeId();
+			// the raiders come from further out, behind their prey
+			const int32 I = SpawnClass(Class.IsEmpty() ? TEXT("lethe") : Class, Id, Name.IsEmpty() ? Id : Name,
+			                           Centre + Polar(11.0 * Km, Bearing + FMath::FRandRange(-25.f, 25.f), 1.0), Facing);
+			Ships[I].TargetId = Ships[V].Id;
+			if (k == 0)
+			{
+				Ships[I].bLeader = true;
+				LeaderIdx = I;
+			}
+			Attackers += FString::Printf(TEXT("%s%s (%s)"), Attackers.IsEmpty() ? TEXT("") : TEXT(", "), *Ships[I].Name, *Id);
+			++k;
+		}
+		bEngagementActive = k > 0;
+		bScenarioOver = false;
+		Report(FString::Printf(TEXT("comms: distress call — the %s %s (%s) is under attack at %.0f km, bearing %03.0f, by %s"),
+		                       VClass.Contains(TEXT("Guild")) ? *VClass : *(TEXT("Free Guilds ") + VClass), *VName, *VId, Range, Bearing,
+		                       Attackers.IsEmpty() ? TEXT("unknown attackers") : *Attackers));
+		(void)LeaderIdx;
 	}
 }

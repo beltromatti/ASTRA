@@ -119,6 +119,15 @@ class EnemyAgent:
         if self.contact == contact:
             self.open = False
 
+    def register(self, contact: str, persona: dict[str, Any]) -> str:
+        """A commander invented by the war director: from now on that ship's captain has a mind and a voice."""
+        key = "cmdr_" + contact.lower().replace("-", "")
+        COMMANDERS[contact] = dict(key=key, name=persona.get("name", "Unknown commander"), ship=persona.get("ship", "a Mandate warship"),
+                                   voice=persona.get("voice", "stuart_bell"), bio=persona.get("bio", ""),
+                                   rank=persona.get("rank", "Ferryman (ship captain)"))
+        self.dead.discard(contact)
+        return key
+
     def senior(self, state: dict[str, Any]) -> str:
         """The Mandate captain in command now: the first of the chain still alive and fighting (the game agrees)."""
         view = state.get("_mandate")
@@ -132,8 +141,10 @@ class EnemyAgent:
         if senior == self.contact:
             if self.contact == "T-21":
                 return "You command the strike group: your decisions apply to every Mandate ship in the system."
-            return ("Archon Varek Solm is dead, his flagship Acheron destroyed: you now command what is left of the strike "
-                    "group, and your decisions apply to every Mandate ship still fighting.")
+            if self.contact in CHAIN and "T-21" in self.dead:
+                return ("Archon Varek Solm's flagship Acheron is gone: you now command what is left of the strike group, "
+                        "and your decisions apply to every Mandate ship still fighting.")
+            return "You command the Mandate ships in this action: your decisions apply to all of them."
         boss = COMMANDERS.get(senior, {}).get("name", "your superior")
         return f"{boss} commands the strike group; your decisions apply only to your own ship."
 
