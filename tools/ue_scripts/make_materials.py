@@ -10,7 +10,7 @@ TEX_SRC = ROOT + "/art/_cache/textures"
 TEX_DST = "/Game/ASTRA/Materials/Textures"
 MAT_DST = "/Game/ASTRA/Materials"
 MI_DST = "/Game/ASTRA/Materials/Instances"
-KIT = "/Game/ASTRA/Kit/Interior/Corridor"
+KIT = globals().get("KIT", "/Game/ASTRA/Kit/Interior/Corridor")
 
 eal = unreal.EditorAssetLibrary
 mel = unreal.MaterialEditingLibrary
@@ -66,9 +66,18 @@ def tex(name):
 
 
 # ---------------------------------------------------------------- helpers
+REBUILD_MASTERS = globals().get("REBUILD_MASTERS", False)
+
+
+class _Existing(Exception):
+    pass
+
+
 def new_material(name, folder=MAT_DST):
     path = f"{folder}/{name}"
     if eal.does_asset_exist(path):
+        if not REBUILD_MASTERS:
+            raise _Existing(path)
         eal.delete_asset(path)
     return tools.create_asset(name, folder, unreal.Material, unreal.MaterialFactoryNew())
 
@@ -264,9 +273,11 @@ def srgb_to_linear(h):
 def make_mi(name, parent, scalars=None, vectors=None, textures=None, switches=None, masked=False):
     path = f"{MI_DST}/{name}"
     if eal.does_asset_exist(path):
-        eal.delete_asset(path)
-    mi = tools.create_asset(name, MI_DST, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-    mel.set_material_instance_parent(mi, parent)
+        mi = eal.load_asset(path)
+    else:
+        mi = tools.create_asset(name, MI_DST, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    if mi.get_editor_property("parent") != parent:
+        mel.set_material_instance_parent(mi, parent)
     for k, v in (scalars or {}).items():
         mel.set_material_instance_scalar_parameter_value(mi, k, v)
     for k, v in (vectors or {}).items():
@@ -281,7 +292,7 @@ def make_mi(name, parent, scalars=None, vectors=None, textures=None, switches=No
         ov.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
         mi.set_editor_property("base_property_overrides", ov)
     mel.update_material_instance(mi)
-    eal.save_loaded_asset(mi)
+    eal.save_loaded_asset(mi, only_if_is_dirty=False)
     return mi
 
 
@@ -320,6 +331,18 @@ def build_instances(hard, emi, glass):
     mis["MI_ASTRA_Light"] = make_mi("MI_ASTRA_Light", emi,
         scalars={"Intensity": 40.0}, vectors={"EmissiveColor": [1.0, 0.95, 0.88]})
     mis["MI_ASTRA_Glass"] = make_mi("MI_ASTRA_Glass", glass)
+    mis["MI_ASTRA_Rubber"] = make_mi("MI_ASTRA_Rubber", hard,
+        scalars={"RoughnessMin": 0.55, "RoughnessMax": 0.8, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.5,
+                 "MacroBrightness": 0.08, "NormalStrength": 0.5, "ScratchRoughness": 0.0},
+        vectors={"Tint": [0.045, 0.047, 0.05]},
+        textures={"BaseColorMap": "T_DeckRubber_BC", "NormalMap": "T_DeckRubber_N", "ORMMap": "T_DeckRubber_ORM"})
+    command_blue = srgb_to_linear("#3E7BFA")
+    mis["MI_ASTRA_Accent"] = make_mi("MI_ASTRA_Accent", emi,
+        scalars={"Intensity": 25.0}, vectors={"EmissiveColor": command_blue, "BaseColor": [0.05, 0.05, 0.06]})
+    mis["MI_ASTRA_Guide"] = make_mi("MI_ASTRA_Guide", emi,
+        scalars={"Intensity": 6.0}, vectors={"EmissiveColor": [0.75, 0.9, 1.0], "BaseColor": [0.05, 0.05, 0.06]})
+    mis["MI_ASTRA_Screen"] = make_mi("MI_ASTRA_Screen", emi,
+        scalars={"Intensity": 3.0, "Roughness": 0.15}, vectors={"EmissiveColor": [0.18, 0.42, 0.85], "BaseColor": [0.01, 0.012, 0.015]})
     log.append("instances: " + ", ".join(mis))
     return mis
 
@@ -332,8 +355,18 @@ def assign(_mis):
 
 
 import_textures()
-hard = build_hard()
-emi = build_emissive()
-glass = build_glass()
+
+
+def master(builder, name):
+    try:
+        return builder()
+    except _Existing:
+        log.append(f"{name} kept")
+        return eal.load_asset(f"{MAT_DST}/{name}")
+
+
+hard = master(build_hard, "M_ASTRA_Hard")
+emi = master(build_emissive, "M_ASTRA_Emissive")
+glass = master(build_glass, "M_ASTRA_Glass")
 assign(build_instances(hard, emi, glass))
 print(json.dumps(log, indent=1))

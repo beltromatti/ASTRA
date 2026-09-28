@@ -38,17 +38,52 @@ def place(name, x, y=0.0, z=0.0, yaw=0.0, label=None, scale=None, folder="Corrid
     return a
 
 
-# --- corridor run along +X
+# --- corridor run along +X (kit v2: structural shells + wall panels chosen per bay)
+import random  # noqa: E402
+
+rng = random.Random(7)
+BAYS = ((0.14, 1.86), (2.14, 3.86))
+LOW = [("SM_COR_PanelLow_Plain", 0.6), ("SM_COR_PanelLow_Access", 0.2), ("SM_COR_PanelLow_Vent", 0.2)]
+UP = [("SM_COR_PanelUp_Plain", 0.55), ("SM_COR_PanelUp_Screen", 0.25), ("SM_COR_PanelUp_Vent", 0.2)]
+
+
+def pick(options):
+    r, acc = rng.random(), 0.0
+    for name, w in options:
+        acc += w
+        if r <= acc:
+            return name
+    return options[-1][0]
+
+
+def panels(xm, window=False, tag=""):
+    """Wall panels for the module starting at xm (m). UE -Y wall: yaw 0; UE +Y wall: yaw 180 (origin at bay end)."""
+    for side in (-1, 1):
+        for bi, (b0, b1) in enumerate(BAYS):
+            if window and side == -1:
+                items = [("SM_COR_PanelLowShort_Plain", 0.22)]
+            else:
+                items = [(pick(LOW), 0.22), (pick(UP), 1.32)]
+            for name, z in items:
+                if side == -1:
+                    place(name, xm + b0, y=-1.6, z=z, label=f"{tag}_P{bi}_{name[7:]}_{'L' if side < 0 else 'R'}", folder="Corridor/Panels")
+                else:
+                    place(name, xm + b1, y=1.6, z=z, yaw=180.0, label=f"{tag}_P{bi}_{name[7:]}_R", folder="Corridor/Panels")
+
+
 place("SM_COR_EndCap", 0.0, yaw=180.0, label="EndCap_A")
 for i, x in enumerate((0.0, 4.0, 8.0)):
-    place("SM_COR_Straight_4m", x, label=f"Straight_{i}")
+    place("SM_COR_Shell_4m", x, label=f"Shell_{i}")
+    panels(x, tag=f"M{i}")
 place("SM_COR_Bulkhead", 12.0, label="Bulkhead_0")
 place("SM_COR_DoorLeaf", 12.25, y=-0.66, label="DoorLeaf_L")            # open: slid into the wall
 place("SM_COR_DoorLeaf", 12.25, y=0.66, label="DoorLeaf_R", scale=(1, -1, 1))
-place("SM_COR_Window_4m", 12.5, label="Window_0")
+place("SM_COR_ShellWindow_4m", 12.5, label="ShellWindow_0")
+panels(12.5, window=True, tag="W0")
 place("SM_COR_WindowGlass", 12.5, label="WindowGlass_0")
-place("SM_COR_Straight_4m", 16.5, label="Straight_3")
-place("SM_COR_Straight_4m", 20.5, label="Straight_4")
+for i, x in enumerate((16.5, 20.5)):
+    place("SM_COR_Shell_4m", x, label=f"Shell_{i + 3}")
+    panels(x, tag=f"M{i + 3}")
 place("SM_COR_EndCap", 24.5, label="EndCap_B")
 
 # --- ceiling lights: one rect light per 4 m module (two strips each), shadowed
@@ -110,8 +145,8 @@ pp.set_editor_property("unbound", True)
 s = pp.get_editor_property("settings")
 for k, v in {
     "auto_exposure_method": unreal.AutoExposureMethod.AEM_HISTOGRAM,
-    "auto_exposure_min_brightness": 3.0,
-    "auto_exposure_max_brightness": 10.0,
+    "auto_exposure_min_brightness": 7.2,
+    "auto_exposure_max_brightness": 7.2,
     "auto_exposure_bias": 0.0,
     "bloom_intensity": 0.35,
     "vignette_intensity": 0.25,

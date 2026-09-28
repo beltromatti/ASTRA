@@ -5,7 +5,7 @@ import os
 
 import unreal
 
-SRC = globals().get("SRC", "/Users/beltromatti/Desktop/ASTRA/art/export/kit_interni")
+SRC = globals().get("SRC", "/Users/beltromatti/Desktop/ASTRA/art/export/kit_corridor")
 DST = globals().get("DST", "/Game/ASTRA/Kit/Interior/Corridor")
 
 tasks = []
