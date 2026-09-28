@@ -90,6 +90,7 @@ from .mess import MessTalk  # noqa: E402
 from .visits import VisitPlanner  # noqa: E402
 from .loss import Aftermath  # noqa: E402
 from .finale import Finale  # noqa: E402
+from .memory import MemoryKeeper  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
 
@@ -212,6 +213,9 @@ class Mind:
         self.aftermath = Aftermath(self.llm, self._say_external, self._director_command, self._register_voice, self.director,
                                    self.voice.busy_s)
         self.director.finale = Finale(self.llm, self._say_external, self._director_command, self.voice.busy_s)
+        self.memory = MemoryKeeper(self.llm, self.director.memories, self.director.note)
+        self.agent.memories = self.memory.lines
+        self.agent.say = self._crew_say
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
         self.agent.war = lambda: self.director.war.crew_view()
@@ -261,6 +265,12 @@ class Mind:
             await self.game.execute("log_entry", {"text": entry[:200]}, "captain")
         except Exception:  # noqa: BLE001
             log.warning("the game did not acknowledge the log entry")
+
+    async def _crew_say(self, speaker: str, text: str, lang: str, tone: str) -> None:
+        """The crew's lines: voiced, and heard by the memory keeper (an officer remembers what passed with the Captain)."""
+        if speaker in CREW:
+            self.memory.hear(speaker, text)
+        await self.voice.say(speaker, text, lang, tone)
 
     def _register_voice(self, key: str, name: str, voice: str) -> None:
         """A voice of the story (the board, whoever finds the pod, a captor): a name on the channel and a voice."""
@@ -574,7 +584,9 @@ class Mind:
                         await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {to_enemy}", lang, self._battle_state())
                         continue
                     text = r.crew
+                self.memory.hear("Captain", text)
                 t = await self.agent.handle(text, lang)
+                asyncio.create_task(self.memory.maybe_read())
                 for name, args_, res in t.actions:
                     if name == "end_transmission":
                         self.enemy.open = False

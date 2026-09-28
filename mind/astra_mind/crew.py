@@ -94,7 +94,7 @@ Everyone wears a neural translator implant, "the Interpreter": people hear each 
 
 
 def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None,
-                  war: str = "", mood: str = "", bonds: str = "", standing: str = "") -> str:
+                  war: str = "", mood: str = "", bonds: str = "", standing: str = "", memories: str = "") -> str:
     lang_name = LANG_NAMES.get(lang, lang)
     roster = "\n".join(
         f"- {o.id}: {o.title}, {o.role}. Duties: {o.duties}. Character: {o.personality}." for o in CREW.values())
@@ -216,6 +216,12 @@ word of comfort; never announce it or explain it)
 
 Standing orders from the Captain (in force until withdrawn)
 {standing or "- none: every action waits for the Captain's order, except damage control, shield facing, point defence and the radiators"}
+
+What each officer remembers of the Captain (their conversations; let it show when it matters — asking after
+someone the Captain spoke of, recalling a promise, honouring a confidence; never recite it, never invent more).
+These are facts about the CAPTAIN: the Captain's family, home and past belong to the Captain — an officer speaking
+of them says "your brother" to the Captain, never "my brother".
+{memories or "- nothing yet: they are still getting to know the Captain"}
 
 Where each officer stands with the Captain (it shows in small ways — warmth or formality, a pause before a read-back,
 an unasked question, loyalty under fire; never announce it)

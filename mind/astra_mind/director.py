@@ -215,6 +215,7 @@ class Director:
         self.decisive = False                    # the decisive battle is being fought
         self.finale = None                       # the arc's ending (finale.Finale, set by the server)
         self.standing: list[dict[str, str]] = []   # the Captain's standing orders (shared with the bridge agent)
+        self.memories: dict[str, list[dict[str, str]]] = {}   # what each officer remembers of the Captain (memory.py)
 
     def reset(self) -> None:
         """A new campaign: the war begins again at Aurelia."""
@@ -224,6 +225,7 @@ class Director:
         self.mood = ""
         self.bonds = {}
         self.standing.clear()
+        self.memories.clear()
         self.arc, self.act, self.act_beats, self.decisive = 1, 1, 0, False
         self.busy = False
         self.granted = False
@@ -242,6 +244,9 @@ class Director:
             self.mood = str(d.get("mood", ""))
             self.bonds = {str(k): str(v) for k, v in (d.get("bonds") or {}).items()}
             self.standing[:] = [o for o in (d.get("standing") or []) if isinstance(o, dict) and o.get("department") and o.get("order")]
+            self.memories.clear()
+            self.memories.update({str(k): [m for m in v if isinstance(m, dict) and m.get("memory")]
+                                  for k, v in (d.get("memories") or {}).items() if isinstance(v, list)})
             self.arc, self.act = int(d.get("arc", 1)), int(d.get("act", 1))
             self.act_beats, self.decisive = int(d.get("act_beats", 0)), bool(d.get("decisive", False))
         except (OSError, ValueError):
@@ -265,7 +270,7 @@ class Director:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds,
                            "standing": self.standing, "arc": self.arc, "act": self.act, "act_beats": self.act_beats,
-                           "decisive": self.decisive}, f,
+                           "decisive": self.decisive, "memories": self.memories}, f,
                           ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:
