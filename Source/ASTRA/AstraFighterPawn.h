@@ -37,6 +37,7 @@ public:
 	UFUNCTION(Exec) void AstraMissile() { In.bMissile = true; MissilePulse = 0.2f; }
 	UFUNCTION(Exec) void AstraLand() { Land(); }
 	UFUNCTION(Exec) void AstraDescend() { Descend(); }
+	UFUNCTION(Exec) void AstraFlakTest(float Metres = 80.f) { SpawnFlak(GetActorLocation() + GetActorForwardVector() * Metres * 100.f); }
 	/** Testing: over New Ravenna, point the nose at a spot of the zone (metres; default: 300 m over Port Aurelius Field). */
 	UFUNCTION(Exec) void AstraFacePlanet(float X = 1800.f, float Y = -1400.f, float Z = 491.f);
 	/** The walker the Captain was before boarding (restored when the flight ends). */
@@ -115,5 +116,19 @@ private:
 	void ClimbOutPlanetside();
 	void Crash();
 	float TraceAGL(FVector* OutGround = nullptr) const;
+
+	// ground fire over a Mandate world: its batteries answer an enemy craft that ignores the challenge
+	float AtmoHull = 100.f;                    // the Falcon's hull down here (up in the plot the battle keeps it)
+	float HostileT = 0.f;                      // seconds in the batteries' reach
+	float FlakT = 0.f;                         // until the next burst
+	bool bGroundFire = false;
+	int32 HullBand = 4;                        // the last quarter of hull the crew heard about
+	float GarrisonT = 0.f;                     // on the ground at an enemy field
+	UPROPERTY() TArray<TObjectPtr<class AStaticMeshActor>> FlakFx;
+	TArray<float> FlakAge;
+	TArray<uint8> FlakKind;                    // 0 the flash, 1 the smoke it leaves
+	void TickGroundFire(float Dt);
+	void SpawnFlak(const FVector& At);
+	void TickFlakFx(float Dt);
 	FAstraPilotStatus PlanetStatus() const;
 };

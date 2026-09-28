@@ -195,6 +195,13 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
   - un insediamento fuori mappa è diffidente;
   - un mondo silenzioso non risponde. Su Hollow, dalle comunicazioni: «nessuna risposta dal campo di Hollow su nessun canale: solo statico».
   Il Capitano lo chiama per nome («Pyre Ground Control, qui Eagle…», «torre», «campo»); la storia ricorda le discese sui mondi nemici o muti. Nello snapshot c'è ora `surface` (mondo, tipo, campo, se il Capitano è laggiù).
+- [x] **Fuoco di terra del Mandato**:
+  - sui mondi del Mandato le batterie aprono il fuoco su Eagle se resta entro 14 km dal campo e sotto i 6 km di quota per 20 secondi dopo la sfida del Warden (subito entro 5 km);
+  - colpi di flak (lampo breve, sbuffi scuri sfrangiati, boato, scossone) sempre più precisi vicino al campo;
+  - i colpi vicini danneggiano lo scafo del Falcon (sull'HUD); a zero c'è l'eiezione e il soccorso di un Wasp;
+  - l'equipaggio lo sente: «fuoco da terra su Pyre, contraerea del Mandate attorno a voi — virare e salire, subito» (Price); «posso portare la Aquila in appoggio o restare fuori tiro, dica lei» (Serra);
+  - chi atterra comunque vede arrivare una colonna della guarnigione dopo 40 s;
+  - materiale `M_FX_Smoke` (`tools/ue_scripts/make_fx_smoke.py`); console `AstraFlakTest <m>`.
 - [x] **Città sui mondi popolosi**:
   - accanto al campo sorge una cittadina o una città proporzionata alla popolazione della mappa della guerra (la mente la manda al gioco col settore): Pyre 33 blocchi, Sabel 106, Halcyon 135, Asphodel 177, Concord 285;
   - strade su una griglia di 60 m (asfalto, cordoli, tratteggi, isolati di cemento: maschera nel colore dei vertici e parametri `CityX`/`CityY`/`CityYaw` di `M_ASTRA_Terrain`), torri più alte verso il centro;
@@ -236,7 +243,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
 2. Altri ponti: mensa (l'equipaggio fuori servizio), armeria; ufficiali che vengono a parlare col Capitano in cabina; volti veri per l'equipaggio (MetaHuman); esterno della plancia (scatola e corridoi ancora grezzi da fuori).
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
-4. Mondi generati oltre: batterie di terra del Mandato che sparano davvero e guarnigioni; edifici più vari e luci della città; preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.
+4. Mondi generati oltre: guarnigioni a terra (mezzi visibili, cattura), edifici più vari e luci della città; preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
 
 ## Come provarlo (per l'utente)

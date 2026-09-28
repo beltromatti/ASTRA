@@ -186,6 +186,8 @@ public:
 	FString SurfaceWorldName() const;
 	FVector SurfaceSite() const;
 	FString SurfaceSiteName() const;
+	/** Who holds the world below (astra | mandate | guilds | contested | silent; empty: uncharted). */
+	FString SurfaceOwner() const;
 	/** The level of the sea (world z, cm) on the world below; very low when it has none. */
 	float SurfaceSeaZ() const;
 

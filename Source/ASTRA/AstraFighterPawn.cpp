@@ -13,6 +13,8 @@
 #include "Engine/Font.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/World.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Framework/Application/SlateApplication.h"
@@ -464,6 +466,7 @@ void AAstraFighterPawn::Land()
 void AAstraFighterPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	TickFlakFx(DeltaTime);
 	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 	// the hands on the controls: the lever moves at 0.6 a second, the stick recentres when the mouse rests
 	In.Throttle = FMath::Clamp(In.Throttle + ((bThrUp ? 1.f : 0.f) - (bThrDown ? 1.f : 0.f) + PadThr.X - PadThr.Y) * 0.6f * DeltaTime, 0.f, 1.f);
@@ -568,6 +571,10 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 		break;
 	case EPhase::Atmosphere:
 		TickAtmosphere(DeltaTime);
+		if (Phase == EPhase::Atmosphere)
+		{
+			TickGroundFire(DeltaTime);
+		}
 		St = PlanetStatus();
 		break;
 	case EPhase::Settling:
@@ -591,6 +598,17 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 		break;
 	}
 	case EPhase::Landed:
+		if (UAstraShipSubsystem* ShipG = GetWorld()->GetSubsystem<UAstraShipSubsystem>(); ShipG && ShipG->SurfaceOwner() == TEXT("mandate"))
+		{
+			// down at an enemy field: the garrison turns out (the crew hears of it, and the story remembers)
+			const float Before = GarrisonT;
+			GarrisonT += DeltaTime;
+			if (Before < 40.f && GarrisonT >= 40.f)
+			{
+				ShipG->PublishEvent(FString::Printf(TEXT("flight: a Mandate garrison column is closing on Eagle's landing site on %s — armoured "
+				                                          "vehicles on the road from %s"), *ShipG->SurfaceWorldName(), *ShipG->SurfaceSiteName()), true);
+			}
+		}
 		// on the ground: W lifts off, E climbs out
 		if (In.Throttle > 0.2f)
 		{
@@ -666,6 +684,14 @@ void AAstraFighterPawn::FinishFlight()
 
 void AAstraFighterPawn::EndPlay(const EEndPlayReason::Type Reason)
 {
+	for (AStaticMeshActor* A : FlakFx)
+	{
+		if (A)
+		{
+			A->Destroy();
+		}
+	}
+	FlakFx.Reset();
 	ShowHud(false);
 	StopSounds();
 	Super::EndPlay(Reason);
@@ -856,6 +882,10 @@ void AAstraFighterPawn::Descend()
 	Phase = EPhase::Entry;
 	PhaseT = 0.f;
 	bSwitched = false;
+	AtmoHull = 100.f;       // a fresh count of the damage down there
+	HostileT = FlakT = GarrisonT = 0.f;
+	bGroundFire = false;
+	HullBand = 4;
 	if (USoundBase* S = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Entry_Plasma.SW_Entry_Plasma")))
 	{
 		PlasmaAudio = UGameplayStatics::CreateSound2D(this, S, 0.9f, 1.f, 0.f, nullptr, false, false);
@@ -1098,10 +1128,155 @@ FAstraPilotStatus AAstraFighterPawn::PlanetStatus() const
 	St.bFlying = true;
 	St.SpeedMps = AirVel.Size() / 100.f;
 	St.Throttle = In.Throttle;
-	St.HullPct = 100.f;
+	St.HullPct = AtmoHull;
 	St.ShieldPct = 100.f;
 	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
 	St.HomeWorld = Ship ? Ship->SurfaceSite() : UAstraShipSubsystem::PlanetZone() + FieldSpot * 100.0;
 	St.HomeRangeKm = FVector::Dist(GetActorLocation(), St.HomeWorld) / 100000.f;
 	return St;
+}
+// ------------------------------------------------------------------------------------------------ ground fire
+void AAstraFighterPawn::TickGroundFire(float Dt)
+{
+	UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	if (!Ship || Ship->SurfaceOwner() != TEXT("mandate"))
+	{
+		return;
+	}
+	const FVector Site = Ship->SurfaceSite();
+	const float DistKm = FVector::Dist2D(GetActorLocation(), Site) / 100000.f;
+	const float AltM = (GetActorLocation().Z - Site.Z) / 100.f;
+	if (DistKm > 14.f || AltM > 6000.f)
+	{
+		HostileT = FMath::Max(0.f, HostileT - Dt * 0.5f);
+		return;
+	}
+	HostileT += Dt;
+	// the challenge comes first (the field's warden on the radio): the guns open twenty seconds later, at once inside 5 km
+	if (HostileT < 20.f && DistKm > 5.f)
+	{
+		return;
+	}
+	if (!bGroundFire)
+	{
+		bGroundFire = true;
+		Ship->PublishEvent(FString::Printf(TEXT("flight: ground fire over %s — the Mandate's batteries are shooting at Eagle; flak is "
+		                                        "bursting around the Falcon"), *Ship->SurfaceWorldName()), true);
+	}
+	FlakT -= Dt;
+	if (FlakT > 0.f)
+	{
+		return;
+	}
+	FlakT = FMath::FRandRange(0.6f, 1.5f) * (DistKm < 6.f ? 0.6f : 1.f);
+	// a burst near the Falcon, a little ahead (the gunners lead it): tighter the nearer the field and the lower it flies
+	const float Spread = FMath::Lerp(35.f, 170.f, FMath::Clamp(DistKm / 14.f, 0.f, 1.f)) * FMath::Lerp(0.7f, 1.2f, FMath::Clamp(AltM / 6000.f, 0.f, 1.f));
+	const FVector At = GetActorLocation() + AirVel * FMath::FRandRange(0.15f, 0.7f) + FMath::VRand() * FMath::FRandRange(0.25f, 1.f) * Spread * 100.f;
+	SpawnFlak(At);
+	const float Miss = FVector::Dist(At, GetActorLocation()) / 100.f;
+	HitJolt = FMath::Max(HitJolt, FMath::Clamp(1.f - Miss / 140.f, 0.f, 1.f) * 0.8f);
+	if (Miss < 45.f)
+	{
+		AtmoHull -= FMath::Lerp(24.f, 7.f, Miss / 45.f);
+		if (USoundBase* S = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Impact.SW_Impact")))
+		{
+			UGameplayStatics::PlaySound2D(this, S, 0.9f);
+		}
+		if (AtmoHull <= 0.f)
+		{
+			Crash();
+			return;
+		}
+		const int32 Band = FMath::CeilToInt(AtmoHull / 25.f);
+		if (Band < HullBand)
+		{
+			HullBand = Band;
+			Ship->PublishEvent(FString::Printf(TEXT("flight: Eagle is hit by flak over %s — hull %d%%"), *Ship->SurfaceWorldName(),
+			                                   FMath::RoundToInt(AtmoHull)), true);
+		}
+	}
+}
+
+void AAstraFighterPawn::SpawnFlak(const FVector& At)
+{
+	// the shell's flash, and the black puff it leaves hanging in the air; the crack of it, louder the nearer
+	static const TCHAR* Mats[2] = {TEXT("/Game/ASTRA/Materials/M_FX_Blast.M_FX_Blast"), TEXT("/Game/ASTRA/Materials/M_FX_Smoke.M_FX_Smoke")};
+	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	for (int32 Piece = 0; Piece < 3; ++Piece)
+	{
+		const uint8 Kind = Piece == 0 ? 0 : 1;   // one flash, two puffs a few metres apart (a ragged cloud)
+		UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, Mats[Kind]);
+		if (!Sphere || !M)
+		{
+			continue;
+		}
+		FActorSpawnParameters P;
+		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector Where = At + (Piece == 0 ? FVector::ZeroVector : FMath::VRand() * FMath::FRandRange(200.f, 450.f));
+		AStaticMeshActor* A = GetWorld()->SpawnActor<AStaticMeshActor>(Where, FRotator(FMath::FRandRange(0.f, 360.f), FMath::FRandRange(0.f, 360.f), 0.f), P);
+		if (!A)
+		{
+			continue;
+		}
+		A->SetMobility(EComponentMobility::Movable);
+		UStaticMeshComponent* C = A->GetStaticMeshComponent();
+		C->SetStaticMesh(Sphere);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCastShadow(false);
+		UMaterialInstanceDynamic* MID = C->CreateAndSetMaterialInstanceDynamicFromMaterial(0, M);
+		if (Kind == 0)
+		{
+			MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.f, 0.5f, 0.18f));
+			MID->SetScalarParameterValue(TEXT("Intensity"), 350.f);
+		}
+		A->SetActorScale3D(FVector(Kind == 0 ? 4.f : FMath::FRandRange(7.f, 10.f)));
+		FlakFx.Add(A);
+		FlakAge.Add(0.f);
+		FlakKind.Add(Kind);
+	}
+	const float Dist = FVector::Dist(At, GetActorLocation()) / 100.f;
+	if (USoundBase* S = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_PD_Burst.SW_PD_Burst")))
+	{
+		UGameplayStatics::PlaySound2D(this, S, FMath::Clamp(1.3f - Dist / 350.f, 0.15f, 1.f), FMath::FRandRange(0.42f, 0.55f));
+	}
+}
+
+void AAstraFighterPawn::TickFlakFx(float Dt)
+{
+	for (int32 i = FlakFx.Num() - 1; i >= 0; --i)
+	{
+		FlakAge[i] += Dt;
+		AStaticMeshActor* A = FlakFx[i];
+		const float Life = FlakKind[i] == 0 ? 0.16f : 5.f;
+		const float T = FlakAge[i] / Life;
+		if (!A || T >= 1.f)
+		{
+			if (A)
+			{
+				A->Destroy();
+			}
+			FlakFx.RemoveAtSwap(i);
+			FlakAge.RemoveAtSwap(i);
+			FlakKind.RemoveAtSwap(i);
+			continue;
+		}
+		UStaticMeshComponent* C = A->GetStaticMeshComponent();
+		UMaterialInstanceDynamic* MID = C ? Cast<UMaterialInstanceDynamic>(C->GetMaterial(0)) : nullptr;
+		if (FlakKind[i] == 0)
+		{
+			A->SetActorScale3D(FVector(FMath::Lerp(4.f, 11.f, T)));
+			if (MID)
+			{
+				MID->SetScalarParameterValue(TEXT("Fade"), 1.f - T);
+			}
+		}
+		else
+		{
+			A->SetActorScale3D(A->GetActorScale3D() * (1.f + 0.35f * Dt));   // the puff swells and drifts apart
+			if (MID)
+			{
+				MID->SetScalarParameterValue(TEXT("Opacity"), 0.9f * FMath::Pow(1.f - T, 1.4f));
+			}
+		}
+	}
 }

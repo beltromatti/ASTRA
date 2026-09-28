@@ -1615,6 +1615,16 @@ FVector UAstraShipSubsystem::SurfaceSite() const
 	return PlanetZone() + FVector(1800.0, -1400.0, 191.4) * 100.0;   // Port Aurelius Field (art/export/newravenna/nr_sites.json, y mirrored)
 }
 
+FString UAstraShipSubsystem::SurfaceOwner() const
+{
+	if (IsHomeWorld())
+	{
+		return TEXT("astra");
+	}
+	const FAstraSectorSystem* S = FindSector(SystemName);
+	return S ? S->Owner : FString();
+}
+
 FString UAstraShipSubsystem::SurfaceSiteName() const
 {
 	if (!IsHomeWorld())
