@@ -152,6 +152,15 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 			}
 		}
 	}
+	// the star stays the main directional light (forward shading, translucency, volumetric fog): the planet's light
+	// below is only a fill (the engine clamps priorities at 0, so the star is raised instead)
+	if (Sun)
+	{
+		if (UDirectionalLightComponent* SD = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
+		{
+			SD->SetForwardShadingPriority(1);
+		}
+	}
 	// the planet's light: spawned here, aimed by UpdateAttitudeVisuals
 	FActorSpawnParameters SP;
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -382,6 +391,16 @@ void UAstraShipSubsystem::DriveExternally(float Heading, float Mark, float Speed
 	SpeedMps = Speed;
 	bTurning = false;
 	UpdateAttitudeVisuals();
+}
+
+FString UAstraShipSubsystem::CaptainAboard() const
+{
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (P && P->GetActorLocation().Z < -3000.f)
+	{
+		return TEXT("on the flight deck (Deck 9), away from the bridge: the XO has the conn; the Captain speaks by intercom");
+	}
+	return TEXT("on the bridge");
 }
 
 void UAstraShipSubsystem::Event(const FString& Text, bool bReport)
@@ -795,6 +814,9 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		S->SetArrayField(TEXT("contacts"), Battle->ContactsJson());
 		S->SetStringField(TEXT("enemy_small_craft"), Battle->EnemyCraftSummary());
 		S->SetObjectField(TEXT("_mandate"), Battle->MandateViewJson());   // for the enemy minds only
+		// where the Captain is: in a Falcon the XO has the conn and the Captain speaks by radio
+		const FString Flying = Battle->PilotSummary();
+		S->SetStringField(TEXT("captain"), !Flying.IsEmpty() ? Flying : CaptainAboard());
 		S->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(100.f * Battle->PlayerHullFraction()));
 		Sh->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()));
 	}

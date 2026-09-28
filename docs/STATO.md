@@ -126,7 +126,8 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Caccia nemici (Harpy) lanciati dagli incrociatori del Mandato: razzi e cannoni sull'Aquila; la pattuglia e la difesa di punto li abbattono; scie dei missili
 - [x] **Ponte di volo percorribile** (Deck 9, `art/blender/hangar.py`, `tools/ue_scripts/build_hangar.py`, dati in `data/ship/aquila_hangar.json`): navata di 145 × 56 m allineata alla prua dell'Aquila v2, due tubi di lancio che sboccano nelle bocche di prua (con campi di contenimento), binari delle catapulte, passerelle, cabina di controllo vetrata, 8 Falcon e 7 Hammer negli stalli, 12 Wasp nelle rastrelliere, personale di ponte. I velivoli seguono la simulazione: al lancio rullano fino al binario e vengono catapultati nel tubo (suono della catapulta), all'atterraggio tornano negli stalli; i caccia della simulazione ora nascono proprio dalle bocche di prua. Le luci dell'hangar si accendono solo quando il Capitano è laggiù
 - [x] **Ascensore** tra il corridoio di babordo della plancia e il ponte di volo (E davanti alle porte; console `AstraUse`)
-- [ ] Pilotare un caccia in prima persona
+- [x] **Pilotare un Falcon in prima persona** (`AstraFighterPawn`, abitacolo `art/blender/cockpit.py`): sul ponte di volo, **E** accanto a un Falcon di Alpha → nell'abitacolo sulla catapulta di sinistra (vista vera dell'hangar, dei caccia parcheggiati e dei tubi); **W** per dare motore e la catapulta ti spara fuori dalla bocca di prua. In volo: mouse = cloche virtuale (beccheggio/imbardata), A/D rollio, W/S manetta (X a zero), Q/E e Spazio/Ctrl traslazioni, Shift postbruciatore, Alt per guardarsi intorno, **tasto sinistro cannoni**, **destro missile** sul bersaglio agganciato (12°, 6 km, 1,2 s). HUD proiettato sul tettuccio: reticolo, cloche, parentesi sui nemici, riquadro d'aggancio con distanza, **indicatore di anticipo** per i cannoni, freccia verso l'Aquila, velocità/manetta, scafo, scudi, missili. Il modello di volo è nel riferimento della portaerei (manetta a zero = in formazione con l'Aquila). **F** vicino alla bocca del tubo per rientrare; se ti abbattono ti eietti e un Wasp riporta la capsula. Il Falcon è una vera unità della simulazione: i nemici e la difesa di punto possono colpirlo, i tuoi colpi e missili fanno danni veri; l'equipaggio sa dove sei (l'XO prende il comando, Price ti segue sul canale di controllo) e puoi dare ordini al ponte via radio (V)
+- [ ] Discesa su un pianeta con lo stesso Falcon (M7)
 
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
@@ -145,7 +146,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 ## Prossimi passi
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
 2. Altri ponti raggiungibili con l'ascensore: sala macchine con il capo Okonkwo, infermeria (i feriti del ruolino), alloggi.
-3. Pilotare un caccia in prima persona dal ponte di volo.
+3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
 4. Simulazione di calore (M2); discesa sul pianeta (M7); preparazione al multigiocatore (M8: autorità del server, comandi come RPC).
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
 
@@ -156,7 +157,8 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 4. La battaglia parte da sola (dopo ~80 s si sveglia la fregata, dopo ~170 s arriva il gruppo d'attacco). Per accelerare: `astra.battle.time 168`, `astra.battle.timescale 3`.
 5. Quando l'Archon Solm chiama, parlagli direttamente (canale aperto): tutto ciò che non inizia con il nome/ruolo di un ufficiale va a lui. «Comunicazioni, chiudete il canale» per chiuderlo.
 6. Da terminale: `tools/ue.py pie start|stop` e `tools/ue.py pie cmd 'astra.say ...'` per provare senza toccare l'editor.
-7. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.
+7. Pilotare: scendi con l'ascensore (E davanti alle porte in fondo al corridoio di babordo), avvicinati a un Falcon di Alpha (lato sinistro dell'hangar) e premi E; W per il lancio. Rientro: torna alla bocca di prua sinistra dell'Aquila, rallenta e premi F.
+8. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.
 
 ## Note operative
 - Prestazioni (2026-09-28, standalone 1080p, battaglia): ~19 ms di mediana (≈52 fps), limitate dalla GPU (~18,5 ms: luci 2,6, ombre 2,0, Lumen 1,6, traslucenza 1,4). Gli "scatti" da ~31 ms ogni ~12 frame non sono lavoro in più: la CPU, più veloce della GPU, si blocca in attesa delle query di occlusione (trovato con Unreal Insights da riga di comando: `-trace=cpu,frame` e `UnrealInsights -NoUI -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimingEvents ..."`). Per scendere serve ridurre il costo GPU. Diagnostica schermi: `astra.screens.profile 1`

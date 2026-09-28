@@ -3,7 +3,9 @@
 
 #include "ASTRAPlayerController.h"
 #include "AstraCampaign.h"
+#include "AstraFighterPawn.h"
 #include "AstraHangar.h"
+#include "AstraShipSubsystem.h"
 #include "EngineUtils.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
@@ -64,7 +66,7 @@ void AASTRAPlayerController::SetupInputComponent()
 	{
 		InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AASTRAPlayerController::OnTalkPressed);
 		InputComponent->BindKey(EKeys::V, IE_Released, this, &AASTRAPlayerController::OnTalkReleased);
-		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AASTRAPlayerController::ToggleSeat);
+		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AASTRAPlayerController::ToggleSeat).bConsumeInput = false;   // a Falcon uses E too
 		// the campaign menu (the game pauses behind it)
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
 		InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
@@ -118,13 +120,24 @@ void AASTRAPlayerController::OnTalkReleased()
 
 void AASTRAPlayerController::ToggleSeat()
 {
-	// the lift to the flight deck (or back up) when standing at one of its landings
+	// in a Falcon: E is the pilot's (on the catapult it climbs out, in flight it is a thruster)
+	if (AAstraFighterPawn* F = Cast<AAstraFighterPawn>(GetPawn()))
+	{
+		F->ClimbOut();
+		return;
+	}
+	// the lift to the flight deck (or back up) when standing at one of its landings; a Falcon of Alpha on the deck
 	if (APawn* Me = GetPawn())
 	{
 		for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
 		{
 			if (It->TryUseLift(Me))
 			{
+				return;
+			}
+			if (It->TryBoard(Me))
+			{
+				BoardFalcon(*It, Me);
 				return;
 			}
 		}
@@ -170,6 +183,34 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 		C->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
 	bSeated = bSit;
+}
+
+void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
+{
+	// a moment of dark (climbing the ladder, strapping in), then the cockpit on Alpha's catapult
+	if (PlayerCameraManager)
+	{
+		PlayerCameraManager->StartCameraFade(1.f, 0.f, 1.2f, FLinearColor::Black, false, false);
+	}
+	FActorSpawnParameters P;
+	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const FTransform Cradle = Hangar->CatapultPose(0.f);
+	AAstraFighterPawn* F = GetWorld()->SpawnActor<AAstraFighterPawn>(AAstraFighterPawn::StaticClass(), Cradle, P);
+	if (!F)
+	{
+		return;
+	}
+	Walker->SetActorHiddenInGame(true);
+	Walker->SetActorEnableCollision(false);
+	Possess(F);
+	F->BeginOnCatapult(Hangar, Walker);
+	if (UWorld* W = GetWorld())
+	{
+		if (UAstraShipSubsystem* Ship = W->GetSubsystem<UAstraShipSubsystem>())
+		{
+			Ship->PublishEvent(TEXT("flight: the Captain has climbed into a Falcon of Alpha on the port catapult"), true);
+		}
+	}
 }
 
 void AASTRAPlayerController::OpenMenu()

@@ -92,6 +92,7 @@ struct FAstraBattleShip
 	bool bNegotiated = false;            // holding fire / withdrawing under terms agreed over the channel
 	bool bLeader = false;                // leads its group (the commander on the channel)
 	bool bDerelict = false;              // a dead station or hulk to investigate: no power, tumbling slowly
+	bool bPiloted = false;               // the Captain flies it (first person): no AI, the stick drives it
 	float SpinDeg = 0.f;
 	// tactical orders by datalink (the Mandate commander's to their ships, the Captain's requests to the fleet)
 	int32 OrderTarget = -1;              // ship id to concentrate on (-1: the nearest)
@@ -180,6 +181,36 @@ struct FAstraSquadron
 	EAstraSide Side = EAstraSide::Astra;   // Mandate wings fly from their cruisers
 	int32 CarrierId = -1;                  // the ship they launch from and land on
 	int32 Rockets = 0;                     // per aircraft (Mandate strike fighters)
+};
+
+/** The Captain at the stick of a Falcon: what the pilot does this frame (the fighter pawn fills it). */
+struct FAstraPilotInput
+{
+	float Throttle = 0.f;                        // 0..1, the lever
+	FVector Strafe = FVector::ZeroVector;        // y lateral, z vertical (-1..1)
+	float Roll = 0.f, Pitch = 0.f, Yaw = 0.f;    // stick rates (-1..1)
+	bool bBoost = false;
+	bool bGuns = false;
+	bool bMissile = false;                       // held: one missile at the lock per press
+};
+
+/** What the Falcon's displays show (world positions in cm for the head-up display). */
+struct FAstraPilotStatus
+{
+	bool bFlying = false;
+	bool bDown = false;                          // shot down: the Captain ejected
+	float SpeedMps = 0.f, Throttle = 0.f, HullPct = 100.f, ShieldPct = 100.f;
+	int32 Missiles = 0;
+	FString LockName;
+	float LockProgress = 0.f;                    // 0..1 (1 = locked)
+	float LockRangeKm = 0.f;
+	FVector LockWorld = FVector::ZeroVector, LeadWorld = FVector::ZeroVector;
+	bool bHasLock = false;
+	FVector HomeWorld = FVector::ZeroVector;     // the Aquila's recovery tube (Alpha's, port)
+	float HomeRangeKm = 0.f;
+	bool bCanLand = false;
+	TArray<FVector> Hostiles, Friends;           // within 25 km
+	TArray<float> HostileSizes;                  // their radius (m): craft or warship
 };
 
 /** What the tactical plot shows of one object (the holo table draws these; positions in the Aquila's frame). */
@@ -292,6 +323,22 @@ public:
 	/** The Captain's request to the friendly warships in company (by fleet datalink): focus_fire (target), engage_freely,
 	 *  cover_us, close_in, stand_off, hold_fire. Ship: a contact id or "all". */
 	bool FleetRequest(const FString& Ship, const FString& Request, const FString& Target, FString& OutDetail);
+	/** The Captain takes a Falcon of Alpha from the flight deck (one fewer on deck) or brings it back. */
+	bool TakeFalcon();
+	void ReturnFalcon();
+	/** The Captain's Falcon clears the bow tube: from now on the battle flies it with the pilot's input and moves the pawn
+	 *  with the rest of the world (the same frame as every ship). World pose where it leaves the tube, speed relative
+	 *  to the Aquila. */
+	bool LaunchPiloted(AActor* Pawn, const FVector& WorldPos, const FQuat& WorldRot, float SpeedMps);
+	void SetPilotInput(const FAstraPilotInput& In) { Pilot = In; }
+	void GetPilotStatus(FAstraPilotStatus& Out) const;
+	/** Recovered through the bow tube (bLanded) or the pod picked up after an ejection: the craft leaves the battle. */
+	void EndPiloted(bool bLanded);
+	bool IsPiloting() const { return PilotedId >= 0; }
+	/** Where the Captain is, for the crew: flying (with range and state) or "" when aboard. */
+	FString PilotSummary() const;
+	/** Bridge world (cm) -> system frame (m), and back for rotations. */
+	FVector FromWorld(const FVector& WorldCm) const;
 	/** Contact id of the ship whose captain commands the Mandate forces now: the group leader, else the biggest ship left. */
 	FString MandateCommander() const;
 	/** The war director's next beat (from the mind): raid | distress | reinforcements | resupply | calm. Contact ids are
@@ -420,6 +467,20 @@ private:
 
 	int32 AddShip(const FString& Contact, const FString& Name, const FString& Class, const FString& Mesh, EAstraSide Side,
 	              const FVector& Pos, float HeadingDeg, float Speed, float Radius, float Hull, float Shield);
+	// --- the Captain's Falcon
+	int32 PilotedId = -1;
+	FAstraPilotInput Pilot;
+	TWeakObjectPtr<AActor> PilotActor;   // the pawn, moved with the craft
+	float PilotGunT = 0.f;
+	bool bPilotGunSide = false;
+	int32 PilotLock = -1;
+	float PilotLockT = 0.f;
+	bool bPilotMissileLatch = false;
+	bool bPilotDown = false;
+	void TickPiloted(FAstraBattleShip& S, float Dt);
+	void FirePilotGuns(FAstraBattleShip& S);
+	FVector PilotMouth() const;           // Alpha's tube mouth, system frame
+
 	FAstraBattleShip* FindByContact(const FString& Contact);
 	FAstraBattleShip* FindById(int32 Id);
 	const FAstraBattleShip* FindByContact(const FString& Contact) const { return const_cast<UAstraBattleSubsystem*>(this)->FindByContact(Contact); }

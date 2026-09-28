@@ -79,6 +79,12 @@ namespace
 		}));
 	FAutoConsoleCommand CmdBattleTime(TEXT("astra.battle.time"), TEXT("Jump the scenario clock: astra.battle.time <seconds>"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num()) { GBattleJumpTo = FCString::Atof(*A[0]); } }));
+	FString GFaceRequest;
+	bool GHomeRequest = false;
+	FAutoConsoleCommand CmdFlyHome(TEXT("astra.fly.home"), TEXT("Testing: put the Captain's Falcon 300 m ahead of the Aquila's port tube, matching her speed"),
+		FConsoleCommandDelegate::CreateLambda([]() { GHomeRequest = true; }));
+	FAutoConsoleCommand CmdFlyFace(TEXT("astra.fly.face"), TEXT("Testing: turn the Captain's Falcon to face a contact: astra.fly.face <contact id|aquila>"),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num()) { GFaceRequest = A[0].ToUpper(); } }));
 	FAutoConsoleCommand CmdBattleScale(TEXT("astra.battle.timescale"), TEXT("Battle simulation speed: astra.battle.timescale <x>"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num()) { GBattleTimeScale = FMath::Clamp(FCString::Atof(*A[0]), 0.1f, 20.f); } }));
 }
@@ -385,6 +391,11 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	{
 		if (!S.bAlive)
 		{
+			continue;
+		}
+		if (S.bPiloted)
+		{
+			TickPiloted(S, Dt);
 			continue;
 		}
 		if (S.bCraft)
@@ -1650,7 +1661,16 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S)
 	if (S.Actor) { S.Actor->Destroy(); S.Actor = nullptr; }
 	if (S.ShieldBubble) { S.ShieldBubble->Destroy(); S.ShieldBubble = nullptr; }
 	if (S.DriveFlare) { S.DriveFlare->Destroy(); S.DriveFlare = nullptr; }
-	if (S.bCraft)
+	if (S.bPiloted)
+	{
+		bPilotDown = true;
+		if (Squadrons.IsValidIndex(S.Squadron))
+		{
+			--Squadrons[S.Squadron].Total;
+		}
+		Report(TEXT("flight: Eagle is down — the Captain's Falcon was destroyed, the Captain ejected; a Wasp is going out for the pod"), true);
+	}
+	else if (S.bCraft)
 	{
 		if (Squadrons.IsValidIndex(S.Squadron))
 		{
@@ -1824,6 +1844,14 @@ void UAstraBattleSubsystem::TickFlashes(float Dt)
 // ------------------------------------------------------------------------------------------------------ visuals
 void UAstraBattleSubsystem::SyncVisuals()
 {
+	if (PilotedId >= 0)
+	{
+		const FAstraBattleShip* P = FindById(PilotedId);
+		if (AActor* Pawn = PilotActor.Get(); Pawn && P && P->bAlive)
+		{
+			Pawn->SetActorLocationAndRotation(ToWorld(P->Pos), ToWorldRot(P->Att));
+		}
+	}
 	FVector Eye = FVector::ZeroVector;   // the camera (the bridge, the hangar, the lift...)
 	if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0))
 	{
@@ -3799,4 +3827,285 @@ void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
 	                             : *FString::Printf(TEXT("; the %s world %s ahead"), *Planet.Replace(TEXT("_"), TEXT(" ")), *PName), ExitSpeed));
 	Report(FString::Printf(TEXT("director: beat complete — transit from %s into the %s system (%s star, %s world %s)%s"), *From, *Name, *Star, *Planet,
 	                       *PName, bLeftFight ? TEXT("; the Aquila left an engagement behind") : TEXT("")), false);
+}
+
+// ------------------------------------------------------------------------------------------ the Captain's Falcon
+FVector UAstraBattleSubsystem::FromWorld(const FVector& WorldCm) const
+{
+	const FAstraBattleShip& P = Ships[0];
+	return P.Pos + P.Att.RotateVector(WorldCm / 100.0 + BridgeOffset);
+}
+
+FVector UAstraBattleSubsystem::PilotMouth() const
+{
+	// Alpha's tube (port): the recovery approach is just outside its mouth
+	return Ships[0].Pos + Ships[0].Att.RotateVector(FVector(420.0, -14.9, -4.3));
+}
+
+bool UAstraBattleSubsystem::TakeFalcon()
+{
+	for (FAstraSquadron& Q : Squadrons)
+	{
+		if (Q.Side == EAstraSide::Astra && Q.Name == TEXT("alpha") && Q.OnDeck > 0 && Q.ToLaunch == 0)
+		{
+			--Q.OnDeck;
+			return true;
+		}
+	}
+	return false;
+}
+
+void UAstraBattleSubsystem::ReturnFalcon()
+{
+	for (FAstraSquadron& Q : Squadrons)
+	{
+		if (Q.Side == EAstraSide::Astra && Q.Name == TEXT("alpha"))
+		{
+			Q.OnDeck = FMath::Min(Q.OnDeck + 1, Q.Total);
+		}
+	}
+}
+
+bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos, const FQuat& WorldRot, float SpeedMps)
+{
+	if (Ships.Num() == 0 || PilotedId >= 0)
+	{
+		return false;
+	}
+	const FVector Pos = FromWorld(WorldPos);
+	const FQuat Att = Ships[0].Att * WorldRot;
+	const int32 I = AddShip(TEXT("EAGLE"), TEXT("Eagle (the Captain's Falcon)"), TEXT("ASTRA fighter (Falcon)"), TEXT(""), EAstraSide::Astra,
+	                        Pos, 0.f, 0.f, 10.f, 90.f, 40.f);
+	FAstraBattleShip& C = Ships[I];
+	C.Att = Att;
+	C.Vel = Ships[0].Vel + Att.GetForwardVector() * SpeedMps;
+	C.bCraft = true;
+	C.bPiloted = true;
+	C.CraftKind = 0;
+	C.Squadron = Squadrons.IndexOfByPredicate([](const FAstraSquadron& Q) { return Q.Side == EAstraSide::Astra && Q.Name == TEXT("alpha"); });
+	C.Missiles = 4;
+	C.RailDamage = 0.f;
+	C.PDRange = 0.f;
+	C.PDChannels = 0;
+	C.bShieldsUp = true;
+	C.ShieldRegen = 3.f;
+	C.CruiseSpeed = 720.f;
+	C.MaxAccel = 150.f;
+	C.Mode = EAstraShipMode::Cruise;
+	PilotedId = C.Id;
+	PilotActor = Pawn;
+	bPilotDown = false;
+	PilotLock = -1;
+	PilotLockT = 0.f;
+	Pilot = FAstraPilotInput();
+	Pilot.Throttle = 0.6f;
+	Report(TEXT("flight: the Captain is off the catapult in a Falcon of Alpha, callsign Eagle — the XO has the conn"), true);
+	return true;
+}
+
+void UAstraBattleSubsystem::EndPiloted(bool bLanded)
+{
+	if (FAstraBattleShip* S = FindById(PilotedId))
+	{
+		S->bAlive = false;
+		S->Mode = EAstraShipMode::Dead;
+		S->ContactId = FString::Printf(TEXT("EAGLE-%d"), S->Id);   // the callsign is free for the next sortie
+	}
+	if (bLanded)
+	{
+		ReturnFalcon();
+		Report(TEXT("flight: Eagle recovered through the port tube, the Captain is back aboard"), true);
+	}
+	else
+	{
+		Report(TEXT("flight: the Captain's escape pod is aboard — the Captain is unhurt"), true);
+	}
+	PilotedId = -1;
+	PilotActor = nullptr;
+	bPilotDown = false;
+}
+
+FString UAstraBattleSubsystem::PilotSummary() const
+{
+	const FAstraBattleShip* S = PilotedId >= 0 ? FindById(PilotedId) : nullptr;
+	if (!S)
+	{
+		return FString();
+	}
+	if (!S->bAlive)
+	{
+		return TEXT("the Captain ejected from a destroyed Falcon; the pod is being recovered");
+	}
+	return FString::Printf(TEXT("flying a Falcon of Alpha (callsign Eagle), %.1f km from the Aquila, hull %.0f%%, %d missiles; the XO has the conn "
+	                            "and the Captain talks to the bridge by radio"),
+	                       FVector::Dist(S->Pos, Ships[0].Pos) / OneKm, 100.f * S->Hull / S->HullMax, S->Missiles);
+}
+
+void UAstraBattleSubsystem::TickPiloted(FAstraBattleShip& S, float Dt)
+{
+	if (GHomeRequest)
+	{
+		GHomeRequest = false;
+		S.Pos = PilotMouth() + Ships[0].Att.GetForwardVector() * 300.0;
+		S.Vel = Ships[0].Vel;
+		S.Att = Ships[0].Att * FQuat(FVector::UpVector, PI);   // facing the bow
+	}
+	if (!GFaceRequest.IsEmpty())
+	{
+		const FAstraBattleShip* T = GFaceRequest == TEXT("AQUILA") ? &Ships[0] : FindByContact(GFaceRequest);
+		if (T)
+		{
+			S.Att = FRotationMatrix::MakeFromX((T->Pos - S.Pos).GetSafeNormal()).ToQuat();
+		}
+		GFaceRequest.Reset();
+	}
+	// the stick: rates in the craft's own frame (pitch 75, yaw 55, roll 140 deg/s at full deflection)
+	const float Boost = Pilot.bBoost ? 1.f : 0.f;
+	const FRotator Turn(Pilot.Pitch * 75.f * Dt, Pilot.Yaw * 55.f * Dt, Pilot.Roll * 140.f * Dt);
+	S.Att = (S.Att * Turn.Quaternion()).GetNormalized();
+	// flight assist: the velocity follows the lever and the strafe thrusters, in the carrier's frame (the fleet moves
+	// together: throttle zero keeps station with the Aquila, which is also how she is brought home)
+	const float MaxV = FMath::Lerp(720.f, 1050.f, Boost);
+	const FVector Want = Ships[0].Vel + S.Att.RotateVector(FVector(Pilot.Throttle * MaxV, Pilot.Strafe.Y * 160.f, Pilot.Strafe.Z * 160.f));
+	S.Vel += (Want - S.Vel).GetClampedToMaxSize(FMath::Lerp(150.f, 260.f, Boost) * Dt);
+	S.Pos += S.Vel * Dt;
+	S.Shield = FMath::Min(S.ShieldMax, S.Shield + S.ShieldRegen * Dt);
+	// guns: two cannons in the wing roots, alternating, ten rounds a second
+	PilotGunT -= Dt;
+	if (Pilot.bGuns && PilotGunT <= 0.f)
+	{
+		PilotGunT = 0.1f;
+		FirePilotGuns(S);
+	}
+	// the lock: the hostile nearest the nose inside 12 degrees and 6 km, held for 1.2 s
+	const FVector Fwd = S.Att.GetForwardVector();
+	const FAstraBattleShip* Best = nullptr;
+	float BestAng = 12.f;
+	for (const FAstraBattleShip& O : Ships)
+	{
+		if (!O.bAlive || !O.bHostile || O.bCold || O.Id == S.Id)
+		{
+			continue;
+		}
+		const FVector To = O.Pos - S.Pos;
+		const double D = To.Size();
+		if (D > 6 * OneKm || D < 30.0)
+		{
+			continue;
+		}
+		const float Ang = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(To / D, Fwd), -1.0, 1.0)));
+		if (Ang < BestAng)
+		{
+			BestAng = Ang;
+			Best = &O;
+		}
+	}
+	if (Best && Best->Id == PilotLock)
+	{
+		PilotLockT = FMath::Min(1.f, PilotLockT + Dt / 1.2f);
+	}
+	else
+	{
+		PilotLock = Best ? Best->Id : -1;
+		PilotLockT = 0.f;
+	}
+	if (Pilot.bMissile && !bPilotMissileLatch && S.Missiles > 0 && PilotLockT >= 1.f)
+	{
+		if (FAstraBattleShip* T = FindById(PilotLock))
+		{
+			FireMissile(S, *T);
+			--S.Missiles;
+			HullSound(TEXT("SW_VLS_Launch"), 0.5f, 0.2f);
+		}
+	}
+	bPilotMissileLatch = Pilot.bMissile;
+}
+
+void UAstraBattleSubsystem::FirePilotGuns(FAstraBattleShip& S)
+{
+	const FVector Fwd = S.Att.GetForwardVector();
+	bPilotGunSide = !bPilotGunSide;
+	const FVector Muzzle = S.Pos + Fwd * 4.0 + S.Att.GetRightVector() * (bPilotGunSide ? 2.4 : -2.4) - S.Att.GetUpVector() * 1.3;
+	const FVector Dir = (Fwd + FMath::VRand() * 0.0035f).GetSafeNormal();
+	FAstraBattleShip* Hit = nullptr;
+	double HitT = 2.5 * OneKm;
+	for (FAstraBattleShip& O : Ships)
+	{
+		if (!O.bAlive || !O.bHostile || O.Id == S.Id)
+		{
+			continue;
+		}
+		const double R = O.bCraft ? FMath::Max(O.Radius, 14.f) : O.Radius;   // a little generosity with fighters
+		const FVector L = O.Pos - Muzzle;
+		const double Tca = FVector::DotProduct(L, Dir);
+		if (Tca < 0.0 || Tca - R > HitT)
+		{
+			continue;
+		}
+		const double D2 = L.SizeSquared() - Tca * Tca;
+		if (D2 > R * R)
+		{
+			continue;
+		}
+		const double T0 = FMath::Max(0.0, Tca - FMath::Sqrt(R * R - D2));
+		if (T0 < HitT)
+		{
+			HitT = T0;
+			Hit = &O;
+		}
+	}
+	AddBeam(Muzzle, Muzzle + Dir * HitT, 0.05f, FLinearColor(0.55f, 0.85f, 1.f));
+	HullSound(TEXT("SW_PD_Burst"), 0.22f, 0.09f);
+	if (Hit)
+	{
+		ApplyHit(*Hit, Dir, Hit->bCraft ? 14.f : 5.f, Muzzle + Dir * HitT);
+	}
+}
+
+void UAstraBattleSubsystem::GetPilotStatus(FAstraPilotStatus& Out) const
+{
+	Out = FAstraPilotStatus();
+	const FAstraBattleShip* S = PilotedId >= 0 ? FindById(PilotedId) : nullptr;
+	if (!S)
+	{
+		return;
+	}
+	Out.bFlying = S->bAlive;
+	Out.bDown = bPilotDown;
+	Out.SpeedMps = (S->Vel - Ships[0].Vel).Size();   // relative to the Aquila: the frame the pilot flies in
+	Out.Throttle = Pilot.Throttle;
+	Out.HullPct = 100.f * FMath::Max(0.f, S->Hull) / S->HullMax;
+	Out.ShieldPct = 100.f * S->Shield / FMath::Max(1.f, S->ShieldMax);
+	Out.Missiles = S->Missiles;
+	if (const FAstraBattleShip* T = PilotLock >= 0 ? FindById(PilotLock) : nullptr; T && T->bAlive)
+	{
+		Out.bHasLock = true;
+		Out.LockName = T->bIdentified ? T->Name : T->ContactId;
+		Out.LockProgress = PilotLockT;
+		Out.LockRangeKm = FVector::Dist(T->Pos, S->Pos) / OneKm;
+		Out.LockWorld = ToWorld(T->Pos);
+		// where to aim the cannons: the target's position when a round (1600 m/s) gets there
+		const double Tof = FVector::Dist(T->Pos, S->Pos) / 1600.0;
+		Out.LeadWorld = ToWorld(T->Pos + (T->Vel - S->Vel) * Tof);
+	}
+	const FVector Mouth = PilotMouth();
+	Out.HomeWorld = ToWorld(Mouth);
+	Out.HomeRangeKm = FVector::Dist(Mouth, S->Pos) / OneKm;
+	Out.bCanLand = FVector::Dist(Mouth, S->Pos) < 600.0 && (S->Vel - Ships[0].Vel).Size() < 220.f;
+	for (const FAstraBattleShip& O : Ships)
+	{
+		if (!O.bAlive || O.Id == S->Id || O.bPlayer || FVector::Dist(O.Pos, S->Pos) > 25 * OneKm)
+		{
+			continue;
+		}
+		if (O.bHostile && !O.bCold)
+		{
+			Out.Hostiles.Add(ToWorld(O.Pos));
+			Out.HostileSizes.Add(O.Radius);
+		}
+		else if (O.Side == EAstraSide::Astra)
+		{
+			Out.Friends.Add(ToWorld(O.Pos));
+		}
+	}
 }

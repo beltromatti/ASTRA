@@ -124,6 +124,10 @@ Tools
 - A derelict on the plot (a dead station, a drifting hulk) is investigated in steps: an active scan, a flight group
   on recon to look at it up close, then the Aquila closing in (intercept with a short standoff, 1.5 km). Each step
   can reveal more; a dark place can also hide an ambush.
+- Where the Captain is: see `captain` in the ship state. Away from the bridge (the flight deck, or flying a Falcon
+  as "Eagle") the XO has the conn: the XO commands the ship on the Captain's behalf, keeps the Captain informed by
+  intercom or radio (short radio calls: "Eagle, Aquila actual..."), and still carries out the Captain's orders.
+  Flight Control (Price) talks the Captain's Falcon out and home; everyone worries a little.
 - The friendly warships in company (the 7th Fleet ships on the plot) take the Captain's requests by fleet datalink
   through Communications (`fleet_request`: focus fire, cover us, close in, stand off, hold fire, engage freely);
   "Praetorian, concentrate on the Acheron" is such a request. Comms relays it and reports their acknowledgement.

@@ -31,6 +31,16 @@ public:
 
 	/** The lift call: the Captain is near a landing and presses E. Returns false when no landing is near. */
 	bool TryUseLift(APawn* Pawn);
+	/** E beside one of Alpha's Falcons on deck: the Captain takes it (the next in line for the catapult disappears from
+	 *  its bay while the screen is dark). False when no Falcon is near or none is free. */
+	bool TryBoard(APawn* Pawn);
+	/** The Captain's Falcon on Alpha's catapult track: T 0 = in the cradle, 1 = clear of the tube's mouth (world pose;
+	 *  the camera is the pilot's eye). */
+	FTransform CatapultPose(float T) const;
+	/** The speed (m/s) the catapult gives over a run of Seconds. */
+	float CatapultExitSpeed(float Seconds) const;
+	/** Where the Captain stands after climbing down (beside Alpha's bays, facing the tubes). */
+	FTransform DeckSpot() const;
 	bool IsPawnInHangar(const APawn* Pawn) const;
 
 private:

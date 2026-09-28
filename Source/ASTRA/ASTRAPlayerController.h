@@ -70,6 +70,8 @@ protected:
 	FTimerHandle SeatTimer;
 	void ToggleSeat();
 	void OpenMenu();
+	/** The Captain climbs into a Falcon of Alpha on the flight deck: the cockpit on the port catapult. */
+	void BoardFalcon(class AAstraHangar* Hangar, APawn* Walker);
 
 public:
 	/** Console twin of the E key (the lift, the captain's chair): for tests and accessibility. */

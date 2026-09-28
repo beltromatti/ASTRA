@@ -23,6 +23,7 @@ namespace
 	const FName CraftTag(TEXT("ASTRA.Hangar.Craft"));
 	constexpr float HangarLength = 16000.f, HangarHalfWidth = 2900.f, HangarHeight = 2200.f;   // cm, with the tubes
 	constexpr float TrackStartX = 4600.f, TubeEndX = 16200.f, TubeY = 1490.f;
+	constexpr float CradleX = 12000.f;   // the Captain's Falcon waits here, ahead of Alpha's bays
 }
 
 AAstraHangar::AAstraHangar()
@@ -137,6 +138,55 @@ bool AAstraHangar::TryUseLift(APawn* Pawn)
 		UGameplayStatics::PlaySound2D(this, LiftSound, 0.8f);
 	}
 	return true;
+}
+
+bool AAstraHangar::TryBoard(APawn* Pawn)
+{
+	TArray<FParked>* Alpha = Parked.Find(TEXT("alpha"));
+	if (!Pawn || !Alpha || LiftT >= 0.f)
+	{
+		return false;
+	}
+	bool bNear = false;
+	for (const FParked& P : *Alpha)
+	{
+		bNear |= P.Actor && !P.bAway && FVector::Dist2D(P.Actor->GetActorLocation(), Pawn->GetActorLocation()) < 900.f;
+	}
+	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	if (!bNear || !Battle || Battle->IsPiloting() || !Battle->TakeFalcon())
+	{
+		return false;
+	}
+	// the Falcon next in line leaves its bay while the screen is dark (the deck count is one fewer already)
+	SyncSquadrons();
+	for (FParked& P : *Alpha)
+	{
+		if (P.Anim >= 0.f)
+		{
+			P.Anim = -1.f;
+			P.bAway = true;
+			P.Actor->SetActorHiddenInGame(true);
+		}
+	}
+	return true;
+}
+
+FTransform AAstraHangar::CatapultPose(float T) const
+{
+	// Alpha's track (port tube), from a cradle just ahead of the bays (the wings clear the parked Falcons) to clear of
+	// the mouth; the eye 2.6 m over the deck (the Falcon's axis at 1.4 m, the pilot 1.2 m above it)
+	const FVector Local(FMath::Lerp(CradleX, TubeEndX + 300.f, T), -TubeY, 260.f);
+	return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(Local));
+}
+
+float AAstraHangar::CatapultExitSpeed(float Seconds) const
+{
+	return 2.f * ((TubeEndX + 300.f) - CradleX) / 100.f / FMath::Max(0.1f, Seconds);
+}
+
+FTransform AAstraHangar::DeckSpot() const
+{
+	return FTransform(GetActorRotation(), GetActorTransform().TransformPosition(FVector(2800.f, -1150.f, 100.f)));
 }
 
 void AAstraHangar::Tick(float DeltaTime)

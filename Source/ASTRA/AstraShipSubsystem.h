@@ -150,6 +150,8 @@ public:
 
 	/** Anything that happens to or around the ship; bReport = worth telling the Captain (the crew decides the words). */
 	void PublishEvent(const FString& Text, bool bReport) { Event(Text, bReport); }
+	/** Where the Captain is aboard, for the crew ("on the bridge", "on the flight deck"...). */
+	FString CaptainAboard() const;
 
 	/** The battle simulation reports a hit on our hull: compartments, lights, reports. */
 	void OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir);
