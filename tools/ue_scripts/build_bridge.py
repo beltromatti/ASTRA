@@ -90,11 +90,15 @@ for st in DATA["stations"]:
     x, y = st["pos"]
     z = level_z[st["level"]]
     yaw = st["yaw"]
-    back = 0.0 if st["kind"] == "tactical_rail" else 0.62
-    if sid == "xo":
-        x, y, back = x + 0.35, y - 0.55, 0.0
-    fx, fy = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
-    c = eas.spawn_actor_from_class(unreal.AstraCrewMember, V((x - fx * back) * M, (y - fy * back) * M, z * M), R(yaw=yaw - 90.0))
+    if st["kind"] == "tactical_rail":
+        # standing at the rail (idle animation): the mannequin faces its +Y, hence yaw - 90
+        c = eas.spawn_actor_from_class(unreal.AstraCrewMember, V(x * M, y * M, z * M), R(yaw=yaw - 90.0))
+        c.set_editor_property("posture", unreal.AstraCrewPosture.STANDING)
+    else:
+        # seated on the station's chair (procedural pose, faces the actor's +X)
+        c = eas.spawn_actor_from_class(unreal.AstraCrewMember, V(x * M, y * M, z * M), R(yaw=yaw))
+        c.set_editor_property("posture", unreal.AstraCrewPosture.SEATED_CONSOLE if st["kind"] == "console_seated"
+                              else unreal.AstraCrewPosture.SEATED_ARMCHAIR)
     c.set_editor_property("station_id", sid)
     c.set_editor_property("display_name", CREW[sid])
     c.set_actor_label(f"Crew_{sid}")

@@ -257,7 +257,8 @@ def shell(name: str):
                 continue
             if math.hypot(cx - dc[0], cy - dc[1]) < dr + 1.0:
                 continue
-            lbox(b, (cx - size / 2, cy - size / 2, CEIL - 0.025), (cx + size / 2, cy + size / 2, CEIL), A.MAT_PANEL)
+            lbox(b, (cx - size / 2, cy - size / 2, CEIL - 0.025), (cx + size / 2, cy + size / 2, CEIL), A.MAT_STRUCTURE)
+            lbox(b, (cx - 0.11, cy - 0.11, CEIL - 0.03), (cx + 0.11, cy + 0.11, CEIL - 0.024), A.MAT_GUIDE)   # recessed downlight
     # radial beams from the dome towards the window mullions and the walls
     for a in ANG[1:-1]:
         p_in = (dc[0] + (dr + 0.1) * math.cos(a), dc[1] + (dr + 0.1) * math.sin(a))
@@ -324,7 +325,7 @@ def console_seated(name: str):
     for i in range(4):
         j = (i + 1) % 4
         faces.append(bm.faces.new((vl[i], vl[j], vr[j], vr[i])))
-    idx = b.mi(A.MAT_PANEL)
+    idx = b.mi(A.MAT_RUBBER)
     for f in faces:
         f.material_index = idx
     bmesh.ops.recalc_face_normals(bm, faces=faces)
@@ -370,7 +371,7 @@ def chair(name: str, captain: bool = False):
     base.box((0.0, 0, 0.415), (0.3, 0.3, 0.04), A.MAT_STRUCTURE)
     parts.append(A.finish(base.to_object(name + "_base"), bevel=0.004))
     # seat
-    seat_shell = A.rounded_box(name + "_seatshell", (0.02, 0, 0.45), (0.53 * k, 0.53 * k, 0.05), 0.02, A.MAT_PANEL)
+    seat_shell = A.rounded_box(name + "_seatshell", (0.02, 0, 0.45), (0.53 * k, 0.53 * k, 0.05), 0.02, A.MAT_STRUCTURE)
     seat = A.rounded_box(name + "_seat", (0.035, 0, 0.505), (0.49 * k, 0.49 * k, 0.075), 0.034, A.MAT_LEATHER,
                          cuts=(3, 3, 0))
     A.transform(seat, rot_deg=(0, -3.0, 0))
@@ -382,7 +383,7 @@ def chair(name: str, captain: bool = False):
         A.transform(o, rot_deg=(0, -12.0, 0))
         A.transform(o, loc=(-0.25 * k, 0, 0.83 * k + 0.02))
         return o
-    parts.append(back_part(name + "_backshell", 0.03, 0.54 * k, 0.68 * k, A.MAT_PANEL, -0.058, 0.012))
+    parts.append(back_part(name + "_backshell", 0.03, 0.54 * k, 0.68 * k, A.MAT_STRUCTURE, -0.058, 0.012))
     parts.append(back_part(name + "_back", 0.05, 0.48 * k, 0.6 * k, A.MAT_LEATHER, 0.0, 0.022))
     # headrest on two posts
     hz = 1.24 * k
@@ -428,7 +429,7 @@ def tactical_rail(name: str):
         pts_out = [(cx + r1 * math.cos(a), r1 * math.sin(a)) for a in (a0, a1)]
         poly = [pts_in[0], pts_in[1], pts_out[1], pts_out[0]]
         slab(b, poly, 0.0, 0.95, A.MAT_STRUCTURE)
-        slab(b, poly, 0.95, 1.0, A.MAT_PANEL)
+        slab(b, poly, 0.95, 1.0, A.MAT_RUBBER)
         # sloped screen strip on top, facing the officer (outer side)
         mid_in = ((pts_in[0][0] + pts_in[1][0]) / 2, (pts_in[0][1] + pts_in[1][1]) / 2)
         mid_out = ((pts_out[0][0] + pts_out[1][0]) / 2, (pts_out[0][1] + pts_out[1][1]) / 2)
@@ -450,7 +451,7 @@ def holo_table(name: str):
     circle = lambda rr, n=48: [(rr * math.cos(2 * math.pi * k / n), rr * math.sin(2 * math.pi * k / n)) for k in range(n)]
     slab(b, circle(r * 0.55), 0.0, h - 0.12, A.MAT_STRUCTURE)            # pedestal
     slab(b, circle(r * 0.7), 0.0, 0.08, A.MAT_TRIM)                       # foot
-    slab(b, circle(r), h - 0.12, h - 0.02, A.MAT_PANEL)                   # table rim body
+    slab(b, circle(r), h - 0.12, h - 0.02, A.MAT_STRUCTURE)               # table rim body
     slab(b, circle(r + 0.03), h - 0.03, h + 0.02, A.MAT_TRIM)             # rim
     slab(b, circle(r - 0.06, 64), h - 0.02, h + 0.006, A.MAT_TRIM)       # dark projection surface (the plot draws on it)
     slab(b, circle(r * 0.56, 48), h - 0.3, h - 0.26, A.MAT_ACCENT)        # glow ring under the top

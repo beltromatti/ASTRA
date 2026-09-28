@@ -309,7 +309,7 @@ def build_instances(hard, emi, glass):
         scalars={"RoughnessMin": 0.28, "RoughnessMax": 0.62, "MetallicFromMap": 0.0, "MetallicBias": 0.0,
                  "BaseColorMapInfluence": 0.5, "MacroBrightness": 0.10, "RoughnessVariation": 0.14,
                  "ScratchRoughness": 0.2, "NormalStrength": 0.8},
-        vectors={"Tint": [c * 1.6 for c in gunmetal]},
+        vectors={"Tint": [c * 1.05 for c in gunmetal]},
         textures={"BaseColorMap": "T_Gunmetal_BC", "NormalMap": "T_Gunmetal_N", "ORMMap": "T_Gunmetal_ORM"})
     mis["MI_ASTRA_Floor"] = make_mi("MI_ASTRA_Floor", hard,
         scalars={"RoughnessMin": 0.55, "RoughnessMax": 0.85, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.8,
@@ -337,9 +337,9 @@ def build_instances(hard, emi, glass):
         vectors={"Tint": [0.045, 0.047, 0.05]},
         textures={"BaseColorMap": "T_DeckRubber_BC", "NormalMap": "T_DeckRubber_N", "ORMMap": "T_DeckRubber_ORM"})
     mis["MI_ASTRA_FloorBridge"] = make_mi("MI_ASTRA_FloorBridge", hard,
-        scalars={"RoughnessMin": 0.5, "RoughnessMax": 0.82, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.85,
-                 "MacroBrightness": 0.1, "RoughnessVariation": 0.1, "ScratchRoughness": -0.1, "NormalStrength": 0.8},
-        vectors={"Tint": [0.35, 0.38, 0.46]},
+        scalars={"RoughnessMin": 0.26, "RoughnessMax": 0.6, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.7,
+                 "MacroBrightness": 0.08, "RoughnessVariation": 0.12, "ScratchRoughness": 0.12, "NormalStrength": 0.7},
+        vectors={"Tint": [0.07, 0.078, 0.095]},
         textures={"BaseColorMap": "T_DeckRubber_BC", "NormalMap": "T_DeckRubber_N", "ORMMap": "T_DeckRubber_ORM"})
     mis["MI_ASTRA_Leather"] = make_mi("MI_ASTRA_Leather", hard,
         scalars={"RoughnessMin": 0.34, "RoughnessMax": 0.52, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.3,

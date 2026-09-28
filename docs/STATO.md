@@ -41,7 +41,8 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Livello `L_CorridorTest` (24,5 m, paratia, finestrone) — 58 fps a 1080p col profilo A (docs/bench/prestazioni_2026-09-28.md)
 - [x] Plancia v1 dai dati (`data/ship/aquila_bridge.json` → `art/blender/bridge.py` → `L_Bridge`): pozzo del timone, pedana, 9 postazioni, cupola, finestrone a 6 facce
 - [x] Cielo di Aurelia: stelle NASA + nebulosa Teal Veil procedurale 8K (`art/blender/sky_aurelia.py`), stella Aurelia nel materiale del cielo, orientamento pilotabile
-- [ ] Plancia v2: pavimento scuro, soffitto a cassettoni, poltrone rifatte, schermi con interfacce, ologramma sul tavolo
+- [x] Plancia v2 (primo passaggio): pavimento scuro semi-lucido, soffitto a cassettoni scuri con faretti incassati, console e poltrone scure, tavolo olografico vivo, schermi vivi
+- [ ] Plancia v2 (secondo passaggio): dettagli a pannelli, cavi e condotti, segnaletica e decalcomanie, usura
 - [ ] Esterno della Aquila (almeno la prua visibile dalla plancia), pianeta New Ravenna
 - [ ] Movimento in prima persona nella nave, ascensore, segnaletica/decalcomanie
 
@@ -50,7 +51,9 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Voce: WhisperKit locale (push-to-talk) → testo; Pocket TTS locale con voci scelte dal casting automatico (docs/bench/voci_casting_2026-09-28.md)
 - [x] Unreal: `UAstraMindSubsystem` (collegamento), `UAstraShipSubsystem` (stato e comandi reali: rotta/virata che ruota cielo e stella, allerta con luci, materiali e klaxon), `AAstraCrewMember` (voce spazializzata dalla postazione)
 - [x] Prova: in plancia «Allarme rosso! Timoniere, virare a zero-nove-zero» → la XO conferma, il timoniere ripete l'ordine, la nave va in condizione rossa e vira; «fuoco sulla Praetorian» → Voss rifiuta (nave amica)
-- [ ] Rapporti spontanei dagli eventi (rotta raggiunta, contatti), schermi con dati vivi, gesti/sguardo verso il capitano, MetaHuman e labiale
+- [x] Rapporti spontanei dagli eventi (rotta raggiunta, contatti, danni), schermi con dati vivi
+- [x] Equipaggio seduto alle postazioni con posa procedurale (calcolata dallo scheletro: niente animazioni esterne): mani sulla console, respiro, micro-movimenti, testa e spalle che si girano verso il capitano quando parla; la tattica resta in piedi alla ringhiera
+- [ ] MetaHuman e labiale, gesti
 
 ## M4 (prima versione) — Battaglia
 - [x] Generatore di astronavi (`art/blender/shipgen.py`): ASTRA (Aquila, Praetorian, Vigilant), Kharon Mandate (Acheron, Styx, Lethe), mercantile delle Gilde; livree per fazione
@@ -64,11 +67,13 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Sistemi dell'Aquila: budget del reattore (700%) con effetti reali (scudi = rigenerazione e assorbimento, armi = cadenza, motori = velocità), scudi a settore che contano, danni per ponte/sezione con 4 squadre di controllo danni che arrivano e riparano; incendi non presidiati che si estendono
 - [x] Equipaggio più credibile: rilettura obbligatoria degli ordini eseguiti con i dati veri, iniziativa entro la propria autorità (squadre, scudi, difesa di punto), mai azioni dichiarate e non fatte; voci che non si sovrappongono e rapporti che aspettano il silenzio (raggruppati; scartati quando parla il capitano)
 - [x] Bilanciamento: gruppo d'attacco di 4 navi; esiti variabili nelle prove (da vittoria con ritirata nemica a Praetorian e Vigilant perduti, Aquila al 5%)
-- [ ] Tavolo olografico con la situazione tattica viva, squadre di controllo danni visibili sugli schermi
+- [x] Tavolo olografico tattico vivo (navi per fazione e stato, missili, esplosioni, anelli con scala logaritmica, etichette che non si sovrappongono)
+- [x] Schermi di plancia vivi (UAstraScreensSubsystem): display principale con tavola del controllo danni per ponte/sezione, barra tattica, console di timone, operazioni, sensori, ingegneria
+- [x] Canale aperto con il nemico: gli ordini restano alla plancia, le frasi per il comandante nemico vanno sul canale (router euristico + LLM per le frasi miste)
 - [ ] Navi v2 (sagome e dettagli più belli), effetti visivi migliori (scie, esplosioni volumetriche)
 
 ## Prossimi passi
-1. Tavolo olografico tattico vivo (navi, missili, rotte, settori degli scudi) e schermi di plancia con dati veri.
+1. Plancia v2 secondo passaggio (dettagli, segnaletica), navi v2 ed effetti visivi della battaglia (scie, esplosioni).
 2. Equipaggio: schermi vivi, comportamento dei corpi (posture sedute, gesti), poi MetaHuman + labiale.
 3. Navi v2 e effetti; simulazione di energia/calore (M2); hangar e caccia (M5).
 
