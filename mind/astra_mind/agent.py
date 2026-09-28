@@ -49,6 +49,7 @@ class BridgeAgent:
         self.history: list[dict[str, str]] = []
         self.history_turns = history_turns
         self.spent = 0.0
+        self._ev = 0                     # ids for event-report tool calls in the history
 
     def _trim_history(self) -> None:
         """Keep the last `history_turns` turns (a turn starts at a user message)."""
@@ -145,8 +146,9 @@ class BridgeAgent:
         msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events())}]
         msgs += self.history
         msgs.append({"role": "user", "content": f"[Ship systems event, not the Captain speaking] {event}\n"
-                                                "If this deserves telling the Captain now, the responsible officer reports it "
-                                                "in one short line with speak (in the Captain's language). Otherwise call no tool."})
+                                                "The Captain should hear this: the responsible officer reports it now, in one "
+                                                "short line with speak (in the Captain's language). Call no tool only if it "
+                                                "merely repeats what was reported in the last few seconds."})
 
         async def on_call(call: ToolCall) -> None:
             args = call.arguments() or {}
@@ -162,9 +164,23 @@ class BridgeAgent:
                                    reasoning={"enabled": False}, max_tokens=320, temperature=0.4, on_tool_call=on_call,
                                    allow_fallbacks=True)
         turn.cost += comp.cost
+        if not turn.lines and not comp.error and comp.content.strip():
+            # the report came back as prose ("sensors: ...") instead of a speak call: voice it anyway, officer by officer
+            for raw in [l for l in comp.content.strip().splitlines() if l.strip()][:2]:
+                spk, line = _parse_prose(raw)
+                if len(line) >= 4 and not _looks_like_tool(line):
+                    turn.lines.append((spk, line))
+                    await self.say(spk, line, lang, "focused")
+            log.info("event report salvaged from prose: %s", comp.content[:160])
         if turn.lines:
-            self.history.append({"role": "user", "content": f"[event] {event}"})
-            self.history.append({"role": "assistant", "content": " ".join(f"{s}: {t}" for s, t in turn.lines)})
+            # native tool-call history (prose history teaches the model to answer in prose)
+            self.history.append({"role": "user", "content": f"[Ship systems event, not the Captain speaking] {event}"})
+            self.history.append({"role": "assistant", "content": None, "tool_calls": [
+                {"id": f"ev{self._ev}_{i}", "type": "function", "function": {"name": "speak", "arguments": json.dumps(
+                    {"speaker": spk, "text": line, "tone": "focused"}, ensure_ascii=False)}} for i, (spk, line) in enumerate(turn.lines)]})
+            for i in range(len(turn.lines)):
+                self.history.append({"role": "tool", "tool_call_id": f"ev{self._ev}_{i}", "content": "spoken"})
+            self._ev += 1
             self._trim_history()
         turn.t_end = time.perf_counter() - t0
         self.spent += turn.cost
@@ -228,7 +244,7 @@ def _owner(tool: str) -> str:
     return {"set_course": "helm", "set_throttle": "helm", "set_alert": "xo", "set_shields": "tactical",
             "route_power": "ops", "set_target": "tactical", "fire_weapons": "tactical", "set_point_defense": "tactical",
             "launch_squadron": "flight", "recall_squadron": "flight", "dispatch_damage_control": "ops", "hail": "comms",
-            "set_emcon": "sensors", "active_scan": "sensors"}.get(tool, "xo")
+            "set_emcon": "sensors", "active_scan": "sensors", "end_transmission": "comms", "cease_fire": "tactical"}.get(tool, "xo")
 
 
 def _fallback_line(lang: str) -> str:

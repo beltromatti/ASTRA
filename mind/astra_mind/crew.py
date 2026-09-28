@@ -121,4 +121,4 @@ Recent events
 {events}
 
 Current ship state (live telemetry, JSON)
-{json.dumps(ship_state, separators=(",", ":"), ensure_ascii=False)}"""
+{json.dumps({k: v for k, v in ship_state.items() if not k.startswith("_")}, separators=(",", ":"), ensure_ascii=False)}"""

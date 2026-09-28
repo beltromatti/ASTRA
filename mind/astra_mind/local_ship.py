@@ -59,6 +59,8 @@ class LocalShip:
         if name == "route_power":
             s["power_pct"][a["system"]] = a["percent"]
             return self._ok(f"{a['system']} at {a['percent']}%")
+        if name == "cease_fire":
+            return self._ok("all offensive fire stopped; point defense stays on")
         if name in ("set_target", "fire_weapons"):
             c = self._contact(a.get("contact_id"))
             if c is None:

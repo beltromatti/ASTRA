@@ -34,10 +34,15 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "percent": {"type": "number", "minimum": 0, "maximum": 150}}, ["system", "percent"]),
     _fn("set_target", "Tactical: designate the current target (a contact id from the state).", {
         "contact_id": {"type": "string"}}, ["contact_id"]),
-    _fn("fire_weapons", "Tactical: fire a weapon group at a contact.", {
+    _fn("fire_weapons", "Tactical: engage a contact with a weapon group. Railguns (range 10 km) and lasers (4 km) fire "
+                        "`salvo` volleys at their cadence (railguns one volley every 7 s; 12 = sustained fire, about 1.5 "
+                        "minutes); if the target is still beyond range they stay assigned and open fire by themselves "
+                        "once it closes. Missiles (25 km) launch `salvo` missiles at once (max 8; the VLS then cycles 14 s).", {
         "weapon": {"type": "string", "enum": ["railguns", "lasers", "missiles", "torpedoes"]},
         "contact_id": {"type": "string"},
         "salvo": {"type": "integer", "minimum": 1, "maximum": 12}}, ["weapon", "contact_id", "salvo"]),
+    _fn("cease_fire", "Tactical: stop all our offensive fire at once (queued volleys cancelled; point defense stays on).",
+        {}, []),
     _fn("set_point_defense", "Tactical: point-defence mode.", {
         "mode": {"type": "string", "enum": ["auto", "hold", "free"]}}, ["mode"]),
     _fn("launch_squadron", "Flight Control: launch a flight group on a mission.", {
@@ -57,6 +62,7 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "intent": {"type": "string", "enum": ["identify", "warn", "demand_surrender", "request_support", "negotiate", "report"]},
         "message": {"type": "string", "description": "What we transmit, in English (the Interpreter translates)"}},
         ["contact_id", "intent", "message"]),
+    _fn("end_transmission", "Communications: close the open channel (e.g. with an enemy commander).", {}, []),
     _fn("set_emcon", "Science & Sensors: emission control (silent = passive sensors only).", {
         "level": {"type": "string", "enum": ["silent", "restricted", "full"]}}, ["level"]),
     _fn("active_scan", "Science & Sensors: active radar/lidar ping or focused scan of a contact (reveals our position).", {

@@ -9,6 +9,8 @@ Esempi:
   tools/ue.py py 'result = unreal.SystemLibrary.get_engine_version()'
   tools/ue.py pyfile /percorso/assoluto/script.py
   tools/ue.py foto docs/progressi/viewport.png  # cattura del viewport su file
+  tools/ue.py pie start|stop                 # Play In Editor
+  tools/ue.py pie cmd 'astra.say Red alert.' 'astra.battle.time 168'   # comandi console nel mondo di gioco
 
 Le risposte con immagini in base64 vengono salvate su file (non stampate).
 """
@@ -182,6 +184,27 @@ def main(argv):
         elif cmd == "pyfile":
             res = toolset_call(f"{AGENT_TOOLSET}.run_python_file", {"path": os.path.abspath(args[0])})
             print(_unwrap(res))
+        elif cmd == "pie":
+            sub, rest = args[0], args[1:]
+            if sub == "start":
+                code = ("les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)\n"
+                        "if not unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world():\n"
+                        "    les.editor_request_begin_play()\n"
+                        "print('PIE richiesto')")
+            elif sub == "stop":
+                code = ("if unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world():\n"
+                        "    unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()\n"
+                        "print('PIE fermato')")
+            elif sub == "cmd":
+                code = ("w = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()\n"
+                        "assert w, 'PIE non attivo'\n"
+                        f"for c in {rest!r}:\n"
+                        "    unreal.SystemLibrary.execute_console_command(w, c)\n"
+                        "print('ok')")
+            else:
+                print("uso: pie start|stop|cmd <comando>...")
+                return 1
+            print(agent_python("import unreal\n" + code))
         elif cmd == "foto":
             out = os.path.abspath(args[0] if args else os.path.join(ROOT, ".astra", "viewport.png"))
             cam = _unwrap(toolset_call("EditorToolset.EditorAppToolset.GetCameraTransform", {}))

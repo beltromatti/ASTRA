@@ -58,9 +58,17 @@ struct FAstraBattleShip
 	bool bShieldsUp = true;
 
 	float RailCd = 8.f, RailT = 3.f, RailRange = 8000.f, RailDamage = 55.f;
+	int32 RailSlugs = 2;                 // slugs per volley
 	float MissileCd = 30.f, MissileT = 10.f, MissileRange = 25000.f;
 	int32 Missiles = 12;
 	float PDRange = 2000.f, PDT = 0.f;
+	int32 PDChannels = 2;                // missiles engaged per point-defence cycle
+
+	// the player's fire control: orders become volleys fired at the weapons' cadence
+	int32 FireTarget = -1;
+	int32 RailVolleys = 0;
+	int32 LaserShots = 0;
+	float LaserT = 0.f;
 
 	int32 TargetId = -1;
 	EAstraShipMode Mode = EAstraShipMode::Idle;
@@ -69,6 +77,8 @@ struct FAstraBattleShip
 	bool bIdentified = true;
 	bool bAlive = true;
 	bool bFleeing = false;
+	bool bHoldFire = false;              // ceasefire ordered by its commander
+	bool bNegotiated = false;            // holding fire / withdrawing under terms agreed over the channel
 
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> ShieldBubble = nullptr;
@@ -127,11 +137,22 @@ public:
 
 	/** Contacts as the crew sees them (id, class, name when known, range, true bearing/mark, status, shields/hull when scanned). */
 	TArray<TSharedPtr<FJsonValue>> ContactsJson() const;
+	/** The battle as the Mandate commander knows it: the true state and orders of their own ships, and the ASTRA ships.
+	 *  Private to the enemy minds (the crew never sees it). */
+	TSharedRef<FJsonObject> MandateViewJson() const;
 
 	/** The player's ship fires on a contact. */
 	bool PlayerFire(const FString& Weapon, const FString& ContactId, int32 Salvo, FString& OutDetail);
 	bool PlayerScan(const FString& ContactId, FString& OutDetail);
 	bool PlayerHail(const FString& ContactId, FString& OutDetail);
+	bool PlayerCeaseFire(FString& OutDetail);
+	/** The Aquila's weapons as fire control reports them (live: assignments, volleys left, VLS cycle, ammunition). */
+	TSharedRef<FJsonObject> PlayerWeaponsJson() const;
+	/** A Mandate commander's decision (from their mind): continue_attack | hold_fire | withdraw | accept_surrender.
+	 *  The senior surviving commander orders the whole strike group; any other captain only their own ship. */
+	bool EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail);
+	/** Contact id of the ship whose captain commands the Mandate forces now (Acheron, then Styx, Cocytus, Lethe). */
+	FString MandateCommander() const;
 	void SetPlayerShields(bool bUp) { if (Ships.Num()) { Ships[0].bShieldsUp = bUp; } }
 
 	float PlayerHullFraction() const { return Ships.Num() ? Ships[0].Hull / Ships[0].HullMax : 1.f; }
@@ -160,6 +181,8 @@ private:
 	int32 NextId = 1;
 	int32 StageDone = 0;
 	bool bScenarioOver = false;
+	float TransmissionAt = -1.f;
+	FString TransmissionText;           // "T-21 — ...": who opens a channel to the Aquila, and why
 
 	int32 AddShip(const FString& Contact, const FString& Name, const FString& Class, const FString& Mesh, EAstraSide Side,
 	              const FVector& Pos, float HeadingDeg, float Speed, float Radius, float Hull, float Shield);
@@ -171,6 +194,7 @@ private:
 	void TickScenario(float Dt);
 	void TickAI(FAstraBattleShip& S, float Dt);
 	void TickWeapons(FAstraBattleShip& S, float Dt);
+	void TickPlayerFire(FAstraBattleShip& P, float Dt);
 	void TickProjectiles(float Dt);
 	void TickFlashes(float Dt);
 	void SyncVisuals();
@@ -180,6 +204,7 @@ private:
 	void FireLaser(FAstraBattleShip& From, FAstraBattleShip& To);
 	void ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos);
 	void Destroy(FAstraBattleShip& S);
+	void BreakCeasefire(const FAstraBattleShip& Victim);
 	void AddFlash(const FVector& Pos, float Size, float Life, const FLinearColor& Color, float Intensity);
 	void AddBeam(const FVector& A, const FVector& B, float Life, const FLinearColor& Color);
 

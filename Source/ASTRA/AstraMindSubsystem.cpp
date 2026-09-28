@@ -17,6 +17,9 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "WebSocketsModule.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundWaveProcedural.h"
 
 namespace
 {
@@ -234,6 +237,10 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 		{
 			Crew->BeginLine(Id, (int32)Msg->GetNumberField(TEXT("rate")));
 		}
+		else
+		{
+			BeginChannelLine(Id, (int32)Msg->GetNumberField(TEXT("rate")));
+		}
 	}
 	else if (Type == TEXT("audio_end"))
 	{
@@ -269,7 +276,11 @@ void UAstraMindSubsystem::OnBinary(const void* Data, SIZE_T Size, SIZE_T BytesRe
 	}
 	int32 LineId = 0;
 	FMemory::Memcpy(&LineId, BinaryBuffer.GetData(), 4);
-	if (const FString* Sp = LineSpeakers.Find(LineId))
+	if (LineId == ChannelLine && ChannelWave)
+	{
+		ChannelWave->QueueAudio(BinaryBuffer.GetData() + 4, BinaryBuffer.Num() - 4);
+	}
+	else if (const FString* Sp = LineSpeakers.Find(LineId))
 	{
 		if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), *Sp))
 		{
@@ -301,4 +312,39 @@ void UAstraMindSubsystem::HandleCommand(const TSharedPtr<FJsonObject>& Msg)
 	R->SetBoolField(TEXT("ok"), bOk);
 	R->SetStringField(TEXT("detail"), Detail);
 	Send(R);
+}
+
+void UAstraMindSubsystem::BeginChannelLine(int32 LineId, int32 Rate)
+{
+	UWorld* World = GameWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (!ChannelAudio || !IsValid(ChannelAudio))
+	{
+		// a 2D "radio": band-limited like a comms channel (the Interpreter's translation of the enemy's voice)
+		ChannelAudio = UGameplayStatics::CreateSound2D(World, nullptr, 1.f, 1.f, 0.f, nullptr, true, false);
+		if (ChannelAudio)
+		{
+			ChannelAudio->SetLowPassFilterEnabled(true);
+			ChannelAudio->SetLowPassFilterFrequency(3600.f);
+			ChannelAudio->SetHighPassFilterEnabled(true);
+			ChannelAudio->SetHighPassFilterFrequency(320.f);
+		}
+	}
+	if (!ChannelAudio)
+	{
+		return;
+	}
+	ChannelLine = LineId;
+	ChannelWave = NewObject<USoundWaveProcedural>(this);
+	ChannelWave->SetSampleRate(Rate);
+	ChannelWave->NumChannels = 1;
+	ChannelWave->Duration = INDEFINITELY_LOOPING_DURATION;
+	ChannelWave->SoundGroup = SOUNDGROUP_Voice;
+	ChannelWave->bLooping = false;
+	ChannelAudio->SetSound(ChannelWave);
+	ChannelAudio->Play();
+	UE_LOG(LogASTRA, Log, TEXT("[Mind] channel voice (line %d)"), LineId);
 }

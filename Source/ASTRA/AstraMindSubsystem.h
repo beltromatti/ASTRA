@@ -40,6 +40,10 @@ private:
 	int32 ConnectFailures = 0;
 	TArray<uint8> BinaryBuffer;
 	TMap<int32, FString> LineSpeakers;
+	UPROPERTY() TObjectPtr<class UAudioComponent> ChannelAudio;
+	UPROPERTY() TObjectPtr<class USoundWaveProcedural> ChannelWave;
+	int32 ChannelLine = -1;
+	void BeginChannelLine(int32 LineId, int32 Rate);
 	FDelegateHandle ShipEventHandle;
 	TWeakObjectPtr<UWorld> BoundWorld;
 

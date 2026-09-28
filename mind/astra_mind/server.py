@@ -26,6 +26,7 @@ from lingua import Language, LanguageDetectorBuilder
 from .agent import BridgeAgent, ShipLink
 from .audio_in import PushToTalk
 from .crew import CREW
+from .enemy import COMMANDERS, EnemyAgent
 from .env import REPO_ROOT
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
@@ -78,6 +79,21 @@ class GameShip:
             fut.set_result({"ok": bool(msg.get("ok")), "detail": msg.get("detail", "")})
 
 
+EXTERNAL_SPEAKERS = {c["key"]: (f'{c["name"]} ({c["ship"]})', c["voice"]) for c in COMMANDERS.values()}
+
+# the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
+import re as _re
+_CREW_ADDRESS = _re.compile(
+    r"^\W*(serra|ferri|tanaka|voss|martin|nair|mensah|price|numero uno|primo ufficiale|xo|comandante|timon\w*|helm\w*|"
+    r"tattic\w*|tactical|ops|operazion\w*|operations|comunicazion\w*|comms?|sensor\w*|scienz\w*|ingegner\w*|"
+    r"engineering|volo|flight|plancia|bridge|number one|chiud\w* (il )?canale|close (the )?channel|fine trasmissione|"
+    r"end transmission)\b", _re.I)
+
+
+def addressed_to_crew(text: str) -> bool:
+    return bool(_CREW_ADDRESS.match(text.strip()))
+
+
 class Voice:
     """Serialises the crew's lines: each line is synthesised and streamed to the sink in speaking order."""
 
@@ -93,9 +109,9 @@ class Voice:
         self._n += 1
         lid = self._n
         self.enqueued[lid] = time.perf_counter()
-        o = CREW[speaker]
-        await self.sink("json", {"type": "line", "id": lid, "speaker": speaker, "name": o.title, "text": text,
-                                 "lang": lang, "tone": tone})
+        name = CREW[speaker].title if speaker in CREW else EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
+        await self.sink("json", {"type": "line", "id": lid, "speaker": speaker, "name": name, "text": text,
+                                 "lang": lang, "tone": tone, "channel": speaker not in CREW})
         await self.q.put((lid, speaker, text, lang))
 
     async def run(self) -> None:
@@ -103,7 +119,8 @@ class Voice:
             lid, speaker, text, lang = await self.q.get()
             try:
                 await self.sink("json", {"type": "audio_begin", "line": lid, "speaker": speaker, "rate": self.tts.sample_rate})
-                async for pcm in self.tts.stream(text, CREW[speaker].voice, lang if self.tts.supported(lang) else "en"):
+                voice = CREW[speaker].voice if speaker in CREW else EXTERNAL_SPEAKERS.get(speaker, ("", "alba"))[1]
+                async for pcm in self.tts.stream(text, voice, lang if self.tts.supported(lang) else "en"):
                     if lid not in self.first_audio:
                         self.first_audio[lid] = time.perf_counter()
                     await self.sink("audio", struct.pack("<I", lid) + pcm)
@@ -125,6 +142,7 @@ class Mind:
         self.game: GameShip | None = None
         self.voice = Voice(self.tts, self._sink)
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
+        self.enemy = EnemyAgent(self.llm, self.voice.say, self._enemy_command)
         self.turns: asyncio.Queue = asyncio.Queue()
         self.lang_file = REPO_ROOT / "mind" / ".cache" / "captain_lang.txt"
         self.lang = self.lang_file.read_text().strip() if self.lang_file.exists() else "en"   # the Captain's language
@@ -138,6 +156,17 @@ class Mind:
                 dead.append(ws)
         for ws in dead:
             self.clients.discard(ws)
+
+    async def _enemy_command(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        ship = self.game if (self.game and self.game.state) else None
+        if ship is None:
+            return {"ok": True, "detail": "(no game)"}
+        return await ship.execute(name, args, self.enemy.speaker)
+
+    def _battle_state(self) -> dict[str, Any]:
+        st = dict(self.game.state) if (self.game and self.game.state) else dict(self.local.snapshot())
+        st["_events"] = (self.game.events if self.game else [])[-8:]
+        return st
 
     async def turn_worker(self) -> None:
         while True:
@@ -157,6 +186,16 @@ class Mind:
                         await self.turns.put(p)
                     if pending:
                         continue          # the Captain spoke: answer first, the events stay in the state/history
+                    transmissions = [e for e in events if e.startswith("transmission:")]
+                    events = [e for e in events if not e.startswith("transmission:")]
+                    for tr in transmissions:
+                        # "transmission: T-22 — why": that captain calls the Aquila (arrival, succession, broken ceasefire)
+                        m = _re.match(r"transmission:\s*(T-\d+)\s*—\s*(.*)", tr)
+                        if m and self.enemy.open_channel(m.group(1)):
+                            await self.enemy.respond(f"[Situation: {m.group(2)}. You are the one opening this channel: make "
+                                                     "your transmission to the Aquila's captain.]", self.lang, self._battle_state())
+                    if not events:
+                        continue
                     t = await self.agent.handle_event(" | ".join(events), self.lang)
                     log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
                     continue
@@ -164,7 +203,18 @@ class Mind:
                     self.lang = lang
                     self.lang_file.parent.mkdir(parents=True, exist_ok=True)
                     self.lang_file.write_text(lang)
+                if self.enemy.open and not addressed_to_crew(text):
+                    # the channel is open and the Captain is not talking to the bridge: Solm hears it
+                    await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {text}", lang, self._battle_state())
+                    continue
                 t = await self.agent.handle(text, lang)
+                for name, args_, res in t.actions:
+                    if name == "end_transmission":
+                        self.enemy.open = False
+                    if name == "hail" and res.get("ok") and "Mandate" in str(res.get("detail", "")) \
+                            and self.enemy.open_channel(str(args_.get("contact_id", "")).upper()):
+                        await self.enemy.respond(f"[The ASTRA ship hails you. Their message: {args_.get('message', '')}]",
+                                                 lang, self._battle_state())
                 await self._sink("json", {"type": "turn_end", "first_line_s": t.t_first_line, "total_s": round(t.t_end, 3),
                                           "cost": t.cost, "actions": [[n, a, r] for n, a, r in t.actions], "error": t.error})
                 log.info("turn %.2fs (first line %.2fs) cost $%.5f: %s", t.t_end, t.t_first_line or -1, t.cost,
@@ -186,12 +236,16 @@ class Mind:
                 if kind == "hello":
                     # a new game session: the crew starts a fresh conversation (the ship state is new too)
                     self.agent.history.clear()
+                    self.enemy.reset()
                     log.info("new game session: conversation reset")
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
                 elif kind == "event":
                     text = msg.get("text", "")
                     self.game.events.append(text)
+                    gone = _re.search(r"\((T-\d+)[,)]", text)
+                    if gone and ("destroyed" in text or "left sensor range" in text):
+                        self.enemy.ship_destroyed(gone.group(1))   # nobody left on that ship to answer a hail
                     if msg.get("report"):
                         await self.turns.put(("\x00event:" + text, self.lang))
                 elif kind == "command_result":

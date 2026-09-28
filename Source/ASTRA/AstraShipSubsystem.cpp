@@ -264,6 +264,20 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		}
 		return Battle ? Battle->PlayerHail(Id, OutDetail) : false;
 	}
+	if (Name == TEXT("cease_fire"))
+	{
+		return Battle ? Battle->PlayerCeaseFire(OutDetail) : false;
+	}
+	if (Name == TEXT("enemy_order"))
+	{
+		return Battle ? Battle->EnemyOrder(Str(TEXT("order")), Str(TEXT("reason")), Str(TEXT("commander")), OutDetail) : false;
+	}
+	if (Name == TEXT("channel_closed") || Name == TEXT("end_transmission"))
+	{
+		OutDetail = TEXT("channel closed");
+		Event(Name == TEXT("channel_closed") ? TEXT("comms: the Mandate cut the channel") : TEXT("comms: channel closed"));
+		return true;
+	}
 	if (Name == TEXT("set_emcon"))
 	{
 		Emcon = Str(TEXT("level"));
@@ -301,7 +315,15 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	Sh->SetStringField(TEXT("mode"), ShieldMode);
 	S->SetObjectField(TEXT("shields"), Sh);
 	TSharedRef<FJsonObject> W = MakeShared<FJsonObject>();
-	for (const auto& KV : Weapons) { W->SetStringField(KV.Key, KV.Value); }
+	const UAstraBattleSubsystem* FireControl = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	if (FireControl)
+	{
+		W = FireControl->PlayerWeaponsJson();
+	}
+	else
+	{
+		for (const auto& KV : Weapons) { W->SetStringField(KV.Key, KV.Value); }
+	}
 	W->SetStringField(TEXT("point_defense"), PointDefense);
 	S->SetObjectField(TEXT("weapons"), W);
 	S->SetStringField(TEXT("target"), TargetId);
@@ -313,6 +335,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (Battle)
 	{
 		S->SetArrayField(TEXT("contacts"), Battle->ContactsJson());
+		S->SetObjectField(TEXT("_mandate"), Battle->MandateViewJson());   // for the enemy minds only
 		S->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(100.f * Battle->PlayerHullFraction()));
 		Sh->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()));
 	}
