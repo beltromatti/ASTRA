@@ -84,7 +84,7 @@ class GameShip:
 
 EXTERNAL_SPEAKERS = {c["key"]: (f'{c["name"]} ({c["ship"]})', c["voice"]) for c in COMMANDERS.values()}
 EXTERNAL_SPEAKERS[ADMIRAL["key"]] = (f'{ADMIRAL["name"]} ({ADMIRAL["ship"]})', ADMIRAL["voice"])
-from .port import PORT as PORT_CONTROL, PortControl, for_port, stimulus_for  # noqa: E402
+from .port import PORT as PORT_CONTROL, FieldControl, for_field, stimulus_for, world_of  # noqa: E402
 from .medbay import patient_voice  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 
@@ -195,7 +195,7 @@ class Mind:
         self.voice = Voice(self.tts, self._sink)
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
-        self.port = PortControl(self.llm, self._say_external)
+        self.port = FieldControl(self.llm, self._say_external, self._register_field)
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander,
                                  news=self._fleet_news)
         # the Captain's log is private: the story reads it, the crew does not
@@ -247,8 +247,36 @@ class Mind:
         except Exception:  # noqa: BLE001
             log.warning("the game did not acknowledge the log entry")
 
+    def _register_field(self, persona: dict[str, Any]) -> None:
+        """A world's field controller gets a name and a voice on the radio."""
+        EXTERNAL_SPEAKERS[persona["key"]] = (f'{persona["name"]} ({persona["place"]})', persona["voice"])
+
+    def _sector_for(self, world: str) -> dict[str, Any] | None:
+        """The March's entry for the system whose main world this is (None: a world outside the charted March)."""
+        w = (world or "").strip().lower()
+        for s_ in self.director.war.systems.values():
+            if str(s_.get("world", "")).lower() == w:
+                return s_
+        return None
+
+    def _field_world(self, world: str) -> dict[str, Any] | None:
+        """Tune the field control to the world Eagle is over (its persona: who answers there, if anyone)."""
+        sec = self._sector_for(world)
+        surf = ((self.game.state if self.game else None) or {}).get("surface") or {}
+        kind = surf.get("kind") if str(surf.get("world", "")).lower() == world.lower() else ""
+        return self.port.set_world(world, kind or (sec or {}).get("planet", ""), sec)
+
+    async def _silent_field(self, world: str, delay: float, called: bool) -> None:
+        """A world gone silent: nobody answers from its field; comms says so (and the story remembers)."""
+        await asyncio.sleep(delay)
+        text = (f"comms: the Captain called the field on {world} — no answer on any channel, only static"
+                if called else f"comms: nothing from the field on {world} — no beacon, no traffic, no answer on any channel")
+        self.director.note(f"the Captain flew down to {world}: its field is dark and silent")
+        self.last_activity = time.monotonic()
+        await self.turns.put(("\x00event:" + text, self.lang))
+
     async def _port_call(self, cue: str, delay: float) -> None:
-        """Port Aurelius Control speaks up (after the entry's glow has faded, or as Eagle touches down)."""
+        """The world's field control speaks up (after the entry's glow has faded, or as Eagle touches down)."""
         await asyncio.sleep(delay)
         try:
             await self.port.respond(cue, self.lang, self._battle_state(), self.director.war.brief(detail=False))
@@ -472,10 +500,16 @@ class Mind:
                     self.record_log(entry)
                     continue
                 st_now = self.game.state if (self.game and self.game.state) else {}
-                if "New Ravenna" in str(st_now.get("captain", "")) and for_port(text):
-                    self.director.note(f"the Captain to Port Aurelius Control: {text}")
-                    await self.port.respond(f"[Eagle on the radio]: {text}", lang, self._battle_state(), self.director.war.brief(detail=False))
-                    continue
+                surf = st_now.get("surface") or {}
+                if surf.get("captain_here") and surf.get("world"):
+                    persona = self._field_world(surf["world"])
+                    if for_field(text, persona or {"world": surf["world"]}):
+                        if persona is None:
+                            asyncio.create_task(self._silent_field(surf["world"], 2.0, True))
+                            continue
+                        self.director.note(f"the Captain to {persona['place']}: {text}")
+                        await self.port.respond(f"[Eagle on the radio]: {text}", lang, self._battle_state(), self.director.war.brief(detail=False))
+                        continue
                 to_enemy = ""
                 if self.enemy.open:
                     # a channel is open: the words meant for the enemy go over it, the orders stay on the bridge
@@ -517,7 +551,12 @@ class Mind:
             async for raw in ws:
                 if isinstance(raw, bytes):
                     continue
-                msg = json.loads(raw)
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError as e:
+                    # one bad message (a NaN in the snapshot...) must not cut the crew off from the ship
+                    log.warning("bad JSON from the game (%s): ...%s...", e, raw[max(0, e.pos - 160): e.pos + 60].replace("\n", " "))
+                    continue
                 kind = msg.get("type")
                 if kind == "hello":
                     # a new game session: the crew starts a fresh conversation (the ship state is new too)
@@ -550,9 +589,16 @@ class Mind:
                         asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
                     elif text.startswith("story:"):
                         self.director.note(text.split(":", 1)[1].strip())   # remembered, no new beat
-                    port_cue = stimulus_for(text)
-                    if port_cue:
-                        asyncio.create_task(self._port_call(port_cue, 6.0 if "left the plot" in text else 1.5))
+                    flight_world = world_of(text) if text.startswith("flight:") else None
+                    if flight_world:
+                        persona = self._field_world(flight_world)
+                        port_cue = stimulus_for(text, persona)
+                        if port_cue:
+                            asyncio.create_task(self._port_call(port_cue, 6.0 if "left the plot" in text else 1.5))
+                        elif persona is None and "left the plot" in text:
+                            asyncio.create_task(self._silent_field(flight_world, 8.0, False))
+                        if persona and persona.get("owner") == "mandate" and "left the plot" in text:
+                            self.director.note(f"the Captain flew a Falcon down to {flight_world}, a Kharon Mandate world")
                     fallen = _fallen(text)
                     if fallen:
                         self.director.note("fallen: " + "; ".join(fallen))

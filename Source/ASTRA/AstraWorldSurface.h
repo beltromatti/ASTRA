@@ -27,12 +27,13 @@ public:
 	AAstraWorldSurface();
 
 	/** Builds the world (the actor stands at the zone's origin: sea level, the landing zone's centre). */
-	void Build(const FString& InWorldName, const FString& InPlanetType);
+	void Build(const FString& InWorldName, const FString& InPlanetType, const FString& InOwner = FString());
 	void Show(bool bShow);
 	bool IsBuilt() const { return Gen.IsValid(); }
 
 	FString WorldName;
 	FString PlanetType;
+	FString Owner;   // who holds the system (the mind's war map): a silent world's field is dark
 	/** The landing pad's centre on the ground (world, cm), and the height of the sea (world z, cm; none: very low). */
 	FVector SiteWorld() const;
 	float SeaWorldZ() const;

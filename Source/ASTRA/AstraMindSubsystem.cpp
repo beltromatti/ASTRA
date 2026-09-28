@@ -156,6 +156,58 @@ void UAstraMindSubsystem::LaunchMind()
 	UE_LOG(LogASTRA, Log, TEXT("[Mind] launched astra-mind (%s)"), H.IsValid() ? TEXT("ok") : TEXT("FAILED"));
 }
 
+namespace
+{
+	/** JSON has no NaN or infinity: a value gone bad somewhere in the ship (the serializer writes nan, inf) must not
+	 *  cost the crew the whole message. Outside strings, those tokens become null. */
+	FString NoNaN(const FString& In)
+	{
+		FString Out;
+		Out.Reserve(In.Len());
+		bool bInString = false;
+		for (int32 i = 0; i < In.Len(); ++i)
+		{
+			const TCHAR C = In[i];
+			if (bInString)
+			{
+				Out.AppendChar(C);
+				if (C == TEXT('\\') && i + 1 < In.Len())
+				{
+					Out.AppendChar(In[++i]);
+				}
+				else if (C == TEXT('"'))
+				{
+					bInString = false;
+				}
+				continue;
+			}
+			if (C == TEXT('"'))
+			{
+				bInString = true;
+				Out.AppendChar(C);
+				continue;
+			}
+			bool bBad = false;
+			for (const TCHAR* Token : {TEXT("-nan"), TEXT("nan"), TEXT("-inf"), TEXT("inf")})
+			{
+				const int32 N = FCString::Strlen(Token);
+				if (FCString::Strncmp(*In + i, Token, N) == 0)
+				{
+					Out += TEXT("null");
+					i += N - 1;
+					bBad = true;
+					break;
+				}
+			}
+			if (!bBad)
+			{
+				Out.AppendChar(C);
+			}
+		}
+		return Out;
+	}
+}
+
 void UAstraMindSubsystem::Send(const TSharedRef<FJsonObject>& Msg)
 {
 	if (!IsConnected())
@@ -165,7 +217,7 @@ void UAstraMindSubsystem::Send(const TSharedRef<FJsonObject>& Msg)
 	FString Out;
 	TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
 	FJsonSerializer::Serialize(Msg, W);
-	Socket->Send(Out);
+	Socket->Send(NoNaN(Out));
 }
 
 void UAstraMindSubsystem::SayText(const FString& Text)

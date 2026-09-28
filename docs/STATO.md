@@ -188,6 +188,14 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
   - cielo per tipo (atmosfera, nebbia, nuvole volumetriche) e un sole con ora e direzione proprie per ogni mondo;
   - campo d'atterraggio con piazzola, hangar e torre col faro (spento sui mondi morti).
 - [x] Il Falcon scende su qualunque mondo (**G** col muso sul pianeta). Esce a 17 km dal campo, a 8,5 km di quota. Equipaggio ed eventi usano i nomi veri («Eagle has landed on Cassia Prime, near the landing field on Cassia Prime»); dopo uno schianto il soccorso arriva con un Wasp.
+- [x] **Chi risponde dal campo** (`mind/astra_mind/port.py`, `FieldControl`): ogni mondo ha il suo controllore, con nome, voce e modi decisi dal nome del mondo (stesso mondo, stessa voce) e un atteggiamento che dipende da chi lo tiene nella mappa della guerra (se il mondo cambia padrone, cambia anche la voce):
+  - un avamposto ASTRA è contento di vedere la Marina;
+  - un porto delle Gilde è cortese e chiede la tassa d'ormeggio. Su Sabel, Controller Ines Brandt: «Atterraggio autorizzato… Tassa di ormeggio: duecento crediti Guild, pagabili al banco»;
+  - un campo del Mandato sfida Eagle. Su Pyre, Warden Luca Lindgren: «Avete violato lo spazio aereo del Mandato… Le batterie di terra vi tengono sotto tiro», e poi «Se toccate il suolo, siete in arresto»;
+  - un insediamento fuori mappa è diffidente;
+  - un mondo silenzioso non risponde. Su Hollow, dalle comunicazioni: «nessuna risposta dal campo di Hollow su nessun canale: solo statico».
+  Il Capitano lo chiama per nome («Pyre Ground Control, qui Eagle…», «torre», «campo»); la storia ricorda le discese sui mondi nemici o muti. Nello snapshot c'è ora `surface` (mondo, tipo, campo, se il Capitano è laggiù).
+- [x] Robustezza: un NaN nello snapshot (gli scudi di un relitto, 0 su 0) rendeva il JSON invalido e la mente perdeva la nave. Ora le percentuali sono protette, il gioco converte qualunque nan/inf in null fuori dalle stringhe, e la mente scarta un messaggio guasto senza chiudere la connessione.
 - Tecnica:
   - `FAstraWorldGen` (`Source/ASTRA/AstraWorldGen.*`): rumore di valore fbm/ridged con domain warp, crateri in una griglia di ricerca, coni; il sito è il punto più piano e asciutto entro 3,5 km (sulla calotta, non sul mare ghiacciato). I dettagli fini restano solo nel nucleo, così il terreno lontano non fa aliasing.
   - `AAstraWorldSurface` (`AstraWorldSurface.*`): ProceduralMeshComponent con tangenti e componenti statici. Le ombre del nucleo le proietta un **proxy invisibile a 48 m** (un quarto dei triangoli, stesso aspetto).
@@ -221,7 +229,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
 2. Altri ponti: mensa (l'equipaggio fuori servizio), armeria; ufficiali che vengono a parlare col Capitano in cabina; volti veri per l'equipaggio (MetaHuman); esterno della plancia (scatola e corridoi ancora grezzi da fuori).
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
-4. Mondi generati oltre: controllori di campo con voce propria sugli altri mondi (come Port Aurelius Control), avamposti diversi per fazione, città sui mondi popolosi; preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.
+4. Mondi generati oltre: avamposti diversi per fazione (batterie di terra del Mandato che sparano davvero, guarnigioni), città sui mondi popolosi (Asphodel, Nemet, Concord); preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
 
 ## Come provarlo (per l'utente)

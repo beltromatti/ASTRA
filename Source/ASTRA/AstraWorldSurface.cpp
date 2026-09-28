@@ -165,10 +165,11 @@ AAstraWorldSurface::AAstraWorldSurface()
 	Beacon->SetIntensityUnits(ELightUnits::Lumens);
 }
 
-void AAstraWorldSurface::Build(const FString& InWorldName, const FString& InPlanetType)
+void AAstraWorldSurface::Build(const FString& InWorldName, const FString& InPlanetType, const FString& InOwner)
 {
 	WorldName = InWorldName;
 	PlanetType = InPlanetType;
+	Owner = InOwner;
 	const double T0 = FPlatformTime::Seconds();
 	Gen = MakeUnique<FAstraWorldGen>(WorldName, FAstraWorldGen::KindFromPlanetType(PlanetType));
 	BuildGround();
@@ -550,7 +551,7 @@ void AAstraWorldSurface::BuildOutpost()
 		Outpost.Add(C);
 	}
 	Beacon->SetRelativeLocation(Site + FVector(8000, 8000, 3600));
-	Beacon->SetIntensity(Gen->Kind == EAstraWorldKind::Barren ? 0.f : 60000.f);   // a dead post shows no light
+	Beacon->SetIntensity(Owner == TEXT("silent") ? 0.f : 60000.f);   // a world gone silent shows no light
 	Beacon->SetAttenuationRadius(6000.f);
 	Beacon->SetLightColor(FLinearColor(1.f, 0.3f, 0.2f));
 }
@@ -588,6 +589,6 @@ float AAstraWorldSurface::SeaWorldZ() const
 
 FString AAstraWorldSurface::SiteName() const
 {
-	return Gen && Gen->Kind == EAstraWorldKind::Barren ? FString::Printf(TEXT("the dark landing field on %s"), *WorldName)
-	                                                    : FString::Printf(TEXT("the landing field on %s"), *WorldName);
+	return Owner == TEXT("silent") ? FString::Printf(TEXT("the dark landing field on %s"), *WorldName)
+	                               : FString::Printf(TEXT("the landing field on %s"), *WorldName);
 }

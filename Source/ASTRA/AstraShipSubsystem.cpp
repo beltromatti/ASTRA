@@ -1176,6 +1176,17 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	TSharedRef<FJsonObject> S = MakeShared<FJsonObject>();
 	S->SetStringField(TEXT("ship"), TEXT("ASN Aquila"));
 	S->SetStringField(TEXT("location"), LocationName);
+	if (HasSurface())
+	{
+		// the world below, which a Falcon can fly down to (its field speaks on the radio when Eagle comes down)
+		const FAstraSystemLook* L = CurrentLook();
+		TSharedRef<FJsonObject> W = MakeShared<FJsonObject>();
+		W->SetStringField(TEXT("world"), SurfaceWorldName());
+		W->SetStringField(TEXT("kind"), IsHomeWorld() ? FString(TEXT("ocean")) : (L ? L->PlanetType : FString()));
+		W->SetStringField(TEXT("field"), SurfaceSiteName());
+		W->SetBoolField(TEXT("captain_here"), bPlanetside);
+		S->SetObjectField(TEXT("surface"), W);
+	}
 	S->SetStringField(TEXT("alert"), AlertName(Alert));
 	S->SetNumberField(TEXT("heading_deg"), FMath::RoundToInt(HeadingDeg));
 	S->SetNumberField(TEXT("mark_deg"), FMath::RoundToInt(MarkDeg));
@@ -1584,7 +1595,8 @@ AAstraWorldSurface* UAstraShipSubsystem::WorldBelow()
 		GeneratedWorld = GetWorld()->SpawnActor<AAstraWorldSurface>(PlanetZone(), FRotator::ZeroRotator, P);
 		if (GeneratedWorld)
 		{
-			GeneratedWorld->Build(L->PlanetName, L->PlanetType);
+			const FAstraSectorSystem* Sec = FindSector(SystemName);
+			GeneratedWorld->Build(L->PlanetName, L->PlanetType, Sec ? Sec->Owner : FString());
 			GeneratedWorld->Show(false);
 		}
 	}
@@ -1602,9 +1614,9 @@ FVector UAstraShipSubsystem::SurfaceSite() const
 
 FString UAstraShipSubsystem::SurfaceSiteName() const
 {
-	if (!IsHomeWorld() && GeneratedWorld)
+	if (!IsHomeWorld())
 	{
-		return GeneratedWorld->SiteName();
+		return GeneratedWorld ? GeneratedWorld->SiteName() : FString::Printf(TEXT("the landing field on %s"), *SurfaceWorldName());
 	}
 	return TEXT("Port Aurelius Field");
 }

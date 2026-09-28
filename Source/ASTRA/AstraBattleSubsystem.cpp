@@ -66,6 +66,11 @@ namespace
 	bool GGateJump = false;
 	FAutoConsoleCommand CmdBattleGateJump(TEXT("astra.battle.gatejump"), TEXT("Testing: put the Aquila 30 km in front of the Janus Gate, bow on"),
 		FConsoleCommandDelegate::CreateLambda([]() { GGateJump = true; }));
+	/** A percentage for the snapshot: a derelict has no shields at all (0 of 0), and JSON has no NaN. */
+	double Pct(double V, double Max)
+	{
+		return Max > 0.0 ? FMath::RoundToDouble(100.0 * V / Max) : 0.0;
+	}
 	FString EtaText(double Seconds)
 	{
 		const int32 S = FMath::Max(0, FMath::RoundToInt(Seconds / 10.0) * 10);
@@ -2119,8 +2124,8 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 				                                 : S.bHoldFire ? TEXT("holding fire, as ordered")
 				                                 : S.bCold ? TEXT("running silent, waiting")
 				                                 : S.bHostile ? TEXT("attacking") : TEXT("standing by"));
-				O->SetNumberField(TEXT("hull_pct"), FMath::RoundToDouble(100.0 * S.Hull / S.HullMax));
-				O->SetNumberField(TEXT("shields_pct"), FMath::RoundToDouble(100.0 * S.Shield / S.ShieldMax));
+				O->SetNumberField(TEXT("hull_pct"), Pct(S.Hull, S.HullMax));
+				O->SetNumberField(TEXT("shields_pct"), Pct(S.Shield, S.ShieldMax));
 				O->SetNumberField(TEXT("missiles_left"), S.Missiles);
 				O->SetNumberField(TEXT("range_to_aquila_km"), FMath::RoundToDouble(FVector::Dist(S.Pos, Aquila) / 100.0) / 10.0);
 				if (const FAstraBattleShip* T = FindById(S.TargetId); T && T->bAlive && !S.bFleeing)
@@ -2151,8 +2156,8 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 					continue;
 				}
 			}
-			O->SetNumberField(TEXT("hull_pct"), FMath::RoundToDouble(100.0 * S.Hull / S.HullMax));
-			O->SetNumberField(TEXT("shields_pct"), FMath::RoundToDouble(100.0 * S.Shield / S.ShieldMax));
+			O->SetNumberField(TEXT("hull_pct"), Pct(S.Hull, S.HullMax));
+			O->SetNumberField(TEXT("shields_pct"), Pct(S.Shield, S.ShieldMax));
 			// what their sensors read of the shield: a reinforced sector is stronger, the others weaker
 			const FVector Fz = S.ShieldFacing;
 			O->SetStringField(TEXT("shields"), Fz.IsNearlyZero() ? TEXT("balanced")
@@ -2218,8 +2223,8 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 		if (!S.bCold)
 		{
 			O->SetNumberField(TEXT("speed_mps"), FMath::RoundToDouble(S.Vel.Size()));
-			O->SetNumberField(TEXT("shields_pct"), FMath::RoundToDouble(100.0 * S.Shield / S.ShieldMax));
-			O->SetNumberField(TEXT("hull_pct"), FMath::RoundToDouble(100.0 * S.Hull / S.HullMax));
+			O->SetNumberField(TEXT("shields_pct"), Pct(S.Shield, S.ShieldMax));
+			O->SetNumberField(TEXT("hull_pct"), Pct(S.Hull, S.HullMax));
 		}
 		Out.Add(MakeShared<FJsonValueObject>(O));
 	}
