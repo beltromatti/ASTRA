@@ -24,7 +24,7 @@ public class ASTRA : ModuleRules
 			"WebSockets"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });   // font measuring for the live screens
 
 		PublicIncludePaths.AddRange(new string[] {
 			"ASTRA",

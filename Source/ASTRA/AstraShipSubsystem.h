@@ -80,6 +80,22 @@ public:
 	float GetSpeedMps() const { return SpeedMps; }
 	bool AreShieldsUp() const { return bShieldsUp; }
 	FString GetShieldMode() const { return ShieldMode; }
+	// --- read access for the bridge screens
+	float GetThrottlePct() const { return ThrottlePct; }
+	float GetReactorPct() const { return ReactorPct; }
+	const TMap<FString, float>& GetPowerPct() const { return PowerPct; }
+	const TArray<FAstraDamage>& GetDamage() const { return Damage; }
+	const TArray<FString>& GetRecentEvents() const { return RecentEvents; }
+	FString GetInterceptId() const { return InterceptId; }
+	double GetInterceptRangeKm() const { return InterceptRangeKm; }
+	bool IsBroadside() const { return bBroadside; }
+	bool IsTurning() const { return bTurning; }
+	float GetTargetHeadingDeg() const { return TargetHeadingDeg; }
+	float GetTargetMarkDeg() const { return TargetMarkDeg; }
+	FString GetEmcon() const { return Emcon; }
+	FString GetPointDefense() const { return PointDefense; }
+	int32 GetNumDamageTeams() const { return NumDamageTeams; }
+	float GetPowerBudget() const { return PowerBudget; }
 	/** Effective power of a system as a fraction of nominal: the allocation, minus what damaged conduits lose (0..1.5). */
 	float PowerFactor(const FString& System) const;
 

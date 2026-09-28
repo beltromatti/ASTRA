@@ -27,6 +27,7 @@ from .agent import BridgeAgent, ShipLink
 from .audio_in import PushToTalk
 from .crew import CREW
 from .enemy import COMMANDERS, EnemyAgent
+from .router import route
 from .env import REPO_ROOT
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
@@ -257,10 +258,16 @@ class Mind:
                     self.lang = lang
                     self.lang_file.parent.mkdir(parents=True, exist_ok=True)
                     self.lang_file.write_text(lang)
-                if self.enemy.open and not addressed_to_crew(text):
-                    # the channel is open and the Captain is not talking to the bridge: Solm hears it
-                    await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {text}", lang, self._battle_state())
-                    continue
+                to_enemy = ""
+                if self.enemy.open:
+                    # a channel is open: the words meant for the enemy go over it, the orders stay on the bridge
+                    r = await route(self.llm, text, COMMANDERS.get(self.enemy.contact, {}).get("name", "the enemy commander"))
+                    log.info("channel open, routed (%s): crew=%r enemy=%r", r.how, r.crew[:60], r.enemy[:60])
+                    to_enemy = r.enemy
+                    if not r.crew:
+                        await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {to_enemy}", lang, self._battle_state())
+                        continue
+                    text = r.crew
                 t = await self.agent.handle(text, lang)
                 for name, args_, res in t.actions:
                     if name == "end_transmission":
@@ -269,6 +276,8 @@ class Mind:
                             and self.enemy.open_channel(str(args_.get("contact_id", "")).upper()):
                         await self.enemy.respond(f"[The ASTRA ship hails you. Their message: {args_.get('message', '')}]",
                                                  lang, self._battle_state())
+                if to_enemy and self.enemy.open:
+                    await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {to_enemy}", lang, self._battle_state())
                 await self._sink("json", {"type": "turn_end", "first_line_s": t.t_first_line, "total_s": round(t.t_end, 3),
                                           "cost": t.cost, "actions": [[n, a, r] for n, a, r in t.actions], "error": t.error})
                 log.info("turn %.2fs (first line %.2fs) cost $%.5f: %s", t.t_end, t.t_first_line or -1, t.cost,

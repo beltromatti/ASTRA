@@ -741,6 +741,38 @@ bool UAstraBattleSubsystem::PlayerCeaseFire(FString& OutDetail)
 	return true;
 }
 
+UAstraBattleSubsystem::FFireControl UAstraBattleSubsystem::GetFireControl() const
+{
+	FFireControl F;
+	if (Ships.Num() == 0)
+	{
+		return F;
+	}
+	const FAstraBattleShip& P = Ships[0];
+	if (const FAstraBattleShip* T = Ships.FindByPredicate([&P](const FAstraBattleShip& S) { return S.Id == P.FireTarget && S.bAlive; }))
+	{
+		if (P.RailVolleys > 0 || P.LaserShots > 0)
+		{
+			F.Target = T->ContactId;
+			F.TargetRangeKm = FVector::Dist(P.Pos, T->Pos) / Km;
+		}
+	}
+	F.RailVolleys = P.RailVolleys;
+	F.RailNext = P.RailT;
+	F.LaserShots = P.LaserShots;
+	F.Missiles = P.Missiles;
+	F.MissileCycle = P.MissileT;
+	for (const FAstraProjectile& Pr : Projectiles)
+	{
+		if (!Pr.bDead && Pr.Kind == EAstraProjKind::Missile)
+		{
+			F.OursInFlight += Pr.Owner == P.Id ? 1 : 0;
+			F.Inbound += Pr.Target == P.Id ? 1 : 0;
+		}
+	}
+	return F;
+}
+
 void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 {
 	Out.Reset();

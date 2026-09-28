@@ -187,6 +187,20 @@ public:
 	void PlayerInternalDamage(float Hull) { if (Ships.Num()) { Ships[0].Hull = FMath::Max(1.f, Ships[0].Hull - Hull); } }
 
 	float PlayerHullFraction() const { return Ships.Num() ? Ships[0].Hull / Ships[0].HullMax : 1.f; }
+	/** The Aquila's fire control at a glance (bridge screens). */
+	struct FFireControl
+	{
+		FString Target;          // contact id under fire control ("" = none)
+		int32 RailVolleys = 0;
+		float RailNext = 0.f;
+		int32 LaserShots = 0;
+		int32 Missiles = 0;
+		float MissileCycle = 0.f;
+		int32 OursInFlight = 0;
+		int32 Inbound = 0;       // missiles flying at us
+		float TargetRangeKm = 0.f;
+	};
+	FFireControl GetFireControl() const;
 	float PlayerShieldFraction() const { return Ships.Num() ? Ships[0].Shield / Ships[0].ShieldMax : 1.f; }
 	bool IsScenarioOver() const { return bScenarioOver; }
 
