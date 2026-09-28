@@ -36,7 +36,7 @@ public:
 		FString Hint;
 		FVector2D Stick = FVector2D::ZeroVector;
 		float Speed = 0.f, Throttle = 0.f, Hull = 100.f, Shield = 100.f;
-		int32 Missiles = 0;
+		int32 Missiles = 0, Decoys = 0;
 		bool bBoost = false, bFlying = false;
 		TArray<FVector2D> Hostiles;
 		TArray<float> HostileBox;
@@ -85,7 +85,10 @@ public:
 		};
 		auto Text = [&](const FVector2D& At, const FString& S, const FLinearColor& Col, bool bSmall = false)
 		{
-			FSlateDrawElement::MakeText(Out, Layer + 1, G.ToPaintGeometry(FVector2D(600.f, 40.f), FSlateLayoutTransform(At)), S,
+			// a dark halo under the glyphs keeps them legible against a sunlit hull or a planet
+			FSlateDrawElement::MakeText(Out, Layer + 1, G.ToPaintGeometry(FVector2D(900.f, 40.f), FSlateLayoutTransform(At + FVector2D(1.5f, 1.5f))), S,
+			                            bSmall ? Small : Font, ESlateDrawEffect::None, FLinearColor(0.f, 0.f, 0.f, 0.65f * Col.A));
+			FSlateDrawElement::MakeText(Out, Layer + 2, G.ToPaintGeometry(FVector2D(900.f, 40.f), FSlateLayoutTransform(At)), S,
 			                            bSmall ? Small : Font, ESlateDrawEffect::None, Col);
 		};
 		auto Bracket = [&](const FVector2D& At, float H, const FLinearColor& Col)
@@ -99,11 +102,16 @@ public:
 		};
 		if (!Data.Hint.IsEmpty())
 		{
-			Text(FVector2D(C.X - 260.f * U, Size.Y * 0.78f), Data.Hint, Ink);
+			const bool bAlarm = Data.Hint.StartsWith(TEXT("MISSILE")) || Data.Hint.StartsWith(TEXT("HULL"));
+			const bool bBlink = !bAlarm || FMath::Fmod(FPlatformTime::Seconds(), 0.8) < 0.5;
+			if (bBlink)
+			{
+				Text(FVector2D(C.X - 300.f * U, Size.Y * 0.3f), Data.Hint, bAlarm ? Warn : Ink);
+			}
 		}
 		if (!Data.bFlying)
 		{
-			return Layer + 2;
+			return Layer + 3;
 		}
 		// the reticle and the stick
 		Circle(C, 14.f * U, Ink);
@@ -170,7 +178,8 @@ public:
 		Text(RB, FString::Printf(TEXT("HULL %3.0f%%"), Data.Hull), HullCol);
 		Text(RB + FVector2D(0, 22) * U, FString::Printf(TEXT("SHLD %3.0f%%"), Data.Shield), Data.Shield < 20.f ? Warn : Ink);
 		Text(RB + FVector2D(0, 44) * U, FString::Printf(TEXT("MSL  %d"), Data.Missiles), Data.Missiles == 0 ? Dim : Ink);
-		return Layer + 2;
+		Text(RB + FVector2D(0, 66) * U, FString::Printf(TEXT("DCY  %d"), Data.Decoys), Data.Decoys == 0 ? Dim : Ink);
+		return Layer + 3;
 	}
 
 private:
@@ -313,6 +322,7 @@ void AAstraFighterPawn::SetupPlayerInputComponent(UInputComponent* IC)
 	Flag(EKeys::LeftShift, [this](bool b) { In.bBoost = b; });
 	Flag(EKeys::LeftMouseButton, [this](bool b) { In.bGuns = b; });
 	Flag(EKeys::RightMouseButton, [this](bool b) { In.bMissile = b; });
+	Flag(EKeys::C, [this](bool b) { In.bDecoy = b; });
 	Flag(EKeys::X, [this](bool b) { if (b) { In.Throttle = 0.f; } });   // X: cut the throttle
 	IC->BindKey(EKeys::F, IE_Pressed, this, &AAstraFighterPawn::Land);
 }
@@ -459,6 +469,25 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 		}
 		break;
 	}
+	if (Phase == EPhase::Flying && St.bFlying)
+	{
+		const float HS = St.HullPct + St.ShieldPct;
+		if (LastHS >= 0.f && HS < LastHS - 0.5f)
+		{
+			HitJolt = FMath::Min(1.f, HitJolt + (LastHS - HS) / 25.f + 0.3f);
+			if (USoundBase* Bang = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Impact.SW_Impact")))
+			{
+				UGameplayStatics::PlaySound2D(this, Bang, 0.35f + 0.4f * HitJolt, 1.5f);
+			}
+		}
+		LastHS = HS;
+	}
+	HitJolt = FMath::Max(0.f, HitJolt - DeltaTime * 3.f);
+	if (HitJolt > 0.f)
+	{
+		Camera->SetRelativeRotation(FRotator(LookPitch + FMath::FRandRange(-1.5f, 1.5f) * HitJolt, LookYaw + FMath::FRandRange(-1.5f, 1.5f) * HitJolt,
+		                                     FMath::FRandRange(-1.f, 1.f) * HitJolt));
+	}
 	UpdateSounds(St, DeltaTime);
 	UpdateHud(St);
 }
@@ -547,6 +576,7 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	D.Hull = St.HullPct;
 	D.Shield = St.ShieldPct;
 	D.Missiles = St.Missiles;
+	D.Decoys = St.Decoys;
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	FVector2D VP(1920.f, 1080.f);
 	if (GetWorld()->GetGameViewport())
@@ -605,7 +635,7 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	}
 	if (St.Incoming > 0)
 	{
-		D.Hint = FString::Printf(TEXT("MISSILE%s INBOUND  ·  BREAK AND BOOST"), St.Incoming > 1 ? TEXT("S") : TEXT(""));
+		D.Hint = FString::Printf(TEXT("MISSILE%s INBOUND  ·  C: DECOYS  ·  BREAK AND BOOST"), St.Incoming > 1 ? TEXT("S") : TEXT(""));
 	}
 	else if (St.bCanLand)
 	{

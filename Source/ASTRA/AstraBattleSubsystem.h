@@ -192,6 +192,7 @@ struct FAstraPilotInput
 	bool bBoost = false;
 	bool bGuns = false;
 	bool bMissile = false;                       // held: one missile at the lock per press
+	bool bDecoy = false;                         // held: one decoy salvo per press
 };
 
 /** What the Falcon's displays show (world positions in cm for the head-up display). */
@@ -201,6 +202,7 @@ struct FAstraPilotStatus
 	bool bDown = false;                          // shot down: the Captain ejected
 	float SpeedMps = 0.f, Throttle = 0.f, HullPct = 100.f, ShieldPct = 100.f;
 	int32 Missiles = 0;
+	int32 Decoys = 0;
 	FString LockName;
 	float LockProgress = 0.f;                    // 0..1 (1 = locked)
 	float LockRangeKm = 0.f;
@@ -477,6 +479,8 @@ private:
 	int32 PilotLock = -1;
 	float PilotLockT = 0.f;
 	bool bPilotMissileLatch = false;
+	bool bPilotDecoyLatch = false;
+	int32 PilotDecoys = 4;
 	bool bPilotDown = false;
 	void TickPiloted(FAstraBattleShip& S, float Dt);
 	void FirePilotGuns(FAstraBattleShip& S);

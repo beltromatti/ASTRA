@@ -72,7 +72,7 @@ namespace
 	FAutoConsoleCommand CmdBattleKill(TEXT("astra.battle.kill"), TEXT("Destroy a contact at once (testing effects): astra.battle.kill <contact id>"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num()) { GKillRequests.Add(A[0].ToUpper()); } }));
 	FAutoConsoleCommand CmdBattleSpawn(TEXT("astra.battle.spawn"),
-		TEXT("Spawn a hostile ship for testing: astra.battle.spawn <styx|lethe|acheron> <range_km> <bearing relative to the bow, deg>"),
+		TEXT("Spawn a hostile ship for testing: astra.battle.spawn <styx|lethe|acheron|harpies> <range_km> <bearing relative to the bow, deg> (harpies: a destroyer launching four strike fighters)"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A)
 		{
 			if (A.Num() >= 3) { GSpawnRequests.Add({A[0].ToLower(), FCString::Atof(*A[1]), FCString::Atof(*A[2])}); }
@@ -327,6 +327,10 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		Ships[I].Mode = EAstraShipMode::Attack;
 		Ships[I].TargetId = Ships[0].Id;
 		SpawnVisual(Ships[I]);
+		if (R.Kind == TEXT("harpies"))
+		{
+			AddEnemyWing(I, 4, 1.f);   // testing: a carrier that launches strike fighters at once
+		}
 	}
 	GSpawnRequests.Reset();
 	for (const FString& K : GKillRequests)
@@ -821,7 +825,14 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 					--Channels;
 					S.PDT = 0.5f;
 					AddBeam(S.Pos + (C.Pos - S.Pos).GetSafeNormal() * S.Radius * 0.6, C.Pos, 0.1f, FLinearColor(1.f, 0.6f, 0.3f));
-					if (FMath::FRand() < (C.CraftKind == 0 ? 0.07f : (C.CraftKind == 1 ? 0.1f : 0.14f)))
+					if (C.bPiloted)
+					{
+						if (FMath::FRand() < 0.22f)
+						{
+							ApplyHit(C, (C.Pos - S.Pos).GetSafeNormal(), 14.f, C.Pos);   // the Captain's Falcon: hurt, not erased
+						}
+					}
+					else if (FMath::FRand() < (C.CraftKind == 0 ? 0.07f : (C.CraftKind == 1 ? 0.1f : 0.14f)))
 					{
 						ApplyHit(C, (C.Pos - S.Pos).GetSafeNormal(), 1000.f, C.Pos);
 					}
@@ -2426,7 +2437,51 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 		}
 		FVector Goal = S.Pos + S.Vel;
 		const float Orbit = Time * 0.3f + S.OrbitPhase;
-		if (T && !bMandateStandDown())
+		// the Captain's Falcon near them: the two nearest Harpies break off and hunt it (a dogfight)
+		bool bDogfight = false;
+		FAstraBattleShip* Eagle = PilotedId >= 0 ? FindById(PilotedId) : nullptr;
+		if (Eagle && Eagle->bAlive && !bMandateStandDown() && FVector::Dist(Eagle->Pos, S.Pos) < 5 * OneKm)
+		{
+			int32 Closer = 0;
+			for (const FAstraBattleShip& O : Ships)
+			{
+				Closer += (O.bAlive && O.bCraft && O.Side == EAstraSide::Mandate && O.Id != S.Id &&
+				           FVector::Dist(O.Pos, Eagle->Pos) < FVector::Dist(S.Pos, Eagle->Pos)) ? 1 : 0;
+			}
+			if (Closer < 2)
+			{
+				const FVector ToE = Eagle->Pos - S.Pos;
+				const double D = ToE.Size();
+				Goal = Eagle->Pos + Eagle->Vel * 0.6 - ToE.GetSafeNormal() * 250.0;   // onto its tail
+				const float Facing = FVector::DotProduct(S.Att.GetForwardVector(), ToE / FMath::Max(1.0, D));
+				if (D < 900.0 && Facing > 0.93f && (S.GunT -= Dt) <= 0.f)
+				{
+					S.GunT = 0.25f;
+					const bool bHit = FMath::FRand() < 0.33f;
+					AddBeam(S.Pos, Eagle->Pos + (bHit ? FVector::ZeroVector : FMath::VRand() * 25.0), 0.06f, FLinearColor(1.f, 0.55f, 0.3f));
+					if (bHit)
+					{
+						ApplyHit(*Eagle, ToE.GetSafeNormal(), 7.f, Eagle->Pos);
+					}
+				}
+				else if (S.Missiles > 0 && D > 1200.0 && D < 3500.0 && Facing > 0.8f && (S.GunT -= Dt) <= 0.f)
+				{
+					S.GunT = 4.f;
+					--S.Missiles;
+					FireMissile(S, *Eagle);
+					FAstraProjectile& R = Projectiles.Last();
+					R.Damage = 40.f;
+					R.MaxSpeed = 1250.f;
+					if (R.Actor) { R.Actor->SetActorScale3D(FVector(3.f)); }
+				}
+				bDogfight = true;   // not striking the carrier while it dogfights
+			}
+		}
+		if (bDogfight)
+		{
+			// (the goal is set: on the Falcon's tail)
+		}
+		else if (T && !bMandateStandDown())
 		{
 			const FVector ToT = T->Pos - S.Pos;
 			const double D = ToT.Size();
@@ -3897,6 +3952,7 @@ bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos,
 	bPilotDown = false;
 	PilotLock = -1;
 	PilotLockT = 0.f;
+	PilotDecoys = 4;
 	Pilot = FAstraPilotInput();
 	Pilot.Throttle = 0.6f;
 	Report(TEXT("flight: the Captain is off the catapult in a Falcon of Alpha, callsign Eagle — the XO has the conn"), true);
@@ -4019,6 +4075,27 @@ void UAstraBattleSubsystem::TickPiloted(FAstraBattleShip& S, float Dt)
 		}
 	}
 	bPilotMissileLatch = Pilot.bMissile;
+	// decoys: a burst of flares and chaff; most seekers homing on the Falcon lose it
+	if (Pilot.bDecoy && !bPilotDecoyLatch && PilotDecoys > 0)
+	{
+		--PilotDecoys;
+		int32 Spoofed = 0;
+		for (FAstraProjectile& Pr : Projectiles)
+		{
+			if (!Pr.bDead && Pr.Kind == EAstraProjKind::Missile && Pr.Target == S.Id && FMath::FRand() < 0.8f)
+			{
+				Pr.Target = -1;
+				++Spoofed;
+			}
+		}
+		for (int32 k = 0; k < 6; ++k)
+		{
+			AddFlash(S.Pos - S.Att.GetForwardVector() * (8.0 + 6.0 * k) + FMath::VRand() * 6.0, 4.f, 1.6f, FLinearColor(1.f, 0.75f, 0.4f), 90.f);
+		}
+		HullSound(TEXT("SW_PD_Burst"), 0.35f, 0.1f);
+		UE_LOG(LogASTRA, Log, TEXT("[Battle] Eagle decoys: %d seekers spoofed, %d decoys left"), Spoofed, PilotDecoys);
+	}
+	bPilotDecoyLatch = Pilot.bDecoy;
 }
 
 void UAstraBattleSubsystem::FirePilotGuns(FAstraBattleShip& S)
@@ -4077,6 +4154,7 @@ void UAstraBattleSubsystem::GetPilotStatus(FAstraPilotStatus& Out) const
 	Out.HullPct = 100.f * FMath::Max(0.f, S->Hull) / S->HullMax;
 	Out.ShieldPct = 100.f * S->Shield / FMath::Max(1.f, S->ShieldMax);
 	Out.Missiles = S->Missiles;
+	Out.Decoys = PilotDecoys;
 	if (const FAstraBattleShip* T = PilotLock >= 0 ? FindById(PilotLock) : nullptr; T && T->bAlive)
 	{
 		Out.bHasLock = true;

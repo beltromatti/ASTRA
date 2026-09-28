@@ -58,6 +58,8 @@ private:
 	bool bLeft = false, bRight = false, bUp = false, bDown = false;
 	float LookYaw = 0.f, LookPitch = 0.f;      // free look (Alt held) — the head turns, not the ship
 	float TestRoll = 0.f;                      // console roll (testing)
+	float LastHS = -1.f;                       // hull + shields last frame (a drop is a hit)
+	float HitJolt = 0.f;
 	float MissilePulse = 0.f;
 	bool bFreeLook = false;
 
