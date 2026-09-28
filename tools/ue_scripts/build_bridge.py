@@ -123,6 +123,12 @@ for d in DATA["doors"]:
         lt.set_folder_path("Lighting")
         lt.tags = [unreal.Name("ASTRA.ShipLight")]
     place(f"{CK}/SM_COR_EndCap", mods[0], yc, 0.0, 180.0, label=f"Corr{tag}_EndCap", folder="Corridors")
+# the Aquila herself around the bridge: the hull frame's origin is 172 m aft and 62 m below the bridge floor
+# (BridgeOffset in AstraBattleSubsystem.h); no shadows (a 780 m hull would shade the bridge unpredictably)
+hull = place("/Game/ASTRA/Ships/SM_SHIP_ASTRA_Aquila", -172.0, 0.0, -62.0, 0.0, label="Aquila_Hull", folder="Ship")
+hc = hull.get_component_by_class(unreal.StaticMeshComponent)
+hc.set_editor_property("cast_shadow", False)
+hc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
 md = DATA["master_display"]
 place("SM_BRG_MasterDisplay", md["pos"][0], md["pos"][1], 0.0, label="MasterDisplay")
 

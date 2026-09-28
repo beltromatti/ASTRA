@@ -145,10 +145,13 @@ def astra_ship(name: str, length: float, seed: int, carrier: bool = False, beam:
         t = i / 28
         st.append((-L / 2 + t * L, section_astra(W * profile(t, wprof), Hh * profile(t, hprof)), Hh * profile(t, zprof)))
     loft(b, st, PLATE)
-    # dorsal spine (layered: narrower raised ridge over the middle two thirds)
+    # dorsal spine (layered: narrower raised ridge over the middle two thirds). On the carrier it stops just aft of
+    # the bridge, which sits on its own pedestal at the front of the spine (see docs: data/ship/aquila_bridge.json,
+    # BridgeOffset = (172, 0, 62) m in the hull frame): nothing may rise into the bridge or in front of its window.
     sp = []
+    t_end = 0.70 if carrier else 0.74
     for i in range(13):
-        t = 0.12 + 0.62 * i / 12
+        t = 0.12 + (t_end - 0.12) * i / 12
         taper = 1.0 - 0.6 * max(0.0, (t - 0.55) / 0.19)
         sp.append((-L / 2 + t * L, section_astra(W * 0.42 * taper, Hh * 0.55), Hh * 1.05))
     loft(b, sp, FRAME)
@@ -165,13 +168,24 @@ def astra_ship(name: str, length: float, seed: int, carrier: bool = False, beam:
     # command section: a low, wide brow at the front of the spine with the panoramic bridge window facing forward
     # (no tall tower: spaceships do not need a mast)
     bx = 0.22 * L
-    brow = []
-    for i in range(7):
-        t = i / 6
-        taper = 1.0 - 0.55 * t
-        brow.append((bx - L * 0.07 + t * L * 0.1, section_astra(W * 0.5 * taper, Hh * 0.38 * (1.0 - 0.4 * t)), Hh * 1.45))
-    loft(b, brow, PLATE)
-    b.box((bx + L * 0.028, 0.0, Hh * 1.45), (L * 0.006, W * 0.42, Hh * 0.22), LIGHTS)       # bridge window band
+    if carrier:
+        # the bridge's pedestal: from the hull up to just under the bridge floor (1.45 Hh), tapering forward
+        top = Hh * 1.45 - 0.6
+        brow = []
+        for i in range(7):
+            t = i / 6
+            half = (top - Hh * 0.85) / 2
+            brow.append((bx - L * 0.03 + t * L * 0.045, section_astra(W * 0.42 * (1.0 - 0.35 * t), half * (1.0 - 0.3 * t)),
+                         top - half * (1.0 - 0.3 * t)))
+        loft(b, brow, PLATE)
+    else:
+        brow = []
+        for i in range(7):
+            t = i / 6
+            taper = 1.0 - 0.55 * t
+            brow.append((bx - L * 0.07 + t * L * 0.1, section_astra(W * 0.5 * taper, Hh * 0.38 * (1.0 - 0.4 * t)), Hh * 1.45))
+        loft(b, brow, PLATE)
+        b.box((bx + L * 0.028, 0.0, Hh * 1.45), (L * 0.006, W * 0.42, Hh * 0.22), LIGHTS)   # bridge window band
     for k in range(3):   # sensor masts, short
         b.cylinder((bx - L * 0.05 + k * 5, (k - 1) * W * 0.18, Hh * 1.8), (bx - L * 0.05 + k * 5, (k - 1) * W * 0.18, Hh * (2.1 + 0.1 * k)),
                    0.3 + 0.05 * k, FRAME, segments=6)
