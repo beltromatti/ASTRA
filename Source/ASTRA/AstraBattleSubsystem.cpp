@@ -141,6 +141,24 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			SpawnVisual(S);
 		}
 	}
+	// Janus Gate Aurelia: 110 km out on bearing 070 (where the Mandate comes from), its ring facing us
+	if (UStaticMesh* GateMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Space/SM_JANUS_Gate.SM_JANUS_Gate")))
+	{
+		FAstraWreck G;
+		G.Pos = Ships[0].Pos + Polar(110 * Km, 70, 3);
+		G.Att = FRotationMatrix::MakeFromX((Ships[0].Pos - G.Pos).GetSafeNormal()).ToQuat() * FQuat(FVector::XAxisVector, 0.3f);
+		G.SpinDeg = 0.f;
+		FActorSpawnParameters GP;
+		GP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		G.Actor = InWorld.SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, GP);
+		G.Actor->SetMobility(EComponentMobility::Movable);
+		UStaticMeshComponent* GC = G.Actor->GetStaticMeshComponent();
+		GC->SetStaticMesh(GateMesh);
+		GC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		GC->SetCastShadow(false);
+		GC->bAffectDistanceFieldLighting = false;
+		Landmarks.Add(G);
+	}
 	SyncVisuals();
 	UE_LOG(LogASTRA, Log, TEXT("[Battle] scenario 'Aurelia patrol' ready: %d ships"), Ships.Num());
 }
@@ -2358,6 +2376,13 @@ void UAstraBattleSubsystem::Explode(FAstraBattleShip& S)
 
 void UAstraBattleSubsystem::TickWrecks(float Dt)
 {
+	for (FAstraWreck& L : Landmarks)
+	{
+		if (L.Actor)
+		{
+			L.Actor->SetActorLocationAndRotation(ToWorld(L.Pos), ToWorldRot(L.Att));
+		}
+	}
 	for (int32 i = Wrecks.Num() - 1; i >= 0; --i)
 	{
 		FAstraWreck& W = Wrecks[i];

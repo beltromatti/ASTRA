@@ -287,6 +287,7 @@ private:
 	UPROPERTY() TArray<FAstraFlash> Flashes;
 	UPROPERTY() TArray<FAstraSquadron> Squadrons;
 	UPROPERTY() TArray<FAstraWreck> Wrecks;
+	UPROPERTY() TArray<FAstraWreck> Landmarks;   // the Janus Gate and other fixed structures of the system (Life -1)
 	UPROPERTY() TObjectPtr<UStaticMesh> RingMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> BlastMat;
 	UPROPERTY() TObjectPtr<UStaticMesh> CubeMesh;

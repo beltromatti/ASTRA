@@ -226,7 +226,7 @@ sun.set_folder_path("Lighting")
 sun.set_editor_property("tags", ["ASTRA.Sun"])
 
 sky = eas.spawn_actor_from_object(eal.load_asset("/Engine/EngineSky/SM_SkySphere") or eal.load_asset("/Engine/BasicShapes/Sphere"), V(0, 0, 0), R())
-sky.set_actor_scale3d(V(400, 400, 400))
+sky.set_actor_scale3d(V(12000, 12000, 12000))   # ~490 km: the sphere is opaque, anything beyond it would be hidden
 smc = sky.get_component_by_class(unreal.StaticMeshComponent)
 smc.set_material(0, eal.load_asset("/Game/ASTRA/Space/M_ASTRA_SpaceSky"))
 smc.set_editor_property("cast_shadow", False)
