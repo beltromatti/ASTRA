@@ -71,6 +71,12 @@ def setup_space(sky_yaw_deg: float = 0.0, sky_pitch_deg: float = 0.0) -> str:
     if sun:
         f = sun.get_actor_forward_vector()
         mel.set_material_instance_vector_parameter_value(mi, "SunDirection", unreal.LinearColor(-f.x, -f.y, -f.z, 0.0))
+    # New Ravenna: ahead, to port and a little low at the start (given in world space, stored in the sky frame)
+    w = (0.8, -0.5, -0.1)
+    nw = math.sqrt(sum(c * c for c in w))
+    w = tuple(c / nw for c in w)
+    ps = tuple(sum(w[k] * axis[k] for k in range(3)) for axis in (ax, ay, az))
+    mel.set_material_instance_vector_parameter_value(mi, "PlanetDirection", unreal.LinearColor(ps[0], ps[1], ps[2], 0.0))
     mel.update_material_instance(mi)
     save(mi)
     for a in eas.get_all_level_actors():
