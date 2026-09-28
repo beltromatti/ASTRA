@@ -98,6 +98,8 @@ WAR_NEWS = _fn("war_news", "Something happens elsewhere in the March, and the fl
     "owner": {"type": "string", "enum": list(OWNERS), "description": "who holds it now, if that changed"},
     "threat": {"type": "integer", "minimum": 0, "maximum": 3, "description": "0 quiet, 1 raids, 2 under attack, 3 front line"}},
     ["text", "system"])
+NARRATE = _fn("narrate", "Game master mode only: the director answers the player out of character, one short line.", {
+    "text": {"type": "string", "description": "in the player's language, one sentence"}}, ["text"])
 TRANSMIT = _fn("transmit", "Vice Admiral Rourke speaks to the Aquila over the fleet net.", {
     "text": {"type": "string", "description": "what he says, in the Captain's language, names in English; 1-3 sentences"}},
     ["text"])
@@ -321,7 +323,22 @@ class Director:
         finally:
             self.busy = False
 
-    async def _next_beat(self, lang: str, state: dict[str, Any]) -> None:
+    async def gm_request(self, text: str, lang: str, state: dict[str, Any]) -> None:
+        """The player speaks to the director directly (game master mode): what they would like to happen next."""
+        if self.busy:
+            await self.say("director", {"it": "Un momento: la storia sta già decidendo la prossima mossa."}.get(
+                lang, "One moment: the story is already deciding its next move."), lang, "calm")
+            return
+        self.busy = True
+        try:
+            self.note(f"(the player asked the director: {text})")
+            await self._next_beat(lang, state, request=text)
+        except Exception:  # noqa: BLE001
+            log.exception("game master request failed")
+        finally:
+            self.busy = False
+
+    async def _next_beat(self, lang: str, state: dict[str, Any], request: str = "") -> None:
         t0 = time.perf_counter()
         prompt = DIRECTOR_PROMPT.format(world=WORLD, lang_name=LANG_NAMES.get(lang, lang), war=self.war.brief(),
                                         arc=self.arc, arc_text=self.arc_text(),
@@ -333,6 +350,8 @@ class Director:
         speech: list[str] = []
         news: list[dict[str, Any]] = []
 
+        narration: list[str] = []
+
         async def on_call(call: ToolCall) -> None:
             a = call.arguments() or {}
             if call.name == "start_beat" and not beat:
@@ -341,11 +360,24 @@ class Director:
                 speech.append(a["text"].strip())
             elif call.name == "war_news" and a.get("text") and not news:
                 news.append(a)
+            elif call.name == "narrate" and (a.get("text") or "").strip() and not narration:
+                narration.append(a["text"].strip())
 
+        ask = "Decide the next beat now."
+        tools = [BEAT_TOOL, WAR_NEWS, TRANSMIT]
+        if request:
+            # game master mode: the player's wish, made to fit the world
+            ask = (f"The player — the Captain, speaking to you, the director, out of character — asks: \"{request}\". Make "
+                   "the next beat answer it if it can happen in this world now (choose the beat type and details that "
+                   "realise it; adapt it to what is possible here and to the story); if it cannot, give the closest "
+                   "thing that fits and keeps the story coherent. FIRST call `narrate` once: one short line to the player, "
+                   f"in {LANG_NAMES.get(lang, lang)}, as a game master would (what you are setting up, without spoiling "
+                   "surprises); then the beat.")
+            tools = tools + [NARRATE]
         comp = await self.llm.chat(model=MODEL, messages=[{"role": "system", "content": prompt},
-                                                          {"role": "user", "content": "Decide the next beat now."}],
-                                   tools=[BEAT_TOOL, WAR_NEWS, TRANSMIT], tool_choice="auto", providers=PROVIDERS,
-                                   reasoning={"enabled": False}, max_tokens=900, temperature=0.8, on_tool_call=on_call,
+                                                          {"role": "user", "content": ask}],
+                                   tools=tools, tool_choice="auto", providers=PROVIDERS,
+                                   reasoning={"enabled": False}, max_tokens=1300 if request else 900, temperature=0.8, on_tool_call=on_call,
                                    allow_fallbacks=True)
         for n in news:   # the war elsewhere moves first: the beat may follow from it
             changed = self.war.update(n.get("system", ""), n.get("owner"), n.get("threat"), n["text"])
@@ -353,6 +385,9 @@ class Director:
             self.note(f"war news: {n['text']} ({changed})")
             if self.announce:
                 await self.announce(n["text"])
+        for line in narration[:1]:
+            if len(line) > 12 and line[-1] in ".!?…»\"'":         # never a line cut short
+                await self.say("director", line, lang, "calm")
         if comp.error or not beat:
             log.error("director produced no beat: %s %r", comp.error, comp.content[:200])
             return

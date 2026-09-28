@@ -91,6 +91,11 @@ from .visits import VisitPlanner  # noqa: E402
 from .loss import Aftermath  # noqa: E402
 from .finale import Finale  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
+EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
+
+# the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
+import re as _re  # noqa: E402
+_GM_ADDRESS = _re.compile(r"^\W*(regista|director|narrat\w*|game ?master|gm|réalisateur|directeur|director de juego|spielleiter|erzähler)\b[\s,:;.!-]*", _re.I)
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
 import re as _re
@@ -530,6 +535,12 @@ class Mind:
                     self.lang = lang
                     self.lang_file.parent.mkdir(parents=True, exist_ok=True)
                     self.lang_file.write_text(lang)
+                gm = _GM_ADDRESS.match(text)
+                if gm and len(text) > gm.end() + 3 and not self.aftermath.active:
+                    # game master mode: the wish goes to the director, who makes it fit the world
+                    log.info("game master request: %s", text)
+                    asyncio.create_task(self.director.gm_request(text[gm.end():].strip(), lang, self._battle_state()))
+                    continue
                 if self.aftermath.wants():
                     # before the Board of Inquiry, or a Mandate officer: the Captain answers them, not the crew
                     await self.aftermath.captain_says(text)
