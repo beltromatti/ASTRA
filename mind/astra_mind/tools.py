@@ -63,6 +63,8 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "salvo": {"type": "integer", "minimum": 1, "maximum": 12}}, ["weapon", "contact_id", "salvo"]),
     _fn("cease_fire", "Tactical: stop all our offensive fire at once (queued volleys cancelled; point defense stays on).",
         {}, []),
+    _fn("launch_decoys", "Tactical: flares and chaff off her flanks for 18 s: about half the missiles on their terminal run at "
+                         "the Aquila lose her. Two of eight aboard each launch; best just before a salvo arrives.", {}, []),
     _fn("set_point_defense", "Tactical: point-defence mode.", {
         "mode": {"type": "string", "enum": ["auto", "hold", "free"]}}, ["mode"]),
     _fn("launch_squadron", "Flight Control: launch a flight group (alpha = 8 Falcon fighters, bravo = 7 Hammer torpedo "
@@ -122,7 +124,7 @@ SHIP_TOOLS: list[dict[str, Any]] = [
 
 DEPARTMENTS = ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"]
 # what a standing order lets each department do by itself when an event calls for it
-DEPT_TOOLS = {"tactical": {"set_target", "fire_weapons", "cease_fire", "set_shields", "set_point_defense"},
+DEPT_TOOLS = {"tactical": {"set_target", "fire_weapons", "cease_fire", "set_shields", "set_point_defense", "launch_decoys"},
               "helm": {"set_course", "intercept", "set_throttle"},
               "ops": {"route_power", "dispatch_damage_control"},
               "engineering": {"set_radiators", "vent_heat", "route_power"},

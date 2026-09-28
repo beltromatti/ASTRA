@@ -1933,6 +1933,10 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		Event(FString::Printf(TEXT("engineering: coolant vented, heat down to %.0f %%"), HeatPct), false);
 		return true;
 	}
+	if (Name == TEXT("launch_decoys"))
+	{
+		return Battle ? Battle->LaunchDecoys(OutDetail) : false;
+	}
 	if (Name == TEXT("active_scan"))
 	{
 		return Battle ? Battle->PlayerScan(Str(TEXT("contact_id")), OutDetail) : false;
@@ -1995,6 +1999,12 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		for (const auto& KV : Weapons) { W->SetStringField(KV.Key, KV.Value); }
 	}
 	W->SetStringField(TEXT("point_defense"), PointDefense);
+	if (FireControl)
+	{
+		W->SetStringField(TEXT("decoys"), FireControl->DecoyT > 0.f
+			? FString::Printf(TEXT("out now (%.0f s left), %d aboard"), FireControl->DecoyT, FireControl->PlayerDecoys)
+			: FString::Printf(TEXT("%d aboard (two a launch)"), FireControl->PlayerDecoys));
+	}
 	S->SetObjectField(TEXT("weapons"), W);
 	S->SetStringField(TEXT("target"), TargetId);
 	S->SetStringField(TEXT("emcon"), Emcon);

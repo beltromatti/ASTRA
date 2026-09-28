@@ -257,6 +257,7 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
   - Sul tavolo olografico un contatto senza distanza sta sul bordo, lungo il suo rilevamento («BEARING ONLY  NO RANGE»).
   - L'apertura della campagna resta scritta com'è.
   - Prova reale: tre navi entrano al buio a 45 km; le scorte le tracciano a 34-35 km, arrivano le classificazioni e l'equipaggio ragiona («due contatti ostili in avvicinamento: tengo gli scudi bilanciati e la difesa di punto in automatico»).
+- [x] **Esche** (`launch_decoys`): razzi e chaff dai fianchi dell'Aquila per 18 s; circa metà dei missili nella corsa finale verso di lei perde il bersaglio e vola alla cieca. A bordo ce ne sono 8, se ne usano due per lancio, e il rifornimento le ricarica. Il Tattico le usa d'iniziativa come la difesa di punto. Prova reale: due missili dalla Persephone → «ho lanciato decoy e il point defence li sta ingaggiando», e il rapporto «the decoys drew off 1 missile».
 - Prove: `astra.heat <percento>`; `astra.cmd set_radiators {'state':'extended'}`, `astra.cmd vent_heat {}`
 
 ## Equipaggio in movimento

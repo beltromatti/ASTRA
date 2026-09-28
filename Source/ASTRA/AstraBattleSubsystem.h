@@ -139,6 +139,7 @@ struct FAstraProjectile
 	float MaxSpeed = 1600.f;             // guided weapons: missiles 1600 m/s, torpedoes 900 m/s
 	bool bTorpedo = false;
 	bool bDead = false;
+	bool bDecoyChecked = false;          // a missile coming at the Aquila meets her decoys once, on its terminal run
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Trail = nullptr;   // guided weapons: the exhaust streak behind
 };
@@ -365,6 +366,13 @@ public:
 	void AquilaBlasts(const FVector& HullCentreW, const FVector& HullExtentW);
 	/** After the loss, when the story moves on (hours, days): the fight stops where it was, no more reports. */
 	void Freeze() { bFrozen = true; }
+	/** The Aquila's decoys (two flares and chaff canisters a launch, eight aboard): for 18 s each missile on its
+	 *  terminal run at her may be drawn off. */
+	bool LaunchDecoys(FString& OutDetail);
+	int32 PlayerDecoys = 8;
+	float DecoyT = 0.f;
+	int32 DecoysSeduced = 0;
+	float LastDecoyReport = -100.f;
 	/** The warships still in the system on one side ("ASN Praetorian (battleship), ..."), the Aquila left out. */
 	FString ForcesLine(bool bAstra) const;
 	void AquilaBreach(const FVector& ReactorW);

@@ -248,7 +248,7 @@ class BridgeAgent:
 
 EVENT_ASK = ("The Captain should hear this: the responsible officer reports it now, in one short line with speak (in the "
              "Captain's language). Within their own authority an officer may also act at once (Operations: damage-control "
-             "teams; Tactical: shield facing and point defense; Engineering: the radiators): to act, CALL the tool in this "
+             "teams; Tactical: shield facing, point defense and decoys against incoming missiles; Engineering: the radiators): to act, CALL the tool in this "
              "same turn, then say what was done — saying it without the tool call does nothing and misleads the Captain. "
              "Anything else (course, weapons, alert, power, venting coolant) waits for the Captain's order — propose it "
              "instead — unless a standing order in force covers it. Call no tool only if this merely repeats what was "
@@ -256,7 +256,7 @@ EVENT_ASK = ("The Captain should hear this: the responsible officer reports it n
 STANDING_ASK = (" Standing orders in force (see them in the rules) are the Captain's orders given in advance: when this "
                 "event is what one is about, that officer carries it out now, fully (weapons free means firing: fire_weapons, "
                 "not just a target), with the tool calls in this same turn, and says what was done.")
-INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators"}
+INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 INITIATIVE_TOOLS = [t for t in SHIP_TOOLS if t["function"]["name"] in INITIATIVE]
 
 
@@ -309,7 +309,7 @@ def _owner(tool: str) -> str:
     return {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "transit_gate": "helm", "set_alert": "xo", "set_shields": "tactical",
             "route_power": "ops", "set_target": "tactical", "fire_weapons": "tactical", "set_point_defense": "tactical",
             "launch_squadron": "flight", "recall_squadron": "flight", "dispatch_damage_control": "ops", "hail": "comms",
-            "set_emcon": "sensors", "active_scan": "sensors", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
+            "set_emcon": "sensors", "active_scan": "sensors", "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
             "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
             "dismiss_visitor": "captain", "abandon_ship": "xo"}.get(tool, "xo")
 

@@ -456,6 +456,13 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	}
 	TickProjectiles(Dt);
 	TickFlashes(Dt);
+	DecoyT = FMath::Max(0.f, DecoyT - Dt);
+	if (DecoysSeduced > 0 && Time - LastDecoyReport > 6.f)
+	{
+		Report(FString::Printf(TEXT("tactical: the decoys drew off %d missile%s"), DecoysSeduced, DecoysSeduced > 1 ? TEXT("s") : TEXT("")));
+		DecoysSeduced = 0;
+		LastDecoyReport = Time;
+	}
 	SyncVisuals();
 }
 
@@ -771,6 +778,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		{
 			RepairUntil = -1.f;
 			P.Missiles += RepairMissiles;
+			PlayerDecoys = 8;                              // the decoy magazines refilled with the missiles
 			Report(FString::Printf(TEXT("engineering: repairs and resupply complete — hull at %.0f%%, %d missiles in the VLS"), 100.f * P.Hull / P.HullMax, P.Missiles));
 			if (!bEngagementActive)
 			{
@@ -2093,6 +2101,18 @@ void UAstraBattleSubsystem::TickProjectiles(float Dt)
 		}
 		Pr.Life -= Dt;
 		FAstraBattleShip* T = FindById(Pr.Target);
+		if (Pr.Kind == EAstraProjKind::Missile && T && T->bPlayer && DecoyT > 0.f && !Pr.bDecoyChecked
+		    && FVector::Dist(Pr.Pos, T->Pos) < 7.f * OneKm)
+		{
+			// the terminal run through the Aquila's decoys: about half the seekers take the bait and fly on blind
+			Pr.bDecoyChecked = true;
+			if (FMath::FRand() < 0.5f)
+			{
+				Pr.Target = -1;
+				T = nullptr;
+				++DecoysSeduced;
+			}
+		}
 		if (Pr.Kind == EAstraProjKind::Missile && T && T->bAlive)
 		{
 			// guided: accelerate towards an intercept point
@@ -2134,6 +2154,39 @@ void UAstraBattleSubsystem::TickProjectiles(float Dt)
 			Projectiles.RemoveAtSwap(i);
 		}
 	}
+}
+
+bool UAstraBattleSubsystem::LaunchDecoys(FString& OutDetail)
+{
+	if (Ships.Num() == 0 || !Ships[0].bAlive)
+	{
+		OutDetail = TEXT("no ship to launch from");
+		return false;
+	}
+	if (DecoyT > 0.f)
+	{
+		OutDetail = FString::Printf(TEXT("decoys already out: %.0f s left"), DecoyT);
+		return true;
+	}
+	if (PlayerDecoys <= 0)
+	{
+		OutDetail = TEXT("no decoys left aboard (a resupply brings more)");
+		return false;
+	}
+	PlayerDecoys = FMath::Max(0, PlayerDecoys - 2);
+	DecoyT = 18.f;
+	// the flares and the chaff blooms drifting off her flanks: bright, then fading
+	const FAstraBattleShip& P = Ships[0];
+	for (int32 i = 0; i < 10; ++i)
+	{
+		const FVector Out = (P.Att.GetRightVector() * (i % 2 ? 1.f : -1.f) + FMath::VRand() * 0.6f).GetSafeNormal();
+		AddFlash(P.Pos + Out * P.Radius * 1.1f, FMath::FRandRange(6.f, 14.f), 18.f, FLinearColor(1.f, 0.8f, 0.55f), 400.f);
+		Flashes.Last().Vel = P.Vel + Out * FMath::FRandRange(25.f, 60.f);
+		Flashes.Last().Age = -FMath::FRandRange(0.f, 1.2f);
+	}
+	HullSound(TEXT("SW_PD_Burst"), 0.5f, 0.2f);
+	OutDetail = FString::Printf(TEXT("decoys away: flares and chaff for 18 s, %d left aboard"), PlayerDecoys);
+	return true;
 }
 
 void UAstraBattleSubsystem::AddFlash(const FVector& Pos, float Size, float Life, const FLinearColor& Color, float Intensity)
