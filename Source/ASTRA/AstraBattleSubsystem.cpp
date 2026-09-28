@@ -741,6 +741,74 @@ bool UAstraBattleSubsystem::PlayerCeaseFire(FString& OutDetail)
 	return true;
 }
 
+void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
+{
+	Out.Reset();
+	if (Ships.Num() == 0)
+	{
+		return;
+	}
+	const FAstraBattleShip& P = Ships[0];
+	const FVector Origin = ToWorld(P.Pos);
+	auto Dir = [this](const FVector& Pos, const FVector& Vel)
+	{
+		return Vel.IsNearlyZero() ? FVector::ZeroVector : (ToWorld(Pos + Vel) - ToWorld(Pos)).GetSafeNormal();
+	};
+	for (const FAstraBattleShip& S : Ships)
+	{
+		if (!S.bAlive)
+		{
+			continue;
+		}
+		FAstraHoloBlip B;
+		B.Kind = 0;
+		B.Rel = ToWorld(S.Pos) - Origin;
+		B.Rot = ToWorldRot(S.Att);
+		B.VelDir = Dir(S.Pos, S.Vel);
+		B.Speed = S.Vel.Size();
+		B.Side = S.Side;
+		B.bPlayer = S.bPlayer;
+		B.bHostile = S.bHostile;
+		B.bUnknown = !S.bIdentified || S.bCold;
+		B.bRetreating = S.bFleeing;
+		B.bHoldFire = S.bHoldFire;
+		B.bTargeted = !S.bPlayer && (P.FireTarget == S.Id) && (P.RailVolleys > 0 || P.LaserShots > 0);
+		B.Size = S.Radius >= 300.f ? 1.f : (S.Radius >= 200.f ? 0.85f : (S.Radius >= 130.f ? 0.7f : 0.55f));
+		B.RangeKm = FVector::Dist(S.Pos, P.Pos) / Km;
+		B.Name = S.bIdentified ? S.Name : FString();
+		B.Contact = S.ContactId;
+		Out.Add(B);
+	}
+	for (const FAstraProjectile& Pr : Projectiles)
+	{
+		if (Pr.bDead || Pr.Kind != EAstraProjKind::Missile)
+		{
+			continue;
+		}
+		FAstraHoloBlip B;
+		B.Kind = 1;
+		B.Rel = ToWorld(Pr.Pos) - Origin;
+		B.VelDir = Dir(Pr.Pos, Pr.Vel);
+		const FAstraBattleShip* Owner = Ships.FindByPredicate([&Pr](const FAstraBattleShip& S) { return S.Id == Pr.Owner; });
+		B.Side = Owner ? Owner->Side : EAstraSide::Neutral;
+		B.bHostile = Owner && Owner->bHostile;
+		Out.Add(B);
+	}
+	for (const FAstraFlash& F : Flashes)
+	{
+		if (F.bBeam || F.Size < 60.f)
+		{
+			continue;   // only explosions and heavy hits make it to the plot
+		}
+		FAstraHoloBlip B;
+		B.Kind = 2;
+		B.Rel = ToWorld(F.Pos) - Origin;
+		B.Size = F.Size;
+		B.Fade = 1.f - F.Age / F.Life;
+		Out.Add(B);
+	}
+}
+
 TSharedRef<FJsonObject> UAstraBattleSubsystem::PlayerWeaponsJson() const
 {
 	TSharedRef<FJsonObject> W = MakeShared<FJsonObject>();

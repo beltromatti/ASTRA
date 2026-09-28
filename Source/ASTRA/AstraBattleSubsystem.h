@@ -127,6 +127,28 @@ struct FAstraFlash
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> MID = nullptr;
 };
 
+/** What the tactical plot shows of one object (the holo table draws these; positions in the Aquila's frame). */
+struct FAstraHoloBlip
+{
+	FVector Rel = FVector::ZeroVector;      // cm, bridge-world axes, relative to the Aquila's centre
+	FQuat Rot = FQuat::Identity;            // bridge-world orientation
+	FVector VelDir = FVector::ZeroVector;   // bridge-world unit vector
+	float Speed = 0.f;                      // m/s
+	int32 Kind = 0;                         // 0 ship, 1 missile, 2 blast
+	EAstraSide Side = EAstraSide::Neutral;
+	bool bPlayer = false;
+	bool bHostile = false;
+	bool bUnknown = false;
+	bool bRetreating = false;
+	bool bHoldFire = false;
+	bool bTargeted = false;                 // our fire control is on it
+	float Size = 1.f;                       // 1 capital, ~0.7 escort, ~0.55 small
+	float Fade = 1.f;
+	float RangeKm = 0.f;
+	FString Name;
+	FString Contact;
+};
+
 UCLASS()
 class ASTRA_API UAstraBattleSubsystem : public UTickableWorldSubsystem
 {
@@ -151,6 +173,8 @@ public:
 	bool PlayerCeaseFire(FString& OutDetail);
 	/** The Aquila's weapons as fire control reports them (live: assignments, volleys left, VLS cycle, ammunition). */
 	TSharedRef<FJsonObject> PlayerWeaponsJson() const;
+	/** Everything the tactical plot should draw right now. */
+	void GetHoloBlips(TArray<FAstraHoloBlip>& Out) const;
 	/** A Mandate commander's decision (from their mind): continue_attack | hold_fire | withdraw | accept_surrender.
 	 *  The senior surviving commander orders the whole strike group; any other captain only their own ship. */
 	bool EnemyOrder(const FString& Order, const FString& Reason, const FString& Commander, FString& OutDetail);

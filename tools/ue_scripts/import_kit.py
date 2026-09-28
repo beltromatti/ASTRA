@@ -7,6 +7,7 @@ import unreal
 
 SRC = globals().get("SRC", "/Users/beltromatti/Desktop/ASTRA/art/export/kit_corridor")
 DST = globals().get("DST", "/Game/ASTRA/Kit/Interior/Corridor")
+NANITE = globals().get("NANITE", True)   # off for translucent/additive props (holograms)
 
 tasks = []
 for f in sorted(os.listdir(SRC)):
@@ -33,7 +34,7 @@ for path in eal.list_assets(DST, recursive=False, include_folder=False):
         continue
     ns = asset.get_editor_property("nanite_settings")
     is_glass = "Glass" in asset.get_name()
-    ns.enabled = not is_glass  # translucent glass stays non-Nanite
+    ns.enabled = NANITE and not is_glass  # translucent glass stays non-Nanite
     asset.set_editor_property("nanite_settings", ns)
     body = asset.get_editor_property("body_setup")
     if body:

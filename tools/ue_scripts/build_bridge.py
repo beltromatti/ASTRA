@@ -45,6 +45,10 @@ place("SM_BRG_WindowGlass", 0, 0, label="Bridge_WindowGlass")
 place("SM_BRG_Railing", 0, 0, label="Bridge_Railings")
 ht = DATA["holo_table"]
 place("SM_BRG_HoloTable", ht["pos"][0], ht["pos"][1], 0.0, label="HoloTable")
+# the live tactical plot above the table (AAstraHoloTable, C++): origin on the table top, +X towards the bow
+plot = eas.spawn_actor_from_class(unreal.AstraHoloTable, V(ht["pos"][0] * M, ht["pos"][1] * M, (ht["height"] + 0.01) * M), R())
+plot.set_actor_label("HoloTable_Plot")
+plot.set_folder_path("Bridge")
 # closed doors in the back wall (the corridors beyond are another level for now)
 for d in DATA["doors"]:
     dx, dy = d["pos"]
@@ -122,10 +126,11 @@ for i, (x, y) in enumerate(((0.0, 0.0), (5.6, 0.0), (0.5, -5.8), (0.5, 5.8), (-3
 pl = eas.spawn_actor_from_class(unreal.PointLight, V(ht["pos"][0] * M, ht["pos"][1] * M, (ht["height"] + 0.35) * M), R())
 plc = pl.get_component_by_class(unreal.PointLightComponent)
 plc.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
-plc.set_editor_property("intensity", 1200.0)
+plc.set_editor_property("intensity", 350.0)      # the plot itself glows; a strong light only made a hot spot on the top
 plc.set_editor_property("light_color", unreal.Color(r=110, g=190, b=255, a=255))
 plc.set_editor_property("attenuation_radius", 450.0)
 plc.set_editor_property("cast_shadows", False)
+plc.set_editor_property("specular_scale", 0.0)   # glow on the room, no hot spot mirrored in the table top
 pl.set_actor_label("HoloTable_Glow")
 pl.set_folder_path("Lighting")
 

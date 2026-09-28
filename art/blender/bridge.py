@@ -452,8 +452,7 @@ def holo_table(name: str):
     slab(b, circle(r * 0.7), 0.0, 0.08, A.MAT_TRIM)                       # foot
     slab(b, circle(r), h - 0.12, h - 0.02, A.MAT_PANEL)                   # table rim body
     slab(b, circle(r + 0.03), h - 0.03, h + 0.02, A.MAT_TRIM)             # rim
-    b.screen(Matrix.Translation(U(0, 0, h + 0.009)) @ Matrix.Rotation(math.radians(-90), 4, "Y")
-             @ Matrix.Diagonal((0.006, -2 * (r - 0.12), -2 * (r - 0.12), 1.0)), "MI_ASTRA_ScreenHolo")   # projection surface
+    slab(b, circle(r - 0.06, 64), h - 0.02, h + 0.006, A.MAT_TRIM)       # dark projection surface (the plot draws on it)
     slab(b, circle(r * 0.56, 48), h - 0.3, h - 0.26, A.MAT_ACCENT)        # glow ring under the top
     return A.finish(b.to_object(name), bevel=0.006)
 
