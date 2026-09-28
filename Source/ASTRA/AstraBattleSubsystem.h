@@ -163,6 +163,7 @@ struct FAstraSquadron
 	int32 TargetId = -1;
 	float RearmT = 0.f;      // rearming after recovery
 	int32 LostSinceReport = 0;
+	TArray<FString> LostCrew;             // who was flying the aircraft lost since the last report
 	float LastLossReport = -100.f;
 	bool bAirborneReported = false;
 	int32 Launched = 0;      // aircraft launched in this sortie

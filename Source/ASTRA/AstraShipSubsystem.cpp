@@ -77,6 +77,8 @@ bool UAstraShipSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	Roster.Generate();
+	CasualtyRng.Initialize((int32)(FDateTime::Now().GetTicks() & 0x7fffffff));
 	PowerPct = {{TEXT("shields"), 100.f}, {TEXT("weapons"), 100.f}, {TEXT("engines"), 100.f}, {TEXT("sensors"), 100.f},
 	            {TEXT("life_support"), 100.f}, {TEXT("flight_deck"), 100.f}};
 	Weapons = {{TEXT("railguns"), TEXT("ready (4 twin turrets)")}, {TEXT("lasers"), TEXT("ready (12 batteries)")},
@@ -685,8 +687,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	}
 	S->SetArrayField(TEXT("damage"), Dmg);
 	S->SetStringField(TEXT("damage_control"), FString::Printf(TEXT("%d teams, %d free"), NumDamageTeams, NumDamageTeams - Busy));
-	S->SetStringField(TEXT("casualties"), Wounded + Killed ? FString::Printf(TEXT("%d wounded (in the medbay), %d killed"), Wounded, Killed)
-	                                                     : FString(TEXT("none")));
+	S->SetStringField(TEXT("casualties"), Roster.Summary());
 	float Sum = 0.f;
 	for (const auto& KV : PowerPct) { Sum += KV.Value; }
 	S->SetStringField(TEXT("power_budget"), FString::Printf(TEXT("%.0f%% of %.0f%% allocated (six systems at 100%% = 600%%)"), Sum, PowerBudget));
@@ -923,12 +924,10 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 		if (D.Kind == TEXT("hull breach")) { W = Roll2 < 0.4f ? FMath::RandRange(1, 3) : 0; K = Roll2 < 0.1f ? 1 : 0; }
 		else if (D.Kind == TEXT("fire")) { W = Roll2 < 0.35f ? FMath::RandRange(1, 2) : 0; }
 		else { W = Roll2 < 0.1f ? 1 : 0; }
-		Wounded += W;
-		Killed += K;
-		if (W || K)
+		const FString Names = (W || K) ? Roster.Casualties(D.Deck, W, K, CasualtyRng) : FString();
+		if (!Names.IsEmpty())
 		{
-			Where += FString::Printf(TEXT(" — casualties: %s%s%s"), W ? *FString::Printf(TEXT("%d wounded"), W) : TEXT(""), (W && K) ? TEXT(", ") : TEXT(""),
-			                         K ? *FString::Printf(TEXT("%d killed"), K) : TEXT(""));
+			Where += TEXT(" — casualties: ") + Names;
 		}
 		if (!Damage.ContainsByPredicate([&D](const FAstraDamage& X) { return X.Deck == D.Deck && X.Section == D.Section && X.Kind == D.Kind; }))
 		{

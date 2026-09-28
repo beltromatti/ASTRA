@@ -1331,8 +1331,21 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S)
 	{
 		if (Squadrons.IsValidIndex(S.Squadron))
 		{
-			--Squadrons[S.Squadron].Total;
-			++Squadrons[S.Squadron].LostSinceReport;
+			FAstraSquadron& Q = Squadrons[S.Squadron];
+			--Q.Total;
+			++Q.LostSinceReport;
+			// a manned aircraft of ours: somebody was flying it
+			if (Q.Side == EAstraSide::Astra && Q.Kind != 2)
+			{
+				if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+				{
+					const FString Who = Ship->AircrewLost();
+					if (!Who.IsEmpty())
+					{
+						Q.LostCrew.Add(Who);
+					}
+				}
+			}
 		}
 	}
 	else if (!S.bPlayer)
@@ -1921,11 +1934,13 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		if (Q.LostSinceReport > 0 && Time - Q.LastLossReport > 12.f)
 		{
 			Report(Q.Side == EAstraSide::Astra
-				? FString::Printf(TEXT("flight: %s squadron has lost %d %s%s to enemy fire, %d left"), *Q.Name, Q.LostSinceReport, *Q.CallSign,
-				                  Q.LostSinceReport > 1 ? TEXT("s") : TEXT(""), Q.Total)
+				? FString::Printf(TEXT("flight: %s squadron has lost %d %s%s to enemy fire, %d left%s"), *Q.Name, Q.LostSinceReport, *Q.CallSign,
+				                  Q.LostSinceReport > 1 ? TEXT("s") : TEXT(""), Q.Total,
+				                  Q.LostCrew.Num() ? *(TEXT(" — ") + FString::Join(Q.LostCrew, TEXT("; "))) : TEXT(""))
 				: FString::Printf(TEXT("tactical: %d Harp%s splashed, %d of the enemy strike fighters left"), Q.LostSinceReport,
 				                  Q.LostSinceReport > 1 ? TEXT("ies") : TEXT("y"), Q.Total));
 			Q.LostSinceReport = 0;
+			Q.LostCrew.Reset();
 			Q.LastLossReport = Time;
 		}
 		if (Q.TorpedoReportAt > 0.f && Time >= Q.TorpedoReportAt)

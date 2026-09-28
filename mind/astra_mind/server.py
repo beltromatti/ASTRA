@@ -279,6 +279,11 @@ class Mind:
             last_chat = time.monotonic()
             pair = random.sample(["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"], 2)
             topic = random.choice(self.QUIET_TOPICS)
+            fallen = str(st.get("casualties", "")).split("the fallen: ", 1)
+            if len(fallen) == 2 and random.random() < 0.5:   # every loss has a name: they remember them
+                who = fallen[1].split("), ")[0].rstrip(")") + ")"
+                topic = f"{who}, who was killed aboard: what they were like, something they said or did"
+                pair = ["xo", random.choice(["ops", "tactical", "flight", "engineering"])]
             self.voice.low_priority = True
             try:
                 t = await self.agent.handle_event(
@@ -419,6 +424,9 @@ class Mind:
                     self.game.events.append(text)
                     if text.startswith("director:"):
                         asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
+                    fallen = _fallen(text)
+                    if fallen:
+                        self.director.note("fallen: " + "; ".join(fallen))
                     gone = _re.search(r"\((T-\d+)[,)]", text)
                     if gone and ("destroyed" in text or "left sensor range" in text):
                         self.enemy.ship_destroyed(gone.group(1))   # nobody left on that ship to answer a hail
@@ -540,3 +548,18 @@ def main() -> None:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def _fallen(text: str) -> list[str]:
+    """Names of the crew killed in a report ("... Petty Officer Amara Diallo (weapons, from Mars) and ... killed; ...")."""
+    out: list[str] = []
+    for seg in _re.split(r"[;—]", text):
+        seg = seg.strip()
+        if not seg.endswith(" killed"):
+            continue
+        body = seg[: -len(" killed")].split("casualties: ")[-1]
+        for part in body.split(" and "):
+            name = _re.sub(r" \((?!call sign)[^)]*\)", "", part).strip()
+            if name:
+                out.append(name)
+    return out

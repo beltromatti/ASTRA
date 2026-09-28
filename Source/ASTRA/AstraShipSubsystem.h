@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Dom/JsonObject.h"
+#include "AstraCrewRoster.h"
 #include "AstraShipSubsystem.generated.h"
 
 class UMaterialInstanceDynamic;
@@ -152,6 +153,9 @@ public:
 
 	/** The battle simulation reports a hit on our hull: compartments, lights, reports. */
 	void OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir);
+	/** One of our manned aircraft was shot down: who was flying it (for the flight report). */
+	FString AircrewLost() { return Roster.AircrewLost(CasualtyRng); }
+	const FAstraCrewRoster& GetRoster() const { return Roster; }
 
 	FAstraShipEvent OnShipEvent;
 	FAstraAlertChanged OnAlertChanged;
@@ -188,7 +192,8 @@ private:
 	bool bHomeCaptured = false;
 	void CaptureHomeSky();
 	int32 NextDamageId = 1;
-	int32 Wounded = 0, Killed = 0;    // the crew's cost
+	FAstraCrewRoster Roster;          // the 560 aboard, by name: the crew's cost
+	FRandomStream CasualtyRng;
 	static constexpr int32 NumDamageTeams = 4;
 	static constexpr float PowerBudget = 700.f;   // six systems at 100% = 600; the reactor can give 100 more
 	float HullPct = 100.f;
