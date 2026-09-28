@@ -206,3 +206,56 @@ def stats(obj: bpy.types.Object) -> dict:
     dims = obj.dimensions
     return {"name": obj.name, "tris": tris, "materials": [m.name for m in me.materials],
             "size_m": [round(dims.x, 3), round(dims.y, 3), round(dims.z, 3)]}
+
+
+def subsurf(obj: bpy.types.Object, levels: int = 2, crease_edges: Iterable | None = None) -> None:
+    """Subdivision surface on a cage (smooth sculpted shapes for chairs/consoles), applied."""
+    mod = obj.modifiers.new("Subsurf", "SUBSURF")
+    mod.levels = levels
+    mod.render_levels = levels
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+def render_preview(objects: Sequence[bpy.types.Object], path: str, size: int = 900,
+                   view: tuple[float, float] = (35.0, 25.0), dist_mul: float = 1.6) -> str:
+    """Quick Workbench render framing the given objects (azimuth, elevation in degrees). For visual QA."""
+    scene = bpy.context.scene
+    mins = Vector((1e9, 1e9, 1e9))
+    maxs = Vector((-1e9, -1e9, -1e9))
+    for o in objects:
+        for c in o.bound_box:
+            w = o.matrix_world @ Vector(c)
+            mins = Vector((min(mins.x, w.x), min(mins.y, w.y), min(mins.z, w.z)))
+            maxs = Vector((max(maxs.x, w.x), max(maxs.y, w.y), max(maxs.z, w.z)))
+    center = (mins + maxs) / 2
+    radius = (maxs - mins).length / 2
+    az, el = math.radians(view[0]), math.radians(view[1])
+    direction = Vector((math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el)))
+    cam_data = bpy.data.cameras.new("PreviewCam")
+    cam_data.lens = 50
+    cam = bpy.data.objects.new("PreviewCam", cam_data)
+    scene.collection.objects.link(cam)
+    cam.location = center + direction * radius * dist_mul * 2.2
+    cam.rotation_euler = (-direction).to_track_quat("-Z", "Y").to_euler()
+    cam_data.clip_end = 10000
+    scene.camera = cam
+    scene.render.engine = "BLENDER_WORKBENCH"
+    scene.display.shading.light = "STUDIO"
+    scene.display.shading.color_type = "MATERIAL"
+    scene.display.shading.show_cavity = True
+    scene.display.shading.cavity_type = "BOTH"
+    scene.display.shading.show_shadows = True
+    scene.render.resolution_x = size
+    scene.render.resolution_y = int(size * 0.66)
+    scene.render.film_transparent = False
+    scene.render.filepath = path
+    palette = {MAT_PANEL: (0.78, 0.74, 0.66, 1), MAT_STRUCTURE: (0.08, 0.085, 0.095, 1), MAT_FLOOR: (0.2, 0.2, 0.21, 1),
+               MAT_GRATE: (0.3, 0.3, 0.32, 1), MAT_TRIM: (0.45, 0.46, 0.48, 1), MAT_LIGHT: (1, 1, 0.95, 1),
+               MAT_ACCENT: (0.1, 0.3, 1, 1), MAT_GUIDE: (0.7, 0.9, 1, 1), MAT_SCREEN: (0.05, 0.2, 0.45, 1),
+               MAT_GLASS: (0.5, 0.7, 0.8, 1), MAT_RUBBER: (0.03, 0.03, 0.03, 1)}
+    for m in bpy.data.materials:
+        m.diffuse_color = palette.get(m.name, (0.6, 0.6, 0.6, 1))
+    bpy.ops.render.render(write_still=True)
+    bpy.data.objects.remove(cam, do_unlink=True)
+    return path

@@ -1,0 +1,28 @@
+{
+  "id": "ASN_Aquila_Bridge",
+  "name": "Bridge",
+  "signage": "DECK 1 · SECTION A · BRIDGE",
+  "frame": "Unreal convention: X forward (towards the bow window), Y starboard, Z up; metres; origin = floor point under the captain's chair",
+  "levels": {"upper": 0.0, "well": -0.6, "dais": 0.2},
+  "ceiling": {"height": 4.6, "dome_center": [-4.8, 0.0], "dome_radius": 3.4, "dome_height": 5.6},
+  "window": {"center": [0.0, 0.0], "radius": 10.0, "angles_deg": [-60, -40, -20, 0, 20, 40, 60], "sill": 0.3, "head": 4.2},
+  "walls": {"back_x": -8.5, "back_half_width": 7.0},
+  "well": {"edge_x": 2.4, "half_width": 5.2, "front_radius": 9.6, "stairs_y": [-4.7, 4.7], "stair_width": 1.0},
+  "doors": [
+    {"id": "door_port", "pos": [-8.5, -3.9], "width": 1.6, "height": 2.4, "leads_to": "Corridor 1-A port"},
+    {"id": "door_starboard", "pos": [-8.5, 3.9], "width": 1.6, "height": 2.4, "leads_to": "Corridor 1-A starboard"}
+  ],
+  "master_display": {"pos": [-8.5, 0.0], "width": 5.2, "height": 2.2, "bottom": 1.2},
+  "holo_table": {"pos": [-4.8, 0.0], "radius": 1.5, "height": 0.95},
+  "stations": [
+    {"id": "captain", "role": "Captain", "pos": [0.0, 0.0], "level": "dais", "yaw": 0, "kind": "captain_chair"},
+    {"id": "xo", "role": "Executive Officer", "pos": [-0.3, -2.0], "level": "dais", "yaw": 0, "kind": "xo_chair"},
+    {"id": "helm", "role": "Helm", "pos": [5.8, -1.6], "level": "well", "yaw": 0, "kind": "console_seated"},
+    {"id": "ops", "role": "Operations", "pos": [5.8, 1.6], "level": "well", "yaw": 0, "kind": "console_seated"},
+    {"id": "tactical", "role": "Tactical", "pos": [-2.2, 0.0], "level": "upper", "yaw": 0, "kind": "tactical_rail"},
+    {"id": "comms", "role": "Communications", "pos": [0.6, -6.9], "level": "upper", "yaw": -97, "kind": "console_seated"},
+    {"id": "sensors", "role": "Science & Sensors", "pos": [-3.0, -6.6], "level": "upper", "yaw": -97, "kind": "console_seated"},
+    {"id": "engineering", "role": "Engineering", "pos": [0.6, 6.9], "level": "upper", "yaw": 97, "kind": "console_seated"},
+    {"id": "flight", "role": "Flight Control", "pos": [-3.0, 6.6], "level": "upper", "yaw": 97, "kind": "console_seated"}
+  ]
+}
