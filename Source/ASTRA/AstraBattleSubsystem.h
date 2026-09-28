@@ -91,6 +91,8 @@ struct FAstraBattleShip
 	bool bJammed = false;                // an EW drone is degrading its fire control
 	bool bNegotiated = false;            // holding fire / withdrawing under terms agreed over the channel
 	bool bLeader = false;                // leads its group (the commander on the channel)
+	bool bDerelict = false;              // a dead station or hulk to investigate: no power, tumbling slowly
+	float SpinDeg = 0.f;
 
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> ShieldBubble = nullptr;
@@ -200,6 +202,24 @@ struct FAstraHoloBlip
 };
 
 /** What is left of a destroyed ship (a burnt hulk drifting and tumbling) or a piece of debris. */
+/** A place to investigate (a silent station, a drifting hulk): what the crew learns, stage by stage, and what may be
+ *  waiting there cold. */
+USTRUCT()
+struct FAstraPOI
+{
+	GENERATED_BODY()
+
+	int32 ShipId = -1;
+	FString Name;
+	TArray<FString> Findings;   // 1: the active scan; 2: a flight group reaches it or the Aquila closes to 5 km; 3: alongside (2 km)
+	int32 Revealed = 0;
+	float NextRevealT = 0.f;
+	TArray<int32> Ambush;       // ships lying cold nearby
+	float AmbushKm = 0.f;
+	bool bAmbushSprung = false;
+	bool bDone = false;
+};
+
 USTRUCT()
 struct FAstraWreck
 {
@@ -323,6 +343,9 @@ private:
 	UPROPERTY() TArray<FAstraSquadron> Squadrons;
 	UPROPERTY() TArray<FAstraWreck> Wrecks;
 	UPROPERTY() TArray<FAstraWreck> Landmarks;   // the Janus Gate and other fixed structures of the system (Life -1)
+	UPROPERTY() TArray<FAstraPOI> POIs;
+	void TickPOIs(float Dt);
+	void RevealPOI(FAstraPOI& Poi);
 	UPROPERTY() TObjectPtr<UStaticMesh> RingMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> BlastMat;
 	UPROPERTY() TObjectPtr<UStaticMesh> CubeMesh;

@@ -372,6 +372,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	}
 	TickPlayer(Dt);
 	TickGateRun(Dt);
+	TickPOIs(Dt);
 	TickScenario(Dt);
 	TickSquadrons(Dt);
 	for (FAstraBattleShip& S : Ships)
@@ -611,6 +612,12 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 
 void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 {
+	if (S.bDerelict)
+	{
+		S.Pos += S.Vel * Dt;
+		S.Att = FQuat(FVector(0.2f, 0.3f, 1.f).GetSafeNormal(), FMath::DegreesToRadians(S.SpinDeg * Dt)) * S.Att;
+		return;
+	}
 	FVector DesiredVel = S.Vel;
 	FVector Face = S.Vel.IsNearlyZero() ? S.Att.GetForwardVector() : S.Vel.GetSafeNormal();
 	FAstraBattleShip* T = FindById(S.TargetId);
@@ -1178,6 +1185,24 @@ bool UAstraBattleSubsystem::PlayerScan(const FString& ContactId, FString& OutDet
 		Time = FMath::Max(Time, 78.f);   // the ping gives us away: the frigate reacts
 		OutDetail = TEXT("active ping on T-11: hull ~160 m, reactor warm, weapons ports detected — it has seen us");
 		return true;
+	}
+	if (T)
+	{
+		if (FAstraPOI* Poi = POIs.FindByPredicate([T](const FAstraPOI& X) { return X.ShipId == T->Id; }))
+		{
+			if (Poi->Revealed == 0)
+			{
+				RevealPOI(*Poi);
+				OutDetail = FString::Printf(TEXT("scan of %s (%s): %s"), *T->ContactId, *Poi->Name, *Poi->Findings[0]);
+			}
+			else
+			{
+				OutDetail = FString::Printf(TEXT("scan of %s (%s): nothing new from this range — %s"), *T->ContactId, *Poi->Name,
+				                            Poi->Revealed < Poi->Findings.Num() ? TEXT("a flight group, or the Aquila closing to 5 km, would learn more")
+				                                                                : TEXT("everything there is to learn has been learned"));
+			}
+			return true;
+		}
 	}
 	OutDetail = T ? FString::Printf(TEXT("scan of %s: %s, hull %.0f%%, shields %.0f%%"), *T->ContactId, *T->Class,
 	                                 100.f * T->Hull / T->HullMax, 100.f * T->Shield / T->ShieldMax)
@@ -1756,7 +1781,8 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 		{
 			O->SetStringField(TEXT("name"), S.Name);
 		}
-		O->SetStringField(TEXT("status"), S.bCold ? TEXT("unidentified, cold drive, drifting")
+		O->SetStringField(TEXT("status"), S.bDerelict ? TEXT("derelict: no power, no transponder, tumbling")
+		                                  : S.bCold ? TEXT("unidentified, cold drive, drifting")
 		                                          : (S.bHostile ? (S.bFleeing ? TEXT("hostile, retreating") : (S.bHoldFire ? TEXT("hostile, holding fire") : TEXT("hostile"))) : SideName(S.Side)));
 		O->SetNumberField(TEXT("range_km"), FMath::RoundToDouble(FVector::Dist(P.Pos, S.Pos) / 100.0) / 10.0);
 		O->SetNumberField(TEXT("bearing_deg"), FMath::RoundToDouble(BearingDeg(P.Pos, S.Pos)));
@@ -2350,7 +2376,7 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 		}
 		if (T)
 		{
-			Goal = T->Pos + (S.Pos - T->Pos).GetSafeNormal() * 6000.0;
+			Goal = T->Pos + (S.Pos - T->Pos).GetSafeNormal() * (T->bDerelict ? 700.0 : 6000.0);   // a derelict is looked at up close
 			if (!T->bIdentified && FVector::Dist(S.Pos, T->Pos) < 9000.0)
 			{
 				T->bIdentified = true;
@@ -2623,6 +2649,83 @@ bool UAstraBattleSubsystem::StartBeat(const TSharedPtr<FJsonObject>& Beat, FStri
 		                            "tuned the gate for us. The helm lays in the approach on the Captain's order (%s)"), *L.Name, *GateStatus()));
 		OutDetail = FString::Printf(TEXT("Fleet orders the Aquila to the %s system (%s star, %s world %s); the gate is tuned, the Captain "
 		                                 "decides when to go through"), *L.Name, *L.StarClass, *L.PlanetType, *L.PlanetName);
+		return true;
+	}
+	if (Type == TEXT("investigate"))
+	{
+		// a place to search: it is on the plot at once (a station, a hulk); an ambush may be lying cold around it
+		const TSharedPtr<FJsonObject>* PoiObj = nullptr;
+		FString Kind = TEXT("listening_post"), PName = TEXT("the derelict");
+		if (Beat->TryGetObjectField(TEXT("poi"), PoiObj))
+		{
+			(*PoiObj)->TryGetStringField(TEXT("kind"), Kind);
+			(*PoiObj)->TryGetStringField(TEXT("name"), PName);
+		}
+		double Brg = FMath::FRandRange(0.f, 359.f), Rng = 30.0;
+		Beat->TryGetNumberField(TEXT("bearing_deg"), Brg);
+		Beat->TryGetNumberField(TEXT("range_km"), Rng);
+		Rng = FMath::Clamp(Rng, 12.0, 60.0);
+		const FVector Pos = Ships[0].Pos + Polar(Rng * Km, Brg, FMath::FRandRange(-4.f, 4.f));
+		const FString Cid = FString::Printf(TEXT("T-%d"), NextContact++);
+		const bool bStation = Kind.Contains(TEXT("post")) || Kind.Contains(TEXT("station"));
+		const bool bWarship = Kind.Contains(TEXT("warship"));
+		const int32 I = AddShip(Cid, PName, bStation ? TEXT("ASTRA listening post, Watch class (derelict)")
+		                                    : (bWarship ? TEXT("ASTRA destroyer, Vigilant class (derelict)") : TEXT("Free Guilds freighter (derelict)")),
+		                        bStation ? TEXT("SM_STATION_ASTRA_Watch") : (bWarship ? TEXT("SM_SHIP_ASTRA_Vigilant") : TEXT("SM_SHIP_GUILD_Freighter")),
+		                        EAstraSide::Neutral, Pos, FMath::FRandRange(0.f, 360.f), 0.f, bStation ? 120.f : 150.f, 5000.f, 0.f);
+		FAstraBattleShip& D = Ships[I];
+		D.bDerelict = true;
+		D.RailDamage = 0.f;
+		D.Missiles = 0;
+		D.bShieldsUp = false;
+		D.Vel = FMath::VRand() * 2.f;
+		D.SpinDeg = FMath::FRandRange(0.15f, 0.5f);
+		SpawnVisual(D);
+		FAstraPOI Poi;
+		Poi.ShipId = D.Id;
+		Poi.Name = PName;
+		const TArray<TSharedPtr<FJsonValue>>* F = nullptr;
+		if (Beat->TryGetArrayField(TEXT("findings"), F))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *F)
+			{
+				if (!V->AsString().IsEmpty() && Poi.Findings.Num() < 3) { Poi.Findings.Add(V->AsString()); }
+			}
+		}
+		if (Poi.Findings.Num() == 0)
+		{
+			Poi.Findings.Add(TEXT("no power, no life signs from this range; the hull is intact"));
+		}
+		TArray<FString> Ids = {Cid};
+		const TArray<TSharedPtr<FJsonValue>>* Amb = nullptr;
+		if (Beat->TryGetArrayField(TEXT("ambush"), Amb))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Amb)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				FString Cls = TEXT("styx"), Nm = TEXT("Unknown");
+				if (O.IsValid()) { O->TryGetStringField(TEXT("class"), Cls); O->TryGetStringField(TEXT("name"), Nm); }
+				const FString AId = FString::Printf(TEXT("T-%d"), NextContact++);
+				const FVector APos = Pos + Polar(FMath::FRandRange(3.f, 6.5f) * Km, FMath::FRandRange(0.f, 359.f), FMath::FRandRange(-6.f, 6.f));
+				const int32 J = SpawnClass(Cls, AId, Nm, APos, FMath::FRandRange(0.f, 360.f));
+				FAstraBattleShip& A = Ships[J];
+				A.bCold = true;           // lying dark: drives off, no emissions
+				A.bHostile = false;
+				A.bIdentified = false;
+				A.Mode = EAstraShipMode::Idle;
+				A.Vel = FVector::ZeroVector;
+				Poi.Ambush.Add(A.Id);
+				Ids.Add(AId);
+				if (Poi.Ambush.Num() == 1) { A.bLeader = true; }
+			}
+			double Ak = 12.0;
+			Beat->TryGetNumberField(TEXT("ambush_km"), Ak);
+			Poi.AmbushKm = FMath::Clamp((float)Ak, 4.f, 25.f);
+		}
+		POIs.Add(Poi);
+		Report(FString::Printf(TEXT("sensors: new contact %s at bearing %03.0f, %.0f km — %s: no power, no transponder, tumbling slowly"),
+		                       *Cid, Brg, Rng, *PName));
+		OutDetail = FString::Printf(TEXT("%s placed at bearing %03.0f, %.0f km (%s); contact ids %s"), *PName, Brg, Rng, *Kind, *FString::Join(Ids, TEXT(", ")));
 		return true;
 	}
 	if (Type != TEXT("raid") && Type != TEXT("distress") && Type != TEXT("reinforcements"))
@@ -3049,6 +3152,84 @@ void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 	            "three short lines where the Aquila is, her state, and what the war needs from her now"));
 }
 
+void UAstraBattleSubsystem::RevealPOI(FAstraPOI& Poi)
+{
+	if (Poi.Revealed >= Poi.Findings.Num())
+	{
+		return;
+	}
+	const FString& F = Poi.Findings[Poi.Revealed++];
+	Poi.NextRevealT = Time + 8.f;
+	Report(FString::Printf(TEXT("sensors: %s — %s"), *Poi.Name, *F));
+	Report(FString::Printf(TEXT("story: at %s the crew learned: %s"), *Poi.Name, *F), false);
+	if (Poi.Revealed >= Poi.Findings.Num() && !Poi.bDone)
+	{
+		Poi.bDone = true;
+		if (!bEngagementActive)
+		{
+			Report(FString::Printf(TEXT("director: beat complete — investigation of %s: %s"), *Poi.Name, *FString::Join(Poi.Findings, TEXT(" / "))), false);
+		}
+	}
+}
+
+void UAstraBattleSubsystem::TickPOIs(float Dt)
+{
+	for (FAstraPOI& Poi : POIs)
+	{
+		const FAstraBattleShip* S = FindById(Poi.ShipId);
+		if (!S || !S->bAlive || Ships.Num() == 0)
+		{
+			continue;
+		}
+		const double D = FVector::Dist(Ships[0].Pos, S->Pos);
+		// the ambush wakes when the Aquila is close enough to be sure of her
+		if (!Poi.bAmbushSprung && Poi.Ambush.Num() && D < Poi.AmbushKm * Km)
+		{
+			Poi.bAmbushSprung = true;
+			int32 N = 0;
+			for (const int32 Id : Poi.Ambush)
+			{
+				if (FAstraBattleShip* A = FindById(Id); A && A->bAlive)
+				{
+					A->bCold = false;
+					A->bHostile = true;
+					A->bIdentified = true;
+					A->Mode = EAstraShipMode::Attack;
+					A->TargetId = Ships[0].Id;
+					++N;
+				}
+			}
+			if (N)
+			{
+				bEngagementActive = true;
+				bScenarioOver = false;
+				Report(FString::Printf(TEXT("sensors: drives lighting up around %s — %d Kharon Mandate warship%s lying cold: it is an ambush!"),
+				                       *Poi.Name, N, N > 1 ? TEXT("s were") : TEXT(" was")));
+				const FAstraBattleShip* Lead = FindById(Poi.Ambush[0]);
+				if (Lead && Lead->bAlive)
+				{
+					TransmissionAt = Time + 10.f;
+					TransmissionText = FString::Printf(TEXT("%s — the ambush's commander hails the Aquila"), *Lead->ContactId);
+				}
+			}
+		}
+		if (Poi.Revealed >= Poi.Findings.Num() || Time < Poi.NextRevealT)
+		{
+			continue;
+		}
+		// what the crew learns without a scan: a flight group reaching it, the Aquila closing in, alongside
+		bool bCraftThere = false;
+		for (const FAstraBattleShip& C : Ships)
+		{
+			bCraftThere |= C.bAlive && C.bCraft && C.Side == EAstraSide::Astra && FVector::Dist(C.Pos, S->Pos) < 1500.0;
+		}
+		if ((Poi.Revealed == 0 && D < 8 * Km) || (Poi.Revealed == 1 && (D < 5 * Km || bCraftThere)) || (Poi.Revealed == 2 && D < 2 * Km))
+		{
+			RevealPOI(Poi);
+		}
+	}
+}
+
 int32 UAstraBattleSubsystem::HostilesFighting(double WithinKm) const
 {
 	int32 N = 0;
@@ -3247,6 +3428,7 @@ void UAstraBattleSubsystem::ClearSystem()
 		if (S.DriveFlare) { S.DriveFlare->Destroy(); }
 	}
 	Ships.SetNum(1);
+	POIs.Reset();
 	Squadrons.RemoveAll([](const FAstraSquadron& Q) { return Q.Side != EAstraSide::Astra; });
 	for (FAstraSquadron& Q : Squadrons)
 	{

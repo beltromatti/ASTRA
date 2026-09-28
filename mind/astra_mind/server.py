@@ -461,6 +461,8 @@ class Mind:
                     self.game.events.append(text)
                     if text.startswith("director:"):
                         asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
+                    elif text.startswith("story:"):
+                        self.director.note(text.split(":", 1)[1].strip())   # remembered, no new beat
                     fallen = _fallen(text)
                     if fallen:
                         self.director.note("fallen: " + "; ".join(fallen))

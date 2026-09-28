@@ -47,8 +47,18 @@ COMMANDER = {"type": "object", "properties": {
     "orders": {"type": "string", "description": "their mission here, as the Mandate gave it to them (one sentence)"}},
     "required": ["name", "rank", "bio", "orders"]}
 
+POI = {"type": "object", "properties": {
+    "kind": {"type": "string", "enum": ["listening_post", "derelict_warship", "derelict_freighter"]},
+    "name": {"type": "string", "description": "e.g. Thule Watch, the freighter Silver Kestrel, ASN Resolve"}}, "required": ["kind", "name"]}
 BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulation.", {
-    "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit"]},
+    "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit", "investigate"]},
+    "poi": {**POI, "description": "investigate: the place to search (on the plot at once, dark and tumbling)"},
+    "findings": {"type": "array", "items": {"type": "string"}, "description": "investigate: what the crew learns there, in "
+                 "order — 1) the active scan, 2) a flight group reaches it or the Aquila closes in, 3) alongside. Concrete "
+                 "facts in English (what happened, who, a clue that moves the story), 1-3 items"},
+    "ambush": {"type": "array", "items": SHIP, "description": "investigate (optional): Mandate ships lying cold near it, "
+               "waking when the Aquila comes within ambush_km"},
+    "ambush_km": {"type": "number", "description": "investigate: how close the Aquila must come before the ambush springs"},
     "delay_s": {"type": "number", "description": "seconds before it happens (raids and distress: 60-300; calm: 90-240)"},
     "bearing_deg": {"type": "number", "description": "true bearing from the Aquila where they appear (0-359)"},
     "range_km": {"type": "number", "description": "distance from the Aquila (raid 20-40, distress 25-45, reinforcements 15-30)"},
@@ -100,6 +110,10 @@ Rules
   gate on their own: the log says so, and the story follows them.
 - Raids, distress calls and reinforcements happen where the Aquila is, and must make sense there (who holds the
   system, who could reach it through its gates).
+- investigate: a place to search where the Aquila is — a silent station, a drifting warship, a dead freighter. Its
+  findings are the story: what happened there, who did it, a clue that leads on (logs, survivors, a Mandate code, a
+  course). An ambush lying cold around it is possible, not mandatory. A raid or distress there must include `commander`;
+  for an ambush, give `commander` for its first ship.
 - The war is bigger than the Aquila: `war_news` moves it elsewhere (systems fall or are retaken, fronts shift) as a
   consequence of what happened and of the enemy's plans. Mandate ships never appear deep in ASTRA space without a
   reason (a gate they hold, a breakthrough reported first).
@@ -276,16 +290,16 @@ class Director:
         # the leader of a raid or of the raiders gets a mind and a voice
         cmd = beat.get("commander") or {}
         ids = _ids(res.get("detail", ""))
-        if ids and cmd.get("name") and beat.get("type") in ("raid", "distress"):
-            first = (beat.get("ships") or beat.get("attackers") or [{}])[0]
-            leader_id = ids[1] if beat.get("type") == "distress" and len(ids) > 1 else ids[0]
+        if ids and cmd.get("name") and beat.get("type") in ("raid", "distress", "investigate") and (beat.get("type") != "investigate" or len(ids) > 1):
+            first = (beat.get("ships") or beat.get("attackers") or beat.get("ambush") or [{}])[0]
+            leader_id = ids[1] if beat.get("type") in ("distress", "investigate") and len(ids) > 1 else ids[0]
             self.register(leader_id, {"name": cmd["name"], "rank": cmd.get("rank", "Ferryman (ship captain)"),
                                       "bio": cmd.get("bio", ""), "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),
                                       "voice": COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
                                       "mission": cmd.get("orders") or beat.get("why", "")})
             self.voice_i += 1
             self.note(f"{cmd['name']} ({cmd.get('rank', '')}) leads it, aboard {first.get('name', '?')} ({leader_id})")
-        if not speech and beat.get("type") in ("transit", "raid", "distress", "reinforcements"):
+        if not speech and beat.get("type") in ("transit", "raid", "distress", "reinforcements", "investigate"):
             speech = await self._brief_line(beat, res.get("detail", ""), lang, state)
         for line in speech[:2]:
             await self.say("admiral", line, lang, "measured")

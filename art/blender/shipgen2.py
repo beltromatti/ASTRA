@@ -398,7 +398,59 @@ def astra_ship2(name: str, length: float, seed: int, kind: str):
     return obj
 
 
+# ================================================================================================= stations
+def listening_post(name: str, seed: int = 31):
+    """Thule Watch class listening post (ASTRA): a long truss spine, a cluster of habitat and operations modules, three
+    great dishes, arrays of antennas, radiator and solar wings. Built to be seen dark and drifting as well as alive."""
+    rng = random.Random(seed)
+    b = A.Builder()
+    s = 1.0
+    # the spine: a square truss 220 m long (four longerons and cross members)
+    L = 220.0
+    for sy in (-1, 1):
+        for sz in (-1, 1):
+            b.cylinder((-L / 2, sy * 4, sz * 4), (L / 2, sy * 4, sz * 4), 0.7, FRAME, segments=8)
+    for k in range(23):
+        x = -L / 2 + k * L / 22
+        for (y0, z0, y1, z1) in ((-4, -4, 4, -4), (-4, 4, 4, 4), (-4, -4, -4, 4), (4, -4, 4, 4), (-4, -4, 4, 4)):
+            b.cylinder((x, y0, z0), (x + (L / 22 if (y0, z0, y1, z1) == (-4, -4, 4, 4) else 0.01), y1, z1), 0.35, FRAME, segments=6)
+    # the operations core: stacked modules around the middle of the spine
+    core = K.Hull(b, [(x, K.chamfer_rect(w, h, 0.35), 0.0) for x, w, h in
+                      ((-34, 10, 10), (-30, 16, 15), (-10, 18, 17), (10, 18, 17), (30, 16, 15), (34, 10, 10))], PLATE, cell=5.0)
+    core.plate(rng, depth=(0.2, 0.6), recess=0.3, margin=0.3, skip=0.15, max_run=(2, 2), mats={FRAME: 0.15, LIVERY: 0.05})
+    for k, (x, r) in enumerate(((-60, 9), (55, 8), (-85, 6.5), (80, 6))):   # habitat drums along the spine
+        b.cylinder((x - 12, 0, 0), (x + 12, 0, 0), r, PLATE, segments=20)
+        for j in range(3):
+            b.cylinder((x - 12 + j * 11, 0, 0), (x - 11 + j * 11, 0, 0), r + 0.5, FRAME, segments=20)
+    # three great dishes looking up and out, on pylons
+    for k, (x, y, z, r, tilt) in enumerate(((-20, 0, 26, 22, 0), (70, 16, 14, 14, 35), (-100, -14, 12, 12, -30))):
+        from mathutils import Matrix
+        with K.part(b, Matrix.Translation((x, y, z)) @ Matrix.Rotation(math.radians(tilt), 4, "X")):
+            b.cylinder((0, 0, -z + 5), (0, 0, 0), 1.6, FRAME, segments=10)
+            b.cylinder((0, 0, 0), (0, 0, r * 0.28), r * 0.12, FRAME, segments=24, radius2=r)     # the bowl
+            b.cylinder((0, 0, r * 0.28), (0, 0, r * 0.3), r, PLATE, segments=32)
+            b.cylinder((0, 0, 0), (0, 0, r * 0.75), 0.4, FRAME, segments=6)                     # the feed
+            b.box((0, 0, r * 0.78), (2.4, 2.4, 2.4), FRAME)
+    # antenna arrays and masts
+    for k in range(9):
+        x = -L / 2 + 20 + k * 22
+        K.mast(b, x, rng.choice((-1, 1)) * 4, rng.choice((-1, 1)) * 4, rng.uniform(10, 28), FRAME, LIGHTS)
+    # solar and radiator wings on both flanks
+    for side in (-1, 1):
+        for k in range(3):
+            x = -95 + k * 40
+            b.box((x, side * 34, 0), (30, 52, 0.4), RADIATOR if k == 1 else LIVERY)
+            b.cylinder((x, side * 5, 0), (x, side * 8, 0), 0.8, FRAME, segments=8)
+    K.running_lights(b, [(L / 2, 0, 5), (-L / 2, 0, 5), (0, 0, 20)], 1.2, LIGHTS)
+    obj = b.to_object(name)
+    if os.environ.get("NOBEVEL") != "1":
+        A.finish(obj, bevel=0.05, segments=1)
+    A.box_uv(obj, texel_m=8.0)
+    return obj
+
+
 SHIPS = {
+    "SM_STATION_ASTRA_Watch": (listening_post, dict(seed=31)),
     "SM_SHIP_ASTRA_Aquila": (astra_ship2, dict(length=780.0, seed=1, kind="carrier")),
     "SM_SHIP_ASTRA_Praetorian": (astra_ship2, dict(length=920.0, seed=7, kind="battleship")),
     "SM_SHIP_ASTRA_Vigilant": (astra_ship2, dict(length=280.0, seed=3, kind="destroyer")),
