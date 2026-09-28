@@ -54,4 +54,7 @@ private:
 
 	int32 CurrentLine = -1;
 	float SpeakingLevel = 0.f;
+	FRotator RestRotation;
+	float FacingBlend = 0.f;     // 0 = at the station, 1 = turned towards the Captain
+	float SinceSpoke = 100.f;
 };

@@ -8,6 +8,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundWaveProcedural.h"
@@ -34,6 +35,7 @@ AAstraCrewMember::AAstraCrewMember()
 void AAstraCrewMember::BeginPlay()
 {
 	Super::BeginPlay();
+	RestRotation = GetActorRotation();
 	if (!Body->GetSkeletalMeshAsset())
 	{
 		// placeholder body until the MetaHuman crew (M3): Epic's mannequin, idle loop
@@ -106,6 +108,25 @@ void AAstraCrewMember::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	SpeakingLevel = FMath::FInterpTo(SpeakingLevel, 0.f, DeltaSeconds, 4.f);
+	// when talking to the Captain, turn towards them (at most 70 degrees from the station), then drift back
+	SinceSpoke = IsSpeaking() ? 0.f : SinceSpoke + DeltaSeconds;
+	const float Target = SinceSpoke < 2.5f ? 1.f : 0.f;
+	FacingBlend = FMath::FInterpTo(FacingBlend, Target, DeltaSeconds, 2.5f);
+	if (FacingBlend > 0.001f)
+	{
+		if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+		{
+			const FVector To = Cam->GetCameraLocation() - GetActorLocation();
+			// the mannequin mesh faces +Y in its local space: actor yaw = facing yaw - 90
+			const float DesiredYaw = FMath::RadiansToDegrees(FMath::Atan2(To.Y, To.X)) - 90.f;
+			const float Delta = FMath::Clamp(FMath::FindDeltaAngleDegrees(RestRotation.Yaw, DesiredYaw), -70.f, 70.f);
+			SetActorRotation(FRotator(0.f, RestRotation.Yaw + Delta * FacingBlend, 0.f));
+		}
+	}
+	else if (!GetActorRotation().Equals(RestRotation, 0.01f))
+	{
+		SetActorRotation(RestRotation);
+	}
 }
 
 AAstraCrewMember* AAstraCrewMember::FindByStation(UWorld* World, const FString& Station)

@@ -135,6 +135,37 @@ class BridgeAgent:
         self.spent += turn.cost
         return turn
 
+    async def handle_event(self, event: str, lang: str) -> Turn:
+        """A ship event (not the Captain): the responsible officer reports it if it is worth saying aloud."""
+        turn = Turn(text=f"[event] {event}", lang=lang)
+        t0 = time.perf_counter()
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events())}]
+        msgs += self.history
+        msgs.append({"role": "user", "content": f"[Ship systems event, not the Captain speaking] {event}\n"
+                                                "If this deserves telling the Captain now, the responsible officer reports it "
+                                                "in one short line with speak (in the Captain's language). Otherwise call no tool."})
+
+        async def on_call(call: ToolCall) -> None:
+            args = call.arguments() or {}
+            if call.name == "speak" and args.get("text"):
+                spk = args.get("speaker") if args.get("speaker") in CREW else "xo"
+                turn.lines.append((spk, args["text"]))
+                if turn.t_first_line is None:
+                    turn.t_first_line = time.perf_counter() - t0
+                await self.say(spk, args["text"], lang, args.get("tone", "focused"))
+
+        comp = await self.llm.chat(model=MODEL, messages=msgs, tools=[SPEAK], tool_choice="auto", providers=PROVIDERS,
+                                   reasoning={"enabled": False}, max_tokens=160, temperature=0.4, on_tool_call=on_call,
+                                   allow_fallbacks=True)
+        turn.cost += comp.cost
+        if turn.lines:
+            self.history.append({"role": "user", "content": f"[event] {event}"})
+            self.history.append({"role": "assistant", "content": " ".join(f"{s}: {t}" for s, t in turn.lines)})
+            self._trim_history()
+        turn.t_end = time.perf_counter() - t0
+        self.spent += turn.cost
+        return turn
+
     async def _report_failures(self, msgs, calls, failures, lang, turn: Turn) -> None:
         notes = "\n".join(f"- {c.name}({c.arguments_raw}) FAILED: {r.get('detail', 'unknown')}" for c, r in failures)
         follow = msgs + [

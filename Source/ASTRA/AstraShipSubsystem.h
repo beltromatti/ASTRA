@@ -33,7 +33,7 @@ struct FAstraContact
 	UPROPERTY(BlueprintReadOnly) float BearingDeg = 0.f;
 };
 
-DECLARE_MULTICAST_DELEGATE_OneParam(FAstraShipEvent, const FString& /*Text*/);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FAstraShipEvent, const FString& /*Text*/, bool /*bReport: worth telling the Captain*/);
 DECLARE_MULTICAST_DELEGATE_OneParam(FAstraAlertChanged, EAstraAlert /*NewAlert*/);
 
 /**
@@ -80,7 +80,7 @@ private:
 	TArray<FString> RecentEvents;
 	bool bTurning = false;
 
-	void Event(const FString& Text);
+	void Event(const FString& Text, bool bReport = false);
 	const FAstraContact* FindContact(const FString& Id) const;
 	void SetAlert(EAstraAlert NewAlert);
 

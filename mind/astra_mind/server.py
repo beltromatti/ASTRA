@@ -126,6 +126,7 @@ class Mind:
         self.voice = Voice(self.tts, self._sink)
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
         self.turns: asyncio.Queue = asyncio.Queue()
+        self.lang = "en"            # the Captain's language (last detected)
 
     async def _sink(self, kind: str, payload: Any) -> None:
         dead = []
@@ -142,6 +143,11 @@ class Mind:
             text, lang = await self.turns.get()
             try:
                 self.agent.ship = self.game if (self.game and self.game.state) else self.local
+                if text.startswith("\x00event:"):
+                    t = await self.agent.handle_event(text[len("\x00event:"):], self.lang)
+                    log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
+                    continue
+                self.lang = lang
                 t = await self.agent.handle(text, lang)
                 await self._sink("json", {"type": "turn_end", "first_line_s": t.t_first_line, "total_s": round(t.t_end, 3),
                                           "cost": t.cost, "actions": [[n, a, r] for n, a, r in t.actions], "error": t.error})
@@ -168,7 +174,10 @@ class Mind:
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
                 elif kind == "event":
-                    self.game.events.append(msg.get("text", ""))
+                    text = msg.get("text", "")
+                    self.game.events.append(text)
+                    if msg.get("report"):
+                        await self.turns.put(("\x00event:" + text, self.lang))
                 elif kind == "command_result":
                     self.game.resolve(msg)
                 elif kind == "player_text":

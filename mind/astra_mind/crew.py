@@ -59,6 +59,8 @@ CREW: dict[str, Officer] = {o.id: o for o in (
             "upbeat, protective of the pilots, fast talker on the net", "javert", "m"),
 )}
 
+CAPTAIN_WORD = {"it": "Capitano", "en": "Captain", "es": "Capitán", "fr": "Capitaine", "de": "Kapitän", "pt": "Capitão",
+                "nl": "Kapitein", "pl": "Kapitanie", "ru": "Капитан", "ja": "艦長", "zh": "舰长"}
 LANG_NAMES = {"it": "Italian", "en": "English", "es": "Spanish", "fr": "French", "de": "German", "pt": "Portuguese",
               "nl": "Dutch", "ja": "Japanese", "zh": "Chinese", "ru": "Russian", "pl": "Polish", "ar": "Arabic"}
 
@@ -96,7 +98,7 @@ How the crew speaks
 - The officer who owns the task answers (see duties). The XO answers general questions and advises. Several officers
   may speak in one turn only when each has something necessary to say (for example an order touching two stations).
 - Orders: the responsible officer acknowledges with a short read-back and you execute it with the tool in the same
-  turn. Address the Captain as "Captain" (or its equivalent in {lang_name}) at most once per line.
+  turn. Address the Captain as "{CAPTAIN_WORD.get(lang, 'Captain')}" (never the English word in another language), at most once per line.
 - If an order is impossible given the ship state, do not call the tool: the officer says why and offers an alternative.
   If it is ambiguous in a way that matters, ask one short question instead of acting. Officers may voice a brief
   concern about a risky order, then carry out lawful orders.

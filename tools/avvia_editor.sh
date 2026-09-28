@@ -4,6 +4,8 @@
 # (UEditorEngine::ShouldThrottleCPUUsage), così catture e misure restano affidabili anche senza utente.
 UE="/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app"
 PROJ="/Users/beltromatti/Desktop/ASTRA/ASTRA.uproject"
+# the MCP server does not retry if its port is still held by a previous instance: wait until 8000 is free
+for i in {1..30}; do lsof -nP -iTCP:8000 -sTCP:LISTEN >/dev/null 2>&1 || break; sleep 1; done
 open -g -a "$UE" --args "$PROJ" -ModelContextProtocolStartServer -unattended "$@"
 for i in {1..90}; do
   sleep 2

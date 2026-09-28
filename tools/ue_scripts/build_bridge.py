@@ -29,7 +29,11 @@ else:
 
 
 def place(mesh, x, y, z=0.0, yaw=0.0, label=None, folder="Bridge"):
-    a = eas.spawn_actor_from_object(eal.load_asset(f"{KIT}/{mesh}"), V(x * M, y * M, z * M), R(yaw=yaw))
+    path = mesh if mesh.startswith("/Game/") else f"{KIT}/{mesh}"
+    asset = eal.load_asset(path)
+    if asset is None:
+        raise RuntimeError(f"missing asset {path}")
+    a = eas.spawn_actor_from_object(asset, V(x * M, y * M, z * M), R(yaw=yaw))
     a.set_actor_label(label or mesh)
     a.set_folder_path(folder)
     return a
@@ -41,6 +45,14 @@ place("SM_BRG_WindowGlass", 0, 0, label="Bridge_WindowGlass")
 place("SM_BRG_Railing", 0, 0, label="Bridge_Railings")
 ht = DATA["holo_table"]
 place("SM_BRG_HoloTable", ht["pos"][0], ht["pos"][1], 0.0, label="HoloTable")
+# closed doors in the back wall (the corridors beyond are another level for now)
+for d in DATA["doors"]:
+    dx, dy = d["pos"]
+    sy, sz = d["width"] / 1.43, d["height"] / 2.3
+    for sgn, lab in ((1.0, "A"), (-1.0, "B")):
+        leaf = place("/Game/ASTRA/Kit/Interior/Corridor/SM_COR_DoorLeaf", dx - 0.15, dy, 0.0, 0.0,
+                     label=f"Door_{d['id']}_{lab}", folder="Bridge/Doors")
+        leaf.set_actor_scale3d(V(1.0, sgn * sy, sz))
 md = DATA["master_display"]
 place("SM_BRG_MasterDisplay", md["pos"][0], md["pos"][1], 0.0, label="MasterDisplay")
 

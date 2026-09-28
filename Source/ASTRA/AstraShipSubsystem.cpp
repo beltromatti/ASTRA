@@ -106,14 +106,14 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 	}
 }
 
-void UAstraShipSubsystem::Event(const FString& Text)
+void UAstraShipSubsystem::Event(const FString& Text, bool bReport)
 {
 	RecentEvents.Add(Text);
 	if (RecentEvents.Num() > 16)
 	{
 		RecentEvents.RemoveAt(0);
 	}
-	OnShipEvent.Broadcast(Text);
+	OnShipEvent.Broadcast(Text, bReport);
 }
 
 const FAstraContact* UAstraShipSubsystem::FindContact(const FString& Id) const
@@ -342,7 +342,7 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 			HeadingDeg = TargetHeadingDeg;
 			MarkDeg = TargetMarkDeg;
 			bTurning = false;
-			Event(FString::Printf(TEXT("helm: steady on course %03.0f mark %.0f"), HeadingDeg, MarkDeg));
+			Event(FString::Printf(TEXT("helm: turn complete, steady on course %03.0f mark %.0f"), HeadingDeg, MarkDeg), true);
 		}
 		UpdateAttitudeVisuals();
 	}

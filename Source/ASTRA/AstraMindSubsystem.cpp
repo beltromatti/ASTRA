@@ -166,11 +166,12 @@ void UAstraMindSubsystem::BindShipEvents()
 	if (UAstraShipSubsystem* Ship = World->GetSubsystem<UAstraShipSubsystem>())
 	{
 		BoundWorld = World;
-		ShipEventHandle = Ship->OnShipEvent.AddLambda([this](const FString& Text)
+		ShipEventHandle = Ship->OnShipEvent.AddLambda([this](const FString& Text, bool bReport)
 		{
 			TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 			M->SetStringField(TEXT("type"), TEXT("event"));
 			M->SetStringField(TEXT("text"), Text);
+			M->SetBoolField(TEXT("report"), bReport);
 			Send(M);
 		});
 	}
