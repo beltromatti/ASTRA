@@ -20,6 +20,11 @@ for f in sorted(os.listdir(SRC)):
         tasks.append(t)
 unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)
 
+import importlib  # noqa: E402
+import astra_editor  # noqa: E402
+importlib.reload(astra_editor)
+materials = astra_editor.assign_materials_by_slot(DST)  # FBX placeholder materials -> ASTRA instances
+
 report = []
 eal = unreal.EditorAssetLibrary
 for path in eal.list_assets(DST, recursive=False, include_folder=False):
@@ -35,10 +40,10 @@ for path in eal.list_assets(DST, recursive=False, include_folder=False):
         body.set_editor_property("collision_trace_flag", unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
     bb = asset.get_bounding_box()
     slots = [str(m.get_editor_property("material_slot_name")) for m in asset.get_editor_property("static_materials")]
-    eal.save_loaded_asset(asset)
+    astra_editor.save(asset)
     report.append({"mesh": asset.get_name(), "nanite": ns.enabled,
                    "min": [round(bb.min.x), round(bb.min.y), round(bb.min.z)],
                    "max": [round(bb.max.x), round(bb.max.y), round(bb.max.z)], "slots": slots})
 others = [p for p in eal.list_assets(DST, recursive=False, include_folder=False)
           if not isinstance(eal.load_asset(p), unreal.StaticMesh)]
-print(json.dumps({"meshes": report, "other_assets": others}, indent=1))
+print(json.dumps({"meshes": report, "materials": materials, "other_assets": others}, indent=1))
