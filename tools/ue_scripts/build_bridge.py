@@ -122,7 +122,17 @@ for d in DATA["doors"]:
         lt.set_actor_label(f"Corr{tag}_Light{i}")
         lt.set_folder_path("Lighting")
         lt.tags = [unreal.Name("ASTRA.ShipLight")]
-    place(f"{CK}/SM_COR_EndCap", mods[0], yc, 0.0, 180.0, label=f"Corr{tag}_EndCap", folder="Corridors")
+    if yc > 0:
+        # the starboard corridor ends at the Captain's quarters: a bulkhead and a door (tools/ue_scripts/build_quarters.py
+        # builds the cabin and places them again)
+        place(f"{CK}/SM_COR_Bulkhead", mods[0], yc, 0.0, 180.0, label="Quarters_Bulkhead", folder="Quarters/Door")
+        qd = eas.spawn_actor_from_class(unreal.AstraDoor, V((mods[0] - 0.25) * M, yc * M, 0.0), R())
+        qd.set_editor_property("width", 140.0)
+        qd.set_editor_property("height", 230.0)
+        qd.set_actor_label("Door_Quarters")
+        qd.set_folder_path("Quarters/Door")
+    else:
+        place(f"{CK}/SM_COR_EndCap", mods[0], yc, 0.0, 180.0, label=f"Corr{tag}_EndCap", folder="Corridors")
 # the Aquila herself around the bridge: the hull frame's origin is 172 m aft and 62 m below the bridge floor
 # (BridgeOffset in AstraBattleSubsystem.h); no shadows (a 780 m hull would shade the bridge unpredictably)
 hull = place("/Game/ASTRA/Ships/SM_SHIP_ASTRA_Aquila", -172.0, 0.0, -62.0, 0.0, label="Aquila_Hull", folder="Ship")

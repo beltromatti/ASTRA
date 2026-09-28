@@ -622,10 +622,72 @@ def med_scan():
     return s.save("Med_Scan")
 
 
+# ---------------------------------------------------------------- the Captain's quarters (Deck 1)
+def _war_data():
+    """The Aurelia March from the mind's war map (mind/astra_mind/war.py: stdlib only)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("astra_war", os.path.join(ROOT, "mind", "astra_mind", "war.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.SECTOR, mod.LINKS
+
+
+def quarters_map():
+    """A chart of the Aurelia March on the cabin wall: the systems, their gates, who holds them (as the war began)."""
+    systems, links = _war_data()
+    s = Screen(w=2048, h=1024, dept="command", title="The Aurelia March", sub="7TH FLEET · STRATEGIC CHART · ASN AQUILA", seed=401)
+    xs = [d["x"] for d in systems]
+    ys = [d["y"] for d in systems]
+    x0, x1, y0, y1 = min(xs) - 6, max(xs) + 6, min(ys) - 6, max(ys) + 6
+    P = lambda d: (80 + (d["x"] - x0) / (x1 - x0) * 1888, 1000 - (d["y"] - y0) / (y1 - y0) * 900)   # noqa: E731
+    pos = {d["name"]: P(d) for d in systems}
+    colour = {"astra": (80, 160, 255), "mandate": (230, 70, 55), "guilds": (240, 180, 70), "silent": (130, 140, 150)}
+    for a, b in links:
+        s.line([pos[a], pos[b]], fill=(40, 75, 110), width=3)
+    for d in systems:
+        x, y = pos[d["name"]]
+        c = colour.get(d["owner"], TEXT)
+        r = 16 if d["name"] in ("Aurelia", "Concordia", "Kharon") else 11
+        s.d.ellipse(s.P(x - r - 8, y - r - 8, x + r + 8, y + r + 8), outline=tuple(v // 3 for v in c), width=2 * S)
+        s.d.ellipse(s.P(x - r, y - r, x + r, y + r), fill=c)
+        s.text(x, y + r + 12, d["name"].upper(), F_TITLE(30), fill=TEXT, anchor="ma")
+        s.text(x, y + r + 48, d["world"], F_MONO(16), fill=DIM, anchor="ma")
+    ax, ay = pos["Aurelia"]
+    s.d.ellipse(s.P(ax - 44, ay - 44, ax + 44, ay + 44), outline=CYAN, width=2 * S)
+    s.text(ax + 50, ay - 60, "ASN AQUILA", F_MONO_B(18), fill=CYAN)
+    for i, (lab, own) in enumerate((("ASTRA", "astra"), ("KHARON MANDATE", "mandate"), ("FREE GUILDS", "guilds"), ("SILENT", "silent"))):
+        x = 90 + i * 260
+        s.d.ellipse(s.P(x, 70, x + 18, 88), fill=colour[own])
+        s.text(x + 30, 66, lab, F_LABEL(20), fill=TEXT)
+    s.footer("JANUS GATE LINKS · POSITIONS NOT TO SCALE", color=DIM)
+    return s.save("Quarters_Map")
+
+
+def quarters_log():
+    """The desk terminal: the Captain's log, ready to take a voice entry."""
+    s = Screen(w=1024, h=640, dept="command", title="Captain's Log", sub="ASN AQUILA · CVC-01 · PRIVATE", seed=402)
+    s.panel(24, 64, 1000, 170, "Voice entry")
+    s.text(44, 108, "SAY  \"CAPTAIN'S LOG\"  TO BEGIN", F_MONO_B(26), fill=TEXT)
+    for i in range(46):   # a quiet waveform, waiting
+        h = 4 + 10 * abs(math.sin(i * 0.7)) * (0.3 + 0.7 * s.rng.random())
+        s.d.rectangle(s.P(560 + i * 9, 132 - h, 565 + i * 9, 132 + h), fill=(40, 110, 160))
+    s.panel(24, 190, 1000, 600, "Entries")
+    for k in range(6):
+        y = 236 + k * 60
+        s.text(44, y, f"2491.{265 + k:03d}", F_MONO(16), fill=CYAN)
+        for j, w in enumerate((0.9, 0.62)):
+            s.d.rectangle(s.P(180, y + 4 + j * 22, 180 + int(780 * w * (0.7 + 0.3 * s.rng.random())), y + 12 + j * 22), fill=(28, 52, 80))
+    s.footer("ENCRYPTED · CAPTAIN'S EYES ONLY", color=DIM)
+    return s.save("Quarters_Log")
+
+
 if __name__ == "__main__":
     import sys
     if sys.argv[1:] == ["med"]:   # only the Medbay's screens
         print("UI_OK", [med_vitals(), med_vitals(critical=True), med_standby(), med_ward(), med_scan()])
+        raise SystemExit
+    if sys.argv[1:] == ["quarters"]:
+        print("UI_OK", [quarters_map(), quarters_log()])
         raise SystemExit
     made = []
     made += helm() + ops() + comms() + sensors() + engineering() + flight()
@@ -634,4 +696,5 @@ if __name__ == "__main__":
         made.append(touch_pad(f"{st}_Touch", dept))
     made += [master_display(), holo_plot(), tactical_strip()]
     made += [med_vitals(), med_vitals(critical=True), med_standby(), med_ward(), med_scan()]
+    made += [quarters_map(), quarters_log()]
     print("UI_OK", len(made), made)

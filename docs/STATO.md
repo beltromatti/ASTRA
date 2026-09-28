@@ -156,6 +156,12 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - Prove: `astra.medbay admit 8` (feriti da colpi casuali), `astra.medbay care 10` (dieci minuti di cure), `astra.medbay go` (nel reparto); avvio con `-astra_medbay` per le misure
 - Prestazioni (standalone 1080p, profilo A): 19,0 ms di GPU in infermeria, come la plancia (erano 25,3 ms con 32 luci di cui 10 con ombre: ora 11 luci lunghe, 3 con ombre)
 
+## Alloggi del Capitano (Deck 1)
+- [x] **Captain's quarters** (`art/blender/quarters.py`, `tools/ue_scripts/build_quarters.py`, dati in `data/ship/aquila_quarters.json`): la porta in fondo al corridoio di dritta (prima un tappo cieco, ora paratia con porta scorrevole) apre sulla cabina del Capitano, 8,6 × 9,2 m: moquette blu, legno scuro (boiserie, mobili), pareti calde, soffitto a cassettoni con luce indiretta e faretti; scrivania sotto il **finestrone di poppa** con terminale del diario di bordo, lampada, tazza; poltrona del Capitano e due sedie; divano, tavolino e poltrona; **branda** nell'alcova con luce da lettura e mensola (libri, una foto); libreria; angolo cottura con la **macchina del caffè**; credenza sotto l'oblò di dritta con il **modellino dell'Aquila** (1:1000); la **carta dell'Aurelia March** a parete (disegnata dai dati della guerra, `tools/art/ui_screens.py quarters`); la targa della nave. Legno Wood051 e moquette Carpet012 (CC0 ambientCG). Luci calde di zona accese solo con il Capitano dentro
+- [x] **La vista**: dal finestrone si vede l'intera Aquila che si allunga verso poppa sotto New Ravenna
+- [x] **Riposare**: E accanto alla branda → dissolvenza al nero, «RESTING · the XO has the conn»; il mondo corre 6 volte più veloce (battaglie, cure dell'infermeria, il regista) finché succede qualcosa che il Capitano deve sapere: allora l'XO lo sveglia (esempio reale: dopo 1,1 minuti di nave la fregata T-11 accende i motori e il Capitano si sveglia con i rapporti di Sensori e Tattica); altrimenti ci si alza da soli (E) o dopo 150 s reali, e l'XO fa il punto. L'equipaggio sa se il Capitano è in cabina o dorme
+- [x] **Fuori**: il blocco della cabina rivestito di piastre di scafo con i suoi finestroni illuminati, su un piedistallo che affonda nel pendio di poppa dell'isola; accanto la torre dell'ascensore di plancia; carenature sotto i due corridoi dietro la plancia (prima galleggiavano sopra l'isola) — `SM_SHIP_ASTRA_AquilaBridgeBlock`, con la luce del pianeta come lo scafo
+
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
 - [x] Vice Admiral Adrian Rourke, comandante della Settima Flotta: trasmette gli ordini, risponde quando l'Aquila chiama la flotta, può concedere rinforzi o rifornimento
@@ -172,7 +178,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 
 ## Prossimi passi
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
-2. Altri ponti: alloggi del Capitano (diario, riposo), mensa (l'equipaggio fuori servizio), armeria; volti veri per l'equipaggio (MetaHuman).
+2. Altri ponti: mensa (l'equipaggio fuori servizio), armeria; ufficiali che vengono a parlare col Capitano in cabina; volti veri per l'equipaggio (MetaHuman); esterno della plancia (scatola e corridoi ancora grezzi da fuori).
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
 4. Simulazione di calore (M2); M7 seconda parte (spazioporto, città, altri pianeti); preparazione al multigiocatore (M8: autorità del server, comandi come RPC).
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
@@ -185,8 +191,9 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 5. Quando l'Archon Solm chiama, parlagli direttamente (canale aperto): tutto ciò che non inizia con il nome/ruolo di un ufficiale va a lui. «Comunicazioni, chiudete il canale» per chiuderlo.
 6. Da terminale: `tools/ue.py pie start|stop` e `tools/ue.py pie cmd 'astra.say ...'` per provare senza toccare l'editor.
 7. Infermeria: ascensore (E alle porte in fondo al corridoio di babordo) → tasto 2. Parla con la dottoressa («Dottoressa, come stanno i feriti?») o con un ferito per nome. Senza battaglia i letti sono vuoti: `astra.medbay admit 8`.
-8. Pilotare: scendi con l'ascensore (E davanti alle porte in fondo al corridoio di babordo), avvicinati a un Falcon di Alpha (lato sinistro dell'hangar) e premi E; W per il lancio. Rientro: torna alla bocca di prua sinistra dell'Aquila, rallenta e premi F.
-9. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.
+8. Cabina del Capitano: la porta in fondo al corridoio di dritta (quello senza ascensore). E accanto alla branda per riposare.
+9. Pilotare: scendi con l'ascensore (E davanti alle porte in fondo al corridoio di babordo), avvicinati a un Falcon di Alpha (lato sinistro dell'hangar) e premi E; W per il lancio. Rientro: torna alla bocca di prua sinistra dell'Aquila, rallenta e premi F.
+10. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.
 
 ## Note operative
 - Prestazioni (2026-09-28, standalone 1080p, battaglia): ~19 ms di mediana (≈52 fps), limitate dalla GPU (~18,5 ms: luci 2,6, ombre 2,0, Lumen 1,6, traslucenza 1,4). Gli "scatti" da ~31 ms ogni ~12 frame non sono lavoro in più: la CPU, più veloce della GPU, si blocca in attesa delle query di occlusione (trovato con Unreal Insights da riga di comando: `-trace=cpu,frame` e `UnrealInsights -NoUI -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimingEvents ..."`). Per scendere serve ridurre il costo GPU. Diagnostica schermi: `astra.screens.profile 1`

@@ -7,6 +7,7 @@
 #include "AstraBridgeFX.h"
 #include "AstraHangar.h"
 #include "AstraPatient.h"
+#include "AstraQuarters.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -268,7 +269,8 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 	{
 		UStaticMeshComponent* C = It->GetStaticMeshComponent();
 		const UStaticMesh* M = C ? C->GetStaticMesh() : nullptr;
-		if (M && (M->GetName().StartsWith(TEXT("SM_SHIP_")) || M->GetName().StartsWith(TEXT("SM_STATION_"))))
+		if (M && (M->GetName().StartsWith(TEXT("SM_SHIP_")) || M->GetName().StartsWith(TEXT("SM_STATION_")))
+		    && !It->ActorHasTag(TEXT("ASTRA.Interior")))   // a ship's model in a cabin stays inside
 		{
 			C->SetLightingChannels(true, true, false);
 			++Exterior;
@@ -591,6 +593,19 @@ FString UAstraShipSubsystem::CaptainAboard() const
 				            "patients in their beds can hear and answer the Captain; the XO has the conn on the bridge and the bridge "
 				            "officers speak by intercom");
 			}
+		}
+	}
+	for (TActorIterator<AAstraQuarters> It(GetWorld()); It; ++It)
+	{
+		if (It->IsResting())
+		{
+			return TEXT("asleep in the Captain's quarters (Deck 1, behind the bridge): the XO has the conn and wakes the Captain only "
+			            "for something important");
+		}
+		if (It->IsPawnInside(P))
+		{
+			return TEXT("in the Captain's quarters (Deck 1, behind the bridge), off the bridge: the XO has the conn; the bridge "
+			            "officers speak by intercom");
 		}
 	}
 	if (P && P->GetActorLocation().Z < -3000.f)

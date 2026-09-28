@@ -12,6 +12,7 @@
 #include "AstraCampaign.h"
 #include "AstraFighterPawn.h"
 #include "AstraHangar.h"
+#include "AstraQuarters.h"
 #include "AstraShipSubsystem.h"
 #include "EngineUtils.h"
 #include "EnhancedInputSubsystems.h"
@@ -176,6 +177,17 @@ void AASTRAPlayerController::ToggleSeat()
 		F->ClimbOut();
 		return;
 	}
+	// the Captain's quarters: the bunk (lie down to rest, or get up)
+	if (APawn* Me = GetPawn())
+	{
+		for (TActorIterator<AAstraQuarters> It(GetWorld()); It; ++It)
+		{
+			if (It->TryRest(Me))
+			{
+				return;
+			}
+		}
+	}
 	// on New Ravenna: back into the parked Falcon
 	if (APawn* Me = GetPawn())
 	{
@@ -300,6 +312,8 @@ namespace
 		TEXT("\n")
 		TEXT("THE LIFT (at the end of the port corridor)\n")
 		TEXT("  E, then 1-4     Bridge · Medbay · Main Engineering · Flight Deck\n")
+		TEXT("  the Captain's quarters: the door at the end of the starboard corridor;\n")
+		TEXT("  E beside the bunk to rest (the XO wakes you if anything happens)\n")
 		TEXT("\n")
 		TEXT("ON THE FLIGHT DECK\n")
 		TEXT("  E               beside a Falcon of Alpha: climb in\n")

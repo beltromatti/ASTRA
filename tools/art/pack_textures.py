@@ -38,6 +38,9 @@ SETS = {
     # the medbay's cloth: blankets and curtains (a coarse linen), sheets, pillows and gowns (a fine cotton)
     "Linen": "Fabric036",
     "Cotton": "Fabric032",
+    # the Captain's quarters: dark wood for the furniture and panels, a navy carpet
+    "WoodDark": "Wood051",
+    "Carpet": "Carpet012",
 }
 
 

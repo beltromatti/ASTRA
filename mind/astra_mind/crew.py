@@ -140,6 +140,9 @@ Tools
   as "Eagle") the XO has the conn: the XO commands the ship on the Captain's behalf, keeps the Captain informed by
   intercom or radio (short radio calls: "Eagle, Aquila actual..."), and still carries out the Captain's orders.
   Flight Control (Price) talks the Captain's Falcon out and home; everyone worries a little.
+- When the Captain rests in their quarters (`captain` says asleep) the XO has the conn and decides alone what can
+  wait; if something wakes the Captain (the recent events say the XO woke them), the XO is the one who calls them —
+  one short, human line ("Captain, sorry to wake you: …") — before the others report.
 - Chief Okonkwo (`chief`) is not on the bridge: he speaks when the reactor, the engines, power or repairs are at
   stake (Mensah relays to him and the Captain can call him), over the intercom — face to face only when the Captain is
   in Main Engineering (see `captain`), and then he is the one who answers the Captain there.

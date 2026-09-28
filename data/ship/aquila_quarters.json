@@ -1,0 +1,23 @@
+{
+  "id": "aquila_quarters",
+  "name": "Captain's Quarters · Deck 1 · Section A",
+  "signage": "DECK 1 · SECTION A · CAPTAIN'S QUARTERS",
+  "frame": "Unreal convention: X forward, Y starboard, Z up; metres; origin = deck level on the inner face of the forward wall, on the door's axis; the cabin runs aft (negative x)",
+  "world_origin": [-21.6, 3.9, 0.0],
+  "world_note": "behind the bridge, at the aft end of the starboard corridor (Corridor 1-A starboard ends at x -20.8 with a bulkhead and a door); the block overhangs the island's aft slope on a pedestal; its big window looks aft along the whole ship",
+  "corridor_end_x": -20.8,
+  "length": 8.6,
+  "half_width": 4.6,
+  "height": 3.1,
+  "door": {"y": 0.0, "width": 1.4, "height": 2.3},
+  "window_aft": {"y0": -3.9, "y1": 3.9, "z0": 0.6, "z1": 2.7, "mullions": [-1.3, 1.3]},
+  "window_side": {"x0": -6.5, "x1": -4.7, "z0": 0.9, "z1": 2.5},
+  "desk": {"x": -6.9, "y": 2.4, "width": 2.0, "depth": 0.9},
+  "sofa": {"x0": -3.3, "x1": -5.9, "depth": 0.9},
+  "bunk": {"x0": -0.35, "x1": -2.55, "y0": -4.55, "y1": -3.4, "top": 0.55},
+  "bookcase": {"x0": -1.5, "x1": -4.3, "depth": 0.4, "height": 2.25},
+  "galley": {"x0": -0.3, "x1": -0.95, "y0": 1.4, "y1": 4.55},
+  "map_screen": {"y0": -3.05, "y1": -0.95, "zc": 1.75},
+  "model_pedestal": {"x": -5.6, "y": 4.15},
+  "port_block": {"x0": -21.0, "x1": -25.8, "y0": -8.2, "y1": -1.0, "note": "the housing of the bridge lift, behind the port corridor's end"}
+}
