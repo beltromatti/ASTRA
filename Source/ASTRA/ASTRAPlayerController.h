@@ -81,6 +81,8 @@ protected:
 	/** F1: the controls card (shown for a while at the start of a campaign as a hint). */
 	void ToggleHelp();
 	UFUNCTION(Exec) void AstraHelp() { ToggleHelp(); }
+	/** Console: pick a deck on the open lift panel (1 bridge, 2 engineering, 3 flight deck). */
+	UFUNCTION(Exec) void AstraDeck(int32 N) { if (LiftMenu.IsValid()) { ChooseDeck(N); } }
 	void ShowHelp(bool bShow);
 	TSharedPtr<class SWidget> HelpWidget;
 	TSharedPtr<class SWidget> HintWidget;
