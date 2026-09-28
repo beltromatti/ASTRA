@@ -11,7 +11,7 @@
 
 ## 2. Linguaggi di design delle fazioni
 
-### ASTRA (noi)
+### ASTRA Navy (noi)
 - **Scafi:**
   - forme lunghe e orizzontali, a strati, con una "spina" dorsale;
   - prua affilata ma non aggressiva;
@@ -23,14 +23,14 @@
   - scia dei motori bianco-blu;
   - finestre bianco caldo.
 
-### Mandato di Kharon (nemico)
+### Kharon Mandate (nemico)
 - **Scafi:** lastre di corazza angolari e brutali, asimmetriche; prue a lama rivolte in avanti.
 - **Colori:** basalto e grafite, con accenti di rame ossidato e bronzo.
 - **Luci:** ambra e rosso; radiatori a vista che brillano d'arancio; scia dei motori arancio-viola.
 - **Sensazione:** "navi sopravvissute", rattoppate con orgoglio.
 
 ## 3. Palette (hex)
-| Uso | ASTRA | Mandato |
+| Uso | ASTRA Navy | Kharon Mandate |
 |---|---|---|
 | Scafo principale | `#E6E1D6` avorio · `#C9CCCF` grigio chiaro | `#23252A` grafite · `#3A3632` basalto |
 | Struttura | `#4A4F55` canna di fucile | `#1A1B1E` nero ferro |
@@ -40,19 +40,19 @@
 **Interni ASTRA per reparto** (strisce luminose e mostrine):
 | Reparto | Colore | Hex |
 |---|---|---|
-| Comando | blu | `#3E7BFA` |
-| Ingegneria | ambra | `#FF9F1C` |
-| Medico | verde acqua | `#2EC4B6` |
-| Sicurezza | rosso | `#E63946` |
-| Volo | giallo | `#FFD60A` |
-| Scienza e sensori | viola | `#9B5DE5` |
+| Command | blu | `#3E7BFA` |
+| Engineering | ambra | `#FF9F1C` |
+| Medical | verde acqua | `#2EC4B6` |
+| Security | rosso | `#E63946` |
+| Flight | giallo | `#FFD60A` |
+| Science & Sensors | viola | `#9B5DE5` |
 
 ## 4. Stati di luce della nave
 | Stato | Luce |
 |---|---|
-| **Condizione verde** | Bianco caldo e neutro, strisce di reparto tenui |
-| **Condizione gialla** | Accenti ambra, luce generale al 85% |
-| **Condizione rossa** | Strisce rosse pulsanti lente, luce bianca al 45%, luci d'emergenza a pavimento |
+| **Condition Green** | Bianco caldo e neutro, strisce di reparto tenui |
+| **Condition Yellow** | Accenti ambra, luce generale al 85% |
+| **Condition Red** | Strisce rosse pulsanti lente, luce bianca al 45%, luci d'emergenza a pavimento |
 | **Blackout** | Solo strisce d'emergenza e segnaletica fotoluminescente, e il fumo diventa visibile |
 | **Carica dei railgun** | Calo del 10–20% per mezzo secondo su tutta la nave |
 
@@ -66,18 +66,19 @@
   - livree come parametri di materiale.
 - **Usura:** bordi consumati dove si passa, colature sotto le prese d'aria, bruciature vicino agli ugelli, graffi sulle maniglie.
 
-## 6. Segnaletica e testo
-- La segnaletica è **nella lingua del giocatore**: la genero con pannelli di testo localizzati, non con texture fisse. Pittogrammi universali, ponte e sezione in codice (esempio: "4-C").
+## 6. Lingua, segnaletica e testo
+- **Lingua del gioco: inglese.** Segnaletica, interfacce, nomi di luoghi, navi e fazioni, log e schermi sono in inglese. Solo gli NPC parlano la lingua del giocatore (tramite "the Interpreter").
+- Segnaletica con pittogrammi universali e codici di ponte e sezione in stile navale, per esempio **"DECK 4 · SECTION C"**, **"ENGINEERING"**, **"FLIGHT DECK"**, **"MEDBAY"**, **"AUTHORIZED PERSONNEL ONLY"**.
 - **Font (liberi, licenza OFL):** **Barlow Condensed** per segnaletica e titoli; **IBM Plex Sans** e **IBM Plex Mono** per interfacce e dati.
 
 ## 7. Interfacce diegetiche
 - Pannelli scuri traslucidi, dati bianco-azzurri, avvisi ambra, criticità rosse.
 - Schemi a linee, niente effetti retrò esagerati.
 - Leggibilità prima di tutto: testo grande, contrasto alto, e colore mai usato da solo.
-- Tavolo olografico: linee di elevazione, anelli di distanza, ellissi d'incertezza; colore per fazione (ASTRA azzurro, Mandato ambra, neutrali bianco, sconosciuti grigio).
+- Tavolo olografico: linee di elevazione, anelli di distanza, ellissi d'incertezza; colore per fazione (ASTRA azzurro, Mandate ambra, neutrali bianco, unknown grigio).
 
 ## 8. Spazio e fotografia
-- **Neri profondi** e pochi punti di colore dalla nebulosa. Per Aurelia: stella arancione e nebulosa verde-azzurra, colori complementari.
+- **Neri profondi** e pochi punti di colore dalla nebulosa. Per Aurelia: stella arancione e nebulosa verde-azzurra (the Teal Veil), colori complementari.
 - **Esposizione fisica per zona** e tonemapper filmico ACES.
 - Bloom moderato; lens flare solo per stelle, motori ed esplosioni; grana leggera; aberrazione cromatica minima.
 - Profondità di campo solo nei momenti cinematografici.

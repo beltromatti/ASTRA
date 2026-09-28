@@ -9,6 +9,7 @@ Leggi SEMPRE prima [docs/STATO.md](docs/STATO.md) (dove siamo, cosa fare dopo) e
 - Budget: **zero per tutto ciò che non è AI**. Spese AI solo tramite OpenRouter (credito limitato: tieni il conto in docs/STATO.md, avvisa in RICHIESTE.md sotto 3 $ residui). Modelli economici e veloci.
 
 ## Principi di lavoro
+- **Lingua del gioco: INGLESE** (richiesta esplicita dell'utente). Nomi di lore, luoghi, navi, fazioni, segnaletica, interfacce, schermi, log, asset e codice: in inglese. Solo gli NPC rispondono nella lingua parlata dal giocatore. La documentazione per l'utente (docs/) resta in italiano, ma con i nomi ufficiali inglesi.
 - Lavora sempre su `main`, commit piccoli e frequenti, push su `origin` (repo privato GitHub beltromatti/ASTRA). Messaggi di commit in italiano. Chiudi ogni messaggio di commit con:
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - Aggiorna docs/STATO.md a ogni passo significativo (è la memoria che permette di riprendere dopo interruzioni).

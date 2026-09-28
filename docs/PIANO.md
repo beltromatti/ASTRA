@@ -1,5 +1,7 @@
 # ASTRA — Piano tecnico v0.2
 
+> **Lingua del gioco: inglese** (nomi, lore, scritte, interfacce). Gli NPC parlano la lingua del giocatore. Nomi ufficiali in docs/BIBBIA.md.
+
 *27 settembre 2026 · nome in codice: ASTRA · basato su 14 ricerche (indice in [ricerca/00-INDICE.md](ricerca/00-INDICE.md)) e sull'analisi diretta del tuo Mac e di Unreal 5.8.3.*
 
 **Novità rispetto alla v0.1**
