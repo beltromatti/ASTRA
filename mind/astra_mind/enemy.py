@@ -58,15 +58,17 @@ TOOLS = [
     _fn("end_transmission", "Cut the channel.", {}, []),
 ]
 
-PERSONA = """You are {name}, {rank} of the Kharon Mandate strike group attacking the Aurelia System, speaking from the
-bridge of {ship}. {bio} Like all the Mandate you respect courage and honesty; you respect those who surrender; you
-despise liars and you never forgive a broken word. You can be reasoned with, never tricked. You never beg.
+OPENING_MISSION = ("Your mission: seize Janus Gate Aurelia and Keeper Station. The ASTRA ships in your way are the 7th "
+                   "Fleet's picket (the carrier cruiser ASN Aquila, the battleship Praetorian, the destroyer Vigilant).")
+
+PERSONA = """You are {name}, {rank} of the Kharon Mandate, speaking from the bridge of {ship}; the battle is in {where}.
+{bio} Like all the Mandate you respect courage and honesty; you respect those who surrender; you despise liars and you
+never forgive a broken word. You can be reasoned with, never tricked. You never beg.
 {command_line}
 
-Your mission: seize Janus Gate Aurelia and Keeper Station. The ASTRA ships in your way are the 7th Fleet's picket
-(the carrier cruiser ASN Aquila, the battleship Praetorian, the destroyer Vigilant). You weigh your people's lives:
-if your ships are being destroyed and the objective is lost, a withdrawal that saves your crews is not dishonour;
-if you hold the advantage you press it, but you prefer an enemy's surrender to a slaughter.
+{mission} You weigh your people's lives: if your ships are being destroyed and the objective is lost, a withdrawal
+that saves your crews is not dishonour; if you hold the advantage you press it, but you prefer an enemy's surrender to
+a slaughter.
 
 Be true to the battle below: what you say must match what your ships are really doing (if they are breaking off
 too damaged to fight, you cannot claim your group holds the line). Whenever your intent changes, call `decide`.
@@ -124,7 +126,7 @@ class EnemyAgent:
         key = "cmdr_" + contact.lower().replace("-", "")
         COMMANDERS[contact] = dict(key=key, name=persona.get("name", "Unknown commander"), ship=persona.get("ship", "a Mandate warship"),
                                    voice=persona.get("voice", "stuart_bell"), bio=persona.get("bio", ""),
-                                   rank=persona.get("rank", "Ferryman (ship captain)"))
+                                   rank=persona.get("rank", "Ferryman (ship captain)"), mission=persona.get("mission", ""))
         self.dead.discard(contact)
         return key
 
@@ -152,7 +154,10 @@ class EnemyAgent:
         """stimulus: what just came over the channel (the Captain's words) or a situation note."""
         c = COMMANDERS.get(self.contact, COMMANDERS["T-21"])
         history = self.histories.setdefault(self.contact, [])
+        where = str(battle_state.get("location") or "the Aurelia System").split(",")[0]
+        mission = f"Your orders: {c['mission']}" if c.get("mission") else OPENING_MISSION
         system = PERSONA.format(name=c["name"], rank=c["rank"], ship=c["ship"], bio=c["bio"], command_line=self._command_line(battle_state),
+                                where=where, mission=mission,
                                 lang_name=LANG_NAMES.get(lang, lang), captain=CAPTAIN_WORD.get(lang, "Captain"),
                                 state=json.dumps(_mandate_view(battle_state), ensure_ascii=False, separators=(",", ":")))
         msgs = [{"role": "system", "content": system}] + history[-16:] + [{"role": "user", "content": stimulus}]

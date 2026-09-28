@@ -215,6 +215,14 @@ struct FAstraWreck
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 };
 
+/** A Janus transit in progress: the helm flies to the gate's approach lane, then the lane field has the ship. */
+enum class EAstraGateRun : uint8
+{
+	None,
+	Approach,
+	Lane
+};
+
 UCLASS()
 class ASTRA_API UAstraBattleSubsystem : public UTickableWorldSubsystem
 {
@@ -254,6 +262,15 @@ public:
 	/** The war director's next beat (from the mind): raid | distress | reinforcements | resupply | calm. Contact ids are
 	 *  assigned now (so the mind can give the new commanders a persona before they arrive). */
 	bool StartBeat(const TSharedPtr<FJsonObject>& Beat, FString& OutDetail);
+	/** Janus transit, on the Captain's order (helm) or Fleet's: the helm flies at full ahead to the gate's approach lane;
+	 *  inside the lane the gate's field takes the ship and draws her through the ring into the destination system.
+	 *  Args: system_name (+ star_class, planet_type, planet_name when the director charts a new system). */
+	bool BeginGateRun(const TSharedPtr<FJsonObject>& Args, FString& OutDetail);
+	void AbortGateRun();
+	bool IsGateRunActive() const { return GateRun != EAstraGateRun::None; }
+	bool IsInLane() const { return GateRun == EAstraGateRun::Lane; }
+	/** Where the system's Janus Gate is, Fleet's orders, the transit under way (for the crew and the screens). */
+	FString GateStatus() const;
 	/** Where a live contact is from the Aquila, aimed at its lead point (for the helm's intercept). */
 	bool ContactGeometry(const FString& ContactId, double& OutBearing, double& OutMark, double& OutRangeKm) const;
 	void SetPlayerShields(bool bUp) { if (Ships.Num()) { Ships[0].bShieldsUp = bUp; } }
@@ -298,8 +315,24 @@ private:
 	float RepairUntil = -1.f, RepairHullPerSec = 0.f;
 	int32 RepairMissiles = 0;
 	float CalmUntil = -1.f;
-	float TransitAt = -1.f;             // a Janus transit is counting down
-	TSharedPtr<FJsonObject> TransitBeat;
+	TSharedPtr<FJsonObject> TransitBeat; // the destination of the Janus transit under way (system name and look)
+	EAstraGateRun GateRun = EAstraGateRun::None;
+	int32 GateLandmark = INDEX_NONE;    // the system's Janus Gate in Landmarks
+	float GateSide = 1.f;               // the face of the ring we approach (+1 = along the gate's axis)
+	float GateSteerT = 0.f;
+	FString GateDest;                   // destination of the run under way
+	FString FleetOrderedDest;           // Fleet orders a transit (the director); the Captain decides when to go
+	double LaneT = 0.0, LaneDur = 20.0, LaneK = 0.4;   // the lane: time, duration, initial speed share of the ease
+	FVector LaneP0 = FVector::ZeroVector, LaneT0 = FVector::ZeroVector, LaneP1 = FVector::ZeroVector, LaneT1 = FVector::ZeroVector;
+	bool bLaneSound = false, bLaneFade = false;
+	float GateHeat = 0.f;               // the ring's glow after a transit (1 = just came through), fading
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> GateGlyphMID;
+	// the approach lane's markers on both faces of the ring: hoops of light every 2.5 km, a wave running into the gate
+	UPROPERTY() TArray<TObjectPtr<UMaterialInstanceDynamic>> LaneRingMIDs;
+	TArray<int32> LaneRingIdx;          // in Landmarks
+	TArray<float> LaneRingAxial;        // signed distance from the ring along the gate's axis (m)
+	void TickGateRun(float Dt);
+	void SpawnGate(const FVector& Pos, const FQuat& Att);
 	void DoTransit(const TSharedPtr<FJsonObject>& Beat);
 	void ArriveBeat(const TSharedPtr<FJsonObject>& Beat);
 	int32 SpawnClass(const FString& Class, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);

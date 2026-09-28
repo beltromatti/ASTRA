@@ -274,6 +274,24 @@ class Mind:
             finally:
                 self.voice.low_priority = False
 
+    async def story_watch(self) -> None:
+        """The war never stalls: when nothing has moved the story for a long while (no fight, no transit under way),
+        the director decides what happens — Rourke presses the Captain, or the war comes to the Aquila."""
+        while True:
+            await asyncio.sleep(15)
+            st = self.game.state if (self.game and self.game.state) else None
+            if not st or not self.clients or not self.director.campaign or self.director.busy:
+                continue
+            quiet = time.monotonic() - self.director.last_event_t
+            hostile = any(str(c.get("status", "")).startswith("hostile") for c in st.get("contacts", []) or [])
+            gate = str(st.get("janus_gate", ""))
+            if hostile or st.get("alert") == "red" or quiet < 420 or "under way" in gate or "lane" in gate:
+                continue
+            why = "the Captain has not acted on Fleet's transit orders" if "Fleet orders" in gate else "nothing has happened"
+            log.info("story stalled for %.0f s: %s", quiet, why)
+            asyncio.create_task(self.director.on_event(f"director: story stalled — {why} for {int(quiet // 60)} minutes",
+                                                       self.lang, self._battle_state()))
+
     async def turn_worker(self) -> None:
         while True:
             text, lang = await self.turns.get()
@@ -425,6 +443,7 @@ class Mind:
         asyncio.create_task(self.voice.run())
         asyncio.create_task(self.turn_worker())
         asyncio.create_task(self.quiet_moments())
+        asyncio.create_task(self.story_watch())
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)

@@ -34,8 +34,18 @@ namespace
 	TArray<FString> GKillRequests;
 	TArray<TArray<FString>> GTransitRequests;
 	FAutoConsoleCommand CmdBattleTransit(TEXT("astra.battle.transit"),
-		TEXT("Janus transit (testing): astra.battle.transit <system_name> <red_dwarf|orange|yellow|blue_white> <ocean|desert|ice|lava|gas_giant|barren> <planet_name> [delay_s]"),
-		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num() >= 3) { GTransitRequests.Add(A); } }));
+		TEXT("Janus transit (testing; the helm flies to the gate): astra.battle.transit <system_name> [red_dwarf|orange|yellow|blue_white] [ocean|desert|ice|lava|gas_giant|barren] [planet_name]"),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num() >= 1) { GTransitRequests.Add(A); } }));
+	bool GGateJump = false;
+	FAutoConsoleCommand CmdBattleGateJump(TEXT("astra.battle.gatejump"), TEXT("Testing: put the Aquila 30 km in front of the Janus Gate, bow on"),
+		FConsoleCommandDelegate::CreateLambda([]() { GGateJump = true; }));
+	FString EtaText(double Seconds)
+	{
+		const int32 S = FMath::Max(0, FMath::RoundToInt(Seconds / 10.0) * 10);
+		return S >= 60 ? FString::Printf(TEXT("%d min %02d s"), S / 60, S % 60) : FString::Printf(TEXT("%d s"), FMath::Max(S, 10));
+	}
+	const double LaneEntryKm = 25.0;    // the gate's approach lane opens this far off the ring
+	const float LaneRingStepM = 2500.f; // the lane's markers, every 2.5 km out to 22.5 km
 	FAutoConsoleCommand CmdBattleKill(TEXT("astra.battle.kill"), TEXT("Destroy a contact at once (testing effects): astra.battle.kill <contact id>"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num()) { GKillRequests.Add(A[0].ToUpper()); } }));
 	FAutoConsoleCommand CmdBattleSpawn(TEXT("astra.battle.spawn"),
@@ -147,22 +157,9 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		}
 	}
 	// Janus Gate Aurelia: 110 km out on bearing 070 (where the Mandate comes from), its ring facing us
-	if (UStaticMesh* GateMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Space/SM_JANUS_Gate.SM_JANUS_Gate")))
 	{
-		FAstraWreck G;
-		G.Pos = Ships[0].Pos + Polar(110 * Km, 70, 3);
-		G.Att = FRotationMatrix::MakeFromX((Ships[0].Pos - G.Pos).GetSafeNormal()).ToQuat() * FQuat(FVector::XAxisVector, 0.3f);
-		G.SpinDeg = 0.f;
-		FActorSpawnParameters GP;
-		GP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		G.Actor = InWorld.SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, GP);
-		G.Actor->SetMobility(EComponentMobility::Movable);
-		UStaticMeshComponent* GC = G.Actor->GetStaticMeshComponent();
-		GC->SetStaticMesh(GateMesh);
-		GC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		GC->SetCastShadow(false);
-		GC->bAffectDistanceFieldLighting = false;
-		Landmarks.Add(G);
+		const FVector GPos = Ships[0].Pos + Polar(110 * Km, 70, 3);
+		SpawnGate(GPos, FRotationMatrix::MakeFromX((Ships[0].Pos - GPos).GetSafeNormal()).ToQuat() * FQuat(FVector::XAxisVector, 0.3f));
 	}
 	SyncVisuals();
 	UE_LOG(LogASTRA, Log, TEXT("[Battle] scenario 'Aurelia patrol' ready: %d ships"), Ships.Num());
@@ -305,17 +302,31 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	for (const TArray<FString>& A : GTransitRequests)
 	{
 		TSharedPtr<FJsonObject> B = MakeShared<FJsonObject>();
-		B->SetStringField(TEXT("type"), TEXT("transit"));
 		B->SetStringField(TEXT("system_name"), A[0].Replace(TEXT("_"), TEXT(" ")));
-		B->SetStringField(TEXT("star_class"), A[1]);
-		B->SetStringField(TEXT("planet_type"), A[2]);
+		B->SetStringField(TEXT("star_class"), A.IsValidIndex(1) ? A[1] : FString());
+		B->SetStringField(TEXT("planet_type"), A.IsValidIndex(2) ? A[2] : FString());
 		B->SetStringField(TEXT("planet_name"), A.IsValidIndex(3) ? A[3].Replace(TEXT("_"), TEXT(" ")) : FString());
-		B->SetNumberField(TEXT("delay_s"), A.IsValidIndex(4) ? FCString::Atof(*A[4]) : 20.0);
 		FString Detail;
-		StartBeat(B, Detail);
+		BeginGateRun(B, Detail);
+		UE_LOG(LogASTRA, Log, TEXT("[Battle] transit request: %s"), *Detail);
 	}
 	GTransitRequests.Reset();
+	if (GGateJump && Landmarks.IsValidIndex(GateLandmark))
+	{
+		GGateJump = false;
+		const FAstraWreck& G = Landmarks[GateLandmark];
+		const FVector Axis = G.Att.GetForwardVector();
+		const float Side = FVector::DotProduct(Ships[0].Pos - G.Pos, Axis) >= 0.0 ? 1.f : -1.f;
+		Ships[0].Pos = G.Pos + Axis * Side * 30 * Km;
+		const FVector Dir = -Axis * Side;
+		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+		{
+			Ship->DriveExternally(FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)),
+			                      FMath::RadiansToDegrees(FMath::Atan2(Dir.Z, FVector2D(Dir.X, Dir.Y).Size())), Ship->GetSpeedMps());
+		}
+	}
 	TickPlayer(Dt);
+	TickGateRun(Dt);
 	TickScenario(Dt);
 	TickSquadrons(Dt);
 	for (FAstraBattleShip& S : Ships)
@@ -364,7 +375,10 @@ void UAstraBattleSubsystem::TickPlayer(float Dt)
 		               : M == TEXT("port") ? FVector(0, -1, 0) : M == TEXT("starboard") ? FVector(0, 1, 0)
 		               : M == TEXT("dorsal") ? FVector(0, 0, 1) : M == TEXT("ventral") ? FVector(0, 0, -1) : FVector::ZeroVector;
 	}
-	P.Pos += P.Vel * Dt;
+	if (GateRun != EAstraGateRun::Lane)   // in the lane the gate's field moves the ship (TickGateRun)
+	{
+		P.Pos += P.Vel * Dt;
+	}
 }
 
 void UAstraBattleSubsystem::TickScenario(float Dt)
@@ -476,11 +490,6 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 				Report(TEXT("director: beat complete — resupply"), false);
 			}
 		}
-	}
-	if (TransitAt > 0.f && Time >= TransitAt)
-	{
-		TransitAt = -1.f;
-		DoTransit(TransitBeat);
 	}
 	if (CalmUntil > 0.f && Time >= CalmUntil)
 	{
@@ -2501,13 +2510,34 @@ bool UAstraBattleSubsystem::StartBeat(const TSharedPtr<FJsonObject>& Beat, FStri
 	}
 	if (Type == TEXT("transit"))
 	{
-		FString Name = TEXT("an unknown");
+		// Fleet orders the transit and Keeper Station tunes the gate; the Captain decides when the Aquila goes through
+		FString Name, Star, Planet, PName;
 		Beat->TryGetStringField(TEXT("system_name"), Name);
-		const double D = FMath::Clamp(Delay, 20.0, 120.0);
-		TransitAt = Time + (float)D;
-		TransitBeat = Beat;
-		Report(FString::Printf(TEXT("helm: Janus transit to the %s system in %.0f seconds — the gate is spinning up, all hands to transit stations"), *Name, D));
-		OutDetail = FString::Printf(TEXT("transit to the %s system in %.0f s"), *Name, D);
+		Beat->TryGetStringField(TEXT("star_class"), Star);
+		Beat->TryGetStringField(TEXT("planet_type"), Planet);
+		Beat->TryGetStringField(TEXT("planet_name"), PName);
+		UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+		if (Name.TrimStartAndEnd().IsEmpty() || !Ship || !Landmarks.IsValidIndex(GateLandmark))
+		{
+			OutDetail = TEXT("a transit needs a destination system and a gate");
+			return false;
+		}
+		if (bEngagementActive)
+		{
+			OutDetail = TEXT("the Aquila is in the middle of an engagement");
+			return false;
+		}
+		if (Name.TrimStartAndEnd().Equals(Ship->GetSystemName(), ESearchCase::IgnoreCase))
+		{
+			OutDetail = FString::Printf(TEXT("the Aquila is already in the %s system"), *Ship->GetSystemName());
+			return false;
+		}
+		const FAstraSystemLook L = Ship->ChartSystem(Name, Star, Planet, PName);
+		FleetOrderedDest = L.Name;
+		Report(FString::Printf(TEXT("comms: orders from Fleet — the Aquila is to transit the Janus Gate to the %s system; Keeper Station has "
+		                            "tuned the gate for us. The helm lays in the approach on the Captain's order (%s)"), *L.Name, *GateStatus()));
+		OutDetail = FString::Printf(TEXT("Fleet orders the Aquila to the %s system (%s star, %s world %s); the gate is tuned, the Captain "
+		                                 "decides when to go through"), *L.Name, *L.StarClass, *L.PlanetType, *L.PlanetName);
 		return true;
 	}
 	if (Type != TEXT("raid") && Type != TEXT("distress") && Type != TEXT("reinforcements"))
@@ -2718,24 +2748,330 @@ void UAstraBattleSubsystem::HullSound(const TCHAR* Name, float Volume, float Min
 }
 
 // ---------------------------------------------------------------------------------------------- Janus transit
+void UAstraBattleSubsystem::SpawnGate(const FVector& Pos, const FQuat& Att)
+{
+	UStaticMesh* GateMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Space/SM_JANUS_Gate.SM_JANUS_Gate"));
+	if (!GateMesh || !GetWorld())
+	{
+		return;
+	}
+	FAstraWreck G;
+	G.Pos = Pos;
+	G.Att = Att;
+	G.SpinDeg = 0.f;
+	FActorSpawnParameters GP;
+	GP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	G.Actor = GetWorld()->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, GP);
+	G.Actor->SetMobility(EComponentMobility::Movable);
+	UStaticMeshComponent* GC = G.Actor->GetStaticMeshComponent();
+	GC->SetStaticMesh(GateMesh);
+	GC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GC->SetCastShadow(false);
+	GC->bAffectDistanceFieldLighting = false;
+	GateGlyphMID = nullptr;
+	for (int32 i = 0; i < GC->GetNumMaterials(); ++i)
+	{
+		if (const UMaterialInterface* M = GC->GetMaterial(i); M && M->GetName().Contains(TEXT("Glyph")))
+		{
+			GateGlyphMID = GC->CreateAndSetMaterialInstanceDynamic(i);
+		}
+	}
+	Landmarks.Add(G);
+	GateLandmark = Landmarks.Num() - 1;
+	LaneRingMIDs.Reset();
+	LaneRingIdx.Reset();
+	LaneRingAxial.Reset();
+	UStaticMesh* RingM = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Space/SM_JANUS_LaneRing.SM_JANUS_LaneRing"));
+	if (!RingM || !GlowMat)
+	{
+		return;
+	}
+	for (const int32 Side : {1, -1})
+	{
+		for (int32 k = 1; k <= 9; ++k)
+		{
+			FAstraWreck W;
+			W.Pos = Pos + Att.GetForwardVector() * (Side * k * LaneRingStepM);
+			W.Att = Att * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(k * 4.f));
+			W.SpinDeg = 0.f;
+			FActorSpawnParameters RP;
+			RP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			W.Actor = GetWorld()->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, RP);
+			W.Actor->SetMobility(EComponentMobility::Movable);
+			UStaticMeshComponent* RC = W.Actor->GetStaticMeshComponent();
+			RC->SetStaticMesh(RingM);
+			RC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			RC->SetCastShadow(false);
+			UMaterialInstanceDynamic* M = RC->CreateAndSetMaterialInstanceDynamicFromMaterial(0, GlowMat);
+			M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.55f, 0.85f, 1.f));
+			M->SetScalarParameterValue(TEXT("Intensity"), 0.f);
+			W.Actor->SetActorHiddenInGame(true);
+			Landmarks.Add(W);
+			LaneRingIdx.Add(Landmarks.Num() - 1);
+			LaneRingMIDs.Add(M);
+			LaneRingAxial.Add(Side * k * LaneRingStepM);
+		}
+	}
+}
+
+bool UAstraBattleSubsystem::BeginGateRun(const TSharedPtr<FJsonObject>& Args, FString& OutDetail)
+{
+	FString Name, Star, Planet, PName;
+	if (Args.IsValid())
+	{
+		Args->TryGetStringField(TEXT("system_name"), Name);
+		Args->TryGetStringField(TEXT("star_class"), Star);
+		Args->TryGetStringField(TEXT("planet_type"), Planet);
+		Args->TryGetStringField(TEXT("planet_name"), PName);
+	}
+	Name.TrimStartAndEndInline();
+	if (Name.IsEmpty())
+	{
+		Name = FleetOrderedDest;   // "take us through" = where Fleet sends us
+	}
+	UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+	if (Name.IsEmpty())
+	{
+		OutDetail = TEXT("which system? Keeper Station needs a destination to tune the gate");
+		return false;
+	}
+	if (!Ship || Ships.Num() == 0 || !Landmarks.IsValidIndex(GateLandmark))
+	{
+		OutDetail = TEXT("there is no Janus Gate in this system");
+		return false;
+	}
+	if (GateRun == EAstraGateRun::Lane)
+	{
+		OutDetail = FString::Printf(TEXT("already in the gate's lane to the %s system"), *GateDest);
+		return false;
+	}
+	if (Name.Equals(Ship->GetSystemName(), ESearchCase::IgnoreCase))
+	{
+		OutDetail = FString::Printf(TEXT("the Aquila is already in the %s system"), *Ship->GetSystemName());
+		return false;
+	}
+	const FAstraSystemLook L = Ship->ChartSystem(Name, Star, Planet, PName);
+	TransitBeat = MakeShared<FJsonObject>();
+	TransitBeat->SetStringField(TEXT("system_name"), L.Name);
+	TransitBeat->SetStringField(TEXT("star_class"), L.StarClass);
+	TransitBeat->SetStringField(TEXT("planet_type"), L.PlanetType);
+	TransitBeat->SetStringField(TEXT("planet_name"), L.PlanetName);
+	GateDest = L.Name;
+	const FAstraWreck& G = Landmarks[GateLandmark];
+	const FVector Axis = G.Att.GetForwardVector();
+	GateSide = FVector::DotProduct(Ships[0].Pos - G.Pos, Axis) >= 0.0 ? 1.f : -1.f;
+	GateRun = EAstraGateRun::Approach;
+	GateSteerT = 0.f;
+	Ship->SetThrottle(100.f);
+	const FVector Aim = G.Pos + Axis * GateSide * LaneEntryKm * Km;
+	const double D = FVector::Dist(Ships[0].Pos, Aim);
+	OutDetail = FString::Printf(TEXT("course laid in for the Janus Gate (bearing %03.0f, %.0f km); Keeper Station tunes it to the %s system (%s star). "
+	                                 "Full ahead to the approach lane %.0f km off the ring, where the gate's field takes the ship and draws her "
+	                                 "through (no turning back once in the lane); transit in about %s%s"),
+	                            BearingDeg(Ships[0].Pos, G.Pos), FVector::Dist(Ships[0].Pos, G.Pos) / Km, *L.Name, *L.StarClass.Replace(TEXT("_"), TEXT("-")),
+	                            LaneEntryKm, *EtaText(D / 480.0 + 22.0), bEngagementActive ? TEXT(" — the engagement will be left behind") : TEXT(""));
+	Report(FString::Printf(TEXT("helm: Janus approach to the %s system begun"), *L.Name), false);
+	return true;
+}
+
+void UAstraBattleSubsystem::AbortGateRun()
+{
+	if (GateRun == EAstraGateRun::Approach)
+	{
+		GateRun = EAstraGateRun::None;
+		Report(FString::Printf(TEXT("helm: Janus approach to the %s system cancelled"), *GateDest), false);
+		GateDest.Empty();
+	}
+}
+
+FString UAstraBattleSubsystem::GateStatus() const
+{
+	if (!Landmarks.IsValidIndex(GateLandmark) || Ships.Num() == 0)
+	{
+		return TEXT("no Janus Gate in this system");
+	}
+	const FAstraWreck& G = Landmarks[GateLandmark];
+	const FAstraBattleShip& P = Ships[0];
+	FString Out = FString::Printf(TEXT("Janus Gate: bearing %03.0f mark %.0f, %.1f km"), BearingDeg(P.Pos, G.Pos), MarkDeg(P.Pos, G.Pos),
+	                              FVector::Dist(P.Pos, G.Pos) / Km);
+	if (GateRun == EAstraGateRun::Approach)
+	{
+		const FVector Aim = G.Pos + G.Att.GetForwardVector() * GateSide * LaneEntryKm * Km;
+		const double D = FVector::Dist(P.Pos, Aim);
+		Out += FString::Printf(TEXT("; Janus approach to the %s system under way: %.0f km to the lane, transit in about %s"), *GateDest, D / Km,
+		                       *EtaText(D / FMath::Max(150.0, (double)P.Vel.Size()) + 22.0));
+	}
+	else if (GateRun == EAstraGateRun::Lane)
+	{
+		Out += FString::Printf(TEXT("; in the gate's lane to the %s system: helm locked, transit in %.0f s"), *GateDest, FMath::Max(0.0, LaneDur - LaneT));
+	}
+	else if (!FleetOrderedDest.IsEmpty())
+	{
+		Out += FString::Printf(TEXT("; Fleet orders a transit to the %s system (the gate is tuned for us): the helm lays in the approach on the "
+		                            "Captain's order"), *FleetOrderedDest);
+	}
+	return Out;
+}
+
+void UAstraBattleSubsystem::TickGateRun(float Dt)
+{
+	// the ring's glyphs: calm, tuned (a slow pulse), spinning up in the lane, hot after a transit
+	const float Pulse = 0.5f + 0.5f * FMath::Sin(Time * 1.7f);
+	GateHeat = FMath::Max(0.f, GateHeat - Dt / 14.f);
+	float Glow = 1.f;
+	if (GateRun == EAstraGateRun::Lane)
+	{
+		const float X = (float)FMath::Clamp(LaneT / LaneDur, 0.0, 1.0);
+		Glow = 2.5f + 16.f * X * X;
+	}
+	else if (GateRun == EAstraGateRun::Approach || !FleetOrderedDest.IsEmpty())
+	{
+		Glow = 1.6f + 0.9f * Pulse;
+	}
+	Glow = FMath::Max(Glow, 1.f + 10.f * GateHeat * GateHeat);
+	if (GateGlyphMID)
+	{
+		GateGlyphMID->SetScalarParameterValue(TEXT("Intensity"), 70.f * Glow);
+		const float W = FMath::Clamp((Glow - 1.f) / 12.f, 0.f, 1.f);
+		GateGlyphMID->SetVectorParameterValue(TEXT("EmissiveColor"), FMath::Lerp(FLinearColor(0.55f, 0.85f, 1.f), FLinearColor(0.9f, 0.96f, 1.f), W));
+	}
+	// the lane's markers on our face of the ring: dark when the gate is idle; tuned, a slow wave of light runs along them
+	// into the ring; in the lane they blaze and the wave races; after a transit they cool down with the ring
+	if (Landmarks.IsValidIndex(GateLandmark) && Ships.Num() > 0)
+	{
+		const FAstraWreck& G0 = Landmarks[GateLandmark];
+		const bool bTuned = GateRun != EAstraGateRun::None || !FleetOrderedDest.IsEmpty();
+		const float Side = GateRun != EAstraGateRun::None ? GateSide
+		                 : (FVector::DotProduct(Ships[0].Pos - G0.Pos, G0.Att.GetForwardVector()) >= 0.0 ? 1.f : -1.f);
+		const bool bLane = GateRun == EAstraGateRun::Lane;
+		const float WaveSpeed = bLane ? 3.f : 0.9f;                 // rings per second
+		const float Wave = 9.5f - FMath::Fmod(Time * WaveSpeed, 11.f);  // ring index the band is on (9 -> 0)
+		for (int32 i = 0; i < LaneRingMIDs.Num(); ++i)
+		{
+			if (!LaneRingMIDs[i] || !Landmarks.IsValidIndex(LaneRingIdx[i]) || !Landmarks[LaneRingIdx[i]].Actor)
+			{
+				continue;
+			}
+			const float Axial = LaneRingAxial[i];
+			const float K = FMath::Abs(Axial) / LaneRingStepM;
+			float B = 0.f;
+			if (Axial * Side > 0.f)
+			{
+				if (bTuned)
+				{
+					B = (bLane ? 0.7f : 0.22f) + FMath::Exp(-FMath::Square(K - Wave) / 0.7f) * (bLane ? 1.6f : 1.f);
+				}
+				B = FMath::Max(B, GateHeat * GateHeat * 1.5f);
+			}
+			AActor* RA = Landmarks[LaneRingIdx[i]].Actor;
+			RA->SetActorHiddenInGame(B < 0.01f);
+			LaneRingMIDs[i]->SetScalarParameterValue(TEXT("Intensity"), 70.f * B);
+		}
+	}
+	if (GateRun == EAstraGateRun::None || !Landmarks.IsValidIndex(GateLandmark) || Ships.Num() == 0)
+	{
+		return;
+	}
+	UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	if (!Ship)
+	{
+		return;
+	}
+	FAstraBattleShip& P = Ships[0];
+	const FAstraWreck& G = Landmarks[GateLandmark];
+	const FVector N = G.Att.GetForwardVector() * GateSide;   // out of the ring, towards our side
+	if (GateRun == EAstraGateRun::Approach)
+	{
+		const FVector Rel = P.Pos - G.Pos;
+		const double A = FVector::DotProduct(Rel, N);
+		const double R = (Rel - N * A).Size();
+		const FVector F = P.Att.GetForwardVector();
+		// inside the approach cone, bow towards the ring: the lane field takes the ship
+		if (A > 3 * Km && A < 2 * LaneEntryKm * Km && R < 0.5 * A + 4 * Km && FVector::DotProduct(F, -N) > 0.35)
+		{
+			GateRun = EAstraGateRun::Lane;
+			LaneT = 0.0;
+			LaneP0 = P.Pos;
+			LaneP1 = G.Pos;
+			const double L = FVector::Dist(LaneP0, LaneP1);
+			LaneT0 = F * L;
+			LaneT1 = -N * L;
+			LaneDur = FMath::Clamp(L / 1250.0, 12.0, 32.0);
+			LaneK = FMath::Clamp(FMath::Max(150.0, (double)P.Vel.Size()) * LaneDur / L, 0.05, 1.0);
+			bLaneSound = bLaneFade = false;
+			Ship->SetLaneControl(true);
+			Report(FString::Printf(TEXT("helm: the gate's lane field has the Aquila — helm locked, transit to the %s system in %.0f seconds"),
+			                       *GateDest, LaneDur));
+			return;
+		}
+		if ((GateSteerT -= Dt) <= 0.f)
+		{
+			GateSteerT = 0.5f;
+			const FVector Aim = G.Pos + N * LaneEntryKm * Km;
+			Ship->SteerTo((float)BearingDeg(P.Pos, Aim), (float)MarkDeg(P.Pos, Aim));
+		}
+		return;
+	}
+	// in the lane: a smooth path from where the field took us to the heart of the ring, faster and faster
+	LaneT += Dt;
+	const double X = FMath::Clamp(LaneT / LaneDur, 0.0, 1.0);
+	const double U = LaneK * X + (1.0 - LaneK) * X * X;
+	const double DUdt = (LaneK + 2.0 * (1.0 - LaneK) * X) / LaneDur;
+	const double U2 = U * U, U3 = U2 * U;
+	const FVector Pos = LaneP0 * (2 * U3 - 3 * U2 + 1) + LaneT0 * (U3 - 2 * U2 + U) + LaneP1 * (-2 * U3 + 3 * U2) + LaneT1 * (U3 - U2);
+	const FVector Tan = LaneP0 * (6 * U2 - 6 * U) + LaneT0 * (3 * U2 - 4 * U + 1) + LaneP1 * (-6 * U2 + 6 * U) + LaneT1 * (3 * U2 - 2 * U);
+	const FVector Dir = Tan.GetSafeNormal();
+	const float H = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X));
+	const float M = FMath::RadiansToDegrees(FMath::Atan2(Dir.Z, FVector2D(Dir.X, Dir.Y).Size()));
+	P.Vel = Tan * DUdt;
+	P.Pos = Pos;
+	Ship->DriveExternally(H, M, (float)P.Vel.Size());
+	P.Att = FRotator(M, H, 0.f).Quaternion();
+	Shake = FMath::Max(Shake, (float)(0.08 + 0.4 * X * X * X));
+	if (!bLaneSound && LaneT >= LaneDur - 2.3)
+	{
+		bLaneSound = true;   // the recording's crack lands on the crossing
+		HullSound(TEXT("SW_Transit"), 1.f, 0.f);
+	}
+	if (!bLaneFade && LaneT >= LaneDur - 0.35)
+	{
+		bLaneFade = true;
+		if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+		{
+			Cam->StartCameraFade(0.f, 1.f, 0.35f, FLinearColor::White, false, true);
+		}
+	}
+	if (X >= 1.0)
+	{
+		DoTransit(TransitBeat);
+	}
+}
+
 void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
 {
 	if (!Beat.IsValid() || Ships.Num() == 0)
 	{
 		return;
 	}
-	FString Name = TEXT("Unknown"), Star = TEXT("yellow"), Planet = TEXT("barren"), PName;
+	FString Name = TEXT("Unknown"), Star, Planet, PName;
 	Beat->TryGetStringField(TEXT("system_name"), Name);
 	Beat->TryGetStringField(TEXT("star_class"), Star);
 	Beat->TryGetStringField(TEXT("planet_type"), Planet);
 	Beat->TryGetStringField(TEXT("planet_name"), PName);
-	// the gate's flash and the jolt through the hull
+	UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const FString From = Ship ? Ship->GetSystemName() : FString(TEXT("Aurelia"));
+	const bool bLeftFight = bEngagementActive;
+	const float ExitSpeed = FMath::Max(600.f, (float)Ships[0].Vel.Size());
+	// the gate's flash and the jolt through the hull (the sound was started in the lane, timed to the crossing)
 	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
 	{
 		Cam->StartCameraFade(1.f, 0.f, 3.5f, FLinearColor::White, false, false);
 	}
 	Shake = 1.f;
-	HullSound(TEXT("SW_Transit"), 1.f, 0.f);
+	if (!bLaneSound)
+	{
+		HullSound(TEXT("SW_Transit"), 1.f, 0.f);
+	}
 	// everything left behind in the old system (our own aircraft come aboard first)
 	for (int32 i = Ships.Num() - 1; i >= 1; --i)
 	{
@@ -2781,43 +3117,34 @@ void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
 	bSurrenderAccepted = false;
 	StageDone = 3;
 	Ships[0].Pos = FVector::ZeroVector;
-	// the gate we came through, behind us
-	if (UStaticMesh* GateMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Space/SM_JANUS_Gate.SM_JANUS_Gate")))
-	{
-		FAstraWreck G;
-		G.Pos = Ships[0].Pos - Ships[0].Att.GetForwardVector() * 22 * Km;
-		G.Att = FRotationMatrix::MakeFromX((Ships[0].Pos - G.Pos).GetSafeNormal()).ToQuat();
-		FActorSpawnParameters GP;
-		GP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		G.Actor = GetWorld()->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, GP);
-		G.Actor->SetMobility(EComponentMobility::Movable);
-		UStaticMeshComponent* GC = G.Actor->GetStaticMeshComponent();
-		GC->SetStaticMesh(GateMesh);
-		GC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		GC->SetCastShadow(false);
-		GC->bAffectDistanceFieldLighting = false;
-		Landmarks.Add(G);
-	}
-	// the new sky: star, main world, nebula tint (stable for a given system name)
-	FRandomStream R((int32)GetTypeHash(Name));
+	// out of the destination's gate: its ring right behind us, the ship still carrying the lane's speed
+	const FVector Bow = Ships[0].Att.GetForwardVector();
+	GateLandmark = INDEX_NONE;
+	SpawnGate(Ships[0].Pos - Bow * 1.5 * Km, FRotationMatrix::MakeFromX(Bow).ToQuat() * FQuat(FVector::XAxisVector, FMath::FRandRange(0.f, 1.f)));
+	GateHeat = 1.f;
+	GateRun = EAstraGateRun::None;
+	FleetOrderedDest.Empty();
+	GateDest.Empty();
+	// the new sky: star, main world, nebula tint (a charted system always looks the same)
 	FAstraSystemLook L;
-	L.Name = Name;
-	L.StarClass = Star;
-	L.PlanetType = Planet;
-	L.PlanetName = PName;
-	L.SunWorld = FVector(R.FRandRange(-0.3f, 0.9f), R.FRandRange(-0.9f, 0.9f), R.FRandRange(0.1f, 0.6f));
-	L.PlanetWorld = FVector(1.f, R.FRandRange(-0.7f, 0.7f), R.FRandRange(-0.22f, 0.12f));
-	L.PlanetSize = Planet == TEXT("gas_giant") ? R.FRandRange(0.35f, 0.5f) : R.FRandRange(0.16f, 0.3f);
-	L.NebulaHue = R.FRandRange(-1.2f, 1.2f);
-	L.NebulaSat = R.FRandRange(0.6f, 1.3f);
-	L.Seed = R.FRandRange(0.f, 50.f);
-	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	if (Ship)
 	{
+		L = Ship->ChartSystem(Name, Star, Planet, PName);
+		Ship->SetLaneControl(false);
+		Ship->SetSpeedMps(ExitSpeed);
+		Ship->SetThrottle(40.f);
 		Ship->ApplySystem(L);
 	}
+	Name = L.Name;
+	Star = L.StarClass;
+	Planet = L.PlanetType;
+	PName = L.PlanetName;
 	SyncVisuals();
-	Report(FString::Printf(TEXT("helm: transit complete — the Aquila is through the gate into the %s system (%s star)%s"), *Name,
-	                       *Star.Replace(TEXT("_"), TEXT(" ")),
-	                       PName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT("; the %s world %s ahead"), *Planet.Replace(TEXT("_"), TEXT(" ")), *PName)));
-	Report(FString::Printf(TEXT("director: beat complete — transit into the %s system (%s star, %s world %s)"), *Name, *Star, *Planet, *PName), false);
+	const bool bHome = Name.Equals(TEXT("Aurelia"), ESearchCase::IgnoreCase);
+	Report(FString::Printf(TEXT("helm: transit complete — the Aquila is through the gate into the %s system (%s star)%s; coasting out of the "
+	                            "lane at %.0f m/s, throttle 40%%"), *Name, *Star.Replace(TEXT("_"), TEXT(" ")),
+	                       bHome ? TEXT(", home: New Ravenna in the distance")
+	                             : *FString::Printf(TEXT("; the %s world %s ahead"), *Planet.Replace(TEXT("_"), TEXT(" ")), *PName), ExitSpeed));
+	Report(FString::Printf(TEXT("director: beat complete — transit from %s into the %s system (%s star, %s world %s)%s"), *From, *Name, *Star, *Planet,
+	                       *PName, bLeftFight ? TEXT("; the Aquila left an engagement behind") : TEXT("")), false);
 }

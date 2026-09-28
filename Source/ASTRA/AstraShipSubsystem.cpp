@@ -13,6 +13,8 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialParameterCollection.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 #include "Sound/SoundBase.h"
 
 namespace
@@ -33,6 +35,37 @@ namespace
 
 	float WrapDeg(float D) { return FMath::Fmod(FMath::Fmod(D, 360.f) + 360.f, 360.f); }
 	float DeltaDeg(float From, float To) { return FMath::FindDeltaAngleDegrees(From, To); }
+
+	// testing: any ship command as the crew (or the director) would send it; single quotes stand for double quotes
+	FAutoConsoleCommandWithWorldAndArgs CmdShip(TEXT("astra.cmd"),
+		TEXT("Run a ship command (testing): astra.cmd <name> <json args, ' for \">, e.g. astra.cmd director_beat {'beat':{'type':'transit','system_name':'Meridian'}}"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			if (A.Num() < 1 || !Ship)
+			{
+				return;
+			}
+			FString Json;
+			for (int32 i = 1; i < A.Num(); ++i)
+			{
+				Json += (i > 1 ? TEXT(" ") : TEXT("")) + A[i];
+			}
+			Json = Json.Replace(TEXT("'"), TEXT("\""));
+			TSharedPtr<FJsonObject> Args = MakeShared<FJsonObject>();
+			if (!Json.IsEmpty())
+			{
+				TSharedRef<TJsonReader<>> R = TJsonReaderFactory<>::Create(Json);
+				if (!FJsonSerializer::Deserialize(R, Args) || !Args.IsValid())
+				{
+					UE_LOG(LogASTRA, Warning, TEXT("[Cmd] bad JSON: %s"), *Json);
+					return;
+				}
+			}
+			FString Detail;
+			const bool bOk = Ship->ApplyCommand(A[0], Args, Detail);
+			UE_LOG(LogASTRA, Log, TEXT("[Cmd] %s -> %s: %s"), *A[0], bOk ? TEXT("ok") : TEXT("FAILED"), *Detail);
+		}));
 }
 
 bool UAstraShipSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -110,6 +143,120 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 			}
 		}
 	}
+	CaptureHomeSky();
+}
+
+void UAstraShipSubsystem::CaptureHomeSky()
+{
+	// Aurelia as the level has it: every sky parameter except the attitude ones (they follow the ship)
+	if (SkyMID)
+	{
+		TArray<FMaterialParameterInfo> Infos;
+		TArray<FGuid> Ids;
+		SkyMID->GetAllScalarParameterInfo(Infos, Ids);
+		for (const FMaterialParameterInfo& I : Infos)
+		{
+			float V = 0.f;
+			if (SkyMID->GetScalarParameterValue(FHashedMaterialParameterInfo(I.Name), V))
+			{
+				HomeScalars.Add(I.Name, V);
+			}
+		}
+		Infos.Reset();
+		Ids.Reset();
+		SkyMID->GetAllVectorParameterInfo(Infos, Ids);
+		for (const FMaterialParameterInfo& I : Infos)
+		{
+			const FString N = I.Name.ToString();
+			if (N.StartsWith(TEXT("SkyAxis")) || N == TEXT("SunDirection"))
+			{
+				continue;
+			}
+			FLinearColor C;
+			if (SkyMID->GetVectorParameterValue(FHashedMaterialParameterInfo(I.Name), C))
+			{
+				HomeVectors.Add(I.Name, C);
+			}
+		}
+	}
+	HomeSunDir0 = SunDir0;
+	if (Sun && Sun->GetLightComponent())
+	{
+		HomeLux = Sun->GetLightComponent()->Intensity;
+		HomeKelvin = Sun->GetLightComponent()->Temperature;
+	}
+	bHomeCaptured = SkyMID != nullptr;
+	FAstraSystemLook Home;   // the defaults are Aurelia's
+	Systems.Add(Home.Name, Home);
+}
+
+FAstraSystemLook UAstraShipSubsystem::ChartSystem(const FString& InName, const FString& Star, const FString& Planet, const FString& PlanetName)
+{
+	const FString Name = InName.TrimStartAndEnd();
+	for (const auto& KV : Systems)
+	{
+		if (KV.Key.Equals(Name, ESearchCase::IgnoreCase))
+		{
+			return KV.Value;
+		}
+	}
+	static const TCHAR* Stars[] = {TEXT("red_dwarf"), TEXT("red_dwarf"), TEXT("orange"), TEXT("orange"), TEXT("yellow"), TEXT("blue_white")};
+	static const TCHAR* Worlds[] = {TEXT("barren"), TEXT("barren"), TEXT("desert"), TEXT("ice"), TEXT("gas_giant"), TEXT("gas_giant"), TEXT("ocean"), TEXT("lava")};
+	auto Valid = [](const FString& V, const TCHAR* const* List, int32 N)
+	{
+		for (int32 i = 0; i < N; ++i)
+		{
+			if (V == List[i]) { return true; }
+		}
+		return false;
+	};
+	FRandomStream R((int32)GetTypeHash(Name.ToLower()));
+	FAstraSystemLook L;
+	L.Name = Name;
+	const FString DerivedStar = Stars[R.RandHelper(UE_ARRAY_COUNT(Stars))];
+	const FString DerivedWorld = Worlds[R.RandHelper(UE_ARRAY_COUNT(Worlds))];
+	L.StarClass = Valid(Star, Stars, UE_ARRAY_COUNT(Stars)) ? Star : DerivedStar;
+	L.PlanetType = Valid(Planet, Worlds, UE_ARRAY_COUNT(Worlds)) ? Planet : DerivedWorld;
+	L.PlanetName = PlanetName.IsEmpty() ? Name + TEXT(" Prime") : PlanetName;
+	L.SunWorld = FVector(R.FRandRange(-0.3f, 0.9f), R.FRandRange(-0.9f, 0.9f), R.FRandRange(0.1f, 0.6f));
+	L.PlanetWorld = FVector(1.f, R.FRandRange(-0.7f, 0.7f), R.FRandRange(-0.22f, 0.12f));
+	L.PlanetSize = L.PlanetType == TEXT("gas_giant") ? R.FRandRange(0.35f, 0.5f) : R.FRandRange(0.16f, 0.3f);
+	L.NebulaHue = R.FRandRange(-1.2f, 1.2f);
+	L.NebulaSat = R.FRandRange(0.6f, 1.3f);
+	L.Seed = R.FRandRange(0.f, 50.f);
+	Systems.Add(Name, L);
+	return L;
+}
+
+FString UAstraShipSubsystem::KnownSystemsLine() const
+{
+	TArray<FString> Parts;
+	for (const auto& KV : Systems)
+	{
+		const FAstraSystemLook& L = KV.Value;
+		Parts.Add(FString::Printf(TEXT("%s (%s star, %s world %s)%s"), *L.Name, *L.StarClass.Replace(TEXT("_"), TEXT("-")),
+		                          *L.PlanetType.Replace(TEXT("_"), TEXT(" ")), *L.PlanetName,
+		                          L.Name.Equals(SystemName, ESearchCase::IgnoreCase) ? TEXT(" — we are here") : TEXT("")));
+	}
+	return FString::Join(Parts, TEXT("; "));
+}
+
+void UAstraShipSubsystem::SteerTo(float Heading, float Mark)
+{
+	InterceptId.Empty();
+	TargetHeadingDeg = WrapDeg(Heading);
+	TargetMarkDeg = FMath::Clamp(Mark, -60.f, 60.f);
+	bTurning = true;
+	bAutoHelm = true;
+}
+
+void UAstraShipSubsystem::DriveExternally(float Heading, float Mark, float Speed)
+{
+	HeadingDeg = TargetHeadingDeg = WrapDeg(Heading);
+	MarkDeg = TargetMarkDeg = FMath::Clamp(Mark, -89.f, 89.f);
+	SpeedMps = Speed;
+	bTurning = false;
+	UpdateAttitudeVisuals();
 }
 
 void UAstraShipSubsystem::Event(const FString& Text, bool bReport)
@@ -150,6 +297,25 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	auto Num = [&Args](const TCHAR* K, double Def = 0.0) { double V = Def; Args->TryGetNumberField(K, V); return V; };
 	auto Str = [&Args](const TCHAR* K) { FString V; Args->TryGetStringField(K, V); return V; };
 
+	if (Name == TEXT("transit_gate"))
+	{
+		return Battle ? Battle->BeginGateRun(Args, OutDetail) : false;
+	}
+	if ((Name == TEXT("intercept") || Name == TEXT("set_course")) && Battle && Battle->IsInLane())
+	{
+		OutDetail = TEXT("impossible: the Janus lane has the ship, the helm answers again after the transit");
+		return false;
+	}
+	FString Aborted;
+	if (Name == TEXT("intercept") || Name == TEXT("set_course"))
+	{
+		bAutoHelm = false;
+		if (Battle && Battle->IsGateRunActive())
+		{
+			Battle->AbortGateRun();
+			Aborted = TEXT(" (Janus approach cancelled)");
+		}
+	}
 	if (Name == TEXT("intercept"))
 	{
 		const FString Id = Str(TEXT("contact_id")).ToUpper();
@@ -165,8 +331,8 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		bBroadside = false;
 		InterceptRangeKm = Rng;
 		OutDetail = FString::Printf(TEXT("intercepting %s: bearing %03.0f mark %.0f, range %.1f km, throttle %.0f%%; at %.0f km the helm turns "
-		                                 "broadside and holds the range (course follows the target)"),
-		                            *Id, Brg, Mk, Rng, ThrottlePct, InterceptStandoffKm);
+		                                 "broadside and holds the range (course follows the target)%s"),
+		                            *Id, Brg, Mk, Rng, ThrottlePct, InterceptStandoffKm, *Aborted);
 		return true;
 	}
 	if (Name == TEXT("set_course"))
@@ -175,7 +341,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		TargetHeadingDeg = WrapDeg((float)Num(TEXT("heading_deg"), HeadingDeg));
 		TargetMarkDeg = FMath::Clamp((float)Num(TEXT("mark_deg"), MarkDeg), -90.f, 90.f);
 		bTurning = true;
-		OutDetail = FString::Printf(TEXT("coming to %03.0f mark %.0f (turn rate 1.5 deg/s)"), TargetHeadingDeg, TargetMarkDeg);
+		OutDetail = FString::Printf(TEXT("coming to %03.0f mark %.0f (turn rate 1.5 deg/s)%s"), TargetHeadingDeg, TargetMarkDeg, *Aborted);
 		return true;
 	}
 	if (Name == TEXT("set_throttle"))
@@ -371,6 +537,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		                                                *InterceptId, InterceptRangeKm, bBroadside ? TEXT("broadside, holding the range") : TEXT("closing"),
 		                                                InterceptStandoffKm));
 	}
+	else if (const UAstraBattleSubsystem* Gate = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr; Gate && Gate->IsGateRunActive())
+	{
+		S->SetStringField(TEXT("helm"), Gate->GateStatus());
+	}
 	else if (bTurning)
 	{
 		S->SetStringField(TEXT("helm"), FString::Printf(TEXT("turning to %03.0f mark %.0f"), TargetHeadingDeg, TargetMarkDeg));
@@ -419,7 +589,12 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		S->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(100.f * Battle->PlayerHullFraction()));
 		Sh->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()));
 	}
-	S->SetStringField(TEXT("bearing_convention"), TEXT("bearings are true bearings in the Aurelia system plane, like headings: steer to a contact's bearing to point at it"));
+	if (Battle)
+	{
+		S->SetStringField(TEXT("janus_gate"), Battle->GateStatus());
+	}
+	S->SetStringField(TEXT("known_systems"), KnownSystemsLine());
+	S->SetStringField(TEXT("bearing_convention"), TEXT("bearings are true bearings in the system plane, like headings: steer to a contact's bearing to point at it"));
 	TArray<TSharedPtr<FJsonValue>> Dmg;
 	int32 Busy = 0;
 	for (const FAstraDamage& D : Damage)
@@ -447,6 +622,12 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 
 void UAstraShipSubsystem::Tick(float DeltaTime)
 {
+	if (bLaneControl)   // the Janus lane drives attitude and speed (DriveExternally)
+	{
+		TickDamage(DeltaTime);
+		UpdateAlertVisuals(DeltaTime);
+		return;
+	}
 	// helm intercept: re-aim at the target's lead point twice a second; broadside inside the standoff (with hysteresis)
 	if (!InterceptId.IsEmpty() && (InterceptRetargetT -= DeltaTime) <= 0.f)
 	{
@@ -487,7 +668,7 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 			HeadingDeg = TargetHeadingDeg;
 			MarkDeg = TargetMarkDeg;
 			bTurning = false;
-			if (InterceptId.IsEmpty())
+			if (InterceptId.IsEmpty() && !bAutoHelm)
 			{
 				Event(FString::Printf(TEXT("helm: turn complete, steady on course %03.0f mark %.0f"), HeadingDeg, MarkDeg), true);
 			}
@@ -659,8 +840,8 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 		D.Kind = Roll < 0.35f ? TEXT("hull breach") : (Roll < 0.65f ? TEXT("fire") : TEXT("conduit damage"));
 		if (D.Kind == TEXT("conduit damage"))
 		{
-			static const TCHAR* Systems[] = {TEXT("shields"), TEXT("weapons"), TEXT("engines"), TEXT("sensors")};
-			D.System = Systems[FMath::RandRange(0, 3)];
+			static const TCHAR* Conduits[] = {TEXT("shields"), TEXT("weapons"), TEXT("engines"), TEXT("sensors")};
+			D.System = Conduits[FMath::RandRange(0, 3)];
 		}
 		Where = FString::Printf(TEXT("%s: %s%s"), *D.Where(), *D.Kind, D.System.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s power -20%%)"), *D.System));
 		// people were in that compartment
@@ -758,6 +939,22 @@ namespace
 
 void UAstraShipSubsystem::ApplySystem(const FAstraSystemLook& L)
 {
+	SystemName = L.Name;
+	if (L.Name.Equals(TEXT("Aurelia"), ESearchCase::IgnoreCase) && bHomeCaptured)
+	{
+		// home: the sky exactly as it was (star, New Ravenna, the nebula), the sun where it belongs among the stars
+		LocationName = TEXT("Aurelia System, home of the 7th Fleet: just through the Janus Gate Aurelia, New Ravenna in the distance");
+		SunDir0 = HomeSunDir0;
+		for (const auto& KV : HomeScalars) { SkyMID->SetScalarParameterValue(KV.Key, KV.Value); }
+		for (const auto& KV : HomeVectors) { SkyMID->SetVectorParameterValue(KV.Key, KV.Value); }
+		if (Sun && Sun->GetLightComponent())
+		{
+			Sun->GetLightComponent()->SetIntensity(HomeLux);
+			Sun->GetLightComponent()->SetTemperature(HomeKelvin);
+		}
+		UpdateAttitudeVisuals();
+		return;
+	}
 	LocationName = FString::Printf(TEXT("%s System, just through the Janus Gate%s"), *L.Name,
 	                               L.PlanetName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", the %s world %s ahead"), *L.PlanetType.Replace(TEXT("_"), TEXT(" ")), *L.PlanetName));
 	const FQuat Delta(FRotator(MarkDeg - Mark0, HeadingDeg - Heading0, 0.f));

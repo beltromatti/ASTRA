@@ -67,6 +67,12 @@ class LocalShip:
             return self._ok(f"intercepting {c['id']}: bearing {c['bearing_deg']:03d}, range {c['range_km']} km")
         if name == "cease_fire":
             return self._ok("all offensive fire stopped; point defense stays on")
+        if name == "transit_gate":
+            dest = (a.get("system_name") or "").strip()
+            if not dest:
+                return {"ok": False, "detail": "which system? Keeper Station needs a destination"}
+            s["helm"] = f"Janus approach to the {dest} system under way"
+            return self._ok(f"course laid in for the Janus Gate; the gate is tuned to the {dest} system, transit in about 3 min")
         if name in ("set_target", "fire_weapons"):
             c = self._contact(a.get("contact_id"))
             if c is None:

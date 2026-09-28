@@ -10,6 +10,7 @@ DST = globals().get("DST", "/Game/ASTRA/Kit/Interior/Corridor")
 NANITE = globals().get("NANITE", True)   # off for translucent/additive props (holograms)
 
 tasks = []
+imported = {os.path.splitext(f)[0] for f in os.listdir(SRC) if f.lower().endswith(".fbx")}   # only these are touched below
 for f in sorted(os.listdir(SRC)):
     if f.lower().endswith(".fbx"):
         t = unreal.AssetImportTask()
@@ -30,7 +31,7 @@ report = []
 eal = unreal.EditorAssetLibrary
 for path in eal.list_assets(DST, recursive=False, include_folder=False):
     asset = eal.load_asset(path)
-    if not isinstance(asset, unreal.StaticMesh):
+    if not isinstance(asset, unreal.StaticMesh) or asset.get_name() not in imported:
         continue
     ns = asset.get_editor_property("nanite_settings")
     is_glass = "Glass" in asset.get_name()

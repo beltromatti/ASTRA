@@ -19,7 +19,7 @@ SPEAK = _fn("speak", "An officer speaks aloud on the bridge (one call per line, 
     ["speaker", "text", "tone"])
 
 SHIP_TOOLS: list[dict[str, Any]] = [
-    _fn("set_course", "Helm: new heading (0-359, relative to the Aurelia system plane) and mark/pitch (-90..90).", {
+    _fn("set_course", "Helm: new heading (0-359, relative to the system plane) and mark/pitch (-90..90).", {
         "heading_deg": {"type": "number", "minimum": 0, "maximum": 359.99},
         "mark_deg": {"type": "number", "minimum": -90, "maximum": 90}}, ["heading_deg", "mark_deg"]),
     _fn("intercept", "Helm: continuous intercept of a contact — the course follows it; at the standoff range the ship "
@@ -27,6 +27,14 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "contact_id": {"type": "string"},
         "standoff_km": {"type": "number", "minimum": 1, "maximum": 30,
                         "description": "range to hold: railguns reach 10 km, lasers 4 km"}}, ["contact_id", "standoff_km"]),
+    _fn("transit_gate", "Helm: take the Aquila through the system's Janus Gate to another star system. The helm flies at "
+                        "full ahead to the gate's approach lane (see janus_gate in the state for where it is), then the "
+                        "gate's field takes the ship and draws her through the ring: once in the lane there is no turning "
+                        "back. Everything in this system (enemies, allies, wrecks) stays behind. Only on the Captain's "
+                        "explicit order. A set_course or intercept before the lane cancels the approach.", {
+        "system_name": {"type": "string", "description": "destination system, English name (known_systems in the state, "
+                                                         "Fleet's orders, or any system the Captain names)"}},
+        ["system_name"]),
     _fn("set_throttle", "Helm: main drive throttle in percent (0 = all stop, 33 = one third, 50 = half, 100 = full = 480 m/s).", {
         "percent": {"type": "number", "minimum": 0, "maximum": 100}}, ["percent"]),
     _fn("set_alert", "Set the ship's alert condition (lighting, stations, doors follow it).", {

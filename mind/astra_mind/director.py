@@ -40,8 +40,9 @@ SHIP = {"type": "object", "properties": {
     "required": ["class", "name"]}
 COMMANDER = {"type": "object", "properties": {
     "name": {"type": "string"}, "rank": {"type": "string", "description": "e.g. Ferryman (ship captain), Warden, Archon"},
-    "bio": {"type": "string", "description": "two sentences: who they are, what drives them, how they talk"}},
-    "required": ["name", "rank", "bio"]}
+    "bio": {"type": "string", "description": "two sentences: who they are, what drives them, how they talk"},
+    "orders": {"type": "string", "description": "their mission here, as the Mandate gave it to them (one sentence)"}},
+    "required": ["name", "rank", "bio", "orders"]}
 
 BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulation.", {
     "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit"]},
@@ -57,7 +58,7 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "hull_pct": {"type": "number", "description": "resupply: hull integrity restored up to this percent"},
     "missiles": {"type": "integer", "description": "resupply: missiles brought aboard"},
     "duration_s": {"type": "number", "description": "resupply: how long it takes (60-300)"},
-    "system_name": {"type": "string", "description": "transit: the star system on the other side of the gate (English name)"},
+    "system_name": {"type": "string", "description": "transit: the star system Fleet sends the Aquila to (English name)"},
     "star_class": {"type": "string", "enum": ["red_dwarf", "orange", "yellow", "blue_white"], "description": "transit"},
     "planet_type": {"type": "string", "enum": ["ocean", "desert", "ice", "lava", "gas_giant", "barren"], "description": "transit"},
     "planet_name": {"type": "string", "description": "transit: the main world seen on arrival"},
@@ -82,9 +83,13 @@ Rules
 - A raid or distress MUST include `commander` for its leader: invent a person (English name, rank, a bio with a reason
   to fight and a way of speaking). Recurring characters are welcome when the story justifies it.
 - Never reuse the name of a ship that is still on the plot (see contacts) for a new ship.
-- transit sends the Aquila through the Janus Gate into another star system (delay 30-90 s for the countdown): use it
-  when the story moves on — chasing the enemy through the gate, a mission on another front, a system that needs
-  help — at most every few beats. Invent the system and its main world (English names), coherent with the war.
+- transit: Fleet orders the Aquila through the Janus Gate to another star system (Keeper Station tunes the gate; the
+  Captain decides when to go, and the war goes on wherever the Aquila is). It is the right beat when the story moves
+  elsewhere: the enemy fled or regroups beyond the gate, another front needs her, a system calls for help. Not right
+  after arriving. Invent the system and its main world (English names, coherent with the war); to send her back
+  somewhere, reuse its name from the campaign log. The Aquila's system is `location`; `known_systems` lists those
+  charted. The Captain may also take the ship through the gate on their own: the log says so, and the story follows.
+- If the Captain has not acted on Fleet's orders for a long while, Rourke may press them, or the war may come to them.
 - Keep the whole thing coherent with the campaign log below and with the live state.
 
 Campaign log (oldest first)
@@ -129,12 +134,14 @@ class Director:
         self.granted = False
         self.voice_i = 0
         self.admiral_history: list[dict[str, Any]] = []
+        self.last_event_t = time.monotonic()   # the last time the story moved (a director event or a beat)
 
     def reset(self) -> None:
         self.campaign.clear()
         self.busy = False
         self.granted = False
         self.admiral_history.clear()
+        self.last_event_t = time.monotonic()
 
     def note(self, text: str) -> None:
         self.campaign.append(text)
@@ -142,7 +149,8 @@ class Director:
 
     # ------------------------------------------------------------------------------------------------ the beats
     async def on_event(self, text: str, lang: str, state: dict[str, Any]) -> None:
-        """text: 'director: engagement over — ...' or 'director: beat complete — ...' from the game."""
+        """text: 'director: engagement over — ...', 'director: beat complete — ...' (the game) or 'director: story stalled — ...'."""
+        self.last_event_t = time.monotonic()
         self.note(text.split(":", 1)[1].strip())
         if "engagement over" in text:
             self.granted = False
@@ -194,7 +202,8 @@ class Director:
             leader_id = ids[1] if beat.get("type") == "distress" and len(ids) > 1 else ids[0]
             self.register(leader_id, {"name": cmd["name"], "rank": cmd.get("rank", "Ferryman (ship captain)"),
                                       "bio": cmd.get("bio", ""), "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),
-                                      "voice": COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)]})
+                                      "voice": COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
+                                      "mission": cmd.get("orders") or beat.get("why", "")})
             self.voice_i += 1
             self.note(f"{cmd['name']} ({cmd.get('rank', '')}) leads it, aboard {first.get('name', '?')} ({leader_id})")
         for line in speech[:2]:
@@ -250,7 +259,7 @@ def _ids(detail: str) -> list[str]:
 
 def _brief(state: dict[str, Any]) -> dict[str, Any]:
     """What the director and the admiral need of the live state (compact)."""
-    keep = ("alert", "hull_pct", "shields", "weapons", "squadrons", "damage_control", "heading_deg", "speed_mps")
+    keep = ("location", "known_systems", "janus_gate", "alert", "hull_pct", "shields", "weapons", "squadrons", "damage_control", "heading_deg", "speed_mps")
     out = {k: state.get(k) for k in keep if k in state}
     out["contacts"] = [{k: c.get(k) for k in ("id", "name", "class", "status", "range_km", "bearing_deg", "hull_pct")}
                        for c in state.get("contacts", []) or []]

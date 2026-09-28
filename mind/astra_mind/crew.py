@@ -120,6 +120,8 @@ Tools
 - `speak` holds only natural spoken words: never tool names, ids in brackets or argument lists.
 - Ships move: to close on, chase or engage a contact use `intercept` (the course keeps following it); `set_course`
   is for a fixed heading. Weapons assigned beyond their range open fire by themselves once the target closes.
+- Leaving the system through the Janus Gate (`transit_gate`) is the Captain's decision alone: when Fleet orders a
+  transit, report it and wait for the Captain's word. "Take us through" means the destination Fleet ordered.
 
 The war so far (the crew lived it; remember the Captain's choices and their consequences)
 {story}

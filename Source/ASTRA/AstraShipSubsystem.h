@@ -114,6 +114,20 @@ public:
 	/** A new star system around the ship (Janus transit): star, sun light, planet, sky tint, location name. */
 	void ApplySystem(const FAstraSystemLook& Look);
 	FString GetLocationName() const { return LocationName; }
+	FString GetSystemName() const { return SystemName; }
+	/** Charted star systems, by name: a system's look is fixed the first time it is charted (the director's choice, or
+	 *  derived from its name: the universe is seeded, the same name is always the same place). Aurelia is home. */
+	FAstraSystemLook ChartSystem(const FString& Name, const FString& Star = FString(), const FString& Planet = FString(),
+	                             const FString& PlanetName = FString());
+	/** "Aurelia (orange star, ocean world New Ravenna); Cassia (...)" for the crew. */
+	FString KnownSystemsLine() const;
+	/** Autopilot (the Janus approach): the helm steers to a heading without the usual turn reports. */
+	void SteerTo(float Heading, float Mark);
+	void SetThrottle(float Pct) { ThrottlePct = FMath::Clamp(Pct, 0.f, 100.f); }
+	void SetSpeedMps(float V) { SpeedMps = V; }
+	/** The Janus lane has the ship: attitude and speed come from the gate's field until the transit. */
+	void SetLaneControl(bool bOn) { bLaneControl = bOn; bAutoHelm = false; }
+	void DriveExternally(float Heading, float Mark, float Speed);
 
 	/** Effective power of a system as a fraction of nominal: the allocation, minus what damaged conduits lose (0..1.5). */
 	float PowerFactor(const FString& System) const;
@@ -144,6 +158,17 @@ private:
 	TArray<FString> RecentEvents;
 	TArray<FAstraDamage> Damage;      // open incidents inside the hull
 	FString LocationName = TEXT("Aurelia System, en route to New Ravenna high orbit");
+	FString SystemName = TEXT("Aurelia");
+	TMap<FString, FAstraSystemLook> Systems;   // charted systems
+	bool bLaneControl = false;                 // the Janus lane drives the ship
+	bool bAutoHelm = false;                    // the gate approach autopilot steers (no turn reports)
+	// the home sky as the level sets it, restored when the Aquila comes back to Aurelia
+	TMap<FName, float> HomeScalars;
+	TMap<FName, FLinearColor> HomeVectors;
+	FVector HomeSunDir0 = FVector::ForwardVector;
+	float HomeLux = 0.f, HomeKelvin = 0.f;
+	bool bHomeCaptured = false;
+	void CaptureHomeSky();
 	int32 NextDamageId = 1;
 	int32 Wounded = 0, Killed = 0;    // the crew's cost
 	static constexpr int32 NumDamageTeams = 4;
