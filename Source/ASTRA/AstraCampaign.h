@@ -30,6 +30,10 @@ public:
 	void StartNew();
 	void Continue();
 	void SaveNow(const TCHAR* Why);
+	/** After the loss of the Aquila: the Captain's new command, a sister ship renamed Aquila, weeks later in System —
+	 *  the save is rewritten (a new hull, a full magazine and air group; the fallen stay fallen, the wounded have
+	 *  healed or gone home) and the level starts over from it. */
+	void NewCommand(const FString& System);
 	bool IsStarted() const { return bStarted; }
 
 	/** The title menu (bInGame: opened with Esc during play — the game pauses, Resume comes first). */

@@ -90,6 +90,17 @@ protected:
 	UFUNCTION(Exec) void AstraTypeTest(const FString& Text);
 	void OpenOrderLine();
 	void CloseOrderLine();
+	TSharedPtr<class SWidget> StoryWidget;
+	TSharedPtr<class SBorder> StoryShade;
+	TSharedPtr<class STextBlock> StoryTitle;
+	TSharedPtr<class STextBlock> StorySub;
+	float StoryBlackNow = 0.f;
+	float StoryBlackWant = 0.f;
+	float StoryFade = 1.2f;
+	float StoryTextT = -1.f;      // since the card began (-1: none)
+	float StoryHold = 0.f;
+	bool bStoryStayBlack = false;
+	void EnsureStoryWidget();
 	TSharedPtr<class SWidget> OrderLine;
 	TSharedPtr<class SEditableTextBox> OrderBox;
 	FTimerHandle OrderFocusTimer;
@@ -98,6 +109,12 @@ protected:
 	FTimerHandle HintTimer;
 
 public:
+	/** The story's cards between scenes (the loss, the inquiry, a new command): the screen fades to black, the title and
+	 *  its line fade in, hold, fade out; bStayBlack keeps the dark after them (a scene of voices in the dark). */
+	void StoryCard(const FString& Title, const FString& Sub, float Hold, bool bStayBlack, bool bStartBlack = false);
+	void StoryBlack(bool bOn, float Fade = 1.2f);
+	virtual void PlayerTick(float DeltaTime) override;
+
 	/** Console twin of the E key (the lift, the captain's chair): for tests and accessibility. */
 	UFUNCTION(Exec)
 	void AstraUse() { ToggleSeat(); }

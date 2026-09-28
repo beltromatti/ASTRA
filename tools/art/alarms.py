@@ -68,7 +68,24 @@ def impact():
     return x / np.max(np.abs(x)) * 0.95
 
 
+def abandon():
+    """The general alarm for ABANDON SHIP, as navies sound it: seven short blasts and one long, on a hard buzzer."""
+    def blast(dur):
+        n = int(dur * SR)
+        t = np.arange(n) / SR
+        ph = 2 * np.pi * 415 * t
+        s = np.sign(np.sin(ph)) * 0.55 + 0.35 * np.sin(2 * ph) + 0.2 * np.sin(3.01 * ph) + 0.1 * np.sin(5.02 * ph)
+        s *= 1.0 + 0.25 * np.sin(2 * np.pi * 31 * t)                  # the buzzer's rattle
+        return np.tanh(1.4 * s) * env(n, 0.008, 0.03)
+    parts = []
+    for _ in range(7):
+        parts += [blast(0.26), np.zeros(int(0.19 * SR))]
+    parts += [blast(1.9), np.zeros(int(0.4 * SR))]
+    return room(np.concatenate(parts), t60=0.8, mix=0.22)
+
+
 os.makedirs(OUT, exist_ok=True)
+sf.write(os.path.join(OUT, "SW_Abandon_Alarm.wav"), abandon().astype(np.float32), SR, subtype="PCM_16")
 sf.write(os.path.join(OUT, "SW_Impact.wav"), impact().astype(np.float32), SR, subtype="PCM_16")
 sf.write(os.path.join(OUT, "SW_Alert_Red.wav"), whoop().astype(np.float32), SR, subtype="PCM_16")
 sf.write(os.path.join(OUT, "SW_Alert_Yellow.wav"), chime([880, 660, 880, 660]).astype(np.float32), SR, subtype="PCM_16")

@@ -25,6 +25,8 @@ public:
 	/** Lights for this hull (its static mesh's name); bMandate: dark but for a slow red strobe; bNoTopStrobe: none over
 	 *  a bridge the Captain looks out of. */
 	void Setup(const FString& MeshName, bool bMandate, bool bNoTopStrobe = false);
+	/** A lifepod's distress beacon: an orange double flash (local position on the pod). */
+	void AddBeacon(const FVector& Local) { AddLamp(Local, FLinearColor(1.f, 0.38f, 0.06f), 0.5f, 120.f, 1); }
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:

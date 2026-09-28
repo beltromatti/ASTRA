@@ -9,6 +9,12 @@
 #include "AstraPatient.h"
 #include "AstraQuarters.h"
 #include "AstraCrewMember.h"
+#include "AstraLifepod.h"
+#include "AstraCampaign.h"
+#include "ASTRAPlayerController.h"
+#include "AstraFighterPawn.h"
+#include "Camera/PlayerCameraManager.h"
+#include "GameFramework/PlayerController.h"
 #include "AstraWorldGen.h"
 #include "AstraWorldSurface.h"
 #include "AstraNavLights.h"
@@ -982,6 +988,336 @@ void UAstraShipSubsystem::TickVisit(float DeltaTime)
 	}
 }
 
+// ------------------------------------------------------------------------------------------------ abandon ship
+AActor* UAstraShipSubsystem::AquilaHullActor() const
+{
+	for (TActorIterator<AStaticMeshActor> It(GetWorld()); It; ++It)
+	{
+		const UStaticMeshComponent* C = It->GetStaticMeshComponent();
+		if (C && C->GetStaticMesh() && C->GetStaticMesh()->GetName() == TEXT("SM_SHIP_ASTRA_Aquila") && !It->ActorHasTag(TEXT("ASTRA.Interior")))
+		{
+			return *It;
+		}
+	}
+	return nullptr;
+}
+
+bool UAstraShipSubsystem::StartAbandon(bool bOrdered, FString& OutDetail)
+{
+	if (bShipLost)
+	{
+		OutDetail = TEXT("the Aquila is already lost");
+		return false;
+	}
+	if (bAbandon)
+	{
+		OutDetail = FString::Printf(TEXT("the ship is already being abandoned: %.0f s to the reactor breach"), AbandonLeft);
+		return true;
+	}
+	bAbandon = true;
+	bAbandonOrdered = bOrdered;
+	AbandonLeft = bOrdered ? 110.f : 70.f;
+	AbandonT = 0.f;
+	AbandonAlarmT = 0.f;
+	AbandonCall = 0;
+	PodLaunchT = 4.f;
+	EvacFrac = 0.f;
+	SetAlert(EAstraAlert::Red);
+	ThrottlePct = 0.f;                // all stop: the drive is shut down for the evacuation
+	if (Visitor.IsValid())
+	{
+		EndVisit(TEXT("abandon ship"), true);
+	}
+	for (TActorIterator<AAstraLifepodHatch> It(GetWorld()); It; ++It)
+	{
+		It->SetState(AAstraLifepodHatch::EState::Boarding);
+	}
+	Event(FString::Printf(TEXT("ship: ABANDON SHIP — %s. All hands to the lifepods: the main reactor breaches in %d seconds. The "
+	                           "Captain's pods are off Corridor 1-A: 1-A on the port side by the lift, 1-B on the starboard side by the "
+	                           "Captain's quarters"),
+	                      bOrdered ? TEXT("the Captain's order; Engineering is overloading the reactor so the enemy cannot take her")
+	                               : TEXT("the main reactor's containment is failing and cannot be held: the Aquila is lost"),
+	                      FMath::RoundToInt(AbandonLeft)), true);
+	OutDetail = FString::Printf(TEXT("abandon ship: all hands to the lifepods, %.0f s to the reactor breach"), AbandonLeft);
+	UE_LOG(LogASTRA, Log, TEXT("[Ship] ABANDON SHIP (%s)"), bOrdered ? TEXT("ordered") : TEXT("reactor failing"));
+	return true;
+}
+
+bool UAstraShipSubsystem::BoardLifepod(AAstraLifepodHatch* Hatch, APlayerController* PC, bool bHauled)
+{
+	if (!bAbandon || !Hatch || !PC || CaptainPod.IsValid() || Hatch->GetState() == AAstraLifepodHatch::EState::Gone)
+	{
+		return false;
+	}
+	APawn* Me = PC->GetPawn();
+	if (!Me || Cast<AAstraFighterPawn>(Me))
+	{
+		return false;
+	}
+	FActorSpawnParameters SP;
+	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AAstraLifepod* Pod = GetWorld()->SpawnActor<AAstraLifepod>(Hatch->PodStart(), Hatch->GetActorRotation(), SP);
+	if (!Pod)
+	{
+		return false;
+	}
+	CaptainPod = Pod;
+	CaptainPodName = Hatch->PodName;
+	bCaptainHauled = bHauled;
+	Hatch->SetState(AAstraLifepodHatch::EState::Gone);
+	if (PC->PlayerCameraManager)
+	{
+		PC->PlayerCameraManager->StartCameraFade(0.f, 1.f, bHauled ? 0.1f : 0.35f, FLinearColor::Black, false, true);
+	}
+	// through the hatch, into the seat, the harness: then the pod is fired
+	const AActor* Hull = AquilaHullActor();
+	FVector HullC(-18000.f, 0.f, -4000.f), HullE(40000.f, 7700.f, 5000.f);
+	if (Hull)
+	{
+		Hull->GetActorBounds(false, HullC, HullE);
+	}
+	const FVector Start = Hatch->PodStart();
+	const FVector Dir = Hatch->LaunchDir;
+	const FString Name = Hatch->PodName;
+	TWeakObjectPtr<APlayerController> WPC(PC);
+	TWeakObjectPtr<APawn> WMe(Me);
+	TWeakObjectPtr<AAstraLifepod> WPod(Pod);
+	FTimerHandle H;
+	GetWorld()->GetTimerManager().SetTimer(H, [WPC, WMe, WPod, Start, Dir, HullC, Name]()
+	{
+		if (!WPC.IsValid() || !WPod.IsValid())
+		{
+			return;
+		}
+		WPC->Possess(WPod.Get());
+		if (WMe.IsValid())
+		{
+			WMe->SetActorHiddenInGame(true);
+			WMe->SetActorEnableCollision(false);
+		}
+		WPod->Launch(Start, Dir, HullC, Name);
+		if (WPC->PlayerCameraManager)
+		{
+			WPC->PlayerCameraManager->StartCameraFade(1.f, 0.f, 1.6f, FLinearColor::Black, false, false);
+		}
+	}, bHauled ? 1.2f : 0.5f, false);
+	Event(bHauled ? FString::Printf(TEXT("ship: the Captain did not reach a lifepod in time — Commander Serra hauled the Captain into the "
+	                                     "last one, lifepod %s, and it was fired as the reactor went; Serra is in it with the Captain"), *Name)
+	              : FString::Printf(TEXT("ship: the Captain is in lifepod %s and it has been fired clear of the Aquila; the crew still "
+	                                     "aboard keep going to their pods (the officers now speak to the Captain over the pods' radio)"), *Name), true);
+	UE_LOG(LogASTRA, Log, TEXT("[Ship] the Captain boards lifepod %s%s"), *Name, bHauled ? TEXT(" (hauled)") : TEXT(""));
+	return true;
+}
+
+void UAstraShipSubsystem::HaulCaptain()
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	APawn* Me = PC ? PC->GetPawn() : nullptr;
+	if (!Me || Cast<AAstraFighterPawn>(Me) || CaptainPod.IsValid())
+	{
+		return;
+	}
+	AAstraLifepodHatch* Best = nullptr;
+	float BestD = TNumericLimits<float>::Max();
+	for (TActorIterator<AAstraLifepodHatch> It(GetWorld()); It; ++It)
+	{
+		const float D = FVector::Dist(It->GetActorLocation(), Me->GetActorLocation());
+		if (It->GetState() != AAstraLifepodHatch::EState::Gone && D < BestD)
+		{
+			BestD = D;
+			Best = *It;
+		}
+	}
+	if (Best)
+	{
+		BoardLifepod(Best, PC, true);
+	}
+}
+
+void UAstraShipSubsystem::LaunchOtherPod()
+{
+	const AActor* Hull = AquilaHullActor();
+	UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Kit/Lifepod/SM_POD_Exterior.SM_POD_Exterior"));
+	if (!Hull || !M)
+	{
+		return;
+	}
+	FVector C, E;
+	Hull->GetActorBounds(false, C, E);
+	// out of her flanks, from bow to stern, well inside the plating: they appear as they clear it
+	const float Side = FMath::RandBool() ? 1.f : -1.f;
+	const FVector P(C.X + FMath::FRandRange(-0.75f, 0.5f) * E.X, C.Y + Side * E.Y * 0.55f, C.Z + FMath::FRandRange(-0.2f, 0.5f) * E.Z);
+	FActorSpawnParameters SP;
+	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AStaticMeshActor* A = GetWorld()->SpawnActor<AStaticMeshActor>(P, FRotator(0.f, Side * 90.f + 180.f, 0.f), SP);
+	if (!A)
+	{
+		return;
+	}
+	A->SetMobility(EComponentMobility::Movable);
+	A->GetStaticMeshComponent()->SetStaticMesh(M);
+	A->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	A->GetStaticMeshComponent()->SetLightingChannels(true, true, false);
+	UAstraNavLights* NL = NewObject<UAstraNavLights>(A);
+	NL->SetupAttachment(A->GetRootComponent());
+	NL->RegisterComponent();
+	NL->AddBeacon(FVector(-90.f, 0.f, 185.f));
+	FDriftPod D;
+	D.Actor = A;
+	D.Vel = FVector(FMath::FRandRange(-5.f, 5.f), Side * FMath::FRandRange(26.f, 44.f), FMath::FRandRange(3.f, 15.f)) * 100.f;
+	D.Spin = FRotator(FMath::FRandRange(-9.f, 9.f), FMath::FRandRange(-9.f, 9.f), FMath::FRandRange(-14.f, 14.f));
+	DriftPods.Add(D);
+}
+
+void UAstraShipSubsystem::DarkenAquila()
+{
+	// the hulk: her plating burnt dark, embers in the wounds; her lights, her name and her running lights gone
+	for (TActorIterator<AStaticMeshActor> It(GetWorld()); It; ++It)
+	{
+		UStaticMeshComponent* C = It->GetStaticMeshComponent();
+		const FString N = C && C->GetStaticMesh() ? C->GetStaticMesh()->GetName() : FString();
+		if ((N != TEXT("SM_SHIP_ASTRA_Aquila") && N != TEXT("SM_SHIP_ASTRA_AquilaBridgeBlock")) || It->ActorHasTag(TEXT("ASTRA.Interior")))
+		{
+			continue;
+		}
+		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
+		{
+			if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(i))
+			{
+				M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.025f, 0.023f, 0.022f));
+				M->SetVectorParameterValue(TEXT("EmissiveColor"), FLinearColor(0.9f, 0.3f, 0.08f));
+				M->SetScalarParameterValue(TEXT("Intensity"), FMath::FRandRange(0.f, 3.f));
+			}
+		}
+		TArray<UActorComponent*> Gone;
+		for (UActorComponent* Comp : It->GetComponents())
+		{
+			if (Cast<UAstraNavLights>(Comp) || Cast<UDecalComponent>(Comp))
+			{
+				Gone.Add(Comp);
+			}
+		}
+		for (UActorComponent* Comp : Gone)
+		{
+			Comp->DestroyComponent();
+		}
+	}
+	RadiatorGlow = nullptr;
+}
+
+void UAstraShipSubsystem::TickAbandon(float DeltaTime)
+{
+	for (FDriftPod& D : DriftPods)
+	{
+		if (AActor* A = D.Actor.Get())
+		{
+			A->SetActorLocationAndRotation(A->GetActorLocation() + D.Vel * DeltaTime, A->GetActorRotation() + D.Spin * DeltaTime);
+		}
+	}
+	if (!bAbandon)
+	{
+		return;
+	}
+	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	if (!bShipLost)
+	{
+		AbandonLeft -= DeltaTime;
+		AbandonT += DeltaTime;
+		EvacFrac = 1.f - FMath::Exp(-AbandonT / 32.f);
+		if (!CaptainPod.IsValid() && (AbandonAlarmT -= DeltaTime) <= 0.f)
+		{
+			// the general alarm, over and over while the Captain is still aboard
+			AbandonAlarmT = 8.f;
+			if (USoundBase* A = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Abandon_Alarm.SW_Abandon_Alarm")))
+			{
+				UGameplayStatics::PlaySound2D(this, A, 0.5f);
+			}
+		}
+		if ((PodLaunchT -= DeltaTime) <= 0.f && DriftPods.Num() < 60)
+		{
+			PodLaunchT = FMath::FRandRange(0.8f, 3.f);
+			LaunchOtherPod();
+		}
+		static const float Calls[] = {60.f, 30.f, 10.f};
+		if (AbandonCall < 3 && AbandonLeft <= Calls[AbandonCall])
+		{
+			Event(FString::Printf(TEXT("ship: %d seconds to the reactor breach — %d%% of the crew are in the lifepods%s"), FMath::RoundToInt(Calls[AbandonCall]),
+			                      FMath::RoundToInt(EvacFrac * 100.f), CaptainPod.IsValid() ? TEXT("") : TEXT("; the Captain is still aboard")), true);
+			++AbandonCall;
+		}
+		if (AbandonLeft <= 0.f)
+		{
+			HaulCaptain();
+			bShipLost = true;
+			LostT = 0.f;
+			LossStage = 0;
+			const AActor* Hull = AquilaHullActor();
+			FVector C(-18000.f, 0.f, -4000.f), E(40000.f, 7700.f, 5000.f);
+			if (Hull)
+			{
+				Hull->GetActorBounds(false, C, E);
+			}
+			if (Battle)
+			{
+				Battle->AquilaBlasts(C, E);
+			}
+			ThrottlePct = 0.f;
+			SpeedMps = 0.f;
+		}
+		return;
+	}
+	LostT += DeltaTime;
+	if (LossStage == 0 && LostT >= 4.f)
+	{
+		// the reactor (Main Engineering, Deck 7): the breach
+		LossStage = 1;
+		if (Battle)
+		{
+			Battle->AquilaBreach(FVector(-34000.f, 0.f, -4800.f));
+		}
+		DarkenAquila();
+		int32 Alive = 0;
+		for (const FAstraCrewman& P : Roster.Get())
+		{
+			Alive += P.Status != 2 ? 1 : 0;
+		}
+		const int32 Lost = FMath::RoundToInt((1.f - EvacFrac) * Alive * 0.9f);
+		LostSummary = Roster.LostWithShip(Lost, CasualtyRng);
+		Event(FString::Printf(TEXT("ship: the Aquila's main reactor has breached — she is gone. %d%% of her crew got off in the lifepods; %d did not%s"),
+		                      FMath::RoundToInt(EvacFrac * 100.f), Lost, LostSummary.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *LostSummary)), true);
+		for (TActorIterator<AAstraLifepodHatch> It(GetWorld()); It; ++It)
+		{
+			It->SetState(AAstraLifepodHatch::EState::Gone);
+		}
+	}
+	if (LossStage == 1 && LostT >= 5.6f)
+	{
+		LossStage = 2;
+		if (AAstraLifepod* Pod = CaptainPod.Get())
+		{
+			Pod->FeelBreach(1.f);
+		}
+	}
+	if (LossStage == 2 && LostT >= 18.f)
+	{
+		// the story takes it from here: who finds the Captain's pod, and what follows (the mind's aftermath)
+		LossStage = 3;
+		const FString Friends = Battle ? Battle->ForcesLine(true) : FString();
+		const FString Foes = Battle ? Battle->ForcesLine(false) : FString();
+		const APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0);
+		const FString Where = CaptainPod.IsValid() ? FString::Printf(TEXT("the Captain is adrift in lifepod %s with its distress beacon on%s"), *CaptainPodName,
+		                                                              bCaptainHauled ? TEXT(", hauled into it by Commander Serra at the last moment") : TEXT(""))
+		                    : Cast<AAstraFighterPawn>(Me) ? FString(TEXT("the Captain was flying Eagle (a Falcon of Alpha) and is still out there, with nowhere to land"))
+		                                                  : FString(TEXT("the Captain got off the ship"));
+		Event(FString::Printf(TEXT("director: the Aquila is lost — %s in the %s system; %d%% of her crew got off in some %d lifepods%s; %s; "
+		                           "still in the fight: %s; the Mandate: %s"),
+		                      bAbandonOrdered ? TEXT("abandoned on the Captain's order and scuttled (reactor overload)") : TEXT("her reactor's containment failed"),
+		                      *SystemName, FMath::RoundToInt(EvacFrac * 100.f), DriftPods.Num() + 1,
+		                      LostSummary.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", lost with her: %s"), *LostSummary), *Where,
+		                      Friends.IsEmpty() ? TEXT("no ASTRA warship") : *Friends, Foes.IsEmpty() ? TEXT("no ship left in the system") : *Foes), false);
+	}
+}
+
 bool UAstraShipSubsystem::IsCaptainInMess() const
 {
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
@@ -1205,6 +1541,67 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		Args->TryGetStringField(TEXT("officer"), Who);
 		Args->TryGetStringField(TEXT("reason"), Why);
 		return StartVisit(Who, Why, OutDetail);
+	}
+	if (Name == TEXT("abandon_ship"))
+	{
+		return StartAbandon(true, OutDetail);
+	}
+	if (Name == TEXT("story_card") || Name == TEXT("story_black"))
+	{
+		// the aftermath's scenes (the mind): cards on a black screen, or the dark of a scene played in voices
+		AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(this, 0));
+		if (!PC)
+		{
+			OutDetail = TEXT("no player");
+			return false;
+		}
+		if (bShipLost)
+		{
+			// the story has left the fight behind (hours, days later): the battle stops where it was
+			if (UAstraBattleSubsystem* B = GetWorld()->GetSubsystem<UAstraBattleSubsystem>())
+			{
+				B->Freeze();
+			}
+		}
+		if (Name == TEXT("story_card"))
+		{
+			double Hold = 5.0;
+			bool bBlack = false;
+			Args->TryGetNumberField(TEXT("hold"), Hold);
+			Args->TryGetBoolField(TEXT("black"), bBlack);
+			PC->StoryCard(Str(TEXT("title")), Str(TEXT("sub")), (float)Hold, bBlack);
+			OutDetail = TEXT("card shown");
+		}
+		else
+		{
+			bool bOn = true;
+			double Fade = 1.2;
+			Args->TryGetBoolField(TEXT("on"), bOn);
+			Args->TryGetNumberField(TEXT("fade"), Fade);
+			PC->StoryBlack(bOn, (float)Fade);
+			OutDetail = bOn ? TEXT("dark") : TEXT("light");
+		}
+		return true;
+	}
+	if (Name == TEXT("new_command"))
+	{
+		if (!bShipLost)
+		{
+			OutDetail = TEXT("the Aquila is not lost");
+			return false;
+		}
+		if (UAstraCampaignSubsystem* C = GetWorld()->GetSubsystem<UAstraCampaignSubsystem>())
+		{
+			const FString Sys = Str(TEXT("system"));
+			// a moment for the last card to fade, then the new ship
+			FTimerHandle H;
+			TWeakObjectPtr<UAstraCampaignSubsystem> WC(C);
+			GetWorld()->GetTimerManager().SetTimer(H, [WC, Sys]() { if (WC.IsValid()) { WC->NewCommand(Sys); } }, 1.5f, false);
+			OutDetail = TEXT("the new Aquila");
+			return true;
+		}
+		OutDetail = TEXT("no campaign");
+		return false;
 	}
 	if (Name == TEXT("visit_end") || Name == TEXT("dismiss_visitor"))
 	{
@@ -1698,6 +2095,18 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		}
 		S->SetObjectField(TEXT("medbay"), Med);
 	}
+	if (bAbandon)
+	{
+		const APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0);
+		S->SetStringField(TEXT("abandon"), bShipLost
+			? FString::Printf(TEXT("THE AQUILA IS LOST: her reactor breached; %d%% of the crew got off in the lifepods%s"), FMath::RoundToInt(EvacFrac * 100.f),
+			                  CaptainPod.IsValid() ? *FString::Printf(TEXT("; the Captain is adrift in lifepod %s (the officers speak over the pods' radio)"), *CaptainPodName) : TEXT(""))
+			: FString::Printf(TEXT("ABANDON SHIP in progress (%s): %.0f s to the reactor breach; %d%% of the crew in the lifepods; %s"),
+			                  bAbandonOrdered ? TEXT("the Captain's order") : TEXT("the reactor is failing"), FMath::Max(0.f, AbandonLeft), FMath::RoundToInt(EvacFrac * 100.f),
+			                  CaptainPod.IsValid() ? *FString::Printf(TEXT("the Captain is away in lifepod %s"), *CaptainPodName)
+			                  : Cast<AAstraFighterPawn>(Me) ? TEXT("the Captain is flying Eagle")
+			                  : TEXT("the Captain is still aboard: the pods are off Corridor 1-A (1-A port by the lift, 1-B starboard by the Captain's quarters)")));
+	}
 	if (const AAstraCrewMember* V = Visitor.Get())
 	{
 		S->SetStringField(TEXT("visitor"), FString::Printf(TEXT("%s (%s) %s"), *V->StationId, *V->DisplayName, V->HasArrived()
@@ -1747,6 +2156,13 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 
 void UAstraShipSubsystem::Tick(float DeltaTime)
 {
+	if (bShipLost)
+	{
+		// a dead ship: no heat, no ward, no helm; only the pods drifting and the loss's own timing
+		TickAbandon(DeltaTime);
+		UpdateAlertVisuals(DeltaTime);
+		return;
+	}
 	TickHeat(DeltaTime);
 	// the Medbay: the doctors' rounds every minute (conditions change, the healed go back to duty, some die), the beds
 	// follow the roster
@@ -1761,6 +2177,12 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 		}
 	}
 	TickVisit(DeltaTime);
+	TickAbandon(DeltaTime);
+	if (bShipLost)
+	{
+		UpdateAlertVisuals(DeltaTime);
+		return;                        // a dead ship: no helm, no heat, no damage control
+	}
 	if ((MessSyncT -= DeltaTime) <= 0.f)
 	{
 		MessSyncT = 5.f;

@@ -191,6 +191,30 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
   - prove: `astra.cmd visit {'officer':'doctor','reason':'...'}` (con il Capitano in cabina), `astra.walk <postazione> [back]` per guardare il percorso senza visita
 - [x] **Fuori**: il blocco della cabina rivestito di piastre di scafo con i suoi finestroni illuminati, su un piedistallo che affonda nel pendio di poppa dell'isola; accanto la torre dell'ascensore di plancia; carenature sotto i due corridoi dietro la plancia (prima galleggiavano sopra l'isola) — `SM_SHIP_ASTRA_AquilaBridgeBlock`, con la luce del pianeta come lo scafo
 
+## La perdita dell'Aquila: abbandono nave, capsule, inchiesta, nuovo comando
+Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere è una svolta della storia, mai un vicolo cieco.
+- [x] **Abbandono nave** (`UAstraShipSubsystem::StartAbandon`): per ordine del Capitano (strumento `abandon_ship`; l'XO lo contesta una volta se la nave non è spacciata; il reattore viene sovraccaricato perché il nemico non la prenda) oppure da solo quando lo scafo arriva a zero (il contenimento del reattore cede).
+  - conto alla rovescia: 110 s su ordine, 70 s se cede il reattore;
+  - allarme rosso, motori fermi, e l'**allarme generale delle marine vere**: 7 suoni brevi e 1 lungo (`SW_Abandon_Alarm`, sintetizzato), che si ripete finché il Capitano è a bordo;
+  - l'equipaggio parla corto e concitato: l'XO lo annuncia a tutti e indirizza il Capitano alle capsule, gli ufficiali contano la loro gente;
+  - la percentuale di evacuati cresce nel tempo, con gli annunci a 60, 30 e 10 secondi.
+- [x] **Le perdite dipendono dalla decisione**: ordinare presto salva più persone. Prova reale: 97 % evacuati con l'ordine dato presto, circa 88 % se si aspetta il cedimento del reattore. Chi non riesce a uscire viene preso dal ruolino vero (`FAstraCrewRoster::LostWithShip`: prima i feriti critici che non si potevano spostare, poi i macchinisti rimasti al reattore) e finisce sul muro della memoria.
+- [x] **Le capsule** (`art/blender/lifepod.py`, `tools/ue_scripts/build_lifepods.py`, `AAstraLifepodHatch`, `AAstraLifepod`):
+  - due portelli nel corridoio 1-A: **1-A** a babordo accanto all'ascensore, **1-B** a dritta verso la cabina del Capitano;
+  - ogni portello ha la cornice gialla e nera, la porta con l'oblò rosso, il cartello e una spia: verde = sigillato, ambra lampeggiante = imbarco, rossa = partita;
+  - **E** al portello: il Capitano entra nella capsula, legato al sedile davanti all'oblò. Si sentono i bulloni esplosivi, la rotaia e il motore; poi la deriva a circa 26 m/s, e i giroscopi tengono l'oblò puntato sulla nave (il mouse guarda intorno);
+  - dai fianchi dell'Aquila escono decine di altre capsule, ognuna col suo faro arancione di soccorso;
+  - se il tempo scade, Serra trascina il Capitano nell'ultima capsula.
+- [x] **La fine, vista dall'oblò** (circa 2-3 km): esplosioni che corrono lungo lo scafo, poi la rottura del reattore a poppa (lampo bianco, palla di fuoco, anello d'onda d'urto, detriti). Lo scafo resta bruciato e scuro con le braci nelle ferite; il nome e le luci di navigazione spariscono. Nella capsula si sente e si sente tremare (`SW_Breach_Felt`), e gli ufficiali parlano dalla radio delle altre capsule.
+- [x] **Dopo** (`mind/astra_mind/loss.py`):
+  - il regista decide dallo stato vero chi trova la capsula: un soccorso della 7ª Flotta, la cattura da parte del Mandato, oppure ore o giorni alla deriva;
+  - poi una voce alla radio e cartelli su schermo nero (`story_card`);
+  - se il Capitano è catturato: un ufficiale del Mandato lo interroga (interattivo, a voce o per iscritto), poi arriva lo scambio di prigionieri;
+  - poi la **Commissione d'inchiesta** della 7ª Flotta, **interattiva**: presiede Rourke, siedono il capitano Okafor e il comandante Vale (giudice avvocato). Leggono il **diario del Capitano** e la campagna, fanno almeno tre domande a turno e il Capitano risponde con parole sue. Prova reale: «Ho visto il suo diario… Parliamo della tattica, non della poesia»;
+  - il verdetto (encomio, proscioglimento o biasimo) e poi il **nuovo comando**: la gemella CVC-03, ribattezzata Aquila, qualche settimana dopo;
+  - il salvataggio viene riscritto: nave nuova, santabarbara e gruppo aereo pieni, i caduti restano caduti, i feriti sono guariti. Il livello riparte, l'XO dà il benvenuto a bordo e il regista racconta cosa è cambiato nella Marca.
+- Prove: `astra.cmd abandon_ship {}`, poi al portello `AstraUse` (o **E**); `slomo 5` per accelerare. Il dopo si prova anche fuori dal gioco, con un gioco finto e risposte scritte del Capitano.
+
 ## M2 (prima versione) — Calore e furtività
 - [x] **Calore della nave** (`UAstraShipSubsystem::TickHeat`): il reattore (secondo la potenza assegnata), il motore (manetta), le salve dei railgun, i laser, i missili, gli scudi che si ricaricano e l'energia che fermano scaldano la nave; lo scafo irradia di base e i **radiatori** portano via calore, di più quanto più è caldo. Tarato: crociera ~15 %, battaglia tipica con radiatori retratti ~60-70 %, battaglia lunga e dura oltre il 100 %; con i radiatori estesi 30-50 %
 - [x] **Effetti**: sopra il 70 % cadenza delle armi e rigenerazione degli scudi calano (fino al 55 % a pieno calore), sopra il 90 % anche il motore; oltre il 92 % i **condotti cedono** (incidenti veri da riparare, −20 % di potenza) e qualcuno in sala macchine si ustiona (ruolino e infermeria)

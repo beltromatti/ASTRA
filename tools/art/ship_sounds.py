@@ -121,6 +121,62 @@ def door_chime():
     return norm(lp(x, 6000), 0.55)
 
 
+def pod_launch():
+    """A lifepod leaving the ship: the hatch slamming, the explosive bolts, the launch rail's rush, the pod's motor
+    burning for a few seconds and fading, the frame's ring."""
+    t = t_(6.0)
+    x = np.zeros_like(t)
+    slam = np.sin(2 * np.pi * 70 * t) * np.exp(-t * 18) * 0.8 + bp(rng.normal(0, 1, len(t)), 200, 1200) * np.exp(-t * 25) * 0.5
+    x += slam
+    for k, when in enumerate((0.55, 0.6, 0.66, 0.7)):                 # the bolts, a ragged volley
+        i = int(when * SR)
+        n = len(t) - i
+        tt = t[:n]
+        x[i:] += (np.sin(2 * np.pi * (48 + 20 * k) * tt) * np.exp(-tt * 14) * 0.9
+                  + hp(rng.normal(0, 1, n), 1500) * np.exp(-tt * 60) * 0.6)
+    i = int(0.72 * SR)
+    tt = t[: len(t) - i]
+    rush = bp(rng.normal(0, 1, len(tt)), 180, 2400) * np.clip(tt / 0.1, 0, 1) * np.exp(-tt * 1.1) * 0.9
+    motor = (np.sin(2 * np.pi * np.cumsum(90 + 30 * np.exp(-tt)) / SR) * 0.35 + lp(rng.normal(0, 1, len(tt)), 400) * 0.6) \
+        * np.clip(tt / 0.2, 0, 1) * np.exp(-tt * 0.7)
+    x[i:] += rush + motor
+    x += frame_ring(t, 0.5, 7)
+    return norm(np.tanh(1.3 * x), 0.9)
+
+
+def pod_hum(dur=12.0):
+    """Inside a drifting lifepod (loopable): the CO2 scrubber's fan, the electronics, a faint tick of the beacon."""
+    t = t_(dur)
+    fan = sum(np.sin(2 * np.pi * f * t) * a for f, a in ((120, 0.2), (240, 0.08), (361, 0.05)))
+    air = lp(rng.normal(0, 1, len(t)), 900) * 0.25
+    tick = np.zeros_like(t)
+    for k in range(int(dur / 4)):                                     # the beacon's ping, every 4 s (dur divisible)
+        i = int((k * 4 + 1.0) * SR)
+        n = int(0.09 * SR)
+        tick[i:i + n] += np.sin(2 * np.pi * 1320 * t[:n]) * np.exp(-t[:n] * 40) * 0.25
+    x = fan + air + tick
+    fade = int(0.5 * SR)                                              # seamless loop: cross-fade the ends
+    x[:fade] = x[:fade] * np.linspace(0, 1, fade) + x[-fade:] * np.linspace(1, 0, fade)
+    return norm(x[:-fade], 0.5)
+
+
+def breach_felt():
+    """The Aquila's reactor letting go, felt in the pod: no sound crosses the vacuum, but the shock and the debris
+    reach the pod's shell — a deep thud that swells, the hull groaning, fragments pinging off it."""
+    t = t_(9.0)
+    swell = lp(rng.normal(0, 1, len(t)), 90) * np.clip(t / 0.4, 0, 1) * np.exp(-t * 0.5) * 3.0
+    thud = np.sin(2 * np.pi * (30 + 18 * np.exp(-t * 2)) * t) * np.exp(-t * 0.9) * 1.2
+    groan = np.sin(2 * np.pi * np.cumsum(55 + 12 * np.sin(2 * np.pi * 0.3 * t)) / SR) * np.clip((t - 0.8) / 1.5, 0, 1) * np.exp(-t * 0.35) * 0.35
+    pings = np.zeros_like(t)
+    for k in range(40):
+        i = int(rng.uniform(0.6, 7.5) * SR)
+        n = int(0.25 * SR)
+        f = rng.uniform(900, 3200)
+        pings[i:i + n] += np.sin(2 * np.pi * f * t[:n]) * np.exp(-t[:n] * rng.uniform(18, 40)) * rng.uniform(0.1, 0.35)
+    x = swell + thud + groan + pings + frame_ring(t, 0.8, 9)
+    return norm(np.tanh(1.2 * x), 0.95)
+
+
 def door(opening=True):
     """A pressure door: the seal releasing (hiss), the leaves' motor, the soft stop (or the seal closing)."""
     t = t_(0.9)
@@ -247,6 +303,8 @@ for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("S
                  ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp), ("SW_Door_Chime", door_chime),
                  ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False)), ("SW_Transit", transit),
                  ("SW_Sparks", sparks), ("SW_Falcon_Engine", falcon_engine), ("SW_Lock_Beep", lock_beep), ("SW_Lock_Solid", lock_solid),
-                 ("SW_Missile_Warning", missile_warning), ("SW_Entry_Plasma", entry_plasma)):
+                 ("SW_Missile_Warning", missile_warning), ("SW_Entry_Plasma", entry_plasma),
+                 # last: new sounds must not shift the random stream of the ones above
+                 ("SW_Pod_Launch", pod_launch), ("SW_Pod_Hum", pod_hum), ("SW_Breach_Felt", breach_felt)):
     sf.write(os.path.join(OUT, name + ".wav"), fn().astype(np.float32), SR, subtype="PCM_16")
 print("SHIP_SOUNDS_OK", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

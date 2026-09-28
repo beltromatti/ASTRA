@@ -313,7 +313,7 @@ void UAstraBattleSubsystem::Report(const FString& Text, bool bReport)
 // ------------------------------------------------------------------------------------------------------ tick
 void UAstraBattleSubsystem::Tick(float DeltaTime)
 {
-	if (Ships.Num() == 0)
+	if (Ships.Num() == 0 || bFrozen)
 	{
 		return;
 	}
@@ -1785,8 +1785,72 @@ void UAstraBattleSubsystem::ApplyHit(FAstraBattleShip& To, const FVector& FromDi
 	}
 	if (To.Hull <= 0.f)
 	{
+		if (To.bPlayer)
+		{
+			// the Aquila does not simply vanish: her reactor's containment fails and she is abandoned (the ship
+			// subsystem runs the evacuation and calls AquilaBlasts/AquilaBreach when the reactor goes)
+			To.Hull = 0.f;
+			if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+			{
+				Ship->ReactorFailing();
+			}
+			return;
+		}
 		Destroy(To);
 	}
+}
+
+void UAstraBattleSubsystem::AquilaBlasts(const FVector& HullCentreW, const FVector& HullExtentW)
+{
+	FAstraBattleShip& P = Ships[0];
+	P.bShieldsUp = false;
+	P.Shield = 0.f;
+	// explosions running along her over four seconds, the burning compartments letting go one after another
+	for (int32 i = 0; i < 18; ++i)
+	{
+		const FVector W(HullCentreW.X + FMath::FRandRange(-0.95f, 0.9f) * HullExtentW.X, HullCentreW.Y + FMath::FRandRange(-0.75f, 0.75f) * HullExtentW.Y,
+		                HullCentreW.Z + FMath::FRandRange(-0.4f, 0.8f) * HullExtentW.Z);
+		AddFlash(FromWorld(W), FMath::FRandRange(60.f, 160.f), FMath::FRandRange(0.9f, 1.8f), FLinearColor(1.f, FMath::FRandRange(0.4f, 0.7f), 0.18f), 320.f);
+		Flashes.Last().Age = -FMath::FRandRange(0.f, 3.6f);
+	}
+}
+
+FString UAstraBattleSubsystem::ForcesLine(bool bAstra) const
+{
+	TArray<FString> Out;
+	for (const FAstraBattleShip& S : Ships)
+	{
+		if (!S.bPlayer && !S.bCraft && S.bAlive && !S.bDerelict && (S.Side == EAstraSide::Astra) == bAstra && (bAstra || S.Side == EAstraSide::Mandate))
+		{
+			Out.Add(FString::Printf(TEXT("%s (%s, %s)"), *S.Name, *S.Class, *S.ContactId));
+		}
+	}
+	return FString::Join(Out, TEXT(", "));
+}
+
+void UAstraBattleSubsystem::AquilaBreach(const FVector& ReactorW)
+{
+	FAstraBattleShip& P = Ships[0];
+	if (!P.bAlive)
+	{
+		return;
+	}
+	P.bAlive = false;
+	P.Mode = EAstraShipMode::Dead;
+	P.Hull = 0.f;
+	P.Vel *= 0.2f;
+	// the reactor, aft: a ship's death centred on it (the flash of the core letting go, the fireball, the shockwave ring,
+	// blasts along her axis, the debris); her own actor is the level's hull, which the ship subsystem darkens. Pos is
+	// the frame's origin: moved to the reactor for the explosion only, and put back
+	const FVector Centre = P.Pos;
+	const float R0 = P.Radius;
+	P.Pos = FromWorld(ReactorW);
+	P.Radius = 240.f;
+	Explode(P);
+	AddFlash(P.Pos, 700.f, 0.9f, FLinearColor(1.f, 0.97f, 0.9f), 1200.f);    // the first instant: white, huge, gone
+	P.Pos = Centre;
+	P.Radius = R0;
+	UE_LOG(LogASTRA, Log, TEXT("[Battle] the Aquila's reactor breached"));
 }
 
 void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S)

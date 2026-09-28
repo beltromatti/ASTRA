@@ -42,6 +42,11 @@ public:
 	/** A manned aircraft was shot down: its pilot is killed or ejects and is recovered wounded. Returns the report. */
 	FString AircrewLost(FRandomStream& R);
 
+	/** The ship is abandoned and K people do not get off: first the critically wounded who could not be moved, then
+	 *  the engineers holding the reactor to the end (Deck 7), then anyone. Returns "Petty Officer ... (Engineering),
+	 *  Crewman ... and 23 others" (empty if nobody). The wounded who got off stay wounded (the ward goes with them). */
+	FString LostWithShip(int32 K, FRandomStream& R);
+
 	/** The Medbay's work over Minutes of care: conditions improve (or, for the critical, sometimes fail), the healed go
 	 *  back to duty. Each change is reported in OutNews (bReport = the Captain should hear it). */
 	struct FNews { FString Text; bool bReport = false; };

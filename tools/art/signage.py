@@ -123,6 +123,9 @@ def main():
     md.rectangle((cx - b, cy - a, cx + b, cy + a), fill=(*ICE, 255))
     med.save(os.path.join(OUT, "T_SIGN_Room_Medbay.png"))
     plate(1024, 256, "MESS HALL", "DECK 4 · SECTION B", (240, 200, 120)).save(os.path.join(OUT, "T_SIGN_Room_Mess.png"))
+    # the lifepods off Corridor 1-A: the hatch's plate (yellow: emergency equipment)
+    for pod, side in (("1A", "PORT"), ("1B", "STARBOARD")):
+        plate(1024, 256, f"LIFEPOD {pod[0]}-{pod[1]}", f"DECK 1 · {side} · 6 PERSONS", (250, 190, 40)).save(os.path.join(OUT, f"T_SIGN_Lifepod_{pod}.png"))
     w2, h2 = 2048, 512
     fd = Image.new("RGBA", (w2, h2), (*PLATE, 255))
     dd = ImageDraw.Draw(fd)

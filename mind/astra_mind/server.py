@@ -88,6 +88,7 @@ from .port import PORT as PORT_CONTROL, FieldControl, for_field, stimulus_for, w
 from .medbay import patient_voice  # noqa: E402
 from .mess import MessTalk  # noqa: E402
 from .visits import VisitPlanner  # noqa: E402
+from .loss import Aftermath  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
@@ -202,6 +203,8 @@ class Mind:
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander,
                                  news=self._fleet_news)
         self.visits = VisitPlanner(self.llm, self._director_command, self.director.note)
+        self.aftermath = Aftermath(self.llm, self._say_external, self._director_command, self._register_voice, self.director,
+                                   self.voice.busy_s)
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
         self.agent.war = lambda: self.director.war.crew_view()
@@ -250,6 +253,10 @@ class Mind:
             await self.game.execute("log_entry", {"text": entry[:200]}, "captain")
         except Exception:  # noqa: BLE001
             log.warning("the game did not acknowledge the log entry")
+
+    def _register_voice(self, key: str, name: str, voice: str) -> None:
+        """A voice of the story (the board, whoever finds the pod, a captor): a name on the channel and a voice."""
+        EXTERNAL_SPEAKERS[key] = (name, voice)
 
     def _register_field(self, persona: dict[str, Any]) -> None:
         """A world's field controller gets a name and a voice on the radio."""
@@ -346,7 +353,7 @@ class Mind:
         while True:
             await asyncio.sleep(10)
             st = self.game.state if (self.game and self.game.state) else None
-            if not st or not self.clients:
+            if not st or not self.clients or st.get("abandon") or self.aftermath.active:
                 continue
             idle = time.monotonic() - max(self.last_activity, self.voice.busy_until)
             hostile = any(str(c.get("status", "")).startswith("hostile") and "retreating" not in str(c.get("status", ""))
@@ -417,7 +424,7 @@ class Mind:
         while True:
             await asyncio.sleep(5)
             st = self.game.state if (self.game and self.game.state) else None
-            if not st or not self.clients:
+            if not st or not self.clients or st.get("abandon") or self.aftermath.active:
                 continue
             flags = tactical_flags(st)
             now = time.monotonic()
@@ -452,7 +459,7 @@ class Mind:
         while True:
             await asyncio.sleep(15)
             st = self.game.state if (self.game and self.game.state) else None
-            if not st or not self.clients or not self.director.campaign or self.director.busy:
+            if not st or not self.clients or not self.director.campaign or self.director.busy or st.get("abandon") or self.aftermath.active:
                 continue
             quiet = time.monotonic() - self.director.last_event_t
             hostile = any(str(c.get("status", "")).startswith("hostile") for c in st.get("contacts", []) or [])
@@ -520,6 +527,10 @@ class Mind:
                     self.lang = lang
                     self.lang_file.parent.mkdir(parents=True, exist_ok=True)
                     self.lang_file.write_text(lang)
+                if self.aftermath.wants():
+                    # before the Board of Inquiry, or a Mandate officer: the Captain answers them, not the crew
+                    await self.aftermath.captain_says(text)
+                    continue
                 entry = captains_log_entry(text)
                 if entry is not None:
                     # the Captain dictates the log: recorded (a chirp from the console), remembered by the story
@@ -593,13 +604,24 @@ class Mind:
                 elif kind == "campaign":
                     # the Captain chose in the title menu: a new war, or the saved one
                     if msg.get("mode") == "continue":
-                        ok = self.director.load()
+                        new_command = self.aftermath.resume_note
+                        ok = self.director.load(note=f"NEW COMMAND: {new_command}" if new_command else "")
                         log.info("campaign continued (war map %s): %s, %d story notes", "loaded" if ok else "missing",
                                  self.director.war.current, len(self.director.campaign))
                         # the war resumes: the director decides what the Aquila meets now (after the XO's welcome)
-                        asyncio.create_task(self.director.on_event(
-                            f"director: campaign resumed — the Aquila is back on patrol in the {self.director.war.current} system",
-                            self.lang, self._battle_state()))
+                        if new_command:
+                            # after the loss: a new ship, weeks later; the crew's memory of the pod and the hearing is
+                            # the story's now (the campaign notes), not the bridge's conversation
+                            self.aftermath.resume_note = ""
+                            self.aftermath.reset()
+                            self.agent.history.clear()
+                            self.enemy.reset()
+                            resume = (f"director: campaign resumed — the Captain takes command of the new Aquila at New Ravenna "
+                                      f"({new_command}); weeks have passed and the March moved on: tell what changed with "
+                                      f"war_news, then the first beat for the new ship")
+                        else:
+                            resume = f"director: campaign resumed — the Aquila is back on patrol in the {self.director.war.current} system"
+                        asyncio.create_task(self.director.on_event(resume, self.lang, self._battle_state()))
                     else:
                         self.director.reset()
                         log.info("new campaign")
@@ -616,7 +638,10 @@ class Mind:
                 elif kind == "event":
                     text = msg.get("text", "")
                     self.game.events.append(text)
-                    if text.startswith("director:"):
+                    if text.startswith("director: the Aquila is lost"):
+                        # the story of the loss: who finds the Captain, the board, a new command (mind/astra_mind/loss.py)
+                        asyncio.create_task(self.aftermath.on_lost(text, self.lang))
+                    elif text.startswith("director:") and not self.aftermath.active:
                         asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
                     elif text.startswith("story:"):
                         self.director.note(text.split(":", 1)[1].strip())   # remembered, no new beat
@@ -639,7 +664,7 @@ class Mind:
                     gone = _re.search(r"\((T-\d+)[,)]", text)
                     if gone and ("destroyed" in text or "left sensor range" in text):
                         self.enemy.ship_destroyed(gone.group(1))   # nobody left on that ship to answer a hail
-                    if msg.get("report"):
+                    if msg.get("report") and not self.aftermath.muted:
                         self.last_activity = time.monotonic()
                         await self.turns.put(("\x00event:" + text, self.lang))
                 elif kind == "command_result":

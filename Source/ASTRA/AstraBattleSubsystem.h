@@ -352,6 +352,14 @@ public:
 	FString PilotSummary() const;
 	/** Bridge world (cm) -> system frame (m), and back for rotations. */
 	FVector FromWorld(const FVector& WorldCm) const;
+	/** The Aquila's end (the ship subsystem's timing): explosions running along her hull (world bounds), then the
+	 *  reactor's breach at ReactorW (world): the flash, the ring, the debris; she is dead from then on. */
+	void AquilaBlasts(const FVector& HullCentreW, const FVector& HullExtentW);
+	/** After the loss, when the story moves on (hours, days): the fight stops where it was, no more reports. */
+	void Freeze() { bFrozen = true; }
+	/** The warships still in the system on one side ("ASN Praetorian (battleship), ..."), the Aquila left out. */
+	FString ForcesLine(bool bAstra) const;
+	void AquilaBreach(const FVector& ReactorW);
 	/** Contact id of the ship whose captain commands the Mandate forces now: the group leader, else the biggest ship left. */
 	FString MandateCommander() const;
 	/** The war director's next beat (from the mind): raid | distress | reinforcements | resupply | calm. Contact ids are
@@ -411,6 +419,7 @@ public:
 	float ConsumeShake(float DeltaTime);
 
 private:
+	bool bFrozen = false;   // Freeze(): the story has left this fight behind
 	UPROPERTY() TArray<FAstraBattleShip> Ships;
 	UPROPERTY() TArray<FAstraProjectile> Projectiles;
 	UPROPERTY() TArray<FAstraFlash> Flashes;

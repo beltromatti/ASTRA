@@ -702,8 +702,32 @@ def mess_placeholder(name: str, title: str, sub: str):
     return s.save(name)
 
 
+def pod_status():
+    """The lifepod's two little displays (left half: the distress beacon; right half: life support), in the red of an
+    emergency panel. The pod's own clock and air are the game's (the texture is the panel at launch)."""
+    s = Screen(w=1024, h=320, dept="command", title="Lifepod 1-A", sub="ASN AQUILA · CVC-01 · SIX SEATS", seed=611)
+    s.panel(24, 70, 500, 296, "DISTRESS BEACON")
+    for k, r in enumerate((26, 48, 70)):
+        c = (255, 74 + k * 30, 46 + k * 20)
+        s.d.arc(s.P(120 - r, 190 - r, 120 + r, 190 + r), 300, 60, fill=c, width=3 * 2)
+    s.d.ellipse(s.P(110, 180, 130, 200), fill=RED)
+    s.text(215, 128, "TRANSMITTING", F_TITLE(34), fill=RED)
+    s.text(215, 178, "121.5 · 243.0 MHZ", F_MONO(20), fill=TEXT)
+    s.text(215, 214, "IFF ASTRA NAVY", F_MONO(20), fill=DIM)
+    s.text(215, 250, "PING EVERY 4 S", F_MONO(20), fill=DIM)
+    s.panel(524, 70, 1000, 296, "LIFE SUPPORT")
+    s.bar(548, 122, 430, 18, 0.99, "O2", "72:00 H", color=GREEN, warn=1.1, crit=1.2)
+    s.bar(548, 174, 430, 18, 0.06, "CO2", "0.4 %", color=GREEN)
+    s.bar(548, 226, 430, 18, 1.0, "POWER", "100 %", color=GREEN, warn=1.1, crit=1.2)
+    s.footer("ADRIFT · KEEP HARNESSES FASTENED", color=AMBER)
+    return s.save("Pod_Status")
+
+
 if __name__ == "__main__":
     import sys
+    if sys.argv[1:] == ["pod"]:
+        print("UI_OK", [pod_status()])
+        raise SystemExit
     if sys.argv[1:] == ["mess"]:
         print("UI_OK", [mess_menu(), mess_placeholder("Mess_News", "Fleet News", "7TH FLEET NET · AURELIA MARCH"),
                         mess_placeholder("Mess_Memorial", "In Memoriam", "ASN AQUILA · CVC-01")])

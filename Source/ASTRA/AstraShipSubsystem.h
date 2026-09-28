@@ -12,6 +12,7 @@ class UMaterialInstanceDynamic;
 class UMaterialParameterCollection;
 class ALight;
 class ADirectionalLight;
+class APlayerController;
 
 UENUM(BlueprintType)
 enum class EAstraAlert : uint8
@@ -201,6 +202,15 @@ public:
 	void ResumeFrom(const TSharedPtr<FJsonObject>& Save);
 
 	/** Testing the Medbay: "admit" N wounded from random hits, or let the doctors' "care" run N minutes. */
+	/** ABANDON SHIP: the Captain's order (bOrdered: her reactor is overloaded so the enemy cannot take her) or the
+	 *  reactor's containment failing at the end of her hull. The crew goes to the lifepods (the sooner the order, the
+	 *  more of them get off); the Captain boards one at a hatch off Corridor 1-A (BoardLifepod), or the XO hauls the
+	 *  Captain into the last one; then the reactor breaches and the Aquila is gone. */
+	bool StartAbandon(bool bOrdered, FString& OutDetail);
+	void ReactorFailing() { FString D; if (!bAbandon) { StartAbandon(false, D); } }
+	bool IsAbandoning() const { return bAbandon && !bShipLost; }
+	bool IsShipLost() const { return bShipLost; }
+	bool BoardLifepod(class AAstraLifepodHatch* Hatch, APlayerController* PC, bool bHauled = false);
 	/** The way from an officer's place to the Captain's quarters (world cm, deck level); OutWaitAt: the point at the
 	 *  cabin's door where they wait for the chime. */
 	static TArray<FVector> VisitRouteFor(const class AAstraCrewMember* C, int32& OutWaitAt);
@@ -279,6 +289,29 @@ private:
 	float VisitSilentT = 0.f;         // since the visitor last spoke
 	bool StartVisit(const FString& Who, const FString& Why, FString& OutDetail);
 	void EndVisit(const TCHAR* Why, bool bHurry = false);
+	// abandoning ship, and the loss
+	bool bAbandon = false;
+	bool bAbandonOrdered = false;
+	bool bShipLost = false;
+	float AbandonLeft = 0.f;          // to the reactor breach
+	float AbandonT = 0.f;             // since the order
+	float AbandonAlarmT = 0.f;
+	float PodLaunchT = 0.f;
+	float LostT = 0.f;                // since the breach began
+	int32 AbandonCall = 0;            // the countdown's call-outs made (60, 30, 10 s)
+	int32 LossStage = 0;
+	float EvacFrac = 0.f;             // the crew in the pods
+	FString LostSummary;              // who did not get off
+	FString CaptainPodName;
+	bool bCaptainHauled = false;
+	TWeakObjectPtr<class AAstraLifepod> CaptainPod;
+	struct FDriftPod { TWeakObjectPtr<AActor> Actor; FVector Vel = FVector::ZeroVector; FRotator Spin = FRotator::ZeroRotator; };
+	TArray<FDriftPod> DriftPods;
+	void TickAbandon(float DeltaTime);
+	void LaunchOtherPod();
+	void HaulCaptain();
+	void DarkenAquila();
+	AActor* AquilaHullActor() const;
 	void TickVisit(float DeltaTime);
 	UPROPERTY() TObjectPtr<class AAstraBridgeFX> BridgeFX;   // sparks and arcs on the bridge when we are hit hard
 	FRandomStream CasualtyRng;

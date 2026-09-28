@@ -210,8 +210,8 @@ class Director:
         self.last_event_t = time.monotonic()
         self.save()
 
-    def load(self) -> bool:
-        """Continue the saved campaign: the war map and the story so far."""
+    def load(self, note: str = "") -> bool:
+        """Continue the saved campaign: the war map and the story so far (note: what happened meanwhile)."""
         ok = self.war.load()
         try:
             with open(self._story_path(), encoding="utf-8") as f:
@@ -228,7 +228,7 @@ class Director:
         self.granted = False
         self.admiral_history.clear()
         self.last_event_t = time.monotonic()
-        self.note("the Captain returned to the bridge after a watch change; the war went on")
+        self.note(note or "the Captain returned to the bridge after a watch change; the war went on")
         return ok
 
     def _story_path(self) -> str:

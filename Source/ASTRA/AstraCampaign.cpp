@@ -1,6 +1,7 @@
 // ASTRA — the campaign and the title menu.
 
 #include "AstraCampaign.h"
+#include "ASTRAPlayerController.h"
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
@@ -329,6 +330,15 @@ void UAstraCampaignSubsystem::Begin(const FString& Mode)
 	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 	UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
 	const TSharedPtr<FJsonObject> Save = Mode == TEXT("continue") ? LoadSave() : nullptr;
+	FString SavedWhen;
+	if (Save.IsValid() && Save->TryGetStringField(TEXT("saved"), SavedWhen) && SavedWhen == TEXT("NEW COMMAND"))
+	{
+		// the first watch aboard the new Aquila: the scene opens in the dark on her name
+		if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GetWorld(), 0)))
+		{
+			PC->StoryCard(TEXT("ASN AQUILA"), TEXT("CVC-03 · NEW RAVENNA FLEET YARDS · THE CAPTAIN'S NEW COMMAND"), 4.f, false, true);
+		}
+	}
 	if (Save.IsValid() && Battle && Ship)
 	{
 		const TSharedPtr<FJsonObject>* S = nullptr;
@@ -385,6 +395,34 @@ void UAstraCampaignSubsystem::SaveNow(const TCHAR* Why)
 	}
 }
 
+void UAstraCampaignSubsystem::NewCommand(const FString& System)
+{
+	UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+	if (!Ship)
+	{
+		return;
+	}
+	TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+	O->SetNumberField(TEXT("version"), 1);
+	O->SetStringField(TEXT("saved"), TEXT("NEW COMMAND"));
+	TSharedRef<FJsonObject> S = Ship->SaveJson();
+	S->SetStringField(TEXT("system"), System.IsEmpty() ? TEXT("Aurelia") : System);
+	S->SetArrayField(TEXT("wounded"), {});
+	S->SetArrayField(TEXT("medbay"), {});
+	S->RemoveField(TEXT("heat_pct"));
+	S->RemoveField(TEXT("radiators_out"));
+	S->RemoveField(TEXT("radiator_health"));
+	S->RemoveField(TEXT("coolant_vents"));
+	O->SetObjectField(TEXT("ship"), S);
+	O->SetObjectField(TEXT("battle"), MakeShared<FJsonObject>());   // a new hull: her defaults (full hull, magazine, air group)
+	FString Text;
+	TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Text);
+	FJsonSerializer::Serialize(O, W);
+	FFileHelper::SaveStringToFile(Text, *SavePath());
+	UE_LOG(LogASTRA, Log, TEXT("[Campaign] new command: the new Aquila in %s"), *System);
+	UGameplayStatics::OpenLevel(GetWorld(), FName(*UGameplayStatics::GetCurrentLevelName(GetWorld())), true, TEXT("astra_campaign=continue"));
+}
+
 void UAstraCampaignSubsystem::Tick(float DeltaTime)
 {
 	// console or command-line starts (tests, automation, "new campaign" from the menu mid-game)
@@ -403,8 +441,10 @@ void UAstraCampaignSubsystem::Tick(float DeltaTime)
 	{
 		FSlateApplication::Get().SetKeyboardFocus(Menu);   // keep Enter working on the menu
 	}
-	if (bStarted && !MenuWidget.IsValid() && (AutoSaveT -= DeltaTime) <= 0.f)
+	const UAstraShipSubsystem* ShipNow = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+	if (bStarted && !MenuWidget.IsValid() && (AutoSaveT -= DeltaTime) <= 0.f && !(ShipNow && ShipNow->IsShipLost()))
 	{
+		// (never while the Aquila is lost: the save that follows is the new command's)
 		AutoSaveT = 60.f;
 		SaveNow(TEXT("autosave"));
 	}

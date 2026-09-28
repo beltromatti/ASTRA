@@ -285,6 +285,62 @@ FString FAstraCrewRoster::AircrewLost(FRandomStream& R)
 	return FString::Printf(TEXT("%s %s"), *People[i].Name(), bKilled ? TEXT("killed") : TEXT("ejected, recovered wounded by search and rescue"));
 }
 
+FString FAstraCrewRoster::LostWithShip(int32 K, FRandomStream& R)
+{
+	TArray<int32> Order;
+	for (const int32 i : Hurt)
+	{
+		if (People[i].Status == 1 && People[i].Condition >= 2)
+		{
+			Order.Add(i);                                    // the critical: no time to move them
+		}
+	}
+	TArray<int32> Eng, Rest;
+	for (int32 i = 0; i < People.Num(); ++i)
+	{
+		const FAstraCrewman& P = People[i];
+		if (P.Status == 0 && P.Dept != TEXT("Air Group pilots"))
+		{
+			(P.Deck == 7 ? Eng : Rest).Add(i);
+		}
+	}
+	for (int32 n = Eng.Num() - 1; n > 0; --n) { Eng.Swap(n, R.RandHelper(n + 1)); }
+	for (int32 n = Rest.Num() - 1; n > 0; --n) { Rest.Swap(n, R.RandHelper(n + 1)); }
+	Order.Append(Eng.GetData(), FMath::Min(Eng.Num(), FMath::Max(0, K / 3)));   // a third of them in Main Engineering
+	Order.Append(Rest);
+	TArray<FString> Names;
+	int32 Lost = 0;
+	for (const int32 i : Order)
+	{
+		if (Lost >= K)
+		{
+			break;
+		}
+		if (People[i].Status == 2)
+		{
+			continue;
+		}
+		if (People[i].Status == 1)
+		{
+			Leave(i);
+		}
+		People[i].Status = 2;
+		Fallen.AddUnique(i);
+		if (Names.Num() < 3)
+		{
+			Names.Add(FString::Printf(TEXT("%s (%s)"), *People[i].Name(), *People[i].Dept));
+		}
+		++Lost;
+	}
+	++Rev;
+	if (Lost == 0)
+	{
+		return FString();
+	}
+	return Lost > Names.Num() ? FString::Printf(TEXT("%s and %d others"), *FString::Join(Names, TEXT(", ")), Lost - Names.Num())
+	                          : FString::Join(Names, TEXT(", "));
+}
+
 void FAstraCrewRoster::Care(float Minutes, FRandomStream& R, TArray<FNews>& OutNews)
 {
 	const TArray<int32> Ward = Hurt;

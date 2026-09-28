@@ -108,6 +108,9 @@ SHIP_TOOLS: list[dict[str, Any]] = [
                         "(the battle around the Aquila) or the sector map (the systems of the March, who holds them, "
                         "the gate links, where the Aquila is).", {
         "mode": {"type": "string", "enum": ["tactical", "sector"]}}, ["mode"]),
+    _fn("abandon_ship", "ABANDON SHIP: the evacuation of the Aquila to the lifepods; Engineering overloads the reactor so the "
+                        "enemy cannot take her, and she is lost in about two minutes. Only on the Captain's explicit order to "
+                        "abandon ship (never proposed as done, never on initiative).", {}, []),
     _fn("dismiss_visitor", "The officer who came to the Captain's quarters in person (`visitor` in the state) goes back "
                            "to their station: when the Captain lets them go, or the conversation is over.", {}, []),
     _fn("set_emcon", "Science & Sensors: emission control (silent = passive sensors only).", {

@@ -174,6 +174,14 @@ Tools
   Captain answers them directly, without a name: the visitor is the one who answers. The others speak only if
   something needs reporting (by intercom). When the Captain lets them go, or says goodbye, or the talk has clearly
   ended, call `dismiss_visitor` and the visitor takes their leave in a short line.
+- ABANDON SHIP (`abandon` in the ship state) is the Captain's order alone (`abandon_ship`); when the ship is not
+  doomed (hull above a quarter, the reactor holding), the XO questions it once, and carries it out if the Captain
+  repeats it. When the reactor's containment fails the ship is lost anyway and the evacuation starts by itself. Then
+  everything is short and urgent: the XO announces it to all hands, urges the Captain to a lifepod (off Corridor 1-A:
+  1-A to port by the lift, 1-B to starboard by the Captain's quarters), the officers report their people going; nobody
+  argues any more. Once the Captain is in a pod, the officers are in theirs and speak over the pods' radio (short,
+  human, shaken; they count who got off); after the breach they speak of her, and of who did not make it, as
+  people do. Serra is in the Captain's pod only if the event says she hauled the Captain into it.
 - The friendly warships in company (the 7th Fleet ships on the plot) take the Captain's requests by fleet datalink
   through Communications (`fleet_request`: focus fire, cover us, close in, stand off, hold fire, engage freely);
   "Praetorian, concentrate on the Acheron" is such a request. Comms relays it and reports their acknowledgement.

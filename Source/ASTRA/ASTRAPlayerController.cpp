@@ -7,6 +7,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/GameViewportClient.h"
@@ -14,6 +15,7 @@
 #include "AstraCampaign.h"
 #include "AstraFighterPawn.h"
 #include "AstraHangar.h"
+#include "AstraLifepod.h"
 #include "AstraQuarters.h"
 #include "AstraShipSubsystem.h"
 #include "EngineUtils.h"
@@ -180,6 +182,27 @@ void AASTRAPlayerController::ToggleSeat()
 	{
 		F->ClimbOut();
 		return;
+	}
+	// a lifepod's hatch: sealed, or (abandoning ship) the way off her
+	if (APawn* Me = GetPawn())
+	{
+		for (TActorIterator<AAstraLifepodHatch> It(GetWorld()); It; ++It)
+		{
+			if (It->IsWithinReach(Me))
+			{
+				UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+				if (Ship && Ship->IsAbandoning())
+				{
+					Ship->BoardLifepod(*It, this);
+				}
+				else if (GEngine)
+				{
+					GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor(250, 190, 40),
+					                                 FString::Printf(TEXT("LIFEPOD %s · sealed · it opens on ABANDON SHIP"), *It->PodName));
+				}
+				return;
+			}
+		}
 	}
 	// the Captain's quarters: the bunk (lie down to rest, or get up)
 	if (APawn* Me = GetPawn())
@@ -409,6 +432,98 @@ void AASTRAPlayerController::ChooseDeck(int32 Number)
 	if (H && GetPawn() && Number >= 1 && Number <= NumDecks)
 	{
 		H->RideLift(GetPawn(), DeckLanding[Number]);
+	}
+}
+
+void AASTRAPlayerController::EnsureStoryWidget()
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC || StoryWidget.IsValid())
+	{
+		return;
+	}
+	UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
+	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	StoryWidget = SNew(SOverlay)
+		+ SOverlay::Slot()
+		[
+			SAssignNew(StoryShade, SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.f))
+		]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 14)
+			[
+				SAssignNew(StoryTitle, STextBlock).Font(Title ? FSlateFontInfo(Title, 46) : FCoreStyle::GetDefaultFontStyle("Bold", 46))
+				.ColorAndOpacity(FLinearColor(0.75f, 0.88f, 1.f, 0.f)).Justification(ETextJustify::Center)
+			]
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+			[
+				SAssignNew(StorySub, STextBlock).Font(Mono ? FSlateFontInfo(Mono, 17) : FCoreStyle::GetDefaultFontStyle("Mono", 17))
+				.ColorAndOpacity(FLinearColor(0.45f, 0.55f, 0.66f, 0.f)).Justification(ETextJustify::Center)
+			]
+		];
+	VC->AddViewportWidgetContent(StoryWidget.ToSharedRef(), 60);
+}
+
+void AASTRAPlayerController::StoryCard(const FString& Title, const FString& Sub, float Hold, bool bStayBlack, bool bStartBlack)
+{
+	EnsureStoryWidget();
+	if (!StoryWidget.IsValid())
+	{
+		return;
+	}
+	if (bStartBlack)
+	{
+		StoryBlackNow = 1.f;          // a scene that opens in the dark (a new level after the loss)
+	}
+	StoryTitle->SetText(FText::FromString(Title));
+	StorySub->SetText(FText::FromString(Sub));
+	StoryTextT = 0.f;
+	StoryHold = FMath::Max(1.f, Hold);
+	bStoryStayBlack = bStayBlack;
+	StoryBlackWant = 1.f;
+	StoryFade = 1.2f;
+}
+
+void AASTRAPlayerController::StoryBlack(bool bOn, float Fade)
+{
+	EnsureStoryWidget();
+	StoryBlackWant = bOn ? 1.f : 0.f;
+	bStoryStayBlack = bOn;
+	StoryFade = FMath::Max(0.05f, Fade);
+}
+
+void AASTRAPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+	if (!StoryWidget.IsValid())
+	{
+		return;
+	}
+	StoryBlackNow = FMath::FInterpConstantTo(StoryBlackNow, StoryBlackWant, DeltaTime, 1.f / StoryFade);
+	float TextA = 0.f;
+	if (StoryTextT >= 0.f)
+	{
+		// the lines come once the screen is dark: a second in, the hold, a second out
+		StoryTextT += StoryBlackNow > 0.95f ? DeltaTime : 0.f;
+		TextA = FMath::Clamp(FMath::Min(StoryTextT, StoryHold + 2.f - StoryTextT), 0.f, 1.f);
+		if (StoryTextT > StoryHold + 2.f)
+		{
+			StoryTextT = -1.f;
+			StoryBlackWant = bStoryStayBlack ? 1.f : 0.f;
+		}
+	}
+	StoryShade->SetBorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, StoryBlackNow));
+	StoryTitle->SetColorAndOpacity(FLinearColor(0.75f, 0.88f, 1.f, TextA));
+	StorySub->SetColorAndOpacity(FLinearColor(0.45f, 0.55f, 0.66f, TextA));
+	if (StoryBlackNow <= 0.f && StoryBlackWant <= 0.f && StoryTextT < 0.f)
+	{
+		if (UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr)
+		{
+			VC->RemoveViewportWidgetContent(StoryWidget.ToSharedRef());
+		}
+		StoryWidget.Reset();
 	}
 }
 
