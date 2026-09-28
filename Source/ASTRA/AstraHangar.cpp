@@ -20,6 +20,7 @@
 namespace
 {
 	const FName ZoneTag(TEXT("ASTRA.Zone.Hangar"));
+	const FName EngZoneTag(TEXT("ASTRA.Zone.Engineering"));
 	const FName CraftTag(TEXT("ASTRA.Hangar.Craft"));
 	constexpr float HangarLength = 16000.f, HangarHalfWidth = 2900.f, HangarHeight = 2200.f;   // cm, with the tubes
 	constexpr float TrackStartX = 4600.f, TubeEndX = 16200.f, TubeY = 1490.f;
@@ -44,6 +45,13 @@ void AAstraHangar::BeginPlay()
 			if (ALight* L = Cast<ALight>(*It))
 			{
 				ZoneLights.Add(L);
+			}
+		}
+		else if (It->ActorHasTag(EngZoneTag))
+		{
+			if (ALight* L = Cast<ALight>(*It))
+			{
+				EngLights.Add(L);
 			}
 		}
 		else if (It->ActorHasTag(CraftTag))
@@ -104,6 +112,61 @@ void AAstraHangar::SetZoneLights(bool bOn)
 			L->GetLightComponent()->SetVisibility(bOn);
 		}
 	}
+}
+
+FVector AAstraHangar::LandingWorld(int32 Index) const
+{
+	return Index == 0 ? BridgeLanding : (Index == 1 ? GetActorTransform().TransformPosition(HangarLanding) : EngineeringLanding);
+}
+
+int32 AAstraHangar::LiftLandingNear(const APawn* Pawn) const
+{
+	if (!Pawn || LiftT >= 0.f || LiftCooldown > 0.f)
+	{
+		return -1;
+	}
+	const FVector P = Pawn->GetActorLocation();
+	for (int32 i = 0; i < NumLandings(); ++i)
+	{
+		const FVector L = LandingWorld(i);
+		if (FVector::Dist2D(P, L) < 320.f && FMath::Abs(P.Z - L.Z) < 400.f)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+bool AAstraHangar::IsPawnInEngineering(const APawn* Pawn) const
+{
+	if (!Pawn || EngineeringLanding.IsNearlyZero())
+	{
+		return false;
+	}
+	const FVector D = Pawn->GetActorLocation() - EngineeringLanding;
+	return D.X < 800.f && D.X > -5000.f && FMath::Abs(D.Y) < 1600.f && D.Z > -600.f && D.Z < 1800.f;
+}
+
+bool AAstraHangar::RideLift(APawn* Pawn, int32 ToLanding)
+{
+	const int32 From = LiftLandingNear(Pawn);
+	if (From < 0 || ToLanding < 0 || ToLanding >= NumLandings() || ToLanding == From)
+	{
+		return false;
+	}
+	RideTo = LandingWorld(ToLanding);
+	RideToLanding = ToLanding;
+	Rider = Pawn;
+	LiftT = 0.f;
+	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+	{
+		Cam->StartCameraFade(0.f, 1.f, 0.4f, FLinearColor::Black, false, true);
+	}
+	if (LiftSound)
+	{
+		UGameplayStatics::PlaySound2D(this, LiftSound, 0.8f);
+	}
+	return true;
 }
 
 bool AAstraHangar::TryUseLift(APawn* Pawn)
@@ -208,7 +271,7 @@ void AAstraHangar::Tick(float DeltaTime)
 			Rider->SetActorLocation(RideTo + FVector(0, 0, Half), false, nullptr, ETeleportType::TeleportPhysics);
 			if (AController* Ctl = Rider->GetController())
 			{
-				Ctl->SetControlRotation(FRotator(0.f, RideTo.Z < -1000.f ? GetActorRotation().Yaw : 0.f, 0.f));
+				Ctl->SetControlRotation(FRotator(0.f, RideToLanding == 2 ? 180.f : (RideTo.Z < -1000.f ? GetActorRotation().Yaw : 0.f), 0.f));
 			}
 			SetZoneLights(IsPawnInHangar(Rider.Get()));
 			if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
@@ -226,10 +289,22 @@ void AAstraHangar::Tick(float DeltaTime)
 			LiftCooldown = 1.0f;
 		}
 	}
-	if ((CheckT -= DeltaTime) <= 0.f)
+		if ((CheckT -= DeltaTime) <= 0.f)
 	{
 		CheckT = 0.25f;
 		SetZoneLights(IsPawnInHangar(UGameplayStatics::GetPlayerPawn(this, 0)));
+		const bool bEng = IsPawnInEngineering(UGameplayStatics::GetPlayerPawn(this, 0));
+		if (bEng != bEngLightsOn)
+		{
+			bEngLightsOn = bEng;
+			for (ALight* L : EngLights)
+			{
+				if (L && L->GetLightComponent())
+				{
+					L->GetLightComponent()->SetVisibility(bEng);
+				}
+			}
+		}
 		SyncSquadrons();
 	}
 	for (auto& KV : Parked)

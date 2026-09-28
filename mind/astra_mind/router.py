@@ -19,7 +19,7 @@ PROVIDERS = ["together", "modal"]
 
 # bridge officers by name or role, and ship-order vocabulary (it/en/es/fr/de)
 _CREW = re.compile(
-    r"\b(serra|ferri|tanaka|voss|martin|nair|mensah|price|numero uno|primo ufficiale|number one|xo|"
+    r"\b(serra|ferri|tanaka|voss|martin|nair|mensah|price|okonkwo|numero uno|primo ufficiale|number one|xo|"
     r"timon\w*|helm\w*|tattic\w*|tactical|operazion\w*|operations|ops|comunicazion\w*|comms?|sensor\w*|scienz\w*|"
     r"ingegner\w*|engineering|volo|flight|plancia|bridge|t[aá]ctic\w*|timonel\w*|navigat\w*|steuer\w*|taktik\w*)\b", re.I)
 _ORDER = re.compile(

@@ -29,6 +29,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector HangarLanding = FVector(250.f, 0.f, 20.f);
 
+	/** Main Engineering's landing (world, cm; zero = no third stop). */
+	UPROPERTY(EditAnywhere, Category = "Hangar")
+	FVector EngineeringLanding = FVector::ZeroVector;
+
+	/** The lift network: which landing the pawn stands at (0 the bridge, 1 the flight deck, 2 Main Engineering, -1 none),
+	 *  and the ride to another (fade, the car's hum, the other deck). */
+	int32 LiftLandingNear(const APawn* Pawn) const;
+	bool RideLift(APawn* Pawn, int32 ToLanding);
+	int32 NumLandings() const { return EngineeringLanding.IsNearlyZero() ? 2 : 3; }
+	bool IsPawnInEngineering(const APawn* Pawn) const;
+
 	/** The lift call: the Captain is near a landing and presses E. Returns false when no landing is near. */
 	bool TryUseLift(APawn* Pawn);
 	/** E beside one of Alpha's Falcons on deck: the Captain takes it (the next in line for the catapult disappears from
@@ -53,6 +64,10 @@ private:
 	};
 	TMap<FString, TArray<FParked>> Parked;   // squadron -> its craft, in bay order
 	UPROPERTY() TArray<TObjectPtr<ALight>> ZoneLights;
+	UPROPERTY() TArray<TObjectPtr<ALight>> EngLights;
+	bool bEngLightsOn = true;
+	int32 RideToLanding = -1;
+	FVector LandingWorld(int32 Index) const;
 	UPROPERTY() TObjectPtr<USoundBase> CatapultSound;
 	UPROPERTY() TObjectPtr<USoundBase> LiftSound;
 	bool bLightsOn = true;

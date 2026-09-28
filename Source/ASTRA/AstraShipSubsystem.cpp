@@ -5,6 +5,7 @@
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraBridgeFX.h"
+#include "AstraHangar.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -461,6 +462,17 @@ FString UAstraShipSubsystem::CaptainAboard() const
 		return CaptainPlanetside;
 	}
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (P)
+	{
+		for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
+		{
+			if (It->IsPawnInEngineering(P))
+			{
+				return TEXT("in Main Engineering (Deck 7), face to face with Chief Okonkwo and the engineering watch; the XO has the conn "
+				            "on the bridge and the bridge officers speak by intercom");
+			}
+		}
+	}
 	if (P && P->GetActorLocation().Z < -3000.f)
 	{
 		return TEXT("on the flight deck (Deck 9), away from the bridge: the XO has the conn; the Captain speaks by intercom");

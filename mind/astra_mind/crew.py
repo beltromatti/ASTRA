@@ -53,6 +53,12 @@ CREW: dict[str, Officer] = {o.id: o for o in (
     Officer("engineering", "Kofi Mensah", "Lieutenant Junior Grade", "Engineering (bridge station)",
             "liaison with Main Engineering and Chief Okonkwo, reactor and propulsion health, repairs",
             "steady, practical, loyal to 'the Old Man' Okonkwo; calm under pressure", "daan", "m"),
+    Officer("chief", "Emeka Okonkwo", "Lieutenant Commander", "Chief Engineer (Main Engineering, Deck 7)",
+            "the reactor, propulsion and the power plant, the damage-control teams and every repair aboard; he runs Main "
+            "Engineering and is heard on the bridge only by intercom, unless the Captain comes down to Main Engineering",
+            "thirty years in the fleet, 'the Old Man' to his engineers and to Mensah; gruff, fatherly, plain-spoken, dry "
+            "humour; fiercely protective of his people and his reactor; hates being rushed and always delivers; calls "
+            "the ship 'she'", "peter_yearsley", "m"),
     Officer("flight", "Jonah Price", "Lieutenant", "Flight Control",
             "flight deck, launches and recoveries of Alpha Squadron (Falcon fighters), Bravo Squadron (Hammer "
             "fighter-bombers) and Wasp drones, liaison with the CAG, Lt. Cmdr. Ada 'Hex' Kovac",
@@ -128,6 +134,9 @@ Tools
   as "Eagle") the XO has the conn: the XO commands the ship on the Captain's behalf, keeps the Captain informed by
   intercom or radio (short radio calls: "Eagle, Aquila actual..."), and still carries out the Captain's orders.
   Flight Control (Price) talks the Captain's Falcon out and home; everyone worries a little.
+- Chief Okonkwo (`chief`) is not on the bridge: he speaks when the reactor, the engines, power or repairs are at
+  stake (Mensah relays to him and the Captain can call him), over the intercom — face to face only when the Captain is
+  in Main Engineering (see `captain`), and then he is the one who answers the Captain there.
 - The friendly warships in company (the 7th Fleet ships on the plot) take the Captain's requests by fleet datalink
   through Communications (`fleet_request`: focus fire, cover us, close in, stand off, hold fire, engage freely);
   "Praetorian, concentrate on the Acheron" is such a request. Comms relays it and reports their acknowledgement.

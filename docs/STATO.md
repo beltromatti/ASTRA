@@ -137,6 +137,12 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] **Port Aurelius**: spazioporto sul pianoro sopra la baia (`art/blender/spaceport.py`: piazzale in cemento con linee di rullaggio, 5 piazzole con anello dipinto, frecce e luci di bordo, torre di controllo con cabina vetrata e faro, 3 hangar, terminal vetrato) e la città lungo la baia (243 edifici in tre tipi: torri di vetro, blocchi a fasce, blocchi a gradoni, disposti dal generatore del terreno); il Falcon ha il carrello
 - [x] **Port Aurelius Control** (`mind/astra_mind/port.py`): il controllore Dario Vance (voce propria, via radio) chiama Eagle appena uscito dal rientro, assegna una piazzola, dà vento e rotta, risponde quando lo si chiama («Port Aurelius, qui Eagle...», «Torre...»), accoglie all'atterraggio e saluta alla partenza; conosce la guerra come la sente la gente di New Ravenna («quaggiù tutti col fiato sospeso per le notizie da Thule»)
 
+## Sala Macchine (Deck 7) e ascensore a tre ponti
+- [x] **Main Engineering** (`art/blender/engineering.py`, `tools/ue_scripts/build_engineering.py`, dati in `data/ship/aquila_engineering.json`): sala di 42 × 28 × 14 m a poppa dell'isola, il **nucleo del reattore** dal pozzo al soffitto (doghe scure, fessure da cui si vede il plasma azzurro che pulsa, bobine di contenimento), condotti che si irradiano verso le pareti, balconata con scale, linee del refrigerante blu, console dei tecnici, e il **tavolo del display di sistema** con lo schema vivo della nave; luci di zona accese solo quando il Capitano è laggiù
+- [x] Il **Capo ingegnere Emeka Okonkwo** («il Vecchio»: burbero, paterno, chiama la nave «lei») è un ufficiale dell'equipaggio con voce propria: in sala macchine risponde di persona, altrimenti via interfono; i tecnici di guardia sono ai loro posti
+- [x] **Ascensore a tre ponti**: E alle porte apre il pannello (1 plancia · Deck 1, 2 sala macchine · Deck 7, 3 ponte di volo · Deck 9); l'equipaggio sa dove si trova il Capitano
+- [x] Quando il Capitano è lontano dalla plancia (ponte di volo, sala macchine, Falcon, New Ravenna) le voci degli ufficiali arrivano via interfono/radio
+
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
 - [x] Vice Admiral Adrian Rourke, comandante della Settima Flotta: trasmette gli ordini, risponde quando l'Aquila chiama la flotta, può concedere rinforzi o rifornimento
@@ -153,7 +159,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 
 ## Prossimi passi
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
-2. Altri ponti raggiungibili con l'ascensore: sala macchine con il capo Okonkwo, infermeria (i feriti del ruolino), alloggi.
+2. Altri ponti: infermeria (i feriti del ruolino e il medico di bordo), alloggi del Capitano (diario, riposo).
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
 4. Simulazione di calore (M2); M7 seconda parte (spazioporto, città, altri pianeti); preparazione al multigiocatore (M8: autorità del server, comandi come RPC).
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).

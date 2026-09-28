@@ -1,0 +1,22 @@
+{
+  "id": "aquila_engineering",
+  "name": "Main Engineering · Deck 7 · Section F",
+  "signage": "DECK 7 · SECTION F · MAIN ENGINEERING",
+  "frame": "Unreal convention: X forward, Y starboard, Z up; metres; origin = deck level at the centre of the forward wall, where the lift opens; the hall runs aft (negative x)",
+  "world_origin": [-330.0, 0.0, -58.0],
+  "world_note": "inside the Aquila's hull aft of the island (hull frame x -158, z +4): the lift joins it to the bridge corridor and the flight deck",
+  "length": 42.0,
+  "half_width": 14.0,
+  "height": 14.0,
+  "reactor": {"x": -26.0, "y": 0.0, "radius": 4.2, "pit_radius": 7.5, "pit_depth": 2.5},
+  "gallery": {"z": 6.5, "width": 2.2},
+  "lift": {"y": 0.0, "width": 3.0, "height": 3.2},
+  "master_console": {"x": -12.0, "y": 0.0, "length": 7.0, "width": 2.4},
+  "wall_consoles": [{"x": -8.0, "side": -1}, {"x": -18.0, "side": -1}, {"x": -8.0, "side": 1}, {"x": -18.0, "side": 1}],
+  "crew": [
+    {"station": "chief", "x": -13.5, "y": 1.6, "yaw": 180.0, "name": "Chief Engineer Emeka Okonkwo"},
+    {"station": "eng_tech1", "x": -8.0, "y": -12.4, "yaw": -90.0},
+    {"station": "eng_tech2", "x": -18.0, "y": 12.4, "yaw": 90.0},
+    {"station": "eng_tech3", "x": -33.0, "y": -9.0, "yaw": 20.0}
+  ]
+}

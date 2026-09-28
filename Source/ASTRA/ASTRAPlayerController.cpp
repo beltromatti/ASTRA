@@ -2,6 +2,7 @@
 
 
 #include "ASTRAPlayerController.h"
+#include "Widgets/SBoxPanel.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBorder.h"
@@ -107,6 +108,17 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
 		InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
+		// the lift's panel (only while it is open)
+		auto Deck = [this](const FKey& K, int32 N)
+		{
+			FInputKeyBinding B(FInputChord(K), IE_Pressed);
+			B.bConsumeInput = false;
+			B.KeyDelegate.GetDelegateForManualSet().BindLambda([this, N]() { if (LiftMenu.IsValid()) { ChooseDeck(N); } });
+			InputComponent->KeyBindings.Add(B);
+		};
+		Deck(EKeys::One, 1);
+		Deck(EKeys::Two, 2);
+		Deck(EKeys::Three, 3);
 	}
 
 	// only add IMCs for local player controllers
@@ -178,10 +190,24 @@ void AASTRAPlayerController::ToggleSeat()
 	// the lift to the flight deck (or back up) when standing at one of its landings; a Falcon of Alpha on the deck
 	if (APawn* Me = GetPawn())
 	{
+		if (LiftMenu.IsValid())
+		{
+			CloseLiftMenu();   // E again: never mind
+			return;
+		}
 		for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
 		{
-			if (It->TryUseLift(Me))
+			const int32 From = It->LiftLandingNear(Me);
+			if (From >= 0)
 			{
+				if (It->NumLandings() > 2)
+				{
+					ShowLiftMenu(*It, From);
+				}
+				else
+				{
+					It->RideLift(Me, From == 0 ? 1 : 0);
+				}
 				return;
 			}
 			if (It->TryBoard(Me))
@@ -287,6 +313,73 @@ namespace
 		TEXT("                  RB boost · LB decoys · Y recover/land · X descend\n")
 		TEXT("\n")
 		TEXT("F1  this card");
+}
+
+namespace
+{
+	// the lift's decks, by the number on its panel: 1 the bridge (landing 0), 2 Main Engineering (2), 3 the flight deck (1)
+	const int32 DeckLanding[4] = {-1, 0, 2, 1};
+	const TCHAR* DeckName[4] = {TEXT(""), TEXT("BRIDGE  ·  DECK 1"), TEXT("MAIN ENGINEERING  ·  DECK 7"), TEXT("FLIGHT DECK  ·  DECK 9")};
+}
+
+void AASTRAPlayerController::ShowLiftMenu(AAstraHangar* Hangar, int32 From)
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC || !Hangar)
+	{
+		return;
+	}
+	CloseLiftMenu();
+	LiftHangar = Hangar;
+	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	const FSlateFontInfo Font = Mono ? FSlateFontInfo(Mono, 18) : FCoreStyle::GetDefaultFontStyle("Mono", 18);
+	const FSlateFontInfo Small = Mono ? FSlateFontInfo(Mono, 12) : FCoreStyle::GetDefaultFontStyle("Mono", 12);
+	TSharedRef<SVerticalBox> List = SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 12)
+		[
+			SNew(STextBlock).Font(Small).ColorAndOpacity(FLinearColor(0.55f, 0.75f, 1.f)).Text(FText::FromString(TEXT("LIFT  ·  ASN AQUILA")))
+		];
+	for (int32 N = 1; N <= 3; ++N)
+	{
+		const bool bHere = DeckLanding[N] == From;
+		List->AddSlot().AutoHeight().Padding(0, 4)
+		[
+			SNew(STextBlock).Font(Font).ColorAndOpacity(bHere ? FLinearColor(0.5f, 0.55f, 0.6f, 0.7f) : FLinearColor(0.88f, 0.92f, 0.97f))
+			.Text(FText::FromString(FString::Printf(TEXT("%d   %s%s"), N, DeckName[N], bHere ? TEXT("   (here)") : TEXT(""))))
+		];
+	}
+	List->AddSlot().AutoHeight().Padding(0, 12, 0, 0)
+	[
+		SNew(STextBlock).Font(Small).ColorAndOpacity(FLinearColor(0.6f, 0.65f, 0.7f)).Text(FText::FromString(TEXT("press a number  ·  E to stay")))
+	];
+	LiftMenu = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
+	[
+		SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.88f))
+		.Padding(FMargin(36, 26))
+		[
+			List
+		]
+	];
+	VC->AddViewportWidgetContent(LiftMenu.ToSharedRef(), 45);
+}
+
+void AASTRAPlayerController::CloseLiftMenu()
+{
+	if (LiftMenu.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
+	{
+		GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(LiftMenu.ToSharedRef());
+	}
+	LiftMenu.Reset();
+}
+
+void AASTRAPlayerController::ChooseDeck(int32 Number)
+{
+	AAstraHangar* H = LiftHangar.Get();
+	CloseLiftMenu();
+	if (H && GetPawn() && Number >= 1 && Number <= 3)
+	{
+		H->RideLift(GetPawn(), DeckLanding[Number]);
+	}
 }
 
 void AASTRAPlayerController::ToggleHelp()

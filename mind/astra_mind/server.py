@@ -90,7 +90,7 @@ EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTRO
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
 import re as _re
 _CREW_ADDRESS = _re.compile(
-    r"^\W*(serra|ferri|tanaka|voss|martin|nair|mensah|price|numero uno|primo ufficiale|xo|comandante|timon\w*|helm\w*|"
+    r"^\W*(serra|ferri|tanaka|voss|martin|nair|mensah|price|okonkwo|capo|chief|numero uno|primo ufficiale|xo|comandante|timon\w*|helm\w*|"
     r"tattic\w*|tactical|ops|operazion\w*|operations|comunicazion\w*|comms?|sensor\w*|scienz\w*|ingegner\w*|"
     r"engineering|volo|flight|plancia|bridge|number one|chiud\w* (il )?canale|close (the )?channel|fine trasmissione|"
     r"end transmission|praetorian|vigilant|flotta|fleet|scorta|escort)\b", _re.I)

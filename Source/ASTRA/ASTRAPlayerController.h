@@ -72,6 +72,12 @@ protected:
 	void OpenMenu();
 	/** The Captain climbs into a Falcon of Alpha on the flight deck: the cockpit on the port catapult. */
 	void BoardFalcon(class AAstraHangar* Hangar, APawn* Walker);
+	/** The lift's panel: which deck (1 the bridge, 2 Main Engineering, 3 the flight deck). */
+	void ShowLiftMenu(class AAstraHangar* Hangar, int32 From);
+	void CloseLiftMenu();
+	void ChooseDeck(int32 Number);
+	TSharedPtr<class SWidget> LiftMenu;
+	TWeakObjectPtr<class AAstraHangar> LiftHangar;
 	/** F1: the controls card (shown for a while at the start of a campaign as a hint). */
 	void ToggleHelp();
 	UFUNCTION(Exec) void AstraHelp() { ToggleHelp(); }
