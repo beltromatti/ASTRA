@@ -52,6 +52,9 @@ public:
 
 	static AAstraCrewMember* FindByStation(UWorld* World, const FString& Station);
 
+	/** Something burst right in front of them (their console shorted out): they recoil and shield their face. */
+	void Startle(float Strength);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -79,6 +82,8 @@ private:
 	float SinceSpoke = 100.f;
 	float Phase = 0.f;           // desynchronises idle motion between crew members
 	float LifeTime = 0.f;
+	float StartleT = 0.f;        // 1 at the burst, down to 0 (recoil, then back to work)
+	float StartleStrength = 0.f;
 
 	// procedural seated pose: reference pose data and the basis of the body (component space)
 	TArray<FTransform> RefLocal;

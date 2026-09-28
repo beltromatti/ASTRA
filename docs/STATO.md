@@ -82,6 +82,9 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Distruzioni: lampo, palla di fuoco (M_FX_Blast), esplosioni secondarie, onda d'urto, detriti, relitto annerito alla deriva
 - [ ] Navi v2 (sagome e dettagli più belli), scie dei missili, colpi sugli scudi più ricchi
 
+## Danni in plancia
+- [x] I colpi forti fanno andare in corto plafoniere e console (`AstraBridgeFX`): pioggia di scintille che rimbalzano sul ponte e si raffreddano dal bianco al rosso, lampo arancione che illumina la stazione, crepitio elettrico (SW_Sparks, sintetizzato); di preferenza dove il Capitano sta guardando. L'ufficiale alla console colpita si ritrae e si ripara il viso. Prova: `astra.fx.sparks`
+
 ## Equipaggio di bordo (le 560 persone)
 - [x] Ruolino generato con seme fisso (`Source/ASTRA/AstraCrewRoster.*`): 420 marinai, 60 piloti con nominativo, 80 fanti di marina; nome, grado, reparto, ponte e mondo d'origine. I colpi feriscono e uccidono persone vere nel compartimento colpito, i caccia abbattuti hanno un pilota (ucciso o eiettato e recuperato); l'equipaggio li nomina, il regista li ricorda, nei momenti di quiete a volte si parla di chi non c'è più
 

@@ -4,6 +4,7 @@
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraBridgeFX.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
@@ -79,6 +80,9 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	Roster.Generate();
 	CasualtyRng.Initialize((int32)(FDateTime::Now().GetTicks() & 0x7fffffff));
+	FActorSpawnParameters FXP;
+	FXP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	BridgeFX = InWorld.SpawnActor<AAstraBridgeFX>(FVector::ZeroVector, FRotator::ZeroRotator, FXP);
 	PowerPct = {{TEXT("shields"), 100.f}, {TEXT("weapons"), 100.f}, {TEXT("engines"), 100.f}, {TEXT("sensors"), 100.f},
 	            {TEXT("life_support"), 100.f}, {TEXT("flight_deck"), 100.f}};
 	Weapons = {{TEXT("railguns"), TEXT("ready (4 twin turrets)")}, {TEXT("lasers"), TEXT("ready (12 batteries)")},
@@ -903,6 +907,19 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 {
 	FlickerTime = 0.6f;
 	FString Where;
+	if (HullDamage > 8.f && BridgeFX)
+	{
+		// the shock runs through the frame: a fixture or a console on the bridge shorts out
+		const float Strength = FMath::Clamp(HullDamage / 60.f, 0.2f, 1.f);
+		if (FMath::FRand() < 0.35f + 0.5f * Strength)
+		{
+			BridgeFX->RandomBurst(Strength);
+		}
+		if (HullDamage > 35.f)
+		{
+			BridgeFX->RandomBurst(Strength * 0.7f);
+		}
+	}
 	if (HullDamage > 8.f)
 	{
 		// where did it land? a compartment (decks 1-12, sections A-H) and what it does there

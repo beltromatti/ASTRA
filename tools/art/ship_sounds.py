@@ -136,6 +136,27 @@ def transit():
     return norm(np.tanh(1.2 * (drone + hiss + boom + ring)))
 
 
+def sparks():
+    """A shorted fixture: the arc's snap and buzz, then a shower of crackles thinning out as the sparks die."""
+    t = t_(1.6)
+    x = np.zeros_like(t)
+    arc_t = t[: int(0.22 * SR)]
+    buzz = (np.sign(np.sin(2 * np.pi * 120 * arc_t)) * 0.3 + bp(rng.normal(0, 1, len(arc_t)), 1500, 9000) * 0.9)
+    x[: len(arc_t)] += buzz * np.exp(-arc_t * 9) * (0.6 + 0.4 * (rng.random(len(arc_t)) > 0.5))
+    snap_n = int(0.012 * SR)
+    x[:snap_n] += hp(rng.normal(0, 1, snap_n), 800) * 1.6
+    for _ in range(140):                      # crackles, dense at first, sparse as the shower cools
+        at = rng.exponential(0.28)
+        if at > 1.5:
+            continue
+        i = int(at * SR)
+        m = int(rng.uniform(0.0008, 0.004) * SR)
+        if i + m >= len(x):
+            continue
+        x[i:i + m] += hp(rng.normal(0, 1, m), 2500) * np.exp(-np.arange(m) / m * 4) * rng.uniform(0.2, 0.8) * np.exp(-at * 1.5)
+    return norm(np.tanh(1.4 * hp(x, 300)), 0.85)
+
+
 def bridge_ambience(dur=24.0):
     """The bridge at rest: the reactor's deep hum through the deck, air handling, and far electronics (loopable)."""
     t = t_(dur)
@@ -160,6 +181,7 @@ def bridge_ambience(dur=24.0):
 os.makedirs(OUT, exist_ok=True)
 for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("SW_Torpedo_Launch", lambda: vls_launch(True)),
                  ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp),
-                 ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False)), ("SW_Transit", transit)):
+                 ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False)), ("SW_Transit", transit),
+                 ("SW_Sparks", sparks)):
     sf.write(os.path.join(OUT, name + ".wav"), fn().astype(np.float32), SR, subtype="PCM_16")
 print("SHIP_SOUNDS_OK", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

@@ -193,6 +193,7 @@ private:
 	void CaptureHomeSky();
 	int32 NextDamageId = 1;
 	FAstraCrewRoster Roster;          // the 560 aboard, by name: the crew's cost
+	UPROPERTY() TObjectPtr<class AAstraBridgeFX> BridgeFX;   // sparks and arcs on the bridge when we are hit hard
 	FRandomStream CasualtyRng;
 	static constexpr int32 NumDamageTeams = 4;
 	static constexpr float PowerBudget = 700.f;   // six systems at 100% = 600; the reactor can give 100 more

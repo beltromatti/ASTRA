@@ -213,8 +213,17 @@ void AAstraCrewMember::InitSeated()
 	UpdateSeated(0.f);
 }
 
+void AAstraCrewMember::Startle(float Strength)
+{
+	StartleT = 1.f;
+	StartleStrength = FMath::Clamp(Strength, 0.3f, 1.f);
+}
+
 void AAstraCrewMember::UpdateSeated(float DeltaSeconds)
 {
+	StartleT = FMath::Max(0.f, StartleT - DeltaSeconds / 1.6f);
+	// recoil envelope: a jolt in a tenth of a second, a slow return to the console
+	const float Recoil = StartleStrength * FMath::Min(1.f, (1.f - StartleT) * 10.f) * FMath::SmoothStep(0.f, 0.6f, StartleT);
 	const int32 N = RefCS.Num();
 	const FVector Up = FVector::UpVector;
 	const float T = LifeTime + Phase;
@@ -251,7 +260,7 @@ void AAstraCrewMember::UpdateSeated(float DeltaSeconds)
 		}
 	}
 	// spine: a slight lean towards the console, breathing on top
-	const float Lean = bConsole ? 1.f : 0.45f;
+	const float Lean = (bConsole ? 1.f : 0.45f) - 1.6f * Recoil;
 	const float Breath = 0.9f * FMath::Sin(T * 2.f * PI / 4.3f);
 	const FVector Side = FVector::CrossProduct(Up, Fwd).GetSafeNormal();   // lean axis (pitch forward)
 	const float Sgn = FVector::DotProduct(Side, Right) >= 0.f ? 1.f : -1.f;
@@ -268,6 +277,7 @@ void AAstraCrewMember::UpdateSeated(float DeltaSeconds)
 	{
 		Rot.Add(B, ShoulderTurn * FQuat(PitchAxis, FMath::DegreesToRadians(12.f * Lean)) * RefCS[B].GetRotation());
 	}
+	LookYaw += 38.f * Recoil * (FMath::Sin(Phase * 7.f) >= 0.f ? 1.f : -1.f);   // turn the face away from the burst
 	const FQuat HeadTurn(Up, FMath::DegreesToRadians(LookYaw));
 	if (const int32 B = Bone(TEXT("neck_01")); B != INDEX_NONE)
 	{
@@ -297,7 +307,14 @@ void AAstraCrewMember::UpdateSeated(float DeltaSeconds)
 		const TCHAR* Finger = k ? TEXT("middle_metacarpal_r") : TEXT("middle_metacarpal_l");
 		const float Work = bConsole ? (1.f - 0.7f * FacingBlend) : 0.f;
 		const float Tap = Work * (2.5f * FMath::Sin(T * 4.1f + k * 1.7f) * FMath::Max(0.f, FMath::Sin(T * 0.8f + k)));
-		if (bConsole)
+		const bool bShield = Recoil > 0.01f && (k == 1) == (FMath::Sin(Phase * 7.f) >= 0.f);
+		if (bShield)
+		{
+			// forearm up across the face
+			Aim(UpperArm, LowerArm, FMath::Lerp(Fwd * 0.45f - Up * 0.85f + Right * (0.16f * S), Fwd * 0.75f + Up * 0.25f + Right * (0.25f * S), Recoil));
+			Aim(LowerArm, Hand, FMath::Lerp(Fwd * 0.97f - Right * (0.26f * S), Up * 0.85f - Right * (0.55f * S) + Fwd * 0.1f, Recoil));
+		}
+		else if (bConsole)
 		{
 			Aim(UpperArm, LowerArm, Fwd * 0.45f - Up * 0.85f + Right * (0.16f * S));
 			Aim(LowerArm, Hand, Fwd * 0.97f + Up * (-0.05f + Tap * 0.01f) - Right * (0.26f * S));
