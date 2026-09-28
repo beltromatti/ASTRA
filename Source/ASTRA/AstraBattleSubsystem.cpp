@@ -1651,9 +1651,9 @@ bool UAstraBattleSubsystem::LaunchSquadron(const FString& Name, const FString& M
 		OutDetail = TEXT("cannot task a strike on a friendly vessel");
 		return false;
 	}
-	if (M == TEXT("escort") && T->Side != EAstraSide::Astra)
+	if (M == TEXT("escort") && T->Side == EAstraSide::Mandate)
 	{
-		OutDetail = TEXT("escort is for friendly ships");
+		OutDetail = TEXT("escort is for friendly or civilian ships");
 		return false;
 	}
 	if (M == TEXT("sar") && LastWreckName.IsEmpty())

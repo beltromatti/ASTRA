@@ -56,7 +56,7 @@ SHIP_TOOLS: list[dict[str, Any]] = [
     _fn("launch_squadron", "Flight Control: launch a flight group (alpha = 8 Falcon fighters, bravo = 7 Hammer torpedo "
                             "bombers, drones = 12 Wasp drones) or re-task it if airborne. Missions: cap = patrol around the "
                             "Aquila shooting down incoming missiles; strike = attack a contact (bombers make a torpedo run "
-                            "then return, fighters strafe); escort = protect a friendly ship; ew = jam an enemy ship's fire "
+                            "then return, fighters strafe); escort = protect a friendly or civilian ship; ew = jam an enemy ship's fire "
                             "control; recon = identify a contact (or the nearest unknown one); sar = rescue survivors at the "
                             "last wreck. Enemy point defence shoots at them.", {
         "squadron": {"type": "string", "enum": ["alpha", "bravo", "drones"]},
