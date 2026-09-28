@@ -398,6 +398,89 @@ def astra_ship2(name: str, length: float, seed: int, kind: str):
     return obj
 
 
+# =================================================================================================== craft
+def craft2(name: str, kind: str, seed: int, mandate: bool = False):
+    """Small craft v2 (built to be seen up close on the flight deck): a lofted fuselage with a chine, a lit canopy
+    frame, wings with hardpoints and wingtip lights, tail fins, engines with glowing throats, landing skids.
+    kind: fighter (Falcon, Harpy) | bomber (Hammer) | drone (Wasp)."""
+    rng = random.Random(seed)
+    b = A.Builder()
+    L = {"fighter": 18.0 if not mandate else 16.0, "bomber": 26.0, "drone": 8.0}[kind]
+    w = L * (0.075 if kind == "fighter" else (0.1 if kind == "bomber" else 0.12))
+    h = L * (0.06 if kind != "drone" else 0.1)
+    sec = (lambda ww, hh: K.blade(ww, hh, 0.1)) if mandate else (lambda ww, hh: K.chamfer_rect(ww, hh, 0.38, top=0.8, bottom=0.7))
+    wp = [(0.0, 0.62), (0.12, 0.95), (0.5, 1.0), (0.78, 0.7), (1.0, 0.1)]
+    hp = [(0.0, 0.7), (0.15, 0.95), (0.5, 1.0), (0.8, 0.75), (1.0, 0.15)]
+    st = [(-L / 2 + (i / 12) * L, sec(w * profile(i / 12, wp), h * profile(i / 12, hp)), h * 0.12 * max(0.0, i / 12 - 0.6)) for i in range(13)]
+    fus = K.Hull(b, st, PLATE, cell=max(0.8, L / 16))
+    fus.plate(rng, depth=(0.02, 0.06), recess=0.04, margin=0.05, skip=0.35, max_run=(2, 2), mats={FRAME: 0.18} if not mandate else {LIVERY: 0.15})
+    if kind != "drone":
+        # the canopy: a glazed lit block framed by the fuselage, raked back
+        cx = L * (0.2 if kind == "fighter" else 0.25)
+        K.slab(b, cx - L * 0.12, cx + L * 0.1, K.chamfer_rect(w * 0.55, h * 0.35, 0.45, top=0.6), K.chamfer_rect(w * 0.3, h * 0.2, 0.45, top=0.5),
+               LIGHTS, h * 0.95, h * 0.85)
+        K.slab(b, cx - L * 0.125, cx - L * 0.11, K.chamfer_rect(w * 0.6, h * 0.38, 0.4), K.chamfer_rect(w * 0.6, h * 0.38, 0.4), FRAME, h * 0.95, h * 0.95)
+    # wings
+    if kind == "drone":
+        from mathutils import Matrix
+        for ang in (90, 210, 330):
+            a = math.radians(ang)
+            with K.part(b, Matrix.Rotation(a - math.pi / 2, 4, "X")):
+                K.slab(b, -L * 0.35, L * 0.05, K.chamfer_rect(w * 1.8, 0.08, 0.2), K.chamfer_rect(w * 0.6, 0.06, 0.2), FRAME, 0.0, 0.0, w * 1.6, w * 1.1)
+        b.cylinder((L * 0.5, 0, 0), (L * 0.56, 0, 0), w * 0.45, LIGHTS, segments=16)   # the sensor eye
+    else:
+        span = L * (0.72 if kind == "fighter" else 0.88) * (1.1 if mandate else 1.0)
+        root_c, tip_c = L * (0.42 if kind == "fighter" else 0.36), L * (0.14 if kind == "fighter" else 0.2)
+        sweep = L * (0.18 if kind == "fighter" else 0.06) * (-1.0 if mandate else 1.0)
+        for side in (-1, 1):
+            y0, y1 = side * w * 0.9, side * span / 2
+            bm = b.bm
+            z = -h * 0.25
+            verts = [bm.verts.new(v) for v in (
+                (-L * 0.28, y0, z - 0.12), (-L * 0.28 + root_c, y0, z - 0.12), (-L * 0.28 + sweep + root_c * 0.5 + tip_c * 0.5, y1, z + (0.3 if not mandate else -0.2)),
+                (-L * 0.28 + sweep + root_c * 0.5 - tip_c * 0.5, y1, z + (0.3 if not mandate else -0.2)),
+                (-L * 0.28, y0, z + 0.12), (-L * 0.28 + root_c, y0, z + 0.12), (-L * 0.28 + sweep + root_c * 0.5 + tip_c * 0.5, y1, z + (0.36 if not mandate else -0.14)),
+                (-L * 0.28 + sweep + root_c * 0.5 - tip_c * 0.5, y1, z + (0.36 if not mandate else -0.14)))]
+            import bmesh as _bm
+            idx = b.mi(PLATE)
+            faces = [bm.faces.new((verts[a], verts[bb], verts[c], verts[d])) for a, bb, c, d in
+                     ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0))]
+            for f in faces:
+                f.material_index = idx
+            _bm.ops.recalc_face_normals(bm, faces=faces)
+            tipx = -L * 0.28 + sweep + root_c * 0.5
+            K.running_lights(b, [(tipx, y1, z + 0.3)], max(0.2, L * 0.012), LIGHTS)
+            b.box((tipx - tip_c * 0.1, y1 - side * L * 0.04, z + 0.25), (tip_c * 0.8, L * 0.035, 0.1), LIVERY)   # wingtip livery
+            # hardpoints: missiles (fighters) or torpedoes (bombers) under the wings
+            for k in range(2 if kind == "fighter" else 1):
+                yy = side * (w * 1.6 + (span / 2 - w) * (0.35 + 0.3 * k))
+                r = L * (0.012 if kind == "fighter" else 0.035)
+                b.cylinder((-L * 0.18, yy, z - 0.45 - r), (L * 0.05 + (L * 0.12 if kind == "bomber" else 0), yy, z - 0.45 - r), r, FRAME, segments=10)
+        # tail fins: twin, canted outwards (the Harpy has a single blade)
+        for side in ((-1, 1) if not mandate else (0,)):
+            yb = side * w * 0.55
+            K.slab(b, -L * 0.48, -L * 0.3, K.chamfer_rect(0.1, h * 0.9, 0.2), K.chamfer_rect(0.08, h * 0.35, 0.2), PLATE,
+                   h * 1.3, h * 1.55, yb + side * 0.2, yb + side * 0.5)
+    # engines
+    ne = 1 if kind == "drone" else 2
+    for i in range(ne):
+        yy = 0.0 if ne == 1 else (i - 0.5) * w * 1.15
+        r = L * (0.04 if kind == "fighter" else (0.05 if kind == "bomber" else 0.06))
+        b.cylinder((-L * 0.44, yy, 0), (-L * 0.53, yy, 0), r * 1.15, FRAME, segments=16)
+        b.cylinder((-L * 0.53, yy, 0), (-L * 0.56, yy, 0), r * 0.85, ENGINE, segments=16, radius2=r * 1.05)
+        b.cylinder((-L * 0.535, yy, 0), (-L * 0.545, yy, 0), r * 0.9, GLOW, segments=16)
+    # landing skids (parked on the deck they touch it)
+    if kind != "drone":
+        for x, yy in ((L * 0.28, 0.0), (-L * 0.15, w * 1.1), (-L * 0.15, -w * 1.1)):
+            b.cylinder((x, yy, -h * 0.9), (x, yy, -h * 1.35), max(0.08, L * 0.006), FRAME, segments=8)
+            b.box((x, yy, -h * 1.38), (L * 0.05, L * 0.012, 0.06), FRAME)
+    obj = b.to_object(name)
+    if os.environ.get("NOBEVEL") != "1":
+        A.finish(obj, bevel=max(0.01, L * 0.001), segments=1)
+    A.box_uv(obj, texel_m=2.0)
+    return obj
+
+
 # ================================================================================================= stations
 def listening_post(name: str, seed: int = 31):
     """Thule Watch class listening post (ASTRA): a long truss spine, a cluster of habitat and operations modules, three
@@ -450,6 +533,10 @@ def listening_post(name: str, seed: int = 31):
 
 
 SHIPS = {
+    "SM_CRAFT_ASTRA_Falcon": (craft2, dict(kind="fighter", seed=21)),
+    "SM_CRAFT_ASTRA_Hammer": (craft2, dict(kind="bomber", seed=23)),
+    "SM_CRAFT_ASTRA_Wasp": (craft2, dict(kind="drone", seed=25)),
+    "SM_CRAFT_MANDATE_Harpy": (craft2, dict(kind="fighter", seed=27, mandate=True)),
     "SM_STATION_ASTRA_Watch": (listening_post, dict(seed=31)),
     "SM_SHIP_ASTRA_Aquila": (astra_ship2, dict(length=780.0, seed=1, kind="carrier")),
     "SM_SHIP_ASTRA_Praetorian": (astra_ship2, dict(length=920.0, seed=7, kind="battleship")),
