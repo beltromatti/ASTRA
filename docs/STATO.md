@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-28 (pomeriggio) · **Traguardo corrente:** M6 — La campagna (regista, diario, umore dell'equipaggio)
+**Ultimo aggiornamento:** 2026-09-28 (pomeriggio) · **Traguardo corrente:** M7 — Pianeti (discesa su New Ravenna)
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -129,7 +129,10 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] **Pilotare un Falcon in prima persona** (`AstraFighterPawn`, abitacolo `art/blender/cockpit.py`): sul ponte di volo, **E** accanto a un Falcon di Alpha → nell'abitacolo sulla catapulta di sinistra (vista vera dell'hangar, dei caccia parcheggiati e dei tubi); **W** per dare motore e la catapulta ti spara fuori dalla bocca di prua. In volo: mouse = cloche virtuale (beccheggio/imbardata), A/D rollio, W/S manetta (X a zero), Q/E e Spazio/Ctrl traslazioni, Shift postbruciatore, Alt per guardarsi intorno, **tasto sinistro cannoni**, **destro missile** sul bersaglio agganciato (12°, 6 km, 1,2 s). HUD proiettato sul tettuccio: reticolo, cloche, parentesi sui nemici, riquadro d'aggancio con distanza, **indicatore di anticipo** per i cannoni, freccia verso l'Aquila, velocità/manetta, scafo, scudi, missili. Il modello di volo è nel riferimento della portaerei (manetta a zero = in formazione con l'Aquila). **F** vicino alla bocca del tubo per rientrare; se ti abbattono ti eietti e un Wasp riporta la capsula. Il Falcon è una vera unità della simulazione: i nemici e la difesa di punto possono colpirlo, i tuoi colpi e missili fanno danni veri; l'equipaggio sa dove sei (l'XO prende il comando, Price ti segue sul canale di controllo) e puoi dare ordini al ponte via radio (V)
 - [x] Duelli: due Harpy si staccano e inseguono il Falcon del Capitano quando è vicino (cannoni in coda, razzi a guida); la difesa di punto delle navi nemiche lo colpisce con molti colpi piccoli (c'è tempo per sganciarsi); **C: esche** (4 salve di chaff/flare: la maggior parte dei cercatori perde il bersaglio); colpi sentiti in cabina (scossa, rumore), allarme missile che lampeggia sull'HUD. Suoni dell'abitacolo sintetizzati: motori legati a manetta e postbruciatore, bip del cercatore, tono d'aggancio, allarme missile
 - Prova: `astra.battle.spawn harpies 8 0` (un cacciatorpediniere che lancia quattro Harpy), `astra.fly.home`, `astra.fly.face <contatto>`; comandi del pawn da console: `AstraThrottle`, `AstraStick`, `AstraGuns`, `AstraMissile`, `AstraLand`
-- [ ] Discesa su un pianeta con lo stesso Falcon (M7)
+- [x] **M7 (prima versione) — Discesa su New Ravenna**: in volo, col muso sul pianeta, **G** avvia il rientro (plasma che avvolge il tettuccio, rombo, scossoni); al culmine la zona di superficie prende il posto dello spazio e il Falcon esce a 8,5 km sopra il mare a sud della baia di Port Aurelius, con le nuvole sotto. Volo in atmosfera (330 m/s, postbruciatore 520), collisioni con terreno e mare, **F** per posarsi (sotto 90 m e 75 m/s), **E** per scendere a piedi, di nuovo **E** accanto al Falcon per risalire, **W** per decollare; oltre 14 km di quota si torna in orbita accanto all'Aquila. Schianto = eiezione, soccorso di Port Aurelius e ritorno sul ponte di volo (Falcon perso). Intanto la guerra continua lassù e l'equipaggio ti segue via radio
+- Tecnica: la zona di superficie è nello stesso mondo, 1000 km sotto la plancia (tag `ASTRA.Planet.NewRavenna`, costruita da `tools/ue_scripts/build_newravenna.py`): terreno Nanite (`art/blender/terrain.py`: 16 tessere da 3 km a 8 m + anello di 64 km, erosione, baia, promontori, isole, catena innevata), oceano (`M_NR_Ocean`, onde procedurali `tools/art/water_normals.py`), `SkyAtmosphere` (raggio 6000 km), nuvole volumetriche, nebbia, luce del cielo in tempo reale; `UAstraShipSubsystem::SetPlanetside` scambia cielo, luci ed esposizione. Materiale `M_ASTRA_Terrain` (`tools/ue_scripts/make_planet_materials.py`) con texture CC0 ambientCG (Rock035, Grass004, Ground037, Ground054, Snow010A). KillZ del livello a -1e10
+- Prova da console: `astra.fly.face planet` poi `AstraDescend`; `AstraFacePlanet x y z` (m, zona)
+- [ ] Spazioporto e città di Port Aurelius, controllo del traffico di Port Aurelius (voce), carrello del Falcon
 
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
@@ -149,7 +152,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
 2. Altri ponti raggiungibili con l'ascensore: sala macchine con il capo Okonkwo, infermeria (i feriti del ruolino), alloggi.
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
-4. Simulazione di calore (M2); discesa sul pianeta (M7); preparazione al multigiocatore (M8: autorità del server, comandi come RPC).
+4. Simulazione di calore (M2); M7 seconda parte (spazioporto, città, altri pianeti); preparazione al multigiocatore (M8: autorità del server, comandi come RPC).
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
 
 ## Come provarlo (per l'utente)
