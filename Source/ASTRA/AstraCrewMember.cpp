@@ -106,7 +106,8 @@ void AAstraCrewMember::ApplyUniform()
 {
 	// uniforms on the placeholder bodies: navy trousers, the jacket in the department's colour (docs/STILE.md §3); the
 	// wounded in the medbay wear a hospital gown
-	const FString Dept = StationId == TEXT("tactical") ? TEXT("Security") : StationId == TEXT("sensors") ? TEXT("Science")
+	const FString Dept = !UniformDept.IsEmpty() ? UniformDept
+	                   : StationId == TEXT("tactical") ? TEXT("Security") : StationId == TEXT("sensors") ? TEXT("Science")
 	                   : (StationId == TEXT("engineering") || StationId == TEXT("chief") || StationId.StartsWith(TEXT("eng_"))) ? TEXT("Engineering")
 	                   : StationId == TEXT("flight") ? TEXT("Flight")
 	                   : (StationId == TEXT("doctor") || StationId.StartsWith(TEXT("med_"))) ? TEXT("Medical") : TEXT("Command");
@@ -121,6 +122,22 @@ void AAstraCrewMember::ApplyUniform()
 			C->SetMaterial(0, Uniform);   // head and legs
 			C->SetMaterial(1, Jacket);    // torso and arms
 		}
+	}
+}
+
+void AAstraCrewMember::SetUniformDept(const FString& RosterDept)
+{
+	const FString D = RosterDept.ToLower();
+	const FString U = D.Contains(TEXT("engineering")) || D.Contains(TEXT("damage")) ? TEXT("Engineering")
+	                : D.Contains(TEXT("flight")) || D.Contains(TEXT("pilot")) ? TEXT("Flight")
+	                : D.Contains(TEXT("med")) ? TEXT("Medical")
+	                : D.Contains(TEXT("sensor")) || D.Contains(TEXT("science")) ? TEXT("Science")
+	                : D.Contains(TEXT("weapon")) || D.Contains(TEXT("marine")) || D.Contains(TEXT("security")) ? TEXT("Security")
+	                : TEXT("Command");
+	if (U != UniformDept)
+	{
+		UniformDept = U;
+		ApplyUniform();
 	}
 }
 

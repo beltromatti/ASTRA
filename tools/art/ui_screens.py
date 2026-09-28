@@ -681,8 +681,33 @@ def quarters_log():
     return s.save("Quarters_Log")
 
 
+def mess_menu():
+    """The galley's board over the pass: what is served today (the war has not reached the coffee yet)."""
+    s = Screen(w=2048, h=264, dept="command", title="Galley · Deck 4", sub="TODAY · WATCH ROTATION 2", seed=501)
+    items = (("BRAISED LAMB WITH BARLEY", "from New Ravenna's hills"), ("AURELIAN RICE", "saffron, peppers"),
+             ("GREENS", "hydroponics bay B"), ("COFFEE", "real beans, from Meridian"))
+    for i, (dish, note) in enumerate(items):
+        x = 40 + i * 500
+        s.text(x, 118, dish, F_TITLE(40), fill=TEXT)
+        s.text(x, 172, note, F_MONO(20), fill=DIM)
+        if i:
+            s.d.rectangle(s.P(x - 22, 112, x - 19, 216), fill=(28, 52, 80))
+    return s.save("Mess_Menu")
+
+
+def mess_placeholder(name: str, title: str, sub: str):
+    """What the mess's big screens show before the ship draws them live (AstraScreensSubsystem)."""
+    s = Screen(w=1024, h=320, dept="command", title=title, sub=sub, seed=502)
+    s.footer("STANDBY", color=DIM)
+    return s.save(name)
+
+
 if __name__ == "__main__":
     import sys
+    if sys.argv[1:] == ["mess"]:
+        print("UI_OK", [mess_menu(), mess_placeholder("Mess_News", "Fleet News", "7TH FLEET NET · AURELIA MARCH"),
+                        mess_placeholder("Mess_Memorial", "In Memoriam", "ASN AQUILA · CVC-01")])
+        raise SystemExit
     if sys.argv[1:] == ["med"]:   # only the Medbay's screens
         print("UI_OK", [med_vitals(), med_vitals(critical=True), med_standby(), med_ward(), med_scan()])
         raise SystemExit
@@ -697,4 +722,6 @@ if __name__ == "__main__":
     made += [master_display(), holo_plot(), tactical_strip()]
     made += [med_vitals(), med_vitals(critical=True), med_standby(), med_ward(), med_scan()]
     made += [quarters_map(), quarters_log()]
+    made += [mess_menu(), mess_placeholder("Mess_News", "Fleet News", "7TH FLEET NET · AURELIA MARCH"),
+             mess_placeholder("Mess_Memorial", "In Memoriam", "ASN AQUILA · CVC-01")]
     print("UI_OK", len(made), made)

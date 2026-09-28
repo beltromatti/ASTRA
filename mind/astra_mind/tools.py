@@ -13,10 +13,11 @@ def _fn(name: str, desc: str, props: dict[str, Any], required: list[str]) -> dic
 
 
 PATIENTS = [f"patient{i}" for i in range(1, 13)]   # the Medbay's twelve beds (the wounded speak as their bed)
+MESS = [f"mess{i}" for i in range(1, 13)] + ["mess_cook"]   # the Mess Hall's places at table, and its cook
 
-SPEAK = _fn("speak", "Someone aboard speaks aloud: an officer, or a wounded crewman in the Medbay (one call per line, in "
-                     "speaking order).", {
-    "speaker": {"type": "string", "enum": list(CREW) + PATIENTS},
+SPEAK = _fn("speak", "Someone aboard speaks aloud: an officer, a wounded crewman in the Medbay, or someone off duty in "
+                     "the Mess Hall (one call per line, in speaking order).", {
+    "speaker": {"type": "string", "enum": list(CREW) + PATIENTS + MESS},
     "text": {"type": "string", "description": "The spoken line, in the Captain's language, max ~25 words"},
     "tone": {"type": "string", "enum": ["calm", "focused", "urgent", "tense", "alarmed", "warm", "dry"]}},
     ["speaker", "text", "tone"])

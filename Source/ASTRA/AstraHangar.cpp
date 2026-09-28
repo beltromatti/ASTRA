@@ -24,6 +24,7 @@ namespace
 	const FName ZoneTag(TEXT("ASTRA.Zone.Hangar"));
 	const FName EngZoneTag(TEXT("ASTRA.Zone.Engineering"));
 	const FName MedZoneTag(TEXT("ASTRA.Zone.Medbay"));
+	const FName MessZoneTag(TEXT("ASTRA.Zone.Mess"));
 	const FName CraftTag(TEXT("ASTRA.Hangar.Craft"));
 	constexpr float HangarLength = 16000.f, HangarHalfWidth = 2900.f, HangarHeight = 2200.f;   // cm, with the tubes
 	constexpr float TrackStartX = 4600.f, TubeEndX = 16200.f, TubeY = 1490.f;
@@ -62,6 +63,13 @@ void AAstraHangar::BeginPlay()
 			if (ALight* L = Cast<ALight>(*It))
 			{
 				MedLights.Add(L);
+			}
+		}
+		else if (It->ActorHasTag(MessZoneTag))
+		{
+			if (ALight* L = Cast<ALight>(*It))
+			{
+				MessLights.Add(L);
 			}
 		}
 		else if (It->ActorHasTag(CraftTag))
@@ -132,6 +140,7 @@ FVector AAstraHangar::LandingWorld(int32 Index) const
 	case 1: return GetActorTransform().TransformPosition(HangarLanding);
 	case 2: return EngineeringLanding;
 	case 3: return MedbayLanding;
+	case 4: return MessLanding;
 	default: return FVector::ZeroVector;
 	}
 }
@@ -186,6 +195,17 @@ bool AAstraHangar::IsPawnInMedbay(const APawn* Pawn) const
 	}
 	const FVector D = Pawn->GetActorLocation() - MedbayLanding;
 	return D.X < 400.f && D.X > -2900.f && FMath::Abs(D.Y) < 950.f && D.Z > -300.f && D.Z < 600.f;
+}
+
+bool AAstraHangar::IsPawnInMess(const APawn* Pawn) const
+{
+	if (!Pawn || MessLanding.IsNearlyZero())
+	{
+		return false;
+	}
+	// the hall runs aft of its lift: 34 m long, 20 m wide
+	const FVector D = Pawn->GetActorLocation() - MessLanding;
+	return D.X < 400.f && D.X > -3600.f && FMath::Abs(D.Y) < 1100.f && D.Z > -300.f && D.Z < 700.f;
 }
 
 bool AAstraHangar::RideLift(APawn* Pawn, int32 ToLanding)
@@ -354,13 +374,15 @@ void AAstraHangar::Tick(float DeltaTime)
 		};
 		const bool bToEng = Zone(EngLights, bEngLightsOn, IsPawnInEngineering(Me));
 		const bool bToMed = Zone(MedLights, bMedLightsOn, IsPawnInMedbay(Me));
+		const bool bToMess = Zone(MessLights, bMessLightsOn, IsPawnInMess(Me));
 		// the ship notices where the Captain goes: the crew talks about it, the story remembers it
-		if ((bToEng || bToMed) && GetWorld()->GetTimeSeconds() > 5.0)
+		if ((bToEng || bToMed || bToMess) && GetWorld()->GetTimeSeconds() > 5.0)
 		{
 			if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 			{
 				Ship->PublishEvent(bToMed
 					? FString::Printf(TEXT("the Captain came down to the Medbay to see the wounded (%s)"), *Ship->GetRoster().Summary())
+					: bToMess ? FString(TEXT("the Captain came down to the Mess Hall on Deck 4, where the off-duty watch is eating"))
 					: FString(TEXT("the Captain came down to Main Engineering to see Chief Okonkwo and the reactor watch")), false);
 			}
 		}

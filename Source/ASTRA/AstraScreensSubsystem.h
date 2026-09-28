@@ -58,4 +58,5 @@ private:
 	void DrawOps(UCanvas* C, int32 W, int32 H, const FString& Slot);
 	void DrawSensors(UCanvas* C, int32 W, int32 H, const FString& Slot);
 	void DrawEngineering(UCanvas* C, int32 W, int32 H, const FString& Slot);
+	void DrawMess(UCanvas* C, int32 W, int32 H, const FString& Slot);
 };

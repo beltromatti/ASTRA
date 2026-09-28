@@ -69,6 +69,10 @@ public:
 	 *  patient's bed changes hands. */
 	void SetBody(bool bFemale);
 
+	/** The jacket of someone from the roster (its department: "engineering", "flight deck", "marines"...), not of the
+	 *  station: the off-duty crew in the Mess Hall come from all over the ship. */
+	void SetUniformDept(const FString& RosterDept);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -108,5 +112,6 @@ private:
 	void InitSeated();
 	void UpdateSeated(float DeltaSeconds);
 	void ApplyUniform();
+	FString UniformDept;   // a roster department's uniform (SetUniformDept); empty: the station's
 	int32 Bone(const TCHAR* Name) const;
 };

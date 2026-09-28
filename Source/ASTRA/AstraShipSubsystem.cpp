@@ -222,6 +222,26 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			GEngine->Exec(GetWorld(), TEXT("ProfileGPU"));
 		}), 25.f, false);
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("astra_mess")))
+	{
+		// testing (performance runs): the Captain in the Mess Hall a few seconds in, looking down the tables
+		FTimerHandle H;
+		InWorld.GetTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+			for (TActorIterator<AAstraHangar> It(GetWorld()); It && P; ++It)
+			{
+				if (!It->MessLanding.IsNearlyZero())
+				{
+					P->SetActorLocation(It->MessLanding + FVector(-300.f, 0.f, 100.f), false, nullptr, ETeleportType::TeleportPhysics);
+					if (AController* C = P->GetController())
+					{
+						C->SetControlRotation(FRotator(-6.f, 180.f, 0.f));
+					}
+				}
+			}
+		}), 4.f, false);
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("astra_medbay")))
 	{
 		// testing (performance runs): the Captain in the Medbay among eight wounded a few seconds in
@@ -763,6 +783,80 @@ void UAstraShipSubsystem::TestMedbay(const FString& What, int32 N)
 	SyncWard();
 }
 
+bool UAstraShipSubsystem::IsCaptainInMess() const
+{
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
+	{
+		if (It->IsPawnInMess(P))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void UAstraShipSubsystem::SyncMess()
+{
+	// the off-duty watch at the tables: fit people from all over the ship, a new watch every half hour (never while the
+	// Captain is among them); a place whose diner has been hurt or killed goes to someone else
+	UWorld* World = GetWorld();
+	if (!World || Roster.Get().Num() == 0)
+	{
+		return;
+	}
+	TArray<AAstraCrewMember*> Seats;
+	for (TActorIterator<AAstraCrewMember> It(World); It; ++It)
+	{
+		if (It->StationId.StartsWith(TEXT("mess")) && It->StationId != TEXT("mess_cook"))
+		{
+			Seats.Add(*It);
+		}
+	}
+	Seats.Sort([](const AAstraCrewMember& A, const AAstraCrewMember& B)
+	{
+		return FCString::Atoi(*A.StationId.Mid(4)) < FCString::Atoi(*B.StationId.Mid(4));
+	});
+	const bool bCaptainHere = IsCaptainInMess();
+	const int32 Watch = int32(World->GetTimeSeconds() / 1800.0);
+	if (Watch != MessWatch && !bCaptainHere)
+	{
+		MessWatch = Watch;
+		MessDiners.Init(INDEX_NONE, Seats.Num());
+	}
+	MessDiners.SetNum(Seats.Num());
+	FRandomStream R(7700 + FMath::Max(MessWatch, 0) * 131 + Roster.GetFallen().Num());
+	const TArray<FAstraCrewman>& People = Roster.Get();
+	for (int32 s = 0; s < Seats.Num(); ++s)
+	{
+		int32& Who = MessDiners[s];
+		if (Who >= 0 && People[Who].Status == 0)
+		{
+			continue;
+		}
+		Who = INDEX_NONE;
+		for (int32 Try = 0; Try < 400 && Who < 0; ++Try)
+		{
+			const int32 i = R.RandHelper(People.Num());
+			if (People[i].Status == 0 && !MessDiners.Contains(i))
+			{
+				Who = i;
+			}
+		}
+		if (Who >= 0)
+		{
+			const FAstraCrewman& M = People[Who];
+			Seats[s]->DisplayName = M.Name();
+			if (Seats[s]->bFemaleBody != M.bFemale)
+			{
+				Seats[s]->bFemaleBody = M.bFemale;
+				Seats[s]->SetBody(M.bFemale);
+			}
+			Seats[s]->SetUniformDept(M.Dept);
+		}
+	}
+}
+
 void UAstraShipSubsystem::SyncWard()
 {
 	if (WardRev == Roster.Version() || !GetWorld())
@@ -800,6 +894,11 @@ FString UAstraShipSubsystem::CaptainAboard() const
 			{
 				return TEXT("in Main Engineering (Deck 7), face to face with Chief Okonkwo and the engineering watch; the XO has the conn "
 				            "on the bridge and the bridge officers speak by intercom");
+			}
+			if (It->IsPawnInMess(P))
+			{
+				return TEXT("in the Mess Hall (Deck 4) among the off-duty crew at their tables: they can hear and answer the Captain; "
+				            "the XO has the conn on the bridge and the bridge officers speak by intercom");
 			}
 			if (It->IsPawnInMedbay(P))
 			{
@@ -904,6 +1003,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	if (Name == TEXT("sector"))
 	{
 		// the war map from the mind: every system's look is charted (Aurelia keeps the level's sky), links and owners kept
+		Args->TryGetStringArrayField(TEXT("news"), SectorNews);   // the fleet net's latest (the Mess Hall's news screen)
 		const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
 		if (!Args->TryGetArrayField(TEXT("systems"), List))
 		{
@@ -1381,6 +1481,41 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		}
 		S->SetObjectField(TEXT("medbay"), Med);
 	}
+	if (IsCaptainInMess() && MessDiners.Num())
+	{
+		// the Mess Hall's tables: who sits where (their `speaker` ids when the Captain talks to them there), as the Captain
+		// sees the hall coming out of the lift (facing aft: port is on the right)
+		static const TCHAR* Along[] = {TEXT("nearest"), TEXT("middle"), TEXT("farthest")};
+		static const TCHAR* Across[] = {TEXT("outer right"), TEXT("inner right"), TEXT("inner left"), TEXT("outer left")};
+		static const int32 Tables[][2] = {{0, 1}, {0, 1}, {0, 2}, {1, 0}, {1, 0}, {1, 2}, {1, 2}, {1, 3}, {2, 1}, {2, 1}, {2, 3}, {0, 3}};
+		TArray<TSharedPtr<FJsonValue>> Diners;
+		for (int32 k = 0; k < MessDiners.Num(); ++k)
+		{
+			if (MessDiners[k] < 0)
+			{
+				continue;
+			}
+			const FAstraCrewman& M = Roster.Get()[MessDiners[k]];
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetStringField(TEXT("speaker"), FString::Printf(TEXT("mess%d"), k + 1));
+			const int32 (&Tb)[2] = Tables[FMath::Min(k, int32(UE_ARRAY_COUNT(Tables)) - 1)];
+			O->SetStringField(TEXT("seat"), FString::Printf(TEXT("at the %s table of the %s row"), Along[Tb[0]], Across[Tb[1]]));
+			O->SetStringField(TEXT("name"), M.Name());
+			O->SetStringField(TEXT("gender"), M.bFemale ? TEXT("f") : TEXT("m"));
+			O->SetStringField(TEXT("dept"), M.Dept);
+			O->SetStringField(TEXT("deck"), FString::FromInt(M.Deck));
+			O->SetStringField(TEXT("home"), M.Home);
+			Diners.Add(MakeShared<FJsonValueObject>(O));
+		}
+		TSharedRef<FJsonObject> Mess = MakeShared<FJsonObject>();
+		Mess->SetArrayField(TEXT("diners"), Diners);
+		Mess->SetStringField(TEXT("cook"), TEXT("mess_cook: Petty Officer Tomas Wren, the galley's chief cook, behind the serving line"));
+		// what the galley's board says is served today (tools/art/ui_screens.py mess_menu)
+		Mess->SetStringField(TEXT("menu"), TEXT("braised lamb with barley (from New Ravenna's hills); Aurelian rice with saffron and peppers; "
+		                                        "greens from hydroponics bay B; real coffee, beans from Meridian"));
+		Mess->SetStringField(TEXT("walls"), TEXT("the fleet's news on one big screen; on the other, IN MEMORIAM: the names of the Aquila's fallen"));
+		S->SetObjectField(TEXT("mess"), Mess);
+	}
 	float Sum = 0.f;
 	for (const auto& KV : PowerPct) { Sum += KV.Value; }
 	S->SetStringField(TEXT("power_budget"), FString::Printf(TEXT("%.0f%% of %.0f%% allocated (six systems at 100%% = 600%%)"), Sum, PowerBudget));
@@ -1401,6 +1536,11 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 		{
 			Event(N.Text, N.bReport);
 		}
+	}
+	if ((MessSyncT -= DeltaTime) <= 0.f)
+	{
+		MessSyncT = 5.f;
+		SyncMess();
 	}
 	if ((WardSyncT -= DeltaTime) <= 0.f)
 	{

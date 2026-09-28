@@ -361,6 +361,9 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			{
 				bNear = FVector::Dist(Cam->GetCameraLocation(), Crew->GetActorLocation()) < 2500.f;
 			}
+			// the people in the Medbay and the Mess Hall speak only while the Captain is there: always in person, from
+			// their place (a far table is simply quieter, never a voice on the radio)
+			bNear |= Crew->StationId.StartsWith(TEXT("mess")) || Crew->StationId.StartsWith(TEXT("patient"));
 		}
 		if (Crew && bNear)
 		{

@@ -86,6 +86,7 @@ EXTERNAL_SPEAKERS = {c["key"]: (f'{c["name"]} ({c["ship"]})', c["voice"]) for c 
 EXTERNAL_SPEAKERS[ADMIRAL["key"]] = (f'{ADMIRAL["name"]} ({ADMIRAL["ship"]})', ADMIRAL["voice"])
 from .port import PORT as PORT_CONTROL, FieldControl, for_field, stimulus_for, world_of  # noqa: E402
 from .medbay import patient_voice  # noqa: E402
+from .mess import MessTalk  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
@@ -196,6 +197,7 @@ class Mind:
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
         self.port = FieldControl(self.llm, self._say_external, self._register_field)
+        self.mess = MessTalk(self.llm, self.voice.say)
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander,
                                  news=self._fleet_news)
         # the Captain's log is private: the story reads it, the crew does not
@@ -421,6 +423,21 @@ class Mind:
             self.last_activity = now
             await self.turns.put(("\x00event:bridge: tactical check — " + "; ".join(flags), self.lang))
 
+    async def mess_talk(self) -> None:
+        """The Mess Hall is never silent while the Captain is there: people at the tables talk among themselves
+        (mind/astra_mind/mess.py), in the pauses the Captain and the reports leave."""
+        while True:
+            await asyncio.sleep(4)
+            st = self.game.state if (self.game and self.game.state) else None
+            if not st or not self.clients:
+                continue
+            now = time.monotonic()
+            ctx = {"events": list(self.game.events)[-8:] if self.game else [], "campaign": list(self.director.campaign),
+                   "mood": self.director.mood, "bonds": "; ".join(self.director.bonds_lines()), "war": self.director.war.crew_view(),
+                   "casualties": st.get("casualties", ""), "menu": (st.get("mess") or {}).get("menu", "")}
+            await self.mess.tick(st, self.lang, ctx, quiet_s=now - max(self.captain_t, self.last_activity),
+                                 voice_busy_s=self.voice.busy_s())
+
     async def story_watch(self) -> None:
         """The war never stalls: when nothing has moved the story for a long while (no fight, no transit under way),
         the director decides what happens — Rourke presses the Captain, or the war comes to the Aquila."""
@@ -582,6 +599,11 @@ class Mind:
                     self.game.state = msg.get("state", {})
                     for p_ in ((self.game.state.get("medbay") or {}).get("patients") or []):
                         EXTERNAL_SPEAKERS[p_["speaker"]] = (p_.get("name", p_["speaker"]), patient_voice(p_))
+                    mess_ = self.game.state.get("mess") or {}
+                    for d_ in mess_.get("diners") or []:
+                        EXTERNAL_SPEAKERS[d_["speaker"]] = (d_.get("name", d_["speaker"]), patient_voice(d_))
+                    if mess_:
+                        EXTERNAL_SPEAKERS["mess_cook"] = ("Petty Officer Tomas Wren", "juergen")
                 elif kind == "event":
                     text = msg.get("text", "")
                     self.game.events.append(text)
@@ -645,6 +667,7 @@ class Mind:
         asyncio.create_task(self.turn_worker())
         asyncio.create_task(self.quiet_moments())
         asyncio.create_task(self.story_watch())
+        asyncio.create_task(self.mess_talk())
         asyncio.create_task(self.tactical_watch())
         asyncio.create_task(self.enemy_tactics())
         loop = asyncio.get_running_loop()

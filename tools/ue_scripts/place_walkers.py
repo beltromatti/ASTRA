@@ -61,5 +61,12 @@ r = en["reactor"]
 ring = [(ex + r["x"] + 9.2 * math.cos(2 * math.pi * k / 8), ey + r["y"] + 9.2 * math.sin(2 * math.pi * k / 8)) for k in range(8)]
 walker("Walker_EngTech", ring, ez, "Engineering", False, pause=(2.0, 8.0), speed=125.0)
 
+# the Mess Hall: two of the off-duty watch, between the serving line, the drinks and the tables
+ms = data("mess")
+mx, my, mz = ms["world_origin"]
+for k, w in enumerate(ms["walkers"]):
+    walker(f"Walker_Mess{k + 1}", [(mx + x, my + y) for x, y in w["route"]], mz, ("Engineering", "Flight")[k % 2], w["female"],
+           pause=(4.0, 12.0), speed=110.0)
+
 unreal.EditorLevelLibrary.save_current_level()
 print(json.dumps(log))

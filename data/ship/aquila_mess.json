@@ -1,0 +1,37 @@
+{
+  "id": "aquila_mess",
+  "name": "Mess Hall · Deck 4 · Section B",
+  "signage": "DECK 4 · SECTION B · MESS HALL",
+  "frame": "Unreal convention: X forward, Y starboard, Z up; metres; origin = deck level on the inner face of the forward wall, on the lift's axis; the hall runs aft (negative x)",
+  "world_origin": [-122.0, 0.0, -46.0],
+  "world_note": "inside the Aquila's hull amidships (hull frame x 50, z 16), aft of the island and forward of the Medbay; the lift joins it to the bridge corridor and the other decks",
+  "length": 38.0,
+  "half_width": 10.0,
+  "height": 3.8,
+  "lift": {"y": 0.0, "width": 3.0, "height": 3.2},
+  "galley": {"x0": -1.6, "x1": -9.4, "y_counter": -8.7, "depth": 0.9, "height": 0.92, "kitchen_y": -10.0,
+             "note": "the serving line along the port wall, the kitchen seen through the pass behind it"},
+  "drinks": {"x0": -1.6, "x1": -6.2, "y_counter": 9.1, "depth": 0.8, "height": 0.95},
+  "tables": {"x_centres": [-14.0, -22.5, -31.0], "y_centres": [-6.9, -3.1, 3.1, 6.9], "length": 7.0, "width": 1.0,
+             "height": 0.74, "bench_offset": 0.78, "bench_height": 0.45, "bench_width": 0.38},
+  "screens": {"news": {"y0": -8.6, "y1": -1.6, "z0": 1.05, "z1": 3.15}, "memorial": {"y0": 1.6, "y1": 8.6, "z0": 1.05, "z1": 3.15}},
+  "diners": [
+    {"station": "mess1", "table": [0, 1], "side": -1, "dx": -1.8},
+    {"station": "mess2", "table": [0, 1], "side": 1, "dx": -1.2},
+    {"station": "mess3", "table": [0, 2], "side": 1, "dx": 1.6},
+    {"station": "mess4", "table": [1, 0], "side": 1, "dx": -0.6},
+    {"station": "mess5", "table": [1, 0], "side": -1, "dx": 0.3},
+    {"station": "mess6", "table": [1, 2], "side": -1, "dx": -2.2},
+    {"station": "mess7", "table": [1, 2], "side": 1, "dx": -1.4},
+    {"station": "mess8", "table": [1, 3], "side": -1, "dx": 1.9},
+    {"station": "mess9", "table": [2, 1], "side": -1, "dx": 0.4},
+    {"station": "mess10", "table": [2, 1], "side": 1, "dx": 1.1},
+    {"station": "mess11", "table": [2, 3], "side": 1, "dx": -1.0},
+    {"station": "mess12", "table": [0, 3], "side": -1, "dx": 0.9}
+  ],
+  "cook": {"station": "mess_cook", "x": -5.4, "y": -9.5, "yaw": 90.0, "female": false},
+  "walkers": [
+    {"route": [[-3.0, -6.5], [-12.0, -5.0], [-26.0, -5.0], [-12.0, -1.2], [-3.0, -1.2]], "female": true},
+    {"route": [[-3.5, 7.5], [-18.0, 5.0], [-33.0, 5.0], [-18.0, 1.2], [-4.0, 1.2]], "female": false}
+  ]
+}

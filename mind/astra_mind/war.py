@@ -149,7 +149,7 @@ class WarMap:
         return {"current": self.current, "systems": [
             {"name": k, "star_class": s["star"], "planet_type": s["planet"], "planet_name": s["world"], "owner": s["owner"],
              "threat": s["threat"], "x": s["x"], "y": s["y"], "links": self.links[k], "pop": s.get("pop", 0)}
-            for k, s in self.systems.items()]}
+            for k, s in self.systems.items()], "news": self.news[-5:]}
 
     # ---------------------------------------------------------------------------------------------- saving
     def save(self) -> None:

@@ -133,7 +133,8 @@ class BridgeAgent:
             args = call.arguments() or {}
             if call.name == "speak":
                 speaker = args.get("speaker", "xo")
-                if speaker not in CREW and speaker not in _patients(self.ship.snapshot()):
+                st_ = self.ship.snapshot()
+                if speaker not in CREW and speaker not in _patients(st_) and speaker not in _diners(st_):
                     speaker = "doctor" if str(speaker).startswith("patient") else "xo"
                 line = (args.get("text") or "").strip()
                 if _looks_like_tool(line):
@@ -261,6 +262,12 @@ def _parse_prose(content: str) -> tuple[str, str]:
 def _patients(state: dict[str, Any]) -> set[str]:
     """The Medbay's occupied beds (their speaker ids)."""
     return {p.get("speaker", "") for p in ((state or {}).get("medbay") or {}).get("patients", [])}
+
+
+def _diners(state: dict[str, Any]) -> set[str]:
+    """The Mess Hall's people while the Captain is there: the diners at their places and the cook (speaker ids)."""
+    mess = (state or {}).get("mess") or {}
+    return {d.get("speaker", "") for d in mess.get("diners", [])} | ({"mess_cook"} if mess else set())
 
 
 def _owner(tool: str) -> str:

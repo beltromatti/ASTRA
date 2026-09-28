@@ -157,6 +157,27 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - Prove: `astra.medbay admit 8` (feriti da colpi casuali), `astra.medbay care 10` (dieci minuti di cure), `astra.medbay go` (nel reparto); avvio con `-astra_medbay` per le misure
 - Prestazioni (standalone 1080p, profilo A): 19,0 ms di GPU in infermeria, come la plancia (erano 25,3 ms con 32 luci di cui 10 con ombre: ora 11 luci lunghe, 3 con ombre)
 
+## Mensa (Deck 4) e ascensore a cinque ponti
+- [x] **La Mensa** (Mess Hall, Deck 4 · Section B; `art/blender/messhall.py`, `tools/ue_scripts/build_messhall.py`, dati in `data/ship/aquila_mess.json`):
+  - sala di 38 × 20 m a mezza nave, con i costoloni della nave e le travi, pannelli luminosi sopra i tavoli, condotti;
+  - banco del rancio con le vaschette di cibo e il parafiato, e oltre il passavivande la cucina (forni, fornelli, pentole);
+  - lavagna del menù: agnello brasato con orzo, riso aureliano, verdure dall'idroponica B, caffè vero da Meridian;
+  - angolo bevande, dodici tavoli lunghi con panche imbottite, bacheca con i biglietti, fontanella, verdure idroponiche sotto la luce di crescita;
+  - due grandi **schermi vivi** a poppa:
+    - «FLEET NEWS»: la Marca sistema per sistema e le ultime notizie della rete di flotta, dalla mente;
+    - «IN MEMORIAM»: i nomi dei caduti dell'Aquila presi dal ruolino, con il reparto.
+- [x] L'equipaggio fuori servizio:
+  - dodici persone vere del ruolino ai tavoli, con il vassoio davanti e l'uniforme del loro reparto; cambiano a ogni turno di mezz'ora, mai sotto gli occhi del Capitano, e chi viene ferito o ucciso lascia il posto a un altro;
+  - il cuoco, Petty Officer Tomas Wren, dietro il banco;
+  - due persone che vanno e vengono tra banco e tavoli.
+- [x] **Conversazioni ascoltate** (`mind/astra_mind/mess.py`): mentre il Capitano è in mensa, ogni 35-70 s due o tre persone allo stesso tavolo parlano tra loro, con la loro voce e dal loro posto. Temi: il lavoro sul loro ponte, gli amici in infermeria, casa, la guerra, le decisioni del Capitano come le hanno capite. Il testo nasce da chi sono e da cosa ha vissuto la nave (eventi, caduti, campagna, umore, legami). Esempi reali:
+  - all'ingresso: «Attenzione, il Capitano è appena entrato. Niente scenate, continuiamo a mangiare»;
+  - «sul deck 7 stamattina hanno ricaricato i banchi VLS come se domani si sparasse. Nessuno ci dice niente».
+- [x] Il Capitano può parlare con loro, per nome, al tavolo o al cuoco; risponde l'agente dell'equipaggio con i loro id (`mess3`, `mess_cook`). Esempio: «Buongiorno, Capitano! … il rancio oggi è da ammiraglio, se mi permette» (Wren) e «Confermo, Capitano: la zuppa vale il turno di guardia. Anche se il pane è di ieri».
+- [x] Ascensore a **cinque ponti** (tasti 1-5): Bridge · Mess Hall · Medbay · Main Engineering · Flight Deck. I cartelli dicono «DECKS 1 · 4 · 6 · 7 · 9».
+- Le voci di mensa e infermeria partono sempre dal posto di chi parla: un tavolo lontano si sente più piano, mai via radio.
+- Prestazioni (1080p, standalone, editor chiuso): 18,8 ms di mediana. Quattro luci lunghe, una per fila di tavoli, al posto di otto: le luci passano da 3 a 2 ms. Avvio di prova: `-astra_mess`.
+
 ## Alloggi del Capitano (Deck 1)
 - [x] **Captain's quarters** (`art/blender/quarters.py`, `tools/ue_scripts/build_quarters.py`, dati in `data/ship/aquila_quarters.json`): la porta in fondo al corridoio di dritta (prima un tappo cieco, ora paratia con porta scorrevole) apre sulla cabina del Capitano, 8,6 × 9,2 m: moquette blu, legno scuro (boiserie, mobili), pareti calde, soffitto a cassettoni con luce indiretta e faretti; scrivania sotto il **finestrone di poppa** con terminale del diario di bordo, lampada, tazza; poltrona del Capitano e due sedie; divano, tavolino e poltrona; **branda** nell'alcova con luce da lettura e mensola (libri, una foto); libreria; angolo cottura con la **macchina del caffè**; credenza sotto l'oblò di dritta con il **modellino dell'Aquila** (1:1000); la **carta dell'Aurelia March** a parete (disegnata dai dati della guerra, `tools/art/ui_screens.py quarters`); la targa della nave. Legno Wood051 e moquette Carpet012 (CC0 ambientCG). Luci calde di zona accese solo con il Capitano dentro
 - [x] **La vista**: dal finestrone si vede l'intera Aquila che si allunga verso poppa sotto New Ravenna
@@ -264,7 +285,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 4. La battaglia parte da sola (dopo ~80 s si sveglia la fregata, dopo ~170 s arriva il gruppo d'attacco). Per accelerare: `astra.battle.time 168`, `astra.battle.timescale 3`.
 5. Quando l'Archon Solm chiama, parlagli direttamente (canale aperto): tutto ciò che non inizia con il nome/ruolo di un ufficiale va a lui. «Comunicazioni, chiudete il canale» per chiuderlo.
 6. Da terminale: `tools/ue.py pie start|stop` e `tools/ue.py pie cmd 'astra.say ...'` per provare senza toccare l'editor.
-7. Infermeria: ascensore (E alle porte in fondo al corridoio di babordo) → tasto 2. Parla con la dottoressa («Dottoressa, come stanno i feriti?») o con un ferito per nome. Senza battaglia i letti sono vuoti: `astra.medbay admit 8`.
+7. Infermeria: ascensore (E alle porte in fondo al corridoio di babordo) → tasto 3. Mensa: tasto 2 (ascolta i tavoli, parla con chi vuoi o con il cuoco Wren). Parla con la dottoressa («Dottoressa, come stanno i feriti?») o con un ferito per nome. Senza battaglia i letti sono vuoti: `astra.medbay admit 8`.
 8. Cabina del Capitano: la porta in fondo al corridoio di dritta (quello senza ascensore). E accanto alla branda per riposare.
 9. Pilotare: scendi con l'ascensore (E davanti alle porte in fondo al corridoio di babordo), avvicinati a un Falcon di Alpha (lato sinistro dell'hangar) e premi E; W per il lancio. Rientro: torna alla bocca di prua sinistra dell'Aquila, rallenta e premi F.
 10. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.

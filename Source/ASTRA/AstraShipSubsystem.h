@@ -150,6 +150,9 @@ public:
 	FString KnownSystemsLine() const;
 	/** The sector at war (from the mind): gate links for the helm, the plot for the holo table. */
 	const TArray<FAstraSectorSystem>& GetSector() const { return Sector; }
+	const TArray<FString>& GetSectorNews() const { return SectorNews; }
+	/** The Captain is in the Mess Hall (Deck 4). */
+	bool IsCaptainInMess() const;
 	const FAstraSectorSystem* FindSector(const FString& Name) const;
 	/** What the holo table shows: "tactical" (the battle around the Aquila) or "sector" (the war map). */
 	FString GetHoloMode() const { return HoloMode; }
@@ -260,6 +263,11 @@ private:
 	float WardSyncT = 0.f;
 	int32 WardRev = -1;
 	void SyncWard();                  // the beds in the Medbay follow the roster
+	void SyncMess();                  // the off-duty watch at the Mess Hall's tables, from the roster
+	TArray<int32> MessDiners;         // roster indices at the tables (mess1..mess12), INDEX_NONE for an empty place
+	int32 MessWatch = -1;             // the half-hour watch they belong to
+	float MessSyncT = 0.f;
+	TArray<FString> SectorNews;       // the latest news on the fleet net (the mind's war map)
 	UPROPERTY() TObjectPtr<class AAstraBridgeFX> BridgeFX;   // sparks and arcs on the bridge when we are hit hard
 	FRandomStream CasualtyRng;
 	static constexpr int32 NumDamageTeams = 4;

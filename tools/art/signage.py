@@ -112,7 +112,7 @@ def main():
         p.save(os.path.join(OUT, f"T_SIGN_Door_{side}.png"))
     # the lift between the bridge and the flight deck, and the flight deck's own wall sign
     for name in ("Lift_Bridge", "Lift_Hangar"):
-        plate(1024, 256, "LIFT", "DECKS 1 · 6 · 7 · 9 · PRESS TO CALL", (240, 170, 40)).save(os.path.join(OUT, f"T_SIGN_{name}.png"))
+        plate(1024, 256, "LIFT", "DECKS 1 · 4 · 6 · 7 · 9 · PRESS TO CALL", (240, 170, 40)).save(os.path.join(OUT, f"T_SIGN_{name}.png"))
     # the rooms the lift opens into: their names over the doors
     plate(1024, 256, "MAIN ENGINEERING", "DECK 7 · SECTION F", (240, 170, 40), title_scale=0.42).save(os.path.join(OUT, "T_SIGN_Room_Engineering.png"))
     med = plate(1024, 256, "MEDBAY", "DECK 6 · SECTION C", (46, 196, 182))
@@ -122,6 +122,7 @@ def main():
     md.rectangle((cx - a, cy - b, cx + a, cy + b), fill=(*ICE, 255))
     md.rectangle((cx - b, cy - a, cx + b, cy + a), fill=(*ICE, 255))
     med.save(os.path.join(OUT, "T_SIGN_Room_Medbay.png"))
+    plate(1024, 256, "MESS HALL", "DECK 4 · SECTION B", (240, 200, 120)).save(os.path.join(OUT, "T_SIGN_Room_Mess.png"))
     w2, h2 = 2048, 512
     fd = Image.new("RGBA", (w2, h2), (*PLATE, 255))
     dd = ImageDraw.Draw(fd)

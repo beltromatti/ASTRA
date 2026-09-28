@@ -194,7 +194,8 @@ bool UAstraScreensSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 bool UAstraScreensSubsystem::IsLive(const FString& Name)
 {
 	static const TSet<FString> Live = {TEXT("Master"), TEXT("Tactical"), TEXT("Helm_A"), TEXT("Helm_B"), TEXT("Ops_A"), TEXT("Ops_B"),
-	                                   TEXT("Ops_C"), TEXT("Sensors_A"), TEXT("Sensors_B"), TEXT("Eng_A"), TEXT("Eng_B")};
+	                                   TEXT("Ops_C"), TEXT("Sensors_A"), TEXT("Sensors_B"), TEXT("Eng_A"), TEXT("Eng_B"),
+	                                   TEXT("Mess_News"), TEXT("Mess_Memorial")};
 	return Live.Contains(Name);
 }
 
@@ -207,13 +208,18 @@ UAstraScreenPage* UAstraScreensSubsystem::PageFor(const FString& Name)
 			return P;
 		}
 	}
-	const FIntPoint Size = Name == TEXT("Master") ? FIntPoint(2048, 864) : (Name == TEXT("Tactical") ? FIntPoint(2048, 256) : FIntPoint(1024, 640));
+	const FIntPoint Size = Name == TEXT("Master") ? FIntPoint(2048, 864) : (Name == TEXT("Tactical") ? FIntPoint(2048, 256)
+	                     : Name.StartsWith(TEXT("Mess_")) ? FIntPoint(2048, 614) : FIntPoint(1024, 640));
 	UAstraScreenPage* P = NewObject<UAstraScreenPage>(this);
 	P->Name = Name;
 	P->Owner = this;
 	P->Target = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(this, UCanvasRenderTarget2D::StaticClass(), Size.X, Size.Y);
 	P->Target->ClearColor = BG;
 	P->Target->OnCanvasRenderTargetUpdate.AddDynamic(P, &UAstraScreenPage::Draw);
+	if (Name.StartsWith(TEXT("Mess_")))
+	{
+		P->Interval = 3.f;   // the mess's walls change with the war, not by the second
+	}
 	P->Wait = FMath::FRand() * P->Interval;   // spread the redraws over frames
 	Pages.Add(P);
 	return P;
@@ -311,6 +317,7 @@ void UAstraScreensSubsystem::DrawPage(const FString& Name, UCanvas* Canvas, int3
 		else if (Station == TEXT("Ops")) { DrawOps(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Sensors")) { DrawSensors(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Eng")) { DrawEngineering(Canvas, Width, Height, Slot); }
+		else if (Station == TEXT("Mess")) { DrawMess(Canvas, Width, Height, Slot); }
 	}
 }
 
@@ -795,5 +802,99 @@ void UAstraScreensSubsystem::DrawEngineering(UCanvas* C, int32 W, int32 H, const
 	if (Row == 0)
 	{
 		P.Text(W * 0.5f, H * 0.5f - 20, TEXT("GRID INTACT"), false, 40, GREEN, 1);
+	}
+}
+
+// ------------------------------------------------------------------------------------------------------ the mess
+void UAstraScreensSubsystem::DrawMess(UCanvas* C, int32 W, int32 H, const FString& Slot)
+{
+	FPaint P{C, TitleFont, MonoFont, Time};
+	const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+	if (!Ship)
+	{
+		return;
+	}
+	if (Slot == TEXT("Memorial"))
+	{
+		// the Aquila's dead, by name: the whole ship passes this wall at every meal
+		P.Rect(0, 0, W, H, RGB(3, 6, 12));
+		P.Text(W * 0.5f, 26, TEXT("IN MEMORIAM"), false, 96, TEXTC, 1);
+		P.Text(W * 0.5f, 142, TEXT("ASN AQUILA  \u00B7  CVC-01  \u00B7  THEY GAVE THEIR LIVES FOR THE AURELIA MARCH"), true, 22, DIM, 1);
+		P.Line(W * 0.22f, 186, W * 0.78f, 186, DIM, 2.f);
+		const FAstraCrewRoster& R = Ship->GetRoster();
+		const TArray<int32>& Fallen = R.GetFallen();
+		if (Fallen.Num() == 0)
+		{
+			P.Text(W * 0.5f, 300, TEXT("No one aboard has fallen."), false, 52, DIM, 1);
+			return;
+		}
+		// three columns of names in the order they were lost; the department beside each
+		constexpr int32 Cols = 3, Rows = 11;
+		const float ColW = (W - 160.f) / Cols;
+		for (int32 k = 0; k < FMath::Min(Fallen.Num(), Cols * Rows); ++k)
+		{
+			const FAstraCrewman& M = R.Get()[Fallen[k]];
+			const float X = 80.f + (k / Rows) * ColW, Y = 206.f + (k % Rows) * 34.f;
+			P.Text(X, Y, M.Name(), false, 29, TEXTC);
+			P.Text(X + ColW - 30.f, Y + 7, M.Dept.ToUpper(), true, 14, DIM, 2);
+		}
+		if (Fallen.Num() > Cols * Rows)
+		{
+			P.Text(W * 0.5f, H - 34, FString::Printf(TEXT("AND %d MORE"), Fallen.Num() - Cols * Rows), true, 20, DIM, 1);
+		}
+		return;
+	}
+	// the fleet net: the March system by system (who holds it, how hard it is pressed), and the latest news
+	P.Header(W, TEXT("Fleet News"), TEXT("7TH FLEET NET  \u00B7  AURELIA MARCH"), COMMAND);
+	const TArray<FAstraSectorSystem>& Sector = Ship->GetSector();
+	P.Panel(24, 64, 760, H - 24, TEXT("The March"));
+	static const TCHAR* Threat[] = {TEXT("QUIET"), TEXT("RAIDS"), TEXT("UNDER ATTACK"), TEXT("FRONT LINE")};
+	for (int32 i = 0; i < Sector.Num() && i < 11; ++i)
+	{
+		const FAstraSectorSystem& X = Sector[i];
+		const float Y = 108.f + i * 42.f;
+		const FLinearColor Own = X.Owner == TEXT("astra") ? CYAN : X.Owner == TEXT("mandate") ? RED
+		                       : X.Owner == TEXT("guilds") ? AMBER : DIM;
+		P.Rect(44, Y + 8, 14, 14, Own);
+		P.Text(70, Y, X.Name.ToUpper(), false, 26, TEXTC);
+		P.Text(330, Y + 6, X.Owner == TEXT("astra") ? TEXT("ASTRA") : X.Owner == TEXT("mandate") ? TEXT("MANDATE")
+		                  : X.Owner == TEXT("guilds") ? TEXT("FREE GUILDS") : X.Owner.ToUpper(), true, 16, Own);
+		P.Text(740, Y + 6, Threat[FMath::Clamp(X.Threat, 0, 3)], true, 16, X.Threat >= 2 ? RED : (X.Threat == 1 ? AMBER : DIM), 2);
+		if (X.Name.Equals(Ship->GetSystemName(), ESearchCase::IgnoreCase))
+		{
+			P.Frame(38, Y - 2, 710, 38, CYAN, 2.f);
+		}
+	}
+	if (Sector.Num() == 0)
+	{
+		P.Text(400, 300, TEXT("NO CONTACT WITH THE FLEET NET"), true, 20, DIM, 1);
+	}
+	P.Panel(800, 64, W - 24, H - 24, TEXT("Latest"));
+	const TArray<FString>& News = Ship->GetSectorNews();
+	float Y = 112.f;
+	for (int32 k = News.Num() - 1; k >= 0 && Y < H - 80; --k)
+	{
+		// wrap each item to the panel (about 70 characters a line), newest first
+		FString Left = News[k];
+		bool bFirst = true;
+		while (!Left.IsEmpty() && Y < H - 60)
+		{
+			int32 Cut = Left.Len() <= 72 ? Left.Len() : 72;
+			if (Cut < Left.Len())
+			{
+				int32 Sp = INDEX_NONE;
+				Left.Left(Cut).FindLastChar(TEXT(' '), Sp);
+				Cut = Sp > 20 ? Sp : Cut;
+			}
+			P.Text(bFirst ? 824 : 846, Y, Left.Left(Cut).TrimStartAndEnd(), true, 19, bFirst ? TEXTC : DIM);
+			Left = Left.Mid(Cut).TrimStartAndEnd();
+			Y += 30.f;
+			bFirst = false;
+		}
+		Y += 14.f;
+	}
+	if (News.Num() == 0)
+	{
+		P.Text(824, 112, TEXT("Nothing new on the net."), true, 19, DIM);
 	}
 }
