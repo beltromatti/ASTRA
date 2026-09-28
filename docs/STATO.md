@@ -82,6 +82,9 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Distruzioni: lampo, palla di fuoco (M_FX_Blast), esplosioni secondarie, onda d'urto, detriti, relitto annerito alla deriva
 - [ ] Navi v2 (sagome e dettagli più belli), scie dei missili, colpi sugli scudi più ricchi
 
+## Plancia: segnaletica
+- [x] Emblema della ASTRA Navy (stella a otto punte in doppio anello, "ASTRA NAVY", "CONCORD · LAW · LIGHT"), insegna "ASN AQUILA · CVC-01" sopra lo schermo principale, targhe retroilluminate delle stazioni col colore del reparto, cartelli "CORRIDOR 1-A" sopra le porte, emblema intarsiato nel pavimento del pozzo, chevron di sicurezza sul bordo. Rigenerare: `uv run --with pillow python tools/art/signage.py`, `blender ... art/blender/signs.py`, `tools/ue.py pyfile tools/ue_scripts/place_signage.py`
+
 ## Navi v2
 - [x] Nuovo generatore procedurale hard-surface (`art/blender/hullkit.py` + `shipgen2.py`): scafi a griglia con sezioni smussate e piastre di corazza in rilievo e incassate (inset per regioni), lastre di corazza sui fianchi, torri di comando, torrette con canne e manicotti, griglie VLS, bocche d'hangar illuminate, blocchi motore a più ugelli, radiatori a lamelle, ali radianti pieghevoli, strisce di luci di bordo leggibili a chilometri, luci di navigazione
 - [x] Mandato: **Acheron** (prua a doppia lama attorno al cannone spinale ad anelli, vita con gli hangar dei caccia, chiglia, torre asimmetrica), **Styx** (lunga prua a lancia, sponson posteriori con radiatori), **Lethe** (cuneo compatto). ASTRA: **Aquila** (bocche di lancio a prua, isola inclinata che porta la plancia: dal finestrone si vede la prua), **Praetorian** (cittadella e sei torri trinate), **Vigilant**
