@@ -125,6 +125,7 @@ struct FAstraProjectile
 	bool bTorpedo = false;
 	bool bDead = false;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
+	UPROPERTY() TObjectPtr<AStaticMeshActor> Trail = nullptr;   // guided weapons: the exhaust streak behind
 };
 
 USTRUCT()
@@ -168,6 +169,9 @@ struct FAstraSquadron
 	int32 TorpedoesAway = 0; // released since the last report (one spoken report per torpedo run)
 	float TorpedoReportAt = -1.f;
 	FString TorpedoTarget;
+	EAstraSide Side = EAstraSide::Astra;   // Mandate wings fly from their cruisers
+	int32 CarrierId = -1;                  // the ship they launch from and land on
+	int32 Rockets = 0;                     // per aircraft (Mandate strike fighters)
 };
 
 /** What the tactical plot shows of one object (the holo table draws these; positions in the Aquila's frame). */
@@ -329,6 +333,13 @@ private:
 	void TickSquadrons(float Dt);
 	void TickCraft(FAstraBattleShip& S, float Dt);
 	int32 AirborneCount(int32 Squadron) const;
+	/** A Mandate cruiser's strike wing (Harpy fighters) that launches after Delay seconds against the Aquila. */
+	void AddEnemyWing(int32 CarrierIdx, int32 Count, float Delay);
+	bool bMandateStandDown() const;   // the Mandate leader agreed to terms: their fighters break off
+public:
+	/** What the bridge knows about enemy small craft (for the crew's telemetry). */
+	FString EnemyCraftSummary() const;
+private:
 	void FireTorpedo(FAstraBattleShip& From, FAstraBattleShip& To);
 	void TickPlayerFire(FAstraBattleShip& P, float Dt);
 	void TickProjectiles(float Dt);

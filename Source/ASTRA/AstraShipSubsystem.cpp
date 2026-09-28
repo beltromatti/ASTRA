@@ -414,6 +414,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (Battle)
 	{
 		S->SetArrayField(TEXT("contacts"), Battle->ContactsJson());
+		S->SetStringField(TEXT("enemy_small_craft"), Battle->EnemyCraftSummary());
 		S->SetObjectField(TEXT("_mandate"), Battle->MandateViewJson());   // for the enemy minds only
 		S->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(100.f * Battle->PlayerHullFraction()));
 		Sh->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()));
