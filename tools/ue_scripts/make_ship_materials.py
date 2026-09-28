@@ -81,7 +81,9 @@ log.append("hull instances ok")
 
 
 # --- FX materials: additive unlit glow (tracers, beams, flashes) and fresnel shell (shields, blast shells)
-def fx_material(name, fresnel):
+def fx_material(name, fresnel, soft=False):
+    """fresnel: bright at the rim (shields, blast shells); soft: bright at the core and fading to nothing at the rim
+    (a glow ball that never shows the sphere's edge: drive flares)."""
     p = f"{MAT}/{name}"
     if eal.does_asset_exist(p):
         m = eal.load_asset(p)
@@ -107,6 +109,20 @@ def fx_material(name, fresnel):
     mel.connect_material_expressions(a, "", b, "A")
     mel.connect_material_expressions(fade, "", b, "B")
     out = b
+    if soft:
+        fr = E(unreal.MaterialExpressionFresnel, -650, 300)
+        fr.set_editor_property("exponent", 1.0)
+        fr.set_editor_property("base_reflect_fraction", 0.0)
+        core = E(unreal.MaterialExpressionOneMinus, -500, 300)
+        mel.connect_material_expressions(fr, "", core, "")
+        pw = E(unreal.MaterialExpressionPower, -380, 300)
+        mel.connect_material_expressions(core, "", pw, "Base")
+        ex = E(unreal.MaterialExpressionScalarParameter, -500, 400, parameter_name="Falloff", default_value=3.0)
+        mel.connect_material_expressions(ex, "", pw, "Exp")
+        c = E(unreal.MaterialExpressionMultiply, -250, 200)
+        mel.connect_material_expressions(b, "", c, "A")
+        mel.connect_material_expressions(pw, "", c, "B")
+        out = c
     if fresnel:
         fr = E(unreal.MaterialExpressionFresnel, -650, 300)
         fr.set_editor_property("exponent", 3.0)
@@ -122,5 +138,6 @@ def fx_material(name, fresnel):
 
 fx_material("M_FX_Glow", False)
 fx_material("M_FX_Shell", True)
+fx_material("M_FX_Flare", False, soft=True)
 log.append("fx materials ok")
 print(json.dumps(log))

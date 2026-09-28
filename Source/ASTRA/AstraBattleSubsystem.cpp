@@ -119,6 +119,7 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	GlowMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Glow.M_FX_Glow"));
+	FlareMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Flare.M_FX_Flare"));
 	ShellMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Shell.M_FX_Shell"));
 	RingMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Holo/SM_HOLO_Ring.SM_HOLO_Ring"));
 	BlastMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Blast.M_FX_Blast"));
@@ -206,6 +207,7 @@ void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	C->SetCastShadow(false);          // km-scale shadows are invisible and cost VSM pages
 	C->bAffectDynamicIndirectLighting = false;
+	C->SetLightingChannels(true, true, false);   // outside the hull: the planet's light reaches it too
 	if (SphereMesh && ShellMat && !S.bCraft)
 	{
 		S.ShieldBubble = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, P);
@@ -230,7 +232,7 @@ void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 		D->SetStaticMesh(SphereMesh);
 		D->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		D->SetCastShadow(false);
-		UMaterialInstanceDynamic* M = D->CreateAndSetMaterialInstanceDynamicFromMaterial(0, GlowMat);
+		UMaterialInstanceDynamic* M = D->CreateAndSetMaterialInstanceDynamicFromMaterial(0, FlareMat ? FlareMat.Get() : GlowMat.Get());
 		M->SetVectorParameterValue(TEXT("Color"), S.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.45f, 0.3f)
 		                                        : (S.Side == EAstraSide::Astra ? FLinearColor(0.55f, 0.78f, 1.f) : FLinearColor(0.9f, 0.9f, 1.f)));
 		M->SetScalarParameterValue(TEXT("Intensity"), 60.f);
@@ -1590,6 +1592,11 @@ void UAstraBattleSubsystem::TickFlashes(float Dt)
 // ------------------------------------------------------------------------------------------------------ visuals
 void UAstraBattleSubsystem::SyncVisuals()
 {
+	FVector Eye = FVector::ZeroVector;   // the camera (the bridge, the hangar, the lift...)
+	if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0))
+	{
+		Eye = Cam->GetCameraLocation();
+	}
 	for (FAstraBattleShip& S : Ships)
 	{
 		if (!S.bAlive || !S.Actor)
@@ -1601,13 +1608,14 @@ void UAstraBattleSubsystem::SyncVisuals()
 		S.Actor->SetActorLocationAndRotation(W, R);
 		if (S.DriveFlare)
 		{
-			// the plume at the stern, never smaller than ~0.25 degrees (a torch drive is visible from far away)
+			// the plume at the stern, never smaller than ~0.25 degrees from where the Captain stands (a torch drive
+			// is visible from far away); a soft ball of light that fades to nothing at its rim
 			const FVector Stern = ToWorld(S.Pos - S.Att.GetForwardVector() * S.Radius * 1.05);
-			const float Dist = Stern.Size() / 100.f;
+			const float Dist = FVector::Dist(Stern, Eye) / 100.f;
 			const float Speed = S.Vel.Size();
 			const float Throttle = FMath::Clamp(Speed / 400.f, 0.15f, 1.f);
 			S.DriveFlare->SetActorLocation(Stern);
-			S.DriveFlare->SetActorScale3D(FVector(FMath::Max(S.Radius * 0.12f, Dist * 0.0045f) * Throttle));
+			S.DriveFlare->SetActorScale3D(FVector(FMath::Max(S.Radius * 0.16f, Dist * 0.0065f) * Throttle));
 		}
 		if (S.ShieldBubble && S.ShieldMID)
 		{
@@ -2509,6 +2517,7 @@ void UAstraBattleSubsystem::Explode(FAstraBattleShip& S)
 			C->SetStaticMesh(CubeMesh);
 			C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			C->SetCastShadow(false);
+			C->SetLightingChannels(true, true, false);
 			if (Frame)
 			{
 				C->SetMaterial(0, Frame);
@@ -2959,6 +2968,7 @@ void UAstraBattleSubsystem::SpawnGate(const FVector& Pos, const FQuat& Att)
 	GC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GC->SetCastShadow(false);
 	GC->bAffectDistanceFieldLighting = false;
+	GC->SetLightingChannels(true, true, false);
 	GateGlyphMID = nullptr;
 	for (int32 i = 0; i < GC->GetNumMaterials(); ++i)
 	{

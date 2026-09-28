@@ -5,10 +5,13 @@
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraBridgeFX.h"
+#include "Components/DirectionalLightComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/Light.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
@@ -149,7 +152,78 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 			}
 		}
 	}
+	// the planet's light: spawned here, aimed by UpdateAttitudeVisuals
+	FActorSpawnParameters SP;
+	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	SP.ObjectFlags |= RF_Transient;
+	PlanetLight = InWorld.SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator::ZeroRotator, SP);
+	if (PlanetLight)
+	{
+		if (UDirectionalLightComponent* D = Cast<UDirectionalLightComponent>(PlanetLight->GetLightComponent()))
+		{
+			D->SetMobility(EComponentMobility::Movable);
+			D->SetCastShadows(false);
+			D->SetLightingChannels(false, true, false);
+			D->SetAtmosphereSunLight(false);
+			D->SetSpecularScale(0.3f);
+			D->SetLightSourceAngle(25.f);     // a planet is a broad source: soft highlights
+			D->SetIntensity(0.f);
+		}
+	}
+	// the Aquila's own hull (and any ship or station placed in the level) is outside: channel 1 as well
+	int32 Exterior = 0;
+	for (TActorIterator<AStaticMeshActor> It(&InWorld); It; ++It)
+	{
+		UStaticMeshComponent* C = It->GetStaticMeshComponent();
+		const UStaticMesh* M = C ? C->GetStaticMesh() : nullptr;
+		if (M && (M->GetName().StartsWith(TEXT("SM_SHIP_")) || M->GetName().StartsWith(TEXT("SM_STATION_"))))
+		{
+			C->SetLightingChannels(true, true, false);
+			++Exterior;
+		}
+	}
+	SetPlanetFill(TEXT("ocean"));
+	UE_LOG(LogASTRA, Log, TEXT("[Ship] planet light %s, %d exterior meshes"), PlanetLight ? TEXT("on") : TEXT("missing"), Exterior);
 	CaptureHomeSky();
+}
+
+void UAstraShipSubsystem::SetPlanetFill(const FString& T)
+{
+	// the colour of the light a world throws back, and how much of it (albedo: ice and gas bright, lava dark)
+	if (T == TEXT("desert")) { PlanetFill = FLinearColor(1.f, 0.72f, 0.45f); PlanetFillGain = 1.2f; }
+	else if (T == TEXT("ice")) { PlanetFill = FLinearColor(0.85f, 0.93f, 1.f); PlanetFillGain = 1.6f; }
+	else if (T == TEXT("lava")) { PlanetFill = FLinearColor(1.f, 0.42f, 0.2f); PlanetFillGain = 0.6f; }
+	else if (T == TEXT("gas_giant")) { PlanetFill = FLinearColor(1.f, 0.84f, 0.62f); PlanetFillGain = 1.4f; }
+	else if (T == TEXT("barren")) { PlanetFill = FLinearColor(0.76f, 0.73f, 0.7f); PlanetFillGain = 0.8f; }
+	else { PlanetFill = FLinearColor(0.42f, 0.6f, 1.f); PlanetFillGain = 1.f; }
+}
+
+void UAstraShipSubsystem::UpdatePlanetLight(const FVector& SunNow, const FVector Axes[3])
+{
+	if (!PlanetLight || !SkyMID)
+	{
+		return;
+	}
+	FLinearColor P;
+	float Radius = 0.f;
+	SkyMID->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("PlanetDirection")), P);
+	SkyMID->GetScalarParameterValue(FHashedMaterialParameterInfo(TEXT("PlanetAngularRadius")), Radius);
+	const FVector Dir = (Axes[0] * P.R + Axes[1] * P.G + Axes[2] * P.B).GetSafeNormal();   // ship -> planet (world)
+	if (Dir.IsNearlyZero())
+	{
+		return;
+	}
+	// how much of its lit face we see (full when the star is behind us), how big it is in the sky; a touch more than
+	// physics (x3) so the night side of a hull is not a hole
+	const float Phase = 0.5f * (1.f - FVector::DotProduct(SunNow.GetSafeNormal(), Dir));
+	const float SunLux = Sun && Sun->GetLightComponent() ? Sun->GetLightComponent()->Intensity : 1200.f;
+	const float S = FMath::Sin(FMath::Clamp(Radius, 0.f, 1.2f));
+	PlanetLight->SetActorRotation((-Dir).Rotation());
+	if (ULightComponent* LC = PlanetLight->GetLightComponent())
+	{
+		LC->SetIntensity(SunLux * S * S * 0.35f * 3.f * PlanetFillGain * Phase);
+		LC->SetLightColor(PlanetFill);
+	}
 }
 
 void UAstraShipSubsystem::CaptureHomeSky()
@@ -831,6 +905,9 @@ void UAstraShipSubsystem::UpdateAttitudeVisuals()
 		}
 		const FVector SunNow = Delta.UnrotateVector(SunDir0);
 		SkyMID->SetVectorParameterValue(TEXT("SunDirection"), FLinearColor(SunNow.X, SunNow.Y, SunNow.Z, 0.f));
+		const FVector Axes[3] = {FVector(Cols[0][0], Cols[1][0], Cols[2][0]), FVector(Cols[0][1], Cols[1][1], Cols[2][1]),
+		                         FVector(Cols[0][2], Cols[1][2], Cols[2][2])};
+		UpdatePlanetLight(SunNow, Axes);
 	}
 	if (Sun)
 	{
@@ -1087,6 +1164,7 @@ void UAstraShipSubsystem::ApplySystem(const FAstraSystemLook& L)
 		SunDir0 = HomeSunDir0;
 		for (const auto& KV : HomeScalars) { SkyMID->SetScalarParameterValue(KV.Key, KV.Value); }
 		for (const auto& KV : HomeVectors) { SkyMID->SetVectorParameterValue(KV.Key, KV.Value); }
+		SetPlanetFill(TEXT("ocean"));
 		if (Sun && Sun->GetLightComponent())
 		{
 			Sun->GetLightComponent()->SetIntensity(HomeLux);
@@ -1099,15 +1177,15 @@ void UAstraShipSubsystem::ApplySystem(const FAstraSystemLook& L)
 	                               L.PlanetName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", the %s world %s ahead"), *L.PlanetType.Replace(TEXT("_"), TEXT(" ")), *L.PlanetName));
 	const FQuat Delta(FRotator(MarkDeg - Mark0, HeadingDeg - Heading0, 0.f));
 	SunDir0 = Delta.RotateVector(L.SunWorld.GetSafeNormal());
-	float Lux = 1200.f, Kelvin = 4300.f, Size = 0.0075f, PlanetLight = 6.f;
+	float Lux = 1200.f, Kelvin = 4300.f, Size = 0.0075f, PlanetGlow = 6.f;
 	FLinearColor StarC(1.f, 0.6f, 0.3f);
-	if (L.StarClass == TEXT("red_dwarf")) { Lux = 650.f; Kelvin = 3100.f; Size = 0.013f; StarC = FLinearColor(1.f, 0.32f, 0.16f); PlanetLight = 2.2f; }
-	else if (L.StarClass == TEXT("yellow")) { Lux = 1600.f; Kelvin = 5600.f; Size = 0.0068f; StarC = FLinearColor(1.f, 0.86f, 0.62f); PlanetLight = 4.f; }
-	else if (L.StarClass == TEXT("blue_white")) { Lux = 2200.f; Kelvin = 9000.f; Size = 0.0048f; StarC = FLinearColor(0.72f, 0.84f, 1.f); PlanetLight = 3.5f; }
+	if (L.StarClass == TEXT("red_dwarf")) { Lux = 650.f; Kelvin = 3100.f; Size = 0.013f; StarC = FLinearColor(1.f, 0.32f, 0.16f); PlanetGlow = 2.2f; }
+	else if (L.StarClass == TEXT("yellow")) { Lux = 1600.f; Kelvin = 5600.f; Size = 0.0068f; StarC = FLinearColor(1.f, 0.86f, 0.62f); PlanetGlow = 4.f; }
+	else if (L.StarClass == TEXT("blue_white")) { Lux = 2200.f; Kelvin = 9000.f; Size = 0.0048f; StarC = FLinearColor(0.72f, 0.84f, 1.f); PlanetGlow = 3.5f; }
 	// bright worlds (ice, gas, desert) reflect far more than an ocean world: keep them out of the white
 	if (L.PlanetType == TEXT("gas_giant") || L.PlanetType == TEXT("ice") || L.PlanetType == TEXT("desert"))
 	{
-		PlanetLight *= 0.5f;
+		PlanetGlow *= 0.5f;
 	}
 	if (SkyMID)
 	{
@@ -1116,9 +1194,10 @@ void UAstraShipSubsystem::ApplySystem(const FAstraSystemLook& L)
 		SkyMID->SetScalarParameterValue(TEXT("NebulaHue"), L.NebulaHue);
 		SkyMID->SetScalarParameterValue(TEXT("NebulaSaturation"), L.NebulaSat);
 		SkyMID->SetScalarParameterValue(TEXT("PlanetAngularRadius"), L.PlanetSize);
-		SkyMID->SetScalarParameterValue(TEXT("PlanetBrightness"), PlanetLight);
+		SkyMID->SetScalarParameterValue(TEXT("PlanetBrightness"), PlanetGlow);
 		SkyMID->SetScalarParameterValue(TEXT("PlanetSeed"), L.Seed);
 		PlanetPalette(SkyMID, L.PlanetType);
+		SetPlanetFill(L.PlanetType);
 		// the planet's direction lives in the sky frame: express the wanted world direction with the current sky basis
 		FLinearColor AX, AY, AZ;
 		SkyMID->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("SkyAxisX")), AX);

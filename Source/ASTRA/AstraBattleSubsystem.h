@@ -387,6 +387,7 @@ private:
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> GlowMat;
+	UPROPERTY() TObjectPtr<UMaterialInterface> FlareMat;   // soft glow ball (drive flares)
 	UPROPERTY() TObjectPtr<UMaterialInterface> ShellMat;
 
 	/** The bridge's position in the Aquila's hull frame (m): the world origin is the bridge, not the ship centre. */

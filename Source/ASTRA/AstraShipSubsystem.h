@@ -223,6 +223,13 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialParameterCollection> ShipMPC;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> SkyMID;
 	UPROPERTY() TObjectPtr<ADirectionalLight> Sun;
+	// the star's light thrown back by the planet (earthshine): a soft fill from the planet on everything outside the
+	// hull (lighting channel 1: it casts no shadow, so it must never reach inside)
+	UPROPERTY() TObjectPtr<ADirectionalLight> PlanetLight;
+	FLinearColor PlanetFill = FLinearColor(0.42f, 0.6f, 1.f);
+	float PlanetFillGain = 1.f;
+	void SetPlanetFill(const FString& PlanetType);
+	void UpdatePlanetLight(const FVector& SunNow, const FVector Axes[3]);
 	UPROPERTY() TArray<TObjectPtr<ALight>> ShipLights;
 	TArray<float> ShipLightBase;
 	TArray<FLinearColor> ShipLightColorBase;
