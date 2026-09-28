@@ -147,6 +147,23 @@ macro = custom(m, "return saturate(0.5 + 0.72 * ((A - 0.5) + (B - 0.5)));", [("A
 
 # a shore (beach sand, wet at the waterline) only where there is a sea at z = 0: 0 on dry worlds, whose low ground is dry
 shore = scalar(m, "Shore", 1.0, -2000, 1050)
+# a city's ground (generated worlds): the vertex colour's red is 1 - urban (meshes without colours are white: no city);
+# the streets run on the city's 60 m grid, whose centre and bearing AAstraWorldSurface sets per world
+vcol = E(m, unreal.MaterialExpressionVertexColor, -2600, 1500)
+paving = custom(m, """
+float urban = saturate(1.0 - VC.r);
+float2 d = P.xy - float2(CX, CY);
+float a = radians(Yaw);
+float2 q = float2(d.x * cos(a) + d.y * sin(a), -d.x * sin(a) + d.y * cos(a));
+float2 cell = frac(q / 60.0 + 0.5) - 0.5;
+float edge = max(abs(cell.x), abs(cell.y));
+float street = smoothstep(0.372, 0.385, edge);                          // 14 m of asphalt between the blocks
+float kerb = smoothstep(0.35, 0.357, edge) * (1.0 - smoothstep(0.366, 0.372, edge));   // a pale kerb
+float2 lane = abs(cell);
+float dash = step(0.49, max(lane.x, lane.y)) * step(0.5, frac((lane.x > lane.y ? q.y : q.x) / 6.0)) * street;   // centre dashes
+return float4(urban, street, kerb, dash);
+""", [("VC", (vcol, "")), ("P", (loc_m, "")), ("CX", (scalar(m, "CityX", 0.0, -2000, 1600), "")), ("CY", (scalar(m, "CityY", 0.0, -2000, 1700), "")),
+      ("Yaw", (scalar(m, "CityYaw", 0.0, -2000, 1800), ""))], -1700, 1500)
 # the blend: rock on the steep, sand at the waterline, snow up high, meadow in patches, grass elsewhere
 weights = custom(m, """
 float z = P.z;
@@ -193,14 +210,19 @@ float3 c = rock * w.x + Sand * w.y + Snow * w.z + Meadow * MeadowTint * w.w + Gr
 float tone = lerp(0.82, 1.14, Mc.b) * lerp(0.95, 1.05, Mc.r);
 // wet sand and dark shingle right at the waterline
 float wet = (1.0 - smoothstep(-0.5, 1.8, P.z)) * Shore;
-return c * tone * lerp(1.0, 0.55, wet);
+c = c * tone * lerp(1.0, 0.55, wet);
+// the city: concrete blocks, asphalt streets, kerbs and dashes
+float3 asphalt = float3(0.05, 0.05, 0.055) * lerp(0.85, 1.15, Mc.b);
+float3 concrete = float3(0.32, 0.31, 0.29) * lerp(0.82, 1.1, Mc.r);
+float3 paved = lerp(concrete, asphalt, City.y) + City.z * 0.2 + City.w * 0.45;
+return lerp(c, paved, City.x);
 """, [("N", (nrm, "")), ("RockXY", (S["Rock"]["BC"], "RGB")), ("RockXZ", (rock_xz, "RGB")), ("RockYZ", (rock_yz, "RGB")),
       ("Sand", (S["Sand"]["BC"], "RGB")), ("Snow", (S["Snow"]["BC"], "RGB")), ("Meadow", (S["Meadow"]["BC"], "RGB")),
       ("Grass", (S["Grass"]["BC"], "RGB")), ("W", (weights, "")), ("Mc", (macro, "")), ("P", (loc_m, "")),
       ("GrassTint", (vector(m, "GrassTint", (0.5, 0.66, 0.4, 1), -1000, 600), "RGB")),
       ("MeadowTint", (vector(m, "MeadowTint", (0.7, 0.78, 0.58, 1), -1000, 700), "RGB")),
       ("RockTint", (vector(m, "RockTint", (1, 1, 1, 1), -1000, 500), "RGB")), ("Shore", (shore, "")),
-      ("Strata", (scalar(m, "Strata", 0.0, -1000, 400), ""))], -700, 900,
+      ("Strata", (scalar(m, "Strata", 0.0, -1000, 400), "")), ("City", (paving, ""))], -700, 900,
       unreal.CustomMaterialOutputType.CMOT_FLOAT3)
 tint = binop(m, M, shade, "", vector(m, "Tint", (1, 1, 1, 1), -700, 800), "RGB", -450, 900)
 mel.connect_material_property(tint, "", unreal.MaterialProperty.MP_BASE_COLOR)
@@ -211,8 +233,9 @@ float grass = saturate(1.0 - w.x - w.y - w.z - w.w);
 float r = Rock.g * w.x + Sand.g * w.y + Snow.g * w.z + Meadow.g * w.w + Grass.g * grass;
 float ao = Rock.r * w.x + Sand.r * w.y + Snow.r * w.z + Meadow.r * w.w + Grass.r * grass;
 float wet = (1.0 - smoothstep(-0.5, 1.8, P.z)) * Shore;
-return float4(lerp(saturate(0.4 + 0.6 * r), 0.2, wet), ao, 0, 0);
-""", [("Shore", (shore, "")), ("W", (weights, "")), ("Rock", (S["Rock"]["ORM"], "RGB")), ("Sand", (S["Sand"]["ORM"], "RGB")), ("Snow", (S["Snow"]["ORM"], "RGB")),
+float rough = lerp(lerp(saturate(0.4 + 0.6 * r), 0.2, wet), 0.82, City.x);
+return float4(rough, lerp(ao, 1.0, City.x), 0, 0);
+""", [("City", (paving, "")), ("Shore", (shore, "")), ("W", (weights, "")), ("Rock", (S["Rock"]["ORM"], "RGB")), ("Sand", (S["Sand"]["ORM"], "RGB")), ("Snow", (S["Snow"]["ORM"], "RGB")),
       ("Meadow", (S["Meadow"]["ORM"], "RGB")), ("Grass", (S["Grass"]["ORM"], "RGB")), ("P", (loc_m, ""))], -700, 1500)
 rough = E(m, unreal.MaterialExpressionComponentMask, -450, 1500, r=True)
 link(surf, "", rough, "")
@@ -225,9 +248,9 @@ normal = custom(m, """
 float4 w = W;
 float grass = saturate(1.0 - w.x - w.y - w.z - w.w);
 float3 n = Rock * w.x + Sand * w.y + Snow * w.z + Meadow * w.w + Grass * grass;
-n.xy *= Strength * saturate(Up.z * 2.0 - 0.6);   // the maps are laid from above: they smear on the walls, so fade there
+n.xy *= Strength * saturate(Up.z * 2.0 - 0.6) * (1.0 - City.x * 0.85);   // laid from above: fade on walls and pavements
 return normalize(n);
-""", [("Up", (nrm, "")), ("W", (weights, "")), ("Rock", (S["Rock"]["N"], "RGB")), ("Sand", (S["Sand"]["N"], "RGB")), ("Snow", (S["Snow"]["N"], "RGB")),
+""", [("City", (paving, "")), ("Up", (nrm, "")), ("W", (weights, "")), ("Rock", (S["Rock"]["N"], "RGB")), ("Sand", (S["Sand"]["N"], "RGB")), ("Snow", (S["Snow"]["N"], "RGB")),
       ("Meadow", (S["Meadow"]["N"], "RGB")), ("Grass", (S["Grass"]["N"], "RGB")), ("Strength", (scalar(m, "NormalStrength", 0.9, -900, 2000), ""))],
       -700, 1900, unreal.CustomMaterialOutputType.CMOT_FLOAT3)
 mel.connect_material_property(normal, "", unreal.MaterialProperty.MP_NORMAL)

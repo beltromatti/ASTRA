@@ -890,6 +890,9 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 			X.Threat = (int32)T;
 			X.Pos = FVector2D(PX, PY);
 			O->TryGetStringArrayField(TEXT("links"), X.Links);
+			double Pop = 0.0;
+			O->TryGetNumberField(TEXT("pop"), Pop);
+			X.PopM = float(Pop);
 			FString Star, Planet, World;
 			O->TryGetStringField(TEXT("star_class"), Star);
 			O->TryGetStringField(TEXT("planet_type"), Planet);
@@ -1596,7 +1599,7 @@ AAstraWorldSurface* UAstraShipSubsystem::WorldBelow()
 		if (GeneratedWorld)
 		{
 			const FAstraSectorSystem* Sec = FindSector(SystemName);
-			GeneratedWorld->Build(L->PlanetName, L->PlanetType, Sec ? Sec->Owner : FString());
+			GeneratedWorld->Build(L->PlanetName, L->PlanetType, Sec ? Sec->Owner : FString(), Sec ? Sec->PopM : 0.f);
 			GeneratedWorld->Show(false);
 		}
 	}

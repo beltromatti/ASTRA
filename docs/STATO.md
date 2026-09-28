@@ -195,6 +195,13 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
   - un insediamento fuori mappa è diffidente;
   - un mondo silenzioso non risponde. Su Hollow, dalle comunicazioni: «nessuna risposta dal campo di Hollow su nessun canale: solo statico».
   Il Capitano lo chiama per nome («Pyre Ground Control, qui Eagle…», «torre», «campo»); la storia ricorda le discese sui mondi nemici o muti. Nello snapshot c'è ora `surface` (mondo, tipo, campo, se il Capitano è laggiù).
+- [x] **Città sui mondi popolosi**:
+  - accanto al campo sorge una cittadina o una città proporzionata alla popolazione della mappa della guerra (la mente la manda al gioco col settore): Pyre 33 blocchi, Sabel 106, Halcyon 135, Asphodel 177, Concord 285;
+  - strade su una griglia di 60 m (asfalto, cordoli, tratteggi, isolati di cemento: maschera nel colore dei vertici e parametri `CityX`/`CityY`/`CityYaw` di `M_ASTRA_Terrain`), torri più alte verso il centro;
+  - stile per fazione: vetro ASTRA, basse stecche dei mercati delle Gilde, blocchi a gradoni del Mandato; torri più alte nelle capitali;
+  - terminal accanto alla piazzola dove la gente viaggia;
+  - costo circa 0,3 ms (Concord 19,5 ms di mediana).
+  Il controllore di campo sa della città («A great city spreads out a couple of kilometres from the field…»).
 - [x] Robustezza: un NaN nello snapshot (gli scudi di un relitto, 0 su 0) rendeva il JSON invalido e la mente perdeva la nave. Ora le percentuali sono protette, il gioco converte qualunque nan/inf in null fuori dalle stringhe, e la mente scarta un messaggio guasto senza chiudere la connessione.
 - Tecnica:
   - `FAstraWorldGen` (`Source/ASTRA/AstraWorldGen.*`): rumore di valore fbm/ridged con domain warp, crateri in una griglia di ricerca, coni; il sito è il punto più piano e asciutto entro 3,5 km (sulla calotta, non sul mare ghiacciato). I dettagli fini restano solo nel nucleo, così il terreno lontano non fa aliasing.
@@ -229,7 +236,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
 2. Altri ponti: mensa (l'equipaggio fuori servizio), armeria; ufficiali che vengono a parlare col Capitano in cabina; volti veri per l'equipaggio (MetaHuman); esterno della plancia (scatola e corridoi ancora grezzi da fuori).
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
-4. Mondi generati oltre: avamposti diversi per fazione (batterie di terra del Mandato che sparano davvero, guarnigioni), città sui mondi popolosi (Asphodel, Nemet, Concord); preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.
+4. Mondi generati oltre: batterie di terra del Mandato che sparano davvero e guarnigioni; edifici più vari e luci della città; preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
 
 ## Come provarlo (per l'utente)

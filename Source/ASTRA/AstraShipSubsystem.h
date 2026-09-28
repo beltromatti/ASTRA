@@ -73,6 +73,7 @@ struct FAstraSectorSystem
 	int32 Threat = 0;           // 0 quiet .. 3 front line
 	FVector2D Pos = FVector2D::ZeroVector;   // light-years on the sector plot
 	TArray<FString> Links;      // the systems its Janus Gate is bound to
+	float PopM = 0.f;           // millions of people on its main world (a city grows by the field)
 };
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FAstraShipEvent, const FString& /*Text*/, bool /*bReport: worth telling the Captain*/);

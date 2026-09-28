@@ -17,6 +17,7 @@ class UVolumetricCloudComponent;
 class UExponentialHeightFogComponent;
 class USkyLightComponent;
 class UPointLightComponent;
+class UHierarchicalInstancedStaticMeshComponent;
 
 UCLASS()
 class ASTRA_API AAstraWorldSurface : public AActor
@@ -27,13 +28,15 @@ public:
 	AAstraWorldSurface();
 
 	/** Builds the world (the actor stands at the zone's origin: sea level, the landing zone's centre). */
-	void Build(const FString& InWorldName, const FString& InPlanetType, const FString& InOwner = FString());
+	void Build(const FString& InWorldName, const FString& InPlanetType, const FString& InOwner = FString(), float InPopM = 0.f);
 	void Show(bool bShow);
 	bool IsBuilt() const { return Gen.IsValid(); }
 
 	FString WorldName;
 	FString PlanetType;
 	FString Owner;   // who holds the system (the mind's war map): a silent world's field is dark
+	float PopM = 0.f;   // millions of people on the world: a town or a city grows beside the field
+	int32 CityBlocks = 0;
 	/** The landing pad's centre on the ground (world, cm), and the height of the sea (world z, cm; none: very low). */
 	FVector SiteWorld() const;
 	float SeaWorldZ() const;
@@ -52,10 +55,21 @@ private:
 	UPROPERTY() TObjectPtr<USkyLightComponent> SkyLight;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Outpost;
 	UPROPERTY() TObjectPtr<UPointLightComponent> Beacon;
+	UPROPERTY() TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> City;
 	TUniquePtr<FAstraWorldGen> Gen;
 	float HorizonZ = 0.f;   // m: the height the far ground settles to at its rim, and the horizon rings beyond it (over the curve)
 
 	void BuildGround();
 	void BuildSky();
 	void BuildOutpost();
+	void PlanCity();   // where the city stands (its centre, spread and street grid), before the ground is laid
+	void BuildCity();
+	FVector2D CityCentre = FVector2D::ZeroVector;
+	double CitySigma = 0.0;
+	float CityYaw = 0.f;
+	int32 CityN = 0;
+	/** The core's ground (m, zone frame) at (x, y) m, between its samples. */
+	float GroundAt(double X, double Y) const;
+	TArray<float> CoreH;   // the core's heights after weathering and levelling (m)
+	int32 CoreN = 0;
 };

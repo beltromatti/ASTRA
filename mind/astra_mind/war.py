@@ -148,7 +148,8 @@ class WarMap:
         """What the game needs: looks for the gates, links for routing, the plot for the holo table."""
         return {"current": self.current, "systems": [
             {"name": k, "star_class": s["star"], "planet_type": s["planet"], "planet_name": s["world"], "owner": s["owner"],
-             "threat": s["threat"], "x": s["x"], "y": s["y"], "links": self.links[k]} for k, s in self.systems.items()]}
+             "threat": s["threat"], "x": s["x"], "y": s["y"], "links": self.links[k], "pop": s.get("pop", 0)}
+            for k, s in self.systems.items()]}
 
     # ---------------------------------------------------------------------------------------------- saving
     def save(self) -> None:

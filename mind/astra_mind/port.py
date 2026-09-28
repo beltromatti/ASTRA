@@ -59,7 +59,7 @@ orbit above your world. You know that, and it matters to you.
 {lore}
 
 {world}: a {kind} world{about}.
-The field: {field}.
+The field: {field}.{city}
 
 {stance}
 
@@ -122,6 +122,14 @@ TRANSMIT = {"type": "function", "function": {"name": "transmit", "description": 
                                                             "required": ["text"]}}}
 
 
+def _city(world: str, pop: float | None) -> str:
+    """The town or city the game raises beside the field, as big as the world's people."""
+    if not pop or pop < 0.05:
+        return ""
+    size = "A small town" if pop < 3 else "A city" if pop < 30 else "A great city" if pop < 200 else "The capital's endless city"
+    return f" {size} spreads out a couple of kilometres from the field (about {pop:g} million people live on {world})."
+
+
 def persona_for(world: str, kind: str, sector: dict[str, Any] | None) -> dict[str, Any] | None:
     """Who answers from the field on this world (None: a world gone silent, where nobody does)."""
     if world.strip().lower() == HOME.lower():
@@ -137,7 +145,8 @@ def persona_for(world: str, kind: str, sector: dict[str, Any] | None) -> dict[st
              else f"{world} Field Control")
     return dict(key=FIELD_KEY, name=f"{title} {_FIRST[g][(h >> 1) % len(_FIRST[g])]} {_LAST[(h >> 5) % len(_LAST)]}",
                 place=place, voice=_VOICES[g][(h >> 9) % len(_VOICES[g])], owner=owner, world=world, kind=kind or "rocky",
-                what=what, manner=manner, stance=stance, about=(sector or {}).get("about", ""))
+                what=what, manner=manner, stance=stance, about=(sector or {}).get("about", ""),
+                city=_city(world, (sector or {}).get("pop")))
 
 
 # the Captain calling the field (several languages); the world's own name is added per persona
@@ -196,7 +205,8 @@ class FieldControl:
         else:
             prompt = FIELD_PROMPT.format(**common, place=p["place"], world=p["world"], what=p["what"], kind=p["kind"],
                                          about=f" — {p['about']}" if p.get("about") else "",
-                                         field=_FIELD.get(p["kind"], _FIELD["barren"]), stance=p["stance"], manner=p["manner"])
+                                         field=_FIELD.get(p["kind"], _FIELD["barren"]), stance=p["stance"], manner=p["manner"],
+                                         city=p.get("city", ""))
         msgs = [{"role": "system", "content": prompt}] + self.history[-10:] + [{"role": "user", "content": stimulus}]
         lines: list[str] = []
 

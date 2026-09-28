@@ -8,9 +8,11 @@
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Async/ParallelFor.h"
 #include "ProceduralMeshComponent.h"
 
@@ -165,19 +167,21 @@ AAstraWorldSurface::AAstraWorldSurface()
 	Beacon->SetIntensityUnits(ELightUnits::Lumens);
 }
 
-void AAstraWorldSurface::Build(const FString& InWorldName, const FString& InPlanetType, const FString& InOwner)
+void AAstraWorldSurface::Build(const FString& InWorldName, const FString& InPlanetType, const FString& InOwner, float InPopM)
 {
 	WorldName = InWorldName;
 	PlanetType = InPlanetType;
 	Owner = InOwner;
+	PopM = InPopM;
 	const double T0 = FPlatformTime::Seconds();
 	Gen = MakeUnique<FAstraWorldGen>(WorldName, FAstraWorldGen::KindFromPlanetType(PlanetType));
 	BuildGround();
 	BuildSky();
 	BuildOutpost();
-	UE_LOG(LogASTRA, Log, TEXT("[World] %s (%s) built in %.2f s: site (%.0f, %.0f) at %.0f m, sea %s"), *WorldName, *PlanetType,
-	       FPlatformTime::Seconds() - T0, Gen->Site.X, Gen->Site.Y, Gen->SiteZ,
-	       Gen->SeaLevel > -1.0e5f ? *FString::Printf(TEXT("at %.0f m"), Gen->SeaLevel) : TEXT("none"));
+	BuildCity();
+	UE_LOG(LogASTRA, Log, TEXT("[World] %s (%s, %s, %.2g M people) built in %.2f s: site (%.0f, %.0f) at %.0f m, sea %s, %d city blocks"),
+	       *WorldName, *PlanetType, Owner.IsEmpty() ? TEXT("uncharted") : *Owner, PopM, FPlatformTime::Seconds() - T0, Gen->Site.X,
+	       Gen->Site.Y, Gen->SiteZ, Gen->SeaLevel > -1.0e5f ? *FString::Printf(TEXT("at %.0f m"), Gen->SeaLevel) : TEXT("none"), CityBlocks);
 }
 
 void AAstraWorldSurface::BuildGround()
@@ -278,6 +282,21 @@ void AAstraWorldSurface::BuildGround()
 			H[j * NC + i] = FMath::Lerp(FarAt(X, Y), H[j * NC + i], W);
 		}
 	}
+	CoreH = H;
+	CoreN = NC;
+	PlanCity();
+	// the city's ground (paved streets and blocks) rides in the vertex colour: red = 1 - urban (white, the default, is
+	// open country everywhere else)
+	auto Urban = [this, &G](double X, double Y)
+	{
+		if (CityN == 0)
+		{
+			return 0.f;
+		}
+		const float D = float(FVector2D::Distance(FVector2D(X, Y), CityCentre) / (CitySigma * 1.3));
+		const float Field = FMath::Max(FMath::Abs(float(X - G.Site.X)), FMath::Abs(float(Y - G.Site.Y))) < G.SiteHalf + 120.f ? 0.f : 1.f;
+		return FMath::Clamp(1.7f * FMath::Exp(-D * D) - 0.35f, 0.f, 1.f) * Field;   // paved through the centre, fading into the suburbs
+	};
 	auto NormalAt = [&](const TArray<float>& Hs, int32 N, double Step, int32 i, int32 j)
 	{
 		const float L = Hs[j * N + FMath::Max(i - 1, 0)], R = Hs[j * N + FMath::Min(i + 1, N - 1)];
@@ -285,6 +304,14 @@ void AAstraWorldSurface::BuildGround()
 		return FVector(-(R - L) / (2.0 * Step), -(U - D) / (2.0 * Step), 1.0).GetSafeNormal();
 	};
 	UMaterialInterface* Ground = Mat(FString::Printf(TEXT("MI_W_Terrain_%s"), KindName(G.Kind)));
+	if (Ground && CityN > 0)
+	{
+		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Ground, this);
+		MID->SetScalarParameterValue(TEXT("CityX"), float(CityCentre.X));
+		MID->SetScalarParameterValue(TEXT("CityY"), float(CityCentre.Y));
+		MID->SetScalarParameterValue(TEXT("CityYaw"), CityYaw);
+		Ground = MID;
+	}
 	// core sections (4 x 4), with skirts along the core's outer edge
 	const int32 PerTile = (NC - 1) / CoreTiles;
 	int32 Section = 0;
@@ -295,6 +322,7 @@ void AAstraWorldSurface::BuildGround()
 			TArray<FVector> V;
 			TArray<FVector> Nrm;
 			TArray<FVector2D> UV;
+			TArray<FColor> Col;
 			TArray<int32> Tri;
 			const int32 I0 = ti * PerTile, J0 = tj * PerTile, NS = PerTile + 1;
 			V.Reserve(NS * NS + 4 * NS * 2);
@@ -307,6 +335,7 @@ void AAstraWorldSurface::BuildGround()
 					V.Add(FVector(X, Y, H[GJ * NC + GI] - Drop(X, Y)) * 100.0);
 					Nrm.Add(NormalAt(H, NC, CoreStep, GI, GJ));
 					UV.Add(FVector2D(X / 100.0, Y / 100.0));
+					Col.Add(FColor(uint8(FMath::RoundToInt(255.f * (1.f - Urban(X, Y)))), 255, 255, 255));
 				}
 			}
 			for (int32 j = 0; j < NS - 1; ++j)
@@ -326,9 +355,11 @@ void AAstraWorldSurface::BuildGround()
 					// copies first: Add() must not take a reference into the array it may grow
 					const FVector P = V[E] - FVector(0, 0, 4000.0), N = Nrm[E];
 					const FVector2D T = UV[E];
+					const FColor K = Col[E];
 					V.Add(P);
 					Nrm.Add(N);
 					UV.Add(T);
+					Col.Add(K);
 				}
 				for (int32 k = 0; k + 1 < Edge.Num(); ++k)
 				{
@@ -341,7 +372,7 @@ void AAstraWorldSurface::BuildGround()
 			if (tj == CoreTiles - 1) { E.Reset(); for (int32 i = 0; i < NS; ++i) { E.Add((NS - 1) * NS + i); } Skirt(E); }
 			if (ti == 0) { E.Reset(); for (int32 j = 0; j < NS; ++j) { E.Add(j * NS); } Skirt(E); }
 			if (ti == CoreTiles - 1) { E.Reset(); for (int32 j = 0; j < NS; ++j) { E.Add(j * NS + NS - 1); } Skirt(E); }
-			Core->CreateMeshSection(Section, V, Tri, Nrm, UV, TArray<FColor>(), TangentsFor(Nrm), true);
+			Core->CreateMeshSection(Section, V, Tri, Nrm, UV, Col, TangentsFor(Nrm), true);
 			if (Ground)
 			{
 				Core->SetMaterial(Section, Ground);
@@ -531,11 +562,12 @@ void AAstraWorldSurface::BuildOutpost()
 	const FPiece Pieces[] = {
 		{TEXT("SM_NR_Pad"), FVector(0, 0, 0), 0.f, FVector(1.f)},
 		{TEXT("SM_NR_Hangar"), FVector(-9000, 7000, 0), 90.f, FVector(0.6f)},
-		{TEXT("SM_NR_Tower"), FVector(8000, 8000, 0), -90.f, FVector(0.55f)}};
+		{TEXT("SM_NR_Tower"), FVector(8000, 8000, 0), -90.f, FVector(0.55f)},
+		{TEXT("SM_NR_Terminal"), FVector(0, -12000, 0), 0.f, FVector(PopM >= 1.f ? 0.7f : 0.f)}};   // a terminal where people travel
 	for (const FPiece& P : Pieces)
 	{
 		UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Planet/NewRavenna/Port/%s.%s"), P.Mesh, P.Mesh));
-		if (!M)
+		if (!M || P.Scale.IsNearlyZero())
 		{
 			continue;
 		}
@@ -591,4 +623,155 @@ FString AAstraWorldSurface::SiteName() const
 {
 	return Owner == TEXT("silent") ? FString::Printf(TEXT("the dark landing field on %s"), *WorldName)
 	                               : FString::Printf(TEXT("the landing field on %s"), *WorldName);
+}
+
+float AAstraWorldSurface::GroundAt(double X, double Y) const
+{
+	if (CoreN < 2)
+	{
+		return 0.f;
+	}
+	const double GX = FMath::Clamp((X + CoreHalf) / CoreStep, 0.0, CoreN - 1.001), GY = FMath::Clamp((Y + CoreHalf) / CoreStep, 0.0, CoreN - 1.001);
+	const int32 X0 = FMath::FloorToInt(GX), Y0 = FMath::FloorToInt(GY);
+	const float TX = float(GX - X0), TY = float(GY - Y0);
+	const float A = CoreH[Y0 * CoreN + X0], B = CoreH[Y0 * CoreN + X0 + 1], C = CoreH[(Y0 + 1) * CoreN + X0], D = CoreH[(Y0 + 1) * CoreN + X0 + 1];
+	return FMath::Lerp(FMath::Lerp(A, B, TX), FMath::Lerp(C, D, TX), TY);
+}
+
+void AAstraWorldSurface::PlanCity()
+{
+	// a town or a city beside the field, as big as the world's people (none on an empty or silent world)
+	CityN = PopM > 0.05f && Owner != TEXT("silent") ? FMath::Min(300, FMath::RoundToInt(80.f * FMath::LogX(10.f, 1.f + PopM * 4.f))) : 0;
+	if (CityN == 0 || !Gen)
+	{
+		CityN = 0;
+		return;
+	}
+	const FAstraWorldGen& G = *Gen;
+	FRandomStream R(int32((G.Seed ^ 0x51ab2c7u) & 0x7fffffff));
+	const float MinZ = G.Kind == EAstraWorldKind::Ice ? 12.f : (G.SeaLevel > -1.0e5f ? G.SeaLevel + 4.f : -1.0e5f);
+	auto Slope = [this](double X, double Y)
+	{
+		const float H0 = GroundAt(X, Y);
+		return FMath::Max(FMath::Abs(GroundAt(X + 30.0, Y) - H0), FMath::Abs(GroundAt(X, Y + 30.0) - H0)) / 30.f;
+	};
+	// the centre: gentle, dry ground 1.3-2.6 km from the field
+	CityCentre = G.Site + FVector2D(1800.0, 0.0);
+	float Best = 1e9f;
+	for (int32 k = 0; k < 40; ++k)
+	{
+		const float A = R.FRandRange(0.f, 2.f * PI), D = R.FRandRange(1300.f, 2600.f);
+		const FVector2D P = G.Site + FVector2D(FMath::Cos(A), FMath::Sin(A)) * D;
+		if (FMath::Abs(P.X) > CoreHalf - 1200.0 || FMath::Abs(P.Y) > CoreHalf - 1200.0)
+		{
+			continue;
+		}
+		float Score = 0.f;
+		for (int32 s = 0; s < 9; ++s)
+		{
+			const FVector2D Q = P + FVector2D((s % 3 - 1) * 250.0, (s / 3 - 1) * 250.0);
+			Score += Slope(Q.X, Q.Y) * 10.f + (GroundAt(Q.X, Q.Y) < MinZ ? 5.f : 0.f);
+		}
+		if (Score < Best)
+		{
+			Best = Score;
+			CityCentre = P;
+		}
+	}
+	CitySigma = 140.0 + 1.7 * CityN;   // m: dense at the heart, thinning out into the suburbs
+	CityYaw = R.FRandRange(0.f, 90.f);
+}
+
+void AAstraWorldSurface::BuildCity()
+{
+	// streets on a 60 m grid, towers taller towards the centre; ASTRA cities of glass towers, Guild towns of low market
+	// slabs, Mandate cities of stepped blocks
+	const int32 N = CityN;
+	if (N == 0 || !Gen)
+	{
+		return;
+	}
+	const FAstraWorldGen& G = *Gen;
+	FRandomStream R(int32((G.Seed ^ 0x2c7e51abu) & 0x7fffffff));
+	const float MinZ = G.Kind == EAstraWorldKind::Ice ? 12.f : (G.SeaLevel > -1.0e5f ? G.SeaLevel + 4.f : -1.0e5f);
+	auto Slope = [this](double X, double Y)
+	{
+		const float H0 = GroundAt(X, Y);
+		return FMath::Max(FMath::Abs(GroundAt(X + 30.0, Y) - H0), FMath::Abs(GroundAt(X, Y + 30.0) - H0)) / 30.f;
+	};
+	const FVector2D Centre = CityCentre;
+	const double Sigma = CitySigma;
+	const float GridYaw = CityYaw;
+	const FQuat GridRot(FVector::UpVector, FMath::DegreesToRadians(GridYaw));
+	const bool bMandate = Owner == TEXT("mandate"), bGuilds = Owner == TEXT("guilds");
+	const float Tall = (bMandate ? 90.f : bGuilds ? 70.f : 160.f) * (PopM > 100.f ? 1.7f : 1.f);   // how high the centre's towers climb
+	// Port Aurelius's blocks (tools/ue_scripts/build_newravenna.py): height, width, depth before scaling
+	struct FVariant { const TCHAR* Mesh; float H, W, D; };
+	const FVariant Variants[3] = {{TEXT("SM_NR_Bldg_A"), 120.f, 30.f, 30.f}, {TEXT("SM_NR_Bldg_B"), 40.f, 44.f, 22.f},
+	                              {TEXT("SM_NR_Bldg_C"), 70.f, 32.f, 32.f}};
+	for (const FVariant& V : Variants)
+	{
+		UHierarchicalInstancedStaticMeshComponent* C = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
+		C->SetMobility(EComponentMobility::Static);
+		C->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Planet/NewRavenna/Port/%s.%s"), V.Mesh, V.Mesh)));
+		C->SetupAttachment(Root);
+		C->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		C->SetCollisionResponseToAllChannels(ECR_Block);
+		C->RegisterComponent();
+		City.Add(C);
+	}
+	TArray<FVector2D> Placed;
+	for (int32 Try = 0; Try < N * 6 && Placed.Num() < N; ++Try)
+	{
+		// a normal scatter around the centre, snapped to the street grid (60 m blocks)
+		const double U1 = FMath::Max(1e-6, (double)R.FRand()), U2 = R.FRand();
+		const double Rr = Sigma * FMath::Sqrt(-2.0 * FMath::Loge(U1));
+		const FVector Local(FMath::GridSnap(Rr * FMath::Cos(2.0 * PI * U2), 60.0) + R.FRandRange(-5.f, 5.f),
+		                    FMath::GridSnap(Rr * FMath::Sin(2.0 * PI * U2), 60.0) + R.FRandRange(-5.f, 5.f), 0.0);
+		const FVector2D P = Centre + FVector2D(GridRot.RotateVector(Local));
+		if (FMath::Abs(P.X) > CoreHalf - 300.0 || FMath::Abs(P.Y) > CoreHalf - 300.0)
+		{
+			continue;
+		}
+		if (FMath::Abs(P.X - G.Site.X) < G.SiteHalf + 260.0 && FMath::Abs(P.Y - G.Site.Y) < G.SiteHalf + 260.0)
+		{
+			continue;   // the field and its approach stay clear
+		}
+		const float Z = GroundAt(P.X, P.Y);
+		if (Z < MinZ || Slope(P.X, P.Y) > 0.22f)
+		{
+			continue;
+		}
+		bool bClash = false;
+		for (const FVector2D& O : Placed)
+		{
+			if (FVector2D::DistSquared(O, P) < 30.0 * 30.0)
+			{
+				bClash = true;
+				break;
+			}
+		}
+		if (bClash)
+		{
+			continue;
+		}
+		const float Near = FMath::Exp(-float(FVector2D::DistSquared(P, Centre) / FMath::Square(Sigma * 0.55)));
+		const float W = R.FRandRange(18.f, 44.f), D = R.FRandRange(18.f, 44.f);
+		const float H = 10.f - 14.f * (FMath::Loge(FMath::Max(1e-4f, R.FRand())) + FMath::Loge(FMath::Max(1e-4f, R.FRand())))
+		              + Tall * Near * R.FRand();
+		const int32 Vi = bMandate ? (H >= 40.f ? 2 : 1) : (H >= 90.f ? 0 : H >= 45.f ? 2 : 1);
+		const FVariant& V = Variants[Vi];
+		// set down on the lowest corner and sunk a metre, so nothing floats on a slope
+		float Zmin = Z;
+		for (const FVector2D& Cn : {FVector2D(-0.5, -0.5), FVector2D(0.5, -0.5), FVector2D(0.5, 0.5), FVector2D(-0.5, 0.5)})
+		{
+			const FVector2D Q = P + FVector2D(GridRot.RotateVector(FVector(Cn.X * W, Cn.Y * D, 0.0)));
+			Zmin = FMath::Min(Zmin, GroundAt(Q.X, Q.Y));
+		}
+		City[Vi]->AddInstance(FTransform(FRotator(0.f, GridYaw + (R.FRand() < 0.15f ? 12.f : 0.f), 0.f),
+		                                 FVector(P.X, P.Y, Zmin - 1.0) * 100.0, FVector(W / V.W, D / V.D, H / V.H)));
+		Placed.Add(P);
+	}
+	CityBlocks = Placed.Num();
+	UE_LOG(LogASTRA, Log, TEXT("[World] %s: %d city blocks around (%.0f, %.0f)"), *WorldName, CityBlocks, Centre.X, Centre.Y);
 }
