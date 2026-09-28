@@ -170,7 +170,7 @@ def astra_ship(name: str, length: float, seed: int, carrier: bool = False, beam:
     bx = 0.22 * L
     if carrier:
         # the bridge's pedestal: from the hull up to just under the bridge floor (1.45 Hh), tapering forward
-        top = Hh * 1.45 - 0.6
+        top = Hh * 1.45 - 1.6   # below the bridge well slab (bridge floor 62 m, well -0.6 m, slab -0.9 m)
         brow = []
         for i in range(7):
             t = i / 6

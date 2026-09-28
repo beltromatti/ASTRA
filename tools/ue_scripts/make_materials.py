@@ -337,7 +337,7 @@ def build_instances(hard, emi, glass):
         vectors={"Tint": [0.045, 0.047, 0.05]},
         textures={"BaseColorMap": "T_DeckRubber_BC", "NormalMap": "T_DeckRubber_N", "ORMMap": "T_DeckRubber_ORM"})
     mis["MI_ASTRA_FloorBridge"] = make_mi("MI_ASTRA_FloorBridge", hard,
-        scalars={"RoughnessMin": 0.26, "RoughnessMax": 0.6, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.7,
+        scalars={"RoughnessMin": 0.45, "RoughnessMax": 0.75, "MetallicFromMap": 0.0, "BaseColorMapInfluence": 0.7,
                  "MacroBrightness": 0.08, "RoughnessVariation": 0.12, "ScratchRoughness": 0.12, "NormalStrength": 0.7},
         vectors={"Tint": [0.07, 0.078, 0.095]},
         textures={"BaseColorMap": "T_DeckRubber_BC", "NormalMap": "T_DeckRubber_N", "ORMMap": "T_DeckRubber_ORM"})

@@ -129,6 +129,7 @@ hull = place("/Game/ASTRA/Ships/SM_SHIP_ASTRA_Aquila", -172.0, 0.0, -62.0, 0.0, 
 hc = hull.get_component_by_class(unreal.StaticMeshComponent)
 hc.set_editor_property("cast_shadow", False)
 hc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+hc.set_editor_property("affect_distance_field_lighting", False)   # its coarse distance field would leak into the bridge
 md = DATA["master_display"]
 place("SM_BRG_MasterDisplay", md["pos"][0], md["pos"][1], 0.0, label="MasterDisplay")
 
