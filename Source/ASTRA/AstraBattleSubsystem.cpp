@@ -4092,6 +4092,10 @@ void UAstraBattleSubsystem::GetPilotStatus(FAstraPilotStatus& Out) const
 	Out.HomeWorld = ToWorld(Mouth);
 	Out.HomeRangeKm = FVector::Dist(Mouth, S->Pos) / OneKm;
 	Out.bCanLand = FVector::Dist(Mouth, S->Pos) < 600.0 && (S->Vel - Ships[0].Vel).Size() < 220.f;
+	for (const FAstraProjectile& Pr : Projectiles)
+	{
+		Out.Incoming += (!Pr.bDead && Pr.Kind == EAstraProjKind::Missile && Pr.Target == S->Id) ? 1 : 0;
+	}
 	for (const FAstraBattleShip& O : Ships)
 	{
 		if (!O.bAlive || O.Id == S->Id || O.bPlayer || FVector::Dist(O.Pos, S->Pos) > 25 * OneKm)

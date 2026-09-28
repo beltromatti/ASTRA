@@ -178,10 +178,47 @@ def bridge_ambience(dur=24.0):
     return norm(x, 0.6)
 
 
+def falcon_engine(dur=8.0):
+    """A Falcon's engines felt through the airframe (loopable): the turbopumps' whine, the drive's rumble, the air in
+    the cockpit. The game bends its pitch and level with the throttle."""
+    t = t_(dur)
+    wob = 1 + 0.004 * np.sin(2 * np.pi * 0.7 * t) + 0.002 * np.sin(2 * np.pi * 2.3 * t)
+    rumble = sum(np.sin(2 * np.pi * 62 * k * t * wob + k) / k ** 1.2 for k in range(1, 9)) * 0.35
+    whine = (np.sin(2 * np.pi * 1840 * t * wob) * 0.09 + np.sin(2 * np.pi * 3680 * t * wob) * 0.035 + np.sin(2 * np.pi * 2760 * t * wob) * 0.02)
+    roar = lp(hp(rng.normal(0, 1, len(t)), 60), 900, order=4) * 0.9 * (1 + 0.1 * np.sin(2 * np.pi * t / 3.1))
+    air = hp(rng.normal(0, 1, len(t)), 4000) * 0.025
+    x = rumble + whine + roar + air
+    n = SR
+    fade = np.linspace(0, 1, n)
+    x[:n] = x[:n] * fade + x[-n:] * (1 - fade)
+    return norm(x[:-n], 0.7)
+
+
+def lock_beep():
+    """The seeker searching: one short beep."""
+    t = t_(0.09)
+    return norm(np.sin(2 * np.pi * 1650 * t) * np.minimum(1, t * 400) * np.exp(-t * 18), 0.5)
+
+
+def lock_solid():
+    """The seeker locked: a steady tone (exactly 2100 cycles in a second: it loops without a seam)."""
+    t = t_(1.0)
+    return norm(np.sin(2 * np.pi * 2100 * t) + 0.25 * np.sin(2 * np.pi * 4200 * t), 0.45)
+
+
+def missile_warning():
+    """Missile inbound on the Falcon: a fast warble (loops seamlessly)."""
+    t = t_(1.0)
+    f = np.where((t * 8) % 1 < 0.5, 950, 1420)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    return norm(np.tanh(3 * np.sin(ph)) * 0.8, 0.55)
+
+
 os.makedirs(OUT, exist_ok=True)
 for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("SW_Torpedo_Launch", lambda: vls_launch(True)),
                  ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp),
                  ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False)), ("SW_Transit", transit),
-                 ("SW_Sparks", sparks)):
+                 ("SW_Sparks", sparks), ("SW_Falcon_Engine", falcon_engine), ("SW_Lock_Beep", lock_beep), ("SW_Lock_Solid", lock_solid),
+                 ("SW_Missile_Warning", missile_warning)):
     sf.write(os.path.join(OUT, name + ".wav"), fn().astype(np.float32), SR, subtype="PCM_16")
 print("SHIP_SOUNDS_OK", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))

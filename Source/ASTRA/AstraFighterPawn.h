@@ -61,6 +61,15 @@ private:
 	float MissilePulse = 0.f;
 	bool bFreeLook = false;
 
+	// the cockpit's sounds: the engines through the airframe, the seeker's tones, the missile warning
+	UPROPERTY() TObjectPtr<class UAudioComponent> EngineAudio;
+	UPROPERTY() TObjectPtr<class UAudioComponent> LockAudio;
+	UPROPERTY() TObjectPtr<class UAudioComponent> WarnAudio;
+	float BeepT = 0.f;
+	void StartSounds();
+	void StopSounds();
+	void UpdateSounds(const FAstraPilotStatus& St, float Dt);
+
 	TSharedPtr<SAstraFlightHud> Hud;
 	void ShowHud(bool bShow);
 	void UpdateHud(const FAstraPilotStatus& St);

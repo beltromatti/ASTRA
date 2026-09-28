@@ -6,6 +6,7 @@
 #include "AstraHangar.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Components/AudioComponent.h"
 #include "Components/InputComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Font.h"
@@ -210,6 +211,71 @@ void AAstraFighterPawn::BeginOnCatapult(AAstraHangar* InHangar, APawn* InWalker)
 		SetActorLocationAndRotation(InHangar->CatapultPose(0.f).GetLocation(), InHangar->CatapultPose(0.f).GetRotation());
 	}
 	ShowHud(true);
+	StartSounds();
+}
+
+void AAstraFighterPawn::StartSounds()
+{
+	auto Make = [this](const TCHAR* Name, float Volume) -> UAudioComponent*
+	{
+		USoundBase* S = LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Audio/%s.%s"), Name, Name));
+		return S ? UGameplayStatics::CreateSound2D(this, S, Volume, 1.f, 0.f, nullptr, false, false) : nullptr;
+	};
+	EngineAudio = Make(TEXT("SW_Falcon_Engine"), 0.3f);
+	LockAudio = Make(TEXT("SW_Lock_Solid"), 0.35f);
+	WarnAudio = Make(TEXT("SW_Missile_Warning"), 0.45f);
+	if (EngineAudio)
+	{
+		EngineAudio->SetPitchMultiplier(0.75f);
+		EngineAudio->Play();
+	}
+}
+
+void AAstraFighterPawn::StopSounds()
+{
+	for (UAudioComponent* A : {EngineAudio.Get(), LockAudio.Get(), WarnAudio.Get()})
+	{
+		if (A)
+		{
+			A->Stop();
+			A->DestroyComponent();
+		}
+	}
+	EngineAudio = LockAudio = WarnAudio = nullptr;
+}
+
+void AAstraFighterPawn::UpdateSounds(const FAstraPilotStatus& St, float Dt)
+{
+	const bool bFlying = Phase == EPhase::Flying && St.bFlying;
+	if (EngineAudio)
+	{
+		// the lever and the afterburner in the airframe; the catapult's run pushes it up too
+		const float Push = Phase == EPhase::Launching ? 1.f : In.Throttle;
+		const float Boost = (bFlying && In.bBoost) ? 1.f : 0.f;
+		EngineAudio->SetPitchMultiplier(0.72f + 0.5f * Push + 0.22f * Boost);
+		EngineAudio->SetVolumeMultiplier(Phase == EPhase::Ending ? 0.f : 0.28f + 0.35f * Push + 0.15f * Boost);
+	}
+	// the seeker: beeps while it works on a target, a steady tone once locked
+	const bool bLocked = bFlying && St.bHasLock && St.LockProgress >= 1.f;
+	if (LockAudio)
+	{
+		if (bLocked && !LockAudio->IsPlaying()) { LockAudio->Play(); }
+		else if (!bLocked && LockAudio->IsPlaying()) { LockAudio->Stop(); }
+	}
+	if (bFlying && St.bHasLock && !bLocked && (BeepT -= Dt) <= 0.f)
+	{
+		BeepT = 0.28f;
+		if (USoundBase* B = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Lock_Beep.SW_Lock_Beep")))
+		{
+			UGameplayStatics::PlaySound2D(this, B, 0.4f);
+		}
+	}
+	if (WarnAudio)
+	{
+		const bool bWarn = bFlying && St.Incoming > 0;
+		if (bWarn && !WarnAudio->IsPlaying()) { WarnAudio->Play(); }
+		else if (!bWarn && WarnAudio->IsPlaying()) { WarnAudio->Stop(); }
+	}
 }
 
 void AAstraFighterPawn::SetupPlayerInputComponent(UInputComponent* IC)
@@ -393,6 +459,7 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 		}
 		break;
 	}
+	UpdateSounds(St, DeltaTime);
 	UpdateHud(St);
 }
 
@@ -433,6 +500,7 @@ void AAstraFighterPawn::FinishFlight()
 void AAstraFighterPawn::EndPlay(const EEndPlayReason::Type Reason)
 {
 	ShowHud(false);
+	StopSounds();
 	Super::EndPlay(Reason);
 }
 
@@ -535,7 +603,11 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 		D.bHomeEdge = true;
 		D.HomeEdgeAngle = FMath::Atan2(-Local.Z, Local.Y);
 	}
-	if (St.bCanLand)
+	if (St.Incoming > 0)
+	{
+		D.Hint = FString::Printf(TEXT("MISSILE%s INBOUND  ·  BREAK AND BOOST"), St.Incoming > 1 ? TEXT("S") : TEXT(""));
+	}
+	else if (St.bCanLand)
 	{
 		D.Hint = TEXT("RECOVERY APPROACH  ·  F: INTO THE TUBE");
 	}

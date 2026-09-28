@@ -209,6 +209,7 @@ struct FAstraPilotStatus
 	FVector HomeWorld = FVector::ZeroVector;     // the Aquila's recovery tube (Alpha's, port)
 	float HomeRangeKm = 0.f;
 	bool bCanLand = false;
+	int32 Incoming = 0;                          // missiles homing on the Falcon
 	TArray<FVector> Hostiles, Friends;           // within 25 km
 	TArray<float> HostileSizes;                  // their radius (m): craft or warship
 };
