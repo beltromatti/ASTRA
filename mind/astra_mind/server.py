@@ -202,6 +202,7 @@ class Mind:
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
         self.agent.war = lambda: self.director.war.crew_view()
         self.agent.mood = lambda: self.director.mood
+        self.agent.bonds = lambda: "\n".join(f"- {line}" for line in self.director.bonds_lines())
         self.turns: asyncio.Queue = asyncio.Queue()
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.captain_t = 0.0                     # the last time the Captain spoke

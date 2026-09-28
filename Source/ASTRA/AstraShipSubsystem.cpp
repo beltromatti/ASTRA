@@ -602,6 +602,7 @@ FString UAstraShipSubsystem::CaptainAboard() const
 
 void UAstraShipSubsystem::Event(const FString& Text, bool bReport)
 {
+	UE_LOG(LogASTRA, Log, TEXT("[Event]%s %s"), bReport ? TEXT(" (report)") : TEXT(""), *Text);
 	RecentEvents.Add(Text);
 	if (RecentEvents.Num() > 16)
 	{
@@ -1059,6 +1060,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 			}
 			TSharedRef<FJsonObject> Bed = MakeShared<FJsonObject>();
 			Bed->SetStringField(TEXT("speaker"), FString::Printf(TEXT("patient%d"), Pt.Bed + 1));
+			// where the bed is, as the Captain sees the ward coming out of the lift (facing aft: port is on the right)
+			static const TCHAR* Ordinal[] = {TEXT("first"), TEXT("second"), TEXT("third"), TEXT("fourth"), TEXT("fifth"), TEXT("sixth")};
+			Bed->SetStringField(TEXT("bed"), FString::Printf(TEXT("the %s bed of the row on the %s as you come in from the lift"),
+				Ordinal[Pt.Bed % 6], Pt.Bed < 6 ? TEXT("right") : TEXT("left")));
 			Bed->SetStringField(TEXT("name"), Pt.Name());
 			Bed->SetStringField(TEXT("gender"), Pt.bFemale ? TEXT("f") : TEXT("m"));
 			Bed->SetStringField(TEXT("dept"), Pt.Dept);

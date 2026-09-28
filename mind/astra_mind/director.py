@@ -73,6 +73,11 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "duration_s": {"type": "number", "description": "resupply: how long it takes (60-300)"},
     "system_name": {"type": "string", "description": "transit: the system Fleet sends the Aquila to — one the gate here reaches"},
     "why": {"type": "string", "description": "the story reason, one sentence (for the campaign log)"},
+    "officers": {"type": "object", "additionalProperties": {"type": "string"},
+                 "description": "only for officers whose bond with the Captain changed because of what happened (keys: "
+                 "xo, helm, ops, tactical, comms, sensors, engineering, chief, doctor, flight): one sentence in English — "
+                 "how they now see the Captain and why (trust earned or lost, loyalty, doubt about an order, resentment, "
+                 "admiration, a debt), and what they carry. Omit everyone else: their bond carries over"},
     "crew_mood": {"type": "string", "description": "how the Aquila's bridge crew feels now and why, in English, 1-2 "
                   "sentences naming officers where it matters (Serra XO, Ferri helm, Tanaka ops, Voss tactical, Martin "
                   "comms, Nair sensors, Mensah engineering, Price flight): grief for the fallen, pride, fatigue, anger, "
@@ -125,6 +130,12 @@ Rules
 - `crew_mood`: the people aboard live this war. Losses (the casualties in the live state), close calls, victories,
   the Captain's choices (mercy, ruthlessness, retreats, promises kept or broken) and long waits change how the crew
   feels; carry it from beat to beat and let it evolve (the mood before this beat: {mood}).
+- `officers`: each officer has a bond with the Captain (below). The Captain's choices move it — an order that cost
+  lives, mercy or ruthlessness, trusting an officer's advice or overruling it, visiting the wounded in the Medbay or
+  going down to Main Engineering, keeping or breaking a promise. Change a bond only when something happened that would
+  change it, and keep it human and specific (Voss knows the Mandate: overruling her about them stings; Okonkwo
+  respects a captain who asks before pushing his reactor; Lindqvist judges by how the Captain treats the wounded).
+  Where each officer stands now: {bonds}
 - The Captain's own log entries ("captain's log: …" in the campaign log) are the player telling you what they
   think, fear and want: let the story answer them (a suspicion confirmed or proven wrong, a hope rewarded or tested).
 - Keep the whole thing coherent with the map, the campaign log below and the live state.
@@ -182,6 +193,7 @@ class Director:
         self.admiral_history: list[dict[str, Any]] = []
         self.last_event_t = time.monotonic()   # the last time the story moved (a director event or a beat)
         self.mood = ""                          # how the bridge crew feels (the director's latest word on it)
+        self.bonds: dict[str, str] = {}          # officer id -> how they stand with the Captain (the director keeps it)
 
     def reset(self) -> None:
         """A new campaign: the war begins again at Aurelia."""
@@ -189,6 +201,7 @@ class Director:
         self.war.save()
         self.campaign.clear()
         self.mood = ""
+        self.bonds = {}
         self.busy = False
         self.granted = False
         self.admiral_history.clear()
@@ -204,9 +217,11 @@ class Director:
             self.campaign[:] = d.get("campaign", [])[-30:]
             self.voice_i = int(d.get("voice_i", 0))
             self.mood = str(d.get("mood", ""))
+            self.bonds = {str(k): str(v) for k, v in (d.get("bonds") or {}).items()}
         except (OSError, ValueError):
             self.campaign.clear()
             self.mood = ""
+            self.bonds = {}
         self.busy = False
         self.granted = False
         self.admiral_history.clear()
@@ -222,7 +237,8 @@ class Director:
             os.makedirs(os.path.dirname(self._story_path()), exist_ok=True)
             tmp = self._story_path() + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood}, f, ensure_ascii=False, indent=1)
+                json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds}, f,
+                          ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:
             log.exception("could not save the story")
@@ -231,6 +247,11 @@ class Director:
         self.campaign.append(text)
         del self.campaign[:-30]
         self.save()
+
+    def bonds_lines(self) -> list[str]:
+        """Where each officer stands with the Captain (for the crew and the director)."""
+        from .crew import CREW
+        return [f"{CREW[k].name} ({k}): {v}" for k, v in self.bonds.items() if k in CREW]
 
     # ------------------------------------------------------------------------------------------------ the beats
     async def on_event(self, text: str, lang: str, state: dict[str, Any]) -> None:
@@ -257,6 +278,7 @@ class Director:
         t0 = time.perf_counter()
         prompt = DIRECTOR_PROMPT.format(world=WORLD, lang_name=LANG_NAMES.get(lang, lang), war=self.war.brief(),
                                         mood=self.mood or "not yet set: the patrol has just begun",
+                                        bonds="; ".join(self.bonds_lines()) or "(nothing yet: a new ship, a new crew, a new captain)",
                                         campaign="\n".join(f"- {c}" for c in self.campaign) or "- (the war has just begun)",
                                         state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
         beat: dict[str, Any] = {}
@@ -286,6 +308,14 @@ class Director:
         if comp.error or not beat:
             log.error("director produced no beat: %s %r", comp.error, comp.content[:200])
             return
+        bonds = beat.pop("officers", None) or {}
+        if isinstance(bonds, dict) and bonds:
+            from .crew import CREW
+            for k, v in bonds.items():
+                if k in CREW and isinstance(v, str) and v.strip():
+                    self.bonds[k] = v.strip()[:300]
+                    log.info("bond %s: %s", k, self.bonds[k])
+            self.save()
         mood = (beat.pop("crew_mood", "") or "").strip()
         if mood:
             self.mood = mood[:400]
@@ -394,7 +424,8 @@ def _ids(detail: str) -> list[str]:
 
 def _brief(state: dict[str, Any]) -> dict[str, Any]:
     """What the director and the admiral need of the live state (compact)."""
-    keep = ("location", "janus_gate", "alert", "hull_pct", "shields", "weapons", "squadrons", "damage_control", "heading_deg", "speed_mps")
+    keep = ("location", "janus_gate", "alert", "hull_pct", "shields", "weapons", "squadrons", "damage_control", "heading_deg",
+            "speed_mps", "casualties", "captain")
     out = {k: state.get(k) for k in keep if k in state}
     out["contacts"] = [{k: c.get(k) for k in ("id", "name", "class", "status", "range_km", "bearing_deg", "hull_pct")}
                        for c in state.get("contacts", []) or []]

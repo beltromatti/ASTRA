@@ -2,6 +2,8 @@
 
 #include "AstraHangar.h"
 
+#include "AstraShipSubsystem.h"
+
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "Camera/PlayerCameraManager.h"
@@ -334,22 +336,34 @@ void AAstraHangar::Tick(float DeltaTime)
 		CheckT = 0.25f;
 		SetZoneLights(IsPawnInHangar(UGameplayStatics::GetPlayerPawn(this, 0)));
 		const APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0);
-		auto Zone = [](TArray<TObjectPtr<ALight>>& Lights, bool& bOnNow, bool bIn)
+		auto Zone = [](TArray<TObjectPtr<ALight>>& Lights, bool& bOnNow, bool bIn) -> bool   // true: the Captain just came in
 		{
-			if (bIn != bOnNow)
+			if (bIn == bOnNow)
 			{
-				bOnNow = bIn;
-				for (ALight* L : Lights)
+				return false;
+			}
+			bOnNow = bIn;
+			for (ALight* L : Lights)
+			{
+				if (L && L->GetLightComponent())
 				{
-					if (L && L->GetLightComponent())
-					{
-						L->GetLightComponent()->SetVisibility(bIn);
-					}
+					L->GetLightComponent()->SetVisibility(bIn);
 				}
 			}
+			return bIn;
 		};
-		Zone(EngLights, bEngLightsOn, IsPawnInEngineering(Me));
-		Zone(MedLights, bMedLightsOn, IsPawnInMedbay(Me));
+		const bool bToEng = Zone(EngLights, bEngLightsOn, IsPawnInEngineering(Me));
+		const bool bToMed = Zone(MedLights, bMedLightsOn, IsPawnInMedbay(Me));
+		// the ship notices where the Captain goes: the crew talks about it, the story remembers it
+		if ((bToEng || bToMed) && GetWorld()->GetTimeSeconds() > 5.0)
+		{
+			if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+			{
+				Ship->PublishEvent(bToMed
+					? FString::Printf(TEXT("the Captain came down to the Medbay to see the wounded (%s)"), *Ship->GetRoster().Summary())
+					: FString(TEXT("the Captain came down to Main Engineering to see Chief Okonkwo and the reactor watch")), false);
+			}
+		}
 		SyncSquadrons();
 	}
 	for (auto& KV : Parked)

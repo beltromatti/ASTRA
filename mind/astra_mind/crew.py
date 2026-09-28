@@ -92,7 +92,7 @@ Everyone wears a neural translator implant, "the Interpreter": people hear each 
 
 
 def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None,
-                  war: str = "", mood: str = "") -> str:
+                  war: str = "", mood: str = "", bonds: str = "") -> str:
     lang_name = LANG_NAMES.get(lang, lang)
     roster = "\n".join(
         f"- {o.id}: {o.title}, {o.role}. Duties: {o.duties}. Character: {o.personality}." for o in CREW.values())
@@ -167,6 +167,10 @@ The Aurelia March (what the fleet knows of the sector)
 The mood on the bridge (let it colour how each officer speaks: a pause, a clipped answer, a joke that falls flat, a
 word of comfort; never announce it or explain it)
 {mood or "- steady: a crew doing its job"}
+
+Where each officer stands with the Captain (it shows in small ways — warmth or formality, a pause before a read-back,
+an unasked question, loyalty under fire; never announce it)
+{bonds or "- a new ship and a new captain: everyone still taking the measure of them"}
 
 Recent events
 {events}
