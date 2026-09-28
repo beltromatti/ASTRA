@@ -54,7 +54,7 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "percent": {"type": "number", "minimum": 0, "maximum": 150}}, ["system", "percent"]),
     _fn("set_target", "Tactical: designate the current target (a contact id from the state).", {
         "contact_id": {"type": "string"}}, ["contact_id"]),
-    _fn("fire_weapons", "Tactical: engage a contact with a weapon group. Railguns (range 10 km) and lasers (4 km) fire "
+    _fn("fire_weapons", "Tactical: engage a contact with a weapon group (it needs a track: never a bearing-only contact). Railguns (range 10 km) and lasers (4 km) fire "
                         "`salvo` volleys at their cadence (railguns one volley every 7 s; 12 = sustained fire, about 1.5 "
                         "minutes); if the target is still beyond range they stay assigned and open fire by themselves "
                         "once it closes. Missiles (25 km) launch `salvo` missiles at once (max 8; the VLS then cycles 14 s).", {
@@ -115,7 +115,8 @@ SHIP_TOOLS: list[dict[str, Any]] = [
                            "to their station: when the Captain lets them go, or the conversation is over.", {}, []),
     _fn("set_emcon", "Science & Sensors: emission control (silent = passive sensors only).", {
         "level": {"type": "string", "enum": ["silent", "restricted", "full"]}}, ["level"]),
-    _fn("active_scan", "Science & Sensors: active radar/lidar ping or focused scan of a contact (reveals our position).", {
+    _fn("active_scan", "Science & Sensors: active radar/lidar ping (every contact within 90 km tracked and classified) or a "
+                       "focused scan of a contact (identifies it within 60 km). It reveals our position to everyone.", {
         "contact_id": {"type": "string", "description": "Contact id, or empty string for a full sweep"}}, ["contact_id"]),
 ]
 

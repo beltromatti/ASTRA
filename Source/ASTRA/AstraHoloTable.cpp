@@ -384,8 +384,9 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 	const float Pulse = 0.75f + 0.25f * FMath::Sin(Time * 6.f);
 	for (const FAstraHoloBlip& B : Blips)
 	{
-		const FVector P = PlotPoint(B.Rel);
-		const bool bBeyond = B.Rel.Size() / 100000.f > RangeKm * 1.02f;
+		// a passive bearing has no range: it sits on the rim, along its line
+		const FVector P = PlotPoint(B.bBearingOnly ? B.Rel.GetSafeNormal() * 1.0e12f : B.Rel);
+		const bool bBeyond = B.bBearingOnly || B.Rel.Size() / 100000.f > RangeKm * 1.02f;
 		if (B.Kind == 0)
 		{
 			const FLinearColor Col = BlipColor(B);
@@ -424,7 +425,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			UTextRenderComponent* T = PooledText(Labels, NL++);
 			const FString Title = B.bPlayer ? FString(TEXT("ASN AQUILA"))
 			                    : (B.Name.IsEmpty() ? FString::Printf(TEXT("%s  UNKNOWN"), *B.Contact) : FString::Printf(TEXT("%s  %s"), *B.Name.ToUpper(), *B.Contact));
-			FString Sub = B.bPlayer ? FString() : RangeText(B.RangeKm);
+			FString Sub = B.bPlayer ? FString() : (B.bBearingOnly ? FString(TEXT("BEARING ONLY  NO RANGE")) : RangeText(B.RangeKm));
 			if (B.bHoldFire) { Sub += TEXT("  HOLDING FIRE"); }
 			else if (B.bRetreating) { Sub += TEXT("  WITHDRAWING"); }
 			if (B.bTargeted) { Sub += TEXT("  [TARGET]"); }

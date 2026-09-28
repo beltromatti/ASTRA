@@ -76,6 +76,13 @@ struct FAstraBattleShip
 	bool bHostile = false;
 	bool bCold = false;                  // drives off, minimal emissions (hard to classify)
 	bool bIdentified = true;
+	// what the Aquila (and her friends, by datalink) knows of a Mandate ship: the track is live, the rest is kept
+	uint8 Track = 2;                     // 0 not on our plot, 1 a passive bearing only (no range), 2 a firm track
+	bool bClassified = true;             // its class is known
+	float TrackHold = 0.f;               // a lost track lingers this long before it degrades
+	bool bFog = false;                   // under the fog of war (the director's Mandate ships; the opening's are scripted)
+	bool bDark = false;                  // running dark (EMCON): a fraction of its signature, until it lights up
+	float LitT = 0.f;                    // it fired: every sensor saw it, for a while
 	bool bAlive = true;
 	bool bFleeing = false;
 	bool bHoldFire = false;              // ceasefire ordered by its commander
@@ -228,6 +235,7 @@ struct FAstraHoloBlip
 	bool bPlayer = false;
 	bool bHostile = false;
 	bool bUnknown = false;
+	bool bBearingOnly = false;              // a passive bearing, no range: drawn at the rim along the bearing
 	bool bRetreating = false;
 	bool bHoldFire = false;
 	bool bTargeted = false;                 // our fire control is on it
@@ -481,6 +489,13 @@ private:
 	float PlayerSinceFired = 999.f;
 	FVector PlayerLastKnown = FVector::ZeroVector;
 	void TickDetection(float Dt);
+	/** The Aquila's own picture of the Mandate's ships: passive bearings from their emissions, tracks from the active
+	 *  sensors (EMCON) and the friends' datalink, classification and identity as they close; reported as they change. */
+	void TickSensors(float Dt);
+	float SignatureKmOf(const FAstraBattleShip& S) const;
+	/** How the crew can name it: "KMS Lethe (T-31)", "a Mandate frigate (T-31)" or "T-31". */
+	FString KnownLabel(const FAstraBattleShip& S) const;
+	float SensorReportT = 0.f;
 	float Shake = 0.f;
 	int32 InboundSinceReport = 0;       // missiles launched at us since the last spoken report
 	float LastInboundReport = -100.f;

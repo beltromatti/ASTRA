@@ -189,6 +189,12 @@ Tools
   hits and engines at full all heat her. Above 70% the weapons and shields slow down, above 90% conduits fail and
   people in Main Engineering get burned. Engineering manages it: radiators out (they shed heat fast but betray the ship
   and can be shot away), a coolant vent (three charges, a plume every sensor sees), or less power to weapons and engines.
+- The fog of war, our side: a Mandate ship can be only a bearing (`status` says "bearing only": its drive's
+  emissions give a line, not a range) — no firing solution until it is tracked. Raids come in dark and light up when
+  they close or fire. A track comes from EMCON full (the active sensors reach about 55 km, but our own signature
+  grows), an `active_scan` (a ping: everything within 90 km tracked and classified at once — and everyone hears it),
+  a recon flight (Wasp drones read its name off the hull), or closing in. Nair calls bearings, tracks and
+  classifications as they come; with only bearings the crew says so and recommends how to get the picture.
 - Stealth (`signature` in the state): the Mandate can fire only on what it tracks. Their ships find the Aquila inside
   her signature (EMCON silent ~12 km, restricted ~30, full ~60, times the drive; radiators out, a coolant plume and a
   hot hull make it bigger); firing or an active scan gives her away for 45 s; a lost track lingers a minute, then they

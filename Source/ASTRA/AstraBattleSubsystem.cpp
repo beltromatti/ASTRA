@@ -326,6 +326,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	const float Dt = FMath::Min(DeltaTime, 0.1f) * GBattleTimeScale;
 	Time += Dt;
 	TickDetection(Dt);
+	TickSensors(Dt);
 	if (GBattleJumpTo >= 0.f)
 	{
 		Time = GBattleJumpTo;
@@ -519,6 +520,131 @@ void UAstraBattleSubsystem::TickDetection(float Dt)
 	bPlayerEverTracked = bPlayerEverTracked || (bHostiles && bNow);
 }
 
+float UAstraBattleSubsystem::SignatureKmOf(const FAstraBattleShip& S) const
+{
+	// what a Mandate ship gives off (drive plume, reactor, emissions): a cruiser shows further than a frigate; running
+	// dark cuts it to a third; the drive at speed shows more
+	const float Base = S.bCraft ? 7.f : (S.Radius >= 300.f ? 48.f : (S.Radius >= 200.f ? 36.f : 27.f));
+	const float Speed = FMath::Clamp(S.Vel.Size() / FMath::Max(S.CruiseSpeed, 1.f), 0.f, 1.5f);
+	return Base * (S.bDark ? 0.33f : 1.f) * (0.6f + 0.4f * Speed);
+}
+
+FString UAstraBattleSubsystem::KnownLabel(const FAstraBattleShip& S) const
+{
+	if (!S.bFog || S.bIdentified)
+	{
+		return FString::Printf(TEXT("%s (%s)"), *S.Name, *S.ContactId);
+	}
+	return S.bClassified ? FString::Printf(TEXT("a %s (%s)"), *S.Class, *S.ContactId) : S.ContactId;
+}
+
+void UAstraBattleSubsystem::TickSensors(float Dt)
+{
+	if (Ships.Num() == 0 || !Ships[0].bAlive)
+	{
+		return;
+	}
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const FString E = Ship ? Ship->GetEmcon() : FString(TEXT("restricted"));
+	const float SensorPower = Ship ? FMath::Clamp(Ship->PowerFactor(TEXT("sensors")), 0.2f, 1.5f) : 1.f;
+	// the Aquila's active sensors (radar, lidar): full EMCON sees furthest; silent only listens
+	const float ActiveKm = (E == TEXT("full") ? 55.f : (E == TEXT("restricted") ? 28.f : 0.f)) * SensorPower;
+	const FAstraBattleShip& P = Ships[0];
+	TArray<FString> NewBearings, NewTracks, Classified, Lost;
+	for (FAstraBattleShip& S : Ships)
+	{
+		if (!S.bFog || !S.bAlive || S.bPlayer)
+		{
+			continue;
+		}
+		S.LitT = FMath::Max(0.f, S.LitT - Dt);
+		// running dark until close, until it fights, until it runs
+		if (S.bDark && (FVector::Dist(S.Pos, P.Pos) < 20.f * OneKm || S.LitT > 0.f || S.bFleeing))
+		{
+			S.bDark = false;
+		}
+		const float Sig = SignatureKmOf(S);
+		auto Sense = [&S, Sig, this](const FVector& From, float Active, bool bRecon) -> uint8
+		{
+			const float R = FVector::Dist(From, S.Pos) / OneKm;
+			uint8 K = 0;
+			if (R < Active * 0.35f) { K = 4; }            // close enough to read its hull: identified
+			else if (R < Active * 0.7f) { K = 3; }        // classified
+			else if (R < Active) { K = 2; }               // a firm track
+			if (R < Sig * 0.7f) { K = FMath::Max<uint8>(K, 2); }   // loud and near: passive gives a track too
+			else if (R < Sig * 1.7f) { K = FMath::Max<uint8>(K, 1); }   // a bearing from its emissions
+			if (S.LitT > 0.f && R < 90.f) { K = FMath::Max<uint8>(K, 2); }   // it fired: everyone saw it
+			if (bRecon && R < 8.f) { K = 4; }             // eyes on it: a flight group reads its name off the hull
+			return K;
+		};
+		uint8 Best = Sense(P.Pos, ActiveKm, false);
+		for (const FAstraBattleShip& A : Ships)
+		{
+			// the 7th Fleet's ships and our flight groups share their tracks by datalink
+			if (A.bAlive && !A.bPlayer && !A.bDerelict && A.Side == EAstraSide::Astra)
+			{
+				Best = FMath::Max(Best, Sense(A.Pos, A.bCraft ? 10.f : 30.f, A.bCraft));
+			}
+		}
+		const uint8 OldTrack = S.Track;
+		const bool bWasClassified = S.bClassified;
+		if (Best >= 2)
+		{
+			S.Track = 2;
+			S.TrackHold = 30.f;                          // a lost track lingers half a minute
+		}
+		else if ((S.TrackHold -= Dt) <= 0.f)
+		{
+			S.Track = FMath::Max<uint8>(Best, S.Track == 2 ? 1 : Best);   // a firm track fades to a bearing, then to nothing
+			S.TrackHold = S.Track == 1 && Best < 1 ? 30.f : 0.f;
+		}
+		else if (S.Track < Best)
+		{
+			S.Track = Best;
+		}
+		S.bClassified = S.bClassified || Best >= 3;
+		if (Best >= 4 && !S.bIdentified)
+		{
+			S.bIdentified = true;
+			Classified.Add(FString::Printf(TEXT("%s identified: %s"), *S.ContactId, *S.Name));
+		}
+		else if (S.bClassified && !bWasClassified)
+		{
+			Classified.Add(FString::Printf(TEXT("%s classified: %s"), *S.ContactId, *S.Class));
+		}
+		if (OldTrack == 0 && S.Track == 1)
+		{
+			NewBearings.Add(FString::Printf(TEXT("%s bearing %03.0f"), *S.ContactId, BearingDeg(P.Pos, S.Pos)));
+		}
+		else if (OldTrack < 2 && S.Track == 2)
+		{
+			NewTracks.Add(FString::Printf(TEXT("%s at %.0f km, bearing %03.0f"), *KnownLabel(S), FVector::Dist(P.Pos, S.Pos) / OneKm, BearingDeg(P.Pos, S.Pos)));
+		}
+		else if (OldTrack == 2 && S.Track < 2)
+		{
+			Lost.Add(KnownLabel(S));
+		}
+	}
+	// the sensors officer's calls, grouped (a raid group lighting up is one call, not eight)
+	if (NewBearings.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: faint drive emissions — %s: passive bearing%s only, no range yet (an active scan, a recon flight or "
+		                            "closing in would give a track)"), *FString::Join(NewBearings, TEXT("; ")), NewBearings.Num() > 1 ? TEXT("s") : TEXT("")));
+	}
+	if (NewTracks.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: firm track%s — %s"), NewTracks.Num() > 1 ? TEXT("s") : TEXT(""), *FString::Join(NewTracks, TEXT("; "))));
+	}
+	if (Classified.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: %s"), *FString::Join(Classified, TEXT("; "))));
+	}
+	if (Lost.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: lost the track on %s — a bearing at most now"), *FString::Join(Lost, TEXT(", "))));
+	}
+}
+
 void UAstraBattleSubsystem::TickPlayer(float Dt)
 {
 	FAstraBattleShip& P = Ships[0];
@@ -557,7 +683,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	{
 		StageDone = 1;
 		Frigate->bCold = false;
-		Frigate->bIdentified = true;
+		Frigate->bIdentified = Frigate->bClassified = true;
 		Frigate->bHostile = true;
 		Frigate->Mode = EAstraShipMode::Attack;
 		Frigate->CruiseSpeed = 650.f;
@@ -970,6 +1096,7 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 	const double Dist = FVector::Dist(S.Pos, T->Pos);
 	if (S.RailDamage > 0.f && S.RailT <= 0.f && Dist < S.RailRange)
 	{
+		S.LitT = 40.f;                                  // the muzzle flashes and the rails' pulse: every sensor sees it
 		S.RailT = S.RailCd * FMath::FRandRange(0.8f, 1.2f);
 		for (int32 i = 0; i < S.RailSlugs; ++i)
 		{
@@ -979,6 +1106,7 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 	if (S.Missiles > 0 && (S.MissileT <= 0.f || S.bSalvo) && Dist < S.MissileRange && Dist > 2.5 * OneKm && T->Side != EAstraSide::Neutral)
 	{
 		// a massed salvo empties the ready cells (6 on a cruiser, 3 on a destroyer): the cells then reload for longer
+		S.LitT = 40.f;
 		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f) * (S.bConserve ? 2.2f : 1.f) * (S.bSalvo ? 2.f : 1.f);
 		const int32 N = FMath::Min(S.Missiles, S.bSalvo ? (S.Radius > 200.f ? 6 : 3) : (S.Radius > 200.f ? 4 : 2));
 		S.bSalvo = false;
@@ -996,8 +1124,8 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 			// one spoken report per 20 s at most, with the total: a real tactical officer does not call every salvo
 			InboundSinceReport += N;
 			const bool bSpeak = Time - LastInboundReport > 20.f;
-			Report(FString::Printf(TEXT("tactical: %d missiles inbound from %s (%s)%s, point defense tracking"), InboundSinceReport, *S.Name,
-			                       *S.ContactId, bSpeak ? TEXT("") : TEXT(" [same engagement, already reported]")), bSpeak);
+			Report(FString::Printf(TEXT("tactical: %d missiles inbound from %s%s, point defense tracking"), InboundSinceReport, *KnownLabel(S),
+			                       bSpeak ? TEXT("") : TEXT(" [same engagement, already reported]")), bSpeak);
 			if (bSpeak)
 			{
 				LastInboundReport = Time;
@@ -1104,6 +1232,12 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 	if (T->Side == EAstraSide::Astra)
 	{
 		OutDetail = TEXT("weapons interlock: target is a friendly vessel");
+		return false;
+	}
+	if (T->bFog && T->Track < 2)
+	{
+		OutDetail = FString::Printf(TEXT("no firing solution on %s: only a passive bearing, no range — we need a track (an active scan, "
+		                                 "EMCON full, a recon flight, or closing in)"), *T->ContactId);
 		return false;
 	}
 	if (T->Side == EAstraSide::Mandate && T->bNegotiated)
@@ -1238,8 +1372,13 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		{
 			continue;
 		}
+		if (S.bFog && S.Track == 0)
+		{
+			continue;
+		}
 		FAstraHoloBlip B;
 		B.Kind = 0;
+		B.bBearingOnly = S.bFog && S.Track == 1;
 		B.Rel = ToWorld(S.Pos) - Origin;
 		B.Rot = ToWorldRot(S.Att);
 		B.VelDir = Dir(S.Pos, S.Vel);
@@ -1247,7 +1386,7 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		B.Side = S.Side;
 		B.bPlayer = S.bPlayer;
 		B.bHostile = S.bHostile;
-		B.bUnknown = !S.bIdentified || S.bCold;
+		B.bUnknown = (S.bFog ? !S.bClassified : !S.bIdentified) || S.bCold;
 		B.bRetreating = S.bFleeing;
 		B.bHoldFire = S.bHoldFire;
 		B.bTargeted = !S.bPlayer && (P.FireTarget == S.Id) && (P.RailVolleys > 0 || P.LaserShots > 0);
@@ -1378,6 +1517,23 @@ bool UAstraBattleSubsystem::PlayerScan(const FString& ContactId, FString& OutDet
 {
 	PlayerSinceFired = 0.f;   // an active ping: every sensor out there hears it
 	FAstraBattleShip* T = ContactId.IsEmpty() ? nullptr : FindByContact(ContactId);
+	int32 Found = 0;
+	for (FAstraBattleShip& S : Ships)
+	{
+		if (S.bFog && S.bAlive && FVector::Dist(S.Pos, Ships[0].Pos) < 90.f * OneKm)
+		{
+			Found += S.Track < 2 ? 1 : 0;
+			S.Track = 2;
+			S.TrackHold = 45.f;
+			S.bClassified = true;
+			S.bIdentified = S.bIdentified || (&S == T && FVector::Dist(S.Pos, Ships[0].Pos) < 60.f * OneKm);
+		}
+	}
+	if (!T && Found > 0)
+	{
+		OutDetail = FString::Printf(TEXT("full active sweep: %d contact(s) now tracked and classified — and every sensor out there heard our ping"), Found);
+		return true;
+	}
 	if (T && T->ContactId == TEXT("T-11") && StageDone == 0)
 	{
 		Time = FMath::Max(Time, 78.f);   // the ping gives us away: the frigate reacts
@@ -2279,9 +2435,28 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 		{
 			continue;
 		}
+		if (S.bFog && S.Track == 0)
+		{
+			continue;                                  // not on our plot at all
+		}
 		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 		O->SetStringField(TEXT("id"), S.ContactId);
-		O->SetStringField(TEXT("class"), S.bIdentified ? S.Class : TEXT("unknown"));
+		if (S.bFog && S.Track == 1)
+		{
+			// a passive bearing: where it is along a line, not how far
+			O->SetStringField(TEXT("class"), S.bClassified ? S.Class : FString(TEXT("unknown")));
+			if (S.bIdentified)
+			{
+				O->SetStringField(TEXT("name"), S.Name);
+			}
+			O->SetStringField(TEXT("status"), TEXT("bearing only (passive, faint drive emissions): no range, no firing solution — an active scan, "
+			                                       "EMCON full, a recon flight or closing in would give a track"));
+			O->SetNumberField(TEXT("bearing_deg"), FMath::RoundToDouble(BearingDeg(P.Pos, S.Pos)));
+			O->SetNumberField(TEXT("mark_deg"), FMath::RoundToDouble(MarkDeg(P.Pos, S.Pos)));
+			Out.Add(MakeShared<FJsonValueObject>(O));
+			continue;
+		}
+		O->SetStringField(TEXT("class"), (S.bFog ? S.bClassified : S.bIdentified) ? S.Class : TEXT("unknown"));
 		if (S.bIdentified)
 		{
 			O->SetStringField(TEXT("name"), S.Name);
@@ -2931,7 +3106,8 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 			Goal = T->Pos + (S.Pos - T->Pos).GetSafeNormal() * (T->bDerelict ? 700.0 : 6000.0);   // a derelict is looked at up close
 			if (!T->bIdentified && FVector::Dist(S.Pos, T->Pos) < 9000.0)
 			{
-				T->bIdentified = true;
+				T->bIdentified = T->bClassified = true;
+				T->Track = 2;
 				Report(FString::Printf(TEXT("flight: %s recon has identified %s: %s, %s"), *Q.CallSign, *T->ContactId, *T->Class, *T->Name));
 			}
 		}
@@ -3379,6 +3555,12 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			}
 			if (Type == TEXT("raid"))
 			{
+				// the fog of war: they come through dark; what the Aquila knows of them grows with her sensors (TickSensors)
+				Ships[I].bFog = true;
+				Ships[I].bDark = true;
+				Ships[I].Track = 0;
+				Ships[I].bClassified = false;
+				Ships[I].bIdentified = false;
 				Ships[I].TargetId = (k == 0 || Ships.Num() < 3) ? PlayerId : Ships[FMath::RandRange(0, 2)].Id;
 				if (k == 0)
 				{
@@ -3398,8 +3580,8 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			bEngagementActive = true;
 			bScenarioOver = false;
 			bSurrenderAccepted = false;
-			Report(FString::Printf(TEXT("sensors: %d new contacts at %.0f km, bearing %03.0f — Kharon Mandate raid group: %s; closing at 450 m/s"),
-			                       k, Range, Bearing, *Listing));
+			// (no listing here: the raid is under the fog of war, and the sensors report it as they find it)
+			UE_LOG(LogASTRA, Log, TEXT("[Battle] raid in, dark: %d ships at %.0f km, bearing %03.0f — %s"), k, Range, Bearing, *Listing);
 			bool bHail = true;
 			Beat->TryGetBoolField(TEXT("hail"), bHail);
 			if (bHail && LeaderIdx != INDEX_NONE)
@@ -3747,7 +3929,7 @@ void UAstraBattleSubsystem::TickPOIs(float Dt)
 				{
 					A->bCold = false;
 					A->bHostile = true;
-					A->bIdentified = true;
+					A->bIdentified = A->bClassified = true;
 					A->Mode = EAstraShipMode::Attack;
 					A->TargetId = Ships[0].Id;
 					++N;
