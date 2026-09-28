@@ -269,6 +269,8 @@ public:
 	/** Flight Control: launch (or re-task an airborne) flight group on a mission; recall it to the flight deck. */
 	bool LaunchSquadron(const FString& Name, const FString& Mission, const FString& ContactId, FString& OutDetail);
 	bool RecallSquadron(const FString& Name, FString& OutDetail);
+	/** How many aircraft of each of our flight groups are on the flight deck (for the hangar's parked craft). */
+	void GetDeckState(TMap<FString, int32>& Out) const;
 	/** Status line per flight group, for the crew's telemetry and the screens. */
 	TSharedRef<FJsonObject> SquadronsJson() const;
 	/** The Aquila's weapons as fire control reports them (live: assignments, volleys left, VLS cycle, ammunition). */

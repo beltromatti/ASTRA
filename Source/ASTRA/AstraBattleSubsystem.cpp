@@ -2063,7 +2063,10 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		const FVector CarrierPos = Carrier->Pos, CarrierVel = Carrier->Vel;   // copies: AddShip may reallocate Ships
 		const FQuat CarrierAtt = Carrier->Att;
 		const float Side = (Q.Launched % 2) ? 1.f : -1.f;
-		const FVector Pos = CarrierPos + CarrierAtt.RotateVector(FVector(-60.0, Side * 40.0, -30.0));
+		// the Aquila's craft leave through her bow launch tubes (hull frame: x 390 m, y +-14.9 m, z -4.3 m)
+		const bool bFromAquila = Q.CarrierId == Ships[0].Id;
+		const float TubeSide = Q.Name == TEXT("bravo") ? 1.f : (Q.Name == TEXT("alpha") ? -1.f : Side);
+		const FVector Pos = CarrierPos + CarrierAtt.RotateVector(bFromAquila ? FVector(398.0, TubeSide * 14.9, -4.3) : FVector(-60.0, Side * 40.0, -30.0));
 		const float Radius = Q.Kind == 1 ? 14.f : (Q.Kind == 2 ? 5.f : 10.f);
 		const float Hull = Q.Kind == 1 ? 110.f : (Q.Kind == 2 ? 25.f : 60.f);
 		const TCHAR* Role = Q.Kind == 1 ? TEXT("torpedo bomber") : (Q.Kind == 2 ? TEXT("drone") : TEXT("fighter"));
@@ -3226,6 +3229,17 @@ void UAstraBattleSubsystem::TickPOIs(float Dt)
 		if ((Poi.Revealed == 0 && D < 8 * Km) || (Poi.Revealed == 1 && (D < 5 * Km || bCraftThere)) || (Poi.Revealed == 2 && D < 2 * Km))
 		{
 			RevealPOI(Poi);
+		}
+	}
+}
+
+void UAstraBattleSubsystem::GetDeckState(TMap<FString, int32>& Out) const
+{
+	for (const FAstraSquadron& Q : Squadrons)
+	{
+		if (Q.Side == EAstraSide::Astra)
+		{
+			Out.Add(Q.Name, Q.OnDeck);
 		}
 	}
 }

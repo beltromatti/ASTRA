@@ -3,6 +3,8 @@
 
 #include "ASTRAPlayerController.h"
 #include "AstraCampaign.h"
+#include "AstraHangar.h"
+#include "EngineUtils.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
@@ -116,6 +118,17 @@ void AASTRAPlayerController::OnTalkReleased()
 
 void AASTRAPlayerController::ToggleSeat()
 {
+	// the lift to the flight deck (or back up) when standing at one of its landings
+	if (APawn* Me = GetPawn())
+	{
+		for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
+		{
+			if (It->TryUseLift(Me))
+			{
+				return;
+			}
+		}
+	}
 	const APawn* P = GetPawn();
 	if (!P)
 	{

@@ -109,7 +109,9 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 ## M5 (prima versione) — Hangar e caccia
 - [x] Tre gruppi di volo reali nella simulazione: Alpha (8 Falcon), Bravo (7 Hammer, siluri), Droni (12 Wasp); lancio a cadenza dal ponte di volo (dipende dalla potenza del ponte), missioni pattuglia/attacco/scorta/disturbo/ricognizione/soccorso, perdite per la difesa di punto, rientro e riarmo
 - [x] Caccia nemici (Harpy) lanciati dagli incrociatori del Mandato: razzi e cannoni sull'Aquila; la pattuglia e la difesa di punto li abbattono; scie dei missili
-- [ ] Hangar camminabile, pilotare un caccia in prima persona
+- [x] **Ponte di volo percorribile** (Deck 9, `art/blender/hangar.py`, `tools/ue_scripts/build_hangar.py`, dati in `data/ship/aquila_hangar.json`): navata di 145 × 56 m allineata alla prua dell'Aquila v2, due tubi di lancio che sboccano nelle bocche di prua (con campi di contenimento), binari delle catapulte, passerelle, cabina di controllo vetrata, 8 Falcon e 7 Hammer negli stalli, 12 Wasp nelle rastrelliere, personale di ponte. I velivoli seguono la simulazione: al lancio rullano fino al binario e vengono catapultati nel tubo (suono della catapulta), all'atterraggio tornano negli stalli; i caccia della simulazione ora nascono proprio dalle bocche di prua. Le luci dell'hangar si accendono solo quando il Capitano è laggiù
+- [x] **Ascensore** tra il corridoio di babordo della plancia e il ponte di volo (E davanti alle porte; console `AstraUse`)
+- [ ] Pilotare un caccia in prima persona
 
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)

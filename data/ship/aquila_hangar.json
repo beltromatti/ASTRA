@@ -1,0 +1,20 @@
+{
+  "id": "aquila_hangar",
+  "name": "Flight Deck · Deck 9 · Section B",
+  "signage": "DECK 9 · SECTION B · FLIGHT DECK",
+  "frame": "Unreal convention: X forward (towards the bow tubes), Y starboard, Z up; metres; origin = deck level, centre of the aft wall",
+  "world_origin": [60.0, 0.0, -72.8],
+  "world_note": "placed so the launch tubes open exactly into the lit mouths of the Aquila's bow (hull x 390, y +-14.9, bottom z -17.2); the bridge is the world origin",
+  "length": 145.0,
+  "half_width": 28.0,
+  "height": 20.0,
+  "tubes": [{"y": -14.9, "width": 26.0, "height": 13.0, "length": 13.0}, {"y": 14.9, "width": 26.0, "height": 13.0, "length": 13.0}],
+  "lift": {"y": 0.0, "width": 3.0, "height": 3.2},
+  "booth": {"depth": 7.0, "half_width": 11.0, "floor": 9.0, "window_bottom": 10.2, "window_top": 14.6},
+  "catwalk": {"z": 9.0, "width": 2.4},
+  "bays": {
+    "alpha": {"craft": "SM_CRAFT_ASTRA_Falcon", "count": 8, "y": -21.0, "x0": 24.0, "pitch": 13.0, "yaw": 38.0},
+    "bravo": {"craft": "SM_CRAFT_ASTRA_Hammer", "count": 7, "y": 20.0, "x0": 26.0, "pitch": 16.0, "yaw": -38.0},
+    "drones": {"craft": "SM_CRAFT_ASTRA_Wasp", "count": 12, "x": 5.5, "y0": -24.0, "pitch": 3.9, "rows": 2, "row_height": 3.2}
+  }
+}

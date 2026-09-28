@@ -1,0 +1,275 @@
+// ASTRA — the flight deck.
+
+#include "AstraHangar.h"
+
+#include "ASTRA.h"
+#include "AstraBattleSubsystem.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/LightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/Light.h"
+#include "Engine/StaticMeshActor.h"
+#include "EngineUtils.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+
+namespace
+{
+	const FName ZoneTag(TEXT("ASTRA.Zone.Hangar"));
+	const FName CraftTag(TEXT("ASTRA.Hangar.Craft"));
+	constexpr float HangarLength = 16000.f, HangarHalfWidth = 2900.f, HangarHeight = 2200.f;   // cm, with the tubes
+	constexpr float TrackStartX = 4600.f, TubeEndX = 16200.f, TubeY = 1490.f;
+}
+
+AAstraHangar::AAstraHangar()
+{
+	PrimaryActorTick.bCanEverTick = true;
+	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
+}
+
+void AAstraHangar::BeginPlay()
+{
+	Super::BeginPlay();
+	CatapultSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Catapult.SW_Catapult"));
+	LiftSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Door_Close.SW_Door_Close"));
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(ZoneTag))
+		{
+			if (ALight* L = Cast<ALight>(*It))
+			{
+				ZoneLights.Add(L);
+			}
+		}
+		else if (It->ActorHasTag(CraftTag))
+		{
+			AStaticMeshActor* A = Cast<AStaticMeshActor>(*It);
+			if (!A)
+			{
+				continue;
+			}
+			for (const TCHAR* Sq : {TEXT("alpha"), TEXT("bravo"), TEXT("drones")})
+			{
+				if (A->ActorHasTag(FName(FString::Printf(TEXT("ASTRA.Hangar.%s"), Sq))))
+				{
+					A->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+					FParked P;
+					P.Actor = A;
+					P.Home = A->GetActorTransform();
+					Parked.FindOrAdd(Sq).Add(P);
+				}
+			}
+		}
+	}
+	// bay order: the craft nearest the tubes launch first (they are the last ones kept home)
+	const FTransform Me = GetActorTransform();
+	for (auto& KV : Parked)
+	{
+		KV.Value.Sort([&Me](const FParked& A, const FParked& B)
+		{
+			const FVector La = Me.InverseTransformPosition(A.Home.GetLocation()), Lb = Me.InverseTransformPosition(B.Home.GetLocation());
+			return La.X + La.Z * 0.1f < Lb.X + Lb.Z * 0.1f;
+		});
+	}
+	SetZoneLights(IsPawnInHangar(UGameplayStatics::GetPlayerPawn(this, 0)));
+	UE_LOG(LogASTRA, Log, TEXT("[Hangar] %d zone lights, %d flight groups parked"), ZoneLights.Num(), Parked.Num());
+}
+
+bool AAstraHangar::IsPawnInHangar(const APawn* Pawn) const
+{
+	if (!Pawn)
+	{
+		return false;
+	}
+	const FVector L = GetActorTransform().InverseTransformPosition(Pawn->GetActorLocation());
+	return L.X > -1200.f && L.X < HangarLength && FMath::Abs(L.Y) < HangarHalfWidth && L.Z > -300.f && L.Z < HangarHeight;
+}
+
+void AAstraHangar::SetZoneLights(bool bOn)
+{
+	if (bOn == bLightsOn)
+	{
+		return;
+	}
+	bLightsOn = bOn;
+	for (ALight* L : ZoneLights)
+	{
+		if (L && L->GetLightComponent())
+		{
+			L->GetLightComponent()->SetVisibility(bOn);
+		}
+	}
+}
+
+bool AAstraHangar::TryUseLift(APawn* Pawn)
+{
+	if (!Pawn || LiftT >= 0.f || LiftCooldown > 0.f)
+	{
+		return false;
+	}
+	const FVector P = Pawn->GetActorLocation();
+	const FVector Down = GetActorTransform().TransformPosition(HangarLanding);
+	const FVector Up = BridgeLanding;
+	if (FVector::Dist2D(P, Up) < 320.f && FMath::Abs(P.Z - Up.Z) < 400.f)
+	{
+		RideTo = Down;
+	}
+	else if (FVector::Dist2D(P, Down) < 320.f && FMath::Abs(P.Z - Down.Z) < 400.f)
+	{
+		RideTo = Up;
+	}
+	else
+	{
+		return false;
+	}
+	Rider = Pawn;
+	LiftT = 0.f;
+	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+	{
+		Cam->StartCameraFade(0.f, 1.f, 0.4f, FLinearColor::Black, false, true);
+	}
+	if (LiftSound)
+	{
+		UGameplayStatics::PlaySound2D(this, LiftSound, 0.8f);
+	}
+	return true;
+}
+
+void AAstraHangar::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	LiftCooldown = FMath::Max(0.f, LiftCooldown - DeltaTime);
+	// the lift ride: fade out, the car moves (a moment of dark and the hum), fade in on the other deck
+	if (LiftT >= 0.f)
+	{
+		const float Before = LiftT;
+		LiftT += DeltaTime;
+		if (Before < 0.9f && LiftT >= 0.9f && Rider.IsValid())
+		{
+			float Half = 96.f;
+			if (const ACharacter* C = Cast<ACharacter>(Rider.Get()))
+			{
+				Half = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+			}
+			Rider->SetActorLocation(RideTo + FVector(0, 0, Half), false, nullptr, ETeleportType::TeleportPhysics);
+			if (AController* Ctl = Rider->GetController())
+			{
+				Ctl->SetControlRotation(FRotator(0.f, RideTo.Z < -1000.f ? GetActorRotation().Yaw : 0.f, 0.f));
+			}
+			SetZoneLights(IsPawnInHangar(Rider.Get()));
+			if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+			{
+				Cam->StartCameraFade(1.f, 0.f, 0.7f, FLinearColor::Black, false, false);
+			}
+			if (LiftSound)
+			{
+				UGameplayStatics::PlaySound2D(this, LiftSound, 0.6f, 1.08f);
+			}
+		}
+		if (LiftT > 1.8f)
+		{
+			LiftT = -1.f;
+			LiftCooldown = 1.0f;
+		}
+	}
+	if ((CheckT -= DeltaTime) <= 0.f)
+	{
+		CheckT = 0.25f;
+		SetZoneLights(IsPawnInHangar(UGameplayStatics::GetPlayerPawn(this, 0)));
+		SyncSquadrons();
+	}
+	for (auto& KV : Parked)
+	{
+		for (FParked& P : KV.Value)
+		{
+			if (P.Anim >= 0.f)
+			{
+				Animate(P, KV.Key, DeltaTime);
+			}
+		}
+	}
+}
+
+void AAstraHangar::SyncSquadrons()
+{
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	if (!Battle)
+	{
+		return;
+	}
+	TMap<FString, int32> OnDeck;
+	Battle->GetDeckState(OnDeck);
+	for (auto& KV : Parked)
+	{
+		const int32* N = OnDeck.Find(KV.Key);
+		if (!N)
+		{
+			continue;
+		}
+		TArray<FParked>& Craft = KV.Value;
+		for (int32 i = 0; i < Craft.Num(); ++i)
+		{
+			FParked& P = Craft[i];
+			if (!P.Actor)
+			{
+				continue;
+			}
+			const bool bHome = i < *N;
+			if (bHome && P.bAway)
+			{
+				// landed and struck below: back in its bay
+				P.bAway = false;
+				P.Anim = -1.f;
+				P.Actor->SetActorTransform(P.Home);
+				P.Actor->SetActorHiddenInGame(false);
+			}
+			else if (!bHome && !P.bAway && P.Anim < 0.f)
+			{
+				P.Anim = 0.f;   // launch: taxi to the catapult, then down the tube
+			}
+		}
+	}
+}
+
+void AAstraHangar::Animate(FParked& P, const FString& Squadron, float Dt)
+{
+	const float Before = P.Anim;
+	P.Anim = FMath::Min(1.f, P.Anim + Dt / 6.f);
+	const FTransform Me = GetActorTransform();
+	const FVector Home = Me.InverseTransformPosition(P.Home.GetLocation());
+	const float Tube = Squadron == TEXT("bravo") ? TubeY : (Squadron == TEXT("alpha") ? -TubeY : (Home.Y > 0 ? TubeY : -TubeY));
+	const FVector Start(TrackStartX, Tube, Home.Z);
+	const FVector End(TubeEndX, Tube, Home.Z);
+	FVector L;
+	float Yaw;
+	if (P.Anim < 0.55f)
+	{
+		// taxi: roll out of the bay, swing onto the track facing the tube
+		const float T = FMath::SmoothStep(0.f, 1.f, P.Anim / 0.55f);
+		L = FMath::Lerp(Home, Start, T);
+		const float HomeYaw = P.Home.Rotator().Yaw - GetActorRotation().Yaw;
+		Yaw = FMath::Lerp(HomeYaw, 0.f, FMath::Clamp(T * 1.4f, 0.f, 1.f));
+	}
+	else
+	{
+		// the catapult: a hard, accelerating run down the track and out of the tube
+		if (Before < 0.55f && CatapultSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, CatapultSound, Me.TransformPosition(Start), 1.f, FMath::FRandRange(0.95f, 1.05f));
+		}
+		const float T = (P.Anim - 0.55f) / 0.45f;
+		L = FMath::Lerp(Start, End, T * T);
+		Yaw = 0.f;
+	}
+	P.Actor->SetActorLocationAndRotation(Me.TransformPosition(L), FRotator(0.f, GetActorRotation().Yaw + Yaw, 0.f));
+	if (P.Anim >= 1.f)
+	{
+		P.Anim = -1.f;
+		P.bAway = true;
+		P.Actor->SetActorHiddenInGame(true);
+	}
+}

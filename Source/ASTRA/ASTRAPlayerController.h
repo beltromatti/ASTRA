@@ -70,5 +70,12 @@ protected:
 	FTimerHandle SeatTimer;
 	void ToggleSeat();
 	void OpenMenu();
+
+public:
+	/** Console twin of the E key (the lift, the captain's chair): for tests and accessibility. */
+	UFUNCTION(Exec)
+	void AstraUse() { ToggleSeat(); }
+
+protected:
 	void SetSeated(bool bSit);
 };

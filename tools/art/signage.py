@@ -110,6 +110,17 @@ def main():
             pts = [(2 * ax - x, y) for x, y in pts]
         pd.polygon(pts, fill=(*ICE, 255))
         p.save(os.path.join(OUT, f"T_SIGN_Door_{side}.png"))
+    # the lift between the bridge and the flight deck, and the flight deck's own wall sign
+    for name, title, code in (("Lift_Bridge", "LIFT", "FLIGHT DECK · DECK 9 · PRESS TO CALL"), ("Lift_Hangar", "LIFT", "BRIDGE · DECK 1 · PRESS TO CALL")):
+        plate(1024, 256, title, code, (240, 170, 40)).save(os.path.join(OUT, f"T_SIGN_{name}.png"))
+    w2, h2 = 2048, 512
+    fd = Image.new("RGBA", (w2, h2), (*PLATE, 255))
+    dd = ImageDraw.Draw(fd)
+    dd.rectangle((0, 0, w2 - 1, h2 - 1), outline=(40, 46, 56, 255), width=6)
+    fd.alpha_composite(emblem(400, ICE), (56, 56))
+    dd.text((520, 230), "FLIGHT DECK", font=font(TITLE, 230), fill=(*ICE, 255), anchor="lm")
+    dd.text((528, 410), "DECK 9 · SECTION B · ALPHA · BRAVO · DRONES", font=font(MONO, 50), fill=(*DIM, 255), anchor="lm")
+    fd.save(os.path.join(OUT, "T_SIGN_FlightDeck.png"))
     # floor decals (white on transparent: the material tints and blends them)
     emblem(1024, (235, 238, 242)).save(os.path.join(OUT, "T_DECAL_Emblem.png"))
     edge = Image.new("RGBA", (1024, 64), (0, 0, 0, 0))

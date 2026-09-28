@@ -1,0 +1,58 @@
+// ASTRA — the flight deck (Deck 9): its lights come on while the Captain is down there, the parked flight groups follow
+// the simulation (a launch: the craft taxis to its catapult and is thrown down the tube; a landing: it is back in its
+// bay), and the lift joins it to the bridge's corridor.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "AstraHangar.generated.h"
+
+class ALight;
+class AStaticMeshActor;
+class USoundBase;
+
+UCLASS()
+class ASTRA_API AAstraHangar : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AAstraHangar();
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
+
+	/** The lift's two landings: on the bridge deck (world, cm) and here (relative to this actor, cm). */
+	UPROPERTY(EditAnywhere, Category = "Hangar")
+	FVector BridgeLanding = FVector(-1860.f, -390.f, 20.f);
+
+	UPROPERTY(EditAnywhere, Category = "Hangar")
+	FVector HangarLanding = FVector(250.f, 0.f, 20.f);
+
+	/** The lift call: the Captain is near a landing and presses E. Returns false when no landing is near. */
+	bool TryUseLift(APawn* Pawn);
+	bool IsPawnInHangar(const APawn* Pawn) const;
+
+private:
+	struct FParked
+	{
+		TObjectPtr<AStaticMeshActor> Actor = nullptr;
+		FTransform Home;
+		float Anim = -1.f;       // < 0 parked or away; 0..1 taxi + catapult
+		bool bAway = false;
+	};
+	TMap<FString, TArray<FParked>> Parked;   // squadron -> its craft, in bay order
+	UPROPERTY() TArray<TObjectPtr<ALight>> ZoneLights;
+	UPROPERTY() TObjectPtr<USoundBase> CatapultSound;
+	UPROPERTY() TObjectPtr<USoundBase> LiftSound;
+	bool bLightsOn = true;
+	float CheckT = 0.f;
+	float LiftCooldown = 0.f;
+	float LiftT = -1.f;          // a ride in progress (fade, move, fade)
+	TWeakObjectPtr<APawn> Rider;
+	FVector RideTo;
+
+	void SetZoneLights(bool bOn);
+	void SyncSquadrons();
+	void Animate(FParked& P, const FString& Squadron, float Dt);
+};
