@@ -95,7 +95,7 @@ class BridgeAgent:
         self.spent += turn.cost
         return turn
 
-    async def handle_event(self, event: str, lang: str) -> Turn:
+    async def handle_event(self, event: str, lang: str, ask: str | None = None) -> Turn:
         """A ship event (not the Captain): the responsible officer reports it, and may act within their own authority."""
         turn = Turn(text=f"[event] {event}", lang=lang)
         t0 = time.perf_counter()
@@ -103,7 +103,7 @@ class BridgeAgent:
         user = f"[Ship systems event, not the Captain speaking] {event}"
         msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events())}]
         msgs += self.history
-        msgs.append({"role": "user", "content": user + "\n" + EVENT_ASK})
+        msgs.append({"role": "user", "content": user + "\n" + (ask or EVENT_ASK)})
         on_call = self._on_call(turn, lang, t0, pending, allowed=INITIATIVE)
         comp = await self.llm.chat(model=MODEL, messages=msgs, tools=[SPEAK] + INITIATIVE_TOOLS, tool_choice="auto",
                                    providers=PROVIDERS, reasoning={"enabled": False}, max_tokens=360, temperature=0.4,

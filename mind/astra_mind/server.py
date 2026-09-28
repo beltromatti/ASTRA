@@ -192,6 +192,7 @@ class Mind:
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander)
         self.turns: asyncio.Queue = asyncio.Queue()
+        self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.lang_file = REPO_ROOT / "mind" / ".cache" / "captain_lang.txt"
         self.lang = self.lang_file.read_text().strip() if self.lang_file.exists() else "en"   # the Captain's language
 
@@ -232,6 +233,42 @@ class Mind:
         st = dict(self.game.state) if (self.game and self.game.state) else dict(self.local.snapshot())
         st["_events"] = (self.game.events if self.game else [])[-8:]
         return st
+
+    QUIET_TOPICS = [
+        "where they grew up and who waits for them there", "a memory of the Long Night their family still tells",
+        "the Aquila's quirks as a brand-new ship (a hatch that sticks, the coffee, the smell of new wiring)",
+        "the pilots of Alpha and Bravo and their superstitions", "the Teal Veil outside the window",
+        "what they think the Mandate wants, and whether they understand it", "a letter or message from home",
+        "the last shore leave on New Ravenna", "an old navy story about the 7th Fleet", "food in the mess",
+        "what they will do when the war is over", "the strange calm of watching the plot when nothing moves"]
+
+    async def quiet_moments(self) -> None:
+        """When the bridge has been quiet for a while (no fight, nobody talking), two officers exchange a line or two."""
+        import random
+        last_chat = time.monotonic()
+        while True:
+            await asyncio.sleep(10)
+            st = self.game.state if (self.game and self.game.state) else None
+            if not st or not self.clients:
+                continue
+            idle = time.monotonic() - max(self.last_activity, self.voice.busy_until)
+            hostile = any(str(c.get("status", "")).startswith("hostile") and "retreating" not in str(c.get("status", ""))
+                          for c in st.get("contacts", []) or [])
+            if hostile or st.get("alert") == "red" or idle < random.uniform(100, 160) or time.monotonic() - last_chat < 240:
+                continue
+            last_chat = time.monotonic()
+            pair = random.sample(["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"], 2)
+            topic = random.choice(self.QUIET_TOPICS)
+            self.voice.low_priority = True
+            try:
+                t = await self.agent.handle_event(
+                    f"bridge: a quiet moment on watch", self.lang,
+                    ask=(f"A quiet moment: {pair[0]} and {pair[1]} exchange one or two short, natural lines about {topic}, "
+                         "in character, knowing the Captain can hear (they may include the Captain with a glance). No orders, "
+                         "no reports, no tools except speak; at most two lines in total."))
+                log.info("quiet moment (%s, %s): %s", pair[0], pair[1], " | ".join(f"{s}: {x}" for s, x in t.lines))
+            finally:
+                self.voice.low_priority = False
 
     async def turn_worker(self) -> None:
         while True:
@@ -344,10 +381,12 @@ class Mind:
                     if gone and ("destroyed" in text or "left sensor range" in text):
                         self.enemy.ship_destroyed(gone.group(1))   # nobody left on that ship to answer a hail
                     if msg.get("report"):
+                        self.last_activity = time.monotonic()
                         await self.turns.put(("\x00event:" + text, self.lang))
                 elif kind == "command_result":
                     self.game.resolve(msg)
                 elif kind == "player_text":
+                    self.last_activity = time.monotonic()
                     text = msg.get("text", "").strip()
                     if text:
                         await self.turns.put((text, msg.get("lang") or detect_lang(text)))
@@ -378,6 +417,7 @@ class Mind:
         await self.stt.start()
         asyncio.create_task(self.voice.run())
         asyncio.create_task(self.turn_worker())
+        asyncio.create_task(self.quiet_moments())
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
