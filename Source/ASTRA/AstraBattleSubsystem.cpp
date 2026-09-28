@@ -30,6 +30,9 @@ namespace
 	float GBattleJumpTo = -1.f;
 	struct FSpawnRequest { FString Kind; float RangeKm; float RelBearing; };
 	TArray<FSpawnRequest> GSpawnRequests;
+	TArray<FString> GKillRequests;
+	FAutoConsoleCommand CmdBattleKill(TEXT("astra.battle.kill"), TEXT("Destroy a contact at once (testing effects): astra.battle.kill <contact id>"),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num()) { GKillRequests.Add(A[0].ToUpper()); } }));
 	FAutoConsoleCommand CmdBattleSpawn(TEXT("astra.battle.spawn"),
 		TEXT("Spawn a hostile ship for testing: astra.battle.spawn <styx|lethe|acheron> <range_km> <bearing relative to the bow, deg>"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A)
@@ -79,6 +82,9 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	GlowMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Glow.M_FX_Glow"));
 	ShellMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Shell.M_FX_Shell"));
+	RingMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Holo/SM_HOLO_Ring.SM_HOLO_Ring"));
+	BlastMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Blast.M_FX_Blast"));
+	CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 
 	// the Aquila first (index 0): the player's ship, heading 045 mark 10 like the helm
 	const int32 P = AddShip(TEXT("AQUILA"), TEXT("ASN Aquila"), TEXT("Aquila-class carrier cruiser"), TEXT(""), EAstraSide::Astra,
@@ -264,6 +270,14 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		SpawnVisual(Ships[I]);
 	}
 	GSpawnRequests.Reset();
+	for (const FString& K : GKillRequests)
+	{
+		if (FAstraBattleShip* S = FindByContact(K); S && S->bAlive)
+		{
+			Destroy(*S);
+		}
+	}
+	GKillRequests.Reset();
 	TickPlayer(Dt);
 	TickScenario(Dt);
 	TickSquadrons(Dt);
@@ -319,6 +333,13 @@ void UAstraBattleSubsystem::TickPlayer(float Dt)
 void UAstraBattleSubsystem::TickScenario(float Dt)
 {
 	FAstraBattleShip* Frigate = FindByContact(TEXT("T-11"));
+	// the Captain has just come onto the bridge: the XO gives the situation
+	if (!bBriefed && Time > 6.f)
+	{
+		bBriefed = true;
+		Report(TEXT("bridge: the Captain has just come onto the bridge — the XO greets them and briefs the situation in two or "
+		            "three short lines (where we are, the patrol with the 7th Fleet, anything on the sensors worth their attention)"));
+	}
 	// stage 1: the drifting contact wakes up and goes for the freighter (earlier if we poked it with an active scan)
 	if (StageDone == 0 && Frigate && Frigate->bAlive && Time > 80.f)
 	{
@@ -1167,8 +1188,12 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S)
 	const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
 	S.bAlive = false;
 	S.Mode = EAstraShipMode::Dead;
-	AddFlash(S.Pos, S.Radius * 2.2f, 4.f, FLinearColor(1.f, 0.55f, 0.25f), 120.f);
-	AddFlash(S.Pos, S.Radius * 1.2f, 2.f, FLinearColor(1.f, 0.9f, 0.7f), 400.f);
+	AddFlash(S.Pos, S.Radius * 1.4f, 2.6f, FLinearColor(1.f, 0.5f, 0.2f), 160.f);    // fireball: the gas cloud expands and thins
+	AddFlash(S.Pos, S.Radius * 0.9f, 1.1f, FLinearColor(1.f, 0.92f, 0.75f), 600.f);  // the flash of the reactor letting go
+	if (!S.bCraft)
+	{
+		Explode(S);   // takes over the ship's actor as the hulk
+	}
 	if (S.Actor) { S.Actor->Destroy(); S.Actor = nullptr; }
 	if (S.ShieldBubble) { S.ShieldBubble->Destroy(); S.ShieldBubble = nullptr; }
 	if (S.DriveFlare) { S.DriveFlare->Destroy(); S.DriveFlare = nullptr; }
@@ -1279,7 +1304,8 @@ void UAstraBattleSubsystem::AddFlash(const FVector& Pos, float Size, float Life,
 		C->SetStaticMesh(SphereMesh);
 		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		C->SetCastShadow(false);
-		F.MID = C->CreateAndSetMaterialInstanceDynamicFromMaterial(0, GlowMat);
+		// fireballs get the soft, billowing blast material; small hit sparks stay simple glows
+		F.MID = C->CreateAndSetMaterialInstanceDynamicFromMaterial(0, (Size >= 40.f && BlastMat) ? BlastMat : GlowMat);
 		F.MID->SetVectorParameterValue(TEXT("Color"), Color);
 		F.MID->SetScalarParameterValue(TEXT("Intensity"), Intensity);
 	}
@@ -1314,10 +1340,12 @@ void UAstraBattleSubsystem::AddBeam(const FVector& A, const FVector& B, float Li
 
 void UAstraBattleSubsystem::TickFlashes(float Dt)
 {
+	TickWrecks(Dt);
 	for (int32 i = Flashes.Num() - 1; i >= 0; --i)
 	{
 		FAstraFlash& F = Flashes[i];
 		F.Age += Dt;
+		F.Pos += F.Vel * Dt;
 		if (F.Age >= F.Life)
 		{
 			if (F.Actor) { F.Actor->Destroy(); }
@@ -1384,8 +1412,20 @@ void UAstraBattleSubsystem::SyncVisuals()
 		{
 			continue;
 		}
+		if (F.Age < 0.f)
+		{
+			F.Actor->SetActorHiddenInGame(true);   // a delayed blast (secondary explosions)
+			continue;
+		}
+		F.Actor->SetActorHiddenInGame(false);
 		const float K = F.Age / FMath::Max(0.01f, F.Life);
-		if (F.bBeam)
+		if (F.bRing)
+		{
+			F.Actor->SetActorLocationAndRotation(ToWorld(F.Pos), ToWorldRot(F.Rot));
+			const float R = F.Size * (0.15f + 0.85f * FMath::Sqrt(K));   // ring mesh radius is 1 m
+			F.Actor->SetActorScale3D(FVector(R, R, R * 0.6f));
+		}
+		else if (F.bBeam)
 		{
 			const FVector A = ToWorld(F.Pos), B = ToWorld(F.BeamTo);
 			const FVector D = B - A;
@@ -1395,11 +1435,11 @@ void UAstraBattleSubsystem::SyncVisuals()
 		else
 		{
 			F.Actor->SetActorLocation(ToWorld(F.Pos));
-			F.Actor->SetActorScale3D(FVector(F.Size * (0.4f + 1.6f * FMath::Sqrt(K))));   // metres -> sphere scale (100 cm mesh)
+			F.Actor->SetActorScale3D(FVector(F.Size * (0.4f + 1.4f * FMath::Sqrt(K))));   // metres -> sphere scale (100 cm mesh)
 		}
 		if (F.MID)
 		{
-			F.MID->SetScalarParameterValue(TEXT("Fade"), FMath::Square(1.f - K));
+			F.MID->SetScalarParameterValue(TEXT("Fade"), FMath::Pow(1.f - K, 3.5f));
 		}
 	}
 }
@@ -1929,4 +1969,118 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 		S.Att = Ang <= MaxStep ? Want : FQuat::Slerp(S.Att, Want, MaxStep / Ang);
 	}
 	S.Pos += S.Vel * Dt;
+}
+
+// ------------------------------------------------------------------------------------------------ destruction
+void UAstraBattleSubsystem::Explode(FAstraBattleShip& S)
+{
+	UWorld* World = GetWorld();
+	const FVector Drift = S.Vel * 0.55f;
+	const FVector Axis = S.Att.GetForwardVector();
+	// secondary blasts running along the hull over two seconds
+	for (int32 i = 0; i < 6; ++i)
+	{
+		const FVector P = S.Pos + Axis * FMath::FRandRange(-1.f, 1.f) * S.Radius + FMath::VRand() * S.Radius * 0.25f;
+		AddFlash(P, S.Radius * FMath::FRandRange(0.35f, 0.8f), FMath::FRandRange(1.f, 2.f), FLinearColor(1.f, FMath::FRandRange(0.45f, 0.7f), 0.2f), 220.f);
+		Flashes.Last().Age = -FMath::FRandRange(0.15f, 2.2f);
+		Flashes.Last().Vel = Drift;
+	}
+	// shockwave ring in the ship's plane
+	if (World && RingMesh && GlowMat)
+	{
+		FAstraFlash F;
+		F.Pos = S.Pos;
+		F.Size = S.Radius * 4.5f;
+		F.Life = 1.8f;
+		F.bRing = true;
+		F.Vel = Drift;
+		F.Rot = S.Att * FQuat(FVector::ForwardVector, FMath::DegreesToRadians(FMath::FRandRange(-25.f, 25.f)));
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		F.Actor = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, SP);
+		F.Actor->SetMobility(EComponentMobility::Movable);
+		UStaticMeshComponent* C = F.Actor->GetStaticMeshComponent();
+		C->SetStaticMesh(RingMesh);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCastShadow(false);
+		F.MID = C->CreateAndSetMaterialInstanceDynamicFromMaterial(0, GlowMat);
+		F.MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.f, 0.72f, 0.45f));
+		F.MID->SetScalarParameterValue(TEXT("Intensity"), 80.f);
+		Flashes.Add(F);
+	}
+	// the hulk: the ship's own mesh, burnt dark, drifting and tumbling slowly
+	if (S.Actor)
+	{
+		FAstraWreck W;
+		W.Actor = S.Actor;
+		S.Actor = nullptr;
+		W.Pos = S.Pos;
+		W.Vel = Drift + FMath::VRand() * 4.f;
+		W.Att = S.Att;
+		W.SpinAxis = FMath::VRand();
+		W.SpinDeg = FMath::FRandRange(1.5f, 4.5f);
+		if (UStaticMeshComponent* C = W.Actor->GetStaticMeshComponent())
+		{
+			for (int32 i = 0; i < C->GetNumMaterials(); ++i)
+			{
+				if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(i))
+				{
+					M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.025f, 0.023f, 0.022f));
+					M->SetVectorParameterValue(TEXT("EmissiveColor"), FLinearColor(0.9f, 0.3f, 0.08f));
+					M->SetScalarParameterValue(TEXT("Intensity"), FMath::FRandRange(0.f, 3.f));   // a few embers still glowing
+				}
+			}
+		}
+		Wrecks.Add(W);
+	}
+	// debris
+	if (World && CubeMesh)
+	{
+		UMaterialInterface* Frame = LoadObject<UMaterialInterface>(nullptr, S.Side == EAstraSide::Mandate
+			? TEXT("/Game/ASTRA/Materials/Instances/MI_HULL_M_Frame.MI_HULL_M_Frame")
+			: TEXT("/Game/ASTRA/Materials/Instances/MI_HULL_A_Plate.MI_HULL_A_Plate"));
+		for (int32 i = 0; i < 16; ++i)
+		{
+			FAstraWreck D;
+			D.Pos = S.Pos + FMath::VRand() * S.Radius * 0.4f;
+			D.Vel = Drift + FMath::VRand() * FMath::FRandRange(25.f, 130.f);
+			D.Att = FQuat(FMath::VRand(), FMath::FRandRange(0.f, 6.f));
+			D.SpinAxis = FMath::VRand();
+			D.SpinDeg = FMath::FRandRange(20.f, 140.f);
+			D.Life = FMath::FRandRange(18.f, 30.f);
+			D.Scale = S.Radius * FMath::FRandRange(0.015f, 0.06f);
+			FActorSpawnParameters SP;
+			SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			D.Actor = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, SP);
+			D.Actor->SetMobility(EComponentMobility::Movable);
+			UStaticMeshComponent* C = D.Actor->GetStaticMeshComponent();
+			C->SetStaticMesh(CubeMesh);
+			C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			C->SetCastShadow(false);
+			if (Frame)
+			{
+				C->SetMaterial(0, Frame);
+			}
+			D.Actor->SetActorScale3D(FVector(D.Scale * FMath::FRandRange(0.5f, 1.5f), D.Scale * FMath::FRandRange(0.3f, 1.f), D.Scale * FMath::FRandRange(0.1f, 0.5f)));
+			Wrecks.Add(D);
+		}
+	}
+}
+
+void UAstraBattleSubsystem::TickWrecks(float Dt)
+{
+	for (int32 i = Wrecks.Num() - 1; i >= 0; --i)
+	{
+		FAstraWreck& W = Wrecks[i];
+		W.Age += Dt;
+		W.Pos += W.Vel * Dt;
+		W.Att = FQuat(W.SpinAxis, FMath::DegreesToRadians(W.SpinDeg * Dt)) * W.Att;
+		if (!W.Actor || (W.Life > 0.f && W.Age > W.Life) || FVector::Dist(W.Pos, Ships[0].Pos) > 200 * Km)
+		{
+			if (W.Actor) { W.Actor->Destroy(); }
+			Wrecks.RemoveAtSwap(i);
+			continue;
+		}
+		W.Actor->SetActorLocationAndRotation(ToWorld(W.Pos), ToWorldRot(W.Att));
+	}
 }

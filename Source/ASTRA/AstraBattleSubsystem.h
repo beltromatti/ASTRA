@@ -135,6 +135,9 @@ struct FAstraFlash
 	FLinearColor Color = FLinearColor::White;
 	FVector BeamTo = FVector::ZeroVector; // lasers: flash drawn as a beam from Pos to BeamTo
 	bool bBeam = false;
+	bool bRing = false;                   // shockwave ring (expands in its plane)
+	FVector Vel = FVector::ZeroVector;    // drifts with what exploded (m/s)
+	FQuat Rot = FQuat::Identity;          // rings: orientation in the system frame
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> MID = nullptr;
 };
@@ -187,6 +190,23 @@ struct FAstraHoloBlip
 	float RangeKm = 0.f;
 	FString Name;
 	FString Contact;
+};
+
+/** What is left of a destroyed ship (a burnt hulk drifting and tumbling) or a piece of debris. */
+USTRUCT()
+struct FAstraWreck
+{
+	GENERATED_BODY()
+
+	FVector Pos = FVector::ZeroVector;
+	FVector Vel = FVector::ZeroVector;
+	FQuat Att = FQuat::Identity;
+	FVector SpinAxis = FVector::UpVector;
+	float SpinDeg = 2.f;                  // deg/s
+	float Life = -1.f;                    // debris fade away; hulks stay (-1)
+	float Age = 0.f;
+	float Scale = 1.f;
+	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 };
 
 UCLASS()
@@ -257,6 +277,11 @@ private:
 	UPROPERTY() TArray<FAstraProjectile> Projectiles;
 	UPROPERTY() TArray<FAstraFlash> Flashes;
 	UPROPERTY() TArray<FAstraSquadron> Squadrons;
+	UPROPERTY() TArray<FAstraWreck> Wrecks;
+	UPROPERTY() TObjectPtr<UStaticMesh> RingMesh;
+	UPROPERTY() TObjectPtr<UMaterialInterface> BlastMat;
+	UPROPERTY() TObjectPtr<UStaticMesh> CubeMesh;
+	bool bBriefed = false;
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> GlowMat;
@@ -307,6 +332,8 @@ private:
 	void OnCommanderLost(const FAstraBattleShip& Old, const TCHAR* How);
 	void AddFlash(const FVector& Pos, float Size, float Life, const FLinearColor& Color, float Intensity);
 	void AddBeam(const FVector& A, const FVector& B, float Life, const FLinearColor& Color);
+	void Explode(FAstraBattleShip& S);    // secondary blasts, shockwave, debris, and the hulk left behind
+	void TickWrecks(float Dt);
 
 	FVector ToWorld(const FVector& SystemPos) const;      // system frame (m) -> world (cm)
 	FQuat ToWorldRot(const FQuat& SystemRot) const;
