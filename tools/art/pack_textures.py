@@ -35,6 +35,9 @@ SETS = {
     "Meadow": "Ground037",
     "Sand": "Ground054",
     "Snow": "Snow010A",
+    # the walls of other worlds: red desert sandstone, and a pale rock that tints to regolith grey or blue ice
+    "RockRed": "Rock029",
+    "RockLight": "Rock026",
     # the medbay's cloth: blankets and curtains (a coarse linen), sheets, pillows and gowns (a fine cotton)
     "Linen": "Fabric036",
     "Cotton": "Fabric032",

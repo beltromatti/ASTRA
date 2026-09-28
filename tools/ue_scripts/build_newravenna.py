@@ -71,6 +71,8 @@ cloud = eas.spawn_actor_from_class(unreal.VolumetricCloud, ZONE, unreal.Rotator(
 cc = cloud.get_component_by_class(unreal.VolumetricCloudComponent)
 cc.set_editor_property("layer_bottom_altitude", 1.8)             # km
 cc.set_editor_property("layer_height", 6.0)
+for k in ("view_sample_count_scale", "shadow_view_sample_count_scale", "reflection_view_sample_count_scale_value"):
+    cc.set_editor_property(k, 0.5)                                 # half the samples: TSR smooths the rest (~3 ms saved)
 cm = eal.load_asset("/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst")
 if cm:
     cc.set_editor_property("material", cm)

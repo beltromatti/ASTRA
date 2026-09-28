@@ -21,7 +21,8 @@ public class ASTRA : ModuleRules
 			"Slate",
 			"Json",
 			"JsonUtilities",
-			"WebSockets"
+			"WebSockets",
+			"ProceduralMeshComponent"   // the ground of any world, generated at run time (AAstraWorldSurface)
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "RenderCore" });   // font measuring and render fences for the live screens

@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-28 (sera) · **Traguardo corrente:** M1/M7 — ponti della nave percorribili (infermeria) e pianeti
+**Ultimo aggiornamento:** 2026-09-28 (notte) · **Traguardo corrente:** M7 — le superfici di tutti i mondi (generati a runtime); M1 — ponti della nave
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -15,6 +15,7 @@
 | 2026-09-28 | 10,00 $ | 0,77 $ | transiti nel Janus Gate, ordini della Flotta, prove complete del regista |
 | 2026-09-28 | 10,00 $ | 1,16 $ | indagini sui relitti, campagne complete di prova, consigliere tattico, umore dell'equipaggio |
 | 2026-09-28 | 10,00 $ | 1,44 $ | diario del capitano, tattica del Mandato, Port Aurelius Control, sala macchine, infermeria (dialoghi con medico e feriti) |
+| 2026-09-28 | 10,00 $ | 1,74 $ | legami tra ufficiali, riposo del Capitano, calore e furtività (reazioni dell'equipaggio), discese sui mondi generati |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -173,6 +174,35 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 ## Equipaggio in movimento
 - [x] **La nave vive**: membri dell'equipaggio che fanno il loro giro (`AAstraWalker`, `tools/ue_scripts/place_walkers.py`): un marinaio in ciascun corridoio dietro la plancia, un'infermiera che passa tra i letti dell'infermeria, due addetti del ponte di volo tra gli stalli e le catapulte, un tecnico che gira attorno al pozzo del reattore. Personaggi con movimento vero (l'AnimBlueprint del manichino fonde fermo e camminata), soste a ogni tappa, divisa del reparto; se il Capitano sbarra loro la strada, dopo un po' tornano indietro
 
+## M7 (seconda parte) — Le superfici di tutti i mondi, generate a runtime
+- [x] Ogni sistema raggiunto dal Gate ha la superficie del suo mondo principale, **generata dal nome e dal tipo** (stesso nome = stesso mondo: universo con seme). Cinque tipi:
+  - **oceanico**: arcipelaghi con montagne, scogliere e spiagge; un'isola sempre vicino al campo;
+  - **desertico**: mesa e butte a gradoni con pareti di arenaria rossa stratificata, mari di dune, un canyon;
+  - **ghiacciato**: calotta con creste di pressione, nunatak di roccia, catena montuosa nell'interno, mare ghiacciato a sud chiuso da una falesia di ghiaccio;
+  - **roccioso senz'aria**: crateri di ogni misura (legge di potenza) con orli, ejecta e picchi centrali, un grande cratere in vista del campo, cielo nero;
+  - **vulcanico**: piane di basalto, coni con cratere sommitale, canali e laghi di lava viva (croste scure che scivolano su fessure incandescenti).
+  I giganti gassosi non hanno superficie.
+- [x] Il mondo si costruisce in 0,1–0,5 s, nascosto dal plasma del rientro:
+  - nucleo di 12 km a maglie di 24 m (16 sezioni con collisione, erosione termica con la pendenza massima propria del tipo, piazzola spianata);
+  - terreno lontano di 90 km a 300 m, poi anelli d'orizzonte fino a 600 km e un mare che **curvano come il pianeta** (raggio 6000 km, lo stesso della SkyAtmosphere): nessun bordo del mondo, nemmeno da 14 km di quota;
+  - cielo per tipo (atmosfera, nebbia, nuvole volumetriche) e un sole con ora e direzione proprie per ogni mondo;
+  - campo d'atterraggio con piazzola, hangar e torre col faro (spento sui mondi morti).
+- [x] Il Falcon scende su qualunque mondo (**G** col muso sul pianeta). Esce a 17 km dal campo, a 8,5 km di quota. Equipaggio ed eventi usano i nomi veri («Eagle has landed on Cassia Prime, near the landing field on Cassia Prime»); dopo uno schianto il soccorso arriva con un Wasp.
+- Tecnica:
+  - `FAstraWorldGen` (`Source/ASTRA/AstraWorldGen.*`): rumore di valore fbm/ridged con domain warp, crateri in una griglia di ricerca, coni; il sito è il punto più piano e asciutto entro 3,5 km (sulla calotta, non sul mare ghiacciato). I dettagli fini restano solo nel nucleo, così il terreno lontano non fa aliasing.
+  - `AAstraWorldSurface` (`AstraWorldSurface.*`): ProceduralMeshComponent con tangenti e componenti statici. Le ombre del nucleo le proietta un **proxy invisibile a 48 m** (un quarto dei triangoli, stesso aspetto).
+  - `UAstraShipSubsystem::WorldBelow()` crea o ricrea il mondo quando cambia il sistema.
+- Materiali:
+  - `M_ASTRA_Terrain` ha i nuovi parametri `RockTint`, `Shore` (spiaggia e battigia bagnata solo dove c'è un mare a quota zero) e `Strata` (stratificazioni sulle pareti); il rumore macro usa due scale, così dall'alto non si vede più la griglia;
+  - istanze `MI_W_Terrain_<Tipo>` (`tools/ue_scripts/make_world_materials.py`);
+  - lava `M_ASTRA_Lava` (`tools/ue_scripts/make_lava_material.py`), che da lontano si uniforma in un bagliore senza reticoli;
+  - nuove rocce CC0 ambientCG: Rock029 (arenaria rossa) e Rock026 (roccia chiara).
+- Prestazioni (1080p, standalone su L_Bridge, editor chiuso): mondo ghiacciato 17,7 ms di mediana, deserto 16,7 ms. Prima del proxy d'ombra e delle nuvole a metà campioni erano 23 ms. Anche le nuvole di New Ravenna ora usano metà campioni (21,5 → circa 18 ms).
+- Prova:
+  - `astra.battle.arrive <Sistema> [stella] [tipo] [Nome_Pianeta]` esce subito da un Gate, senza corsia (es. `astra.battle.arrive Veyra orange desert Sabel`);
+  - poi `astra.planet go` (a piedi al campo), oppure Falcon + `astra.fly.face planet` + `AstraDescend`;
+  - misure: `tools/perf/run_perf.sh /Game/ASTRA/Maps/L_Bridge 1500 1920 1080 -astra_world=Cassia+blue_white+ice+Cassia_Prime`.
+
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
 - [x] Vice Admiral Adrian Rourke, comandante della Settima Flotta: trasmette gli ordini, risponde quando l'Aquila chiama la flotta, può concedere rinforzi o rifornimento
@@ -191,7 +221,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 1. Dettagli sugli scafi da vicino (decal di nome e numeri di scafo, luci di posizione lampeggianti), caccia visti dall'hangar.
 2. Altri ponti: mensa (l'equipaggio fuori servizio), armeria; ufficiali che vengono a parlare col Capitano in cabina; volti veri per l'equipaggio (MetaHuman); esterno della plancia (scatola e corridoi ancora grezzi da fuori).
 3. Pilotaggio: comandi con gamepad, collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
-4. M7 seconda parte (le superfici degli altri mondi); preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.
+4. Mondi generati oltre: controllori di campo con voce propria sugli altri mondi (come Port Aurelius Control), avamposti diversi per fazione, città sui mondi popolosi; preparazione al multigiocatore (M8: autorità del server, comandi come RPC); M2 oltre: sensori passivi/attivi per le navi nemiche fredde, calore delle navi nemiche.
 5. Equipaggio MetaHuman + labiale (attende l'autorizzazione Epic in RICHIESTE.md).
 
 ## Come provarlo (per l'utente)
@@ -205,11 +235,12 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 8. Cabina del Capitano: la porta in fondo al corridoio di dritta (quello senza ascensore). E accanto alla branda per riposare.
 9. Pilotare: scendi con l'ascensore (E davanti alle porte in fondo al corridoio di babordo), avvicinati a un Falcon di Alpha (lato sinistro dell'hangar) e premi E; W per il lancio. Rientro: torna alla bocca di prua sinistra dell'Aquila, rallenta e premi F.
 10. Il Janus Gate è a 110 km sul rilevamento 070: «Timoniere, portaci attraverso il Gate verso Cassia» (circa 2-3 minuti di avvicinamento, poi la corsia). Ogni sistema ha il suo Gate alle spalle per tornare.
+11. Altri mondi: attraversa un Gate (o da console `astra.battle.arrive Cassia blue_white ice Cassia_Prime`), poi lancia un Falcon, punta il pianeta e premi **G**: ogni mondo ha la sua superficie (ghiaccio, deserto, crateri, lava, isole) e il suo campo d'atterraggio.
 
 ## Note operative
 - Prestazioni (2026-09-28, standalone 1080p, battaglia): ~19 ms di mediana (≈52 fps), limitate dalla GPU (~18,5 ms: luci 2,6, ombre 2,0, Lumen 1,6, traslucenza 1,4). Gli "scatti" da ~31 ms ogni ~12 frame non sono lavoro in più: la CPU, più veloce della GPU, si blocca in attesa delle query di occlusione (trovato con Unreal Insights da riga di comando: `-trace=cpu,frame` e `UnrealInsights -NoUI -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimingEvents ..."`). Per scendere serve ridurre il costo GPU. Diagnostica schermi: `astra.screens.profile 1`
 - **Nanite, lezioni dall'infermeria**: (1) un mesh Nanite con anche un solo slot traslucido (vetro) viene disegnato dalla sua *fallback* grossolana (errore ~1% delle dimensioni: 34 cm sul reparto: pannelli del soffitto esagonali, anelli "a punte"); `import_kit.py` ora lascia classici questi mesh, e reimportare non basta (gli slot vecchi restano): cancellare e reimportare. (2) I poligoni con più di 4 lati si triangolano all'esportazione (`astra_bpy.export_fbx`): l'importatore FBX perde triangoli sui poligoni con vertici allineati. (3) I materiali assegnati a runtime a mesh Nanite devono avere il flag d'uso Nanite (impostato su M_ASTRA_Screen/Hard/Emissive). Verifica: `r.Nanite.Visualize Triangles` (nero = non Nanite) e il log (`Invalid material ... Nanite`)
-- Le prestazioni si misurano solo col gioco standalone (`tools/perf/run_perf.sh <mappa> 1500 1920 1080 [-astra_medbay|-astra_planet]`): nel PIE l'editor usa la qualità Epic (Lumen alto, ~70 ms). Il riepilogo legge anche i CSV con l'intestazione in fondo (`[HasHeaderRowAtEnd]`, quando nuove statistiche compaiono durante la cattura)
+- Le prestazioni si misurano solo col gioco standalone (`tools/perf/run_perf.sh <mappa> 1500 1920 1080 [-astra_medbay|-astra_planet|-astra_world=Sistema+stella+tipo+Nome]`) e **con l'editor chiuso** (aperto ruba la GPU: le misure raddoppiano, 42 ms invece di 18): nel PIE l'editor usa la qualità Epic (Lumen alto, ~70 ms). Il riepilogo legge anche i CSV con l'intestazione in fondo (`[HasHeaderRowAtEnd]`, quando nuove statistiche compaiono durante la cattura)
 - Ricompilare il C++: `tools/ricompila.sh` (salva, chiude editor e menti, compila, riapre e aspetta l'MCP; log in Saved/Logs/build_last.log).
 - Console di prova: `astra.cmd <comando> <json con ' al posto di ">` esegue qualsiasi comando di bordo come farebbe l'equipaggio.
 - La sfera del cielo è opaca e ricentrata sulla camera: il suo raggio (≈490 km, scala 12000 di SM_SkySphere) è la distanza massima visibile. Prima era 16 km e nascondeva le navi lontane.

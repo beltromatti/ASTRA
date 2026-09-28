@@ -583,8 +583,8 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 			AirVel = FVector::ZeroVector;
 			if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 			{
-				Ship->SetCaptainPlanetside(TEXT("landed on New Ravenna near Port Aurelius, in a Falcon of Alpha; the XO has the conn"));
-				Ship->PublishEvent(TEXT("flight: Eagle has landed on New Ravenna, near Port Aurelius"), true);
+				Ship->SetCaptainPlanetside(FString::Printf(TEXT("landed on %s near %s, in a Falcon of Alpha; the XO has the conn"), *Ship->SurfaceWorldName(), *Ship->SurfaceSiteName()));
+				Ship->PublishEvent(FString::Printf(TEXT("flight: Eagle has landed on %s, near %s"), *Ship->SurfaceWorldName(), *Ship->SurfaceSiteName()), true);
 			}
 		}
 		St = PlanetStatus();
@@ -599,7 +599,7 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 			In.Throttle = 0.15f;
 			if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 			{
-				Ship->SetCaptainPlanetside(TEXT("flying a Falcon over New Ravenna near Port Aurelius; the XO has the conn"));
+				Ship->SetCaptainPlanetside(FString::Printf(TEXT("flying a Falcon over %s near %s; the XO has the conn"), *Ship->SurfaceWorldName(), *Ship->SurfaceSiteName()));
 			}
 		}
 		St = PlanetStatus();
@@ -729,7 +729,8 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	}
 	else if (CanDescend())
 	{
-		D.Hint = TEXT("NEW RAVENNA BELOW  ·  G: BEGIN DESCENT");
+		const UAstraShipSubsystem* ShipB = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+		D.Hint = FString::Printf(TEXT("%s BELOW  ·  G: BEGIN DESCENT"), ShipB ? *ShipB->SurfaceWorldName().ToUpper() : TEXT("THE WORLD"));
 	}
 	if (!D.bFlying)
 	{
@@ -785,7 +786,8 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 		D.LockText = FString::Printf(TEXT("%s  %.1f km%s"), *St.LockName.ToUpper(), St.LockRangeKm, D.bLockOn ? TEXT("  LOCK") : TEXT(""));
 		D.bLead = Project(St.LeadWorld, D.LeadPos);
 	}
-	D.HomeText = bAir ? FString::Printf(TEXT("PORT AURELIUS FIELD %.1f km"), St.HomeRangeKm)
+	const UAstraShipSubsystem* ShipH = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	D.HomeText = bAir ? FString::Printf(TEXT("%s %.1f km"), ShipH ? *ShipH->SurfaceSiteName().ToUpper() : TEXT("FIELD"), St.HomeRangeKm)
 	                  : FString::Printf(TEXT("AQUILA %.1f km%s"), St.HomeRangeKm, St.bCanLand ? TEXT("  ·  F: RECOVER") : TEXT(""));
 	if (Project(St.HomeWorld, D.HomePos))
 	{
@@ -864,7 +866,7 @@ void AAstraFighterPawn::Descend()
 	}
 	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 	{
-		Ship->PublishEvent(TEXT("flight: Eagle is starting a descent to New Ravenna — entry interface in a few seconds"), true);
+		Ship->PublishEvent(FString::Printf(TEXT("flight: Eagle is starting a descent to %s — entry interface in a few seconds"), *Ship->SurfaceWorldName()), true);
 	}
 }
 
@@ -886,9 +888,13 @@ void AAstraFighterPawn::TickEntryExit(float Dt, bool bEntry)
 			// off the fleet's plot, into the planet's zone: over the sea, nose down a little, heading for the coast
 			Battle->LeavePiloted();
 			Ship->SetPlanetside(true);
-			Ship->SetCaptainPlanetside(TEXT("flying a Falcon through New Ravenna's atmosphere toward Port Aurelius; the XO has the conn"));
+			Ship->SetCaptainPlanetside(FString::Printf(TEXT("flying a Falcon through %s's atmosphere toward %s; the XO has the conn"), *Ship->SurfaceWorldName(), *Ship->SurfaceSiteName()));
+			// home: over the sea south of the bay; elsewhere: 17 km short of the landing field, on the same heading
 			const FRotator Heading(-10.f, -90.f, 0.f);
-			SetActorLocationAndRotation(UAstraShipSubsystem::PlanetZone() + EntryStart * 100.0, Heading);
+			const FVector Site = Ship->SurfaceSite();
+			SetActorLocationAndRotation(Ship->IsHomeWorld() ? UAstraShipSubsystem::PlanetZone() + EntryStart * 100.0
+			                                                : FVector(Site.X, Site.Y + EntryStart.Y * 100.0, UAstraShipSubsystem::PlanetZone().Z + EntryStart.Z * 100.0),
+			                            Heading);
 			AirVel = Heading.Vector() * 32000.f;
 			In.Throttle = 0.45f;
 			Cockpit->SetLightingChannels(true, false, false);
@@ -999,7 +1005,7 @@ void AAstraFighterPawn::TickAtmosphere(float Dt)
 		}
 		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 		{
-			Ship->PublishEvent(TEXT("flight: Eagle is climbing out of New Ravenna's atmosphere, back to orbit"), true);
+			Ship->PublishEvent(FString::Printf(TEXT("flight: Eagle is climbing out of %s's atmosphere, back to orbit"), *Ship->SurfaceWorldName()), true);
 		}
 	}
 }
@@ -1017,7 +1023,9 @@ void AAstraFighterPawn::Crash()
 	}
 	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 	{
-		Ship->PublishEvent(TEXT("flight: Eagle went down on New Ravenna — the Captain ejected and a Port Aurelius rescue craft is bringing the Captain up to the Aquila; the Falcon is lost"), true);
+		Ship->PublishEvent(FString::Printf(TEXT("flight: Eagle went down on %s — the Captain ejected and %s is bringing the Captain up "
+		                                       "to the Aquila; the Falcon is lost"), *Ship->SurfaceWorldName(),
+		                                  Ship->IsHomeWorld() ? TEXT("a Port Aurelius rescue craft") : TEXT("a search-and-rescue Wasp")), true);
 		Ship->SetPlanetside(false);
 	}
 	if (UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>())
@@ -1056,7 +1064,7 @@ void AAstraFighterPawn::ClimbOutPlanetside()
 	PC->SetControlRotation(FRotator(0.f, GetActorRotation().Yaw + 90.f, 0.f));
 	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 	{
-		Ship->SetCaptainPlanetside(TEXT("on foot on New Ravenna near Port Aurelius, beside a landed Falcon of Alpha; the XO has the conn"));
+		Ship->SetCaptainPlanetside(FString::Printf(TEXT("on foot on %s near %s, beside a landed Falcon of Alpha; the XO has the conn"), *Ship->SurfaceWorldName(), *Ship->SurfaceSiteName()));
 	}
 }
 
@@ -1080,7 +1088,7 @@ void AAstraFighterPawn::Reboard(APawn* InWalker)
 	}
 	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 	{
-		Ship->SetCaptainPlanetside(TEXT("in a landed Falcon on New Ravenna near Port Aurelius; the XO has the conn"));
+		Ship->SetCaptainPlanetside(FString::Printf(TEXT("in a landed Falcon on %s near %s; the XO has the conn"), *Ship->SurfaceWorldName(), *Ship->SurfaceSiteName()));
 	}
 }
 
@@ -1092,7 +1100,8 @@ FAstraPilotStatus AAstraFighterPawn::PlanetStatus() const
 	St.Throttle = In.Throttle;
 	St.HullPct = 100.f;
 	St.ShieldPct = 100.f;
-	St.HomeWorld = UAstraShipSubsystem::PlanetZone() + FieldSpot * 100.0;
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	St.HomeWorld = Ship ? Ship->SurfaceSite() : UAstraShipSubsystem::PlanetZone() + FieldSpot * 100.0;
 	St.HomeRangeKm = FVector::Dist(GetActorLocation(), St.HomeWorld) / 100000.f;
 	return St;
 }

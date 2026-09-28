@@ -8,6 +8,8 @@
 #include "AstraHangar.h"
 #include "AstraPatient.h"
 #include "AstraQuarters.h"
+#include "AstraWorldGen.h"
+#include "AstraWorldSurface.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -64,13 +66,14 @@ namespace
 			Ship->SetPlanetside(bGo);
 			if (bGo)
 			{
-				// on the apron by Pad 3, facing the tower
-				P->SetActorLocation(UAstraShipSubsystem::PlanetZone() + FVector(1790.0, -1250.0, 194.0) * 100.0, false, nullptr, ETeleportType::TeleportPhysics);
+				// on the apron by Pad 3, facing the tower (home); beside the landing pad elsewhere
+				P->SetActorLocation(Ship->IsHomeWorld() ? UAstraShipSubsystem::PlanetZone() + FVector(1790.0, -1250.0, 194.0) * 100.0
+				                                        : Ship->SurfaceSite() + FVector(2600.0, 0.0, 200.0), false, nullptr, ETeleportType::TeleportPhysics);
 				if (APlayerController* PC = Cast<APlayerController>(P->GetController()))
 				{
 					PC->SetControlRotation(FRotator(0.f, 180.f, 0.f));
 				}
-				Ship->SetCaptainPlanetside(TEXT("on foot at Port Aurelius Field on New Ravenna; the XO has the conn"));
+				Ship->SetCaptainPlanetside(FString::Printf(TEXT("on foot at %s on %s; the XO has the conn"), *Ship->SurfaceSiteName(), *Ship->SurfaceWorldName()));
 			}
 			else
 			{
@@ -190,6 +193,31 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		{
 			GEngine->Exec(GetWorld(), TEXT("astra.planet go"));
 		}), 4.f, false);
+	}
+	FString WorldSystem;
+	if (FParse::Value(FCommandLine::Get(), TEXT("astra_world="), WorldSystem))
+	{
+		// testing (performance runs): out of a gate in that system, then the Captain on foot at its landing field
+		// (-astra_world=Cassia+blue_white+ice+Cassia_Prime: the arguments of astra.battle.arrive, joined by '+')
+		WorldSystem.ReplaceInline(TEXT("+"), TEXT(" "));
+		FTimerHandle H, H2;
+		InWorld.GetTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, WorldSystem]()
+		{
+			GEngine->Exec(GetWorld(), *FString::Printf(TEXT("astra.battle.arrive %s"), *WorldSystem));
+		}), 3.f, false);
+		InWorld.GetTimerManager().SetTimer(H2, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			GEngine->Exec(GetWorld(), TEXT("astra.planet go"));
+		}), 6.f, false);
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("astra_profilegpu")))
+	{
+		// testing: one frame's GPU breakdown in the log, once the scene has settled
+		FTimerHandle H;
+		InWorld.GetTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			GEngine->Exec(GetWorld(), TEXT("ProfileGPU"));
+		}), 25.f, false);
 	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("astra_medbay")))
 	{
@@ -1436,19 +1464,22 @@ void UAstraShipSubsystem::SetPlanetside(bool bOn)
 			SL->SetVisibility(!bOn);
 		}
 	}
+	// home: New Ravenna's hand-built zone; elsewhere: the world generated from its name (both in the same zone)
+	const bool bHome = IsHomeWorld() && PlanetActors.Num() > 0;
 	for (AActor* A : PlanetActors)
 	{
 		if (!A)
 		{
 			continue;
 		}
-		A->SetActorHiddenInGame(!bOn);
+		const bool bShow = bOn && bHome;
+		A->SetActorHiddenInGame(!bShow);
 		TInlineComponentArray<USceneComponent*> Cs(A);
 		for (USceneComponent* C : Cs)
 		{
-			C->SetVisibility(bOn);
+			C->SetVisibility(bShow);
 		}
-		if (bOn)
+		if (bShow)
 		{
 			if (USkyLightComponent* SL = A->FindComponentByClass<USkyLightComponent>())
 			{
@@ -1456,16 +1487,33 @@ void UAstraShipSubsystem::SetPlanetside(bool bOn)
 			}
 		}
 	}
+	if (!bHome && bOn)
+	{
+		if (AAstraWorldSurface* W = WorldBelow())
+		{
+			W->Show(true);
+		}
+	}
+	else if (GeneratedWorld)
+	{
+		GeneratedWorld->Show(false);
+	}
 	if (PlanetLight && PlanetLight->GetLightComponent())
 	{
 		PlanetLight->GetLightComponent()->SetVisibility(!bOn);
 	}
 	if (Sun)
 	{
-		if (bOn)
+		if (bOn && bHome)
 		{
-			// mid-afternoon over Port Aurelius: the sun high in the south-west, over the sea
+			// mid-afternoon over Port Aurelius
 			Sun->SetActorRotation(FRotator(-38.f, 60.f, 0.f));
+		}
+		else if (bOn)
+		{
+			// every other world has its own hour: the height and the bearing of its sun come from its name
+			FRandomStream R((int32)GetTypeHash(SurfaceWorldName().ToLower()));
+			Sun->SetActorRotation(FRotator(-R.FRandRange(22.f, 56.f), R.FRandRange(0.f, 360.f), 0.f));
 		}
 		else
 		{
@@ -1486,7 +1534,88 @@ void UAstraShipSubsystem::SetPlanetside(bool bOn)
 	{
 		CaptainPlanetside.Reset();
 	}
-	UE_LOG(LogASTRA, Log, TEXT("[Ship] planetside %s"), bOn ? TEXT("on: New Ravenna") : TEXT("off: space"));
+	UE_LOG(LogASTRA, Log, TEXT("[Ship] planetside %s"), bOn ? *FString::Printf(TEXT("on: %s"), *SurfaceWorldName()) : TEXT("off: space"));
+}
+
+const FAstraSystemLook* UAstraShipSubsystem::CurrentLook() const
+{
+	for (const auto& KV : Systems)
+	{
+		if (KV.Key.Equals(SystemName, ESearchCase::IgnoreCase))
+		{
+			return &KV.Value;
+		}
+	}
+	return nullptr;
+}
+
+bool UAstraShipSubsystem::HasSurface() const
+{
+	if (IsHomeWorld())
+	{
+		return PlanetActors.Num() > 0;
+	}
+	const FAstraSystemLook* L = CurrentLook();
+	return L && FAstraWorldGen::HasSurface(L->PlanetType);
+}
+
+FString UAstraShipSubsystem::SurfaceWorldName() const
+{
+	const FAstraSystemLook* L = CurrentLook();
+	return IsHomeWorld() ? FString(TEXT("New Ravenna")) : (L ? L->PlanetName : SystemName + TEXT(" Prime"));
+}
+
+AAstraWorldSurface* UAstraShipSubsystem::WorldBelow()
+{
+	const FAstraSystemLook* L = CurrentLook();
+	if (IsHomeWorld() || !L || !FAstraWorldGen::HasSurface(L->PlanetType))
+	{
+		return nullptr;
+	}
+	if (GeneratedWorld && GeneratedWorld->WorldName != L->PlanetName)
+	{
+		GeneratedWorld->Destroy();   // another system's world: the Aquila has moved on
+		GeneratedWorld = nullptr;
+	}
+	if (!GeneratedWorld)
+	{
+		FActorSpawnParameters P;
+		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		GeneratedWorld = GetWorld()->SpawnActor<AAstraWorldSurface>(PlanetZone(), FRotator::ZeroRotator, P);
+		if (GeneratedWorld)
+		{
+			GeneratedWorld->Build(L->PlanetName, L->PlanetType);
+			GeneratedWorld->Show(false);
+		}
+	}
+	return GeneratedWorld;
+}
+
+FVector UAstraShipSubsystem::SurfaceSite() const
+{
+	if (!IsHomeWorld() && GeneratedWorld)
+	{
+		return GeneratedWorld->SiteWorld();
+	}
+	return PlanetZone() + FVector(1800.0, -1400.0, 191.4) * 100.0;   // Port Aurelius Field (art/export/newravenna/nr_sites.json, y mirrored)
+}
+
+FString UAstraShipSubsystem::SurfaceSiteName() const
+{
+	if (!IsHomeWorld() && GeneratedWorld)
+	{
+		return GeneratedWorld->SiteName();
+	}
+	return TEXT("Port Aurelius Field");
+}
+
+float UAstraShipSubsystem::SurfaceSeaZ() const
+{
+	if (!IsHomeWorld())
+	{
+		return GeneratedWorld ? GeneratedWorld->SeaWorldZ() : -1.0e12f;
+	}
+	return PlanetZone().Z;
 }
 
 void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)

@@ -177,7 +177,16 @@ public:
 	void SetCaptainPlanetside(const FString& What) { CaptainPlanetside = What; }
 	/** Where the system's main world is, seen from the bridge now (world direction, unit). */
 	FVector PlanetDirectionWorld() const { return PlanetDirNow; }
-	bool HasSurface() const { return SystemName.Equals(TEXT("Aurelia"), ESearchCase::IgnoreCase) && PlanetActors.Num() > 0; }
+	/** The Captain can fly down: New Ravenna's hand-built zone at home, a world generated from its name elsewhere (any
+	 *  world with ground: not a gas giant). */
+	bool HasSurface() const;
+	bool IsHomeWorld() const { return SystemName.Equals(TEXT("Aurelia"), ESearchCase::IgnoreCase); }
+	/** The world below ("New Ravenna", "Cassia Prime"...), where ships set down on it (world, cm) and what it is called. */
+	FString SurfaceWorldName() const;
+	FVector SurfaceSite() const;
+	FString SurfaceSiteName() const;
+	/** The level of the sea (world z, cm) on the world below; very low when it has none. */
+	float SurfaceSeaZ() const;
 
 	/** The battle simulation reports a hit on our hull: compartments, lights, reports. */
 	void OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir);
@@ -239,6 +248,10 @@ private:
 	int32 HeatStage = 0;              // 0 nominal, 1 hot (70 %), 2 critical (90 %): reported once, with hysteresis
 	float HeatHarmT = 0.f;            // at critical: the next conduit failure / burn
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> RadiatorGlow;
+	// the generated world below (the system's main world when it is not New Ravenna), built at the first descent
+	UPROPERTY() TObjectPtr<class AAstraWorldSurface> GeneratedWorld;
+	const FAstraSystemLook* CurrentLook() const;
+	class AAstraWorldSurface* WorldBelow();
 	void TickHeat(float DeltaTime);
 	float CareT = 0.f;                // the Medbay's rounds: every minute the wounded's conditions move on
 	float WardSyncT = 0.f;

@@ -23,7 +23,8 @@ ST = unreal.MaterialSamplerType
 log = []
 
 LAYERS = ("Rock", "Grass", "Meadow", "Sand", "Snow")
-names = [f"T_{L}_{k}" for L in LAYERS for k in ("BC", "N", "ORM")] + ["T_Water_N"]
+EXTRA = ("RockRed", "RockLight")   # rock for other worlds' walls (MI_W_Terrain_*, tools/ue_scripts/make_world_materials.py)
+names = [f"T_{L}_{k}" for L in LAYERS + EXTRA for k in ("BC", "N", "ORM")] + ["T_Water_N"]
 tasks = []
 for n in names:
     if eal.does_asset_exist(f"{TEX}/{n}"):
@@ -136,20 +137,29 @@ loc_m = binop(m, M, local, "", const(m, 0.01, -2450, 160), "", -2300, 60)       
 nrm = E(m, unreal.MaterialExpressionVertexNormalWS, -2600, 300)
 macro_uv = E(m, unreal.MaterialExpressionComponentMask, -2150, 700, r=True, g=True)
 link(binop(m, M, loc_m, "", const(m, 1.0 / 900.0, -2300, 760), "", -2200, 700), "", macro_uv, "")
-macro = sample(m, "MacroNoise", tex("T_ASTRA_MacroNoise"), ST.SAMPLERTYPE_MASKS, macro_uv, -2000, 700, "Variation")
+macro1 = sample(m, "MacroNoise", tex("T_ASTRA_MacroNoise"), ST.SAMPLERTYPE_MASKS, macro_uv, -2000, 700, "Variation")
+# a second sampling, broader and turned, breaks the first one's 900 m repeat (it shows as a grid from the air)
+macro_uv2 = custom(m, "return float2(P.x * 0.8 - P.y * 0.6, P.x * 0.6 + P.y * 0.8) / 3700.0 + float2(0.37, 0.61);",
+                   [("P", (loc_m, ""))], -2150, 860, unreal.CustomMaterialOutputType.CMOT_FLOAT2)
+macro2 = sample(m, "MacroNoise2", tex("T_ASTRA_MacroNoise"), ST.SAMPLERTYPE_MASKS, macro_uv2, -2000, 860, "Variation")
+macro = custom(m, "return saturate(0.5 + 0.72 * ((A - 0.5) + (B - 0.5)));", [("A", (macro1, "RGB")), ("B", (macro2, "RGB"))],
+               -1850, 780, unreal.CustomMaterialOutputType.CMOT_FLOAT3)
 
+# a shore (beach sand, wet at the waterline) only where there is a sea at z = 0: 0 on dry worlds, whose low ground is dry
+shore = scalar(m, "Shore", 1.0, -2000, 1050)
 # the blend: rock on the steep, sand at the waterline, snow up high, meadow in patches, grass elsewhere
 weights = custom(m, """
 float z = P.z;
 float up = N.z;
 float rock = smoothstep(0.83, 0.66, up + (Mc.g - 0.5) * 0.08);
-float sand = (1.0 - smoothstep(1.2, 3.5, z + (Mc.r - 0.5) * 2.0)) * smoothstep(0.7, 0.85, up);
+float sand = (1.0 - smoothstep(1.2, 3.5, z + (Mc.r - 0.5) * 2.0)) * smoothstep(0.7, 0.85, up) * Shore;
 float snow = smoothstep(SnowLine, SnowLine + 260.0, z + (Mc.g - 0.5) * 380.0) * smoothstep(0.55, 0.75, up);
 float meadow = smoothstep(0.5, 0.72, Mc.r * 0.7 + Mc.b * 0.3) * 0.8 * (1.0 - smoothstep(600.0, 1200.0, z));
 float r = 1.0 - rock;
 snow *= r; sand *= r * (1.0 - snow); meadow *= r * (1.0 - snow) * (1.0 - sand);
 return float4(rock, sand, snow, meadow);
-""", [("P", (loc_m, "")), ("N", (nrm, "")), ("Mc", (macro, "RGB")), ("SnowLine", (scalar(m, "SnowLine", 1450.0, -2000, 950), ""))], -1700, 500)
+""", [("P", (loc_m, "")), ("N", (nrm, "")), ("Mc", (macro, "")), ("SnowLine", (scalar(m, "SnowLine", 1450.0, -2000, 950), "")),
+      ("Shore", (shore, ""))], -1700, 500)
 
 # texture coordinates (metres -> tiles): top-down for every layer, two side projections for the rock
 def plane_uv(axes, scale, x, y):
@@ -172,19 +182,25 @@ rock_yz = sample(m, "RockBC_YZ", tex("T_Rock_BC"), ST.SAMPLERTYPE_COLOR, uv_yz, 
 shade = custom(m, """
 float3 an = pow(abs(N), 4.0);
 an /= (an.x + an.y + an.z + 1e-4);
-float3 rock = RockXY * an.z + RockXZ * an.y + RockYZ * an.x;
+float3 rock = (RockXY * an.z + RockXZ * an.y + RockYZ * an.x) * RockTint;
+// sedimentary strata (desert walls): bands every ~9 m and ~23 m, wavering with the macro noise
+float band = sin(P.z * 0.698 + Mc.g * 6.0) * 0.5 + 0.5;
+float band2 = sin(P.z * 0.273 + 1.7 + Mc.b * 3.0) * 0.5 + 0.5;
+rock *= lerp(1.0, lerp(0.74, 1.14, band) * lerp(0.86, 1.1, band2), Strata);
 float4 w = W;
 float grass = saturate(1.0 - w.x - w.y - w.z - w.w);
 float3 c = rock * w.x + Sand * w.y + Snow * w.z + Meadow * MeadowTint * w.w + Grass * GrassTint * grass;
 float tone = lerp(0.82, 1.14, Mc.b) * lerp(0.95, 1.05, Mc.r);
 // wet sand and dark shingle right at the waterline
-float wet = 1.0 - smoothstep(-0.5, 1.8, P.z);
+float wet = (1.0 - smoothstep(-0.5, 1.8, P.z)) * Shore;
 return c * tone * lerp(1.0, 0.55, wet);
 """, [("N", (nrm, "")), ("RockXY", (S["Rock"]["BC"], "RGB")), ("RockXZ", (rock_xz, "RGB")), ("RockYZ", (rock_yz, "RGB")),
       ("Sand", (S["Sand"]["BC"], "RGB")), ("Snow", (S["Snow"]["BC"], "RGB")), ("Meadow", (S["Meadow"]["BC"], "RGB")),
-      ("Grass", (S["Grass"]["BC"], "RGB")), ("W", (weights, "")), ("Mc", (macro, "RGB")), ("P", (loc_m, "")),
+      ("Grass", (S["Grass"]["BC"], "RGB")), ("W", (weights, "")), ("Mc", (macro, "")), ("P", (loc_m, "")),
       ("GrassTint", (vector(m, "GrassTint", (0.5, 0.66, 0.4, 1), -1000, 600), "RGB")),
-      ("MeadowTint", (vector(m, "MeadowTint", (0.7, 0.78, 0.58, 1), -1000, 700), "RGB"))], -700, 900,
+      ("MeadowTint", (vector(m, "MeadowTint", (0.7, 0.78, 0.58, 1), -1000, 700), "RGB")),
+      ("RockTint", (vector(m, "RockTint", (1, 1, 1, 1), -1000, 500), "RGB")), ("Shore", (shore, "")),
+      ("Strata", (scalar(m, "Strata", 0.0, -1000, 400), ""))], -700, 900,
       unreal.CustomMaterialOutputType.CMOT_FLOAT3)
 tint = binop(m, M, shade, "", vector(m, "Tint", (1, 1, 1, 1), -700, 800), "RGB", -450, 900)
 mel.connect_material_property(tint, "", unreal.MaterialProperty.MP_BASE_COLOR)
@@ -194,9 +210,9 @@ float4 w = W;
 float grass = saturate(1.0 - w.x - w.y - w.z - w.w);
 float r = Rock.g * w.x + Sand.g * w.y + Snow.g * w.z + Meadow.g * w.w + Grass.g * grass;
 float ao = Rock.r * w.x + Sand.r * w.y + Snow.r * w.z + Meadow.r * w.w + Grass.r * grass;
-float wet = 1.0 - smoothstep(-0.5, 1.8, P.z);
+float wet = (1.0 - smoothstep(-0.5, 1.8, P.z)) * Shore;
 return float4(lerp(saturate(0.4 + 0.6 * r), 0.2, wet), ao, 0, 0);
-""", [("W", (weights, "")), ("Rock", (S["Rock"]["ORM"], "RGB")), ("Sand", (S["Sand"]["ORM"], "RGB")), ("Snow", (S["Snow"]["ORM"], "RGB")),
+""", [("Shore", (shore, "")), ("W", (weights, "")), ("Rock", (S["Rock"]["ORM"], "RGB")), ("Sand", (S["Sand"]["ORM"], "RGB")), ("Snow", (S["Snow"]["ORM"], "RGB")),
       ("Meadow", (S["Meadow"]["ORM"], "RGB")), ("Grass", (S["Grass"]["ORM"], "RGB")), ("P", (loc_m, ""))], -700, 1500)
 rough = E(m, unreal.MaterialExpressionComponentMask, -450, 1500, r=True)
 link(surf, "", rough, "")
@@ -209,9 +225,9 @@ normal = custom(m, """
 float4 w = W;
 float grass = saturate(1.0 - w.x - w.y - w.z - w.w);
 float3 n = Rock * w.x + Sand * w.y + Snow * w.z + Meadow * w.w + Grass * grass;
-n.xy *= Strength;
+n.xy *= Strength * saturate(Up.z * 2.0 - 0.6);   // the maps are laid from above: they smear on the walls, so fade there
 return normalize(n);
-""", [("W", (weights, "")), ("Rock", (S["Rock"]["N"], "RGB")), ("Sand", (S["Sand"]["N"], "RGB")), ("Snow", (S["Snow"]["N"], "RGB")),
+""", [("Up", (nrm, "")), ("W", (weights, "")), ("Rock", (S["Rock"]["N"], "RGB")), ("Sand", (S["Sand"]["N"], "RGB")), ("Snow", (S["Snow"]["N"], "RGB")),
       ("Meadow", (S["Meadow"]["N"], "RGB")), ("Grass", (S["Grass"]["N"], "RGB")), ("Strength", (scalar(m, "NormalStrength", 0.9, -900, 2000), ""))],
       -700, 1900, unreal.CustomMaterialOutputType.CMOT_FLOAT3)
 mel.connect_material_property(normal, "", unreal.MaterialProperty.MP_NORMAL)

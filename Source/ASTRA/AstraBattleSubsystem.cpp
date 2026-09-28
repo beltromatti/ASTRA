@@ -56,6 +56,10 @@ namespace
 	FAutoConsoleCommand CmdBattleTransit(TEXT("astra.battle.transit"),
 		TEXT("Janus transit (testing; the helm flies to the gate): astra.battle.transit <system_name> [red_dwarf|orange|yellow|blue_white] [ocean|desert|ice|lava|gas_giant|barren] [planet_name]"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num() >= 1) { GTransitRequests.Add(A); } }));
+	TArray<TArray<FString>> GArriveRequests;
+	FAutoConsoleCommand CmdBattleArrive(TEXT("astra.battle.arrive"),
+		TEXT("Testing: come out of a gate at once, no lane: astra.battle.arrive <system_name> [star] [planet type] [planet_name]"),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num() >= 1) { GArriveRequests.Add(A); } }));
 	bool GStatusRequest = false;
 	FAutoConsoleCommand CmdBattleStatus(TEXT("astra.battle.status"), TEXT("Log every ship's hull, shields, target and mode (balancing)"),
 		FConsoleCommandDelegate::CreateLambda([]() { GStatusRequest = true; }));
@@ -354,6 +358,16 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		UE_LOG(LogASTRA, Log, TEXT("[Battle] transit request: %s"), *Detail);
 	}
 	GTransitRequests.Reset();
+	for (const TArray<FString>& A : GArriveRequests)
+	{
+		TSharedPtr<FJsonObject> B = MakeShared<FJsonObject>();
+		B->SetStringField(TEXT("system_name"), A[0].Replace(TEXT("_"), TEXT(" ")));
+		B->SetStringField(TEXT("star_class"), A.IsValidIndex(1) ? A[1] : FString());
+		B->SetStringField(TEXT("planet_type"), A.IsValidIndex(2) ? A[2] : FString());
+		B->SetStringField(TEXT("planet_name"), A.IsValidIndex(3) ? A[3].Replace(TEXT("_"), TEXT(" ")) : FString());
+		DoTransit(B);
+	}
+	GArriveRequests.Reset();
 	if (GStatusRequest)
 	{
 		GStatusRequest = false;
@@ -4066,7 +4080,9 @@ bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos,
 	PilotDecoys = 4;
 	Pilot = FAstraPilotInput();
 	Pilot.Throttle = 0.6f;
-	Report(bFromPlanet ? TEXT("flight: Eagle is back in orbit from New Ravenna, climbing to rejoin the Aquila")
+	const UAstraShipSubsystem* ShipW = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const FString WorldN = ShipW ? ShipW->SurfaceWorldName() : FString(TEXT("the world below"));
+	Report(bFromPlanet ? FString::Printf(TEXT("flight: Eagle is back in orbit from %s, climbing to rejoin the Aquila"), *WorldN)
 	                   : TEXT("flight: the Captain is off the catapult in a Falcon of Alpha, callsign Eagle — the XO has the conn"), true);
 	return true;
 }
@@ -4092,7 +4108,9 @@ void UAstraBattleSubsystem::LeavePiloted()
 	}
 	PilotedId = -1;
 	PilotActor = nullptr;
-	Report(TEXT("flight: Eagle has left the plot — the Captain is descending into New Ravenna's atmosphere"), true);
+	const UAstraShipSubsystem* ShipD = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	Report(FString::Printf(TEXT("flight: Eagle has left the plot — the Captain is descending into %s's atmosphere"),
+	                       ShipD ? *ShipD->SurfaceWorldName() : TEXT("the world's")), true);
 }
 
 void UAstraBattleSubsystem::EndPiloted(bool bLanded)
