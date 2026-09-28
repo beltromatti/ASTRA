@@ -2,6 +2,7 @@
 
 
 #include "ASTRAPlayerController.h"
+#include "AstraCampaign.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "InputMappingContext.h"
@@ -62,6 +63,9 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AASTRAPlayerController::OnTalkPressed);
 		InputComponent->BindKey(EKeys::V, IE_Released, this, &AASTRAPlayerController::OnTalkReleased);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AASTRAPlayerController::ToggleSeat);
+		// the campaign menu (the game pauses behind it)
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
+		InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
 	}
 
 	// only add IMCs for local player controllers
@@ -153,4 +157,15 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 		C->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
 	bSeated = bSit;
+}
+
+void AASTRAPlayerController::OpenMenu()
+{
+	if (UAstraCampaignSubsystem* C = GetWorld() ? GetWorld()->GetSubsystem<UAstraCampaignSubsystem>() : nullptr)
+	{
+		if (C->IsStarted() && !C->IsMenuOpen())
+		{
+			C->ShowMenu(true);
+		}
+	}
 }

@@ -31,6 +31,11 @@ public:
 	/** A manned aircraft was shot down: its pilot is killed or ejects and is recovered wounded. Returns the report. */
 	FString AircrewLost(FRandomStream& R);
 
+	/** For the campaign save: who fell, who is in the medbay (indices into the seeded roster). */
+	const TArray<int32>& GetFallen() const { return Fallen; }
+	const TArray<int32>& GetHurt() const { return Hurt; }
+	void Restore(const TArray<int32>& InFallen, const TArray<int32>& InHurt);
+
 	int32 NumWounded() const;
 	int32 NumKilled() const;
 	/** For the crew's telemetry: counts, and the names of the fallen (most recent first). */

@@ -27,6 +27,9 @@ public:
 
 	bool IsConnected() const;
 
+	/** The Captain chose: a new campaign or the saved one ("new" | "continue"); the mind resets or loads the war. */
+	void SendCampaign(const FString& Mode);
+
 	/** Launch `uv run astra-mind` automatically when nothing is listening. */
 	UPROPERTY(config)
 	bool bAutoLaunchMind = true;
@@ -37,6 +40,9 @@ private:
 	double NextConnectTime = 0.0;
 	double NextStateTime = 0.0;
 	bool bLaunchedMind = false;
+	FString PendingCampaign;   // sent once connected
+	double LastStateSent = 0.0;
+	TArray<TSharedRef<FJsonObject>> PendingEvents;   // reports raised before the mind was reachable
 	int32 ConnectFailures = 0;
 	TArray<uint8> BinaryBuffer;
 	TMap<int32, FString> LineSpeakers;

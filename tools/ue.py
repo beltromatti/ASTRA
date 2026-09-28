@@ -9,7 +9,7 @@ Esempi:
   tools/ue.py py 'result = unreal.SystemLibrary.get_engine_version()'
   tools/ue.py pyfile /percorso/assoluto/script.py
   tools/ue.py foto docs/progressi/viewport.png  # cattura del viewport su file
-  tools/ue.py pie start|stop                 # Play In Editor
+  tools/ue.py pie start [--menu|--continue]|stop   # Play In Editor (starts a new campaign unless --menu)
   tools/ue.py pie cmd 'astra.say Red alert.' 'astra.battle.time 168'   # comandi console nel mondo di gioco
 
 Le risposte con immagini in base64 vengono salvate su file (non stampate).
@@ -187,10 +187,23 @@ def main(argv):
         elif cmd == "pie":
             sub, rest = args[0], args[1:]
             if sub == "start":
+                # the title menu waits for a choice: tests start a campaign at once (--menu to see the menu,
+                # --continue to resume the saved one)
+                mode = None if "--menu" in rest else ("continue" if "--continue" in rest else "new")
                 code = ("les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)\n"
                         "if not unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world():\n"
                         "    les.editor_request_begin_play()\n"
                         "print('PIE richiesto')")
+                print(agent_python("import unreal\n" + code))
+                if mode:
+                    import time as _t
+                    for _ in range(40):
+                        _t.sleep(0.5)
+                        r = agent_python("import unreal\nw = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()\n"
+                                         f"print('ok' if w else 'no')\nif w: unreal.SystemLibrary.execute_console_command(w, 'astra.campaign {mode}')")
+                        if "ok" in str(r):
+                            break
+                return 0
             elif sub == "stop":
                 code = ("if unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world():\n"
                         "    unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()\n"

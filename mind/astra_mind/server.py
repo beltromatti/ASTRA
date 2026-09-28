@@ -414,9 +414,21 @@ class Mind:
                     # a new game session: the crew starts a fresh conversation (the ship state is new too)
                     self.agent.history.clear()
                     self.enemy.reset()
-                    self.director.reset()
+                    log.info("new game session: conversation reset (the war waits for the Captain's choice)")
+                elif kind == "campaign":
+                    # the Captain chose in the title menu: a new war, or the saved one
+                    if msg.get("mode") == "continue":
+                        ok = self.director.load()
+                        log.info("campaign continued (war map %s): %s, %d story notes", "loaded" if ok else "missing",
+                                 self.director.war.current, len(self.director.campaign))
+                        # the war resumes: the director decides what the Aquila meets now (after the XO's welcome)
+                        asyncio.create_task(self.director.on_event(
+                            f"director: campaign resumed — the Aquila is back on patrol in the {self.director.war.current} system",
+                            self.lang, self._battle_state()))
+                    else:
+                        self.director.reset()
+                        log.info("new campaign")
                     asyncio.create_task(self._send_sector())
-                    log.info("new game session: conversation reset")
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
                 elif kind == "event":

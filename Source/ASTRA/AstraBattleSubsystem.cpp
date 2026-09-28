@@ -269,6 +269,12 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	{
 		return;
 	}
+	if (!bStarted)
+	{
+		SyncVisuals();   // the plot stays drawn behind the menu
+		TickWrecks(0.f);
+		return;
+	}
 	const float Dt = FMath::Min(DeltaTime, 0.1f) * GBattleTimeScale;
 	Time += Dt;
 	if (GBattleJumpTo >= 0.f)
@@ -2912,6 +2918,74 @@ void UAstraBattleSubsystem::AbortGateRun()
 	}
 }
 
+TSharedRef<FJsonObject> UAstraBattleSubsystem::SaveJson() const
+{
+	TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+	if (Ships.Num() == 0)
+	{
+		return O;
+	}
+	const FAstraBattleShip& P = Ships[0];
+	O->SetNumberField(TEXT("hull_frac"), P.Hull / P.HullMax);
+	O->SetNumberField(TEXT("missiles"), P.Missiles);
+	O->SetNumberField(TEXT("torpedoes"), P.Torpedoes);
+	TArray<TSharedPtr<FJsonValue>> Q;
+	for (const FAstraSquadron& S : Squadrons)
+	{
+		if (S.Side != EAstraSide::Astra)
+		{
+			continue;
+		}
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetStringField(TEXT("name"), S.Name);
+		J->SetNumberField(TEXT("total"), S.Total);
+		Q.Add(MakeShared<FJsonValueObject>(J));
+	}
+	O->SetArrayField(TEXT("squadrons"), Q);
+	return O;
+}
+
+void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
+{
+	if (!Save.IsValid() || Ships.Num() == 0)
+	{
+		return;
+	}
+	ClearSystem();
+	StageDone = 3;
+	bBriefed = true;
+	FAstraBattleShip& P = Ships[0];
+	P.Pos = FVector::ZeroVector;
+	double V = 1.0;
+	if (Save->TryGetNumberField(TEXT("hull_frac"), V)) { P.Hull = FMath::Clamp((float)V, 0.05f, 1.f) * P.HullMax; }
+	if (Save->TryGetNumberField(TEXT("missiles"), V)) { P.Missiles = (int32)V; }
+	if (Save->TryGetNumberField(TEXT("torpedoes"), V)) { P.Torpedoes = (int32)V; }
+	const TArray<TSharedPtr<FJsonValue>>* Q = nullptr;
+	if (Save->TryGetArrayField(TEXT("squadrons"), Q))
+	{
+		for (const TSharedPtr<FJsonValue>& J : *Q)
+		{
+			const TSharedPtr<FJsonObject> O = J->AsObject();
+			FString Name;
+			double Total = 0.0;
+			if (O.IsValid() && O->TryGetStringField(TEXT("name"), Name) && O->TryGetNumberField(TEXT("total"), Total))
+			{
+				if (FAstraSquadron* S = Squadrons.FindByPredicate([&Name](const FAstraSquadron& X) { return X.Name == Name; }))
+				{
+					S->Total = S->OnDeck = FMath::Max(0, (int32)Total);
+				}
+			}
+		}
+	}
+	// the system's gate, some way off the bow
+	const FVector GPos = P.Pos + Polar(70 * Km, P.Att.Rotator().Yaw + 35.0, 2.0);
+	SpawnGate(GPos, FRotationMatrix::MakeFromX((P.Pos - GPos).GetSafeNormal()).ToQuat() * FQuat(FVector::XAxisVector, 0.8f));
+	SyncVisuals();
+	bStarted = true;
+	Report(TEXT("bridge: the Captain returns to the bridge after the watch change — the XO welcomes them back and sums up in two or "
+	            "three short lines where the Aquila is, her state, and what the war needs from her now"));
+}
+
 int32 UAstraBattleSubsystem::HostilesFighting(double WithinKm) const
 {
 	int32 N = 0;
@@ -3095,31 +3169,8 @@ void UAstraBattleSubsystem::TickGateRun(float Dt)
 	}
 }
 
-void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
+void UAstraBattleSubsystem::ClearSystem()
 {
-	if (!Beat.IsValid() || Ships.Num() == 0)
-	{
-		return;
-	}
-	FString Name = TEXT("Unknown"), Star, Planet, PName;
-	Beat->TryGetStringField(TEXT("system_name"), Name);
-	Beat->TryGetStringField(TEXT("star_class"), Star);
-	Beat->TryGetStringField(TEXT("planet_type"), Planet);
-	Beat->TryGetStringField(TEXT("planet_name"), PName);
-	UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
-	const FString From = Ship ? Ship->GetSystemName() : FString(TEXT("Aurelia"));
-	const bool bLeftFight = bEngagementActive;
-	const float ExitSpeed = FMath::Max(600.f, (float)Ships[0].Vel.Size());
-	// the gate's flash and the jolt through the hull (the sound was started in the lane, timed to the crossing)
-	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
-	{
-		Cam->StartCameraFade(1.f, 0.f, 3.5f, FLinearColor::White, false, false);
-	}
-	Shake = 1.f;
-	if (!bLaneSound)
-	{
-		HullSound(TEXT("SW_Transit"), 1.f, 0.f);
-	}
 	// everything left behind in the old system (our own aircraft come aboard first)
 	for (int32 i = Ships.Num() - 1; i >= 1; --i)
 	{
@@ -3164,6 +3215,34 @@ void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
 	bScenarioOver = false;
 	bSurrenderAccepted = false;
 	StageDone = 3;
+}
+
+void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)
+{
+	if (!Beat.IsValid() || Ships.Num() == 0)
+	{
+		return;
+	}
+	FString Name = TEXT("Unknown"), Star, Planet, PName;
+	Beat->TryGetStringField(TEXT("system_name"), Name);
+	Beat->TryGetStringField(TEXT("star_class"), Star);
+	Beat->TryGetStringField(TEXT("planet_type"), Planet);
+	Beat->TryGetStringField(TEXT("planet_name"), PName);
+	UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const FString From = Ship ? Ship->GetSystemName() : FString(TEXT("Aurelia"));
+	const bool bLeftFight = bEngagementActive;
+	const float ExitSpeed = FMath::Max(600.f, (float)Ships[0].Vel.Size());
+	// the gate's flash and the jolt through the hull (the sound was started in the lane, timed to the crossing)
+	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+	{
+		Cam->StartCameraFade(1.f, 0.f, 3.5f, FLinearColor::White, false, false);
+	}
+	Shake = 1.f;
+	if (!bLaneSound)
+	{
+		HullSound(TEXT("SW_Transit"), 1.f, 0.f);
+	}
+	ClearSystem();
 	Ships[0].Pos = FVector::ZeroVector;
 	// out of the destination's gate: its ring right behind us, the ship still carrying the lane's speed
 	const FVector Bow = Ships[0].Att.GetForwardVector();

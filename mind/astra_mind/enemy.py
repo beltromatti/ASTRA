@@ -104,6 +104,9 @@ class EnemyAgent:
         self.open = False
         self.contact = "T-21"
         self.dead.clear()
+        # commanders invented in an earlier game session belonged to ships that no longer exist
+        for cid in [c for c, v in COMMANDERS.items() if str(v.get("key", "")).startswith("cmdr_")]:
+            del COMMANDERS[cid]
 
     @property
     def speaker(self) -> str:

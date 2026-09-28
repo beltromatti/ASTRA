@@ -69,5 +69,6 @@ protected:
 	bool bSeated = false;
 	FTimerHandle SeatTimer;
 	void ToggleSeat();
+	void OpenMenu();
 	void SetSeated(bool bSit);
 };

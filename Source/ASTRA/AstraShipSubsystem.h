@@ -153,6 +153,10 @@ public:
 
 	/** The battle simulation reports a hit on our hull: compartments, lights, reports. */
 	void OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir);
+	/** The campaign save: the system the Aquila is in, the crew's losses. */
+	TSharedRef<FJsonObject> SaveJson() const;
+	void ResumeFrom(const TSharedPtr<FJsonObject>& Save);
+
 	/** One of our manned aircraft was shot down: who was flying it (for the flight report). */
 	FString AircrewLost() { return Roster.AircrewLost(CasualtyRng); }
 	const FAstraCrewRoster& GetRoster() const { return Roster; }

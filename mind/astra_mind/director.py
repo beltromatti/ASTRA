@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re as _re
 import time
 from typing import Any, Awaitable, Callable
@@ -159,6 +160,7 @@ class Director:
         self.last_event_t = time.monotonic()   # the last time the story moved (a director event or a beat)
 
     def reset(self) -> None:
+        """A new campaign: the war begins again at Aurelia."""
         self.war.reset()
         self.war.save()
         self.campaign.clear()
@@ -166,10 +168,42 @@ class Director:
         self.granted = False
         self.admiral_history.clear()
         self.last_event_t = time.monotonic()
+        self.save()
+
+    def load(self) -> bool:
+        """Continue the saved campaign: the war map and the story so far."""
+        ok = self.war.load()
+        try:
+            with open(self._story_path(), encoding="utf-8") as f:
+                d = json.load(f)
+            self.campaign[:] = d.get("campaign", [])[-30:]
+            self.voice_i = int(d.get("voice_i", 0))
+        except (OSError, ValueError):
+            self.campaign.clear()
+        self.busy = False
+        self.granted = False
+        self.admiral_history.clear()
+        self.last_event_t = time.monotonic()
+        self.note("the Captain returned to the bridge after a watch change; the war went on")
+        return ok
+
+    def _story_path(self) -> str:
+        return os.path.join(os.path.dirname(self.war.save_path), "story.json")
+
+    def save(self) -> None:
+        try:
+            os.makedirs(os.path.dirname(self._story_path()), exist_ok=True)
+            tmp = self._story_path() + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"campaign": self.campaign, "voice_i": self.voice_i}, f, ensure_ascii=False, indent=1)
+            os.replace(tmp, self._story_path())
+        except OSError:
+            log.exception("could not save the story")
 
     def note(self, text: str) -> None:
         self.campaign.append(text)
         del self.campaign[:-30]
+        self.save()
 
     # ------------------------------------------------------------------------------------------------ the beats
     async def on_event(self, text: str, lang: str, state: dict[str, Any]) -> None:

@@ -160,6 +160,32 @@ FString FAstraCrewRoster::AircrewLost(FRandomStream& R)
 	return FString::Printf(TEXT("%s %s"), *People[i].Name(), bKilled ? TEXT("killed") : TEXT("ejected, recovered wounded by search and rescue"));
 }
 
+void FAstraCrewRoster::Restore(const TArray<int32>& InFallen, const TArray<int32>& InHurt)
+{
+	for (FAstraCrewman& P : People)
+	{
+		P.Status = 0;
+	}
+	Fallen.Reset();
+	Hurt.Reset();
+	for (const int32 i : InFallen)
+	{
+		if (People.IsValidIndex(i))
+		{
+			People[i].Status = 2;
+			Fallen.Add(i);
+		}
+	}
+	for (const int32 i : InHurt)
+	{
+		if (People.IsValidIndex(i) && People[i].Status == 0)
+		{
+			People[i].Status = 1;
+			Hurt.Add(i);
+		}
+	}
+}
+
 int32 FAstraCrewRoster::NumWounded() const
 {
 	return Hurt.FilterByPredicate([this](int32 i) { return People[i].Status == 1; }).Num();

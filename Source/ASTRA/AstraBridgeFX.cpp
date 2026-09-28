@@ -22,7 +22,7 @@ namespace
 	FAutoConsoleCommand CmdSparks(TEXT("astra.fx.sparks"), TEXT("Testing: a burst of sparks on the bridge"),
 		FConsoleCommandDelegate::CreateLambda([]() { ++GSparkRequests; }));
 	constexpr int32 MaxSparks = 180;
-	constexpr float Gravity = 980.f;      // cm/s², the gravity plating
+	constexpr float SparkGravity = 980.f;      // cm/s², the gravity plating
 	constexpr float BridgeRadius = 1500.f;
 }
 
@@ -221,7 +221,7 @@ void AAstraBridgeFX::Tick(float DeltaTime)
 			Sparks.RemoveAtSwap(i);
 			continue;
 		}
-		S.Vel.Z -= Gravity * Dt;
+		S.Vel.Z -= SparkGravity * Dt;
 		S.Vel *= 1.f - 0.6f * Dt;   // air drag
 		S.Pos += S.Vel * Dt;
 		if (S.Pos.Z < S.Floor && S.Vel.Z < 0.f)   // bounce on the deck, losing most of the energy

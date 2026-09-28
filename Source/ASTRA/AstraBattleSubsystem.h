@@ -298,6 +298,14 @@ public:
 	float PlayerShieldFraction() const { return Ships.Num() ? Ships[0].Shield / Ships[0].ShieldMax : 1.f; }
 	bool IsScenarioOver() const { return bScenarioOver; }
 
+	/** The campaign: nothing moves until the Captain chooses (new campaign, or continue a saved one). */
+	void StartCampaign() { bStarted = true; }
+	bool IsStarted() const { return bStarted; }
+	/** What a save keeps of the battle side: the Aquila's hull and magazines, her flight groups. */
+	TSharedRef<FJsonObject> SaveJson() const;
+	/** Continue a saved campaign: the opening scenario is gone, the Aquila is on patrol in the saved system. */
+	void ResumeFrom(const TSharedPtr<FJsonObject>& Save);
+
 	/** For the score: is a fight on, how many enemy warships fight within a range, since when the last one ended. */
 	bool IsEngaged() const { return bEngagementActive; }
 	int32 HostilesFighting(double WithinKm) const;
@@ -319,6 +327,7 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialInterface> BlastMat;
 	UPROPERTY() TObjectPtr<UStaticMesh> CubeMesh;
 	bool bBriefed = false;
+	bool bStarted = false;              // the campaign has begun (menu choice)
 	bool bEngagementActive = false;     // a fight is on: the outcome is evaluated
 	float EngagementEndedAt = -1.f;
 	int32 NextContact = 40;             // contact ids for ships the director brings in
@@ -344,6 +353,8 @@ private:
 	TArray<float> LaneRingAxial;        // signed distance from the ring along the gate's axis (m)
 	void TickGateRun(float Dt);
 	void SpawnGate(const FVector& Pos, const FQuat& Att);
+	/** Everything but the Aquila leaves the plot (a transit, a resumed campaign). */
+	void ClearSystem();
 	void DoTransit(const TSharedPtr<FJsonObject>& Beat);
 	void ArriveBeat(const TSharedPtr<FJsonObject>& Beat);
 	int32 SpawnClass(const FString& Class, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);

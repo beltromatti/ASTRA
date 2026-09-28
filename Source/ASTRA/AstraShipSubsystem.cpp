@@ -245,6 +245,40 @@ const FAstraSectorSystem* UAstraShipSubsystem::FindSector(const FString& Name) c
 	return Sector.FindByPredicate([&Name](const FAstraSectorSystem& S) { return S.Name.Equals(Name.TrimStartAndEnd(), ESearchCase::IgnoreCase); });
 }
 
+TSharedRef<FJsonObject> UAstraShipSubsystem::SaveJson() const
+{
+	TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+	O->SetStringField(TEXT("system"), SystemName);
+	TArray<TSharedPtr<FJsonValue>> K, W;
+	for (const int32 i : Roster.GetFallen()) { K.Add(MakeShared<FJsonValueNumber>(i)); }
+	for (const int32 i : Roster.GetHurt()) { W.Add(MakeShared<FJsonValueNumber>(i)); }
+	O->SetArrayField(TEXT("fallen"), K);
+	O->SetArrayField(TEXT("wounded"), W);
+	O->SetStringField(TEXT("casualties"), Roster.Summary());
+	return O;
+}
+
+void UAstraShipSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
+{
+	if (!Save.IsValid())
+	{
+		return;
+	}
+	TArray<int32> K, W;
+	const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+	if (Save->TryGetArrayField(TEXT("fallen"), A)) { for (const auto& V : *A) { K.Add((int32)V->AsNumber()); } }
+	if (Save->TryGetArrayField(TEXT("wounded"), A)) { for (const auto& V : *A) { W.Add((int32)V->AsNumber()); } }
+	Roster.Restore(K, W);
+	FString Sys = TEXT("Aurelia");
+	Save->TryGetStringField(TEXT("system"), Sys);
+	ApplySystem(ChartSystem(Sys));
+	LocationName = FString::Printf(TEXT("%s System, on patrol%s"), *Sys,
+	                               Sys.Equals(TEXT("Aurelia"), ESearchCase::IgnoreCase) ? TEXT(" near the Janus Gate Aurelia") : TEXT(""));
+	ThrottlePct = 30.f;
+	SpeedMps = 150.f;
+	SetAlert(EAstraAlert::Green);
+}
+
 FString UAstraShipSubsystem::KnownSystemsLine() const
 {
 	TArray<FString> Parts;
@@ -372,6 +406,12 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 				Systems.Add(X.Name, MakeLook(X.Name, Star, Planet, World));
 			}
 			Sector.Add(X);
+		}
+		if (!SystemName.Equals(TEXT("Aurelia"), ESearchCase::IgnoreCase) && FindSector(SystemName))
+		{
+			const FString Keep = LocationName;
+			ApplySystem(Systems.FindChecked(FindSector(SystemName)->Name));   // a resumed campaign: the sector's own look
+			LocationName = Keep;
 		}
 		OutDetail = FString::Printf(TEXT("sector charted: %d systems"), Sector.Num());
 		return true;

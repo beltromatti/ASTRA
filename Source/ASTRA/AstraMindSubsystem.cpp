@@ -99,6 +99,30 @@ void UAstraMindSubsystem::Connect()
 		Hello->SetStringField(TEXT("client"), TEXT("ue"));
 		Send(Hello);
 		NextStateTime = 0.0;
+		if (!PendingCampaign.IsEmpty())
+		{
+			const FString Mode = PendingCampaign;
+			PendingCampaign.Empty();
+			SendCampaign(Mode);
+		}
+		if (PendingEvents.Num())
+		{
+			if (UWorld* W = GameWorld())
+			{
+				if (UAstraShipSubsystem* S = W->GetSubsystem<UAstraShipSubsystem>())
+				{
+					TSharedRef<FJsonObject> St = MakeShared<FJsonObject>();
+					St->SetStringField(TEXT("type"), TEXT("ship_state"));
+					St->SetObjectField(TEXT("state"), S->Snapshot());
+					Send(St);
+				}
+			}
+			for (const TSharedRef<FJsonObject>& E : PendingEvents)
+			{
+				Send(E);
+			}
+			PendingEvents.Reset();
+		}
 	});
 	Socket->OnConnectionError().AddLambda([this](const FString& Error)
 	{
@@ -171,10 +195,36 @@ void UAstraMindSubsystem::BindShipEvents()
 		BoundWorld = World;
 		ShipEventHandle = Ship->OnShipEvent.AddLambda([this](const FString& Text, bool bReport)
 		{
+			// a report makes the crew speak: they must see the ship as it is now, not as it was up to a second ago
+			const double Now = FPlatformTime::Seconds();
+			if (bReport && Now - LastStateSent > 0.1)
+			{
+				if (UWorld* W = GameWorld())
+				{
+					if (UAstraShipSubsystem* S = W->GetSubsystem<UAstraShipSubsystem>())
+					{
+						TSharedRef<FJsonObject> St = MakeShared<FJsonObject>();
+						St->SetStringField(TEXT("type"), TEXT("ship_state"));
+						St->SetObjectField(TEXT("state"), S->Snapshot());
+						Send(St);
+						LastStateSent = Now;
+						NextStateTime = Now + 1.0;
+					}
+				}
+			}
 			TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 			M->SetStringField(TEXT("type"), TEXT("event"));
 			M->SetStringField(TEXT("text"), Text);
 			M->SetBoolField(TEXT("report"), bReport);
+			if (!IsConnected())
+			{
+				// the mind is still starting: keep what the crew must hear, deliver it once connected
+				if (bReport && PendingEvents.Num() < 24)
+				{
+					PendingEvents.Add(M);
+				}
+				return;
+			}
 			Send(M);
 		});
 	}
@@ -183,6 +233,7 @@ void UAstraMindSubsystem::BindShipEvents()
 bool UAstraMindSubsystem::Tick(float DeltaTime)
 {
 	const double Now = FPlatformTime::Seconds();
+	BindShipEvents();   // even before the mind answers: the reports raised meanwhile are queued
 	if (!Socket.IsValid() || (!Socket->IsConnected() && Now >= NextConnectTime))
 	{
 		if (Now >= NextConnectTime)
@@ -192,10 +243,10 @@ bool UAstraMindSubsystem::Tick(float DeltaTime)
 		}
 		return true;
 	}
-	BindShipEvents();
 	if (IsConnected() && Now >= NextStateTime)
 	{
 		NextStateTime = Now + 1.0;
+		LastStateSent = Now;
 		if (UWorld* World = GameWorld())
 		{
 			if (UAstraShipSubsystem* Ship = World->GetSubsystem<UAstraShipSubsystem>())
@@ -208,6 +259,19 @@ bool UAstraMindSubsystem::Tick(float DeltaTime)
 		}
 	}
 	return true;
+}
+
+void UAstraMindSubsystem::SendCampaign(const FString& Mode)
+{
+	if (!IsConnected())
+	{
+		PendingCampaign = Mode;
+		return;
+	}
+	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+	M->SetStringField(TEXT("type"), TEXT("campaign"));
+	M->SetStringField(TEXT("mode"), Mode);
+	Send(M);
 }
 
 void UAstraMindSubsystem::OnText(const FString& Text)
