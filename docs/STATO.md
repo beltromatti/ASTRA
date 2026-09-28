@@ -82,6 +82,11 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Distruzioni: lampo, palla di fuoco (M_FX_Blast), esplosioni secondarie, onda d'urto, detriti, relitto annerito alla deriva
 - [ ] Navi v2 (sagome e dettagli più belli), scie dei missili, colpi sugli scudi più ricchi
 
+## Navi v2
+- [x] Nuovo generatore procedurale hard-surface (`art/blender/hullkit.py` + `shipgen2.py`): scafi a griglia con sezioni smussate e piastre di corazza in rilievo e incassate (inset per regioni), lastre di corazza sui fianchi, torri di comando, torrette con canne e manicotti, griglie VLS, bocche d'hangar illuminate, blocchi motore a più ugelli, radiatori a lamelle, ali radianti pieghevoli, strisce di luci di bordo leggibili a chilometri, luci di navigazione
+- [x] Mandato: **Acheron** (prua a doppia lama attorno al cannone spinale ad anelli, vita con gli hangar dei caccia, chiglia, torre asimmetrica), **Styx** (lunga prua a lancia, sponson posteriori con radiatori), **Lethe** (cuneo compatto). ASTRA: **Aquila** (bocche di lancio a prua, isola inclinata che porta la plancia: dal finestrone si vede la prua), **Praetorian** (cittadella e sei torri trinate), **Vigilant**
+- Rigenerare: `blender -b --factory-startup --python-exit-code 1 -P art/blender/shipgen2.py -- art/export/ships_v2 [--preview <cartella>]`, poi `import_kit.py` con SRC=art/export/ships_v2, DST=/Game/ASTRA/Ships (i caccia restano quelli di shipgen.py v1)
+
 ## Musica adattiva
 - [x] Colonna sonora originale composta in codice (`tools/music/score.py`) e suonata con un campionatore orchestrale scritto da me (`tools/music/sampler.py`) sui campioni **VSCO 2 Community Edition (CC0)**: archi, corni, tromboni, tuba, trombe, flauto, arpa, timpani, grancassa, rullante, piatti; riverbero da sala sintetico, mastering sotto i dialoghi, loop senza cuciture. Cinque brani: **Aurelia** (calma), **Tension**, **Battle**, **Aftermath**, **Transit**
 - [x] `UAstraMusicSubsystem`: sceglie l'umore dalla simulazione (nemici che combattono, missili in arrivo, allarme rosso, battaglia appena finita), dissolvenze incrociate, la musica si abbassa quando parla un ufficiale; lo stacco del transito è sincronizzato in modo che il colpo cada esattamente sull'attraversamento dell'anello. Console: `astra.music.volume 0.34`, `astra.music.mood calm|tension|battle|aftermath|auto`
@@ -110,7 +115,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] **Campagna salvata e ripresa**: menu iniziale (Slate, in inglese) con CONTINUE (riepilogo: sistema, scafo, caduti, ora), NEW CAMPAIGN (con conferma se c'è un salvataggio), QUIT; Esc/F10 in partita apre il menu e mette in pausa. Salvataggio automatico ogni minuto e a ogni svolta della storia: `Saved/Campaign/ship.json` (gioco: sistema, scafo, missili, squadriglie, caduti e feriti del ruolino), `war.json` e `story.json` (mente: mappa della guerra e registro della storia). Alla ripresa: la nave è in pattuglia nel sistema salvato col suo cielo, l'XO dà il bentornato con i dati veri, il regista decide subito cosa succede. Test: `tools/ue.py pie start` (nuova campagna automatica), `--continue`, `--menu`; console `astra.campaign new|continue`
 
 ## Prossimi passi
-1. Plancia v2 secondo passaggio (dettagli, segnaletica), navi v2, scie dei missili.
+1. Plancia v2 secondo passaggio (dettagli, segnaletica), trama di pannelli per gli scafi (normal map), mercantile e caccia v2.
 2. Corridoi collegati alla plancia (porte che si aprono), hangar camminabile.
 3. Equipaggio: MetaHuman + labiale, gesti.
 4. Simulazione di calore (M2); caccia nemici; mappa strategica della guerra (M6); pianeta (M7).
