@@ -11,6 +11,7 @@
 | 2026-09-28 | 10,00 $ | 0,10 $ | benchmark modelli (9 configurazioni × 40 ordini) |
 | 2026-09-28 | 10,00 $ | 0,13 $ | sviluppo dell'equipaggio AI (≈0,0005 $ a turno di plancia) |
 | 2026-09-28 | 10,00 $ | 0,40 $ | battaglie di prova complete con comandanti nemici (≈0,001–0,002 $ a turno) |
+| 2026-09-28 | 10,00 $ | 0,63 $ | squadroni, regista della guerra, ammiraglio (≈0,002 $ per decisione del regista) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -70,12 +71,23 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Tavolo olografico tattico vivo (navi per fazione e stato, missili, esplosioni, anelli con scala logaritmica, etichette che non si sovrappongono)
 - [x] Schermi di plancia vivi (UAstraScreensSubsystem): display principale con tavola del controllo danni per ponte/sezione, barra tattica, console di timone, operazioni, sensori, ingegneria
 - [x] Canale aperto con il nemico: gli ordini restano alla plancia, le frasi per il comandante nemico vanno sul canale (router euristico + LLM per le frasi miste)
-- [ ] Navi v2 (sagome e dettagli più belli), effetti visivi migliori (scie, esplosioni volumetriche)
+- [x] Distruzioni: lampo, palla di fuoco (M_FX_Blast), esplosioni secondarie, onda d'urto, detriti, relitto annerito alla deriva
+- [ ] Navi v2 (sagome e dettagli più belli), scie dei missili, colpi sugli scudi più ricchi
+
+## M5 (prima versione) — Hangar e caccia
+- [x] Tre gruppi di volo reali nella simulazione: Alpha (8 Falcon), Bravo (7 Hammer, siluri), Droni (12 Wasp); lancio a cadenza dal ponte di volo (dipende dalla potenza del ponte), missioni pattuglia/attacco/scorta/disturbo/ricognizione/soccorso, perdite per la difesa di punto, rientro e riarmo
+- [ ] Hangar camminabile, caccia nemici (Harpy), pilotare un caccia in prima persona
+
+## M6 (prima versione) — Il regista della guerra
+- [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
+- [x] Vice Admiral Adrian Rourke, comandante della Settima Flotta: trasmette gli ordini, risponde quando l'Aquila chiama la flotta, può concedere rinforzi o rifornimento
+- [ ] Mappa strategica della guerra (sistemi, fronti, fazioni), conseguenze a lungo termine, salvataggio della campagna
 
 ## Prossimi passi
-1. Plancia v2 secondo passaggio (dettagli, segnaletica), navi v2 ed effetti visivi della battaglia (scie, esplosioni).
-2. Equipaggio: schermi vivi, comportamento dei corpi (posture sedute, gesti), poi MetaHuman + labiale.
-3. Navi v2 e effetti; simulazione di energia/calore (M2); hangar e caccia (M5).
+1. Plancia v2 secondo passaggio (dettagli, segnaletica), navi v2, scie dei missili.
+2. Corridoi collegati alla plancia (porte che si aprono), hangar camminabile.
+3. Equipaggio: MetaHuman + labiale, gesti.
+4. Simulazione di calore (M2); caccia nemici; mappa strategica della guerra (M6); pianeta (M7).
 
 ## Come provarlo (per l'utente)
 1. `tools/avvia_editor.sh` (o apri ASTRA.uproject); il livello iniziale è la plancia (`L_Bridge`).
