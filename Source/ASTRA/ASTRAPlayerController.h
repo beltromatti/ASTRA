@@ -58,4 +58,16 @@ protected:
 	/** Push-to-talk (V): the Captain speaks to the bridge crew */
 	void OnTalkPressed();
 	void OnTalkReleased();
+
+	/** The captain's chair (E): sit down / stand up. The game starts seated. */
+	UPROPERTY(EditAnywhere, Category = "ASTRA")
+	FVector CaptainSeat = FVector(0.f, 0.f, 20.f);
+
+	UPROPERTY(EditAnywhere, Config, Category = "ASTRA")
+	bool bStartSeated = true;
+
+	bool bSeated = false;
+	FTimerHandle SeatTimer;
+	void ToggleSeat();
+	void SetSeated(bool bSit);
 };

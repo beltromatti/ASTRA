@@ -10,7 +10,11 @@
 #include "ASTRA.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "AstraMindSubsystem.h"
+#include "Camera/CameraComponent.h"
 #include "Engine/GameInstance.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "TimerManager.h"
 
 AASTRAPlayerController::AASTRAPlayerController()
 {
@@ -21,6 +25,11 @@ AASTRAPlayerController::AASTRAPlayerController()
 void AASTRAPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	if (IsLocalPlayerController() && bStartSeated)
+	{
+		// the Captain starts in the chair (the pawn is possessed right after BeginPlay)
+		GetWorldTimerManager().SetTimer(SeatTimer, FTimerDelegate::CreateUObject(this, &AASTRAPlayerController::SetSeated, true), 0.3f, false);
+	}
 
 	
 	// only spawn touch controls on local player controllers
@@ -52,6 +61,7 @@ void AASTRAPlayerController::SetupInputComponent()
 	{
 		InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AASTRAPlayerController::OnTalkPressed);
 		InputComponent->BindKey(EKeys::V, IE_Released, this, &AASTRAPlayerController::OnTalkReleased);
+		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AASTRAPlayerController::ToggleSeat);
 	}
 
 	// only add IMCs for local player controllers
@@ -98,4 +108,49 @@ void AASTRAPlayerController::OnTalkReleased()
 	{
 		Mind->PushToTalk(false);
 	}
+}
+
+void AASTRAPlayerController::ToggleSeat()
+{
+	const APawn* P = GetPawn();
+	if (!P)
+	{
+		return;
+	}
+	if (bSeated)
+	{
+		SetSeated(false);
+	}
+	else if (FVector::Dist2D(P->GetActorLocation(), CaptainSeat) < 220.f)
+	{
+		SetSeated(true);
+	}
+}
+
+void AASTRAPlayerController::SetSeated(bool bSit)
+{
+	ACharacter* C = Cast<ACharacter>(GetPawn());
+	if (!C)
+	{
+		return;
+	}
+	const UCameraComponent* Cam = C->FindComponentByClass<UCameraComponent>();
+	const float EyeZ = Cam ? Cam->GetRelativeLocation().Z : 64.f;
+	if (bSit)
+	{
+		// seated eye height about 1.18 m above the dais, a little forward of the seat back, facing the bow window
+		C->SetActorEnableCollision(false);
+		C->GetCharacterMovement()->DisableMovement();
+		C->SetActorLocation(CaptainSeat + FVector(8.f, 0.f, 118.f - EyeZ), false, nullptr, ETeleportType::TeleportPhysics);
+		SetControlRotation(FRotator(-6.f, 0.f, 0.f));
+		SetIgnoreMoveInput(true);
+	}
+	else
+	{
+		SetIgnoreMoveInput(false);
+		C->SetActorLocation(CaptainSeat + FVector(-85.f, 0.f, C->GetDefaultHalfHeight() + 2.f), false, nullptr, ETeleportType::TeleportPhysics);
+		C->SetActorEnableCollision(true);
+		C->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
+	bSeated = bSit;
 }

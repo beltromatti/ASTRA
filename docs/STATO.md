@@ -44,6 +44,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 - [x] Cielo di Aurelia: stelle NASA + nebulosa Teal Veil procedurale 8K (`art/blender/sky_aurelia.py`), stella Aurelia nel materiale del cielo, orientamento pilotabile
 - [x] Plancia v2 (primo passaggio): pavimento scuro semi-lucido, soffitto a cassettoni scuri con faretti incassati, console e poltrone scure, tavolo olografico vivo, schermi vivi
 - [ ] Plancia v2 (secondo passaggio): dettagli a pannelli, cavi e condotti, segnaletica e decalcomanie, usura
+- [x] Si parte seduti sulla poltrona del capitano (E per alzarsi/sedersi)
 - [x] Pianeta New Ravenna nel finestrone (sfera analitica nel materiale del cielo: continenti, nuvole, terminatore, luci notturne, atmosfera)
 - [x] Corridoi percorribili dietro la plancia (babordo e tribordo, oblò sullo scafo) con porte scorrevoli vere (AAstraDoor) e suoni
 - [x] Suoni di bordo sintetizzati: railgun, VLS, siluri, difesa di punto, catapulta, porte, bip delle console, ambiente di plancia
@@ -80,7 +81,8 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 
 ## M5 (prima versione) — Hangar e caccia
 - [x] Tre gruppi di volo reali nella simulazione: Alpha (8 Falcon), Bravo (7 Hammer, siluri), Droni (12 Wasp); lancio a cadenza dal ponte di volo (dipende dalla potenza del ponte), missioni pattuglia/attacco/scorta/disturbo/ricognizione/soccorso, perdite per la difesa di punto, rientro e riarmo
-- [ ] Hangar camminabile, caccia nemici (Harpy), pilotare un caccia in prima persona
+- [x] Caccia nemici (Harpy) lanciati dagli incrociatori del Mandato: razzi e cannoni sull'Aquila; la pattuglia e la difesa di punto li abbattono; scie dei missili
+- [ ] Hangar camminabile, pilotare un caccia in prima persona
 
 ## M6 (prima versione) — Il regista della guerra
 - [x] Regista a runtime (mind/astra_mind/director.py): a ogni esito sceglie il prossimo sviluppo (incursione, soccorso, rinforzi, rifornimento, calma) coerente con il registro della campagna, e inventa i nuovi comandanti nemici (mente e voce proprie)
@@ -96,7 +98,7 @@ Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese 
 ## Come provarlo (per l'utente)
 1. `tools/avvia_editor.sh` (o apri ASTRA.uproject); il livello iniziale è la plancia (`L_Bridge`).
 2. Il servizio delle menti parte da solo al primo avvio della partita (oppure `cd mind && uv run astra-mind`).
-3. Premi Play; tieni premuto **V** e parla al ponte in qualsiasi lingua (al primo uso macOS chiede il permesso del microfono), oppure dalla console (`) scrivi `astra.say Allarme rosso!`.
+3. Premi Play: sei seduto sulla poltrona del capitano (**E** per alzarti e camminare, di nuovo **E** vicino alla poltrona per sederti; le porte in fondo portano ai corridoi). Tieni premuto **V** e parla al ponte in qualsiasi lingua (al primo uso macOS chiede il permesso del microfono), oppure dalla console (`) scrivi `astra.say Allarme rosso!`.
 4. La battaglia parte da sola (dopo ~80 s si sveglia la fregata, dopo ~170 s arriva il gruppo d'attacco). Per accelerare: `astra.battle.time 168`, `astra.battle.timescale 3`.
 5. Quando l'Archon Solm chiama, parlagli direttamente (canale aperto): tutto ciò che non inizia con il nome/ruolo di un ufficiale va a lui. «Comunicazioni, chiudete il canale» per chiuderlo.
 6. Da terminale: `tools/ue.py pie start|stop` e `tools/ue.py pie cmd 'astra.say ...'` per provare senza toccare l'editor.
