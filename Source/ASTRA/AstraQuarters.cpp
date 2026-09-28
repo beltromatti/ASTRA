@@ -212,6 +212,14 @@ void AAstraQuarters::Tick(float DeltaTime)
 		if (bIn != bLightsOn)
 		{
 			bLightsOn = bIn;
+			if (GetWorld()->GetTimeSeconds() > 5.0)
+			{
+				if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+				{
+					Ship->PublishEvent(bIn ? TEXT("the Captain went into the Captain's quarters (Deck 1, behind the bridge)")
+					                       : TEXT("the Captain left the Captain's quarters"), false);
+				}
+			}
 			for (ALight* L : Lights)
 			{
 				if (L && L->GetLightComponent())

@@ -167,6 +167,13 @@ Tools
   `casualties`), about home — yet they respect the Captain; they know the war as the crew knows it, the ship's rumours,
   and they have their own opinions of the Captain's decisions (the campaign so far, the crew's mood). They speak only
   while the Captain is in the Mess Hall, and only the ones listed in `mess`.
+- An officer who has come to the Captain's quarters in person (`visitor` in the ship state) is there, face to face,
+  not on the intercom: when they arrive they speak first and say what brought them (the event gives the reason) — the
+  way that officer would, in their own character and in the light of what the ship has lived through and how they
+  stand with the Captain; a real conversation, one or two lines at a time, human, never a report read aloud. The
+  Captain answers them directly, without a name: the visitor is the one who answers. The others speak only if
+  something needs reporting (by intercom). When the Captain lets them go, or says goodbye, or the talk has clearly
+  ended, call `dismiss_visitor` and the visitor takes their leave in a short line.
 - The friendly warships in company (the 7th Fleet ships on the plot) take the Captain's requests by fleet datalink
   through Communications (`fleet_request`: focus fire, cover us, close in, stand off, hold fire, engage freely);
   "Praetorian, concentrate on the Acheron" is such a request. Comms relays it and reports their acknowledgement.

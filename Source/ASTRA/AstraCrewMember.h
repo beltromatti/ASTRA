@@ -73,6 +73,19 @@ public:
 	 *  station: the off-duty crew in the Mess Hall come from all over the ship. */
 	void SetUniformDept(const FString& RosterDept);
 
+	/** A visit (the Captain's quarters): the officer leaves their place and walks the route (world, cm, deck level: the
+	 *  height follows the points, stairs and the dais included) to its end, where they stand and face the Captain; at the
+	 *  point WaitAt they stop for WaitSeconds first (at the door). Leave() walks them back along it (bHurry: at a jog)
+	 *  and returns them to their place. */
+	void Visit(const TArray<FVector>& Route, int32 WaitAt = INDEX_NONE, float WaitSeconds = 0.f);
+	void Leave(bool bHurry = false);
+	bool IsVisiting() const { return VisitPhase != 0; }
+	bool HasArrived() const { return VisitPhase == 2; }
+	bool IsWalking() const { return VisitPhase == 1 || VisitPhase == 3; }
+	bool IsWaiting() const { return VisitWaitLeft > 0.f; }
+	/** Everyone walking on a visit right now (doors open for them). */
+	static const TArray<TWeakObjectPtr<AAstraCrewMember>>& Walkers();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -113,5 +126,16 @@ private:
 	void UpdateSeated(float DeltaSeconds);
 	void ApplyUniform();
 	FString UniformDept;   // a roster department's uniform (SetUniformDept); empty: the station's
+	uint8 VisitPhase = 0;  // 0 at their place, 1 walking there, 2 arrived, 3 walking back
+	TArray<FVector> VisitRoute;
+	int32 VisitNext = 0;
+	int32 VisitWaitAt = INDEX_NONE;
+	float VisitWaitS = 0.f;
+	float VisitWaitLeft = 0.f;
+	float VisitSpeedNow = 140.f;
+	FTransform HomeXf;
+	EAstraCrewPosture HomePosture = EAstraCrewPosture::Standing;
+	void TickVisit(float DeltaSeconds);
+	void StandingBody(bool bWalk);   // the standing mannequin, idle or walking
 	int32 Bone(const TCHAR* Name) const;
 };

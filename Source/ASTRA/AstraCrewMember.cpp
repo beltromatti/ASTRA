@@ -141,6 +141,158 @@ void AAstraCrewMember::SetUniformDept(const FString& RosterDept)
 	}
 }
 
+namespace
+{
+	TArray<TWeakObjectPtr<AAstraCrewMember>> GWalkers;
+	constexpr float VisitSpeed = 140.f;   // cm/s, an unhurried walk
+	constexpr float HurrySpeed = 310.f;   // back to their station at a jog (action stations)
+}
+
+const TArray<TWeakObjectPtr<AAstraCrewMember>>& AAstraCrewMember::Walkers()
+{
+	GWalkers.RemoveAll([](const TWeakObjectPtr<AAstraCrewMember>& W) { return !W.IsValid() || !W->IsWalking(); });
+	return GWalkers;
+}
+
+void AAstraCrewMember::StandingBody(bool bWalk)
+{
+	if (USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, bBodyFemale
+		? TEXT("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple")
+		: TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple")))
+	{
+		if (Body->GetSkeletalMeshAsset() != Mesh)
+		{
+			Body->SetSkeletalMeshAsset(Mesh);
+		}
+	}
+	Body->SetVisibility(true);
+	Seated->SetVisibility(false);
+	const bool bJog = bWalk && VisitSpeedNow > VisitSpeed;
+	if (UAnimSequence* A = LoadObject<UAnimSequence>(nullptr, bJog
+		? TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd.MF_Unarmed_Jog_Fwd")
+		: bWalk ? TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Walk/MF_Unarmed_Walk_Fwd.MF_Unarmed_Walk_Fwd")
+		: TEXT("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle")))
+	{
+		Body->PlayAnimation(A, true);
+		Body->SetPlayRate(bJog ? 0.9f : bWalk ? 0.95f : 1.f);
+	}
+	ApplyUniform();
+}
+
+void AAstraCrewMember::Visit(const TArray<FVector>& Route, int32 WaitAt, float WaitSeconds)
+{
+	if (Route.Num() < 2 || VisitPhase != 0)
+	{
+		return;
+	}
+	HomeXf = GetActorTransform();
+	HomePosture = Posture;
+	Posture = EAstraCrewPosture::Standing;
+	VisitRoute = Route;
+	VisitNext = 1;
+	VisitPhase = 1;
+	VisitWaitAt = WaitAt;
+	VisitWaitS = WaitSeconds;
+	VisitWaitLeft = 0.f;
+	VisitSpeedNow = VisitSpeed;
+	SetActorLocation(Route[0]);
+	StandingBody(true);
+	GWalkers.AddUnique(this);
+	UE_LOG(LogASTRA, Log, TEXT("[Crew] %s leaves their place on a visit"), *StationId);
+}
+
+void AAstraCrewMember::Leave(bool bHurry)
+{
+	if (VisitPhase != 1 && VisitPhase != 2)
+	{
+		return;
+	}
+	// back the way they came, from where they stand (walking there: from the last point they passed)
+	TArray<FVector> Back;
+	Back.Add(GetActorLocation());
+	for (int32 i = FMath::Min(VisitNext - 1, VisitRoute.Num() - 1); i >= 0; --i)
+	{
+		Back.Add(VisitRoute[i]);
+	}
+	VisitRoute = Back;
+	VisitNext = 1;
+	VisitPhase = 3;
+	VisitWaitLeft = 0.f;
+	VisitSpeedNow = bHurry ? HurrySpeed : VisitSpeed;
+	StandingBody(true);
+	GWalkers.AddUnique(this);
+}
+
+void AAstraCrewMember::TickVisit(float DeltaSeconds)
+{
+	if (VisitPhase == 2)
+	{
+		return;
+	}
+	if (!VisitRoute.IsValidIndex(VisitNext))
+	{
+		if (VisitPhase == 1)
+		{
+			VisitPhase = 2;              // arrived: stand, and face the Captain
+			StandingBody(false);
+			if (const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0))
+			{
+				const FVector To = (P->GetActorLocation() - GetActorLocation()) * FVector(1, 1, 0);
+				SetActorRotation(FRotator(0.f, To.Rotation().Yaw - 90.f, 0.f));   // the mannequin faces its +Y
+			}
+			RestRotation = GetActorRotation();
+		}
+		else
+		{
+			VisitPhase = 0;              // home: back to their place and posture
+			SetActorTransform(HomeXf);
+			RestRotation = HomeXf.Rotator();
+			Posture = HomePosture;
+			if (Posture != EAstraCrewPosture::Standing)
+			{
+				Body->SetVisibility(false);
+			}
+			SetBody(bBodyFemale);
+			UE_LOG(LogASTRA, Log, TEXT("[Crew] %s is back at their place"), *StationId);
+		}
+		return;
+	}
+	if (VisitWaitLeft > 0.f)
+	{
+		// at the door: a moment's wait (the chime), then on
+		if ((VisitWaitLeft -= DeltaSeconds) <= 0.f)
+		{
+			StandingBody(true);
+		}
+		return;
+	}
+	const FVector From = VisitRoute[VisitNext - 1];
+	const FVector Target = VisitRoute[VisitNext];
+	FVector To = Target - GetActorLocation();
+	To.Z = 0.f;
+	const float Step = VisitSpeedNow * DeltaSeconds;
+	if (To.Size() <= Step)
+	{
+		SetActorLocation(Target);
+		if (VisitPhase == 1 && VisitNext == VisitWaitAt && VisitWaitS > 0.f)
+		{
+			VisitWaitLeft = VisitWaitS;
+			StandingBody(false);
+		}
+		++VisitNext;
+		return;
+	}
+	const FVector Dir = To.GetSafeNormal();
+	FVector Next = GetActorLocation() + Dir * Step;
+	// the deck's height along the way: down the well's stairs, off the dais (a ramp between the points)
+	const float Seg = FVector::Dist2D(From, Target);
+	Next.Z = Seg > 1.f ? FMath::Lerp(Target.Z, From.Z, FMath::Clamp(FVector::Dist2D(Next, Target) / Seg, 0.f, 1.f)) : Target.Z;
+	SetActorLocation(Next);
+	// turn towards where they are going (the mannequin faces its own +Y)
+	const float WantYaw = Dir.Rotation().Yaw - 90.f;
+	SetActorRotation(FRotator(0.f, FMath::FixedTurn(GetActorRotation().Yaw, WantYaw, 300.f * DeltaSeconds), 0.f));
+}
+
 void AAstraCrewMember::BeginLine(int32 LineId, int32 SampleRate)
 {
 	CurrentLine = LineId;
@@ -183,6 +335,12 @@ bool AAstraCrewMember::IsSpeaking() const
 void AAstraCrewMember::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (VisitPhase == 1 || VisitPhase == 3)
+	{
+		TickVisit(DeltaSeconds);
+		return;
+	}
+
 	SpeakingLevel = FMath::FInterpTo(SpeakingLevel, 0.f, DeltaSeconds, 4.f);
 	// when talking to the Captain, turn towards them (at most 70 degrees from the station), then drift back
 	SinceSpoke = IsSpeaking() ? 0.f : SinceSpoke + DeltaSeconds;

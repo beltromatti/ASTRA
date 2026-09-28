@@ -109,6 +109,18 @@ def chirp():
     return norm(np.concatenate(parts + [np.zeros(int(0.05 * SR))]), 0.5)
 
 
+def door_chime():
+    """Someone at the Captain's door: a warm two-note chime (a falling fourth), soft bell partials, a short tail."""
+    x = np.zeros(int(1.5 * SR))
+    for start, fq in ((0.0, 988.0), (0.32, 740.0)):
+        t = t_(1.1)
+        tone = sum(np.sin(2 * np.pi * fq * m * t) * a * np.exp(-t * d) for m, a, d in ((1, 1.0, 3.2), (2.01, 0.28, 5.5), (3.0, 0.1, 8.0)))
+        tone *= np.clip(t / 0.006, 0, 1)
+        i = int(start * SR)
+        x[i:i + len(t)] += tone[: len(x) - i]
+    return norm(lp(x, 6000), 0.55)
+
+
 def door(opening=True):
     """A pressure door: the seal releasing (hiss), the leaves' motor, the soft stop (or the seal closing)."""
     t = t_(0.9)
@@ -232,7 +244,7 @@ def entry_plasma(dur=10.0):
 
 os.makedirs(OUT, exist_ok=True)
 for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("SW_Torpedo_Launch", lambda: vls_launch(True)),
-                 ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp),
+                 ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp), ("SW_Door_Chime", door_chime),
                  ("SW_Bridge_Ambience", bridge_ambience), ("SW_Door_Open", door), ("SW_Door_Close", lambda: door(False)), ("SW_Transit", transit),
                  ("SW_Sparks", sparks), ("SW_Falcon_Engine", falcon_engine), ("SW_Lock_Beep", lock_beep), ("SW_Lock_Solid", lock_solid),
                  ("SW_Missile_Warning", missile_warning), ("SW_Entry_Plasma", entry_plasma)):

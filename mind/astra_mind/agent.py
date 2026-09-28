@@ -275,7 +275,8 @@ def _owner(tool: str) -> str:
             "route_power": "ops", "set_target": "tactical", "fire_weapons": "tactical", "set_point_defense": "tactical",
             "launch_squadron": "flight", "recall_squadron": "flight", "dispatch_damage_control": "ops", "hail": "comms",
             "set_emcon": "sensors", "active_scan": "sensors", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
-            "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering"}.get(tool, "xo")
+            "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
+            "dismiss_visitor": "captain"}.get(tool, "xo")
 
 
 def _fallback_line(lang: str) -> str:

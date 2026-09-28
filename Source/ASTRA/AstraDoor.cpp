@@ -2,6 +2,8 @@
 
 #include "AstraDoor.h"
 
+#include "AstraCrewMember.h"
+
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Pawn.h"
@@ -65,6 +67,12 @@ void AAstraDoor::Tick(float DeltaTime)
 		{
 			const FVector D = P->GetActorLocation() - GetActorLocation();
 			bNear = FVector2D(D.X, D.Y).Size() < OpenRadius && FMath::Abs(D.Z) < 300.f;
+		}
+		// an officer walking to the Captain's quarters (or back)
+		for (const TWeakObjectPtr<AAstraCrewMember>& W : AAstraCrewMember::Walkers())
+		{
+			const FVector D = W->GetActorLocation() - GetActorLocation();
+			bNear |= FVector2D(D.X, D.Y).Size() < OpenRadius && FMath::Abs(D.Z) < 300.f;
 		}
 	}
 	// close only after the way has been clear for a moment

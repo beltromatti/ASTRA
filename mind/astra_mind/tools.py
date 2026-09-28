@@ -108,6 +108,8 @@ SHIP_TOOLS: list[dict[str, Any]] = [
                         "(the battle around the Aquila) or the sector map (the systems of the March, who holds them, "
                         "the gate links, where the Aquila is).", {
         "mode": {"type": "string", "enum": ["tactical", "sector"]}}, ["mode"]),
+    _fn("dismiss_visitor", "The officer who came to the Captain's quarters in person (`visitor` in the state) goes back "
+                           "to their station: when the Captain lets them go, or the conversation is over.", {}, []),
     _fn("set_emcon", "Science & Sensors: emission control (silent = passive sensors only).", {
         "level": {"type": "string", "enum": ["silent", "restricted", "full"]}}, ["level"]),
     _fn("active_scan", "Science & Sensors: active radar/lidar ping or focused scan of a contact (reveals our position).", {

@@ -8,6 +8,7 @@
 #include "AstraHangar.h"
 #include "AstraPatient.h"
 #include "AstraQuarters.h"
+#include "AstraCrewMember.h"
 #include "AstraWorldGen.h"
 #include "AstraWorldSurface.h"
 #include "AstraNavLights.h"
@@ -121,6 +122,23 @@ namespace
 				Ship->AddHeat(A.Num() ? FCString::Atof(*A[0]) - Ship->GetHeatPct() : 0.f);
 				UE_LOG(LogASTRA, Log, TEXT("[Heat] %.0f %%"), Ship->GetHeatPct());
 			}
+		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdWalk(TEXT("astra.walk"),
+		TEXT("Testing: astra.walk <station> [back] walks an officer along their way to the Captain's quarters (no visit), or back"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			AAstraCrewMember* C = A.Num() ? AAstraCrewMember::FindByStation(World, A[0]) : nullptr;
+			if (!C)
+			{
+				return;
+			}
+			if (A.Num() > 1 && A[1] == TEXT("back"))
+			{
+				C->Leave();
+				return;
+			}
+			int32 WaitAt = INDEX_NONE;
+			C->Visit(UAstraShipSubsystem::VisitRouteFor(C, WaitAt), WaitAt, 2.4f);
 		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdShip(TEXT("astra.cmd"),
 		TEXT("Run a ship command (testing): astra.cmd <name> <json args, ' for \">, e.g. astra.cmd director_beat {'beat':{'type':'transit','system_name':'Meridian'}}"),
@@ -783,6 +801,187 @@ void UAstraShipSubsystem::TestMedbay(const FString& What, int32 N)
 	SyncWard();
 }
 
+TArray<FVector> UAstraShipSubsystem::VisitRouteFor(const AAstraCrewMember* C, int32& OutWaitAt)
+{
+	// the bridge is the world origin (metres here; deck level 0, the well -0.6, the dais +0.2): from each station out of
+	// the bridge's starboard door (round the holo table's back and down the well's starboard stairs as needed), along
+	// Corridor 1-A starboard to the cabin's door (a wait there: the chime), and a step and a half inside the cabin
+	TArray<FVector> R;
+	auto P = [&R](float X, float Y, float Z = 0.f) { R.Add(FVector(X * 100.f, Y * 100.f, Z)); };
+	const FString& S = C->StationId;
+	if (S == TEXT("helm") || S == TEXT("ops"))
+	{
+		// up the starboard stairs: two steps of 0.2 m between x 3.1 and 2.4 (art/blender/bridge.py)
+		R.Add(C->GetActorLocation());
+		P(4.2f, S == TEXT("helm") ? -1.2f : 1.8f, -60.f);
+		P(3.3f, 4.7f, -60.f);
+		P(2.25f, 4.7f);
+		P(-7.6f, 4.0f);
+	}
+	else if (S == TEXT("engineering"))
+	{
+		R.Add(C->GetActorLocation());
+		P(0.3f, 5.2f);
+		P(-5.5f, 4.5f);
+		P(-7.7f, 3.9f);
+	}
+	else if (S == TEXT("flight"))
+	{
+		R.Add(C->GetActorLocation());
+		P(-3.2f, 5.0f);
+		P(-7.6f, 4.0f);
+	}
+	else if (S == TEXT("tactical"))
+	{
+		R.Add(C->GetActorLocation());
+		P(-2.4f, 2.6f);
+		P(-7.6f, 3.6f);
+	}
+	else if (S == TEXT("xo"))
+	{
+		// off the command dais (an ellipse 1.25 x 2.9 m, 0.2 m high)
+		R.Add(C->GetActorLocation());
+		P(-0.7f, -2.25f, 20.f);
+		P(-0.95f, -2.4f);
+		P(-5.0f, -2.6f);
+		P(-7.2f, -2.0f);
+		P(-7.2f, 2.0f);
+		P(-7.7f, 3.6f);
+	}
+	else if (S == TEXT("comms") || S == TEXT("sensors"))
+	{
+		R.Add(C->GetActorLocation());
+		if (S == TEXT("comms"))
+		{
+			P(0.3f, -5.2f);
+			P(-5.5f, -4.6f);
+		}
+		else
+		{
+			P(-3.0f, -5.2f);
+		}
+		P(-7.3f, -2.7f);
+		P(-7.3f, 2.6f);
+		P(-7.7f, 3.9f);
+	}
+	else
+	{
+		// from another deck (the doctor, the Chief): up in the bridge lift, forward along Corridor 1-A port, across the
+		// bridge behind the holo table
+		P(-18.6f, -3.9f);
+		P(-10.0f, -3.9f);
+		P(-7.6f, -3.9f);
+		P(-7.3f, -2.7f);
+		P(-7.3f, 2.6f);
+		P(-7.7f, 3.9f);
+	}
+	P(-9.2f, 3.9f);
+	P(-17.9f, 3.9f);
+	OutWaitAt = R.Num() - 1;         // 3.2 m short of the cabin's door (it opens at 2.6)
+	P(-20.4f, 3.9f);
+	P(-23.2f, 3.9f);
+	return R;
+}
+
+bool UAstraShipSubsystem::StartVisit(const FString& Who, const FString& Why, FString& OutDetail)
+{
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	AAstraQuarters* Q = nullptr;
+	for (TActorIterator<AAstraQuarters> It(GetWorld()); It; ++It)
+	{
+		Q = *It;
+	}
+	if (!Q || !Q->IsPawnInside(P) || Q->IsResting())
+	{
+		OutDetail = TEXT("the Captain is not awake in the quarters");
+		return false;
+	}
+	if (Visitor.IsValid())
+	{
+		OutDetail = TEXT("someone is already with the Captain");
+		return false;
+	}
+	if (Alert == EAstraAlert::Red)
+	{
+		OutDetail = TEXT("red alert: every officer is at their station");
+		return false;
+	}
+	AAstraCrewMember* C = AAstraCrewMember::FindByStation(GetWorld(), Who);
+	if (!C || C->IsVisiting() || Who.StartsWith(TEXT("patient")) || Who.StartsWith(TEXT("mess")))
+	{
+		OutDetail = FString::Printf(TEXT("no officer %s free to come"), *Who);
+		return false;
+	}
+	int32 WaitAt = INDEX_NONE;
+	const TArray<FVector> Route = VisitRouteFor(C, WaitAt);
+	C->Visit(Route, WaitAt, 2.4f);
+	Visitor = C;
+	VisitReason = Why;
+	bVisitAnnounced = false;
+	bVisitChimed = false;
+	VisitSilentT = 0.f;
+	Event(FString::Printf(TEXT("%s has left their station and is on the way to the Captain's quarters"), *C->DisplayName), false);
+	OutDetail = TEXT("on the way to the Captain's quarters");
+	return true;
+}
+
+void UAstraShipSubsystem::EndVisit(const TCHAR* Why, bool bHurry)
+{
+	if (AAstraCrewMember* V = Visitor.Get())
+	{
+		Event(V->HasArrived() ? FString::Printf(TEXT("%s has left the Captain's quarters and is going back to their station (%s)"), *V->DisplayName, Why)
+		                      : FString::Printf(TEXT("%s turned back before reaching the Captain's quarters (%s)"), *V->DisplayName, Why), false);
+		V->Leave(bHurry);
+	}
+	Visitor.Reset();
+}
+
+void UAstraShipSubsystem::TickVisit(float DeltaTime)
+{
+	AAstraCrewMember* V = Visitor.Get();
+	if (!V)
+	{
+		return;
+	}
+	bool bCaptainThere = false;
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	for (TActorIterator<AAstraQuarters> It(GetWorld()); It; ++It)
+	{
+		bCaptainThere |= It->IsPawnInside(P) && !It->IsResting();
+	}
+	if (Alert == EAstraAlert::Red)
+	{
+		EndVisit(TEXT("action stations"), true);       // back to their station at a jog
+		return;
+	}
+	if (!bCaptainThere)
+	{
+		EndVisit(TEXT("the Captain left the cabin"));
+		return;
+	}
+	if (V->IsWaiting() && !bVisitChimed)
+	{
+		// at the cabin's door: the chime inside, then the door opens for them
+		bVisitChimed = true;
+		if (USoundBase* Chime = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Door_Chime.SW_Door_Chime")))
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, Chime, FVector(-2190.f, 390.f, 210.f), 0.7f);
+		}
+	}
+	if (V->HasArrived() && !bVisitAnnounced)
+	{
+		// in the cabin: the crew hears it as an event the officer answers in person (the mind lets them speak first)
+		bVisitAnnounced = true;
+		Event(FString::Printf(TEXT("%s: %s has come to the Captain's quarters in person and stands just inside the door — %s"),
+		                      *V->StationId, *V->DisplayName, *VisitReason), true);
+	}
+	VisitSilentT = V->IsSpeaking() ? 0.f : VisitSilentT + DeltaTime;
+	if (V->HasArrived() && VisitSilentT > 150.f)
+	{
+		EndVisit(TEXT("nothing more to say"));
+	}
+}
+
 bool UAstraShipSubsystem::IsCaptainInMess() const
 {
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
@@ -998,6 +1197,24 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		HoloMode = M;
 		OutDetail = M == TEXT("sector") ? TEXT("holo table: the sector map (the March, who holds what, the gate links)")
 		                                : TEXT("holo table: tactical plot");
+		return true;
+	}
+	if (Name == TEXT("visit"))
+	{
+		FString Who, Why;
+		Args->TryGetStringField(TEXT("officer"), Who);
+		Args->TryGetStringField(TEXT("reason"), Why);
+		return StartVisit(Who, Why, OutDetail);
+	}
+	if (Name == TEXT("visit_end") || Name == TEXT("dismiss_visitor"))
+	{
+		if (!Visitor.IsValid())
+		{
+			OutDetail = TEXT("nobody is visiting the Captain");
+			return false;
+		}
+		EndVisit(TEXT("the Captain let them go"));
+		OutDetail = TEXT("going back to their station");
 		return true;
 	}
 	if (Name == TEXT("sector"))
@@ -1481,6 +1698,12 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		}
 		S->SetObjectField(TEXT("medbay"), Med);
 	}
+	if (const AAstraCrewMember* V = Visitor.Get())
+	{
+		S->SetStringField(TEXT("visitor"), FString::Printf(TEXT("%s (%s) %s"), *V->StationId, *V->DisplayName, V->HasArrived()
+			? TEXT("is here in the Captain's quarters, in person: they speak face to face; the Captain can let them go (dismiss_visitor)")
+			: TEXT("is walking to the Captain's quarters")));
+	}
 	if (IsCaptainInMess() && MessDiners.Num())
 	{
 		// the Mess Hall's tables: who sits where (their `speaker` ids when the Captain talks to them there), as the Captain
@@ -1537,6 +1760,7 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 			Event(N.Text, N.bReport);
 		}
 	}
+	TickVisit(DeltaTime);
 	if ((MessSyncT -= DeltaTime) <= 0.f)
 	{
 		MessSyncT = 5.f;

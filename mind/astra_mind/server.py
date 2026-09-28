@@ -87,6 +87,7 @@ EXTERNAL_SPEAKERS[ADMIRAL["key"]] = (f'{ADMIRAL["name"]} ({ADMIRAL["ship"]})', A
 from .port import PORT as PORT_CONTROL, FieldControl, for_field, stimulus_for, world_of  # noqa: E402
 from .medbay import patient_voice  # noqa: E402
 from .mess import MessTalk  # noqa: E402
+from .visits import VisitPlanner  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
@@ -200,6 +201,7 @@ class Mind:
         self.mess = MessTalk(self.llm, self.voice.say)
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander,
                                  news=self._fleet_news)
+        self.visits = VisitPlanner(self.llm, self._director_command, self.director.note)
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
         self.agent.war = lambda: self.director.war.crew_view()
@@ -317,6 +319,12 @@ class Mind:
             who = COMMANDERS.get(self.enemy.contact, {}).get("name", "the Mandate commander")
             self.director.note(f"{who} decided: {args.get('order')} ({args.get('reason', '')})")
         return await ship.execute(name, args, self.enemy.speaker)
+
+    def _visit_ctx(self) -> dict[str, Any]:
+        """What the story knows when it decides whether an officer comes to the Captain's quarters."""
+        return {"events": list(self.game.events)[-12:] if self.game else [],
+                "campaign": [c for c in self.director.campaign if not c.startswith("captain's log:")],
+                "mood": self.director.mood, "bonds": "; ".join(self.director.bonds_lines())}
 
     def _battle_state(self) -> dict[str, Any]:
         st = dict(self.game.state) if (self.game and self.game.state) else dict(self.local.snapshot())
@@ -498,7 +506,8 @@ class Mind:
                         continue
                     self.voice.low_priority = True
                     try:
-                        ask = TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else None
+                        ask = TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else \
+                            VISIT_ASK if any("has come to the Captain's quarters in person" in e for e in events) else None
                         t = await self.agent.handle_event(" | ".join(events), self.lang, ask=ask)
                     finally:
                         self.voice.low_priority = False
@@ -611,6 +620,9 @@ class Mind:
                         asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
                     elif text.startswith("story:"):
                         self.director.note(text.split(":", 1)[1].strip())   # remembered, no new beat
+                    elif text.startswith("the Captain went into the Captain's quarters"):
+                        # someone may have a reason to come by in person (mind/astra_mind/visits.py)
+                        self.visits.captain_entered(lambda: (self.game.state if self.game else {}) or {}, self._visit_ctx)
                     flight_world = world_of(text) if text.startswith("flight:") else None
                     if flight_world:
                         persona = self._field_world(flight_world)
@@ -673,7 +685,8 @@ class Mind:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
-        async with websockets.serve(self.handle_client, HOST, PORT, max_size=2 ** 22):
+        # a game busy for a while (loading, compiling shaders) must not lose the crew: pings wait up to 90 s
+        async with websockets.serve(self.handle_client, HOST, PORT, max_size=2 ** 22, ping_interval=20, ping_timeout=90):
             await asyncio.Future()
 
 
@@ -770,6 +783,12 @@ def _fallen(text: str) -> list[str]:
     return out
 
 
+VISIT_ASK = ("An officer has just come to the Captain's quarters in person (the event says who and why). That officer, "
+             "and only that officer, speaks now with speak, face to face: a first line or two that open what they came "
+             "to say, in their own voice and character, shaped by the reason, by what the ship has lived through and by "
+             "how they stand with the Captain. Human and direct, not a report; then they wait for the Captain. True to "
+             "the ship: names of the fallen or the wounded only from the casualties, the Medbay and the events, never "
+             "invented. No tools.")
 TACTICAL_ASK = ("A tactical check of the fight (the facts above come from the plot, they are true now). The XO, or the "
                 "officer whose station it concerns, tells the Captain the single most important problem in one short "
                 "sentence and recommends a concrete order the Captain could give (a course or intercept, a target, a "

@@ -201,6 +201,9 @@ public:
 	void ResumeFrom(const TSharedPtr<FJsonObject>& Save);
 
 	/** Testing the Medbay: "admit" N wounded from random hits, or let the doctors' "care" run N minutes. */
+	/** The way from an officer's place to the Captain's quarters (world cm, deck level); OutWaitAt: the point at the
+	 *  cabin's door where they wait for the chime. */
+	static TArray<FVector> VisitRouteFor(const class AAstraCrewMember* C, int32& OutWaitAt);
 	void TestMedbay(const FString& What, int32 N);
 
 	/** One of our manned aircraft was shot down: who was flying it (for the flight report). */
@@ -268,6 +271,15 @@ private:
 	int32 MessWatch = -1;             // the half-hour watch they belong to
 	float MessSyncT = 0.f;
 	TArray<FString> SectorNews;       // the latest news on the fleet net (the mind's war map)
+	// an officer come to the Captain's quarters in person (the mind decides when, and why)
+	TWeakObjectPtr<class AAstraCrewMember> Visitor;
+	FString VisitReason;
+	bool bVisitAnnounced = false;
+	bool bVisitChimed = false;
+	float VisitSilentT = 0.f;         // since the visitor last spoke
+	bool StartVisit(const FString& Who, const FString& Why, FString& OutDetail);
+	void EndVisit(const TCHAR* Why, bool bHurry = false);
+	void TickVisit(float DeltaTime);
 	UPROPERTY() TObjectPtr<class AAstraBridgeFX> BridgeFX;   // sparks and arcs on the bridge when we are hit hard
 	FRandomStream CasualtyRng;
 	static constexpr int32 NumDamageTeams = 4;
