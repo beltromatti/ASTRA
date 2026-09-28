@@ -34,7 +34,10 @@ if eal.does_asset_exist(path):
 else:
     m = tools.create_asset("M_ASTRA_SpaceSky", DST, unreal.Material, unreal.MaterialFactoryNew())
 m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
-m.set_editor_property("is_sky", True)
+# not "IsSky": sky-pass meshes did not render in the game view (only in the editor). A plain unlit sphere that the
+# material recentres on the camera (world position offset) is robust everywhere; the look only depends on the view
+# direction, so the sphere's size and position do not matter.
+m.set_editor_property("is_sky", False)
 m.set_editor_property("two_sided", True)
 
 
@@ -88,7 +91,7 @@ link(axes[2], "", ap2, "B")
 
 samp = E(unreal.MaterialExpressionTextureSampleParameterCube, -800, 250, parameter_name="SkyCubemap", texture=cube, group="Sky")
 link(ap2, "", samp, "UVs")
-bright = sparam("SkyBrightness", 0.25, -800, 480)
+bright = sparam("SkyBrightness", 3.0, -800, 480)
 sky = E(unreal.MaterialExpressionMultiply, -550, 300)
 link(samp, "RGB", sky, "A")
 link(bright, "", sky, "B")
@@ -148,6 +151,13 @@ eai = E(unreal.MaterialExpressionEyeAdaptationInverse, 100, 400)
 link(total, "", eai, "LightValueInput")
 link(sparam("ExposureCompensation", 0.85, -100, 600), "", eai, "AlphaInput")
 mel.connect_material_property(eai, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+# world position offset: move every vertex by (camera - object position) so the sphere is always centred on the eye
+campos = E(unreal.MaterialExpressionCameraPositionWS, -600, 1500)
+objpos = E(unreal.MaterialExpressionObjectPositionWS, -600, 1600)
+wpo = E(unreal.MaterialExpressionSubtract, -400, 1550)
+link(campos, "", wpo, "A")
+link(objpos, "", wpo, "B")
+mel.connect_material_property(wpo, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
 mel.recompile_material(m)
 eal.save_loaded_asset(m, only_if_is_dirty=False)
 log.append("M_ASTRA_SpaceSky ok")

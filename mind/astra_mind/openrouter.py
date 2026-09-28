@@ -21,6 +21,7 @@ API_URL = "https://openrouter.ai/api/v1/chat/completions"
 class ToolCall:
     name: str = ""
     arguments_raw: str = ""
+    id: str = ""
 
     def arguments(self) -> dict[str, Any] | None:
         try:
@@ -77,7 +78,11 @@ class OpenRouter:
         max_tokens: int = 500,
         temperature: float | None = 0.3,
         extra: dict[str, Any] | None = None,
+        on_tool_call: Any = None,
+        allow_fallbacks: bool = False,
     ) -> Completion:
+        """Streaming chat. `on_tool_call(ToolCall)` (sync or async) fires as soon as each tool call's arguments are
+        complete, before the rest of the reply has arrived: speech can start while the model is still writing."""
         body: dict[str, Any] = {
             "model": model,
             "messages": messages,
@@ -93,7 +98,7 @@ class OpenRouter:
             body["tools"] = tools
             body["tool_choice"] = tool_choice
         if providers:
-            body["provider"] = {"order": providers, "allow_fallbacks": False, "require_parameters": True}
+            body["provider"] = {"order": providers, "allow_fallbacks": allow_fallbacks, "require_parameters": True}
         if reasoning is not None:
             body["reasoning"] = reasoning
         if extra:
@@ -101,7 +106,21 @@ class OpenRouter:
 
         out = Completion(model=model)
         calls: dict[int, ToolCall] = {}
+        fired: set[int] = set()
         t0 = time.perf_counter()
+
+        async def fire(upto_exclusive: int | None) -> None:
+            if on_tool_call is None:
+                return
+            for i in sorted(calls):
+                if i in fired or (upto_exclusive is not None and i >= upto_exclusive):
+                    continue
+                if calls[i].arguments() is None:
+                    continue
+                fired.add(i)
+                r = on_tool_call(calls[i])
+                if hasattr(r, "__await__"):
+                    await r
         try:
             async with self._client.stream("POST", API_URL, json=body) as resp:
                 if resp.status_code != 200:
@@ -129,7 +148,11 @@ class OpenRouter:
                             out.content += delta["content"]
                         for tc in delta.get("tool_calls") or []:
                             idx = tc.get("index", 0)
+                            if idx not in calls and calls:
+                                await fire(idx)          # a new call started: the previous ones are complete
                             call = calls.setdefault(idx, ToolCall())
+                            if tc.get("id") and not call.id:
+                                call.id = tc["id"]
                             fn = tc.get("function") or {}
                             if fn.get("name"):
                                 call.name += fn["name"]
@@ -150,6 +173,8 @@ class OpenRouter:
                         out.reasoning_tokens = ((usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0)
         except (httpx.HTTPError, json.JSONDecodeError) as exc:
             out.error = f"{type(exc).__name__}: {exc}"[:300]
+        if not out.error:
+            await fire(None)
         out.t_end = time.perf_counter() - t0
         out.tool_calls = [calls[i] for i in sorted(calls)]
         return out

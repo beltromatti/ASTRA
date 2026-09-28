@@ -8,10 +8,15 @@ dependencies = [
     "pydantic>=2.9",
     "lingua-language-detector>=2.0",
     "websockets>=14",
+    "pocket-tts>=1.0",
+    "numpy>=2.0",
+    "soundfile>=0.12",
+    "sounddevice>=0.5",
 ]
 
 [project.scripts]
 astra-bench = "astra_mind.bench.run:main"
+astra-mind = "astra_mind.server:main"
 
 [build-system]
 requires = ["hatchling"]

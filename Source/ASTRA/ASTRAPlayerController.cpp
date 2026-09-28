@@ -9,6 +9,8 @@
 #include "Blueprint/UserWidget.h"
 #include "ASTRA.h"
 #include "Widgets/Input/SVirtualJoystick.h"
+#include "AstraMindSubsystem.h"
+#include "Engine/GameInstance.h"
 
 AASTRAPlayerController::AASTRAPlayerController()
 {
@@ -45,6 +47,13 @@ void AASTRAPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
+	// push-to-talk to the bridge crew
+	if (IsLocalPlayerController() && InputComponent)
+	{
+		InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AASTRAPlayerController::OnTalkPressed);
+		InputComponent->BindKey(EKeys::V, IE_Released, this, &AASTRAPlayerController::OnTalkReleased);
+	}
+
 	// only add IMCs for local player controllers
 	if (IsLocalPlayerController())
 	{
@@ -73,4 +82,20 @@ bool AASTRAPlayerController::ShouldUseTouchControls() const
 {
 	// are we on a mobile platform? Should we force touch?
 	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;
+}
+
+void AASTRAPlayerController::OnTalkPressed()
+{
+	if (UAstraMindSubsystem* Mind = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr)
+	{
+		Mind->PushToTalk(true);
+	}
+}
+
+void AASTRAPlayerController::OnTalkReleased()
+{
+	if (UAstraMindSubsystem* Mind = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr)
+	{
+		Mind->PushToTalk(false);
+	}
 }

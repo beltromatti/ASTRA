@@ -64,6 +64,26 @@ for st in DATA["stations"]:
             smc_c.set_material_by_name(f"MI_ASTRA_Screen{slot}", eal.load_asset(f"/Game/ASTRA/UI/Materials/MI_UI_{prefix}_{slot}"))
         place("SM_BRG_ChairCrew", x, y, z, yaw, label=f"Station_{lab}_Chair", folder="Bridge/Stations")
 
+# --- bridge crew (placeholder bodies until the MetaHuman crew); the station id is the mind's `speaker`
+CREW = {"xo": "Cmdr. Elena Serra", "helm": "Lt. Marco Ferri", "ops": "Lt. Yuki Tanaka", "tactical": "Lt. Cmdr. Sara Voss",
+        "comms": "Ens. Leo Martin", "sensors": "Lt. Priya Nair", "engineering": "Lt. (j.g.) Kofi Mensah", "flight": "Lt. Jonah Price"}
+for st in DATA["stations"]:
+    sid = st["id"]
+    if sid not in CREW:
+        continue
+    x, y = st["pos"]
+    z = level_z[st["level"]]
+    yaw = st["yaw"]
+    back = 0.0 if st["kind"] == "tactical_rail" else 0.62
+    if sid == "xo":
+        x, y, back = x + 0.35, y - 0.55, 0.0
+    fx, fy = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    c = eas.spawn_actor_from_class(unreal.AstraCrewMember, V((x - fx * back) * M, (y - fy * back) * M, z * M), R(yaw=yaw - 90.0))
+    c.set_editor_property("station_id", sid)
+    c.set_editor_property("display_name", CREW[sid])
+    c.set_actor_label(f"Crew_{sid}")
+    c.set_folder_path("Bridge/Crew")
+
 # --- lights: dome downlight + rect lights along the ceiling beams + holo glow (no shadows) + station spots
 def rect(x, y, z, w, h, lumens, temp, label, shadows=True, pitch=-90.0, yaw=0.0):
     a = eas.spawn_actor_from_class(unreal.RectLight, V(x * M, y * M, z * M), R(pitch=pitch, yaw=yaw))
@@ -78,6 +98,7 @@ def rect(x, y, z, w, h, lumens, temp, label, shadows=True, pitch=-90.0, yaw=0.0)
     c.set_editor_property("cast_shadows", shadows)
     a.set_actor_label(label)
     a.set_folder_path("Lighting")
+    a.set_editor_property("tags", ["ASTRA.ShipLight"])
     return a
 
 
@@ -108,6 +129,7 @@ sc.set_editor_property("temperature", 4300.0)
 sc.set_editor_property("light_source_angle", 0.35)
 sun.set_actor_label("Sun_Aurelia")
 sun.set_folder_path("Lighting")
+sun.set_editor_property("tags", ["ASTRA.Sun"])
 
 sky = eas.spawn_actor_from_object(eal.load_asset("/Engine/EngineSky/SM_SkySphere") or eal.load_asset("/Engine/BasicShapes/Sphere"), V(0, 0, 0), R())
 sky.set_actor_scale3d(V(400, 400, 400))
@@ -115,9 +137,12 @@ smc = sky.get_component_by_class(unreal.StaticMeshComponent)
 smc.set_material(0, eal.load_asset("/Game/ASTRA/Space/M_ASTRA_SpaceSky"))
 smc.set_editor_property("cast_shadow", False)
 smc.set_editor_property("affect_distance_field_lighting", False)
+smc.set_editor_property("affect_dynamic_indirect_lighting", False)
+smc.set_editor_property("bounds_scale", 100.0)      # the material recentres the sphere on the camera: never cull it
 smc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
 sky.set_actor_label("SpaceSky")
 sky.set_folder_path("Space")
+sky.set_editor_property("tags", ["ASTRA.Sky"])
 
 pp = eas.spawn_actor_from_class(unreal.PostProcessVolume, V(0, 0, 0), R())
 pp.set_editor_property("unbound", True)
@@ -131,7 +156,7 @@ pp.set_editor_property("settings", s)
 pp.set_actor_label("PostProcess_Bridge")
 pp.set_folder_path("Lighting")
 
-ps = eas.spawn_actor_from_class(unreal.PlayerStart, V(-1.0 * M, 0.9 * M, 1.0 * M), R())
+ps = eas.spawn_actor_from_class(unreal.PlayerStart, V(0.35 * M, 0.95 * M, 1.35 * M), R())   # on the dais, beside the chair
 ps.set_folder_path("Gameplay")
 unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).set_level_viewport_camera_info(
     V(-7.2 * M, -1.2 * M, 1.75 * M), R(pitch=-4.0, yaw=4.0))

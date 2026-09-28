@@ -18,7 +18,10 @@ public class ASTRA : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			"Json",
+			"JsonUtilities",
+			"WebSockets"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

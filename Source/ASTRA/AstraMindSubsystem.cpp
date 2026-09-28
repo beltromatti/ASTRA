@@ -1,0 +1,303 @@
+// ASTRA — link to astra-mind.
+
+#include "AstraMindSubsystem.h"
+
+#include "ASTRA.h"
+#include "AstraCrewMember.h"
+#include "AstraShipSubsystem.h"
+#include "Dom/JsonObject.h"
+#include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
+#include "HAL/PlatformProcess.h"
+#include "IWebSocket.h"
+#include "Misc/Paths.h"
+#include "Modules/ModuleManager.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+#include "WebSocketsModule.h"
+
+namespace
+{
+	const TCHAR* MindUrl = TEXT("ws://127.0.0.1:8765");
+	UAstraMindSubsystem* GActiveMind = nullptr;
+
+	FAutoConsoleCommand CmdSay(TEXT("astra.say"), TEXT("Speak to the bridge crew as the Captain (typed): astra.say <text>"),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& Args)
+		{
+			if (GActiveMind)
+			{
+				GActiveMind->SayText(FString::Join(Args, TEXT(" ")));
+			}
+		}));
+	FAutoConsoleCommand CmdPtt(TEXT("astra.ptt"), TEXT("Push-to-talk: astra.ptt 1 | astra.ptt 0"),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& Args)
+		{
+			if (GActiveMind && Args.Num() > 0)
+			{
+				GActiveMind->PushToTalk(Args[0] == TEXT("1"));
+			}
+		}));
+
+	void Screen(const FString& S, const FColor& C, float Time = 6.f)
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, Time, C, S);   // development captions; the game itself has no HUD
+		}
+	}
+}
+
+void UAstraMindSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	GActiveMind = this;
+	FModuleManager::LoadModuleChecked<FWebSocketsModule>(TEXT("WebSockets"));
+	TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UAstraMindSubsystem::Tick), 0.0f);
+	NextConnectTime = FPlatformTime::Seconds() + 0.5;
+}
+
+void UAstraMindSubsystem::Deinitialize()
+{
+	FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);
+	if (Socket.IsValid())
+	{
+		Socket->Close();
+		Socket.Reset();
+	}
+	if (GActiveMind == this)
+	{
+		GActiveMind = nullptr;
+	}
+	Super::Deinitialize();
+}
+
+bool UAstraMindSubsystem::IsConnected() const
+{
+	return Socket.IsValid() && Socket->IsConnected();
+}
+
+UWorld* UAstraMindSubsystem::GameWorld() const
+{
+	const UGameInstance* GI = GetGameInstance();
+	return GI ? GI->GetWorld() : nullptr;
+}
+
+void UAstraMindSubsystem::Connect()
+{
+	Socket = FWebSocketsModule::Get().CreateWebSocket(MindUrl, TEXT(""));
+	Socket->OnConnected().AddLambda([this]()
+	{
+		ConnectFailures = 0;
+		UE_LOG(LogASTRA, Log, TEXT("[Mind] connected"));
+		TSharedRef<FJsonObject> Hello = MakeShared<FJsonObject>();
+		Hello->SetStringField(TEXT("type"), TEXT("hello"));
+		Hello->SetStringField(TEXT("client"), TEXT("ue"));
+		Send(Hello);
+		NextStateTime = 0.0;
+	});
+	Socket->OnConnectionError().AddLambda([this](const FString& Error)
+	{
+		++ConnectFailures;
+		UE_LOG(LogASTRA, Verbose, TEXT("[Mind] connection error: %s"), *Error);
+		if (ConnectFailures == 2 && bAutoLaunchMind && !bLaunchedMind)
+		{
+			LaunchMind();
+		}
+		NextConnectTime = FPlatformTime::Seconds() + 2.0;
+	});
+	Socket->OnClosed().AddLambda([this](int32 Code, const FString& Reason, bool bClean)
+	{
+		UE_LOG(LogASTRA, Log, TEXT("[Mind] closed (%d) %s"), Code, *Reason);
+		NextConnectTime = FPlatformTime::Seconds() + 2.0;
+	});
+	Socket->OnMessage().AddUObject(this, &UAstraMindSubsystem::OnText);
+	Socket->OnRawMessage().AddUObject(this, &UAstraMindSubsystem::OnBinary);
+	Socket->Connect();
+}
+
+void UAstraMindSubsystem::LaunchMind()
+{
+	bLaunchedMind = true;
+	const FString MindDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("mind"));
+	const FString LogFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Logs/astra-mind.log"));
+	const FString Cmd = FString::Printf(TEXT("-lc \"cd '%s' && exec uv run astra-mind >> '%s' 2>&1\""), *MindDir, *LogFile);
+	FProcHandle H = FPlatformProcess::CreateProc(TEXT("/bin/zsh"), *Cmd, true, true, true, nullptr, 0, nullptr, nullptr);
+	UE_LOG(LogASTRA, Log, TEXT("[Mind] launched astra-mind (%s)"), H.IsValid() ? TEXT("ok") : TEXT("FAILED"));
+}
+
+void UAstraMindSubsystem::Send(const TSharedRef<FJsonObject>& Msg)
+{
+	if (!IsConnected())
+	{
+		return;
+	}
+	FString Out;
+	TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Msg, W);
+	Socket->Send(Out);
+}
+
+void UAstraMindSubsystem::SayText(const FString& Text)
+{
+	Screen(FString::Printf(TEXT("Captain: %s"), *Text), FColor(255, 214, 120));
+	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+	M->SetStringField(TEXT("type"), TEXT("player_text"));
+	M->SetStringField(TEXT("text"), Text);
+	Send(M);
+}
+
+void UAstraMindSubsystem::PushToTalk(bool bDown)
+{
+	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+	M->SetStringField(TEXT("type"), TEXT("ptt"));
+	M->SetBoolField(TEXT("down"), bDown);
+	Send(M);
+}
+
+void UAstraMindSubsystem::BindShipEvents()
+{
+	UWorld* World = GameWorld();
+	if (!World || BoundWorld.Get() == World)
+	{
+		return;
+	}
+	if (UAstraShipSubsystem* Ship = World->GetSubsystem<UAstraShipSubsystem>())
+	{
+		BoundWorld = World;
+		ShipEventHandle = Ship->OnShipEvent.AddLambda([this](const FString& Text)
+		{
+			TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+			M->SetStringField(TEXT("type"), TEXT("event"));
+			M->SetStringField(TEXT("text"), Text);
+			Send(M);
+		});
+	}
+}
+
+bool UAstraMindSubsystem::Tick(float DeltaTime)
+{
+	const double Now = FPlatformTime::Seconds();
+	if (!Socket.IsValid() || (!Socket->IsConnected() && Now >= NextConnectTime))
+	{
+		if (Now >= NextConnectTime)
+		{
+			NextConnectTime = Now + 2.0;
+			Connect();
+		}
+		return true;
+	}
+	BindShipEvents();
+	if (IsConnected() && Now >= NextStateTime)
+	{
+		NextStateTime = Now + 1.0;
+		if (UWorld* World = GameWorld())
+		{
+			if (UAstraShipSubsystem* Ship = World->GetSubsystem<UAstraShipSubsystem>())
+			{
+				TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+				M->SetStringField(TEXT("type"), TEXT("ship_state"));
+				M->SetObjectField(TEXT("state"), Ship->Snapshot());
+				Send(M);
+			}
+		}
+	}
+	return true;
+}
+
+void UAstraMindSubsystem::OnText(const FString& Text)
+{
+	TSharedPtr<FJsonObject> Msg;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Msg) || !Msg.IsValid())
+	{
+		return;
+	}
+	const FString Type = Msg->GetStringField(TEXT("type"));
+	if (Type == TEXT("command"))
+	{
+		HandleCommand(Msg);
+	}
+	else if (Type == TEXT("line"))
+	{
+		const int32 Id = (int32)Msg->GetNumberField(TEXT("id"));
+		const FString Speaker = Msg->GetStringField(TEXT("speaker"));
+		LineSpeakers.Add(Id, Speaker);
+		Screen(FString::Printf(TEXT("%s: %s"), *Msg->GetStringField(TEXT("name")), *Msg->GetStringField(TEXT("text"))), FColor(150, 210, 255), 9.f);
+		UE_LOG(LogASTRA, Log, TEXT("[Crew] %s: %s"), *Speaker, *Msg->GetStringField(TEXT("text")));
+	}
+	else if (Type == TEXT("audio_begin"))
+	{
+		const int32 Id = (int32)Msg->GetNumberField(TEXT("line"));
+		if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Msg->GetStringField(TEXT("speaker"))))
+		{
+			Crew->BeginLine(Id, (int32)Msg->GetNumberField(TEXT("rate")));
+		}
+	}
+	else if (Type == TEXT("audio_end"))
+	{
+		const int32 Id = (int32)Msg->GetNumberField(TEXT("line"));
+		if (const FString* Sp = LineSpeakers.Find(Id))
+		{
+			if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), *Sp))
+			{
+				Crew->EndLine(Id);
+			}
+		}
+	}
+	else if (Type == TEXT("transcript"))
+	{
+		Screen(FString::Printf(TEXT("Captain (%s): %s"), *Msg->GetStringField(TEXT("lang")), *Msg->GetStringField(TEXT("text"))), FColor(255, 214, 120));
+	}
+	else if (Type == TEXT("status"))
+	{
+		FString Mic;
+		if (Msg->TryGetStringField(TEXT("mic"), Mic))
+		{
+			Screen(FString::Printf(TEXT("Microphone %s (allow microphone access for the game in System Settings)"), *Mic), FColor::Orange, 10.f);
+		}
+	}
+}
+
+void UAstraMindSubsystem::OnBinary(const void* Data, SIZE_T Size, SIZE_T BytesRemaining)
+{
+	BinaryBuffer.Append(static_cast<const uint8*>(Data), (int32)Size);
+	if (BytesRemaining > 0 || BinaryBuffer.Num() < 4)
+	{
+		return;
+	}
+	int32 LineId = 0;
+	FMemory::Memcpy(&LineId, BinaryBuffer.GetData(), 4);
+	if (const FString* Sp = LineSpeakers.Find(LineId))
+	{
+		if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), *Sp))
+		{
+			Crew->QueueVoice(LineId, BinaryBuffer.GetData() + 4, BinaryBuffer.Num() - 4);
+		}
+	}
+	BinaryBuffer.Reset();
+}
+
+void UAstraMindSubsystem::HandleCommand(const TSharedPtr<FJsonObject>& Msg)
+{
+	const FString Id = Msg->GetStringField(TEXT("id"));
+	const FString Name = Msg->GetStringField(TEXT("name"));
+	const TSharedPtr<FJsonObject>* Args = nullptr;
+	Msg->TryGetObjectField(TEXT("args"), Args);
+	bool bOk = false;
+	FString Detail = TEXT("ship systems unavailable");
+	if (UWorld* World = GameWorld())
+	{
+		if (UAstraShipSubsystem* Ship = World->GetSubsystem<UAstraShipSubsystem>())
+		{
+			bOk = Ship->ApplyCommand(Name, Args ? *Args : nullptr, Detail);
+		}
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Ship] %s -> %s: %s"), *Name, bOk ? TEXT("ok") : TEXT("FAILED"), *Detail);
+	TSharedRef<FJsonObject> R = MakeShared<FJsonObject>();
+	R->SetStringField(TEXT("type"), TEXT("command_result"));
+	R->SetStringField(TEXT("id"), Id);
+	R->SetBoolField(TEXT("ok"), bOk);
+	R->SetStringField(TEXT("detail"), Detail);
+	Send(R);
+}

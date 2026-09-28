@@ -1,6 +1,6 @@
 # File binari su Git LFS (quota GitHub gratuita: 10 GiB)
-*.uasset filter=lfs diff=lfs merge=lfs -text lockable
-*.umap   filter=lfs diff=lfs merge=lfs -text lockable
+*.uasset filter=lfs diff=lfs merge=lfs -text
+*.umap   filter=lfs diff=lfs merge=lfs -text
 *.fbx    filter=lfs diff=lfs merge=lfs -text
 *.glb    filter=lfs diff=lfs merge=lfs -text
 *.blend  filter=lfs diff=lfs merge=lfs -text

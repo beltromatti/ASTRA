@@ -127,6 +127,8 @@ smc = sky.get_component_by_class(unreal.StaticMeshComponent)
 smc.set_material(0, eal.load_asset("/Game/ASTRA/Space/M_ASTRA_SpaceSky"))
 smc.set_editor_property("cast_shadow", False)
 smc.set_editor_property("affect_distance_field_lighting", False)
+smc.set_editor_property("affect_dynamic_indirect_lighting", False)
+smc.set_editor_property("bounds_scale", 100.0)      # the material recentres the sphere on the camera: never cull it
 smc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
 sky.set_actor_label("SpaceSky")
 sky.set_folder_path("Space")

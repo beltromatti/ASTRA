@@ -54,4 +54,8 @@ protected:
 
 	/** Returns true if the player should use UMG touch controls */
 	bool ShouldUseTouchControls() const;
+
+	/** Push-to-talk (V): the Captain speaks to the bridge crew */
+	void OnTalkPressed();
+	void OnTalkReleased();
 };

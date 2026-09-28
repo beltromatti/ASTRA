@@ -97,6 +97,7 @@ def mi(folder, name, texture, flip_u=0.0, flip_v=0.0, intensity=None):
     mel.set_material_instance_scalar_parameter_value(inst, "FlipV", flip_v)
     if intensity is not None:
         mel.set_material_instance_scalar_parameter_value(inst, "Intensity", intensity)
+    mel.set_material_instance_scalar_parameter_value(inst, "Roughness", 0.35)     # matte anti-glare coating
     mel.update_material_instance(inst)
     eal.save_loaded_asset(inst, only_if_is_dirty=False)
     return inst
@@ -106,10 +107,10 @@ FLIP = globals().get("FLIP", {})   # {"Tactical": (1, 0), ...} orientation fixes
 for slot, tex_name in (("A", "Helm_A"), ("B", "Helm_B"), ("C", "Helm_C"), ("Touch", "Helm_Touch"), ("Tactical", "Tactical"),
                        ("Holo", "Holo"), ("Master", "Master")):
     fu, fv = FLIP.get(slot, (0.0, 0.0))
-    mi(MI, f"MI_ASTRA_Screen{slot}", tex_name, fu, fv, intensity=3.0 if slot == "Touch" else None)
+    mi(MI, f"MI_ASTRA_Screen{slot}", tex_name, fu, fv, intensity=8.0 if slot == "Touch" else 22.0)
 for st in ("Helm", "Ops", "Comms", "Sensors", "Eng", "Flight"):
     for slot in ("A", "B", "C", "Touch"):
         fu, fv = FLIP.get(slot, (0.0, 0.0))
-        mi(UI_MI, f"MI_UI_{st}_{slot}", f"{st}_{slot}", fu, fv, intensity=3.0 if slot == "Touch" else None)
+        mi(UI_MI, f"MI_UI_{st}_{slot}", f"{st}_{slot}", fu, fv, intensity=8.0 if slot == "Touch" else 22.0)
 log.append("screen instances ok")
 print(json.dumps(log))
