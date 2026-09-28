@@ -1,0 +1,51 @@
+# ===================== Segreti (MAI su git) =====================
+.env
+*.env
+!.env.example
+secrets*
+*.pem
+*.key
+
+# ===================== Unreal Engine =====================
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+.idea/
+*.xcworkspace
+*.xcodeproj
+*.sln
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+# Contenuti di terzi importati "grezzi": restano in locale e si riscaricano dagli script
+# (fonti e licenze in docs/LICENZE.md). Le nostre rielaborazioni vivono in Content/ASTRA/.
+Content/ThirdParty/
+# MetaHuman generati: si rigenerano dal roster (mind/crew/roster.yaml) con gli script
+Content/MetaHumans/
+
+# ===================== Python / Node =====================
+__pycache__/
+*.pyc
+.venv/
+.uv-cache/
+node_modules/
+
+# ===================== Cache, download e modelli (riproducibili) =====================
+art/_downloads/
+art/_cache/
+art/_tmp/
+voice/models/
+voice/.build/
+mind/.cache/
+tools/.cache/
+tools/models/
+*.log
+
+# ===================== macOS =====================
+.DS_Store

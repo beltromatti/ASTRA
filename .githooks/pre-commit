@@ -1,0 +1,9 @@
+#!/bin/sh
+# Blocca qualsiasi commit che contenga segreti.
+if git diff --cached --name-only | grep -E '(^|/)\.env$|(^|/)secrets' >/dev/null; then
+  echo "BLOCCATO: stai per committare un file di segreti (.env)." >&2; exit 1
+fi
+if git diff --cached -U0 --no-color -- . ':(exclude).githooks/*' | grep -E '^\+' | grep -E -i 'sk-or-v1-[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{30,}|(OPENROUTER|SKETCHFAB|BLENDKIT|FREESOUND|DATA_GOV|HF)_[A-Z_]*=[A-Za-z0-9_\-]{12,}' >/dev/null; then
+  echo "BLOCCATO: il commit contiene quella che sembra una chiave API." >&2; exit 1
+fi
+exit 0
