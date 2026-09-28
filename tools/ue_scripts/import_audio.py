@@ -1,14 +1,15 @@
 """Import the ship's synthesised sounds (art/_cache/audio/*.wav, made by tools/art/ship_sounds.py) as SoundWaves in
 /Game/ASTRA/Audio. Only the names in ONLY (a global, optional) are imported; loops are flagged.
-Run: tools/ue.py py "ONLY=['SW_Sparks']; exec(open('tools/ue_scripts/import_audio.py').read())" """
+Run: tools/ue.py py "ONLY=['SW_Sparks']; exec(open('tools/ue_scripts/import_audio.py').read())"
+Music: tools/ue.py py "SRC='.../art/_cache/music'; DST='/Game/ASTRA/Audio/Music'; exec(open('tools/ue_scripts/import_audio.py').read())" """
 import os
 
 import unreal
 
-SRC = "/Users/beltromatti/Desktop/ASTRA/art/_cache/audio"
-DST = "/Game/ASTRA/Audio"
+SRC = globals().get("SRC", "/Users/beltromatti/Desktop/ASTRA/art/_cache/audio")
+DST = globals().get("DST", "/Game/ASTRA/Audio")
 ONLY = globals().get("ONLY")
-LOOPS = {"SW_Bridge_Ambience"}
+LOOPS = {"SW_Bridge_Ambience", "MX_Aurelia", "MX_Tension", "MX_Battle", "MX_Aftermath"}
 
 tasks = []
 for f in sorted(os.listdir(SRC)):

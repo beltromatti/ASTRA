@@ -298,6 +298,13 @@ public:
 	float PlayerShieldFraction() const { return Ships.Num() ? Ships[0].Shield / Ships[0].ShieldMax : 1.f; }
 	bool IsScenarioOver() const { return bScenarioOver; }
 
+	/** For the score: is a fight on, how many enemy warships fight within a range, since when the last one ended. */
+	bool IsEngaged() const { return bEngagementActive; }
+	int32 HostilesFighting(double WithinKm) const;
+	float SecondsSinceEngagement() const { return EngagementEndedAt < 0.f ? 1e9f : Time - EngagementEndedAt; }
+	/** The Janus lane: seconds left to the crossing (-1 when not in the lane). */
+	float LaneSecondsLeft() const { return GateRun == EAstraGateRun::Lane ? (float)(LaneDur - LaneT) : -1.f; }
+
 	/** Camera shake request for the bridge (0..1), decays over time. */
 	float ConsumeShake(float DeltaTime);
 
@@ -313,6 +320,7 @@ private:
 	UPROPERTY() TObjectPtr<UStaticMesh> CubeMesh;
 	bool bBriefed = false;
 	bool bEngagementActive = false;     // a fight is on: the outcome is evaluated
+	float EngagementEndedAt = -1.f;
 	int32 NextContact = 40;             // contact ids for ships the director brings in
 	TArray<TPair<float, TSharedPtr<FJsonObject>>> PendingBeats;
 	float RepairUntil = -1.f, RepairHullPerSec = 0.f;

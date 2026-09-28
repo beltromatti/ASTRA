@@ -529,6 +529,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		{
 			bScenarioOver = true;
 			bEngagementActive = false;
+			EngagementEndedAt = Time;
 			FString Fleet;
 			int32 MandateLost = 0;
 			for (const FAstraBattleShip& S : Ships)
@@ -2909,6 +2910,19 @@ void UAstraBattleSubsystem::AbortGateRun()
 		Report(FString::Printf(TEXT("helm: Janus approach to the %s system cancelled"), *GateDest), false);
 		GateDest.Empty();
 	}
+}
+
+int32 UAstraBattleSubsystem::HostilesFighting(double WithinKm) const
+{
+	int32 N = 0;
+	for (const FAstraBattleShip& S : Ships)
+	{
+		if (S.bAlive && S.bHostile && !S.bCraft && !S.bFleeing && !S.bHoldFire && FVector::Dist(S.Pos, Ships[0].Pos) < WithinKm * Km)
+		{
+			++N;
+		}
+	}
+	return N;
 }
 
 FString UAstraBattleSubsystem::GateStatus() const
