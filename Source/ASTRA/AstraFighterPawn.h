@@ -89,6 +89,16 @@ private:
 	void MouseX(float V);
 	void MouseY(float V);
 	void Land();
+	// the gamepad
+	FVector PadAxes = FVector::ZeroVector;     // roll, pitch, yaw
+	FVector2D PadThr = FVector2D::ZeroVector;  // right trigger up, left trigger down
+	float PadLiftV = 0.f;
+	void PadRoll(float V);
+	void PadPitch(float V);
+	void PadYaw(float V);
+	void PadLift(float V);
+	void PadThrottleUp(float V);
+	void PadThrottleDown(float V);
 
 	// --- New Ravenna: the Falcon flies itself in the planet's zone (the battle is up in space)
 	FVector AirVel = FVector::ZeroVector;      // cm/s, world

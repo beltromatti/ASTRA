@@ -334,6 +334,14 @@ void AAstraFighterPawn::SetupPlayerInputComponent(UInputComponent* IC)
 	Super::SetupPlayerInputComponent(IC);
 	IC->BindAxisKey(EKeys::MouseX, this, &AAstraFighterPawn::MouseX);
 	IC->BindAxisKey(EKeys::MouseY, this, &AAstraFighterPawn::MouseY);
+	// a gamepad: left stick flies (pitch, roll), right stick yaws and slides, triggers are the lever, the face
+	// buttons the weapons, the bumpers boost and decoys
+	IC->BindAxisKey(EKeys::Gamepad_LeftX, this, &AAstraFighterPawn::PadRoll);
+	IC->BindAxisKey(EKeys::Gamepad_LeftY, this, &AAstraFighterPawn::PadPitch);
+	IC->BindAxisKey(EKeys::Gamepad_RightX, this, &AAstraFighterPawn::PadYaw);
+	IC->BindAxisKey(EKeys::Gamepad_RightY, this, &AAstraFighterPawn::PadLift);
+	IC->BindAxisKey(EKeys::Gamepad_RightTriggerAxis, this, &AAstraFighterPawn::PadThrottleUp);
+	IC->BindAxisKey(EKeys::Gamepad_LeftTriggerAxis, this, &AAstraFighterPawn::PadThrottleDown);
 	auto Hold = [IC, this](const FKey& K, bool AAstraFighterPawn::* Flag)
 	{
 		FInputKeyBinding P(FInputChord(K), IE_Pressed);
@@ -365,6 +373,12 @@ void AAstraFighterPawn::SetupPlayerInputComponent(UInputComponent* IC)
 	Flag(EKeys::LeftMouseButton, [this](bool b) { In.bGuns = b; });
 	Flag(EKeys::RightMouseButton, [this](bool b) { In.bMissile = b; });
 	Flag(EKeys::C, [this](bool b) { In.bDecoy = b; });
+	Flag(EKeys::Gamepad_FaceButton_Bottom, [this](bool b) { In.bGuns = b; });
+	Flag(EKeys::Gamepad_FaceButton_Right, [this](bool b) { In.bMissile = b; });
+	Flag(EKeys::Gamepad_LeftShoulder, [this](bool b) { In.bDecoy = b; });
+	Flag(EKeys::Gamepad_RightShoulder, [this](bool b) { In.bBoost = b; });
+	IC->BindKey(EKeys::Gamepad_FaceButton_Top, IE_Pressed, this, &AAstraFighterPawn::Land);
+	IC->BindKey(EKeys::Gamepad_FaceButton_Left, IE_Pressed, this, &AAstraFighterPawn::Descend);
 	IC->BindKey(EKeys::G, IE_Pressed, this, &AAstraFighterPawn::Descend);
 	Flag(EKeys::X, [this](bool b) { if (b) { In.Throttle = 0.f; } });   // X: cut the throttle
 	IC->BindKey(EKeys::F, IE_Pressed, this, &AAstraFighterPawn::Land);
@@ -384,6 +398,13 @@ bool AAstraFighterPawn::ClimbOut()
 	FinishFlight();
 	return true;
 }
+
+void AAstraFighterPawn::PadRoll(float V) { PadAxes.X = V; }
+void AAstraFighterPawn::PadPitch(float V) { PadAxes.Y = V; }
+void AAstraFighterPawn::PadYaw(float V) { PadAxes.Z = V; }
+void AAstraFighterPawn::PadLift(float V) { PadLiftV = V; }
+void AAstraFighterPawn::PadThrottleUp(float V) { PadThr.X = V; }
+void AAstraFighterPawn::PadThrottleDown(float V) { PadThr.Y = V; }
 
 void AAstraFighterPawn::MouseX(float V)
 {
@@ -445,20 +466,20 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 	// the hands on the controls: the lever moves at 0.6 a second, the stick recentres when the mouse rests
-	In.Throttle = FMath::Clamp(In.Throttle + ((bThrUp ? 1.f : 0.f) - (bThrDown ? 1.f : 0.f)) * 0.6f * DeltaTime, 0.f, 1.f);
+	In.Throttle = FMath::Clamp(In.Throttle + ((bThrUp ? 1.f : 0.f) - (bThrDown ? 1.f : 0.f) + PadThr.X - PadThr.Y) * 0.6f * DeltaTime, 0.f, 1.f);
 	if (TestRoll == 0.f)
 	{
 		Stick *= FMath::Max(0.f, 1.f - 1.6f * DeltaTime);
 	}
 	const FVector2D Shaped(FMath::Sign(Stick.X) * FMath::Square(Stick.X) * 0.7f + Stick.X * 0.3f, FMath::Sign(Stick.Y) * FMath::Square(Stick.Y) * 0.7f + Stick.Y * 0.3f);
-	In.Yaw = Shaped.X;
-	In.Pitch = Shaped.Y;
-	In.Roll = FMath::Clamp((bRollR ? 1.f : 0.f) - (bRollL ? 1.f : 0.f) + TestRoll, -1.f, 1.f);
+	In.Yaw = FMath::Clamp(Shaped.X + PadAxes.Z * FMath::Abs(PadAxes.Z), -1.f, 1.f);
+	In.Pitch = FMath::Clamp(Shaped.Y - PadAxes.Y * FMath::Abs(PadAxes.Y), -1.f, 1.f);   // stick back = nose up
+	In.Roll = FMath::Clamp((bRollR ? 1.f : 0.f) - (bRollL ? 1.f : 0.f) + TestRoll + PadAxes.X * FMath::Abs(PadAxes.X), -1.f, 1.f);
 	if (MissilePulse > 0.f && (MissilePulse -= DeltaTime) <= 0.f)
 	{
 		In.bMissile = false;
 	}
-	In.Strafe = FVector(0.f, (bRight ? 1.f : 0.f) - (bLeft ? 1.f : 0.f), (bUp ? 1.f : 0.f) - (bDown ? 1.f : 0.f));
+	In.Strafe = FVector(0.f, (bRight ? 1.f : 0.f) - (bLeft ? 1.f : 0.f), FMath::Clamp((bUp ? 1.f : 0.f) - (bDown ? 1.f : 0.f) + PadLiftV, -1.f, 1.f));
 	if (!bFreeLook)
 	{
 		LookYaw = FMath::FInterpTo(LookYaw, 0.f, DeltaTime, 4.f);

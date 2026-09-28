@@ -16,6 +16,9 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "EngineUtils.h"
+#include "TimerManager.h"
+#include "Engine/Engine.h"
+#include "Misc/CommandLine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -44,6 +47,33 @@ namespace
 	float DeltaDeg(float From, float To) { return FMath::FindDeltaAngleDegrees(From, To); }
 
 	// testing: any ship command as the crew (or the director) would send it; single quotes stand for double quotes
+	FAutoConsoleCommandWithWorldAndArgs CmdPlanet(TEXT("astra.planet"),
+		TEXT("Testing: astra.planet go (the Captain on foot at Port Aurelius Field) | back (on the bridge in space)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			APawn* P = World ? UGameplayStatics::GetPlayerPawn(World, 0) : nullptr;
+			if (!Ship || !P)
+			{
+				return;
+			}
+			const bool bGo = A.Num() == 0 || A[0].Equals(TEXT("go"), ESearchCase::IgnoreCase);
+			Ship->SetPlanetside(bGo);
+			if (bGo)
+			{
+				// on the apron by Pad 3, facing the tower
+				P->SetActorLocation(UAstraShipSubsystem::PlanetZone() + FVector(1790.0, -1250.0, 194.0) * 100.0, false, nullptr, ETeleportType::TeleportPhysics);
+				if (APlayerController* PC = Cast<APlayerController>(P->GetController()))
+				{
+					PC->SetControlRotation(FRotator(0.f, 180.f, 0.f));
+				}
+				Ship->SetCaptainPlanetside(TEXT("on foot at Port Aurelius Field on New Ravenna; the XO has the conn"));
+			}
+			else
+			{
+				P->SetActorLocation(FVector(-300.0, 0.0, 120.0), false, nullptr, ETeleportType::TeleportPhysics);
+			}
+		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdShip(TEXT("astra.cmd"),
 		TEXT("Run a ship command (testing): astra.cmd <name> <json args, ' for \">, e.g. astra.cmd director_beat {'beat':{'type':'transit','system_name':'Meridian'}}"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
@@ -109,6 +139,15 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	if (USoundBase* Amb = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Bridge_Ambience.SW_Bridge_Ambience")))
 	{
 		UGameplayStatics::SpawnSound2D(&InWorld, Amb, 0.5f);
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("astra_planet")))
+	{
+		// testing (performance runs): the Captain on foot at Port Aurelius Field a few seconds in
+		FTimerHandle H;
+		InWorld.GetTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			GEngine->Exec(GetWorld(), TEXT("astra.planet go"));
+		}), 4.f, false);
 	}
 	UE_LOG(LogASTRA, Log, TEXT("[Ship] online: sky %s, sun %s, %d ship lights"), SkyMID ? TEXT("yes") : TEXT("no"),
 	       Sun ? TEXT("yes") : TEXT("no"), ShipLights.Num());

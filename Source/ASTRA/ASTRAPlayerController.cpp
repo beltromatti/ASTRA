@@ -282,7 +282,9 @@ namespace
 		TEXT("  left mouse      cannons                     right mouse    missile (locked)\n")
 		TEXT("  C               decoys                      Alt      look around\n")
 		TEXT("  F               near the Aquila's port bow tube, slow: recover\n")
-		TEXT("  V (hold)        talk to the bridge by radio\n")
+		TEXT("  V (hold)        talk to the bridge by radio · G  facing a planet: descend\n")
+		TEXT("  gamepad         left stick fly · right stick yaw/lift · triggers throttle · A guns · B missile\n")
+		TEXT("                  RB boost · LB decoys · Y recover/land · X descend\n")
 		TEXT("\n")
 		TEXT("F1  this card");
 }
