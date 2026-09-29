@@ -314,6 +314,13 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
   - poi `astra.planet go` (a piedi al campo), oppure Falcon + `astra.fly.face planet` + `AstraDescend`;
   - misure: `tools/perf/run_perf.sh /Game/ASTRA/Maps/L_Bridge 1500 1920 1080 -astra_world=Cassia+blue_white+ice+Cassia_Prime`.
 
+## Scafi: segni di battaglia
+- [x] **Cicatrici dove arrivano i colpi** (`UAstraBattleSubsystem::AddScar`, `tools/art/scorch.py`, `tools/ue_scripts/make_fx_scorch.py`): ogni colpo che passa gli scudi e intacca lo scafo lascia un decal nel punto d'impatto.
+  - Il decal ha fuliggine irregolare, raggiere dell'esplosione, schizzi e crepe incandescenti che si raffreddano in meno di un minuto; i colpi pesanti aprono uno squarcio nero con il bordo fuso.
+  - È largo 12-52 m secondo il danno, e se ne tengono al massimo 20 per scafo.
+  - Sull'Aquila un raggio dall'esterno trova la piastra colpita (lo scafo ha collisioni complesse), sulle altre navi la bruciatura è proiettata verso il centro.
+  - Restano sui relitti. Si vedono dalla plancia, dal Falcon e dalla capsula.
+
 ## Scafi: luci di navigazione e nome
 - [x] **Luci di navigazione** su ogni nave e velivolo (`UAstraNavLights`):
   - posizioni lette dalla forma vera di ogni scafo (`tools/ue_scripts/extract_nav_lights.py` → `data/ship/nav_lights.json`);

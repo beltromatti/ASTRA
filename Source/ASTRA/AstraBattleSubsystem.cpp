@@ -1,6 +1,8 @@
 // ASTRA — battle simulation.
 
 #include "AstraBattleSubsystem.h"
+#include "EngineUtils.h"
+#include "Components/DecalComponent.h"
 
 #include "ASTRA.h"
 #include "AstraNavLights.h"
@@ -457,6 +459,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	TickProjectiles(Dt);
 	TickFlashes(Dt);
 	DecoyT = FMath::Max(0.f, DecoyT - Dt);
+	TickScars(Dt);
 	if (DecoysSeduced > 0 && Time - LastDecoyReport > 6.f)
 	{
 		Report(FString::Printf(TEXT("tactical: the decoys drew off %d missile%s"), DecoysSeduced, DecoysSeduced > 1 ? TEXT("s") : TEXT("")));
@@ -1935,6 +1938,10 @@ void UAstraBattleSubsystem::ApplyHit(FAstraBattleShip& To, const FVector& FromDi
 	}
 	To.Hull -= ToHull;
 	AddFlash(HitPos, ToHull > 10.f ? 45.f : 25.f, 0.8f, To.ShieldFlash > 0.f ? FLinearColor(0.6f, 0.8f, 1.f) : FLinearColor(1.f, 0.6f, 0.3f), 80.f);
+	if (ToHull > 8.f && !To.bCraft)
+	{
+		AddScar(To, HitPos, ToHull);             // the plating remembers it
+	}
 	if (To.bPlayer)
 	{
 		Shake = FMath::Min(1.f, Shake + (ToHull > 20.f ? 0.8f : 0.35f));
@@ -2152,6 +2159,117 @@ void UAstraBattleSubsystem::TickProjectiles(float Dt)
 			if (Projectiles[i].Actor) { Projectiles[i].Actor->Destroy(); }
 			if (Projectiles[i].Trail) { Projectiles[i].Trail->Destroy(); }
 			Projectiles.RemoveAtSwap(i);
+		}
+	}
+}
+
+void UAstraBattleSubsystem::AddScar(const FAstraBattleShip& S, const FVector& SystemHit, float Damage)
+{
+	UWorld* World = GetWorld();
+	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_ScorchDecal.M_FX_ScorchDecal"));
+	if (!World || !Mat)
+	{
+		return;
+	}
+	const FVector W = ToWorld(SystemHit);
+	AActor* On = nullptr;
+	FVector Loc, N;
+	float Depth = 1000.f;
+	if (S.bPlayer)
+	{
+		// the Aquila's hull has its collision: from outside the hit, in towards her keel line, to the plating it struck
+		AActor* Hull = nullptr;
+		for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+		{
+			const UStaticMeshComponent* C = It->GetStaticMeshComponent();
+			if (C && C->GetStaticMesh() && C->GetStaticMesh()->GetName() == TEXT("SM_SHIP_ASTRA_Aquila") && !It->ActorHasTag(TEXT("ASTRA.Interior")))
+			{
+				Hull = *It;
+				break;
+			}
+		}
+		if (!Hull)
+		{
+			return;
+		}
+		FVector C, E;
+		Hull->GetActorBounds(false, C, E);
+		const FVector Axis(FMath::Clamp(W.X, C.X - E.X, C.X + E.X), C.Y, C.Z);
+		const FVector Out = (W - Axis).GetSafeNormal();
+		FHitResult Hit;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraScar), true);
+		// the hit point may lie inside her outline (the battle's hit sphere is wider than her beam): start well outside it
+		const FVector From = Axis + Out * (E.Y + E.Z + 5000.f);
+		if (Out.IsNearlyZero() || !World->LineTraceSingleByChannel(Hit, From, Axis, ECC_Visibility, Q) || !Hit.GetActor())
+		{
+			return;
+		}
+		On = Hit.GetActor();
+		Loc = Hit.ImpactPoint;
+		N = Hit.ImpactNormal;
+	}
+	else
+	{
+		// the others have no collision: the scar is projected from the hit in towards the centre of the ship
+		On = S.Actor;
+		if (!On)
+		{
+			return;
+		}
+		const FVector Centre = On->GetActorLocation();
+		N = (W - Centre).GetSafeNormal();
+		Loc = W;
+		Depth = FMath::Max(1000.f, (W - Centre).Size());
+	}
+	// twenty scars at most on one hull: the oldest goes
+	int32 OnThis = 0;
+	for (const FAstraScar& X : Scars) { OnThis += X.On.Get() == On ? 1 : 0; }
+	if (OnThis >= 20)
+	{
+		const int32 Oldest = Scars.IndexOfByPredicate([On](const FAstraScar& X) { return X.On.Get() == On; });
+		if (Scars.IsValidIndex(Oldest))
+		{
+			if (UDecalComponent* D = Scars[Oldest].Decal.Get()) { D->DestroyComponent(); }
+			Scars.RemoveAt(Oldest);
+		}
+	}
+	UDecalComponent* D = NewObject<UDecalComponent>(On);
+	D->SetupAttachment(On->GetRootComponent());
+	D->SetUsingAbsoluteScale(true);
+	D->RegisterComponent();
+	UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Mat, D);
+	M->SetScalarParameterValue(TEXT("Heat"), 1.f);
+	M->SetScalarParameterValue(TEXT("Breach"), Damage > 45.f ? 1.f : 0.f);
+	M->SetScalarParameterValue(TEXT("Fade"), 1.f);
+	D->SetDecalMaterial(M);
+	const float Half = FMath::Clamp(Damage * 28.f, 600.f, 2600.f);           // 12-52 m across
+	D->DecalSize = FVector(Depth, Half, Half);
+	FRotator R = FRotationMatrix::MakeFromX(-N).Rotator();                   // it projects along X, into the plating
+	R.Roll = FMath::FRandRange(0.f, 360.f);
+	D->SetWorldLocationAndRotation(Loc, R);
+	D->SetFadeScreenSize(0.0004f);
+	FAstraScar X;
+	X.Decal = D;
+	X.Mid = M;
+	X.On = On;
+	Scars.Add(X);
+}
+
+void UAstraBattleSubsystem::TickScars(float Dt)
+{
+	for (int32 i = Scars.Num() - 1; i >= 0; --i)
+	{
+		FAstraScar& X = Scars[i];
+		if (!X.Decal.IsValid() || !X.Mid.IsValid())
+		{
+			Scars.RemoveAtSwap(i);
+			continue;
+		}
+		X.Heat = FMath::Max(0.f, X.Heat - Dt / 50.f);                         // the embers die in under a minute
+		if (FMath::Abs(X.Heat - X.Shown) > 0.02f)
+		{
+			X.Shown = X.Heat;
+			X.Mid->SetScalarParameterValue(TEXT("Heat"), X.Heat);
 		}
 	}
 }

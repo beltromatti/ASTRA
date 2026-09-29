@@ -366,6 +366,18 @@ public:
 	void AquilaBlasts(const FVector& HullCentreW, const FVector& HullExtentW);
 	/** After the loss, when the story moves on (hours, days): the fight stops where it was, no more reports. */
 	void Freeze() { bFrozen = true; }
+	/** Battle scars: a burn (and, for a heavy hit, a breach) painted where a hit landed on a hull; hot at first, cooling. */
+	struct FAstraScar
+	{
+		TWeakObjectPtr<class UDecalComponent> Decal;
+		TWeakObjectPtr<class UMaterialInstanceDynamic> Mid;
+		TWeakObjectPtr<AActor> On;
+		float Heat = 1.f;
+		float Shown = 1.f;
+	};
+	TArray<FAstraScar> Scars;
+	void AddScar(const FAstraBattleShip& S, const FVector& SystemHit, float Damage);
+	void TickScars(float Dt);
 	/** The Aquila's decoys (two flares and chaff canisters a launch, eight aboard): for 18 s each missile on its
 	 *  terminal run at her may be drawn off. */
 	bool LaunchDecoys(FString& OutDetail);
