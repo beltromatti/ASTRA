@@ -354,12 +354,12 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 - [x] **Umore dell'equipaggio**: a ogni svolta il regista scrive come si sente la plancia e perché, nominando gli ufficiali (lutto per i caduti, orgoglio, stanchezza, dubbi su un ordine, rabbia), e lo fa evolvere di beat in beat (salvato in `story.json`). Colora il modo in cui gli ufficiali parlano senza mai dichiararlo, e affiora nei momenti di quiete. Esempio reale dopo la prima battaglia: *«Exhausted but proud… Grief for the Vigilant sits under everything — Mensah's repair gangs work in silence, Price counts seven Hammers where there were eight»*; alla domanda sul morale Serra risponde «stanchi, ma orgogliosi di aver tenuto Aurelia. Il dolore per il Vigilant è ancora aperto…»
 
 ## Prossimi passi
-1. **Scafi che portano i segni della battaglia**: bruciature e squarci come decal nel punto dei colpi, sull'Aquila e sulle navi; i nomi sulle navi di scorta (disegnati a runtime come gli schermi); la targa CVC-03 nella cabina della nuova Aquila.
-2. **Sensori, seconda parte**: pianeti e stazioni che coprono la linea di vista; triangolazione passiva tra due navi (due rilevamenti danno la distanza); il Mandato che disturba i nostri sensori; il calore delle navi nemiche.
-3. **Altri ponti**: alloggi dell'equipaggio, armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia.
-4. **Fuori dalla plancia**: un dispositivo da polso (allarmi, stato della nave, ordini in corso) quando il Capitano è altrove.
-5. **Pilotaggio**: collisioni del Falcon con le navi, missioni di scorta ordinate da Price.
-6. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
+1. **Sensori, seconda parte**: il Mandato che disturba i nostri sensori (guerra elettronica), il calore delle navi nemiche, pianeti e stazioni che coprono la linea di vista, esche e inganni del Mandato.
+2. **Altri ponti**: alloggi dell'equipaggio, armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia.
+3. **Fuori dalla plancia**: un dispositivo da polso (allarmi, stato della nave, ordini permanenti) quando il Capitano è altrove.
+4. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
+5. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
+6. **Distribuzione**: la mente Python con le sue dipendenze accanto al gioco pacchettizzato.
 7. **M8, preparazione al multigiocatore**: autorità del server, comandi come RPC, stato replicato (le menti restano sul server, la voce si sintetizza sui client).
 
 ## Come provarlo (per l'utente)
