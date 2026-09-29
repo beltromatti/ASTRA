@@ -1765,9 +1765,12 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		InterceptRetargetT = 0.f;
 		bBroadside = false;
 		InterceptRangeKm = Rng;
-		OutDetail = FString::Printf(TEXT("intercepting %s: bearing %03.0f mark %.0f, range %.1f km, throttle %.0f%%; at %.0f km the helm turns "
-		                                 "broadside and holds the range (course follows the target)%s"),
-		                            *Id, Brg, Mk, Rng, ThrottlePct, InterceptStandoffKm, *Aborted);
+		OutDetail = Rng < 0.0
+			? FString::Printf(TEXT("steering down the bearing of %s: %03.0f mark %.0f, range unknown (a bearing only), throttle %.0f%%; the helm "
+			                       "turns broadside at %.0f km once there is a track%s"), *Id, Brg, Mk, ThrottlePct, InterceptStandoffKm, *Aborted)
+			: FString::Printf(TEXT("intercepting %s: bearing %03.0f mark %.0f, range %.1f km, throttle %.0f%%; at %.0f km the helm turns "
+			                       "broadside and holds the range (course follows the target)%s"),
+			                  *Id, Brg, Mk, Rng, ThrottlePct, InterceptStandoffKm, *Aborted);
 		return true;
 	}
 	if (Name == TEXT("set_course"))
@@ -2023,9 +2026,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	S->SetNumberField(TEXT("mark_deg"), FMath::RoundToInt(MarkDeg));
 	if (!InterceptId.IsEmpty())
 	{
-		S->SetStringField(TEXT("helm"), FString::Printf(TEXT("intercepting %s, range %.1f km, %s (standoff %.0f km); course follows the target"),
-		                                                *InterceptId, InterceptRangeKm, bBroadside ? TEXT("broadside, holding the range") : TEXT("closing"),
-		                                                InterceptStandoffKm));
+		S->SetStringField(TEXT("helm"), InterceptRangeKm < 0.0
+			? FString::Printf(TEXT("steering down the bearing of %s (no range: a bearing only); broadside at %.0f km once tracked"), *InterceptId, InterceptStandoffKm)
+			: FString::Printf(TEXT("intercepting %s, range %.1f km, %s (standoff %.0f km); course follows the target"),
+			                  *InterceptId, InterceptRangeKm, bBroadside ? TEXT("broadside, holding the range") : TEXT("closing"), InterceptStandoffKm));
 	}
 	else if (const UAstraBattleSubsystem* Gate = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr; Gate && Gate->IsGateRunActive())
 	{
@@ -2290,7 +2294,7 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 		if (Battle && Battle->ContactGeometry(InterceptId, Brg, Mk, Rng))
 		{
 			InterceptRangeKm = Rng;
-			bBroadside = bBroadside ? Rng < InterceptStandoffKm + 1.5 : Rng < InterceptStandoffKm;
+			bBroadside = Rng >= 0.0 && (bBroadside ? Rng < InterceptStandoffKm + 1.5 : Rng < InterceptStandoffKm);
 			float H = (float)Brg, M = (float)Mk;
 			if (bBroadside)
 			{

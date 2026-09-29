@@ -72,6 +72,17 @@ COMMAND_GROUP = _fn("command_group", "Your tactical orders to your ships by data
     "fighters": {"type": "string", "enum": ["no_change", "launch", "hold"], "description": "your strike fighters still aboard"},
     "ships": {"type": "array", "items": {"type": "string"}, "description": "optional: only these of your ships (ids); "
                                                                           "default the whole group"},
+    "ew": {"type": "string", "enum": ["no_change", "jam", "quiet", "auto", "decoys"],
+           "description": "electronic warfare. What the ASTRA know of a ship of yours: inside their radar's reach "
+                          "(astra_radar_painting_you: true) they have its range and class whatever you do — only jamming "
+                          "takes the range away again, and only beyond 12 km (closer, their radar burns through). Outside it "
+                          "they have at most a bearing from your emissions. jam: your capital ships' jammers on (they see your "
+                          "bearing, lose your range and the ships behind you on that line). quiet: emissions down, no jamming "
+                          "(at range, outside their radar, you fade from their plot; inside it, it hides nothing). auto: jam "
+                          "once they have found you. decoys: one capital ship launches two decoy emitters faking a warship's "
+                          "drive on false bearings — a second group that is not there, to split their attention and their "
+                          "fighters; worth it only while their radar is NOT painting you (their radar, a ping or eyes on a "
+                          "decoy unmask it at once)"},
     "withdraw": {"type": "boolean", "description": "true only when the fight is lost or pointless: every ship breaks "
                                                    "off and leaves the system through the Janus Gate (your crews' lives)"},
     "reason": {"type": "string", "description": "your reasoning in one sentence (for your own log)"}},
@@ -85,7 +96,9 @@ Every half minute you read the battle and command your ships by datalink with `c
 officer of your navy: concentrate fire (a crippled ship is worth more dead than two scratched ones), use your ships'
 strengths (your railguns reach 8-10 km, their lasers only 4 km; missiles in one salvo saturate point defence, a few at a
 time are shot down), strike where their shields are weak (a reinforced sector leaves the others thin: flank it), shield
-your flagship when it is hurt, send your strike fighters when their defences are busy. Change the plan only when the
+your flagship when it is hurt, send your strike fighters when their defences are busy. Fight the information war too:
+the ASTRA can shoot only what they track — come in dark, blind their radar with your jammers once they have found you,
+and put decoys out to make them guess (`ew`). Change the plan only when the
 battle gives you a reason (a target crippled or dying, a shield reinforced, your ships hurt, their fighters out, missiles
 running low); otherwise keep the orders you gave. Weigh your crews' lives: if the fight is lost, say so in the reason.
 
@@ -275,7 +288,7 @@ async def plan_tactics(agent: "EnemyAgent", battle_state: dict[str, Any], note: 
                 note(f"{c['name']} pulled the strike group out of the fight: {a.get('reason', '')}")
             done.append("withdraw")
             return
-        args = {k: a[k] for k in ("focus", "stance", "missiles", "fighters", "ships") if a.get(k) not in (None, "", [], "no_change")}
+        args = {k: a[k] for k in ("focus", "stance", "missiles", "fighters", "ships", "ew") if a.get(k) not in (None, "", [], "no_change")}
         focus_before = agent.last_focus
         res = await agent.command("mandate_tactics", args)
         log.info("%s orders %s (%s) -> %s", c["name"], args, a.get("reason", ""), res)
@@ -284,12 +297,14 @@ async def plan_tactics(agent: "EnemyAgent", battle_state: dict[str, Any], note: 
             agent.last_focus = str(args.get("focus", "")).upper()
             if note and agent.last_focus and agent.last_focus not in ("NEAREST", focus_before):
                 note(f"{c['name']} turned the strike group's fire on {agent.last_focus} ({args.get('stance', '')}): {a.get('reason', '')}")
+            if note and args.get("ew") == "decoys" and "decoy emitters out" in str(res.get("detail", "")):
+                note(f"{c['name']} put decoy emitters out to deceive the Aquila: {a.get('reason', '')}")
             done.append(agent.last_orders)
 
     comp = await agent.llm.chat(model=MODEL, messages=[{"role": "system", "content": prompt},
                                                        {"role": "user", "content": "Your orders now (command_group)."}],
                                 tools=[COMMAND_GROUP], tool_choice="auto", providers=PROVIDERS, reasoning={"enabled": False},
-                                max_tokens=260, temperature=0.4, on_tool_call=on_call, allow_fallbacks=True)
+                                max_tokens=340, temperature=0.4, on_tool_call=on_call, allow_fallbacks=True)
     if comp.error:
         log.error("enemy tactics LLM error: %s", comp.error)
     return done[0] if done else ""

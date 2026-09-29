@@ -84,6 +84,12 @@ struct FAstraBattleShip
 	bool bDark = false;                  // running dark (EMCON): a fraction of its signature, until it lights up
 	float LitT = 0.f;                    // it fired: every sensor saw it, for a while
 	bool bJamming = false;               // a Mandate capital ship blinding our radar along its bearing (until burn-through)
+	bool bGhost = false;                 // a Mandate decoy emitter: a drone faking a warship's drive (a bearing, never a track)
+	FVector GhostGoal = FVector::ZeroVector;   // where the decoy flies (its false bearing); zero once it is there
+	float GhostLife = 0.f;
+	uint8 EwMode = 0;                    // Mandate capital ships: 0 jam once found, 1 jam now, 2 quiet (no jamming, back to dark)
+	int32 Decoys = 0;                    // decoy emitters aboard (a Mandate capital ship of a raid carries four)
+	bool bIlluminated = false;           // the ASTRA radar paints it (its warning receivers know)
 	bool bAlive = true;
 	bool bFleeing = false;
 	bool bHoldFire = false;              // ceasefire ordered by its commander
@@ -496,6 +502,8 @@ private:
 	void DoTransit(const TSharedPtr<FJsonObject>& Beat);
 	void ArriveBeat(const TSharedPtr<FJsonObject>& Beat);
 	int32 SpawnClass(const FString& Class, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);
+	/** A Mandate ship puts decoy emitters out: drones that fly to false bearings faking a warship's drive. */
+	int32 LaunchGhosts(int32 OwnerIdx, int32 N);
 	UPROPERTY() TObjectPtr<UStaticMesh> SphereMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> GlowMat;

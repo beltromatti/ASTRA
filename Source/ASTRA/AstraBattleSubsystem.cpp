@@ -573,18 +573,37 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	// the Aquila's active sensors (radar, lidar): full EMCON sees furthest; silent only listens
 	const float ActiveKm = (E == TEXT("full") ? 55.f : (E == TEXT("restricted") ? 28.f : 0.f)) * SensorPower;
 	const FAstraBattleShip& P = Ships[0];
-	TArray<FString> NewBearings, NewTracks, Classified, Lost, JamOn, BurnThrough;
+	TArray<FString> NewBearings, NewTracks, Classified, Lost, JamOn, BurnThrough, Unmasked, Faded;
 	// the Mandate's jammers: a capital ship that has stopped running dark (it came close, fired, or heard our ping and
 	// knows it has been found) floods our radar along its bearing; inside 12 km the returns burn through the noise
 	TArray<FVector> JamDirs;
 	for (FAstraBattleShip& S : Ships)
 	{
-		if (!S.bFog || !S.bAlive || S.bPlayer)
+		if (!S.bFog || !S.bAlive || S.bPlayer || S.bGhost)
 		{
 			continue;
 		}
 		const float R = FVector::Dist(S.Pos, P.Pos) / OneKm;
-		const bool bJam = S.Radius >= 200.f && S.bHostile && !S.bDark && !S.bFleeing && !S.bHoldFire && R > 12.f && R < 55.f;
+		// their warning receivers hear a radar painting them: ours, or a fleet ship's inside 30 km
+		S.bIlluminated = R < ActiveKm;
+		for (const FAstraBattleShip& A : Ships)
+		{
+			if (!S.bIlluminated && A.bAlive && !A.bPlayer && !A.bCraft && !A.bDerelict && A.Side == EAstraSide::Astra)
+			{
+				S.bIlluminated = FVector::Dist(A.Pos, S.Pos) < 30.f * OneKm;
+			}
+		}
+		// the commander's EW orders: jam now, or stay quiet (no jamming; back to dark when not fighting close)
+		if (S.EwMode == 2 && !S.bDark && S.LitT <= 0.f && R > 20.f && !S.bFleeing)
+		{
+			S.bDark = true;
+		}
+		const bool bWantJam = S.EwMode == 1 || (S.EwMode == 0 && !S.bDark);
+		const bool bJam = S.Radius >= 200.f && S.bHostile && bWantJam && !S.bFleeing && !S.bHoldFire && R > 12.f && R < 55.f;
+		if (bJam)
+		{
+			S.bDark = false;                           // a jammer is anything but dark
+		}
 		if (bJam && !S.bJamming)
 		{
 			JamOn.Add(FString::Printf(TEXT("%s on bearing %03.0f"), *KnownLabel(S), BearingDeg(P.Pos, S.Pos)));
@@ -615,6 +634,50 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	{
 		if (!S.bFog || !S.bAlive || S.bPlayer)
 		{
+			continue;
+		}
+		if (S.bGhost)
+		{
+			// a decoy gives a loud bearing and nothing else: the first radar return (ours inside our active range, the
+			// fleet's inside theirs, jammed or not), or a flight group near it, shows a return far too small for that
+			// drive — a drone. Its battery dies after a few minutes: the bearing fades like any other
+			const float R = FVector::Dist(S.Pos, P.Pos) / OneKm;
+			bool bUnmask = R < ActiveKm * (Jammed(P.Pos, S.Pos) ? 0.45f : 1.f);
+			for (const FAstraBattleShip& A : Ships)
+			{
+				if (bUnmask)
+				{
+					break;
+				}
+				if (A.bAlive && !A.bPlayer && !A.bDerelict && A.Side == EAstraSide::Astra)
+				{
+					const float RA = FVector::Dist(A.Pos, S.Pos) / OneKm;
+					bUnmask = A.bCraft ? RA < 10.f : RA < 30.f * (Jammed(A.Pos, S.Pos) ? 0.45f : 1.f);
+				}
+			}
+			const uint8 OldTrack = S.Track;
+			if (bUnmask)
+			{
+				if (OldTrack > 0)
+				{
+					Unmasked.Add(FString::Printf(TEXT("%s (bearing %03.0f)"), *S.ContactId, BearingDeg(P.Pos, S.Pos)));
+				}
+				S.bAlive = false;
+				continue;
+			}
+			S.Track = (R < 85.f && S.GhostLife > 0.f) ? 1 : 0;
+			if (OldTrack == 0 && S.Track == 1)
+			{
+				NewBearings.Add(FString::Printf(TEXT("%s bearing %03.0f"), *S.ContactId, BearingDeg(P.Pos, S.Pos)));
+			}
+			else if (OldTrack == 1 && S.Track == 0)
+			{
+				Faded.Add(S.ContactId);
+			}
+			if (S.GhostLife <= 0.f)
+			{
+				S.bAlive = false;
+			}
 			continue;
 		}
 		S.LitT = FMath::Max(0.f, S.LitT - Dt);
@@ -680,6 +743,11 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 			S.Track = 2;
 			S.TrackHold = 30.f;                          // a lost track lingers half a minute
 		}
+		else if (Best == 1 && S.Track <= 1)
+		{
+			S.Track = 1;
+			S.TrackHold = 20.f;                          // a bearing lingers a little when the emissions dip
+		}
 		else if ((S.TrackHold -= Dt) <= 0.f)
 		{
 			S.Track = FMath::Max<uint8>(Best, S.Track == 2 ? 1 : Best);   // a firm track fades to a bearing, then to nothing
@@ -712,6 +780,10 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 		{
 			Lost.Add(KnownLabel(S));
 		}
+		else if (OldTrack == 1 && S.Track == 0)
+		{
+			Faded.Add(S.ContactId);
+		}
 	}
 	// the sensors officer's calls, grouped (a raid group lighting up is one call, not eight)
 	if (NewBearings.Num())
@@ -741,6 +813,16 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	if (BurnThrough.Num())
 	{
 		Report(FString::Printf(TEXT("sensors: burn-through on %s — the jamming no longer hides it"), *FString::Join(BurnThrough, TEXT(", "))));
+	}
+	if (Unmasked.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: %s — a decoy: the radar return is far too small for that drive, a Mandate drone emitter "
+		                            "faking a warship. Dropped from the plot"), *FString::Join(Unmasked, TEXT(", "))));
+	}
+	if (Faded.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: the bearing on %s has faded — its emissions stopped (it went quiet, or it was never "
+		                            "there)"), *FString::Join(Faded, TEXT(", "))));
 	}
 }
 
@@ -953,6 +1035,33 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 
 void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 {
+	if (S.bGhost)
+	{
+		// a decoy flies out fast to its false bearing, then comes in like a warship at cruise, holding outside the
+		// reach of the radar that would unmask it; its battery runs out after five minutes or so
+		const FVector Aq = Ships[0].Pos;
+		FVector Want = FVector::ZeroVector;
+		if (!S.GhostGoal.IsZero())
+		{
+			Want = (S.GhostGoal - S.Pos).GetSafeNormal() * 900.f;
+			if (FVector::Dist(S.Pos, S.GhostGoal) < 2.f * OneKm)
+			{
+				S.GhostGoal = FVector::ZeroVector;
+			}
+		}
+		else if (FVector::Dist(S.Pos, Aq) > 34.f * OneKm)
+		{
+			Want = (Aq - S.Pos).GetSafeNormal() * 170.f;
+		}
+		S.Vel += (Want - S.Vel).GetClampedToMaxSize(120.f * Dt);
+		S.Pos += S.Vel * Dt;
+		if (!S.Vel.IsNearlyZero())
+		{
+			S.Att = S.Vel.ToOrientationQuat();
+		}
+		S.GhostLife -= Dt;
+		return;
+	}
 	if (S.bDerelict)
 	{
 		S.Pos += S.Vel * Dt;
@@ -1508,6 +1617,21 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 			FString Head, Tail;
 			B.ClassShort = S.Class.Split(TEXT(", "), &Head, &Tail) ? Tail : S.Class;   // "Kharon Mandate cruiser, Acheron class"
 		}
+		if (S.bGhost)
+		{
+			B.Side = EAstraSide::Mandate;                 // it is made to look like one
+			B.bHostile = true;
+		}
+		if (B.bBearingOnly)
+		{
+			// a bearing has no range, no speed, no size: only a direction (every plot pins it to its rim)
+			B.Rel = B.Rel.GetSafeNormal() * 1.0e9f;
+			B.RangeKm = -1.f;
+			B.Speed = 0.f;
+			B.VelDir = FVector::ZeroVector;
+			B.Size = 0.7f;
+			B.Rot = FQuat::Identity;
+		}
 		if (S.bCraft && Squadrons.IsValidIndex(S.Squadron))
 		{
 			B.bCraft = true;
@@ -1632,8 +1756,16 @@ bool UAstraBattleSubsystem::PlayerScan(const FString& ContactId, FString& OutDet
 	PlayerSinceFired = 0.f;   // an active ping: every sensor out there hears it
 	FAstraBattleShip* T = ContactId.IsEmpty() ? nullptr : FindByContact(ContactId);
 	int32 Found = 0;
+	TArray<FString> Decoys;
+	const bool bTargetGhost = T && T->bGhost && T->bAlive;
 	for (FAstraBattleShip& S : Ships)
 	{
+		if (S.bGhost && S.bAlive && FVector::Dist(S.Pos, Ships[0].Pos) < 90.f * OneKm)
+		{
+			Decoys.Add(S.ContactId);                   // the return is a drone's: a decoy, off the plot
+			S.bAlive = false;
+			continue;
+		}
 		if (S.bFog && S.bAlive && FVector::Dist(S.Pos, Ships[0].Pos) < 90.f * OneKm)
 		{
 			Found += S.Track < 2 ? 1 : 0;
@@ -1644,9 +1776,20 @@ bool UAstraBattleSubsystem::PlayerScan(const FString& ContactId, FString& OutDet
 			S.bIdentified = S.bIdentified || (&S == T && FVector::Dist(S.Pos, Ships[0].Pos) < 60.f * OneKm);
 		}
 	}
-	if (!T && Found > 0)
+	const FString DecoyNote = Decoys.Num() ? FString::Printf(TEXT("; %s %s decoy%s — drone emitters faking a warship's drive (a radar "
+	                                                            "return far too small), dropped from the plot"), *FString::Join(Decoys, TEXT(", ")),
+	                                                            Decoys.Num() > 1 ? TEXT("were") : TEXT("was a"), Decoys.Num() > 1 ? TEXT("s") : TEXT(""))
+	                                       : FString();
+	if (bTargetGhost)
 	{
-		OutDetail = FString::Printf(TEXT("full active sweep: %d contact(s) now tracked and classified — and every sensor out there heard our ping"), Found);
+		OutDetail = FString::Printf(TEXT("active ping on %s: the return is far too small for that drive — a decoy emitter, a Mandate drone; "
+		                                 "dropped from the plot%s — and every sensor out there heard our ping"), *T->ContactId, *DecoyNote);
+		return true;
+	}
+	if (!T && (Found > 0 || Decoys.Num()))
+	{
+		OutDetail = FString::Printf(TEXT("full active sweep: %d contact(s) now tracked and classified%s — and every sensor out there heard our ping"),
+		                            Found, *DecoyNote);
 		return true;
 	}
 	if (T && T->ContactId == TEXT("T-11") && StageDone == 0)
@@ -1690,6 +1833,14 @@ bool UAstraBattleSubsystem::ContactGeometry(const FString& ContactId, double& Ou
 		return false;
 	}
 	const FAstraBattleShip& P = Ships[0];
+	if (T->bFog && T->Track < 2)
+	{
+		// only a bearing: the helm can steer down it, but has no range and no lead
+		OutBearing = BearingDeg(P.Pos, T->Pos);
+		OutMark = MarkDeg(P.Pos, T->Pos);
+		OutRangeKm = -1.0;
+		return true;
+	}
 	const double D = FVector::Dist(P.Pos, T->Pos);
 	const double Lead = FMath::Min(D / FMath::Max((double)P.Vel.Size(), 100.0), 60.0) * 0.5;
 	const FVector Aim = T->Pos + T->Vel * Lead;
@@ -1722,11 +1873,14 @@ FString UAstraBattleSubsystem::MandateCommander() const
 
 bool UAstraBattleSubsystem::EnemyTactics(const TSharedPtr<FJsonObject>& Args, FString& OutDetail)
 {
-	FString Focus, StanceName, Missiles, Fighters;
+	Ships.Reserve(Ships.Num() + 4);                   // decoys may be added below: no reallocation under our pointers
+	FString Focus, StanceName, Missiles, Fighters, Ew;
 	Args->TryGetStringField(TEXT("focus"), Focus);
 	Args->TryGetStringField(TEXT("stance"), StanceName);
 	Args->TryGetStringField(TEXT("missiles"), Missiles);
 	Args->TryGetStringField(TEXT("fighters"), Fighters);
+	Args->TryGetStringField(TEXT("ew"), Ew);
+	Ew = Ew.ToLower();
 	TArray<FString> Only;
 	Args->TryGetStringArrayField(TEXT("ships"), Only);
 	for (FString& O : Only) { O = O.ToUpper(); }
@@ -1784,6 +1938,31 @@ bool UAstraBattleSubsystem::EnemyTactics(const TSharedPtr<FJsonObject>& Args, FS
 			S.Mode = EAstraShipMode::Attack;
 		}
 	}
+	// electronic warfare: jammers on, everything quiet, or decoys out (the capital ships carry them)
+	int32 GhostsOut = 0;
+	FString EwDone;
+	if (Ew == TEXT("jam") || Ew == TEXT("quiet") || Ew == TEXT("auto"))
+	{
+		for (FAstraBattleShip* S : Group)
+		{
+			S->EwMode = Ew == TEXT("jam") ? 1 : (Ew == TEXT("quiet") ? 2 : 0);
+		}
+		EwDone = Ew == TEXT("jam") ? TEXT(", jammers on") : (Ew == TEXT("quiet") ? TEXT(", emissions down (no jamming)") : TEXT(", EW as the situation calls"));
+	}
+	else if (Ew == TEXT("decoys"))
+	{
+		for (int32 i = 0; i < Group.Num(); ++i)
+		{
+			if (Group[i]->Decoys >= 2 && Group[i]->bFog)
+			{
+				Group[i]->Decoys -= 2;
+				const int32 Idx = UE_PTRDIFF_TO_INT32(Group[i] - Ships.GetData());
+				GhostsOut += LaunchGhosts(Idx, 2);   // (within the reserve: Group and F stay valid)
+				break;                                // one ship's pair per order: the rest are kept for later
+			}
+		}
+		EwDone = GhostsOut ? FString::Printf(TEXT(", %d decoy emitters out"), GhostsOut) : FString(TEXT(", no decoys left aboard"));
+	}
 	if (Group.Num() == 0)
 	{
 		OutDetail = TEXT("no ship of the strike group is fighting");
@@ -1809,7 +1988,7 @@ bool UAstraBattleSubsystem::EnemyTactics(const TSharedPtr<FJsonObject>& Args, FS
 		}
 	}
 	// what the Aquila's sensors see of it (the fire shifting, ships swinging wide, opening or closing the range)
-	const FString Who = Group.Num() > 1 ? FString(TEXT("the Mandate ships")) : FString::Printf(TEXT("%s (%s)"), *Group[0]->Name, *Group[0]->ContactId);
+	const FString Who = Group.Num() > 1 ? FString(TEXT("the Mandate ships")) : KnownLabel(*Group[0]);
 	const FString Them = F ? (F->bPlayer ? FString(TEXT("us")) : FString::Printf(TEXT("the %s (%s)"), *F->Name.Replace(TEXT("ASN "), TEXT("")), *F->ContactId)) : FString();
 	TArray<FString> Seen;
 	if (bFocusChanged && F)
@@ -1841,11 +2020,11 @@ bool UAstraBattleSubsystem::EnemyTactics(const TSharedPtr<FJsonObject>& Args, FS
 	{
 		Report(FString::Printf(TEXT("sensors: %s"), *FString::Join(Seen, TEXT("; "))), true);
 	}
-	OutDetail = FString::Printf(TEXT("%d ship%s: focus %s, stance %s, missiles %s%s%s"), Group.Num(), Group.Num() == 1 ? TEXT("") : TEXT("s"),
+	OutDetail = FString::Printf(TEXT("%d ship%s: focus %s, stance %s, missiles %s%s%s%s"), Group.Num(), Group.Num() == 1 ? TEXT("") : TEXT("s"),
 	                            F ? *F->ContactId : TEXT("nearest"), Stance >= 0 ? Stances[Stance] : TEXT("unchanged"),
 	                            Missiles.IsEmpty() ? TEXT("unchanged") : *Missiles.ToLower(),
 	                            Salvo ? *FString::Printf(TEXT(" (%d in the salvo)"), Salvo) : TEXT(""),
-	                            Launched ? *FString::Printf(TEXT(", %d fighters launching"), Launched) : TEXT(""));
+	                            Launched ? *FString::Printf(TEXT(", %d fighters launching"), Launched) : TEXT(""), *EwDone);
 	UE_LOG(LogASTRA, Log, TEXT("[Battle] Mandate tactics: %s"), *OutDetail);
 	return true;
 }
@@ -1872,6 +2051,11 @@ bool UAstraBattleSubsystem::FleetRequest(const FString& Ship, const FString& Req
 	if (R == TEXT("focus_fire"))
 	{
 		T = FindByContact(Target.ToUpper());
+		if (T && T->bAlive && T->bFog && T->Track < 2)
+		{
+			OutDetail = FString::Printf(TEXT("focus fire needs a track: %s is only a bearing, for the whole fleet"), *T->ContactId);
+			return false;
+		}
 		if (!T || !T->bAlive || !T->bHostile || T->bCraft)
 		{
 			OutDetail = FString::Printf(TEXT("focus fire needs a hostile warship on the plot ('%s' is not one)"), *Target);
@@ -2013,8 +2197,9 @@ bool UAstraBattleSubsystem::PlayerHail(const FString& ContactId, FString& OutDet
 		OutDetail = FString::Printf(TEXT("no contact %s to hail"), *ContactId);
 		return false;
 	}
-	OutDetail = FString::Printf(TEXT("channel open to %s (%s)%s"), *T->Name, *T->ContactId,
-	                            T->Side == EAstraSide::Mandate ? TEXT(", Mandate ship: reply expected") : TEXT(""));
+	OutDetail = (T->bFog && !T->bClassified && !T->bIdentified)
+		? FString::Printf(TEXT("hailing %s on all frequencies: a reply will come if anyone there wants to talk"), *T->ContactId)
+		: FString::Printf(TEXT("channel open to %s%s"), *KnownLabel(*T), T->Side == EAstraSide::Mandate ? TEXT(", Mandate ship: reply expected") : TEXT(""));
 	return true;
 }
 
@@ -2640,6 +2825,24 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 				static const TCHAR* StanceNames[] = {TEXT("standard"), TEXT("close"), TEXT("standoff"), TEXT("flank"), TEXT("screen")};
 				O->SetStringField(TEXT("stance"), StanceNames[FMath::Min<int32>(S.Stance, 4)]);
 				if (S.bConserve) { O->SetBoolField(TEXT("conserving_missiles"), true); }
+				if (S.bFog)
+				{
+					// what the ASTRA can see of it, as far as its own warning receivers can tell
+					O->SetStringField(TEXT("emissions"), S.bJamming ? TEXT("jamming the ASTRA radar (they see your bearing, not your range)")
+					                                     : S.bDark ? TEXT("running dark (hard to find at range)")
+					                                               : TEXT("drive and sensors lit (visible at range)"));
+					O->SetStringField(TEXT("ew_orders"), S.EwMode == 1 ? TEXT("jam") : (S.EwMode == 2 ? TEXT("quiet") : TEXT("auto: jam once found")));
+					if (S.Decoys > 0) { O->SetNumberField(TEXT("decoys_aboard"), S.Decoys); }
+					if (S.bIlluminated) { O->SetBoolField(TEXT("astra_radar_painting_you"), true); }
+					// the ship's EW officer: what the ASTRA can know of it now, and what would change that
+					const float RKm = FVector::Dist(S.Pos, Aquila) / OneKm;
+					O->SetStringField(TEXT("ew_officer"),
+						S.bJamming ? TEXT("jamming: they hold our bearing, not our range; inside 12 km their radar burns through")
+						: (S.bIlluminated && RKm <= 12.f) ? TEXT("their radar paints us at close range: they see everything — jamming, going quiet or decoys change nothing here")
+						: S.bIlluminated ? TEXT("their radar paints us: they have our range and class — going quiet hides nothing now; only jamming takes our range away (beyond 12 km); decoys would be unmasked at once")
+						: S.bDark ? TEXT("dark and outside their radar: at most a faint bearing, likely nothing — decoys now would draw their eyes elsewhere")
+						          : TEXT("outside their radar but lit: they may hold our bearing from the drive — going quiet would fade us, decoys would muddle their picture"));
+				}
 				if (S.ContactId == Cmd)
 				{
 					O->SetBoolField(TEXT("commands_the_strike_group"), true);
@@ -2676,6 +2879,15 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 	}
 	V->SetArrayField(TEXT("your_ships"), Own);
 	V->SetArrayField(TEXT("astra_ships"), Foe);
+	int32 GhostsFlying = 0;
+	for (const FAstraBattleShip& S : Ships)
+	{
+		GhostsFlying += (S.bGhost && S.bAlive) ? 1 : 0;
+	}
+	if (GhostsFlying)
+	{
+		V->SetNumberField(TEXT("decoys_flying"), GhostsFlying);   // (those the ASTRA unmask stop transmitting: the count drops)
+	}
 	int32 Craft = 0;
 	for (const FAstraBattleShip& S : Ships)
 	{
@@ -3376,7 +3588,7 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 			double Best = 1e18;
 			for (FAstraBattleShip& O : Ships)
 			{
-				if (O.bAlive && !O.bCraft && !O.bPlayer && !O.bIdentified && FVector::Dist(O.Pos, S.Pos) < Best)
+				if (O.bAlive && !O.bCraft && !O.bPlayer && !O.bIdentified && (!O.bFog || O.Track > 0) && FVector::Dist(O.Pos, S.Pos) < Best)
 				{
 					Best = FVector::Dist(O.Pos, S.Pos);
 					T = &O;
@@ -3387,7 +3599,7 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 		if (T)
 		{
 			Goal = T->Pos + (S.Pos - T->Pos).GetSafeNormal() * (T->bDerelict ? 700.0 : 6000.0);   // a derelict is looked at up close
-			if (!T->bIdentified && FVector::Dist(S.Pos, T->Pos) < 9000.0)
+			if (!T->bIdentified && !T->bGhost && FVector::Dist(S.Pos, T->Pos) < 9000.0)
 			{
 				T->bIdentified = T->bClassified = true;
 				T->Track = 2;
@@ -3554,6 +3766,44 @@ void UAstraBattleSubsystem::TickWrecks(float Dt)
 }
 
 // ---------------------------------------------------------------------------------------------- the war director
+int32 UAstraBattleSubsystem::LaunchGhosts(int32 OwnerIdx, int32 N)
+{
+	if (!Ships.IsValidIndex(OwnerIdx) || Ships.Num() == 0)
+	{
+		return 0;
+	}
+	const FVector From = Ships[OwnerIdx].Pos;       // copies: adding ships may reallocate
+	const FVector Aquila = Ships[0].Pos;
+	const double R = FMath::Clamp(FVector::Dist(From, Aquila) / OneKm, 38.0, 80.0);
+	const double B = BearingDeg(Aquila, From);
+	int32 Made = 0;
+	for (int32 k = 0; k < N; ++k)
+	{
+		// a false bearing well off the real one, at about the same range: a second group, a pincer that is not there
+		const double Off = ((k + FMath::RandRange(0, 1)) % 2 ? 1.0 : -1.0) * FMath::FRandRange(35.f, 70.f);
+		const FVector Goal = Aquila + Polar(R * OneKm, B + Off, FMath::FRandRange(-6.f, 6.f));
+		const FString Id = FString::Printf(TEXT("T-%d"), NextContact++);
+		const int32 I = AddShip(Id, TEXT("decoy emitter"), TEXT("Mandate decoy emitter, a drone faking a warship's drive"), TEXT(""),
+		                        EAstraSide::Neutral, From + FMath::VRand() * 300.f, 0.f, 0.f, 4.f, 1.f, 0.f);
+		FAstraBattleShip& G = Ships[I];
+		G.bGhost = true;
+		G.bFog = true;
+		G.Track = 0;
+		G.bIdentified = G.bClassified = false;
+		G.GhostGoal = Goal;
+		G.GhostLife = FMath::FRandRange(270.f, 340.f);
+		G.CruiseSpeed = 900.f;
+		G.Vel = (Goal - G.Pos).GetSafeNormal() * 400.f;
+		G.Att = G.Vel.ToOrientationQuat();
+		G.Missiles = 0;
+		G.RailDamage = 0.f;
+		G.Mode = EAstraShipMode::Cruise;
+		++Made;
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Battle] %d decoy emitters out from %s"), Made, *Ships[OwnerIdx].ContactId);
+	return Made;
+}
+
 int32 UAstraBattleSubsystem::SpawnClass(const FString& Class, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg)
 {
 	const FString C = Class.ToLower();
@@ -3835,6 +4085,11 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			if (Type == TEXT("raid") && Ships[I].Radius >= 200.f)
 			{
 				AddEnemyWing(I, 4, 30.f);
+				Ships[I].Decoys = 4;
+			}
+			else if (Type == TEXT("raid") && Ships[I].Radius >= 130.f)
+			{
+				Ships[I].Decoys = 2;                      // a destroyer carries a pair of decoy emitters too
 			}
 			if (Type == TEXT("raid"))
 			{
@@ -3844,7 +4099,17 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 				Ships[I].Track = 0;
 				Ships[I].bClassified = false;
 				Ships[I].bIdentified = false;
-				Ships[I].TargetId = (k == 0 || Ships.Num() < 3) ? PlayerId : Ships[FMath::RandRange(0, 2)].Id;
+				// the leader goes for the Aquila; the others for her or one of the ASTRA warships with her (never
+				// another ship that merely happens to be in the system)
+				TArray<int32> Prey = {PlayerId};
+				for (const FAstraBattleShip& O : Ships)
+				{
+					if (O.bAlive && !O.bPlayer && !O.bCraft && !O.bDerelict && O.Side == EAstraSide::Astra)
+					{
+						Prey.Add(O.Id);
+					}
+				}
+				Ships[I].TargetId = k == 0 ? PlayerId : Prey[FMath::RandRange(0, Prey.Num() - 1)];
 				if (k == 0)
 				{
 					Ships[I].bLeader = true;

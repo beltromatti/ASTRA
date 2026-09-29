@@ -421,7 +421,8 @@ void UAstraScreensSubsystem::DrawMaster(UCanvas* C, int32 W, int32 H)
 	FString Helm = TEXT("STEADY ON COURSE");
 	if (!Ship->GetInterceptId().IsEmpty())
 	{
-		Helm = FString::Printf(TEXT("INTERCEPT %s  ·  %.1f KM  ·  %s"), *Ship->GetInterceptId(), Ship->GetInterceptRangeKm(),
+		Helm = Ship->GetInterceptRangeKm() < 0.0 ? FString::Printf(TEXT("INTERCEPT %s  ·  BEARING ONLY"), *Ship->GetInterceptId())
+		     : FString::Printf(TEXT("INTERCEPT %s  ·  %.1f KM  ·  %s"), *Ship->GetInterceptId(), Ship->GetInterceptRangeKm(),
 		                       Ship->IsBroadside() ? TEXT("BROADSIDE") : TEXT("CLOSING"));
 	}
 	else if (Ship->IsTurning())
@@ -571,8 +572,10 @@ void UAstraScreensSubsystem::DrawHelm(UCanvas* C, int32 W, int32 H, const FStrin
 	{
 		P.Text(MX, 392, TEXT("INTERCEPT"), false, 30, AMBER);
 		P.Text(MX, 434, Ship->GetInterceptId(), true, 40, TEXTC, 0, true);
-		P.Text(MX, 494, FString::Printf(TEXT("RANGE %.1f KM"), Ship->GetInterceptRangeKm()), true, 22, CYAN);
-		P.Text(MX, 526, Ship->IsBroadside() ? TEXT("BROADSIDE · HOLDING RANGE") : TEXT("CLOSING ON LEAD POINT"), true, 18, CYAN);
+		const bool bBearing = Ship->GetInterceptRangeKm() < 0.0;
+		P.Text(MX, 494, bBearing ? FString(TEXT("RANGE UNKNOWN")) : FString::Printf(TEXT("RANGE %.1f KM"), Ship->GetInterceptRangeKm()), true, 22, CYAN);
+		P.Text(MX, 526, bBearing ? TEXT("STEERING DOWN THE BEARING") : (Ship->IsBroadside() ? TEXT("BROADSIDE · HOLDING RANGE") : TEXT("CLOSING ON LEAD POINT")),
+		       true, 18, CYAN);
 	}
 	else if (Ship->IsTurning())
 	{
@@ -726,7 +729,10 @@ void UAstraScreensSubsystem::DrawSensors(UCanvas* C, int32 W, int32 H, const FSt
 	P.Text(790, 56, TEXT("BRG"), true, 15, DIM, 2);
 	P.Text(W - 24, 56, TEXT("STATUS"), true, 15, DIM, 2);
 	int32 Row = 0;
-	Blips.Sort([](const FAstraHoloBlip& A, const FAstraHoloBlip& B) { return A.RangeKm < B.RangeKm; });
+	Blips.Sort([](const FAstraHoloBlip& A, const FAstraHoloBlip& B)
+	{
+		return (A.bBearingOnly ? 1.0e6f : A.RangeKm) < (B.bBearingOnly ? 1.0e6f : B.RangeKm);   // bearings (no range) last
+	});
 	for (const FAstraHoloBlip& B : Blips)
 	{
 		if (B.Kind != 0 || B.bPlayer || B.bCraft || Row >= 11)
@@ -738,11 +744,11 @@ void UAstraScreensSubsystem::DrawSensors(UCanvas* C, int32 W, int32 H, const FSt
 		P.Rect(16, Y, W - 32, 42, PANEL);
 		P.Rect(16, Y, 6, 42, Col);
 		P.Text(30, Y + 9, B.Contact, true, 20, Col, 0, true);
-		P.Text(110, Y + 9, B.Name.IsEmpty() ? TEXT("UNIDENTIFIED") : B.Name.ToUpper(), false, 22, TEXTC);
-		P.Text(700, Y + 9, FString::Printf(TEXT("%.1f KM"), B.RangeKm), true, 18, TEXTC, 2);
+		P.Text(110, Y + 9, !B.Name.IsEmpty() ? B.Name.ToUpper() : (!B.ClassShort.IsEmpty() ? B.ClassShort.ToUpper() : FString(TEXT("UNIDENTIFIED"))), false, 22, TEXTC);
+		P.Text(700, Y + 9, B.bBearingOnly ? FString(TEXT("—")) : FString::Printf(TEXT("%.1f KM"), B.RangeKm), true, 18, TEXTC, 2);
 		const float Brg = FMath::Fmod(FMath::RadiansToDegrees(FMath::Atan2(B.Rel.Y, B.Rel.X)) + Ship->GetHeadingDeg() + 720.f, 360.f);
 		P.Text(790, Y + 9, FString::Printf(TEXT("%03.0f"), Brg), true, 18, TEXTC, 2);
-		P.Text(W - 24, Y + 11, B.bUnknown ? TEXT("UNKNOWN") : (B.Side == EAstraSide::Astra ? TEXT("FRIENDLY")
+		P.Text(W - 24, Y + 11, B.bJamming ? TEXT("JAMMING") : B.bBearingOnly ? TEXT("BEARING ONLY") : B.bUnknown ? TEXT("UNKNOWN") : (B.Side == EAstraSide::Astra ? TEXT("FRIENDLY")
 		                     : (B.bHostile ? (B.bRetreating ? TEXT("WITHDRAWING") : (B.bHoldFire ? TEXT("HOLDING FIRE") : TEXT("HOSTILE"))) : TEXT("NEUTRAL"))),
 		       true, 16, Col, 2);
 		++Row;

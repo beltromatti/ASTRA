@@ -610,7 +610,9 @@ class Mind:
                         self.enemy.open = False
                     if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() == "fleet":
                         await self.director.admiral_reply(str(args_.get("message", "")), lang, self._battle_state())
-                    if name == "hail" and res.get("ok") and "Mandate" in str(res.get("detail", "")) \
+                    # (open_channel knows who has a commander to answer: a contact not yet classified, a decoy, a
+                    # friendly ship never do)
+                    if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() != "fleet" \
                             and self.enemy.open_channel(str(args_.get("contact_id", "")).upper()):
                         await self.enemy.respond(f"[The ASTRA ship hails you. Their message: {args_.get('message', '')}]",
                                                  lang, self._battle_state())

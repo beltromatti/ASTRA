@@ -270,6 +270,22 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
   - I **missili** possono partire lo stesso, **home-on-jam** (volano sul disturbo); i railgun e i laser no, e il rifiuto spiega perché e cosa serve.
   - Sul tavolo olografico: una linea di rumore tremolante dall'Aquila verso il disturbatore, «JAMMING  NO RANGE». Nel piano dei contatti letto dall'equipaggio: stato JAMMING e le contromisure.
   - Prova reale: incursione a 85 km, impulso, l'Acheron accende i disturbatori a 54 km → Nair: «disturbo elettronico: strobo dell'Acheron su zero-due-cinque, la sua portata è nascosta e le tracce su quel rilevamento svaniscono»; il Tattico: «senza distanza i railgun tacciono, Capitano. I missili possono puntare sul disturbo»; railgun rifiutati, 2 missili partiti in home-on-jam; burn-through a 12 km, poi l'identificazione (KMS Charon).
+- [x] **Gli inganni del Mandato: le esche** (`LaunchGhosts`): un incrociatore Acheron d'incursione porta 4 emettitori-esca, un cacciatorpediniere Styx 2. Un'esca è un drone che vola veloce verso un **falso rilevamento** (35-70° fuori da quello vero, alla stessa distanza) e poi si avvicina come una nave da guerra in crociera, tenendosi fuori dal radar; dopo circa cinque minuti la batteria finisce.
+  - Per i nostri sensori è identica a un contatto vero visto solo per rilevamento: stesso rapporto («faint drive emissions»), stesso simbolo sul tavolo, stesso rifiuto se le si spara, stesso saluto senza risposta («hailing T-44 on all frequencies»).
+  - La smaschera il primo ritorno radar (nostro entro la portata attiva, di una nave della flotta entro 30 km, anche col disturbo), un impulso attivo o un gruppo di volo a meno di 10 km: il Sensori la annuncia («a decoy: the radar return is far too small for that drive») e la toglie dal piano.
+  - Prova reale: incursione spenta a 70 km, due esche lanciate → il Sensori vede solo le esche, a 043 e 005 («deboli emissioni di motore: T-44 e T-45, solo rilevamenti passivi»), mentre la vera incursione arriva spenta a 023; l'impulso smaschera le due esche e trova le due navi vere, che accendono i disturbatori.
+- [x] **Il comandante nemico combatte anche la guerra dell'informazione**: `command_group` ha il campo `ew` (jam, quiet, auto, decoys).
+  - Nella sua vista della battaglia, per ogni sua nave: emissioni, ordini di guerra elettronica, esche a bordo, se il nostro radar la sta illuminando, e il parere del suo **ufficiale di guerra elettronica** calcolato dal gioco (ad esempio «their radar paints us: going quiet hides nothing now; only jamming takes our range away»).
+  - Prova a vuoto su tre situazioni: spento e non scoperto → quiet; illuminato a 40 km → jam; combattimento a 9 km → jam (inutile ma innocuo). Prova reale: Halvorsen tiene il gruppo spento finché l'Aquila non lo vede («my group is still outside her radar, so I stay silent and dark»).
+  - Un rilevamento vero che si spegne ora viene annunciato come quello di un'esca («the bearing on T-40 has faded — it went quiet, or it was never there»); un rilevamento resta 20 s quando le emissioni calano, niente sfarfallio al limite.
+- [x] **Meno fughe dalla nebbia**:
+  - Un contatto noto solo per rilevamento non ha distanza, velocità né dimensione su nessun piano: il tavolo non zooma più fino alla sua distanza vera, lo schermo dei contatti scrive «—» e «BEARING ONLY», il timone lo insegue lungo il rilevamento senza distanza («range unknown»).
+  - La flotta non concentra il fuoco su un rilevamento.
+  - La ricognizione va solo verso ciò che è sul piano.
+  - Le fregate di un'incursione puntano le navi ASTRA, mai un'altra nave che si trova nel sistema.
+  - L'ammiraglio non conosce distanze, classi, nomi né trucchi di un'incursione spenta.
+  - Il Regista rispetta i dettagli delle richieste esplicite del giocatore.
+  - Le incursioni arrivano a 25-60 km, così il gioco dei sensori ha tempo di svolgersi.
 - [x] **La nebbia regge in ogni rapporto**: il nome di una nave del Mandato compare solo dopo l'identificazione (lancio dei caccia, danni, fuga, distruzione, missioni dei gruppi di volo, richieste alla flotta); prima è «a Kharon Mandate cruiser, Acheron class (T-41)» o solo «T-41». Sul tavolo, un contatto classificato mostra la sua classe («T-41  ACHERON CLASS») invece di «UNKNOWN».
 - Prove: `astra.heat <percento>`; `astra.cmd set_radiators {'state':'extended'}`, `astra.cmd vent_heat {}`; `astra.battle.status` elenca ogni nave con rilevamento, distanza, traccia e disturbo
 
@@ -362,7 +378,7 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 - [x] **Umore dell'equipaggio**: a ogni svolta il regista scrive come si sente la plancia e perché, nominando gli ufficiali (lutto per i caduti, orgoglio, stanchezza, dubbi su un ordine, rabbia), e lo fa evolvere di beat in beat (salvato in `story.json`). Colora il modo in cui gli ufficiali parlano senza mai dichiararlo, e affiora nei momenti di quiete. Esempio reale dopo la prima battaglia: *«Exhausted but proud… Grief for the Vigilant sits under everything — Mensah's repair gangs work in silence, Price counts seven Hammers where there were eight»*; alla domanda sul morale Serra risponde «stanchi, ma orgogliosi di aver tenuto Aurelia. Il dolore per il Vigilant è ancora aperto…»
 
 ## Prossimi passi
-1. **Sensori, seconda parte**: gli inganni del Mandato (falsi contatti), pianeti e stazioni che coprono la linea di vista.
+1. **Sensori, terza parte**: pianeti e stazioni che coprono la linea di vista.
 2. **Altri ponti**: alloggi dell'equipaggio, armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia.
 3. **Fuori dalla plancia**: un dispositivo da polso (allarmi, stato della nave, ordini permanenti) quando il Capitano è altrove.
 4. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.

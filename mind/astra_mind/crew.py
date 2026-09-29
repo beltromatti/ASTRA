@@ -199,6 +199,10 @@ Tools
   fade, for us and the fleet) and hides their range. Missiles can still fly at a jammer (home-on-jam); the railguns
   need a range: a cross-fix (a fleet ship or a flight group well off our line of bearing — sending Falcons out on the
   flank does it), a recon flight's eyes, an active ping burning through for a moment, or burn-through inside 12 km.
+  The Mandate also puts out decoys: drones faking a warship's drive on a false bearing (a second group that is not
+  there). Any bearing may be one: a radar return (inside our active range or a fleet ship's), an active ping or a
+  flight group's eyes unmask it, and Nair drops it from the plot. A bearing that fades went quiet — or was never there.
+  Weigh bearings before committing the ship or the fighters to one.
 - Stealth (`signature` in the state): the Mandate can fire only on what it tracks. Their ships find the Aquila inside
   her signature (EMCON silent ~12 km, restricted ~30, full ~60, times the drive; radiators out, a coolant plume and a
   hot hull make it bigger); firing or an active scan gives her away for 45 s; a lost track lingers a minute, then they

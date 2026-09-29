@@ -64,8 +64,11 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "ambush_km": {"type": "number", "description": "investigate: how close the Aquila must come before the ambush springs"},
     "delay_s": {"type": "number", "description": "seconds before it happens (raids and distress: 60-300; calm: 90-240)"},
     "bearing_deg": {"type": "number", "description": "true bearing from the Aquila where they appear (0-359)"},
-    "range_km": {"type": "number", "description": "distance from the Aquila (raid 20-40, distress 25-45, reinforcements 15-30)"},
-    "ships": {"type": "array", "items": SHIP, "description": "raid: the Mandate ships (first = leader); reinforcements: ASTRA ships; "
+    "range_km": {"type": "number", "description": "distance from the Aquila (raid 25-60: from further out the sensor game has "
+                                                  "time to play — they come dark, a bearing, decoys, jamming; distress 25-45; "
+                                                  "reinforcements 15-30; what the player asks for, if they ask)"},
+    "ships": {"type": "array", "items": SHIP, "description": "raid: the Mandate ships (first = leader; an acheron jams our radar "
+              "and carries decoys, a styx carries decoys); reinforcements: ASTRA ships; "
               "decisive: the Mandate's main fleet (4-8 ships, the leader first, an acheron among them)"},
     "attackers": {"type": "array", "items": SHIP, "description": "distress: the Mandate raiders (styx or lethe)"},
     "ship": {"type": "object", "properties": {"name": {"type": "string"}, "class": {"type": "string"}},
@@ -113,7 +116,10 @@ and the player's choices matter (spared enemies may come back, negotiated terms 
 Rules
 - Call `start_beat` exactly once, `war_news` at most once, and ALWAYS `transmit` once: Vice Admiral Adrian Rourke
   (7th Fleet commander) briefs the Aquila in {lang_name} about what is coming or what to do now — in character,
-  concrete, without game terms.
+  concrete, without game terms. The fog of war holds for him too: of a raid (it comes dark) the fleet knows at most
+  what a distant picket glimpsed — roughly from where, perhaps how many, that it is the Mandate — never the ranges,
+  classes, names or tricks it will use; the Aquila's own sensors must find them (he may tell her to keep her eyes open,
+  never what she will see).
 - Pacing: after a hard fight (hull below 50% or ships lost) prefer resupply or calm; escalate step by step; a raid is
   1-4 Mandate ships sized to what the Aquila and her escorts can fight; distress calls are Free Guilds freighters hunted
   by 1-2 raiders; reinforcements are 1-2 ASTRA destroyers (vigilant), rarely a battleship.
@@ -376,10 +382,11 @@ class Director:
         tools = [BEAT_TOOL, WAR_NEWS, TRANSMIT]
         if request:
             # game master mode: the player's wish, made to fit the world
-            ask = (f"The player — the Captain, speaking to you, the director, out of character — asks: \"{request}\". Make "
-                   "the next beat answer it if it can happen in this world now (choose the beat type and details that "
-                   "realise it; adapt it to what is possible here and to the story); if it cannot, give the closest "
-                   "thing that fits and keeps the story coherent. FIRST call `narrate` once: one short line to the player, "
+            ask = (f"The player — the Captain, speaking to you, the director, out of character — asks: \"{request}\". The "
+                   "player's wish comes first: make the next beat realise it, with the beat type and the details it asks "
+                   "for (a raid, a distress call, reinforcements, a transit can always happen: give exactly that, woven "
+                   "into the story), adapting only what this world makes impossible; only if it truly cannot happen here, "
+                   "give the closest thing that fits. FIRST call `narrate` once: one short line to the player, "
                    f"in {LANG_NAMES.get(lang, lang)}, as a game master would (what you are setting up, without spoiling "
                    "surprises); then the beat.")
             tools = tools + [NARRATE]
