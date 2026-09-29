@@ -1,6 +1,8 @@
 // ASTRA — battle simulation.
 
 #include "AstraBattleSubsystem.h"
+#include "AstraHullName.h"
+#include "Misc/Crc.h"
 #include "EngineUtils.h"
 #include "Components/DecalComponent.h"
 
@@ -231,6 +233,14 @@ void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 		NL->SetupAttachment(S.Actor->GetRootComponent());
 		NL->RegisterComponent();
 		NL->Setup(S.Mesh, S.Side == EAstraSide::Mandate);
+	}
+	if (S.Side == EAstraSide::Astra && !S.bCraft && !S.bDerelict && !S.Name.IsEmpty())
+	{
+		// her name on both flanks, and a hull number of her class (the same name always has the same number)
+		const bool bBattleship = S.Mesh.Contains(TEXT("Praetorian"));
+		const uint32 H = FCrc::StrCrc32(*S.Name);
+		UAstraHullName::Paint(S.Actor, S.Name, FString::Printf(TEXT("%s-%02d"), bBattleship ? TEXT("BB") : TEXT("DD"),
+		                                                      bBattleship ? 2 + H % 9 : 10 + H % 80));
 	}
 	if (SphereMesh && ShellMat && !S.bCraft)
 	{

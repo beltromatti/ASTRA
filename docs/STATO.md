@@ -321,6 +321,8 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
   - Sull'Aquila un raggio dall'esterno trova la piastra colpita (lo scafo ha collisioni complesse), sulle altre navi la bruciatura è proiettata verso il centro.
   - Restano sui relitti. Si vedono dalla plancia, dal Falcon e dalla capsula.
 
+- [x] **I nomi delle navi ASTRA sui fianchi** (`UAstraHullName`, `tools/ue_scripts/make_hull_decal_rt.py`): ogni nave della 7ª Flotta che la storia porta ha il suo nome e il numero di scafo della sua classe (BB per le corazzate, DD per i cacciatorpediniere: lo stesso nome ha sempre lo stesso numero). Il nome viene disegnato a runtime col font del gioco su una render target (bianco su nero, la maschera è il canale rosso) e messo sui due fianchi come decal, con lo stesso materiale e lo stesso verso del nome dell'Aquila. Esempi: «ASN PRAETORIAN · BB-06», «ASN VIGILANT · DD-37».
+
 ## Scafi: luci di navigazione e nome
 - [x] **Luci di navigazione** su ogni nave e velivolo (`UAstraNavLights`):
   - posizioni lette dalla forma vera di ogni scafo (`tools/ue_scripts/extract_nav_lights.py` → `data/ship/nav_lights.json`);
