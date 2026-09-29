@@ -377,7 +377,7 @@ void AASTRAPlayerController::TickPad(float DeltaTime)
 		{
 			PadMesh->DestroyComponent();
 		}
-		PadMesh = NewObject<UStaticMeshComponent>(Me, TEXT("CaptainDatapad"));
+		PadMesh = NewObject<UStaticMeshComponent>(Me, MakeUniqueObjectName(Me, UStaticMeshComponent::StaticClass(), TEXT("CaptainDatapad")));
 		PadMesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Kit/Props/SM_PROP_Datapad.SM_PROP_Datapad")));
 		PadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		PadMesh->SetCastShadow(false);
