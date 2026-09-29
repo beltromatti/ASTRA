@@ -214,6 +214,7 @@ class Director:
         self.act_beats = 0
         self.decisive = False                    # the decisive battle is being fought
         self.finale = None                       # the arc's ending (finale.Finale, set by the server)
+        self.blocked = lambda: False             # the story waits (the ship being abandoned, the aftermath): set by the server
         self.standing: list[dict[str, str]] = []   # the Captain's standing orders (shared with the bridge agent)
         self.memories: dict[str, list[dict[str, str]]] = {}   # what each officer remembers of the Captain (memory.py)
 
@@ -322,6 +323,9 @@ class Director:
         self.busy = True
         try:
             await asyncio.sleep(14.0)   # the bridge reports the outcome first
+            if self.blocked():
+                log.info("director: no new beat while the Aquila is being abandoned or lost")
+                return
             await self._next_beat(lang, state)
         except Exception:  # noqa: BLE001
             log.exception("director failed")

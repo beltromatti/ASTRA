@@ -213,6 +213,7 @@ class Mind:
         self.aftermath = Aftermath(self.llm, self._say_external, self._director_command, self._register_voice, self.director,
                                    self.voice.busy_s)
         self.director.finale = Finale(self.llm, self._say_external, self._director_command, self.voice.busy_s)
+        self.director.blocked = lambda: bool(((self.game.state if self.game else None) or {}).get("abandon")) or self.aftermath.active
         self.memory = MemoryKeeper(self.llm, self.director.memories, self.director.note)
         self.agent.memories = self.memory.lines
         self.agent.say = self._crew_say

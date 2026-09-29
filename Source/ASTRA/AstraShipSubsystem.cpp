@@ -1612,6 +1612,12 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	{
 		return StartAbandon(true, OutDetail);
 	}
+	if (bAbandon && Name == TEXT("director_beat"))
+	{
+		// nothing new happens to a ship being abandoned (or already lost): the story waits for the aftermath
+		OutDetail = TEXT("the Aquila is being abandoned: no new beat");
+		return false;
+	}
 	if (Name == TEXT("story_card") || Name == TEXT("story_black"))
 	{
 		// the aftermath's scenes (the mind): cards on a black screen, or the dark of a scene played in voices
