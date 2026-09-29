@@ -113,6 +113,8 @@ class BridgeAgent:
             # the model answered in prose instead of calling speak: salvage it as the XO's (or tagged officer's) line
             log.warning("no speak call, salvaging content: %s", comp.content[:200])
             await self._salvage(comp.content, turn, lang, max_lines=3)
+            if not turn.lines and not pending:
+                await self._speak_now(msgs, turn, lang)          # nothing sayable came out: ask once more, spoken
         if comp.error:
             turn.error = comp.error
             log.error("LLM error: %s", comp.error)
@@ -187,6 +189,11 @@ class BridgeAgent:
     async def _salvage(self, content: str, turn: Turn, lang: str, max_lines: int) -> None:
         for raw in [l for l in content.strip().splitlines() if l.strip()][:max_lines]:
             spk, line = _parse_prose(raw)
+            if _looks_like_reasoning(line, lang):
+                # the model thinking aloud (in English, about tools and states) is never an officer's line: the
+                # read-back or a second, spoken answer takes its place
+                log.warning("not voiced (reasoning, not speech): %s", line[:160])
+                continue
             if len(line) >= 4 and not _looks_like_tool(line):
                 turn.lines.append((spk, line))
                 await self.say(spk, line, lang, "focused")
@@ -202,6 +209,16 @@ class BridgeAgent:
             turn.actions.append((call.name, call.arguments() or {}, res))
             results[id(call)] = res
         return results
+
+    async def _speak_now(self, msgs, turn: Turn, lang: str) -> None:
+        """A second try when the model wrote notes instead of speaking: the answer to the Captain, spoken, in character."""
+        follow = msgs + [{"role": "user", "content": f"[Answer the Captain now: the officer concerned speaks, in {lang}, one or two "
+                                                     "short lines in character, with speak. No notes, no reasoning.]"}]
+        t0 = time.perf_counter()
+        comp = await self.llm.chat(model=MODEL, messages=follow, tools=[SPEAK], tool_choice="auto", providers=PROVIDERS,
+                                   reasoning={"enabled": False}, max_tokens=260, temperature=0.4,
+                                   on_tool_call=self._on_call(turn, lang, t0, [], allowed=set()), allow_fallbacks=True)
+        turn.cost += comp.cost
 
     async def _follow_up(self, msgs, turn: Turn, lang: str, readback: bool) -> None:
         notes = "\n".join(f"- {n}({json.dumps(a, ensure_ascii=False)}) {'ok' if r.get('ok') else 'FAILED'}: {r.get('detail', '')}"
@@ -263,6 +280,32 @@ INITIATIVE_TOOLS = [t for t in SHIP_TOOLS if t["function"]["name"] in INITIATIVE
 
 
 _TOOLISH = None
+
+
+_EN_FUNCTION_WORDS = {"the", "is", "and", "to", "of", "it's", "but", "so", "this", "that", "with", "let", "check", "order",
+                      "however", "because", "should", "must", "can't", "we", "i", "are", "has", "have", "not", "which"}
+_REASONING_MARKS = ("let me check", "let me think", "let me see", "the tool", "tool call", "function call", "speak(",
+                    "in the state", "state says", "according to the state", "the captain's order stands", "as an ai",
+                    "the model", "i will call", "i should call")
+
+
+def _looks_like_reasoning(text: str, lang: str) -> bool:
+    """The model's notes to itself (what the state says, which tool to call) rather than an officer speaking: English
+    prose when the Captain speaks another language, or the tell-tale phrases of thinking aloud."""
+    import re
+    from .tools import SHIP_TOOL_NAMES
+    t = (text or "").lower()
+    if any(m in t for m in _REASONING_MARKS):
+        return True
+    if any(re.search(r"\b%s\b" % re.escape(n), t) for n in SHIP_TOOL_NAMES if "_" in n):
+        return True                                   # an officer never says "set_target" or "active_scan"
+    if t.startswith("let me ") or " let me carry" in t:
+        return True
+    if lang != "en":
+        words = re.findall(r"[a-z']+", t)
+        if len(words) >= 6 and sum(w in _EN_FUNCTION_WORDS for w in words) / len(words) > 0.2:
+            return True
+    return False
 
 
 def _looks_like_tool(text: str) -> bool:
