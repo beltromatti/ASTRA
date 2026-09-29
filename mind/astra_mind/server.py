@@ -36,6 +36,7 @@ from .env import CACHE
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
 from .stt import WhisperKit
+from .speech import Voice
 from .tts import TTSEngine
 
 log = logging.getLogger("astra.mind")
@@ -110,89 +111,16 @@ _CREW_ADDRESS = _re.compile(
     r"end transmission|praetorian|vigilant|flotta|fleet|scorta|escort)\b", _re.I)
 
 
+def speaker_identity(speaker: str) -> tuple[str, str, bool]:
+    """(display name, voice, aboard) of anyone who can speak: a bridge officer or someone on a channel or in a room."""
+    if speaker in CREW:
+        return CREW[speaker].title, CREW[speaker].voice, True
+    name, voice = EXTERNAL_SPEAKERS.get(speaker, (speaker, "alba"))
+    return name, voice, False
+
+
 def addressed_to_crew(text: str) -> bool:
     return bool(_CREW_ADDRESS.match(text.strip()))
-
-
-class Voice:
-    """Serialises the crew's lines in speaking order. Synthesis runs one line ahead; each line is sent when the previous
-    one has finished playing (the game plays audio as it arrives, so sending early would make officers talk over each
-    other). Lines from event reports are low priority: when the Captain speaks, the unspoken ones are dropped."""
-
-    GAP_S = 0.25                    # a breath between two lines
-
-    def __init__(self, tts: TTSEngine, sink) -> None:  # noqa: ANN001
-        self.tts = tts
-        self.sink = sink            # async (kind, payload) -> None
-        self.q: asyncio.Queue = asyncio.Queue()
-        self._n = 0
-        self.first_audio: dict[int, float] = {}
-        self.enqueued: dict[int, float] = {}
-        self.low_priority = False   # set while an event turn is speaking
-        self.busy_until = 0.0       # monotonic time when the line being played ends
-
-    async def say(self, speaker: str, text: str, lang: str, tone: str) -> None:
-        self._n += 1
-        lid = self._n
-        self.enqueued[lid] = time.perf_counter()
-        name = CREW[speaker].title if speaker in CREW else EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
-        await self.sink("json", {"type": "line", "id": lid, "speaker": speaker, "name": name, "text": text,
-                                 "lang": lang, "tone": tone, "channel": speaker not in CREW})
-        await self.q.put((lid, speaker, text, lang, self.low_priority))
-
-    def busy_s(self) -> float:
-        """Seconds of speech still ahead (playing + queued, estimated)."""
-        return max(0.0, self.busy_until - time.monotonic()) + 3.0 * self.q.qsize()
-
-    def drop_low_priority(self) -> int:
-        keep, dropped = [], 0
-        while not self.q.empty():
-            item = self.q.get_nowait()
-            self.q.task_done()
-            if item[4]:
-                dropped += 1
-            else:
-                keep.append(item)
-        for item in keep:
-            self.q.put_nowait(item)
-        return dropped
-
-    async def run(self) -> None:
-        ready: asyncio.Queue = asyncio.Queue(maxsize=1)      # one line synthesised ahead
-
-        async def synth() -> None:
-            while True:
-                lid, speaker, text, lang, _ = await self.q.get()
-                chunks: asyncio.Queue = asyncio.Queue()
-                await ready.put((lid, speaker, chunks))
-                try:
-                    voice = CREW[speaker].voice if speaker in CREW else EXTERNAL_SPEAKERS.get(speaker, ("", "alba"))[1]
-                    async for pcm in self.tts.stream(text, voice, lang if self.tts.supported(lang) else "en"):
-                        await chunks.put(pcm)
-                except Exception:  # noqa: BLE001
-                    log.exception("voice line %s failed", lid)
-                finally:
-                    await chunks.put(None)
-                    self.q.task_done()
-
-        asyncio.create_task(synth())
-        rate = self.tts.sample_rate
-        while True:
-            lid, speaker, chunks = await ready.get()
-            wait = self.busy_until - time.monotonic()
-            if wait > 0:
-                await asyncio.sleep(wait)
-            await self.sink("json", {"type": "audio_begin", "line": lid, "speaker": speaker, "rate": rate})
-            t_first, samples = None, 0
-            while (pcm := await chunks.get()) is not None:
-                if t_first is None:
-                    t_first = time.monotonic()
-                    self.first_audio[lid] = time.perf_counter()
-                samples += len(pcm) // 2
-                await self.sink("audio", struct.pack("<I", lid) + pcm)
-                self.busy_until = t_first + samples / rate + self.GAP_S
-            await self.sink("json", {"type": "audio_end", "line": lid})
-            log.debug("voice line %d (%s): waited %.2f s, %.2f s of audio", lid, speaker, max(0.0, wait), samples / rate)
 
 
 class Mind:
@@ -204,7 +132,7 @@ class Mind:
         self.local = LocalShip()
         self.clients: set = set()
         self.game: GameShip | None = None
-        self.voice = Voice(self.tts, self._sink)
+        self.voice = Voice(self.tts, self._sink, speaker_identity)
         self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
         self.port = FieldControl(self.llm, self._say_external, self._register_field)
@@ -900,7 +828,7 @@ async def offline_turns(utterances: list[str], out_dir: Path, check_audio: bool)
             lid = struct.unpack("<I", payload[:4])[0]
             audio.setdefault(lid, []).append(payload[4:])
 
-    voice = Voice(tts, sink)
+    voice = Voice(tts, sink, speaker_identity)
     runner = asyncio.create_task(voice.run())
     agent = BridgeAgent(llm, ship, voice.say)
     out_dir.mkdir(parents=True, exist_ok=True)

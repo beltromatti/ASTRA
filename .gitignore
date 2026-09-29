@@ -65,3 +65,6 @@ Content/Characters/
 
 # App costruita da tools/pacchetto.sh
 Packaged/
+
+# worktrees of the helper agents (each works on its own branch; the lead merges)
+.claude/worktrees/
