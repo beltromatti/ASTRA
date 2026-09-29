@@ -13,7 +13,7 @@ BIN="/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor.app/Conten
 OUTDIR="$HOME/Library/Application Support/Epic/UnrealEngine/5.8/Saved/Profiling/CSV"  # where -game writes on Mac
 mkdir -p "$OUTDIR" "$PROJ/Saved/Logs"
 before=$(ls -1t "$OUTDIR"/*.csv 2>/dev/null | head -1)
-"$BIN" "$PROJ/ASTRA.uproject" "$MAP" -game -windowed -ResX=$RX -ResY=$RY -unattended -nosound -NoVerifyGC -astra_campaign=new \
+"$BIN" "$PROJ/ASTRA.uproject" "$MAP" -game -windowed -ResX=$RX -ResY=$RY -unattended -nosound -NoVerifyGC -astra_campaign=new -astra_nomind \
   -csvCaptureFrames=$FRAMES -ExitAfterCsvProfiling -csvGpuStats -csvMetadata="map=$MAP,res=${RX}x${RY}" \
   -ExecCmds="t.MaxFPS 0, r.VSync 0${ASTRA_PERF_CMDS:+, $ASTRA_PERF_CMDS}" "$@" > "$PROJ/Saved/Logs/perf_last_stdout.log" 2>&1 || true
 after=$(ls -1t "$OUTDIR"/*.csv 2>/dev/null | head -1)

@@ -68,6 +68,12 @@ void UAstraMindSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	FModuleManager::LoadModuleChecked<FWebSocketsModule>(TEXT("WebSockets"));
 	TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UAstraMindSubsystem::Tick), 0.0f);
 	NextConnectTime = FPlatformTime::Seconds() + 0.5;
+	if (FParse::Param(FCommandLine::Get(), TEXT("astra_nomind")))
+	{
+		// testing (performance runs): no mind, no connection, no credit spent
+		bAutoLaunchMind = false;
+		NextConnectTime = TNumericLimits<double>::Max();
+	}
 #if !WITH_EDITOR
 	// the app draws nothing while it is in the background (battery, heat: a fanless Mac); a cheat cvar, so it is set
 	// here rather than in an ini (the editor, driven from outside while in the background, must not idle)

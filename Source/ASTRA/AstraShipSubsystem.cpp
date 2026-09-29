@@ -247,6 +247,23 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			GEngine->Exec(GetWorld(), TEXT("ProfileGPU"));
 		}), 25.f, false);
 	}
+	FString LaterCmds;
+	if (FParse::Value(FCommandLine::Get(), TEXT("astra_later="), LaterCmds, false))
+	{
+		// testing: console commands run once the scene has settled, ';' between them (-astra_later="stat dumpframe -ms=0.1")
+		FTimerHandle H;
+		InWorld.GetTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, LaterCmds]()
+		{
+			TArray<FString> Cmds;
+			LaterCmds.ParseIntoArray(Cmds, TEXT(";"));
+			APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+			for (const FString& Cmd : Cmds)
+			{
+				// through the player's console path, which reaches the viewport too (shot, HighResShot)
+				if (PC) { PC->ConsoleCommand(Cmd.TrimStartAndEnd()); } else { GEngine->Exec(GetWorld(), *Cmd.TrimStartAndEnd()); }
+			}
+		}), 25.f, false);
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("astra_decisive")))
 	{
 		// testing (performance runs): a decisive battle in front of the bridge — two ASTRA destroyers join, eight Mandate
@@ -2419,7 +2436,14 @@ void UAstraShipSubsystem::UpdateAttitudeVisuals()
 	}
 	if (Sun && !bPlanetside)
 	{
-		Sun->SetActorRotation((-Delta.UnrotateVector(SunDir0)).Rotation());
+		// the star's light follows in quarter-degree steps: any turn of a directional light throws its whole shadow cache
+		// away (every virtual shadow page drawn again, each frame of a turn), and a quarter of a degree moves a shadow on
+		// the bridge floor by a centimetre
+		const FVector Want = (-Delta.UnrotateVector(SunDir0)).GetSafeNormal();
+		if (FVector::DotProduct(Want, Sun->GetActorForwardVector()) < FMath::Cos(FMath::DegreesToRadians(0.25f)))
+		{
+			Sun->SetActorRotation(Want.Rotation());
+		}
 	}
 }
 

@@ -23,6 +23,7 @@ namespace
 {
 	// diagnostics: time each page's redraw including the render thread's work (blocks the game thread while on)
 	TAutoConsoleVariable<int32> CVarScreensProfile(TEXT("astra.screens.profile"), 0, TEXT("Log the cost of each bridge screen redraw"));
+	TAutoConsoleVariable<FString> CVarScreensSkip(TEXT("astra.screens.skip"), TEXT(""), TEXT("Diagnostics: pages never redrawn (comma-separated names, e.g. Master,Tactical)"));
 	FLinearColor RGB(uint8 R, uint8 G, uint8 B, float A = 1.f)
 	{
 		FLinearColor C(FColor(R, G, B));
@@ -50,33 +51,49 @@ namespace
 		return Frac < 0.25f ? RED : (Frac < 0.5f ? AMBER : CYAN);
 	}
 
-	/** Thin drawing helper over a UCanvas, in render-target pixels. */
+	/** Thin drawing helper over a UCanvas, in render-target pixels. The items are kept and drawn together when the
+	 *  page is done — every fill, then every line, then every text: the canvas starts a new batch each time the kind
+	 *  of item changes, and the Master page's hundreds of alternating cells, frames and labels made it an 11 ms GPU
+	 *  spike each time it was redrawn (a stutter every 11 frames on the bridge). */
 	struct FPaint
 	{
 		UCanvas* C = nullptr;
 		UFont* Title = nullptr;
 		UFont* Mono = nullptr;
 		float Time = 0.f;
+		mutable TArray<FCanvasTileItem> Tiles;
+		mutable TArray<FCanvasLineItem> Lines;
+		mutable TArray<FCanvasTextItem> Texts;
 
+		~FPaint() { Flush(); }
+		void Flush() const
+		{
+			for (FCanvasTileItem& T : Tiles) { C->DrawItem(T); }
+			for (FCanvasLineItem& L : Lines) { C->DrawItem(L); }
+			for (FCanvasTextItem& T : Texts) { C->DrawItem(T); }
+			Tiles.Reset();
+			Lines.Reset();
+			Texts.Reset();
+		}
 		void Rect(float X, float Y, float W, float H, const FLinearColor& Col) const
 		{
 			FCanvasTileItem T(FVector2D(X, Y), FVector2D(W, H), Col);
 			T.BlendMode = Col.A < 1.f ? SE_BLEND_Translucent : SE_BLEND_Opaque;
-			C->DrawItem(T);
+			Tiles.Add(T);
 		}
 		void Frame(float X, float Y, float W, float H, const FLinearColor& Col, float Thick = 1.f) const
 		{
-			FCanvasBoxItem B(FVector2D(X, Y), FVector2D(W, H));
-			B.SetColor(Col);
-			B.LineThickness = Thick;
-			C->DrawItem(B);
+			Line(X, Y, X + W, Y, Col, Thick);
+			Line(X + W, Y, X + W, Y + H, Col, Thick);
+			Line(X + W, Y + H, X, Y + H, Col, Thick);
+			Line(X, Y + H, X, Y, Col, Thick);
 		}
 		void Line(float X0, float Y0, float X1, float Y1, const FLinearColor& Col, float Thick = 1.f) const
 		{
 			FCanvasLineItem L(FVector2D(X0, Y0), FVector2D(X1, Y1));
 			L.SetColor(Col);
 			L.LineThickness = Thick;
-			C->DrawItem(L);
+			Lines.Add(L);
 		}
 		FSlateFontInfo Font(bool bMono, float Px, bool bBold = false) const
 		{
@@ -98,7 +115,7 @@ namespace
 			const float W = Align ? Width(S, F) : 0.f;
 			FCanvasTextItem T(FVector2D(X - (Align == 1 ? W * 0.5f : (Align == 2 ? W : 0.f)), Y), FText::FromString(S), F, Col);
 			T.BlendMode = SE_BLEND_Translucent;
-			C->DrawItem(T);
+			Texts.Add(T);
 		}
 		void Brackets(float X0, float Y0, float X1, float Y1, const FLinearColor& Col, float L = 14.f) const
 		{
@@ -283,6 +300,10 @@ void UAstraScreensSubsystem::Tick(float DeltaTime)
 		if (!bPadVisible && P->Name == TEXT("Pad"))
 		{
 			continue;                                  // the datapad is painted only while the Captain holds it up
+		}
+		if (!CVarScreensSkip.GetValueOnGameThread().IsEmpty() && CVarScreensSkip.GetValueOnGameThread().Contains(P->Name))
+		{
+			continue;
 		}
 		P->Wait -= DeltaTime;
 		if (P->Wait <= 0.f && (!Due || P->Wait < Due->Wait))
