@@ -5024,9 +5024,43 @@ FString UAstraBattleSubsystem::PilotSummary() const
 	{
 		return TEXT("the Captain ejected from a destroyed Falcon; the pod is being recovered");
 	}
-	return FString::Printf(TEXT("flying a Falcon of Alpha (callsign Eagle), %.1f km from the Aquila, hull %.0f%%, %d missiles; the XO has the conn "
-	                            "and the Captain talks to the bridge by radio"),
-	                       FVector::Dist(S->Pos, Ships[0].Pos) / OneKm, 100.f * S->Hull / S->HullMax, S->Missiles);
+	// the picture around the Falcon as a pilot takes it: clock positions off the nose, high or low, range, closing
+	auto Clock = [S](const FVector& Pos) -> FString
+	{
+		const FVector D = S->Att.UnrotateVector(Pos - S->Pos);
+		const float Az = FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X));
+		int32 Hr = FMath::RoundToInt(Az / 30.f);
+		Hr = ((Hr % 12) + 12) % 12;
+		const float El = FMath::RadiansToDegrees(FMath::Atan2(D.Z, FVector2D(D.X, D.Y).Size()));
+		return FString::Printf(TEXT("%d o'clock %s"), Hr == 0 ? 12 : Hr, El > 15.f ? TEXT("high") : (El < -15.f ? TEXT("low") : TEXT("level")));
+	};
+	struct FNear { const FAstraBattleShip* T; double D; };
+	TArray<FNear> Threats;
+	for (const FAstraBattleShip& O : Ships)
+	{
+		if (O.bAlive && O.Id != S->Id && !O.bGhost && (O.bHostile || (O.bCraft && O.Side == EAstraSide::Mandate)) && (!O.bFog || O.Track >= 2))
+		{
+			const double D = FVector::Dist(O.Pos, S->Pos);
+			if (D < 15.0 * OneKm)
+			{
+				Threats.Add({&O, D});
+			}
+		}
+	}
+	Threats.Sort([](const FNear& A, const FNear& B) { return A.D < B.D; });
+	TArray<FString> Around;
+	for (int32 i = 0; i < FMath::Min(Threats.Num(), 3); ++i)
+	{
+		const FAstraBattleShip& T = *Threats[i].T;
+		const bool bClosing = FVector::DotProduct(T.Vel - S->Vel, (S->Pos - T.Pos).GetSafeNormal()) > 30.f;
+		Around.Add(FString::Printf(TEXT("%s at %s, %.1f km%s"), T.bCraft ? TEXT("a Harpy (Mandate strike fighter)") : *KnownLabel(T),
+		                           *Clock(T.Pos), Threats[i].D / OneKm, bClosing ? TEXT(", closing") : TEXT("")));
+	}
+	return FString::Printf(TEXT("flying a Falcon of Alpha (callsign Eagle), %.1f km from the Aquila (she is at %s), hull %.0f%%, %d missiles; %s; "
+	                            "the XO has the conn and the Captain talks to the bridge by radio (Price is the Captain's flight controller)"),
+	                       FVector::Dist(S->Pos, Ships[0].Pos) / OneKm, *Clock(Ships[0].Pos), 100.f * S->Hull / S->HullMax, S->Missiles,
+	                       Around.Num() ? *FString::Printf(TEXT("around the Falcon: %s"), *FString::Join(Around, TEXT("; ")))
+	                                    : TEXT("no threats within 15 km of the Falcon"));
 }
 
 void UAstraBattleSubsystem::TickPiloted(FAstraBattleShip& S, float Dt)

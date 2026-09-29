@@ -444,6 +444,27 @@ class Mind:
         await self.turns.put(("\x00event:bridge: after-action — " + outcome[:320] + ". The Captain's orders in this fight: " + said[:600],
                               self.lang))
 
+    async def flight_controller(self) -> None:
+        """The Captain in a Falcon is never alone: Price, the flight controller, calls the picture around the Falcon
+        over the radio — a new threat closing at once, otherwise every half minute or so while there is one."""
+        last_t, last_sig = 0.0, ""
+        while True:
+            await asyncio.sleep(3)
+            st = self.game.state if (self.game and self.game.state) else None
+            cap = str((st or {}).get("captain", ""))
+            if not st or not self.clients or not cap.startswith("flying a Falcon"):
+                last_sig = ""
+                continue
+            m = _re.search(r"around the Falcon: (.*?); the XO has the conn", cap)
+            pic = m.group(1) if m else ""
+            sig = _re.sub(r"[\d.]+ km|\d+ o'clock \w+", "", pic)     # who is out there, not where exactly
+            now = time.monotonic()
+            urgent = bool(pic) and sig != last_sig and "closing" in pic
+            if now - self.captain_t < 6 or not pic or (not urgent and now - last_t < 35):
+                continue
+            last_t, last_sig = now, sig
+            await self.turns.put(("\x00event:flight: controller call — the Captain is " + cap, self.lang))
+
     async def standing_sync(self) -> None:
         """The Captain's datapad lists the standing orders in force: the game gets them whenever they change (and
         again whenever it reconnects)."""
@@ -601,7 +622,8 @@ class Mind:
                         continue
                     self.voice.low_priority = True
                     try:
-                        ask = AFTER_ACTION_ASK if any(e.startswith("bridge: after-action") for e in events) else \
+                        ask = FLIGHT_CALL_ASK if any(e.startswith("flight: controller call") for e in events) else \
+                            AFTER_ACTION_ASK if any(e.startswith("bridge: after-action") for e in events) else \
                             TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else \
                             VISIT_ASK if any("has come to the Captain's quarters in person" in e for e in events) else None
                         t = await self.agent.handle_event(" | ".join(events), self.lang, ask=ask)
@@ -822,6 +844,7 @@ class Mind:
         asyncio.create_task(self.enemy_tactics())
         asyncio.create_task(self.standing_sync())
         asyncio.create_task(self.idle_exit())
+        asyncio.create_task(self.flight_controller())
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
@@ -922,6 +945,12 @@ def _fallen(text: str) -> list[str]:
                 out.append(name)
     return out
 
+
+FLIGHT_CALL_ASK = ("Price, the Captain's flight controller, makes one short radio call to the Captain in the Falcon (callsign "
+                   "Eagle): the most important thing around the Falcon now — a threat by clock position, high or low, its "
+                   "range and whether it is closing; or the way home; or what to hit — in clipped radio style (\"Eagle, "
+                   "Price: two bandits, your two o'clock high, three kilometres, closing\"), in the Captain's language. One "
+                   "line, no tools; nothing new worth a call: reply SILENT.")
 
 AFTER_ACTION_ASK = ("The fight is over. The XO gives the Captain a short after-action, two or three sentences in character: the "
                     "outcome and what it cost (hull, people, ships, fighters), what worked, and one honest lesson for the next "
