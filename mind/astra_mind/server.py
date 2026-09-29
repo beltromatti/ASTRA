@@ -493,12 +493,16 @@ class Mind:
         hostiles close and untouched, magazines running dry) the XO or the officer concerned says so, once, with a
         recommendation. The problems are found here, from the telemetry; the officer only phrases them."""
         last_t, last_key = 0.0, ""
+        pictures: set[str] = set()                  # blind pictures already put to the Captain (once each)
         while True:
             await asyncio.sleep(5)
             st = self.game.state if (self.game and self.game.state) else None
             if not st or not self.clients or st.get("abandon") or self.aftermath.active:
                 continue
             flags = tactical_flags(st)
+            info = picture_flag(st)
+            if info and info[0] not in pictures and len(flags) < 3:
+                flags.append(info[1])
             now = time.monotonic()
             # in a fight the bridge is never silent: only the Captain's own words hold the check back
             key = "|".join(sorted(f.split(":", 1)[0] for f in flags))
@@ -506,6 +510,8 @@ class Mind:
             if not flags or now - self.captain_t < 10 or now - last_t < 40 or (key == last_key and now - last_t < 100):
                 continue
             last_t, last_key = now, key
+            if info and info[1] in flags:
+                pictures.add(info[0])
             log.info("tactical check: %s", flags)
             self.last_activity = now
             await self.turns.put(("\x00event:bridge: tactical check — " + "; ".join(flags), self.lang))
@@ -912,9 +918,32 @@ VISIT_ASK = ("An officer has just come to the Captain's quarters in person (the 
 TACTICAL_ASK = ("A tactical check of the fight (the facts above come from the plot, they are true now). The XO, or the "
                 "officer whose station it concerns, tells the Captain the single most important problem in one short "
                 "sentence and recommends a concrete order the Captain could give (a course or intercept, a target, a "
-                "flight group, shields). Do not act on your own — unless a standing order in force covers the problem: "
+                "flight group, shields); for a blind picture, Nair gives the two best options and what each costs, in two "
+                "short sentences, weighing how this Captain usually fights. Do not act on your own — unless a standing order in force covers the problem: "
                 "then that officer carries it out now and reports it — and do not repeat what was said in the last "
                 "minute. If nothing here really needs the Captain now, reply with the word SILENT and call no tool.")
+
+
+def picture_flag(st: dict) -> tuple[str, str] | None:
+    """The information war: when the plot holds only bearings (no range: faint emissions, a jammer, perhaps decoys),
+    the Captain should hear the options once — (signature of this picture, the fact for the crew)."""
+    contacts = st.get("contacts", []) or []
+    bearings = [c for c in contacts if str(c.get("status", "")).startswith(("bearing only", "JAMMING"))]
+    if not bearings:
+        return None
+    jammers = [c for c in bearings if str(c.get("status", "")).startswith("JAMMING")]
+    firm = [c for c in contacts if str(c.get("status", "")).startswith("hostile")]
+    if len(bearings) < 2 and not jammers:
+        return None
+    sig = "|".join(sorted(str(c.get("id")) for c in bearings)) + "#" + "|".join(sorted(str(c.get("id")) for c in jammers))
+    ids = ", ".join(f"{c.get('id')} ({int(c.get('bearing_deg', 0) or 0):03d}{', jamming' if c in jammers else ''})" for c in bearings[:5])
+    options = ("missiles can fly home-on-jam; a flight group sent out on the flank gives a cross-fix (a range) or eyes on "
+               "it; an active ping burns through and unmasks decoys for a moment but tells everyone where we are; or "
+               "close in (burn-through inside 12 km)") if jammers else \
+              ("an active ping gives ranges and unmasks decoys but tells everyone where we are; a recon flight (Wasp "
+               "drones) looks without giving us away; EMCON full reaches further; or wait for them to close")
+    return sig, (f"blind picture: {len(bearings)} contact(s) with no range — {ids}"
+                 f"{'; ' + str(len(firm)) + ' tracked' if firm else ''}; any bearing may be a decoy. Options: {options}")
 
 
 def tactical_flags(st: dict) -> list[str]:
