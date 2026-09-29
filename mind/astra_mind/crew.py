@@ -94,7 +94,8 @@ Everyone wears a neural translator implant, "the Interpreter": people hear each 
 
 
 def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None,
-                  war: str = "", mood: str = "", bonds: str = "", standing: str = "", memories: str = "", style: str = "") -> str:
+                  war: str = "", mood: str = "", bonds: str = "", standing: str = "", memories: str = "", style: str = "",
+                  home: str = "") -> str:
     lang_name = LANG_NAMES.get(lang, lang)
     roster = "\n".join(
         f"- {o.id}: {o.title}, {o.role}. Duties: {o.duties}. Character: {o.personality}." for o in CREW.values())
@@ -242,6 +243,10 @@ wants and offer it before being asked ("Falcons are fuelled for CAP, as you like
 dangerous against what you face now (a ping against decoys and jammers, standing off from an enemy that outranges us),
 say so plainly. Never recite this read.
 {style or "- no fights together yet: learn how the Captain commands"}
+
+The officers' own lives beyond the war (they carry it: it may show in a clipped answer or a distracted pause; an officer
+may bring it to the Captain in a quiet moment, never in the middle of a fight; the others know only what they were told)
+{home or "- nothing from home lately"}
 
 Where each officer stands with the Captain (it shows in small ways — warmth or formality, a pause before a read-back,
 an unasked question, loyalty under fire; never announce it)

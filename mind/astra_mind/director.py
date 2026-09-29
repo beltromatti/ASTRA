@@ -86,6 +86,16 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
                  "engineering Mensah he, chief Okonkwo he, doctor Lindqvist she, flight Price he): one sentence in English — "
                  "how they now see the Captain and why (trust earned or lost, loyalty, doubt about an order, resentment, "
                  "admiration, a debt), and what they carry. Omit everyone else: their bond carries over"},
+    "home": {"type": "object", "properties": {
+                 "officer": {"type": "string", "enum": ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering",
+                                                        "chief", "doctor", "flight"]},
+                 "news": {"type": "string", "description": "one sentence in English: what happened and how it weighs on them"}},
+             "description": "now and then (one beat in four or five, never during the decisive battle): something from an "
+                            "officer's life beyond the war reaches them by the fleet mail — a letter or a message from home, "
+                            "a birth or a death, a sibling on a ship that was hit, a promotion board, a debt, a quarrel with "
+                            "another officer that came to a head. Specific, human, consistent with who they are and with the "
+                            "war (a home world threatened, a friend on a lost ship). They carry it; they may bring it to the "
+                            "Captain in a quiet moment"},
     "crew_mood": {"type": "string", "description": "how the Aquila's bridge crew feels now and why, in English, 1-2 "
                   "sentences naming officers where it matters (Serra XO she, Ferri helm he, Tanaka ops she, Voss tactical "
                   "she, Martin comms he, Nair sensors she, Mensah engineering he, Price flight he, Chief Okonkwo he, Dr. "
@@ -227,6 +237,7 @@ class Director:
         self.standing: list[dict[str, str]] = []   # the Captain's standing orders (shared with the bridge agent)
         self.memories: dict[str, list[dict[str, str]]] = {}   # what each officer remembers of the Captain (memory.py)
         self.style: dict[str, Any] = {}          # how the Captain commands: the XO's read, the Mandate's (style.py)
+        self.home: list[dict[str, Any]] = []     # the officers' own lives: news from home (told to the Captain or not yet)
         self.captain_style = lambda: ""          # the XO's read, for the story (set by the server)
 
     def reset(self) -> None:
@@ -239,6 +250,7 @@ class Director:
         self.standing.clear()
         self.memories.clear()
         self.style.clear()
+        self.home.clear()
         self.arc, self.act, self.act_beats, self.decisive = 1, 1, 0, False
         self.busy = False
         self.granted = False
@@ -262,6 +274,7 @@ class Director:
                                   for k, v in (d.get("memories") or {}).items() if isinstance(v, list)})
             self.style.clear()
             self.style.update(d.get("style") or {})
+            self.home[:] = [h for h in (d.get("home") or []) if isinstance(h, dict) and h.get("officer") and h.get("news")][-12:]
             self.arc, self.act = int(d.get("arc", 1)), int(d.get("act", 1))
             self.act_beats, self.decisive = int(d.get("act_beats", 0)), bool(d.get("decisive", False))
         except (OSError, ValueError):
@@ -285,7 +298,7 @@ class Director:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds,
                            "standing": self.standing, "arc": self.arc, "act": self.act, "act_beats": self.act_beats,
-                           "decisive": self.decisive, "memories": self.memories, "style": self.style}, f,
+                           "decisive": self.decisive, "memories": self.memories, "style": self.style, "home": self.home}, f,
                           ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:
@@ -311,6 +324,13 @@ class Director:
         self.campaign.append(text)
         del self.campaign[:-30]
         self.save()
+
+    def home_lines(self) -> str:
+        """For the crew: what is going on in the officers' own lives (the latest first)."""
+        from .crew import CREW
+        return "\n".join(f"- {CREW[h['officer']].name} ({h['officer']}): {h['news']}"
+                          + ("" if h.get("told") else " (has not told the Captain yet)")
+                          for h in reversed(self.home[-6:]) if h.get("officer") in CREW)
 
     def bonds_lines(self) -> list[str]:
         """Where each officer stands with the Captain (for the crew and the director)."""
@@ -416,6 +436,11 @@ class Director:
         if comp.error or not beat:
             log.error("director produced no beat: %s %r", comp.error, comp.content[:200])
             return
+        home = beat.pop("home", None)
+        if isinstance(home, dict) and home.get("officer") and str(home.get("news") or "").strip():
+            self.home = (self.home + [{"officer": str(home["officer"]), "news": str(home["news"]).strip()[:300], "told": False}])[-12:]
+            self.note(f"news from home for {home['officer']}: {str(home['news']).strip()[:200]}")
+            log.info("news from home: %s — %s", home["officer"], home["news"])
         bonds = beat.pop("officers", None) or {}
         if isinstance(bonds, dict) and bonds:
             from .crew import CREW

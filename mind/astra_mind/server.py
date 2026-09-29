@@ -220,6 +220,7 @@ class Mind:
         # how this Captain commands: the XO learns it fight by fight, the Mandate's intelligence too (style.py)
         self.style = StyleKeeper(self.llm, self.director.style)
         self.agent.style = self.style.xo_line
+        self.agent.home = self.director.home_lines
         self.director.captain_style = self.style.xo_line
         self.enemy.intel = self.style.mandate_line
         self.agent.say = self._crew_say
@@ -399,6 +400,22 @@ class Mind:
             # the Captain and how they stand (memory.py, the bonds) — a question, a thanks, a doubt; the Captain answers
             mems = self.memory.lines()
             personal = random.random() < (0.45 if (mems or self.director.bonds) else 0.2) and "Captain's quarters" not in str(st.get("captain", ""))
+            # news from home not yet told: that officer brings it to the Captain first
+            untold = next((h for h in self.director.home if not h.get("told") and h.get("officer") in CREW), None)
+            if untold and "Captain's quarters" not in str(st.get("captain", "")) and random.random() < 0.7:
+                untold["told"] = True
+                self.director.save()
+                self.voice.low_priority = True
+                try:
+                    t = await self.agent.handle_event(
+                        "bridge: a quiet moment on watch", self.lang,
+                        ask=(f"A quiet moment. {untold['officer']} turns to the Captain, off the record: news from home has "
+                             f"reached them ({untold['news']}). In one or two short human lines, in character, they tell the "
+                             "Captain — as much as they want to say; it invites an answer. Only speak, only that officer."))
+                    log.info("news from home told (%s): %s", untold["officer"], " | ".join(f"{s}: {x}" for s, x in t.lines))
+                finally:
+                    self.voice.low_priority = False
+                continue
             self.voice.low_priority = True
             try:
                 if personal:
