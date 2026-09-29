@@ -4456,6 +4456,59 @@ FVector UAstraBattleSubsystem::FromWorld(const FVector& WorldCm) const
 	return P.Pos + P.Att.RotateVector(WorldCm / 100.0 + BridgeOffset);
 }
 
+bool UAstraBattleSubsystem::PilotCollision(FAstraBattleShip& S, const FVector& Prev)
+{
+	FString What;
+	// the Aquila's hull is solid (the level's actor has its collision), except at the tube she launches and
+	// recovers the Falcon through
+	const FAstraBattleShip& A = Ships[0];
+	if (A.bAlive && FVector::Dist(S.Pos, A.Pos) < 900.0 && FVector::Dist(S.Pos, PilotMouth()) > 70.0)
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraPilotHit), true);
+		if (APawn* Me = UGameplayStatics::GetPlayerPawn(this, 0))
+		{
+			Q.AddIgnoredActor(Me);
+		}
+		if (GetWorld()->LineTraceSingleByChannel(Hit, ToWorld(Prev), ToWorld(S.Pos), ECC_Visibility, Q) && Hit.GetActor())
+		{
+			What = TEXT("the Aquila's hull");
+		}
+	}
+	// the others have no collision: the box of their hull (a little inside its outline, which takes in masts and guns)
+	for (const FAstraBattleShip& O : Ships)
+	{
+		if (!What.IsEmpty())
+		{
+			break;
+		}
+		if (O.bPlayer || O.bCraft || O.Id == S.Id || !O.bAlive || !O.Actor || FVector::Dist(S.Pos, O.Pos) > O.Radius * 2.5)
+		{
+			continue;
+		}
+		const UStaticMeshComponent* C = O.Actor->GetStaticMeshComponent();
+		if (!C || !C->GetStaticMesh())
+		{
+			continue;
+		}
+		const FBox B = C->GetStaticMesh()->GetBoundingBox();                        // cm, the mesh's own frame
+		const FVector Local = O.Att.UnrotateVector(S.Pos - O.Pos) * 100.0 / C->GetComponentScale();
+		const FVector Ext = B.GetExtent() * 0.8f;
+		const FVector Ctr = B.GetCenter();
+		if (FMath::Abs(Local.X - Ctr.X) < Ext.X && FMath::Abs(Local.Y - Ctr.Y) < Ext.Y && FMath::Abs(Local.Z - Ctr.Z) < Ext.Z)
+		{
+			What = FString::Printf(TEXT("the hull of %s"), *O.Name);
+		}
+	}
+	if (What.IsEmpty())
+	{
+		return false;
+	}
+	Report(FString::Printf(TEXT("flight: Eagle flew into %s"), *What));
+	Destroy(S);
+	return true;
+}
+
 FVector UAstraBattleSubsystem::PilotMouth() const
 {
 	// Alpha's tube (port): the recovery approach is just outside its mouth
@@ -4626,6 +4679,10 @@ void UAstraBattleSubsystem::TickPiloted(FAstraBattleShip& S, float Dt)
 	const FVector Want = Ships[0].Vel + S.Att.RotateVector(FVector(Pilot.Throttle * MaxV, Pilot.Strafe.Y * 160.f, Pilot.Strafe.Z * 160.f));
 	S.Vel += (Want - S.Vel).GetClampedToMaxSize(FMath::Lerp(150.f, 260.f, Boost) * Dt);
 	S.Pos += S.Vel * Dt;
+	if (PilotCollision(S, S.Pos - S.Vel * Dt))
+	{
+		return;                                   // she flew into a hull: the Captain ejects (the usual recovery)
+	}
 	S.Shield = FMath::Min(S.ShieldMax, S.Shield + S.ShieldRegen * Dt);
 	// guns: two cannons in the wing roots, alternating, ten rounds a second
 	PilotGunT -= Dt;

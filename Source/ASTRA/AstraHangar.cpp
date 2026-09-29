@@ -179,7 +179,8 @@ int32 AAstraHangar::LiftLandingNear(const APawn* Pawn) const
 
 bool AAstraHangar::IsPawnInEngineering(const APawn* Pawn) const
 {
-	if (!Pawn || EngineeringLanding.IsNearlyZero())
+	// only the Captain on foot is in a room (a Falcon crossing the hull, a lifepod: never)
+	if (!Pawn || !Pawn->IsA<ACharacter>() || EngineeringLanding.IsNearlyZero())
 	{
 		return false;
 	}
@@ -189,7 +190,8 @@ bool AAstraHangar::IsPawnInEngineering(const APawn* Pawn) const
 
 bool AAstraHangar::IsPawnInMedbay(const APawn* Pawn) const
 {
-	if (!Pawn || MedbayLanding.IsNearlyZero())
+	// only the Captain on foot is in a room (a Falcon crossing the hull, a lifepod: never)
+	if (!Pawn || !Pawn->IsA<ACharacter>() || MedbayLanding.IsNearlyZero())
 	{
 		return false;
 	}
@@ -199,7 +201,8 @@ bool AAstraHangar::IsPawnInMedbay(const APawn* Pawn) const
 
 bool AAstraHangar::IsPawnInMess(const APawn* Pawn) const
 {
-	if (!Pawn || MessLanding.IsNearlyZero())
+	// only the Captain on foot is in a room (a Falcon crossing the hull, a lifepod: never)
+	if (!Pawn || !Pawn->IsA<ACharacter>() || MessLanding.IsNearlyZero())
 	{
 		return false;
 	}

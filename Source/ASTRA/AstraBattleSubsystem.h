@@ -512,6 +512,8 @@ private:
 	/** The Aquila's own picture of the Mandate's ships: passive bearings from their emissions, tracks from the active
 	 *  sensors (EMCON) and the friends' datalink, classification and identity as they close; reported as they change. */
 	void TickSensors(float Dt);
+	/** The Captain's Falcon against the hulls (the Aquila's collision, the others' boxes): true if she was lost. */
+	bool PilotCollision(FAstraBattleShip& S, const FVector& Prev);
 	float SignatureKmOf(const FAstraBattleShip& S) const;
 	/** How the crew can name it: "KMS Lethe (T-31)", "a Mandate frigate (T-31)" or "T-31". */
 	FString KnownLabel(const FAstraBattleShip& S) const;
