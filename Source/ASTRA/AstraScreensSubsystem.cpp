@@ -536,7 +536,15 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 	}
 	FPaint P{C, TitleFont, MonoFont, Time};
 	P.Rect(0, 0, W, H, BG);
-	P.Header(W, TEXT("ASN Aquila · Captain's Datapad"), FString::Printf(TEXT("%s · %s"), *Ship->GetHullNumber(), *ShipClock(Time).Right(13)), COMMAND);
+	// a margin all round: held at an angle, the bezel's lip hides the page's edges; secondary text brighter than on the
+	// bridge's screens (the pad is read anywhere, in sunlight too)
+	const float MX = 46.f, RX = W - 46.f;
+	const FLinearColor SOFT = RGB(120, 160, 205);
+	P.Rect(0, 0, W, 50, HEADER);
+	P.Rect(MX - 14, 12, 6, 30, COMMAND);
+	P.Text(MX, 12, TEXT("ASN AQUILA · CAPTAIN'S DATAPAD"), false, 26, TEXTC);
+	P.Text(RX, 18, FString::Printf(TEXT("%s · %s"), *Ship->GetHullNumber(), *ShipClock(Time).Right(13)), true, 15, CYAN, 2);
+	P.Line(0, 50, W, 50, COMMAND, 2.f);
 	// condition and where the Captain is
 	const EAstraAlert Alert = Ship->GetAlert();
 	FLinearColor AC = AlertColor(Alert);
@@ -544,19 +552,19 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 	{
 		AC.A = P.Pulse(0.8f) * 0.6f + 0.4f;
 	}
-	P.Text(24, 54, TEXT("CONDITION"), false, 18, CYAN);
-	P.Text(24, 72, AlertText(Alert), false, 44, AC);
-	P.Text(W - 24, 58, TEXT("CAPTAIN"), false, 16, DIM, 2);
-	P.Text(W - 24, 80, Ship->CaptainPlace(), true, 20, TEXTC, 2);
+	P.Text(MX, 54, TEXT("CONDITION"), false, 18, CYAN);
+	P.Text(MX, 72, AlertText(Alert), false, 44, AC);
+	P.Text(RX, 58, TEXT("CAPTAIN"), false, 16, SOFT, 2);
+	P.Text(RX, 80, Ship->CaptainPlace(), true, 20, TEXTC, 2);
 	// hull, shields, heat
 	const float Sh = Battle ? Battle->PlayerShieldFraction() : 1.f;
 	const float Hu = Battle ? Battle->PlayerHullFraction() : 1.f;
 	const float He = Ship->GetHeatPct() / 100.f;
-	const float BW = (W - 48 - 40) / 3.f;
-	P.Bar(24, 128, BW, 16, Hu, TEXT("Hull"), FString::Printf(TEXT("%.0f %%"), 100.f * Hu), Level(Hu));
-	P.Bar(24 + BW + 20, 128, BW, 16, Sh, TEXT("Shields"), Ship->AreShieldsUp() ? FString::Printf(TEXT("%.0f %%"), 100.f * Sh) : FString(TEXT("DOWN")),
+	const float BW = (RX - MX - 40) / 3.f;
+	P.Bar(MX, 128, BW, 16, Hu, TEXT("Hull"), FString::Printf(TEXT("%.0f %%"), 100.f * Hu), Level(Hu));
+	P.Bar(MX + BW + 20, 128, BW, 16, Sh, TEXT("Shields"), Ship->AreShieldsUp() ? FString::Printf(TEXT("%.0f %%"), 100.f * Sh) : FString(TEXT("DOWN")),
 	      Ship->AreShieldsUp() ? Level(Sh) : DIM);
-	P.Bar(24 + 2 * (BW + 20), 128, BW, 16, FMath::Clamp(He, 0.f, 1.f), TEXT("Heat"), FString::Printf(TEXT("%.0f %%"), 100.f * He),
+	P.Bar(MX + 2 * (BW + 20), 128, BW, 16, FMath::Clamp(He, 0.f, 1.f), TEXT("Heat"), FString::Printf(TEXT("%.0f %%"), 100.f * He),
 	      He > 0.9f ? RED : (He > 0.7f ? AMBER : CYAN));
 	// contacts, as the sensors know them: the nearest first, bearings (no range) after
 	TArray<FAstraHoloBlip> Blips;
@@ -581,9 +589,9 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 		return (A.bBearingOnly ? 1.0e6f : A.RangeKm) < (B.bBearingOnly ? 1.0e6f : B.RangeKm);
 	});
 	const UAstraBattleSubsystem::FFireControl Fc = Battle ? Battle->GetFireControl() : UAstraBattleSubsystem::FFireControl();
-	P.Line(24, 180, W - 24, 180, DIM);
-	P.Text(24, 188, TEXT("CONTACTS"), false, 18, CYAN);
-	P.Text(W - 24, 190, FString::Printf(TEXT("%d HOSTILE · %d FRIENDLY%s"), Hostiles, Friends,
+	P.Line(MX, 180, RX, 180, DIM);
+	P.Text(MX, 188, TEXT("CONTACTS"), false, 18, CYAN);
+	P.Text(RX, 190, FString::Printf(TEXT("%d HOSTILE · %d FRIENDLY%s"), Hostiles, Friends,
 	                                    Fc.Inbound ? *FString::Printf(TEXT(" · %d MISSILES INBOUND"), Fc.Inbound) : TEXT("")), true, 16,
 	       (Hostiles || Fc.Inbound) ? RED : DIM, 2);
 	int32 Row = 0;
@@ -597,11 +605,11 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 		const FLinearColor Col = B->bUnknown ? TEXTC : (B->Side == EAstraSide::Astra ? CYAN : (B->bHostile ? (B->bHoldFire ? AMBER : RED) : YELLOW));
 		const FString What = !B->Name.IsEmpty() ? B->Name.ToUpper() : (!B->ClassShort.IsEmpty() ? B->ClassShort.ToUpper() : FString(TEXT("UNIDENTIFIED")));
 		const float Brg = FMath::Fmod(FMath::RadiansToDegrees(FMath::Atan2(B->Rel.Y, B->Rel.X)) + Ship->GetHeadingDeg() + 720.f, 360.f);
-		P.Text(24, Y, B->Contact, true, 17, Col, 0, true);
-		P.Text(110, Y, What.Left(30), true, 17, TEXTC);
+		P.Text(MX, Y, B->Contact, true, 17, Col, 0, true);
+		P.Text(MX + 88, Y, What.Left(28), true, 17, TEXTC);
 		P.Text(640, Y, B->bBearingOnly ? FString(TEXT("NO RANGE")) : FString::Printf(TEXT("%.1f KM"), B->RangeKm), true, 17, TEXTC, 2);
 		P.Text(720, Y, FString::Printf(TEXT("%03.0f"), Brg), true, 17, TEXTC, 2);
-		P.Text(W - 24, Y, B->bJamming ? TEXT("JAMMING") : B->bBearingOnly ? TEXT("BEARING ONLY")
+		P.Text(RX, Y, B->bJamming ? TEXT("JAMMING") : B->bBearingOnly ? TEXT("BEARING ONLY")
 		                  : B->bUnknown ? TEXT("UNKNOWN") : (B->Side == EAstraSide::Astra ? TEXT("FRIENDLY")
 		                  : (B->bHostile ? (B->bRetreating ? TEXT("WITHDRAWING") : (B->bHoldFire ? TEXT("HOLDING FIRE") : TEXT("HOSTILE"))) : TEXT("NEUTRAL"))),
 		       true, 16, Col, 2);
@@ -609,40 +617,40 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 	}
 	if (Ships.Num() == 0)
 	{
-		P.Text(24, 216, TEXT("NO CONTACTS ON THE PLOT"), true, 17, DIM);
+		P.Text(MX, 216, TEXT("NO CONTACTS ON THE PLOT"), true, 17, SOFT);
 	}
 	else if (Ships.Num() > 4)
 	{
-		P.Text(W - 24, 216 + 4 * 26, FString::Printf(TEXT("+%d MORE"), Ships.Num() - 4), true, 14, DIM, 2);
+		P.Text(RX, 216 + 4 * 26, FString::Printf(TEXT("+%d MORE"), Ships.Num() - 4), true, 14, SOFT, 2);
 	}
 	// fire control, flight groups, damage
-	P.Line(24, 330, W - 24, 330, DIM);
+	P.Line(MX, 330, RX, 330, DIM);
 	int32 Busy = 0;
 	for (const FAstraDamage& D : Ship->GetDamage())
 	{
 		Busy += D.Team >= 0 ? 1 : 0;
 	}
-	P.Text(24, 338, !Fc.Target.IsEmpty() ? FString::Printf(TEXT("FIRE CONTROL  %s  %.1f KM  ·  RAILGUNS %d VOLLEYS  ·  VLS %d"), *Fc.Target, Fc.TargetRangeKm, Fc.RailVolleys, Fc.Missiles)
-	                                   : FString::Printf(TEXT("FIRE CONTROL  NO TARGET  ·  VLS %d MISSILES"), Fc.Missiles), true, 16, Fc.Target.IsEmpty() ? DIM : AMBER);
-	P.Text(24, 360, TEXT("FLIGHT  ") + (Battle ? Battle->FlightLine() : FString()), true, 16, TEXTC);
+	P.Text(MX, 338, !Fc.Target.IsEmpty() ? FString::Printf(TEXT("FIRE CONTROL  %s  %.1f KM  ·  RAILGUNS %d VOLLEYS  ·  VLS %d"), *Fc.Target, Fc.TargetRangeKm, Fc.RailVolleys, Fc.Missiles)
+	                                   : FString::Printf(TEXT("FIRE CONTROL  NO TARGET  ·  VLS %d MISSILES"), Fc.Missiles), true, 16, Fc.Target.IsEmpty() ? SOFT : AMBER);
+	P.Text(MX, 360, TEXT("FLIGHT  ") + (Battle ? Battle->FlightLine() : FString()), true, 16, TEXTC);
 	const int32 Incidents = Ship->GetDamage().Num();
-	P.Text(24, 382, Incidents ? FString::Printf(TEXT("DAMAGE  %d INCIDENT%s  ·  %d / %d TEAMS OUT"), Incidents, Incidents > 1 ? TEXT("S") : TEXT(""), Busy, Ship->GetNumDamageTeams())
+	P.Text(MX, 382, Incidents ? FString::Printf(TEXT("DAMAGE  %d INCIDENT%s  ·  %d / %d TEAMS OUT"), Incidents, Incidents > 1 ? TEXT("S") : TEXT(""), Busy, Ship->GetNumDamageTeams())
 	                          : FString(TEXT("DAMAGE  NONE  ·  ALL DECKS PRESSURIZED")), true, 16, Incidents ? AMBER : GREEN);
 	// standing orders
-	P.Line(24, 410, W - 24, 410, DIM);
-	P.Text(24, 416, TEXT("STANDING ORDERS"), false, 18, CYAN);
+	P.Line(MX, 410, RX, 410, DIM);
+	P.Text(MX, 416, TEXT("STANDING ORDERS"), false, 18, CYAN);
 	const TArray<FString>& Orders = Ship->GetStandingOrders();
 	if (Orders.Num() == 0)
 	{
-		P.Text(24, 442, TEXT("NONE IN FORCE"), true, 16, DIM);
+		P.Text(MX, 442, TEXT("NONE IN FORCE"), true, 16, SOFT);
 	}
 	for (int32 i = 0; i < FMath::Min(Orders.Num(), 3); ++i)
 	{
-		P.Text(24, 442 + i * 22, TEXT("· ") + Orders[Orders.Num() - 1 - i].Left(104), true, 15, TEXTC);
+		P.Text(MX, 442 + i * 22, TEXT("· ") + Orders[Orders.Num() - 1 - i].Left(104), true, 15, TEXTC);
 	}
 	// the comms log: the last words heard, newest at the bottom
-	P.Line(24, 512, W - 24, 512, DIM);
-	P.Text(24, 518, TEXT("COMMS"), false, 18, CYAN);
+	P.Line(MX, 512, RX, 512, DIM);
+	P.Text(MX, 518, TEXT("COMMS"), false, 18, CYAN);
 	TArray<TPair<FString, FString>> Log;
 	if (Mind)
 	{
@@ -665,7 +673,7 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 		Who.ParseIntoArrayWS(Parts);
 		Who = Parts.Num() ? Parts.Last().ToUpper() : FString(TEXT("SHIP"));
 		bool bFirst = true;
-		for (const FString& Seg : Wrap(L.Value, 92))
+		for (const FString& Seg : Wrap(L.Value, 86))
 		{
 			Lines.Add(TPair<FString, FString>(bFirst ? Who : FString(), Seg));
 			bFirst = false;
@@ -675,14 +683,15 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 	for (int32 i = FMath::Max(0, Lines.Num() - MaxLines), k = 0; i < Lines.Num(); ++i, ++k)
 	{
 		const float Y = 544.f + k * 21.f;
-		P.Text(24, Y, Lines[i].Key, true, 15, CYAN);
-		P.Text(126, Y, Lines[i].Value, true, 15, TEXTC);
+		P.Text(MX, Y, Lines[i].Key, true, 15, CYAN);
+		P.Text(MX + 100, Y, Lines[i].Value, true, 15, TEXTC);
 	}
 	if (Lines.Num() == 0)
 	{
-		P.Text(24, 544, TEXT("QUIET ON ALL CHANNELS"), true, 15, DIM);
+		P.Text(MX, 544, TEXT("QUIET ON ALL CHANNELS"), true, 15, SOFT);
 	}
-	P.Footer(W, H, TEXT("TAB  LOWER THE DATAPAD  ·  HOLD V  SPEAK  ·  T  TYPE"), DIM);
+	P.Rect(0, H - 30, W, 30, HEADER);
+	P.Text(MX, H - 27, TEXT("TAB  LOWER THE DATAPAD  ·  HOLD V  SPEAK  ·  T  TYPE"), true, 14, SOFT);
 }
 
 void UAstraScreensSubsystem::DrawTactical(UCanvas* C, int32 W, int32 H)

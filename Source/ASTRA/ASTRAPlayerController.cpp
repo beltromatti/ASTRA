@@ -394,8 +394,8 @@ void AASTRAPlayerController::TickPad(float DeltaTime)
 		}
 	}
 	const float A = FMath::InterpEaseInOut(0.f, 1.f, PadAlpha, 2.f);
-	const FVector Down(20.f, -14.f, -44.f), Up(27.f, -5.f, -8.5f);
-	const FQuat RDown = FRotator(-70.f, -10.f, 8.f).Quaternion(), RUp = FRotator(-17.f, -10.f, 3.f).Quaternion();
+	const FVector Down(20.f, -16.f, -44.f), Up(27.f, -7.5f, -9.f);
+	const FQuat RDown = FRotator(-70.f, -14.f, 8.f).Quaternion(), RUp = FRotator(-18.f, -15.f, 3.f).Quaternion();
 	PadMesh->SetRelativeLocationAndRotation(FMath::Lerp(Down, Up, A), FQuat::Slerp(RDown, RUp, A));
 	PadMesh->SetVisibility(true);
 }

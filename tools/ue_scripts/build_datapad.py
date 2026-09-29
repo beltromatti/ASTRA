@@ -35,10 +35,11 @@ def mi(name, parent_path, scalars=None, vectors=None, textures=None):
 mi("MI_PAD_Body", HARD, {"RoughnessMin": 0.42, "RoughnessMax": 0.62, "MetallicFromMap": 0.0, "MetallicBias": 0.0,
                          "BaseColorMapInfluence": 0.25, "NormalStrength": 0.35, "UVScale": 4.0, "MacroBrightness": 0.04,
                          "ScratchRoughness": 0.08, "RoughnessVariation": 0.1},
-   {"Tint": (0.028, 0.03, 0.034)},
+   {"Tint": (0.009, 0.01, 0.012)},
    {"BaseColorMap": f"{TEX}/T_PanelPaint_BC", "NormalMap": f"{TEX}/T_PanelPaint_N", "ORMMap": f"{TEX}/T_PanelPaint_ORM"})
 # the screen: the game sets its ScreenTexture to the live page
-mi("MI_PAD_Screen", SCREEN, {"Intensity": 2.2, "Roughness": 0.18, "FlipU": 0.0, "FlipV": 0.0})
+# (bright and matte: it is read in the bridge's sunlight, a glossy face washed out)
+mi("MI_PAD_Screen", SCREEN, {"Intensity": 9.0, "Roughness": 0.65, "Specular": 0.12, "FlipU": 0.0, "FlipV": 0.0})
 
 SRC = os.path.join(ROOT, "art", "export", "datapad")
 DST = "/Game/ASTRA/Kit/Props"

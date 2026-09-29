@@ -169,7 +169,7 @@ def light(cls, x, y, z, label, intensity, color, radius, shadows=False, pitch=-9
     lc.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
     lc.set_editor_property("intensity", intensity)
     lc.set_editor_property("attenuation_radius", radius)
-    lc.set_editor_property("light_color", unreal.Color(*color, 255))
+    lc.set_editor_property("light_color", unreal.Color(r=color[0], g=color[1], b=color[2], a=255))
     lc.set_editor_property("cast_shadows", shadows)
     if size and isinstance(lc, unreal.RectLightComponent):
         lc.set_editor_property("source_width", size[0] * M)
@@ -182,16 +182,17 @@ def light(cls, x, y, z, label, intensity, color, radius, shadows=False, pitch=-9
 
 H = D["height"]
 LEN = D["length"]
-light(unreal.RectLight, -10.0, -0.07, H - 0.05, "Berths_Aisle", 5000, (255, 214, 170), 900, shadows=True, size=(18.0, 0.3))
+# (a dim room, but the Captain must see the racks and who sleeps in them: about a third of the Mess's light)
+light(unreal.RectLight, -10.0, -0.07, H - 0.05, "Berths_Aisle", 14000, (255, 214, 170), 1100, shadows=True, size=(18.0, 0.3))
 for x in (-4.0, -10.0, -16.0):
-    light(unreal.PointLight, x, 0.0, 0.25, f"Berths_Night_{-int(x)}", 260, (255, 40, 25), 450)
-for k, (g, stk, side, lvl) in enumerate(((1, 0, 1, 1), (3, 1, -1, 2), (5, 0, 1, 0))):
+    light(unreal.PointLight, x, 0.0, 0.25, f"Berths_Night_{-int(x)}", 600, (255, 40, 25), 550)
+for k, (g, stk, side, lvl) in enumerate(((0, 1, -1, 0), (1, 0, 1, 1), (2, 1, -1, 2), (3, 1, -1, 2), (4, 0, 1, 0), (5, 0, 1, 0), (6, 1, -1, 1))):
     xg = ST["x_start"] - g * (2 * RW + LW)
     x = xg - RW / 2 - stk * RW
     z = (ST["rack_heights"][lvl + 1] if lvl + 1 < 3 else ST["rack_heights"][2] + 0.85) - 0.1
-    light(unreal.PointLight, x, side * (YF + RL - 0.35), z, f"Berths_Reading{k + 1}", 120, (255, 190, 120), 180)
+    light(unreal.PointLight, x, side * (YF + RL - 0.35), z, f"Berths_Reading{k + 1}", 450, (255, 190, 120), 260)
 lo = D["lounge"]
-light(unreal.RectLight, lo["table"]["x"], lo["table"]["y"], H - 0.06, "Berths_Lounge", 2600, (255, 225, 190), 700, shadows=True,
+light(unreal.RectLight, lo["table"]["x"], lo["table"]["y"], H - 0.06, "Berths_Lounge", 5000, (255, 225, 190), 700, shadows=True,
       size=(2.0, 1.2))
 light(unreal.RectLight, -LEN + 0.6, -0.7, 2.7, "Berths_News", 500, (190, 215, 255), 400, pitch=-35.0, yaw=180.0, size=(3.0, 0.2))
 log.append("lights")

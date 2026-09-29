@@ -180,7 +180,7 @@ def light(cls, x, y, z, label, intensity, color, radius, shadows=False, pitch=-9
     lc.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
     lc.set_editor_property("intensity", intensity)
     lc.set_editor_property("attenuation_radius", radius)
-    lc.set_editor_property("light_color", unreal.Color(*color, 255))
+    lc.set_editor_property("light_color", unreal.Color(r=color[0], g=color[1], b=color[2], a=255))
     lc.set_editor_property("cast_shadows", shadows)
     if size and isinstance(lc, unreal.RectLightComponent):
         lc.set_editor_property("source_width", size[0] * M)

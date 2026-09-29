@@ -3,8 +3,8 @@
   "name": "Crew Berthing · Deck 3 · Section C",
   "signage": "DECK 3 · SECTION C · CREW BERTHING",
   "frame": "Unreal convention: X forward, Y starboard, Z up; metres; origin = deck level on the inner face of the forward wall, on the lift's axis; the compartment runs aft (negative x)",
-  "world_origin": [-176.0, 0.0, -42.0],
-  "world_note": "inside the Aquila's hull amidships, one deck above the Mess Hall and aft of it (hull frame x -176..-200, z -42): the lift joins it to the bridge corridor and the other decks. Eighty-four racks for the ratings of the Red watch; the compartment is kept dim, somebody is always asleep",
+  "world_origin": [-176.0, 0.0, -46.0],
+  "world_note": "inside the Aquila's hull amidships, aft of the Mess Hall at its height (x -176..-200, z -46: the hull's inner skin runs at -41.3 m above this part of the ship, so the compartment sits below it like the Mess): the lift joins it to the bridge corridor and the other decks. Eighty-four racks for the ratings of the Red watch; the compartment is kept dim, somebody is always asleep",
   "length": 24.0,
   "half_width": 3.6,
   "height": 3.3,
@@ -35,7 +35,7 @@
     {"group": 6, "stack": 1, "side": -1, "level": 1}
   ],
   "awake": [
-    {"station": "berth1", "seat": [-21.55, -1.25], "yaw": 0.0},
-    {"station": "berth2", "seat": [-23.05, 0.45], "yaw": 180.0}
+    {"station": "berth1", "seat": [-21.55, -1.25], "yaw": 90.0},
+    {"station": "berth2", "seat": [-23.05, 0.45], "yaw": -90.0}
   ]
 }
