@@ -18,6 +18,7 @@
 | 2026-09-28 | 10,00 $ | 1,74 $ | legami tra ufficiali, riposo del Capitano, calore e furtività (reazioni dell'equipaggio), discese sui mondi generati |
 | 2026-09-28 | 10,00 $ | 1,96 $ | controllori di campo, flak, mensa (conversazioni ai tavoli), visite degli ufficiali in cabina |
 | 2026-09-29 | 10,00 $ | 2,26 $ | abbandono nave e inchiesta (prove complete in gioco e fuori), ordini permanenti, finale d'arco, Game Master |
+| 2026-09-29 | 10,00 $ | 2,62 $ | memoria degli ufficiali, nebbia di guerra, disturbo e inganni del Mandato (comandante nemico che sceglie la guerra elettronica) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
