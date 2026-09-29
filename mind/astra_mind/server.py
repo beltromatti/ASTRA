@@ -434,6 +434,16 @@ class Mind:
                 log.info("no game for 20 minutes: the mind stops")
                 os._exit(0)
 
+    async def _after_action(self, outcome: str, orders: list[str]) -> None:
+        """The fight is over: once the reports are out, the XO gives the Captain a short after-action — the outcome and
+        its cost, what worked, one honest lesson — from what really happened and what the Captain ordered."""
+        await asyncio.sleep(10)
+        if self.aftermath.active or not self.clients or ((self.game.state if self.game else None) or {}).get("abandon"):
+            return
+        said = "; ".join(o.split(" => ")[0].strip(' -"') for o in orders[-8:]) or "(none: the crew fought it on its own)"
+        await self.turns.put(("\x00event:bridge: after-action — " + outcome[:320] + ". The Captain's orders in this fight: " + said[:600],
+                              self.lang))
+
     async def standing_sync(self) -> None:
         """The Captain's datapad lists the standing orders in force: the game gets them whenever they change (and
         again whenever it reconnects)."""
@@ -591,7 +601,8 @@ class Mind:
                         continue
                     self.voice.low_priority = True
                     try:
-                        ask = TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else \
+                        ask = AFTER_ACTION_ASK if any(e.startswith("bridge: after-action") for e in events) else \
+                            TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else \
                             VISIT_ASK if any("has come to the Captain's quarters in person" in e for e in events) else None
                         t = await self.agent.handle_event(" | ".join(events), self.lang, ask=ask)
                     finally:
@@ -740,7 +751,10 @@ class Mind:
                         asyncio.create_task(self.aftermath.on_lost(text, self.lang))
                     elif text.startswith("director:") and not self.aftermath.active:
                         if "engagement over" in text:
-                            asyncio.create_task(self.style.after_battle(text.split(":", 1)[1].strip()))
+                            outcome_, orders_ = text.split(":", 1)[1].strip(), list(self.style.orders)
+                            asyncio.create_task(self.style.after_battle(outcome_))
+                            if not self.director.decisive:          # (the decisive battle ends in the arc's finale instead)
+                                asyncio.create_task(self._after_action(outcome_, orders_))
                         asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
                     elif text.startswith("story:"):
                         self.director.note(text.split(":", 1)[1].strip())   # remembered, no new beat
@@ -908,6 +922,11 @@ def _fallen(text: str) -> list[str]:
                 out.append(name)
     return out
 
+
+AFTER_ACTION_ASK = ("The fight is over. The XO gives the Captain a short after-action, two or three sentences in character: the "
+                    "outcome and what it cost (hull, people, ships, fighters), what worked, and one honest lesson for the next "
+                    "fight — from what really happened (the reports above) and the Captain's own orders; no flattery, no "
+                    "blame. The officer most involved may add one line. No tools.")
 
 VISIT_ASK = ("An officer has just come to the Captain's quarters in person (the event says who and why). That officer, "
              "and only that officer, speaks now with speak, face to face: a first line or two that open what they came "
