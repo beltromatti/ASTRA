@@ -41,9 +41,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector MessLanding = FVector::ZeroVector;
 
+	/** Crew Berthing's landing (Deck 3; world, cm; zero = no such stop). */
+	UPROPERTY(EditAnywhere, Category = "Hangar")
+	FVector BerthLanding = FVector::ZeroVector;
+
 	/** The lift network: which landing the pawn stands at (0 the bridge, 1 the flight deck, 2 Main Engineering, 3 the
-	 *  Medbay, 4 the Mess Hall, -1 none), and the ride to another (fade, the car's hum, the other deck). */
-	static constexpr int32 MaxLandings = 5;
+	 *  Medbay, 4 the Mess Hall, 5 Crew Berthing, -1 none), and the ride to another (fade, the car's hum, the other deck). */
+	static constexpr int32 MaxLandings = 6;
 	int32 LiftLandingNear(const APawn* Pawn) const;
 	bool RideLift(APawn* Pawn, int32 ToLanding);
 	bool HasLanding(int32 Index) const { return Index >= 0 && Index < MaxLandings && !LandingWorld(Index).IsNearlyZero(); }
@@ -51,6 +55,7 @@ public:
 	bool IsPawnInEngineering(const APawn* Pawn) const;
 	bool IsPawnInMedbay(const APawn* Pawn) const;
 	bool IsPawnInMess(const APawn* Pawn) const;
+	bool IsPawnInBerths(const APawn* Pawn) const;
 
 	/** The lift call: the Captain is near a landing and presses E. Returns false when no landing is near. */
 	bool TryUseLift(APawn* Pawn);
@@ -80,6 +85,8 @@ private:
 	UPROPERTY() TArray<TObjectPtr<ALight>> MedLights;
 	UPROPERTY() TArray<TObjectPtr<ALight>> MessLights;
 	bool bMessLightsOn = true;
+	UPROPERTY() TArray<TObjectPtr<ALight>> BerthLights;
+	bool bBerthLightsOn = true;
 	bool bEngLightsOn = true;
 	bool bMedLightsOn = true;
 	int32 RideToLanding = -1;

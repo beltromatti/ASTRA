@@ -1502,6 +1502,11 @@ FString UAstraShipSubsystem::CaptainAboard() const
 				return TEXT("in the Mess Hall (Deck 4) among the off-duty crew at their tables: they can hear and answer the Captain; "
 				            "the XO has the conn on the bridge and the bridge officers speak by intercom");
 			}
+			if (It->IsPawnInBerths(P))
+			{
+				return TEXT("in Crew Berthing (Deck 3), in the dim aisle between the racks where the Red watch sleeps (two ratings "
+				            "who cannot sleep sit at the table aft); the XO has the conn and the bridge officers speak by intercom, softly");
+			}
 			if (It->IsPawnInMedbay(P))
 			{
 				return TEXT("in the Medbay (Deck 6), among the wounded, face to face with Dr. Lindqvist and the medical staff; the "
@@ -1545,6 +1550,7 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	{
 		if (It->IsPawnInEngineering(P)) { return TEXT("DECK 7 · MAIN ENGINEERING"); }
 		if (It->IsPawnInMess(P)) { return TEXT("DECK 4 · MESS HALL"); }
+		if (It->IsPawnInBerths(P)) { return TEXT("DECK 3 · CREW BERTHING"); }
 		if (It->IsPawnInMedbay(P)) { return TEXT("DECK 6 · MEDBAY"); }
 		if (It->IsPawnInHangar(P)) { return TEXT("DECK 9 · FLIGHT DECK"); }
 	}

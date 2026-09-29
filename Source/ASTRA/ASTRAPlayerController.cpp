@@ -133,6 +133,7 @@ void AASTRAPlayerController::SetupInputComponent()
 		Deck(EKeys::Three, 3);
 		Deck(EKeys::Four, 4);
 		Deck(EKeys::Five, 5);
+		Deck(EKeys::Six, 6);
 	}
 
 	// only add IMCs for local player controllers
@@ -395,7 +396,7 @@ namespace
 		TEXT("  Esc             pause · save · menu\n")
 		TEXT("\n")
 		TEXT("THE LIFT (at the end of the port corridor)\n")
-		TEXT("  E, then 1-5     Bridge · Mess Hall · Medbay · Main Engineering · Flight Deck\n")
+		TEXT("  E, then 1-6     Bridge · Crew Berthing · Mess Hall · Medbay · Main Engineering · Flight Deck\n")
 		TEXT("  the Captain's quarters: the door at the end of the starboard corridor;\n")
 		TEXT("  E beside the bunk to rest (the XO wakes you if anything happens)\n")
 		TEXT("\n")
@@ -421,10 +422,10 @@ namespace
 {
 	// the lift's decks, top to bottom, by the number on its panel: 1 the bridge (landing 0), 2 the Mess Hall (4), 3 the
 	// Medbay (3), 4 Main Engineering (2), 5 the flight deck (1)
-	constexpr int32 NumDecks = 5;
-	const int32 DeckLanding[NumDecks + 1] = {-1, 0, 4, 3, 2, 1};
-	const TCHAR* DeckName[NumDecks + 1] = {TEXT(""), TEXT("BRIDGE  ·  DECK 1"), TEXT("MESS HALL  ·  DECK 4"), TEXT("MEDBAY  ·  DECK 6"),
-	                                       TEXT("MAIN ENGINEERING  ·  DECK 7"), TEXT("FLIGHT DECK  ·  DECK 9")};
+	constexpr int32 NumDecks = 6;
+	const int32 DeckLanding[NumDecks + 1] = {-1, 0, 5, 4, 3, 2, 1};
+	const TCHAR* DeckName[NumDecks + 1] = {TEXT(""), TEXT("BRIDGE  ·  DECK 1"), TEXT("CREW BERTHING  ·  DECK 3"), TEXT("MESS HALL  ·  DECK 4"),
+	                                       TEXT("MEDBAY  ·  DECK 6"), TEXT("MAIN ENGINEERING  ·  DECK 7"), TEXT("FLIGHT DECK  ·  DECK 9")};
 }
 
 void AASTRAPlayerController::ShowLiftMenu(AAstraHangar* Hangar, int32 From)

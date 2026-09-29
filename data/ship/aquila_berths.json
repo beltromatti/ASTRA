@@ -1,0 +1,41 @@
+{
+  "id": "aquila_berths",
+  "name": "Crew Berthing · Deck 3 · Section C",
+  "signage": "DECK 3 · SECTION C · CREW BERTHING",
+  "frame": "Unreal convention: X forward, Y starboard, Z up; metres; origin = deck level on the inner face of the forward wall, on the lift's axis; the compartment runs aft (negative x)",
+  "world_origin": [-176.0, 0.0, -42.0],
+  "world_note": "inside the Aquila's hull amidships, one deck above the Mess Hall and aft of it (hull frame x -176..-200, z -42): the lift joins it to the bridge corridor and the other decks. Eighty-four racks for the ratings of the Red watch; the compartment is kept dim, somebody is always asleep",
+  "length": 24.0,
+  "half_width": 3.6,
+  "height": 3.3,
+  "lift": {"y": 0.0, "width": 3.0, "height": 3.0},
+  "aisle_half_width": 1.25,
+  "stacks": {
+    "note": "a stack = three racks one above the other; its head against the outboard wall, its foot on the aisle. Along x: two stacks side by side, then a column of lockers, repeated",
+    "x_start": -2.6,
+    "rack_width": 0.86,
+    "rack_length": 2.02,
+    "y_foot": 1.28,
+    "locker_width": 0.64,
+    "groups": 7,
+    "rack_heights": [0.3, 1.12, 1.94],
+    "variants": ["A", "B", "C", "A", "C", "B", "A"]
+  },
+  "lounge": {"x0": -20.4, "x1": -24.0, "table": {"x": -22.3, "y": -0.4, "length": 1.6, "width": 0.9, "height": 0.74},
+             "screen": {"y0": -2.2, "y1": 0.8, "z0": 1.05, "z1": 2.45},
+             "note": "the aft end: a table with four stools, the fleet news on the aft wall, a shelf of books and games, a coffee maker"},
+  "head_door": {"y": -2.6, "width": 1.0, "height": 2.2, "note": "the washroom, forward port corner (a closed door)"},
+  "sleepers": [
+    {"group": 0, "stack": 1, "side": -1, "level": 0},
+    {"group": 1, "stack": 0, "side": 1, "level": 1},
+    {"group": 2, "stack": 1, "side": -1, "level": 2},
+    {"group": 3, "stack": 0, "side": -1, "level": 0},
+    {"group": 4, "stack": 1, "side": 1, "level": 0},
+    {"group": 5, "stack": 0, "side": 1, "level": 1},
+    {"group": 6, "stack": 1, "side": -1, "level": 1}
+  ],
+  "awake": [
+    {"station": "berth1", "seat": [-21.55, -1.25], "yaw": 0.0},
+    {"station": "berth2", "seat": [-23.05, 0.45], "yaw": 180.0}
+  ]
+}

@@ -113,7 +113,7 @@ def main():
         p.save(os.path.join(OUT, f"T_SIGN_Door_{side}.png"))
     # the lift between the bridge and the flight deck, and the flight deck's own wall sign
     for name in ("Lift_Bridge", "Lift_Hangar"):
-        plate(1024, 256, "LIFT", "DECKS 1 · 4 · 6 · 7 · 9 · PRESS TO CALL", (240, 170, 40)).save(os.path.join(OUT, f"T_SIGN_{name}.png"))
+        plate(1024, 256, "LIFT", "DECKS 1 · 3 · 4 · 6 · 7 · 9 · PRESS TO CALL", (240, 170, 40)).save(os.path.join(OUT, f"T_SIGN_{name}.png"))
     # the rooms the lift opens into: their names over the doors
     plate(1024, 256, "MAIN ENGINEERING", "DECK 7 · SECTION F", (240, 170, 40), title_scale=0.42).save(os.path.join(OUT, "T_SIGN_Room_Engineering.png"))
     med = plate(1024, 256, "MEDBAY", "DECK 6 · SECTION C", (46, 196, 182))
@@ -124,6 +124,10 @@ def main():
     md.rectangle((cx - b, cy - a, cx + b, cy + a), fill=(*ICE, 255))
     med.save(os.path.join(OUT, "T_SIGN_Room_Medbay.png"))
     plate(1024, 256, "MESS HALL", "DECK 4 · SECTION B", (240, 200, 120)).save(os.path.join(OUT, "T_SIGN_Room_Mess.png"))
+    # Crew Berthing (the red watch's racks: the quiet colour of the night lights) and its washroom door
+    plate(1024, 256, "CREW BERTHING", "DECK 3 · SECTION C · RED WATCH · QUIET", (200, 70, 60), title_scale=0.44).save(
+        os.path.join(OUT, "T_SIGN_Berth_3C.png"))
+    plate(1024, 256, "HEAD", "DECK 3 · SECTION C", (150, 170, 190)).save(os.path.join(OUT, "T_SIGN_Head.png"))
     # the lifepods off Corridor 1-A: the hatch's plate (yellow: emergency equipment)
     for pod, side in (("1A", "PORT"), ("1B", "STARBOARD")):
         plate(1024, 256, f"LIFEPOD {pod[0]}-{pod[1]}", f"DECK 1 · {side} · 6 PERSONS", (250, 190, 40)).save(os.path.join(OUT, f"T_SIGN_Lifepod_{pod}.png"))

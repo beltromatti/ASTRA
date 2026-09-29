@@ -290,6 +290,16 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 - [x] **La nebbia regge in ogni rapporto**: il nome di una nave del Mandato compare solo dopo l'identificazione (lancio dei caccia, danni, fuga, distruzione, missioni dei gruppi di volo, richieste alla flotta); prima è «a Kharon Mandate cruiser, Acheron class (T-41)» o solo «T-41». Sul tavolo, un contatto classificato mostra la sua classe («T-41  ACHERON CLASS») invece di «UNKNOWN».
 - Prove: `astra.heat <percento>`; `astra.cmd set_radiators {'state':'extended'}`, `astra.cmd vent_heat {}`; `astra.battle.status` elenca ogni nave con rilevamento, distanza, traccia e disturbo
 
+## Alloggi dell'equipaggio (Deck 3 · Section C) — pronti da importare
+- [ ] **Crew Berthing** (`data/ship/aquila_berths.json`, `art/blender/berths.py`, `tools/ue_scripts/build_berths.py`): un compartimento di 24 × 7 m, basso e in penombra (qualcuno dorme sempre).
+  - 28 pile di tre cuccette ai due lati del corridoio: telaio d'acciaio, materassi, coperte spiegazzate, cuscini, lucina di lettura e rete portaoggetti alla testa, tende sul corridoio (tre varianti: aperte, chiusa in alto, chiusa a metà).
+  - Colonne di armadietti fra le coppie di pile; canaline e un tubo sul soffitto; luci notturne rosse al battiscopa.
+  - A poppa un angolo relax: tavolo con quattro sgabelli, tazze e carte, le notizie della flotta (la stessa pagina viva della mensa), una mensola di libri e giochi, la macchinetta del caffè.
+  - Il cartello «CREW BERTHING · DECK 3 · SECTION C · RED WATCH · QUIET», la porta del bagno («HEAD»).
+  - Sette marinai del turno Rosso dormono nelle cuccette; due che non riescono a dormire siedono al tavolo.
+  - Ascensore: sesta fermata (tasti 1-6 in ordine di ponte: Bridge, Crew Berthing, Mess Hall, Medbay, Main Engineering, Flight Deck); zona luci accese solo con il Capitano presente; il datapad e l'equipaggio sanno quando il Capitano è lì.
+  - Anteprima Blender dal corridoio: già convincente. Da fare quando si potrà compilare: build, `build_berths.py` nell'editor, prova in gioco (posizione dei dormienti sotto le coperte, luci).
+
 ## Lo stile di comando del Capitano (la mente impara, il nemico anche)
 - [x] **L'XO impara come comanda il Capitano** (`mind/astra_mind/style.py`): durante un combattimento la mente annota gli ordini del Capitano (le parole e cosa ha fatto la nave); a fine scontro («engagement over») un modello riscrive due schede, salvate con la storia:
   - la **lettura dell'XO** (per l'equipaggio, massimo 90 parole): distanza e pazienza, armi e missili, caccia, sensori ed emissioni, scudi, saluti e resa, rischi, cosa usa per primo e cosa non fa mai. L'equipaggio la usa per **anticipare** («i Falcon sono pronti per la CAP, come li vuole lei») e per avvertire quando un'abitudine è pericolosa contro ciò che ha davanti;
@@ -405,7 +415,7 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 
 ## Prossimi passi
 1. **Sensori, terza parte**: pianeti e stazioni che coprono la linea di vista.
-2. **Altri ponti**: alloggi dell'equipaggio, armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia.
+2. **Altri ponti**: alloggi dell'equipaggio (pronti, da importare), armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia.
 3. **Fuori dalla plancia**: un dispositivo da polso (allarmi, stato della nave, ordini permanenti) quando il Capitano è altrove.
 4. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
 5. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.

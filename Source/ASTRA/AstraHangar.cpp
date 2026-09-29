@@ -25,6 +25,7 @@ namespace
 	const FName EngZoneTag(TEXT("ASTRA.Zone.Engineering"));
 	const FName MedZoneTag(TEXT("ASTRA.Zone.Medbay"));
 	const FName MessZoneTag(TEXT("ASTRA.Zone.Mess"));
+	const FName BerthZoneTag(TEXT("ASTRA.Zone.Berths"));
 	const FName CraftTag(TEXT("ASTRA.Hangar.Craft"));
 	constexpr float HangarLength = 16000.f, HangarHalfWidth = 2900.f, HangarHeight = 2200.f;   // cm, with the tubes
 	constexpr float TrackStartX = 4600.f, TubeEndX = 16200.f, TubeY = 1490.f;
@@ -70,6 +71,13 @@ void AAstraHangar::BeginPlay()
 			if (ALight* L = Cast<ALight>(*It))
 			{
 				MessLights.Add(L);
+			}
+		}
+		else if (It->ActorHasTag(BerthZoneTag))
+		{
+			if (ALight* L = Cast<ALight>(*It))
+			{
+				BerthLights.Add(L);
 			}
 		}
 		else if (It->ActorHasTag(CraftTag))
@@ -141,6 +149,7 @@ FVector AAstraHangar::LandingWorld(int32 Index) const
 	case 2: return EngineeringLanding;
 	case 3: return MedbayLanding;
 	case 4: return MessLanding;
+	case 5: return BerthLanding;
 	default: return FVector::ZeroVector;
 	}
 }
@@ -209,6 +218,17 @@ bool AAstraHangar::IsPawnInMess(const APawn* Pawn) const
 	// the hall runs aft of its lift: 34 m long, 20 m wide
 	const FVector D = Pawn->GetActorLocation() - MessLanding;
 	return D.X < 400.f && D.X > -3600.f && FMath::Abs(D.Y) < 1100.f && D.Z > -300.f && D.Z < 700.f;
+}
+
+bool AAstraHangar::IsPawnInBerths(const APawn* Pawn) const
+{
+	if (!Pawn || !Pawn->IsA<ACharacter>() || BerthLanding.IsNearlyZero())
+	{
+		return false;
+	}
+	// the compartment runs 24 m aft of its lift, 7 m wide
+	const FVector D = Pawn->GetActorLocation() - BerthLanding;
+	return D.X < 400.f && D.X > -2500.f && FMath::Abs(D.Y) < 450.f && D.Z > -300.f && D.Z < 600.f;
 }
 
 bool AAstraHangar::RideLift(APawn* Pawn, int32 ToLanding)
@@ -378,14 +398,16 @@ void AAstraHangar::Tick(float DeltaTime)
 		const bool bToEng = Zone(EngLights, bEngLightsOn, IsPawnInEngineering(Me));
 		const bool bToMed = Zone(MedLights, bMedLightsOn, IsPawnInMedbay(Me));
 		const bool bToMess = Zone(MessLights, bMessLightsOn, IsPawnInMess(Me));
+		const bool bToBerth = Zone(BerthLights, bBerthLightsOn, IsPawnInBerths(Me));
 		// the ship notices where the Captain goes: the crew talks about it, the story remembers it
-		if ((bToEng || bToMed || bToMess) && GetWorld()->GetTimeSeconds() > 5.0)
+		if ((bToEng || bToMed || bToMess || bToBerth) && GetWorld()->GetTimeSeconds() > 5.0)
 		{
 			if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 			{
 				Ship->PublishEvent(bToMed
 					? FString::Printf(TEXT("the Captain came down to the Medbay to see the wounded (%s)"), *Ship->GetRoster().Summary())
 					: bToMess ? FString(TEXT("the Captain came down to the Mess Hall on Deck 4, where the off-duty watch is eating"))
+					: bToBerth ? FString(TEXT("the Captain came down to Crew Berthing on Deck 3, where the Red watch sleeps in its racks"))
 					: FString(TEXT("the Captain came down to Main Engineering to see Chief Okonkwo and the reactor watch")), false);
 			}
 		}
