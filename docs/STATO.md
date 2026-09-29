@@ -21,6 +21,7 @@
 | 2026-09-29 | 10,00 $ | 2,62 $ | memoria degli ufficiali, nebbia di guerra, disturbo e inganni del Mandato (comandante nemico che sceglie la guerra elettronica) |
 | 2026-09-29 | 10,00 $ | 2,70 $ | stile di comando del Capitano, rapporto post-azione, quadro cieco, controllore di volo, notizie da casa, prove offline dell'equipaggio |
 | 2026-09-29 | 10,00 $ | 2,79 $ | misure di prestazioni per l'app (la mente partiva anche nelle prove: ora `-astra_nomind`) |
+| 2026-09-29 | 10,00 $ | 3,12 $ | **prima partita dell'utente** con l'app (≈35 minuti, due sessioni: 0,33 $, cioè ≈0,5–0,6 $ l'ora di gioco con regista, nemici e memoria) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -429,6 +430,13 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 - [x] **Umore dell'equipaggio**: a ogni svolta il regista scrive come si sente la plancia e perché, nominando gli ufficiali (lutto per i caduti, orgoglio, stanchezza, dubbi su un ordine, rabbia), e lo fa evolvere di beat in beat (salvato in `story.json`). Colora il modo in cui gli ufficiali parlano senza mai dichiararlo, e affiora nei momenti di quiete. Esempio reale dopo la prima battaglia: *«Exhausted but proud… Grief for the Vigilant sits under everything — Mensah's repair gangs work in silence, Price counts seven Hammers where there were eight»*; alla domanda sul morale Serra risponde «stanchi, ma orgogliosi di aver tenuto Aurelia. Il dolore per il Vigilant è ancora aperto…»
 
 ## Prossimi passi
+0. **Dalla prima partita dell'utente** (29/9, 15:43–16:15, dal log della mente; nessun crash):
+   - ha dato due ordini a voce (riconoscimento 1,8–1,9 s per frasi brevi) e poi solo **scritti**: capire perché; mancano ancora le conferme istantanee e il classificatore d'intenti locale previsti dalla ricerca (09, 13);
+   - con il canale nemico aperto, «rapporto armamenti» e «ci sono navi nemiche» sono finiti **al comandante del Mandato**: il router va corretto (in dubbio, all'equipaggio);
+   - voleva **vedere** i nemici («portaci a contatto visivo», «voglio vedere a schermo i nemici»): serve lo schermo principale che inquadra il bersaglio («On screen!»);
+   - molte domande di stato (velocità, portata, quante navi) e fuoco ordinato a 16 km con i railgun a 10: portate e distanze vanno lette a colpo d'occhio;
+   - prima sessione: carica frontale, scafo al 23 % in due minuti, abbandono nave; è uscito 40 s dopo l'inizio della Commissione d'inchiesta (forse non era chiaro che doveva rispondere). Seconda: vittoria su Solm, 5 piloti persi, poi il regista ha legato la notizia del fratello di Price alla nave Resolve alla deriva;
+   - ha aperto l'app da `Desktop/ASTRA/Packaged/Mac` invece che da `~/Applications`.
 1. **Sensori, terza parte**: pianeti e stazioni che coprono la linea di vista.
 2. **Altri ponti**: armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia; conversazioni sussurrate al tavolo degli alloggi.
 3. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
