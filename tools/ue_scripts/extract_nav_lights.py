@@ -40,6 +40,7 @@ for path in eal.list_assets("/Game/ASTRA/Ships", recursive=False):
     out[name] = {"port": r(port), "starboard": r(star), "top": r(top), "belly": r(belly), "stern": r(stern), "bow": r(bow),
                  "length_m": round(L / 100.0, 1)}
 os.makedirs(f"{ROOT}/data/ship", exist_ok=True)
-with open(f"{ROOT}/data/ship/nav_lights.json", "w", encoding="utf-8") as f:
-    json.dump(out, f, indent=1)
+for path in (f"{ROOT}/data/ship/nav_lights.json", f"{ROOT}/Content/ASTRA/Data/nav_lights.json"):   # the source, and the game's copy
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=1)
 print(json.dumps({k: v["length_m"] for k, v in out.items()}))

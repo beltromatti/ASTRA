@@ -25,7 +25,10 @@ namespace
 		{
 			bLoaded = true;
 			FString Text;
-			if (FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/nav_lights.json"))))
+			// staged with the game (Content/ASTRA/Data, always packaged as a loose file: DefaultGame.ini); the repo's
+			// data/ship copy is the source the extractor writes
+			if (FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectContentDir(), TEXT("ASTRA/Data/nav_lights.json")))
+			    || FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/nav_lights.json"))))
 			{
 				TSharedRef<TJsonReader<>> R = TJsonReaderFactory<>::Create(Text);
 				FJsonSerializer::Deserialize(R, Data);

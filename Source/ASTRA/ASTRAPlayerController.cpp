@@ -195,10 +195,10 @@ void AASTRAPlayerController::ToggleSeat()
 				{
 					Ship->BoardLifepod(*It, this);
 				}
-				else if (GEngine)
+				else
 				{
-					GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor(250, 190, 40),
-					                                 FString::Printf(TEXT("LIFEPOD %s · sealed · it opens on ABANDON SHIP"), *It->PodName));
+					Subtitle(-1 - It->PodName.Len(), TEXT("notice"), FString::Printf(TEXT("LIFEPOD %s"), *It->PodName),
+					         TEXT("Sealed. It opens on ABANDON SHIP."));
 				}
 				return;
 			}
