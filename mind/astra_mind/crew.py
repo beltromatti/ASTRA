@@ -94,7 +94,7 @@ Everyone wears a neural translator implant, "the Interpreter": people hear each 
 
 
 def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None,
-                  war: str = "", mood: str = "", bonds: str = "", standing: str = "", memories: str = "") -> str:
+                  war: str = "", mood: str = "", bonds: str = "", standing: str = "", memories: str = "", style: str = "") -> str:
     lang_name = LANG_NAMES.get(lang, lang)
     roster = "\n".join(
         f"- {o.id}: {o.title}, {o.role}. Duties: {o.duties}. Character: {o.personality}." for o in CREW.values())
@@ -236,6 +236,12 @@ someone the Captain spoke of, recalling a promise, honouring a confidence; never
 These are facts about the CAPTAIN: the Captain's family, home and past belong to the Captain — an officer speaking
 of them says "your brother" to the Captain, never "my brother".
 {memories or "- nothing yet: they are still getting to know the Captain"}
+
+How this Captain commands (the XO's read, from the fights so far). Anticipate it: have ready what the Captain usually
+wants and offer it before being asked ("Falcons are fuelled for CAP, as you like them, Captain"); when a habit is
+dangerous against what you face now (a ping against decoys and jammers, standing off from an enemy that outranges us),
+say so plainly. Never recite this read.
+{style or "- no fights together yet: learn how the Captain commands"}
 
 Where each officer stands with the Captain (it shows in small ways — warmth or formality, a pause before a read-back,
 an unasked question, loyalty under fire; never announce it)

@@ -55,6 +55,7 @@ class BridgeAgent:
         self.mood = lambda: ""           # how the crew feels (the director's word, set by the server)
         self.bonds = lambda: ""          # how each officer stands with the Captain (the director's, set by the server)
         self.standing: list[dict[str, str]] = []   # the Captain's standing orders (the director saves them with the story)
+        self.style: Callable[[], str] = lambda: ""   # the XO's read of how the Captain commands (style.py)
         self.memories = lambda: ""       # what each officer remembers of the Captain (memory.py, set by the server)
 
     def _trim_history(self) -> None:
@@ -64,7 +65,7 @@ class BridgeAgent:
             self.history = self.history[starts[-self.history_turns]:]
 
     def _messages(self, text: str, lang: str) -> list[dict[str, Any]]:
-        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign(), self.war(), self.mood(), self.bonds(), self.standing_lines(), self.memories())}]
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign(), self.war(), self.mood(), self.bonds(), self.standing_lines(), self.memories(), self.style())}]
         msgs += self.history
         msgs.append({"role": "user", "content": f"Captain: {text}"})
         return msgs
@@ -133,7 +134,7 @@ class BridgeAgent:
         t0 = time.perf_counter()
         pending: list[tuple[ToolCall, asyncio.Task]] = []
         user = f"[Ship systems event, not the Captain speaking] {event}"
-        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign(), self.war(), self.mood(), self.bonds(), self.standing_lines(), self.memories())}]
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system_prompt(lang, self.ship.snapshot(), self.ship.recent_events(), self.campaign(), self.war(), self.mood(), self.bonds(), self.standing_lines(), self.memories(), self.style())}]
         msgs += self.history
         msgs.append({"role": "user", "content": user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing else "")})
         allowed = self.initiative()

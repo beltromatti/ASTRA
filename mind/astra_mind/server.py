@@ -28,6 +28,7 @@ from .agent import BridgeAgent, ShipLink
 from .audio_in import PushToTalk
 from .crew import CREW
 from .enemy import COMMANDERS, EnemyAgent
+from .style import StyleKeeper
 from .router import route
 from .director import ADMIRAL, Director
 from .env import CACHE
@@ -216,6 +217,11 @@ class Mind:
         self.director.blocked = lambda: bool(((self.game.state if self.game else None) or {}).get("abandon")) or self.aftermath.active
         self.memory = MemoryKeeper(self.llm, self.director.memories, self.director.note)
         self.agent.memories = self.memory.lines
+        # how this Captain commands: the XO learns it fight by fight, the Mandate's intelligence too (style.py)
+        self.style = StyleKeeper(self.llm, self.director.style)
+        self.agent.style = self.style.xo_line
+        self.director.captain_style = self.style.xo_line
+        self.enemy.intel = self.style.mandate_line
         self.agent.say = self._crew_say
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
@@ -634,6 +640,7 @@ class Mind:
                     text = r.crew
                 self.memory.hear("Captain", text)
                 t = await self.agent.handle(text, lang)
+                self.style.captain_order(text, t.actions)
                 asyncio.create_task(self.memory.maybe_read())
                 for name, args_, res in t.actions:
                     if name == "end_transmission":
@@ -707,6 +714,7 @@ class Mind:
                             asyncio.create_task(self.director.on_event(resume, self.lang, self._battle_state()))
                     else:
                         self.director.reset()
+                        self.style.reset()
                         log.info("new campaign")
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
@@ -725,6 +733,8 @@ class Mind:
                         # the story of the loss: who finds the Captain, the board, a new command (mind/astra_mind/loss.py)
                         asyncio.create_task(self.aftermath.on_lost(text, self.lang))
                     elif text.startswith("director:") and not self.aftermath.active:
+                        if "engagement over" in text:
+                            asyncio.create_task(self.style.after_battle(text.split(":", 1)[1].strip()))
                         asyncio.create_task(self.director.on_event(text, self.lang, self._battle_state()))
                     elif text.startswith("story:"):
                         self.director.note(text.split(":", 1)[1].strip())   # remembered, no new beat

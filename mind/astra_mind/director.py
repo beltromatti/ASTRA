@@ -154,6 +154,9 @@ Rules
   change it, and keep it human and specific (Voss knows the Mandate: overruling her about them stings; Okonkwo
   respects a captain who asks before pushing his reactor; Lindqvist judges by how the Captain treats the wounded).
   Where each officer stands now: {bonds}
+- How this Captain fights (the XO's read of the fights so far): {captain_style}
+  Now and then let the story test those habits: an enemy that has learned them and plays on them, a situation where
+  the usual answer fails — never every time, and never unfairly.
 - The Captain's own log entries ("captain's log: …" in the campaign log) are the player telling you what they
   think, fear and want: let the story answer them (a suspicion confirmed or proven wrong, a hope rewarded or tested).
 - Keep the whole thing coherent with the map, the campaign log below and the live state.
@@ -223,6 +226,8 @@ class Director:
         self.blocked = lambda: False             # the story waits (the ship being abandoned, the aftermath): set by the server
         self.standing: list[dict[str, str]] = []   # the Captain's standing orders (shared with the bridge agent)
         self.memories: dict[str, list[dict[str, str]]] = {}   # what each officer remembers of the Captain (memory.py)
+        self.style: dict[str, Any] = {}          # how the Captain commands: the XO's read, the Mandate's (style.py)
+        self.captain_style = lambda: ""          # the XO's read, for the story (set by the server)
 
     def reset(self) -> None:
         """A new campaign: the war begins again at Aurelia."""
@@ -233,6 +238,7 @@ class Director:
         self.bonds = {}
         self.standing.clear()
         self.memories.clear()
+        self.style.clear()
         self.arc, self.act, self.act_beats, self.decisive = 1, 1, 0, False
         self.busy = False
         self.granted = False
@@ -254,6 +260,8 @@ class Director:
             self.memories.clear()
             self.memories.update({str(k): [m for m in v if isinstance(m, dict) and m.get("memory")]
                                   for k, v in (d.get("memories") or {}).items() if isinstance(v, list)})
+            self.style.clear()
+            self.style.update(d.get("style") or {})
             self.arc, self.act = int(d.get("arc", 1)), int(d.get("act", 1))
             self.act_beats, self.decisive = int(d.get("act_beats", 0)), bool(d.get("decisive", False))
         except (OSError, ValueError):
@@ -277,7 +285,7 @@ class Director:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds,
                            "standing": self.standing, "arc": self.arc, "act": self.act, "act_beats": self.act_beats,
-                           "decisive": self.decisive, "memories": self.memories}, f,
+                           "decisive": self.decisive, "memories": self.memories, "style": self.style}, f,
                           ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:
@@ -359,6 +367,7 @@ class Director:
                                         arc=self.arc, arc_text=self.arc_text(),
                                         mood=self.mood or "not yet set: the patrol has just begun",
                                         bonds="; ".join(self.bonds_lines()) or "(nothing yet: a new ship, a new crew, a new captain)",
+                                        captain_style=self.captain_style() or "(no fights yet)",
                                         campaign="\n".join(f"- {c}" for c in self.campaign) or "- (the war has just begun)",
                                         state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
         beat: dict[str, Any] = {}

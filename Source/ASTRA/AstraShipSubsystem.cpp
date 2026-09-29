@@ -8,6 +8,7 @@
 #include "AstraHangar.h"
 #include "AstraPatient.h"
 #include "AstraQuarters.h"
+#include "GameFramework/Character.h"
 #include "AstraCrewMember.h"
 #include "AstraLifepod.h"
 #include "AstraCampaign.h"

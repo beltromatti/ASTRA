@@ -102,7 +102,7 @@ and put decoys out to make them guess (`ew`). Change the plan only when the
 battle gives you a reason (a target crippled or dying, a shield reinforced, your ships hurt, their fighters out, missiles
 running low); otherwise keep the orders you gave. Weigh your crews' lives: if the fight is lost, say so in the reason.
 
-Your last orders: {last}
+{intel}Your last orders: {last}
 
 The battle as your sensors see it (live):
 {state}"""
@@ -149,6 +149,7 @@ class EnemyAgent:
         self.dead: set[str] = set()
         self.last_orders = "none yet: each ship fights the nearest enemy at standard range"
         self.last_focus = ""
+        self.intel: Callable[[], str] = lambda: ""   # what Mandate intelligence knows of the Aquila's captain (style.py)
 
     def reset(self) -> None:
         self.histories.clear()
@@ -273,7 +274,10 @@ async def plan_tactics(agent: "EnemyAgent", battle_state: dict[str, Any], note: 
         return ""
     where = str(battle_state.get("location") or "the Aurelia System").split(",")[0]
     mission = f"Your orders: {c['mission']}" if c.get("mission") else OPENING_MISSION
-    prompt = TACTICS.format(name=c["name"], rank=c["rank"], ship=c["ship"], bio=c["bio"], where=where, mission=mission,
+    intel = agent.intel()
+    intel = (f"What Mandate intelligence has learned of the Aquila's captain from earlier fights (use it: lay the trap "
+             f"their habits walk into): {intel}\n\n") if intel else ""
+    prompt = TACTICS.format(name=c["name"], rank=c["rank"], ship=c["ship"], bio=c["bio"], where=where, mission=mission, intel=intel,
                             last=agent.last_orders, state=json.dumps(_mandate_view(battle_state), ensure_ascii=False, separators=(",", ":")))
     done: list[str] = []
 

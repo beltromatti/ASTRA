@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Containers/Ticker.h"
+#include "HAL/PlatformProcess.h"
 #include "AstraMindSubsystem.generated.h"
 
 class IWebSocket;

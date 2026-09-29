@@ -290,6 +290,26 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 - [x] **La nebbia regge in ogni rapporto**: il nome di una nave del Mandato compare solo dopo l'identificazione (lancio dei caccia, danni, fuga, distruzione, missioni dei gruppi di volo, richieste alla flotta); prima è «a Kharon Mandate cruiser, Acheron class (T-41)» o solo «T-41». Sul tavolo, un contatto classificato mostra la sua classe («T-41  ACHERON CLASS») invece di «UNKNOWN».
 - Prove: `astra.heat <percento>`; `astra.cmd set_radiators {'state':'extended'}`, `astra.cmd vent_heat {}`; `astra.battle.status` elenca ogni nave con rilevamento, distanza, traccia e disturbo
 
+## Lo stile di comando del Capitano (la mente impara, il nemico anche)
+- [x] **L'XO impara come comanda il Capitano** (`mind/astra_mind/style.py`): durante un combattimento la mente annota gli ordini del Capitano (le parole e cosa ha fatto la nave); a fine scontro («engagement over») un modello riscrive due schede, salvate con la storia:
+  - la **lettura dell'XO** (per l'equipaggio, massimo 90 parole): distanza e pazienza, armi e missili, caccia, sensori ed emissioni, scudi, saluti e resa, rischi, cosa usa per primo e cosa non fa mai. L'equipaggio la usa per **anticipare** («i Falcon sono pronti per la CAP, come li vuole lei») e per avvertire quando un'abitudine è pericolosa contro ciò che ha davanti;
+  - la **lettura dell'intelligence del Mandato** (massimo 60 parole): le stesse abitudini viste da fuori, e come sfruttarle. I comandanti nemici la ricevono solo dopo due scontri con l'Aquila, e la usano per tenderle trappole.
+- Il Regista la legge: ogni tanto la storia mette alla prova le abitudini del Capitano (un nemico che le ha imparate, una situazione in cui la risposta solita fallisce), mai sempre e mai in modo sleale.
+- Prova a vuoto su due battaglie:
+  - l'XO: «The Captain opens with an active sweep of the whole volume, then launches Alpha on CAP before the first shot… Strikes hard, then closes to finish; never waits»;
+  - il Mandato: «Exploit: her opening ping and hail reveal her early; hit her before she closes, or draw the salvo and break off while she is committed forward».
+
+## Distribuzione: l'app ASTRA per macOS
+- [x] **`tools/pacchetto.sh`**: compila, cuoce tutti i contenuti (anche quelli caricati per percorso a runtime: `/Game/ASTRA`, i manichini, le forme base del motore), impacchetta (pak + IoStore, Development) e installa **`~/Applications/ASTRA.app`** (2,1 GB).
+  - La mente Python viaggia nell'app (`Contents/Resources/mind`, solo i sorgenti). Al primo avvio uv crea il suo ambiente in `~/Library/Application Support/ASTRA/venv` (Python 3.13, fissato da `mind/.python-version`; pochi secondi grazie alla cache).
+  - Il gioco passa alla mente la cartella dei salvataggi (`ASTRA_SAVED`: la campagna e la storia stanno insieme) e la sua cartella dati (`ASTRA_HOME`: la chiave, i modelli della voce, le cache).
+  - Chiudendo il gioco si chiude anche la mente; in ogni caso una mente senza gioco per 20 minuti si spegne da sola.
+- Prova reale: l'app parte, carica plancia, battaglia, schermi e hangar, avvia la mente dal bundle e si collega (circa un minuto per caricare le voci).
+- **Da sapere**:
+  - l'app non va lanciata dalla Scrivania: i processi figli (Python) chiederebbero a macOS il permesso per la cartella Scrivania. Per questo si installa in `~/Applications`, e i dati della mente sono copie (la chiave, chmod 600, mai su git) e cloni APFS (i modelli della voce), non collegamenti al repository;
+  - dopo aver cambiato la chiave nel `.env`, rilancia `tools/pacchetto.sh` (o copia il `.env` in `~/Library/Application Support/ASTRA/`).
+- Cosa manca per distribuirla ad altri: firma e notarizzazione Apple (serve un account sviluppatore: vedi RICHIESTE se servirà), e uv e whisperkit-cli installati sul Mac di destinazione.
+
 ## Equipaggio in movimento
 - [x] **La nave vive**: membri dell'equipaggio che fanno il loro giro (`AAstraWalker`, `tools/ue_scripts/place_walkers.py`): un marinaio in ciascun corridoio dietro la plancia, un'infermiera che passa tra i letti dell'infermeria, due addetti del ponte di volo tra gli stalli e le catapulte, un tecnico che gira attorno al pozzo del reattore. Personaggi con movimento vero (l'AnimBlueprint del manichino fonde fermo e camminata), soste a ogni tappa, divisa del reparto; se il Capitano sbarra loro la strada, dopo un po' tornano indietro
 
@@ -384,7 +404,7 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 3. **Fuori dalla plancia**: un dispositivo da polso (allarmi, stato della nave, ordini permanenti) quando il Capitano è altrove.
 4. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
 5. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
-6. **Distribuzione**: la mente Python con le sue dipendenze accanto al gioco pacchettizzato.
+6. **Distribuzione, seconda parte**: il datapad nel pacchetto (dopo i permessi macOS), un'icona, il menu iniziale provato dall'app, la firma per altri Mac.
 7. **M8, preparazione al multigiocatore**: autorità del server, comandi come RPC, stato replicato (le menti restano sul server, la voce si sintetizza sui client).
 
 ## Come provarlo (per l'utente)
