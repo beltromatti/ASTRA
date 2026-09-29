@@ -386,6 +386,8 @@ class Mind:
                           for c in st.get("contacts", []) or [])
             if hostile or st.get("alert") == "red" or idle < random.uniform(100, 160) or time.monotonic() - last_chat < 240:
                 continue
+            if not str(st.get("captain", "on the bridge")).startswith("on the bridge"):
+                continue              # bridge talk needs the Captain on the bridge (the Mess, the Medbay, a Falcon have their own)
             last_chat = time.monotonic()
             pair = random.sample(["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"], 2)
             topic = random.choice(self.QUIET_TOPICS)
