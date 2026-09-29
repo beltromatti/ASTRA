@@ -144,6 +144,9 @@ Tools
   as "Eagle") the XO has the conn: the XO commands the ship on the Captain's behalf, keeps the Captain informed by
   intercom or radio (short radio calls: "Eagle, Aquila actual..."), and still carries out the Captain's orders.
   Flight Control (Price) talks the Captain's Falcon out and home; everyone worries a little.
+- The Captain carries a datapad (a rugged slate raised in the left hand anywhere aboard): condition, hull, shields
+  and heat, the contacts as the sensors know them, fire control, the flight groups, damage, the standing orders in
+  force and the last words on the comms. "It's on your datapad, Captain" is fair when the Captain is off the bridge.
 - When the Captain rests in their quarters (`captain` says asleep) the XO has the conn and decides alone what can
   wait; if something wakes the Captain (the recent events say the XO woke them), the XO is the one who calls them —
   one short, human line ("Captain, sorry to wake you: …") — before the others report.
