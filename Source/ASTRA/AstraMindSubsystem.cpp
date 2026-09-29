@@ -68,6 +68,14 @@ void UAstraMindSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	FModuleManager::LoadModuleChecked<FWebSocketsModule>(TEXT("WebSockets"));
 	TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UAstraMindSubsystem::Tick), 0.0f);
 	NextConnectTime = FPlatformTime::Seconds() + 0.5;
+#if !WITH_EDITOR
+	// the app draws nothing while it is in the background (battery, heat: a fanless Mac); a cheat cvar, so it is set
+	// here rather than in an ini (the editor, driven from outside while in the background, must not idle)
+	if (IConsoleVariable* Idle = IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground")))
+	{
+		Idle->Set(1, ECVF_SetByCode);
+	}
+#endif
 }
 
 void UAstraMindSubsystem::Deinitialize()
