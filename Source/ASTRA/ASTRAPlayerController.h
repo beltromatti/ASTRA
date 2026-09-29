@@ -101,6 +101,14 @@ protected:
 	float StoryHold = 0.f;
 	bool bStoryStayBlack = false;
 	void EnsureStoryWidget();
+	struct FSubLine { int32 Id = 0; FString Name; FString Text; FLinearColor Color; float Age = 0.f; float EndAge = -1.f; };
+	TArray<FSubLine> SubLines;
+	TSharedPtr<class SWidget> SubWidget;
+	TArray<TSharedPtr<class STextBlock>> SubNames;
+	TArray<TSharedPtr<class STextBlock>> SubTexts;
+	TArray<TSharedPtr<class SBorder>> SubRows;
+	void EnsureSubtitles();
+	void TickSubtitles(float DeltaTime);
 	TSharedPtr<class SWidget> OrderLine;
 	TSharedPtr<class SEditableTextBox> OrderBox;
 	FTimerHandle OrderFocusTimer;
@@ -113,6 +121,10 @@ public:
 	 *  its line fade in, hold, fade out; bStayBlack keeps the dark after them (a scene of voices in the dark). */
 	void StoryCard(const FString& Title, const FString& Sub, float Hold, bool bStayBlack, bool bStartBlack = false);
 	void StoryBlack(bool bOn, float Fade = 1.2f);
+	/** Subtitles: a spoken line shown while its voice plays (and a moment after), three at most, the speaker's name in
+	 *  the colour of their department or channel. Id ties the line to its audio; SubtitleEnd when it has been said. */
+	void Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text);
+	void SubtitleEnd(int32 Id);
 	virtual void PlayerTick(float DeltaTime) override;
 
 	/** Console twin of the E key (the lift, the captain's chair): for tests and accessibility. */

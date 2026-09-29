@@ -1,6 +1,7 @@
 // ASTRA — link to astra-mind.
 
 #include "AstraMindSubsystem.h"
+#include "ASTRAPlayerController.h"
 
 #include "Camera/PlayerCameraManager.h"
 
@@ -45,11 +46,16 @@ namespace
 			}
 		}));
 
+	/** A line the player should read (the Captain's own words, a system notice): the game's subtitles. */
+	int32 GNoticeId = -1000;
 	void Screen(const FString& S, const FColor& C, float Time = 6.f)
 	{
-		if (GEngine)
+		UWorld* W = GActiveMind ? GActiveMind->GameWorld() : nullptr;
+		if (AASTRAPlayerController* PC = W ? Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(W, 0)) : nullptr)
 		{
-			GEngine->AddOnScreenDebugMessage(-1, Time, C, S);   // development captions; the game itself has no HUD
+			FString Name, Text = S;
+			S.Split(TEXT(": "), &Name, &Text);
+			PC->Subtitle(--GNoticeId, Name.StartsWith(TEXT("Captain")) ? TEXT("captain") : TEXT("notice"), Name.IsEmpty() ? TEXT("SHIP") : Name, Text);
 		}
 	}
 }
@@ -345,12 +351,21 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 		const int32 Id = (int32)Msg->GetNumberField(TEXT("id"));
 		const FString Speaker = Msg->GetStringField(TEXT("speaker"));
 		LineSpeakers.Add(Id, Speaker);
-		Screen(FString::Printf(TEXT("%s: %s"), *Msg->GetStringField(TEXT("name")), *Msg->GetStringField(TEXT("text"))), FColor(150, 210, 255), 9.f);
+		LineTexts.Add(Id, TPair<FString, FString>(Msg->GetStringField(TEXT("name")), Msg->GetStringField(TEXT("text"))));
 		UE_LOG(LogASTRA, Log, TEXT("[Crew] %s: %s"), *Speaker, *Msg->GetStringField(TEXT("text")));
 	}
 	else if (Type == TEXT("audio_begin"))
 	{
 		const int32 Id = (int32)Msg->GetNumberField(TEXT("line"));
+		// the subtitle comes up with the voice
+		if (const TPair<FString, FString>* T = LineTexts.Find(Id))
+		{
+			if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GameWorld(), 0)))
+			{
+				PC->Subtitle(Id, Msg->GetStringField(TEXT("speaker")), T->Key, T->Value);
+			}
+			LineTexts.Remove(Id);
+		}
 		AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Msg->GetStringField(TEXT("speaker")));
 		// an officer the Captain can hear in person speaks from their station; one far away (the Captain on the flight
 		// deck, in a Falcon, down on New Ravenna) comes over the intercom or the radio
@@ -381,6 +396,10 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 	else if (Type == TEXT("audio_end"))
 	{
 		const int32 Id = (int32)Msg->GetNumberField(TEXT("line"));
+		if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GameWorld(), 0)))
+		{
+			PC->SubtitleEnd(Id);
+		}
 		if (const FString* Sp = LineSpeakers.Find(Id))
 		{
 			if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), *Sp))

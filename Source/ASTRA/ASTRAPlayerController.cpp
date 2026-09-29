@@ -499,9 +499,142 @@ void AASTRAPlayerController::StoryBlack(bool bOn, float Fade)
 	StoryFade = FMath::Max(0.05f, Fade);
 }
 
+static FLinearColor SpeakerColor(const FString& S)
+{
+	// the bridge's departments (the stations' colours), then the voices from outside: radio, the enemy, the story
+	if (S == TEXT("xo") || S == TEXT("captain")) { return FLinearColor(0.92f, 0.94f, 1.f); }
+	if (S == TEXT("helm") || S == TEXT("flight")) { return FLinearColor(0.35f, 0.62f, 1.f); }
+	if (S == TEXT("ops") || S == TEXT("comms") || S == TEXT("engineering") || S == TEXT("chief")) { return FLinearColor(1.f, 0.72f, 0.25f); }
+	if (S == TEXT("tactical")) { return FLinearColor(1.f, 0.36f, 0.3f); }
+	if (S == TEXT("sensors") || S == TEXT("doctor")) { return FLinearColor(0.3f, 0.85f, 0.8f); }
+	if (S == TEXT("admiral") || S.StartsWith(TEXT("board"))) { return FLinearColor(1.f, 0.85f, 0.45f); }
+	if (S == TEXT("director")) { return FLinearColor(0.75f, 0.6f, 1.f); }
+	if (S.StartsWith(TEXT("mess")) || S.StartsWith(TEXT("patient"))) { return FLinearColor(0.75f, 0.78f, 0.82f); }
+	if (S == TEXT("finder") || S.Contains(TEXT("field")) || S.Contains(TEXT("port"))) { return FLinearColor(0.5f, 0.9f, 0.5f); }
+	return FLinearColor(1.f, 0.45f, 0.35f);                   // the Mandate, a captor: anyone else on the channel
+}
+
+void AASTRAPlayerController::EnsureSubtitles()
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC || SubWidget.IsValid())
+	{
+		return;
+	}
+	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	const FSlateFontInfo NameFont = Mono ? FSlateFontInfo(Mono, 14) : FCoreStyle::GetDefaultFontStyle("Bold", 14);
+	const FSlateFontInfo TextFont = Mono ? FSlateFontInfo(Mono, 15) : FCoreStyle::GetDefaultFontStyle("Regular", 15);
+	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);
+	for (int32 i = 0; i < 3; ++i)
+	{
+		TSharedPtr<STextBlock> N, T;
+		TSharedPtr<SBorder> Row;
+		Box->AddSlot().AutoHeight().Padding(0, 3)
+		[
+			SAssignNew(Row, SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.f, 0.f, 0.f, 0.f))
+			.Padding(FMargin(12, 5)).Visibility(EVisibility::Collapsed)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(0, 0, 10, 0)
+				[
+					SAssignNew(N, STextBlock).Font(NameFont)
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.f)
+				[
+					SAssignNew(T, STextBlock).Font(TextFont).AutoWrapText(true)
+				]
+			]
+		];
+		SubNames.Add(N);
+		SubTexts.Add(T);
+		SubRows.Add(Row);
+	}
+	SubWidget = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 0, 60))
+	[
+		SNew(SBox).MaxDesiredWidth(1150.f)
+		[
+			Box
+		]
+	];
+	VC->AddViewportWidgetContent(SubWidget.ToSharedRef(), 45);
+}
+
+void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text)
+{
+	EnsureSubtitles();
+	// the name as a crew would say it: the surname alone ("Vice Admiral Adrian Rourke (7th Fleet command)" -> ROURKE)
+	FString Short = Name;
+	int32 Paren = INDEX_NONE;
+	if (Short.FindChar(TEXT('('), Paren))
+	{
+		Short = Short.Left(Paren);
+	}
+	Short.TrimStartAndEndInline();
+	TArray<FString> Words;
+	Short.ParseIntoArrayWS(Words);
+	FSubLine L;
+	L.Id = Id;
+	L.Name = (Words.Num() ? Words.Last() : Short).ToUpper();
+	L.Text = Text;
+	L.Color = SpeakerColor(Speaker);
+	SubLines.Add(L);
+	while (SubLines.Num() > 3)
+	{
+		SubLines.RemoveAt(0);
+	}
+}
+
+void AASTRAPlayerController::SubtitleEnd(int32 Id)
+{
+	for (FSubLine& L : SubLines)
+	{
+		if (L.Id == Id && L.EndAge < 0.f)
+		{
+			L.EndAge = L.Age;
+		}
+	}
+}
+
+void AASTRAPlayerController::TickSubtitles(float DeltaTime)
+{
+	if (!SubWidget.IsValid())
+	{
+		return;
+	}
+	for (int32 i = SubLines.Num() - 1; i >= 0; --i)
+	{
+		FSubLine& L = SubLines[i];
+		L.Age += DeltaTime;
+		// said: it stays two seconds and fades; never said (no audio came): it goes after its reading time
+		const float Gone = L.EndAge >= 0.f ? L.EndAge + 2.5f : 4.f + L.Text.Len() * 0.07f;
+		if (L.Age > Gone)
+		{
+			SubLines.RemoveAt(i);
+		}
+	}
+	for (int32 i = 0; i < SubRows.Num(); ++i)
+	{
+		const bool bOn = SubLines.IsValidIndex(i);
+		SubRows[i]->SetVisibility(bOn ? EVisibility::HitTestInvisible : EVisibility::Collapsed);
+		if (!bOn)
+		{
+			continue;
+		}
+		const FSubLine& L = SubLines[i];
+		const float Gone = L.EndAge >= 0.f ? L.EndAge + 2.5f : 4.f + L.Text.Len() * 0.07f;
+		const float A = FMath::Clamp(FMath::Min(L.Age / 0.25f, (Gone - L.Age) / 0.8f), 0.f, 1.f);
+		SubRows[i]->SetBorderBackgroundColor(FLinearColor(0.f, 0.005f, 0.01f, 0.62f * A));
+		SubNames[i]->SetText(FText::FromString(L.Name));
+		SubNames[i]->SetColorAndOpacity(FLinearColor(L.Color.R, L.Color.G, L.Color.B, A));
+		SubTexts[i]->SetText(FText::FromString(L.Text));
+		SubTexts[i]->SetColorAndOpacity(FLinearColor(0.92f, 0.94f, 0.97f, A));
+	}
+}
+
 void AASTRAPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+	TickSubtitles(DeltaTime);
 	if (!StoryWidget.IsValid())
 	{
 		return;

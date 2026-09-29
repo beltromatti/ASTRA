@@ -61,5 +61,8 @@ private:
 	void OnBinary(const void* Data, SIZE_T Size, SIZE_T BytesRemaining);
 	void HandleCommand(const TSharedPtr<FJsonObject>& Msg);
 	void BindShipEvents();
+	TMap<int32, TPair<FString, FString>> LineTexts;   // line id -> (name, text): shown when its voice begins
+
+public:
 	UWorld* GameWorld() const;
 };
