@@ -125,7 +125,7 @@ public:
 						+ SVerticalBox::Slot().AutoHeight()
 						[
 							SNew(STextBlock).Font(MonoFont(11)).ColorAndOpacity(MenuDim).AutoWrapText(true)
-							.Text(FText::FromString(TEXT("Hold V and speak to your bridge crew, in any language.\nE: leave or take the captain's chair.   Esc: this menu.")))
+							.Text(FText::FromString(TEXT("Hold V and speak to your bridge crew, in any language (or T to type).\nE: leave or take the captain's chair.   Tab: your datapad.   Esc: this menu.")))
 						]
 					]
 				]

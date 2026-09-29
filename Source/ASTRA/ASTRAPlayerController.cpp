@@ -65,7 +65,7 @@ void AASTRAPlayerController::BeginPlay()
 				.Padding(FMargin(14, 8))
 				[
 					SNew(STextBlock).Font(Mono ? FSlateFontInfo(Mono, 13) : FCoreStyle::GetDefaultFontStyle("Mono", 13))
-					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  hold V  talk to the crew  ·  T  type")))
+					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  hold V  talk to the crew  ·  T  type  ·  Tab  datapad")))
 				]
 			];
 			VC->AddViewportWidgetContent(HintWidget.ToSharedRef(), 5);
