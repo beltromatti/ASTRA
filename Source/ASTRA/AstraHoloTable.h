@@ -46,6 +46,7 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Dots;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Blasts;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Leaders;   // icon -> raised label
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Strobes;   // a jammer's strobe: the Aquila -> its bearing
 	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> Labels;
 	// the sector plot (the war map): systems, gate links, names
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorNodes;

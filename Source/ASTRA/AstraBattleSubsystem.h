@@ -83,6 +83,7 @@ struct FAstraBattleShip
 	bool bFog = false;                   // under the fog of war (the director's Mandate ships; the opening's are scripted)
 	bool bDark = false;                  // running dark (EMCON): a fraction of its signature, until it lights up
 	float LitT = 0.f;                    // it fired: every sensor saw it, for a while
+	bool bJamming = false;               // a Mandate capital ship blinding our radar along its bearing (until burn-through)
 	bool bAlive = true;
 	bool bFleeing = false;
 	bool bHoldFire = false;              // ceasefire ordered by its commander
@@ -237,6 +238,7 @@ struct FAstraHoloBlip
 	bool bHostile = false;
 	bool bUnknown = false;
 	bool bBearingOnly = false;              // a passive bearing, no range: drawn at the rim along the bearing
+	bool bJamming = false;                  // its jamming strobe: a flickering line from the Aquila along its bearing
 	bool bRetreating = false;
 	bool bHoldFire = false;
 	bool bTargeted = false;                 // our fire control is on it
@@ -247,6 +249,7 @@ struct FAstraHoloBlip
 	float RangeKm = 0.f;
 	FString Name;
 	FString Contact;
+	FString ClassShort;                     // classified but not identified: "Acheron class"
 };
 
 /** What is left of a destroyed ship (a burnt hulk drifting and tumbling) or a piece of debris. */

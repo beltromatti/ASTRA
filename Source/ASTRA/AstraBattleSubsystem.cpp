@@ -401,9 +401,12 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 			if (!S.bCraft)
 			{
 				const FAstraBattleShip* T = FindById(S.TargetId);
-				UE_LOG(LogASTRA, Log, TEXT("[Status] t=%.0f %s %-12s %s hull %4.0f/%4.0f shield %4.0f/%4.0f target %s range %.1f km mode %d%s%s"), Time,
+				UE_LOG(LogASTRA, Log, TEXT("[Status] t=%.0f %s %-12s %s hull %4.0f/%4.0f shield %4.0f/%4.0f target %s range %.1f km mode %d "
+				                           "from us %03.0f/%.1f km%s%s%s%s"), Time,
 				       *S.ContactId, *S.Name, S.bAlive ? TEXT("alive") : TEXT("DEAD "), S.Hull, S.HullMax, S.Shield, S.ShieldMax,
 				       T ? *T->ContactId : TEXT("-"), T ? FVector::Dist(S.Pos, T->Pos) / OneKm : 0.0, (int32)S.Mode,
+				       BearingDeg(Ships[0].Pos, S.Pos), FVector::Dist(Ships[0].Pos, S.Pos) / OneKm,
+				       S.bFog ? *FString::Printf(TEXT(" track %d"), S.Track) : TEXT(""), S.bJamming ? TEXT(" JAM") : TEXT(""),
 				       S.bHoldFire ? TEXT(" HOLD") : TEXT(""), S.bFleeing ? TEXT(" FLEE") : TEXT(""));
 			}
 		}
@@ -570,7 +573,44 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	// the Aquila's active sensors (radar, lidar): full EMCON sees furthest; silent only listens
 	const float ActiveKm = (E == TEXT("full") ? 55.f : (E == TEXT("restricted") ? 28.f : 0.f)) * SensorPower;
 	const FAstraBattleShip& P = Ships[0];
-	TArray<FString> NewBearings, NewTracks, Classified, Lost;
+	TArray<FString> NewBearings, NewTracks, Classified, Lost, JamOn, BurnThrough;
+	// the Mandate's jammers: a capital ship that has stopped running dark (it came close, fired, or heard our ping and
+	// knows it has been found) floods our radar along its bearing; inside 12 km the returns burn through the noise
+	TArray<FVector> JamDirs;
+	for (FAstraBattleShip& S : Ships)
+	{
+		if (!S.bFog || !S.bAlive || S.bPlayer)
+		{
+			continue;
+		}
+		const float R = FVector::Dist(S.Pos, P.Pos) / OneKm;
+		const bool bJam = S.Radius >= 200.f && S.bHostile && !S.bDark && !S.bFleeing && !S.bHoldFire && R > 12.f && R < 55.f;
+		if (bJam && !S.bJamming)
+		{
+			JamOn.Add(FString::Printf(TEXT("%s on bearing %03.0f"), *KnownLabel(S), BearingDeg(P.Pos, S.Pos)));
+		}
+		else if (!bJam && S.bJamming && R <= 12.f)
+		{
+			BurnThrough.Add(KnownLabel(S));
+		}
+		S.bJamming = bJam;
+		if (bJam)
+		{
+			JamDirs.Add((S.Pos - P.Pos).GetSafeNormal());
+		}
+	}
+	auto Jammed = [&JamDirs](const FVector& From, const FVector& To) -> bool
+	{
+		const FVector D = (To - From).GetSafeNormal();
+		for (const FVector& J : JamDirs)
+		{
+			if (FVector::DotProduct(D, J) > 0.9f)      // within about 25 degrees of a jammer's bearing
+			{
+				return true;
+			}
+		}
+		return false;
+	};
 	for (FAstraBattleShip& S : Ships)
 	{
 		if (!S.bFog || !S.bAlive || S.bPlayer)
@@ -597,14 +637,41 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 			if (bRecon && R < 8.f) { K = 4; }             // eyes on it: a flight group reads its name off the hull
 			return K;
 		};
-		uint8 Best = Sense(P.Pos, ActiveKm, false);
+		uint8 Best = Sense(P.Pos, ActiveKm * (Jammed(P.Pos, S.Pos) ? 0.45f : 1.f), false);
 		for (const FAstraBattleShip& A : Ships)
 		{
-			// the 7th Fleet's ships and our flight groups share their tracks by datalink
+			// the 7th Fleet's ships and our flight groups share their tracks by datalink (jammed like ours)
 			if (A.bAlive && !A.bPlayer && !A.bDerelict && A.Side == EAstraSide::Astra)
 			{
-				Best = FMath::Max(Best, Sense(A.Pos, A.bCraft ? 10.f : 30.f, A.bCraft));
+				Best = FMath::Max(Best, Sense(A.Pos, (A.bCraft ? 10.f : 30.f) * (Jammed(A.Pos, S.Pos) ? 0.45f : 1.f), A.bCraft));
 			}
+		}
+		bool bCrossFix = false;
+		if (S.bJamming)
+		{
+			// the jammer gives its own bearing away (the strobe) but hides its range until burn-through. Two strobe
+			// bearings from far enough apart (a fleet ship, a flight group out on the flank) cross at its range: a
+			// track, not a classification; eyes on it (a flight group inside 8 km) still read its hull
+			uint8 J = 1;
+			const FVector FromUs = (S.Pos - P.Pos).GetSafeNormal();
+			for (const FAstraBattleShip& A : Ships)
+			{
+				if (!A.bAlive || A.bPlayer || A.bDerelict || A.Side != EAstraSide::Astra)
+				{
+					continue;
+				}
+				if (A.bCraft && FVector::Dist(A.Pos, S.Pos) < 8.f * OneKm)
+				{
+					J = 4;
+					break;
+				}
+				if (FVector::Dist(A.Pos, S.Pos) < 90.f * OneKm && FVector::DotProduct(FromUs, (S.Pos - A.Pos).GetSafeNormal()) < 0.99756f)
+				{
+					J = FMath::Max<uint8>(J, 2);              // the bearings cross at better than 4 degrees
+					bCrossFix = J == 2;
+				}
+			}
+			Best = S.LitT > 0.f ? FMath::Max<uint8>(J, 2) : J;
 		}
 		const uint8 OldTrack = S.Track;
 		const bool bWasClassified = S.bClassified;
@@ -638,7 +705,8 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 		}
 		else if (OldTrack < 2 && S.Track == 2)
 		{
-			NewTracks.Add(FString::Printf(TEXT("%s at %.0f km, bearing %03.0f"), *KnownLabel(S), FVector::Dist(P.Pos, S.Pos) / OneKm, BearingDeg(P.Pos, S.Pos)));
+			NewTracks.Add(FString::Printf(TEXT("%s at %.0f km, bearing %03.0f%s"), *KnownLabel(S), FVector::Dist(P.Pos, S.Pos) / OneKm, BearingDeg(P.Pos, S.Pos),
+			                              bCrossFix ? TEXT(" (a cross-fix on its jamming, with the fleet's bearing)") : TEXT("")));
 		}
 		else if (OldTrack == 2 && S.Track < 2)
 		{
@@ -662,6 +730,17 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	if (Lost.Num())
 	{
 		Report(FString::Printf(TEXT("sensors: lost the track on %s — a bearing at most now"), *FString::Join(Lost, TEXT(", "))));
+	}
+	if (JamOn.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: jamming — a strobe from %s: it floods our radar along that bearing (its range is hidden and our "
+		                            "tracks there fade, the fleet's too). Missiles can home on the jamming; the railguns need a range: a "
+		                            "cross-fix (a fleet ship or a flight group well off our line), a recon flight's eyes, an active ping "
+		                            "burning through for a moment, or burn-through inside 12 km"), *FString::Join(JamOn, TEXT("; "))));
+	}
+	if (BurnThrough.Num())
+	{
+		Report(FString::Printf(TEXT("sensors: burn-through on %s — the jamming no longer hides it"), *FString::Join(BurnThrough, TEXT(", "))));
 	}
 }
 
@@ -997,7 +1076,7 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 		{
 			S.bFleeing = true;
 			S.Mode = EAstraShipMode::Evade;
-			Report(FString::Printf(TEXT("sensors: %s (%s) is badly damaged and breaking off, heading away from the fight"), *S.Name, *S.ContactId));
+			Report(FString::Printf(TEXT("sensors: %s is badly damaged and breaking off, heading away from the fight"), *KnownLabel(S)));
 		}
 	}
 	if (S.bHoldFire && !S.bFleeing)
@@ -1019,7 +1098,7 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 			if (S.Actor) { S.Actor->Destroy(); }
 			if (S.ShieldBubble) { S.ShieldBubble->Destroy(); }
 			if (S.DriveFlare) { S.DriveFlare->Destroy(); }
-			Report(FString::Printf(TEXT("sensors: %s (%s) has left sensor range"), *S.Name, *S.ContactId));
+			Report(FString::Printf(TEXT("sensors: %s has left sensor range"), *KnownLabel(S)));
 		}
 	}
 	if (S.Mode == EAstraShipMode::Idle && !S.bHostile)
@@ -1255,10 +1334,16 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 		OutDetail = TEXT("weapons interlock: target is a friendly vessel");
 		return false;
 	}
-	if (T->bFog && T->Track < 2)
+	const FString W = Weapon.ToLower();
+	const bool bHomeOnJam = T->bJamming && T->Track < 2 && (W == TEXT("missiles") || W == TEXT("torpedoes"));
+	if (T->bFog && T->Track < 2 && !bHomeOnJam)
 	{
-		OutDetail = FString::Printf(TEXT("no firing solution on %s: only a passive bearing, no range — we need a track (an active scan, "
-		                                 "EMCON full, a recon flight, or closing in)"), *T->ContactId);
+		OutDetail = T->bJamming
+			? FString::Printf(TEXT("no firing solution for the %s on %s: it is jamming, we have its bearing but no range — missiles can "
+			                       "home on the jamming; for the guns we need a cross-fix, a recon flight, an active ping or to close "
+			                       "inside 12 km"), *W, *T->ContactId)
+			: FString::Printf(TEXT("no firing solution on %s: only a passive bearing, no range — we need a track (an active scan, "
+			                       "EMCON full, a recon flight, or closing in)"), *T->ContactId);
 		return false;
 	}
 	if (T->Side == EAstraSide::Mandate && T->bNegotiated)
@@ -1267,7 +1352,6 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 	}
 	FAstraBattleShip& P = Ships[0];
 	const double Dist = FVector::Dist(P.Pos, T->Pos);
-	const FString W = Weapon.ToLower();
 	if (W == TEXT("railguns"))
 	{
 		P.FireTarget = T->Id;
@@ -1303,8 +1387,11 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 			Ship->AddHeat(0.1f * N);   // the launch cells' exhaust
 		}
 		PlayerSinceFired = 0.f;   // the launch lights them up
-		OutDetail = FString::Printf(TEXT("%d missiles away at %s, %d left in the VLS, time to target about %.0f s"), N, *T->ContactId,
-		                            P.Missiles, Dist / 1400.0 + 2.0);
+		OutDetail = bHomeOnJam
+			? FString::Printf(TEXT("%d missiles away at %s in home-on-jam mode (they ride its jamming; the range is theirs to find), %d "
+			                       "left in the VLS"), N, *T->ContactId, P.Missiles)
+			: FString::Printf(TEXT("%d missiles away at %s, %d left in the VLS, time to target about %.0f s"), N, *T->ContactId,
+			                  P.Missiles, Dist / 1400.0 + 2.0);
 	}
 	else if (W == TEXT("lasers"))
 	{
@@ -1400,6 +1487,7 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		FAstraHoloBlip B;
 		B.Kind = 0;
 		B.bBearingOnly = S.bFog && S.Track == 1;
+		B.bJamming = S.bJamming;
 		B.Rel = ToWorld(S.Pos) - Origin;
 		B.Rot = ToWorldRot(S.Att);
 		B.VelDir = Dir(S.Pos, S.Vel);
@@ -1415,6 +1503,11 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		B.RangeKm = FVector::Dist(S.Pos, P.Pos) / OneKm;
 		B.Name = S.bIdentified ? S.Name : FString();
 		B.Contact = S.ContactId;
+		if (S.bFog && S.bClassified && !S.bIdentified)
+		{
+			FString Head, Tail;
+			B.ClassShort = S.Class.Split(TEXT(", "), &Head, &Tail) ? Tail : S.Class;   // "Kharon Mandate cruiser, Acheron class"
+		}
 		if (S.bCraft && Squadrons.IsValidIndex(S.Squadron))
 		{
 			B.bCraft = true;
@@ -1546,6 +1639,7 @@ bool UAstraBattleSubsystem::PlayerScan(const FString& ContactId, FString& OutDet
 			Found += S.Track < 2 ? 1 : 0;
 			S.Track = 2;
 			S.TrackHold = 45.f;
+			S.bDark = S.bDark && !S.bHostile;          // they heard it: found, no point in running dark (their jammers come on)
 			S.bClassified = true;
 			S.bIdentified = S.bIdentified || (&S == T && FVector::Dist(S.Pos, Ships[0].Pos) < 60.f * OneKm);
 		}
@@ -1804,7 +1898,7 @@ bool UAstraBattleSubsystem::FleetRequest(const FString& Ship, const FString& Req
 	}
 	TArray<FString> Names;
 	for (const FAstraBattleShip* S : Fleet) { Names.Add(S->Name); }
-	const FString What = R == TEXT("focus_fire") ? FString::Printf(TEXT("shifting fire to the %s (%s)"), *T->Name, *T->ContactId)
+	const FString What = R == TEXT("focus_fire") ? FString::Printf(TEXT("shifting fire to %s"), *KnownLabel(*T))
 	                   : R == TEXT("engage_freely") ? FString(TEXT("engaging targets of opportunity"))
 	                   : R == TEXT("cover_us") ? FString(TEXT("moving to cover the Aquila, between us and the enemy"))
 	                   : R == TEXT("close_in") ? FString(TEXT("closing to knife-fight range"))
@@ -2081,7 +2175,8 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S)
 	}
 	else if (!S.bPlayer)
 	{
-		Report(FString::Printf(TEXT("tactical: %s (%s, %s) destroyed"), *S.Name, *S.ContactId, *S.Class));
+		Report(FString::Printf(TEXT("tactical: %s destroyed"), (!S.bFog || S.bIdentified)
+			? *FString::Printf(TEXT("%s (%s, %s)"), *S.Name, *S.ContactId, *S.Class) : *KnownLabel(S)));
 		if (S.Side == EAstraSide::Astra)
 		{
 			LastWreckPos = S.Pos;
@@ -2630,8 +2725,11 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 			{
 				O->SetStringField(TEXT("name"), S.Name);
 			}
-			O->SetStringField(TEXT("status"), TEXT("bearing only (passive, faint drive emissions): no range, no firing solution — an active scan, "
-			                                       "EMCON full, a recon flight or closing in would give a track"));
+			O->SetStringField(TEXT("status"), S.bJamming
+				? TEXT("JAMMING: its strobe gives the bearing, the noise hides the range — missiles can home on the jamming; the guns need a "
+				       "cross-fix (a fleet ship or a flight group well off our line), a recon flight, an active ping or burn-through inside 12 km")
+				: TEXT("bearing only (passive, faint drive emissions): no range, no firing solution — an active scan, "
+				       "EMCON full, a recon flight or closing in would give a track"));
 			O->SetNumberField(TEXT("bearing_deg"), FMath::RoundToDouble(BearingDeg(P.Pos, S.Pos)));
 			O->SetNumberField(TEXT("mark_deg"), FMath::RoundToDouble(MarkDeg(P.Pos, S.Pos)));
 			Out.Add(MakeShared<FJsonValueObject>(O));
@@ -2646,6 +2744,10 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 		                                  : S.bCold ? TEXT("unidentified, cold drive, drifting")
 		                                          : (S.bHostile ? (S.bFleeing ? TEXT("hostile, retreating") : (S.bHoldFire ? TEXT("hostile, holding fire") : TEXT("hostile"))) : SideName(S.Side)));
 		O->SetNumberField(TEXT("range_km"), FMath::RoundToDouble(FVector::Dist(P.Pos, S.Pos) / 100.0) / 10.0);
+		if (S.bJamming)
+		{
+			O->SetStringField(TEXT("jamming"), TEXT("still jamming: this range comes from a cross-fix, a ping or a flight's eyes"));
+		}
 		O->SetNumberField(TEXT("bearing_deg"), FMath::RoundToDouble(BearingDeg(P.Pos, S.Pos)));
 		O->SetNumberField(TEXT("mark_deg"), FMath::RoundToDouble(MarkDeg(P.Pos, S.Pos)));
 		if (!S.bCold)
@@ -2784,7 +2886,7 @@ bool UAstraBattleSubsystem::LaunchSquadron(const FString& Name, const FString& M
 	OutDetail = FString::Printf(TEXT("%s squadron: %s%s%s, mission %s%s"), *Q.Name,
 	                            Airborne ? *FString::Printf(TEXT("%d airborne re-tasked"), Airborne) : TEXT(""),
 	                            (Airborne && !Launch.IsEmpty()) ? TEXT(", ") : TEXT(""), *Launch, *M,
-	                            T ? *FString::Printf(TEXT(" on %s (%s)"), *T->ContactId, *T->Name) : TEXT(""));
+	                            T ? *FString::Printf(TEXT(" on %s"), *KnownLabel(*T)) : TEXT(""));
 	return true;
 }
 
@@ -2896,7 +2998,7 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		}
 		if (Q.TorpedoReportAt > 0.f && Time >= Q.TorpedoReportAt)
 		{
-			Report(FString::Printf(TEXT("flight: %s squadron torpedo run on the %s: %d torpedoes away, bombers returning"), *Q.Name,
+			Report(FString::Printf(TEXT("flight: %s squadron torpedo run on %s: %d torpedoes away, bombers returning"), *Q.Name,
 			                       *Q.TorpedoTarget, Q.TorpedoesAway));
 			Q.TorpedoesAway = 0;
 			Q.TorpedoReportAt = -1.f;
@@ -2964,8 +3066,8 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 			Q.bAirborneReported = true;
 			const FAstraBattleShip* Cr = FindById(Q.CarrierId);
 			Report(bOurs ? FString::Printf(TEXT("flight: %s squadron airborne, %d %ss on %s"), *Q.Name, Q.Launched, *Q.CallSign, *Q.Mission.ToUpper())
-			             : FString::Printf(TEXT("sensors: the %s (%s) has launched strike fighters — %d Harpies inbound on the Aquila"),
-			                               Cr ? *Cr->Name : TEXT("enemy cruiser"), Cr ? *Cr->ContactId : TEXT("?"), Q.Launched));
+			             : FString::Printf(TEXT("sensors: %s has launched strike fighters — %d Harpies inbound on the Aquila"),
+			                               Cr ? *KnownLabel(*Cr) : TEXT("an enemy cruiser"), Q.Launched));
 		}
 	}
 }
@@ -3236,7 +3338,7 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 					FireTorpedo(S, *T);
 				}
 				Q.TorpedoesAway += S.Torpedoes;
-				Q.TorpedoTarget = FString::Printf(TEXT("%s (%s)"), *T->Name, *T->ContactId);
+				Q.TorpedoTarget = KnownLabel(*T);
 				if (Q.TorpedoReportAt < 0.f)
 				{
 					Q.TorpedoReportAt = Time + 6.f;   // the rest of the group releases within seconds: one report for the run

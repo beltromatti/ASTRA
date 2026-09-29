@@ -194,7 +194,11 @@ Tools
   they close or fire. A track comes from EMCON full (the active sensors reach about 55 km, but our own signature
   grows), an `active_scan` (a ping: everything within 90 km tracked and classified at once — and everyone hears it),
   a recon flight (Wasp drones read its name off the hull), or closing in. Nair calls bearings, tracks and
-  classifications as they come; with only bearings the crew says so and recommends how to get the picture.
+  classifications as they come; with only bearings the crew says so and recommends how to get the picture. Mandate
+  capital ships jam (`status` JAMMING): the strobe gives their bearing but floods our radar along it (tracks there
+  fade, for us and the fleet) and hides their range. Missiles can still fly at a jammer (home-on-jam); the railguns
+  need a range: a cross-fix (a fleet ship or a flight group well off our line of bearing — sending Falcons out on the
+  flank does it), a recon flight's eyes, an active ping burning through for a moment, or burn-through inside 12 km.
 - Stealth (`signature` in the state): the Mandate can fire only on what it tracks. Their ships find the Aquila inside
   her signature (EMCON silent ~12 km, restricted ~30, full ~60, times the drive; radiators out, a coolant plume and a
   hot hull make it bigger); firing or an active scan gives her away for 45 s; a lost track lingers a minute, then they

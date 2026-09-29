@@ -225,7 +225,7 @@ void AAstraHoloTable::Tick(float DeltaTime)
 
 void AAstraHoloTable::HideTactical()
 {
-	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders})
+	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders, &Strobes})
 	{
 		HideFrom(*Pool, 0);
 	}
@@ -374,7 +374,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		FaceViewer(T, ViewerLocal);
 	}
 
-	int32 NI = 0, NL = 0, ND = 0, NB = 0;
+	int32 NI = 0, NL = 0, ND = 0, NB = 0, NS = 0;
 	TArray<FVector4> PlacedLabels;
 	// the viewer's picture plane (for label decluttering), seen from the player towards the table centre
 	const FVector ViewDir = (FVector(0, 0, PlaneHeight) - ViewerLocal).GetSafeNormal();
@@ -414,6 +414,18 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			SetColor(Vec, Col, 7.f);
 			++NI;
 
+			if (B.bJamming)
+			{
+				// the jamming strobe, as a radar scope shows it: a line of noise from us out along its bearing
+				const FVector C = FVector(0, 0, PlaneHeight);
+				const FVector ToP = P - C;
+				UStaticMeshComponent* Strobe = Pooled(Strobes, NS++, LineMesh);
+				Strobe->SetRelativeLocationAndRotation(C, ToP.Rotation());
+				Strobe->SetRelativeScale3D(FVector(ToP.Size() / 100.f, 0.45f, 0.45f));
+				const float Noise = 0.45f + 0.35f * FMath::Abs(FMath::Sin(Time * 23.f + NS)) + 0.2f * FMath::Sin(Time * 57.f);
+				SetColor(Strobe, Col, 10.f * Noise);
+			}
+
 			if (B.bNoLabel)
 			{
 				if (Leaders.IsValidIndex(NI - 1))
@@ -424,8 +436,10 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			}
 			UTextRenderComponent* T = PooledText(Labels, NL++);
 			const FString Title = B.bPlayer ? FString(TEXT("ASN AQUILA"))
-			                    : (B.Name.IsEmpty() ? FString::Printf(TEXT("%s  UNKNOWN"), *B.Contact) : FString::Printf(TEXT("%s  %s"), *B.Name.ToUpper(), *B.Contact));
-			FString Sub = B.bPlayer ? FString() : (B.bBearingOnly ? FString(TEXT("BEARING ONLY  NO RANGE")) : RangeText(B.RangeKm));
+			                    : (B.Name.IsEmpty() ? FString::Printf(TEXT("%s  %s"), *B.Contact, B.ClassShort.IsEmpty() ? TEXT("UNKNOWN") : *B.ClassShort.ToUpper())
+			                                        : FString::Printf(TEXT("%s  %s"), *B.Name.ToUpper(), *B.Contact));
+			FString Sub = B.bPlayer ? FString() : (B.bBearingOnly ? FString(B.bJamming ? TEXT("JAMMING  NO RANGE") : TEXT("BEARING ONLY  NO RANGE"))
+			                                                      : RangeText(B.RangeKm) + (B.bJamming ? TEXT("  JAMMING") : TEXT("")));
 			if (B.bHoldFire) { Sub += TEXT("  HOLDING FIRE"); }
 			else if (B.bRetreating) { Sub += TEXT("  WITHDRAWING"); }
 			if (B.bTargeted) { Sub += TEXT("  [TARGET]"); }
@@ -489,4 +503,5 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 	HideFrom(Leaders, NI);
 	HideFrom(Dots, ND);
 	HideFrom(Blasts, NB);
+	HideFrom(Strobes, NS);
 }

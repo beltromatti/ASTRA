@@ -54,10 +54,11 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "percent": {"type": "number", "minimum": 0, "maximum": 150}}, ["system", "percent"]),
     _fn("set_target", "Tactical: designate the current target (a contact id from the state).", {
         "contact_id": {"type": "string"}}, ["contact_id"]),
-    _fn("fire_weapons", "Tactical: engage a contact with a weapon group (it needs a track: never a bearing-only contact). Railguns (range 10 km) and lasers (4 km) fire "
+    _fn("fire_weapons", "Tactical: engage a contact with a weapon group (it needs a track: never a bearing-only contact — except missiles at a jammer). Railguns (range 10 km) and lasers (4 km) fire "
                         "`salvo` volleys at their cadence (railguns one volley every 7 s; 12 = sustained fire, about 1.5 "
                         "minutes); if the target is still beyond range they stay assigned and open fire by themselves "
-                        "once it closes. Missiles (25 km) launch `salvo` missiles at once (max 8; the VLS then cycles 14 s).", {
+                        "once it closes. Missiles (25 km) launch `salvo` missiles at once (max 8; the VLS then cycles 14 s); at a "
+                        "jamming contact they fly home-on-jam, without a range.", {
         "weapon": {"type": "string", "enum": ["railguns", "lasers", "missiles", "torpedoes"]},
         "contact_id": {"type": "string"},
         "salvo": {"type": "integer", "minimum": 1, "maximum": 12}}, ["weapon", "contact_id", "salvo"]),
