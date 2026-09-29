@@ -805,6 +805,11 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	}
 	if (JamOn.Num())
 	{
+		// the receivers at the sensors station rasp as the jammers come on (heard on the bridge)
+		if (Ship && Ship->CaptainPlace() == TEXT("BRIDGE"))
+		{
+			HullSound(TEXT("SW_Jam_Static"), 0.35f, 8.f);
+		}
 		Report(FString::Printf(TEXT("sensors: jamming — a strobe from %s: it floods our radar along that bearing (its range is hidden and our "
 		                            "tracks there fade, the fleet's too). Missiles can home on the jamming; the railguns need a range: a "
 		                            "cross-fix (a fleet ship or a flight group well off our line), a recon flight's eyes, an active ping "

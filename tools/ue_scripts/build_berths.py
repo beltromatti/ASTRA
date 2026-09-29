@@ -49,6 +49,10 @@ def import_png(src_dir, names, dst):
 
 import_png(os.path.join(ROOT, "art", "_cache", "signage"), ["T_SIGN_Berth_3C", "T_SIGN_Head", "T_SIGN_Lift_Bridge", "T_SIGN_Lift_Hangar"], SIGN_TEX)
 log.append("textures")
+# the new sounds (tools/art/ship_sounds.py): the compartment's night, the datapad, the jammers' rasp
+ONLY = ["SW_Berth_Ambience", "SW_Pad_Up", "SW_Pad_Down", "SW_Jam_Static"]
+exec(open(os.path.join(ROOT, "tools", "ue_scripts", "import_audio.py")).read())
+log.append("sounds")
 
 
 def mi(name, parent_path, scalars=None, vectors=None, textures=None):
@@ -191,6 +195,23 @@ light(unreal.RectLight, lo["table"]["x"], lo["table"]["y"], H - 0.06, "Berths_Lo
       size=(2.0, 1.2))
 light(unreal.RectLight, -LEN + 0.6, -0.7, 2.7, "Berths_News", 500, (190, 215, 255), 400, pitch=-35.0, yaw=180.0, size=(3.0, 0.2))
 log.append("lights")
+
+# ---- the compartment's own sound at night: air handlers, the reactor faint through the deck, a creak (heard only in it)
+sw = eal.load_asset("/Game/ASTRA/Audio/SW_Berth_Ambience")
+if sw:
+    amb = eas.spawn_actor_from_class(unreal.AmbientSound, V(-12.0, 0.0, 2.0), unreal.Rotator())
+    ac = amb.get_component_by_class(unreal.AudioComponent)
+    ac.set_editor_property("sound", sw)
+    ac.set_editor_property("volume_multiplier", 0.6)
+    ac.set_editor_property("override_attenuation", True)
+    att = ac.get_editor_property("attenuation_overrides")
+    att.set_editor_property("attenuation_shape", unreal.AttenuationShape.BOX)
+    att.set_editor_property("attenuation_shape_extents", unreal.Vector(1300.0, 450.0, 250.0))
+    att.set_editor_property("falloff_distance", 400.0)
+    ac.set_editor_property("attenuation_overrides", att)
+    amb.set_actor_label("Berths_Ambience")
+    amb.set_folder_path("Berths")
+    log.append("ambience")
 
 # ---- the lift: doors and the landing on the lift network (the compartment's sign is on its forward wall)
 leaf = eal.load_asset("/Game/ASTRA/Kit/Interior/Corridor/SM_COR_DoorLeaf")

@@ -85,7 +85,7 @@ protected:
 	UFUNCTION(Exec) void AstraDeck(int32 N) { if (LiftMenu.IsValid()) { ChooseDeck(N); } }
 	void ShowHelp(bool bShow);
 	/** Tab: the Captain's datapad, raised in the left hand anywhere aboard (the ship at a glance), or lowered. */
-	void TogglePad() { bPadUp = !bPadUp; }
+	void TogglePad();
 	UFUNCTION(Exec) void AstraPad() { TogglePad(); }
 	void TickPad(float DeltaTime);
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> PadMesh;

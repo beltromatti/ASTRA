@@ -28,6 +28,8 @@
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "AstraMindSubsystem.h"
 #include "AstraScreensSubsystem.h"
+#include "Sound/SoundBase.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -332,6 +334,20 @@ void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
 		{
 			Ship->PublishEvent(TEXT("flight: the Captain has climbed into a Falcon of Alpha on the port catapult"), true);
 		}
+	}
+}
+
+void AASTRAPlayerController::TogglePad()
+{
+	if (!Cast<ACharacter>(GetPawn()))
+	{
+		return;                                        // on foot only: a Falcon has its own instruments
+	}
+	bPadUp = !bPadUp;
+	const TCHAR* Name = bPadUp ? TEXT("/Game/ASTRA/Audio/SW_Pad_Up.SW_Pad_Up") : TEXT("/Game/ASTRA/Audio/SW_Pad_Down.SW_Pad_Down");
+	if (USoundBase* S = LoadObject<USoundBase>(nullptr, Name))
+	{
+		UGameplayStatics::PlaySound2D(this, S, 0.5f);
 	}
 }
 

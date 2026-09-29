@@ -9,7 +9,7 @@ import unreal
 SRC = globals().get("SRC", "/Users/beltromatti/Desktop/ASTRA/art/_cache/audio")
 DST = globals().get("DST", "/Game/ASTRA/Audio")
 ONLY = globals().get("ONLY")
-LOOPS = {"SW_Bridge_Ambience", "MX_Aurelia", "MX_Tension", "MX_Battle", "MX_Aftermath", "SW_Falcon_Engine", "SW_Lock_Solid", "SW_Missile_Warning", "SW_Pod_Hum"}
+LOOPS = {"SW_Bridge_Ambience", "MX_Aurelia", "MX_Tension", "MX_Battle", "MX_Aftermath", "SW_Falcon_Engine", "SW_Lock_Solid", "SW_Missile_Warning", "SW_Pod_Hum", "SW_Berth_Ambience"}
 
 tasks = []
 for f in sorted(os.listdir(SRC)):

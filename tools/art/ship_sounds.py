@@ -298,6 +298,54 @@ def entry_plasma(dur=10.0):
     return norm(np.tanh(1.3 * x), 0.85)
 
 
+def pad(up=True):
+    """The Captain's datapad: the rubber-bumpered slate taken up (or put down) — a soft handling thump, the screen
+    waking with a small rising two-tone (falling when it goes to sleep)."""
+    t = t_(0.45)
+    thump = lp(rng.normal(0, 1, len(t)), 900) * np.exp(-t * 45) * 0.7
+    tones = np.zeros_like(t)
+    for k, fq in enumerate((1318.5, 1760.0) if up else (1760.0, 1318.5)):
+        i = int((0.08 + k * 0.07) * SR)
+        tt = t[: len(t) - i]
+        tones[i:] += np.sin(2 * np.pi * fq * tt) * np.exp(-tt * 30) * np.clip(tt / 0.003, 0, 1) * 0.35
+    return norm(thump + tones, 0.45)
+
+
+def berth_ambience(dur=26.0):
+    """Crew Berthing at night (loopable): the air handlers' low wash, the reactor felt faintly through the deck,
+    a hull creak now and then, the far tick of the ship settling — quieter and softer than the bridge."""
+    t = t_(dur)
+    air = lp(hp(rng.normal(0, 1, len(t)), 30), 240, order=4) * (1 + 0.2 * np.sin(2 * np.pi * t / 11.0))
+    hum = (np.sin(2 * np.pi * 50 * t) * 0.12 + np.sin(2 * np.pi * 23 * t) * 0.18) * (1 + 0.1 * np.sin(2 * np.pi * t / 7.0))
+    creaks = np.zeros_like(t)
+    for _ in range(int(dur / 6)):
+        i = rng.integers(0, len(t) - SR)
+        m = int(rng.uniform(0.3, 0.8) * SR)
+        tt = np.arange(m) / SR
+        f0 = rng.uniform(70, 140)
+        creaks[i:i + m] += np.sin(2 * np.pi * (f0 + 25 * np.sin(2 * np.pi * 3 * tt)) * tt) * np.sin(np.pi * tt / tt[-1]) * 0.12
+    ticks = np.zeros_like(t)
+    for _ in range(int(dur / 2.5)):
+        i = rng.integers(0, len(t) - 2000)
+        ticks[i:i + 2000] += hp(rng.normal(0, 1, 2000), 2500) * np.exp(-np.arange(2000) / 180.0) * 0.05
+    x = air * 0.9 + hum + lp(creaks, 900) + ticks
+    n = SR
+    fade = np.linspace(0, 1, n)
+    x[:n] = x[:n] * fade + x[-n:] * (1 - fade)
+    return norm(x[:-n], 0.45)
+
+
+def jam_static():
+    """The sensors station when the Mandate's jammers come on: a burst of rasping noise sweeping through the
+    receivers, the strobe's pulse in it, then settling to a hiss."""
+    t = t_(2.2)
+    noise = rng.normal(0, 1, len(t))
+    sweep = np.sin(2 * np.pi * (300 + 2600 * t / t[-1]) * t)
+    rasp = bp(noise, 900, 5200) * (0.6 + 0.4 * np.sign(np.sin(2 * np.pi * 37 * t)))    # the strobe's chopping
+    env = np.clip(t / 0.05, 0, 1) * (0.35 + 0.65 * np.exp(-t * 1.6))
+    return norm((rasp * 0.8 + sweep * bp(noise, 200, 3000) * 0.3) * env, 0.5)
+
+
 os.makedirs(OUT, exist_ok=True)
 for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("SW_Torpedo_Launch", lambda: vls_launch(True)),
                  ("SW_PD_Burst", pd_burst), ("SW_Catapult", catapult), ("SW_Console_Chirp", chirp), ("SW_Door_Chime", door_chime),
@@ -305,6 +353,8 @@ for name, fn in (("SW_Rail_Fire", rail_fire), ("SW_VLS_Launch", vls_launch), ("S
                  ("SW_Sparks", sparks), ("SW_Falcon_Engine", falcon_engine), ("SW_Lock_Beep", lock_beep), ("SW_Lock_Solid", lock_solid),
                  ("SW_Missile_Warning", missile_warning), ("SW_Entry_Plasma", entry_plasma),
                  # last: new sounds must not shift the random stream of the ones above
-                 ("SW_Pod_Launch", pod_launch), ("SW_Pod_Hum", pod_hum), ("SW_Breach_Felt", breach_felt)):
+                 ("SW_Pod_Launch", pod_launch), ("SW_Pod_Hum", pod_hum), ("SW_Breach_Felt", breach_felt),
+                 ("SW_Pad_Up", pad), ("SW_Pad_Down", lambda: pad(False)), ("SW_Berth_Ambience", berth_ambience),
+                 ("SW_Jam_Static", jam_static)):
     sf.write(os.path.join(OUT, name + ".wav"), fn().astype(np.float32), SR, subtype="PCM_16")
 print("SHIP_SOUNDS_OK", sorted(f for f in os.listdir(OUT) if f.endswith(".wav")))
