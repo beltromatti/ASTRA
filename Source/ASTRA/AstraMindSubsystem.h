@@ -1,5 +1,4 @@
 // ASTRA — link to astra-mind (the crew's minds and voices, mind/): WebSocket client, command routing, voice routing.
-
 #pragma once
 
 #include "CoreMinimal.h"
