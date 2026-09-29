@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-29 (notte) · **Traguardo corrente:** M7 — le superfici di tutti i mondi (generati a runtime); M1 — ponti della nave
+**Ultimo aggiornamento:** 2026-09-29 (pomeriggio) · **Traguardo corrente:** l'app di rilascio per il Mac (Shipping) in prova dall'utente; poi M7 — le superfici di tutti i mondi; M1 — ponti della nave
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -20,6 +20,7 @@
 | 2026-09-29 | 10,00 $ | 2,26 $ | abbandono nave e inchiesta (prove complete in gioco e fuori), ordini permanenti, finale d'arco, Game Master |
 | 2026-09-29 | 10,00 $ | 2,62 $ | memoria degli ufficiali, nebbia di guerra, disturbo e inganni del Mandato (comandante nemico che sceglie la guerra elettronica) |
 | 2026-09-29 | 10,00 $ | 2,70 $ | stile di comando del Capitano, rapporto post-azione, quadro cieco, controllore di volo, notizie da casa, prove offline dell'equipaggio |
+| 2026-09-29 | 10,00 $ | 2,79 $ | misure di prestazioni per l'app (la mente partiva anche nelle prove: ora `-astra_nomind`) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -329,6 +330,15 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
   - l'app non va lanciata dalla Scrivania: i processi figli (Python) chiederebbero a macOS il permesso per la cartella Scrivania. Per questo si installa in `~/Applications`, e i dati della mente sono copie (la chiave, chmod 600, mai su git) e cloni APFS (i modelli della voce), non collegamenti al repository;
   - dopo aver cambiato la chiave nel `.env`, rilancia `tools/pacchetto.sh` (o copia il `.env` in `~/Library/Application Support/ASTRA/`).
 - Cosa manca per distribuirla ad altri: firma e notarizzazione Apple (serve un account sviluppatore: vedi RICHIESTE se servirà), e uv e whisperkit-cli installati sul Mac di destinazione.
+- [x] **App di rilascio (Shipping, 2026-09-29)**: `tools/pacchetto.sh shipping` — codice ottimizzato, niente console né statistiche, stessa app in `~/Applications/ASTRA.app`.
+  - Mac: `Build/Mac/Resources/Info.Template.plist` (alta risoluzione Retina, frase del microfono, categoria giochi), identificativo `com.beltromatti.ASTRA`, versione 0.1.0, icona (`tools/art/app_icon.py`), niente sandbox (la mente è un processo figlio e parla in rete: il sandbox di Epic per Shipping, NoNet, la bloccherebbe).
+  - Immagine: schermo intero, sincronizzata con lo schermo, 60 fps al massimo; il 3D passa per TSR a metà della risoluzione Retina (1710x1107 sull'Air 15") e la risoluzione dinamica lo tiene nei 16,7 ms (dal 100% al 40%, sulla plancia sta al 50% con 2 ms di margine).
+  - Nel gioco Shipping non ci sono log (il motore installato dal Launcher non permette di riaccenderli); la mente scrive il suo in `~/Library/Application Support/Epic/ASTRA/Saved/Logs/astra-mind.log`.
+  - Il nome nel Dock e nella barra dei menu è «ASTRA» (UE lo prende dall'eseguibile, `ASTRA-Mac-Shipping`: `pacchetto.sh` corregge `CFBundleName` prima di firmare).
+  - **Avvio che si bloccava** (trovato provando l'app): se la finestra nasce a schermo intero, il motore aspetta senza limite (`FMacWindow::WaitForFullScreenTransition`) che macOS finisca la transizione, e macOS la fa solo per l'app attiva: aperta mentre un'altra app teneva il fuoco, restava al 100% di CPU prima ancora di caricare. Ora l'app nasce in finestra e va a schermo intero da sola appena è in primo piano (`Source/ASTRA/ASTRA.cpp`, `r.setres ...wf`, una volta sola; `-windowed` la tiene in finestra). Serve `Version=5` in `DefaultGameUserSettings.ini`: senza, il motore ignora la sezione quando crea la finestra (e usa il suo default, WindowedFullscreen).
+  - `SButton::SimulateClick` non esiste in Shipping (Invio nel menu ora chiama direttamente l'azione della prima voce).
+  - La mente spegne il suo server WhisperKit quando si chiude (segnale, 20 minuti senza gioco): prima restava orfano con il modello caricato (ne ho trovato uno vivo da 34 ore).
+  - Provata (2026-09-29): parte, disegna la plancia a 1710x1107 (screenshot fatto dal gioco stesso con `-astra_later="HighResShot 1"`), la mente si collega in ~20 s quando WhisperKit è già caldo; chiudendo il gioco si chiudono mente e WhisperKit; aperta in secondo piano non si blocca più (resta ferma finché non la porti davanti: `t.IdleWhenNotForeground`). I websocket di UE girano su un thread loro: stando in un'altra app la connessione con la mente resta viva.
 
 ## Equipaggio in movimento
 - [x] **La nave vive**: membri dell'equipaggio che fanno il loro giro (`AAstraWalker`, `tools/ue_scripts/place_walkers.py`): un marinaio in ciascun corridoio dietro la plancia, un'infermiera che passa tra i letti dell'infermeria, due addetti del ponte di volo tra gli stalli e le catapulte, un tecnico che gira attorno al pozzo del reattore. Personaggi con movimento vero (l'AnimBlueprint del manichino fonde fermo e camminata), soste a ogni tappa, divisa del reparto; se il Capitano sbarra loro la strada, dopo un po' tornano indietro
@@ -423,7 +433,7 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 2. **Altri ponti**: armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia; conversazioni sussurrate al tavolo degli alloggi.
 3. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
 4. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
-5. **Distribuzione, seconda parte**: un'icona per l'app, il menu iniziale provato dall'app, la firma per altri Mac (serve un account sviluppatore Apple).
+5. **Distribuzione, seconda parte**: la firma per altri Mac (serve un account sviluppatore Apple); un menu delle impostazioni grafiche nel gioco; una cache PSO registrata (niente scatti alla prima comparsa di un effetto).
 6. **M8, preparazione al multigiocatore**: progetto scritto in `docs/MULTIGIOCATORE.md`; primi passi senza rischi: la nave del giocatore come indice (non più `Ships[0]`) e la conoscenza dei sensori per osservatore.
 
 ## Come provarlo (per l'utente)
@@ -441,15 +451,25 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 11. Altri mondi: attraversa un Gate (o da console `astra.battle.arrive Cassia blue_white ice Cassia_Prime`), poi lancia un Falcon, punta il pianeta e premi **G**: ogni mondo ha la sua superficie (ghiaccio, deserto, crateri, lava, isole) e il suo campo d'atterraggio.
 
 12. **Il datapad**: premi **Tab** ovunque a bordo (a piedi): il Capitano solleva nella mano sinistra un tablet con condizione, posizione, scafo, scudi e calore, i contatti come li conoscono i sensori, fuoco, gruppi di volo, danni, ordini permanenti e le ultime parole sentite alla radio. Di nuovo Tab per abbassarlo.
-13. **L'app**: `tools/pacchetto.sh` costruisce e installa `~/Applications/ASTRA.app`; aprila come qualsiasi app (la prima volta la mente impiega circa un minuto a caricare le voci).
+13. **L'app**: `tools/pacchetto.sh shipping` costruisce e installa `~/Applications/ASTRA.app` (la build di rilascio; senza argomento: Development, con la console); aprila come qualsiasi app (la prima volta la mente impiega circa un minuto a caricare le voci). Esc apre il menu, Cmd+Q chiude.
 
 ## Note operative
 - **Campagna di sviluppo**: la partita creata dalle prove (2026-09-29) è stata spostata in `Saved/Campaign_prove_2026-09-29` (l'ultima prova l'aveva lasciata con l'Aquila al 2 %): alla prossima apertura il gioco propone una campagna nuova. Per riprenderla basta rinominare la cartella in `Saved/Campaign`.
 - Se UnrealBuildTool va in crash con «Segmentation fault» in `libUbaHost` (l'acceleratore di compilazione), basta rilanciare `tools/ricompila.sh`.
-- Prestazioni (2026-09-28, standalone 1080p, battaglia): ~19 ms di mediana (≈52 fps), limitate dalla GPU (~18,5 ms: luci 2,6, ombre 2,0, Lumen 1,6, traslucenza 1,4). Gli "scatti" da ~31 ms ogni ~12 frame non sono lavoro in più: la CPU, più veloce della GPU, si blocca in attesa delle query di occlusione (trovato con Unreal Insights da riga di comando: `-trace=cpu,frame` e `UnrealInsights -NoUI -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimingEvents ..."`). Per scendere serve ridurre il costo GPU. Diagnostica schermi: `astra.screens.profile 1`
+- **Prestazioni (2026-09-29, 1710x1107 come l'app sull'Air, risoluzione dinamica al 50%)**: plancia **15,1 ms** di mediana (p95 16,7; GPU 14,8), battaglia decisiva GPU 14,9 ms — prima 19,4 ms. Limite: la GPU (render thread e worker aspettano la GPU dentro la visibilità, dove tornano le query di occlusione: `stat dumpframe` lo mostra). Cosa ha contato:
+  - **TSR**: al livello antialiasing Epic la storia è al 200% dell'uscita (3420x2214): 2,5 ms. Ora `sg.AntiAliasingQuality=2` e `r.TSR.History.ScreenPercentage=100` in `Config/Mac/MacEngine.ini` (vince anche su un vecchio GameUserSettings).
+  - **Vetri** (M_ASTRA_Glass, traslucenza con luce per pixel): la cache di radianza di Lumen per i riflessi dei traslucidi costava 1 ms di marcatura delle sonde; spenta, differenza invisibile (confronto di screenshot: 1/255 di scarto medio).
+  - **Luci**: le locali senza ombre in un unico passaggio clustered (`r.UseClusteredDeferredShading_ToBeRemoved=1`): da 2,3 a 1,0 ms.
+  - **Schermi**: FCanvas apre un lotto nuovo a ogni cambio di tipo di elemento; `FPaint` ora accumula e disegna tessere, poi linee, poi testi: spariti gli scatti di 11 ms del ridisegno del Master (p95 da 31,6 a 20 ms).
+  - **Sole**: segue le virate a passi di 0,25° (ogni rotazione di una luce direzionale butta tutta la sua cache di ombre virtuali).
+  - Provati e scartati: ombre classiche al posto delle virtuali (+4 ms), bias di risoluzione delle ombre locali, query di occlusione spente (nessun guadagno).
+  - Su Metal i tempi per passaggio di `ProfileGPU` sono inaffidabili: passaggi consecutivi finiscono in una sola finestra di misura (il «VSM Log Stats And Status» da 4,5 ms era il TSR). Conviene confrontare il `GPUTime` totale del CSV tra due prove.
+  - Le ombre virtuali (2,3 ms) sono quasi tutte costo fisso di gestione (40 mappe: 17 livelli del sole e le facce delle luci locali): la cache funziona (49 pagine dinamiche ridisegnate a fotogramma, l'equipaggio animato).
+  - Nella build dell'editor uno shader visto per la prima volta blocca il render thread ~200 ms; nell'app gli shader sono cotti e macOS tiene le pipeline compilate nella sua cache Metal dopo il primo uso.
+  - Diagnostica schermi: `astra.screens.profile 1`; `astra.screens.skip 1` (schermi mai ridisegnati, per misurare).
 - **Nanite, lezioni dall'infermeria**: (1) un mesh Nanite con anche un solo slot traslucido (vetro) viene disegnato dalla sua *fallback* grossolana (errore ~1% delle dimensioni: 34 cm sul reparto: pannelli del soffitto esagonali, anelli "a punte"); `import_kit.py` ora lascia classici questi mesh, e reimportare non basta (gli slot vecchi restano): cancellare e reimportare. (2) I poligoni con più di 4 lati si triangolano all'esportazione (`astra_bpy.export_fbx`): l'importatore FBX perde triangoli sui poligoni con vertici allineati. (3) I materiali assegnati a runtime a mesh Nanite devono avere il flag d'uso Nanite (impostato su M_ASTRA_Screen/Hard/Emissive). Verifica: `r.Nanite.Visualize Triangles` (nero = non Nanite) e il log (`Invalid material ... Nanite`)
-- Le prestazioni si misurano solo col gioco standalone (`tools/perf/run_perf.sh <mappa> 1500 1920 1080 [-astra_medbay|-astra_mess|-astra_decisive|-astra_planet|-astra_world=Sistema+stella+tipo+Nome]`) e **con l'editor chiuso** (aperto ruba la GPU: le misure raddoppiano, 42 ms invece di 18): nel PIE l'editor usa la qualità Epic (Lumen alto, ~70 ms). Il riepilogo legge anche i CSV con l'intestazione in fondo (`[HasHeaderRowAtEnd]`, quando nuove statistiche compaiono durante la cattura)
-- **Pacchetto** (build di rilascio): i dati letti a runtime stanno in `Content/ASTRA/Data` (le luci di navigazione; `DefaultGame.ini` li mette sempre nel pacchetto come file sciolti); niente messaggi di debug per il giocatore (i sottotitoli e gli avvisi sono Slate). Ancora da fare per distribuire: la mente Python con le sue dipendenze accanto al gioco (oggi il gioco la avvia da `mind/` nel progetto).
+- Le prestazioni si misurano solo col gioco standalone (`tools/perf/run_perf.sh <mappa> 1500 1710 1107 [-astra_medbay|-astra_mess|-astra_decisive|-astra_planet|-astra_world=Sistema+stella+tipo+Nome]`; la mente non parte, `-astra_nomind`; `ASTRA_PERF_CMDS="cvar valore, ..."` per provare impostazioni; `-astra_later="stat dumpframe -ms=0.15"` o `-astra_later="HighResShot 1"` esegue comandi dopo 25 s, gli screenshot finiscono in `~/Library/Application Support/Epic/UnrealEngine/5.8/Saved/Screenshots/MacEditor`; servono almeno 2200 fotogrammi perché il gioco sia ancora aperto) e **con l'editor chiuso** (aperto ruba la GPU: le misure raddoppiano, 42 ms invece di 18): nel PIE l'editor usa la qualità Epic (Lumen alto, ~70 ms). Il riepilogo legge anche i CSV con l'intestazione in fondo (`[HasHeaderRowAtEnd]`, quando nuove statistiche compaiono durante la cattura)
+- **Pacchetto** (build di rilascio): i dati letti a runtime stanno in `Content/ASTRA/Data` (le luci di navigazione; `DefaultGame.ini` li mette sempre nel pacchetto come file sciolti); niente messaggi di debug per il giocatore (i sottotitoli e gli avvisi sono Slate). La mente viaggia nell'app (sezione Distribuzione).
 - Ricompilare il C++: `tools/ricompila.sh` (salva, chiude editor e menti, compila, riapre e aspetta l'MCP; log in Saved/Logs/build_last.log).
 - Console di prova: `astra.cmd <comando> <json con ' al posto di ">` esegue qualsiasi comando di bordo come farebbe l'equipaggio.
 - La sfera del cielo è opaca e ricentrata sulla camera: il suo raggio (≈490 km, scala 12000 di SM_SkySphere) è la distanza massima visibile. Prima era 16 km e nascondeva le navi lontane.

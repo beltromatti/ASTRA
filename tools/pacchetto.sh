@@ -27,6 +27,11 @@ DATA="$HOME/Library/Application Support/ASTRA"
 mkdir -p "$DATA/voice"
 [[ -f .env ]] && { rm -f "$DATA/.env"; cp .env "$DATA/.env"; chmod 600 "$DATA/.env"; }
 [[ -d voice/models ]] && { rm -rf "$DATA/voice/models"; cp -cR voice/models "$DATA/voice/models"; }
+# il nome nel Dock e nella barra dei menu: UE lo prende dall'eseguibile (ASTRA-Mac-Shipping nella build di rilascio)
+PL="$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName ASTRA" "$PL"
+/usr/libexec/PlistBuddy -c "Delete :CFBundleDisplayName" "$PL" 2>/dev/null
+/usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string ASTRA" "$PL"
 codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
 # installata in ~/Applications (fuori dalle cartelle protette: Scrivania, Documenti, Download)
 mkdir -p "$HOME/Applications"

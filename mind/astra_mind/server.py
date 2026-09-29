@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import os
+import signal
 import struct
 import sys
 import time
@@ -451,6 +452,7 @@ class Mind:
                 alone_since = time.monotonic()
             elif time.monotonic() - alone_since > 1200:
                 log.info("no game for 20 minutes: the mind stops")
+                self.stt.stop_server()
                 os._exit(0)
 
     async def _after_action(self, outcome: str, orders: list[str]) -> None:
@@ -851,8 +853,16 @@ class Mind:
         if text:
             await self.turns.put((text, lang))
 
+    def _quit(self, sig: int) -> None:
+        log.info("signal %d: the mind stops", sig)
+        self.stt.stop_server()
+        os._exit(0)
+
     async def serve(self) -> None:
         import websockets
+        # the game closing (or anyone stopping the mind) takes the speech server down with it
+        for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+            asyncio.get_running_loop().add_signal_handler(sig, self._quit, sig)
         await self.stt.start()
         asyncio.create_task(self.voice.run())
         asyncio.create_task(self.turn_worker())

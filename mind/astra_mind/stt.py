@@ -80,7 +80,16 @@ class WhisperKit:
         j = r.json()
         return (j.get("text") or "").strip(), (j.get("language") or language or "en")
 
-    async def close(self) -> None:
-        await self._client.aclose()
+    def stop_server(self) -> None:
+        """The server this mind started goes with it: a mind that stops must not leave the model loaded behind it (a
+        server found already running, started by someone else, is left alone)."""
         if self._proc and self._proc.poll() is None:
             self._proc.terminate()
+            try:
+                self._proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self._proc.kill()
+
+    async def close(self) -> None:
+        await self._client.aclose()
+        self.stop_server()

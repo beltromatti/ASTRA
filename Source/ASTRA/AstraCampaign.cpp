@@ -69,6 +69,10 @@ public:
 		TSharedRef<SVerticalBox> Items = SNew(SVerticalBox);
 		auto Item = [&](const FString& Label, const FString& Sub, FSimpleDelegate Do, int32 Index)
 		{
+			if (Index == 0)
+			{
+				FirstDo = Do;
+			}
 			Items->AddSlot().AutoHeight().Padding(0, 6)
 			[
 				SAssignNew(Buttons[Index], SButton)
@@ -136,9 +140,9 @@ public:
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Key) override
 	{
-		if (Key.GetKey() == EKeys::Enter && Buttons[0].IsValid())
+		if (Key.GetKey() == EKeys::Enter && FirstDo.IsBound())
 		{
-			Buttons[0]->SimulateClick();
+			Click(FirstDo, 0);   // (SButton::SimulateClick does not exist in Shipping)
 			return FReply::Handled();
 		}
 		return FReply::Unhandled();
@@ -146,6 +150,7 @@ public:
 
 private:
 	TSharedPtr<SButton> Buttons[3];
+	FSimpleDelegate FirstDo;     // Enter: the first item (resume, or continue the saved war)
 	bool bHasSave = false;
 	bool bNeedConfirm = false;   // a saved war is not thrown away with one click
 	bool bConfirmNew = false;

@@ -25,7 +25,7 @@ public class ASTRA : ModuleRules
 			"ProceduralMeshComponent"   // the ground of any world, generated at run time (AAstraWorldSurface)
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "RenderCore" });   // font measuring and render fences for the live screens
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "RenderCore", "ApplicationCore" });   // font measuring and render fences for the live screens; is the app in front (full screen on the Mac)
 
 		PublicIncludePaths.AddRange(new string[] {
 			"ASTRA",

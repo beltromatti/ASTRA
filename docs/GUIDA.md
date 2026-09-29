@@ -60,6 +60,10 @@ Un regista decide i passi della guerra (incursioni, richieste d'aiuto, indagini,
 in tre atti, fino a una **battaglia decisiva** che chiude l'arco; poi la guerra continua. Se perdi l'Aquila ci sono le
 capsule di salvataggio, un'inchiesta e un nuovo comando.
 
-## Giocare fuori dall'editor
-`tools/pacchetto.sh` costruisce e installa **`~/Applications/ASTRA.app`**. La prima volta la mente impiega circa un
-minuto a caricare le voci.
+## Giocare (l'app)
+Apri **`~/Applications/ASTRA.app`** (Spotlight: «ASTRA», oppure Finder → Vai → Inizio → Applicazioni). Parte a schermo
+intero a 60 fps; **Esc** apre il menu, **Cmd+Q** chiude il gioco (e la mente con lui).
+- Al primo avvio la mente impiega circa un minuto a caricare le voci: l'equipaggio parla quando è pronta.
+- La prima volta che tieni premuto **V** macOS chiede il permesso del microfono.
+- I salvataggi stanno in `~/Library/Application Support/Epic/ASTRA/Saved/Campaign` (l'app salva da sola).
+- Ricostruirla: `tools/pacchetto.sh shipping` (rilascio) oppure `tools/pacchetto.sh` (Development, con la console `~`).
