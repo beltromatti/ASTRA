@@ -422,7 +422,7 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 4. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
 5. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
 6. **Distribuzione, seconda parte**: il datapad nel pacchetto (dopo i permessi macOS), un'icona, il menu iniziale provato dall'app, la firma per altri Mac.
-7. **M8, preparazione al multigiocatore**: autorità del server, comandi come RPC, stato replicato (le menti restano sul server, la voce si sintetizza sui client).
+7. **M8, preparazione al multigiocatore**: progetto scritto in `docs/MULTIGIOCATORE.md`; primi passi senza rischi: la nave del giocatore come indice (non più `Ships[0]`) e la conoscenza dei sensori per osservatore.
 
 ## Come provarlo (per l'utente)
 1. `tools/avvia_editor.sh` (o apri ASTRA.uproject); il livello iniziale è la plancia (`L_Bridge`).
