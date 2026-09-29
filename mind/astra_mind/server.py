@@ -389,14 +389,31 @@ class Mind:
                 who = fallen[1].split("), ")[0].rstrip(")") + ")"
                 topic = f"{who}, who was killed aboard: what they were like, something they said or did"
                 pair = ["xo", random.choice(["ops", "tactical", "flight", "engineering"])]
+            # now and then one of them turns to the Captain instead: something personal, from what they remember of
+            # the Captain and how they stand (memory.py, the bonds) — a question, a thanks, a doubt; the Captain answers
+            mems = self.memory.lines()
+            personal = random.random() < (0.45 if (mems or self.director.bonds) else 0.2) and "Captain's quarters" not in str(st.get("captain", ""))
             self.voice.low_priority = True
             try:
-                t = await self.agent.handle_event(
-                    f"bridge: a quiet moment on watch", self.lang,
-                    ask=(f"A quiet moment: {pair[0]} and {pair[1]} exchange one or two short, natural lines about {topic}, "
-                         "in character, knowing the Captain can hear (they may include the Captain with a glance). No orders, "
-                         "no reports, no tools except speak; at most two lines in total."))
-                log.info("quiet moment (%s, %s): %s", pair[0], pair[1], " | ".join(f"{s}: {x}" for s, x in t.lines))
+                if personal:
+                    who = random.choice([k for k in ("xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight")
+                                         if k in mems or k in self.director.bonds] or ["xo", "helm", "sensors"])
+                    t = await self.agent.handle_event(
+                        f"bridge: a quiet moment on watch", self.lang,
+                        ask=(f"A quiet moment. {who} turns to the Captain, off the record, with one short personal line: "
+                             "something that officer has been meaning to say or ask — from what they remember of the Captain "
+                             "and of their conversations, from how they stand with the Captain, or from what the ship has "
+                             "lived through (a question about someone the Captain spoke of, a promise, a thanks, a doubt "
+                             "about an order, something about themselves). One line, human and specific, never a report; it "
+                             "invites an answer. Only speak, only that officer."))
+                    log.info("personal moment (%s): %s", who, " | ".join(f"{s}: {x}" for s, x in t.lines))
+                else:
+                    t = await self.agent.handle_event(
+                        f"bridge: a quiet moment on watch", self.lang,
+                        ask=(f"A quiet moment: {pair[0]} and {pair[1]} exchange one or two short, natural lines about {topic}, "
+                             "in character, knowing the Captain can hear (they may include the Captain with a glance). No orders, "
+                             "no reports, no tools except speak; at most two lines in total."))
+                    log.info("quiet moment (%s, %s): %s", pair[0], pair[1], " | ".join(f"{s}: {x}" for s, x in t.lines))
             finally:
                 self.voice.low_priority = False
 
