@@ -27,6 +27,11 @@
 #include "ASTRA.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "AstraMindSubsystem.h"
+#include "AstraScreensSubsystem.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/Character.h"
@@ -114,6 +119,7 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AASTRAPlayerController::OpenMenu);
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
 		InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AASTRAPlayerController::OnTypePressed);
+		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AASTRAPlayerController::TogglePad);
 		// the lift's panel (only while it is open)
 		auto Deck = [this](const FKey& K, int32 N)
 		{
@@ -328,12 +334,62 @@ void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
 	}
 }
 
+void AASTRAPlayerController::TickPad(float DeltaTime)
+{
+	// held up in the left hand below the line of sight, tilted to face the eye; only on foot (a Falcon has its own
+	// instruments). Its page is painted only while it is up.
+	ACharacter* Me = Cast<ACharacter>(GetPawn());
+	PadAlpha = FMath::FInterpConstantTo(PadAlpha, (bPadUp && Me) ? 1.f : 0.f, DeltaTime, 4.f);
+	UAstraScreensSubsystem* Screens = GetWorld() ? GetWorld()->GetSubsystem<UAstraScreensSubsystem>() : nullptr;
+	if (Screens)
+	{
+		Screens->SetPadVisible(PadAlpha > 0.f);
+	}
+	UCameraComponent* Cam = Me ? Me->FindComponentByClass<UCameraComponent>() : nullptr;
+	if (PadAlpha <= 0.f || !Cam)
+	{
+		if (PadMesh)
+		{
+			PadMesh->SetVisibility(false);
+		}
+		return;
+	}
+	if (!PadMesh || PadMesh->GetOwner() != Me)
+	{
+		if (PadMesh)
+		{
+			PadMesh->DestroyComponent();
+		}
+		PadMesh = NewObject<UStaticMeshComponent>(Me, TEXT("CaptainDatapad"));
+		PadMesh->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Kit/Props/SM_PROP_Datapad.SM_PROP_Datapad")));
+		PadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		PadMesh->SetCastShadow(false);
+		PadMesh->SetupAttachment(Cam);
+		PadMesh->RegisterComponent();
+		const int32 Slot = PadMesh->GetMaterialIndex(TEXT("MI_PAD_Screen"));
+		UTextureRenderTarget2D* Page = Screens ? Screens->GetPadTarget() : nullptr;
+		if (Slot != INDEX_NONE && Page)
+		{
+			if (UMaterialInstanceDynamic* M = PadMesh->CreateDynamicMaterialInstance(Slot))
+			{
+				M->SetTextureParameterValue(TEXT("ScreenTexture"), Page);
+			}
+		}
+	}
+	const float A = FMath::InterpEaseInOut(0.f, 1.f, PadAlpha, 2.f);
+	const FVector Down(20.f, -14.f, -44.f), Up(27.f, -5.f, -8.5f);
+	const FQuat RDown = FRotator(-70.f, -10.f, 8.f).Quaternion(), RUp = FRotator(-17.f, -10.f, 3.f).Quaternion();
+	PadMesh->SetRelativeLocationAndRotation(FMath::Lerp(Down, Up, A), FQuat::Slerp(RDown, RUp, A));
+	PadMesh->SetVisibility(true);
+}
+
 namespace
 {
 	const TCHAR* HelpCard =
 		TEXT("ON THE BRIDGE\n")
 		TEXT("  V (hold)        talk to the crew, in any language\n")
 		TEXT("  T               type to the crew instead (Enter sends, Esc cancels)\n")
+		TEXT("  Tab             the datapad: the ship at a glance, anywhere aboard\n")
 		TEXT("  E               stand up / sit down · doors · the lift\n")
 		TEXT("  WASD, mouse     walk and look\n")
 		TEXT("  Esc             pause · save · menu\n")
@@ -635,6 +691,7 @@ void AASTRAPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
 	TickSubtitles(DeltaTime);
+	TickPad(DeltaTime);
 	if (!StoryWidget.IsValid())
 	{
 		return;

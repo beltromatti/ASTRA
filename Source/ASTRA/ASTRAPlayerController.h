@@ -84,6 +84,13 @@ protected:
 	/** Console: pick a deck on the open lift panel (1 bridge, 2 engineering, 3 flight deck). */
 	UFUNCTION(Exec) void AstraDeck(int32 N) { if (LiftMenu.IsValid()) { ChooseDeck(N); } }
 	void ShowHelp(bool bShow);
+	/** Tab: the Captain's datapad, raised in the left hand anywhere aboard (the ship at a glance), or lowered. */
+	void TogglePad() { bPadUp = !bPadUp; }
+	UFUNCTION(Exec) void AstraPad() { TogglePad(); }
+	void TickPad(float DeltaTime);
+	UPROPERTY() TObjectPtr<class UStaticMeshComponent> PadMesh;
+	bool bPadUp = false;
+	float PadAlpha = 0.f;
 	/** T: a line typed to the crew instead of spoken (the voice is never required); Enter sends it, Esc cancels. */
 	void OnTypePressed();   // opens the line on the next tick (the T itself must not land in the box)
 	/** Test of the typed line through Slate itself: opens it, types the text key by key, presses Enter. */

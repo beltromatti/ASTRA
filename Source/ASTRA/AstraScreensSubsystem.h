@@ -42,8 +42,13 @@ public:
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 
 	void DrawPage(const FString& Name, UCanvas* Canvas, int32 Width, int32 Height);
+	/** The Captain's datapad: its live page (painted only while it is raised). */
+	class UTextureRenderTarget2D* GetPadTarget();
+	void SetPadVisible(bool bVisible);
 
 private:
+	bool bPadVisible = false;
+	void DrawPad(UCanvas* C, int32 W, int32 H);
 	UPROPERTY() TArray<TObjectPtr<UAstraScreenPage>> Pages;
 	UPROPERTY() TObjectPtr<UFont> TitleFont;
 	UPROPERTY() TObjectPtr<UFont> MonoFont;

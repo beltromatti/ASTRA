@@ -58,3 +58,6 @@ art/export/
 
 # Epic template content (placeholders, re-copied by tools/setup_epic_content.sh)
 Content/Characters/
+
+# App costruita da tools/pacchetto.sh
+Packaged/

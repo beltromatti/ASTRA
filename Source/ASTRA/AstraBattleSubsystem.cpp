@@ -1538,6 +1538,24 @@ bool UAstraBattleSubsystem::PlayerCeaseFire(FString& OutDetail)
 	return true;
 }
 
+FString UAstraBattleSubsystem::FlightLine() const
+{
+	TArray<FString> Out;
+	for (int32 i = 0; i < Squadrons.Num(); ++i)
+	{
+		const FAstraSquadron& Q = Squadrons[i];
+		if (Q.Side != EAstraSide::Astra)
+		{
+			continue;
+		}
+		const int32 Up = AirborneCount(i);
+		Out.Add(Up > 0 ? FString::Printf(TEXT("%s %d UP · %s"), *Q.Name.ToUpper(), Up, *Q.Mission.ToUpper())
+		        : Q.RearmT > 0.f ? FString::Printf(TEXT("%s REARMING %.0fS"), *Q.Name.ToUpper(), Q.RearmT)
+		                         : FString::Printf(TEXT("%s %d ON DECK"), *Q.Name.ToUpper(), Q.OnDeck));
+	}
+	return FString::Join(Out, TEXT("   "));
+}
+
 UAstraBattleSubsystem::FFireControl UAstraBattleSubsystem::GetFireControl() const
 {
 	FFireControl F;

@@ -13,6 +13,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
+#include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
 #include "IWebSocket.h"
 #include "Misc/Paths.h"
@@ -81,6 +82,13 @@ void UAstraMindSubsystem::Deinitialize()
 	{
 		GActiveMind = nullptr;
 	}
+#if !WITH_EDITOR
+	// a packaged game takes its mind with it (in the editor it stays up between play sessions: its voices load slowly)
+	if (MindProc.IsValid() && FPlatformProcess::IsProcRunning(MindProc))
+	{
+		FPlatformProcess::TerminateProc(MindProc, true);
+	}
+#endif
 	Super::Deinitialize();
 }
 
@@ -155,11 +163,29 @@ void UAstraMindSubsystem::Connect()
 void UAstraMindSubsystem::LaunchMind()
 {
 	bLaunchedMind = true;
-	const FString MindDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("mind"));
-	const FString LogFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Logs/astra-mind.log"));
-	const FString Cmd = FString::Printf(TEXT("-lc \"cd '%s' && exec uv run astra-mind >> '%s' 2>&1\""), *MindDir, *LogFile);
-	FProcHandle H = FPlatformProcess::CreateProc(TEXT("/bin/zsh"), *Cmd, true, true, true, nullptr, 0, nullptr, nullptr);
-	UE_LOG(LogASTRA, Log, TEXT("[Mind] launched astra-mind (%s)"), H.IsValid() ? TEXT("ok") : TEXT("FAILED"));
+	FString MindDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("mind"));
+	const FString Saved = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+	const FString LogFile = Saved / TEXT("Logs/astra-mind.log");
+	IFileManager::Get().MakeDirectory(*(Saved / TEXT("Logs")), true);
+	// the game's Saved folder is where the campaign lives: the mind keeps the war and the story beside it
+	FString Env = FString::Printf(TEXT("ASTRA_SAVED='%s' "), *Saved);
+	if (!FPaths::FileExists(MindDir / TEXT("pyproject.toml")))
+	{
+		// a packaged game: the mind travels inside the app bundle (Contents/Resources/mind); its own data (the key, the
+		// voice models, its Python environment, caches) lives in Application Support/ASTRA
+		MindDir = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::GetPath(FString(FPlatformProcess::ExecutablePath())), TEXT("../Resources/mind")));
+#if PLATFORM_MAC
+		const FString Home = FPlatformMisc::GetEnvironmentVariable(TEXT("HOME")) / TEXT("Library/Application Support/ASTRA");
+#else
+		const FString Home = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPlatformProcess::UserSettingsDir(), TEXT("ASTRA")));
+#endif
+		IFileManager::Get().MakeDirectory(*Home, true);
+		Env += FString::Printf(TEXT("ASTRA_HOME='%s' UV_PROJECT_ENVIRONMENT='%s/venv' "), *Home, *Home);
+	}
+	const FString Cmd = FString::Printf(TEXT("-lc \"cd '%s' && %sexec uv run --frozen astra-mind >> '%s' 2>&1\""), *MindDir, *Env, *LogFile);
+	UE_LOG(LogASTRA, Log, TEXT("[Mind] starting the mind from %s"), *MindDir);
+	MindProc = FPlatformProcess::CreateProc(TEXT("/bin/zsh"), *Cmd, true, true, true, nullptr, 0, nullptr, nullptr);
+	UE_LOG(LogASTRA, Log, TEXT("[Mind] launched astra-mind (%s)"), MindProc.IsValid() ? TEXT("ok") : TEXT("FAILED"));
 }
 
 namespace
@@ -363,6 +389,11 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GameWorld(), 0)))
 			{
 				PC->Subtitle(Id, Msg->GetStringField(TEXT("speaker")), T->Key, T->Value);
+			}
+			HeardLines.Add(*T);
+			if (HeardLines.Num() > 12)
+			{
+				HeardLines.RemoveAt(0);
 			}
 			LineTexts.Remove(Id);
 		}

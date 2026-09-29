@@ -4,6 +4,19 @@ Qui scrivo solo ciò che **non posso fare io** (per regole di sicurezza: creare 
 
 ## Aperte
 
+### 2026-09-29 — Finestre di permesso di macOS in sospeso (quando torni, 1 minuto)
+Provando la prima app pacchettizzata di ASTRA dalla cartella del progetto sul Desktop, i processi Python della mente
+hanno chiesto a macOS di accedere alla **Scrivania**. Sul tuo schermo ci sono probabilmente una o più finestre
+«… vorrebbe accedere ai file nella cartella Scrivania» (per **Python**, forse per **dotnet**/UnrealBuildTool o per **ASTRA**).
+Io non posso rispondere a finestre di permesso di sistema.
+- Finché restano aperte, macOS mette in coda altre richieste: **la compilazione del C++ è ferma** (UnrealBuildTool resta
+  in attesa). Nel frattempo lavoro su ciò che non richiede di compilare.
+- Cosa fare: rispondi alle finestre. **Consenti** per Python/dotnet (sono gli strumenti di sviluppo che già usano il
+  progetto sul Desktop); per ASTRA puoi anche negare, perché d'ora in poi l'app si installa in `~/Applications` e tiene
+  i suoi dati in `~/Library/Application Support/ASTRA`, fuori dalle cartelle protette.
+- Poi scrivimi "permessi fatti" (o riavvia semplicemente la sessione): riprendo a compilare e pubblico il datapad.
+
+
 ### 2026-09-28 — Autorizzare l'account Epic nell'editor per i MetaHuman (una volta, 1 minuto)
 Per trasformare l'equipaggio da manichini a **MetaHuman** realistici, Unreal usa il servizio Epic di *auto-rigging* dei volti:
 richiede che tu autorizzi una volta il tuo account Epic nell'editor (io non posso accedere né concedere autorizzazioni).

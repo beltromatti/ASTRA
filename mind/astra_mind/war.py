@@ -16,7 +16,9 @@ from typing import Any
 
 log = logging.getLogger("astra.war")
 
-SAVE_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "Saved", "Campaign"))
+from .env import SAVED
+
+SAVE_DIR = str(SAVED / "Campaign")          # the game's own Saved/Campaign: the war and the story live beside its save
 
 OWNERS = ("astra", "mandate", "guilds", "contested", "silent")
 

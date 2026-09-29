@@ -434,6 +434,8 @@ public:
 		float TargetRangeKm = 0.f;
 	};
 	FFireControl GetFireControl() const;
+	/** The Aquila's flight groups at a glance ("ALPHA 6 UP · CAP   BRAVO 7 ON DECK   DRONES REARMING"). */
+	FString FlightLine() const;
 	float PlayerShieldFraction() const { return Ships.Num() ? Ships[0].Shield / Ships[0].ShieldMax : 1.f; }
 	bool IsScenarioOver() const { return bScenarioOver; }
 

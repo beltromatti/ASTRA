@@ -1529,6 +1529,37 @@ FString UAstraShipSubsystem::CaptainAboard() const
 	return TEXT("on the bridge");
 }
 
+FString UAstraShipSubsystem::CaptainPlace() const
+{
+	if (!CaptainPlanetside.IsEmpty())
+	{
+		return TEXT("PLANETSIDE");
+	}
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (P && !P->IsA<ACharacter>())
+	{
+		return TEXT("FLIGHT · IN A FALCON");
+	}
+	for (TActorIterator<AAstraHangar> It(GetWorld()); It && P; ++It)
+	{
+		if (It->IsPawnInEngineering(P)) { return TEXT("DECK 7 · MAIN ENGINEERING"); }
+		if (It->IsPawnInMess(P)) { return TEXT("DECK 4 · MESS HALL"); }
+		if (It->IsPawnInMedbay(P)) { return TEXT("DECK 6 · MEDBAY"); }
+		if (It->IsPawnInHangar(P)) { return TEXT("DECK 9 · FLIGHT DECK"); }
+	}
+	for (TActorIterator<AAstraQuarters> It(GetWorld()); It && P; ++It)
+	{
+		if (It->IsPawnInside(P)) { return TEXT("DECK 1 · CAPTAIN'S QUARTERS"); }
+	}
+	if (P && P->GetActorLocation().Z < -3000.f)
+	{
+		return TEXT("DECK 9 · FLIGHT DECK");
+	}
+	// the bridge proper spans about 20 m around its centre; beyond it, the corridors of Deck 1
+	return (P && FMath::Abs(P->GetActorLocation().X) < 1000.f && FMath::Abs(P->GetActorLocation().Y) < 700.f) ? TEXT("BRIDGE")
+	                                                                                                          : TEXT("DECK 1 · CORRIDORS");
+}
+
 void UAstraShipSubsystem::Event(const FString& Text, bool bReport)
 {
 	UE_LOG(LogASTRA, Log, TEXT("[Event]%s %s"), bReport ? TEXT(" (report)") : TEXT(""), *Text);
@@ -1571,6 +1602,21 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	if (Name == TEXT("transit_gate"))
 	{
 		return Battle ? Battle->BeginGateRun(Args, OutDetail) : false;
+	}
+	if (Name == TEXT("standing_orders"))
+	{
+		// the mind keeps the Captain's standing orders; the datapad shows them
+		StandingOrders.Reset();
+		const TArray<TSharedPtr<FJsonValue>>* L = nullptr;
+		if (Args.IsValid() && Args->TryGetArrayField(TEXT("orders"), L))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *L)
+			{
+				StandingOrders.Add(V->AsString());
+			}
+		}
+		OutDetail = FString::Printf(TEXT("%d standing order(s) on the Captain's datapad"), StandingOrders.Num());
+		return true;
 	}
 	if (Name == TEXT("log_entry"))
 	{

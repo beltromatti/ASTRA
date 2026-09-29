@@ -172,6 +172,10 @@ public:
 	void PublishEvent(const FString& Text, bool bReport) { Event(Text, bReport); }
 	/** Where the Captain is aboard, for the crew ("on the bridge", "on the flight deck"...). */
 	FString CaptainAboard() const;
+	/** The same, as the Captain's datapad writes it ("DECK 4 · MESS HALL"). */
+	FString CaptainPlace() const;
+	/** The Captain's standing orders in force ("tactical: weapons free on hostiles inside 10 km"), from the crew's mind. */
+	const TArray<FString>& GetStandingOrders() const { return StandingOrders; }
 
 	/** The Captain is on (or over) New Ravenna: the surface zone's sky, sky light, clouds and ground replace space
 	 *  (the war goes on up there). The zone lies 1000 km below the bridge in the same world. */
@@ -243,6 +247,7 @@ private:
 	TMap<FString, FString> Squadrons;
 	TArray<FAstraContact> Contacts;
 	TArray<FString> RecentEvents;
+	TArray<FString> StandingOrders;
 	TArray<FAstraDamage> Damage;      // open incidents inside the hull
 	FString LocationName = TEXT("Aurelia System, en route to New Ravenna high orbit");
 	FString SystemName = TEXT("Aurelia");

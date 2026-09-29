@@ -13,11 +13,11 @@ from pathlib import Path
 
 import httpx
 
-from .env import REPO_ROOT
+from .env import HOME
 
 log = logging.getLogger("astra.stt")
 
-MODEL_DIR = REPO_ROOT / "voice" / "models" / "models" / "argmaxinc" / "whisperkit-coreml" / "openai_whisper-large-v3-v20240930_turbo"
+MODEL_DIR = HOME / "voice" / "models" / "models" / "argmaxinc" / "whisperkit-coreml" / "openai_whisper-large-v3-v20240930_turbo"
 PORT = 50060
 GLOSSARY = ("ASN Aquila, Kharon Mandate, Janus Gate, Keeper Station, New Ravenna, Port Aurelius, Aurelia, Tiberius, "
             "Ceres Belt, Vulcan, Teal Veil, Serra, Ferri, Voss, Tanaka, Martin, Nair, Mensah, Price, Kovac, Okonkwo, "

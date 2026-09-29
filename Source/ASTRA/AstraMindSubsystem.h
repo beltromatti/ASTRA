@@ -40,6 +40,7 @@ private:
 	double NextConnectTime = 0.0;
 	double NextStateTime = 0.0;
 	bool bLaunchedMind = false;
+	FProcHandle MindProc;   // the mind this game started (a packaged game stops it when it quits)
 	FString PendingCampaign;   // sent once connected
 	double LastStateSent = 0.0;
 	TArray<TSharedRef<FJsonObject>> PendingEvents;   // reports raised before the mind was reachable
@@ -65,4 +66,9 @@ private:
 
 public:
 	UWorld* GameWorld() const;
+	/** The last lines the crew spoke (name, text), as heard: the Captain's datapad keeps a comms log. */
+	const TArray<TPair<FString, FString>>& GetHeardLines() const { return HeardLines; }
+
+private:
+	TArray<TPair<FString, FString>> HeardLines;
 };

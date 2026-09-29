@@ -30,7 +30,7 @@ from .crew import CREW
 from .enemy import COMMANDERS, EnemyAgent
 from .router import route
 from .director import ADMIRAL, Director
-from .env import REPO_ROOT
+from .env import CACHE
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
 from .stt import WhisperKit
@@ -226,7 +226,7 @@ class Mind:
         self.turns: asyncio.Queue = asyncio.Queue()
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.captain_t = 0.0                     # the last time the Captain spoke
-        self.lang_file = REPO_ROOT / "mind" / ".cache" / "captain_lang.txt"
+        self.lang_file = CACHE / "captain_lang.txt"
         self.lang = self.lang_file.read_text().strip() if self.lang_file.exists() else "en"   # the Captain's language
 
     async def _sink(self, kind: str, payload: Any) -> None:
@@ -416,6 +416,36 @@ class Mind:
                     log.info("quiet moment (%s, %s): %s", pair[0], pair[1], " | ".join(f"{s}: {x}" for s, x in t.lines))
             finally:
                 self.voice.low_priority = False
+
+    async def idle_exit(self) -> None:
+        """A mind nobody has talked to for 20 minutes goes (a game that crashed or quit does not leave it running)."""
+        alone_since = time.monotonic()
+        while True:
+            await asyncio.sleep(30)
+            if self.clients:
+                alone_since = time.monotonic()
+            elif time.monotonic() - alone_since > 1200:
+                log.info("no game for 20 minutes: the mind stops")
+                os._exit(0)
+
+    async def standing_sync(self) -> None:
+        """The Captain's datapad lists the standing orders in force: the game gets them whenever they change (and
+        again whenever it reconnects)."""
+        sent: tuple[Any, str] = (None, "")
+        while True:
+            await asyncio.sleep(3)
+            game = self.game if (self.game and self.game.state) else None
+            if not game:
+                continue
+            now = json.dumps(self.agent.standing, ensure_ascii=False)
+            if sent == (game, now):
+                continue
+            try:
+                await game.execute("standing_orders", {"orders": [f"{o['department']}: {o['order']}" for o in self.agent.standing]},
+                                   "captain")
+                sent = (game, now)                   # (a game that does not know the command is not asked again)
+            except Exception:  # noqa: BLE001
+                log.exception("could not send the standing orders")
 
     async def enemy_tactics(self) -> None:
         """The Mandate fights with its head: while its strike group is attacking, its senior commander reads the battle
@@ -760,6 +790,8 @@ class Mind:
         asyncio.create_task(self.mess_talk())
         asyncio.create_task(self.tactical_watch())
         asyncio.create_task(self.enemy_tactics())
+        asyncio.create_task(self.standing_sync())
+        asyncio.create_task(self.idle_exit())
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
@@ -826,7 +858,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="astra-mind")
     ap.add_argument("--say", help="one utterance against the local ship model")
     ap.add_argument("--script", help="file with one utterance per line")
-    ap.add_argument("--out", default=str(REPO_ROOT / "mind" / ".cache" / "turns"))
+    ap.add_argument("--out", default=str(CACHE / "turns"))
     ap.add_argument("--check-audio", action="store_true", help="re-transcribe every generated line (voice QA)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()

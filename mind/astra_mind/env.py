@@ -6,12 +6,18 @@ from functools import lru_cache
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# A packaged game launches the mind from inside its app bundle with ASTRA_HOME (the mind's own data: the key, the voice
+# models, caches — in Application Support) and ASTRA_SAVED (the game's Saved folder, where the campaign lives). Run from
+# the repository, both are the repository itself.
+HOME = Path(os.environ["ASTRA_HOME"]) if os.environ.get("ASTRA_HOME") else REPO_ROOT
+SAVED = Path(os.environ["ASTRA_SAVED"]) if os.environ.get("ASTRA_SAVED") else REPO_ROOT / "Saved"
+CACHE = HOME / "cache" if os.environ.get("ASTRA_HOME") else REPO_ROOT / "mind" / ".cache"
 
 
 @lru_cache(maxsize=1)
 def load_env() -> dict[str, str]:
     values: dict[str, str] = {}
-    env_file = REPO_ROOT / ".env"
+    env_file = HOME / ".env"
     if env_file.exists():
         for raw in env_file.read_text(encoding="utf-8").splitlines():
             line = raw.strip()
