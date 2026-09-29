@@ -420,12 +420,11 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 
 ## Prossimi passi
 1. **Sensori, terza parte**: pianeti e stazioni che coprono la linea di vista.
-2. **Altri ponti**: alloggi dell'equipaggio (pronti, da importare), armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia.
-3. **Fuori dalla plancia**: un dispositivo da polso (allarmi, stato della nave, ordini permanenti) quando il Capitano è altrove.
-4. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
-5. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
-6. **Distribuzione, seconda parte**: il datapad nel pacchetto (dopo i permessi macOS), un'icona, il menu iniziale provato dall'app, la firma per altri Mac.
-7. **M8, preparazione al multigiocatore**: progetto scritto in `docs/MULTIGIOCATORE.md`; primi passi senza rischi: la nave del giocatore come indice (non più `Ships[0]`) e la conoscenza dei sensori per osservatore.
+2. **Altri ponti**: armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia; conversazioni sussurrate al tavolo degli alloggi.
+3. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
+4. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
+5. **Distribuzione, seconda parte**: un'icona per l'app, il menu iniziale provato dall'app, la firma per altri Mac (serve un account sviluppatore Apple).
+6. **M8, preparazione al multigiocatore**: progetto scritto in `docs/MULTIGIOCATORE.md`; primi passi senza rischi: la nave del giocatore come indice (non più `Ships[0]`) e la conoscenza dei sensori per osservatore.
 
 ## Come provarlo (per l'utente)
 1. `tools/avvia_editor.sh` (o apri ASTRA.uproject); il livello iniziale è la plancia (`L_Bridge`).
