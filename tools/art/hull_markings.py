@@ -55,6 +55,9 @@ def hull_name(name: str, number: str, out: str) -> None:
 def main() -> None:
     os.makedirs(OUT, exist_ok=True)
     hull_name("ASN AQUILA", "CVC-01", os.path.join(OUT, "T_HULL_Name_Aquila.png"))
+    # the sisters that carry her name after a loss (the Captain's new command): CVC-03, then -04, -05
+    for n in (3, 4, 5):
+        hull_name("ASN AQUILA", f"CVC-0{n}", os.path.join(OUT, f"T_HULL_Name_Aquila_0{n}.png"))
     print("hull markings ->", OUT)
 
 

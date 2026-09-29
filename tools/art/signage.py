@@ -93,14 +93,15 @@ def main():
         plate(1024, 192, name, f"DECK 1 · BRIDGE · STATION {i + 1:02d}", DEPT[sid]).save(os.path.join(OUT, f"T_SIGN_{sid.capitalize()}.png"))
     # the ship's name plate: the emblem, the name, the line
     w, h = 2048, 512
-    img = Image.new("RGBA", (w, h), (*PLATE, 255))
-    d = ImageDraw.Draw(img)
-    d.rectangle((0, 0, w - 1, h - 1), outline=(40, 46, 56, 255), width=6)
-    em = emblem(420, ICE)
-    img.alpha_composite(em, (46, 46))
-    d.text((530, 250), "ASN AQUILA", font=font(TITLE, 250), fill=(*ICE, 255), anchor="lm")
-    d.text((538, 420), "CVC-01 · CARRIER CRUISER · 7TH FLEET", font=font(MONO, 50), fill=(*DIM, 255), anchor="lm")
-    img.filter(ImageFilter.GaussianBlur(0.5)).save(os.path.join(OUT, "T_SIGN_Aquila.png"))
+    for hull, suffix in (("CVC-01", ""), ("CVC-03", "_03"), ("CVC-04", "_04"), ("CVC-05", "_05")):
+        img = Image.new("RGBA", (w, h), (*PLATE, 255))
+        d = ImageDraw.Draw(img)
+        d.rectangle((0, 0, w - 1, h - 1), outline=(40, 46, 56, 255), width=6)
+        em = emblem(420, ICE)
+        img.alpha_composite(em, (46, 46))
+        d.text((530, 250), "ASN AQUILA", font=font(TITLE, 250), fill=(*ICE, 255), anchor="lm")
+        d.text((538, 420), f"{hull} · CARRIER CRUISER · 7TH FLEET", font=font(MONO, 50), fill=(*DIM, 255), anchor="lm")
+        img.filter(ImageFilter.GaussianBlur(0.5)).save(os.path.join(OUT, f"T_SIGN_Aquila{suffix}.png"))
     for side, word, direction in (("Port", "PORT", -1), ("Starboard", "STARBOARD", 1)):
         p = plate(1024, 256, "CORRIDOR 1-A", f"{word} · DECK 1 · TO THE SPINE", (230, 230, 240))
         pd = ImageDraw.Draw(p)

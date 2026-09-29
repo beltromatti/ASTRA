@@ -332,7 +332,7 @@ void UAstraScreensSubsystem::DrawMaster(UCanvas* C, int32 W, int32 H)
 	}
 	FPaint P{C, TitleFont, MonoFont, Time};
 	P.Rect(0, 0, W, H, BG);
-	P.Header(W, TEXT("ASN Aquila · Master Systems Display"), TEXT("CVC-01 · AQUILA CLASS · 780 M"), COMMAND);
+	P.Header(W, TEXT("ASN Aquila · Master Systems Display"), FString::Printf(TEXT("%s · AQUILA CLASS · 780 M"), Ship ? *Ship->GetHullNumber() : TEXT("CVC-01")), COMMAND);
 
 	// damage control board: decks 1-12 x sections A-H
 	P.Text(40, 58, TEXT("DAMAGE CONTROL"), false, 22, CYAN);
@@ -819,7 +819,9 @@ void UAstraScreensSubsystem::DrawMess(UCanvas* C, int32 W, int32 H, const FStrin
 		// the Aquila's dead, by name: the whole ship passes this wall at every meal
 		P.Rect(0, 0, W, H, RGB(3, 6, 12));
 		P.Text(W * 0.5f, 26, TEXT("IN MEMORIAM"), false, 96, TEXTC, 1);
-		P.Text(W * 0.5f, 142, TEXT("ASN AQUILA  \u00B7  CVC-01  \u00B7  THEY GAVE THEIR LIVES FOR THE AURELIA MARCH"), true, 22, DIM, 1);
+		P.Text(W * 0.5f, 142, Ship && Ship->GetHullNumber() != TEXT("CVC-01")
+			? FString::Printf(TEXT("ASN AQUILA  \u00B7  CVC-01 AND %s  \u00B7  THEY GAVE THEIR LIVES FOR THE AURELIA MARCH"), *Ship->GetHullNumber())
+			: FString(TEXT("ASN AQUILA  \u00B7  CVC-01  \u00B7  THEY GAVE THEIR LIVES FOR THE AURELIA MARCH")), true, 22, DIM, 1);
 		P.Line(W * 0.22f, 186, W * 0.78f, 186, DIM, 2.f);
 		const FAstraCrewRoster& R = Ship->GetRoster();
 		const TArray<int32>& Fallen = R.GetFallen();

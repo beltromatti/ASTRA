@@ -336,7 +336,13 @@ void UAstraCampaignSubsystem::Begin(const FString& Mode)
 		// the first watch aboard the new Aquila: the scene opens in the dark on her name
 		if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GetWorld(), 0)))
 		{
-			PC->StoryCard(TEXT("ASN AQUILA"), TEXT("CVC-03 · NEW RAVENNA FLEET YARDS · THE CAPTAIN'S NEW COMMAND"), 4.f, false, true);
+			FString Hull = TEXT("CVC-03");
+			const TSharedPtr<FJsonObject>* ShipSave = nullptr;
+			if (Save->TryGetObjectField(TEXT("ship"), ShipSave))
+			{
+				(*ShipSave)->TryGetStringField(TEXT("hull_number"), Hull);
+			}
+			PC->StoryCard(TEXT("ASN AQUILA"), FString::Printf(TEXT("%s · NEW RAVENNA FLEET YARDS · THE CAPTAIN'S NEW COMMAND"), *Hull), 4.f, false, true);
 		}
 	}
 	if (Save.IsValid() && Battle && Ship)
@@ -407,6 +413,10 @@ void UAstraCampaignSubsystem::NewCommand(const FString& System)
 	O->SetStringField(TEXT("saved"), TEXT("NEW COMMAND"));
 	TSharedRef<FJsonObject> S = Ship->SaveJson();
 	S->SetStringField(TEXT("system"), System.IsEmpty() ? TEXT("Aurelia") : System);
+	// the sister that takes her name: CVC-03 after the first Aquila, then the next (the yards have built up to -05)
+	const FString Old = Ship->GetHullNumber();
+	const int32 Next = Old == TEXT("CVC-01") ? 3 : FMath::Min(5, FCString::Atoi(*Old.Right(2)) + 1);
+	S->SetStringField(TEXT("hull_number"), FString::Printf(TEXT("CVC-%02d"), Next));
 	S->SetArrayField(TEXT("wounded"), {});
 	S->SetArrayField(TEXT("medbay"), {});
 	S->RemoveField(TEXT("heat_pct"));

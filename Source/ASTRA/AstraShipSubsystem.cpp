@@ -598,7 +598,52 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::SaveJson() const
 	O->SetNumberField(TEXT("radiator_health"), RadiatorHealth);
 	O->SetNumberField(TEXT("coolant_vents"), CoolantVents);
 	O->SetStringField(TEXT("casualties"), Roster.Summary());
+	O->SetStringField(TEXT("hull_number"), HullNumber);
 	return O;
+}
+
+void UAstraShipSubsystem::ApplyHullNumber()
+{
+	if (HullNumber == TEXT("CVC-01") || !GetWorld())
+	{
+		return;
+	}
+	const FString Suffix = FString::Printf(TEXT("_%s"), *HullNumber.Right(2));
+	UTexture2D* HullTex = LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Materials/Textures/T_HULL_Name_Aquila%s.T_HULL_Name_Aquila%s"), *Suffix, *Suffix));
+	UTexture2D* SignTex = LoadObject<UTexture2D>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/UI/Signage/T_SIGN_Aquila%s.T_SIGN_Aquila%s"), *Suffix, *Suffix));
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		// the name on her flanks (the hull's decals)
+		TArray<UDecalComponent*> Decals;
+		It->GetComponents(Decals);
+		for (UDecalComponent* D : Decals)
+		{
+			UMaterialInterface* M = D->GetDecalMaterial();
+			if (HullTex && M && M->GetName().Contains(TEXT("MI_HULL_Name_Aquila")))
+			{
+				HullTex->SetForceMipLevelsToBeResident(1.0e7f);
+				UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(M, D);
+				Mid->SetTextureParameterValue(TEXT("Marking"), HullTex);
+				D->SetDecalMaterial(Mid);
+			}
+		}
+		// the ship's plate over the master display
+		TArray<UStaticMeshComponent*> Meshes;
+		It->GetComponents(Meshes);
+		for (UStaticMeshComponent* C : Meshes)
+		{
+			for (int32 i = 0; SignTex && i < C->GetNumMaterials(); ++i)
+			{
+				UMaterialInterface* M = C->GetMaterial(i);
+				if (M && M->GetName() == TEXT("MI_SIGN_Aquila"))
+				{
+					UMaterialInstanceDynamic* Mid = C->CreateDynamicMaterialInstance(i);
+					Mid->SetTextureParameterValue(TEXT("ScreenTexture"), SignTex);
+				}
+			}
+		}
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Ship] she is the %s now"), *HullNumber);
 }
 
 void UAstraShipSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
@@ -629,6 +674,12 @@ void UAstraShipSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 	if (Save->TryGetNumberField(TEXT("radiator_health"), Num)) { RadiatorHealth = FMath::Clamp((float)Num, 0.25f, 1.f); }
 	if (Save->TryGetNumberField(TEXT("coolant_vents"), Num)) { CoolantVents = FMath::Clamp((int32)Num, 0, 3); }
 	Save->TryGetBoolField(TEXT("radiators_out"), bRadiatorsOut);
+	FString Hull;
+	if (Save->TryGetStringField(TEXT("hull_number"), Hull) && !Hull.IsEmpty())
+	{
+		HullNumber = Hull;
+		ApplyHullNumber();
+	}
 	FString Sys = TEXT("Aurelia");
 	Save->TryGetStringField(TEXT("system"), Sys);
 	ApplySystem(ChartSystem(Sys));

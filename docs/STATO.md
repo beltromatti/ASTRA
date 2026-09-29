@@ -219,7 +219,8 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
   - se il Capitano è catturato: un ufficiale del Mandato lo interroga (interattivo, a voce o per iscritto), poi arriva lo scambio di prigionieri;
   - poi la **Commissione d'inchiesta** della 7ª Flotta, **interattiva**: presiede Rourke, siedono il capitano Okafor e il comandante Vale (giudice avvocato). Leggono il **diario del Capitano** e la campagna, fanno almeno tre domande a turno e il Capitano risponde con parole sue. Prova reale: «Ho visto il suo diario… Parliamo della tattica, non della poesia»;
   - il verdetto (encomio, proscioglimento o biasimo) e poi il **nuovo comando**: la gemella CVC-03, ribattezzata Aquila, qualche settimana dopo;
-  - il salvataggio viene riscritto: nave nuova, santabarbara e gruppo aereo pieni, i caduti restano caduti, i feriti sono guariti. Il livello riparte, l'XO dà il benvenuto a bordo e il regista racconta cosa è cambiato nella Marca.
+  - il salvataggio viene riscritto: nave nuova, santabarbara e gruppo aereo pieni, i caduti restano caduti, i feriti sono guariti. Il livello riparte, l'XO dà il benvenuto a bordo e il regista racconta cosa è cambiato nella Marca;
+  - la nuova nave porta il suo numero di scafo (CVC-03, poi -04, -05): lo dicono il nome sui fianchi, la targa di plancia, il display principale e il muro della memoria, che ora ricorda «CVC-01 AND CVC-03».
 - Prove: `astra.cmd abandon_ship {}`, poi al portello `AstraUse` (o **E**); `slomo 5` per accelerare. Il dopo si prova anche fuori dal gioco, con un gioco finto e risposte scritte del Capitano.
 
 ## La forma della guerra: atti, battaglia decisiva, finale

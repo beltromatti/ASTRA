@@ -209,6 +209,9 @@ public:
 	bool StartAbandon(bool bOrdered, FString& OutDetail);
 	void ReactorFailing() { FString D; if (!bAbandon) { StartAbandon(false, D); } }
 	bool IsAbandoning() const { return bAbandon && !bShipLost; }
+	/** Her hull number: CVC-01, or a sister's (CVC-03...) when the Captain took the name to a new command. */
+	const FString& GetHullNumber() const { return HullNumber; }
+	void SetHullNumber(const FString& N) { HullNumber = N; ApplyHullNumber(); }
 	/** A railgun volley: the capacitors' draw makes the ship's lights sag for a moment (the power is visible). */
 	void RailgunDraw() { RailDraw = 1.f; }
 	bool IsShipLost() const { return bShipLost; }
@@ -323,6 +326,8 @@ private:
 	double LastHitReport = -100.0;
 	float FlickerTime = 0.f;
 	float RailDraw = 0.f;              // 1 at a railgun volley, fading: the lights sag
+	FString HullNumber = TEXT("CVC-01");
+	void ApplyHullNumber();            // the name on her flanks and the plate on the bridge carry her number
 	bool bTurning = false;
 	// helm intercept: the course follows a contact; at the standoff range the ship turns broadside and holds it
 	FString InterceptId;
