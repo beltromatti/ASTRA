@@ -185,6 +185,7 @@ bool AASTRAPlayerController::ShouldUseTouchControls() const
 
 void AASTRAPlayerController::OnTalkPressed()
 {
+	EnsureSubtitles();   // (the "listening" mark lives with the subtitles)
 	if (UAstraMindSubsystem* Mind = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr)
 	{
 		Mind->PushToTalk(true);
@@ -672,6 +673,12 @@ void AASTRAPlayerController::EnsureSubtitles()
 	const FSlateFontInfo NameFont = Mono ? FSlateFontInfo(Mono, 14) : FCoreStyle::GetDefaultFontStyle("Bold", 14);
 	const FSlateFontInfo TextFont = Mono ? FSlateFontInfo(Mono, 15) : FCoreStyle::GetDefaultFontStyle("Regular", 15);
 	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);
+	// the crew is listening: from the talk key going down until the answer begins
+	Box->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 4)
+	[
+		SAssignNew(ListeningText, STextBlock).Font(NameFont).Text(FText::FromString(TEXT("\u25CF  LISTENING")))
+		.ColorAndOpacity(FLinearColor(1.f, 0.84f, 0.47f, 0.f))
+	];
 	for (int32 i = 0; i < 3; ++i)
 	{
 		TSharedPtr<STextBlock> N, T;
@@ -785,6 +792,14 @@ void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 		{
 			SubLines.RemoveAt(i);
 		}
+	}
+	if (ListeningText.IsValid())
+	{
+		const UAstraMindSubsystem* Mind = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr;
+		const bool bHeard = Mind && Mind->IsCaptainHeard();
+		ListeningA = FMath::FInterpConstantTo(ListeningA, bHeard ? 1.f : 0.f, DeltaTime, bHeard ? 8.f : 2.5f);
+		const float Pulse = Mind && Mind->IsCaptainTalking() ? 0.75f + 0.25f * FMath::Sin(GetWorld()->GetRealTimeSeconds() * 6.f) : 0.6f;
+		ListeningText->SetColorAndOpacity(FLinearColor(1.f, 0.84f, 0.47f, ListeningA * Pulse));
 	}
 	for (int32 i = 0; i < SubRows.Num(); ++i)
 	{

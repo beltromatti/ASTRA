@@ -128,6 +128,8 @@ protected:
 	TArray<TSharedPtr<class STextBlock>> SubNames;
 	TArray<TSharedPtr<class STextBlock>> SubTexts;
 	TArray<TSharedPtr<class SBorder>> SubRows;
+	TSharedPtr<class STextBlock> ListeningText;   // "LISTENING" while the crew hears the Captain
+	float ListeningA = 0.f;
 	void EnsureSubtitles();
 	void TickSubtitles(float DeltaTime);
 	TSharedPtr<class SWidget> OrderLine;

@@ -147,7 +147,8 @@ void UAstraMusicSubsystem::Tick(float DeltaTime)
 		}
 	}
 	DuckHold = bFloor ? 0.5f : DuckHold - DeltaTime;
-	const float DuckTo = DuckHold > 0.f ? 0.55f : 1.f;
+	// while the Captain holds the talk key the music drops further (-12 dB): less of it reaches the microphone
+	const float DuckTo = Mind && Mind->IsCaptainTalking() ? 0.25f : (DuckHold > 0.f ? 0.55f : 1.f);
 	Duck = FMath::FInterpConstantTo(Duck, DuckTo, DeltaTime, (1.f - 0.55f) / (DuckTo < Duck ? 0.15f : 0.8f));
 	if (Current)
 	{

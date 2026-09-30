@@ -74,6 +74,7 @@ private:
 	int32 VoiceProtocol = 1;       // the mind's (status.voice)
 	FString FloorState = TEXT("idle");   // who has the floor: idle | crew | captain (the mind's floor message)
 	bool bVoicesPaused = false;
+	bool bTalkKeyDown = false;
 	void TickVoices();
 	void CancelVoice(int32 LineId, float FadeSeconds);
 	void SendVoiceStatus(int32 LineId, const TCHAR* State, const FString& Detail);
@@ -105,6 +106,10 @@ public:
 	 *  back. False from a mind that does not say (voice protocol 1): then the officers' own voices tell. */
 	bool IsFloorTaken() const { return FloorState != TEXT("idle"); }
 	bool SaysFloor() const { return VoiceProtocol >= 2 && IsConnected(); }
+	/** The Captain holds the talk key (the game's own sound steps back so less of it reaches the microphone). */
+	bool IsCaptainTalking() const { return bTalkKeyDown; }
+	/** The Captain's words are with the crew: from the key going down until the answer begins (the mind's floor). */
+	bool IsCaptainHeard() const { return bTalkKeyDown || (SaysFloor() && FloorState == TEXT("captain")); }
 
 private:
 	TArray<TPair<FString, FString>> HeardLines;

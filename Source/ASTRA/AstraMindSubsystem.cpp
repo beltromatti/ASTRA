@@ -304,6 +304,7 @@ void UAstraMindSubsystem::AddContext(const TSharedRef<FJsonObject>& Msg) const
 
 void UAstraMindSubsystem::PushToTalk(bool bDown)
 {
+	bTalkKeyDown = bDown;
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("ptt"));
 	M->SetBoolField(TEXT("down"), bDown);
