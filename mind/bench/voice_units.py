@@ -198,10 +198,20 @@ async def recogniser() -> None:
     tr = await r2.recognise(speech_pcm())
     check("recogniser: a Captain speaking a language the fast engine lacks goes straight to the other", tr.backend == "whisperkit" and r2.backends[0].calls == 0)
 
-    r2b = Recognizer(backends=[Fake("parakeet", frozenset({"it", "en"}), "Avanti tutta?", 0.7, fast=True),
+    garbage = "Kancho, Harimichinihakujna na Zensoku"
+    r2b = Recognizer(backends=[Fake("parakeet", frozenset({"it", "en"}), garbage, 0.7, fast=True),
                                Fake("whisperkit", None, "Thanks for watching!", None, lang="en")], prior="it")
     tr = await r2b.recognise(speech_pcm())
-    check("recogniser: a second opinion that is a subtitle credit is ignored", tr.text == "Avanti tutta?" and tr.escalated, f"{tr.text!r}")
+    check("recogniser: a second opinion that is a subtitle credit is ignored", tr.text == garbage and tr.escalated, f"{tr.text!r}")
+    crew_word = Fake("parakeet", frozenset({"it"}), "Avanti tutta?", 0.7, fast=True)
+    second_c = Fake("whisperkit", None, "Avanti tutta.", None, lang="it")
+    tr = await Recognizer(backends=[crew_word, second_c], prior="it").recognise(speech_pcm())
+    check("recogniser: an unsure phrase with a crew word in it stays with the fast engine (Whisper is no better on European speech)",
+          not tr.escalated and second_c.calls == 0 and tr.text == "Avanti tutta?", f"escalated={tr.escalated} calls={second_c.calls}")
+    sure = Fake("parakeet", frozenset({"it"}), garbage, 0.9, fast=True)
+    second_s = Fake("whisperkit", None, "Avanti tutta.", None, lang="it")
+    tr = await Recognizer(backends=[sure, second_s], prior="it").recognise(speech_pcm())
+    check("recogniser: a phrase the fast engine is sure of never goes to the second", not tr.escalated and second_s.calls == 0)
 
     r3 = Recognizer(backends=[Fake("whisperkit", None, "Thank you for watching!", None, lang="en")], prior="en")
     tr = await r3.recognise(speech_pcm())
@@ -244,7 +254,7 @@ async def recogniser() -> None:
         s3.feed(pcm[i:i + 640])
         await asyncio.sleep(0.02)
     check("session: a slow engine decodes nothing while the key is held", slow_first.calls == 0, f"{slow_first.calls} calls")
-    fast_unsure = Fake("parakeet", frozenset({"it"}), "Avanti tutta?", 0.7, delay=0.02, fast=True)
+    fast_unsure = Fake("parakeet", frozenset({"it"}), garbage, 0.7, delay=0.02, fast=True)
     second = Fake("whisperkit", None, "Avanti tutta.", None, lang="it", delay=0.05)
     r9 = Recognizer(backends=[fast_unsure, second], prior="it")
     await r9.ready()

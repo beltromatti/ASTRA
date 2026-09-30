@@ -27,7 +27,7 @@ import numpy as np
 from .env import CACHE
 from .voice_audio import f32_to_pcm16, pcm16_to_f32, resample, speech_frames, trim_speech
 from .voice_glossary import GLOSSARY, Glossary
-from .voice_lang import resolve_language
+from .voice_lang import domain_hits, resolve_language
 from .voice_stt_backends import (BackendResult, FasterWhisperBackend, ParakeetBackend, PARAKEET_LANGS, SherpaParakeetBackend, SttBackend,
                                  WhisperKitBackend, fetch_sherpa_model)
 
@@ -35,7 +35,9 @@ log = logging.getLogger("astra.stt")
 
 RATE = 16000
 MIN_SPEECH_S = 0.15                 # less than this is a key click or a breath, not an order
-SURE_CONF = 0.86                    # Parakeet's own confidence above which its text is taken as it is
+ESCALATE_CONF = 0.84                # below this confidence, and with no word of the crew's in the text, Parakeet's phrase is what it writes for a
+                                    # language it does not know (romanised Japanese: 0.63-0.80): the second engine is asked. European phrases
+                                    # in noise, or with a crew word in them, are not worth the two seconds: Whisper is no better at them
 PAD_MS = 220.0                      # silence kept around the speech: the ends of words are quiet
 BOOT_WAIT_S = 4.0                   # how long a first phrase waits for the fast engine before the other one answers it
 IDLE_RELEASE_S = 600.0              # the second engine is let go after this long without a phrase
@@ -64,6 +66,13 @@ class Transcript:
     partial_hit: bool = False                   # the result came from a decode made while the key was still held
     escalated: bool = False                     # a second engine was asked (uncertain phrase or another language)
     speech: bool = True                         # False: nothing that sounds like speech was recorded
+
+
+def unsure(conf: float | None, text: str) -> bool:
+    """Is this the sort of phrase the second engine should look at? Low confidence and nothing in it that a bridge officer would
+    say (measured on 1260 synthetic orders: 0.5 % of clean and 1 % of noisy European phrases, all six non-European ones;
+    the confidence alone would have sent 6 % and 14 %)."""
+    return conf is not None and conf < ESCALATE_CONF and not any(domain_hits(text).values())
 
 
 class Recognizer:
@@ -240,10 +249,9 @@ class Recognizer:
             escalated = res is not None
         if res is None:
             return Transcript(text="", lang=prior)
-        # the fast engine is unsure (another language, noise, a very short phrase): ask the one that knows every language
-        # (not for a draft: what the Captain is still saying is decoded again, whole, when he lets go of the key)
-        if res.backend == getattr(prim, "name", "") and res.conf is not None and res.conf < SURE_CONF and fall is not None and not escalated \
-                and not draft:
+        # the fast engine is unsure (a language it does not know written as if it were one it does): ask the one that knows every
+        # language (not for a draft: what the Captain is still saying is decoded again, whole, when he lets go of the key)
+        if res.backend == getattr(prim, "name", "") and unsure(res.conf, res.text) and fall is not None and not escalated and not draft:
             second = await self._engine(fall, pcm, lang_hint, use_glossary)
             if second is not None and second.text:
                 escalated = True
@@ -252,19 +260,20 @@ class Recognizer:
 
     @staticmethod
     def _arbitrate(a: BackendResult, b: BackendResult, prior: str) -> BackendResult:
-        """The first engine was unsure of a phrase and the second gave a text too. The second looks at the whole phrase, says the
-        language it heard and was handed the game's names, so its text wins, unless it is empty, a subtitle credit, or in a
-        language the Captain has no reason to be speaking while the first engine's text reads as his own."""
+        """The first engine was unsure of a phrase and the second gave a text too. A second opinion in a language the first cannot
+        read wins (Japanese, Chinese, Arabic: Parakeet only romanises them); otherwise the first engine's text stays when it reads
+        as a language at all (on European speech Whisper is not the better of the two), and the second's replaces it when it does not."""
         if not a.text:
             return b
         if not b.text or _HALLUCINATION.search(b.text) or _FILLER_ONLY.match(b.text):
             return a
         if b.lang and b.lang not in PARAKEET_LANGS:
-            return b                                        # Japanese, Chinese, Arabic...: Parakeet only romanises them
-        la, ca = resolve_language(a.text, prior)
-        if b.lang is None or b.lang == la or b.lang == prior:
             return b
-        return a if ca >= 0.6 else b
+        _, ca = resolve_language(a.text, prior)
+        if ca >= 0.6 or b.lang is None:
+            return a
+        _, cb = resolve_language(b.text, prior, backend_lang=b.lang)
+        return b if cb > ca else a
 
     def _finish(self, res: BackendResult, prior: str, escalated: bool, use_glossary: bool) -> Transcript:
         text = re.sub(r"\s+", " ", res.text).strip()
@@ -336,8 +345,7 @@ class RecognitionSession:
         pcm = pcm16 if pcm16 is not None else b"".join(self._chunks)
         best = self._best
         # a draft that covers everything said is the answer, unless the engine was unsure of it and a second one could look
-        if best is not None and not self._tail_has_speech(pcm, best[0]) \
-                and (best[1].conf is None or best[1].conf >= SURE_CONF or self.rec.fallback is None):
+        if best is not None and not self._tail_has_speech(pcm, best[0]) and (self.rec.fallback is None or not unsure(best[1].conf, best[1].raw)):
             tr = best[1]
             tr.latency_s = time.perf_counter() - t0
             tr.partial_hit = True

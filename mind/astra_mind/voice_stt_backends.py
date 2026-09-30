@@ -242,9 +242,9 @@ class WhisperKitBackend(SttBackend):
         import httpx
         self.port = port
         self.model_dir = model_dir or (VOICE_MODELS / "models" / "argmaxinc" / "whisperkit-coreml" / "openai_whisper-large-v3-v20240930_turbo")
-        self.extra_args = extra_args if extra_args is not None else [
-            "--without-timestamps", "--chunking-strategy", "none", "--temperature-fallback-count", "0",
-            "--concurrent-worker-count", "1"]
+        # Only the timestamps are switched off. Measured against the server's defaults (docs/bench/voce_2026-09-30.md): stopping the
+        # temperature fallback and the chunking gained 2 % of the time and cost a third of the accuracy in noise
+        self.extra_args = extra_args if extra_args is not None else ["--without-timestamps"]
         self._proc: subprocess.Popen | None = None
         self._client = httpx.AsyncClient(timeout=30.0)
         self.url = f"http://127.0.0.1:{port}/v1/audio/transcriptions"

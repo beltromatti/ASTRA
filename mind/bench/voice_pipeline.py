@@ -97,10 +97,11 @@ def make_backend(name: str):
         return SherpaParakeetBackend(model_dir=Path(os.environ["BENCH_SHERPA"]) if os.environ.get("BENCH_SHERPA") else None)
     if name == "parakeet-v3":
         return ParakeetBackend(model="v3")
-    if name == "whisperkit-baseline":            # the first version's server: default chunking, fallbacks on
+    if name == "whisperkit-baseline":            # the server's defaults (temperature fallback and chunking on): what the mind runs
         return WhisperKitBackend(port=50071, extra_args=["--without-timestamps"])
-    if name == "whisperkit-tuned":
-        return WhisperKitBackend(port=50072)
+    if name == "whisperkit-tuned":               # the flags tried and dropped: no temperature fallback, no chunking, one worker
+        return WhisperKitBackend(port=50072, extra_args=["--without-timestamps", "--chunking-strategy", "none", "--temperature-fallback-count", "0",
+                                                         "--concurrent-worker-count", "1"])
     if name in ("whisperkit-turbo632", "whisperkit-small216"):           # quantised variants (downloaded to BENCH_MODELS)
         folder = {"whisperkit-turbo632": "openai_whisper-large-v3-v20240930_turbo_632MB", "whisperkit-small216": "openai_whisper-small_216MB"}[name]
         return WhisperKitBackend(port=50073 if name.endswith("632") else 50074, model_dir=Path(os.environ.get("BENCH_MODELS", str(CACHE / "models"))) / folder)
@@ -234,7 +235,7 @@ async def sec_lang(args) -> None:  # noqa: ANN001
     if not stt_rows:
         raise SystemExit("run the stt section (parakeet-ultra) first: the language test uses its transcripts")
     langs = sorted({r["lang"] for r in stt_rows})
-    wk = (load("stt") or {}).get("whisperkit-tuned", {}).get("rows", [])
+    wk = (load("stt") or {}).get("whisperkit-baseline", {}).get("rows", [])
     out: dict = {}
     for name, fn in (("only the text (lingua)", lambda r, prior: max(text_scores(r["text"]).items(), key=lambda kv: kv[1])[0] if r["text"] else prior),
                      ("text + crew vocabulary, no history", lambda r, prior: resolve_language(r["text"], "en" if False else prior, None)[0]),
