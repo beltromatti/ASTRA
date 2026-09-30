@@ -465,7 +465,8 @@ class Parts:
     """A mesh made of several finishing groups (hard-surface body, fine detail, emissive/screens, soft parts).
     b = Parts(); b.body.box(...); b.emit.lamp_box(...); obj = b.build('SM_X')."""
 
-    def __init__(self, bevel: float = 0.008, fine_bevel: float = 0.003) -> None:
+    def __init__(self, bevel: float = 0.008, fine_bevel: float = 0.003, angle: float = 35.0) -> None:
+        self.angle = angle
         self.body = FB()
         self.fine = FB()
         self.emit = FB()
@@ -491,7 +492,7 @@ class Parts:
                 continue
             o = fb.to_object(f"{name}_{tag}")
             if bev > 0:
-                A.bevel_and_normals(o, width=bev)
+                A.bevel_and_normals(o, width=bev, angle_deg=self.angle)
             A.box_uv(o, texel_m=uv_meter)
             if tag == "soft":                                      # cushions and other organic parts: smooth shading
                 bpy.ops.object.select_all(action="DESELECT")
