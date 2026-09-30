@@ -195,7 +195,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 
 | Variabile | Predefinito | Cosa fa |
 |---|---|---|
-| `ASTRA_TTS_SPEED` | 1.12 | velocità del parlato (1.0 = quella del modello; ±0,06 secondo il tono) |
+| `ASTRA_TTS_SPEED` | 1.12 | velocità del parlato (1.0 = quella del modello; ±0,06 secondo il tono). Nessun costo di comprensibilità misurabile fino a ×1,20: WER del riconoscitore sulle voci a ×1,00 / ×1,12 / ×1,20 = 16,7 / 16,6 / 16,8 % in media sulle sette lingue (tre voci, tre frasi per lingua), e con dieci voci e quattro frasi 13,6 / 16,6 / 15,7 % in olandese, 27,1 / 23,7 / 26,0 % in italiano: differenze dentro il rumore |
 | `ASTRA_TTS_LUFS` | −19 | volume di ogni voce |
 | `ASTRA_TTS_PAUSE_MS` | 300 | pausa più lunga tenuta dentro una riga |
 | `ASTRA_TTS_RESIDENT` | 2 | modelli di lingua tenuti in memoria (~430 MB l'uno) |
