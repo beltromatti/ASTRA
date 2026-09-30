@@ -802,6 +802,36 @@ void UAstraShipSubsystem::RadiatorHit()
 	}
 }
 
+void UAstraShipSubsystem::SetBattleShort(bool bOn)
+{
+	if (bOn == bBattleShort)
+	{
+		return;
+	}
+	bBattleShort = bOn;
+	PowerBudget = bOn ? 800.f : 700.f;
+	if (!bOn)
+	{
+		// back inside the normal budget: every allocation above nominal comes down in proportion
+		float Sum = 0.f, Over = 0.f;
+		for (const auto& KV : PowerPct)
+		{
+			Sum += KV.Value;
+			Over += FMath::Max(0.f, KV.Value - 100.f);
+		}
+		if (Sum > PowerBudget && Over > 0.f)
+		{
+			const float K = FMath::Clamp(1.f - (Sum - PowerBudget) / Over, 0.f, 1.f);
+			for (auto& KV : PowerPct)
+			{
+				KV.Value = KV.Value > 100.f ? 100.f + (KV.Value - 100.f) * K : KV.Value;
+			}
+		}
+	}
+	Event(bOn ? TEXT("engineering: battle short — the reactor's limits are overridden: 800% of power to allocate, and she runs hot")
+	          : TEXT("engineering: the reactor is back inside its limits (700%)"));
+}
+
 void UAstraShipSubsystem::TickHeat(float DeltaTime)
 {
 	if (DeltaTime <= 0.f)
@@ -815,7 +845,7 @@ void UAstraShipSubsystem::TickHeat(float DeltaTime)
 	}
 	// what the ship makes by herself: the reactor (by the power drawn), the drive (by the throttle and the engines' power);
 	// the battle adds the rest (weapons fired, hits soaked, shields recharging: AddHeat)
-	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (ThrottlePct / 100.f) * PowerFactor(TEXT("engines"));
+	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (ThrottlePct / 100.f) * PowerFactor(TEXT("engines")) + (bBattleShort ? 0.3f : 0.f);
 	// what she sheds: the hull's own glow, plus the radiators, more the hotter she is (retracted: a cruise settles near 15 %,
 	// a typical fight near 70 %, a long heavy one beyond 100 %; extended they shed 2.6 times as much, torn ones less)
 	const float B = bRadiatorsOut ? 0.5f + (1.3f - 0.5f) * RadiatorHealth : 0.5f;
@@ -2238,6 +2268,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (const UAstraStationsSubsystem* St = GetWorld() ? GetWorld()->GetSubsystem<UAstraStationsSubsystem>() : nullptr)
 	{
 		S->SetObjectField(TEXT("stations"), St->StationsJson());
+		S->SetStringField(TEXT("action_target"), St->ActionTarget());   // what "target: action" means now (tactical's target, else the nearest hostile)
 		if (Viewscreen)
 		{
 			S->SetStringField(TEXT("viewscreen"), Viewscreen->Describe());   // what the Captain sees on the main screen now

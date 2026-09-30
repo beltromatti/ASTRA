@@ -72,8 +72,6 @@ namespace
 			Add(TEXT("tactical"), TEXT("missiles"), {TEXT("conserve"), TEXT("normal"), TEXT("saturate")});
 			Add(TEXT("sensors"), TEXT("emcon"), {TEXT("silent"), TEXT("restricted"), TEXT("limited"), TEXT("full")});
 			Add(TEXT("sensors"), TEXT("scan"), {TEXT("passive"), TEXT("sweep"), TEXT("focus")});
-			Add(TEXT("sensors"), TEXT("ew"), {TEXT("jam"), TEXT("ew_off")});
-			Add(TEXT("sensors"), TEXT("sigint"), {TEXT("sigint_on"), TEXT("sigint_off")});
 			Add(TEXT("ops"), TEXT("viewscreen"), {TEXT("auto"), TEXT("forward"), TEXT("target"), TEXT("tactical"), TEXT("fleet"), TEXT("comms"),
 			                                      TEXT("damage"), TEXT("sector"), TEXT("off")});
 			Add(TEXT("ops"), TEXT("holo"), {TEXT("ship")});
@@ -97,7 +95,7 @@ namespace
 		static const TMap<FString, TArray<FString>> T = {
 			{TEXT("helm"), {TEXT("course")}},
 			{TEXT("tactical"), {TEXT("engagement"), TEXT("shields"), TEXT("point_defense"), TEXT("missiles")}},
-			{TEXT("sensors"), {TEXT("emcon"), TEXT("scan"), TEXT("ew"), TEXT("sigint")}},
+			{TEXT("sensors"), {TEXT("emcon"), TEXT("scan")}},
 			{TEXT("ops"), {TEXT("viewscreen"), TEXT("holo"), TEXT("datapad"), TEXT("damage_control")}},
 			{TEXT("engineering"), {TEXT("power"), TEXT("heat"), TEXT("reactor")}},
 			{TEXT("comms"), {TEXT("channel"), TEXT("listen")}},
@@ -158,11 +156,9 @@ const TArray<FString>& UAstraStationsSubsystem::ModeChoices(const FString& Stati
 		{TEXT("tactical.missiles"), {TEXT("conserve"), TEXT("normal"), TEXT("saturate")}},
 		{TEXT("sensors.emcon"), {TEXT("silent"), TEXT("restricted"), TEXT("limited"), TEXT("full")}},
 		{TEXT("sensors.scan"), {TEXT("passive"), TEXT("sweep"), TEXT("focus")}},
-		{TEXT("sensors.ew"), {TEXT("jam"), TEXT("ew_off")}},
-		{TEXT("sensors.sigint"), {TEXT("sigint_on"), TEXT("sigint_off")}},
 		{TEXT("ops.viewscreen"), {TEXT("auto"), TEXT("forward"), TEXT("target"), TEXT("tactical"), TEXT("fleet"), TEXT("sector"), TEXT("comms"),
 		                          TEXT("damage"), TEXT("off")}},
-		{TEXT("ops.holo"), {TEXT("tactical"), TEXT("sector"), TEXT("ship"), TEXT("fleet")}},
+		{TEXT("ops.holo"), {TEXT("tactical"), TEXT("sector"), TEXT("ship")}},
 		{TEXT("ops.datapad"), {TEXT("push")}},
 		{TEXT("ops.damage_control"), {TEXT("auto"), TEXT("priority")}},
 		{TEXT("engineering.power"), {TEXT("balanced"), TEXT("combat"), TEXT("evasive"), TEXT("silent"), TEXT("shields"), TEXT("weapons"), TEXT("engines"),
@@ -204,11 +200,13 @@ void UAstraStationsSubsystem::Defaults()
 		S.Officer = Officer;
 		return S;
 	};
-	auto Set = [](FAstraStation& S, const TCHAR* Aspect, const TCHAR* Mode, TSharedPtr<FJsonObject> Params = nullptr)
+	DefaultModes.Reset();
+	auto Set = [this](FAstraStation& S, const TCHAR* Aspect, const TCHAR* Mode, TSharedPtr<FJsonObject> Params = nullptr)
 	{
 		FAstraStationAspect& A = S.Aspects.Add(Aspect);
 		A.Mode = Mode;
 		A.Params = Params.IsValid() ? Params : MakeShared<FJsonObject>();
+		DefaultModes.Add(S.Id + TEXT(".") + Aspect, Mode);
 	};
 	FAstraStation& Helm = Station(TEXT("helm"), TEXT("helm"));
 	TSharedPtr<FJsonObject> Face = MakeShared<FJsonObject>();
@@ -416,11 +414,17 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 		return false;
 	}
 	const FString& M = A.Mode;
-	const FString Target = Str(A.Params, TEXT("target"), Str(A.Params, TEXT("contact_id"))).ToUpper();
+	const FString RawTarget = Str(A.Params, TEXT("target"), Str(A.Params, TEXT("contact_id")));
+	const FString Target = Resolve(RawTarget);
 	TArray<FContact> Cs;
 	B->GetContacts(Cs);
 	auto NeedTarget = [&](bool bFirm) -> bool
 	{
+		if (RawTarget.Equals(TEXT("action"), ESearchCase::IgnoreCase) && Target.IsEmpty())
+		{
+			Detail = TEXT("on the action: nothing to follow yet, it waits for the next fight");
+			return true;                  // "the action" with no fight on: the mode waits (it follows whatever comes)
+		}
 		const FContact* C = FindContact(Cs, Target);
 		if (!C)
 		{
@@ -462,6 +466,10 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 			{
 				return false;
 			}
+			if (Target.IsEmpty())
+			{
+				return true;              // "the action" and no fight on yet: the executor starts the intercept when there is one
+			}
 			TSharedPtr<FJsonObject> C = Obj({{TEXT("contact_id"), Target}});
 			C->SetNumberField(TEXT("standoff_km"), Num(A.Params, TEXT("standoff_km"), 6.0));
 			const bool bOk = Command(TEXT("intercept"), C, Detail);
@@ -493,6 +501,10 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 				return false;
 			}
 			const FContact* C = FindContact(Cs, Target);
+			if (!C)
+			{
+				return true;              // "the action" and no fight on yet: NeedTarget has said so
+			}
 			Detail = FString::Printf(TEXT("%s %s%s"), *M.Replace(TEXT("_"), TEXT(" ")), *C->Label,
 			                         C->RangeKm >= 0.0 ? *FString::Printf(TEXT(", %.1f km"), C->RangeKm) : TEXT(", range unknown"));
 			return true;
@@ -544,13 +556,22 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 				{
 					Ids.AddUnique(Target);
 				}
+				// "hostiles": every hostile warship on the plot, the new ones too, until none is left
 				int32 Live = 0;
 				for (const FString& Id : Ids)
 				{
-					const FContact* C = FindContact(Cs, Id);
+					if (Id == TEXT("HOSTILES"))
+					{
+						for (const FContact& C : Cs)
+						{
+							Live += (C.Side == EAstraSide::Mandate && !C.bCraft) ? 1 : 0;
+						}
+						continue;
+					}
+					const FContact* C = FindContact(Cs, Resolve(Id));
 					Live += (C && C->Side != EAstraSide::Astra) ? 1 : 0;
 				}
-				if (Live == 0)
+				if (Live == 0 && !Ids.Contains(TEXT("HOSTILES")))
 				{
 					Detail = Ids.Num() ? TEXT("none of those contacts is a live hostile on the plot") : TEXT("engage needs a target");
 					return false;
@@ -561,7 +582,8 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 					Arr.Add(MakeShared<FJsonValueString>(Id));
 				}
 				A.Params->SetArrayField(TEXT("targets"), Arr);
-				Detail = FString::Printf(TEXT("engaging %s until %s"), *FString::Join(Ids, TEXT(", ")), Ids.Num() > 1 ? TEXT("they are down") : TEXT("it is down"));
+				Detail = Ids.Contains(TEXT("HOSTILES")) ? FString(TEXT("engaging every hostile warship, as they come, until none is left"))
+				                                        : FString::Printf(TEXT("engaging %s until %s"), *FString::Join(Ids, TEXT(", ")), Ids.Num() > 1 ? TEXT("they are down") : TEXT("it is down"));
 				return true;
 			}
 			Detail = M == TEXT("weapons_free") ? FString::Printf(TEXT("weapons free inside %.0f km"), Num(A.Params, TEXT("range_km"), 25.0))
@@ -709,6 +731,12 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 			const bool bOut = M == TEXT("radiators_extended") || M == TEXT("extended");
 			return Command(TEXT("set_radiators"), Obj({{TEXT("state"), bOut ? TEXT("extended") : TEXT("retracted")}}), Detail);
 		}
+		if (AspectName == TEXT("reactor"))
+		{
+			Sh->SetBattleShort(M == TEXT("battle_short"));
+			Detail = Sh->IsBattleShort() ? TEXT("battle short: 800% of power to allocate, the reactor runs hot") : TEXT("reactor back to its normal limits");
+			return true;
+		}
 		Detail = FString::Printf(TEXT("%s %s"), *AspectName, *M);
 		return true;
 	}
@@ -767,7 +795,8 @@ void UAstraStationsSubsystem::Tick(float DeltaTime)
 			FAstraStationAspect& A = AKV.Value;
 			if (A.Until.StartsWith(TEXT("time:")) && Now - A.Since >= FCString::Atod(*A.Until.Mid(5)))
 			{
-				const FString Fallback = SKV.Key == TEXT("helm") ? TEXT("hold") : A.Mode;
+				const FString* Def = DefaultModes.Find(SKV.Key + TEXT(".") + AKV.Key);
+				const FString Fallback = Def ? *Def : A.Mode;
 				if (Fallback != A.Mode)
 				{
 					Expire(SKV.Key, AKV.Key, Fallback, TEXT("the time set for it is up"));
@@ -1017,7 +1046,9 @@ void UAstraStationsSubsystem::TickHelm()
 		return;
 	}
 	const FString& M = A->Mode;
-	const FString Target = Str(A->Params, TEXT("target"), Str(A->Params, TEXT("contact_id"))).ToUpper();
+	const FString Raw = Str(A->Params, TEXT("target"), Str(A->Params, TEXT("contact_id")));
+	const bool bFollowsAction = Raw.Equals(TEXT("action"), ESearchCase::IgnoreCase);
+	const FString Target = Resolve(Raw);
 	TArray<FContact> Cs;
 	B->GetContacts(Cs);
 	const FContact* T = Target.IsEmpty() ? nullptr : FindContact(Cs, Target);
@@ -1025,6 +1056,10 @@ void UAstraStationsSubsystem::TickHelm()
 	                       || M == TEXT("broadside") || M == TEXT("formation");
 	if (bNeedsTarget && !T)
 	{
+		if (bFollowsAction)
+		{
+			return;                       // no fight right now: the mode waits for the next one (it follows the action)
+		}
 		Expire(TEXT("helm"), TEXT("course"), TEXT("hold"), FString::Printf(TEXT("%s is no longer on the plot"), *Target));
 		return;
 	}
@@ -1200,13 +1235,56 @@ void UAstraStationsSubsystem::TickTactical()
 		{
 			for (const TSharedPtr<FJsonValue>& V : *List)
 			{
-				const FContact* C = FindContact(Cs, V->AsString());
+				const FString Id = V->AsString().ToUpper();
+				if (Id == TEXT("HOSTILES"))
+				{
+					// every hostile warship: stay on the one we fight while it is inside missile range, else the best one in
+					// reach — whoever is firing on us first, then the nearest (the plot is nearest first) — never a chase
+					const FContact* Cur = EngagedId.IsEmpty() ? nullptr : FindContact(Cs, EngagedId);
+					if (Cur && Cur->Side == EAstraSide::Mandate && Cur->RangeKm >= 0.0 && Cur->RangeKm < 25.0)
+					{
+						Want = Cur->ContactId;
+						break;
+					}
+					const FContact* Best = nullptr;
+					for (const FContact& C : Cs)
+					{
+						if (C.Side != EAstraSide::Mandate || C.bCraft || C.Track < 2)
+						{
+							continue;
+						}
+						if (!Best || (C.bFiringAtUs && !Best->bFiringAtUs && C.RangeKm < 30.0))
+						{
+							Best = &C;
+						}
+					}
+					if (Best)
+					{
+						Want = Best->ContactId;
+						break;
+					}
+					continue;
+				}
+				const FContact* C = FindContact(Cs, Resolve(Id));
 				if (C && C->Side != EAstraSide::Astra)
 				{
 					Want = C->ContactId;
 					break;
 				}
 			}
+		}
+		bool bAllHostiles = false;
+		if (List)
+		{
+			for (const TSharedPtr<FJsonValue>& V : *List)
+			{
+				bAllHostiles |= V->AsString().Equals(TEXT("hostiles"), ESearchCase::IgnoreCase);
+			}
+		}
+		if (Want.IsEmpty() && bAllHostiles)
+		{
+			EngagedId.Empty();            // no hostile warship on the plot now: the order stands for the next one
+			return;
 		}
 		if (Want.IsEmpty())
 		{
@@ -1391,7 +1469,7 @@ void UAstraStationsSubsystem::TickSensors()
 	}
 	else if (Scan->Mode == TEXT("focus"))
 	{
-		const FString Target = Str(Scan->Params, TEXT("target"), Str(Scan->Params, TEXT("contact_id"))).ToUpper();
+		const FString Target = Resolve(Str(Scan->Params, TEXT("target"), Str(Scan->Params, TEXT("contact_id"))));
 		TArray<FContact> Cs;
 		B->GetContacts(Cs);
 		const FContact* C = FindContact(Cs, Target);

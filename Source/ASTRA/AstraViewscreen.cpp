@@ -418,6 +418,10 @@ void AAstraViewscreen::Direct(float Dt)
 			Zoom = Zs == TEXT("close") ? 2.f : Zs == TEXT("max") ? 4.f : Zs == TEXT("wide") ? 0.4f : 1.f;
 		}
 	}
+	if (Target.Equals(TEXT("action"), ESearchCase::IgnoreCase))
+	{
+		Target = St->ActionTarget();      // "the action": whatever the fight is about now
+	}
 	const FString Key = Mode + TEXT("|") + Target.ToUpper();
 	if (Key != LastModeKey)
 	{
