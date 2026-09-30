@@ -12,33 +12,6 @@ from typing import Any, Awaitable, Callable
 
 from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
 from .openrouter import OpenRouter, ToolCall
-from .speech import _sentences
-
-# one transmission, however many `transmit` calls the model makes: at most this many sentences and words (the persona asks for
-# one to three sentences, and 20-second hails still came: the bridge waits for nothing that long; 40 words are about 13 s)
-MAX_SENTENCES = 4
-MAX_WORDS = 40
-
-
-def clip_transmission(text: str, sentences_left: int, words_left: int) -> str:
-    """The part of `text` that fits the budget left: all of it when it fits; else how it opens (the first sentence) and its point
-    (the last sentences that still fit: a demand, an ultimatum, an answer come at the end), in their order. A first sentence too
-    long by itself is cut at a word."""
-    parts = [p.strip() for p in _sentences(text.strip()) if p.strip()]
-    count = [len(p.split()) for p in parts]
-    if not parts or sentences_left <= 0 or words_left <= 0:
-        return ""
-    if len(parts) <= sentences_left and sum(count) <= words_left:
-        return " ".join(parts)
-    if count[0] >= words_left:
-        return " ".join(parts[0].split()[:max(words_left, 8)]).rstrip(",;:") + "."
-    keep, words = [0], count[0]
-    for k in range(len(parts) - 1, 0, -1):
-        if len(keep) >= sentences_left or words + count[k] > words_left:
-            break
-        keep.append(k)
-        words += count[k]
-    return " ".join(parts[k] for k in sorted(keep))
 
 log = logging.getLogger("astra.enemy")
 
@@ -149,8 +122,11 @@ a slaughter.
 Be true to the battle below: what you say must match what your ships are really doing (if they are breaking off
 too damaged to fight, you cannot claim your group holds the line). Whenever your intent changes, call `decide`.
 
-How you speak: short, precise, formal military radio speech, with a cold dignity; one to three sentences per
-transmission. The Interpreter implant translates you: always speak in {lang_name}, keep names in English. Address the
+How you speak: short, precise, formal military radio speech, with a cold dignity. A transmission is what a commander
+says on an open channel in the middle of a battle: one to three short sentences, about ten seconds, and the point comes
+early (your demand, your answer, your warning); name yourself only the first time you open a channel. The other side can
+cut in at any moment, and whatever you had not yet said is lost unless it was said first. If you have more to say, you
+transmit again later, when it matters. The Interpreter implant translates you: always speak in {lang_name}, keep names in English. Address the
 other captain as "{captain}" of the ASTRA ship. Never mention AI, games or prompts.
 
 Tools: `transmit` to speak; `decide` whenever your intent changes (it really changes what your ships do: hold_fire
@@ -252,13 +228,8 @@ class EnemyAgent:
         async def on_call(call: ToolCall) -> None:
             a = call.arguments() or {}
             if call.name == "transmit" and len((a.get("text") or "").strip()) >= 4:
-                said = " ".join(lines)
-                text = clip_transmission(a["text"], MAX_SENTENCES - len(_sentences(said)), MAX_WORDS - len(said.split()))
-                if text != a["text"].strip():
-                    log.info("%s's transmission clipped to the budget (%d words kept)", c["name"], len(text.split()))
-                if len(text) >= 4:
-                    lines.append(text)
-                    await self.say(spk, text, lang, a.get("tone", "cold"))
+                lines.append(a["text"].strip())
+                await self.say(spk, a["text"].strip(), lang, a.get("tone", "cold"))
             elif call.name == "decide":
                 res = await self.command("enemy_order", {"order": a.get("order", "continue_attack"), "reason": a.get("reason", ""),
                                                          "commander": self.contact})
@@ -273,9 +244,8 @@ class EnemyAgent:
         if comp.error:
             log.error("enemy LLM error: %s", comp.error)
         if not lines and comp.content.strip() and not comp.error:
-            text = clip_transmission(comp.content, MAX_SENTENCES, MAX_WORDS)
-            lines.append(text)
-            await self.say(spk, text, lang, "cold")
+            lines.append(comp.content.strip())
+            await self.say(spk, comp.content.strip(), lang, "cold")
         history.append({"role": "user", "content": stimulus})
         history.append({"role": "assistant", "content": " ".join(lines) or "(silence)"})
         log.info("%s %.2fs: %s", c["name"], time.perf_counter() - t0, " | ".join(lines))
