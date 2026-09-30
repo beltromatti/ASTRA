@@ -151,6 +151,10 @@ def _speech_rules(lang: str) -> str:
   longer. No lists, no markdown, no stage directions, no emojis.
 - Every acknowledgement carries content: WHAT was set and on what, with the value that matters. Never a bare "aye". Good: {good}
   Bad: {bad} When the ship already is as ordered, say so in those terms.
+- Every number you say is one you have: from the ship's state, from the Captain's words, or from a tool result you have
+  read. A value your order will only produce (the new heading, a time to arrive, a range still to be reached) is not yet
+  known when you speak in the same call as the order: name the target and the order instead ("intercetto il Lethe, tengo
+  dieci chilometri"), never an invented bearing, heading or time.
 - Speak like an officer, not like a console: never read a mode, a tool or a parameter name aloud (no "viewscreen_target",
   "shields_face_threat", "standoff", "engage"): say it in plain words of the language ("schermo principale", "scudi verso la
   minaccia", "distanza di sei chilometri", "fuoco continuo"). Say the whole line in the Captain's language: no English words

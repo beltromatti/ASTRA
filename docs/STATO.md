@@ -25,10 +25,19 @@
 
 **Strumenti di prova del lead** (gioco con `tools/play.py launch --nomind`; `tools/play.py tp X Y YAW PITCH` per le foto): `astra.battle.time 170` (arriva il gruppo d'attacco), `astra.cmd station {...}`, `astra.viewscreen.dump` (l'immagine dello schermo principale a piena risoluzione), `astra.screens.dump <Pagina>` (una console su PNG), `/state` con `context`.
 
-## Prestazioni (30/9, finestra 1600×900, plancia v3 in battaglia; misure sporche quando gli agenti compilano)
-- La cattura dello schermo principale raddoppiava il thread di rendering (36 ms): ora vede solo gli attori dello spazio → ~16 ms.
-- GPU per passaggio a 70% (ProfileGPU): luci differite ~6 ms (17 luci in un passaggio a cluster, il sole con l'ombra virtuale 1,35 ms), ombre 2 ms, Nanite 2,3 ms, base pass 1,8 ms, Lumen 2 ms, traslucidi 1,3 ms, post 1 ms; la cattura ~3 ms per immagine.
-- Fatto: bias dell'ombra virtuale del sole a 0 (−3 ms), cattura a 20 Hz (−0,7 ms), nitidezza dopo TSR. La risoluzione dinamica restava al 40% (pixel grossi): il thread di gioco (~13 ms) e quello di rendering sono ora il limite insieme alla GPU. Prossimo: misure a macchina scarica con `tools/play.py perf`, costo del thread di gioco (tick degli attori ~7 ms), luci della plancia.
+## Prestazioni (misure pulite 30/9 sera: macchina scarica, finestra 1600×900, plancia v3 in battaglia, prove A/B alternate)
+- **Costo GPU**: ~27 ms al 100 %, ~17,5 al 70 %, ~12,6 al 50 %, ~12 al 40 %: un costo fisso di ~9–10 ms (ombre ~1,6, GI Lumen ~1,1,
+  post-processing ~1,1, riflessi ~0,8, TSR ~0,7 più la sua parte alla risoluzione d'uscita, traslucidi ~0,7, personaggi ~0,6,
+  Nanite) più ~14 ms per milione di pixel. La telecamera dello schermo principale a 20 Hz costa ormai ~0.
+- **Al 70 %, spegnendo una cosa per volta**: TSR→TAA −2,9 ms, ombre dinamiche −3,6 (sole ~2,2, due spot ~1,1), riflessi Lumen −2,6
+  (quasi tutti dalle superfici ruvide), 17 luci rettangolari −1,8, GI Lumen −1,4, traslucidi −1,0; le ombre virtuali restano la
+  scelta giusta (le mappe classiche +4,4 ms); qualità di aggiornamento di TSR e densità delle sonde GI: nessun guadagno.
+- **Applicato** (MacEngine.ini): riflessi tracciati solo sotto rugosità 0,25 e filtro del sole 4×2 raggi: −2,5 ms a chip caldo.
+  TSR resta: a parità di costo è più nitido di TAA con più pixel (TAA perde le righe sottili e fa scalini sul bordo delle ombre).
+- **Risultato**: la risoluzione dinamica si assesta al ~50–55 % a 60 fps (prima ~45 %); per il 70 % servono ~5 ms. Strade: raggi
+  delle luci grandi (12–18 m, ~1 ms), materiali della plancia più leggeri (la loro ombreggiatura Nanite ~3 ms al 70 %), un
+  upscaler MetalFX al posto di TSR (da valutare: plugin nostro), la modalità 30 fps del menu (immagine quasi piena).
+- Il chip senza ventola si scalda in pochi minuti (la stessa scena passa da 17 a 21 ms): misure sempre alternate A/B.
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |

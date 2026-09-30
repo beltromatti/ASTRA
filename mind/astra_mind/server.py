@@ -801,17 +801,16 @@ class Mind:
                  " | ".join(f"{s}: {x}" for s, x in t.lines))
 
     async def _chatter(self, event: str, lang: str, ask: str):
-        """A quiet moment's talk: its own model role (small and cheap), a compact prompt, only `speak`, two lines at most."""
+        """A quiet moment's talk: its own model role (small and cheap), a compact prompt that asks for two or three lines, only `speak`."""
         system = chatter_system(lang, self.director.mood, self.memory.lines(), "; ".join(self.director.bonds_lines()), self.director.home_lines(),
                                 list(self.director.campaign), list(self.game.events)[-5:] if self.game else [])
-        return await self.agent.handle_event(event, lang, ask=ask, role="chatter", system=system, history_turns=2, max_lines=2, speak_only=True)
+        return await self.agent.handle_event(event, lang, ask=ask, role="chatter", system=system, history_turns=2, speak_only=True)
 
     async def _event_turn(self, events: list[str], ask: str | None):
         """A report turn (or the officers' watch check: its own compact prompt, its own cheaper model, only the last few exchanges)."""
         if any(e.startswith("bridge: watch") for e in events):
             st = self.game.state if (self.game and self.game.state) else self.local.snapshot()
             t = await self.agent.handle_event(" | ".join(events), self.lang, ask=watch_ask(self.lang), role="watch", history_turns=4,
-                                              max_lines=2,
                                               system=watch_system(self.lang, st, self.agent.standing_lines(), self.agent.style(),
                                                                   recent_orders(self.agent.history)))
             chk = getattr(self, "_watch_check", None)
