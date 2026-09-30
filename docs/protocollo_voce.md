@@ -243,3 +243,19 @@ uv run python -m astra_mind.tts               # quali modelli e voci sono in cac
 Motori (`voice_stt_backends.py`, un'interfaccia sola: `start`, `transcribe`, `stop`): `ParakeetBackend` (helper Swift sul Neural Engine, Apple Silicon), `SherpaParakeetBackend` (lo stesso modello in ONNX su CPU: Windows, Linux, Mac senza helper), `WhisperKitBackend` (99 lingue, dice la lingua, accetta i nomi come suggerimento), `FasterWhisperBackend` (CPU, portabile). L'ordine di prova è quello: il primo che parte è il motore veloce, il secondo la riserva. `ASTRA_STT` cambia il primo.
 
 **Limite del percorso portabile**: Parakeet ONNX non dà una confidenza confrontabile con quella dell'helper (l'esportazione int8 scrive perfino «Captain» per il turco «Kaptan»), quindi lì non c'è il passaggio automatico a Whisper per una lingua non europea alla prima frase: si imposta la lingua del Capitano (il file `captain_lang.txt` nella cartella della cache, che la mente scrive da sola quando cambia lingua) e da quel momento le frasi vanno a faster-whisper. Sul Mac con l'helper il passaggio è automatico (6 frasi su 6 in sei lingue non europee).
+
+## 10. Come si legge il log della mente (`astra-mind.log`)
+
+| Riga | Cosa vuol dire |
+|---|---|
+| `STT 0.27s after the key (decode 0.06s, parakeet, from the partial) [it] Timoniere, rotta 217, avanti tutta.` | dal rilascio del tasto al testo 0,27 s (100 ms sono il post-roll del microfono); `from the partial` = il testo era già pronto da una bozza fatta mentre il Capitano parlava; `[it]` la lingua che l'equipaggio userà |
+| `Parakeet ready in 0.6 s` / `WhisperKit ready in 3.3 s` / `TTS model italian loaded in 1.8 s` | avvii dei motori (la prima volta su una macchina molto di più: modello scaricato e compilato) |
+| `line 7 (sensors, normal) not spoken: expired — …` | una riga che non verrà mai detta, con il motivo (stessi valori di `line_dropped`); mai in silenzio |
+| `line 7 merged into line 6 (sensors)` / `line 7 shortened (240 -> 96 chars, 18 s of speech waiting)` | l'unione di due frasi dello stesso ufficiale / l'accorciamento di una riga lunga quando c'è troppo parlato in attesa |
+| `line 9 was cut at 30 %: said again as line 12 after the floor is free` | interrotta dal Capitano prima della metà: ripetuta intera, una volta sola, dopo la risposta |
+| `the game says line 12 is failed (no audio component)` | **il gioco non ha potuto riprodurre la riga** (`voice_status`): è il segnale di «il testo compare e nessuno parla» |
+| `the game says line 12 is stalled` | la coda audio del gioco si è svuotata a riga non finita (scatto del gioco) |
+| `the key has been down for 45 s: taken as released` | un `ptt up` è andato perso: l'equipaggio riprende a parlare |
+| `the floor is released: no answer to the Captain came within 8 s` | il modello non ha risposto in tempo: i rapporti riprendono |
+| `whisperkit is not ready yet: this phrase goes without it` | Whisper sta ancora compilando il suo modello: questa frase è andata solo a Parakeet |
+| `TTS: 31 s of audio for 120 characters: stopped (the model did not find the end)` | la sintesi non trovava la fine della riga: tagliata (di norma mai) |
