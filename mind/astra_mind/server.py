@@ -630,6 +630,7 @@ class Mind:
                         log.info("%d event(s) not reported: the newest was %.0f s ago, the bridge was busy: %s", len(events), now_t - newest,
                                  " | ".join(e[:70] for e in events))
                         continue
+                    fresh_events = list(events)
                     events = [e if w is None or now_t - w <= REPORT_LATE_S else f"{e} [happened {now_t - w:.0f} s ago]" for e, w in zip(events, when)]
                     self.voice.low_priority = True
                     self.voice.report_since = newest              # (a report is worth saying for a few seconds after its news; see speech.py)
@@ -645,6 +646,11 @@ class Mind:
                         self.voice.low_priority = False
                         self.voice.report_since = None
                     log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
+                    if getattr(t, "cancelled", False) and not t.lines:
+                        # the Captain took the floor while a warning of danger was being written: it is reported after his order (the crew
+                        # says nothing if what he ordered already covered it)
+                        for e in [e for e in fresh_events if _URGENT_EVENT.search(e)]:
+                            await self.turns.put(("\x00event:" + e, self.lang))
                     continue
                 self.voice.captain_turn_begin()               # what is said from here to the end of this turn answers the Captain
                 dropped = self.voice.drop_low_priority()      # the Captain speaks: small talk is no longer worth saying

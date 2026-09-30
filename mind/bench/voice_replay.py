@@ -322,7 +322,34 @@ async def r4_order_while_the_enemys_message_is_written() -> list[str]:
         return bad
 
 
-SCENARIOS = [r1_live_sequence, r2_old_news_is_not_reported, r3_warning_during_a_hail, r4_order_while_the_enemys_message_is_written]
+async def r5_warning_cut_off_by_an_order() -> list[str]:
+    """The Captain types an order while the model is still writing a warning of danger: the order is answered at once, and the warning is written and said after
+    the answer (the danger is not lost)."""
+    async with Replay() as r:
+        LAST[:] = [r]
+        await asyncio.sleep(10.0)
+        r.script["missiles inbound"] = (2.0, r.script["missiles inbound"][1])
+        jobs = [r.event(10.0, "tactical: missiles inbound, bearing 270"), r.order(10.5, "Timoniere, prua sul Cocytus e tienila lì")]
+        await asyncio.gather(*[asyncio.ensure_future(j) for j in jobs])
+        await r.settle(3.0)
+        tr = r.trace()
+        bad = check(tr, r.mind.voice.enqueued) + r.log
+        ack = [i for i in tr.order() if tr.line[i]["priority"] == "answer"]
+        warn = [i for i in tr.order() if tr.line[i]["priority"] == "urgent"]
+        if not ack:
+            return bad + ["the order was never answered"]
+        late = tr.begin[ack[0]] - 10.5 - SCRIPT["Timoniere, prua sul Cocytus"][0]
+        if late > 0.6:
+            bad.append(f"the answer began {late:.2f} s after the model had finished")
+        if not warn:
+            bad.append("the warning of danger was lost when the Captain took the floor")
+        elif tr.begin[warn[0]] < tr.begin[ack[0]]:
+            bad.append("the warning came before the answer to the Captain")
+        return bad
+
+
+SCENARIOS = [r1_live_sequence, r2_old_news_is_not_reported, r3_warning_during_a_hail, r4_order_while_the_enemys_message_is_written,
+             r5_warning_cut_off_by_an_order]
 
 
 def main() -> int:
