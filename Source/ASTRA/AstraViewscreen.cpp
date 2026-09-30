@@ -229,10 +229,12 @@ void AAstraViewscreen::BeginPlay()
 	Feed = NewObject<UTextureRenderTarget2D>(this, TEXT("RT_ViewscreenFeed"));
 	Feed->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
 	Feed->ClearColor = FLinearColor::Black;
+	Feed->bAutoGenerateMips = true;   // seen smaller than it is from the chair: without mips a ship's plating sparkles
+	Feed->MipsSamplerFilter = TF_Trilinear;
 	Feed->InitAutoFormat(FeedWidth, FeedHeight);
 	Feed->UpdateResourceImmediate(true);
 	Capture->TextureTarget = Feed;
-	Overlay = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(this, UCanvasRenderTarget2D::StaticClass(), FeedWidth, FeedHeight);
+	Overlay = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(this, UCanvasRenderTarget2D::StaticClass(), OverlayWidth, OverlayHeight);
 	Overlay->ClearColor = FLinearColor(0.f, 0.f, 0.f, 1.f);   // the canvas leaves 1 - coverage in alpha: feed * a + rgb
 	Overlay->OnCanvasRenderTargetUpdate.AddDynamic(this, &AAstraViewscreen::DrawOverlay);
 
@@ -1132,19 +1134,31 @@ bool AAstraViewscreen::Dump(const FString& Path) const
 	FTextureRenderTargetResource* FR = Feed ? Feed->GameThread_GetRenderTargetResource() : nullptr;
 	FTextureRenderTargetResource* OR = Overlay ? Overlay->GameThread_GetRenderTargetResource() : nullptr;
 	TArray<FColor> Fp, Op;
-	if (!FR || !OR || !FR->ReadPixels(Fp) || !OR->ReadPixels(Op) || Fp.Num() != Op.Num() || Fp.Num() != FeedWidth * FeedHeight)
+	if (!FR || !OR || !FR->ReadPixels(Fp) || !OR->ReadPixels(Op) || Fp.Num() != FeedWidth * FeedHeight || Op.Num() != OverlayWidth * OverlayHeight)
 	{
 		return false;
 	}
-	// as the material composes it: feed * overlay alpha + overlay colour
-	for (int32 i = 0; i < Fp.Num(); ++i)
+	// as the material composes it, at the overlay's resolution: feed (bilinear) * overlay alpha + overlay colour
+	TArray<FColor> Out;
+	Out.SetNumUninitialized(Op.Num());
+	auto Px = [&Fp, this](int32 X, int32 Y) { const FColor& C = Fp[Y * FeedWidth + X]; return FVector3f(C.R, C.G, C.B); };   // bytes, as stored
+	for (int32 y = 0; y < OverlayHeight; ++y)
 	{
-		const float K = Op[i].A / 255.f;
-		Fp[i] = FColor((uint8)FMath::Min(255.f, Fp[i].R * K + Op[i].R), (uint8)FMath::Min(255.f, Fp[i].G * K + Op[i].G),
-		               (uint8)FMath::Min(255.f, Fp[i].B * K + Op[i].B), 255);
+		const float Fy = FMath::Clamp((y + 0.5f) * FeedHeight / OverlayHeight - 0.5f, 0.f, FeedHeight - 1.f);
+		const int32 Y0 = (int32)Fy, Y1 = FMath::Min(Y0 + 1, FeedHeight - 1);
+		for (int32 x = 0; x < OverlayWidth; ++x)
+		{
+			const float Fx = FMath::Clamp((x + 0.5f) * FeedWidth / OverlayWidth - 0.5f, 0.f, FeedWidth - 1.f);
+			const int32 X0 = (int32)Fx, X1 = FMath::Min(X0 + 1, FeedWidth - 1);
+			const FVector3f F = FMath::Lerp(FMath::Lerp(Px(X0, Y0), Px(X1, Y0), Fx - X0), FMath::Lerp(Px(X0, Y1), Px(X1, Y1), Fx - X0), Fy - Y0);
+			const FColor& O = Op[y * OverlayWidth + x];
+			const float K = O.A / 255.f;
+			Out[y * OverlayWidth + x] = FColor((uint8)FMath::Min(255.f, F.X * K + O.R), (uint8)FMath::Min(255.f, F.Y * K + O.G),
+			                                   (uint8)FMath::Min(255.f, F.Z * K + O.B), 255);
+		}
 	}
 	TArray64<uint8> Png;
-	FImageUtils::PNGCompressImageArray(FeedWidth, FeedHeight, TArrayView64<const FColor>(Fp.GetData(), Fp.Num()), Png);
+	FImageUtils::PNGCompressImageArray(OverlayWidth, OverlayHeight, TArrayView64<const FColor>(Out.GetData(), Out.Num()), Png);
 	return Png.Num() > 0 && FFileHelper::SaveArrayToFile(Png, *Path);
 }
 

@@ -35,9 +35,13 @@ public:
 	/** Screen size in metres (the image plane; the frame belongs to the bridge's art). */
 	UPROPERTY(EditAnywhere, Category = "Viewscreen") float WidthM = 7.2f;
 	UPROPERTY(EditAnywhere, Category = "Viewscreen") float HeightM = 3.0f;
-	/** Feed resolution (the camera): wide, like the screen. */
-	UPROPERTY(EditAnywhere, Category = "Viewscreen") int32 FeedWidth = 1280;
-	UPROPERTY(EditAnywhere, Category = "Viewscreen") int32 FeedHeight = 534;
+	/** Feed resolution (the camera): wide, like the screen. From the chair the screen spans ~470 of the frame's pixels at 70 %
+	 *  resolution: 960 wide is still twice that (sharp when the Captain walks up to it), and the mips keep it from sparkling. */
+	UPROPERTY(EditAnywhere, Category = "Viewscreen") int32 FeedWidth = 960;
+	UPROPERTY(EditAnywhere, Category = "Viewscreen") int32 FeedHeight = 400;
+	/** The overlay's resolution (text and symbols, drawn on a canvas: cheap, and kept crisp). Same aspect as the feed. */
+	UPROPERTY(EditAnywhere, Category = "Viewscreen") int32 OverlayWidth = 1280;
+	UPROPERTY(EditAnywhere, Category = "Viewscreen") int32 OverlayHeight = 534;
 
 	/** What is on screen now, for the crew and the datapad ("auto: tactical's target T-23 Cocytus, zoom x38"). */
 	FString Describe() const;
