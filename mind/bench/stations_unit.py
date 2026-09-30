@@ -116,7 +116,7 @@ class ToolsTest(unittest.TestCase):
 
     def test_schema_lists_only_the_modes_a_build_reports(self) -> None:
         state = LocalShip(stations=True, fight=True).snapshot()
-        state["stations"]["helm"]["modes"] = ["hold", "intercept"]
+        state["stations"]["helm"]["supports"] = ["hold", "intercept"]
         ts = tools_for(state)
         station_tool = next(t for t in ts.tools if t["function"]["name"] == "station")
         modes = station_tool["function"]["parameters"]["properties"]["mode"]["enum"]
@@ -140,9 +140,12 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         c = Crew(Script([station("helm", "intercept", target="T-23", standoff_km=6),
                          speak("Intercetto il Cocytus, tengo sei chilometri.")]))
         turn = await c.agent.handle("seguilo", "it")
-        lane = c.ship.lane("helm", "nav")
-        self.assertEqual((lane["mode"], lane["params"]["target"], lane["set_by"]), ("intercept", "T-23", "helm"))
+        lane = c.ship.lane("helm", "course")
+        self.assertEqual((lane["mode"], lane["params"]["target"], lane["set_by"]), ("intercept", "T-23", "captain"))
         self.assertEqual(lane["until"], "target_lost")
+        sent = next(a for _, n, a, _ in c.ship.log if n == "station")                    # what the game received: its own words
+        self.assertEqual((sent["station"], sent["aspect"], sent["mode"], sent["by"]), ("helm", "course", "intercept", "captain"))
+        self.assertEqual(sent["params"], {"target": "T-23", "standoff_km": 6})
         self.assertEqual([t for _, t in c.said], ["Intercetto il Cocytus, tengo sei chilometri."])
         self.assertTrue(turn.actions[0][2]["ok"])
         # the history keeps the call and its result in the native format (the model must know what was set)
@@ -153,7 +156,7 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
                  Script([speak("Non ho un bersaglio, Capitano: quale contatto?")]))          # the follow-up
         turn = await c.agent.handle("intercettalo", "it")
         self.assertFalse(turn.actions[0][2]["ok"])
-        self.assertEqual(c.ship.lane("helm", "nav")["mode"], "hold")                          # nothing changed
+        self.assertEqual(c.ship.lane("helm", "course")["mode"], "hold")                          # nothing changed
         self.assertEqual(len(c.llm.requests), 2)                                              # the follow-up ran
         self.assertIn("FAILED", json.dumps(c.llm.requests[1]["messages"]))
         self.assertEqual(len(c.said), 1)
@@ -215,7 +218,7 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         turn = await c.agent.handle_event("tactical: T-23 (Cocytus) destroyed", "it")
         self.assertTrue(turn.actions[0][2]["ok"])
         lane = c.ship.lane("tactical", "engagement")
-        self.assertEqual((lane["mode"], lane["set_by"]), ("engage", "tactical"))
+        self.assertEqual((lane["mode"], lane["set_by"]), ("engage", "officer"))
 
     async def test_the_hard_limits_hold_whatever_the_delegation(self) -> None:
         for st, mode, params in (("helm", "transit", {"system": "Cassia"}), ("helm", "retreat", {}), ("xo", "delegation", {"station": "tactical", "level": "auto"})):
@@ -266,7 +269,7 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         c.agent.preempt()
         turn = await task
         self.assertTrue(turn.cancelled)
-        self.assertEqual(c.ship.lane("helm", "nav")["mode"], "keep_on_bow")                 # it was done
+        self.assertEqual(c.ship.lane("helm", "course")["mode"], "keep_on_bow")                 # it was done
         self.assertEqual(c.said, [])                                                       # nothing was said
         self.assertTrue(any(m.get("tool_calls") for m in c.agent.history))                   # and the crew remembers doing it
         self.assertFalse(c.agent.busy())
@@ -305,7 +308,7 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
                                    history_turns=2, max_lines=2, speak_only=True)
         self.assertEqual([t for _, t in c.said], ["Bel cielo stasera, Marco.", "Bugiardo: piove polvere."])
         self.assertEqual({t["function"]["name"] for t in c.llm.requests[0]["tools"]}, {"speak"})
-        self.assertEqual(c.ship.lane("helm", "nav")["set_by"], "auto")                     # the stray station call did nothing
+        self.assertEqual(c.ship.lane("helm", "course")["set_by"], "default")                  # the stray station call did nothing
         self.assertLess(len(c.llm.requests[0]["messages"][0]["content"]) // 4, 1600)      # a compact prompt of its own
 
     async def test_an_older_game_build_still_works(self) -> None:
@@ -404,7 +407,34 @@ class RouterTest(unittest.TestCase):
         self.assertEqual(router.quick("scudi a poppa", self.ctx(heard_s=5.0)).dest, "crew")
 
     def test_what_the_rules_cannot_tell_is_left_to_the_model_not_guessed(self) -> None:
-        self.assertIsNone(router.quick("ascolta cocytus non deve finire cosi", self.ctx()))
+        self.assertIsNone(router.quick("che cosa cercate qui", self.ctx()))
+
+    def test_a_filler_before_the_name_does_not_hide_it(self) -> None:
+        for text in ("Ok, Vael, ti ascolto.", "Senta, Ferryman: parliamoci chiaro.", "Ehm, Vael, forse possiamo trovare un accordo."):
+            self.assertEqual(router.quick(text, self.ctx()).dest, "external", text)
+        r = router.quick("Ok Vael ti ascolto. Voss, tieni gli occhi aperti.", self.ctx())
+        self.assertEqual(r.dest, "both")
+        self.assertIn("ascolto", r.external)
+        self.assertIn("occhi aperti", r.crew)
+
+    def test_a_name_that_closes_short_words_is_spoken_to(self) -> None:
+        for text in ("back off vael", "rispondimi capitano", "sei sola vael"):
+            self.assertEqual(router.quick(text, self.ctx()).dest, "external", text)
+        self.assertEqual(router.quick("il cocytus e fuori portata voss", self.ctx()).dest, "crew")
+
+    def test_talk_about_the_party_stays_aboard_even_in_an_exchange(self) -> None:
+        for text in ("wait what did she say", "chi e quello che ha appena parlato", "chiedi all'ammiraglio cosa vuole che facciamo"):
+            self.assertEqual(router.quick(text, self.ctx(heard_s=4.0)).dest, "crew", text)
+
+    def test_an_article_before_a_name_makes_it_the_subject_not_the_one_spoken_to(self) -> None:
+        r = router.quick("Allora, riassumiamo: il Cocytus e solo, giusto?", self.ctx())
+        self.assertTrue(r is None or r.dest == "crew")                     # (never sent out on the channel)
+
+    def test_a_sentence_that_names_the_party_is_not_filler_for_its_neighbours(self) -> None:
+        r = router.quick("Un attimo Vael. Comunicazioni, registrate tutto.", self.ctx())
+        self.assertEqual(r.dest, "both")
+        self.assertIn("attimo", r.external)
+        self.assertIn("registrate", r.crew)
 
     def test_the_rules_are_fast(self) -> None:
         t0 = time.perf_counter()
@@ -420,13 +450,13 @@ class RouterModelTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_when_the_model_does_not_answer_the_words_stay_aboard(self) -> None:
         llm = FakeLLM(Script(error="HTTP 500"), Script(error="HTTP 500"))
-        r = await router.route(llm, "ascolta cocytus non deve finire cosi", self.ctx())
+        r = await router.route(llm, "che cosa cercate qui", self.ctx())
         self.assertEqual((r.dest, r.how), ("crew", "fallback"))
         self.assertTrue(r.unsure)
 
     async def test_the_model_settles_the_open_case(self) -> None:
         llm = FakeLLM(Script(content="party"))
-        r = await router.route(llm, "ascolta cocytus non deve finire cosi", self.ctx())
+        r = await router.route(llm, "che cosa cercate qui", self.ctx())
         self.assertEqual((r.dest, r.how, r.party), ("external", "llm", "T-23"))
 
     async def test_mixed_takes_a_second_small_call_to_split(self) -> None:
@@ -525,7 +555,7 @@ class LocalShipTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("destroyed" in r for r in reports), reports)
         self.assertTrue(any(r.startswith("helm:") and "ended" in r for r in reports), reports)
         self.assertTrue(any(r.startswith("ops: viewscreen released") for r in reports), reports)
-        for st, lane, default in (("helm", "nav", "hold"), ("tactical", "engagement", "return_fire"), ("ops", "viewscreen", "viewscreen_auto")):
+        for st, lane, default in (("helm", "course", "hold"), ("tactical", "engagement", "return_fire"), ("ops", "viewscreen", "viewscreen_auto")):
             self.assertEqual(ship.lane(st, lane)["mode"], default)
 
     async def test_a_new_contact_appears_as_a_bearing_and_cannot_be_engaged_until_tracked(self) -> None:
@@ -540,17 +570,17 @@ class LocalShipTest(unittest.IsolatedAsyncioTestCase):
         ship.advance(8)
         self.assertTrue(any("T-31 identified" in r for r in ship.take_reports()))
 
-    async def test_the_selectors_follow_the_tactical_target(self) -> None:
+    async def test_the_bow_follows_its_target(self) -> None:
         ship = LocalShip(fight=True)
         await ship.execute("station", {"station": "tactical", "mode": "engage", "params": {"targets": ["T-24"]}}, "tactical")
-        res = await ship.execute("station", {"station": "helm", "mode": "keep_on_bow", "params": {"target": "tactical_target"}}, "helm")
+        res = await ship.execute("station", {"station": "helm", "mode": "keep_on_bow", "params": {"target": "T-24"}}, "helm")
         self.assertTrue(res["ok"], res)
         before = abs(((ship.heading - ship.range_bearing(ship.contacts["T-24"])[1]) + 540) % 360 - 180)
         ship.advance(30)                                          # (the Phlegethon circles at about the ship's turn rate)
         after = abs(((ship.heading - ship.range_bearing(ship.contacts["T-24"])[1]) + 540) % 360 - 180)
         self.assertLess(after, before)
         self.assertLess(after, 40)
-        self.assertIn("bow on T-24", ship.snapshot()["stations"]["helm"]["lanes"]["nav"]["status"])
+        self.assertIn("bow on T-24", ship.snapshot()["stations"]["helm"]["status"])
 
     async def test_delegation_is_stored(self) -> None:
         ship = LocalShip(fight=True)
@@ -563,6 +593,219 @@ class LocalShipTest(unittest.IsolatedAsyncioTestCase):
         res = await ship.execute("station", {"station": "helm", "mode": "hold"}, "helm")
         self.assertFalse(res["ok"])
         self.assertNotIn("stations", ship.snapshot())
+
+
+# ================================================================================================ the game's own words
+# What UAstraStationsSubsystem takes and reports, copied from Source/ASTRA/AstraStations.cpp as of main (Defaults(), ModeTable(),
+# ModeChoices(), Enter() and the executors' reads): the aspects each station has, the modes each aspect takes, the parameters
+# the code reads. If the game changes, this fixture and stations.py change together — the test below is the alarm.
+GAME_ASPECTS = {
+    "helm": ("course",), "tactical": ("engagement", "shields", "point_defense", "missiles"), "sensors": ("emcon", "scan"),
+    "ops": ("viewscreen", "holo", "damage_control", "datapad"), "engineering": ("power", "heat", "reactor"),
+    "comms": ("channel", "listen"), "flight": ("alpha", "bravo", "drones"), "xo": ("delegation",),
+}
+GAME_MODES = {
+    "course": {"hold", "course", "intercept", "keep_on_bow", "follow", "orbit", "broadside", "evade", "retreat", "formation", "transit"},
+    "engagement": {"hold_fire", "return_fire", "weapons_free", "engage"},
+    "shields": {"balanced", "face_threat", "sector", "forward", "aft", "port", "starboard", "dorsal", "ventral", "shields_off"},
+    "point_defense": {"protect", "pd_auto", "pd_off"}, "missiles": {"conserve", "normal", "saturate"},
+    "emcon": {"silent", "restricted", "limited", "full"}, "scan": {"passive", "sweep", "focus"},
+    "viewscreen": {"auto", "forward", "target", "tactical", "fleet", "comms", "damage", "sector", "off"},
+    "holo": {"tactical", "sector", "ship"}, "datapad": {"push"}, "damage_control": {"auto", "priority"},
+    "power": {"balanced", "combat", "evasive", "silent", "shields", "weapons", "engines", "custom"},
+    "heat": {"auto", "extended", "retracted", "radiators_extended", "radiators_retracted"}, "reactor": {"normal", "battle_short"},
+    "channel": {"open", "close", "mute", "unmute"}, "listen": {"all", "enemy", "fleet"},
+    "alpha": {"hold", "cap", "escort", "strike", "ew", "recon", "sar", "recall"}, "bravo": {"hold", "cap", "escort", "strike", "ew", "recon", "sar", "recall"},
+    "drones": {"hold", "cap", "escort", "strike", "ew", "recon", "sar", "recall"}, "delegation": {"delegation"},
+}
+GAME_PARAM_KEYS = {"target", "contact_id", "targets", "weapons", "fire", "standoff_km", "speed_pct", "heading_deg", "mark_deg",
+                   "distance_km", "side", "slot", "radius_km", "direction", "range_km", "every_s", "zoom", "party", "page", "focus",
+                   "what", "sector", "system", "squadron", "mission", "station", "delegation", "level", "face_action", "shields",
+                   "weapons", "engines", "sensors", "life_support", "flight_deck"}
+# a contact list and a station as the game writes them (UAstraStationsSubsystem::StationsJson)
+GAME_STATIONS = {
+    "helm": {"officer": "helm", "delegation": "auto", "status": "INTERCEPT T-23 at 14.2 km · heading 122 mark 0 · 310 m/s (throttle 64%)",
+             "modes": {"course": {"mode": "intercept", "params": {"target": "T-23", "standoff_km": 6}, "until": "target_lost",
+                                  "set_by": "captain", "for_s": 84}},
+             "recent": ["course intercept: intercepting T-23"]},
+    "tactical": {"officer": "tactical", "delegation": "advise", "status": "ENGAGE T-23 at 14.2 km · rails 3 · lasers 0 · VLS 96",
+                 "modes": {"engagement": {"mode": "engage", "params": {"targets": ["T-23"], "fire": "sustained"}, "until": "target_lost",
+                                          "set_by": "captain", "for_s": 30},
+                           "shields": {"mode": "face_threat", "until": "order", "set_by": "default", "for_s": 300},
+                           "point_defense": {"mode": "pd_auto", "until": "order", "set_by": "default", "for_s": 300},
+                           "missiles": {"mode": "normal", "until": "order", "set_by": "default", "for_s": 300}}, "recent": []},
+    "ops": {"officer": "ops", "delegation": "auto", "status": "screen target · holo tactical · damage control auto",
+            "modes": {"viewscreen": {"mode": "target", "params": {"target": "T-23", "zoom": "close"}, "until": "target_lost",
+                                     "set_by": "captain", "for_s": 20},
+                      "holo": {"mode": "tactical", "until": "order", "set_by": "default", "for_s": 300},
+                      "damage_control": {"mode": "auto", "until": "order", "set_by": "default", "for_s": 300},
+                      "datapad": {"mode": "push", "until": "order", "set_by": "default", "for_s": 300}}, "recent": []},
+    "comms": {"officer": "comms", "delegation": "auto", "status": "channel close · listening fleet",
+              "modes": {"channel": {"mode": "close", "until": "order", "set_by": "default", "for_s": 300},
+                        "listen": {"mode": "fleet", "until": "order", "set_by": "default", "for_s": 300}}, "recent": []},
+    "flight": {"officer": "flight", "delegation": "auto", "status": "",
+               "modes": {"alpha": {"mode": "cap", "until": "order", "set_by": "officer", "for_s": 40},
+                         "bravo": {"mode": "hold", "until": "order", "set_by": "default", "for_s": 300},
+                         "drones": {"mode": "hold", "until": "order", "set_by": "default", "for_s": 300}}, "recent": []},
+    "engineering": {"officer": "engineering", "delegation": "auto", "status": "",
+                    "modes": {"power": {"mode": "combat", "until": "order", "set_by": "captain", "for_s": 5},
+                              "heat": {"mode": "auto", "until": "order", "set_by": "default", "for_s": 300},
+                              "reactor": {"mode": "normal", "until": "order", "set_by": "default", "for_s": 300}}, "recent": []},
+    "sensors": {"officer": "sensors", "delegation": "auto", "status": "",
+                "modes": {"emcon": {"mode": "restricted", "until": "order", "set_by": "default", "for_s": 300},
+                          "scan": {"mode": "focus", "params": {"target": "T-31"}, "until": "target_lost", "set_by": "officer", "for_s": 9}},
+                "recent": []},
+    "xo": {"officer": "xo", "delegation": "auto", "status": "", "modes": {}, "recent": []},
+}
+
+
+def sample_command(md: S.Mode) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+    for q in md.params:
+        if q.required:
+            params[q.name] = (q.enum[0] if q.enum else ["T-23"] if q.kind == "strings" else 10 if q.kind in ("number", "integer") else "T-23")
+    if md.name == "course":
+        params = {"heading_deg": 90}
+    return {"station": md.station, "mode": md.name, "params": params}
+
+
+class WireTest(unittest.IsolatedAsyncioTestCase):
+    """The crew's commands leave in the game's words and the game's state is read in the crew's words."""
+
+    def test_every_mode_leaves_in_words_the_game_knows(self) -> None:
+        for name, md in S.MODE_INDEX.items():
+            cmd, err = S.normalize(sample_command(md))
+            self.assertIsNotNone(cmd, (name, err))
+            w = S.to_wire(cmd, "captain")
+            self.assertIn(w["aspect"], GAME_ASPECTS[w["station"]], name)
+            self.assertIn(w["mode"], GAME_MODES[w["aspect"]], name)
+            self.assertLessEqual(set(w["params"]), GAME_PARAM_KEYS, name)
+            self.assertEqual(w["by"], "captain")
+
+    def test_what_the_game_does_not_have_is_not_offered(self) -> None:
+        for gone in ("ew_jam", "ew_off", "sigint_on", "sigint_off", "holo_fleet", "listen_off"):
+            self.assertNotIn(gone, S.MODE_INDEX)
+        self.assertNotIn("weapons", S.MODE_INDEX["datapad_push"].param("page").enum)
+        self.assertEqual(set(S.MODE_INDEX["datapad_push"].param("page").enum), {"overview", "contact", "damage", "fleet", "orders"})
+
+    def test_the_wire_round_trips(self) -> None:
+        for name, md in S.MODE_INDEX.items():
+            cmd, _ = S.normalize(sample_command(md))
+            back, why = S.from_wire(S.to_wire(cmd, "officer"))
+            self.assertIsNotNone(back, (name, why))
+            self.assertEqual((back["mode"], back["params"]), (cmd["mode"], cmd["params"]), name)
+
+    def test_examples_as_the_game_takes_them(self) -> None:
+        def wire(st_id, mode, /, **params):
+            cmd, err = S.normalize({"station": st_id, "mode": mode, "params": params})
+            self.assertIsNotNone(cmd, err)
+            return S.to_wire(cmd)
+
+        w = wire("tactical", "shields_face_threat")
+        self.assertEqual((w["aspect"], w["mode"]), ("shields", "face_threat"))
+        w = wire("ops", "viewscreen_target", target="T-23", zoom="close")
+        self.assertEqual((w["station"], w["aspect"], w["mode"], w["params"], w["until"]),
+                         ("ops", "viewscreen", "target", {"target": "T-23", "zoom": "close"}, "target_lost"))
+        w = wire("flight", "mission", squadron="alpha", type="strike", target="T-23")
+        self.assertEqual((w["aspect"], w["mode"], w["params"]["target"]), ("alpha", "strike", "T-23"))
+        w = wire("xo", "delegation", station="tactical", level="advise")
+        self.assertEqual((w["station"], w["mode"], w["params"]), ("xo", "delegation", {"station": "tactical", "delegation": "advise"}))
+        w = wire("engineering", "power_profile", profile="combat")
+        self.assertEqual((w["aspect"], w["mode"]), ("power", "combat"))
+        w = wire("engineering", "power_custom", shields_pct=130, weapons_pct=110)
+        self.assertEqual((w["mode"], w["params"]), ("custom", {"shields": 130, "weapons": 110}))
+        w = wire("engineering", "heat_radiators", state="extended")
+        self.assertEqual((w["aspect"], w["mode"]), ("heat", "extended"))
+        w = wire("sensors", "emcon", level="silent")
+        self.assertEqual((w["aspect"], w["mode"]), ("emcon", "silent"))
+        w = wire("tactical", "shields_sector", sector="fore")                   # ("fore" is what a sailor says: forward)
+        self.assertEqual((w["aspect"], w["mode"]), ("shields", "forward"))
+        w = wire("helm", "broadside", target="T-23", side="best")
+        self.assertEqual(w["params"]["side"], "auto")                          # (the game's word for "the side that is nearer")
+        w = wire("helm", "course", speed_pct=0)                                # all stop: the heading is the present one
+        self.assertEqual((w["mode"], w["params"]), ("course", {"speed_pct": 0}))
+
+    def test_a_course_needs_something_to_steer_or_a_speed(self) -> None:
+        cmd, err = S.normalize({"station": "helm", "mode": "course", "params": {}})
+        self.assertIsNone(cmd)
+
+    def test_all_hostiles_become_the_ids_the_game_takes(self) -> None:
+        state = LocalShip(fight=True).snapshot()
+        cmd, _ = S.normalize({"station": "tactical", "mode": "engage", "params": {"targets": ["hostiles"]}})
+        self.assertEqual(S.to_wire(cmd, state=state)["params"]["targets"], ["T-23", "T-24"])          # nearest first
+        cmd, _ = S.normalize({"station": "tactical", "mode": "engage", "params": {"targets": ["T-24", "hostiles"]}})
+        self.assertEqual(S.to_wire(cmd, state=state)["params"]["targets"], ["T-24", "T-23"])
+
+    def test_what_the_game_would_refuse_is_refused_the_same_way(self) -> None:
+        for args in ({"station": "sensors", "aspect": "ew", "mode": "jam", "params": {"target": "T-23"}},
+                     {"station": "ops", "aspect": "holo", "mode": "fleet"},
+                     {"station": "warp", "mode": "hold"}, {"station": "helm", "mode": ""}):
+            cmd, why = S.from_wire(args)
+            self.assertIsNone(cmd, args)
+            self.assertTrue(why)
+
+    def test_a_mode_without_its_aspect_goes_where_the_games_table_puts_it(self) -> None:
+        for station, mode, aspect in (("tactical", "engage", "engagement"), ("tactical", "face_threat", "shields"), ("ops", "auto", "viewscreen"),
+                                      ("engineering", "auto", "heat"), ("engineering", "silent", "power"), ("sensors", "silent", "emcon"),
+                                      ("comms", "mute", "channel")):
+            self.assertEqual(S._aspect_for(station, mode), aspect, (station, mode))
+
+    def test_the_games_state_is_read_in_the_crews_words(self) -> None:
+        state = {"stations": GAME_STATIONS, "sim_time_s": 900.0, "viewscreen": "target: ordered, T-23 (Cocytus), zoom x8"}
+        lanes = S.lanes_of(GAME_STATIONS["helm"])
+        self.assertEqual((lanes["course"]["mode"], lanes["course"]["params"]["target"], lanes["course"]["set_by"]), ("intercept", "T-23", "captain"))
+        self.assertEqual(S.lanes_of(GAME_STATIONS["tactical"])["shields"]["mode"], "shields_face_threat")
+        self.assertEqual(S.lanes_of(GAME_STATIONS["ops"])["viewscreen"]["mode"], "viewscreen_target")
+        self.assertEqual(S.lanes_of(GAME_STATIONS["flight"])["alpha"]["params"], {"squadron": "alpha", "type": "cap"})
+        self.assertEqual(S.lanes_of(GAME_STATIONS["engineering"])["power"]["params"], {"profile": "combat"})
+        self.assertEqual(S.lanes_of(GAME_STATIONS["sensors"])["emcon"]["params"], {"level": "restricted"})
+        self.assertEqual(S.lanes_of(GAME_STATIONS["comms"])["channel"]["mode"], "close")            # (a word of the game's, kept as it is)
+        self.assertEqual(S.delegation_of(state, "tactical"), "advise")
+        self.assertEqual(S.available_from_state(state)["helm"], None)                                # (no list of modes: all of them)
+        board = S.board(state)
+        for needle in ("[course] intercept(target=T-23,standoff_km=6) until target_lost by captain, 84 s ago",
+                       "delegation advise", "[viewscreen] viewscreen_target(target=T-23,zoom=close)", "[alpha] mission(squadron=alpha,type=cap)",
+                       "main screen now: target: ordered, T-23", "INTERCEPT T-23 at 14.2 km"):
+            self.assertIn(needle, board)
+        self.assertNotIn("[datapad]", board)                                                          # (nothing pushed yet)
+
+    def test_a_mode_of_a_newer_build_is_shown_under_the_games_name(self) -> None:
+        st = {"modes": {"course": {"mode": "warp_jump", "params": {"x": 1}, "until": "order", "set_by": "captain", "for_s": 3}}}
+        lane = S.lanes_of(st)["course"]
+        self.assertEqual((lane["mode"], lane["params"]), ("warp_jump", {"x": 1}))
+        self.assertIn("warp_jump", S.board({"stations": {"helm": st}}))
+
+    async def test_the_local_ship_speaks_the_games_language(self) -> None:
+        ship = LocalShip(fight=True)
+        state = ship.snapshot()
+        for sid, ss in state["stations"].items():
+            self.assertEqual(set(ss), {"officer", "delegation", "status", "modes", "recent"}, sid)
+            self.assertLessEqual(set(ss["modes"]), set(GAME_ASPECTS[sid]), sid)
+            for aspect, m in ss["modes"].items():
+                self.assertIn(m["mode"], GAME_MODES[aspect], (sid, aspect))
+                self.assertLessEqual(set(m), {"mode", "params", "until", "set_by", "for_s"})
+        res = await ship.execute("station", {"station": "tactical", "aspect": "shields", "mode": "forward", "params": {"sector": "forward"}, "by": "captain"}, "tactical")
+        self.assertTrue(res["ok"], res)
+        sh = ship.snapshot()["stations"]["tactical"]["modes"]["shields"]
+        self.assertEqual((sh["mode"], sh["set_by"]), ("forward", "captain"))
+        bad = await ship.execute("station", {"station": "sensors", "aspect": "ew", "mode": "jam", "params": {"target": "T-23"}}, "sensors")
+        self.assertFalse(bad["ok"])
+
+    async def test_the_helm_turns_the_bow_to_the_action_by_itself(self) -> None:
+        ship = LocalShip(fight=True)
+        self.assertEqual(ship.snapshot()["stations"]["helm"]["modes"]["course"]["mode"], "hold")
+        ship.advance(40)
+        want = ship.range_bearing(ship.contacts["T-23"])[1]
+        self.assertLess(abs(((ship.heading - want) + 540) % 360 - 180), 40)
+
+    async def test_expiries_are_reported_in_the_games_words(self) -> None:
+        ship = LocalShip(fight=True)
+        await ship.execute("station", {"station": "helm", "aspect": "course", "mode": "keep_on_bow", "params": {"target": "T-23"}, "until": "target_lost"}, "helm")
+        await ship.execute("station", {"station": "tactical", "aspect": "engagement", "mode": "engage", "params": {"targets": ["T-23"]}, "until": "target_lost"}, "tactical")
+        ship.advance(80)
+        reports = ship.take_reports()
+        self.assertIn("helm: keep on bow ended (T-23 is no longer on the plot): back to hold", reports)
+        self.assertIn("tactical: engage ended (the targets are down or gone): back to return fire", reports)
 
 
 if __name__ == "__main__":

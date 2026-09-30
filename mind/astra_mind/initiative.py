@@ -80,9 +80,9 @@ class Watch:
         hostile, blind, _ = self.contacts(state)
         return bool(hostile or blind or flags or state.get("alert") == "red")
 
-    def digest(self, state: dict[str, Any], flags: list[str]) -> str:
-        """What matters, coarsely: two checks with the same digest have nothing new to decide."""
-        hostile, blind, friends = self.contacts(state)
+    @staticmethod
+    def consoles(state: dict[str, Any]) -> list[tuple]:
+        """The consoles without the clocks: (station, aspect, mode, target(s), delegation) — what a change means something for."""
         lanes = []
         for sid, ss in (state.get("stations") or {}).items():
             if not isinstance(ss, dict):
@@ -90,6 +90,12 @@ class Watch:
             for lane, ls in station_model.lanes_of(ss).items():
                 par = ls.get("params") or {}
                 lanes.append((sid, lane, ls.get("mode"), par.get("target") or par.get("targets"), ss.get("delegation")))
+        return lanes
+
+    def digest(self, state: dict[str, Any], flags: list[str]) -> str:
+        """What matters, coarsely: two checks with the same digest have nothing new to decide."""
+        hostile, blind, friends = self.contacts(state)
+        lanes = self.consoles(state)
         sh = (state.get("shields") or {}).get("strength_pct")
         parts = {
             "h": sorted((str(c.get("id")), int((c.get("range_km") or 0) // 2), int((c.get("hull_pct") or 0) // 25)) for c in hostile),
@@ -168,9 +174,10 @@ class Watch:
                     reach = "inside" if (c.get("range_km") or 99) <= 10 else "beyond"
                     out.append(f"hostile {c.get('id')} {c.get('name') or ''} at {c.get('range_km')} km ({reach} the railguns' 10 km) has no "
                                f"fire assigned (the posture is {mode.replace('_', ' ')})")
-        nav = lane("helm", "nav")
-        if hostile and (nav.get("mode") or "hold") == "hold":
-            out.append("the helm is holding course with hostiles about (the Captain wants the action ahead of the bow)")
+        nav = lane("helm", "course")
+        if hostile and (nav.get("mode") or "hold") == "hold" and (nav.get("params") or {}).get("face_action") is False:
+            out.append("the helm is holding the heading with hostiles about (the Captain wants the action ahead of the bow: "
+                       "the helm turns the bow to it by itself unless told to keep the heading)")
         vs = lane("ops", "viewscreen")
         if vs.get("mode") == "viewscreen_target" and not any(str(c.get("id")) == str((vs.get("params") or {}).get("target"))
                                                                 for c in state.get("contacts", []) or []):
@@ -197,7 +204,7 @@ class Watch:
                      + "; ".join(f"{k} {str(v)[:40]}" for k, v in (state.get('squadrons') or {}).items()))
         if self._events:
             lines.append("Since the last check: " + " | ".join(self._events[-6:]))
-        board = station_model.board(state)
+        board = json.dumps(self.consoles(state), default=str, sort_keys=True)
         if board != self._board and self._board:
             lines.append("(the consoles changed since the last check)")
         self._board = board

@@ -21,6 +21,8 @@ from astra_mind import router
 from .router_eval import make_ctx
 from .router_set import ALL
 from .router_test2_set import TEST2
+from .router_test3_set import TEST3
+from .router_test4_set import TEST4
 from .router_test_set import TEST
 
 DIM = 1 << 15
@@ -49,7 +51,7 @@ def train(X: np.ndarray, y: np.ndarray, epochs: int = 200, lr: float = 0.8, l2: 
 
 
 def main() -> None:
-    items = [i for i in ALL + TEST + TEST2 if i.chan in ("enemy", "live", "fleet", "fleet_live") and i.dest in ("crew", "external")]
+    items = [i for i in ALL + TEST + TEST2 + TEST3 + TEST4 if i.chan in ("enemy", "live", "fleet", "fleet_live") and i.dest in ("crew", "external")]
     X = np.stack([features(i.text, i.chan) for i in items])
     y = np.array([1.0 if i.dest == "external" else 0.0 for i in items], dtype=np.float32)
     idx = list(range(len(items)))

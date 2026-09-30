@@ -201,7 +201,7 @@ async def sc_follow_until_ordered(llm: OpenRouter, lang: str) -> Result:
     await h.captain(t1)
     text = {"it": "Ferri, seguilo e tienilo a sei chilometri", "en": "Ferri, stay on him and keep six kilometres"}[lang]
     turn = await h.captain(text)
-    nav = h.ship.lane("helm", "nav")
+    nav = h.ship.lane("helm", "course")
     sc.must("helm pursues T-23", nav["mode"] in ("intercept", "follow", "broadside", "orbit") and nav["params"].get("target") in ("T-23", "tactical_target"),
             f"{nav}")
     dist = nav["params"].get("standoff_km") or nav["params"].get("distance_km") or nav["params"].get("range_km")
@@ -375,7 +375,7 @@ async def _fight_to_the_kill(h: Harness) -> list[str]:
     """The Captain's earlier orders stand (engage, intercept, screen on T-23); the fight runs until T-23 falls."""
     for st, mode, p in (("tactical", "engage", {"targets": ["T-23"]}), ("helm", "intercept", {"target": "T-23", "standoff_km": 8}),
                         ("ops", "viewscreen_target", {"target": "T-23", "zoom": 6})):
-        await h.ship.execute("station", {"station": st, "mode": mode, "params": p}, "captain")
+        await h.ship.execute("station", {"station": st, "mode": mode, "params": p, "by": "captain"}, "captain")
     h.ship.advance(70)
     return h.ship.take_reports()
 
@@ -532,7 +532,7 @@ async def sc_typed_noise(llm: OpenRouter, lang: str) -> Result:
     sc.res.transcript.append(transcript(h, t1, turn, h.lines))
     t2 = "timoniere a massima velocita verso il cocktops"
     turn2 = await h.captain(t2)
-    nav = h.ship.lane("helm", "nav")
+    nav = h.ship.lane("helm", "course")
     sc.must("understood: the helm closes on T-23 at full", nav["mode"] in ("intercept", "follow", "broadside") and nav["params"].get("target") == "T-23", f"{nav}")
     sc.spoke_well(h, max_total=40)
     sc.res.transcript.append(transcript(h, t2, turn2, h.lines))
@@ -581,7 +581,7 @@ async def sc_routing(llm: OpenRouter, lang: str) -> Result:
     ch = Channel(party="T-23", name="Ferryman Irina Vael (the Cocytus)")
     ctx = Context(channel=ch)
     cases = {"it": [("rapporto armamenti", "crew"), ("ci sono navi nemiche", "crew"), ("qui il capitano dell'Aquila, fermatevi o verrete annientati", "external"),
-                    ("ascolta cocytus non deve finire cosi", "external"), ("che fanno adesso", "crew")],
+                    ("che cosa cercate qui", "external"), ("che fanno adesso", "crew")],
              "en": [("weapons report", "crew"), ("Ferryman, this is your last chance", "external"), ("what are your intentions", "external"),
                     ("Tactical, lock missiles on the Cocytus", "crew")]}[lang]
     for text, want in cases:

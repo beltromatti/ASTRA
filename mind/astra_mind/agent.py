@@ -347,7 +347,9 @@ class BridgeAgent:
             ok, why = station_model.may_on_initiative(cmd, station_model.delegation_of(state, cmd["station"]), standing_for)
             if not ok:
                 return {"ok": False, "detail": why}
-        return await _safe_execute(self.ship, "station", cmd, owner_of("station", cmd))
+        # to the game in its own words: the aspect, the game's mode name, and who decided (the console log and the board show it)
+        wire = station_model.to_wire(cmd, by="captain" if captain else "officer", state=state)
+        return await _safe_execute(self.ship, "station", wire, owner_of("station", cmd))
 
     async def _salvage(self, content: str, turn: Turn, lang: str, max_lines: int) -> None:
         for raw in [l for l in content.strip().splitlines() if l.strip()][:max_lines]:

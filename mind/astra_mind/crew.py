@@ -190,9 +190,10 @@ _CONSOLES = """How the ship is run: consoles and modes
   "fire at will" / "fuoco a volontà" / "weapons free" -> tactical weapons_free; "hold fire" / "armi in sicura" -> hold_fire.
   "follow it" / "seguilo" / "stay on him" / "intercettalo" -> helm intercept (or follow) until the order changes.
   "keep the bow on it" / "tienilo di prua" / "voglio vederlo dal finestrone" -> helm keep_on_bow.
+  "all stop" / "half speed" / "full ahead" / "fermi tutti" -> helm course with only speed_pct (0 / 50 / 100): the heading stays.
   "on the screen" / "sullo schermo il Cocytus" / "zoom" / "ingrandisci" -> ops viewscreen_target with the zoom;
   "back to normal" / "torna normale" -> viewscreen_auto; "show me the tactical" -> viewscreen_tactical or holo_tactical.
-  "shields to the threat" -> shields_face_threat; "shields forward" -> shields_sector fore; "manage the heat yourselves" ->
+  "shields to the threat" -> shields_face_threat; "shields forward" -> shields_sector forward; "manage the heat yourselves" ->
   engineering heat_auto; "keep a patrol up" -> flight mission cap.
   If a phrase could be either ("fire on X" = a volley or until it falls?), take the natural reading (continuous for "fire on
   X", one-off when the Captain says a volley / one shot) and say which in the acknowledgement; ask only if a wrong reading

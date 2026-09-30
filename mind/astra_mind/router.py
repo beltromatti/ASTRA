@@ -109,12 +109,15 @@ _SHIPS = _alt("acheron", "styx", "lethe", "cocytus", "cocito", "phlegethon", "av
 _RANKS = _alt("comandante", "commander", "commandant", "kommandant", "capitano nemico", "enemy commander", "comandante nemico",
               "comandante enemigo")
 _PARTY_NAMES = _PERSONS + "|" + _SHIPS + "|kharon|fleet command|comando flotta|settima flotta|7th fleet"
-_LEAD = (r"(?:il |la |l'|lo |the |le |el |der |die |das |ehi |hey |eh |oye |attenzione |attention |achtung |capitan\w* |capitaine |"
-         r"kapitaen |captain |ferryman |commander |comandante |commandant |kommandant )?")
+_FILLERS = (r"(?:(?:ok|okay|allora|senti|senta|sentite|ascolta|ascolti|ascoltate|dunque|beh|be'|ehm|uhm|mh|ehi|eh|oh|ah|well|so|look|listen|"
+            r"right|all right|alright|now|hey|bon|bien|alors|ecoute|ecoutez|also|na ja|nun|hoer|hoeren sie|pues|bueno|oye|mira|mire|entonces|vale|"
+            r"attenzione|attention|achtung)[,.]?\s+)*")
+_LEAD = _FILLERS + (r"(?:capitan\w* |capitaine |kapitaen |captain |ferryman |commander |comandante |commandant |kommandant )?")
+# (no articles in the lead-in: "il Cocytus e solo" is about it)
 _PARTY_VOC = _rx(r"(?:^|[,:;]\s*|[.!?]\s+)" + _LEAD + r"(?:" + _PARTY_NAMES + "|" + _RANKS + r")\b\s*[,:;]?")
 _TITLE_ANY = _rx(r"\b(?:ferryman|archon|warden|ammiragli\w*|admiral|amiral|almirante|comandante|commander|commandant|kommandant|"
                  r"capitano nemico|enemy commander)\b")
-_PARTY_END = _rx(r"(?:^|\s)(?:" + _PERSONS + "|" + _RANKS + r")\s*[.!?]*$")
+_PARTY_END = _rx(r"(?:^|\s)(?:" + _PERSONS + "|" + _RANKS + r"|capitano|captain|capitan|capitaine|kapitaen|kapitan)\s*[.!?]*$")
 _RANKISH = _rx(r"^(?:l'|il|la|lo|the|le|el|der|die|das|mister|signor|capitano|captain|capitan|capitaine|kapitaen|comandante|commander|"
                r"ammiraglio|admiral|amiral|almirante|ferryman|archon|warden|vice|l'ammiraglio|l'archon|dell'ammiraglio)$")
 _PARTY_ANY = _rx(r"\b(?:" + _PARTY_NAMES + r")\b")
@@ -184,12 +187,29 @@ _EXT_MED = _rx(r"(?:^|\s)(?:"
                r"me (?:escuchan|oyen|escucha|oye)|oigan|escuchen|mi palabra|deteng\w+|cesen (?:el )?fuego|no confio en|"
                r"ecoutez(?:-moi)?|vous nous (?:entendez|recevez)|ma parole|cessez le feu|je (?:ne )?vous (?:\w+ )?(?:pas )?(?:fais|dis|donne|offre)|"
                r"hoert (?:mir )?zu|hoeren sie|hoert ihr mich|hoeren sie mich|mein wort|ich vertraue (?:ihnen|euch)|stellen sie das feuer ein|"
-               r"stellt das feuer ein"
+               r"stellt das feuer ein|"
+               r"parliamo(?:ne)?|parlamentare|discutiamone|let's talk|lets talk|talk terms|hablemos|negociemos|parlons|discutons|"
+               r"reden wir|sprechen wir|lasst uns reden|verhandeln wir|"
+               r"(?:ti|vi|la) (?:ascolto|sento|ricevo)|i hear you|i'm listening|im listening|i copy you|loud and clear|te escucho|les escucho|"
+               r"je vous (?:entends|ecoute)|ich hoere sie|ich hoere euch|"
+               r"(?:la|le) (?:lasciamo|lasceremo|lascer\w+|invito|avverto|consiglio|do|offro|ordino|concedo|garantisco|assicuro)|"
+               r"si (?:arrenda|ritiri|fermi|allontani|spost\w+)|ceda|cede adesso|(?:ritiri|risponda|ascolti|abbassi|spenga|mi dica)\b"
                r")")
 # a weak sign of a second person ("you", "voi"): a nudge only — the crew is addressed in the second person too
 _EXT_WEAK = _rx(r"(?:^|\s)(?:voi|vi|ustedes|vosotros|vous|ihr|euch|you|your|yours|vostr\w*|vuestr\w*|votre|vos|eure\w*|ihre\w*)\b")
+# talk ABOUT them, in the third person ("what did she say"): for the crew, whatever else the words look like
+_ABOUT_THEM = _rx(r"\b(?:(?:what|why|how|when|where|who) (?:did|does|do|is|was|would|will) (?:she|he|they)|"
+                  r"(?:she|he|they) (?:said|says|told|meant|means|wants?|has|have|had|will|would|is|are|was|were)|"
+                  r"qu'a-t-(?:elle|il)|qu'(?:elle|il|ils|elles) (?:a|ont) (?:dit|voulu)|elle (?:a dit|veut)|ils (?:ont dit|veulent)|"
+                  r"chi (?:e|era|sarebbe) (?:quello|quella|costui|colei|il tizio|la tizia)|(?:quello|quella|costui|colei|il tizio|la tizia) "
+                  r"(?:che )?(?:ha|sta|vuole|dice|dice di)\b|"
+                  # asking someone to pass a word on ("chiedi all'ammiraglio ...", "tell them ..."): an order for Comms
+                  r"(?:chiedi|chiedete|di|dite|digli|ditegli|dille|ditele|avvisa|avvisate|informa|informate|comunica|comunicate) "
+                  r"(?:a |al |allo |all'|alla |ai |agli |alle |gli |le |loro )(?!tuo|tua|tuoi|tue|vostr)|"
+                  r"(?:tell|ask|inform|notify) (?:him|her|them|the (?!fleet)|our|my)\b)")
 # a reply in a conversation (counts only while the party has just spoken)
 _REPLY = _rx(r"^(?:no|si|mai|forse|va bene|ok|d'accordo|certo|come|cosa|perche|quando|dove|quanto tempo|ripeta|ripeti|aspetti|aspettate|"
+             r"un attimo|un momento|un secondo|hold on|one moment|just a moment|one second|un instante|un moment|un instant|einen moment|"
              r"sentito|capito|chiaro|accetto|rifiuto|ho capito|"
              r"yes|yeah|sure|never|maybe|fine|all right|alright|agreed|why|what|when|where|how long|repeat that|wait|stand by|understood|"
              r"i accept|i agree|i refuse|i understand|go on|and if|"
@@ -231,6 +251,8 @@ _CREW_STEMS = (
     "wie viele", "wie weit", "wie schnell", "entfernt", "zeigt", "bildschirm", "hitze", "sensoren", "schaden",
 )
 _CREW_RX = _rx(r"(?:^|\s)(?:" + "|".join(re.escape(s).replace(r"\ ", " ") for s in _CREW_STEMS) + r")")
+
+
 
 # "mandate" is an order ("send") far more often than the Kharon Mandate: never a party by itself
 _SPLIT_RX = re.compile(r"(?<=[.!?;])\s+|\n+")
@@ -314,6 +336,10 @@ def score_segment(seg: str, ctx: Context, first: bool, prev_ext: bool = False, p
         s.crew += 2
         s.officers = s.officers or (ctx.facing,)
         s.why.append("facing " + ctx.facing)
+    about = bool(_ABOUT_THEM.search(t))
+    if about:
+        s.crew += 3
+        s.why.append("talks about them, not to them")
     if not ch or not ch.open:
         return s
     # the party
@@ -332,14 +358,15 @@ def score_segment(seg: str, ctx: Context, first: bool, prev_ext: bool = False, p
     if voc:
         # set off by a comma or a colon, or a title at the very start ("ammiraglio, ...", "Ferryman ..."): he is being spoken to;
         # a bare name at the start of typed words may be the subject of a sentence ("vael sta bluffando") and needs more evidence
+        at_the_end = voc.end() >= len(t.rstrip()) and len(t.split()) <= 8                # "back off vael": the name closes short words
         spoken_to = (bool(re.search(r"[,:;]\s*$", voc.group(0))) or bool(re.match(r"\s*[,:;]", voc.group(0)))
-                     or bool(re.search(r"[,:;]\s*$", t[:voc.start()])) or bool(_TITLE_ANY.search(voc.group(0))))
+                     or bool(re.search(r"[,:;]\s*$", t[:voc.start()])) or bool(_TITLE_ANY.search(voc.group(0))) or at_the_end)
         s.ext += (3 if spoken_to else 2) if domain < 3 else 2
         s.why.append("party vocative" + ("" if spoken_to else " (bare name)"))
     if _EXT_WEAK.search(t):
         s.ext += 1                                 # "you", "voi", "vos": the words may be for them; a lone ship word is not enough
         s.soft += 1
-    if ch.talking and not voc_officers and not prev_crew:
+    if ch.talking and not voc_officers and not prev_crew and not about:
         words = len(t.split())
         if _REPLY.match(t):
             s.ext += 3 if not domain else 2
@@ -395,8 +422,10 @@ def decide(text: str, ctx: Context) -> Decision:
     prev_ext = prev_crew = False
     why = []
     weak_ext = False
+    pointed: list[bool] = []                         # (per sentence: does it point at the party at all?)
     for i, seg in enumerate(segs):
         sc = score_segment(seg, ctx, i == 0, prev_ext, prev_crew)
+        pointed.append(sc.ext >= 2)
         officers += list(sc.officers)
         if not ch or not ch.live:
             d = "crew"
@@ -422,7 +451,8 @@ def decide(text: str, ctx: Context) -> Decision:
     if "unsure" in dests:
         # a sentence the rules cannot place takes the side of its neighbours when they agree, else the model decides
         known = {d for d in dests if d != "unsure"}
-        if len(known) == 1 and len(segs) > 1:
+        names_party = any(d == "unsure" and p for d, p in zip(dests, pointed))       # ("Un attimo Vael." is not filler)
+        if len(known) == 1 and len(segs) > 1 and not (names_party and known == {"crew"}):
             dests = [next(iter(known)) if d == "unsure" else d for d in dests]
         else:
             return Decision("unsure", officers=tuple(dict.fromkeys(officers)), why=" | ".join(why))
@@ -440,14 +470,16 @@ LABEL_PROMPT = """The Captain of a starship is speaking aloud on the bridge and 
 the Captain's words are for. Reply with ONE word:
 crew  - for the bridge crew: orders (also shouted ones, whatever the language), questions about our own ship, weapons, sensors,
         contacts, talk ABOUT the party or "the enemy" in the third person, a word to an officer or to everyone aboard, thinking aloud;
+        the words are often typed fast, with slips: read them for what they mean;
 party - for {party} on the channel: a demand, threat, offer, question or reply put TO them, calling them by name, ship or rank, or
-        "you" aimed at them;
+        "you" aimed at them, or a statement of the Captain's position that only makes sense said to them;
 mixed - part for the crew and part for {party}.
 Default to crew: answer party only when the words are plainly said to {party}. {situation}
 Examples (in any language): "apri il fuoco a discrezione" crew; "rapporto sullo stato delle armi" crew; "ci sono ancora nemici in
-zona?" crew; "Kade sta mentendo, Voss" crew; "Tir !" crew; "Ferri, portaci via. Ferryman, e la vostra ultima offerta" mixed; "voi,
-fermatevi subito o apro il fuoco" party; "Ferryman Doran, qui il capitano dell'Aquila" party; "tell me what you want" party; "esto se
-acaba aqui" party; "pouvez-vous m'entendre ?" party when they just spoke, else crew."""
+zona?" crew; "Kade sta mentendo, Voss" crew; "Tir !" crew; "misili sul nemico" crew; "Ferri, portaci via. Ferryman, e la vostra
+ultima offerta" mixed; "voi, fermatevi subito o apro il fuoco" party; "Ferryman Doran, qui il capitano dell'Aquila" party; "tell me
+what you want" party; "esto se acaba aqui" party; "non siamo venuti per combattere" party; "you are making a mistake" party;
+"pouvez-vous m'entendre ?" party when they just spoke, else crew."""
 
 SPLIT_PROMPT = """The Captain's words mix an order for the bridge crew and words for {party} on the channel. Split them, verbatim. Reply with
 JSON only: {{"crew": "<the part for the crew>", "party": "<the part for {party}>"}}"""

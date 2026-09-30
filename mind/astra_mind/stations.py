@@ -1,18 +1,20 @@
 """The bridge stations as the crew sees them: live consoles with persistent modes (docs/ARCHITETTURA.md §4).
 
-This module is the single description of the `station` command — which stations exist, their lanes (independent
-persistent modes), the modes with their parameters and defaults, and how far an officer may go on their own
-initiative. Everything else derives from it: the JSON schema and the text of the `station` tool (tools.py), the
-validation of the arguments before they reach the ship, the console board in the crew's prompt (crew.py), the
-offline ship (local_ship.py) and the contract proposal for the game side (docs/contratto_postazioni.md).
+This module is the single description of the `station` command on the mind's side. It has two faces:
 
-Reading of the game's `ship_state.state.stations` (all optional, the mind adapts to what it finds):
-    {"helm": {"officer": "helm", "delegation": "auto", "modes": ["hold", ...],          # `modes`: what this build supports
-              "lanes": {"nav": {"mode": "intercept", "params": {...}, "until": "target_lost", "set_by": "captain",
-                                "since": 812.4, "status": "closing on T-23 at 310 m/s, 14.2 km, ETA 1:10"}},
-              "last_actions": ["..."]}, ...}
-A station of the ARCHITETTURA shape (mode/params/until/status at the top level, no `lanes`) is read as one lane.
-"""
+* the CREW's vocabulary — one flat, self-describing name per mode (`shields_face_threat`, `viewscreen_target`, `scan_focus`), so
+  that a model picks the right one from the meaning of the Captain's words; the JSON schema and the text of the `station` tool
+  (tools.py), the validation of the arguments, the console board of the crew's prompt (crew.py), the initiative watch and the
+  offline ship (local_ship.py) all derive from it;
+* the GAME's vocabulary — what UAstraStationsSubsystem (Source/ASTRA/AstraStations.cpp) really takes and reports: a command
+  `{station, aspect, mode, params, until, note, by}` (an ASPECT is one independent persistent mode of a station: "course",
+  "engagement", "shields"...; the flight station has one per squadron) and a state
+  `stations.<id> = {officer, delegation, status, modes: {aspect: {mode, params, until, set_by, for_s}}, recent: [...]}`.
+  `to_wire` turns a checked crew command into the first, `from_wire` reads one back (the offline ship speaks the game's
+  language), `lanes_of` reads the second into the crew's names. The table `_build()` is the ONLY place that knows both.
+
+A lane of this module is a game aspect. What the game does not have (yet) is not in the table: electronic warfare and SIGINT
+modes, a squadron `formation`, a fleet holo, datapad pages other than the game's five."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -22,14 +24,14 @@ from typing import Any, Iterable
 NUM, INT, STR, BOOL, STRS, ZOOM = "number", "integer", "string", "boolean", "strings", "zoom"
 ZOOM_WORDS = ("close", "wide", "max")             # (a zoom is a magnification, or one of these words: the game knows what they mean)
 
-# what a target may be: a contact id from the plot, or a selector the executor re-evaluates every tick
-SELECTORS = ("tactical_target", "nearest_hostile", "biggest_threat")
 UNTIL_WORDS = ("done", "target_lost", "order")           # and "time:<seconds>"
 DELEGATIONS = ("manual", "advise", "auto")
-SIDES_SHIP = ("port", "starboard")
 SQUADRONS = ("alpha", "bravo", "drones")
 WEAPON_GROUPS = ("railguns", "lasers", "missiles", "torpedoes")
-SECTORS = ("fore", "aft", "port", "starboard", "dorsal", "ventral")
+SECTORS = ("forward", "aft", "port", "starboard", "dorsal", "ventral")
+POWER_PROFILES = ("balanced", "combat", "evasive", "silent", "shields", "weapons", "engines")
+DATAPAD_PAGES = ("overview", "contact", "damage", "fleet", "orders")
+POWER_SYSTEMS = ("shields", "weapons", "engines", "sensors", "life_support", "flight_deck")
 
 
 @dataclass(frozen=True)
@@ -47,16 +49,21 @@ class P:
 
 @dataclass(frozen=True)
 class Mode:
-    name: str
+    name: str                                # the crew's name for the mode: unique across the ship
     station: str
-    lane: str
+    lane: str                                # the game's aspect it belongs to
     params: tuple[P, ...] = ()
-    until: str = "order"                     # default end condition
+    until: str = "order"                     # default end condition (what the game does with it)
     summary: str = ""
     authority: str = "free"                  # free | engaged | captain — see `may_on_initiative`
+    native: str = ""                         # the game's name for the mode when it differs from `name` ("" = the same)
 
     def param(self, name: str) -> P | None:
         return next((p for p in self.params if p.name == name), None)
+
+    @property
+    def game_mode(self) -> str:
+        return self.native or self.name
 
 
 @dataclass(frozen=True)
@@ -67,153 +74,148 @@ class Station:
     summary: str = ""
 
 
-def _target(required: bool = True, desc: str = "contact id (T-23) or a selector") -> P:
+def _target(required: bool = True, desc: str = "contact id from the plot (T-23)") -> P:
     return P("target", STR, desc, required=required)
 
 
 def _speed() -> P:
-    return P("speed_pct", NUM, "cap on the throttle, percent (0-100)", lo=0, hi=100)
+    return P("speed_pct", NUM, "throttle, percent (0-100)", lo=0, hi=100)
 
 
 def _mk(station: str, lane: str, name: str, summary: str, params: tuple[P, ...] = (), until: str = "order",
-        authority: str = "free") -> Mode:
-    return Mode(name, station, lane, params, until, summary, authority)
+        authority: str = "free", native: str = "") -> Mode:
+    return Mode(name, station, lane, params, until, summary, authority, native)
 
 
 def _build() -> dict[str, Station]:
     m = _mk
     helm = [
-        m("helm", "nav", "hold", "cancel any pursuit, keep the present heading; speed as given (0 = all stop), else unchanged",
-          (_speed(),), "order"),
-        m("helm", "nav", "course", "steer to a fixed heading and mark, then hold it",
-          (P("heading_deg", NUM, "true bearing in the system plane, 0-359.99", required=True, lo=0, hi=359.99),
-           P("mark_deg", NUM, "pitch, -90..90", lo=-90, hi=90, default=0), _speed()), "done", "captain"),
-        m("helm", "nav", "intercept", "close on a contact and hold the standoff range, broadside inside it; the course follows the target",
+        m("helm", "course", "hold", "cancel any pursuit and keep the present heading; in a fight the bow comes round to the action "
+          "by itself unless face_action is false", (P("face_action", BOOL, "false: keep the heading even in a fight", default=True),)),
+        m("helm", "course", "course", "steer to a heading and mark (default: the present ones) and/or set the speed; 'all stop' is "
+          "speed_pct 0", (P("heading_deg", NUM, "true bearing in the system plane, 0-359.99", lo=0, hi=359.99),
+                          P("mark_deg", NUM, "pitch, -90..90", lo=-90, hi=90), _speed()), "order", "captain"),
+        m("helm", "course", "intercept", "close on a contact and hold the standoff range, broadside inside it; the course follows the target",
           (_target(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40, default=6), _speed()),
           "target_lost", "engaged"),
-        m("helm", "nav", "keep_on_bow", "keep the bow on the target (attitude only, speed unchanged): the Captain sees it through the window",
+        m("helm", "course", "keep_on_bow", "keep the bow on the target (attitude only, speed unchanged): the Captain sees it through the window",
           (_target(),), "target_lost"),
-        m("helm", "nav", "follow", "shadow a ship at a distance and on a side of it",
-          (_target(), P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=3),
-           P("side", STR, "which side of the ship to keep", enum=("astern", "ahead", "port", "starboard"), default="astern")), "order", "engaged"),
-        m("helm", "nav", "orbit", "circle a contact at a radius",
-          (_target(), P("radius_km", NUM, "orbit radius", lo=0.5, hi=40, default=6)), "order", "engaged"),
-        m("helm", "nav", "broadside", "present a broadside to the target (all turrets bear) and keep the range",
+        m("helm", "course", "follow", "shadow a ship at a distance and on a side of it",
+          (_target(), P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=2),
+           P("side", STR, "which side of the ship to keep", enum=("astern", "port", "starboard", "above", "below"), default="astern")),
+          "target_lost", "engaged"),
+        m("helm", "course", "orbit", "circle a contact at a radius",
+          (_target(), P("radius_km", NUM, "orbit radius", lo=0.5, hi=40, default=8),
+           P("direction", STR, "counter-clockwise or clockwise", enum=("ccw", "cw"), default="ccw")), "target_lost", "engaged"),
+        m("helm", "course", "broadside", "present a broadside to the target (all turrets bear) and keep the range",
           (_target(), P("side", STR, "which side to present", enum=("port", "starboard", "best"), default="best"),
-           P("range_km", NUM, "range to keep", lo=0.5, hi=40, default=6)), "target_lost", "engaged"),
-        m("helm", "nav", "evade", "evasive manoeuvres against incoming fire; runs 30 s unless told otherwise",
-          (P("pattern", STR, "how to evade", enum=("jink", "spiral", "away"), default="jink"),), "time:30"),
-        m("helm", "nav", "retreat", "break off and run",
-          (P("toward", STR, "gate | fleet | a contact id | away (from the nearest threat)", default="away"), _speed()), "order",
-          "captain"),
-        m("helm", "nav", "formation", "hold a slot on a friendly ship",
-          (P("leader", STR, "contact id of the friendly ship", required=True),
-           P("slot", STR, "the slot on the leader", enum=("ahead", "astern", "port", "starboard", "port_quarter", "starboard_quarter"),
-             default="port_quarter")), "order", "captain"),
-        m("helm", "nav", "transit", "fly to the Janus Gate's approach lane and go through (no turning back once in the lane)",
-          (P("system", STR, "destination system, one the gate is tuned to", required=True),), "done", "captain"),
+           P("range_km", NUM, "range to keep", lo=0.5, hi=40, default=8)), "target_lost", "engaged"),
+        m("helm", "course", "evade", "evasive manoeuvres against incoming fire (jinks every few seconds), full ahead; runs 45 s unless told otherwise",
+          (), "time:45"),
+        m("helm", "course", "retreat", "break off and run: full ahead away from the threats", (), "order", "captain"),
+        m("helm", "course", "formation", "hold a slot on a friendly ship (default: the fleet's flagship)",
+          (P("target", STR, "contact id of the friendly ship to keep station on (default: the flagship)"),
+           P("slot", STR, "the slot on it", enum=("astern", "port", "starboard", "above", "below"), default="astern"),
+           P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=3)), "target_lost", "captain"),
+        m("helm", "course", "transit", "fly to the Janus Gate's approach lane and go through (no turning back once in the lane)",
+          (P("system", STR, "destination system, one the gate is tuned to", required=True),), "order", "captain"),
     ]
     tactical = [
         m("tactical", "engagement", "hold_fire", "no fire unless ordered", (), "order", "captain"),
         m("tactical", "engagement", "return_fire", "fire only at ships that fire on us (the default posture)", (), "order"),
         m("tactical", "engagement", "weapons_free", "engage any tracked hostile inside range at will, until told otherwise",
-          (P("range_km", NUM, "only inside this range (default: each weapon's own)", lo=1, hi=40),), "order", "captain"),
+          (P("range_km", NUM, "only inside this range (default 25 km)", lo=1, hi=40),), "order", "captain"),
         m("tactical", "engagement", "engage",
-          "fire on the listed targets until they fall: assigns the weapons, keeps the cadence, retargets inside the list",
-          (P("targets", STRS, "contact ids or selectors, in order of priority; 'hostiles' = every tracked hostile", required=True),
-           P("weapons", STRS, "subset of railguns, lasers, missiles, torpedoes (default: all that reach)"),
-           P("fire", STR, "sustained = keep firing; volley = one salvo per group then hold; conserve = only sure hits",
-             enum=("sustained", "volley", "conserve"), default="sustained"),
-           P("priority", STR, "which listed target first", enum=("ordered", "nearest", "weakest", "biggest_threat"), default="ordered")),
+          "fire on the listed targets until they fall: assigns the weapons, keeps the cadence, moves on to the next in the list",
+          (P("targets", STRS, "contact ids, in order of priority; 'hostiles' = every tracked hostile on the plot", required=True),
+           P("weapons", STRS, "subset of railguns, lasers, missiles, torpedoes (default: railguns, lasers, missiles)"),
+           P("fire", STR, "sustained = keep firing; volley = one missile salvo then hold; conserve = fewer missiles, only sure hits",
+             enum=("sustained", "volley", "conserve"), default="sustained")),
           "target_lost", "engaged"),
-        m("tactical", "shields", "shields_balanced", "shields even on every sector", (), "order"),
-        m("tactical", "shields", "shields_face_threat", "turn the strongest sector towards the incoming fire, continuously", (), "order"),
+        m("tactical", "shields", "shields_balanced", "shields even on every sector", (), "order", native="balanced"),
+        m("tactical", "shields", "shields_face_threat", "turn the strongest sector towards the incoming fire, continuously (the default)",
+          (), "order", native="face_threat"),
         m("tactical", "shields", "shields_sector", "fix the reinforced sector",
-          (P("sector", STR, "fore | aft | port | starboard | dorsal | ventral", enum=SECTORS, required=True),), "order"),
+          (P("sector", STR, "forward | aft | port | starboard | dorsal | ventral", enum=SECTORS, required=True),), "order",
+          native="sector"),
         m("tactical", "shields", "shields_off", "shields down", (), "order", "captain"),
         m("tactical", "point_defense", "pd_auto", "point defence on automatic", (), "order"),
         m("tactical", "point_defense", "pd_protect", "point defence covers a friendly ship first",
-          (P("target", STR, "contact id of the friendly ship", required=True),), "order"),
+          (P("target", STR, "contact id of the friendly ship", required=True),), "order", native="protect"),
         m("tactical", "point_defense", "pd_off", "point defence off", (), "order", "captain"),
-        m("tactical", "missiles", "missiles_normal", "missiles as the fire order says", (), "order"),
-        m("tactical", "missiles", "missiles_conserve", "spare the magazines: only sure hits", (), "order"),
-        m("tactical", "missiles", "missiles_saturate", "empty the cells in one salvo to saturate their point defence", (), "order", "captain"),
+        m("tactical", "missiles", "missiles_normal", "missiles as the fire order says", (), "order", native="normal"),
+        m("tactical", "missiles", "missiles_conserve", "spare the magazines: fewer missiles, only sure hits", (), "order", native="conserve"),
+        m("tactical", "missiles", "missiles_saturate", "empty the cells in salvos of eight to saturate their point defence", (), "order",
+          "captain", native="saturate"),
     ]
     sensors = [
-        m("sensors", "emcon", "emcon", "emission control: silent = passive only, restricted, full = active sensors out (bigger signature)",
+        m("sensors", "emcon", "emcon", "emission control: silent = passive only, restricted = the normal state, full = active sensors "
+          "out (a bigger signature)",
           (P("level", STR, "silent | restricted | full", enum=("silent", "restricted", "full"), required=True),), "order", "captain"),
-        m("sensors", "scan", "scan_passive", "passive sensors only, keep the picture", (), "order"),
+        m("sensors", "scan", "scan_passive", "passive sensors only, keep the picture", (), "order", native="passive"),
         m("sensors", "scan", "scan_sweep", "an active ping every so often (everyone hears it)",
-          (P("every_s", NUM, "seconds between pings", lo=5, hi=300, default=30),), "order", "captain"),
-        m("sensors", "scan", "scan_focus", "keep a focused scan on a contact until it is identified or lost",
-          (_target(),), "done"),
-        m("sensors", "ew", "ew_off", "no jamming", (), "order"),
-        m("sensors", "ew", "ew_jam", "jam a contact's fire control",
-          (_target(),), "target_lost", "captain"),
-        m("sensors", "sigint", "sigint_on", "listen in on their datalinks and traffic", (), "order"),
-        m("sensors", "sigint", "sigint_off", "stop listening in", (), "order"),
+          (P("every_s", NUM, "seconds between pings (at least 15)", lo=15, hi=300, default=60),), "order", "captain", native="sweep"),
+        m("sensors", "scan", "scan_focus", "keep a focused scan on a contact until it is tracked or lost",
+          (_target(),), "target_lost", native="focus"),
     ]
     ops = [
-        m("ops", "viewscreen", "viewscreen_auto", "the director picks the subject: the fight, the threat, the strongest event", (), "order"),
+        m("ops", "viewscreen", "viewscreen_auto", "the director picks the subject: the fight, the threat, the strongest event", (), "order",
+          native="auto"),
         m("ops", "viewscreen", "viewscreen_forward", "the forward optical view",
-          (P("zoom", ZOOM, "a magnification 1-49, or close | wide | max", lo=1, hi=100),), "order"),
+          (P("zoom", ZOOM, "a magnification 1-49, or close | wide | max", lo=1, hi=100),), "order", native="forward"),
         m("ops", "viewscreen", "viewscreen_target", "the camera on a contact, with the zoom; released when it is lost",
-          (_target(), P("zoom", ZOOM, "a magnification 1-49, or close | wide | max (default: fits the range)", lo=1, hi=100)), "target_lost"),
-        m("ops", "viewscreen", "viewscreen_tactical", "the tactical plot on the main screen", (), "order"),
-        m("ops", "viewscreen", "viewscreen_fleet", "the fleet: friendly ships and their status", (), "order"),
+          (_target(), P("zoom", ZOOM, "a magnification 1-49, or close | wide | max (default: fits the range)", lo=1, hi=100)),
+          "target_lost", native="target"),
+        m("ops", "viewscreen", "viewscreen_tactical", "the tactical plot on the main screen", (), "order", native="tactical"),
+        m("ops", "viewscreen", "viewscreen_fleet", "the fleet: friendly ships and their status", (), "order", native="fleet"),
         m("ops", "viewscreen", "viewscreen_comms", "the open channel's party on screen",
-          (P("party", STR, "contact id or 'fleet' (default: the open channel)"),), "order"),
-        m("ops", "viewscreen", "viewscreen_damage", "the damage board", (), "order"),
-        m("ops", "viewscreen", "viewscreen_sector", "the sector map", (), "order"),
-        m("ops", "viewscreen", "viewscreen_off", "screen off: the true window", (), "order"),
-        m("ops", "holo", "holo_tactical", "the holo table shows the battle around the Aquila",
-          (P("range_km", NUM, "plot radius (default: fits the contacts)", lo=2, hi=200),), "order"),
-        m("ops", "holo", "holo_sector", "the holo table shows the sector map", (), "order"),
-        m("ops", "holo", "holo_ship", "the holo table shows one ship in detail", (_target(desc="contact id"),), "order"),
-        m("ops", "holo", "holo_fleet", "the holo table shows the fleet", (), "order"),
-        m("ops", "datapad", "datapad_push", "put a page on the Captain's datapad",
-          (P("page", STR, "status | contacts | weapons | damage | flight | orders | comms | ship", required=True,
-             enum=("status", "contacts", "weapons", "damage", "flight", "orders", "comms", "ship")),
-           P("focus", STR, "a contact id for page 'ship' or 'contacts'")), "done"),
-        m("ops", "damage_control", "dc_auto", "the four damage-control teams go where the worst is: fires, breaches, weapons, reactor", (), "order"),
+          (P("party", STR, "contact id or 'fleet' (default: the open channel)"),), "order", native="comms"),
+        m("ops", "viewscreen", "viewscreen_damage", "the damage board", (), "order", native="damage"),
+        m("ops", "viewscreen", "viewscreen_sector", "the sector map", (), "order", native="sector"),
+        m("ops", "viewscreen", "viewscreen_off", "screen off: the true window", (), "order", native="off"),
+        m("ops", "holo", "holo_tactical", "the holo table shows the battle around the Aquila", (), "order", native="tactical"),
+        m("ops", "holo", "holo_sector", "the holo table shows the sector map", (), "order", native="sector"),
+        m("ops", "holo", "holo_ship", "the holo table shows the tactical plot with one ship marked", (_target(desc="contact id"),), "order",
+          native="ship"),
+        m("ops", "datapad", "datapad_push", "put a page on the Captain's datapad (Tab shows it)",
+          (P("page", STR, "overview | contact (a dossier: give focus) | damage | fleet | orders", required=True, enum=DATAPAD_PAGES),
+           P("focus", STR, "a contact id, for the page 'contact'")), "order", native="push"),
+        m("ops", "damage_control", "dc_auto", "the damage-control teams go where the worst is: breaches, fires, then what a fight needs",
+          (), "order", native="auto"),
         m("ops", "damage_control", "dc_priority", "steer the damage-control teams towards one thing first",
-          (P("what", STR, "reactor | weapons | shields | sensors | engines | life_support | flight_deck | fires | breaches | casualties",
-             required=True, enum=("reactor", "weapons", "shields", "sensors", "engines", "life_support", "flight_deck",
-                                  "fires", "breaches", "casualties")),), "order"),
+          (P("what", STR, "what first: breaches | fires | reactor | weapons | shields | engines | a deck", required=True),), "order",
+          native="priority"),
     ]
     engineering = [
-        m("engineering", "power", "power_profile", "set the reactor's distribution by profile",
-          (P("profile", STR, "balanced | offense (weapons up) | defense (shields up) | engines | sensors | flight_ops",
-             required=True, enum=("balanced", "offense", "defense", "engines", "sensors", "flight_ops")),), "order"),
-        m("engineering", "power", "power_custom", "set several systems' power at once (percent of nominal, budget 700%: raising one needs a cut elsewhere)",
-          (P("shields_pct", NUM, "", lo=0, hi=150), P("weapons_pct", NUM, "", lo=0, hi=150), P("engines_pct", NUM, "", lo=0, hi=150),
-           P("sensors_pct", NUM, "", lo=0, hi=150), P("life_support_pct", NUM, "", lo=0, hi=150),
-           P("flight_deck_pct", NUM, "", lo=0, hi=150)), "order"),
-        m("engineering", "heat", "heat_auto", "manage the heat by themselves: radiators out or in, cadence throttled to keep under the limit",
-          (P("limit_pct", NUM, "heat ceiling", lo=30, hi=95, default=70),), "order"),
+        m("engineering", "power", "power_profile", "set the reactor's distribution by profile: balanced (all nominal), combat "
+          "(shields and weapons up), evasive (engines and shields up), silent (everything low, hard to detect), shields | weapons | "
+          "engines (that system up)",
+          (P("profile", STR, " | ".join(POWER_PROFILES), required=True, enum=POWER_PROFILES),), "order"),
+        m("engineering", "power", "power_custom", "set several systems' power at once (percent of nominal; the reactor's budget is "
+          "700%: raising one needs a cut elsewhere)",
+          tuple(P(f"{s}_pct", NUM, "", lo=0, hi=150) for s in POWER_SYSTEMS), "order", native="custom"),
+        m("engineering", "heat", "heat_auto", "manage the heat by themselves: radiators out when it climbs, in when it is low, coolant "
+          "vent in an emergency", (), "order", native="auto"),
         m("engineering", "heat", "heat_radiators", "radiators fixed",
           (P("state", STR, "extended | retracted", enum=("extended", "retracted"), required=True),), "order"),
-        m("engineering", "reactor", "reactor_normal", "the reactor at its normal rating", (), "order"),
-        m("engineering", "reactor", "reactor_battle_short", "battle short: safeties bypassed for more output, for a limited time, at a risk",
-          (), "time:120", "captain"),
+        m("engineering", "reactor", "reactor_normal", "the reactor at its normal rating", (), "order", native="normal"),
+        m("engineering", "reactor", "reactor_battle_short", "battle short: safeties bypassed for more output, at a risk",
+          (), "order", "captain", native="battle_short"),
     ]
     comms = [
-        m("comms", "channel", "channel_mute", "the Captain's voice no longer goes out on the open channel", (), "order"),
-        m("comms", "channel", "channel_unmute", "the Captain's voice goes out on the open channel again", (), "order"),
-        m("comms", "listen", "listen_off", "no monitoring", (), "order"),
-        m("comms", "listen", "listen_fleet", "monitor the fleet net and report", (), "order"),
-        m("comms", "listen", "listen_enemy", "monitor and translate the enemy's channels", (), "order"),
-        m("comms", "listen", "listen_all", "monitor everything", (), "order"),
+        m("comms", "channel", "channel_mute", "the Captain's voice no longer goes out on the open channel", (), "order", native="mute"),
+        m("comms", "channel", "channel_unmute", "the Captain's voice goes out on the open channel again", (), "order", native="unmute"),
+        m("comms", "listen", "listen_fleet", "monitor the fleet net and report", (), "order", native="fleet"),
+        m("comms", "listen", "listen_enemy", "monitor and translate the enemy's channels", (), "order", native="enemy"),
+        m("comms", "listen", "listen_all", "monitor everything", (), "order", native="all"),
     ]
     flight = [
-        m("flight", "mission", "mission", "launch a flight group on a mission, or re-task it if airborne; it runs until it ends",
+        m("flight", "mission", "mission", "launch a flight group on a mission, or re-task it if airborne; a strike or an escort that "
+          "loses its target goes back on patrol by itself",
           (P("squadron", STR, "alpha (8 Falcon) | bravo (7 Hammer, torpedoes) | drones (12 Wasp)", enum=SQUADRONS, required=True),
-           P("type", STR, "cap (close patrol, within 3 km) | escort | strike | recon | ew | sar | hold (stay on deck) | recall",
-             enum=("cap", "escort", "strike", "recon", "ew", "sar", "hold", "recall"), required=True),
-           P("target", STR, "contact id for strike/escort/recon/ew"),
-           P("formation", STR, "wedge | line | screen | trail (optional)", enum=("wedge", "line", "screen", "trail")),
-           P("rtb_when", STR, "come home when: mauled | winchester (out of weapons) | target_dead | never",
-             enum=("mauled", "winchester", "target_dead", "never"))), "done"),
+           P("type", STR, "cap (close patrol, within 3 km) | escort | strike | ew | recon | sar | hold (stay on deck) | recall",
+             enum=("cap", "escort", "strike", "ew", "recon", "sar", "hold", "recall"), required=True),
+           P("target", STR, "contact id for strike, escort, ew and recon")), "order"),
     ]
     xo = [
         m("xo", "delegation", "delegation", "how far an officer may act on their own: manual = only on orders, advise = proposes and "
@@ -226,7 +228,7 @@ def _build() -> dict[str, Station]:
     for sid, modes, summary in (
             ("helm", helm, "course, speed, pursuit, formation, evasion"),
             ("tactical", tactical, "weapons, targets, shields, point defence, missile doctrine"),
-            ("sensors", sensors, "emissions, scans, jamming, signals intelligence"),
+            ("sensors", sensors, "emissions and scans"),
             ("ops", ops, "the main viewscreen, the holo table, the Captain's datapad, damage control"),
             ("engineering", engineering, "power, heat, reactor"),
             ("comms", comms, "the channel and what is listened to"),
@@ -326,7 +328,7 @@ def tool_description(available: dict[str, Iterable[str] | None] | None = None) -
             "words. A single act (one salvo, decoys, a hail, one scan ping, a damage-control dispatch) is a one-shot tool "
             "instead. A new mode replaces the old one in the same [lane]; other lanes keep running. `until`: done | "
             "target_lost | order (until the order changes) | time:<seconds>; leave it out for the mode's default. A target is "
-            "a contact id (T-23) or a selector: tactical_target | nearest_hostile | biggest_threat.\n"
+            "a contact id from the plot (T-23).\n"
             + describe(available) + "\nParameters: " + param_help(available))
 
 
@@ -356,7 +358,7 @@ def _num(v: Any) -> float | None:
 
 
 def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] | None = None) -> tuple[dict[str, Any] | None, str]:
-    """Check a `station` call. Returns (the command args to send, "") or (None, why not — in words the officer can use).
+    """Check a `station` call. Returns (the crew's command, "") or (None, why not — in words the officer can use).
     Numbers are coerced and clamped to the mode's range; unknown parameters are dropped; a missing required one is an error."""
     st_id = str(args.get("station", "")).strip().lower()
     mode = str(args.get("mode", "")).strip().lower().replace("-", "_").replace(" ", "_")
@@ -403,6 +405,8 @@ def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] |
             if p.hi is not None:
                 x = min(p.hi, x)
             out[p.name] = int(round(x)) if p.kind == INT else round(x, 2)
+        elif p.kind == BOOL:
+            out[p.name] = v if isinstance(v, bool) else str(v).strip().lower() in ("true", "yes", "1")
         elif p.kind == STRS:
             items = [str(i).strip() for i in (v if isinstance(v, list) else [v]) if str(i).strip()]
             if not items and p.required:
@@ -415,9 +419,14 @@ def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] |
             out[p.name] = items
         else:
             s = str(v).strip()
-            if p.enum is not None and s.lower() not in p.enum:
-                return None, f"'{p.name}' must be one of {', '.join(p.enum)}, got {s!r}"
-            out[p.name] = s.lower() if p.enum is not None else s
+            if p.enum is not None:
+                s = {"fore": "forward", "front": "forward", "rear": "aft", "left": "port", "right": "starboard"}.get(s.lower(), s.lower()) \
+                    if p.name == "sector" else s.lower()
+                if s not in p.enum:
+                    return None, f"'{p.name}' must be one of {', '.join(p.enum)}, got {str(v).strip()!r}"
+            out[p.name] = s
+    if md.name == "course" and not ({"heading_deg", "mark_deg", "speed_pct"} & set(out)):
+        return None, "course needs a heading, a mark or a speed"
     until = str(args.get("until") or md.until).strip().lower()
     if not (until in UNTIL_WORDS or (until.startswith("time:") and _num(until[5:]) is not None)):
         until = md.until
@@ -448,15 +457,162 @@ def may_on_initiative(cmd: dict[str, Any], delegation: str, standing_for: set[st
     return True, ""
 
 
+# ================================================================================================ the game's vocabulary
+_NATIVE_TO_MODE: dict[tuple[str, str], Mode] = {}
+for _md in MODE_INDEX.values():
+    if _md.station not in ("flight", "xo") and _md.name not in ("shields_sector", "emcon", "power_profile", "heat_radiators"):
+        _NATIVE_TO_MODE[(_md.lane, _md.game_mode)] = _md
+# the modes whose game name carries a parameter, and the game's own aliases
+_EMCON = {"silent": "silent", "restricted": "restricted", "limited": "restricted", "full": "full"}
+_RADIATORS = {"extended": "extended", "radiators_extended": "extended", "retracted": "retracted", "radiators_retracted": "retracted"}
+
+
+def to_wire(cmd: dict[str, Any], by: str = "", state: dict[str, Any] | None = None) -> dict[str, Any]:
+    """A checked command (from `normalize`) as the game's `station` command takes it:
+    {station, aspect, mode, params, until, note, by}. `by`: "captain" | "officer" (who decided; the game records it as set_by).
+    `state`: the ship state, to expand `hostiles` in an engage into the contacts' ids (the game wants ids)."""
+    md = MODE_INDEX[cmd["mode"]]
+    p = dict(cmd.get("params") or {})
+    st = cmd["station"]
+    out: dict[str, Any] = {"station": st, "aspect": md.lane, "mode": md.game_mode, "until": cmd.get("until") or md.until}
+    if md.name == "delegation":
+        out["params"] = {"station": p["station"], "delegation": p["level"]}
+    elif md.name == "mission":
+        out["aspect"], out["mode"] = p["squadron"], p["type"]
+        out["params"] = {"squadron": p["squadron"], **({"target": p["target"]} if p.get("target") else {})}
+    elif md.name == "emcon":
+        out["mode"], out["params"] = p["level"], {}
+    elif md.name == "power_profile":
+        out["mode"], out["params"] = p["profile"], {}
+    elif md.name == "power_custom":
+        out["params"] = {k[:-4]: v for k, v in p.items() if k.endswith("_pct")}
+    elif md.name == "heat_radiators":
+        out["mode"], out["params"] = p["state"], {}
+    elif md.name == "shields_sector":
+        out["mode"], out["params"] = p["sector"], {"sector": p["sector"]}
+    else:
+        if md.name == "broadside" and p.get("side") == "best":
+            p["side"] = "auto"
+        if md.name == "engage":
+            p["targets"] = _expand_hostiles(p.get("targets") or [], state)
+        out["params"] = p
+    if cmd.get("note"):
+        out["note"] = cmd["note"]
+    if by:
+        out["by"] = by
+    return out
+
+
+def _expand_hostiles(targets: list[str], state: dict[str, Any] | None) -> list[str]:
+    """`hostiles` in a target list becomes the ids of the tracked hostile contacts, nearest first (the game takes ids)."""
+    if not any(t.lower() == "hostiles" for t in targets):
+        return targets
+    cs = [c for c in (state or {}).get("contacts", []) or []
+          if str(c.get("status", "")).startswith("hostile") and isinstance(c.get("range_km"), (int, float))]
+    ids = [str(c["id"]) for c in sorted(cs, key=lambda c: c["range_km"])]
+    out: list[str] = []
+    for t in targets:
+        for i in (ids if t.lower() == "hostiles" else [t]):
+            if i not in out:
+                out.append(i)
+    return out
+
+
+def internal_of(aspect: str, native: str, params: dict[str, Any] | None = None) -> tuple[Mode | None, dict[str, Any]]:
+    """What the game calls (aspect, mode, params) in the crew's words: (the Mode, its params), or (None, {}) for a mode this
+    module does not know (a newer build)."""
+    p = dict(params or {})
+    aspect, native = str(aspect).lower(), str(native).lower()
+    if aspect in SQUADRONS:
+        t = p.get("target")
+        return MODE_INDEX["mission"], {"squadron": aspect, "type": native, **({"target": t} if t else {})}
+    if aspect == "emcon" and native in _EMCON:
+        return MODE_INDEX["emcon"], {"level": _EMCON[native]}
+    if aspect == "power" and native in POWER_PROFILES:
+        return MODE_INDEX["power_profile"], {"profile": native}
+    if aspect == "heat" and native in _RADIATORS:
+        return MODE_INDEX["heat_radiators"], {"state": _RADIATORS[native]}
+    if aspect == "shields" and (native in SECTORS or native == "sector"):
+        sec = str(p.get("sector") or native)
+        return MODE_INDEX["shields_sector"], {"sector": sec if sec in SECTORS else "forward"}
+    md = _NATIVE_TO_MODE.get((aspect, native))
+    if md is None:
+        return None, {}
+    if md.name == "broadside" and p.get("side") == "auto":
+        p["side"] = "best"
+    if md.name == "power_custom":
+        p = {f"{k}_pct": v for k, v in p.items()}
+    return md, p
+
+
+def from_wire(args: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """The reverse of `to_wire`: a `station` command as the game receives it -> the crew's command (checked like `normalize`).
+    (None, why) when the game would refuse it: an unknown station, aspect or mode."""
+    st_id = str(args.get("station", "")).strip().lower()
+    st = STATIONS.get(st_id)
+    if st is None:
+        return None, f"no station '{st_id}' ({', '.join(STATIONS)})"
+    raw = args.get("params") if isinstance(args.get("params"), dict) else {}
+    mode = str(args.get("mode", "")).strip().lower()
+    aspect = str(args.get("aspect", "")).strip().lower()
+    if st_id == "xo":
+        crew = {"station": "xo", "mode": "delegation", "params": {"station": raw.get("station", ""),
+                                                                 "level": raw.get("delegation") or raw.get("level", "")}}
+        return normalize(crew)
+    if st_id == "flight":
+        aspect = aspect or str(raw.get("squadron", "")).lower()
+        mode = mode or str(raw.get("mission", "")).lower()
+        if aspect not in SQUADRONS:
+            return None, "flight: say which squadron (alpha, bravo, drones)"
+        md, params = internal_of(aspect, mode, raw)
+        if md is None:
+            return None, f"flight has no mission '{mode}' for {aspect}"
+        return normalize({"station": st_id, "mode": md.name, "params": params, "until": args.get("until"), "note": args.get("note")})
+    if not mode:
+        return None, f"{st_id}: which mode?"
+    if not aspect:
+        aspect = _aspect_for(st_id, mode)
+    md, params = internal_of(aspect, mode, raw)
+    if md is None or md.station != st_id:
+        return None, f"{st_id} has no mode '{mode}'" + (f" for {aspect}" if aspect else "")
+    return normalize({"station": st_id, "mode": md.name, "params": params, "until": args.get("until"), "note": args.get("note")})
+
+
+_ASPECT_STATION = {md.lane: md.station for md in MODE_INDEX.values()}
+
+
+def _aspect_for(station: str, native: str) -> str:
+    """Which aspect a game mode name belongs to when the command does not say (the game's own table: a name shared by several
+    aspects goes to the station's main one)."""
+    hits = [lane for (lane, n), md in _NATIVE_TO_MODE.items() if n == native and md.station == station]
+    for names, aspect in ((_EMCON, "emcon"), (POWER_PROFILES, "power"), (_RADIATORS, "heat"), (SECTORS, "shields")):
+        if native in names and _ASPECT_STATION.get(aspect) == station:
+            hits.append(aspect)
+    if station == "ops" and "viewscreen" in hits:
+        return "viewscreen"
+    return hits[0] if hits else ""
+
+
 # ------------------------------------------------------------------------------------------------ reading the state
 def lanes_of(station_state: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
-    """The lanes of a station as the game reports them (or the ARCHITETTURA flat shape as one lane)."""
+    """The lanes of a station as the game reports them (`modes: {aspect: {mode, params, until, set_by, for_s}}`), each with the
+    mode in the crew's name (and `native`, the game's). A mode this module does not know is kept under the game's name."""
     if not isinstance(station_state, dict):
         return {}
-    lanes = station_state.get("lanes")
-    if isinstance(lanes, dict) and lanes:
-        return {str(k): v for k, v in lanes.items() if isinstance(v, dict)}
-    if station_state.get("mode"):
+    modes = station_state.get("modes")
+    if isinstance(modes, dict) and modes:
+        out: dict[str, dict[str, Any]] = {}
+        for aspect, ls in modes.items():
+            if not isinstance(ls, dict):
+                continue
+            md, params = internal_of(aspect, ls.get("mode", ""), ls.get("params") if isinstance(ls.get("params"), dict) else None)
+            params = params if md else dict(ls.get("params") or {})
+            if params.get("face_action") is True:
+                params.pop("face_action")                            # (the default: nothing to say)
+            out[str(aspect)] = {**{k: v for k, v in ls.items() if k not in ("mode", "params")},
+                                "mode": md.name if md else ls.get("mode"), "native": ls.get("mode"), "params": params}
+        return out
+    if station_state.get("mode"):                                    # the flat shape of the first sketch (one mode per station)
         md = MODE_INDEX.get(str(station_state["mode"]))
         return {md.lane if md else "main": {k: station_state.get(k) for k in
                                             ("mode", "params", "until", "set_by", "since", "status") if k in station_state}}
@@ -464,14 +620,15 @@ def lanes_of(station_state: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
 
 
 def available_from_state(state: dict[str, Any] | None) -> dict[str, list[str] | None] | None:
-    """Which stations (and modes) this game build has, from `stations` in the state; None: an older build without stations."""
+    """Which stations this game build has, from `stations` in the state (None: an older build without stations). A build may also
+    list the modes it supports (`supports: [...]`); the game as of now does not, and then every mode of the station is offered."""
     stations = (state or {}).get("stations")
     if not isinstance(stations, dict) or not stations:
         return None
     out: dict[str, list[str] | None] = {}
     for sid, ss in stations.items():
         if sid in STATIONS and isinstance(ss, dict):
-            modes = ss.get("modes")
+            modes = ss.get("supports")
             out[sid] = [str(x) for x in modes] if isinstance(modes, list) and modes else None
     return out or None
 
@@ -503,18 +660,23 @@ def board(state: dict[str, Any] | None, titles: dict[str, str] | None = None) ->
         for lane, ls in lanes.items():
             mode = ls.get("mode") or "idle"
             par = ls.get("params") or {}
+            if lane == "datapad" and not par:
+                continue                                             # (nothing pushed yet)
             ptxt = ",".join(f"{k}={v if not isinstance(v, list) else '/'.join(map(str, v))}" for k, v in par.items()) if isinstance(par, dict) else ""
-            since = ""
-            t0 = _num(ls.get("since"))
-            if now is not None and t0 is not None and now >= t0:
-                since = f", {int(now - t0)} s ago"
+            ago = ""
+            for_s, t0 = _num(ls.get("for_s")), _num(ls.get("since"))
+            if for_s is not None:
+                ago = f", {int(for_s)} s ago"
+            elif now is not None and t0 is not None and now >= t0:
+                ago = f", {int(now - t0)} s ago"
             by = f" by {ls['set_by']}" if ls.get("set_by") else ""
             until = f" until {ls['until']}" if ls.get("until") and ls.get("until") != "order" else ""
             status = f" — {ls['status']}" if ls.get("status") else ""
-            parts.append(f"[{lane}] {mode}{'(' + ptxt + ')' if ptxt else ''}{until}{by}{since}{status}")
-        acts = ss.get("last_actions")
+            parts.append(f"[{lane}] {mode}{'(' + ptxt + ')' if ptxt else ''}{until}{by}{ago}{status}")
+        acts = ss.get("recent") or ss.get("last_actions")
         tail = f" | last: {'; '.join(map(str, acts[-2:]))}" if isinstance(acts, list) and acts else ""
-        lines.append(head + ": " + " ; ".join(parts) + tail)
+        status = f" || {ss['status']}" if ss.get("status") else ""
+        lines.append(head + ": " + " ; ".join(parts) + status + tail)
     if (state or {}).get("viewscreen"):
         lines.append(f"- main screen now: {state['viewscreen']}")
     return "\n".join(lines)

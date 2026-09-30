@@ -183,9 +183,9 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
     async def test_an_open_case_starts_the_crew_at_once_and_holds_it_until_the_router_answers(self) -> None:
         await self.state(LocalShip(stations=True, fight=True))
         self.mind.enemy.open_channel("T-23")
-        self.model.router_says = {"non deve finire": "party"}
+        self.model.router_says = {"cercate qui": "party"}
         self.model.crew = [("station", {"station": "tactical", "mode": "engage", "params": {"targets": ["T-23"]}})]
-        await self.say("ascolta cocytus non deve finire cosi", self.OPEN, wait=1.0)
+        await self.say("che cosa cercate qui", self.OPEN, wait=1.0)
         self.assertEqual(self.game.commands, [])                                     # the held crew turn did nothing
         self.assertTrue(any(c["kind"] == "router" for c in self.model.calls))
         self.assertTrue(any(c["kind"] == "enemy" for c in self.model.calls))

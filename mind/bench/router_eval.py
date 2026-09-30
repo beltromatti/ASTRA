@@ -1,6 +1,6 @@
 """Measure the router's rules on the labelled sets (no model, no cost).
 
-    cd mind && .venv/bin/python -m bench.router_eval [--set dev|playtest|test|all] [-v]
+    cd mind && .venv/bin/python -m bench.router_eval [--set dev|playtest|test|test2|test3|test4|all] [-v]
 
 Reports, per set and per language / style / channel: how many of the words the rules settle by themselves, and how many of
 those they settle correctly; and — counting the words left to the model as the safe default (the crew) — the accuracy of the
@@ -84,12 +84,14 @@ def evaluate(items: list[Item], verbose: bool = False, title: str = "") -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--set", default="all", choices=["dev", "playtest", "test", "test2", "all"])
+    ap.add_argument("--set", default="all", choices=["dev", "playtest", "test", "test2", "test3", "test4", "all"])
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     from .router_test2_set import TEST2
+    from .router_test3_set import TEST3
+    from .router_test4_set import TEST4
     from .router_test_set import TEST
-    sets = {"dev": DEV, "playtest": PLAYTEST, "test": TEST, "test2": TEST2, "all": ALL + TEST + TEST2}
+    sets = {"dev": DEV, "playtest": PLAYTEST, "test": TEST, "test2": TEST2, "test3": TEST3, "test4": TEST4, "all": ALL + TEST + TEST2 + TEST3 + TEST4}
     evaluate(sets[args.set], args.verbose, args.set)
 
 

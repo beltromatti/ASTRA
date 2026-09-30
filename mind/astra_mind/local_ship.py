@@ -1,12 +1,14 @@
 """A minimal ship model used when the game is not connected (tests, the text console) — the game's
 UAstraShipSubsystem is the real, authoritative implementation of the same tools.
 
-With `stations=True` (the default) it also has live consoles like the ones of docs/contratto_postazioni.md: every
-station keeps its modes per lane, the modes have plausible simple effects (the helm turns and closes, tactical fires
+With `stations=True` (the default) it also has live consoles that speak the game's language (UAstraStationsSubsystem: the
+`station` command takes `{station, aspect, mode, params, until, note, by}`, the state has `stations.<id>.modes.<aspect>`):
+every station keeps one mode per aspect, the modes have plausible simple effects (the helm turns and closes, tactical fires
 and kills, the viewscreen follows its target and is released when the target is lost...) and `advance(seconds)` runs a
 small fight — contacts that manoeuvre, a new contact that appears, targets that are destroyed — reporting what the
-executors would report (`ship.reports`). With `stations=False` it is the old build: no `stations` in the state and
-the `station` command unknown, so the mind's fallback to the legacy tools can be tested."""
+executors would report (`ship.reports`, in the game's words: "helm: intercept ended (T-23 is no longer on the plot): back
+to hold"). With `stations=False` it is the old build: no `stations` in the state and the `station` command unknown, so the
+mind's fallback to the legacy tools can be tested."""
 from __future__ import annotations
 
 import copy
@@ -36,22 +38,22 @@ INITIAL: dict[str, Any] = {
     ],
 }
 
-# the lane each station starts in
+# the aspect each station starts in (the game's own defaults: UAstraStationsSubsystem::Defaults)
 DEFAULT_LANES: dict[str, dict[str, tuple[str, dict[str, Any]]]] = {
-    "helm": {"nav": ("hold", {})},
-    "tactical": {"engagement": ("return_fire", {}), "shields": ("shields_balanced", {}), "point_defense": ("pd_auto", {}),
+    "helm": {"course": ("hold", {})},
+    "tactical": {"engagement": ("return_fire", {}), "shields": ("shields_face_threat", {}), "point_defense": ("pd_auto", {}),
                  "missiles": ("missiles_normal", {})},
-    "sensors": {"emcon": ("emcon", {"level": "restricted"}), "scan": ("scan_passive", {}), "ew": ("ew_off", {}),
-                "sigint": ("sigint_off", {})},
-    "ops": {"viewscreen": ("viewscreen_auto", {}), "holo": ("holo_tactical", {}), "damage_control": ("dc_auto", {})},
-    "engineering": {"power": ("power_profile", {"profile": "balanced"}), "heat": ("heat_auto", {"limit_pct": 70}),
-                    "reactor": ("reactor_normal", {})},
-    "comms": {"channel": ("channel_unmute", {}), "listen": ("listen_off", {})},
+    "sensors": {"emcon": ("emcon", {"level": "restricted"}), "scan": ("scan_passive", {})},
+    "ops": {"viewscreen": ("viewscreen_auto", {}), "holo": ("holo_tactical", {}), "damage_control": ("dc_auto", {}),
+            "datapad": ("datapad_push", {})},
+    "engineering": {"power": ("power_profile", {"profile": "balanced"}), "heat": ("heat_auto", {}), "reactor": ("reactor_normal", {})},
+    "comms": {"channel": ("close", {}), "listen": ("listen_fleet", {})},          # ("close": the game's word for no channel open)
     "flight": {"alpha": ("mission", {"squadron": "alpha", "type": "hold"}), "bravo": ("mission", {"squadron": "bravo", "type": "hold"}),
                "drones": ("mission", {"squadron": "drones", "type": "hold"})},
     "xo": {},
 }
 LANE_OF_MODE = {name: md.lane for name, md in station_model.MODE_INDEX.items()}
+TARGET_MODES = ("intercept", "keep_on_bow", "follow", "broadside", "orbit", "formation")     # the helm modes about a ship
 RAIL_KM, LASER_KM, RAIL_PCT_S, LASER_PCT_S = 10.0, 4.0, 2.4, 1.6      # a railgun volley every 7 s is ~2.4 %/s on average here
 
 
@@ -126,7 +128,7 @@ class LocalShip:
         self._focus_t: dict[str, float] = {}
         self.helm_note = ""                   # the helm's own line when a legacy command (a gate transit) has it
         for sid, lanes in DEFAULT_LANES.items():
-            self.lanes[sid] = {lane: {"mode": m, "params": dict(p), "until": "order", "set_by": "auto", "since": 0.0, "status": ""}
+            self.lanes[sid] = {lane: {"mode": m, "params": dict(p), "until": "order", "set_by": "default", "since": 0.0, "status": ""}
                                for lane, (m, p) in lanes.items()}
         if fight:
             self.setup_fight()
@@ -242,11 +244,13 @@ class LocalShip:
         lane = LANE_OF_MODE.get(mode, "main")
         if station == "flight":
             lane = str(params.get("squadron", "alpha"))
-        self.lanes[station][lane] = {"mode": mode, "params": dict(params), "until": until, "set_by": by, "since": round(self.t, 1),
-                                     "status": ""}
-        note = f"{mode}" + (f" {params}" if params else "")
-        self.last_actions[station] = (self.last_actions[station] + [f"{by}: {note}"])[-4:]
+        self.lanes[station][lane] = {"mode": mode, "params": dict(params), "until": until, "set_by": by or "officer",
+                                     "since": round(self.t, 1), "status": ""}
+        self._act(station, f"{lane} {mode}" + (f" {params}" if params else ""))
         return lane
+
+    def _act(self, station: str, text: str) -> None:
+        self.last_actions[station] = (self.last_actions[station] + [text])[-3:]
 
     def _reset_lane(self, station: str, lane: str) -> None:
         if lane in DEFAULT_LANES[station]:
@@ -254,18 +258,25 @@ class LocalShip:
             self.lanes[station][lane] = {"mode": m, "params": dict(p), "until": "order", "set_by": "auto", "since": round(self.t, 1),
                                          "status": ""}
 
+    def _expire(self, station: str, lane: str, why: str) -> None:
+        """A mode that ran out (the game's Expire): the aspect falls back to its default, and the officer reports it."""
+        was = self.lanes[station][lane]["mode"]
+        m, _ = DEFAULT_LANES[station][lane]
+        self._reset_lane(station, lane)
+        self._emit(f"{station}: {was.replace('_', ' ')} ended ({why}): back to {m.replace('_', ' ')}")
+
     def _lane_status(self, station: str, lane: str, ls: dict[str, Any]) -> str:
         m, p = ls["mode"], ls["params"]
         if station == "helm":
             tgt = self._resolve(p.get("target"))
-            if m in ("intercept", "keep_on_bow", "follow", "broadside", "orbit") and tgt:
+            if m in TARGET_MODES and tgt:
                 rng, brg = self.range_bearing(tgt)
                 if m == "keep_on_bow":
                     return f"bow on {tgt.id} (bearing {brg:03.0f}, {rng:.1f} km), speed {self.speed:.0f} m/s"
                 return f"{m} {tgt.id} at {rng:.1f} km, {self.speed:.0f} m/s" + (
                     f", ETA {int(max(0, rng - float(p.get('standoff_km', 6))) * 1000 / max(self.speed, 1))} s" if m == "intercept" else "")
             if m == "course":
-                return f"heading {self.heading:03.0f}, ordered {p.get('heading_deg', 0):03.0f}"
+                return f"heading {self.heading:03.0f}, ordered {p.get('heading_deg', self.heading):03.0f}"
             return f"steady on {self.heading:03.0f} at {self.speed:.0f} m/s"
         if station == "tactical" and lane == "engagement":
             if m == "engage":
@@ -282,21 +293,50 @@ class LocalShip:
             return f"focused on {p.get('target')}"
         return ""
 
+    def _station_status(self, sid: str) -> str:
+        """The one status line of a console (the game writes one per station)."""
+        lanes = self.lanes[sid]
+        if sid == "helm":
+            return self._lane_status("helm", "course", lanes["course"])
+        if sid == "tactical":
+            eng = self._lane_status("tactical", "engagement", lanes["engagement"])
+            return f"{eng} · shields {lanes['shields']['mode'].replace('shields_', '')} · PD {lanes['point_defense']['mode'].replace('pd_', '')}"
+        if sid == "sensors":
+            return f"EMCON {lanes['emcon']['params'].get('level', '')} · scan {lanes['scan']['mode'].replace('scan_', '')}"
+        if sid == "ops":
+            return f"screen {lanes['viewscreen']['mode'].replace('viewscreen_', '')} · holo {lanes['holo']['mode'].replace('holo_', '')}"
+        return ""
+
+    def _native(self, sid: str, lane: str, ls: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+        """One aspect in the game's words: (aspect, mode, params)."""
+        if ls["mode"] not in station_model.MODE_INDEX:                        # (the game's own word: "close")
+            return lane, ls["mode"], dict(ls["params"])
+        w = station_model.to_wire({"station": sid, "mode": ls["mode"], "params": ls["params"], "until": ls["until"]})
+        params = dict(w["params"])
+        if ls["mode"] == "hold":
+            params.setdefault("face_action", True)
+        return w["aspect"], w["mode"], params
+
     def _stations_json(self) -> dict[str, Any]:
+        """ship_state.state.stations as the game writes it: {officer, delegation, status, modes: {aspect: {...}}, recent}."""
         out: dict[str, Any] = {}
         for sid, lanes in self.lanes.items():
-            ls_out = {}
+            modes: dict[str, Any] = {}
             for lane, ls in lanes.items():
-                ls_out[lane] = {**ls, "status": self._lane_status(sid, lane, ls)}
-            out[sid] = {"officer": sid, "delegation": self.delegation.get(sid, "auto"), "lanes": ls_out,
-                        "last_actions": list(self.last_actions.get(sid, []))}
+                aspect, native, params = self._native(sid, lane, ls)
+                o: dict[str, Any] = {"mode": native, "until": ls["until"], "set_by": ls["set_by"], "for_s": max(0, round(self.t - ls["since"]))}
+                if params:
+                    o["params"] = params
+                modes[aspect] = o
+            out[sid] = {"officer": sid, "delegation": self.delegation.get(sid, "auto"), "status": self._station_status(sid),
+                        "modes": modes, "recent": list(self.last_actions.get(sid, []))[-3:]}
         return out
 
     def _sync_legacy(self) -> None:
         """The old flat fields the crew and the tactical advisor read (as the game writes them)."""
         s = self.state
-        h = self.lanes["helm"]["nav"]
-        tgt = self._resolve(h["params"].get("target")) if h["mode"] in ("intercept", "keep_on_bow", "follow", "broadside", "orbit") else None
+        h = self.lanes["helm"]["course"]
+        tgt = self._resolve(h["params"].get("target")) if h["mode"] in TARGET_MODES else None
         if tgt and h["mode"] == "intercept":
             rng, _ = self.range_bearing(tgt)
             s["helm"] = (f"intercepting {tgt.id}, range {rng:.1f} km, {'broadside, holding the range' if rng < float(h['params'].get('standoff_km', 6)) else 'closing'}"
@@ -316,7 +356,7 @@ class LocalShip:
                                  f"assigned to {c.id}, waiting for it to close inside 10 km (now {rng:.0f} km), 12 volleys queued")
         s["target"] = self.state.get("target")
         sh = self.lanes["tactical"]["shields"]
-        s["shields"]["mode"] = {"shields_balanced": "balanced", "shields_face_threat": "face_threat", "shields_sector": str(sh["params"].get("sector", "fore")),
+        s["shields"]["mode"] = {"shields_balanced": "balanced", "shields_face_threat": "face_threat", "shields_sector": str(sh["params"].get("sector", "forward")),
                                 "shields_off": "off"}.get(sh["mode"], s["shields"]["mode"])
         s["weapons"]["point_defense"] = {"pd_auto": "auto", "pd_protect": "auto", "pd_off": "hold"}.get(self.lanes["tactical"]["point_defense"]["mode"], "auto")
         s["emcon"] = str(self.lanes["sensors"]["emcon"]["params"].get("level", s["emcon"]))
@@ -367,10 +407,10 @@ class LocalShip:
         self._tick_release()
 
     def _tick_helm(self, dt: float) -> None:
-        h = self.lanes["helm"]["nav"]
+        h = self.lanes["helm"]["course"]
         m, p = h["mode"], h["params"]
         want_h, want_speed = None, None
-        tgt = self._resolve(p.get("target")) if m in ("intercept", "keep_on_bow", "follow", "broadside", "orbit") else None
+        tgt = self._resolve(p.get("target")) if m in TARGET_MODES else None
         if m == "intercept" and tgt:
             rng, brg = self.range_bearing(tgt)
             st = float(p.get("standoff_km", 6))
@@ -378,23 +418,23 @@ class LocalShip:
             want_speed = 480.0 * float(p.get("speed_pct", 100)) / 100 if rng > st + 0.5 else 0.0
         elif m == "keep_on_bow" and tgt:
             want_h = self.range_bearing(tgt)[1]
-        elif m in ("follow", "orbit", "broadside") and tgt:
+        elif m in ("follow", "orbit", "broadside", "formation") and tgt:
             rng, brg = self.range_bearing(tgt)
             want_h = brg if rng > float(p.get("distance_km", p.get("range_km", p.get("radius_km", 6)))) else _wrap(brg + 90)
             want_speed = 300.0
         elif m == "course":
             want_h = float(p.get("heading_deg", self.heading))
             want_speed = 480.0 * float(p["speed_pct"]) / 100 if "speed_pct" in p else None
-            if abs(_delta(self.heading, want_h)) < 0.1:
-                self._set_hold_after_course()
         elif m == "retreat":
             hostile = self._resolve("nearest_hostile")
             want_h = _wrap(self.range_bearing(hostile)[1] + 180) if hostile else self.heading
             want_speed = 480.0
         elif m == "evade":
             want_h = _wrap(self.heading + 30 * math.sin(self.t / 2))
-        elif m == "hold" and "speed_pct" in p:
-            want_speed = 480.0 * float(p["speed_pct"]) / 100
+            want_speed = 480.0
+        elif m == "hold" and p.get("face_action", True):
+            hostile = self._resolve("nearest_hostile")                 # in a fight the bow comes round to the action, by itself
+            want_h = self.range_bearing(hostile)[1] if hostile else None
         if want_h is not None:
             self.heading = _wrap(self.heading + max(-1.5 * dt, min(1.5 * dt, _delta(self.heading, want_h))))
         if want_speed is not None:
@@ -402,11 +442,7 @@ class LocalShip:
         self.x += math.sin(math.radians(self.heading)) * self.speed * dt / 1000.0
         self.y += math.cos(math.radians(self.heading)) * self.speed * dt / 1000.0
 
-    def _set_hold_after_course(self) -> None:
-        h = self.lanes["helm"]["nav"]
-        if h["mode"] == "course" and h.get("until") == "done":
-            self._emit(f"helm: turn complete, steady on course {self.heading:03.0f}")
-            self._reset_lane("helm", "nav")
+
 
     def _tick_fire(self, dt: float) -> None:
         eng = self.lanes["tactical"]["engagement"]
@@ -439,17 +475,19 @@ class LocalShip:
                 self._emit(f"tactical: {c.id} ({c.name}) destroyed")
 
     def _tick_release(self) -> None:
-        """The modes that end with their target: the console returns to its default and reports."""
-        h = self.lanes["helm"]["nav"]
-        if h["mode"] in ("intercept", "keep_on_bow", "follow", "broadside", "orbit") and h.get("until") == "target_lost" \
-                and not self._resolve(h["params"].get("target")):
-            self._emit(f"helm: {h['mode']} of {h['params'].get('target')} ended, the contact is gone — holding course {self.heading:03.0f}")
-            self._reset_lane("helm", "nav")
+        """The modes that end: the console returns to its default and reports it (the game's Expire)."""
+        h = self.lanes["helm"]["course"]
+        if h["mode"] in TARGET_MODES and h["params"].get("target") and not self._resolve(h["params"].get("target")):
+            self._expire("helm", "course", f"{h['params'].get('target')} is no longer on the plot")
+        elif h["until"].startswith("time:") and self.t - h["since"] >= float(h["until"][5:]):
+            self._expire("helm", "course", "the time set for it is up")
+        for sid, lanes in self.lanes.items():                    # (only the helm falls back when its time is up; the others lapse to `order`)
+            for ls in lanes.values():
+                if sid != "helm" and ls["until"].startswith("time:") and self.t - ls["since"] >= float(ls["until"][5:]):
+                    ls["until"] = "order"
         eng = self.lanes["tactical"]["engagement"]
-        if eng["mode"] == "engage" and not any(self._resolve(t) for t in eng["params"].get("targets", [])) and \
-                "hostiles" not in eng["params"].get("targets", []):
-            self._emit(f"tactical: engage complete — {', '.join(eng['params'].get('targets', []))} destroyed or lost, back to return fire")
-            self._reset_lane("tactical", "engagement")
+        if eng["mode"] == "engage" and not any(self._resolve(t) for t in eng["params"].get("targets", [])):
+            self._expire("tactical", "engagement", "the targets are down or gone")
         vs = self.lanes["ops"]["viewscreen"]
         if vs["mode"] == "viewscreen_target" and not self._resolve(vs["params"].get("target")):
             self._emit(f"ops: viewscreen released — {vs['params'].get('target')} lost, back to auto")
@@ -461,9 +499,8 @@ class LocalShip:
             if c and self.t - t0 >= 6 and not c.classified:
                 c.classified = True
                 self._emit(f"sensors: {c.id} identified — {c.cls} {c.name}, {self.range_bearing(c)[0]:.0f} km, bearing {self.range_bearing(c)[1]:03.0f}")
-                self._reset_lane("sensors", "scan")
             elif not c:
-                self._reset_lane("sensors", "scan")
+                self._expire("sensors", "scan", f"{sc['params'].get('target')} is gone")
 
     # ------------------------------------------------------------------------------------------------ commands
     async def execute(self, name: str, a: dict[str, Any], by: str) -> dict[str, Any]:
@@ -479,7 +516,7 @@ class LocalShip:
             s["heading_deg"], s["mark_deg"] = round(a["heading_deg"]) % 360, round(a["mark_deg"])
             self.heading = float(s["heading_deg"])              # (the old build turned instantly for the tests)
             self.helm_note = ""
-            self._reset_lane("helm", "nav")                       # a set_course cancels an intercept
+            self._reset_lane("helm", "course")                    # a set_course cancels an intercept
             return self._ok(f"coming to {s['heading_deg']:03d} mark {s['mark_deg']}")
         if name == "set_throttle":
             s["throttle_pct"] = a["percent"]
@@ -490,7 +527,7 @@ class LocalShip:
             return self._ok(f"condition {a['level']}")
         if name == "set_shields":
             mode = {"balanced": "shields_balanced", "off": "shields_off"}.get(a["mode"], "shields_sector")
-            self._set_lane("tactical", mode, {"sector": a["mode"]} if mode == "shields_sector" else {}, "order", by)
+            self._set_lane("tactical", mode, {"sector": a["mode"]} if mode == "shields_sector" else {}, "order", "officer")
             if a["mode"] == "off":
                 s["shields"]["state"] = "down"
             else:
@@ -504,7 +541,7 @@ class LocalShip:
             if c is None:
                 return {"ok": False, "detail": f"no contact {a.get('contact_id')} to intercept"}
             self.helm_note = ""
-            self._set_lane("helm", "intercept", {"target": c.id, "standoff_km": a.get("standoff_km", 6)}, "target_lost", by)
+            self._set_lane("helm", "intercept", {"target": c.id, "standoff_km": a.get("standoff_km", 6)}, "target_lost", "officer")
             rng, brg = self.range_bearing(c)
             return self._ok(f"intercepting {c.id}: bearing {brg:03.0f}, range {rng:.1f} km")
         if name == "cease_fire":
@@ -568,7 +605,7 @@ class LocalShip:
             return self._ok("channel closed")
         if name == "set_emcon":
             s["emcon"] = a["level"]
-            self._set_lane("sensors", "emcon", {"level": a["level"]}, "order", by)
+            self._set_lane("sensors", "emcon", {"level": a["level"]}, "order", "officer")
             return self._ok(f"emcon {a['level']}")
         if name == "active_scan":
             return self._ok("scan running")
@@ -584,38 +621,54 @@ class LocalShip:
             return self._ok(f"coolant vented: heat {t['heat_pct']}%, {t['coolant_vents']} charges left")
         return {"ok": False, "detail": f"unknown tool {name}"}
 
+    @staticmethod
+    def parse(a: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+        """A `station` command's arguments -> the crew's checked command. The game's form (an `aspect` given) is read as the game
+        reads it; the crew's own names are accepted too (the tests call the ship with them)."""
+        if "aspect" in a:
+            return station_model.from_wire(a)
+        cmd, err = station_model.normalize(a)
+        if cmd is None:
+            cmd2, err2 = station_model.from_wire(a)
+            return (cmd2, "") if cmd2 is not None else (None, err)
+        return cmd, ""
+
     def _station(self, a: dict[str, Any], by: str) -> dict[str, Any]:
         if not self.stations_on:
             return {"ok": False, "detail": "unknown command station"}
-        cmd, err = station_model.normalize(a)
+        cmd, err = self.parse(a)
         if cmd is None:
             return {"ok": False, "detail": err}
         st, mode, p, until = cmd["station"], cmd["mode"], cmd["params"], cmd["until"]
+        set_by = str(a.get("by") or "officer")                       # who decided: captain | officer | xo (the game: args.by)
         if st == "xo":
             self.delegation[p["station"]] = p["level"]
-            self.last_actions["xo"] = (self.last_actions["xo"] + [f"{by}: delegation {p['station']} {p['level']}"])[-4:]
-            return self._ok(f"{p['station']} is on {p['level']}")
+            self._act("xo", f"delegation: {p['station']} now on {p['level']}")
+            return self._ok(f"{p['station']} now on {p['level']}")
         # targets must exist (an intercept of nothing is a mistake the console would refuse)
-        for key in ("target", "leader"):
-            if key in p and not self._resolve(p[key]) and p[key] not in ("fleet", "gate", "away"):
-                return {"ok": False, "detail": f"no contact {p[key]} on the plot"}
+        if "target" in p and not self._resolve(p["target"]):
+            return {"ok": False, "detail": f"no contact {p['target']} on the plot"}
+        if mode in ("follow", "orbit", "broadside", "formation") and p.get("target") and not self._resolve(p["target"]).classified:
+            return {"ok": False, "detail": f"{p['target']} is only a bearing (no range): the helm can steer down it, not hold a distance"}
         if mode == "engage":
-            bad = [t for t in p["targets"] if t != "hostiles" and not self._resolve(t)]
+            if not p["targets"] or all(t.lower() == "hostiles" for t in p["targets"]):
+                return {"ok": False, "detail": "none of those contacts is a live hostile on the plot"}
+            bad = [t for t in p["targets"] if not self._resolve(t)]
             if bad:
                 return {"ok": False, "detail": f"no contact {bad[0]} on the plot"}
-            friendly = [t for t in p["targets"] if self._resolve(t) and not self._resolve(t).status.startswith("hostile")]
+            friendly = [t for t in p["targets"] if not self._resolve(t).status.startswith("hostile")]
             if friendly:
                 return {"ok": False, "detail": f"weapons interlock: {friendly[0]} is not hostile"}
-            blind = [t for t in p["targets"] if self._resolve(t) and not self._resolve(t).classified]
+            blind = [t for t in p["targets"] if not self._resolve(t).classified]
             if blind:
                 return {"ok": False, "detail": f"{blind[0]} is a bearing only: no firing solution yet"}
-        lane = self._set_lane(st, mode, p, until, by)
+        lane = self._set_lane(st, mode, p, until, set_by)
         if st == "helm":
             self.helm_note = ""
+            if mode == "course" and "speed_pct" in p:
+                self.state["throttle_pct"] = p["speed_pct"]
         if mode == "scan_focus":
             self._focus_t[str(p.get("target"))] = self.t
-        if st == "helm" and mode == "hold" and "speed_pct" in p:
-            self.state["throttle_pct"] = p["speed_pct"]
         if st == "flight":
             sq, kind = p["squadron"], p["type"]
             self.state["squadrons"][sq] = ("on deck, ready" if kind == "hold" else "recovering" if kind == "recall"
@@ -636,11 +689,13 @@ class LocalShip:
         return [c for c in self.log if name is None or c[1] == name]
 
     def station_calls(self, station: str | None = None, mode: str | None = None) -> list[dict[str, Any]]:
+        """The `station` commands that were accepted, in the crew's names ({station, mode, params, until, by, set_by})."""
         out = []
         for by, name, args, res in self.log:
             if name != "station" or not res.get("ok"):
                 continue
-            cmd, _ = station_model.normalize(args)
+            cmd, _ = self.parse(args)
             if cmd and (station is None or cmd["station"] == station) and (mode is None or cmd["mode"] == mode):
-                out.append({**cmd, "by": by})
+                out.append({**cmd, "by": by, "set_by": str(args.get("by") or "officer")})
         return out
+
