@@ -2722,6 +2722,524 @@
    "crew_slots": 2
   },
   {
+   "id": "d4_lounge_D1",
+   "deck": 4,
+   "section": "D",
+   "kind": "lounge",
+   "name": "Crew Lounge",
+   "bounds": [-272.0, 22.0, -248.0, 38.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_lounge_D1"],
+   "dept": "services",
+   "prefab": "lounge",
+   "mesh": "SM_SHIP_Lounge",
+   "pos": [-272.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["power_bus", "entertainment"],
+   "stations": [
+    {"id": "d4_lounge_D1.s0", "role": "crew", "kind": "sit", "pos": [-268.0, 26.0, -46.0], "yaw": 45.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s1", "role": "crew", "kind": "sit", "pos": [-268.0, 28.6, -46.0], "yaw": 315.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s2", "role": "crew", "kind": "sit", "pos": [-264.3, 26.6, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s3", "role": "crew", "kind": "sit", "pos": [-264.3, 28.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s4", "role": "crew", "kind": "sit", "pos": [-268.0, 33.4, -46.0], "yaw": 45.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s5", "role": "crew", "kind": "sit", "pos": [-268.0, 36.0, -46.0], "yaw": 315.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s6", "role": "crew", "kind": "sit", "pos": [-264.3, 34.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s7", "role": "crew", "kind": "sit", "pos": [-264.3, 35.4, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s8", "role": "crew", "kind": "eat", "pos": [-256.6, 26.3, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s9", "role": "crew", "kind": "eat", "pos": [-256.6, 28.5, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s10", "role": "crew", "kind": "eat", "pos": [-252.4, 26.3, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s11", "role": "crew", "kind": "eat", "pos": [-251.3, 27.4, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s12", "role": "crew", "kind": "eat", "pos": [-255.6, 33.5, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s13", "role": "crew", "kind": "eat", "pos": [-253.0, 33.5, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s14", "role": "crew", "kind": "eat", "pos": [-250.4, 33.5, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_lounge_D1.s15", "role": "barista", "kind": "work", "pos": [-253.0, 35.6, -46.0], "yaw": 270.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-266.0, 30.0, -42.5],
+     "lumens": 5200,
+     "temperature": 3200,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_lounge_D1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-254.0, 27.0, -42.5],
+     "lumens": 4200,
+     "temperature": 3400,
+     "size": [8.0, 3.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_lounge_D1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-254.0, 34.0, -42.5],
+     "lumens": 4200,
+     "temperature": 3400,
+     "size": [8.0, 3.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_lounge_D1.l2"
+    }
+   ],
+   "plate": "lounge",
+   "lane": "O_s",
+   "size": [24.0, 16.0, 3.6],
+   "crew_slots": 16
+  },
+  {
+   "id": "d4_games_D1",
+   "deck": 4,
+   "section": "D",
+   "kind": "lounge",
+   "name": "Games Room",
+   "bounds": [-296.0, 22.0, -272.0, 38.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_games_D1"],
+   "dept": "services",
+   "prefab": "games",
+   "mesh": "SM_SHIP_Games",
+   "pos": [-296.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["power_bus", "entertainment"],
+   "stations": [
+    {"id": "d4_games_D1.s0", "role": "crew", "kind": "sit", "pos": [-291.0, 27.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_games_D1.s1", "role": "crew", "kind": "sit", "pos": [-289.0, 27.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_games_D1.s2", "role": "crew", "kind": "sit", "pos": [-291.0, 33.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_games_D1.s3", "role": "crew", "kind": "sit", "pos": [-289.0, 33.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_games_D1.s4", "role": "crew", "kind": "sit", "pos": [-284.0, 26.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_games_D1.s5", "role": "crew", "kind": "sit", "pos": [-282.0, 26.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_games_D1.s6", "role": "crew", "kind": "stand", "pos": [-278.5, 36.1, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_games_D1.s7", "role": "crew", "kind": "stand", "pos": [-276.5, 36.1, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_games_D1.s8", "role": "crew", "kind": "stand", "pos": [-281.0, 30.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_games_D1.s9", "role": "crew", "kind": "stand", "pos": [-277.0, 30.0, -46.0], "yaw": 180.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-290.0, 30.0, -42.5],
+     "lumens": 4500,
+     "temperature": 4000,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_games_D1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-278.0, 30.0, -42.5],
+     "lumens": 4500,
+     "temperature": 3600,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_games_D1.l1"
+    }
+   ],
+   "plate": "games",
+   "lane": "O_s",
+   "size": [24.0, 16.0, 3.6],
+   "crew_slots": 10
+  },
+  {
+   "id": "d4_library_D1",
+   "deck": 4,
+   "section": "D",
+   "kind": "library",
+   "name": "Library",
+   "bounds": [-312.0, 22.0, -296.0, 38.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_library_D1"],
+   "dept": "services",
+   "prefab": "library",
+   "mesh": "SM_SHIP_Library",
+   "pos": [-312.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["power_bus"],
+   "stations": [
+    {"id": "d4_library_D1.s0", "role": "crew", "kind": "sit", "pos": [-307.0, 30.0, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_library_D1.s1", "role": "crew", "kind": "sit", "pos": [-304.0, 30.0, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_library_D1.s2", "role": "crew", "kind": "sit", "pos": [-307.0, 32.0, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_library_D1.s3", "role": "crew", "kind": "sit", "pos": [-300.4, 27.4, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_library_D1.s4", "role": "crew", "kind": "sit", "pos": [-309.4, 26.6, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_library_D1.s5", "role": "librarian", "kind": "work", "pos": [-298.4, 25.0, -46.0], "yaw": 0.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-304.0, 30.0, -42.5],
+     "lumens": 4500,
+     "temperature": 3300,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_library_D1.l0"
+    }
+   ],
+   "plate": "library",
+   "lane": "O_s",
+   "size": [16.0, 16.0, 3.6],
+   "crew_slots": 6
+  },
+  {
+   "id": "d4_hydro_E1",
+   "deck": 4,
+   "section": "E",
+   "kind": "hydroponics",
+   "name": "Hydroponics Bay",
+   "bounds": [-344.0, 22.0, -320.0, 38.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_hydro_E1"],
+   "dept": "science",
+   "prefab": "hydro",
+   "mesh": "SM_SHIP_Hydro",
+   "pos": [-344.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["life_support", "potable_water", "food_service"],
+   "stations": [
+    {"id": "d4_hydro_E1.s0", "role": "botanist", "kind": "work", "pos": [-336.0, 30.0, -46.0], "yaw": 0.0, "dept": "science"},
+    {"id": "d4_hydro_E1.s1", "role": "botanist", "kind": "work", "pos": [-328.0, 30.0, -46.0], "yaw": 180.0, "dept": "science"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-332.0, 30.0, -42.7],
+     "lumens": 3500,
+     "temperature": 7000,
+     "size": [20.0, 12.0],
+     "radius": 1100,
+     "shadows": false,
+     "id": "d4_hydro_E1.l0"
+    }
+   ],
+   "plate": "hydro",
+   "lane": "O_s",
+   "size": [24.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_laundry_E1",
+   "deck": 4,
+   "section": "E",
+   "kind": "laundry",
+   "name": "Laundry",
+   "bounds": [-356.0, 22.0, -344.0, 38.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_laundry_E1"],
+   "dept": "services",
+   "prefab": "laundry",
+   "mesh": "SM_SHIP_Laundry",
+   "pos": [-356.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["potable_water", "power_bus"],
+   "stations": [
+    {"id": "d4_laundry_E1.s0", "role": "laundry_hand", "kind": "work", "pos": [-352.0, 29.0, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_laundry_E1.s1", "role": "laundry_hand", "kind": "work", "pos": [-348.0, 29.0, -46.0], "yaw": 90.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-350.0, 30.0, -42.7],
+     "lumens": 5000,
+     "temperature": 4800,
+     "size": [6.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_laundry_E1.l0"
+    }
+   ],
+   "plate": "laundry",
+   "lane": "O_s",
+   "size": [12.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_heads_E1",
+   "deck": 4,
+   "section": "E",
+   "kind": "heads",
+   "name": "Heads · Showers",
+   "bounds": [-368.0, 22.0, -356.0, 38.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_heads_E1"],
+   "dept": "services",
+   "prefab": "heads",
+   "mesh": "SM_SHIP_Heads",
+   "pos": [-368.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["potable_water", "waste"],
+   "stations": [],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-362.0, 30.0, -42.7],
+     "lumens": 5000,
+     "temperature": 5000,
+     "size": [6.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_heads_E1.l0"
+    }
+   ],
+   "plate": "heads",
+   "lane": "O_s",
+   "size": [12.0, 16.0, 3.4],
+   "crew_slots": 0
+  },
+  {
+   "id": "d4_quiet_E1",
+   "deck": 4,
+   "section": "E",
+   "kind": "chapel",
+   "name": "Quiet Room",
+   "bounds": [-380.0, 22.0, -368.0, 38.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_quiet_E1"],
+   "dept": "services",
+   "prefab": "quiet",
+   "mesh": "SM_SHIP_Quiet",
+   "pos": [-380.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["power_bus"],
+   "stations": [
+    {"id": "d4_quiet_E1.s0", "role": "crew", "kind": "sit", "pos": [-376.4, 29.6, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_quiet_E1.s1", "role": "crew", "kind": "sit", "pos": [-371.6, 29.6, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_quiet_E1.s2", "role": "crew", "kind": "sit", "pos": [-376.4, 31.8, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_quiet_E1.s3", "role": "crew", "kind": "sit", "pos": [-371.6, 31.8, -46.0], "yaw": 90.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-374.0, 30.0, -42.5],
+     "lumens": 1500,
+     "temperature": 2700,
+     "size": [5.0, 5.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_quiet_E1.l0"
+    }
+   ],
+   "plate": "chapel",
+   "lane": "O_s",
+   "size": [12.0, 16.0, 3.6],
+   "crew_slots": 4
+  },
+  {
+   "id": "d4_store_dry_F1",
+   "deck": 4,
+   "section": "F",
+   "kind": "storage",
+   "name": "Dry Stores",
+   "bounds": [-408.0, 22.0, -384.0, 38.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_store_dry_F1"],
+   "dept": "flight",
+   "prefab": "store_dry",
+   "mesh": "SM_SHIP_StoreDry",
+   "pos": [-408.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["supply"],
+   "stations": [
+    {"id": "d4_store_dry_F1.s0", "role": "storekeeper", "kind": "work", "pos": [-395.0, 25.0, -46.0], "yaw": 90.0, "dept": "flight"},
+    {"id": "d4_store_dry_F1.s1", "role": "storekeeper", "kind": "stand", "pos": [-393.0, 31.0, -46.0], "yaw": 90.0, "dept": "flight"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-396.0, 27.0, -42.7],
+     "lumens": 5200,
+     "temperature": 4600,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_store_dry_F1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-396.0, 34.0, -42.7],
+     "lumens": 5200,
+     "temperature": 4600,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_store_dry_F1.l1"
+    }
+   ],
+   "plate": "stores_dry",
+   "lane": "O_s",
+   "size": [24.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_hold_F1",
+   "deck": 4,
+   "section": "F",
+   "kind": "storage",
+   "name": "General Stores",
+   "bounds": [-432.0, 22.0, -408.0, 38.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_hold_F1"],
+   "dept": "flight",
+   "prefab": "hold",
+   "mesh": "SM_SHIP_Hold",
+   "pos": [-432.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["supply"],
+   "stations": [
+    {"id": "d4_hold_F1.s0", "role": "storekeeper", "kind": "work", "pos": [-423.0, 25.0, -46.0], "yaw": 90.0, "dept": "flight"},
+    {"id": "d4_hold_F1.s1", "role": "handler", "kind": "work", "pos": [-416.0, 31.0, -46.0], "yaw": 0.0, "dept": "flight"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-420.0, 27.0, -42.7],
+     "lumens": 5200,
+     "temperature": 4600,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_hold_F1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-420.0, 34.0, -42.7],
+     "lumens": 5200,
+     "temperature": 4600,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_hold_F1.l1"
+    }
+   ],
+   "plate": "stores",
+   "lane": "O_s",
+   "size": [24.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_laundry_G1",
+   "deck": 4,
+   "section": "G",
+   "kind": "laundry",
+   "name": "Laundry",
+   "bounds": [-452.0, 22.0, -440.0, 38.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_laundry_G1"],
+   "dept": "services",
+   "prefab": "laundry",
+   "mesh": "SM_SHIP_Laundry",
+   "pos": [-452.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["potable_water", "power_bus"],
+   "stations": [
+    {"id": "d4_laundry_G1.s0", "role": "laundry_hand", "kind": "work", "pos": [-448.0, 29.0, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_laundry_G1.s1", "role": "laundry_hand", "kind": "work", "pos": [-444.0, 29.0, -46.0], "yaw": 90.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-446.0, 30.0, -42.7],
+     "lumens": 5000,
+     "temperature": 4800,
+     "size": [6.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_laundry_G1.l0"
+    }
+   ],
+   "plate": "laundry",
+   "lane": "O_s",
+   "size": [12.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_heads_G1",
+   "deck": 4,
+   "section": "G",
+   "kind": "heads",
+   "name": "Heads · Showers",
+   "bounds": [-464.0, 22.0, -452.0, 38.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_heads_G1"],
+   "dept": "services",
+   "prefab": "heads",
+   "mesh": "SM_SHIP_Heads",
+   "pos": [-464.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["potable_water", "waste"],
+   "stations": [],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-458.0, 30.0, -42.7],
+     "lumens": 5000,
+     "temperature": 5000,
+     "size": [6.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_heads_G1.l0"
+    }
+   ],
+   "plate": "heads",
+   "lane": "O_s",
+   "size": [12.0, 16.0, 3.4],
+   "crew_slots": 0
+  },
+  {
+   "id": "d4_quiet_G1",
+   "deck": 4,
+   "section": "G",
+   "kind": "chapel",
+   "name": "Quiet Room",
+   "bounds": [-476.0, 22.0, -464.0, 38.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_quiet_G1"],
+   "dept": "services",
+   "prefab": "quiet",
+   "mesh": "SM_SHIP_Quiet",
+   "pos": [-476.0, 22.0, -46.0],
+   "yaw": 0.0,
+   "systems": ["power_bus"],
+   "stations": [
+    {"id": "d4_quiet_G1.s0", "role": "crew", "kind": "sit", "pos": [-472.4, 29.6, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_quiet_G1.s1", "role": "crew", "kind": "sit", "pos": [-467.6, 29.6, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_quiet_G1.s2", "role": "crew", "kind": "sit", "pos": [-472.4, 31.8, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_quiet_G1.s3", "role": "crew", "kind": "sit", "pos": [-467.6, 31.8, -46.0], "yaw": 90.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-470.0, 30.0, -42.5],
+     "lumens": 1500,
+     "temperature": 2700,
+     "size": [5.0, 5.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_quiet_G1.l0"
+    }
+   ],
+   "plate": "chapel",
+   "lane": "O_s",
+   "size": [12.0, 16.0, 3.6],
+   "crew_slots": 4
+  },
+  {
    "id": "d4_observation_A2",
    "deck": 4,
    "section": "A",
@@ -2996,6 +3514,492 @@
    "lane": "O_p",
    "size": [24.0, 16.0, 3.4],
    "crew_slots": 2
+  },
+  {
+   "id": "d4_games_D2",
+   "deck": 4,
+   "section": "D",
+   "kind": "lounge",
+   "name": "Games Room",
+   "bounds": [-272.0, -38.0, -248.0, -22.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_games_D2"],
+   "dept": "services",
+   "prefab": "games",
+   "mesh": "SM_SHIP_Games",
+   "pos": [-248.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["power_bus", "entertainment"],
+   "stations": [
+    {"id": "d4_games_D2.s0", "role": "crew", "kind": "sit", "pos": [-253.0, -27.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_games_D2.s1", "role": "crew", "kind": "sit", "pos": [-255.0, -27.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_games_D2.s2", "role": "crew", "kind": "sit", "pos": [-253.0, -33.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_games_D2.s3", "role": "crew", "kind": "sit", "pos": [-255.0, -33.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_games_D2.s4", "role": "crew", "kind": "sit", "pos": [-260.0, -26.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_games_D2.s5", "role": "crew", "kind": "sit", "pos": [-262.0, -26.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_games_D2.s6", "role": "crew", "kind": "stand", "pos": [-265.5, -36.1, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_games_D2.s7", "role": "crew", "kind": "stand", "pos": [-267.5, -36.1, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_games_D2.s8", "role": "crew", "kind": "stand", "pos": [-263.0, -30.0, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_games_D2.s9", "role": "crew", "kind": "stand", "pos": [-267.0, -30.0, -46.0], "yaw": 0.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-254.0, -30.0, -42.5],
+     "lumens": 4500,
+     "temperature": 4000,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_games_D2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-266.0, -30.0, -42.5],
+     "lumens": 4500,
+     "temperature": 3600,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_games_D2.l1"
+    }
+   ],
+   "plate": "games",
+   "lane": "O_p",
+   "size": [24.0, 16.0, 3.6],
+   "crew_slots": 10
+  },
+  {
+   "id": "d4_lounge_D2",
+   "deck": 4,
+   "section": "D",
+   "kind": "lounge",
+   "name": "Crew Lounge",
+   "bounds": [-296.0, -38.0, -272.0, -22.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_lounge_D2"],
+   "dept": "services",
+   "prefab": "lounge",
+   "mesh": "SM_SHIP_Lounge",
+   "pos": [-272.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["power_bus", "entertainment"],
+   "stations": [
+    {"id": "d4_lounge_D2.s0", "role": "crew", "kind": "sit", "pos": [-276.0, -26.0, -46.0], "yaw": 225.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s1", "role": "crew", "kind": "sit", "pos": [-276.0, -28.6, -46.0], "yaw": 135.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s2", "role": "crew", "kind": "sit", "pos": [-279.7, -26.6, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s3", "role": "crew", "kind": "sit", "pos": [-279.7, -28.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s4", "role": "crew", "kind": "sit", "pos": [-276.0, -33.4, -46.0], "yaw": 225.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s5", "role": "crew", "kind": "sit", "pos": [-276.0, -36.0, -46.0], "yaw": 135.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s6", "role": "crew", "kind": "sit", "pos": [-279.7, -34.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s7", "role": "crew", "kind": "sit", "pos": [-279.7, -35.4, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s8", "role": "crew", "kind": "eat", "pos": [-287.4, -26.3, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s9", "role": "crew", "kind": "eat", "pos": [-287.4, -28.5, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s10", "role": "crew", "kind": "eat", "pos": [-291.6, -26.3, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s11", "role": "crew", "kind": "eat", "pos": [-292.7, -27.4, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s12", "role": "crew", "kind": "eat", "pos": [-288.4, -33.5, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s13", "role": "crew", "kind": "eat", "pos": [-291.0, -33.5, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s14", "role": "crew", "kind": "eat", "pos": [-293.6, -33.5, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_lounge_D2.s15", "role": "barista", "kind": "work", "pos": [-291.0, -35.6, -46.0], "yaw": 90.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-278.0, -30.0, -42.5],
+     "lumens": 5200,
+     "temperature": 3200,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_lounge_D2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-290.0, -27.0, -42.5],
+     "lumens": 4200,
+     "temperature": 3400,
+     "size": [8.0, 3.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_lounge_D2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-290.0, -34.0, -42.5],
+     "lumens": 4200,
+     "temperature": 3400,
+     "size": [8.0, 3.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_lounge_D2.l2"
+    }
+   ],
+   "plate": "lounge",
+   "lane": "O_p",
+   "size": [24.0, 16.0, 3.6],
+   "crew_slots": 16
+  },
+  {
+   "id": "d4_library_D2",
+   "deck": 4,
+   "section": "D",
+   "kind": "library",
+   "name": "Library",
+   "bounds": [-312.0, -38.0, -296.0, -22.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_library_D2"],
+   "dept": "services",
+   "prefab": "library",
+   "mesh": "SM_SHIP_Library",
+   "pos": [-296.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["power_bus"],
+   "stations": [
+    {"id": "d4_library_D2.s0", "role": "crew", "kind": "sit", "pos": [-301.0, -30.0, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_library_D2.s1", "role": "crew", "kind": "sit", "pos": [-304.0, -30.0, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_library_D2.s2", "role": "crew", "kind": "sit", "pos": [-301.0, -32.0, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_library_D2.s3", "role": "crew", "kind": "sit", "pos": [-307.6, -27.4, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_library_D2.s4", "role": "crew", "kind": "sit", "pos": [-298.6, -26.6, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_library_D2.s5", "role": "librarian", "kind": "work", "pos": [-309.6, -25.0, -46.0], "yaw": 180.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-304.0, -30.0, -42.5],
+     "lumens": 4500,
+     "temperature": 3300,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_library_D2.l0"
+    }
+   ],
+   "plate": "library",
+   "lane": "O_p",
+   "size": [16.0, 16.0, 3.6],
+   "crew_slots": 6
+  },
+  {
+   "id": "d4_hydro_E2",
+   "deck": 4,
+   "section": "E",
+   "kind": "hydroponics",
+   "name": "Hydroponics Bay",
+   "bounds": [-344.0, -38.0, -320.0, -22.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_hydro_E2"],
+   "dept": "science",
+   "prefab": "hydro",
+   "mesh": "SM_SHIP_Hydro",
+   "pos": [-320.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["life_support", "potable_water", "food_service"],
+   "stations": [
+    {"id": "d4_hydro_E2.s0", "role": "botanist", "kind": "work", "pos": [-328.0, -30.0, -46.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d4_hydro_E2.s1", "role": "botanist", "kind": "work", "pos": [-336.0, -30.0, -46.0], "yaw": 0.0, "dept": "science"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-332.0, -30.0, -42.7],
+     "lumens": 3500,
+     "temperature": 7000,
+     "size": [20.0, 12.0],
+     "radius": 1100,
+     "shadows": false,
+     "id": "d4_hydro_E2.l0"
+    }
+   ],
+   "plate": "hydro",
+   "lane": "O_p",
+   "size": [24.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_store_cold_E1",
+   "deck": 4,
+   "section": "E",
+   "kind": "storage",
+   "name": "Cold Stores",
+   "bounds": [-368.0, -38.0, -344.0, -22.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_store_cold_E1"],
+   "dept": "science",
+   "prefab": "store_cold",
+   "mesh": "SM_SHIP_StoreCold",
+   "pos": [-344.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["supply", "cold_chain", "coolant"],
+   "stations": [{"id": "d4_store_cold_E1.s0", "role": "storekeeper", "kind": "work", "pos": [-357.0, -25.0, -46.0], "yaw": 270.0, "dept": "flight"}],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-356.0, -27.0, -42.7],
+     "lumens": 4200,
+     "temperature": 6800,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_store_cold_E1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-356.0, -34.0, -42.7],
+     "lumens": 4200,
+     "temperature": 6800,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_store_cold_E1.l1"
+    }
+   ],
+   "plate": "stores_cold",
+   "lane": "O_p",
+   "size": [24.0, 16.0, 3.4],
+   "crew_slots": 1
+  },
+  {
+   "id": "d4_heads_E2",
+   "deck": 4,
+   "section": "E",
+   "kind": "heads",
+   "name": "Heads · Showers",
+   "bounds": [-380.0, -38.0, -368.0, -22.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_heads_E2"],
+   "dept": "services",
+   "prefab": "heads",
+   "mesh": "SM_SHIP_Heads",
+   "pos": [-368.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["potable_water", "waste"],
+   "stations": [],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-374.0, -30.0, -42.7],
+     "lumens": 5000,
+     "temperature": 5000,
+     "size": [6.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_heads_E2.l0"
+    }
+   ],
+   "plate": "heads",
+   "lane": "O_p",
+   "size": [12.0, 16.0, 3.4],
+   "crew_slots": 0
+  },
+  {
+   "id": "d4_hold_F2",
+   "deck": 4,
+   "section": "F",
+   "kind": "storage",
+   "name": "General Stores",
+   "bounds": [-408.0, -38.0, -384.0, -22.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_hold_F2"],
+   "dept": "flight",
+   "prefab": "hold",
+   "mesh": "SM_SHIP_Hold",
+   "pos": [-384.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["supply"],
+   "stations": [
+    {"id": "d4_hold_F2.s0", "role": "storekeeper", "kind": "work", "pos": [-393.0, -25.0, -46.0], "yaw": 270.0, "dept": "flight"},
+    {"id": "d4_hold_F2.s1", "role": "handler", "kind": "work", "pos": [-400.0, -31.0, -46.0], "yaw": 180.0, "dept": "flight"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-396.0, -27.0, -42.7],
+     "lumens": 5200,
+     "temperature": 4600,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_hold_F2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-396.0, -34.0, -42.7],
+     "lumens": 5200,
+     "temperature": 4600,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_hold_F2.l1"
+    }
+   ],
+   "plate": "stores",
+   "lane": "O_p",
+   "size": [24.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_store_dry_F2",
+   "deck": 4,
+   "section": "F",
+   "kind": "storage",
+   "name": "Dry Stores",
+   "bounds": [-432.0, -38.0, -408.0, -22.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_store_dry_F2"],
+   "dept": "flight",
+   "prefab": "store_dry",
+   "mesh": "SM_SHIP_StoreDry",
+   "pos": [-408.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["supply"],
+   "stations": [
+    {"id": "d4_store_dry_F2.s0", "role": "storekeeper", "kind": "work", "pos": [-421.0, -25.0, -46.0], "yaw": 270.0, "dept": "flight"},
+    {"id": "d4_store_dry_F2.s1", "role": "storekeeper", "kind": "stand", "pos": [-423.0, -31.0, -46.0], "yaw": 270.0, "dept": "flight"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-420.0, -27.0, -42.7],
+     "lumens": 5200,
+     "temperature": 4600,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_store_dry_F2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-420.0, -34.0, -42.7],
+     "lumens": 5200,
+     "temperature": 4600,
+     "size": [16.0, 0.8],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_store_dry_F2.l1"
+    }
+   ],
+   "plate": "stores_dry",
+   "lane": "O_p",
+   "size": [24.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_laundry_G2",
+   "deck": 4,
+   "section": "G",
+   "kind": "laundry",
+   "name": "Laundry",
+   "bounds": [-452.0, -38.0, -440.0, -22.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_laundry_G2"],
+   "dept": "services",
+   "prefab": "laundry",
+   "mesh": "SM_SHIP_Laundry",
+   "pos": [-440.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["potable_water", "power_bus"],
+   "stations": [
+    {"id": "d4_laundry_G2.s0", "role": "laundry_hand", "kind": "work", "pos": [-444.0, -29.0, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_laundry_G2.s1", "role": "laundry_hand", "kind": "work", "pos": [-448.0, -29.0, -46.0], "yaw": 270.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-446.0, -30.0, -42.7],
+     "lumens": 5000,
+     "temperature": 4800,
+     "size": [6.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_laundry_G2.l0"
+    }
+   ],
+   "plate": "laundry",
+   "lane": "O_p",
+   "size": [12.0, 16.0, 3.4],
+   "crew_slots": 2
+  },
+  {
+   "id": "d4_heads_G2",
+   "deck": 4,
+   "section": "G",
+   "kind": "heads",
+   "name": "Heads · Showers",
+   "bounds": [-464.0, -38.0, -452.0, -22.0],
+   "z": [-46.0, -42.3],
+   "status": "built",
+   "doors": ["d4_door_heads_G2"],
+   "dept": "services",
+   "prefab": "heads",
+   "mesh": "SM_SHIP_Heads",
+   "pos": [-452.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["potable_water", "waste"],
+   "stations": [],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-458.0, -30.0, -42.7],
+     "lumens": 5000,
+     "temperature": 5000,
+     "size": [6.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_heads_G2.l0"
+    }
+   ],
+   "plate": "heads",
+   "lane": "O_p",
+   "size": [12.0, 16.0, 3.4],
+   "crew_slots": 0
+  },
+  {
+   "id": "d4_quiet_G2",
+   "deck": 4,
+   "section": "G",
+   "kind": "chapel",
+   "name": "Quiet Room",
+   "bounds": [-476.0, -38.0, -464.0, -22.0],
+   "z": [-46.0, -42.1],
+   "status": "built",
+   "doors": ["d4_door_quiet_G2"],
+   "dept": "services",
+   "prefab": "quiet",
+   "mesh": "SM_SHIP_Quiet",
+   "pos": [-464.0, -22.0, -46.0],
+   "yaw": 180.0,
+   "systems": ["power_bus"],
+   "stations": [
+    {"id": "d4_quiet_G2.s0", "role": "crew", "kind": "sit", "pos": [-467.6, -29.6, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_quiet_G2.s1", "role": "crew", "kind": "sit", "pos": [-472.4, -29.6, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_quiet_G2.s2", "role": "crew", "kind": "sit", "pos": [-467.6, -31.8, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_quiet_G2.s3", "role": "crew", "kind": "sit", "pos": [-472.4, -31.8, -46.0], "yaw": 270.0, "dept": "services"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-470.0, -30.0, -42.5],
+     "lumens": 1500,
+     "temperature": 2700,
+     "size": [5.0, 5.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d4_quiet_G2.l0"
+    }
+   ],
+   "plate": "chapel",
+   "lane": "O_p",
+   "size": [12.0, 16.0, 3.6],
+   "crew_slots": 4
   },
   {
    "id": "d4_galley_pass_B1",
@@ -3323,7 +4327,7 @@
    "crew_slots": 2
   },
   {
-   "id": "d4_library_D1",
+   "id": "d4_library_D3",
    "deck": 4,
    "section": "D",
    "kind": "library",
@@ -3331,7 +4335,7 @@
    "bounds": [-292.0, -18.0, -276.0, -2.0],
    "z": [-46.0, -42.1],
    "status": "built",
-   "doors": ["d4_door_library_D1"],
+   "doors": ["d4_door_library_D3"],
    "dept": "services",
    "prefab": "library",
    "mesh": "SM_SHIP_Library",
@@ -3339,12 +4343,12 @@
    "yaw": 180.0,
    "systems": ["power_bus"],
    "stations": [
-    {"id": "d4_library_D1.s0", "role": "crew", "kind": "sit", "pos": [-281.0, -10.0, -46.0], "yaw": 270.0, "dept": "services"},
-    {"id": "d4_library_D1.s1", "role": "crew", "kind": "sit", "pos": [-284.0, -10.0, -46.0], "yaw": 270.0, "dept": "services"},
-    {"id": "d4_library_D1.s2", "role": "crew", "kind": "sit", "pos": [-281.0, -12.0, -46.0], "yaw": 90.0, "dept": "services"},
-    {"id": "d4_library_D1.s3", "role": "crew", "kind": "sit", "pos": [-287.6, -7.4, -46.0], "yaw": 0.0, "dept": "services"},
-    {"id": "d4_library_D1.s4", "role": "crew", "kind": "sit", "pos": [-278.6, -6.6, -46.0], "yaw": 180.0, "dept": "services"},
-    {"id": "d4_library_D1.s5", "role": "librarian", "kind": "work", "pos": [-289.6, -5.0, -46.0], "yaw": 180.0, "dept": "services"}
+    {"id": "d4_library_D3.s0", "role": "crew", "kind": "sit", "pos": [-281.0, -10.0, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_library_D3.s1", "role": "crew", "kind": "sit", "pos": [-284.0, -10.0, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_library_D3.s2", "role": "crew", "kind": "sit", "pos": [-281.0, -12.0, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_library_D3.s3", "role": "crew", "kind": "sit", "pos": [-287.6, -7.4, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_library_D3.s4", "role": "crew", "kind": "sit", "pos": [-278.6, -6.6, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_library_D3.s5", "role": "librarian", "kind": "work", "pos": [-289.6, -5.0, -46.0], "yaw": 180.0, "dept": "services"}
    ],
    "lights": [
     {
@@ -3355,7 +4359,7 @@
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_library_D1.l0"
+     "id": "d4_library_D3.l0"
     }
    ],
    "plate": "library",
@@ -3403,7 +4407,7 @@
    "crew_slots": 4
   },
   {
-   "id": "d4_hold_F1",
+   "id": "d4_hold_F3",
    "deck": 4,
    "section": "F",
    "kind": "storage",
@@ -3411,7 +4415,7 @@
    "bounds": [-408.0, 2.0, -384.0, 18.0],
    "z": [-46.0, -42.3],
    "status": "built",
-   "doors": ["d4_door_hold_F1"],
+   "doors": ["d4_door_hold_F3"],
    "dept": "flight",
    "prefab": "hold",
    "mesh": "SM_SHIP_Hold",
@@ -3419,8 +4423,8 @@
    "yaw": 0.0,
    "systems": ["supply"],
    "stations": [
-    {"id": "d4_hold_F1.s0", "role": "storekeeper", "kind": "work", "pos": [-399.0, 5.0, -46.0], "yaw": 90.0, "dept": "flight"},
-    {"id": "d4_hold_F1.s1", "role": "handler", "kind": "work", "pos": [-392.0, 11.0, -46.0], "yaw": 0.0, "dept": "flight"}
+    {"id": "d4_hold_F3.s0", "role": "storekeeper", "kind": "work", "pos": [-399.0, 5.0, -46.0], "yaw": 90.0, "dept": "flight"},
+    {"id": "d4_hold_F3.s1", "role": "handler", "kind": "work", "pos": [-392.0, 11.0, -46.0], "yaw": 0.0, "dept": "flight"}
    ],
    "lights": [
     {
@@ -3431,7 +4435,7 @@
      "size": [16.0, 0.8],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_hold_F1.l0"
+     "id": "d4_hold_F3.l0"
     },
     {
      "type": "rect",
@@ -3441,7 +4445,7 @@
      "size": [16.0, 0.8],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_hold_F1.l1"
+     "id": "d4_hold_F3.l1"
     }
    ],
    "plate": "stores",
@@ -3521,7 +4525,7 @@
    "crew_slots": 0
   },
   {
-   "id": "d4_laundry_G1",
+   "id": "d4_laundry_G3",
    "deck": 4,
    "section": "G",
    "kind": "laundry",
@@ -3529,7 +4533,7 @@
    "bounds": [-464.0, 2.0, -452.0, 18.0],
    "z": [-46.0, -42.3],
    "status": "built",
-   "doors": ["d4_door_laundry_G1"],
+   "doors": ["d4_door_laundry_G3"],
    "dept": "services",
    "prefab": "laundry",
    "mesh": "SM_SHIP_Laundry",
@@ -3537,8 +4541,8 @@
    "yaw": 0.0,
    "systems": ["potable_water", "power_bus"],
    "stations": [
-    {"id": "d4_laundry_G1.s0", "role": "laundry_hand", "kind": "work", "pos": [-460.0, 9.0, -46.0], "yaw": 90.0, "dept": "services"},
-    {"id": "d4_laundry_G1.s1", "role": "laundry_hand", "kind": "work", "pos": [-456.0, 9.0, -46.0], "yaw": 90.0, "dept": "services"}
+    {"id": "d4_laundry_G3.s0", "role": "laundry_hand", "kind": "work", "pos": [-460.0, 9.0, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_laundry_G3.s1", "role": "laundry_hand", "kind": "work", "pos": [-456.0, 9.0, -46.0], "yaw": 90.0, "dept": "services"}
    ],
    "lights": [
     {
@@ -3549,7 +4553,7 @@
      "size": [6.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_laundry_G1.l0"
+     "id": "d4_laundry_G3.l0"
     }
    ],
    "plate": "laundry",
@@ -3558,7 +4562,7 @@
    "crew_slots": 2
   },
   {
-   "id": "d4_heads_G1",
+   "id": "d4_heads_G3",
    "deck": 4,
    "section": "G",
    "kind": "heads",
@@ -3566,7 +4570,7 @@
    "bounds": [-476.0, 2.0, -464.0, 18.0],
    "z": [-46.0, -42.3],
    "status": "built",
-   "doors": ["d4_door_heads_G1"],
+   "doors": ["d4_door_heads_G3"],
    "dept": "services",
    "prefab": "heads",
    "mesh": "SM_SHIP_Heads",
@@ -3583,7 +4587,7 @@
      "size": [6.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_heads_G1.l0"
+     "id": "d4_heads_G3.l0"
     }
    ],
    "plate": "heads",
@@ -3639,7 +4643,7 @@
    "crew_slots": 2
   },
   {
-   "id": "d4_store_dry_F1",
+   "id": "d4_store_dry_F3",
    "deck": 4,
    "section": "F",
    "kind": "storage",
@@ -3647,7 +4651,7 @@
    "bounds": [-408.0, -18.0, -384.0, -2.0],
    "z": [-46.0, -42.3],
    "status": "built",
-   "doors": ["d4_door_store_dry_F1"],
+   "doors": ["d4_door_store_dry_F3"],
    "dept": "flight",
    "prefab": "store_dry",
    "mesh": "SM_SHIP_StoreDry",
@@ -3655,8 +4659,8 @@
    "yaw": 180.0,
    "systems": ["supply"],
    "stations": [
-    {"id": "d4_store_dry_F1.s0", "role": "storekeeper", "kind": "work", "pos": [-397.0, -5.0, -46.0], "yaw": 270.0, "dept": "flight"},
-    {"id": "d4_store_dry_F1.s1", "role": "storekeeper", "kind": "stand", "pos": [-399.0, -11.0, -46.0], "yaw": 270.0, "dept": "flight"}
+    {"id": "d4_store_dry_F3.s0", "role": "storekeeper", "kind": "work", "pos": [-397.0, -5.0, -46.0], "yaw": 270.0, "dept": "flight"},
+    {"id": "d4_store_dry_F3.s1", "role": "storekeeper", "kind": "stand", "pos": [-399.0, -11.0, -46.0], "yaw": 270.0, "dept": "flight"}
    ],
    "lights": [
     {
@@ -3667,7 +4671,7 @@
      "size": [16.0, 0.8],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_store_dry_F1.l0"
+     "id": "d4_store_dry_F3.l0"
     },
     {
      "type": "rect",
@@ -3677,7 +4681,7 @@
      "size": [16.0, 0.8],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_store_dry_F1.l1"
+     "id": "d4_store_dry_F3.l1"
     }
    ],
    "plate": "stores_dry",
@@ -3766,7 +4770,7 @@
    "crew_slots": 4
   },
   {
-   "id": "d4_heads_G2",
+   "id": "d4_heads_G4",
    "deck": 4,
    "section": "G",
    "kind": "heads",
@@ -3774,7 +4778,7 @@
    "bounds": [-452.0, -18.0, -440.0, -2.0],
    "z": [-46.0, -42.3],
    "status": "built",
-   "doors": ["d4_door_heads_G2"],
+   "doors": ["d4_door_heads_G4"],
    "dept": "services",
    "prefab": "heads",
    "mesh": "SM_SHIP_Heads",
@@ -3791,7 +4795,7 @@
      "size": [6.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_heads_G2.l0"
+     "id": "d4_heads_G4.l0"
     }
    ],
    "plate": "heads",
@@ -3800,7 +4804,7 @@
    "crew_slots": 0
   },
   {
-   "id": "d4_laundry_G2",
+   "id": "d4_laundry_G4",
    "deck": 4,
    "section": "G",
    "kind": "laundry",
@@ -3808,7 +4812,7 @@
    "bounds": [-464.0, -18.0, -452.0, -2.0],
    "z": [-46.0, -42.3],
    "status": "built",
-   "doors": ["d4_door_laundry_G2"],
+   "doors": ["d4_door_laundry_G4"],
    "dept": "services",
    "prefab": "laundry",
    "mesh": "SM_SHIP_Laundry",
@@ -3816,8 +4820,8 @@
    "yaw": 180.0,
    "systems": ["potable_water", "power_bus"],
    "stations": [
-    {"id": "d4_laundry_G2.s0", "role": "laundry_hand", "kind": "work", "pos": [-456.0, -9.0, -46.0], "yaw": 270.0, "dept": "services"},
-    {"id": "d4_laundry_G2.s1", "role": "laundry_hand", "kind": "work", "pos": [-460.0, -9.0, -46.0], "yaw": 270.0, "dept": "services"}
+    {"id": "d4_laundry_G4.s0", "role": "laundry_hand", "kind": "work", "pos": [-456.0, -9.0, -46.0], "yaw": 270.0, "dept": "services"},
+    {"id": "d4_laundry_G4.s1", "role": "laundry_hand", "kind": "work", "pos": [-460.0, -9.0, -46.0], "yaw": 270.0, "dept": "services"}
    ],
    "lights": [
     {
@@ -3828,7 +4832,7 @@
      "size": [6.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d4_laundry_G2.l0"
+     "id": "d4_laundry_G4.l0"
     }
    ],
    "plate": "laundry",
@@ -4297,7 +5301,7 @@
    "bounds": [-296.0, -2.0, -280.0, 2.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": ["d4_door_laundry_D1", "d4_door_library_D1"],
+   "doors": ["d4_door_laundry_D1", "d4_door_library_D3"],
    "passage": "SPM",
    "modules": [8, 11],
    "tone": "S",
@@ -4594,7 +5598,7 @@
    "bounds": [-472.0, -2.0, -456.0, 2.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": ["d4_door_laundry_G1", "d4_door_heads_G1", "d4_door_laundry_G2"],
+   "doors": ["d4_door_laundry_G3", "d4_door_heads_G3", "d4_door_laundry_G4"],
    "passage": "SPA",
    "modules": [13, 16],
    "tone": "S",
@@ -4621,7 +5625,7 @@
    "bounds": [-456.0, -2.0, -440.0, 2.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": ["d4_door_stair_452n", "d4_door_heads_G2"],
+   "doors": ["d4_door_stair_452n", "d4_door_heads_G4"],
    "passage": "SPA",
    "modules": [17, 20],
    "tone": "S",
@@ -4729,7 +5733,7 @@
    "bounds": [-400.0, -2.0, -384.0, 2.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": ["d4_door_hold_F1", "d4_door_store_dry_F1"],
+   "doors": ["d4_door_hold_F3", "d4_door_store_dry_F3"],
    "passage": "SPA",
    "modules": [31, 34],
    "tone": "S",
@@ -4891,7 +5895,7 @@
    "bounds": [-472.0, 18.0, -456.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_heads_G1", "d4_door_quiet_G1"],
    "passage": "SBP",
    "modules": [13, 16],
    "tone": "P",
@@ -4918,7 +5922,7 @@
    "bounds": [-456.0, 18.0, -440.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_laundry_G1"],
    "passage": "SBP",
    "modules": [17, 20],
    "tone": "P",
@@ -4972,7 +5976,7 @@
    "bounds": [-432.0, 18.0, -416.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_hold_F1"],
    "passage": "SBP",
    "modules": [23, 26],
    "tone": "P",
@@ -5026,7 +6030,7 @@
    "bounds": [-400.0, 18.0, -384.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_store_dry_F1"],
    "passage": "SBP",
    "modules": [31, 34],
    "tone": "P",
@@ -5053,7 +6057,7 @@
    "bounds": [-384.0, 18.0, -368.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_quiet_E1"],
    "passage": "SBP",
    "modules": [35, 38],
    "tone": "P",
@@ -5080,7 +6084,7 @@
    "bounds": [-368.0, 18.0, -352.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_heads_E1"],
    "passage": "SBP",
    "modules": [39, 42],
    "tone": "P",
@@ -5107,7 +6111,7 @@
    "bounds": [-352.0, 18.0, -336.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_laundry_E1"],
    "passage": "SBP",
    "modules": [43, 46],
    "tone": "P",
@@ -5134,7 +6138,7 @@
    "bounds": [-336.0, 18.0, -320.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_hydro_E1"],
    "passage": "SBP",
    "modules": [47, 50],
    "tone": "P",
@@ -5188,7 +6192,7 @@
    "bounds": [-312.0, 18.0, -296.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_library_D1"],
    "passage": "SBP",
    "modules": [53, 56],
    "tone": "P",
@@ -5215,7 +6219,7 @@
    "bounds": [-296.0, 18.0, -280.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_games_D1"],
    "passage": "SBP",
    "modules": [57, 60],
    "tone": "P",
@@ -5269,7 +6273,7 @@
    "bounds": [-264.0, 18.0, -248.0, 22.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_lounge_D1"],
    "passage": "SBP",
    "modules": [65, 68],
    "tone": "P",
@@ -6025,7 +7029,7 @@
    "bounds": [-472.0, -22.0, -456.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_heads_G2", "d4_door_quiet_G2"],
    "passage": "PP",
    "modules": [13, 16],
    "tone": "P",
@@ -6052,7 +7056,7 @@
    "bounds": [-456.0, -22.0, -440.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_laundry_G2"],
    "passage": "PP",
    "modules": [17, 20],
    "tone": "P",
@@ -6106,7 +7110,7 @@
    "bounds": [-432.0, -22.0, -416.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_store_dry_F2"],
    "passage": "PP",
    "modules": [23, 26],
    "tone": "P",
@@ -6160,7 +7164,7 @@
    "bounds": [-400.0, -22.0, -384.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_hold_F2"],
    "passage": "PP",
    "modules": [31, 34],
    "tone": "P",
@@ -6187,7 +7191,7 @@
    "bounds": [-384.0, -22.0, -368.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_heads_E2"],
    "passage": "PP",
    "modules": [35, 38],
    "tone": "P",
@@ -6214,7 +7218,7 @@
    "bounds": [-368.0, -22.0, -352.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_store_cold_E1"],
    "passage": "PP",
    "modules": [39, 42],
    "tone": "P",
@@ -6268,7 +7272,7 @@
    "bounds": [-336.0, -22.0, -320.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_hydro_E2"],
    "passage": "PP",
    "modules": [47, 50],
    "tone": "P",
@@ -6322,7 +7326,7 @@
    "bounds": [-312.0, -22.0, -296.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_library_D2"],
    "passage": "PP",
    "modules": [53, 56],
    "tone": "P",
@@ -6349,7 +7353,7 @@
    "bounds": [-296.0, -22.0, -280.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_lounge_D2"],
    "passage": "PP",
    "modules": [57, 60],
    "tone": "P",
@@ -6403,7 +7407,7 @@
    "bounds": [-264.0, -22.0, -248.0, -18.0],
    "z": [-46.0, -42.2],
    "status": "built",
-   "doors": [],
+   "doors": ["d4_door_games_D2"],
    "passage": "PP",
    "modules": [65, 68],
    "tone": "P",
@@ -50251,6 +51255,198 @@
    "side": 1
   },
   {
+   "id": "d4_door_lounge_D1",
+   "deck": 4,
+   "pos": [-262.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_lounge_D1",
+   "b": "d4_sbp_D0",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "lounge",
+   "side": 1
+  },
+  {
+   "id": "d4_door_games_D1",
+   "deck": 4,
+   "pos": [-286.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_games_D1",
+   "b": "d4_sbp_D2",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "games",
+   "side": 1
+  },
+  {
+   "id": "d4_door_library_D1",
+   "deck": 4,
+   "pos": [-306.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_library_D1",
+   "b": "d4_sbp_D3",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "library",
+   "side": 1
+  },
+  {
+   "id": "d4_door_hydro_E1",
+   "deck": 4,
+   "pos": [-334.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_hydro_E1",
+   "b": "d4_sbp_E0",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "hydro",
+   "side": 1
+  },
+  {
+   "id": "d4_door_laundry_E1",
+   "deck": 4,
+   "pos": [-350.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_laundry_E1",
+   "b": "d4_sbp_E1",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "laundry",
+   "side": 1
+  },
+  {
+   "id": "d4_door_heads_E1",
+   "deck": 4,
+   "pos": [-362.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_heads_E1",
+   "b": "d4_sbp_E2",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "heads",
+   "side": 1
+  },
+  {
+   "id": "d4_door_quiet_E1",
+   "deck": 4,
+   "pos": [-374.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_quiet_E1",
+   "b": "d4_sbp_E3",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "chapel",
+   "side": 1
+  },
+  {
+   "id": "d4_door_store_dry_F1",
+   "deck": 4,
+   "pos": [-394.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_store_dry_F1",
+   "b": "d4_sbp_F0",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "stores_dry",
+   "side": 1
+  },
+  {
+   "id": "d4_door_hold_F1",
+   "deck": 4,
+   "pos": [-422.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_hold_F1",
+   "b": "d4_sbp_F2",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "stores",
+   "side": 1
+  },
+  {
+   "id": "d4_door_laundry_G1",
+   "deck": 4,
+   "pos": [-446.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_laundry_G1",
+   "b": "d4_sbp_G0",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "laundry",
+   "side": 1
+  },
+  {
+   "id": "d4_door_heads_G1",
+   "deck": 4,
+   "pos": [-458.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_heads_G1",
+   "b": "d4_sbp_G1",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "heads",
+   "side": 1
+  },
+  {
+   "id": "d4_door_quiet_G1",
+   "deck": 4,
+   "pos": [-470.0, 21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_quiet_G1",
+   "b": "d4_sbp_G1",
+   "locked": false,
+   "wall": "near",
+   "passage": "SBP",
+   "plate": "chapel",
+   "side": 1
+  },
+  {
    "id": "d4_door_observation_A2",
    "deck": 4,
    "pos": [2.0, -21.775, -46.0],
@@ -50328,6 +51524,182 @@
    "wall": "near",
    "passage": "PP",
    "plate": "stores",
+   "side": -1
+  },
+  {
+   "id": "d4_door_games_D2",
+   "deck": 4,
+   "pos": [-258.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_games_D2",
+   "b": "d4_pp_D0",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "games",
+   "side": -1
+  },
+  {
+   "id": "d4_door_lounge_D2",
+   "deck": 4,
+   "pos": [-282.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_lounge_D2",
+   "b": "d4_pp_D2",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "lounge",
+   "side": -1
+  },
+  {
+   "id": "d4_door_library_D2",
+   "deck": 4,
+   "pos": [-302.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_library_D2",
+   "b": "d4_pp_D3",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "library",
+   "side": -1
+  },
+  {
+   "id": "d4_door_hydro_E2",
+   "deck": 4,
+   "pos": [-330.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_hydro_E2",
+   "b": "d4_pp_E0",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "hydro",
+   "side": -1
+  },
+  {
+   "id": "d4_door_store_cold_E1",
+   "deck": 4,
+   "pos": [-358.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_store_cold_E1",
+   "b": "d4_pp_E2",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "stores_cold",
+   "side": -1
+  },
+  {
+   "id": "d4_door_heads_E2",
+   "deck": 4,
+   "pos": [-374.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_heads_E2",
+   "b": "d4_pp_E3",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "heads",
+   "side": -1
+  },
+  {
+   "id": "d4_door_hold_F2",
+   "deck": 4,
+   "pos": [-394.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_hold_F2",
+   "b": "d4_pp_F0",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "stores",
+   "side": -1
+  },
+  {
+   "id": "d4_door_store_dry_F2",
+   "deck": 4,
+   "pos": [-422.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_store_dry_F2",
+   "b": "d4_pp_F2",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "stores_dry",
+   "side": -1
+  },
+  {
+   "id": "d4_door_laundry_G2",
+   "deck": 4,
+   "pos": [-446.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_laundry_G2",
+   "b": "d4_pp_G0",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "laundry",
+   "side": -1
+  },
+  {
+   "id": "d4_door_heads_G2",
+   "deck": 4,
+   "pos": [-458.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_heads_G2",
+   "b": "d4_pp_G1",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "heads",
+   "side": -1
+  },
+  {
+   "id": "d4_door_quiet_G2",
+   "deck": 4,
+   "pos": [-470.0, -21.775, -46.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d4_quiet_G2",
+   "b": "d4_pp_G1",
+   "locked": false,
+   "wall": "near",
+   "passage": "PP",
+   "plate": "chapel",
    "side": -1
   },
   {
@@ -50459,14 +51831,14 @@
    "side": -1
   },
   {
-   "id": "d4_door_library_D1",
+   "id": "d4_door_library_D3",
    "deck": 4,
    "pos": [-282.0, -1.775, -46.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d4_library_D1",
+   "a": "d4_library_D3",
    "b": "d4_spm_D2",
    "locked": false,
    "wall": "near",
@@ -50491,14 +51863,14 @@
    "side": -1
   },
   {
-   "id": "d4_door_hold_F1",
+   "id": "d4_door_hold_F3",
    "deck": 4,
    "pos": [-398.0, 1.775, -46.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d4_hold_F1",
+   "a": "d4_hold_F3",
    "b": "d4_spa_F0",
    "locked": false,
    "wall": "near",
@@ -50539,14 +51911,14 @@
    "side": 1
   },
   {
-   "id": "d4_door_laundry_G1",
+   "id": "d4_door_laundry_G3",
    "deck": 4,
    "pos": [-458.0, 1.775, -46.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d4_laundry_G1",
+   "a": "d4_laundry_G3",
    "b": "d4_spa_G1",
    "locked": false,
    "wall": "near",
@@ -50555,14 +51927,14 @@
    "side": 1
   },
   {
-   "id": "d4_door_heads_G1",
+   "id": "d4_door_heads_G3",
    "deck": 4,
    "pos": [-470.0, 1.775, -46.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d4_heads_G1",
+   "a": "d4_heads_G3",
    "b": "d4_spa_G1",
    "locked": false,
    "wall": "near",
@@ -50587,14 +51959,14 @@
    "side": 1
   },
   {
-   "id": "d4_door_store_dry_F1",
+   "id": "d4_door_store_dry_F3",
    "deck": 4,
    "pos": [-398.0, -1.775, -46.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d4_store_dry_F1",
+   "a": "d4_store_dry_F3",
    "b": "d4_spa_F0",
    "locked": false,
    "wall": "near",
@@ -50635,14 +52007,14 @@
    "side": -1
   },
   {
-   "id": "d4_door_heads_G2",
+   "id": "d4_door_heads_G4",
    "deck": 4,
    "pos": [-446.0, -1.775, -46.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d4_heads_G2",
+   "a": "d4_heads_G4",
    "b": "d4_spa_G0",
    "locked": false,
    "wall": "near",
@@ -50651,14 +52023,14 @@
    "side": -1
   },
   {
-   "id": "d4_door_laundry_G2",
+   "id": "d4_door_laundry_G4",
    "deck": 4,
    "pos": [-458.0, -1.775, -46.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d4_laundry_G2",
+   "a": "d4_laundry_G4",
    "b": "d4_spa_G1",
    "locked": false,
    "wall": "near",
@@ -67307,6 +68679,503 @@
     "act": "work",
     "yaw": 0.0
    },
+   {"id": "d4_lounge_D1.in0", "deck": 4, "p": [-262.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_lounge_D1"},
+   {"id": "d4_lounge_D1.hub", "deck": 4, "p": [-260.0, 30.0, -46.0], "kind": "room", "comp": "d4_lounge_D1"},
+   {
+    "id": "d4_lounge_D1.s0",
+    "deck": 4,
+    "p": [-268.0, 26.0, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 45.0
+   },
+   {
+    "id": "d4_lounge_D1.s1",
+    "deck": 4,
+    "p": [-268.0, 28.6, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 315.0
+   },
+   {
+    "id": "d4_lounge_D1.s2",
+    "deck": 4,
+    "p": [-264.3, 26.6, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_lounge_D1.s3",
+    "deck": 4,
+    "p": [-264.3, 28.0, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_lounge_D1.s4",
+    "deck": 4,
+    "p": [-268.0, 33.4, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 45.0
+   },
+   {
+    "id": "d4_lounge_D1.s5",
+    "deck": 4,
+    "p": [-268.0, 36.0, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 315.0
+   },
+   {
+    "id": "d4_lounge_D1.s6",
+    "deck": 4,
+    "p": [-264.3, 34.0, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_lounge_D1.s7",
+    "deck": 4,
+    "p": [-264.3, 35.4, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_lounge_D1.s8",
+    "deck": 4,
+    "p": [-256.6, 26.3, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_lounge_D1.s9",
+    "deck": 4,
+    "p": [-256.6, 28.5, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_lounge_D1.s10",
+    "deck": 4,
+    "p": [-252.4, 26.3, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_lounge_D1.s11",
+    "deck": 4,
+    "p": [-251.3, 27.4, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_lounge_D1.s12",
+    "deck": 4,
+    "p": [-255.6, 33.5, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_lounge_D1.s13",
+    "deck": 4,
+    "p": [-253.0, 33.5, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_lounge_D1.s14",
+    "deck": 4,
+    "p": [-250.4, 33.5, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_lounge_D1.s15",
+    "deck": 4,
+    "p": [-253.0, 35.6, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D1",
+    "role": "barista",
+    "act": "work",
+    "yaw": 270.0
+   },
+   {"id": "d4_games_D1.in0", "deck": 4, "p": [-286.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_games_D1"},
+   {"id": "d4_games_D1.hub", "deck": 4, "p": [-284.0, 30.0, -46.0], "kind": "room", "comp": "d4_games_D1"},
+   {"id": "d4_games_D1.s0", "deck": 4, "p": [-291.0, 27.0, -46.0], "kind": "station", "comp": "d4_games_D1", "role": "crew", "act": "sit", "yaw": 0.0},
+   {
+    "id": "d4_games_D1.s1",
+    "deck": 4,
+    "p": [-289.0, 27.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {"id": "d4_games_D1.s2", "deck": 4, "p": [-291.0, 33.0, -46.0], "kind": "station", "comp": "d4_games_D1", "role": "crew", "act": "sit", "yaw": 0.0},
+   {
+    "id": "d4_games_D1.s3",
+    "deck": 4,
+    "p": [-289.0, 33.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {"id": "d4_games_D1.s4", "deck": 4, "p": [-284.0, 26.0, -46.0], "kind": "station", "comp": "d4_games_D1", "role": "crew", "act": "sit", "yaw": 0.0},
+   {
+    "id": "d4_games_D1.s5",
+    "deck": 4,
+    "p": [-282.0, 26.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_games_D1.s6",
+    "deck": 4,
+    "p": [-278.5, 36.1, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D1",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_games_D1.s7",
+    "deck": 4,
+    "p": [-276.5, 36.1, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D1",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_games_D1.s8",
+    "deck": 4,
+    "p": [-281.0, 30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D1",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_games_D1.s9",
+    "deck": 4,
+    "p": [-277.0, 30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D1",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 180.0
+   },
+   {"id": "d4_library_D1.in0", "deck": 4, "p": [-306.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_library_D1"},
+   {"id": "d4_library_D1.hub", "deck": 4, "p": [-304.0, 30.0, -46.0], "kind": "room", "comp": "d4_library_D1"},
+   {
+    "id": "d4_library_D1.s0",
+    "deck": 4,
+    "p": [-307.0, 30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_library_D1.s1",
+    "deck": 4,
+    "p": [-304.0, 30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_library_D1.s2",
+    "deck": 4,
+    "p": [-307.0, 32.0, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_library_D1.s3",
+    "deck": 4,
+    "p": [-300.4, 27.4, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_library_D1.s4",
+    "deck": 4,
+    "p": [-309.4, 26.6, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_library_D1.s5",
+    "deck": 4,
+    "p": [-298.4, 25.0, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D1",
+    "role": "librarian",
+    "act": "work",
+    "yaw": 0.0
+   },
+   {"id": "d4_hydro_E1.in0", "deck": 4, "p": [-334.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_hydro_E1"},
+   {"id": "d4_hydro_E1.hub", "deck": 4, "p": [-332.0, 30.0, -46.0], "kind": "room", "comp": "d4_hydro_E1"},
+   {
+    "id": "d4_hydro_E1.s0",
+    "deck": 4,
+    "p": [-336.0, 30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_hydro_E1",
+    "role": "botanist",
+    "act": "work",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_hydro_E1.s1",
+    "deck": 4,
+    "p": [-328.0, 30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_hydro_E1",
+    "role": "botanist",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {"id": "d4_laundry_E1.in0", "deck": 4, "p": [-350.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_laundry_E1"},
+   {"id": "d4_laundry_E1.hub", "deck": 4, "p": [-350.0, 30.0, -46.0], "kind": "room", "comp": "d4_laundry_E1"},
+   {
+    "id": "d4_laundry_E1.s0",
+    "deck": 4,
+    "p": [-352.0, 29.0, -46.0],
+    "kind": "station",
+    "comp": "d4_laundry_E1",
+    "role": "laundry_hand",
+    "act": "work",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_laundry_E1.s1",
+    "deck": 4,
+    "p": [-348.0, 29.0, -46.0],
+    "kind": "station",
+    "comp": "d4_laundry_E1",
+    "role": "laundry_hand",
+    "act": "work",
+    "yaw": 90.0
+   },
+   {"id": "d4_heads_E1.in0", "deck": 4, "p": [-362.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_heads_E1"},
+   {"id": "d4_heads_E1.hub", "deck": 4, "p": [-362.0, 30.0, -46.0], "kind": "room", "comp": "d4_heads_E1"},
+   {"id": "d4_quiet_E1.in0", "deck": 4, "p": [-374.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_quiet_E1"},
+   {"id": "d4_quiet_E1.hub", "deck": 4, "p": [-374.0, 30.0, -46.0], "kind": "room", "comp": "d4_quiet_E1"},
+   {
+    "id": "d4_quiet_E1.s0",
+    "deck": 4,
+    "p": [-376.4, 29.6, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_E1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_quiet_E1.s1",
+    "deck": 4,
+    "p": [-371.6, 29.6, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_E1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_quiet_E1.s2",
+    "deck": 4,
+    "p": [-376.4, 31.8, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_E1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_quiet_E1.s3",
+    "deck": 4,
+    "p": [-371.6, 31.8, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_E1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {"id": "d4_store_dry_F1.in0", "deck": 4, "p": [-394.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_store_dry_F1"},
+   {"id": "d4_store_dry_F1.hub", "deck": 4, "p": [-396.0, 30.0, -46.0], "kind": "room", "comp": "d4_store_dry_F1"},
+   {
+    "id": "d4_store_dry_F1.s0",
+    "deck": 4,
+    "p": [-395.0, 25.0, -46.0],
+    "kind": "station",
+    "comp": "d4_store_dry_F1",
+    "role": "storekeeper",
+    "act": "work",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_store_dry_F1.s1",
+    "deck": 4,
+    "p": [-393.0, 31.0, -46.0],
+    "kind": "station",
+    "comp": "d4_store_dry_F1",
+    "role": "storekeeper",
+    "act": "stand",
+    "yaw": 90.0
+   },
+   {"id": "d4_hold_F1.in0", "deck": 4, "p": [-422.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_hold_F1"},
+   {"id": "d4_hold_F1.hub", "deck": 4, "p": [-420.0, 30.0, -46.0], "kind": "room", "comp": "d4_hold_F1"},
+   {
+    "id": "d4_hold_F1.s0",
+    "deck": 4,
+    "p": [-423.0, 25.0, -46.0],
+    "kind": "station",
+    "comp": "d4_hold_F1",
+    "role": "storekeeper",
+    "act": "work",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_hold_F1.s1",
+    "deck": 4,
+    "p": [-416.0, 31.0, -46.0],
+    "kind": "station",
+    "comp": "d4_hold_F1",
+    "role": "handler",
+    "act": "work",
+    "yaw": 0.0
+   },
+   {"id": "d4_laundry_G1.in0", "deck": 4, "p": [-446.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_laundry_G1"},
+   {"id": "d4_laundry_G1.hub", "deck": 4, "p": [-446.0, 30.0, -46.0], "kind": "room", "comp": "d4_laundry_G1"},
+   {
+    "id": "d4_laundry_G1.s0",
+    "deck": 4,
+    "p": [-448.0, 29.0, -46.0],
+    "kind": "station",
+    "comp": "d4_laundry_G1",
+    "role": "laundry_hand",
+    "act": "work",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_laundry_G1.s1",
+    "deck": 4,
+    "p": [-444.0, 29.0, -46.0],
+    "kind": "station",
+    "comp": "d4_laundry_G1",
+    "role": "laundry_hand",
+    "act": "work",
+    "yaw": 90.0
+   },
+   {"id": "d4_heads_G1.in0", "deck": 4, "p": [-458.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_heads_G1"},
+   {"id": "d4_heads_G1.hub", "deck": 4, "p": [-458.0, 30.0, -46.0], "kind": "room", "comp": "d4_heads_G1"},
+   {"id": "d4_quiet_G1.in0", "deck": 4, "p": [-470.0, 23.2, -46.0], "kind": "door_in", "comp": "d4_quiet_G1"},
+   {"id": "d4_quiet_G1.hub", "deck": 4, "p": [-470.0, 30.0, -46.0], "kind": "room", "comp": "d4_quiet_G1"},
+   {
+    "id": "d4_quiet_G1.s0",
+    "deck": 4,
+    "p": [-472.4, 29.6, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_G1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_quiet_G1.s1",
+    "deck": 4,
+    "p": [-467.6, 29.6, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_G1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_quiet_G1.s2",
+    "deck": 4,
+    "p": [-472.4, 31.8, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_G1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_quiet_G1.s3",
+    "deck": 4,
+    "p": [-467.6, 31.8, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_G1",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
    {"id": "d4_observation_A2.in0", "deck": 4, "p": [2.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_observation_A2"},
    {"id": "d4_observation_A2.hub", "deck": 4, "p": [0.0, -30.0, -46.0], "kind": "room", "comp": "d4_observation_A2"},
    {
@@ -67547,6 +69416,478 @@
     "act": "work",
     "yaw": 180.0
    },
+   {"id": "d4_games_D2.in0", "deck": 4, "p": [-258.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_games_D2"},
+   {"id": "d4_games_D2.hub", "deck": 4, "p": [-260.0, -30.0, -46.0], "kind": "room", "comp": "d4_games_D2"},
+   {
+    "id": "d4_games_D2.s0",
+    "deck": 4,
+    "p": [-253.0, -27.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_games_D2.s1",
+    "deck": 4,
+    "p": [-255.0, -27.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_games_D2.s2",
+    "deck": 4,
+    "p": [-253.0, -33.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_games_D2.s3",
+    "deck": 4,
+    "p": [-255.0, -33.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_games_D2.s4",
+    "deck": 4,
+    "p": [-260.0, -26.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_games_D2.s5",
+    "deck": 4,
+    "p": [-262.0, -26.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_games_D2.s6",
+    "deck": 4,
+    "p": [-265.5, -36.1, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_games_D2.s7",
+    "deck": 4,
+    "p": [-267.5, -36.1, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_games_D2.s8",
+    "deck": 4,
+    "p": [-263.0, -30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_games_D2.s9",
+    "deck": 4,
+    "p": [-267.0, -30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_games_D2",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 0.0
+   },
+   {"id": "d4_lounge_D2.in0", "deck": 4, "p": [-282.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_lounge_D2"},
+   {"id": "d4_lounge_D2.hub", "deck": 4, "p": [-284.0, -30.0, -46.0], "kind": "room", "comp": "d4_lounge_D2"},
+   {
+    "id": "d4_lounge_D2.s0",
+    "deck": 4,
+    "p": [-276.0, -26.0, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 225.0
+   },
+   {
+    "id": "d4_lounge_D2.s1",
+    "deck": 4,
+    "p": [-276.0, -28.6, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 135.0
+   },
+   {
+    "id": "d4_lounge_D2.s2",
+    "deck": 4,
+    "p": [-279.7, -26.6, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_lounge_D2.s3",
+    "deck": 4,
+    "p": [-279.7, -28.0, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_lounge_D2.s4",
+    "deck": 4,
+    "p": [-276.0, -33.4, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 225.0
+   },
+   {
+    "id": "d4_lounge_D2.s5",
+    "deck": 4,
+    "p": [-276.0, -36.0, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 135.0
+   },
+   {
+    "id": "d4_lounge_D2.s6",
+    "deck": 4,
+    "p": [-279.7, -34.0, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_lounge_D2.s7",
+    "deck": 4,
+    "p": [-279.7, -35.4, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_lounge_D2.s8",
+    "deck": 4,
+    "p": [-287.4, -26.3, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_lounge_D2.s9",
+    "deck": 4,
+    "p": [-287.4, -28.5, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_lounge_D2.s10",
+    "deck": 4,
+    "p": [-291.6, -26.3, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_lounge_D2.s11",
+    "deck": 4,
+    "p": [-292.7, -27.4, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_lounge_D2.s12",
+    "deck": 4,
+    "p": [-288.4, -33.5, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_lounge_D2.s13",
+    "deck": 4,
+    "p": [-291.0, -33.5, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_lounge_D2.s14",
+    "deck": 4,
+    "p": [-293.6, -33.5, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "crew",
+    "act": "eat",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_lounge_D2.s15",
+    "deck": 4,
+    "p": [-291.0, -35.6, -46.0],
+    "kind": "station",
+    "comp": "d4_lounge_D2",
+    "role": "barista",
+    "act": "work",
+    "yaw": 90.0
+   },
+   {"id": "d4_library_D2.in0", "deck": 4, "p": [-302.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_library_D2"},
+   {"id": "d4_library_D2.hub", "deck": 4, "p": [-304.0, -30.0, -46.0], "kind": "room", "comp": "d4_library_D2"},
+   {
+    "id": "d4_library_D2.s0",
+    "deck": 4,
+    "p": [-301.0, -30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_library_D2.s1",
+    "deck": 4,
+    "p": [-304.0, -30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_library_D2.s2",
+    "deck": 4,
+    "p": [-301.0, -32.0, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_library_D2.s3",
+    "deck": 4,
+    "p": [-307.6, -27.4, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_library_D2.s4",
+    "deck": 4,
+    "p": [-298.6, -26.6, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_library_D2.s5",
+    "deck": 4,
+    "p": [-309.6, -25.0, -46.0],
+    "kind": "station",
+    "comp": "d4_library_D2",
+    "role": "librarian",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {"id": "d4_hydro_E2.in0", "deck": 4, "p": [-330.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_hydro_E2"},
+   {"id": "d4_hydro_E2.hub", "deck": 4, "p": [-332.0, -30.0, -46.0], "kind": "room", "comp": "d4_hydro_E2"},
+   {
+    "id": "d4_hydro_E2.s0",
+    "deck": 4,
+    "p": [-328.0, -30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_hydro_E2",
+    "role": "botanist",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_hydro_E2.s1",
+    "deck": 4,
+    "p": [-336.0, -30.0, -46.0],
+    "kind": "station",
+    "comp": "d4_hydro_E2",
+    "role": "botanist",
+    "act": "work",
+    "yaw": 0.0
+   },
+   {"id": "d4_store_cold_E1.in0", "deck": 4, "p": [-358.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_store_cold_E1"},
+   {"id": "d4_store_cold_E1.hub", "deck": 4, "p": [-356.0, -30.0, -46.0], "kind": "room", "comp": "d4_store_cold_E1"},
+   {
+    "id": "d4_store_cold_E1.s0",
+    "deck": 4,
+    "p": [-357.0, -25.0, -46.0],
+    "kind": "station",
+    "comp": "d4_store_cold_E1",
+    "role": "storekeeper",
+    "act": "work",
+    "yaw": 270.0
+   },
+   {"id": "d4_heads_E2.in0", "deck": 4, "p": [-374.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_heads_E2"},
+   {"id": "d4_heads_E2.hub", "deck": 4, "p": [-374.0, -30.0, -46.0], "kind": "room", "comp": "d4_heads_E2"},
+   {"id": "d4_hold_F2.in0", "deck": 4, "p": [-394.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_hold_F2"},
+   {"id": "d4_hold_F2.hub", "deck": 4, "p": [-396.0, -30.0, -46.0], "kind": "room", "comp": "d4_hold_F2"},
+   {
+    "id": "d4_hold_F2.s0",
+    "deck": 4,
+    "p": [-393.0, -25.0, -46.0],
+    "kind": "station",
+    "comp": "d4_hold_F2",
+    "role": "storekeeper",
+    "act": "work",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_hold_F2.s1",
+    "deck": 4,
+    "p": [-400.0, -31.0, -46.0],
+    "kind": "station",
+    "comp": "d4_hold_F2",
+    "role": "handler",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {"id": "d4_store_dry_F2.in0", "deck": 4, "p": [-422.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_store_dry_F2"},
+   {"id": "d4_store_dry_F2.hub", "deck": 4, "p": [-420.0, -30.0, -46.0], "kind": "room", "comp": "d4_store_dry_F2"},
+   {
+    "id": "d4_store_dry_F2.s0",
+    "deck": 4,
+    "p": [-421.0, -25.0, -46.0],
+    "kind": "station",
+    "comp": "d4_store_dry_F2",
+    "role": "storekeeper",
+    "act": "work",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_store_dry_F2.s1",
+    "deck": 4,
+    "p": [-423.0, -31.0, -46.0],
+    "kind": "station",
+    "comp": "d4_store_dry_F2",
+    "role": "storekeeper",
+    "act": "stand",
+    "yaw": 270.0
+   },
+   {"id": "d4_laundry_G2.in0", "deck": 4, "p": [-446.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_laundry_G2"},
+   {"id": "d4_laundry_G2.hub", "deck": 4, "p": [-446.0, -30.0, -46.0], "kind": "room", "comp": "d4_laundry_G2"},
+   {
+    "id": "d4_laundry_G2.s0",
+    "deck": 4,
+    "p": [-444.0, -29.0, -46.0],
+    "kind": "station",
+    "comp": "d4_laundry_G2",
+    "role": "laundry_hand",
+    "act": "work",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_laundry_G2.s1",
+    "deck": 4,
+    "p": [-448.0, -29.0, -46.0],
+    "kind": "station",
+    "comp": "d4_laundry_G2",
+    "role": "laundry_hand",
+    "act": "work",
+    "yaw": 270.0
+   },
+   {"id": "d4_heads_G2.in0", "deck": 4, "p": [-458.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_heads_G2"},
+   {"id": "d4_heads_G2.hub", "deck": 4, "p": [-458.0, -30.0, -46.0], "kind": "room", "comp": "d4_heads_G2"},
+   {"id": "d4_quiet_G2.in0", "deck": 4, "p": [-470.0, -23.2, -46.0], "kind": "door_in", "comp": "d4_quiet_G2"},
+   {"id": "d4_quiet_G2.hub", "deck": 4, "p": [-470.0, -30.0, -46.0], "kind": "room", "comp": "d4_quiet_G2"},
+   {
+    "id": "d4_quiet_G2.s0",
+    "deck": 4,
+    "p": [-467.6, -29.6, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_G2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_quiet_G2.s1",
+    "deck": 4,
+    "p": [-472.4, -29.6, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_G2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_quiet_G2.s2",
+    "deck": 4,
+    "p": [-467.6, -31.8, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_G2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d4_quiet_G2.s3",
+    "deck": 4,
+    "p": [-472.4, -31.8, -46.0],
+    "kind": "station",
+    "comp": "d4_quiet_G2",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 270.0
+   },
    {"id": "d4_galley_pass_B1.in0", "deck": 4, "p": [-138.0, -16.8, -46.0], "kind": "door_in", "comp": "d4_galley_pass_B1"},
    {"id": "d4_galley_pass_B1.hub", "deck": 4, "p": [-136.0, -16.0, -46.0], "kind": "room", "comp": "d4_galley_pass_B1"},
    {
@@ -67705,64 +70046,64 @@
     "act": "work",
     "yaw": 180.0
    },
-   {"id": "d4_library_D1.in0", "deck": 4, "p": [-282.0, -3.2, -46.0], "kind": "door_in", "comp": "d4_library_D1"},
-   {"id": "d4_library_D1.hub", "deck": 4, "p": [-284.0, -10.0, -46.0], "kind": "room", "comp": "d4_library_D1"},
+   {"id": "d4_library_D3.in0", "deck": 4, "p": [-282.0, -3.2, -46.0], "kind": "door_in", "comp": "d4_library_D3"},
+   {"id": "d4_library_D3.hub", "deck": 4, "p": [-284.0, -10.0, -46.0], "kind": "room", "comp": "d4_library_D3"},
    {
-    "id": "d4_library_D1.s0",
+    "id": "d4_library_D3.s0",
     "deck": 4,
     "p": [-281.0, -10.0, -46.0],
     "kind": "station",
-    "comp": "d4_library_D1",
+    "comp": "d4_library_D3",
     "role": "crew",
     "act": "sit",
     "yaw": 270.0
    },
    {
-    "id": "d4_library_D1.s1",
+    "id": "d4_library_D3.s1",
     "deck": 4,
     "p": [-284.0, -10.0, -46.0],
     "kind": "station",
-    "comp": "d4_library_D1",
+    "comp": "d4_library_D3",
     "role": "crew",
     "act": "sit",
     "yaw": 270.0
    },
    {
-    "id": "d4_library_D1.s2",
+    "id": "d4_library_D3.s2",
     "deck": 4,
     "p": [-281.0, -12.0, -46.0],
     "kind": "station",
-    "comp": "d4_library_D1",
+    "comp": "d4_library_D3",
     "role": "crew",
     "act": "sit",
     "yaw": 90.0
    },
    {
-    "id": "d4_library_D1.s3",
+    "id": "d4_library_D3.s3",
     "deck": 4,
     "p": [-287.6, -7.4, -46.0],
     "kind": "station",
-    "comp": "d4_library_D1",
+    "comp": "d4_library_D3",
     "role": "crew",
     "act": "sit",
     "yaw": 0.0
    },
    {
-    "id": "d4_library_D1.s4",
+    "id": "d4_library_D3.s4",
     "deck": 4,
     "p": [-278.6, -6.6, -46.0],
     "kind": "station",
-    "comp": "d4_library_D1",
+    "comp": "d4_library_D3",
     "role": "crew",
     "act": "sit",
     "yaw": 180.0
    },
    {
-    "id": "d4_library_D1.s5",
+    "id": "d4_library_D3.s5",
     "deck": 4,
     "p": [-289.6, -5.0, -46.0],
     "kind": "station",
-    "comp": "d4_library_D1",
+    "comp": "d4_library_D3",
     "role": "librarian",
     "act": "work",
     "yaw": 180.0
@@ -67809,24 +70150,24 @@
     "act": "sit",
     "yaw": 270.0
    },
-   {"id": "d4_hold_F1.in0", "deck": 4, "p": [-398.0, 3.2, -46.0], "kind": "door_in", "comp": "d4_hold_F1"},
-   {"id": "d4_hold_F1.hub", "deck": 4, "p": [-396.0, 10.0, -46.0], "kind": "room", "comp": "d4_hold_F1"},
+   {"id": "d4_hold_F3.in0", "deck": 4, "p": [-398.0, 3.2, -46.0], "kind": "door_in", "comp": "d4_hold_F3"},
+   {"id": "d4_hold_F3.hub", "deck": 4, "p": [-396.0, 10.0, -46.0], "kind": "room", "comp": "d4_hold_F3"},
    {
-    "id": "d4_hold_F1.s0",
+    "id": "d4_hold_F3.s0",
     "deck": 4,
     "p": [-399.0, 5.0, -46.0],
     "kind": "station",
-    "comp": "d4_hold_F1",
+    "comp": "d4_hold_F3",
     "role": "storekeeper",
     "act": "work",
     "yaw": 90.0
    },
    {
-    "id": "d4_hold_F1.s1",
+    "id": "d4_hold_F3.s1",
     "deck": 4,
     "p": [-392.0, 11.0, -46.0],
     "kind": "station",
-    "comp": "d4_hold_F1",
+    "comp": "d4_hold_F3",
     "role": "handler",
     "act": "work",
     "yaw": 0.0
@@ -67855,30 +70196,30 @@
    },
    {"id": "d4_stair_452n.in0", "deck": 4, "p": [-450.0, 3.2, -46.0], "kind": "door_in", "comp": "d4_stair_452n"},
    {"id": "d4_stair_452n.hub", "deck": 4, "p": [-448.0, 6.0, -46.0], "kind": "room", "comp": "d4_stair_452n"},
-   {"id": "d4_laundry_G1.in0", "deck": 4, "p": [-458.0, 3.2, -46.0], "kind": "door_in", "comp": "d4_laundry_G1"},
-   {"id": "d4_laundry_G1.hub", "deck": 4, "p": [-458.0, 10.0, -46.0], "kind": "room", "comp": "d4_laundry_G1"},
+   {"id": "d4_laundry_G3.in0", "deck": 4, "p": [-458.0, 3.2, -46.0], "kind": "door_in", "comp": "d4_laundry_G3"},
+   {"id": "d4_laundry_G3.hub", "deck": 4, "p": [-458.0, 10.0, -46.0], "kind": "room", "comp": "d4_laundry_G3"},
    {
-    "id": "d4_laundry_G1.s0",
+    "id": "d4_laundry_G3.s0",
     "deck": 4,
     "p": [-460.0, 9.0, -46.0],
     "kind": "station",
-    "comp": "d4_laundry_G1",
+    "comp": "d4_laundry_G3",
     "role": "laundry_hand",
     "act": "work",
     "yaw": 90.0
    },
    {
-    "id": "d4_laundry_G1.s1",
+    "id": "d4_laundry_G3.s1",
     "deck": 4,
     "p": [-456.0, 9.0, -46.0],
     "kind": "station",
-    "comp": "d4_laundry_G1",
+    "comp": "d4_laundry_G3",
     "role": "laundry_hand",
     "act": "work",
     "yaw": 90.0
    },
-   {"id": "d4_heads_G1.in0", "deck": 4, "p": [-470.0, 3.2, -46.0], "kind": "door_in", "comp": "d4_heads_G1"},
-   {"id": "d4_heads_G1.hub", "deck": 4, "p": [-470.0, 10.0, -46.0], "kind": "room", "comp": "d4_heads_G1"},
+   {"id": "d4_heads_G3.in0", "deck": 4, "p": [-470.0, 3.2, -46.0], "kind": "door_in", "comp": "d4_heads_G3"},
+   {"id": "d4_heads_G3.hub", "deck": 4, "p": [-470.0, 10.0, -46.0], "kind": "room", "comp": "d4_heads_G3"},
    {"id": "d4_hold_H1.in0", "deck": 4, "p": [-498.0, 3.2, -46.0], "kind": "door_in", "comp": "d4_hold_H1"},
    {"id": "d4_hold_H1.hub", "deck": 4, "p": [-496.0, 10.0, -46.0], "kind": "room", "comp": "d4_hold_H1"},
    {
@@ -67901,24 +70242,24 @@
     "act": "work",
     "yaw": 0.0
    },
-   {"id": "d4_store_dry_F1.in0", "deck": 4, "p": [-398.0, -3.2, -46.0], "kind": "door_in", "comp": "d4_store_dry_F1"},
-   {"id": "d4_store_dry_F1.hub", "deck": 4, "p": [-396.0, -10.0, -46.0], "kind": "room", "comp": "d4_store_dry_F1"},
+   {"id": "d4_store_dry_F3.in0", "deck": 4, "p": [-398.0, -3.2, -46.0], "kind": "door_in", "comp": "d4_store_dry_F3"},
+   {"id": "d4_store_dry_F3.hub", "deck": 4, "p": [-396.0, -10.0, -46.0], "kind": "room", "comp": "d4_store_dry_F3"},
    {
-    "id": "d4_store_dry_F1.s0",
+    "id": "d4_store_dry_F3.s0",
     "deck": 4,
     "p": [-397.0, -5.0, -46.0],
     "kind": "station",
-    "comp": "d4_store_dry_F1",
+    "comp": "d4_store_dry_F3",
     "role": "storekeeper",
     "act": "work",
     "yaw": 270.0
    },
    {
-    "id": "d4_store_dry_F1.s1",
+    "id": "d4_store_dry_F3.s1",
     "deck": 4,
     "p": [-399.0, -11.0, -46.0],
     "kind": "station",
-    "comp": "d4_store_dry_F1",
+    "comp": "d4_store_dry_F3",
     "role": "storekeeper",
     "act": "stand",
     "yaw": 270.0
@@ -68027,26 +70368,26 @@
     "act": "sit",
     "yaw": 270.0
    },
-   {"id": "d4_heads_G2.in0", "deck": 4, "p": [-446.0, -3.2, -46.0], "kind": "door_in", "comp": "d4_heads_G2"},
-   {"id": "d4_heads_G2.hub", "deck": 4, "p": [-446.0, -10.0, -46.0], "kind": "room", "comp": "d4_heads_G2"},
-   {"id": "d4_laundry_G2.in0", "deck": 4, "p": [-458.0, -3.2, -46.0], "kind": "door_in", "comp": "d4_laundry_G2"},
-   {"id": "d4_laundry_G2.hub", "deck": 4, "p": [-458.0, -10.0, -46.0], "kind": "room", "comp": "d4_laundry_G2"},
+   {"id": "d4_heads_G4.in0", "deck": 4, "p": [-446.0, -3.2, -46.0], "kind": "door_in", "comp": "d4_heads_G4"},
+   {"id": "d4_heads_G4.hub", "deck": 4, "p": [-446.0, -10.0, -46.0], "kind": "room", "comp": "d4_heads_G4"},
+   {"id": "d4_laundry_G4.in0", "deck": 4, "p": [-458.0, -3.2, -46.0], "kind": "door_in", "comp": "d4_laundry_G4"},
+   {"id": "d4_laundry_G4.hub", "deck": 4, "p": [-458.0, -10.0, -46.0], "kind": "room", "comp": "d4_laundry_G4"},
    {
-    "id": "d4_laundry_G2.s0",
+    "id": "d4_laundry_G4.s0",
     "deck": 4,
     "p": [-456.0, -9.0, -46.0],
     "kind": "station",
-    "comp": "d4_laundry_G2",
+    "comp": "d4_laundry_G4",
     "role": "laundry_hand",
     "act": "work",
     "yaw": 270.0
    },
    {
-    "id": "d4_laundry_G2.s1",
+    "id": "d4_laundry_G4.s1",
     "deck": 4,
     "p": [-460.0, -9.0, -46.0],
     "kind": "station",
-    "comp": "d4_laundry_G2",
+    "comp": "d4_laundry_G4",
     "role": "laundry_hand",
     "act": "work",
     "yaw": 270.0
@@ -71841,6 +74182,80 @@
    {"a": "d4_hold_C1.in0", "b": "d4_hold_C1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d4_hold_C1.hub", "b": "d4_hold_C1.s0", "len": 5.83, "kind": "walk", "w": 1.0},
    {"a": "d4_hold_C1.hub", "b": "d4_hold_C1.s1", "len": 4.12, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.065", "b": "d4_lounge_D1.in0", "len": 3.2, "kind": "door", "door": "d4_door_lounge_D1", "w": 1.6},
+   {"a": "d4_lounge_D1.in0", "b": "d4_lounge_D1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s0", "len": 8.94, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s1", "len": 8.12, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s2", "len": 5.48, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s3", "len": 4.74, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s4", "len": 8.69, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s5", "len": 10.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s6", "len": 5.87, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s7", "len": 6.9, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s8", "len": 5.02, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s9", "len": 3.72, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s10", "len": 8.45, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s11", "len": 9.08, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s12", "len": 5.62, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s13", "len": 7.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s14", "len": 10.22, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D1.hub", "b": "d4_lounge_D1.s15", "len": 8.96, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.059", "b": "d4_games_D1.in0", "len": 3.2, "kind": "door", "door": "d4_door_games_D1", "w": 1.6},
+   {"a": "d4_games_D1.in0", "b": "d4_games_D1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s0", "len": 7.62, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s1", "len": 5.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s2", "len": 7.62, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s3", "len": 5.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s4", "len": 4.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s5", "len": 4.47, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s6", "len": 8.21, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s7", "len": 9.67, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s8", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D1.hub", "b": "d4_games_D1.s9", "len": 7.0, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.054", "b": "d4_library_D1.in0", "len": 3.2, "kind": "door", "door": "d4_door_library_D1", "w": 1.6},
+   {"a": "d4_library_D1.in0", "b": "d4_library_D1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s0", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s1", "len": 0.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s2", "len": 3.61, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s3", "len": 4.44, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s4", "len": 6.38, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s5", "len": 7.51, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.047", "b": "d4_hydro_E1.in0", "len": 3.2, "kind": "door", "door": "d4_door_hydro_E1", "w": 1.6},
+   {"a": "d4_hydro_E1.in0", "b": "d4_hydro_E1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_hydro_E1.hub", "b": "d4_hydro_E1.s0", "len": 4.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_hydro_E1.hub", "b": "d4_hydro_E1.s1", "len": 4.0, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.043", "b": "d4_laundry_E1.in0", "len": 3.2, "kind": "door", "door": "d4_door_laundry_E1", "w": 1.6},
+   {"a": "d4_laundry_E1.in0", "b": "d4_laundry_E1.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4_laundry_E1.hub", "b": "d4_laundry_E1.s0", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4_laundry_E1.hub", "b": "d4_laundry_E1.s1", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.040", "b": "d4_heads_E1.in0", "len": 3.2, "kind": "door", "door": "d4_door_heads_E1", "w": 1.6},
+   {"a": "d4_heads_E1.in0", "b": "d4_heads_E1.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4.SBP.037", "b": "d4_quiet_E1.in0", "len": 3.2, "kind": "door", "door": "d4_door_quiet_E1", "w": 1.6},
+   {"a": "d4_quiet_E1.in0", "b": "d4_quiet_E1.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4_quiet_E1.hub", "b": "d4_quiet_E1.s0", "len": 2.43, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_E1.hub", "b": "d4_quiet_E1.s1", "len": 2.43, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_E1.hub", "b": "d4_quiet_E1.s2", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_E1.hub", "b": "d4_quiet_E1.s3", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.032", "b": "d4_store_dry_F1.in0", "len": 3.2, "kind": "door", "door": "d4_door_store_dry_F1", "w": 1.6},
+   {"a": "d4_store_dry_F1.in0", "b": "d4_store_dry_F1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_store_dry_F1.hub", "b": "d4_store_dry_F1.s0", "len": 5.1, "kind": "walk", "w": 1.0},
+   {"a": "d4_store_dry_F1.hub", "b": "d4_store_dry_F1.s1", "len": 3.16, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.025", "b": "d4_hold_F1.in0", "len": 3.2, "kind": "door", "door": "d4_door_hold_F1", "w": 1.6},
+   {"a": "d4_hold_F1.in0", "b": "d4_hold_F1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_hold_F1.hub", "b": "d4_hold_F1.s0", "len": 5.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_hold_F1.hub", "b": "d4_hold_F1.s1", "len": 4.12, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.019", "b": "d4_laundry_G1.in0", "len": 3.2, "kind": "door", "door": "d4_door_laundry_G1", "w": 1.6},
+   {"a": "d4_laundry_G1.in0", "b": "d4_laundry_G1.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4_laundry_G1.hub", "b": "d4_laundry_G1.s0", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4_laundry_G1.hub", "b": "d4_laundry_G1.s1", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4.SBP.016", "b": "d4_heads_G1.in0", "len": 3.2, "kind": "door", "door": "d4_door_heads_G1", "w": 1.6},
+   {"a": "d4_heads_G1.in0", "b": "d4_heads_G1.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4.SBP.013", "b": "d4_quiet_G1.in0", "len": 3.2, "kind": "door", "door": "d4_door_quiet_G1", "w": 1.6},
+   {"a": "d4_quiet_G1.in0", "b": "d4_quiet_G1.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4_quiet_G1.hub", "b": "d4_quiet_G1.s0", "len": 2.43, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_G1.hub", "b": "d4_quiet_G1.s1", "len": 2.43, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_G1.hub", "b": "d4_quiet_G1.s2", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_G1.hub", "b": "d4_quiet_G1.s3", "len": 3.0, "kind": "walk", "w": 1.0},
    {"a": "d4.PP.131", "b": "d4_observation_A2.in0", "len": 3.2, "kind": "door", "door": "d4_door_observation_A2", "w": 1.6},
    {"a": "d4_observation_A2.in0", "b": "d4_observation_A2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d4_observation_A2.hub", "b": "d4_observation_A2.s0", "len": 9.22, "kind": "walk", "w": 1.0},
@@ -71874,6 +74289,73 @@
    {"a": "d4_hold_C2.in0", "b": "d4_hold_C2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d4_hold_C2.hub", "b": "d4_hold_C2.s0", "len": 5.83, "kind": "walk", "w": 1.0},
    {"a": "d4_hold_C2.hub", "b": "d4_hold_C2.s1", "len": 4.12, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.066", "b": "d4_games_D2.in0", "len": 3.2, "kind": "door", "door": "d4_door_games_D2", "w": 1.6},
+   {"a": "d4_games_D2.in0", "b": "d4_games_D2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s0", "len": 7.62, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s1", "len": 5.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s2", "len": 7.62, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s3", "len": 5.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s4", "len": 4.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s5", "len": 4.47, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s6", "len": 8.21, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s7", "len": 9.67, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s8", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_games_D2.hub", "b": "d4_games_D2.s9", "len": 7.0, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.060", "b": "d4_lounge_D2.in0", "len": 3.2, "kind": "door", "door": "d4_door_lounge_D2", "w": 1.6},
+   {"a": "d4_lounge_D2.in0", "b": "d4_lounge_D2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s0", "len": 8.94, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s1", "len": 8.12, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s2", "len": 5.48, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s3", "len": 4.74, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s4", "len": 8.69, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s5", "len": 10.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s6", "len": 5.87, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s7", "len": 6.9, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s8", "len": 5.02, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s9", "len": 3.72, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s10", "len": 8.45, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s11", "len": 9.08, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s12", "len": 5.62, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s13", "len": 7.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s14", "len": 10.22, "kind": "walk", "w": 1.0},
+   {"a": "d4_lounge_D2.hub", "b": "d4_lounge_D2.s15", "len": 8.96, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.055", "b": "d4_library_D2.in0", "len": 3.2, "kind": "door", "door": "d4_door_library_D2", "w": 1.6},
+   {"a": "d4_library_D2.in0", "b": "d4_library_D2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_library_D2.hub", "b": "d4_library_D2.s0", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D2.hub", "b": "d4_library_D2.s1", "len": 0.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D2.hub", "b": "d4_library_D2.s2", "len": 3.61, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D2.hub", "b": "d4_library_D2.s3", "len": 4.44, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D2.hub", "b": "d4_library_D2.s4", "len": 6.38, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D2.hub", "b": "d4_library_D2.s5", "len": 7.51, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.048", "b": "d4_hydro_E2.in0", "len": 3.2, "kind": "door", "door": "d4_door_hydro_E2", "w": 1.6},
+   {"a": "d4_hydro_E2.in0", "b": "d4_hydro_E2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_hydro_E2.hub", "b": "d4_hydro_E2.s0", "len": 4.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_hydro_E2.hub", "b": "d4_hydro_E2.s1", "len": 4.0, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.041", "b": "d4_store_cold_E1.in0", "len": 3.2, "kind": "door", "door": "d4_door_store_cold_E1", "w": 1.6},
+   {"a": "d4_store_cold_E1.in0", "b": "d4_store_cold_E1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_store_cold_E1.hub", "b": "d4_store_cold_E1.s0", "len": 5.1, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.037", "b": "d4_heads_E2.in0", "len": 3.2, "kind": "door", "door": "d4_door_heads_E2", "w": 1.6},
+   {"a": "d4_heads_E2.in0", "b": "d4_heads_E2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4.PP.032", "b": "d4_hold_F2.in0", "len": 3.2, "kind": "door", "door": "d4_door_hold_F2", "w": 1.6},
+   {"a": "d4_hold_F2.in0", "b": "d4_hold_F2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_hold_F2.hub", "b": "d4_hold_F2.s0", "len": 5.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_hold_F2.hub", "b": "d4_hold_F2.s1", "len": 4.12, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.025", "b": "d4_store_dry_F2.in0", "len": 3.2, "kind": "door", "door": "d4_door_store_dry_F2", "w": 1.6},
+   {"a": "d4_store_dry_F2.in0", "b": "d4_store_dry_F2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_store_dry_F2.hub", "b": "d4_store_dry_F2.s0", "len": 5.1, "kind": "walk", "w": 1.0},
+   {"a": "d4_store_dry_F2.hub", "b": "d4_store_dry_F2.s1", "len": 3.16, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.019", "b": "d4_laundry_G2.in0", "len": 3.2, "kind": "door", "door": "d4_door_laundry_G2", "w": 1.6},
+   {"a": "d4_laundry_G2.in0", "b": "d4_laundry_G2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4_laundry_G2.hub", "b": "d4_laundry_G2.s0", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4_laundry_G2.hub", "b": "d4_laundry_G2.s1", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4.PP.016", "b": "d4_heads_G2.in0", "len": 3.2, "kind": "door", "door": "d4_door_heads_G2", "w": 1.6},
+   {"a": "d4_heads_G2.in0", "b": "d4_heads_G2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4.PP.013", "b": "d4_quiet_G2.in0", "len": 3.2, "kind": "door", "door": "d4_door_quiet_G2", "w": 1.6},
+   {"a": "d4_quiet_G2.in0", "b": "d4_quiet_G2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4_quiet_G2.hub", "b": "d4_quiet_G2.s0", "len": 2.43, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_G2.hub", "b": "d4_quiet_G2.s1", "len": 2.43, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_G2.hub", "b": "d4_quiet_G2.s2", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_quiet_G2.hub", "b": "d4_quiet_G2.s3", "len": 3.0, "kind": "walk", "w": 1.0},
    {"a": "d4.PP.096", "b": "d4_galley_pass_B1.in0", "len": 3.2, "kind": "door", "door": "d4_door_galley_pass_B1", "w": 1.6},
    {"a": "d4_galley_pass_B1.in0", "b": "d4_galley_pass_B1.hub", "len": 2.15, "kind": "walk", "w": 1.5},
    {"a": "d4_galley_pass_B1.hub", "b": "d4_galley_pass_B1.s0", "len": 4.0, "kind": "walk", "w": 1.0},
@@ -71906,44 +74388,44 @@
    {"a": "d4_hold_D1.in0", "b": "d4_hold_D1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d4_hold_D1.hub", "b": "d4_hold_D1.s0", "len": 5.83, "kind": "walk", "w": 1.0},
    {"a": "d4_hold_D1.hub", "b": "d4_hold_D1.s1", "len": 4.12, "kind": "walk", "w": 1.0},
-   {"a": "d4.SPM.011", "b": "d4_library_D1.in0", "len": 3.2, "kind": "door", "door": "d4_door_library_D1", "w": 1.6},
-   {"a": "d4_library_D1.in0", "b": "d4_library_D1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s0", "len": 3.0, "kind": "walk", "w": 1.0},
-   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s1", "len": 0.0, "kind": "walk", "w": 1.0},
-   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s2", "len": 3.61, "kind": "walk", "w": 1.0},
-   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s3", "len": 4.44, "kind": "walk", "w": 1.0},
-   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s4", "len": 6.38, "kind": "walk", "w": 1.0},
-   {"a": "d4_library_D1.hub", "b": "d4_library_D1.s5", "len": 7.51, "kind": "walk", "w": 1.0},
+   {"a": "d4.SPM.011", "b": "d4_library_D3.in0", "len": 3.2, "kind": "door", "door": "d4_door_library_D3", "w": 1.6},
+   {"a": "d4_library_D3.in0", "b": "d4_library_D3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_library_D3.hub", "b": "d4_library_D3.s0", "len": 3.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D3.hub", "b": "d4_library_D3.s1", "len": 0.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D3.hub", "b": "d4_library_D3.s2", "len": 3.61, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D3.hub", "b": "d4_library_D3.s3", "len": 4.44, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D3.hub", "b": "d4_library_D3.s4", "len": 6.38, "kind": "walk", "w": 1.0},
+   {"a": "d4_library_D3.hub", "b": "d4_library_D3.s5", "len": 7.51, "kind": "walk", "w": 1.0},
    {"a": "d4.SPM.007", "b": "d4_quiet_D2.in0", "len": 3.2, "kind": "door", "door": "d4_door_quiet_D2", "w": 1.6},
    {"a": "d4_quiet_D2.in0", "b": "d4_quiet_D2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
    {"a": "d4_quiet_D2.hub", "b": "d4_quiet_D2.s0", "len": 2.43, "kind": "walk", "w": 1.0},
    {"a": "d4_quiet_D2.hub", "b": "d4_quiet_D2.s1", "len": 2.43, "kind": "walk", "w": 1.0},
    {"a": "d4_quiet_D2.hub", "b": "d4_quiet_D2.s2", "len": 3.0, "kind": "walk", "w": 1.0},
    {"a": "d4_quiet_D2.hub", "b": "d4_quiet_D2.s3", "len": 3.0, "kind": "walk", "w": 1.0},
-   {"a": "d4.SPA.031", "b": "d4_hold_F1.in0", "len": 3.2, "kind": "door", "door": "d4_door_hold_F1", "w": 1.6},
-   {"a": "d4_hold_F1.in0", "b": "d4_hold_F1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d4_hold_F1.hub", "b": "d4_hold_F1.s0", "len": 5.83, "kind": "walk", "w": 1.0},
-   {"a": "d4_hold_F1.hub", "b": "d4_hold_F1.s1", "len": 4.12, "kind": "walk", "w": 1.0},
+   {"a": "d4.SPA.031", "b": "d4_hold_F3.in0", "len": 3.2, "kind": "door", "door": "d4_door_hold_F3", "w": 1.6},
+   {"a": "d4_hold_F3.in0", "b": "d4_hold_F3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_hold_F3.hub", "b": "d4_hold_F3.s0", "len": 5.83, "kind": "walk", "w": 1.0},
+   {"a": "d4_hold_F3.hub", "b": "d4_hold_F3.s1", "len": 4.12, "kind": "walk", "w": 1.0},
    {"a": "d4.SPA.024", "b": "d4_hydro_F1.in0", "len": 3.2, "kind": "door", "door": "d4_door_hydro_F1", "w": 1.6},
    {"a": "d4_hydro_F1.in0", "b": "d4_hydro_F1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d4_hydro_F1.hub", "b": "d4_hydro_F1.s0", "len": 4.0, "kind": "walk", "w": 1.0},
    {"a": "d4_hydro_F1.hub", "b": "d4_hydro_F1.s1", "len": 4.0, "kind": "walk", "w": 1.0},
    {"a": "d4.SPA.018", "b": "d4_stair_452n.in0", "len": 3.2, "kind": "door", "door": "d4_door_stair_452n", "w": 1.6},
    {"a": "d4_stair_452n.in0", "b": "d4_stair_452n.hub", "len": 3.44, "kind": "walk", "w": 1.5},
-   {"a": "d4.SPA.016", "b": "d4_laundry_G1.in0", "len": 3.2, "kind": "door", "door": "d4_door_laundry_G1", "w": 1.6},
-   {"a": "d4_laundry_G1.in0", "b": "d4_laundry_G1.hub", "len": 6.8, "kind": "walk", "w": 1.5},
-   {"a": "d4_laundry_G1.hub", "b": "d4_laundry_G1.s0", "len": 2.24, "kind": "walk", "w": 1.0},
-   {"a": "d4_laundry_G1.hub", "b": "d4_laundry_G1.s1", "len": 2.24, "kind": "walk", "w": 1.0},
-   {"a": "d4.SPA.013", "b": "d4_heads_G1.in0", "len": 3.2, "kind": "door", "door": "d4_door_heads_G1", "w": 1.6},
-   {"a": "d4_heads_G1.in0", "b": "d4_heads_G1.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4.SPA.016", "b": "d4_laundry_G3.in0", "len": 3.2, "kind": "door", "door": "d4_door_laundry_G3", "w": 1.6},
+   {"a": "d4_laundry_G3.in0", "b": "d4_laundry_G3.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4_laundry_G3.hub", "b": "d4_laundry_G3.s0", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4_laundry_G3.hub", "b": "d4_laundry_G3.s1", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4.SPA.013", "b": "d4_heads_G3.in0", "len": 3.2, "kind": "door", "door": "d4_door_heads_G3", "w": 1.6},
+   {"a": "d4_heads_G3.in0", "b": "d4_heads_G3.hub", "len": 6.8, "kind": "walk", "w": 1.5},
    {"a": "d4.SPA.006", "b": "d4_hold_H1.in0", "len": 3.2, "kind": "door", "door": "d4_door_hold_H1", "w": 1.6},
    {"a": "d4_hold_H1.in0", "b": "d4_hold_H1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d4_hold_H1.hub", "b": "d4_hold_H1.s0", "len": 5.83, "kind": "walk", "w": 1.0},
    {"a": "d4_hold_H1.hub", "b": "d4_hold_H1.s1", "len": 4.12, "kind": "walk", "w": 1.0},
-   {"a": "d4.SPA.031", "b": "d4_store_dry_F1.in0", "len": 3.2, "kind": "door", "door": "d4_door_store_dry_F1", "w": 1.6},
-   {"a": "d4_store_dry_F1.in0", "b": "d4_store_dry_F1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d4_store_dry_F1.hub", "b": "d4_store_dry_F1.s0", "len": 5.1, "kind": "walk", "w": 1.0},
-   {"a": "d4_store_dry_F1.hub", "b": "d4_store_dry_F1.s1", "len": 3.16, "kind": "walk", "w": 1.0},
+   {"a": "d4.SPA.031", "b": "d4_store_dry_F3.in0", "len": 3.2, "kind": "door", "door": "d4_door_store_dry_F3", "w": 1.6},
+   {"a": "d4_store_dry_F3.in0", "b": "d4_store_dry_F3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d4_store_dry_F3.hub", "b": "d4_store_dry_F3.s0", "len": 5.1, "kind": "walk", "w": 1.0},
+   {"a": "d4_store_dry_F3.hub", "b": "d4_store_dry_F3.s1", "len": 3.16, "kind": "walk", "w": 1.0},
    {"a": "d4.SPA.026", "b": "d4_library_F1.in0", "len": 3.2, "kind": "door", "door": "d4_door_library_F1", "w": 1.6},
    {"a": "d4_library_F1.in0", "b": "d4_library_F1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d4_library_F1.hub", "b": "d4_library_F1.s0", "len": 3.0, "kind": "walk", "w": 1.0},
@@ -71958,12 +74440,12 @@
    {"a": "d4_quiet_F1.hub", "b": "d4_quiet_F1.s1", "len": 2.43, "kind": "walk", "w": 1.0},
    {"a": "d4_quiet_F1.hub", "b": "d4_quiet_F1.s2", "len": 3.0, "kind": "walk", "w": 1.0},
    {"a": "d4_quiet_F1.hub", "b": "d4_quiet_F1.s3", "len": 3.0, "kind": "walk", "w": 1.0},
-   {"a": "d4.SPA.019", "b": "d4_heads_G2.in0", "len": 3.2, "kind": "door", "door": "d4_door_heads_G2", "w": 1.6},
-   {"a": "d4_heads_G2.in0", "b": "d4_heads_G2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
-   {"a": "d4.SPA.016", "b": "d4_laundry_G2.in0", "len": 3.2, "kind": "door", "door": "d4_door_laundry_G2", "w": 1.6},
-   {"a": "d4_laundry_G2.in0", "b": "d4_laundry_G2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
-   {"a": "d4_laundry_G2.hub", "b": "d4_laundry_G2.s0", "len": 2.24, "kind": "walk", "w": 1.0},
-   {"a": "d4_laundry_G2.hub", "b": "d4_laundry_G2.s1", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4.SPA.019", "b": "d4_heads_G4.in0", "len": 3.2, "kind": "door", "door": "d4_door_heads_G4", "w": 1.6},
+   {"a": "d4_heads_G4.in0", "b": "d4_heads_G4.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4.SPA.016", "b": "d4_laundry_G4.in0", "len": 3.2, "kind": "door", "door": "d4_door_laundry_G4", "w": 1.6},
+   {"a": "d4_laundry_G4.in0", "b": "d4_laundry_G4.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d4_laundry_G4.hub", "b": "d4_laundry_G4.s0", "len": 2.24, "kind": "walk", "w": 1.0},
+   {"a": "d4_laundry_G4.hub", "b": "d4_laundry_G4.s1", "len": 2.24, "kind": "walk", "w": 1.0},
    {"a": "d4.SPA.007", "b": "d4_hold_H2.in0", "len": 3.2, "kind": "door", "door": "d4_door_hold_H2", "w": 1.6},
    {"a": "d4_hold_H2.in0", "b": "d4_hold_H2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d4_hold_H2.hub", "b": "d4_hold_H2.s0", "len": 5.83, "kind": "walk", "w": 1.0},
@@ -75055,7 +77537,7 @@
  },
  "systems": {
   "catapults": {"name": "Catapults", "compartments": ["flight_deck"]},
-  "cold_chain": {"name": "Cold storage", "compartments": ["d4_store_cold_A1", "d4_store_cold_C1"]},
+  "cold_chain": {"name": "Cold storage", "compartments": ["d4_store_cold_A1", "d4_store_cold_C1", "d4_store_cold_E1"]},
   "command": {"name": "Command", "compartments": ["bridge"]},
   "comms": {
    "name": "Communications",
@@ -75089,17 +77571,17 @@
   "coolant": {
    "name": "Coolant loops and heat exchangers",
    "compartments": [
-    "engineering", "d4_store_cold_A1", "d4_store_cold_C1", "d2_sensor_room_D1", "d2_sensor_room_D2", "d2_sensor_room_F1", "d2_machinery_G1",
-    "d2_sensor_room_C1", "d2_sensor_room_C2", "d2_sensor_room_F2", "d2_sensor_room_G1", "d2_machinery_G2", "d5_radiator_pumps_G1",
-    "d5_machinery_H1", "d5_machinery_H2", "d5_machinery_G1", "d5_machinery_G2", "d5_machinery_E1", "d5_radiator_pumps_E1", "d5_sensor_room_A1",
-    "d5_sensor_room_A2", "d5_transporter_B1", "d5_sensor_room_C1", "d5_sensor_room_A3", "d5_sensor_room_A4", "d5_transporter_C1",
-    "d5_sensor_room_A5", "d5_transporter_B2", "d5_transporter_B3", "d5_sensor_room_C2", "d5_sensor_room_C3", "d5_sensor_room_C4",
-    "d5_radiator_pumps_E2", "d5_machinery_E2", "d5_sensor_room_F1", "d5_machinery_F1", "d5_radiator_pumps_G2", "d5_radiator_pumps_G3",
-    "d5_machinery_H3", "d5_machinery_H4", "d5_sensor_room_A6", "d5_transporter_C2", "d5_transporter_C3", "d5_machinery_E3", "d5_radiator_pumps_E3",
-    "d5_radiator_pumps_F1", "d5_sensor_room_F2", "d5_machinery_G3", "d5_machinery_G4", "d6_machinery_H1", "d6_machinery_H2", "d7_machinery_G1",
-    "d7_machinery_H1", "d7_machinery_H2", "d7_radiator_pumps_G1", "d7_machinery_H3", "d7_machinery_H4", "d7_radiator_pumps_E1", "d7_machinery_E1",
-    "d7_machinery_E2", "d7_machinery_B1", "d7_machinery_B2", "d7_machinery_B3", "d7_machinery_C1", "d7_machinery_C2", "d7_machinery_C3",
-    "d7_machinery_D1", "d7_machinery_B4", "d7_machinery_B5", "d7_radiator_pumps_E2", "d7_radiator_pumps_E3", "d7_machinery_F1",
+    "engineering", "d4_store_cold_A1", "d4_store_cold_C1", "d4_store_cold_E1", "d2_sensor_room_D1", "d2_sensor_room_D2", "d2_sensor_room_F1",
+    "d2_machinery_G1", "d2_sensor_room_C1", "d2_sensor_room_C2", "d2_sensor_room_F2", "d2_sensor_room_G1", "d2_machinery_G2",
+    "d5_radiator_pumps_G1", "d5_machinery_H1", "d5_machinery_H2", "d5_machinery_G1", "d5_machinery_G2", "d5_machinery_E1", "d5_radiator_pumps_E1",
+    "d5_sensor_room_A1", "d5_sensor_room_A2", "d5_transporter_B1", "d5_sensor_room_C1", "d5_sensor_room_A3", "d5_sensor_room_A4",
+    "d5_transporter_C1", "d5_sensor_room_A5", "d5_transporter_B2", "d5_transporter_B3", "d5_sensor_room_C2", "d5_sensor_room_C3",
+    "d5_sensor_room_C4", "d5_radiator_pumps_E2", "d5_machinery_E2", "d5_sensor_room_F1", "d5_machinery_F1", "d5_radiator_pumps_G2",
+    "d5_radiator_pumps_G3", "d5_machinery_H3", "d5_machinery_H4", "d5_sensor_room_A6", "d5_transporter_C2", "d5_transporter_C3", "d5_machinery_E3",
+    "d5_radiator_pumps_E3", "d5_radiator_pumps_F1", "d5_sensor_room_F2", "d5_machinery_G3", "d5_machinery_G4", "d6_machinery_H1", "d6_machinery_H2",
+    "d7_machinery_G1", "d7_machinery_H1", "d7_machinery_H2", "d7_radiator_pumps_G1", "d7_machinery_H3", "d7_machinery_H4", "d7_radiator_pumps_E1",
+    "d7_machinery_E1", "d7_machinery_E2", "d7_machinery_B1", "d7_machinery_B2", "d7_machinery_B3", "d7_machinery_C1", "d7_machinery_C2",
+    "d7_machinery_C3", "d7_machinery_D1", "d7_machinery_B4", "d7_machinery_B5", "d7_radiator_pumps_E2", "d7_radiator_pumps_E3", "d7_machinery_F1",
     "d7_radiator_pumps_G2", "d7_machinery_H5", "d7_machinery_H6", "d7_machinery_B6", "d7_machinery_B7", "d7_machinery_C4", "d7_machinery_C5",
     "d7_machinery_C6", "d7_machinery_D2", "d7_machinery_D3", "d7_machinery_E3", "d7_machinery_E4", "d7_machinery_F2", "d7_radiator_pumps_G3",
     "d7_machinery_H7", "d7_machinery_H8", "d8_machinery_H1", "d8_machinery_H2", "d8_machinery_G1", "d8_machinery_E1", "d8_machinery_E2",
@@ -75174,10 +77656,13 @@
   },
   "dumbwaiter": {"name": "Dumbwaiter", "compartments": ["d4_galley_pass_B1"]},
   "engines": {"name": "Main engines", "compartments": ["engineering"]},
-  "entertainment": {"name": "Recreation", "compartments": ["d4_games_A1", "d4_lounge_A1"]},
+  "entertainment": {"name": "Recreation", "compartments": ["d4_games_A1", "d4_lounge_A1", "d4_lounge_D1", "d4_games_D1", "d4_games_D2", "d4_lounge_D2"]},
   "food_service": {
    "name": "Galley and food stores",
-   "compartments": ["mess", "d4_hydro_A1", "d4_hydro_A2", "d4_galley_B1", "d4_galley_pass_B1", "d4_hydro_D1", "d4_hydro_F1", "d5_hydro_D1", "d5_hydro_D2"]
+   "compartments": [
+    "mess", "d4_hydro_A1", "d4_hydro_A2", "d4_hydro_E1", "d4_galley_B1", "d4_hydro_E2", "d4_galley_pass_B1", "d4_hydro_D1", "d4_hydro_F1",
+    "d5_hydro_D1", "d5_hydro_D2"
+   ]
   },
   "fuel": {
    "name": "Fuel and coolant tanks",
@@ -75193,18 +77678,19 @@
   "life_support": {
    "name": "Atmosphere and life support",
    "compartments": [
-    "quarters", "berths", "mess", "medbay", "flight_deck", "d4_concourse", "d4_berth_lobby", "d4_hydro_A1", "d4_hydro_A2", "d4_hydro_D1",
-    "d4_hydro_F1", "d3_staterooms_C1", "d3_staterooms_C2", "d3_staterooms_E1", "d3_staterooms_F1", "d3_gym_C1", "d3_staterooms_C3", "d3_gym_D1",
-    "d3_staterooms_D1", "d3_staterooms_E2", "d3_gym_E1", "d3_gym_F1", "d3_staterooms_F2", "d3_gym_G1", "d3_staterooms_A1", "d3_gym_A1",
-    "d3_staterooms_B1", "d3_staterooms_B2", "d3_gym_A2", "d3_staterooms_A2", "d3_gym_A3", "d5_hydro_D1", "d5_hydro_D2", "d6_quarantine_E1",
-    "d6_quarantine_F1", "d6_quarantine_G1", "d6_quarantine_B1", "d6_quarantine_B2", "d6_quarantine_B3", "d6_quarantine_C1", "d6_quarantine_C2",
-    "d6_quarantine_B4", "d6_quarantine_B5", "d6_quarantine_B6", "d6_quarantine_C3", "d6_quarantine_C4", "d6_quarantine_C5", "d6_quarantine_D1",
-    "d6_quarantine_E2", "d6_quarantine_F2", "d6_quarantine_G2", "d6_quarantine_C6", "d6_quarantine_C7", "d6_quarantine_C8", "d6_quarantine_D2",
-    "d8_barracks_G1", "d8_barracks_G2", "d8_barracks_C1", "d8_barracks_D1", "d8_barracks_D2", "d8_barracks_D3", "d8_barracks_E1", "d8_barracks_E2",
-    "d8_barracks_E3", "d8_barracks_D4", "d8_barracks_D5", "d8_barracks_E4", "d8_barracks_E5", "d8_barracks_F1", "d8_barracks_B1", "d8_barracks_C2",
-    "d8_barracks_D6", "d8_barracks_D7", "d8_barracks_D8", "d8_barracks_E6", "d8_barracks_E7", "d8_barracks_E8", "d8_barracks_F2", "d8_barracks_F3",
-    "d8_barracks_G3", "d8_barracks_D9", "d8_barracks_D10", "d8_barracks_D11", "d8_barracks_E9", "d8_barracks_E10", "d8_barracks_F4",
-    "d8_barracks_F5", "d8_barracks_G4", "medbay_lobby", "engineering_lobby", "flight_deck_lobby"
+    "quarters", "berths", "mess", "medbay", "flight_deck", "d4_concourse", "d4_berth_lobby", "d4_hydro_A1", "d4_hydro_A2", "d4_hydro_E1",
+    "d4_hydro_E2", "d4_hydro_D1", "d4_hydro_F1", "d3_staterooms_C1", "d3_staterooms_C2", "d3_staterooms_E1", "d3_staterooms_F1", "d3_gym_C1",
+    "d3_staterooms_C3", "d3_gym_D1", "d3_staterooms_D1", "d3_staterooms_E2", "d3_gym_E1", "d3_gym_F1", "d3_staterooms_F2", "d3_gym_G1",
+    "d3_staterooms_A1", "d3_gym_A1", "d3_staterooms_B1", "d3_staterooms_B2", "d3_gym_A2", "d3_staterooms_A2", "d3_gym_A3", "d5_hydro_D1",
+    "d5_hydro_D2", "d6_quarantine_E1", "d6_quarantine_F1", "d6_quarantine_G1", "d6_quarantine_B1", "d6_quarantine_B2", "d6_quarantine_B3",
+    "d6_quarantine_C1", "d6_quarantine_C2", "d6_quarantine_B4", "d6_quarantine_B5", "d6_quarantine_B6", "d6_quarantine_C3", "d6_quarantine_C4",
+    "d6_quarantine_C5", "d6_quarantine_D1", "d6_quarantine_E2", "d6_quarantine_F2", "d6_quarantine_G2", "d6_quarantine_C6", "d6_quarantine_C7",
+    "d6_quarantine_C8", "d6_quarantine_D2", "d8_barracks_G1", "d8_barracks_G2", "d8_barracks_C1", "d8_barracks_D1", "d8_barracks_D2",
+    "d8_barracks_D3", "d8_barracks_E1", "d8_barracks_E2", "d8_barracks_E3", "d8_barracks_D4", "d8_barracks_D5", "d8_barracks_E4", "d8_barracks_E5",
+    "d8_barracks_F1", "d8_barracks_B1", "d8_barracks_C2", "d8_barracks_D6", "d8_barracks_D7", "d8_barracks_D8", "d8_barracks_E6", "d8_barracks_E7",
+    "d8_barracks_E8", "d8_barracks_F2", "d8_barracks_F3", "d8_barracks_G3", "d8_barracks_D9", "d8_barracks_D10", "d8_barracks_D11",
+    "d8_barracks_E9", "d8_barracks_E10", "d8_barracks_F4", "d8_barracks_F5", "d8_barracks_G4", "medbay_lobby", "engineering_lobby",
+    "flight_deck_lobby"
    ]
   },
   "lift": {"name": "Lift", "compartments": ["lift_housing_bridge"]},
@@ -75238,8 +77724,9 @@
   "potable_water": {
    "name": "Water",
    "compartments": [
-    "d4_hydro_A1", "d4_laundry_A1", "d4_heads_A1", "d4_heads_A2", "d4_laundry_A2", "d4_hydro_A2", "d4_heads_A3", "d4_galley_B1", "d4_hydro_D1",
-    "d4_laundry_D1", "d4_hydro_F1", "d4_laundry_G1", "d4_heads_G1", "d4_heads_G2", "d4_laundry_G2", "d5_hydro_D1", "d5_hydro_D2"
+    "d4_hydro_A1", "d4_laundry_A1", "d4_heads_A1", "d4_heads_A2", "d4_laundry_A2", "d4_hydro_A2", "d4_heads_A3", "d4_hydro_E1", "d4_laundry_E1",
+    "d4_heads_E1", "d4_laundry_G1", "d4_heads_G1", "d4_galley_B1", "d4_hydro_E2", "d4_heads_E2", "d4_laundry_G2", "d4_heads_G2", "d4_hydro_D1",
+    "d4_laundry_D1", "d4_hydro_F1", "d4_laundry_G3", "d4_heads_G3", "d4_heads_G4", "d4_laundry_G4", "d5_hydro_D1", "d5_hydro_D2"
    ]
   },
   "power_bus": {
@@ -75247,40 +77734,42 @@
    "compartments": [
     "quarters", "ready_room", "berths", "mess", "medbay", "engineering", "flight_deck", "d4_bow_obs", "d4_concourse", "d4_berth_lobby",
     "d4_library_A1", "d4_stair_44p", "d4_games_A1", "d4_laundry_A1", "d4_quiet_A1", "d4_lounge_A1", "d4_laundry_A2", "d4_library_A2", "d4_quiet_A2",
-    "d4_stair_92n", "d4_observation_A1", "d4_observation_d14_B1", "d4_observation_A2", "d4_galley_B1", "d4_laundry_D1", "d4_stair_300n",
-    "d4_quiet_D1", "d4_library_D1", "d4_quiet_D2", "d4_stair_452n", "d4_laundry_G1", "d4_library_F1", "d4_quiet_F1", "d4_laundry_G2",
-    "d2_stair_92n", "d2_stair_300n", "d2_stair_452n", "d2_briefing_B1", "d2_offices_B1", "d2_point_defense_B1", "d2_vls_magazine_C1",
-    "d2_offices_C1", "d2_vls_magazine_C2", "d2_vls_magazine_D1", "d2_barbette_E1", "d2_point_defense_E1", "d2_offices_F1", "d2_barbette_F1",
-    "d2_machinery_G1", "d2_offices_G1", "d2_comms_center_H1", "d2_briefing_B2", "d2_point_defense_B2", "d2_comms_center_C1", "d2_point_defense_D1",
-    "d2_offices_D1", "d2_point_defense_D2", "d2_point_defense_E2", "d2_barbette_E2", "d2_offices_E1", "d2_barbette_F2", "d2_offices_F2",
-    "d2_machinery_G2", "d2_comms_center_H2", "d2_point_defense_H1", "d3_stair_92n", "d3_stair_300n", "d3_stair_452n", "d3_staterooms_C1",
-    "d3_staterooms_C2", "d3_offices_D1", "d3_offices_E1", "d3_staterooms_E1", "d3_offices_E2", "d3_staterooms_F1", "d3_offices_F1", "d3_gym_C1",
-    "d3_staterooms_C3", "d3_gym_D1", "d3_staterooms_D1", "d3_staterooms_E2", "d3_gym_E1", "d3_gym_F1", "d3_staterooms_F2", "d3_gym_G1",
-    "d3_wardroom_A1", "d3_staterooms_A1", "d3_gym_A1", "d3_wardroom_A2", "d3_staterooms_B1", "d3_staterooms_B2", "d3_gym_A2", "d3_wardroom_A3",
-    "d3_staterooms_A2", "d3_gym_A3", "d3_offices_B1", "d5_stair_44p", "d5_stair_92n", "d5_stair_300n", "d5_stair_452n", "d5_radiator_pumps_G1",
-    "d5_machinery_H1", "d5_machinery_H2", "d5_machinery_G1", "d5_machinery_G2", "d5_machinery_E1", "d5_radiator_pumps_E1", "d5_lab_A1", "d5_lab_A2",
-    "d5_lab_B1", "d5_transporter_B1", "d5_lab_B2", "d5_lab_C1", "d5_lab_A3", "d5_lab_A4", "d5_lab_B3", "d5_lab_B4", "d5_transporter_C1",
-    "d5_lab_B5", "d5_transporter_B2", "d5_lab_B6", "d5_transporter_B3", "d5_lab_C2", "d5_lab_C3", "d5_lab_D1", "d5_lab_D2", "d5_lab_D3",
-    "d5_radiator_pumps_E2", "d5_lab_E1", "d5_machinery_E2", "d5_machinery_F1", "d5_radiator_pumps_G2", "d5_radiator_pumps_G3", "d5_machinery_H3",
-    "d5_machinery_H4", "d5_lab_A5", "d5_lab_B7", "d5_lab_B8", "d5_transporter_C2", "d5_lab_C4", "d5_transporter_C3", "d5_lab_C5", "d5_machinery_E3",
-    "d5_radiator_pumps_E3", "d5_lab_E2", "d5_radiator_pumps_F1", "d5_machinery_G3", "d5_machinery_G4", "d6_stair_44p", "d6_stair_92n",
-    "d6_stair_300n", "d6_stair_452n", "d6_machinery_H1", "d6_surgery_E1", "d6_surgery_F1", "d6_surgery_G1", "d6_surgery_C1", "d6_surgery_C2",
-    "d6_surgery_D1", "d6_surgery_B1", "d6_surgery_B2", "d6_surgery_B3", "d6_surgery_B4", "d6_surgery_C3", "d6_surgery_C4", "d6_surgery_A1",
-    "d6_surgery_C5", "d6_surgery_C6", "d6_surgery_A2", "d6_surgery_B5", "d6_surgery_B6", "d6_surgery_B7", "d6_surgery_B8", "d6_surgery_C7",
-    "d6_surgery_C8", "d6_surgery_C9", "d6_surgery_D2", "d6_machinery_H2", "d6_surgery_A3", "d6_surgery_C10", "d6_surgery_C11", "d6_surgery_C12",
-    "d6_surgery_D3", "d6_surgery_E2", "d6_surgery_E3", "d6_surgery_F2", "d6_surgery_G2", "d7_stair_44p", "d7_stair_92n", "d7_stair_300n",
-    "d7_stair_452n", "d7_power_control_G1", "d7_machinery_G1", "d7_machinery_H1", "d7_machinery_H2", "d7_radiator_pumps_G1", "d7_power_control_G2",
-    "d7_machinery_H3", "d7_machinery_H4", "d7_radiator_pumps_E1", "d7_machinery_E1", "d7_machinery_E2", "d7_machinery_B1", "d7_power_control_B1",
-    "d7_machinery_B2", "d7_power_control_B2", "d7_power_control_C1", "d7_power_control_C2", "d7_power_control_D1", "d7_power_control_B3",
-    "d7_machinery_B3", "d7_power_control_B4", "d7_machinery_C1", "d7_machinery_C2", "d7_machinery_C3", "d7_machinery_D1", "d7_machinery_B4",
-    "d7_power_control_B5", "d7_machinery_B5", "d7_power_control_B6", "d7_power_control_C3", "d7_power_control_C4", "d7_power_control_D2",
-    "d7_radiator_pumps_E2", "d7_radiator_pumps_E3", "d7_machinery_F1", "d7_power_control_F1", "d7_radiator_pumps_G2", "d7_power_control_G3",
-    "d7_machinery_H5", "d7_machinery_H6", "d7_power_control_B7", "d7_machinery_B6", "d7_power_control_B8", "d7_machinery_B7", "d7_machinery_C4",
-    "d7_machinery_C5", "d7_machinery_C6", "d7_machinery_D2", "d7_machinery_D3", "d7_machinery_E3", "d7_machinery_E4", "d7_machinery_F2",
-    "d7_power_control_F2", "d7_radiator_pumps_G3", "d7_power_control_G4", "d7_machinery_H7", "d7_machinery_H8", "d8_stair_44p", "d8_stair_92n",
-    "d8_stair_300n", "d8_stair_452n", "d8_barracks_G1", "d8_machinery_H1", "d8_machinery_H2", "d8_machinery_G1", "d8_barracks_G2", "d8_barracks_C1",
-    "d8_armory_C1", "d8_armory_D1", "d8_barracks_D1", "d8_barracks_D2", "d8_armory_D2", "d8_barracks_D3", "d8_barracks_E1", "d8_barracks_E2",
-    "d8_barracks_E3", "d8_armory_C2", "d8_firing_range_C1", "d8_barracks_D4", "d8_armory_D3", "d8_barracks_D5", "d8_machinery_E1", "d8_barracks_E4",
+    "d4_stair_92n", "d4_observation_A1", "d4_observation_d14_B1", "d4_lounge_D1", "d4_games_D1", "d4_library_D1", "d4_laundry_E1", "d4_quiet_E1",
+    "d4_laundry_G1", "d4_quiet_G1", "d4_observation_A2", "d4_galley_B1", "d4_games_D2", "d4_lounge_D2", "d4_library_D2", "d4_laundry_G2",
+    "d4_quiet_G2", "d4_laundry_D1", "d4_stair_300n", "d4_quiet_D1", "d4_library_D3", "d4_quiet_D2", "d4_stair_452n", "d4_laundry_G3",
+    "d4_library_F1", "d4_quiet_F1", "d4_laundry_G4", "d2_stair_92n", "d2_stair_300n", "d2_stair_452n", "d2_briefing_B1", "d2_offices_B1",
+    "d2_point_defense_B1", "d2_vls_magazine_C1", "d2_offices_C1", "d2_vls_magazine_C2", "d2_vls_magazine_D1", "d2_barbette_E1",
+    "d2_point_defense_E1", "d2_offices_F1", "d2_barbette_F1", "d2_machinery_G1", "d2_offices_G1", "d2_comms_center_H1", "d2_briefing_B2",
+    "d2_point_defense_B2", "d2_comms_center_C1", "d2_point_defense_D1", "d2_offices_D1", "d2_point_defense_D2", "d2_point_defense_E2",
+    "d2_barbette_E2", "d2_offices_E1", "d2_barbette_F2", "d2_offices_F2", "d2_machinery_G2", "d2_comms_center_H2", "d2_point_defense_H1",
+    "d3_stair_92n", "d3_stair_300n", "d3_stair_452n", "d3_staterooms_C1", "d3_staterooms_C2", "d3_offices_D1", "d3_offices_E1", "d3_staterooms_E1",
+    "d3_offices_E2", "d3_staterooms_F1", "d3_offices_F1", "d3_gym_C1", "d3_staterooms_C3", "d3_gym_D1", "d3_staterooms_D1", "d3_staterooms_E2",
+    "d3_gym_E1", "d3_gym_F1", "d3_staterooms_F2", "d3_gym_G1", "d3_wardroom_A1", "d3_staterooms_A1", "d3_gym_A1", "d3_wardroom_A2",
+    "d3_staterooms_B1", "d3_staterooms_B2", "d3_gym_A2", "d3_wardroom_A3", "d3_staterooms_A2", "d3_gym_A3", "d3_offices_B1", "d5_stair_44p",
+    "d5_stair_92n", "d5_stair_300n", "d5_stair_452n", "d5_radiator_pumps_G1", "d5_machinery_H1", "d5_machinery_H2", "d5_machinery_G1",
+    "d5_machinery_G2", "d5_machinery_E1", "d5_radiator_pumps_E1", "d5_lab_A1", "d5_lab_A2", "d5_lab_B1", "d5_transporter_B1", "d5_lab_B2",
+    "d5_lab_C1", "d5_lab_A3", "d5_lab_A4", "d5_lab_B3", "d5_lab_B4", "d5_transporter_C1", "d5_lab_B5", "d5_transporter_B2", "d5_lab_B6",
+    "d5_transporter_B3", "d5_lab_C2", "d5_lab_C3", "d5_lab_D1", "d5_lab_D2", "d5_lab_D3", "d5_radiator_pumps_E2", "d5_lab_E1", "d5_machinery_E2",
+    "d5_machinery_F1", "d5_radiator_pumps_G2", "d5_radiator_pumps_G3", "d5_machinery_H3", "d5_machinery_H4", "d5_lab_A5", "d5_lab_B7", "d5_lab_B8",
+    "d5_transporter_C2", "d5_lab_C4", "d5_transporter_C3", "d5_lab_C5", "d5_machinery_E3", "d5_radiator_pumps_E3", "d5_lab_E2",
+    "d5_radiator_pumps_F1", "d5_machinery_G3", "d5_machinery_G4", "d6_stair_44p", "d6_stair_92n", "d6_stair_300n", "d6_stair_452n",
+    "d6_machinery_H1", "d6_surgery_E1", "d6_surgery_F1", "d6_surgery_G1", "d6_surgery_C1", "d6_surgery_C2", "d6_surgery_D1", "d6_surgery_B1",
+    "d6_surgery_B2", "d6_surgery_B3", "d6_surgery_B4", "d6_surgery_C3", "d6_surgery_C4", "d6_surgery_A1", "d6_surgery_C5", "d6_surgery_C6",
+    "d6_surgery_A2", "d6_surgery_B5", "d6_surgery_B6", "d6_surgery_B7", "d6_surgery_B8", "d6_surgery_C7", "d6_surgery_C8", "d6_surgery_C9",
+    "d6_surgery_D2", "d6_machinery_H2", "d6_surgery_A3", "d6_surgery_C10", "d6_surgery_C11", "d6_surgery_C12", "d6_surgery_D3", "d6_surgery_E2",
+    "d6_surgery_E3", "d6_surgery_F2", "d6_surgery_G2", "d7_stair_44p", "d7_stair_92n", "d7_stair_300n", "d7_stair_452n", "d7_power_control_G1",
+    "d7_machinery_G1", "d7_machinery_H1", "d7_machinery_H2", "d7_radiator_pumps_G1", "d7_power_control_G2", "d7_machinery_H3", "d7_machinery_H4",
+    "d7_radiator_pumps_E1", "d7_machinery_E1", "d7_machinery_E2", "d7_machinery_B1", "d7_power_control_B1", "d7_machinery_B2",
+    "d7_power_control_B2", "d7_power_control_C1", "d7_power_control_C2", "d7_power_control_D1", "d7_power_control_B3", "d7_machinery_B3",
+    "d7_power_control_B4", "d7_machinery_C1", "d7_machinery_C2", "d7_machinery_C3", "d7_machinery_D1", "d7_machinery_B4", "d7_power_control_B5",
+    "d7_machinery_B5", "d7_power_control_B6", "d7_power_control_C3", "d7_power_control_C4", "d7_power_control_D2", "d7_radiator_pumps_E2",
+    "d7_radiator_pumps_E3", "d7_machinery_F1", "d7_power_control_F1", "d7_radiator_pumps_G2", "d7_power_control_G3", "d7_machinery_H5",
+    "d7_machinery_H6", "d7_power_control_B7", "d7_machinery_B6", "d7_power_control_B8", "d7_machinery_B7", "d7_machinery_C4", "d7_machinery_C5",
+    "d7_machinery_C6", "d7_machinery_D2", "d7_machinery_D3", "d7_machinery_E3", "d7_machinery_E4", "d7_machinery_F2", "d7_power_control_F2",
+    "d7_radiator_pumps_G3", "d7_power_control_G4", "d7_machinery_H7", "d7_machinery_H8", "d8_stair_44p", "d8_stair_92n", "d8_stair_300n",
+    "d8_stair_452n", "d8_barracks_G1", "d8_machinery_H1", "d8_machinery_H2", "d8_machinery_G1", "d8_barracks_G2", "d8_barracks_C1", "d8_armory_C1",
+    "d8_armory_D1", "d8_barracks_D1", "d8_barracks_D2", "d8_armory_D2", "d8_barracks_D3", "d8_barracks_E1", "d8_barracks_E2", "d8_barracks_E3",
+    "d8_armory_C2", "d8_firing_range_C1", "d8_barracks_D4", "d8_armory_D3", "d8_barracks_D5", "d8_machinery_E1", "d8_barracks_E4",
     "d8_machinery_E2", "d8_barracks_E5", "d8_barracks_F1", "d8_barracks_B1", "d8_barracks_C2", "d8_armory_C3", "d8_armory_D4", "d8_barracks_D6",
     "d8_barracks_D7", "d8_armory_D5", "d8_barracks_D8", "d8_barracks_E6", "d8_barracks_E7", "d8_barracks_E8", "d8_barracks_F2", "d8_barracks_F3",
     "d8_barracks_G3", "d8_machinery_H3", "d8_machinery_H4", "d8_armory_C4", "d8_firing_range_C2", "d8_barracks_D9", "d8_barracks_D10",
@@ -75351,40 +77840,40 @@
   "supply": {
    "name": "Stores",
    "compartments": [
-    "d4_hold_A1", "d4_hold_A2", "d4_store_cold_A1", "d4_hold_B1", "d4_hold_C1", "d4_store_dry_d10_B1", "d4_store_cold_C1", "d4_hold_C2",
-    "d4_hold_C3", "d4_store_dry_C1", "d4_hold_D1", "d4_hold_F1", "d4_hold_H1", "d4_store_dry_F1", "d4_hold_H2", "d5_dc_locker_H1",
-    "d5_dc_locker_H2", "d5_dc_locker_H3", "d5_dc_locker_H4", "d5_dc_locker_H5", "d5_dc_locker_H6", "d5_dc_locker_H7", "d5_dc_locker_H8",
-    "d5_dc_locker_H9", "d6_dc_locker_E1", "d6_pharmacy_E1", "d6_pharmacy_F1", "d6_pharmacy_G1", "d6_dc_locker_H1", "d6_dc_locker_H2",
-    "d6_dc_locker_C1", "d6_pharmacy_D1", "d6_dc_locker_A1", "d6_dc_locker_C2", "d6_dc_locker_C3", "d6_pharmacy_A1", "d6_dc_locker_B1",
-    "d6_pharmacy_B1", "d6_dc_locker_B2", "d6_pharmacy_B2", "d6_dc_locker_B3", "d6_pharmacy_B3", "d6_dc_locker_B4", "d6_pharmacy_B4",
-    "d6_pharmacy_B5", "d6_dc_locker_B5", "d6_pharmacy_B6", "d6_dc_locker_C4", "d6_dc_locker_C5", "d6_dc_locker_A2", "d6_dc_locker_C6",
-    "d6_dc_locker_C7", "d6_dc_locker_C8", "d6_pharmacy_D2", "d6_dc_locker_E2", "d6_dc_locker_F1", "d6_dc_locker_G1", "d6_pharmacy_A2",
-    "d6_dc_locker_B6", "d6_pharmacy_B7", "d6_dc_locker_B7", "d6_pharmacy_B8", "d6_dc_locker_B8", "d6_pharmacy_B9", "d6_dc_locker_B9",
-    "d6_pharmacy_B10", "d6_dc_locker_B10", "d6_pharmacy_B11", "d6_dc_locker_B11", "d6_pharmacy_B12", "d6_dc_locker_C9", "d6_dc_locker_C10",
-    "d6_dc_locker_C11", "d6_pharmacy_D3", "d6_pharmacy_E2", "d6_pharmacy_E3", "d6_pharmacy_F2", "d6_pharmacy_G2", "d6_dc_locker_H3",
-    "d6_dc_locker_H4", "d7_dc_locker_H1", "d7_dc_locker_H2", "d7_dc_locker_B1", "d7_dc_locker_B2", "d7_dc_locker_C1", "d7_dc_locker_C2",
-    "d7_dc_locker_D1", "d7_dc_locker_B3", "d7_dc_locker_B4", "d7_dc_locker_B5", "d7_dc_locker_B6", "d7_dc_locker_C3", "d7_dc_locker_C4",
-    "d7_dc_locker_D2", "d7_dc_locker_D3", "d7_dc_locker_F1", "d7_dc_locker_H3", "d7_dc_locker_B7", "d7_dc_locker_B8", "d7_dc_locker_F2",
-    "d7_dc_locker_H4", "d8_dc_locker_G1", "d8_dc_locker_G2", "d8_dc_locker_H1", "d8_dc_locker_H2", "d8_dc_locker_H3", "d8_dc_locker_H4",
-    "d8_dc_locker_H5", "d8_dc_locker_E1", "d8_dc_locker_E2", "d8_dc_locker_E3", "d8_dc_locker_E4", "d8_dc_locker_E5", "d8_dc_locker_E6",
-    "d8_dc_locker_F1", "d8_dc_locker_F2", "d8_dc_locker_G3", "d8_dc_locker_G4", "d8_dc_locker_H6", "d8_dc_locker_H7", "d8_dc_locker_H8",
-    "d8_dc_locker_H9", "d8_dc_locker_H10", "d9_cargo_hold_E1", "d9_cargo_hold_F1", "d9_cargo_hold_F2", "d9_cargo_hold_G1", "d9_cargo_hold_G2",
-    "d9_cargo_hold_E2", "d9_cargo_hold_F3", "d9_cargo_hold_F4", "d9_cargo_hold_G3", "d9_cargo_hold_G4", "d9_dc_locker_H1", "d9_dc_locker_H2",
-    "d9_dc_locker_H3", "d9_dc_locker_H4", "d9_dc_locker_H5", "d9_dc_locker_H6", "d9_dc_locker_H7", "d9_dc_locker_H8", "d9_cargo_hold_E3",
-    "d9_cargo_hold_F5", "d9_cargo_hold_F6", "d9_cargo_hold_G5", "d9_cargo_hold_G6", "d9_cargo_hold_E4", "d9_cargo_hold_F7", "d9_cargo_hold_F8",
-    "d9_cargo_hold_G7", "d9_cargo_hold_G8", "d9_dc_locker_H9", "d9_dc_locker_H10", "d9_dc_locker_H11", "d9_dc_locker_H12", "d9_dc_locker_H13",
-    "d9_dc_locker_H14", "d9_dc_locker_H15", "d9_dc_locker_H16", "d10_hold_B1", "d10_hold_C1", "d10_cargo_hold_C1", "d10_hold_C2", "d10_hold_D1",
-    "d10_cargo_hold_D1", "d10_hold_D2", "d10_hold_E1", "d10_cargo_hold_E1", "d10_hold_F1", "d10_cargo_hold_F1", "d10_hold_F2", "d10_cargo_hold_B1",
-    "d10_cargo_hold_C2", "d10_cargo_hold_D2", "d10_cargo_hold_D3", "d10_cargo_hold_E2", "d10_cargo_hold_E3", "d10_cargo_hold_F2", "d10_hold_H1",
-    "d10_cargo_hold_B2", "d10_hold_B2", "d10_hold_C3", "d10_cargo_hold_C3", "d10_hold_C4", "d10_hold_D3", "d10_cargo_hold_D4", "d10_hold_D4",
-    "d10_hold_E2", "d10_cargo_hold_E4", "d10_hold_E3", "d10_hold_F3", "d10_cargo_hold_F3", "d10_hold_F4", "d10_hold_G1", "d10_cargo_hold_G1",
-    "d10_cargo_hold_B3", "d10_cargo_hold_C4", "d10_cargo_hold_C5", "d10_cargo_hold_D5", "d10_cargo_hold_D6", "d10_cargo_hold_E5",
-    "d10_cargo_hold_E6", "d10_cargo_hold_F4", "d10_cargo_hold_G2", "d10_hold_H2", "d11_dc_locker_B1", "d11_dc_locker_C1", "d11_dc_locker_C2",
-    "d11_dc_locker_C3", "d11_dc_locker_D1", "d11_dc_locker_D2", "d11_dc_locker_E1", "d11_dc_locker_E2", "d11_dc_locker_E3", "d11_dc_locker_F1",
-    "d11_dc_locker_F2", "d11_dc_locker_G1", "d11_dc_locker_G2", "d11_dc_locker_H1", "d11_dc_locker_H2", "d11_dc_locker_H3", "d11_dc_locker_B2",
-    "d11_dc_locker_C4", "d11_dc_locker_C5", "d11_dc_locker_C6", "d11_dc_locker_D3", "d11_dc_locker_D4", "d11_dc_locker_D5", "d11_dc_locker_E4",
-    "d11_dc_locker_E5", "d11_dc_locker_E6", "d11_dc_locker_F3", "d11_dc_locker_F4", "d11_dc_locker_G3", "d11_dc_locker_H4", "d11_dc_locker_H5",
-    "d11_dc_locker_H6"
+    "d4_hold_A1", "d4_hold_A2", "d4_store_cold_A1", "d4_hold_B1", "d4_hold_C1", "d4_store_dry_F1", "d4_hold_F1", "d4_store_dry_d10_B1",
+    "d4_store_cold_C1", "d4_hold_C2", "d4_store_cold_E1", "d4_hold_F2", "d4_store_dry_F2", "d4_hold_C3", "d4_store_dry_C1", "d4_hold_D1",
+    "d4_hold_F3", "d4_hold_H1", "d4_store_dry_F3", "d4_hold_H2", "d5_dc_locker_H1", "d5_dc_locker_H2", "d5_dc_locker_H3", "d5_dc_locker_H4",
+    "d5_dc_locker_H5", "d5_dc_locker_H6", "d5_dc_locker_H7", "d5_dc_locker_H8", "d5_dc_locker_H9", "d6_dc_locker_E1", "d6_pharmacy_E1",
+    "d6_pharmacy_F1", "d6_pharmacy_G1", "d6_dc_locker_H1", "d6_dc_locker_H2", "d6_dc_locker_C1", "d6_pharmacy_D1", "d6_dc_locker_A1",
+    "d6_dc_locker_C2", "d6_dc_locker_C3", "d6_pharmacy_A1", "d6_dc_locker_B1", "d6_pharmacy_B1", "d6_dc_locker_B2", "d6_pharmacy_B2",
+    "d6_dc_locker_B3", "d6_pharmacy_B3", "d6_dc_locker_B4", "d6_pharmacy_B4", "d6_pharmacy_B5", "d6_dc_locker_B5", "d6_pharmacy_B6",
+    "d6_dc_locker_C4", "d6_dc_locker_C5", "d6_dc_locker_A2", "d6_dc_locker_C6", "d6_dc_locker_C7", "d6_dc_locker_C8", "d6_pharmacy_D2",
+    "d6_dc_locker_E2", "d6_dc_locker_F1", "d6_dc_locker_G1", "d6_pharmacy_A2", "d6_dc_locker_B6", "d6_pharmacy_B7", "d6_dc_locker_B7",
+    "d6_pharmacy_B8", "d6_dc_locker_B8", "d6_pharmacy_B9", "d6_dc_locker_B9", "d6_pharmacy_B10", "d6_dc_locker_B10", "d6_pharmacy_B11",
+    "d6_dc_locker_B11", "d6_pharmacy_B12", "d6_dc_locker_C9", "d6_dc_locker_C10", "d6_dc_locker_C11", "d6_pharmacy_D3", "d6_pharmacy_E2",
+    "d6_pharmacy_E3", "d6_pharmacy_F2", "d6_pharmacy_G2", "d6_dc_locker_H3", "d6_dc_locker_H4", "d7_dc_locker_H1", "d7_dc_locker_H2",
+    "d7_dc_locker_B1", "d7_dc_locker_B2", "d7_dc_locker_C1", "d7_dc_locker_C2", "d7_dc_locker_D1", "d7_dc_locker_B3", "d7_dc_locker_B4",
+    "d7_dc_locker_B5", "d7_dc_locker_B6", "d7_dc_locker_C3", "d7_dc_locker_C4", "d7_dc_locker_D2", "d7_dc_locker_D3", "d7_dc_locker_F1",
+    "d7_dc_locker_H3", "d7_dc_locker_B7", "d7_dc_locker_B8", "d7_dc_locker_F2", "d7_dc_locker_H4", "d8_dc_locker_G1", "d8_dc_locker_G2",
+    "d8_dc_locker_H1", "d8_dc_locker_H2", "d8_dc_locker_H3", "d8_dc_locker_H4", "d8_dc_locker_H5", "d8_dc_locker_E1", "d8_dc_locker_E2",
+    "d8_dc_locker_E3", "d8_dc_locker_E4", "d8_dc_locker_E5", "d8_dc_locker_E6", "d8_dc_locker_F1", "d8_dc_locker_F2", "d8_dc_locker_G3",
+    "d8_dc_locker_G4", "d8_dc_locker_H6", "d8_dc_locker_H7", "d8_dc_locker_H8", "d8_dc_locker_H9", "d8_dc_locker_H10", "d9_cargo_hold_E1",
+    "d9_cargo_hold_F1", "d9_cargo_hold_F2", "d9_cargo_hold_G1", "d9_cargo_hold_G2", "d9_cargo_hold_E2", "d9_cargo_hold_F3", "d9_cargo_hold_F4",
+    "d9_cargo_hold_G3", "d9_cargo_hold_G4", "d9_dc_locker_H1", "d9_dc_locker_H2", "d9_dc_locker_H3", "d9_dc_locker_H4", "d9_dc_locker_H5",
+    "d9_dc_locker_H6", "d9_dc_locker_H7", "d9_dc_locker_H8", "d9_cargo_hold_E3", "d9_cargo_hold_F5", "d9_cargo_hold_F6", "d9_cargo_hold_G5",
+    "d9_cargo_hold_G6", "d9_cargo_hold_E4", "d9_cargo_hold_F7", "d9_cargo_hold_F8", "d9_cargo_hold_G7", "d9_cargo_hold_G8", "d9_dc_locker_H9",
+    "d9_dc_locker_H10", "d9_dc_locker_H11", "d9_dc_locker_H12", "d9_dc_locker_H13", "d9_dc_locker_H14", "d9_dc_locker_H15", "d9_dc_locker_H16",
+    "d10_hold_B1", "d10_hold_C1", "d10_cargo_hold_C1", "d10_hold_C2", "d10_hold_D1", "d10_cargo_hold_D1", "d10_hold_D2", "d10_hold_E1",
+    "d10_cargo_hold_E1", "d10_hold_F1", "d10_cargo_hold_F1", "d10_hold_F2", "d10_cargo_hold_B1", "d10_cargo_hold_C2", "d10_cargo_hold_D2",
+    "d10_cargo_hold_D3", "d10_cargo_hold_E2", "d10_cargo_hold_E3", "d10_cargo_hold_F2", "d10_hold_H1", "d10_cargo_hold_B2", "d10_hold_B2",
+    "d10_hold_C3", "d10_cargo_hold_C3", "d10_hold_C4", "d10_hold_D3", "d10_cargo_hold_D4", "d10_hold_D4", "d10_hold_E2", "d10_cargo_hold_E4",
+    "d10_hold_E3", "d10_hold_F3", "d10_cargo_hold_F3", "d10_hold_F4", "d10_hold_G1", "d10_cargo_hold_G1", "d10_cargo_hold_B3", "d10_cargo_hold_C4",
+    "d10_cargo_hold_C5", "d10_cargo_hold_D5", "d10_cargo_hold_D6", "d10_cargo_hold_E5", "d10_cargo_hold_E6", "d10_cargo_hold_F4",
+    "d10_cargo_hold_G2", "d10_hold_H2", "d11_dc_locker_B1", "d11_dc_locker_C1", "d11_dc_locker_C2", "d11_dc_locker_C3", "d11_dc_locker_D1",
+    "d11_dc_locker_D2", "d11_dc_locker_E1", "d11_dc_locker_E2", "d11_dc_locker_E3", "d11_dc_locker_F1", "d11_dc_locker_F2", "d11_dc_locker_G1",
+    "d11_dc_locker_G2", "d11_dc_locker_H1", "d11_dc_locker_H2", "d11_dc_locker_H3", "d11_dc_locker_B2", "d11_dc_locker_C4", "d11_dc_locker_C5",
+    "d11_dc_locker_C6", "d11_dc_locker_D3", "d11_dc_locker_D4", "d11_dc_locker_D5", "d11_dc_locker_E4", "d11_dc_locker_E5", "d11_dc_locker_E6",
+    "d11_dc_locker_F3", "d11_dc_locker_F4", "d11_dc_locker_G3", "d11_dc_locker_H4", "d11_dc_locker_H5", "d11_dc_locker_H6"
    ]
   },
   "tactical": {"name": "Tactical", "compartments": ["bridge"]},
@@ -75392,7 +77881,10 @@
    "name": "Lattice transport (transporter)",
    "compartments": ["d5_transporter_B1", "d5_transporter_C1", "d5_transporter_B2", "d5_transporter_B3", "d5_transporter_C2", "d5_transporter_C3"]
   },
-  "waste": {"name": "Waste and recycling", "compartments": ["d4_heads_A1", "d4_heads_A2", "d4_heads_A3", "d4_heads_G1", "d4_heads_G2"]},
+  "waste": {
+   "name": "Waste and recycling",
+   "compartments": ["d4_heads_A1", "d4_heads_A2", "d4_heads_A3", "d4_heads_E1", "d4_heads_G1", "d4_heads_E2", "d4_heads_G2", "d4_heads_G3", "d4_heads_G4"]
+  },
   "weapons": {
    "name": "Weapons (railguns, lasers, point defence)",
    "compartments": [
@@ -75630,6 +78122,114 @@
     "comp": "d4_hold_C1"
    },
    {
+    "mesh": "SM_SHIP_Lounge",
+    "pos": [-272.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/D",
+    "label": "d4_lounge_D1",
+    "cls": "room",
+    "comp": "d4_lounge_D1"
+   },
+   {
+    "mesh": "SM_SHIP_Games",
+    "pos": [-296.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/D",
+    "label": "d4_games_D1",
+    "cls": "room",
+    "comp": "d4_games_D1"
+   },
+   {
+    "mesh": "SM_SHIP_Library",
+    "pos": [-312.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/D",
+    "label": "d4_library_D1",
+    "cls": "room",
+    "comp": "d4_library_D1"
+   },
+   {
+    "mesh": "SM_SHIP_Hydro",
+    "pos": [-344.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/E",
+    "label": "d4_hydro_E1",
+    "cls": "room",
+    "comp": "d4_hydro_E1"
+   },
+   {
+    "mesh": "SM_SHIP_Laundry",
+    "pos": [-356.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/E",
+    "label": "d4_laundry_E1",
+    "cls": "room",
+    "comp": "d4_laundry_E1"
+   },
+   {
+    "mesh": "SM_SHIP_Heads",
+    "pos": [-368.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/E",
+    "label": "d4_heads_E1",
+    "cls": "room",
+    "comp": "d4_heads_E1"
+   },
+   {
+    "mesh": "SM_SHIP_Quiet",
+    "pos": [-380.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/E",
+    "label": "d4_quiet_E1",
+    "cls": "room",
+    "comp": "d4_quiet_E1"
+   },
+   {
+    "mesh": "SM_SHIP_StoreDry",
+    "pos": [-408.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/F",
+    "label": "d4_store_dry_F1",
+    "cls": "room",
+    "comp": "d4_store_dry_F1"
+   },
+   {
+    "mesh": "SM_SHIP_Hold",
+    "pos": [-432.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/F",
+    "label": "d4_hold_F1",
+    "cls": "room",
+    "comp": "d4_hold_F1"
+   },
+   {
+    "mesh": "SM_SHIP_Laundry",
+    "pos": [-452.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/G",
+    "label": "d4_laundry_G1",
+    "cls": "room",
+    "comp": "d4_laundry_G1"
+   },
+   {
+    "mesh": "SM_SHIP_Heads",
+    "pos": [-464.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/G",
+    "label": "d4_heads_G1",
+    "cls": "room",
+    "comp": "d4_heads_G1"
+   },
+   {
+    "mesh": "SM_SHIP_Quiet",
+    "pos": [-476.0, 22.0, -46.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck04/Rooms/G",
+    "label": "d4_quiet_G1",
+    "cls": "room",
+    "comp": "d4_quiet_G1"
+   },
+   {
     "mesh": "SM_SHIP_Observation",
     "pos": [12.0, -22.0, -46.0],
     "yaw": 180.0,
@@ -75673,6 +78273,105 @@
     "label": "d4_hold_C2",
     "cls": "room",
     "comp": "d4_hold_C2"
+   },
+   {
+    "mesh": "SM_SHIP_Games",
+    "pos": [-248.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/D",
+    "label": "d4_games_D2",
+    "cls": "room",
+    "comp": "d4_games_D2"
+   },
+   {
+    "mesh": "SM_SHIP_Lounge",
+    "pos": [-272.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/D",
+    "label": "d4_lounge_D2",
+    "cls": "room",
+    "comp": "d4_lounge_D2"
+   },
+   {
+    "mesh": "SM_SHIP_Library",
+    "pos": [-296.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/D",
+    "label": "d4_library_D2",
+    "cls": "room",
+    "comp": "d4_library_D2"
+   },
+   {
+    "mesh": "SM_SHIP_Hydro",
+    "pos": [-320.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/E",
+    "label": "d4_hydro_E2",
+    "cls": "room",
+    "comp": "d4_hydro_E2"
+   },
+   {
+    "mesh": "SM_SHIP_StoreCold",
+    "pos": [-344.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/E",
+    "label": "d4_store_cold_E1",
+    "cls": "room",
+    "comp": "d4_store_cold_E1"
+   },
+   {
+    "mesh": "SM_SHIP_Heads",
+    "pos": [-368.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/E",
+    "label": "d4_heads_E2",
+    "cls": "room",
+    "comp": "d4_heads_E2"
+   },
+   {
+    "mesh": "SM_SHIP_Hold",
+    "pos": [-384.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/F",
+    "label": "d4_hold_F2",
+    "cls": "room",
+    "comp": "d4_hold_F2"
+   },
+   {
+    "mesh": "SM_SHIP_StoreDry",
+    "pos": [-408.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/F",
+    "label": "d4_store_dry_F2",
+    "cls": "room",
+    "comp": "d4_store_dry_F2"
+   },
+   {
+    "mesh": "SM_SHIP_Laundry",
+    "pos": [-440.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/G",
+    "label": "d4_laundry_G2",
+    "cls": "room",
+    "comp": "d4_laundry_G2"
+   },
+   {
+    "mesh": "SM_SHIP_Heads",
+    "pos": [-452.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/G",
+    "label": "d4_heads_G2",
+    "cls": "room",
+    "comp": "d4_heads_G2"
+   },
+   {
+    "mesh": "SM_SHIP_Quiet",
+    "pos": [-464.0, -22.0, -46.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck04/Rooms/G",
+    "label": "d4_quiet_G2",
+    "cls": "room",
+    "comp": "d4_quiet_G2"
    },
    {
     "mesh": "SM_SHIP_GalleyPass",
@@ -75751,9 +78450,9 @@
     "pos": [-276.0, -2.0, -46.0],
     "yaw": 180.0,
     "folder": "Interior/Deck04/Rooms/D",
-    "label": "d4_library_D1",
+    "label": "d4_library_D3",
     "cls": "room",
-    "comp": "d4_library_D1"
+    "comp": "d4_library_D3"
    },
    {
     "mesh": "SM_SHIP_Quiet",
@@ -75769,9 +78468,9 @@
     "pos": [-408.0, 2.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Rooms/F",
-    "label": "d4_hold_F1",
+    "label": "d4_hold_F3",
     "cls": "room",
-    "comp": "d4_hold_F1"
+    "comp": "d4_hold_F3"
    },
    {
     "mesh": "SM_SHIP_Hydro",
@@ -75796,18 +78495,18 @@
     "pos": [-464.0, 2.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Rooms/G",
-    "label": "d4_laundry_G1",
+    "label": "d4_laundry_G3",
     "cls": "room",
-    "comp": "d4_laundry_G1"
+    "comp": "d4_laundry_G3"
    },
    {
     "mesh": "SM_SHIP_Heads",
     "pos": [-476.0, 2.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Rooms/G",
-    "label": "d4_heads_G1",
+    "label": "d4_heads_G3",
     "cls": "room",
-    "comp": "d4_heads_G1"
+    "comp": "d4_heads_G3"
    },
    {
     "mesh": "SM_SHIP_Hold",
@@ -75823,9 +78522,9 @@
     "pos": [-384.0, -2.0, -46.0],
     "yaw": 180.0,
     "folder": "Interior/Deck04/Rooms/F",
-    "label": "d4_store_dry_F1",
+    "label": "d4_store_dry_F3",
     "cls": "room",
-    "comp": "d4_store_dry_F1"
+    "comp": "d4_store_dry_F3"
    },
    {
     "mesh": "SM_SHIP_Library",
@@ -75850,18 +78549,18 @@
     "pos": [-440.0, -2.0, -46.0],
     "yaw": 180.0,
     "folder": "Interior/Deck04/Rooms/G",
-    "label": "d4_heads_G2",
+    "label": "d4_heads_G4",
     "cls": "room",
-    "comp": "d4_heads_G2"
+    "comp": "d4_heads_G4"
    },
    {
     "mesh": "SM_SHIP_Laundry",
     "pos": [-452.0, -2.0, -46.0],
     "yaw": 180.0,
     "folder": "Interior/Deck04/Rooms/G",
-    "label": "d4_laundry_G2",
+    "label": "d4_laundry_G4",
     "cls": "room",
-    "comp": "d4_laundry_G2"
+    "comp": "d4_laundry_G4"
    },
    {
     "mesh": "SM_SHIP_Hold",
@@ -77377,7 +80076,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-472.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77385,7 +80084,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 13,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -77410,7 +80109,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_A",
     "pos": [-460.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77418,7 +80117,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 16,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -77443,7 +80142,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-448.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77451,7 +80150,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 19,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Bulkhead",
@@ -77525,7 +80224,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-424.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77533,7 +80232,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 25,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -77602,7 +80301,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_R_A",
     "pos": [-396.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77610,7 +80309,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 32,
-    "suffix": "Straight_C"
+    "suffix": "Door_R_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -77673,7 +80372,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-376.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77681,7 +80380,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 37,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -77706,7 +80405,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_A",
     "pos": [-364.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77714,7 +80413,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 40,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -77739,7 +80438,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-352.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77747,7 +80446,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 43,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -77783,7 +80482,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-336.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77791,7 +80490,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 47,
-    "suffix": "Straight_C"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -77876,7 +80575,7 @@
     "suffix": "Straight_C"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_A",
+    "mesh": "SM_SHIP_P_Door_R_A",
     "pos": [-308.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77884,7 +80583,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 54,
-    "suffix": "Straight_A"
+    "suffix": "Door_R_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_B",
@@ -77931,7 +80630,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-288.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -77939,7 +80638,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 59,
-    "suffix": "Straight_C"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -77997,7 +80696,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-264.0, 20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/SBP",
@@ -78005,7 +80704,7 @@
     "cls": "module",
     "passage": "SBP",
     "index": 65,
-    "suffix": "Straight_C"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -79183,7 +81882,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_L_B",
     "pos": [-472.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79191,7 +81890,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 13,
-    "suffix": "Straight_B"
+    "suffix": "Door_L_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -79216,7 +81915,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_L_A",
     "pos": [-460.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79224,7 +81923,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 16,
-    "suffix": "Straight_B"
+    "suffix": "Door_L_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -79249,7 +81948,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_L_B",
     "pos": [-448.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79257,7 +81956,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 19,
-    "suffix": "Straight_B"
+    "suffix": "Door_L_B"
    },
    {
     "mesh": "SM_SHIP_P_Bulkhead",
@@ -79331,7 +82030,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_L_B",
     "pos": [-424.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79339,7 +82038,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 25,
-    "suffix": "Straight_B"
+    "suffix": "Door_L_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -79408,7 +82107,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_L_A",
     "pos": [-396.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79416,7 +82115,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 32,
-    "suffix": "Straight_C"
+    "suffix": "Door_L_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -79479,7 +82178,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_L_B",
     "pos": [-376.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79487,7 +82186,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 37,
-    "suffix": "Straight_B"
+    "suffix": "Door_L_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -79523,7 +82222,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_L_B",
     "pos": [-360.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79531,7 +82230,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 41,
-    "suffix": "Straight_C"
+    "suffix": "Door_L_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -79600,7 +82299,7 @@
     "suffix": "Straight_C"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_A",
+    "mesh": "SM_SHIP_P_Door_L_A",
     "pos": [-332.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79608,7 +82307,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 48,
-    "suffix": "Straight_A"
+    "suffix": "Door_L_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_B",
@@ -79693,7 +82392,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_L_B",
     "pos": [-304.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79701,7 +82400,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 55,
-    "suffix": "Straight_B"
+    "suffix": "Door_L_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -79748,7 +82447,7 @@
     "suffix": "Straight_C"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_A",
+    "mesh": "SM_SHIP_P_Door_L_A",
     "pos": [-284.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79756,7 +82455,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 60,
-    "suffix": "Straight_A"
+    "suffix": "Door_L_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_B",
@@ -79814,7 +82513,7 @@
     "suffix": "Straight_C"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_A",
+    "mesh": "SM_SHIP_P_Door_L_A",
     "pos": [-260.0, -20.0, -46.0],
     "yaw": 0.0,
     "folder": "Interior/Deck04/Passages/PP",
@@ -79822,7 +82521,7 @@
     "cls": "module",
     "passage": "PP",
     "index": 66,
-    "suffix": "Straight_A"
+    "suffix": "Door_L_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_B",
@@ -81358,6 +84057,102 @@
     "cls": "plate"
    },
    {
+    "mesh": "SM_SHIP_Plate_lounge",
+    "pos": [-262.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_lounge_D1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_games",
+    "pos": [-286.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_games_D1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_library",
+    "pos": [-306.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_library_D1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_hydro",
+    "pos": [-334.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_hydro_E1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_laundry",
+    "pos": [-350.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_laundry_E1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_heads",
+    "pos": [-362.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_heads_E1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_chapel",
+    "pos": [-374.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_quiet_E1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_stores_dry",
+    "pos": [-394.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_store_dry_F1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_stores",
+    "pos": [-422.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_hold_F1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_laundry",
+    "pos": [-446.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_laundry_G1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_heads",
+    "pos": [-458.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_heads_G1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_chapel",
+    "pos": [-470.0, 21.49, -43.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_quiet_G1",
+    "cls": "plate"
+   },
+   {
     "mesh": "SM_SHIP_Plate_observation",
     "pos": [2.0, -21.49, -43.28],
     "yaw": 90.0,
@@ -81395,6 +84190,94 @@
     "yaw": 90.0,
     "folder": "Interior/Deck04/Plates",
     "label": "d4_plate_hold_C2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_games",
+    "pos": [-258.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_games_D2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_lounge",
+    "pos": [-282.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_lounge_D2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_library",
+    "pos": [-302.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_library_D2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_hydro",
+    "pos": [-330.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_hydro_E2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_stores_cold",
+    "pos": [-358.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_store_cold_E1",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_heads",
+    "pos": [-374.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_heads_E2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_stores",
+    "pos": [-394.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_hold_F2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_stores_dry",
+    "pos": [-422.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_store_dry_F2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_laundry",
+    "pos": [-446.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_laundry_G2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_heads",
+    "pos": [-458.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_heads_G2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_chapel",
+    "pos": [-470.0, -21.49, -43.28],
+    "yaw": 90.0,
+    "folder": "Interior/Deck04/Plates",
+    "label": "d4_plate_quiet_G2",
     "cls": "plate"
    },
    {
@@ -81466,7 +84349,7 @@
     "pos": [-282.0, -1.49, -43.28],
     "yaw": 90.0,
     "folder": "Interior/Deck04/Plates",
-    "label": "d4_plate_library_D1",
+    "label": "d4_plate_library_D3",
     "cls": "plate"
    },
    {
@@ -81482,7 +84365,7 @@
     "pos": [-398.0, 1.49, -43.28],
     "yaw": -90.0,
     "folder": "Interior/Deck04/Plates",
-    "label": "d4_plate_hold_F1",
+    "label": "d4_plate_hold_F3",
     "cls": "plate"
    },
    {
@@ -81506,7 +84389,7 @@
     "pos": [-458.0, 1.49, -43.28],
     "yaw": -90.0,
     "folder": "Interior/Deck04/Plates",
-    "label": "d4_plate_laundry_G1",
+    "label": "d4_plate_laundry_G3",
     "cls": "plate"
    },
    {
@@ -81514,7 +84397,7 @@
     "pos": [-470.0, 1.49, -43.28],
     "yaw": -90.0,
     "folder": "Interior/Deck04/Plates",
-    "label": "d4_plate_heads_G1",
+    "label": "d4_plate_heads_G3",
     "cls": "plate"
    },
    {
@@ -81530,7 +84413,7 @@
     "pos": [-398.0, -1.49, -43.28],
     "yaw": 90.0,
     "folder": "Interior/Deck04/Plates",
-    "label": "d4_plate_store_dry_F1",
+    "label": "d4_plate_store_dry_F3",
     "cls": "plate"
    },
    {
@@ -81554,7 +84437,7 @@
     "pos": [-446.0, -1.49, -43.28],
     "yaw": 90.0,
     "folder": "Interior/Deck04/Plates",
-    "label": "d4_plate_heads_G2",
+    "label": "d4_plate_heads_G4",
     "cls": "plate"
    },
    {
@@ -81562,7 +84445,7 @@
     "pos": [-458.0, -1.49, -43.28],
     "yaw": 90.0,
     "folder": "Interior/Deck04/Plates",
-    "label": "d4_plate_laundry_G2",
+    "label": "d4_plate_laundry_G4",
     "cls": "plate"
    },
    {

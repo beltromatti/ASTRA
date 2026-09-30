@@ -181,10 +181,13 @@ def check(plan: dict, verbose: bool = True) -> dict:
         secs = P.sections(d)
         for letter, x0, x1 in secs:
             hits = [c for c in comps.values() if c["deck"] == d and c["section"] == letter and c["kind"] == "corridor"]
-            allc = [c for c in comps.values() if c["deck"] == d and c["section"] == letter]
+            allc = [c for c in comps.values() if c["deck"] == d and (c["section"] == letter or (c["bounds"][0] < x1 and c["bounds"][2] > x0 and c["kind"] != "corridor"))]
             env = decks[d]["envelope"]
             inside = P.half_width_at({"half_width": env["half_width"]}, (x0 + x1) / 2) is not None
-            if not allc and inside:
+            # a volume that crosses the deck (the Flight Deck's hangar) fills the sections it stands in
+            spanned = any(c.get("spans_decks") and d in c["spans_decks"] and c["bounds"][0] < x1 and c["bounds"][2] > x0 for c in comps.values()
+                          if c["deck"] != d)
+            if not allc and inside and not spanned:
                 warnings.append(f"deck {d} section {letter}: no compartment")
     stats["compartments"] = len(comps)
     stats["doors"] = len(doors)

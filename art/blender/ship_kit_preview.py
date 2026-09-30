@@ -34,6 +34,14 @@ def _kelvin(k: float):
     return LAY.kelvin_to_rgb(k)
 
 
+# the best view(s) of each room for the progress images (--room-views best)
+BEST = {"galley": ["corner_b"], "galley_pass": ["corner_a"], "store_dry": ["door"], "store_cold": ["corner_a"], "hold": ["door"], "heads": ["door"],
+        "laundry": ["door"], "hydro": ["corner_a"], "lounge": ["corner_a"], "games": ["corner_b"], "library": ["corner_a"], "quiet": ["corner_a"],
+        "observation": ["corner_a"], "bow_obs": ["corner"], "concourse": ["spine", "lift"], "berth_lobby": ["back"], "stair_tower": ["hall", "well"],
+        "lab": ["corner_a"], "workshop": ["corner_a"], "armory": ["corner_b"], "cabins": ["far"]}
+SKIP_BEST = {"observation_d14", "store_dry_d10"}
+
+
 def room_views(key: str, spec: dict, names: list[str] | None) -> dict:
     L, D = spec["L"], spec["D"]
     door_x = spec["doors"][0]["x"] if spec["doors"] else L / 2
@@ -80,8 +88,12 @@ def rooms(args: dict, plan, reg: dict, objs: dict) -> list[str]:
         if name not in objs or item[0] not in ("room",):
             continue
         key = item[1]
+        rv = args["room_views"]
+        best = bool(rv) and rv == ["best"]
+        if best and key in SKIP_BEST:
+            continue
         _remove_instances()
-        done += render_room(key, objs[name], out, args["samples"], args["room_views"])
+        done += render_room(key, objs[name], out, args["samples"], BEST.get(key, ["corner_a"]) if best else rv, plan_view=not best)
     if "SM_SHIP_StairTowerTop" in objs:
         pass
     return done
@@ -144,7 +156,7 @@ def deck_lights(plan: dict, deck: int, center: tuple, radius: float, gain: float
 
 def _find(plan: dict, pred, key=None):
     items = [c for c in plan["compartments"] if pred(c)]
-    return sorted(items, key=key)[0] if items else None
+    return sorted(items, key=key or (lambda c: c["id"]))[0] if items else None
 
 
 def d4_views(plan: dict) -> dict:

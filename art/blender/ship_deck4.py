@@ -52,8 +52,13 @@ def build(B: Builder) -> Deck:
     D.lane("SPF", -1, 80.0, [("hold",), ("link", "PP"), ("heads",), ("laundry",), ("store_cold",), ("hydro",), ("gap", 12), ("link", "PP"), ("library",),
                              ("quiet",), ("heads",), ("gap", 8), T(-92.0), ("gap", 12)], "I_p spine fwd")
     # ---- the side passages' outer rooms (16 m deep)
-    D.lane("SBP", +1, 12.0, [("observation",), ("gap", 92), ("observation_d14",), ("hold",), ("gap", 8), ("hold",), ("gap", 64)], "O_s")
-    D.lane("PP", -1, 12.0, [("observation",), ("gap", 92), ("store_dry_d10",), ("galley",), ("gap", 8), ("store_cold",), ("hold",)], "O_p")
+    # the outer lanes go on aft as far as the hull's width allows (x -484): sections D (-248 .. -320), E (-320 .. -384), F (-384 .. -440), G (-440 .. -484)
+    D.lane("SBP", +1, 12.0, [("observation",), ("gap", 92), ("observation_d14",), ("hold",), ("gap", 8), ("hold",), ("gap", 64),
+                             ("lounge",), ("games",), ("library",), ("gap", 8), ("hydro",), ("laundry",), ("heads",), ("quiet",), ("gap", 4),
+                             ("store_dry",), ("hold",), ("gap", 8), ("laundry",), ("heads",), ("quiet",), ("gap", 8)], "O_s")
+    D.lane("PP", -1, 12.0, [("observation",), ("gap", 92), ("store_dry_d10",), ("galley",), ("gap", 8), ("store_cold",), ("hold",), ("gap", 40),
+                            ("games",), ("lounge",), ("library",), ("gap", 8), ("hydro",), ("store_cold",), ("heads",), ("gap", 4),
+                            ("hold",), ("store_dry",), ("gap", 8), ("laundry",), ("heads",), ("quiet",), ("gap", 8)], "O_p")
     # ---- the galley pass along the Mess kitchen (inner lane of the port passage, four metres deep)
     D.lane("PP", +1, -124.0, [("galley_pass",)], "I_p galley")
     # ---- aft of the Berthing: the mid spine, x -204 -> -328
