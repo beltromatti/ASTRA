@@ -80,7 +80,14 @@ VOICES = list(GENDER)
 
 # macOS's own voices, for the languages Pocket TTS does not speak (a Captain who speaks Japanese, Russian or Arabic to his crew
 # is answered in it, in a plainer voice, instead of by the English model reading foreign text): (woman, man) in order of preference
-SYSTEM_VOICES = {"ja": (("Kyoko", "O-Ren"), ("Otoya", "Hattori")), "zh": (("Tingting", "Meijia", "Sinji"), ("Sinji", "Tingting")),
+SYSTEM_VOICES = {"it": (("Alice", "Federica"), ("Eddy (Italian (Italy))", "Reed (Italian (Italy))")),
+                 "en": (("Samantha", "Karen"), ("Daniel", "Eddy (English (US))")),
+                 "es": (("Mónica", "Paulina"), ("Eddy (Spanish (Spain))", "Jorge")),
+                 "fr": (("Amélie", "Eddy (French (France))"), ("Thomas", "Jacques")),
+                 "de": (("Anna", "Eddy (German (Germany))"), ("Eddy (German (Germany))", "Reed (German (Germany))")),
+                 "pt": (("Luciana", "Joana"), ("Eddy (Portuguese (Brazil))", "Reed (Portuguese (Brazil))")),
+                 "nl": (("Ellen", "Claire"), ("Xander", "Ellen")),
+                 "ja": (("Kyoko", "O-Ren"), ("Otoya", "Hattori")), "zh": (("Tingting", "Meijia", "Sinji"), ("Sinji", "Tingting")),
                  "ko": (("Yuna",), ("Yuna",)), "ru": (("Milena",), ("Yuri", "Milena")), "pl": (("Zosia", "Ewa"), ("Krzysztof", "Zosia")),
                  "ar": (("Majed", "Laila"), ("Majed", "Tarik")), "hi": (("Lekha",), ("Rishi", "Lekha")), "tr": (("Yelda",), ("Cem", "Yelda")),
                  "sv": (("Alva",), ("Oskar", "Alva")), "da": (("Sara",), ("Magnus", "Sara")), "fi": (("Satu",), ("Satu",)),
@@ -245,6 +252,7 @@ class TTSEngine:
         # (language, voice) -> the voice that speaks instead where the first is hard to understand (voice_casting.py)
         self.overrides: dict[tuple[str, str], str] = {tuple(k.split("/", 1)): v for k, v in self._read_gains(_OVERRIDES_FILE).items()}
         self.system = SystemVoices()
+        self._cached: set[str] = set()                                       # languages whose model was found in the local cache
 
     # ------------------------------------------------------------------------------------------ facts
     def supported(self, lang: str) -> bool:
@@ -253,10 +261,24 @@ class TTSEngine:
 
     def can_speak(self, lang: str) -> bool:
         """Some voice speaks it: Pocket TTS, or (macOS) one of the system's."""
-        return lang in MODEL_FOR_LANG or self.system.pick(lang) is not None
+        return self.available(lang) or lang in MODEL_FOR_LANG or self.system.pick(lang) is not None
 
     def loaded(self, lang: str) -> bool:
         return MODEL_FOR_LANG.get(lang, "english") in self._models
+
+    def available(self, lang: str) -> bool:
+        """Pocket TTS can speak it now: its model is in memory or in the local cache. A language it supports whose model is still to
+        be downloaded (a first start; the download runs in the background) is not: a line would wait minutes for it, so a system
+        voice speaks meanwhile (a line said in a plainer voice beats a line never said)."""
+        if lang not in MODEL_FOR_LANG:
+            return False
+        if self.loaded(lang) or lang in self._cached:
+            return True
+        home = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface") / "hub"
+        if any(home.glob(f"models--kyutai--pocket-tts/snapshots/*/languages/{MODEL_FOR_LANG[lang]}/model.safetensors")):
+            self._cached.add(lang)
+            return True
+        return False
 
     @staticmethod
     def _read_gains(path: Path) -> dict[str, dict[str, float]]:
@@ -442,12 +464,13 @@ class TTSEngine:
 
     def stream(self, text: str, voice: str, lang: str, *, speed: float | None = None, tone: str | None = None) -> SpeechStream:
         """Start speaking `text`: an async iterator of PCM16 chunks (call it from the event loop). It runs in a worker
-        thread; `stop()` on the result ends it at once. A language Pocket TTS does not speak goes to a system voice when there
-        is one (macOS), else to the English model."""
+        thread; `stop()` on the result ends it at once. A language Pocket TTS does not speak, or whose model is not on the machine
+        yet, goes to a system voice when there is one (macOS); else a language it does not speak goes to the English model, and one
+        it speaks waits for its model (downloaded on first use)."""
         system_voice = None
-        if not self.supported(lang):
+        if not self.available(lang):
             system_voice = self.system.pick(lang, GENDER.get(voice, "f"))
-            if system_voice is None:
+            if system_voice is None and not self.supported(lang):
                 lang = "en"
                 letters = [c for c in text if c.isalpha()]
                 if letters and sum(1 for c in letters if ord(c) > 0x24F) / len(letters) > 0.3:

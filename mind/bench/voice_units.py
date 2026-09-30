@@ -159,6 +159,23 @@ def speech_text() -> None:
     check("text: a language without a front end is left alone", speakable("今日は217です", "ja") == "今日は217です")
     check("text: words are untouched", speakable("Agli ordini, Capitano.", "it") == "Agli ordini, Capitano.")
 
+    import os
+    import tempfile
+    from astra_mind.tts import TTSEngine
+    with tempfile.TemporaryDirectory() as td:
+        was = os.environ.get("HF_HOME")
+        os.environ["HF_HOME"] = td                                   # a machine with nothing downloaded yet
+        try:
+            eng = TTSEngine()
+            check("tts: a language whose model is not on the machine is not available (a system voice speaks meanwhile, the model is fetched)",
+                  not eng.available("it") and eng.can_speak("it") and eng.supported("it"))
+            check("tts: a language Pocket does not speak is not available either", not eng.available("ja") and not eng.available("xx"))
+        finally:
+            if was is None:
+                os.environ.pop("HF_HOME", None)
+            else:
+                os.environ["HF_HOME"] = was
+
 
 class Fake(SttBackend):
     """A stand-in engine: says what it is told, takes a given time."""
