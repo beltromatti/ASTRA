@@ -1,6 +1,8 @@
 // ASTRA — the adaptive score.
 
 #include "AstraMusicSubsystem.h"
+#include "AstraMindSubsystem.h"
+#include "Engine/GameInstance.h"
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
@@ -126,13 +128,27 @@ void UAstraMusicSubsystem::Tick(float DeltaTime)
 {
 	SCOPE_CYCLE_COUNTER(STAT_AstraMusic);
 	Since += DeltaTime;
-	// the officers must be understood: the music steps back while any of them speaks
-	bool bSpeaking = false;
-	for (TActorIterator<AAstraCrewMember> It(GetWorld()); It && !bSpeaking; ++It)
+	// the voices must be understood: the music steps back while someone has the floor — an officer, a voice on the
+	// radio, the Captain speaking — as the mind says (protocollo_voce §4.4); a mind that does not say: while an officer's
+	// voice sounds. Down in 0.15 s, held half a second after the floor falls quiet (no pumping between two lines), up
+	// in 0.8 s.
+	bool bFloor = false;
+	const UGameInstance* GI = GetWorld()->GetGameInstance();
+	const UAstraMindSubsystem* Mind = GI ? GI->GetSubsystem<UAstraMindSubsystem>() : nullptr;
+	if (Mind && Mind->SaysFloor())
 	{
-		bSpeaking = It->IsSpeaking();
+		bFloor = Mind->IsFloorTaken();
 	}
-	Duck = FMath::FInterpTo(Duck, bSpeaking ? 0.55f : 1.f, DeltaTime, bSpeaking ? 6.f : 1.2f);
+	else
+	{
+		for (TActorIterator<AAstraCrewMember> It(GetWorld()); It && !bFloor; ++It)
+		{
+			bFloor = It->IsSpeaking();
+		}
+	}
+	DuckHold = bFloor ? 0.5f : DuckHold - DeltaTime;
+	const float DuckTo = DuckHold > 0.f ? 0.55f : 1.f;
+	Duck = FMath::FInterpConstantTo(Duck, DuckTo, DeltaTime, (1.f - 0.55f) / (DuckTo < Duck ? 0.15f : 0.8f));
 	if (Current)
 	{
 		Current->SetVolumeMultiplier(GMusicVolume * Duck);

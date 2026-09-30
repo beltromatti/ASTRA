@@ -37,6 +37,7 @@ BLOCK = 320                 # 20 ms
 PREROLL_S = 0.30
 POSTROLL_S = 0.10
 IDLE_CLOSE_S = 300.0
+OPEN_WAIT_S = 2.0           # a key press waits this long at most for the device to open (see PushToTalk.begin)
 PAD_MS = 220.0
 _BLUETOOTH = ("airpods", "bluetooth", "beats", "buds", "wh-1000", "wf-1000", "bose", "jabra", "hands-free", "hfp")
 
@@ -73,10 +74,11 @@ class PushToTalk:
         self._last_press = 0.0
         self._closer: threading.Timer | None = None
         self._first_block = threading.Event()
+        self._opening: asyncio.Future | None = None     # the device being opened in a worker thread
         self._device_name = ""
         self.overflows = 0
         self.last: Recording | None = None
-        self.mode = os.environ.get("ASTRA_MIC", "auto").lower()           # auto | always | ptt
+        self.mode = os.environ.get("ASTRA_MIC", "auto").lower()           # auto | always | ptt | off (no device: silent takes)
 
     # ------------------------------------------------------------------------------------------ device
     @staticmethod
@@ -107,7 +109,7 @@ class PushToTalk:
             return None, ""
 
     def _keep_open(self) -> bool:
-        if self.mode == "ptt":
+        if self.mode in ("ptt", "off"):
             return False
         if self.mode == "always":
             return True
@@ -183,8 +185,49 @@ class PushToTalk:
             self._close()
 
     # ------------------------------------------------------------------------------------------ recording
+    def _open_primed(self) -> bool:
+        """(worker thread) Open the device and let it deliver its first block."""
+        if not self._open():
+            return False
+        self._first_block.wait(timeout=1.0)
+        return True
+
+    def _late_open(self, fut: asyncio.Future) -> None:
+        """An open that outlived its key press finished: a microphone nobody is using follows the usual closing rule."""
+        if self._take is None and not fut.cancelled() and fut.exception() is None and fut.result():
+            self._schedule_close()
+
+    async def begin(self, on_chunk: Callable[[bytes], None] | None = None, wait_s: float = OPEN_WAIT_S) -> bool:
+        """Key down, without ever holding up the event loop: opening the device can block for as long as the system
+        wants (its microphone-permission prompt, a headset switching profile; measured: the whole mind stopped, crew
+        voices included, while PortAudio waited inside CoreAudio), so it is opened in a worker thread and waited for at
+        most `wait_s`. Not open by then: this press records nothing (the open goes on; the next press finds the
+        microphone ready, or fails at once while the system is still deciding)."""
+        if self.mode == "off":
+            # no device at all (tests driving the key, a machine without a microphone): the key takes the floor, and
+            # the take is silent
+            with self._lock:
+                self._take = _Take(chunks=[], on_chunk=None)
+            self._last_press = time.monotonic()
+            return True
+        if self._stream is None:
+            if self._opening is not None and not self._opening.done():
+                log.warning("microphone: the system is still opening it (a permission prompt?): this press is not recorded")
+                return False
+            loop = asyncio.get_running_loop()
+            self._opening = fut = loop.run_in_executor(None, self._open_primed)
+            try:
+                if not await asyncio.wait_for(asyncio.shield(fut), wait_s):
+                    return False
+            except asyncio.TimeoutError:
+                log.warning("microphone: not open after %.1f s (a permission prompt?): this press is not recorded", wait_s)
+                fut.add_done_callback(self._late_open)
+                return False
+        return self.start(on_chunk)                                         # open: start() no longer blocks
+
     def start(self, on_chunk: Callable[[bytes], None] | None = None) -> bool:
-        """Key down. `on_chunk(pcm16)` is called (in the running event loop) with the pre-roll and then every 20 ms block."""
+        """Key down. `on_chunk(pcm16)` is called (in the running event loop) with the pre-roll and then every 20 ms block.
+        Blocks while the device opens: from the event loop use `begin`."""
         if self._closer is not None:
             self._closer.cancel()
         t0 = time.perf_counter()

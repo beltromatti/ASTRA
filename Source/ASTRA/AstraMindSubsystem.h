@@ -46,13 +46,38 @@ private:
 	TArray<TSharedRef<FJsonObject>> PendingEvents;   // reports raised before the mind was reachable
 	int32 ConnectFailures = 0;
 	TArray<uint8> BinaryBuffer;
-	TMap<int32, FString> LineSpeakers;
 	FString ExternalSpeaker, ExternalLine;
 	int32 ExternalLineId = -1;
+	/** The radio: every voice that is not an officer heard in person (the enemy, the Admiral, a controller, an officer
+	 *  far away or behind a wall), 2D and band-limited like a comms channel. */
 	UPROPERTY() TObjectPtr<class UAudioComponent> ChannelAudio;
-	UPROPERTY() TObjectPtr<class USoundWaveProcedural> ChannelWave;
-	int32 ChannelLine = -1;
-	void BeginChannelLine(int32 LineId, int32 Rate);
+	UPROPERTY() TObjectPtr<class UAstraVoiceWave> ChannelWave;
+	class UAstraVoiceWave* BeginChannelLine(int32 LineId, int32 Rate);
+
+	/** A line being heard (voice protocol 2, docs/protocollo_voce.md): where its audio goes and how much of it has been
+	 *  played, so the game can tell the mind that a voice started, stalled, failed or finished. */
+	struct FVoiceLine
+	{
+		TWeakObjectPtr<class UAstraVoiceWave> Wave;
+		TWeakObjectPtr<class UAudioComponent> Comp;
+		TWeakObjectPtr<class AAstraCrewMember> Crew;   // at the officer's place; unset: the radio
+		int64 From = 0;           // the wave's bytes queued before this line
+		int64 Bytes = 0;          // this line's bytes queued
+		double FirstBytesAt = -1.0;
+		double EmptySince = -1.0;
+		bool bStarted = false;
+		bool bEnded = false;      // audio_end came: all of it is queued
+		bool bStallSaid = false;
+	};
+	TMap<int32, FVoiceLine> Voices;
+	TMap<FString, bool> OnRadio;   // officer -> heard over the intercom (decided a line at a time, with hysteresis)
+	int32 VoiceProtocol = 1;       // the mind's (status.voice)
+	FString FloorState = TEXT("idle");   // who has the floor: idle | crew | captain (the mind's floor message)
+	bool bVoicesPaused = false;
+	void TickVoices();
+	void CancelVoice(int32 LineId, float FadeSeconds);
+	void SendVoiceStatus(int32 LineId, const TCHAR* State, const FString& Detail);
+	bool HeardOnRadio(const class AAstraCrewMember* Crew);
 	FDelegateHandle ShipEventHandle;
 	TWeakObjectPtr<UWorld> BoundWorld;
 
@@ -76,6 +101,10 @@ public:
 	const FString& GetExternalSpeaker() const { return ExternalSpeaker; }
 	/** What they are saying (the line in flight). */
 	const FString& GetExternalLine() const { return ExternalLine; }
+	/** Someone has the floor (an officer or a voice on the radio speaks, or the Captain is speaking): the music steps
+	 *  back. False from a mind that does not say (voice protocol 1): then the officers' own voices tell. */
+	bool IsFloorTaken() const { return FloorState != TEXT("idle"); }
+	bool SaysFloor() const { return VoiceProtocol >= 2 && IsConnected(); }
 
 private:
 	TArray<TPair<FString, FString>> HeardLines;

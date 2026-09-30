@@ -25,7 +25,7 @@ public class ASTRA : ModuleRules
 			"ProceduralMeshComponent"   // the ground of any world, generated at run time (AAstraWorldSurface)
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "RenderCore", "RHI", "ApplicationCore", "HTTPServer" });   // font measuring and render fences for the live screens; is the app in front (full screen on the Mac); the playtest harness (AstraHarness)
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "RenderCore", "RHI", "ApplicationCore", "HTTPServer", "AudioExtensions" });   // font measuring and render fences for the live screens; is the app in front (full screen on the Mac); the playtest harness (AstraHarness); the voices' own procedural wave (AstraVoiceWave)
 
 		PublicIncludePaths.AddRange(new string[] {
 			"ASTRA",

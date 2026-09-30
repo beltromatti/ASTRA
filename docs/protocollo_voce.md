@@ -27,6 +27,15 @@ L'unica correzione **indispensabile** al gioco è la 1 (senza, le voci esterne r
 6. Musica abbassata dal messaggio `floor`, non da `IsSpeaking()` (4.4).
 7. (Facoltativo) abbassare l'audio del gioco mentre il tasto della voce è premuto (3.3).
 
+**Fatto nel gioco (30/9, lead): 1–6**, provati dal vivo in una battaglia intera (voci a bordo e via radio `started` in 20–70 ms e `finished` a fine ascolto, il comandante della Lethe e l'equipaggio dalla scialuppa via radio, il tasto che ferma la riga in corso). Come:
+- `UAstraVoiceWave` (`Source/ASTRA/AstraVoiceWave.*`): la wave procedurale di una voce, che conta i byte messi in coda; `UAstraMindSubsystem` tiene per ogni riga in ascolto la wave, il punto in cui comincia e quanti byte ha ricevuto, e da lì manda `started` (i primi byte suonati), `stalled` (coda vuota per più di 250 ms prima di `audio_end`, una volta per riga), `failed` (nessuna componente, `Play()` non parte, o due secondi di audio arrivato senza che nulla suoni) e `finished` (coda svuotata dopo `audio_end`; poi la componente si ferma, così una voce finita non tiene occupato un canale audio del motore).
+- Una riga che comincia mentre la precedente dello stesso ufficiale (o della radio) suona ancora si accoda sulla stessa wave: nessun `SetSound` su una voce che suona.
+- Vicino o radio: per ufficiale, con isteresi 22/28 m, e radio anche quando un muro o una porta chiusa sta tra lui e il Capitano (lo stesso controllo del contesto `in_earshot`).
+- Sottotitoli: `max(hold_s, audio_end + 1 s)`, finché la voce continua restano; `cancel` li sfuma in 0,35 s.
+- Musica: abbassata a 0,55 quando `floor` non è `idle` (attacco 0,15 s, tenuta 0,5 s, rilascio 0,8 s); con una mente di protocollo 1, dalle voci degli ufficiali come prima.
+
+**Trovato nella prova dal vivo (corretto nella mente)**: `PushToTalk.start()` apriva il microfono dentro il ciclo degli eventi; quando macOS non risponde (la richiesta del permesso del microfono in attesa) PortAudio resta fermo dentro CoreAudio e con lui **tutta la mente** (niente più voci né risposte, per minuti). Ora `PushToTalk.begin()` lo apre in un thread e aspetta al massimo 2 s (`OPEN_WAIT_S`): altrimenti quel tasto non registra, la mente continua, e il tasto successivo trova il microfono pronto. `ASTRA_MIC=off` fa premere il tasto senza aprire alcun dispositivo (per le prove).
+
 ## 1. Cosa cambia per il gioco così com'è (senza toccare il C++)
 
 - `line` arriva **quando la voce parte** (prima arrivava all'accodamento): il gioco non lo mostra da nessuna parte (lo conserva e mostra il sottotitolo a `audio_begin`), quindi non c'è più un sottotitolo per una riga che poi viene scartata.
@@ -205,7 +214,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 | `ASTRA_SHERPA_MODEL` | `<modelli>/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` | modello del Parakeet su CPU (`python -m astra_mind.stt --fetch-portable`) |
 | `ASTRA_FW_MODEL` | `small` | modello di faster-whisper |
 | `ASTRA_VOICE_MODELS` | `<home>/voice/models` | dove cercare i modelli di Whisper/Parakeet |
-| `ASTRA_MIC` | `auto` | `always` (microfono sempre aperto), `ptt` (aperto solo a tasto premuto), `auto` |
+| `ASTRA_MIC` | `auto` | `always` (microfono sempre aperto), `ptt` (aperto solo a tasto premuto), `off` (nessun dispositivo: il tasto prende la parola e registra silenzio; per le prove), `auto` |
 | `ASTRA_VOICE_QOS` | 1 | priorità dei thread della voce (macOS) |
 
 ## 7. Come si prova (dalla cartella `mind/`)

@@ -53,12 +53,21 @@ public:
 	UPROPERTY(EditAnywhere, Category = "ASTRA")
 	float ReclineDeg = 20.f;
 
-	/** Starts a new spoken line; PCM16 mono chunks follow through QueueVoice. */
-	void BeginLine(int32 LineId, int32 SampleRate);
-	void QueueVoice(int32 LineId, const uint8* Pcm, int32 NumBytes);
-	void EndLine(int32 LineId);
+	/** A spoken line begins at this officer's place: the wave it plays on (the mind's link queues its PCM16 mono), null
+	 *  if the voice cannot play. A line that begins while the last one still sounds (the game fell behind the mind's
+	 *  clock) follows it on the same wave instead of cutting it short (docs/protocollo_voce.md §3.2). */
+	class UAstraVoiceWave* BeginLine(int32 LineId, int32 SampleRate);
+	/** Some of the line's audio arrived: its loudness moves the officer. */
+	void HearVoice(const uint8* Pcm, int32 NumBytes);
+	/** The mind stopped the line (the Captain spoke, an answer comes first): the voice fades out over FadeSeconds. */
+	void CancelLine(float FadeSeconds);
+	UAudioComponent* GetVoice() const { return Voice; }
 
 	bool IsSpeaking() const;
+
+	/** Whether a voice carries between them and a listener's ear: near, or a line just over their head reaches it (a
+	 *  wall, a bulkhead or a closed door stops a voice; consoles and chairs do not). */
+	bool CanBeHeardFrom(const FVector& Eye, const AActor* Listener) const;
 
 	static AAstraCrewMember* FindByStation(UWorld* World, const FString& Station);
 
@@ -104,7 +113,7 @@ protected:
 
 private:
 	UPROPERTY()
-	TObjectPtr<USoundWaveProcedural> CurrentWave;
+	TObjectPtr<class UAstraVoiceWave> CurrentWave;
 
 	int32 CurrentLine = -1;
 	float SpeakingLevel = 0.f;

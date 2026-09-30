@@ -947,7 +947,7 @@ class Mind:
                         self._captain_speaks()                 # (and the crew's model calls with them: agent.preempt)
                         self._ptt_ctx = msg.get("context") or self._ptt_ctx
                         self._ptt_session = self.stt.session()
-                        if not self.mic.start(self._ptt_session.feed):
+                        if not await self.mic.begin(self._ptt_session.feed):
                             self.voice.captain_end(False)
                             await ws.send(json.dumps({"type": "status", "mic": "unavailable"}))
                     else:

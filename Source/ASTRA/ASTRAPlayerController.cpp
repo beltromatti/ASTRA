@@ -706,7 +706,7 @@ void AASTRAPlayerController::EnsureSubtitles()
 	VC->AddViewportWidgetContent(SubWidget.ToSharedRef(), 45);
 }
 
-void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text)
+void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text, float HoldSeconds, bool bVoiced)
 {
 	FAstraTimeline::Record(TEXT("line"), FString::Printf(TEXT("%s: %s"), *Name, *Text));
 	EnsureSubtitles();
@@ -725,6 +725,9 @@ void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FS
 	L.Name = (Words.Num() ? Words.Last() : Short).ToUpper();
 	L.Text = Text;
 	L.Color = SpeakerColor(Speaker);
+	// the time to read it: 17 characters a second after a 1.4 s start, 12 s at most (protocollo_voce §3.1)
+	L.Hold = HoldSeconds > 0.f ? HoldSeconds : FMath::Min(12.f, FMath::Max(bVoiced ? 2.f : 4.f, 1.4f + Text.Len() / 17.f));
+	L.bVoiced = bVoiced;
 	SubLines.Add(L);
 	while (SubLines.Num() > 3)
 	{
@@ -743,6 +746,31 @@ void AASTRAPlayerController::SubtitleEnd(int32 Id)
 	}
 }
 
+void AASTRAPlayerController::SubtitleCancel(int32 Id)
+{
+	for (FSubLine& L : SubLines)
+	{
+		if (L.Id == Id && L.CutAge < 0.f)
+		{
+			L.CutAge = L.Age;
+		}
+	}
+}
+
+float AASTRAPlayerController::SubtitleGone(const FSubLine& L)
+{
+	// said: its reading time, or a second after its voice, whichever is later; still being said: it stays (at most half
+	// a minute past its reading time: a voice that never ends); a notice: its reading time; stopped: it fades at once
+	float Gone = L.EndAge >= 0.f ? FMath::Max(L.Hold, L.EndAge + 1.f)
+	           : L.bVoiced     ? FMath::Max(L.Hold, FMath::Min(L.Age + 1.f, L.Hold + 30.f))
+	                           : L.Hold;
+	if (L.CutAge >= 0.f)
+	{
+		Gone = FMath::Min(Gone, L.CutAge + 0.35f);
+	}
+	return Gone;
+}
+
 void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 {
 	if (!SubWidget.IsValid())
@@ -753,9 +781,7 @@ void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 	{
 		FSubLine& L = SubLines[i];
 		L.Age += DeltaTime;
-		// said: it stays two seconds and fades; never said (no audio came): it goes after its reading time
-		const float Gone = L.EndAge >= 0.f ? L.EndAge + 2.5f : 4.f + L.Text.Len() * 0.07f;
-		if (L.Age > Gone)
+		if (L.Age > SubtitleGone(L))
 		{
 			SubLines.RemoveAt(i);
 		}
@@ -769,8 +795,7 @@ void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 			continue;
 		}
 		const FSubLine& L = SubLines[i];
-		const float Gone = L.EndAge >= 0.f ? L.EndAge + 2.5f : 4.f + L.Text.Len() * 0.07f;
-		const float A = FMath::Clamp(FMath::Min(L.Age / 0.25f, (Gone - L.Age) / 0.8f), 0.f, 1.f);
+		const float A = FMath::Clamp(FMath::Min(L.Age / 0.2f, (SubtitleGone(L) - L.Age) / 0.35f), 0.f, 1.f);
 		SubRows[i]->SetBorderBackgroundColor(FLinearColor(0.f, 0.005f, 0.01f, 0.62f * A));
 		SubNames[i]->SetText(FText::FromString(L.Name));
 		SubNames[i]->SetColorAndOpacity(FLinearColor(L.Color.R, L.Color.G, L.Color.B, A));
