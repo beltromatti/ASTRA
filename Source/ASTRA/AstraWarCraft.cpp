@@ -21,7 +21,7 @@
 
 namespace
 {
-	const double WarKm = 1000.0;
+	using AstraWar::WarKm;
 	const float TorpedoRelease = 4000.f;
 	const float RocketRelease = 4500.f;
 

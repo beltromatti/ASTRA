@@ -22,7 +22,7 @@
 
 namespace
 {
-	const double WarKm = 1000.0;
+	using AstraWar::WarKm;
 
 	float TargetValue(const FAstraBattleShip& E)
 	{
@@ -186,10 +186,13 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	// each behaviour can be switched off (or scaled) for one side alone, for the bench's A/B of what it is worth:
 	// astra.war.tune flank_a 0 (ASTRA) / flank_m 0 (Mandate)
 	static AstraWar::FTuneVar KRetreat[2] = {AstraWar::FTuneVar(TEXT("retreat_ratio_a"), 0.38f), AstraWar::FTuneVar(TEXT("retreat_ratio_m"), 0.38f)};
-	static AstraWar::FTuneVar KFlank[2] = {AstraWar::FTuneVar(TEXT("flank_a"), 1.f), AstraWar::FTuneVar(TEXT("flank_m"), 1.f)};
+	static AstraWar::FTuneVar KFlank[2] = {AstraWar::FTuneVar(TEXT("flank_a"), 0.f), AstraWar::FTuneVar(TEXT("flank_m"), 0.f)};
 	static AstraWar::FTuneVar KSalvo[2] = {AstraWar::FTuneVar(TEXT("saturate_a"), 1.f), AstraWar::FTuneVar(TEXT("saturate_m"), 1.f)};
 	static AstraWar::FTuneVar KRotate[2] = {AstraWar::FTuneVar(TEXT("rotate_a"), 1.f), AstraWar::FTuneVar(TEXT("rotate_m"), 1.f)};
-	static AstraWar::FTuneVar KFocus[2] = {AstraWar::FTuneVar(TEXT("focus_a"), 1.f), AstraWar::FTuneVar(TEXT("focus_m"), 1.f)};
+	// focus_a / focus_m: 0 no concentration of fire (each ship the nearest it can hit), 1 the first scored rule (class value and how battered),
+	// 2 the threat removed per unit of effort to kill (the default)
+	static AstraWar::FTuneVar KFocus[2] = {AstraWar::FTuneVar(TEXT("focus_a"), 3.f), AstraWar::FTuneVar(TEXT("focus_m"), 3.f)};
+	static AstraWar::FTuneVar KFlankRatio(TEXT("flank_ratio"), 0.9f);      // the strength ratio (ours over theirs) from which the group flanks by itself
 	static AstraWar::FTuneVar KRange[2] = {AstraWar::FTuneVar(TEXT("range_ai_a"), 1.f), AstraWar::FTuneVar(TEXT("range_ai_m"), 1.f)};
 	// --- who is in it and where
 	TArray<FAstraBattleShip*, TInlineAllocator<12>> M;
@@ -205,8 +208,8 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	{
 		return;
 	}
-	FVector C = FVector::ZeroVector, V = FVector::ZeroVector;
-	float Str = 0.f, W = 0.f, MinCruise = 1e9f;
+	FVector C = FVector::ZeroVector, V = FVector::ZeroVector, CF = FVector::ZeroVector;
+	float Str = 0.f, W = 0.f, WF = 0.f, MinCruise = 1e9f;
 	int32 Fleeing = 0;
 	for (FAstraBattleShip* S : M)
 	{
@@ -214,12 +217,18 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		C += S->Pos * Wt;
 		V += S->Vel * Wt;
 		W += Wt;
+		if (!S->bTaskSet || S->Task == EAstraTask::Formation)
+		{
+			CF += S->Pos * Wt;                                          // the line's own centre: a flanker or a ship in reserve must not turn the axis
+			WF += Wt;
+		}
 		Str += S->CombatValue * Readiness(*S);
 		MinCruise = FMath::Min(MinCruise, S->CruiseSpeed);
 		Fleeing += S->bFleeing ? 1 : 0;
 	}
 	C /= W;
 	V /= W;
+	CF = WF > 0.f ? CF / WF : C;
 	G.Centroid = C;
 	G.Vel = V;
 	if (const FAstraBattleShip* Pt = FindById(G.ProtecteeId); Pt && Pt->bAlive && FVector::Dist(Pt->Pos, C) < 20.0 * WarKm)
@@ -335,7 +344,8 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		G.RegroupSince = Time;
 	}
 	// --- the axis: towards the enemy (its nearest), the protectee's threat axis, or the objective
-	FVector Ref = C + G.Axis * 10000.0;
+	const FVector AxisFrom = (G.bGuideSet && G.State == EAstraGroupState::Engage) ? G.Guide : CF;                  // the axis is measured from the guide, not from the ships: with a flanker or a casualty away the ships' centre sits to one side and the group would wheel round the enemy for ever
+	FVector Ref = AxisFrom + G.Axis * 10000.0;
 	if (bEnemy)
 	{
 		double Nearest = 1e18;
@@ -356,12 +366,17 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	{
 		Ref = G.Objective;
 	}
-	FVector NewAxis = (Ref - C).GetSafeNormal();
+	FVector NewAxis = (Ref - AxisFrom).GetSafeNormal();
 	if (!NewAxis.IsNearlyZero())
 	{
 		G.Axis = (G.Axis * 0.5 + NewAxis * 0.5).GetSafeNormal();
 	}
 	// --- withdraw / regroup
+	if (G.State != EAstraGroupState::Engage)
+	{
+		G.bGuideSet = false;                                            // (a fresh guide when the fight resumes)
+		G.GuideV = FVector::ZeroVector;
+	}
 	if (G.State == EAstraGroupState::Withdraw)
 	{
 		const FAstraBattleShip* Prot = FindById(G.ProtecteeId);
@@ -474,7 +489,22 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	{
 		Focus = OrderedTarget;
 	}
-	else if (bEnemy && (KFocus[Me].Get() > 0.5f))
+	else if (bEnemy && !(KFocus[Me].Get() > 0.5f))
+	{
+		// no concentration of fire (the bench's baseline): the guide leads on the nearest enemy, each ship fights the nearest it can hit
+		double Nearest = 1e18;
+		FAstraBattleShip* Near = nullptr;
+		for (const FEnemy& X : E)
+		{
+			if (X.S->Side != EAstraSide::Neutral && !X.S->bHoldFire && !(X.S->bFleeing && X.S->bNegotiated) && FVector::Dist(X.Pos, AxisFrom) < Nearest)
+			{
+				Nearest = FVector::Dist(X.Pos, AxisFrom);
+				Near = X.S;
+			}
+		}
+		Focus = Near ? Near : Focus;
+	}
+	else if (bEnemy)
 	{
 		FAstraBattleShip* Best = nullptr;
 		float BestScore = -1.f;
@@ -504,6 +534,27 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			const double Over = FMath::Max(0.0, X.D - (double)G.EngageRange * 1.4);
 			const float ReachF = (float)FMath::Clamp(1.3 - 0.6 * Over / 15000.0, 0.45, 1.0);
 			float Score = TargetValue(O) * (0.5f + Vuln) * ReachF;
+			if (KFocus[Me].Get() > 1.5f)
+			{
+				const bool bStrict = KFocus[Me].Get() > 2.5f;                          // mode 3: what our guns reach right now, no allowance for closing
+				// the threat taken off the field per unit of effort: what it can do to us, times what our guns can do to it, over what it
+				// takes to break it (hull and the shield on the face it shows us). A tanky cruiser is not worth more than the destroyer
+				// beside it that dies four times as fast and is half as dangerous.
+				double Mine = 0.0;
+				for (const FAstraBattleShip* S : M)
+				{
+					Mine += ShipDps(*S, FMath::Max(0.0, FVector::Dist(S->Pos, X.Pos) - (bStrict ? 0.0 : 700.0)));
+				}
+				const double Threat = ShipDps(O, X.D);
+				double Shield = O.Shield;
+				if (O.Dmg.bModel && O.Dmg.Pool > 0.f)
+				{
+					const int32 Face = AstraFacingOf(O.Att.UnrotateVector((C - X.Pos).GetSafeNormal()));
+					Shield = O.Dmg.Sector[Face];
+				}
+				const double Weight = O.bPlayer ? 1.9 : (O.ClassKey == FName(TEXT("aquila")) ? 1.7 : (O.ClassKey == FName(TEXT("freighter")) ? 0.15 : 1.0));
+				Score = (float)(Weight * (Threat + 3.0) * (Mine + 3.0) / (O.Hull + Shield + 300.0) * 1000.0);
+			}
 			if (Focus && O.Id == Focus->Id)
 			{
 				Score *= 1.4f;                                          // the stickiness: no dithering between two
@@ -529,10 +580,11 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		Focus = Best ? Best : Focus;
 	}
 	G.FocusTarget = Focus ? Focus->Id : -1;
+	G.bConcentrate = KFocus[Me].Get() > 0.5f || OrderedTarget != nullptr;   // (the ships follow the group's target only when it is concentrating fire)
 	const FVector FocusPos = Focus ? KnownPos(Me, *Focus) : Ref;
 	if (Focus)
 	{
-		const FVector A = (FocusPos - C).GetSafeNormal();
+		const FVector A = (FocusPos - AxisFrom).GetSafeNormal();
 		if (!A.IsNearlyZero())
 		{
 			G.Axis = (G.Axis * 0.4 + A * 0.6).GetSafeNormal();
@@ -595,7 +647,13 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	}
 	// --- the guide: it leads the group to the range and holds there
 	const float GuideSpeed = MinCruise * 0.92f;
-	FVector GuideTarget = C;
+	if (!G.bGuideSet)
+	{
+		G.Guide = CF;
+		G.GuideV = V;                                                   // (the group's own velocity: no jerk when a group is formed or resumes)
+		G.bGuideSet = true;
+	}
+	FVector GuideTarget = G.Guide;                                      // nothing to go to: it holds where it is
 	if (Focus)
 	{
 		GuideTarget = FocusPos - G.Axis * (double)G.EngageRange;
@@ -619,11 +677,6 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			GuideTarget = Ally->Centroid - G.Axis * 2500.0;
 		}
 	}
-	if (!G.bGuideSet)
-	{
-		G.Guide = C;
-		G.bGuideSet = true;
-	}
 	if (G.Order == EAstraGroupOrder::Hold)
 	{
 		GuideTarget = G.Guide;
@@ -633,28 +686,47 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		G.Formation = EAstraFormation::Screen;
 	}
 	// a ship far behind its slot slows the guide (the group keeps together)
-	double MaxLag = 0.0;
+	double MaxLag = 0.0, MinAccel = 1e9;
 	for (const FAstraBattleShip* S : M)
 	{
+		MinAccel = FMath::Min(MinAccel, (double)S->MaxAccel * EngineFactor(*S));
 		if (S->bTaskSet && S->Task == EAstraTask::Formation)
 		{
 			MaxLag = FMath::Max(MaxLag, FVector::Dist(S->Pos, S->TaskPos));
 		}
 	}
 	const float LagK = MaxLag > 4.0 * WarKm ? 0.45f : 1.f;
+	// the guide moves like a ship of the group: it speeds up and brakes at what the slowest can follow, and starts braking early
+	// enough to stop at its point even with the enemy coming the other way (two groups closing at cruise speed must not pass
+	// through each other: a capital ship needs kilometres to stop)
+	const double Ag = FMath::Max(2.0, 0.55 * MinAccel);
 	const FVector ToGuide = GuideTarget - G.Guide;
-	const double Step = (double)GuideSpeed * LagK * DtT;
-	FVector GuideVel = FVector::ZeroVector;
-	if (ToGuide.Size() > Step)
+	const double GapM = ToGuide.Size();
+	const FVector DirE = GapM > 1.0 ? ToGuide / GapM : FVector::ZeroVector;
+	double VMax = (double)GuideSpeed * LagK;
 	{
-		GuideVel = ToGuide.GetSafeNormal() * GuideSpeed * LagK;
-		G.Guide += GuideVel * DtT;
+		double Room = FMath::Sqrt(2.0 * Ag * GapM);                        // the speed from which it can still stop at the point
+		if (Focus)
+		{
+			const double Toward = FVector::DotProduct(DirE, G.Axis);      // > 0: the guide is going for the enemy
+			if (Toward > 0.0)
+			{
+				Room -= FMath::Max(0.0, FVector::DotProduct(Focus->SeenVel[Me], -G.Axis)) * Toward;   // the enemy's own approach shortens the room
+			}
+		}
+		VMax = FMath::Min(VMax, FMath::Max(0.0, Room));
+	}
+	G.GuideV += (DirE * VMax - G.GuideV).GetClampedToMaxSize(Ag * DtT);
+	if (GapM < 30.0 && G.GuideV.SizeSquared() < 25.0)
+	{
+		G.Guide = GuideTarget;
+		G.GuideV = FVector::ZeroVector;
 	}
 	else
 	{
-		G.Guide = GuideTarget;
-		GuideVel = FVector::ZeroVector;                                 // (no matching of the enemy's velocity: two groups doing it drift off together)
+		G.Guide += G.GuideV * DtT;
 	}
+	const FVector GuideVel = G.GuideV;                                  // (no matching of the enemy's velocity: two groups doing it drift off together)
 	// --- the slots
 	const FVector Right = HorizontalRight(G.Axis);
 	double AvgR = 0.0;
@@ -724,9 +796,29 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		S.TaskVel = GuideVel;
 		S.bTaskSet = true;
 	}
-	// --- flanks: one or two agile, healthy ships swing to the enemy's blind arc
+	// --- flanks: one or two agile, healthy ships swing to the enemy's blind arc, once the main body is at the enemy's range and holds it
+	// (a flank is a swing made while the line has the enemy's eyes, never a run ahead of the group: alone in front, it takes the whole
+	// enemy line's fire)
+	double MainD = 1e9;
+	if (Focus)
+	{
+		double Sum = 0.0;
+		int32 Cnt = 0;
+		for (const FAstraBattleShip* S : M)
+		{
+			if (!S->bTaskSet || S->Task == EAstraTask::Formation)
+			{
+				Sum += FVector::Dist(S->Pos, FocusPos);
+				++Cnt;
+			}
+		}
+		MainD = Cnt > 0 ? Sum / Cnt : 1e9;
+	}
+	const bool bInContact = Focus && MainD < (double)G.EngageRange * (G.ContactSince >= 0.f ? 1.8 : 1.35);   // (hysteresis)
+	G.ContactSince = bInContact ? (G.ContactSince < 0.f ? Time : G.ContactSince) : -1.f;
+	const bool bHeld = G.ContactSince >= 0.f && Time - G.ContactSince > 8.f;
 	const bool bFlankOrder = G.Order == EAstraGroupOrder::FlankLeft || G.Order == EAstraGroupOrder::FlankRight;
-	const bool bAutoFlank = KFlank[Me].Get() > 0.5f && G.Order == EAstraGroupOrder::Auto && N >= 3 && bEnemy && Focus && EStr > 0.5f * Str;
+	const bool bAutoFlank = KFlank[Me].Get() > 0.5f && G.Order == EAstraGroupOrder::Auto && N >= 4 && bEnemy && Focus && bHeld && Str >= KFlankRatio.Get() * EStr;
 	if (Focus && (bFlankOrder || bAutoFlank))
 	{
 		const int32 Want = bFlankOrder ? FMath::Max(1, N / 2) : FMath::Min(2, N / 3);
@@ -792,7 +884,11 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			const FVector Back = -G.Axis;
 			const double Goal2 = FMath::RadiansToDegrees(FMath::Atan2(Back.Y, Back.X)) - G.FlankSide[i] * 105.0;
 			double Delta = FMath::UnwindDegrees(Goal2 - Now2);
-			const double Rr = FMath::Max((double)G.EngageRange * 1.05, 3500.0);
+			double Rr = FMath::Max((double)G.EngageRange * 1.05, 3500.0);
+			if (!bHeld)
+			{
+				Rr = FMath::Max(Rr, MainD);                                              // (an ordered flank before contact goes round at the line's own distance)
+			}
 			// the point it heads for is a few seconds ahead of it on the arc (what it can fly), never a point running away round the circle
 			const double MaxStep = FMath::RadiansToDegrees((double)F->CruiseSpeed * 8.0 / Rr);
 			Delta = FMath::Clamp(Delta, -MaxStep, MaxStep);
@@ -940,6 +1036,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::GroupsJson() const
 	                                      TEXT("regroup"), TEXT("reinforce"), TEXT("hold")};
 	static const TCHAR* const Forms[] = {TEXT("line"), TEXT("wedge"), TEXT("column"), TEXT("screen")};
 	TArray<TSharedPtr<FJsonValue>> Arr;
+	const FVector P0 = Ships.Num() ? Ships[0].Pos : FVector::ZeroVector;      // (the record's frame: the Aquila, like the ships' km)
 	for (const FAstraBattleGroup& G : Groups)
 	{
 		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
@@ -956,6 +1053,20 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::GroupsJson() const
 		J->SetNumberField(TEXT("range_m"), FMath::RoundToDouble(G.EngageRange));
 		J->SetNumberField(TEXT("strength"), FMath::RoundToDouble(G.Strength * 100.0) / 100.0);
 		J->SetNumberField(TEXT("enemy_strength"), FMath::RoundToDouble(G.EnemyStrength * 100.0) / 100.0);
+		{
+			TArray<TSharedPtr<FJsonValue>> Gd;                              // where the guide is (km), and the axis it points along
+			for (int32 k = 0; k < 3; ++k)
+			{
+				Gd.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble((G.Guide - P0)[k] / 10.0) / 100.0));
+			}
+			J->SetArrayField(TEXT("guide_km"), Gd);
+			TArray<TSharedPtr<FJsonValue>> Ax;
+			for (int32 k = 0; k < 3; ++k)
+			{
+				Ax.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(G.Axis[k] * 100.0) / 100.0));
+			}
+			J->SetArrayField(TEXT("axis"), Ax);
+		}
 		Arr.Add(MakeShared<FJsonValueObject>(J));
 	}
 	R->SetArrayField(TEXT("groups"), Arr);

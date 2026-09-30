@@ -1,0 +1,8 @@
+{
+  "_doc": "Symmetric: two cruisers and four destroyers a side in one wedge, facing across 30 km; the Mandate side is the ASTRA side turned half a circle about the origin. The group is big enough for flanks, rotation and target allocation to matter.",
+  "mirror": true,
+  "astra": [
+    {"name": "Vanguard", "formation": "wedge", "at_km": [-15, 0, 0], "heading": 0, "spacing_km": 1.6,
+     "ships": [{"class": "acheron", "n": 2}, {"class": "styx", "n": 4}]}
+  ]
+}

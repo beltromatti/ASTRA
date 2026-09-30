@@ -14,7 +14,7 @@
 
 namespace
 {
-	const double WarKm = 1000.0;
+	using AstraWar::WarKm;
 }
 
 // ---------------------------------------------------------------------------------------------- what a ship can do
@@ -104,7 +104,7 @@ FAstraBattleShip* UAstraBattleSubsystem::ChooseTarget(FAstraBattleShip& S, FAstr
 	// what its guns reach (the group's focus is followed only when the ship can shoot at it: a ship out of reach of the focus
 	// fights the nearest it can hit, and the group's guide brings the rest in)
 	const double Reach = (S.RailDamage > 0.f ? (double)S.RailRange : (double)S.LaserRange) * 1.08 + S.Radius;
-	if (G && G->FocusTarget >= 0)
+	if (G && G->FocusTarget >= 0 && G->bConcentrate)
 	{
 		FAstraBattleShip* F = FindById(G->FocusTarget);
 		if (F && CanEngage(S, *F) && FVector::Dist(S.Pos, KnownPos(Me, *F)) < Reach + F->Radius)

@@ -267,7 +267,11 @@ def cmd_sweep(a: argparse.Namespace) -> None:
     """What each behaviour is worth: the same symmetric scenario with the behaviour switched off for the ASTRA side alone
     (astra.war.tune <feature>_a 0), against the control where both sides have it."""
     seeds = list(range(1, a.seeds + 1))
-    variants = [("control", "")] + [(f"{f} off for ASTRA", f"astra.war.tune {f}_a 0") for f in a.features.split(",")]
+    variants = [("control", "")]
+    for f in a.features.split(","):
+        # "flank" switches the behaviour off for ASTRA; "flank=1" sets it to a value (for the ones that are off by default, or a mode)
+        n, _, v = f.partition("=")
+        variants.append((f"{n} {'off' if not v else '=' + v} for ASTRA", f"astra.war.tune {n}_a {v or 0}"))
     for name, ex in variants:
         tag = "sw_" + name.split()[0]
         t0 = time.time()
@@ -470,7 +474,8 @@ def cmd_groups(a: argparse.Namespace) -> None:
         for g in f.get("groups", []):
             foc = names.get(g["focus"], "-") if g["focus"] >= 0 else "-"
             print(f"   {g['side'][:3]} {g['name'][:24]:24} {g['state']:8} {g['order']:8} {g['formation']:6} {g['ships']} ships  focus {foc:8}"
-                  f" range {g['range_m'] / 1000:4.1f} km  str {g['strength']:.2f} vs {g['enemy_strength']:.2f}  morale {g.get('morale', 0):.2f}")
+                  f" range {g['range_m'] / 1000:4.1f} km  str {g['strength']:.2f} vs {g['enemy_strength']:.2f}  morale {g.get('morale', 0):.2f}"
+                  + (f"  guide ({g['guide_km'][0]:6.1f},{g['guide_km'][1]:6.1f}) axis ({g['axis'][0]:5.2f},{g['axis'][1]:5.2f})" if "guide_km" in g else ""))
         for s in f["ships"]:
             if not s["craft"] and s["alive"] and s["side"] in ("astra", "mandate"):
                 sh = " ".join(f"{v:3.0f}" for v in s.get("shields", []))

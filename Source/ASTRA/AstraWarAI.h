@@ -74,11 +74,13 @@ struct FAstraBattleGroup
 	FVector Vel = FVector::ZeroVector;
 	FVector Axis = FVector::ForwardVector;    // to the enemy
 	FVector Guide = FVector::ZeroVector;      // the formation guide: a point that moves ahead of the group
+	FVector GuideV = FVector::ZeroVector;     // its velocity (it accelerates and brakes as gently as the slowest ship can follow)
 	bool bGuideSet = false;
 	FVector Objective = FVector::ZeroVector;  // where it goes when it sees nothing
 	bool bHasObjective = false;
 	int32 EnemyGroup = -1;           // the enemy group it is assigned to (fleet level)
 	int32 FocusTarget = -1;          // the ship id under concentrated fire
+	bool bConcentrate = true;        // the ships follow it (false: the bench's "no focus fire" baseline)
 	float FocusSince = 0.f;
 	float EngageRange = 5500.f;      // m: the range its armament likes against this enemy
 	// strength and spirit
@@ -95,6 +97,7 @@ struct FAstraBattleGroup
 	int32 FlankShip[2] = {-1, -1};
 	int8 FlankSide[2] = {0, 0};
 	float FlankAssignedAt = -100.f;
+	float ContactSince = -1.f;       // the main body has been at the enemy's range since (-1: not yet)
 	float NextThink = 0.f;
 };
 

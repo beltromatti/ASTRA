@@ -11,6 +11,7 @@
 namespace AstraWar
 {
 	const double OneKm = 1000.0;
+	const double WarKm = OneKm;                 // (the war files' own short name, brought in with a using-declaration: no clash in a unity build)
 
 	// the six faces of a hull (shield sectors and armour plates) — the same order as AstraFacingOf()
 	constexpr int32 NumFacings = 6;
