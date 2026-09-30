@@ -41,6 +41,8 @@ void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 			V.RangeKm = FVector::Dist(P.Pos, S.Pos) / 1000.0;
 			V.HullFrac = S.HullMax > 0.f ? S.Hull / S.HullMax : -1.f;
 			V.ShieldFrac = S.ShieldMax > 0.f ? S.Shield / S.ShieldMax : -1.f;
+			V.Actor = S.Actor;
+			V.Flare = S.DriveFlare;
 		}
 		else
 		{
@@ -54,6 +56,18 @@ void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 		const double Ra = A.RangeKm < 0.0 ? 1e9 : A.RangeKm, Rb = B.RangeKm < 0.0 ? 1e9 : B.RangeKm;
 		return Ra < Rb;
 	});
+}
+
+bool UAstraBattleSubsystem::WasDestroyed(const FString& ContactId) const
+{
+	for (const FAstraBattleShip& S : Ships)
+	{
+		if (!S.bAlive && S.ContactId.Equals(ContactId, ESearchCase::IgnoreCase))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void UAstraBattleSubsystem::GetInboundMissiles(TArray<FVector>& Out) const

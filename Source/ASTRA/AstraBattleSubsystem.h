@@ -456,6 +456,8 @@ public:
 		double BearingDeg = 0.0, MarkDeg = 0.0;
 		float HullFrac = -1.f, ShieldFrac = -1.f;   // -1 unknown
 		float RadiusM = 100.f;
+		const AStaticMeshActor* Actor = nullptr;   // what the optical sensors see of it (firm tracks only)
+		AStaticMeshActor* Flare = nullptr;         // its drive plume, sized to be seen from the bridge (not through a zoom)
 	};
 	/** Every contact on the Aquila's plot (not the Aquila herself), nearest first. */
 	void GetContacts(TArray<FContactView>& Out) const;
@@ -463,8 +465,12 @@ public:
 	FVector PlayerPos() const { return Ships.Num() ? Ships[0].Pos : FVector::ZeroVector; }
 	FVector PlayerVel() const { return Ships.Num() ? Ships[0].Vel : FVector::ZeroVector; }
 	FQuat PlayerAtt() const { return Ships.Num() ? Ships[0].Att : FQuat::Identity; }
+	/** A ship of the battle with this contact id is dead (destroyed, not merely lost from the plot). */
+	bool WasDestroyed(const FString& ContactId) const;
 	/** Missiles flying at the Aquila now (system frame). */
 	void GetInboundMissiles(TArray<FVector>& Out) const;
+	/** Where a point of the system frame is drawn in the level (cm, the bridge at the origin). */
+	FVector WorldOf(const FVector& SystemPos) const { return Ships.Num() ? ToWorld(SystemPos) : FVector::ZeroVector; }
 	/** Bearing and mark (degrees, the helm's convention) from the Aquila to a point of the system frame. */
 	double BearingTo(const FVector& Point) const { return Ships.Num() ? BearingDeg(Ships[0].Pos, Point) : 0.0; }
 	double MarkTo(const FVector& Point) const { return Ships.Num() ? MarkDeg(Ships[0].Pos, Point) : 0.0; }

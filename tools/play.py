@@ -65,10 +65,22 @@ def timeline(since: float) -> tuple[list[dict], float]:
     return t.get("entries", []), float(t.get("now", since))
 
 
+def game_process() -> bool:
+    return subprocess.run(["pgrep", "-f", f"astra_harness_port={PORT}"], capture_output=True).returncode == 0
+
+
 def cmd_launch(a: argparse.Namespace) -> None:
     if alive():
         print("a harness game is already running; `tools/play.py quit` first")
         return
+    # a game still closing keeps the port: the new one would run without the harness
+    for _ in range(40):
+        if not game_process():
+            break
+        time.sleep(0.5)
+    else:
+        subprocess.run(["pkill", "-f", f"astra_harness_port={PORT}"], check=False)
+        time.sleep(2.0)
     PLAY_DIR.mkdir(parents=True, exist_ok=True)
     w, h = a.res.split("x")
     args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), a.map, "-game", "-windowed", f"-ResX={w}", f"-ResY={h}",
@@ -183,9 +195,9 @@ def cmd_quit(_: argparse.Namespace) -> None:
     except (urllib.error.URLError, OSError):
         pass
     # the game closes in a few seconds; make sure (a harness game is always ours)
-    for _ in range(40):
+    for _ in range(60):
         time.sleep(0.5)
-        if not alive():
+        if not alive() and not game_process():
             print("game closed")
             return
     subprocess.run(["pkill", "-f", f"astra_harness_port={PORT}"], check=False)

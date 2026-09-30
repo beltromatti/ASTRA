@@ -3,6 +3,7 @@
 #include "AstraShipSubsystem.h"
 #include "AstraHarness.h"
 #include "AstraStations.h"
+#include "AstraViewscreen.h"
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
@@ -194,6 +195,8 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	FActorSpawnParameters FXP;
 	FXP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	BridgeFX = InWorld.SpawnActor<AAstraBridgeFX>(FVector::ZeroVector, FRotator::ZeroRotator, FXP);
+	// the main viewscreen: in front of the central facets of the bow window, 1.2 m above the upper deck (ARCHITETTURA §5)
+	Viewscreen = InWorld.SpawnActor<AAstraViewscreen>(FVector(900.f, 0.f, 120.f), FRotator::ZeroRotator, FXP);
 	PowerPct = {{TEXT("shields"), 100.f}, {TEXT("weapons"), 100.f}, {TEXT("engines"), 100.f}, {TEXT("sensors"), 100.f},
 	            {TEXT("life_support"), 100.f}, {TEXT("flight_deck"), 100.f}};
 	Weapons = {{TEXT("railguns"), TEXT("ready (4 twin turrets)")}, {TEXT("lasers"), TEXT("ready (12 batteries)")},
@@ -2104,6 +2107,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (const UAstraStationsSubsystem* St = GetWorld() ? GetWorld()->GetSubsystem<UAstraStationsSubsystem>() : nullptr)
 	{
 		S->SetObjectField(TEXT("stations"), St->StationsJson());
+		if (Viewscreen)
+		{
+			S->SetStringField(TEXT("viewscreen"), Viewscreen->Describe());   // what the Captain sees on the main screen now
+		}
 	}
 	S->SetStringField(TEXT("location"), LocationName);
 	if (HasSurface())

@@ -324,6 +324,7 @@ private:
 	AActor* AquilaHullActor() const;
 	void TickVisit(float DeltaTime);
 	UPROPERTY() TObjectPtr<class AAstraBridgeFX> BridgeFX;   // sparks and arcs on the bridge when we are hit hard
+	UPROPERTY() TObjectPtr<class AAstraViewscreen> Viewscreen;   // the main viewscreen in front of the bow window
 	FRandomStream CasualtyRng;
 	static constexpr int32 NumDamageTeams = 4;
 	static constexpr float PowerBudget = 700.f;   // six systems at 100% = 600; the reactor can give 100 more
