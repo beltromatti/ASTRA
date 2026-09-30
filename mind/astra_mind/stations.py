@@ -19,7 +19,8 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 # ------------------------------------------------------------------------------------------------ parameter kinds
-NUM, INT, STR, BOOL, STRS = "number", "integer", "string", "boolean", "strings"
+NUM, INT, STR, BOOL, STRS, ZOOM = "number", "integer", "string", "boolean", "strings", "zoom"
+ZOOM_WORDS = ("close", "wide", "max")             # (a zoom is a magnification, or one of these words: the game knows what they mean)
 
 # what a target may be: a contact id from the plot, or a selector the executor re-evaluates every tick
 SELECTORS = ("tactical_target", "nearest_hostile", "biggest_threat")
@@ -155,9 +156,9 @@ def _build() -> dict[str, Station]:
     ops = [
         m("ops", "viewscreen", "viewscreen_auto", "the director picks the subject: the fight, the threat, the strongest event", (), "order"),
         m("ops", "viewscreen", "viewscreen_forward", "the forward optical view",
-          (P("zoom", NUM, "magnification, 1-40", lo=1, hi=40, default=1),), "order"),
+          (P("zoom", ZOOM, "a magnification 1-49, or close | wide | max", lo=1, hi=100),), "order"),
         m("ops", "viewscreen", "viewscreen_target", "the camera on a contact, with the zoom; released when it is lost",
-          (_target(), P("zoom", NUM, "magnification, 1-40 (default: fits the range)", lo=1, hi=40)), "target_lost"),
+          (_target(), P("zoom", ZOOM, "a magnification 1-49, or close | wide | max (default: fits the range)", lo=1, hi=100)), "target_lost"),
         m("ops", "viewscreen", "viewscreen_tactical", "the tactical plot on the main screen", (), "order"),
         m("ops", "viewscreen", "viewscreen_fleet", "the fleet: friendly ships and their status", (), "order"),
         m("ops", "viewscreen", "viewscreen_comms", "the open channel's party on screen",
@@ -254,6 +255,8 @@ for _md in MODE_INDEX.values():
 def _kind_schema(p: P) -> dict[str, Any]:
     if p.kind == STRS:
         return {"type": "array", "items": {"type": "string"}}
+    if p.kind == ZOOM:
+        return {"type": ["number", "string"]}
     return {"type": p.kind}
 
 
@@ -268,6 +271,8 @@ def params_schema() -> dict[str, Any]:
 def _param_text(p: P) -> str:
     """One parameter as the officer reads it: name, ? if optional, the choices or the default."""
     txt = p.name + ("" if p.required else "?")
+    if p.kind == ZOOM:
+        return txt + "=1-49|close|wide|max"
     if p.enum is not None:
         txt += "=" + "|".join(p.enum)
     elif p.default is not None:
@@ -379,6 +384,15 @@ def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] |
         if v is None or v == "":
             if p.required:
                 return None, f"{st_id} {md.name} needs '{p.name}'" + (f" ({p.desc})" if p.desc else "")
+            continue
+        if p.kind == ZOOM:
+            if isinstance(v, str) and v.strip().lower() in ZOOM_WORDS:
+                out[p.name] = v.strip().lower()
+                continue
+            x = _num(str(v).lower().lstrip("x")) if isinstance(v, str) else _num(v)
+            if x is None:
+                return None, f"'zoom' must be a number or one of {', '.join(ZOOM_WORDS)}, got {v!r}"
+            out[p.name] = round(min(max(x, p.lo or 1), p.hi or 100), 2)
             continue
         if p.kind in (NUM, INT):
             x = _num(v)
@@ -501,4 +515,6 @@ def board(state: dict[str, Any] | None, titles: dict[str, str] | None = None) ->
         acts = ss.get("last_actions")
         tail = f" | last: {'; '.join(map(str, acts[-2:]))}" if isinstance(acts, list) and acts else ""
         lines.append(head + ": " + " ; ".join(parts) + tail)
+    if (state or {}).get("viewscreen"):
+        lines.append(f"- main screen now: {state['viewscreen']}")
     return "\n".join(lines)

@@ -7,12 +7,19 @@ The game sends it with every word of the Captain's (`place`, `in_earshot`, `faci
 anything: it describes the room, and the router and the crew's prompt use it."""
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from .crew import CREW
+
 BRIDGE = ("xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight")
 PLACES = ("bridge", "quarters", "mess", "medbay", "engineering", "berthing", "flight_deck", "falcon", "planetside", "corridor")
+# the slugs the game sends in `context.place` (the datapad's place) -> the names used here
+PLACE_SLUGS = {"bridge": "bridge", "corridors": "corridor", "captains_quarters": "quarters", "main_engineering": "engineering",
+               "mess_hall": "mess", "crew_berthing": "berthing", "medbay": "medbay", "flight_deck": "flight_deck",
+               "in_a_falcon": "falcon", "planetside": "planetside"}
 
 _PLACE_WORDS = (                                 # (text found in the ship state's `captain`, place)
     ("main engineering", "engineering"), ("mess hall", "mess"), ("crew berthing", "berthing"), ("medbay", "medbay"),
@@ -83,6 +90,17 @@ class Exchange:
         self._said.clear()
 
 
+def known_speakers(ids: Any) -> tuple[str, ...]:
+    """The ids the game lists as within earshot, reduced to the ones the crew's mind knows: an officer, the doctor, the chief, a
+    patient's bed, a place at a table in the Mess (the game also lists extras: "deck1", "sleeper3"...)."""
+    out = []
+    for x in ids or []:
+        x = str(x)
+        if x in CREW or x == "mess_cook" or re.fullmatch(r"(patient|mess)\d+", x):
+            out.append(x)
+    return tuple(out)
+
+
 def place_from_state(state: dict[str, Any] | None) -> tuple[str, bool]:
     """(place, asleep) from the ship state's `captain` text (what the game already writes)."""
     st = state or {}
@@ -115,7 +133,8 @@ def earshot_from_state(place: str, state: dict[str, Any] | None) -> tuple[str, .
 
 def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any = None, names: dict[str, str] | None = None,
           exchange: Exchange | None = None) -> Context:
-    """The context of one utterance. `raw`: the game's `context` (None or {} on a build that does not send it);
+    """The context of one utterance. `raw`: the game's `context` (None or {} on a build that does not send it):
+        {place: slug, place_name, pawn, in_earshot: [ids], facing: id|null, channel: {party, open, muted}|null};
     `enemy`: the mind's enemy agent (open, contact) — the channel the mind itself keeps; `names`: party id -> display name."""
     ex = exchange or Exchange()
     if raw:
@@ -123,11 +142,14 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
         channel = None
         if ch and (ch.get("party") or ch.get("open")):
             party = str(ch.get("party") or "")
-            channel = Channel(party=party, name=(names or {}).get(party, party), kind=str(ch.get("kind") or _kind(party)),
+            channel = Channel(party=party, name=(names or {}).get(party, party), kind=str(ch.get("kind") or _kind(party, state)),
                               open=bool(ch.get("open", True)), muted=bool(ch.get("muted", False)),
-                              heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), screen=bool(ch.get("screen", False)))
-        place = str(raw.get("place") or "bridge")
-        return Context(place=place, in_earshot=tuple(str(x) for x in (raw.get("in_earshot") or earshot_from_state(place, state))),
+                              heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party),
+                              screen=bool(ch.get("screen", False)) or _on_screen(state, party))
+        slug = str(raw.get("place") or "bridge")
+        place = PLACE_SLUGS.get(slug, slug)
+        listed = known_speakers(raw.get("in_earshot")) if raw.get("in_earshot") is not None else earshot_from_state(place, state)
+        return Context(place=place, in_earshot=listed or (BRIDGE if place == "bridge" else ()),
                        facing=(str(raw["facing"]) if raw.get("facing") else None), channel=channel,
                        pawn=str(raw.get("pawn") or "seated"), source="game", asleep=place_from_state(state)[1])
     place, asleep = place_from_state(state)
@@ -135,17 +157,26 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
     if enemy is not None and getattr(enemy, "open", False):
         party = str(getattr(enemy, "contact", "") or "")
         channel = Channel(party=party, name=(names or {}).get(party, party), kind="enemy", open=True, muted=False,
-                          heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party))
+                          heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), screen=_on_screen(state, party))
     return Context(place=place, in_earshot=earshot_from_state(place, state), facing=None, channel=channel,
                    pawn="falcon" if place == "falcon" else "seated", source="inferred", asleep=asleep)
 
 
-def _kind(party: str) -> str:
+def _on_screen(state: dict[str, Any] | None, party: str) -> bool:
+    """The party is on the main screen: the game's one-line `viewscreen` says the mode is comms with them."""
+    line = str((state or {}).get("viewscreen") or "").lower()
+    return line.startswith(("comms", "auto: comms")) or ("comms" in line and party.lower() in line)
+
+
+def _kind(party: str, state: dict[str, Any] | None = None) -> str:
     p = party.lower()
     if p in ("fleet", "admiral", "rourke"):
         return "fleet"
     if p.startswith("port") or p in ("field", "control"):
         return "port"
+    for c in (state or {}).get("contacts", []) or []:
+        if str(c.get("id", "")).lower() == p and str(c.get("status", "")) == "friendly":
+            return "ally"                                  # an allied ship on the channel: what is said to it is for it, like the fleet
     return "enemy"
 
 

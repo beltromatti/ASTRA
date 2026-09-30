@@ -36,6 +36,7 @@ class Role:
     temperature: float | None = 0.3
     first_token_s: float | None = None                  # a request silent for this long is dropped and retried on the fallback
     max_price: tuple[float, float] | None = CEILING     # whatever OpenRouter falls back to must not cost more than this
+    fallback: str | None = None                         # the role that answers if this one's model cannot (after a retry)
     note: str = ""
 
     def reasoning_arg(self) -> dict[str, Any] | None:
@@ -52,8 +53,8 @@ ROLES: dict[str, Role] = {r.name: r for r in (
          note="the initiative watch: adjust the consoles, at most two short lines"),
     Role("router", DEEPSEEK, _DS, max_tokens=16, temperature=0.0, first_token_s=1.2,
          note="who is the Captain talking to (only the cases the rules cannot settle)"),
-    Role("chatter", DEEPSEEK, _DS, max_tokens=200, temperature=0.7, first_token_s=6.0,
-         note="quiet moments and low-stakes talk"),
+    Role("chatter", "openai/gpt-oss-120b", ("crusoe", "baseten", "groq"), (("effort", "low"),), max_tokens=700, temperature=0.7,
+         first_token_s=6.0, fallback="crew", note="quiet moments and low-stakes talk (bench/stations_models.py: 5x cheaper, faster, same checks)"),
 )}
 
 
@@ -69,6 +70,10 @@ def role(name: str) -> Role:
 
 
 # ------------------------------------------------------------------------------------------------ the ledger
+class SpendCapReached(RuntimeError):
+    """A bench has spent what it was allowed to."""
+
+
 class Ledger:
     """What the session has spent, by role and by model (the cost OpenRouter reports for each call)."""
 
@@ -79,8 +84,18 @@ class Ledger:
         self.by_model: dict[str, float] = defaultdict(float)
         self.n_role: dict[str, int] = defaultdict(int)
         self.write_file = True
+        self.cap: float | None = None            # a ceiling (dollars) over everything the log holds plus this run: a bench stops there
+
+    def prior(self) -> float:
+        """What earlier runs spent (the sum of the log)."""
+        try:
+            return sum(json.loads(l).get("cost", 0.0) for l in (CACHE / "spend.jsonl").read_text().splitlines() if l.strip())
+        except (OSError, ValueError):
+            return 0.0
 
     def add(self, role_name: str, model: str, comp: Completion) -> None:
+        if self.cap is not None and self.write_file and self.prior() + comp.cost > self.cap:
+            raise SpendCapReached(f"the spend cap of {self.cap:.3f} $ is reached ({self.prior():.4f} $ in the log)")
         self.calls += 1
         self.total += comp.cost
         self.by_role[role_name] += comp.cost
@@ -135,4 +150,7 @@ async def chat(llm: OpenRouter, role_name: str, *, messages: list[dict[str, Any]
         kw["first_token_timeout"] = (kw["first_token_timeout"] or 3.0) * 2
         comp = await llm.chat(messages=messages, tools=tools, tool_choice=tool_choice, on_tool_call=watched, **kw)
         LEDGER.add(role_name, kw["model"], comp)
+    if comp.error and r.fallback and not fired and not comp.content.strip():
+        log.warning("%s: still %s — the %s role answers", role_name, comp.error[:100], r.fallback)
+        return await chat(llm, r.fallback, messages=messages, tools=tools, tool_choice=tool_choice, on_tool_call=on_tool_call)
     return comp

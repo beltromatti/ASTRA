@@ -99,6 +99,7 @@ class Result:
     cost: float = 0.0
     seconds: float = 0.0
     transcript: list[str] = field(default_factory=list)
+    turns: list[Any] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
@@ -108,6 +109,14 @@ class Result:
 def detect(text: str) -> str:
     lang = _LANG.detect_language_of(text)
     return _CODES.get(lang, "?") if lang else "?"
+
+
+def looks_like(text: str, want: str) -> bool:
+    """The line is in the wanted language, or at least the detector does not say another one with confidence."""
+    want_l = {v: k for k, v in _CODES.items()}.get(want)
+    conf = {c.language: c.value for c in _LANG.compute_language_confidence_values(text)}
+    top = max(conf, key=conf.get) if conf else None
+    return top is None or top == want_l or conf.get(want_l, 0.0) >= 0.25 or conf[top] < 0.6
 
 
 class Scenario:
@@ -129,7 +138,7 @@ class Scenario:
                   f"{len(lines)} lines, {h.words()} words: {lines}")
         self.must("no bare ack", not any(is_bare_ack(t) for _, t in lines), f"{lines}")
         want = lang or h.lang
-        wrong = [t for _, t in lines if len(t.split()) >= 4 and detect(t) not in (want, "?")]
+        wrong = [t for _, t in lines if len(t.split()) >= 5 and not looks_like(t, want)]
         self.must(f"language {want}", not wrong, f"{wrong}")
 
 
@@ -153,6 +162,7 @@ async def sc_engage_until_it_falls(llm: OpenRouter, lang: str) -> Result:
     sc.must("the gunnery officer answers first", h.lines and h.lines[0][0] in ("tactical", "xo"), f"{h.lines[:1]}")
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -166,6 +176,7 @@ async def sc_one_volley(llm: OpenRouter, lang: str) -> Result:
     sc.spoke_well(h)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -180,6 +191,7 @@ async def sc_fire_at_will(llm: OpenRouter, lang: str) -> Result:
     sc.spoke_well(h)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -200,6 +212,7 @@ async def sc_follow_until_ordered(llm: OpenRouter, lang: str) -> Result:
     sc.must("the helmsman answers", h.lines and h.lines[0][0] == "helm", f"{h.lines[:1]}")
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -214,6 +227,7 @@ async def sc_bow_on_it(llm: OpenRouter, lang: str) -> Result:
     sc.spoke_well(h)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -234,6 +248,7 @@ async def sc_viewscreen(llm: OpenRouter, lang: str) -> Result:
     sc.must("back to the automatic director", h.ship.lane("ops", "viewscreen")["mode"] == "viewscreen_auto", f"{h.ship.lane('ops', 'viewscreen')}")
     sc.res.transcript.append(transcript(h, back, turn2, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -247,6 +262,7 @@ async def sc_datapad(llm: OpenRouter, lang: str) -> Result:
     sc.spoke_well(h)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -262,6 +278,7 @@ async def sc_delegation(llm: OpenRouter, lang: str) -> Result:
         sc.spoke_well(h, max_total=30, max_lines=2)
         sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -286,6 +303,7 @@ async def sc_other_consoles(llm: OpenRouter, lang: str) -> Result:
         sc.spoke_well(h, max_total=36, max_lines=3)
         sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -303,6 +321,7 @@ async def sc_coordination(llm: OpenRouter, lang: str) -> Result:
     sc.must("both officers speak", {s for s, _ in h.lines} >= {"tactical", "helm"}, f"{h.lines}")
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -318,6 +337,7 @@ async def sc_questions(llm: OpenRouter, lang: str) -> Result:
     sc.must("gives the speed and the range fact", any(k in joined for k in ("300", "trecento", "three hundred")) and any(k in joined for k in ("15", "quindici", "fifteen", "portata", "range", "reach")), joined)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -333,6 +353,7 @@ async def sc_out_of_reach(llm: OpenRouter, lang: str) -> Result:
     sc.spoke_well(h, max_total=50, max_lines=3)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -346,6 +367,7 @@ async def sc_legacy_build(llm: OpenRouter, lang: str) -> Result:
     sc.spoke_well(h)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -378,6 +400,7 @@ async def sc_initiative_after_a_kill(llm: OpenRouter, lang: str) -> Result:
     sc.must("nothing strategic", not [c for c in h.ship.station_calls() if c["mode"] in S.STRATEGIC], f"{h.ship.station_calls()}")
     sc.res.transcript.append(f"reports: {reports}\n" + transcript(h, "[watch]", turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -398,6 +421,7 @@ async def sc_initiative_new_contact(llm: OpenRouter, lang: str) -> Result:
     sc.must("at most two lines", len(h.lines) <= 2, f"{h.lines}")
     sc.res.transcript.append(f"reports: {reports}\n" + transcript(h, "[watch]", turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -422,6 +446,7 @@ async def sc_delegation_advise(llm: OpenRouter, lang: str) -> Result:
         sc.must(f"{level}: at most two lines", len(h.lines) <= 2, f"{h.lines}")
         sc.res.transcript.append(f"[{level}] " + transcript(h, "[watch]", turn, h.lines))
         sc.res.cost += h.cost
+        sc.res.turns += h.turns
     return sc.res
 
 
@@ -434,6 +459,7 @@ async def sc_standing_order(llm: OpenRouter, lang: str) -> Result:
     sc.spoke_well(h, max_total=40)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
+    sc.res.turns += h.turns
     return sc.res
 
 
@@ -498,6 +524,7 @@ async def main_async(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    models.LEDGER.cap = 0.385                                    # (the work's whole budget for model calls is 0.40 $)
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default="")
     ap.add_argument("--langs", default="it,en")

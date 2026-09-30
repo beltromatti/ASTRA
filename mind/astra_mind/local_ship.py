@@ -213,7 +213,26 @@ class LocalShip:
         if self.stations_on:
             s["sim_time_s"] = round(self.t, 1)
             s["stations"] = self._stations_json()
+            s["viewscreen"] = self._viewscreen_line()
         return s
+
+    def _viewscreen_line(self) -> str:
+        """What is on the main screen, in the one line the game writes ("auto: target, T-24 (Phlegethon), zoom x49")."""
+        vs = self.lanes["ops"]["viewscreen"]
+        m, p = vs["mode"], vs["params"]
+        tgt = self._resolve(p.get("target")) if p.get("target") else None
+        zoom = p.get("zoom", "")
+        z = f", zoom x{zoom}" if zoom not in ("", None) else ""
+        if m == "viewscreen_target" and tgt:
+            return f"target: ordered, {tgt.id} ({tgt.name}){z or ', zoom x8'}"
+        if m == "viewscreen_auto":
+            pick = self._resolve("tactical_target") or self._resolve("nearest_hostile")
+            return f"auto: target, {pick.id} ({pick.name}), zoom x8" if pick else "auto: forward view"
+        if m == "viewscreen_off":
+            return "off (the bare window)"
+        if m == "viewscreen_comms":
+            return f"comms: {p.get('party') or (self.channel or {}).get('party', '')}"
+        return m.replace("viewscreen_", "") + z
 
     def recent_events(self) -> list[str]:
         return self.events[-8:]

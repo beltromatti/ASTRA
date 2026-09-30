@@ -32,7 +32,7 @@ from .enemy import COMMANDERS, EnemyAgent
 from .style import StyleKeeper
 from . import router as router_mod
 from .context import Exchange, parse as parse_context
-from .initiative import Watch, recent_orders, watch_ask, watch_system
+from .initiative import Watch, chatter_system, recent_orders, watch_ask, watch_system
 from .director import ADMIRAL, Director
 from .env import CACHE
 from .local_ship import LocalShip
@@ -347,7 +347,7 @@ class Mind:
                 self.director.save()
                 self.voice.low_priority = True
                 try:
-                    t = await self.agent.handle_event(
+                    t = await self._chatter(
                         "bridge: a quiet moment on watch", self.lang,
                         ask=(f"A quiet moment. {untold['officer']} turns to the Captain, off the record: news from home has "
                              f"reached them ({untold['news']}). In one or two short human lines, in character, they tell the "
@@ -361,7 +361,7 @@ class Mind:
                 if personal:
                     who = random.choice([k for k in ("xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight")
                                          if k in mems or k in self.director.bonds] or ["xo", "helm", "sensors"])
-                    t = await self.agent.handle_event(
+                    t = await self._chatter(
                         f"bridge: a quiet moment on watch", self.lang,
                         ask=(f"A quiet moment. {who} turns to the Captain, off the record, with one short personal line: "
                              "something that officer has been meaning to say or ask — from what they remember of the Captain "
@@ -371,7 +371,7 @@ class Mind:
                              "invites an answer. Only speak, only that officer."))
                     log.info("personal moment (%s): %s", who, " | ".join(f"{s}: {x}" for s, x in t.lines))
                 else:
-                    t = await self.agent.handle_event(
+                    t = await self._chatter(
                         f"bridge: a quiet moment on watch", self.lang,
                         ask=(f"A quiet moment: {pair[0]} and {pair[1]} exchange one or two short, natural lines about {topic}, "
                              "in character, knowing the Captain can hear (they may include the Captain with a glance). No orders, "
@@ -732,6 +732,12 @@ class Mind:
                                   "route": {"dest": r.dest, "how": r.how, "ms": round(r.ms, 1), "addressed": list(r.addressed)}})
         log.info("turn %.2fs (first line %.2fs) cost $%.5f: %s", t.t_end, t.t_first_line or -1, t.cost,
                  " | ".join(f"{s}: {x}" for s, x in t.lines))
+
+    async def _chatter(self, event: str, lang: str, ask: str):
+        """A quiet moment's talk: its own model role (small and cheap), a compact prompt, only `speak`, two lines at most."""
+        system = chatter_system(lang, self.director.mood, self.memory.lines(), "; ".join(self.director.bonds_lines()), self.director.home_lines(),
+                                list(self.director.campaign), list(self.game.events)[-5:] if self.game else [])
+        return await self.agent.handle_event(event, lang, ask=ask, role="chatter", system=system, history_turns=2, max_lines=2, speak_only=True)
 
     async def _event_turn(self, events: list[str], ask: str | None):
         """A report turn (or the officers' watch check: its own compact prompt, its own cheaper model, only the last few exchanges)."""

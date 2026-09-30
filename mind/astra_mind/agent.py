@@ -194,14 +194,14 @@ class BridgeAgent:
             self._active.discard(turn)
 
     async def handle_event(self, event: str, lang: str, ask: str | None = None, *, role: str = "crew", system: str | None = None,
-                           history_turns: int | None = None, max_lines: int | None = None) -> Turn:
+                           history_turns: int | None = None, max_lines: int | None = None, speak_only: bool = False) -> Turn:
         """A ship event (not the Captain): the responsible officer reports it, and may act within their own authority.
         role: the model role ('crew', or 'watch' for the initiative watch); system: a prompt of its own (the watch's compact one)."""
         turn = Turn(text=f"[event] {event}", lang=lang, kind="event", max_lines=max_lines)
         t0 = time.perf_counter()
         state = self.ship.snapshot()
         ts = tools_for(state)
-        allowed = self.initiative()
+        allowed = set() if speak_only else self.initiative()         # (chatter only talks)
         pending: list[tuple[ToolCall, asyncio.Task]] = []
         fired: list[ToolCall] = []
         held: list[tuple[str, str, str]] = []
@@ -297,7 +297,7 @@ class BridgeAgent:
                 await self._voice(turn, t0, speaker, line, lang, tone)
             elif call.name == "standing_order" and captain:
                 pending.append((call, asyncio.create_task(self._standing_order(args))))     # the mind's own, not the ship's
-            elif call.name == "station":
+            elif call.name == "station" and (captain or (allowed is not None and "station" in allowed)):
                 pending.append((call, asyncio.create_task(self._station(args, ts, state, captain, standing_for))))
             elif call.name in ts.names and (captain or (allowed is not None and call.name in allowed)) and call.name in SHIP_TOOL_NAMES:
                 pending.append((call, asyncio.create_task(_safe_execute(self.ship, call.name, args, owner_of(call.name, args)))))

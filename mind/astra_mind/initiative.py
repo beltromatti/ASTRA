@@ -274,3 +274,25 @@ def recent_orders(history: list[dict[str, Any]], n: int = 3) -> str:
     """The Captain's last few orders, from the crew's history (their words only)."""
     said = [m["content"][len("Captain: "):] for m in history if m.get("role") == "user" and str(m.get("content", "")).startswith("Captain: ")]
     return "; ".join(f'"{s.splitlines()[0][:100]}"' for s in said[-n:])
+
+
+_CHATTER_SYSTEM = """You voice the officers of the ASN Aquila in a quiet moment on the bridge, off the record. The player is the ship's Captain.
+Speak in {lang_name} (proper names stay in English), naturally and briefly: one short line each, two lines in all at most, in character,
+human and specific — never a report, never an order, never a bare "aye". Use `speak` only.
+
+Officers (ids for `speak`):
+{roster}
+
+The mood aboard (let it colour the words, never announce it): {mood}
+What the officers remember of the Captain: {memories}
+Where they stand with the Captain: {bonds}
+The officers' lives beyond the war: {home}
+The war so far: {story}
+Recent events: {events}"""
+
+
+def chatter_system(lang: str, mood: str, memories: str, bonds: str, home: str, story: list[str], events: list[str]) -> str:
+    roster = "\n".join(f"- {o.id}: {o.title}, {o.role}. {o.personality}." for o in CREW.values() if o.id in DUTIES_V2)
+    return _CHATTER_SYSTEM.format(lang_name=LANG_NAMES.get(lang, lang), roster=roster, mood=mood or "steady: a crew doing its job",
+                                  memories=memories or "nothing yet", bonds=bonds or "a new ship and a new captain", home=home or "nothing lately",
+                                  story="; ".join(story[-6:]) or "the patrol has just begun", events="; ".join(events[-5:]) or "none")

@@ -172,6 +172,11 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         await c.agent.handle("siamo in raggio?", "it")
         self.assertEqual([t for _, t in c.said], ["Sì, Capitano."])
 
+    async def test_a_mode_name_in_a_line_is_spoken_as_plain_words(self) -> None:
+        c = Crew(Script([speak("Propongo keep_on_bow su T-24 e scan_focus su T-31.", "helm")]))
+        await c.agent.handle("consigli?", "it")
+        self.assertEqual(c.said[0][1], "Propongo prua sul bersaglio su T-24 e scansione mirata su T-31.")
+
     async def test_runaway_lines_are_cut(self) -> None:
         long = "Capitano, la situazione è la seguente. " + " ".join(["parola"] * 80) + ". Poi ancora altro."
         self.assertLessEqual(len(_tighten(long).split()), 70)
@@ -282,6 +287,17 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(c.said), 1)
         self.assertFalse(turn.cancelled)
 
+    async def test_chatter_only_talks_and_is_capped_at_two_lines(self) -> None:
+        c = Crew(Script([speak("Bel cielo stasera, Marco.", "sensors"), speak("Bugiardo: piove polvere.", "helm"),
+                         speak("Una terza battuta.", "xo"), station("helm", "hold")]), fight=False)
+        system = __import__("astra_mind.initiative", fromlist=["x"]).chatter_system("it", "steady", "", "", "", [], [])
+        turn = await c.agent.handle_event("bridge: a quiet moment on watch", "it", ask="chat", role="chatter", system=system,
+                                          history_turns=2, max_lines=2, speak_only=True)
+        self.assertEqual([t for _, t in c.said], ["Bel cielo stasera, Marco.", "Bugiardo: piove polvere."])
+        self.assertEqual({t["function"]["name"] for t in c.llm.requests[0]["tools"]}, {"speak"})
+        self.assertEqual(c.ship.lane("helm", "nav")["set_by"], "auto")                     # the stray station call did nothing
+        self.assertLess(len(c.llm.requests[0]["messages"][0]["content"]) // 4, 1600)      # a compact prompt of its own
+
     async def test_an_older_game_build_still_works(self) -> None:
         c = Crew(Script([("intercept", {"contact_id": "T-23", "standoff_km": 6}), speak("Intercetto il Cocytus a sei chilometri.")]),
                  stations=False)
@@ -321,6 +337,17 @@ class ModelsTest(unittest.IsolatedAsyncioTestCase):
             pass
         comp = await models.chat(llm, "crew", messages=[], on_tool_call=on_call)
         self.assertEqual(len(llm.requests), 1)
+
+    async def test_a_role_whose_model_cannot_answer_hands_over_to_its_fallback(self) -> None:
+        llm = FakeLLM(Script(error="HTTP 502"), Script(error="HTTP 502"), Script([speak("Capitano, i Falcon dormono.", "flight")]))
+        got: list[str] = []
+
+        async def on_call(call: ToolCall) -> None:
+            got.append(call.name)
+        comp = await models.chat(llm, "chatter", messages=[], on_tool_call=on_call)
+        self.assertFalse(comp.error)
+        self.assertEqual(got, ["speak"])
+        self.assertEqual([r["model"] for r in llm.requests], [models.role("chatter").model] * 2 + [models.role("crew").model])
 
     async def test_every_role_carries_the_price_ceiling(self) -> None:
         llm = FakeLLM(Script([speak("Sì.")]))
