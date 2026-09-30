@@ -51,6 +51,7 @@ ROOMS = {
     "quiet": ("ship_rooms_social", "quiet"), "observation": ("ship_rooms_social", "observation"), "bow_obs": ("ship_rooms_social", "bow_obs"),
     "concourse": ("ship_rooms_hub", "concourse"), "berth_lobby": ("ship_rooms_hub", "berth_lobby"), "stair_tower": ("ship_rooms_hub", "stair_tower"),
     "observation_d14": ("ship_rooms_social", "observation_d14"), "store_dry_d10": ("ship_rooms_service", "store_dry_d10"),
+    "surgery": ("ship_rooms_med", "surgery"), "quarantine": ("ship_rooms_med", "quarantine"), "pharmacy": ("ship_rooms_med", "pharmacy"),
     "lab": ("ship_rooms_work", "lab"), "workshop": ("ship_rooms_work", "workshop"), "armory": ("ship_rooms_work", "armory"),
     "cabins": ("ship_rooms_work", "cabins"),
 }

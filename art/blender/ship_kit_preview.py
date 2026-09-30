@@ -38,7 +38,8 @@ def _kelvin(k: float):
 BEST = {"galley": ["corner_b"], "galley_pass": ["corner_a"], "store_dry": ["door"], "store_cold": ["corner_a"], "hold": ["door"], "heads": ["door"],
         "laundry": ["door"], "hydro": ["corner_a"], "lounge": ["corner_a"], "games": ["corner_b"], "library": ["corner_a"], "quiet": ["corner_a"],
         "observation": ["corner_a"], "bow_obs": ["corner"], "concourse": ["spine", "lift"], "berth_lobby": ["back"], "stair_tower": ["hall", "well"],
-        "lab": ["corner_a"], "workshop": ["corner_a"], "armory": ["corner_b"], "cabins": ["far"]}
+        "lab": ["corner_a"], "workshop": ["corner_a"], "armory": ["corner_b"], "cabins": ["far"], "surgery": ["corner_a"], "quarantine": ["corner_b"],
+        "pharmacy": ["corner_a"]}
 SKIP_BEST = {"observation_d14", "store_dry_d10"}
 
 

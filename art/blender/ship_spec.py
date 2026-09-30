@@ -136,6 +136,22 @@ _reg("cabins", name="Crew Cabins", kind="cabins", dept="services", L=20.0, D=16.
      spots=[spot("sleeper", "sleep", 1.34, y, 0) for y in (0.56, 4.56, 8.56, 12.56)] + [spot("sleeper", "sleep", 18.66, y, 180) for y in (0.56, 4.56, 8.56, 12.56)],
      lights=[light(10.0, 8.0, 3.1, 2500, 3400, (14.0, 0.6))])
 
+# ---- Deck 6: the medical rooms around the Medbay (docs/BIBBIA.md §6: Medbay, surgery, quarantine, pharmacy) ---------------------
+_reg("surgery", name="Surgery", kind="surgery", dept="medical", L=16.0, D=16.0, h=3.6, plate="surgery",
+     doors=[door("near", 6.0)], systems=["medical", "power_bus"],
+     spots=[spot("surgeon", "work", 3.9, 9.0, 0, "medical"), spot("nurse", "work", 6.6, 9.0, 180, "medical"), spot("surgeon", "work", 9.9, 9.0, 0, "medical"),
+            spot("nurse", "work", 12.6, 9.0, 180, "medical")],
+     lights=[light(5.0, 9.0, 3.5, 6500, 6000, (4.0, 3.0)), light(11.0, 9.0, 3.5, 6500, 6000, (4.0, 3.0)), light(8.0, 13.5, 3.5, 3500, 5600, (12.0, 1.0))])
+_reg("quarantine", name="Quarantine Ward", kind="quarantine", dept="medical", L=24.0, D=16.0, h=3.6, plate="quarantine",
+     doors=[door("near", 10.0)], systems=["medical", "life_support"],
+     spots=[spot("nurse", "work", 13.4, 6.2, 0, "medical"), spot("nurse", "work", 16.4, 4.4, 90, "medical")]
+           + [spot("patient", "sleep", 1.7 + 3.7 * k, 14.59, 270, "medical") for k in range(6)],
+     lights=[light(12.0, 4.5, 3.5, 6000, 6000, (14.0, 1.0)), light(12.0, 12.8, 3.5, 4500, 5200, (20.0, 1.0))])
+_reg("pharmacy", name="Pharmacy", kind="pharmacy", dept="medical", L=12.0, D=16.0, h=3.4, plate="pharmacy",
+     doors=[door("near", 6.0)], systems=["medical", "supply"],
+     spots=[spot("pharmacist", "work", 6.0, 5.4, -90, "medical"), spot("pharmacist", "work", 6.0, 7.4, 90, "medical")],
+     lights=[light(6.0, 8.0, 3.3, 4200, 5600, (6.0, 8.0))])
+
 
 def _variant(base: str, suffix: str, door_x: float) -> None:
     """The same room with its near door moved to `door_x` (the layout puts some doors on another module of the corridor): another mesh."""
@@ -197,9 +213,6 @@ _plan("transporter", "Transporter Room", "transporter", "science", 24.0, 16.0, 3
       ("transporter_chief", "operator"), 2, 10.0, lm=4500, temp=6500)
 _plan("sensor_archive", "Sensor Archive", "archive", "science", 16.0, 16.0, 3.4, ["sensors", "data_trunk"], ("archivist",), 2, 6.0)
 _plan("radiator_pumps", "Radiator Manifold", "machinery", "engineering", 24.0, 16.0, 3.7, ["coolant", "radiators", "power_bus"], ("machinist",), 3, 10.0)
-_plan("surgery", "Surgery", "surgery", "medical", 16.0, 16.0, 3.6, ["medical", "power_bus"], ("surgeon", "nurse"), 3, 6.0, lm=6500, temp=6000)
-_plan("quarantine", "Quarantine Ward", "quarantine", "medical", 24.0, 16.0, 3.6, ["medical", "life_support"], ("nurse",), 3, 10.0)
-_plan("pharmacy", "Pharmacy", "pharmacy", "medical", 12.0, 16.0, 3.4, ["medical", "supply"], ("pharmacist",), 1, 6.0)
 _plan("dc_locker", "Damage Control Locker", "damage_control", "engineering", 12.0, 16.0, 3.4, ["damage_control", "supply"], ("dc_tech",), 4, 6.0)
 _plan("power_control", "Power Control", "power", "engineering", 24.0, 16.0, 3.6, ["power_bus", "reactor", "data_trunk"], ("power_tech",), 4, 10.0)
 _plan("machinery", "Machinery Space", "machinery", "engineering", 24.0, 16.0, 3.7, ["power_bus", "coolant", "compressed_air"], ("machinist",), 2, 10.0)
