@@ -59,6 +59,7 @@ FADE_CUT_MS = 140               # fade-out of a stop in the middle of a word
 FADE_PAUSE_MS = 40              # ... at a pause
 PLAYBACK_LAG_S = 0.06           # the game starts playing this long after a chunk is sent
 TURN_TIMEOUT_S = 8.0            # the floor is held for the Captain's order at most this long after he let go of the key
+TURN_OPEN_MAX_S = 25.0          # a Captain's turn (the crew's model writing the answer) keeps the reports quiet at most this long
 KEY_STUCK_S = 45.0              # a key held down this long is taken as released (a "key up" that never arrived must not silence the crew)
 MAX_QUEUED = 10                 # more unsaid lines than this and the least important are dropped
 BACKLOG_SHORTEN_S = 14.0        # with this much speech waiting, long lines of little importance are cut to their first sentence
@@ -137,6 +138,8 @@ class Voice:
         self._down_t = 0.0                      # loop time the key went down
         self._turn_pending = False              # the Captain has spoken and his answer has not started yet
         self._hold_until = 0.0
+        self._open_turns = 0                    # Captain's turns being answered (captain_turn_begin .. captain_turn_end)
+        self._turn_t = 0.0                      # loop time the latest one began
         self._synth_line: Line | None = None    # the line whose audio is being made (or was made last)
         self._cps: dict[str, float] = {}
         self._floor = ""
@@ -177,7 +180,12 @@ class Voice:
         return _ANSWERING.get()
 
     def captain_turn_begin(self) -> None:
-        """The task calling this is about to answer the Captain (the server's turn worker, for a spoken or typed order)."""
+        """The task calling this is about to answer the Captain (the server's turn worker, for a spoken or typed order). Until it
+        ends (`captain_turn_end`) the reports wait: the crew's model streams its officers' lines a second or two apart, and a
+        report must not start in the gap between two of them (only to be cut by the next)."""
+        if not _ANSWERING.get():
+            self._open_turns += 1
+            self._turn_t = self._now()
         _ANSWERING.set(True)
 
     def captain_turn_end(self) -> None:
@@ -185,11 +193,14 @@ class Voice:
         produced no line, the floor is released at once (a silent order)."""
         was = _ANSWERING.get()
         _ANSWERING.set(False)
-        if was and self._turn_pending and not self._captain_down and not any(l.prio == Prio.ANSWER for l in self._queue) \
+        if not was:
+            return
+        self._open_turns = max(0, self._open_turns - 1)
+        if self._turn_pending and not self._captain_down and not any(l.prio == Prio.ANSWER for l in self._queue) \
                 and not (self._cur is not None and self._cur.prio == Prio.ANSWER):
             self._turn_pending = False
             self._set_floor(self._floor_state())
-            self._wake()
+        self._wake()
 
     async def preemptible(self, coro, poll: float = 0.05):
         """Await a producer's work (an LLM turn that will write a report) but give it up the moment the Captain takes the
@@ -386,6 +397,7 @@ class Voice:
             self._request_cut(self._cur, reason, also_answers=True)
         self._captain_down = self._turn_pending = False        # (the game went away with the key down, or a new game begins: nobody holds the floor)
         self._hold_until = 0.0
+        self._open_turns = 0
         self._set_floor(self._floor_state())
         self._wake()
         return n
@@ -438,6 +450,11 @@ class Voice:
                 self._set_floor(self._floor_state())
                 return False
             return True
+        if self._open_turns > 0:
+            if self._now() - self._turn_t <= TURN_OPEN_MAX_S:
+                return True
+            log.warning("a Captain's turn has been open for %.0f s: the reports may go on", TURN_OPEN_MAX_S)
+            self._open_turns = 0
         return False
 
     def _floor_state(self) -> str:
@@ -599,6 +616,8 @@ class Voice:
                     wait = max(0.05, self._down_t + KEY_STUCK_S - self._now())
                 elif self._turn_pending and self._hold_until:
                     wait = max(0.01, self._hold_until - self._now())
+                elif self._open_turns:
+                    wait = max(0.05, self._turn_t + TURN_OPEN_MAX_S - self._now())
                 await self._wait(wait)
                 continue
             if self._captain_down:

@@ -775,9 +775,41 @@ async def s21_late_answer() -> list[str]:
         return bad
 
 
+async def s22_turn_with_two_answers() -> list[str]:
+    """The crew's model streams two officers' answers two seconds apart while a report waits: the report does not start in the gap between them."""
+    async with Bridge() as b:
+        await b.say("busy", "xo", LONG)                                # something is being said when the Captain speaks
+        await asyncio.sleep(0.5)
+        b.voice.captain_begin()
+        await asyncio.sleep(0.6)
+        b.voice.captain_end(None)
+        await b.say("report", "sensors", "Sensors. New contact bearing two seven zero, range forty kilometres, closing.")
+        await asyncio.sleep(0.3)
+        b.voice.captain_turn_begin()
+        await b.say("a", "helm", "Aye, Captain, coming to two one seven.", answer=True)
+        await asyncio.sleep(4.0)                                       # the model is still writing the second officer's line
+        await b.say("b", "tactical", "Tactical, weapons ready.", answer=True)
+        b.voice.captain_turn_end()
+        await b.settle(2.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        order = tr.order()
+        if b.ids["a"] not in tr.begin or b.ids["b"] not in tr.begin:
+            return bad + [f"an answer was never said: order {order}"]
+        between = [i for i in order if tr.begin[b.ids["a"]] < tr.begin[i] < tr.begin[b.ids["b"]]]
+        if between:
+            bad.append(f"lines {between} began between the two answers")
+        cut = [i for i in order if tr.reason.get(i) == "cut" and i != b.ids["busy"]]
+        if cut:
+            bad.append(f"lines {cut} were cut (a line that started in the gap between the answers is cut by the second)")
+        if b.ids["report"] not in tr.begin or tr.begin[b.ids["report"]] < tr.begin[b.ids["b"]]:
+            bad.append("the report was not said after the answers")
+        return bad
+
+
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
              s10_shorten, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
-             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer]
+             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers]
 
 
 def main() -> int:
