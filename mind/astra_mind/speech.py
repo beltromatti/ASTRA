@@ -629,6 +629,9 @@ class Voice:
             if line.gen_error and not line.chunks:
                 self._drop(line, "synth_failed")
                 continue
+            if line.gen_done and not line.chunks:
+                self._drop(line, "no_audio")                # (only punctuation, or a voice that made silence: a subtitle with no voice)
+                continue
             if not self._can_start_smoothly(line):
                 await self._wait(0.05)
                 continue

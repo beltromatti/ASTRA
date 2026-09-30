@@ -70,7 +70,7 @@ Tutti JSON in frame di testo, tranne l'audio (frame binario). Formato dell'audio
 
 **`cancel`** — *ferma questa riga adesso*: `{"type":"cancel","line":12,"reason":"captain","fade_ms":140}`. `reason` ∈ `captain` (il Capitano ha preso la parola), `answer_first` (arriva la risposta al Capitano), `urgent_first` (arriva un avviso di pericolo), `new_session`, `no_listener`, `cleared`. `fade_ms`: 40 se la mente ha trovato una pausa entro mezzo secondo (si ferma in una pausa), 140 se ferma a metà parola.
 
-**`line_dropped`** — *informativo*: una riga accodata che non verrà mai detta: `{"type":"line_dropped","id":13,"speaker":"sensors","text":"…","reason":"expired"}`. `reason` ∈ `captain_spoke` (chiacchiera scartata quando il Capitano parla), `superseded` (una riga più recente sullo stesso argomento), `expired`, `stale`, `overflow`, `synth_failed`, `synth_timeout`, `no_listener`, `empty`, `merged_into_<id>` (unita a un'altra riga: il suo testo è dentro quella), `new_session`, `cleared`. Il gioco non deve fare nulla (non ne ha mai visto il `line`); può scriverlo nel log.
+**`line_dropped`** — *informativo*: una riga accodata che non verrà mai detta: `{"type":"line_dropped","id":13,"speaker":"sensors","text":"…","reason":"expired"}`. `reason` ∈ `captain_spoke` (chiacchiera scartata quando il Capitano parla), `superseded` (una riga più recente sullo stesso argomento), `expired`, `stale`, `overflow`, `synth_failed`, `synth_timeout`, `no_audio` (solo punteggiatura: la voce non fa alcun suono), `no_listener`, `empty`, `merged_into_<id>` (unita a un'altra riga: il suo testo è dentro quella), `new_session`, `cleared`. Il gioco non deve fare nulla (non ne ha mai visto il `line`); può scriverlo nel log.
 
 **`floor`** — chi ha la parola: `{"type":"floor","state":"idle|crew|captain","line":12|null}`. `captain` da quando il Capitano preme il tasto (o manda un ordine scritto) finché la sua risposta non comincia; `crew` mentre una riga è in ascolto; `idle` altrimenti. Serve ad abbassare la musica (sezione 4.4) senza indovinare dal contenuto della coda audio.
 
@@ -206,7 +206,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 
 ```
 uv run python -m bench.voice_units            # 78 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti)
-uv run python -m bench.voice_floor -v         # 22 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
+uv run python -m bench.voice_floor -v         # 23 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
 uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-baseline   # riconoscimento: WER e latenza, motori alternati clip per clip
 uv run python -m bench.voice_pipeline live tts mic floor mem   # (più sezioni di seguito) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
 uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)

@@ -70,6 +70,7 @@ class FakeTTS:
         self.rtf = rtf
         self.cps = cps
         self.fail: set[str] = set()
+        self.silent: set[str] = set()                    # texts it makes no sound for
         self.calls: list[str] = []
 
     def supported(self, lang: str) -> bool:
@@ -88,7 +89,7 @@ class FakeTTS:
         marks = [(m.start() / max(1, len(text))) * dur for m in re.finditer(r"[.,;:!?]", text) if 0 < m.start() < len(text) - 1]
 
         async def gen() -> None:
-            n = math.ceil(dur / CHUNK_S)
+            n = 0 if text in self.silent else math.ceil(dur / CHUNK_S)
             try:
                 if text in self.fail:
                     await asyncio.sleep(0.05)
@@ -807,9 +808,27 @@ async def s22_turn_with_two_answers() -> list[str]:
         return bad
 
 
+async def s23_no_audio() -> list[str]:
+    """A line the voice makes no sound for (only punctuation) is dropped and declared: no subtitle without a voice, and the next line is said."""
+    async with Bridge() as b:
+        b.tts.silent = {"..."}
+        await b.say("empty", "sensors", "...")
+        await b.say("next", "helm", "Helm here, all steady.")
+        await b.settle(1.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        if b.ids["empty"] in tr.begin:
+            bad.append("a line with no sound was announced")
+        if tr.dropped.get(b.ids["empty"]) != "no_audio":
+            bad.append(f"the empty line was dropped as {tr.dropped.get(b.ids['empty'])!r}")
+        if b.ids["next"] not in tr.begin:
+            bad.append("the line after it was never said")
+        return bad
+
+
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
              s10_shorten, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
-             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers]
+             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio]
 
 
 def main() -> int:
