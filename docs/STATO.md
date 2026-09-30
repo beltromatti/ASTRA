@@ -2,7 +2,21 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-09-29 (pomeriggio) · **Traguardo corrente:** l'app di rilascio per il Mac (Shipping) in prova dall'utente; poi M7 — le superfici di tutti i mondi; M1 — ponti della nave
+**Ultimo aggiornamento:** 2026-09-30 · **Traguardo corrente:** Piano v0.3 ([PIANO.md](PIANO.md)), fase **F1 — La plancia viva**; architettura a moduli e sviluppo in parallelo con agenti di supporto ([ARCHITETTURA.md](ARCHITETTURA.md))
+
+## Piano v0.3 — dove siamo (aggiornato a ogni passo)
+| Fase | Stato |
+|---|---|
+| **F0** Fondamenta per lavorare in parallelo | ✓ controlli in prima persona (mancavano gli asset di input: WASD e mouse non avevano mai funzionato); ✓ banco di prova da terminale (`tools/play.py`, `-astra_harness`); ✓ architettura, piano, stile v0.2; agenti di supporto: VOCE in corso |
+| **F1** La plancia viva | in corso: modello delle postazioni, schermo principale, tavolo olografico davanti, equipaggio agente, router, voce, plancia v3 |
+| **F2** La guerra grande | da fare |
+| **F3** Persone vere | da fare (MetaHuman: autorizzazione Epic in RICHIESTE) |
+| **F4** La nave intera e la distruzione | da fare |
+| **F5** Abbordaggi e prima persona | da fare (i controlli a piedi di F0 sono la base) |
+| **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | da fare |
+
+**Agenti di supporto attivi** (worktree in `.claude/worktrees/`, rami `worktree-*`):
+- **VOCE** — riconoscimento più rapido in tutte le lingue, sintesi più veloce e con volume costante, turni di parola con priorità al Capitano, niente sottotitoli senza voce (`mind/astra_mind/{speech,stt,tts,audio_in}.py`, `docs/protocollo_voce.md`).
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
