@@ -8,7 +8,6 @@ orange, amber slits and a single red pulse for lights, engines orange-violet. "S
 """
 from __future__ import annotations
 
-import math
 from dataclasses import replace
 
 import numpy as np
@@ -199,7 +198,7 @@ class MandateShip:
         d = self.sp.get("blades")
         if not d:
             return
-        c, g, rng, s = self.c, self.g, self.rng, self.s
+        c, g, s = self.c, self.g, self.s
         sch = replace(self.st.scheme, row_w=(3.0 * s, 6.0 * s), plate_len=(8 * s, 24 * s), shear=(2.0 * s, 1.5 * s))
         for side in (-1, 1):
             st = []
@@ -307,7 +306,7 @@ class MandateShip:
             self.g.keep_out((x - w / 2 - 4, y - 8, z - h / 2 - 4), (x + w / 2 + 4, y + 8, z + h / 2 + 4))
 
     def engines(self) -> None:
-        c, g, rng = self.c, self.g, self.rng
+        c = self.c
         e = self.sp["engines"]
         b = self.b
         sec = LF.blade(e["w"], e["h"], 0.0)
@@ -364,7 +363,6 @@ class MandateShip:
     def keel(self, x0: float, x1: float, depth: float, h0: float = 0.4, h1: float = 0.25) -> None:
         """A ventral blade keel, deepest amidships (two lofts meeting at the deepest point)."""
         s = self.s
-        b = self.b
         xm = 0.5 * (x0 + x1)
         zb = self.zat(xm) - self.hat(xm) * 0.95
         self.slab_loft(x0, xm, 0.0, 2.2 * s, 2.6 * s, depth * h0, depth, zb - depth * 0.55, nst=3)
@@ -485,7 +483,7 @@ def _acheron_extras(ship: MandateShip) -> None:
 
 def _mandate_hooks(ship: MandateShip, name: str) -> None:
     """Tower, weapons, radiators and hangars placed on the finished hull (heights come from its sections)."""
-    s, W, H = ship.s, ship.b["W"], ship.b["H"]
+    s, W = ship.s, ship.b["W"]
     x_st, x_fr = ship.b["x0"], ship.b["x1"]
     sp = ship.sp
     if name == "acheron":

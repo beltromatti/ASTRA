@@ -14,13 +14,10 @@ import numpy as np
 
 import ship3_geo as G
 import ship3_hull as H
-import ship3_kit as K
 import ship3_kit2 as K2
 import ship3_loft as LF
-import ship3_panels as PN
 import ship3_text as TX
-from ship3_astra import astra_style, flat_field
-from ship3_cut import make_all_cuts
+from ship3_astra import astra_style
 from ship3_kit import Ctx, Xf
 
 I3 = np.eye(3)

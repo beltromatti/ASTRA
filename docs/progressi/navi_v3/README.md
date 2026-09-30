@@ -16,6 +16,8 @@ Per ogni nave, in `docs/progressi/navi_v3/`:
 | `<Nome>_cutface.jpg` | la faccia di taglio anteriore del pezzo Mid da vicino: fascia di corazza strappata, fodera, paratia, ponti interni, travi, lastre piegate, braci |
 | `Falcon`, `Hammer`, `Wasp`, `Harpy`, `Watch` | tre quarti (velivoli e stazione non si rompono) |
 
+`_overview.jpg` riunisce in una sola immagine le dodici viste a tre quarti.
+
 Navi: Aquila, Praetorian, Vigilant (ASTRA Navy); Acheron, Styx, Lethe (Kharon Mandate); Freighter «Brightwater» (Free Guilds); stazione Thule Watch;
 velivoli Falcon, Hammer, Wasp (ASTRA) e Harpy (Mandate).
 
@@ -81,3 +83,15 @@ il Lethe 220 m (240); il Freighter 340 m (352); il Praetorian 1100 m (1129); l'A
   paratia di fondo, ponti e ossature, travi, lastre piegate; `pivot_m` è il baricentro di ogni pezzo (per farlo ruotare su sé stesso).
 - **Aquila aperta sul basso** (`docs/NAVE.md` §8.2): il blocco superiore e l'isola non hanno fondo né facce dentro lo scafo inferiore; `nave_checks` legge
   `data/ship/aquila_plan.json` e conta i vertici dell'esterno nei volumi liberi dei ponti 2-12: 0.
+
+## Nel gioco
+
+- **Importazione**: `/Game/ASTRA/Ships/SM_*` (stessi nomi di prima: il gioco non cambia), pezzi in `/Game/ASTRA/Ships/Sections/SM_SHIP_<Fazione>_<Nome>_Sec<Bow|Mid|Stern>`.
+  Nanite, collisione complessa come semplice, materiali assegnati per nome dello slot (`MI_HULL_<A|M|G>_<Plate|Frame|Livery|Trim|Marking|Engine|Glow|Lights|Nav|Radiator|Cut|Glass|Blue|Green>`).
+- **Rottura**: i pezzi stanno nello stesso sistema di riferimento della nave intera: a rottura si nasconde la mesh intera e si mettono i tre pezzi alla stessa trasformazione
+  (l'immagine non cambia), poi gli impulsi. `manifest.json` dà per ogni nave grande `cuts_x_m` (piani di taglio, prua per prima), `sections` (limiti in x), `cut_faces` (centro, normale, estensione
+  di ogni faccia di taglio, in assi di Unreal) e `pivot_m` per pezzo. La faccia di taglio usa lo slot `MI_HULL_<f>_Cut`: un'istanza dinamica con `Heat` da 1 a 0 spegne le braci.
+- **Danni**: `MI_ShipDamage_<Burn|Hole|Torn|Impact|Strafe|Melt|Gouge|Blast>` sono decalcomanie deferred (atlante `T_ShipDamage_A`, parametri `Heat`, `Breach`, `Fade` come le cicatrici del gioco).
+- **Luci**: `Intensity` dei radiatori come prima (il calore dell'Aquila); finestre e luci di via in `M_ASTRA_ShipLight` (modalità 0 finestre, 1 luci di via, 2 scia dei motori, 3 pannelli).
+- **Misure**: sono cambiate rispetto alla v2 (Aquila 799 × 140 × 92 m contro 826 × 197 × 167; Praetorian 1129 contro 975 m): ricontrollare i raggi usati dal gioco
+  (`extract_nav_lights.py` legge le mesh nuove).

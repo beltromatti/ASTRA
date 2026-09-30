@@ -76,7 +76,6 @@ def text_proto(text: str, depth: float = 0.03, res: int = 2, flat: bool = False)
     bpy.data.meshes.remove(me)
     V[:, 2] += depth / 2.0
     # drop the back faces (they sit on the hull): triangles lying flat at z = 0
-    zmax = V[:, 2].max()
     flat_back = np.all(V[F][:, :, 2] < 1e-6, axis=1)
     if flat:                                                                   # a sticker: keep only the front faces, not the thin side walls
         flat_back = flat_back | ~np.all(V[F][:, :, 2] > depth - 1e-6, axis=1)

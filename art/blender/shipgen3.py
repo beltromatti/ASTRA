@@ -24,7 +24,6 @@ manifest.json lists per mesh: triangles, size, bounds, slots, and for the pieces
 from __future__ import annotations
 
 import json
-import math
 import os
 import sys
 import time
@@ -207,7 +206,6 @@ def main() -> None:
             if k in info:
                 entry[k] = info[k]
         manifest["meshes"][name] = entry
-        cap_tris = g.triangles(cap=True)
         print(f"{name}: {st['tris']:,} tris, {len(mats)} slots, {st['size_m']} m, {time.time() - t0:.1f}s")
         # ---------------------------------------------------------------------------------- the section pieces
         pieces = {}

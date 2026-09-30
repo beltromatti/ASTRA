@@ -14,7 +14,6 @@ from dataclasses import replace
 
 import numpy as np
 
-import ship3_cut
 import ship3_geo as G
 import ship3_hull as H
 import ship3_kit as K

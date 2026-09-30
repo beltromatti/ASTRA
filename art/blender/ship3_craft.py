@@ -14,7 +14,6 @@ import numpy as np
 
 import ship3_geo as G
 import ship3_hull as H
-import ship3_kit as K
 import ship3_kit2 as K2
 import ship3_loft as LF
 import ship3_mandate as MD
@@ -122,7 +121,7 @@ def missile(c: Ctx, p0, length: float, r: float, mandate: bool) -> None:
 # ============================================================================================================ the craft
 def build_falcon(c: Ctx) -> dict:
     """Falcon: Alpha Squadron's fighter, 18 m."""
-    g, rng, m = c.g, c.rng, c.m
+    g, m = c.g, c.m
     L = 18.0
     w, h = L * 0.075, L * 0.06
     wp = [(0.0, 0.62), (0.12, 0.95), (0.5, 1.0), (0.78, 0.7), (1.0, 0.1)]
@@ -188,7 +187,7 @@ def _craft_marks(c: Ctx, fac: str, L: float, h: float, w: float) -> None:
 
 def build_hammer(c: Ctx) -> dict:
     """Hammer: Bravo Squadron's bomber, 26 m: a broad fuselage, torpedo on the keel, big wings, twin engines."""
-    g, rng, m = c.g, c.rng, c.m
+    g, m = c.g, c.m
     L = 26.0
     w, h = L * 0.1, L * 0.06
     wp = [(0.0, 0.62), (0.12, 0.95), (0.5, 1.0), (0.78, 0.7), (1.0, 0.1)]
@@ -360,7 +359,7 @@ def build_wasp(c: Ctx) -> dict:
 
 def build_harpy(c: Ctx) -> dict:
     """Harpy: the Mandate's attack fighter, 16 m: forward-swept wings, a single tail blade, cannons in the wing roots, patched."""
-    g, rng, m = c.g, c.rng, c.m
+    g, m = c.g, c.m
     L = 16.0
     w, h = L * 0.075, L * 0.06
     wp = [(0.0, 0.62), (0.12, 0.95), (0.5, 1.0), (0.78, 0.7), (1.0, 0.1)]

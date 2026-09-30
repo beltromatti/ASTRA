@@ -10,14 +10,13 @@ from dataclasses import replace
 
 import numpy as np
 
-import ship3_cut
 import ship3_geo as G
 import ship3_hull as H
 import ship3_kit as K
 import ship3_kit2 as K2
 import ship3_loft as LF
 import ship3_text as TX
-from ship3_astra import (GOLD, NAVY, PRE, astra_sec, astra_style, flank_plating, flat_field, on_zone, ring_rect, top_z)
+from ship3_astra import (PRE, astra_sec, astra_style, flank_plating, flat_field, on_zone, ring_rect, top_z)
 from ship3_cut import make_all_cuts
 from ship3_kit import Ctx, Xf
 
@@ -143,7 +142,6 @@ class Warship:
     def engines(self) -> None:
         c, g, rng, sp = self.c, self.g, self.rng, self.sp
         e = sp["engines"]
-        Hh = sp["H"]
         sec = LF.chamfer_rect(e["w"], e["h"], 0.3)
         xa, xb = sp["x_st"] - e["len"], sp["x_st"]
         blk = LF.Loft.along_x([(x, sec, 0.0) for x in (xa, 0.5 * (xa + xb), xb)])
@@ -257,8 +255,7 @@ class Warship:
         if "emblem_at" in m:
             ex, ew, dia = m["emblem_at"]
             zone = hull.zone(4)
-            outline_c = 0.5 * dia
-            field = flat_field(c, zone, ex - dia * 0.6, ex + dia * 0.6, ew - dia * 0.6 / zone.sw(ex), ew + dia * 0.6 / zone.sw(ex), "Plate", 0.4)
+            flat_field(c, zone, ex - dia * 0.6, ex + dia * 0.6, ew - dia * 0.6 / zone.sw(ex), ew + dia * 0.6 / zone.sw(ex), "Plate", 0.4)
             P, N, _ = zone.frame(np.array([ex]), np.array([ew]))
             TX.astra_emblem(g, P[0] + N[0] * 0.4, N[0], dia, c.m("Marking"), up=(1.0, 0.0, 0.0), depth=0.08)
 

@@ -9,7 +9,6 @@ lines. Everything is numpy; a ship's plating is a few thousand calls.
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 
 import numpy as np
