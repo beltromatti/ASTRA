@@ -24,6 +24,7 @@
 #include "WebSocketsModule.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "AstraSettings.h"
 #include "AstraVoiceWave.h"
 
 namespace
@@ -647,8 +648,6 @@ UAstraVoiceWave* UAstraMindSubsystem::BeginChannelLine(int32 LineId, int32 Rate)
 			ChannelAudio->SetLowPassFilterFrequency(3600.f);
 			ChannelAudio->SetHighPassFilterEnabled(true);
 			ChannelAudio->SetHighPassFilterFrequency(320.f);
-			// the band takes ~3.5 dB of loudness away: the radio must not sound quieter than a voice in the room (§4.1)
-			ChannelAudio->SetVolumeMultiplier(1.5f);
 			ChannelAudio->bOverridePriority = true;
 			ChannelAudio->Priority = 4.f;
 			ChannelAudio->bIsUISound = false;
@@ -662,6 +661,8 @@ UAstraVoiceWave* UAstraMindSubsystem::BeginChannelLine(int32 LineId, int32 Rate)
 	{
 		return nullptr;
 	}
+	// the band takes ~3.5 dB of loudness away: the radio must not sound quieter than a voice in the room (§4.1)
+	ChannelAudio->SetVolumeMultiplier(1.5f * FAstraSettings::Get().Voices);
 	ChannelAudio->Play();
 	UE_LOG(LogASTRA, Log, TEXT("[Mind] channel voice (line %d)"), LineId);
 	return ChannelAudio->IsPlaying() ? ChannelWave.Get() : nullptr;

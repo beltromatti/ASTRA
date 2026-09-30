@@ -13,6 +13,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "Sound/SoundAttenuation.h"
+#include "AstraSettings.h"
 #include "AstraVoiceWave.h"
 #include "Engine/World.h"
 
@@ -316,6 +317,7 @@ UAstraVoiceWave* AAstraCrewMember::BeginLine(int32 LineId, int32 SampleRate)
 	CurrentWave = NewObject<UAstraVoiceWave>(this);
 	CurrentWave->Setup(SampleRate);
 	Voice->SetSound(CurrentWave);
+	Voice->SetVolumeMultiplier(FAstraSettings::Get().Voices);
 	Voice->Play();
 	UE_LOG(LogASTRA, Log, TEXT("[Crew] %s speaking (line %d)"), *StationId, LineId);
 	return Voice->IsPlaying() ? CurrentWave.Get() : nullptr;

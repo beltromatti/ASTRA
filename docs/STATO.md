@@ -470,7 +470,7 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 2. **Altri ponti**: armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia; conversazioni sussurrate al tavolo degli alloggi.
 3. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
 4. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
-5. **Distribuzione, seconda parte**: la firma per altri Mac (serve un account sviluppatore Apple); un menu delle impostazioni grafiche nel gioco; una cache PSO registrata (niente scatti alla prima comparsa di un effetto).
+5. **Distribuzione, seconda parte**: la firma per altri Mac (serve un account sviluppatore Apple); ~~un menu delle impostazioni grafiche nel gioco~~ (fatto il 30/9: SETTINGS nel menu — qualità, nitidezza come soglia della risoluzione dinamica 70/55/40 %, 30 o 60 fps, volumi di musica e voci, sottotitoli; salvate in GameUserSettings.ini); una cache PSO registrata (niente scatti alla prima comparsa di un effetto).
 6. **M8, preparazione al multigiocatore**: progetto scritto in `docs/MULTIGIOCATORE.md`; primi passi senza rischi: la nave del giocatore come indice (non più `Ships[0]`) e la conoscenza dei sensori per osservatore.
 
 ## Come provarlo (per l'utente)

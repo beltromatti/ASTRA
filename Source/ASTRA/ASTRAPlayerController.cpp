@@ -27,6 +27,7 @@
 #include "ASTRA.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "AstraMindSubsystem.h"
+#include "AstraSettings.h"
 #include "AstraInput.h"
 #include "AstraHarness.h"
 #include "ASTRACharacter.h"
@@ -800,6 +801,11 @@ void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 		ListeningA = FMath::FInterpConstantTo(ListeningA, bHeard ? 1.f : 0.f, DeltaTime, bHeard ? 8.f : 2.5f);
 		const float Pulse = Mind && Mind->IsCaptainTalking() ? 0.75f + 0.25f * FMath::Sin(GetWorld()->GetRealTimeSeconds() * 6.f) : 0.6f;
 		ListeningText->SetColorAndOpacity(FLinearColor(1.f, 0.84f, 0.47f, ListeningA * Pulse));
+	}
+	// subtitles off in the settings: the crew's spoken lines go unwritten (notices and the Captain's own words stay)
+	if (!FAstraSettings::Get().bSubtitles)
+	{
+		SubLines.RemoveAll([](const FSubLine& L) { return L.bVoiced; });
 	}
 	for (int32 i = 0; i < SubRows.Num(); ++i)
 	{
