@@ -24,6 +24,15 @@ vertex VOut fs_vs(uint Vid [[vertex_id]]) { float2 P = float2(float((Vid << 1) &
 struct FOut { float Depth [[depth(any)]]; };
 fragment FOut fs_depth(VOut In [[stage_in]], texture2d<float, access::read> Src [[texture(0)]]) { FOut O; O.Depth = Src.read(uint2(In.Pos.xy)).x; return O; }
 kernel void fill_eye(texture2d<float, access::write> Out [[texture(0)]], constant float& E [[buffer(0)]], uint2 gid [[thread_position_in_grid]]) { Out.write(float4(E, 0, 0, 1.0), gid); }
+kernel void poison(texture2d<half, access::read_write> C [[texture(0)]], constant uint4& R [[buffer(0)]], uint2 gid [[thread_position_in_grid]])
+{
+	// R = x0, y0, x1, y1: poison a block of texels with a mix of NaN, +Inf, -Inf and negative values.
+	uint2 p = gid + R.xy;
+	if (p.x >= R.z || p.y >= R.w) return;
+	uint k = (p.x + p.y) % 4;
+	half v = k == 0 ? half(NAN) : (k == 1 ? half(INFINITY) : (k == 2 ? half(-INFINITY) : half(-5.0)));
+	C.write(half4(v, v, v, 1.0h), p);
+}
 kernel void clear_velocity(texture2d<float, access::write> Out [[texture(0)]], uint2 gid [[thread_position_in_grid]])
 { if (gid.x < Out.get_width() && gid.y < Out.get_height()) Out.write(float4(0.0), gid); }
 )MSL";
@@ -59,7 +68,7 @@ struct FRig
 {
 	id<MTLDevice> Dev; id<MTLCommandQueue> Q;
 	FHeap Heap;
-	id<MTLComputePipelineState> PsoRender, PsoFillEye, PsoClearVel;
+	id<MTLComputePipelineState> PsoRender, PsoFillEye, PsoClearVel, PsoPoison;
 	id<MTLRenderPipelineState> RPS; id<MTLDepthStencilState> DSS;
 	double HalfFov = 45.0 * M_PI / 180.0; float MinZ = 5.0f;
 
@@ -68,7 +77,7 @@ struct FRig
 		Dev = MTLCreateSystemDefaultDevice(); Q = [Dev newCommandQueue];
 		Heap.Init(Dev, 768ull * 1024 * 1024);
 		id<MTLLibrary> Lib = MakeLib(Dev, kSrcScene), DLib = MakeLib(Dev, kSrcDepthFill);
-		PsoRender = MakePSO(Dev, Lib, "e2e_render"); PsoFillEye = MakePSO(Dev, DLib, "fill_eye"); PsoClearVel = MakePSO(Dev, DLib, "clear_velocity");
+		PsoRender = MakePSO(Dev, Lib, "e2e_render"); PsoFillEye = MakePSO(Dev, DLib, "fill_eye"); PsoClearVel = MakePSO(Dev, DLib, "clear_velocity"); PsoPoison = MakePSO(Dev, DLib, "poison");
 		MTLRenderPipelineDescriptor* RPD = [MTLRenderPipelineDescriptor new];
 		RPD.vertexFunction = [DLib newFunctionWithName:@"fs_vs"]; RPD.fragmentFunction = [DLib newFunctionWithName:@"fs_depth"];
 		RPD.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8; RPD.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
@@ -266,6 +275,47 @@ int main()
 		FTextures Dyn = MakeTextures(R, 1024, 600, OutW, OutH, 672, 378);
 		double PDyn = RunScene("dynamic resolution, 40%..70% changing every frame", Dyn, S, [&](int F, int& W, int& H) { float Fr = 0.42f + 0.28f * (0.5f + 0.5f * sinf(F * 0.7f)); W = (int)ceilf(OutW * Fr); H = (int)ceilf(OutH * Fr); }, 0, 0, true, true);
 		Check(PDyn > 17.5, "dynamic resolution still converges (> 17.5 dB)");
+
+		printf("non-finite input\n");
+		{
+			// A few frames have NaN, +-Inf and negative texels in a block of the colour (a material that divided by zero): what
+			// does MetalFX leave in its output, and how long does it take to recover?
+			FTextures T = MakeTextures(R, 1024, 600, OutW, OutH, CW0, CH0);
+			std::shared_ptr<FScaler> Sp = FScaler::Create(R.Dev, OutW, OutH, Err);
+			auto CountBad = [&](int& NonFinite, double& MaxAbs) {
+				id<MTLTexture> Sh = MakeTex2D(R.Dev, MTLPixelFormatRGBA16Float, OutW, OutH, MTLTextureUsageShaderRead, MTLStorageModeShared);
+				RunCB(R.Q, ^(id<MTLCommandBuffer> CB) { id<MTLBlitCommandEncoder> B = [CB blitCommandEncoder]; [B copyFromTexture:T.Output toTexture:Sh]; [B endEncoding]; });
+				std::vector<_Float16> Raw((size_t)OutW * OutH * 4);
+				[Sh getBytes:Raw.data() bytesPerRow:(size_t)OutW * 8 fromRegion:MTLRegionMake2D(0, 0, OutW, OutH) mipmapLevel:0];
+				NonFinite = 0; MaxAbs = 0;
+				for (size_t i = 0; i < (size_t)OutW * OutH * 4; ++i) { float V = (float)Raw[i]; if (!std::isfinite(V)) ++NonFinite; else MaxAbs = std::max(MaxAbs, (double)fabsf(V)); }
+			};
+			const int PoisonFrame = 10;
+			for (int F = 0; F < Frames; ++F)
+			{
+				float Jx = Halton(F % 26 + 1, 2) - 0.5f, Jy = Halton(F % 26 + 1, 3) - 0.5f;
+				float C2P[16]; RenderInputs(R, T, F, CW0, CH0, 0, 0, Jx, Jy, C2P);
+				if (F == PoisonFrame)
+				{
+					RunCB(R.Q, ^(id<MTLCommandBuffer> CB) {
+						id<MTLComputeCommandEncoder> E = [CB computeCommandEncoder];
+						simd_uint4 Box = { 200, 120, 240, 160 };
+						[E setComputePipelineState:R.PsoPoison]; [E setTexture:T.Color atIndex:0]; [E setBytes:&Box length:16 atIndex:0];
+						[E dispatchThreadgroups:MTLSizeMake(3, 3, 1) threadsPerThreadgroup:MTLSizeMake(16, 16, 1)];
+						[E endEncoding];
+					});
+				}
+				Sp->Encode(R.Q, MakeFrame(T, CW0, CH0, 0, 0, Jx, Jy, C2P, F == 0, false, false));
+				if (F == PoisonFrame || F == PoisonFrame + 1 || F == PoisonFrame + 4 || F == PoisonFrame + 12 || F == Frames - 1)
+				{
+					WaitAll(R);
+					int Bad; double Max; CountBad(Bad, Max);
+					printf("    after frame %2d (%s): %d non-finite output values, largest finite value %.2f\n", F, F < PoisonFrame ? "before" : (F == PoisonFrame ? "poisoned input" : "recovering"), Bad, Max);
+					if (F == Frames - 1) Check(Bad == 0, "no non-finite value left in the output a few dozen frames after the poisoned frame");
+				}
+			}
+			WaitAll(R);
+		}
 
 		printf("timings\n");
 		FTimings Tm = S->Timings();
