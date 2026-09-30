@@ -47,6 +47,10 @@ DECKS = globals().get("DECKS", [4, 6])
 REBUILD_KIT = globals().get("REBUILD_KIT", True)
 LOCK_STAIRS = globals().get("LOCK_STAIRS", True)
 REMOVE_LIFT_LEAVES = globals().get("REMOVE_LIFT_LEAVES", True)
+# the whole ship is exposed like the bridge (EV100 6.6, the level's one post-process volume, which the older rooms are lit for):
+# the plan's lamps are rated for a dim ship (~50 lux in the Concourse); at 6x (~300 lux, a working deck) the decks read right in the
+# game (tried 30/9: +2.6 stops is where the Spine and the Concourse look lit, not glaring)
+LIGHT_GAIN = globals().get("LIGHT_GAIN", 6.0)
 SAVE_LEVEL = globals().get("SAVE_LEVEL", True)
 
 eal = unreal.EditorAssetLibrary
@@ -279,7 +283,7 @@ def add_light(cid, ld, deck):
         a = eas.spawn_actor_from_class(unreal.PointLight, pos, R())
         c = a.get_component_by_class(unreal.PointLightComponent)
     c.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
-    c.set_editor_property("intensity", float(ld["lumens"]))
+    c.set_editor_property("intensity", float(ld["lumens"]) * LIGHT_GAIN)
     c.set_editor_property("attenuation_radius", float(ld.get("radius", 1000.0)))
     c.set_editor_property("use_temperature", True)
     c.set_editor_property("temperature", float(ld.get("temperature", 5000.0)))
