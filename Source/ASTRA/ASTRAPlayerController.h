@@ -30,6 +30,8 @@ public:
 	bool IsSeated() const { return bSeated; }
 	/** Out of the captain's chair (W while seated, or E). */
 	void StandUp() { if (bSeated) { SetSeated(false); } }
+	/** A short notice at the bottom right of the screen (the start hint, "OPS › DATAPAD: DAMAGE REPORT"). */
+	void ShowNotice(const FString& Text, float Seconds);
 
 protected:
 

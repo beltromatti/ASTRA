@@ -66,30 +66,10 @@ void AASTRAPlayerController::BeginPlay()
 	{
 		GetWorldTimerManager().SetTimerForNextTick([this]()
 		{
-			UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
-			if (!VC || HintWidget.IsValid())
+			if (!HintWidget.IsValid())
 			{
-				return;
+				ShowNotice(TEXT("F1  controls  ·  W or E  stand up  ·  hold V  talk to the crew  ·  T  type  ·  Tab  datapad"), 45.f);
 			}
-			UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
-			HintWidget = SNew(SBox).HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 28, 22))
-			[
-				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.7f))
-				.Padding(FMargin(14, 8))
-				[
-					SNew(STextBlock).Font(Mono ? FSlateFontInfo(Mono, 13) : FCoreStyle::GetDefaultFontStyle("Mono", 13))
-					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  W or E  stand up  ·  hold V  talk to the crew  ·  T  type  ·  Tab  datapad")))
-				]
-			];
-			VC->AddViewportWidgetContent(HintWidget.ToSharedRef(), 5);
-			GetWorldTimerManager().SetTimer(HintTimer, [this]()
-			{
-				if (HintWidget.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
-				{
-					GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
-					HintWidget.Reset();
-				}
-			}, 45.f, false);
 		});
 	}
 	if (IsLocalPlayerController() && bStartSeated)
@@ -135,6 +115,23 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
 		InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AASTRAPlayerController::OnTypePressed);
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AASTRAPlayerController::TogglePad);
+		// the datapad's pages: the mouse wheel while it is raised
+		auto Wheel = [this](const FKey& K, int32 Dir)
+		{
+			FInputKeyBinding B(FInputChord(K), IE_Pressed);
+			B.bConsumeInput = false;
+			B.KeyDelegate.GetDelegateForManualSet().BindLambda([this, Dir]()
+			{
+				UAstraScreensSubsystem* Screens = GetWorld() ? GetWorld()->GetSubsystem<UAstraScreensSubsystem>() : nullptr;
+				if (bPadUp && Screens)
+				{
+					Screens->CyclePad(Dir);
+				}
+			});
+			InputComponent->KeyBindings.Add(B);
+		};
+		Wheel(EKeys::MouseScrollDown, 1);
+		Wheel(EKeys::MouseScrollUp, -1);
 		// the lift's panel (only while it is open)
 		auto Deck = [this](const FKey& K, int32 N)
 		{
@@ -354,6 +351,39 @@ void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
 			Ship->PublishEvent(TEXT("flight: the Captain has climbed into a Falcon of Alpha on the port catapult"), true);
 		}
 	}
+}
+
+void AASTRAPlayerController::ShowNotice(const FString& Text, float Seconds)
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC)
+	{
+		return;
+	}
+	if (HintWidget.IsValid())
+	{
+		VC->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
+		HintWidget.Reset();
+	}
+	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	HintWidget = SNew(SBox).HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 28, 22))
+	[
+		SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.7f))
+		.Padding(FMargin(14, 8))
+		[
+			SNew(STextBlock).Font(Mono ? FSlateFontInfo(Mono, 13) : FCoreStyle::GetDefaultFontStyle("Mono", 13))
+			.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(Text))
+		]
+	];
+	VC->AddViewportWidgetContent(HintWidget.ToSharedRef(), 5);
+	GetWorldTimerManager().SetTimer(HintTimer, [this]()
+	{
+		if (HintWidget.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
+		{
+			GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
+			HintWidget.Reset();
+		}
+	}, Seconds, false);
 }
 
 void AASTRAPlayerController::TogglePad()

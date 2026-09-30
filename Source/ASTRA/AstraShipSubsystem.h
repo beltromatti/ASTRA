@@ -233,6 +233,7 @@ public:
 	/** One of our manned aircraft was shot down: who was flying it (for the flight report). */
 	FString AircrewLost() { return Roster.AircrewLost(CasualtyRng); }
 	const FAstraCrewRoster& GetRoster() const { return Roster; }
+	const TMap<FString, FString>& GetSquadrons() const { return Squadrons; }
 
 	FAstraShipEvent OnShipEvent;
 	FAstraAlertChanged OnAlertChanged;

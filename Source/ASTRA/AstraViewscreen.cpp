@@ -39,6 +39,16 @@ namespace
 			}
 		}));
 
+	FAutoConsoleCommandWithWorldAndArgs CmdViewscreenWhat(TEXT("astra.viewscreen.what"),
+		TEXT("Testing: astra.viewscreen.what (every visible thing in the optical sensors' field of view, nearest first)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			for (TActorIterator<AAstraViewscreen> It(World); It; ++It)
+			{
+				It->LogWhatIsInView();
+			}
+		}));
+
 	using FContact = UAstraBattleSubsystem::FContactView;
 	const FLinearColor ColAstra(0.40f, 0.74f, 1.0f);
 	const FLinearColor ColMandate(1.0f, 0.60f, 0.20f);
@@ -237,9 +247,9 @@ void AAstraViewscreen::BeginPlay()
 	PP.bOverride_AutoExposureMethod = true;
 	PP.AutoExposureMethod = EAutoExposureMethod::AEM_Histogram;
 	PP.bOverride_AutoExposureMinBrightness = PP.bOverride_AutoExposureMaxBrightness = true;
-	// the sensor's gain: like the eye through the window, but it may lift a ship's dark side up to 2.5 stops
-	PP.AutoExposureMinBrightness = EV - 2.5f;
-	PP.AutoExposureMaxBrightness = EV;
+	// the sensor's gain: one stop over the eye at the window, fixed. An adaptive gain lifted the empty sky around a
+	// small ship until a zoomed patch of nebula filled the frame with a flat blue.
+	PP.AutoExposureMinBrightness = PP.AutoExposureMaxBrightness = EV - 1.f;
 	PP.bOverride_AutoExposureBias = true;
 	PP.AutoExposureBias = 0.f;
 	PP.bOverride_DynamicGlobalIlluminationMethod = true;
@@ -1001,4 +1011,43 @@ bool AAstraViewscreen::Dump(const FString& Path) const
 	TArray64<uint8> Png;
 	FImageUtils::PNGCompressImageArray(FeedWidth, FeedHeight, TArrayView64<const FColor>(Fp.GetData(), Fp.Num()), Png);
 	return Png.Num() > 0 && FFileHelper::SaveArrayToFile(Png, *Path);
+}
+
+void AAstraViewscreen::LogWhatIsInView() const
+{
+	const FVector Fwd = CamRot.GetForwardVector();
+	const double HalfTan = FMath::Tan(FMath::DegreesToRadians(Fov * 0.5)) * 1.2;   // a little wider than the frame
+	TArray<TPair<double, FString>> Seen;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->IsHidden() || *It == this)
+		{
+			continue;
+		}
+		TArray<UPrimitiveComponent*> Prims;
+		It->GetComponents<UPrimitiveComponent>(Prims);
+		for (const UPrimitiveComponent* P : Prims)
+		{
+			if (!P || !P->IsVisible() || !P->IsRegistered())
+			{
+				continue;
+			}
+			const FBoxSphereBounds& B = P->Bounds;
+			const FVector D = B.Origin - CamPos;
+			const double X = FVector::DotProduct(D, Fwd);
+			const double Lat = (D - Fwd * X).Size();
+			// the bounds sphere touches the cone of the view (or contains the camera)
+			if (D.Size() < B.SphereRadius || (X > -B.SphereRadius && Lat - B.SphereRadius < FMath::Max(X, 0.0) * HalfTan))
+			{
+				Seen.Add({FMath::Max(0.0, D.Size() - B.SphereRadius), FString::Printf(TEXT("%s.%s (%s, r %.0f m)"), *It->GetName(), *P->GetName(),
+				                                                                        *P->GetClass()->GetName(), B.SphereRadius / 100.0)});
+			}
+		}
+	}
+	Seen.Sort([](const TPair<double, FString>& L, const TPair<double, FString>& R) { return L.Key < R.Key; });
+	UE_LOG(LogASTRA, Display, TEXT("[Viewscreen] in view (FOV %.2f, %s): %d"), Fov, *Describe(), Seen.Num());
+	for (int32 i = 0; i < FMath::Min(Seen.Num(), 40); ++i)
+	{
+		UE_LOG(LogASTRA, Display, TEXT("[Viewscreen]   %8.1f km  %s"), Seen[i].Key / 100000.0, *Seen[i].Value);
+	}
 }

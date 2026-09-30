@@ -123,6 +123,18 @@ namespace
 			}
 			Ship->TestMedbay(A[0], A.Num() > 1 ? FCString::Atoi(*A[1]) : 3);
 		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdHit(TEXT("astra.ship.hit"),
+		TEXT("Testing: astra.ship.hit [hull damage per hit = 60] [hits = 3] (hits through the shields, from random directions)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			const float Dmg = A.Num() > 0 ? FCString::Atof(*A[0]) : 60.f;
+			const int32 N = A.Num() > 1 ? FCString::Atoi(*A[1]) : 3;
+			for (int32 i = 0; Ship && i < N; ++i)
+			{
+				Ship->OnHullHit(Dmg, 0.f, FMath::VRand());
+			}
+		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdHeat(TEXT("astra.heat"),
 		TEXT("Testing: astra.heat <percent> sets the ship's thermal load"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)

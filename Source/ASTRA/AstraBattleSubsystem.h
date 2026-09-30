@@ -450,6 +450,7 @@ public:
 		bool bFiringAtUs = false;  // its guns or its commander's orders are on the Aquila
 		bool bDerelict = false;
 		bool bJamming = false;
+		bool bUnknown = false;     // not classified yet (or running cold) and not shown hostile: of no known side
 		FVector Pos = FVector::ZeroVector;   // m, system frame (bearing-only: somewhere along the bearing)
 		FVector Vel = FVector::ZeroVector;   // m/s (zero when unknown)
 		double RangeKm = -1.0;               // -1 unknown

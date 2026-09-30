@@ -90,6 +90,7 @@ private:
 	void TickSensors();
 	void TickEngineering();
 	void TickFlight();
+	void TickOps();
 	void Expire(const FString& Station, const FString& AspectName, const FString& Fallback, const FString& Why);
 	void UpdateStatus();
 };

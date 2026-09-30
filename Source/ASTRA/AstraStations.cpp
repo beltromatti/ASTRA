@@ -1,4 +1,5 @@
 #include "AstraStations.h"
+#include "AstraScreensSubsystem.h"
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraHarness.h"
@@ -226,6 +227,7 @@ void UAstraStationsSubsystem::Defaults()
 	Set(Ops, TEXT("viewscreen"), TEXT("auto"));
 	Set(Ops, TEXT("holo"), TEXT("tactical"));
 	Set(Ops, TEXT("damage_control"), TEXT("auto"));
+	Set(Ops, TEXT("datapad"), TEXT("push"));             // the last page sent to the Captain (none yet)
 	FAstraStation& Eng = Station(TEXT("engineering"), TEXT("engineering"));
 	Set(Eng, TEXT("power"), TEXT("balanced"));
 	Set(Eng, TEXT("heat"), TEXT("auto"));
@@ -626,6 +628,20 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 	}
 	if (Station == TEXT("ops"))
 	{
+		if (AspectName == TEXT("datapad"))
+		{
+			// a page sent to the Captain's datapad: overview, contact{focus}, damage, fleet, orders
+			UAstraScreensSubsystem* Scr = GetWorld()->GetSubsystem<UAstraScreensSubsystem>();
+			const FString Page = Str(A.Params, TEXT("page"), TEXT("overview")).ToLower();
+			const FString Focus = Str(A.Params, TEXT("focus"), Target);
+			if (!Scr || !Scr->PushPad(Page, Focus, TEXT("ops")))
+			{
+				Detail = TEXT("datapad pages: overview, contact {focus: contact id}, damage, fleet, orders");
+				return false;
+			}
+			Detail = FString::Printf(TEXT("datapad: the %s page%s is on the Captain's datapad"), *Page, Focus.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" on %s"), *Focus));
+			return true;
+		}
 		if (AspectName == TEXT("holo"))
 		{
 			return Command(TEXT("holo_display"), Obj({{TEXT("mode"), M == TEXT("ship") ? TEXT("tactical") : M}}), Detail);
@@ -787,7 +803,67 @@ void UAstraStationsSubsystem::Tick(float DeltaTime)
 	TickSensors();
 	TickEngineering();
 	TickFlight();
+	TickOps();
 	UpdateStatus();
+}
+
+void UAstraStationsSubsystem::TickOps()
+{
+	// damage control on auto: every free team to the worst open incident — breaches first (the air goes), then fires
+	// (they spread), then the power conduits of what a fight needs; "priority {what}" puts one kind, system or deck first
+	UAstraShipSubsystem* Sh = Ship();
+	const FAstraStation* S = Stations.Find(TEXT("ops"));
+	const FAstraStationAspect* A = S ? S->Aspects.Find(TEXT("damage_control")) : nullptr;
+	if (!Sh || !A || S->Delegation != TEXT("auto"))
+	{
+		return;
+	}
+	const TArray<FAstraDamage>& Dmg = Sh->GetDamage();
+	int32 Busy = 0;
+	for (const FAstraDamage& D : Dmg)
+	{
+		Busy += D.Team >= 0 ? 1 : 0;
+	}
+	if (Busy >= Sh->GetNumDamageTeams())
+	{
+		return;
+	}
+	const FString What = A->Mode == TEXT("priority") ? Str(A->Params, TEXT("what"), Str(A->Params, TEXT("target"))).ToLower() : FString();
+	auto Score = [&What](const FAstraDamage& D)
+	{
+		float Sc = D.Kind.Contains(TEXT("breach")) ? 100.f : (D.Kind.Contains(TEXT("fire")) ? 80.f : 50.f);
+		if (D.System.Contains(TEXT("shield")) || D.System.Contains(TEXT("weapon")) || D.System.Contains(TEXT("engine")))
+		{
+			Sc += 10.f;
+		}
+		if (!What.IsEmpty() && (D.Kind.Contains(What) || D.System.Contains(What) || D.Where().Contains(What)))
+		{
+			Sc += 200.f;
+		}
+		return Sc;
+	};
+	const FAstraDamage* Best = nullptr;
+	for (const FAstraDamage& D : Dmg)
+	{
+		if (D.Team < 0 && (!Best || Score(D) > Score(*Best)))
+		{
+			Best = &D;
+		}
+	}
+	if (!Best)
+	{
+		return;
+	}
+	const FString Kind = Best->Kind, Where = Best->Where();   // copies: the command changes the list
+	TSharedPtr<FJsonObject> Args = MakeShared<FJsonObject>();
+	Args->SetNumberField(TEXT("deck"), Best->Deck);
+	Args->SetStringField(TEXT("section"), FString::Chr(Best->Section));
+	Args->SetStringField(TEXT("priority"), Kind.Contains(TEXT("breach")) ? TEXT("critical") : TEXT("normal"));
+	FString Detail;
+	if (Command(TEXT("dispatch_damage_control"), Args, Detail))
+	{
+		Act(TEXT("ops"), FString::Printf(TEXT("damage control: a team to the %s at %s"), *Kind, *Where), false);
+	}
 }
 
 void UAstraStationsSubsystem::Expire(const FString& Station, const FString& AspectName, const FString& Fallback, const FString& Why)

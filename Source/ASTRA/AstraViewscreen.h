@@ -43,6 +43,8 @@ public:
 	FString Describe() const;
 	/** The image as it is on the screen now, at full resolution, to a PNG (testing: astra.viewscreen.dump). */
 	bool Dump(const FString& Path) const;
+	/** Testing: log every visible component in the camera's field of view, nearest first (astra.viewscreen.what). */
+	void LogWhatIsInView() const;
 
 private:
 	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Screen;

@@ -20,18 +20,27 @@ void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 		FContactView V;
 		V.Id = S.Id;
 		V.ContactId = S.ContactId;
-		V.Side = S.Side;
+		// what the Aquila believes, not the truth: an unclassified or cold contact is of no known side until it shows
+		// itself (the holo table's rule, GetHoloBlips); a decoy is made to look like a Mandate warship
+		const bool bUnknown = (S.bFog ? !S.bClassified : !S.bIdentified) || S.bCold;
+		V.bUnknown = bUnknown && !S.bHostile && !S.bGhost;
+		V.Side = S.bGhost ? EAstraSide::Mandate : (V.bUnknown ? EAstraSide::Neutral : S.Side);
 		V.Track = S.Track;
 		V.bCraft = S.bCraft;
 		V.bDerelict = S.bDerelict;
-		V.bCapital = !S.bCraft && !S.bDerelict && S.Side != EAstraSide::Neutral;
+		V.bCapital = !S.bCraft && !S.bDerelict && V.Side != EAstraSide::Neutral;
 		V.bFleeing = S.bFleeing;
 		V.bJamming = S.bJamming;
 		V.bFiringAtUs = S.Side == EAstraSide::Mandate && !S.bHoldFire && (S.TargetId == P.Id || S.FireTarget == P.Id);
 		V.RadiusM = S.Radius;
 		const bool bFirm = S.Track >= 2;
-		V.Class = (S.bClassified || !S.bFog) ? S.Class : FString();
-		V.Label = (S.bIdentified || !S.bFog) ? S.Name : !V.Class.IsEmpty() ? FString::Printf(TEXT("%s (%s class)"), *S.ContactId, *V.Class) : S.ContactId;
+		V.Class = !bUnknown ? S.Class : FString();
+		FString Head, Short;
+		if (!V.Class.Split(TEXT(", "), &Head, &Short))
+		{
+			Short = V.Class;             // "Kharon Mandate cruiser, Acheron class" -> "Acheron class"
+		}
+		V.Label = S.bIdentified ? S.Name : (!V.Class.IsEmpty() ? FString::Printf(TEXT("%s (%s)"), *S.ContactId, *Short) : S.ContactId);
 		V.BearingDeg = BearingDeg(P.Pos, S.Pos);
 		V.MarkDeg = MarkDeg(P.Pos, S.Pos);
 		if (bFirm)
