@@ -101,7 +101,7 @@ class Laws:
         self.bo_seat = [(0.0, 0.010), (0.5, 0.034), (1.0, 0.046)]
         self.th_seat = [(0.0, 0.032), (1.0, 0.052)]
         if command:
-            self.w_back = [(0.0, 0.200 * s), (0.22, 0.190 * s), (0.42, 0.205 * s), (0.66, 0.250 * s), (0.84, 0.250 * s), (1.0, 0.165 * s)]
+            self.w_back = [(0.0, 0.200 * s), (0.22, 0.190 * s), (0.42, 0.205 * s), (0.66, 0.240 * s), (0.84, 0.228 * s), (1.0, 0.150 * s)]
             self.bo_back = [(0.0, 0.05), (0.4, 0.07), (0.66, 0.125), (1.0, 0.07)]
         else:
             self.w_back = [(0.0, 0.190 * s), (0.25, 0.176 * s), (0.45, 0.186 * s), (0.68, 0.226 * s), (0.86, 0.230 * s), (1.0, 0.160 * s)]
@@ -184,8 +184,8 @@ def chair_shell_parts(b: Parts, scale: float = 1.0, command: bool = False, capta
     bean_part(fb, prof, laws, "seat", 0.0, 1.0, shell, cap0=0.05, cap1=0.03, nres=18, e=4.6, nphi=36)
     bean_part(fb, prof, laws, "back", 0.03, 1.0, shell, cap0=0.03, cap1=0.06, nres=36, e=4.6, nphi=36)
     # the carbon inset on the back of the shell (a proud panel) and a slim ridge along the spine
-    bean_part(fb, prof, laws, "back", 0.12, 0.90, inset, w_scale=0.74, lift=lambda g: -laws.th("back", g) + 0.004, thick=0.014, cap0=0.02, cap1=0.03,
-              nres=20, e=5.0)
+    bean_part(fb, prof, laws, "back", 0.10, 0.955, inset, w_scale=0.72, lift=lambda g: -laws.th("back", g) + 0.004, thick=0.014, cap0=0.02, cap1=0.03,
+              nres=24, e=5.0)
     # ---- cushions: seat, one long back cushion, a headrest pillow; rounded, smooth-shaded
     bean_part(soft, prof, laws, "seat", 0.05, 0.98, L.LEATHER, w_scale=0.90, lift=0.050, thick=0.056, cap0=0.02, cap1=0.02, nres=14, e=2.8)
     bean_part(soft, prof, laws, "back", 0.10, 0.80, L.LEATHER, w_scale=0.86, lift=0.048, thick=0.054, cap0=0.02, cap1=0.03, nres=22, e=2.8)

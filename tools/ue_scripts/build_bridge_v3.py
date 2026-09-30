@@ -278,7 +278,7 @@ def add_light(ld):
         c = a.get_component_by_class(unreal.PointLightComponent)
         c.set_editor_property("specular_scale", ld.get("specular", 1.0))
     c.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
-    c.set_editor_property("intensity", float(ld["lumens"]))
+    c.set_editor_property("intensity", float(ld["lumens"]) * float(DATA.get("light_gain", 1.0)))       # one knob to retune the whole room
     c.set_editor_property("attenuation_radius", float(ld.get("radius", 1000.0)))
     if "color" in ld:
         r, g, b = ld["color"]

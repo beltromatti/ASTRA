@@ -172,6 +172,7 @@ def palette_lamp(name: str, strength: float) -> bpy.types.Material:
 
 def screen_mat(name: str, page: str | None, strength: float = 2.6, hover: bool = False) -> bpy.types.Material:
     mt = Mat(name)
+    page = "Helm_Touch" if page == "Touch" else page                     # the armrest pads show the touch page (MI_ASTRA_ScreenTouch)
     path = find(UI_DIRS, f"T_UI_{page}.png") if page else None
     if hover:
         # additive-looking hologram: emission over transparency; the back side (seen from behind) is much dimmer

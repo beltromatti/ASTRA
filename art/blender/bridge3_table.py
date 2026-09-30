@@ -2,7 +2,7 @@
 
 Origin = the table centre on the floor of the well. The top is 0.95 m above the floor; the volume above it is left clear
 (the hologram reaches 2.2 m above the top). A flared pedestal, a dish-shaped body, a rim ring with range ticks and a crown
-of emitter lenses, a dark glass top and a projector lens at the centre; a marker on the bow side shows which way is forward.
+of emitter lenses, a matte black projection plate and a projector lens at the centre; a marker on the bow side shows which way is forward.
 """
 from __future__ import annotations
 
@@ -43,8 +43,8 @@ def build_holo_table(D: dict, name: str = "SM_BRG3_HoloTable"):
     # the rim ring: brushed metal, a stepped outer band, an inner chamfer towards the glass
     rev([(plot_r + 0.02, 0.86), (R, 0.86), (R, 0.955), (plot_r + 0.02, 0.955)], L.TRIM, seg=72)
     rev([(R, 0.84), (R + 0.02, 0.84), (R + 0.02, 0.94), (R, 0.94)], L.STRUCT, seg=72)
-    # the dark glass top and a lit line at its edge
-    rev([(0.001, 0.93), (plot_r + 0.02, 0.93), (plot_r + 0.02, 0.945), (0.001, 0.945)], L.DGLASS, seg=72)
+    # the matte projection plate and a lit line at its edge
+    rev([(0.001, 0.93), (plot_r + 0.02, 0.93), (plot_r + 0.02, 0.945), (0.001, 0.945)], L.RUBBER, seg=72)             # matte black projection plate: no mirror of the ceiling
     em.lamp_arc([(plot_r + 0.004, 0.0), (plot_r + 0.02, 0.0), (plot_r + 0.02, 0.003), (plot_r + 0.004, 0.003)], 0, 0, 0, 0, 360, "cyan", L.LAMP_DIM,
                 seg=96, z0=0.9455, loop=True)
     # range ticks on the rim (every 5 degrees, a longer one every 30) and the crown of emitter lenses

@@ -212,6 +212,7 @@
       "yaw": -10
     }
   ],
+  "light_gain": 1.0,
   "lights": [
     {
       "id": "Dome_Downlight",
@@ -323,13 +324,39 @@
       "note": "bounces off the ceiling panels between the ring beams"
     },
     {
+      "id": "Wall_Wash_Port",
+      "type": "rect",
+      "pos": [-1.4, -4.3, 3.95],
+      "dir": [0, -0.80, -0.60],
+      "size": [9.0, 0.35],
+      "along": [1, 0, 0],
+      "lumens": 2800,
+      "temperature": 5200,
+      "shadows": false,
+      "radius": 900,
+      "note": "grazes the port wall's layered panels and the walkway in front of it"
+    },
+    {
+      "id": "Wall_Wash_Starboard",
+      "type": "rect",
+      "pos": [-1.4, 4.3, 3.95],
+      "dir": [0, 0.80, -0.60],
+      "size": [9.0, 0.35],
+      "along": [1, 0, 0],
+      "lumens": 2800,
+      "temperature": 5200,
+      "shadows": false,
+      "radius": 900,
+      "note": "the same on the starboard side"
+    },
+    {
       "id": "Bay_Comms",
       "type": "rect",
       "pos": [0.05, -7.55, 3.05],
       "dir": [0.1, 0.55, -0.83],
       "size": [1.7, 0.25],
       "along": [1, 0, 0],
-      "lumens": 900,
+      "lumens": 1400,
       "temperature": 5600,
       "shadows": false,
       "radius": 500
@@ -341,7 +368,7 @@
       "dir": [0.1, 0.55, -0.83],
       "size": [1.7, 0.25],
       "along": [1, 0, 0],
-      "lumens": 900,
+      "lumens": 1400,
       "temperature": 5600,
       "shadows": false,
       "radius": 500
@@ -353,7 +380,7 @@
       "dir": [0.1, -0.55, -0.83],
       "size": [1.7, 0.25],
       "along": [1, 0, 0],
-      "lumens": 900,
+      "lumens": 1400,
       "temperature": 5600,
       "shadows": false,
       "radius": 500
@@ -365,7 +392,7 @@
       "dir": [0.1, -0.55, -0.83],
       "size": [1.7, 0.25],
       "along": [1, 0, 0],
-      "lumens": 900,
+      "lumens": 1400,
       "temperature": 5600,
       "shadows": false,
       "radius": 500

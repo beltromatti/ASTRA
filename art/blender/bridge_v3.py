@@ -8,8 +8,13 @@ Options:
   --only A,B          build only these meshes (names without the SM_BRG3_ prefix are accepted; no manifest is written)
   --no-export         build (and preview) without writing FBX files
   --preview <dir>     render the preview views into <dir> (Eevee); --views seated,standing,... to choose, --samples N
+  --check-screens     ray-cast every live screen from 0.25 m in front of it: reports the ones that something covers
   --studio            with --preview and --only: render each mesh alone on a dark floor (views front,back,side,q34,q34b,top,low)
   --save-blend <f>    write the assembled preview scene (meshes, materials, lights) as a .blend to open in Blender
+
+Preview environment variables (Eevee, all optional): BRG3_HOLO=1 (a placeholder tactical plot over the table), BRG3_VIEWSCREEN=on (a placeholder
+image on the main viewscreen: planet, two ships), BRG3_NOCEILING=1 (cutaway), BRG3_EXPOSURE=<EV>, BRG3_GAIN=<x> (light gain), BRG3_SKY=<strength>,
+BRG3_SAMPLES=<n> (studio), BRG3_TARGET=x,y,z and BRG3_FOV=<deg> (studio camera), BRG3_DEBUG_MATS=1 (studio: one flat colour per material slot).
 
 Layout coordinates (data file): X forward, Y starboard, Z up, metres. Every builder works in that frame (bridge3_lib.FB
 mirrors Y on the way out, the U() convention of bridge.py v2), so the FBX meshes land exactly on the data in Unreal.
@@ -61,7 +66,7 @@ def load_data() -> dict:
 def parse_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out = {"out_dir": os.path.join(ROOT, "art", "export", "bridge_v3"), "only": None, "export": True, "preview": None,
-           "views": None, "samples": 48, "save_blend": None, "studio": False}
+           "views": None, "samples": 48, "save_blend": None, "studio": False, "check_screens": False}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -81,6 +86,8 @@ def parse_args() -> dict:
             i += 1
         elif a == "--studio":
             out["studio"] = True
+        elif a == "--check-screens":
+            out["check_screens"] = True
         elif a == "--save-blend":
             out["save_blend"] = argv[i + 1]
             i += 1
@@ -252,6 +259,14 @@ def main() -> None:
     for r in checks["routes"]:
         print(f"  route {r['route']}: clearance {r['min_clearance_m']} m (nearest {r['nearest']}) {'ok' if r['ok'] else 'TOO TIGHT'}")
 
+    if args["check_screens"] or (args["export"] and not args["only"]):
+        sc = check_screens(D, objs)
+        checks["screens"] = sc
+        for k, v in sorted(sc.items()):
+            if not v["ok"]:
+                print(f"  SCREEN COVERED: {k} -> {v['hit']}")
+        print(f"  screens: {sum(1 for v in sc.values() if v['ok'])}/{len(sc)} visible from 25 cm in front")
+
     if args["export"]:
         out_dir = args["out_dir"]
         os.makedirs(out_dir, exist_ok=True)
@@ -298,13 +313,60 @@ def assemble(D: dict, objs: dict) -> list:
     return out
 
 
+def check_screens(D: dict, objs: dict) -> dict:
+    """Every SCREEN_ slot of every placed mesh must be the first thing a ray meets when it travels towards the screen along
+    the screen's normal, from 0.25 m in front of it (nothing covers it: no glass over a screen, no bezel in front). Returns
+    {slot: {"ok": bool, "hit": "Object:material" when covered}}."""
+    from mathutils import Vector
+    inst = assemble(D, objs)
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    scene = bpy.context.scene
+    res: dict = {}
+    for o in inst:
+        mesh = o.data
+        names = [m.name if m else "" for m in mesh.materials]
+        for i, nm in enumerate(names):
+            if not nm.startswith("SCREEN_"):
+                continue
+            polys = [p for p in mesh.polygons if p.material_index == i]
+            if not polys:
+                continue
+            tot = sum(p.area for p in polys) or 1.0
+            c0 = sum((p.center * p.area for p in polys), Vector()) / tot
+            pm = min(polys, key=lambda p: (p.center - c0).length)            # a real face near the middle (curved screens: the mean is off the surface)
+            c, n = pm.center, pm.normal
+            if n.length < 1e-6:
+                continue
+            mw = o.matrix_world
+            cw = mw @ c
+            nw = (mw.to_3x3() @ n).normalized()
+            hit, loc, nrm, idx, hobj, _ = scene.ray_cast(dg, cw + nw * 0.25, -nw, distance=0.9)
+            ok = False
+            what = "nothing"
+            if hit:
+                hmesh = hobj.data
+                mi = hmesh.polygons[idx].material_index
+                hm = hmesh.materials[mi].name if mi < len(hmesh.materials) and hmesh.materials[mi] else ""
+                ok = (hm == nm)
+                what = f"{hobj.name}:{hm}"
+            res[nm] = {"ok": ok} if ok else {"ok": False, "hit": what}
+    for o in inst:
+        bpy.data.objects.remove(o, do_unlink=True)
+    for o in objs.values():
+        o.hide_render = False
+        o.hide_viewport = False
+    return res
+
+
 VIEWS = {
     # name: (eye layout xyz, yaw, pitch, fov)
     "overview": ((-7.5, -7.0, 9.0), 40.0, -32.0, 75.0),
     "top": ((0.0, 0.0, 22.0), 0.0, -90.0, 60.0),
     "top_open": ((1.0, 0.0, 19.0), 0.0, -90.0, 70.0),
     "seated": ((0.08, 0.0, 1.38), 0.0, -6.0, 90.0),
-    "standing": ((-1.15, 0.85, 1.86), -10.0, -6.0, 86.0),
+    "seated_off": ((0.08, 0.0, 1.38), 0.0, -6.0, 90.0),                       # the same, viewscreen switched off (the window shows)
+    "standing": ((-1.85, 0.95, 1.74), -8.0, -7.0, 84.0),
     "deck_aft": ((-4.6, 0.0, 1.72), 0.0, -3.0, 90.0),
     "crew_back": ((3.55, -2.2, 0.55), 0.0, 6.0, 55.0),
     "crew_side": ((6.05, 0.4, 0.35), -90.0, 5.0, 55.0),
@@ -350,7 +412,7 @@ def preview_scene(D, c, objs, args, views) -> None:
     PV.sky_dome(yaw_deg=float(os.environ.get("BRG3_SKYYAW", "0")))
     PV.make_materials(D.get("screens", {}))
     PV.configure_render(1600, 900, args["samples"], exposure=float(os.environ.get("BRG3_EXPOSURE", "0")))
-    PV.json_lights(D, LAY, PV.GAIN)
+    PV.json_lights(D, LAY, PV.GAIN * float(D.get("light_gain", 1.0)))
     if os.environ.get("BRG3_VIEWSCREEN") == "on":
         PV.viewscreen_placeholder(True)
     if os.environ.get("BRG3_HOLO"):
