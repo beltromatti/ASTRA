@@ -343,8 +343,13 @@ def speech_frames(x: np.ndarray, sr: int, frame_ms: float = 20.0, margin_db: flo
     lv = frame_rms_db(x, frame)
     if len(lv) == 0:
         return np.zeros(0, dtype=bool)
-    noise = float(np.percentile(lv, 10))
-    on = (lv > max(floor_db, noise + margin_db))
+    real = lv[lv > -90.0]                                   # (digital silence says nothing about the room's noise)
+    noise = float(np.percentile(real, 10)) if len(real) else -90.0
+    if len(real) and float(np.percentile(real, 90)) - noise < 6.0:
+        # a flat recording has no quiet part to measure the room by: loud enough to be speech, or nothing
+        on = lv > -45.0
+    else:
+        on = (lv > max(floor_db, noise + margin_db))
     hang = int(hang_ms / frame_ms)
     if hang > 0 and on.any():
         # a positive origin looks back: a frame is speech if any of the last `hang` frames was

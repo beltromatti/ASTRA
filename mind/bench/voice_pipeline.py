@@ -1,0 +1,671 @@
+"""Benchmark of the whole voice pipeline, run from mind/:
+
+    uv run python -m bench.voice_pipeline stt   [--langs it,en,...] [--backends parakeet-ultra,...] [--load gpu,cpu:4] [--quick]
+    uv run python -m bench.voice_pipeline live  [--backends ...]       recognition as the key is held (real-time feeding)
+    uv run python -m bench.voice_pipeline lang                         language decisions over sessions
+    uv run python -m bench.voice_pipeline other                        languages the crew is not spoken in (the STT fallback path)
+    uv run python -m bench.voice_pipeline tts   [--langs ...]          first sound, real-time factor, loudness, pace, intelligibility
+    uv run python -m bench.voice_pipeline mic                          push-to-talk capture against a fake sound device
+    uv run python -m bench.voice_pipeline floor                        the speech-floor scenarios (bench/voice_floor.py) + real-voice timings
+    uv run python -m bench.voice_pipeline report                       docs/bench/voce_<date>.md from the results gathered so far
+
+Results of every section are kept in mind/.cache/voice_bench/results_<section>.json (a section run again replaces its own)."""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import datetime as dt
+import json
+import os
+import re
+import statistics
+import struct
+import subprocess
+import sys
+import threading
+import time
+import types
+from pathlib import Path
+
+import numpy as np
+
+from astra_mind.env import CACHE, REPO_ROOT
+from astra_mind.stt import Recognizer
+from astra_mind.tts import CALIBRATION, TTSEngine
+from astra_mind.voice_audio import f32_to_pcm16, integrated_lufs, peak_db, resample
+from astra_mind.voice_casting import wer as wer_fn, words as words_fn
+from astra_mind.voice_glossary import GLOSSARY
+from astra_mind.voice_stt_backends import FasterWhisperBackend, ParakeetBackend, WhisperKitBackend
+
+from . import voice_corpus as vc
+
+OUT = CACHE / "voice_bench"
+TODAY = dt.date.today().isoformat()
+
+
+def save(section: str, data) -> None:  # noqa: ANN001
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / f"results_{section}.json").write_text(json.dumps(data, indent=1, ensure_ascii=False))
+
+
+def load(section: str):
+    f = OUT / f"results_{section}.json"
+    return json.loads(f.read_text()) if f.exists() else None
+
+
+def load_avg() -> float:
+    return os.getloadavg()[0]
+
+
+def pct(xs: list[float], q: float) -> float:
+    return float(np.percentile(xs, q)) if xs else float("nan")
+
+
+# ------------------------------------------------------------------------------------------------ load generators
+class Load:
+    """A synthetic game next to the benchmark: GPU busy (a Metal matmul loop) and/or N busy CPU processes."""
+
+    def __init__(self, spec: str) -> None:
+        self.procs: list[subprocess.Popen] = []
+        for part in [p for p in spec.split(",") if p]:
+            if part == "gpu":
+                code = ("import torch,time\nd=torch.device('mps')\na=torch.randn(3072,3072,device=d,dtype=torch.float16)\n"
+                        "while True:\n    for _ in range(20): b=a@a\n    torch.mps.synchronize()\n")
+                self.procs.append(subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+            elif part.startswith("cpu"):
+                n = int(part.split(":")[1]) if ":" in part else 4
+                for _ in range(n):
+                    self.procs.append(subprocess.Popen([sys.executable, "-c", "while True: pass"]))
+        time.sleep(2.0 if self.procs else 0.0)
+
+    def stop(self) -> None:
+        for p in self.procs:
+            p.terminate()
+        for p in self.procs:
+            try:
+                p.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                p.kill()
+
+
+# ------------------------------------------------------------------------------------------------ backends under test
+def make_backend(name: str):
+    if name == "parakeet-ultra":
+        return ParakeetBackend(model="ultra")
+    if name == "parakeet-v3":
+        return ParakeetBackend(model="v3")
+    if name == "whisperkit-baseline":            # the first version's server: default chunking, fallbacks on
+        return WhisperKitBackend(port=50071, extra_args=["--without-timestamps"])
+    if name == "whisperkit-tuned":
+        return WhisperKitBackend(port=50072)
+    if name.startswith("faster-whisper"):
+        model = name.split("-", 2)[2] if name.count("-") >= 2 else "small"
+        return FasterWhisperBackend(model=model)
+    raise SystemExit(f"unknown backend {name}")
+
+
+def entities_found(text: str, ents: list[str]) -> int:
+    t = text.lower()
+    return sum(1 for e in ents if e.lower() in t)
+
+
+# ------------------------------------------------------------------------------------------------ STT: accuracy and latency
+async def sec_stt(args) -> None:  # noqa: ANN001
+    langs = args.langs.split(",")
+    tts = TTSEngine()
+    await asyncio.get_running_loop().run_in_executor(None, tts.warm, "en", ["george"], False)
+    print("building the corpus...", flush=True)
+    clips = vc.build(tts, langs, per_lang=6 if args.quick else None)
+    print(len(clips), "clips", flush=True)
+    del tts
+    results = load("stt") or {}
+    ld = Load(args.load) if args.load else None
+    try:
+        for bname in args.backends.split(","):
+            backend = make_backend(bname)
+            rec = Recognizer(backends=[backend])
+            await rec.start()
+            if not await rec.ready():
+                print(bname, "unavailable, skipped", flush=True)
+                continue
+            sub = clips
+            if bname.startswith(("whisperkit", "faster")):            # slower engines: a sample of the corpus
+                sub = [c for i, c in enumerate(clips) if i % (3 if not args.quick else 2) == 0]
+            await rec.recognise(f32_to_pcm16(sub[0].pcm))                                  # warm-up
+            rows = []
+            t_all = time.perf_counter()
+            for i, c in enumerate(sub):
+                t0 = time.perf_counter()
+                tr = await rec.recognise(f32_to_pcm16(c.pcm), lang_hint=None)
+                wall = time.perf_counter() - t0
+                raw_hyp = tr.raw
+                rows.append({"lang": c.lang, "speaker": c.speaker, "cond": c.condition, "dur": c.seconds, "wall": wall, "decode": tr.decode_s,
+                             "wer": wer_fn(c.text, tr.text), "wer_raw": wer_fn(c.text, raw_hyp), "n_ent": len(c.entities),
+                             "ent_raw": entities_found(raw_hyp, c.entities), "ent_fix": entities_found(tr.text, c.entities),
+                             "lang_out": tr.lang, "conf": tr.conf, "text": tr.text, "ref": c.text})
+                if i % 60 == 0:
+                    print(f"  {bname}: {i}/{len(sub)}", flush=True)
+            key = bname + ("@" + args.load if args.load else "")
+            results[key] = {"rows": rows, "load_avg": load_avg(), "seconds": time.perf_counter() - t_all}
+            summarise(key, rows)
+            await rec.close()
+            save("stt", results)
+    finally:
+        if ld:
+            ld.stop()
+
+
+def summarise(name: str, rows: list[dict]) -> None:
+    for cond in ("clean", "noisy", "hard"):
+        r = [x for x in rows if x["cond"] == cond]
+        if r:
+            print(f"{name:26s} {cond:5s} n={len(r):4d}  WER {100*np.mean([x['wer'] for x in r]):5.1f}%  latency median {1000*statistics.median([x['wall'] for x in r]):5.0f} ms "
+                  f"p95 {1000*pct([x['wall'] for x in r], 95):5.0f} ms", flush=True)
+
+
+# ------------------------------------------------------------------------------------------------ STT live: the key is held
+async def sec_live(args) -> None:  # noqa: ANN001
+    """A person holding the key: the audio arrives in 20 ms blocks in real time; at release, the time to the text."""
+    langs = args.langs.split(",")
+    tts = TTSEngine()
+    await asyncio.get_running_loop().run_in_executor(None, tts.warm, "en", ["george"], False)
+    clips = vc.build(tts, langs, conditions=["clean", "noisy"], pocket=["alba"], say_n=1, per_lang=5)
+    clips = [c for i, c in enumerate(clips)]
+    del tts
+    results = load("live") or {}
+    ld = Load(args.load) if args.load else None
+    try:
+        for bname in args.backends.split(","):
+            backend = make_backend(bname)
+            rec = Recognizer(backends=[backend])
+            await rec.start()
+            if not await rec.ready():
+                continue
+            await rec.recognise(f32_to_pcm16(clips[0].pcm))
+            rows = []
+            for c in clips[:: args.stride]:
+                pcm = f32_to_pcm16(c.pcm)
+                sess = rec.session()
+                block = 320 * 2
+                t0 = time.perf_counter()
+                for i in range(0, len(pcm), block):
+                    sess.feed(pcm[i:i + block])
+                    await asyncio.sleep(max(0.0, t0 + (i + block) / 2 / 16000 - time.perf_counter()))
+                # the key goes up 120 ms after the last word (a typical release), post-roll 100 ms of silence
+                sil = np.zeros(int(0.22 * 16000), dtype="<i2").tobytes()
+                for i in range(0, len(sil), block):
+                    sess.feed(sil[i:i + block])
+                    await asyncio.sleep(0.02)
+                full = pcm + sil
+                t1 = time.perf_counter()
+                tr = await sess.finish(full)
+                lat = time.perf_counter() - t1
+                rows.append({"lang": c.lang, "cond": c.condition, "dur": c.seconds, "latency": lat, "partial_hit": tr.partial_hit,
+                             "wer": wer_fn(c.text, tr.text)})
+            key = bname + ("@" + args.load if args.load else "")
+            results[key] = {"rows": rows, "load_avg": load_avg()}
+            lat = [r["latency"] for r in rows]
+            print(f"{key:28s} live: median {1000*statistics.median(lat):5.0f} ms  p95 {1000*pct(lat, 95):5.0f} ms  max {1000*max(lat):5.0f} ms  "
+                  f"served from a partial {100*np.mean([r['partial_hit'] for r in rows]):.0f}%  WER {100*np.mean([r['wer'] for r in rows]):.1f}%", flush=True)
+            await rec.close()
+            save("live", results)
+    finally:
+        if ld:
+            ld.stop()
+
+
+# ------------------------------------------------------------------------------------------------ language decisions
+async def sec_lang(args) -> None:  # noqa: ANN001
+    from astra_mind.voice_lang import resolve_language, text_scores
+    stt_rows = (load("stt") or {}).get("parakeet-ultra", {}).get("rows", [])
+    if not stt_rows:
+        raise SystemExit("run the stt section (parakeet-ultra) first: the language test uses its transcripts")
+    langs = sorted({r["lang"] for r in stt_rows})
+    wk = (load("stt") or {}).get("whisperkit-tuned", {}).get("rows", [])
+    out: dict = {}
+    for name, fn in (("only the text (lingua)", lambda r, prior: max(text_scores(r["text"]).items(), key=lambda kv: kv[1])[0] if r["text"] else prior),
+                     ("text + crew vocabulary, no history", lambda r, prior: resolve_language(r["text"], "en" if False else prior, None)[0]),
+                     ):
+        pass
+    correct = {"lingua": 0, "no_prior": 0, "prior_same": 0, "prior_wrong": 0}
+    n = 0
+    short = {"lingua": 0, "no_prior": 0, "prior_same": 0, "prior_wrong": 0}
+    n_short = 0
+    for r in stt_rows:
+        if not r["text"] or r["cond"] != "clean":
+            continue
+        n += 1
+        ts = text_scores(r["text"])
+        best = max(ts.items(), key=lambda kv: kv[1])[0] if ts else ""
+        d = {"lingua": best,
+             "no_prior": resolve_language(r["text"], "zz")[0],
+             "prior_same": resolve_language(r["text"], r["lang"])[0],
+             "prior_wrong": resolve_language(r["text"], "en" if r["lang"] != "en" else "it")[0]}
+        is_short = len(r["text"].split()) <= 3
+        n_short += is_short
+        for k, v in d.items():
+            correct[k] += v == r["lang"]
+            short[k] += is_short and v == r["lang"]
+    out["overall"] = {k: v / n for k, v in correct.items()}
+    out["short_phrases"] = {k: v / max(1, n_short) for k, v in short.items()}
+    out["n"], out["n_short"] = n, n_short
+    # a session: ten orders in one language after another, with the prior carried by the recogniser's own decisions
+    flips = 0
+    total = 0
+    for lang in langs:
+        prior = lang
+        seq = [r for r in stt_rows if r["lang"] == lang and r["cond"] == "clean" and r["text"]][:24]
+        for r in seq:
+            got, conf = resolve_language(r["text"], prior)
+            total += 1
+            flips += got != lang
+            prior = got
+    out["session_flips"] = {"orders": total, "wrong": flips}
+    # Whisper's own detection, where measured
+    if wk:
+        ok = sum(1 for r in wk if r["text"] and r["lang_out"] == r["lang"])
+        out["whisper_out"] = {"n": len(wk), "correct": ok / max(1, len(wk))}
+    save("lang", out)
+    print(json.dumps(out, indent=1))
+
+
+# ------------------------------------------------------------------------------------------------ languages beyond the crew's
+async def sec_other(args) -> None:  # noqa: ANN001
+    rec = Recognizer()
+    await rec.start()
+    if not await rec.ready():
+        raise SystemExit("no recogniser")
+    rows = []
+    for lang, (voice, text) in vc.OTHER.items():
+        x = vc.say_clip(voice, text)
+        if x is None:
+            continue
+        pcm = f32_to_pcm16(x)
+        rec.prior = "en"                                     # a Captain who has not spoken it before
+        t0 = time.perf_counter()
+        tr = await rec.recognise(pcm)
+        first = time.perf_counter() - t0
+        rec.prior = lang                                     # ... and one who speaks it all the time
+        t0 = time.perf_counter()
+        tr2 = await rec.recognise(pcm)
+        again = time.perf_counter() - t0
+        cer = char_error(text, tr.text) if lang in ("ja", "zh") else None
+        rows.append({"lang": lang, "voice": voice, "first": {"lang": tr.lang, "backend": tr.backend, "escalated": tr.escalated, "s": first, "text": tr.text},
+                     "known": {"lang": tr2.lang, "backend": tr2.backend, "s": again, "text": tr2.text}, "cer": cer, "ref": text})
+        print(f"{lang}: first phrase -> {tr.lang} via {tr.backend} in {first:.2f}s | known -> {tr2.lang} via {tr2.backend} in {again:.2f}s | {tr.text!r}", flush=True)
+    save("other", rows)
+    await rec.close()
+
+
+def char_error(ref: str, hyp: str) -> float:
+    r = re.sub(r"[\W\d_]+", "", ref)
+    h = re.sub(r"[\W\d_]+", "", hyp)
+    d = np.zeros((len(r) + 1, len(h) + 1), dtype=int)
+    d[:, 0] = range(len(r) + 1)
+    d[0, :] = range(len(h) + 1)
+    for i in range(1, len(r) + 1):
+        for j in range(1, len(h) + 1):
+            d[i, j] = min(d[i - 1, j] + 1, d[i, j - 1] + 1, d[i - 1, j - 1] + (r[i - 1] != h[j - 1]))
+    return float(d[len(r), len(h)] / max(1, len(r)))
+
+
+# ------------------------------------------------------------------------------------------------ TTS
+async def sec_tts(args) -> None:  # noqa: ANN001
+    from astra_mind.crew import CREW
+    from astra_mind.voice_casting import EXTRA
+    langs = args.langs.split(",")
+    tts = TTSEngine()
+    rec = Recognizer(backends=[ParakeetBackend()])
+    await rec.start()
+    await rec.ready()
+    rows = []
+    ld = Load(args.load) if args.load else None
+    voices = [o.voice for o in CREW.values()]
+    try:
+        for lang in langs:
+            texts = CALIBRATION[lang] + [EXTRA[lang]]
+            await asyncio.get_running_loop().run_in_executor(None, tts.warm, lang, voices, False)
+            model = tts._model(lang)
+            for v in voices:
+                state = tts._voice(lang, v)
+                tts.profile(lang, v)
+                for text in texts:
+                    # the first version's path: the raw model, chunks straight to PCM16
+                    def old():
+                        t0 = time.perf_counter()
+                        ch, first_sound = [], None
+                        for c in model.generate_audio_stream(state, text):
+                            a = c.detach().cpu().numpy().astype(np.float32).reshape(-1)
+                            ch.append(a)
+                            if first_sound is None and np.sqrt(np.mean(a ** 2)) > 10 ** (-50 / 20):
+                                first_sound = time.perf_counter() - t0
+                        return np.concatenate(ch), first_sound, time.perf_counter() - t0
+                    xo, fs_old, tot_old = await asyncio.get_running_loop().run_in_executor(None, old)
+                    t0 = time.perf_counter()
+                    st = tts.stream(text, v, lang)
+                    chunks, first_sound = [], None
+                    async for c in st:
+                        a = np.frombuffer(c, dtype="<i2").astype(np.float32) / 32768.0
+                        chunks.append(a)
+                        if first_sound is None and np.sqrt(np.mean(a ** 2)) > 10 ** (-50 / 20):
+                            first_sound = time.perf_counter() - t0
+                    tot_new = time.perf_counter() - t0
+                    xn = np.concatenate(chunks)
+                    heard_o, _ = await rec.transcribe(f32_to_pcm16(resample(xo, tts.sample_rate, 16000)), language=lang, glossary=False)
+                    heard_n, _ = await rec.transcribe(f32_to_pcm16(resample(xn, tts.sample_rate, 16000)), language=lang, glossary=False)
+                    rows.append({"lang": lang, "voice": v, "chars": len(text),
+                                 "old": {"dur": len(xo) / tts.sample_rate, "lufs": integrated_lufs(xo, tts.sample_rate), "peak": peak_db(xo),
+                                         "first_sound": fs_old, "total": tot_old, "wer": wer_fn(text, heard_o)},
+                                 "new": {"dur": len(xn) / tts.sample_rate, "lufs": integrated_lufs(xn, tts.sample_rate), "peak": peak_db(xn),
+                                         "first_sound": first_sound, "first_chunk": st.t_first, "total": tot_new, "wer": wer_fn(text, heard_n),
+                                         "pauses": len(st.boundaries)}})
+                print(lang, v, "old dur %.2f -> new %.2f s; first sound %.0f -> %.0f ms" % (rows[-1]["old"]["dur"], rows[-1]["new"]["dur"],
+                                                                                           1000 * (rows[-1]["old"]["first_sound"] or 0), 1000 * (rows[-1]["new"]["first_sound"] or 0)), flush=True)
+    finally:
+        if ld:
+            ld.stop()
+    key = "tts" + ("@" + args.load if args.load else "")
+    data = load("tts") or {}
+    data[key] = {"rows": rows, "load_avg": load_avg(), "speed": tts.speed, "target_lufs": tts.target_lufs}
+    save("tts", data)
+    await rec.close()
+
+
+# ------------------------------------------------------------------------------------------------ mic against a fake device
+class FakeDevice:
+    """A stand-in for `sounddevice`: 20 ms blocks delivered in real time from a shared signal (silence when nothing is queued)."""
+
+    signal_lock = threading.Lock()
+    queue = np.zeros(0, dtype=np.int16)
+    open_delay = 0.12
+
+    class RawInputStream:
+        def __init__(self, samplerate, channels, dtype, blocksize, latency, callback):  # noqa: ANN001
+            self.cb, self.n, self.rate = callback, blocksize, samplerate
+            self.run = False
+            self.th: threading.Thread | None = None
+
+        def start(self) -> None:
+            time.sleep(FakeDevice.open_delay)                               # opening a Core Audio input takes time
+            self.run = True
+            self.th = threading.Thread(target=self._loop, daemon=True)
+            self.th.start()
+
+        def _loop(self) -> None:
+            t = time.perf_counter()
+            rng = np.random.default_rng(1)
+            while self.run:
+                t += self.n / self.rate
+                time.sleep(max(0.0, t - time.perf_counter()))
+                with FakeDevice.signal_lock:
+                    q = FakeDevice.queue
+                    take = q[: self.n]
+                    FakeDevice.queue = q[self.n:]
+                block = np.zeros(self.n, dtype=np.int16)
+                block[: len(take)] = take
+                block = (block + rng.integers(-3, 4, self.n)).astype(np.int16)
+                self.cb(block.tobytes(), self.n, None, None)
+
+        def stop(self) -> None:
+            self.run = False
+
+        def close(self) -> None:
+            self.run = False
+
+    @staticmethod
+    def query_devices(kind=None):  # noqa: ANN001
+        return {"name": "Fake microphone"}
+
+
+async def sec_mic(args) -> None:  # noqa: ANN001
+    fake = types.ModuleType("sounddevice")
+    fake.RawInputStream = FakeDevice.RawInputStream
+    fake.query_devices = FakeDevice.query_devices
+    sys.modules["sounddevice"] = fake
+    from astra_mind.audio_in import PushToTalk
+    tts = TTSEngine()
+    x = vc.pocket_clip(tts, "alba", "it", "Timoniere, rotta due uno sette, avanti tutta.")
+    speech = f32_to_pcm16(x)
+    sp = np.frombuffer(speech, dtype="<i2")
+    res: dict = {}
+
+    def say(delay_s: float, sig: np.ndarray) -> None:
+        def go() -> None:
+            time.sleep(delay_s)
+            with FakeDevice.signal_lock:
+                FakeDevice.queue = np.concatenate([FakeDevice.queue, sig])
+        threading.Thread(target=go, daemon=True).start()
+
+    ptt = PushToTalk()
+    got_chunks: list[bytes] = []
+    # press 1: the device has to be opened (no pre-roll); speech begins 50 ms after the press
+    t0 = time.perf_counter()
+    ok = ptt.start(got_chunks.append)
+    res["first_press_open_ms"] = (time.perf_counter() - t0) * 1000
+    say(0.05, sp)
+    await asyncio.sleep(len(sp) / 16000 + 0.4)
+    rec1 = await ptt.finish()
+    res["first_press"] = {"ok": ok, "speech_s": rec1.speech_s, "raw_s": rec1.raw_s, "preroll_s": rec1.preroll_s, "on_chunk_blocks": len(got_chunks)}
+    # press 2: the device stays open; speech begins 200 ms BEFORE the press (the person starts talking as the finger goes down)
+    await asyncio.sleep(0.6)
+    say(0.0, sp)
+    await asyncio.sleep(0.2)
+    got2: list[bytes] = []
+    ptt.start(got2.append)
+    await asyncio.sleep(len(sp) / 16000 - 0.1)
+    rec2 = await ptt.finish()
+    # the first 200 ms of the phrase must be in the recording: compare the start of the speech with the reference
+    lead = np.frombuffer(rec2.raw, dtype="<i2")
+    corr = np.correlate(lead[: 16000].astype(np.float64), sp[: 3200].astype(np.float64), "valid")
+    offset = int(np.argmax(corr))
+    res["second_press"] = {"preroll_s": rec2.preroll_s, "speech_s": rec2.speech_s, "phrase_starts_at_s": offset / 16000,
+                           "first_syllable_kept": rec2.preroll_s >= 0.19 and offset / 16000 < 0.15}
+    # press 3: nothing said: an empty recording
+    await asyncio.sleep(0.3)
+    ptt.start()
+    await asyncio.sleep(0.8)
+    rec3 = await ptt.finish()
+    res["silence_press"] = {"pcm_bytes": len(rec3.pcm), "raw_s": rec3.raw_s, "speech_s": rec3.speech_s}
+    # press 4: released early (the last word is still in the buffers): the post-roll keeps it
+    await asyncio.sleep(0.3)
+    ptt.start()
+    say(0.05, sp)
+    await asyncio.sleep(len(sp) / 16000 - 0.05)                # the key goes up right at the end of the phrase
+    rec4 = await ptt.finish()
+    res["release_at_the_end"] = {"speech_s": rec4.speech_s, "phrase_s": len(sp) / 16000}
+    ptt.close()
+    print(json.dumps(res, indent=1))
+    save("mic", res)
+
+
+# ------------------------------------------------------------------------------------------------ the floor
+async def sec_floor(args) -> None:  # noqa: ANN001
+    from . import voice_floor as vf
+    rows = []
+    for sc in vf.SCENARIOS:
+        try:
+            bad = vf.run(sc())
+        except Exception as e:  # noqa: BLE001
+            bad = [f"crashed {e!r}"]
+        rows.append({"name": sc.__name__, "doc": (sc.__doc__ or "").strip().splitlines()[0], "bad": bad})
+    print(f"{sum(1 for r in rows if not r['bad'])}/{len(rows)} scenarios pass")
+    real = await real_floor()
+    save("floor", {"scenarios": rows, "real": real})
+
+
+async def real_floor() -> dict:
+    """The floor with the real voice engine and a recording sink: how long a stop and an answer really take."""
+    from astra_mind.speech import Voice
+    from astra_mind.server import speaker_identity
+    tts = TTSEngine()
+    ev: list[tuple] = []
+
+    async def sink(kind, payload):  # noqa: ANN001
+        t = asyncio.get_running_loop().time()
+        if kind == "audio":
+            ev.append((t, "audio", struct.unpack("<I", payload[:4])[0], (len(payload) - 4) / 2 / tts.sample_rate))
+        else:
+            ev.append((t, payload["type"], payload.get("id") or payload.get("line"), payload))
+
+    await asyncio.get_running_loop().run_in_executor(None, tts.warm, "it", ["alba", "giovanni", "eve"], False)
+    v = Voice(tts, sink, speaker_identity)
+    task = asyncio.create_task(v.run())
+    stops, answers, firsts = [], [], []
+    long = "Capitano, tutti i ponti riferiscono di essere pronti. La sala macchine conferma che il reattore regge al novanta per cento, il tattico ha i railgun carichi e la squadriglia Alpha è sul ponte."
+    for i in range(10):
+        ev.clear()
+        t_say = asyncio.get_running_loop().time()
+        await v.say("xo", long, "it", "calm")
+        await asyncio.sleep(1.5 + 0.23 * i)                       # the key goes down at different places in the line
+        t_down = asyncio.get_running_loop().time()
+        v.captain_begin()
+        await asyncio.sleep(0.9)
+        v.captain_end(None)
+        await asyncio.sleep(0.4)
+        v.captain_turn_begin()
+        t_ans = asyncio.get_running_loop().time()
+        await v.say("helm", "Agli ordini, Capitano: rotta due-uno-sette.", "it", "focused", answer=True)
+        v.captain_turn_end()
+        await v.q.join()
+        await asyncio.sleep(0.3)
+        cancel = [e for e in ev if e[1] == "cancel"]
+        if cancel:
+            stops.append(cancel[0][0] - t_down)
+        begins = [e for e in ev if e[1] == "audio_begin" and e[0] >= t_ans]
+        if begins:
+            answers.append(begins[0][0] - t_ans)
+        b0 = [e for e in ev if e[1] == "audio_begin"]
+        if b0:
+            firsts.append(b0[0][0] - t_say)
+        await v.clear("bench")
+        await asyncio.sleep(0.5)
+    task.cancel()
+    return {"stop_s": stops, "answer_s": answers, "first_line_s": firsts}
+
+
+# ------------------------------------------------------------------------------------------------ report
+def fmt_ms(x: float) -> str:
+    return f"{1000 * x:.0f}"
+
+
+def report(args) -> None:  # noqa: ANN001
+    out = REPO_ROOT / "docs" / "bench" / f"voce_{TODAY}.md"
+    L: list[str] = [f"# Voce: riconoscimento, sintesi, palco del parlato — {TODAY}", ""]
+    stt, live, lang, other, tts, mic, floor = (load(s) for s in ("stt", "live", "lang", "other", "tts", "mic", "floor"))
+    L += ["Macchina: MacBook Air M4 16 GB. **Durante le misure l'editor di Unreal era aperto** (carico medio 7–10 su 10 core): i tempi sono quelli di un Mac già "
+          "occupato, non di uno libero. Il parlato di prova è sintetico (Pocket TTS e voci di sistema macOS), non registrazioni di persone: misura le differenze "
+          "tra motori, il peso dei nomi del gioco, del rumore e della lingua, non la precisione assoluta su una persona stanca con il microfono del portatile.", ""]
+    if stt:
+        L += ["## 1. Riconoscimento vocale", ""]
+        L += ["Frasi d'ordine (2–7 s) in sette lingue, cinque voci per frase (tre Pocket TTS, due voci di sistema), tre condizioni: pulito, rumoroso (15 dB sopra "
+              "ventilazione, ronzio del reattore e bip delle console) e difficile (6 dB, riverbero, un'altra voce che parla, esplosioni). "
+              "WER = parole sbagliate / parole, numeri esclusi. Latenza = tempo da una registrazione finita al testo (motore + taglio del silenzio + glossario).", ""]
+        L += ["| Motore | condizione | n | WER | latenza mediana ms | p95 ms | carico medio |", "|---|---|---|---|---|---|---|"]
+        for name, d in stt.items():
+            rows = d["rows"]
+            for cond in ("clean", "noisy", "hard"):
+                r = [x for x in rows if x["cond"] == cond]
+                if r:
+                    L.append(f"| {name} | {cond} | {len(r)} | {100 * np.mean([x['wer'] for x in r]):.1f} % | {fmt_ms(statistics.median([x['wall'] for x in r]))} | "
+                             f"{fmt_ms(pct([x['wall'] for x in r], 95))} | {d['load_avg']:.1f} |")
+        L += ["", "### WER per lingua (condizione pulita)", "", "| Motore | " + " | ".join(sorted({x['lang'] for d in stt.values() for x in d['rows']})) + " |",
+              "|---|" + "---|" * len({x['lang'] for d in stt.values() for x in d['rows']})]
+        langs = sorted({x['lang'] for d in stt.values() for x in d['rows']})
+        for name, d in stt.items():
+            cells = []
+            for lg in langs:
+                r = [x for x in d["rows"] if x["lang"] == lg and x["cond"] == "clean"]
+                cells.append(f"{100 * np.mean([x['wer'] for x in r]):.1f}" if r else "—")
+            L.append(f"| {name} | " + " | ".join(cells) + " |")
+        L += ["", "### Nomi del gioco (Praetorian, Acheron, Lindqvist, Janus Gate…)", "", "| Motore | nomi trovati grezzi | dopo il glossario | totale |", "|---|---|---|---|"]
+        for name, d in stt.items():
+            n = sum(x["n_ent"] for x in d["rows"])
+            L.append(f"| {name} | {sum(x['ent_raw'] for x in d['rows'])} ({100 * sum(x['ent_raw'] for x in d['rows']) / max(1, n):.0f} %) | "
+                     f"{sum(x['ent_fix'] for x in d['rows'])} ({100 * sum(x['ent_fix'] for x in d['rows']) / max(1, n):.0f} %) | {n} |")
+        L.append("")
+    if live:
+        L += ["## 2. Dal rilascio del tasto al testo (parlato ricevuto in tempo reale, decodifica incrementale)", "",
+              "Il parlato arriva a blocchi di 20 ms come dal microfono; il tasto si rilascia 220 ms dopo l'ultima parola. Latenza = da `finish()` al testo.", "",
+              "| Motore | frasi | mediana ms | p95 ms | max ms | risposta da una decodifica parziale | WER |", "|---|---|---|---|---|---|---|"]
+        for name, d in live.items():
+            r = d["rows"]
+            lat = [x["latency"] for x in r]
+            L.append(f"| {name} | {len(r)} | {fmt_ms(statistics.median(lat))} | {fmt_ms(pct(lat, 95))} | {fmt_ms(max(lat))} | {100 * np.mean([x['partial_hit'] for x in r]):.0f} % | "
+                     f"{100 * np.mean([x['wer'] for x in r]):.1f} % |")
+        L.append("")
+    if lang:
+        L += ["## 3. Lingua dell'ordine", "", f"Testi trascritti da Parakeet (condizione pulita, {lang['n']} frasi, di cui {lang['n_short']} di tre parole o meno).", "",
+              "| Metodo | corretta su tutte | corretta su frasi brevi |", "|---|---|---|"]
+        names = {"lingua": "solo il testo (lingua)", "no_prior": "testo + vocabolario di bordo, senza storia", "prior_same": "… con la lingua dell'ordine precedente = quella giusta",
+                 "prior_wrong": "… con la lingua precedente sbagliata (cambio di lingua)"}
+        for k, nm in names.items():
+            L.append(f"| {nm} | {100 * lang['overall'][k]:.1f} % | {100 * lang['short_phrases'][k]:.1f} % |")
+        L += ["", f"Sessioni di ordini nella stessa lingua: {lang['session_flips']['wrong']} errori su {lang['session_flips']['orders']} ordini.", ""]
+    if other:
+        L += ["## 4. Lingue fuori dall'equipaggio (percorso di riserva)", "", "Una frase in ciascuna lingua, voce di sistema macOS. «Prima frase»: il Capitano non l'ha mai usata (storia = inglese); «nota»: parla sempre quella.", "",
+              "| Lingua | prima frase: lingua, motore, s | nota: lingua, motore, s | CER (ja, zh) |", "|---|---|---|---|"]
+        for r in other:
+            L.append(f"| {r['lang']} | {r['first']['lang']}, {r['first']['backend']}{' (2° parere)' if r['first']['escalated'] else ''}, {r['first']['s']:.2f} | "
+                     f"{r['known']['lang']}, {r['known']['backend']}, {r['known']['s']:.2f} | {'—' if r['cer'] is None else f'{100 * r['cer']:.0f} %'} |")
+        L.append("")
+    if tts:
+        L += ["## 5. Sintesi vocale", ""]
+        for key, d in tts.items():
+            rows = d["rows"]
+            L += [f"### {key} (carico medio {d['load_avg']:.1f}; velocità x{d['speed']}, obiettivo {d['target_lufs']} LUFS)", "",
+                  "| Lingua | durata prima→dopo | primo suono ms prima→dopo | primo chunk ms | LUFS prima (min…max, σ) | LUFS dopo (min…max, σ) | WER prima→dopo |", "|---|---|---|---|---|---|---|"]
+            for lg in sorted({r["lang"] for r in rows}):
+                r = [x for x in rows if x["lang"] == lg]
+                lo = [x["old"]["lufs"] for x in r]
+                ln = [x["new"]["lufs"] for x in r]
+                L.append(f"| {lg} | {np.mean([x['old']['dur'] for x in r]):.2f} → {np.mean([x['new']['dur'] for x in r]):.2f} s "
+                         f"({100 * (np.mean([x['new']['dur'] for x in r]) / np.mean([x['old']['dur'] for x in r]) - 1):+.0f} %) | "
+                         f"{fmt_ms(statistics.median([x['old']['first_sound'] or 0 for x in r]))} → {fmt_ms(statistics.median([x['new']['first_sound'] or 0 for x in r]))} | "
+                         f"{fmt_ms(statistics.median([x['new']['first_chunk'] or 0 for x in r]))} | {min(lo):.1f}…{max(lo):.1f}, {np.std(lo):.1f} | {min(ln):.1f}…{max(ln):.1f}, {np.std(ln):.1f} | "
+                         f"{100 * np.mean([x['old']['wer'] for x in r]):.1f} → {100 * np.mean([x['new']['wer'] for x in r]):.1f} % |")
+            allo = [x["old"]["lufs"] for x in rows]
+            alln = [x["new"]["lufs"] for x in rows]
+            L += ["", f"Tutte le lingue: volume da {min(allo):.1f}…{max(allo):.1f} LUFS (σ {np.std(allo):.1f}) a {min(alln):.1f}…{max(alln):.1f} LUFS (σ {np.std(alln):.1f}); "
+                      f"durata media {np.mean([x['old']['dur'] for x in rows]):.2f} → {np.mean([x['new']['dur'] for x in rows]):.2f} s; "
+                      f"picco massimo dopo {max(x['new']['peak'] for x in rows):.1f} dBFS.", ""]
+    if mic:
+        L += ["## 6. Microfono (dispositivo finto)", "", "```", json.dumps(mic, indent=1), "```", ""]
+    if floor:
+        ok = sum(1 for r in floor["scenarios"] if not r["bad"])
+        L += ["## 7. Il palco del parlato", "", f"Scenari con orologio virtuale: **{ok}/{len(floor['scenarios'])}** superati (invarianti: nessun sottotitolo senza audio, una voce alla volta, "
+              "nessuna riga persa in silenzio, audio a passo, pause naturali, Capitano per primo, sottotitolo abbastanza lungo).", "",
+              "| Scenario | esito |", "|---|---|"]
+        for r in floor["scenarios"]:
+            L.append(f"| {r['name']}: {r['doc']} | {'ok' if not r['bad'] else 'FALLITO: ' + '; '.join(r['bad'])} |")
+        real = floor.get("real", {})
+        if real.get("stop_s"):
+            L += ["", "Con la voce vera (dieci prove, il tasto scende in punti diversi di una riga lunga):", "",
+                  f"- **Fermata del parlante**: mediana {fmt_ms(statistics.median(real['stop_s']))} ms, massima {fmt_ms(max(real['stop_s']))} ms dopo la pressione del tasto",
+                  f"- **Risposta al Capitano** (da quando il modello la scrive al primo suono): mediana {fmt_ms(statistics.median(real['answer_s']))} ms, massima {fmt_ms(max(real['answer_s']))} ms",
+                  f"- **Prima riga su piano libero** (dall'accodamento al primo suono): mediana {fmt_ms(statistics.median(real['first_line_s']))} ms", ""]
+    out.write_text("\n".join(L) + "\n", encoding="utf-8")
+    print("REPORT", out)
+
+
+# ------------------------------------------------------------------------------------------------ main
+def main() -> int:
+    ap = argparse.ArgumentParser(prog="bench.voice_pipeline")
+    ap.add_argument("section", choices=["stt", "live", "lang", "other", "tts", "mic", "floor", "report"])
+    ap.add_argument("--langs", default="it,en,es,fr,de,pt,nl")
+    ap.add_argument("--backends", default="parakeet-ultra")
+    ap.add_argument("--load", default="", help="synthetic game next to the benchmark: gpu, cpu:4, gpu,cpu:4")
+    ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--stride", type=int, default=1)
+    args = ap.parse_args()
+    logging_level = os.environ.get("BENCH_LOG", "WARNING")
+    import logging
+    logging.basicConfig(level=getattr(logging, logging_level), format="%(name)s %(message)s")
+    if args.section == "report":
+        report(args)
+        return 0
+    asyncio.run({"stt": sec_stt, "live": sec_live, "lang": sec_lang, "other": sec_other, "tts": sec_tts, "mic": sec_mic, "floor": sec_floor}[args.section](args))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -2,8 +2,10 @@
 
 WebSocket ws://127.0.0.1:8765 — JSON text frames + binary audio frames.
 Game -> mind:  hello · ship_state{state} · event{text} · player_text{text,lang?} · ptt{down} · command_result{id,ok,detail}
-Mind -> game:  status{...} · transcript{text,lang} · command{id,name,args,by} · line{id,speaker,name,text,lang,tone}
-               audio_begin{line,speaker,rate} · <binary: uint32 LE line id + PCM16 mono> · audio_end{line} · turn_end{...}
+Mind -> game:  status{...} · transcript{text,lang} · command{id,name,args,by} · turn_end{...}
+               voice (docs/protocollo_voce.md): line{id,speaker,name,text,lang,tone,priority,est_s,hold_s,...} (sent when the
+               voice starts) · audio_begin{line,speaker,rate,est_s,hold_s} · <binary: uint32 LE line id + PCM16 mono, paced>
+               · audio_end{line,dur_s,reason} · cancel{line,reason,fade_ms} · line_dropped{id,reason} · floor{state}
 
 Also: `astra-mind --say "text"` (one turn against the local ship model, audio to .wav) and `--script file` (a list of
 utterances, timings, audio round-trip check with the recogniser).
@@ -35,9 +37,11 @@ from .director import ADMIRAL, Director
 from .env import CACHE
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
-from .stt import WhisperKit
+from .stt import Recognizer
+from .voice_lang import resolve_language
 from .speech import Voice
 from .tts import TTSEngine
+from .voice_qos import boost_thread
 
 log = logging.getLogger("astra.mind")
 HOST, PORT = "127.0.0.1", 8765
@@ -127,8 +131,9 @@ class Mind:
     def __init__(self) -> None:
         self.llm = OpenRouter()
         self.tts = TTSEngine()
-        self.stt = WhisperKit()
+        self.stt = Recognizer()
         self.mic = PushToTalk()
+        self._ptt_session = None                # the recognition session of the key press being held
         self.local = LocalShip()
         self.clients: set = set()
         self.game: GameShip | None = None
@@ -347,7 +352,7 @@ class Mind:
                 finally:
                     self.voice.low_priority = False
                 continue
-            self.voice.low_priority = True
+            self.voice.chatter = True             # (small talk: the lowest priority, dropped when the Captain speaks)
             try:
                 if personal:
                     who = random.choice([k for k in ("xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight")
@@ -369,7 +374,7 @@ class Mind:
                              "no reports, no tools except speak; at most two lines in total."))
                     log.info("quiet moment (%s, %s): %s", pair[0], pair[1], " | ".join(f"{s}: {x}" for s, x in t.lines))
             finally:
-                self.voice.low_priority = False
+                self.voice.chatter = False
 
     async def idle_exit(self) -> None:
         """A mind nobody has talked to for 20 minutes goes (a game that crashed or quit does not leave it running)."""
@@ -538,7 +543,7 @@ class Mind:
                     # let the bridge fall quiet first (reports must not pile up behind the voices), then coalesce:
                     # everything that happened meanwhile becomes one report turn; the Captain's words are never merged
                     # or delayed behind events
-                    while self.voice.busy_s() > 1.2 and self.turns.empty():
+                    while (self.voice.busy_s() > 1.2 or self.voice.held) and self.turns.empty():
                         await asyncio.sleep(0.2)
                     events = [text[len("\x00event:"):]]
                     pending = []
@@ -575,15 +580,21 @@ class Mind:
                             AFTER_ACTION_ASK if any(e.startswith("bridge: after-action") for e in events) else \
                             TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else \
                             VISIT_ASK if any("has come to the Captain's quarters in person" in e for e in events) else None
-                        t = await self.agent.handle_event(" | ".join(events), self.lang, ask=ask)
+                        t = await self.voice.preemptible(self.agent.handle_event(" | ".join(events), self.lang, ask=ask))
                     finally:
                         self.voice.low_priority = False
+                    if t is None:                     # the Captain took the floor while the report was being written: it waits
+                        for e in events:              # behind his order (nothing is lost: it is put back in the queue)
+                            await self.turns.put(("\x00event:" + e, self.lang))
+                        continue
                     log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
                     continue
-                dropped = self.voice.drop_low_priority()      # the Captain speaks: pending reports can wait
+                self.voice.captain_turn_begin()               # what is said from here to the end of this turn answers the Captain
+                dropped = self.voice.drop_low_priority()      # the Captain speaks: small talk is no longer worth saying
                 if dropped:
-                    log.info("captain speaks: %d unspoken report lines dropped", dropped)
+                    log.info("captain speaks: %d unspoken small-talk lines dropped", dropped)
                 if lang != self.lang:
+                    asyncio.create_task(self.tts.prepare(lang, [o.voice for o in CREW.values()]))   # the crew will answer in it
                     self.lang = lang
                     self.lang_file.parent.mkdir(parents=True, exist_ok=True)
                     self.lang_file.write_text(lang)
@@ -649,11 +660,15 @@ class Mind:
                          " | ".join(f"{s}: {x}" for s, x in t.lines))
             except Exception:  # noqa: BLE001
                 log.exception("turn failed")
+            finally:
+                self.voice.captain_turn_end()             # (no line came out of the Captain's turn: his floor is released)
 
     async def handle_client(self, ws) -> None:  # noqa: ANN001
         self.clients.add(ws)
+        self.voice.muted = False
         self.game = GameShip(lambda m: ws.send(json.dumps(m, ensure_ascii=False)))
-        await ws.send(json.dumps({"type": "status", "crew": {k: v.title for k, v in CREW.items()}, "rate": self.tts.sample_rate}))
+        await ws.send(json.dumps({"type": "status", "crew": {k: v.title for k, v in CREW.items()}, "rate": self.tts.sample_rate,
+                                  "voice": 2}))       # voice protocol 2: docs/protocollo_voce.md (cancel, hold_s, floor, line_dropped)
         log.info("game connected")
         try:
             async for raw in ws:
@@ -671,6 +686,7 @@ class Mind:
                     self.agent.history.clear()
                     self.enemy.reset()
                     self.port.reset()
+                    await self.voice.clear("new_session")     # what the last session had not said yet is not said in this one
                     log.info("new game session: conversation reset (the war waits for the Captain's choice)")
                 elif kind == "campaign":
                     # the Captain chose in the title menu: a new war, or the saved one
@@ -757,29 +773,43 @@ class Mind:
                     self.last_activity = self.captain_t = time.monotonic()
                     text = msg.get("text", "").strip()
                     if text:
-                        await self.turns.put((text, msg.get("lang") or detect_lang(text)))
+                        self.voice.captain_input()             # a typed order takes the floor like a spoken one
+                        await self.turns.put((text, msg.get("lang") or resolve_language(text, self.lang)[0]))
                 elif kind == "ptt":
                     if msg.get("down"):
-                        ok = self.mic.start()
-                        if not ok:
+                        self.voice.captain_begin()             # whoever talks stops at the end of the phrase; the floor is his
+                        self._ptt_session = self.stt.session()
+                        if not self.mic.start(self._ptt_session.feed):
+                            self.voice.captain_end(False)
                             await ws.send(json.dumps({"type": "status", "mic": "unavailable"}))
                     else:
-                        pcm = self.mic.stop()
-                        asyncio.create_task(self._recognise(pcm))
+                        self.voice.captain_end(None)           # (his order is coming: the floor stays his until it is answered)
+                        asyncio.create_task(self._recognise())
         finally:
             self.clients.discard(ws)
+            if not self.clients:
+                self.voice.muted = True                        # nobody is listening: nothing more is made or queued
+                await self.voice.clear("no_listener")
             log.info("game disconnected")
 
-    async def _recognise(self, pcm: bytes) -> None:
-        if len(pcm) < 16000 * 2 * 0.3:
+    async def _recognise(self) -> None:
+        """The key is up: the last sounds, then the words (most of them were already decoded while he spoke)."""
+        session, self._ptt_session = self._ptt_session, None
+        rec = await self.mic.finish()
+        if session is None or rec.speech_s < 0.15:
+            if session is not None:
+                session.cancel()
+            self.voice.captain_end(False)                  # nothing was said: nobody is kept waiting for an order
             return
-        t0 = time.perf_counter()
-        text, lang = await self.stt.transcribe(pcm)
-        log.info("STT %.2fs [%s] %s", time.perf_counter() - t0, lang, text)
+        tr = await session.finish(rec.raw)
+        log.info("STT %.2fs after the key (decode %.2fs, %s%s) [%s] %s", tr.latency_s, tr.decode_s, tr.backend,
+                 ", from the partial" if tr.partial_hit else "", tr.lang, tr.text)
         self.captain_t = time.monotonic()
-        await self._sink("json", {"type": "transcript", "text": text, "lang": lang})
-        if text:
-            await self.turns.put((text, lang))
+        if not tr.text:
+            self.voice.captain_end(False)
+            return
+        await self._sink("json", {"type": "transcript", "text": tr.text, "lang": tr.lang})
+        await self.turns.put((tr.text, tr.lang))
 
     def _quit(self, sig: int) -> None:
         log.info("signal %d: the mind stops", sig)
@@ -803,7 +833,9 @@ class Mind:
         asyncio.create_task(self.idle_exit())
         asyncio.create_task(self.flight_controller())
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
+        boost_thread()                                # this thread (the audio's pacing) on the performance cores, like the game
+        for lg in dict.fromkeys([self.lang, "en"]):   # the Captain's language first, then English (the two stay in memory)
+            await loop.run_in_executor(None, self.tts.warm, lg, [o.voice for o in CREW.values()])
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
         # a game busy for a while (loading, compiling shaders) must not lose the crew: pings wait up to 90 s
         async with websockets.serve(self.handle_client, HOST, PORT, max_size=2 ** 22, ping_interval=20, ping_timeout=90):
@@ -813,7 +845,7 @@ class Mind:
 # ---------------------------------------------------------------------------------------------- offline tools
 async def offline_turns(utterances: list[str], out_dir: Path, check_audio: bool) -> None:
     llm, tts = OpenRouter(), TTSEngine()
-    stt = WhisperKit() if check_audio else None
+    stt = Recognizer() if check_audio else None
     if stt:
         await stt.start()
     ship = LocalShip()

@@ -179,13 +179,35 @@ class Voice:
         _ANSWERING.set(True)
 
     def captain_turn_end(self) -> None:
-        """...and has finished: if it produced no line, the floor is released at once (a silent order)."""
+        """...and has finished (safe to call from any task: only a task that began a Captain's turn ends one). If the turn
+        produced no line, the floor is released at once (a silent order)."""
+        was = _ANSWERING.get()
         _ANSWERING.set(False)
-        if self._turn_pending and not self._captain_down and not any(l.prio == Prio.ANSWER for l in self._queue) \
+        if was and self._turn_pending and not self._captain_down and not any(l.prio == Prio.ANSWER for l in self._queue) \
                 and not (self._cur is not None and self._cur.prio == Prio.ANSWER):
             self._turn_pending = False
             self._set_floor(self._floor_state())
             self._wake()
+
+    async def preemptible(self, coro, poll: float = 0.05):
+        """Await a producer's work (an LLM turn that will write a report) but give it up the moment the Captain takes the
+        floor: returns its result, or None when it was cancelled. The caller puts the report back to be written after his
+        order has been answered."""
+        task = asyncio.ensure_future(coro)
+        try:
+            while True:
+                done, _ = await asyncio.wait({task}, timeout=poll)
+                if done:
+                    return task.result()
+                if self.held:
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
+                    self.stats["preempted"] += 1
+                    log.info("a report was being written when the Captain took the floor: it waits")
+                    return None
+        except asyncio.CancelledError:
+            task.cancel()
+            raise
 
     # ------------------------------------------------------------------------------------------ time and estimates
     @staticmethod

@@ -108,11 +108,12 @@ def resolve_language(text: str, prior: str = "en", backend_lang: str | None = No
         score[k] = v
     hits = domain_hits(text)
     for k, n in hits.items():
-        score[k] += min(0.6, 0.25 * n)
+        score[k] += min(0.7, 0.30 * n)
     if backend_lang in score:
         score[backend_lang] += backend_weight
-    # the language of the last words is the best guess: the shorter the phrase, the more it counts
-    score[prior if prior in score else "en"] += 0.55 if len(words) <= 2 else 0.40 if len(words) <= 4 else 0.25 if len(words) <= 8 else 0.10
+    # the language of the last words breaks ties: a phrase whose own words say another language wins against it, a name or
+    # an "okay" (nothing to go on) keeps the language of the last order
+    score[prior if prior in score else "en"] += 0.30 if len(words) <= 2 else 0.22 if len(words) <= 4 else 0.12 if len(words) <= 8 else 0.05
     total = sum(score.values()) or 1.0
     best = max(score, key=score.get)
     return best, score[best] / total

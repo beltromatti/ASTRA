@@ -134,8 +134,8 @@ class Recognizer:
         for b in self.backends:
             await b.close()
 
-    def session(self, rate: int = RATE) -> "RecognitionSession":
-        return RecognitionSession(self, rate)
+    def session(self, rate: int = RATE, partial_every_s: float = 1.0) -> "RecognitionSession":
+        return RecognitionSession(self, rate, partial_every_s)
 
     # ------------------------------------------------------------------------------------------ legacy call
     async def transcribe(self, pcm16: bytes, rate: int = RATE, language: str | None = None, glossary: bool = True) -> tuple[str, str]:

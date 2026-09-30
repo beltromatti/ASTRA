@@ -44,6 +44,7 @@ TONE_SPEED = {"calm": -0.03, "warm": -0.03, "weary": -0.06, "measured": -0.02, "
               "cold": 0.0, "focused": 0.02, "urgent": 0.06, "furious": 0.05, "shaken": 0.03}
 
 _GAINS_FILE = Path(__file__).with_name("voice_gains.json")           # shipped: measured for every catalogue voice
+_OVERRIDES_FILE = Path(__file__).with_name("voice_overrides.json")   # shipped: who speaks for a voice hard to understand in a language
 _USER_GAINS = CACHE / "voice_gains.json"                              # measured on this machine for what was missing
 
 CALIBRATION = {
@@ -178,7 +179,8 @@ class TTSEngine:
         self._lock = threading.RLock()                                       # one generation at a time: they would only fight for the CPU
         self._shipped = self._read_gains(_GAINS_FILE)
         self._user = self._read_gains(_USER_GAINS)
-        self.overrides: dict[tuple[str, str], str] = {}                      # (language, voice) -> the voice to use instead (casting)
+        # (language, voice) -> the voice that speaks instead where the first is hard to understand (voice_casting.py)
+        self.overrides: dict[tuple[str, str], str] = {tuple(k.split("/", 1)): v for k, v in self._read_gains(_OVERRIDES_FILE).items()}
 
     # ------------------------------------------------------------------------------------------ facts
     def supported(self, lang: str) -> bool:

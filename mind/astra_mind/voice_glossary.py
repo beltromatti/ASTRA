@@ -69,7 +69,7 @@ _TERMS: list[tuple[str, tuple[str, ...], bool]] = [
     # people
     ("Okonkwo", ("okonko", "okonkwo", "okonkvo", "okonquo", "okonkuo", "okonco", "ocoyo", "okonkwa"), True),
     ("Lindqvist", ("lindquist", "lindkvist", "lindqvist", "lindkwist", "lindquest", "lindqvis", "lindquis"), True),
-    ("Mensah", ("mensà", "menza", "mensha"), False),
+    ("Mensah", ("menza", "mensha", "menzah"), False),
     ("Tanaka", (), False),
     ("Voss", ("vos", "foss", "fos"), False),
     ("Nair", ("nayer", "naïr", "nayr"), False),
@@ -232,6 +232,9 @@ class Glossary:
         f = _fold(heard)
         t = self._alias.get(f)
         if t is not None:
+            # a common word that is also a short name ("serra", "price") is not capitalised: only a real mishearing is fixed
+            if not t.fuzzy and t.n_words == 1 and f == _fold(t.text):
+                return None
             return t
         f = re.sub(r"[\s'’\-]+", " ", f).strip()
         t = self._alias.get(f)
