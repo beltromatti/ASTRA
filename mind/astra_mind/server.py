@@ -654,6 +654,10 @@ class Mind:
         if n or dropped:
             log.info("the Captain speaks: %d turn(s) cut off, %d unspoken line(s) dropped", n, dropped)
 
+    def _can_answer(self, party: str) -> bool:
+        """Someone answers on this channel: the admiral, or a Mandate captain with a mind who is still alive."""
+        return party == "fleet" or (party in COMMANDERS and party not in self.enemy.dead)
+
     async def _to_party(self, party: str, words: str, lang: str) -> None:
         """What the Captain said TO the party on the channel goes out: the enemy commander answers, or the admiral."""
         self.exchange.said(party)
@@ -674,6 +678,9 @@ class Mind:
         st = self.game.state if (self.game and self.game.state) else {}
         ctx = parse_context(raw_ctx, st, self.enemy, self._party_names(), self.exchange)
         r = router_mod.quick(text, ctx)
+        if r is not None and r.external and not self._can_answer(r.party):
+            # (the channel is open but nobody on it can answer — a friendly ship, a decoy: the words stay with the crew)
+            r.crew, r.external, r.party = (r.crew + " " + r.external).strip(), "", ""
         gate = route_task = None
         if r is None:
             gate = asyncio.get_running_loop().create_future()
@@ -701,6 +708,8 @@ class Mind:
             else:
                 r = got
                 r.addressed = router_mod.decide(text, ctx).officers
+                if r.external and not self._can_answer(r.party):
+                    r.crew, r.external, r.party = (r.crew + " " + r.external).strip() or text, "", ""
             gate.set_result(r.dest == "crew" or (r.how == "fallback"))
             if r.dest == "both":                                    # the crew's turn was for the whole: start it again on its part
                 await turn_task

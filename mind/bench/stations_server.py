@@ -40,7 +40,8 @@ class Model:
         user = str(messages[-1].get("content", ""))
         out = Completion(model=model, provider="fake", cost=0.0005)
         kind = "router" if not names else "enemy" if "transmit" in names else "crew"
-        self.calls.append({"kind": kind, "model": model, "user": user[:160], "tools": names, "watch": "WATCH CHECK" in user})
+        self.calls.append({"kind": kind, "model": model, "user": user[:160], "tools": names, "watch": "WATCH CHECK" in user,
+                           "system": str(messages[0].get("content", ""))})
         script: list[tuple[str, dict[str, Any]]] = []
         if kind == "router":
             out.content = next((v for k, v in self.router_says.items() if k in user), "crew")
@@ -225,6 +226,25 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(watch_calls[0]["model"], models.role("watch").model)
         self.assertIn(("station", "helm"), [(c["name"], c["args"]["station"]) for c in self.game.commands])
         self.assertIn(("helm", "Prua sul Cocytus."), self.game.lines())
+
+    async def test_words_for_a_channel_nobody_can_answer_stay_with_the_crew(self) -> None:
+        await self.state(LocalShip(stations=True, fight=True))
+        self.model.crew = [("fleet_request", {"ship": "T-01", "request": "focus_fire", "target": "T-23"}),
+                           ("speak", {"speaker": "comms", "text": "Praetorian, fuoco concentrato sul Cocytus.", "tone": "focused"})]
+        ctx = {"place": "bridge", "channel": {"party": "T-01", "open": True, "muted": False}}     # an allied ship: no mind answers there
+        await self.say("Praetorian, concentrate il fuoco sul Cocytus", ctx, wait=0.8)
+        self.assertEqual([c["name"] for c in self.game.commands], ["fleet_request"])
+        self.assertEqual([c for c in self.model.calls if c["kind"] == "enemy"], [])
+
+    async def test_the_games_own_context_fields_are_understood(self) -> None:
+        await self.state(LocalShip(stations=True, fight=True))
+        self.model.crew = [("speak", {"speaker": "mess_cook", "text": "Agnello con l'orzo, Capitano.", "tone": "warm"})]
+        ctx = {"place": "mess_hall", "place_name": "DECK 4 · MESS HALL", "pawn": "on_foot", "in_earshot": ["mess1", "mess_cook", "deck1", "sleeper3"],
+               "facing": "mess_cook", "channel": None}
+        await self.say("cosa c'è da mangiare?", ctx, wait=0.6)
+        room = [c for c in self.model.calls if c["kind"] == "crew"][0]["system"]
+        self.assertIn("not on the bridge (mess)", room)
+        self.assertIn("looking at mess_cook", room)
 
     async def test_no_watch_on_an_older_build(self) -> None:
         self.mind.watch.quiet_s = 0.0

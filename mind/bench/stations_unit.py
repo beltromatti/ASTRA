@@ -291,8 +291,8 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         c = Crew(Script([speak("Bel cielo stasera, Marco.", "sensors"), speak("Bugiardo: piove polvere.", "helm"),
                          speak("Una terza battuta.", "xo"), station("helm", "hold")]), fight=False)
         system = __import__("astra_mind.initiative", fromlist=["x"]).chatter_system("it", "steady", "", "", "", [], [])
-        turn = await c.agent.handle_event("bridge: a quiet moment on watch", "it", ask="chat", role="chatter", system=system,
-                                          history_turns=2, max_lines=2, speak_only=True)
+        await c.agent.handle_event("bridge: a quiet moment on watch", "it", ask="chat", role="chatter", system=system,
+                                   history_turns=2, max_lines=2, speak_only=True)
         self.assertEqual([t for _, t in c.said], ["Bel cielo stasera, Marco.", "Bugiardo: piove polvere."])
         self.assertEqual({t["function"]["name"] for t in c.llm.requests[0]["tools"]}, {"speak"})
         self.assertEqual(c.ship.lane("helm", "nav")["set_by"], "auto")                     # the stray station call did nothing
@@ -335,7 +335,7 @@ class ModelsTest(unittest.IsolatedAsyncioTestCase):
 
         async def on_call(call: ToolCall) -> None:
             pass
-        comp = await models.chat(llm, "crew", messages=[], on_tool_call=on_call)
+        await models.chat(llm, "crew", messages=[], on_tool_call=on_call)
         self.assertEqual(len(llm.requests), 1)
 
     async def test_a_role_whose_model_cannot_answer_hands_over_to_its_fallback(self) -> None:

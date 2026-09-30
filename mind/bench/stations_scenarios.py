@@ -50,7 +50,6 @@ class Harness:
 
     async def captain(self, text: str, ctx: Context | None = None) -> Turn:
         self.lines = []
-        n_calls = len(self.ship.log)
         turn = await self.agent.handle(text, self.lang, ctx)
         self.cost += turn.cost
         self.turns.append(turn)
@@ -389,8 +388,6 @@ async def sc_initiative_after_a_kill(llm: OpenRouter, lang: str) -> Result:
     sc.must("a check was due", chk is not None)
     if turn is None:
         return sc.res
-    tac = [c for c in h.modes("tactical", "engage")]
-    helm = [c for c in h.modes("helm") if c["by"] != "captain"]
     proposes = any("?" in t or "propon" in t.lower() or "propose" in t.lower() or "vuole" in t.lower() or "shall" in t.lower() for _, t in h.lines)
     acted_on_t24 = [c for c in h.ship.station_calls() if c["by"] != "captain" and "T-24" in json.dumps(c["params"])]
     sc.must("moves on to the next threat (acts on T-24 or proposes it)", bool(acted_on_t24) or proposes, f"{h.ship.log[-4:]} | {h.lines}")
@@ -432,7 +429,6 @@ async def sc_delegation_advise(llm: OpenRouter, lang: str) -> Result:
         reports = await _fight_to_the_kill(h)
         for st in ("tactical", "helm", "ops"):
             h.ship.delegation[st] = level
-        before = len(h.ship.log)
         turn, chk = await h.watch(reports)
         if turn is None:
             sc.must(f"{level}: a check was due", False)

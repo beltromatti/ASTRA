@@ -13,7 +13,6 @@ import argparse
 import asyncio
 import json
 import random
-import statistics
 import time
 from dataclasses import dataclass
 
