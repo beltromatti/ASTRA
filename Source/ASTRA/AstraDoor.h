@@ -8,6 +8,18 @@
 
 class UStaticMeshComponent;
 
+/** The doors' list of walkers: anyone who goes about the ship on their own feet and whom the doors open for, besides the player's pawn
+ *  and the officers on a visit (AAstraCrewMember::Walkers): the crew's bodies (AAstraLifeBody), damage-control teams in view, whatever
+ *  comes next. A walker adds itself while it moves and removes itself when it stops; an actor that is destroyed leaves the list by
+ *  itself (weak pointers). A door opens when any walker is within its OpenRadius on its deck. Cheap by design: the list is as long as
+ *  the people who walk in view, and a door only reads it. */
+namespace AstraDoors
+{
+	ASTRA_API void AddWalker(const AActor* Walker);
+	ASTRA_API void RemoveWalker(const AActor* Walker);
+	ASTRA_API const TArray<TWeakObjectPtr<const AActor>>& Walkers();
+}
+
 UCLASS()
 class ASTRA_API AAstraDoor : public AActor
 {

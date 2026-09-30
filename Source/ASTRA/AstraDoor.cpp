@@ -14,6 +14,32 @@
 
 DECLARE_CYCLE_STAT(TEXT("Doors"), STAT_AstraDoors, STATGROUP_Astra);
 
+namespace
+{
+	TArray<TWeakObjectPtr<const AActor>> GDoorWalkers;
+}
+
+void AstraDoors::AddWalker(const AActor* Walker)
+{
+	if (!Walker)
+	{
+		return;
+	}
+	// the dead leave the list when someone joins it (a door skips a stale entry in the meantime)
+	GDoorWalkers.RemoveAllSwap([](const TWeakObjectPtr<const AActor>& W) { return !W.IsValid(); });
+	GDoorWalkers.AddUnique(Walker);
+}
+
+void AstraDoors::RemoveWalker(const AActor* Walker)
+{
+	GDoorWalkers.RemoveSwap(Walker);
+}
+
+const TArray<TWeakObjectPtr<const AActor>>& AstraDoors::Walkers()
+{
+	return GDoorWalkers;
+}
+
 AAstraDoor::AAstraDoor()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -77,6 +103,15 @@ void AAstraDoor::Tick(float DeltaTime)
 		{
 			const FVector D = W->GetActorLocation() - GetActorLocation();
 			bNear |= FVector2D(D.X, D.Y).Size() < OpenRadius && FMath::Abs(D.Z) < 300.f;
+		}
+		// the crew going about the ship on their own feet (AstraDoors::AddWalker)
+		for (const TWeakObjectPtr<const AActor>& W : AstraDoors::Walkers())
+		{
+			if (const AActor* A = W.Get())
+			{
+				const FVector D = A->GetActorLocation() - GetActorLocation();
+				bNear |= FVector2D(D.X, D.Y).Size() < OpenRadius && FMath::Abs(D.Z) < 300.f;
+			}
 		}
 	}
 	// close only after the way has been clear for a moment
