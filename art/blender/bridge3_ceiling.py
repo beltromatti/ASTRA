@@ -12,12 +12,12 @@ import os
 import random
 import sys
 
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge3_lib as L  # noqa: E402
 import bridge3_shell as SH  # noqa: E402
-from bridge3_lib import Parts, Rx, Rz, T, lerp, polar  # noqa: E402
+from bridge3_lib import Parts, Ry, Rx, Rz, T, lerp, polar  # noqa: E402
 
 
 def room_poly(c: SH.Ctx, window_r: float | None = None):
@@ -87,7 +87,19 @@ def build_ceiling(c: SH.Ctx, name: str = "SM_BRG3_Ceiling"):
     slab = [(c.BACK_X - 0.34, -c.BACK_HW - 0.34), (c.front_p[0], c.front_p[1] - 0.34)]
     slab += [c.arc(c.ANG[k], c.R + 0.35) for k in range(1, 6)]
     slab += [(c.front_s[0], c.front_s[1] + 0.34), (c.BACK_X - 0.34, c.BACK_HW + 0.34)]
-    fb.prism(slab, CE + 0.02, CE + 0.3, L.STRUCT)
+    hole = Rd + 0.10                                              # square hole round the dome, closed above by a lid
+    far = 40.0
+    z_top = CE + Hd + 0.30
+    for rect in (
+            [(dc[0] - far, dc[1] - far), (dc[0] - hole, dc[1] - far), (dc[0] - hole, dc[1] + far), (dc[0] - far, dc[1] + far)],
+            [(dc[0] + hole, dc[1] - far), (dc[0] + far, dc[1] - far), (dc[0] + far, dc[1] + far), (dc[0] + hole, dc[1] + far)],
+            [(dc[0] - hole, dc[1] + hole), (dc[0] + hole, dc[1] + hole), (dc[0] + hole, dc[1] + far), (dc[0] - hole, dc[1] + far)],
+            [(dc[0] - hole, dc[1] - far), (dc[0] + hole, dc[1] - far), (dc[0] + hole, dc[1] - hole), (dc[0] - hole, dc[1] - hole)]):
+        cl = SH.clip_convex(slab, rect, 0.0)
+        if len(cl) >= 3 and SH.poly_area(cl) > 0.05:
+            fb.prism(cl, CE + 0.02, z_top, L.STRUCT)
+    lid = hole + 0.30
+    fb.prism([(dc[0] - lid, dc[1] - lid), (dc[0] + lid, dc[1] - lid), (dc[0] + lid, dc[1] + lid), (dc[0] - lid, dc[1] + lid)], CE + Hd + 0.02, z_top, L.STRUCT)
 
     # ---- panels on a polar grid (10 degree sectors x radial bands), clipped to the room
     def wedge(r0, r1, a0, a1):
@@ -175,16 +187,47 @@ def build_ceiling(c: SH.Ctx, name: str = "SM_BRG3_Ceiling"):
             rings_pts.append([tuple(cp - e * w + nrm * 0.03), tuple(cp + e * w + nrm * 0.03), tuple(cp + e * w - nrm * 0.08),
                               tuple(cp - e * w - nrm * 0.08)])
         fb.loft(rings_pts, L.TRIM, caps=True)
+    for j in range(1, len(betas) - 1):                            # a fine lit line in each seam between the rows of panels
+        bs = betas[j] - 0.006
+        em.lamp_arc([(-0.007, 0.0), (0.007, 0.0), (0.007, 0.004), (-0.007, 0.004)], dc[0], dc[1], (Rs - 0.052) * math.sin(bs), 0, 360, "white_warm",
+                    L.LAMP_DIM, seg=96, z0=zc + (Rs - 0.052) * math.cos(bs), loop=True)
+
+    def seg_rot(pa, pb):                                          # a rotation whose x axis runs along pa -> pb
+        d = (Vector(pb) - Vector(pa)).normalized()
+        y = Vector((0.0, 0.0, 1.0)).cross(d)
+        y = y.normalized() if y.length > 1e-6 else Vector((0.0, 1.0, 0.0))
+        z = d.cross(y)
+        return Matrix(((d.x, y.x, z.x, 0.0), (d.y, y.y, z.y, 0.0), (d.z, y.z, z.z, 0.0), (0.0, 0.0, 0.0, 1.0)))
+
+    for k in range(n_sec):                                        # a warm line under every rib of the dome
+        ph = k * 360.0 / n_sec
+        for j in range(len(betas) - 1):
+            pa, pb = sph(betas[j], ph, -0.0815), sph(betas[j + 1] - 0.004, ph, -0.0815)
+            ln = (Vector(pb) - Vector(pa)).length
+            mid = tuple((u + v) / 2 for u, v in zip(pa, pb))
+            em.lamp_cbox(mid, (ln * 0.96, 0.010, 0.004), "warm_dim", L.LAMP_DIM, seg_rot(pa, pb))
     # the rim ring where the dome meets the ceiling, with a cove line facing the dome
     fb.arc_sweep([(-0.16, 0.0), (0.16, 0.0), (0.16, 0.22), (-0.16, 0.22)], dc[0], dc[1], Rd, 0, 360, L.TRIM, seg=72, z0=CE - 0.22, loop=True)
     em.lamp_arc([(-0.176, 0.0), (-0.16, 0.0), (-0.16, 0.014), (-0.176, 0.014)], dc[0], dc[1], Rd, 0, 360, "white_warm", L.LAMP_HOT, seg=72,
                 z0=CE - 0.09, loop=True)
-    # the eye: a ring of light round a dark glass lens
-    zt = CE + Hd
-    fb.cyl((dc[0], dc[1], zt - 0.10), (dc[0], dc[1], zt + 0.02), 1.02, L.TRIM, seg=48)
-    fb.cyl((dc[0], dc[1], zt - 0.13), (dc[0], dc[1], zt - 0.10), 0.86, L.DGLASS, seg=48)
-    em.lamp_cyl((dc[0], dc[1], zt - 0.118), (dc[0], dc[1], zt - 0.106), 0.95, "white_cool", L.LAMP_HOT, seg=48)
-    fb.cyl((dc[0], dc[1], zt - 0.135), (dc[0], dc[1], zt - 0.10), 0.72, L.DGLASS, seg=48)
+    # the eye: a lens disc hanging under the apex of the dome, a ring of light round a dark glass lens
+    def z_dome(r):                                                # the room-facing surface of the panels at radius r
+        return zc + math.sqrt(max(0.0, (Rs - 0.05) ** 2 - r * r))
+
+    r_eye = 0.95
+    z_fl = z_dome(r_eye)
+    fb.cyl((dc[0], dc[1], z_fl - 0.10), (dc[0], dc[1], z_fl + 0.02), r_eye + 0.12, L.TRIM, seg=56)
+    fb.cyl((dc[0], dc[1], z_fl - 0.104), (dc[0], dc[1], z_fl - 0.10), r_eye + 0.03, L.STRUCT, seg=56)
+    fb.cyl((dc[0], dc[1], z_fl - 0.118), (dc[0], dc[1], z_fl - 0.104), r_eye - 0.06, L.DGLASS, seg=56)
+    em.lamp_arc([(r_eye - 0.11, 0.0), (r_eye - 0.05, 0.0), (r_eye - 0.05, 0.005), (r_eye - 0.11, 0.005)], dc[0], dc[1], 0.0, 0, 360, "white_cool",
+                L.LAMP_HOT, seg=64, z0=z_fl - 0.1195, loop=True)
+    fb.cyl((dc[0], dc[1], z_fl - 0.140), (dc[0], dc[1], z_fl - 0.118), 0.30, L.TRIM, seg=40)
+    fb.cyl((dc[0], dc[1], z_fl - 0.146), (dc[0], dc[1], z_fl - 0.140), 0.24, L.DGLASS, seg=40)
+    em.lamp_cyl((dc[0], dc[1], z_fl - 0.1475), (dc[0], dc[1], z_fl - 0.1455), 0.07, "white_cool", L.LAMP_HOT, seg=24)
+    for k in range(12):                                           # twelve small emitters on the disc, between the ring and the centre lens
+        a_ = 2 * math.pi * k / 12
+        px, py = dc[0] + 0.52 * math.cos(a_), dc[1] + 0.52 * math.sin(a_)
+        em.lamp_cyl((px, py, z_fl - 0.1195), (px, py, z_fl - 0.1175), 0.018, "cyan", L.LAMP, seg=8)
 
     # ---- the holo collector above the table: a flush lens in a ring flange, a crown of emitters
     cx0, cy0 = cd["collector_center"]
@@ -200,9 +243,11 @@ def build_ceiling(c: SH.Ctx, name: str = "SM_BRG3_Ceiling"):
 
     # ---- recessed downlights over the stations: a lens in a ring (the lights themselves are in the data file)
     for (lx, ly) in ((1.1, 0.0), (6.9, -2.2), (6.9, 2.2), (-2.6, 0.0)):
-        fb.cyl((lx, ly, CE - 0.07), (lx, ly, CE - 0.045), 0.13, L.TRIM, seg=24)
-        fb.cyl((lx, ly, CE - 0.075), (lx, ly, CE - 0.07), 0.095, L.DGLASS, seg=24)
-        em.lamp_cyl((lx, ly, CE - 0.0745), (lx, ly, CE - 0.0715), 0.075, "white_cool", L.LAMP_HOT, seg=24)
+        rr = math.hypot(lx - dc[0], ly - dc[1])
+        zb = z_dome(rr) - 0.02 if rr < Rd - 0.3 else CE - 0.045          # inside the dome the lens sits in the dome, not on the flat ceiling
+        fb.cyl((lx, ly, zb - 0.055), (lx, ly, zb + 0.06), 0.13, L.TRIM, seg=24)
+        fb.cyl((lx, ly, zb - 0.06), (lx, ly, zb - 0.055), 0.095, L.DGLASS, seg=24)
+        em.lamp_cyl((lx, ly, zb - 0.0595), (lx, ly, zb - 0.0565), 0.075, "white_cool", L.LAMP_HOT, seg=24)
 
     # ---- ducts along the back half of the room, on brackets
     for y in (-4.9, 4.9):
