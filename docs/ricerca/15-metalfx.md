@@ -26,7 +26,9 @@ a parità di costo dovrebbe dare più nitidezza e meno ghosting, o a parità di 
   la storia della frame precedente (`PrevHistory`, un oggetto nostro che il motore conserva nello stato della vista).
   Uscita: una texture alla `OutputViewRect` (origine 0,0; è il «secondary view rect»: la vista di gioco prima dell'upscale
   finale alla finestra, sul Retina la metà della finestra) e la nuova storia. **Non c'è un flag di reset**: si ricava
-  (`FSceneView::bCameraCut`, `PrevHistory` nulla, cambio di dimensione, una frame renderizzata con TSR in mezzo).
+  (`FSceneView::bCameraCut`, `PrevHistory` nulla, cambio di dimensione, una frame renderizzata con TSR in mezzo, e un
+  teletrasporto: il gioco non segnala mai i tagli di camera, quindi il plugin applica la stessa soglia che il motore usa per le
+  sue storie, 75° o 100 m in un frame, `IsLargeCameraMovement` in `SceneVisibility.cpp`).
 - Con un upscaler di terze parti le traslucenze «post-DOF» sono composte **prima** dell'upscaler (TSR le compone dopo, a piena
   risoluzione): vetri e ologrammi restano meno puliti. Limite da valutare nel gioco; MetalFX ha una *reactive mask* che per
   ora non sfruttiamo.
@@ -176,7 +178,8 @@ un guadagno di ~1 ms e più, e un'immagine che `probe_e2e` dice migliore di un s
    volta in assoluto sulla macchina 2–3 s, poi 0,2–0,6 s) la vista di gioco usa TSR, poi passa a MetalFX da sola. Se cambia la dimensione della finestra si ricostruisce (TSR nel frattempo).
 3. `astra.metalfx.status` (console o `astra.cmd`): `ACTIVE` o il motivo per cui no, l'uscita, il tempo GPU dell'ultimo frame e la media. `stat AstraMetalFX` lo mostra a schermo (build Development).
    `r.AstraMetalFX.LogInterval 5` lo scrive nel log ogni 5 s.
-4. **Confronto TSR / MetalFX**: `r.AstraMetalFX 0` e `1` a caldo (la storia ricomincia a ogni cambio). A parità di costo: fissa `r.DynamicRes.OperationMode 0` e lo stesso `r.ScreenPercentage`, leggi il tempo GPU
+4. **Confronto TSR / MetalFX**: `r.AstraMetalFX 0` e `1` a caldo (la storia ricomincia a ogni cambio; vale anche `r.TemporalAA.Upscaler 0`,
+   l'interruttore del motore per gli upscaler di terze parti, che rimette TSR: il plugin lo riconosce). A parità di costo: fissa `r.DynamicRes.OperationMode 0` e lo stesso `r.ScreenPercentage`, leggi il tempo GPU
    totale (banco `tools/perf`/`stat gpu`) **più** il tempo di `stat AstraMetalFX` (il RHI non vede il command buffer di MetalFX, §3.4), poi alza il `r.ScreenPercentage` di MetalFX finché i totali pareggiano.
    Con la risoluzione dinamica accesa, abbassa `r.DynamicRes.FrameTimeBudget` del costo di MetalFX (o conta sul 10 % di margine `r.DynamicRes.TargetedGPUHeadRoomPercentage`, che è circa quello).
 5. **Diagnosi**: `r.AstraMetalFX.Debug 1` mostra i vettori di moto (fermo e senza oggetti in moto: tutto scuro; girando la testa un colore uniforme per direzione; un oggetto in moto ha un colore suo);

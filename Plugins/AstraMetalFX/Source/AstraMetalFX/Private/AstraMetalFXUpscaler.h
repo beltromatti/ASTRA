@@ -43,7 +43,11 @@ public:
 		const uint32 DeclineEpoch;   // the manager's count of frames the game view went without MetalFX when this was made
 	};
 
-	explicit FAstraMetalFXUpscaler(FContextPtr InContext);
+	/**
+	 * DeclineEpoch is the manager's count of frames the game view went without MetalFX, read on the GAME thread when this frame was
+	 * set up: the render thread runs a frame or two behind, so reading the counter there could already include later frames.
+	 */
+	FAstraMetalFXUpscaler(FContextPtr InContext, uint32 InDeclineEpoch);
 
 	/** The same pointer for every call: the engine compares it with the history's name by address. */
 	static const TCHAR* GetUpscalerDebugName();
@@ -57,4 +61,5 @@ public:
 
 private:
 	FContextPtr Context;
+	uint32 DeclineEpoch;
 };

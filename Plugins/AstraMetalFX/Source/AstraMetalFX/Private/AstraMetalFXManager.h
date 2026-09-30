@@ -32,6 +32,12 @@ public:
 	/** r.AstraMetalFX. Game thread. */
 	bool IsEnabledByCVar() const;
 
+	/**
+	 * False when the engine's own r.TemporalAA.Upscaler is 0: the renderer then ignores third-party upscalers and runs TSR even if
+	 * one is installed, so MetalFX must count that frame as declined (its history goes stale). Game thread.
+	 */
+	bool IsEngineUpscalerSwitchOn() const;
+
 	/** True while MetalFX can run here: supported machine and no failure so far this session. */
 	bool IsAvailable() const { return bSupported && !bDisabled.load(); }
 

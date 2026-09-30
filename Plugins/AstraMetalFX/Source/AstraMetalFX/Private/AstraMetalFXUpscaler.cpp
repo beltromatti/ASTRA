@@ -46,8 +46,9 @@ namespace
 	}
 }
 
-FAstraMetalFXUpscaler::FAstraMetalFXUpscaler(FContextPtr InContext)
+FAstraMetalFXUpscaler::FAstraMetalFXUpscaler(FContextPtr InContext, uint32 InDeclineEpoch)
 	: Context(MoveTemp(InContext))
+	, DeclineEpoch(InDeclineEpoch)
 {
 	check(Context.IsValid());
 }
@@ -71,7 +72,7 @@ float FAstraMetalFXUpscaler::GetMaxUpsampleResolutionFraction() const
 
 UE::Renderer::Private::ITemporalUpscaler* FAstraMetalFXUpscaler::Fork_GameThread(const FSceneViewFamily& ViewFamily) const
 {
-	return new FAstraMetalFXUpscaler(Context);
+	return new FAstraMetalFXUpscaler(Context, DeclineEpoch);
 }
 
 FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& GraphBuilder, const FSceneView& View, const FInputs& Inputs) const
@@ -95,11 +96,11 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 		|| Prev == nullptr
 		|| Prev->Context != Context
 		|| Prev->OutputSize != OutputSize
-		|| Prev->DeclineEpoch != Manager.GetDeclineEpoch();   // TSR ran in between: the history is stale
+		|| Prev->DeclineEpoch != DeclineEpoch;   // TSR ran in between: the history is stale
 
 	FOutputs Outputs;
 	Outputs.FullRes = FScreenPassTexture(OutputTexture, Inputs.OutputViewRect);
-	Outputs.NewHistory = MakeRefCount<FHistory>(Context, View.ViewMatrices, OutputSize, Manager.GetDeclineEpoch());
+	Outputs.NewHistory = MakeRefCount<FHistory>(Context, View.ViewMatrices, OutputSize, DeclineEpoch);
 
 	if (!Context->IsHealthy())
 	{

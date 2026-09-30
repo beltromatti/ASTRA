@@ -39,7 +39,7 @@ void FAstraMetalFXViewExtension::BeginRenderViewFamily(FSceneViewFamily& InViewF
 	}
 
 	FAstraMetalFXManager& Manager = FAstraMetalFXManager::Get();
-	if (!Manager.IsEnabledByCVar() || !Manager.IsAvailable())
+	if (!Manager.IsEnabledByCVar() || !Manager.IsAvailable() || !Manager.IsEngineUpscalerSwitchOn())
 	{
 		Manager.NoteDeclinedFrame();
 		return;
@@ -58,5 +58,5 @@ void FAstraMetalFXViewExtension::BeginRenderViewFamily(FSceneViewFamily& InViewF
 		return;
 	}
 
-	InViewFamily.SetTemporalUpscalerInterface(new FAstraMetalFXUpscaler(Context));
+	InViewFamily.SetTemporalUpscalerInterface(new FAstraMetalFXUpscaler(Context, Manager.GetDeclineEpoch()));
 }

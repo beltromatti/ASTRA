@@ -70,6 +70,12 @@ bool FAstraMetalFXManager::IsEnabledByCVar() const
 	return CVarAstraMetalFX.GetValueOnGameThread() != 0;
 }
 
+bool FAstraMetalFXManager::IsEngineUpscalerSwitchOn() const
+{
+	static IConsoleVariable* const EngineSwitch = IConsoleManager::Get().FindConsoleVariable(TEXT("r.TemporalAA.Upscaler"));
+	return EngineSwitch == nullptr || EngineSwitch->GetInt() != 0;
+}
+
 AstraMetalFX::EDebugView FAstraMetalFXManager::GetDebugView() const
 {
 	return (AstraMetalFX::EDebugView)FMath::Clamp(CVarAstraMetalFXDebug.GetValueOnRenderThread(), 0, 2);
