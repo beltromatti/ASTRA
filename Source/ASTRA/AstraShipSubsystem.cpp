@@ -1589,7 +1589,7 @@ FString UAstraShipSubsystem::CaptainAboard() const
 			}
 			if (It->IsPawnInBerths(P))
 			{
-				return TEXT("in Crew Berthing (Deck 3), in the dim aisle between the racks where the Red watch sleeps (two ratings "
+				return TEXT("in Crew Berthing (Deck 4), in the dim aisle between the racks where the Red watch sleeps (two ratings "
 				            "who cannot sleep sit at the table aft); the XO has the conn and the bridge officers speak by intercom, softly");
 			}
 			if (It->IsPawnInMedbay(P))
@@ -1635,7 +1635,7 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	{
 		if (It->IsPawnInEngineering(P)) { return TEXT("DECK 7 · MAIN ENGINEERING"); }
 		if (It->IsPawnInMess(P)) { return TEXT("DECK 4 · MESS HALL"); }
-		if (It->IsPawnInBerths(P)) { return TEXT("DECK 3 · CREW BERTHING"); }
+		if (It->IsPawnInBerths(P)) { return TEXT("DECK 4 · CREW BERTHING"); }
 		if (It->IsPawnInMedbay(P)) { return TEXT("DECK 6 · MEDBAY"); }
 		if (It->IsPawnInHangar(P)) { return TEXT("DECK 9 · FLIGHT DECK"); }
 	}

@@ -410,7 +410,7 @@ void AAstraHangar::Tick(float DeltaTime)
 				Ship->PublishEvent(bToMed
 					? FString::Printf(TEXT("the Captain came down to the Medbay to see the wounded (%s)"), *Ship->GetRoster().Summary())
 					: bToMess ? FString(TEXT("the Captain came down to the Mess Hall on Deck 4, where the off-duty watch is eating"))
-					: bToBerth ? FString(TEXT("the Captain came down to Crew Berthing on Deck 3, where the Red watch sleeps in its racks"))
+					: bToBerth ? FString(TEXT("the Captain came down to Crew Berthing on Deck 4, where the Red watch sleeps in its racks"))
 					: FString(TEXT("the Captain came down to Main Engineering to see Chief Okonkwo and the reactor watch")), false);
 			}
 		}

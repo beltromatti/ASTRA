@@ -1,8 +1,8 @@
-"""Builds Crew Berthing (Deck 3 · Section C) into the bridge level, from data/ship/aquila_berths.json: the signs, the
+"""Builds Crew Berthing (Deck 4 · Section C) into the bridge level, from data/ship/aquila_berths.json: the signs, the
 materials, the kit (art/export/berths, art/blender/berths.py), the racks and locker columns along the aisle, the Red
 watch asleep in some of the racks (flat, under their blankets), two ratings who cannot sleep at the table aft, the night
 lighting (tagged ASTRA.Zone.Berths: on only while the Captain is there), the lift's doors and sign and its sixth landing;
-the lift signs on the other decks now list Deck 3. Idempotent: the "Berths" folder is replaced. Not during PIE, after
+the lift signs on the other decks now list it (Deck 4 · Section C). Idempotent: the "Berths" folder is replaced. Not during PIE, after
 the C++ module is built (AAstraHangar::BerthLanding):
   tools/ue.py pyfile tools/ue_scripts/build_berths.py
 """

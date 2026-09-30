@@ -73,8 +73,8 @@ def existing(B: Builder) -> None:
     aw = [{"id": f"berths.{a['station']}", "role": "crew", "kind": "sit", "pos": [rnd(e["box"][2] - 0.3 + a["seat"][0]), rnd(a["seat"][1]), rnd(-46.0)],
            "yaw": a["yaw"], "dept": "services", "station": a["station"]} for a in berth["awake"]]
     add("berths", "Crew Berthing", 4, 4, "C", "berthing", e["box"][:4], (e["box"][4], e["box"][5]), e["entrance"], "services",
-        ["power_bus", "life_support"], aw, label_deck=3, data="aquila_berths.json", capacity=84,
-        note="its signage says DECK 3; it stands on the Deck 4 plane (z -46, like the Mess): the Deck 3 plane (z -42) is under the hull's inner skin here")
+        ["power_bus", "life_support"], aw, label_deck=4, data="aquila_berths.json", capacity=84,
+        note="it stands on the Deck 4 plane (z -46, like the Mess), and its signage says so (DECK 4 · SECTION C): the Deck 3 plane (z -42) is under the hull's inner skin here")
     # ---- Deck 4: Mess Hall
     e = ex["mess"]
     add("mess", "Mess Hall", 4, 4, "B", "mess", e["box"][:4], (e["box"][4], e["box"][5]), e["entrance"], "services", ["food_service", "power_bus", "life_support"],

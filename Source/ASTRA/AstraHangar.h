@@ -41,7 +41,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector MessLanding = FVector::ZeroVector;
 
-	/** Crew Berthing's landing (Deck 3; world, cm; zero = no such stop). */
+	/** Crew Berthing's landing (Deck 4, Section C; world, cm; zero = no such stop). */
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector BerthLanding = FVector::ZeroVector;
 
