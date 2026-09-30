@@ -2,63 +2,144 @@
 """Run the war headless and read what happened (Source/ASTRA/AstraWarSimCommandlet.*): no rendering, no GPU, faster than
 real time. For the lead and the war module's support agents (in their own worktree, with their own build).
 
-  tools/war.py run [--seconds 900] [--jump 170] [--exec "astra.battle.spawn styx 12 30"] [--out Saved/War/run.json]
-  tools/war.py report Saved/War/run.json      the story of the battle: arrivals, kills, damage, withdrawals, the outcome
+  tools/war.py run [--seconds 900] [--jump 170] [--exec "astra.battle.spawn styx 12 30"] [--scenario name] [--out Saved/War/run.json]
+  tools/war.py report Saved/War/run.json      the story of the battle: arrivals, kills, damage, withdrawals, the outcome, the books
   tools/war.py ship Saved/War/run.json T-21   one ship through the battle (position, hull, shields, mode, target)
+  tools/war.py ab --a "..." --b "..." --seeds 6 [--scenario name] [--jobs 3]
+                                              the same scenario over seeds, variant A (an --exec) against B, side by side
+  tools/war.py batch --seeds 12 [--tag t] [--scenario name] [--exec "..."]
+                                              N seeds of one scenario (in parallel), one line per seed and the mean
+  tools/war.py compare tagA tagB              two saved batches (Saved/War/<tag>_<seed>.json) side by side
 
-`run` needs the editor target built for this checkout (tools/ricompila.sh --no-launch, or Build.sh ASTRAEditor) and uses
+`run` needs the editor target built for this checkout (Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex) and uses
 -nullrhi: it never opens a window or touches the GPU, so it can run while the game or the editor is open.
+The scenarios are data/war/scenarios/*.json (see docs/GUERRA.md); without --scenario the opening (Aurelia patrol) is played.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
+import statistics
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ENGINE = Path("/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd")
+WAR = ROOT / "Saved" / "War"
 
 
-def cmd_run(a: argparse.Namespace) -> None:
-    out = (ROOT / a.out).resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
+def build_args(a: argparse.Namespace, out: Path) -> list[str]:
     args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraWarSim", f"-seconds={a.seconds}", f"-step={a.step}",
             f"-every={a.every}", f"-out={out}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout",
             "-FullStdOutLogOutput"]
-    if a.jump >= 0:
+    if a.jump is not None and a.jump >= 0:
         args.append(f"-jump={a.jump}")
     args.append(f"-seed={a.seed}")
+    if getattr(a, "scenario", ""):
+        args.append(f"-scenario={a.scenario}")
     if a.exec:
         args.append(f'-exec={a.exec}')
-    t0 = time.time()
-    log = ROOT / "Saved" / "War" / "last_run.log"
+    return args
+
+
+def run_once(a: argparse.Namespace, out: Path, log: Path) -> int:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    log.parent.mkdir(parents=True, exist_ok=True)
     with open(log, "w") as f:
         # a crash can leave the engine hanging in its crash handler: never wait for ever
-        p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
+        p = subprocess.Popen(build_args(a, out), stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
         try:
-            p.wait(timeout=max(180.0, a.seconds / 5.0))
+            p.wait(timeout=max(240.0, a.seconds / 3.0))
         except subprocess.TimeoutExpired:
             p.kill()
             p.wait()
             print(f"   the war bench did not finish in time: killed (log {log})")
-        r = p
+        return p.returncode
+
+
+def cmd_run(a: argparse.Namespace) -> None:
+    out = (ROOT / a.out).resolve()
+    log = WAR / "last_run.log"
+    t0 = time.time()
+    rc = run_once(a, out, log)
     if getattr(a, "quiet", False):
-        if r.returncode != 0:
-            print(f"   exit {r.returncode} (log {log})")
+        if rc != 0:
+            print(f"   exit {rc} (log {log})")
         return
     lines = [l for l in log.read_text(errors="replace").splitlines() if "[WarSim]" in l or "Error" in l]
     for l in lines[-12:]:
         print(l[l.find("[WarSim]"):] if "[WarSim]" in l else l)
-    print(f"exit {r.returncode} in {time.time() - t0:.0f} s; log {log}")
+    print(f"exit {rc} in {time.time() - t0:.0f} s; log {log}")
     if out.exists():
         report(out)
 
 
+# ------------------------------------------------------------------------------------------------ reading a record
+def load(path: str | Path) -> dict:
+    raw = Path(path).read_bytes()
+    enc = "utf-16" if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8"
+    return json.loads(raw.decode(enc))
+
+
+def fate_of(s: dict) -> str:
+    """alive | destroyed | gone (left the theatre, or a craft that landed) — older records only have `alive`."""
+    if "fate" in s:
+        return s["fate"]
+    return "alive" if s.get("alive") else "gone"
+
+
+def focus_from_frames(d: dict, side: str) -> float:
+    """The share of a side's warships that aim at the same target (the modal one), averaged over the frames where at least
+    two of them have a target: works on any record, old or new."""
+    vals = []
+    for f in d["frames"]:
+        ids = {s["id"]: s for s in f["ships"]}
+        tg = [s["target"] for s in f["ships"] if s["side"] == side and not s["craft"] and s["alive"] and s.get("target", -1) >= 0
+              and ids.get(s["target"], {}).get("alive")]
+        if len(tg) >= 2:
+            vals.append(max(tg.count(t) for t in set(tg)) / len(tg))
+    return statistics.mean(vals) if vals else -1.0
+
+
+def metrics(path: Path | str) -> dict:
+    d = load(path)
+    fin = d["final"]["ships"]
+    st = d.get("stats", {})
+    m: dict = {"t": d["battle_seconds"]}
+    for side in ("astra", "mandate"):
+        caps = [s for s in fin if s["side"] == side and not s["craft"] and s["c"] != "AQUILA" and not s["c"].startswith("EAGLE")]
+        m[side] = {"n": len(caps), "alive": sum(1 for s in caps if fate_of(s) == "alive"),
+                   "destroyed": sum(1 for s in caps if fate_of(s) == "destroyed"),
+                   "gone": sum(1 for s in caps if fate_of(s) == "gone")}
+        c = st.get("craft", {}).get(side, {})
+        m[side]["craft"] = {"launched": c.get("launched", 0), "lost": c.get("lost", 0), "recovered": c.get("recovered", 0),
+                            "pd": c.get("lost_point_defence", 0), "guns": c.get("lost_craft_guns", 0), "msl": c.get("lost_missiles", 0)}
+        m[side]["focus"] = st.get("focus", {}).get(side, focus_from_frames(d, side))
+        m[side]["ships"] = st.get("ships", {}).get(side, {})
+        m[side]["missiles"] = st.get("missiles", {}).get(side, {})
+    aq = next((s for s in fin if s["c"] == "AQUILA"), None)
+    if aq is None:
+        m["aquila"] = "-"
+    elif aq["alive"]:
+        m["aquila"] = f"{aq.get('hull', 0):.0f}%"
+    else:
+        m["aquila"] = "LOST" if aq.get("fate", "destroyed") == "destroyed" else "-"      # a sandbox scenario has no Aquila in it
+    m["aquila_hull"] = aq.get("hull", 0) if aq and aq["alive"] else 0
+    ev = [e for e in d["events"] if e["report"] and "engagement over" in e["text"]]
+    m["over_at"] = ev[0]["t"] if ev else None
+    m["perf"] = st.get("perf", {})
+    m["world_tick"] = st.get("world_tick", {})
+    m["damage"] = st.get("damage", {})
+    return m
+
+
 def outcome(path: Path) -> dict:
-    d = load(str(path))
+    """The old summary: (alive, total, craft alive, craft total) per side."""
+    d = load(path)
     fin = d["final"]["ships"]
     o = {}
     for side in ("astra", "mandate"):
@@ -70,25 +151,86 @@ def outcome(path: Path) -> dict:
     return o
 
 
+# ------------------------------------------------------------------------------------------------ batches
+def seeds_run(a: argparse.Namespace, tag: str, ex: str, seeds: list[int], jobs: int) -> list[Path]:
+    WAR.mkdir(parents=True, exist_ok=True)
+
+    def one(seed: int) -> Path:
+        ns = argparse.Namespace(**vars(a))
+        ns.exec = ex
+        ns.seed = seed
+        out = WAR / f"{tag}_{seed}.json"
+        rc = run_once(ns, out, WAR / f"{tag}_{seed}.log")
+        if not out.exists():
+            print(f"   {tag} seed {seed}: no record (exit {rc}, log {WAR / f'{tag}_{seed}.log'})")
+        return out
+
+    with ThreadPoolExecutor(max(1, jobs)) as pool:
+        return [p for p in pool.map(one, seeds)]
+
+
+def fmt_side(m: dict, side: str) -> str:
+    s = m[side]
+    c = s["craft"]
+    return (f"{s['alive']}/{s['n']} alive {s['destroyed']} lost {s['gone']} left"
+            f"  craft {c['launched']:3d} out {c['lost']:3d} lost (PD {c['pd']}, guns {c['guns']}, msl {c['msl']}) {c['recovered']:3d} home")
+
+
+def print_batch(tag: str, paths: list[Path]) -> list[dict]:
+    rows = []
+    for p in paths:
+        if not p.exists():
+            continue
+        m = metrics(p)
+        rows.append(m)
+        seed = p.stem.split("_")[-1]
+        ww = m["world_tick"].get("ms_avg", 0)
+        print(f"  seed {seed:>3}  Aquila {m['aquila']:>5}  ASTRA {fmt_side(m, 'astra')}  |  MANDATE {fmt_side(m, 'mandate')}"
+              f"  focus {m['astra']['focus']:.2f}/{m['mandate']['focus']:.2f}  ms/tick {m['perf'].get('ms_avg', 0):.3f} (world {ww:.3f})")
+    if rows:
+        def mean(f):
+            v = [f(r) for r in rows]
+            return statistics.mean(v), (statistics.pstdev(v) if len(v) > 1 else 0.0)
+        for side in ("astra", "mandate"):
+            a, sa = mean(lambda r: r[side]["alive"])
+            n = rows[0][side]["n"]
+            cl, scl = mean(lambda r: r[side]["craft"]["lost"])
+            pd, spd = mean(lambda r: r[side]["craft"]["pd"])
+            fo, sfo = mean(lambda r: max(r[side]["focus"], 0.0))
+            print(f"  mean {side:8}: warships alive {a:4.1f}±{sa:3.1f} of {n}   craft lost {cl:5.1f}±{scl:4.1f} (to PD {pd:4.1f}±{spd:3.1f})"
+                  f"   focus of fire {fo:.2f}±{sfo:.2f}")
+        ah, sah = mean(lambda r: r["aquila_hull"])
+        ms, sms = mean(lambda r: r["perf"].get("ms_avg", 0))
+        p95, _ = mean(lambda r: r["perf"].get("ms_p95", 0))
+        print(f"  mean Aquila hull {ah:5.1f}%±{sah:4.1f}   battle-subsystem tick {ms:.3f}±{sms:.3f} ms (p95 {p95:.3f})")
+    return rows
+
+
+def cmd_batch(a: argparse.Namespace) -> None:
+    seeds = list(range(1, a.seeds + 1))
+    t0 = time.time()
+    paths = seeds_run(a, a.tag, a.exec, seeds, a.jobs)
+    print(f"== {a.tag}: {a.scenario or 'opening'} {a.exec or ''} ({time.time() - t0:.0f} s)")
+    print_batch(a.tag, paths)
+
+
 def cmd_ab(a: argparse.Namespace) -> None:
+    seeds = list(range(1, a.seeds + 1))
     for name, ex in (("A", a.a), ("B", a.b)):
-        print(f"== variant {name}: {ex or '(as is)'}")
-        for seed in range(1, a.seeds + 1):
-            out = ROOT / "Saved" / "War" / f"ab_{name}_{seed}.json"
-            ns = argparse.Namespace(seconds=a.seconds, jump=a.jump, step=0.1, every=10, exec=ex, out=str(out.relative_to(ROOT)),
-                                    seed=seed, quiet=True)
-            cmd_run(ns)
-            o = outcome(out)
-            print(f"   seed {seed}: Aquila {o['aquila']:5}  ASTRA warships {o['astra'][0]}/{o['astra'][1]} craft {o['astra'][2]}/{o['astra'][3]}"
-                  f"  ·  Mandate warships {o['mandate'][0]}/{o['mandate'][1]} craft {o['mandate'][2]}/{o['mandate'][3]}")
+        t0 = time.time()
+        paths = seeds_run(a, f"ab_{name}", ex, seeds, a.jobs)
+        print(f"== variant {name}: {ex or '(as is)'} ({time.time() - t0:.0f} s)")
+        print_batch(f"ab_{name}", paths)
 
 
-def load(path: str) -> dict:
-    raw = Path(path).read_bytes()
-    enc = "utf-16" if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else "utf-8"
-    return json.loads(raw.decode(enc))
+def cmd_compare(a: argparse.Namespace) -> None:
+    for tag in (a.a, a.b):
+        paths = sorted(WAR.glob(f"{tag}_*.json"), key=lambda p: int(p.stem.split("_")[-1]))
+        print(f"== {tag}")
+        print_batch(tag, paths)
 
 
+# ------------------------------------------------------------------------------------------------ reading one record
 def report(path: Path | str) -> None:
     d = load(str(path))
     print(f"\n== {path}: {d['battle_seconds']:.0f} s of battle in {d['wall_seconds']:.1f} s")
@@ -97,32 +239,74 @@ def report(path: Path | str) -> None:
         for s in f["ships"]:
             first.setdefault(s["id"], (f["t"], s))
     deaths = []
-    alive_prev = {}
+    prev = {}
     for f in d["frames"]:
         for s in f["ships"]:
-            if alive_prev.get(s["id"], True) and not s["alive"]:
+            if prev.get(s["id"], True) and not s["alive"]:
                 deaths.append((f["t"], s))
-            alive_prev[s["id"]] = s["alive"]
+            prev[s["id"]] = s["alive"]
     print("-- arrivals (first seen in the record)")
     for sid, (t, s) in sorted(first.items(), key=lambda x: x[1][0]):
         if t > 0 and not s["craft"]:
             print(f"  {t:7.1f}  {s['c']:6} {s['name'][:28]:28} {s['side']}")
-    print("-- losses")
+    print("-- losses (a craft that landed is not a loss)")
+    fin = {s["id"]: s for s in d["final"]["ships"]}
     for t, s in deaths:
-        print(f"  {t:7.1f}  {s['c']:6} {s['name'][:28]:28} {s['side']}{' (craft)' if s['craft'] else ''}")
-    fin = d["final"]["ships"]
+        f = fate_of(fin.get(s["id"], s))
+        if s["craft"] and f == "gone":
+            continue
+        print(f"  {t:7.1f}  {s['c']:6} {s['name'][:28]:28} {s['side']}{' (craft)' if s['craft'] else ''}"
+              f"{'  [left the theatre]' if f == 'gone' and not s['craft'] else ''}")
+    fin_l = d["final"]["ships"]
     for side in ("astra", "mandate", "neutral"):
-        caps = [s for s in fin if s["side"] == side and not s["craft"]]
-        craft = [s for s in fin if s["side"] == side and s["craft"]]
+        caps = [s for s in fin_l if s["side"] == side and not s["craft"]]
+        craft = [s for s in fin_l if s["side"] == side and s["craft"]]
         alive = [s for s in caps if s["alive"]]
-        print(f"-- {side}: warships {len(alive)}/{len(caps)} alive, craft {sum(1 for s in craft if s['alive'])}/{len(craft)}")
+        print(f"-- {side}: warships {len(alive)}/{len(caps)} alive, craft {sum(1 for s in craft if s['alive'])}/{len(craft)} flying at the end")
         for s in alive:
             print(f"     {s['c']:6} {s['name'][:24]:24} hull {s.get('hull', 0):3.0f}% shields {s.get('shield', 0):3.0f}%"
                   f" {'FLEEING' if s.get('fleeing') else ''}")
+    st = d.get("stats")
+    if st:
+        print_stats(st)
     reports = [e for e in d["events"] if e["report"]]
     print(f"-- {len(d['events'])} events, {len(reports)} reports; the last reports:")
     for e in reports[-8:]:
         print(f"  {e['t']:7.1f}  {e['text'][:150]}")
+
+
+def print_stats(st: dict) -> None:
+    print("-- the books")
+    dm = st.get("damage", {})
+    for t in ("kinetic", "energy", "explosive"):
+        x = dm.get(t)
+        if not x or not x["hits"]:
+            continue
+        fac = x["by_facing"]
+        tot = max(x["in"], 1e-9)
+        print(f"  {t:9} {x['hits']:5d} hits {x['in']:8.0f} dmg: shields {100 * x['shield'] / tot:3.0f}%  armour {100 * x.get('plate', 0) / tot:3.0f}%"
+              f"  structure {100 * x['structure'] / tot:3.0f}%   by facing "
+              + " ".join(f"{k[:2]} {100 * v / tot:2.0f}%" for k, v in fac.items()))
+    if "sectors_collapsed" in dm:
+        print(f"  shield sectors taken down: {dm['sectors_collapsed']}")
+    for side in ("astra", "mandate"):
+        c = st.get("craft", {}).get(side, {})
+        sh = st.get("ships", {}).get(side, {})
+        ms = st.get("missiles", {}).get(side, {})
+        print(f"  {side:8} craft: {c.get('launched', 0)} out, {c.get('lost', 0)} lost (PD {c.get('lost_point_defence', 0)}, craft guns "
+              f"{c.get('lost_craft_guns', 0)}, missiles {c.get('lost_missiles', 0)}, other {c.get('lost_other', 0)}), {c.get('recovered', 0)} recovered"
+              f" | warships: {', '.join(f'{k} {v}' for k, v in sh.items() if v)}"
+              f" | missiles: {ms.get('fired', 0)} fired, {ms.get('shot_down', 0)} shot down, {ms.get('decoyed', 0)} decoyed")
+    fo = st.get("focus", {})
+    print(f"  focus of fire (share of a side's damage on its most-hit target, 10 s windows): ASTRA {fo.get('astra', -1)} ({fo.get('astra_windows', 0)} windows),"
+          f" Mandate {fo.get('mandate', -1)} ({fo.get('mandate_windows', 0)})")
+    p = st.get("perf", {})
+    if p:
+        print(f"  the battle's tick: {p.get('ms_avg', 0):.3f} ms avg, p95 {p.get('ms_p95', 0):.3f}, p99 {p.get('ms_p99', 0):.3f}, max {p.get('ms_max', 0):.3f}"
+              f" ({p.get('ticks', 0)} ticks; peak {p.get('peak_ships', 0)} warships, {p.get('peak_craft', 0)} craft, {p.get('peak_projectiles', 0)} projectiles)")
+    w = st.get("world_tick")
+    if w:
+        print(f"  the whole world tick: {w['ms_avg']:.3f} ms avg, p95 {w['ms_p95']:.3f}, max {w['ms_max']:.3f}")
 
 
 def cmd_report(a: argparse.Namespace) -> None:
@@ -135,34 +319,53 @@ def cmd_ship(a: argparse.Namespace) -> None:
         for s in f["ships"]:
             if s["c"].upper() == a.contact.upper() or s["name"].lower() == a.contact.lower():
                 if not s["alive"]:
-                    print(f"{f['t']:7.1f}  destroyed")
+                    print(f"{f['t']:7.1f}  {fate_of(s)}")
                     return
                 km = s["km"]
+                extra = ""
+                if "shields" in s:
+                    extra = "  sectors " + "/".join(f"{v:.0f}" for v in s["shields"])
                 print(f"{f['t']:7.1f}  ({km[0]:7.1f},{km[1]:7.1f},{km[2]:6.1f}) km  {s['v']:5.0f} m/s  hull {s['hull']:3.0f}%"
                       f"  sh {s['shield']:3.0f}%  mode {s['mode']}  target {s['target']}  stance {s['stance']}"
-                      f"{'  FLEEING' if s['fleeing'] else ''}")
+                      f"{'  FLEEING' if s['fleeing'] else ''}{extra}")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="war.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def common(p: argparse.ArgumentParser, seconds: float = 900, jump: float | None = -1) -> None:
+        p.add_argument("--seconds", type=float, default=seconds)
+        p.add_argument("--jump", type=float, default=jump)
+        p.add_argument("--step", type=float, default=0.1)
+        p.add_argument("--every", type=float, default=10)
+        p.add_argument("--scenario", default="")
+
     p = sub.add_parser("run")
-    p.add_argument("--seconds", type=float, default=900)
-    p.add_argument("--jump", type=float, default=-1)
-    p.add_argument("--step", type=float, default=0.1)
-    p.add_argument("--every", type=float, default=5)
+    common(p, 900, -1)
     p.add_argument("--exec", default="")
     p.add_argument("--out", default="Saved/War/run.json")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--quiet", action="store_true")
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("ab", help="compare: the same scenario over several seeds, with and without an --exec change")
-    p.add_argument("--seconds", type=float, default=900)
-    p.add_argument("--jump", type=float, default=160)
+    common(p, 900, 160)
     p.add_argument("--seeds", type=int, default=4)
+    p.add_argument("--jobs", type=int, default=3)
     p.add_argument("--a", default="", help="exec for variant A")
     p.add_argument("--b", default="", help="exec for variant B")
     p.set_defaults(fn=cmd_ab)
+    p = sub.add_parser("batch", help="one scenario over N seeds in parallel: a line per seed and the mean")
+    common(p, 900, 160)
+    p.add_argument("--seeds", type=int, default=6)
+    p.add_argument("--jobs", type=int, default=3)
+    p.add_argument("--tag", default="batch")
+    p.add_argument("--exec", default="")
+    p.set_defaults(fn=cmd_batch)
+    p = sub.add_parser("compare", help="two saved batches side by side")
+    p.add_argument("a")
+    p.add_argument("b")
+    p.set_defaults(fn=cmd_compare)
     p = sub.add_parser("report")
     p.add_argument("path")
     p.set_defaults(fn=cmd_report)

@@ -7,6 +7,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Dom/JsonObject.h"
+#include "AstraWarStats.h"
 #include "AstraBattleSubsystem.generated.h"
 
 class AStaticMeshActor;
@@ -146,6 +147,7 @@ struct FAstraProjectile
 	float MaxSpeed = 1600.f;             // guided weapons: missiles 1600 m/s, torpedoes 900 m/s
 	bool bTorpedo = false;
 	bool bDead = false;
+	EAstraHitKind HitKind = EAstraHitKind::Missile;   // what it does on impact (the damage type follows)
 	bool bDecoyChecked = false;          // a missile coming at the Aquila meets her decoys once, on its terminal run
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Trail = nullptr;   // guided weapons: the exhaust streak behind
@@ -471,6 +473,9 @@ public:
 	float GetBattleTime() const { return Time; }
 	/** The truth, for tests and tuning (never for the crew): every ship with its side, state, orders and damage. */
 	TSharedRef<FJsonObject> DebugState() const;
+	/** The war bench's counters (damage by type and facing, losses by cause, focus of fire, cost per tick). */
+	TSharedRef<FJsonObject> WarStatsJson() const { return Stats.ToJson(); }
+	const FAstraWarStats& GetWarStats() const { return Stats; }
 	/** A ship of the battle with this contact id is dead (destroyed, not merely lost from the plot). */
 	bool WasDestroyed(const FString& ContactId) const;
 	/** Missiles flying at the Aquila now (system frame). */
@@ -504,6 +509,7 @@ public:
 	float ConsumeShake(float DeltaTime);
 
 private:
+	FAstraWarStats Stats;
 	bool bFrozen = false;   // Freeze(): the story has left this fight behind
 	UPROPERTY() TArray<FAstraBattleShip> Ships;
 	UPROPERTY() TArray<FAstraProjectile> Projectiles;
@@ -636,8 +642,10 @@ private:
 	void FireRail(FAstraBattleShip& From, FAstraBattleShip& To, float Spread);
 	void FireMissile(FAstraBattleShip& From, FAstraBattleShip& To);
 	void FireLaser(FAstraBattleShip& From, FAstraBattleShip& To);
-	void ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos);
-	void Destroy(FAstraBattleShip& S);
+	/** A blow lands: FromDir is the direction of travel, HitPos where it strikes the hull; Kind says what it is (and so how
+	 *  shields and armour take it); SourceId is the ship that fired (-1: none). */
+	void ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId);
+	void Destroy(FAstraBattleShip& S, EAstraHitKind Cause = EAstraHitKind::Internal);
 	void BreakCeasefire(const FAstraBattleShip& Victim);
 	/** The Mandate commander's ship is gone (destroyed or jumped out): the next captain in line takes over and calls. */
 	void OnCommanderLost(const FAstraBattleShip& Old, const TCHAR* How);

@@ -81,15 +81,19 @@ int32 UAstraWarSimCommandlet::Main(const FString& Params)
 	const double Wall0 = FPlatformTime::Seconds();
 	double NextFrame = 0.0;
 	const int32 N = FMath::CeilToInt(Seconds / Step);
+	TArray<float> WorldMs;                // what a whole world tick costs (the battle, the stations, the ship: everything that ticks)
+	WorldMs.Reserve(N);
 	for (int32 i = 0; i < N; ++i)
 	{
 		const float T0 = B->GetBattleTime();
+		const double W0 = FPlatformTime::Seconds();
 		World->Tick(LEVELTICK_All, Step);
 		if (FMath::IsNearlyEqual(T0, B->GetBattleTime()))
 		{
 			// the world tick did not reach the tickable subsystems: tick them as the engine loop would
 			FTickableGameObject::TickObjects(World, LEVELTICK_All, false, Step);
 		}
+		WorldMs.Add((float)((FPlatformTime::Seconds() - W0) * 1000.0));
 		if (B->GetBattleTime() >= NextFrame)
 		{
 			NextFrame = B->GetBattleTime() + Every;
@@ -109,6 +113,20 @@ int32 UAstraWarSimCommandlet::Main(const FString& Params)
 	Root->SetArrayField(TEXT("events"), Events);
 	Root->SetArrayField(TEXT("frames"), Frames);
 	Root->SetObjectField(TEXT("final"), B->DebugState());
+	TSharedRef<FJsonObject> Stats = B->WarStatsJson();
+	if (WorldMs.Num())
+	{
+		WorldMs.Sort();
+		double Sum = 0.0;
+		for (const float M : WorldMs) { Sum += M; }
+		TSharedRef<FJsonObject> WJ = MakeShared<FJsonObject>();
+		WJ->SetNumberField(TEXT("ms_avg"), FMath::RoundToDouble(Sum / WorldMs.Num() * 1000.0) / 1000.0);
+		WJ->SetNumberField(TEXT("ms_p50"), FMath::RoundToDouble(WorldMs[WorldMs.Num() / 2] * 1000.0) / 1000.0);
+		WJ->SetNumberField(TEXT("ms_p95"), FMath::RoundToDouble(WorldMs[FMath::Min(WorldMs.Num() - 1, (int32)(WorldMs.Num() * 0.95))] * 1000.0) / 1000.0);
+		WJ->SetNumberField(TEXT("ms_max"), FMath::RoundToDouble(WorldMs.Last() * 1000.0) / 1000.0);
+		Stats->SetObjectField(TEXT("world_tick"), WJ);
+	}
+	Root->SetObjectField(TEXT("stats"), Stats);
 	FString Json;
 	const TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Json);
 	FJsonSerializer::Serialize(Root, W);
