@@ -65,6 +65,18 @@ def timeline(since: float) -> tuple[list[dict], float]:
     return t.get("entries", []), float(t.get("now", since))
 
 
+def port_free() -> bool:
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", PORT))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
 def game_process() -> bool:
     return subprocess.run(["pgrep", "-f", f"astra_harness_port={PORT}"], capture_output=True).returncode == 0
 
@@ -81,6 +93,11 @@ def cmd_launch(a: argparse.Namespace) -> None:
     else:
         subprocess.run(["pkill", "-f", f"astra_harness_port={PORT}"], check=False)
         time.sleep(2.0)
+    # the last game's connections linger a while in TIME_WAIT and the engine's listener cannot bind until they go
+    for _ in range(120):
+        if port_free():
+            break
+        time.sleep(0.5)
     PLAY_DIR.mkdir(parents=True, exist_ok=True)
     w, h = a.res.split("x")
     args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), a.map, "-game", "-windowed", f"-ResX={w}", f"-ResY={h}",

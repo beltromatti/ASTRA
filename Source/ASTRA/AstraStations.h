@@ -57,6 +57,10 @@ public:
 	FString ModeOf(const FString& Station, const FString& Aspect) const;
 	/** Its parameters (may be null). */
 	TSharedPtr<FJsonObject> ParamsOf(const FString& Station, const FString& Aspect) const;
+	/** The aspects of a station, in the order its console shows them. */
+	static const TArray<FString>& AspectsOf(const FString& Station);
+	/** The modes an aspect offers (the buttons of the console's control surface). */
+	static const TArray<FString>& ModeChoices(const FString& Station, const FString& Aspect);
 	/** The contact the fight is about for the bridge (tactical's target, else the nearest hostile known), "" if none. */
 	FString ActionTarget() const { return ActionTargetId; }
 

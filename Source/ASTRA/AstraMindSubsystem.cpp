@@ -274,7 +274,18 @@ void UAstraMindSubsystem::SayText(const FString& Text)
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("player_text"));
 	M->SetStringField(TEXT("text"), Text);
+	AddContext(M);
 	Send(M);
+}
+
+void UAstraMindSubsystem::AddContext(const TSharedRef<FJsonObject>& Msg) const
+{
+	// v2: where the Captain's words go — who hears them, who is being looked at, the open channel (ARCHITETTURA §3)
+	const UWorld* World = GameWorld();
+	if (const UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr)
+	{
+		Msg->SetObjectField(TEXT("context"), Ship->CaptainContext());
+	}
 }
 
 void UAstraMindSubsystem::PushToTalk(bool bDown)
@@ -282,6 +293,7 @@ void UAstraMindSubsystem::PushToTalk(bool bDown)
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("ptt"));
 	M->SetBoolField(TEXT("down"), bDown);
+	AddContext(M);
 	Send(M);
 }
 

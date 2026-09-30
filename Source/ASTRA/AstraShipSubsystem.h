@@ -174,6 +174,11 @@ public:
 	FString CaptainAboard() const;
 	/** The same, as the Captain's datapad writes it ("DECK 4 · MESS HALL"). */
 	FString CaptainPlace() const;
+	/** Where the Captain's words go (protocol v2 `context`, docs/ARCHITETTURA.md §3): the place, the crew who hear them
+	 *  (distance and walls), the one the Captain is looking at, the open channel, how the Captain is (on foot, seated...). */
+	TSharedRef<FJsonObject> CaptainContext() const;
+	/** The comms channel open now ("" when none): the other party's contact id. */
+	const FString& GetChannelParty() const { return ChannelParty; }
 	/** The Captain's standing orders in force ("tactical: weapons free on hostiles inside 10 km"), from the crew's mind. */
 	const TArray<FString>& GetStandingOrders() const { return StandingOrders; }
 
@@ -363,6 +368,7 @@ private:
 	bool bPlanetside = false;
 	float SpaceEV = 6.6f;
 	FString CaptainPlanetside;
+	FString ChannelParty;             // the channel open now (a hail, ours or theirs, until it is closed)
 	FVector PlanetDirNow = FVector::DownVector;
 	FLinearColor PlanetFill = FLinearColor(0.42f, 0.6f, 1.f);
 	float PlanetFillGain = 1.f;

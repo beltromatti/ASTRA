@@ -1589,9 +1589,92 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	                                                                                                          : TEXT("DECK 1 · CORRIDORS");
 }
 
+TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
+{
+	TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
+	const FString Where = CaptainPlace();
+	FString Place = Where.Contains(TEXT("·")) ? Where.RightChop(Where.Find(TEXT("·")) + 1).TrimStartAndEnd() : Where;
+	Place = Place.ToLower().Replace(TEXT("'"), TEXT("")).Replace(TEXT(" "), TEXT("_"));   // "bridge", "captains_quarters", "flight_deck"…
+	C->SetStringField(TEXT("place"), Place);
+	C->SetStringField(TEXT("place_name"), Where);
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0);
+	FString Pawn = TEXT("on_foot");
+	if (CaptainPod.IsValid()) { Pawn = TEXT("pod"); }
+	else if (P && !P->IsA<ACharacter>()) { Pawn = TEXT("falcon"); }
+	else if (const AASTRAPlayerController* PC = P ? Cast<AASTRAPlayerController>(P->GetController()) : nullptr; PC && PC->IsSeated()) { Pawn = TEXT("seated"); }
+	C->SetStringField(TEXT("pawn"), Pawn);
+	// who hears the Captain's voice in the room: near enough, and no wall or closed door between
+	TArray<TSharedPtr<FJsonValue>> Ear;
+	FString Facing;
+	float BestAngle = 22.f;
+	if (Cam && Pawn != TEXT("falcon") && Pawn != TEXT("pod"))
+	{
+		const FVector Eye = Cam->GetCameraLocation();
+		const FVector Look = Cam->GetCameraRotation().Vector();
+		for (TActorIterator<AAstraCrewMember> It(GetWorld()); It; ++It)
+		{
+			if (It->StationId.IsEmpty() || It->IsHidden())
+			{
+				continue;
+			}
+			const FVector Head = It->GetActorLocation() + FVector(0.f, 0.f, It->Posture == EAstraCrewPosture::Standing ? 70.f : 30.f);
+			const float Dist = FVector::Dist(Eye, Head);
+			if (Dist > 1600.f)
+			{
+				continue;
+			}
+			// the voice carries over consoles and chairs: blocked only when no line reaches just above the head
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraEarshot), false, P);
+			Q.AddIgnoredActor(*It);
+			FHitResult Hit;
+			const FVector Over[2] = {Head + FVector(0.f, 0.f, 60.f), It->GetActorLocation() + FVector(0.f, 0.f, 190.f)};
+			const bool bHeard = Dist < 400.f || !GetWorld()->LineTraceSingleByChannel(Hit, Eye, Over[0], ECC_Visibility, Q)
+			                                  || !GetWorld()->LineTraceSingleByChannel(Hit, Eye, Over[1], ECC_Visibility, Q);
+			if (!bHeard)
+			{
+				continue;                  // a wall, a door, a bulkhead
+			}
+			Ear.Add(MakeShared<FJsonValueString>(It->StationId));
+			const float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Look, (Head - Eye).GetSafeNormal()), -1.f, 1.f)));
+			if (Dist < 1000.f && Angle < BestAngle)
+			{
+				BestAngle = Angle;
+				Facing = It->StationId;
+			}
+		}
+	}
+	C->SetArrayField(TEXT("in_earshot"), Ear);
+	if (Facing.IsEmpty()) { C->SetField(TEXT("facing"), MakeShared<FJsonValueNull>()); }
+	else { C->SetStringField(TEXT("facing"), Facing); }
+	if (ChannelParty.IsEmpty())
+	{
+		C->SetField(TEXT("channel"), MakeShared<FJsonValueNull>());
+	}
+	else
+	{
+		TSharedRef<FJsonObject> Ch = MakeShared<FJsonObject>();
+		Ch->SetStringField(TEXT("party"), ChannelParty);
+		Ch->SetBoolField(TEXT("open"), true);
+		Ch->SetBoolField(TEXT("muted"), false);
+		C->SetObjectField(TEXT("channel"), Ch);
+	}
+	return C;
+}
+
 void UAstraShipSubsystem::Event(const FString& Text, bool bReport)
 {
 	UE_LOG(LogASTRA, Log, TEXT("[Event]%s %s"), bReport ? TEXT(" (report)") : TEXT(""), *Text);
+	// the comms channel: a hail opens it ("transmission: T-21 — …"), closing it ends it
+	FString Party;
+	if (Text.StartsWith(TEXT("transmission: ")) && Text.Mid(14).Split(TEXT(" — "), &Party, nullptr))
+	{
+		ChannelParty = Party.TrimStartAndEnd();
+	}
+	else if (Text.StartsWith(TEXT("comms: channel closed")) || Text.StartsWith(TEXT("comms: the Mandate cut the channel")))
+	{
+		ChannelParty.Reset();
+	}
 	RecentEvents.Add(Text);
 	if (RecentEvents.Num() > 16)
 	{
@@ -2014,9 +2097,15 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		if (Id.Equals(TEXT("fleet"), ESearchCase::IgnoreCase))
 		{
 			OutDetail = TEXT("7th Fleet net open: Vice Admiral Adrian Rourke, 7th Fleet commander, is on the line (reply expected)");
+			ChannelParty = TEXT("fleet");
 			return true;
 		}
-		return Battle ? Battle->PlayerHail(Id, OutDetail) : false;
+		const bool bOk = Battle ? Battle->PlayerHail(Id, OutDetail) : false;
+		if (bOk)
+		{
+			ChannelParty = Id.ToUpper();
+		}
+		return bOk;
 	}
 	if (Name == TEXT("director_beat"))
 	{

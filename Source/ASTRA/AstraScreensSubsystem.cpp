@@ -5,6 +5,7 @@
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraShipSubsystem.h"
+#include "AstraStations.h"
 #include "AstraMindSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "CanvasItem.h"
@@ -18,11 +19,26 @@
 #include "Materials/MaterialInstance.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "RenderingThread.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Misc/Paths.h"
+#include "Misc/FileHelper.h"
+#include "ImageUtils.h"
 
 namespace
 {
 	// diagnostics: time each page's redraw including the render thread's work (blocks the game thread while on)
 	TAutoConsoleVariable<int32> CVarScreensProfile(TEXT("astra.screens.profile"), 0, TEXT("Log the cost of each bridge screen redraw"));
+	FAutoConsoleCommandWithWorldAndArgs CmdScreensDump(TEXT("astra.screens.dump"),
+		TEXT("Testing: astra.screens.dump <Page> [path.png] (Helm_A, Ops_Touch, Master, Tactical...)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			UAstraScreensSubsystem* S = World ? World->GetSubsystem<UAstraScreensSubsystem>() : nullptr;
+			if (S && A.Num())
+			{
+				const FString Path = A.Num() > 1 ? A[1] : FPaths::ProjectSavedDir() / TEXT("Play") / (A[0] + TEXT(".png"));
+				UE_LOG(LogASTRA, Display, TEXT("[Screens] dump %s -> %s: %s"), *A[0], *Path, S->DumpPage(A[0], Path) ? TEXT("ok") : TEXT("failed"));
+			}
+		}));
 	TAutoConsoleVariable<FString> CVarScreensSkip(TEXT("astra.screens.skip"), TEXT(""), TEXT("Diagnostics: pages never redrawn (comma-separated names, e.g. Master,Tactical)"));
 	FLinearColor RGB(uint8 R, uint8 G, uint8 B, float A = 1.f)
 	{
@@ -214,7 +230,10 @@ bool UAstraScreensSubsystem::IsLive(const FString& Name)
 {
 	static const TSet<FString> Live = {TEXT("Master"), TEXT("Tactical"), TEXT("Helm_A"), TEXT("Helm_B"), TEXT("Ops_A"), TEXT("Ops_B"),
 	                                   TEXT("Ops_C"), TEXT("Sensors_A"), TEXT("Sensors_B"), TEXT("Eng_A"), TEXT("Eng_B"),
-	                                   TEXT("Mess_News"), TEXT("Mess_Memorial"), TEXT("Pad")};
+	                                   TEXT("Mess_News"), TEXT("Mess_Memorial"), TEXT("Pad"),
+	                                   // the control surfaces: the desk panels, and the third monitor where it had a static page
+	                                   TEXT("Helm_Touch"), TEXT("Ops_Touch"), TEXT("Sensors_Touch"), TEXT("Eng_Touch"), TEXT("Flight_Touch"),
+	                                   TEXT("Comms_Touch"), TEXT("Helm_C"), TEXT("Sensors_C"), TEXT("Eng_C"), TEXT("Flight_C"), TEXT("Comms_C")};
 	return Live.Contains(Name);
 }
 
@@ -367,7 +386,16 @@ void UAstraScreensSubsystem::DrawPage(const FString& Name, UCanvas* Canvas, int3
 	else if (Name == TEXT("Tactical")) { DrawTactical(Canvas, Width, Height); }
 	else if (Name.Split(TEXT("_"), &Station, &Slot))
 	{
-		if (Station == TEXT("Helm")) { DrawHelm(Canvas, Width, Height, Slot); }
+		static const TMap<FString, FString> Ids = {{TEXT("Helm"), TEXT("helm")}, {TEXT("Ops"), TEXT("ops")}, {TEXT("Sensors"), TEXT("sensors")},
+		                                           {TEXT("Eng"), TEXT("engineering")}, {TEXT("Flight"), TEXT("flight")}, {TEXT("Comms"), TEXT("comms")}};
+		if (Slot == TEXT("Touch") || (Slot == TEXT("C") && Station != TEXT("Ops")))
+		{
+			if (const FString* Id = Ids.Find(Station))
+			{
+				DrawControls(Canvas, Width, Height, *Id);
+			}
+		}
+		else if (Station == TEXT("Helm")) { DrawHelm(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Ops")) { DrawOps(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Sensors")) { DrawSensors(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Eng")) { DrawEngineering(Canvas, Width, Height, Slot); }
@@ -1156,4 +1184,104 @@ void UAstraScreensSubsystem::DrawMess(UCanvas* C, int32 W, int32 H, const FStrin
 	{
 		P.Text(824, 112, TEXT("Nothing new on the net."), true, 19, DIM);
 	}
+}
+
+void UAstraScreensSubsystem::DrawControls(UCanvas* C, int32 W, int32 H, const FString& Station)
+{
+	const UAstraStationsSubsystem* St = GetWorld()->GetSubsystem<UAstraStationsSubsystem>();
+	const FAstraStation* S = St ? St->Find(Station) : nullptr;
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	if (!S)
+	{
+		return;
+	}
+	static const TMap<FString, FLinearColor> Accents = {{TEXT("helm"), COMMAND}, {TEXT("ops"), COMMAND}, {TEXT("comms"), COMMAND},
+	                                                     {TEXT("sensors"), SCIENCE}, {TEXT("engineering"), ENGINEERING}, {TEXT("flight"), AMBER}};
+	const FLinearColor Accent = Accents.Contains(Station) ? Accents[Station] : CYAN;
+	const FLinearColor DelegCol = S->Delegation == TEXT("auto") ? GREEN : (S->Delegation == TEXT("advise") ? AMBER : RED);
+	P.Header(W, FString::Printf(TEXT("%s · Control surface"), *Station), FString::Printf(TEXT("DELEGATION %s"), *S->Delegation.ToUpper()), Accent);
+	P.Rect(W - 190, 50, 174, 26, DelegCol * 0.25f);
+	P.Frame(W - 190, 50, 174, 26, DelegCol);
+	P.Text(W - 103, 53, S->Delegation == TEXT("auto") ? TEXT("OFFICER IN CONTROL") : (S->Delegation == TEXT("advise") ? TEXT("ADVISING ONLY") : TEXT("MANUAL")),
+	       true, 14, DelegCol, 1);
+	const TArray<FString>& Aspects = UAstraStationsSubsystem::AspectsOf(Station);
+	const float Top = 84.f, Bottom = H - 128.f;
+	const float RowH = FMath::Min(150.f, (Bottom - Top) / FMath::Max(1, Aspects.Num()));
+	const float Now = GetWorld()->GetTimeSeconds();
+	for (int32 i = 0; i < Aspects.Num(); ++i)
+	{
+		const FString& Asp = Aspects[i];
+		const FAstraStationAspect* A = S->Aspects.Find(Asp);
+		const float Y = Top + i * RowH;
+		P.Panel(16, Y, W - 16, Y + RowH - 8, Asp.Replace(TEXT("_"), TEXT(" ")));
+		// the buttons: every mode the aspect offers, the one in force lit
+		const TArray<FString>& Modes = UAstraStationsSubsystem::ModeChoices(Station, Asp);
+		const int32 Rows = (Modes.Num() > 6 && RowH >= 140.f) ? 2 : 1;
+		const int32 PerRow = FMath::Max(1, FMath::DivideAndRoundUp(Modes.Num(), Rows));
+		const float BW = (W - 64.f - (PerRow - 1) * 8.f) / PerRow;
+		const float BH = 28.f;
+		int32 Longest = 1;
+		for (const FString& Md : Modes) { Longest = FMath::Max(Longest, Md.Len()); }
+		const float BPx = FMath::Clamp((BW - 10.f) / (Longest * 0.62f), 11.f, 15.f);
+		for (int32 m = 0; m < Modes.Num(); ++m)
+		{
+			const float X = 32.f + (m % PerRow) * (BW + 8.f);
+			const float BY = Y + 38.f + (m / PerRow) * (BH + 6.f);
+			const bool bOn = A && A->Mode == Modes[m];
+			P.Rect(X, BY, BW, BH, bOn ? Accent : RGB(8, 16, 30));
+			P.Frame(X, BY, BW, BH, bOn ? TEXTC : DIM);
+			P.Text(X + BW * 0.5f, BY + BH * 0.5f - BPx * 0.6f, Modes[m].Replace(TEXT("_"), TEXT(" ")).ToUpper(), true, BPx, bOn ? RGB(4, 9, 18) : LINE, 1, bOn);
+		}
+		if (A)
+		{
+			// what the mode is about, when it ends, who set it
+			FString Detail;
+			if (A->Params.IsValid())
+			{
+				for (const auto& KV : A->Params->Values)
+				{
+					FString V;
+					if (KV.Value.IsValid() && KV.Value->TryGetString(V) && !V.IsEmpty())
+					{
+						Detail += FString::Printf(TEXT("%s %s  "), *FString(*KV.Key).Replace(TEXT("_"), TEXT(" ")), *V);
+					}
+					else if (double D = 0.0; KV.Value.IsValid() && KV.Value->TryGetNumber(D))
+					{
+						Detail += FString::Printf(TEXT("%s %g  "), *FString(*KV.Key).Replace(TEXT("_"), TEXT(" ")), D);
+					}
+				}
+			}
+			Detail += FString::Printf(TEXT("until %s · set by %s %.0f s ago"), *A->Until.Replace(TEXT("_"), TEXT(" ")), *A->SetBy, FMath::Max(0.f, Now - (float)A->Since));
+			P.Text(W - 32, Y + RowH - 34, Detail.Left(int32((W - 64) / 8.4f)), true, 14, CYAN, 2);
+		}
+	}
+	// the officer's own words for the station, and the last things done
+	P.Panel(16, Bottom, W - 16, H - 12, TEXT("Officer"));
+	P.Text(32, Bottom + 36, S->Status.Left(int32((W - 64) / 8.8f)), true, 15, TEXTC);
+	for (int32 k = 0; k < 2 && k < S->Actions.Num(); ++k)
+	{
+		P.Text(32, Bottom + 60 + k * 22, (TEXT("› ") + S->Actions[S->Actions.Num() - 1 - k]).Left(int32((W - 64) / 8.4f)), true, 14, k == 0 ? CYAN : DIM);
+	}
+}
+
+bool UAstraScreensSubsystem::DumpPage(const FString& Name, const FString& Path)
+{
+	for (UAstraScreenPage* P : Pages)
+	{
+		if (P && P->Name == Name && P->Target)
+		{
+			FTextureRenderTargetResource* R = P->Target->GameThread_GetRenderTargetResource();
+			TArray<FColor> Px;
+			if (!R || !R->ReadPixels(Px) || Px.Num() != P->Target->SizeX * P->Target->SizeY)
+			{
+				return false;
+			}
+			for (FColor& C : Px) { C.A = 255; }
+			TArray64<uint8> Png;
+			FImageUtils::PNGCompressImageArray(P->Target->SizeX, P->Target->SizeY, TArrayView64<const FColor>(Px.GetData(), Px.Num()), Png);
+			return Png.Num() > 0 && FFileHelper::SaveArrayToFile(Png, *Path);
+		}
+	}
+	return false;
 }

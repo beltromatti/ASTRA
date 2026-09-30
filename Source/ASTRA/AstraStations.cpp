@@ -138,6 +138,48 @@ namespace
 	}
 }
 
+// ------------------------------------------------------------------------------------------------ the consoles
+const TArray<FString>& UAstraStationsSubsystem::AspectsOf(const FString& Station)
+{
+	static const TArray<FString> None;
+	const TArray<FString>* A = AspectTable().Find(Station);
+	return A ? *A : None;
+}
+
+const TArray<FString>& UAstraStationsSubsystem::ModeChoices(const FString& Station, const FString& Aspect)
+{
+	static const TMap<FString, TArray<FString>> T = {
+		{TEXT("helm.course"), {TEXT("hold"), TEXT("course"), TEXT("intercept"), TEXT("keep_on_bow"), TEXT("follow"), TEXT("orbit"), TEXT("broadside"),
+		                       TEXT("evade"), TEXT("retreat"), TEXT("formation"), TEXT("transit")}},
+		{TEXT("tactical.engagement"), {TEXT("hold_fire"), TEXT("return_fire"), TEXT("weapons_free"), TEXT("engage")}},
+		{TEXT("tactical.shields"), {TEXT("balanced"), TEXT("face_threat"), TEXT("forward"), TEXT("aft"), TEXT("port"), TEXT("starboard"), TEXT("shields_off")}},
+		{TEXT("tactical.point_defense"), {TEXT("protect"), TEXT("pd_auto"), TEXT("pd_off")}},
+		{TEXT("tactical.missiles"), {TEXT("conserve"), TEXT("normal"), TEXT("saturate")}},
+		{TEXT("sensors.emcon"), {TEXT("silent"), TEXT("restricted"), TEXT("limited"), TEXT("full")}},
+		{TEXT("sensors.scan"), {TEXT("passive"), TEXT("sweep"), TEXT("focus")}},
+		{TEXT("sensors.ew"), {TEXT("jam"), TEXT("ew_off")}},
+		{TEXT("sensors.sigint"), {TEXT("sigint_on"), TEXT("sigint_off")}},
+		{TEXT("ops.viewscreen"), {TEXT("auto"), TEXT("forward"), TEXT("target"), TEXT("tactical"), TEXT("fleet"), TEXT("sector"), TEXT("comms"),
+		                          TEXT("damage"), TEXT("off")}},
+		{TEXT("ops.holo"), {TEXT("tactical"), TEXT("sector"), TEXT("ship"), TEXT("fleet")}},
+		{TEXT("ops.datapad"), {TEXT("push")}},
+		{TEXT("ops.damage_control"), {TEXT("auto"), TEXT("priority")}},
+		{TEXT("engineering.power"), {TEXT("balanced"), TEXT("combat"), TEXT("evasive"), TEXT("silent"), TEXT("shields"), TEXT("weapons"), TEXT("engines"),
+		                             TEXT("custom")}},
+		{TEXT("engineering.heat"), {TEXT("auto"), TEXT("extended"), TEXT("retracted")}},
+		{TEXT("engineering.reactor"), {TEXT("normal"), TEXT("battle_short")}},
+		{TEXT("comms.channel"), {TEXT("open"), TEXT("close"), TEXT("mute")}},
+		{TEXT("comms.listen"), {TEXT("all"), TEXT("enemy"), TEXT("fleet")}},
+		{TEXT("flight.alpha"), {TEXT("hold"), TEXT("cap"), TEXT("escort"), TEXT("strike"), TEXT("ew"), TEXT("recall")}},
+		{TEXT("flight.bravo"), {TEXT("hold"), TEXT("cap"), TEXT("escort"), TEXT("strike"), TEXT("ew"), TEXT("recall")}},
+		{TEXT("flight.drones"), {TEXT("hold"), TEXT("cap"), TEXT("escort"), TEXT("strike"), TEXT("ew"), TEXT("recall")}},
+		{TEXT("xo.delegation"), {TEXT("manual"), TEXT("advise"), TEXT("auto")}},
+	};
+	static const TArray<FString> None;
+	const TArray<FString>* M = T.Find(Station + TEXT(".") + Aspect);
+	return M ? *M : None;
+}
+
 // ------------------------------------------------------------------------------------------------ lifecycle
 bool UAstraStationsSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {

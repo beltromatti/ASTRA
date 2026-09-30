@@ -403,6 +403,10 @@ TSharedRef<FJsonObject> UAstraHarness::StateJson() const
 			Pw->SetNumberField(TEXT("eye_z_m"), FMath::RoundToDouble(C->GetFirstPersonCameraComponent()->GetComponentLocation().Z) / 100.0);
 		}
 		O->SetObjectField(TEXT("pawn"), Pw);
+		if (const UAstraShipSubsystem* Ship = W->GetSubsystem<UAstraShipSubsystem>())
+		{
+			O->SetObjectField(TEXT("context"), Ship->CaptainContext());   // what the mind gets with the Captain's words
+		}
 	}
 	return O;
 }
