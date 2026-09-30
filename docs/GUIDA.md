@@ -11,12 +11,12 @@ ascolta in qualsiasi lingua e ti risponde nella tua; nomi, cartelli e schermi de
 | **Tab** | il datapad: la nave a colpo d'occhio, ovunque a bordo |
 | **E** | alzarsi e sedersi, porte, ascensore, salire su un Falcon |
 | **W** (seduto) | alzarsi dalla poltrona e camminare |
-| **1-6** (all'ascensore) | Plancia · Alloggi dell'equipaggio · Mensa · Infermeria · Sala macchine · Ponte di volo |
+| **1-6** (all'ascensore) | Plancia (Ponte 1) · Alloggi dell'equipaggio (Ponte 4, sezione C) · Mensa (Ponte 4, sezione B) · Infermeria (Ponte 6) · Sala macchine (Ponte 7) · Ponte di volo (Ponte 9) |
 | **WASD**, mouse | camminare e guardarsi intorno (anche il gamepad) |
 | **Shift** (tieni premuto) | correre |
 | **Spazio** | saltare; da accovacciato o a terra, rialzarsi |
 | **C** · **C** tenuto premuto | accovacciarsi · stendersi a terra |
-| **Esc** | pausa, salvataggio, menu |
+| **Esc** | pausa, salvataggio, menu (con **SETTINGS**) |
 | **F1** | i comandi a schermo |
 
 In volo su un Falcon: **W** per il lancio, **F** per rientrare vicino alla bocca di prua sinistra, **G** verso un pianeta.
@@ -31,6 +31,26 @@ Chiama l'ufficiale per nome o per ruolo, come faresti in plancia. Qualche esempi
 - «Ordine permanente per il tattico: fuoco libero su ogni ostile entro dieci chilometri» (resta valido finché non lo ritiri)
 - «Diario del Capitano: …» (la storia lo legge)
 - «Regista, voglio un'incursione del Mandato da lontano» (parli fuori dal gioco con il regista della storia)
+
+Mentre tieni premuto **V** in basso compare «● LISTENING». Il Capitano parla sempre per primo: se un ufficiale sta
+parlando si interrompe, e ciò che voleva dire lo ripensa con la situazione di quel momento (magari non serve più).
+Gli ufficiali fuori plancia li senti attraverso la stanza o all'interfono; i sottotitoli seguono la voce.
+
+## La nave
+Oltre alla plancia si camminano due ponti interi dell'Aquila: il **Ponte 4** (Crew Services: la **Spina**, il corridoio
+che va da prua a poppa, la mensa con gli ascensori, gli alloggi dell'equipaggio e le stanze dei servizi) e il **Ponte 6**
+(Medical, con l'infermeria). Le porte si aprono da sole; gli ascensori collegano i ponti. Gli altri ponti arrivano via via.
+
+## Le impostazioni (Esc → SETTINGS)
+| Voce | Cosa cambia |
+|---|---|
+| **GRAPHICS** | LOW · MEDIUM · HIGH · EPIC (HIGH ed EPIC illuminano la nave con Lumen e ombre piene) |
+| **IMAGE** | SHARP (mai sotto il 70 % di risoluzione) · BALANCED (55 %) · SMOOTH (fino al 40 % nelle battaglie pesanti) |
+| **FRAME RATE** | 60 (il più fluido) · 30 (immagine molto più nitida e Mac più fresco) |
+| **MUSIC** · **VOICES** | volumi di musica e voci |
+| **SUBTITLES** | sottotitoli accesi o spenti |
+
+Clic o Invio passa al valore successivo, le frecce scorrono, Esc chiude; le scelte restano salvate.
 
 ## La guerra dell'informazione
 Il Mandato arriva **spento**: all'inizio vedi al massimo un **rilevamento** (una direzione, senza distanza). Senza

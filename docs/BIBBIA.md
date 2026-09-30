@@ -123,8 +123,8 @@ La frontiera tra i Core Worlds e gli Outer Worlds. Undici sistemi, ognuno con il
 - **I dodici ponti** (dall'alto; sezioni A–H da prua a poppa lungo lo scafo; segnaletica "DECK 4 · SECTION C"):
   - **Deck 1** — Bridge, Captain's quarters, ready room, corridoi di comando.
   - **Deck 2** — CIC (centro informazioni di combattimento), sala riunioni, uffici dei reparti, comunicazioni.
-  - **Deck 3** — alloggi dell'equipaggio (Crew Berthing), alloggi degli ufficiali, palestra.
-  - **Deck 4** — Mess Hall, cucina (galley), sala comune (lounge), osservatorio.
+  - **Deck 3** — alloggi degli ufficiali, palestra.
+  - **Deck 4** — i servizi dell'equipaggio: Mess Hall, cucina (galley), sala comune (lounge), osservatorio, e gli alloggi dell'equipaggio (Crew Berthing, Section C).
   - **Deck 5** — laboratori scientifici, Transporter Room, archivio dei sensori.
   - **Deck 6** — Medbay, chirurgia, quarantena, farmacia.
   - **Deck 7** — Main Engineering, reattore, sala di controllo della potenza, radiatori.

@@ -35,20 +35,19 @@ testo. È un principio da applicare caso per caso, non un dogma (dettagli: [ARCH
 Il 30/9 sera questo principio è stato applicato:
 - all'equipaggio: le sue parole arrivano come le dice;
 - al router: un modello decide cosa esce su un canale aperto;
-- ai messaggi del nemico: la brevità è della persona.
+- ai messaggi del nemico: la brevità è della persona;
+- al palco della voce (1/10): le battute che hanno aspettato o sono state interrotte le ripensa chi le doveva dire (§4.2).
 
-Resta da applicarlo al palco della voce (§4.2).
-
-## 2. Dove siamo (30/9 sera)
+## 2. Dove siamo (1/10)
 
 | Area | Stato |
 |---|---|
 | **Controlli in prima persona**, banco di prova da terminale | fatto |
-| **Plancia viva** (F1) | quasi fatta. Pronti: postazioni vere, schermo principale intelligente, tavolo olografico leggibile dalla poltrona, datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente, plancia v3, menu SETTINGS. La voce v2 è provata dal vivo: parla anche chi è fuori plancia, sottotitoli giusti, il Capitano sempre per primo. Mancano: il palco della voce che ripensa, la plancia curata nel minimo dettaglio, le persone vere (F3), l'immagine nitida (§4.5) |
+| **Plancia viva** (F1) | quasi fatta. Pronti: postazioni vere, schermo principale intelligente, tavolo olografico leggibile dalla poltrona, datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente, plancia v3, menu SETTINGS. La voce v2 è provata dal vivo: parla anche chi è fuori plancia, sottotitoli giusti, il Capitano sempre per primo. Il palco della voce ripensa invece di scartare. Mancano: la plancia curata nel minimo dettaglio, le persone vere (F3), l'immagine nitida (§4.5) |
 | **Guerra grande** (F2) | in corso (GUERRA). Fatto F2.1: danni fisici, scudi a sei settori, corazza e struttura per sezione, sottosistemi, relitti. F2.2 a metà: gruppi di battaglia, squadriglie di caccia. Da fare: menti di ammiragli e comandanti, scala, bellezza, regista v2 |
 | **Persone vere** (F3) | ferma: serve la tua autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **La nave intera** (F4.1) | in corso (NAVE). Pronti: il DNA dell'Aquila (12 ponti, 2243 compartimenti, 1025 porte, grafo di 3628 luoghi), il kit dei corridoi, il Ponte 4. Il gioco legge già la pianta e trova i percorsi (`UAstraShipPlan`) |
-| **Navi v3** | in corso (ARTE-NAVI): esterni alla qualità di EVE Online, pezzi di sezione per la rottura, decalcomanie di danno |
+| **La nave intera** (F4.1) | NAVE unita: il DNA dell'Aquila (12 ponti, 2251 compartimenti, 1034 porte, grafo di 4450 luoghi), il kit di 96 modelli; il Ponte 4 (la Spina, la mensa, gli alloggi) e il Ponte 6 (Medical) sono nel livello e si camminano a 57 fps. Il gioco legge la pianta e trova i percorsi (`UAstraShipPlan`, 0,1 ms). In corso: VITA (la vita di bordo); da fare: gli altri ponti |
+| **Navi v3** | ARTE-NAVI unita: esterni alla qualità di EVE Online, pezzi di sezione per la rottura, decalcomanie di danno; import nell'editor e prova nel gioco in corso |
 | Distruzione (F4.2) · Abbordaggi e prima persona (F5) · Teletrasporto (F6) · Pianeta (F7) · Rete e Windows (F8) | da fare |
 
 ## 3. Le fasi
@@ -95,9 +94,10 @@ Pronta e provata:
 - sottotitoli che durano quanto serve a leggerli;
 - radio vs voce nella stanza con isteresi e muri.
 
-**Da fare, per il principio §1**: le battute rimaste in coda troppo a lungo, o interrotte a metà, le ripensa chi le doveva
-dire, con lo stato di adesso: le dice aggiornate, le cambia o le lascia cadere. Spariscono lo scarto per età, il riassunto
-«prima e ultima frase» e il taglio alla prima frase quando c'è coda. Resta meccanica la priorità del Capitano.
+**Fatto il 1/10, per il principio §1**: le battute rimaste in coda troppo a lungo, o interrotte a metà, le ripensa chi le
+doveva dire, con lo stato di adesso, appena prima di dirle: le dice aggiornate, le cambia o le lascia cadere (aggancio
+`rethink`). Spariti lo scarto per età, il riassunto «prima e ultima frase» e il taglio alla prima frase quando c'è coda.
+Resta meccanica solo la priorità del Capitano.
 
 ### 4.3 Simulazione e guerra
 - Passo fisso, doppia precisione, la nave del giocatore come riferimento.
@@ -153,12 +153,11 @@ integra, prova nel gioco vero, e li chiude quando il modulo è perfetto.
 | Adesso | Poi (appena si libera un posto) |
 |---|---|
 | **GUERRA** (F2.1–F2.2: danni, gruppi, squadriglie; contratto per le menti) | **MENTE-GUERRA** (ammiragli, comandanti, alleati che parlano, regista v2) · **SCALA** (F2.3) |
-| **NAVE** (F4.1: pianta, kit, ponti) | **VITA** (la vita di bordo sul grafo dei percorsi) → **DISTRUZIONE** (F4.2) |
-| **ARTE-NAVI** (navi v3, pezzi di rottura) | **VFX** (armi, motori, scudi, esplosioni, rotture: F2.4) · **METALFX** (upscaler) |
+| **VITA** (la vita di bordo sul grafo dei percorsi; dopo NAVE, unita il 30/9) | **DISTRUZIONE** (F4.2) · **NAVE-2** (gli altri ponti) |
+| **METALFX** (upscaler; dopo ARTE-NAVI, unita il 1/10) | **VFX** (armi, motori, scudi, esplosioni, rotture: F2.4) |
 
 Il lead, intanto:
-- il palco della voce che ripensa;
-- l'integrazione di ogni modulo;
+- l'integrazione di ogni modulo (le navi v3 nel gioco, poi GUERRA e VITA);
 - le prove nel gioco;
 - le prestazioni;
 - la plancia al dettaglio;
