@@ -15,8 +15,18 @@ struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
+/** How the Captain holds the body on foot. */
+UENUM()
+enum class EAstraPosture : uint8
+{
+	Standing,
+	Crouched,
+	Prone
+};
+
 /**
- *  A basic first person character
+ *  The Captain on foot: walks, runs, jumps, crouches and lies down; the eyes follow the posture.
+ *  The controls come from the player controller's UAstraInputSet (built in code).
  */
 UCLASS(abstract)
 class AASTRACharacter : public ACharacter
@@ -48,9 +58,23 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	class UInputAction* MouseLookAction;
-	
+
 public:
 	AASTRACharacter();
+
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	EAstraPosture GetPosture() const { return Posture; }
+	bool IsSprinting() const { return bSprintHeld && Posture == EAstraPosture::Standing; }
+	/** Back on the feet at once (seated, the lift, a cutscene): no crouch, no prone, eyes at standing height. */
+	void ResetPosture();
+
+	/** Speeds on foot (cm/s): a ship's corridors, not a racetrack. */
+	UPROPERTY(EditAnywhere, Category = "Movement") float WalkSpeed = 380.f;
+	UPROPERTY(EditAnywhere, Category = "Movement") float SprintSpeed = 640.f;
+	UPROPERTY(EditAnywhere, Category = "Movement") float CrouchSpeed = 190.f;
+	UPROPERTY(EditAnywhere, Category = "Movement") float ProneSpeed = 85.f;
 
 protected:
 
@@ -76,11 +100,28 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
+	void SprintStart() { bSprintHeld = true; }
+	void SprintEnd() { bSprintHeld = false; }
+	void CrouchPressed();
+	void CrouchReleased();
+
 protected:
 
 	/** Set up input action bindings */
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
-	
+
+private:
+	EAstraPosture Posture = EAstraPosture::Standing;
+	bool bSprintHeld = false;
+	double CrouchDownAt = -1.0;      // when C went down (a hold of this long lies down)
+	bool bCrouchHoldDone = false;    // the hold already acted: the release does nothing
+	float EyeZ = 0.f;                // camera height above the capsule centre, eased towards the posture's
+	float StandHalfHeight = 96.f;
+	float ProneOffset = 0.f;         // how far the capsule centre went down when lying (to lift it back)
+
+	void SetPosture(EAstraPosture New);
+	bool RoomToGrow(float NewHalfHeight) const;
+	float TargetEyeZ() const;
 
 public:
 
@@ -91,4 +132,3 @@ public:
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
 };
-

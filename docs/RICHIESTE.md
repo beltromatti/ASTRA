@@ -4,7 +4,12 @@ Qui scrivo solo ciò che **non posso fare io** (per regole di sicurezza: creare 
 
 ## Aperte
 
-### 2026-09-28 — Autorizzare l'account Epic nell'editor per i MetaHuman (una volta, 1 minuto)
+### 2026-09-30 — Credito OpenRouter (quando ti fa comodo)
+Restano circa 6,9 $ su 10. Con la guerra grande (molte più menti) e le mie prove di gioco il consumo salirà: l'obiettivo è
+restare sotto 1 $ per ora di battaglia, ma per lo sviluppo delle prossime settimane conviene una ricarica di 10–20 $.
+Niente fretta: sotto i 3 $ residui te lo riscrivo qui e riduco le prove che costano.
+
+### 2026-09-28 — Autorizzare l'account Epic nell'editor per i MetaHuman (una volta, 1 minuto) — ORA PRIORITARIO (fase F3: umani realistici per tutti)
 Per trasformare l'equipaggio da manichini a **MetaHuman** realistici, Unreal usa il servizio Epic di *auto-rigging* dei volti:
 richiede che tu autorizzi una volta il tuo account Epic nell'editor (io non posso accedere né concedere autorizzazioni).
 - Stanotte, provandolo, l'editor ha aperto da solo una pagina Epic di autorizzazione nel browser: puoi chiuderla, è scaduta.

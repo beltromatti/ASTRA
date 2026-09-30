@@ -107,6 +107,36 @@ class Line:
     resumed: bool = False
 
 
+def _as_stream(obj, sample_rate: int) -> SpeechStream:  # noqa: ANN001
+    """A voice engine of the first version (its `stream` is an async generator of PCM chunks: nothing to stop, no pauses known) as the
+    stream the floor works with. The scripted engines of the tests are of that kind; the real engine already returns a SpeechStream."""
+    if hasattr(obj, "stop") and hasattr(obj, "q"):
+        return obj
+    st = SpeechStream(sample_rate)
+
+    async def pump() -> None:
+        try:
+            async for pcm in obj:
+                st.samples += len(pcm) // 2
+                st.q.put_nowait(pcm)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            st.error = exc
+        finally:
+            st.done = True
+            st.q.put_nowait(None)
+
+    task = asyncio.get_running_loop().create_task(pump())
+    stop = st.stop
+
+    def stop_all() -> None:
+        stop()
+        task.cancel()
+    st.stop = stop_all
+    return st
+
+
 class _QueueView:
     """What the first version exposed as `voice.q` (an asyncio.Queue): enough for the offline tools (`await q.join()`)."""
 
@@ -435,6 +465,19 @@ class Voice:
         self.captain_begin()
         self.captain_end(True)
 
+    def captain_speaks(self) -> None:
+        """The hook the server's `_captain_speaks` calls when the Captain starts to talk (his key goes down, or an order is typed):
+        whoever is talking stops (at the next pause within half a second, else a fast fade) and the chatter waiting is dropped.
+        Safe to call again and next to `captain_begin` / `captain_input` (a line already being stopped is left alone). With his
+        key down that is all; without it, it also takes the floor for the answer, as a typed order does."""
+        if self._captain_down:
+            self.drop_low_priority()
+            if self._cur is not None:
+                self._request_cut(self._cur, "captain", also_answers=True)
+            self._wake()
+        else:
+            self.captain_input()
+
     @property
     def held(self) -> bool:
         """The floor belongs to the Captain: only answers may start (and none while his key is down)."""
@@ -547,8 +590,13 @@ class Voice:
     def _start_synth(self, line: Line) -> None:
         self._shape(line)
         voice = self.who(line.speaker)[1]
-        lang = line.lang if self.tts.can_speak(line.lang) else "en"
-        stream = self.tts.stream(line.text, voice, lang, tone=line.tone)
+        can = getattr(self.tts, "can_speak", None)
+        lang = line.lang if (can is None or can(line.lang)) else "en"
+        try:
+            stream = self.tts.stream(line.text, voice, lang, tone=line.tone)
+        except TypeError:                               # an engine with the first version's signature (no tone)
+            stream = self.tts.stream(line.text, voice, lang)
+        stream = _as_stream(stream, self.tts.sample_rate)
         line.stream = stream
         line.chunks, line.gen_done, line.gen_error = [], False, False
         line.first_ready = asyncio.Event()

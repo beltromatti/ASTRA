@@ -5,6 +5,7 @@ argomenti completi e fine; riporta uso e costo dichiarati da OpenRouter.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from dataclasses import dataclass, field
@@ -80,9 +81,14 @@ class OpenRouter:
         extra: dict[str, Any] | None = None,
         on_tool_call: Any = None,
         allow_fallbacks: bool = False,
+        max_price: tuple[float, float] | None = None,
+        first_token_timeout: float | None = None,
     ) -> Completion:
         """Streaming chat. `on_tool_call(ToolCall)` (sync or async) fires as soon as each tool call's arguments are
-        complete, before the rest of the reply has arrived: speech can start while the model is still writing."""
+        complete, before the rest of the reply has arrived: speech can start while the model is still writing.
+        max_price: ($ per M input, $ per M output) ceiling for whatever provider OpenRouter picks (also on a fallback).
+        first_token_timeout: seconds to wait for the first token or tool call; past it the request is dropped and
+        `error` starts with "stall" (the caller may retry: nothing was spoken or done)."""
         body: dict[str, Any] = {
             "model": model,
             "messages": messages,
@@ -97,8 +103,13 @@ class OpenRouter:
             # require_parameters, farebbe scartare tutti gli endpoint
             body["tools"] = tools
             body["tool_choice"] = tool_choice
-        if providers:
-            body["provider"] = {"order": providers, "allow_fallbacks": allow_fallbacks, "require_parameters": True}
+        if providers or max_price:
+            prov: dict[str, Any] = {"allow_fallbacks": allow_fallbacks, "require_parameters": True}
+            if providers:
+                prov["order"] = providers
+            if max_price:
+                prov["max_price"] = {"prompt": max_price[0], "completion": max_price[1]}
+            body["provider"] = prov
         if reasoning is not None:
             body["reasoning"] = reasoning
         if extra:
@@ -127,7 +138,18 @@ class OpenRouter:
                     text = (await resp.aread()).decode("utf-8", "replace")
                     out.error = f"HTTP {resp.status_code}: {text[:300]}"
                     return out
-                async for line in resp.aiter_lines():
+                lines = resp.aiter_lines().__aiter__()
+                while True:
+                    try:
+                        if first_token_timeout and out.t_first_token is None:
+                            line = await asyncio.wait_for(lines.__anext__(), timeout=max(0.05, first_token_timeout - (time.perf_counter() - t0)))
+                        else:
+                            line = await lines.__anext__()
+                    except StopAsyncIteration:
+                        break
+                    except asyncio.TimeoutError:
+                        out.error = f"stall: no first token in {first_token_timeout:.1f} s"
+                        break
                     if out.t_first_byte is None:
                         out.t_first_byte = time.perf_counter() - t0
                     if not line.startswith("data:"):

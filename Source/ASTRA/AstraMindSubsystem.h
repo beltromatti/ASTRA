@@ -58,6 +58,8 @@ private:
 	void Connect();
 	void LaunchMind();
 	void Send(const TSharedRef<FJsonObject>& Msg);
+	/** The Captain's context (protocol v2) on a player_text or ptt message. */
+	void AddContext(const TSharedRef<FJsonObject>& Msg) const;
 	void OnText(const FString& Text);
 	void OnBinary(const void* Data, SIZE_T Size, SIZE_T BytesRemaining);
 	void HandleCommand(const TSharedPtr<FJsonObject>& Msg);

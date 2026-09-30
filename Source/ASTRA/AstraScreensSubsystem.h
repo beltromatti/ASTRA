@@ -45,16 +45,37 @@ public:
 	/** The Captain's datapad: its live page (painted only while it is raised). */
 	class UTextureRenderTarget2D* GetPadTarget();
 	void SetPadVisible(bool bVisible);
+	/** The datapad's pages: overview, contact (a dossier; Focus = the contact), damage, fleet, orders. Ops pushes one to the
+	 *  Captain (a notice and a chime; the page is there when the pad is raised). False for an unknown page. */
+	bool PushPad(const FString& Page, const FString& Focus, const FString& By);
+	/** The mouse wheel on the raised pad: the next or previous page. */
+	void CyclePad(int32 Dir);
+	const FString& GetPadPage() const { return PadPage; }
 
 private:
 	bool bPadVisible = false;
+	FString PadPage = TEXT("overview");
+	FString PadFocus;
+	FString PadPushedBy;
+	float PadPushedAt = -100.f;
 	void DrawPad(UCanvas* C, int32 W, int32 H);
+	void DrawPadOverview(UCanvas* C, int32 W, int32 H);
+	void DrawPadContact(UCanvas* C, int32 W, int32 H);
+	void DrawPadDamage(UCanvas* C, int32 W, int32 H);
+	void DrawPadFleet(UCanvas* C, int32 W, int32 H);
+	void DrawPadOrders(UCanvas* C, int32 W, int32 H);
+	void DrawPadTabs(UCanvas* C, int32 W, int32 H);
+	void RedrawPadNow();
 	UPROPERTY() TArray<TObjectPtr<UAstraScreenPage>> Pages;
 	UPROPERTY() TObjectPtr<UFont> TitleFont;
 	UPROPERTY() TObjectPtr<UFont> MonoFont;
 	float Time = 0.f;
 
 	UAstraScreenPage* PageFor(const FString& Name);
+public:
+	/** Testing: a live page as it is now, to a PNG (astra.screens.dump <Page> [path]). */
+	bool DumpPage(const FString& Name, const FString& Path);
+private:
 	static bool IsLive(const FString& Name);
 
 	void DrawMaster(UCanvas* C, int32 W, int32 H);
@@ -64,4 +85,6 @@ private:
 	void DrawSensors(UCanvas* C, int32 W, int32 H, const FString& Slot);
 	void DrawEngineering(UCanvas* C, int32 W, int32 H, const FString& Slot);
 	void DrawMess(UCanvas* C, int32 W, int32 H, const FString& Slot);
+	/** A station's control surface: its modes in force as lit buttons, who set them, what the officer just did. */
+	void DrawControls(UCanvas* C, int32 W, int32 H, const FString& Station);
 };

@@ -52,6 +52,18 @@ public:
 		FVector2D HomePos = FVector2D::ZeroVector;
 		float HomeEdgeAngle = 0.f;
 		FString HomeText;
+		// the datalink's picture (the Aquila's plot) on the canopy: ships bracketed and named, craft as diamonds
+		struct FMark
+		{
+			FVector2D Pos = FVector2D::ZeroVector;   // normalised
+			float Box = 10.f;                        // px at 1080p (half size)
+			FString Name, Sub;
+			bool bCraft = false, bCapital = false;
+			int32 Side = 0;                          // 0 unknown, 1 friend, 2 foe, 3 neutral
+		};
+		TArray<FMark> Marks;
+		struct FEdge { float Angle = 0.f; FString Text; bool bFoe = true; };
+		TArray<FEdge> Edges;                         // threats out of view: arrows on a ring around the reticle
 		float Plasma = 0.f;          // the entry's glow over everything
 		bool bPlanet = false;        // over New Ravenna: altitude instead of weapons
 		float Alt = 0.f, AGL = 0.f;
@@ -163,14 +175,39 @@ public:
 		{
 			Lines({C + Data.Stick.GetSafeNormal() * 14.f * U, StickAt}, Dim, 1.f);
 		}
-		// who is out there
-		for (int32 i = 0; i < Data.Hostiles.Num(); ++i)
+		// who is out there: the datalink's picture
+		const FLinearColor Friend(0.45f, 0.8f, 1.f, 0.85f), Neutral(1.f, 0.9f, 0.4f, 0.8f), Unknown(0.75f, 0.78f, 0.8f, 0.7f);
+		for (const FData::FMark& M : Data.Marks)
 		{
-			Bracket(Data.Hostiles[i] * Size, Data.HostileBox[i] * U, Foe);
+			const FLinearColor Col = M.Side == 2 ? Foe : (M.Side == 1 ? Friend : (M.Side == 3 ? Neutral : Unknown));
+			const FVector2D At = M.Pos * Size;
+			if (M.bCraft)
+			{
+				const float D = 6.f * U;
+				Lines({At + FVector2D(0, -D), At + FVector2D(D, 0), At + FVector2D(0, D), At + FVector2D(-D, 0), At + FVector2D(0, -D)}, Col, 1.5f);
+			}
+			else
+			{
+				Bracket(At, M.Box * U, Col);
+			}
+			if (!M.Name.IsEmpty())
+			{
+				const float Off = (M.bCraft ? 9.f : M.Box + 6.f) * U;
+				Text(At + FVector2D(Off, -Off), M.Name, Col, true);
+				if (!M.Sub.IsEmpty())
+				{
+					Text(At + FVector2D(Off, -Off + 15.f * U), M.Sub, FLinearColor(Col.R, Col.G, Col.B, Col.A * 0.75f), true);
+				}
+			}
 		}
-		for (const FVector2D& F : Data.Friends)
+		for (const FData::FEdge& E : Data.Edges)
 		{
-			Circle(F * Size, 6.f * U, Dim, 1.f);
+			const FVector2D Dir(FMath::Cos(E.Angle), FMath::Sin(E.Angle));
+			const FVector2D P = C + Dir * 330.f * U;
+			const FVector2D N(-Dir.Y, Dir.X);
+			const FLinearColor Col = E.bFoe ? Foe : Friend;
+			Lines({P - Dir * 12.f * U + N * 9.f * U, P + Dir * 6.f * U, P - Dir * 12.f * U - N * 9.f * U}, Col, 2.f);
+			Text(P + Dir * 14.f * U + FVector2D(-20.f, -8.f) * U, E.Text, Col, true);
 		}
 		// the lock and the lead
 		if (Data.bLock)
@@ -785,23 +822,50 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	};
 	const FVector Eye = Camera->GetComponentLocation();
 	const float Fov = FMath::DegreesToRadians(Camera->FieldOfView);
-	for (int32 i = 0; i < St.Hostiles.Num(); ++i)
+	// the datalink: every contact on the Aquila's plot, as the Aquila knows it, seen from this cockpit
+	if (const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>())
 	{
-		FVector2D N;
-		if (Project(St.Hostiles[i], N))
+		TArray<UAstraBattleSubsystem::FContactView> Cs;
+		Battle->GetContacts(Cs);
+		const FVector Fwd = Camera->GetForwardVector();
+		int32 Named = 0;
+		for (const UAstraBattleSubsystem::FContactView& Ct : Cs)
 		{
-			const float Dist = FVector::Dist(Eye, St.Hostiles[i]) / 100.f;
-			const float Px = St.HostileSizes[i] / FMath::Max(1.f, Dist) / FMath::Tan(Fov / 2) * 960.f;   // its size on screen
-			D.Hostiles.Add(N);
-			D.HostileBox.Add(FMath::Clamp(Px, 9.f, 120.f));
-		}
-	}
-	for (const FVector& F : St.Friends)
-	{
-		FVector2D N;
-		if (Project(F, N))
-		{
-			D.Friends.Add(N);
+			if (Ct.Id == Battle->GetPilotedId() || Ct.Track < 2)
+			{
+				continue;
+			}
+			const FVector W = Ct.Actor ? Ct.Actor->GetActorLocation() : Battle->WorldOf(Ct.Pos);
+			const float DistKm = FVector::Dist(Eye, W) / 100000.f;
+			const int32 Side = Ct.bUnknown ? 0 : (Ct.Side == EAstraSide::Astra ? 1 : (Ct.Side == EAstraSide::Mandate ? 2 : 3));
+			FVector2D N;
+			if (FVector::DotProduct(W - Eye, Fwd) > 0.f && Project(W, N))
+			{
+				SAstraFlightHud::FData::FMark M;
+				M.Pos = N;
+				M.bCraft = Ct.bCraft;
+				M.Side = Side;
+				const float R = Ct.Actor && Ct.Actor->GetStaticMeshComponent() ? Ct.Actor->GetStaticMeshComponent()->Bounds.SphereRadius / 100.f : Ct.RadiusM;
+				M.Box = FMath::Clamp(R / FMath::Max(0.05f, DistKm * 1000.f) / FMath::Tan(Fov / 2) * 540.f * 0.8f, 10.f, 160.f);
+				// names for the warships near enough to matter, and for the craft close to the Falcon
+				const bool bLocked = St.bHasLock && Ct.Label.Equals(St.LockName, ESearchCase::IgnoreCase);   // the lock box names it
+				if (!bLocked && ((!Ct.bCraft && DistKm < 60.f && Named < 8) || (Ct.bCraft && DistKm < 3.f)))
+				{
+					M.Name = Ct.bCraft ? FString::Printf(TEXT("%.1f"), DistKm) : Ct.Label.ToUpper();
+					M.Sub = Ct.bCraft ? FString() : FString::Printf(TEXT("%.1f km"), DistKm);
+					Named += Ct.bCraft ? 0 : 1;
+				}
+				D.Marks.Add(M);
+			}
+			else if (Side == 2 && (DistKm < 8.f || (!Ct.bCraft && DistKm < 40.f)) && D.Edges.Num() < 6)
+			{
+				// a threat behind or beside: an arrow on the ring pointing the way to turn
+				const FVector L = Camera->GetComponentTransform().InverseTransformPosition(W);
+				SAstraFlightHud::FData::FEdge E;
+				E.Angle = FMath::Atan2(-L.Z, L.Y);
+				E.Text = Ct.bCraft ? FString::Printf(TEXT("%.1f"), DistKm) : FString::Printf(TEXT("%s %.0f"), *Ct.ContactId, DistKm);
+				D.Edges.Add(E);
+			}
 		}
 	}
 	if (St.bHasLock && Project(St.LockWorld, D.LockPos))

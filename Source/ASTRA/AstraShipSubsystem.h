@@ -174,6 +174,11 @@ public:
 	FString CaptainAboard() const;
 	/** The same, as the Captain's datapad writes it ("DECK 4 · MESS HALL"). */
 	FString CaptainPlace() const;
+	/** Where the Captain's words go (protocol v2 `context`, docs/ARCHITETTURA.md §3): the place, the crew who hear them
+	 *  (distance and walls), the one the Captain is looking at, the open channel, how the Captain is (on foot, seated...). */
+	TSharedRef<FJsonObject> CaptainContext() const;
+	/** The comms channel open now ("" when none): the other party's contact id. */
+	const FString& GetChannelParty() const { return ChannelParty; }
 	/** The Captain's standing orders in force ("tactical: weapons free on hostiles inside 10 km"), from the crew's mind. */
 	const TArray<FString>& GetStandingOrders() const { return StandingOrders; }
 
@@ -228,6 +233,7 @@ public:
 	/** One of our manned aircraft was shot down: who was flying it (for the flight report). */
 	FString AircrewLost() { return Roster.AircrewLost(CasualtyRng); }
 	const FAstraCrewRoster& GetRoster() const { return Roster; }
+	const TMap<FString, FString>& GetSquadrons() const { return Squadrons; }
 
 	FAstraShipEvent OnShipEvent;
 	FAstraAlertChanged OnAlertChanged;
@@ -324,6 +330,7 @@ private:
 	AActor* AquilaHullActor() const;
 	void TickVisit(float DeltaTime);
 	UPROPERTY() TObjectPtr<class AAstraBridgeFX> BridgeFX;   // sparks and arcs on the bridge when we are hit hard
+	UPROPERTY() TObjectPtr<class AAstraViewscreen> Viewscreen;   // the main viewscreen in front of the bow window
 	FRandomStream CasualtyRng;
 	static constexpr int32 NumDamageTeams = 4;
 	static constexpr float PowerBudget = 700.f;   // six systems at 100% = 600; the reactor can give 100 more
@@ -362,6 +369,7 @@ private:
 	bool bPlanetside = false;
 	float SpaceEV = 6.6f;
 	FString CaptainPlanetside;
+	FString ChannelParty;             // the channel open now (a hail, ours or theirs, until it is closed)
 	FVector PlanetDirNow = FVector::DownVector;
 	FLinearColor PlanetFill = FLinearColor(0.42f, 0.6f, 1.f);
 	float PlanetFillGain = 1.f;

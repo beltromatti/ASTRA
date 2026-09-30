@@ -1,0 +1,102 @@
+// The main viewscreen (docs/ARCHITETTURA.md §5): a holographic screen in front of the bow window. It shows what the
+// ship's optical sensors see — a real camera placed out beyond the hull and aimed at the subject, zoomed to frame it —
+// under a tactical overlay like the Falcon's HUD but richer: brackets and names of the contacts (side, class, range,
+// hull and shields when known), the target fire control is on, missiles inbound, arrows for what is out of frame.
+// Ops (Tanaka) runs it: the station's viewscreen mode (auto, forward, target, tactical, fleet, sector, comms, damage, off).
+// In auto a director follows the action by priority — a ship just destroyed, a heavy hit, tactical's target, the ship
+// firing on us, the nearest enemy, and at rest the view ahead and the fleet — each shot held a few seconds. An ordered
+// subject that is destroyed or lost gives the screen back to the director (and the station's mode back to auto).
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "AstraBattleSubsystem.h"
+#include "AstraViewscreen.generated.h"
+
+class UCanvas;
+class UCanvasRenderTarget2D;
+class UMaterialInstanceDynamic;
+class USceneCaptureComponent2D;
+class UProceduralMeshComponent;
+class UTextureRenderTarget2D;
+class UFont;
+
+UCLASS()
+class AAstraViewscreen : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AAstraViewscreen();
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	/** Screen size in metres (the image plane; the frame belongs to the bridge's art). */
+	UPROPERTY(EditAnywhere, Category = "Viewscreen") float WidthM = 7.2f;
+	UPROPERTY(EditAnywhere, Category = "Viewscreen") float HeightM = 3.0f;
+	/** Feed resolution (the camera): wide, like the screen. */
+	UPROPERTY(EditAnywhere, Category = "Viewscreen") int32 FeedWidth = 1280;
+	UPROPERTY(EditAnywhere, Category = "Viewscreen") int32 FeedHeight = 534;
+
+	/** What is on screen now, for the crew and the datapad ("auto: tactical's target T-23 Cocytus, zoom x38"). */
+	FString Describe() const;
+	/** The image as it is on the screen now, at full resolution, to a PNG (testing: astra.viewscreen.dump). */
+	bool Dump(const FString& Path) const;
+	/** Testing: log every visible component in the camera's field of view, nearest first (astra.viewscreen.what). */
+	void LogWhatIsInView() const;
+
+private:
+	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Screen;
+	UPROPERTY() TObjectPtr<USceneCaptureComponent2D> Capture;
+	UPROPERTY() TObjectPtr<UTextureRenderTarget2D> Feed;
+	UPROPERTY() TObjectPtr<UCanvasRenderTarget2D> Overlay;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> Mid;
+	UPROPERTY() TObjectPtr<UFont> Mono;
+	UPROPERTY() TObjectPtr<UFont> Title;
+
+	// the shot: what the camera frames, where it is, how wide
+	enum class EShot : uint8 { Forward, Contact, Group, Point, Ship, Off };
+	EShot Shot = EShot::Forward;
+	FString ShotId;                    // the contact (Contact)
+	FString ShotName;                  // how the caption calls it
+	TArray<FString> GroupIds;          // the contacts to frame together (Group)
+	FVector ShotPoint = FVector::ZeroVector;   // system frame (Point: where a ship died)
+	FString ShotWhy;                   // "TARGET", "FIRING ON US", "DESTROYED", "ORDERED", …
+	int32 ShotPri = 0;                 // the director's priority of the shot on screen
+	double ShotSince = -100.0;
+	double HoldUntil = 0.0;            // no automatic cut to an equal or lower priority before this
+	FString Mode = TEXT("auto");       // ops' viewscreen mode
+	FString LastModeKey;
+	float Zoom = 1.f;                  // ops' zoom on the framing (2 = twice as close)
+	int32 IdleIdx = 0;                 // at rest: the view ahead, then the fleet, in turn
+	double LostSince = -1.0;           // the ordered subject vanished at (the screen says so, then goes back to auto)
+	float Fade = 0.f, FadeWant = 1.f;
+	float Fov = 50.f, FovWant = 50.f;
+	FVector CamPos = FVector::ZeroVector;      // world (cm)
+	FQuat CamRot = FQuat::Identity;
+	FQuat FromRot = FQuat::Identity;           // where the camera was when the subject changed (a short pan follows)
+	double PanSince = -100.0;
+	bool bCamInit = false;
+	bool bWatched = true;              // someone on the bridge is looking this way (else nothing is rendered)
+	int32 Frame = 0;
+	double Now = 0.0;
+	// firm tracks seen at the last look (for "just destroyed"): contact -> system position and name
+	TMap<FString, TPair<FVector, FString>> LastSeen;
+	TMap<FString, float> LastHull;     // hull fraction at the last look
+	TMap<FString, float> RecentDamage; // hull lost in the last seconds (decays)
+	struct FDeath { FString Id; FString Name; FVector Pos; double At; };
+	TArray<FDeath> Deaths;             // destroyed since the last look, waiting for their moment on screen
+	TArray<UAstraBattleSubsystem::FContactView> Contacts;   // the plot, refreshed every frame
+	bool bPushIn = false;              // the next aim starts a little wide and pushes in (a cut)
+	double LastCaptureAt = -1.0;       // the last refresh of the feed and the overlay
+
+	void Direct(float Dt);
+	void Aim(float DeltaSeconds);
+	UFUNCTION() void DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height);
+	/** World point -> overlay pixel; false when behind the camera. */
+	bool Project(const FVector& World, int32 W, int32 H, FVector2D& Out) const;
+	void Cut(EShot NewShot, const FString& Id, const FString& Name, const FString& Why, int32 Pri, double Hold);
+	/** Give ops' viewscreen back to the director (the ordered subject is gone). */
+	void ReleaseOrder(const FString& Why);
+};

@@ -5,6 +5,7 @@
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraShipSubsystem.h"
+#include "AstraStations.h"
 #include "AstraMindSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "CanvasItem.h"
@@ -18,11 +19,31 @@
 #include "Materials/MaterialInstance.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "RenderingThread.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/StaticMesh.h"
+#include "Sound/SoundBase.h"
+#include "Kismet/GameplayStatics.h"
+#include "ASTRAPlayerController.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Misc/Paths.h"
+#include "Misc/FileHelper.h"
+#include "ImageUtils.h"
 
 namespace
 {
 	// diagnostics: time each page's redraw including the render thread's work (blocks the game thread while on)
 	TAutoConsoleVariable<int32> CVarScreensProfile(TEXT("astra.screens.profile"), 0, TEXT("Log the cost of each bridge screen redraw"));
+	FAutoConsoleCommandWithWorldAndArgs CmdScreensDump(TEXT("astra.screens.dump"),
+		TEXT("Testing: astra.screens.dump <Page> [path.png] (Helm_A, Ops_Touch, Master, Tactical...)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			UAstraScreensSubsystem* S = World ? World->GetSubsystem<UAstraScreensSubsystem>() : nullptr;
+			if (S && A.Num())
+			{
+				const FString Path = A.Num() > 1 ? A[1] : FPaths::ProjectSavedDir() / TEXT("Play") / (A[0] + TEXT(".png"));
+				UE_LOG(LogASTRA, Display, TEXT("[Screens] dump %s -> %s: %s"), *A[0], *Path, S->DumpPage(A[0], Path) ? TEXT("ok") : TEXT("failed"));
+			}
+		}));
 	TAutoConsoleVariable<FString> CVarScreensSkip(TEXT("astra.screens.skip"), TEXT(""), TEXT("Diagnostics: pages never redrawn (comma-separated names, e.g. Master,Tactical)"));
 	FLinearColor RGB(uint8 R, uint8 G, uint8 B, float A = 1.f)
 	{
@@ -214,7 +235,10 @@ bool UAstraScreensSubsystem::IsLive(const FString& Name)
 {
 	static const TSet<FString> Live = {TEXT("Master"), TEXT("Tactical"), TEXT("Helm_A"), TEXT("Helm_B"), TEXT("Ops_A"), TEXT("Ops_B"),
 	                                   TEXT("Ops_C"), TEXT("Sensors_A"), TEXT("Sensors_B"), TEXT("Eng_A"), TEXT("Eng_B"),
-	                                   TEXT("Mess_News"), TEXT("Mess_Memorial"), TEXT("Pad")};
+	                                   TEXT("Mess_News"), TEXT("Mess_Memorial"), TEXT("Pad"),
+	                                   // the control surfaces: the desk panels, and the third monitor where it had a static page
+	                                   TEXT("Helm_Touch"), TEXT("Ops_Touch"), TEXT("Sensors_Touch"), TEXT("Eng_Touch"), TEXT("Flight_Touch"),
+	                                   TEXT("Comms_Touch"), TEXT("Helm_C"), TEXT("Sensors_C"), TEXT("Eng_C"), TEXT("Flight_C"), TEXT("Comms_C")};
 	return Live.Contains(Name);
 }
 
@@ -238,6 +262,10 @@ UAstraScreenPage* UAstraScreensSubsystem::PageFor(const FString& Name)
 	if (Name.StartsWith(TEXT("Mess_")))
 	{
 		P->Interval = 3.f;   // the mess's walls change with the war, not by the second
+	}
+	if (Name == TEXT("Pad"))
+	{
+		P->Interval = 0.12f; // in the Captain's hand, in front of the eyes: it must answer at once
 	}
 	P->Wait = FMath::FRand() * P->Interval;   // spread the redraws over frames
 	Pages.Add(P);
@@ -367,7 +395,16 @@ void UAstraScreensSubsystem::DrawPage(const FString& Name, UCanvas* Canvas, int3
 	else if (Name == TEXT("Tactical")) { DrawTactical(Canvas, Width, Height); }
 	else if (Name.Split(TEXT("_"), &Station, &Slot))
 	{
-		if (Station == TEXT("Helm")) { DrawHelm(Canvas, Width, Height, Slot); }
+		static const TMap<FString, FString> Ids = {{TEXT("Helm"), TEXT("helm")}, {TEXT("Ops"), TEXT("ops")}, {TEXT("Sensors"), TEXT("sensors")},
+		                                           {TEXT("Eng"), TEXT("engineering")}, {TEXT("Flight"), TEXT("flight")}, {TEXT("Comms"), TEXT("comms")}};
+		if (Slot == TEXT("Touch") || (Slot == TEXT("C") && Station != TEXT("Ops")))
+		{
+			if (const FString* Id = Ids.Find(Station))
+			{
+				DrawControls(Canvas, Width, Height, *Id);
+			}
+		}
+		else if (Station == TEXT("Helm")) { DrawHelm(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Ops")) { DrawOps(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Sensors")) { DrawSensors(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Eng")) { DrawEngineering(Canvas, Width, Height, Slot); }
@@ -543,7 +580,7 @@ namespace
 	}
 }
 
-void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
+void UAstraScreensSubsystem::DrawPadOverview(UCanvas* C, int32 W, int32 H)
 {
 	// the Captain's datapad: the ship at a glance anywhere aboard — condition, where the Captain is, hull, shields and
 	// heat, the contacts (as the sensors know them), fire control, flight groups, damage, the standing orders in force
@@ -711,8 +748,6 @@ void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
 	{
 		P.Text(MX, 544, TEXT("QUIET ON ALL CHANNELS"), true, 15, SOFT);
 	}
-	P.Rect(0, H - 30, W, 30, HEADER);
-	P.Text(MX, H - 27, TEXT("TAB  LOWER THE DATAPAD  ·  HOLD V  SPEAK  ·  T  TYPE"), true, 14, SOFT);
 }
 
 void UAstraScreensSubsystem::DrawTactical(UCanvas* C, int32 W, int32 H)
@@ -1155,5 +1190,504 @@ void UAstraScreensSubsystem::DrawMess(UCanvas* C, int32 W, int32 H, const FStrin
 	if (News.Num() == 0)
 	{
 		P.Text(824, 112, TEXT("Nothing new on the net."), true, 19, DIM);
+	}
+}
+
+void UAstraScreensSubsystem::DrawControls(UCanvas* C, int32 W, int32 H, const FString& Station)
+{
+	const UAstraStationsSubsystem* St = GetWorld()->GetSubsystem<UAstraStationsSubsystem>();
+	const FAstraStation* S = St ? St->Find(Station) : nullptr;
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	if (!S)
+	{
+		return;
+	}
+	static const TMap<FString, FLinearColor> Accents = {{TEXT("helm"), COMMAND}, {TEXT("ops"), COMMAND}, {TEXT("comms"), COMMAND},
+	                                                     {TEXT("sensors"), SCIENCE}, {TEXT("engineering"), ENGINEERING}, {TEXT("flight"), AMBER}};
+	const FLinearColor Accent = Accents.Contains(Station) ? Accents[Station] : CYAN;
+	const FLinearColor DelegCol = S->Delegation == TEXT("auto") ? GREEN : (S->Delegation == TEXT("advise") ? AMBER : RED);
+	P.Header(W, FString::Printf(TEXT("%s · Control surface"), *Station), FString::Printf(TEXT("DELEGATION %s"), *S->Delegation.ToUpper()), Accent);
+	P.Rect(W - 190, 50, 174, 26, DelegCol * 0.25f);
+	P.Frame(W - 190, 50, 174, 26, DelegCol);
+	P.Text(W - 103, 53, S->Delegation == TEXT("auto") ? TEXT("OFFICER IN CONTROL") : (S->Delegation == TEXT("advise") ? TEXT("ADVISING ONLY") : TEXT("MANUAL")),
+	       true, 14, DelegCol, 1);
+	const TArray<FString>& Aspects = UAstraStationsSubsystem::AspectsOf(Station);
+	const float Top = 84.f, Bottom = H - 128.f;
+	const float RowH = FMath::Min(150.f, (Bottom - Top) / FMath::Max(1, Aspects.Num()));
+	const float Now = GetWorld()->GetTimeSeconds();
+	for (int32 i = 0; i < Aspects.Num(); ++i)
+	{
+		const FString& Asp = Aspects[i];
+		const FAstraStationAspect* A = S->Aspects.Find(Asp);
+		const float Y = Top + i * RowH;
+		P.Panel(16, Y, W - 16, Y + RowH - 8, Asp.Replace(TEXT("_"), TEXT(" ")));
+		// the buttons: every mode the aspect offers, the one in force lit
+		const TArray<FString>& Modes = UAstraStationsSubsystem::ModeChoices(Station, Asp);
+		const int32 Rows = (Modes.Num() > 6 && RowH >= 140.f) ? 2 : 1;
+		const int32 PerRow = FMath::Max(1, FMath::DivideAndRoundUp(Modes.Num(), Rows));
+		const float BW = (W - 64.f - (PerRow - 1) * 8.f) / PerRow;
+		const float BH = 28.f;
+		int32 Longest = 1;
+		for (const FString& Md : Modes) { Longest = FMath::Max(Longest, Md.Len()); }
+		const float BPx = FMath::Clamp((BW - 10.f) / (Longest * 0.62f), 11.f, 15.f);
+		for (int32 m = 0; m < Modes.Num(); ++m)
+		{
+			const float X = 32.f + (m % PerRow) * (BW + 8.f);
+			const float BY = Y + 38.f + (m / PerRow) * (BH + 6.f);
+			const bool bOn = A && A->Mode == Modes[m];
+			P.Rect(X, BY, BW, BH, bOn ? Accent : RGB(8, 16, 30));
+			P.Frame(X, BY, BW, BH, bOn ? TEXTC : DIM);
+			P.Text(X + BW * 0.5f, BY + BH * 0.5f - BPx * 0.6f, Modes[m].Replace(TEXT("_"), TEXT(" ")).ToUpper(), true, BPx, bOn ? RGB(4, 9, 18) : LINE, 1, bOn);
+		}
+		if (A)
+		{
+			// what the mode is about, when it ends, who set it
+			FString Detail;
+			if (A->Params.IsValid())
+			{
+				for (const auto& KV : A->Params->Values)
+				{
+					FString V;
+					if (KV.Value.IsValid() && KV.Value->TryGetString(V) && !V.IsEmpty())
+					{
+						Detail += FString::Printf(TEXT("%s %s  "), *FString(*KV.Key).Replace(TEXT("_"), TEXT(" ")), *V);
+					}
+					else if (double D = 0.0; KV.Value.IsValid() && KV.Value->TryGetNumber(D))
+					{
+						Detail += FString::Printf(TEXT("%s %g  "), *FString(*KV.Key).Replace(TEXT("_"), TEXT(" ")), D);
+					}
+				}
+			}
+			Detail += FString::Printf(TEXT("until %s · set by %s %.0f s ago"), *A->Until.Replace(TEXT("_"), TEXT(" ")), *A->SetBy, FMath::Max(0.f, Now - (float)A->Since));
+			P.Text(W - 32, Y + RowH - 34, Detail.Left(int32((W - 64) / 8.4f)), true, 14, CYAN, 2);
+		}
+	}
+	// the officer's own words for the station, and the last things done
+	P.Panel(16, Bottom, W - 16, H - 12, TEXT("Officer"));
+	P.Text(32, Bottom + 36, S->Status.Left(int32((W - 64) / 8.8f)), true, 15, TEXTC);
+	for (int32 k = 0; k < 2 && k < S->Actions.Num(); ++k)
+	{
+		P.Text(32, Bottom + 60 + k * 22, (TEXT("› ") + S->Actions[S->Actions.Num() - 1 - k]).Left(int32((W - 64) / 8.4f)), true, 14, k == 0 ? CYAN : DIM);
+	}
+}
+
+bool UAstraScreensSubsystem::DumpPage(const FString& Name, const FString& Path)
+{
+	for (UAstraScreenPage* P : Pages)
+	{
+		if (P && P->Name == Name && P->Target)
+		{
+			FTextureRenderTargetResource* R = P->Target->GameThread_GetRenderTargetResource();
+			TArray<FColor> Px;
+			if (!R || !R->ReadPixels(Px) || Px.Num() != P->Target->SizeX * P->Target->SizeY)
+			{
+				return false;
+			}
+			for (FColor& C : Px) { C.A = 255; }
+			TArray64<uint8> Png;
+			FImageUtils::PNGCompressImageArray(P->Target->SizeX, P->Target->SizeY, TArrayView64<const FColor>(Px.GetData(), Px.Num()), Png);
+			return Png.Num() > 0 && FFileHelper::SaveArrayToFile(Png, *Path);
+		}
+	}
+	return false;
+}
+
+// ------------------------------------------------------------------------------------------------ the datapad's pages
+namespace
+{
+	const TArray<FString>& PadPages()
+	{
+		static const TArray<FString> P = {TEXT("overview"), TEXT("contact"), TEXT("damage"), TEXT("fleet"), TEXT("orders")};
+		return P;
+	}
+
+	void PadHeader(const FPaint& P, float W, const FString& Hull, float Time, const FString& Title, const FLinearColor& Accent)
+	{
+		const float MX = 46.f, RX = W - 46.f;
+		P.Rect(0, 0, W, 50, HEADER);
+		P.Rect(MX - 14, 12, 6, 30, Accent);
+		P.Text(MX, 12, Title, false, 26, TEXTC);
+		P.Text(RX, 18, FString::Printf(TEXT("%s · %s"), *Hull, *ShipClock(Time).Right(13)), true, 15, CYAN, 2);
+		P.Line(0, 50, W, 50, Accent, 2.f);
+	}
+
+	FLinearColor SideCol(EAstraSide S, int32 Track)
+	{
+		if (Track < 2) return TEXTC;
+		return S == EAstraSide::Astra ? CYAN : (S == EAstraSide::Mandate ? RED : YELLOW);
+	}
+
+	/** What the ship's intelligence files say about a class (a line; the optical length is measured). */
+	FString ClassNotes(const FString& Class)
+	{
+		static const TArray<TPair<FString, FString>> Notes = {
+			{TEXT("cruiser"), TEXT("heavy guns, a deep missile magazine and a hangar of strike fighters; a command ship")},
+			{TEXT("destroyer"), TEXT("spinal railgun and missiles; fast, hunts in groups of three")},
+			{TEXT("frigate"), TEXT("light lasers and a few missiles; picket, escort and raider")},
+			{TEXT("battleship"), TEXT("the line's anchor: the heaviest armour, guns and shields in the fleet")},
+			{TEXT("freighter"), TEXT("unarmed merchant hull; under the Free Guilds' flag")},
+			{TEXT("fighter"), TEXT("strike craft: cannons and anti-ship missiles")},
+		};
+		for (const TPair<FString, FString>& N : Notes)
+		{
+			if (Class.Contains(N.Key, ESearchCase::IgnoreCase))
+			{
+				return N.Value;
+			}
+		}
+		return Class.IsEmpty() ? TEXT("not classified yet: a closer look or an active scan will tell") : TEXT("no intelligence on file");
+	}
+}
+
+bool UAstraScreensSubsystem::PushPad(const FString& Page, const FString& Focus, const FString& By)
+{
+	const FString Pg = Page.ToLower();
+	if (!PadPages().Contains(Pg))
+	{
+		return false;
+	}
+	PadPage = Pg;
+	PadFocus = Focus.ToUpper();
+	PadPushedBy = By;
+	PadPushedAt = Time;
+	RedrawPadNow();
+	static const TMap<FString, FString> Names = {{TEXT("overview"), TEXT("THE SHIP AT A GLANCE")}, {TEXT("contact"), TEXT("CONTACT DOSSIER")},
+	                                             {TEXT("damage"), TEXT("DAMAGE REPORT")}, {TEXT("fleet"), TEXT("THE FLEET")}, {TEXT("orders"), TEXT("ORDERS IN FORCE")}};
+	if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(GetWorld()->GetFirstPlayerController()))
+	{
+		PC->ShowNotice(FString::Printf(TEXT("%s  ›  DATAPAD:  %s%s   ·   Tab"), *By.ToUpper(), *Names[Pg], PadFocus.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" %s"), *PadFocus)), 8.f);
+		if (USoundBase* S = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Pad_Up.SW_Pad_Up")))
+		{
+			UGameplayStatics::PlaySound2D(this, S, 0.35f, 1.4f);
+		}
+	}
+	return true;
+}
+
+void UAstraScreensSubsystem::CyclePad(int32 Dir)
+{
+	const int32 I = PadPages().IndexOfByKey(PadPage);
+	PadPage = PadPages()[(FMath::Max(0, I) + Dir + PadPages().Num()) % PadPages().Num()];
+	PadPushedAt = -100.f;
+	RedrawPadNow();
+}
+
+void UAstraScreensSubsystem::RedrawPadNow()
+{
+	for (UAstraScreenPage* P : Pages)
+	{
+		if (P && P->Name == TEXT("Pad"))
+		{
+			P->Wait = -10.f;     // the most overdue page: painted on the next frame
+		}
+	}
+}
+
+void UAstraScreensSubsystem::DrawPad(UCanvas* C, int32 W, int32 H)
+{
+	if (PadPage == TEXT("contact")) { DrawPadContact(C, W, H); }
+	else if (PadPage == TEXT("damage")) { DrawPadDamage(C, W, H); }
+	else if (PadPage == TEXT("fleet")) { DrawPadFleet(C, W, H); }
+	else if (PadPage == TEXT("orders")) { DrawPadOrders(C, W, H); }
+	else { DrawPadOverview(C, W, H); }
+	DrawPadTabs(C, W, H);
+}
+
+void UAstraScreensSubsystem::DrawPadTabs(UCanvas* C, int32 W, int32 H)
+{
+	FPaint P{C, TitleFont, MonoFont, Time};
+	const float MX = 46.f;
+	P.Rect(0, H - 30, W, 30, HEADER);
+	float X = MX;
+	for (const FString& Pg : PadPages())
+	{
+		const bool bOn = Pg == PadPage;
+		const FString L = Pg.ToUpper();
+		const float Wd = L.Len() * 9.2f + 18.f;
+		if (bOn)
+		{
+			P.Rect(X - 9, H - 28, Wd, 26, COMMAND);
+		}
+		P.Text(X, H - 26, L, true, 15, bOn ? TEXTC : DIM, 0, bOn);
+		X += Wd + 8.f;
+	}
+	const bool bPushed = Time - PadPushedAt < 20.f;
+	P.Text(W - MX, H - 26, bPushed ? FString::Printf(TEXT("SENT BY %s"), *PadPushedBy.ToUpper()) : FString(TEXT("WHEEL  PAGES  ·  TAB  LOWER")), true, 14,
+	       bPushed ? AMBER : RGB(120, 160, 205), 2);
+}
+
+void UAstraScreensSubsystem::DrawPadContact(UCanvas* C, int32 W, int32 H)
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	const UAstraStationsSubsystem* St = GetWorld()->GetSubsystem<UAstraStationsSubsystem>();
+	if (!Ship || !Battle)
+	{
+		return;
+	}
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	PadHeader(P, W, Ship->GetHullNumber(), Time, TEXT("CONTACT DOSSIER"), RED);
+	const float MX = 46.f, RX = W - 46.f;
+	TArray<UAstraBattleSubsystem::FContactView> Cs;
+	Battle->GetContacts(Cs);
+	// the pushed contact, else what the fight is about, else the nearest warship
+	FString Id = PadFocus.IsEmpty() && St ? St->ActionTarget() : PadFocus;
+	const UAstraBattleSubsystem::FContactView* Ct = Cs.FindByPredicate([&Id](const UAstraBattleSubsystem::FContactView& X)
+	{
+		return !Id.IsEmpty() && (X.ContactId.Equals(Id, ESearchCase::IgnoreCase) || X.Label.Contains(Id, ESearchCase::IgnoreCase));
+	});
+	if (!Ct)
+	{
+		Ct = Cs.FindByPredicate([](const UAstraBattleSubsystem::FContactView& X) { return !X.bCraft; });
+	}
+	if (!Ct)
+	{
+		P.Text(MX, 90, Id.IsEmpty() ? FString(TEXT("NO CONTACTS ON THE PLOT")) : FString::Printf(TEXT("%s IS NOT ON THE PLOT"), *Id), true, 20, TEXTC);
+		return;
+	}
+	const FLinearColor Col = SideCol(Ct->Side, Ct->Track);
+	const FString SideText = Ct->Track < 2 ? TEXT("PASSIVE BEARING · IFF UNKNOWN") : (Ct->Side == EAstraSide::Astra ? TEXT("FRIENDLY · ASTRA")
+	                        : (Ct->Side == EAstraSide::Mandate ? TEXT("HOSTILE · KHARON MANDATE") : TEXT("NEUTRAL")));
+	P.Text(MX, 60, Ct->Label.ToUpper(), false, 48, Col);
+	P.Text(MX, 116, FString::Printf(TEXT("%s  ·  %s"), *Ct->ContactId, Ct->Class.IsEmpty() ? TEXT("UNCLASSIFIED") : *Ct->Class.ToUpper()), true, 18, TEXTC);
+	P.Text(RX, 70, SideText, true, 17, Col, 2);
+	P.Text(RX, 94, Ct->Track >= 2 ? TEXT("FIRM TRACK") : TEXT("BEARING ONLY"), true, 15, Ct->Track >= 2 ? GREEN : AMBER, 2);
+	// where and how it moves
+	P.Panel(MX - 10, 150, W * 0.5f - 10, 420, TEXT("Track"));
+	const double Brg = Ct->BearingDeg, Mk = Ct->MarkDeg;
+	float Y = 190.f;
+	auto Row = [&](const FString& K, const FString& V, const FLinearColor& VC)
+	{
+		P.Text(MX + 6, Y, K, false, 18, CYAN);
+		P.Text(W * 0.5f - 26, Y, V, true, 20, VC, 2);
+		Y += 38.f;
+	};
+	Row(TEXT("RANGE"), Ct->RangeKm >= 0.0 ? FString::Printf(TEXT("%.1f KM"), Ct->RangeKm) : FString(TEXT("UNKNOWN")), TEXTC);
+	Row(TEXT("BEARING"), FString::Printf(TEXT("%03.0f  MARK %+.0f"), Brg, Mk), TEXTC);
+	if (Ct->Track >= 2)
+	{
+		const FVector Rel = Ct->Pos - Battle->PlayerPos();
+		const double Rate = FVector::DotProduct(Ct->Vel - Battle->PlayerVel(), Rel.GetSafeNormal());
+		Row(TEXT("SPEED"), FString::Printf(TEXT("%.0f M/S"), Ct->Vel.Size()), TEXTC);
+		Row(Rate < 0.0 ? TEXT("CLOSING") : TEXT("OPENING"), FString::Printf(TEXT("%.0f M/S"), FMath::Abs(Rate)), Rate < -150.0 ? AMBER : TEXTC);
+		if (Rate < -1.0 && Ct->RangeKm > 0.0)
+		{
+			const double Eta = Ct->RangeKm * 1000.0 / -Rate;
+			Row(TEXT("AT 5 KM IN"), Eta > 600.0 ? FString(TEXT("OVER 10 MIN")) : FString::Printf(TEXT("%d:%02d"), int32(Eta) / 60, int32(Eta) % 60), TEXTC);
+		}
+	}
+	// its state, as far as we know it
+	P.Panel(W * 0.5f + 10, 150, RX + 10, 420, TEXT("State"));
+	const float SX = W * 0.5f + 28, SW = RX - SX - 8;
+	if (Ct->HullFrac >= 0.f)
+	{
+		P.Bar(SX, 188, SW, 14, Ct->HullFrac, TEXT("Hull"), FString::Printf(TEXT("%.0f %%"), 100.f * Ct->HullFrac), Level(Ct->HullFrac));
+		P.Bar(SX, 246, SW, 14, FMath::Max(0.f, Ct->ShieldFrac), TEXT("Shields"), FString::Printf(TEXT("%.0f %%"), 100.f * FMath::Max(0.f, Ct->ShieldFrac)), CYAN);
+	}
+	else
+	{
+		P.Text(SX, 190, TEXT("DAMAGE STATE UNKNOWN"), true, 17, RGB(120, 160, 205));
+	}
+	float TY = 310.f;
+	auto Flag = [&](bool b, const TCHAR* T, const FLinearColor& FC)
+	{
+		if (b)
+		{
+			P.Rect(SX, TY, SW, 28, FC * 0.22f);
+			P.Text(SX + 10, TY + 3, T, true, 17, FC);
+			TY += 34.f;
+		}
+	};
+	Flag(Ct->bFiringAtUs, TEXT("FIRING ON THE AQUILA"), RED);
+	Flag(St && St->ActionTarget() == Ct->ContactId, TEXT("OUR FIRE CONTROL IS ON IT"), AMBER);
+	Flag(Ct->bFleeing, TEXT("WITHDRAWING"), GREEN);
+	Flag(Ct->bJamming, TEXT("JAMMING OUR SENSORS"), AMBER);
+	Flag(Ct->bDerelict, TEXT("DERELICT · NO DRIVE"), RGB(120, 160, 205));
+	// what the files say
+	P.Line(MX, 440, RX, 440, DIM);
+	P.Text(MX, 450, TEXT("INTELLIGENCE"), false, 18, CYAN);
+	FString Len;
+	if (Ct->Actor)
+	{
+		if (const UStaticMeshComponent* M = Ct->Actor->GetStaticMeshComponent(); M && M->GetStaticMesh())
+		{
+			Len = FString::Printf(TEXT("LENGTH %.0f M (OPTICAL)  ·  "), M->GetStaticMesh()->GetBoundingBox().GetSize().GetMax() * M->GetComponentScale().GetMax() / 100.f);
+		}
+	}
+	int32 L = 0;
+	for (const FString& Seg : Wrap(Len + ClassNotes(Ct->Class).ToUpper(), 86))
+	{
+		P.Text(MX, 478 + 22 * L++, Seg, true, 15, TEXTC);
+	}
+}
+
+void UAstraScreensSubsystem::DrawPadDamage(UCanvas* C, int32 W, int32 H)
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	if (!Ship)
+	{
+		return;
+	}
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	PadHeader(P, W, Ship->GetHullNumber(), Time, TEXT("DAMAGE REPORT"), AMBER);
+	const float MX = 46.f, RX = W - 46.f;
+	const float Sh = Battle ? Battle->PlayerShieldFraction() : 1.f, Hu = Battle ? Battle->PlayerHullFraction() : 1.f, He = Ship->GetHeatPct() / 100.f;
+	const float BW = (RX - MX - 40) / 3.f;
+	P.Bar(MX, 62, BW, 16, Hu, TEXT("Hull"), FString::Printf(TEXT("%.0f %%"), 100.f * Hu), Level(Hu));
+	P.Bar(MX + BW + 20, 62, BW, 16, Sh, TEXT("Shields"), FString::Printf(TEXT("%.0f %%"), 100.f * Sh), Level(Sh));
+	P.Bar(MX + 2 * (BW + 20), 62, BW, 16, FMath::Clamp(He, 0.f, 1.f), TEXT("Heat"), FString::Printf(TEXT("%.0f %%"), 100.f * He), He > 0.9f ? RED : (He > 0.7f ? AMBER : CYAN));
+	const TArray<FAstraDamage>& Dmg = Ship->GetDamage();
+	int32 Busy = 0;
+	for (const FAstraDamage& D : Dmg) { Busy += D.Team >= 0 ? 1 : 0; }
+	P.Line(MX, 120, RX, 120, DIM);
+	P.Text(MX, 128, TEXT("INCIDENTS"), false, 18, CYAN);
+	P.Text(RX, 130, FString::Printf(TEXT("%d OPEN  ·  %d OF %d DAMAGE-CONTROL TEAMS OUT"), Dmg.Num(), Busy, Ship->GetNumDamageTeams()), true, 16, Dmg.Num() ? AMBER : GREEN, 2);
+	if (Dmg.Num() == 0)
+	{
+		P.Text(MX, 162, TEXT("NONE  ·  ALL DECKS PRESSURIZED"), true, 18, GREEN);
+	}
+	for (int32 i = 0; i < FMath::Min(Dmg.Num(), 12); ++i)
+	{
+		const FAstraDamage& D = Dmg[i];
+		const float Y = 160.f + i * 27.f;
+		const FLinearColor KC = D.Kind.Contains(TEXT("breach")) ? RED : (D.Kind.Contains(TEXT("fire")) ? AMBER : YELLOW);
+		P.Text(MX, Y, FString::Printf(TEXT("DECK %2d  %c"), D.Deck, D.Section), true, 17, TEXTC);
+		P.Text(MX + 130, Y, (D.Kind + (D.System.IsEmpty() ? FString() : FString::Printf(TEXT(" (%s)"), *D.System))).ToUpper().Left(40), true, 17, KC);
+		const FString Team = D.Team < 0 ? FString(TEXT("UNATTENDED")) : (D.Travel > 0.f ? FString::Printf(TEXT("TEAM %d  EN ROUTE %.0f S"), D.Team + 1, D.Travel)
+		                                                                              : FString::Printf(TEXT("TEAM %d  %.0f %%"), D.Team + 1, 100.f * D.Progress));
+		P.Text(RX, Y, Team, true, 17, D.Team < 0 ? RED : (D.Travel > 0.f ? AMBER : GREEN), 2);
+	}
+	if (Dmg.Num() > 12)
+	{
+		P.Text(RX, 160 + 12 * 27, FString::Printf(TEXT("+%d MORE"), Dmg.Num() - 12), true, 14, DIM, 2);
+	}
+	P.Line(MX, 500, RX, 500, DIM);
+	P.Text(MX, 508, TEXT("CASUALTIES"), false, 18, CYAN);
+	int32 L = 0;
+	for (const FString& Seg : Wrap(Ship->GetRoster().Summary().ToUpper(), 86))
+	{
+		if (L < 3)
+		{
+			P.Text(MX, 536 + 22 * L++, Seg, true, 15, TEXTC);
+		}
+	}
+}
+
+void UAstraScreensSubsystem::DrawPadFleet(UCanvas* C, int32 W, int32 H)
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	if (!Ship || !Battle)
+	{
+		return;
+	}
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	PadHeader(P, W, Ship->GetHullNumber(), Time, TEXT("THE FLEET"), CYAN);
+	const float MX = 46.f, RX = W - 46.f;
+	TArray<UAstraBattleSubsystem::FContactView> Cs;
+	Battle->GetContacts(Cs);
+	P.Text(MX, 60, TEXT("7TH FLEET · SHIPS IN COMPANY"), false, 18, CYAN);
+	float Y = 90.f;
+	int32 Hostile = 0, HostileCraft = 0, OurCraft = 0;
+	for (const UAstraBattleSubsystem::FContactView& Ct : Cs)
+	{
+		if (Ct.Side == EAstraSide::Mandate) { (Ct.bCraft ? HostileCraft : Hostile)++; }
+		if (Ct.Side == EAstraSide::Astra && Ct.bCraft) { ++OurCraft; }
+		if (Ct.Side != EAstraSide::Astra || Ct.bCraft || Y > 330.f)
+		{
+			continue;
+		}
+		P.Text(MX, Y, Ct.Label.ToUpper().Left(26), true, 17, CYAN, 0, true);
+		P.Text(MX + 300, Y, Ct.Class.Left(30), true, 15, TEXTC);
+		P.Text(RX - 250, Y, Ct.RangeKm >= 0.0 ? FString::Printf(TEXT("%.1f KM"), Ct.RangeKm) : FString(TEXT("-")), true, 16, TEXTC, 2);
+		if (Ct.HullFrac >= 0.f)
+		{
+			P.Rect(RX - 220, Y + 6, 100, 8, RGB(6, 12, 24));
+			P.Rect(RX - 220, Y + 6, 100 * Ct.HullFrac, 8, Level(Ct.HullFrac));
+			P.Rect(RX - 100, Y + 6, 100, 8, RGB(6, 12, 24));
+			P.Rect(RX - 100, Y + 6, 100 * FMath::Max(0.f, Ct.ShieldFrac), 8, CYAN);
+		}
+		Y += 28.f;
+	}
+	P.Text(RX - 220, 62, TEXT("HULL"), true, 13, DIM);
+	P.Text(RX - 100, 62, TEXT("SHIELDS"), true, 13, DIM);
+	P.Line(MX, 350, RX, 350, DIM);
+	P.Text(MX, 358, TEXT("AQUILA AIR GROUP"), false, 18, CYAN);
+	float QY = 388.f;
+	for (const auto& KV : Ship->GetSquadrons())
+	{
+		P.Text(MX, QY, KV.Key.ToUpper(), true, 17, TEXTC, 0, true);
+		P.Text(MX + 120, QY, KV.Value.ToUpper().Left(80), true, 15, TEXTC);
+		QY += 26.f;
+	}
+	P.Line(MX, 480, RX, 480, DIM);
+	P.Text(MX, 488, TEXT("THE ENEMY"), false, 18, RED);
+	P.Text(MX, 516, Hostile + HostileCraft ? FString::Printf(TEXT("%d WARSHIP%s  ·  %d SMALL CRAFT ON THE PLOT"), Hostile, Hostile == 1 ? TEXT("") : TEXT("S"), HostileCraft)
+	                                        : FString(TEXT("NONE ON THE PLOT")), true, 17, Hostile ? RED : GREEN);
+	P.Text(MX, 542, FString::Printf(TEXT("OUR CRAFT IN FLIGHT: %d"), OurCraft), true, 15, TEXTC);
+}
+
+void UAstraScreensSubsystem::DrawPadOrders(UCanvas* C, int32 W, int32 H)
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraStationsSubsystem* St = GetWorld()->GetSubsystem<UAstraStationsSubsystem>();
+	if (!Ship || !St)
+	{
+		return;
+	}
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	PadHeader(P, W, Ship->GetHullNumber(), Time, TEXT("ORDERS IN FORCE"), COMMAND);
+	const float MX = 46.f, RX = W - 46.f;
+	float Y = 62.f;
+	static const TCHAR* Order[] = {TEXT("helm"), TEXT("tactical"), TEXT("sensors"), TEXT("ops"), TEXT("engineering"), TEXT("comms"), TEXT("flight")};
+	for (const TCHAR* Id : Order)
+	{
+		const FAstraStation* S = St->Find(Id);
+		if (!S)
+		{
+			continue;
+		}
+		FString Line;
+		for (const FString& Asp : UAstraStationsSubsystem::AspectsOf(Id))
+		{
+			if (const FAstraStationAspect* A = S->Aspects.Find(Asp))
+			{
+				FString T;
+				if (A->Params.IsValid() && (A->Params->TryGetStringField(TEXT("target"), T) || A->Params->TryGetStringField(TEXT("contact_id"), T)))
+				{
+					T = TEXT(" ") + T;
+				}
+				Line += FString::Printf(TEXT("%s %s%s  ·  "), *Asp.Replace(TEXT("_"), TEXT(" ")), *A->Mode.Replace(TEXT("_"), TEXT(" ")), *T);
+			}
+		}
+		Line.RemoveFromEnd(TEXT("  ·  "));
+		P.Text(MX, Y, FString(Id).ToUpper(), false, 19, CYAN);
+		P.Text(RX, Y + 2, S->Delegation.ToUpper(), true, 13, S->Delegation == TEXT("auto") ? GREEN : AMBER, 2);
+		int32 L = 0;
+		for (const FString& Seg : Wrap(Line.ToUpper(), 76))
+		{
+			if (L < 2)
+			{
+				P.Text(MX + 150, Y + 2 + 20 * L++, Seg, true, 14, TEXTC);
+			}
+		}
+		Y += FMath::Max(1, L) * 20.f + 12.f;
+	}
+	P.Line(MX, Y + 4, RX, Y + 4, DIM);
+	P.Text(MX, Y + 12, TEXT("THE CAPTAIN'S STANDING ORDERS"), false, 18, CYAN);
+	const TArray<FString>& Orders = Ship->GetStandingOrders();
+	if (Orders.Num() == 0)
+	{
+		P.Text(MX, Y + 40, TEXT("NONE IN FORCE"), true, 16, RGB(120, 160, 205));
+	}
+	for (int32 i = 0; i < FMath::Min(Orders.Num(), 4); ++i)
+	{
+		P.Text(MX, Y + 40 + i * 22, (TEXT("· ") + Orders[Orders.Num() - 1 - i]).Left(96), true, 15, TEXTC);
 	}
 }

@@ -1,6 +1,7 @@
 // ASTRA — link to astra-mind.
 
 #include "AstraMindSubsystem.h"
+#include "AstraHarness.h"
 #include "ASTRAPlayerController.h"
 
 #include "Camera/PlayerCameraManager.h"
@@ -268,11 +269,23 @@ void UAstraMindSubsystem::Send(const TSharedRef<FJsonObject>& Msg)
 
 void UAstraMindSubsystem::SayText(const FString& Text)
 {
+	FAstraTimeline::Record(TEXT("captain"), Text);
 	Screen(FString::Printf(TEXT("Captain: %s"), *Text), FColor(255, 214, 120));
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("player_text"));
 	M->SetStringField(TEXT("text"), Text);
+	AddContext(M);
 	Send(M);
+}
+
+void UAstraMindSubsystem::AddContext(const TSharedRef<FJsonObject>& Msg) const
+{
+	// v2: where the Captain's words go — who hears them, who is being looked at, the open channel (ARCHITETTURA §3)
+	const UWorld* World = GameWorld();
+	if (const UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr)
+	{
+		Msg->SetObjectField(TEXT("context"), Ship->CaptainContext());
+	}
 }
 
 void UAstraMindSubsystem::PushToTalk(bool bDown)
@@ -280,6 +293,7 @@ void UAstraMindSubsystem::PushToTalk(bool bDown)
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("ptt"));
 	M->SetBoolField(TEXT("down"), bDown);
+	AddContext(M);
 	Send(M);
 }
 
@@ -455,6 +469,7 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 	}
 	else if (Type == TEXT("transcript"))
 	{
+		FAstraTimeline::Record(TEXT("heard"), FString::Printf(TEXT("[%s] %s"), *Msg->GetStringField(TEXT("lang")), *Msg->GetStringField(TEXT("text"))));
 		Screen(FString::Printf(TEXT("Captain (%s): %s"), *Msg->GetStringField(TEXT("lang")), *Msg->GetStringField(TEXT("text"))), FColor(255, 214, 120));
 	}
 	else if (Type == TEXT("status"))

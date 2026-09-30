@@ -24,7 +24,18 @@ public:
 	/** Constructor */
 	AASTRAPlayerController();
 
+	/** The Captain's controls on foot (built in code the first time they are asked for). */
+	class UAstraInputSet* GetInputSet();
+	const class UAstraInputSet* GetInputSet() const { return InputSet; }
+	bool IsSeated() const { return bSeated; }
+	/** Out of the captain's chair (W while seated, or E). */
+	void StandUp() { if (bSeated) { SetSeated(false); } }
+	/** A short notice at the bottom right of the screen (the start hint, "OPS › DATAPAD: DAMAGE REPORT"). */
+	void ShowNotice(const FString& Text, float Seconds);
+
 protected:
+
+	UPROPERTY() TObjectPtr<class UAstraInputSet> InputSet;
 
 	/** Input Mapping Contexts */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
@@ -137,6 +148,9 @@ public:
 	/** Console twin of the E key (the lift, the captain's chair): for tests and accessibility. */
 	UFUNCTION(Exec)
 	void AstraUse() { ToggleSeat(); }
+	/** Testing: straight into the cockpit of Alpha's Falcon on the catapult, wherever the Captain is. */
+	UFUNCTION(Exec)
+	void AstraBoardFalcon();
 
 protected:
 	void SetSeated(bool bSit);

@@ -27,6 +27,9 @@
 #include "ASTRA.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "AstraMindSubsystem.h"
+#include "AstraInput.h"
+#include "AstraHarness.h"
+#include "ASTRACharacter.h"
 #include "AstraScreensSubsystem.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -46,6 +49,16 @@ AASTRAPlayerController::AASTRAPlayerController()
 	PlayerCameraManagerClass = AASTRACameraManager::StaticClass();
 }
 
+UAstraInputSet* AASTRAPlayerController::GetInputSet()
+{
+	if (!InputSet)
+	{
+		InputSet = NewObject<UAstraInputSet>(this, TEXT("AstraInput"));
+		InputSet->Build();
+	}
+	return InputSet;
+}
+
 void AASTRAPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -53,30 +66,10 @@ void AASTRAPlayerController::BeginPlay()
 	{
 		GetWorldTimerManager().SetTimerForNextTick([this]()
 		{
-			UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
-			if (!VC || HintWidget.IsValid())
+			if (!HintWidget.IsValid())
 			{
-				return;
+				ShowNotice(TEXT("F1  controls  ·  W or E  stand up  ·  hold V  talk to the crew  ·  T  type  ·  Tab  datapad"), 45.f);
 			}
-			UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
-			HintWidget = SNew(SBox).HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 28, 22))
-			[
-				SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.7f))
-				.Padding(FMargin(14, 8))
-				[
-					SNew(STextBlock).Font(Mono ? FSlateFontInfo(Mono, 13) : FCoreStyle::GetDefaultFontStyle("Mono", 13))
-					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  hold V  talk to the crew  ·  T  type  ·  Tab  datapad")))
-				]
-			];
-			VC->AddViewportWidgetContent(HintWidget.ToSharedRef(), 5);
-			GetWorldTimerManager().SetTimer(HintTimer, [this]()
-			{
-				if (HintWidget.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
-				{
-					GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
-					HintWidget.Reset();
-				}
-			}, 45.f, false);
 		});
 	}
 	if (IsLocalPlayerController() && bStartSeated)
@@ -122,6 +115,23 @@ void AASTRAPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AASTRAPlayerController::ToggleHelp);
 		InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AASTRAPlayerController::OnTypePressed);
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AASTRAPlayerController::TogglePad);
+		// the datapad's pages: the mouse wheel while it is raised
+		auto Wheel = [this](const FKey& K, int32 Dir)
+		{
+			FInputKeyBinding B(FInputChord(K), IE_Pressed);
+			B.bConsumeInput = false;
+			B.KeyDelegate.GetDelegateForManualSet().BindLambda([this, Dir]()
+			{
+				UAstraScreensSubsystem* Screens = GetWorld() ? GetWorld()->GetSubsystem<UAstraScreensSubsystem>() : nullptr;
+				if (bPadUp && Screens)
+				{
+					Screens->CyclePad(Dir);
+				}
+			});
+			InputComponent->KeyBindings.Add(B);
+		};
+		Wheel(EKeys::MouseScrollDown, 1);
+		Wheel(EKeys::MouseScrollUp, -1);
 		// the lift's panel (only while it is open)
 		auto Deck = [this](const FKey& K, int32 N)
 		{
@@ -144,6 +154,8 @@ void AASTRAPlayerController::SetupInputComponent()
 		// Add Input Mapping Context
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 		{
+			// the Captain's own controls on foot, built in code (the template's input assets are not used)
+			Subsystem->AddMappingContext(GetInputSet()->OnFoot, 0);
 			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
 			{
 				Subsystem->AddMappingContext(CurrentContext, 0);
@@ -292,6 +304,10 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 	const float EyeZ = Cam ? Cam->GetRelativeLocation().Z : 64.f;
 	if (bSit)
 	{
+		if (AASTRACharacter* AC = Cast<AASTRACharacter>(C))
+		{
+			AC->ResetPosture();
+		}
 		// seated eye height about 1.18 m above the dais, a little forward of the seat back, facing the bow window
 		C->SetActorEnableCollision(false);
 		C->GetCharacterMovement()->DisableMovement();
@@ -307,6 +323,24 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 		C->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
 	bSeated = bSit;
+}
+
+void AASTRAPlayerController::AstraBoardFalcon()
+{
+	APawn* Me = GetPawn();
+	if (!Cast<ACharacter>(Me))
+	{
+		return;
+	}
+	TActorIterator<AAstraHangar> It(GetWorld());
+	if (It)
+	{
+		if (bSeated)
+		{
+			SetSeated(false);
+		}
+		BoardFalcon(*It, Me);
+	}
 }
 
 void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
@@ -335,6 +369,39 @@ void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
 			Ship->PublishEvent(TEXT("flight: the Captain has climbed into a Falcon of Alpha on the port catapult"), true);
 		}
 	}
+}
+
+void AASTRAPlayerController::ShowNotice(const FString& Text, float Seconds)
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC)
+	{
+		return;
+	}
+	if (HintWidget.IsValid())
+	{
+		VC->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
+		HintWidget.Reset();
+	}
+	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
+	HintWidget = SNew(SBox).HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(FMargin(0, 0, 28, 22))
+	[
+		SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.7f))
+		.Padding(FMargin(14, 8))
+		[
+			SNew(STextBlock).Font(Mono ? FSlateFontInfo(Mono, 13) : FCoreStyle::GetDefaultFontStyle("Mono", 13))
+			.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(Text))
+		]
+	];
+	VC->AddViewportWidgetContent(HintWidget.ToSharedRef(), 5);
+	GetWorldTimerManager().SetTimer(HintTimer, [this]()
+	{
+		if (HintWidget.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
+		{
+			GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(HintWidget.ToSharedRef());
+			HintWidget.Reset();
+		}
+	}, Seconds, false);
 }
 
 void AASTRAPlayerController::TogglePad()
@@ -407,8 +474,12 @@ namespace
 		TEXT("  V (hold)        talk to the crew, in any language\n")
 		TEXT("  T               type to the crew instead (Enter sends, Esc cancels)\n")
 		TEXT("  Tab             the datapad: the ship at a glance, anywhere aboard\n")
-		TEXT("  E               stand up / sit down · doors · the lift\n")
-		TEXT("  WASD, mouse     walk and look\n")
+		TEXT("  E               stand up / sit down · doors · the lift · use\n")
+		TEXT("  W (seated)      stand up and walk\n")
+		TEXT("\n")
+		TEXT("ON FOOT\n")
+		TEXT("  WASD, mouse     walk and look          Shift (hold)   run\n")
+		TEXT("  Space           jump (low down: stand)  C              crouch · hold C: lie down\n")
 		TEXT("  Esc             pause · save · menu\n")
 		TEXT("\n")
 		TEXT("THE LIFT (at the end of the port corridor)\n")
@@ -634,6 +705,7 @@ void AASTRAPlayerController::EnsureSubtitles()
 
 void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text)
 {
+	FAstraTimeline::Record(TEXT("line"), FString::Printf(TEXT("%s: %s"), *Name, *Text));
 	EnsureSubtitles();
 	// the name as a crew would say it: the surname alone ("Vice Admiral Adrian Rourke (7th Fleet command)" -> ROURKE)
 	FString Short = Name;

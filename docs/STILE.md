@@ -1,4 +1,4 @@
-# Guida di stile di ASTRA (v0.1)
+# Guida di stile di ASTRA (v0.2)
 
 *Regole visive e sonore che rendono coerente tutto ciò che creo, anche quando parte da materiale gratuito di fonti diverse. Serve anche per l'autocritica delle catture (docs/ricerca/08, §7).*
 
@@ -99,3 +99,34 @@
 | **Alien: Isolation** | Il tatto delle console |
 | **Homeworld** | La scala delle flotte |
 | **Interstellar** | Il realismo |
+
+## 11. La plancia v3: linguaggio visivo (30/9)
+La prima partita l'ha detto chiaro: la plancia v2 sembra un ufficio del 2026 (pareti beige piatte, sedie e scrivanie da
+ufficio, monitor comuni, plafoniere). La v3 deve sembrare **il ponte di comando di una nave da guerra del 2491**.
+
+**Riferimenti:**
+- **Star Trek Discovery e Strange New Worlds**: plance luminose, console scolpite, vetro curvo, pannelli olografici sospesi;
+- **The Expanse**: tutto è funzionale e tattile, schermi a strati, maniglie, cinghie, cavi dove servono;
+- **EVE Online**: materiali scuri con linee di pannello sottili, bordi luminosi, strati di sporco discreti, interfacce
+  traslucide a linee sottili e cerchi.
+
+**Regole:**
+1. **Niente superfici piatte e vuote.** Ogni parete è composta: pannelli a strati in composito scuro con telai in metallo
+   spazzolato, giunture luminose incassate, costoloni strutturali, prese d'aria, canaline, targhette, maniglie.
+2. **Soffitto strutturale**: costoloni che si irradiano dalla cupola, luce indiretta nelle gole, condotti e grate
+   incassati. Niente plafoniere rettangolari da ufficio.
+3. **Pavimento**: piastre di metallo canna di fucile con una grana antiscivolo fine, canali luminosi incassati nel colore
+   del reparto, l'emblema della ASTRA Navy intarsiato.
+4. **Console scolpite**: scocche in composito avorio (`#E6E1D6`) e canna di fucile (`#4A4F55`), piani di lavoro in vetro
+   scuro con interfacce emissive, pannelli olografici sospesi sopra (piani traslucidi emissivi), comandi fisici veri
+   (tasti retroilluminati, manopole, cursori; al timone due leve di spinta), bordi luminosi nel colore del reparto.
+5. **Sedute da nave**: gusci scolpiti con poggiatesta e braccioli con pannelli integrati, attacchi per le cinture, basi a
+   colonna fissate al ponte. Mai sedie da ufficio con le ruote.
+6. **Schermi**: ogni schermo è una superficie con coordinate UV 0–1 e uno slot di materiale col nome `SCREEN_<postazione>_<n>`:
+   i contenuti li disegna il gioco, vivi.
+7. **Luce**: la luce viene dall'architettura (gole, bordi, strisce, schermi) più pochi faretti mirati; in condizione rossa
+   le strisce virano al rosso.
+8. **Scala umana**: dettagli piccoli e credibili (viti, etichette "DECK 1 · SECTION A", avvisi, bocchette), usura lieve
+   solo dove si tocca (bordi delle console, gradini, maniglie).
+9. **Efficienza**: una manciata di materiali condivisi (trim sheet e decalcomanie), niente texture uniche enormi, geometria
+   ricca dove si guarda (console, poltrone) e semplice dove no.

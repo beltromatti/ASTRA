@@ -845,9 +845,86 @@ async def s24_startup_delay() -> list[str]:
         return bad
 
 
+async def s25_hook() -> list[str]:
+    """The server's `captain_speaks()` hook, alone or twice or next to the key: the line in flight is cut, the chatter is dropped, nothing starts until the answer."""
+    async with Bridge() as b:
+        await b.say("long", "xo", LONG)
+        await b.say("chat", "helm", "Nice quiet watch, isn't it? Reminds me of home.", priority="low")
+        await b.say("rep", "sensors", "Sensors. Two new contacts, bearing zero nine zero.")
+        await asyncio.sleep(2.0)
+        t0 = b.t()
+        b.voice.captain_speaks()                                       # no key down: it takes the floor like a typed order
+        b.voice.captain_speaks()                                       # (twice: the same)
+        await asyncio.sleep(1.2)
+        began = [i for i, t in b.trace().begin.items() if t > t0]
+        b.voice.captain_turn_begin()
+        await b.say("ans", "helm", "Aye, Captain.", answer=True)
+        b.voice.captain_turn_end()
+        await b.settle(2.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        if began:
+            bad.append(f"lines {began} began while the Captain held the floor")
+        if tr.reason.get(b.ids["long"]) != "cut" or tr.cancel_t.get(b.ids["long"], 1e9) - t0 > 0.6:
+            bad.append("the line in flight was not cut within 0.6 s")
+        if tr.dropped.get(b.ids["chat"]) != "captain_spoke":
+            bad.append(f"the chatter was {tr.dropped.get(b.ids['chat'])!r}, not dropped as captain_spoke")
+        order = tr.order()
+        if b.ids["ans"] not in order or (b.ids["rep"] in order and order.index(b.ids["rep"]) < order.index(b.ids["ans"])):
+            bad.append(f"the answer did not come first: {order}")
+        # next to the key: with it down the hook only cuts and drops
+        b.voice.captain_begin()
+        b.voice.captain_speaks()
+        await asyncio.sleep(0.3)
+        held = b.voice.held
+        b.voice.captain_end(False)
+        if not held:
+            bad.append("the floor was not held with the key down")
+        return bad
+
+
+class LegacyTTS:
+    """A voice engine of the first version: `stream` is an async generator of PCM chunks (no tone, no stop, no `can_speak`); what a scripted
+    engine in another module's tests looks like."""
+
+    sample_rate = RATE
+
+    def supported(self, lang: str) -> bool:
+        return True
+
+    async def stream(self, text: str, voice: str, lang: str):  # noqa: ANN201
+        for _ in range(math.ceil(max(0.9, len(text) / 16.0) / CHUNK_S)):
+            await asyncio.sleep(CHUNK_S / 6.0)
+            yield CHUNK
+
+
+async def s26_first_version_engine() -> list[str]:
+    """A voice engine with the first version's interface still works, and a line of it can be cut like any other."""
+    async with Bridge() as b:
+        b.voice.tts = LegacyTTS()
+        await b.say("a", "sensors", SENT)
+        await b.say("b", "helm", "Helm here, all steady.")
+        await asyncio.sleep(1.0)
+        b.voice.captain_begin()
+        await asyncio.sleep(0.4)
+        b.voice.captain_end(None)
+        await asyncio.sleep(0.3)
+        b.voice.captain_turn_begin()
+        await b.say("ans", "helm", "Aye, Captain.", answer=True)
+        b.voice.captain_turn_end()
+        await b.settle(2.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        if b.ids["ans"] not in tr.begin:
+            bad.append("the answer was never said")
+        if tr.reason.get(b.ids["a"]) != "cut":
+            bad.append("the line in flight was not cut")
+        return bad
+
+
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
              s10_shorten, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
-             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio, s24_startup_delay]
+             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio, s24_startup_delay, s25_hook, s26_first_version_engine]
 
 
 def main() -> int:
