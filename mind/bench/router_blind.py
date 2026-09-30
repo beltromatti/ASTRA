@@ -16,7 +16,7 @@ import time
 from astra_mind import models, router
 from astra_mind.openrouter import OpenRouter
 
-from .router_eval import make_ctx, split_ok
+from .router_eval import make_ctx
 from .router_set import ALL, DEV, PLAYTEST, Item
 from .router_test2_set import TEST2
 from .router_test3_set import TEST3

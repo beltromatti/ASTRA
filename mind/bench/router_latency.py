@@ -43,7 +43,6 @@ async def one(llm: OpenRouter, text: str, gated: bool) -> tuple[float, float]:
         r = await router.route_llm(llm, text, ctx)
         r_s = time.perf_counter() - t0
         turn = await h.agent.handle(text, "it", ctx)
-    first = (t0 + (turn.t_first_line or turn.t_end) + 0.0)
     # t_first_line counts from the start of handle(): add what came before it (the router, when sequential)
     return ((r_s if not gated else 0.0) + (turn.t_first_line or turn.t_end), r_s) if not gated else (max(r_s, turn.t_first_line or turn.t_end), r_s)
 
