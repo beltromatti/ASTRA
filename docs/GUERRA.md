@@ -136,8 +136,15 @@ tavolo olografico, nel regolatore del giocatore.
 
 Una classe è una riga di `data/war/classes.json`: scafo, scudi (× una scala), spinta, virata, crociera, corazza, quote della
 struttura per sezione (prua / centro / poppa), corazza per faccia, ripartizione degli scudi sulle sei facce, armamento,
-sezione dove vive ogni sistema, **affusti con arco di tiro**, portata preferita. Le sei facce sono nell'ordine prua, poppa,
-babordo, tribordo, dorso, ventre.
+sezione dove vive ogni sistema, **affusti con arco di tiro**, portata preferita, e le **misure vere dello scafo**: `hull_m`
+(la mesh v3 in metri: estremi dell'asse dall'origine della mesh, larghezza, altezza: la scatola che un colpo incontra),
+`cuts_x_m` (dove sono tagliati i pezzi di rottura: il taglio di prua e quello di poppa, su x), `radius` (l'estremo dello
+scafo più lontano dall'origine: serve a tutto ciò che è "grandezza" — spaziatura delle formazioni, evitamento, sfera di
+prima scrematura dei colpi, dimensione degli effetti) e `tier` (quanto conta: 3 nave capitale, 2 incrociatore, 1
+cacciatorpediniere o mercantile, 0 più piccole: ciò che prima dipendeva da soglie sul raggio — firma, disturbo, celle dei
+missili, esche dei raid, punti sul tavolo — usa il tier). Le sei facce sono nell'ordine prua, poppa, babordo, tribordo,
+dorso, ventre. Le misure vengono da `art/export/ships_v3/manifest.json` (ARTE-NAVI): se un modello cambia, si
+aggiornano i numeri qui e si rilancia `python3 tools/war.py embed`.
 
 | classe | ruolo | scafo | scudi | spinta m/s² | virata °/s | crociera m/s | rotaia (colpi × danno / ciclo, portata) | laser | missili | difesa di punto |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -150,13 +157,32 @@ babordo, tribordo, dorso, ventre.
 | freighter | Free Guilds freighter | 700 | 60 ×2,0 | 8 | 2 | 180 | - | - | - | - |
 | station | listening post | 5000 | - | 0 | 0 | 0 | - | - | - | - |
 
+Le misure vere (lunghezza × larghezza × altezza in metri; x dalla poppa alla prua; tagli di prua e di poppa):
+
+| classe | lunghezza × larghezza × altezza | x | tagli (prua, poppa) | `radius` | `tier` |
+|---|---|---|---|---|---|
+| aquila | 799 × 140 × 92 | −407 … +392 | +236, −105 | 407 | 3 |
+| praetorian | 1129 × 184 × 220 | −579 … +550 | +215, −215 | 579 | 3 |
+| acheron | 587 × 105 × 149 | −323 … +264 | +95, −168 | 323 | 2 |
+| vigilant | 306 × 54 × 64 | −156 … +150 | +58, −58 | 156 | 1 |
+| styx | 387 × 81 × 115 | −212 … +175 | +30, −78 | 212 | 1 |
+| lethe | 240 × 61 × 57 | −127 … +113 | +45, −46 | 127 | 0 |
+| freighter | 352 × 73 × 47 | −180 … +173 | +97, −101 | 180 | 1 |
+| station | 221 × 120 × 66 | (±110) | - | 111 | 0 |
+
 (I valori di scudi e struttura della simulazione sono quelli della tabella per la scala e per `struct_scale`, tarati sul banco
-contro il vecchio modello a valori unici: vedi "Il duello" nel §7.) Una nave senza classe (caccia, esche) resta a valori unici.
+contro il vecchio modello a valori unici: vedi "Il duello" nel §7.) Una nave senza classe (caccia, esche) resta a valori unici
+e si colpisce come una sfera di `Radius`.
 
 ### 5.3 I danni fisici (F2.1)
 
-Un colpo arriva da una direzione nel riferimento della nave (il punto d'ingresso nella sfera, più una dispersione lungo lo
-scafo: `hit_scatter`). Da lì:
+Il gioco disegna le mesh in scala vera, quindi ciò che si vede colpito deve essere ciò che la simulazione colpisce: lo scafo di
+una nave con classe è una **scatola** delle misure vere (test delle lastre contro il percorso del proiettile, del raggio laser,
+della raffica di un caccia o del cannone del Falcon del Capitano; prima una sfera di `radius`, enorme sul fianco di una
+nave lunga e sottile). Il punto dove il percorso **entra** nella scatola dice la **faccia** (quella su cui cade il punto:
+prua, poppa, babordo, tribordo, dorso, ventre) e, con la posizione lungo lo scafo contro i **piani di taglio** della classe, la
+**sezione** (prua oltre il taglio di prua, poppa oltre quello di poppa, centro in mezzo); la mira cade dove il cannoniere sceglie e la
+caduta dei colpi li disperde lungo lo scafo (`hit_scatter`, frazione della semilunghezza). Da lì:
 
 1. **Il settore di scudo** della faccia colpita prende la parte che il tipo di danno gli lascia prendere. Ogni settore ha una
    capacità (la quota della faccia × la riserva totale). Si rigenera; il generatore può spostare la capacità da un settore
@@ -179,13 +205,15 @@ scafo: `hit_scatter`). Da lì:
 
 **Morte** (tre modi): esplosione del reattore (30 %, 50 % sotto mezzo scafo, quando il reattore è distrutto), rottura dello
 scafo lungo una sezione sventrata (25 % alla prima, 70 % alla seconda, sicura alla terza; ×1,5 al centro; dopo 2,5–8 s di
-preavviso; l'Aquila non si spezza mai), oppure **relitto disattivato**: niente energia, alla deriva, abbordabile in F5 (reattore
+preavviso; l'Aquila non si spezza mai; il **punto di rottura** degli eventi e della vista dei danni cade sul **taglio vero**
+della sezione che cede: il taglio di prua per la prua, quello di poppa per la poppa, a metà fra i due per il centro; `CutBowX`
+e `CutSternX` danno i due piani in metri sull'asse, riferimento della nave, per chi monta i tre pezzi), oppure **relitto disattivato**: niente energia, alla deriva, abbordabile in F5 (reattore
 spento senza esplosione, o equipaggio che abbandona sotto il 6 % dello scafo). Un relitto colpito ancora può andare in pezzi.
 
 **Cosa possono leggere gli altri moduli**: `GetDamageView(ContactId, FDamageView&)` — con la nebbia di guerra: dettaglio 3 per
 la propria parte (tutto: sistemi, affusti, reattore), 2 per una traccia ferma e classificata (scudi per faccia, piastre e
 struttura per sezione, ultimo colpo), 1 per una traccia ferma (solo sventrata/brucia/si spezza), 0 niente; `ConsumeDeathEvents()`
-(come è morta, dove si è rotta, asse e punto di rottura: per gli effetti visivi); `PlayerEngineFactor()` (0–1: da moltiplicare
+(come è morta, dove si è rotta, asse, punto di rottura e i due piani di taglio: per gli effetti visivi); `PlayerEngineFactor()` (0–1: da moltiplicare
 alla velocità del timone); `RepairPlayerSystems(Amount)` (le squadre dei danni dell'Aquila rimettono in sesto sistemi e affusti
 nelle sezioni non sventrate).
 
@@ -207,14 +235,23 @@ Un gruppo è un pugno di navi con un capo, una formazione (linea, cuneo, colonna
   frenare in tempo anche con il nemico che arriva dall'altra parte (senza questo due gruppi che si avvicinano a 300 m/s si
   attraversano: una nave capitale ha bisogno di chilometri per fermarsi). L'asse è misurato dalla guida verso il nemico, non
   dal centro delle navi.
-- **La distanza.** Per ogni distanza da 3 a 9,5 km il gruppo confronta il suo danno al secondo con quello del nemico vicino al
-  bersaglio (ponderato dalla portata reale dei due armamenti, con un bonus piccolo per la distanza lunga) e sceglie la migliore;
-  se il nemico è molto più veloce resta a 5,5 km (lo raggiungerebbe comunque).
+- **La distanza.** Per ogni distanza da 3 km al massimo dell'armamento (0,92 della portata della rotaia più corta, al più 9,5 km)
+  il gruppo confronta il suo danno al secondo con quello del nemico vicino al bersaglio, ciascuno con la sua portata vera, e
+  sceglie la migliore. A parità (portate uguali, il caso normale) decide una **preferenza debole** (15 %) per la distanza a cui
+  *tutta* la formazione raggiunge il nemico, non solo la prima fila del cuneo: 0,6 della portata della rotaia meno 0,3 della
+  profondità della formazione, circa 4 km per rotaie da 8 km. Un vantaggio di portata (uno spostamento netto del rapporto
+  dei danni) pesa più della preferenza: chi ha la portata maggiore si tiene fuori da quella dell'altro. Se il nemico è molto
+  più veloce (1,25×) resta a 5,5 km (lo raggiungerebbe comunque). **Il banco** (§7.3): contro un gruppo che tiene una distanza
+  fissa, chi **chiude** vince, e il vantaggio cresce fino a 2–3 km; un gruppo che tiene il massimo della portata lascia
+  indietro metà del cuneo e perde da 0,5 a 2 navi su 6. Per questo la distanza è la leva principale del combattimento e la
+  mente può sceglierla (`range_km` in `group_order`, §6.2), mentre il riflesso di riserva resta a una distanza media.
 - **Il bersaglio** (fuoco concentrato, modo 3): per ogni nemico noto, la *minaccia che toglie dal campo per unità di sforzo* =
   (il danno al secondo che può fare a noi) × (il danno al secondo che le nostre navi possono fargli **adesso**, con la portata
   vera) ÷ (scafo + scudo della faccia che ci mostra). Ogni nave segue il bersaglio del gruppo se lo raggiunge, altrimenti
   spara al più vicino che raggiunge; un incrociatore corazzato non vale più del cacciatorpediniere accanto, che muore quattro
-  volte più in fretta e fa la metà del male.
+  volte più in fretta e fa la metà del male. (Il banco non distingue questa regola dal "ognuno il più vicino" nei combattimenti
+  da 3 + 3 e 6 + 6 navi: dentro ±0,3 navi; la regola iniziale, per valore di classe, perdeva contro entrambe quando la guida
+  era difettosa. Resta perché serve a un gruppo che sceglie fra bersagli molto diversi, e perché la mente ha `attack`.)
 - **Salve coordinate di missili.** Le navi tengono le celle finché ce ne sono abbastanza per saturare la difesa di punto del
   bersaglio (3 + 1,6 per canale), poi tutte insieme: ognuna parte al suo tempo di volo prima dell'istante comune
   (*time on target*). Una nave a meno di 0,6 s dall'essere pronta è tenuta anch'essa (il pensiero del gruppo gira ogni 0,4 s).
@@ -241,7 +278,8 @@ nel suo inviluppo). Un riflesso del capitano: sotto il 28 % di scafo e con i mot
 Stormo → squadriglia → **volo** di 3 bombardieri o 4 caccia/droni (capo e gregari). Un modello di volo cinematico (accelerazione
 e virata massime per tipo), missioni (*cap*, *escort*, *strike*, *intercept*, *ew*, *recon*, *sar*), duello (inseguimento, virata
 di rottura, allungo), passaggi dei bombardieri (avvicinamento, sgancio del siluro o dei razzi, uscita), un **muro
-d'inviluppo** della difesa di punto (il volo non entra nella portata di un incrociatore se non per l'attacco), rientro se
+d'inviluppo** della difesa di punto (i caccia, i droni e le squadre di disturbo non entrano nella portata di un incrociatore;
+i **bombardieri sì**: il muro li teneva fuori dal punto di sgancio e non sganciavano, vedi §7.6), rientro se
 danneggiati, scarichi o a fine missione, e separazione fra velivoli con la griglia (centinaia di velivoli a costo contenuto).
 Gli stormi lanciati per scenario si assegnano da soli i bersagli (`bAuto`).
 
@@ -268,14 +306,14 @@ primo), `sym_medium` (2 + 4), `sym_two` (due gruppi da 3), `sym_air` (incrociato
 | nome | default | cosa fa |
 |---|---|---|
 | `shield_scale`, `armour_scale`, `struct_scale` | 1, 1, 1,2 | scale globali di scudi, corazza e struttura |
-| `hit_scatter`, `fire_dps`, `breakup_p1`, `breakup_p2` | 0,5, 0,0015, 0,25, 0,7 | dispersione dei colpi sullo scafo; incendio (quota della struttura al secondo); probabilità di rottura |
+| `hit_scatter`, `fire_dps`, `breakup_p1`, `breakup_p2` | 0,5, 0,0015, 0,25, 0,7 | dispersione dei colpi lungo lo scafo (× 1,3 della semilunghezza); incendio (quota della struttura al secondo); probabilità di rottura |
 | `focus_a/m` | 3 | bersaglio: 0 nessuna concentrazione (ognuno il più vicino), 1 regola iniziale (valore della classe e quanto è battuto), 2 minaccia/sforzo con margine di avvicinamento, **3 minaccia/sforzo con la portata di adesso** |
 | `flank_a/m`, `flank_ratio` | 0, 0,9 | aggiramento automatico (spento); rapporto di forza da cui scatta |
 | `saturate_a/m` | 1 | salve coordinate di missili |
 | `rotate_a/m` | 1 | rotazione delle navi battute |
 | `retreat_ratio_a/m` | 0,38 | soglia di morale della ritirata automatica (0 = mai) |
-| `range_ai_a/m` | 1 | scala la distanza scelta dal gruppo |
-| `wall_a/m` | 1 | muro d'inviluppo della difesa di punto per i velivoli |
+| `range_ai_a/m` | 1 | scala la distanza scelta dal gruppo (0,5 = la metà: più vicino) |
+| `wall_a/m` | 3 | muro d'inviluppo della difesa di punto per i velivoli: 0 nessuno, 1 tutti, 2 solo i bombardieri, **3 tutti fuorché i bombardieri** |
 
 (`_a` = lato ASTRA, `_m` = lato Mandato: si provano su un lato solo in uno scenario simmetrico.)
 
@@ -312,7 +350,8 @@ Un solo comando, sulla strada dei comandi esistente (`UAstraShipSubsystem::Apply
 ```
 astra.cmd group_order {"side":"mandate"|"astra", "group":<nome, id o una sua nave>|"all", "order":<ordine>,
                        "target":<id di contatto o "group of <id>", dove serve>, "for_s":<secondi, facoltativo>,
-                       "by":"admiral"|"commander"|"captain"|"xo", "formation":"line"|"wedge"|"column"|"screen" (facoltativo)}
+                       "by":"admiral"|"commander"|"captain"|"xo", "range_km":<km, facoltativo>,
+                       "formation":"line"|"wedge"|"column"|"screen" (facoltativo)}
 ```
 
 Nel gioco lo strumento è lo stesso che le altre chiamate (nome `group_order`, argomenti in JSON); il risultato è **ok / failed** più
@@ -343,7 +382,9 @@ bersaglio scelto dal gruppo (`attack` senza bersaglio = "tenete duro e premete")
 `failed: you hold no track on M-05 now`.
 
 **`for_s`**: durata in secondi (0 o assente = finché non cambia; massimo 3600). Allo scadere il gruppo torna ad `auto` e
-l'evento lo dice. **`formation`** da sola cambia la formazione.
+l'evento lo dice. **`range_km`**: la distanza a cui il gruppo tiene il bersaglio (da 1,5 a 12 km): **sta sopra la scelta del gruppo**
+e dura quanto l'ordine; è la leva del comandante sul combattimento (chi chiude, contro chi tiene la distanza, vince: §7.3).
+**`formation`** da sola cambia la formazione.
 
 ### 6.3 Gli ordini
 

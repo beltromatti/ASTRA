@@ -20,7 +20,8 @@ real time. For the lead and the war module's support agents (in their own worktr
   tools/war.py embed                          after a change in data/war/classes.json: rewrite the table compiled into the game
 
 `run` needs the editor target built for this checkout (Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex) and uses
--nullrhi: it never opens a window or touches the GPU, so it can run while the game or the editor is open.
+-nullrhi: it never opens a window or touches the GPU, so it can run while the game or the editor is open. It never starts more than two
+engine processes at once (each is ~1.5 GB and the machine is shared: MAX_PROCESSES).
 The scenarios are data/war/scenarios/*.json (see docs/GUERRA.md); without --scenario the opening (Aurelia patrol) is played.
 """
 from __future__ import annotations
@@ -36,6 +37,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+MAX_PROCESSES = 2                                             # AstraWarSim processes at once, whatever --jobs says
 ENGINE = Path("/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd")
 WAR = ROOT / "Saved" / "War"
 
@@ -190,7 +192,7 @@ def seeds_run(a: argparse.Namespace, tag: str, ex: str, seeds: list[int], jobs: 
     WAR.mkdir(parents=True, exist_ok=True)
 
     # the seeds go to the processes in runs of consecutive seeds: each process fights its battles one after the other
-    n = max(1, min(jobs, len(seeds)))
+    n = max(1, min(jobs, MAX_PROCESSES, len(seeds)))              # (the machine is shared: two engines at most, each is ~1.5 GB)
     chunks, k = [], 0
     for i in range(n):
         size = len(seeds) // n + (1 if i < len(seeds) % n else 0)
@@ -408,7 +410,7 @@ def cmd_duel(a: argparse.Namespace) -> None:
         return face, [load(WAR / f"{base}_{sd}.json") for sd in range(1, a.seeds + 1) if (WAR / f"{base}_{sd}.json").exists()]
 
     res: dict[str, list[dict]] = {f: [] for f in names}
-    with ThreadPoolExecutor(max(1, a.jobs)) as pool:
+    with ThreadPoolExecutor(max(1, min(a.jobs, MAX_PROCESSES))) as pool:
         for face, runs in pool.map(one, names):
             res[face] = runs
     print(f"== {a.n} x {a.shooter} (static, {a.range} km) against a {a.target} dummy, {a.seconds:.0f} s, {a.seeds} seed(s)"
@@ -560,21 +562,21 @@ def main() -> None:
     p = sub.add_parser("ab", help="compare: the same scenario over several seeds, with and without an --exec change")
     common(p, 900, 160)
     p.add_argument("--seeds", type=int, default=4)
-    p.add_argument("--jobs", type=int, default=3)
+    p.add_argument("--jobs", type=int, default=2)
     p.add_argument("--a", default="", help="exec for variant A")
     p.add_argument("--b", default="", help="exec for variant B")
     p.set_defaults(fn=cmd_ab)
     p = sub.add_parser("batch", help="one scenario over N seeds in parallel: a line per seed and the mean")
     common(p, 900, 160)
     p.add_argument("--seeds", type=int, default=6)
-    p.add_argument("--jobs", type=int, default=3)
+    p.add_argument("--jobs", type=int, default=2)
     p.add_argument("--tag", default="batch")
     p.add_argument("--exec", default="")
     p.set_defaults(fn=cmd_batch)
     p = sub.add_parser("sweep", help="what each behaviour is worth: switched off for the ASTRA side alone, in a symmetric scenario")
     common(p, 900, -1)
     p.add_argument("--seeds", type=int, default=48)
-    p.add_argument("--jobs", type=int, default=4)
+    p.add_argument("--jobs", type=int, default=2)
     p.add_argument("--features", default="flank,saturate,rotate,focus,retreat_ratio,wall")
     p.set_defaults(fn=cmd_sweep, exec="")
     p = sub.add_parser("compare", help="two saved batches side by side")
@@ -591,7 +593,7 @@ def main() -> None:
     p.add_argument("--missiles", type=int, default=-1, help="the shooters' missiles (-1: the class's)")
     p.add_argument("--tune", default="", help="tuning constants, name=value,name=value (astra.war.tune)")
     p.add_argument("--seeds", type=int, default=6)
-    p.add_argument("--jobs", type=int, default=4)
+    p.add_argument("--jobs", type=int, default=2)
     p.set_defaults(fn=cmd_duel)
     p = sub.add_parser("embed", help="write the ship class table compiled into the game from data/war/classes.json")
     p.set_defaults(fn=cmd_embed)
