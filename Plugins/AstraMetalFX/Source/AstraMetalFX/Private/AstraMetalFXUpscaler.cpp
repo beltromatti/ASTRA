@@ -18,6 +18,22 @@ END_SHADER_PARAMETER_STRUCT()
 
 namespace
 {
+	// The engine's own test for "the camera went somewhere else" (SceneVisibility.cpp, IsLargeCameraMovement): 75 degrees or
+	// 100 m (10000 cm) in one frame. TSR does not use it (it rejects its history by itself), the histories that do reset on it.
+	bool IsLargeCameraMovement(const FViewMatrices& Current, const FViewMatrices& Previous)
+	{
+		const float RotationThreshold = FMath::Cos(FMath::DegreesToRadians(75.0f));
+		const float TranslationThreshold = 10000.0f;
+		const FMatrix& WorldToView = Current.GetWorldToView();
+		const FMatrix& PrevWorldToView = Previous.GetWorldToView();
+		const float ViewRightAngle = WorldToView.GetColumn(0) | PrevWorldToView.GetColumn(0);
+		const float ViewUpAngle = WorldToView.GetColumn(1) | PrevWorldToView.GetColumn(1);
+		const float ViewDirectionAngle = WorldToView.GetColumn(2) | PrevWorldToView.GetColumn(2);
+		const FVector Distance = Current.GetViewOrigin() - Previous.GetViewOrigin();
+		return ViewRightAngle < RotationThreshold || ViewUpAngle < RotationThreshold || ViewDirectionAngle < RotationThreshold
+			|| Distance.SizeSquared() > TranslationThreshold * TranslationThreshold;
+	}
+
 	// The view uniform buffer's ClipToPrevClip, built exactly as SetupCommonViewUniformBufferParameters does (SceneView.cpp),
 	// from the current and the previous frame's matrices: maps the clip position of a pixel of this frame (without the TAA
 	// jitter) to where the same world point was in the previous frame. TSR uses the same matrix to give depth a motion.
@@ -75,7 +91,7 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 
 	// The history the engine kept for this view from the last frame, if it was ours.
 	const FHistory* Prev = Inputs.PrevHistory.IsValid() ? static_cast<const FHistory*>(Inputs.PrevHistory.GetReference()) : nullptr;
-	const bool bReset = View.bCameraCut
+	bool bReset = View.bCameraCut
 		|| Prev == nullptr
 		|| Prev->Context != Context
 		|| Prev->OutputSize != OutputSize
@@ -98,6 +114,9 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 	{
 		PreviousMatrices.ApplyWorldOffset(View.OriginOffsetThisFrame);
 	}
+	// A teleport (the game never signals a camera cut): the depth reprojection below is exact for a static scene, but a view
+	// that jumped this far has nothing in common with its history.
+	bReset = bReset || IsLargeCameraMovement(View.ViewMatrices, PreviousMatrices);
 
 	AstraMetalFX::FFrame Frame;
 	Frame.ViewRect = InputRect;
