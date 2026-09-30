@@ -106,6 +106,8 @@ void UAstraBattleSubsystem::InitShipModel(FAstraBattleShip& S)
 		S.Mounts.Add(M);
 	}
 	BuildDurability(S, S.HullMax, S.ShieldMax);
+	// what it is worth in a fight: its firepower at mid range and what it takes to put it out
+	S.CombatValue = (float)(0.5 * ShipDps(S, 5000.0) / 40.0 + 0.5 * (S.HullMax + S.ShieldMax) / 6000.0);
 }
 
 void UAstraBattleSubsystem::BuildDurability(FAstraBattleShip& S, float Hull, float Shield)

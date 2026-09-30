@@ -36,8 +36,8 @@ def build_args(a: argparse.Namespace, out: Path) -> list[str]:
     args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraWarSim", f"-seconds={a.seconds}", f"-step={a.step}",
             f"-every={a.every}", f"-out={out}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout",
             "-FullStdOutLogOutput"]
-    if a.jump is not None and a.jump >= 0:
-        args.append(f"-jump={a.jump}")
+    if a.jump is not None and a.jump >= 0 and not getattr(a, "scenario", ""):
+        args.append(f"-jump={a.jump}")               # (the opening's clock: a scenario has none)
     args.append(f"-seed={a.seed}")
     if getattr(a, "nseeds", 1) > 1:
         args.append(f"-seeds={a.nseeds}")                 # several battles in one process: the start-up is most of a run
@@ -51,15 +51,34 @@ def build_args(a: argparse.Namespace, out: Path) -> list[str]:
 def run_once(a: argparse.Namespace, out: Path, log: Path) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     log.parent.mkdir(parents=True, exist_ok=True)
+    limit = 180.0 + getattr(a, "nseeds", 1) * (6.0 + a.seconds / 40.0)
     with open(log, "w") as f:
-        # a crash can leave the engine hanging in its crash handler: never wait for ever
         p = subprocess.Popen(build_args(a, out), stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
-        try:
-            p.wait(timeout=180.0 + getattr(a, "nseeds", 1) * (6.0 + a.seconds / 40.0))
-        except subprocess.TimeoutExpired:
-            p.kill()
-            p.wait()
-            print(f"   the war bench did not finish in time: killed (log {log})")
+        t0 = time.time()
+        while p.poll() is None:
+            time.sleep(0.5)
+            # a crash leaves the engine hanging in its crash handler: read the log for it and never wait for ever
+            crashed = False
+            try:
+                with open(log, "rb") as r:
+                    r.seek(max(0, log.stat().st_size - 40000))
+                    tail = r.read().decode(errors="replace")
+                crashed = "Critical error" in tail or "Assertion failed" in tail
+            except OSError:
+                pass
+            if crashed or time.time() - t0 > limit:
+                time.sleep(2.0 if crashed else 0.0)                       # let the stack trace land in the log
+                p.kill()
+                p.wait()
+                why = "crashed" if crashed else "did not finish in time"
+                print(f"   the war bench {why}: killed (log {log})")
+                if crashed:
+                    lines = log.read_text(errors="replace").splitlines()
+                    for i, l in enumerate(lines):
+                        if "Critical error" in l or "Assertion failed" in l:
+                            print("   " + "\n   ".join(x.strip() for x in lines[i:i + 8]))
+                            break
+                break
         return p.returncode
 
 
@@ -116,7 +135,8 @@ def metrics(path: Path | str) -> dict:
         caps = [s for s in fin if s["side"] == side and not s["craft"] and s["c"] != "AQUILA" and not s["c"].startswith("EAGLE")]
         m[side] = {"n": len(caps), "alive": sum(1 for s in caps if fate_of(s) == "alive"),
                    "destroyed": sum(1 for s in caps if fate_of(s) == "destroyed"),
-                   "gone": sum(1 for s in caps if fate_of(s) == "gone")}
+                   "gone": sum(1 for s in caps if fate_of(s) == "gone"),
+                   "dark": sum(1 for s in caps if fate_of(s) == "disabled")}
         c = st.get("craft", {}).get(side, {})
         m[side]["craft"] = {"launched": c.get("launched", 0), "lost": c.get("lost", 0), "recovered": c.get("recovered", 0),
                             "pd": c.get("lost_point_defence", 0), "guns": c.get("lost_craft_guns", 0), "msl": c.get("lost_missiles", 0)}
@@ -184,7 +204,7 @@ def seeds_run(a: argparse.Namespace, tag: str, ex: str, seeds: list[int], jobs: 
 def fmt_side(m: dict, side: str) -> str:
     s = m[side]
     c = s["craft"]
-    return (f"{s['alive']}/{s['n']} alive {s['destroyed']} lost {s['gone']} left"
+    return (f"{s['alive']}/{s['n']} alive {s['destroyed']} lost {s['gone']} left {s['dark']} dark"
             f"  craft {c['launched']:3d} out {c['lost']:3d} lost (PD {c['pd']}, guns {c['guns']}, msl {c['msl']}) {c['recovered']:3d} home")
 
 
@@ -411,6 +431,25 @@ def cmd_report(a: argparse.Namespace) -> None:
     report(a.path)
 
 
+def cmd_groups(a: argparse.Namespace) -> None:
+    """The battle groups through a record: state, order, formation, focus, range, strengths, and the ships' hull and shields."""
+    d = load(a.path)
+    names = {s["id"]: s["c"] for f in d["frames"] for s in f["ships"]}
+    for i, f in enumerate(d["frames"]):
+        if i % a.every:
+            continue
+        print(f"t={f['t']:6.1f}")
+        for g in f.get("groups", []):
+            foc = names.get(g["focus"], "-") if g["focus"] >= 0 else "-"
+            print(f"   {g['side'][:3]} {g['name'][:24]:24} {g['state']:8} {g['order']:8} {g['formation']:6} {g['ships']} ships  focus {foc:8}"
+                  f" range {g['range_m'] / 1000:4.1f} km  str {g['strength']:.2f} vs {g['enemy_strength']:.2f}  morale {g.get('morale', 0):.2f}")
+        for s in f["ships"]:
+            if not s["craft"] and s["alive"] and s["side"] in ("astra", "mandate"):
+                sh = " ".join(f"{v:3.0f}" for v in s.get("shields", []))
+                print(f"        {s['c']:7} hull {s['hull']:3.0f}% sh [{sh}] mode {s['mode']} tgt {names.get(s['target'], '-'):8}"
+                      f" ({s['km'][0]:6.1f},{s['km'][1]:6.1f}) {s['v']:4.0f} m/s{' FLEE' if s.get('fleeing') else ''}")
+
+
 def cmd_ship(a: argparse.Namespace) -> None:
     d = load(a.path)
     for f in d["frames"]:
@@ -481,6 +520,10 @@ def main() -> None:
     p = sub.add_parser("report")
     p.add_argument("path")
     p.set_defaults(fn=cmd_report)
+    p = sub.add_parser("groups", help="the battle groups through a record")
+    p.add_argument("path")
+    p.add_argument("--every", type=int, default=3, help="every Nth frame")
+    p.set_defaults(fn=cmd_groups)
     p = sub.add_parser("ship")
     p.add_argument("path")
     p.add_argument("contact")

@@ -117,7 +117,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 		J->SetStringField(TEXT("side"), S.Side == EAstraSide::Astra ? TEXT("astra") : (S.Side == EAstraSide::Mandate ? TEXT("mandate") : TEXT("neutral")));
 		J->SetBoolField(TEXT("craft"), S.bCraft);
 		J->SetBoolField(TEXT("alive"), S.bAlive);
-		J->SetStringField(TEXT("fate"), S.bAlive ? (S.bDisabled ? TEXT("disabled") : TEXT("alive")) : (S.Mode == EAstraShipMode::Dead ? TEXT("destroyed") : TEXT("gone")));   // gone: left the theatre, or a craft that landed
+		J->SetStringField(TEXT("fate"), S.bAlive ? (S.bDisabled ? TEXT("disabled") : TEXT("alive")) : ((S.Mode == EAstraShipMode::Dead && !(S.bPlayer && bSandbox)) ? TEXT("destroyed") : TEXT("gone")));   // gone: left the theatre, or a craft that landed
 		if (!S.bAlive)
 		{
 			Arr.Add(MakeShared<FJsonValueObject>(J));
@@ -159,5 +159,6 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 		Arr.Add(MakeShared<FJsonValueObject>(J));
 	}
 	O->SetArrayField(TEXT("ships"), Arr);
+	O->SetArrayField(TEXT("groups"), GroupsJson()->GetArrayField(TEXT("groups")));
 	return O;
 }

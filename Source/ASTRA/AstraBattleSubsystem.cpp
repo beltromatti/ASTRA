@@ -131,6 +131,7 @@ int32 UAstraBattleSubsystem::AddShip(const FString& Contact, const FString& Name
 	S.Shield = S.ShieldMax = Shield;
 	S.Mode = Speed > 1.f ? EAstraShipMode::Cruise : EAstraShipMode::Idle;
 	Ships.Add(S);
+	IdIndex.Add(S.Id, Ships.Num() - 1);
 	InitShipModel(Ships.Last());     // a warship gets its class's sections, plates, shield sectors and mounts (AstraWarDamage.cpp)
 	return Ships.Num() - 1;
 }
@@ -167,9 +168,11 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	int32 I = AddShip(TEXT("T-01"), TEXT("ASN Praetorian"), TEXT("ASTRA battleship (7th Fleet flagship)"), TEXT("SM_SHIP_ASTRA_Praetorian"),
 	                  EAstraSide::Astra, A0 + Polar(4.5 * OneKm, 25, 3), 45.f, 288.f, 460.f, 5200.f, 2000.f);
 	BattleshipStats(Ships[I]);
+	const int32 PicketBB = I;
 	I = AddShip(TEXT("T-02"), TEXT("ASN Vigilant"), TEXT("ASTRA destroyer"), TEXT("SM_SHIP_ASTRA_Vigilant"), EAstraSide::Astra,
 	            A0 + Polar(3 * OneKm, 70, 2), 45.f, 288.f, 140.f, 1200.f, 500.f);
 	DestroyerStats(Ships[I]);
+	const int32 PicketDD = I;
 	I = AddShip(TEXT("T-07"), TEXT("Brightwater"), TEXT("Free Guilds freighter"), TEXT("SM_SHIP_GUILD_Freighter"), EAstraSide::Neutral,
 	            A0 + Polar(22 * OneKm, 15, 4), 120.f, 180.f, 170.f, 700.f, 60.f);
 	Ships[I].RailDamage = 0.f;
@@ -179,6 +182,8 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Ships[I].bCold = true;
 	Ships[I].bIdentified = false;
 	Ships[I].Missiles = 8;
+	// the 7th Fleet's picket screens the Aquila (its battle group: they fight where she can support them)
+	NoteGroupSpawn(EAstraSide::Astra, TEXT("7th Fleet picket"), TEXT("screen"), TArray<int32>({PicketBB, PicketDD}), Ships[0].Id);
 
 	// the Aquila's flight groups (Flight Control): fighters, torpedo bombers, drones
 	auto Group = [this](const TCHAR* Name, const TCHAR* Call, const TCHAR* Mesh, int32 Kind, int32 Count)
@@ -316,7 +321,8 @@ FAstraBattleShip* UAstraBattleSubsystem::FindByContact(const FString& Contact)
 
 FAstraBattleShip* UAstraBattleSubsystem::FindById(int32 Id)
 {
-	return Ships.FindByPredicate([Id](const FAstraBattleShip& S) { return S.Id == Id; });
+	const int32* I = IdIndex.Find(Id);
+	return (I && Ships.IsValidIndex(*I) && Ships[*I].Id == Id) ? &Ships[*I] : nullptr;
 }
 
 void UAstraBattleSubsystem::Report(const FString& Text, bool bReport)
@@ -456,6 +462,19 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		}
 	}
 	ProcessWarCommands();                                   // the bench's scenarios and spawns (AstraWarScenario.cpp)
+	// the war's minds: what each side holds on its sensors, who is near whom, what the groups want
+	if ((CompactT -= Dt) <= 0.f)
+	{
+		CompactT = 10.f;
+		CompactShips();
+	}
+	BuildGrid();
+	if ((KnowledgeT -= Dt) <= 0.f)
+	{
+		KnowledgeT = 0.25f;
+		TickKnowledge();
+	}
+	TickGroups(Dt);
 	TickPlayer(Dt);
 	TickGateRun(Dt);
 	TickPOIs(Dt);
@@ -469,6 +488,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	{
 		if (!S.bAlive)
 		{
+			S.DeadT += S.bCraft ? Dt : 0.f;
 			continue;
 		}
 		if (S.bPiloted)
@@ -954,6 +974,13 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		Ships[A].RailCd = 8.f;
 		Ships[A].Missiles = 32;
 		Ships[A].PDChannels = 3;
+		// the Archon's strike group: one battle group, the cruiser leading a wedge, sent at the picket and the carrier
+		NoteGroupSpawn(EAstraSide::Mandate, TEXT("Strike Group Varek Solm"), TEXT("wedge"), TArray<int32>({A, B, D, E}), -1);
+		if (FAstraBattleGroup* SG = FindGroup(Ships[A].GroupId))
+		{
+			SG->Objective = Ships[0].Pos;
+			SG->bHasObjective = true;
+		}
 		AddEnemyWing(A, 6, 28.f);   // the flagship launches its strike fighters once the group is committed
 		for (FAstraBattleShip& S : Ships)   // the fleet engages
 		{
@@ -1114,6 +1141,11 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 	{
 		S.Pos += S.Vel * Dt;
 		S.Att = FQuat(FVector(0.2f, 0.3f, 1.f).GetSafeNormal(), FMath::DegreesToRadians(S.SpinDeg * Dt)) * S.Att;
+		return;
+	}
+	if (S.Dmg.bModel && S.Side != EAstraSide::Neutral)
+	{
+		TickShipAI(S, Dt);                          // the warships of both sides: their own minds, their groups' orders
 		return;
 	}
 	FVector DesiredVel = S.Vel;
@@ -1298,72 +1330,16 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 	{
 		M.T = FMath::Max(0.f, M.T - Dt);
 	}
-	// point defence: every ship shoots at missiles aimed at it (the Aquila's PD is automatic, 24 mounts)
-	if (S.PDT <= 0.f)
-	{
-		int32 Channels = S.Dmg.bModel ? FMath::CeilToInt(S.PDChannels * S.Dmg.Sys[AstraWar::SysPointDefence]) : S.PDChannels;
-		for (FAstraProjectile& Pr : Projectiles)
-		{
-			if (Channels > 0 && !Pr.bDead && Pr.Kind == EAstraProjKind::Missile && Pr.Target == S.Id &&
-			    FVector::Dist(Pr.Pos, S.Pos) < S.PDRange + S.Radius)
-			{
-				--Channels;
-				S.PDT = 0.5f;
-				AddBeam(S.Pos + (Pr.Pos - S.Pos).GetSafeNormal() * S.Radius * 0.6, Pr.Pos, 0.12f, FLinearColor(1.f, 0.85f, 0.5f));
-				if (S.bPlayer)
-				{
-					HullSound(TEXT("SW_PD_Burst"), 0.4f, 0.6f);
-				}
-				if (FMath::FRand() < (S.bPlayer ? 0.32f : 0.25f) * (Pr.bTorpedo ? 0.8f : 1.f))
-				{
-					Pr.bDead = true;
-					if (const FAstraBattleShip* Own = FindById(Pr.Owner); Own && Own->Side != EAstraSide::Neutral)
-					{
-						++Stats.MissilesShot[Own->Side == EAstraSide::Astra ? 0 : 1];
-					}
-					AddFlash(Pr.Pos, 25.f, 0.6f, FLinearColor(1.f, 0.7f, 0.35f), 60.f);
-					if (S.bPlayer)
-					{
-						Report(TEXT("tactical: point defense splashed an incoming missile"), false);
-					}
-				}
-			}
-		}
-		if (S.Side == EAstraSide::Mandate || S.Side == EAstraSide::Astra)
-		{
-			const EAstraSide Foe = S.Side == EAstraSide::Mandate ? EAstraSide::Astra : EAstraSide::Mandate;
-			for (FAstraBattleShip& C : Ships)
-			{
-				if (Channels <= 0)
-				{
-					break;
-				}
-				if (C.bCraft && C.bAlive && C.Side == Foe && FVector::Dist(C.Pos, S.Pos) < 1500.f + S.Radius)
-				{
-					--Channels;
-					S.PDT = 0.5f;
-					AddBeam(S.Pos + (C.Pos - S.Pos).GetSafeNormal() * S.Radius * 0.6, C.Pos, 0.1f, FLinearColor(1.f, 0.6f, 0.3f));
-					if (C.bPiloted)
-					{
-						if (FMath::FRand() < 0.22f)
-						{
-							ApplyHit(C, (C.Pos - S.Pos).GetSafeNormal(), 14.f, C.Pos, EAstraHitKind::PointDefence, S.Id);   // the Captain's Falcon: hurt, not erased
-						}
-					}
-					else if (FMath::FRand() < (C.CraftKind == 0 ? 0.07f : (C.CraftKind == 1 ? 0.1f : 0.14f)))
-					{
-						ApplyHit(C, (C.Pos - S.Pos).GetSafeNormal(), 1000.f, C.Pos, EAstraHitKind::PointDefence, S.Id);
-					}
-				}
-			}
-		}
-	}
+	// point defence: every ship shoots at the missiles that threaten it and what stands beside it, the most dangerous first,
+	// and at the craft inside its envelope (the Aquila's PD is automatic, 24 mounts)
+	TickPointDefence(S);
 	if (S.bPlayer)
 	{
 		TickPlayerFire(S, Dt);
 		return;
 	}
-	if (S.Mode != EAstraShipMode::Attack || S.bFleeing || S.bHoldFire)
+	const bool bRearGuard = S.bFleeing && S.Task == EAstraTask::RearGuard;
+	if ((S.Mode != EAstraShipMode::Attack && !bRearGuard) || (S.bFleeing && !bRearGuard) || S.bHoldFire)
 	{
 		return;
 	}
@@ -1386,13 +1362,24 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 			FireRail(S, *T, (0.0012f + Dist / 30e6) * (S.bJammed ? 3.f : 1.f));
 		}
 	}
-	if (S.Missiles > 0 && (S.MissileT <= 0.f || S.bSalvo) && Dist < S.MissileRange && Dist > 2.5 * OneKm && T->Side != EAstraSide::Neutral)
+	// the missiles: as the ship's cadence allows, unless its group keeps the cells for a saturating salvo, launched together
+	// at the moment the group times (each ship at its own flight time before it), or by the commander's order to salvo
+	if (S.SalvoAt >= 0.f && Time > S.SalvoAt + 8.f)
+	{
+		S.SalvoAt = -1.f;                               // the moment passed with no shot at it: the plan lapses
+	}
+	const bool bTimed = S.SalvoAt >= 0.f && Time >= S.SalvoAt;
+	const bool bMassed = bTimed || S.bSalvo;
+	const bool bMayLaunch = bMassed || (S.MissileT <= 0.f && !S.bHoldMissiles && S.SalvoAt < 0.f);
+	if (S.Missiles > 0 && bMayLaunch && Dist < S.MissileRange && Dist > 2.5 * OneKm && T->Side != EAstraSide::Neutral)
 	{
 		// a massed salvo empties the ready cells (6 on a cruiser, 3 on a destroyer): the cells then reload for longer
 		S.LitT = 40.f;
-		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f) * (S.bConserve ? 2.2f : 1.f) * (S.bSalvo ? 2.f : 1.f);
-		const int32 N = FMath::Min(S.Missiles, S.bSalvo ? (S.Radius > 200.f ? 6 : 3) : (S.Radius > 200.f ? 4 : 2));
+		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f) * (S.bConserve ? 2.2f : 1.f) * (bMassed ? 2.f : 1.f);
+		const int32 N = FMath::Min(S.Missiles, bMassed ? (S.Radius > 200.f ? 6 : 3) : (S.Radius > 200.f ? 4 : 2));
 		S.bSalvo = false;
+		S.SalvoAt = -1.f;
+		S.bHoldMissiles = false;
 		for (int32 i = 0; i < N; ++i)
 		{
 			FireMissile(S, *T);
@@ -1433,6 +1420,7 @@ void UAstraBattleSubsystem::FireRail(FAstraBattleShip& From, FAstraBattleShip& T
 	FAstraProjectile Pr;
 	Pr.Kind = EAstraProjKind::Rail;
 	Pr.HitKind = EAstraHitKind::Rail;
+	Pr.OwnerSide = (int8)AstraSideIdx(From.Side);
 	Pr.Pos = From.Pos + Aim * From.Radius * 0.8;
 	Pr.Vel = From.Vel + Aim * Speed;
 	Pr.Owner = From.Id;
@@ -1461,6 +1449,7 @@ void UAstraBattleSubsystem::FireMissile(FAstraBattleShip& From, FAstraBattleShip
 {
 	FAstraProjectile Pr;
 	Pr.Kind = EAstraProjKind::Missile;
+	Pr.OwnerSide = (int8)AstraSideIdx(From.Side);
 	const FVector Out = (From.Att.GetUpVector() + FMath::VRand() * 0.5f).GetSafeNormal();
 	Pr.Pos = From.Pos + Out * From.Radius * 0.5;
 	Pr.Vel = From.Vel + Out * 300.f;
@@ -3879,18 +3868,19 @@ void UAstraBattleSubsystem::Explode(FAstraBattleShip& S)
 		F.MID->SetScalarParameterValue(TEXT("Intensity"), 80.f);
 		Flashes.Add(F);
 	}
-	// the hulk: the ship's own mesh, burnt dark, drifting and tumbling slowly
-	if (S.Actor)
+	// the hulk: the ship's own mesh, burnt dark, drifting and tumbling slowly (headless: only the obstacle it is)
+	if (S.Actor || !FApp::CanEverRender())
 	{
 		FAstraWreck W;
 		W.Actor = S.Actor;
 		S.Actor = nullptr;
+		W.Radius = S.Radius * 0.8f;
 		W.Pos = S.Pos;
 		W.Vel = Drift + FMath::VRand() * 4.f;
 		W.Att = S.Att;
 		W.SpinAxis = FMath::VRand();
 		W.SpinDeg = FMath::FRandRange(1.5f, 4.5f);
-		if (UStaticMeshComponent* C = W.Actor->GetStaticMeshComponent())
+		if (UStaticMeshComponent* C = W.Actor ? W.Actor->GetStaticMeshComponent() : nullptr)
 		{
 			for (int32 i = 0; i < C->GetNumMaterials(); ++i)
 			{
@@ -3954,13 +3944,18 @@ void UAstraBattleSubsystem::TickWrecks(float Dt)
 		W.Age += Dt;
 		W.Pos += W.Vel * Dt;
 		W.Att = FQuat(W.SpinAxis, FMath::DegreesToRadians(W.SpinDeg * Dt)) * W.Att;
-		if (!W.Actor || (W.Life > 0.f && W.Age > W.Life) || FVector::Dist(W.Pos, Ships[0].Pos) > 200 * OneKm)
+		// (a hulk with no actor, headless, stays as the obstacle it is; the far ones go: from the Aquila, or from the origin in a bench)
+		const FVector Ref = bSandbox ? FVector::ZeroVector : Ships[0].Pos;
+		if ((!W.Actor && W.Radius <= 0.f) || (W.Life > 0.f && W.Age > W.Life) || FVector::Dist(W.Pos, Ref) > 250 * OneKm)
 		{
 			if (W.Actor) { W.Actor->Destroy(); }
 			Wrecks.RemoveAtSwap(i);
 			continue;
 		}
-		W.Actor->SetActorLocationAndRotation(ToWorld(W.Pos), ToWorldRot(W.Att));
+		if (W.Actor)
+		{
+			W.Actor->SetActorLocationAndRotation(ToWorld(W.Pos), ToWorldRot(W.Att));
+		}
 	}
 }
 
@@ -4268,6 +4263,7 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 		const TArray<TSharedPtr<FJsonObject>> Specs = ShipSpecs(TEXT("ships"));
 		int32 k = 0;
 		int32 LeaderIdx = INDEX_NONE;
+		TArray<int32> RaidShips;
 		for (const TSharedPtr<FJsonObject>& Spec : Specs)
 		{
 			if (k >= 8)
@@ -4320,6 +4316,7 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 				Ships[I].Mode = EAstraShipMode::Cruise;
 			}
 			Listing += FString::Printf(TEXT("%s%s (%s, %s)"), Listing.IsEmpty() ? TEXT("") : TEXT(", "), *Ships[I].Name, *Id, *Ships[I].Class);
+			RaidShips.Add(Ships[I].Id);
 			++k;
 		}
 		if (Type == TEXT("raid"))
@@ -4327,6 +4324,24 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			bEngagementActive = true;
 			bScenarioOver = false;
 			bSurrenderAccepted = false;
+			// the raid is one battle group, sent at the Aquila's position
+			if (FAstraBattleShip* First = FindById(RaidShips.IsValidIndex(0) ? RaidShips[0] : -1))
+			{
+				const int32 Gid = NewGroup(EAstraSide::Mandate, FString::Printf(TEXT("Raid group %s"), *First->ContactId), EAstraFormation::Wedge);
+				for (const int32 Rid : RaidShips)
+				{
+					if (FAstraBattleShip* RS = FindById(Rid))
+					{
+						JoinGroup(*RS, Gid);
+					}
+				}
+				if (FAstraBattleGroup* RG = FindGroup(Gid))
+				{
+					RG->LeaderId = First->Id;
+					RG->Objective = Ships[0].Pos;
+					RG->bHasObjective = true;
+				}
+			}
 			// (no listing here: the raid is under the fog of war, and the sensors report it as they find it)
 			UE_LOG(LogASTRA, Log, TEXT("[Battle] raid in, dark: %d ships at %.0f km, bearing %03.0f — %s"), k, Range, Bearing, *Listing);
 			bool bHail = true;
@@ -4921,6 +4936,9 @@ void UAstraBattleSubsystem::ClearSystem()
 		if (S.DriveFlare) { S.DriveFlare->Destroy(); }
 	}
 	Ships.SetNum(1);
+	RebuildIdIndex();
+	Groups.Reset();
+	Flights.Reset();
 	POIs.Reset();
 	Squadrons.RemoveAll([](const FAstraSquadron& Q) { return Q.Side != EAstraSide::Astra; });
 	for (FAstraSquadron& Q : Squadrons)

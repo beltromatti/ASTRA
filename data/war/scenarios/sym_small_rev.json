@@ -1,0 +1,9 @@
+{
+  "_doc": "The same as sym_small with the Mandate side spawned first: any bias that follows the order of the ships in the arrays (who moves first in a tick, the random numbers each is dealt) flips with it; a bias in the sides' own code does not.",
+  "mirror": true,
+  "first": "mandate",
+  "astra": [
+    {"name": "Vanguard", "formation": "wedge", "at_km": [-14, 0, 0], "heading": 0, "spacing_km": 1.6,
+     "ships": [{"class": "acheron", "n": 1}, {"class": "styx", "n": 2}]}
+  ]
+}

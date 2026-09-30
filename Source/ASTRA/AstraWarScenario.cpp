@@ -273,16 +273,22 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 	SandboxReset();
 	bool bMirror = false;
 	Root->TryGetBoolField(TEXT("mirror"), bMirror);
+	FString First;
+	Root->TryGetStringField(TEXT("first"), First);          // which side is spawned first (the order of the ships in the arrays): "mandate" swaps it
 	int32 Spawned = 0, Wings = 0;
 	int32 Counter[2] = {1, 1};
-	for (const int32 SideIdx : {0, 1})
+	TMap<FString, int32> GroupByName[2];              // to resolve "protects" once every group exists
+	TArray<TTuple<int32, int32, FString>> Protect;    // group id, side, the name of the group it screens
+	const bool bMandateFirst = First.Equals(TEXT("mandate"), ESearchCase::IgnoreCase);
+	for (const int32 Pass : {0, 1})
 	{
+		const int32 SideIdx = bMandateFirst ? 1 - Pass : Pass;
 		const EAstraSide Side = SideIdx == 0 ? EAstraSide::Astra : EAstraSide::Mandate;
-		const TArray<TSharedPtr<FJsonValue>>* Groups = nullptr;
+		const TArray<TSharedPtr<FJsonValue>>* SideGroups = nullptr;
 		bool bRotated = false;
-		if (!Root->TryGetArrayField(SideIdx == 0 ? TEXT("astra") : TEXT("mandate"), Groups))
+		if (!Root->TryGetArrayField(SideIdx == 0 ? TEXT("astra") : TEXT("mandate"), SideGroups))
 		{
-			if (SideIdx == 1 && bMirror && Root->TryGetArrayField(TEXT("astra"), Groups))
+			if (SideIdx == 1 && bMirror && Root->TryGetArrayField(TEXT("astra"), SideGroups))
 			{
 				bRotated = true;                            // the ASTRA groups, turned half a circle about the origin
 			}
@@ -291,16 +297,19 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 				continue;
 			}
 		}
-		for (const TSharedPtr<FJsonValue>& GV : *Groups)
+		for (const TSharedPtr<FJsonValue>& GV : *SideGroups)
 		{
 			const TSharedPtr<FJsonObject> G = GV->AsObject();
 			if (!G.IsValid())
 			{
 				continue;
 			}
-			FString GName = TEXT("Group"), Formation = TEXT("line");
+			FString GName = TEXT("Group"), Formation = TEXT("line"), Protects;
 			G->TryGetStringField(TEXT("name"), GName);
 			G->TryGetStringField(TEXT("formation"), Formation);
+			G->TryGetStringField(TEXT("protects"), Protects);
+			const TArray<TSharedPtr<FJsonValue>>* Obj = nullptr;
+			G->TryGetArrayField(TEXT("objective_km"), Obj);
 			const TArray<TSharedPtr<FJsonValue>>* At = nullptr;
 			G->TryGetArrayField(TEXT("at_km"), At);
 			FVector Origin = VecKm(At);
@@ -337,6 +346,11 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 			}
 			const FVector Fwd = FRotator(0.0, Heading, 0.0).RotateVector(FVector::ForwardVector);
 			const FVector Right = FRotator(0.0, Heading, 0.0).RotateVector(FVector::RightVector);
+			FVector Objective = Obj ? VecKm(Obj) : FVector::ZeroVector;
+			if (bRotated && Obj)
+			{
+				Objective = FVector(-Objective.X, -Objective.Y, Objective.Z);
+			}
 			TArray<int32> Made;
 			for (int32 k = 0; k < Plan.Num(); ++k)
 			{
@@ -362,6 +376,17 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 				{
 					Made.Add(I);
 					++Spawned;
+				}
+			}
+			const int32 Gid = NoteGroupSpawn(Side, bRotated ? GName + TEXT(" (mirror)") : GName, Formation, Made, INDEX_NONE);
+			if (FAstraBattleGroup* NG = FindGroup(Gid))
+			{
+				NG->Objective = Objective;                       // where it goes when it sees nothing (the origin unless the file says)
+				NG->bHasObjective = true;
+				GroupByName[SideIdx].Add(GName, Gid);
+				if (!Protects.IsEmpty())
+				{
+					Protect.Add(MakeTuple(Gid, SideIdx, Protects));
 				}
 			}
 			const TArray<TSharedPtr<FJsonValue>>* Ws = nullptr;
@@ -391,6 +416,16 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 					}
 				}
 			}
+		}
+	}
+	for (const TTuple<int32, int32, FString>& P : Protect)
+	{
+		const int32* Other = GroupByName[P.Get<1>()].Find(P.Get<2>());
+		const FAstraBattleGroup* OG = Other ? FindGroup(*Other) : nullptr;
+		if (FAstraBattleGroup* G = FindGroup(P.Get<0>()); G && OG && OG->LeaderId >= 0)
+		{
+			G->ProtecteeId = OG->LeaderId;                    // it screens the other group's leader (a carrier, a flagship)
+			G->Formation = EAstraFormation::Screen;
 		}
 	}
 	OutDetail = FString::Printf(TEXT("%d ships, %d flight groups"), Spawned, Wings);
