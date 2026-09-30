@@ -4,7 +4,7 @@ Il "DNA" della nave (`data/ship/aquila_plan.json`), il kit di moduli e stanze de
 **Ponte 4 (Crew Services) costruito da capo a coda** e gli strumenti per metterlo nel livello. Tutto ciò che è scritto nel gioco è in inglese;
 questa pagina è in italiano con i nomi ufficiali.
 
-Stato: piano dei 12 ponti completo e verificato (0 problemi, 0 avvisi); Ponte 4 con mesh (640 posizionamenti); gli altri ponti hanno un piano
+Stato: piano dei 12 ponti completo e verificato (0 problemi, 0 avvisi); **Ponte 4 e Ponte 6 con mesh** (640 e 681 posizionamenti); gli altri ponti hanno un piano
 "grossolano" ma vero (compartimenti tipizzati con misure, porte, scale, grafo). Non provato in Unreal (l'editor è del lead): vedi "Limiti".
 
 ## 1. Comandi, nell'ordine
@@ -35,7 +35,7 @@ Capitano. Lo scafo `SM_SHIP_ASTRA_Aquila` sta in (-172, 0, -62) m: coordinate de
 | 3 | Crew Country | -42,0 | officers' quarters, gym (e Crew Berthing, vedi §8) | grossolano; **serve la correzione dello scafo** (§8) |
 | 4 | Crew Services | -46,0 | Mess Hall, galley, lounge, observation deck | **costruito** (mesh, porte, luci) |
 | 5 | Science & Transport | -50,0 | science labs, Transporter Room (sei pedane), sensor archive; la navetta interna della Spine | grossolano |
-| 6 | Medical | -54,0 | Medbay, surgery, quarantine, pharmacy | Medbay esistente, il resto grossolano |
+| 6 | Medical | -54,0 | Medbay, surgery, quarantine, pharmacy | **costruito** (mesh, porte, luci): Medbay esistente, la Spine arriva al suo portale, sala operatoria, reparto di quarantena e farmacia accanto, poi servizi; le stanze senza mesh (damage control locker, machinery) restano muri pieni |
 | 7 | Engineering & Power | -58,0 | Main Engineering, reactor, power control, radiators | Engineering esistente, il resto grossolano |
 | 8 | Marines & Armory | -62,0 | Armory, Marine Barracks, firing range, assault-shuttle bay (due Kestrel) | grossolano |
 | 9 | Flight | -66,0 (Flight Deck: -72,8) | Flight Deck: launch tubes, bays, aircraft workshop, control booth | Flight Deck esistente, il resto grossolano |
@@ -88,7 +88,7 @@ generator, frame, decks, compartments, doors, vertical, transit, graph{nodes, ed
 
 Controlli del piano (`ship_checks.py`): dentro l'inviluppo; nessuna sovrapposizione in 3D; porte sui muri (≤ 0,65 m dai limiti del compartimento) e di misura giusta (≥ 0,9 × 1,9 m);
 grafo connesso, ogni compartimento raggiunto, archi sensati, scale e ascensore raggiungibili; nessuna stanza a cavallo di due sezioni; punti fissi del canon; ogni sezione con almeno un compartimento.
-Risultato del piano attuale: 2266 compartimenti, 1048 porte, 3804 nodi, 3940 archi, **0 problemi, 0 avvisi**.
+Risultato del piano attuale: 2251 compartimenti, 1034 porte, 4450 nodi, 4585 archi, **0 problemi, 0 avvisi**.
 
 ## 5. Il Ponte 4 (Crew Services, z -46)
 
@@ -105,11 +105,20 @@ specials a mano. Mappa (immagini `docs/progressi/nave/d4_plan*.jpg`):
 - Numeri: 202 compartimenti (125 tratti di corridoio da 16 m), 455 moduli, 75 stanze, 72 targhe, 38 segnali di sezione; 74 porte, 10 cancelli, 20 portelli stagni (uno per confine di sezione e passaggio); 242 luci, 290 posti.
 - Segnaletica: targa sopra ogni porta (`SM_SHIP_Plate_<stanza>`, lato corridoio) e segnale di sezione a due facce su ogni portello (`SM_SHIP_Sign_<ponte><sezione>`: "DECK 4 · SECTION E" dice in che sezione sei).
 
+### Il Ponte 6 (Medical, z -54) — costruito dal programma
+
+Non a mano come il 4: `ship_decks.plan_deck(coarse=False)` riempie le corsie dal programma del ponte (`PROGRAMME[6]`) con le stanze che hanno una mesh; una stanza del programma senza mesh (damage control locker,
+machinery) resta un compartimento pianificato dietro un muro pieno (la porta è nel piano: `planned: true, locked: true`, nessuna apertura nel corridoio, lo script di Unreal non la fa). Il motore toglie le stanze la cui
+porta incontrerebbe un collegamento a croce sull'altro lato del corridoio (un modulo non può avere un ramo da una parte e una porta dall'altra) e dà la precedenza alle torri delle scale. La Spine corre fino al
+portale del Medbay (l'ingresso del Medbay è su questo piano: `reach_rooms`); il Flight Deck e la sala Engineering non hanno l'ingresso qui e restano ostacoli. **Sala operatoria, reparto di quarantena e farmacia sono
+"fissate" (`PINNED`) accanto al Medbay**, sul lato di dritta della Spine. Numeri: 228 compartimenti, 459 moduli, 91 stanze (surgery, quarantine, pharmacy; magazzini, cabine, lavanderie, servizi, laboratori, serra, biblioteca,
+sale di raccoglimento), 40 segnali, 245 luci, 4 torri delle scale; immagini `docs/progressi/nave/d6_*.jpg`.
+
 ## 6. Il kit (`art/blender/ship_*.py`)
 
 Linguaggio della plancia v3: composito scuro in cornici di metallo spazzolato, nervature con linee di luce, lampade a palette (`MI_BRG3_Lamps*`: la cella dice il colore: command, engineering, white_warm…), un solo slot per
 tutte le etichette (`MI_SHIP_Labels`, atlante `T_SHIP_Labels`). Ogni mesh è chiusa alla luce (sovrapposizione di 2 cm, soffitti chiusi: lo scafo non ferma il sole), Nanite (quelle con un vetro restano classiche: le tre
-di osservazione), collisione complessa come semplice, UV a 1 m (`box_uv`) e per cella per lampade e etichette. Budget: **79 mesh, 2,76 M triangoli in tutto, la più pesante 131 k** (i triangoli in Nanite non sono il costo;
+di osservazione), collisione complessa come semplice, UV a 1 m (`box_uv`) e per cella per lampade e etichette. Budget: **96 mesh, 2,89 M triangoli in tutto, la più pesante 131 k** (i triangoli in Nanite non sono il costo;
 il costo è la memoria: circa 160 MB di FBX su disco, non in git).
 
 | Gruppo | Mesh | Note |
@@ -117,6 +126,7 @@ il costo è la memoria: circa 160 MB di FBX su disco, non in git).
 | Moduli di corridoio (2 toni × 16) | `SM_SHIP_<S|P>_` `Straight_A/B/C, Door_L_A/B, Door_R_A/B, Door_LR, Gate_L/R/LR, Bulkhead, T_L, T_R, X, End` | 17–57 k triangoli; pannelli, prese d'aria, armadietti, quadri elettrici, estintori, pronto soccorso, condotti, schermi; la Bulkhead porta il portello stagno con strisce di pericolo e il campo del segnale |
 | Stanze di servizio | Galley, GalleyPass, StoreDry(+D10), StoreCold, Hold, Heads, Laundry, Hydro | cucina professionale (fuochi, cappa, celle frigo, isole con pentole appese), scaffali con casse, container ISO, docce, lavatrici, serre a tre ripiani |
 | Stanze sociali | Lounge, Games, Library, Quiet, Observation(+D14), BowObs | salotti su tappeti, bar con sgabelli, biliardo, sale da gioco, libri a file, sala di raccoglimento con anello di luce, finestre con vetro |
+| Stanze mediche | Surgery, Quarantine, Pharmacy | sala operatoria (due tavoli, lampade scialitiche, carrelli dell'anestesia), reparto di quarantena (zona filtro, postazione infermieri, sei celle di vetro), farmacia (bancone a gabbia, scaffali, frigoriferi) |
 | Stanze di lavoro | Lab, Workshop, Armory, Cabins | banchi con scaffali di reagenti, cappe, tavolo olografico; torni, fresa, saldatura, carroponte; gabbia, rastrelliere, manichini; corridoio comune e otto cabine con cuccette |
 | Snodi e verticali | Concourse, BerthLobby, StairTower(+Top, +Bottom), LadderTrunk | torre: due rampe a tornante, pozzo, scala a pioli con boccaporto; alta un ponte (4 m) |
 | Segni | `SM_SHIP_Plate_*` (13), `SM_SHIP_Sign_<d><s>` (8) | etichette dell'atlante, lampada sul bordo |
@@ -126,9 +136,9 @@ Crate×4, Leaf, Tile, PaintRed, Soil, Labels), create da `build_ship_interior.py
 delle anteprime. Nessun asset di terzi nuovo (i caratteri Barlow Condensed e IBM Plex Mono sono già in `docs/licenze.csv`).
 
 Controlli del kit (`ship_kit.py`, a ogni esportazione): budget di triangoli, slot noti, UV finite e limitate, misure contro la scheda (`ship_spec.py`), altezza ≤ 4,0 m; e **prove a raggi lungo gli archi del grafo** sul Ponte 4
-(altezze 0,35 / 1,0 / 1,75 m, contro le mesh piazzate): **1626 raggi di corridoio e di porta, 0 bloccati** (dentro le stanze i nodi "hub" e "posto" sono topologia: 192 su 1149 raggi toccano l'arredo, atteso).
-Le anteprime sono in `docs/progressi/nave/` (43 JPG, ciascuna < 250 KB): pianta del Ponte 4 (intera, snodo, poppa), moduli in fila (`modules_*`), viste del ponte dal piano (`d4_*`: la Spine da prua, la porta del Lounge, il portello con il segnale,
-un cancello del Concourse, una giunzione, la torre, il passaggio laterale, tre piante in sezione), ogni stanza (`room_*`).
+(altezze 0,35 / 1,0 / 1,75 m, contro le mesh piazzate): **Ponte 4: 1626 raggi di corridoio e di porta, 0 bloccati; Ponte 6: 1674, 0 bloccati** (le 12 porte di stanze non ancora modellate sono muri pieni e si saltano; dentro le stanze i nodi "hub" e "posto" sono topologia: 192 su 1149 e 454 su 1392 raggi toccano l'arredo, atteso).
+Le anteprime sono in `docs/progressi/nave/` (49 JPG, ciascuna < 250 KB): pianta del Ponte 4 (intera, snodo, poppa), moduli in fila (`modules_*`), viste del ponte dal piano (`d4_*`: la Spine da prua, la porta del Lounge, il portello con il segnale,
+un cancello del Concourse, una giunzione, la torre, il passaggio laterale, tre piante in sezione), il Ponte 6 (`d6_*`: le porte delle tre stanze mediche, la Spine al Medbay, la Spine oltre il Medbay, pianta in sezione), ogni stanza (`room_*`).
 
 ## 7. Il gioco: cosa legge il piano (fatto dal lead) e cosa c'è da collegare
 
@@ -138,7 +148,7 @@ un cancello del Concourse, una giunzione, la torre, il passaggio laterale, tre p
 - **Porte**: una `AAstraDoor` per porta del piano (larghezza, altezza e yaw del record, cartella `Interior/Deck04/Doors`, etichetta `Door_<id>`); le ante scorrono di metà larghezza. Le porte delle torri delle scale restano **chiuse a chiave** finché i ponti sopra e sotto non sono costruiti
   (`LOCK_STAIRS`); i portali delle stanze esistenti non si toccano.
 - **Ascensore** (`AstraHangar`, sei tappe: Bridge, Hangar, Engineering, Medbay, Mess, Berth): il Concourse ha il suo banco (`lift.d4_concourse`, in **(-119,1; 9,0; -46,0) m**, davanti alle due porte a x -121,45, y 7,6 e 10,4). Da fare: mettere `MessLanding` lì (e `BerthLanding` nell'atrio, per esempio
-  (-172; 0; -46)), poi togliere le ante statiche delle alcove (`REMOVE_LIFT_LEAVES = True` distrugge le cartelle `Mess/Lift` e `Berths/Lift`) e riprovare il tragitto; finché non si fa il vecchio comportamento resta.
+  (-172; 0; -46)), poi togliere le ante statiche delle alcove (`REMOVE_LIFT_LEAVES = True` distrugge le cartelle `Mess/Lift`, `Berths/Lift` e `Medbay/Lift` e mette una porta scorrevole nell'apertura: i portali esistenti su cui arriva un ponte costruito) e riprovare il tragitto; finché non si fa il vecchio comportamento resta.
 - **Incidenti** (`AstraShipSubsystem`: fuochi e danni scelgono un ponte 2–11 e una sezione A–H): il piano dà per ogni (ponte, sezione) i compartimenti veri: scegliere un corridoio o una stanza di quel ponte e sezione e usarne `bounds` per il punto.
 
 ## 8. Da sistemare fuori dai miei file (richieste al lead)
@@ -150,7 +160,7 @@ un cancello del Concourse, una giunzione, la torre, il passaggio laterale, tre p
    (-42), e l'interno del Ponte 2 (-36,7) sta dentro il blocco. Serve togliere il fondo del blocco (e dell'isola) dove sovrasta lo scafo (`art/blender/shipgen2.py`, ARTE-NAVI), altrimenti si vedono piani fantasma dall'interno. Lo scafo non ha collisione né ombra e non si vede da dentro (facce rovesciate).
 3. **Radiatori sul Ponte 5.** `AstraShipSubsystem.cpp` ~786: `D.Deck = 5` per i danni ai radiatori; nel canon i radiatori sono sul **Ponte 7** (Engineering & Power) nelle sezioni E–G. Basta `Deck = 7`.
 4. **Navetta della Spine.** Nel piano è solo riservata (Ponte 5, `transit[0]`, fermate a metà di ogni sezione): un giorno un arco `shuttle` nel grafo e un veicolo sulle guide della linea di mezzeria.
-5. **Ponti ancora grossolani** (2, 3, 5–12): sono compartimenti tipizzati e navigabili nel grafo, senza moduli né stanze modellate; per costruirne uno basta scrivere `ship_deck<N>.py` come `ship_deck4.py` (passaggi, corsie con elenchi, torri) e le stanze mancanti in `ship_rooms_*.py`/`ship_spec.py`: il generatore (`--only`, il registro del kit), i controlli, le anteprime e lo script di Unreal funzionano già per qualsiasi ponte (`DECKS = [3, 4]`).
+5. **Ponti ancora grossolani** (2, 3, 5, 7–12): sono compartimenti tipizzati e navigabili nel grafo, senza moduli né stanze modellate. Per costruirne uno basta mettere il suo numero in `BUILT_DECKS` (`ship_plan_gen.py`), scrivere il suo programma e le sue stanze fissate (`PROGRAMME`, `PINNED`, `UNIQUE` in `ship_decks.py`) e le stanze mancanti in `ship_rooms_*.py`/`ship_spec.py`; il generatore, i controlli, il registro del kit, le anteprime e lo script di Unreal (`DECKS`) funzionano già per qualsiasi ponte. Il Ponte 3 resta fuori finché non c'è la correzione dello scafo (punto 2).
 
 ## 9. Limiti noti
 

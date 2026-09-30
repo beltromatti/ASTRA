@@ -7,11 +7,12 @@ and the plan itself copied where the game reads it. Idempotent; run in the edito
   4. tools/ue.py pyfile tools/ue_scripts/build_ship_interior.py                                                     (this script)
 
 Set globals before running to change the defaults:
-  DECKS = [4]                 the decks to (re)place from the plan's "placements" (their folders Interior/Deck<NN>/... are emptied first, nothing else is)
+  DECKS = [4, 6]              the decks to (re)place from the plan's "placements" (their folders Interior/Deck<NN>/... are emptied first, nothing else is)
   REBUILD_KIT = True          delete /Game/ASTRA/Kit/Ship and import the FBX files again (a reimport keeps slots the new FBX no longer has)
   LOCK_STAIRS = True          the stair-tower doors of a deck stay locked while the deck above or below is not built (nothing there yet)
-  REMOVE_LIFT_LEAVES = False  destroy the static leaves that close the lift alcoves of the Mess and the Berthing (their folders "Mess/Lift", "Berths/Lift"):
-                              only once AstraHangar's landings point to the new lift bank (docs/NAVE.md, "Lift")
+  REMOVE_LIFT_LEAVES = False  open the entrances of the existing rooms that a built deck now runs up to: destroy the static lift leaves that close their alcoves
+                              (folders "Mess/Lift", "Berths/Lift" on Deck 4, "Medbay/Lift" on Deck 6) and put a sliding door (AAstraDoor) in the opening; only once
+                              AstraHangar's landings point to the new lift banks (docs/NAVE.md, "Lift"), because the lift's own doors go with the leaves
   SAVE_LEVEL = True
 
 What it does:
@@ -42,7 +43,7 @@ TEX_DST = MAT_DST + "/Textures"
 MI_DIR = MAT_DST + "/Instances"
 DATA_DIR = unreal.Paths.project_content_dir() + "ASTRA/Data"
 
-DECKS = globals().get("DECKS", [4])
+DECKS = globals().get("DECKS", [4, 6])
 REBUILD_KIT = globals().get("REBUILD_KIT", True)
 LOCK_STAIRS = globals().get("LOCK_STAIRS", True)
 REMOVE_LIFT_LEAVES = globals().get("REMOVE_LIFT_LEAVES", False)
@@ -300,13 +301,30 @@ def place_lights(deck):
     return n
 
 
-def remove_lift_leaves():
-    n = 0
-    for a in eas.get_all_level_actors():
-        if str(a.get_folder_path()) in ("Mess/Lift", "Berths/Lift"):
-            eas.destroy_actor(a)
-            n += 1
-    log.append(f"{n} lift leaves removed (Mess/Lift, Berths/Lift)")
+LIFT_LEAVES = {"mess": "Mess/Lift", "berths": "Berths/Lift", "medbay": "Medbay/Lift"}      # the existing rooms whose alcove a built deck of ours reaches
+
+
+def open_existing_entrances():
+    """The entrance of an existing room is the lift alcove of its own builder, closed by two static leaves: where a built deck's corridor now runs up to it,
+    destroy the leaves (and the room's lift sign, in the same folder) and put a sliding door in the opening (the plan's `<room>_entrance`)."""
+    opened = []
+    for cid, folder in LIFT_LEAVES.items():
+        door = next((d for d in PLAN_DATA["doors"] if d["id"] == f"{cid}_entrance"), None)
+        if door is None or door["deck"] not in DECKS or not door.get("b"):
+            continue
+        n = 0
+        for a in eas.get_all_level_actors():
+            if str(a.get_folder_path()) == folder:
+                eas.destroy_actor(a)
+                n += 1
+        x, y, z = door["pos"]
+        a = eas.spawn_actor_from_class(unreal.AstraDoor, V(x * M, y * M, z * M), R(yaw=door.get("yaw", 0.0)))
+        a.set_editor_property("width", float(door["width"]) * M)
+        a.set_editor_property("height", float(door["height"]) * M)
+        a.set_actor_label(f"Door_{door['id']}")
+        a.set_folder_path(f"Interior/Deck{door['deck']:02d}/Doors")
+        opened.append(f"{cid}: {n} leaves removed, door placed")
+    log.append(f"existing entrances opened: {opened}")
 
 
 # ------------------------------------------------------------------------------------------------------------------------ run
@@ -329,7 +347,7 @@ for d in DECKS:
     expect = len(PLAN_DATA["placements"].get(str(d), []))
     report[d] = {"meshes": counts, "expected": expect, "doors": doors, "locked": locked, "zone_lights": lights}
 if REMOVE_LIFT_LEAVES:
-    remove_lift_leaves()
+    open_existing_entrances()
 if SAVE_LEVEL:
     les.save_current_level()
 print(json.dumps({"log": log, "bounds_problems": bad, "decks": report}, indent=1))
