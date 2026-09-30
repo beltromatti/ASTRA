@@ -206,6 +206,34 @@ def d4_views(plan: dict) -> dict:
     return views
 
 
+def d6_views(plan: dict) -> dict:
+    """Camera set for Deck 6 (Medical), from the plan: name -> (eye, target, fov, radius)."""
+    z0 = P.deck_z(6)[0]
+    eye_z = z0 + 1.65
+    views = {}
+    for key in ("surgery", "quarantine", "pharmacy"):
+        c = _find(plan, lambda c, key=key: c["deck"] == 6 and c.get("prefab") == key)
+        if not c:
+            continue
+        for did in c["doors"]:
+            dd = next(x for x in plan["doors"] if x["id"] == did)
+            if dd.get("wall") == "near":
+                side = dd.get("side", 1)
+                views[f"{key}_door"] = ((dd["pos"][0] + 5.0, dd["pos"][1] - side * 1.775, eye_z), (dd["pos"][0], dd["pos"][1], z0 + 1.6), 68, 40)
+                break
+    # the Spine running up to the Medbay's entrance wall
+    md = next((d for d in plan["doors"] if d["id"] == "medbay_entrance"), None)
+    if md:
+        views["spine_medbay"] = ((md["pos"][0] + 40.0, 0.0, eye_z), (md["pos"][0] + 1.0, 0.0, z0 + 1.5), 72, 60)
+    # the Spine's first modules on the other side of the Medbay (aft)
+    views["spine_aft"] = ((-268.0, 0.0, eye_z), (-330.0, 0.0, z0 + 1.55), 78, 70)
+    return views
+
+
+def d6_cuts(plan: dict) -> dict:
+    return {"cut_medbay": (-300.0, -120.0, -34.0, 34.0, 80.0)}
+
+
 def d4_cuts(plan: dict) -> dict:
     """Plan-cut views (ceilings removed): name -> (x0, x1, y0, y1, radius)."""
     return {"cut_hub": (-200.0, -90.0, -34.0, 34.0, 80.0), "cut_fore": (-100.0, 108.0, -48.0, 48.0, 130.0), "cut_aft": (-330.0, -200.0, -34.0, 34.0, 90.0)}
@@ -216,7 +244,7 @@ def deck(args: dict, plan: dict, reg: dict, objs: dict, dk: int = 4) -> list[str
     done = []
     z0 = P.deck_z(dk)[0]
     SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
-    views = d4_views(plan) if dk == 4 else {}
+    views = d4_views(plan) if dk == 4 else d6_views(plan) if dk == 6 else {}
     for name, (eye, tgt, fov, radius) in views.items():
         _remove_instances()
         SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
@@ -227,7 +255,7 @@ def deck(args: dict, plan: dict, reg: dict, objs: dict, dk: int = 4) -> list[str
         SP.render(cam, path)
         print(f"  {path}: {n} placements, {m} lights")
         done.append(path)
-    for name, (x0, x1, y0, y1, radius) in (d4_cuts(plan).items() if dk == 4 else []):
+    for name, (x0, x1, y0, y1, radius) in ((d4_cuts(plan) if dk == 4 else d6_cuts(plan) if dk == 6 else {}).items()):
         _remove_instances()
         SP.setup(1280, 720, max(8, args["samples"] // 2), exposure=0.0, world=WORLD)
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
@@ -300,4 +328,6 @@ def run(args: dict, plan, reg: dict, objs: dict) -> None:
             done += modules(args, plan, reg, objs)
         elif v == "d4" and plan:
             done += deck(args, plan, reg, objs, 4)
+        elif v == "d6" and plan:
+            done += deck(args, plan, reg, objs, 6)
     print("previews:", len(done))

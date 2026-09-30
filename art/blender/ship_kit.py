@@ -241,10 +241,14 @@ class RouteChecker:
         places = [p for p in plan["placements"].get(str(deck), []) if p["mesh"] in self.bvh]
         boxes = [(p, self._world_aabb(p)) for p in places]
         nodes = {n["id"]: n for n in plan["graph"]["nodes"] if n["deck"] == deck}
-        blocked, checked, hub_blocked, hub_checked = [], 0, 0, 0
+        doors = {d["id"]: d for d in plan["doors"]}
+        blocked, checked, hub_blocked, hub_checked, blank = [], 0, 0, 0, 0
         for e in plan["graph"]["edges"]:
             na, nb = nodes.get(e["a"]), nodes.get(e["b"])
             if na is None or nb is None or e["kind"] not in ("walk", "door"):
+                continue
+            if e.get("door") and doors.get(e["door"], {}).get("planned"):       # the door of a room not modelled yet: a plain wall, locked
+                blank += 1
                 continue
             hub = na["kind"] in ("room", "station") or nb["kind"] in ("room", "station")
             for h in (0.35, 1.0, 1.75):
@@ -266,7 +270,7 @@ class RouteChecker:
                     checked += 1
                     if first:
                         blocked.append(f"{e['a']} -> {e['b']} at {h} m: blocked by {first[1]} after {first[0]:.2f} m")
-        return {"deck": deck, "walk_rays": checked, "blocked": blocked, "hub_rays": hub_checked, "hub_blocked": hub_blocked}
+        return {"deck": deck, "walk_rays": checked, "blocked": blocked, "hub_rays": hub_checked, "hub_blocked": hub_blocked, "blank_doors": blank}
 
 
 # ------------------------------------------------------------------------------------------------------------------ main
@@ -343,7 +347,7 @@ def main() -> None:
         rc = RouteChecker(plan, objs)
         route = [rc.check_deck(int(d)) for d in plan.get("placements", {}) if plan["placements"][d]]
         for r in route:
-            print(f"  deck {r['deck']} routes: {r['walk_rays']} corridor/door rays, {len(r['blocked'])} blocked;"
+            print(f"  deck {r['deck']} routes: {r['walk_rays']} corridor/door rays, {len(r['blocked'])} blocked ({r['blank_doors']} doors of rooms not modelled yet left out);"
                   f" inside rooms {r['hub_blocked']} of {r['hub_rays']} hub rays meet furniture (expected)")
             for s in r["blocked"][:20]:
                 print("    BLOCKED", s)
