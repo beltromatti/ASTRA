@@ -212,6 +212,10 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 {
+	if (!FApp::CanEverRender())
+	{
+		return;                           // headless (the war bench, -nullrhi): the battle runs without its pictures
+	}
 	UWorld* World = GetWorld();
 	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Ships/%s.%s"), *S.Mesh, *S.Mesh));
 	if (!World || !Mesh)

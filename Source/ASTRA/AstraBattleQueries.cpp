@@ -2,6 +2,8 @@
 // of war applied (a bearing-only contact has no range, no speed, no damage state).
 
 #include "AstraBattleSubsystem.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 
 void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 {
@@ -94,4 +96,51 @@ void UAstraBattleSubsystem::GetInboundMissiles(TArray<FVector>& Out) const
 			Out.Add(Pr.Pos);
 		}
 	}
+}
+
+TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
+{
+	TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+	O->SetNumberField(TEXT("t"), Time);
+	TArray<TSharedPtr<FJsonValue>> Arr;
+	const FVector P0 = Ships.Num() ? Ships[0].Pos : FVector::ZeroVector;
+	for (const FAstraBattleShip& S : Ships)
+	{
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetNumberField(TEXT("id"), S.Id);
+		J->SetStringField(TEXT("c"), S.ContactId);
+		J->SetStringField(TEXT("name"), S.Name);
+		J->SetStringField(TEXT("side"), S.Side == EAstraSide::Astra ? TEXT("astra") : (S.Side == EAstraSide::Mandate ? TEXT("mandate") : TEXT("neutral")));
+		J->SetBoolField(TEXT("craft"), S.bCraft);
+		J->SetBoolField(TEXT("alive"), S.bAlive);
+		if (!S.bAlive)
+		{
+			Arr.Add(MakeShared<FJsonValueObject>(J));
+			continue;
+		}
+		const FVector R = (S.Pos - P0) / 1000.0;
+		J->SetArrayField(TEXT("km"), {MakeShared<FJsonValueNumber>(FMath::RoundToDouble(R.X * 100.0) / 100.0), MakeShared<FJsonValueNumber>(FMath::RoundToDouble(R.Y * 100.0) / 100.0),
+		                              MakeShared<FJsonValueNumber>(FMath::RoundToDouble(R.Z * 100.0) / 100.0)});
+		J->SetNumberField(TEXT("v"), FMath::RoundToDouble(S.Vel.Size()));
+		J->SetNumberField(TEXT("hull"), FMath::RoundToDouble(100.0 * S.Hull / FMath::Max(1.f, S.HullMax)));
+		J->SetNumberField(TEXT("shield"), FMath::RoundToDouble(100.0 * S.Shield / FMath::Max(1.f, S.ShieldMax)));
+		J->SetNumberField(TEXT("mode"), (int32)S.Mode);
+		J->SetNumberField(TEXT("target"), S.TargetId);
+		J->SetNumberField(TEXT("stance"), S.Stance);
+		J->SetNumberField(TEXT("track"), S.Track);
+		J->SetBoolField(TEXT("fleeing"), S.bFleeing);
+		J->SetBoolField(TEXT("hold_fire"), S.bHoldFire);
+		if (S.bCraft)
+		{
+			J->SetStringField(TEXT("mission"), S.Mission);
+			J->SetNumberField(TEXT("mission_target"), S.MissionTarget);
+		}
+		else
+		{
+			J->SetNumberField(TEXT("missiles"), S.Missiles);
+		}
+		Arr.Add(MakeShared<FJsonValueObject>(J));
+	}
+	O->SetArrayField(TEXT("ships"), Arr);
+	return O;
 }

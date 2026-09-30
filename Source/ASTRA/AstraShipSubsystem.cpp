@@ -208,7 +208,10 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	FXP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	BridgeFX = InWorld.SpawnActor<AAstraBridgeFX>(FVector::ZeroVector, FRotator::ZeroRotator, FXP);
 	// the main viewscreen: in front of the central facets of the bow window, 1.2 m above the upper deck (ARCHITETTURA §5)
-	Viewscreen = InWorld.SpawnActor<AAstraViewscreen>(FVector(900.f, 0.f, 120.f), FRotator::ZeroRotator, FXP);
+	if (FApp::CanEverRender())
+	{
+		Viewscreen = InWorld.SpawnActor<AAstraViewscreen>(FVector(900.f, 0.f, 120.f), FRotator::ZeroRotator, FXP);
+	}
 	PowerPct = {{TEXT("shields"), 100.f}, {TEXT("weapons"), 100.f}, {TEXT("engines"), 100.f}, {TEXT("sensors"), 100.f},
 	            {TEXT("life_support"), 100.f}, {TEXT("flight_deck"), 100.f}};
 	Weapons = {{TEXT("railguns"), TEXT("ready (4 twin turrets)")}, {TEXT("lasers"), TEXT("ready (12 batteries)")},

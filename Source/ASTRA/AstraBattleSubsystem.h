@@ -467,6 +467,10 @@ public:
 	FVector PlayerPos() const { return Ships.Num() ? Ships[0].Pos : FVector::ZeroVector; }
 	FVector PlayerVel() const { return Ships.Num() ? Ships[0].Vel : FVector::ZeroVector; }
 	FQuat PlayerAtt() const { return Ships.Num() ? Ships[0].Att : FQuat::Identity; }
+	/** The battle clock (s since the campaign started). */
+	float GetBattleTime() const { return Time; }
+	/** The truth, for tests and tuning (never for the crew): every ship with its side, state, orders and damage. */
+	TSharedRef<FJsonObject> DebugState() const;
 	/** A ship of the battle with this contact id is dead (destroyed, not merely lost from the plot). */
 	bool WasDestroyed(const FString& ContactId) const;
 	/** Missiles flying at the Aquila now (system frame). */
