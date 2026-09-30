@@ -212,6 +212,36 @@ class Warship:
             K2.nav_light(c, np.array([sp["x_st"] - sp["engines"]["len"] + 3.0, sy * sp["engines"]["w"] * 0.85, sp["engines"]["h"] * 0.98]), np.array([-0.3, sy * 0.3, 0.9]), K2.NAV_WHITE, 1.6)
         K2.nav_light(c, np.array([0.0, 0.0, -sp["H"] - 6.0]), np.array([0.0, 0.0, -1.0]), K2.NAV_RED, 2.0, pulse=True)
 
+    def belly(self) -> None:
+        """Cargo doors, sensor drums, tow hardpoints and point-defence mounts on the flat bottom (spec key "belly"). Nothing crosses a cut."""
+        b = self.sp.get("belly")
+        if not b:
+            return
+        c, g, rng = self.c, self.g, self.rng
+        s = b.get("scale", 1.0)
+        z = self.hull.zone(0)
+        ok = lambda x, half: all(abs(x - xc) > half + 6.0 for xc in self.cuts)                      # noqa: E731
+        for x in b.get("doors", []):
+            if ok(x, 13.0 * s):
+                P, R = on_zone(z, float(x), 0.5, 0.0)
+                K2.cargo_door(c, Xf(P, R, 1.0), 26.0 * s, 14.0 * s)
+                g.keep_out(P - np.array([16.0, 9.0, 8.0]) * s, P + np.array([16.0, 9.0, 8.0]) * s)
+        for x in b.get("sensors", []):
+            if ok(x, 4.0 * s):
+                P, R = on_zone(z, float(x), 0.5, 0.0)
+                K2.sensor_cluster(c, Xf(P, R, 1.0), 3.4 * s)
+                g.keep_out(P - 5.0 * s, P + 5.0 * s)
+        for x in b.get("hardpoints", []):
+            for w in b.get("rows", (0.15, 0.85)):
+                if not ok(x, 4.0 * s):
+                    continue
+                P, R = on_zone(z, float(x), float(w), 0.0)
+                if rng.random() < 0.6:
+                    K2.tow_lug(c, Xf(P, R, s))
+                else:
+                    K.pd_mount(c, Xf(P, R, s))
+                g.keep_out(P - 3.0 * s, P + 3.0 * s)
+
     def markings(self) -> None:
         c, g, sp = self.c, self.g, self.sp
         hull = self.hull
@@ -252,6 +282,7 @@ class Warship:
         self.ends()
         self.engines()
         self.hardware()
+        self.belly()
         self.markings()
         if details:
             H.panelize_plates(c, self.plates, self.st)
@@ -275,6 +306,8 @@ PRAETORIAN = dict(
     engines=dict(len=26.0, w=52.0, h=27.0, ys=[-26.0, 0.0, 26.0], zs=[-11.0, 11.0], R=11.5, rcs=1.1),
     marks=dict(x=420.0, number="BB-07", h=4.0, name="ASN PRAETORIAN", name_x=-330.0, name_h=5.0, emblem_at=(300.0, 0.5, 26.0)),
     cap_scale=1.25, cap_depth=36.0,
+    belly=dict(scale=1.6, doors=[-400.0, -120.0, 100.0, 340.0, 480.0], sensors=[-470.0, -270.0, 10.0, 270.0, 520.0],
+               hardpoints=[-500.0, -330.0, -180.0, 50.0, 170.0, 290.0, 410.0]),
 )
 
 VIGILANT = dict(
@@ -294,6 +327,7 @@ VIGILANT = dict(
     marks=dict(x=110.0, number="DD-114", h=1.7, name="ASN VIGILANT", name_x=-70.0, name_h=2.2),
     flank=dict(band=(0.52, 0.72), strips=((0.14, 0.20),), lower_top=0.485, band_row=(2.6, 3.2)),
     cap_scale=0.5, cap_depth=16.0,
+    belly=dict(scale=0.5, doors=[-70.0, 20.0, 110.0], sensors=[-10.0, 130.0], hardpoints=[-110.0, -40.0, 75.0], rows=(0.2, 0.8)),
 )
 
 
