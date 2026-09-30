@@ -1,4 +1,4 @@
-# ASTRA — Architettura, moduli e contratti (v1, 30 settembre 2026)
+# ASTRA — Architettura, moduli e contratti (v1.1, 30 settembre 2026)
 
 Questo documento è il riferimento tecnico per chi sviluppa ASTRA: io (lo sviluppatore principale, "il lead") e gli
 agenti di supporto che lavorano in parallelo su moduli indipendenti. Descrive gli strati del gioco, i moduli con i loro
@@ -47,23 +47,85 @@ Regole che valgono ovunque:
 5. **Pronto per la rete.** Stato autorevole in simulazione, comandi tipizzati, conoscenza per osservatore
    ([MULTIGIOCATORE.md](MULTIGIOCATORE.md)): quello che scriviamo oggi deve poter girare su un server domani.
 
+## 1bis. Come nascono le intelligenze di ASTRA (filosofia di progetto)
+
+La parola chiave del progetto è **intelligenza**, ovunque. Le entità di ASTRA (ufficiali, comandanti, piloti, equipaggio,
+il regista) devono comportarsi come persone intelligenti. I modelli di oggi lo sono: si parte da lì.
+
+1. **L'intelligenza la danno i modelli, guidati da buoni prompt e dal contesto giusto. Non i filtri nel codice.**
+   Nessun taglio delle loro parole, nessuna riscrittura con espressioni regolari, nessuna lista di parole «vietate»,
+   nessun controllo automatico di «verità» su ciò che dicono. Queste reti di sicurezza diventano un imbuto: si aggiusta un
+   caso e se ne rompe un altro. Se un agente sbaglia si corregge il suo prompt (ruolo, carattere, dottrina, maniere),
+   il contesto che riceve, il disegno dei suoi strumenti o il modello scelto per quel ruolo.
+2. **Percezione = ciò che quella persona potrebbe percepire.** Ognuno riceve ciò che il suo ruolo vede e sente: le
+   console della sua postazione (l'equipaggio di plancia, insieme, le console della plancia), ciò che si dice nella stanza
+   e sui canali che ascolta, la nebbia di guerra. Mai la verità nascosta: il vero stato del nemico, i piani del regista,
+   ciò che nessun sensore mostra. Il nemico vede con i sensori della sua parte. Niente barare.
+3. **Azione = gli strumenti che quella persona avrebbe.** Un ufficiale agisce dalla sua console (modalità `station`,
+   azioni istantanee), la stessa interfaccia che userebbe un giocatore umano seduto lì. Un comandante agisce dando ordini
+   dalla sua dottrina (ordini di gruppo), un PNG con le azioni del suo mestiere. Nessun comando «di servizio» fuori dal
+   ruolo.
+4. **Il codice è il corpo e la fisica, non il giudizio.** Il codice fa:
+   - la simulazione;
+   - il lavoro continuo che un agente ha avviato (gli esecutori delle postazioni, come un pilota automatico);
+   - le automazioni che una nave vera ha (difesa di punto, esche contro una salva, esercitazioni). Ognuna ha un
+     ufficiale che la «possiede», è annunciata e si può revocare;
+   - la meccanica della conversazione (chi ha fisicamente la parola, la priorità assoluta della voce del Capitano);
+   - la rete.
+
+   Il codice non decide cosa dice qualcuno, se un rapporto vale ancora la pena, a chi erano rivolte le parole del
+   Capitano.
+5. **Ripensare, non scartare.** Quando il tempo passa (un rapporto rimasto in coda dietro una plancia occupata), l'agente
+   lo ripensa con lo stato di adesso: lo dice aggiornato, lo cambia o lo lascia cadere. Nessun codice lo scarta per età.
+6. **Si valuta ciò che gli agenti fanno, non come lo scrivono.** I banchi controllano i fatti:
+   - quale strumento è stato chiamato, con che bersaglio;
+   - l'esito nella simulazione;
+   - la latenza e il costo.
+
+   Per la qualità del parlato si gioca (il lead prova nel gioco vero) o si usa un modello giudice. Mai espressioni
+   regolari sul testo.
+7. **Il modello giusto per ogni ruolo.** Tetto di costo DeepSeek V4.1 Flash, modelli più piccoli e veloci dove bastano.
+   Per il lavoro di routine dei PNG, cervelli di codice con memoria; un modello quando qualcuno ci parla. Poche chiamate,
+   buone: in un solo turno l'agente agisce e parla; un secondo turno solo per leggere i risultati quando servono.
+8. **Caso per caso.** Questo è un principio, non un dogma. Per ogni meccanismo ci si chiede: è giudizio (→ il modello,
+   col prompt, il contesto e gli strumenti) o meccanica (→ il codice)?
+
+Conseguenze sul codice che c'è (da fare, vedi [PIANO.md](PIANO.md)):
+- `agent.py`: via i filtri sulle battute. Da togliere:
+  - `_tighten`, che taglia le battute lunghe;
+  - `_deconsole`, che riscrive i nomi delle modalità;
+  - i «signorsì» trattenuti per lista di parole;
+  - le euristiche che riconoscono «ragionamenti» e «strumenti» nel testo;
+  - il recupero della prosa come battuta.
+
+  Si parla solo con `speak`. Se il modello non ha parlato, gli si chiede di rispondere (un nuovo turno), senza
+  indovinare dal testo.
+- `router.py`: con un canale aperto, a decidere se le parole del Capitano erano anche per l'interlocutore esterno sarà un
+  modello veloce con il contesto (chi c'è sul canale, cosa ha appena detto, dove guarda il Capitano). È il giudizio
+  dell'ufficiale alle comunicazioni. Sparisce lo strato di regole in cinque lingue. L'equipaggio sente comunque tutto (è
+  nella stanza) e decide da sé se rispondere.
+- `speech.py`: le battute rimaste troppo a lungo in coda vengono ripensate dall'agente (per il punto 5) invece di
+  scadere per soglia. Resta meccanica la priorità assoluta del Capitano sul canale audio.
+- Gli agenti che ricevono lo stato intero della nave lo ricevono perché è la somma delle console della plancia. Il prompt
+  di ogni ufficiale mette davanti la sua console.
+
 ## 2. I moduli
 
 | Modulo | Cosa contiene | File principali | Chi |
 |---|---|---|---|
-| **SIM** | navi, armi, proiettili, sensori, guerra elettronica, danni, squadriglie, flotte | `AstraBattleSubsystem.*`, `AstraShipSubsystem.*`, `AstraCrewRoster.*` | lead |
+| **SIM / GUERRA** | navi, armi, proiettili, sensori, guerra elettronica, danni fisici per sezione e faccia, gruppi di battaglia, squadriglie, flotte, scenari | `AstraBattleSubsystem.*`, `AstraWar*.*`, `data/war/*`, `AstraShipSubsystem.*`, `AstraCrewRoster.*` | GUERRA (agente, F2.1–F2.2) per la battaglia; lead per la nave |
 | **STAZIONI** | il modello delle postazioni e i loro esecutori continui (§4) | `AstraStations.*` (nuovo) | lead |
 | **VISTA** | schermo principale, sovrimpressioni AR, tavolo olografico, console, datapad, HUD del caccia | `AstraScreensSubsystem.*`, `AstraHoloTable.*`, `AstraViewscreen.*` (nuovo) | lead |
 | **GIOCATORE** | input, personaggio, controller, interazione, prima persona | `AstraInput.*`, `ASTRACharacter.*`, `ASTRAPlayerController.*` | lead |
 | **BANCO** | banco di prova per giocare da terminale, misure | `AstraHarness.*`, `tools/play.py`, `tools/perf/*` | lead |
-| **MENTE-EQUIPAGGIO** | agenti di plancia, strumenti delle postazioni, iniziativa, router e acustica, collaborazione fra ufficiali | `mind/astra_mind/{agent,crew,tools,router}.py`, la loro colla in `server.py` | agente di supporto |
-| **VOCE** | riconoscimento, sintesi, turni di parola, sottotitoli (lato mente) | `mind/astra_mind/{speech,stt,tts,audio_in,voice_casting}.py` | agente di supporto |
+| **MENTE-EQUIPAGGIO** | agenti di plancia, strumenti delle postazioni, iniziativa, router e acustica, collaborazione fra ufficiali | `mind/astra_mind/{agent,crew,tools,router}.py`, la loro colla in `server.py` | unito il 30/9; ora lead |
+| **VOCE** | riconoscimento, sintesi, turni di parola, sottotitoli (lato mente e lato gioco: `AstraVoiceWave.*`) | `mind/astra_mind/{speech,stt,tts,audio_in,voice_casting}.py`, `docs/protocollo_voce.md` | unito il 30/9; ora lead |
 | **MENTE-GUERRA** | regista, comandanti nemici e alleati, gerarchie di flotta | `mind/astra_mind/{director,enemy,war,finale,loss}.py` | poi |
-| **ARTE-PLANCIA** | la plancia v3 (geometria, materiali, console, poltrone), da Blender | `art/blender/bridge*.py`, `tools/ue_scripts/build_bridge*.py` | agente di supporto |
-| **ARTE-NAVI / VFX** | navi v3 con pezzi di rottura, armi, motori, scudi, esplosioni | `art/blender/shipgen*.py`, `tools/ue_scripts/make_fx_*.py` | poi |
+| **ARTE-PLANCIA** | la plancia v3 (geometria, materiali, console, poltrone), da Blender | `art/blender/bridge*.py`, `tools/ue_scripts/build_bridge*.py` | unito il 30/9 |
+| **ARTE-NAVI / VFX** | navi v3 con pezzi di rottura (ARTE-NAVI, agente, in corso); armi, motori, scudi, esplosioni (VFX: poi) | `art/blender/shipgen3.py`, `art/blender/ship3_*.py`, `tools/ue_scripts/*ship*v3*`, `make_fx_*.py` | ARTE-NAVI (agente) |
 | **UMANI** | personaggi realistici, animazioni, labiale, IA dei PNG | `Source/ASTRA/AstraCrew*`, `tools/ue_scripts/make_crew_*` | poi |
-| **NAVE-INTERA** | generatore della pianta dell'Aquila, ponti, cunicoli, vita di bordo | `data/ship/*`, `art/blender/ship_*` | poi |
-| **PRESTAZIONI** | impostazioni di resa, risoluzione, upscaling, profili | `Config/*`, eventuale plugin | lead |
+| **NAVE-INTERA** | la pianta dell'Aquila (compartimenti, porte, grafo dei percorsi), il kit dei corridoi e delle stanze, i ponti | `data/ship/aquila_plan.json`, `art/blender/ship_*`, `tools/ue_scripts/build_ship_interior.py`; lato gioco `AstraShipPlan.*` (lead) | NAVE (agente, F4.1) |
+| **PRESTAZIONI** | impostazioni di resa, risoluzione, upscaling, profili, menu SETTINGS | `Config/*`, `AstraSettings.*`, eventuale plugin MetalFX | lead |
 
 Il lead possiede l'integrazione (collegare i moduli, `ApplyCommand`, il protocollo) e **tutte le prove nel gioco vero**:
 sulla macchina c'è un solo editor e una sola GPU.
@@ -94,25 +156,38 @@ parametri, una condizione di fine, un registro delle azioni. Il codice la esegue
 imposta, la cambia di sua iniziativa quando la delega lo permette, e ne riferisce. La stessa interfaccia la useranno un
 giorno il Capitano o un altro giocatore seduti a quella console.
 
-Comando unico **`station`**: `{station, mode, params, until?, note?}` → imposta la modalità; la risposta dice cosa è
-cambiato. Le azioni istantanee (una salva, un'esca, un saluto) restano comandi a sé. Nello stato (`stations`):
+Comando unico **`station`**: `{station, aspect?, mode, params?, until?, note?, delegation?, by?}` → imposta la modalità
+di un **aspetto** della postazione (il tattico ne ha quattro: ingaggio, scudi, difesa di punto, missili; il volo uno per
+squadriglia); `aspect` si può omettere quando il nome del modo basta a dedurlo; `by` (`captain|officer|xo|auto|default`)
+dice chi l'ha dato. La risposta dice cosa è cambiato. Le azioni istantanee (una salva, un'esca, un saluto) restano
+comandi a sé. Nello stato (`ship_state.state.stations`, implementato in `AstraStations.cpp`):
 
 ```json
-{"helm": {"officer": "helm", "mode": "intercept", "params": {"target": "T-23", "standoff_km": 6},
-          "until": "target_lost", "set_by": "captain", "since": 812.4, "delegation": "auto",
-          "status": "closing on T-23 at 310 m/s, 14.2 km, ETA 1:10", "last_actions": ["…"]}, "…": {}}
+{"helm": {"officer": "helm", "delegation": "auto",
+          "status": "KEEP ON BOW Cocytus at 22.4 km · heading 077 mark 3 · 288 m/s (throttle 60%)",
+          "modes": {"course": {"mode": "keep_on_bow", "params": {"target": "T-23"}, "until": "target_lost",
+                               "set_by": "captain", "for_s": 42}},
+          "recent": ["course keep_on_bow: keep on bow Cocytus, 27.0 km (bow on Cocytus)", "…"]}, "…": {}}
 ```
+Accanto a `stations`: `action_target` (il contatto di cui si occupa la battaglia ora: il bersaglio del tattico, altrimenti
+l'ostile più vicino) e `viewscreen` (la riga di cosa c'è sullo schermo principale).
 
-`until`: `done` (lo decide la modalità) · `target_lost` · `order` (finché non cambia l'ordine) · `time:<s>`.
-`delegation`: `manual` (agisce solo sugli ordini) · `advise` (propone e aspetta «proceda») · `auto` (agisce entro gli
-ordini permanenti e informa). Predefinita: `auto`.
+`until`: `done` (lo decide la modalità) · `target_lost` · `order` (finché non cambia l'ordine) · `time:<s>` (poi l'aspetto
+torna al suo modo predefinito, con i suoi effetti). `delegation`: `manual` (agisce solo sugli ordini) · `advise` (propone e
+aspetta «proceda») · `auto` (agisce entro gli ordini permanenti e informa; il codice ha anche i suoi **riflessi**: Alpha in
+pattuglia quando il nemico si avvicina, esche contro le salve, potenza di combattimento — mai sopra un modo dato dal
+Capitano o da un ufficiale). Predefinita: `auto`.
+
+Bersagli speciali: `target: "action"` (timone `keep_on_bow`, schermo `target`, sensori `focus`) segue la battaglia e
+viene rivalutato a ogni passo; `engage {targets: ["hostiles"]}` è un ordine permanente su ogni nave ostile (la migliore a
+portata, prima chi ci spara; mai un inseguimento; senza ostili aspetta).
 
 | Postazione (ufficiale) | Modalità | Lavoro continuo del codice |
 |---|---|---|
 | **helm** (Ferri) | `hold` · `course{heading_deg, mark_deg, speed_pct}` · `intercept{target, standoff_km}` · `keep_on_bow{target}` · `follow{target, distance_km, side}` · `orbit{target, radius_km}` · `broadside{target, side, range_km}` · `evade{pattern}` · `retreat{toward}` · `formation{leader, slot}` · `transit{system}` | tiene rotta e distanza, insegue, presenta il fianco, schiva; **iniziativa predefinita: a nave ferma in combattimento, la prua sull'azione** (il Capitano vede la battaglia dal finestrone), salvo ordine contrario |
 | **tactical** (Voss) | `engagement`: `hold_fire` · `return_fire` · `weapons_free{range_km}` · `engage{targets[], weapons[], fire: sustained/volley/conserve}`; `shields`: `balanced` · `face_threat` · `sector{…}`; `point_defense`: `auto` · `protect{id}` · `off`; `missiles`: `conserve` · `saturate` | assegna le armi ai bersagli secondo la priorità, salve a cadenza, ruota gli scudi verso la minaccia, difesa di punto |
-| **sensors** (Nair) | `emcon{silent/limited/full}` · `scan{passive/sweep{every_s}/focus{target}}` · `ew{off/jam{target}}` · `sigint{on/off}` | classifica i contatti, mantiene il quadro, smaschera le esche, chiede triangolazioni |
-| **ops** (Tanaka) | `viewscreen{auto/forward/target{id, zoom}/tactical/fleet/comms{party}/damage/sector/off}` · `holo{tactical{range_km}/sector/ship{id}/fleet}` · `datapad{push{page, focus}}` · `damage_control{auto/priority{what}}` | lo **schermo principale** e il **tavolo olografico** seguono l'azione (regia automatica, §5); smista le squadre di riparazione |
+| **sensors** (Nair) | `emcon{silent/restricted/limited/full}` · `scan{passive/sweep{every_s}/focus{target}}` (guerra elettronica e intercettazioni: più avanti, con la fase F2) | classifica i contatti, mantiene il quadro, smaschera le esche, chiede triangolazioni |
+| **ops** (Tanaka) | `viewscreen{auto/forward/target{target, zoom}/tactical/fleet/sector/comms{party}/damage/off}` · `holo{tactical/sector/ship{id}}` · `datapad{push{page: overview/contact/damage/fleet/orders, focus}}` · `damage_control{auto/priority{what}}` | lo **schermo principale** e il **tavolo olografico** seguono l'azione (regia automatica, §5); smista le squadre di riparazione |
 | **engineering** (Mensah) | `power{profile | custom{…}}` · `heat{auto/radiators{extended/retracted}}` · `reactor{normal/battle_short}` | ripartisce l'energia, gestisce il calore, coordina la sala macchine |
 | **comms** (Martin) | `channel{open{party}/close/mute/unmute}` · `listen{fleet/all/enemy}` | tiene i canali, inoltra le richieste della flotta, traduce le intercettazioni |
 | **flight** (Price) | per squadriglia: `mission{type: cap/escort/strike/recon/ew/sar/hold/recall, target, formation}` | lanci, formazioni, recuperi, coordinamento col ponte di volo |

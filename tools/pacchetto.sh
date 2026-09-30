@@ -18,8 +18,12 @@ rm -rf "$OUT/Mac"          # (only our own build output: a previous app must not
 if ! grep -q "BUILD SUCCESSFUL" "$LOG"; then echo "PACCHETTO FALLITO (log: $LOG)"; grep -E "Error|error:" "$LOG" | head -20; exit 1; fi
 APP=$(find "$OUT" -maxdepth 3 -name "*.app" -type d | head -1)
 [[ -z "$APP" ]] && { echo "app non trovata in $OUT"; exit 1; }
-# la mente: solo i sorgenti (il suo ambiente Python nasce al primo avvio in Application Support, con uv)
-rsync -a --delete --exclude .venv --exclude __pycache__ --exclude .cache mind/ "$APP/Contents/Resources/mind/"
+# la mente: solo i sorgenti (il suo ambiente Python nasce al primo avvio in Application Support, con uv) e l'helper del
+# riconoscimento del parlato (Parakeet sul Neural Engine: mind/stt_server/bin/astra-stt, compilato qui se manca; la sua
+# cartella di compilazione, 900 MB, non entra nell'app). Il modello Parakeet (~600 MB) l'helper lo trova in
+# voice/models/parakeet-ultra-coreml se c'è, altrimenti nella cache di FluidAudio in Application Support
+[[ -x mind/stt_server/bin/astra-stt ]] || mind/stt_server/build.sh >> "$LOG" 2>&1 || echo "attenzione: helper astra-stt non compilato (riconoscimento di riserva: Whisper)"
+rsync -a --delete --exclude .venv --exclude __pycache__ --exclude .cache --exclude .build --exclude .swiftpm mind/ "$APP/Contents/Resources/mind/"
 # i dati della mente in Application Support: niente che punti al Desktop (macOS chiederebbe il permesso d'accesso alla
 # Scrivania a ogni processo figlio dell'app). La chiave è una copia locale del .env (mai su git; rilancia lo script se
 # la cambi), i modelli della voce una copia APFS (clonefile: nessuno spazio in più)

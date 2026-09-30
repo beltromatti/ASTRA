@@ -46,6 +46,8 @@
 #include "Serialization/JsonSerializer.h"
 #include "Sound/SoundBase.h"
 
+DECLARE_CYCLE_STAT(TEXT("Ship"), STAT_AstraShip, STATGROUP_Astra);
+
 namespace
 {
 	const FName TagSky(TEXT("ASTRA.Sky"));
@@ -782,7 +784,7 @@ void UAstraShipSubsystem::RadiatorHit()
 	// a wing torn: an incident damage control can repair (each repair gives back a quarter of the radiators)
 	FAstraDamage D;
 	D.Id = NextDamageId++;
-	D.Deck = 5;
+	D.Deck = 7;                                   // the radiators are Engineering & Power's (Deck 7, sections E-G)
 	D.Kind = TEXT("radiator damage");
 	for (const TCHAR Sec : {TEXT('E'), TEXT('F'), TEXT('G')})
 	{
@@ -802,6 +804,36 @@ void UAstraShipSubsystem::RadiatorHit()
 	}
 }
 
+void UAstraShipSubsystem::SetBattleShort(bool bOn)
+{
+	if (bOn == bBattleShort)
+	{
+		return;
+	}
+	bBattleShort = bOn;
+	PowerBudget = bOn ? 800.f : 700.f;
+	if (!bOn)
+	{
+		// back inside the normal budget: every allocation above nominal comes down in proportion
+		float Sum = 0.f, Over = 0.f;
+		for (const auto& KV : PowerPct)
+		{
+			Sum += KV.Value;
+			Over += FMath::Max(0.f, KV.Value - 100.f);
+		}
+		if (Sum > PowerBudget && Over > 0.f)
+		{
+			const float K = FMath::Clamp(1.f - (Sum - PowerBudget) / Over, 0.f, 1.f);
+			for (auto& KV : PowerPct)
+			{
+				KV.Value = KV.Value > 100.f ? 100.f + (KV.Value - 100.f) * K : KV.Value;
+			}
+		}
+	}
+	Event(bOn ? TEXT("engineering: battle short — the reactor's limits are overridden: 800% of power to allocate, and she runs hot")
+	          : TEXT("engineering: the reactor is back inside its limits (700%)"));
+}
+
 void UAstraShipSubsystem::TickHeat(float DeltaTime)
 {
 	if (DeltaTime <= 0.f)
@@ -815,7 +847,7 @@ void UAstraShipSubsystem::TickHeat(float DeltaTime)
 	}
 	// what the ship makes by herself: the reactor (by the power drawn), the drive (by the throttle and the engines' power);
 	// the battle adds the rest (weapons fired, hits soaked, shields recharging: AddHeat)
-	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (ThrottlePct / 100.f) * PowerFactor(TEXT("engines"));
+	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (ThrottlePct / 100.f) * PowerFactor(TEXT("engines")) + (bBattleShort ? 0.3f : 0.f);
 	// what she sheds: the hull's own glow, plus the radiators, more the hotter she is (retracted: a cruise settles near 15 %,
 	// a typical fight near 70 %, a long heavy one beyond 100 %; extended they shed 2.6 times as much, torn ones less)
 	const float B = bRadiatorsOut ? 0.5f + (1.3f - 0.5f) * RadiatorHealth : 0.5f;
@@ -1620,6 +1652,11 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	                                                                                                          : TEXT("DECK 1 · CORRIDORS");
 }
 
+FString UAstraShipSubsystem::GetViewscreenDescription() const
+{
+	return Viewscreen ? Viewscreen->Describe() : FString(TEXT("off (no viewscreen)"));
+}
+
 TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 {
 	TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
@@ -1651,20 +1688,9 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 			}
 			const FVector Head = It->GetActorLocation() + FVector(0.f, 0.f, It->Posture == EAstraCrewPosture::Standing ? 70.f : 30.f);
 			const float Dist = FVector::Dist(Eye, Head);
-			if (Dist > 1600.f)
+			if (Dist > 1600.f || !It->CanBeHeardFrom(Eye, P))
 			{
-				continue;
-			}
-			// the voice carries over consoles and chairs: blocked only when no line reaches just above the head
-			FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraEarshot), false, P);
-			Q.AddIgnoredActor(*It);
-			FHitResult Hit;
-			const FVector Over[2] = {Head + FVector(0.f, 0.f, 60.f), It->GetActorLocation() + FVector(0.f, 0.f, 190.f)};
-			const bool bHeard = Dist < 400.f || !GetWorld()->LineTraceSingleByChannel(Hit, Eye, Over[0], ECC_Visibility, Q)
-			                                  || !GetWorld()->LineTraceSingleByChannel(Hit, Eye, Over[1], ECC_Visibility, Q);
-			if (!bHeard)
-			{
-				continue;                  // a wall, a door, a bulkhead
+				continue;                  // too far, or a wall, a door, a bulkhead between them
 			}
 			Ear.Add(MakeShared<FJsonValueString>(It->StationId));
 			const float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Look, (Head - Eye).GetSafeNormal()), -1.f, 1.f)));
@@ -2088,7 +2114,18 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		FString Sec = Str(TEXT("section")).ToUpper().TrimStartAndEnd();
 		Sec.RemoveFromStart(TEXT("SECTION "));
 		const TCHAR SecC = Sec.Len() ? Sec[0] : TEXT('?');
-		FAstraDamage* D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC; });
+		// one incident by its id (ops' own dispatcher), else the first at that deck and section (a fire and a breach can
+		// share a section: the unattended one first)
+		const int32 IncidentId = (int32)Num(TEXT("id"), -1.0);
+		FAstraDamage* D = IncidentId >= 0 ? Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Id == IncidentId; }) : nullptr;
+		if (!D)
+		{
+			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC && X.Team < 0; });
+		}
+		if (!D)
+		{
+			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC; });
+		}
 		if (D && D->Team >= 0)
 		{
 			OutDetail = FString::Printf(TEXT("team %d is already on the %s at %s (%s)"), D->Team + 1, *D->Kind, *D->Where(),
@@ -2231,6 +2268,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (const UAstraStationsSubsystem* St = GetWorld() ? GetWorld()->GetSubsystem<UAstraStationsSubsystem>() : nullptr)
 	{
 		S->SetObjectField(TEXT("stations"), St->StationsJson());
+		S->SetStringField(TEXT("action_target"), St->ActionTarget());   // what "target: action" means now (tactical's target, else the nearest hostile)
 		if (Viewscreen)
 		{
 			S->SetStringField(TEXT("viewscreen"), Viewscreen->Describe());   // what the Captain sees on the main screen now
@@ -2470,6 +2508,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 
 void UAstraShipSubsystem::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraShip);
 	if (bShipLost)
 	{
 		// a dead ship: no heat, no ward, no helm; only the pods drifting and the loss's own timing

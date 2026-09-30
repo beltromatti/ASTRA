@@ -27,10 +27,12 @@
 #include "ASTRA.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "AstraMindSubsystem.h"
+#include "AstraSettings.h"
 #include "AstraInput.h"
 #include "AstraHarness.h"
 #include "ASTRACharacter.h"
 #include "AstraScreensSubsystem.h"
+#include "AstraWindowHud.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/StaticMeshComponent.h"
@@ -42,6 +44,8 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
+
+DECLARE_CYCLE_STAT(TEXT("Player controller"), STAT_AstraPC, STATGROUP_Astra);
 
 AASTRAPlayerController::AASTRAPlayerController()
 {
@@ -182,6 +186,7 @@ bool AASTRAPlayerController::ShouldUseTouchControls() const
 
 void AASTRAPlayerController::OnTalkPressed()
 {
+	EnsureSubtitles();   // (the "listening" mark lives with the subtitles)
 	if (UAstraMindSubsystem* Mind = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr)
 	{
 		Mind->PushToTalk(true);
@@ -669,6 +674,12 @@ void AASTRAPlayerController::EnsureSubtitles()
 	const FSlateFontInfo NameFont = Mono ? FSlateFontInfo(Mono, 14) : FCoreStyle::GetDefaultFontStyle("Bold", 14);
 	const FSlateFontInfo TextFont = Mono ? FSlateFontInfo(Mono, 15) : FCoreStyle::GetDefaultFontStyle("Regular", 15);
 	TSharedRef<SVerticalBox> Box = SNew(SVerticalBox);
+	// the crew is listening: from the talk key going down until the answer begins
+	Box->AddSlot().AutoHeight().HAlign(HAlign_Center).Padding(0, 0, 0, 4)
+	[
+		SAssignNew(ListeningText, STextBlock).Font(NameFont).Text(FText::FromString(TEXT("\u25CF  LISTENING")))
+		.ColorAndOpacity(FLinearColor(1.f, 0.84f, 0.47f, 0.f))
+	];
 	for (int32 i = 0; i < 3; ++i)
 	{
 		TSharedPtr<STextBlock> N, T;
@@ -703,7 +714,7 @@ void AASTRAPlayerController::EnsureSubtitles()
 	VC->AddViewportWidgetContent(SubWidget.ToSharedRef(), 45);
 }
 
-void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text)
+void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text, float HoldSeconds, bool bVoiced)
 {
 	FAstraTimeline::Record(TEXT("line"), FString::Printf(TEXT("%s: %s"), *Name, *Text));
 	EnsureSubtitles();
@@ -722,6 +733,9 @@ void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FS
 	L.Name = (Words.Num() ? Words.Last() : Short).ToUpper();
 	L.Text = Text;
 	L.Color = SpeakerColor(Speaker);
+	// the time to read it: 17 characters a second after a 1.4 s start, 12 s at most (protocollo_voce §3.1)
+	L.Hold = HoldSeconds > 0.f ? HoldSeconds : FMath::Min(12.f, FMath::Max(bVoiced ? 2.f : 4.f, 1.4f + Text.Len() / 17.f));
+	L.bVoiced = bVoiced;
 	SubLines.Add(L);
 	while (SubLines.Num() > 3)
 	{
@@ -740,6 +754,31 @@ void AASTRAPlayerController::SubtitleEnd(int32 Id)
 	}
 }
 
+void AASTRAPlayerController::SubtitleCancel(int32 Id)
+{
+	for (FSubLine& L : SubLines)
+	{
+		if (L.Id == Id && L.CutAge < 0.f)
+		{
+			L.CutAge = L.Age;
+		}
+	}
+}
+
+float AASTRAPlayerController::SubtitleGone(const FSubLine& L)
+{
+	// said: its reading time, or a second after its voice, whichever is later; still being said: it stays (at most half
+	// a minute past its reading time: a voice that never ends); a notice: its reading time; stopped: it fades at once
+	float Gone = L.EndAge >= 0.f ? FMath::Max(L.Hold, L.EndAge + 1.f)
+	           : L.bVoiced     ? FMath::Max(L.Hold, FMath::Min(L.Age + 1.f, L.Hold + 30.f))
+	                           : L.Hold;
+	if (L.CutAge >= 0.f)
+	{
+		Gone = FMath::Min(Gone, L.CutAge + 0.35f);
+	}
+	return Gone;
+}
+
 void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 {
 	if (!SubWidget.IsValid())
@@ -750,12 +789,23 @@ void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 	{
 		FSubLine& L = SubLines[i];
 		L.Age += DeltaTime;
-		// said: it stays two seconds and fades; never said (no audio came): it goes after its reading time
-		const float Gone = L.EndAge >= 0.f ? L.EndAge + 2.5f : 4.f + L.Text.Len() * 0.07f;
-		if (L.Age > Gone)
+		if (L.Age > SubtitleGone(L))
 		{
 			SubLines.RemoveAt(i);
 		}
+	}
+	if (ListeningText.IsValid())
+	{
+		const UAstraMindSubsystem* Mind = GetGameInstance() ? GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr;
+		const bool bHeard = Mind && Mind->IsCaptainHeard();
+		ListeningA = FMath::FInterpConstantTo(ListeningA, bHeard ? 1.f : 0.f, DeltaTime, bHeard ? 8.f : 2.5f);
+		const float Pulse = Mind && Mind->IsCaptainTalking() ? 0.75f + 0.25f * FMath::Sin(GetWorld()->GetRealTimeSeconds() * 6.f) : 0.6f;
+		ListeningText->SetColorAndOpacity(FLinearColor(1.f, 0.84f, 0.47f, ListeningA * Pulse));
+	}
+	// subtitles off in the settings: the crew's spoken lines go unwritten (notices and the Captain's own words stay)
+	if (!FAstraSettings::Get().bSubtitles)
+	{
+		SubLines.RemoveAll([](const FSubLine& L) { return L.bVoiced; });
 	}
 	for (int32 i = 0; i < SubRows.Num(); ++i)
 	{
@@ -766,8 +816,7 @@ void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 			continue;
 		}
 		const FSubLine& L = SubLines[i];
-		const float Gone = L.EndAge >= 0.f ? L.EndAge + 2.5f : 4.f + L.Text.Len() * 0.07f;
-		const float A = FMath::Clamp(FMath::Min(L.Age / 0.25f, (Gone - L.Age) / 0.8f), 0.f, 1.f);
+		const float A = FMath::Clamp(FMath::Min(L.Age / 0.2f, (SubtitleGone(L) - L.Age) / 0.35f), 0.f, 1.f);
 		SubRows[i]->SetBorderBackgroundColor(FLinearColor(0.f, 0.005f, 0.01f, 0.62f * A));
 		SubNames[i]->SetText(FText::FromString(L.Name));
 		SubNames[i]->SetColorAndOpacity(FLinearColor(L.Color.R, L.Color.G, L.Color.B, A));
@@ -778,9 +827,18 @@ void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 
 void AASTRAPlayerController::PlayerTick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraPC);
 	Super::PlayerTick(DeltaTime);
 	TickSubtitles(DeltaTime);
 	TickPad(DeltaTime);
+	if (IsLocalPlayerController())
+	{
+		if (!WindowHud.IsValid())
+		{
+			WindowHud = MakeShared<FAstraWindowHud>();
+		}
+		WindowHud->Tick(this, DeltaTime);
+	}
 	if (!StoryWidget.IsValid())
 	{
 		return;

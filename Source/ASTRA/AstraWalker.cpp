@@ -9,6 +9,9 @@
 #include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Materials/MaterialInterface.h"
+#include "ASTRA.h"
+
+DECLARE_CYCLE_STAT(TEXT("Walkers"), STAT_AstraWalkers, STATGROUP_Astra);
 
 AAstraWalker::AAstraWalker()
 {
@@ -28,6 +31,8 @@ AAstraWalker::AAstraWalker()
 	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -92.f));
 	GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;   // unseen: it walks, the pose waits
+	GetMesh()->bEnableUpdateRateOptimizations = true;
 }
 
 void AAstraWalker::BeginPlay()
@@ -59,6 +64,7 @@ void AAstraWalker::BeginPlay()
 
 void AAstraWalker::Tick(float DeltaSeconds)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraWalkers);
 	Super::Tick(DeltaSeconds);
 	if (Route.Num() < 2)
 	{

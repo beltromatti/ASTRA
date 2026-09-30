@@ -13,7 +13,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "Sound/SoundAttenuation.h"
-#include "Sound/SoundWaveProcedural.h"
+#include "AstraSettings.h"
+#include "AstraVoiceWave.h"
+#include "Engine/World.h"
+
+DECLARE_CYCLE_STAT(TEXT("Crew"), STAT_AstraCrew, STATGROUP_Astra);
 
 AAstraCrewMember::AAstraCrewMember()
 {
@@ -21,6 +25,9 @@ AAstraCrewMember::AAstraCrewMember()
 	Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
 	RootComponent = Body;
 	Body->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	// the crew are many and spread over twelve decks: an animation that nobody sees is not computed
+	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+	Body->bEnableUpdateRateOptimizations = true;
 	Seated = CreateDefaultSubobject<UPoseableMeshComponent>(TEXT("Seated"));
 	Seated->SetupAttachment(Body);
 	Seated->SetVisibility(false);
@@ -29,6 +36,8 @@ AAstraCrewMember::AAstraCrewMember()
 	Voice->SetupAttachment(Body);
 	Voice->SetRelativeLocation(FVector(0.f, 0.f, 160.f));
 	Voice->bAutoActivate = false;
+	Voice->bOverridePriority = true;   // a voice outranks the ship's hum and the battle when channels run short
+	Voice->Priority = 4.f;
 	NameTag = CreateDefaultSubobject<UTextRenderComponent>(TEXT("NameTag"));
 	NameTag->SetupAttachment(Body);
 	NameTag->SetRelativeLocation(FVector(0.f, 0.f, 205.f));
@@ -48,14 +57,17 @@ void AAstraCrewMember::BeginPlay()
 		// placeholder body until the MetaHuman crew (M3): Epic's mannequin
 		SetBody(bFemaleBody || StationId == TEXT("xo") || StationId == TEXT("ops") || StationId == TEXT("tactical") || StationId == TEXT("sensors"));
 	}
-	// voice: spatialised, audible across the bridge, natural falloff
+	// voice: spatialised; an officer in the same room is always understood — full up to 8 m, then a natural falloff that
+	// stops at -8 dB (protocollo_voce §4.2); farther or behind a wall the line comes over the intercom instead
 	USoundAttenuation* Att = NewObject<USoundAttenuation>(this);
 	Att->Attenuation.bAttenuate = true;
 	Att->Attenuation.bSpatialize = true;
 	Att->Attenuation.AttenuationShape = EAttenuationShape::Sphere;
-	Att->Attenuation.AttenuationShapeExtents = FVector(300.f);
-	Att->Attenuation.FalloffDistance = 2500.f;
-	Att->Attenuation.dBAttenuationAtMax = -18.f;
+	Att->Attenuation.DistanceAlgorithm = EAttenuationDistanceModel::NaturalSound;
+	Att->Attenuation.AttenuationShapeExtents = FVector(800.f);
+	Att->Attenuation.FalloffDistance = 2200.f;
+	Att->Attenuation.dBAttenuationAtMax = -8.f;
+	Att->Attenuation.FalloffMode = ENaturalSoundFalloffMode::Hold;
 	Voice->AttenuationSettings = Att;
 	NameTag->SetText(FText::FromString(DisplayName.IsEmpty() ? StationId : DisplayName));
 }
@@ -293,27 +305,26 @@ void AAstraCrewMember::TickVisit(float DeltaSeconds)
 	SetActorRotation(FRotator(0.f, FMath::FixedTurn(GetActorRotation().Yaw, WantYaw, 300.f * DeltaSeconds), 0.f));
 }
 
-void AAstraCrewMember::BeginLine(int32 LineId, int32 SampleRate)
+UAstraVoiceWave* AAstraCrewMember::BeginLine(int32 LineId, int32 SampleRate)
 {
 	CurrentLine = LineId;
-	CurrentWave = NewObject<USoundWaveProcedural>(this);
-	CurrentWave->SetSampleRate(SampleRate);
-	CurrentWave->NumChannels = 1;
-	CurrentWave->Duration = INDEFINITELY_LOOPING_DURATION;
-	CurrentWave->SoundGroup = SOUNDGROUP_Voice;
-	CurrentWave->bLooping = false;
+	if (CurrentWave && CurrentWave->GetRate() == SampleRate && Voice->IsPlaying() && CurrentWave->GetAvailableAudioByteCount() > 0)
+	{
+		// the last line is still sounding: this one follows it
+		UE_LOG(LogASTRA, Log, TEXT("[Crew] %s speaking (line %d, after the last one)"), *StationId, LineId);
+		return CurrentWave;
+	}
+	CurrentWave = NewObject<UAstraVoiceWave>(this);
+	CurrentWave->Setup(SampleRate);
 	Voice->SetSound(CurrentWave);
+	Voice->SetVolumeMultiplier(FAstraSettings::Get().Voices);
 	Voice->Play();
 	UE_LOG(LogASTRA, Log, TEXT("[Crew] %s speaking (line %d)"), *StationId, LineId);
+	return Voice->IsPlaying() ? CurrentWave.Get() : nullptr;
 }
 
-void AAstraCrewMember::QueueVoice(int32 LineId, const uint8* Pcm, int32 NumBytes)
+void AAstraCrewMember::HearVoice(const uint8* Pcm, int32 NumBytes)
 {
-	if (LineId != CurrentLine || !CurrentWave)
-	{
-		return;
-	}
-	CurrentWave->QueueAudio(Pcm, NumBytes);
 	// crude loudness for the (future) mouth/gesture layer
 	const int16* S = reinterpret_cast<const int16*>(Pcm);
 	const int32 N = NumBytes / 2;
@@ -322,9 +333,13 @@ void AAstraCrewMember::QueueVoice(int32 LineId, const uint8* Pcm, int32 NumBytes
 	SpeakingLevel = FMath::Max(SpeakingLevel, (float)(Sum / FMath::Max(1, N / 8) / 8000.0));
 }
 
-void AAstraCrewMember::EndLine(int32 LineId)
+void AAstraCrewMember::CancelLine(float FadeSeconds)
 {
-	// the procedural wave simply runs out of queued audio; nothing else to do yet
+	// the rest of the line fades out (in a pause of the speech: short; mid-word: longer) and the voice stops; the next
+	// line starts on a new wave
+	Voice->FadeOut(FMath::Max(FadeSeconds, 0.02f), 0.f);
+	CurrentWave = nullptr;
+	CurrentLine = -1;
 }
 
 bool AAstraCrewMember::IsSpeaking() const
@@ -332,12 +347,37 @@ bool AAstraCrewMember::IsSpeaking() const
 	return CurrentWave && CurrentWave->GetAvailableAudioByteCount() > 0;
 }
 
+bool AAstraCrewMember::CanBeHeardFrom(const FVector& Eye, const AActor* Listener) const
+{
+	const FVector Head = GetActorLocation() + FVector(0.f, 0.f, Posture == EAstraCrewPosture::Standing ? 70.f : 30.f);
+	if (FVector::Dist(Eye, Head) < 400.f)
+	{
+		return true;
+	}
+	// the voice carries over consoles and chairs: blocked only when no line reaches just above the head
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraEarshot), false, Listener);
+	Q.AddIgnoredActor(this);
+	FHitResult Hit;
+	return !GetWorld()->LineTraceSingleByChannel(Hit, Eye, Head + FVector(0.f, 0.f, 60.f), ECC_Visibility, Q)
+	    || !GetWorld()->LineTraceSingleByChannel(Hit, Eye, GetActorLocation() + FVector(0.f, 0.f, 190.f), ECC_Visibility, Q);
+}
+
 void AAstraCrewMember::Tick(float DeltaSeconds)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraCrew);
 	Super::Tick(DeltaSeconds);
 	if (VisitPhase == 1 || VisitPhase == 3)
 	{
+		SetActorTickInterval(0.f);
 		TickVisit(DeltaSeconds);
+		return;
+	}
+	// out of sight (another deck, behind a wall): a slow heartbeat, no procedural pose; back to every frame when seen
+	const bool bSeen = Body->WasRecentlyRendered(0.3f) || Seated->WasRecentlyRendered(0.3f) || IsSpeaking();
+	SetActorTickInterval(bSeen ? 0.f : 0.5f);
+	if (!bSeen)
+	{
+		SpeakingLevel = 0.f;
 		return;
 	}
 

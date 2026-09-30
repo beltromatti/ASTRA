@@ -99,6 +99,8 @@ protected:
 	void TogglePad();
 	UFUNCTION(Exec) void AstraPad() { TogglePad(); }
 	void TickPad(float DeltaTime);
+	/** Brackets and names on the bow window (AstraWindowHud). */
+	TSharedPtr<class FAstraWindowHud> WindowHud;
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> PadMesh;
 	bool bPadUp = false;
 	float PadAlpha = 0.f;
@@ -119,12 +121,15 @@ protected:
 	float StoryHold = 0.f;
 	bool bStoryStayBlack = false;
 	void EnsureStoryWidget();
-	struct FSubLine { int32 Id = 0; FString Name; FString Text; FLinearColor Color; float Age = 0.f; float EndAge = -1.f; };
+	struct FSubLine { int32 Id = 0; FString Name; FString Text; FLinearColor Color; float Age = 0.f; float Hold = 4.f; float EndAge = -1.f; float CutAge = -1.f; bool bVoiced = false; };
+	static float SubtitleGone(const FSubLine& L);
 	TArray<FSubLine> SubLines;
 	TSharedPtr<class SWidget> SubWidget;
 	TArray<TSharedPtr<class STextBlock>> SubNames;
 	TArray<TSharedPtr<class STextBlock>> SubTexts;
 	TArray<TSharedPtr<class SBorder>> SubRows;
+	TSharedPtr<class STextBlock> ListeningText;   // "LISTENING" while the crew hears the Captain
+	float ListeningA = 0.f;
 	void EnsureSubtitles();
 	void TickSubtitles(float DeltaTime);
 	TSharedPtr<class SWidget> OrderLine;
@@ -139,10 +144,13 @@ public:
 	 *  its line fade in, hold, fade out; bStayBlack keeps the dark after them (a scene of voices in the dark). */
 	void StoryCard(const FString& Title, const FString& Sub, float Hold, bool bStayBlack, bool bStartBlack = false);
 	void StoryBlack(bool bOn, float Fade = 1.2f);
-	/** Subtitles: a spoken line shown while its voice plays (and a moment after), three at most, the speaker's name in
-	 *  the colour of their department or channel. Id ties the line to its audio; SubtitleEnd when it has been said. */
-	void Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text);
+	/** Subtitles: a spoken line shown with its voice, three at most, the speaker's name in the colour of their
+	 *  department or channel. Id ties the line to its audio. It stays HoldSeconds (the time to read it; 0: worked out
+	 *  from its length) or until a second after its voice ended (SubtitleEnd), whichever is later; a line whose voice
+	 *  was stopped (SubtitleCancel) fades at once. A line without a voice (a notice) goes after its reading time. */
+	void Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text, float HoldSeconds = 0.f, bool bVoiced = false);
 	void SubtitleEnd(int32 Id);
+	void SubtitleCancel(int32 Id);
 	virtual void PlayerTick(float DeltaTime) override;
 
 	/** Console twin of the E key (the lift, the captain's chair): for tests and accessibility. */

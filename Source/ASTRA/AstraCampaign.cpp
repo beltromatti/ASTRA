@@ -6,6 +6,7 @@
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraMindSubsystem.h"
+#include "AstraSettings.h"
 #include "AstraShipSubsystem.h"
 #include "Dom/JsonObject.h"
 #include "Engine/Font.h"
@@ -32,12 +33,27 @@
 #include "Widgets/SWeakWidget.h"
 #include "Widgets/Text/STextBlock.h"
 
+DECLARE_CYCLE_STAT(TEXT("Campaign"), STAT_AstraCampaign, STATGROUP_Astra);
+
 namespace
 {
 	// testing and automation: start without the menu (console, or -astra_campaign=new|continue on the command line)
 	FString GCampaignRequest;
 	FAutoConsoleCommand CmdCampaign(TEXT("astra.campaign"), TEXT("Start the campaign without the menu: astra.campaign new|continue"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A) { if (A.Num()) { GCampaignRequest = A[0].ToLower(); } }));
+
+	FAutoConsoleCommandWithWorld CmdMenuSettings(TEXT("astra.menu.settings"), TEXT("Testing: open the menu's SETTINGS page"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+		{
+			if (UAstraCampaignSubsystem* C = World ? World->GetSubsystem<UAstraCampaignSubsystem>() : nullptr)
+			{
+				if (!C->IsMenuOpen())
+				{
+					C->ShowMenu(C->IsStarted());
+				}
+				C->ShowSettings();
+			}
+		}));
 
 	const FLinearColor MenuInk(0.86f, 0.9f, 0.95f);
 	const FLinearColor MenuDim(0.52f, 0.58f, 0.66f);
@@ -54,6 +70,7 @@ public:
 		SLATE_EVENT(FSimpleDelegate, OnResume)
 		SLATE_EVENT(FSimpleDelegate, OnContinue)
 		SLATE_EVENT(FSimpleDelegate, OnNew)
+		SLATE_EVENT(FSimpleDelegate, OnSettings)
 		SLATE_EVENT(FSimpleDelegate, OnQuit)
 	SLATE_END_ARGS()
 
@@ -102,6 +119,7 @@ public:
 		}
 		Item(TEXT("NEW CAMPAIGN"), bHasSave || Args._InGame ? TEXT("the war begins again at Aurelia; the saved one is lost") : TEXT("the war begins at Aurelia"),
 		     Args._OnNew, 1);
+		Item(TEXT("SETTINGS"), TEXT("graphics, sharpness, frame rate, volumes, subtitles"), Args._OnSettings, 3);
 		Item(TEXT("QUIT"), FString(), Args._OnQuit, 2);
 
 		ChildSlot
@@ -149,7 +167,7 @@ public:
 	}
 
 private:
-	TSharedPtr<SButton> Buttons[3];
+	TSharedPtr<SButton> Buttons[4];
 	FSimpleDelegate FirstDo;     // Enter: the first item (resume, or continue the saved war)
 	bool bHasSave = false;
 	bool bNeedConfirm = false;   // a saved war is not thrown away with one click
@@ -223,6 +241,7 @@ FString UAstraCampaignSubsystem::SaveSummary() const
 void UAstraCampaignSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	FAstraSettings::Get().Apply();   // the player's graphics, frame rate and resolution floor
 	// a start already chosen: the command line (automation) or the level's URL (a new campaign from the in-game menu)
 	FString Arg;
 	const TCHAR* UrlMode = InWorld.URL.GetOption(TEXT("astra_campaign="), nullptr);
@@ -278,6 +297,7 @@ void UAstraCampaignSubsystem::ShowMenu(bool bInGame)
 		.OnResume_Lambda([Self]() { if (Self.IsValid()) { Self->HideMenu(); } })
 		.OnContinue_Lambda([Self]() { if (Self.IsValid()) { Self->Continue(); } })
 		.OnNew_Lambda([Self]() { if (Self.IsValid()) { Self->StartNew(); } })
+		.OnSettings_Lambda([Self]() { if (Self.IsValid()) { Self->ShowSettings(); } })
 		.OnQuit_Lambda([Self]()
 		{
 			if (Self.IsValid())
@@ -295,8 +315,52 @@ void UAstraCampaignSubsystem::ShowMenu(bool bInGame)
 	SetMenuInput(true);
 }
 
+void UAstraCampaignSubsystem::ShowSettings()
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (!VC || !MenuWidget.IsValid() || SettingsWidget.IsValid())
+	{
+		return;
+	}
+	// the page takes the menu's place; BACK (or Esc) puts the menu back
+	VC->RemoveViewportWidgetContent(MenuWidget.ToSharedRef());
+	TWeakObjectPtr<UAstraCampaignSubsystem> Self(this);
+	TSharedRef<SAstraSettingsPage> Page = SNew(SAstraSettingsPage).OnBack_Lambda([Self]() { if (Self.IsValid()) { Self->HideSettings(); } });
+	SettingsPage = Page;
+	SettingsWidget = SNew(SWeakWidget).PossiblyNullContent(Page);
+	VC->AddViewportWidgetContent(SettingsWidget.ToSharedRef(), 50);
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0))
+	{
+		FInputModeUIOnly M;
+		M.SetWidgetToFocus(Page);
+		PC->SetInputMode(M);
+	}
+}
+
+void UAstraCampaignSubsystem::HideSettings()
+{
+	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
+	if (VC && SettingsWidget.IsValid())
+	{
+		VC->RemoveViewportWidgetContent(SettingsWidget.ToSharedRef());
+	}
+	SettingsWidget.Reset();
+	SettingsPage.Reset();
+	if (VC && MenuWidget.IsValid())
+	{
+		VC->AddViewportWidgetContent(MenuWidget.ToSharedRef(), 50);
+		SetMenuInput(true);
+	}
+}
+
 void UAstraCampaignSubsystem::HideMenu()
 {
+	if (SettingsWidget.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
+	{
+		GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(SettingsWidget.ToSharedRef());
+	}
+	SettingsWidget.Reset();
+	SettingsPage.Reset();
 	if (MenuWidget.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
 	{
 		GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(MenuWidget.ToSharedRef());
@@ -440,6 +504,7 @@ void UAstraCampaignSubsystem::NewCommand(const FString& System)
 
 void UAstraCampaignSubsystem::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraCampaign);
 	// console or command-line starts (tests, automation, "new campaign" from the menu mid-game)
 	if (!GCampaignRequest.IsEmpty() && !bStarted)
 	{

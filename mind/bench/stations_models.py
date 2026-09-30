@@ -75,7 +75,7 @@ async def quiet_moments(llm: OpenRouter) -> tuple[list[dict[str, Any]], float]:
                                            "- Price's sister on New Ravenna is expecting a child", ["the Aquila beat off a raid at Aurelia"],
                                            ["engagement over: Mandate raiders withdrew"])
         turn = await h.agent.handle_event("bridge: a quiet moment on watch", "it", ask=ask, role="chatter", system=system,
-                                          history_turns=2, max_lines=2, speak_only=True)
+                                          history_turns=2, speak_only=True)
         cost += turn.cost
         lines = [(s, t) for s, t in turn.lines]
         ok = {"speaks": bool(lines), "short": all(len(t.split()) <= 30 for _, t in lines), "italian": all(sc.looks_like(t, "it") for _, t in lines if len(t.split()) >= 5),

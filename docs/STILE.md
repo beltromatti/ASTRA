@@ -1,4 +1,4 @@
-# Guida di stile di ASTRA (v0.2)
+# Guida di stile di ASTRA (v0.3)
 
 *Regole visive e sonore che rendono coerente tutto ciò che creo, anche quando parte da materiale gratuito di fonti diverse. Serve anche per l'autocritica delle catture (docs/ricerca/08, §7).*
 
@@ -130,3 +130,17 @@ ufficio, monitor comuni, plafoniere). La v3 deve sembrare **il ponte di comando 
    solo dove si tocca (bordi delle console, gradini, maniglie).
 9. **Efficienza**: una manciata di materiali condivisi (trim sheet e decalcomanie), niente texture uniche enormi, geometria
    ricca dove si guarda (console, poltrone) e semplice dove no.
+
+## 12. Le navi v3: scafi al livello di EVE Online (1/10)
+Il linguaggio degli scafi dopo ARTE-NAVI (nota completa e anteprime in [progressi/navi_v3](progressi/navi_v3/README.md)):
+1. **Geometria vera a ogni scala**: piastre a strati con smusso e bordo consumato, pannelli per partizione, portelli, sfiati,
+   finestre, antenne, cannoni e ugelli con profondità; da 300 m di distanza una toppa di 50 m deve ancora leggersi come nave.
+2. **Scritte in geometria** (Barlow Condensed): nomi e numeri di scafo, marcature di servizio, sempre in inglese.
+3. **Usura con una logica**: la vernice lascia il metallo nudo sui bordi e sugli smussi, sporco e fuliggine dove passano i
+   gas di scarico, un tono diverso per ogni piastra. Niente texture per nave: i dati stanno nei vertici (UV1–UV2), i
+   materiali sono pochi e condivisi (`M_ASTRA_HullV3` e 14 istanze per fazione).
+4. **Luci che raccontano**: finestre accese e spente con un lampeggio diverso per scafo; luci di via (rossa a sinistra,
+   verde a dritta, bianca a poppa, rossa pulsante in chiglia); il Mandato ha una sola luce rossa pulsante.
+5. **Fatte per rompersi**: tre pezzi (prua, centro, poppa) nello stesso riferimento della nave intera, con facce di taglio
+   bruciate (corazza strappata, paratie, ponti, travi, braci che si spengono) e 8 decalcomanie di danno.
+6. **Budget**: Nanite, al massimo 3 M triangoli per nave grande e 150 k per velivolo; ~28 MB di texture nuove in tutto.

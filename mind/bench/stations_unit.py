@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from astra_mind import initiative, models, router, stations as S
-from astra_mind.agent import BridgeAgent, is_bare_ack, _tighten
+from astra_mind.agent import BridgeAgent
 from astra_mind.context import Channel, Context
 from astra_mind.local_ship import LocalShip
 from astra_mind.openrouter import Completion, ToolCall
@@ -154,6 +154,16 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         # the history keeps the call and its result in the native format (the model must know what was set)
         self.assertTrue(any(m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "station" for m in c.agent.history))
 
+    async def test_the_warm_up_asks_for_one_token_and_leaves_no_trace(self) -> None:
+        c = Crew(Script(content="ok"))
+        dt = await c.agent.warm_up("it")
+        self.assertGreaterEqual(dt, 0.0)
+        self.assertEqual(len(c.llm.requests), 1)
+        req = c.llm.requests[0]
+        self.assertIn("station", {t["function"]["name"] for t in req["tools"]})               # (the crew's own tools: the cached head is the real one)
+        self.assertTrue(req["messages"][-1]["content"].startswith("[the bridge is manned"))
+        self.assertEqual((c.said, c.agent.history), ([], []))                                 # nothing said, nothing remembered
+
     async def test_a_bad_station_call_is_refused_and_the_officer_says_why(self) -> None:
         c = Crew(Script([station("helm", "intercept")]),                                        # no target
                  Script([speak("Non ho un bersaglio, Capitano: quale contatto?")]))          # the follow-up
@@ -164,14 +174,20 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("FAILED", json.dumps(c.llm.requests[1]["messages"]))
         self.assertEqual(len(c.said), 1)
 
-    async def test_a_bare_aye_is_never_voiced_the_readback_takes_its_place(self) -> None:
-        c = Crew(Script([speak("Agli ordini, Capitano.", "tactical"), station("tactical", "engage", targets=["T-23"])]),
-                 Script([speak("Fuoco continuo sul Cocytus fino a distruzione.", "tactical")]))
-        turn = await c.agent.handle("fuoco sul cocytus", "it")
-        self.assertEqual([t for _, t in c.said], ["Fuoco continuo sul Cocytus fino a distruzione."])
-        self.assertEqual(turn.dropped, ["Agli ordini, Capitano."])
-        # and the history does not teach the model to say it
-        self.assertNotIn("Agli ordini", json.dumps(c.agent.history))
+    async def test_a_line_is_voiced_as_the_officer_said_it(self) -> None:
+        # (no code rewrites, trims or holds back what an officer says: the prompt asks for plain, short, content-bearing lines)
+        c = Crew(Script([speak("Agli ordini, Capitano: fuoco continuo sul Cocytus.", "tactical"), station("tactical", "engage", targets=["T-23"])]))
+        await c.agent.handle("fuoco sul cocytus", "it")
+        self.assertEqual([t for _, t in c.said], ["Agli ordini, Capitano: fuoco continuo sul Cocytus."])
+        self.assertEqual(len(c.llm.requests), 1)                                              # it spoke and acted: no second call
+
+    async def test_no_answer_and_nothing_done_asks_the_officers_to_answer(self) -> None:
+        # the model wrote prose instead of speaking: it is not voiced; the officers are asked for their answer, with speak
+        c = Crew(Script([], content="The helm should confirm the heading."), Script([speak("Prua uno-due-zero, Capitano.", "helm")]))
+        await c.agent.handle("dove siamo diretti?", "it")
+        self.assertEqual([t for _, t in c.said], ["Prua uno-due-zero, Capitano."])
+        self.assertEqual(len(c.llm.requests), 2)
+        self.assertIn("The helm should confirm the heading.", json.dumps(c.llm.requests[1]["messages"]))
 
     async def test_a_plain_yes_to_a_question_is_kept(self) -> None:
         c = Crew(Script([speak("Sì, Capitano.", "tactical")]))
@@ -187,26 +203,6 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         said = [m["content"] for m in c.agent.history if m["role"] == "user"]
         self.assertEqual(sum(1 for m in said if m.startswith("Captain:")), 3)                      # all three orders are still there
         self.assertLessEqual(sum(1 for m in said if not m.startswith("Captain:")), 6)             # the checks are capped
-
-    async def test_a_mode_name_in_a_line_is_spoken_as_plain_words(self) -> None:
-        c = Crew(Script([speak("Propongo keep_on_bow su T-24 e scan_focus su T-31.", "helm")]))
-        await c.agent.handle("consigli?", "it")
-        self.assertEqual(c.said[0][1], "Propongo prua sul bersaglio su T-24 e scansione mirata su T-31.")
-
-    async def test_runaway_lines_are_cut(self) -> None:
-        long = "Capitano, la situazione è la seguente. " + " ".join(["parola"] * 80) + ". Poi ancora altro."
-        self.assertLessEqual(len(_tighten(long).split()), 70)
-        c = Crew(Script([speak(long, "xo")]))
-        await c.agent.handle("rapporto", "it")
-        self.assertLessEqual(len(c.said[0][1].split()), 70)
-
-    def test_bare_acks_in_five_languages(self) -> None:
-        for line in ("Aye aye, Captain.", "Agli ordini, Capitano.", "Ricevuto.", "Sì, signore.", "A sus órdenes, Capitán.", "Reçu.",
-                     "À vos ordres, Capitaine.", "Zu Befehl, Kapitän.", "Understood.", "Eseguo."):
-            self.assertTrue(is_bare_ack(line), line)
-        for line in ("Intercetto il Cocytus, tengo sei chilometri.", "Scudi a prua, novanta per cento.", "Aye, Captain: shields fore.",
-                     "Sì, Capitano: siamo a nove chilometri."):
-            self.assertFalse(is_bare_ack(line), line)
 
     async def test_initiative_needs_auto_delegation(self) -> None:
         c = Crew(Script([station("tactical", "engage", targets=["T-24"]), speak("Cocytus giù: passo al Phlegethon.", "tactical")]))
@@ -303,12 +299,12 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(c.said), 1)
         self.assertFalse(turn.cancelled)
 
-    async def test_chatter_only_talks_and_is_capped_at_two_lines(self) -> None:
+    async def test_chatter_only_talks(self) -> None:
         c = Crew(Script([speak("Bel cielo stasera, Marco.", "sensors"), speak("Bugiardo: piove polvere.", "helm"),
-                         speak("Una terza battuta.", "xo"), station("helm", "hold")]), fight=False)
+                         station("helm", "hold")]), fight=False)
         system = __import__("astra_mind.initiative", fromlist=["x"]).chatter_system("it", "steady", "", "", "", [], [])
         await c.agent.handle_event("bridge: a quiet moment on watch", "it", ask="chat", role="chatter", system=system,
-                                   history_turns=2, max_lines=2, speak_only=True)
+                                   history_turns=2, speak_only=True)
         self.assertEqual([t for _, t in c.said], ["Bel cielo stasera, Marco.", "Bugiardo: piove polvere."])
         self.assertEqual({t["function"]["name"] for t in c.llm.requests[0]["tools"]}, {"speak"})
         self.assertEqual(c.ship.lane("helm", "course")["set_by"], "default")                  # the stray station call did nothing
@@ -374,98 +370,31 @@ class ModelsTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(models.role(name).max_price, models.CEILING)
 
 
-class RouterTest(unittest.TestCase):
-    def ctx(self, **kw: Any) -> Context:
+class RouterModelTest(unittest.IsolatedAsyncioTestCase):
+    """What goes out on an open channel is the comms officer's call, made by a small model (router.for_party)."""
+    def ctx(self, **kw) -> Context:
         return Context(channel=Channel(party="T-23", name="Ferryman Irina Vael (the Cocytus)", **kw))
 
-    def test_the_two_playtest_misroutes(self) -> None:
-        for text in ("rapporto armamenti", "ci sono navi nemiche", "sparate con tutto"):
-            r = router.quick(text, self.ctx())
-            self.assertIsNotNone(r, text)
-            self.assertEqual((r.dest, r.external), ("crew", ""), text)
+    async def test_the_model_says_which_words_go_out(self) -> None:
+        llm = FakeLLM(Script(content='{"to_party": "che cosa cercate qui"}'))
+        r = await router.for_party(llm, "che cosa cercate qui", self.ctx())
+        self.assertEqual((r.external, r.party, r.how), ("che cosa cercate qui", "T-23", "model"))
 
-    def test_words_to_the_party_go_out(self) -> None:
-        r = router.quick("qui il capitano dell'aquila, fermatevi o verrete annientati", self.ctx())
-        self.assertEqual(r.dest, "external")
-        self.assertEqual(r.party, "T-23")
+    async def test_a_part_or_nothing(self) -> None:
+        llm = FakeLLM(Script(content='{"to_party": "un momento"}'), Script(content='{"to_party": ""}'))
+        self.assertEqual((await router.for_party(llm, "ascolta un momento. Voss, missili pronti", self.ctx())).external, "un momento")
+        self.assertEqual((await router.for_party(llm, "rapporto armamenti", self.ctx())).external, "")
 
-    def test_a_mixed_utterance_is_split(self) -> None:
-        r = router.quick("Ferryman, avete un minuto per arrendervi. Tattico, missili pronti sul Cocytus.", self.ctx())
-        self.assertEqual(r.dest, "both")
-        self.assertIn("minuto", r.external)
-        self.assertIn("missili", r.crew)
-        self.assertEqual(r.addressed, ("tactical",))
+    async def test_when_the_model_does_not_answer_nothing_goes_out(self) -> None:
+        llm = FakeLLM(Script(error="HTTP 500"))
+        r = await router.for_party(llm, "che cosa cercate qui", self.ctx())
+        self.assertEqual(r.external, "")                                                  # (nothing goes out)
 
-    def test_no_channel_or_muted_everything_stays_aboard(self) -> None:
-        self.assertEqual(router.quick("Cocytus, arrendetevi", Context()).dest, "crew")
-        self.assertEqual(router.quick("Cocytus, arrendetevi", self.ctx(muted=True)).dest, "crew")
-        self.assertTrue(router.quick("Ferryman, ritiratevi subito", self.ctx(muted=True)).unsure)
-
-    def test_facing_an_officer_names_who_answers_first(self) -> None:
-        r = router.quick("portaci piu vicini", Context(facing="helm"))
-        self.assertEqual(r.addressed, ("helm",))
-
-    def test_a_reply_in_an_exchange_goes_to_the_party(self) -> None:
-        self.assertEqual(router.quick("no", self.ctx(heard_s=5.0)).dest, "external")
-        self.assertEqual(router.quick("scudi a poppa", self.ctx(heard_s=5.0)).dest, "crew")
-
-    def test_what_the_rules_cannot_tell_is_left_to_the_model_not_guessed(self) -> None:
-        self.assertIsNone(router.quick("che cosa cercate qui", self.ctx()))
-
-    def test_a_filler_before_the_name_does_not_hide_it(self) -> None:
-        for text in ("Ok, Vael, ti ascolto.", "Senta, Ferryman: parliamoci chiaro.", "Ehm, Vael, forse possiamo trovare un accordo."):
-            self.assertEqual(router.quick(text, self.ctx()).dest, "external", text)
-        r = router.quick("Ok Vael ti ascolto. Voss, tieni gli occhi aperti.", self.ctx())
-        self.assertEqual(r.dest, "both")
-        self.assertIn("ascolto", r.external)
-        self.assertIn("occhi aperti", r.crew)
-
-    def test_a_name_that_closes_short_words_is_spoken_to(self) -> None:
-        for text in ("back off vael", "rispondimi capitano", "sei sola vael"):
-            self.assertEqual(router.quick(text, self.ctx()).dest, "external", text)
-        self.assertEqual(router.quick("il cocytus e fuori portata voss", self.ctx()).dest, "crew")
-
-    def test_talk_about_the_party_stays_aboard_even_in_an_exchange(self) -> None:
-        for text in ("wait what did she say", "chi e quello che ha appena parlato", "chiedi all'ammiraglio cosa vuole che facciamo"):
-            self.assertEqual(router.quick(text, self.ctx(heard_s=4.0)).dest, "crew", text)
-
-    def test_an_article_before_a_name_makes_it_the_subject_not_the_one_spoken_to(self) -> None:
-        r = router.quick("Allora, riassumiamo: il Cocytus e solo, giusto?", self.ctx())
-        self.assertTrue(r is None or r.dest == "crew")                     # (never sent out on the channel)
-
-    def test_a_sentence_that_names_the_party_is_not_filler_for_its_neighbours(self) -> None:
-        r = router.quick("Un attimo Vael. Comunicazioni, registrate tutto.", self.ctx())
-        self.assertEqual(r.dest, "both")
-        self.assertIn("attimo", r.external)
-        self.assertIn("registrate", r.crew)
-
-    def test_the_rules_are_fast(self) -> None:
-        t0 = time.perf_counter()
-        for _ in range(500):
-            router.quick("Ferryman, avete un minuto per arrendervi. Tattico, missili pronti sul Cocytus.", self.ctx())
-        self.assertLess((time.perf_counter() - t0) / 500 * 1000, 2.0)
-
-
-
-class RouterModelTest(unittest.IsolatedAsyncioTestCase):
-    def ctx(self) -> Context:
-        return Context(channel=Channel(party="T-23", name="Ferryman Irina Vael (the Cocytus)"))
-
-    async def test_when_the_model_does_not_answer_the_words_stay_aboard(self) -> None:
-        llm = FakeLLM(Script(error="HTTP 500"), Script(error="HTTP 500"))
-        r = await router.route(llm, "che cosa cercate qui", self.ctx())
-        self.assertEqual((r.dest, r.how), ("crew", "fallback"))
-        self.assertTrue(r.unsure)
-
-    async def test_the_model_settles_the_open_case(self) -> None:
-        llm = FakeLLM(Script(content="party"))
-        r = await router.route(llm, "che cosa cercate qui", self.ctx())
-        self.assertEqual((r.dest, r.how, r.party), ("external", "llm", "T-23"))
-
-    async def test_mixed_takes_a_second_small_call_to_split(self) -> None:
-        llm = FakeLLM(Script(content="mixed"), Script(content='{"crew": "missili pronti", "party": "un momento"}'))
-        r = await router.route(llm, "ascolta un momento missili pronti", self.ctx())
-        self.assertEqual((r.dest, r.crew, r.external), ("both", "missili pronti", "un momento"))
+    async def test_no_channel_or_muted_no_call(self) -> None:
+        llm = FakeLLM()
+        self.assertEqual((await router.for_party(llm, "Cocytus, arrendetevi", Context())).how, "no_channel")
+        self.assertEqual((await router.for_party(llm, "Cocytus, arrendetevi", self.ctx(muted=True))).how, "no_channel")
+        self.assertEqual(llm.requests, [])
 
 
 class WatchTest(unittest.TestCase):
@@ -732,12 +661,19 @@ class WireTest(unittest.IsolatedAsyncioTestCase):
         cmd, err = S.normalize({"station": "helm", "mode": "course", "params": {}})
         self.assertIsNone(cmd)
 
-    def test_all_hostiles_become_the_ids_the_game_takes(self) -> None:
-        state = LocalShip(fight=True).snapshot()
-        cmd, _ = S.normalize({"station": "tactical", "mode": "engage", "params": {"targets": ["hostiles"]}})
-        self.assertEqual(S.to_wire(cmd, state=state)["params"]["targets"], ["T-23", "T-24"])          # nearest first
+    def test_hostiles_and_action_go_through_as_words_the_game_keeps(self) -> None:
+        cmd, _ = S.normalize({"station": "tactical", "mode": "engage", "params": {"targets": ["Hostiles"]}})
+        self.assertEqual(S.to_wire(cmd)["params"]["targets"], ["hostiles"])                            # (a standing order: the game expands it every tick)
         cmd, _ = S.normalize({"station": "tactical", "mode": "engage", "params": {"targets": ["T-24", "hostiles"]}})
-        self.assertEqual(S.to_wire(cmd, state=state)["params"]["targets"], ["T-24", "T-23"])
+        self.assertEqual(S.to_wire(cmd)["params"]["targets"], ["T-24", "hostiles"])
+        for st_id, mode in (("helm", "keep_on_bow"), ("ops", "viewscreen_target"), ("sensors", "scan_focus")):
+            cmd, err = S.normalize({"station": st_id, "mode": mode, "params": {"target": "ACTION"}})
+            self.assertEqual(cmd["params"]["target"], "action", (mode, err))
+            self.assertEqual(S.to_wire(cmd)["params"]["target"], "action")
+        text = S.tool_description()
+        self.assertIn("`action`", text)
+        self.assertIn("keep_on_bow(target=id|action)", text)
+        self.assertIn("800%", S.MODE_INDEX["reactor_battle_short"].summary)
 
     def test_what_the_game_would_refuse_is_refused_the_same_way(self) -> None:
         for args in ({"station": "sensors", "aspect": "ew", "mode": "jam", "params": {"target": "T-23"}},
@@ -820,6 +756,113 @@ class WireTest(unittest.IsolatedAsyncioTestCase):
         ship.advance(40)
         want = ship.range_bearing(ship.contacts["T-23"])[1]
         self.assertLess(abs(((ship.heading - want) + 540) % 360 - 180), 40)
+
+    # ---- what main's game side does since 333cb1e: "action", hostiles as a standing order, a time limit for any aspect, battle short
+    async def test_the_bow_on_the_action_waits_without_a_fight_and_follows_the_fight_with_one(self) -> None:
+        calm = LocalShip(fight=False)
+        res = await calm.execute("station", {"station": "helm", "aspect": "course", "mode": "keep_on_bow", "params": {"target": "action"},
+                                             "until": "target_lost", "by": "captain"}, "helm")
+        self.assertTrue(res["ok"], res)                                                   # accepted with no fight on
+        calm.advance(10)
+        self.assertEqual(calm.snapshot()["stations"]["helm"]["modes"]["course"]["mode"], "keep_on_bow")         # it waits, it does not expire
+        self.assertEqual(calm.snapshot()["action_target"], "")
+        ship = LocalShip(fight=True)
+        await ship.execute("station", {"station": "helm", "aspect": "course", "mode": "keep_on_bow", "params": {"target": "action"}, "by": "captain"}, "helm")
+        self.assertEqual(ship.snapshot()["action_target"], "T-23")                       # the nearest hostile
+        ship.advance(40)
+        off = lambda cid: abs(((ship.heading - ship.range_bearing(ship.contacts[cid])[1]) + 540) % 360 - 180)      # noqa: E731
+        self.assertLess(off("T-23"), 25)
+        await ship.execute("station", {"station": "tactical", "aspect": "engagement", "mode": "engage", "params": {"targets": ["T-24"]}, "by": "captain"}, "tactical")
+        ship.advance(1)
+        self.assertEqual(ship.snapshot()["action_target"], "T-24")                       # tactical's target is what the fight is about
+        before = off("T-24")
+        ship.advance(60)
+        self.assertLess(off("T-24"), before)                                             # the bow is coming round to the new target
+        self.assertLess(off("T-24"), 45)
+
+    async def test_the_screen_and_the_scan_on_the_action_follow_it_too(self) -> None:
+        ship = LocalShip(fight=True)
+        for st_id, aspect, mode in (("ops", "viewscreen", "target"), ("sensors", "scan", "focus")):
+            res = await ship.execute("station", {"station": st_id, "aspect": aspect, "mode": mode, "params": {"target": "action"}, "by": "captain"}, st_id)
+            self.assertTrue(res["ok"], res)
+        self.assertIn("T-23", ship.snapshot()["viewscreen"])
+        ship.advance(80)                                                                  # T-23 falls: the screen is not released, it moves on
+        st = ship.snapshot()["stations"]
+        self.assertEqual(st["ops"]["modes"]["viewscreen"]["mode"], "target")
+        self.assertEqual(st["sensors"]["modes"]["scan"]["mode"], "focus")
+        self.assertFalse(any(r.startswith("ops: viewscreen released") for r in ship.take_reports()))
+
+    async def test_engage_hostiles_is_a_standing_order_that_outlives_the_targets(self) -> None:
+        ship = LocalShip(fight=True)
+        res = await ship.execute("station", {"station": "tactical", "aspect": "engagement", "mode": "engage", "params": {"targets": ["hostiles"]},
+                                             "until": "target_lost", "by": "captain"}, "tactical")
+        self.assertTrue(res["ok"], res)
+        ship.advance(120)
+        self.assertFalse(ship.contacts["T-23"].alive)                                     # the first one fell (the second circles out of reach)
+        reports = ship.take_reports()
+        self.assertTrue(any("engaging" in r and "was T-23" in r for r in reports), reports)         # it moved on to the next by itself
+        self.assertFalse(any("ended" in r and r.startswith("tactical:") for r in reports), reports)  # and the order still stands
+        self.assertEqual(ship.snapshot()["stations"]["tactical"]["modes"]["engagement"]["mode"], "engage")
+        empty = LocalShip(fight=False)                                                    # nothing hostile on the plot: it waits, it is accepted
+        res = await empty.execute("station", {"station": "tactical", "aspect": "engagement", "mode": "engage", "params": {"targets": ["hostiles"]}}, "tactical")
+        self.assertTrue(res["ok"], res)
+
+    async def test_a_time_limit_sends_any_aspect_back_to_its_default(self) -> None:
+        ship = LocalShip(fight=True)
+        await ship.execute("station", {"station": "tactical", "aspect": "shields", "mode": "forward", "params": {"sector": "forward"}, "until": "time:5"}, "tactical")
+        await ship.execute("station", {"station": "engineering", "aspect": "power", "mode": "combat", "until": "time:5"}, "engineering")
+        await ship.execute("station", {"station": "sensors", "aspect": "emcon", "mode": "silent", "until": "time:5"}, "sensors")
+        self.assertEqual(ship.state["power_pct"]["shields"], 150)
+        ship.advance(7)
+        st = ship.snapshot()["stations"]
+        self.assertEqual(st["tactical"]["modes"]["shields"]["mode"], "face_threat")
+        self.assertEqual(st["engineering"]["modes"]["power"]["mode"], "balanced")
+        self.assertEqual(st["sensors"]["modes"]["emcon"]["mode"], "restricted")
+        self.assertEqual((ship.state["power_pct"]["shields"], ship.state["emcon"]), (100, "restricted"))     # the ship followed the console
+        reports = ship.take_reports()
+        self.assertIn("tactical: shields sector ended (the time set for it is up): back to shields face threat", reports)
+
+    async def test_battle_short_is_800_percent_and_heat_and_normal_scales_it_back(self) -> None:
+        ship = LocalShip(fight=False)
+        for system, pct in (("shields", 150), ("weapons", 150)):
+            self.assertTrue((await ship.execute("route_power", {"system": system, "percent": pct}, "ops"))["ok"])       # 700% of 700%
+        refused = await ship.execute("route_power", {"system": "engines", "percent": 150}, "ops")
+        self.assertFalse(refused["ok"])
+        self.assertIn("budget exceeded", refused["detail"])
+        res = await ship.execute("station", {"station": "engineering", "aspect": "reactor", "mode": "battle_short", "by": "captain"}, "engineering")
+        self.assertTrue(res["ok"], res)
+        self.assertIn("of 800%", ship.snapshot()["power_budget"])
+        self.assertTrue((await ship.execute("route_power", {"system": "engines", "percent": 150}, "ops"))["ok"])       # 750% of 800%
+        heat0 = ship.snapshot()["thermal"]["heat_pct"]
+        ship.advance(60)
+        self.assertGreaterEqual(ship.snapshot()["thermal"]["heat_pct"], heat0 + 17)                                  # +0.3 %/s
+        await ship.execute("station", {"station": "engineering", "aspect": "reactor", "mode": "normal"}, "engineering")
+        snap = ship.snapshot()
+        self.assertIn("of 700%", snap["power_budget"])
+        self.assertLessEqual(sum(snap["power_pct"].values()), 700.5)                                                 # the over-nominal comes down
+        self.assertGreater(snap["power_pct"]["shields"], 100)
+        self.assertTrue(any("back inside its limits" in e for e in ship.events))
+
+    def test_the_watch_does_not_list_hostiles_a_standing_order_already_covers(self) -> None:
+        ship = LocalShip(fight=True)
+        state = ship.snapshot()
+        state["stations"]["tactical"]["modes"]["engagement"] = {"mode": "engage", "params": {"targets": ["HOSTILES"]}, "until": "target_lost",
+                                                                "set_by": "captain", "for_s": 5}           # (the game stores the words in capitals)
+        self.assertFalse(any("no fire assigned" in d for d in initiative.Watch.due(state)))
+        state["stations"]["tactical"]["modes"]["engagement"] = {"mode": "return_fire", "until": "order", "set_by": "default", "for_s": 5}
+        self.assertTrue(any("no fire assigned" in d for d in initiative.Watch.due(state)))
+
+    def test_the_board_says_what_the_action_is_now(self) -> None:
+        state = LocalShip(fight=True).snapshot()
+        self.assertEqual(state["action_target"], "T-23")
+        self.assertIn("the action now (target `action`): T-23 (Cocytus)", S.board(state))
+        calm = LocalShip(fight=False).snapshot()
+        calm["stations"]["helm"]["modes"]["course"] = {"mode": "keep_on_bow", "params": {"target": "action"}, "until": "target_lost", "set_by": "captain", "for_s": 3}
+        self.assertIn("none — no fight", S.board(calm))
+        lane = S.lanes_of(calm["stations"]["helm"])["course"]
+        self.assertEqual((lane["mode"], lane["params"]), ("keep_on_bow", {"target": "action"}))
+        self.assertEqual(S.lanes_of({"modes": {"engagement": {"mode": "engage", "params": {"targets": ["HOSTILES"]}}}})["engagement"]["params"],
+                         {"targets": ["hostiles"]})
 
     async def test_expiries_are_reported_in_the_games_words(self) -> None:
         ship = LocalShip(fight=True)

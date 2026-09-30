@@ -5,7 +5,7 @@ Qui scrivo solo ciò che **non posso fare io** (per regole di sicurezza: creare 
 ## Aperte
 
 ### 2026-09-30 — Credito OpenRouter (quando ti fa comodo)
-Restano circa 6,9 $ su 10. Con la guerra grande (molte più menti) e le mie prove di gioco il consumo salirà: l'obiettivo è
+Restano 5,97 $ su 10 (1/10, verificato sul conto). Con la guerra grande (molte più menti) e le mie prove di gioco il consumo salirà: l'obiettivo è
 restare sotto 1 $ per ora di battaglia, ma per lo sviluppo delle prossime settimane conviene una ricarica di 10–20 $.
 Niente fretta: sotto i 3 $ residui te lo riscrivo qui e riduco le prove che costano.
 
@@ -18,11 +18,9 @@ richiede che tu autorizzi una volta il tuo account Epic nell'editor (io non poss
   e creo e assemblo io gli otto ufficiali (preset scelti per nome e origine, pelle, occhi e corporatura su misura).
 - Nel frattempo l'equipaggio resta con i manichini seduti in posa procedurale (funziona tutto lo stesso).
 
-### 2026-09-28 — Permesso microfono (quando torni, 10 secondi)
-Al primo uso del push-to-talk (tasto **V** in partita) macOS chiederà il permesso di usare il microfono: clicca **Consenti**.
-Senza permesso l'equipaggio funziona comunque con i comandi scritti (console: `astra.say <testo>`). Io non posso concedere permessi di sistema.
 
 ## Chiuse
 - 2026-09-29 — Finestre di permesso di macOS dopo la prova dell'app dal Desktop: risolte, la compilazione è ripartita. ✓
+- 2026-09-29 — Permesso del microfono: concesso (la prima partita ha usato la voce). ✓
 - 2026-09-28 — Chiavi API, account gratuiti, accessi nel browser, Core Data MetaHuman, aggiornamenti Xcode bloccati. ✓
 

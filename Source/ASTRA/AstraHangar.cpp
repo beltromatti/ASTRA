@@ -19,6 +19,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 
+DECLARE_CYCLE_STAT(TEXT("Hangar"), STAT_AstraHangar, STATGROUP_Astra);
+
 namespace
 {
 	const FName ZoneTag(TEXT("ASTRA.Zone.Hangar"));
@@ -338,6 +340,7 @@ FTransform AAstraHangar::DeckSpot() const
 
 void AAstraHangar::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraHangar);
 	Super::Tick(DeltaTime);
 	LiftCooldown = FMath::Max(0.f, LiftCooldown - DeltaTime);
 	// the lift ride: fade out, the car moves (a moment of dark and the hum), fade in on the other deck

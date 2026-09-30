@@ -2,8 +2,10 @@
 
 WebSocket ws://127.0.0.1:8765 — JSON text frames + binary audio frames.
 Game -> mind:  hello · ship_state{state} · event{text} · player_text{text,lang?} · ptt{down} · command_result{id,ok,detail}
-Mind -> game:  status{...} · transcript{text,lang} · command{id,name,args,by} · line{id,speaker,name,text,lang,tone}
-               audio_begin{line,speaker,rate} · <binary: uint32 LE line id + PCM16 mono> · audio_end{line} · turn_end{...}
+Mind -> game:  status{...} · transcript{text,lang} · command{id,name,args,by} · turn_end{...}
+               voice (docs/protocollo_voce.md): line{id,speaker,name,text,lang,tone,priority,est_s,hold_s,...} (sent when the
+               voice starts) · audio_begin{line,speaker,rate,est_s,hold_s} · <binary: uint32 LE line id + PCM16 mono, paced>
+               · audio_end{line,dur_s,reason} · cancel{line,reason,fade_ms} · line_dropped{id,reason} · floor{state}
 
 Also: `astra-mind --say "text"` (one turn against the local ship model, audio to .wav) and `--script file` (a list of
 utterances, timings, audio round-trip check with the recogniser).
@@ -37,9 +39,11 @@ from .director import ADMIRAL, Director
 from .env import CACHE
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
-from .stt import WhisperKit
-from .speech import Voice
+from .stt import Recognizer
+from .voice_lang import resolve_language
+from .speech import REPORT_LATE_S, Voice
 from .tts import TTSEngine
+from .voice_qos import boost_thread
 
 log = logging.getLogger("astra.mind")
 HOST, PORT = "127.0.0.1", 8765
@@ -101,16 +105,12 @@ EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
 
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402
+# events whose report is a warning of danger: the crew says them before any routine talk (voice priority URGENT)
+_URGENT_EVENT = _re.compile(r"missiles? inbound|rockets? inbound|hull integrity critical|containment failing|abandon ship|breach", _re.I)
+# events that are not news but a request to speak (the flight controller calls, the after-action report, the fleet net's news, a visitor
+# at the door): they are reported whenever the bridge is quiet, however long that took
+_NOT_PERISHABLE = _re.compile(r"^(flight: controller call|bridge: after-action|comms: fleet net news)|has come to the Captain's quarters in person", _re.I)
 _GM_ADDRESS = _re.compile(r"^\W*(regista|director|narrat\w*|game ?master|gm|réalisateur|directeur|director de juego|spielleiter|erzähler)\b[\s,:;.!-]*", _re.I)
-
-# the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
-import re as _re
-_CREW_ADDRESS = _re.compile(
-    r"^\W*(serra|ferri|tanaka|voss|martin|nair|mensah|price|okonkwo|capo|chief|lindqvist|dottor\w*|doctor|doc|"
-    r"numero uno|primo ufficiale|xo|comandante|timon\w*|helm\w*|"
-    r"tattic\w*|tactical|ops|operazion\w*|operations|comunicazion\w*|comms?|sensor\w*|scienz\w*|ingegner\w*|"
-    r"engineering|volo|flight|plancia|bridge|number one|chiud\w* (il )?canale|close (the )?channel|fine trasmissione|"
-    r"end transmission|praetorian|vigilant|flotta|fleet|scorta|escort)\b", _re.I)
 
 
 def speaker_identity(speaker: str) -> tuple[str, str, bool]:
@@ -121,21 +121,28 @@ def speaker_identity(speaker: str) -> tuple[str, str, bool]:
     return name, voice, False
 
 
-def addressed_to_crew(text: str) -> bool:
-    return bool(_CREW_ADDRESS.match(text.strip()))
+class _TurnQueue(asyncio.Queue):
+    """The turns waiting for the crew. An event that goes in is stamped with the time it arrived (loop time, a fourth item): a report of it is
+    worth saying only while it is news, and the wait for a quiet bridge must not make old news of it unnoticed."""
+
+    def put_nowait(self, item) -> None:  # noqa: ANN001
+        if isinstance(item, tuple) and len(item) == 2 and str(item[0]).startswith("\x00event:"):
+            item = (item[0], item[1], None, asyncio.get_running_loop().time())
+        super().put_nowait(item)
 
 
 class Mind:
     def __init__(self) -> None:
         self.llm = OpenRouter()
         self.tts = TTSEngine()
-        self.stt = WhisperKit()
+        self.stt = Recognizer()
         self.mic = PushToTalk()
+        self._ptt_session = None                # the recognition session of the key press being held
         self.local = LocalShip()
         self.clients: set = set()
         self.game: GameShip | None = None
         self.voice = Voice(self.tts, self._sink, speaker_identity)
-        self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
+        self.agent = BridgeAgent(self.llm, self.local, self._crew_say)
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
         self.port = FieldControl(self.llm, self._say_external, self._register_field)
         self.mess = MessTalk(self.llm, self.voice.say)
@@ -161,7 +168,7 @@ class Mind:
         self.agent.mood = lambda: self.director.mood
         self.agent.bonds = lambda: "\n".join(f"- {line}" for line in self.director.bonds_lines())
         self.agent.standing = self.director.standing        # one list: the agent keeps it, the story saves it
-        self.turns: asyncio.Queue = asyncio.Queue()
+        self.turns: asyncio.Queue = _TurnQueue()
         self.exchange = Exchange()               # who spoke last on the channel: an exchange going on (the router reads it)
         self.watch = Watch()                     # the officers' initiative watch (initiative.py)
         self._ptt_ctx: dict[str, Any] | None = None   # the game's `context` for the words being spoken (ptt)
@@ -186,9 +193,9 @@ class Mind:
             who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
             self.game.events.append(f"over the radio, {who}: {text}")
         if self.enemy.open and speaker == self.enemy.speaker:
-            self.exchange.heard(self.enemy.contact)          # (an exchange is going on: a short reply of the Captain's is for them)
+            self.exchange.heard(self.enemy.contact, text)    # (an exchange is going on: comms knows what they just said)
         elif speaker == ADMIRAL["key"]:
-            self.exchange.heard("fleet")
+            self.exchange.heard("fleet", text)
         await self.voice.say(speaker, text, lang, tone)
 
     def record_log(self, entry: str) -> None:
@@ -356,7 +363,7 @@ class Mind:
                 finally:
                     self.voice.low_priority = False
                 continue
-            self.voice.low_priority = True
+            self.voice.chatter = True             # (small talk: the lowest priority, dropped when the Captain speaks)
             try:
                 if personal:
                     who = random.choice([k for k in ("xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight")
@@ -378,7 +385,7 @@ class Mind:
                              "no reports, no tools except speak; at most two lines in total."))
                     log.info("quiet moment (%s, %s): %s", pair[0], pair[1], " | ".join(f"{s}: {x}" for s, x in t.lines))
             finally:
-                self.voice.low_priority = False
+                self.voice.chatter = False
 
     async def idle_exit(self) -> None:
         """A mind nobody has talked to for 20 minutes goes (a game that crashed or quit does not leave it running)."""
@@ -558,23 +565,28 @@ class Mind:
             try:
                 self.agent.ship = self.game if (self.game and self.game.state) else self.local
                 if text.startswith("\x00event:"):
-                    # let the bridge fall quiet first (reports must not pile up behind the voices), then coalesce:
-                    # everything that happened meanwhile becomes one report turn; the Captain's words are never merged
-                    # or delayed behind events
-                    while self.voice.busy_s() > 1.2 and self.turns.empty():
+                    # let the bridge fall quiet first (reports must not pile up behind the voices; a warning of danger waits for
+                    # nobody), then coalesce: everything that happened meanwhile becomes one report turn; the Captain's words
+                    # are never merged or delayed behind events
+                    while not _URGENT_EVENT.search(text) and (self.voice.busy_s() > 1.2 or self.voice.held) and self.turns.empty():
                         await asyncio.sleep(0.2)
                     events = [text[len("\x00event:"):]]
+                    when = [rest[1] if len(rest) > 1 else None]           # (the time each one arrived: see _TurnQueue)
                     pending = []
                     while not self.turns.empty():
                         nxt = self.turns.get_nowait()
-                        (events if nxt[0].startswith("\x00event:") else pending).append(
-                            nxt[0][len("\x00event:"):] if nxt[0].startswith("\x00event:") else nxt)
+                        if nxt[0].startswith("\x00event:"):
+                            events.append(nxt[0][len("\x00event:"):])
+                            when.append(nxt[3] if len(nxt) > 3 else None)
+                        else:
+                            pending.append(nxt)
                     for p in pending:
                         await self.turns.put(p)
                     if pending:
                         continue          # the Captain spoke: answer first, the events stay in the state/history
                     transmissions = [e for e in events if e.startswith("transmission:")]
-                    events = [e for e in events if not e.startswith("transmission:")]
+                    keep = [i for i, e in enumerate(events) if not e.startswith("transmission:")]
+                    events, when = [events[i] for i in keep], [when[i] for i in keep]
                     for tr in transmissions:
                         # "transmission: T-22 — why": that captain calls the Aquila (arrival, succession, broken ceasefire)
                         m = _re.match(r"transmission:\s*(T-\d+)\s*—\s*(.*)", tr)
@@ -588,11 +600,26 @@ class Mind:
                                        "wants the Gates for his people; proud, laconic, honest.",
                                 "voice": "stuart_bell"})
                         if m and self.enemy.open_channel(m.group(1)):
-                            await self.enemy.respond(f"[Situation: {m.group(2)}. You are the one opening this channel: make "
-                                                     "your transmission to the Aquila's captain.]", self.lang, self._battle_state())
+                            written = await self.voice.preemptible(self.enemy.respond(
+                                f"[Situation: {m.group(2)}. You are the one opening this channel: make "
+                                "your transmission to the Aquila's captain.]", self.lang, self._battle_state()))
+                            if written is None:      # the Captain took the floor while the message was being written: it is written after his order
+                                await self.turns.put(("\x00event:" + tr, self.lang))
+                    # news that waited too long for a quiet bridge is no news any more: when even the newest of it is old, nothing is reported
+                    # (it stays in the ship's state); in a fresh batch the old items say how old they are, so the crew speaks of them in the
+                    # past or not at all
                     if not events:
                         continue
+                    now_t = asyncio.get_running_loop().time()
+                    newest = max((w for w in when if w is not None), default=None)
+                    # (news that waited for a quiet bridge still goes to the officers, with its age: whether it is worth saying now is
+                    # theirs to judge — docs/ARCHITETTURA.md §1bis)
+                    fresh_events = list(events)
+                    events = [e if w is None or now_t - w <= REPORT_LATE_S else f"{e} [happened {now_t - w:.0f} s ago]" for e, w in zip(events, when)]
                     self.voice.low_priority = True
+                    self.voice.report_since = newest              # (a report is worth saying for a few seconds after its news; see speech.py)
+                    if any(_URGENT_EVENT.search(e) for e in events):
+                        self.voice.urgent = True          # (danger now: it does not wait behind small talk or a routine report)
                     try:
                         ask = FLIGHT_CALL_ASK if any(e.startswith("flight: controller call") for e in events) else \
                             AFTER_ACTION_ASK if any(e.startswith("bridge: after-action") for e in events) else \
@@ -601,12 +628,21 @@ class Mind:
                         t = await self._event_turn(events, ask)
                     finally:
                         self.voice.low_priority = False
+                        self.voice.report_since = None
                     log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
+                    if getattr(t, "cancelled", False) and not t.lines:
+                        # the Captain took the floor while a warning of danger was being written: it is reported after his order (the crew
+                        # says nothing if what he ordered already covered it)
+                        for e in [e for e in fresh_events if _URGENT_EVENT.search(e)]:
+                            await self.turns.put(("\x00event:" + e, self.lang))
                     continue
-                dropped = self.voice.drop_low_priority()      # the Captain speaks: pending reports can wait
+                self.voice.captain_turn_begin()               # what is said from here to the end of this turn answers the Captain
+                dropped = self.voice.drop_low_priority()      # the Captain speaks: small talk is no longer worth saying
                 if dropped:
-                    log.info("captain speaks: %d unspoken report lines dropped", dropped)
+                    log.info("captain speaks: %d unspoken small-talk lines dropped", dropped)
                 if lang != self.lang:
+                    if hasattr(self.tts, "prepare"):
+                        asyncio.create_task(self.tts.prepare(lang, [o.voice for o in CREW.values()]))   # the crew will answer in it
                     self.lang = lang
                     self.lang_file.parent.mkdir(parents=True, exist_ok=True)
                     self.lang_file.write_text(lang)
@@ -639,11 +675,23 @@ class Mind:
                 await self._captain_turn(text, lang, raw_ctx)      # (the router, the crew's turn, the party's answer)
             except Exception:  # noqa: BLE001
                 log.exception("turn failed")
+            finally:
+                self.voice.captain_turn_end()             # (no line came out of the Captain's turn: his floor is released)
 
     # ---------------------------------------------------------------------------------------------- the Captain's words
+    async def _crew_say(self, speaker: str, text: str, lang: str, tone: str) -> int:
+        """A line of the crew's: when its turn comes after a wait (or after being cut off), its officer thinks it again first."""
+        async def rethink(t: str, waited: float, cut_after: str) -> str | None:
+            return await self.agent.rethink(speaker, t, waited, cut_after, lang)
+        return await self.voice.say(speaker, text, lang, tone, rethink=rethink)
+
     def _party_names(self) -> dict[str, str]:
         names = {cid: f'{c["name"]} ({c["ship"]})' for cid, c in COMMANDERS.items()}
-        names["fleet"] = f'{ADMIRAL["name"]} (7th Fleet)'
+        # the fleet channel reaches the admiral and every allied ship: comms knows which ships those are (the plot shows them)
+        st = self.game.state if (self.game and self.game.state) else {}
+        allies = [str(c.get("name") or c.get("id")).split(" (")[0] for c in st.get("contacts", [])
+                  if str(c.get("status", "")).startswith("friendly") and c.get("name")]
+        names["fleet"] = f'{ADMIRAL["name"]} and the 7th Fleet' + (f' ({", ".join(allies)})' if allies else "")
         return names
 
     def _captain_speaks(self) -> None:
@@ -676,58 +724,27 @@ class Mind:
         await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {words}", lang, self._battle_state())
 
     async def _captain_turn(self, text: str, lang: str, raw_ctx: dict[str, Any] | None) -> None:
-        """The Captain's words: whom are they for (the router: rules first, a small model only for the rare case they cannot
-        settle), the crew's turn, and the answer of whoever is on the channel. The crew does not wait for the router: in the
-        rare open case it starts on the words at once and nothing is said or done until the router answers."""
+        """The Captain's words. Everyone in the room hears them: the crew's turn starts at once on all of them, and each officer judges
+        whether they were meant for them. With a channel open, the comms officer's call (router.for_party, a small fast model) decides
+        meanwhile what goes out on it, and whoever is there answers what reached them."""
         st = self.game.state if (self.game and self.game.state) else {}
         ctx = parse_context(raw_ctx, st, self.enemy, self._party_names(), self.exchange)
-        r = router_mod.quick(text, ctx)
-        if r is not None and r.external and not self._can_answer(r.party):
-            # (the channel is open but nobody on it can answer — a friendly ship, a decoy: the words stay with the crew)
-            r.crew, r.external, r.party = (r.crew + " " + r.external).strip(), "", ""
-        gate = route_task = None
-        if r is None:
-            gate = asyncio.get_running_loop().create_future()
-            route_task = asyncio.create_task(router_mod.route_llm(self.llm, text, ctx))
-            crew_text = text
-        else:
-            crew_text = r.crew
-        note = ""
-        if r is not None and r.addressed:
-            note = "the Captain addresses " + " and ".join(self.agent.titles.get(o, o) for o in r.addressed)
-        if r is not None and r.unsure and ctx.channel and ctx.channel.open:
-            note += ("; " if note else "") + (f"a channel with {ctx.channel.name or ctx.channel.party} is open and these words may have "
-                                              "been meant for them: if so, Martin offers to pass them on")
-        turn_task = None
-        if crew_text:
-            self.memory.hear("Captain", crew_text)
-            turn_task = asyncio.create_task(self.agent.handle(crew_text, lang, ctx, note, gate))
-        if route_task is not None:
-            try:
-                got = await asyncio.wait_for(route_task, timeout=1.5)
-            except asyncio.TimeoutError:
-                got = None
-            if got is None:
-                r = router_mod.Route(crew=text, how="fallback", unsure=True)
-            else:
-                r = got
-                r.addressed = router_mod.decide(text, ctx).officers
-                if r.external and not self._can_answer(r.party):
-                    r.crew, r.external, r.party = (r.crew + " " + r.external).strip() or text, "", ""
-            gate.set_result(r.dest == "crew" or (r.how == "fallback"))
-            if r.dest == "both":                                    # the crew's turn was for the whole: start it again on its part
-                await turn_task
-                self.memory.hear("Captain", r.crew)
-                turn_task = asyncio.create_task(self.agent.handle(r.crew, lang, ctx, ""))
-        if ctx.channel:
-            log.info("channel open with %s, routed (%s, %.0f ms): crew=%r party=%r", ctx.channel.party, r.how, r.ms, r.crew[:60],
-                     r.external[:60])
-        t = await turn_task if turn_task is not None else None
-        if r.external and r.party:
-            await self._to_party(r.party, r.external, lang)
+        self.memory.hear("Captain", text)
+        turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx))
+        r = router_mod.Route()
+        party_task = None
+        ch = ctx.channel
+        if ch and ch.live and self._can_answer(ch.party):
+            r = await router_mod.for_party(self.llm, text, ctx)
+            log.info("channel open with %s: out on it (%s, %.0f ms): %r", ch.party, r.how, r.ms, r.external[:80])
+            if r.external:
+                party_task = asyncio.create_task(self._to_party(r.party, r.external, lang))
+        t = await turn_task
+        if party_task is not None:
+            await party_task
         if t is None or (t.cancelled and not t.actions):
             return
-        self.style.captain_order(crew_text if r.dest != "both" else r.crew, t.actions)
+        self.style.captain_order(text, t.actions)
         asyncio.create_task(self.memory.maybe_read())
         for name, args_, res in t.actions:
             if name == "end_transmission":
@@ -742,22 +759,21 @@ class Mind:
                                          lang, self._battle_state())
         await self._sink("json", {"type": "turn_end", "first_line_s": t.t_first_line, "total_s": round(t.t_end, 3),
                                   "cost": t.cost, "actions": [[n, a, r_] for n, a, r_ in t.actions], "error": t.error,
-                                  "route": {"dest": r.dest, "how": r.how, "ms": round(r.ms, 1), "addressed": list(r.addressed)}})
+                                  "route": {"to_party": r.external, "how": r.how, "ms": round(r.ms, 1)}})
         log.info("turn %.2fs (first line %.2fs) cost $%.5f: %s", t.t_end, t.t_first_line or -1, t.cost,
                  " | ".join(f"{s}: {x}" for s, x in t.lines))
 
     async def _chatter(self, event: str, lang: str, ask: str):
-        """A quiet moment's talk: its own model role (small and cheap), a compact prompt, only `speak`, two lines at most."""
+        """A quiet moment's talk: its own model role (small and cheap), a compact prompt that asks for two or three lines, only `speak`."""
         system = chatter_system(lang, self.director.mood, self.memory.lines(), "; ".join(self.director.bonds_lines()), self.director.home_lines(),
                                 list(self.director.campaign), list(self.game.events)[-5:] if self.game else [])
-        return await self.agent.handle_event(event, lang, ask=ask, role="chatter", system=system, history_turns=2, max_lines=2, speak_only=True)
+        return await self.agent.handle_event(event, lang, ask=ask, role="chatter", system=system, history_turns=2, speak_only=True)
 
     async def _event_turn(self, events: list[str], ask: str | None):
         """A report turn (or the officers' watch check: its own compact prompt, its own cheaper model, only the last few exchanges)."""
         if any(e.startswith("bridge: watch") for e in events):
             st = self.game.state if (self.game and self.game.state) else self.local.snapshot()
             t = await self.agent.handle_event(" | ".join(events), self.lang, ask=watch_ask(self.lang), role="watch", history_turns=4,
-                                              max_lines=2,
                                               system=watch_system(self.lang, st, self.agent.standing_lines(), self.agent.style(),
                                                                   recent_orders(self.agent.history)))
             chk = getattr(self, "_watch_check", None)
@@ -768,8 +784,10 @@ class Mind:
 
     async def handle_client(self, ws) -> None:  # noqa: ANN001
         self.clients.add(ws)
+        self.voice.muted = False
         self.game = GameShip(lambda m: ws.send(json.dumps(m, ensure_ascii=False)))
-        await ws.send(json.dumps({"type": "status", "crew": {k: v.title for k, v in CREW.items()}, "rate": self.tts.sample_rate}))
+        await ws.send(json.dumps({"type": "status", "crew": {k: v.title for k, v in CREW.items()}, "rate": self.tts.sample_rate,
+                                  "voice": 2}))       # voice protocol 2: docs/protocollo_voce.md (cancel, hold_s, floor, line_dropped)
         log.info("game connected")
         try:
             async for raw in ws:
@@ -787,8 +805,11 @@ class Mind:
                     self.agent.history.clear()
                     self.enemy.reset()
                     self.port.reset()
+                    await self.voice.clear("new_session")     # what the last session had not said yet is not said in this one
                     self.watch.reset()
                     self.exchange.reset()
+                    if isinstance(self.llm, OpenRouter):
+                        asyncio.create_task(self._warm_up())         # (the session's first report should not pay for a cold route)
                     log.info("new game session: conversation reset (the war waits for the Captain's choice)")
                 elif kind == "campaign":
                     # the Captain chose in the title menu: a new war, or the saved one
@@ -872,36 +893,62 @@ class Mind:
                         await self.turns.put(("\x00event:" + text, self.lang))
                 elif kind == "command_result":
                     self.game.resolve(msg)
+                elif kind == "voice_status":
+                    # the game's own word on a line (started, stalled, failed): the only proof that a voice was really heard
+                    self.voice.game_status(msg)
                 elif kind == "player_text":
                     self.last_activity = self.captain_t = time.monotonic()
                     text = msg.get("text", "").strip()
                     if text:
-                        self._captain_speaks()                        # (priority: the crew stops what it was doing)
-                        await self.turns.put((text, msg.get("lang") or detect_lang(text), msg.get("context")))
+                        self.voice.captain_input()             # a typed order takes the floor like a spoken one
+                        self._captain_speaks()                 # (priority: the crew's model calls stop, and the line in flight)
+                        await self.turns.put((text, msg.get("lang") or resolve_language(text, self.lang)[0], msg.get("context")))
                 elif kind == "ptt":
                     if msg.get("down"):
-                        self._captain_speaks()
+                        self.voice.captain_begin()             # whoever talks stops at the end of the phrase; the floor is his
+                        self._captain_speaks()                 # (and the crew's model calls with them: agent.preempt)
                         self._ptt_ctx = msg.get("context") or self._ptt_ctx
-                        ok = self.mic.start()
-                        if not ok:
+                        self._ptt_session = self.stt.session()
+                        if not await self.mic.begin(self._ptt_session.feed):
+                            self.voice.captain_end(False)
                             await ws.send(json.dumps({"type": "status", "mic": "unavailable"}))
                     else:
-                        pcm = self.mic.stop()
-                        asyncio.create_task(self._recognise(pcm, msg.get("context") or self._ptt_ctx))
+                        self.voice.captain_end(None)           # (his order is coming: the floor stays his until it is answered)
+                        asyncio.create_task(self._recognise(msg.get("context") or self._ptt_ctx))
         finally:
             self.clients.discard(ws)
+            if not self.clients:
+                self.voice.muted = True                        # nobody is listening: nothing more is made or queued
+                await self.voice.clear("no_listener")
             log.info("game disconnected")
 
-    async def _recognise(self, pcm: bytes, ctx: dict[str, Any] | None = None) -> None:
-        if len(pcm) < 16000 * 2 * 0.3:
+    async def _warm_up(self) -> None:
+        """One minimal request through the crew's route (connection, provider, prompt cache) while the game is still starting."""
+        try:
+            await asyncio.sleep(0.4)                                 # (the game's first ship_state is in: the prompt is the real one)
+            self.agent.ship = self.game if (self.game and self.game.state) else self.local
+            log.info("crew route warmed in %.2fs", await self.agent.warm_up(self.lang))
+        except Exception as exc:  # noqa: BLE001
+            log.info("warm-up skipped: %s", exc)
+
+    async def _recognise(self, ctx: dict[str, Any] | None = None) -> None:
+        """The key is up: the last sounds, then the words (most of them were already decoded while he spoke)."""
+        session, self._ptt_session = self._ptt_session, None
+        rec = await self.mic.finish()
+        if session is None or rec.speech_s < 0.15:
+            if session is not None:
+                session.cancel()
+            self.voice.captain_end(False)                  # nothing was said: nobody is kept waiting for an order
             return
-        t0 = time.perf_counter()
-        text, lang = await self.stt.transcribe(pcm)
-        log.info("STT %.2fs [%s] %s", time.perf_counter() - t0, lang, text)
+        tr = await session.finish(rec.raw)
+        log.info("STT %.2fs after the key (decode %.2fs, %s%s) [%s] %s", tr.latency_s, tr.decode_s, tr.backend,
+                 ", from the partial" if tr.partial_hit else "", tr.lang, tr.text)
         self.captain_t = time.monotonic()
-        await self._sink("json", {"type": "transcript", "text": text, "lang": lang})
-        if text:
-            await self.turns.put((text, lang, ctx))
+        if not tr.text:
+            self.voice.captain_end(False)
+            return
+        await self._sink("json", {"type": "transcript", "text": tr.text, "lang": tr.lang})
+        await self.turns.put((tr.text, tr.lang, ctx))
 
     def _quit(self, sig: int) -> None:
         log.info("signal %d: the mind stops", sig)
@@ -925,7 +972,14 @@ class Mind:
         asyncio.create_task(self.idle_exit())
         asyncio.create_task(self.flight_controller())
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.tts.warm, "en", [o.voice for o in CREW.values()])
+        boost_thread()                                # this thread (the audio's pacing) on the performance cores, like the game
+
+        async def warm_voices() -> None:
+            # the Captain's language first, then English (the two stay in memory); in the background: the door opens at once (a first
+            # start downloads the models: minutes), and a line said before they are ready is said by a system voice
+            for lg in dict.fromkeys([self.lang, "en"]):
+                await loop.run_in_executor(None, self.tts.warm, lg, [o.voice for o in CREW.values()])
+        asyncio.create_task(warm_voices())
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
         # a game busy for a while (loading, compiling shaders) must not lose the crew: pings wait up to 90 s
         async with websockets.serve(self.handle_client, HOST, PORT, max_size=2 ** 22, ping_interval=20, ping_timeout=90):
@@ -935,7 +989,7 @@ class Mind:
 # ---------------------------------------------------------------------------------------------- offline tools
 async def offline_turns(utterances: list[str], out_dir: Path, check_audio: bool) -> None:
     llm, tts = OpenRouter(), TTSEngine()
-    stt = WhisperKit() if check_audio else None
+    stt = Recognizer() if check_audio else None
     if stt:
         await stt.start()
     ship = LocalShip()
