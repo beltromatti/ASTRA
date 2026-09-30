@@ -28,6 +28,8 @@ AAstraWalker::AAstraWalker()
 	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -92.f));
 	GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;   // unseen: it walks, the pose waits
+	GetMesh()->bEnableUpdateRateOptimizations = true;
 }
 
 void AAstraWalker::BeginPlay()

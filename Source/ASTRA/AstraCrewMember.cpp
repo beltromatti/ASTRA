@@ -21,6 +21,9 @@ AAstraCrewMember::AAstraCrewMember()
 	Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
 	RootComponent = Body;
 	Body->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	// the crew are many and spread over twelve decks: an animation that nobody sees is not computed
+	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+	Body->bEnableUpdateRateOptimizations = true;
 	Seated = CreateDefaultSubobject<UPoseableMeshComponent>(TEXT("Seated"));
 	Seated->SetupAttachment(Body);
 	Seated->SetVisibility(false);
@@ -337,7 +340,16 @@ void AAstraCrewMember::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (VisitPhase == 1 || VisitPhase == 3)
 	{
+		SetActorTickInterval(0.f);
 		TickVisit(DeltaSeconds);
+		return;
+	}
+	// out of sight (another deck, behind a wall): a slow heartbeat, no procedural pose; back to every frame when seen
+	const bool bSeen = Body->WasRecentlyRendered(0.3f) || Seated->WasRecentlyRendered(0.3f) || IsSpeaking();
+	SetActorTickInterval(bSeen ? 0.f : 0.5f);
+	if (!bSeen)
+	{
+		SpeakingLevel = 0.f;
 		return;
 	}
 
