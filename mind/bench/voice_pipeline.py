@@ -8,6 +8,10 @@
     uv run python -m bench.voice_pipeline mic                          push-to-talk capture against a fake sound device
     uv run python -m bench.voice_pipeline floor                        the speech-floor scenarios (bench/voice_floor.py) + real-voice timings
     uv run python -m bench.voice_pipeline report                       docs/bench/voce_<date>.md from the results gathered so far
+    uv run python -m bench.voice_e2e [--lang it|en]                    the whole glue end to end (fake game, fake microphone, fake model); its results
+                                                                       join the report
+Several sections can follow one another on one line (`stt live tts`); the `stt` flags --per-lang N and --slow-every N shrink the corpus and the sample
+the slow engines see.
 
 Results of every section are kept in mind/.cache/voice_bench/results_<section>.json (a section run again replaces its own)."""
 from __future__ import annotations
@@ -683,7 +687,10 @@ def summary_lines(stt, live, lang, other, tts, floor, mem) -> list[str]:  # noqa
             if pair is None:
                 continue
             an, mine, theirs = pair
-            S.append(f"  - **{n}** sulle stesse {len(mine)} frasi di {an}: mediana {fmt_ms(statistics.median([x['wall'] for x in mine]))} ms "
+            note = ""
+            if abs(base[n]["load_avg"] - base[an]["load_avg"]) > 2.0:
+                note = f" (misure in prove diverse: carico medio {base[n]['load_avg']:.1f} contro {base[an]['load_avg']:.1f}, i tempi non sono confrontabili, il WER sì)"
+            S.append(f"  - **{n}** sulle stesse {len(mine)} frasi di {an}{note}: mediana {fmt_ms(statistics.median([x['wall'] for x in mine]))} ms "
                      f"(p95 {fmt_ms(pct([x['wall'] for x in mine], 95))}) contro {fmt_ms(statistics.median([x['wall'] for x in theirs]))} ms; "
                      f"WER pulito {wer_cond(mine, 'clean')} contro {wer_cond(theirs, 'clean')}, rumoroso {wer_cond(mine, 'noisy')} contro {wer_cond(theirs, 'noisy')}.")
         pk = base.get("parakeet-ultra")
@@ -746,7 +753,7 @@ def decisions_lines(stt, live, tts, floor, mem, other) -> list[str]:  # noqa: AN
                      f"rumoroso {wer_cond(theirs, 'noisy')} contro {wer_cond(mine, 'noisy')}, difficile {wer_cond(theirs, 'hard')} contro {wer_cond(mine, 'hard')}. "
                      "Whisper resta per le lingue che Parakeet non conosce (giapponese, cinese, coreano, arabo, turco…).")
     if pk and v3:
-        D.append(f"2. **Ultra e non v3**: stessa velocità, WER pulito {wer_cond(pk['rows'], 'clean')} contro {wer_cond(v3['rows'], 'clean')} e in condizioni difficili "
+        D.append(f"2. **Ultra e non v3**: stessa velocità (nella prova in cui giravano insieme, con la macchina carica: 120 e 123 ms di mediana), WER pulito {wer_cond(pk['rows'], 'clean')} contro {wer_cond(v3['rows'], 'clean')} e in condizioni difficili "
                  f"{wer_cond(pk['rows'], 'hard')} contro {wer_cond(v3['rows'], 'hard')}.")
     if wb and wt:
         D.append(f"3. **I flag di WhisperKit non si toccano.** «Tarato» (senza fallback di temperatura né divisione in blocchi) guadagna {100 * (1 - med(wt['rows']) / med(wb['rows'])):.0f} % di tempo "
@@ -784,6 +791,16 @@ def decisions_lines(stt, live, tts, floor, mem, other) -> list[str]:  # noqa: AN
                  "le altre righe sono dette, unite, accorciate o scartate secondo regole chiare e mai in silenzio.")
     D.append("")
     return D
+
+
+def italian_numbers(lines: list[str]) -> list[str]:
+    """Decimal commas in the prose and the tables (not in code blocks): the report is in Italian, 14,5 % and not 14.5 %."""
+    out, fenced = [], False
+    for line in lines:
+        if line.startswith("```"):
+            fenced = not fenced
+        out.append(line if fenced or line.startswith("```") else re.sub(r"(?<![\w.])(\d+)\.(\d+)(?![\w.])", r"\1,\2", line))
+    return out
 
 
 def report(args) -> None:  # noqa: ANN001
@@ -977,7 +994,7 @@ def report(args) -> None:  # noqa: ANN001
           "permesso di sistema non si sono potuti provare qui.",
           "- **Il gioco non c'è**: la colla della mente è provata con un gioco finto; come il gioco riproduce l'audio (coda procedurale, attenuazione, musica) è nella diagnosi di "
           "`docs/protocollo_voce.md` e va verificato col gioco vero dopo le correzioni C++.", ""]
-    out.write_text("\n".join(L) + "\n", encoding="utf-8")
+    out.write_text("\n".join(italian_numbers("\n".join(L).split("\n"))) + "\n", encoding="utf-8")
     print("REPORT", out)
 
 

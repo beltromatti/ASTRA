@@ -199,7 +199,15 @@ class ParakeetBackend(SttBackend):
                 header["lang"] = lang
             self._proc.stdin.write((json.dumps(header) + "\n").encode() + pcm16)
             await self._proc.stdin.drain()
-            msg = await asyncio.wait_for(fut, timeout=30)
+            try:
+                msg = await asyncio.wait_for(fut, timeout=10)
+            except asyncio.TimeoutError:
+                # a phrase decodes in a tenth of a second: a helper that says nothing for ten is stuck (the Neural Engine, a lost
+                # message): it is stopped so the next phrase starts a fresh one, and this one goes to the other engine
+                self._pending.pop(rid, None)
+                log.error("the Parakeet helper did not answer in 10 s: restarting it")
+                self.stop()
+                raise RuntimeError("the Parakeet helper did not answer")
         if not msg.get("ok"):
             raise RuntimeError(f"Parakeet: {msg.get('error')}")
         words = [(w["w"], float(w["s"]), float(w["e"])) for w in msg.get("words", [])]
@@ -331,7 +339,7 @@ class WhisperKitBackend(SttBackend):
             data["language"] = lang
         files = {"file": ("speech.wav", pcm16_to_wav(pcm16), "audio/wav")}
         t0 = time.perf_counter()
-        r = await self._client.post(self.url, data=data, files=files)
+        r = await self._client.post(self.url, data=data, files=files, timeout=15.0)       # (a phrase takes two seconds, three at worst)
         r.raise_for_status()
         j = r.json()
         self.last_used = time.monotonic()

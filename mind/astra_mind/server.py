@@ -841,8 +841,13 @@ class Mind:
         asyncio.create_task(self.flight_controller())
         loop = asyncio.get_running_loop()
         boost_thread()                                # this thread (the audio's pacing) on the performance cores, like the game
-        for lg in dict.fromkeys([self.lang, "en"]):   # the Captain's language first, then English (the two stay in memory)
-            await loop.run_in_executor(None, self.tts.warm, lg, [o.voice for o in CREW.values()])
+
+        async def warm_voices() -> None:
+            # the Captain's language first, then English (the two stay in memory); in the background: the door opens at once (a first
+            # start downloads the models: minutes), and a line said before they are ready is said by a system voice
+            for lg in dict.fromkeys([self.lang, "en"]):
+                await loop.run_in_executor(None, self.tts.warm, lg, [o.voice for o in CREW.values()])
+        asyncio.create_task(warm_voices())
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
         # a game busy for a while (loading, compiling shaders) must not lose the crew: pings wait up to 90 s
         async with websockets.serve(self.handle_client, HOST, PORT, max_size=2 ** 22, ping_interval=20, ping_timeout=90):
