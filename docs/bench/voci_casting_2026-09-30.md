@@ -242,23 +242,14 @@ WER = parole sbagliate / parole, numeri esclusi (più basso = più intelligibile
 | doctor | lola | 0.23 | 0.05 | 0.04 | 0.32 | 0.20 | 0.28 | 0.10 |
 | flight | javert | 0.22 | 0.00 | 0.04 | 0.29 | 0.09 | 0.18 | 0.20 |
 
-### Sostituzioni proposte (WER oltre 0,25 nella lingua)
+### Sostituzioni (WER oltre 0,30 nella lingua e una voce libera dello stesso genere con almeno 0,10 in meno; ogni sostituta parla per un solo ufficiale)
 
-| Lingua/voce | parla al suo posto |
-|---|---|
-| de/charles | michael |
-| de/eve | anna |
-| de/mary | vera |
-| fr/caro_davy | eponine |
-| fr/charles | michael |
-| fr/daan | michael |
-| fr/eve | jane |
-| fr/javert | michael |
-| fr/lola | jane |
-| fr/mary | jane |
-| fr/peter_yearsley | michael |
-| it/charles | stuart_bell |
-| it/daan | stuart_bell |
-| it/giovanni | stuart_bell |
-| pt/charles | juergen |
-| pt/lola | vera |
+| Lingua/voce | parla al suo posto | WER prima → dopo |
+|---|---|---|
+| de/mary | vera | 0.34 → 0.14 |
+| fr/caro_davy | eponine | 0.32 → 0.14 |
+| fr/peter_yearsley | michael | 0.35 → 0.22 |
+| it/charles | george | 0.38 → 0.26 |
+| it/giovanni | stuart_bell | 0.33 → 0.16 |
+
+Voci degli ufficiali che restano sopra 0,30 (nessuna voce libera è chiaramente migliore): it/eve (tactical) 0.32, fr/eve (tactical) 0.32, fr/lola (doctor) 0.32.

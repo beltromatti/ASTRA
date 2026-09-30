@@ -6,9 +6,12 @@ It produces three things:
   - docs/bench/voci_casting_<date>.md   the table (WER per language, loudness, pace, pitch) and the officers' voices checked
   - astra_mind/voice_gains.json         the gain that brings each voice in each language to the target loudness (shipped)
   - astra_mind/voice_overrides.json     where an officer's voice is hard to understand in a language, the voice that speaks
-                                        for them there (same gender, nearest pitch, not used by another officer)
+                                        for them there (same gender, nearest pitch, clearly clearer, and a voice that speaks
+                                        for one officer only: ten officers must not end up with three voices)
 
-Run:  uv run python -m astra_mind.voice_casting [--langs it,en,es,fr,de,pt,nl] [--voices alba,eve] [--no-write]"""
+Run:  uv run python -m astra_mind.voice_casting [--langs it,en,es,fr,de,pt,nl] [--voices alba,eve] [--no-write]
+      uv run python -m astra_mind.voice_casting --recompute [docs/bench/voci_casting_<date>.md]
+          the overrides again from the measurements of an earlier run (rules changed, nothing to synthesise)"""
 from __future__ import annotations
 
 import argparse
@@ -121,22 +124,46 @@ async def cast(langs: list[str], voices: list[str], stt: Recognizer, tts: TTSEng
     return rows
 
 
-def propose_overrides(rows: list[dict], crew_voices: dict[str, str], limit: float = 0.25) -> dict[str, str]:
-    """For every officer voice that is hard to understand in a language: the free voice of the same gender with the
-    lowest error rate and the nearest pitch (never one that another officer speaks with)."""
+def propose_overrides(rows: list[dict], crew_voices: dict[str, str], limit: float = 0.30, margin: float = 0.10) -> dict[str, str]:
+    """For every officer voice that is hard to understand in a language (error rate over `limit`): a free voice of the same
+    gender that is clearly clearer (`margin` lower) and has the nearest pitch. A voice never speaks for two officers, and
+    never replaces one that another officer keeps: the bridge must not end up with three officers on one voice. The worst
+    voice is served first; where no free voice is clearly better the officer keeps his own (a slightly harder voice that is
+    his beats an easier one that is somebody else's)."""
     out: dict[str, str] = {}
-    used = set(crew_voices.values())
-    for lang in {r["lang"] for r in rows}:
+    for lang in sorted({r["lang"] for r in rows}):
         rl = {r["voice"]: r for r in rows if r["lang"] == lang}
-        for officer, v in crew_voices.items():
+        taken = set(crew_voices.values())
+        for officer, v in sorted(crew_voices.items(), key=lambda kv: -(rl[kv[1]]["wer"] if kv[1] in rl else 0.0)):
             if v not in rl or rl[v]["wer"] <= limit:
                 continue
-            free = [r for r in rl.values() if GENDER.get(r["voice"]) == GENDER.get(v) and r["voice"] not in used and r["wer"] <= limit]
+            free = [r for r in rl.values() if GENDER.get(r["voice"]) == GENDER.get(v) and r["voice"] not in taken
+                    and r["wer"] <= rl[v]["wer"] - margin and r["wer"] <= limit]
             if not free:
                 continue
             best = min(free, key=lambda r: (abs(r["pitch"] - rl[v]["pitch"]) / 40.0) + r["wer"])
             out[f"{lang}/{v}"] = best["voice"]
+            taken.add(best["voice"])
     return out
+
+
+def rows_from_report(path: Path) -> list[dict]:
+    """The measurements of an earlier run, read back from its report (the per-language tables)."""
+    rows: list[dict] = []
+    lang: str | None = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"## ([a-z]{2})\s*$", line)
+        if m:
+            lang = m.group(1)
+            continue
+        if line.startswith("## "):
+            lang = None
+        if lang and line.startswith("| ") and not line.startswith(("| Voce", "|---")):
+            c = [x.strip() for x in line.strip().strip("|").split("|")]
+            if len(c) == 9:
+                rows.append({"lang": lang, "voice": c[0], "wer": float(c[2]), "lufs": float(c[3]), "peak": float(c[4]), "gain": float(c[5]),
+                             "wps": float(c[6]), "pitch": float(c[7]), "first_ms": float(c[8])})
+    return rows
 
 
 def write_report(rows: list[dict], langs: list[str], crew: dict[str, str], overrides: dict[str, str], path: Path) -> None:
@@ -159,11 +186,19 @@ def write_report(rows: list[dict], langs: list[str], crew: dict[str, str], overr
             fh.write(f"| {officer} | {v} | " + " | ".join(f"{by[(l, v)]['wer']:.2f}" if (l, v) in by else "—" for l in langs) + " |\n")
         fh.write("\n")
         if overrides:
-            fh.write("### Sostituzioni proposte (WER oltre 0,25 nella lingua)\n\n| Lingua/voce | parla al suo posto |\n|---|---|\n")
+            fh.write("### Sostituzioni (WER oltre 0,30 nella lingua e una voce libera dello stesso genere con almeno 0,10 in meno; ogni sostituta parla per un solo ufficiale)\n\n"
+                     "| Lingua/voce | parla al suo posto | WER prima → dopo |\n|---|---|---|\n")
             for k, v in sorted(overrides.items()):
-                fh.write(f"| {k} | {v} |\n")
+                lg, orig = k.split("/", 1)
+                a, b = by.get((lg, orig)), by.get((lg, v))
+                fh.write(f"| {k} | {v} | {a['wer']:.2f} → {b['wer']:.2f} |\n" if a and b else f"| {k} | {v} | |\n")
+            kept = [(o, v, lg, by[(lg, v)]["wer"]) for lg in langs for o, v in crew.items()
+                    if (lg, v) in by and by[(lg, v)]["wer"] > 0.30 and f"{lg}/{v}" not in overrides]
+            if kept:
+                fh.write("\nVoci degli ufficiali che restano sopra 0,30 (nessuna voce libera è chiaramente migliore): " +
+                         ", ".join(f"{lg}/{v} ({o}) {w:.2f}" for o, v, lg, w in kept) + ".\n")
         else:
-            fh.write("Nessuna voce degli ufficiali supera WER 0,25 in nessuna lingua: nessuna sostituzione.\n")
+            fh.write("Nessuna voce degli ufficiali supera WER 0,30 in nessuna lingua: nessuna sostituzione.\n")
 
 
 async def main() -> None:
@@ -171,7 +206,22 @@ async def main() -> None:
     ap.add_argument("--langs", default=",".join(LANGS))
     ap.add_argument("--voices", default=",".join(VOICES))
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--recompute", nargs="?", const="", metavar="REPORT",
+                    help="only the overrides and the report again, from the measurements of an earlier run (default: the newest report)")
     args = ap.parse_args()
+    if args.recompute is not None:
+        from .crew import CREW
+        src = Path(args.recompute) if args.recompute else max((REPO_ROOT / "docs" / "bench").glob("voci_casting_*.md"))
+        rows = rows_from_report(src)
+        langs = list(dict.fromkeys(r["lang"] for r in rows))
+        crew = {o.id: o.voice for o in CREW.values()}
+        overrides = propose_overrides(rows, crew)
+        if not args.no_write:
+            OVERRIDES_FILE.write_text(json.dumps(overrides, indent=1, sort_keys=True))
+            write_report(rows, langs, crew, overrides, src)
+            print("REPORT", src)
+        print("OVERRIDES", json.dumps(overrides, indent=1))
+        return
     langs, voices = args.langs.split(","), args.voices.split(",")
     tts, stt = TTSEngine(), Recognizer(backends=[ParakeetBackend()])         # one engine only: no second opinion in the measurement
     await stt.start()
