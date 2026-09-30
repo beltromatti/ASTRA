@@ -65,17 +65,20 @@ void AAstraDoor::Tick(float DeltaTime)
 	SCOPE_CYCLE_COUNTER(STAT_AstraDoors);
 	Super::Tick(DeltaTime);
 	bool bNear = false;
+	float Nearest = TNumericLimits<float>::Max();   // (the nearest one who could come through, for the tick below)
 	if (!bLocked)
 	{
 		if (const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0))
 		{
 			const FVector D = P->GetActorLocation() - GetActorLocation();
+			Nearest = D.Size();
 			bNear = FVector2D(D.X, D.Y).Size() < OpenRadius && FMath::Abs(D.Z) < 300.f;
 		}
 		// an officer walking to the Captain's quarters (or back)
 		for (const TWeakObjectPtr<AAstraCrewMember>& W : AAstraCrewMember::Walkers())
 		{
 			const FVector D = W->GetActorLocation() - GetActorLocation();
+			Nearest = FMath::Min(Nearest, (float)D.Size());
 			bNear |= FVector2D(D.X, D.Y).Size() < OpenRadius && FMath::Abs(D.Z) < 300.f;
 		}
 	}
@@ -93,4 +96,6 @@ void AAstraDoor::Tick(float DeltaTime)
 		Open = FMath::FInterpConstantTo(Open, Target, DeltaTime, 1.f / FMath::Max(0.1f, SlideTime));
 		Place();
 	}
+	// a ship has hundreds of doors: one at rest with nobody within 15 m looks around four times a second, not every frame
+	SetActorTickInterval(Open == Target && Nearest > OpenRadius + 1500.f ? 0.25f : 0.f);
 }

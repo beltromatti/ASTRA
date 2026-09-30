@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import os
 import struct
 import sys
@@ -116,6 +117,30 @@ class Replay:
         t = asyncio.get_running_loop().time()
         asked = str(messages[-1].get("content", ""))
         names = {x["function"]["name"] for x in (tools or [])}
+        if asked.startswith("[Before speaking]"):
+            # an officer thinking again about a line that waited or was cut off (agent.rethink): the scripted officer is sensible —
+            # a warning or fresh news is said again as it was, a routine report that has waited a long time is let go
+            m = re.search(r"\] (\d+) seconds ago .*?«(.*?)»", asked, re.S)
+            waited, line = (float(m.group(1)), m.group(2)) if m else (0.0, "")
+            self.asked.append((t, "rethink", asked))
+            self.calls += 1
+            await asyncio.sleep(0.4)
+            comp = Completion(provider="script", model="script")
+            urgent = any(w in line.lower() for w in ("missil", "impatto", "breach", "falla", "incoming"))
+            if line and (urgent or waited < 20.0):
+                call = ToolCall(name="speak", arguments_raw=json.dumps({"speaker": "xo", "text": line, "tone": "focused"}))
+                comp.tool_calls.append(call)
+                if on_tool_call is not None:
+                    await on_tool_call(call)
+            return comp
+        items = asked.split("\n")[0].split(" | ")                   # (the events; the ask below them explains the age labels)
+        ages = [float(a) for a in re.findall(r"\[happened (\d+) s ago\]", " | ".join(items))]
+        if ages and min(ages) >= 12.0 and "missiles" not in asked.lower() and all("[happened" in part for part in items):
+            # every item is news that grew old while the bridge was busy: the scripted officer, as the prompt asks, lets it go
+            self.asked.append((t, "old news", asked))
+            self.calls += 1
+            await asyncio.sleep(0.5)
+            return Completion(provider="script", model="script")
         for key, (delay, calls) in self.script.items():
             if key in asked:
                 break
@@ -239,8 +264,8 @@ async def r1_live_sequence() -> list[str]:
 
 
 async def r2_old_news_is_not_reported() -> list[str]:
-    """News that waited for a quiet bridge until even its newest item is old is not reported; in a fresh batch the old item says how old it is;
-    news that arrived after the bridge fell quiet is reported at once."""
+    """News that waited for a quiet bridge goes to the officers with its age and they let it go when it no longer matters (a routine report of
+    old news is not said); in a fresh batch the old item says how old it is; news that arrived after the bridge fell quiet is reported at once."""
     async with Replay() as r:
         LAST[:] = [r]
         await asyncio.sleep(10.0)
@@ -257,9 +282,10 @@ async def r2_old_news_is_not_reported() -> list[str]:
         await r.settle(3.0)
         tr = r.trace()
         bad = check(tr, r.mind.voice.enqueued) + r.log
-        first_batch = [a for t, k, a in r.asked if k == "reactor output" and t < 50]
-        if first_batch:
-            bad.append("the model was asked to report news that had waited too long for a quiet bridge")
+        # the officers are asked about news that waited for a quiet bridge, with its age, and judge it (docs/ARCHITETTURA.md §1bis)
+        first_batch = [a for t, k, a in r.asked if t < 50 and "reactor output at 80" in a]
+        if first_batch and not all("[happened" in a for a in first_batch):
+            bad.append("news that waited for a quiet bridge was put to the officers without its age")
         mixed = [a for t, k, a in r.asked if 60 < t < 100 and k != "opening this channel"]
         if len(mixed) != 1 or "[happened" not in mixed[0] or "reactor output at 85" not in mixed[0]:
             bad.append(f"the batch with old and fresh news was not one report with the old item's age: {mixed!r}")

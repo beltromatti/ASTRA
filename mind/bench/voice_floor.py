@@ -526,18 +526,36 @@ async def s09_merge() -> list[str]:
         return bad
 
 
-async def s10_shorten() -> list[str]:
-    """With a long backlog a long report is cut to its first sentence."""
+async def s10_rethink() -> list[str]:
+    """A report that waited behind a long backlog is not shortened by the floor: whoever was going to say it thinks again (the rethink
+    hook, called with how long it waited) and says it as it stands now, or lets it go; a line without a hook is said in full."""
     async with Bridge() as b:
+        asked: list[tuple[str, float, str]] = []
+
+        def hook(new: str | None):
+            async def rethink(text: str, waited: float, cut_after: str) -> str | None:
+                asked.append((text, waited, cut_after))
+                await asyncio.sleep(0.4)                                # (a small model call)
+                return new
+            return rethink
+
         await b.say("busy", "xo", LONG + " " + LONG)
-        for i in range(3):
-            await b.say(f"f{i}", "ops", f"Operations, report {i}. All damage control teams are on station and ready to respond as needed.")
-        await b.say("long", "sensors", "Sensors. " + "The plot shows several contacts moving in formation across the sector, all of them consistent with a patrol. " * 3)
+        long_sensors = "Sensors. " + "The plot shows several contacts moving in formation across the sector, all of them consistent with a patrol. " * 3
+        await b.say("long", "sensors", long_sensors)                                        # no hook: said in full
+        await b.say("upd", "ops", "Operations: damage control is on the fire in section D.", rethink=hook("Operations: the fire in D is out."))
+        await b.say("gone", "helm", "Helm: we are holding the bearing.", rethink=hook(None))
         await b.settle()
         tr = b.trace()
         bad = check(tr, b.enq)
-        if not any(len(t) < 200 and t.startswith("Sensors. The plot") for t in tr.spoken_texts()):
-            bad.append("the long report was not shortened")
+        spoken = tr.spoken_texts()
+        if long_sensors.strip() not in [t.strip() for t in spoken]:
+            bad.append("a line without a hook was changed by the floor")
+        if len(asked) != 2 or any(w < speech.RETHINK_AFTER_S for _, w, _ in asked):
+            bad.append(f"the two waiting lines were not thought again after waiting: {asked}")
+        if "Operations: the fire in D is out." not in spoken:
+            bad.append("the re-thought line was not said as it stands now")
+        if any("holding the bearing" in t for t in spoken) or tr.dropped.get(b.ids["gone"]) != "rethought":
+            bad.append(f"the line its speaker let go was said or not declared ({tr.dropped.get(b.ids['gone'])!r})")
         return bad
 
 
@@ -934,7 +952,7 @@ ARCHON = ("Aquila, this is Archon Varek Solm of the Kharon Mandate. You have ent
 async def s27_live_replay() -> list[str]:
     """The live test's sequence (game clock): reports queued, an enemy message in flight, and three typed orders answered about a second
     after each: every answer starts within a second and before anything queued; stale reports are dropped, not said late; the
-    enemy's message is cut and comes back short, after the answers."""
+    enemy's message is cut and what was missed of it is replayed after the answers (as it was: the enemy did not stop talking)."""
     async with Bridge() as b:
         await asyncio.sleep(44.0)
         born: dict[str, float] = {}
@@ -1026,8 +1044,8 @@ async def s27_live_replay() -> list[str]:
         else:
             last = arch[-1]
             dur = tr.end[last] - tr.begin[last]
-            if dur > speech.RESUME_MAX_S + 1.0:
-                bad.append(f"what was left of the message took the floor for {dur:.1f} s")
+            if dur > 30.0:
+                bad.append(f"what was left of the message took the floor for {dur:.1f} s")   # (the missed part, replayed as it was)
             if "Stand down" not in tr.line[last]["text"]:
                 bad.append("the point of the message (what it asks) was not said")
             if tr.begin[last] < tr.end[b.ids["o3"]]:
@@ -1125,7 +1143,7 @@ async def s30_reply_replaces_the_rest() -> list[str]:
 
 
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
-             s10_shorten, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
+             s10_rethink, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
              s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio, s24_startup_delay, s25_hook, s26_first_version_engine, s27_live_replay, s28_typed_order_over_an_answer, s29_report_age, s30_reply_replaces_the_rest]
 
 

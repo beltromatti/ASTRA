@@ -249,6 +249,29 @@ class BridgeAgent:
         finally:
             self._active.discard(turn)
 
+    async def rethink(self, speaker: str, text: str, waited_s: float, cut_after: str, lang: str) -> str | None:
+        """An officer thinks again about a line that waited (or was cut off) before it is said: what they say now, or None. The
+        speech floor calls it when the line's turn comes (docs/ARCHITETTURA.md §1bis: the agents re-think, the code does not
+        drop or shorten what they say)."""
+        state = self.ship.snapshot()
+        who = self.titles.get(speaker, speaker)
+        cut = f" They had said only «{cut_after}» when the Captain spoke over them." if cut_after else ""
+        ask = (f"[Before speaking] {waited_s:.0f} seconds ago {who} was about to tell the Captain: «{text}».{cut} The ship has moved on "
+               "since (the state above is now). If it still matters to the Captain, they say it now as it stands — updated, short, "
+               "in character — with speak. If it no longer matters, they say nothing: do not call speak.")
+        msgs = [self._system(lang, state)] + self._last_turns(4) + [{"role": "user", "content": ask}]
+        said: list[str] = []
+
+        async def on_call(call: ToolCall) -> None:
+            if call.name == "speak":
+                line = str((call.arguments() or {}).get("text") or "").strip()
+                if line:
+                    said.append(line)
+
+        comp = await models.chat(self.llm, "crew", messages=msgs, tools=[SPEAK], tool_choice="auto", on_tool_call=on_call, max_tokens=160)
+        self.spent += comp.cost
+        return " ".join(said) if said else None
+
     # ------------------------------------------------------------------------------------------------ internals
     async def _llm(self, turn: Turn, role: str, msgs: list[dict[str, Any]], tools: list[dict[str, Any]], on_call: Any,
                    **kw: Any) -> Completion:
@@ -413,7 +436,9 @@ class BridgeAgent:
 
 
 EVENT_ASK = ("The Captain should hear this: the responsible officer reports it now, in one short line with speak (in the "
-             "Captain's language), unless it merely repeats what was reported in the last few seconds — then say nothing. Within "
+             "Captain's language), unless it merely repeats what was reported in the last few seconds, or it is news that has "
+             "grown old while the bridge was busy ([happened N s ago]) and no longer matters as it stands — then say nothing, or "
+             "say what it means now. Within "
              "their own authority an officer may also act at once: with live consoles, set a mode on their own console when their "
              "delegation is auto and it keeps the Captain's intent alive; on an older build, damage control, shield facing, point "
              "defense and the radiators. To act, CALL the tool in this same turn, then say what was done — saying it without the "
