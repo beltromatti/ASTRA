@@ -137,7 +137,7 @@ delle anteprime. Nessun asset di terzi nuovo (i caratteri Barlow Condensed e IBM
 
 Controlli del kit (`ship_kit.py`, a ogni esportazione): budget di triangoli, slot noti, UV finite e limitate, misure contro la scheda (`ship_spec.py`), altezza ≤ 4,0 m; e **prove a raggi lungo gli archi del grafo** sul Ponte 4
 (altezze 0,35 / 1,0 / 1,75 m, contro le mesh piazzate): **Ponte 4: 1626 raggi di corridoio e di porta, 0 bloccati; Ponte 6: 1674, 0 bloccati** (le 12 porte di stanze non ancora modellate sono muri pieni e si saltano; dentro le stanze i nodi "hub" e "posto" sono topologia: 192 su 1149 e 454 su 1392 raggi toccano l'arredo, atteso).
-Le anteprime sono in `docs/progressi/nave/` (49 JPG, ciascuna < 250 KB): pianta del Ponte 4 (intera, snodo, poppa), moduli in fila (`modules_*`), viste del ponte dal piano (`d4_*`: la Spine da prua, la porta del Lounge, il portello con il segnale,
+Le anteprime sono in `docs/progressi/nave/` (50 JPG, ciascuna < 250 KB): pianta del Ponte 4 (intera, snodo, poppa), moduli in fila (`modules_*`), viste del ponte dal piano (`d4_*`: la Spine da prua, la porta del Lounge, il portello con il segnale,
 un cancello del Concourse, una giunzione, la torre, il passaggio laterale, tre piante in sezione), il Ponte 6 (`d6_*`: le porte delle tre stanze mediche, la Spine al Medbay, la Spine oltre il Medbay, pianta in sezione), ogni stanza (`room_*`).
 
 ## 7. Il gioco: cosa legge il piano (fatto dal lead) e cosa c'è da collegare
