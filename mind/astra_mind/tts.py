@@ -8,6 +8,9 @@ a look-ahead limiter keeps the peaks clean.
 - Voice states are cached per (language, voice). Nothing touches the network once the files are in the Hugging Face cache
   (an offline machine, or a slow connection, used to freeze the whole crew for ~20 s while a model "checked for updates").
 - Generation runs in a worker thread that can be stopped at once (barge-in): `SpeechStream.stop()`.
+- A language Pocket TTS does not speak (Japanese, Russian...), or one it speaks whose model is not on the machine yet, is said
+  by macOS's own voices (`say`), mastered the same way; the line is never held up for a download and never dropped for want of
+  a model.
 """
 from __future__ import annotations
 
@@ -135,9 +138,17 @@ class SystemVoices:
         return x if x.ndim == 1 else x[:, 0]
 
 
+def _hf_hub_dir() -> Path:
+    """Where Hugging Face keeps downloaded models on this machine (its own precedence: HF_HUB_CACHE, HF_HOME, XDG_CACHE_HOME)."""
+    for var in ("HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"):
+        if os.environ.get(var):
+            return Path(os.environ[var])
+    home = os.environ.get("HF_HOME") or str(Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "huggingface")
+    return Path(home) / "hub"
+
+
 def _cache_has_pocket_tts() -> bool:
-    home = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface")
-    return (home / "hub" / "models--kyutai--pocket-tts").exists()
+    return (_hf_hub_dir() / "models--kyutai--pocket-tts").exists()
 
 
 # With the files already in the cache, never ask the Hub "is there a newer one?" (set before huggingface_hub is imported)
@@ -274,8 +285,7 @@ class TTSEngine:
             return False
         if self.loaded(lang) or lang in self._cached:
             return True
-        home = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface") / "hub"
-        if any(home.glob(f"models--kyutai--pocket-tts/snapshots/*/languages/{MODEL_FOR_LANG[lang]}/model.safetensors")):
+        if any(_hf_hub_dir().glob(f"models--kyutai--pocket-tts/snapshots/*/languages/{MODEL_FOR_LANG[lang]}/model.safetensors")):
             self._cached.add(lang)
             return True
         return False
@@ -528,7 +538,7 @@ class TTSEngine:
 
 def cache_status() -> dict[str, tuple[bool, int]]:
     """For every language: (its model is in the Hugging Face cache, how many of the 27 catalogue voices are)."""
-    home = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface") / "hub"
+    home = _hf_hub_dir()
     out: dict[str, tuple[bool, int]] = {}
     for lang, name in MODEL_FOR_LANG.items():
         has_model = any(home.glob(f"models--kyutai--pocket-tts/snapshots/*/languages/{name}/model.safetensors"))
