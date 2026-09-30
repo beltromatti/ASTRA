@@ -2088,7 +2088,18 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		FString Sec = Str(TEXT("section")).ToUpper().TrimStartAndEnd();
 		Sec.RemoveFromStart(TEXT("SECTION "));
 		const TCHAR SecC = Sec.Len() ? Sec[0] : TEXT('?');
-		FAstraDamage* D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC; });
+		// one incident by its id (ops' own dispatcher), else the first at that deck and section (a fire and a breach can
+		// share a section: the unattended one first)
+		const int32 IncidentId = (int32)Num(TEXT("id"), -1.0);
+		FAstraDamage* D = IncidentId >= 0 ? Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Id == IncidentId; }) : nullptr;
+		if (!D)
+		{
+			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC && X.Team < 0; });
+		}
+		if (!D)
+		{
+			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC; });
+		}
 		if (D && D->Team >= 0)
 		{
 			OutDetail = FString::Printf(TEXT("team %d is already on the %s at %s (%s)"), D->Team + 1, *D->Kind, *D->Where(),

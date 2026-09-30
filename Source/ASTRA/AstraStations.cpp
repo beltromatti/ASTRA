@@ -968,14 +968,18 @@ void UAstraStationsSubsystem::TickOps()
 		return;
 	}
 	const FString Kind = Best->Kind, Where = Best->Where();   // copies: the command changes the list
+	const int32 IncidentId = Best->Id;
 	TSharedPtr<FJsonObject> Args = MakeShared<FJsonObject>();
+	Args->SetNumberField(TEXT("id"), IncidentId);
 	Args->SetNumberField(TEXT("deck"), Best->Deck);
 	Args->SetStringField(TEXT("section"), FString::Chr(Best->Section));
 	Args->SetStringField(TEXT("priority"), Kind.Contains(TEXT("breach")) ? TEXT("critical") : TEXT("normal"));
 	FString Detail;
-	if (Command(TEXT("dispatch_damage_control"), Args, Detail))
+	const bool bSent = Command(TEXT("dispatch_damage_control"), Args, Detail);
+	const FAstraDamage* After = Sh->GetDamage().FindByPredicate([IncidentId](const FAstraDamage& X) { return X.Id == IncidentId; });
+	if (bSent && After && After->Team >= 0)
 	{
-		Act(TEXT("ops"), FString::Printf(TEXT("damage control: a team to the %s at %s"), *Kind, *Where), false);
+		Act(TEXT("ops"), FString::Printf(TEXT("damage control: team %d to the %s at %s"), After->Team + 1, *Kind, *Where), false);
 	}
 }
 
