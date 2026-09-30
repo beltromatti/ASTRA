@@ -184,11 +184,6 @@ def hangar_mouth(c: Ctx, xf: Xf, width: float, height: float, depth: float = 6.0
         xf.box(g, (-depth / 2, 0, dz * (hh + 0.15)), (depth, width + 0.6, 0.3), m("Frame"), ch=0.05, kind="hangar")
     for dy in (-1, 1):
         xf.box(g, (-depth / 2, dy * (hw + 0.15), 0), (depth, 0.3, height + 0.6), m("Frame"), ch=0.05, kind="hangar")
-    for dy in (-1, 1):
-        for dz in (-1, 1):
-            xf.box(g, (-depth / 2, dy * (hw - 0.25), dz * (hh - 0.25)), (depth - 0.6, 0.3, 0.3), m("Lights"), ch=0.0, kind="hangar", aux=0.2)
-    for k in range(3):
-        xf.box(g, (-1.2 - k * depth / 3.2, 0, hh - 0.2), (0.3, width - 0.8, 0.2), m("Lights"), ch=0.0, kind="hangar", aux=0.2)
     n = max(4, int(width / 1.6))                                              # hazard stripes on the outer sill
     for i in range(n):
         xf.box(g, (out + 0.01, -hw + (i + 0.5) * width / n, -hh - t * 0.5), (0.05, width / n * 0.5, t * 0.8),

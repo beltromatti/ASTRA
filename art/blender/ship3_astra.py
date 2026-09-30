@@ -404,12 +404,40 @@ def torpedo_tube(c: Ctx, xf: Xf) -> None:
     door.box(g, (0, 0, -3.8), (0.35, 6.6, 6.8), m("Plate"), ch=0.08, kind="torpedo")
 
 
+# The spaces built inside the Aquila's hull (data/ship/aquila_*.json, hull frame = world + (172, 0, 62)): nothing of the exterior may
+# stand in them. (lo, hi) boxes in metres: the hangar with its two launch tubes, the bridge, the decks that have interiors.
+INTERIORS = {
+    "hangar": ((232.0, -28.0, -10.8), (377.0, 28.0, 9.2)),
+    "tube_port": ((377.0, 1.9, -10.8), (390.0, 27.9, 2.2)),
+    "tube_starboard": ((377.0, -27.9, -10.8), (390.0, -1.9, 2.2)),
+    "bridge": ((163.5, -8.7, 62.0), (182.0, 8.7, 66.2)),
+    "engineering": ((-158.0, -14.0, 4.0), (-116.0, 14.0, 18.0)),
+    "medbay": ((-60.0, -9.0, 8.0), (-30.0, 9.0, 12.2)),
+    "mess": ((50.0, -10.0, 16.0), (88.0, 10.0, 19.8)),
+    "berths": ((-28.0, -3.6, 16.0), (-4.0, 3.6, 19.3)),
+}
+
+
+def aquila_checks(g: G.Geo) -> dict:
+    """Vertices of the exterior standing inside an interior space (shrunk by 25 cm), and above the bridge: both must be zero."""
+    V = np.concatenate([ch["V"] for ch in g.chunks if not ch["cap"]]).astype(np.float64)
+    out = {"vertices": int(len(V))}
+    for name, (lo, hi) in INTERIORS.items():
+        lo_, hi_ = np.array(lo) + 0.25, np.array(hi) - 0.25
+        inside = np.all((V > lo_) & (V < hi_), axis=1)
+        out[f"inside_{name}"] = int(inside.sum())
+    above = np.all((V > np.array([150.0, -16.0, 60.7])) & (V < np.array([215.0, 16.0, 200.0])), axis=1)
+    out["above_island_top"] = int(above.sum())
+    out["ok"] = all(v == 0 for k, v in out.items() if k.startswith("inside_") or k == "above_island_top")
+    return out
+
+
 def build_aquila(c: Ctx) -> dict:
     """shipgen3 entry: the whole Aquila, its cut faces, and the camera rigs of its previews."""
     a = Aquila(c)
     a.build()
     faces = a.caps()
-    info = {"cuts": list(a.cuts), "cut_faces": faces, "length_m": 800.0,
+    info = {"cuts": list(a.cuts), "cut_faces": faces, "length_m": 800.0, "checks": aquila_checks(c.g),
             "cam_az": -32.0, "cam_el": 18.0, "cam_dist": 1.9, "sun_az": -50.0, "sun_el": 26.0,
             "closeups": [{"name": "flank", "target": [60.0, -50.0, 3.0], "normal": [0.0, -1.0, 0.0], "distance": 110.0, "span": 50.0},
                          {"name": "bowdeck", "target": [285.0, 0.0, 24.0], "normal": [-0.35, -0.55, 0.75], "distance": 110.0, "span": 50.0}],
