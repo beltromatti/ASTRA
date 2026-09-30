@@ -94,25 +94,38 @@ parametri, una condizione di fine, un registro delle azioni. Il codice la esegue
 imposta, la cambia di sua iniziativa quando la delega lo permette, e ne riferisce. La stessa interfaccia la useranno un
 giorno il Capitano o un altro giocatore seduti a quella console.
 
-Comando unico **`station`**: `{station, mode, params, until?, note?}` → imposta la modalità; la risposta dice cosa è
-cambiato. Le azioni istantanee (una salva, un'esca, un saluto) restano comandi a sé. Nello stato (`stations`):
+Comando unico **`station`**: `{station, aspect?, mode, params?, until?, note?, delegation?, by?}` → imposta la modalità
+di un **aspetto** della postazione (il tattico ne ha quattro: ingaggio, scudi, difesa di punto, missili; il volo uno per
+squadriglia); `aspect` si può omettere quando il nome del modo basta a dedurlo; `by` (`captain|officer|xo|auto|default`)
+dice chi l'ha dato. La risposta dice cosa è cambiato. Le azioni istantanee (una salva, un'esca, un saluto) restano
+comandi a sé. Nello stato (`ship_state.state.stations`, implementato in `AstraStations.cpp`):
 
 ```json
-{"helm": {"officer": "helm", "mode": "intercept", "params": {"target": "T-23", "standoff_km": 6},
-          "until": "target_lost", "set_by": "captain", "since": 812.4, "delegation": "auto",
-          "status": "closing on T-23 at 310 m/s, 14.2 km, ETA 1:10", "last_actions": ["…"]}, "…": {}}
+{"helm": {"officer": "helm", "delegation": "auto",
+          "status": "KEEP ON BOW Cocytus at 22.4 km · heading 077 mark 3 · 288 m/s (throttle 60%)",
+          "modes": {"course": {"mode": "keep_on_bow", "params": {"target": "T-23"}, "until": "target_lost",
+                               "set_by": "captain", "for_s": 42}},
+          "recent": ["course keep_on_bow: keep on bow Cocytus, 27.0 km (bow on Cocytus)", "…"]}, "…": {}}
 ```
+Accanto a `stations`: `action_target` (il contatto di cui si occupa la battaglia ora: il bersaglio del tattico, altrimenti
+l'ostile più vicino) e `viewscreen` (la riga di cosa c'è sullo schermo principale).
 
-`until`: `done` (lo decide la modalità) · `target_lost` · `order` (finché non cambia l'ordine) · `time:<s>`.
-`delegation`: `manual` (agisce solo sugli ordini) · `advise` (propone e aspetta «proceda») · `auto` (agisce entro gli
-ordini permanenti e informa). Predefinita: `auto`.
+`until`: `done` (lo decide la modalità) · `target_lost` · `order` (finché non cambia l'ordine) · `time:<s>` (poi l'aspetto
+torna al suo modo predefinito, con i suoi effetti). `delegation`: `manual` (agisce solo sugli ordini) · `advise` (propone e
+aspetta «proceda») · `auto` (agisce entro gli ordini permanenti e informa; il codice ha anche i suoi **riflessi**: Alpha in
+pattuglia quando il nemico si avvicina, esche contro le salve, potenza di combattimento — mai sopra un modo dato dal
+Capitano o da un ufficiale). Predefinita: `auto`.
+
+Bersagli speciali: `target: "action"` (timone `keep_on_bow`, schermo `target`, sensori `focus`) segue la battaglia e
+viene rivalutato a ogni passo; `engage {targets: ["hostiles"]}` è un ordine permanente su ogni nave ostile (la migliore a
+portata, prima chi ci spara; mai un inseguimento; senza ostili aspetta).
 
 | Postazione (ufficiale) | Modalità | Lavoro continuo del codice |
 |---|---|---|
 | **helm** (Ferri) | `hold` · `course{heading_deg, mark_deg, speed_pct}` · `intercept{target, standoff_km}` · `keep_on_bow{target}` · `follow{target, distance_km, side}` · `orbit{target, radius_km}` · `broadside{target, side, range_km}` · `evade{pattern}` · `retreat{toward}` · `formation{leader, slot}` · `transit{system}` | tiene rotta e distanza, insegue, presenta il fianco, schiva; **iniziativa predefinita: a nave ferma in combattimento, la prua sull'azione** (il Capitano vede la battaglia dal finestrone), salvo ordine contrario |
 | **tactical** (Voss) | `engagement`: `hold_fire` · `return_fire` · `weapons_free{range_km}` · `engage{targets[], weapons[], fire: sustained/volley/conserve}`; `shields`: `balanced` · `face_threat` · `sector{…}`; `point_defense`: `auto` · `protect{id}` · `off`; `missiles`: `conserve` · `saturate` | assegna le armi ai bersagli secondo la priorità, salve a cadenza, ruota gli scudi verso la minaccia, difesa di punto |
-| **sensors** (Nair) | `emcon{silent/limited/full}` · `scan{passive/sweep{every_s}/focus{target}}` · `ew{off/jam{target}}` · `sigint{on/off}` | classifica i contatti, mantiene il quadro, smaschera le esche, chiede triangolazioni |
-| **ops** (Tanaka) | `viewscreen{auto/forward/target{id, zoom}/tactical/fleet/comms{party}/damage/sector/off}` · `holo{tactical{range_km}/sector/ship{id}/fleet}` · `datapad{push{page, focus}}` · `damage_control{auto/priority{what}}` | lo **schermo principale** e il **tavolo olografico** seguono l'azione (regia automatica, §5); smista le squadre di riparazione |
+| **sensors** (Nair) | `emcon{silent/restricted/limited/full}` · `scan{passive/sweep{every_s}/focus{target}}` (guerra elettronica e intercettazioni: più avanti, con la fase F2) | classifica i contatti, mantiene il quadro, smaschera le esche, chiede triangolazioni |
+| **ops** (Tanaka) | `viewscreen{auto/forward/target{target, zoom}/tactical/fleet/sector/comms{party}/damage/off}` · `holo{tactical/sector/ship{id}}` · `datapad{push{page: overview/contact/damage/fleet/orders, focus}}` · `damage_control{auto/priority{what}}` | lo **schermo principale** e il **tavolo olografico** seguono l'azione (regia automatica, §5); smista le squadre di riparazione |
 | **engineering** (Mensah) | `power{profile | custom{…}}` · `heat{auto/radiators{extended/retracted}}` · `reactor{normal/battle_short}` | ripartisce l'energia, gestisce il calore, coordina la sala macchine |
 | **comms** (Martin) | `channel{open{party}/close/mute/unmute}` · `listen{fleet/all/enemy}` | tiene i canali, inoltra le richieste della flotta, traduce le intercettazioni |
 | **flight** (Price) | per squadriglia: `mission{type: cap/escort/strike/recon/ew/sar/hold/recall, target, formation}` | lanci, formazioni, recuperi, coordinamento col ponte di volo |
