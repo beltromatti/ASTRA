@@ -9,6 +9,7 @@
   tools/play.py key W [--hold 2] [--nowait] · down W · up W      real key presses through Slate
   tools/play.py walk fwd|back|left|right SECONDS [--run]
   tools/play.py look YAW [PITCH]          degrees (right and up positive)
+  tools/play.py tp X Y [YAW [PITCH]] [--z Z]  the Captain on foot at a point of the bridge (metres), for pictures
   tools/play.py say "text"                a typed order to the crew (like T)
   tools/play.py cmd "console command"
   tools/play.py shot [name] [--noui]      screenshot (with the UI unless --noui): prints the PNG path
@@ -179,6 +180,10 @@ def cmd_look(a: argparse.Namespace) -> None:
     print(json.dumps(call("/look", {"yaw": a.yaw, "pitch": a.pitch})))
 
 
+def cmd_tp(a: argparse.Namespace) -> None:
+    print(json.dumps(call("/teleport", {"x": a.x, "y": a.y, "z": a.z, "yaw": a.yaw, "pitch": a.pitch})))
+
+
 def cmd_say(a: argparse.Namespace) -> None:
     print(json.dumps(call("/say", {"text": a.text})))
 
@@ -258,6 +263,13 @@ def main() -> None:
     p.add_argument("yaw", type=float)
     p.add_argument("pitch", type=float, nargs="?", default=0.0)
     p.set_defaults(fn=cmd_look)
+    p = sub.add_parser("tp", help="the Captain on foot at x y [z] metres (bridge frame), looking yaw [pitch]")
+    p.add_argument("x", type=float)
+    p.add_argument("y", type=float)
+    p.add_argument("yaw", type=float, nargs="?", default=0.0)
+    p.add_argument("pitch", type=float, nargs="?", default=0.0)
+    p.add_argument("--z", type=float, default=0.0)
+    p.set_defaults(fn=cmd_tp)
     p = sub.add_parser("say")
     p.add_argument("text")
     p.set_defaults(fn=cmd_say)

@@ -313,7 +313,7 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     # glossy ivory ceramic composite of the shells: a light grey-ivory, never beige
     pbr("MI_BRG3_Ivory", "PanelPaint", srgb_to_linear("#A9AAA8"), 1.0, (0.16, 0.30), 0.0, 0.3, 0.3, macro=0.04)
     # gunmetal deck plating with a fine anti-slip knurl
-    pbr("MI_BRG3_DeckPlate", "BRG3_DeckGrain", (0.30, 0.32, 0.36), 2.5, (0.34, 0.62), 0.9, 0.85, 1.0, macro=0.10, scratch=0.10)
+    pbr("MI_BRG3_DeckPlate", "BRG3_DeckGrain", (0.11, 0.115, 0.13), 2.5, (0.34, 0.62), 0.9, 0.85, 1.0, macro=0.10, scratch=0.10)   # gunmetal: the sun through the window washed a lighter plate out
     # opaque black glass: lenses and the work surfaces around the live screens (satin: roughness 0.3-0.38, no texture influence)
     pbr("MI_BRG3_DarkGlass", "PanelPaint", (0.003, 0.004, 0.006), 1.0, (0.30, 0.38), 0.0, 0.0, 0.0, macro=0.0, scratch=0.0)
     # the seats: black leather

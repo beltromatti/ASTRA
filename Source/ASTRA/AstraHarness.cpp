@@ -1,4 +1,6 @@
 #include "AstraHarness.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/Character.h"
 #include "ASTRA.h"
 #include "ASTRACharacter.h"
 #include "ASTRAPlayerController.h"
@@ -200,6 +202,28 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 		O->SetBoolField(TEXT("ok"), P != nullptr);
 		O->SetStringField(TEXT("out"), Out.Left(4000));
 		return ToJson(O);
+	});
+	Bind(TEXT("/teleport"), EVerb::VERB_POST, [this](const TSharedPtr<FJsonObject>& B, const FHttpServerRequest&)
+	{
+		// the Captain on foot at a point of the bridge frame (metres; z = the feet), looking along yaw/pitch: for pictures
+		APlayerController* P = PC();
+		AASTRAPlayerController* AP = Cast<AASTRAPlayerController>(P);
+		if (AP)
+		{
+			AP->StandUp();
+		}
+		ACharacter* C = P ? Cast<ACharacter>(P->GetPawn()) : nullptr;
+		if (!C)
+		{
+			return FString(TEXT("{\"ok\":false}"));
+		}
+		const float Half = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		const FVector At(B->GetNumberField(TEXT("x")) * 100.0, B->GetNumberField(TEXT("y")) * 100.0,
+		                 (B->HasField(TEXT("z")) ? B->GetNumberField(TEXT("z")) : 0.0) * 100.0 + Half + 2.0);
+		C->SetActorLocation(At, false, nullptr, ETeleportType::TeleportPhysics);
+		P->SetControlRotation(FRotator(B->HasField(TEXT("pitch")) ? B->GetNumberField(TEXT("pitch")) : 0.0, B->HasField(TEXT("yaw")) ? B->GetNumberField(TEXT("yaw")) : 0.0, 0.0));
+		FAstraTimeline::Record(TEXT("input"), FString::Printf(TEXT("teleport %.1f %.1f %.1f"), At.X / 100.0, At.Y / 100.0, At.Z / 100.0));
+		return FString(TEXT("{\"ok\":true}"));
 	});
 	Bind(TEXT("/shot"), EVerb::VERB_POST, [this](const TSharedPtr<FJsonObject>& B, const FHttpServerRequest&)
 	{
