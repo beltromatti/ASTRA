@@ -30,7 +30,9 @@ from .audio_in import PushToTalk
 from .crew import CREW
 from .enemy import COMMANDERS, EnemyAgent
 from .style import StyleKeeper
-from .router import route
+from . import router as router_mod
+from .context import Exchange, parse as parse_context
+from .initiative import Watch, recent_orders, watch_ask, watch_system
 from .director import ADMIRAL, Director
 from .env import CACHE
 from .local_ship import LocalShip
@@ -160,6 +162,9 @@ class Mind:
         self.agent.bonds = lambda: "\n".join(f"- {line}" for line in self.director.bonds_lines())
         self.agent.standing = self.director.standing        # one list: the agent keeps it, the story saves it
         self.turns: asyncio.Queue = asyncio.Queue()
+        self.exchange = Exchange()               # who spoke last on the channel: an exchange going on (the router reads it)
+        self.watch = Watch()                     # the officers' initiative watch (initiative.py)
+        self._ptt_ctx: dict[str, Any] | None = None   # the game's `context` for the words being spoken (ptt)
         self.last_activity = time.monotonic()   # the Captain spoke or something was reported
         self.captain_t = 0.0                     # the last time the Captain spoke
         self.lang_file = CACHE / "captain_lang.txt"
@@ -180,6 +185,10 @@ class Mind:
         if self.game is not None:
             who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
             self.game.events.append(f"over the radio, {who}: {text}")
+        if self.enemy.open and speaker == self.enemy.speaker:
+            self.exchange.heard(self.enemy.contact)          # (an exchange is going on: a short reply of the Captain's is for them)
+        elif speaker == ADMIRAL["key"]:
+            self.exchange.heard("fleet")
         await self.voice.say(speaker, text, lang, tone)
 
     def record_log(self, entry: str) -> None:
@@ -475,7 +484,7 @@ class Mind:
         last_t, last_key = 0.0, ""
         pictures: set[str] = set()                  # blind pictures already put to the Captain (once each)
         while True:
-            await asyncio.sleep(5)
+            await asyncio.sleep(2)                       # (the old advisor's own timers are all 40 s and more)
             st = self.game.state if (self.game and self.game.state) else None
             if not st or not self.clients or st.get("abandon") or self.aftermath.active:
                 continue
@@ -484,6 +493,19 @@ class Mind:
             if info and info[0] not in pictures and len(flags) < 3:
                 flags.append(info[1])
             now = time.monotonic()
+            if st.get("stations"):
+                # live consoles: the officers' initiative watch (initiative.py) answers for the advisor too — one check, one
+                # voice — on its own adaptive cadence, never while the Captain speaks or is being answered
+                busy = not self.turns.empty() or self.agent.busy() or self.voice.busy_s() > 3.0
+                chk = self.watch.tick(st, now, flags, None, self.captain_t, busy)
+                if chk is not None:
+                    if info and info[1] in flags:
+                        pictures.add(info[0])                 # (a blind picture is put to the Captain once)
+                    log.info("watch check (%s): %s", "event" if chk.urgent else "periodic", chk.text[:200])
+                    self._watch_check = chk
+                    self.last_activity = now
+                    await self.turns.put(("\x00event:" + chk.text, self.lang))
+                continue
             # in a fight the bridge is never silent: only the Captain's own words hold the check back
             key = "|".join(sorted(f.split(":", 1)[0] for f in flags))
             # (the event queue itself waits for a gap in the voices before the officer speaks)
@@ -531,7 +553,8 @@ class Mind:
 
     async def turn_worker(self) -> None:
         while True:
-            text, lang = await self.turns.get()
+            text, lang, *rest = await self.turns.get()       # (the Captain's words carry the game's `context` as a third item)
+            raw_ctx = rest[0] if rest else None
             try:
                 self.agent.ship = self.game if (self.game and self.game.state) else self.local
                 if text.startswith("\x00event:"):
@@ -575,7 +598,7 @@ class Mind:
                             AFTER_ACTION_ASK if any(e.startswith("bridge: after-action") for e in events) else \
                             TACTICAL_ASK if any(e.startswith("bridge: tactical check") for e in events) else \
                             VISIT_ASK if any("has come to the Captain's quarters in person" in e for e in events) else None
-                        t = await self.agent.handle_event(" | ".join(events), self.lang, ask=ask)
+                        t = await self._event_turn(events, ask)
                     finally:
                         self.voice.low_priority = False
                     log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
@@ -613,42 +636,116 @@ class Mind:
                         self.director.note(f"the Captain to {persona['place']}: {text}")
                         await self.port.respond(f"[Eagle on the radio]: {text}", lang, self._battle_state(), self.director.war.brief(detail=False))
                         continue
-                to_enemy = ""
-                if self.enemy.open:
-                    # a channel is open: the words meant for the enemy go over it, the orders stay on the bridge
-                    r = await route(self.llm, text, COMMANDERS.get(self.enemy.contact, {}).get("name", "the enemy commander"))
-                    log.info("channel open, routed (%s): crew=%r enemy=%r", r.how, r.crew[:60], r.enemy[:60])
-                    to_enemy = r.enemy
-                    if r.enemy:
-                        who = COMMANDERS.get(self.enemy.contact, {}).get("name", "the Mandate commander")
-                        self.director.note(f"the Captain to {who} over the channel: {r.enemy}")
-                    if not r.crew:
-                        await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {to_enemy}", lang, self._battle_state())
-                        continue
-                    text = r.crew
-                self.memory.hear("Captain", text)
-                t = await self.agent.handle(text, lang)
-                self.style.captain_order(text, t.actions)
-                asyncio.create_task(self.memory.maybe_read())
-                for name, args_, res in t.actions:
-                    if name == "end_transmission":
-                        self.enemy.open = False
-                    if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() == "fleet":
-                        await self.director.admiral_reply(str(args_.get("message", "")), lang, self._battle_state())
-                    # (open_channel knows who has a commander to answer: a contact not yet classified, a decoy, a
-                    # friendly ship never do)
-                    if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() != "fleet" \
-                            and self.enemy.open_channel(str(args_.get("contact_id", "")).upper()):
-                        await self.enemy.respond(f"[The ASTRA ship hails you. Their message: {args_.get('message', '')}]",
-                                                 lang, self._battle_state())
-                if to_enemy and self.enemy.open:
-                    await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {to_enemy}", lang, self._battle_state())
-                await self._sink("json", {"type": "turn_end", "first_line_s": t.t_first_line, "total_s": round(t.t_end, 3),
-                                          "cost": t.cost, "actions": [[n, a, r] for n, a, r in t.actions], "error": t.error})
-                log.info("turn %.2fs (first line %.2fs) cost $%.5f: %s", t.t_end, t.t_first_line or -1, t.cost,
-                         " | ".join(f"{s}: {x}" for s, x in t.lines))
+                await self._captain_turn(text, lang, raw_ctx)      # (the router, the crew's turn, the party's answer)
             except Exception:  # noqa: BLE001
                 log.exception("turn failed")
+
+    # ---------------------------------------------------------------------------------------------- the Captain's words
+    def _party_names(self) -> dict[str, str]:
+        names = {cid: f'{c["name"]} ({c["ship"]})' for cid, c in COMMANDERS.items()}
+        names["fleet"] = f'{ADMIRAL["name"]} (7th Fleet)'
+        return names
+
+    def _captain_speaks(self) -> None:
+        """The Captain has priority over everything: whatever the crew was doing (a report, a watch check, a chat) stops now,
+        and the reports still waiting to be voiced are dropped."""
+        n = self.agent.preempt()
+        dropped = self.voice.drop_low_priority()
+        if n or dropped:
+            log.info("the Captain speaks: %d turn(s) cut off, %d unspoken line(s) dropped", n, dropped)
+
+    async def _to_party(self, party: str, words: str, lang: str) -> None:
+        """What the Captain said TO the party on the channel goes out: the enemy commander answers, or the admiral."""
+        self.exchange.said(party)
+        if party == "fleet":
+            await self.director.admiral_reply(words, lang, self._battle_state())
+            return
+        if (not self.enemy.open or self.enemy.contact != party) and not self.enemy.open_channel(party):
+            log.info("words for %s, but nobody answers on that channel: %s", party, words[:80])
+            return
+        who = COMMANDERS.get(party, {}).get("name", "the Mandate commander")
+        self.director.note(f"the Captain to {who} over the channel: {words}")
+        await self.enemy.respond(f"[The ASTRA captain, over the open channel]: {words}", lang, self._battle_state())
+
+    async def _captain_turn(self, text: str, lang: str, raw_ctx: dict[str, Any] | None) -> None:
+        """The Captain's words: whom are they for (the router: rules first, a small model only for the rare case they cannot
+        settle), the crew's turn, and the answer of whoever is on the channel. The crew does not wait for the router: in the
+        rare open case it starts on the words at once and nothing is said or done until the router answers."""
+        st = self.game.state if (self.game and self.game.state) else {}
+        ctx = parse_context(raw_ctx, st, self.enemy, self._party_names(), self.exchange)
+        r = router_mod.quick(text, ctx)
+        gate = route_task = None
+        if r is None:
+            gate = asyncio.get_running_loop().create_future()
+            route_task = asyncio.create_task(router_mod.route_llm(self.llm, text, ctx))
+            crew_text = text
+        else:
+            crew_text = r.crew
+        note = ""
+        if r is not None and r.addressed:
+            note = "the Captain addresses " + " and ".join(self.agent.titles.get(o, o) for o in r.addressed)
+        if r is not None and r.unsure and ctx.channel and ctx.channel.open:
+            note += ("; " if note else "") + (f"a channel with {ctx.channel.name or ctx.channel.party} is open and these words may have "
+                                              "been meant for them: if so, Martin offers to pass them on")
+        turn_task = None
+        if crew_text:
+            self.memory.hear("Captain", crew_text)
+            turn_task = asyncio.create_task(self.agent.handle(crew_text, lang, ctx, note, gate))
+        if route_task is not None:
+            try:
+                got = await asyncio.wait_for(route_task, timeout=1.5)
+            except asyncio.TimeoutError:
+                got = None
+            if got is None:
+                r = router_mod.Route(crew=text, how="fallback", unsure=True)
+            else:
+                r = got
+                r.addressed = router_mod.decide(text, ctx).officers
+            gate.set_result(r.dest == "crew" or (r.how == "fallback"))
+            if r.dest == "both":                                    # the crew's turn was for the whole: start it again on its part
+                await turn_task
+                self.memory.hear("Captain", r.crew)
+                turn_task = asyncio.create_task(self.agent.handle(r.crew, lang, ctx, ""))
+        if ctx.channel:
+            log.info("channel open with %s, routed (%s, %.0f ms): crew=%r party=%r", ctx.channel.party, r.how, r.ms, r.crew[:60],
+                     r.external[:60])
+        t = await turn_task if turn_task is not None else None
+        if r.external and r.party:
+            await self._to_party(r.party, r.external, lang)
+        if t is None or (t.cancelled and not t.actions):
+            return
+        self.style.captain_order(crew_text if r.dest != "both" else r.crew, t.actions)
+        asyncio.create_task(self.memory.maybe_read())
+        for name, args_, res in t.actions:
+            if name == "end_transmission":
+                self.enemy.open = False
+            if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() == "fleet":
+                await self.director.admiral_reply(str(args_.get("message", "")), lang, self._battle_state())
+            # (open_channel knows who has a commander to answer: a contact not yet classified, a decoy, a
+            # friendly ship never do)
+            if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() != "fleet" \
+                    and self.enemy.open_channel(str(args_.get("contact_id", "")).upper()):
+                await self.enemy.respond(f"[The ASTRA ship hails you. Their message: {args_.get('message', '')}]",
+                                         lang, self._battle_state())
+        await self._sink("json", {"type": "turn_end", "first_line_s": t.t_first_line, "total_s": round(t.t_end, 3),
+                                  "cost": t.cost, "actions": [[n, a, r_] for n, a, r_ in t.actions], "error": t.error,
+                                  "route": {"dest": r.dest, "how": r.how, "ms": round(r.ms, 1), "addressed": list(r.addressed)}})
+        log.info("turn %.2fs (first line %.2fs) cost $%.5f: %s", t.t_end, t.t_first_line or -1, t.cost,
+                 " | ".join(f"{s}: {x}" for s, x in t.lines))
+
+    async def _event_turn(self, events: list[str], ask: str | None):
+        """A report turn (or the officers' watch check: its own compact prompt, its own cheaper model, only the last few exchanges)."""
+        if any(e.startswith("bridge: watch") for e in events):
+            st = self.game.state if (self.game and self.game.state) else self.local.snapshot()
+            t = await self.agent.handle_event(" | ".join(events), self.lang, ask=watch_ask(self.lang), role="watch", history_turns=4,
+                                              max_lines=2,
+                                              system=watch_system(self.lang, st, self.agent.standing_lines(), self.agent.style(),
+                                                                  recent_orders(self.agent.history)))
+            chk = getattr(self, "_watch_check", None)
+            if chk is not None:
+                self.watch.ran(chk, bool(t.lines or t.actions))
+            return t
+        return await self.agent.handle_event(" | ".join(events), self.lang, ask=ask)
 
     async def handle_client(self, ws) -> None:  # noqa: ANN001
         self.clients.add(ws)
@@ -671,6 +768,8 @@ class Mind:
                     self.agent.history.clear()
                     self.enemy.reset()
                     self.port.reset()
+                    self.watch.reset()
+                    self.exchange.reset()
                     log.info("new game session: conversation reset (the war waits for the Captain's choice)")
                 elif kind == "campaign":
                     # the Captain chose in the title menu: a new war, or the saved one
@@ -717,6 +816,7 @@ class Mind:
                 elif kind == "event":
                     text = msg.get("text", "")
                     self.game.events.append(text)
+                    self.watch.note(text)                  # (what may change what the officers should do: the watch's next check)
                     if text.startswith("director: the Aquila is lost"):
                         # the story of the loss: who finds the Captain, the board, a new command (mind/astra_mind/loss.py)
                         asyncio.create_task(self.aftermath.on_lost(text, self.lang))
@@ -757,20 +857,23 @@ class Mind:
                     self.last_activity = self.captain_t = time.monotonic()
                     text = msg.get("text", "").strip()
                     if text:
-                        await self.turns.put((text, msg.get("lang") or detect_lang(text)))
+                        self._captain_speaks()                        # (priority: the crew stops what it was doing)
+                        await self.turns.put((text, msg.get("lang") or detect_lang(text), msg.get("context")))
                 elif kind == "ptt":
                     if msg.get("down"):
+                        self._captain_speaks()
+                        self._ptt_ctx = msg.get("context") or self._ptt_ctx
                         ok = self.mic.start()
                         if not ok:
                             await ws.send(json.dumps({"type": "status", "mic": "unavailable"}))
                     else:
                         pcm = self.mic.stop()
-                        asyncio.create_task(self._recognise(pcm))
+                        asyncio.create_task(self._recognise(pcm, msg.get("context") or self._ptt_ctx))
         finally:
             self.clients.discard(ws)
             log.info("game disconnected")
 
-    async def _recognise(self, pcm: bytes) -> None:
+    async def _recognise(self, pcm: bytes, ctx: dict[str, Any] | None = None) -> None:
         if len(pcm) < 16000 * 2 * 0.3:
             return
         t0 = time.perf_counter()
@@ -779,7 +882,7 @@ class Mind:
         self.captain_t = time.monotonic()
         await self._sink("json", {"type": "transcript", "text": text, "lang": lang})
         if text:
-            await self.turns.put((text, lang))
+            await self.turns.put((text, lang, ctx))
 
     def _quit(self, sig: int) -> None:
         log.info("signal %d: the mind stops", sig)

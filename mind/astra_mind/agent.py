@@ -49,7 +49,8 @@ class Turn:
     error: str = ""
     cancelled: bool = False               # the Captain spoke over it (or the words were for someone else): no more is said or done
     task: asyncio.Task | None = None      # the model call in flight (what preempt() cancels)
-    dropped: list[str] = field(default_factory=list)   # lines the crew did not voice (bare acknowledgements)
+    dropped: list[str] = field(default_factory=list)   # lines the crew did not voice (bare acknowledgements, lines over the cap)
+    max_lines: int | None = None          # a governor on the lines a turn may voice (the watch: two)
 
 
 class BridgeAgent:
@@ -152,6 +153,8 @@ class BridgeAgent:
         self._active.add(turn)
         try:
             comp = await self._llm(turn, "crew", msgs, ts.tools, on_call)
+            if gate is not None and not gate.done() and not turn.cancelled:
+                await asyncio.shield(gate)                           # nothing is voiced before the router has said whom it is for
             if gate is not None and gate.done() and not gate.result():
                 turn.cancelled = True                                # the words were for someone else: no trace in the crew's talk
                 await self._settle(pending, turn)
@@ -191,10 +194,10 @@ class BridgeAgent:
             self._active.discard(turn)
 
     async def handle_event(self, event: str, lang: str, ask: str | None = None, *, role: str = "crew", system: str | None = None,
-                           history_turns: int | None = None) -> Turn:
+                           history_turns: int | None = None, max_lines: int | None = None) -> Turn:
         """A ship event (not the Captain): the responsible officer reports it, and may act within their own authority.
         role: the model role ('crew', or 'watch' for the initiative watch); system: a prompt of its own (the watch's compact one)."""
-        turn = Turn(text=f"[event] {event}", lang=lang, kind="event")
+        turn = Turn(text=f"[event] {event}", lang=lang, kind="event", max_lines=max_lines)
         t0 = time.perf_counter()
         state = self.ship.snapshot()
         ts = tools_for(state)
@@ -259,8 +262,8 @@ class BridgeAgent:
         turn must know the ship changed); what the crew had begun to say does not (nobody heard it)."""
         results = await self._settle(pending, turn)
         acts = [c for c in fired if c.name != "speak"]
-        if acts:
-            self._record(user, acts, results, turn, 0)
+        if acts or turn.kind == "captain":
+            self._record(user, acts, results, turn, 0)          # (the Captain's words stay in the talk even if nobody answered yet)
         log.info("turn interrupted by the Captain: %d call(s) had gone out", len(acts))
 
     def _on_call(self, turn: Turn, lang: str, t0: float, pending: list, ts: Any, state: dict[str, Any], fired: list[ToolCall],
@@ -284,6 +287,7 @@ class BridgeAgent:
                 if _looks_like_tool(line):
                     log.warning("speak contained a tool invocation, not voiced: %s", line)
                     line = ""
+                line = _deconsole(line, lang)
                 if len(line) < 4:
                     return                                           # never voice fragments of a cut-off reply
                 tone = args.get("tone", "calm")
@@ -303,6 +307,9 @@ class BridgeAgent:
         return on_call
 
     async def _voice(self, turn: Turn, t0: float, speaker: str, line: str, lang: str, tone: str) -> None:
+        if turn.max_lines is not None and len(turn.lines) >= turn.max_lines:
+            turn.dropped.append(line)                                # (what was done stays done; the line was one too many)
+            return
         if turn.t_first_line is None:
             turn.t_first_line = time.perf_counter() - t0
         turn.lines.append((speaker, line))
@@ -499,6 +506,31 @@ def is_bare_ack(line: str) -> bool:
     """An acknowledgement that says nothing ("Aye aye, Captain", "Agli ordini", "Ricevuto, Capitano"): only stock words."""
     words = [w for w in _plain(line) if w not in _CAPTAIN_WORDS]
     return 0 < len(words) <= 6 and all(w in _BARE_WORDS for w in words)
+
+
+_MODE_WORDS = {
+    "it": {"keep_on_bow": "prua sul bersaglio", "scan_focus": "scansione mirata", "scan_sweep": "scansione a intervalli",
+           "shields_face_threat": "scudi verso la minaccia", "shields_sector": "scudi su un settore", "viewscreen_target": "schermo sul bersaglio",
+           "viewscreen_auto": "schermo automatico", "weapons_free": "fuoco libero", "hold_fire": "fuoco sospeso", "return_fire": "risposta al fuoco",
+           "heat_auto": "gestione automatica del calore", "datapad_push": "pagina sul datapad", "dc_auto": "controllo danni automatico"},
+    "en": {"keep_on_bow": "bow on the target", "scan_focus": "focused scan", "scan_sweep": "sweeping scan", "shields_face_threat": "shields to the threat",
+           "shields_sector": "shields on a sector", "viewscreen_target": "screen on the target", "viewscreen_auto": "automatic screen",
+           "weapons_free": "weapons free", "hold_fire": "hold fire", "return_fire": "return fire", "heat_auto": "automatic heat management",
+           "datapad_push": "page to the datapad", "dc_auto": "automatic damage control"},
+}
+_IDENT = re.compile(r"\b[a-z]{2,}(?:_[a-z]{2,})+\b")
+
+
+def _deconsole(line: str, lang: str) -> str:
+    """An officer talks like an officer: a mode or tool name that slipped into a spoken line becomes plain words."""
+    words = _MODE_WORDS.get(lang, {})
+
+    def plain(m: "re.Match[str]") -> str:
+        ident = m.group(0)
+        if ident in words:
+            return words[ident]
+        return ident.replace("_", " ") if ident in station_model.MODE_INDEX or ident in SHIP_TOOL_NAMES else ident
+    return _IDENT.sub(plain, line)
 
 
 def _kept(calls: list[ToolCall], turn: Turn) -> list[ToolCall]:

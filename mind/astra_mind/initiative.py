@@ -142,6 +142,41 @@ class Watch:
         self.quiet_runs = 0 if spoke_or_acted else self.quiet_runs + 1
 
     # ------------------------------------------------------------------------------------------------ the facts
+    @staticmethod
+    def due(state: dict[str, Any]) -> list[str]:
+        """The decisions the picture leaves open, worked out by the code from the consoles and the plot (so the officers are
+        pointed at them and do not have to notice): a bearing nobody is scanning, a hostile with no fire on it, an idle helm in a
+        fight, a viewscreen on a target that is gone. The officers decide what to do about them, within their delegation."""
+        hostile, blind, _ = Watch.contacts(state)
+        stations = state.get("stations") or {}
+
+        def lane(st: str, name: str) -> dict[str, Any]:
+            return station_model.lanes_of(stations.get(st)).get(name, {})
+
+        out: list[str] = []
+        scan = lane("sensors", "scan")
+        scanning = (scan.get("params") or {}).get("target") if scan.get("mode") == "scan_focus" else None
+        for c in blind[:3]:
+            if str(c.get("id")) != scanning and not str(c.get("status", "")).startswith("JAMMING"):
+                out.append(f"{c.get('id')} is a bearing (brg {int(c.get('bearing_deg', 0)):03d}) with no range and no scan on it")
+        eng = lane("tactical", "engagement")
+        mode = eng.get("mode") or "return_fire"
+        engaged = set((eng.get("params") or {}).get("targets") or []) if mode == "engage" else set()
+        if mode != "weapons_free":
+            for c in sorted(hostile, key=lambda x: x.get("range_km") or 99)[:3]:
+                if str(c.get("id")) not in engaged and "hostiles" not in engaged:
+                    reach = "inside" if (c.get("range_km") or 99) <= 10 else "beyond"
+                    out.append(f"hostile {c.get('id')} {c.get('name') or ''} at {c.get('range_km')} km ({reach} the railguns' 10 km) has no "
+                               f"fire assigned (the posture is {mode.replace('_', ' ')})")
+        nav = lane("helm", "nav")
+        if hostile and (nav.get("mode") or "hold") == "hold":
+            out.append("the helm is holding course with hostiles about (the Captain wants the action ahead of the bow)")
+        vs = lane("ops", "viewscreen")
+        if vs.get("mode") == "viewscreen_target" and not any(str(c.get("id")) == str((vs.get("params") or {}).get("target"))
+                                                                for c in state.get("contacts", []) or []):
+            out.append("the viewscreen is on a target that is gone")
+        return out[:5]
+
     def _facts(self, state: dict[str, Any], flags: list[str], picture: str | None) -> str:
         hostile, blind, friends = self.contacts(state)
         lines = []
@@ -168,6 +203,9 @@ class Watch:
         self._board = board
         if flags or picture:
             lines.append("Problems the plot found: " + "; ".join(flags + ([picture] if picture else [])))
+        due = self.due(state)
+        if due:
+            lines.append("Decisions the plot leaves open (in priority order): " + "; ".join(due))
         return "bridge: watch — " + " || ".join(lines)
 
 
@@ -178,17 +216,20 @@ WATCH_ASK = ("A routine WATCH CHECK of the fight: the Captain has not spoken. Lo
              "line, or (b) where the delegation is advise, or the step is the Captain's to take, PROPOSES it in one short sentence; "
              "or (c) does nothing. Most checks need nothing at all: then call no tool and say nothing (reply SILENT). Never repeat "
              "what an officer said in the last minute, never report what the Captain can see, never more than two lines in all. "
-             "Typical good moves: retarget when a target has fallen and another hostile is inside reach; keep the bow on the action "
-             "when the ship is idle in a fight; face the shields to the threat; scan a bearing-only contact or a lost track; put the "
-             "viewscreen on the target the Captain cares about (and release it when it is lost); recall a mauled squadron; set the "
-             "repair teams on what matters; take the radiators out when heat climbs. If two officers must act together, one short "
-             "line each in the same turn.")
+             "Priorities: (1) a NEW bearing-only contact or a lost track: Sensors sets a focused scan on it (unless one is already "
+             "running) — it is never fired on until it has a range; (2) a target fell or is lost: retarget inside the Captain's "
+             "intent (the gunnery officer may only fire on what the ROE or an order covers — otherwise propose), keep the bow on the "
+             "action, release a viewscreen whose target is gone; (3) the shields towards the threat, heat, a mauled squadron recalled, "
+             "the repair teams on what matters. Do only what the picture asks: do not re-set a mode that already fits.")
 
 _WATCH_SYSTEM = """You are the bridge crew of the ASN Aquila, keeping watch in a fight. The player is the ship's Captain; you voice every
 officer, each the live operator of a console. You know only what the consoles and the facts below say.
 
-Speech: in {lang_name}, {captain} at most once, SHORT — one sentence of 6-16 words per officer, and never more than two lines in all.
-Every line says what was set or proposed and on what; never a bare "aye". Proper names stay in English.
+Speech: EVERY line in {lang_name} (only proper names stay in English), {captain} at most once, SHORT — one sentence of 6-16 words, and
+never more than two lines in all: when several consoles change, ONE line from the XO or the officer most involved covers them all.
+Every line says what was set or proposed and on what; never a bare "aye". Speak like an officer, not a console: never read a mode
+or a parameter name aloud (say "scudi verso la minaccia", not "shields_face_threat"). Actions are real: a line says "I do X" ONLY
+with the `station` call that does X in this same turn; where the delegation is advise or manual the line is a proposal ("propongo...").
 
 Consoles (`station` sets a persistent mode the ship's code then runs every tick; a new mode replaces the old in its [lane]):
 {table}
@@ -211,6 +252,11 @@ Consoles now
 
 Ship state
 {state}"""
+
+
+def watch_ask(lang: str) -> str:
+    """The check's instruction, with the language said again at the end (the model obeys what it read last)."""
+    return WATCH_ASK + f" Speak {LANG_NAMES.get(lang, lang)}, at most two lines in all."
 
 
 def watch_system(lang: str, state: dict[str, Any], standing: str, style: str, orders: str) -> str:
