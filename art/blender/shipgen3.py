@@ -11,8 +11,8 @@ Options:
   --seed N           add N to every ship's seed (other dice, same designs)
   --no-export        build (and preview) without writing FBX files
   --no-pieces        skip the section pieces of the capital ships
-  --preview <dir>    render the previews of each ship into <dir> (Eevee): three-quarter view, a "x300 zoom" patch of hull, the
-                     pieces pulled apart; --views three_quarter,closeup,pieces to choose; --samples N; --hdr uses the 8K Aurelia sky
+  --preview <dir>    render the previews of each ship into <dir> (Eevee): three-quarter view, "x300 zoom" patches of hull, the
+                     pieces pulled apart, one cut face; --views three_quarter,closeup,pieces,cutface to choose; --samples N
   --report           print the budget table at the end
 
 Exported meshes (origin = the ship's origin, x forward, the FBX export mirrors y as usual; opaque, Nanite in Unreal):
@@ -39,7 +39,7 @@ import astra_bpy as A  # noqa: E402
 import ship3_build as B  # noqa: E402
 import ship3_geo as G  # noqa: E402
 import ship3_kit as K  # noqa: E402
-import ship3_preview as PV  # noqa: E402
+import ship3_render as R  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(HERE))
 SEC_NAMES = ("Bow", "Mid", "Stern")
@@ -105,7 +105,7 @@ def short(name: str) -> str:
 def parse_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out = {"out_dir": os.path.join(ROOT, "art", "export", "ships_v3"), "only": None, "detail": 1.0, "seed": 0, "export": True, "pieces": True,
-           "preview": None, "views": ["three_quarter", "closeup", "pieces"], "samples": 40, "hdr": False, "report": False, "size": (1600, 900)}
+           "preview": None, "views": ["three_quarter", "closeup", "pieces", "cutface"], "samples": 40, "report": False, "size": (1600, 900)}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -131,8 +131,6 @@ def parse_args() -> dict:
         elif a == "--samples":
             out["samples"] = int(argv[i + 1])
             i += 1
-        elif a == "--hdr":
-            out["hdr"] = True
         elif a == "--report":
             out["report"] = True
         elif not a.startswith("--"):
@@ -245,7 +243,7 @@ def main() -> None:
         previews.append((name, spec, obj, info))
         # ---------------------------------------------------------------------------------------------- previews
         if args["preview"]:
-            render_previews(name, spec, res, obj, args)
+            R.render_previews(name, short(name), spec, res, obj, args, compact)
         # free the scene for the next ship
         for o in list(bpy.data.objects):
             bpy.data.objects.remove(o, do_unlink=True)
@@ -261,60 +259,6 @@ def main() -> None:
         for n, e in manifest["meshes"].items():
             print(f"  {n:40s} {e['tris']:>10,d} tris  {e['size_m']}")
     print("SHIPGEN3_OK")
-
-
-# -------------------------------------------------------------------------------------------------------------- previews
-def render_previews(name: str, spec: dict, res: dict, obj, args: dict) -> None:
-    """Three-quarter view, a close-up patch and the pieces pulled apart, lit by the orange star with the teal fill."""
-    g, info = res["g"], res["info"]
-    fac = spec["fac"]
-    w, h = args["size"]
-    outd = args["preview"]
-    os.makedirs(outd, exist_ok=True)
-    PV.make_materials(fac)
-    star = dict(sun_az=info.get("sun_az", -38.0), sun_el=info.get("sun_el", 30.0), sun=info.get("sun", 3.6), world=0.5)
-    PV.aurelia_lighting(**star)
-    if args["hdr"]:
-        PV.use_hdr_world(0.35)
-    PV.configure(w, h, args["samples"])
-    V = np.array(obj.bound_box)
-    lo, hi = V.min(axis=0), V.max(axis=0)
-    cen = (lo + hi) / 2
-    R = float(np.linalg.norm(hi - lo)) / 2
-    sn = short(name)
-    for view in args["views"]:
-        if view == "three_quarter":
-            az, el = math.radians(info.get("cam_az", -32.0)), math.radians(info.get("cam_el", 20.0))
-            d = np.array([math.cos(el) * math.cos(az + math.pi / 2), math.cos(el) * math.sin(az + math.pi / 2) * -1, math.sin(el)])
-            dist = R * info.get("cam_dist", 2.05)
-            cam = PV.camera("cam", tuple(cen + d * dist), tuple(cen + np.array(info.get("cam_target_off", [0, 0, 0]))), 50.0)
-            PV.render(cam, os.path.join(outd, f"{sn}_three_quarter.jpg"))
-        elif view == "closeup":
-            for i, cu in enumerate(info.get("closeups", [])):
-                tgt = np.array(cu["target"], float)
-                nrm = G.norm(np.array(cu["normal"], float))
-                dist = cu.get("distance", 110.0)
-                span = cu.get("span", 50.0)
-                cam = PV.camera("cam", tuple(tgt + nrm * dist), tuple(tgt), PV.close_up_lens(dist, span, 36.0))
-                PV.render(cam, os.path.join(outd, f"{sn}_closeup_{cu.get('name', i)}.jpg"))
-    if "pieces" in args["views"] and info.get("cuts"):
-        cuts = info["cuts"]
-        section_of = lambda x, cu=list(cuts): np.where(x > cu[0], 0, np.where(x > cu[1], 1, 2)) if len(cu) == 2 else np.where(x > cu[0], 0, 1)  # noqa: E731
-        obj.hide_render = True
-        gap = info.get("pieces_gap", 0.12) * (hi[0] - lo[0])
-        for k in range(len(cuts) + 1):
-            pa = g.assemble(sections={k}, include_caps=True, section_of=section_of)
-            if pa is None:
-                continue
-            pa, pm = compact(pa, g.mats)
-            po = B.build_object(f"_prev_{k}", pa, pm)
-            po.location.x = (len(cuts) / 2.0 - k) * gap
-            po.location.y = ((k % 2) - 0.5) * gap * 0.18
-            po.location.z = ((k - 1) * 0.35) * gap * 0.08
-        cam_d = R * info.get("pieces_dist", 2.3)
-        az = math.radians(info.get("pieces_az", 28.0))
-        cam = PV.camera("cam", (cen[0] + math.sin(az) * cam_d * 0.6, cen[1] - math.cos(az) * cam_d, cen[2] + R * 0.55), tuple(cen), 50.0)
-        PV.render(cam, os.path.join(outd, f"{sn}_pieces.jpg"))
 
 
 if __name__ == "__main__":

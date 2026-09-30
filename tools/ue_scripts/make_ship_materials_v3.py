@@ -19,6 +19,7 @@ Then in the editor: tools/ue.py pyfile tools/ue_scripts/make_ship_materials_v3.p
 """
 import json
 import os
+import sys
 
 import unreal
 
@@ -390,20 +391,10 @@ def mi(name, parent, scalars=None, vectors=None, textures=None):
     return inst
 
 
-# (tint, bare metal, paint metallic, rough min, rough max, wear gain, grime gain)
-PAINT = {
-    "A": dict(Plate=("#BCBAB4", "#8A8F96", 0.0, 0.30, 0.55), Frame=("#4A4F55", "#7A7F86", 0.35, 0.28, 0.55), Livery=("#1F3A6B", "#8A8F96", 0.0, 0.28, 0.50),
-              Trim=("#B89A4E", "#C9B26B", 0.55, 0.24, 0.42), Marking=("#E4E1D8", "#8A8F96", 0.0, 0.35, 0.55), Engine=("#5B5F66", "#8A8F96", 0.85, 0.30, 0.50)),
-    "M": dict(Plate=("#4A4540", "#54514D", 0.0, 0.42, 0.78), Frame=("#1A1B1E", "#4A4A4C", 0.30, 0.30, 0.62), Livery=("#8C5A2B", "#9A7A55", 0.70, 0.30, 0.55),
-              Trim=("#6E7F63", "#6A7A60", 0.50, 0.35, 0.65), Marking=("#B78A55", "#8A8F96", 0.0, 0.40, 0.70), Engine=("#3A3B40", "#6A6C70", 0.80, 0.35, 0.55)),
-    "G": dict(Plate=("#938A74", "#7B7F84", 0.0, 0.35, 0.75), Frame=("#44484C", "#7B7F84", 0.30, 0.30, 0.70), Livery=("#A2561B", "#7B7F84", 0.0, 0.40, 0.70),
-              Trim=("#C9B25A", "#8A8F96", 0.0, 0.35, 0.60), Marking=("#E4E1D8", "#7B7F84", 0.0, 0.35, 0.55), Engine=("#6A6C70", "#8A8F96", 0.85, 0.35, 0.55),
-              Blue=("#2C5A8C", "#7B7F84", 0.0, 0.35, 0.65), Green=("#3B6B4A", "#7B7F84", 0.0, 0.35, 0.65)),
-}
-LIGHTS = {"A": ((1.0, 0.9, 0.75), 40.0, (0.55, 0.78, 1.0), 90.0), "M": ((1.0, 0.68, 0.25), 40.0, (1.0, 0.42, 0.28), 90.0), "G": ((1.0, 0.95, 0.85), 30.0, (0.9, 0.9, 1.0), 60.0)}
-RADIATOR = {"A": ("#2A2D31", (1.0, 0.24, 0.05), 0.0), "M": ("#2A1A10", (1.0, 0.33, 0.07), 14.0), "G": ("#303236", (1.0, 0.33, 0.07), 0.0)}
-NAVS = {"A": ((1.0, 0.05, 0.03), (0.1, 1.0, 0.2), (1.0, 0.95, 0.9)), "M": ((1.0, 0.06, 0.03), (1.0, 0.06, 0.03), (1.0, 0.06, 0.03)),
-        "G": ((1.0, 0.05, 0.03), (0.1, 1.0, 0.2), (1.0, 0.95, 0.9))}
+sys.path.insert(0, ROOT + "/art/blender")
+import ship3_palette as PAL  # noqa: E402  (one palette for these instances and the Blender previews)
+
+PAINT, LIGHTS, RADIATOR, NAVS = PAL.PAINT, PAL.LIGHTS, PAL.RADIATOR, PAL.NAVS
 
 
 def instances(hull, light, cut, glass):
@@ -411,11 +402,11 @@ def instances(hull, light, cut, glass):
     for f, parts in PAINT.items():
         for part, (col, bare, metal, rmin, rmax) in parts.items():
             mi(f"MI_HULL_{f}_{part}", hull, scalars=dict(RoughMin=rmin, RoughMax=rmax, MetallicBias=metal, ToneAmount=0.20 if f != "M" else 0.26,
-                                                          WearThreshold=0.52, GrimeGain=1.0 if f != "M" else 1.3),
+                                                          WearThreshold=0.52, GrimeGain=1.0 if f != "M" else 1.3, BCInfluence=0.0),
                vectors={"Tint": lin(col), "BareTint": lin(bare)})
             out.append(f"MI_HULL_{f}_{part}")
-        lc, li, gc, gi = LIGHTS[f]
-        mi(f"MI_HULL_{f}_Lights", light, scalars=dict(Intensity=li, Mode=0.0, LitFraction=0.65 if f != "M" else 0.35, FlickerAmount=1.0), vectors={"EmissiveColor": lc})
+        lc, li, gc, gi, lit = LIGHTS[f]
+        mi(f"MI_HULL_{f}_Lights", light, scalars=dict(Intensity=li, Mode=0.0, LitFraction=lit, FlickerAmount=1.0), vectors={"EmissiveColor": lc})
         mi(f"MI_HULL_{f}_Glow", light, scalars=dict(Intensity=gi, Mode=2.0, PulseSpeed=3.0, PulseAmount=0.06), vectors={"EmissiveColor": gc})
         nr, ng, nw = NAVS[f]
         mi(f"MI_HULL_{f}_Nav", light, scalars=dict(Intensity=160.0, Mode=1.0, PulseSpeed=2.4, PulseAmount=0.85), vectors={"NavRed": nr, "NavGreen": ng, "NavWhite": nw})
