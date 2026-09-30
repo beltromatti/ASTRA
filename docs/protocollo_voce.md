@@ -183,7 +183,9 @@ Ora `voice_status` lo dice: nel log della mente (`~/Library/Application Support/
 - **Mai in silenzio**: ogni scarto va nel log, nei contatori (`voice.stats`) e al gioco come `line_dropped`.
 - **Un tasto che non sale**: se il gioco perde il messaggio `ptt up` (o si chiude con il tasto premuto), dopo `KEY_STUCK_S` = 45 s il tasto è considerato rilasciato e l'equipaggio riprende a parlare; alla disconnessione e a `hello` (nuova sessione) `clear()` libera il palco e scarta tutto quello che era in coda.
 
-Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `ptt`/`player_text` → `captain_begin/end/input`; `turn_worker` → `captain_turn_begin/end` attorno al turno del Capitano e `voice.preemptible()` attorno al turno di un rapporto (lo interrompe se il Capitano prende la parola e lo rimette in coda); `quiet_moments` → `voice.chatter`.
+Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `ptt`/`player_text` → `captain_begin/end/input` e poi `_captain_speaks()` del modulo dell'equipaggio (`agent.preempt()`: le chiamate al modello in corso si fermano; `voice.drop_low_priority()`; il gancio `voice.captain_speaks()`); `turn_worker` → `captain_turn_begin/end` attorno al turno del Capitano; `quiet_moments` → `voice.chatter`. Un rapporto tagliato dal Capitano lo ferma `agent.preempt()` (l'`voice.preemptible()` di `speech.py` resta a disposizione dei produttori ma il server non lo usa più).
+
+`voice.captain_speaks()` è il gancio che il server chiama quando il Capitano comincia a parlare: chi parla si ferma (alla prossima pausa entro mezzo secondo, altrimenti una dissolvenza rapida) e le righe `LOW` in coda sono scartate; si può chiamare più volte e accanto a `captain_begin/captain_input` (una riga già in fase di stop resta com'è); con il tasto giù non fa altro, senza tasto prende anche il palco per la risposta, come un ordine scritto. Il palco accetta anche un motore di voce della prima versione (il cui `stream` è un generatore asincrono di PCM senza tono né arresto): i doppioni di prova di altri moduli continuano a funzionare.
 
 ## 6. Regolazioni (variabili d'ambiente)
 
@@ -206,7 +208,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 
 ```
 uv run python -m bench.voice_units            # 78 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti)
-uv run python -m bench.voice_floor -v         # 24 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
+uv run python -m bench.voice_floor -v         # 26 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
 uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-baseline   # riconoscimento: WER e latenza, motori alternati clip per clip
 uv run python -m bench.voice_pipeline live tts mic floor mem   # (più sezioni di seguito) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
 uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)
