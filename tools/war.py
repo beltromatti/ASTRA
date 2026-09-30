@@ -39,6 +39,8 @@ def build_args(a: argparse.Namespace, out: Path) -> list[str]:
     if a.jump is not None and a.jump >= 0:
         args.append(f"-jump={a.jump}")
     args.append(f"-seed={a.seed}")
+    if getattr(a, "nseeds", 1) > 1:
+        args.append(f"-seeds={a.nseeds}")                 # several battles in one process: the start-up is most of a run
     if getattr(a, "scenario", ""):
         args.append(f"-scenario={a.scenario}")
     if a.exec:
@@ -53,7 +55,7 @@ def run_once(a: argparse.Namespace, out: Path, log: Path) -> int:
         # a crash can leave the engine hanging in its crash handler: never wait for ever
         p = subprocess.Popen(build_args(a, out), stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
         try:
-            p.wait(timeout=max(240.0, a.seconds / 3.0))
+            p.wait(timeout=180.0 + getattr(a, "nseeds", 1) * (6.0 + a.seconds / 40.0))
         except subprocess.TimeoutExpired:
             p.kill()
             p.wait()
@@ -155,18 +157,28 @@ def outcome(path: Path) -> dict:
 def seeds_run(a: argparse.Namespace, tag: str, ex: str, seeds: list[int], jobs: int) -> list[Path]:
     WAR.mkdir(parents=True, exist_ok=True)
 
-    def one(seed: int) -> Path:
+    # the seeds go to the processes in runs of consecutive seeds: each process fights its battles one after the other
+    n = max(1, min(jobs, len(seeds)))
+    chunks, k = [], 0
+    for i in range(n):
+        size = len(seeds) // n + (1 if i < len(seeds) % n else 0)
+        chunks.append(seeds[k:k + size])
+        k += size
+
+    def one(chunk: list[int]) -> None:
         ns = argparse.Namespace(**vars(a))
         ns.exec = ex
-        ns.seed = seed
-        out = WAR / f"{tag}_{seed}.json"
-        rc = run_once(ns, out, WAR / f"{tag}_{seed}.log")
-        if not out.exists():
-            print(f"   {tag} seed {seed}: no record (exit {rc}, log {WAR / f'{tag}_{seed}.log'})")
-        return out
+        ns.seed = chunk[0]
+        ns.nseeds = len(chunk)
+        out = WAR / (tag + "_{seed}.json")
+        rc = run_once(ns, out, WAR / f"{tag}_{chunk[0]}.log")
+        for sd in chunk:
+            if not (WAR / f"{tag}_{sd}.json").exists():
+                print(f"   {tag} seed {sd}: no record (exit {rc}, log {WAR / f'{tag}_{chunk[0]}.log'})")
 
-    with ThreadPoolExecutor(max(1, jobs)) as pool:
-        return [p for p in pool.map(one, seeds)]
+    with ThreadPoolExecutor(n) as pool:
+        list(pool.map(one, chunks))
+    return [WAR / f"{tag}_{sd}.json" for sd in seeds]
 
 
 def fmt_side(m: dict, side: str) -> str:
@@ -309,6 +321,92 @@ def print_stats(st: dict) -> None:
         print(f"  the whole world tick: {w['ms_avg']:.3f} ms avg, p95 {w['ms_p95']:.3f}, max {w['ms_max']:.3f}")
 
 
+def cmd_duel(a: argparse.Namespace) -> None:
+    """Static shooters against a passive dummy, a run per face of the dummy and per seed: how long the sector holds, when a
+    section is gutted, how much damage it takes to put the ship out of action, and where the damage went. Shooters and
+    dummy stay exactly on their marks."""
+    facings = {"bow": (1, 0, 0), "stern": (-1, 0, 0), "port": (0, -1, 0), "starboard": (0, 1, 0), "dorsal": (0, 0, 1), "ventral": (0, 0, -1)}
+    names = a.facings.split(",") if a.facings else list(facings)
+
+    def one(face: str) -> tuple[str, list[dict]]:
+        vx, vy, vz = facings[face]
+        perp = (0, 1, 0) if face in ("bow", "stern", "dorsal", "ventral") else (1, 0, 0)
+        cmds = [f"astra.war.tune {kv.split('=')[0]} {kv.split('=')[1]}" for kv in a.tune.split(",") if "=" in kv]
+        cmds += ["astra.war.sandbox", f"astra.war.spawn {a.target} mandate 0 0 0 0 id=TGT static passive"]
+        for i in range(a.n):
+            lat = (i - (a.n - 1) / 2) * 0.35
+            x, y, z = vx * a.range + perp[0] * lat, vy * a.range + perp[1] * lat, vz * a.range + perp[2] * lat
+            heading = math.degrees(math.atan2(-y, -x))
+            mark = math.degrees(math.atan2(-z, math.hypot(x, y)))
+            opts = f" missiles={a.missiles}" if a.missiles >= 0 else ""
+            cmds.append(f"astra.war.spawn {a.shooter} astra {x:.3f} {y:.3f} {z:.3f} {heading:.2f} mark={mark:.2f} id=S{i} static{opts}")
+        ns = argparse.Namespace(seconds=a.seconds, jump=-1, step=0.1, every=2, scenario="", exec=";".join(cmds), seed=1, nseeds=a.seeds)
+        base = f"duel_{a.target}_{a.shooter}_{face}"
+        run_once(ns, WAR / (base + "_{seed}.json"), WAR / f"{base}.log")
+        return face, [load(WAR / f"{base}_{sd}.json") for sd in range(1, a.seeds + 1) if (WAR / f"{base}_{sd}.json").exists()]
+
+    res: dict[str, list[dict]] = {f: [] for f in names}
+    with ThreadPoolExecutor(max(1, a.jobs)) as pool:
+        for face, runs in pool.map(one, names):
+            res[face] = runs
+    print(f"== {a.n} x {a.shooter} (static, {a.range} km) against a {a.target} dummy, {a.seconds:.0f} s, {a.seeds} seed(s)"
+          f"{'' if a.missiles < 0 else f', {a.missiles} missiles'}{'  tune ' + a.tune if a.tune else ''}")
+    print(f"  {'face':9} {'damage taken to be out':>22} {'time out':>9} {'sector down':>11} {'fates (dead/dark/alive)':>24}   shield / plate / structure share")
+    for face in names:
+        runs = res[face]
+        if not runs:
+            print(f"  {face:9} (no record)")
+            continue
+        idx = {"bow": 0, "stern": 1, "port": 2, "starboard": 3, "dorsal": 4, "ventral": 5}[face]
+        tot, tout, tsec, fates = [], [], [], {"destroyed": 0, "disabled": 0, "alive": 0}
+        sh = pl = st = 0.0
+        for d in runs:
+            dm = d["stats"]["damage"]
+            kinds = [k for k in dm if isinstance(dm[k], dict)]
+            tot.append(sum(dm[k]["in"] for k in kinds))
+            sh += sum(dm[k]["shield"] for k in kinds)
+            pl += sum(dm[k]["plate"] for k in kinds)
+            st += sum(dm[k]["structure"] for k in kinds)
+            t_out = t_sec = None
+            for f in d["frames"]:
+                s = next((x for x in f["ships"] if x["c"] == "TGT"), None)
+                if s is None:
+                    continue
+                if t_sec is None and s["alive"] and "shields" in s and s["shields"][idx] <= 5:
+                    t_sec = f["t"]
+                if t_out is None and (not s["alive"] or s.get("fate") == "disabled"):
+                    t_out = f["t"]
+            fin = next((x for x in d["final"]["ships"] if x["c"] == "TGT"), {})
+            fates[fin.get("fate", "alive") if fin.get("fate") in fates else "destroyed" if not fin.get("alive", True) else "alive"] += 1
+            if t_out is not None:
+                tout.append(t_out)
+            if t_sec is not None:
+                tsec.append(t_sec)
+        allv = max(sh + pl + st, 1e-9)
+        mean = lambda v: (statistics.mean(v) if v else float("nan"))
+        print(f"  {face:9} {mean(tot):14.0f} ±{(statistics.pstdev(tot) if len(tot) > 1 else 0):5.0f} {mean(tout):8.0f}s {mean(tsec):10.0f}s"
+              f" {fates['destroyed']:>10}/{fates['disabled']}/{fates['alive']}      {100 * sh / allv:3.0f}% / {100 * pl / allv:3.0f}% / {100 * st / allv:3.0f}%")
+
+
+def cmd_embed(a: argparse.Namespace) -> None:
+    """data/war/classes.json -> Source/ASTRA/AstraWarClassesData.inl (the table compiled in: the game runs without the file)."""
+    src = ROOT / "data" / "war" / "classes.json"
+    text = src.read_text()
+    json.loads(text)                                   # it must parse
+    chunks, cur = [], ""
+    for line in text.splitlines(keepends=True):        # raw literals stay well under the 16 KB limit of some compilers
+        if len(cur) + len(line) > 6000:
+            chunks.append(cur)
+            cur = ""
+        cur += line
+    chunks.append(cur)
+    out = ROOT / "Source" / "ASTRA" / "AstraWarClassesData.inl"
+    body = ",\n".join('R"json(' + c + ')json"' for c in chunks)
+    out.write_text("// generated by `tools/war.py embed` from data/war/classes.json: do not edit here\n"
+                   f"const char* const GAstraWarClassesJson[] = {{\n{body}\n}};\n")
+    print(f"{out.relative_to(ROOT)}: {len(chunks)} chunk(s), {len(text)} bytes")
+
+
 def cmd_report(a: argparse.Namespace) -> None:
     report(a.path)
 
@@ -366,6 +464,20 @@ def main() -> None:
     p.add_argument("a")
     p.add_argument("b")
     p.set_defaults(fn=cmd_compare)
+    p = sub.add_parser("duel", help="static shooters against a passive dummy from each face: the damage model on a bench")
+    p.add_argument("--target", default="praetorian")
+    p.add_argument("--shooter", default="acheron")
+    p.add_argument("--n", type=int, default=2)
+    p.add_argument("--range", type=float, default=5.0, help="km")
+    p.add_argument("--seconds", type=float, default=240)
+    p.add_argument("--facings", default="")
+    p.add_argument("--missiles", type=int, default=-1, help="the shooters' missiles (-1: the class's)")
+    p.add_argument("--tune", default="", help="tuning constants, name=value,name=value (astra.war.tune)")
+    p.add_argument("--seeds", type=int, default=6)
+    p.add_argument("--jobs", type=int, default=4)
+    p.set_defaults(fn=cmd_duel)
+    p = sub.add_parser("embed", help="write the ship class table compiled into the game from data/war/classes.json")
+    p.set_defaults(fn=cmd_embed)
     p = sub.add_parser("report")
     p.add_argument("path")
     p.set_defaults(fn=cmd_report)

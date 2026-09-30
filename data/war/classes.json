@@ -1,0 +1,164 @@
+{
+  "_doc": "Ship classes of the war (docs/GUERRA.md). Read by the battle at startup over the table compiled in (Source/ASTRA/AstraWarClassesData.inl, regenerated with `tools/war.py embed`). Frames: X forward, Y starboard, Z up. Sections: 0 bow, 1 mid, 2 stern. Facings: [bow, stern, port, starboard, dorsal, ventral]. Systems: engines, sensors, hangar, bridge, reactor (the section each sits in). Mounts: kind rail|laser, dir (unit, ship frame), arc (half-angle, degrees), barrels (slugs a volley), section.",
+  "classes": [
+    {
+      "key": "aquila", "mesh": "", "label": "Aquila-class carrier cruiser",
+      "radius": 330, "hull": 3000, "shield": 1100, "shield_regen": 4,
+      "accel": 15, "turn_deg": 3, "cruise": 288, "sensor_km": 55,
+      "sections": [0.26, 0.42, 0.32], "armour": 0.64,
+      "facing_armour": [0.20, 0.16, 0.19, 0.19, 0.13, 0.13],
+      "shield_alloc": [0.23, 0.13, 0.17, 0.17, 0.15, 0.15], "shield_scale": 2.0,
+      "rail": {"slugs": 4, "damage": 55, "cd": 7, "range": 10000},
+      "missiles": {"count": 96, "cd": 14, "range": 25000},
+      "laser": {"damage": 18, "cd": 5, "range": 4000},
+      "pd": {"channels": 4, "range": 2000},
+      "systems": {"engines": 2, "sensors": 0, "hangar": 0, "bridge": 1, "reactor": 2},
+      "range_km": [6, 9],
+      "mounts": [
+        {"kind": "rail", "dir": [0.2, 0, 0.95], "arc": 120, "barrels": 1, "section": 0},
+        {"kind": "rail", "dir": [-0.2, 0, 0.95], "arc": 120, "barrels": 1, "section": 2},
+        {"kind": "rail", "dir": [0.2, 0, -0.95], "arc": 120, "barrels": 1, "section": 0},
+        {"kind": "rail", "dir": [-0.2, 0, -0.95], "arc": 120, "barrels": 1, "section": 2},
+        {"kind": "laser", "dir": [0, 0, 1], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 0, -1], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, -1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [1, 0, 0], "arc": 100, "barrels": 1, "section": 0},
+        {"kind": "laser", "dir": [-1, 0, 0], "arc": 100, "barrels": 1, "section": 2}
+      ]
+    },
+    {
+      "key": "praetorian", "mesh": "SM_SHIP_ASTRA_Praetorian", "label": "ASTRA battleship (7th Fleet flagship)",
+      "radius": 460, "hull": 5200, "shield": 2000, "shield_regen": 8,
+      "accel": 12, "turn_deg": 2.2, "cruise": 300, "sensor_km": 60,
+      "sections": [0.30, 0.40, 0.30], "armour": 0.76,
+      "facing_armour": [0.24, 0.12, 0.20, 0.20, 0.12, 0.12],
+      "shield_alloc": [0.24, 0.11, 0.17, 0.17, 0.155, 0.155], "shield_scale": 2.0,
+      "rail": {"slugs": 4, "damage": 72, "cd": 9, "range": 10000},
+      "missiles": {"count": 24, "cd": 30, "range": 25000},
+      "laser": {"damage": 18, "cd": 5, "range": 4000},
+      "pd": {"channels": 4, "range": 2000},
+      "systems": {"engines": 2, "sensors": 0, "hangar": 1, "bridge": 1, "reactor": 1},
+      "range_km": [5, 8],
+      "mounts": [
+        {"kind": "rail", "dir": [0.3, 0, 0.95], "arc": 115, "barrels": 2, "section": 0},
+        {"kind": "rail", "dir": [-0.3, 0, 0.95], "arc": 115, "barrels": 1, "section": 2},
+        {"kind": "rail", "dir": [0.3, 0, -0.95], "arc": 115, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, -1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 0, 1], "arc": 100, "barrels": 1, "section": 1}
+      ]
+    },
+    {
+      "key": "vigilant", "mesh": "SM_SHIP_ASTRA_Vigilant", "label": "ASTRA destroyer",
+      "radius": 140, "hull": 1200, "shield": 500, "shield_regen": 5,
+      "accel": 18, "turn_deg": 4.5, "cruise": 300, "sensor_km": 40,
+      "sections": [0.32, 0.38, 0.30], "armour": 0.44,
+      "facing_armour": [0.24, 0.12, 0.19, 0.19, 0.13, 0.13],
+      "shield_alloc": [0.24, 0.11, 0.17, 0.17, 0.155, 0.155], "shield_scale": 1.5,
+      "rail": {"slugs": 2, "damage": 55, "cd": 7, "range": 8000},
+      "missiles": {"count": 12, "cd": 30, "range": 25000},
+      "laser": {"damage": 18, "cd": 3.3, "range": 4000},
+      "pd": {"channels": 2, "range": 2000},
+      "systems": {"engines": 2, "sensors": 0, "hangar": 1, "bridge": 1, "reactor": 1},
+      "range_km": [4, 6.5],
+      "mounts": [
+        {"kind": "rail", "dir": [0.3, 0, 0.95], "arc": 125, "barrels": 1, "section": 0},
+        {"kind": "rail", "dir": [-0.3, 0, 0.95], "arc": 125, "barrels": 1, "section": 2},
+        {"kind": "laser", "dir": [0, -1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 1, 0], "arc": 100, "barrels": 1, "section": 1}
+      ]
+    },
+    {
+      "key": "acheron", "mesh": "SM_SHIP_MANDATE_Acheron", "label": "Kharon Mandate cruiser, Acheron class",
+      "radius": 240, "hull": 3600, "shield": 1500, "shield_regen": 4,
+      "accel": 15, "turn_deg": 3, "cruise": 450, "sensor_km": 50,
+      "sections": [0.32, 0.42, 0.26], "armour": 0.68,
+      "facing_armour": [0.28, 0.10, 0.19, 0.19, 0.12, 0.12],
+      "shield_alloc": [0.27, 0.10, 0.16, 0.16, 0.155, 0.155], "shield_scale": 2.0,
+      "rail": {"slugs": 3, "damage": 85, "cd": 8, "range": 8000},
+      "missiles": {"count": 32, "cd": 30, "range": 25000},
+      "laser": {"damage": 18, "cd": 5, "range": 4000},
+      "pd": {"channels": 3, "range": 2000},
+      "systems": {"engines": 2, "sensors": 0, "hangar": 1, "bridge": 1, "reactor": 1},
+      "range_km": [4.5, 7],
+      "mounts": [
+        {"kind": "rail", "dir": [1, 0, 0], "arc": 18, "barrels": 2, "section": 0},
+        {"kind": "rail", "dir": [0, 0, 1], "arc": 130, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, -1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 0, 1], "arc": 100, "barrels": 1, "section": 1}
+      ]
+    },
+    {
+      "key": "styx", "mesh": "SM_SHIP_MANDATE_Styx", "label": "Kharon Mandate destroyer, Styx class",
+      "radius": 130, "hull": 1300, "shield": 500, "shield_regen": 4,
+      "accel": 18, "turn_deg": 4.5, "cruise": 450, "sensor_km": 40,
+      "sections": [0.34, 0.36, 0.30], "armour": 0.44,
+      "facing_armour": [0.28, 0.10, 0.19, 0.19, 0.12, 0.12],
+      "shield_alloc": [0.27, 0.10, 0.16, 0.16, 0.155, 0.155], "shield_scale": 1.5,
+      "rail": {"slugs": 2, "damage": 60, "cd": 9, "range": 8000},
+      "missiles": {"count": 16, "cd": 30, "range": 25000},
+      "laser": {"damage": 18, "cd": 3.3, "range": 4000},
+      "pd": {"channels": 2, "range": 2000},
+      "systems": {"engines": 2, "sensors": 0, "hangar": 1, "bridge": 1, "reactor": 1},
+      "range_km": [4, 6.5],
+      "mounts": [
+        {"kind": "rail", "dir": [1, 0, 0], "arc": 20, "barrels": 1, "section": 0},
+        {"kind": "rail", "dir": [0, 0, 1], "arc": 130, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, -1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 1, 0], "arc": 100, "barrels": 1, "section": 1}
+      ]
+    },
+    {
+      "key": "lethe", "mesh": "SM_SHIP_MANDATE_Lethe", "label": "Kharon Mandate frigate, Lethe class",
+      "radius": 90, "hull": 520, "shield": 220, "shield_regen": 4,
+      "accel": 22, "turn_deg": 6, "cruise": 500, "sensor_km": 35,
+      "sections": [0.34, 0.36, 0.30], "armour": 0.32,
+      "facing_armour": [0.26, 0.11, 0.19, 0.19, 0.125, 0.125],
+      "shield_alloc": [0.26, 0.11, 0.165, 0.165, 0.15, 0.15], "shield_scale": 1.5,
+      "rail": {"slugs": 2, "damage": 55, "cd": 8, "range": 8000},
+      "missiles": {"count": 8, "cd": 30, "range": 25000},
+      "laser": {"damage": 18, "cd": 3.3, "range": 4000},
+      "pd": {"channels": 2, "range": 2000},
+      "systems": {"engines": 2, "sensors": 0, "hangar": 1, "bridge": 1, "reactor": 1},
+      "range_km": [4, 6.5],
+      "mounts": [
+        {"kind": "rail", "dir": [1, 0, 0], "arc": 40, "barrels": 1, "section": 0},
+        {"kind": "rail", "dir": [0, 0, 1], "arc": 140, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, -1, 0], "arc": 100, "barrels": 1, "section": 1},
+        {"kind": "laser", "dir": [0, 1, 0], "arc": 100, "barrels": 1, "section": 1}
+      ]
+    },
+    {
+      "key": "freighter", "mesh": "SM_SHIP_GUILD_Freighter", "label": "Free Guilds freighter",
+      "radius": 170, "hull": 700, "shield": 60, "shield_regen": 2,
+      "accel": 8, "turn_deg": 2, "cruise": 180, "sensor_km": 25,
+      "sections": [0.25, 0.50, 0.25], "armour": 0.2,
+      "facing_armour": [0.20, 0.15, 0.20, 0.20, 0.125, 0.125],
+      "shield_alloc": [0.17, 0.17, 0.17, 0.17, 0.16, 0.16], "shield_scale": 2.0,
+      "rail": {"slugs": 0, "damage": 0, "cd": 8, "range": 0},
+      "missiles": {"count": 0, "cd": 30, "range": 0},
+      "laser": {"damage": 0, "cd": 5, "range": 0},
+      "pd": {"channels": 0, "range": 0},
+      "systems": {"engines": 2, "sensors": 0, "hangar": 1, "bridge": 0, "reactor": 1},
+      "range_km": [8, 12],
+      "mounts": []
+    },
+    {
+      "key": "station", "mesh": "SM_STATION_ASTRA_Watch", "label": "listening post",
+      "radius": 120, "hull": 5000, "shield": 0, "shield_regen": 0,
+      "accel": 0, "turn_deg": 0, "cruise": 0, "sensor_km": 10,
+      "sections": [0.33, 0.34, 0.33], "armour": 0.2,
+      "facing_armour": [0.17, 0.17, 0.17, 0.17, 0.16, 0.16],
+      "shield_alloc": [0.17, 0.17, 0.17, 0.17, 0.16, 0.16], "shield_scale": 1.0,
+      "rail": {"slugs": 0, "damage": 0, "cd": 8, "range": 0},
+      "missiles": {"count": 0, "cd": 30, "range": 0},
+      "laser": {"damage": 0, "cd": 5, "range": 0},
+      "pd": {"channels": 0, "range": 0},
+      "systems": {"engines": 2, "sensors": 0, "hangar": 1, "bridge": 1, "reactor": 1},
+      "range_km": [8, 12],
+      "mounts": []
+    }
+  ]
+}

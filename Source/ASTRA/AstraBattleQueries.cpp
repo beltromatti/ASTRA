@@ -29,11 +29,15 @@ void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 		V.Side = S.bGhost ? EAstraSide::Mandate : (V.bUnknown ? EAstraSide::Neutral : S.Side);
 		V.Track = S.Track;
 		V.bCraft = S.bCraft;
-		V.bDerelict = S.bDerelict;
-		V.bCapital = !S.bCraft && !S.bDerelict && V.Side != EAstraSide::Neutral;
+		V.bDerelict = S.bDerelict || S.bDisabled;      // a ship without power is a hulk: no threat, no target
+		if (S.bDisabled && V.Side == EAstraSide::Mandate)
+		{
+			V.Side = EAstraSide::Neutral;
+		}
+		V.bCapital = !S.bCraft && !V.bDerelict && V.Side != EAstraSide::Neutral;
 		V.bFleeing = S.bFleeing;
 		V.bJamming = S.bJamming;
-		V.bFiringAtUs = S.Side == EAstraSide::Mandate && !S.bHoldFire && (S.TargetId == P.Id || S.FireTarget == P.Id);
+		V.bFiringAtUs = S.Side == EAstraSide::Mandate && !S.bHoldFire && !S.bDisabled && (S.TargetId == P.Id || S.FireTarget == P.Id);
 		V.RadiusM = S.Radius;
 		const bool bFirm = S.Track >= 2;
 		V.Class = !bUnknown ? S.Class : FString();
@@ -113,7 +117,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 		J->SetStringField(TEXT("side"), S.Side == EAstraSide::Astra ? TEXT("astra") : (S.Side == EAstraSide::Mandate ? TEXT("mandate") : TEXT("neutral")));
 		J->SetBoolField(TEXT("craft"), S.bCraft);
 		J->SetBoolField(TEXT("alive"), S.bAlive);
-		J->SetStringField(TEXT("fate"), S.bAlive ? TEXT("alive") : (S.Mode == EAstraShipMode::Dead ? TEXT("destroyed") : TEXT("gone")));   // gone: left the theatre, or a craft that landed
+		J->SetStringField(TEXT("fate"), S.bAlive ? (S.bDisabled ? TEXT("disabled") : TEXT("alive")) : (S.Mode == EAstraShipMode::Dead ? TEXT("destroyed") : TEXT("gone")));   // gone: left the theatre, or a craft that landed
 		if (!S.bAlive)
 		{
 			Arr.Add(MakeShared<FJsonValueObject>(J));
@@ -139,6 +143,18 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 		else
 		{
 			J->SetNumberField(TEXT("missiles"), S.Missiles);
+			if (S.Dmg.bModel)
+			{
+				// the physical state: shield sectors (bow, stern, port, starboard, dorsal, ventral) and structure by section
+				// (bow, mid, stern) in percent, and the systems (engines, sensors, hangar, bridge, reactor, point defence)
+				TArray<TSharedPtr<FJsonValue>> Sh, St, Sy;
+				for (int32 f = 0; f < 6; ++f) { Sh.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(100.0 * S.Dmg.Sector[f] / FMath::Max(1.f, S.Dmg.SectorMax[f])))); }
+				for (int32 k = 0; k < 3; ++k) { St.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(100.0 * S.Dmg.Structure[k] / FMath::Max(1.f, S.Dmg.StructureMax[k])))); }
+				for (int32 k = 0; k < 6; ++k) { Sy.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(100.0 * S.Dmg.Sys[k]))); }
+				J->SetArrayField(TEXT("shields"), Sh);
+				J->SetArrayField(TEXT("sections"), St);
+				J->SetArrayField(TEXT("systems"), Sy);
+			}
 		}
 		Arr.Add(MakeShared<FJsonValueObject>(J));
 	}

@@ -131,6 +131,7 @@ int32 UAstraBattleSubsystem::AddShip(const FString& Contact, const FString& Name
 	S.Shield = S.ShieldMax = Shield;
 	S.Mode = Speed > 1.f ? EAstraShipMode::Cruise : EAstraShipMode::Idle;
 	Ships.Add(S);
+	InitShipModel(Ships.Last());     // a warship gets its class's sections, plates, shield sectors and mounts (AstraWarDamage.cpp)
 	return Ships.Num() - 1;
 }
 
@@ -454,6 +455,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 			                      FMath::RadiansToDegrees(FMath::Atan2(Dir.Z, FVector2D(Dir.X, Dir.Y).Size())), Ship->GetSpeedMps());
 		}
 	}
+	ProcessWarCommands();                                   // the bench's scenarios and spawns (AstraWarScenario.cpp)
 	TickPlayer(Dt);
 	TickGateRun(Dt);
 	TickPOIs(Dt);
@@ -484,7 +486,11 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 			TickAI(S, Dt);
 		}
 		TickWeapons(S, Dt);
-		if (S.bShieldsUp)
+		if (S.Dmg.bModel)
+		{
+			TickDamageState(S, Dt);                // sectors regenerate and move, sections burn, hulls break, systems fail
+		}
+		else if (S.bShieldsUp)
 		{
 			const float Before = S.Shield;
 			S.Shield = FMath::Min(S.ShieldMax, S.Shield + S.ShieldRegen * S.ShieldPower * Dt);
@@ -527,6 +533,10 @@ float UAstraBattleSubsystem::PlayerSignatureKm() const
 
 void UAstraBattleSubsystem::TickDetection(float Dt)
 {
+	if (bSandbox)
+	{
+		return;
+	}
 	PlayerSinceFired += Dt;
 	const FAstraBattleShip& P = Ships[0];
 	const float SigKm = PlayerSignatureKm();
@@ -534,7 +544,7 @@ void UAstraBattleSubsystem::TickDetection(float Dt)
 	bool bHostiles = false;
 	for (const FAstraBattleShip& O : Ships)
 	{
-		if (O.bAlive && O.bHostile && O.Side == EAstraSide::Mandate && !O.bCraft && !O.bCold)
+		if (O.bAlive && O.bHostile && !O.bDisabled && O.Side == EAstraSide::Mandate && !O.bCraft && !O.bCold)
 		{
 			bHostiles = true;
 			bSeen = bSeen || FVector::Dist(O.Pos, P.Pos) < SigKm * OneKm;
@@ -600,7 +610,7 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 	const FString E = Ship ? Ship->GetEmcon() : FString(TEXT("restricted"));
 	const float SensorPower = Ship ? FMath::Clamp(Ship->PowerFactor(TEXT("sensors")), 0.2f, 1.5f) : 1.f;
 	// the Aquila's active sensors (radar, lidar): full EMCON sees furthest; silent only listens
-	const float ActiveKm = (E == TEXT("full") ? 55.f : (E == TEXT("restricted") ? 28.f : 0.f)) * SensorPower;
+	const float ActiveKm = (E == TEXT("full") ? 55.f : (E == TEXT("restricted") ? 28.f : 0.f)) * SensorPower * SensorFactor(Ships[0]);   // (a hurt sensor suite sees less far)
 	const FAstraBattleShip& P = Ships[0];
 	TArray<FString> NewBearings, NewTracks, Classified, Lost, JamOn, BurnThrough, Unmasked, Faded;
 	// the Mandate's jammers: a capital ship that has stopped running dark (it came close, fired, or heard our ping and
@@ -885,6 +895,10 @@ void UAstraBattleSubsystem::TickPlayer(float Dt)
 
 void UAstraBattleSubsystem::TickScenario(float Dt)
 {
+	if (bSandbox)
+	{
+		return;                                   // a bench scenario: no script, no outcome, no director
+	}
 	FAstraBattleShip* Frigate = FindByContact(TEXT("T-11"));
 	// the Captain has just come onto the bridge: the XO gives the situation
 	if (!bBriefed && Time > 6.f)
@@ -981,7 +995,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	if (RepairUntil > 0.f)
 	{
 		FAstraBattleShip& P = Ships[0];
-		P.Hull = FMath::Min(P.HullMax, P.Hull + RepairHullPerSec * Dt);
+		AddHullDelta(P, RepairHullPerSec * Dt);
 		if (Time >= RepairUntil)
 		{
 			RepairUntil = -1.f;
@@ -1005,7 +1019,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		int32 Fighting = 0, Holding = 0, Withdrawing = 0, AgreedWithdraw = 0;
 		for (const FAstraBattleShip& S : Ships)
 		{
-			if (S.bAlive && S.bHostile)
+			if (S.bAlive && S.bHostile && !S.bDisabled)
 			{
 				Fighting += (!S.bFleeing && !S.bHoldFire) ? 1 : 0;
 				Holding += (S.bHoldFire && !S.bFleeing) ? 1 : 0;
@@ -1096,7 +1110,7 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 		S.GhostLife -= Dt;
 		return;
 	}
-	if (S.bDerelict)
+	if (S.bDerelict || S.bDisabled)
 	{
 		S.Pos += S.Vel * Dt;
 		S.Att = FQuat(FVector(0.2f, 0.3f, 1.f).GetSafeNormal(), FMath::DegreesToRadians(S.SpinDeg * Dt)) * S.Att;
@@ -1109,7 +1123,7 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 	const bool bFleet = S.Side == EAstraSide::Astra && !S.bPlayer;
 	const auto Engageable = [this, &S](const FAstraBattleShip& O)
 	{
-		return O.bAlive && !O.bCold && ((S.Side == EAstraSide::Mandate && O.Side == EAstraSide::Astra && !O.bCraft && (!O.bPlayer || bPlayerTracked)) ||
+		return O.bAlive && !O.bCold && !O.bDisabled && ((S.Side == EAstraSide::Mandate && O.Side == EAstraSide::Astra && !O.bCraft && (!O.bPlayer || bPlayerTracked)) ||
 		                                (S.Side == EAstraSide::Astra && O.bHostile && !O.bFleeing && !O.bHoldFire));
 	};
 	if (T && T->bPlayer && S.Side == EAstraSide::Mandate && !bPlayerTracked)
@@ -1252,13 +1266,19 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 	{
 		DesiredVel = FVector::ZeroVector;
 	}
-	// accelerate towards the desired velocity, turn at a capital-ship rate
-	const FVector DV = (DesiredVel - S.Vel).GetClampedToMaxSize(S.MaxAccel * Dt);
+	// accelerate towards the desired velocity, turn at a capital-ship rate (the engines' health sets both)
+	const float Engines = EngineFactor(S);
+	if (S.bHoldStation)
+	{
+		DesiredVel = FVector::ZeroVector;           // a test dummy or a picket kept on its mark (bench scenarios)
+		S.Vel = FVector::ZeroVector;
+	}
+	const FVector DV = (DesiredVel - S.Vel).GetClampedToMaxSize(S.MaxAccel * Engines * Dt);
 	S.Vel += DV;
-	if (!Face.IsNearlyZero())
+	if (!Face.IsNearlyZero() && Engines > 0.f && !S.bFixedAtt)
 	{
 		const FQuat Want = FRotationMatrix::MakeFromX(Face).ToQuat();
-		const float MaxStep = FMath::DegreesToRadians(S.MaxTurnDeg * Dt);
+		const float MaxStep = FMath::DegreesToRadians(S.MaxTurnDeg * Engines * Dt);
 		const float Ang = S.Att.AngularDistance(Want);
 		S.Att = Ang <= MaxStep ? Want : FQuat::Slerp(S.Att, Want, MaxStep / Ang);
 	}
@@ -1267,13 +1287,21 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 
 void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 {
+	if (S.bDisabled)
+	{
+		return;                                   // no power: nothing fires, nothing defends
+	}
 	S.RailT = FMath::Max(0.f, S.RailT - Dt);
 	S.MissileT = FMath::Max(0.f, S.MissileT - Dt);
 	S.PDT = FMath::Max(0.f, S.PDT - Dt);
+	for (FAstraMount& M : S.Mounts)
+	{
+		M.T = FMath::Max(0.f, M.T - Dt);
+	}
 	// point defence: every ship shoots at missiles aimed at it (the Aquila's PD is automatic, 24 mounts)
 	if (S.PDT <= 0.f)
 	{
-		int32 Channels = S.PDChannels;
+		int32 Channels = S.Dmg.bModel ? FMath::CeilToInt(S.PDChannels * S.Dmg.Sys[AstraWar::SysPointDefence]) : S.PDChannels;
 		for (FAstraProjectile& Pr : Projectiles)
 		{
 			if (Channels > 0 && !Pr.bDead && Pr.Kind == EAstraProjKind::Missile && Pr.Target == S.Id &&
@@ -1345,7 +1373,11 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 		return;
 	}
 	const double Dist = FVector::Dist(S.Pos, T->Pos);
-	if (S.RailDamage > 0.f && S.RailT <= 0.f && Dist < S.RailRange)
+	if (S.Mounts.Num())
+	{
+		FireMounts(S, *T, Dist);                    // rails and lasers, mount by mount, each within its field of fire
+	}
+	else if (S.RailDamage > 0.f && S.RailT <= 0.f && Dist < S.RailRange)
 	{
 		S.LitT = 40.f;                                  // the muzzle flashes and the rails' pulse: every sensor sees it
 		S.RailT = S.RailCd * FMath::FRandRange(0.8f, 1.2f);
@@ -1384,7 +1416,7 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 			}
 		}
 	}
-	if (Dist < 4 * OneKm && FMath::FRand() < Dt * 0.6f)
+	if (S.Mounts.Num() == 0 && Dist < 4 * OneKm && FMath::FRand() < Dt * 0.6f)
 	{
 		FireLaser(S, *T);
 	}
@@ -1472,9 +1504,12 @@ void UAstraBattleSubsystem::FireMissile(FAstraBattleShip& From, FAstraBattleShip
 
 void UAstraBattleSubsystem::FireLaser(FAstraBattleShip& From, FAstraBattleShip& To)
 {
-	const FVector Hit = To.Pos + FMath::VRand() * To.Radius * 0.5;
+	// the beam strikes the hull sphere where it enters it, at a random offset from the line to the centre
+	const FVector Dir = (To.Pos - From.Pos).GetSafeNormal();
+	const FVector Off = FVector::VectorPlaneProject(FMath::VRand(), Dir).GetSafeNormal() * To.Radius * 0.9 * FMath::Sqrt(FMath::FRand());
+	const FVector Hit = AstraWar::SphereEntry(To.Pos, To.Radius, To.Pos + Off, Dir);
 	AddBeam(From.Pos, Hit, 0.35f, From.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.35f, 0.15f) : FLinearColor(0.5f, 0.8f, 1.f));
-	ApplyHit(To, (To.Pos - From.Pos).GetSafeNormal(), 18.f, Hit, EAstraHitKind::Laser, From.Id);
+	ApplyHit(To, Dir, From.LaserDamage > 0.f ? From.LaserDamage : 18.f, Hit, EAstraHitKind::Laser, From.Id);
 }
 
 bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& ContactId, int32 Salvo, FString& OutDetail)
@@ -1787,23 +1822,29 @@ void UAstraBattleSubsystem::TickPlayerFire(FAstraBattleShip& P, float Dt)
 		return;   // no power to the weapons
 	}
 	UAstraShipSubsystem* Heat = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	// the mounts that bear on the target (their fields of fire, their health): with none in arc the volley waits for the helm
+	const FVector AimDir = T->Pos + T->Vel * (Dist / 12000.0) - P.Pos;
 	if (P.RailVolleys > 0 && P.RailT <= 0.f && Dist <= P.RailRange)
 	{
-		P.RailT = P.RailCd / FMath::Max(0.25f, P.WeaponPower);   // capacitor recharge follows weapons power (and the heat)
-		HullSound(TEXT("SW_Rail_Fire"), 0.9f, 0.3f);
-		--P.RailVolleys;
-		PlayerSinceFired = 0.f;
-		if (Heat)
+		const int32 Slugs = BearingBarrels(P, EAstraMountKind::Rail, AimDir);
+		if (Slugs > 0)
 		{
-			Heat->RailgunDraw();   // the capacitors pull on the ship's power: the lights sag for a moment
-			Heat->AddHeat(4.0f);   // eight slugs out of the rails: the capacitors and the barrels dump their heat
-		}
-		for (int32 i = 0; i < P.RailSlugs; ++i)
-		{
-			FireRail(P, *T, 0.001f + Dist / 30e6);
+			P.RailT = P.RailCd / FMath::Max(0.25f, P.WeaponPower * PowerFactorOf(P));   // capacitor recharge follows weapons power (and the heat)
+			HullSound(TEXT("SW_Rail_Fire"), 0.9f, 0.3f);
+			--P.RailVolleys;
+			PlayerSinceFired = 0.f;
+			if (Heat)
+			{
+				Heat->RailgunDraw();   // the capacitors pull on the ship's power: the lights sag for a moment
+				Heat->AddHeat(4.0f);   // eight slugs out of the rails: the capacitors and the barrels dump their heat
+			}
+			for (int32 i = 0; i < Slugs; ++i)
+			{
+				FireRail(P, *T, 0.001f + Dist / 30e6);
+			}
 		}
 	}
-	if (P.LaserShots > 0 && P.LaserT <= 0.f && Dist <= 4 * OneKm)
+	if (P.LaserShots > 0 && P.LaserT <= 0.f && Dist <= P.LaserRange && BearingBarrels(P, EAstraMountKind::Laser, AimDir) > 0)
 	{
 		P.LaserT = 0.5f / FMath::Max(0.4f, Heat ? Heat->HeatFactor() : 1.f);
 		--P.LaserShots;
@@ -1920,7 +1961,7 @@ FString UAstraBattleSubsystem::MandateCommander() const
 	const FAstraBattleShip* Best = nullptr;
 	for (const FAstraBattleShip& S : Ships)
 	{
-		if (!S.bAlive || !S.bHostile || S.bCraft || S.Side != EAstraSide::Mandate)
+		if (!S.bAlive || !S.bHostile || S.bCraft || S.bDisabled || S.Side != EAstraSide::Mandate)
 		{
 			continue;
 		}
@@ -2268,7 +2309,8 @@ bool UAstraBattleSubsystem::PlayerHail(const FString& ContactId, FString& OutDet
 	return true;
 }
 
-void UAstraBattleSubsystem::ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId)
+/** The old lump model (craft, and any ship with no class): one shield value, one hull value. */
+void UAstraBattleSubsystem::ApplyHitLump(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId)
 {
 	if (!To.bAlive)
 	{
@@ -2396,7 +2438,7 @@ void UAstraBattleSubsystem::AquilaBreach(const FVector& ReactorW)
 	UE_LOG(LogASTRA, Log, TEXT("[Battle] the Aquila's reactor breached"));
 }
 
-void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause)
+void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EAstraFate How, uint8 Section)
 {
 	{
 		const int32 Side = S.Side == EAstraSide::Astra ? 0 : (S.Side == EAstraSide::Mandate ? 1 : -1);
@@ -2412,7 +2454,7 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause)
 			}
 			else if (!S.bGhost)
 			{
-				++Stats.ShipFate[Side][(int32)EAstraFate::Destroyed];
+				++Stats.ShipFate[Side][(int32)How];
 				Stats.LostWhileRetreating[Side] += S.bFleeing ? 1 : 0;
 			}
 		}
@@ -2420,11 +2462,41 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause)
 	const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
 	S.bAlive = false;
 	S.Mode = EAstraShipMode::Dead;
-	AddFlash(S.Pos, S.Radius * 1.4f, 2.6f, FLinearColor(1.f, 0.5f, 0.2f), 160.f);    // fireball: the gas cloud expands and thins
-	AddFlash(S.Pos, S.Radius * 0.9f, 1.1f, FLinearColor(1.f, 0.92f, 0.75f), 600.f);  // the flash of the reactor letting go
+	S.DeathHow = How;
+	const float Blast = How == EAstraFate::ReactorBreach ? 1.8f : 1.f;    // a reactor going takes the whole ship in a bigger ball of fire
+	AddFlash(S.Pos, S.Radius * 1.4f * Blast, 2.6f, FLinearColor(1.f, 0.5f, 0.2f), 160.f);    // fireball: the gas cloud expands and thins
+	AddFlash(S.Pos, S.Radius * 0.9f * Blast, 1.1f, FLinearColor(1.f, 0.92f, 0.75f), 600.f);  // the flash of the reactor letting go
 	if (!S.bCraft)
 	{
 		Explode(S);   // takes over the ship's actor as the hulk
+		if (!S.bGhost && !S.bPlayer)
+		{
+			FAstraDeathEvent E;                  // for the visuals: how it went, where it broke
+			E.Time = Time;
+			E.ShipId = S.Id;
+			E.ContactId = S.ContactId;
+			E.Name = S.Name;
+			E.Class = S.Class;
+			E.How = How;
+			E.Section = Section;
+			E.Pos = S.Pos;
+			E.Vel = S.Vel;
+			E.Att = S.Att;
+			E.Radius = S.Radius;
+			E.bAstra = S.Side == EAstraSide::Astra;
+			if (How == EAstraFate::Breakup)
+			{
+				E.BreakAxis = S.Att.GetForwardVector();
+				const double Sgn = Section == AstraWar::SecBow ? 1.0 : (Section == AstraWar::SecStern ? -1.0 : 0.0);
+				E.BreakPoint = S.Pos + E.BreakAxis * (Sgn * 0.33 * S.Radius);
+				E.BreakSpeed = FMath::FRandRange(8.f, 25.f);
+			}
+			DeathEvents.Add(E);
+			if (DeathEvents.Num() > 64)
+			{
+				DeathEvents.RemoveAt(0);
+			}
+		}
 	}
 	if (S.Actor) { S.Actor->Destroy(); S.Actor = nullptr; }
 	if (S.ShieldBubble) { S.ShieldBubble->Destroy(); S.ShieldBubble = nullptr; }
@@ -2461,8 +2533,10 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause)
 	}
 	else if (!S.bPlayer)
 	{
-		Report(FString::Printf(TEXT("tactical: %s destroyed"), (!S.bFog || S.bIdentified)
-			? *FString::Printf(TEXT("%s (%s, %s)"), *S.Name, *S.ContactId, *S.Class) : *KnownLabel(S)));
+		Report(FString::Printf(TEXT("tactical: %s %s"), (!S.bFog || S.bIdentified)
+			? *FString::Printf(TEXT("%s (%s, %s)"), *S.Name, *S.ContactId, *S.Class) : *KnownLabel(S),
+			How == EAstraFate::ReactorBreach ? TEXT("destroyed: her reactor breached")
+			: How == EAstraFate::Breakup ? *FString::Printf(TEXT("destroyed: the hull broke apart at the %s"), AstraWar::SectionName(Section)) : TEXT("destroyed")));
 		if (S.Side == EAstraSide::Astra)
 		{
 			LastWreckPos = S.Pos;
@@ -2534,7 +2608,15 @@ void UAstraBattleSubsystem::TickProjectiles(float Dt)
 			const FVector C = FMath::ClosestPointOnSegment(S.Pos, Prev, Pr.Pos);
 			if (FVector::DistSquared(C, S.Pos) < FMath::Square(S.Radius))
 			{
-				ApplyHit(S, (S.Pos - Prev).GetSafeNormal(), Pr.Damage, C, Pr.HitKind, Pr.Owner);
+				// it strikes where its path enters the hit sphere (not where it comes closest to the centre): the point that
+				// says which face and which section of the hull it lands on
+				const FVector Dir = (Pr.Pos - Prev).GetSafeNormal();
+				FVector Entry = AstraWar::SphereEntry(S.Pos, S.Radius, C, Dir);
+				if (FVector::DotProduct(Entry - Prev, Dir) < 0.0)
+				{
+					Entry = Prev;                     // it started inside the sphere
+				}
+				ApplyHit(S, Dir, Pr.Damage, Entry, Pr.HitKind, Pr.Owner);
 				Pr.bDead = true;
 				break;
 			}
@@ -2911,7 +2993,8 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 			}
 			else
 			{
-				O->SetStringField(TEXT("state"), S.bFleeing ? (S.bNegotiated ? TEXT("withdrawing, as ordered") : TEXT("breaking off: too damaged to keep fighting"))
+				O->SetStringField(TEXT("state"), S.bDisabled ? TEXT("disabled: no power, drifting, out of the fight")
+				                                 : S.bFleeing ? (S.bNegotiated ? TEXT("withdrawing, as ordered") : TEXT("breaking off: too damaged to keep fighting"))
 				                                 : S.bHoldFire ? TEXT("holding fire, as ordered")
 				                                 : S.bCold ? TEXT("running silent, waiting")
 				                                 : S.bHostile ? TEXT("attacking") : TEXT("standing by"));
@@ -3055,6 +3138,7 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 			O->SetStringField(TEXT("name"), S.Name);
 		}
 		O->SetStringField(TEXT("status"), S.bDerelict ? TEXT("derelict: no power, no transponder, tumbling")
+		                                  : S.bDisabled ? TEXT("disabled: no power, drifting, no longer a threat (a derelict, boardable later)")
 		                                  : S.bCold ? TEXT("unidentified, cold drive, drifting")
 		                                          : (S.bHostile ? (S.bFleeing ? TEXT("hostile, retreating") : (S.bHoldFire ? TEXT("hostile, holding fire") : TEXT("hostile"))) : SideName(S.Side)));
 		O->SetNumberField(TEXT("range_km"), FMath::RoundToDouble(FVector::Dist(P.Pos, S.Pos) / 100.0) / 10.0);
@@ -3334,7 +3418,13 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 			continue;
 		}
 		const bool bOurs = Q.Side == EAstraSide::Astra;
-		Q.LaunchT = bOurs ? 2.f / FMath::Max(0.3f, Deck) : 1.5f;
+		const float Hangar = HangarFactor(*Carrier);
+		if (Hangar <= 0.f)
+		{
+			Q.LaunchT = 3.f;                  // the hangar is wrecked, or the carrier is dead in the water: the wing waits on deck
+			continue;
+		}
+		Q.LaunchT = (bOurs ? 2.f / FMath::Max(0.3f, Deck) : 1.5f) / FMath::Max(0.3f, Hangar);
 		--Q.ToLaunch;
 		--Q.OnDeck;
 		++Q.Launched;
@@ -3506,7 +3596,7 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 		{
 			// nothing left to strike (or ordered to stand down): back to the carrier, or away if it is gone
 			Goal = (Home && Home->bAlive) ? Home->Pos : S.Pos + (S.Pos - Ships[0].Pos).GetSafeNormal() * 20000.0;
-			if (Home && Home->bAlive && FVector::Dist(S.Pos, Home->Pos) < 400.0)
+			if (Home && Home->bAlive && FVector::Dist(S.Pos, Home->Pos) < 400.0 && HangarFactor(*Home) > 0.f)
 			{
 				S.bAlive = false;
 				++Stats.CraftRecovered[1];
@@ -3618,7 +3708,7 @@ void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 	if (M == TEXT("recall"))
 	{
 		Goal = Carrier.Pos + Carrier.Att.RotateVector(FVector(-60.0, 0.0, -30.0));
-		if (FVector::Dist(S.Pos, Goal) < 400.f)
+		if (FVector::Dist(S.Pos, Goal) < 400.f && HangarFactor(Carrier) > 0.2f)
 		{
 			// trapped aboard
 			S.bAlive = false;
@@ -4271,8 +4361,7 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 		const FString VId = TakeId();
 		const int32 V = SpawnClass(TEXT("freighter"), VId, VName, Centre, Facing);
 		Ships[V].Vel = Ships[V].Att.GetForwardVector() * 200.f;
-		Ships[V].Hull = Ships[V].HullMax = 1500.f;   // a big hauler takes a while to die: time for the Aquila to get there
-		Ships[V].Shield = Ships[V].ShieldMax = 200.f;
+		BuildDurability(Ships[V], 1500.f, 200.f);   // a big hauler takes a while to die: time for the Aquila to get there
 		int32 k = 0;
 		FString Attackers;
 		int32 LeaderIdx = INDEX_NONE;
@@ -4516,7 +4605,7 @@ void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 	FAstraBattleShip& P = Ships[0];
 	P.Pos = FVector::ZeroVector;
 	double V = 1.0;
-	if (Save->TryGetNumberField(TEXT("hull_frac"), V)) { P.Hull = FMath::Clamp((float)V, 0.05f, 1.f) * P.HullMax; }
+	if (Save->TryGetNumberField(TEXT("hull_frac"), V)) { SetHullFraction(P, FMath::Clamp((float)V, 0.05f, 1.f)); }
 	if (Save->TryGetNumberField(TEXT("missiles"), V)) { P.Missiles = (int32)V; }
 	if (Save->TryGetNumberField(TEXT("torpedoes"), V)) { P.Torpedoes = (int32)V; }
 	const TArray<TSharedPtr<FJsonValue>>* Q = nullptr;
@@ -4639,7 +4728,7 @@ int32 UAstraBattleSubsystem::HostilesFighting(double WithinKm) const
 	int32 N = 0;
 	for (const FAstraBattleShip& S : Ships)
 	{
-		if (S.bAlive && S.bHostile && !S.bCraft && !S.bFleeing && !S.bHoldFire && FVector::Dist(S.Pos, Ships[0].Pos) < WithinKm * OneKm)
+		if (S.bAlive && S.bHostile && !S.bDisabled && !S.bCraft && !S.bFleeing && !S.bHoldFire && FVector::Dist(S.Pos, Ships[0].Pos) < WithinKm * OneKm)
 		{
 			++N;
 		}
