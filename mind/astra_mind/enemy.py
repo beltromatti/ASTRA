@@ -12,6 +12,33 @@ from typing import Any, Awaitable, Callable
 
 from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
 from .openrouter import OpenRouter, ToolCall
+from .speech import _sentences
+
+# one transmission, however many `transmit` calls the model makes: at most this many sentences and words (the persona asks for
+# one to three sentences, and 20-second hails still came: the bridge waits for nothing that long; 40 words are about 13 s)
+MAX_SENTENCES = 4
+MAX_WORDS = 40
+
+
+def clip_transmission(text: str, sentences_left: int, words_left: int) -> str:
+    """The part of `text` that fits the budget left: all of it when it fits; else how it opens (the first sentence) and its point
+    (the last sentences that still fit: a demand, an ultimatum, an answer come at the end), in their order. A first sentence too
+    long by itself is cut at a word."""
+    parts = [p.strip() for p in _sentences(text.strip()) if p.strip()]
+    count = [len(p.split()) for p in parts]
+    if not parts or sentences_left <= 0 or words_left <= 0:
+        return ""
+    if len(parts) <= sentences_left and sum(count) <= words_left:
+        return " ".join(parts)
+    if count[0] >= words_left:
+        return " ".join(parts[0].split()[:max(words_left, 8)]).rstrip(",;:") + "."
+    keep, words = [0], count[0]
+    for k in range(len(parts) - 1, 0, -1):
+        if len(keep) >= sentences_left or words + count[k] > words_left:
+            break
+        keep.append(k)
+        words += count[k]
+    return " ".join(parts[k] for k in sorted(keep))
 
 log = logging.getLogger("astra.enemy")
 
@@ -225,8 +252,13 @@ class EnemyAgent:
         async def on_call(call: ToolCall) -> None:
             a = call.arguments() or {}
             if call.name == "transmit" and len((a.get("text") or "").strip()) >= 4:
-                lines.append(a["text"].strip())
-                await self.say(spk, a["text"].strip(), lang, a.get("tone", "cold"))
+                said = " ".join(lines)
+                text = clip_transmission(a["text"], MAX_SENTENCES - len(_sentences(said)), MAX_WORDS - len(said.split()))
+                if text != a["text"].strip():
+                    log.info("%s's transmission clipped to the budget (%d words kept)", c["name"], len(text.split()))
+                if len(text) >= 4:
+                    lines.append(text)
+                    await self.say(spk, text, lang, a.get("tone", "cold"))
             elif call.name == "decide":
                 res = await self.command("enemy_order", {"order": a.get("order", "continue_attack"), "reason": a.get("reason", ""),
                                                          "commander": self.contact})
@@ -241,8 +273,9 @@ class EnemyAgent:
         if comp.error:
             log.error("enemy LLM error: %s", comp.error)
         if not lines and comp.content.strip() and not comp.error:
-            lines.append(comp.content.strip())
-            await self.say(spk, comp.content.strip(), lang, "cold")
+            text = clip_transmission(comp.content, MAX_SENTENCES, MAX_WORDS)
+            lines.append(text)
+            await self.say(spk, text, lang, "cold")
         history.append({"role": "user", "content": stimulus})
         history.append({"role": "assistant", "content": " ".join(lines) or "(silence)"})
         log.info("%s %.2fs: %s", c["name"], time.perf_counter() - t0, " | ".join(lines))

@@ -241,6 +241,18 @@ async def r1_live_sequence() -> list[str]:
 async def r2_old_news_is_not_reported() -> list[str]:
     """News that waited for a quiet bridge until even its newest item is old is not reported; in a fresh batch the old item says how old it is;
     news that arrived after the bridge fell quiet is reported at once."""
+    # the bridge is held by the live test's long message (64 words, about 20 s): the enemy's own budget (enemy.MAX_WORDS) would
+    # clip it now, and it is the floor's rules for old news that are tested here, not how long the enemy may speak
+    from astra_mind import enemy
+    budget = enemy.MAX_SENTENCES, enemy.MAX_WORDS
+    enemy.MAX_SENTENCES, enemy.MAX_WORDS = 99, 999
+    try:
+        return await _r2()
+    finally:
+        enemy.MAX_SENTENCES, enemy.MAX_WORDS = budget
+
+
+async def _r2() -> list[str]:
     async with Replay() as r:
         LAST[:] = [r]
         await asyncio.sleep(10.0)

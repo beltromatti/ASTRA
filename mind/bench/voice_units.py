@@ -347,8 +347,21 @@ def speech_rules() -> None:
           _boil_down("One here. Two here.") == "One here. Two here." and _boil_down(t) == "Aquila, this is Archon Solm. Stand down within two minutes.")
 
 
+def enemy_budget() -> None:
+    from astra_mind.enemy import MAX_SENTENCES, MAX_WORDS, clip_transmission as clip
+    hail = ("Aquila, qui parla l'Arconte Varek Solm del Mandato Kharon. Siete entrati in uno spazio che appartiene ai Mondi Esterni. "
+            "La vostra presenza è un insulto a ogni nave caduta alle Porte. Vi concedo una sola possibilità di ritirarvi prima che la mia flotta "
+            "apra il fuoco. Abbassate le armi e arrendete la vostra nave entro due minuti.")
+    out = clip(hail, MAX_SENTENCES, MAX_WORDS)
+    check("enemy: a 64-word hail is held to the budget", len(out.split()) <= MAX_WORDS, f"{len(out.split())} words")
+    check("enemy: ... keeping how it opens and its demand", out.startswith("Aquila, qui parla") and out.endswith("entro due minuti."), out)
+    check("enemy: a short message is left alone", clip("Negativo, Capitano. Continuiamo.", MAX_SENTENCES, MAX_WORDS) == "Negativo, Capitano. Continuiamo.")
+    check("enemy: a second transmission gets only what is left", clip("Una frase. Un'altra.", 1, 10) == "Una frase.")
+    check("enemy: nothing left, nothing said", clip("Ancora una cosa.", 0, MAX_WORDS) == "")
+
+
 def main() -> int:
-    for fn in (units, glossary_and_language, speech_text, speech_rules):
+    for fn in (units, glossary_and_language, speech_text, speech_rules, enemy_budget):
         try:
             fn()
         except Exception:  # noqa: BLE001
