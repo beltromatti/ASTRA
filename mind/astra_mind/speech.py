@@ -96,6 +96,8 @@ class Line:
     gen_error: bool = False
     first_ready: asyncio.Event = field(default_factory=asyncio.Event)
     synth_t: float = 0.0                         # loop time its audio began to be made
+    t_first: float = 0.0                         # loop time the first of it arrived
+    first_s: float = 0.0                         # seconds of audio in that first piece
     t_begin: float = 0.0                         # loop time the listener hears the first sound (estimated)
     sent_s: float = 0.0
     est_s: float = 0.0
@@ -142,6 +144,7 @@ class Voice:
         self._turn_t = 0.0                      # loop time the latest one began
         self._synth_line: Line | None = None    # the line whose audio is being made (or was made last)
         self._cps: dict[str, float] = {}
+        self._synth_rate = 2.5                  # audio seconds the voice makes per second once it is going (what the last lines showed)
         self._floor = ""
         self.muted = False                      # True: nobody is listening, lines are dropped at once
         self.first_audio: dict[int, float] = {}
@@ -550,6 +553,7 @@ class Voice:
         line.chunks, line.gen_done, line.gen_error = [], False, False
         line.first_ready = asyncio.Event()
         line.synth_t = self._now()
+        line.t_first, line.first_s = 0.0, 0.0
         self._synth_line = line
         asyncio.get_running_loop().create_task(self._collect(line, stream))
 
@@ -559,6 +563,8 @@ class Voice:
             async for pcm in stream:
                 if stream is not line.stream:
                     return                                          # restarted with other text: this audio is stale
+                if not line.chunks:
+                    line.t_first, line.first_s = self._now(), len(pcm) / 2 / stream.sample_rate
                 line.chunks.append(pcm)
                 line.first_ready.set()
                 self._wake()
@@ -572,6 +578,10 @@ class Voice:
             if stream is line.stream:
                 line.gen_done = True
                 line.first_ready.set()
+                dt = self._now() - line.t_first
+                if line.t_first and not line.gen_error and dt > 0.4 and stream.seconds > line.first_s:
+                    rate = min(12.0, max(0.3, (stream.seconds - line.first_s) / dt))
+                    self._synth_rate = 0.6 * self._synth_rate + 0.4 * rate
                 self._wake()
 
     # ------------------------------------------------------------------------------------------ turns
@@ -644,21 +654,31 @@ class Voice:
                 self._synth_line = None
             return line
 
+    def _steady_rate(self, line: Line, made: float) -> float:
+        """Audio seconds the voice makes per second once it is going: counted from the first audio, not from the moment the line was
+        asked for (the model's start-up delay is not its speed). Until a quarter of a second of it has been seen, what the last
+        lines showed."""
+        dt = self._now() - line.t_first
+        if dt >= 0.25 and made > line.first_s:
+            return (made - line.first_s) / dt
+        return self._synth_rate
+
     def _can_start_smoothly(self, line: Line) -> bool:
         """Has the line enough audio to start without running dry? The machine is shared with the game: when the voice makes
         speech slower than it plays (rate r < 1, audio seconds per second), playing at once would stutter, so the start waits
-        until what is buffered lasts until the rest has been made (made >= total x (1 - 0.8 r), with a margin)."""
+        until what is buffered lasts until the rest has been made (made >= total x (1 - 0.8 r), with a margin). At the usual
+        rate (several times real time) that is nothing: the line starts with its first audio."""
         st = line.stream
         if st is None or not line.first_ready.is_set():
             return False
         if line.gen_done or line.chunks == []:
             return line.gen_done
-        elapsed = self._now() - line.synth_t
         made = st.seconds
-        if elapsed < 0.05 or made <= 0.0:
+        if made <= 0.0:
             return False
+        r = self._steady_rate(line, made)
         total = max(line.est_s, made)
-        return made >= total * max(0.0, 1.0 - 0.8 * made / elapsed) + (0.15 if made / elapsed < 1.25 else 0.0)
+        return made >= total * max(0.0, 1.0 - 0.8 * r) + (0.15 if r < 1.25 else 0.0)
 
     # ------------------------------------------------------------------------------------------ saying a line
     def _hold_for(self, line: Line, est: float) -> float:

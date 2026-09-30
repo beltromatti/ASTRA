@@ -66,9 +66,10 @@ class FakeTTS:
 
     sample_rate = RATE
 
-    def __init__(self, rtf: float = 6.0, cps: float = 16.0) -> None:
+    def __init__(self, rtf: float = 6.0, cps: float = 16.0, first_delay: float = 0.0) -> None:
         self.rtf = rtf
         self.cps = cps
+        self.first_delay = first_delay                    # the model's start-up before its first audio
         self.fail: set[str] = set()
         self.silent: set[str] = set()                    # texts it makes no sound for
         self.calls: list[str] = []
@@ -91,6 +92,8 @@ class FakeTTS:
         async def gen() -> None:
             n = 0 if text in self.silent else math.ceil(dur / CHUNK_S)
             try:
+                if self.first_delay:
+                    await asyncio.sleep(self.first_delay)
                 if text in self.fail:
                     await asyncio.sleep(0.05)
                     raise RuntimeError("synthesis failed (test)")
@@ -277,8 +280,8 @@ def timeline(rec: Rec) -> list[str]:
 
 
 class Bridge:
-    def __init__(self, rtf: float = 6.0) -> None:
-        self.tts = FakeTTS(rtf=rtf)
+    def __init__(self, rtf: float = 6.0, first_delay: float = 0.0) -> None:
+        self.tts = FakeTTS(rtf=rtf, first_delay=first_delay)
         self.rec = Rec()
         self.voice = Voice(self.tts, self.rec, who)
         self.enq: dict[int, float] = {}
@@ -825,9 +828,26 @@ async def s23_no_audio() -> list[str]:
         return bad
 
 
+async def s24_startup_delay() -> list[str]:
+    """The model takes 0.4 s to start and then makes speech twice as fast as it plays: the line starts with its first audio, not after a
+    buffer sized as if the voice were slow (its start-up delay is not its speed)."""
+    async with Bridge(rtf=2.0, first_delay=0.4) as b:
+        # one line to let the floor learn how fast this voice goes, then the one that counts
+        await b.say("warm", "sensors", "Sensors here, nothing new to report on any bearing at all.")
+        await b.settle(1.0)
+        await b.say("l", "helm", "Helm here: coming to two one seven, half ahead, all steady and nothing to report.")
+        await b.settle(1.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        wait = tr.begin[b.ids["l"]] - b.enq[b.ids["l"]]
+        if wait > 0.4 + 0.4:
+            bad.append(f"the line began {wait:.2f} s after it was queued: more than the model's 0.4 s start-up and a breath")
+        return bad
+
+
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
              s10_shorten, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
-             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio]
+             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio, s24_startup_delay]
 
 
 def main() -> int:

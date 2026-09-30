@@ -206,7 +206,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 
 ```
 uv run python -m bench.voice_units            # 78 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti)
-uv run python -m bench.voice_floor -v         # 23 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
+uv run python -m bench.voice_floor -v         # 24 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
 uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-baseline   # riconoscimento: WER e latenza, motori alternati clip per clip
 uv run python -m bench.voice_pipeline live tts mic floor mem   # (più sezioni di seguito) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
 uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)
