@@ -158,6 +158,16 @@ async def main() -> int:
     ws.push({"type": "ptt", "down": False})
     await asyncio.sleep(1.5)
 
+    # is the event loop ever held up while the mind listens, thinks and speaks? A ticker measures how late it wakes
+    lags: list[float] = []
+
+    async def lag_probe() -> None:
+        while True:
+            t = time.perf_counter()
+            await asyncio.sleep(0.01)
+            lags.append(time.perf_counter() - t - 0.01)
+    tasks.append(asyncio.create_task(lag_probe()))
+
     # ---------------------------------------------------------------- 1. an order on a quiet bridge
     t_press = time.perf_counter()
     t_up = await press_and_say()
@@ -220,6 +230,9 @@ async def main() -> int:
         out["typed_to_first_word_ms"] = round((ans3[0] - t_typed) * 1000)
 
     await asyncio.sleep(2.0)
+    if lags:
+        out["loop_lag_ms"] = {"p50": round(1000 * float(np.percentile(lags, 50)), 1), "p99": round(1000 * float(np.percentile(lags, 99)), 1),
+                              "max": round(1000 * max(lags), 1), "over_50_ms": sum(1 for x in lags if x > 0.05), "ticks": len(lags)}
     dropped = [m for _, m in ws.since(0, "line_dropped")]
     out["dropped_lines"] = [(m.get("reason"), m.get("speaker")) for m in dropped]
     out["stats"] = dict(mind.voice.stats)

@@ -632,7 +632,6 @@ async def s16_answer_interrupted() -> list[str]:
         await b.say("ans", "helm", "Aye, Captain. Coming to heading two one seven and bringing the throttle up to half ahead, standing by for further orders.", answer=True)
         b.voice.captain_turn_end()
         await asyncio.sleep(2.0)
-        t0 = b.t()
         b.voice.captain_begin()
         await asyncio.sleep(0.8)
         b.voice.captain_end(None)

@@ -22,7 +22,6 @@ import re
 import time
 from dataclasses import dataclass, field
 
-import numpy as np
 
 from .env import CACHE
 from .voice_audio import f32_to_pcm16, pcm16_to_f32, resample, speech_frames, trim_speech

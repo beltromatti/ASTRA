@@ -11,7 +11,6 @@ import hashlib
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import numpy as np
 import soundfile as sf

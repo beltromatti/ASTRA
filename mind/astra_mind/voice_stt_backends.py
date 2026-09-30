@@ -20,7 +20,6 @@ import os
 import platform
 import shutil
 import subprocess
-import sys
 import time
 import wave
 from dataclasses import dataclass, field

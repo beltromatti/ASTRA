@@ -37,7 +37,7 @@ from astra_mind.env import CACHE, REPO_ROOT
 from astra_mind.stt import Recognizer
 from astra_mind.tts import CALIBRATION, TTSEngine
 from astra_mind.voice_audio import f32_to_pcm16, integrated_lufs, peak_db, resample
-from astra_mind.voice_casting import wer as wer_fn, words as words_fn
+from astra_mind.voice_casting import wer as wer_fn
 from astra_mind.voice_glossary import GLOSSARY
 from astra_mind.voice_stt_backends import FasterWhisperBackend, ParakeetBackend, SherpaParakeetBackend, WhisperKitBackend
 
@@ -977,6 +977,9 @@ def report(args) -> None:  # noqa: ANN001
                            ("typed_to_first_word_ms", "ordine scritto: dall'invio alla prima parola (ms)"),
                            ("load_avg", "carico medio della macchina")):
             L.append(f"| {label} | " + " | ".join(str(e2e[k].get(key, "—")) for k in sorted(e2e)) + " |")
+        L.append("| ritardo del ciclo degli eventi mentre la mente ascolta, pensa e parla: mediana / p99 / massimo (ms), tick oltre 50 ms | " +
+                 " | ".join((f"{e2e[k]['loop_lag_ms']['p50']} / {e2e[k]['loop_lag_ms']['p99']} / {e2e[k]['loop_lag_ms']['max']}, {e2e[k]['loop_lag_ms']['over_50_ms']} su {e2e[k]['loop_lag_ms']['ticks']}"
+                            if e2e[k].get("loop_lag_ms") else "—") for k in sorted(e2e)) + " |")
         L.append("")
         for k in sorted(e2e):
             if e2e[k].get("problems"):
