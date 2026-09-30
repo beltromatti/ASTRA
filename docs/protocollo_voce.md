@@ -181,6 +181,7 @@ Ora `voice_status` lo dice: nel log della mente (`~/Library/Application Support/
 - **Unione**: due frasi dello stesso ufficiale, stessa priorità, accodate a meno di 4 s l'una dall'altra e non ancora in sintesi, diventano una sola riga (un respiro, un sottotitolo).
 - **Turni**: una voce sola alla volta, con un respiro di 0,34 s tra voci diverse, 0,18 s tra due frasi della stessa, 0,1 s prima di una risposta al Capitano.
 - **Mai in silenzio**: ogni scarto va nel log, nei contatori (`voice.stats`) e al gioco come `line_dropped`.
+- **Un tasto che non sale**: se il gioco perde il messaggio `ptt up` (o si chiude con il tasto premuto), dopo `KEY_STUCK_S` = 45 s il tasto è considerato rilasciato e l'equipaggio riprende a parlare; alla disconnessione e a `hello` (nuova sessione) `clear()` libera il palco e scarta tutto quello che era in coda.
 
 Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `ptt`/`player_text` → `captain_begin/end/input`; `turn_worker` → `captain_turn_begin/end` attorno al turno del Capitano e `voice.preemptible()` attorno al turno di un rapporto (lo interrompe se il Capitano prende la parola e lo rimette in coda); `quiet_moments` → `voice.chatter`.
 

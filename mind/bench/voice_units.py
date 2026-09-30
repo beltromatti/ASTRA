@@ -198,6 +198,13 @@ async def recogniser() -> None:
     tr = await r2.recognise(speech_pcm())
     check("recogniser: a Captain speaking a language the fast engine lacks goes straight to the other", tr.backend == "whisperkit" and r2.backends[0].calls == 0)
 
+    r10 = Recognizer(backends=[Fake("parakeet", frozenset({"it"}), "x", 0.9, fast=True), Fake("whisperkit", None, "y", None, lang="ja")], prior="ja")
+    await r10.ready()
+    check("recogniser: for a Captain whose language the fast engine lacks the second engine is up at boot", r10._up.get("whisperkit") is True)
+    r11 = Recognizer(backends=[Fake("parakeet", frozenset({"it"}), "x", 0.9, fast=True), Fake("whisperkit", None, "y", None, lang="ja")], prior="it")
+    await r11.ready()
+    check("recogniser: ... and stays down for one who speaks the fast engine's", r11._up.get("whisperkit") is None)
+
     garbage = "Kancho, Harimichinihakujna na Zensoku"
     r2b = Recognizer(backends=[Fake("parakeet", frozenset({"it", "en"}), garbage, 0.7, fast=True),
                                Fake("whisperkit", None, "Thanks for watching!", None, lang="en")], prior="it")

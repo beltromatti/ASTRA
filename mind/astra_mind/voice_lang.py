@@ -33,7 +33,7 @@ DOMAIN: dict[str, set[str]] = {
         take us bring me approach close contact visual screen see want order aye understood doctor wounded medbay deck hangar
         fighters squadron launch recall engines reactor heat radiators tell give show repeat please thanks good bad now again
         the and with what this that from""".split()),
-    "es": set("""capitan timonel tactico comunicaciones sensores ingenieria vuelo rumbo adelante atras toda media escudos proa popa
+    "es": set("""capitan timonel tactico comunicaciones sensores ingenieria vuelo rumbo adelante avante atras toda media escudos proa popa
         estribor babor fuego alto armas torpedos misiles objetivo enemigo nave naves alerta roja amarilla canal abre cierra
         informe estado danos velocidad acelerador girar grados cuantos cuantas hay donde cual puede oye llevanos acerquese
         contacto visual pantalla ver quiero orden recibido doctora heridos enfermeria cubierta hangar cazas escuadron lanzar

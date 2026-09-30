@@ -145,6 +145,14 @@ class Recognizer:
                 self._up[b.name] = False
             if self._up[b.name]:
                 break                                             # the others start only when they are needed (a model each)
+        fb = self.fallback
+        if self._up.get(getattr(self.primary, "name", ""), False) and fb is not None and not self.primary.speaks(self.prior):
+            # the Captain speaks a language the first engine lacks: the second is needed for his very first phrase
+            try:
+                self._up[fb.name] = await fb.start()
+            except Exception:  # noqa: BLE001
+                log.exception("%s failed to start", fb.name)
+                self._up[fb.name] = False
         if not any(self._up.values()):
             log.error("no speech recogniser could start: the Captain can only type")
 

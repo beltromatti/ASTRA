@@ -4,9 +4,10 @@ The mind runs next to a game that keeps every performance core busy. macOS gives
 process whatever is left, often an efficiency core, and the text-to-speech that runs at 6-9x real time on a free core drops
 to 2-3x: the first sound of an answer comes 100-400 ms late and a long line can fall behind its own playback (a gap, a stutter,
 a voice that seems to stop). Raising the quality-of-service class of the threads that make speech to USER_INITIATED puts
-them on the performance cores again (measured: 2.5x -> 8x real time while the Unreal editor used four cores).
+them on the performance cores again. Insurance rather than a proven gain: A/B runs next to the Unreal editor were not consistent
+(one showed 2.5x -> 8x real time, later ones nothing), the call is free, and it cannot make the speech slower.
 
-macOS only (ctypes into libSystem); elsewhere a no-op."""
+macOS only (ctypes into libSystem); elsewhere a no-op. ASTRA_VOICE_QOS=0 switches it off."""
 from __future__ import annotations
 
 import ctypes
