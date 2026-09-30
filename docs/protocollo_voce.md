@@ -16,6 +16,16 @@ Il protocollo è **additivo**: un gioco che non cambia nulla continua a funziona
 
 L'unica correzione **indispensabile** al gioco è la 1 (senza, le voci esterne restano mute). Le altre si sentono già con il gioco com'è, e migliorano ancora se il gioco segue le sezioni 3 e 4.
 
+**Elenco per il C++, in ordine di importanza**
+
+1. `BeginChannelLine`: creare la `USoundWaveProcedural` prima e passarla a `CreateSound2D` (4.1). *Senza questo le voci esterne e lontane non si sentono mai.*
+2. `audio_begin`: mostrare il sottotitolo con la regola `hold_s` (3.1); `audio_end`/`cancel` come in 3.1–3.2.
+3. `cancel`: `FadeOut(fade_ms)`, svuotare la coda procedurale (`ResetAudio()`), fermare (3.2).
+4. Mandare `voice_status` (`started`, `stalled`, `failed`, `finished`) (2.2).
+5. Attenuazione delle voci di bordo con `NaturalSound` (4.2) e una decisione vicino/radio per ufficiale con isteresi 22/28 m (4.3); radio con `SetVolumeMultiplier(1.5)` (4.1).
+6. Musica abbassata dal messaggio `floor`, non da `IsSpeaking()` (4.4).
+7. (Facoltativo) abbassare l'audio del gioco mentre il tasto della voce è premuto (3.3).
+
 ## 1. Cosa cambia per il gioco così com'è (senza toccare il C++)
 
 - `line` arriva **quando la voce parte** (prima arrivava all'accodamento): il gioco non lo mostra da nessuna parte (lo conserva e mostra il sottotitolo a `audio_begin`), quindi non c'è più un sottotitolo per una riga che poi viene scartata.

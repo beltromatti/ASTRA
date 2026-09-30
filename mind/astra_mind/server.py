@@ -103,6 +103,8 @@ EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
 
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402
+# events whose report is a warning of danger: the crew says them before any routine talk (voice priority URGENT)
+_URGENT_EVENT = _re.compile(r"missiles? inbound|rockets? inbound|hull integrity critical|containment failing|abandon ship|breach", _re.I)
 _GM_ADDRESS = _re.compile(r"^\W*(regista|director|narrat\w*|game ?master|gm|réalisateur|directeur|director de juego|spielleiter|erzähler)\b[\s,:;.!-]*", _re.I)
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
@@ -575,6 +577,8 @@ class Mind:
                     if not events:
                         continue
                     self.voice.low_priority = True
+                    if any(_URGENT_EVENT.search(e) for e in events):
+                        self.voice.urgent = True          # (danger now: it does not wait behind small talk or a routine report)
                     try:
                         ask = FLIGHT_CALL_ASK if any(e.startswith("flight: controller call") for e in events) else \
                             AFTER_ACTION_ASK if any(e.startswith("bridge: after-action") for e in events) else \

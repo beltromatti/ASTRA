@@ -123,37 +123,40 @@ async def sec_stt(args) -> None:  # noqa: ANN001
     del tts
     results = load("stt") or {}
     ld = Load(args.load) if args.load else None
+    recs: dict[str, Recognizer] = {}
     try:
         for bname in args.backends.split(","):
-            backend = make_backend(bname)
-            rec = Recognizer(backends=[backend])
+            rec = Recognizer(backends=[make_backend(bname)])
             await rec.start()
             if not await rec.ready():
                 print(bname, "unavailable, skipped", flush=True)
                 continue
-            sub = clips
-            if bname.startswith(("whisperkit", "faster")):            # slower engines: a sample of the corpus
-                sub = [c for i, c in enumerate(clips) if i % (3 if not args.quick else 2) == 0]
-            await rec.recognise(f32_to_pcm16(sub[0].pcm))                                  # warm-up
-            rows = []
-            t_all = time.perf_counter()
-            for i, c in enumerate(sub):
+            await rec.recognise(f32_to_pcm16(clips[0].pcm))                                # warm-up
+            recs[bname] = rec
+        # the engines take turns clip by clip, so whatever else the machine is doing, it does to all of them alike
+        rows: dict[str, list] = {b: [] for b in recs}
+        t_all = time.perf_counter()
+        for i, c in enumerate(clips):
+            for bname, rec in recs.items():
+                if bname.startswith(("whisperkit", "faster")) and i % (2 if args.quick else 3) != 0:
+                    continue                                                               # the slower engines see a sample of the corpus
                 t0 = time.perf_counter()
                 tr = await rec.recognise(f32_to_pcm16(c.pcm), lang_hint=None)
                 wall = time.perf_counter() - t0
-                raw_hyp = tr.raw
-                rows.append({"lang": c.lang, "speaker": c.speaker, "cond": c.condition, "dur": c.seconds, "wall": wall, "decode": tr.decode_s,
-                             "wer": wer_fn(c.text, tr.text), "wer_raw": wer_fn(c.text, raw_hyp), "n_ent": len(c.entities),
-                             "ent_raw": entities_found(raw_hyp, c.entities), "ent_fix": entities_found(tr.text, c.entities),
-                             "lang_out": tr.lang, "conf": tr.conf, "text": tr.text, "ref": c.text})
-                if i % 60 == 0:
-                    print(f"  {bname}: {i}/{len(sub)}", flush=True)
+                rows[bname].append({"lang": c.lang, "speaker": c.speaker, "cond": c.condition, "dur": c.seconds, "wall": wall, "decode": tr.decode_s,
+                                    "wer": wer_fn(c.text, tr.text), "wer_raw": wer_fn(c.text, tr.raw), "n_ent": len(c.entities),
+                                    "ent_raw": entities_found(tr.raw, c.entities), "ent_fix": entities_found(tr.text, c.entities),
+                                    "lang_out": tr.lang, "conf": tr.conf, "text": tr.text, "ref": c.text})
+            if i % 60 == 0:
+                print(f"  {i}/{len(clips)} clips ({time.perf_counter() - t_all:.0f} s)", flush=True)
+        for bname, r in rows.items():
             key = bname + ("@" + args.load if args.load else "")
-            results[key] = {"rows": rows, "load_avg": load_avg(), "seconds": time.perf_counter() - t_all}
-            summarise(key, rows)
-            await rec.close()
-            save("stt", results)
+            results[key] = {"rows": r, "load_avg": load_avg(), "seconds": time.perf_counter() - t_all}
+            summarise(key, r)
+        save("stt", results)
     finally:
+        for rec in recs.values():
+            await rec.close()
         if ld:
             ld.stop()
 
@@ -293,9 +296,20 @@ async def sec_other(args) -> None:  # noqa: ANN001
         tr2 = await rec.recognise(pcm)
         again = time.perf_counter() - t0
         cer = char_error(text, tr.text) if lang in ("ja", "zh") else None
+        # and the crew answering in it: a system voice speaks the same phrase, the recogniser checks it
+        tts = getattr(sec_other, "tts", None) or TTSEngine()
+        sec_other.tts = tts
+        spoken = {"first_ms": None, "lufs": None, "heard": ""}
+        if tts.can_speak(lang):
+            t0 = time.perf_counter()
+            st = tts.stream(text, "alba", lang)
+            pcm_out = b"".join([c async for c in st])
+            xs = np.frombuffer(pcm_out, dtype="<i2").astype(np.float32) / 32768.0
+            heard, _ = await rec.transcribe(f32_to_pcm16(resample(xs, tts.sample_rate, 16000)), language=None, glossary=False)
+            spoken = {"first_ms": (st.t_first or 0) * 1000, "lufs": integrated_lufs(xs, tts.sample_rate), "heard": heard}
         rows.append({"lang": lang, "voice": voice, "first": {"lang": tr.lang, "backend": tr.backend, "escalated": tr.escalated, "s": first, "text": tr.text},
-                     "known": {"lang": tr2.lang, "backend": tr2.backend, "s": again, "text": tr2.text}, "cer": cer, "ref": text})
-        print(f"{lang}: first phrase -> {tr.lang} via {tr.backend} in {first:.2f}s | known -> {tr2.lang} via {tr2.backend} in {again:.2f}s | {tr.text!r}", flush=True)
+                     "known": {"lang": tr2.lang, "backend": tr2.backend, "s": again, "text": tr2.text}, "cer": cer, "ref": text, "spoken": spoken})
+        print(f"{lang}: first phrase -> {tr.lang} via {tr.backend} in {first:.2f}s | known -> {tr2.lang} via {tr2.backend} in {again:.2f}s | {tr.text!r} | crew voice {spoken['first_ms']}", flush=True)
     save("other", rows)
     await rec.close()
 
@@ -546,6 +560,45 @@ async def real_floor() -> dict:
     return {"stop_s": stops, "answer_s": answers, "first_line_s": firsts}
 
 
+# ------------------------------------------------------------------------------------------------ memory
+def rss_mb(pid: int) -> float:
+    try:
+        return int(subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True).stdout.strip() or 0) / 1024
+    except (ValueError, OSError):
+        return 0.0
+
+
+async def sec_mem(args) -> None:  # noqa: ANN001
+    """Resident memory of what the voice adds to the mind, step by step."""
+    from astra_mind.crew import CREW
+    res = {"start": rss_mb(os.getpid())}
+    import astra_mind.server  # noqa: F401 - the whole mind's imports (lingua, pydantic, httpx, torch...)
+    res["imports"] = rss_mb(os.getpid())
+    tts = TTSEngine()
+    voices = [o.voice for o in CREW.values()]
+    for lg in ("en", "it"):
+        await asyncio.get_running_loop().run_in_executor(None, tts.warm, lg, voices, False)
+        res[f"tts_{lg}"] = rss_mb(os.getpid())
+    from astra_mind.voice_lang import resolve_language
+    resolve_language("Timoniere, rotta due uno sette", "it")
+    res["lingua"] = rss_mb(os.getpid())
+    b = ParakeetBackend()
+    rec = Recognizer(backends=[b])
+    await rec.start()
+    await rec.ready()
+    await rec.recognise(f32_to_pcm16(np.random.default_rng(0).standard_normal(16000 * 2).astype(np.float32) * 0.1))
+    res["python_with_stt"] = rss_mb(os.getpid())
+    res["astra_stt_helper"] = rss_mb(b._proc.pid) if b._proc else 0.0
+    await rec.close()
+    w = WhisperKitBackend(port=50075)
+    if w.model_dir.exists():
+        await w.start()
+        res["whisperkit_server"] = rss_mb(w._proc.pid) if w._proc else 0.0
+        w.stop()
+    print(json.dumps({k: round(v) for k, v in res.items()}, indent=1))
+    save("mem", {k: round(v) for k, v in res.items()})
+
+
 # ------------------------------------------------------------------------------------------------ report
 def fmt_ms(x: float) -> str:
     return f"{1000 * x:.0f}"
@@ -554,7 +607,7 @@ def fmt_ms(x: float) -> str:
 def report(args) -> None:  # noqa: ANN001
     out = REPO_ROOT / "docs" / "bench" / f"voce_{TODAY}.md"
     L: list[str] = [f"# Voce: riconoscimento, sintesi, palco del parlato — {TODAY}", ""]
-    stt, live, lang, other, tts, mic, floor = (load(s) for s in ("stt", "live", "lang", "other", "tts", "mic", "floor"))
+    stt, live, lang, other, tts, mic, floor, mem = (load(s) for s in ("stt", "live", "lang", "other", "tts", "mic", "floor", "mem"))
     L += ["Macchina: MacBook Air M4 16 GB. **Durante le misure l'editor di Unreal era aperto** (carico medio 7–10 su 10 core): i tempi sono quelli di un Mac già "
           "occupato, non di uno libero. Il parlato di prova è sintetico (Pocket TTS e voci di sistema macOS), non registrazioni di persone: misura le differenze "
           "tra motori, il peso dei nomi del gioco, del rumore e della lingua, non la precisione assoluta su una persona stanca con il microfono del portatile.", ""]
@@ -605,11 +658,15 @@ def report(args) -> None:  # noqa: ANN001
             L.append(f"| {nm} | {100 * lang['overall'][k]:.1f} % | {100 * lang['short_phrases'][k]:.1f} % |")
         L += ["", f"Sessioni di ordini nella stessa lingua: {lang['session_flips']['wrong']} errori su {lang['session_flips']['orders']} ordini.", ""]
     if other:
-        L += ["## 4. Lingue fuori dall'equipaggio (percorso di riserva)", "", "Una frase in ciascuna lingua, voce di sistema macOS. «Prima frase»: il Capitano non l'ha mai usata (storia = inglese); «nota»: parla sempre quella.", "",
-              "| Lingua | prima frase: lingua, motore, s | nota: lingua, motore, s | CER (ja, zh) |", "|---|---|---|---|"]
+        L += ["## 4. Lingue fuori dall'equipaggio (percorso di riserva)", "", "Una frase in ciascuna lingua, detta da una voce di sistema macOS. «Prima frase»: il Capitano non l'ha mai usata (storia = inglese); «nota»: "
+              "parla sempre quella. «Risposta dell'equipaggio»: la stessa frase detta dalla voce di sistema che sostituisce Pocket TTS (che non parla queste lingue), "
+              "ritrascritta dal riconoscitore.", "",
+              "| Lingua | prima frase: lingua, motore, s | nota: lingua, motore, s | CER (ja, zh) | risposta dell'equipaggio: primo suono ms, LUFS |", "|---|---|---|---|---|"]
         for r in other:
+            sp = r.get("spoken") or {}
             L.append(f"| {r['lang']} | {r['first']['lang']}, {r['first']['backend']}{' (2° parere)' if r['first']['escalated'] else ''}, {r['first']['s']:.2f} | "
-                     f"{r['known']['lang']}, {r['known']['backend']}, {r['known']['s']:.2f} | {'—' if r['cer'] is None else f'{100 * r['cer']:.0f} %'} |")
+                     f"{r['known']['lang']}, {r['known']['backend']}, {r['known']['s']:.2f} | {'—' if r['cer'] is None else f'{100 * r['cer']:.0f} %'} | "
+                     f"{'—' if sp.get('first_ms') is None else f'{sp['first_ms']:.0f} ms, {sp['lufs']:.1f}'} |")
         L.append("")
     if tts:
         L += ["## 5. Sintesi vocale", ""]
@@ -646,6 +703,15 @@ def report(args) -> None:  # noqa: ANN001
                   f"- **Fermata del parlante**: mediana {fmt_ms(statistics.median(real['stop_s']))} ms, massima {fmt_ms(max(real['stop_s']))} ms dopo la pressione del tasto",
                   f"- **Risposta al Capitano** (da quando il modello la scrive al primo suono): mediana {fmt_ms(statistics.median(real['answer_s']))} ms, massima {fmt_ms(max(real['answer_s']))} ms",
                   f"- **Prima riga su piano libero** (dall'accodamento al primo suono): mediana {fmt_ms(statistics.median(real['first_line_s']))} ms", ""]
+    if mem:
+        L += ["## 8. Memoria residente (MB)", "", "| Passo | MB |", "|---|---|"]
+        for k, label in (("start", "Python appena avviato"), ("imports", "dopo gli import della mente (torch, lingua, pydantic…)"), ("tts_en", "+ Pocket TTS inglese, dieci voci"),
+                         ("tts_it", "+ Pocket TTS italiano, dieci voci"), ("lingua", "+ rilevatore di lingua"), ("python_with_stt", "+ sessione di riconoscimento"),
+                         ("astra_stt_helper", "processo a parte: helper Parakeet (il modello vive nel Neural Engine)"),
+                         ("whisperkit_server", "processo a parte: server WhisperKit large-v3-turbo (solo se serve la lingua di riserva)")):
+            if k in mem:
+                L.append(f"| {label} | {mem[k]} |")
+        L.append("")
     out.write_text("\n".join(L) + "\n", encoding="utf-8")
     print("REPORT", out)
 
@@ -653,7 +719,7 @@ def report(args) -> None:  # noqa: ANN001
 # ------------------------------------------------------------------------------------------------ main
 def main() -> int:
     ap = argparse.ArgumentParser(prog="bench.voice_pipeline")
-    ap.add_argument("section", choices=["stt", "live", "lang", "other", "tts", "mic", "floor", "report"])
+    ap.add_argument("section", choices=["stt", "live", "lang", "other", "tts", "mic", "floor", "mem", "report"])
     ap.add_argument("--langs", default="it,en,es,fr,de,pt,nl")
     ap.add_argument("--backends", default="parakeet-ultra")
     ap.add_argument("--load", default="", help="synthetic game next to the benchmark: gpu, cpu:4, gpu,cpu:4")
@@ -666,7 +732,7 @@ def main() -> int:
     if args.section == "report":
         report(args)
         return 0
-    asyncio.run({"stt": sec_stt, "live": sec_live, "lang": sec_lang, "other": sec_other, "tts": sec_tts, "mic": sec_mic, "floor": sec_floor}[args.section](args))
+    asyncio.run({"stt": sec_stt, "live": sec_live, "lang": sec_lang, "other": sec_other, "tts": sec_tts, "mic": sec_mic, "floor": sec_floor, "mem": sec_mem}[args.section](args))
     return 0
 
 

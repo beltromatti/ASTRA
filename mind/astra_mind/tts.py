@@ -30,6 +30,7 @@ import soundfile as sf
 from .env import CACHE
 from .voice_audio import Limiter, PauseCompressor, TimeStretcher, f32_to_pcm16, frame_rms_db, from_db, integrated_lufs
 from .voice_qos import boost_thread
+from .voice_text import speakable
 
 log = logging.getLogger("astra.tts")
 
@@ -473,7 +474,7 @@ class TTSEngine:
                 if system_voice is not None:
                     source = self._run_system(text, system_voice, sp, st.stop_event, st)
                 else:
-                    source = self._run(text, voice, lang, sp, self.profile(lang, voice).gain_db, True, st.stop_event, st)
+                    source = self._run(speakable(text, lang), voice, lang, sp, self.profile(lang, voice).gain_db, True, st.stop_event, st)
                 first = True
                 for a in source:
                     if first:
@@ -498,7 +499,7 @@ class TTSEngine:
         voice = self.voice_for(voice, lang)
         sp = self.speed if speed is None else speed
         g = self.profile(lang, voice).gain_db if gain_db is None else gain_db
-        out = list(self._run(text, voice, lang, sp, g, limit, threading.Event(), None))
+        out = list(self._run(speakable(text, lang), voice, lang, sp, g, limit, threading.Event(), None))
         return np.concatenate(out) if out else np.zeros(0, dtype=np.float32)
 
 

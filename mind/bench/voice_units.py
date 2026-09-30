@@ -126,6 +126,19 @@ def glossary_and_language() -> None:
     check("language: a language the engine reports counts", resolve_language("ok", "en", backend_lang="ja")[0] in ("ja", "en"))
 
 
+def speech_text() -> None:
+    from astra_mind.voice_text import speakable
+    check("text: English order with a percent and a bearing", speakable("Set course 217, mark 0, thrust 50%.", "en") == "Set course two one seven, mark zero, thrust fifty percent.")
+    check("text: contact id, kilometres, bearing digit by digit (Italian)",
+          speakable("Contatto T-21 a 45 km, rilevamento 045.", "it") == "Contatto T ventuno a quarantacinque chilometri, rilevamento zero quattro cinque.")
+    check("text: Spanish and French numbers", speakable("Rumbo 217, 50 %", "es") == "Rumbo dos uno siete, cincuenta por ciento"
+          and speakable("Cap 217, 45 km", "fr") == "Cap deux un sept, quarante-cinq kilomètres")
+    check("text: decimals and thousands (Italian)", speakable("3,5 km/s e 1.200 metri", "it") == "tre virgola cinque chilometri al secondo e milleduecento metri")
+    check("text: em dashes, brackets and ellipses become pauses", speakable("Quota (12 km) — sotto…", "it") == "Quota, dodici chilometri, sotto.")
+    check("text: a language without a front end is left alone", speakable("今日は217です", "ja") == "今日は217です")
+    check("text: words are untouched", speakable("Agli ordini, Capitano.", "it") == "Agli ordini, Capitano.")
+
+
 class Fake(SttBackend):
     """A stand-in engine: says what it is told, takes a given time."""
 
@@ -205,7 +218,7 @@ async def recogniser() -> None:
 
 
 def main() -> int:
-    for fn in (units, glossary_and_language):
+    for fn in (units, glossary_and_language, speech_text):
         try:
             fn()
         except Exception:  # noqa: BLE001
