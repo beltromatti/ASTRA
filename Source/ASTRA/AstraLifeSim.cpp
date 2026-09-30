@@ -622,13 +622,23 @@ void FAstraLifeSim::AssignHomes()
 			++Use[Best].Watch[FMath::Min<int32>(P.Watch, NW - 1)];
 			++Use[Best].Total;
 		}
-		// how long before the watch they must set out: the walk from the bunk to the post, in ship hours, and a margin
+		// how long before a block they must set out: the walk in ship hours, and a margin (a day is short on the clock and a walk is long)
+		auto LeadHours = [this, &P](const FAstraLifePlace& A, const FAstraLifePlace& B)
+		{
+			const double Metres = FVector::Dist2D(A.Pos, B.Pos) / 100.0 * 1.35 + 28.0 * FMath::Abs(A.Deck - B.Deck) + 25.0;
+			const double Seconds = Metres / (Map->Speed.WalkCmS * P.SpeedFactor / 100.0);
+			return (float)FMath::Clamp(Seconds * Map->TimeScale / 3600.0 * 1.15 + 0.06, 0.08, 1.4);
+		};
 		if (P.Home != INDEX_NONE && DutyPl)
 		{
 			const FAstraLifePlace& H = Map->Places[Map->Comps[P.Home].Hub];
-			const double Metres = FVector::Dist2D(H.Pos, DutyPl->Pos) / 100.0 * 1.35 + 28.0 * FMath::Abs(H.Deck - DutyPl->Deck) + 25.0;
-			const double Seconds = Metres / (Map->Speed.WalkCmS * P.SpeedFactor / 100.0);
-			P.LeadH = (float)FMath::Clamp(Seconds * Map->TimeScale / 3600.0 * 1.15 + 0.06, 0.08, 1.4);
+			P.LeadH = LeadHours(H, *DutyPl);
+			if (MessComp != INDEX_NONE)
+			{
+				const FAstraLifePlace& Mess = Map->Places[Map->Comps[MessComp].Hub];
+				P.LeadMessHomeH = LeadHours(H, Mess);
+				P.LeadMessDutyH = LeadHours(*DutyPl, Mess);
+			}
 		}
 	}
 }
@@ -676,23 +686,31 @@ void FAstraLifeSim::BlockAt(const FAstraLifePerson& P, double Sec, EAstraLifeAct
 	const double Cyc = FMath::FloorToDouble(Rel / 24.0);
 	const float U = (float)(Rel - Cyc * 24.0) - P.LeadH;         // hours since the watch began (negative while they walk to it)
 	Cycle = (int32)Cyc;
+	// the meals are sat down to at T1, T4 and T7 and last MealLen; whoever has a walk to the Mess sets out that much earlier
 	const float T1 = D.DutyFirst + P.J[0];
+	const float T1s = FMath::Max(0.6f, T1 - P.LeadMessDutyH);
 	const float T2 = T1 + D.MealLen;
 	const float T3 = 8.f;
 	const float T4 = T3 + D.WindDown + P.J[1];
+	const float T4s = FMath::Max(T3 + 0.05f, T4 - P.LeadMessHomeH);
 	const float T5 = T4 + D.MealLen;
-	const float Sleep0 = FMath::Max(T5 + 0.3f, D.SleepStart + P.J[2]);
-	const float Sleep1 = Sleep0 + D.SleepLen + P.J[4];
-	const float T7 = FMath::Clamp(D.MealBefore + P.J[3], Sleep1 + 0.25f, 24.f - P.LeadH - 0.2f);
-	if (U < T1)          { Act = EAstraLifeAct::Duty;    Block = 0; }
+	// sleep: from about the twelfth hour of the watch for about seven and a half, but never so late that there is no time to wake, eat and walk to the post
+	const float T7max = 24.f - P.LeadH - D.MealLen;
+	const float Sleep1 = FMath::Min(FMath::Max(T5 + 0.3f, D.SleepStart + P.J[2]) + D.SleepLen + P.J[4], T7max - P.LeadMessHomeH - 0.1f);
+	const float Sleep0 = FMath::Max(T5 + 0.3f, FMath::Min(D.SleepStart + P.J[2], Sleep1 - 5.f));
+	const float T7 = FMath::Clamp(D.MealBefore + P.J[3], Sleep1 + 0.1f + P.LeadMessHomeH, T7max);
+	const float T7s = FMath::Max(Sleep1 + 0.05f, T7 - P.LeadMessHomeH);
+	const float T8 = FMath::Min(T7 + D.MealLen, 24.f - P.LeadH);
+	if (U < T1s)         { Act = EAstraLifeAct::Duty;    Block = 0; }
 	else if (U < T2)     { Act = EAstraLifeAct::Meal;    Block = 1; }
 	else if (U < T3)     { Act = EAstraLifeAct::Duty;    Block = 2; }
-	else if (U < T4)     { Act = EAstraLifeAct::Leisure; Block = 3; }
+	else if (U < T4s)    { Act = EAstraLifeAct::Leisure; Block = 3; }
 	else if (U < T5)     { Act = EAstraLifeAct::Meal;    Block = 4; }
 	else if (U < Sleep0) { Act = EAstraLifeAct::Leisure; Block = 5; }
 	else if (U < Sleep1) { Act = EAstraLifeAct::Sleep;   Block = 6; }
-	else if (U < T7)     { Act = EAstraLifeAct::Leisure; Block = 7; }
-	else                 { Act = EAstraLifeAct::Meal;    Block = 8; }
+	else if (U < T7s)    { Act = EAstraLifeAct::Leisure; Block = 7; }
+	else if (U < T8)     { Act = EAstraLifeAct::Meal;    Block = 8; }
+	else                 { Act = EAstraLifeAct::Leisure; Block = 9; }       // up and dressed, a little time before the walk to the post
 }
 
 EAstraLifeAct FAstraLifeSim::ScheduleAt(int32 Person, double ShipSec, int32* OutBlock) const
@@ -1457,58 +1475,20 @@ void FAstraLifeSim::FormParty(const FAstraDamage& D)
 	Pt.Deck = D.Deck;
 	Pt.Section = D.Section;
 	Pt.Kind = D.Kind;
-	Pt.SiteComp = PickSite(D.Deck, D.Section, D.Id);
+	Pt.Site = SiteOf(D.Deck, D.Section, D.Id, &Pt.SiteComp);
 	Pt.ShipTravel0 = D.Travel;
 	Pt.DispatchedAt = Clock;
-	if (Map->Comps.IsValidIndex(Pt.SiteComp))
-	{
-		const FAstraLifeComp& C = Map->Comps[Pt.SiteComp];
-		Pt.Site = C.bCorridor || C.Hub == INDEX_NONE ? FVector(C.Box.GetCenter().X, C.Box.GetCenter().Y, C.Box.Min.Z) : Map->Places[C.Hub].Pos;
-	}
-	else
+	if (!Map->Comps.IsValidIndex(Pt.SiteComp))
 	{
 		return;
 	}
-	// who goes: the nearest of the damage-control ratings who are fit (a sleeper is roused), and if there are too few, engineering
-	auto DeckOfZ = [this](double Z)
-	{
-		int32 Best = 1;
-		for (int32 d = 2; d < Map->DeckFloorCm.Num(); ++d)
-		{
-			if (FMath::Abs(Map->DeckFloorCm[d] - Z) < FMath::Abs(Map->DeckFloorCm[Best] - Z))
-			{
-				Best = d;
-			}
-		}
-		return Best;
-	};
-	TArray<TPair<double, int32>> Cand;
-	auto Consider = [&](const FString& DeptName)
-	{
-		for (int32 i = 0; i < People.Num(); ++i)
-		{
-			const FAstraLifePerson& P = People[i];
-			if (P.Status != 0 || P.Party != INDEX_NONE || P.Dept->Name != DeptName)
-			{
-				continue;
-			}
-			const double Cost = FVector::Dist2D(P.Pos, Pt.Site) + 6000.0 * FMath::Abs(DeckOfZ(P.Pos.Z) - D.Deck) + (P.Act == EAstraLifeAct::Sleep ? 3000.0 : 0.0);
-			Cand.Emplace(Cost, i);
-		}
-	};
-	Consider(Map->Teams.Dept);
-	Cand.Sort([](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
-	if (Cand.Num() < Map->Teams.Min)
-	{
-		const int32 N = Cand.Num();
-		Consider(Map->Teams.BackupDept);
-		Cand.Sort([N](const TPair<double, int32>& A, const TPair<double, int32>& B) { return A.Key < B.Key; });
-		(void)N;
-	}
+	// who goes: the nearest of the damage-control ratings who are fit, and if there are too few, engineering
+	TArray<FGoer> Cand;
+	Goers(D.Deck, Pt.Site, Cand);
 	const int32 Take = FMath::Min(Map->Teams.Size, Cand.Num());
 	for (int32 k = 0; k < Take; ++k)
 	{
-		Pt.Members.Add(Cand[k].Value);
+		Pt.Members.Add(Cand[k].Person);
 	}
 	PartyList.Add(Pt);
 	FAstraLifeParty& Made = PartyList.Last();
@@ -1517,7 +1497,7 @@ void FAstraLifeSim::FormParty(const FAstraDamage& D)
 		FAstraLifePerson& P = People[Made.Members[k]];
 		P.Party = D.Id;
 		P.PartySlot = k;
-		const double EstCm = FVector::Dist2D(P.Pos, Made.Site) * 1.3 + 500.0 * FMath::Abs(DeckOfZ(P.Pos.Z) - D.Deck);
+		const double EstCm = FVector::Dist2D(P.Pos, Made.Site) * 1.5 + 600.0 * FMath::Abs(DeckOfZ(P.Pos.Z) - D.Deck);
 		P.SpeedOverride = (float)FMath::Clamp(EstCm / FMath::Max(4.0, (double)D.Travel), (double)Map->Speed.HurryCmS, (double)Map->Teams.JogCmS);
 		Begin(Made.Members[k], {EAstraLifeAct::Repair, 70000000 + D.Id}, false);
 		Remember(Made.Members[k], 2, FString::Printf(TEXT("Sent with a damage-control party to the %s in section %c of deck %d at %s"), *D.Kind, D.Section, D.Deck, *HourText(Clock)));
@@ -1604,20 +1584,84 @@ void FAstraLifeSim::SyncDamage(const TArray<FAstraDamage>& Damage)
 	}
 }
 
-float FAstraLifeSim::PartyEtaSeconds(const FVector& Site) const
+FVector FAstraLifeSim::SiteOf(int32 Deck, TCHAR Section, int32 IncidentId, int32* OutComp) const
 {
-	// the nearest people who would go, at the party's pace (and a minute to rouse a sleeper)
-	double Best = TNumericLimits<double>::Max();
-	for (const FAstraLifePerson& P : People)
+	const int32 Comp = PickSite(Deck, Section, IncidentId);
+	if (OutComp)
 	{
-		if (P.Status == 0 && P.Party == INDEX_NONE && P.Dept && (P.Dept->Name == Map->Teams.Dept))
+		*OutComp = Comp;
+	}
+	if (!Map->Comps.IsValidIndex(Comp))
+	{
+		return FVector::ZeroVector;
+	}
+	const FAstraLifeComp& C = Map->Comps[Comp];
+	return C.bCorridor || C.Hub == INDEX_NONE ? FVector(C.Box.GetCenter().X, C.Box.GetCenter().Y, C.Box.Min.Z) : Map->Places[C.Hub].Pos;
+}
+
+float FAstraLifeSim::RepairEtaSeconds(int32 Deck, TCHAR Section, int32 IncidentId) const
+{
+	return PartyEtaSeconds(SiteOf(Deck, Section, IncidentId), Deck);
+}
+
+int32 FAstraLifeSim::DeckOfZ(double Z) const
+{
+	int32 Best = 1;
+	for (int32 d = 2; d < Map->DeckFloorCm.Num(); ++d)
+	{
+		if (FMath::Abs(Map->DeckFloorCm[d] - Z) < FMath::Abs(Map->DeckFloorCm[Best] - Z))
 		{
-			double T = FVector::Dist(P.Pos, Site) * 1.3 / Map->Teams.JogCmS;
-			T += P.Act == EAstraLifeAct::Sleep ? 40.0 : 0.0;
-			Best = FMath::Min(Best, T);
+			Best = d;
 		}
 	}
-	return Best < 1.0e8 ? (float)Best : 60.f;
+	return Best;
+}
+
+void FAstraLifeSim::Goers(int32 Deck, const FVector& Site, TArray<FGoer>& Out) const
+{
+	Out.Reset();
+	auto Consider = [&](const FString& DeptName)
+	{
+		for (int32 i = 0; i < People.Num(); ++i)
+		{
+			const FAstraLifePerson& P = People[i];
+			if (P.Status != 0 || P.Party != INDEX_NONE || !P.Dept || P.Dept->Name != DeptName)
+			{
+				continue;
+			}
+			const int32 Decks = FMath::Abs(DeckOfZ(P.Pos.Z) - Deck);
+			const bool bAsleep = P.Act == EAstraLifeAct::Sleep;
+			const double Cost = FVector::Dist2D(P.Pos, Site) + 6000.0 * Decks + (bAsleep ? 3000.0 : 0.0);
+			// their own time: the way is longer than the crow flies, stairs and lifts add to it, a sleeper has to be roused
+			const float Eta = (float)((FVector::Dist2D(P.Pos, Site) * 1.5 + 600.0 * Decks) / Map->Teams.JogCmS + Decks * 6.0 + (bAsleep ? P.WakeDelayS : 0.0));
+			Out.Add({Cost, i, Eta});
+		}
+	};
+	Consider(Map->Teams.Dept);
+	if (Out.Num() < Map->Teams.Min)
+	{
+		Consider(Map->Teams.BackupDept);
+	}
+	Out.Sort([](const FGoer& A, const FGoer& B) { return A.Cost < B.Cost; });
+}
+
+float FAstraLifeSim::PartyEtaSeconds(const FVector& Site, int32 Deck) const
+{
+	// the party is on scene when most of it is: the time of its members' ... 60th percentile
+	TArray<FGoer> G;
+	Goers(Deck, Site, G);
+	const int32 N = FMath::Min(Map->Teams.Size, G.Num());
+	if (N == 0)
+	{
+		return 60.f;
+	}
+	TArray<float> T;
+	for (int32 k = 0; k < N; ++k)
+	{
+		T.Add(G[k].EtaS);
+	}
+	T.Sort();
+	return T[FMath::Min(N - 1, FMath::CeilToInt(N * 0.6f) - 1)] + 2.f;
 }
 
 // ====================================================================================================== asking

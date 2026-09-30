@@ -8,18 +8,9 @@
     "note": "ship seconds per game second: one ship hour is five minutes of play, a ship day two hours. A walk across the ship (300 m) is under an hour of ship time. The game may set the hour (astra.life.hour)."
   },
   "watches": [
-    {
-      "name": "Red",
-      "start": 0.0
-    },
-    {
-      "name": "Gold",
-      "start": 8.0
-    },
-    {
-      "name": "Blue",
-      "start": 16.0
-    }
+    {"name": "Red", "start": 0.0},
+    {"name": "Gold", "start": 8.0},
+    {"name": "Blue", "start": 16.0}
   ],
   "day": {
     "note": "a person's day counted from the start of their watch (u, hours): duty, a meal mid-watch, an hour to wind down, the meal after the watch, leisure, sleep, waking and the meal before the next watch. The offsets (j1..j4) are each person's own, drawn from a seed: nobody eats or turns in on the same minute.",
@@ -30,31 +21,13 @@
     "sleep_len": 7.5,
     "meal_before": 22.75,
     "jitter": {
-      "j1": [
-        -0.5,
-        0.5
-      ],
-      "j2": [
-        -0.25,
-        0.75
-      ],
-      "j3": [
-        -0.5,
-        1.25
-      ],
-      "j4": [
-        -0.5,
-        0.25
-      ],
-      "sleep_len": [
-        -0.5,
-        0.5
-      ]
+      "j1": [-1.0, 1.0],
+      "j2": [-0.25, 1.5],
+      "j3": [-0.25, 1.25],
+      "j4": [-1.3, 0.25],
+      "sleep_len": [-0.5, 0.5]
     },
-    "wake_delay_s": [
-      15,
-      70
-    ]
+    "wake_delay_s": [15, 70]
   },
   "speed": {
     "walk_cm_s": 135.0,
@@ -73,9 +46,7 @@
   },
   "casualty": {
     "note": "what the roster's wounded and killed do on the plan",
-    "medbay_kinds": [
-      "medbay"
-    ]
+    "medbay_kinds": ["medbay"]
   },
   "room_weights": {
     "built": 2.5,
@@ -130,35 +101,25 @@
       "job": "staff officer",
       "duty": [
         {
-          "kinds": [
-            "offices"
-          ],
+          "kinds": ["offices"],
           "weight": 4
         },
         {
-          "kinds": [
-            "briefing"
-          ],
+          "kinds": ["briefing"],
           "weight": 1
         },
         {
-          "kinds": [
-            "wardroom"
-          ],
+          "kinds": ["wardroom"],
           "weight": 0.5
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "briefing"
-          ],
+          "kinds": ["briefing"],
           "weight": 2
         },
         {
-          "kinds": [
-            "offices"
-          ],
+          "kinds": ["offices"],
           "weight": 3
         }
       ],
@@ -170,17 +131,13 @@
       "job": "communications rating",
       "duty": [
         {
-          "kinds": [
-            "comms"
-          ],
+          "kinds": ["comms"],
           "weight": 1
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "comms"
-          ],
+          "kinds": ["comms"],
           "weight": 1
         }
       ],
@@ -192,41 +149,29 @@
       "job": "sensor technician",
       "duty": [
         {
-          "kinds": [
-            "sensors"
-          ],
+          "kinds": ["sensors"],
           "weight": 4
         },
         {
-          "kinds": [
-            "lab"
-          ],
+          "kinds": ["lab"],
           "weight": 2
         },
         {
-          "kinds": [
-            "archive"
-          ],
+          "kinds": ["archive"],
           "weight": 1
         },
         {
-          "kinds": [
-            "hydroponics"
-          ],
+          "kinds": ["hydroponics"],
           "weight": 0.5
         },
         {
-          "kinds": [
-            "transporter"
-          ],
+          "kinds": ["transporter"],
           "weight": 0.5
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "sensors"
-          ],
+          "kinds": ["sensors"],
           "weight": 1
         }
       ],
@@ -238,30 +183,22 @@
       "job": "damage-control technician",
       "duty": [
         {
-          "kinds": [
-            "damage_control"
-          ],
+          "kinds": ["damage_control"],
           "weight": 6
         },
         {
-          "kinds": [
-            "workshop"
-          ],
+          "kinds": ["workshop"],
           "dept": "engineering",
           "weight": 2
         },
         {
-          "kinds": [
-            "crawlway"
-          ],
+          "kinds": ["crawlway"],
           "weight": 1
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "damage_control"
-          ],
+          "kinds": ["damage_control"],
           "weight": 1
         }
       ],
@@ -273,59 +210,41 @@
       "job": "steward",
       "duty": [
         {
-          "kinds": [
-            "galley"
-          ],
+          "kinds": ["galley"],
           "weight": 7
         },
         {
-          "kinds": [
-            "mess"
-          ],
+          "kinds": ["mess"],
           "weight": 4
         },
         {
-          "kinds": [
-            "laundry"
-          ],
+          "kinds": ["laundry"],
           "weight": 3
         },
         {
-          "kinds": [
-            "lounge"
-          ],
+          "kinds": ["lounge"],
           "weight": 1.5
         },
         {
-          "kinds": [
-            "hydroponics"
-          ],
+          "kinds": ["hydroponics"],
           "weight": 1
         },
         {
-          "kinds": [
-            "library"
-          ],
+          "kinds": ["library"],
           "weight": 0.5
         },
         {
-          "kinds": [
-            "gym"
-          ],
+          "kinds": ["gym"],
           "weight": 0.5
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "mess"
-          ],
+          "kinds": ["mess"],
           "weight": 3
         },
         {
-          "kinds": [
-            "concourse"
-          ],
+          "kinds": ["concourse"],
           "weight": 1
         }
       ],
@@ -337,37 +256,27 @@
       "job": "flight-deck hand",
       "duty": [
         {
-          "kinds": [
-            "hangar"
-          ],
+          "kinds": ["hangar"],
           "weight": 10
         },
         {
-          "kinds": [
-            "workshop"
-          ],
+          "kinds": ["workshop"],
           "dept": "flight",
           "weight": 3
         },
         {
-          "kinds": [
-            "flight_ops"
-          ],
+          "kinds": ["flight_ops"],
           "weight": 2
         },
         {
-          "kinds": [
-            "storage"
-          ],
+          "kinds": ["storage"],
           "dept": "flight",
           "weight": 2
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "hangar"
-          ],
+          "kinds": ["hangar"],
           "weight": 1
         }
       ],
@@ -379,23 +288,17 @@
       "job": "pilot",
       "duty": [
         {
-          "kinds": [
-            "flight_ops"
-          ],
+          "kinds": ["flight_ops"],
           "weight": 4
         },
         {
-          "kinds": [
-            "hangar"
-          ],
+          "kinds": ["hangar"],
           "weight": 3
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "hangar"
-          ],
+          "kinds": ["hangar"],
           "weight": 1
         }
       ],
@@ -407,41 +310,29 @@
       "job": "medical corpsman",
       "duty": [
         {
-          "kinds": [
-            "medbay"
-          ],
+          "kinds": ["medbay"],
           "weight": 5
         },
         {
-          "kinds": [
-            "surgery"
-          ],
+          "kinds": ["surgery"],
           "weight": 3
         },
         {
-          "kinds": [
-            "pharmacy"
-          ],
+          "kinds": ["pharmacy"],
           "weight": 1.5
         },
         {
-          "kinds": [
-            "quarantine"
-          ],
+          "kinds": ["quarantine"],
           "weight": 1.5
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "medbay"
-          ],
+          "kinds": ["medbay"],
           "weight": 3
         },
         {
-          "kinds": [
-            "surgery"
-          ],
+          "kinds": ["surgery"],
           "weight": 2
         }
       ],
@@ -453,47 +344,33 @@
       "job": "gunner",
       "duty": [
         {
-          "kinds": [
-            "weapons_control"
-          ],
+          "kinds": ["weapons_control"],
           "weight": 3
         },
         {
-          "kinds": [
-            "weapons"
-          ],
+          "kinds": ["weapons"],
           "weight": 3
         },
         {
-          "kinds": [
-            "magazine"
-          ],
+          "kinds": ["magazine"],
           "weight": 3
         },
         {
-          "kinds": [
-            "armory"
-          ],
+          "kinds": ["armory"],
           "weight": 0.5
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "weapons"
-          ],
+          "kinds": ["weapons"],
           "weight": 4
         },
         {
-          "kinds": [
-            "weapons_control"
-          ],
+          "kinds": ["weapons_control"],
           "weight": 3
         },
         {
-          "kinds": [
-            "magazine"
-          ],
+          "kinds": ["magazine"],
           "weight": 3
         }
       ],
@@ -505,60 +382,42 @@
       "job": "engine-room hand",
       "duty": [
         {
-          "kinds": [
-            "engineering"
-          ],
+          "kinds": ["engineering"],
           "weight": 4
         },
         {
-          "kinds": [
-            "power"
-          ],
+          "kinds": ["power"],
           "weight": 3
         },
         {
-          "kinds": [
-            "machinery"
-          ],
+          "kinds": ["machinery"],
           "weight": 3
         },
         {
-          "kinds": [
-            "fabrication"
-          ],
+          "kinds": ["fabrication"],
           "weight": 1.5
         },
         {
-          "kinds": [
-            "workshop"
-          ],
+          "kinds": ["workshop"],
           "dept": "engineering",
           "weight": 1.5
         },
         {
-          "kinds": [
-            "crawlway"
-          ],
+          "kinds": ["crawlway"],
           "weight": 0.5
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "engineering"
-          ],
+          "kinds": ["engineering"],
           "weight": 4
         },
         {
-          "kinds": [
-            "power"
-          ],
+          "kinds": ["power"],
           "weight": 3
         },
         {
-          "kinds": [
-            "machinery"
-          ],
+          "kinds": ["machinery"],
           "weight": 2
         }
       ],
@@ -570,29 +429,21 @@
       "job": "storekeeper",
       "duty": [
         {
-          "kinds": [
-            "storage"
-          ],
+          "kinds": ["storage"],
           "weight": 4
         },
         {
-          "kinds": [
-            "magazine"
-          ],
+          "kinds": ["magazine"],
           "weight": 1
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "magazine"
-          ],
+          "kinds": ["magazine"],
           "weight": 1
         },
         {
-          "kinds": [
-            "storage"
-          ],
+          "kinds": ["storage"],
           "weight": 1
         }
       ],
@@ -604,30 +455,22 @@
       "job": "marine",
       "duty": [
         {
-          "kinds": [
-            "armory"
-          ],
+          "kinds": ["armory"],
           "weight": 4
         },
         {
-          "kinds": [
-            "range"
-          ],
+          "kinds": ["range"],
           "weight": 3
         },
         {
-          "kinds": [
-            "cabins"
-          ],
+          "kinds": ["cabins"],
           "dept": "security",
           "weight": 1
         }
       ],
       "battle": [
         {
-          "kinds": [
-            "armory"
-          ],
+          "kinds": ["armory"],
           "weight": 1
         }
       ],
@@ -638,51 +481,31 @@
     "note": "where people sleep, by class, in preference order; a room houses people of one watch at a time per bunk, rooms are shared between watches (the watch that is up has the bunk)",
     "marine": [
       {
-        "kinds": [
-          "cabins"
-        ],
+        "kinds": ["cabins"],
         "dept": "security"
       }
     ],
     "officer": [
       {
-        "kinds": [
-          "cabins"
-        ],
-        "deck": [
-          3
-        ]
+        "kinds": ["cabins"],
+        "deck": [3]
       },
       {
-        "kinds": [
-          "cabins"
-        ],
-        "deck": [
-          6
-        ]
+        "kinds": ["cabins"],
+        "deck": [6]
       }
     ],
     "rating": [
       {
-        "kinds": [
-          "berthing"
-        ]
+        "kinds": ["berthing"]
       },
       {
-        "kinds": [
-          "cabins"
-        ],
-        "deck": [
-          6
-        ]
+        "kinds": ["cabins"],
+        "deck": [6]
       },
       {
-        "kinds": [
-          "cabins"
-        ],
-        "deck": [
-          3
-        ]
+        "kinds": ["cabins"],
+        "deck": [3]
       }
     ]
   },
@@ -691,100 +514,56 @@
     "kinds": [
       {
         "id": "lounge",
-        "kinds": [
-          "lounge"
-        ],
-        "taste": [
-          0.2,
-          1.0
-        ],
+        "kinds": ["lounge"],
+        "taste": [0.2, 1.0],
         "label": "in the crew lounge"
       },
       {
         "id": "library",
-        "kinds": [
-          "library"
-        ],
-        "taste": [
-          0.0,
-          0.8
-        ],
+        "kinds": ["library"],
+        "taste": [0.0, 0.8],
         "label": "in the library"
       },
       {
         "id": "chapel",
-        "kinds": [
-          "chapel"
-        ],
-        "taste": [
-          0.0,
-          0.6
-        ],
+        "kinds": ["chapel"],
+        "taste": [0.0, 0.6],
         "label": "in the chapel"
       },
       {
         "id": "observation",
-        "kinds": [
-          "observation"
-        ],
-        "taste": [
-          0.0,
-          0.8
-        ],
+        "kinds": ["observation"],
+        "taste": [0.0, 0.8],
         "label": "at the observation window"
       },
       {
         "id": "gym",
-        "kinds": [
-          "gym"
-        ],
-        "taste": [
-          0.0,
-          0.8
-        ],
+        "kinds": ["gym"],
+        "taste": [0.0, 0.8],
         "label": "in the gymnasium"
       },
       {
         "id": "hydroponics",
-        "kinds": [
-          "hydroponics"
-        ],
-        "taste": [
-          0.0,
-          0.5
-        ],
+        "kinds": ["hydroponics"],
+        "taste": [0.0, 0.5],
         "label": "in the hydroponics garden"
       },
       {
         "id": "concourse",
-        "kinds": [
-          "concourse"
-        ],
-        "taste": [
-          0.0,
-          0.5
-        ],
+        "kinds": ["concourse"],
+        "taste": [0.0, 0.5],
         "label": "on the Mess Concourse"
       },
       {
         "id": "cabin",
-        "kinds": [
-          "__home"
-        ],
-        "taste": [
-          0.1,
-          0.7
-        ],
+        "kinds": ["__home"],
+        "taste": [0.1, 0.7],
         "label": "in their cabin"
       }
     ]
   },
   "meals": {
-    "kinds": [
-      "mess",
-      "lounge",
-      "concourse"
-    ],
+    "kinds": ["mess", "lounge", "concourse"],
     "note": "a meal is taken at the Mess Hall; when it is full the person eats at a lounge table or standing on the Concourse",
     "menu": "braised lamb with barley; Aurelian rice; greens from hydroponics bay B; real coffee from Meridian"
   },
@@ -795,9 +574,7 @@
     "min": 2,
     "dept": "damage control",
     "backup_dept": "engineering",
-    "locker_kinds": [
-      "damage_control"
-    ],
+    "locker_kinds": ["damage_control"],
     "jog_cm_s": 360.0
   },
   "extras": {
@@ -805,78 +582,15 @@
     "mess": "aquila_mess.json",
     "note": "baked by tools/life.py bake from aquila_berths.json and aquila_mess.json: the berthing's 84 racks (a rack the level keeps a sleeper on has `external`) and the Mess Hall's seats beyond the twelve the plan lists",
     "racks": [
-      {
-        "id": "berths.rack1",
-        "x": -179.03,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack2",
-        "x": -179.03,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack3",
-        "x": -179.03,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack4",
-        "x": -179.03,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack5",
-        "x": -179.03,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack6",
-        "x": -179.03,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack7",
-        "x": -179.89,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack8",
-        "x": -179.89,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack9",
-        "x": -179.89,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
+      {"id": "berths.rack1", "x": -179.03, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack2", "x": -179.03, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack3", "x": -179.03, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack4", "x": -179.03, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack5", "x": -179.03, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack6", "x": -179.03, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack7", "x": -179.89, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack8", "x": -179.89, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack9", "x": -179.89, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
       {
         "id": "berths.rack10",
         "x": -179.89,
@@ -886,30 +600,9 @@
         "height_cm": 50.0,
         "external": "sleeper1"
       },
-      {
-        "id": "berths.rack11",
-        "x": -179.89,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack12",
-        "x": -179.89,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack13",
-        "x": -181.39,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
+      {"id": "berths.rack11", "x": -179.89, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack12", "x": -179.89, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack13", "x": -181.39, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
       {
         "id": "berths.rack14",
         "x": -181.39,
@@ -919,174 +612,27 @@
         "height_cm": 132.0,
         "external": "sleeper2"
       },
-      {
-        "id": "berths.rack15",
-        "x": -181.39,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack16",
-        "x": -181.39,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack17",
-        "x": -181.39,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack18",
-        "x": -181.39,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack19",
-        "x": -182.25,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack20",
-        "x": -182.25,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack21",
-        "x": -182.25,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack22",
-        "x": -182.25,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack23",
-        "x": -182.25,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack24",
-        "x": -182.25,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack25",
-        "x": -183.75,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack26",
-        "x": -183.75,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack27",
-        "x": -183.75,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack28",
-        "x": -183.75,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack29",
-        "x": -183.75,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack30",
-        "x": -183.75,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack31",
-        "x": -184.61,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack32",
-        "x": -184.61,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack33",
-        "x": -184.61,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack34",
-        "x": -184.61,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack35",
-        "x": -184.61,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
+      {"id": "berths.rack15", "x": -181.39, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack16", "x": -181.39, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack17", "x": -181.39, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack18", "x": -181.39, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack19", "x": -182.25, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack20", "x": -182.25, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack21", "x": -182.25, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack22", "x": -182.25, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack23", "x": -182.25, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack24", "x": -182.25, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack25", "x": -183.75, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack26", "x": -183.75, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack27", "x": -183.75, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack28", "x": -183.75, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack29", "x": -183.75, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack30", "x": -183.75, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack31", "x": -184.61, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack32", "x": -184.61, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack33", "x": -184.61, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack34", "x": -184.61, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack35", "x": -184.61, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
       {
         "id": "berths.rack36",
         "x": -184.61,
@@ -1096,30 +642,9 @@
         "height_cm": 214.0,
         "external": "sleeper3"
       },
-      {
-        "id": "berths.rack37",
-        "x": -186.11,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack38",
-        "x": -186.11,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack39",
-        "x": -186.11,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
+      {"id": "berths.rack37", "x": -186.11, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack38", "x": -186.11, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack39", "x": -186.11, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
       {
         "id": "berths.rack40",
         "x": -186.11,
@@ -1129,118 +654,20 @@
         "height_cm": 50.0,
         "external": "sleeper4"
       },
-      {
-        "id": "berths.rack41",
-        "x": -186.11,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack42",
-        "x": -186.11,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack43",
-        "x": -186.97,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack44",
-        "x": -186.97,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack45",
-        "x": -186.97,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack46",
-        "x": -186.97,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack47",
-        "x": -186.97,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack48",
-        "x": -186.97,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack49",
-        "x": -188.47,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack50",
-        "x": -188.47,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack51",
-        "x": -188.47,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack52",
-        "x": -188.47,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack53",
-        "x": -188.47,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack54",
-        "x": -188.47,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
+      {"id": "berths.rack41", "x": -186.11, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack42", "x": -186.11, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack43", "x": -186.97, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack44", "x": -186.97, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack45", "x": -186.97, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack46", "x": -186.97, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack47", "x": -186.97, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack48", "x": -186.97, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack49", "x": -188.47, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack50", "x": -188.47, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack51", "x": -188.47, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack52", "x": -188.47, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack53", "x": -188.47, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack54", "x": -188.47, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
       {
         "id": "berths.rack55",
         "x": -189.33,
@@ -1250,54 +677,12 @@
         "height_cm": 50.0,
         "external": "sleeper5"
       },
-      {
-        "id": "berths.rack56",
-        "x": -189.33,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack57",
-        "x": -189.33,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack58",
-        "x": -189.33,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack59",
-        "x": -189.33,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack60",
-        "x": -189.33,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack61",
-        "x": -190.83,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
+      {"id": "berths.rack56", "x": -189.33, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack57", "x": -189.33, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack58", "x": -189.33, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack59", "x": -189.33, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack60", "x": -189.33, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack61", "x": -190.83, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
       {
         "id": "berths.rack62",
         "x": -190.83,
@@ -1307,166 +692,26 @@
         "height_cm": 132.0,
         "external": "sleeper6"
       },
-      {
-        "id": "berths.rack63",
-        "x": -190.83,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack64",
-        "x": -190.83,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack65",
-        "x": -190.83,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack66",
-        "x": -190.83,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack67",
-        "x": -191.69,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack68",
-        "x": -191.69,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack69",
-        "x": -191.69,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack70",
-        "x": -191.69,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack71",
-        "x": -191.69,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack72",
-        "x": -191.69,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack73",
-        "x": -193.19,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack74",
-        "x": -193.19,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack75",
-        "x": -193.19,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack76",
-        "x": -193.19,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack77",
-        "x": -193.19,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack78",
-        "x": -193.19,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack79",
-        "x": -194.05,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 50.0
-      },
-      {
-        "id": "berths.rack80",
-        "x": -194.05,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 132.0
-      },
-      {
-        "id": "berths.rack81",
-        "x": -194.05,
-        "y": 2.33,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 214.0
-      },
-      {
-        "id": "berths.rack82",
-        "x": -194.05,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 50.0
-      },
+      {"id": "berths.rack63", "x": -190.83, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack64", "x": -190.83, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack65", "x": -190.83, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack66", "x": -190.83, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack67", "x": -191.69, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack68", "x": -191.69, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack69", "x": -191.69, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack70", "x": -191.69, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack71", "x": -191.69, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack72", "x": -191.69, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack73", "x": -193.19, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack74", "x": -193.19, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack75", "x": -193.19, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack76", "x": -193.19, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
+      {"id": "berths.rack77", "x": -193.19, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 132.0},
+      {"id": "berths.rack78", "x": -193.19, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0},
+      {"id": "berths.rack79", "x": -194.05, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 50.0},
+      {"id": "berths.rack80", "x": -194.05, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 132.0},
+      {"id": "berths.rack81", "x": -194.05, "y": 2.33, "z": -46.0, "yaw": 90.0, "height_cm": 214.0},
+      {"id": "berths.rack82", "x": -194.05, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 50.0},
       {
         "id": "berths.rack83",
         "x": -194.05,
@@ -1476,826 +721,145 @@
         "height_cm": 132.0,
         "external": "sleeper7"
       },
-      {
-        "id": "berths.rack84",
-        "x": -194.05,
-        "y": -2.33,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 214.0
-      }
+      {"id": "berths.rack84", "x": -194.05, "y": -2.33, "z": -46.0, "yaw": -90.0, "height_cm": 214.0}
     ],
     "mess_seats": [
-      {
-        "id": "mess.seat1",
-        "x": -138.3,
-        "y": -7.68,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat2",
-        "x": -136.0,
-        "y": -7.68,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat3",
-        "x": -133.7,
-        "y": -7.68,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat4",
-        "x": -138.3,
-        "y": -6.12,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat5",
-        "x": -136.0,
-        "y": -6.12,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat6",
-        "x": -133.7,
-        "y": -6.12,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat7",
-        "x": -136.0,
-        "y": -3.88,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat8",
-        "x": -133.7,
-        "y": -3.88,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat9",
-        "x": -138.3,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat10",
-        "x": -136.0,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat11",
-        "x": -133.7,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat12",
-        "x": -138.3,
-        "y": 2.32,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat13",
-        "x": -136.0,
-        "y": 2.32,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat14",
-        "x": -133.7,
-        "y": 2.32,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat15",
-        "x": -138.3,
-        "y": 3.88,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat16",
-        "x": -136.0,
-        "y": 3.88,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat17",
-        "x": -138.3,
-        "y": 6.12,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat18",
-        "x": -136.0,
-        "y": 6.12,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat19",
-        "x": -133.7,
-        "y": 6.12,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat20",
-        "x": -138.3,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat21",
-        "x": -136.0,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat22",
-        "x": -133.7,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat23",
-        "x": -146.8,
-        "y": -7.68,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat24",
-        "x": -142.2,
-        "y": -7.68,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat25",
-        "x": -146.8,
-        "y": -6.12,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat26",
-        "x": -142.2,
-        "y": -6.12,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat27",
-        "x": -146.8,
-        "y": -3.88,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat28",
-        "x": -144.5,
-        "y": -3.88,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat29",
-        "x": -142.2,
-        "y": -3.88,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat30",
-        "x": -146.8,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat31",
-        "x": -144.5,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat32",
-        "x": -142.2,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat33",
-        "x": -144.5,
-        "y": 2.32,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat34",
-        "x": -142.2,
-        "y": 2.32,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat35",
-        "x": -144.5,
-        "y": 3.88,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat36",
-        "x": -142.2,
-        "y": 3.88,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat37",
-        "x": -146.8,
-        "y": 6.12,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat38",
-        "x": -144.5,
-        "y": 6.12,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat39",
-        "x": -146.8,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat40",
-        "x": -144.5,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat41",
-        "x": -142.2,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat42",
-        "x": -155.3,
-        "y": -7.68,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat43",
-        "x": -153.0,
-        "y": -7.68,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat44",
-        "x": -150.7,
-        "y": -7.68,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat45",
-        "x": -155.3,
-        "y": -6.12,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat46",
-        "x": -153.0,
-        "y": -6.12,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat47",
-        "x": -150.7,
-        "y": -6.12,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat48",
-        "x": -155.3,
-        "y": -3.88,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat49",
-        "x": -150.7,
-        "y": -3.88,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat50",
-        "x": -155.3,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat51",
-        "x": -153.0,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat52",
-        "x": -150.7,
-        "y": -2.32,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat53",
-        "x": -155.3,
-        "y": 2.32,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat54",
-        "x": -153.0,
-        "y": 2.32,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat55",
-        "x": -150.7,
-        "y": 2.32,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat56",
-        "x": -155.3,
-        "y": 3.88,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat57",
-        "x": -153.0,
-        "y": 3.88,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat58",
-        "x": -150.7,
-        "y": 3.88,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat59",
-        "x": -155.3,
-        "y": 6.12,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat60",
-        "x": -153.0,
-        "y": 6.12,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat61",
-        "x": -150.7,
-        "y": 6.12,
-        "z": -46.0,
-        "yaw": 90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat62",
-        "x": -155.3,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat63",
-        "x": -153.0,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      },
-      {
-        "id": "mess.seat64",
-        "x": -150.7,
-        "y": 7.68,
-        "z": -46.0,
-        "yaw": -90.0,
-        "height_cm": 52.0
-      }
+      {"id": "mess.seat1", "x": -138.6, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat2", "x": -136.9, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat3", "x": -135.1, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat4", "x": -133.4, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat5", "x": -138.6, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat6", "x": -136.9, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat7", "x": -135.1, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat8", "x": -133.4, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat9", "x": -136.9, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat10", "x": -135.1, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat11", "x": -133.4, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat12", "x": -138.6, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat13", "x": -135.1, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat14", "x": -133.4, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat15", "x": -138.6, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat16", "x": -136.9, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat17", "x": -135.1, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat18", "x": -133.4, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat19", "x": -138.6, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat20", "x": -136.9, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat21", "x": -133.4, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat22", "x": -138.6, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat23", "x": -136.9, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat24", "x": -133.4, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat25", "x": -138.6, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat26", "x": -136.9, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat27", "x": -135.1, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat28", "x": -133.4, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat29", "x": -147.1, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat30", "x": -145.4, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat31", "x": -141.9, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat32", "x": -147.1, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat33", "x": -143.6, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat34", "x": -141.9, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat35", "x": -147.1, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat36", "x": -145.4, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat37", "x": -143.6, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat38", "x": -141.9, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat39", "x": -147.1, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat40", "x": -145.4, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat41", "x": -143.6, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat42", "x": -141.9, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat43", "x": -145.4, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat44", "x": -143.6, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat45", "x": -141.9, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat46", "x": -147.1, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat47", "x": -143.6, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat48", "x": -141.9, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat49", "x": -147.1, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat50", "x": -145.4, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat51", "x": -143.6, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat52", "x": -147.1, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat53", "x": -145.4, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat54", "x": -143.6, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat55", "x": -141.9, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat56", "x": -155.6, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat57", "x": -153.9, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat58", "x": -152.1, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat59", "x": -150.4, "y": -7.68, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat60", "x": -155.6, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat61", "x": -153.9, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat62", "x": -152.1, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat63", "x": -150.4, "y": -6.12, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat64", "x": -155.6, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat65", "x": -153.9, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat66", "x": -150.4, "y": -3.88, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat67", "x": -155.6, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat68", "x": -153.9, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat69", "x": -150.4, "y": -2.32, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat70", "x": -155.6, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat71", "x": -153.9, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat72", "x": -152.1, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat73", "x": -150.4, "y": 2.32, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat74", "x": -155.6, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat75", "x": -153.9, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat76", "x": -152.1, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat77", "x": -150.4, "y": 3.88, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat78", "x": -155.6, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat79", "x": -153.9, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat80", "x": -152.1, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat81", "x": -150.4, "y": 6.12, "z": -46.0, "yaw": 90.0, "height_cm": 52.0},
+      {"id": "mess.seat82", "x": -155.6, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat83", "x": -152.1, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0},
+      {"id": "mess.seat84", "x": -150.4, "y": 7.68, "z": -46.0, "yaw": -90.0, "height_cm": 52.0}
     ]
   },
   "halls": {
     "note": "posts in the existing halls whose furniture the plan does not list (metres, world; yaw in degrees = the way the person faces). Standing rounds and consoles, placed from data/ship/aquila_engineering.json and aquila_hangar.json; adjust here when the halls change.",
     "engineering": [
-      {
-        "x": -338.0,
-        "y": 12.4,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "engineer"
-      },
-      {
-        "x": -348.0,
-        "y": -12.4,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "engineer"
-      },
-      {
-        "x": -340.0,
-        "y": 2.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "power technician"
-      },
-      {
-        "x": -346.5,
-        "y": -2.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "power technician"
-      },
-      {
-        "x": -356.0,
-        "y": 9.6,
-        "yaw": -90.0,
-        "kind": "stand",
-        "role": "coolant tender"
-      },
-      {
-        "x": -356.0,
-        "y": -9.6,
-        "yaw": 90.0,
-        "kind": "stand",
-        "role": "coolant tender"
-      },
-      {
-        "x": -365.6,
-        "y": 0.0,
-        "yaw": 0.0,
-        "kind": "stand",
-        "role": "reactor hand"
-      },
-      {
-        "x": -362.8,
-        "y": 6.8,
-        "yaw": -45.0,
-        "kind": "stand",
-        "role": "reactor hand"
-      },
-      {
-        "x": -362.8,
-        "y": -6.8,
-        "yaw": 45.0,
-        "kind": "stand",
-        "role": "reactor hand"
-      },
-      {
-        "x": -349.2,
-        "y": 6.8,
-        "yaw": -135.0,
-        "kind": "stand",
-        "role": "engineer"
-      },
-      {
-        "x": -349.2,
-        "y": -6.8,
-        "yaw": 135.0,
-        "kind": "stand",
-        "role": "engineer"
-      },
-      {
-        "x": -343.0,
-        "y": -6.0,
-        "yaw": 90.0,
-        "kind": "stand",
-        "role": "engineer"
-      }
+      {"x": -338.0, "y": 12.4, "yaw": 90.0, "kind": "work", "role": "engineer"},
+      {"x": -348.0, "y": -12.4, "yaw": -90.0, "kind": "work", "role": "engineer"},
+      {"x": -340.0, "y": 2.0, "yaw": -90.0, "kind": "work", "role": "power technician"},
+      {"x": -346.5, "y": -2.0, "yaw": 90.0, "kind": "work", "role": "power technician"},
+      {"x": -356.0, "y": 9.6, "yaw": -90.0, "kind": "stand", "role": "coolant tender"},
+      {"x": -356.0, "y": -9.6, "yaw": 90.0, "kind": "stand", "role": "coolant tender"},
+      {"x": -365.6, "y": 0.0, "yaw": 0.0, "kind": "stand", "role": "reactor hand"},
+      {"x": -362.8, "y": 6.8, "yaw": -45.0, "kind": "stand", "role": "reactor hand"},
+      {"x": -362.8, "y": -6.8, "yaw": 45.0, "kind": "stand", "role": "reactor hand"},
+      {"x": -349.2, "y": 6.8, "yaw": -135.0, "kind": "stand", "role": "engineer"},
+      {"x": -349.2, "y": -6.8, "yaw": 135.0, "kind": "stand", "role": "engineer"},
+      {"x": -343.0, "y": -6.0, "yaw": 90.0, "kind": "stand", "role": "engineer"}
     ],
     "flight_deck": [
-      {
-        "x": 84.0,
-        "y": -11.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "armourer"
-      },
-      {
-        "x": 97.0,
-        "y": -11.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "plane captain"
-      },
-      {
-        "x": 110.0,
-        "y": -11.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "armourer"
-      },
-      {
-        "x": 123.0,
-        "y": -11.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "plane captain"
-      },
-      {
-        "x": 136.0,
-        "y": -11.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "armourer"
-      },
-      {
-        "x": 149.0,
-        "y": -11.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "plane captain"
-      },
-      {
-        "x": 162.0,
-        "y": -11.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "armourer"
-      },
-      {
-        "x": 175.0,
-        "y": -11.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "plane captain"
-      },
-      {
-        "x": 86.0,
-        "y": 11.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "fueller"
-      },
-      {
-        "x": 102.0,
-        "y": 11.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "plane captain"
-      },
-      {
-        "x": 118.0,
-        "y": 11.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "fueller"
-      },
-      {
-        "x": 134.0,
-        "y": 11.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "plane captain"
-      },
-      {
-        "x": 150.0,
-        "y": 11.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "fueller"
-      },
-      {
-        "x": 166.0,
-        "y": 11.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "plane captain"
-      },
-      {
-        "x": 182.0,
-        "y": 11.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "fueller"
-      },
-      {
-        "x": 188.0,
-        "y": -9.0,
-        "yaw": 0.0,
-        "kind": "stand",
-        "role": "catapult officer"
-      },
-      {
-        "x": 188.0,
-        "y": 9.0,
-        "yaw": 0.0,
-        "kind": "stand",
-        "role": "catapult officer"
-      },
-      {
-        "x": 196.0,
-        "y": -4.0,
-        "yaw": 0.0,
-        "kind": "stand",
-        "role": "launch crew"
-      },
-      {
-        "x": 196.0,
-        "y": 4.0,
-        "yaw": 0.0,
-        "kind": "stand",
-        "role": "launch crew"
-      },
-      {
-        "x": 72.0,
-        "y": -6.0,
-        "yaw": 0.0,
-        "kind": "stand",
-        "role": "deck supervisor"
-      },
-      {
-        "x": 72.0,
-        "y": 6.0,
-        "yaw": 180.0,
-        "kind": "stand",
-        "role": "deck supervisor"
-      }
+      {"x": 84.0, "y": -11.0, "yaw": -90.0, "kind": "work", "role": "armourer"},
+      {"x": 97.0, "y": -11.0, "yaw": -90.0, "kind": "work", "role": "plane captain"},
+      {"x": 110.0, "y": -11.0, "yaw": -90.0, "kind": "work", "role": "armourer"},
+      {"x": 123.0, "y": -11.0, "yaw": -90.0, "kind": "work", "role": "plane captain"},
+      {"x": 136.0, "y": -11.0, "yaw": -90.0, "kind": "work", "role": "armourer"},
+      {"x": 149.0, "y": -11.0, "yaw": -90.0, "kind": "work", "role": "plane captain"},
+      {"x": 162.0, "y": -11.0, "yaw": -90.0, "kind": "work", "role": "armourer"},
+      {"x": 175.0, "y": -11.0, "yaw": -90.0, "kind": "work", "role": "plane captain"},
+      {"x": 86.0, "y": 11.0, "yaw": 90.0, "kind": "work", "role": "fueller"},
+      {"x": 102.0, "y": 11.0, "yaw": 90.0, "kind": "work", "role": "plane captain"},
+      {"x": 118.0, "y": 11.0, "yaw": 90.0, "kind": "work", "role": "fueller"},
+      {"x": 134.0, "y": 11.0, "yaw": 90.0, "kind": "work", "role": "plane captain"},
+      {"x": 150.0, "y": 11.0, "yaw": 90.0, "kind": "work", "role": "fueller"},
+      {"x": 166.0, "y": 11.0, "yaw": 90.0, "kind": "work", "role": "plane captain"},
+      {"x": 182.0, "y": 11.0, "yaw": 90.0, "kind": "work", "role": "fueller"},
+      {"x": 188.0, "y": -9.0, "yaw": 0.0, "kind": "stand", "role": "catapult officer"},
+      {"x": 188.0, "y": 9.0, "yaw": 0.0, "kind": "stand", "role": "catapult officer"},
+      {"x": 196.0, "y": -4.0, "yaw": 0.0, "kind": "stand", "role": "launch crew"},
+      {"x": 196.0, "y": 4.0, "yaw": 0.0, "kind": "stand", "role": "launch crew"},
+      {"x": 72.0, "y": -6.0, "yaw": 0.0, "kind": "stand", "role": "deck supervisor"},
+      {"x": 72.0, "y": 6.0, "yaw": 180.0, "kind": "stand", "role": "deck supervisor"}
     ],
     "medbay": [
-      {
-        "x": -240.3,
-        "y": -5.0,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "nurse"
-      },
-      {
-        "x": -246.3,
-        "y": 5.0,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "nurse"
-      },
-      {
-        "x": -252.3,
-        "y": -5.0,
-        "yaw": -90.0,
-        "kind": "stand",
-        "role": "corpsman"
-      },
-      {
-        "x": -243.3,
-        "y": 5.0,
-        "yaw": 90.0,
-        "kind": "stand",
-        "role": "corpsman"
-      }
+      {"x": -240.3, "y": -5.0, "yaw": -90.0, "kind": "work", "role": "nurse"},
+      {"x": -246.3, "y": 5.0, "yaw": 90.0, "kind": "work", "role": "nurse"},
+      {"x": -252.3, "y": -5.0, "yaw": -90.0, "kind": "stand", "role": "corpsman"},
+      {"x": -243.3, "y": 5.0, "yaw": 90.0, "kind": "stand", "role": "corpsman"}
     ],
     "mess": [
-      {
-        "x": -124.5,
-        "y": -9.6,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "mess steward"
-      },
-      {
-        "x": -131.0,
-        "y": -9.6,
-        "yaw": 90.0,
-        "kind": "work",
-        "role": "mess steward"
-      },
-      {
-        "x": -124.0,
-        "y": 9.9,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "mess steward"
-      },
-      {
-        "x": -126.5,
-        "y": 9.9,
-        "yaw": -90.0,
-        "kind": "work",
-        "role": "mess steward"
-      }
+      {"x": -124.5, "y": -9.6, "yaw": 90.0, "kind": "work", "role": "mess steward"},
+      {"x": -131.0, "y": -9.6, "yaw": 90.0, "kind": "work", "role": "mess steward"},
+      {"x": -124.0, "y": 9.9, "yaw": -90.0, "kind": "work", "role": "mess steward"},
+      {"x": -126.5, "y": 9.9, "yaw": -90.0, "kind": "work", "role": "mess steward"}
     ]
   }
 }

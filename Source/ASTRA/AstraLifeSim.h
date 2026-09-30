@@ -39,6 +39,8 @@ struct FAstraLifeRoute
 	/** The direction of travel on the floor plane (a unit vector), zero when there is none. */
 	FVector2D Heading() const;
 	bool InLift() const { return !Done() && Kind(Seg) == ESeg::Lift; }
+	/** On a stair or in a lift: nobody can see them there. */
+	bool InShaft() const { return !Done() && Kind(Seg) != ESeg::Walk; }
 	float RemainingCm() const;
 };
 
@@ -62,6 +64,8 @@ struct FAstraLifePerson
 	float J[5] = {0, 0, 0, 0, 0};    // the day's own offsets (hours): mid-watch meal, wind-down, turning in, waking meal, sleep length
 	float SpeedFactor = 1.f;
 	float LeadH = 0.3f;              // how long before their watch they set out (ship hours)
+	float LeadMessDutyH = 0.2f;      // how long before sitting down to the mid-watch meal they leave their post
+	float LeadMessHomeH = 0.2f;      // how long before the other meals they set out from where they live
 	float WakeDelayS = 30.f;         // how long they need to be up and dressed when an alarm goes
 	TArray<float> Taste;             // their liking for each way of spending free time
 	int32 Home = INDEX_NONE;         // the room they sleep in
@@ -187,7 +191,11 @@ public:
 	int32 WhoIsAt(FName ExternalStation) const;
 	void Stats(FAstraLifeStats& Out) const;
 	/** Seconds a repair party needs to reach a place, from where the nearest people who would go are (the ship's "on scene in"). */
-	float PartyEtaSeconds(const FVector& Site) const;
+	float PartyEtaSeconds(const FVector& Site, int32 Deck) const;
+	/** Where an incident in a deck and section is worked (a room or a stretch of corridor the same on every call for that incident), and how
+	 *  long a party takes to get there: what the ship should say when it dispatches a team. */
+	FVector SiteOf(int32 Deck, TCHAR Section, int32 IncidentId, int32* OutComp = nullptr) const;
+	float RepairEtaSeconds(int32 Deck, TCHAR Section, int32 IncidentId) const;
 	/** A test hook: a person's schedule at an hour (their act and block), ignoring the ship's state. */
 	EAstraLifeAct ScheduleAt(int32 Person, double ShipSec, int32* OutBlock = nullptr) const;
 
@@ -262,6 +270,11 @@ private:
 	void FormParty(const FAstraDamage& D);
 	void EndParty(int32 PartyIdx, bool bRepaired);
 	int32 PickSite(int32 Deck, TCHAR Section, int32 IncidentId) const;
+	/** Who would go to a site, the nearest first: the damage-control ratings who are fit (a sleeper is roused), engineering if they are too few.
+	 *  Key: a cost (cm), value: the person; EtaS: their own time to get there. */
+	struct FGoer { double Cost; int32 Person; float EtaS; };
+	void Goers(int32 Deck, const FVector& Site, TArray<FGoer>& Out) const;
+	int32 DeckOfZ(double Z) const;
 	const FBox& SectionBox(int32 Deck, TCHAR Section);
 
 	uint32 Hash(int32 A, int32 B = 0, int32 C = 0) const;

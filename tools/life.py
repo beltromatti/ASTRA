@@ -36,6 +36,23 @@ def load(name: str) -> dict:
     return json.loads((DATA / name).read_text())
 
 
+def dumps(o, indent: int = 0, width: int = 118) -> str:
+    """JSON the way the life file is written by hand: numbers and short objects on one line, one entry per line for lists of objects."""
+    pad = "  " * indent
+    flat = json.dumps(o, ensure_ascii=False)
+    if not isinstance(o, (dict, list)):
+        return flat
+    if isinstance(o, list) and not any(isinstance(x, (dict, list)) for x in o) and len(flat) + len(pad) <= width:
+        return flat
+    if isinstance(o, dict):
+        if len(flat) + len(pad) <= width and not any(isinstance(v, (dict, list)) for v in o.values()):
+            return flat
+        items = [f'{pad}  {json.dumps(k, ensure_ascii=False)}: {dumps(v, indent + 1, width)}' for k, v in o.items()]
+        return "{\n" + ",\n".join(items) + f"\n{pad}}}"
+    items = [f"{pad}  {dumps(v, indent + 1, width)}" for v in o]
+    return "[\n" + ",\n".join(items) + f"\n{pad}]"
+
+
 # ------------------------------------------------------------------------------------------------------------------ check
 def _match(c: dict, sel: dict) -> bool:
     if c["kind"] not in sel["kinds"]:
@@ -116,7 +133,7 @@ def cmd_bake(_: argparse.Namespace) -> int:
                     if key in kept:
                         r["external"] = kept[key]              # the actor the level already has there (a sleeper of the Red watch)
                     racks.append(r)
-    # --- the Mess Hall's seats beyond the twelve the level keeps: three a side along every table, clear of the diners already there
+    # --- the Mess Hall's seats beyond the twelve the level keeps: four a side along every table, clear of the diners already there
     mx, my, mz = mess["world_origin"]
     t = mess["tables"]
     taken = {(d["table"][0], d["table"][1], d["side"]): [] for d in mess["diners"]}
@@ -126,8 +143,8 @@ def cmd_bake(_: argparse.Namespace) -> int:
     for i, tx in enumerate(t["x_centres"]):
         for j, ty in enumerate(t["y_centres"]):
             for side in (-1, 1):
-                for dx in (-2.3, 0.0, 2.3):
-                    if any(abs(dx - o) < 0.9 for o in taken.get((i, j, side), [])):
+                for dx in (-2.6, -0.9, 0.9, 2.6):
+                    if any(abs(dx - o) < 0.85 for o in taken.get((i, j, side), [])):
                         continue
                     seats.append({"id": f"mess.seat{len(seats) + 1}", "x": round(mx + tx + dx, 3), "y": round(my + ty + side * t["bench_offset"], 3),
                                   "z": round(mz, 3), "yaw": 90.0 if side < 0 else -90.0, "height_cm": 52.0})
@@ -135,7 +152,7 @@ def cmd_bake(_: argparse.Namespace) -> int:
     life["extras"]["racks"] = racks
     life["extras"]["mess_seats"] = seats
     life["extras"]["note"] = "baked by tools/life.py bake from aquila_berths.json and aquila_mess.json: the berthing's 84 racks (a rack the level keeps a sleeper on has `external`) and the Mess Hall's seats beyond the twelve the plan lists"
-    (DATA / "aquila_life.json").write_text(json.dumps(life, indent=2) + "\n")
+    (DATA / "aquila_life.json").write_text(dumps(life) + "\n")
     print(f"baked {len(racks)} racks ({len(kept)} kept by the level's sleepers) and {len(seats)} Mess seats into data/ship/aquila_life.json")
     return 0
 

@@ -100,6 +100,7 @@ from .visits import VisitPlanner  # noqa: E402
 from .loss import Aftermath  # noqa: E402
 from .finale import Finale  # noqa: E402
 from .memory import MemoryKeeper  # noqa: E402
+from .npc import Npcs  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
 
@@ -146,6 +147,7 @@ class Mind:
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
         self.port = FieldControl(self.llm, self._say_external, self._register_field)
         self.mess = MessTalk(self.llm, self.voice.say)
+        self.npcs = Npcs(self.llm, self.voice.say, EXTERNAL_SPEAKERS)     # the ship's people when the Captain talks to them (npc.py)
         self.director = Director(self.llm, self._say_external, self._director_command, self._register_commander,
                                  news=self._fleet_news)
         self.visits = VisitPlanner(self.llm, self._director_command, self.director.note)
@@ -694,7 +696,7 @@ class Mind:
     def _captain_speaks(self) -> None:
         """The Captain has priority over everything: whatever the crew was doing (a report, a watch check, a chat) stops now,
         and the reports still waiting to be voiced are dropped."""
-        n = self.agent.preempt()
+        n = self.agent.preempt() + self.npcs.preempt()
         drop = getattr(self.voice, "drop_low_priority", None)        # (the voice module's side: it may give the Captain more than this)
         dropped = drop() if callable(drop) else 0
         hook = getattr(self.voice, "captain_speaks", None)           # the hook for cutting the line being spoken, if the voice has one
@@ -725,9 +727,21 @@ class Mind:
         whether they were meant for them. With a channel open, the comms officer's call (router.for_party, a small fast model) decides
         meanwhile what goes out on it, and whoever is there answers what reached them."""
         st = self.game.state if (self.game and self.game.state) else {}
+        # the crew aboard within earshot (the game's life, npc.py): they hear the words too and judge for themselves; the officers' turn
+        # waits for their word (the gate) and stays out of it when one of them answered
+        people = self.npcs.listeners(raw_ctx, st)
+        gate = None
+        if people:
+            gate = asyncio.get_running_loop().create_future()
+            world = {"state": st, "war": self.director.war.crew_view(), "mood": self.director.mood, "clock": (st.get("life") or {}).get("clock")}
+            where = "at " + str((raw_ctx or {}).get("place_name") or (raw_ctx or {}).get("place") or "somewhere aboard")
+            asyncio.create_task(self.npcs.hear(text, lang, people, world, gate, where))
+            if str((raw_ctx or {}).get("facing", "")).startswith("npc"):
+                faced = next((p.name for p in people if p.id == raw_ctx["facing"]), "a crew member")
+                raw_ctx = {**raw_ctx, "facing": faced}
         ctx = parse_context(raw_ctx, st, self.enemy, self._party_names(), self.exchange)
         self.memory.hear("Captain", text)
-        turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx))
+        turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx, note=self.npcs.note_for_crew(people), gate=gate))
         r = router_mod.Route()
         party_task = None
         ch = ctx.channel
@@ -839,6 +853,7 @@ class Mind:
                     else:
                         self.director.reset()
                         self.style.reset()
+                        self.npcs.reset()
                         log.info("new campaign")
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
