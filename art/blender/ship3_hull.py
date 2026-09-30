@@ -213,3 +213,42 @@ def _point_in_convex(poly: np.ndarray, y: float, z: float) -> bool:
         elif cr * sign < 0:
             return False
     return True
+
+
+# ------------------------------------------------------------------------------------------------------------------- rivets
+_RIVET = {"V": np.array([(-1.0, -1.0, 0.0), (1.0, -1.0, 0.0), (1.0, 1.0, 0.0), (-1.0, 1.0, 0.0), (0.0, 0.0, 0.8)]),
+          "F": np.array([(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)], np.int32), "mat": "Frame",
+          "a1": np.array([(0.2, 0.0)] * 4 + [(0.95, 0.0)]), "a2": np.array([(G.TONE0, 0.0)] * 5)}
+
+
+def rivet_plates(c: Ctx, plates, p: float = 0.3, spacing=(2.2, 3.4), inset: float = 0.17, size: float = 0.06, min_size=(4.0, 1.4), mat: str = "Frame") -> int:
+    """Bolt heads along the edges of a share `p` of the plates, `inset` metres in from the rim (inside the margin the panels leave):
+    four-sided pyramids of half-size `size`, worn bright at the tip. Returns the number of rivets."""
+    g, rng = c.g, c.rng
+    pos, nrm, tan = [], [], []
+    for pl in plates:
+        if rng.random() > p * c.detail:
+            continue
+        la, lw = pl.size_m()
+        if la < min_size[0] or lw < min_size[1]:
+            continue
+        sw = pl.zone.sw(0.5 * (pl.a0 + pl.a1))
+        inner = LF._inset_quad(pl.outline, inset, sw)
+        step = float(rng.uniform(*spacing))
+        for i in (0, 2):                                                           # the two long edges (along a)
+            p0, p1 = inner[i], inner[i + 1]
+            ln = float(np.linalg.norm(np.array([p1[0] - p0[0], (p1[1] - p0[1]) * sw])))
+            n = int(ln / step)
+            if n < 1:
+                continue
+            ts = (np.arange(n) + 0.5) / n
+            ab = p0[None] + (p1 - p0)[None] * ts[:, None]
+            P, N, T = pl.top(ab[:, 0], ab[:, 1], 0.0)
+            pos.append(P)
+            nrm.append(N)
+            tan.append(T)
+    if not pos:
+        return 0
+    P, N, T = np.concatenate(pos), np.concatenate(nrm), np.concatenate(tan)
+    g.instance(_RIVET, P - N * 0.01, frames=G.frames_z(N, T), scales=size, mat=c.m(mat), kind="rivet")
+    return len(P)

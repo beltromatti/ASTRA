@@ -186,6 +186,7 @@ def build_freighter(c: Ctx) -> dict:
     # ---------------------------------------------------------------------------------------------------- details and cuts
     H.panelize_plates(c, plates, st)
     H.scatter_details(c, plates, st)
+    H.rivet_plates(c, plates)
     from ship3_cut import make_cut
     neck = [(6.2 * math.cos(a), 6.2 * math.sin(a)) for a in np.linspace(0.0, 2 * math.pi, 14, endpoint=False)]
     faces = []
@@ -271,4 +272,5 @@ def build_watch(c: Ctx) -> dict:
     K2.nav_light(c, np.array([0.0, 0.0, 20.0]), np.array([0.0, 0.0, 1.0]), K2.NAV_WHITE, 1.4)
     H.panelize_plates(c, plates, st)
     H.scatter_details(c, plates, st)
+    H.rivet_plates(c, plates)
     return {"length_m": 232.0, "cuts": None, "cam_az": -30.0, "cam_el": 22.0, "cam_dist": 1.9, "sun_az": -50.0, "sun_el": 30.0, "closeups": []}

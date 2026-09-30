@@ -374,7 +374,7 @@ def cable_run(c: Ctx, panel: PN.Panel, rng, count: int = 2, scale: float = 1.0) 
 
 def stencil(c: Ctx, panel: PN.Panel, u: float, v: float, text: str, height: float, up=(0.0, 0.0, 1.0), mat: str | None = None) -> None:
     P, fr = panel.frame_at(u, v)
-    TX.place_text(c.g, text, P, fr[2], height, mat or c.m("Marking"), up=up, depth=0.012, kind="text")
+    TX.place_text(c.g, text, P, fr[2], height, mat or c.m("Marking"), up=up, depth=0.012, kind="text", res=1, flat=True)
 
 
 

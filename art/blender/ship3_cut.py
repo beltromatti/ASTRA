@@ -79,7 +79,7 @@ def make_cut(c: Ctx, poly_yz: np.ndarray, xc: float, s: int, sec: int, depth: fl
         V = np.concatenate([np.column_stack([np.full(M_DENSE, xo), outer]), np.column_stack([xi, inner])])
         F = G.quads_to_tris(G.strip_quads(M_DENSE, 0, M_DENSE, True))
         F = _orient(V, F, lambda cc: np.tile([-s, 0.0, 0.0], (len(cc), 1)))
-        g.add(V, F, m("Cut"), a1=np.column_stack([np.full(2 * M_DENSE, 0.5), np.full(2 * M_DENSE, 0.9)]), a2=(0.5, 1.0), kind="cut")
+        g.add(V, F, m("Cut"), a1=np.column_stack([np.full(2 * M_DENSE, 0.5), np.full(2 * M_DENSE, 0.9)]), a2=(0.66, 1.0), kind="cut")
         # (b) the liner: the section inset, going in `depth`, faces the axis; and the back bulkhead
         liner = outer + u_in * (1.4 * scale)
         nseg = 3
@@ -88,11 +88,11 @@ def make_cut(c: Ctx, poly_yz: np.ndarray, xc: float, s: int, sec: int, depth: fl
         Q = np.concatenate([G.strip_quads(M_DENSE, i * M_DENSE, (i + 1) * M_DENSE, True) for i in range(nseg)])
         F = G.quads_to_tris(Q)
         F = _orient(V, F, lambda cc: np.column_stack([np.zeros(len(cc)), cen[0] - cc[:, 1], cen[1] - cc[:, 2]]))
-        g.add(V, F, m("Cut"), a1=(0.2, 1.0), a2=(0.5, 1.0), kind="cut")
+        g.add(V, F, m("Cut"), a1=(0.2, 1.0), a2=(0.40, 1.0), kind="cut")
         Vb = np.vstack([np.column_stack([np.full(M_DENSE, xc + s * depth), liner]), [xc + s * depth, cen[0], cen[1]]])
         Fb = np.stack([np.arange(M_DENSE), (np.arange(M_DENSE) + 1) % M_DENSE, np.full(M_DENSE, M_DENSE)], axis=1)
         Fb = _orient(Vb, Fb, lambda cc: np.tile([-s, 0.0, 0.0], (len(cc), 1)))
-        g.add(Vb, Fb, m("Cut"), a1=(0.0, 1.0), a2=(0.5, 1.0), kind="cut")
+        g.add(Vb, Fb, m("Cut"), a1=(0.0, 1.0), a2=(0.16, 1.0), kind="cut")
         # (c) decks and frames of the burnt interior
         inner_poly = LF._inset_quad(np.asarray(poly_yz, np.float64), 1.6 * scale, 1.0)
         z0, z1 = float(inner_poly[:, 1].min()), float(inner_poly[:, 1].max())
@@ -134,7 +134,7 @@ def make_cut(c: Ctx, poly_yz: np.ndarray, xc: float, s: int, sec: int, depth: fl
         if pieces_b:
             cs = np.array([p[0] for p in pieces_b])
             sz = np.array([p[1] for p in pieces_b])
-            g.boxes(cs, sz / 2.0, m("Cut"), chamfer=0.0, kind="cut", wear=0.2, grime=1.0, aux=1.0)
+            g.boxes(cs, sz / 2.0, m("Cut"), chamfer=0.0, kind="cut", wear=0.2, grime=1.0, aux=1.0, tone=0.80)
         if pieces_l:
             g.boxes(np.array([p[0] for p in pieces_l]), np.array([p[1] for p in pieces_l]) / 2.0, m("Lights"), chamfer=0.0, kind="cut",
                     aux=rng.uniform(0.0, 0.6, len(pieces_l)))
@@ -144,7 +144,7 @@ def make_cut(c: Ctx, poly_yz: np.ndarray, xc: float, s: int, sec: int, depth: fl
             p0 = np.array([xc + s * 1.0, *(outer[i] + u_in[i] * rng.uniform(1.5, 5.0) * scale)])
             ln = rng.uniform(3.0, 15.0) * scale
             d = np.array([-s, rng.uniform(-0.28, 0.28), rng.uniform(-0.28, 0.28)])
-            g.box_between(p0, p0 + G.norm(d) * ln, 0.55 * scale, 1.0 * scale, m("Cut"), chamfer=0.04, kind="cut", wear=0.3, grime=1.0, aux=1.0)
+            g.box_between(p0, p0 + G.norm(d) * ln, 0.55 * scale, 1.0 * scale, m("Cut"), chamfer=0.04, kind="cut", wear=0.3, grime=1.0, aux=1.0, tone=0.92)
         # (e) peeled armour plates: hinged on the rim, curling out into the gap
         for _ in range(int(8 * scale ** 0.5) + 3):
             i = int(rng.integers(0, M_DENSE))
@@ -167,7 +167,7 @@ def make_cut(c: Ctx, poly_yz: np.ndarray, xc: float, s: int, sec: int, depth: fl
             Vq = np.vstack([np.column_stack([np.full(len(q), xc + s * 1.5), q]), [xc + s * 1.5, cq[0], cq[1]]])
             Fq = np.stack([np.arange(len(q)), (np.arange(len(q)) + 1) % len(q), np.full(len(q), len(q))], axis=1)
             Fq = _orient(Vq, Fq, lambda cc: np.tile([-s, 0.0, 0.0], (len(cc), 1)))
-            g.add(Vq, Fq, m("Cut"), a1=(0.3, 1.0), a2=(0.5, 1.0), kind="cut")
+            g.add(Vq, Fq, m("Cut"), a1=(0.3, 1.0), a2=(0.58, 1.0), kind="cut")
     return {"x": float(xc), "normal": [float(-s), 0.0, 0.0], "center": [float(xc), float(cen[0]), float(cen[1])],
             "y": [float(outer[:, 0].min()), float(outer[:, 0].max())], "z": [float(outer[:, 1].min()), float(outer[:, 1].max())], "section": sec}
 

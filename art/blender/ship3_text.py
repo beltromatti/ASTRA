@@ -40,9 +40,9 @@ def _font_path() -> str | None:
     return None
 
 
-def text_proto(text: str, depth: float = 0.03, res: int = 2) -> dict:
+def text_proto(text: str, depth: float = 0.03, res: int = 2, flat: bool = False) -> dict:
     """{"V","F"} of the text 1 m tall (cap height ~0.7), centred, back at z = 0, front at z = depth. Needs Blender."""
-    key = (text, round(depth, 4), res)
+    key = (text, round(depth, 4), res, flat)
     if key in _CACHE:
         return _CACHE[key]
     import bpy
@@ -78,6 +78,8 @@ def text_proto(text: str, depth: float = 0.03, res: int = 2) -> dict:
     # drop the back faces (they sit on the hull): triangles lying flat at z = 0
     zmax = V[:, 2].max()
     flat_back = np.all(V[F][:, :, 2] < 1e-6, axis=1)
+    if flat:                                                                   # a sticker: keep only the front faces, not the thin side walls
+        flat_back = flat_back | ~np.all(V[F][:, :, 2] > depth - 1e-6, axis=1)
     F = F[~flat_back]
     proto = {"V": V, "F": F, "mat": "Marking", "a1": np.tile([0.3, 0.0], (len(V), 1)), "a2": np.tile([G.TONE0, 0.0], (len(V), 1)),
              "width": float(V[:, 0].max() - V[:, 0].min()), "height": float(V[:, 1].max() - V[:, 1].min())}
@@ -85,10 +87,10 @@ def text_proto(text: str, depth: float = 0.03, res: int = 2) -> dict:
     return proto
 
 
-def place_text(g: G.Geo, text: str, origin, normal, height: float, mat: str, up=(0.0, 0.0, 1.0), depth: float = 0.03, lift: float = 0.0,
+def place_text(g: G.Geo, text: str, origin, normal, height: float, mat: str, up=(0.0, 0.0, 1.0), depth: float = 0.03, lift: float = 0.0, res: int = 2, flat: bool = False,
                kind: str = "text") -> float:
     """Letters of `height` metres standing on the surface at `origin` (the middle of the text). Returns the width in metres."""
-    pr = text_proto(text, depth=depth / max(height, 1e-6))
+    pr = text_proto(text, depth=depth / max(height, 1e-6), res=res, flat=flat)
     n = G.norm(normal)
     g.instance(pr, [np.asarray(origin, np.float64) + n * lift], text_frame(normal, up), scales=height, mat=mat, kind=kind)
     return pr["width"] * height

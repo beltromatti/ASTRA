@@ -544,6 +544,7 @@ def _build(c: Ctx, spec: dict, name: str, extras, extra_info: dict) -> dict:
     ship.markings()
     H.panelize_plates(c, ship.plates, ship.st)
     H.scatter_details(c, ship.plates, ship.st)
+    H.rivet_plates(c, ship.plates, p=0.28, mat="Trim", size=0.07)
     patches(c, ship.plates, ship.st)
     welds(c, ship.plates)
     faces = ship.caps()

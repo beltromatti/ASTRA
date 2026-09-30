@@ -331,9 +331,13 @@ def cut_material(name: str, heat: float = 0.35) -> bpy.types.Material:
     uv1 = mt.n("ShaderNodeUVMap", -1900, 300, uv_map="UVMap_D1")
     s1 = mt.n("ShaderNodeSeparateXYZ", -1700, 300)
     mt.l(uv1, "UV", s1, "Vector")
+    uv2 = mt.n("ShaderNodeUVMap", -1900, 100, uv_map="UVMap_D2")
+    s2 = mt.n("ShaderNodeSeparateXYZ", -1700, 100)
+    mt.l(uv2, "UV", s2, "Vector")
     wr, wg, wb, wa, tc = wear_channels(mt, scale=0.9 / 8.0)
     bsdf = mt.n("ShaderNodeBsdfPrincipled", 1500, 0)
     k = mt.mul(mt.mul(mt.add(mt.mul(wb, 1.1), 0.55), mt.sub(1.0, mt.mul(wa, 0.4))), mt.add(mt.mul((s1, "X"), 0.6), 1.0))
+    k = mt.mul(k, mt.add(mt.mul((s2, "X"), 1.6), 0.4))                                    # each part of the cap has its own tone
     col = mt.scale_c((0.05, 0.045, 0.04), k)
     mt.l(col[0], col[1], bsdf, "Base Color")
     bsdf.inputs["Roughness"].default_value = 0.85
@@ -397,13 +401,13 @@ def set_world(strength: float = 1.0) -> None:
     env.inputs["Detail"].default_value = 2.0
     link(tc, "Generated", env, "Vector")
     shape = node("ShaderNodeMapRange", interpolation_type="SMOOTHSTEP", clamp=True)
-    shape.inputs["From Min"].default_value = 0.38
-    shape.inputs["From Max"].default_value = 0.78
+    shape.inputs["From Min"].default_value = 0.44
+    shape.inputs["From Max"].default_value = 0.80
     link(neb, "Fac", shape, "Value")
     envm = node("ShaderNodeMapRange", interpolation_type="SMOOTHSTEP", clamp=True)
-    envm.inputs["From Min"].default_value = 0.35
-    envm.inputs["From Max"].default_value = 0.7
-    envm.inputs["To Min"].default_value = 0.15
+    envm.inputs["From Min"].default_value = 0.45
+    envm.inputs["From Max"].default_value = 0.72
+    envm.inputs["To Min"].default_value = 0.08
     link(env, "Fac", envm, "Value")
     fld = node("ShaderNodeMath", operation="MULTIPLY")
     link(shape, "Result", fld, 0)
@@ -411,11 +415,11 @@ def set_world(strength: float = 1.0) -> None:
     ramp = node("ShaderNodeValToRGB")
     ramp.color_ramp.elements[0].position = 0.0
     ramp.color_ramp.elements[0].color = (0.0, 0.0, 0.0, 1.0)
-    for pos, col in ((0.2, (0.0, 0.025, 0.035, 1.0)), (0.5, (0.01, 0.12, 0.13, 1.0)), (0.85, (0.10, 0.38, 0.36, 1.0))):
+    for pos, col in ((0.2, (0.0, 0.015, 0.022, 1.0)), (0.5, (0.006, 0.07, 0.08, 1.0)), (0.85, (0.06, 0.24, 0.23, 1.0))):
         el = ramp.color_ramp.elements.new(pos)
         el.color = col
     ramp.color_ramp.elements[-1].position = 1.0
-    ramp.color_ramp.elements[-1].color = (0.35, 0.72, 0.62, 1.0)
+    ramp.color_ramp.elements[-1].color = (0.22, 0.46, 0.40, 1.0)
     link(fld, 0, ramp, "Fac")
     # stars: two scales, sharp
     stars = []

@@ -424,6 +424,7 @@ class Aquila:
         if details:
             H.panelize_plates(c, self.plates, self.st)
             H.scatter_details(c, self.plates, self.st)
+            H.rivet_plates(c, self.plates)
 
 
 def torpedo_tube(c: Ctx, xf: Xf) -> None:

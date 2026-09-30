@@ -294,6 +294,7 @@ def build_cut():
     m = fresh("M_ASTRA_ShipCut")
     uv0 = uvset(m, 0, -2000, 0)
     uv1 = uvset(m, 1, -2000, 200)
+    uv2 = uvset(m, 2, -2000, 300)
     uvt = binop(m, unreal.MaterialExpressionMultiply, uv0, "", scalar(m, "WearScale", 0.9, -2000, 100, "UV"), "", -1800, 40)
     wear = texparam(m, "ShipWear", tex("T_ShipWear_M"), ST.SAMPLERTYPE_MASKS, -1600, 0, "Wear")
     link(uvt, "", wear, "UVs")
@@ -302,11 +303,12 @@ def build_cut():
     heat = scalar(m, "Heat", 0.0, -1600, 460, "Burnt")
     ember_i = scalar(m, "EmberIntensity", 26.0, -1600, 520, "Burnt")
     code = """
-float3 col = Tint * (0.55 + 1.1 * WM.b) * (1.0 - 0.4 * WMa) * (1.0 + 0.6 * D1.x);
+float tone = (D2.x == 0.0 && D2.y == 0.0) ? 0.5 : D2.x;
+float3 col = Tint * (0.55 + 1.1 * WM.b) * (1.0 - 0.4 * WMa) * (1.0 + 0.6 * D1.x) * (0.4 + 1.6 * tone);
 float e = smoothstep(0.70, 0.84, WM.r + 0.22 * WM.g) * Heat;
 return float4(col, e);
 """
-    c = custom(m, code, [("WM", (wear, "RGB")), ("WMa", (wear, "A")), ("D1", (uv1, "")), ("Tint", (tint, "RGB")), ("Heat", (heat, ""))], -1200, 200)
+    c = custom(m, code, [("WM", (wear, "RGB")), ("WMa", (wear, "A")), ("D1", (uv1, "")), ("D2", (uv2, "")), ("Tint", (tint, "RGB")), ("Heat", (heat, ""))], -1200, 200)
     mel.connect_material_property(mask(m, c, "", -900, 200, r=True, g=True, b=True), "", unreal.MaterialProperty.MP_BASE_COLOR)
     em = binop(m, unreal.MaterialExpressionMultiply, ember, "RGB", binop(m, unreal.MaterialExpressionMultiply, mask(m, c, "", -900, 300, a=True), "", ember_i, "", -700, 300), "", -500, 300)
     mel.connect_material_property(em, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)

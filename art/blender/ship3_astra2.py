@@ -287,6 +287,7 @@ class Warship:
         if details:
             H.panelize_plates(c, self.plates, self.st)
             H.scatter_details(c, self.plates, self.st)
+            H.rivet_plates(c, self.plates)
 
 
 # ================================================================================================================ specs
