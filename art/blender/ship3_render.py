@@ -54,7 +54,7 @@ def render_previews(name: str, short_name: str, spec: dict, res: dict, obj, args
             cam = args.get("cam") or [info.get("cam_az", -48.0), info.get("cam_el", 18.0), info.get("lens", 60.0)]
             d = view_dir(cam[0], cam[1])
             shot("cam", pts, d, os.path.join(outd, f"{sn}_three_quarter{args.get('tag', '')}.jpg"), (w, h), lens=cam[2] if len(cam) > 2 else info.get("lens", 60.0),
-                 side=side, margin=info.get("margin", 0.05))
+                 side=side, key_el=cam[3] if len(cam) > 3 else 28.0, margin=info.get("margin", 0.05))
         elif view == "closeup":
             for i, cu in enumerate(info.get("closeups", [])):
                 tgt = np.array(cu["target"], float)

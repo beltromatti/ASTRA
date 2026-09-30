@@ -375,3 +375,57 @@ def cable_run(c: Ctx, panel: PN.Panel, rng, count: int = 2, scale: float = 1.0) 
 def stencil(c: Ctx, panel: PN.Panel, u: float, v: float, text: str, height: float, up=(0.0, 0.0, 1.0), mat: str | None = None) -> None:
     P, fr = panel.frame_at(u, v)
     TX.place_text(c.g, text, P, fr[2], height, mat or c.m("Marking"), up=up, depth=0.012, kind="text")
+
+
+
+# ================================================================================================================ hull fittings
+# These stand on plated hull: the plates there are up to ~1 m tall, so every fitting has a base of `base` metres (a little above the
+# tallest plate) and its detail starts on top of it.
+def cargo_door(c: Ctx, xf: Xf, length: float, width: float, leaves: int = 2, base: float = 1.05) -> None:
+    """A cargo / cutter door in a flat hull face (local x along the face, y across, z out of the hull): a deep frame with hazard
+    stripes, leaves with cross ribs and hinge barrels, latch blocks, lit guide strips at both ends."""
+    g, m = c.g, c.m
+    t = max(0.6, 0.045 * width)
+    h = base + 0.5
+    for sy in (-1, 1):
+        xf.box(g, (0, sy * (width / 2 + t / 2), h / 2), (length + 2 * t, t, h), m("Frame"), ch=0.10, kind="door")
+    for sx in (-1, 1):
+        xf.box(g, (sx * (length / 2 + t / 2), 0, h / 2), (t, width, h), m("Frame"), ch=0.10, kind="door")
+    lw = length / leaves
+    for i in range(leaves):
+        cx = -length / 2 + (i + 0.5) * lw
+        xf.box(g, (cx, 0, (base + 0.05) / 2), (lw - 0.25, width - 0.25, base + 0.05), m("Plate"), ch=0.06, wear=0.9, kind="door")
+        for j in (-1, 1):
+            xf.box(g, (cx + j * lw * 0.22, 0, base + 0.11), (0.35, width - 1.0, 0.12), m("Frame"), ch=0.02, kind="door")
+        ex = -length / 2 + 0.6 if i == 0 else length / 2 - 0.6
+        for sy in (-1, 1):
+            xf.box(g, (ex, sy * (width / 2 - 1.0), base + 0.2), (0.7, 0.9, 0.3), m("Engine"), ch=0.03, kind="door")
+    for i in range(1, leaves):
+        xf.cyl(g, (-length / 2 + i * lw, -width / 2 + 0.3, base + 0.1), (-length / 2 + i * lw, width / 2 - 0.3, base + 0.1), 0.22, 0.22, m("Engine"), seg=8, kind="door")
+    n = max(4, int(length / 1.4))
+    for k in range(n):
+        x = -length / 2 + (k + 0.5) * length / n
+        for sy in (-1, 1):
+            xf.box(g, (x, sy * (width / 2 + t / 2), h + 0.02), (length / n * 0.5, t * 0.8, 0.04), m("Trim") if k % 2 else m("Frame"), ch=0.0, kind="door")
+    for sx in (-1, 1):
+        xf.box(g, (sx * (length / 2 - 0.3), 0, base + 0.08), (0.25, width * 0.7, 0.05), m("Lights"), ch=0.0, kind="door", aux=0.2)
+
+
+def tow_lug(c: Ctx, xf: Xf, s: float = 1.0, base: float = 1.05) -> None:
+    """A tow / docking hardpoint: a base, two cheeks, a cross pin (scale 1 = a 3 m block)."""
+    g, m = c.g, c.m
+    xf.box(g, (0, 0, base / 2), (3.4 * s, 2.6 * s, base), m("Frame"), ch=0.08 * s, kind="tow")
+    for sy in (-1, 1):
+        xf.box(g, (0, sy * 0.9 * s, base + 0.8 * s), (2.2 * s, 0.5 * s, 1.8 * s), m("Engine"), ch=0.06 * s, kind="tow")
+    xf.cyl(g, (0, -1.2 * s, base + 1.0 * s), (0, 1.2 * s, base + 1.0 * s), 0.38 * s, 0.38 * s, m("Frame"), seg=12, kind="tow")
+
+
+def sensor_cluster(c: Ctx, xf: Xf, r: float = 3.0, base: float = 1.1) -> None:
+    """A ring of sensor blisters round a big glassy eye on a low drum (unit: metres, r = the drum's radius)."""
+    g, m = c.g, c.m
+    xf.cyl(g, (0, 0, 0), (0, 0, base), r * 1.12, r, m("Frame"), seg=18, ch=0.10, kind="sensor")
+    for k in range(6):
+        a = 2 * math.pi * k / 6 + 0.3
+        rr = r * 0.66
+        xf.dome(g, (rr * math.cos(a), rr * math.sin(a), base - 0.05), r * 0.20, m("Engine"), squash=0.8, seg=10, rings=3, kind="sensor")
+    xf.dome(g, (0, 0, base - 0.05), r * 0.36, m("Glass"), squash=0.75, seg=14, rings=4, kind="sensor")

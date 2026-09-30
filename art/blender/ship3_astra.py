@@ -323,6 +323,39 @@ class Aquila:
                 hi = (x0 + 66.0, 80.0, 90.0) if sy > 0 else (x0 + 66.0, -40.0, 90.0)
                 self.g.keep_out(lo, hi)
 
+    # ---------------------------------------------------------------------------------------------------- belly
+    def belly(self) -> None:
+        """What hangs under the ship: cargo doors and sensor drums on the flat keel, tow hardpoints, point-defence mounts looking down.
+        Nothing crosses a cut plane (the pieces must stay clean) and nothing goes above the hull's bottom face."""
+        c, g, rng = self.c, self.g, self.rng
+        hull, keel = self.hull, self.keel
+        ok = lambda x, half: all(abs(x - xc) > half + 6.0 for xc in self.cuts)                      # noqa: E731
+        for zone, x, w in ((keel.zone(0), -290.0, 0.5), (keel.zone(0), -205.0, 0.5), (keel.zone(0), -40.0, 0.5), (keel.zone(0), 60.0, 0.5),
+                           (hull.zone(0), 170.0, 0.5), (hull.zone(0), 318.0, 0.5)):
+            if not ok(x, 13.0):
+                continue
+            P, R = on_zone(zone, x, w, 0.0)
+            K2.cargo_door(c, Xf(P, R, 1.0), 26.0, 14.0)
+            g.keep_out(P - np.array([16.0, 9.0, 8.0]), P + np.array([16.0, 9.0, 8.0]))
+        for zone, x, w in ((hull.zone(0), 240.0 + 0.0, 0.5), (hull.zone(0), 360.0, 0.5), (keel.zone(0), -120.0, 0.5)):
+            if not ok(x, 4.0):
+                continue
+            P, R = on_zone(zone, x, w, 0.0)
+            K2.sensor_cluster(c, Xf(P, R, 1.0), 3.4)
+            g.keep_out(P - np.array([5.0, 5.0, 5.0]), P + np.array([5.0, 5.0, 5.0]))
+        for zone, xs, ws in ((hull.zone(0), (150.0, 290.0, 345.0), (0.10, 0.90)), (keel.zone(0), (-320.0, -240.0, -160.0, -80.0, 0.0, 100.0), (0.15, 0.85))):
+            for x in xs:
+                for w in ws:
+                    if not ok(x, 4.0):
+                        continue
+                    P, R = on_zone(zone, x, w, 0.0)
+                    if rng.random() < 0.6:                                                        # most places get a lug, some a point-defence mount
+                        K2.tow_lug(c, Xf(P, R, 1.0))
+                        g.keep_out(P - 3.0, P + 3.0)
+                    else:
+                        K.pd_mount(c, Xf(P, R, 1.0))
+                        g.keep_out(P - 3.0, P + 3.0)
+
     # ----------------------------------------------------------------------------------------------- antennas
     def antennas(self) -> None:
         c = self.c
@@ -383,6 +416,7 @@ class Aquila:
         self.engines()
         if self.features:
             self.weapons()
+            self.belly()
             self.radiators()
             self.antennas()
             self.lights()
@@ -440,6 +474,7 @@ def build_aquila(c: Ctx) -> dict:
     info = {"cuts": list(a.cuts), "cut_faces": faces, "length_m": 800.0, "checks": aquila_checks(c.g),
             "cam_az": -32.0, "cam_el": 18.0, "cam_dist": 1.9, "sun_az": -50.0, "sun_el": 26.0,
             "closeups": [{"name": "flank", "target": [60.0, -50.0, 3.0], "normal": [0.0, -1.0, 0.0], "distance": 110.0, "span": 50.0},
-                         {"name": "bowdeck", "target": [285.0, 0.0, 24.0], "normal": [-0.35, -0.55, 0.75], "distance": 110.0, "span": 50.0}],
+                         {"name": "bowdeck", "target": [285.0, 0.0, 24.0], "normal": [-0.35, -0.55, 0.75], "distance": 110.0, "span": 50.0},
+                         {"name": "belly", "target": [-45.0, 0.0, -27.0], "normal": [0.2, -0.25, -0.95], "distance": 110.0, "span": 50.0, "key_el": -38.0}],
             "pieces_gap": 0.10, "pieces_az": 24.0, "pieces_dist": 2.4}
     return info
