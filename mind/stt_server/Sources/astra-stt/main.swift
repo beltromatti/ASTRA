@@ -18,6 +18,8 @@ import Foundation
 import FluidAudio
 
 setvbuf(stderr, nil, _IOLBF, 0)
+// the mind runs next to a game that keeps the performance cores busy: recognition is work the player is waiting for
+pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0)
 
 func log(_ s: String) {
     FileHandle.standardError.write(Data(("[astra-stt] " + s + "\n").utf8))

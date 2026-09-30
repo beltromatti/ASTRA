@@ -236,6 +236,15 @@ class Voice:
             left += self._estimate(l.text, l.lang) + 0.3
         return left
 
+    def game_status(self, msg: dict) -> None:
+        """The game reports what became of a line it was given: `voice_status{line,state,detail}`, state one of started,
+        stalled (the audio ran dry while the line was still being said), failed (it could not play the line at all: the
+        subtitle was shown and nobody spoke), finished. Logged and counted; a failure is a warning."""
+        state = str(msg.get("state", ""))
+        self.stats[f"game_{state}"] += 1
+        text = f"the game says line {msg.get('line')} is {state}" + (f" ({msg.get('detail')})" if msg.get("detail") else "")
+        (log.warning if state in ("stalled", "failed") else log.debug)(text)
+
     # ------------------------------------------------------------------------------------------ enqueue
     async def say(self, speaker: str, text: str, lang: str, tone: str, *, priority: Prio | str | None = None, topic: str | None = None,
                   expires_s: float | None = None, stale_if: Callable[[], bool] | None = None, answer: bool | None = None) -> int:
@@ -505,7 +514,7 @@ class Voice:
     def _start_synth(self, line: Line) -> None:
         self._shape(line)
         voice = self.who(line.speaker)[1]
-        lang = line.lang if self.tts.supported(line.lang) else "en"
+        lang = line.lang if self.tts.can_speak(line.lang) else "en"
         stream = self.tts.stream(line.text, voice, lang, tone=line.tone)
         line.stream = stream
         line.chunks, line.gen_done, line.gen_error = [], False, False

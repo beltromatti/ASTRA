@@ -15,6 +15,9 @@ import asyncio
 import json
 import logging
 import os
+import subprocess
+import sys
+import tempfile
 import threading
 import time
 from collections import OrderedDict
@@ -22,6 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 
 from .env import CACHE
 from .voice_audio import Limiter, PauseCompressor, TimeStretcher, f32_to_pcm16, frame_rms_db, from_db, integrated_lufs
@@ -36,6 +40,7 @@ SAMPLE_RATE = 24000
 SPEED = float(os.environ.get("ASTRA_TTS_SPEED", "1.12"))             # 1.0 = the model's own pace
 TARGET_LUFS = float(os.environ.get("ASTRA_TTS_LUFS", "-19"))         # every voice's integrated loudness
 CEILING_DB = -1.5                                                     # peak ceiling of the limiter
+MIN_CPS = 5.0                                                         # slowest speech there is, characters a second (a cap on runaway generation)
 MAX_PAUSE_MS = float(os.environ.get("ASTRA_TTS_PAUSE_MS", "300"))    # longest silence kept inside a line
 MAX_RESIDENT = int(os.environ.get("ASTRA_TTS_RESIDENT", "2"))        # language models kept in memory
 BOOST = os.environ.get("ASTRA_VOICE_QOS", "1") != "0"                # raise the speech threads' priority (voice_qos.py)
@@ -63,6 +68,63 @@ CALIBRATION = {
     "nl": ["Koers nul vier vijf, hoek tien, halve kracht vooruit, kapitein.", "Rood alarm, schilden naar voren, wapens gereed.",
            "Onbekend contact op vijftig kilometer, drijft koud, geen antwoord."],
 }
+
+
+# the catalogue: who is a woman, who a man (the system voices that stand in for other languages are picked by it)
+GENDER = {"alba": "f", "anna": "f", "azelma": "f", "bill_boerst": "m", "caro_davy": "f", "charles": "m", "cosette": "f",
+          "eponine": "f", "estelle": "f", "eve": "f", "fantine": "f", "george": "m", "giovanni": "m", "jane": "f",
+          "javert": "m", "jean": "m", "juergen": "m", "lola": "f", "marius": "m", "mary": "f", "michael": "m", "paul": "m",
+          "peter_yearsley": "m", "rafael": "m", "stuart_bell": "m", "vera": "f", "daan": "m"}
+VOICES = list(GENDER)
+
+# macOS's own voices, for the languages Pocket TTS does not speak (a Captain who speaks Japanese, Russian or Arabic to his crew
+# is answered in it, in a plainer voice, instead of by the English model reading foreign text): (woman, man) in order of preference
+SYSTEM_VOICES = {"ja": (("Kyoko", "O-Ren"), ("Otoya", "Hattori")), "zh": (("Tingting", "Meijia", "Sinji"), ("Sinji", "Tingting")),
+                 "ko": (("Yuna",), ("Yuna",)), "ru": (("Milena",), ("Yuri", "Milena")), "pl": (("Zosia", "Ewa"), ("Krzysztof", "Zosia")),
+                 "ar": (("Majed", "Laila"), ("Majed", "Tarik")), "hi": (("Lekha",), ("Rishi", "Lekha")), "tr": (("Yelda",), ("Cem", "Yelda")),
+                 "sv": (("Alva",), ("Oskar", "Alva")), "da": (("Sara",), ("Magnus", "Sara")), "fi": (("Satu",), ("Satu",)),
+                 "el": (("Melina",), ("Nikos", "Melina")), "cs": (("Zuzana",), ("Zuzana",)), "uk": (("Lesya",), ("Lesya",)),
+                 "ro": (("Ioana",), ("Ioana",)), "hu": (("Tünde",), ("Tünde",)), "sk": (("Laura",), ("Laura",)), "th": (("Kanya",), ("Kanya",)),
+                 "he": (("Carmit",), ("Carmit",)), "nb": (("Nora",), ("Henrik", "Nora"))}
+
+
+class SystemVoices:
+    """`say` (macOS) for the languages Pocket TTS lacks: the whole line is made at once (a fraction of a second), then mastered
+    like the others."""
+
+    def __init__(self) -> None:
+        self._have: set[str] | None = None
+
+    def installed(self) -> set[str]:
+        if self._have is None:
+            self._have = set()
+            if sys.platform == "darwin":
+                try:
+                    out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True, timeout=10).stdout
+                    for line in out.splitlines():
+                        head = line.split("#")[0].rstrip()
+                        parts = head.rsplit(None, 1)
+                        if parts:
+                            self._have.add(parts[0].strip())
+                except (OSError, subprocess.SubprocessError):
+                    pass
+        return self._have
+
+    def pick(self, lang: str, gender: str = "f") -> str | None:
+        table = SYSTEM_VOICES.get(lang)
+        if not table:
+            return None
+        have = self.installed()
+        mine, other = (table[0], table[1]) if gender == "f" else (table[1], table[0])
+        return next((v for v in (*mine, *other) if v in have), None)         # (a voice of the other sex beats none)
+
+    def render(self, text: str, voice: str, sr: int) -> np.ndarray:
+        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
+            r = subprocess.run(["say", "-v", voice, "-o", f.name, f"--data-format=LEI16@{sr}", text], capture_output=True, timeout=60)
+            if r.returncode != 0:
+                raise RuntimeError(f"say failed: {r.stderr.decode(errors='replace')[:120]}")
+            x, rate = sf.read(f.name, dtype="float32")
+        return x if x.ndim == 1 else x[:, 0]
 
 
 def _cache_has_pocket_tts() -> bool:
@@ -181,10 +243,16 @@ class TTSEngine:
         self._user = self._read_gains(_USER_GAINS)
         # (language, voice) -> the voice that speaks instead where the first is hard to understand (voice_casting.py)
         self.overrides: dict[tuple[str, str], str] = {tuple(k.split("/", 1)): v for k, v in self._read_gains(_OVERRIDES_FILE).items()}
+        self.system = SystemVoices()
 
     # ------------------------------------------------------------------------------------------ facts
     def supported(self, lang: str) -> bool:
+        """Pocket TTS speaks it."""
         return lang in MODEL_FOR_LANG
+
+    def can_speak(self, lang: str) -> bool:
+        """Some voice speaks it: Pocket TTS, or (macOS) one of the system's."""
+        return lang in MODEL_FOR_LANG or self.system.pick(lang) is not None
 
     def loaded(self, lang: str) -> bool:
         return MODEL_FOR_LANG.get(lang, "english") in self._models
@@ -296,63 +364,100 @@ class TTSEngine:
     # ------------------------------------------------------------------------------------------ generation
     def _run(self, text: str, voice: str, lang: str, speed: float, gain_db: float, limit: bool, stop: threading.Event,
              stream: SpeechStream | None):
-        """Generator of processed float32 chunks for one line: pauses shortened, sped up, gained, limited."""
-        sr = self.sample_rate
+        """Generator of processed float32 chunks for one line of Pocket TTS: pauses shortened, sped up, gained, limited."""
         with self._lock:
             model = self._model(lang)
             state = self._voice(lang, voice)
-            sr = self.sample_rate
-            pauses, stretch = PauseCompressor(sr, max_pause_ms=MAX_PAUSE_MS), TimeStretcher(sr, speed)
-            gain = from_db(gain_db)
-            lim = Limiter(sr, ceiling_db=CEILING_DB) if limit else None
-            finder = _PauseFinder(sr)
-            samples = 0
 
-            def emit(a: np.ndarray) -> np.ndarray | None:
-                nonlocal samples
+            cap = int(self.sample_rate * (len(text) / MIN_CPS + 2.5))         # no line runs longer than the slowest speech could
+
+            def chunks():
+                n = 0
+                for chunk in model.generate_audio_stream(state, text, stop=stop):
+                    a = chunk.detach().cpu().numpy().astype(np.float32).reshape(-1)
+                    n += len(a)
+                    yield a
+                    if n > cap:
+                        log.warning("TTS: %d s of audio for %d characters: stopped (the model did not find the end)", n // self.sample_rate, len(text))
+                        stop.set()
+                        return
+
+            yield from self._master(chunks(), self.sample_rate, speed, gain_db, limit, stop, stream)
+
+    def _run_system(self, text: str, voice: str, speed: float, stop: threading.Event, stream: SpeechStream | None):
+        """The same for one of macOS's voices: made whole, its loudness measured, then mastered like the others."""
+        x = self.system.render(text, voice, self.sample_rate)
+        gain_db = float(np.clip(self.target_lufs - integrated_lufs(x, self.sample_rate), -15.0, 15.0))
+        block = int(self.sample_rate * 0.08)
+        yield from self._master((x[i:i + block] for i in range(0, len(x), block)), self.sample_rate, speed, gain_db, True, stop, stream)
+
+    def _master(self, source, sr: int, speed: float, gain_db: float, limit: bool, stop: threading.Event, stream: SpeechStream | None):
+        """Pauses shortened, sped up, gained, limited: what any voice goes through on its way out."""
+        pauses, stretch = PauseCompressor(sr, max_pause_ms=MAX_PAUSE_MS), TimeStretcher(sr, speed)
+        gain = from_db(gain_db)
+        lim = Limiter(sr, ceiling_db=CEILING_DB) if limit else None
+        finder = _PauseFinder(sr)
+        samples = 0
+
+        def emit(a: np.ndarray) -> np.ndarray | None:
+            nonlocal samples
+            if len(a) == 0:
+                return None
+            a = a * gain
+            if lim is not None:
+                a = lim.process(a)
                 if len(a) == 0:
                     return None
-                a = a * gain
-                if lim is not None:
-                    a = lim.process(a)
-                    if len(a) == 0:
-                        return None
-                finder.feed(a)
-                samples += len(a)
+            finder.feed(a)
+            samples += len(a)
+            if stream is not None:
+                stream.samples = samples
+                stream.boundaries = list(finder.found)
+            return a
+
+        for a in source:
+            out = emit(stretch.process(pauses.process(a)))
+            if out is not None:
+                yield out
+            if stop.is_set():
+                return
+        if stop.is_set():
+            return
+        out = emit(stretch.process(pauses.flush()))
+        if out is not None:
+            yield out
+        out = emit(stretch.flush())
+        if out is not None:
+            yield out
+        if lim is not None:
+            last = lim.flush()
+            if len(last):
+                finder.feed(last)
+                samples += len(last)
                 if stream is not None:
                     stream.samples = samples
                     stream.boundaries = list(finder.found)
-                return a
-
-            for chunk in model.generate_audio_stream(state, text, stop=stop):
-                a = chunk.detach().cpu().numpy().astype(np.float32).reshape(-1)
-                out = emit(stretch.process(pauses.process(a)))
-                if out is not None:
-                    yield out
-                if stop.is_set():
-                    return
-            if stop.is_set():
-                return
-            out = emit(stretch.process(pauses.flush()))
-            if out is not None:
-                yield out
-            out = emit(stretch.flush())
-            if out is not None:
-                yield out
-            if lim is not None:
-                last = lim.flush()
-                if len(last):
-                    finder.feed(last)
-                    samples += len(last)
-                    if stream is not None:
-                        stream.samples = samples
-                        stream.boundaries = list(finder.found)
-                    yield last
+                yield last
 
     def stream(self, text: str, voice: str, lang: str, *, speed: float | None = None, tone: str | None = None) -> SpeechStream:
         """Start speaking `text`: an async iterator of PCM16 chunks (call it from the event loop). It runs in a worker
-        thread; `stop()` on the result ends it at once."""
-        lang = lang if self.supported(lang) else "en"
+        thread; `stop()` on the result ends it at once. A language Pocket TTS does not speak goes to a system voice when there
+        is one (macOS), else to the English model."""
+        system_voice = None
+        if not self.supported(lang):
+            system_voice = self.system.pick(lang, GENDER.get(voice, "f"))
+            if system_voice is None:
+                lang = "en"
+                letters = [c for c in text if c.isalpha()]
+                if letters and sum(1 for c in letters if ord(c) > 0x24F) / len(letters) > 0.3:
+                    # no voice for this script here: the English model would grind on the characters for many seconds and
+                    # produce noise: the line is reported unmakeable instead (the floor drops it, and says so)
+                    st = SpeechStream(self.sample_rate)
+                    st.error = RuntimeError(f"no voice for this language ({text[:20]!r}...) on this machine")
+                    st.done = True
+                    st.q.put_nowait(None)
+                    log.error("%s", st.error)
+                    return st
         voice = self.voice_for(voice, lang)
         sp = max(0.8, min(1.5, (self.speed if speed is None else speed) + TONE_SPEED.get(tone or "", 0.0)))
         st = SpeechStream(self.sample_rate)
@@ -365,9 +470,12 @@ class TTSEngine:
             if BOOST:
                 boost_thread()               # performance cores, like the game (threads made below inherit it)
             try:
-                prof = self.profile(lang, voice)
+                if system_voice is not None:
+                    source = self._run_system(text, system_voice, sp, st.stop_event, st)
+                else:
+                    source = self._run(text, voice, lang, sp, self.profile(lang, voice).gain_db, True, st.stop_event, st)
                 first = True
-                for a in self._run(text, voice, lang, sp, prof.gain_db, True, st.stop_event, st):
+                for a in source:
                     if first:
                         st.t_first = time.perf_counter() - st.t_start
                         st.sample_rate = self.sample_rate
@@ -392,3 +500,39 @@ class TTSEngine:
         g = self.profile(lang, voice).gain_db if gain_db is None else gain_db
         out = list(self._run(text, voice, lang, sp, g, limit, threading.Event(), None))
         return np.concatenate(out) if out else np.zeros(0, dtype=np.float32)
+
+
+def cache_status() -> dict[str, tuple[bool, int]]:
+    """For every language: (its model is in the Hugging Face cache, how many of the 27 catalogue voices are)."""
+    home = Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface") / "hub"
+    out: dict[str, tuple[bool, int]] = {}
+    for lang, name in MODEL_FOR_LANG.items():
+        has_model = any(home.glob(f"models--kyutai--pocket-tts/snapshots/*/languages/{name}/model.safetensors"))
+        voices = len({p.name for p in home.glob(f"models--kyutai--pocket-tts-without-voice-cloning/snapshots/*/languages/{name}/embeddings/*.safetensors")})
+        out[lang] = (has_model, voices)
+    return out
+
+
+def main() -> None:
+    """python -m astra_mind.tts [--fetch it,en,...] [--voices alba,...]: what is cached, and download the rest (about 440 MB a
+    language, plus a few hundred kilobytes per voice)."""
+    import argparse
+    ap = argparse.ArgumentParser(prog="python -m astra_mind.tts")
+    ap.add_argument("--fetch", nargs="?", const=",".join(MODEL_FOR_LANG), help="languages to download (default: all seven)")
+    ap.add_argument("--voices", default="", help="voices to prepare (default: all of the catalogue)")
+    args = ap.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if args.fetch:
+        from .voice_casting import VOICES
+        eng = TTSEngine(max_resident=1)
+        for lang in args.fetch.split(","):
+            for v in (args.voices.split(",") if args.voices else VOICES):
+                eng._voice(lang, v)
+            eng._models.clear()
+            eng._voices.clear()
+    for lang, (m, n) in cache_status().items():
+        print(f"{lang}: model {'cached' if m else 'MISSING'}, {n}/27 voices")
+
+
+if __name__ == "__main__":
+    main()

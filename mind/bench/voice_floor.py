@@ -75,6 +75,9 @@ class FakeTTS:
     def supported(self, lang: str) -> bool:
         return True
 
+    def can_speak(self, lang: str) -> bool:
+        return True
+
     def duration(self, text: str) -> float:
         return max(0.9, len(text) / self.cps)
 

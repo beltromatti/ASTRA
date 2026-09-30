@@ -98,6 +98,9 @@ def make_backend(name: str):
         return WhisperKitBackend(port=50071, extra_args=["--without-timestamps"])
     if name == "whisperkit-tuned":
         return WhisperKitBackend(port=50072)
+    if name in ("whisperkit-turbo632", "whisperkit-small216"):           # quantised variants (downloaded to BENCH_MODELS)
+        folder = {"whisperkit-turbo632": "openai_whisper-large-v3-v20240930_turbo_632MB", "whisperkit-small216": "openai_whisper-small_216MB"}[name]
+        return WhisperKitBackend(port=50073 if name.endswith("632") else 50074, model_dir=Path(os.environ.get("BENCH_MODELS", str(CACHE / "models"))) / folder)
     if name.startswith("faster-whisper"):
         model = name.split("-", 2)[2] if name.count("-") >= 2 else "small"
         return FasterWhisperBackend(model=model)

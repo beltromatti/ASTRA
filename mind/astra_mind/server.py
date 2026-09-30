@@ -769,6 +769,9 @@ class Mind:
                         await self.turns.put(("\x00event:" + text, self.lang))
                 elif kind == "command_result":
                     self.game.resolve(msg)
+                elif kind == "voice_status":
+                    # the game's own word on a line (started, stalled, failed): the only proof that a voice was really heard
+                    self.voice.game_status(msg)
                 elif kind == "player_text":
                     self.last_activity = self.captain_t = time.monotonic()
                     text = msg.get("text", "").strip()

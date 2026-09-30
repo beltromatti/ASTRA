@@ -37,6 +37,7 @@ MIN_SPEECH_S = 0.15                 # less than this is a key click or a breath,
 SURE_CONF = 0.86                    # Parakeet's own confidence above which its text is taken as it is
 PAD_MS = 220.0                      # silence kept around the speech: the ends of words are quiet
 BOOT_WAIT_S = 4.0                   # how long a first phrase waits for the fast engine before the other one answers it
+IDLE_RELEASE_S = 600.0              # the second engine is let go after this long without a phrase
 
 # things Whisper "hears" in silence or noise (its training data is full of subtitle credits)
 _HALLUCINATION = re.compile(
@@ -83,6 +84,7 @@ class Recognizer:
         self.glossary = glossary
         self.prior = prior or self._saved_language()              # the language of the last order
         self._boot: asyncio.Task | None = None
+        self._reaper: asyncio.Task | None = None
         self._up: dict[str, bool | None] = {}                     # True up, False failed, None not tried yet
         self.stats = {"n": 0, "escalated": 0, "partial_hits": 0, "empty": 0}
 
@@ -107,6 +109,18 @@ class Recognizer:
         the mind can open its door at once."""
         if self._boot is None:
             self._boot = asyncio.create_task(self._bring_up())
+            self._reaper = asyncio.create_task(self._reap_idle())
+
+    async def _reap_idle(self) -> None:
+        """The second engine (Whisper, 1.5 GB) is started when a phrase needs it and let go after ten idle minutes."""
+        while True:
+            await asyncio.sleep(60)
+            for b in self.backends[1:]:
+                last = getattr(b, "last_used", None)
+                if self._up.get(b.name) and last is not None and time.monotonic() - last > IDLE_RELEASE_S:
+                    log.info("%s idle for %.0f minutes: released", b.name, IDLE_RELEASE_S / 60)
+                    b.stop()
+                    self._up[b.name] = None
 
     async def _bring_up(self) -> None:
         for b in self.backends:

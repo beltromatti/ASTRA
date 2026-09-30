@@ -1,0 +1,198 @@
+# Protocollo della voce (versione 2) e cosa deve fare il gioco
+
+*Per chi scrive il C++ del gioco (`AstraMindSubsystem`, `AstraCrewMember`, `ASTRAPlayerController`, `AstraMusicSubsystem`). Il lato Python è già fatto (`mind/astra_mind/speech.py`, `tts.py`, `stt.py`, `audio_in.py`); qui c'è tutto ciò che il gioco deve sapere e fare, e la diagnosi dei difetti che il giocatore ha segnalato.*
+
+Il protocollo è **additivo**: un gioco che non cambia nulla continua a funzionare, e alcune cose migliorano già da sole (sezione 1). Le cose nuove il gioco le riconosce dal campo `voice: 2` nel messaggio `status` che la mente manda a ogni connessione.
+
+## 0. Sintesi: cosa è emerso e cosa serve al gioco
+
+| # | Sintomo del giocatore | Causa | Dove si corregge |
+|---|---|---|---|
+| 1 | «il testo compare e nessuno parla» | **`BeginChannelLine` non riproduce mai nulla**: `UGameplayStatics::CreateSound2D(World, nullptr, …)` restituisce `nullptr` quando il suono è nullo (sorgente del motore 5.8, `GameplayStatics.cpp:1653`: `if (!Sound || …) return nullptr;`), quindi `ChannelAudio` è sempre nullo e la funzione esce senza suonare. Tutte le voci che non sono di un ufficiale «vicino» passano di lì: comandanti nemici, ammiraglio, regista, controllo del porto, soccorritori e giudici, e ogni ufficiale a più di 25 m (il Capo macchine e la dottoressa dalla plancia, chiunque quando il Capitano è al ponte di volo) | **gioco** (sezione 4.1) |
+| 2 | «il testo lampeggia» / sparisce prima della voce | il gioco toglie il sottotitolo 2,5 s dopo `audio_end`, ma la mente mandava `audio_end` quando aveva *finito di inviare* l'audio (6–9× il tempo reale), non quando era finito di suonare: una riga di 8 s restava a schermo circa 3,8 s | **già risolto dalla mente** (l'audio ora va a passo e `audio_end` arriva alla fine dell'ascolto); regola nuova per il gioco nella sezione 3.1 |
+| 3 | «il volume cala moltissimo senza motivo» | (a) **le dieci voci uscivano con volumi diversi di 12,8 dB** (misurato: da −18,5 LUFS Nair a −31,3 LUFS Okonkwo, tutte molto basse); (b) la curva di attenuazione del gioco è lineare e ignora `dBAttenuationAtMax`; (c) il passaggio «vicino/radio» a 25 m avviene per riga, senza isteresi, e la radio ha un filtro passa-banda; (d) la musica si abbassa a pompa tra una riga e l'altra e può restare abbassata | (a) **già risolto dalla mente** (−19 LUFS ±1 per tutte le voci); (b)(c)(d) **gioco** (sezione 4.2–4.4) |
+| 4 | «a volte smettono di parlare a caso» | una nuova riga dello stesso ufficiale rimpiazzava (`SetSound`) quella in corso se la stima della mente sul suo termine era ottimista; la mente si bloccava quando cambiava lingua (21 s per caricare il modello spagnolo, «controllando gli aggiornamenti» in rete); righe di rapporto scartate in silenzio | **già risolto dalla mente** (modelli in cache senza rete, pre-caricati; ogni scarto è dichiarato); il gioco deve obbedire a `cancel` (sezione 3.2) |
+| 5 | «i miei ordini si perdono o hanno risposta molto dopo» | il riconoscimento durava 1,8–2,1 s a frase breve; la risposta aspettava in coda dietro la riga in corso (fino a 8 s) e dietro ogni turno di evento in volo | **già risolto dalla mente** (Parakeet sul Neural Engine, sessione incrementale, il tasto prende il palco) |
+
+L'unica correzione **indispensabile** al gioco è la 1 (senza, le voci esterne restano mute). Le altre si sentono già con il gioco com'è, e migliorano ancora se il gioco segue le sezioni 3 e 4.
+
+## 1. Cosa cambia per il gioco così com'è (senza toccare il C++)
+
+- `line` arriva **quando la voce parte** (prima arrivava all'accodamento): il gioco non lo mostra da nessuna parte (lo conserva e mostra il sottotitolo a `audio_begin`), quindi non c'è più un sottotitolo per una riga che poi viene scartata.
+- L'audio è **a passo**: mai più di 0,45 s in anticipo sul tempo reale (prima arrivava tutto in un secondo). La coda procedurale del gioco resta corta, e `audio_end` arriva alla fine dell'ascolto.
+- Una riga che la sintesi non riesce a produrre **non genera più sottotitolo** (prima: `audio_begin` + `audio_end` senza audio).
+- Il volume di tutte le voci è lo stesso (−19 LUFS integrati, picchi sotto −1,5 dBFS), le pause tra frasi sono accorciate (mai più di 0,3 s), e il parlato è più veloce del 12 % senza cambiare il timbro.
+- Un messaggio che il gioco non conosce (`cancel`, `line_dropped`, `floor`) viene ignorato dal suo `OnText` (cade fuori dalla catena di `if`).
+
+## 2. Messaggi
+
+Tutti JSON in frame di testo, tranne l'audio (frame binario). Formato dell'audio invariato: `uint32 little-endian` con l'id della riga, poi PCM16 mono alla frequenza `rate`.
+
+### 2.1 Mente → gioco
+
+**`status`** (a ogni connessione): `{"type":"status","crew":{id: titolo,…},"rate":24000,"voice":2}`. `voice: 2` = questo protocollo. (Come prima può arrivare anche `{"type":"status","mic":"unavailable"}`.)
+
+**`transcript`** (invariato): `{"type":"transcript","text":"…","lang":"it"}`. Arriva quando il testo del Capitano è pronto (≤ 0,4 s dal rilascio del tasto); `lang` è la lingua in cui parlava (l'equipaggio risponderà in quella). Va mostrato in cima come prima.
+
+**`line`** — *una riga sta per essere ascoltata*. Il gioco la **conserva**, non la mostra ancora.
+
+| campo | tipo | significato |
+|---|---|---|
+| `id` | int | identificatore della riga (unico nella sessione, cresce) |
+| `speaker` | string | id di chi parla: stazione di plancia (`xo`, `helm`…), `chief`, `doctor`, `patientN`, `messN`, `mess_cook`, chiave di un personaggio (`solm`, `admiral`, `director`, `port_control`, `finder`, `captor`…) |
+| `name` | string | nome da mostrare (il gioco ne prende il cognome) |
+| `text` | string | il testo così com'è detto (dopo eventuale unione o accorciamento) |
+| `lang` | string | lingua del testo |
+| `tone` | string | `calm`, `focused`, `measured`, `cold`, `warm`, `furious`… (colora la resa; per ora solo la velocità) |
+| `channel` | bool | `true` se non è un ufficiale a bordo (radio, nemico, ammiraglio…) |
+| `priority` | string | `answer` · `urgent` · `normal` · `low` |
+| `answer` | bool | è la risposta al Capitano |
+| `topic` | string\|null | argomento dichiarato dal produttore |
+| `est_s` | float | durata prevista dell'audio, in secondi |
+| `hold_s` | float | quanto deve restare a schermo il sottotitolo (regola in 3.1) |
+| `rate` | int | frequenza del PCM che segue |
+
+**`audio_begin`**: `{"type":"audio_begin","line":12,"speaker":"helm","rate":24000,"est_s":3.4,"hold_s":4.5}`. Segue `line` di pochi millisecondi. **Qui** il gioco mostra il sottotitolo e avvia la voce (`BeginLine` / `BeginChannelLine`).
+
+**audio**: frame binari `uint32 id` + PCM16, blocchi da ~80 ms, **a passo** (il primo mezzo secondo subito, poi al ritmo di ascolto).
+
+**`audio_end`**: `{"type":"audio_end","line":12,"dur_s":3.31,"reason":"done"}`. È inviato **alla fine prevista dell'ascolto** (non quando finisce l'invio). `reason`: `done` (finita) o `cut` (interrotta: è preceduta da un `cancel`).
+
+**`cancel`** — *ferma questa riga adesso*: `{"type":"cancel","line":12,"reason":"captain","fade_ms":140}`. `reason` ∈ `captain` (il Capitano ha preso la parola), `answer_first` (arriva la risposta al Capitano), `urgent_first` (arriva un avviso di pericolo), `new_session`, `no_listener`, `cleared`. `fade_ms`: 40 se la mente ha trovato una pausa entro mezzo secondo (si ferma in una pausa), 140 se ferma a metà parola.
+
+**`line_dropped`** — *informativo*: una riga accodata che non verrà mai detta: `{"type":"line_dropped","id":13,"speaker":"sensors","text":"…","reason":"expired"}`. `reason` ∈ `captain_spoke` (chiacchiera scartata quando il Capitano parla), `superseded` (una riga più recente sullo stesso argomento), `expired`, `stale`, `overflow`, `synth_failed`, `synth_timeout`, `no_listener`, `empty`, `merged_into_<id>` (unita a un'altra riga: il suo testo è dentro quella), `new_session`, `cleared`. Il gioco non deve fare nulla (non ne ha mai visto il `line`); può scriverlo nel log.
+
+**`floor`** — chi ha la parola: `{"type":"floor","state":"idle|crew|captain","line":12|null}`. `captain` da quando il Capitano preme il tasto (o manda un ordine scritto) finché la sua risposta non comincia; `crew` mentre una riga è in ascolto; `idle` altrimenti. Serve ad abbassare la musica (sezione 4.4) senza indovinare dal contenuto della coda audio.
+
+### 2.2 Gioco → mente
+
+- `ptt{down:bool}`, `player_text{text,lang?}`: **invariati** e sono i due modi in cui il Capitano prende la parola. La mente li tratta alla lettera: alla pressione del tasto (o all'arrivo del testo) chi parla si ferma entro mezzo secondo; il gioco **non** deve fare nulla per l'interruzione.
+- **`voice_status`** (nuovo, *fortemente consigliato*): `{"type":"voice_status","line":12,"state":"started|stalled|failed|finished","detail":"…"}`. È l'unica prova che una voce sia stata davvero ascoltata: la mente lo registra (i `failed` e gli `stalled` sono avvisi nel log). Oggi il gioco non lo dice mai: per questo «il testo compare e nessuno parla» è rimasto invisibile per tutta la partita.
+  - `started`: la componente audio ha cominciato a riprodurre la riga;
+  - `stalled`: la coda procedurale è rimasta vuota più di 250 ms mentre la riga non era finita;
+  - `failed`: non è stato possibile riprodurla (nessuna componente, nessun attore, `Play()` fallito);
+  - `finished`: la coda si è svuotata dopo `audio_end`.
+
+## 3. Regole per il gioco
+
+### 3.1 Sottotitoli
+
+1. Si mostrano a **`audio_begin`**, con il testo di `line`. Mai prima, mai al posto della voce.
+2. Restano fino a **`max(t_audio_begin + hold_s, t_audio_end + 1,0 s)`**, con dissolvenza di 0,35 s. `hold_s = min(12, max(est_s + 1,0, 1,4 + caratteri / 17))`: dura quanto l'audio più un secondo, oppure quanto serve a leggerlo (17 caratteri al secondo più 1,4 s di attacco), il maggiore, al massimo 12 s. (Oggi: `EndAge + 2,5 s`, e `4 + 0,07 × caratteri` se non arriva `audio_end`.)
+3. A **`cancel`** il sottotitolo di quella riga sfuma in 0,35 s (il testo non viene più detto). Una riga interrotta e poi ripetuta arriva con un id nuovo.
+4. Al massimo tre righe, la più vecchia esce per prima (come ora).
+5. Le parole del Capitano (`transcript`, ordine scritto) restano com'è.
+
+### 3.2 Audio di una riga
+
+1. A `audio_begin`: nuova `USoundWaveProcedural` (`SetSampleRate(rate)`, mono, `bLooping=false`), componente audio in `Play()`.
+2. A ogni frame binario: `QueueAudio`. La coda non supera mai ~0,5 s (la mente va a passo).
+3. **A `cancel`**: `Voice->FadeOut(fade_ms/1000, 0.f)`, poi `CurrentWave->ResetAudio()` e stop della componente; se la mente manda anche `audio_end{reason:"cut"}` va ignorato. Con un gioco che ignora `cancel` la voce finisce comunque entro 0,45 s (è quanto audio c'è in coda).
+4. Non chiamare `SetSound` su una componente che sta ancora suonando la riga precedente: con il protocollo 2 due righe dello stesso ufficiale non si sovrappongono (l'audio di una finisce prima che parta l'altra), ma un `cancel` mancato la troncherebbe.
+5. Mandare `voice_status` (sezione 2.2). In particolare **`failed` quando `Play()` non parte o il componente manca**.
+
+### 3.3 Il Capitano parla (per l'interfaccia)
+
+- Tasto giù: il gioco può abbassare del tutto (−12 dB, 0,15 s) il proprio audio finché il tasto è premuto e riportarlo su al rilascio (0,5 s): riduce quanto del gioco rientra nel microfono. Facoltativo; la mente comunque ferma le voci.
+- `floor{state:"captain"}` è il momento giusto per un piccolo indicatore («ti sta ascoltando»).
+
+## 4. Diagnosi e correzioni consigliate (C++)
+
+### 4.1 Voci esterne e lontane: mute (causa certa)
+
+`AstraMindSubsystem.cpp`, `BeginChannelLine`:
+
+```cpp
+ChannelAudio = UGameplayStatics::CreateSound2D(World, nullptr, 1.f, 1.f, 0.f, nullptr, true, false);   // nullptr: il motore ritorna nullptr
+…
+if (!ChannelAudio) { return; }        // ← esce sempre; ChannelLine non viene nemmeno impostato: anche l'audio in arrivo è scartato
+```
+
+`UGameplayStatics::CreateSound2D` comincia con `if (!Sound || !GEngine || !GEngine->UseSound()) return nullptr;` (5.8, `Private/GameplayStatics.cpp:1653`). Correzione: creare prima la wave e passarla.
+
+```cpp
+ChannelWave = NewObject<USoundWaveProcedural>(this);       // (vedi 3.2: una wave nuova per riga)
+… SetSampleRate, NumChannels, SoundGroup …
+if (!ChannelAudio || !IsValid(ChannelAudio))
+{
+    ChannelAudio = UGameplayStatics::CreateSound2D(World, ChannelWave, 1.f, 1.f, 0.f, nullptr, true, false);
+    if (ChannelAudio) { /* filtri passa-banda, come ora */ }
+}
+else { ChannelAudio->SetSound(ChannelWave); }
+if (!ChannelAudio) { SendVoiceStatus(LineId, "failed", "no audio component"); return; }
+ChannelLine = LineId;
+ChannelAudio->Play();
+```
+
+Chi passa da questo percorso (tutto silenzioso oggi): `solm`, `kade`, `vael`, `quill`, `hale` e ogni comandante nemico registrato, `admiral`, `director`, `port_control`, `finder`, `captor`, `board*`, e **ogni ufficiale con attore a più di 25 m** (il Capo `chief` in sala macchine e la dottoressa `doctor` in infermeria quando il Capitano è in plancia; tutti quando è al ponte di volo o su New Ravenna).
+
+Il volume della radio: i filtri (passa-alto 320 Hz, passa-basso 3,6 kHz) tolgono in media 3,5 dB di sonorità sulle voci della mente (da 1,5 a 7 dB secondo la voce; misurato con filtri a 1, 2 e 4 poli, stesso risultato); compensarli con `SetVolumeMultiplier(1.5)` così la radio non suona più piano delle voci a bordo.
+
+### 4.2 Attenuazione delle voci a bordo
+
+`AstraCrewMember.cpp` (creazione dell'attenuazione, righe ~52–59) imposta `dBAttenuationAtMax = -18` ma lascia `DistanceAlgorithm` al valore di default (**Linear**, costruttore di `FBaseAttenuationSettings`), e con Linear `dBAttenuationAtMax` è ignorato (vale solo per `NaturalSound`, `Attenuation.h`). Risultato: piena fino a 3 m, poi ampiezza lineare fino a zero a 28 m: −3 dB a 10 m, −6 dB a 15 m, −10 dB a 20 m, −16 dB a 24 m. Un Capitano che cammina per la plancia sente le voci salire e scendere a ogni passo.
+
+Impostazione consigliata (un ufficiale nella stessa stanza si sente sempre bene; il volume cala dolcemente e si ferma):
+
+```cpp
+Att->Attenuation.DistanceAlgorithm   = EAttenuationDistanceModel::NaturalSound;
+Att->Attenuation.AttenuationShapeExtents = FVector(800.f);          // 8 m a volume pieno
+Att->Attenuation.FalloffDistance     = 2200.f;
+Att->Attenuation.dBAttenuationAtMax  = -8.f;                        // e da lì non scende più:
+Att->Attenuation.FalloffMode         = ENaturalSoundFalloffMode::Hold;
+```
+
+### 4.3 «Vicino» o «radio»: una decisione per ufficiale, con isteresi
+
+Oggi (`audio_begin`): `bNear = Dist(camera, attore) < 2500` valutato **a ogni riga**. Un Capitano fermo a 25 m sente lo stesso ufficiale ora piano nella stanza (−16 dB), ora in radio a volume pieno, riga per riga. Consiglio: stato per ufficiale (`bOnRadio`), si passa alla radio oltre **28 m** e si torna in stanza sotto **22 m**; mai a metà riga; la radio è sempre udibile (4.1).
+
+### 4.4 Musica: abbassarla dal protocollo, non da `IsSpeaking()`
+
+`AstraMusicSubsystem::Tick` abbassa a 0,55 quando un qualsiasi `AAstraCrewMember::IsSpeaking()` (`AvailableByteCount > 0`), risale con costante 1,2/s: tra due righe (pausa di 0,3 s) la musica risale un poco e ricade (pompa), e se una wave conserva byte non consumati (componente fermata, culling) `IsSpeaking()` resta vero e la musica **resta abbassata** finché quell'ufficiale non parla di nuovo. Le voci esterne (canale) non abbassano affatto la musica. Consigliato: duck = 0,55 quando `floor.state != "idle"` (ricevuto dalla mente), attacco 0,15 s, tenuta 0,5 s dopo il ritorno a `idle`, rilascio 0,8 s; azzerato su `cancel` e sulla chiusura della connessione.
+
+### 4.5 Se dopo queste correzioni «nessuno parla» capita ancora
+
+Ora `voice_status` lo dice: nel log della mente (`~/Library/Application Support/Epic/ASTRA/Saved/Logs/astra-mind.log`) compare `the game says line N is failed/stalled`. Le ipotesi da verificare, non provate: (a) troppi suoni attivi e la componente della voce esclusa dal motore (`AudioMaxChannels` di default 32; `stat sounds`); (b) `Play()` su una componente non attiva.
+
+## 5. Il palco del parlato lato mente (per chi scrive produttori Python)
+
+`voice.say(speaker, text, lang, tone, *, priority=None, topic=None, expires_s=None, stale_if=None, answer=None)` — l'unica chiamata necessaria (le firme e gli attributi che il server usava prima continuano a funzionare: `busy_s()`, `busy_until`, `low_priority`, `drop_low_priority()`, `q.join()`, `first_audio`, `enqueued`).
+
+| Priorità | Chi | Scadenza di default | Regola |
+|---|---|---|---|
+| `Prio.ANSWER` | risposta al Capitano (dentro `captain_turn_begin/end`, o `answer=True`) | 90 s | passa prima di tutto; ferma la riga in corso al prossimo respiro (≤ 0,5 s) |
+| `Prio.URGENT` | pericolo ora (`voice.urgent = True` o `priority=`) | 25 s | ferma una riga normale con più di 1,5 s davanti |
+| `Prio.NORMAL` | rapporti, eventi, comunicazioni | 60 s | in coda, nell'ordine; con oltre 14 s di parlato in attesa le righe lunghe (> 170 caratteri) si accorciano alla prima frase |
+| `Prio.LOW` | chiacchiere (`voice.chatter = True`), avventori della mensa e pazienti | 15 s | scartate quando il Capitano prende la parola |
+
+- **Il Capitano ha il palco.** `voice.captain_begin()` (tasto giù o ordine scritto): la riga in corso si ferma alla prossima pausa entro 0,5 s (`fade_ms` 40) o sfuma a metà parola (140 ms); nessuno comincia finché la sua risposta non parte (al massimo 8 s dopo il rilascio; `captain_end(False)` se non ha detto nulla lo rilascia subito); le righe `LOW` in coda sono scartate (`captain_spoke`); quelle `NORMAL` e `URGENT` aspettano e, finita la risposta, parlano nell'ordine in cui erano. Una riga interrotta prima della metà viene ripetuta intera (una sola volta); dopo la metà si considera detta.
+- **Argomento**: una riga con `topic` sostituisce una più vecchia non ancora detta con lo stesso `topic` (`superseded`), a meno che la vecchia sia più importante.
+- **Scadenza** e **`stale_if`**: un rapporto che non ha parlato entro la scadenza (o per cui `stale_if()` risponde `True` al momento di partire) è scartato e dichiarato.
+- **Unione**: due frasi dello stesso ufficiale, stessa priorità, accodate a meno di 4 s l'una dall'altra e non ancora in sintesi, diventano una sola riga (un respiro, un sottotitolo).
+- **Turni**: una voce sola alla volta, con un respiro di 0,34 s tra voci diverse, 0,18 s tra due frasi della stessa, 0,1 s prima di una risposta al Capitano.
+- **Mai in silenzio**: ogni scarto va nel log, nei contatori (`voice.stats`) e al gioco come `line_dropped`.
+
+Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `ptt`/`player_text` → `captain_begin/end/input`; `turn_worker` → `captain_turn_begin/end` attorno al turno del Capitano e `voice.preemptible()` attorno al turno di un rapporto (lo interrompe se il Capitano prende la parola e lo rimette in coda); `quiet_moments` → `voice.chatter`.
+
+## 6. Regolazioni (variabili d'ambiente)
+
+| Variabile | Predefinito | Cosa fa |
+|---|---|---|
+| `ASTRA_TTS_SPEED` | 1.12 | velocità del parlato (1.0 = quella del modello; ±0,06 secondo il tono) |
+| `ASTRA_TTS_LUFS` | −19 | volume di ogni voce |
+| `ASTRA_TTS_PAUSE_MS` | 300 | pausa più lunga tenuta dentro una riga |
+| `ASTRA_TTS_RESIDENT` | 2 | modelli di lingua tenuti in memoria (~430 MB l'uno) |
+| `ASTRA_STT` | `parakeet` | motore preferito: `parakeet`, `whisperkit`, `faster-whisper` |
+| `ASTRA_STT_MODEL` | `ultra` | modello Parakeet: `ultra`, `v3`, `redux` |
+| `ASTRA_STT_BIN` | — | percorso dell'helper `astra-stt` |
+| `ASTRA_VOICE_MODELS` | `<home>/voice/models` | dove cercare i modelli di Whisper/Parakeet |
+| `ASTRA_MIC` | `auto` | `always` (microfono sempre aperto), `ptt` (aperto solo a tasto premuto), `auto` |
+| `ASTRA_VOICE_QOS` | 1 | priorità dei thread della voce (macOS) |
+
+## 7. Come si prova (dalla cartella `mind/`)
+
+```
+uv run python -m bench.voice_units            # 56 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti)
+uv run python -m bench.voice_floor -v         # 18 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
+uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)
+```

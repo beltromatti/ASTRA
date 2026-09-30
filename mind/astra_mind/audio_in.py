@@ -5,8 +5,10 @@ The game sends ptt down/up; the audio is recorded here, next to the speech recog
 - Pre-roll: once the microphone has been opened it stays open for a while and the last 300 ms are kept in a ring, so the
   first syllable is never lost to the moment the key goes down (opening a Core Audio input takes 30-150 ms; people begin to
   speak as they press). Only those 300 ms exist in memory, and nothing is ever written to disk. After `IDLE_CLOSE_S`
-  without a press the stream is closed again (the orange indicator goes off). A Bluetooth headset is opened per press only:
-  an open input switches the whole headset to its telephone mode (mono, low quality) for as long as it is open.
+  without a press the stream is closed again (the orange indicator goes off). A Bluetooth headset is a different matter:
+  an open input switches the whole headset to its telephone mode (mono, low quality, and the game's sound drops with it)
+  every time it is opened. When the default input is such a headset the computer's own microphone is opened instead (only
+  this stream, no system setting is touched); if there is none, the headset is opened per press and closed at release.
 - Post-roll: a press ends slightly before the last sound has left the audio buffers; `finish()` waits 100 ms for them.
 - Trimming: the silence before and after the speech is cut (voice_audio.trim_speech) and a recording with no speech in it
   comes back empty, so the recogniser never sees a key click or a breath.
@@ -71,6 +73,7 @@ class PushToTalk:
         self._last_press = 0.0
         self._closer: threading.Timer | None = None
         self._first_block = threading.Event()
+        self._device_name = ""
         self.overflows = 0
         self.last: Recording | None = None
         self.mode = os.environ.get("ASTRA_MIC", "auto").lower()           # auto | always | ptt
@@ -84,13 +87,31 @@ class PushToTalk:
         except Exception:  # noqa: BLE001
             return ""
 
+    @staticmethod
+    def pick_device() -> tuple[int | None, str]:
+        """(device index or None for the system's default, its name). When the default input is a Bluetooth headset the
+        computer's own microphone is used instead: an open input switches the whole headset to its telephone mode (mono,
+        low quality, and the game's sound drops with it) every time it is opened, while the built-in one costs nothing.
+        The system's settings are not touched: only this stream is opened on the other device."""
+        try:
+            import sounddevice as sd
+            default = sd.query_devices(kind="input")
+            name = str(default["name"])
+            if any(k in name.lower() for k in _BLUETOOTH):
+                for i, d in enumerate(sd.query_devices()):
+                    dn = str(d["name"]).lower()
+                    if d["max_input_channels"] > 0 and any(k in dn for k in ("macbook", "built-in", "builtin", "internal", "imac", "mac mini", "mac studio")):
+                        return i, str(d["name"])
+            return None, name
+        except Exception:  # noqa: BLE001
+            return None, ""
+
     def _keep_open(self) -> bool:
         if self.mode == "ptt":
             return False
         if self.mode == "always":
             return True
-        name = self.input_name().lower()
-        return not any(k in name for k in _BLUETOOTH)
+        return not any(k in self._device_name.lower() for k in _BLUETOOTH)
 
     def _open(self) -> bool:
         if self._stream is not None:
@@ -101,10 +122,13 @@ class PushToTalk:
             log.error("sounddevice unavailable: %s", exc)
             return False
         self._first_block.clear()
+        device, self._device_name = self.pick_device()
         try:
+            kw = {"device": device} if device is not None else {}
             self._stream = sd.RawInputStream(samplerate=self.rate, channels=1, dtype="int16", blocksize=BLOCK, latency="low",
-                                             callback=self._callback)
+                                             callback=self._callback, **kw)
             self._stream.start()
+            log.info("microphone: %s", self._device_name)
             return True
         except Exception as exc:  # noqa: BLE001 - typically: no microphone permission yet
             log.error("microphone unavailable: %s", exc)

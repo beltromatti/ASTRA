@@ -79,10 +79,9 @@ class SttBackend:
 
 # ================================================================================================ Parakeet (ANE)
 def find_parakeet_binary() -> Path | None:
-    """The astra-stt helper: ASTRA_STT_BIN, the app's bin folder, or the SwiftPM build next to the sources."""
+    """The astra-stt helper: ASTRA_STT_BIN, the app's bin folders, or what mind/stt_server/build.sh made next to the sources."""
     for c in (os.environ.get("ASTRA_STT_BIN"), HOME / "bin" / "astra-stt", MIND_DIR / "bin" / "astra-stt",
-              MIND_DIR / "stt_server" / ".build" / "release" / "astra-stt",
-              Path(__file__).resolve().parents[2] / "mind" / "stt_server" / ".build" / "release" / "astra-stt"):
+              MIND_DIR / "stt_server" / "bin" / "astra-stt", MIND_DIR / "stt_server" / ".build" / "release" / "astra-stt"):
         if c and Path(c).is_file() and os.access(c, os.X_OK):
             return Path(c)
     return None
@@ -210,10 +209,20 @@ class ParakeetBackend(SttBackend):
                 proc.terminate()
             except ProcessLookupError:
                 pass
+        self._dying = proc
         if self._reader:
             self._reader.cancel()
             self._reader = None
         self._ready.clear()
+
+    async def close(self) -> None:
+        self.stop()
+        proc, self._dying = getattr(self, "_dying", None), None
+        if proc is not None:
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=3.0)
+            except (asyncio.TimeoutError, ProcessLookupError):
+                pass
 
 
 # ================================================================================================ WhisperKit (ANE)
