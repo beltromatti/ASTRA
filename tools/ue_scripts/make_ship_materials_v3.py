@@ -298,7 +298,7 @@ def build_cut():
     uvt = binop(m, unreal.MaterialExpressionMultiply, uv0, "", scalar(m, "WearScale", 0.9, -2000, 100, "UV"), "", -1800, 40)
     wear = texparam(m, "ShipWear", tex("T_ShipWear_M"), ST.SAMPLERTYPE_MASKS, -1600, 0, "Wear")
     link(uvt, "", wear, "UVs")
-    tint = vector(m, "Tint", (0.05, 0.045, 0.04, 1), -1600, 300, "Burnt")
+    tint = vector(m, "Tint", (0.085, 0.078, 0.07, 1), -1600, 300, "Burnt")
     ember = vector(m, "EmberColor", (1.0, 0.33, 0.07, 1), -1600, 380, "Burnt")
     heat = scalar(m, "Heat", 0.0, -1600, 460, "Burnt")
     ember_i = scalar(m, "EmberIntensity", 26.0, -1600, 520, "Burnt")
@@ -417,7 +417,7 @@ def instances(hull, light, cut, glass):
         rcol, rem, rint = RADIATOR[f]
         # the radiators keep the parameter the game drives: Intensity (the Aquila's heat glow, TickHeat)
         mi(f"MI_HULL_{f}_Radiator", light, scalars=dict(Intensity=rint, Mode=3.0, Roughness=0.55, Metallic=0.4), vectors={"BaseColor": lin(rcol), "EmissiveColor": rem})
-        mi(f"MI_HULL_{f}_Cut", cut, scalars=dict(Heat=0.0), vectors={"Tint": [0.05, 0.045, 0.04]})
+        mi(f"MI_HULL_{f}_Cut", cut, scalars=dict(Heat=0.0), vectors={"Tint": [0.085, 0.078, 0.07]})
         mi(f"MI_HULL_{f}_Glass", glass)
         out += [f"MI_HULL_{f}_{n}" for n in ("Lights", "Glow", "Nav", "Radiator", "Cut", "Glass")]
     return out

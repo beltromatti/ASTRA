@@ -90,7 +90,7 @@ def render_previews(name: str, short_name: str, spec: dict, res: dict, obj, args
     if "pieces" in args["views"]:
         allp = np.vstack([verts_world(o) for o in objs])
         d = view_dir(info.get("pieces_az", -62.0), info.get("pieces_el", 24.0))
-        shot("cam", allp, d, os.path.join(outd, f"{sn}_pieces.jpg"), (w, h), lens=info.get("lens", 60.0), side=side, margin=0.05)
+        shot("cam", allp, d, os.path.join(outd, f"{sn}_pieces.jpg"), (w, h), lens=info.get("lens", 60.0), side=side, margin=0.05, key_az=48.0, key_el=30.0)
     if "cutface" in args["views"] and info.get("cut_faces"):
         k = 1
         fc = [f for f in info["cut_faces"] if f["section"] == k and f["normal"][0] > 0]

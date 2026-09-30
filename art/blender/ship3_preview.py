@@ -338,7 +338,7 @@ def cut_material(name: str, heat: float = 0.35) -> bpy.types.Material:
     bsdf = mt.n("ShaderNodeBsdfPrincipled", 1500, 0)
     k = mt.mul(mt.mul(mt.add(mt.mul(wb, 1.1), 0.55), mt.sub(1.0, mt.mul(wa, 0.4))), mt.add(mt.mul((s1, "X"), 0.6), 1.0))
     k = mt.mul(k, mt.add(mt.mul((s2, "X"), 1.6), 0.4))                                    # each part of the cap has its own tone
-    col = mt.scale_c((0.05, 0.045, 0.04), k)
+    col = mt.scale_c((0.085, 0.078, 0.07), k)
     mt.l(col[0], col[1], bsdf, "Base Color")
     bsdf.inputs["Roughness"].default_value = 0.85
     bsdf.inputs["Metallic"].default_value = 0.25
