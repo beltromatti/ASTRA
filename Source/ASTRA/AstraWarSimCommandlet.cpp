@@ -37,6 +37,7 @@ namespace
 		FParse::Value(*Params, TEXT("exec="), Exec, false);
 		FParse::Value(*Params, TEXT("at="), At, false);            // "200=astra.cmd ...|300=...": commands at battle times (a mind's orders, scripted)
 		FParse::Value(*Params, TEXT("scenario="), Scenario);
+		const bool bViews = FParse::Param(*Params, TEXT("views"));
 		Step = FMath::Clamp(Step, 0.02f, 0.1f);
 		FMath::RandInit(Seed);           // the same seed, the same battle: comparisons change one thing at a time
 		FMath::SRandInit(Seed);
@@ -125,6 +126,14 @@ namespace
 				if (St)
 				{
 					F->SetObjectField(TEXT("stations"), St->StationsJson());
+				}
+				if (bViews)
+				{
+					// what each side's mind is given of its groups (docs/GUERRA.md): to read the contract, and to measure its size
+					TSharedRef<FJsonObject> V = MakeShared<FJsonObject>();
+					V->SetObjectField(TEXT("astra"), B->SideGroupsJson(0));
+					V->SetObjectField(TEXT("mandate"), B->SideGroupsJson(1));
+					F->SetObjectField(TEXT("views"), V);
 				}
 				Frames.Add(MakeShared<FJsonValueObject>(F));
 			}

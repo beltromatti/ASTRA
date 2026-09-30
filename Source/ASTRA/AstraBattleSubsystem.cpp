@@ -2576,6 +2576,10 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 	S.bAlive = false;
 	S.Mode = EAstraShipMode::Dead;
 	S.DeathHow = How;
+	if (!S.bCraft && !S.bGhost && !S.bPlayer && !S.bDisabled)                 // (a hulk shot to pieces was reported when it went dark)
+	{
+		NoteGroupLoss(S, How == EAstraFate::ReactorBreach ? TEXT("the reactor went") : (How == EAstraFate::Breakup ? TEXT("the hull broke apart") : TEXT("destroyed")));
+	}
 	const float Blast = How == EAstraFate::ReactorBreach ? 1.8f : 1.f;    // a reactor going takes the whole ship in a bigger ball of fire
 	AddFlash(S.Pos, S.Radius * 1.4f * Blast, 2.6f, FLinearColor(1.f, 0.5f, 0.2f), 160.f);    // fireball: the gas cloud expands and thins
 	AddFlash(S.Pos, S.Radius * 0.9f * Blast, 1.1f, FLinearColor(1.f, 0.92f, 0.75f), 600.f);  // the flash of the reactor letting go
@@ -3242,6 +3246,13 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 			Gs.Add(MakeShared<FJsonValueObject>(J));
 		}
 		V->SetArrayField(TEXT("your_groups"), Gs);
+	}
+	{
+		// (docs/GUERRA.md, "Il contratto dei comandanti": the groups with their members, the enemy's groups as seen, what happened to them)
+		const TSharedRef<FJsonObject> Sg = SideGroupsJson(1);
+		V->SetArrayField(TEXT("your_groups"), Sg->GetArrayField(TEXT("your_groups")));
+		V->SetArrayField(TEXT("enemy_groups"), Sg->GetArrayField(TEXT("enemy_groups")));
+		V->SetArrayField(TEXT("group_events"), Sg->GetArrayField(TEXT("group_events")));
 	}
 	return V;
 }

@@ -779,6 +779,15 @@ private:
 	float Readiness(const FAstraBattleShip& S) const;
 	bool CanEngage(const FAstraBattleShip& S, const FAstraBattleShip& O) const;
 	FAstraBattleGroup* FindGroup(int32 Id);
+	const FAstraBattleGroup* FindGroup(int32 Id) const { return const_cast<UAstraBattleSubsystem*>(this)->FindGroup(Id); }
+	// the commanders' tools (AstraWarOrders.cpp)
+	TArray<FAstraGroupEvent> GroupEvents;
+	int32 NextGroupEventSerial = 1;
+	void NoteGroupEvent(int32 SideIdx, const FString& Text);
+	void SetGroupState(FAstraBattleGroup& G, EAstraGroupState New, const FString& Why);
+	void NoteGroupLoss(const FAstraBattleShip& S, const TCHAR* How);
+	FAstraBattleGroup* ResolveGroup(const FString& Key, int32 SideIdx, FString* OutWhy = nullptr);
+	FString DescribeGroupOrder(const FAstraBattleGroup& G, const FAstraBattleShip* Target, const FAstraBattleGroup* Other) const;
 	FAstraBattleShip* ChooseTarget(FAstraBattleShip& S, FAstraBattleGroup* G);
 	FVector ChooseFacing(const FAstraBattleShip& S, const FVector& ToTarget, double Dist) const;
 	FVector AvoidanceVel(const FAstraBattleShip& S) const;
@@ -798,6 +807,12 @@ public:
 	bool SetGroupOrder(int32 GroupId, const FString& Order, const FString& ShipContact, int32 OtherGroup, float Duration, const FString& By, FString& OutDetail);
 	/** The battle groups as the bench reads them (state, order, formation, focus, range, strengths). */
 	TSharedRef<FJsonObject> GroupsJson() const;
+	/** The `group_order` command of the minds: {side, group, order, target, for_s, by, formation}. The detail says, in plain
+	 *  English, what the group will do. Only the callers a side allows may order its groups (docs/GUERRA.md). */
+	bool GroupOrderCommand(const TSharedPtr<FJsonObject>& Args, FString& OutDetail);
+	/** One side's groups as its mind may read them, the fog of war applied: { your_groups, enemy_groups, group_events }.
+	 *  Side 0 is the snapshot's `_astra_groups`, side 1 is merged into `_mandate`. */
+	TSharedRef<FJsonObject> SideGroupsJson(int32 SideIdx) const;
 private:
 
 	// --- bench scenarios (AstraWarScenario.cpp)

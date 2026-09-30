@@ -115,6 +115,7 @@ int32 UAstraBattleSubsystem::NoteGroupSpawn(EAstraSide Side, const FString& Name
  *  found one; groups with nobody left are dropped. */
 void UAstraBattleSubsystem::AssignGroups()
 {
+	TMap<int32, TArray<FString>> Arrivals;                              // group id -> the ships that joined it in this pass (reinforcements)
 	for (FAstraBattleShip& S : Ships)
 	{
 		if (!S.bAlive || S.bCraft || S.bGhost || S.bDerelict || S.bDisabled || S.bPlayer || !S.Dmg.bModel || AstraSideIdx(S.Side) < 0 || S.Mode == EAstraShipMode::Dead)
@@ -146,6 +147,17 @@ void UAstraBattleSubsystem::AssignGroups()
 			}
 		}
 		JoinGroup(S, Gid);
+		if (Time > 5.f && !bSandbox)
+		{
+			Arrivals.FindOrAdd(Gid).Add(FString::Printf(TEXT("%s (%s)"), *S.ContactId, *S.ClassKey.ToString()));
+		}
+	}
+	for (const TPair<int32, TArray<FString>>& A : Arrivals)
+	{
+		if (const FAstraBattleGroup* G = FindGroup(A.Key))
+		{
+			NoteGroupEvent(AstraSideIdx(G->Side), FString::Printf(TEXT("%s: reinforcements arriving: %s"), *G->Name, *FString::Join(A.Value, TEXT(", "))));
+		}
 	}
 	for (int32 i = Groups.Num() - 1; i >= 0; --i)
 	{
@@ -251,6 +263,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		G.Order = EAstraGroupOrder::Auto;                             // an order lapses
 		G.OrderShip = G.OrderGroup = -1;
 		G.OrderUntil = -1.f;
+		NoteGroupEvent(Me, FString::Printf(TEXT("%s: its order has run out, back to its own judgement"), *G.Name));
 	}
 	// --- what it knows of the enemy: the warships held by its side, near it
 	struct FEnemy { FAstraBattleShip* S; FVector Pos; double D; };
@@ -297,7 +310,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	}
 	if (Ordered > 0 && G.State != EAstraGroupState::Withdraw)
 	{
-		G.State = EAstraGroupState::Withdraw;
+		SetGroupState(G, EAstraGroupState::Withdraw, TEXT("the commander's order"));
 		G.WithdrawSince = Time;
 		G.Order = EAstraGroupOrder::Withdraw;
 		G.OrderBy = TEXT("admiral");
@@ -305,10 +318,19 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	if (G.Order == EAstraGroupOrder::Withdraw && G.State == EAstraGroupState::Withdraw && Ordered == 0 && Fleeing < M.Num())
 	{
 		G.Order = EAstraGroupOrder::Auto;                             // "continue the attack": the ships are back in the fight
-		G.State = EAstraGroupState::Engage;
+		SetGroupState(G, EAstraGroupState::Engage, TEXT("the withdrawal is lifted"));
 	}
 	// --- morale: the balance of strength, and how long it has been against the group
-	const float Ratio = EStr > 0.02f ? Str / EStr : 9.f;
+	float AllyStr = 0.f;
+	for (const FAstraBattleGroup& A : Groups)
+	{
+		if (A.Id != G.Id && A.Side == G.Side && A.State == EAstraGroupState::Engage && FVector::Dist(A.Centroid, C) < 30.0 * WarKm)
+		{
+			AllyStr += A.Strength;                                    // the friends fighting beside it count
+		}
+	}
+	G.AlliedStrength = AllyStr;
+	const float Ratio = EStr > 0.02f ? (Str + AllyStr) / EStr : 9.f;
 	if (G.State == EAstraGroupState::Engage)
 	{
 		const float Losses = G.StartStrength > 0.f ? 1.f - Str / G.StartStrength : 0.f;
@@ -322,24 +344,33 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			G.WeakSince = -1.f;
 		}
 		G.Morale = FMath::Clamp(Ratio / 1.2f, 0.f, 1.f) * (1.f - 0.3f * FMath::Clamp(Losses, 0.f, 1.f));
+		if (G.Morale < 0.35f && !G.bBroken)
+		{
+			G.bBroken = true;
+			NoteGroupEvent(Me, FString::Printf(TEXT("%s: morale is breaking (%.2f), strength %.1f against %.1f; unless ordered to stand it will break off"), *G.Name, G.Morale, Str, EStr));
+		}
+		else if (G.Morale > 0.6f)
+		{
+			G.bBroken = false;
+		}
+		// (a default for a group with no commander over it: an order to attack or to hold overrides it, and so does any other order the mind gives)
 		const bool bBreak = G.WeakSince >= 0.f && Time - G.WeakSince > 14.f;
 		if (bBreak && G.Order != EAstraGroupOrder::Hold && G.Order != EAstraGroupOrder::Attack)
 		{
-			G.State = EAstraGroupState::Withdraw;
+			SetGroupState(G, EAstraGroupState::Withdraw, TEXT("it is being beaten"));
 			G.WithdrawSince = Time;
 			G.Rally = FVector::ZeroVector;
-			UE_LOG(LogASTRA, Log, TEXT("[War] %s breaks off: strength %.2f against %.2f, %d of %d ships"), *G.Name, Str, EStr, M.Num(), G.StartCount);
 		}
 	}
 	// --- orders that change the state
 	if (G.Order == EAstraGroupOrder::Withdraw && G.State != EAstraGroupState::Withdraw)
 	{
-		G.State = EAstraGroupState::Withdraw;
+		SetGroupState(G, EAstraGroupState::Withdraw, TEXT("as ordered"));
 		G.WithdrawSince = Time;
 	}
 	if (G.Order == EAstraGroupOrder::Regroup && G.State != EAstraGroupState::Regroup)
 	{
-		G.State = EAstraGroupState::Regroup;
+		SetGroupState(G, EAstraGroupState::Regroup, TEXT("as ordered"));
 		G.Rally = C;
 		G.RegroupSince = Time;
 	}
@@ -417,7 +448,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		const bool bContactLost = !bEnemy || Nearest > 38.0 * WarKm;
 		if (bContactLost && Time - G.WithdrawSince > 20.f && G.Order != EAstraGroupOrder::Withdraw)
 		{
-			G.State = EAstraGroupState::Regroup;                        // out of contact: stop and reform
+			SetGroupState(G, EAstraGroupState::Regroup, TEXT("out of contact"));                        // stop and reform
 			G.Rally = C;
 			G.RegroupSince = Time;
 		}
@@ -437,15 +468,15 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			Nearest = FMath::Min(Nearest, X.D);
 		}
 		const bool bPressed = bEnemy && Nearest < 22.0 * WarKm;
-		if (bPressed && Ratio < 0.9f)
+		if (bPressed && Ratio < 0.9f && G.Order != EAstraGroupOrder::Regroup)      // (an order to regroup stands: the commander decides whether to fall back)
 		{
-			G.State = EAstraGroupState::Withdraw;                       // they are coming and we are not ready: on
+			SetGroupState(G, EAstraGroupState::Withdraw, TEXT("the enemy is on it"));                       // they are coming and we are not ready: on
 			G.WithdrawSince = Time;
 			G.Rally = FVector::ZeroVector;
 		}
 		else if (G.Order != EAstraGroupOrder::Regroup && (G.Morale >= 0.75f || Time - G.RegroupSince > 150.f) && (!bEnemy || Ratio >= 0.9f))
 		{
-			G.State = EAstraGroupState::Engage;
+			SetGroupState(G, EAstraGroupState::Engage, TEXT("rested and reformed"));
 			G.WeakSince = -1.f;
 			G.bGuideSet = false;
 			for (FAstraBattleShip* S : M)
@@ -869,6 +900,21 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 				G.FlankSide[i] = Side;
 			}
 			G.FlankAssignedAt = Time;
+			if (G.FlankShip[0] >= 0 && !G.bFlankReported)
+			{
+				G.bFlankReported = true;
+				G.bFlankArrived = false;
+				FString Ids;
+				for (const int32 Fid : G.FlankShip)
+				{
+					if (const FAstraBattleShip* Fs = Fid >= 0 ? FindById(Fid) : nullptr)
+					{
+						Ids += (Ids.IsEmpty() ? TEXT("") : TEXT(", ")) + Fs->ContactId;
+					}
+				}
+				NoteGroupEvent(Me, FString::Printf(TEXT("%s: flank swing begun by %s, %s round %s"), *G.Name, *Ids, G.FlankSide[0] < 0 ? TEXT("left") : TEXT("right"),
+				                                   *(Focus->bPlayer ? FString(TEXT("the Aquila")) : Focus->ContactId)));
+			}
 		}
 		for (int32 i = 0; i < 2; ++i)
 		{
@@ -894,6 +940,12 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			Delta = FMath::Clamp(Delta, -MaxStep, MaxStep);
 			const double A = FMath::DegreesToRadians(Now2 + Delta);
 			F->TaskPos = FocusPos + FVector(FMath::Cos(A), FMath::Sin(A), 0.0) * Rr;
+			if (!G.bFlankArrived && FMath::Abs(Delta) < 5.0 && FVector::Dist(F->Pos, F->TaskPos) < 1.5 * WarKm)
+			{
+				G.bFlankArrived = true;
+				NoteGroupEvent(Me, FString::Printf(TEXT("%s: flank in position, %s is on the beam of %s"), *G.Name, *F->ContactId,
+				                                   *(Focus->bPlayer ? FString(TEXT("the Aquila")) : Focus->ContactId)));
+			}
 			F->TaskVel = FVector::ZeroVector;
 			F->Task = EAstraTask::Flank;
 			F->bTaskSet = true;
@@ -902,6 +954,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	else
 	{
 		G.FlankShip[0] = G.FlankShip[1] = -1;
+		G.bFlankReported = G.bFlankArrived = false;
 	}
 	// --- the missiles: kept until enough are ready to saturate the target's defence, then all together
 	if (Focus && KSalvo[Me].Get() > 0.5f)

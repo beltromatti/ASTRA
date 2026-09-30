@@ -85,6 +85,7 @@ struct FAstraBattleGroup
 	float EngageRange = 5500.f;      // m: the range its armament likes against this enemy
 	// strength and spirit
 	float StartStrength = 0.f, Strength = 0.f, EnemyStrength = 0.f;
+	float AlliedStrength = 0.f;      // the other groups of its side fighting within 30 km: it is not alone against what the enemy has in sight
 	int32 StartCount = 0;
 	float Morale = 1.f;
 	float WeakSince = -1.f;          // the time the balance turned against it (a retreat needs it to last)
@@ -98,7 +99,19 @@ struct FAstraBattleGroup
 	int8 FlankSide[2] = {0, 0};
 	float FlankAssignedAt = -100.f;
 	float ContactSince = -1.f;       // the main body has been at the enemy's range since (-1: not yet)
+	bool bBroken = false;            // its morale has broken (reported once, until it recovers)
+	bool bFlankReported = false;     // the flank swing has been announced / has arrived (once each per assignment)
+	bool bFlankArrived = false;
 	float NextThink = 0.f;
+};
+
+/** Something that happened to a battle group, as its side's mind is told (docs/GUERRA.md: the events). */
+struct FAstraGroupEvent
+{
+	int32 Serial = 0;                // counts up: a mind tells what is new by it
+	float T = 0.f;                   // battle time
+	int32 SideIdx = 0;               // 0 ASTRA, 1 Mandate
+	FString Text;
 };
 
 /** A flight of 2-4 craft (a leader and wingmen), the unit that flies a mission. */

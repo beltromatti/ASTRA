@@ -329,7 +329,9 @@ void UAstraBattleSubsystem::ThinkShip(FAstraBattleShip& S, float DtT)
 	S.Mode = T ? EAstraShipMode::Attack : EAstraShipMode::Cruise;
 	// --- a ship too hurt to fight breaks off (the group covers it)
 	const float HullF = S.Hull / FMath::Max(1.f, S.HullMax);
-	if (!S.bPlayer && HullF < 0.28f && Engines > 0.3f && !S.bFleeing && S.Side != EAstraSide::Neutral && (Me == 1 || G))
+	// (a reflex of the ship's captain; an order to attack or to hold from the group's commander overrides it)
+	const bool bStandOrder = G && (G->Order == EAstraGroupOrder::Attack || G->Order == EAstraGroupOrder::Hold);
+	if (!S.bPlayer && HullF < 0.28f && Engines > 0.3f && !S.bFleeing && S.Side != EAstraSide::Neutral && (Me == 1 || G) && !bStandOrder)
 	{
 		S.bFleeing = true;
 		S.Mode = EAstraShipMode::Evade;

@@ -47,6 +47,8 @@ def build_args(a: argparse.Namespace, out: Path) -> list[str]:
         args.append(f'-exec={a.exec}')
     if getattr(a, "at", ""):
         args.append(f'-at={a.at}')
+    if getattr(a, "views", False):
+        args.append("-views")                              # each frame also carries what the two minds are given of their groups
     return args
 
 
@@ -483,6 +485,33 @@ def cmd_groups(a: argparse.Namespace) -> None:
                       f" ({s['km'][0]:6.1f},{s['km'][1]:6.1f}) {s['v']:4.0f} m/s{' FLEE' if s.get('fleeing') else ''}")
 
 
+def cmd_views(a: argparse.Namespace) -> None:
+    """What the minds are given of the groups (docs/GUERRA.md): one frame of a record made with --views, and the size of each side's part."""
+    d = load(a.path)
+    frames = [f for f in d["frames"] if "views" in f]
+    if not frames:
+        print("no views in this record: run with --views")
+        return
+    f = frames[min(len(frames) - 1, a.frame)] if a.frame >= 0 else frames[-1]
+    for side in ("astra", "mandate"):
+        v = f["views"][side]
+        text = json.dumps(v, separators=(",", ":"))
+        print(f"== t={f['t']:.0f}  {side}: {len(text)} bytes, {len(v['your_groups'])} own groups, {len(v['enemy_groups'])} enemy groups seen, {len(v['group_events'])} events")
+        if a.full:
+            print(json.dumps(v, indent=1))
+    peak = max((len(json.dumps(fr["views"][s], separators=(",", ":"))), s, fr["t"]) for fr in frames for s in ("astra", "mandate"))
+    print(f"largest view in the record: {peak[0]} bytes ({peak[1]}, t={peak[2]:.0f})")
+    print("-- every group event in the record")
+    seen = set()
+    for fr in frames:
+        for side in ("astra", "mandate"):
+            for e in fr["views"][side]["group_events"]:
+                key = (side, e["n"])
+                if key not in seen:
+                    seen.add(key)
+                    print(f"  {fr['t'] - e['ago_s']:7.0f}  {side:8} #{e['n']:<3} {e['text']}")
+
+
 def cmd_ship(a: argparse.Namespace) -> None:
     d = load(a.path)
     for f in d["frames"]:
@@ -511,6 +540,7 @@ def main() -> None:
         p.add_argument("--every", type=float, default=10)
         p.add_argument("--scenario", default="")
         p.add_argument("--at", default="", help='commands at battle times: "200=astra.cmd ...|300=..."')
+        p.add_argument("--views", action="store_true", help="record the side views (your_groups, enemy_groups, group_events) in every frame")
 
     p = sub.add_parser("run")
     common(p, 900, -1)
@@ -564,6 +594,11 @@ def main() -> None:
     p.add_argument("path")
     p.add_argument("--every", type=int, default=3, help="every Nth frame")
     p.set_defaults(fn=cmd_groups)
+    p = sub.add_parser("views", help="what the minds are given of the groups, from a record made with --views")
+    p.add_argument("path")
+    p.add_argument("--frame", type=int, default=-1)
+    p.add_argument("--full", action="store_true")
+    p.set_defaults(fn=cmd_views)
     p = sub.add_parser("ship")
     p.add_argument("path")
     p.add_argument("contact")

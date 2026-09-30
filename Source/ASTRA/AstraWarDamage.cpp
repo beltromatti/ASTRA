@@ -656,6 +656,10 @@ void UAstraBattleSubsystem::DisableShip(FAstraBattleShip& S, const TCHAR* Why)
 	const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
 	S.bDisabled = true;
 	S.DeathHow = EAstraFate::Disabled;
+	if (!S.bCraft && !S.bGhost)
+	{
+		NoteGroupLoss(S, *FString::Printf(TEXT("disabled, %s"), Why));
+	}
 	S.Mode = EAstraShipMode::Idle;
 	S.bFleeing = false;
 	S.TargetId = -1;
