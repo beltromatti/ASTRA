@@ -23,7 +23,7 @@ from .openrouter import Completion, OpenRouter
 log = logging.getLogger("astra.models")
 
 DEEPSEEK = "deepseek/deepseek-v4.1-flash"
-CEILING = (0.30, 1.20)          # $ per million tokens in / out: DeepSeek V4.1 Flash, the ceiling for every role
+CEILING = (0.31, 1.25)          # $ per million tokens in / out: DeepSeek V4.1 Flash (0.30 / 1.20) plus rounding, the ceiling for every role
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ ROLES: dict[str, Role] = {r.name: r for r in (
          note="the Captain's turns and the officers' reports: quality and Italian first"),
     Role("watch", DEEPSEEK, _DS, max_tokens=300, temperature=0.4, first_token_s=5.0,
          note="the initiative watch: adjust the consoles, at most two short lines"),
-    Role("router", DEEPSEEK, _DS, max_tokens=60, temperature=0.0, first_token_s=1.2,
+    Role("router", DEEPSEEK, _DS, max_tokens=16, temperature=0.0, first_token_s=1.2,
          note="who is the Captain talking to (only the cases the rules cannot settle)"),
     Role("chatter", DEEPSEEK, _DS, max_tokens=200, temperature=0.7, first_token_s=6.0,
          note="quiet moments and low-stakes talk"),

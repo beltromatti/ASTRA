@@ -25,6 +25,7 @@ import re
 import time
 import unicodedata
 from dataclasses import dataclass, field
+from typing import Any
 
 from .context import BRIDGE, Context
 from .models import chat as role_chat
@@ -304,7 +305,7 @@ def score_segment(seg: str, ctx: Context, first: bool, prev_ext: bool = False, p
     elif _officers_in(t, False):
         s.crew += 1
         s.officers = _officers_in(t, False)
-    seen = {m.group(0).strip()[:4] for m in _CREW_RX.finditer(t.replace("'", " "))}
+    seen = {m.group(0).strip()[:4] for m in _CREW_RX.finditer(re.sub(r"['!?.,;:]", " ", t) + " ")}
     domain = len(seen)
     if domain:
         s.crew += min(3, domain)
@@ -435,11 +436,58 @@ def decide(text: str, ctx: Context) -> Decision:
 
 
 # ================================================================================================ the model, for what the rules leave open
-PROMPT = """On the bridge of a warship the Captain has a radio channel open with {party} ({kind}). Decide what each part of the
-Captain's words is for: the BRIDGE CREW (orders, questions about the ship, a word to an officer) or {party} on the channel
-(a demand, a threat, an offer, a question or a reply put to them, or calling them by name/ship/rank). Everything about our own
-ship, weapons, crew, contacts or "the enemy" as a third party is for the crew. When it is really unclear, it is for the crew.
-{talking}Reply with JSON only: {{"crew": "<words for the crew, verbatim, or empty>", "party": "<words for {party}, verbatim, or empty>"}}"""
+LABEL_PROMPT = """The Captain of a starship is speaking aloud on the bridge and has a radio channel open with {party} ({kind}). Say whom
+the Captain's words are for. Reply with ONE word:
+crew  - for the bridge crew: orders (also shouted ones, whatever the language), questions about our own ship, weapons, sensors,
+        contacts, talk ABOUT the party or "the enemy" in the third person, a word to an officer or to everyone aboard, thinking aloud;
+party - for {party} on the channel: a demand, threat, offer, question or reply put TO them, calling them by name, ship or rank, or
+        "you" aimed at them;
+mixed - part for the crew and part for {party}.
+Default to crew: answer party only when the words are plainly said to {party}. {situation}
+Examples (in any language): "apri il fuoco a discrezione" crew; "rapporto sullo stato delle armi" crew; "ci sono ancora nemici in
+zona?" crew; "Kade sta mentendo, Voss" crew; "Tir !" crew; "Ferri, portaci via. Ferryman, e la vostra ultima offerta" mixed; "voi,
+fermatevi subito o apro il fuoco" party; "Ferryman Doran, qui il capitano dell'Aquila" party; "tell me what you want" party; "esto se
+acaba aqui" party; "pouvez-vous m'entendre ?" party when they just spoke, else crew."""
+
+SPLIT_PROMPT = """The Captain's words mix an order for the bridge crew and words for {party} on the channel. Split them, verbatim. Reply with
+JSON only: {{"crew": "<the part for the crew>", "party": "<the part for {party}>"}}"""
+
+
+def _situation(ctx: Context) -> str:
+    ch = ctx.channel
+    out = []
+    if ch and ch.kind == "fleet":
+        out.append("This channel reaches the admiral and the allied ships: an order or a request put to any of them is for the party.")
+    if ch and ch.talking:
+        out.append(f"{ch.name or ch.party} spoke to the Captain {ch.heard_s:.0f} seconds ago, so a short reply may be for them.")
+    elif ch:
+        out.append(f"{ch.name or ch.party} has been silent for a while.")
+    if ctx.facing:
+        out.append(f"The Captain is looking at: {ctx.facing}.")
+    return " ".join(out)
+
+
+def parse_label(content: str) -> str | None:
+    """crew | party | mixed from a model's reply (the first of the three words in it)."""
+    m = re.search(r"\b(crew|party|mixed)\b", content.strip().lower())
+    return m.group(1) if m else None
+
+
+async def classify(llm: OpenRouter, text: str, ctx: Context, **over: Any) -> tuple[str | None, float, float]:
+    """(label, seconds, dollars): one word from the small model — crew | party | mixed (None: no usable answer)."""
+    ch = ctx.channel
+    t0 = time.perf_counter()
+    system = LABEL_PROMPT.format(party=(ch.name or ch.party) if ch else "the party", kind=ch.kind if ch else "enemy",
+                                 situation=_situation(ctx))
+    try:
+        comp = await role_chat(llm, "router", messages=[{"role": "system", "content": system}, {"role": "user", "content": text}], **over)
+    except Exception:  # noqa: BLE001
+        log.exception("router model failed")
+        return None, time.perf_counter() - t0, 0.0
+    if comp.error:
+        log.warning("router model error: %s", comp.error[:120])
+        return None, time.perf_counter() - t0, comp.cost
+    return parse_label(comp.content), time.perf_counter() - t0, comp.cost
 
 
 async def route_llm(llm: OpenRouter, text: str, ctx: Context, hint: str = "") -> Route | None:
@@ -448,26 +496,22 @@ async def route_llm(llm: OpenRouter, text: str, ctx: Context, hint: str = "") ->
     if not ch:
         return None
     t0 = time.perf_counter()
-    talking = (f"The party spoke to the Captain {ch.heard_s:.0f} seconds ago, so a short reply may be for them. " if ch.talking else
-               "The party has been silent for a while. ")
-    if ctx.facing:
-        talking += f"The Captain is looking at: {ctx.facing}. "
-    system = PROMPT.format(party=ch.name or ch.party, kind=ch.kind, talking=talking + hint)
-    try:
-        comp = await role_chat(llm, "router", messages=[{"role": "system", "content": system}, {"role": "user", "content": text}])
-    except Exception:  # noqa: BLE001
-        log.exception("router model failed")
+    label, _, _ = await classify(llm, text, ctx)
+    if label is None:
         return None
-    if comp.error:
-        log.warning("router model error: %s", comp.error[:120])
-        return None
-    m = re.search(r"\{.*\}", comp.content, re.S)
+    if label == "crew":
+        return Route(crew=text.strip(), how="llm", ms=(time.perf_counter() - t0) * 1000)
+    if label == "party":
+        return Route(external=text.strip(), party=ch.party, how="llm", ms=(time.perf_counter() - t0) * 1000)
+    # mixed: the rare case, a second small call splits the words
     try:
+        comp = await role_chat(llm, "router", messages=[{"role": "system", "content": SPLIT_PROMPT.format(party=ch.name or ch.party)},
+                                                        {"role": "user", "content": text}], max_tokens=200)
+        m = re.search(r"\{.*\}", comp.content, re.S)
         data = json.loads(m.group(0)) if m else {}
-    except ValueError:
+    except Exception:  # noqa: BLE001
         return None
-    crew = str(data.get("crew") or "").strip()
-    ext = str(data.get("party") or data.get("external") or data.get("enemy") or "").strip()
+    crew, ext = str(data.get("crew") or "").strip(), str(data.get("party") or "").strip()
     if not crew and not ext:
         return None
     return Route(crew=crew, external=ext, party=ch.party if ext else "", how="llm", ms=(time.perf_counter() - t0) * 1000)
