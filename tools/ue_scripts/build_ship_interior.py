@@ -310,24 +310,24 @@ def remove_lift_leaves():
 
 
 # ------------------------------------------------------------------------------------------------------------------------ run
+# the level first: the old actors of the decks go before their meshes are deleted and imported again
+if not eal.does_asset_exist(LEVEL):
+    raise RuntimeError(f"{LEVEL} missing: build the bridge level first (build_bridge.py)")
+les.load_level(LEVEL)
+cleared = clear_deck_folders(DECKS)
+log.append(f"{cleared} old actors of the decks {DECKS} removed")
 build_materials()
-kit_g = import_kit()
+import_kit()
 bad = check_bounds()
 log.append(f"kit: {len(MANIFEST['meshes'])} meshes imported; {len(bad)} bounds problems")
 copy_plan()
-
-if eal.does_asset_exist(LEVEL):
-    les.load_level(LEVEL)
-else:
-    raise RuntimeError(f"{LEVEL} missing: build the bridge level first (build_bridge.py)")
-cleared = clear_deck_folders(DECKS)
-log.append(f"{cleared} old actors of the decks {DECKS} removed")
 report = {}
 for d in DECKS:
     counts = place_meshes(d)
     doors, locked = place_doors(d)
     lights = place_lights(d)
-    report[d] = {"meshes": counts, "doors": doors, "locked": locked, "zone_lights": lights}
+    expect = len(PLAN_DATA["placements"].get(str(d), []))
+    report[d] = {"meshes": counts, "expected": expect, "doors": doors, "locked": locked, "zone_lights": lights}
 if REMOVE_LIFT_LEAVES:
     remove_lift_leaves()
 if SAVE_LEVEL:
