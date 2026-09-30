@@ -2,8 +2,10 @@
 answers with a result; `speak` is handled by the mind itself (text -> voice)."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
+from . import stations as station_model
 from .crew import CREW
 
 
@@ -16,9 +18,12 @@ PATIENTS = [f"patient{i}" for i in range(1, 13)]   # the Medbay's twelve beds (t
 MESS = [f"mess{i}" for i in range(1, 13)] + ["mess_cook"]   # the Mess Hall's places at table, and its cook
 
 SPEAK = _fn("speak", "Someone aboard speaks aloud: an officer, a wounded crewman in the Medbay, or someone off duty in "
-                     "the Mess Hall (one call per line, in speaking order).", {
+                     "the Mess Hall (one call per line, in speaking order). Short and specific: one sentence, and an "
+                     "acknowledgement always says WHAT was set or answered (never a bare 'aye').", {
     "speaker": {"type": "string", "enum": list(CREW) + PATIENTS + MESS},
-    "text": {"type": "string", "description": "The spoken line, in the Captain's language, max ~25 words"},
+    "text": {"type": "string", "description": "The spoken line, in the Captain's language: usually one short sentence "
+                                              "(6-16 words); two only when the second carries something needed; more only "
+                                              "when the Captain asked for a report or an explanation"},
     "tone": {"type": "string", "enum": ["calm", "focused", "urgent", "tense", "alarmed", "warm", "dry"]}},
     ["speaker", "text", "tone"])
 
@@ -147,3 +152,85 @@ STANDING = _fn("standing_order", "Record (or cancel) a STANDING ORDER: an order 
 
 ALL_TOOLS = [SPEAK, STANDING] + SHIP_TOOLS
 SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS}
+
+
+# ================================================================================================ the stations (v2)
+# A game build that reports `stations` in the ship state has live consoles: the persistent behaviours go through the one
+# `station` tool and the legacy tools they replace are hidden; what stays are the ONE-OFF actions. A build without
+# `stations` keeps the legacy tools as they were, so the mind never breaks against an older game.
+SUPERSEDED = {
+    "helm": {"set_course", "set_throttle", "intercept", "transit_gate"},
+    "tactical": {"set_target", "set_shields", "set_point_defense"},
+    "sensors": {"set_emcon"},
+    "ops": {"holo_display"},
+    "engineering": {"set_radiators"},
+    "flight": {"launch_squadron", "recall_squadron"},
+}
+# how the one-off tools read next to the station tool (the division of labour: one act here, a standing behaviour there)
+_ONE_OFF = {
+    "fire_weapons": " ONE-OFF: fires now and is done (a salvo). To keep firing until a target falls, to fire at will, or to "
+                    "keep a weapon group on a target, set tactical's `engage` / `weapons_free` mode with `station` instead.",
+    "cease_fire": " ONE-OFF: stops all fire right now; `hold_fire` (station) keeps them quiet until ordered.",
+    "launch_decoys": " ONE-OFF, against an incoming salvo.",
+    "active_scan": " ONE-OFF ping (a focused one identifies a contact); repeated pings are sensors' `scan_sweep` mode.",
+    "dispatch_damage_control": " ONE-OFF dispatch to a named incident; letting the teams choose is ops' `dc_auto` / `dc_priority` mode.",
+    "route_power": " ONE system, right now; whole profiles are engineering's `power_profile` / `power_custom` modes.",
+    "vent_heat": " ONE-OFF (three charges); managing the heat is engineering's `heat_auto` mode.",
+}
+_OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "transit_gate": "helm", "set_alert": "xo",
+          "set_shields": "tactical", "route_power": "ops", "set_target": "tactical", "fire_weapons": "tactical",
+          "set_point_defense": "tactical", "launch_squadron": "flight", "recall_squadron": "flight",
+          "dispatch_damage_control": "ops", "hail": "comms", "set_emcon": "sensors", "active_scan": "sensors",
+          "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
+          "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
+          "dismiss_visitor": "captain", "abandon_ship": "xo"}
+LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
+
+
+@dataclass
+class ToolSet:
+    """What the crew may call this turn."""
+    tools: list[dict[str, Any]]
+    names: set[str]
+    available: dict[str, list[str] | None] | None       # the consoles on line (None: an older build, legacy tools only)
+
+    @property
+    def stations(self) -> bool:
+        return self.available is not None
+
+
+def tools_for(state: dict[str, Any] | None) -> ToolSet:
+    """The tools that fit the game build (`stations` in its state or not)."""
+    avail = station_model.available_from_state(state)
+    if avail is None:
+        return ToolSet(list(ALL_TOOLS), {t["function"]["name"] for t in ALL_TOOLS}, None)
+    hidden: set[str] = set()
+    for s in avail:
+        hidden |= SUPERSEDED.get(s, set())
+    tools: list[dict[str, Any]] = [SPEAK, STANDING, station_model.tool_schema(avail)]
+    for t in SHIP_TOOLS:
+        name = t["function"]["name"]
+        if name in hidden:
+            continue
+        if name in _ONE_OFF:
+            t = {"type": "function", "function": {**t["function"], "description": t["function"]["description"] + _ONE_OFF[name]}}
+        tools.append(t)
+    return ToolSet(tools, {t["function"]["name"] for t in tools}, avail)
+
+
+def owner_of(name: str, args: dict[str, Any] | None = None) -> str:
+    """Who acts when a tool is called (the officer id recorded as the command's `by`)."""
+    if name == "station":
+        return str((args or {}).get("station") or "xo")
+    return _OWNER.get(name, "xo")
+
+
+def initiative_names(state: dict[str, Any] | None, standing: list[dict[str, str]]) -> set[str]:
+    """The tools an officer may use on their own at an event or a watch. Legacy build: the usual few plus a standing
+    order's department. Consoles: the defensive one-offs and `station` (each call is then checked by
+    stations.may_on_initiative against the delegation and the standing orders)."""
+    ts = tools_for(state)
+    allowed = ({"station", "launch_decoys", "dispatch_damage_control"} if ts.stations else set(LEGACY_INITIATIVE))
+    for o in standing:
+        allowed |= DEPT_TOOLS.get(o.get("department", ""), set())
+    return allowed & ts.names
