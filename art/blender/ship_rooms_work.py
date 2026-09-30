@@ -192,7 +192,7 @@ def cabins(name: str = "SM_SHIP_Cabins"):
             xh = xw + (0.09 if side == 0 else -0.09)                                                  # the hall side of the wall
             b.emit.lamp_box((min(xh, xh + (0.006 if side == 0 else -0.006)), yc + dw / 2 + 0.06, 1.55),
                             (max(xh, xh + (0.006 if side == 0 else -0.006)), yc + dw / 2 + 0.12, 1.62), "green", LAMP_DIM)
-            b.emit.label_fit((xh + (0.0005 if side == 0 else -0.0005), yc, 2.3), 0.30, f"code_4A{k + 1 + 4 * side:02d}", (1 if side == 0 else -1, 0, 0))
+            b.emit.label_fit((xh + (0.0005 if side == 0 else -0.0005), yc, 2.3), 0.30, f"cabin_{k + 1 + 4 * side:02d}", (1 if side == 0 else -1, 0, 0))
         for yw in (4.0, 8.0, 12.0):
             x0, x1 = (xl, xw) if side == 0 else (xw, xr)
             b.body.box((x0, yw - 0.06, 0.0), (x1, yw + 0.06, H), COMPOSITE)

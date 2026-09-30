@@ -64,8 +64,7 @@ ROOMS = {
 for _d in range(2, 13):                 # the plate over a stair tower's door says where the flights go from this deck
     ROOMS[f"stairs_{_d}"] = ("STAIRS", f"UP DECK {_d - 1} · DOWN DECK {_d + 1}" if _d < 12 else "UP DECK 11", "neutral")
 
-CODES_DECK = 4                 # the small codes ("4C-07") are drawn for this deck only
-CODES_PER_SECTION = 12
+CODES_PER_SECTION = 12         # cabin numbers 1..12
 
 EQUIPMENT_TAGS = {"eq_vent": "VENT", "eq_breaker": "BREAKER PANEL", "eq_maint": "MAINTENANCE ACCESS", "eq_comm": "COMM RELAY",
                   "eq_hydrant": "FIRE HYDRANT", "eq_water": "POTABLE WATER", "eq_air": "AIR HANDLING", "eq_dc": "DC LOCKER",
@@ -217,9 +216,8 @@ def build() -> None:
         for x in SECTIONS:
             add(f"sec_{d}{x}", B3.plate(512, 64, f"DECK {d} · SECTION {x}", "", DEPT[DECK_TAG[d]]),
                 f"DECK {d} · SECTION {x}")
-    for x in SECTIONS:
-        for n in range(1, CODES_PER_SECTION + 1):
-            add(f"code_{CODES_DECK}{x}{n:02d}", B3.tag(256, 64, f"{CODES_DECK}{x}-{n:02d}"), f"{CODES_DECK}{x}-{n:02d}")
+    for n in range(1, CODES_PER_SECTION + 1):                       # the numbers on the doors of the cabins (a cabin block is the same on every deck)
+        add(f"cabin_{n:02d}", B3.tag(256, 64, f"CABIN {n}"), f"CABIN {n}")
     for key, (title, sub, dept) in ROOMS.items():
         add(f"room_{key}", B3.plate(768, 96, title, sub, DEPT[dept]), title)
     for k in ("fwd", "aft", "port", "stbd"):
