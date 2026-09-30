@@ -94,6 +94,30 @@ FAstraFlight* UAstraBattleSubsystem::FindFlight(int32 Id)
 }
 
 // ---------------------------------------------------------------------------------------------- the steering fields
+namespace
+{
+	/** Does a craft keep out of the enemy's point-defence envelopes? wall_a / wall_m (the bench's A/B per side): 0 never, 1 every craft,
+	 *  2 the bombers only, 3 every craft but the bombers. */
+	bool WarKeepsOutOfEnvelopes(int32 Me, const FAstraBattleShip& S)
+	{
+		static AstraWar::FTuneVar KWall[2] = {AstraWar::FTuneVar(TEXT("wall_a"), 3.f), AstraWar::FTuneVar(TEXT("wall_m"), 3.f)};
+		if (Me < 0)
+		{
+			return false;
+		}
+		const float K = KWall[Me].Get();
+		if (K < 0.5f)
+		{
+			return false;
+		}
+		if (K < 1.5f)
+		{
+			return true;
+		}
+		return K < 2.5f ? S.CraftKind == 1 : S.CraftKind != 1;
+	}
+}
+
 /** What pushes a craft off its course: enemy ships' point-defence envelopes (any ship that has point defence), hulls, hulks,
  *  and the craft round it. A velocity, in m/s. */
 FVector UAstraBattleSubsystem::CraftAvoidance(const FAstraBattleShip& S) const
@@ -114,8 +138,7 @@ FVector UAstraBattleSubsystem::CraftAvoidance(const FAstraBattleShip& S) const
 		const bool bHostile = AstraSideIdx(E.Side) == 1 - Me && Me >= 0;
 		// the envelope (its PD reach and its radius, with a margin): only ships with point defence that works have one
 		double Env = 0.0;
-		static AstraWar::FTuneVar KWall[2] = {AstraWar::FTuneVar(TEXT("wall_a"), 1.f), AstraWar::FTuneVar(TEXT("wall_m"), 1.f)};
-		if (bHostile && Me >= 0 && KWall[Me].Get() > 0.5f && E.PDChannels > 0 && !E.bDisabled && (!E.Dmg.bModel || E.Dmg.Sys[AstraWar::SysPointDefence] > 0.15f))
+		if (bHostile && Me >= 0 && WarKeepsOutOfEnvelopes(Me, S) && E.PDChannels > 0 && !E.bDisabled && (!E.Dmg.bModel || E.Dmg.Sys[AstraWar::SysPointDefence] > 0.15f))
 		{
 			Env = (E.PDRange + E.Radius) * 1.35 + 350.0;
 		}
@@ -199,9 +222,8 @@ static FVector WarOrbit(const FAstraBattleShip& S, const FVector& Centre, const 
  *  wanted velocity towards the ship). The wall stands a turning radius outside the reach of the guns. */
 FVector UAstraBattleSubsystem::EnvelopeWall(const FAstraBattleShip& S, const FVector& Steer) const
 {
-	static AstraWar::FTuneVar KWall[2] = {AstraWar::FTuneVar(TEXT("wall_a"), 1.f), AstraWar::FTuneVar(TEXT("wall_m"), 1.f)};   // (the bench's A/B)
 	const int32 Me = AstraSideIdx(S.Side);
-	if (Me < 0 || KWall[Me].Get() < 0.5f)
+	if (!WarKeepsOutOfEnvelopes(Me, S))
 	{
 		return Steer;
 	}
@@ -739,8 +761,10 @@ void UAstraBattleSubsystem::FireCraft(FAstraBattleShip& S, float Dt)
 				else if (!bDefended && S.Missiles <= 0 && D < 1500.0 && Cone > 0.95)
 				{
 					S.GunHeat = 0.5f;
-					AddBeam(S.Pos, B->Pos - Dir * B->Radius, 0.08f, FLinearColor(0.6f, 0.85f, 1.f));
-					ApplyHit(*B, Dir, S.CraftKind == 2 ? 1.f : 3.f, B->Pos - Dir * B->Radius, EAstraHitKind::Cannon, S.Id);
+					FVector Strike = B->Pos - Dir * B->Radius;
+					HullSweep(*B, S.Pos, B->Pos + Dir * (double)B->Radius, Strike);       // (where its burst enters the hull)
+					AddBeam(S.Pos, Strike, 0.08f, FLinearColor(0.6f, 0.85f, 1.f));
+					ApplyHit(*B, Dir, S.CraftKind == 2 ? 1.f : 3.f, Strike, EAstraHitKind::Cannon, S.Id);
 				}
 			}
 			return;

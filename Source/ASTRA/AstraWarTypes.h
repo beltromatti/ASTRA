@@ -57,6 +57,16 @@ namespace AstraWar
 	{
 		return N.X > 0.33 ? SecBow : (N.X < -0.33 ? SecStern : SecMid);
 	}
+	/** The hull as a shot strikes it: a box along the ship's axis, the mesh's own measures (the game draws the meshes at true scale, so
+	 *  what is seen struck is what the simulation strikes). Mid is where the box's centre lies on the axis (from the mesh's origin), Hx
+	 *  Hy Hz its half extents (length, width, height), CutBow and CutStern the x of the planes where the break-up pieces are cut (the
+	 *  bow piece runs from the first to the bow, the middle between them, the stern from the second to the stern). */
+	struct FHullBox
+	{
+		float Mid = 0.f, Hx = 0.f, Hy = 0.f, Hz = 0.f;
+		float CutBow = 0.f, CutStern = 0.f;
+		bool Valid() const { return Hx > 0.f && Hy > 0.f && Hz > 0.f; }
+	};
 	/** The tuning table of the war (astra.war.tune <name> <value>: from the console or the bench's --exec): a change bumps
 	 *  the version, and every FTuneVar reads its value again. For A/B runs without a build. */
 	ASTRA_API int32& TuneVersion();
@@ -160,7 +170,8 @@ struct FAstraDeathEvent
 	FVector Vel = FVector::ZeroVector;
 	FQuat Att = FQuat::Identity;
 	FVector BreakAxis = FVector::ZeroVector; // Breakup: the ship's long axis (the cut is a plane across it), system frame
-	FVector BreakPoint = FVector::ZeroVector;// Breakup: where the plane crosses the axis, system frame
+	FVector BreakPoint = FVector::ZeroVector;// Breakup: where the plane crosses the axis, system frame (on the class's true cut of that section)
+	float CutBowX = 0.f, CutSternX = 0.f;    // the two cut planes along the axis (m from the ship's origin, ship frame): the pieces are cut there
 	float BreakSpeed = 0.f;                  // Breakup: relative speed of the two pieces along the axis (m/s)
 	float Radius = 100.f;
 	bool bAstra = false;

@@ -39,7 +39,7 @@ double UAstraBattleSubsystem::ShipDps(const FAstraBattleShip& S, double RangeM) 
 	}
 	if (S.Missiles > 0 && RangeM > 2500.0 && RangeM < S.MissileRange)
 	{
-		Dps += (S.Radius > 200.f ? 4.0 : 2.0) * 110.0 / FMath::Max(1.f, S.MissileCd) * 0.5;   // half of them meet point defence
+		Dps += (S.SizeTier >= 2 ? 4.0 : 2.0) * 110.0 / FMath::Max(1.f, S.MissileCd) * 0.5;   // half of them meet point defence
 	}
 	return Dps * Power;
 }
@@ -329,8 +329,8 @@ void UAstraBattleSubsystem::ThinkShip(FAstraBattleShip& S, float DtT)
 	S.Mode = T ? EAstraShipMode::Attack : EAstraShipMode::Cruise;
 	// --- a ship too hurt to fight breaks off (the group covers it)
 	const float HullF = S.Hull / FMath::Max(1.f, S.HullMax);
-	// (a reflex of the ship's captain; an order to attack or to hold from the group's commander overrides it)
-	const bool bStandOrder = G && (G->Order == EAstraGroupOrder::Attack || G->Order == EAstraGroupOrder::Hold);
+	// (a reflex of the ship's captain, for a group with no commander over it; any order in force from the group's commander stands over it)
+	const bool bStandOrder = G && G->Order != EAstraGroupOrder::Auto;
 	if (!S.bPlayer && HullF < 0.28f && Engines > 0.3f && !S.bFleeing && S.Side != EAstraSide::Neutral && (Me == 1 || G) && !bStandOrder)
 	{
 		S.bFleeing = true;

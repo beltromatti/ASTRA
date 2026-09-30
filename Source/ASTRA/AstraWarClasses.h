@@ -24,7 +24,9 @@ namespace AstraWar
 		FName Key;
 		FString Label;
 		FString Mesh;                                   // the mesh the game draws it with (empty: none, headless)
-		float Radius = 150.f, Hull = 1000.f, Shield = 400.f, ShieldRegen = 4.f;
+		float Radius = 150.f, Hull = 1000.f, Shield = 400.f, ShieldRegen = 4.f;   // Radius: the farthest end of the hull from the mesh's origin
+		FHullBox Box;                                   // the hull as a shot strikes it (the mesh's own measures), with the break-up cut planes
+		int32 Tier = 0;                                 // how big it counts: 3 capital ship, 2 cruiser, 1 destroyer or freighter, 0 smaller
 		float Accel = 15.f, TurnDeg = 3.f, Cruise = 300.f, SensorKm = 45.f;
 		float SectionShare[NumSections] = {0.3f, 0.4f, 0.3f};
 		float ArmourFrac = 0.25f;

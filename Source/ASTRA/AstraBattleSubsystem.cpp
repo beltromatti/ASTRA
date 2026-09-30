@@ -127,6 +127,7 @@ int32 UAstraBattleSubsystem::AddShip(const FString& Contact, const FString& Name
 	S.Vel = S.Att.GetForwardVector() * Speed;
 	S.CruiseSpeed = FMath::Max(Speed, 150.f);
 	S.Radius = Radius;
+	S.SizeTier = Radius >= 300.f ? 3 : (Radius >= 200.f ? 2 : (Radius >= 130.f ? 1 : 0));   // (a class table, where there is one, sets it at InitShipModel)
 	S.Hull = S.HullMax = Hull;
 	S.Shield = S.ShieldMax = Shield;
 	S.Mode = Speed > 1.f ? EAstraShipMode::Cruise : EAstraShipMode::Idle;
@@ -606,7 +607,7 @@ float UAstraBattleSubsystem::SignatureKmOf(const FAstraBattleShip& S) const
 {
 	// what a Mandate ship gives off (drive plume, reactor, emissions): a cruiser shows further than a frigate; running
 	// dark cuts it to a third; the drive at speed shows more
-	const float Base = S.bCraft ? 7.f : (S.Radius >= 300.f ? 48.f : (S.Radius >= 200.f ? 36.f : 27.f));
+	const float Base = S.bCraft ? 7.f : (S.SizeTier >= 3 ? 48.f : (S.SizeTier >= 2 ? 36.f : 27.f));
 	const float Speed = FMath::Clamp(S.Vel.Size() / FMath::Max(S.CruiseSpeed, 1.f), 0.f, 1.5f);
 	return Base * (S.bDark ? 0.33f : 1.f) * (0.6f + 0.4f * Speed);
 }
@@ -658,7 +659,7 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 			S.bDark = true;
 		}
 		const bool bWantJam = S.EwMode == 1 || (S.EwMode == 0 && !S.bDark);
-		const bool bJam = S.Radius >= 200.f && S.bHostile && bWantJam && !S.bFleeing && !S.bHoldFire && R > 12.f && R < 55.f;
+		const bool bJam = S.SizeTier >= 2 && S.bHostile && bWantJam && !S.bFleeing && !S.bHoldFire && R > 12.f && R < 55.f;
 		if (bJam)
 		{
 			S.bDark = false;                           // a jammer is anything but dark
@@ -1225,7 +1226,7 @@ void UAstraBattleSubsystem::TickAI(FAstraBattleShip& S, float Dt)
 		// hold a preferred engagement range, circling at an angle; break off when badly hurt. The commander's stance
 		// changes the fight: close (lasers, knife range), standoff (out of the lasers, railguns and missiles), flank
 		// (onto the target's weak shield sector, or its beam), screen (between the target and the flagship)
-		float Pref = S.Radius > 200.f ? 4 * OneKm : 3 * OneKm;
+		float Pref = S.SizeTier >= 2 ? 4 * OneKm : 3 * OneKm;
 		if (S.Stance == 1) { Pref = 1.8f * OneKm; }
 		else if (S.Stance == 2) { Pref = FMath::Clamp(S.RailRange * 0.9f, 5.f * OneKm, 9.f * OneKm); }
 		const FVector ToT = T->Pos - S.Pos;
@@ -1376,7 +1377,7 @@ void UAstraBattleSubsystem::TickWeapons(FAstraBattleShip& S, float Dt)
 		// a massed salvo empties the ready cells (6 on a cruiser, 3 on a destroyer): the cells then reload for longer
 		S.LitT = 40.f;
 		S.MissileT = S.MissileCd * FMath::FRandRange(0.8f, 1.2f) * (S.bConserve ? 2.2f : 1.f) * (bMassed ? 2.f : 1.f);
-		const int32 N = FMath::Min(S.Missiles, bMassed ? (S.Radius > 200.f ? 6 : 3) : (S.Radius > 200.f ? 4 : 2));
+		const int32 N = FMath::Min(S.Missiles, bMassed ? (S.SizeTier >= 2 ? 6 : 3) : (S.SizeTier >= 2 ? 4 : 2));
 		S.bSalvo = false;
 		S.SalvoAt = -1.f;
 		S.bHoldMissiles = false;
@@ -1493,10 +1494,9 @@ void UAstraBattleSubsystem::FireMissile(FAstraBattleShip& From, FAstraBattleShip
 
 void UAstraBattleSubsystem::FireLaser(FAstraBattleShip& From, FAstraBattleShip& To)
 {
-	// the beam strikes the hull sphere where it enters it, at a random offset from the line to the centre
+	// the beam strikes the hull where it enters it, at a random point of the side it comes from
 	const FVector Dir = (To.Pos - From.Pos).GetSafeNormal();
-	const FVector Off = FVector::VectorPlaneProject(FMath::VRand(), Dir).GetSafeNormal() * To.Radius * 0.9 * FMath::Sqrt(FMath::FRand());
-	const FVector Hit = AstraWar::SphereEntry(To.Pos, To.Radius, To.Pos + Off, Dir);
+	const FVector Hit = HullRandomEntry(From.Pos, To);
 	AddBeam(From.Pos, Hit, 0.35f, From.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.35f, 0.15f) : FLinearColor(0.5f, 0.8f, 1.f));
 	ApplyHit(To, Dir, From.LaserDamage > 0.f ? From.LaserDamage : 18.f, Hit, EAstraHitKind::Laser, From.Id);
 }
@@ -1697,7 +1697,7 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		B.bRetreating = S.bFleeing;
 		B.bHoldFire = S.bHoldFire;
 		B.bTargeted = !S.bPlayer && (P.FireTarget == S.Id) && (P.RailVolleys > 0 || P.LaserShots > 0);
-		B.Size = S.Radius >= 300.f ? 1.f : (S.Radius >= 200.f ? 0.85f : (S.Radius >= 130.f ? 0.7f : 0.55f));
+		B.Size = S.SizeTier >= 3 ? 1.f : (S.SizeTier >= 2 ? 0.85f : (S.SizeTier >= 1 ? 0.7f : 0.55f));
 		B.RangeKm = FVector::Dist(S.Pos, P.Pos) / OneKm;
 		B.Name = S.bIdentified ? S.Name : FString();
 		B.Contact = S.ContactId;
@@ -2024,7 +2024,7 @@ bool UAstraBattleSubsystem::EnemyTactics(const TSharedPtr<FJsonObject>& Args, FS
 		{
 			S.bSalvo = true;
 			S.bConserve = false;
-			Salvo += FMath::Min(S.Missiles, S.Radius > 200.f ? 6 : 3);
+			Salvo += FMath::Min(S.Missiles, S.SizeTier >= 2 ? 6 : 3);
 		}
 		else if (Missiles.Equals(TEXT("conserve"), ESearchCase::IgnoreCase)) { S.bConserve = true; }
 		else if (Missiles.Equals(TEXT("normal"), ESearchCase::IgnoreCase)) { S.bConserve = false; }
@@ -2600,12 +2600,13 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 			E.Vel = S.Vel;
 			E.Att = S.Att;
 			E.Radius = S.Radius;
+			E.CutBowX = S.Box.CutBow;
+			E.CutSternX = S.Box.CutStern;
 			E.bAstra = S.Side == EAstraSide::Astra;
 			if (How == EAstraFate::Breakup)
 			{
 				E.BreakAxis = S.Att.GetForwardVector();
-				const double Sgn = Section == AstraWar::SecBow ? 1.0 : (Section == AstraWar::SecStern ? -1.0 : 0.0);
-				E.BreakPoint = S.Pos + E.BreakAxis * (Sgn * 0.33 * S.Radius);
+				E.BreakPoint = S.Pos + E.BreakAxis * BreakX(S, Section);                // on the true cut of the section that lets go
 				E.BreakSpeed = FMath::FRandRange(8.f, 25.f);
 			}
 			DeathEvents.Add(E);
@@ -2722,17 +2723,12 @@ void UAstraBattleSubsystem::TickProjectiles(float Dt)
 			{
 				continue;
 			}
-			const FVector C = FMath::ClosestPointOnSegment(S.Pos, Prev, Pr.Pos);
-			if (FVector::DistSquared(C, S.Pos) < FMath::Square(S.Radius))
+			FVector Entry;
+			if (HullSweep(S, Prev, Pr.Pos, Entry))
 			{
-				// it strikes where its path enters the hit sphere (not where it comes closest to the centre): the point that
-				// says which face and which section of the hull it lands on
+				// it strikes where its path enters the hull (the box of the mesh's own measures), not where it comes closest to the
+				// centre: the point that says which face and which section of the hull it lands on
 				const FVector Dir = (Pr.Pos - Prev).GetSafeNormal();
-				FVector Entry = AstraWar::SphereEntry(S.Pos, S.Radius, C, Dir);
-				if (FVector::DotProduct(Entry - Prev, Dir) < 0.0)
-				{
-					Entry = Prev;                     // it started inside the sphere
-				}
 				ApplyHit(S, Dir, Pr.Damage, Entry, Pr.HitKind, Pr.Owner);
 				Pr.bDead = true;
 				break;
@@ -4091,12 +4087,12 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			const FVector Pos = Centre + Polar(k == 0 ? 0.0 : 3.5 * OneKm, Bearing + 90.0 + 70.0 * k, (k % 2) ? 2.0 : -2.0);
 			const int32 I = SpawnClass(Type == TEXT("reinforcements") && !Class.ToLower().Contains(TEXT("praetorian")) ? TEXT("vigilant") : Class, Id,
 			                           Name.IsEmpty() ? Id : Name, Pos, Facing);
-			if (Type == TEXT("raid") && Ships[I].Radius >= 200.f)
+			if (Type == TEXT("raid") && Ships[I].SizeTier >= 2)
 			{
 				AddEnemyWing(I, 4, 30.f);
 				Ships[I].Decoys = 4;
 			}
-			else if (Type == TEXT("raid") && Ships[I].Radius >= 130.f)
+			else if (Type == TEXT("raid") && Ships[I].SizeTier >= 1)
 			{
 				Ships[I].Decoys = 2;                      // a destroyer carries a pair of decoy emitters too
 			}
@@ -4752,6 +4748,7 @@ void UAstraBattleSubsystem::ClearSystem()
 	Ships.SetNum(1);
 	RebuildIdIndex();
 	Groups.Reset();
+	GroupEvents.Reset();                          // (what happened to the old system's groups is not news here)
 	Flights.Reset();
 	POIs.Reset();
 	Squadrons.RemoveAll([](const FAstraSquadron& Q) { return Q.Side != EAstraSide::Astra; });
@@ -5199,6 +5196,21 @@ void UAstraBattleSubsystem::FirePilotGuns(FAstraBattleShip& S)
 	{
 		if (!O.bAlive || !O.bHostile || O.Id == S.Id)
 		{
+			continue;
+		}
+		if (O.Box.Valid())
+		{
+			// a hull of true measures: where the round's path enters the box
+			FVector Entry;
+			if (HullSweep(O, Muzzle, Muzzle + Dir * HitT, Entry))
+			{
+				const double T0 = FVector::Dist(Entry, Muzzle);
+				if (T0 < HitT)
+				{
+					HitT = T0;
+					Hit = &O;
+				}
+			}
 			continue;
 		}
 		const double R = O.bCraft ? FMath::Max(O.Radius, 14.f) : O.Radius;   // a little generosity with fighters

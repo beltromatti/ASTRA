@@ -126,6 +126,25 @@ void UAstraBattleSubsystem::NoteGroupLoss(const FAstraBattleShip& S, const TCHAR
 	                                                     FMath::Max(G->StartCount, Left)));
 }
 
+bool UAstraBattleSubsystem::OnPlot(int32 SideIdx, const FAstraBattleShip& X, FVector& OutPos) const
+{
+	if (SideIdx == 0 && (!X.bFog || X.Track >= 2))
+	{
+		OutPos = X.Pos;                                  // the Aquila's own plot: a firm track, or a scripted ship that is always on it
+		return true;
+	}
+	if (SideIdx == 0 && X.bFog)
+	{
+		return false;                                    // a bearing only, or nothing
+	}
+	if (!Knows(SideIdx, X))
+	{
+		return false;
+	}
+	OutPos = KnownPos(SideIdx, X);
+	return true;
+}
+
 // ---------------------------------------------------------------------------------------------- finding what an order names
 FAstraBattleGroup* UAstraBattleSubsystem::ResolveGroup(const FString& Key, int32 SideIdx, FString* OutWhy)
 {
@@ -233,17 +252,20 @@ FString UAstraBattleSubsystem::DescribeGroupOrder(const FAstraBattleGroup& G, co
 	case EAstraGroupOrder::Attack:
 		if (Target)
 		{
-			const double D = FVector::Dist(KnownPos(Me, *Target), C);
-			Text = FString::Printf(TEXT("attacking %s, %.1f km away: every ship that can reach it fires on it, the group closes to %.1f km (on its firing line in ~%.0f s) and will not break off by itself"),
-			                       *Label(*Target), D / WarKm, G.EngageRange / WarKm, OrdEtaS(D - G.EngageRange, Pace));
+			FVector TPos = Target->Pos;
+			OnPlot(Me, *Target, TPos);
+			const double D = FVector::Dist(TPos, C);
+			const double Hold = G.OrderRangeM > 0.f ? G.OrderRangeM : G.EngageRange;
+			Text = FString::Printf(TEXT("attacking %s, %.1f km away: every ship that can reach it fires on it, the group %s %.1f km (on its firing line in ~%.0f s)"),
+			                       *Label(*Target), D / WarKm, G.OrderRangeM > 0.f ? TEXT("closes to the ordered") : TEXT("closes to"), Hold / WarKm, OrdEtaS(D - Hold, Pace));
 		}
 		else if (Other)
 		{
-			Text = FString::Printf(TEXT("attacking the %s group: fire on whichever of its ships is worth most, and it will not break off by itself"), *Other->Name);
+			Text = FString::Printf(TEXT("attacking the %s group: fire on whichever of its ships is worth most"), *Other->Name);
 		}
 		else
 		{
-			Text = TEXT("pressing the attack on whatever it judges best, and it will not break off by itself");
+			Text = TEXT("pressing the attack on whatever it judges best");
 		}
 		break;
 	case EAstraGroupOrder::Pin:
@@ -269,7 +291,8 @@ FString UAstraBattleSubsystem::DescribeGroupOrder(const FAstraBattleGroup& G, co
 		}
 		if (Mover && Target)
 		{
-			const FVector TP = KnownPos(Me, *Target);
+			FVector TP = Target->Pos;
+			OnPlot(Me, *Target, TP);
 			const FVector Back = (C - TP).GetSafeNormal();
 			const double Rr = FMath::Max((double)G.EngageRange * 1.05, 3500.0);
 			const FVector From = Mover->Pos - TP;
@@ -281,14 +304,15 @@ FString UAstraBattleSubsystem::DescribeGroupOrder(const FAstraBattleGroup& G, co
 			const FVector Point = TP + FVector(FMath::Cos(Goal), FMath::Sin(Goal), 0.0) * Rr;
 			for (const FAstraBattleShip& X : Ships)
 			{
-				if (X.bAlive && !X.bCraft && !X.bDisabled && !X.bGhost && AstraSideIdx(X.Side) == 1 - Me && X.RailDamage > 0.f && FVector::Dist(KnownPos(Me, X), Point) < X.RailRange && Knows(Me, X))
+				FVector XP;
+				if (X.bAlive && !X.bCraft && !X.bDisabled && !X.bGhost && AstraSideIdx(X.Side) == 1 - Me && X.RailDamage > 0.f && OnPlot(Me, X, XP) && FVector::Dist(XP, Point) < X.RailRange)
 				{
 					++EnemiesThere;
 				}
 			}
 		}
 		Text = FString::Printf(TEXT("flanking %s%s, %d ship%s swinging to its beam%s%s; the rest of the line holds the enemy's attention"), bLeft ? TEXT("left") : TEXT("right"), *On,
-		                       FMath::Max(1, N / 2), N / 2 > 1 ? TEXT("s") : TEXT(""), Eta > 0.0 ? *FString::Printf(TEXT(", ~%.0f s to get there"), Eta) : TEXT(""),
+		                       FMath::Clamp(N / 2, 1, 2), N / 2 > 1 ? TEXT("s") : TEXT(""), Eta > 0.0 ? *FString::Printf(TEXT(", ~%.0f s to get there"), Eta) : TEXT(""),
 		                       EnemiesThere > 0 ? *FString::Printf(TEXT("; %d enemy ships have that point inside their gun range"), EnemiesThere) : TEXT(""));
 		break;
 	}
@@ -305,9 +329,10 @@ FString UAstraBattleSubsystem::DescribeGroupOrder(const FAstraBattleGroup& G, co
 		double Nearest = 1e18;
 		for (const FAstraBattleShip& X : Ships)
 		{
-			if (X.bAlive && !X.bCraft && !X.bDisabled && AstraSideIdx(X.Side) == 1 - Me && Knows(Me, X))
+			FVector XP;
+			if (X.bAlive && !X.bCraft && !X.bDisabled && AstraSideIdx(X.Side) == 1 - Me && OnPlot(Me, X, XP))
 			{
-				Nearest = FMath::Min(Nearest, (double)FVector::Dist(KnownPos(Me, X), C));
+				Nearest = FMath::Min(Nearest, (double)FVector::Dist(XP, C));
 			}
 		}
 		Text = Nearest < 1e17 ? FString::Printf(TEXT("withdrawing: the nearest enemy is %.1f km away; the group breaks contact, the healthiest ship covering the rear, and is clear of them in ~%.0f s"), Nearest / WarKm,
@@ -330,13 +355,21 @@ FString UAstraBattleSubsystem::DescribeGroupOrder(const FAstraBattleGroup& G, co
 		}
 		break;
 	case EAstraGroupOrder::Hold:
-		Text = TEXT("holding this position, firing at what comes in range, and it will not break off by itself");
+		Text = TEXT("holding this position, firing at what comes in range");
 		break;
 	}
 	FString Tail;
+	if (G.OrderRangeM > 0.f && G.Order != EAstraGroupOrder::Attack && G.Order != EAstraGroupOrder::Withdraw && G.Order != EAstraGroupOrder::Regroup)
+	{
+		Tail = FString::Printf(TEXT("; it holds %.1f km from its target"), G.OrderRangeM / WarKm);
+	}
+	if (G.Order != EAstraGroupOrder::Auto && G.Order != EAstraGroupOrder::Withdraw && G.Order != EAstraGroupOrder::Regroup)
+	{
+		Tail += TEXT("; while this order stands the group does not break off by itself");       // (the automatic retreat is for a group with no commander)
+	}
 	if (G.OrderUntil > 0.f)
 	{
-		Tail = FString::Printf(TEXT(" (for %.0f s, then back to its own judgement)"), FMath::Max(0.f, G.OrderUntil - Time));
+		Tail += FString::Printf(TEXT(" (for %.0f s, then back to its own judgement)"), FMath::Max(0.f, G.OrderUntil - Time));
 	}
 	return FString::Printf(TEXT("%s: %s%s"), *G.Name, *Text, *Tail);
 }
@@ -350,7 +383,7 @@ bool UAstraBattleSubsystem::GroupOrderCommand(const TSharedPtr<FJsonObject>& Arg
 		return false;
 	}
 	FString SideText, GroupText, OrderText, TargetText, ByText, FormationText;
-	double ForS = 0.0;
+	double ForS = 0.0, RangeKm = 0.0;
 	Args->TryGetStringField(TEXT("side"), SideText);
 	Args->TryGetStringField(TEXT("group"), GroupText);
 	Args->TryGetStringField(TEXT("order"), OrderText);
@@ -361,6 +394,7 @@ bool UAstraBattleSubsystem::GroupOrderCommand(const TSharedPtr<FJsonObject>& Arg
 	{
 		Args->TryGetNumberField(TEXT("duration_s"), ForS);
 	}
+	Args->TryGetNumberField(TEXT("range_km"), RangeKm);                   // optional: the distance to hold from the target
 	SideText = SideText.ToLower().TrimStartAndEnd();
 	ByText = ByText.ToLower().TrimStartAndEnd();
 	const FString Order = OrderText.ToLower().TrimStartAndEnd();
@@ -461,7 +495,8 @@ bool UAstraBattleSubsystem::GroupOrderCommand(const TSharedPtr<FJsonObject>& Arg
 				OutDetail = FString::Printf(TEXT("'%s' is not a hostile warship on your plot: name one by its contact id (or \"group of <id>\")"), *TargetText);
 				return false;
 			}
-			if (!Knows(Me, *T))
+			FVector TSeen;
+			if (!OnPlot(Me, *T, TSeen))
 			{
 				OutDetail = FString::Printf(TEXT("you hold no track on %s now: an order needs a contact you can see"), *Tag.ToUpper());
 				return false;
@@ -520,6 +555,7 @@ bool UAstraBattleSubsystem::GroupOrderCommand(const TSharedPtr<FJsonObject>& Arg
 			continue;
 		}
 		G->OrderShip = G->OrderGroup = -1;                                   // (no stale target from an earlier order)
+		G->OrderRangeM = 0.f;
 		FString Detail;
 		const float Duration = FMath::Clamp((float)ForS, 0.f, 3600.f);
 		const FString ShipContact = (TargetShip && bNeedsEnemy) ? (TargetShip->bPlayer ? FString(TEXT("AQUILA")) : TargetShip->ContactId) : FString();
@@ -537,7 +573,10 @@ bool UAstraBattleSubsystem::GroupOrderCommand(const TSharedPtr<FJsonObject>& Arg
 		{
 			G->ProtecteeId = TargetShip->Id;
 		}
-		G->bGuideSet = G->bGuideSet;                                         // (the guide carries on from where it is)
+		if (RangeKm > 0.0 && Order != TEXT("auto") && Order != TEXT("withdraw") && Order != TEXT("regroup"))
+		{
+			G->OrderRangeM = (float)(FMath::Clamp(RangeKm, 1.5, 12.0) * WarKm);   // the commander's distance: stands over the group's own choice
+		}
 		Done.Add(DescribeGroupOrder(*G, bNeedsEnemy ? TargetShip : nullptr, TargetGroup));
 	}
 	OutDetail = FString::Join(Done, TEXT("; "));
@@ -663,7 +702,12 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::SideGroupsJson(int32 SideIdx) con
 	TArray<FSeen> Seen;
 	for (const FAstraBattleShip& X : Ships)
 	{
-		if (!X.bAlive || X.bCraft || X.bGhost || X.bDerelict || X.bDisabled || AstraSideIdx(X.Side) != 1 - SideIdx || (X.bFog && X.Track < 2 && SideIdx == 0) || !Knows(SideIdx, X))
+		if (!X.bAlive || X.bCraft || X.bGhost || X.bDerelict || X.bDisabled || AstraSideIdx(X.Side) != 1 - SideIdx)
+		{
+			continue;
+		}
+		FVector SeenAt;
+		if (!OnPlot(SideIdx, X, SeenAt))
 		{
 			continue;
 		}
@@ -688,7 +732,8 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::SideGroupsJson(int32 SideIdx) con
 		{
 			const FString Id = X->bPlayer ? FString(TEXT("AQUILA")) : X->ContactId;
 			Lowest = (Lowest.IsEmpty() || Id < Lowest) ? Id : Lowest;
-			const FVector P = KnownPos(SideIdx, *X);
+			FVector P = X->Pos;
+			OnPlot(SideIdx, *X, P);
 			C += P;
 			Near = FMath::Min(Near, (double)FVector::Dist(P, Ref));
 			TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();

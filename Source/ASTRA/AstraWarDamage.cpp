@@ -67,6 +67,91 @@ namespace
 	int32 WarOpposite(int32 F) { return F ^ 1; }
 }
 
+// ---------------------------------------------------------------------------------------------- where a shot strikes
+bool UAstraBattleSubsystem::HullSweep(const FAstraBattleShip& T, const FVector& P0, const FVector& P1, FVector& OutEntry) const
+{
+	// the bounding sphere first (what is far from the path costs one closest-point test)
+	const FVector Closest = FMath::ClosestPointOnSegment(T.Pos, P0, P1);
+	const double Bound = T.Radius * (T.Box.Valid() ? 1.05 : 1.0) + 1.0;
+	if (FVector::DistSquared(Closest, T.Pos) > Bound * Bound)
+	{
+		return false;
+	}
+	if (!T.Box.Valid())
+	{
+		// no measures (craft, decoys): a sphere of Radius, struck where the path enters it
+		const FVector Dir = (P1 - P0).GetSafeNormal();
+		FVector Entry = AstraWar::SphereEntry(T.Pos, T.Radius, Closest, Dir);
+		if (FVector::DotProduct(Entry - P0, Dir) < 0.0)
+		{
+			Entry = P0;                                        // it started inside
+		}
+		OutEntry = Entry;
+		return true;
+	}
+	// the box, in the ship's frame (the slab test: the last entry against the first exit on the three axes)
+	const FQuat Inv = T.Att.Inverse();
+	const FVector Off(T.Box.Mid, 0.0, 0.0);
+	const FVector L0 = Inv.RotateVector(P0 - T.Pos) - Off;
+	const FVector L1 = Inv.RotateVector(P1 - T.Pos) - Off;
+	const FVector D = L1 - L0;
+	const double H[3] = {(double)T.Box.Hx, (double)T.Box.Hy, (double)T.Box.Hz};
+	double T0 = 0.0, T1 = 1.0;
+	for (int32 a = 0; a < 3; ++a)
+	{
+		const double O = L0[a], Dd = D[a];
+		if (FMath::Abs(Dd) < 1e-9)
+		{
+			if (FMath::Abs(O) > H[a])
+			{
+				return false;                                  // parallel to the slab and outside it
+			}
+			continue;
+		}
+		double Ta = (-H[a] - O) / Dd, Tb = (H[a] - O) / Dd;
+		if (Ta > Tb)
+		{
+			Swap(Ta, Tb);
+		}
+		T0 = FMath::Max(T0, Ta);
+		T1 = FMath::Min(T1, Tb);
+		if (T0 > T1)
+		{
+			return false;
+		}
+	}
+	OutEntry = P0 + (P1 - P0) * T0;                            // (T0 = 0: it started inside the hull)
+	return true;
+}
+
+FVector UAstraBattleSubsystem::HullRandomEntry(const FVector& From, const FAstraBattleShip& T) const
+{
+	if (T.Box.Valid())
+	{
+		const FVector LP(FMath::FRandRange(-0.9f, 0.9f) * T.Box.Hx, FMath::FRandRange(-0.9f, 0.9f) * T.Box.Hy, FMath::FRandRange(-0.9f, 0.9f) * T.Box.Hz);
+		const FVector Aim = T.Pos + T.Att.RotateVector(LP + FVector(T.Box.Mid, 0.0, 0.0));
+		const FVector Dir = (Aim - From).GetSafeNormal();
+		FVector Entry;
+		if (HullSweep(T, From, Aim + Dir * (double)T.Radius * 2.0, Entry))
+		{
+			return Entry;
+		}
+		return Aim;
+	}
+	const FVector Dir = (T.Pos - From).GetSafeNormal();
+	const FVector Off = FVector::VectorPlaneProject(FMath::VRand(), Dir).GetSafeNormal() * T.Radius * 0.9 * FMath::Sqrt(FMath::FRand());
+	return AstraWar::SphereEntry(T.Pos, T.Radius, T.Pos + Off, Dir);
+}
+
+float UAstraBattleSubsystem::BreakX(const FAstraBattleShip& S, int32 Section) const
+{
+	if (!S.Box.Valid() || (S.Box.CutBow == 0.f && S.Box.CutStern == 0.f))
+	{
+		return (Section == AstraWar::SecBow ? 1.f : (Section == AstraWar::SecStern ? -1.f : 0.f)) * 0.33f * S.Radius;   // (no cuts known: a third of the way)
+	}
+	return Section == AstraWar::SecBow ? S.Box.CutBow : (Section == AstraWar::SecStern ? S.Box.CutStern : 0.5f * (S.Box.CutBow + S.Box.CutStern));
+}
+
 // ---------------------------------------------------------------------------------------------- building a ship's model
 void UAstraBattleSubsystem::InitShipModel(FAstraBattleShip& S)
 {
@@ -77,6 +162,9 @@ void UAstraBattleSubsystem::InitShipModel(FAstraBattleShip& S)
 		return;                                   // craft, decoys, anything with no class: hull and shield stay lumps
 	}
 	S.ClassKey = Key;
+	S.Radius = C->Radius;                      // the class's measures, not the caller's guess: the game draws the mesh at true scale
+	S.Box = C->Box;
+	S.SizeTier = (uint8)FMath::Clamp(C->Tier, 0, 3);
 	S.MaxAccel = C->Accel;
 	S.MaxTurnDeg = C->TurnDeg;
 	S.SensorKm = C->SensorKm;
@@ -362,18 +450,45 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 	FAstraShipDamage& D = To.Dmg;
 	const EAstraDamageType Type = AstraDamageTypeOf(Kind);
 	const FWarHitProfile P = WarProfileOf(Type, Damage);
-	// --- where: the outward normal at the point it strikes, in the ship's frame
-	FVector N = To.Att.UnrotateVector(HitPos - To.Pos);
-	if (N.SizeSquared() < 1.0)
-	{
-		N = To.Att.UnrotateVector(-FromDir);                 // dead centre: from where it came
-	}
-	N = N.GetSafeNormal();
-	const int32 F = AstraFacingOf(N);
-	// the section: guns aim at the middle of what they see, but the fall of shot and the gunners' choice of aim scatter the hits
-	// along the hull (a shot from ahead still strikes the bow)
+	// --- where: the face it struck and the section along the hull, from the point where its path entered it
 	static AstraWar::FTuneVar KScatter(TEXT("hit_scatter"), 0.5f);
-	const int32 Sec = AstraWar::SectionOfNormal(FVector(N.X + FMath::FRandRange(-KScatter.Get(), KScatter.Get()), N.Y, N.Z));
+	FVector N;
+	int32 F, Sec;
+	if (To.Box.Valid())
+	{
+		// the hull is a box of the mesh's own measures: the face is the one the point lies on, the section comes from where along
+		// the hull it is against the class's cut planes; the fall of shot and the gunners' choice of aim scatter the hits along it
+		const FVector Lp = To.Att.UnrotateVector(HitPos - To.Pos) - FVector(To.Box.Mid, 0.0, 0.0);
+		const FVector R(Lp.X / To.Box.Hx, Lp.Y / To.Box.Hy, Lp.Z / To.Box.Hz);          // 1 on the surface, along each axis
+		const FVector A = R.GetAbs();
+		if (A.X >= A.Y && A.X >= A.Z)
+		{
+			F = R.X >= 0.0 ? AstraWar::Bow : AstraWar::Stern;
+		}
+		else if (A.Y >= A.Z)
+		{
+			F = R.Y >= 0.0 ? AstraWar::Starboard : AstraWar::Port;
+		}
+		else
+		{
+			F = R.Z >= 0.0 ? AstraWar::Dorsal : AstraWar::Ventral;
+		}
+		N = R.SizeSquared() > 1e-6 ? R.GetSafeNormal() : AstraWar::FacingVector(F);   // where on the hull, as a direction out of it
+		const double X = Lp.X + To.Box.Mid + FMath::FRandRange(-1.f, 1.f) * KScatter.Get() * 1.3 * To.Box.Hx;
+		Sec = X > To.Box.CutBow ? AstraWar::SecBow : (X < To.Box.CutStern ? AstraWar::SecStern : AstraWar::SecMid);
+	}
+	else
+	{
+		// no measures: the sphere's outward normal, the section scattered (a shot from ahead still strikes the bow)
+		N = To.Att.UnrotateVector(HitPos - To.Pos);
+		if (N.SizeSquared() < 1.0)
+		{
+			N = To.Att.UnrotateVector(-FromDir);                 // dead centre: from where it came
+		}
+		N = N.GetSafeNormal();
+		F = AstraFacingOf(N);
+		Sec = AstraWar::SectionOfNormal(FVector(N.X + FMath::FRandRange(-KScatter.Get(), KScatter.Get()), N.Y, N.Z));
+	}
 	D.LastHitLocal = N;
 	D.LastHitAge = 0.f;
 	D.LastHitFacing = (uint8)F;
@@ -689,6 +804,8 @@ void UAstraBattleSubsystem::DisableShip(FAstraBattleShip& S, const TCHAR* Why)
 	E.Vel = S.Vel;
 	E.Att = S.Att;
 	E.Radius = S.Radius;
+	E.CutBowX = S.Box.CutBow;
+	E.CutSternX = S.Box.CutStern;
 	E.bAstra = S.Side == EAstraSide::Astra;
 	DeathEvents.Add(E);
 	if (DeathEvents.Num() > 64)
@@ -966,8 +1083,9 @@ bool UAstraBattleSubsystem::GetDamageViewById(int32 ShipId, FDamageView& Out) co
 	Out.bBreakingUp = D.bBreakingUp;
 	Out.BreakSection = D.BreakSection;
 	Out.BreakAxis = S->Att.GetForwardVector();
-	const double Sgn = D.BreakSection == AstraWar::SecBow ? 1.0 : (D.BreakSection == AstraWar::SecStern ? -1.0 : 0.0);
-	Out.BreakPoint = S->Pos + Out.BreakAxis * (Sgn * 0.33 * S->Radius);
+	Out.BreakPoint = S->Pos + Out.BreakAxis * BreakX(*S, D.BreakSection);
+	Out.CutBowX = S->Box.CutBow;
+	Out.CutSternX = S->Box.CutStern;
 	for (int32 s = 0; s < AstraWar::NumSections; ++s)
 	{
 		Out.bGutted[s] = D.GuttedT[s] >= 0.f;

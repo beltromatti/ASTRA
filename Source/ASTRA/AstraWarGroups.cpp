@@ -263,6 +263,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		G.Order = EAstraGroupOrder::Auto;                             // an order lapses
 		G.OrderShip = G.OrderGroup = -1;
 		G.OrderUntil = -1.f;
+		G.OrderRangeM = 0.f;
 		NoteGroupEvent(Me, FString::Printf(TEXT("%s: its order has run out, back to its own judgement"), *G.Name));
 	}
 	// --- what it knows of the enemy: the warships held by its side, near it
@@ -347,15 +348,16 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		if (G.Morale < 0.35f && !G.bBroken)
 		{
 			G.bBroken = true;
-			NoteGroupEvent(Me, FString::Printf(TEXT("%s: morale is breaking (%.2f), strength %.1f against %.1f; unless ordered to stand it will break off"), *G.Name, G.Morale, Str, EStr));
+			NoteGroupEvent(Me, FString::Printf(TEXT("%s: morale is breaking (%.2f), strength %.1f against %.1f; with no order in force it will break off"), *G.Name, G.Morale, Str, EStr));
 		}
 		else if (G.Morale > 0.6f)
 		{
 			G.bBroken = false;
 		}
-		// (a default for a group with no commander over it: an order to attack or to hold overrides it, and so does any other order the mind gives)
+		// (a default for a group with no commander over it: any order in force stands over it — to break off, the commander orders
+		// the withdrawal; `auto` gives the judgement back to the group)
 		const bool bBreak = G.WeakSince >= 0.f && Time - G.WeakSince > 14.f;
-		if (bBreak && G.Order != EAstraGroupOrder::Hold && G.Order != EAstraGroupOrder::Attack)
+		if (bBreak && G.Order == EAstraGroupOrder::Auto)
 		{
 			SetGroupState(G, EAstraGroupState::Withdraw, TEXT("it is being beaten"));
 			G.WithdrawSince = Time;
@@ -630,6 +632,27 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 			MinRail = S->RailDamage > 0.f ? FMath::Min(MinRail, (double)S->RailRange) : MinRail;
 		}
 		const double Cap = MinRail < 1e8 ? MinRail * 0.92 : 7000.0;
+		// Where it likes to be when the two sides' DPS do not settle it (equal reach: they never do): close enough that the whole
+		// formation reaches the enemy, not just its front rank. A preference and no more: an outranging (a clear difference in
+		// the DPS at some range) outweighs it. Measured: a group that held the longest range left the rear of its wedge out of
+		// reach and lost to one that closed (docs/GUERRA.md, sec. 7.3).
+		double AvgRad = 0.0;
+		for (const FAstraBattleShip* S : M)
+		{
+			AvgRad += S->Radius;
+		}
+		AvgRad /= FMath::Max(1, M.Num());
+		const double Sp0 = FMath::Clamp(AvgRad * 2.4 + 500.0, 900.0, 3500.0);
+		const int32 Nm = M.Num();
+		double Depth = Sp0;
+		switch (G.Formation)
+		{
+		case EAstraFormation::Wedge: Depth = 1.28 * Sp0 * (Nm / 2); break;
+		case EAstraFormation::Column: Depth = 1.2 * Sp0 * (Nm - 1); break;
+		case EAstraFormation::Line: Depth = 0.5 * (Nm - 1) * Sp0; break;
+		default: break;
+		}
+		const double R0 = FMath::Max(3000.0, 0.6 * (MinRail < 1e8 ? MinRail : 8000.0) - 0.3 * Depth);
 		double BestR = G.EngageRange, BestScore = -1.0;
 		for (double R = 3000.0; R <= FMath::Min(9500.0, Cap) + 1.0; R += 1000.0)
 		{
@@ -645,7 +668,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 					Theirs += ShipDps(*X.S, R);
 				}
 			}
-			double Score = (Mine + 4.0) / (Theirs + 4.0) * (1.0 + 0.015 * R / 1000.0);
+			double Score = (Mine + 4.0) / (Theirs + 4.0) * (1.0 + 0.15 * (1.0 - FMath::Min(1.0, FMath::Abs(R - R0) / 3000.0)));
 			if (FMath::Abs(R - G.EngageRange) < 1.0)
 			{
 				Score *= 1.06;                                          // hysteresis: keep the range unless another is clearly better
@@ -675,6 +698,10 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	else if (!bEnemy)
 	{
 		G.EngageRange = FMath::Max(G.EngageRange, 5500.f);
+	}
+	if (G.OrderRangeM > 0.f && G.Order != EAstraGroupOrder::Auto)
+	{
+		G.EngageRange = G.OrderRangeM;                                  // the commander's distance stands over the group's own choice
 	}
 	// --- the guide: it leads the group to the range and holds there
 	const float GuideSpeed = MinCruise * 0.92f;
@@ -956,7 +983,8 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		G.FlankShip[0] = G.FlankShip[1] = -1;
 		G.bFlankReported = G.bFlankArrived = false;
 	}
-	// --- the missiles: kept until enough are ready to saturate the target's defence, then all together
+	// --- the missiles: kept until enough are ready to saturate the target's defence, then all together (a ship a moment from ready is held too: the think
+	// comes every 0.4 s and its cells would be gone by the time it saw them ready)
 	if (Focus && KSalvo[Me].Get() > 0.5f)
 	{
 		TArray<FAstraBattleShip*, TInlineAllocator<12>> Ready;
@@ -966,10 +994,10 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		{
 			S->bHoldMissiles = false;
 			const double D = FVector::Dist(S->Pos, FocusPos);
-			if (S->Missiles > 0 && S->MissileT <= 0.f && !S->bConserve && S->SalvoAt < 0.f && D > 2600.0 && D < S->MissileRange * 0.95)
+			if (S->Missiles > 0 && S->MissileT <= 0.6f && !S->bConserve && S->SalvoAt < 0.f && D > 2600.0 && D < S->MissileRange * 0.95)
 			{
 				Ready.Add(S);
-				Cells += FMath::Min(S->Missiles, S->Radius > 200.f ? 6 : 3);
+				Cells += FMath::Min(S->Missiles, S->SizeTier >= 2 ? 6 : 3);
 				MaxTof = FMath::Max(MaxTof, D / 1200.0 + 1.5);
 			}
 		}

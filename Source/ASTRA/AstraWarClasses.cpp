@@ -74,6 +74,22 @@ namespace AstraWar
 				O->TryGetStringField(TEXT("label"), C.Label);
 				O->TryGetStringField(TEXT("mesh"), C.Mesh);
 				C.Radius = (float)NumField(O, TEXT("radius"), C.Radius);
+				C.Tier = (int32)NumField(O, TEXT("tier"), C.Tier);
+				if (const TSharedPtr<FJsonObject>* HB = nullptr; O->TryGetObjectField(TEXT("hull_m"), HB))
+				{
+					float X[2] = {-C.Radius, C.Radius};
+					ArrayField(*HB, TEXT("x"), X, false);
+					C.Box.Mid = 0.5f * (X[0] + X[1]);
+					C.Box.Hx = 0.5f * (X[1] - X[0]);
+					C.Box.Hy = 0.5f * (float)NumField(*HB, TEXT("width"), 2.0 * C.Box.Hy);
+					C.Box.Hz = 0.5f * (float)NumField(*HB, TEXT("height"), 2.0 * C.Box.Hz);
+				}
+				{
+					float Cuts[2] = {C.Box.CutBow, C.Box.CutStern};
+					ArrayField(O, TEXT("cuts_x_m"), Cuts, false);
+					C.Box.CutBow = Cuts[0];
+					C.Box.CutStern = Cuts[1];
+				}
 				C.Hull = (float)NumField(O, TEXT("hull"), C.Hull);
 				C.Shield = (float)NumField(O, TEXT("shield"), C.Shield);
 				C.ShieldRegen = (float)NumField(O, TEXT("shield_regen"), C.ShieldRegen);

@@ -135,6 +135,8 @@ struct FAstraBattleShip
 	// section, subsystems and weapon mounts with their fields of fire. Hull and Shield above stay the sums (what the rest of
 	// the game reads); craft and decoys have no model (Dmg.bModel false) and keep the lumps.
 	FName ClassKey;
+	AstraWar::FHullBox Box;              // the hull as a shot strikes it (a box from the class's true measures); empty: a sphere of Radius
+	uint8 SizeTier = 0;                  // how big it counts (3 capital ship, 2 cruiser, 1 destroyer, 0 smaller): what depends on class size
 	FAstraShipDamage Dmg;
 	TArray<FAstraMount> Mounts;
 	bool bDisabled = false;              // no power: dead in the water, drifting, a derelict (boardable in F5)
@@ -554,7 +556,8 @@ public:
 		bool bDisabled = false, bBreakingUp = false, bReactorCritical = false;
 		uint8 BreakSection = 0;
 		FVector BreakAxis = FVector::ZeroVector;    // the ship's long axis: the break is a plane across it (system frame)
-		FVector BreakPoint = FVector::ZeroVector;   // where the plane crosses it
+		FVector BreakPoint = FVector::ZeroVector;   // where the plane crosses it (the class's true cut of the section that lets go)
+		float CutBowX = 0.f, CutSternX = 0.f;       // the two cut planes of the break-up pieces (m along the axis, from the ship's origin)
 		FVector LastHitLocal = FVector::ZeroVector; // unit vector, ship frame, out of the ship: where the last blow struck
 		float LastHitAge = 1e9f;
 		int32 LastHitFacing = 0;
@@ -567,6 +570,13 @@ public:
 	/** The Aquila's engines as the helm should feel them (0 = dead, 1 = sound), her damage control's help to the systems. */
 	float PlayerEngineFactor() const;
 	void RepairPlayerSystems(float Amount);
+	/** Where a path (P0 to P1, system frame) first meets a ship's hull: the point it strikes. The hull is a box of the mesh's own measures
+	 *  (a sphere of Radius for what has none). */
+	bool HullSweep(const FAstraBattleShip& T, const FVector& P0, const FVector& P1, FVector& OutEntry) const;
+	/** Where a beam from From, aimed at a random point of the target's side, enters its hull. */
+	FVector HullRandomEntry(const FVector& From, const FAstraBattleShip& T) const;
+	/** The x (along the ship's axis, from its origin) of the cut where the section that lets go breaks away. */
+	float BreakX(const FAstraBattleShip& S, int32 Section) const;
 	/** The Aquila in the system frame. */
 	FVector PlayerPos() const { return Ships.Num() ? Ships[0].Pos : FVector::ZeroVector; }
 	FVector PlayerVel() const { return Ships.Num() ? Ships[0].Vel : FVector::ZeroVector; }
@@ -788,6 +798,8 @@ private:
 	void NoteGroupLoss(const FAstraBattleShip& S, const TCHAR* How);
 	FAstraBattleGroup* ResolveGroup(const FString& Key, int32 SideIdx, FString* OutWhy = nullptr);
 	FString DescribeGroupOrder(const FAstraBattleGroup& G, const FAstraBattleShip* Target, const FAstraBattleGroup* Other) const;
+	/** Is this enemy ship on the side's plot now (its ships' sensors; for ASTRA also the Aquila's own plot), and where. */
+	bool OnPlot(int32 SideIdx, const FAstraBattleShip& X, FVector& OutPos) const;
 	FAstraBattleShip* ChooseTarget(FAstraBattleShip& S, FAstraBattleGroup* G);
 	FVector ChooseFacing(const FAstraBattleShip& S, const FVector& ToTarget, double Dist) const;
 	FVector AvoidanceVel(const FAstraBattleShip& S) const;

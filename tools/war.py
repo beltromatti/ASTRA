@@ -10,6 +10,14 @@ real time. For the lead and the war module's support agents (in their own worktr
   tools/war.py batch --seeds 12 [--tag t] [--scenario name] [--exec "..."]
                                               N seeds of one scenario (in parallel), one line per seed and the mean
   tools/war.py compare tagA tagB              two saved batches (Saved/War/<tag>_<seed>.json) side by side
+  tools/war.py sweep --scenario sym_small --seeds 96 --features flank=1,focus,saturate,rotate,retreat_ratio
+                                              what each behaviour is worth: switched off (or set: name=value) for the ASTRA side alone in
+                                              a symmetric scenario, against the control where both sides have it (astra.war.tune <name>_a)
+  tools/war.py groups Saved/War/run.json     the battle groups through a record (state, order, focus, guide, axis, ships)
+  tools/war.py views Saved/War/run.json      what the minds are given of the groups (record made with run --views), its size and the events
+  tools/war.py duel --shooter acheron --target praetorian --range 5
+                                              static shooters against a passive dummy from each face: the damage model on a bench
+  tools/war.py embed                          after a change in data/war/classes.json: rewrite the table compiled into the game
 
 `run` needs the editor target built for this checkout (Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex) and uses
 -nullrhi: it never opens a window or touches the GPU, so it can run while the game or the editor is open.

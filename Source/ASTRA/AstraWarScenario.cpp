@@ -250,7 +250,7 @@ int32 UAstraBattleSubsystem::AddWing(int32 CarrierIdx, int32 Kind, int32 Count, 
 	Q.Side = Carrier.Side;
 	Q.CarrierId = Carrier.Id;
 	Q.Mission = Mission;
-	Q.Rockets = (Kind == 0 && !bAstra) ? 4 : 0;
+	Q.Rockets = Kind == 0 ? 4 : 0;                         // (the two sides' wings are alike in a bench scenario: the same load-out)
 	Q.bAuto = true;                                        // a bench wing has no crew to give it targets
 	Squadrons.Add(Q);
 	return Squadrons.Num() - 1;

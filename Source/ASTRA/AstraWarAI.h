@@ -68,6 +68,7 @@ struct FAstraBattleGroup
 	int32 OrderShip = -1;            // Attack/Pin/Flank: the ship id the order is about (-1: the group's own choice)
 	int32 OrderGroup = -1;           // Attack/Pin/Reinforce: the group id
 	float OrderUntil = -1.f;         // battle time it lapses (-1: until changed)
+	float OrderRangeM = 0.f;         // the commander's chosen distance to the target, m (0: the group's own choice)
 	FString OrderBy;                 // who gave it: admiral | captain | auto
 	// what it sees and wants
 	FVector Centroid = FVector::ZeroVector;
