@@ -1,4 +1,7 @@
 #include "AstraHarness.h"
+#include "RHI.h"
+#include "RenderTimer.h"
+#include "DynamicResolutionState.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
 #include "ASTRA.h"
@@ -396,6 +399,21 @@ TSharedRef<FJsonObject> UAstraHarness::StateJson() const
 	O->SetNumberField(TEXT("real"), FPlatformTime::Seconds());
 	O->SetNumberField(TEXT("game"), W ? W->GetTimeSeconds() : -1.0);
 	O->SetNumberField(TEXT("fps"), FMath::RoundToDouble(FpsAvg * 10.0) / 10.0);
+	{
+		// where the frame goes (like stat unit): game thread, render thread, GPU, and the dynamic resolution now
+		TSharedRef<FJsonObject> Pf = MakeShared<FJsonObject>();
+		auto Ms = [](uint32 Cycles) { return FMath::RoundToDouble(FPlatformTime::ToMilliseconds(Cycles) * 10.0) / 10.0; };
+		Pf->SetNumberField(TEXT("game_ms"), Ms(GGameThreadTime));
+		Pf->SetNumberField(TEXT("render_ms"), Ms(GRenderThreadTime));
+		Pf->SetNumberField(TEXT("gpu_ms"), Ms(RHIGetGPUFrameCycles()));
+		if (GEngine)
+		{
+			FDynamicResolutionStateInfos Dyn;
+			GEngine->GetDynamicResolutionCurrentStateInfos(Dyn);
+			Pf->SetNumberField(TEXT("dynres_pct"), FMath::RoundToDouble(100.0 * Dyn.ResolutionFractionApproximations[GDynamicPrimaryResolutionFraction]));
+		}
+		O->SetObjectField(TEXT("perf"), Pf);
+	}
 	O->SetStringField(TEXT("map"), W ? W->GetMapName() : FString());
 	O->SetBoolField(TEXT("paused"), W && W->IsPaused());
 	const UAstraCampaignSubsystem* Camp = W ? W->GetSubsystem<UAstraCampaignSubsystem>() : nullptr;

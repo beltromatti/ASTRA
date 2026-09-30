@@ -3,6 +3,7 @@
 
   tools/play.py launch [--map /Game/ASTRA/Maps/L_Bridge] [--res 1600x900] [--continue] [--nomind] [--sound] [--args "..."]
   tools/play.py state                     where the Captain is, posture, view, fps, menu, game clock
+  tools/play.py perf [SECONDS] [--label]  median frame timings: fps, game thread, render thread, GPU, dynamic resolution
   tools/play.py ship [key ...]            the ship snapshot the crew sees (optionally only some keys)
   tools/play.py timeline [--all|--last N] what happened since the last call (lines, reports, commands, inputs)
   tools/play.py watch SECONDS             print what happens for a while
@@ -184,6 +185,28 @@ def cmd_tp(a: argparse.Namespace) -> None:
     print(json.dumps(call("/teleport", {"x": a.x, "y": a.y, "z": a.z, "yaw": a.yaw, "pitch": a.pitch})))
 
 
+def cmd_perf(a: argparse.Namespace) -> None:
+    """Median frame timings over a few seconds (like stat unit): fps, game thread, render thread, GPU, dynamic resolution."""
+    keys = ("game_ms", "render_ms", "gpu_ms", "dynres_pct")
+    samples: dict[str, list[float]] = {k: [] for k in keys}
+    fps: list[float] = []
+    end = time.time() + a.seconds
+    while time.time() < end:
+        st = call("/state")
+        fps.append(float(st.get("fps", 0)))
+        for k in keys:
+            v = st.get("perf", {}).get(k)
+            if isinstance(v, (int, float)):
+                samples[k].append(float(v))
+        time.sleep(0.25)
+
+    def med(xs: list[float]) -> float:
+        xs = sorted(xs)
+        return xs[len(xs) // 2] if xs else float("nan")
+    print(f"{a.label + ': ' if a.label else ''}fps {med(fps):.1f} · game {med(samples['game_ms']):.1f} ms · render {med(samples['render_ms']):.1f} ms"
+          f" · gpu {med(samples['gpu_ms']):.1f} ms · dynres {med(samples['dynres_pct']):.0f}%")
+
+
 def cmd_say(a: argparse.Namespace) -> None:
     print(json.dumps(call("/say", {"text": a.text})))
 
@@ -270,6 +293,10 @@ def main() -> None:
     p.add_argument("pitch", type=float, nargs="?", default=0.0)
     p.add_argument("--z", type=float, default=0.0)
     p.set_defaults(fn=cmd_tp)
+    p = sub.add_parser("perf", help="median frame timings over a few seconds")
+    p.add_argument("seconds", type=float, nargs="?", default=6.0)
+    p.add_argument("--label", default="")
+    p.set_defaults(fn=cmd_perf)
     p = sub.add_parser("say")
     p.add_argument("text")
     p.set_defaults(fn=cmd_say)
