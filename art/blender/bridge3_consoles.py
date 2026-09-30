@@ -78,11 +78,11 @@ def fan_body(b: Parts, F: Fan, dept: str, station: str, spine: bool = True) -> N
             continue
         sweep(fb, [(1.0, zs(1.0) - 0.004), (r1 + 0.006, zs(r1) + 0.024), (r1 + 0.006, zs(r1) + 0.036), (1.0, zs(1.0) + 0.008)], th0, th1, L.IVORY, 6)
     # the glass work surface (the whole fan is dark glass between the lip and the spine)
-    sweep(fb, [(r0 + 0.012, zs(r0 + 0.012) - 0.002), (1.06, zs(1.06) - 0.002), (1.06, zs(1.06) + 0.004), (r0 + 0.012, zs(r0 + 0.012) + 0.004)],
+    sweep(fb, [(r0 + 0.012, zs(r0 + 0.012) - 0.002), (1.06, zs(1.06) - 0.002), (1.06, zs(1.06) + 0.0015), (r0 + 0.012, zs(r0 + 0.012) + 0.0015)],
           -a + 1.0, a - 1.0, L.DGLASS, 26)
     if spine:
         # the raised spine along the back: ivory cover, a dark emitter slot with a crown of lenses
-        sweep(fb, [(1.06, zs(1.06) + 0.004), (1.10, zs(1.10) + 0.10), (r1 - 0.02, zs(r1) + 0.13), (r1, zs(r1) + 0.02)], -a + 1.0, a - 1.0, L.IVORY, 26)
+        sweep(fb, [(1.06, zs(1.06) + 0.0015), (1.10, zs(1.10) + 0.10), (r1 - 0.02, zs(r1) + 0.13), (r1, zs(r1) + 0.02)], -a + 1.0, a - 1.0, L.IVORY, 26)
         sweep(fb, [(1.10, zs(1.10) + 0.10), (1.18, zs(1.18) + 0.115), (1.18, zs(1.18) + 0.122), (1.10, zs(1.10) + 0.107)], -a + 4.0, a - 4.0, L.STRUCT, 26)
         for k in range(-7, 8):
             th = k * (a - 8.0) / 7.0
@@ -135,11 +135,11 @@ def touch_screen(b: Parts, F: Fan, slot: str, r: float, th: float, w: float, asp
     h = w / aspect
     with b.emit.at(F.frame(r, th, lift)):
         b.emit.screen((0, 0, 0), w, h, slot, (0, 0, 1), up=(1, 0, 0))
-    with b.fine.at(F.frame(r, th, 0.0)):                       # a thin brushed bezel and a lit border round the glass
-        b.fine.box((-h / 2 - 0.012, -w / 2 - 0.012, 0.0), (-h / 2, w / 2 + 0.012, 0.004), L.STRUCT)
-        b.fine.box((h / 2, -w / 2 - 0.012, 0.0), (h / 2 + 0.012, w / 2 + 0.012, 0.004), L.STRUCT)
-        b.fine.box((-h / 2, -w / 2 - 0.012, 0.0), (h / 2, -w / 2, 0.004), L.STRUCT)
-        b.fine.box((-h / 2, w / 2, 0.0), (h / 2, w / 2 + 0.012, 0.004), L.STRUCT)
+    with b.fine.at(F.frame(r, th, 0.0)):                       # a thin brushed bezel round the glass, proud of the surface
+        b.fine.box((-h / 2 - 0.012, -w / 2 - 0.012, 0.0), (-h / 2, w / 2 + 0.012, 0.006), L.STRUCT)
+        b.fine.box((h / 2, -w / 2 - 0.012, 0.0), (h / 2 + 0.012, w / 2 + 0.012, 0.006), L.STRUCT)
+        b.fine.box((-h / 2, -w / 2 - 0.012, 0.0), (h / 2, -w / 2, 0.006), L.STRUCT)
+        b.fine.box((-h / 2, w / 2, 0.0), (h / 2, w / 2 + 0.012, 0.006), L.STRUCT)
     return {"screen": slot, "size_m": [round(w, 3), round(h, 3)], "surface": "glass"}
 
 
@@ -311,7 +311,15 @@ def tactical_body(b: Parts, F: Fan, dept: str) -> None:
     dim = dept + "_dim"
     sweep(fb, [(0.5, 0.0), (r1 + 0.03, 0.0), (r1 + 0.03, 0.07), (0.5, 0.07)], -a, a, L.STRUCT, 28)                      # floor plate
     sweep(fb, [(0.70, 0.07), (r1 - 0.05, 0.07), (r1 - 0.05, zs(r1 - 0.05) - 0.10), (0.70, zs(0.70) - 0.10)], -44, 44, L.COMPOSITE, 22)  # core
-    sweep(fb, [(r0, F.z0 - 0.078), (r1, zs(r1) - 0.078), (r1, zs(r1) - 0.012), (r0, F.z0 - 0.012)], -a, a, L.IVORY, 30)   # the slab
+    sweep(fb, [(r0, F.z0 - 0.078), (r1, zs(r1) - 0.078), (r1, zs(r1) - 0.012), (r0, F.z0 - 0.012)], -a, a, L.COMPOSITE, 30)   # the slab
+    sweep(fb, [(r1, zs(r1) - 0.056), (r1 + 0.008, zs(r1) - 0.052), (r1 + 0.008, zs(r1) - 0.016), (r1, zs(r1) - 0.012)], -a, a, L.IVORY, 30)   # armour band
+    for k in range(-3, 4):                                                   # bolted straps over the band
+        th = k * a / 3.4
+        c, s_ = math.cos(math.radians(th)), math.sin(math.radians(th))
+        with fb.at(T((r1 + 0.004) * c, (r1 + 0.004) * s_, zs(r1) - 0.034) @ Rz(th)):
+            fb.box((0.0, -0.035, -0.024), (0.006, 0.035, 0.024), L.TRIM)
+    em.lamp_arc([(r1 - 0.004, 0.0), (r1 + 0.004, 0.0), (r1 + 0.004, 0.006), (r1 - 0.004, 0.006)], 0, 0, 0, -a + 4, a - 4, dim, L.LAMP_DIM, seg=28,
+                z0=zs(r1) - 0.075)
     sweep(fb, [(r0 + 0.012, F.z0 - 0.012), (r1 - 0.012, zs(r1 - 0.012) - 0.012), (r1 - 0.012, zs(r1 - 0.012) + 0.002),
                (r0 + 0.012, F.z0 + 0.002)], -a + 1.0, a - 1.0, L.DGLASS, 30)                                              # glass top
     sweep(fb, [(r0 - 0.014, F.z0 - 0.078), (r0, F.z0 - 0.078), (r0, F.z0 + 0.008), (r0 - 0.014, F.z0 + 0.008)], -a, a, L.TRIM, 30)  # lip

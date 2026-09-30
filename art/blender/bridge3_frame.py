@@ -216,8 +216,10 @@ def build_rails(c: SH.Ctx, name: str = "SM_BRG3_Rails", glass_name: str = "SM_BR
     fb, em = b.body, b.emit
     gl = FB()
     sw = c.STAIR_W
-    runs = [((c.WELL_X - 0.08, -c.WELL_HW + sw), (c.WELL_X - 0.08, c.WELL_HW - sw), 0.0)]
+    gate = 2.0                                                    # half-width of the opening in front of the dais (a 0.6 m step, lit nosing)
+    runs = []
     for s in (1, -1):
+        runs.append(((c.WELL_X - 0.08, s * gate), (c.WELL_X - 0.08, s * (c.WELL_HW - sw)), 0.0))
         runs.append(((c.WELL_X + 0.75, s * (c.WELL_HW + 0.08)), (c.xe - 0.45, s * (c.WELL_HW + 0.08)), 0.0))
     for (p0, p1, z) in runs:
         ln = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
@@ -237,6 +239,13 @@ def build_rails(c: SH.Ctx, name: str = "SM_BRG3_Rails", glass_name: str = "SM_BR
         run_box(fb, p0, p1, 0.06, 0.14, 0.05, L.STRUCT)
         run_box(em, p0, p1, 0.10, 0.108, 0.052, L.LAMP_DIM, cell="command_dim")
         run_box(gl, p0, p1, 0.16, 0.96, 0.012, L.GLASS)
+    # the two gate posts of the opening: taller, with a lit edge and a cap lamp facing the passage
+    for sd in (-1, 1):
+        x, y = c.WELL_X - 0.08, sd * gate
+        fb.cbox((x, y, 0.56), (0.075, 0.075, 1.12), L.STRUCT)
+        fb.cbox((x, y, 1.135), (0.10, 0.10, 0.03), L.TRIM)
+        em.lamp_cbox((x, y - sd * 0.0385, 0.60), (0.024, 0.004, 0.86), "command", L.LAMP)
+        em.lamp_cbox((x, y, 1.152), (0.06, 0.06, 0.004), "amber", L.LAMP_DIM)
     return b.build(name), A.finish(gl.to_object(glass_name), bevel=0.0)
 
 
