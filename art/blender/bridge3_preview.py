@@ -700,8 +700,7 @@ def studio(objs: list, out_dir: str, views: list | None = None, fov: float = 34.
     bpy.ops.mesh.primitive_plane_add(size=14.0, location=(0, 0, 0))
     floor = bpy.context.active_object
     floor.name = "StudioFloor"
-    if L.DECK in bpy.data.materials:
-        floor.data.materials.append(bpy.data.materials[L.DECK])
+    floor.data.materials.append(pbr("StudioFloor", (0.05, 0.052, 0.058), None, 1.0, (0.30, 0.42), 0.0, 0.0, 0.0, 0.0, coat=0.0, spec=0.4))
     if os.environ.get("BRG3_DEBUG_MATS"):                       # flat identification colours per material
         colors = {L.STRUCT: (1, 0, 0), L.TRIM: (0, 1, 0), L.RUBBER: (0, 0, 1), L.LEATHER: (1, 1, 0), L.COMPOSITE: (1, 0, 1), L.IVORY: (1, 1, 1),
                   L.DECK: (0.4, 0.4, 0.4), L.DGLASS: (0, 1, 1), L.GLASS: (0.5, 0.2, 0.8)}
