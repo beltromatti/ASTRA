@@ -8,6 +8,7 @@ Options:
   --only A,B          build only these meshes (names without the SM_BRG3_ prefix are accepted; no manifest is written)
   --no-export         build (and preview) without writing FBX files
   --preview <dir>     render the preview views into <dir> (Eevee); --views seated,standing,... to choose, --samples N
+  --studio            with --preview and --only: render each mesh alone on a dark floor (views front,back,side,q34,q34b,top,low)
   --save-blend <f>    write the assembled preview scene (meshes, materials, lights) as a .blend to open in Blender
 
 Layout coordinates (data file): X forward, Y starboard, Z up, metres. Every builder works in that frame (bridge3_lib.FB
@@ -60,7 +61,7 @@ def load_data() -> dict:
 def parse_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out = {"out_dir": os.path.join(ROOT, "art", "export", "bridge_v3"), "only": None, "export": True, "preview": None,
-           "views": None, "samples": 48, "save_blend": None}
+           "views": None, "samples": 48, "save_blend": None, "studio": False}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -78,6 +79,8 @@ def parse_args() -> dict:
         elif a == "--samples":
             out["samples"] = int(argv[i + 1])
             i += 1
+        elif a == "--studio":
+            out["studio"] = True
         elif a == "--save-blend":
             out["save_blend"] = argv[i + 1]
             i += 1
@@ -261,6 +264,10 @@ def main() -> None:
             print("manifest:", json.dumps(man["budget"]), "materials", json.dumps(man["materials"]["counts"]))
         print("BRIDGE3_OK", out_dir)
 
+    if args["studio"] and args["preview"]:
+        PV.make_materials(D.get("screens", {}))
+        PV.studio(list(objs.values()), args["preview"], args["views"])
+        return
     if args["preview"] or args["save_blend"]:
         preview_scene(D, c, objs, args, (args["views"] or ["overview"]) if args["preview"] else [])
         if args["save_blend"]:
@@ -297,17 +304,27 @@ VIEWS = {
     "top": ((0.0, 0.0, 22.0), 0.0, -90.0, 60.0),
     "top_open": ((1.0, 0.0, 19.0), 0.0, -90.0, 70.0),
     "seated": ((0.08, 0.0, 1.38), 0.0, -6.0, 90.0),
-    "standing": ((-4.6, 0.0, 1.72), 0.0, -3.0, 90.0),
+    "standing": ((-1.15, 0.85, 1.86), -10.0, -6.0, 86.0),
+    "deck_aft": ((-4.6, 0.0, 1.72), 0.0, -3.0, 90.0),
+    "crew_back": ((3.55, -2.2, 0.55), 0.0, 6.0, 55.0),
+    "crew_side": ((6.05, 0.4, 0.35), -90.0, 5.0, 55.0),
+    "cap_back": ((-1.9, 0.0, 1.15), 0.0, 4.0, 62.0),
+    "cap_side": ((0.0, 2.7, 1.0), -90.0, 4.0, 58.0),
+    "cap_front": ((2.1, 0.0, 1.0), 180.0, 4.0, 55.0),
+    "xo_side": ((-0.15, 0.6, 1.0), -90.0, 4.0, 55.0),
+    "dome": ((-1.0, 0.0, 1.5), 0.0, 62.0, 100.0),
+    "dome_close": ((0.0, 0.0, 3.4), 0.0, 68.0, 100.0),
+    "helm_top": ((6.9, -2.2, 3.0), 0.0, -90.0, 48.0),
     "helm_back": ((5.4, -3.6, 1.1), 146.0, -4.0, 90.0),
     "crew_chair": ((7.3, -1.1, 0.75), 205.0, -6.0, 60.0),
     "helm_holo_back": ((8.4, -2.2, 0.85), 180.0, 0.0, 70.0),
     "helm_holo_front": ((4.8, -2.2, 0.75), 0.0, 6.0, 70.0),
     "captain_front": ((2.0, 1.1, 1.1), -155.0, -6.0, 60.0),
-    "port": ((0.0, 2.4, 1.65), -90.0, 4.0, 90.0),
-    "starboard": ((0.0, -2.4, 1.65), 90.0, 4.0, 90.0),
+    "port": ((-1.6, 0.0, 1.7), -90.0, 3.0, 92.0),
+    "starboard": ((-1.6, 0.0, 1.7), 90.0, 3.0, 92.0),
     "ceiling": ((-4.0, 0.0, 1.7), 0.0, 38.0, 100.0),
     "helm_close": ((4.2, -4.0, 1.55), 35.0, -14.0, 70.0),
-    "chair_close": ((1.6, 1.3, 1.25), -140.0, -8.0, 62.0),
+    "chair_close": ((1.95, 1.35, 1.12), -144.0, -9.0, 52.0),
     "well": ((2.7, 0.0, 1.2), 0.0, -12.0, 90.0),
     "wall_s": ((-1.0, 0.5, 1.6), 78.0, 2.0, 80.0),
     "wall_p": ((-1.0, -0.5, 1.6), -78.0, 2.0, 80.0),

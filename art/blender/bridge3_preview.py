@@ -247,7 +247,7 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     pbr(L.COMPOSITE, (0.05, 0.056, 0.07), "Carbon", 4.0, (0.22, 0.42), 0.0, 0.3, 0.35, 0.5, coat=0.5, coat_rough=0.12)
     pbr(L.IVORY, srgb_to_linear("#A9AAA8"), "PanelPaint", 1.0, (0.16, 0.3), 0.0, 0.0, 0.3, 0.4, coat=0.3, coat_rough=0.12)
     pbr(L.DECK, (0.30, 0.32, 0.36), "BRG3_DeckGrain", 2.5, (0.34, 0.62), 0.0, 0.9, 0.85, 1.0)
-    pbr(L.DGLASS, (0.003, 0.004, 0.006), None, 1.0, (0.10, 0.16), 0.0, 0.0, 0.0, 0.0, coat=0.0, spec=0.35)
+    pbr(L.DGLASS, (0.003, 0.004, 0.006), None, 1.0, (0.30, 0.38), 0.0, 0.0, 0.0, 0.0, coat=0.0, spec=0.28)
     palette_lamp(L.LAMP, 7.0)
     palette_lamp(L.LAMP_DIM, 2.4)
     palette_lamp(L.LAMP_HOT, 22.0)
@@ -455,55 +455,150 @@ def _np():
     return np
 
 
+def _vnoise3(p, seed: int = 0):
+    """3D value noise in [0, 1] on an (..., 3) array of points (smoothstep-interpolated lattice hash)."""
+    np = _np()
+    rng = np.random.default_rng(seed)
+    table = rng.random(256).astype(np.float32)
+    perm = rng.permutation(256)
+    i = np.floor(p).astype(np.int64)
+    f = (p - i).astype(np.float32)
+    f = f * f * (3 - 2 * f)
+
+    def h(ix, iy, iz):
+        return table[perm[(perm[(perm[ix & 255] + iy) & 255] + iz) & 255]]
+
+    out = 0.0
+    for dx in (0, 1):
+        for dy in (0, 1):
+            for dz in (0, 1):
+                w = (f[..., 0] if dx else 1 - f[..., 0]) * (f[..., 1] if dy else 1 - f[..., 1]) * (f[..., 2] if dz else 1 - f[..., 2])
+                out = out + w * h(i[..., 0] + dx, i[..., 1] + dy, i[..., 2] + dz)
+    return out
+
+
+def _fbm3(p, octaves: int = 6, seed: int = 0):
+    v, amp, tot = 0.0, 0.5, 0.0
+    for o in range(octaves):
+        v = v + amp * _vnoise3(p * (2.0 ** o), seed + o * 17)
+        tot += amp
+        amp *= 0.5
+    return v / tot
+
+
+def _poly_mask(np, xx, yy, pts):
+    """Even-odd point-in-polygon on the grids xx, yy for the polygon `pts` [(x, y), ...]."""
+    inside = np.zeros(xx.shape, bool)
+    n = len(pts)
+    for k in range(n):
+        x0, y0 = pts[k]
+        x1, y1 = pts[(k + 1) % n]
+        if y0 == y1:
+            continue
+        cond = ((y0 > yy) != (y1 > yy)) & (xx < (x1 - x0) * (yy - y0) / (y1 - y0) + x0)
+        inside ^= cond
+    return inside
+
+
 def viewscreen_placeholder(on: bool = True) -> None:
-    """Preview only: what the main viewscreen may show (a planet, two hostile ships, contact brackets) so the ON state can be judged
-    next to the OFF one (the game draws the real thing: a SceneCapture plus the tactical overlay)."""
+    """Preview only: what the main viewscreen may show (a lit planet with clouds and an atmosphere, two hostile warships with
+    contact brackets, a debris streak) so the ON state can be judged next to the OFF one (the game draws the real thing: a
+    SceneCapture plus the tactical overlay)."""
     if "SCREEN_viewscreen_1" not in bpy.data.materials or not on:
         return
     np = _np()
     w, h = 1920, 800
     rng = np.random.default_rng(3)
     img = np.zeros((h, w, 3), np.float32)
-    img += 0.004
-    stars = rng.random((h, w)) > 0.9985
-    img += stars[..., None] * rng.random((h, w, 1)).astype(np.float32) * 0.9
+    # starfield: many faint stars, a few bright ones with a tint
+    st = rng.random((h, w))
+    img += (st > 0.9975)[..., None] * (rng.random((h, w, 1)).astype(np.float32) ** 3 * 0.9 + 0.05)
+    tint = np.array([1.0, 0.92, 0.85], np.float32)
+    img += (st > 0.99985)[..., None] * tint * 1.2
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
-    # the planet: lit from the upper right, a thin atmosphere
-    cx, cy, r = 0.24 * w, 0.32 * h, 0.52 * h
-    d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
-    disc = np.clip((r - d) / 2.0, 0.0, 1.0)
-    nx, ny = (xx - cx) / r, (yy - cy) / r
-    nz = np.sqrt(np.clip(1 - nx * nx - ny * ny, 0, 1))
-    light = np.clip(nx * 0.55 + ny * 0.35 + nz * 0.6, 0, 1)
-    ocean = np.array([0.03, 0.10, 0.22], np.float32)
-    land = np.array([0.12, 0.16, 0.08], np.float32)
-    n = np.sin(xx * 0.013) * np.sin(yy * 0.021 + xx * 0.004) + 0.5 * np.sin(xx * 0.05 + yy * 0.03)
-    col = np.where((n > 0.25)[..., None], land, ocean) * (0.15 + 1.6 * light[..., None])
-    img = img * (1 - disc[..., None]) + col * disc[..., None]
-    atm = np.exp(-((d - r) / (0.025 * r)) ** 2) * np.clip(light * 1.3 + 0.1, 0, 1)
-    img += atm[..., None] * np.array([0.12, 0.35, 0.8], np.float32) * 1.4
-    # two hostile ships: dark hulls with an orange engine glow, and a distant one
-    for (sx, sy, sa, sb, sc) in ((0.68, 0.46, 0.15, 0.028, 1.0), (0.83, 0.30, 0.07, 0.014, 0.6)):
-        ex, ey = sx * w, sy * h
-        a, b = sa * w, sb * h
-        m = np.clip(1.0 - (((xx - ex) / a) ** 2 + ((yy - ey) / b) ** 2), 0, 1)
-        m = np.clip(m * 6.0, 0, 1)
-        hull = np.array([0.05, 0.045, 0.045], np.float32) + 0.25 * np.clip(-(yy - ey) / b, 0, 1)[..., None] * np.array([0.3, 0.22, 0.15], np.float32)
-        img = img * (1 - m[..., None]) + hull * m[..., None]
-        glow = np.exp(-(((xx - (ex + a * 0.95)) / (0.03 * w * sc)) ** 2 + ((yy - ey) / (0.012 * h)) ** 2))
-        img += glow[..., None] * np.array([1.0, 0.45, 0.12], np.float32) * 1.6
-        # contact brackets
-        pad = 0.035 * w * sc
-        for (bx, by) in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
-            px0, py0 = ex + bx * (a + pad), ey + by * (b + pad * 0.5)
-            for k in range(3):
-                for t in range(int(0.028 * w * sc)):
-                    for (ox, oy) in ((-bx * t, 0), (0, -by * t)):
-                        x0, y0 = int(px0 + ox), int(py0 + oy)
-                        if 0 <= x0 < w and 0 <= y0 < h:
-                            img[max(0, y0 - k):y0 + 1, x0] = (1.0, 0.45, 0.2)
+    # the planet: a big lit sphere at the lower left, sun from the upper right (noise only where the disc is)
+    cx, cy, r = 0.20 * w, 0.78 * h, 0.72 * h
+    dx, dy = (xx - cx) / r, (yy - cy) / r
+    d2 = dx * dx + dy * dy
+    inside = d2 < 1.0
+    nz = np.sqrt(np.clip(1 - d2, 0, 1))
+    n3 = np.stack([dx, dy, nz], axis=-1).astype(np.float32)
+    sun = np.array([0.55, -0.45, 0.70], np.float32)
+    sun /= np.linalg.norm(sun)
+    ndl_full = np.clip((n3 * sun).sum(-1), 0, 1)
+    P = n3[inside]
+    ph = 0.4
+    rot = np.array([[np.cos(ph), 0, np.sin(ph)], [0, 1, 0], [-np.sin(ph), 0, np.cos(ph)]], np.float32)
+    q = P @ rot
+    lat = np.abs(P[:, 1])
+    height = _fbm3(q * 2.2 + 5.0, 6, 11)
+    land = height > 0.52
+    ocean = np.array([0.02, 0.07, 0.17], np.float32)
+    shallow = np.array([0.03, 0.16, 0.24], np.float32)
+    green = np.array([0.08, 0.17, 0.06], np.float32)
+    dry = np.array([0.24, 0.19, 0.10], np.float32)
+    moist = _fbm3(q * 3.1 + 40.0, 4, 31)
+    landcol = (green * (1 - moist[:, None]) + dry * moist[:, None]) * (0.7 + 0.9 * (height[:, None] - 0.5))
+    depth = np.clip((0.52 - height[:, None]) * 4, 0, 1)
+    seacol = ocean * (1 - 0.6 * depth) + shallow * np.clip(1 - (0.52 - height[:, None]) * 12, 0, 1) * 0.5
+    col = np.where(land[:, None], landcol, seacol)
+    ice = np.clip((lat * 1.35 - 0.86) * 9, 0, 1)
+    col = col * (1 - ice[:, None]) + np.array([0.7, 0.75, 0.8], np.float32) * ice[:, None]
+    cl = _fbm3(q * 3.4 + 90.0, 6, 51)
+    cloud = np.clip((cl - 0.52) * 3.2, 0, 1) * 0.85
+    col = col * (1 - cloud[:, None]) + np.array([0.85, 0.88, 0.92], np.float32) * cloud[:, None]
+    ndl = ndl_full[inside]
+    lit = col * (0.02 + 1.9 * ndl[:, None] ** 0.9)
+    hv = sun + np.array([0, 0, 1], np.float32)
+    hv /= np.linalg.norm(hv)
+    glint = np.exp(-(1 - np.clip((P * hv).sum(-1), 0, 1)) * 60) * (~land) * (1 - cloud)
+    lit = lit + glint[:, None] * np.array([0.5, 0.55, 0.6], np.float32) * 0.8
+    term = np.clip((P * sun).sum(-1) * 4 + 0.35, 0, 1)
+    city = (_fbm3(q * 14 + 200, 3, 71) > 0.66) & land & (ndl < 0.05)
+    lit = lit + city[:, None] * np.array([0.6, 0.4, 0.15], np.float32) * (1 - term[:, None]) * 0.5
+    pl = np.zeros((h, w, 3), np.float32)
+    pl[inside] = lit
+    disc = np.clip((1.0 - np.sqrt(d2)) * r / 1.5, 0.0, 1.0)
+    img = img * (1 - disc[..., None]) + pl * disc[..., None]
+    rim = np.sqrt(d2)
+    atm = np.exp(-((rim - 1.0) / 0.018) ** 2) * np.clip(ndl_full * 1.4 + 0.12, 0, 1)
+    atm2 = np.exp(-np.clip(rim - 1.0, 0, 9) / 0.03) * (rim > 1.0) * np.clip(ndl_full * 1.3 + 0.1, 0, 1) * 0.5
+    img += (atm + atm2)[..., None] * np.array([0.10, 0.32, 0.85], np.float32) * 1.3
+    # two hostile warships: wedge hulls with superstructure and lit windows, orange engine glow; one far away
+    def ship(sx, sy, L, sc, ang_deg):
+        nonlocal img
+        ca, sa = np.cos(np.radians(ang_deg)), np.sin(np.radians(ang_deg))
+        u = ((xx - sx) * ca + (yy - sy) * sa) / (L * 0.5)
+        v = (-(xx - sx) * sa + (yy - sy) * ca) / (L * 0.5)
+        hull = [(-1.0, -0.13), (-0.55, -0.20), (0.45, -0.15), (1.0, -0.02), (1.0, 0.03), (0.45, 0.13), (-0.55, 0.19), (-1.0, 0.11)]
+        tower = [(-0.60, -0.20), (-0.30, -0.34), (0.05, -0.31), (0.12, -0.16)]
+        wing = [(-0.85, 0.11), (-0.55, 0.19), (-0.45, 0.34), (-0.80, 0.30)]
+        m = _poly_mask(np, u, v, hull)
+        mt = _poly_mask(np, u, v, tower)
+        mw = _poly_mask(np, u, v, wing)
+        body = m | mt | mw
+        shade = np.clip(0.55 - v * 1.4, 0.15, 1.0)
+        base = np.array([0.075, 0.07, 0.07], np.float32) * shade[..., None]
+        base = base + (mt[..., None] * np.array([0.02, 0.02, 0.025], np.float32))
+        panels = (np.sin(u * 60) * np.sin(v * 50) > 0.85)[..., None] * np.array([0.05, 0.05, 0.06], np.float32)
+        win = ((np.sin(u * 90) > 0.93) & (np.abs(v - 0.02) < 0.03) & m)[..., None] * np.array([1.0, 0.75, 0.4], np.float32) * 0.9
+        img = np.where(body[..., None], base + panels + win, img)
+        gx = -1.0
+        glow = np.exp(-(((u - gx) / (0.10 * sc)) ** 2 + ((v + 0.02) / 0.10) ** 2)) + 0.6 * np.exp(-(((u - gx + 0.12) / (0.25 * sc)) ** 2 + ((v + 0.02) / 0.05) ** 2))
+        img = img + glow[..., None] * np.array([1.0, 0.42, 0.10], np.float32) * 1.4
+        # contact brackets round the hull
+        bx0, bx1, by0, by1 = sx - L * 0.56, sx + L * 0.56, sy - L * 0.20, sy + L * 0.20
+        arm = L * 0.07
+        for (px, py, ex, ey) in ((bx0, by0, 1, 1), (bx1, by0, -1, 1), (bx0, by1, 1, -1), (bx1, by1, -1, -1)):
+            for t in range(int(arm)):
+                for (ox, oy) in ((ex * t, 0), (0, ey * t)):
+                    x0, y0 = int(px + ox), int(py + oy)
+                    if 0 <= x0 < w - 2 and 0 <= y0 < h - 2:
+                        img[y0:y0 + 2, x0:x0 + 2] = (1.0, 0.45, 0.2)
+    ship(0.66 * w, 0.44 * h, 0.30 * w, 1.0, -4.0)
+    ship(0.86 * w, 0.30 * h, 0.12 * w, 0.6, -8.0)
     image = bpy.data.images.new("preview_viewscreen", w, h, alpha=False, float_buffer=True)
-    rgba = np.concatenate([img[::-1], np.ones((h, w, 1), np.float32)], axis=2)
+    rgba = np.concatenate([np.clip(img[::-1], 0.0, 8.0), np.ones((h, w, 1), np.float32)], axis=2).astype(np.float32)
     image.pixels.foreach_set(rgba.ravel())
     m = bpy.data.materials["SCREEN_viewscreen_1"]
     m.use_nodes = True
@@ -583,3 +678,48 @@ def holo_plot(D: dict) -> None:
                             (0.62, 0.15, 0.06, "h", "ship"), (0.78, -0.2, 0.0, "h", "ship"), (0.5, -0.45, 0.09, "h", "ship"),
                             (0.85, 0.3, -0.03, "h", "dot"), (0.1, 0.5, 0.0, "f", "dot")):
         icon(x, y, z, c, k)
+
+
+# ------------------------------------------------------------------------------------------------------------------ studio
+STUDIO_VIEWS = {
+    "front": (3.4, 0.0, 1.25), "back": (-3.4, 0.0, 1.25), "side": (0.0, -3.4, 1.15), "q34": (2.5, -2.5, 1.7), "q34b": (-2.4, 2.4, 1.6),
+    "top": (1.6, -1.3, 3.4), "low": (2.3, 1.6, 0.55),
+}
+
+
+def studio(objs: list, out_dir: str, views: list | None = None, fov: float = 34.0, target=(0.0, 0.0, 0.78)) -> None:
+    """Preview only: every prop alone on a dark deck patch under a soft key, a cool rim and a warm fill (a quick way to judge a
+    shape without the room). One JPG per object and view: studio_<mesh>_<view>.jpg."""
+    views = views or ["front", "back", "side", "q34"]
+    if os.environ.get("BRG3_TARGET"):
+        target = tuple(float(v) for v in os.environ["BRG3_TARGET"].split(","))
+    fov = float(os.environ.get("BRG3_FOV", fov))
+    set_world((0.012, 0.013, 0.017), 1.0)
+    configure_render(1200, 800, int(os.environ.get("BRG3_SAMPLES", "24")))
+    bpy.ops.mesh.primitive_plane_add(size=14.0, location=(0, 0, 0))
+    floor = bpy.context.active_object
+    floor.name = "StudioFloor"
+    if L.DECK in bpy.data.materials:
+        floor.data.materials.append(bpy.data.materials[L.DECK])
+    if os.environ.get("BRG3_DEBUG_MATS"):                       # flat identification colours per material
+        colors = {L.STRUCT: (1, 0, 0), L.TRIM: (0, 1, 0), L.RUBBER: (0, 0, 1), L.LEATHER: (1, 1, 0), L.COMPOSITE: (1, 0, 1), L.IVORY: (1, 1, 1),
+                  L.DECK: (0.4, 0.4, 0.4), L.DGLASS: (0, 1, 1), L.GLASS: (0.5, 0.2, 0.8)}
+        for m in bpy.data.materials:
+            col = colors.get(m.name, (1.0, 0.5, 0.0) if m.name.startswith("SCREEN_") else (0.3, 0.3, 0.3))
+            emissive(m.name, col, 1.0)
+    add_light("AREA", "Key", (2.4, 2.6, 3.4), 900.0, (1.0, 0.96, 0.9), size=(2.6, 2.6), target=target)
+    add_light("AREA", "Rim", (-2.6, -2.2, 2.6), 700.0, (0.7, 0.85, 1.0), size=(1.2, 3.0), target=target)
+    add_light("AREA", "Fill", (3.2, -2.8, 1.6), 160.0, (1.0, 0.9, 0.8), size=(3.0, 3.0), target=target)
+    add_light("AREA", "Top", (0.0, 0.0, 4.2), 300.0, (1.0, 1.0, 1.0), size=(3.0, 3.0), target=target)
+    tx, ty, tz = target
+    for o in objs:
+        for q in objs:
+            q.hide_render = q is not o
+        for v in views:
+            ex, ey, ez = STUDIO_VIEWS[v]
+            dx, dy, dz = tx - ex, ty - ey, tz - ez
+            yaw = math.degrees(math.atan2(dy, dx))
+            pitch = math.degrees(math.atan2(dz, math.hypot(dx, dy)))
+            cam = add_camera(f"cam_{v}", (ex, ey, ez), yaw, pitch, fov)
+            render(cam, os.path.join(out_dir, f"studio_{o.name.replace('SM_BRG3_', '')}_{v}.jpg"))
+            print("rendered", o.name, v)

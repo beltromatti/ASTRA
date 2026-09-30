@@ -79,7 +79,7 @@
       "kind": "captain_chair",
       "mesh": "SM_BRG3_ChairCaptain",
       "seat": {"posture": "seated_armchair", "seat_height": 0.52, "hip_height": 0.62, "eye": [0.08, 0.0, 1.18], "note": "the player's eye (ASTRAPlayerController: CaptainSeat + 8 cm forward, 1.18 m above the dais)"},
-      "hands": {"left": [0.2, -0.37, 0.775], "right": [0.2, 0.37, 0.775], "rest": "armrest pods (touch screens)"},
+      "hands": {"left": [0.2, -0.373, 0.79], "right": [0.2, 0.373, 0.79], "rest": "armrest pods (touch screens, top 0.79 m at the wrist)"},
       "screens": ["SCREEN_captain_1", "SCREEN_captain_2"]
     },
     {
@@ -91,7 +91,7 @@
       "kind": "xo_chair",
       "mesh": "SM_BRG3_ChairXO",
       "seat": {"posture": "seated_armchair", "seat_height": 0.52, "hip_height": 0.62, "eye": [0.06, 0.0, 1.2]},
-      "hands": {"left": [0.19, -0.33, 0.775], "right": [0.19, 0.33, 0.775], "rest": "armrest pods (touch screen on the right)"},
+      "hands": {"left": [0.19, -0.338, 0.785], "right": [0.19, 0.338, 0.785], "rest": "armrest pods (touch screen on the right)"},
       "screens": ["SCREEN_xo_1"]
     },
     {
@@ -224,6 +224,16 @@
       "shadows": false,
       "radius": 1400,
       "note": "the dome's eye: soft top light for the dais, tactical and the back of the room"
+    },
+    {
+      "id": "Dome_Uplight",
+      "type": "point",
+      "pos": [0.0, 0.0, 4.25],
+      "lumens": 900,
+      "radius": 900,
+      "temperature": 4200,
+      "specular": 0.35,
+      "shadows": false
     },
     {
       "id": "Well_Downlight",
