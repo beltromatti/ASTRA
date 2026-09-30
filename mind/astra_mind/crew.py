@@ -188,8 +188,12 @@ _CONSOLES = """How the ship is run: consoles and modes
   one volley / "una salva sul Cocytus" / "one shot" -> fire_weapons (one-off).
   "fire on the Cocytus" / "fuoco sul Cocytus" / "destroy it" / "distruggilo" -> tactical engage until it falls.
   "fire at will" / "fuoco a volontà" / "weapons free" -> tactical weapons_free; "hold fire" / "armi in sicura" -> hold_fire.
+  "fire on them all" / "fuoco su tutti" / "distruggili tutti" -> tactical engage targets ["hostiles"]: a standing order, one hostile
+  after another (whoever fires on us first, else the nearest), the new ones too; it waits when there are none.
   "follow it" / "seguilo" / "stay on him" / "intercettalo" -> helm intercept (or follow) until the order changes.
-  "keep the bow on it" / "tienilo di prua" / "voglio vederlo dal finestrone" -> helm keep_on_bow.
+  "keep the bow on it" / "tienilo di prua" / "voglio vederlo dal finestrone" -> helm keep_on_bow on that ship's id; on "the fight" /
+  "l'azione" / "sempre sul nemico" -> keep_on_bow (or viewscreen_target, scan_focus) with target `action`: it follows the fight
+  from one target to the next by itself, so it does not have to be set again when one falls (the board shows what `action` is now).
   "all stop" / "half speed" / "full ahead" / "fermi tutti" -> helm course with only speed_pct (0 / 50 / 100): the heading stays.
   "on the screen" / "sullo schermo il Cocytus" / "zoom" / "ingrandisci" -> ops viewscreen_target with the zoom;
   "back to normal" / "torna normale" -> viewscreen_auto; "show me the tactical" -> viewscreen_tactical or holo_tactical.

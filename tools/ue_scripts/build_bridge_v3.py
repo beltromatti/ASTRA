@@ -64,10 +64,15 @@ DST = KIT
 NANITE = True
 exec(open(ROOT + "/tools/ue_scripts/import_kit.py").read())      # Nanite on, complex-as-simple collision; glass/translucent stay classic
 
+# only what this script builds again: the level also holds the flight deck, engineering, the medbay, the mess, the berths,
+# the quarters, the lifepods, New Ravenna, the walkers and the signage, each built by its own script
+OWNED = {"Bridge", "Bridge/Crew", "Bridge/Doors", "Bridge/Stations", "Bridge/Props", "Corridors", "Corridors/Panels",
+         "Lighting", "Space", "Gameplay", "Ship", "Quarters/Door"}
 if eal.does_asset_exist(LEVEL):
     les.load_level(LEVEL)
     for a in eas.get_all_level_actors():
-        eas.destroy_actor(a)
+        if str(a.get_folder_path()) in OWNED:
+            eas.destroy_actor(a)
 else:
     les.new_level(LEVEL)
 

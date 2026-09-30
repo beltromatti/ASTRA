@@ -840,6 +840,8 @@ class Mind:
                     await self.voice.clear("new_session")     # what the last session had not said yet is not said in this one
                     self.watch.reset()
                     self.exchange.reset()
+                    if isinstance(self.llm, OpenRouter):
+                        asyncio.create_task(self._warm_up())         # (the session's first report should not pay for a cold route)
                     log.info("new game session: conversation reset (the war waits for the Captain's choice)")
                 elif kind == "campaign":
                     # the Captain chose in the title menu: a new war, or the saved one
@@ -951,6 +953,15 @@ class Mind:
                 self.voice.muted = True                        # nobody is listening: nothing more is made or queued
                 await self.voice.clear("no_listener")
             log.info("game disconnected")
+
+    async def _warm_up(self) -> None:
+        """One minimal request through the crew's route (connection, provider, prompt cache) while the game is still starting."""
+        try:
+            await asyncio.sleep(0.4)                                 # (the game's first ship_state is in: the prompt is the real one)
+            self.agent.ship = self.game if (self.game and self.game.state) else self.local
+            log.info("crew route warmed in %.2fs", await self.agent.warm_up(self.lang))
+        except Exception as exc:  # noqa: BLE001
+            log.info("warm-up skipped: %s", exc)
 
     async def _recognise(self, ctx: dict[str, Any] | None = None) -> None:
         """The key is up: the last sounds, then the words (most of them were already decoded while he spoke)."""

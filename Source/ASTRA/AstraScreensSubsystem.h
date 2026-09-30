@@ -85,6 +85,10 @@ private:
 	void DrawSensors(UCanvas* C, int32 W, int32 H, const FString& Slot);
 	void DrawEngineering(UCanvas* C, int32 W, int32 H, const FString& Slot);
 	void DrawMess(UCanvas* C, int32 W, int32 H, const FString& Slot);
+	/** Communications: the channel (open, with whom), the traffic heard (A), the fleet net and the log (B). */
+	void DrawComms(UCanvas* C, int32 W, int32 H, const FString& Slot);
+	/** Flight operations: the air group (A), the craft in flight and the deck (B). */
+	void DrawFlight(UCanvas* C, int32 W, int32 H, const FString& Slot);
 	/** A station's control surface: its modes in force as lit buttons, who set them, what the officer just did. */
 	void DrawControls(UCanvas* C, int32 W, int32 H, const FString& Station);
 };

@@ -40,6 +40,7 @@ SCRIPT: dict[str, tuple[float, list[tuple[str, str, str]]]] = {
     "reactor output": (1.0, [("engineering", "Macchine: il reattore è all'ottanta per cento, il circuito due è caldo ma regge.", "calm")]),
     "second contact": (1.0, [("sensors", "Sensori: secondo contatto rilevamento uno otto zero, distanza sessanta chilometri.", "focused")]),
     "opening this channel": (1.5, [("solm", ARCHON, "cold")]),
+    "stand by": (0.05, []),                                                  # (the warm-up request the server sends when a game says hello: nothing is said)
     "missiles inbound": (0.8, [("tactical", "Missili in arrivo, rilevamento due sette zero! Prepararsi all'impatto!", "urgent")]),
 }
 

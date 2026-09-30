@@ -198,6 +198,7 @@ AAstraViewscreen::AAstraViewscreen()
 	Capture->bCaptureEveryFrame = false;
 	Capture->bCaptureOnMovement = false;
 	Capture->bAlwaysPersistRenderingState = true;   // its own exposure and anti-aliasing history, like an eye
+	Capture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;   // space only (RebuildShowList)
 	Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 }
 
@@ -418,6 +419,10 @@ void AAstraViewscreen::Direct(float Dt)
 			Zoom = Zs == TEXT("close") ? 2.f : Zs == TEXT("max") ? 4.f : Zs == TEXT("wide") ? 0.4f : 1.f;
 		}
 	}
+	if (Target.Equals(TEXT("action"), ESearchCase::IgnoreCase))
+	{
+		Target = St->ActionTarget();      // "the action": whatever the fight is about now
+	}
 	const FString Key = Mode + TEXT("|") + Target.ToUpper();
 	if (Key != LastModeKey)
 	{
@@ -479,8 +484,9 @@ void AAstraViewscreen::Direct(float Dt)
 			{
 				continue;
 			}
+			const FContact* Focus = FindC(Cs, Engaged);
 			const bool bWant = Mode == TEXT("fleet") ? C.Side == EAstraSide::Astra
-			                 : Mode == TEXT("tactical") ? (C.Side == EAstraSide::Mandate && C.RangeKm < 90.0)
+			                 : Mode == TEXT("tactical") ? (C.Side == EAstraSide::Mandate && (Focus ? FVector::Dist(C.Pos, Focus->Pos) < 25000.0 : C.RangeKm < 60.0))
 			                 : C.RangeKm < 150.0;
 			if (bWant)
 			{
@@ -514,11 +520,12 @@ void AAstraViewscreen::Direct(float Dt)
 		Best = {EShot::Contact, E->ContactId, E->Label, E->Track >= 2 ? TEXT("TARGET") : TEXT("BEARING"), 4, 8.0, FVector::ZeroVector, {}};
 		if (Shot == EShot::Contact && ShotId == E->ContactId && Now - ShotSince > 16.0)
 		{
-			// a long fight: now and then the wider picture, every hostile together, then back on the target
+			// a long fight: now and then the wider picture — the target's group, the hostile warships within 20 km of
+			// it — then back on the target
 			TArray<FString> Hostiles;
 			for (const FContact& C : Cs)
 			{
-				if (!C.bCraft && C.Track >= 2 && C.Side == EAstraSide::Mandate && C.RangeKm < 90.0)
+				if (!C.bCraft && C.Track >= 2 && C.Side == EAstraSide::Mandate && FVector::Dist(C.Pos, E->Pos) < 20000.0 && Hostiles.Num() < 6)
 				{
 					Hostiles.Add(C.ContactId);
 				}
@@ -777,6 +784,11 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 		const bool bOnBridge = FMath::Abs(Eye.X) < 1100.0 && FMath::Abs(Eye.Y) < 1100.0 && Eye.Z > -150.0 && Eye.Z < 700.0;
 		bWatched = bOnBridge && FVector::DotProduct(PCM->GetCameraRotation().Vector(), ToScreen.GetSafeNormal()) > 0.15;
 	}
+	if (Now >= NextShowListAt)
+	{
+		NextShowListAt = Now + 0.5;
+		RebuildShowList();
+	}
 	// camera and overlay together (the brackets stay on the image), 30 times a second by default
 	const int32 Hz = CVarViewscreenHz.GetValueOnGameThread();
 	const bool bDue = Hz > 0 && Now - LastCaptureAt >= 1.0 / Hz - 0.004;
@@ -812,6 +824,8 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	const FVector2D Ctr(Width * 0.5f, Height * 0.5f);
 	int32 Labelled = 0, Arrows = 0;
 	TMap<EAstraSide, TPair<FVector2D, int32>> CraftGroups;
+	struct FLabelReq { const FContact* C; FBox2D Box; FLinearColor Col; int32 Order; };
+	TArray<FLabelReq> Pending;
 	for (const FContact& C : Contacts)
 	{
 		const FVector World = B->WorldOf(C.Pos);
@@ -884,13 +898,32 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		{
 			D.Ring(R.GetCenter(), R.GetExtent().GetMax() * 1.25f + 8.f * S, ColAlarm, (float)Now * 0.7f);   // not around a ship that fills the frame
 		}
-		if (Labelled >= 6 && C.ContactId != Engaged)
+		Pending.Add({&C, R, Col, (C.ContactId == Engaged ? 0 : (C.bFiringAtUs ? 1 : 2)) * 1000 + Labelled++});
+	}
+	// the labels, most important first (the target, who fires on us, then the nearest), each where it overlaps nothing
+	// already written: right of its box, left, below, above; else only its id; else nothing (the box says enough)
+	Pending.Sort([](const FLabelReq& A, const FLabelReq& B) { return A.Order < B.Order; });
+	TArray<FBox2D> Taken;
+	auto Free = [&Taken, Width, Top, Bottom](const FBox2D& Q)
+	{
+		if (Q.Min.X < 4.f || Q.Max.X > Width - 4.f || Q.Min.Y < Top || Q.Max.Y > Bottom)
 		{
-			D.Text(R.Max.X + 6.f * S, R.Min.Y, C.ContactId, true, PxData, Dimmed(Col, 0.8f));
-			continue;                     // a crowded screen: names only for the nearest few and the target
+			return false;
 		}
-		++Labelled;
-		// the label: name, class, range and speed, hull and shields; on the left when the right has no room
+		for (const FBox2D& T : Taken)
+		{
+			if (T.Intersect(Q))
+			{
+				return false;
+			}
+		}
+		return true;
+	};
+	for (const FLabelReq& L : Pending)
+	{
+		const FContact& C = *L.C;
+		const FBox2D& R = L.Box;
+		const FLinearColor& Col = L.Col;
 		const FString Name = C.Label.ToUpper();
 		FString Kind = C.Class;
 		Kind.RemoveFromStart(TEXT("Kharon Mandate "));
@@ -900,11 +933,45 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		const FString Kin = FString::Printf(TEXT("%.1f km   %.0f m/s"), C.RangeKm, C.Vel.Size());
 		const float Bw = 110.f * S;
 		const float BlockW = FMath::Max3(D.Width(Name, false, PxName), D.Width(Cls, true, PxData), FMath::Max(D.Width(Kin, true, PxData), Bw));
-		// the side with more room; always whole on the screen (over the hull when the ship fills the frame)
-		const bool bLeft = R.Max.X + 10.f * S + BlockW > Width - 8.f && R.Min.X > Width - R.Max.X;
-		const float X = bLeft ? FMath::Max(R.Min.X - 10.f * S, BlockW + 12.f * S) : FMath::Min(R.Max.X + 10.f * S, Width - BlockW - 12.f * S);
-		const int32 Al = bLeft ? 2 : 0;
-		float Y = FMath::Clamp((float)R.Min.Y - 4.f * S, Top + 4.f * S, Bottom - 104.f * S);
+		FString Tags;
+		if (C.ContactId == Engaged) { Tags += TEXT("ENGAGED   "); }
+		if (C.bFiringAtUs) { Tags += TEXT("FIRING ON US   "); }
+		if (C.bFleeing) { Tags += TEXT("RUNNING   "); }
+		if (C.bJamming) { Tags += TEXT("JAMMING"); }
+		const float BlockH = PxName * 1.08f + PxData * 2.7f + (C.HullFrac >= 0.f ? 16.f * S : 0.f) + (Tags.IsEmpty() ? 0.f : PxData * 1.1f);
+		const float Gap = 10.f * S;
+		// beside the box, below, above; and for a ship that fills the frame, inside its own box (over the hull)
+		const FVector2D Tries[5] = {FVector2D(R.Max.X + Gap, R.Min.Y - 4.f * S), FVector2D(R.Min.X - Gap - BlockW, R.Min.Y - 4.f * S),
+		                            FVector2D(R.GetCenter().X - BlockW * 0.5f, R.Max.Y + Gap), FVector2D(R.GetCenter().X - BlockW * 0.5f, R.Min.Y - Gap - BlockH),
+		                            FVector2D(R.Min.X + Gap * 2.f, R.Min.Y + Gap * 2.f)};
+		const bool bBig = R.GetSize().X > Width * 0.4f && R.GetSize().Y > BlockH + 4.f * Gap;
+		int32 Pick = INDEX_NONE;
+		for (int32 t = 0; t < (bBig ? 5 : 4) && Pick == INDEX_NONE; ++t)
+		{
+			if (Free(FBox2D(Tries[t], Tries[t] + FVector2D(BlockW, BlockH))))
+			{
+				Pick = t;
+			}
+		}
+		Taken.Add(R);                     // its box, from now on, is not for the labels of the others
+		if (Pick == INDEX_NONE)
+		{
+			// no room for the whole label: the id alone, beside the box
+			const float Iw = D.Width(C.ContactId, true, PxData);
+			const FVector2D At(R.Max.X + 4.f * S, R.Min.Y);
+			const FBox2D Q(At, At + FVector2D(Iw, PxData * 1.1f));
+			if (Free(Q))
+			{
+				Taken.Add(Q);
+				D.Text(At.X, At.Y, C.ContactId, true, PxData, Dimmed(Col, 0.85f));
+			}
+			continue;
+		}
+		Taken.Add(FBox2D(Tries[Pick], Tries[Pick] + FVector2D(BlockW, BlockH)));
+		const float X = Tries[Pick].X;
+		const int32 Al = 0;
+		const bool bLeft = false;
+		float Y = Tries[Pick].Y;
 		D.Text(X, Y, Name, false, PxName, Col, Al);
 		Y += PxName * 1.08f;
 		D.Text(X, Y, Cls, true, PxData, Dimmed(Col, 0.78f), Al);
@@ -918,11 +985,6 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 			D.Bar(Bx, Y + 7.f * S, Bw, FMath::Max(0.f, C.ShieldFrac), ColAstra);
 			Y += 16.f * S;
 		}
-		FString Tags;
-		if (C.ContactId == Engaged) { Tags += TEXT("ENGAGED   "); }
-		if (C.bFiringAtUs) { Tags += TEXT("FIRING ON US   "); }
-		if (C.bFleeing) { Tags += TEXT("RUNNING   "); }
-		if (C.bJamming) { Tags += TEXT("JAMMING"); }
 		if (!Tags.IsEmpty())
 		{
 			D.Text(X, Y, Tags.TrimEnd(), true, PxData, ColAlarm, Al);
@@ -1049,5 +1111,34 @@ void AAstraViewscreen::LogWhatIsInView() const
 	for (int32 i = 0; i < FMath::Min(Seen.Num(), 40); ++i)
 	{
 		UE_LOG(LogASTRA, Display, TEXT("[Viewscreen]   %8.1f km  %s"), Seen[i].Key / 100000.0, *Seen[i].Value);
+	}
+}
+
+void AAstraViewscreen::RebuildShowList()
+{
+	static const FName TagSky(TEXT("ASTRA.Sky"));
+	static const FName TagPlanet(TEXT("ASTRA.Planet.NewRavenna"));
+	Capture->ShowOnlyActors.Reset();
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		AActor* A = *It;
+		if (A == this || A->IsHidden() || A->ActorHasTag(TagPlanet))
+		{
+			continue;
+		}
+		bool bSpace = A->ActorHasTag(TagSky) || A->GetActorLocation().SizeSquared() > FMath::Square(60000.0);   // beyond 600 m: out there
+		if (!bSpace)
+		{
+			// the Aquila's own hull (its frame is 183 m from the bridge): seen from outside in the damage view
+			if (const AStaticMeshActor* SMA = Cast<AStaticMeshActor>(A))
+			{
+				const UStaticMeshComponent* C = SMA->GetStaticMeshComponent();
+				bSpace = C && C->GetStaticMesh() && C->GetStaticMesh()->GetName().StartsWith(TEXT("SM_SHIP_"));
+			}
+		}
+		if (bSpace)
+		{
+			Capture->ShowOnlyActors.Add(A);
+		}
 	}
 }

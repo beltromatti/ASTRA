@@ -802,6 +802,36 @@ void UAstraShipSubsystem::RadiatorHit()
 	}
 }
 
+void UAstraShipSubsystem::SetBattleShort(bool bOn)
+{
+	if (bOn == bBattleShort)
+	{
+		return;
+	}
+	bBattleShort = bOn;
+	PowerBudget = bOn ? 800.f : 700.f;
+	if (!bOn)
+	{
+		// back inside the normal budget: every allocation above nominal comes down in proportion
+		float Sum = 0.f, Over = 0.f;
+		for (const auto& KV : PowerPct)
+		{
+			Sum += KV.Value;
+			Over += FMath::Max(0.f, KV.Value - 100.f);
+		}
+		if (Sum > PowerBudget && Over > 0.f)
+		{
+			const float K = FMath::Clamp(1.f - (Sum - PowerBudget) / Over, 0.f, 1.f);
+			for (auto& KV : PowerPct)
+			{
+				KV.Value = KV.Value > 100.f ? 100.f + (KV.Value - 100.f) * K : KV.Value;
+			}
+		}
+	}
+	Event(bOn ? TEXT("engineering: battle short — the reactor's limits are overridden: 800% of power to allocate, and she runs hot")
+	          : TEXT("engineering: the reactor is back inside its limits (700%)"));
+}
+
 void UAstraShipSubsystem::TickHeat(float DeltaTime)
 {
 	if (DeltaTime <= 0.f)
@@ -815,7 +845,7 @@ void UAstraShipSubsystem::TickHeat(float DeltaTime)
 	}
 	// what the ship makes by herself: the reactor (by the power drawn), the drive (by the throttle and the engines' power);
 	// the battle adds the rest (weapons fired, hits soaked, shields recharging: AddHeat)
-	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (ThrottlePct / 100.f) * PowerFactor(TEXT("engines"));
+	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (ThrottlePct / 100.f) * PowerFactor(TEXT("engines")) + (bBattleShort ? 0.3f : 0.f);
 	// what she sheds: the hull's own glow, plus the radiators, more the hotter she is (retracted: a cruise settles near 15 %,
 	// a typical fight near 70 %, a long heavy one beyond 100 %; extended they shed 2.6 times as much, torn ones less)
 	const float B = bRadiatorsOut ? 0.5f + (1.3f - 0.5f) * RadiatorHealth : 0.5f;
@@ -914,19 +944,35 @@ void UAstraShipSubsystem::TestMedbay(const FString& What, int32 N)
 TArray<FVector> UAstraShipSubsystem::VisitRouteFor(const AAstraCrewMember* C, int32& OutWaitAt)
 {
 	// the bridge is the world origin (metres here; deck level 0, the well -0.6, the dais +0.2): from each station out of
-	// the bridge's starboard door (round the holo table's back and down the well's starboard stairs as needed), along
+	// the bridge's starboard door (the v3 bridge's walks: tools/ue_scripts/bridge3_routes_cpp.py), along
 	// Corridor 1-A starboard to the cabin's door (a wait there: the chime), and a step and a half inside the cabin
 	TArray<FVector> R;
 	auto P = [&R](float X, float Y, float Z = 0.f) { R.Add(FVector(X * 100.f, Y * 100.f, Z)); };
 	const FString& S = C->StationId;
-	if (S == TEXT("helm") || S == TEXT("ops"))
+	// bridge v3 (data/ship/aquila_bridge.json routes.to_starboard_door): the helm goes round the holo table and up the port stairs
+	if (S == TEXT("helm"))
 	{
-		// up the starboard stairs: two steps of 0.2 m between x 3.1 and 2.4 (art/blender/bridge.py)
 		R.Add(C->GetActorLocation());
-		P(4.2f, S == TEXT("helm") ? -1.2f : 1.8f, -60.f);
-		P(3.3f, 4.7f, -60.f);
+		P(5.1f, -2.7f, -60.0f);
+		P(3.6f, -3.3f, -60.0f);
+		P(3.3f, -4.7f, -60.0f);
+		P(2.25f, -4.7f);
+		P(0.3f, -5.2f);
+		P(-5.5f, -4.6f);
+		P(-7.3f, -2.7f);
+		P(-7.3f, 2.6f);
+		P(-7.7f, 3.9f);
+	}
+	else if (S == TEXT("ops"))
+	{
+		R.Add(C->GetActorLocation());
+		P(5.1f, 2.7f, -60.0f);
+		P(3.6f, 3.3f, -60.0f);
+		P(3.3f, 4.7f, -60.0f);
 		P(2.25f, 4.7f);
-		P(-7.6f, 4.0f);
+		P(0.3f, 5.2f);
+		P(-5.5f, 4.5f);
+		P(-7.7f, 3.9f);
 	}
 	else if (S == TEXT("engineering"))
 	{
@@ -949,27 +995,27 @@ TArray<FVector> UAstraShipSubsystem::VisitRouteFor(const AAstraCrewMember* C, in
 	}
 	else if (S == TEXT("xo"))
 	{
-		// off the command dais (an ellipse 1.25 x 2.9 m, 0.2 m high)
 		R.Add(C->GetActorLocation());
-		P(-0.7f, -2.25f, 20.f);
+		P(-0.7f, -2.25f, 20.0f);
 		P(-0.95f, -2.4f);
 		P(-5.0f, -2.6f);
 		P(-7.2f, -2.0f);
 		P(-7.2f, 2.0f);
 		P(-7.7f, 3.6f);
 	}
-	else if (S == TEXT("comms") || S == TEXT("sensors"))
+	else if (S == TEXT("comms"))
 	{
 		R.Add(C->GetActorLocation());
-		if (S == TEXT("comms"))
-		{
-			P(0.3f, -5.2f);
-			P(-5.5f, -4.6f);
-		}
-		else
-		{
-			P(-3.0f, -5.2f);
-		}
+		P(0.3f, -5.2f);
+		P(-5.5f, -4.6f);
+		P(-7.3f, -2.7f);
+		P(-7.3f, 2.6f);
+		P(-7.7f, 3.9f);
+	}
+	else if (S == TEXT("sensors"))
+	{
+		R.Add(C->GetActorLocation());
+		P(-3.0f, -5.2f);
 		P(-7.3f, -2.7f);
 		P(-7.3f, 2.6f);
 		P(-7.7f, 3.9f);
@@ -2072,7 +2118,18 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		FString Sec = Str(TEXT("section")).ToUpper().TrimStartAndEnd();
 		Sec.RemoveFromStart(TEXT("SECTION "));
 		const TCHAR SecC = Sec.Len() ? Sec[0] : TEXT('?');
-		FAstraDamage* D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC; });
+		// one incident by its id (ops' own dispatcher), else the first at that deck and section (a fire and a breach can
+		// share a section: the unattended one first)
+		const int32 IncidentId = (int32)Num(TEXT("id"), -1.0);
+		FAstraDamage* D = IncidentId >= 0 ? Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Id == IncidentId; }) : nullptr;
+		if (!D)
+		{
+			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC && X.Team < 0; });
+		}
+		if (!D)
+		{
+			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC; });
+		}
 		if (D && D->Team >= 0)
 		{
 			OutDetail = FString::Printf(TEXT("team %d is already on the %s at %s (%s)"), D->Team + 1, *D->Kind, *D->Where(),
@@ -2211,6 +2268,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (const UAstraStationsSubsystem* St = GetWorld() ? GetWorld()->GetSubsystem<UAstraStationsSubsystem>() : nullptr)
 	{
 		S->SetObjectField(TEXT("stations"), St->StationsJson());
+		S->SetStringField(TEXT("action_target"), St->ActionTarget());   // what "target: action" means now (tactical's target, else the nearest hostile)
 		if (Viewscreen)
 		{
 			S->SetStringField(TEXT("viewscreen"), Viewscreen->Describe());   // what the Captain sees on the main screen now

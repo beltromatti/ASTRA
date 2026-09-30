@@ -36,7 +36,15 @@ def cmd_run(a: argparse.Namespace) -> None:
     t0 = time.time()
     log = ROOT / "Saved" / "War" / "last_run.log"
     with open(log, "w") as f:
-        r = subprocess.run(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
+        # a crash can leave the engine hanging in its crash handler: never wait for ever
+        p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
+        try:
+            p.wait(timeout=max(180.0, a.seconds / 5.0))
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait()
+            print(f"   the war bench did not finish in time: killed (log {log})")
+        r = p
     if getattr(a, "quiet", False):
         if r.returncode != 0:
             print(f"   exit {r.returncode} (log {log})")

@@ -139,6 +139,9 @@ public:
 	FString GetPointDefense() const { return PointDefense; }
 	int32 GetNumDamageTeams() const { return NumDamageTeams; }
 	float GetPowerBudget() const { return PowerBudget; }
+	/** Engineering's battle short: the reactor past its limits (budget 800%, heat +0.3%/s) or back to normal. */
+	void SetBattleShort(bool bOn);
+	bool IsBattleShort() const { return bBattleShort; }
 	/** A new star system around the ship (Janus transit): star, sun light, planet, sky tint, location name. */
 	void ApplySystem(const FAstraSystemLook& Look);
 	FString GetLocationName() const { return LocationName; }
@@ -333,7 +336,8 @@ private:
 	UPROPERTY() TObjectPtr<class AAstraViewscreen> Viewscreen;   // the main viewscreen in front of the bow window
 	FRandomStream CasualtyRng;
 	static constexpr int32 NumDamageTeams = 4;
-	static constexpr float PowerBudget = 700.f;   // six systems at 100% = 600; the reactor can give 100 more
+	float PowerBudget = 700.f;        // six systems at 100% = 600; the reactor can give 100 more (800 on a battle short)
+	bool bBattleShort = false;        // the reactor's safety limits overridden: more power, more heat, a risk to the core
 	float HullPct = 100.f;
 	double LastHitReport = -100.0;
 	float FlickerTime = 0.f;

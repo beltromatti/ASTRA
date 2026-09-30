@@ -83,6 +83,10 @@ void AAstraHoloTable::BeginPlay()
 	Disc->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Disc->SetCastShadow(false);
 	Disc->SetMaterial(0, GridMat);
+	if (UMaterialInstanceDynamic* DM = Disc->CreateDynamicMaterialInstance(0, GridMat))
+	{
+		DM->SetScalarParameterValue(TEXT("Intensity"), 32.f);   // the projector's grid, visible in a sunlit room
+	}
 	Disc->SetRelativeLocation(FVector(0, 0, 1.5f));
 	Disc->SetRelativeScale3D(FVector(PlotRadius / 100.f, PlotRadius / 100.f, 1.f));
 
@@ -90,9 +94,9 @@ void AAstraHoloTable::BeginPlay()
 	for (int32 i = 0; i < 3; ++i)
 	{
 		UStaticMeshComponent* R = Pooled(Rings, i, RingMesh);
-		SetColor(R, ColAstra, i == 0 ? 10.f : 5.f);
+		SetColor(R, ColAstra, i == 0 ? 20.f : 10.f);
 		UTextRenderComponent* T = PooledText(RingLabels, i);
-		T->SetWorldSize(2.6f);
+		T->SetWorldSize(3.4f);
 		T->SetTextRenderColor(FColor(120, 200, 255));
 	}
 }
@@ -390,8 +394,9 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		if (B.Kind == 0)
 		{
 			const FLinearColor Col = BlipColor(B);
-			const float Base = (B.bPlayer ? 32.f : 24.f) * (bBeyond ? 0.45f : 1.f) * (B.bRetreating ? 0.6f : 1.f) * (B.bTargeted ? Pulse * 1.5f : 1.f);
-			const float Size = (B.bPlayer ? 11.f : 9.f) * B.Size;
+			// bright enough for a bridge in sunlight, big enough to read from the chair (the v3 table is 2.7 m across)
+			const float Base = (B.bPlayer ? 80.f : 60.f) * (bBeyond ? 0.45f : 1.f) * (B.bRetreating ? 0.6f : 1.f) * (B.bTargeted ? Pulse * 1.5f : 1.f);
+			const float Size = (B.bPlayer ? 18.f : 14.5f) * B.Size;
 			UStaticMeshComponent* Icon = Pooled(Icons, NI, B.bUnknown ? UnknownMesh.Get() : ShipMesh.Get());
 			Icon->SetRelativeLocationAndRotation(P, B.bUnknown ? FRotator(0.f, Time * 40.f, 0.f) : B.Rot.Rotator());
 			Icon->SetRelativeScale3D(FVector(Size / 100.f));
@@ -403,7 +408,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			Stem->SetVisibility(FMath::Abs(Dz) > 0.6f);
 			Stem->SetRelativeLocationAndRotation(FVector(P.X, P.Y, PlaneHeight), FRotator(Dz > 0.f ? 90.f : -90.f, 0.f, 0.f));
 			Stem->SetRelativeScale3D(FVector(FMath::Max(FMath::Abs(Dz), 0.1f) / 100.f, 0.15f, 0.15f));
-			SetColor(Stem, Col, 5.f);
+			SetColor(Stem, Col, 12.f);
 
 			// velocity vector: 500 m/s = 12 cm
 			UStaticMeshComponent* Vec = Pooled(Vectors, NI, LineMesh);
@@ -411,7 +416,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			Vec->SetVisibility(L > 0.8f && !B.VelDir.IsNearlyZero());
 			Vec->SetRelativeLocationAndRotation(P, B.VelDir.Rotation());
 			Vec->SetRelativeScale3D(FVector(L / 100.f, 0.18f, 0.18f));
-			SetColor(Vec, Col, 7.f);
+			SetColor(Vec, Col, 14.f);
 			++NI;
 
 			if (B.bJamming)
@@ -445,9 +450,9 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			if (B.bTargeted) { Sub += TEXT("  [TARGET]"); }
 			T->SetText(FText::FromString(Sub.IsEmpty() ? Title : Title + TEXT("<br>") + Sub));
 			T->SetTextRenderColor(Col.ToFColor(true));
-			T->SetWorldSize(B.bPlayer ? 3.6f : 3.2f);   // (WS below)
+			T->SetWorldSize(B.bPlayer ? 5.0f : 4.4f);   // (WS below)
 			// declutter in the viewer's picture plane: a label that would cover another climbs just above it
-			const float WS = B.bPlayer ? 3.6f : 3.2f;
+			const float WS = B.bPlayer ? 5.0f : 4.4f;
 			const float W = FMath::Max(Title.Len(), Sub.Len()) * WS * 0.52f;
 			const float H = (Sub.IsEmpty() ? 1.f : 2.f) * WS * 1.05f;
 			const FVector Anchor = P + FVector(0, 0, Size * 0.3f + 1.2f);
@@ -477,7 +482,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			Lead->SetVisibility(Rise > 1.f);
 			Lead->SetRelativeLocationAndRotation(Anchor, FRotator(90.f, 0.f, 0.f));
 			Lead->SetRelativeScale3D(FVector(FMath::Max(Rise, 0.1f) / 100.f, 0.16f, 0.16f));
-			SetColor(Lead, Col, 9.f);
+			SetColor(Lead, Col, 16.f);
 			FaceViewer(T, ViewerLocal);
 		}
 		else if (B.Kind == 1)

@@ -222,9 +222,30 @@ async def sc_bow_on_it(llm: OpenRouter, lang: str) -> Result:
     text = {"it": "tienilo di prua, voglio vederlo dal finestrone", "en": "keep it on the bow, I want to see it through the window"}[lang]
     turn = await h.captain(text)
     calls = h.modes("helm", "keep_on_bow")
-    sc.must("helm keep_on_bow on the target", bool(calls) and calls[-1]["params"].get("target") in ("T-23", "tactical_target"), f"{h.ship.log}")
+    sc.must("helm keep_on_bow on the target", bool(calls) and calls[-1]["params"].get("target") in ("T-23", "tactical_target", "action"), f"{h.ship.log}")
     sc.spoke_well(h)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
+    sc.res.cost = h.cost
+    sc.res.turns += h.turns
+    return sc.res
+
+
+async def sc_action(llm: OpenRouter, lang: str) -> Result:
+    sc = Scenario("the fight itself as a target: `action` for the bow, `hostiles` for the guns", lang)
+    h = Harness(llm, lang)
+    text = {"it": "tieni sempre la prua sull'azione", "en": "keep the bow on the action, whatever happens"}[lang]
+    turn = await h.captain(text)
+    calls = h.modes("helm", "keep_on_bow")
+    sc.must("helm keep_on_bow on `action` (it follows the fight by itself)", bool(calls) and str(calls[-1]["params"].get("target", "")).lower() == "action",
+            f"{h.ship.log}")
+    sc.spoke_well(h)
+    sc.res.transcript.append(transcript(h, text, turn, h.lines))
+    text2 = {"it": "fuoco su tutti", "en": "fire on all of them"}[lang]
+    turn2 = await h.captain(text2)
+    eng = [c for c in h.modes("tactical", "engage") if any(str(t).lower() == "hostiles" for t in c["params"].get("targets", []))]
+    sc.must("tactical engage on `hostiles` (a standing order)", bool(eng), f"{h.ship.log[-3:]}")
+    sc.spoke_well(h)
+    sc.res.transcript.append(transcript(h, text2, turn2, h.lines))
     sc.res.cost = h.cost
     sc.res.turns += h.turns
     return sc.res
@@ -613,7 +634,7 @@ async def sc_routing(llm: OpenRouter, lang: str) -> Result:
 
 
 SCENARIOS: list[Callable[[OpenRouter, str], Any]] = [
-    sc_engage_until_it_falls, sc_one_volley, sc_fire_at_will, sc_follow_until_ordered, sc_bow_on_it, sc_speed, sc_viewscreen, sc_datapad,
+    sc_engage_until_it_falls, sc_one_volley, sc_fire_at_will, sc_follow_until_ordered, sc_bow_on_it, sc_action, sc_speed, sc_viewscreen, sc_datapad,
     sc_delegation, sc_other_consoles, sc_coordination, sc_questions, sc_out_of_reach, sc_legacy_build, sc_standing_order,
     sc_initiative_after_a_kill, sc_initiative_new_contact, sc_delegation_advise, sc_advise_then_go, sc_correction, sc_report_on_request,
     sc_typed_noise, sc_mess_and_medbay, sc_routing,

@@ -61,6 +61,8 @@ public:
 	static const TArray<FString>& AspectsOf(const FString& Station);
 	/** The modes an aspect offers (the buttons of the console's control surface). */
 	static const TArray<FString>& ModeChoices(const FString& Station, const FString& Aspect);
+	/** A target parameter as the executors use it: "action" follows the fight (ActionTarget, re-read every tick). */
+	FString Resolve(const FString& Target) const { return Target.Equals(TEXT("action"), ESearchCase::IgnoreCase) ? ActionTargetId : Target.ToUpper(); }
 	/** The contact the fight is about for the bridge (tactical's target, else the nearest hostile known), "" if none. */
 	FString ActionTarget() const { return ActionTargetId; }
 
@@ -74,6 +76,7 @@ private:
 	FString LastShieldSector;
 	double ShieldSectorSince = 0.0;
 	TMap<FString, FString> SquadronTargets; // squadron -> contact its mission is about
+	TMap<FString, FString> DefaultModes;    // "station.aspect" -> the mode it had at the start (a time limit goes back to it)
 
 	void Defaults();
 	UAstraShipSubsystem* Ship() const;

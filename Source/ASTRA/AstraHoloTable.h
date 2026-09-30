@@ -29,11 +29,11 @@ public:
 
 	/** Height of the tactical plane above the actor origin (the table top), cm. */
 	UPROPERTY(EditAnywhere, Category = "Holo")
-	float PlaneHeight = 24.f;
+	float PlaneHeight = 42.f;         // a plot that floats well above the v3 table, seen from the Captain's chair
 
 	/** How far above/below the plane a contact may be drawn (cm). */
 	UPROPERTY(EditAnywhere, Category = "Holo")
-	float MaxDepth = 18.f;
+	float MaxDepth = 28.f;
 
 private:
 	UPROPERTY() TObjectPtr<USceneComponent> Root;

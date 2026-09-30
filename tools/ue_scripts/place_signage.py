@@ -136,16 +136,10 @@ def sign(name, x, y, z, yaw, w, h):
     return a
 
 
-for st in data["stations"]:
-    sid, (x, y), lvl, yaw, kind = st["id"], st["pos"], levels[st["level"]], st["yaw"], st["kind"]
-    fx, fy = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
-    if kind == "console_seated":
-        sign(sid.capitalize(), x + fx * 0.95, y + fy * 0.95, lvl + 1.74, yaw + 180.0, 0.86, 0.16)
-    elif kind == "tactical_rail":
-        sign("Tactical", x + 0.42, y, lvl + 0.98, 0.0, 0.6, 0.1125)
+# the stations' names are part of the v3 consoles and chairs (art/blender/bridge3_*.py): no plates floating over them
 md = data["master_display"]
 back = data["walls"]["back_x"]
-sign("Aquila", back + 0.06, 0.0, md["bottom"] + md["height"] + 0.42, 0.0, 2.6, 0.65)
+sign("Aquila", back + 0.06, 0.0, md["bottom"] + md["height"] + 0.27, 0.0, 2.6, 0.65)   # clear of the display's frame
 for d in data["doors"]:
     dx, dy = d["pos"]
     sign("Door_Starboard" if dy > 0 else "Door_Port", dx + 0.07, dy, d["height"] + 0.16, 0.0, 1.0, 0.25)

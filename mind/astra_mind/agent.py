@@ -127,6 +127,16 @@ class BridgeAgent:
     def standing_lines(self) -> str:
         return "\n".join(f"- {o['department']}: {o['order']}" for o in self.standing)
 
+    async def warm_up(self, lang: str) -> float:
+        """The first crew turn of a session should not pay for a cold connection and a cold prompt cache: one request goes out
+        while the game is still starting, with the crew's own tools and system prompt, asking for a single token. Nothing is
+        said, done or remembered. Returns the seconds it took."""
+        t0 = time.perf_counter()
+        state = self.ship.snapshot()
+        msgs = [self._system(lang, state), {"role": "user", "content": "[the bridge is manned: stand by]"}]
+        await models.chat(self.llm, "crew", messages=msgs, tools=tools_for(state).tools, max_tokens=1, retry=False, first_token_s=20.0)
+        return time.perf_counter() - t0
+
     async def _standing_order(self, args: dict[str, Any]) -> dict[str, Any]:
         """The Captain's orders that last: recorded, or withdrawn (a department's, or all of them)."""
         dept, order = str(args.get("department", "")).lower(), str(args.get("order", "")).strip()
@@ -348,7 +358,7 @@ class BridgeAgent:
             if not ok:
                 return {"ok": False, "detail": why}
         # to the game in its own words: the aspect, the game's mode name, and who decided (the console log and the board show it)
-        wire = station_model.to_wire(cmd, by="captain" if captain else "officer", state=state)
+        wire = station_model.to_wire(cmd, by="captain" if captain else "officer")
         return await _safe_execute(self.ship, "station", wire, owner_of("station", cmd))
 
     async def _salvage(self, content: str, turn: Turn, lang: str, max_lines: int) -> None:

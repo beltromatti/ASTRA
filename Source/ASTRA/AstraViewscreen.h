@@ -90,6 +90,10 @@ private:
 	TArray<UAstraBattleSubsystem::FContactView> Contacts;   // the plot, refreshed every frame
 	bool bPushIn = false;              // the next aim starts a little wide and pushes in (a cut)
 	double LastCaptureAt = -1.0;       // the last refresh of the feed and the overlay
+	double NextShowListAt = 0.0;       // when the list of what the camera may see is rebuilt
+	/** The camera sees only space (the sky, the Aquila's hull, ships, weapons, wrecks): the bridge, the decks inside and
+	 *  the planet's surface zone never enter its scene (half the render thread's work of a capture was theirs). */
+	void RebuildShowList();
 
 	void Direct(float Dt);
 	void Aim(float DeltaSeconds);
