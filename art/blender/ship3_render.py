@@ -51,9 +51,10 @@ def render_previews(name: str, short_name: str, spec: dict, res: dict, obj, args
     pts = verts_world(obj)
     for view in args["views"]:
         if view == "three_quarter":
-            d = view_dir(info.get("cam_az", -48.0), info.get("cam_el", 18.0))
-            shot("cam", pts, d, os.path.join(outd, f"{sn}_three_quarter.jpg"), (w, h), lens=info.get("lens", 60.0), side=side,
-                 margin=info.get("margin", 0.05))
+            cam = args.get("cam") or [info.get("cam_az", -48.0), info.get("cam_el", 18.0), info.get("lens", 60.0)]
+            d = view_dir(cam[0], cam[1])
+            shot("cam", pts, d, os.path.join(outd, f"{sn}_three_quarter{args.get('tag', '')}.jpg"), (w, h), lens=cam[2] if len(cam) > 2 else info.get("lens", 60.0),
+                 side=side, margin=info.get("margin", 0.05))
         elif view == "closeup":
             for i, cu in enumerate(info.get("closeups", [])):
                 tgt = np.array(cu["target"], float)
@@ -61,7 +62,7 @@ def render_previews(name: str, short_name: str, spec: dict, res: dict, obj, args
                 dist = cu.get("distance", 110.0)
                 span = cu.get("span", 50.0)
                 cam = PV.camera("cam", tuple(tgt + nrm * dist), tuple(tgt), PV.close_up_lens(dist, span, 36.0))
-                PV.rig(cam.location, tgt, key_az=cu.get("key_az", 75.0), key_el=cu.get("key_el", 26.0), side=cu.get("side", side))
+                PV.rig(cam.location, tgt, key_az=cu.get("key_az", 70.0), key_el=cu.get("key_el", 36.0), side=cu.get("side", side))
                 PV.render(cam, os.path.join(outd, f"{sn}_closeup_{cu.get('name', i)}.jpg"))
     cuts = info.get("cuts")
     if not cuts or not ("pieces" in args["views"] or "cutface" in args["views"]):

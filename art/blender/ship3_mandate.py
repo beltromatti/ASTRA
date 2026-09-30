@@ -554,7 +554,7 @@ def _build(c: Ctx, spec: dict, name: str, extras, extra_info: dict) -> dict:
 
 def build_acheron(c: Ctx) -> dict:
     return _build(c, acheron_spec(), "acheron", _acheron_extras,
-                  {"cam_az": -30.0, "cam_el": 20.0, "cam_dist": 1.9, "sun_az": -55.0, "sun_el": 30.0,
+                  {"cam_az": -30.0, "cam_el": 20.0, "cam_dist": 1.9, "sun_az": -55.0, "sun_el": 30.0, "exposure": 0.6,
                    "closeups": [{"name": "waist", "target": [-100.0, -38.0, 0.0], "normal": [0.0, -1.0, 0.25], "distance": 110.0, "span": 50.0},
                                 {"name": "tower", "target": [-30.0, -15.0, 50.0], "normal": [0.2, -0.9, 0.35], "distance": 110.0, "span": 50.0}],
                    "pieces_gap": 0.11})
@@ -562,13 +562,13 @@ def build_acheron(c: Ctx) -> dict:
 
 def build_styx(c: Ctx) -> dict:
     return _build(c, styx_spec(), "styx", _styx_extras,
-                  {"cam_az": -30.0, "cam_el": 20.0, "cam_dist": 1.9, "sun_az": -55.0, "sun_el": 30.0,
+                  {"cam_az": -30.0, "cam_el": 20.0, "cam_dist": 1.9, "sun_az": -55.0, "sun_el": 30.0, "exposure": 0.6,
                    "closeups": [{"name": "stern", "target": [-120.0, -30.0, 5.0], "normal": [-0.3, -0.9, 0.3], "distance": 100.0, "span": 50.0}],
                    "pieces_gap": 0.13})
 
 
 def build_lethe(c: Ctx) -> dict:
     return _build(c, lethe_spec(), "lethe", _lethe_extras,
-                  {"cam_az": -30.0, "cam_el": 20.0, "cam_dist": 1.9, "sun_az": -55.0, "sun_el": 30.0,
+                  {"cam_az": -30.0, "cam_el": 20.0, "cam_dist": 1.9, "sun_az": -55.0, "sun_el": 30.0, "exposure": 0.6,
                    "closeups": [{"name": "hull", "target": [-20.0, -20.0, 5.0], "normal": [0.0, -1.0, 0.4], "distance": 90.0, "span": 40.0}],
                    "pieces_gap": 0.14})

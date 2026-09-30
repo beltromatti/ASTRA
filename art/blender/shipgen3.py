@@ -131,6 +131,12 @@ def parse_args() -> dict:
         elif a == "--samples":
             out["samples"] = int(argv[i + 1])
             i += 1
+        elif a == "--cam":                                    # az,el[,lens]: another angle for the three-quarter view
+            out["cam"] = [float(x) for x in argv[i + 1].split(",")]
+            i += 1
+        elif a == "--tag":                                    # suffix for the preview file names
+            out["tag"] = argv[i + 1]
+            i += 1
         elif a == "--report":
             out["report"] = True
         elif not a.startswith("--"):

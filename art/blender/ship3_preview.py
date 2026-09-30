@@ -209,7 +209,8 @@ def hull_material(name: str, fac: str, part: str, tone_amount: float | None = No
     g = mt.sat(mt.mul(mt.mul(grime, grime_gain), mt.add(mt.mul(wb, 0.8), 0.6)))
     grime_f = mt.sub(1.0, mt.mul(g, 0.55))
     soot_f = mt.sub(1.0, mt.mul(mt.mul(soot, 0.6), mt.add(mt.mul(wa, 0.5), 0.5)))
-    k = mt.mul(mt.mul(tone_f, macro_f), mt.mul(grime_f, soot_f))
+    dirt_f = mt.mul(mt.sub(1.0, mt.mul(mt.math("POWER", wb, 1.3), 0.22)), mt.sub(1.0, mt.mul(wa, 0.12)))              # weathering of the flat plates: blotches and streaks
+    k = mt.mul(mt.mul(mt.mul(tone_f, macro_f), mt.mul(grime_f, soot_f)), dirt_f)
     paint = mt.scale_c(srgb(tint_hex), k)
     # chips and scratches
     chip = mt.sat(mt.mul(mt.sub(mt.add(mt.mul(wear, 1.0), mt.mul(mt.sub(wr, 0.5), 0.9)), 0.52), 10.0))
@@ -355,7 +356,7 @@ def make_materials(fac: str) -> dict:
     out["Glow"] = glow_material(pre + "Glow", fac, PAL.LIGHTS[fac][3] * 0.6)
     out["Nav"] = nav_material(pre + "Nav")
     out["Glass"] = glass_material(pre + "Glass")
-    out["Radiator"] = radiator_material(pre + "Radiator", fac, 2.6 if fac == "M" else 0.0)
+    out["Radiator"] = radiator_material(pre + "Radiator", fac, 1.5 if fac == "M" else 0.0)
     out["Cut"] = cut_material(pre + "Cut")
     out["Decal"] = hull_material(pre + "Decal", fac, "Marking")
     return out

@@ -178,7 +178,8 @@ def build_hull():
 
     P = {}
     defs = (("BCInfluence", 0.4), ("ToneAmount", 0.20), ("MacroBrightness", 0.10), ("GrimeGain", 1.0), ("GrimeDarken", 0.55), ("SootDarken", 0.6),
-            ("WearGain", 1.0), ("WearThreshold", 0.52), ("WearSoftness", 0.10), ("WearBreakup", 0.9), ("ScratchAmount", 0.35))
+            ("WearGain", 1.0), ("WearThreshold", 0.52), ("WearSoftness", 0.10), ("WearBreakup", 0.9), ("ScratchAmount", 0.35), ("DirtBlotch", 0.22),
+            ("StreakAmount", 0.12))
     for i, (n, v) in enumerate(defs):
         P[n] = scalar(m, n, v, -1800, -900 + 60 * i, "Paint")
     tint = vector(m, "Tint", (0.5, 0.5, 0.5, 1), -1800, -1100, "Paint")
@@ -195,6 +196,7 @@ paint *= 1.0 + (MN.r - 0.5) * 2.0 * MacroBrightness;
 paint *= 1.0 + (tone - 0.5) * 2.0 * ToneAmount;
 float g = saturate(grime * GrimeGain * (0.6 + 0.8 * WMrgb.b));
 paint *= (1.0 - g * GrimeDarken) * (1.0 - soot * SootDarken * (0.5 + 0.5 * WMa));
+paint *= (1.0 - DirtBlotch * pow(max(WMrgb.b, 0.0), 1.3)) * (1.0 - StreakAmount * WMa);
 float chip = saturate((wear * WearGain + (WMrgb.r - 0.5) * WearBreakup - WearThreshold) / max(WearSoftness, 0.001));
 float scr = smoothstep(0.86, 0.97, WMrgb.g) * ScratchAmount;
 float isbare = saturate(max(chip, scr));
@@ -202,7 +204,7 @@ float3 metal = BareTint * (0.8 + 0.4 * WMrgb.g);
 return float4(lerp(paint, metal, isbare), isbare);
 """
     ins = [("BC", (bc, "RGB")), ("MN", (macro, "RGB")), ("WMrgb", (wear, "RGB")), ("WMa", (wear, "A")), ("D1", (uv1, "")), ("D2", (uv2, "")),
-           ("Tint", (tint, "RGB")), ("BareTint", (bare, "RGB"))] + [(n, (P[n], "")) for n in ("BCInfluence", "ToneAmount", "MacroBrightness", "GrimeGain", "GrimeDarken", "SootDarken", "WearGain", "WearThreshold", "WearSoftness", "WearBreakup", "ScratchAmount")]
+           ("Tint", (tint, "RGB")), ("BareTint", (bare, "RGB"))] + [(n, (P[n], "")) for n in ("BCInfluence", "ToneAmount", "MacroBrightness", "GrimeGain", "GrimeDarken", "SootDarken", "WearGain", "WearThreshold", "WearSoftness", "WearBreakup", "ScratchAmount", "DirtBlotch", "StreakAmount")]
     base = custom(m, base_code, ins, -1200, -300)
     for i, nme in enumerate(("RoughMin", "RoughMax", "RoughVar", "GrimeRough", "BareRoughness", "BareMetallic", "MetallicBias", "MetallicFromMap", "CavityAO")):
         P[nme] = scalar(m, nme, {"RoughMin": 0.3, "RoughMax": 0.6, "RoughVar": 0.18, "GrimeRough": 0.25, "BareRoughness": 0.42, "BareMetallic": 0.75,

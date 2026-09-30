@@ -380,7 +380,10 @@ def build_harpy(c: Ctx) -> dict:
         yy = side * (w * 1.1)
         g.cylinder((L * 0.05, yy, -h * 0.25), (L * 0.26, yy, -h * 0.25), 0.07, 0.06, m("Engine"), seg=8, kind="cannon")           # cannons in the wing roots
         g.cylinder((L * 0.25, yy, -h * 0.25), (L * 0.28, yy, -h * 0.25), 0.10, 0.10, m("Frame"), seg=8, kind="cannon")
-        missile(c, (-L * 0.14, side * (w * 1.6 + (span - w) * 0.55), -h * 0.25 - 0.4), 1.8, 0.09, True)
+        ym = side * (w * 1.6 + (span - w) * 0.55)
+        missile(c, (-L * 0.14, ym, -h * 0.25 - 0.4), 1.8, 0.09, True)
+        for xx in (-L * 0.14 + 0.35, -L * 0.14 + 1.25):                                  # the pylons that hold it to the wing
+            g.box((xx, ym, -h * 0.25 - 0.26), (0.5, 0.07, 0.34), m("Frame"), chamfer=0.01, kind="missile")
         if side > 0:
             MD.tally_marks(c, wl.zone(0), 1.0, 0.5, 7, 0.12)
     base = np.array([-L * 0.44, 0.0, h * 0.95])                  # the single tail blade
