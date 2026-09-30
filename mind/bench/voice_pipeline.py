@@ -816,7 +816,9 @@ def report(args) -> None:  # noqa: ANN001
         L += ["## 1. Riconoscimento vocale", ""]
         L += ["Frasi d'ordine (2–7 s) in sette lingue, cinque voci per frase (tre Pocket TTS, due voci di sistema), tre condizioni: pulito, rumoroso (15 dB sopra "
               "ventilazione, ronzio del reattore e bip delle console) e difficile (6 dB, riverbero, un'altra voce che parla, esplosioni). "
-              "WER = parole sbagliate / parole, numeri esclusi. Latenza = tempo da una registrazione finita al testo (motore + taglio del silenzio + glossario).", ""]
+              "WER = parole sbagliate / parole, numeri esclusi (oltre 100 % vuol dire che il motore ha scritto più parole sbagliate o inventate di quante ne fossero state dette: "
+              "rumore preso per parole). Latenza = tempo da una registrazione finita al testo (motore + taglio del silenzio + glossario). I campioni più piccoli (le prove delle "
+              "alternative e sotto carico usano le prime tre frasi di ogni lingua, le più brevi) hanno WER più alti dell'intero corpus: si confrontano solo sulle stesse frasi.", ""]
         L += ["| Motore | condizione | n | WER | latenza mediana ms | p95 ms | carico medio |", "|---|---|---|---|---|---|---|"]
         for name, d in stt.items():
             rows = d["rows"]

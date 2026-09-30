@@ -106,13 +106,13 @@ async def main() -> int:
     replies: list[str] = []
     marks: dict[str, float] = {}
 
-    async def stub_handle(text: str, language: str):  # noqa: ANN202
+    async def stub_handle(text: str, language: str, *_a, **_k):  # noqa: ANN002, ANN003, ANN202
         """The crew's model, replaced: the helm answers with a canned line, as a turn that produced one line."""
         replies.append(text)
         marks["agent_called"] = time.perf_counter()
         await mind.agent.say("helm", REPLY[lang], language, "focused")
         marks["agent_said"] = time.perf_counter()
-        return SimpleNamespace(actions=[], lines=[("helm", REPLY[lang])], t_first_line=0.0, t_end=0.0, cost=0.0, error=None)
+        return SimpleNamespace(actions=[], lines=[("helm", REPLY[lang])], t_first_line=0.0, t_end=0.0, cost=0.0, error=None, cancelled=False)
 
     async def no_model(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
         return None
