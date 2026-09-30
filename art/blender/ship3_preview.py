@@ -213,7 +213,7 @@ def hull_material(name: str, fac: str, part: str, tone_amount: float | None = No
     paint = mt.scale_c(srgb(tint_hex), k)
     # chips and scratches
     chip = mt.sat(mt.mul(mt.sub(mt.add(mt.mul(wear, 1.0), mt.mul(mt.sub(wr, 0.5), 0.9)), 0.52), 10.0))
-    scr = mt.mul(mt.smooth(wg, 0.86, 0.97), 0.5)
+    scr = mt.mul(mt.smooth(wg, 0.86, 0.97), 0.35)
     isbare = mt.sat(mt.math("MAXIMUM", chip, scr))
     metal_c = mt.scale_c(srgb(bare_hex), mt.add(mt.mul(wg, 0.4), 0.8))
     col = mt.lerp_c(paint, metal_c, isbare)
@@ -324,7 +324,7 @@ def radiator_material(name: str, fac: str, glow: float) -> bpy.types.Material:
     return mt.m
 
 
-def cut_material(name: str, heat: float = 0.5) -> bpy.types.Material:
+def cut_material(name: str, heat: float = 0.35) -> bpy.types.Material:
     """M_ASTRA_ShipCut: scorched carbon with streaks and glowing embers (heat 0..1)."""
     mt = NodeMat(name)
     uv1 = mt.n("ShaderNodeUVMap", -1900, 300, uv_map="UVMap_D1")
@@ -337,9 +337,9 @@ def cut_material(name: str, heat: float = 0.5) -> bpy.types.Material:
     mt.l(col[0], col[1], bsdf, "Base Color")
     bsdf.inputs["Roughness"].default_value = 0.85
     bsdf.inputs["Metallic"].default_value = 0.25
-    e = mt.smooth(mt.add(mt.add(wr, mt.mul((s1, "Y"), 0.25)), mt.mul(wg, 0.2)), 0.66, 0.92)
+    e = mt.smooth(mt.add(wr, mt.mul(wg, 0.22)), 0.70, 0.84)
     bsdf.inputs["Emission Color"].default_value = (1.0, 0.33, 0.07, 1.0)
-    st = mt.mul(e, 26.0 * heat * 0.25)
+    st = mt.mul(e, 26.0 * heat * 0.2)
     mt.l(st[0], st[1], bsdf, "Emission Strength")
     mt.l(bsdf, "BSDF", mt.out, "Surface")
     return mt.m
@@ -355,7 +355,7 @@ def make_materials(fac: str) -> dict:
     out["Glow"] = glow_material(pre + "Glow", fac, PAL.LIGHTS[fac][3] * 0.6)
     out["Nav"] = nav_material(pre + "Nav")
     out["Glass"] = glass_material(pre + "Glass")
-    out["Radiator"] = radiator_material(pre + "Radiator", fac, 7.0 if fac == "M" else 0.0)
+    out["Radiator"] = radiator_material(pre + "Radiator", fac, 2.6 if fac == "M" else 0.0)
     out["Cut"] = cut_material(pre + "Cut")
     out["Decal"] = hull_material(pre + "Decal", fac, "Marking")
     return out

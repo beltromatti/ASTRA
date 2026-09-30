@@ -109,11 +109,29 @@ def astra_emblem(g: G.Geo, origin, normal, diameter: float, mat: str, up=(0.0, 0
 
 
 def mandate_mark(g: G.Geo, origin, normal, diameter: float, mat: str, up=(0.0, 0.0, 1.0), lift: float = 0.0, depth: float = 0.06) -> None:
-    """The Kharon Mandate's mark: the ferryman's coin, a ring with a single oar-bar across it and a wave line under it."""
+    """The Kharon Mandate's mark: the ferryman's coin, a ring with a diagonal oar (shaft and leaf blade) over two lines of waves."""
     fr = text_frame(normal, up)
     o = np.asarray(origin, np.float64) + G.norm(normal) * lift
     r = diameter / 2.0
-    g.revolve([(0.82 * r, 0.0), (r, 0.0), (r, depth), (0.82 * r, depth), (0.82 * r, 0.0)], mat, origin=o, frame=fr, seg=40, wear=0.5, kind="emblem")
-    mid = o + fr[2] * depth / 2
-    g.box(mid, (0.12 * r, 1.5 * r, depth), mat, frame=fr, chamfer=0.0, wear=0.5, kind="emblem")                       # the oar
-    g.box(mid + fr[1] * (-0.35 * r), (1.2 * r, 0.10 * r, depth), mat, frame=fr, chamfer=0.0, wear=0.5, kind="emblem")   # the wave
+    g.revolve([(0.84 * r, 0.0), (r, 0.0), (r, depth), (0.84 * r, depth), (0.84 * r, 0.0)], mat, origin=o, frame=fr, seg=40, wear=0.5, kind="emblem")
+
+    def bar(p, q, w):
+        p, q = np.asarray(p, np.float64) * r, np.asarray(q, np.float64) * r
+        d = q - p
+        L = float(np.linalg.norm(d))
+        th = math.atan2(d[1], d[0])
+        cs, sn = math.cos(th), math.sin(th)
+        frame = np.stack([cs * fr[0] + sn * fr[1], -sn * fr[0] + cs * fr[1], fr[2]])
+        mid = o + fr[0] * (p[0] + q[0]) / 2 + fr[1] * (p[1] + q[1]) / 2 + fr[2] * depth / 2
+        g.box(mid, (L, w * r, depth), mat, frame=frame, chamfer=0.0, wear=0.5, kind="emblem")
+
+    p0, p1, p2 = np.array([-0.52, 0.52]), np.array([0.36, -0.30]), np.array([0.64, -0.56])
+    bar(p0, p1, 0.085)                                                                   # the oar's shaft
+    ax = (p2 - p1) / np.linalg.norm(p2 - p1)
+    nx = np.array([-ax[1], ax[0]])                                                       # the leaf blade: a kite round the axis
+    kite = np.array([p1 + nx * 0.07, p1 + (p2 - p1) * 0.40 + nx * 0.19, p2, p1 + (p2 - p1) * 0.40 - nx * 0.19, p1 - nx * 0.07]) * r
+    g.prism(kite, depth, mat, origin=o, frame=fr, chamfer=0.0, wear=0.5, kind="emblem", cap_bottom=False)
+    for y0 in (-0.30, -0.52):                                                            # two lines of waves
+        pts = [(-0.64 + 0.16 * k, y0 + (0.11 if k % 2 else 0.0)) for k in range(5)]
+        for a, b in zip(pts[:-1], pts[1:]):
+            bar(a, b, 0.065)

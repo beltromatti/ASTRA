@@ -30,13 +30,13 @@ def craft_style(mandate: bool) -> H.HullStyle:
     if mandate:
         st = MD.mandate_style(0.08)
         sch = replace(st.scheme, row_w=(0.5, 1.0), plate_len=(1.0, 3.0), gap_a=(0.03, 0.06), gap_w=(0.03, 0.06), levels=(0.05, 0.08, 0.12), wedge=0.02, shear=(0.3, 0.2),
-                      chamfer=0.02, rim=0.05, embed=0.06, min_len=0.6, mats=(("Plate", 0.92), ("Frame", 0.05), ("Livery", 0.03)))
+                      chamfer=0.02, rim=0.05, embed=0.06, min_len=0.6, min_w=0.25, mats=(("Plate", 0.92), ("Frame", 0.05), ("Livery", 0.03)))
         pn = replace(st.panels, min_size=(0.4, 0.3), max_size=(1.6, 1.0), seam=(0.012, 0.025), margin=0.04, lifts=(0.01, 0.02), lift_w=(0.6, 0.4), chamfer=0.006, rim=0.012)
         return replace(st, scheme=sch, panels=pn, p_panels=0.6, detail_density=0.35, stencil_height=0.10)
     from ship3_astra import astra_style
     st = astra_style(0.1)
     sch = replace(st.scheme, row_w=(0.5, 1.0), plate_len=(1.2, 3.5), gap_a=(0.03, 0.05), gap_w=(0.03, 0.05), levels=(0.03, 0.05, 0.07), wedge=0.01, chamfer=0.012,
-                  rim=0.035, embed=0.05, min_len=0.6, mats=(("Plate", 0.94), ("Frame", 0.06)), tone_sigma=0.1)
+                  rim=0.035, embed=0.05, min_len=0.6, min_w=0.25, mats=(("Plate", 0.94), ("Frame", 0.06)), tone_sigma=0.1)
     pn = replace(st.panels, min_size=(0.4, 0.3), max_size=(1.5, 1.0), seam=(0.01, 0.02), margin=0.03, lifts=(0.008, 0.016), lift_w=(0.6, 0.4), chamfer=0.005, rim=0.01)
     return replace(st, scheme=sch, panels=pn, p_panels=0.6, detail_density=0.4, stencil_height=0.09)
 
@@ -234,35 +234,128 @@ def build_hammer(c: Ctx) -> dict:
             "notes": "vertical extents kept: skids at z=-2.16"}
 
 
-def build_wasp(c: Ctx) -> dict:
-    """Wasp: an electronic-warfare and recon drone, ~9 m: a spindle body, three swept fins, a sensor eye, one drive bell."""
-    g, rng, m = c.g, c.rng, c.m
-    L = 8.0
+def drone_style() -> H.HullStyle:
+    """Plates and panels for a 1 m wide drone: fingers of ceramic 15-30 cm wide, panel seams of 5-10 mm."""
     st = craft_style(False)
-    prof = [(0.0, -L * 0.5), (0.22, -L * 0.42), (0.42, -L * 0.2), (0.5, L * 0.05), (0.44, L * 0.3), (0.26, L * 0.44), (0.0, L * 0.5)]
-    # spindle: a loft of small octagons (x = axis) so it gets plates like everything else
-    stations = []
-    for r, x in prof:
-        stations.append((x, LF.chamfer_rect(max(r, 0.06), max(r, 0.06), 0.4), 0.0))
+    sch = replace(st.scheme, row_w=(0.13, 0.28), plate_len=(0.38, 1.1), gap_a=(0.010, 0.020), gap_w=(0.010, 0.020), levels=(0.010, 0.018, 0.028),
+                  wedge=0.006, chamfer=0.005, rim=0.014, embed=0.02, min_len=0.22, min_w=0.07, mats=(("Plate", 0.90), ("Frame", 0.10)), tone_sigma=0.12)
+    pn = replace(st.panels, min_size=(0.16, 0.11), max_size=(0.7, 0.4), seam=(0.004, 0.009), margin=0.018, lifts=(0.004, 0.008), lift_w=(0.6, 0.4),
+                 chamfer=0.003, rim=0.005)
+    return replace(st, scheme=sch, panels=pn, p_panels=0.75, detail_density=0.6, stencil_height=0.06, detail_scale=0.28)
+
+
+def polygon_ring(n: int, ry: float, rz: float, phase: float = 0.0) -> list:
+    a = np.linspace(0.0, 2.0 * math.pi, n, endpoint=False) + phase
+    return [(ry * math.cos(t), rz * math.sin(t)) for t in a]
+
+
+def fin_loft(ang_deg: float, r0: float, r1: float, x_front: float, chord0: float, chord1: float, sweep: float, t0: float, t1: float, n: int = 4) -> LF.Loft:
+    """A fin standing out of a round body at `ang_deg` (0 = +y, 90 = up) from radius r0 to r1: the front edge at x_front sweeps back by
+    `sweep`, the chord tapers, the section is a thick-nosed lens."""
+    a = math.radians(ang_deg)
+    e_rad = np.array([0.0, math.cos(a), math.sin(a)])
+    e_tan = np.array([0.0, -math.sin(a), math.cos(a)])
+    rings, av = [], []
+    for i in range(n):
+        t = i / (n - 1)
+        r = r0 + (r1 - r0) * t
+        ch = chord0 + (chord1 - chord0) * t
+        th = t0 + (t1 - t0) * t
+        xf_ = x_front - sweep * t
+        sec = [(xf_, 0.0), (xf_ - 0.22 * ch, 0.5 * th), (xf_ - 0.70 * ch, 0.36 * th), (xf_ - ch, 0.0), (xf_ - 0.70 * ch, -0.30 * th), (xf_ - 0.22 * ch, -0.5 * th)]
+        rings.append(np.array([np.array([x, 0.0, 0.0]) + r * e_rad + z * e_tan for x, z in sec]))
+        av.append(r - r0)
+    return LF.Loft(av, rings)
+
+
+_AX_X = np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])        # revolve axis (local z) -> world +x
+
+
+def build_wasp(c: Ctx) -> dict:
+    """Wasp: an electronic-warfare and recon drone, ~9 m: a twelve-sided spindle of ceramic plates with frame rings, a gimballed sensor
+    head with a glowing lens and whisker probes, two ear dishes, three swept fins (the down-going two carry the running lights) with
+    jammer pods, thruster clusters, instrument blisters, a dorsal whip, a belly phased array, one drive bell. Vertical extent kept: the
+    fins stop at about z = -0.9."""
+    g, rng, m = c.g, c.rng, c.m
+    st = drone_style()
+    xs = np.linspace(-3.7, 3.9, 19)
+    rp = [(-3.7, 0.30), (-3.45, 0.40), (-3.1, 0.49), (-2.4, 0.53), (-1.2, 0.55), (0.0, 0.56), (1.2, 0.55), (2.3, 0.49), (3.2, 0.40), (3.9, 0.29)]
+
+    def radius(x: float) -> float:
+        return float(np.interp(x, [p[0] for p in rp], [p[1] for p in rp]))
+
+    stations = [(float(x), polygon_ring(12, radius(x), radius(x) * 0.94, math.pi / 12), 0.0) for x in xs]
     body = LF.Loft.along_x(stations)
-    plates = plate_small(c, body, st)
-    for ang in (90.0, 210.0, 330.0):
+    plates = plate_small(c, body, st, panel_p=0.75)
+    H.end_face(c, np.array(stations[0][1]), float(xs[0]), -1.0, st, plate=False)
+    H.end_face(c, np.array(stations[-1][1]), float(xs[-1]), 1.0, st, plate=False)
+    # frame rings at the section joints, with bolt heads
+    for x in (-2.75, -1.55, -0.3, 0.95, 2.2, 3.05):
+        r = radius(x) * 0.97
+        g.revolve([(r, -0.055), (r + 0.075, -0.055), (r + 0.075, 0.055), (r, 0.055), (r, -0.055)], m("Frame"), origin=(x, 0.0, 0.0), frame=_AX_X, seg=24, wear=0.7, kind="ring")
+        for k in range(8):
+            aa = 2 * math.pi * k / 8 + 0.2
+            g.cylinder((x, (r + 0.075) * math.cos(aa), (r + 0.075) * math.sin(aa)), (x, (r + 0.10) * math.cos(aa), (r + 0.10) * math.sin(aa)), 0.018, 0.016,
+                       m("Engine"), seg=6, kind="ring")
+    # the sensor head: collar, gimbal ring, lens barrel, glowing lens, whisker probes
+    g.cylinder((3.9, 0, 0), (4.12, 0, 0), 0.30, 0.29, m("Frame"), seg=16, chamfer=0.02, kind="head")
+    g.revolve([(0.30, -0.07), (0.38, -0.07), (0.38, 0.07), (0.30, 0.07), (0.30, -0.07)], m("Engine"), origin=(4.2, 0.0, 0.0), frame=_AX_X, seg=20, wear=0.5, kind="head")
+    g.cylinder((4.12, 0, 0), (4.42, 0, 0), 0.25, 0.23, m("Engine"), seg=16, chamfer=0.015, kind="head")
+    g.revolve([(0.17, 0.0), (0.22, 0.0), (0.22, 0.03), (0.17, 0.03), (0.17, 0.0)], m("Frame"), origin=(4.42, 0.0, 0.0), frame=_AX_X, seg=20, kind="head")
+    g.dome((4.43, 0, 0), 0.17, m("Glow"), frame=_AX_X, seg=16, rings=4, squash=0.55, kind="lens")
+    for sy in (-1, 1):
+        for sz in (-1, 1):
+            g.cylinder((3.98, sy * 0.30, sz * 0.26), (4.62, sy * 0.47, sz * 0.40), 0.014, 0.008, m("Frame"), seg=5, kind="probe")
+            g.dome((4.62, sy * 0.47, sz * 0.40), 0.022, m("Lights"), frame=_AX_X, seg=6, rings=2, kind="probe", aux=0.1)
+    # ear dishes on short booms
+    for sy in (-1, 1):
+        d = np.array([0.80, sy * 0.52, 0.30])
+        d /= np.linalg.norm(d)
+        K2.dish_antenna(c, Xf((2.75, sy * 0.66, 0.32), G.frame_x(d), 1.0), 0.30)
+        g.cylinder((2.78, sy * 0.50, 0.14), (2.75, sy * 0.66, 0.32), 0.035, 0.03, m("Frame"), seg=8, kind="boom")
+    # three swept fins: dorsal, and the two going down and out (green to starboard, red to port)
+    for ang, col in ((90.0, K2.NAV_WHITE), (210.0, K2.NAV_GREEN), (330.0, K2.NAV_RED)):
+        fl = fin_loft(ang, 0.42, 1.66, 0.95, 2.35, 1.0, 1.45, 0.16, 0.07, n=5)
+        plates += plate_small(c, fl, st, panel_p=0.75)
         a = math.radians(ang)
-        base = np.array([-L * 0.05, math.cos(a) * 0.5, math.sin(a) * 0.5])
-        out = np.array([0.0, math.cos(a), math.sin(a)])
-        tip = base + out * 2.2 + np.array([-L * 0.30, 0.0, 0.0])
-        g.box_between(base, tip, 0.9, 0.10, m("Frame"), up=(0.0, 0.0, 1.0) if abs(out[2]) < 0.9 else (1.0, 0.0, 0.0), chamfer=0.02, kind="fin")
-        g.box_between(base + out * 0.4, tip * 0.98 + np.array([0.0, 0.0, 0.0]), 0.5, 0.06, m("Plate"), up=(0.0, 0.0, 1.0) if abs(out[2]) < 0.9 else (1.0, 0.0, 0.0), chamfer=0.01, kind="fin")
-        g.cylinder(tip, tip + np.array([-0.3, 0.0, 0.0]), 0.06, 0.05, m("Nav"), seg=6, kind="nav", a1_all=(K2.NAV_WHITE if ang == 90.0 else (K2.NAV_RED if ang == 210.0 else K2.NAV_GREEN), 0.0))
-    g.cylinder((L * 0.46, 0, 0), (L * 0.56, 0, 0), 0.24, 0.22, m("Frame"), seg=14, chamfer=0.03, kind="eye")
-    g.cylinder((L * 0.55, 0, 0), (L * 0.575, 0, 0), 0.16, 0.16, m("Glow"), seg=12, kind="eye")
-    engine(c, np.array([-L * 0.48, 0.0, 0.0]), 0.26, "astra")
-    for k in range(3):                                           # instrument blisters and a dorsal whip
-        a = math.radians(30 + 120 * k)
-        g.dome(np.array([L * 0.1, math.cos(a) * 0.46, math.sin(a) * 0.46]), 0.11, m("Engine"), frame=G.frame_z((0.0, math.cos(a), math.sin(a))), seg=8, rings=2, kind="blister")
-    g.cylinder((0.0, 0, 0.5), (0.0, 0, 1.3), 0.03, 0.015, m("Frame"), seg=6, kind="antenna")
+        er = np.array([0.0, math.cos(a), math.sin(a)])
+        tip = fl.R[-1].mean(axis=0)
+        g.box_between(tip + np.array([0.15, 0, 0]), tip + np.array([-0.55, 0, 0]), 0.11, 0.11, m("Engine"), up=tuple(er), chamfer=0.01, kind="pod")          # jammer pod
+        K2.nav_light(c, tip + np.array([-0.60, 0, 0]), np.array([-1.0, 0.0, 0.0]), col, 0.10)
+        for kk in range(3):                                                    # sensor teeth along the leading edge
+            rr = 0.62 + 0.34 * kk
+            p0 = np.array([0.95 - 1.45 * (rr - 0.42) / 1.24 + 0.03, 0, 0]) + er * rr
+            g.box(p0, (0.03, 0.05, 0.20), m("Lights"), frame=G.frame_z(er), chamfer=0.0, kind="sensor", aux=0.15 + 0.2 * kk)
+    # the dorsal whip on its plinth
+    g.cylinder((0.80, 0, 0.58), (0.80, 0, 0.66), 0.05, 0.05, m("Engine"), seg=8, kind="antenna")
+    g.cylinder((0.80, 0, 0.66), (0.80, 0, 1.60), 0.022, 0.008, m("Frame"), seg=6, kind="antenna")
+    # drive and thrusters
+    engine(c, np.array([-3.84, 0.0, 0.0]), 0.27, "astra")
+    for pos, nrm in (((-2.6, 0.0, 0.56), (0.0, 0.0, 1.0)), ((-2.6, 0.0, -0.56), (0.0, 0.0, -1.0)), ((2.6, 0.50, 0.12), (0.0, 1.0, 0.0)), ((2.6, -0.50, 0.12), (0.0, -1.0, 0.0))):
+        K2.thruster_cluster(c, Xf(pos, G.frame_z(nrm), 1.0), 0.06)
+    # belly phased array: a grid of dark cells in a frame
+    g.box((0.6, 0.0, -0.56), (1.9, 0.62, 0.05), m("Frame"), chamfer=0.01, kind="array")
+    for i in range(9):
+        for j in range(3):
+            g.box((-0.15 + i * 0.2, -0.2 + j * 0.2, -0.595), (0.15, 0.15, 0.03), m("Glass"), chamfer=0.0, kind="array")
+    # instrument blisters along the flanks and back
+    for k in range(7):
+        x = -1.9 + 0.8 * k + float(rng.uniform(-0.15, 0.15))
+        a = math.radians(float(rng.choice([35.0, 145.0, 215.0, 325.0])))
+        nrm = np.array([0.0, math.cos(a), math.sin(a)])
+        g.dome(np.array([x, 0.0, 0.0]) + nrm * radius(x) * 0.96, 0.06 + 0.03 * float(rng.random()), m("Engine"), frame=G.frame_z(nrm), seg=10, rings=3, kind="blister")
+    # markings on flat marking panels, proud of the plates: the callsign, a roundel, the unit
+    for sy in (-1, 1):
+        g.box((-1.25, sy * 0.556, 0.0), (0.9, 0.04, 0.22), m("Plate"), chamfer=0.006, wear=0.6, kind="mark")
+        TX.place_text(g, "AD-09", np.array([-1.25, sy * 0.578, 0.0]), np.array([0.0, sy, 0.0]), 0.12, m("Marking"), up=(0.0, 0.0, 1.0), depth=0.01)
+        g.cylinder((0.25, sy * 0.54, 0.0), (0.25, sy * 0.585, 0.0), 0.15, 0.145, m("Plate"), seg=20, chamfer=0.004, kind="mark")
+        TX.astra_emblem(g, np.array([0.25, sy * 0.587, 0.0]), np.array([0.0, sy, 0.0]), 0.26, m("Marking"), up=(0.0, 0.0, 1.0), depth=0.008)
+        g.box((-2.3, sy * 0.535, 0.0), (0.5, 0.04, 0.2), m("Plate"), chamfer=0.006, wear=0.6, kind="mark")
+        TX.place_text(g, "ASN", np.array([-2.3, sy * 0.557, 0.0]), np.array([0.0, sy, 0.0]), 0.11, m("Marking"), up=(0.0, 0.0, 1.0), depth=0.01)
     H.scatter_details(c, plates, st)
-    return {"length_m": 9.0, "cam_az": -35.0, "cam_el": 18.0, "cam_dist": 2.3, "sun_az": -50.0, "sun_el": 32.0, "closeups": [], "cuts": None}
+    return {"length_m": 9.0, "cam_az": -40.0, "cam_el": 20.0, "lens": 70.0, "sun_az": -50.0, "sun_el": 32.0, "closeups": [], "cuts": None,
+            "notes": "vertical extent kept: fins reach about z=-0.9"}
+
 
 
 def build_harpy(c: Ctx) -> dict:

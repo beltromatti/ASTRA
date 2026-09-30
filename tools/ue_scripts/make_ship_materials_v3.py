@@ -178,7 +178,7 @@ def build_hull():
 
     P = {}
     defs = (("BCInfluence", 0.4), ("ToneAmount", 0.20), ("MacroBrightness", 0.10), ("GrimeGain", 1.0), ("GrimeDarken", 0.55), ("SootDarken", 0.6),
-            ("WearGain", 1.0), ("WearThreshold", 0.52), ("WearSoftness", 0.10), ("WearBreakup", 0.9), ("ScratchAmount", 0.5))
+            ("WearGain", 1.0), ("WearThreshold", 0.52), ("WearSoftness", 0.10), ("WearBreakup", 0.9), ("ScratchAmount", 0.35))
     for i, (n, v) in enumerate(defs):
         P[n] = scalar(m, n, v, -1800, -900 + 60 * i, "Paint")
     tint = vector(m, "Tint", (0.5, 0.5, 0.5, 1), -1800, -1100, "Paint")
@@ -301,7 +301,7 @@ def build_cut():
     ember_i = scalar(m, "EmberIntensity", 26.0, -1600, 520, "Burnt")
     code = """
 float3 col = Tint * (0.55 + 1.1 * WM.b) * (1.0 - 0.4 * WMa) * (1.0 + 0.6 * D1.x);
-float e = smoothstep(0.66, 0.92, WM.r + 0.25 * (D1.y) + 0.2 * WM.g) * Heat;
+float e = smoothstep(0.70, 0.84, WM.r + 0.22 * WM.g) * Heat;
 return float4(col, e);
 """
     c = custom(m, code, [("WM", (wear, "RGB")), ("WMa", (wear, "A")), ("D1", (uv1, "")), ("Tint", (tint, "RGB")), ("Heat", (heat, ""))], -1200, 200)

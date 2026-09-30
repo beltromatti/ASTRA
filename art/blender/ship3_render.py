@@ -102,5 +102,5 @@ def render_previews(name: str, short_name: str, spec: dict, res: dict, obj, args
             ctr = mw @ Vector(f["center"])
             size = max(f["y"][1] - f["y"][0], f["z"][1] - f["z"][0])
             cam = PV.camera("cam", tuple(ctr + Vector((size * 1.7, -size * 0.85, size * 0.55))), tuple(ctr), 50.0)
-            PV.rig(cam.location, tuple(ctr), key_az=40.0, key_el=26.0, side=side)
+            PV.rig(cam.location, tuple(ctr), key_az=68.0, key_el=24.0, side=side)
             PV.render(cam, os.path.join(outd, f"{sn}_cutface.jpg"))

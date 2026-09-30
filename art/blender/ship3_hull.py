@@ -25,6 +25,7 @@ class HullStyle:
     labels: tuple = ("ACCESS 4C-12", "COOLANT", "NO STEP", "DECK 4 · SECTION C", "AUTHORIZED PERSONNEL ONLY", "FUEL", "O2 SUPPLY")
     stencil_height: float = 0.32
     alt_mats: tuple = ("Frame",)
+    detail_scale: float = 1.0             # size of the scattered details (hatches, vents, blisters, lamps): 0.3 for a drone
 
 
 def plate_loft(c: Ctx, loft: LF.Loft, style: HullStyle, zones=None, skip_fn=None, mat_fn=None, tone_fn=None, a_range=None,
@@ -79,19 +80,20 @@ def scatter_details(c: Ctx, plates, style: HullStyle, up=(0.0, 0.0, 1.0), densit
                     continue
             kind = kinds[int(rng.choice(len(kinds), p=w))]
             u, v = rng.uniform(0.3, 0.7), rng.uniform(0.35, 0.65)
+            ds = style.detail_scale
             if kind == "hatch":
-                K2.hatch(c, pn, u, v, rng, size=(rng.uniform(0.7, 1.4), rng.uniform(0.6, 1.1)))
+                K2.hatch(c, pn, u, v, rng, size=(rng.uniform(0.7, 1.4) * ds, rng.uniform(0.6, 1.1) * ds), scale=ds)
             elif kind == "vent":
-                K2.vent(c, pn, u, v, rng, size=(rng.uniform(1.0, 2.2), rng.uniform(0.6, 1.2)))
+                K2.vent(c, pn, u, v, rng, size=(rng.uniform(1.0, 2.2) * ds, rng.uniform(0.6, 1.2) * ds), scale=ds)
             elif kind == "blister":
-                K2.blister(c, pn, u, v, rng, r=rng.uniform(0.35, 0.9))
+                K2.blister(c, pn, u, v, rng, r=rng.uniform(0.35, 0.9) * ds, scale=ds)
             elif kind == "lamp":
-                K2.lamp(c, pn, u, v, rng, size=rng.uniform(0.35, 0.6))
+                K2.lamp(c, pn, u, v, rng, size=rng.uniform(0.35, 0.6) * ds)
             elif kind == "cable":
-                K2.cable_run(c, pn, rng, count=int(rng.integers(1, 4)))
+                K2.cable_run(c, pn, rng, count=int(rng.integers(1, 4)), scale=ds)
             elif kind == "stencil":
                 la, lw = pn.size_m()
-                if la > 2.5 and lw > 0.8:
+                if la > 2.5 * ds and lw > 0.8 * ds:
                     K2.stencil(c, pn, 0.5, 0.5, str(rng.choice(style.labels)), min(style.stencil_height, lw * 0.35), up=stencil_up or up)
             n += 1
     return n

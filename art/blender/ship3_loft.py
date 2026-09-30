@@ -363,6 +363,7 @@ class Scheme:
     tone_sigma: float = 0.13              # spread of the plates' tones
     mats: tuple = (("Plate", 1.0),)
     min_len: float = 4.0
+    min_w: float = 0.6                    # narrowest row of plates worth laying (metres)
 
 
 def _pick(rng, options):
@@ -407,7 +408,7 @@ def plate_zone(g: G.Geo, zone, rng: np.random.Generator, sch: Scheme, prefix: st
         w0, w1 = edges[ri], edges[ri + 1]
         gw = rng.uniform(*sch.gap_w) / swz
         pw0, pw1 = w0 + gw * 0.5, w1 - gw * 0.5
-        if pw1 - pw0 < 0.6 / swz:
+        if pw1 - pw0 < sch.min_w / swz:
             continue
         for s_lo, s_hi in spans:
             a = s_lo
@@ -459,7 +460,7 @@ def plate_tower(g: G.Geo, zone, rng: np.random.Generator, sch: Scheme, prefix: s
         r0, r1 = edges[ri], edges[ri + 1]
         gr = rng.uniform(*sch.gap_w)
         pa0, pa1 = r0 + gr * 0.5, r1 - gr * 0.5
-        if pa1 - pa0 < 0.6:
+        if pa1 - pa0 < sch.min_w:
             continue
         x = 0.0
         first = True

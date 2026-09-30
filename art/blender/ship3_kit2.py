@@ -298,76 +298,78 @@ def _tone(panel: PN.Panel, rng, s: float = 0.05) -> float:
     return float(np.clip(panel.plate.tone + rng.normal(0, s), 0.05, 0.95))
 
 
-def hatch(c: Ctx, panel: PN.Panel, u: float, v: float, rng, size=(1.0, 0.8)) -> None:
-    """An access hatch: a thin lid on a frame, two hinges and a handle."""
-    g, m = c.g, c.m
+def hatch(c: Ctx, panel: PN.Panel, u: float, v: float, rng, size=(1.0, 0.8), scale: float = 1.0) -> None:
+    """An access hatch: a thin lid on a frame, two hinges and a handle (`scale` shrinks everything for small craft)."""
+    g, m, s = c.g, c.m, scale
     la, lw = panel.size_m()
     sx, sy = min(size[0], la * 0.7), min(size[1], lw * 0.7)
-    if sx < 0.3 or sy < 0.25:
+    if sx < 0.3 * s or sy < 0.25 * s:
         return
     P, fr = panel.frame_at(u, v)
     n = fr[2]
-    g.box(P + n * 0.03, (sx + 0.14, sy + 0.14, 0.06), m("Frame"), frame=fr, chamfer=0.015, kind="hatch")
-    g.box(P + n * 0.085, (sx, sy, 0.05), m("Plate"), frame=fr, chamfer=0.015, wear=0.9, kind="hatch", tone=_tone(panel, rng))
-    g.box(P + n * 0.14 + fr[1] * (sy * 0.28), (sx * 0.35, 0.07, 0.06), m("Engine"), frame=fr, chamfer=0.01, kind="hatch")
+    g.box(P + n * 0.03 * s, (sx + 0.14 * s, sy + 0.14 * s, 0.06 * s), m("Frame"), frame=fr, chamfer=0.015 * s, kind="hatch")
+    g.box(P + n * 0.085 * s, (sx, sy, 0.05 * s), m("Plate"), frame=fr, chamfer=0.015 * s, wear=0.9, kind="hatch", tone=_tone(panel, rng))
+    g.box(P + n * 0.14 * s + fr[1] * (sy * 0.28), (sx * 0.35, 0.07 * s, 0.06 * s), m("Engine"), frame=fr, chamfer=0.01 * s, kind="hatch")
     for sxx in (-1, 1):
-        g.box(P + n * 0.08 + fr[0] * (sxx * sx * 0.4) - fr[1] * (sy * 0.5), (0.14, 0.08, 0.08), m("Frame"), frame=fr, chamfer=0.01, kind="hatch")
+        g.box(P + n * 0.08 * s + fr[0] * (sxx * sx * 0.4) - fr[1] * (sy * 0.5), (0.14 * s, 0.08 * s, 0.08 * s), m("Frame"), frame=fr, chamfer=0.01 * s,
+              kind="hatch")
 
 
-def vent(c: Ctx, panel: PN.Panel, u: float, v: float, rng, size=(1.6, 0.9)) -> None:
+def vent(c: Ctx, panel: PN.Panel, u: float, v: float, rng, size=(1.6, 0.9), scale: float = 1.0) -> None:
     """A vent grille: a frame with parallel slats leaning one way."""
-    g, m = c.g, c.m
+    g, m, s = c.g, c.m, scale
     la, lw = panel.size_m()
     sx, sy = min(size[0], la * 0.75), min(size[1], lw * 0.75)
-    if sx < 0.4 or sy < 0.3:
+    if sx < 0.4 * s or sy < 0.3 * s:
         return
     P, fr = panel.frame_at(u, v)
     n = fr[2]
-    g.box(P + n * 0.05, (sx + 0.16, sy + 0.16, 0.10), m("Frame"), frame=fr, chamfer=0.02, kind="vent", grime=0.6)
-    k = max(3, int(sy / 0.13))
+    g.box(P + n * 0.05 * s, (sx + 0.16 * s, sy + 0.16 * s, 0.10 * s), m("Frame"), frame=fr, chamfer=0.02 * s, kind="vent", grime=0.6)
+    k = max(3, int(sy / (0.13 * s)))
     ys = (np.arange(k) + 0.5) / k * sy - sy / 2
     Fs = np.broadcast_to(_rx(35.0) @ fr, (k, 3, 3))
-    g.boxes(P[None] + n[None] * 0.09 + fr[1][None] * ys[:, None], (sx / 2, 0.035, 0.06), m("Engine"), frames=Fs, chamfer=0.0, kind="vent")
+    g.boxes(P[None] + n[None] * 0.09 * s + fr[1][None] * ys[:, None], (sx / 2, 0.035 * s, 0.06 * s), m("Engine"), frames=Fs, chamfer=0.0, kind="vent")
 
 
-def blister(c: Ctx, panel: PN.Panel, u: float, v: float, rng, r: float = 0.6) -> None:
+def blister(c: Ctx, panel: PN.Panel, u: float, v: float, rng, r: float = 0.6, scale: float = 1.0) -> None:
     """A sensor blister: a domed housing on a collar, sometimes with a lens."""
-    g, m = c.g, c.m
+    g, m, s = c.g, c.m, scale
     la, lw = panel.size_m()
     r = min(r, la * 0.4, lw * 0.4)
-    if r < 0.2:
+    if r < 0.2 * s:
         return
     P, fr = panel.frame_at(u, v)
-    g.cylinder(P, P + fr[2] * 0.12, r * 1.2, r * 1.15, m("Frame"), seg=14, chamfer=0.02, kind="blister")
-    g.dome(P + fr[2] * 0.1, r, m("Engine"), frame=fr, seg=12, rings=3, squash=0.8, kind="blister")
+    g.cylinder(P, P + fr[2] * 0.12 * s, r * 1.2, r * 1.15, m("Frame"), seg=14, chamfer=0.02 * s, kind="blister")
+    g.dome(P + fr[2] * 0.1 * s, r, m("Engine"), frame=fr, seg=12, rings=3, squash=0.8, kind="blister")
     if rng.random() < 0.5:
-        q = P + fr[2] * (0.1 + r * 0.7) + fr[0] * r * 0.4
-        g.cylinder(q, q + fr[0] * 0.1, r * 0.25, r * 0.25, m("Glow"), seg=8, kind="blister")
+        q = P + fr[2] * (0.1 * s + r * 0.7) + fr[0] * r * 0.4
+        g.cylinder(q, q + fr[0] * 0.1 * s, r * 0.25, r * 0.25, m("Glow"), seg=8, kind="blister")
 
 
 def lamp(c: Ctx, panel: PN.Panel, u: float, v: float, rng, size: float = 0.5) -> None:
     """A docking / flood lamp: a small housing with a lit lens."""
     g, m = c.g, c.m
     P, fr = panel.frame_at(u, v)
-    g.box(P + fr[2] * (0.2 * size), (size, size, 0.4 * size), m("Frame"), frame=fr, chamfer=0.03, kind="lamp")
-    g.box(P + fr[2] * (0.43 * size), (0.72 * size, 0.72 * size, 0.06), m("Lights"), frame=fr, chamfer=0.0, kind="lamp", aux=float(rng.random() * 0.5))
+    g.box(P + fr[2] * (0.2 * size), (size, size, 0.4 * size), m("Frame"), frame=fr, chamfer=0.03 * min(1.0, size / 0.4), kind="lamp")
+    g.box(P + fr[2] * (0.43 * size), (0.72 * size, 0.72 * size, 0.06 * min(1.0, size / 0.4)), m("Lights"), frame=fr, chamfer=0.0, kind="lamp",
+          aux=float(rng.random() * 0.5))
 
 
-def cable_run(c: Ctx, panel: PN.Panel, rng, count: int = 2) -> None:
+def cable_run(c: Ctx, panel: PN.Panel, rng, count: int = 2, scale: float = 1.0) -> None:
     """Cables and pipes laid along a panel with clamps."""
-    g, m = c.g, c.m
+    g, m, s = c.g, c.m, scale
     la, lw = panel.size_m()
-    if la < 1.5 or lw < 0.8:
+    if la < 1.5 * s or lw < 0.8 * s:
         return
     v0 = rng.uniform(0.25, 0.75)
     for k in range(count):
         v = v0 + (k - (count - 1) / 2) * min(0.14, 0.4 / max(count, 1))
         P0, N0, _ = panel.pts([[0.05, v]])
         P1, N1, _ = panel.pts([[0.95, v]])
-        g.cylinders(P0 + N0 * 0.09, P1 + N1 * 0.09, 0.05 + 0.02 * (k % 2), m("Frame") if k % 2 == 0 else m("Engine"), seg=6, kind="cable")
+        g.cylinders(P0 + N0 * 0.09 * s, P1 + N1 * 0.09 * s, (0.05 + 0.02 * (k % 2)) * s, m("Frame") if k % 2 == 0 else m("Engine"), seg=6, kind="cable")
     for uu in (0.2, 0.5, 0.8):
         P, fr = panel.frame_at(uu, v0)
-        g.box(P + fr[2] * 0.06, (0.12, 0.16 * count + 0.1, 0.12), m("Frame"), frame=fr, chamfer=0.01, kind="cable")
+        g.box(P + fr[2] * 0.06 * s, (0.12 * s, (0.16 * count + 0.1) * s, 0.12 * s), m("Frame"), frame=fr, chamfer=0.01 * s, kind="cable")
 
 
 def stencil(c: Ctx, panel: PN.Panel, u: float, v: float, text: str, height: float, up=(0.0, 0.0, 1.0), mat: str | None = None) -> None:
