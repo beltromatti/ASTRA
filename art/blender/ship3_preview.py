@@ -37,9 +37,9 @@ PAINTS = {
           "Radiator": ("#303236", 0.4, 0.35, 0.7), "Cut": ("#0F0D0C", 0.3, 0.6, 0.9)},
 }
 BARE = {"A": "#8A8F96", "M": "#54514D", "G": "#7B7F84"}
-EMISSIVE = {"A": {"Glow": ("#8CC8FF", 60.0), "Lights": ("#FFE6BF", 26.0)},
-            "M": {"Glow": ("#FF6B47", 60.0), "Lights": ("#FFAE40", 26.0)},
-            "G": {"Glow": ("#E6E6FF", 40.0), "Lights": ("#FFF2D9", 20.0)}}
+EMISSIVE = {"A": {"Glow": ("#8CC8FF", 22.0), "Lights": ("#FFE2B0", 5.5)},
+            "M": {"Glow": ("#FF6B47", 22.0), "Lights": ("#FFAE40", 5.5)},
+            "G": {"Glow": ("#E6E6FF", 16.0), "Lights": ("#FFF2D9", 4.5)}}
 
 
 class NodeMat:
@@ -205,7 +205,7 @@ def glow_material(name: str, fac: str, strength: float = 60.0) -> bpy.types.Mate
     return mt.m
 
 
-def nav_material(name: str, strength: float = 120.0) -> bpy.types.Material:
+def nav_material(name: str, strength: float = 40.0) -> bpy.types.Material:
     """Running lights: UVMap_D1.x is the colour code (0 red, 0.5 green, 1 white)."""
     mt = NodeMat(name)
     uv1 = mt.n("ShaderNodeUVMap", -700, 0, uv_map="UVMap_D1")
@@ -296,7 +296,7 @@ def aurelia_lighting(sun_az: float = 35.0, sun_el: float = 28.0, sun: float = 4.
     az, el = math.radians(sun_az), math.radians(sun_el)
     d = Vector((math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el)))            # towards the sun
     rot = (-d).to_track_quat("-Z", "Y").to_euler()
-    o = add_light("SUN", "Aurelia", (1.0, 0.62, 0.32), sun, size=0.53)
+    o = add_light("SUN", "Aurelia", (1.0, 0.78, 0.55), sun, size=0.53)
     o.rotation_euler = rot
     d2 = Vector((-d.x, -d.y, 0.35)).normalized()
     o2 = add_light("SUN", "TealVeil", (0.25, 0.75, 0.8), fill, size=8.0)
@@ -356,3 +356,18 @@ def render(cam, path: str) -> str:
 def close_up_lens(distance: float, span: float, sensor: float = 36.0) -> float:
     """Focal length that makes a patch `span` metres wide fill the frame at `distance` (the '×300 zoom' framing)."""
     return sensor * distance / span
+
+
+def use_hdr_world(strength: float = 0.35, yaw_deg: float = 0.0) -> None:
+    """The 8K Aurelia sky (radiance kept) as the world: the nebula lights the shadow side of the ships."""
+    path = find(SKY_DIRS, "T_Sky_Aurelia_8k.hdr")
+    if not path:
+        return
+    w = bpy.context.scene.world
+    nt = w.node_tree
+    for n in list(nt.nodes):
+        if n.type == "TEX_ENVIRONMENT":
+            n.image = bpy.data.images.load(path, check_existing=True)
+    for n in nt.nodes:
+        if n.type == "BACKGROUND":
+            n.inputs["Strength"].default_value = strength

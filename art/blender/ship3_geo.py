@@ -181,6 +181,7 @@ class Geo:
         self.cuts: list[float] | None = None          # x of the section cuts, bow first
         self.keepouts: list[tuple[np.ndarray, np.ndarray]] = []
         self.notes: dict = {}
+        self._cap_sec: int | None = None
 
     # ---------------------------------------------------------------------------------------------- bookkeeping
     def mi(self, name) -> int:
@@ -207,8 +208,22 @@ class Geo:
                     return True
         return False
 
-    def add(self, V, F, mat, a1=(0.0, 0.0), a2=(TONE0, 0.0), uv=None, kind: str = "", split: bool = False,
-            cap: bool = False) -> None:
+    def capture(self, sec: int):
+        """Context manager: everything added inside belongs to the cut faces of section `sec` (pieces only)."""
+        geo = self
+
+        class _Cap:
+            def __enter__(self_):
+                geo._cap_sec = sec
+
+            def __exit__(self_, *a):
+                geo._cap_sec = None
+        return _Cap()
+
+    def add(self, V, F, mat, a1=(0.0, 0.0), a2=(TONE0, 0.0), uv=None, kind: str = "", split: bool = True,
+            cap: bool = False, sec: int | None = None) -> None:
+        if self._cap_sec is not None:
+            cap, sec = True, self._cap_sec
         V = np.ascontiguousarray(V, F32)
         F = np.ascontiguousarray(F, I32)
         if len(F) == 0:
@@ -221,7 +236,7 @@ class Geo:
         else:
             mat = np.asarray(mat, np.int16)
         self.chunks.append({"V": V, "F": F, "mat": mat, "a1": a1, "a2": a2, "uv": None if uv is None else np.ascontiguousarray(uv, F32),
-                            "kind": kind, "split": split, "cap": cap})
+                            "kind": kind, "split": split, "cap": cap, "sec": sec})
 
     # ---------------------------------------------------------------------------------------------- boxes
     def boxes(self, centers, half, mat, frames=None, chamfer=0.04, wear=0.85, grime=0.0, tone=TONE0, aux=0.0, kind: str = "box",
@@ -235,6 +250,7 @@ class Geo:
         fr = np.broadcast_to(np.eye(3) if frames is None else np.asarray(frames, np.float64), (n, 3, 3))
         c = np.broadcast_to(np.asarray(chamfer, np.float64), (n,))
         c = np.minimum(c, 0.45 * half.min(axis=1))
+        c = np.where(c < 0.012, 0.0, c)                         # a chamfer under a centimetre is invisible: a plain box
         use_ch = bool(np.any(c > 1e-6))
         nv = _BOX_NV if use_ch else 24
         tris = _BOX_TRIS if use_ch else _BOX_PLAIN_TRIS
@@ -476,9 +492,9 @@ class Geo:
 
     # ---------------------------------------------------------------------------------------------- assembly
     def assemble(self, sections=None, include_caps: bool = False, section_of=None):
-        """Concatenate the chunks into flat arrays. sections: keep only the chunks whose section id is in the set; section_of
-        maps an array of x to section ids (`split` chunks are decided per triangle, the others by their vertex centre).
-        include_caps adds the pieces-only cap chunks (and, when `sections` is given, only those of the wanted sections)."""
+        """Concatenate the chunks into flat arrays. sections: keep only the triangles of those section ids (section_of maps an
+        array of x to ids, decided per triangle by its centre; a chunk may carry a fixed `sec`). include_caps adds the pieces-only cap
+        chunks (with `sections`: only the caps of the wanted sections); without it the caps are left out (the whole ship)."""
         Vs, Fs, Ms, A1s, A2s = [], [], [], [], []
         uv_over = []                                   # (first triangle, per-corner UVs) of chunks with their own UVs
         off = 0
@@ -487,27 +503,29 @@ class Geo:
         for c in self.chunks:
             if c["cap"] and not include_caps:
                 continue
-            V, F, mat = c["V"], c["F"], c["mat"]
+            V, F, mat, a1, a2, uvc = c["V"], c["F"], c["mat"], c["a1"], c["a2"], c["uv"]
             if wanted is not None:
-                if c["split"]:
-                    tc = V[F].mean(axis=1)[:, 0]
-                    keep = np.isin(section_of(tc), wanted)
-                    F, mat = F[keep], mat[keep]
-                    if len(F) == 0:
+                if c["cap"] or c.get("sec") is not None:
+                    if c.get("sec") not in wanted:
                         continue
                 else:
-                    sec = c.get("sec")
-                    if sec is None:
-                        sec = int(section_of(np.array([float(V[:, 0].mean())]))[0])
-                    if sec not in wanted:
+                    tc = V[F].mean(axis=1)[:, 0]
+                    keep = np.isin(section_of(tc), wanted)
+                    if not keep.any():
                         continue
-            if c["uv"] is not None:
-                uv_over.append((tri_pos, c["uv"][F]))
+                    if not keep.all():
+                        F, mat = F[keep], mat[keep]
+                        used, inv = np.unique(F, return_inverse=True)      # drop the vertices of the other sections
+                        V, a1, a2 = V[used], a1[used], a2[used]
+                        uvc = None if uvc is None else uvc[used]
+                        F = inv.reshape(F.shape).astype(I32)
+            if uvc is not None:
+                uv_over.append((tri_pos, uvc[F]))
             Vs.append(V)
             Fs.append(F + off)
             Ms.append(mat)
-            A1s.append(c["a1"])
-            A2s.append(c["a2"])
+            A1s.append(a1)
+            A2s.append(a2)
             off += len(V)
             tri_pos += len(F)
         if not Vs:

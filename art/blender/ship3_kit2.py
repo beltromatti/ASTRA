@@ -79,27 +79,35 @@ def thruster_cluster(c: Ctx, xf: Xf, r: float = 0.45) -> None:
 
 
 # ============================================================================================================== radiators
-def radiator_wing(c: Ctx, xf: Xf, length: float, span: float, open_deg: float, style: str = "astra") -> None:
-    """A folding radiator panel hinged along local x at y = 0 (the hull flank), opened by `open_deg` about the hinge (0 = flat on
-    the hull, 90 = square to it). Louvres between frames, coolant manifolds, hinge barrel and a pair of struts."""
+def radiator_wing(c: Ctx, xf: Xf, length: float, span: float, open_deg: float, style: str = "astra", leaves: int = 3) -> None:
+    """A folding radiator hinged along local x at y = 0 (the hull flank), opened by `open_deg` about the hinge (0 = flat on the
+    hull, 90 = square to it): `leaves` panels folding on their own hinges, each a frame round a corrugated sheet with coolant
+    tubes running along it, headers at the ends, struts from the hull."""
     g, m = c.g, c.m
     hinge = xf.sub((0, 0, 0), _rx(open_deg))
-    hinge.cyl(g, (0, 0, 0), (length, 0, 0), 0.65, 0.65, m("Engine"), seg=12, ch=0.05, kind="radiator")
-    t = 0.55
-    hinge.box(g, (length / 2, span / 2 + 0.6, 0), (length, span - 1.2, t), m("Frame"), ch=0.08, kind="radiator")                  # back plate
-    for sx in (0.0, length):
-        hinge.box(g, (sx, span / 2 + 0.6, 0), (0.9, span - 0.8, t + 0.5), m("Frame"), ch=0.08, kind="radiator")                   # end frames
-    hinge.box(g, (length / 2, span, 0), (length, 0.9, t + 0.5), m("Frame"), ch=0.08, kind="radiator")                            # outer frame
-    n = max(6, int(length / 0.9))
-    for k in range(n):                                                                            # louvres, alternately tilted
-        x = (k + 0.5) * length / n
-        lv = hinge.sub((x, span / 2 + 0.6, t / 2 + 0.12), _rx(28.0 if k % 2 == 0 else -28.0))
-        lv.box(g, (0, 0, 0), (0.55 * length / n * 1.3, span - 2.2, 0.12), m("Radiator"), ch=0.02, kind="radiator")
-    for y in (span * 0.3, span * 0.65):                                                           # manifold pipes across the back
-        hinge.cyl(g, (0.6, y, -t / 2 - 0.3), (length - 0.6, y, -t / 2 - 0.3), 0.22, 0.22, m("Frame"), seg=8, kind="radiator")
-    if open_deg > 12.0:                                                                           # struts from the hull to the panel
-        for sx in (length * 0.2, length * 0.8):
-            g.box_between(xf.p(sx, 0, 0) + xf.R[2] * 0.5, hinge.p(sx, span * 0.7, -t / 2 - 0.2), 0.5 * xf.s, 0.5 * xf.s, m("Engine"), chamfer=0.05, kind="radiator")
+    hinge.cyl(g, (0, 0, 0), (length, 0, 0), 0.7, 0.7, m("Engine"), seg=12, ch=0.05, kind="radiator")
+    ls = (span - 0.8) / leaves
+    t = 0.5
+    for i in range(leaves):
+        y0, y1 = 0.8 + i * ls, 0.8 + (i + 1) * ls
+        ym = 0.5 * (y0 + y1)
+        hinge.box(g, (length / 2, ym, 0), (length - 0.6, ls - 0.5, t), m("Frame"), ch=0.06, kind="radiator")              # the sheet
+        for sx in (0.3, length - 0.3):                                                                                  # end frames
+            hinge.box(g, (sx, ym, 0), (0.6, ls - 0.3, t + 0.3), m("Engine"), ch=0.05, kind="radiator")
+        for sy in (y0 + 0.15, y1 - 0.15):                                                                              # long frames
+            hinge.box(g, (length / 2, sy, 0), (length, 0.5, t + 0.3), m("Engine"), ch=0.05, kind="radiator")
+        n = max(8, int(length / 1.1))                                                                                   # corrugations across the leaf
+        xs = (np.arange(n) + 0.5) * length / n
+        cs = np.stack([xs, np.full(n, ym), np.full(n, t / 2 + 0.07)], axis=1)
+        g.boxes(hinge.pts(cs), np.array([0.09, (ls - 1.3) / 2, 0.07]) * hinge.s, m("Radiator"), frames=hinge.R, chamfer=0.0, kind="radiator")
+        for k in range(4):                                                                                              # coolant tubes along the leaf
+            yy = y0 + ls * (0.2 + 0.2 * k)
+            hinge.cyl(g, (0.8, yy, t / 2 + 0.2), (length - 0.8, yy, t / 2 + 0.2), 0.12, 0.12, m("Frame"), seg=6, kind="radiator")
+        if i < leaves - 1:                                                                                              # the fold hinge
+            hinge.cyl(g, (0.3, y1 + 0.02, 0), (length - 0.3, y1 + 0.02, 0), 0.32, 0.32, m("Engine"), seg=8, kind="radiator")
+    for sx in (length * 0.2, length * 0.8):                                                                           # struts hull -> panel
+        if open_deg > 12.0:
+            g.box_between(xf.p(sx, 0, 0) + xf.R[2] * 0.5, hinge.p(sx, span * 0.72, -t / 2 - 0.2), 0.5 * xf.s, 0.5 * xf.s, m("Engine"), chamfer=0.05, kind="radiator")
 
 
 # ================================================================================================================ antennas

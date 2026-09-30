@@ -12,6 +12,7 @@ from dataclasses import replace
 
 import numpy as np
 
+import ship3_cut
 import ship3_geo as G
 import ship3_hull as H
 import ship3_kit as K
@@ -19,6 +20,7 @@ import ship3_kit2 as K2
 import ship3_loft as LF
 import ship3_panels as PN
 import ship3_text as TX
+from ship3_cut import make_all_cuts
 from ship3_kit import Ctx, Xf
 
 PRE = "MI_HULL_A_"
@@ -75,6 +77,47 @@ def on_zone(zone, a: float, w: float, lift: float = 0.0, ex=(1.0, 0.0, 0.0)):
     return P[0] + N[0] * lift, G.frame_z(N[0], ex)
 
 
+def flank_plating(c: Ctx, st: H.HullStyle, z: LF.Zone, voids, cuts, x_span, name_span=None, strips=((0.10, 0.148), (0.27, 0.318)),
+                  band=(0.52, 0.715), lower_top: float = 0.485, upper_from: float = 0.75, window_lift: float = 0.76, band_row=(3.6, 4.2)) -> list:
+    """A vertical flank, the Navy's way: plates below the navy band with window strips (ribbons carrying rows of lit and dark
+    windows), the band with its gold thread above and below, plates over it. name_span: an x range kept clear for a flat field
+    (the game projects a name decal there). Returns the plates."""
+    g, rng, s = c.g, c.rng, st.scheme
+    clear = (lambda x0, x1, w0, w1: x1 > name_span[0] and x0 < name_span[1]) if name_span else None
+    out: list = []
+    strip = replace(s, row_w=(1.4, 1.8), plate_len=(50, 120), levels=(0.7,), level_weights=(1.0,), wedge=0.0, mats=(("Frame", 1.0),),
+                    gap_w=(0.02, 0.03), tone_sigma=0.04)
+    edges_w = [0.0] + [x for r in strips for x in r] + [lower_top]
+    for i in range(0, len(edges_w) - 1, 2):
+        out += LF.plate_zone(g, z, rng, s, PRE, w_lo=edges_w[i], w_hi=edges_w[i + 1], skip=clear, voids=voids)
+    edges = [x_span[0]] + [x for r in voids for x in r] + [x_span[1]]
+    spans = [(edges[i], edges[i + 1]) for i in range(0, len(edges) - 1, 2)]
+    for lo, hi in strips:
+        out += LF.plate_zone(g, z, rng, strip, PRE, w_lo=lo, w_hi=hi, skip=clear, voids=voids)
+        for sa, sb in spans:                                          # rows of windows along the strip, between the ribs
+            pieces = [(sa, sb)]
+            if name_span:
+                pieces = [(sa, min(sb, name_span[0])), (max(sa, name_span[1]), sb)]
+            for lo_a, hi_a in pieces:
+                for xc in cuts:                                        # the cut planes stay clear
+                    if lo_a < xc < hi_a:
+                        pieces.append((xc + 4.0, hi_a))
+                        hi_a = xc - 4.0
+                        break
+                if hi_a - lo_a > 12.0:
+                    K2.window_band(c, z, 0.5 * (lo + hi), lo_a + 2.0, hi_a - 2.0, rows=1, lift=window_lift)
+    navy = replace(s, row_w=band_row, plate_len=(30, 90), mats=((NAVY, 1.0),), levels=(0.5,), level_weights=(1.0,), wedge=0.0, tone_sigma=0.05)
+    gold = replace(s, row_w=(0.4, 0.5), plate_len=(40, 120), mats=((GOLD, 1.0),), levels=(0.58,), level_weights=(1.0,), wedge=0.0,
+                   gap_w=(0.02, 0.03), chamfer=0.05, rim=0.1, tone_sigma=0.03)
+    out += LF.plate_zone(g, z, rng, navy, PRE, w_lo=band[0], w_hi=band[1], voids=voids)
+    out += LF.plate_zone(g, z, rng, gold, PRE, w_lo=band[0] - 0.028, w_hi=band[0] - 0.005, voids=voids)
+    out += LF.plate_zone(g, z, rng, gold, PRE, w_lo=band[1] + 0.005, w_hi=band[1] + 0.028, voids=voids)
+    out += LF.plate_zone(g, z, rng, s, PRE, w_lo=upper_from, w_hi=1.0, voids=voids)
+    if name_span:
+        flat_field(c, z, name_span[0] + 4.0, name_span[1] - 4.0, 0.03, lower_top - 0.015, "Plate", 0.4)
+    return out
+
+
 # ------------------------------------------------------------------------------------------------------------ the Aquila
 class Aquila:
     """The Aquila's build: one method per part, so the pieces read like the ship's own list of works."""
@@ -105,33 +148,7 @@ class Aquila:
 
     # ----------------------------------------------------------------------------------------------------- hull
     def flank(self, z: LF.Zone, voids) -> list:
-        """A vertical flank: plates below the navy band with two window strips (ribbons carrying rows of windows), the band and its
-        gold thread, plates above; a flat field for the name decal."""
-        c, g, rng, s = self.c, self.g, self.rng, self.st.scheme
-        a0, a1 = self.NAME_SPAN
-        clear = lambda x0, x1, w0, w1: x1 > a0 and x0 < a1              # noqa: E731  the name field stays free of plates and strips
-        out: list = []
-        strip = replace(s, row_w=(1.4, 1.8), plate_len=(50, 120), levels=(0.7,), level_weights=(1.0,), wedge=0.0, mats=(("Frame", 1.0),),
-                        gap_w=(0.02, 0.03), tone_sigma=0.04)
-        for lo, hi in ((0.0, 0.10), (0.148, 0.27), (0.318, 0.485)):
-            out += LF.plate_zone(g, z, rng, s, PRE, w_lo=lo, w_hi=hi, skip=clear, voids=voids)
-        edges = [self.X_ST + 8.0] + [x for r in voids for x in r] + [self.X_BW - 40.0]
-        spans = [(edges[i], edges[i + 1]) for i in range(0, len(edges) - 1, 2)]
-        for lo, hi in ((0.10, 0.148), (0.27, 0.318)):
-            out += LF.plate_zone(g, z, rng, strip, PRE, w_lo=lo, w_hi=hi, skip=clear, voids=voids)
-            for sa, sb in spans:                                          # rows of windows along the strip, between the ribs
-                for lo_a, hi_a in ((sa, min(sb, a0)), (max(sa, a1), sb)):
-                    if hi_a - lo_a > 12.0 and not any(lo_a < xc < hi_a for xc in self.cuts):
-                        K2.window_band(c, z, 0.5 * (lo + hi), lo_a + 2.0, hi_a - 2.0, rows=1, lift=0.76)
-        navy = replace(s, row_w=(3.6, 4.2), plate_len=(30, 90), mats=((NAVY, 1.0),), levels=(0.5,), level_weights=(1.0,), wedge=0.0, tone_sigma=0.05)
-        gold = replace(s, row_w=(0.4, 0.5), plate_len=(40, 120), mats=((GOLD, 1.0),), levels=(0.58,), level_weights=(1.0,), wedge=0.0,
-                       gap_w=(0.02, 0.03), chamfer=0.05, rim=0.1, tone_sigma=0.03)
-        out += LF.plate_zone(g, z, rng, navy, PRE, w_lo=0.52, w_hi=0.715, voids=voids)
-        out += LF.plate_zone(g, z, rng, gold, PRE, w_lo=0.492, w_hi=0.515, voids=voids)
-        out += LF.plate_zone(g, z, rng, gold, PRE, w_lo=0.72, w_hi=0.743, voids=voids)
-        out += LF.plate_zone(g, z, rng, s, PRE, w_lo=0.75, w_hi=1.0, voids=voids)
-        flat_field(c, z, a0 + 4.0, a1 - 4.0, 0.03, 0.47, "Plate", 0.4)
-        return out
+        return flank_plating(self.c, self.st, z, voids, self.cuts, (self.X_ST + 8.0, self.X_BW - 40.0), self.NAME_SPAN)
 
     def plate_hull(self) -> None:
         c, g, rng = self.c, self.g, self.rng
@@ -219,16 +236,19 @@ class Aquila:
         st = [(x, LF.chamfer_rect(22.5 - (x - x0) / (x1 - x0) * 7.5, 4.0 - (x - x0) / (x1 - x0), 0.35), -25.3 + (x - x0) / (x1 - x0) * 0.5)
               for x in np.linspace(x0, x1, 9)]
         keel = LF.Loft.along_x(st).with_stations(self.cuts)
+        self.keel = keel
         for k in (0, 1, 2, 6, 7):
             z = keel.zone(k)
             z.skin(g, c.m("Frame"))
             self.plates += LF.plate_zone(g, z, rng, sch, PRE, tone_fn=lambda a, w: -0.12)
         # the dorsal spine, interrupted where the aft turrets stand
         sp = replace(self.st.scheme, row_w=(2.0, 3.6), plate_len=(8, 26), levels=(0.35, 0.5), level_weights=(0.6, 0.4))
+        self.spines = []
         for a0, a1 in ((-306.0, -258.0), (-222.0, -174.0), (-128.0, -40.0), (-4.0, 92.0)):
             zsp = self.deck_top + 2.2
             stations = [(x, LF.chamfer_rect(9.6 - (x + 306) / 400 * 1.8, 3.0, 0.4), zsp) for x in np.linspace(a0, a1, 4)]
             spine = LF.Loft.along_x(stations).with_stations(self.cuts)
+            self.spines.append(spine)
             for k in (2, 3, 4, 5, 6):
                 z = spine.zone(k)
                 z.skin(g, c.m("Frame"))
@@ -296,11 +316,11 @@ class Aquila:
         """Folding radiator wings on the shoulders: three panels of 70 m per side, half open."""
         c = self.c
         for sy in (1, -1):
-            for x0 in (-322.0, -248.0, -174.0):
-                xf = Xf((x0, 45.0, 18.3), I3, 1.0) if sy > 0 else Xf((x0 + 70.0, -45.0, 18.3), Xf().rot_z(180.0), 1.0)
-                K2.radiator_wing(c, xf, 70.0, 30.0, 35.0)
+            for x0 in (-322.0, -252.0, -182.0):
+                xf = Xf((x0, 45.0, 18.3), I3, 1.0) if sy > 0 else Xf((x0 + 66.0, -45.0, 18.3), Xf().rot_z(180.0), 1.0)
+                K2.radiator_wing(c, xf, 66.0, 30.0, 35.0)
                 lo = (x0, 40.0, 0.0) if sy > 0 else (x0, -80.0, 0.0)
-                hi = (x0 + 70.0, 80.0, 90.0) if sy > 0 else (x0 + 70.0, -40.0, 90.0)
+                hi = (x0 + 66.0, 80.0, 90.0) if sy > 0 else (x0 + 66.0, -40.0, 90.0)
                 self.g.keep_out(lo, hi)
 
     # ----------------------------------------------------------------------------------------------- antennas
@@ -338,6 +358,20 @@ class Aquila:
             else:
                 TX.place_text(g, "CVC-01", base, N[0], 8.0, c.m("Marking"), up=(1.0, 0.0, 0.0), depth=0.08)
 
+    # ------------------------------------------------------------------------------------- pieces (cut faces)
+    def cap_extras(self, xc: float) -> list:
+        """Other structures the cut plane passes through, as (section polygon, side, z limit): the parts outside the hull's own section."""
+        ex = []
+        top = top_z(self.hull, xc)
+        bot = float(self.hull.ring_at(xc)[:, 2].min())
+        for loft, side, lim in [(self.deck, 1, top)] + [(sp, 1, top) for sp in self.spines] + [(self.keel, -1, bot)]:
+            if loft.a[0] + 1.0 < xc < loft.a[-1] - 1.0:
+                ex.append((loft.ring_at(xc)[:, 1:3], side, lim))
+        return ex
+
+    def caps(self) -> list:
+        return make_all_cuts(self.c, self.hull, self.cuts, extras_fn=self.cap_extras, depth=30.0)
+
     # ------------------------------------------------------------------------------------------------- build
     def build(self, details: bool = True) -> None:
         c = self.c
@@ -368,3 +402,16 @@ def torpedo_tube(c: Ctx, xf: Xf) -> None:
         xf.cyl(g, (1.3, 3.3 * np.cos(a), 3.3 * np.sin(a)), (1.55, 3.3 * np.cos(a), 3.3 * np.sin(a)), 0.16, 0.14, m("Frame"), seg=6, kind="torpedo")
     door = xf.sub((1.3, 0.0, 3.8), xf.rot_y(-70.0))
     door.box(g, (0, 0, -3.8), (0.35, 6.6, 6.8), m("Plate"), ch=0.08, kind="torpedo")
+
+
+def build_aquila(c: Ctx) -> dict:
+    """shipgen3 entry: the whole Aquila, its cut faces, and the camera rigs of its previews."""
+    a = Aquila(c)
+    a.build()
+    faces = a.caps()
+    info = {"cuts": list(a.cuts), "cut_faces": faces, "length_m": 800.0,
+            "cam_az": -32.0, "cam_el": 18.0, "cam_dist": 1.9, "sun_az": -50.0, "sun_el": 26.0,
+            "closeups": [{"name": "flank", "target": [60.0, -50.0, 3.0], "normal": [0.0, -1.0, 0.0], "distance": 110.0, "span": 50.0},
+                         {"name": "bowdeck", "target": [285.0, 0.0, 24.0], "normal": [-0.35, -0.55, 0.75], "distance": 110.0, "span": 50.0}],
+            "pieces_gap": 0.10, "pieces_az": 24.0, "pieces_dist": 2.4}
+    return info
