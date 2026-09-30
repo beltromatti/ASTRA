@@ -10,3 +10,6 @@ DECLARE_LOG_CATEGORY_EXTERN(LogASTRA, Log, All);
 /** The war bench (AstraWarSimCommandlet) wants the same battle from the same seed: every random stream seeds from
  *  FMath::Rand() instead of the clock while this is on. */
 extern ASTRA_API bool GAstraDeterministic;
+
+/** `stat Astra`: where the game thread's time goes among ASTRA's own systems. */
+DECLARE_STATS_GROUP(TEXT("ASTRA"), STATGROUP_Astra, STATCAT_Advanced);

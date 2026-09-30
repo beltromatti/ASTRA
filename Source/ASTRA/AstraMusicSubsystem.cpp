@@ -11,6 +11,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 
+DECLARE_CYCLE_STAT(TEXT("Music"), STAT_AstraMusic, STATGROUP_Astra);
+
 namespace
 {
 	float GMusicVolume = 0.34f;          // under the dialogue: the crew must always be heard
@@ -122,6 +124,7 @@ void UAstraMusicSubsystem::Play(EAstraMood NewMood, float Fade)
 
 void UAstraMusicSubsystem::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraMusic);
 	Since += DeltaTime;
 	// the officers must be understood: the music steps back while any of them speaks
 	bool bSpeaking = false;

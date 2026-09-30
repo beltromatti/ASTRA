@@ -27,6 +27,8 @@
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 
+DECLARE_CYCLE_STAT(TEXT("Viewscreen"), STAT_AstraViewscreen, STATGROUP_Astra);
+
 namespace
 {
 	TAutoConsoleVariable<int32> CVarViewscreenHz(TEXT("astra.viewscreen.hz"), 30, TEXT("Main viewscreen: optical feed and overlay refreshes per second (0 = frozen)"));
@@ -751,6 +753,7 @@ bool AAstraViewscreen::Project(const FVector& World, int32 W, int32 H, FVector2D
 
 void AAstraViewscreen::Tick(float DeltaSeconds)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraViewscreen);
 	Super::Tick(DeltaSeconds);
 	UWorld* W = GetWorld();
 	Now = W->GetTimeSeconds();

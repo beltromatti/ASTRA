@@ -5,6 +5,8 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 
+DECLARE_CYCLE_STAT(TEXT("Zone lights"), STAT_AstraZoneLights, STATGROUP_Astra);
+
 namespace
 {
 	TAutoConsoleVariable<int32> CVarZoneMax(TEXT("astra.zonelights.max"), 8, TEXT("Interior zone lights lit at once, nearest to the Captain first"));
@@ -49,6 +51,7 @@ void UAstraZoneLights::OnWorldBeginPlay(UWorld& InWorld)
 
 void UAstraZoneLights::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraZoneLights);
 	Accum += DeltaTime;
 	if (Lights.Num() == 0 || Accum < 0.25f)
 	{

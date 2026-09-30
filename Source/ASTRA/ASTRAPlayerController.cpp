@@ -44,6 +44,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 
+DECLARE_CYCLE_STAT(TEXT("Player controller"), STAT_AstraPC, STATGROUP_Astra);
+
 AASTRAPlayerController::AASTRAPlayerController()
 {
 	// set the player camera manager class
@@ -779,6 +781,7 @@ void AASTRAPlayerController::TickSubtitles(float DeltaTime)
 
 void AASTRAPlayerController::PlayerTick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraPC);
 	Super::PlayerTick(DeltaTime);
 	TickSubtitles(DeltaTime);
 	TickPad(DeltaTime);

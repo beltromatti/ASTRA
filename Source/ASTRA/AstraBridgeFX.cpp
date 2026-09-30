@@ -15,6 +15,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Sound/SoundBase.h"
+#include "ASTRA.h"
+
+DECLARE_CYCLE_STAT(TEXT("Bridge FX"), STAT_AstraBridgeFX, STATGROUP_Astra);
 
 namespace
 {
@@ -194,6 +197,7 @@ void AAstraBridgeFX::Burst(const FVector& At, const FVector& Dir, float Strength
 
 void AAstraBridgeFX::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraBridgeFX);
 	Super::Tick(DeltaTime);
 	const float Dt = FMath::Min(DeltaTime, 0.05f);
 	for (; GSparkRequests > 0; --GSparkRequests)

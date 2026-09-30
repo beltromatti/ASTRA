@@ -29,6 +29,8 @@
 #include "Misc/FileHelper.h"
 #include "ImageUtils.h"
 
+DECLARE_CYCLE_STAT(TEXT("Screens"), STAT_AstraScreens, STATGROUP_Astra);
+
 namespace
 {
 	// diagnostics: time each page's redraw including the render thread's work (blocks the game thread while on)
@@ -320,6 +322,7 @@ void UAstraScreensSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 void UAstraScreensSubsystem::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraScreens);
 	Time += DeltaTime;
 	// one screen redrawn per frame at most (the most overdue one): drawing them all in the same frame was a
 	// 12 ms hitch four times a second
