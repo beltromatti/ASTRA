@@ -434,6 +434,40 @@ public:
 		float TargetRangeKm = 0.f;
 	};
 	FFireControl GetFireControl() const;
+	/** One ship as the Aquila knows it now (fog of war applied): what the stations' executors and the main viewscreen use.
+	 *  (AstraBattleQueries.cpp) */
+	struct FContactView
+	{
+		int32 Id = -1;
+		FString ContactId;
+		FString Label;             // what the crew may call it: the name once identified, the class once classified, else the id
+		FString Class;             // empty until classified
+		EAstraSide Side = EAstraSide::Neutral;
+		uint8 Track = 0;           // 1 a bearing only (no range), 2 a firm track
+		bool bCraft = false;       // fighters, bombers, drones
+		bool bCapital = false;     // a warship (not a craft, a hulk or a freighter)
+		bool bFleeing = false;
+		bool bFiringAtUs = false;  // its guns or its commander's orders are on the Aquila
+		bool bDerelict = false;
+		bool bJamming = false;
+		FVector Pos = FVector::ZeroVector;   // m, system frame (bearing-only: somewhere along the bearing)
+		FVector Vel = FVector::ZeroVector;   // m/s (zero when unknown)
+		double RangeKm = -1.0;               // -1 unknown
+		double BearingDeg = 0.0, MarkDeg = 0.0;
+		float HullFrac = -1.f, ShieldFrac = -1.f;   // -1 unknown
+		float RadiusM = 100.f;
+	};
+	/** Every contact on the Aquila's plot (not the Aquila herself), nearest first. */
+	void GetContacts(TArray<FContactView>& Out) const;
+	/** The Aquila in the system frame. */
+	FVector PlayerPos() const { return Ships.Num() ? Ships[0].Pos : FVector::ZeroVector; }
+	FVector PlayerVel() const { return Ships.Num() ? Ships[0].Vel : FVector::ZeroVector; }
+	FQuat PlayerAtt() const { return Ships.Num() ? Ships[0].Att : FQuat::Identity; }
+	/** Missiles flying at the Aquila now (system frame). */
+	void GetInboundMissiles(TArray<FVector>& Out) const;
+	/** Bearing and mark (degrees, the helm's convention) from the Aquila to a point of the system frame. */
+	double BearingTo(const FVector& Point) const { return Ships.Num() ? BearingDeg(Ships[0].Pos, Point) : 0.0; }
+	double MarkTo(const FVector& Point) const { return Ships.Num() ? MarkDeg(Ships[0].Pos, Point) : 0.0; }
 	/** The Aquila's flight groups at a glance ("ALPHA 6 UP · CAP   BRAVO 7 ON DECK   DRONES REARMING"). */
 	FString FlightLine() const;
 	float PlayerShieldFraction() const { return Ships.Num() ? Ships[0].Shield / Ships[0].ShieldMax : 1.f; }

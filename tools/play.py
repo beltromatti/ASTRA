@@ -179,10 +179,17 @@ def cmd_shot(a: argparse.Namespace) -> None:
 
 def cmd_quit(_: argparse.Namespace) -> None:
     try:
-        call("/quit")
+        call("/quit", {})
     except (urllib.error.URLError, OSError):
         pass
-    print("quit sent")
+    # the game closes in a few seconds; make sure (a harness game is always ours)
+    for _ in range(40):
+        time.sleep(0.5)
+        if not alive():
+            print("game closed")
+            return
+    subprocess.run(["pkill", "-f", f"astra_harness_port={PORT}"], check=False)
+    print("game killed (it did not close by itself)")
 
 
 def main() -> None:

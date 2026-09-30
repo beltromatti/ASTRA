@@ -2,6 +2,7 @@
 
 #include "AstraShipSubsystem.h"
 #include "AstraHarness.h"
+#include "AstraStations.h"
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
@@ -1624,6 +1625,17 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		}
 		FAstraTimeline::Record(TEXT("cmd"), FString::Printf(TEXT("%s %s"), *Name, *ArgsText.Left(300)));
 	}
+	// the bridge stations' persistent modes (docs/ARCHITETTURA.md §4)
+	if (Name == TEXT("station"))
+	{
+		UAstraStationsSubsystem* St = GetWorld() ? GetWorld()->GetSubsystem<UAstraStationsSubsystem>() : nullptr;
+		FString By;
+		if (Args.IsValid())
+		{
+			Args->TryGetStringField(TEXT("by"), By);
+		}
+		return St ? St->SetMode(Args, By.IsEmpty() ? TEXT("officer") : By, OutDetail) : false;
+	}
 	if (!Args.IsValid())
 	{
 		OutDetail = TEXT("invalid arguments");
@@ -2089,6 +2101,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 {
 	TSharedRef<FJsonObject> S = MakeShared<FJsonObject>();
 	S->SetStringField(TEXT("ship"), TEXT("ASN Aquila"));
+	if (const UAstraStationsSubsystem* St = GetWorld() ? GetWorld()->GetSubsystem<UAstraStationsSubsystem>() : nullptr)
+	{
+		S->SetObjectField(TEXT("stations"), St->StationsJson());
+	}
 	S->SetStringField(TEXT("location"), LocationName);
 	if (HasSurface())
 	{
