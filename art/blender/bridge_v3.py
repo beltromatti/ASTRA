@@ -203,7 +203,8 @@ def build_manifest(D: dict, c: SH.Ctx, objs: dict, stats: dict, checks: dict) ->
     gv = FR.viewscreen_geom(c)
     screens["SCREEN_viewscreen_1"] = {"mesh": "SM_BRG3_ViewscreenImage", "size_m": [gv["w"], gv["h"]], "aspect": round(gv["w"] / gv["h"], 3),
                                       "surface": "viewscreen", "page": "Viewscreen", "instance": None,
-                                      "arc": {"radius_m": gv["R"], "half_angle_deg": round(gv["half_deg"], 2), "z_bottom": gv["z0"], "z_top": gv["z1"]},
+                                      "curved": gv["curved"], "x_m": gv["x"], "z_bottom": gv["z0"], "z_top": gv["z1"],
+                                      "arc": ({"radius_m": gv["R"], "half_angle_deg": round(gv["half_deg"], 2)} if gv["curved"] else None),
                                       "uv": "0-1 over the image area, u to the viewer's right (seen from the Captain), v up"}
     md = D["master_display"]
     screens["SCREEN_master_1"] = {"mesh": "SM_BRG3_MasterDisplay", "size_m": [md["width"], md["height"]], "aspect": round(md["width"] / md["height"], 3),

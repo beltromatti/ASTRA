@@ -67,7 +67,7 @@
     "width": 7.2,
     "height": 3.0,
     "bottom": 1.2,
-    "note": "curved translucent emissive image plane on an arc of radius 9 m centred on the captain; bottom/top rails are projector emitters"
+    "curved": false, "note": "flat translucent emissive image plane, 7.2 x 3.0 m, bottom edge 1.2 m above the upper deck, x = pos[0]: the shape AAstraViewscreen (C++) builds itself at (900, 0, 120) cm; the rails at its top and bottom are projector emitters. curved=true bends image and frame on an arc of `radius` m centred on the bridge origin (the C++ quad has to follow it)"
   },
   "stations": [
     {
@@ -470,7 +470,7 @@
     }
   ],
   "routes": {
-    "note": "walking routes of the officers to the starboard door (the Captain's quarters are that way): [x, y, level]; VisitRouteFor in AstraShipSubsystem.cpp still has the v2 waypoints (tables moved, stations moved). The helm goes round the table and up the PORT stairs, the ops up the starboard ones; 0.5 m clearance verified by art/blender/bridge3_checks.py",
+    "note": "walking routes of the officers to the starboard door (the Captain's quarters are that way): [x, y, level]; VisitRouteFor in AstraShipSubsystem.cpp still has the v2 waypoints (table and stations moved): python3 tools/ue_scripts/bridge3_routes_cpp.py prints the v3 branches to paste. The helm goes round the table and up the PORT stairs, the ops up the starboard ones; 0.5 m clearance verified by art/blender/bridge3_checks.py",
     "to_starboard_door": {
       "helm": [
         [6.0, -2.2, "well"],

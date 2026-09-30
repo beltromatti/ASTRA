@@ -251,50 +251,76 @@ def build_rails(c: SH.Ctx, name: str = "SM_BRG3_Rails", glass_name: str = "SM_BR
 
 # ---------------------------------------------------------------------------------------------------------- viewscreen
 def viewscreen_geom(c: SH.Ctx) -> dict:
+    """The main viewscreen: 7.2 x 3.0 m, facing the Captain, at x = pos[0]. `curved` false (the default): a flat image plane, the
+    shape AAstraViewscreen (C++) builds itself at (900, 0, 120) cm; true: an arc of radius `radius` centred on the bridge origin
+    (the C++ quad then has to follow the same arc)."""
     v = c.D["viewscreen"]
     R = v["radius"]
     half = math.degrees((v["width"] / 2) / R)
-    return {"R": R, "half_deg": half, "z0": v["bottom"], "z1": v["bottom"] + v["height"], "w": v["width"], "h": v["height"]}
+    return {"R": R, "half_deg": half, "z0": v["bottom"], "z1": v["bottom"] + v["height"], "w": v["width"], "h": v["height"],
+            "curved": bool(v.get("curved", False)), "x": v["pos"][0], "half_m": v["width"] / 2}
 
 
 def build_viewscreen_frame(c: SH.Ctx, name: str = "SM_BRG3_ViewscreenFrame"):
-    """The projector frame of the main viewscreen: a top and a bottom emitter rail on the arc of the image, two slim pylons
-    at the ends, hangers and posts. Nothing stands in the image area: switched off, the window is what you see."""
+    """The projector frame of the main viewscreen: a top and a bottom emitter rail along the image, two slim pylons at the
+    ends, hangers and posts. Nothing stands in the image area: switched off, the window is what you see."""
     g = viewscreen_geom(c)
-    R, ha, z0, z1 = g["R"], g["half_deg"], g["z0"], g["z1"]
+    R, z0, z1, px, hm, curved = g["R"], g["z0"], g["z1"], g["x"], g["half_m"], g["curved"]
     b = Parts(bevel=0.006, fine_bevel=0.003)
     fb, em = b.body, b.emit
     CE = c.CEIL
-    ext = ha + 1.5
+    ext = hm + 0.24                                               # the rails run a little past the image (metres along the screen)
+    ang = lambda m: math.degrees(m / R)                           # arc angle of a length along the screen (curved variant)
+
+    def run(builder, prof, mat, zbase, half_len, lamp=None):
+        """A profile [(dr, z)] (dr away from the Captain) run along the screen for +-half_len metres: swept round the arc
+        (curved) or extruded along y (flat); with `lamp` (a palette cell) the faces are painted as emitters."""
+        if curved:
+            faces = builder.arc_sweep(prof, 0, 0, R, -ang(half_len), ang(half_len), mat, seg=44, z0=zbase)
+        else:
+            faces = builder.extrude_y([(px + dr, zbase + z) for dr, z in prof], -half_len, half_len, mat)
+        if lamp:
+            builder._paint(faces, L.cell_uv(lamp))
+        return faces
+
+    def at(y_m):
+        """Position (x, y) and the local frame yaw (degrees) of the point y_m along the screen."""
+        if curved:
+            a = ang(y_m)
+            return polar(0, 0, R, a), a
+        return (px, y_m), 0.0
+
     # top rail: a slanted brushed bar, an emitter slot facing the image
-    fb.arc_sweep([(-0.10, 0.0), (0.07, 0.0), (0.07, 0.15), (-0.05, 0.15)], 0, 0, R, -ext, ext, L.TRIM, seg=44, z0=z1)
-    fb.arc_sweep([(-0.08, -0.012), (0.05, -0.012), (0.05, 0.0), (-0.08, 0.0)], 0, 0, R, -ext, ext, L.STRUCT, seg=44, z0=z1)
-    em.lamp_arc([(-0.085, 0.0), (0.0, 0.0), (0.0, 0.008), (-0.085, 0.008)], 0, 0, R, -ha, ha, "white_cool", L.LAMP_HOT, seg=44, z0=z1 - 0.02)
+    run(fb, [(-0.10, 0.0), (0.07, 0.0), (0.07, 0.15), (-0.05, 0.15)], L.TRIM, z1, ext)
+    run(fb, [(-0.08, -0.012), (0.05, -0.012), (0.05, 0.0), (-0.08, 0.0)], L.STRUCT, z1, ext)
+    run(em, [(-0.085, 0.0), (0.0, 0.0), (0.0, 0.008), (-0.085, 0.008)], L.LAMP_HOT, z1 - 0.02, hm, lamp="white_cool")
     # bottom rail: the mirror image, emitter slot facing up
-    fb.arc_sweep([(-0.05, 0.0), (0.07, 0.0), (0.07, 0.15), (-0.10, 0.15)], 0, 0, R, -ext, ext, L.TRIM, seg=44, z0=z0 - 0.15)
-    fb.arc_sweep([(-0.08, 0.0), (0.05, 0.0), (0.05, 0.012), (-0.08, 0.012)], 0, 0, R, -ext, ext, L.STRUCT, seg=44, z0=z0 - 0.162)
-    em.lamp_arc([(-0.085, 0.0), (0.0, 0.0), (0.0, 0.008), (-0.085, 0.008)], 0, 0, R, -ha, ha, "white_cool", L.LAMP_HOT, seg=44, z0=z0 + 0.012)
+    run(fb, [(-0.05, 0.0), (0.07, 0.0), (0.07, 0.15), (-0.10, 0.15)], L.TRIM, z0 - 0.15, ext)
+    run(fb, [(-0.08, 0.0), (0.05, 0.0), (0.05, 0.012), (-0.08, 0.012)], L.STRUCT, z0 - 0.162, ext)
+    run(em, [(-0.085, 0.0), (0.0, 0.0), (0.0, 0.008), (-0.085, 0.008)], L.LAMP_HOT, z0 + 0.012, hm, lamp="white_cool")
     # pylons at both ends: slim fins from the well floor to the ceiling, a fine edge emitter facing the image
     for sd in (-1, 1):
-        a = sd * (ha + 1.3)
-        px, py = polar(0, 0, R, a)
-        m = T(px, py, 0) @ Rz(a)
+        (qx, qy), a = at(sd * (hm + 0.20))
+        m = T(qx, qy, 0) @ Rz(a)
         with fb.at(m), em.at(m):
             fb.prism([(-0.06, -0.09), (0.06, -0.09), (0.06, 0.09), (-0.06, 0.09)], c.WELL, CE, L.STRUCT)
             fb.prism([(-0.075, -0.115), (0.075, -0.115), (0.075, 0.115), (-0.075, 0.115)], c.WELL - 0.02, c.WELL + 0.22, L.TRIM)
             fb.box((-0.08, -0.12, z0 + 0.45), (0.08, 0.12, z0 + 0.60), L.TRIM)
             em.lamp_box((-0.064, -0.006 - sd * 0.09, z0 - 0.05), (-0.06, 0.006 - sd * 0.09, z1 + 0.05), "white_cool", L.LAMP_DIM)
     # posts under the bottom rail and hangers over the top rail
-    for a in (-ha * 0.9, -ha * 0.45, 0.0, ha * 0.45, ha * 0.9):
-        px, py = polar(0, 0, R + 0.0, a)
-        fb.cyl((px, py, c.WELL), (px, py, z0 - 0.15), 0.035, L.TRIM, seg=12)
-        fb.cyl((px, py, c.WELL), (px, py, c.WELL + 0.06), 0.09, L.STRUCT, seg=16)
-        fb.cyl((px, py, z1 + 0.15), (px, py, CE + 0.02), 0.025, L.TRIM, seg=10)
+    for f in (-0.9, -0.45, 0.0, 0.45, 0.9):
+        (qx, qy), _ = at(f * hm)
+        fb.cyl((qx, qy, c.WELL), (qx, qy, z0 - 0.15), 0.035, L.TRIM, seg=12)
+        fb.cyl((qx, qy, c.WELL), (qx, qy, c.WELL + 0.06), 0.09, L.STRUCT, seg=16)
+        fb.cyl((qx, qy, z1 + 0.15), (qx, qy, CE + 0.02), 0.025, L.TRIM, seg=10)
     return b.build(name)
 
 
 def build_viewscreen_image(c: SH.Ctx, name: str = "SM_BRG3_ViewscreenImage"):
     g = viewscreen_geom(c)
     fb = FB()
-    fb.screen_arc(0.0, 0.0, g["R"], -g["half_deg"], g["half_deg"], g["z0"], g["z1"], "SCREEN_viewscreen_1", inward=True, seg=40)
+    if g["curved"]:
+        fb.screen_arc(0.0, 0.0, g["R"], -g["half_deg"], g["half_deg"], g["z0"], g["z1"], "SCREEN_viewscreen_1", inward=True, seg=40)
+    else:
+        fb.screen((g["x"], 0.0, (g["z0"] + g["z1"]) / 2), g["w"], g["h"], "SCREEN_viewscreen_1", (-1, 0, 0), up=(0, 0, 1))
     return A.finish(fb.to_object(name), bevel=0.0)
