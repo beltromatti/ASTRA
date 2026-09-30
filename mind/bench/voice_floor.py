@@ -175,8 +175,9 @@ class Trace:
         return [self.line[i]["text"] for i in self.order()]
 
 
-def check(tr: Trace, enq: dict[int, float]) -> list[str]:
-    """The invariants that hold in every scenario; returns the violations."""
+def check(tr: Trace, enq: dict[int, float], down: list[tuple[float, float]] | None = None) -> list[str]:
+    """The invariants that hold in every scenario; returns the violations. `down`: the intervals in which the Captain's key was down
+    (an answer queued meanwhile is not due until he lets go)."""
     bad: list[str] = []
     for lid in enq:
         if lid not in tr.end and lid not in tr.dropped:
@@ -216,8 +217,12 @@ def check(tr: Trace, enq: dict[int, float]) -> list[str]:
     for lid, tb in tr.begin.items():
         if tr.line[lid]["priority"] == "answer" and lid in enq:
             busy = any(tr.line[o]["priority"] == "answer" and tr.begin[o] < enq[lid] < tr.end.get(o, 1e9) for o in tr.begin if o != lid)
-            if not busy and tb - enq[lid] > 0.35:
-                bad.append(f"I9 the answer (line {lid}) waited {tb - enq[lid]:.2f} s to start")
+            due = enq[lid]
+            for a, z in down or []:
+                if a <= due < z:
+                    due = z
+            if not busy and tb - due > 0.35:
+                bad.append(f"I9 the answer (line {lid}) waited {tb - due:.2f} s to start")
     return bad
 
 
@@ -743,9 +748,36 @@ async def s20_new_session() -> list[str]:
         return bad
 
 
+async def s21_late_answer() -> list[str]:
+    """The Captain speaks again while the answer to his previous order is still being written: the late answer waits until he lets go of the key, then follows."""
+    async with Bridge() as b:
+        b.voice.captain_input()                                    # order 1, typed
+        await asyncio.sleep(1.0)
+        t_down = b.t()
+        b.voice.captain_begin()                                    # order 2, spoken: the key goes down
+        await asyncio.sleep(0.5)
+        b.voice.captain_turn_begin()
+        await b.say("late", "helm", "Aye, Captain, coming to two one seven.", answer=True)   # ... and the answer to order 1 arrives
+        b.voice.captain_turn_end()
+        await asyncio.sleep(1.0)                                   # still talking
+        t_up = b.t()
+        started_while_down = b.ids["late"] in b.trace().begin
+        b.voice.captain_end(None)
+        await b.settle(2.0)
+        tr = b.trace()
+        bad = check(tr, b.enq, down=[(t_down, t_up)])
+        if started_while_down:
+            bad.append("the late answer began while the Captain still held the key")
+        if b.ids["late"] not in tr.begin:
+            bad.append("the late answer was never said")
+        elif tr.begin[b.ids["late"]] - t_up > 0.6:
+            bad.append(f"the late answer waited {tr.begin[b.ids['late']] - t_up:.2f} s after the key went up")
+        return bad
+
+
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
              s10_shorten, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
-             s17_flags, s18_compat, s19_stuck_key, s20_new_session]
+             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer]
 
 
 def main() -> int:

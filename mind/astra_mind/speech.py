@@ -422,7 +422,7 @@ class Voice:
 
     @property
     def held(self) -> bool:
-        """The floor belongs to the Captain: only answers may start."""
+        """The floor belongs to the Captain: only answers may start (and none while his key is down)."""
         if self._captain_down:
             if self._now() - self._down_t <= KEY_STUCK_S:
                 return True
@@ -600,6 +600,11 @@ class Voice:
                 elif self._turn_pending and self._hold_until:
                     wait = max(0.01, self._hold_until - self._now())
                 await self._wait(wait)
+                continue
+            if self._captain_down:
+                # he is speaking again: nobody starts, not even the answer to his earlier order (it is made meanwhile and follows
+                # the moment he lets go); a key held for too long is let go of (KEY_STUCK_S)
+                await self._wait(max(0.05, self._down_t + KEY_STUCK_S - self._now()))
                 continue
             now = self._now()
             if line.gen_error and not line.chunks:

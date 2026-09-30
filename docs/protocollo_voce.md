@@ -175,7 +175,7 @@ Ora `voice_status` lo dice: nel log della mente (`~/Library/Application Support/
 | `Prio.NORMAL` | rapporti, eventi, comunicazioni | 60 s | in coda, nell'ordine; con oltre 14 s di parlato in attesa le righe lunghe (> 170 caratteri) si accorciano alla prima frase |
 | `Prio.LOW` | chiacchiere (`voice.chatter = True`), avventori della mensa e pazienti | 15 s | scartate quando il Capitano prende la parola |
 
-- **Il Capitano ha il palco.** `voice.captain_begin()` (tasto giù o ordine scritto): la riga in corso si ferma alla prossima pausa entro 0,5 s (`fade_ms` 40) o sfuma a metà parola (140 ms); nessuno comincia finché la sua risposta non parte (al massimo 8 s dopo il rilascio; `captain_end(False)` se non ha detto nulla lo rilascia subito); le righe `LOW` in coda sono scartate (`captain_spoke`); quelle `NORMAL` e `URGENT` aspettano e, finita la risposta, parlano nell'ordine in cui erano. Una riga interrotta prima della metà viene ripetuta intera (una sola volta); dopo la metà si considera detta.
+- **Il Capitano ha il palco.** `voice.captain_begin()` (tasto giù o ordine scritto): la riga in corso si ferma alla prossima pausa entro 0,5 s (`fade_ms` 40) o sfuma a metà parola (140 ms); nessuno comincia finché la sua risposta non parte (al massimo 8 s dopo il rilascio; `captain_end(False)` se non ha detto nulla lo rilascia subito); mentre il tasto è premuto non comincia nessuno, nemmeno la risposta tardiva a un ordine precedente (viene preparata intanto e parte al rilascio); le righe `LOW` in coda sono scartate (`captain_spoke`); quelle `NORMAL` e `URGENT` aspettano e, finita la risposta, parlano nell'ordine in cui erano. Una riga interrotta prima della metà viene ripetuta intera (una sola volta); dopo la metà si considera detta.
 - **Argomento**: una riga con `topic` sostituisce una più vecchia non ancora detta con lo stesso `topic` (`superseded`), a meno che la vecchia sia più importante.
 - **Scadenza** e **`stale_if`**: un rapporto che non ha parlato entro la scadenza (o per cui `stale_if()` risponde `True` al momento di partire) è scartato e dichiarato.
 - **Unione**: due frasi dello stesso ufficiale, stessa priorità, accodate a meno di 4 s l'una dall'altra e non ancora in sintesi, diventano una sola riga (un respiro, un sottotitolo).
@@ -206,7 +206,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 
 ```
 uv run python -m bench.voice_units            # 78 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti)
-uv run python -m bench.voice_floor -v         # 20 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
+uv run python -m bench.voice_floor -v         # 21 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
 uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-baseline   # riconoscimento: WER e latenza, motori alternati clip per clip
 uv run python -m bench.voice_pipeline live tts mic floor mem   # (più sezioni di seguito) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
 uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)
@@ -241,3 +241,5 @@ uv run python -m astra_mind.tts               # quali modelli e voci sono in cac
 6. **`transcript`** al gioco e turno all'equipaggio; le risposte escono nella lingua del Capitano (`lang`).
 
 Motori (`voice_stt_backends.py`, un'interfaccia sola: `start`, `transcribe`, `stop`): `ParakeetBackend` (helper Swift sul Neural Engine, Apple Silicon), `SherpaParakeetBackend` (lo stesso modello in ONNX su CPU: Windows, Linux, Mac senza helper), `WhisperKitBackend` (99 lingue, dice la lingua, accetta i nomi come suggerimento), `FasterWhisperBackend` (CPU, portabile). L'ordine di prova è quello: il primo che parte è il motore veloce, il secondo la riserva. `ASTRA_STT` cambia il primo.
+
+**Limite del percorso portabile**: Parakeet ONNX non dà una confidenza confrontabile con quella dell'helper (l'esportazione int8 scrive perfino «Captain» per il turco «Kaptan»), quindi lì non c'è il passaggio automatico a Whisper per una lingua non europea alla prima frase: si imposta la lingua del Capitano (il file `captain_lang.txt` nella cartella della cache, che la mente scrive da sola quando cambia lingua) e da quel momento le frasi vanno a faster-whisper. Sul Mac con l'helper il passaggio è automatico (6 frasi su 6 in sei lingue non europee).
