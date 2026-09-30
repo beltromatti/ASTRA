@@ -24,16 +24,9 @@ import numpy as np
 from .env import REPO_ROOT
 from .stt import Recognizer
 from .voice_stt_backends import ParakeetBackend
-from .tts import CALIBRATION, TTSEngine
+from .tts import CALIBRATION, GENDER, TTSEngine, VOICES
 from .voice_audio import f32_to_pcm16, resample
 
-GENDER = {"alba": "f", "anna": "f", "azelma": "f", "bill_boerst": "m", "caro_davy": "f", "charles": "m", "cosette": "f",
-          "eponine": "f", "estelle": "f", "eve": "f", "fantine": "f", "george": "m", "giovanni": "m", "jane": "f",
-          "javert": "m", "jean": "m", "juergen": "m", "lola": "f", "marius": "m", "mary": "f", "michael": "m", "paul": "m",
-          "peter_yearsley": "m", "rafael": "m", "stuart_bell": "m", "vera": "f", "daan": "m"}
-VOICES = ["alba", "anna", "azelma", "bill_boerst", "caro_davy", "charles", "cosette", "eponine", "estelle", "eve",
-          "fantine", "george", "giovanni", "jane", "javert", "jean", "juergen", "lola", "marius", "mary", "michael",
-          "paul", "peter_yearsley", "rafael", "stuart_bell", "vera", "daan"]
 LANGS = ["it", "en", "es", "fr", "de", "pt", "nl"]
 # the calibration lines plus one line full of the game's names: intelligibility of what the Captain must understand
 EXTRA = {

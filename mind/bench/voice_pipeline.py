@@ -35,7 +35,7 @@ from astra_mind.tts import CALIBRATION, TTSEngine
 from astra_mind.voice_audio import f32_to_pcm16, integrated_lufs, peak_db, resample
 from astra_mind.voice_casting import wer as wer_fn, words as words_fn
 from astra_mind.voice_glossary import GLOSSARY
-from astra_mind.voice_stt_backends import FasterWhisperBackend, ParakeetBackend, WhisperKitBackend
+from astra_mind.voice_stt_backends import FasterWhisperBackend, ParakeetBackend, SherpaParakeetBackend, WhisperKitBackend
 
 from . import voice_corpus as vc
 
@@ -92,6 +92,8 @@ class Load:
 def make_backend(name: str):
     if name == "parakeet-ultra":
         return ParakeetBackend(model="ultra")
+    if name == "parakeet-onnx":                    # the same model on the CPU (sherpa-onnx): the portable path
+        return SherpaParakeetBackend(model_dir=Path(os.environ["BENCH_SHERPA"]) if os.environ.get("BENCH_SHERPA") else None)
     if name == "parakeet-v3":
         return ParakeetBackend(model="v3")
     if name == "whisperkit-baseline":            # the first version's server: default chunking, fallbacks on
@@ -118,7 +120,7 @@ async def sec_stt(args) -> None:  # noqa: ANN001
     tts = TTSEngine()
     await asyncio.get_running_loop().run_in_executor(None, tts.warm, "en", ["george"], False)
     print("building the corpus...", flush=True)
-    clips = vc.build(tts, langs, per_lang=6 if args.quick else None)
+    clips = vc.build(tts, langs, per_lang=args.per_lang or (6 if args.quick else None))
     print(len(clips), "clips", flush=True)
     del tts
     results = load("stt") or {}
@@ -136,10 +138,14 @@ async def sec_stt(args) -> None:  # noqa: ANN001
         # the engines take turns clip by clip, so whatever else the machine is doing, it does to all of them alike
         rows: dict[str, list] = {b: [] for b in recs}
         t_all = time.perf_counter()
+        every = args.slow_every or (2 if args.quick else 3)
+        n_cond = len(vc.CONDITIONS)
         for i, c in enumerate(clips):
             for bname, rec in recs.items():
-                if bname.startswith(("whisperkit", "faster")) and i % (2 if args.quick else 3) != 0:
-                    continue                                                               # the slower engines see a sample of the corpus
+                # the slower engines see a sample of the corpus, the same for all of them and balanced across the conditions
+                # (a plain every-third clip would always land on the same condition: they come in threes)
+                if bname.startswith(("whisperkit", "faster")) and (i // n_cond + i % n_cond) % every != 0:
+                    continue
                 t0 = time.perf_counter()
                 tr = await rec.recognise(f32_to_pcm16(c.pcm), lang_hint=None)
                 wall = time.perf_counter() - t0
@@ -633,6 +639,22 @@ def report(args) -> None:  # noqa: ANN001
                 r = [x for x in d["rows"] if x["lang"] == lg and x["cond"] == "clean"]
                 cells.append(f"{100 * np.mean([x['wer'] for x in r]):.1f}" if r else "—")
             L.append(f"| {name} | " + " | ".join(cells) + " |")
+        base = {n: d for n, d in stt.items() if "@" not in n}
+        if len(base) > 1:                                    # engines that saw different samples are compared on the clips all of them saw
+            def key_of(x):  # noqa: ANN001, ANN202
+                return (x["lang"], x["speaker"], x["cond"], x["ref"])
+            common = set.intersection(*[{key_of(x) for x in d["rows"]} for d in base.values()])
+            if len(common) >= 30:
+                L += ["", f"### Stesso campione per tutti i motori ({len(common)} frasi viste da ognuno)", "",
+                      "| Motore | WER pulito | WER rumoroso | WER difficile | WER tutte | latenza mediana ms | p95 ms |", "|---|---|---|---|---|---|---|"]
+                for name, d in base.items():
+                    r = [x for x in d["rows"] if key_of(x) in common]
+                    cells = []
+                    for cond in ("clean", "noisy", "hard"):
+                        rc = [x for x in r if x["cond"] == cond]
+                        cells.append(f"{100 * np.mean([x['wer'] for x in rc]):.1f} %" if rc else "—")
+                    L.append(f"| {name} | " + " | ".join(cells) + f" | {100 * np.mean([x['wer'] for x in r]):.1f} % | "
+                             f"{fmt_ms(statistics.median([x['wall'] for x in r]))} | {fmt_ms(pct([x['wall'] for x in r], 95))} |")
         L += ["", "### Nomi del gioco (Praetorian, Acheron, Lindqvist, Janus Gate…)", "", "| Motore | nomi trovati grezzi | dopo il glossario | totale |", "|---|---|---|---|"]
         for name, d in stt.items():
             n = sum(x["n_ent"] for x in d["rows"])
@@ -725,6 +747,8 @@ def main() -> int:
     ap.add_argument("--load", default="", help="synthetic game next to the benchmark: gpu, cpu:4, gpu,cpu:4")
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--stride", type=int, default=1)
+    ap.add_argument("--slow-every", type=int, default=0, help="stt: the Whisper engines decode one clip in N (default 3, 2 with --quick)")
+    ap.add_argument("--per-lang", type=int, default=0, help="stt: only the first N orders of every language (default all 12, 6 with --quick)")
     args = ap.parse_args()
     logging_level = os.environ.get("BENCH_LOG", "WARNING")
     import logging

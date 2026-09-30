@@ -3,6 +3,8 @@ confidence when the engine reports them):
 
 - ParakeetBackend: NVIDIA Parakeet TDT 0.6B v3 / Ultra (25 European languages) on the Apple Neural Engine, through the
   `astra-stt` Swift helper (mind/stt_server, FluidAudio). About 40x faster than the audio, no GPU: the game keeps it.
+- SherpaParakeetBackend: the same Parakeet model as an int8 ONNX export on the CPU (sherpa-onnx): the fast engine of a machine
+  without the Neural Engine helper (Windows, Linux, an Intel Mac).
 - WhisperKitBackend: Whisper large-v3-turbo on the Neural Engine behind `whisperkit-cli serve` (99 languages, reports the
   language, takes a prompt with the game's names). The fallback for everything Parakeet does not speak.
 - FasterWhisperBackend: faster-whisper (CTranslate2) on the CPU: portable to Windows and Linux, the fallback of last resort.
@@ -313,6 +315,97 @@ class WhisperKitBackend(SttBackend):
     async def close(self) -> None:
         await self._client.aclose()
         self.stop()
+
+
+# ================================================================================================ Parakeet on the CPU (ONNX, portable)
+class SherpaParakeetBackend(SttBackend):
+    """The same Parakeet TDT 0.6B v3 (int8 ONNX export) through sherpa-onnx on the CPU: 25 European languages on Windows, Linux
+    or a Mac without the Neural Engine helper. Install `uv sync --extra portable`, unpack
+    sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 (k2-fsa/sherpa-onnx, asr-models release) into the voice models folder or point
+    ASTRA_SHERPA_MODEL at it. It says no confidence, so the second engine is never asked for a second opinion."""
+    name = "parakeet-onnx"
+    languages = PARAKEET_LANGS
+    takes_prompt = False
+    reports_language = False
+
+    def __init__(self, model_dir: Path | None = None, threads: int | None = None) -> None:
+        self.model_dir = model_dir or Path(os.environ.get("ASTRA_SHERPA_MODEL") or VOICE_MODELS / "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8")
+        self.threads = threads or max(2, min(6, (os.cpu_count() or 4) // 2))   # (the game keeps the rest of the cores)
+        self._rec = None
+        self._lock = asyncio.Lock()
+
+    @staticmethod
+    def available(model_dir: Path | None = None) -> bool:
+        try:
+            import sherpa_onnx  # noqa: F401
+        except Exception:  # noqa: BLE001
+            return False
+        d = model_dir or Path(os.environ.get("ASTRA_SHERPA_MODEL") or VOICE_MODELS / "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8")
+        return (d / "encoder.int8.onnx").exists()
+
+    async def start(self) -> bool:
+        if self._rec is not None:
+            return True
+        if not self.available(self.model_dir):
+            log.warning("sherpa-onnx Parakeet unavailable (package or model %s missing)", self.model_dir)
+            return False
+        import sherpa_onnx
+        d = self.model_dir
+        t0 = time.perf_counter()
+        self._rec = await asyncio.get_running_loop().run_in_executor(None, lambda: sherpa_onnx.OfflineRecognizer.from_transducer(
+            encoder=str(d / "encoder.int8.onnx"), decoder=str(d / "decoder.int8.onnx"), joiner=str(d / "joiner.int8.onnx"),
+            tokens=str(d / "tokens.txt"), num_threads=self.threads, sample_rate=16000, feature_dim=128, model_type="nemo_transducer"))
+        log.info("Parakeet (ONNX, %d threads) loaded in %.1f s", self.threads, time.perf_counter() - t0)
+        return True
+
+    async def transcribe(self, pcm16: bytes, *, lang: str | None = None, prompt: str | None = None) -> BackendResult:
+        if self._rec is None and not await self.start():
+            raise RuntimeError("Parakeet (ONNX) is not available")
+        audio = np.frombuffer(pcm16, dtype="<i2").astype(np.float32) / 32768.0
+        rec = self._rec
+
+        def run() -> BackendResult:
+            t0 = time.perf_counter()
+            s = rec.create_stream()
+            s.accept_waveform(16000, audio)
+            rec.decode_stream(s)
+            return BackendResult(text=str(s.result.text).strip(), lang=None, conf=None, seconds=time.perf_counter() - t0, backend="parakeet-onnx")
+
+        async with self._lock:
+            return await asyncio.get_running_loop().run_in_executor(None, run)
+
+    def stop(self) -> None:
+        self._rec = None
+
+
+SHERPA_MODEL_NAME = "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
+SHERPA_MODEL_URL = f"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/{SHERPA_MODEL_NAME}.tar.bz2"
+
+
+def fetch_sherpa_model(root: Path | None = None) -> Path:
+    """Download and unpack the int8 ONNX export of Parakeet v3 (about 490 MB, from the k2-fsa release) into the voice models
+    folder. Returns the model folder; a model already there is left alone."""
+    import tarfile
+
+    import httpx
+    root = root or VOICE_MODELS
+    out = root / SHERPA_MODEL_NAME
+    if (out / "encoder.int8.onnx").exists():
+        return out
+    root.mkdir(parents=True, exist_ok=True)
+    part = root / f"{SHERPA_MODEL_NAME}.tar.bz2.part"
+    log.info("downloading %s (about 490 MB)", SHERPA_MODEL_URL)
+    with httpx.stream("GET", SHERPA_MODEL_URL, follow_redirects=True, timeout=60.0) as r:
+        r.raise_for_status()
+        with open(part, "wb") as f:
+            for block in r.iter_bytes(1 << 20):
+                f.write(block)
+    with tarfile.open(part, "r:bz2") as tar:
+        tar.extractall(root, filter="data")
+    part.unlink(missing_ok=True)
+    if not (out / "encoder.int8.onnx").exists():
+        raise RuntimeError(f"the archive did not contain {SHERPA_MODEL_NAME}/encoder.int8.onnx")
+    return out
 
 
 # ================================================================================================ faster-whisper (CPU, portable)

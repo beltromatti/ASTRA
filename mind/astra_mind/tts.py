@@ -524,7 +524,6 @@ def main() -> None:
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.fetch:
-        from .voice_casting import VOICES
         eng = TTSEngine(max_resident=1)
         for lang in args.fetch.split(","):
             for v in (args.voices.split(",") if args.voices else VOICES):

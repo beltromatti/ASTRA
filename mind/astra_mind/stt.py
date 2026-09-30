@@ -10,7 +10,8 @@
   vocabulary, the engine's report and the language of the previous order are weighed together (voice_lang.py).
 - The game's names are fixed afterwards (voice_glossary.py) or offered as a prompt where the engine takes one.
 
-`python -m astra_mind.stt` prints which engines are available here; `--fetch` downloads the Parakeet model.
+`python -m astra_mind.stt` prints which engines are available here; `--fetch` downloads the Parakeet model (`--fetch-portable`:
+the ONNX export for machines without the Neural Engine helper).
 """
 from __future__ import annotations
 
@@ -27,8 +28,8 @@ from .env import CACHE
 from .voice_audio import f32_to_pcm16, pcm16_to_f32, resample, speech_frames, trim_speech
 from .voice_glossary import GLOSSARY, Glossary
 from .voice_lang import resolve_language
-from .voice_stt_backends import (BackendResult, FasterWhisperBackend, ParakeetBackend, PARAKEET_LANGS, SttBackend,
-                                 WhisperKitBackend)
+from .voice_stt_backends import (BackendResult, FasterWhisperBackend, ParakeetBackend, PARAKEET_LANGS, SherpaParakeetBackend, SttBackend,
+                                 WhisperKitBackend, fetch_sherpa_model)
 
 log = logging.getLogger("astra.stt")
 
@@ -71,14 +72,18 @@ class Recognizer:
 
     def __init__(self, backends: list[SttBackend] | None = None, glossary: Glossary = GLOSSARY, prior: str | None = None) -> None:
         if backends is None:
+            # the fast engine for the 25 European languages: the Neural Engine helper here, the same model on the CPU elsewhere;
+            # then the engines that know every language, for the phrases the first is unsure of
             backends = []
             if ParakeetBackend.available():
                 backends.append(ParakeetBackend())
+            elif SherpaParakeetBackend.available():
+                backends.append(SherpaParakeetBackend())
             if WhisperKitBackend.available():
                 backends.append(WhisperKitBackend())
             if FasterWhisperBackend.available():
                 backends.append(FasterWhisperBackend())
-            forced = os.environ.get("ASTRA_STT", "").lower()      # parakeet | whisperkit | faster-whisper: tried first
+            forced = os.environ.get("ASTRA_STT", "").lower()      # parakeet | parakeet-onnx | whisperkit | faster-whisper: tried first
             backends.sort(key=lambda b: 0 if b.name == forced else 1)
         self.backends = backends
         self.glossary = glossary
@@ -252,7 +257,7 @@ class Recognizer:
     def _finish(self, res: BackendResult, prior: str, escalated: bool, use_glossary: bool) -> Transcript:
         text = re.sub(r"\s+", " ", res.text).strip()
         raw = text
-        if res.backend != "parakeet" and (_HALLUCINATION.search(text) or _FILLER_ONLY.match(text)):
+        if not res.backend.startswith("parakeet") and (_HALLUCINATION.search(text) or _FILLER_ONLY.match(text)):
             log.info("dropped a recogniser hallucination: %r", text)
             text = ""
         fixes: list[tuple[str, str]] = []
@@ -342,13 +347,18 @@ WhisperKit = Recognizer
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser(prog="python -m astra_mind.stt", description="Which speech engines this machine can run")
-    ap.add_argument("--fetch", action="store_true", help="start the Parakeet helper once so it downloads and compiles its model")
+    ap.add_argument("--fetch", action="store_true",
+                    help="download what this machine needs: the Parakeet model through the helper (Apple Silicon) or the ONNX export (elsewhere)")
+    ap.add_argument("--fetch-portable", action="store_true", help="download the ONNX export of Parakeet (any platform, ~490 MB)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
-    print("Parakeet (Neural Engine):", "yes" if ParakeetBackend.available() else "no (build mind/stt_server with `swift build -c release`)")
-    print("WhisperKit:", "yes" if WhisperKitBackend.available() else "no")
+    print("Parakeet (Neural Engine):", "yes" if ParakeetBackend.available() else "no (build it: mind/stt_server/build.sh)")
+    print("Parakeet (ONNX, CPU, any platform):", "yes" if SherpaParakeetBackend.available() else "no (uv sync --extra portable; --fetch-portable)")
+    print("WhisperKit:", "yes" if WhisperKitBackend.available() else "no (whisperkit-cli)")
     print("faster-whisper:", "yes" if FasterWhisperBackend.available() else "no (uv sync --extra portable)")
-    if args.fetch:
+    if args.fetch_portable or (args.fetch and not ParakeetBackend.available()):
+        print("Parakeet (ONNX) model:", fetch_sherpa_model())
+    elif args.fetch:
         async def go() -> None:
             b = ParakeetBackend()
             print("ready:", await b.start())
