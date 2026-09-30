@@ -360,5 +360,7 @@ def build_side_wall(c: SH.Ctx, side: int, name: str, stations: list[dict]):
                 utility_rail(fb, a, bnd)
         cable_runs(fb, 0.2, Lw - 0.2, rng)
         cornice(fb, Lw)
+        fb.label(((nb - 0.5) * Pe, -0.055, 3.3), 1.0, 0.125, (0, -1, 0), "deck_bridge")
+        fb.label((0.5 * Pe, -0.055, 3.3), 1.0, 0.125, (0, -1, 0), "deck_bridge")
     obj = b.build(name)
     return obj, info

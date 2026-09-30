@@ -199,7 +199,7 @@ def screen_mat(name: str, page: str | None, strength: float = 2.6, hover: bool =
         return mt.m
     bsdf = mt.node("ShaderNodeBsdfPrincipled", 500, 0)
     bsdf.inputs["Base Color"].default_value = (0.01, 0.012, 0.015, 1)
-    bsdf.inputs["Roughness"].default_value = 0.16
+    bsdf.inputs["Roughness"].default_value = 0.35
     bsdf.inputs["Emission Strength"].default_value = strength
     if path:
         t = mt.image(path, x=-300, y=0)
@@ -216,7 +216,7 @@ def glass(name: str, tint=(0.02, 0.03, 0.035), alpha: float = 0.10) -> bpy.types
     bsdf.inputs["Base Color"].default_value = tint + (1.0,)
     bsdf.inputs["Roughness"].default_value = 0.04
     bsdf.inputs["Alpha"].default_value = alpha
-    bsdf.inputs["Specular IOR Level"].default_value = 0.8
+    bsdf.inputs["Specular IOR Level"].default_value = 0.25
     mt.link(bsdf, "BSDF", mt.out, "Surface")
     mt.m.surface_render_method = "BLENDED"
     return mt.m
@@ -243,11 +243,11 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     pbr(L.STRUCT, [c * 1.05 for c in gunmetal], "Gunmetal", 1.0, (0.28, 0.62), 0.0, 1.0, 0.5, 0.8)
     pbr(L.TRIM, (0.62, 0.64, 0.67), "Brushed", 1.0, (0.22, 0.45), 0.0, 1.0, 0.6, 0.7)
     pbr(L.RUBBER, (0.045, 0.047, 0.05), "DeckRubber", 1.0, (0.55, 0.8), 0.0, 0.0, 0.5, 0.5)
-    pbr(L.LEATHER, (0.05, 0.055, 0.075), "LeatherBlack", 8.0, (0.3, 0.5), 0.0, 0.0, 0.7, 0.9, coat=0.15, coat_rough=0.25)
+    pbr(L.LEATHER, (0.05, 0.055, 0.075), "LeatherBlack", 2.0, (0.3, 0.5), 0.0, 0.0, 0.7, 0.9, coat=0.15, coat_rough=0.25)
     pbr(L.COMPOSITE, (0.05, 0.056, 0.07), "Carbon", 4.0, (0.22, 0.42), 0.0, 0.3, 0.35, 0.5, coat=0.5, coat_rough=0.12)
     pbr(L.IVORY, srgb_to_linear("#A9AAA8"), "PanelPaint", 1.0, (0.16, 0.3), 0.0, 0.0, 0.3, 0.4, coat=0.3, coat_rough=0.12)
     pbr(L.DECK, (0.30, 0.32, 0.36), "BRG3_DeckGrain", 2.5, (0.34, 0.62), 0.0, 0.9, 0.85, 1.0)
-    pbr(L.DGLASS, (0.003, 0.004, 0.006), None, 1.0, (0.06, 0.09), 0.0, 0.0, 0.0, 0.0, coat=0.0, spec=0.35)
+    pbr(L.DGLASS, (0.003, 0.004, 0.006), None, 1.0, (0.10, 0.16), 0.0, 0.0, 0.0, 0.0, coat=0.0, spec=0.35)
     palette_lamp(L.LAMP, 7.0)
     palette_lamp(L.LAMP_DIM, 2.4)
     palette_lamp(L.LAMP_HOT, 22.0)
@@ -423,6 +423,8 @@ def json_lights(D: dict, lay, gain: float = 1.0) -> list:
             bl.shadow_soft_size = 0.1
             bl.energy = lm * 0.16 * gain
         bl.color = col
+        if "specular" in ld:
+            bl.specular_factor = float(ld["specular"])
         bl.use_shadow = bool(ld.get("shadows", False))
         o = bpy.data.objects.new(ld["id"], bl)
         bpy.context.scene.collection.objects.link(o)
@@ -445,3 +447,139 @@ def json_lights(D: dict, lay, gain: float = 1.0) -> list:
         o.rotation_euler = rot.to_euler()
         made.append(o)
     return made
+
+
+# -------------------------------------------------------------------------------------------- preview-only placeholders
+def _np():
+    import numpy as np
+    return np
+
+
+def viewscreen_placeholder(on: bool = True) -> None:
+    """Preview only: what the main viewscreen may show (a planet, two hostile ships, contact brackets) so the ON state can be judged
+    next to the OFF one (the game draws the real thing: a SceneCapture plus the tactical overlay)."""
+    if "SCREEN_viewscreen_1" not in bpy.data.materials or not on:
+        return
+    np = _np()
+    w, h = 1920, 800
+    rng = np.random.default_rng(3)
+    img = np.zeros((h, w, 3), np.float32)
+    img += 0.004
+    stars = rng.random((h, w)) > 0.9985
+    img += stars[..., None] * rng.random((h, w, 1)).astype(np.float32) * 0.9
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    # the planet: lit from the upper right, a thin atmosphere
+    cx, cy, r = 0.24 * w, 0.32 * h, 0.52 * h
+    d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
+    disc = np.clip((r - d) / 2.0, 0.0, 1.0)
+    nx, ny = (xx - cx) / r, (yy - cy) / r
+    nz = np.sqrt(np.clip(1 - nx * nx - ny * ny, 0, 1))
+    light = np.clip(nx * 0.55 + ny * 0.35 + nz * 0.6, 0, 1)
+    ocean = np.array([0.03, 0.10, 0.22], np.float32)
+    land = np.array([0.12, 0.16, 0.08], np.float32)
+    n = np.sin(xx * 0.013) * np.sin(yy * 0.021 + xx * 0.004) + 0.5 * np.sin(xx * 0.05 + yy * 0.03)
+    col = np.where((n > 0.25)[..., None], land, ocean) * (0.15 + 1.6 * light[..., None])
+    img = img * (1 - disc[..., None]) + col * disc[..., None]
+    atm = np.exp(-((d - r) / (0.025 * r)) ** 2) * np.clip(light * 1.3 + 0.1, 0, 1)
+    img += atm[..., None] * np.array([0.12, 0.35, 0.8], np.float32) * 1.4
+    # two hostile ships: dark hulls with an orange engine glow, and a distant one
+    for (sx, sy, sa, sb, sc) in ((0.68, 0.46, 0.15, 0.028, 1.0), (0.83, 0.30, 0.07, 0.014, 0.6)):
+        ex, ey = sx * w, sy * h
+        a, b = sa * w, sb * h
+        m = np.clip(1.0 - (((xx - ex) / a) ** 2 + ((yy - ey) / b) ** 2), 0, 1)
+        m = np.clip(m * 6.0, 0, 1)
+        hull = np.array([0.05, 0.045, 0.045], np.float32) + 0.25 * np.clip(-(yy - ey) / b, 0, 1)[..., None] * np.array([0.3, 0.22, 0.15], np.float32)
+        img = img * (1 - m[..., None]) + hull * m[..., None]
+        glow = np.exp(-(((xx - (ex + a * 0.95)) / (0.03 * w * sc)) ** 2 + ((yy - ey) / (0.012 * h)) ** 2))
+        img += glow[..., None] * np.array([1.0, 0.45, 0.12], np.float32) * 1.6
+        # contact brackets
+        pad = 0.035 * w * sc
+        for (bx, by) in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+            px0, py0 = ex + bx * (a + pad), ey + by * (b + pad * 0.5)
+            for k in range(3):
+                for t in range(int(0.028 * w * sc)):
+                    for (ox, oy) in ((-bx * t, 0), (0, -by * t)):
+                        x0, y0 = int(px0 + ox), int(py0 + oy)
+                        if 0 <= x0 < w and 0 <= y0 < h:
+                            img[max(0, y0 - k):y0 + 1, x0] = (1.0, 0.45, 0.2)
+    image = bpy.data.images.new("preview_viewscreen", w, h, alpha=False, float_buffer=True)
+    rgba = np.concatenate([img[::-1], np.ones((h, w, 1), np.float32)], axis=2)
+    image.pixels.foreach_set(rgba.ravel())
+    m = bpy.data.materials["SCREEN_viewscreen_1"]
+    m.use_nodes = True
+    m.node_tree.nodes.clear()
+    out = m.node_tree.nodes.new("ShaderNodeOutputMaterial")
+    tex = m.node_tree.nodes.new("ShaderNodeTexImage")
+    tex.image = image
+    em = m.node_tree.nodes.new("ShaderNodeEmission")
+    em.inputs["Strength"].default_value = 1.1
+    tr = m.node_tree.nodes.new("ShaderNodeBsdfTransparent")
+    mix = m.node_tree.nodes.new("ShaderNodeMixShader")
+    mix.inputs["Fac"].default_value = 0.94
+    m.node_tree.links.new(tex.outputs["Color"], em.inputs["Color"])
+    m.node_tree.links.new(tr.outputs["BSDF"], mix.inputs[1])
+    m.node_tree.links.new(em.outputs["Emission"], mix.inputs[2])
+    m.node_tree.links.new(mix.outputs["Shader"], out.inputs["Surface"])
+    m.surface_render_method = "BLENDED"
+
+
+def holo_plot(D: dict) -> None:
+    """Preview only: a placeholder tactical plot over the table (rings, bearing spokes, friendly and hostile icons) at the height
+    AstraHoloTable draws it (24 cm above the top), to check that the volume above the table is clear and how it reads."""
+    np = _np()
+    ht = D["holo_table"]
+    from mathutils import Vector
+    top_z = D["levels"][ht.get("level", "well")] + ht["height"]
+    pr = ht.get("plot_radius", 1.2)
+    n = 1024
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float32)
+    px, py = (xx / n * 2 - 1), (yy / n * 2 - 1)
+    d = np.sqrt(px * px + py * py)
+    a = np.arctan2(py, px)
+    rings = np.exp(-((np.abs(((d * 4.0) % 1.0) - 0.5) - 0.5) / 0.012) ** 2)
+    spokes = np.exp(-((np.abs(((a / (2 * np.pi) * 12.0) % 1.0) - 0.5) - 0.5) / 0.006) ** 2) * np.clip(d * 5 - 0.3, 0, 1)
+    rim = np.exp(-((d - 0.985) / 0.012) ** 2)
+    edge = np.clip((1.0 - d) / 0.03, 0, 1)
+    val = (0.05 + 0.32 * rings + 0.16 * spokes + 0.9 * rim) * edge
+    img = np.zeros((n, n, 4), np.float32)
+    img[..., 0], img[..., 1], img[..., 2] = val * 0.25, val * 0.7, val * 1.0
+    img[..., 3] = np.clip(val * 1.6, 0, 1)
+    image = bpy.data.images.new("preview_plot", n, n, alpha=True, float_buffer=True)
+    image.pixels.foreach_set(img[::-1].ravel())
+    mat = bpy.data.materials.new("PreviewPlot")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = image
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Strength"].default_value = 6.0
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(tex.outputs["Color"], em.inputs["Color"])
+    nt.links.new(tex.outputs["Alpha"], mix.inputs["Fac"])
+    nt.links.new(tr.outputs["BSDF"], mix.inputs[1])
+    nt.links.new(em.outputs["Emission"], mix.inputs[2])
+    nt.links.new(mix.outputs["Shader"], out.inputs["Surface"])
+    mat.surface_render_method = "BLENDED"
+    bpy.ops.mesh.primitive_plane_add(size=2 * pr, location=(ht["pos"][0], -ht["pos"][1], top_z + 0.24))
+    o = bpy.context.active_object
+    o.name = "PreviewPlot"
+    o.data.materials.append(mat)
+    # icons: friendly (cyan), hostile (amber), a vector line
+    def icon(x, y, z, cell, kind):
+        ic = emissive("PreviewIcon_" + cell, (0.2, 0.7, 1.0) if cell == "f" else (1.0, 0.55, 0.12), 14.0)
+        if kind == "ship":
+            bpy.ops.mesh.primitive_cone_add(vertices=3, radius1=0.035, depth=0.11, location=(ht["pos"][0] + x, -(ht["pos"][1] + y), top_z + 0.24 + z),
+                                            rotation=(0, math.radians(90), math.radians(-y * 20)))
+        else:
+            bpy.ops.mesh.primitive_ico_sphere_add(radius=0.022, subdivisions=1, location=(ht["pos"][0] + x, -(ht["pos"][1] + y), top_z + 0.24 + z))
+        oo = bpy.context.active_object
+        oo.data.materials.append(ic)
+        st = bpy.data.objects.new("stem", None)
+        return oo
+    for (x, y, z, c, k) in ((-0.15, 0.0, 0.02, "f", "ship"), (-0.35, 0.28, 0.0, "f", "ship"), (-0.3, -0.32, 0.03, "f", "ship"),
+                            (0.62, 0.15, 0.06, "h", "ship"), (0.78, -0.2, 0.0, "h", "ship"), (0.5, -0.45, 0.09, "h", "ship"),
+                            (0.85, 0.3, -0.03, "h", "dot"), (0.1, 0.5, 0.0, "f", "dot")):
+        icon(x, y, z, c, k)

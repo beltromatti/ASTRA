@@ -33,7 +33,7 @@ CACHE = os.path.join(ROOT, "art", "_cache", "bridge3")
 STRUCT = A.MAT_STRUCTURE            # gunmetal structure
 TRIM = A.MAT_TRIM                   # brushed metal
 RUBBER = A.MAT_RUBBER               # dark rubber / cable jackets
-LEATHER = A.MAT_LEATHER             # seat upholstery
+LEATHER = "MI_BRG3_Leather"         # seat upholstery: black leather (T_LeatherBlack)
 GLASS = A.MAT_GLASS                 # translucent window / rail glass (classic meshes only)
 COMPOSITE = "MI_BRG3_Composite"     # dark composite wall/ceiling panels
 IVORY = "MI_BRG3_Ivory"             # glossy ivory ceramic composite (console shells, chair shells)
@@ -419,9 +419,10 @@ class FB:
         """A decal-ready label plate (one quad) centred at `center`, w x h, front side towards `facing`; it uses the atlas rect
         of `cell` (u right, v up as the viewer sees it). `up` orients the image on floors and ceilings."""
         atlas = atlas if atlas is not None else LABELS
+        cell = LABEL_TEXT.get(cell, cell)
         r = atlas.get(cell)
         if r is None:
-            return None
+            raise KeyError(f"label {cell!r} is not in the atlas")
         u0, v0, u1, v1 = r
         return self.screen(center, w, h, LABEL, facing, up=up, u_range=(u0, u1), v_range=(v0, v1))
 
@@ -439,16 +440,23 @@ class FB:
 
 
 LABELS: dict[str, tuple[float, float, float, float]] = {}
+LABEL_TEXT: dict[str, str] = {}
 
 
 def load_label_atlas() -> dict:
-    """Label rects (u0, v0, u1, v1) from art/_cache/bridge3/labels.json (tools/art/bridge3_textures.py)."""
+    """Label rects (u0, v0, u1, v1) from art/_cache/bridge3/labels.json (tools/art/bridge3_textures.py); a label can be asked
+    for by its cell name (tag_03) or by its text ("COOLANT · LOOP 2")."""
     path = os.path.join(CACHE, "labels.json")
     LABELS.clear()
-    if os.path.exists(path):
-        data = json.load(open(path, encoding="utf-8"))
-        for k, v in data["rects"].items():
-            LABELS[k] = tuple(v)
+    LABEL_TEXT.clear()
+    if not os.path.exists(path):
+        raise RuntimeError(f"{path} missing: run  uv run --with pillow --with numpy python tools/art/bridge3_textures.py")
+    data = json.load(open(path, encoding="utf-8"))
+    for k, v in data["rects"].items():
+        LABELS[k] = tuple(v)
+    for group in ("tags", "small"):
+        for cell, text in data.get(group, {}).items():
+            LABEL_TEXT[text] = cell
     return LABELS
 
 
@@ -473,6 +481,8 @@ class Parts:
             yield self
 
     def build(self, name: str, uv_meter: float = 1.0) -> bpy.types.Object:
+        """Bevel and shade each group, box-project the UVs (1 UV unit = `uv_meter` metres: 1.0 walls, 0.5 consoles, 0.25 seats),
+        join. Faces with their own UVs (lamps, labels, screens) are left alone."""
         objs = []
         for tag, fb, bev in (("body", self.body, self.bevel), ("fine", self.fine, self.fine_bevel), ("soft", self.soft, self.soft_bevel),
                              ("emit", self.emit, 0.0)):
@@ -480,7 +490,9 @@ class Parts:
                 fb.bm.free()
                 continue
             o = fb.to_object(f"{name}_{tag}")
-            A.finish(o, bevel=bev)
+            if bev > 0:
+                A.bevel_and_normals(o, width=bev)
+            A.box_uv(o, texel_m=uv_meter)
             if tag == "soft":                                      # cushions and other organic parts: smooth shading
                 bpy.ops.object.select_all(action="DESELECT")
                 o.select_set(True)

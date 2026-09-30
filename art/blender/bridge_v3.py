@@ -284,6 +284,10 @@ def assemble(D: dict, objs: dict) -> list:
     for o in objs.values():
         o.hide_render = True
         o.hide_viewport = True
+    if os.environ.get("BRG3_NOCEILING"):
+        for o in out:
+            if o.name in ("Bridge_Ceiling",):
+                o.hide_render = True
     return out
 
 
@@ -291,7 +295,8 @@ VIEWS = {
     # name: (eye layout xyz, yaw, pitch, fov)
     "overview": ((-7.5, -7.0, 9.0), 40.0, -32.0, 75.0),
     "top": ((0.0, 0.0, 22.0), 0.0, -90.0, 60.0),
-    "seated": ((0.0, 0.0, 1.38), 0.0, -2.0, 90.0),
+    "top_open": ((1.0, 0.0, 19.0), 0.0, -90.0, 70.0),
+    "seated": ((0.08, 0.0, 1.38), 0.0, -6.0, 90.0),
     "standing": ((-4.6, 0.0, 1.72), 0.0, -3.0, 90.0),
     "helm_back": ((5.4, -3.6, 1.1), 146.0, -4.0, 90.0),
     "crew_chair": ((7.3, -1.1, 0.75), 205.0, -6.0, 60.0),
@@ -308,6 +313,15 @@ VIEWS = {
     "wall_p": ((-1.0, -0.5, 1.6), -78.0, 2.0, 80.0),
     "bay_close": ((-3.3, 5.0, 1.7), 97.0, 3.0, 70.0),
     "back": ((5.0, 0.0, 1.6), 180.0, 2.0, 90.0),
+    "eng_close": ((-0.9, 4.9, 1.6), 62.0, -15.0, 60.0),
+    "label_check": ((4.07, 5.52, 1.6), 97.0, 29.0, 60.0),
+    "stairs": ((0.6, 3.2, 1.6), 30.0, -24.0, 65.0),
+    "chair_a": ((7.4, -3.5, 0.62), 135.0, -6.0, 42.0),
+    "chair_b": ((6.0, -4.1, 0.5), 90.0, -3.0, 42.0),
+    "chair_c": ((4.6, -2.2, 0.65), 0.0, -4.0, 42.0),
+    "screen_top": ((3.0, 0.0, 1.5), 0.0, 18.0, 70.0),
+    "master": ((-4.5, 0.0, 1.6), 180.0, 2.0, 60.0),
+    "window_side": ((0.5, 6.0, 1.5), 40.0, 4.0, 75.0),
     "helm_console": ((3.6, -2.2, 1.3), 0.0, -12.0, 65.0),
     "tactical_close": ((-1.0, 1.4, 1.5), -140.0, -8.0, 62.0),
 }
@@ -320,6 +334,10 @@ def preview_scene(D, c, objs, args, views) -> None:
     PV.make_materials(D.get("screens", {}))
     PV.configure_render(1600, 900, args["samples"], exposure=float(os.environ.get("BRG3_EXPOSURE", "0")))
     PV.json_lights(D, LAY, PV.GAIN)
+    if os.environ.get("BRG3_VIEWSCREEN") == "on":
+        PV.viewscreen_placeholder(True)
+    if os.environ.get("BRG3_HOLO"):
+        PV.holo_plot(D)
     for v in views:
         eye, yaw, pitch, fov = VIEWS[v]
         cam = PV.add_camera(v, eye, yaw, pitch, fov)

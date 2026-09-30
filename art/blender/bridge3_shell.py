@@ -327,22 +327,33 @@ def build_deck(c: Ctx, name: str = "SM_BRG3_Deck"):
         ya, yb = sorted((s * c.WELL_HW - 0.05, s * c.WELL_HW + 0.03))
         fb.box((xa, ya, UP - 0.045), (xb, yb, UP + 0.004), L.TRIM)
 
-    # ---- inlaid light channels
-    # command rings round the dais, on the upper deck only (the well starts at x = edge)
-    for r in (3.5, 5.2):
-        for (a0, a1) in ((48.0, 132.0), (-132.0, -48.0)):
-            pts = [p for p in arc_pts(0, 0, r, a0, a1, 24) if p[0] < c.WELL_X - 0.15 and abs(p[1]) < c.side_wall_y(p[0], 1) - 0.4]
-            polyline_lamp(em, pts, UP, 0.02, 0.004, "command_dim", L.LAMP_DIM, frame_w=0.05)
-    # spokes from the dais to the doors, the tactical station, the bays
-    for tgt in ((-8.0, 3.9), (-8.0, -3.9)):
-        pts = [(0.0, math.copysign(3.15, tgt[1])), (-2.0, math.copysign(3.7, tgt[1])), (-4.5, math.copysign(3.9, tgt[1])), tgt]
-        polyline_lamp(em, pts, UP, 0.02, 0.004, "command_dim", L.LAMP_DIM, frame_w=0.05)
-    polyline_lamp(em, [(-1.6, 0.0), (-2.5, 0.0)], UP, 0.02, 0.004, "security", L.LAMP_DIM, frame_w=0.05)
-    # the tactical well: rings round the table, guides from the stairs
+    # ---- inlaid light channels: two rings round the dais, the ship's axis, rings round the table, the guides from the stairs
+    def run_lamps(pts, keep, z, cell, w=0.02):
+        for p0, p1 in zip(pts, pts[1:] + pts[:1]):
+            if keep(p0) and keep(p1):
+                line_lamp(em, p0, p1, z, w, 0.004, cell, L.LAMP_DIM, frame_w=0.05)
+
+    on_upper = lambda p: p[0] < c.WELL_X - 0.2 and abs(p[1]) < c.side_wall_y(p[0], 1) - 0.5
+    for grow in (0.38, 0.9):
+        run_lamps(ellipse_poly(0, 0, c.dais_hx + grow, c.dais_hy + grow, 120), on_upper, UP, "command_dim")
+    # the axis: from the master display forward, chevrons pointing at the dais; another set leads from the table to the bow
+    line_lamp(em, (-7.75, 0.0), (-4.05, 0.0), UP, 0.03, 0.004, "command", L.LAMP_DIM, frame_w=0.06)
+    for k in range(6):
+        x = -7.2 + k * 0.6
+        for sd in (-1, 1):
+            line_lamp(em, (x - 0.16, sd * 0.2), (x, 0.0), UP, 0.03, 0.004, "command", L.LAMP_DIM)
+    line_lamp(em, (-2.05, 0.0), (-1.62, 0.0), UP, 0.03, 0.004, "security", L.LAMP_DIM, frame_w=0.06)
+    for k in range(4):
+        x = tx + c.table_r + 0.8 + k * 0.45
+        for sd in (-1, 1):
+            line_lamp(em, (x - 0.14, sd * 0.2), (x, 0.0), WL, 0.03, 0.004, "command", L.LAMP_DIM)
     for r in (c.table_r + 0.22, c.table_r + 0.55):
-        pts = arc_pts(tx, ty, r, 0, 360, 72)
-        polyline_lamp(em, pts, WL, 0.02, 0.004, "command_dim", L.LAMP_DIM, frame_w=0.05)
+        polyline_lamp(em, arc_pts(tx, ty, r, 0, 360, 72), WL, 0.02, 0.004, "command_dim", L.LAMP_DIM, frame_w=0.05)
     for yc in c.STAIR_Y:
         pts = [(c.WELL_X + 0.8, yc), (c.WELL_X + 1.6, yc * 0.85), (tx - 1.4 * math.cos(math.radians(40)), math.copysign(1.0, yc) * 1.2)]
         polyline_lamp(em, pts, WL, 0.02, 0.004, "command_dim", L.LAMP_DIM, frame_w=0.05)
+    # legends on the deck: MIND THE STEP at the top of each stair, COMMAND DAIS on the dais front (readable from the well)
+    for yc in c.STAIR_Y:
+        b.body.label((c.WELL_X - 0.42, yc, UP + 0.0025), 0.9, 0.1125, (0, 0, 1), "deck_step", up=(1, 0, 0))
+    b.body.label((c.dais_hx - 0.36, 0.0, DS + 0.0025), 0.9, 0.1125, (0, 0, 1), "deck_dais", up=(-1, 0, 0))
     return b.build(name)

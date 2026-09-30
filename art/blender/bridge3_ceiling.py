@@ -17,7 +17,7 @@ from mathutils import Vector
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge3_lib as L  # noqa: E402
 import bridge3_shell as SH  # noqa: E402
-from bridge3_lib import Parts, Rz, lerp, polar  # noqa: E402
+from bridge3_lib import Parts, Rx, Rz, T, lerp, polar  # noqa: E402
 
 
 def room_poly(c: SH.Ctx, window_r: float | None = None):
@@ -93,6 +93,7 @@ def build_ceiling(c: SH.Ctx, name: str = "SM_BRG3_Ceiling"):
     def wedge(r0, r1, a0, a1):
         return [polar(dc[0], dc[1], r0, a0), polar(dc[0], dc[1], r0, a1), polar(dc[0], dc[1], r1, a1), polar(dc[0], dc[1], r1, a0)]
 
+    n_pan = 0
     for a in ang_ribs:
         for r0, r1 in zip(rad_edges[:-1], rad_edges[1:]):
             gap_a = math.degrees(0.15 / max(r0, 1.0))
@@ -105,6 +106,13 @@ def build_ceiling(c: SH.Ctx, name: str = "SM_BRG3_Ceiling"):
                 cx = sum(q[0] for q in cl) / len(cl)
                 cy = sum(q[1] for q in cl) / len(cl)
                 fb.prism([(cx + (q[0] - cx) * 0.8, cy + (q[1] - cy) * 0.8) for q in cl], CE - 0.06, CE - 0.045, L.COMPOSITE)
+                n_pan += 1
+                if n_pan % 5 == 0 and SH.poly_area(cl) > 1.4 and cx < 3.0:            # a recessed grille (the air of the deck)
+                    with b.at(T(cx, cy, CE - 0.06) @ Rz(a + 5.0)):
+                        fb.box((-0.34, -0.21, -0.006), (0.34, 0.21, 0.006), L.TRIM)
+                        fb.box((-0.30, -0.17, -0.012), (0.30, 0.17, 0.0), L.RUBBER)
+                        for k in range(7):
+                            fb.cbox((0.0, -0.15 + k * 0.05, -0.014), (0.6, 0.012, 0.006), L.TRIM, Rx(28))
 
     # ---- radial ribs from the dome to the walls (brushed metal, a warm line in the soffit)
     for a in ang_ribs:
@@ -189,6 +197,12 @@ def build_ceiling(c: SH.Ctx, name: str = "SM_BRG3_Ceiling"):
         em.lamp_cyl((px, py, CE - 0.125), (px, py, CE - 0.118), 0.022, "cyan", L.LAMP, seg=8)
     em.lamp_arc([(cr - 0.20, 0.0), (cr - 0.19, 0.0), (cr - 0.19, 0.01), (cr - 0.20, 0.01)], cx0, cy0, 0.0, 0, 360, "cyan", L.LAMP_DIM, seg=64,
                 z0=CE - 0.137, loop=True)
+
+    # ---- recessed downlights over the stations: a lens in a ring (the lights themselves are in the data file)
+    for (lx, ly) in ((1.1, 0.0), (6.9, -2.2), (6.9, 2.2), (-2.6, 0.0)):
+        fb.cyl((lx, ly, CE - 0.07), (lx, ly, CE - 0.045), 0.13, L.TRIM, seg=24)
+        fb.cyl((lx, ly, CE - 0.075), (lx, ly, CE - 0.07), 0.095, L.DGLASS, seg=24)
+        em.lamp_cyl((lx, ly, CE - 0.0745), (lx, ly, CE - 0.0715), 0.075, "white_cool", L.LAMP_HOT, seg=24)
 
     # ---- ducts along the back half of the room, on brackets
     for y in (-4.9, 4.9):

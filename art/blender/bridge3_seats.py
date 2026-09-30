@@ -91,7 +91,7 @@ def chair_shell_parts(b: Parts, scale: float = 1.0, command: bool = False, capta
             (1.0, (0.16 if not command else 0.24) * s)]
     btab = [(0.0, 0.020), (0.3, 0.045), (0.45, 0.04), (0.6, 0.06), (0.85, 0.10 if command else 0.075), (1.0, 0.11 if command else 0.06)]
     base_mat = L.IVORY if command else L.STRUCT
-    band_mat = L.IVORY
+    band_mat = L.IVORY if command else L.STRUCT
     # the shell in three panels with hairline gaps: seat + lumbar, shoulders, the headrest crown
     fb.loft(shell_rings(prof, wtab, btab, 15, 0.038, span=(0.0, 0.60)), base_mat, caps=True)
     fb.loft(shell_rings(prof, wtab, btab, 15, 0.038, span=(0.625, 0.885)), band_mat, caps=True)
@@ -114,6 +114,17 @@ def chair_shell_parts(b: Parts, scale: float = 1.0, command: bool = False, capta
     for z in (0.66, 0.86, 1.06):                                # clamp bands round the fin
         if z < zt - 0.05:
             fb.box((-0.36 * s - 0.01 * (z - 0.6), -0.024, z - 0.02), (-0.31 * s, 0.024, z + 0.02), L.TRIM)
+    # the back of the shell: panel grooves across, rivets, a release handle with a warning lamp
+    for zz in (0.72, 0.90, 1.08):
+        if zz < top - 0.1:
+            fine.box((-0.30 * s - 0.028 * (zz - 0.6) - 0.004, -0.23 * s, zz), (-0.278 * s - 0.028 * (zz - 0.6), 0.23 * s, zz + 0.005), L.STRUCT)
+    for sd in (-1, 1):
+        for zz in (0.68, 0.98):
+            if zz < top - 0.12:
+                for yy in (0.09, 0.19):
+                    fine.cyl((-0.315 * s - 0.03 * (zz - 0.6), sd * yy * s, zz), (-0.325 * s - 0.03 * (zz - 0.6), sd * yy * s, zz), 0.009, L.TRIM, seg=8)
+    fine.box((-0.372 * s - 0.03, -0.045, 0.795), (-0.352 * s - 0.03, 0.045, 0.83), L.RUBBER)
+    em.lamp_box((-0.3735 * s - 0.03, -0.03, 0.833), (-0.372 * s - 0.03, 0.03, 0.842), "amber", L.LAMP_DIM)
     # harness: rings at the shoulders, folded straps down the shell sides with buckles
     for sd in (-1, 1):
         zr = 0.95 * (top / 1.30)
@@ -145,7 +156,7 @@ def build_chair_crew(name: str = "SM_BRG3_ChairCrew"):
     for sd in (-1, 1):
         b.fine.box((-0.05, sd * 0.285 - 0.025, 0.50), (0.14, sd * 0.285 + 0.025, 0.505), L.RUBBER)
         b.fine.box((-0.02, sd * 0.285 - 0.012, 0.44), (0.03, sd * 0.285 + 0.012, 0.50), L.TRIM)
-    return b.build(name)
+    return b.build(name, uv_meter=0.25)
 
 
 def armrest_pod(b: Parts, sd: int, slot: str | None, dept: str, scale: float = 1.0) -> dict | None:
@@ -188,4 +199,4 @@ def build_chair_command(name: str, captain: bool, screens: list[str]):
             infos.append(info)
     # a name plate on the back of the chair (towards the tactical officer behind it)
     b.body.label((-0.40 * scale, 0.0, 0.82), 0.44, 0.055, (-1, 0, 0), "st_captain" if captain else "st_xo", up=(0, 0, 1))
-    return b.build(name), infos
+    return b.build(name, uv_meter=0.25), infos

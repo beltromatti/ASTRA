@@ -143,6 +143,7 @@ def handset(fb: FB, fine: FB, em: FB, x: float, y: float, yaw: float = 0.0) -> N
 
 
 def label_plate(fb: FB, x: float, y: float, w: float, h: float, cell: str) -> None:
+    """A tiny label lying on the work surface (image up = uphill), e.g. label_plate(fb, 0.05, 0.0, 0.08, 0.02, "PWR")."""
     fb.label((x, y, 0.0025), w, h, (0, 0, 1), cell, up=(1, 0, 0))
 
 

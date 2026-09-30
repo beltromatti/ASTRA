@@ -71,4 +71,4 @@ def build_holo_table(D: dict, name: str = "SM_BRG3_HoloTable"):
         with b.at(T(px, py, 0.60) @ Rz(a)):
             fine.box((0.0, -0.05, -0.04), (0.02, 0.05, 0.04), L.TRIM)
             em.lamp_box((0.02, -0.03, -0.006), (0.024, 0.03, 0.006), "green", L.LAMP_DIM)
-    return b.build(name)
+    return b.build(name, uv_meter=0.5)

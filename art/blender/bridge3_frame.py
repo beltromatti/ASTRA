@@ -265,16 +265,16 @@ def build_viewscreen_frame(c: SH.Ctx, name: str = "SM_BRG3_ViewscreenFrame"):
     fb.arc_sweep([(-0.05, 0.0), (0.07, 0.0), (0.07, 0.15), (-0.10, 0.15)], 0, 0, R, -ext, ext, L.TRIM, seg=44, z0=z0 - 0.15)
     fb.arc_sweep([(-0.08, 0.0), (0.05, 0.0), (0.05, 0.012), (-0.08, 0.012)], 0, 0, R, -ext, ext, L.STRUCT, seg=44, z0=z0 - 0.162)
     em.lamp_arc([(-0.085, 0.0), (0.0, 0.0), (0.0, 0.008), (-0.085, 0.008)], 0, 0, R, -ha, ha, "white_cool", L.LAMP_HOT, seg=44, z0=z0 + 0.012)
-    # pylons at both ends: slim fins from the well floor to the ceiling, an edge emitter facing the image
+    # pylons at both ends: slim fins from the well floor to the ceiling, a fine edge emitter facing the image
     for sd in (-1, 1):
         a = sd * (ha + 1.3)
         px, py = polar(0, 0, R, a)
         m = T(px, py, 0) @ Rz(a)
         with fb.at(m), em.at(m):
-            fb.prism([(-0.09, -0.16), (0.09, -0.16), (0.09, 0.16), (-0.09, 0.16)], c.WELL, CE, L.TRIM)
-            fb.prism([(-0.06, -0.12), (0.06, -0.12), (0.06, 0.12), (-0.06, 0.12)], c.WELL - 0.02, c.WELL + 0.25, L.STRUCT)
-            fb.box((-0.10, -0.18, z0 + 0.4), (0.10, 0.18, z0 + 0.62), L.STRUCT)
-            em.lamp_box((-0.093, -0.006 - sd * 0.156, z0 - 0.05), (-0.087, 0.006 - sd * 0.156, z1 + 0.05), "white_cool", L.LAMP)
+            fb.prism([(-0.06, -0.09), (0.06, -0.09), (0.06, 0.09), (-0.06, 0.09)], c.WELL, CE, L.STRUCT)
+            fb.prism([(-0.075, -0.115), (0.075, -0.115), (0.075, 0.115), (-0.075, 0.115)], c.WELL - 0.02, c.WELL + 0.22, L.TRIM)
+            fb.box((-0.08, -0.12, z0 + 0.45), (0.08, 0.12, z0 + 0.60), L.TRIM)
+            em.lamp_box((-0.064, -0.006 - sd * 0.09, z0 - 0.05), (-0.06, 0.006 - sd * 0.09, z1 + 0.05), "white_cool", L.LAMP_DIM)
     # posts under the bottom rail and hangers over the top rail
     for a in (-ha * 0.9, -ha * 0.45, 0.0, ha * 0.45, ha * 0.9):
         px, py = polar(0, 0, R + 0.0, a)

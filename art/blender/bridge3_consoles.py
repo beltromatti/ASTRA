@@ -187,7 +187,7 @@ def build_console(kind: str, name: str, station: dict, rng_seed: int = 5):
     fn = {"helm": helm_controls, "ops": ops_controls, "comms": comms_controls, "sensors": sensors_controls,
           "engineering": engineering_controls, "flight": flight_controls, "tactical": tactical_controls}[kind]
     info["screens"] += fn(b, F, dept, rng)
-    return b.build(name), info
+    return b.build(name, uv_meter=0.5), info
 
 
 def helm_controls(b: Parts, F: Fan, dept: str, rng: random.Random) -> list:
@@ -276,6 +276,7 @@ def engineering_controls(b: Parts, F: Fan, dept: str, rng: random.Random) -> lis
     for k, th in enumerate((-20.0, -7.0, 7.0, 20.0)):
         with b.at(F.frame(0.72, th)):
             K.slider(fine, em, 0.0, 0.0, 0.20, (0.35, 0.7, 0.55, 0.85)[k], ("engineering", "amber", "engineering", "amber")[k], axis="x")
+            K.label_plate(fb, -0.135, 0.0, 0.05, 0.0125, ("PWR", "DATA", "COOL", "AIR")[k])
     for sd in (-1, 1):
         with b.at(F.frame(0.94, sd * 34.0)):
             for k in range(6):
