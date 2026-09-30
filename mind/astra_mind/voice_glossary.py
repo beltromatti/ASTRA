@@ -31,11 +31,13 @@ class Term:
 _TERMS: list[tuple[str, tuple[str, ...], bool]] = [
     # ships
     ("Praetorian", ("pretoria", "pretoriano", "pretoriana", "pretorian", "praetoria", "pretorien", "pretoriaan", "praetorien",
-                    "pretoriane", "pretorio", "pretori"), True),
+                    "pretoriane", "pretorio", "pretori", "kraitorian", "kraetorian", "pratoria", "aquatorien", "aquatorion", "apretoriano",
+                    "traitoriano", "praetor"), True),
     ("Vigilant", ("vigilante", "vigilent", "vigilanta", "vigilanz"), True),
-    ("Acheron", ("acheronte", "achéron", "akeron", "acheronte", "acaron", "aqueronte", "acheronta"), True),
-    ("Styx", ("stix", "stige", "sticks", "stics", "stics", "stigs", "stiks", "estige", "styxe"), False),
-    ("Lethe", ("lete", "leti", "lethe", "letè", "lethé", "leth", "lithe", "letá"), False),
+    ("Acheron", ("acheronte", "achéron", "akeron", "acaron", "aqueronte", "acheronta", "acheiro", "hachero", "acherau", "achaorn"), True),
+    ("Styx", ("stix", "stige", "sticks", "stics", "stigs", "stiks", "estige", "styxe", "stucks", "stucke", "stycks", "stex"), False),
+    ("Lethe", ("lete", "leti", "lethe", "letè", "lethé", "leth", "lithe", "letá", "lahte", "lähte", "leten", "lece", "lithi", "lethi",
+               "leter", "alete"), False),
     ("Cocytus", ("cocito", "cocitus", "kokitus", "cocytos", "cocytus", "cocyte", "cócito", "kokytus", "cocidus"), True),
     ("Phlegethon", ("flegetonte", "flegeton", "phlegeton", "fleghetonte", "phlegethont", "flegetón", "flegeton", "flagiton",
                     "phlegetont"), True),
@@ -48,14 +50,15 @@ _TERMS: list[tuple[str, tuple[str, ...], bool]] = [
     ("Aurelia", ("aurelia", "aurelja"), False),
     ("New Ravenna", ("nuova ravenna", "new raven", "nueva ravenna", "nouvelle ravenne", "neue ravenna", "nova ravenna"), True),
     ("Port Aurelius", ("porto aurelius", "port aurelio", "porto aurelio", "puerto aurelius", "port aurélius"), True),
-    ("Janus Gate", ("giano gate", "janus", "yanus gate", "porta di giano", "janus gait", "janus geit", "giano"), True),
+    ("Janus Gate", ("giano gate", "janus", "yanus gate", "porta di giano", "janus gait", "janus geit", "giano", "janusgate", "hanusgate",
+                    "januskaaten", "sianuskarte", "janugat", "janusgeht", "janusgarte", "janusbet", "janusbait", "jahusgate"), True),
     ("Keeper Station", ("kipper station", "stazione keeper"), True),
     ("Kharon Mandate", ("caron mandate", "charon mandate", "kharon mandato", "karon mandate"), True),
     ("Teal Veil", ("teal vail", "tiel veil"), True),
     ("Ceres Belt", ("cerere belt", "ceres belt", "cintura di cerere"), True),
     ("Tiberius", ("tiberio",), False),
     ("Vulcan", (), False),
-    ("Cassia", (), False),
+    ("Cassia", ("casia", "cacia", "kassia", "kessia", "kasia"), False),
     ("Meridian", (), False),
     ("Concordia", (), False),
     ("Thule", ("tule", "tulle", "thoule"), False),
@@ -68,7 +71,8 @@ _TERMS: list[tuple[str, tuple[str, ...], bool]] = [
     ("Nemet", (), False),
     # people
     ("Okonkwo", ("okonko", "okonkwo", "okonkvo", "okonquo", "okonkuo", "okonco", "ocoyo", "okonkwa"), True),
-    ("Lindqvist", ("lindquist", "lindkvist", "lindqvist", "lindkwist", "lindquest", "lindqvis", "lindquis"), True),
+    ("Lindqvist", ("lindquist", "lindkvist", "lindqvist", "lindkwist", "lindquest", "lindqvis", "lindquis", "lindix", "lingvist", "lindist",
+                   "lindis", "lindbeast", "lindfist", "lindvis", "lindvest", "lindguist", "lindgust"), True),
     ("Mensah", ("menza", "mensha", "menzah"), False),
     ("Tanaka", (), False),
     ("Voss", ("vos", "foss", "fos"), False),
@@ -83,7 +87,8 @@ _TERMS: list[tuple[str, tuple[str, ...], bool]] = [
     ("Vance", (), False),
     ("Wren", (), False),
     # the ships' vocabulary
-    ("railgun", ("rail gun", "rail-gun", "railgan", "reilgan", "rail gan"), False),
+    ("railgun", ("rail gun", "rail-gun", "railgan", "reilgan", "rail gan", "raigun", "ragun", "rajun"), False),
+    ("railguns", ("rail guns", "rail-guns", "railgans", "raiguns", "raigains", "raiboons", "ralbons", "reilguns", "raguns", "rajuns"), False),
     ("VLS", ("v l s", "v.l.s.", "vi elle esse"), False),
     ("EMCON", ("e m con", "e-mcon", "emcom", "e mcon", "em con", "emkon"), False),
     ("point defense", ("point defence",), False),
@@ -209,26 +214,32 @@ class Glossary:
         if not words:
             return text, []
         edits: list[tuple[int, int, str, str]] = []
-        i = 0
-        while i < len(words):
-            done = False
-            for n in (3, 2, 1):
-                if i + n > len(words):
-                    continue
-                span = words[i:i + n]
-                # words separated by anything but spaces (a comma, a full stop) are not one name
-                if any(re.search(r"[^\s'’\-]", text[span[k][1]:span[k + 1][0]]) for k in range(n - 1)):
-                    continue
-                heard = text[span[0][0]:span[-1][1]]
-                term = self._match(heard, n)
-                if term is not None:
-                    if heard != term.text:
-                        edits.append((span[0][0], span[-1][1], heard, term.text))
-                    i += n
-                    done = True
-                    break
-            if not done:
-                i += 1
+        taken = [False] * len(words)
+        # names written the way recognisers write them (aliases) are settled first, then the near-misses: otherwise a near-miss
+        # window ("il Janusgate") could swallow the article before the alias of the word next to it had its say
+        for fuzzy in (False, True):
+            i = 0
+            while i < len(words):
+                done = False
+                for n in (3, 2, 1):
+                    if taken[i] or i + n > len(words) or any(taken[i:i + n]):
+                        continue
+                    span = words[i:i + n]
+                    # words separated by anything but spaces (a comma, a full stop) are not one name
+                    if any(re.search(r"[^\s'’\-]", text[span[k][1]:span[k + 1][0]]) for k in range(n - 1)):
+                        continue
+                    heard = text[span[0][0]:span[-1][1]]
+                    term = self._match_fuzzy(heard, n) if fuzzy else self._match_alias(heard)
+                    if term is not None:
+                        if heard != term.text:
+                            edits.append((span[0][0], span[-1][1], heard, term.text))
+                        for j in range(i, i + n):
+                            taken[j] = True
+                        i += n
+                        done = True
+                        break
+                if not done:
+                    i += 1
         self._vocative(text, words, edits)
         if not edits:
             return text, []
@@ -293,6 +304,10 @@ class Glossary:
         return best if best is not None and best_sim >= (0.75 if len(ks) <= 4 else 0.66) else None
 
     def _match(self, heard: str, n_words: int = 1) -> Term | None:
+        return self._match_alias(heard) or self._match_fuzzy(heard, n_words)
+
+    def _match_alias(self, heard: str) -> Term | None:
+        """The name as the game writes it, or as a recogniser is known to write it."""
         if heard in _CAPS_ALIASES:
             return self._alias.get(_fold(_CAPS_ALIASES[heard]))
         f = _fold(heard)
@@ -302,26 +317,28 @@ class Glossary:
             if not t.fuzzy and t.n_words == 1 and f == _fold(t.text):
                 return None
             return t
-        f = re.sub(r"[\s'’\-]+", " ", f).strip()
-        t = self._alias.get(f)
-        if t is not None:
-            return t
+        return self._alias.get(re.sub(r"[\s'’\-]+", " ", f).strip())
+
+    def _match_fuzzy(self, heard: str, n_words: int = 1) -> Term | None:
+        """A near-miss of a long, distinctive name (by sound)."""
         k = phon(heard)
         if len(k) < 5:
             return None
         best, best_sim = None, 0.0
         for cand in self.terms:
-            # a near-match must have as many words as the name (else "Janus gate to" would swallow the "to")
-            if not cand.fuzzy or cand.n_words != n_words:
+            # a near-match must have as many words as the name (else "Janus gate to" would swallow the "to"); one word written
+            # for a two-word name ("Janusgate") is the name run together, and must match it closely
+            compound = n_words == 1 and cand.n_words == 2
+            if not cand.fuzzy or (cand.n_words != n_words and not compound):
                 continue
             if cand.key[0] in "aeiou" and k == cand.key[1:]:      # the unstressed first vowel lost: "Queron", "Cheron" for Acheron
                 return cand
             # long names tolerate one slip in six letters or so; the first sound must agree
-            if len(k) >= 6 and abs(len(cand.key) - len(k)) <= 2 and k[0] == cand.key[0]:
+            if abs(len(cand.key) - len(k)) <= 2 and k[0] == cand.key[0]:
                 s = _sim(k, cand.key)
-                if s > best_sim:
+                if s > best_sim and s >= (0.88 if compound else 0.80):
                     best, best_sim = cand, s
-        return best if best is not None and best_sim >= 0.80 else None
+        return best
 
 
 GLOSSARY = Glossary()

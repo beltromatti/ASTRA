@@ -164,9 +164,16 @@ class Recognizer:
         return tr.text, tr.lang
 
     # ------------------------------------------------------------------------------------------ the work
+    def drafts_enabled(self) -> bool:
+        """Is it worth decoding what has been said so far while the key is still held? Only with a fast engine that speaks the
+        language of the last order and is up: a slow one would take longer than the sentence."""
+        prim = self.primary
+        return prim is not None and prim.fast and prim.speaks(self.prior) and self._up.get(prim.name) is True
+
     async def recognise(self, pcm16: bytes, rate: int = RATE, *, lang_hint: str | None = None, use_glossary: bool = True,
-                        raw_audio: bool = False) -> Transcript:
-        """Text and language of a finished recording. `raw_audio` skips the silence trimming (already-clean audio)."""
+                        raw_audio: bool = False, draft: bool = False) -> Transcript:
+        """Text and language of a finished recording. `raw_audio` skips the silence trimming (already-clean audio); `draft`: a
+        decode of speech still being made, which never waits for the second engine."""
         t_in = time.perf_counter()
         x = pcm16_to_f32(pcm16)
         if rate != RATE:
@@ -180,7 +187,7 @@ class Recognizer:
             self.stats["empty"] += 1
             return Transcript(text="", lang=lang_hint or self.prior, audio_s=audio_s, speech_s=speech_s, speech=False,
                               latency_s=time.perf_counter() - t_in)
-        tr = await self._decode(f32_to_pcm16(trimmed), lang_hint, use_glossary)
+        tr = await self._decode(f32_to_pcm16(trimmed), lang_hint, use_glossary, draft)
         tr.audio_s, tr.speech_s = audio_s, speech_s
         tr.latency_s = time.perf_counter() - t_in
         self.stats["n"] += 1
@@ -216,7 +223,7 @@ class Recognizer:
             log.exception("%s failed on a phrase", backend.name)
             return None
 
-    async def _decode(self, pcm: bytes, lang_hint: str | None, use_glossary: bool) -> Transcript:
+    async def _decode(self, pcm: bytes, lang_hint: str | None, use_glossary: bool, draft: bool = False) -> Transcript:
         await self.start()
         prior = lang_hint or self.prior
         prim, fall = self.primary, self.fallback
@@ -228,13 +235,15 @@ class Recognizer:
             escalated = res is not None
         if res is None and prim is not None:
             res = await self._engine(prim, pcm, lang_hint if (lang_hint and prim.speaks(lang_hint)) else None, use_glossary)
-        if res is None and fall is not None:
+        if res is None and fall is not None and not draft:
             res = await self._engine(fall, pcm, lang_hint, use_glossary)
             escalated = res is not None
         if res is None:
             return Transcript(text="", lang=prior)
         # the fast engine is unsure (another language, noise, a very short phrase): ask the one that knows every language
-        if res.backend == getattr(prim, "name", "") and res.conf is not None and res.conf < SURE_CONF and fall is not None and not escalated:
+        # (not for a draft: what the Captain is still saying is decoded again, whole, when he lets go of the key)
+        if res.backend == getattr(prim, "name", "") and res.conf is not None and res.conf < SURE_CONF and fall is not None and not escalated \
+                and not draft:
             second = await self._engine(fall, pcm, lang_hint, use_glossary)
             if second is not None and second.text:
                 escalated = True
@@ -243,16 +252,19 @@ class Recognizer:
 
     @staticmethod
     def _arbitrate(a: BackendResult, b: BackendResult, prior: str) -> BackendResult:
-        """Two engines disagree about an uncertain phrase: the one whose language the Captain plausibly speaks wins."""
+        """The first engine was unsure of a phrase and the second gave a text too. The second looks at the whole phrase, says the
+        language it heard and was handed the game's names, so its text wins, unless it is empty, a subtitle credit, or in a
+        language the Captain has no reason to be speaking while the first engine's text reads as his own."""
         if not a.text:
             return b
+        if not b.text or _HALLUCINATION.search(b.text) or _FILLER_ONLY.match(b.text):
+            return a
         if b.lang and b.lang not in PARAKEET_LANGS:
             return b                                        # Japanese, Chinese, Arabic...: Parakeet only romanises them
-        _, ca = resolve_language(a.text, prior)
-        if ca >= 0.6 or b.lang is None:
-            return a
-        _, cb = resolve_language(b.text, prior, backend_lang=b.lang)
-        return b if cb > ca else a
+        la, ca = resolve_language(a.text, prior)
+        if b.lang is None or b.lang == la or b.lang == prior:
+            return b
+        return a if ca >= 0.6 else b
 
     def _finish(self, res: BackendResult, prior: str, escalated: bool, use_glossary: bool) -> Transcript:
         text = re.sub(r"\s+", " ", res.text).strip()
@@ -293,13 +305,13 @@ class RecognitionSession:
             return
         self._chunks.append(pcm16)
         self._n += len(pcm16) // 2
-        if (self._task is None or self._task.done()) and self._n - self._last_n >= int(self.every * self.rate):
+        if (self._task is None or self._task.done()) and self._n - self._last_n >= int(self.every * self.rate) and self.rec.drafts_enabled():
             self._last_n = self._n
             self._task = asyncio.get_running_loop().create_task(self._partial(self._n))
 
     async def _partial(self, n: int) -> None:
         try:
-            tr = await self.rec.recognise(b"".join(self._chunks)[: n * 2], self.rate)
+            tr = await self.rec.recognise(b"".join(self._chunks)[: n * 2], self.rate, draft=True)
             if tr.speech and tr.text and not self._closed:
                 self._best = (n, tr)
         except asyncio.CancelledError:
@@ -323,7 +335,9 @@ class RecognitionSession:
         self._closed = True
         pcm = pcm16 if pcm16 is not None else b"".join(self._chunks)
         best = self._best
-        if best is not None and not self._tail_has_speech(pcm, best[0]):
+        # a draft that covers everything said is the answer, unless the engine was unsure of it and a second one could look
+        if best is not None and not self._tail_has_speech(pcm, best[0]) \
+                and (best[1].conf is None or best[1].conf >= SURE_CONF or self.rec.fallback is None):
             tr = best[1]
             tr.latency_s = time.perf_counter() - t0
             tr.partial_hit = True

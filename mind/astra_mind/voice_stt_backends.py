@@ -62,6 +62,7 @@ class SttBackend:
     languages: frozenset[str] | None = None        # None: any
     takes_prompt = False
     reports_language = False
+    fast = False                                    # decodes a few seconds of speech in a fraction of a second: worth a draft while the key is held
 
     async def start(self) -> bool:                 # noqa: D102
         return False
@@ -94,6 +95,7 @@ class ParakeetBackend(SttBackend):
     languages = PARAKEET_LANGS
     takes_prompt = False
     reports_language = False
+    fast = True
 
     def __init__(self, model: str | None = None, binary: Path | None = None, compute: str = "ane") -> None:
         self.model = model or os.environ.get("ASTRA_STT_MODEL", "ultra")
@@ -327,6 +329,7 @@ class SherpaParakeetBackend(SttBackend):
     languages = PARAKEET_LANGS
     takes_prompt = False
     reports_language = False
+    fast = True
 
     def __init__(self, model_dir: Path | None = None, threads: int | None = None) -> None:
         self.model_dir = model_dir or Path(os.environ.get("ASTRA_SHERPA_MODEL") or VOICE_MODELS / "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8")

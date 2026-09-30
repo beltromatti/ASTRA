@@ -207,7 +207,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 uv run python -m bench.voice_units            # 63 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti)
 uv run python -m bench.voice_floor -v         # 20 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
 uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-tuned   # riconoscimento: WER e latenza, motori alternati clip per clip
-uv run python -m bench.voice_pipeline live tts mic floor mem   # (una sezione per volta) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
+uv run python -m bench.voice_pipeline live tts mic floor mem   # (più sezioni di seguito) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
 uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)
 uv run python -m astra_mind.stt               # quali motori di riconoscimento ci sono su questa macchina
 uv run python -m astra_mind.tts               # quali modelli e voci sono in cache
@@ -226,3 +226,14 @@ uv run python -m astra_mind.tts               # quali modelli e voci sono in cac
 | Windows / Linux / Mac senza il helper | Parakeet ONNX su CPU e faster-whisper | `uv sync --extra portable` e `uv run python -m astra_mind.stt --fetch-portable` (~490 MB) | — |
 
 `tools/pacchetto.sh` copia `mind/` con `rsync`: la cartella di compilazione di Swift non deve finirci (900 MB); con `build.sh` com'è ora non si trova più dentro `mind/`, ma per le cartelle `.build` già esistenti conviene aggiungere `--exclude .build --exclude .swiftpm`.
+
+## 9. Il riconoscimento del parlato, passo per passo (per chi lo tocca)
+
+1. **Tasto giù** — `captain_begin()`: chi parla si ferma entro mezzo secondo. Il microfono (`audio_in.py`) tiene sempre gli ultimi 300 ms già ascoltati (pre-roll) e li consegna subito alla sessione di riconoscimento, poi ogni blocco da 20 ms. Se la periferica è una cuffia Bluetooth si apre il microfono del computer (la cuffia passerebbe alla qualità da telefono e il suono del gioco cala).
+2. **Mentre il tasto è premuto** — circa ogni secondo la sessione (`RecognitionSession`) fa decodificare a Parakeet quello che è stato detto fin lì (una *bozza*: ~0,12 s per una frase di 5 s sul Neural Engine). Le bozze si fanno solo se il primo motore è veloce, è pronto e parla la lingua dell'ultimo ordine; non chiamano mai il secondo motore.
+3. **Tasto su** — 100 ms di post-roll (l'ultimo suono deve uscire dai buffer del sistema). Se l'ultima bozza copre tutto il parlato e Parakeet ne è sicuro (confidenza ≥ `SURE_CONF` = 0,86), è la risposta e il testo esce subito; se dopo la bozza c'è ancora parlato, una decodifica completa (~0,12 s). Se Parakeet è incerto o la lingua non è tra le 25 europee che conosce, la frase va **anche** a Whisper large-v3-turbo (WhisperKit, 1,5–2 s: solo per queste frasi) e `_arbitrate` sceglie il testo.
+4. **Silenzio tagliato** — prima e dopo il parlato (rilevatore a energia, 220 ms di margine): Whisper «sente» sottotitoli nel silenzio, e un tasto premuto per sbaglio non arriva mai a un motore.
+5. **Nomi e lingua** — `voice_glossary.py` corregge i nomi del gioco (alias, somiglianza fonetica per i nomi lunghi, il nome dell'ufficiale a inizio frase, il nome «a pezzi» tipo *Janusgate*); `voice_lang.py` decide la lingua pesando testo, vocabolario di plancia, lingua detta dal motore e lingua dell'ordine precedente (un «Mi sentite?» resta italiano anche dopo tre ordini in inglese).
+6. **`transcript`** al gioco e turno all'equipaggio; le risposte escono nella lingua del Capitano (`lang`).
+
+Motori (`voice_stt_backends.py`, un'interfaccia sola: `start`, `transcribe`, `stop`): `ParakeetBackend` (helper Swift sul Neural Engine, Apple Silicon), `SherpaParakeetBackend` (lo stesso modello in ONNX su CPU: Windows, Linux, Mac senza helper), `WhisperKitBackend` (99 lingue, dice la lingua, accetta i nomi come suggerimento), `FasterWhisperBackend` (CPU, portabile). L'ordine di prova è quello: il primo che parte è il motore veloce, il secondo la riserva. `ASTRA_STT` cambia il primo.

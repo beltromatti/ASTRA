@@ -90,6 +90,7 @@ class Load:
 
 # ------------------------------------------------------------------------------------------------ backends under test
 def make_backend(name: str):
+    name = name.split("#")[0]                       # "parakeet-ultra#r3": the same engine under another key (a second run's own copy)
     if name == "parakeet-ultra":
         return ParakeetBackend(model="ultra")
     if name == "parakeet-onnx":                    # the same model on the CPU (sherpa-onnx): the portable path
@@ -627,6 +628,105 @@ def fmt_ms(x: float) -> str:
     return f"{1000 * x:.0f}"
 
 
+def stt_key(x: dict) -> tuple:
+    return (x["lang"], x["speaker"], x["cond"], x["ref"])
+
+
+def stt_anchor_rows(base: dict, name: str) -> tuple[str, list[dict], list[dict]] | None:
+    """(anchor name, this engine's rows, the anchor's rows) on the clips both saw. The anchor is a Parakeet Ultra run: the one with the
+    most clips in common (on a tie the smaller run, which was interleaved with this engine, so the machine was doing the same to both)."""
+    best = None
+    for rn, rd in base.items():
+        if not rn.startswith("parakeet-ultra") or rn == name:
+            continue
+        theirs = {stt_key(x): x for x in rd["rows"]}
+        mine = [x for x in base[name]["rows"] if stt_key(x) in theirs]
+        cand = (len(mine), -len(rd["rows"]), rn, mine, [theirs[stt_key(x)] for x in mine])
+        if best is None or cand[:2] > best[:2]:
+            best = cand
+    return None if best is None or best[0] < 30 else (best[2], best[3], best[4])
+
+
+def wer_cond(rows: list[dict], cond: str) -> str:
+    r = [x["wer"] for x in rows if cond == "all" or x["cond"] == cond]
+    return f"{100 * np.mean(r):.1f} %" if r else "—"
+
+
+def ents_now(rows: list[dict]) -> tuple[int, int, int]:
+    """(names found in the raw text, names found after today's glossary, names in the references) over the rows that kept the raw text."""
+    raw_hits = now_hits = total = 0
+    for x in rows:
+        if "raw" not in x:
+            continue
+        fixed = GLOSSARY.correct(x["raw"])[0]
+        raw_hits += entities_found(x["raw"], x["ents"])
+        now_hits += entities_found(fixed, x["ents"])
+        total += len(x["ents"])
+    return raw_hits, now_hits, total
+
+
+def summary_lines(stt, live, lang, other, tts, floor, mem) -> list[str]:  # noqa: ANN001
+    """The few numbers that answer the owner's complaints, from the results of the sections that were run."""
+    S: list[str] = ["## Sintesi", ""]
+    if stt:
+        base = {n: d for n, d in stt.items() if "@" not in n}
+        pk = base.get("parakeet-ultra")
+        if pk:
+            walls = [x["wall"] for x in pk["rows"]]
+            S.append(f"- **Riconoscimento, da registrazione finita a testo** — **Parakeet Ultra** sul Neural Engine (tutto il corpus, {len(walls)} frasi): mediana {fmt_ms(statistics.median(walls))} ms, "
+                     f"p95 {fmt_ms(pct(walls, 95))} ms; WER {wer_cond(pk['rows'], 'clean')} pulito, {wer_cond(pk['rows'], 'noisy')} rumoroso, {wer_cond(pk['rows'], 'hard')} difficile.")
+        for n, d in base.items():
+            if n.startswith("parakeet-ultra"):
+                continue
+            pair = stt_anchor_rows(base, n)
+            if pair is None:
+                continue
+            an, mine, theirs = pair
+            S.append(f"  - **{n}** sulle stesse {len(mine)} frasi di {an}: mediana {fmt_ms(statistics.median([x['wall'] for x in mine]))} ms "
+                     f"(p95 {fmt_ms(pct([x['wall'] for x in mine], 95))}) contro {fmt_ms(statistics.median([x['wall'] for x in theirs]))} ms; "
+                     f"WER pulito {wer_cond(mine, 'clean')} contro {wer_cond(theirs, 'clean')}, rumoroso {wer_cond(mine, 'noisy')} contro {wer_cond(theirs, 'noisy')}.")
+        pk = base.get("parakeet-ultra")
+        if pk:
+            raw_hits, now_hits, n_ent = ents_now(pk["rows"])
+            if n_ent:
+                S.append(f"- **Nomi del gioco** (Praetorian, Acheron, Voss…), a voce sintetica con accento straniero: trovati {100 * raw_hits / n_ent:.0f} % dal motore da solo, "
+                         f"{100 * now_hits / n_ent:.0f} % con il glossario attuale (tabella sotto: il resto sono nomi che il motore non scrive affatto o scrive troppo lontani).")
+    if live:
+        for n, d in live.items():
+            if "@" in n:
+                continue
+            lat = [x["latency"] + 0.1 for x in d["rows"]]
+            S.append(f"- **Dal rilascio del tasto al testo** ({n}; parlato in tempo reale, il tasto sale 220 ms dopo l'ultima parola; comprende i 100 ms di post-roll del microfono): "
+                     f"mediana {fmt_ms(statistics.median(lat))} ms, p95 {fmt_ms(pct(lat, 95))} ms, massimo {fmt_ms(max(lat))} ms su {len(lat)} frasi; "
+                     f"{100 * np.mean([x['partial_hit'] for x in d['rows']]):.0f} % delle risposte era già pronta da una decodifica fatta mentre il Capitano parlava.")
+    if lang:
+        S.append(f"- **Lingua dell'ordine**: giusta nel {100 * lang['overall']['prior_wrong']:.1f} % dei casi anche quando la lingua precedente era sbagliata "
+                 f"({100 * lang['short_phrases']['prior_wrong']:.1f} % sulle frasi di tre parole o meno); {lang['session_flips']['wrong']} errori su {lang['session_flips']['orders']} ordini in sessione.")
+    if tts:
+        d = tts.get("tts") or next(iter(tts.values()))
+        rows = d["rows"]
+        lo, ln = [x["old"]["lufs"] for x in rows], [x["new"]["lufs"] for x in rows]
+        do, dn = np.mean([x["old"]["dur"] for x in rows]), np.mean([x["new"]["dur"] for x in rows])
+        S.append(f"- **Sintesi**: righe {100 * (1 - dn / do):.0f} % più brevi ({do:.2f} → {dn:.2f} s in media); volume delle voci da {min(lo):.1f}…{max(lo):.1f} LUFS (σ {np.std(lo):.1f}) "
+                 f"a {min(ln):.1f}…{max(ln):.1f} LUFS (σ {np.std(ln):.1f}); primo suono mediano {fmt_ms(statistics.median([x['old']['first_sound'] or 0 for x in rows]))} → "
+                 f"{fmt_ms(statistics.median([x['new']['first_sound'] or 0 for x in rows]))} ms; generazione {np.mean([x['new']['total'] / x['new']['dur'] for x in rows]):.2f} s "
+                 f"di calcolo per secondo di parlato (carico medio {d['load_avg']:.1f}).")
+    if floor:
+        ok = sum(1 for r in floor["scenarios"] if not r["bad"])
+        real = floor.get("real", {})
+        extra = ""
+        if real.get("stop_s"):
+            extra = (f"; con la voce vera chi parla si ferma in {fmt_ms(statistics.median(real['stop_s']))} ms (massimo {fmt_ms(max(real['stop_s']))}) dalla pressione del tasto "
+                     f"e la risposta parte {fmt_ms(statistics.median(real['answer_s']))} ms dopo essere stata scritta")
+        S.append(f"- **Palco del parlato**: {ok}/{len(floor['scenarios'])} scenari con orologio virtuale superati (nessun sottotitolo senza audio, nessuna riga persa in silenzio, "
+                 f"il Capitano per primo, una voce alla volta){extra}.")
+    if mem:
+        S.append(f"- **Memoria**: la parte di voce aggiunge circa {mem.get('python_with_stt', 0) - mem.get('imports', 0)} MB al processo Python (due lingue di sintesi comprese) e "
+                 f"{mem.get('astra_stt_helper', 0)} MB di helper Parakeet; WhisperKit ({mem.get('whisperkit_server', 0)} MB) si carica solo se serve e si scarica dopo dieci minuti.")
+    S.append("")
+    return S
+
+
 def report(args) -> None:  # noqa: ANN001
     out = REPO_ROOT / "docs" / "bench" / f"voce_{TODAY}.md"
     L: list[str] = [f"# Voce: riconoscimento, sintesi, palco del parlato — {TODAY}", ""]
@@ -635,6 +735,7 @@ def report(args) -> None:  # noqa: ANN001
           "ogni misura): i tempi sono quelli di un Mac già occupato, non di uno libero. Il parlato di prova è sintetico (Pocket TTS e voci di sistema macOS), non registrazioni "
           "di persone: misura le differenze tra motori, il peso dei nomi del gioco, del rumore e della lingua, non la precisione assoluta su una persona stanca con il "
           "microfono del portatile. Dove più motori sono confrontati, si alternano clip per clip (quello che il resto della macchina fa in quel momento lo fa a tutti).", ""]
+    L += summary_lines(stt, live, lang, other, tts, floor, mem)
     if stt:
         L += ["## 1. Riconoscimento vocale", ""]
         L += ["Frasi d'ordine (2–7 s) in sette lingue, cinque voci per frase (tre Pocket TTS, due voci di sistema), tre condizioni: pulito, rumoroso (15 dB sopra "
@@ -658,26 +759,48 @@ def report(args) -> None:  # noqa: ANN001
                 cells.append(f"{100 * np.mean([x['wer'] for x in r]):.1f}" if r else "—")
             L.append(f"| {name} | " + " | ".join(cells) + " |")
         base = {n: d for n, d in stt.items() if "@" not in n}
-        if len(base) > 1:                                    # engines that saw different samples are compared on the clips all of them saw
-            def key_of(x):  # noqa: ANN001, ANN202
-                return (x["lang"], x["speaker"], x["cond"], x["ref"])
-            common = set.intersection(*[{key_of(x) for x in d["rows"]} for d in base.values()])
-            if len(common) >= 30:
-                L += ["", f"### Stesso campione per tutti i motori ({len(common)} frasi viste da ognuno)", "",
-                      "| Motore | WER pulito | WER rumoroso | WER difficile | WER tutte | latenza mediana ms | p95 ms |", "|---|---|---|---|---|---|---|"]
-                for name, d in base.items():
-                    r = [x for x in d["rows"] if key_of(x) in common]
-                    cells = []
-                    for cond in ("clean", "noisy", "hard"):
-                        rc = [x for x in r if x["cond"] == cond]
-                        cells.append(f"{100 * np.mean([x['wer'] for x in rc]):.1f} %" if rc else "—")
-                    L.append(f"| {name} | " + " | ".join(cells) + f" | {100 * np.mean([x['wer'] for x in r]):.1f} % | "
-                             f"{fmt_ms(statistics.median([x['wall'] for x in r]))} | {fmt_ms(pct([x['wall'] for x in r], 95))} |")
-        L += ["", "### Nomi del gioco (Praetorian, Acheron, Lindqvist, Janus Gate…)", "", "| Motore | nomi trovati grezzi | dopo il glossario | totale |", "|---|---|---|---|"]
+        rows_tab = []
+        for name in base:
+            pair = None if name.startswith("parakeet-ultra") else stt_anchor_rows(base, name)
+            if pair is None:
+                continue
+            an, mine, theirs = pair
+            rows_tab.append(f"| {name} | {len(mine)} | {wer_cond(mine, 'clean')} | {wer_cond(mine, 'noisy')} | {wer_cond(mine, 'hard')} | "
+                            f"{wer_cond(theirs, 'clean')} / {wer_cond(theirs, 'noisy')} / {wer_cond(theirs, 'hard')} ({an}) | "
+                            f"{fmt_ms(statistics.median([x['wall'] for x in mine]))} / {fmt_ms(statistics.median([x['wall'] for x in theirs]))} | "
+                            f"{fmt_ms(pct([x['wall'] for x in mine], 95))} / {fmt_ms(pct([x['wall'] for x in theirs], 95))} | {base[name]['load_avg']:.1f} |")
+        if rows_tab:
+            L += ["", "### Ogni motore contro Parakeet Ultra, sulle stesse frasi", "",
+                  "Un motore che ha visto solo un campione del corpus (i Whisper: uno ogni due o tre frasi, bilanciato tra le condizioni) si confronta con Parakeet Ultra sulle "
+                  "*stesse* frasi. Latenza «motore / Parakeet»: i due si alternano clip per clip nella stessa prova.", "",
+                  "| Motore | frasi | WER pulito | WER rumoroso | WER difficile | Parakeet Ultra: pulito / rumoroso / difficile | latenza mediana ms | p95 ms | carico medio |",
+                  "|---|---|---|---|---|---|---|---|---|"] + rows_tab
+        L += ["", "### Nomi del gioco (Praetorian, Acheron, Lindqvist, Janus Gate…)", "",
+              "I nomi sono detti da voci sintetiche con l'accento della loro lingua: un motore che scrive «Queron» per «Acheron» sbaglia per lo stesso motivo per cui sbaglierebbe con una persona "
+              "che lo pronuncia all'italiana. «Glossario attuale» = il glossario del codice di oggi applicato al testo grezzo salvato (correzioni fonetiche, nome dell'ufficiale in vocativo a "
+              "inizio frase, vocale iniziale persa); la colonna «glossario alla misura» è quello che c'era quando la misura è stata fatta.", "",
+              "| Motore | nomi trovati grezzi | glossario alla misura | glossario attuale | totale |", "|---|---|---|---|---|"]
         for name, d in stt.items():
             n = sum(x["n_ent"] for x in d["rows"])
+            raw_hits, now_hits, n_now = ents_now(d["rows"])
             L.append(f"| {name} | {sum(x['ent_raw'] for x in d['rows'])} ({100 * sum(x['ent_raw'] for x in d['rows']) / max(1, n):.0f} %) | "
-                     f"{sum(x['ent_fix'] for x in d['rows'])} ({100 * sum(x['ent_fix'] for x in d['rows']) / max(1, n):.0f} %) | {n} |")
+                     f"{sum(x['ent_fix'] for x in d['rows'])} ({100 * sum(x['ent_fix'] for x in d['rows']) / max(1, n):.0f} %) | "
+                     + (f"{now_hits} ({100 * now_hits / max(1, n_now):.0f} %)" if n_now else "—") + f" | {n} |")
+        pk = stt.get("parakeet-ultra")
+        if pk and any("raw" in x for x in pk["rows"]):
+            by_e: dict[str, list[int]] = {}
+            for x in pk["rows"]:
+                if "raw" not in x:
+                    continue
+                fixed = GLOSSARY.correct(x["raw"])[0]
+                for e in x["ents"]:
+                    c = by_e.setdefault(e, [0, 0, 0])
+                    c[0] += 1
+                    c[1] += e.lower() in x["raw"].lower()
+                    c[2] += e.lower() in fixed.lower()
+            L += ["", "Per nome (Parakeet Ultra, tutte le condizioni):", "", "| Nome | frasi | grezzo | glossario attuale |", "|---|---|---|---|"]
+            for e, (n_e, a, b) in sorted(by_e.items(), key=lambda kv: kv[1][2] / kv[1][0]):
+                L.append(f"| {e} | {n_e} | {100 * a / n_e:.0f} % | {100 * b / n_e:.0f} % |")
         L.append("")
     if live:
         L += ["## 2. Dal rilascio del tasto al testo (parlato ricevuto in tempo reale, decodifica incrementale)", "",
@@ -769,7 +892,8 @@ def report(args) -> None:  # noqa: ANN001
 # ------------------------------------------------------------------------------------------------ main
 def main() -> int:
     ap = argparse.ArgumentParser(prog="bench.voice_pipeline")
-    ap.add_argument("section", choices=["stt", "live", "lang", "other", "tts", "mic", "floor", "mem", "report"])
+    ap.add_argument("sections", nargs="+", metavar="section", choices=["stt", "live", "lang", "other", "tts", "mic", "floor", "mem", "report"],
+                    help="one or more of stt live lang other tts mic floor mem report, run in this order")
     ap.add_argument("--langs", default="it,en,es,fr,de,pt,nl")
     ap.add_argument("--backends", default="parakeet-ultra")
     ap.add_argument("--load", default="", help="synthetic game next to the benchmark: gpu, cpu:4, gpu,cpu:4")
@@ -781,10 +905,12 @@ def main() -> int:
     logging_level = os.environ.get("BENCH_LOG", "WARNING")
     import logging
     logging.basicConfig(level=getattr(logging, logging_level), format="%(name)s %(message)s")
-    if args.section == "report":
-        report(args)
-        return 0
-    asyncio.run({"stt": sec_stt, "live": sec_live, "lang": sec_lang, "other": sec_other, "tts": sec_tts, "mic": sec_mic, "floor": sec_floor, "mem": sec_mem}[args.section](args))
+    runners = {"stt": sec_stt, "live": sec_live, "lang": sec_lang, "other": sec_other, "tts": sec_tts, "mic": sec_mic, "floor": sec_floor, "mem": sec_mem}
+    for section in args.sections:
+        if section == "report":
+            report(args)
+        else:
+            asyncio.run(runners[section](args))
     return 0
 
 

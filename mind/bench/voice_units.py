@@ -125,6 +125,9 @@ def glossary_and_language() -> None:
                                     "Rapporto danni, subito.", "Tank the damage, ops.")))
     check("glossary: a lost first vowel (Queron, Cheron -> Acheron)", fix("Tattico, fuoco sulla Queron.") == "Tattico, fuoco sulla Acheron."
           and fix("fire on the Cheron") == "fire on the Acheron")
+    check("glossary: a two-word name run together (Janusgate)", fix("portaci attraverso il Janusgate verso Cassia") == "portaci attraverso il Janus Gate verso Cassia")
+    check("glossary: the plural of railgun stays plural", fix("mantieni i raiguns sulla Styx") == "mantieni i railguns sulla Styx")
+    check("glossary: a five-letter slip (Akron -> Acheron), a spelling of Cassia", fix("fire on the Akron") == "fire on the Acheron" and fix("rotta per Casia") == "rotta per Cassia")
     check("glossary: LET in capitals is Lethe, 'let' is a word", fix("lancez les missiles sur le LET") == "lancez les missiles sur le Lethe" and fix("Let me know when ready.") == "Let me know when ready.")
     check("glossary: the prompt lists names and stays short", "Praetorian" in GLOSSARY.prompt() and len(GLOSSARY.prompt()) < 500)
     check("phonetic key ignores accents and doubled letters", phon("Praetórian") == phon("Pretorian"))
@@ -155,9 +158,10 @@ class Fake(SttBackend):
     """A stand-in engine: says what it is told, takes a given time."""
 
     def __init__(self, name: str, langs: frozenset[str] | None, text: str = "", conf: float | None = 0.95, lang: str | None = None, delay: float = 0.0,
-                 prompt: bool = False) -> None:
+                 prompt: bool = False, fast: bool = False) -> None:
         self.name, self.languages, self.text, self.conf, self.lang, self.delay = name, langs, text, conf, lang, delay
         self.takes_prompt = prompt
+        self.fast = fast
         self.calls = 0
 
     async def start(self) -> bool:
@@ -194,6 +198,11 @@ async def recogniser() -> None:
     tr = await r2.recognise(speech_pcm())
     check("recogniser: a Captain speaking a language the fast engine lacks goes straight to the other", tr.backend == "whisperkit" and r2.backends[0].calls == 0)
 
+    r2b = Recognizer(backends=[Fake("parakeet", frozenset({"it", "en"}), "Avanti tutta?", 0.7, fast=True),
+                               Fake("whisperkit", None, "Thanks for watching!", None, lang="en")], prior="it")
+    tr = await r2b.recognise(speech_pcm())
+    check("recogniser: a second opinion that is a subtitle credit is ignored", tr.text == "Avanti tutta?" and tr.escalated, f"{tr.text!r}")
+
     r3 = Recognizer(backends=[Fake("whisperkit", None, "Thank you for watching!", None, lang="en")], prior="en")
     tr = await r3.recognise(speech_pcm())
     check("recogniser: a subtitle credit heard by Whisper is dropped", tr.text == "")
@@ -204,7 +213,8 @@ async def recogniser() -> None:
     tr = await r5.recognise(f32_to_pcm16(np.random.default_rng(1).standard_normal(16000 * 2).astype(np.float32) * 0.003))
     check("recogniser: noise is never sent to an engine", tr.text == "" and not tr.speech and r5.backends[0].calls == 0)
 
-    r6 = Recognizer(backends=[Fake("parakeet", None, "Avanti tutta.", 0.97, delay=0.05)], prior="it")
+    r6 = Recognizer(backends=[Fake("parakeet", None, "Avanti tutta.", 0.97, delay=0.05, fast=True)], prior="it")
+    await r6.ready()
     pcm = speech_pcm(3.0, tail=0.6)
     sess = r6.session(partial_every_s=0.5)
     for i in range(0, len(pcm), 640):
@@ -216,13 +226,36 @@ async def recogniser() -> None:
           f"{time.perf_counter() - t0:.3f}s hit={tr.partial_hit}")
     tt = np.arange(int(3.4 * 16000)) / 16000
     vowel = f32_to_pcm16((0.2 * sum(np.sin(2 * np.pi * 130 * h * tt) / h for h in range(1, 10)) / 2.5).astype(np.float32))   # speech to the very end
-    r7 = Recognizer(backends=[Fake("parakeet", None, "Avanti tutta.", 0.97, delay=0.3)], prior="it")
+    r7 = Recognizer(backends=[Fake("parakeet", None, "Avanti tutta.", 0.97, delay=0.3, fast=True)], prior="it")
+    await r7.ready()
     s2 = r7.session(partial_every_s=1.0)                          # decodes at 1.0, 2.0 and 3.0 s: 0.4 s of speech come after the last
     for i in range(0, len(vowel), 640):
         s2.feed(vowel[i:i + 640])
         await asyncio.sleep(0.02)
     tr = await s2.finish(vowel)
     check("session: speech after the last partial means a final decode", not tr.partial_hit and tr.text == "Avanti tutta.", f"hit={tr.partial_hit} {tr.text!r}")
+
+    # a slow first engine makes no drafts (it would take longer than the sentence); an unsure draft is not the answer
+    slow_first = Fake("whisperkit", None, "Avanti tutta.", None, lang="it", delay=0.05)
+    r8 = Recognizer(backends=[slow_first], prior="it")
+    await r8.ready()
+    s3 = r8.session(partial_every_s=0.5)
+    for i in range(0, len(pcm), 640):
+        s3.feed(pcm[i:i + 640])
+        await asyncio.sleep(0.02)
+    check("session: a slow engine decodes nothing while the key is held", slow_first.calls == 0, f"{slow_first.calls} calls")
+    fast_unsure = Fake("parakeet", frozenset({"it"}), "Avanti tutta?", 0.7, delay=0.02, fast=True)
+    second = Fake("whisperkit", None, "Avanti tutta.", None, lang="it", delay=0.05)
+    r9 = Recognizer(backends=[fast_unsure, second], prior="it")
+    await r9.ready()
+    s4 = r9.session(partial_every_s=0.5)
+    for i in range(0, len(pcm), 640):
+        s4.feed(pcm[i:i + 640])
+        await asyncio.sleep(0.02)
+    calls_before = second.calls
+    tr = await s4.finish(pcm)
+    check("session: an unsure draft is decoded again at release, with the second engine (and drafts never called it)",
+          calls_before == 0 and second.calls == 1 and tr.escalated and not tr.partial_hit and tr.text == "Avanti tutta.", f"before={calls_before} calls={second.calls} {tr.text!r}")
 
     r8 = Recognizer(backends=[Fake("parakeet", None, "Tattico, fuoco sull'Acheronte", 0.97)], prior="it")
     tr = await r8.recognise(speech_pcm())
