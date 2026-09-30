@@ -1,0 +1,236 @@
+"""ASN Aquila interior kit: the room shells and the shared room machinery (bridge v3 language). The rooms themselves live in
+ship_rooms_*.py; the sizes, doors, crew spots and zone lights they follow are in ship_spec.py (the plan uses the same numbers).
+
+Room frame: origin on the floor at the corridor-side corner of the room, x along the corridor (0..L), y INTO the room (0..D), z up. The
+near wall (y = 0) is the corridor's wall (its structure belongs to the corridor module: the room adds only a finish layer 5 cm thick with
+the door opening and its trim); the far wall (y = D) and the side walls (x = 0, x = L) have their own 0.2 m structure and a finish layer.
+"""
+from __future__ import annotations
+
+import math
+import random
+
+from mathutils import Matrix
+
+import ship_lib as SL
+import ship_furniture as F
+from bridge3_lib import Rz, T, frame
+from ship_catalog import CLEAR_H, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW
+from ship_lib import (COMPOSITE, DECK, DGLASS, GLASS, IVORY, LAMP, LAMP_DIM, LAMP_HOT, RUBBER, STRUCT, TRIM, SParts, SFB)
+
+WS = 0.20               # structure thickness of a room's own walls
+WF = 0.05               # finish layer
+FIN = 0.0
+
+
+class Style:
+    """The look of a room: materials of the floor, the wainscot, the upper wall, the trim and the ceiling, the accent lamp colour."""
+
+    def __init__(self, floor: str = DECK, floor_mode: str = "plates", wall_lo: str = COMPOSITE, wall_hi: str = COMPOSITE, trim: str = TRIM,
+                 ceil: str = COMPOSITE, accent: str = "cool_dim", strip: str = "white_cool", wain_h: float = 1.05, ribs: bool = True,
+                 rib_mat: str = TRIM, skirt: str = STRUCT, light_mode: str = "strips", rail: bool = True, cove: str | None = None) -> None:
+        self.__dict__.update(locals())
+        del self.__dict__["self"]
+
+
+def wall_matrix(name: str, L: float, D: float) -> Matrix:
+    """Wall-local frame (s along the wall, t outward from its finished face, z up) in room coordinates."""
+    if name == "far":                 # y = D - WS is the finished face, s along +x, t towards +y
+        return Matrix(((1, 0, 0, 0), (0, 1, 0, D - WS), (0, 0, 1, 0), (0, 0, 0, 1)))
+    if name == "left":                # x = WS is the finished face, s along +y, t towards -x
+        return Matrix(((0, -1, 0, WS), (1, 0, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)))
+    if name == "right":               # x = L - WS is the finished face, s along -y, t towards +x
+        return Matrix(((0, 1, 0, L - WS), (-1, 0, 0, D), (0, 0, 1, 0), (0, 0, 0, 1)))
+    if name == "near":                # y = FIN is the finished face, s along -x, t towards -y
+        return Matrix(((-1, 0, 0, L), (0, -1, 0, FIN), (0, 0, 1, 0), (0, 0, 0, 1)))
+    raise ValueError(name)
+
+
+def wall_len(name: str, L: float, D: float) -> float:
+    return L if name in ("far", "near") else D
+
+
+def door_spans(name: str, doors: list, L: float, D: float) -> list[tuple[float, float, float]]:
+    """(s0, s1, height) of every door opening on a wall, in the wall's own s coordinate."""
+    out = []
+    for d in doors:
+        if d["wall"] != name:
+            continue
+        x = d["x"]
+        w, h = d["w"], d["h"]
+        if name == "near":
+            s = L - x                    # the near wall's s runs along -x
+        elif name == "far":
+            s = x
+        else:
+            s = x
+        out.append((s - w / 2, s + w / 2, h))
+    return sorted(out)
+
+
+def wall_segments(s_len: float, spans: list) -> list[tuple[float, float, float, float]]:
+    """Solid pieces (s0, s1, z0, z1-open) of a wall of length s_len with openings: [(s0, s1, z_bottom, 'top')]: fully solid runs have z_bottom 0;
+    the piece above an opening starts at the opening's height."""
+    segs = []
+    cur = 0.0
+    for (a, b, h) in spans:
+        if a > cur:
+            segs.append((cur, a, 0.0))
+        segs.append((a, b, h))
+        cur = b
+    if cur < s_len:
+        segs.append((cur, s_len, 0.0))
+    return segs
+
+
+def door_trim(fb: SFB, s0: float, s1: float, h: float, t_in: float, t_out: float) -> None:
+    """Jambs and header of a door opening through a wall (wall-local frame): brushed trim proud of the finish by 3 cm."""
+    fb.box((s0 - 0.07, t_in - 0.03, 0.0), (s0, t_out, h + 0.07), TRIM)
+    fb.box((s1, t_in - 0.03, 0.0), (s1 + 0.07, t_out, h + 0.07), TRIM)
+    fb.box((s0 - 0.07, t_in - 0.03, h), (s1 + 0.07, t_out, h + 0.07), TRIM)
+
+
+def wall_finish(b: SParts, name: str, L: float, D: float, H: float, st: Style, doors: list, windows: list | None = None,
+                structure: bool = True) -> None:
+    """One wall: structure, wainscot, upper panels, rail, skirting, ribs, cornice, with its door openings and windows (s0, s1, z0, z1)."""
+    fb, fine, em = b.body, b.fine, b.emit
+    sl = wall_len(name, L, D)
+    spans = door_spans(name, doors, L, D)
+    wins = windows or []
+    M = wall_matrix(name, L, D)
+    with b.at(M):
+        # structure (t 0 .. WS): solid except the openings
+        if structure:
+            for (a, c, hb) in wall_segments(sl, spans):
+                if hb > 0:
+                    fb.box((a, 0.0, hb), (c, WS, H), STRUCT)
+                else:
+                    fb.box((a, 0.0, 0.0), (c, WS, H), STRUCT)
+            for (a, c, z0, z1) in wins:
+                pass
+        # finish: wainscot, upper wall, rail, skirt
+        for (a, c, hb) in wall_segments(sl, spans):
+            zlo = hb
+            if hb == 0.0:
+                fb.box((a, -WF, 0.0), (c, 0.0, st.wain_h), st.wall_lo)
+                fb.box((a, -WF, st.wain_h), (c, 0.0, H), st.wall_hi)
+                fb.box((a, -WF - 0.014, st.wain_h - 0.03), (c, -WF, st.wain_h + 0.03), st.trim)
+                fb.box((a, -WF - 0.012, 0.0), (c, -WF, 0.10), st.skirt)
+            else:
+                fb.box((a, -WF, hb), (c, 0.0, H), st.wall_hi)
+        for (a, c, hb) in spans:
+            door_trim(fine, a, c, hb, -WF, WS if structure else 0.0)
+        # ribs at every 4 m of the room (they carry the ship's frames; not through openings)
+        if st.ribs and name in ("far", "near"):
+            xs = [k * MOD for k in range(1, int(sl // MOD) + 1) if k * MOD < sl - 0.1] if name == "far" else []
+            for k, s in enumerate(xs):
+                sw = sl - s if name == "far" else s
+                if any(a - 0.3 < s < c + 0.3 for (a, c, _h) in spans):
+                    continue
+                fb.box((s - 0.10, -WF - 0.10, 0.0), (s + 0.10, -WF, H), st.rib_mat)
+                fine.box((s - 0.07, -WF - 0.112, 0.06), (s + 0.07, -WF - 0.10, H - 0.06), STRUCT)
+                em.lamp_box((s - 0.006, -WF - 0.118, 0.5), (s + 0.006, -WF - 0.112, H - 0.5), st.accent, LAMP_DIM)
+        # cornice
+        fb.box((0.0, -WF - 0.06, H - 0.06), (sl, 0.0, H), st.trim)
+
+
+def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far_door: bool = True, windows_far: list | None = None,
+                seed: int = 1) -> None:
+    """Floor, ceiling and the four walls of a room."""
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    doors = doors if doors is not None else spec["doors"]
+    fb, fine, em = b.body, b.fine, b.emit
+    rng = random.Random(seed)
+    # floor: structure and covering
+    fb.box((0.0, 0.0, -0.30), (L, D, -0.012), STRUCT)
+    if st.floor_mode == "plates":
+        rows = int(D // 1.0)
+        for j in range(rows):
+            y0, y1 = j * D / rows + 0.008, (j + 1) * D / rows - 0.008
+            cuts = [0.0] + [k * 2.0 + (1.0 if j % 2 else 0.0) for k in range(int(L // 2.0) + 1)] + [L]
+            cuts = sorted({round(c, 3) for c in cuts if 0.0 <= c <= L})
+            for a, c in zip(cuts, cuts[1:]):
+                if c - a < 0.3:
+                    continue
+                faces = fb.box((a + 0.008, y0, -0.012), (c - 0.008, y1, 0.0), st.floor)
+                _plate_uv(fb, faces, rng)
+    else:
+        fb.box((0.0, 0.0, -0.012), (L, D, 0.0), st.floor)
+        step = 4.0
+        for k in range(1, int(L // step) + 1):
+            if k * step < L:
+                fine.box((k * step - 0.01, 0.0, 0.0), (k * step + 0.01, D, 0.003), st.trim)
+    # ceiling: structure and finish
+    fb.box((0.0, 0.0, H), (L, D, H + 0.30), STRUCT)
+    fb.box((WS + WF, FIN + WF, H - 0.05), (L - WS - WF, D - WS - WF, H), st.ceil)
+    # walls
+    for name in ("left", "right", "far", "near"):
+        d_list = doors
+        if name == "far" and not far_door:
+            d_list = [d for d in doors if d["wall"] != "far"]
+        wall_finish(b, name, L, D, H, st, d_list, structure=(name != "near"))
+    # a cove of light along the perimeter, facing up: the ceiling gets its bounce (and the room its glow) from it
+    cell = st.cove or st.accent
+    z = H - 0.20
+    x0, x1, y0, y1 = WS + WF + 0.10, L - WS - WF - 0.10, FIN + WF + 0.10, D - WS - WF - 0.10
+    door_x = [d["x"] for d in doors if d["wall"] == "near"]
+    gaps = [(dx - 1.1, dx + 1.1) for dx in door_x]
+    cuts = [x0] + [v for g in sorted(gaps) for v in g] + [x1]
+    for a, c in zip(cuts[0::2], cuts[1::2]):
+        if c - a > 0.5:
+            em.lamp_box((a, y0, z), (c, y0 + 0.05, z + 0.012), cell, LAMP)
+    em.lamp_box((x0, y1 - 0.05, z), (x1, y1, z + 0.012), cell, LAMP)
+    em.lamp_box((x0, y0 + 0.05, z), (x0 + 0.05, y1 - 0.05, z + 0.012), cell, LAMP)
+    em.lamp_box((x1 - 0.05, y0 + 0.05, z), (x1, y1 - 0.05, z + 0.012), cell, LAMP)
+    for k in (0.0,):
+        pass
+
+
+def _plate_uv(fb, faces, rng):
+    ou, ov = rng.random() * 8.0, rng.random() * 8.0
+    for f in faces:
+        n = f.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        f[fb.cu] = 1
+        for loop in f.loops:
+            co = loop.vert.co
+            u, v = ((co.y, co.z), (co.x, co.z), (co.x, co.y))[ax]
+            loop[fb.uv].uv = (u + ou, v + ov)
+
+
+def luminaire_strips(b: SParts, L: float, D: float, H: float, ys: list[float], cell: str = "white_cool", x0: float = 1.5, x1: float | None = None,
+                     mat: str = LAMP_HOT, w: float = 0.32) -> None:
+    """Linear ceiling luminaires along x (trough frame + a lamp strip), like the corridor's."""
+    x1 = L - 1.5 if x1 is None else x1
+    for y in ys:
+        F_ = b.body
+        F_.box((x0, y - w / 2 - 0.03, H - 0.075), (x1, y - w / 2, H - 0.02), TRIM)
+        F_.box((x0, y + w / 2, H - 0.075), (x1, y + w / 2 + 0.03, H - 0.02), TRIM)
+        F_.box((x0, y - w / 2, H - 0.027), (x1, y + w / 2, H - 0.02), STRUCT)
+        b.emit.lamp_box((x0 + 0.06, y - w / 2 + 0.03, H - 0.034), (x1 - 0.06, y + w / 2 - 0.03, H - 0.028), cell, mat)
+
+
+def door_plate_hint(b: SParts, spec: dict) -> None:
+    """Nothing to build: the room's name plate is a separate mesh placed over the corridor's door (SM_SHIP_Plate_<plate>)."""
+    return None
+
+
+def place(b: SParts, x: float, y: float, yaw: float, fn, *args, z: float = 0.0, **kw):
+    """Build one piece (a furniture function) at (x, y) on the floor, turned by yaw (degrees; 0 = front towards +x, 90 = towards +y)."""
+    with b.at(frame(x, y, z, yaw)):
+        return fn(b, *args, **kw)
+
+
+def wall_label(b: SParts, x: float, y: float, z: float, facing, cell: str, w: float = 0.5, h: float | None = None, up=(0, 0, 1)) -> None:
+    """A label tile on a wall (room frame): facing = the direction the label looks (into the room)."""
+    b.emit.label_fit((x, y, z), w, cell, facing, up=up) if h is None else b.emit.label((x, y, z), w, h, facing, cell, up=up)
+
+
+def ceiling_panels(b: SParts, L: float, D: float, H: float, nx: int, ny: int, cell: str = "white_cool", margin: float = 1.4, w: float = 1.2, d: float = 0.6,
+                   mat: str = LAMP_HOT) -> None:
+    """A grid of luminous ceiling panels (brushed frame, a bright lamp face)."""
+    for i in range(nx):
+        for j in range(ny):
+            cx = margin + (i + 0.5) * (L - 2 * margin) / nx
+            cy = margin + (j + 0.5) * (D - 2 * margin) / ny
+            F.ceiling_light_panel(b, cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2, H - 0.05, cell, mat)
