@@ -20,6 +20,14 @@
 - **VITA** — le ~560 persone dell'Aquila sul grafo dei percorsi: turni, lavori veri, pasti, sonno, posti di combattimento, squadre di riparazione che camminano fino ai danni, feriti in infermeria; corpi solo vicino al Capitano (≤ ~40), memoria in codice, un modello piccolo quando il Capitano ci parla.
 - Chiusi: ~~MENTE-EQUIPAGGIO~~, ~~ARTE-PLANCIA~~, ~~VOCE~~, ~~NAVE~~ (unita e importata il 30/9 sera: Ponti 4 e 6 nel livello, `docs/NAVE.md`), ~~ARTE-NAVI~~ (unita il 1/10: 12 navi e velivoli v3 con 21 pezzi di rottura (prua, centro e poppa di 7 navi), materiali a strati con usura, 8 decalcomanie di danno, lo scafo dell'Aquila aperto sotto il blocco per i Ponti 2–3; anteprime in `docs/progressi/navi_v3/`).
 
+**Prove d'integrazione del lead (1/10 notte, rami locali `integ-*`, non pubblicati):**
+- **GUERRA** (main + F2.2 parte 3): si unisce senza conflitti e compila; nel gioco la battaglia d'apertura è intensa e credibile
+  (riflessi, caccia, missili, esche, danni, calore al 97 %, scafo 88 % in 2,5 minuti senza mente), 59,7 fps a macchina scarica. Difetti
+  trovati e corretti su main: scintille delle console a ogni colpo (4 in 15 s) e incendi interni a ogni colpo (sei ponti in 30 s).
+  Da fare all'unione: `PlayerEngineFactor()` al timone, `RepairPlayerSystems()` dalle squadre, `GetWeaponRanges()` su tavolo e schermo.
+- **METALFX**: il plugin parte, costruisce lo scaler (2,8 s) e poi si spegne: il colore che arriva all'upscaler nel gioco vero è
+  RG11B10Float, il plugin voleva RGBA16F. Rimandato all'aiutante.
+
 **Banco della guerra senza grafica**: `tools/war.py run|report|ship|ab` (commandlet `AstraWarSim`, ~1000× il tempo reale, deterministico per seme; vedi [GUERRA.md](GUERRA.md)).
 
 **Strumenti di prova del lead** (gioco con `tools/play.py launch --nomind`; `tools/play.py tp X Y YAW PITCH` per le foto): `astra.battle.time 170` (arriva il gruppo d'attacco), `astra.cmd station {...}`, `astra.viewscreen.dump` (l'immagine dello schermo principale a piena risoluzione), `astra.screens.dump <Pagina>` (una console su PNG), `/state` con `context`.
