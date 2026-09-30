@@ -184,10 +184,11 @@ class BridgeAgent:
             turn.cost += comp.cost
             log.info("llm: provider=%s finish=%s calls=%s content=%r error=%s", comp.provider, comp.finish_reason,
                      [(c.name, c.arguments_raw[:120]) for c in comp.tool_calls], comp.content[:200], comp.error)
-            if not comp.error and not turn.lines and not pending and not turn.cancelled:
-                # the Captain spoke and nobody answered nor did anything: the officers are asked to answer (their own words,
-                # with speak; what the model wrote outside speak is its draft, never voiced as it is)
-                log.warning("no speak call and no action (content: %r): asking for the answer", comp.content[:200])
+            if not comp.error and not turn.lines and not pending and not turn.cancelled and comp.content.strip():
+                # the model wrote instead of speaking (silence alone is a choice: the words may have been for someone on the
+                # channel): the officers are asked for their answer, with speak — what they wrote is shown back as their notes,
+                # never voiced as it is
+                log.warning("wrote instead of speaking (%r): asking for the answer", comp.content[:200])
                 await self._speak_now(msgs, turn, lang, ts, draft=comp.content)
             if comp.error:
                 turn.error = comp.error
@@ -355,13 +356,14 @@ class BridgeAgent:
         return results
 
     async def _speak_now(self, msgs, turn: Turn, lang: str, ts: Any, draft: str = "") -> None:
-        """The Captain is still waiting for an answer: the officers are asked to give it, spoken (their draft, if the model
-        wrote one outside speak, is shown back to them as their own notes)."""
+        """The model wrote instead of speaking: the officers are asked for their answer, spoken (what they wrote is shown back to
+        them as their own notes), or for silence when the words were not for them."""
         follow = list(msgs)
         if draft.strip():
             follow.append({"role": "assistant", "content": draft.strip()})
-        follow.append({"role": "user", "content": f"[The Captain is waiting for an answer. The officer concerned answers now, in {lang}, "
-                                                  "in character, with speak.]"})
+        follow.append({"role": "user", "content": f"[What you wrote was not said aloud. If the Captain's words were for the bridge, the "
+                                                  f"officer concerned answers now, in {lang}, in character, with speak; if they were not "
+                                                  "for you, say nothing.]"})
         t0 = time.perf_counter()
         comp = await self._llm(turn, "crew", follow, [SPEAK], self._on_call(turn, lang, t0, [], ts, {}, [], captain=True),
                                max_tokens=200)

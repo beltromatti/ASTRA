@@ -370,98 +370,31 @@ class ModelsTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(models.role(name).max_price, models.CEILING)
 
 
-class RouterTest(unittest.TestCase):
-    def ctx(self, **kw: Any) -> Context:
+class RouterModelTest(unittest.IsolatedAsyncioTestCase):
+    """What goes out on an open channel is the comms officer's call, made by a small model (router.for_party)."""
+    def ctx(self, **kw) -> Context:
         return Context(channel=Channel(party="T-23", name="Ferryman Irina Vael (the Cocytus)", **kw))
 
-    def test_the_two_playtest_misroutes(self) -> None:
-        for text in ("rapporto armamenti", "ci sono navi nemiche", "sparate con tutto"):
-            r = router.quick(text, self.ctx())
-            self.assertIsNotNone(r, text)
-            self.assertEqual((r.dest, r.external), ("crew", ""), text)
+    async def test_the_model_says_which_words_go_out(self) -> None:
+        llm = FakeLLM(Script(content='{"to_party": "che cosa cercate qui"}'))
+        r = await router.for_party(llm, "che cosa cercate qui", self.ctx())
+        self.assertEqual((r.external, r.party, r.how), ("che cosa cercate qui", "T-23", "model"))
 
-    def test_words_to_the_party_go_out(self) -> None:
-        r = router.quick("qui il capitano dell'aquila, fermatevi o verrete annientati", self.ctx())
-        self.assertEqual(r.dest, "external")
-        self.assertEqual(r.party, "T-23")
+    async def test_a_part_or_nothing(self) -> None:
+        llm = FakeLLM(Script(content='{"to_party": "un momento"}'), Script(content='{"to_party": ""}'))
+        self.assertEqual((await router.for_party(llm, "ascolta un momento. Voss, missili pronti", self.ctx())).external, "un momento")
+        self.assertEqual((await router.for_party(llm, "rapporto armamenti", self.ctx())).external, "")
 
-    def test_a_mixed_utterance_is_split(self) -> None:
-        r = router.quick("Ferryman, avete un minuto per arrendervi. Tattico, missili pronti sul Cocytus.", self.ctx())
-        self.assertEqual(r.dest, "both")
-        self.assertIn("minuto", r.external)
-        self.assertIn("missili", r.crew)
-        self.assertEqual(r.addressed, ("tactical",))
+    async def test_when_the_model_does_not_answer_nothing_goes_out(self) -> None:
+        llm = FakeLLM(Script(error="HTTP 500"))
+        r = await router.for_party(llm, "che cosa cercate qui", self.ctx())
+        self.assertEqual(r.external, "")                                                  # (nothing goes out)
 
-    def test_no_channel_or_muted_everything_stays_aboard(self) -> None:
-        self.assertEqual(router.quick("Cocytus, arrendetevi", Context()).dest, "crew")
-        self.assertEqual(router.quick("Cocytus, arrendetevi", self.ctx(muted=True)).dest, "crew")
-        self.assertTrue(router.quick("Ferryman, ritiratevi subito", self.ctx(muted=True)).unsure)
-
-    def test_facing_an_officer_names_who_answers_first(self) -> None:
-        r = router.quick("portaci piu vicini", Context(facing="helm"))
-        self.assertEqual(r.addressed, ("helm",))
-
-    def test_a_reply_in_an_exchange_goes_to_the_party(self) -> None:
-        self.assertEqual(router.quick("no", self.ctx(heard_s=5.0)).dest, "external")
-        self.assertEqual(router.quick("scudi a poppa", self.ctx(heard_s=5.0)).dest, "crew")
-
-    def test_what_the_rules_cannot_tell_is_left_to_the_model_not_guessed(self) -> None:
-        self.assertIsNone(router.quick("che cosa cercate qui", self.ctx()))
-
-    def test_a_filler_before_the_name_does_not_hide_it(self) -> None:
-        for text in ("Ok, Vael, ti ascolto.", "Senta, Ferryman: parliamoci chiaro.", "Ehm, Vael, forse possiamo trovare un accordo."):
-            self.assertEqual(router.quick(text, self.ctx()).dest, "external", text)
-        r = router.quick("Ok Vael ti ascolto. Voss, tieni gli occhi aperti.", self.ctx())
-        self.assertEqual(r.dest, "both")
-        self.assertIn("ascolto", r.external)
-        self.assertIn("occhi aperti", r.crew)
-
-    def test_a_name_that_closes_short_words_is_spoken_to(self) -> None:
-        for text in ("back off vael", "rispondimi capitano", "sei sola vael"):
-            self.assertEqual(router.quick(text, self.ctx()).dest, "external", text)
-        self.assertEqual(router.quick("il cocytus e fuori portata voss", self.ctx()).dest, "crew")
-
-    def test_talk_about_the_party_stays_aboard_even_in_an_exchange(self) -> None:
-        for text in ("wait what did she say", "chi e quello che ha appena parlato", "chiedi all'ammiraglio cosa vuole che facciamo"):
-            self.assertEqual(router.quick(text, self.ctx(heard_s=4.0)).dest, "crew", text)
-
-    def test_an_article_before_a_name_makes_it_the_subject_not_the_one_spoken_to(self) -> None:
-        r = router.quick("Allora, riassumiamo: il Cocytus e solo, giusto?", self.ctx())
-        self.assertTrue(r is None or r.dest == "crew")                     # (never sent out on the channel)
-
-    def test_a_sentence_that_names_the_party_is_not_filler_for_its_neighbours(self) -> None:
-        r = router.quick("Un attimo Vael. Comunicazioni, registrate tutto.", self.ctx())
-        self.assertEqual(r.dest, "both")
-        self.assertIn("attimo", r.external)
-        self.assertIn("registrate", r.crew)
-
-    def test_the_rules_are_fast(self) -> None:
-        t0 = time.perf_counter()
-        for _ in range(500):
-            router.quick("Ferryman, avete un minuto per arrendervi. Tattico, missili pronti sul Cocytus.", self.ctx())
-        self.assertLess((time.perf_counter() - t0) / 500 * 1000, 2.0)
-
-
-
-class RouterModelTest(unittest.IsolatedAsyncioTestCase):
-    def ctx(self) -> Context:
-        return Context(channel=Channel(party="T-23", name="Ferryman Irina Vael (the Cocytus)"))
-
-    async def test_when_the_model_does_not_answer_the_words_stay_aboard(self) -> None:
-        llm = FakeLLM(Script(error="HTTP 500"), Script(error="HTTP 500"))
-        r = await router.route(llm, "che cosa cercate qui", self.ctx())
-        self.assertEqual((r.dest, r.how), ("crew", "fallback"))
-        self.assertTrue(r.unsure)
-
-    async def test_the_model_settles_the_open_case(self) -> None:
-        llm = FakeLLM(Script(content="party"))
-        r = await router.route(llm, "che cosa cercate qui", self.ctx())
-        self.assertEqual((r.dest, r.how, r.party), ("external", "llm", "T-23"))
-
-    async def test_mixed_takes_a_second_small_call_to_split(self) -> None:
-        llm = FakeLLM(Script(content="mixed"), Script(content='{"crew": "missili pronti", "party": "un momento"}'))
-        r = await router.route(llm, "ascolta un momento missili pronti", self.ctx())
-        self.assertEqual((r.dest, r.crew, r.external), ("both", "missili pronti", "un momento"))
+    async def test_no_channel_or_muted_no_call(self) -> None:
+        llm = FakeLLM()
+        self.assertEqual((await router.for_party(llm, "Cocytus, arrendetevi", Context())).how, "no_channel")
+        self.assertEqual((await router.for_party(llm, "Cocytus, arrendetevi", self.ctx(muted=True))).how, "no_channel")
+        self.assertEqual(llm.requests, [])
 
 
 class WatchTest(unittest.TestCase):

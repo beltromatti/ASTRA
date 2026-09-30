@@ -5,8 +5,7 @@
 A fake game connects to the real `Mind` (its turn worker, router glue, watch loop, event queue) over a fake websocket: it sends
 the ship state (with or without consoles), the Captain's words with or without `context`, ship events, and answers the mind's
 `command` messages like the game does. The model is a function that answers by what it is asked. What is checked: the
-Captain's words with a channel open go to the crew or to the party as the router decides, the crew does not start speaking
-before the router has answered, an old game build (no consoles, no context) works as before, a new Captain utterance cuts off
+Captain's words with a channel open reach the crew at once and go out to the party as comms decides (router.for_party), an old game build (no consoles, no context) works as before, a new Captain utterance cuts off
 what the crew was doing, and a fight with live consoles brings the officers' watch check and its `station` commands."""
 from __future__ import annotations
 
@@ -43,8 +42,9 @@ class Model:
         self.calls.append({"kind": kind, "model": model, "user": user[:160], "tools": names, "watch": "WATCH CHECK" in user,
                            "system": str(messages[0].get("content", ""))})
         script: list[tuple[str, dict[str, Any]]] = []
-        if kind == "router":
-            out.content = next((v for k, v in self.router_says.items() if k in user), "crew")
+        if kind == "router":                                       # the comms officer's call: the words that go out, as JSON
+            verdict = next((v for k, v in self.router_says.items() if k in user), "crew")
+            out.content = json.dumps({"to_party": user if verdict == "party" else ""})
             return out
         if kind == "enemy":
             script = [("transmit", {"text": self.enemy_says, "tone": "cold"})]
@@ -166,9 +166,11 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([c for c in self.model.calls if c["kind"] == "enemy"], [])
         self.game.commands.clear()
         self.mind.enemy.open_channel("T-23")
+        self.model.router_says = {"fermatevi": "party"}
+        self.model.crew = []                                                       # (the crew hears it and has nothing to do)
         await self.say("qui il capitano dell'aquila, fermatevi o verrete annientati", self.OPEN, wait=0.8)
-        self.assertEqual(self.game.commands, [])                                     # the crew never saw it
-        self.assertEqual(len([c for c in self.model.calls if c["kind"] == "crew"]), 1)
+        self.assertEqual(self.game.commands, [])
+        self.assertEqual(len([c for c in self.model.calls if c["kind"] == "crew"]), 2)     # the crew heard both
         self.assertTrue(any(s == self.mind.enemy.speaker for s, _ in self.game.lines()))   # the enemy answered
 
     async def test_the_playtest_misroutes_now_reach_the_crew(self) -> None:
@@ -180,15 +182,15 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len([c for c in self.model.calls if c["kind"] == "crew"]), 2)
         self.assertEqual([c for c in self.model.calls if c["kind"] == "enemy"], [])
 
-    async def test_an_open_case_starts_the_crew_at_once_and_holds_it_until_the_router_answers(self) -> None:
+    async def test_the_crew_hears_at_once_while_comms_decides_what_goes_out(self) -> None:
         await self.state(LocalShip(stations=True, fight=True))
         self.mind.enemy.open_channel("T-23")
         self.model.router_says = {"cercate qui": "party"}
-        self.model.crew = [("station", {"station": "tactical", "mode": "engage", "params": {"targets": ["T-23"]}})]
+        self.model.crew = []
         await self.say("che cosa cercate qui", self.OPEN, wait=1.0)
-        self.assertEqual(self.game.commands, [])                                     # the held crew turn did nothing
-        self.assertTrue(any(c["kind"] == "router" for c in self.model.calls))
-        self.assertTrue(any(c["kind"] == "enemy" for c in self.model.calls))
+        self.assertTrue(any(c["kind"] == "crew" for c in self.model.calls))       # the room heard it
+        self.assertTrue(any(c["kind"] == "router" for c in self.model.calls))     # comms decided
+        self.assertTrue(any(c["kind"] == "enemy" for c in self.model.calls))      # and it went out
 
     async def test_an_open_case_the_router_gives_to_the_crew(self) -> None:
         await self.state(LocalShip(stations=True, fight=True))

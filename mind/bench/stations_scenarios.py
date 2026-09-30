@@ -655,7 +655,7 @@ async def sc_mess_and_medbay(llm: OpenRouter, lang: str) -> Result:
 
 
 async def sc_routing(llm: OpenRouter, lang: str) -> Result:
-    sc = Scenario("routing with an open channel (rules + small model)", lang)
+    sc = Scenario("an open channel: what comms lets out (a small model)", lang)
     ch = Channel(party="T-23", name="Ferryman Irina Vael (the Cocytus)")
     ctx = Context(channel=ch)
     cases = {"it": [("rapporto armamenti", "crew"), ("ci sono navi nemiche", "crew"), ("qui il capitano dell'Aquila, fermatevi o verrete annientati", "external"),
@@ -664,8 +664,9 @@ async def sc_routing(llm: OpenRouter, lang: str) -> Result:
                     ("Tactical, lock missiles on the Cocytus", "crew")]}[lang]
     for text, want in cases:
         t0 = time.perf_counter()
-        r = await router.route(llm, text, ctx)
-        sc.must(f"{text!r} -> {want}", r.dest == want, f"{r.dest} via {r.how} in {(time.perf_counter() - t0) * 1000:.0f} ms")
+        r = await router.for_party(llm, text, ctx)
+        got = "external" if r.external else "crew"
+        sc.must(f"{text!r} -> {want}", got == want, f"{got} ({r.external!r}) via {r.how} in {(time.perf_counter() - t0) * 1000:.0f} ms")
     sc.res.transcript.append("routes: " + "; ".join(f"{t!r}" for t, _ in cases))
     return sc.res
 

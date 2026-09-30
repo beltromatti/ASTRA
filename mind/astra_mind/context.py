@@ -35,6 +35,7 @@ class Channel:
     open: bool = True
     muted: bool = False                 # the Captain's voice does not go out
     heard_s: float | None = None        # seconds since the party last spoke to the Captain (None: not in this exchange)
+    last_words: str = ""                # what the party last said on the channel (as comms heard it)
     said_s: float | None = None         # seconds since the Captain last spoke to the party
     screen: bool = False                # the party is on the main viewscreen
 
@@ -69,14 +70,20 @@ class Context:
 
 
 class Exchange:
-    """The mind's memory of the talk with each party on the channel: who spoke last, and when."""
+    """The mind's memory of the talk with each party on the channel: who spoke last, when, and what they said."""
 
     def __init__(self) -> None:
         self._heard: dict[str, float] = {}
         self._said: dict[str, float] = {}
+        self._words: dict[str, str] = {}
 
-    def heard(self, party: str) -> None:
+    def heard(self, party: str, words: str = "") -> None:
         self._heard[party] = time.monotonic()
+        if words:
+            self._words[party] = words
+
+    def last_words(self, party: str) -> str:
+        return self._words.get(party, "")
 
     def said(self, party: str) -> None:
         self._said[party] = time.monotonic()
@@ -88,6 +95,7 @@ class Exchange:
     def reset(self) -> None:
         self._heard.clear()
         self._said.clear()
+        self._words.clear()
 
 
 def known_speakers(ids: Any) -> tuple[str, ...]:
@@ -144,7 +152,7 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
             party = str(ch.get("party") or "")
             channel = Channel(party=party, name=(names or {}).get(party, party), kind=str(ch.get("kind") or _kind(party, state)),
                               open=bool(ch.get("open", True)), muted=bool(ch.get("muted", False)) or _comms_muted(state),
-                              heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party),
+                              heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), last_words=ex.last_words(party),
                               screen=bool(ch.get("screen", False)) or _on_screen(state, party))
         slug = str(raw.get("place") or "bridge")
         place = PLACE_SLUGS.get(slug, slug)
@@ -157,7 +165,8 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
     if enemy is not None and getattr(enemy, "open", False):
         party = str(getattr(enemy, "contact", "") or "")
         channel = Channel(party=party, name=(names or {}).get(party, party), kind="enemy", open=True, muted=_comms_muted(state),
-                          heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), screen=_on_screen(state, party))
+                          heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), last_words=ex.last_words(party),
+                          screen=_on_screen(state, party))
     return Context(place=place, in_earshot=earshot_from_state(place, state), facing=None, channel=channel,
                    pawn="falcon" if place == "falcon" else "seated", source="inferred", asleep=asleep)
 
@@ -204,6 +213,7 @@ def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
         if ch.muted:
             parts.append(f"A channel with {who} is open but MUTED: nothing the Captain says reaches them.")
         else:
-            parts.append(f"A channel with {who} is open: only what the Captain clearly says TO them goes out on it (the router "
-                         "has sorted this out); everything on this line is for the bridge.")
+            parts.append(f"A channel with {who} is open: what the Captain says TO them goes out on it (Martin lets it through), "
+                         f"and you hear every word as well. Words said to {who} are for {who} to answer, not for you: act and "
+                         "speak on what is meant for the bridge (Martin may say in a few words that a message went out, if that helps).")
     return " ".join(parts)
