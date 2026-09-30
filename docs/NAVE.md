@@ -1,7 +1,7 @@
 # NAVE — l'ASN Aquila come nave vera (fase F4.1)
 
 Il "DNA" della nave (`data/ship/aquila_plan.json`), il kit di moduli e stanze dell'interno (Blender, nel linguaggio della plancia v3), il
-**Ponte 4 (Crew Services) costruito da capo a coda** e gli strumenti per metterlo nel livello. Tutto ciò che è scritto nel gioco è in inglese;
+**Ponte 4 (Crew Services) costruito da capo a coda a mano**, il **Ponte 6 (Medical) costruito dal suo programma** e gli strumenti per metterli nel livello. Tutto ciò che è scritto nel gioco è in inglese;
 questa pagina è in italiano con i nomi ufficiali.
 
 Stato: piano dei 12 ponti completo e verificato (0 problemi, 0 avvisi); **Ponte 4 e Ponte 6 con mesh** (640 e 681 posizionamenti); gli altri ponti hanno un piano
@@ -14,10 +14,10 @@ uv run --python /opt/homebrew/bin/python3.13 --with pillow --with numpy python t
 python3 art/blender/ship_plan_gen.py                                                                              # piano: data/ship/aquila_plan.json
 python3 art/blender/ship_checks.py                                                                                # controlli del piano (0 problemi attesi)
 /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python-exit-code 1 -P art/blender/ship_kit.py   # FBX + manifest in art/export/ship
-tools/ue.py pyfile tools/ue_scripts/build_ship_interior.py                                                        # il lead: materiali, kit, Ponte 4 in L_Bridge
+tools/ue.py pyfile tools/ue_scripts/build_ship_interior.py                                                        # il lead: materiali, kit, Ponti 4 e 6 in L_Bridge
 ```
 
-Anteprime (Eevee, senza editor): `Blender -b … -P art/blender/ship_kit.py -- --no-export --no-checks --preview docs/progressi/nave --views rooms,modules,d4 --room-views best --samples 36`.
+Anteprime (Eevee, senza editor): `Blender -b … -P art/blender/ship_kit.py -- --no-export --no-checks --preview docs/progressi/nave --views rooms,modules,d4,d6 --room-views best --samples 36`.
 Un solo pezzo: `… -- --only Galley,S_Bulkhead,Sign_4B --no-export`. Piano in pianta: `uv run … --with pillow python tools/art/ship_planview.py 4 out.jpg [--x0 -260 --x1 -60 --scale 6 --graph]`.
 Il piano è la fonte unica: lo leggono `ship_kit.py` (quali targhe e segnali servono), `build_ship_interior.py` e il gioco (`UAstraShipPlan`, che lo cerca in
 `Content/ASTRA/Data/aquila_plan.json`, dove lo script lo copia, poi in `data/ship/`).
@@ -111,7 +111,7 @@ Non a mano come il 4: `ship_decks.plan_deck(coarse=False)` riempie le corsie dal
 machinery) resta un compartimento pianificato dietro un muro pieno (la porta è nel piano: `planned: true, locked: true`, nessuna apertura nel corridoio, lo script di Unreal non la fa). Il motore toglie le stanze la cui
 porta incontrerebbe un collegamento a croce sull'altro lato del corridoio (un modulo non può avere un ramo da una parte e una porta dall'altra) e dà la precedenza alle torri delle scale. La Spine corre fino al
 portale del Medbay (l'ingresso del Medbay è su questo piano: `reach_rooms`); il Flight Deck e la sala Engineering non hanno l'ingresso qui e restano ostacoli. **Sala operatoria, reparto di quarantena e farmacia sono
-"fissate" (`PINNED`) accanto al Medbay**, sul lato di dritta della Spine. Numeri: 228 compartimenti, 459 moduli, 91 stanze (surgery, quarantine, pharmacy; magazzini, cabine, lavanderie, servizi, laboratori, serra, biblioteca,
+"fissate" (`PINNED`) accanto al Medbay**, sul lato di dritta della Spine. Finché non si tolgono le ante dell'alcova del Medbay (`REMOVE_LIFT_LEAVES`) la Spine finisce contro la sua parete. Numeri: 228 compartimenti, 459 moduli, 91 stanze (surgery, quarantine, pharmacy; magazzini, cabine, lavanderie, servizi, laboratori, serra, biblioteca,
 sale di raccoglimento), 40 segnali, 245 luci, 4 torri delle scale; immagini `docs/progressi/nave/d6_*.jpg`.
 
 ## 6. Il kit (`art/blender/ship_*.py`)
@@ -129,7 +129,7 @@ il costo è la memoria: circa 160 MB di FBX su disco, non in git).
 | Stanze mediche | Surgery, Quarantine, Pharmacy | sala operatoria (due tavoli, lampade scialitiche, carrelli dell'anestesia), reparto di quarantena (zona filtro, postazione infermieri, sei celle di vetro), farmacia (bancone a gabbia, scaffali, frigoriferi) |
 | Stanze di lavoro | Lab, Workshop, Armory, Cabins | banchi con scaffali di reagenti, cappe, tavolo olografico; torni, fresa, saldatura, carroponte; gabbia, rastrelliere, manichini; corridoio comune e otto cabine con cuccette |
 | Snodi e verticali | Concourse, BerthLobby, StairTower(+Top, +Bottom), LadderTrunk | torre: due rampe a tornante, pozzo, scala a pioli con boccaporto; alta un ponte (4 m) |
-| Segni | `SM_SHIP_Plate_*` (13), `SM_SHIP_Sign_<d><s>` (8) | etichette dell'atlante, lampada sul bordo |
+| Segni | `SM_SHIP_Plate_*` (19: una per stanza, una per le scale di ogni ponte costruito), `SM_SHIP_Sign_<d><s>` (16: sezioni A–H dei ponti 4 e 6) | etichette dell'atlante, lampada sul bordo; i numeri sulle porte delle cabine sono `CABIN 1..12`, uguali su ogni ponte |
 
 Materiali: le istanze del progetto (`MI_ASTRA_Structure/Trim/Rubber/Glass`, `MI_BRG3_Composite/Ivory/DeckPlate/DarkGlass/Lamps*`) e **17 nuove** `MI_SHIP_*` (Laminate, Steel, Fabric×4, Bedding, Wood,
 Crate×4, Leaf, Tile, PaintRed, Soil, Labels), create da `build_ship_interior.py` (padre `M_ASTRA_Hard` con i set di texture già nel progetto; Labels = `M_ASTRA_Screen` con `T_SHIP_Labels`); i valori sono quelli
@@ -145,8 +145,8 @@ un cancello del Concourse, una giunzione, la torre, il passaggio laterale, tre p
 - **`UAstraShipPlan`** (C++ del lead) legge `compartments, doors, graph` (nodo più vicino, rotta A*, compartimento di un punto, porte stagne sigillate, porte a chiave). Le stanze esistenti e il Ponte 4 sono nel piano; ogni cambio di nomi va detto.
 - **Luci di zona** (`UAstraZoneLights`): le luci hanno il tag `ASTRA.ZoneLight.<compartimento>` (lo mette lo script), senza ombre; ne restano accese le 8 più vicine. Non hanno il tag `ASTRA.ShipLight` (l'allerta e il livello di luce non le toccano: se si vuole, aggiungerlo in `add_light`;
   le lampade emissive delle mesh seguono già l'allerta dalla palette).
-- **Porte**: una `AAstraDoor` per porta del piano (larghezza, altezza e yaw del record, cartella `Interior/Deck04/Doors`, etichetta `Door_<id>`); le ante scorrono di metà larghezza. Le porte delle torri delle scale restano **chiuse a chiave** finché i ponti sopra e sotto non sono costruiti
-  (`LOCK_STAIRS`); i portali delle stanze esistenti non si toccano.
+- **Porte**: una `AAstraDoor` per porta del piano (larghezza, altezza e yaw del record, cartella `Interior/Deck<NN>/Doors`, etichetta `Door_<id>`); le ante scorrono di metà larghezza. Le porte delle torri delle scale restano **chiuse a chiave** finché i ponti sopra e sotto non sono costruiti
+  (`LOCK_STAIRS`: oggi tutte, perché 3, 5 e 7 non ci sono); le porte di stanze non ancora modellate (`planned`) non si fanno; i portali delle stanze esistenti non si toccano salvo `REMOVE_LIFT_LEAVES`.
 - **Ascensore** (`AstraHangar`, sei tappe: Bridge, Hangar, Engineering, Medbay, Mess, Berth): il Concourse ha il suo banco (`lift.d4_concourse`, in **(-119,1; 9,0; -46,0) m**, davanti alle due porte a x -121,45, y 7,6 e 10,4). Da fare: mettere `MessLanding` lì (e `BerthLanding` nell'atrio, per esempio
   (-172; 0; -46)), poi togliere le ante statiche delle alcove (`REMOVE_LIFT_LEAVES = True` distrugge le cartelle `Mess/Lift`, `Berths/Lift` e `Medbay/Lift` e mette una porta scorrevole nell'apertura: i portali esistenti su cui arriva un ponte costruito) e riprovare il tragitto; finché non si fa il vecchio comportamento resta.
 - **Incidenti** (`AstraShipSubsystem`: fuochi e danni scelgono un ponte 2–11 e una sezione A–H): il piano dà per ogni (ponte, sezione) i compartimenti veri: scegliere un corridoio o una stanza di quel ponte e sezione e usarne `bounds` per il punto.
