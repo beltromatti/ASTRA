@@ -650,7 +650,11 @@ class Mind:
         """The Captain has priority over everything: whatever the crew was doing (a report, a watch check, a chat) stops now,
         and the reports still waiting to be voiced are dropped."""
         n = self.agent.preempt()
-        dropped = self.voice.drop_low_priority()
+        drop = getattr(self.voice, "drop_low_priority", None)        # (the voice module's side: it may give the Captain more than this)
+        dropped = drop() if callable(drop) else 0
+        hook = getattr(self.voice, "captain_speaks", None)           # the hook for cutting the line being spoken, if the voice has one
+        if callable(hook):
+            hook()
         if n or dropped:
             log.info("the Captain speaks: %d turn(s) cut off, %d unspoken line(s) dropped", n, dropped)
 

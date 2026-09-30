@@ -53,7 +53,7 @@ ROLES: dict[str, Role] = {r.name: r for r in (
          note="the initiative watch: adjust the consoles, at most two short lines"),
     Role("router", DEEPSEEK, _DS, max_tokens=16, temperature=0.0, first_token_s=1.2,
          note="who is the Captain talking to (only the cases the rules cannot settle)"),
-    Role("chatter", "openai/gpt-oss-120b", ("crusoe", "baseten", "groq"), (("effort", "low"),), max_tokens=700, temperature=0.7,
+    Role("chatter", "openai/gpt-oss-120b", ("crusoe",), (("effort", "low"),), max_tokens=700, temperature=0.7,
          first_token_s=6.0, fallback="crew", note="quiet moments and low-stakes talk (bench/stations_models.py: 5x cheaper, faster, same checks)"),
 )}
 

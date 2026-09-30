@@ -172,6 +172,16 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         await c.agent.handle("siamo in raggio?", "it")
         self.assertEqual([t for _, t in c.said], ["Sì, Capitano."])
 
+    async def test_a_fight_full_of_checks_does_not_push_the_captains_orders_out_of_the_history(self) -> None:
+        c = Crew(*[Script([speak(f"Ordine {i} eseguito, Capitano.", "helm")]) for i in range(3)], *[Script([speak(f"Controllo {i}.", "tactical")]) for i in range(20)])
+        for i in range(3):
+            await c.agent.handle(f"ordine {i}", "it")
+        for i in range(20):
+            await c.agent.handle_event(f"tactical: something {i}", "it")
+        said = [m["content"] for m in c.agent.history if m["role"] == "user"]
+        self.assertEqual(sum(1 for m in said if m.startswith("Captain:")), 3)                      # all three orders are still there
+        self.assertLessEqual(sum(1 for m in said if not m.startswith("Captain:")), 6)             # the checks are capped
+
     async def test_a_mode_name_in_a_line_is_spoken_as_plain_words(self) -> None:
         c = Crew(Script([speak("Propongo keep_on_bow su T-24 e scan_focus su T-31.", "helm")]))
         await c.agent.handle("consigli?", "it")

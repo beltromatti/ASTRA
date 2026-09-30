@@ -237,7 +237,8 @@ async def sc_viewscreen(llm: OpenRouter, lang: str) -> Result:
     turn = await h.captain(text)
     calls = h.modes("ops", "viewscreen_target")
     sc.must("ops viewscreen_target on T-23", bool(calls) and calls[-1]["params"].get("target") == "T-23", f"{h.ship.log}")
-    sc.must("zoomed", bool(calls) and float(calls[-1]["params"].get("zoom", 1)) > 1, f"{calls[-1]['params'] if calls else None}")
+    zoom = calls[-1]["params"].get("zoom", 1) if calls else 1
+    sc.must("zoomed", zoom in ("close", "max") or (not isinstance(zoom, str) and float(zoom) > 1), f"{calls[-1]['params'] if calls else None}")
     sc.spoke_well(h)
     sc.must("Tanaka answers", h.lines and h.lines[0][0] == "ops", f"{h.lines[:1]}")
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
@@ -274,7 +275,7 @@ async def sc_delegation(llm: OpenRouter, lang: str) -> Result:
     for st, level, text in phrases:
         turn = await h.captain(text)
         sc.must(f"{text!r} -> {st} {level}", h.ship.delegation[st] == level, f"{h.ship.delegation}")
-        sc.spoke_well(h, max_total=30, max_lines=2)
+        sc.spoke_well(h, max_total=36, max_lines=2)      # (the XO announces, the officer says what changes for them: two short lines)
         sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
     sc.res.turns += h.turns
@@ -452,7 +453,7 @@ async def sc_standing_order(llm: OpenRouter, lang: str) -> Result:
     text = {"it": "Voss, fuoco libero su qualsiasi nave del Mandato entro dieci chilometri, sempre", "en": "Voss, weapons free on any Mandate ship inside ten kilometres, always"}[lang]
     turn = await h.captain(text)
     sc.must("recorded as a standing order (or set as weapons free)", bool(h.agent.standing) or bool(h.modes("tactical", "weapons_free")), f"{h.ship.log} {h.agent.standing}")
-    sc.spoke_well(h, max_total=40)
+    sc.spoke_well(h, max_line_words=30, max_total=40)
     sc.res.transcript.append(transcript(h, text, turn, h.lines))
     sc.res.cost = h.cost
     sc.res.turns += h.turns

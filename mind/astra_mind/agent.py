@@ -90,10 +90,22 @@ class BridgeAgent:
 
     # ------------------------------------------------------------------------------------------------ prompts
     def _trim_history(self) -> None:
-        """Keep the last `history_turns` turns (a turn starts at a user message)."""
+        """Keep the last `history_turns` of the Captain's turns (a turn starts at a user message), and of the crew's own (reports,
+        watch checks, chatter: at most the last six since then) — a fight full of checks must not push the Captain's orders out."""
         starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
-        if len(starts) > self.history_turns:
-            self.history = self.history[starts[-self.history_turns]:]
+        captain = [i for i in starts if str(self.history[i].get("content", "")).startswith("Captain:")]
+        if len(starts) <= self.history_turns and len(captain) <= self.history_turns:
+            return
+        first = captain[-self.history_turns] if len(captain) > self.history_turns else (captain[0] if captain else starts[0])
+        keep = [i for i in starts if i >= first]
+        events = [i for i in keep if i not in captain]
+        drop_events = set(events[:-6]) if len(events) > 6 else set()
+        ends = {s: (starts[k + 1] if k + 1 < len(starts) else len(self.history)) for k, s in enumerate(starts)}
+        kept: list[dict[str, Any]] = []
+        for i in keep:
+            if i not in drop_events:
+                kept += self.history[i:ends[i]]
+        self.history = kept
 
     def _last_turns(self, n: int) -> list[dict[str, Any]]:
         starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
@@ -214,7 +226,7 @@ class BridgeAgent:
         tools = [t for t in ts.tools if t["function"]["name"] in (allowed | {"speak"})]
         self._active.add(turn)
         try:
-            comp = await self._llm(turn, role, msgs, tools, on_call, max_tokens=360)
+            comp = await self._llm(turn, role, msgs, tools, on_call, **({"max_tokens": 360} if role == "crew" else {}))   # (the other roles carry their own)
             if turn.cancelled:
                 await self._finish_interrupted(user, fired, pending, turn)
                 turn.t_end = time.perf_counter() - t0
