@@ -125,6 +125,22 @@ def clip_poly(poly: np.ndarray, axis: int, value: float, keep_greater: bool) -> 
     return np.array(out) if len(out) >= 3 else np.zeros((0, 2))
 
 
+def clip_poly_line(poly: np.ndarray, n, d: float) -> np.ndarray:
+    """Sutherland-Hodgman: a convex polygon (m,2) cut by the half-plane n.p >= d (any direction)."""
+    n = np.asarray(n, np.float64)
+    out = []
+    m = len(poly)
+    s = poly @ n - d
+    for i in range(m):
+        a, b = poly[i], poly[(i + 1) % m]
+        sa, sb = s[i], s[(i + 1) % m]
+        if sa >= -1e-9:
+            out.append(a)
+        if (sa >= -1e-9) != (sb >= -1e-9):
+            out.append(a + (b - a) * (sa / (sa - sb)))
+    return np.array(out) if len(out) >= 3 else np.zeros((0, 2))
+
+
 def _poly_area(p: np.ndarray) -> float:
     x, y = p[:, 0], p[:, 1]
     return 0.5 * float(np.sum(x * np.roll(y, -1) - np.roll(x, -1) * y))
@@ -161,13 +177,13 @@ def face_pieces(poly: np.ndarray, holes) -> list[np.ndarray]:
     return pieces
 
 
-def end_face(c: Ctx, ring_yz: np.ndarray, x: float, normal_x: float, style: HullStyle, holes=(), zo: float = 0.0, plate: bool = True) -> None:
+def end_face(c: Ctx, ring_yz: np.ndarray, x: float, normal_x: float, style: HullStyle, holes=(), zo: float = 0.0, plate: bool = True, pieces=None) -> None:
     """The flat bow or stern face of a hull at x: the skin as convex pieces (holes left open), then plates on the rectangles that
     fit inside each piece. ring_yz: the section polygon (n,2) as (y, z); normal_x = +1 (bow) or -1 (stern)."""
     g, rng = c.g, c.rng
     poly = np.asarray(ring_yz, np.float64).copy()
     poly[:, 1] += zo
-    for piece in face_pieces(poly, holes):
+    for piece in (face_pieces(poly, holes) if pieces is None else pieces):      # `pieces`: convex polygons (y, z) given ready (already at their height)
         cen = piece.mean(axis=0)
         V = np.column_stack([np.full(len(piece) + 1, x), np.vstack([piece, cen])])
         k = len(piece)
@@ -252,3 +268,35 @@ def rivet_plates(c: Ctx, plates, p: float = 0.3, spacing=(2.2, 3.4), inset: floa
     P, N, T = np.concatenate(pos), np.concatenate(nrm), np.concatenate(tan)
     g.instance(_RIVET, P - N * 0.01, frames=G.frames_z(N, T), scales=size, mat=c.m(mat), kind="rivet")
     return len(P)
+
+
+def subtract_convex(poly: np.ndarray, halfplanes) -> list:
+    """A convex polygon (m,2) minus a convex region given by its half-planes [(n, d), ...] (inside: n.p >= d), as convex pieces."""
+    pieces = []
+    cur = poly
+    for n, d in halfplanes:
+        n = np.asarray(n, np.float64)
+        out = clip_poly_line(cur, -n, -d)
+        if len(out) >= 3 and abs(_poly_area(out)) > 1e-3:
+            pieces.append(out)
+        cur = clip_poly_line(cur, n, d)
+        if len(cur) < 3:
+            break
+    return pieces
+
+
+def polygon_halfplanes(poly: np.ndarray, inset: float = 0.0) -> list:
+    """The half-planes (n, d) whose intersection is the convex polygon (any winding), each moved `inset` inwards."""
+    poly = np.asarray(poly, np.float64)
+    sign = 1.0 if _poly_area(poly) > 0 else -1.0
+    out = []
+    m = len(poly)
+    for i in range(m):
+        p, q = poly[i], poly[(i + 1) % m]
+        e = q - p
+        ln = float(np.linalg.norm(e))
+        if ln < 1e-9:
+            continue
+        n = sign * np.array([-e[1], e[0]]) / ln                         # the inward normal of a counter-clockwise polygon
+        out.append((n, float(n @ p) + inset))
+    return out

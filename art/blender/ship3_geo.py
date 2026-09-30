@@ -547,3 +547,112 @@ def box_uv(V: np.ndarray, F: np.ndarray, texel_m: float = 8.0, lattice: float = 
     rows = np.arange(len(F))[:, None]
     cols = np.arange(3)[None, :]
     return np.stack([P[rows, cols, ua[:, None]], P[rows, cols, va[:, None]]], axis=-1) / texel_m
+
+
+# --------------------------------------------------------------------------------------------------------------- clipping
+def clip_halfspace(V, F, mat, attrs, n, d):
+    """Keep the part of a triangle mesh on the side n.p >= d (a plane cut through triangles, per-vertex `attrs` interpolated).
+    Returns (V, F, mat, attrs) with the vertices compacted; triangles of zero area are dropped."""
+    n = np.asarray(n, np.float64)
+    V64 = np.asarray(V, np.float64)
+    A64 = [np.asarray(a, np.float64) for a in attrs]
+    s = V64 @ n - d
+    sf = s[F]
+    ins = sf >= 0.0
+    cnt = ins.sum(axis=1)
+    Fout, Mout = [F[cnt == 3]], [mat[cnt == 3]]
+    extra_V, extra_A = [], [[] for _ in A64]
+    nv = len(V64)
+
+    def cut(ip, io):                                     # the point on the edge from an inside vertex to an outside one
+        nonlocal nv
+        sp, so = s[ip], s[io]
+        t = sp / (sp - so)
+        extra_V.append(V64[ip] + (V64[io] - V64[ip]) * t[:, None])
+        for k, a in enumerate(A64):
+            extra_A[k].append(a[ip] + (a[io] - a[ip]) * t[:, None])
+        idx = np.arange(nv, nv + len(ip))
+        nv += len(ip)
+        return idx
+
+    one = cnt == 1
+    if one.any():
+        Fo = F[one]
+        k = np.argmax(ins[one], axis=1)
+        r = np.arange(len(Fo))
+        a_, b_, c_ = Fo[r, k], Fo[r, (k + 1) % 3], Fo[r, (k + 2) % 3]
+        ab, ac = cut(a_, b_), cut(a_, c_)
+        Fout.append(np.stack([a_, ab, ac], axis=1))
+        Mout.append(mat[one])
+    two = cnt == 2
+    if two.any():
+        Fo = F[two]
+        k = np.argmax(~ins[two], axis=1)
+        r = np.arange(len(Fo))
+        o_, p_, q_ = Fo[r, k], Fo[r, (k + 1) % 3], Fo[r, (k + 2) % 3]
+        op, oq = cut(p_, o_), cut(q_, o_)
+        Fout.append(np.stack([p_, q_, oq], axis=1))
+        Fout.append(np.stack([p_, oq, op], axis=1))
+        Mout.append(mat[two])
+        Mout.append(mat[two])
+    F2 = np.concatenate(Fout).astype(np.int64)
+    M2 = np.concatenate(Mout)
+    V2 = np.concatenate([V64] + extra_V) if extra_V else V64
+    A2 = [np.concatenate([a] + ex) if ex else a for a, ex in zip(A64, extra_A)]
+    area = np.linalg.norm(np.cross(V2[F2[:, 1]] - V2[F2[:, 0]], V2[F2[:, 2]] - V2[F2[:, 0]]), axis=1)
+    ok = area > 1e-9
+    F2, M2 = F2[ok], M2[ok]
+    used, inv = np.unique(F2, return_inverse=True)
+    return V2[used], inv.reshape(F2.shape).astype(I32), M2, [a[used] for a in A2]
+
+
+def clip_region(V, F, mat, attrs, halfspaces):
+    """The part of a mesh inside a convex region: the intersection of half-spaces [(normal, d), ...], n.p >= d."""
+    for n, d in halfspaces:
+        if len(F) == 0:
+            break
+        V, F, mat, attrs = clip_halfspace(V, F, mat, attrs, n, d)
+    return V, F, mat, attrs
+
+
+def _geo_clip_chunks(self, i0: int, i1: int, regions) -> int:
+    """Keep, of the chunks i0..i1-1 (cap chunks aside), only what lies in the union of `regions` (each a convex region as a list of
+    half-spaces (n, d), n.p >= d; the regions must not overlap). Vertex data (wear, tone, UVs) follows the cut. Returns the triangles
+    removed."""
+    before = 0
+    after = 0
+    keep = []
+    for i, c in enumerate(self.chunks):
+        if not (i0 <= i < i1) or c["cap"]:
+            keep.append(c)
+            continue
+        V, F, mat = c["V"], c["F"], c["mat"]
+        attrs = [c["a1"], c["a2"]] + ([c["uv"]] if c["uv"] is not None else [])
+        before += len(F)
+        pieces = [clip_region(V, F, mat, attrs, r) for r in regions]
+        pieces = [p for p in pieces if len(p[1])]
+        if not pieces:
+            continue
+        off = 0
+        Vs, Fs, Ms, As = [], [], [], [[] for _ in attrs]
+        for v2, f2, m2, a2 in pieces:
+            Vs.append(v2)
+            Fs.append(f2 + off)
+            Ms.append(m2)
+            for k in range(len(attrs)):
+                As[k].append(a2[k])
+            off += len(v2)
+        c = dict(c)
+        c["V"] = np.concatenate(Vs).astype(F32)
+        c["F"] = np.concatenate(Fs).astype(I32)
+        c["mat"] = np.concatenate(Ms).astype(np.int16)
+        c["a1"] = np.concatenate(As[0]).astype(F32)
+        c["a2"] = np.concatenate(As[1]).astype(F32)
+        c["uv"] = np.concatenate(As[2]).astype(F32) if c["uv"] is not None else None
+        after += len(c["F"])
+        keep.append(c)
+    self.chunks = keep
+    return before - after
+
+
+Geo.clip_chunks = _geo_clip_chunks

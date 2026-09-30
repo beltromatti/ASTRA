@@ -8,6 +8,8 @@ thread, white hull numbers, folding radiators on the flanks, warm windows, white
 """
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import replace
 
 import numpy as np
@@ -24,6 +26,9 @@ from ship3_cut import make_all_cuts
 from ship3_kit import Ctx, Xf
 
 PRE = "MI_HULL_A_"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PLAN = os.path.join(ROOT, "data", "ship", "aquila_plan.json")
+HULL_TO_WORLD = np.array([-172.0, 0.0, -62.0])                # world = hull + this (docs/NAVE.md §2)
 NAVY, GOLD = "Livery", "Trim"
 I3 = np.eye(3)
 
@@ -125,6 +130,9 @@ class Aquila:
     X_ST, X_BW = -372.0, 390.0
     ISLAND_TOP = 60.4
     NAME_SPAN = (143.0, 217.0)          # x range of the flank fields kept clear for the game's name decal
+    BLOCK_X = (-327.6, 132.6)           # the upper block (the raised body along the aft two thirds) and the island's base, hull frame:
+    ISLAND_X = (96.0, 212.0)            # both stand on the lower hull and are open to it (no bottom, no faces inside the decks' space)
+    ISLAND_FLOOR = 37.0                 # over the block the island's walls start where they leave the block's chamfers (z of the crossing ~37.5)
 
     def __init__(self, c: Ctx, cuts=(236.0, -105.0), features: bool = True):
         self.c, self.g, self.rng = c, c.g, c.rng
@@ -144,6 +152,7 @@ class Aquila:
         self.plates: list[LF.Plate] = []
         self.rib_x = [float(x) for x in np.arange(-340.0, 381.0, 60.0) if all(abs(x - xc) > 12 for xc in cuts)]
         self.deck_fields = [(292.0, 320.0, 0.20, 0.80), (364.0, 388.0, 0.12, 0.88)]     # flat fields on the bow deck: emblem, hull number
+        self.covered_top = [(self.BLOCK_X[0] - 1.0, self.BLOCK_X[1] + 1.0, 0.0, 1.0), (self.ISLAND_X[0] - 3.0, self.ISLAND_X[1] + 3.0, 0.16, 0.84)]
         self.g.keep_out((150.0, -16.0, self.ISLAND_TOP + 0.2), (215.0, 16.0, 90.0))       # nothing rises in front of the bridge window
 
     # ----------------------------------------------------------------------------------------------------- hull
@@ -161,15 +170,16 @@ class Aquila:
             if k in (2, 6):
                 pl = self.flank(z, voids)
             elif k == 4:
+                covered = self.covered_top                                 # under the block and the island: hidden, and inside the decks' space
                 pl = LF.plate_zone(g, z, rng, self.st.scheme, PRE, voids=voids,
-                                   skip=lambda x0, x1, w0, w1: any(x1 > f[0] and x0 < f[1] and w1 > f[2] and w0 < f[3] for f in fields))
+                                   skip=lambda x0, x1, w0, w1: any(x1 > f[0] and x0 < f[1] and w1 > f[2] and w0 < f[3] for f in fields + covered))
                 for f in fields:
                     flat_field(c, z, f[0] + 0.5, f[1] - 0.5, f[2], f[3], "Plate", 0.4)
             else:
                 dark = -0.10 if k in (0, 1, 7) else 0.0
                 pl = LF.plate_zone(g, z, rng, self.st.scheme, PRE, tone_fn=lambda a, w, d=dark: d, voids=voids)
             self.plates += pl
-        H.ribs(c, self.hull, self.rib_x, 1.8, 1.25)
+        H.ribs(c, self.hull, self.rib_x, 1.8, 1.25, skip_fn=lambda zz, x0, x1, w0, w1: zz.k == 4 and x0 < self.ISLAND_X[1] + 2.0 and x1 > self.BLOCK_X[0] - 2.0)
 
     # ---------------------------------------------------------------------------------------------- upper deck
     def upper_deck(self) -> None:
@@ -189,44 +199,113 @@ class Aquila:
             z = deck.zone(k)
             z.skin(g, c.m("Frame"))
             self.plates += LF.plate_zone(g, z, rng, self.st.scheme, PRE, voids=voids if k == 4 else ())
-        # the forward end of the upper deck stands free of the island: close it
-        H.end_face(c, np.array(stations[-1][1]), up1, 1.0, self.st, zo=zo)
+        # the ends of the block are closed above the lower hull's top only (below it the block is open onto the lower hull, so the decks'
+        # interiors are clear); the forward face also has the island's cross-section cut out of it (the block opens into the island)
+        for x_end, normal, sec in ((up1, 1.0, stations[-1][1]), (up0, -1.0, stations[0][1])):
+            ring = np.array(sec, float).copy()
+            ring[:, 1] += zo
+            poly = H.clip_poly(ring, 1, top_z(self.hull, x_end), True)
+            pieces = [poly]
+            if normal > 0:
+                hole = self.island_section(x_end)
+                if hole is not None:
+                    pieces = H.subtract_convex(poly, H.polygon_halfplanes(hole, inset=0.3))
+            H.end_face(c, np.array(sec), x_end, normal, self.st, zo=zo, pieces=pieces)
 
     # ------------------------------------------------------------------------------------------------ island
+    def island_loft_pair(self) -> tuple:
+        ib = self.H * 1.0 * 0.9
+        top = self.ISLAND_TOP
+        loftA = LF.Loft([ib, top], [ring_rect(112.0, 212.0, 19.0, ib, 0.18 * 38.0), ring_rect(152.0, 184.0, 11.5, top, 0.18 * 23.0)])
+        loftB = LF.Loft([ib, ib + 22.0], [ring_rect(96.0, 150.0, 15.0, ib, 0.2 * 30.0), ring_rect(118.0, 150.0, 10.0, ib + 22.0, 0.2 * 20.0)])
+        return loftA, loftB
+
+    def island_section(self, x: float):
+        """The island's cross-section at hull x as a convex polygon (y, z) from just above the lower hull's top, or None."""
+        loftA, loftB = self.island_loft_pair()
+        zs = np.linspace(self.H - 1.0, 41.0, 37)
+        lo, hi, zz = [], [], []
+        for z in zs:
+            ys = []
+            for loft in (loftA, loftB):
+                if not (loft.a[0] - 1e-6 <= z <= loft.a[-1] + 1e-6):
+                    continue
+                ring = loft.ring_at(float(z))[:, :2]
+                for i in range(len(ring)):
+                    p, q = ring[i], ring[(i + 1) % len(ring)]
+                    if (p[0] - x) * (q[0] - x) <= 0.0 and abs(q[0] - p[0]) > 1e-9:
+                        ys.append(p[1] + (q[1] - p[1]) * (x - p[0]) / (q[0] - p[0]))
+            if len(ys) >= 2:
+                lo.append(min(ys))
+                hi.append(max(ys))
+                zz.append(float(z))
+        if len(zz) < 3:
+            return None
+        right = [(hi[i], zz[i]) for i in range(len(zz))]
+        left = [(lo[i], zz[i]) for i in range(len(zz) - 1, -1, -1)]
+        return np.array(right + left)
+
     def island(self) -> None:
-        """The tower that carries the bridge: same footprints and heights as v2 (the bridge floor is at z 62, the top at 60.4)."""
+        """The tower that carries the bridge: same footprints and heights as v2 (the bridge floor is at z 62, the top at 60.4). It is
+        open to what it stands on: over the block its walls start where they leave the block (z 37), forward of the block they start on the
+        lower hull's top; nothing of it stays inside the decks' space."""
         c, g, rng = self.c, self.g, self.rng
         ib = self.H * 1.0 * 0.9
         top = self.ISLAND_TOP
         sch = replace(self.st.scheme, row_w=(2.6, 4.2), plate_len=(6.0, 16.0), levels=(0.4,), level_weights=(1.0,), wedge=0.0, chamfer=0.08, rim=0.2, min_len=3.0)
-        loftA = LF.Loft([ib, top], [ring_rect(112.0, 212.0, 19.0, ib, 0.18 * 38.0), ring_rect(152.0, 184.0, 11.5, top, 0.18 * 23.0)])
-        loftB = LF.Loft([ib, ib + 22.0], [ring_rect(96.0, 150.0, 15.0, ib, 0.2 * 30.0), ring_rect(118.0, 150.0, 10.0, ib + 22.0, 0.2 * 20.0)])
+        loftA, loftB = self.island_loft_pair()
         self.island_lofts = (loftA, loftB)
-        for loft, cap in ((loftA, True), (loftB, True)):
+        xb, zf = self.BLOCK_X[1], self.ISLAND_FLOOR
+        rear, slope = 90.3, 40.0 / 38.8                             # the rear face of the main tower: x - slope * z = 89.7 (hull frame)
+
+        def standing_a(P) -> bool:                                   # above what the tower stands on?
+            return bool(P[2] >= zf or (P[0] >= xb and P[2] >= self.H))
+
+        def standing_b(P) -> bool:                                   # the sensor base: only where it stands out behind the main tower
+            return bool(P[2] >= zf and P[0] - slope * P[2] <= rear)
+
+        ranges = []
+        for loft, stand in ((loftA, standing_a), (loftB, standing_b)):
+            start = len(g.chunks)
             for z in loft.zones():
                 z.skin(g, c.m("Frame"))
-                self.plates += LF.plate_tower(g, z, rng, sch, PRE)
-            if cap:
-                ring = loft.R[-1]
-                cen = ring.mean(axis=0)
-                V = np.vstack([ring, cen])
-                k = len(ring)
-                F = np.stack([np.arange(k), (np.arange(k) + 1) % k, np.full(k, k)], axis=1)
-                a_, b_, c_ = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
-                if np.sum(np.cross(b_ - a_, c_ - a_)[:, 2]) < 0:
-                    F = F[:, [0, 2, 1]]
-                g.add(V, F, c.m("Frame"), a1=(0.0, 0.5), kind="skin")
+                for pl in LF.plate_tower(g, z, rng, sch, PRE):
+                    Pm, _, _ = pl.top(np.array([0.5 * (pl.a0 + pl.a1)]), np.array([0.5 * (pl.w0 + pl.w1)]), 0.0)
+                    if stand(Pm[0]):
+                        self.plates.append(pl)
+            ring = loft.R[-1]                                        # the roof
+            cen = ring.mean(axis=0)
+            V = np.vstack([ring, cen])
+            k = len(ring)
+            F = np.stack([np.arange(k), (np.arange(k) + 1) % k, np.full(k, k)], axis=1)
+            a_, b_, c_ = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
+            if np.sum(np.cross(b_ - a_, c_ - a_)[:, 2]) < 0:
+                F = F[:, [0, 2, 1]]
+            g.add(V, F, c.m("Frame"), a1=(0.0, 0.5), kind="skin")
+            ranges.append([(start, len(g.chunks))])
         # decks of lit windows on the tower's long sides and its raked front
+        w0 = len(g.chunks)
         for z in (loftA.zone(0), loftA.zone(4)):
             for zz in np.arange(ib + 5.0, top - 4.0, 6.5):
                 K2.window_row(c, z, float(zz), 0.10, 0.90, lift=0.5)
         z = loftA.zone(2)
         for zz in np.arange(ib + 6.0, top - 12.0, 7.0):
             K2.window_row(c, z, float(zz), 0.15, 0.85, lift=0.5)
+        w1 = len(g.chunks)
         # the sensor tower on the forward base
         for zone in (loftB.zone(0), loftB.zone(4)):
             for zz in np.arange(ib + 4.0, ib + 19.0, 6.0):
                 K2.window_row(c, zone, float(zz), 0.12, 0.88, lift=0.5, win=(1.1, 0.7))
+        w2 = len(g.chunks)
+        ranges[0].append((w0, w1))
+        ranges[1].append((w1, w2))
+        # cut both where they would stand inside the block, the lower hull or each other (highest chunks first: the indices stay valid)
+        above = [((0.0, 0.0, 1.0), zf)]
+        beside = [((0.0, 0.0, -1.0), -zf), ((1.0, 0.0, 0.0), xb), ((0.0, 0.0, 1.0), self.H)]
+        behind = [((0.0, 0.0, 1.0), zf), ((-1.0, 0.0, slope), -rear)]
+        todo = [(i0, i1, [above, beside]) for i0, i1 in ranges[0]] + [(i0, i1, [behind]) for i0, i1 in ranges[1]]
+        for i0, i1, regs in sorted(todo, reverse=True):
+            g.clip_chunks(i0, i1, regs)
 
     # ------------------------------------------------------------------------------------------ keel and spine
     def keel_and_spine(self) -> None:
@@ -435,7 +514,7 @@ def torpedo_tube(c: Ctx, xf: Xf) -> None:
     for k in range(8):
         a = 2 * np.pi * k / 8
         xf.cyl(g, (1.3, 3.3 * np.cos(a), 3.3 * np.sin(a)), (1.55, 3.3 * np.cos(a), 3.3 * np.sin(a)), 0.16, 0.14, m("Frame"), seg=6, kind="torpedo")
-    door = xf.sub((1.3, 0.0, 3.8), xf.rot_y(-70.0))
+    door = xf.sub((1.3, 0.0, 3.8), xf.rot_y(70.0))
     door.box(g, (0, 0, -3.8), (0.35, 6.6, 6.8), m("Plate"), ch=0.08, kind="torpedo")
 
 
@@ -467,15 +546,62 @@ def aquila_checks(g: G.Geo) -> dict:
     return out
 
 
+def nave_checks(g: G.Geo) -> dict:
+    """The decks of the plan (data/ship/aquila_plan.json, docs/NAVE.md): the exterior must have no vertex inside any deck's interior
+    (x within the envelope, |y| below its half width, z from the floor structure to the ceiling structure), or the decks would show
+    phantom floors and walls. Counts per deck; ok when all are zero. Skipped when the plan is not there."""
+    if not os.path.exists(PLAN):
+        return {"skipped": "no plan"}
+    plan = json.load(open(PLAN, encoding="utf-8"))
+    chunks = [ch for ch in g.chunks if not ch["cap"]]
+    V = np.concatenate([ch["V"] for ch in chunks]).astype(np.float64) + HULL_TO_WORLD
+    kind = np.concatenate([np.full(len(ch["V"]), i) for i, ch in enumerate(chunks)])
+    out: dict = {}
+    why: dict = {}
+    for d in plan["decks"]:
+        hw = d["envelope"]["half_width"]
+        if not hw:
+            continue
+        xs = np.array([h[0] for h in hw])
+        ws = np.array([h[1] for h in hw])
+        o = np.argsort(xs)
+        xs, ws = xs[o], ws[o]
+        z0, z1 = d["z"] + 0.02, d["ceiling"] - 0.02                          # the clear height: the slabs of the structure hide what is in them
+        sel = (V[:, 2] > z0) & (V[:, 2] < z1) & (V[:, 0] > xs[0]) & (V[:, 0] < xs[-1])
+        if 6 <= d["id"] <= 11:                                                # the Flight Deck is the existing hangar (x 60..218, |y| < 29): checked with the tubes
+            sel &= ~((V[:, 0] > 60.0) & (V[:, 0] < 218.0) & (np.abs(V[:, 1]) < 29.0))
+        n = 0
+        if sel.any():
+            w = np.interp(V[sel, 0], xs, ws)
+            bad = np.abs(V[sel, 1]) < w - 0.5                                  # the rooms keep 0.5 m of their own wall inside the envelope
+            if d["id"] == 2:                                                   # the island's front is raked: forward of it there is no ship
+                f = (V[sel, 2] - HULL_TO_WORLD[2] - 21.6) / (60.4 - 21.6)
+                bad &= V[sel, 0] < 212.0 - 28.0 * f + HULL_TO_WORLD[0] - 0.5
+                bad &= ~((V[sel, 0] > 27.0) & (np.abs(V[sel, 1]) > 10.0))       # the island base's front corners are chamfered (6.8 m): the plan's envelope is square there
+            n = int(bad.sum())
+            for i in np.unique(kind[sel][bad]):                     # which parts: chunk kinds, for the report
+                k = chunks[int(i)]["kind"] or "?"
+                why[k] = why.get(k, 0) + int((kind[sel][bad] == i).sum())
+            if n:
+                P = V[sel][bad]
+                out.setdefault("where", {})[f"deck{d['id']}"] = [[round(float(v), 1) for v in P.min(axis=0)], [round(float(v), 1) for v in P.max(axis=0)]]
+        out[f"deck{d['id']}"] = n
+    out["ok"] = all(v == 0 for k, v in out.items() if k.startswith("deck"))
+    if why:
+        out["by_kind"] = dict(sorted(why.items(), key=lambda kv: -kv[1]))
+    return out
+
+
 def build_aquila(c: Ctx) -> dict:
     """shipgen3 entry: the whole Aquila, its cut faces, and the camera rigs of its previews."""
     a = Aquila(c)
     a.build()
     faces = a.caps()
-    info = {"cuts": list(a.cuts), "cut_faces": faces, "length_m": 800.0, "checks": aquila_checks(c.g),
+    info = {"cuts": list(a.cuts), "cut_faces": faces, "length_m": 800.0, "checks": dict(aquila_checks(c.g), nave=nave_checks(c.g)),
             "cam_az": -32.0, "cam_el": 18.0, "cam_dist": 1.9, "sun_az": -50.0, "sun_el": 26.0,
             "closeups": [{"name": "flank", "target": [60.0, -50.0, 3.0], "normal": [0.0, -1.0, 0.0], "distance": 110.0, "span": 50.0},
                          {"name": "bowdeck", "target": [285.0, 0.0, 24.0], "normal": [-0.35, -0.55, 0.75], "distance": 110.0, "span": 50.0},
-                         {"name": "belly", "target": [-45.0, 0.0, -27.0], "normal": [0.2, -0.25, -0.95], "distance": 110.0, "span": 50.0, "key_el": -38.0}],
+                         {"name": "belly", "target": [-45.0, 0.0, -27.0], "normal": [0.2, -0.25, -0.95], "distance": 110.0, "span": 50.0, "key_el": -38.0},
+                         {"name": "island", "target": [132.0, -19.0, 34.0], "normal": [0.55, -0.75, 0.3], "distance": 90.0, "span": 50.0}],
             "pieces_gap": 0.10, "pieces_az": 24.0, "pieces_dist": 2.4}
     return info
