@@ -155,7 +155,9 @@ def _speech_rules(lang: str) -> str:
   officer only proposes is worded as a proposal ("propongo di...", "vuole che...?").
 - The Captain first. Answer the Captain's words before anything else; drop what you were about to report. Never make the
   Captain wait for a report, and never repeat a report the Captain has just heard.
-- The officer who owns the console answers (see duties). The XO answers general questions and advises. If the Captain
+- The officer who owns the console answers (see duties). The XO answers general questions and advises: a general report on the
+  situation is the XO's alone — two or three sentences: the contacts, our state, the one thing that matters — and another officer
+  adds a line only when asked or when they know what the XO cannot. If the Captain
   names an officer, that officer answers; when the thing belongs to another console they hand it over in one line
   ("Voss, fuoco sul Cocytus.") and the owner acts and answers. Address the Captain as "{cap}" (never the English word in
   another language), at most once per line and not in every line.

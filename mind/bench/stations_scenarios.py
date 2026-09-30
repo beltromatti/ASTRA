@@ -459,6 +459,122 @@ async def sc_standing_order(llm: OpenRouter, lang: str) -> Result:
     return sc.res
 
 
+async def sc_advise_then_go(llm: OpenRouter, lang: str) -> Result:
+    sc = Scenario("advise: they propose, the Captain says go, they act", lang)
+    h = Harness(llm, lang)
+    reports = await _fight_to_the_kill(h)
+    for st in ("tactical", "helm", "ops"):
+        h.ship.delegation[st] = "advise"
+    turn, chk = await h.watch(reports)
+    if turn is None:
+        sc.must("a check was due", False)
+        return sc.res
+    sc.res.transcript.append("[watch, advise] " + transcript(h, "[watch]", turn, h.lines))
+    moved = [c for c in h.ship.station_calls() if c["by"] != "captain" and c["station"] in ("tactical", "helm", "ops")]
+    sc.must("nothing moved before the go", not moved, f"{moved}")
+    go = {"it": "sì, procedi", "en": "yes, go ahead"}[lang]
+    n_before = len(h.ship.station_calls())
+    turn2 = await h.captain(go)
+    after = h.ship.station_calls()[n_before:]
+    sc.must("after the go they act on what they proposed", any(c["station"] in ("tactical", "helm", "ops") for c in after), f"{after} | {h.lines}")
+    sc.spoke_well(h, max_total=44)
+    sc.res.transcript.append(transcript(h, go, turn2, h.lines))
+    sc.res.cost = h.cost
+    sc.res.turns += h.turns
+    return sc.res
+
+
+async def sc_correction(llm: OpenRouter, lang: str) -> Result:
+    sc = Scenario("the Captain corrects an order: the last word stands", lang)
+    h = Harness(llm, lang)
+    t1 = {"it": "Ferri, rotta zero-nove-zero", "en": "Ferri, heading zero-nine-zero"}[lang]
+    t2 = {"it": "no, aspetta: rotta due-sette-zero", "en": "no, wait: heading two-seven-zero"}[lang]
+    turn = await h.captain(t1)
+    sc.res.transcript.append(transcript(h, t1, turn, h.lines))
+    turn2 = await h.captain(t2)
+    courses = h.modes("helm", "course")
+    sc.must("the last heading is two-seven-zero", bool(courses) and abs(float(courses[-1]["params"].get("heading_deg", -1)) - 270) < 1, f"{h.ship.log}")
+    sc.spoke_well(h, max_total=30, max_lines=2)
+    sc.res.transcript.append(transcript(h, t2, turn2, h.lines))
+    sc.res.cost = h.cost
+    sc.res.turns += h.turns
+    return sc.res
+
+
+async def sc_report_on_request(llm: OpenRouter, lang: str) -> Result:
+    sc = Scenario("a report asked for is a report: enough to inform, not a speech", lang)
+    h = Harness(llm, lang)
+    text = {"it": "rapporto sulla situazione", "en": "situation report"}[lang]
+    turn = await h.captain(text)
+    joined = " ".join(t for _, t in h.lines).lower()
+    sc.must("no ship command", not [c for c in h.ship.log if c[1] != "speak"], f"{h.ship.log}")
+    sc.must("long enough to say something, not a speech (15-75 words)", 15 <= h.words() <= 75, f"{h.words()} words: {h.lines}")
+    sc.must("names the contacts", "cocytus" in joined or "phlegethon" in joined, joined)
+    sc.must("at most three lines", len(h.lines) <= 3, f"{h.lines}")
+    sc.must("no bare ack", not any(is_bare_ack(t) for _, t in h.lines), f"{h.lines}")
+    sc.res.transcript.append(transcript(h, text, turn, h.lines))
+    sc.res.cost = h.cost
+    sc.res.turns += h.turns
+    return sc.res
+
+
+async def sc_typed_noise(llm: OpenRouter, lang: str) -> Result:
+    sc = Scenario("typed orders with typos and no punctuation (the playtest's style)", lang)
+    h = Harness(llm, "it")
+    if lang != "it":
+        return sc.res
+    t1 = "fuoco a volonta sul cocktopus"
+    turn = await h.captain(t1)
+    eng = h.modes("tactical", "engage") + h.modes("tactical", "weapons_free")
+    sc.must("understood: fire on the Cocytus (engage T-23 or weapons free)", bool(eng) and (eng[-1]["mode"] == "weapons_free" or "T-23" in eng[-1]["params"].get("targets", [])), f"{h.ship.log}")
+    sc.spoke_well(h, max_total=40)
+    sc.res.transcript.append(transcript(h, t1, turn, h.lines))
+    t2 = "timoniere a massima velocita verso il cocktops"
+    turn2 = await h.captain(t2)
+    nav = h.ship.lane("helm", "nav")
+    sc.must("understood: the helm closes on T-23 at full", nav["mode"] in ("intercept", "follow", "broadside") and nav["params"].get("target") == "T-23", f"{nav}")
+    sc.spoke_well(h, max_total=40)
+    sc.res.transcript.append(transcript(h, t2, turn2, h.lines))
+    sc.res.cost = h.cost
+    sc.res.turns += h.turns
+    return sc.res
+
+
+async def sc_mess_and_medbay(llm: OpenRouter, lang: str) -> Result:
+    sc = Scenario("people in the room answer in person (Mess Hall, Medbay)", lang)
+    if lang != "it":
+        return sc.res
+    h = Harness(llm, "it", fight=False)
+    h.ship.state["captain"] = ("in the Mess Hall (Deck 4) among the off-duty crew at their tables: they can hear and answer the Captain; the XO has "
+                               "the conn on the bridge and the bridge officers speak by intercom")
+    h.ship.state["mess"] = {"diners": [{"speaker": "mess1", "seat": "at the nearest table of the outer right row", "name": "Petty Officer Amara Diallo",
+                                        "gender": "f", "dept": "weapons", "deck": "4", "home": "Mars"}],
+                            "cook": "mess_cook: Petty Officer Tomas Wren, the galley's chief cook, behind the serving line",
+                            "menu": "braised lamb with barley; Aurelian rice with saffron; real coffee"}
+    ctx = Context(place="mess", in_earshot=("mess1", "mess_cook"), facing="mess_cook")
+    text = "Wren, cosa c'è di buono oggi?"
+    turn = await h.captain(text, ctx)
+    sc.must("the cook answers in person", bool(h.lines) and h.lines[0][0] == "mess_cook", f"{h.lines}")
+    sc.must("short", h.words() <= 40 and len(h.lines) <= 2, f"{h.lines}")
+    sc.must("no console touched", not h.ship.station_calls(), f"{h.ship.log}")
+    sc.res.transcript.append(transcript(h, text, turn, h.lines))
+    h.ship.state.pop("mess")
+    h.ship.state["captain"] = ("in the Medbay (Deck 6), among the wounded, face to face with Dr. Lindqvist and the medical staff; the patients in "
+                               "their beds can hear and answer the Captain; the XO has the conn on the bridge and the bridge officers speak by intercom")
+    h.ship.state["medbay"] = {"patients": [{"speaker": "patient1", "bed": "the first bed of the row on the right as you come in from the lift",
+                                            "name": "Crewman Ilse Novak", "gender": "f", "dept": "engineering", "home": "Ceres",
+                                            "injury": "burns on the left arm", "condition": "stable"}]}
+    ctx2 = Context(place="medbay", in_earshot=("doctor", "patient1"), facing="patient1")
+    text2 = "Novak, come si sente?"
+    turn2 = await h.captain(text2, ctx2)
+    sc.must("the patient answers in person (or the doctor for her)", bool(h.lines) and h.lines[0][0] in ("patient1", "doctor"), f"{h.lines}")
+    sc.must("short", h.words() <= 40 and len(h.lines) <= 2, f"{h.lines}")
+    sc.res.transcript.append(transcript(h, text2, turn2, h.lines))
+    sc.res.cost = h.cost
+    sc.res.turns += h.turns
+    return sc.res
+
+
 async def sc_routing(llm: OpenRouter, lang: str) -> Result:
     sc = Scenario("routing with an open channel (rules + small model)", lang)
     ch = Channel(party="T-23", name="Ferryman Irina Vael (the Cocytus)")
@@ -478,7 +594,8 @@ async def sc_routing(llm: OpenRouter, lang: str) -> Result:
 SCENARIOS: list[Callable[[OpenRouter, str], Any]] = [
     sc_engage_until_it_falls, sc_one_volley, sc_fire_at_will, sc_follow_until_ordered, sc_bow_on_it, sc_viewscreen, sc_datapad,
     sc_delegation, sc_other_consoles, sc_coordination, sc_questions, sc_out_of_reach, sc_legacy_build, sc_standing_order,
-    sc_initiative_after_a_kill, sc_initiative_new_contact, sc_delegation_advise, sc_routing,
+    sc_initiative_after_a_kill, sc_initiative_new_contact, sc_delegation_advise, sc_advise_then_go, sc_correction, sc_report_on_request,
+    sc_typed_noise, sc_mess_and_medbay, sc_routing,
 ]
 
 
