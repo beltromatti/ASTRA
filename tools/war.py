@@ -45,6 +45,8 @@ def build_args(a: argparse.Namespace, out: Path) -> list[str]:
         args.append(f"-scenario={a.scenario}")
     if a.exec:
         args.append(f'-exec={a.exec}')
+    if getattr(a, "at", ""):
+        args.append(f'-at={a.at}')
     return args
 
 
@@ -220,6 +222,12 @@ def print_batch(tag: str, paths: list[Path]) -> list[dict]:
         print(f"  seed {seed:>3}  Aquila {m['aquila']:>5}  ASTRA {fmt_side(m, 'astra')}  |  MANDATE {fmt_side(m, 'mandate')}"
               f"  focus {m['astra']['focus']:.2f}/{m['mandate']['focus']:.2f}  ms/tick {m['perf'].get('ms_avg', 0):.3f} (world {ww:.3f})")
     if rows:
+        edge = [(r["astra"]["alive"] + r["astra"]["gone"]) - (r["mandate"]["alive"] + r["mandate"]["gone"]) for r in rows]
+        cedge = [r["mandate"]["craft"]["lost"] - r["astra"]["craft"]["lost"] for r in rows]
+        wa, wm = sum(1 for e in edge if e > 0), sum(1 for e in edge if e < 0)
+        se = lambda v: (statistics.pstdev(v) / math.sqrt(len(v))) if len(v) > 1 else 0.0
+        print(f"  outcome over {len(rows)} battles: ASTRA ahead {wa}, Mandate ahead {wm}, level {len(rows) - wa - wm};"
+              f" survivors edge {statistics.mean(edge):+.2f}±{se(edge):.2f} warships, craft edge {statistics.mean(cedge):+.1f}±{se(cedge):.1f} (ASTRA's minus the Mandate's)")
         def mean(f):
             v = [f(r) for r in rows]
             return statistics.mean(v), (statistics.pstdev(v) if len(v) > 1 else 0.0)
@@ -253,6 +261,26 @@ def cmd_ab(a: argparse.Namespace) -> None:
         paths = seeds_run(a, f"ab_{name}", ex, seeds, a.jobs)
         print(f"== variant {name}: {ex or '(as is)'} ({time.time() - t0:.0f} s)")
         print_batch(f"ab_{name}", paths)
+
+
+def cmd_sweep(a: argparse.Namespace) -> None:
+    """What each behaviour is worth: the same symmetric scenario with the behaviour switched off for the ASTRA side alone
+    (astra.war.tune <feature>_a 0), against the control where both sides have it."""
+    seeds = list(range(1, a.seeds + 1))
+    variants = [("control", "")] + [(f"{f} off for ASTRA", f"astra.war.tune {f}_a 0") for f in a.features.split(",")]
+    for name, ex in variants:
+        tag = "sw_" + name.split()[0]
+        t0 = time.time()
+        paths = seeds_run(a, tag, ex, seeds, a.jobs)
+        print(f"== {name}  ({time.time() - t0:.0f} s)")
+        rows = [metrics(p) for p in paths if p.exists()]
+        edge = [(r["astra"]["alive"] + r["astra"]["gone"]) - (r["mandate"]["alive"] + r["mandate"]["gone"]) for r in rows]
+        cedge = [r["mandate"]["craft"]["lost"] - r["astra"]["craft"]["lost"] for r in rows]
+        wa, wm = sum(1 for e in edge if e > 0), sum(1 for e in edge if e < 0)
+        se = lambda v: (statistics.pstdev(v) / math.sqrt(len(v))) if len(v) > 1 else 0.0
+        print(f"   ASTRA ahead {wa}, Mandate ahead {wm}, level {len(rows) - wa - wm};"
+              f" survivors edge {statistics.mean(edge):+.2f}±{se(edge):.2f} warships; craft edge {statistics.mean(cedge):+.1f}±{se(cedge):.1f}"
+              f"; ASTRA alive {statistics.mean(r['astra']['alive'] + r['astra']['gone'] for r in rows):.2f}, Mandate alive {statistics.mean(r['mandate']['alive'] + r['mandate']['gone'] for r in rows):.2f}")
 
 
 def cmd_compare(a: argparse.Namespace) -> None:
@@ -477,6 +505,7 @@ def main() -> None:
         p.add_argument("--step", type=float, default=0.1)
         p.add_argument("--every", type=float, default=10)
         p.add_argument("--scenario", default="")
+        p.add_argument("--at", default="", help='commands at battle times: "200=astra.cmd ...|300=..."')
 
     p = sub.add_parser("run")
     common(p, 900, -1)
@@ -499,6 +528,12 @@ def main() -> None:
     p.add_argument("--tag", default="batch")
     p.add_argument("--exec", default="")
     p.set_defaults(fn=cmd_batch)
+    p = sub.add_parser("sweep", help="what each behaviour is worth: switched off for the ASTRA side alone, in a symmetric scenario")
+    common(p, 900, -1)
+    p.add_argument("--seeds", type=int, default=48)
+    p.add_argument("--jobs", type=int, default=4)
+    p.add_argument("--features", default="flank,saturate,rotate,focus,retreat_ratio,wall")
+    p.set_defaults(fn=cmd_sweep, exec="")
     p = sub.add_parser("compare", help="two saved batches side by side")
     p.add_argument("a")
     p.add_argument("b")

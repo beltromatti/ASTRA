@@ -33,8 +33,9 @@ namespace
 		FParse::Value(*Params, TEXT("jump="), Jump);
 		FParse::Value(*Params, TEXT("step="), Step);
 		FParse::Value(*Params, TEXT("every="), Every);
-		FString Exec, Scenario;
+		FString Exec, Scenario, At;
 		FParse::Value(*Params, TEXT("exec="), Exec, false);
+		FParse::Value(*Params, TEXT("at="), At, false);            // "200=astra.cmd ...|300=...": commands at battle times (a mind's orders, scripted)
 		FParse::Value(*Params, TEXT("scenario="), Scenario);
 		Step = FMath::Clamp(Step, 0.02f, 0.1f);
 		FMath::RandInit(Seed);           // the same seed, the same battle: comparisons change one thing at a time
@@ -81,6 +82,20 @@ namespace
 		{
 			GEngine->Exec(World, *FString::Printf(TEXT("astra.battle.time %f"), Jump));
 		}
+		TArray<TPair<float, FString>> Timed;
+		{
+			TArray<FString> Items;
+			At.ParseIntoArray(Items, TEXT("|"));
+			for (const FString& It : Items)
+			{
+				FString T, C;
+				if (It.Split(TEXT("="), &T, &C))
+				{
+					Timed.Add(TPair<float, FString>(FCString::Atof(*T), C.TrimStartAndEnd()));
+				}
+			}
+		}
+		int32 NextTimed = 0;
 
 		const double Wall0 = FPlatformTime::Seconds();
 		double NextFrame = 0.0;
@@ -89,6 +104,11 @@ namespace
 		WorldMs.Reserve(N);
 		for (int32 i = 0; i < N; ++i)
 		{
+			while (NextTimed < Timed.Num() && B->GetBattleTime() >= Timed[NextTimed].Key)
+			{
+				GEngine->Exec(World, *Timed[NextTimed].Value);
+				++NextTimed;
+			}
 			const float T0 = B->GetBattleTime();
 			const double W0 = FPlatformTime::Seconds();
 			World->Tick(LEVELTICK_All, Step);

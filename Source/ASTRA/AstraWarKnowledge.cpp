@@ -54,12 +54,25 @@ void UAstraBattleSubsystem::CompactShips()
 void UAstraBattleSubsystem::BuildGrid()
 {
 	Grid.Reset(Ships.Num());
+	CapIdx.Reset();
+	HulkIdx.Reset();
 	for (int32 i = 0; i < Ships.Num(); ++i)
 	{
 		const FAstraBattleShip& S = Ships[i];
 		if (S.bAlive && !S.bGhost)
 		{
 			Grid.Add(i, S.Pos);
+			if (!S.bCraft)
+			{
+				CapIdx.Add(i);
+			}
+		}
+	}
+	for (int32 i = 0; i < Wrecks.Num(); ++i)
+	{
+		if (Wrecks[i].Radius > 0.f)
+		{
+			HulkIdx.Add(i);
 		}
 	}
 }

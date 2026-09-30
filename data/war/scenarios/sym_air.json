@@ -1,0 +1,12 @@
+{
+  "_doc": "Symmetric carrier battle: each side a cruiser carrying eight fighters and six torpedo bombers, screened by two destroyers, 24 km apart; the Mandate side is the ASTRA side turned half a circle. Measures what the flights do: dogfights, attack runs, losses to point defence.",
+  "mirror": true,
+  "astra": [
+    {"name": "Carrier group", "formation": "column", "at_km": [-12, 0, 0], "heading": 0, "spacing_km": 1.5,
+     "ships": [{"class": "acheron", "n": 1, "name": "Carrier"}],
+     "wings": [{"carrier": 0, "kind": "fighter", "n": 8, "mission": "cap", "delay": 5},
+               {"carrier": 0, "kind": "bomber", "n": 6, "mission": "strike", "delay": 25}]},
+    {"name": "Escort group", "formation": "screen", "at_km": [-10, 0, 0], "heading": 0, "spacing_km": 1.5, "protects": "Carrier group",
+     "ships": [{"class": "styx", "n": 2}]}
+  ]
+}

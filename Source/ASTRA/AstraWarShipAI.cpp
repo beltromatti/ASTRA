@@ -101,28 +101,31 @@ FAstraBattleShip* UAstraBattleSubsystem::ChooseTarget(FAstraBattleShip& S, FAstr
 		}
 		S.OrderTarget = -1;                                   // gone: back to the group's choice
 	}
-	const double Reach = FMath::Max(S.RailRange, S.LaserRange) * 1.6 + S.Radius;
+	// what its guns reach (the group's focus is followed only when the ship can shoot at it: a ship out of reach of the focus
+	// fights the nearest it can hit, and the group's guide brings the rest in)
+	const double Reach = (S.RailDamage > 0.f ? (double)S.RailRange : (double)S.LaserRange) * 1.08 + S.Radius;
 	if (G && G->FocusTarget >= 0)
 	{
 		FAstraBattleShip* F = FindById(G->FocusTarget);
-		if (F && CanEngage(S, *F) && FVector::Dist(S.Pos, KnownPos(Me, *F)) < FMath::Max(Reach, (double)G->EngageRange * 2.2))
+		if (F && CanEngage(S, *F) && FVector::Dist(S.Pos, KnownPos(Me, *F)) < Reach + F->Radius)
 		{
 			return F;
 		}
 	}
-	// the nearest it can engage
+	// the nearest it can engage (in reach first)
 	FAstraBattleShip* Best = nullptr;
-	double BestD = 1e18;
+	double BestScore = 1e18;
 	for (FAstraBattleShip& O : Ships)
 	{
 		if (!CanEngage(S, O))
 		{
 			continue;
 		}
-		const double D = FVector::DistSquared(S.Pos, KnownPos(Me, O));
-		if (D < BestD)
+		const double D = FVector::Dist(S.Pos, KnownPos(Me, O));
+		const double Score = D + (D < Reach + O.Radius ? 0.0 : 1.0e6);        // one it can hit beats one it can only approach
+		if (Score < BestScore)
 		{
-			BestD = D;
+			BestScore = Score;
 			Best = &O;
 		}
 	}

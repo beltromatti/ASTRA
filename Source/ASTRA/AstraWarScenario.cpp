@@ -251,6 +251,7 @@ int32 UAstraBattleSubsystem::AddWing(int32 CarrierIdx, int32 Kind, int32 Count, 
 	Q.CarrierId = Carrier.Id;
 	Q.Mission = Mission;
 	Q.Rockets = (Kind == 0 && !bAstra) ? 4 : 0;
+	Q.bAuto = true;                                        // a bench wing has no crew to give it targets
 	Squadrons.Add(Q);
 	return Squadrons.Num() - 1;
 }
@@ -322,7 +323,7 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 				Heading += 180.0;
 			}
 			// the ships of the group, in order
-			struct FPlan { FName Key; FString Name; };
+			struct FPlan { FName Key; FString Name; bool bHold; };
 			TArray<FPlan> Plan;
 			const TArray<TSharedPtr<FJsonValue>>* Ships_ = nullptr;
 			if (G->TryGetArrayField(TEXT("ships"), Ships_))
@@ -338,9 +339,11 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 					}
 					SO->TryGetNumberField(TEXT("n"), N);
 					SO->TryGetStringField(TEXT("name"), SName);
+					bool bHold = false;
+					SO->TryGetBoolField(TEXT("hold"), bHold);
 					for (int32 k = 0; k < (int32)N; ++k)
 					{
-						Plan.Add({FName(*Class.ToLower()), SName.IsEmpty() ? FString() : (N > 1.0 ? FString::Printf(TEXT("%s %d"), *SName, k + 1) : SName)});
+						Plan.Add({FName(*Class.ToLower()), SName.IsEmpty() ? FString() : (N > 1.0 ? FString::Printf(TEXT("%s %d"), *SName, k + 1) : SName), bHold});
 					}
 				}
 			}
@@ -374,6 +377,7 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 				const int32 I = SpawnByKey(Plan[k].Key, Side, Id, Plan[k].Name.IsEmpty() ? FString::Printf(TEXT("%s %s"), *Plan[k].Key.ToString(), *Id) : Plan[k].Name, Slot, (float)Heading);
 				if (I != INDEX_NONE)
 				{
+					Ships[I].bHoldStation = Plan[k].bHold;
 					Made.Add(I);
 					++Spawned;
 				}

@@ -183,8 +183,14 @@ void UAstraBattleSubsystem::TickGroups(float Dt)
 void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 {
 	const int32 Me = AstraSideIdx(G.Side);
-	static AstraWar::FTuneVar KRetreat(TEXT("retreat_ratio"), 0.38f), KFlank(TEXT("flank"), 1.f), KSalvo(TEXT("saturate"), 1.f), KRotate(TEXT("rotate"), 1.f),
-	                          KFocus(TEXT("focus"), 1.f), KRange(TEXT("range_ai"), 1.f), KMorale(TEXT("morale_ai"), 1.f);
+	// each behaviour can be switched off (or scaled) for one side alone, for the bench's A/B of what it is worth:
+	// astra.war.tune flank_a 0 (ASTRA) / flank_m 0 (Mandate)
+	static AstraWar::FTuneVar KRetreat[2] = {AstraWar::FTuneVar(TEXT("retreat_ratio_a"), 0.38f), AstraWar::FTuneVar(TEXT("retreat_ratio_m"), 0.38f)};
+	static AstraWar::FTuneVar KFlank[2] = {AstraWar::FTuneVar(TEXT("flank_a"), 1.f), AstraWar::FTuneVar(TEXT("flank_m"), 1.f)};
+	static AstraWar::FTuneVar KSalvo[2] = {AstraWar::FTuneVar(TEXT("saturate_a"), 1.f), AstraWar::FTuneVar(TEXT("saturate_m"), 1.f)};
+	static AstraWar::FTuneVar KRotate[2] = {AstraWar::FTuneVar(TEXT("rotate_a"), 1.f), AstraWar::FTuneVar(TEXT("rotate_m"), 1.f)};
+	static AstraWar::FTuneVar KFocus[2] = {AstraWar::FTuneVar(TEXT("focus_a"), 1.f), AstraWar::FTuneVar(TEXT("focus_m"), 1.f)};
+	static AstraWar::FTuneVar KRange[2] = {AstraWar::FTuneVar(TEXT("range_ai_a"), 1.f), AstraWar::FTuneVar(TEXT("range_ai_m"), 1.f)};
 	// --- who is in it and where
 	TArray<FAstraBattleShip*, TInlineAllocator<12>> M;
 	for (const int32 Id : G.Members)
@@ -297,7 +303,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	if (G.State == EAstraGroupState::Engage)
 	{
 		const float Losses = G.StartStrength > 0.f ? 1.f - Str / G.StartStrength : 0.f;
-		const bool bWeak = bEnemy && (Ratio < KRetreat.Get() * KMorale.Get() || (Losses > 0.6f && Ratio < 0.8f));
+		const bool bWeak = bEnemy && KRetreat[Me].Get() > 0.f && (Ratio < KRetreat[Me].Get() || (Losses > 0.6f && Ratio < 0.8f));
 		if (bWeak)
 		{
 			G.WeakSince = G.WeakSince < 0.f ? Time : G.WeakSince;
@@ -468,7 +474,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	{
 		Focus = OrderedTarget;
 	}
-	else if (bEnemy && (KFocus.Get() > 0.5f))
+	else if (bEnemy && (KFocus[Me].Get() > 0.5f))
 	{
 		FAstraBattleShip* Best = nullptr;
 		float BestScore = -1.f;
@@ -581,7 +587,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		{
 			BestR = FMath::Min(Cap, 9000.0);
 		}
-		G.EngageRange = (float)(BestR * KRange.Get());
+		G.EngageRange = (float)(BestR * KRange[Me].Get());
 	}
 	else if (!bEnemy)
 	{
@@ -673,7 +679,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	{
 		Fit += Readiness(*S) > 0.6f ? 1 : 0;
 	}
-	const bool bRotate = KRotate.Get() > 0.5f && N >= 2 && Fit >= 1 && bEnemy;
+	const bool bRotate = KRotate[Me].Get() > 0.5f && N >= 2 && Fit >= 1 && bEnemy;
 	for (int32 k = 0; k < N; ++k)
 	{
 		FAstraBattleShip& S = *M[k];
@@ -720,7 +726,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	}
 	// --- flanks: one or two agile, healthy ships swing to the enemy's blind arc
 	const bool bFlankOrder = G.Order == EAstraGroupOrder::FlankLeft || G.Order == EAstraGroupOrder::FlankRight;
-	const bool bAutoFlank = KFlank.Get() > 0.5f && G.Order == EAstraGroupOrder::Auto && N >= 3 && bEnemy && Focus && EStr > 0.5f * Str;
+	const bool bAutoFlank = KFlank[Me].Get() > 0.5f && G.Order == EAstraGroupOrder::Auto && N >= 3 && bEnemy && Focus && EStr > 0.5f * Str;
 	if (Focus && (bFlankOrder || bAutoFlank))
 	{
 		const int32 Want = bFlankOrder ? FMath::Max(1, N / 2) : FMath::Min(2, N / 3);
@@ -802,7 +808,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 		G.FlankShip[0] = G.FlankShip[1] = -1;
 	}
 	// --- the missiles: kept until enough are ready to saturate the target's defence, then all together
-	if (Focus && KSalvo.Get() > 0.5f)
+	if (Focus && KSalvo[Me].Get() > 0.5f)
 	{
 		TArray<FAstraBattleShip*, TInlineAllocator<12>> Ready;
 		double MaxTof = 0.0;

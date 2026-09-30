@@ -2,6 +2,7 @@
 // of war applied (a bearing-only contact has no range, no speed, no damage state).
 
 #include "AstraBattleSubsystem.h"
+#include "AstraWarClasses.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 
@@ -71,6 +72,32 @@ void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 		const double Ra = A.RangeKm < 0.0 ? 1e9 : A.RangeKm, Rb = B.RangeKm < 0.0 ? 1e9 : B.RangeKm;
 		return Ra < Rb;
 	});
+}
+
+UAstraBattleSubsystem::FWeaponRanges UAstraBattleSubsystem::GetWeaponRanges(const FString& ContactId) const
+{
+	FWeaponRanges R;
+	if (Ships.Num() == 0)
+	{
+		return R;
+	}
+	const FAstraBattleShip* S = ContactId.IsEmpty() ? &Ships[0] : FindByContact(ContactId);
+	if (!S || !S->bAlive)
+	{
+		return R;
+	}
+	// what the Aquila can know: her own side by datalink; the others once their class is known (classified, or identified)
+	const bool bKnown = S->bPlayer || S->Side == EAstraSide::Astra || (S->bFog ? S->bClassified : S->bIdentified);
+	if (!bKnown || S->bCraft || S->bGhost || S->bDerelict)
+	{
+		return R;
+	}
+	const AstraWar::FShipClass* C = S->ClassKey.IsNone() ? nullptr : AstraWar::FindClass(S->ClassKey);
+	R.RailKm = S->RailDamage > 0.f ? S->RailRange / 1000.f : 0.f;
+	R.LaserKm = (S->Dmg.bModel ? S->LaserDamage > 0.f : true) ? S->LaserRange / 1000.f : 0.f;
+	R.MissileKm = ((C && C->Missiles > 0) || S->Missiles > 0) ? S->MissileRange / 1000.f : 0.f;
+	R.PointDefenseKm = S->PDChannels > 0 ? S->PDRange / 1000.f : 0.f;
+	return R;
 }
 
 bool UAstraBattleSubsystem::WasDestroyed(const FString& ContactId) const

@@ -245,6 +245,7 @@ struct FAstraSquadron
 	EAstraSide Side = EAstraSide::Astra;   // Mandate wings fly from their cruisers
 	int32 CarrierId = -1;                  // the ship they launch from and land on
 	int32 Rockets = 0;                     // per aircraft (Mandate strike fighters)
+	bool bAuto = false;                    // its craft pick their own targets (the Mandate's wings, a bench scenario's): no crew to task it
 };
 
 /** The Captain at the stick of a Falcon: what the pilot does this frame (the fighter pawn fills it). */
@@ -471,6 +472,15 @@ public:
 	void PlayerInternalDamage(float Hull) { if (Ships.Num()) { AddHullDelta(Ships[0], -Hull); } }
 
 	float PlayerHullFraction() const { return Ships.Num() ? Ships[0].Hull / Ships[0].HullMax : 1.f; }
+	/** Weapon reach as the plot may show it (km; 0 = none or unknown). */
+	struct FWeaponRanges
+	{
+		float RailKm = 0.f, LaserKm = 0.f, MissileKm = 0.f, PointDefenseKm = 0.f;
+	};
+	/** Empty id: the Aquila's own weapons. A contact id: that ship's reach as the Aquila knows it: its class's weapons once
+	 *  it is classified (fog of war), all zeros before. The numbers are the ones the fire code uses (the class table, or
+	 *  what a scenario set on the ship). (AstraBattleQueries.cpp) */
+	FWeaponRanges GetWeaponRanges(const FString& ContactId = FString()) const;
 	/** The Aquila's fire control at a glance (bridge screens). */
 	struct FFireControl
 	{
@@ -717,6 +727,14 @@ private:
 	void TickWeapons(FAstraBattleShip& S, float Dt);
 	void TickSquadrons(float Dt);
 	void TickCraft(FAstraBattleShip& S, float Dt);
+	// --- the craft's minds (AstraWarCraft.cpp)
+	void AssignFlight(FAstraBattleShip& C, int32 Squadron);
+	FAstraFlight* FindFlight(int32 Id);
+	FVector CraftAvoidance(const FAstraBattleShip& S) const;
+	FVector EnvelopeWall(const FAstraBattleShip& S, const FVector& Steer) const;
+	void ThinkCraft(FAstraBattleShip& S, float DtT);
+	void FireCraft(FAstraBattleShip& S, float Dt);
+	void LandCraft(FAstraBattleShip& S, FAstraBattleShip& Carrier, FAstraSquadron& Q);
 	int32 AirborneCount(int32 Squadron) const;
 	/** A Mandate cruiser's strike wing (Harpy fighters) that launches after Delay seconds against the Aquila. */
 	void AddEnemyWing(int32 CarrierIdx, int32 Count, float Delay);
@@ -744,6 +762,8 @@ private:
 	TArray<FAstraFlight> Flights;
 	int32 NextGroupId = 1, NextFlightId = 1;
 	FAstraWarGrid Grid;
+	TArray<int32> CapIdx;               // this tick: the alive warships (indices in Ships)
+	TArray<int32> HulkIdx;              // and the hulks that are obstacles (indices in Wrecks)
 	TMap<int32, int32> IdIndex;         // ship id -> index in Ships
 	float KnowledgeT = 0.f, GroupAssignT = 0.f, CompactT = 0.f;
 	void RebuildIdIndex();
