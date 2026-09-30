@@ -43,6 +43,13 @@ namespace Core
 		float ClipToPrevClip[16] = {};          // Unreal's ClipToPrevClip, row-major, verbatim
 		bool bReset = false;
 		EDebugMode Debug = EDebugMode::Off;
+
+		/**
+		 * Whatever the host needs to stay alive until the GPU has finished with the frame (the Unreal RHI textures: the RHI
+		 * recycles the memory of a texture the moment it is destroyed and does not know about our command buffer). Released by
+		 * the command buffer's completion handler, on a Metal thread, together with the rest of the frame.
+		 */
+		std::shared_ptr<void> KeepAlive;
 	};
 
 	struct FTimings
@@ -56,8 +63,9 @@ namespace Core
 	/**
 	 * Fills a texture with black (a render pass clear, the texture needs the render target usage): what the host's frame gets
 	 * instead of an upscaled image when the scaler cannot run, so the tonemapper never reads uninitialised memory.
+	 * KeepAlive is released when the GPU has completed the clear (see FFrameInput::KeepAlive).
 	 */
-	void ClearTexture(id<MTLCommandQueue> Queue, id<MTLTexture> Texture);
+	void ClearTexture(id<MTLCommandQueue> Queue, id<MTLTexture> Texture, std::shared_ptr<void> KeepAlive = nullptr);
 
 	/** A MetalFX temporal scaler for one output size with its private textures and kernels. Creating it is slow: a worker thread. */
 	class FScaler : public std::enable_shared_from_this<FScaler>

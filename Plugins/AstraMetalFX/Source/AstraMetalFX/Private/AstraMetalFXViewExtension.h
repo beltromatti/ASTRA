@@ -17,6 +17,10 @@ public:
 	virtual void BeginRenderViewFamily(FSceneViewFamily& InViewFamily) override;
 
 private:
-	/** Only the game's own, single, real-time view is a candidate: scene captures, editor viewports, split screen keep TSR. */
-	static bool IsCandidate(const FSceneViewFamily& Family);
+	/**
+	 * Only the game's own, single, real-time view is a candidate: scene captures, editor viewports, split screen keep TSR.
+	 * Returns null for a candidate, else why not. bOutMainGameView tells whether the family is the game's main view (a view of a
+	 * game world that is no capture): that is the one whose frames TSR renders instead of MetalFX, and the one worth reporting.
+	 */
+	static const TCHAR* GetRejection(const FSceneViewFamily& Family, bool& bOutMainGameView);
 };

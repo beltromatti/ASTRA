@@ -11,37 +11,75 @@ FAstraMetalFXViewExtension::FAstraMetalFXViewExtension(const FAutoRegister& Auto
 {
 }
 
-bool FAstraMetalFXViewExtension::IsCandidate(const FSceneViewFamily& Family)
+const TCHAR* FAstraMetalFXViewExtension::GetRejection(const FSceneViewFamily& Family, bool& bOutMainGameView)
 {
-	if (Family.Views.Num() != 1 || !Family.bRealtimeUpdate || Family.GetTemporalUpscalerInterface() != nullptr)
-	{
-		return false;
-	}
-	if (Family.GetFeatureLevel() < ERHIFeatureLevel::SM5 || !Family.EngineShowFlags.TemporalAA || !Family.EngineShowFlags.PostProcessing)
-	{
-		return false;
-	}
-
-	const FSceneView* View = Family.Views[0];
+	bOutMainGameView = false;
+	const FSceneView* View = Family.Views.Num() > 0 ? Family.Views[0] : nullptr;
 	if (!View || !View->bIsGameView || View->bIsSceneCapture || View->bIsReflectionCapture || View->bIsPlanarReflection)
 	{
-		return false;
+		return TEXT("not the game's main view");
+	}
+	bOutMainGameView = true;
+
+	if (Family.Views.Num() != 1)
+	{
+		return TEXT("the view family has several views (split screen)");
+	}
+	if (!Family.bRealtimeUpdate)
+	{
+		return TEXT("the view family is not real-time");
+	}
+	if (Family.GetTemporalUpscalerInterface() != nullptr)
+	{
+		return TEXT("another upscaler is already installed on the view family");
+	}
+	if (Family.GetFeatureLevel() < ERHIFeatureLevel::SM5)
+	{
+		return TEXT("the feature level is below SM5");
+	}
+	if (!Family.EngineShowFlags.TemporalAA || !Family.EngineShowFlags.PostProcessing)
+	{
+		return TEXT("the TemporalAA or PostProcessing show flag is off");
 	}
 	// The view must be one TSR (or TAA) would accumulate: a temporal method, with a view state to keep the history in.
-	return IsTemporalAccumulationBasedMethod(View->AntiAliasingMethod) && View->State != nullptr;
+	if (!IsTemporalAccumulationBasedMethod(View->AntiAliasingMethod))
+	{
+		return TEXT("the anti-aliasing method is not temporal (r.AntiAliasingMethod 4 is TSR)");
+	}
+	if (View->State == nullptr)
+	{
+		return TEXT("the view has no view state to keep a history in");
+	}
+	return nullptr;
 }
 
 void FAstraMetalFXViewExtension::BeginRenderViewFamily(FSceneViewFamily& InViewFamily)
 {
-	if (!IsCandidate(InViewFamily))
+	FAstraMetalFXManager& Manager = FAstraMetalFXManager::Get();
+
+	bool bMainGameView = false;
+	if (const TCHAR* Rejection = GetRejection(InViewFamily, bMainGameView))
 	{
-		return;   // not ours: the engine's own upscaler, untouched
+		if (bMainGameView)
+		{
+			Manager.NoteDeclinedFrame(Rejection);   // the game view itself, but not upscaled by us: its MetalFX history goes stale
+		}
+		return;   // anything else is not ours: the engine's own upscaler, untouched
 	}
 
-	FAstraMetalFXManager& Manager = FAstraMetalFXManager::Get();
-	if (!Manager.IsEnabledByCVar() || !Manager.IsAvailable() || !Manager.IsEngineUpscalerSwitchOn())
+	if (!Manager.IsEnabledByCVar())
 	{
-		Manager.NoteDeclinedFrame();
+		Manager.NoteDeclinedFrame(TEXT("r.AstraMetalFX is 0"));
+		return;
+	}
+	if (!Manager.IsAvailable())
+	{
+		Manager.NoteDeclinedFrame(TEXT("MetalFX is not available on this machine or failed earlier in this session"));
+		return;
+	}
+	if (!Manager.IsEngineUpscalerSwitchOn())
+	{
+		Manager.NoteDeclinedFrame(TEXT("r.TemporalAA.Upscaler is 0 (the engine ignores third-party upscalers)"));
 		return;
 	}
 
@@ -54,9 +92,10 @@ void FAstraMetalFXViewExtension::BeginRenderViewFamily(FSceneViewFamily& InViewF
 	const FAstraMetalFXManager::FContextPtr Context = Manager.AcquireContext(OutputSize);
 	if (!Context.IsValid())
 	{
-		Manager.NoteDeclinedFrame();   // still being built, or failed: TSR this frame
+		Manager.NoteDeclinedFrame(TEXT("the scaler for this window size is being built"));   // or it failed: TSR this frame
 		return;
 	}
 
 	InViewFamily.SetTemporalUpscalerInterface(new FAstraMetalFXUpscaler(Context, Manager.GetDeclineEpoch()));
+	Manager.NoteUpscaledFrame(OutputSize);
 }

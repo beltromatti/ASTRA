@@ -50,9 +50,15 @@ public:
 	 */
 	FContextPtr AcquireContext(FIntPoint OutputSize);
 
-	/** The game view is rendered without MetalFX this frame: the MetalFX history, if any, is stale when we come back. */
-	void NoteDeclinedFrame() { DeclineEpoch.fetch_add(1); }
+	/**
+	 * Game thread: the game's main view is rendered without MetalFX this frame (TSR or no temporal upscaling). The MetalFX history,
+	 * if any, is stale when we come back, and the reason (a string literal) is what astra.metalfx.status says while it lasts.
+	 */
+	void NoteDeclinedFrame(const TCHAR* Reason);
 	uint32 GetDeclineEpoch() const { return DeclineEpoch.load(); }
+
+	/** Game thread: the game's main view is upscaled by MetalFX this frame. */
+	void NoteUpscaledFrame(FIntPoint OutputSize);
 
 	/** r.AstraMetalFX.Debug. Render thread. */
 	AstraMetalFX::EDebugView GetDebugView() const;
@@ -71,6 +77,9 @@ private:
 
 	std::atomic<bool> bDisabled{ false };
 	std::atomic<uint32> DeclineEpoch{ 0 };
+	std::atomic<const TCHAR*> LastDeclineReason{ nullptr };
+	std::atomic<double> LastDeclineTime{ 0.0 };
+	bool bUpscalingNow = false;   // game thread: what the game view did last frame, to log the switches between MetalFX and TSR
 	std::atomic<int32> BuildsInFlight{ 0 };
 
 	mutable FCriticalSection Lock;   // guards everything below

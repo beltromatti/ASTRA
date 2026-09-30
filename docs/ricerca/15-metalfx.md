@@ -74,7 +74,10 @@ Thread di sottomissione:    callback → MTLCommandBuffer nostro → commit     
 Perché l'ordine regge: `GRHIGlobals.SupportsConcurrentTranslateAndSubmit` è falso su Metal, quindi la traduzione di una
 sottomissione aspetta la chiusura della precedente (`RHICommandList.cpp`, `Dispatch_ProcessCommandList`: prerequisito
 `LastClose`, che scatta dopo `RHISubmitCommandLists`); la coda dei payload è FIFO. Il render thread non si blocca
-(`DispatchToRHIThread`, non `FlushRHIThread`).
+(`DispatchToRHIThread`, non `FlushRHIThread`). E Metal mette i command buffer in coda nell'ordine di `enqueue`, o, se non lo si
+chiama, di `commit`: il RHI di Unreal non chiama mai `enqueue` (`MetalCommandQueue.cpp`: `commandBuffer(...)` alla creazione, `commit()`
+nel `Flush` di `FlushBatchedPayloads`) e il plugin nemmeno, quindi l'ordine in coda è quello dei commit, tutti sullo stesso thread
+(`MetalRHI.UseSubmissionThread` è 1 di base; a 0 il callback gira nel thread che sottomette, con lo stesso ordine).
 
 ### 3.3 Ordine sulla GPU: nessun evento, basta il *hazard tracking* di Metal
 Fra command buffer della stessa coda Metal non garantisce da sola che uno finisca prima che l'altro cominci (la GPU può
@@ -85,7 +88,9 @@ texture fra command buffer, senza fence né eventi. **Provato** (`probe_hazard`)
 consumatore» per 200 frame senza alcuna sincronizzazione, con texture tracked (heap placement o no) **0 letture sbagliate**;
 con texture untracked 285 milioni di texel sbagliati (il test discrimina). Il plugin controlla a ogni frame che le texture di
 Unreal siano tracked (`MTLResource.hazardTrackingMode`) e, se un aggiornamento del motore lo cambiasse, si spegne e torna a TSR
-invece di correre.
+invece di correre. Il RHI Metal non ha l'allocatore di risorse transitorie di RDG (niente `RHICreateTransientResourceAllocator` in
+`MetalRHI`): le texture dello stesso frame non condividono memoria, il riuso è solo da un frame all'altro, e lì il tracking ordina
+anche la scrittura del frame dopo contro la lettura di MetalFX.
 
 ### 3.4 Costi e rischi del taglio
 - Un command buffer in più e una sottomissione in più per frame (Metal RHI ne fa già una per il present). Nessuna attesa della CPU.
@@ -96,7 +101,11 @@ invece di correre.
 - Il callback gira sul thread di sottomissione di Metal: niente di lento lì (creare uno scaler costa 0,2–3 s: si fa prima, su un
   thread di lavoro; il callback tocca solo oggetti già pronti).
 - Una texture di Unreal resta viva per MetalFX finché il suo command buffer non è finito: il plugin ne tiene un riferimento
-  (Objective-C) fino al completion handler.
+  (Objective-C) e uno dell'oggetto RHI (`TRefCountPtr<FRHITexture>`) fino al completion handler. Il secondo conta: il RHI Metal
+  mette le texture in heap *placement* che gestisce da sé e rida' la memoria a un'altra texture appena la prima è distrutta,
+  senza sapere del nostro command buffer (`probe_core` prova che gli oggetti tenuti si rilasciano solo a lavoro finito). Gli
+  oggetti RHI si rilasciano dal thread dei completion handler di Metal: `FRHIResource::Release` lo permette (la cancellazione
+  vera è accodata in `PendingDeletes`, una coda multi-produttore).
 
 ## 4. Cosa riceve e cosa vuole MetalFX (verificato con `tools/metalfx_probe`)
 
@@ -104,7 +113,7 @@ invece di correre.
 |---|---|---|---|
 | colore | `PF_FloatRGBA` (RGBA16F), rettangolo `ViewRect` | `colorTexture` RGBA16F, contenuto nell'angolo (0,0) | diretto; se `ViewRect.Min` ≠ 0 una copia blit |
 | profondità | `PF_DepthStencil` = `Depth32Float_Stencil8`, **reversed Z** (1 vicino, 0 lontano) | qualunque formato di profondità va bene (accettato anche D32F_S8 nel descrittore) | diretta, `depthReversed = YES` |
-| movimento | `Velocity`: RGBA16 UNORM codificato, **solo i pixel che disegnano velocità** (oggetti in moto, ossa); gli altri sono 0 | `motionTexture` RG16F: *pixel del rettangolo di ingresso, posizione precedente meno attuale, x a destra, y in giù* | kernel `astra_motion`: dinamici = decodifica della codifica di Unreal (`Common.ush`), statici = riproiezione della profondità con `ClipToPrevClip` come fa TSR |
+| movimento | `Velocity`: RG16 o RGBA16 UNORM codificato (`FVelocityRendering::GetFormat`; se manca un 1×1 nero), **solo i pixel che disegnano velocità** (oggetti in moto, ossa); gli altri sono 0 | `motionTexture` RG16F: *pixel del rettangolo di ingresso, posizione precedente meno attuale, x a destra, y in giù* | kernel `astra_motion`: dinamici = decodifica della codifica di Unreal (`Common.ush`), statici = riproiezione della profondità con `ClipToPrevClip` come fa TSR |
 | jitter | `TemporalJitterPixels` = spostamento dell'immagine in pixel (+x destra, +y giù) | `jitterOffsetX/Y` | **identico, senza cambiare segno** (provato con un PSNR contro la verità) |
 | esposizione | colore × `PreExposure`; il tonemapper moltiplica per `Exposure` (eye adaptation `x`) | `preExposure` e `exposureTexture` (R16F 1×1) | `preExposure = View.PreExposure`; kernel `astra_exposure` copia `EyeAdaptation.x` |
 | risoluzione dinamica | rettangolo che varia frame per frame dentro texture allocate al limite alto | `inputContentProperties`: fattore di scala = uscita / ingresso in **[1, 3]** (supportato da M4), `inputContentWidth/Height` per frame | scaler creato **per dimensione d'uscita** (ingresso massimo = uscita); `GetMin/MaxUpsampleResolutionFraction` = 1/3…1 |
@@ -129,7 +138,7 @@ Esiti delle sonde (macchina: MacBook Air M4, macOS 26.6, Xcode 26.2, tutto con i
   rettangolo, profondità `Depth32Float_Stencil8`, velocità UNORM, frame committati uno dietro l'altro **senza attese** (il command buffer di MetalFX in mezzo a quelli del «renderer»: solo il hazard tracking li ordina):
   19,74 dB (come `probe_e2e`), identico con texture più grandi, con il rettangolo che non parte dall'angolo (la copia) e con la risoluzione dinamica che cambia a ogni frame (20,05 dB);
   i frame sbagliati (colore senza tracking, formato, dimensione dell'uscita, uso mancante, rettangolo fuori) sono rifiutati con il motivo; rettangoli fuori scala vengono stretti (un avviso) invece di arrivare a MetalFX;
-  **NaN, ±Inf e valori negativi nel colore non avvelenano l'uscita** (MetalFX li assorbe: 0 valori non finiti anche nel frame avvelenato, quindi nessun passo di pulizia); uno scaler fallito produce un'uscita nera;
+  **NaN, ±Inf e valori negativi nel colore non avvelenano l'uscita** (MetalFX li assorbe: 0 valori non finiti anche nel frame avvelenato, quindi nessun passo di pulizia); uno scaler fallito produce un'uscita nera; gli oggetti che il chiamante fa tenere in vita (`KeepAlive`, le texture RHI) si rilasciano solo a command buffer finito;
   `probe_core soak 6000`: 6000 frame con rettangolo, offset, reset, velocità ed esposizione che cambiano, i tempi letti da un altro thread: 6000 completati, 0 errori, niente in volo alla fine.
 - `probe_memory`: lo scaler tiene ~48 MB a 1600×900 e ~83 MB a 1710×1107 (vedi §5). `probe_hazard`: vedi §3.3.
 - Controllo dei simboli del plugin compilato (`nm -u` contro gli export dei moduli del motore): ogni simbolo di Unreal che usa è esportato (non usa nulla di `MetalRHI` oltre alle chiamate virtuali
@@ -175,8 +184,8 @@ un guadagno di ~1 ms e più, e un'immagine che `probe_e2e` dice migliore di un s
 
 1. Compila con l'editor chiuso (`tools/ricompila.sh`, o `Build.sh ASTRAEditor Mac Development …`): il plugin è in `ASTRA.uproject` (solo Mac) e si compila con il progetto.
 2. All'avvio il log dice `MetalFX upscaler ready`, poi `building the MetalFX scaler for an output of WxH` e `MetalFX scaler N ready` / `was built in X s`: per qualche secondo (la prima
-   volta in assoluto sulla macchina 2–3 s, poi 0,2–0,6 s) la vista di gioco usa TSR, poi passa a MetalFX da sola. Se cambia la dimensione della finestra si ricostruisce (TSR nel frattempo).
-3. `astra.metalfx.status` (console o `astra.cmd`): `ACTIVE` o il motivo per cui no, l'uscita, il tempo GPU dell'ultimo frame e la media. `stat AstraMetalFX` lo mostra a schermo (build Development).
+   volta in assoluto sulla macchina 2–3 s, poi 0,2–0,6 s) la vista di gioco usa TSR, poi passa a MetalFX da sola (`the game view is upscaled by MetalFX (output WxH)`; quando torna a TSR: `the game view is upscaled by TSR again: <motivo>`). Se cambia la dimensione della finestra si ricostruisce (TSR nel frattempo).
+3. `astra.metalfx.status` (console o `astra.cmd`): `ACTIVE` o il motivo per cui no (l'ultimo che la vista di gioco ha annotato: `r.AstraMetalFX is 0`, `the anti-aliasing method is not temporal`, `the scaler for this window size is being built`...), l'uscita, il tempo GPU dell'ultimo frame e la media. `stat AstraMetalFX` lo mostra a schermo (build Development).
    `r.AstraMetalFX.LogInterval 5` lo scrive nel log ogni 5 s.
 4. **Confronto TSR / MetalFX**: `r.AstraMetalFX 0` e `1` a caldo (la storia ricomincia a ogni cambio; vale anche `r.TemporalAA.Upscaler 0`,
    l'interruttore del motore per gli upscaler di terze parti, che rimette TSR: il plugin lo riconosce). A parità di costo: fissa `r.DynamicRes.OperationMode 0` e lo stesso `r.ScreenPercentage`, leggi il tempo GPU

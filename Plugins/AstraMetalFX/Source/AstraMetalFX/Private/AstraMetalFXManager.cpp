@@ -246,6 +246,27 @@ void FAstraMetalFXManager::StartBuild(FIntPoint OutputSize)
 	});
 }
 
+void FAstraMetalFXManager::NoteDeclinedFrame(const TCHAR* Reason)
+{
+	DeclineEpoch.fetch_add(1);
+	LastDeclineReason.store(Reason);
+	LastDeclineTime.store(FPlatformTime::Seconds());
+	if (bUpscalingNow)
+	{
+		bUpscalingNow = false;
+		UE_LOG(LogAstraMetalFX, Log, TEXT("the game view is upscaled by TSR again: %s"), Reason);
+	}
+}
+
+void FAstraMetalFXManager::NoteUpscaledFrame(FIntPoint OutputSize)
+{
+	if (!bUpscalingNow)
+	{
+		bUpscalingNow = true;
+		UE_LOG(LogAstraMetalFX, Log, TEXT("the game view is upscaled by MetalFX (output %dx%d)"), OutputSize.X, OutputSize.Y);
+	}
+}
+
 void FAstraMetalFXManager::PublishFrame(const FContextPtr& Context)
 {
 	const AstraMetalFX::FGpuTimings Timings = Context->GetTimings();
@@ -288,17 +309,26 @@ FAstraMetalFXStatus FAstraMetalFXManager::GetStatus() const
 	{
 		Status.Reason = DisabledReason;
 	}
-	else if (!Status.bEnabled)
-	{
-		Status.Reason = TEXT("r.AstraMetalFX is 0");
-	}
-	else if (!Current.IsValid())
-	{
-		Status.Reason = bBuilding ? TEXT("the scaler is being built") : TEXT("no game view asked for it yet");
-	}
 	else if (!Status.bActive)
 	{
-		Status.Reason = TEXT("the game view did not use it in the last frames (TSR)");
+		// The last reason the game's main view was rendered without MetalFX, while it is recent (the game thread notes one per frame).
+		const TCHAR* Decline = LastDeclineReason.load();
+		if (Decline != nullptr && FPlatformTime::Seconds() - LastDeclineTime.load() < 2.0)
+		{
+			Status.Reason = Decline;
+		}
+		else if (!Status.bEnabled)
+		{
+			Status.Reason = TEXT("r.AstraMetalFX is 0");
+		}
+		else if (!Current.IsValid())
+		{
+			Status.Reason = bBuilding ? TEXT("the scaler is being built") : TEXT("the game's main view has not been rendered yet");
+		}
+		else
+		{
+			Status.Reason = TEXT("the game's main view did not use it in the last frames (TSR)");
+		}
 	}
 	if (Current.IsValid())
 	{

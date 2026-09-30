@@ -118,7 +118,7 @@ namespace Core
 		GLogger = std::move(Logger);
 	}
 
-	void ClearTexture(id<MTLCommandQueue> Queue, id<MTLTexture> Texture)
+	void ClearTexture(id<MTLCommandQueue> Queue, id<MTLTexture> Texture, std::shared_ptr<void> KeepAlive)
 	{
 		@autoreleasepool
 		{
@@ -136,7 +136,11 @@ namespace Core
 			id<MTLRenderCommandEncoder> Encoder = [CommandBuffer renderCommandEncoderWithDescriptor:Pass];
 			[Encoder endEncoding];
 			GInFlight.fetch_add(1);
-			[CommandBuffer addCompletedHandler:^(id<MTLCommandBuffer>) { GInFlight.fetch_sub(1); }];
+			[CommandBuffer addCompletedHandler:^(id<MTLCommandBuffer>)
+			{
+				(void)KeepAlive;   // the block owns it until the GPU is done
+				GInFlight.fetch_sub(1);
+			}];
 			[CommandBuffer commit];
 		}
 	}

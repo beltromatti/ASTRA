@@ -56,6 +56,14 @@ namespace AstraMetalFX
 			});
 		}
 
+		// The RHI textures of one frame. The RHI places its textures in heaps it manages itself and hands the memory of a texture to
+		// the next one as soon as the first is destroyed; our command buffer is unknown to it, so the textures are kept alive
+		// until the GPU has completed that command buffer (the core releases this from its completion handler).
+		struct FKeepAlive
+		{
+			TRefCountPtr<FRHITexture> Textures[5];
+		};
+
 		id<MTLDevice> GetDevice()
 		{
 			if (!IsRHIMetal())
@@ -156,16 +164,23 @@ namespace AstraMetalFX
 			// access to the underlying resource"). Retained by the frame input until the GPU has completed the command buffer.
 			auto Native = [](FRHITexture* Texture) -> id<MTLTexture> { return Texture ? (__bridge id<MTLTexture>)Texture->GetNativeResource() : nil; };
 
+			std::shared_ptr<FKeepAlive> Keep = std::make_shared<FKeepAlive>();
+			Keep->Textures[0] = Frame.SceneColor;
+			Keep->Textures[1] = Frame.SceneDepth;
+			Keep->Textures[2] = Frame.SceneVelocity;
+			Keep->Textures[3] = Frame.EyeAdaptation;
+			Keep->Textures[4] = Frame.Output;
+
 			// A scaler that cannot run still owes the renderer a valid image this frame (frames already in the pipeline were
 			// set up before the failure was noticed): black, until the game view is switched to TSR.
-			auto ClearInstead = [this, &Frame, &Native]()
+			auto ClearInstead = [this, &Frame, &Native, Keep]()
 			{
 				id<MTLTexture> Output = Native(Frame.Output);
 				if (Output)
 				{
-					GetIMetalDynamicRHI()->RHIRunOnQueue([Output](MTL::CommandQueue* Queue)
+					GetIMetalDynamicRHI()->RHIRunOnQueue([Output, Keep](MTL::CommandQueue* Queue)
 					{
-						Core::ClearTexture((__bridge id<MTLCommandQueue>)Queue, Output);
+						Core::ClearTexture((__bridge id<MTLCommandQueue>)Queue, Output, Keep);
 					}, /*bWaitForSubmission=*/false);
 				}
 			};
@@ -191,6 +206,7 @@ namespace AstraMetalFX
 			FMemory::Memcpy(Input->ClipToPrevClip, Frame.ClipToPrevClip, sizeof(Input->ClipToPrevClip));
 			Input->bReset = Frame.bReset;
 			Input->Debug = (Core::EDebugMode)Frame.DebugView;
+			Input->KeepAlive = Keep;
 
 			const std::string Problem = Impl->Scaler->Validate(*Input);
 			if (!Problem.empty())

@@ -405,6 +405,47 @@ int main(int argc, char** argv)
 			}
 		}
 
+		printf("the host's keep-alive object stays alive until the GPU has completed the frame\n");
+		{
+			std::shared_ptr<FScaler> S5 = FScaler::Create(R.Dev, OutW, OutH, Err);
+			FTextures T = MakeTextures(R, 600, 340, OutW, OutH, 600, 340);
+			float C2P[16]; RenderInputs(R, T, 0, 528, 297, 0, 0, 0, 0, C2P); WaitAll(R);
+			std::mutex Mx;
+			std::vector<uint64_t> CompletedWhenReleased;   // frames the scaler had already counted when each object was destroyed
+			const int N = 6;
+			for (int F = 0; F < N; ++F)
+			{
+				std::shared_ptr<FFrameInput> In = MakeFrame(T, 528, 297, 0, 0, 0, 0, C2P, F == 0, false, false);
+				In->KeepAlive = std::shared_ptr<void>(new int(F), [&, Sk = S5.get()](void* P)
+				{
+					delete static_cast<int*>(P);
+					std::lock_guard<std::mutex> Lock(Mx);
+					CompletedWhenReleased.push_back(Sk->Timings().Frames);
+				});
+				S5->Encode(R.Q, In);
+			}
+			WaitAll(R);
+			for (int i = 0; i < 2000; ++i) { { std::lock_guard<std::mutex> Lock(Mx); if ((int)CompletedWhenReleased.size() == N) break; } usleep(1000); }
+			bool bAfterCompletion = true;
+			{
+				std::lock_guard<std::mutex> Lock(Mx);
+				Check((int)CompletedWhenReleased.size() == N, "every frame's keep-alive object was released exactly once");
+				// Released one at a time, in completion order: the i-th release sees at least i+1 completed frames. An object released
+				// when Encode returned (before the GPU ran) would see fewer.
+				std::vector<uint64_t> Sorted = CompletedWhenReleased;
+				std::sort(Sorted.begin(), Sorted.end());
+				for (size_t i = 0; i < Sorted.size(); ++i) bAfterCompletion = bAfterCompletion && Sorted[i] >= (uint64_t)i + 1;
+			}
+			Check(bAfterCompletion, "none was released before its command buffer completed");
+
+			// The same for the clear that stands in for a failed frame.
+			std::atomic<int> ClearReleased{ 0 };
+			ClearTexture(R.Q, T.Output, std::shared_ptr<void>(new int(0), [&](void* P) { delete static_cast<int*>(P); ClearReleased++; }));
+			WaitAll(R);
+			for (int i = 0; i < 2000 && ClearReleased == 0; ++i) usleep(1000);
+			Check(ClearReleased == 1, "the clear's keep-alive object was released once the clear completed");
+		}
+
 		FScaler::ReleaseSharedResources();
 		printf("%s (%d failures)\n", GFailures == 0 ? "PASS" : "FAIL", GFailures);
 		return GFailures == 0 ? 0 : 2;
