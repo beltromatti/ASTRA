@@ -31,6 +31,7 @@
 #include "AstraHarness.h"
 #include "ASTRACharacter.h"
 #include "AstraScreensSubsystem.h"
+#include "AstraWindowHud.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/StaticMeshComponent.h"
@@ -781,6 +782,14 @@ void AASTRAPlayerController::PlayerTick(float DeltaTime)
 	Super::PlayerTick(DeltaTime);
 	TickSubtitles(DeltaTime);
 	TickPad(DeltaTime);
+	if (IsLocalPlayerController())
+	{
+		if (!WindowHud.IsValid())
+		{
+			WindowHud = MakeShared<FAstraWindowHud>();
+		}
+		WindowHud->Tick(this, DeltaTime);
+	}
 	if (!StoryWidget.IsValid())
 	{
 		return;
