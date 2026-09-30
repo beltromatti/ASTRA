@@ -1,0 +1,305 @@
+"""ASN Aquila interior kit: the corridor modules (bridge v3 language).
+
+A module is a 4 m x 4 m cell of the ship's grid: 3.1 m clear between the finished walls, 0.45 m of wall on each side, 3.4 m
+clear height, 0.3 m of floor and ceiling structure (a 4 m deck pitch). Module frame: origin on the floor on the centre line at
+the AFT end, x forward 0..4, y across (starboard +), z up. The walls are layered dark composite panels in brushed frames with
+ribs every 2 m, light lines, a handrail, cable trays and conduits; a bay holds a piece of equipment; the ceiling has a linear
+luminaire, a duct and a cable tray; the floor is gunmetal plates in a running bond with guide lights and a direction chevron.
+
+  SM_SHIP_<tone>_Straight_A/B/C    straight cells with different equipment bays
+  SM_SHIP_<tone>_Door_L_A/B, _R_A/B, _LR    a sliding door (1.6 x 2.4, AAstraDoor) in the port / starboard / both walls
+  SM_SHIP_<tone>_Gate_L / _R / _LR          a wide portal (3.2 x 3.0, two leaves) into a big space
+  SM_SHIP_<tone>_Bulkhead                    the section blast door frame across the corridor (2.0 x 2.5 opening) at the forward end
+  SM_SHIP_<tone>_T_L / _T_R / _X             the throat of a side passage (3.1 m) on the port / starboard / both sides
+  SM_SHIP_<tone>_End                         a closed end wall at the forward end (turn it with the yaw)
+tone S = the spine (blue lines, cool white light), tone P = the passages (amber lines, warm white light).
+"""
+from __future__ import annotations
+
+import math
+import random
+
+from mathutils import Matrix
+
+import ship_lib as SL
+import ship_walls as SW
+from bridge3_lib import Rz
+from ship_catalog import (BLAST_H, BLAST_W, CLEAR_H, CORRIDOR_SPECS, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONES, WALL_T)
+from ship_lib import (COMPOSITE, DECK, IVORY, LAMP, LAMP_DIM, LAMP_HOT, RUBBER, STRUCT, TRIM, SParts)
+
+H = CLEAR_H
+FLOOR_T = 0.30
+OV = 0.02                       # modules overlap by 2 cm at their ends (no light leaks through the seams)
+PLAN = {"A": (("lockers", "plain"), ("safety", "vent")),
+        "B": (("vent", "conduits"), ("hydrant", "screen")),
+        "C": (("screen", "plain"), ("panelboard", "vent"))}          # bay kinds (left = port wall, right = starboard wall)
+NARROW = {"A": (("plain", "vent"), ("vent", "plain")), "B": (("vent", "plain"), ("plain", "vent"))}
+OPENING = {"door": (2.0 - DOOR_W / 2, 2.0 + DOOR_W / 2, DOOR_H), "gate": (2.0 - GATE_W / 2, 2.0 + GATE_W / 2, GATE_H),
+           "branch": (0.45, 3.55, H)}
+
+
+def wall_matrix(side: int) -> Matrix:
+    """Wall-local frame (s along the wall, t outward from the finished face, z up) in module coordinates; side +1 = starboard."""
+    m = Matrix.Identity(4)
+    m[1][1] = float(side)
+    m[1][3] = side * HW
+    return m
+
+
+def plate_uv(fb, faces, rng: random.Random, scale: float = 1.0) -> None:
+    ou, ov = rng.random() * 8.0, rng.random() * 8.0
+    for f in faces:
+        n = f.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        f[fb.cu] = 1
+        for loop in f.loops:
+            co = loop.vert.co
+            u, v = ((co.y, co.z), (co.x, co.z), (co.x, co.y))[ax]
+            loop[fb.uv].uv = (u / scale + ou, v / scale + ov)
+
+
+# ---------------------------------------------------------------------------------------------------------------- floor
+def floor(b: SParts, tn: dict, rng: random.Random, seam: bool = True) -> None:
+    fb, em = b.body, b.emit
+    fb.box((-OV, -SLOT_HW, -FLOOR_T), (MOD + OV, SLOT_HW, -0.012), STRUCT)
+    rows = 4
+    rw = 2 * HW / rows
+    for j in range(rows):
+        y0, y1 = -HW + j * rw + 0.008, -HW + (j + 1) * rw - 0.008
+        cuts = [0.0, 2.0, 4.0] if j % 2 == 0 else [0.0, 1.0, 3.0, 4.0]
+        for a, c in zip(cuts, cuts[1:]):
+            x0 = a - (OV if a == 0.0 else 0.0) + 0.008
+            x1 = c + (OV if c == MOD else 0.0) - 0.008
+            faces = fb.box((x0, y0, -0.012), (x1, y1, 0.0), DECK)
+            plate_uv(fb, faces, rng, 1.0)
+    for y in (-1.34, 1.34):                               # guide lights near the walls
+        em.lamp_box((0.15, y - 0.014, 0.0), (1.9, y + 0.014, 0.004), tn["accent_dim"], LAMP_DIM)
+        em.lamp_box((2.1, y - 0.014, 0.0), (3.85, y + 0.014, 0.004), tn["accent_dim"], LAMP_DIM)
+    # the direction chevron on the centre line (points forward)
+    SL.lamp_strip(em, (1.72, -0.30, 0.002), (2.12, 0.0, 0.002), 0.035, 0.004, tn["accent"], LAMP_DIM)
+    SL.lamp_strip(em, (1.72, 0.30, 0.002), (2.12, 0.0, 0.002), 0.035, 0.004, tn["accent"], LAMP_DIM)
+
+
+# -------------------------------------------------------------------------------------------------------------- ceiling
+def ceiling(b: SParts, tn: dict, rng: random.Random, duct_side: int = 1) -> None:
+    fb, em, fine = b.body, b.emit, b.fine
+    fb.box((-OV, -SLOT_HW, H), (MOD + OV, SLOT_HW, H + FLOOR_T), STRUCT)
+    # composite panels either side of the luminaire, brushed frames, cross beams every 2 m
+    for (s0, s1) in ((0.14, 1.86), (2.14, 3.86)):
+        for sy in (-1, 1):
+            y0, y1 = (0.36, HW - 0.06) if sy > 0 else (-HW + 0.06, -0.36)
+            fb.box((s0, y0, H - 0.045), (s1, y1, H), COMPOSITE)
+            fb.box((s0, y0, H - 0.058), (s1, y0 + 0.028, H - 0.045), TRIM)
+            fb.box((s0, y1 - 0.028, H - 0.058), (s1, y1, H - 0.045), TRIM)
+            fb.box((s0, y0 + 0.028, H - 0.058), (s0 + 0.028, y1 - 0.028, H - 0.045), TRIM)
+            fb.box((s1 - 0.028, y0 + 0.028, H - 0.058), (s1, y1 - 0.028, H - 0.045), TRIM)
+    for s in (0.0, 2.0):
+        for (y0, y1) in ((-HW, -0.36), (0.36, HW)):
+            fb.box((s - 0.07, y0, H - 0.17), (s + 0.07, y1, H - 0.02), TRIM)
+            fb.box((s - 0.045, y0, H - 0.185), (s + 0.045, y1, H - 0.17), STRUCT)
+        em.lamp_box((s - 0.006, -HW + 0.1, H - 0.187), (s + 0.006, -0.42, H - 0.182), tn["accent_dim"], LAMP_DIM)
+        em.lamp_box((s - 0.006, 0.42, H - 0.187), (s + 0.006, HW - 0.1, H - 0.182), tn["accent_dim"], LAMP_DIM)
+    # the linear luminaire: a trough with a bright strip and two dim edge lines
+    fb.box((0.06, -0.33, H - 0.075), (MOD - 0.06, -0.29, H - 0.02), TRIM)                # the trough: two side bars, two end bars
+    fb.box((0.06, 0.29, H - 0.075), (MOD - 0.06, 0.33, H - 0.02), TRIM)
+    fb.box((0.06, -0.29, H - 0.075), (0.10, 0.29, H - 0.02), TRIM)
+    fb.box((MOD - 0.10, -0.29, H - 0.075), (MOD - 0.06, 0.29, H - 0.02), TRIM)
+    fb.box((0.10, -0.29, H - 0.027), (MOD - 0.10, 0.29, H - 0.02), STRUCT)               # the back of the trough
+    em.lamp_box((0.16, -0.22, H - 0.034), (MOD - 0.16, 0.22, H - 0.028), tn["strip"], LAMP_HOT)
+    em.lamp_box((0.14, -0.285, H - 0.06), (MOD - 0.14, -0.27, H - 0.056), tn["accent_dim"], LAMP_DIM)
+    em.lamp_box((0.14, 0.27, H - 0.06), (MOD - 0.14, 0.285, H - 0.056), tn["accent_dim"], LAMP_DIM)
+    # a round duct on one side, a rectangular vent duct and a cable tray on the other
+    yd = duct_side * 1.0
+    fine.cyl((-OV, yd, H - 0.22), (MOD + OV, yd, H - 0.22), 0.14, TRIM, seg=14)
+    for s in (0.55, 2.55):
+        fine.box((s - 0.03, yd - 0.05, H - 0.10), (s + 0.03, yd + 0.05, H), STRUCT)
+        fine.box((s - 0.075, yd - 0.145, H - 0.24), (s + 0.075, yd + 0.145, H - 0.20), TRIM)
+    fine.box((0.7, yd - 0.145, H - 0.225), (0.78, yd + 0.145, H - 0.215), STRUCT)
+    fine.box((3.0, yd - 0.145, H - 0.225), (3.08, yd + 0.145, H - 0.215), STRUCT)
+    yv = -duct_side * 1.05
+    fine.box((-OV, yv - 0.22, H - 0.26), (MOD + OV, yv + 0.22, H - 0.05), COMPOSITE)
+    for k in range(3):
+        fine.box((0.35 + k * 1.3, yv - 0.16, H - 0.268), (0.75 + k * 1.3, yv + 0.16, H - 0.26), RUBBER)
+        for j in range(4):
+            fine.box((0.38 + k * 1.3 + j * 0.1, yv - 0.15, H - 0.27), (0.42 + k * 1.3 + j * 0.1, yv + 0.15, H - 0.266), TRIM)
+    fine.box((-OV, yv + 0.30, H - 0.14), (MOD + OV, yv + 0.55, H - 0.13), STRUCT)
+    for k in range(4):
+        fine.cyl((-OV, yv + 0.34 + 0.05 * k, H - 0.115), (MOD + OV, yv + 0.34 + 0.05 * k, H - 0.115), 0.012, RUBBER, seg=6)
+
+
+# ------------------------------------------------------------------------------------------------------ doors and frames
+def door_frame(b: SParts, sc: float, w: float, h: float, tn: dict, wide: bool = False) -> None:
+    """Jambs and header through the wall thickness, a status lamp, a call panel, a threshold (wall-local frame)."""
+    fb, fine, em = b.body, b.fine, b.emit
+    jl, jr = sc - w / 2, sc + w / 2
+    t0 = -0.075
+    fine.box((jl - 0.09, t0, 0.0), (jl, WALL_T + 0.01, h + 0.09), TRIM)
+    fine.box((jr, t0, 0.0), (jr + 0.09, WALL_T + 0.01, h + 0.09), TRIM)
+    fine.box((jl - 0.09, t0, h), (jr + 0.09, WALL_T + 0.01, h + 0.09), TRIM)
+    fine.box((jl - 0.02, t0 - 0.012, 0.0), (jl, t0, h), STRUCT)
+    fine.box((jr, t0 - 0.012, 0.0), (jr + 0.02, t0, h), STRUCT)
+    fine.box((jl - 0.02, t0 - 0.012, h), (jr + 0.02, t0, h + 0.02), STRUCT)
+    fine.box((jl, -0.02, 0.0), (jr, WALL_T + 0.01, 0.012), TRIM)                                   # threshold
+    em.lamp_box((sc - 0.22, t0 - 0.014, h + 0.03), (sc + 0.22, t0 - 0.008, h + 0.06), "green", LAMP)   # status lamp above
+    for sgn in (-1, 1):                                                                            # call panel beside the door
+        s = (jl - 0.24) if sgn < 0 else (jr + 0.24)
+        fine.box((s - 0.06, -0.05, 1.02), (s + 0.06, -0.008, 1.22), TRIM)
+        fine.box((s - 0.045, -0.058, 1.05), (s + 0.045, -0.05, 1.19), RUBBER)
+        em.lamp_box((s - 0.012, -0.0585, 1.10), (s + 0.012, -0.0575, 1.14), tn["accent"], LAMP)
+    if wide:
+        em.lamp_box((jl, t0 - 0.014, h + 0.10), (jr, t0 - 0.008, h + 0.115), tn["accent"], LAMP)
+
+
+def header_plate(b: SParts, sc: float, w: float, h: float) -> None:
+    """The composite header over a door with a blank recessed field (the room's name plate is placed there by the layout)."""
+    fb = b.body
+    z0, z1 = h + 0.13, H - 0.52
+    if z1 - z0 < 0.25:
+        return
+    s0, s1 = sc - w / 2 - 0.1, sc + w / 2 + 0.1
+    SW.panel(fb, s0, s1, z0, z1, raised=False, bolts=True)
+    fb.box((sc - 0.62, -0.05, z0 + 0.06), (sc + 0.62, -0.035, z1 - 0.06), SL.DGLASS)
+
+
+# ----------------------------------------------------------------------------------------------------------------- walls
+def wall(b: SParts, side: int, kind: str, tn: dict, rng: random.Random, plan_id: str) -> None:
+    fb, fine, em = b.body, b.fine, b.emit
+    with b.at(wall_matrix(side)):
+        s_op = OPENING.get(kind)
+        # ---- the body: full height except over openings
+        if s_op is None:
+            fb.box((-OV, 0.0, 0.0), (MOD + OV, WALL_T, H), STRUCT)
+        else:
+            a, c, oh = s_op
+            fb.box((-OV, 0.0, 0.0), (a, WALL_T, H), STRUCT)
+            fb.box((c, 0.0, 0.0), (MOD + OV, WALL_T, H), STRUCT)
+            if oh < H:
+                fb.box((a, 0.0, oh), (c, WALL_T, H), STRUCT)
+        # ---- corridor-side finish
+        plinth_spans = [(0.0, MOD)] if s_op is None else [(0.0, s_op[0] - 0.1), (s_op[1] + 0.1, MOD)]
+        for (a, c) in plinth_spans:
+            if c - a > 0.15:
+                SW.plinth(fine, a + 0.02, c - 0.02, tn["accent_dim"])
+        ribs = [0.0, 2.0] if kind == "wall" else [0.0]
+        for s in ribs:
+            SW.rib(fb, s, 0.0, H - 0.06, tn["accent_dim"], wide=False)
+        # the equipment bays
+        left_plan, right_plan = PLAN[plan_id] if kind == "wall" else NARROW["A" if plan_id != "B" else "B"]
+        kinds = (left_plan if side < 0 else right_plan)
+        if kind == "wall":
+            for (s0, s1), k in zip(((0.14, 1.86), (2.14, 3.86)), kinds):
+                SW.bay(fb, k, s0, s1, H, rng, tn["accent"], tn["accent_dim"])
+        elif kind == "door":
+            for (s0, s1), k in zip(((0.14, 1.04), (2.96, 3.86)), kinds):
+                SW.bay(fb, k, s0, s1, H, rng, tn["accent"], tn["accent_dim"])
+            door_frame(b, 2.0, DOOR_W, DOOR_H, tn)
+            header_plate(b, 2.0, DOOR_W, DOOR_H)
+        elif kind == "gate":
+            SW.panel(fb, 0.06, 0.32, 0.36, H - 0.55, raised=False)
+            SW.panel(fb, MOD - 0.32, MOD - 0.06, 0.36, H - 0.55, raised=False)
+            door_frame(b, 2.0, GATE_W, GATE_H, tn, wide=True)
+        elif kind == "branch":
+            for s in (0.45, 3.55):                          # the jambs of the side passage's throat
+                fine.box((s - 0.09 if s < 2 else s, -0.075, 0.0), (s if s < 2 else s + 0.09, WALL_T + 0.01, H), TRIM)
+                em.lamp_box((s - 0.006, -0.082, 0.35), (s + 0.006, -0.077, H - 0.35), tn["accent_dim"], LAMP_DIM)
+            fine.box((0.45, -0.02, 0.0), (3.55, WALL_T + 0.01, 0.012), TRIM)
+            em.lamp_box((0.6, -0.012, 0.0), (3.4, 0.012, 0.004), tn["accent"], LAMP_DIM)
+        # rails, service zone, cornice
+        if kind == "wall":
+            SW.utility_rail(fine, 0.15, 3.85, tn["accent_dim"])
+            SW.cable_runs(fine, 0.2, 3.8, H, rng, tray=True, conduits=2)
+            SW.cornice(fine, 0.0, MOD, H)
+        elif kind == "door":
+            SW.utility_rail(fine, 0.15, 1.1, tn["accent_dim"])
+            SW.utility_rail(fine, 2.9, 3.85, tn["accent_dim"])
+            SW.cable_runs(fine, 0.2, 3.8, H, rng, tray=True, conduits=1)
+            SW.cornice(fine, 0.0, MOD, H)
+        else:
+            SW.cornice(fine, 0.0, 0.4 if kind == "gate" else 0.45, H)
+            SW.cornice(fine, MOD - (0.4 if kind == "gate" else 0.45), MOD, H)
+
+
+# ------------------------------------------------------------------------------------------------------------------ ends
+def end_wall(b: SParts, tn: dict, rng: random.Random) -> None:
+    """A closed end at the forward end: structure, composite finish, a maintenance hatch and a tag."""
+    fb, fine, em = b.body, b.fine, b.emit
+    fb.box((MOD - 0.42, -HW - 0.02, 0.0), (MOD + OV, HW + 0.02, H), STRUCT)
+    # finish panels (built directly in module coordinates, facing -x)
+    x = MOD - 0.42
+    for (y0, y1) in ((-HW, -0.65), (0.65, HW)):
+        SW_panel_x(fb, x, y0 + 0.04, y1 - 0.04, 0.36, H - 0.55)
+    fine.box((x - 0.05, -0.62, 0.02), (x, 0.62, 0.30), TRIM)
+    fine.box((x - 0.05, -0.62, 0.30), (x, 0.62, H - 0.5), COMPOSITE)
+    fine.box((x - 0.07, -0.5, 0.4), (x - 0.05, 0.5, 2.2), STRUCT)
+    fine.box((x - 0.11, -0.16, 1.15), (x - 0.07, 0.16, 1.27), TRIM)
+    em.lamp_box((x - 0.05, 0.42, 2.02), (x - 0.045, 0.46, 2.12), "amber", LAMP)
+    em.label((x - 0.06, 0.0, 2.55), 0.9, 0.225, (-1, 0, 0), "tag_08")
+
+
+def SW_panel_x(fb, x: float, y0: float, y1: float, z0: float, z1: float) -> None:
+    """A wall panel on a wall that faces -x (finished face at x): the same layers as ship_walls.panel."""
+    proud = 0.026
+    fw = 0.028
+    fb.box((x - proud, y0, z0), (x, y1, z1), COMPOSITE)
+    tf = x - proud - 0.012
+    fb.box((tf, y0, z0), (x - proud, y1, z0 + fw), TRIM)
+    fb.box((tf, y0, z1 - fw), (x - proud, y1, z1), TRIM)
+    fb.box((tf, y0, z0 + fw), (x - proud, y0 + fw, z1 - fw), TRIM)
+    fb.box((tf, y1 - fw, z0 + fw), (x - proud, y1, z1 - fw), TRIM)
+
+
+def blast_frame(b: SParts, tn: dict) -> None:
+    """The section blast door: a heavy frame across the corridor at the forward end (x 3.4 .. 4.0), opening 2.0 x 2.5."""
+    fb, fine, em = b.body, b.fine, b.emit
+    hx = BLAST_W / 2
+    x0, x1 = 3.40, MOD + OV
+    fb.box((x0, -HW - 0.02, 0.0), (x1, -hx, H), STRUCT)
+    fb.box((x0, hx, 0.0), (x1, HW + 0.02, H), STRUCT)
+    fb.box((x0, -hx, BLAST_H), (x1, hx, H), STRUCT)
+    # brushed jambs and a heavy header, proud of the frame on the approach side (x < 3.4)
+    fine.box((x0 - 0.10, -hx - 0.16, 0.0), (x1 - 0.1, -hx, BLAST_H + 0.16), TRIM)
+    fine.box((x0 - 0.10, hx, 0.0), (x1 - 0.1, hx + 0.16, BLAST_H + 0.16), TRIM)
+    fine.box((x0 - 0.10, -hx - 0.16, BLAST_H), (x1 - 0.1, hx + 0.16, BLAST_H + 0.16), TRIM)
+    for sgn in (-1, 1):
+        y = sgn * (hx + 0.08)
+        for z in (0.3, 0.9, 1.5, 2.1):
+            fine.box((x0 - 0.135, y - 0.075, z - 0.05), (x0 - 0.10, y + 0.075, z + 0.05), STRUCT)
+            for dy in (-0.05, 0.05):
+                fine.cyl((x0 - 0.135, y + dy, z), (x0 - 0.146, y + dy, z), 0.012, TRIM, seg=6)
+    # hazard stripes on the jamb faces and across the floor threshold
+    for sgn in (-1, 1):
+        fb.label((x0 - 0.137, sgn * (hx + 0.08), BLAST_H / 2 + 0.05), BLAST_H - 0.1, 0.10, (-1, 0, 0), "hazard_h", up=(0, 1, 0))
+    fb.label((x0 - 0.06, 0.0, BLAST_H + 0.08), 2 * hx + 0.3, 0.10, (-1, 0, 0), "hazard")
+    fb.label((x0 + 0.20, 0.0, 0.0125), 2 * hx, 0.18, (0, 0, 1), "hazard_h", up=(1, 0, 0))
+    # lamps: two red beacons, a green ready lamp, guide lines on both sides
+    for sgn in (-1, 1):
+        em.lamp_box((x0 - 0.14, sgn * (hx + 0.06) - 0.03, BLAST_H + 0.2), (x0 - 0.10, sgn * (hx + 0.06) + 0.03, BLAST_H + 0.26), "red", LAMP)
+    em.lamp_box((x0 - 0.12, -0.10, BLAST_H + 0.20), (x0 - 0.10, 0.10, BLAST_H + 0.25), "green", LAMP)
+    # finish on the approach side between the frame and the walls
+    for (y0, y1) in ((-HW, -hx - 0.2), (hx + 0.2, HW)):
+        if y1 - y0 > 0.2:
+            SW_panel_x(fb, x0, y0 + 0.03, y1 - 0.03, 0.36, H - 0.55)
+    fb.box((x0 - 0.06, -hx - 0.2, BLAST_H + 0.18), (x0, hx + 0.2, H - 0.06), COMPOSITE)
+    fb.box((x0 - 0.045, -0.9, BLAST_H + 0.26), (x0 - 0.02, 0.9, H - 0.14), SL.DGLASS)         # the sign field over the opening
+
+
+# ------------------------------------------------------------------------------------------------------- the whole module
+def build_module(name: str, tone: str, suffix: str) -> "bpy.types.Object":
+    left, right, aft, fwd = CORRIDOR_SPECS[suffix.split("#")[0]]
+    tn = TONES[tone]
+    plan_id = "A"
+    for ch in ("A", "B", "C"):
+        if suffix.endswith("_" + ch):
+            plan_id = ch
+    seed = sum(ord(c) for c in name) * 7 + 13
+    rng = random.Random(seed)
+    b = SParts(bevel=0.006, fine_bevel=0.003)
+    floor(b, tn, rng)
+    ceiling(b, tn, rng, duct_side=1 if plan_id != "B" else -1)
+    wall(b, -1, left, tn, rng, plan_id)
+    wall(b, 1, right, tn, rng, plan_id)
+    if fwd == "closed":
+        end_wall(b, tn, rng)
+    elif fwd == "blast":
+        blast_frame(b, tn)
+    return b.build(name)
