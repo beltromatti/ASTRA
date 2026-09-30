@@ -1,6 +1,7 @@
 // ASTRA — link to astra-mind.
 
 #include "AstraMindSubsystem.h"
+#include "AstraHarness.h"
 #include "ASTRAPlayerController.h"
 
 #include "Camera/PlayerCameraManager.h"
@@ -268,6 +269,7 @@ void UAstraMindSubsystem::Send(const TSharedRef<FJsonObject>& Msg)
 
 void UAstraMindSubsystem::SayText(const FString& Text)
 {
+	FAstraTimeline::Record(TEXT("captain"), Text);
 	Screen(FString::Printf(TEXT("Captain: %s"), *Text), FColor(255, 214, 120));
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("player_text"));
@@ -455,6 +457,7 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 	}
 	else if (Type == TEXT("transcript"))
 	{
+		FAstraTimeline::Record(TEXT("heard"), FString::Printf(TEXT("[%s] %s"), *Msg->GetStringField(TEXT("lang")), *Msg->GetStringField(TEXT("text"))));
 		Screen(FString::Printf(TEXT("Captain (%s): %s"), *Msg->GetStringField(TEXT("lang")), *Msg->GetStringField(TEXT("text"))), FColor(255, 214, 120));
 	}
 	else if (Type == TEXT("status"))

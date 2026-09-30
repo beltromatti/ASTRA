@@ -27,6 +27,9 @@
 #include "ASTRA.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "AstraMindSubsystem.h"
+#include "AstraInput.h"
+#include "AstraHarness.h"
+#include "ASTRACharacter.h"
 #include "AstraScreensSubsystem.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -44,6 +47,16 @@ AASTRAPlayerController::AASTRAPlayerController()
 {
 	// set the player camera manager class
 	PlayerCameraManagerClass = AASTRACameraManager::StaticClass();
+}
+
+UAstraInputSet* AASTRAPlayerController::GetInputSet()
+{
+	if (!InputSet)
+	{
+		InputSet = NewObject<UAstraInputSet>(this, TEXT("AstraInput"));
+		InputSet->Build();
+	}
+	return InputSet;
 }
 
 void AASTRAPlayerController::BeginPlay()
@@ -65,7 +78,7 @@ void AASTRAPlayerController::BeginPlay()
 				.Padding(FMargin(14, 8))
 				[
 					SNew(STextBlock).Font(Mono ? FSlateFontInfo(Mono, 13) : FCoreStyle::GetDefaultFontStyle("Mono", 13))
-					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  hold V  talk to the crew  ·  T  type  ·  Tab  datapad")))
+					.ColorAndOpacity(FLinearColor(0.82f, 0.88f, 0.95f, 0.95f)).Text(FText::FromString(TEXT("F1  controls  ·  W or E  stand up  ·  hold V  talk to the crew  ·  T  type  ·  Tab  datapad")))
 				]
 			];
 			VC->AddViewportWidgetContent(HintWidget.ToSharedRef(), 5);
@@ -144,6 +157,8 @@ void AASTRAPlayerController::SetupInputComponent()
 		// Add Input Mapping Context
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 		{
+			// the Captain's own controls on foot, built in code (the template's input assets are not used)
+			Subsystem->AddMappingContext(GetInputSet()->OnFoot, 0);
 			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
 			{
 				Subsystem->AddMappingContext(CurrentContext, 0);
@@ -292,6 +307,10 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 	const float EyeZ = Cam ? Cam->GetRelativeLocation().Z : 64.f;
 	if (bSit)
 	{
+		if (AASTRACharacter* AC = Cast<AASTRACharacter>(C))
+		{
+			AC->ResetPosture();
+		}
 		// seated eye height about 1.18 m above the dais, a little forward of the seat back, facing the bow window
 		C->SetActorEnableCollision(false);
 		C->GetCharacterMovement()->DisableMovement();
@@ -407,8 +426,12 @@ namespace
 		TEXT("  V (hold)        talk to the crew, in any language\n")
 		TEXT("  T               type to the crew instead (Enter sends, Esc cancels)\n")
 		TEXT("  Tab             the datapad: the ship at a glance, anywhere aboard\n")
-		TEXT("  E               stand up / sit down · doors · the lift\n")
-		TEXT("  WASD, mouse     walk and look\n")
+		TEXT("  E               stand up / sit down · doors · the lift · use\n")
+		TEXT("  W (seated)      stand up and walk\n")
+		TEXT("\n")
+		TEXT("ON FOOT\n")
+		TEXT("  WASD, mouse     walk and look          Shift (hold)   run\n")
+		TEXT("  Space           jump (low down: stand)  C              crouch · hold C: lie down\n")
 		TEXT("  Esc             pause · save · menu\n")
 		TEXT("\n")
 		TEXT("THE LIFT (at the end of the port corridor)\n")
@@ -634,6 +657,7 @@ void AASTRAPlayerController::EnsureSubtitles()
 
 void AASTRAPlayerController::Subtitle(int32 Id, const FString& Speaker, const FString& Name, const FString& Text)
 {
+	FAstraTimeline::Record(TEXT("line"), FString::Printf(TEXT("%s: %s"), *Name, *Text));
 	EnsureSubtitles();
 	// the name as a crew would say it: the surname alone ("Vice Admiral Adrian Rourke (7th Fleet command)" -> ROURKE)
 	FString Short = Name;

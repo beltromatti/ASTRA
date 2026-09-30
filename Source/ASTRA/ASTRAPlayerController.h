@@ -24,7 +24,16 @@ public:
 	/** Constructor */
 	AASTRAPlayerController();
 
+	/** The Captain's controls on foot (built in code the first time they are asked for). */
+	class UAstraInputSet* GetInputSet();
+	const class UAstraInputSet* GetInputSet() const { return InputSet; }
+	bool IsSeated() const { return bSeated; }
+	/** Out of the captain's chair (W while seated, or E). */
+	void StandUp() { if (bSeated) { SetSeated(false); } }
+
 protected:
+
+	UPROPERTY() TObjectPtr<class UAstraInputSet> InputSet;
 
 	/** Input Mapping Contexts */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")

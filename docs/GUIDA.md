@@ -10,8 +10,12 @@ ascolta in qualsiasi lingua e ti risponde nella tua; nomi, cartelli e schermi de
 | **T** | scrivi un ordine (Invio manda, Esc annulla) |
 | **Tab** | il datapad: la nave a colpo d'occhio, ovunque a bordo |
 | **E** | alzarsi e sedersi, porte, ascensore, salire su un Falcon |
+| **W** (seduto) | alzarsi dalla poltrona e camminare |
 | **1-6** (all'ascensore) | Plancia · Alloggi dell'equipaggio · Mensa · Infermeria · Sala macchine · Ponte di volo |
-| **WASD**, mouse | camminare e guardarsi intorno |
+| **WASD**, mouse | camminare e guardarsi intorno (anche il gamepad) |
+| **Shift** (tieni premuto) | correre |
+| **Spazio** | saltare; da accovacciato o a terra, rialzarsi |
+| **C** · **C** tenuto premuto | accovacciarsi · stendersi a terra |
 | **Esc** | pausa, salvataggio, menu |
 | **F1** | i comandi a schermo |
 

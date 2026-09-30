@@ -1,6 +1,7 @@
 // ASTRA — ship simulation.
 
 #include "AstraShipSubsystem.h"
+#include "AstraHarness.h"
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
@@ -1614,6 +1615,15 @@ void UAstraShipSubsystem::SetAlert(EAstraAlert NewAlert)
 
 bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJsonObject>& Args, FString& OutDetail)
 {
+	{
+		FString ArgsText;
+		if (Args.IsValid())
+		{
+			const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> W = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&ArgsText);
+			FJsonSerializer::Serialize(Args.ToSharedRef(), W);
+		}
+		FAstraTimeline::Record(TEXT("cmd"), FString::Printf(TEXT("%s %s"), *Name, *ArgsText.Left(300)));
+	}
 	if (!Args.IsValid())
 	{
 		OutDetail = TEXT("invalid arguments");

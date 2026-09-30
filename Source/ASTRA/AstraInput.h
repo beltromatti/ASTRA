@@ -1,0 +1,36 @@
+// The Captain's controls on foot, built in code (no input assets): Enhanced Input actions and their default keys for
+// keyboard and mouse and for a gamepad. The player controller owns one set and adds its mapping context; the character
+// binds to its actions. The discrete keys of the ship (V, T, E, Tab, F1, Esc) stay bound on the controller.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "UObject/Object.h"
+#include "AstraInput.generated.h"
+
+class UInputAction;
+class UInputMappingContext;
+
+UCLASS()
+class UAstraInputSet : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	/** Creates the actions and the on-foot mapping context (call once, right after construction). */
+	void Build();
+
+	/** Walk (Axis2D: X right, Y forward) — WASD, arrows, left stick. */
+	UPROPERTY() TObjectPtr<UInputAction> Move;
+	/** Look with the mouse (Axis2D, per-frame delta; Y already turned so that up looks up). */
+	UPROPERTY() TObjectPtr<UInputAction> MouseLook;
+	/** Look with a stick (Axis2D, a rate scaled by the frame time). */
+	UPROPERTY() TObjectPtr<UInputAction> StickLook;
+	UPROPERTY() TObjectPtr<UInputAction> Jump;
+	/** Held: run. */
+	UPROPERTY() TObjectPtr<UInputAction> Sprint;
+	/** Tap: crouch or stand up; hold: lie down (the character times it). */
+	UPROPERTY() TObjectPtr<UInputAction> Crouch;
+
+	UPROPERTY() TObjectPtr<UInputMappingContext> OnFoot;
+};
