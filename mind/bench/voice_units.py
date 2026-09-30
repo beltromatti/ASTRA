@@ -138,6 +138,9 @@ def glossary_and_language() -> None:
     check("language: a full English order after Italian switches", resolve_language("Helm, come to heading two one seven and full ahead", "it")[0] == "en")
     check("language: Spanish is Spanish", resolve_language("Comunicaciones, abra un canal con el Praetorian", "it")[0] == "es")
     check("language: empty text keeps the last language", resolve_language("", "de")[0] == "de")
+    check("language: Swedish is Swedish (a language with a system voice, not one of the seven)", resolve_language("Kapten, sätt kurs två ett sju, full fart framåt.", "it")[0] == "sv")
+    check("language: 'Avante toda' is Spanish for a Captain who speaks Spanish, Portuguese for one who speaks Portuguese",
+          resolve_language("Avante toda.", "es")[0] == "es" and resolve_language("Avante toda.", "pt")[0] == "pt")
     check("language: a language the engine reports counts", resolve_language("ok", "en", backend_lang="ja")[0] in ("ja", "en"))
 
 

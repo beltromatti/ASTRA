@@ -224,6 +224,12 @@ async def main() -> int:
     out["dropped_lines"] = [(m.get("reason"), m.get("speaker")) for m in dropped]
     out["stats"] = dict(mind.voice.stats)
     print(json.dumps(out, indent=1, ensure_ascii=False, default=str))
+    out["load_avg"] = round(os.getloadavg()[0], 1)
+    out["problems"] = list(bad)
+    from .voice_pipeline import load as load_results, save as save_results
+    kept = load_results("e2e") or {}
+    kept[lang] = json.loads(json.dumps(out, default=str))
+    save_results("e2e", kept)
     ws.inbox.put_nowait(None)
     for t in tasks:
         t.cancel()

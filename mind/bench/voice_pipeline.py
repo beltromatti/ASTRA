@@ -789,7 +789,7 @@ def decisions_lines(stt, live, tts, floor, mem, other) -> list[str]:  # noqa: AN
 def report(args) -> None:  # noqa: ANN001
     out = REPO_ROOT / "docs" / "bench" / f"voce_{TODAY}.md"
     L: list[str] = [f"# Voce: riconoscimento, sintesi, palco del parlato — {TODAY}", ""]
-    stt, live, lang, other, tts, mic, floor, mem = (load(s) for s in ("stt", "live", "lang", "other", "tts", "mic", "floor", "mem"))
+    stt, live, lang, other, tts, mic, floor, mem, e2e = (load(s) for s in ("stt", "live", "lang", "other", "tts", "mic", "floor", "mem", "e2e"))
     L += ["Macchina: MacBook Air M4 16 GB. **Durante le misure l'editor di Unreal era aperto e altri agenti compilavano** (il carico medio, su 10 core, è scritto accanto a "
           "ogni misura): i tempi sono quelli di un Mac già occupato, non di uno libero. Il parlato di prova è sintetico (Pocket TTS e voci di sistema macOS), non registrazioni "
           "di persone: misura le differenze tra motori, il peso dei nomi del gioco, del rumore e della lingua, non la precisione assoluta su una persona stanca con il "
@@ -944,7 +944,39 @@ def report(args) -> None:  # noqa: ANN001
             if k in mem:
                 L.append(f"| {label} | {mem[k]} |")
         L.append("")
+    if e2e:
+        L += ["## 9. Da capo a fondo (gioco finto, microfono finto, modello di linguaggio finto)", "",
+              "`bench/voice_e2e.py`: la colla della mente (tasto, sessione di riconoscimento, transcript, palco, voci) con il riconoscimento e le voci veri e la risposta dell'equipaggio "
+              "sostituita da una riga fissa (nessuna chiamata di rete: la parte del modello non c'è, quindi «dal transcript alla prima parola» è la sola parte della mente). "
+              "Il Capitano preme il tasto, comincia a parlare un quarto di secondo dopo e lascia il tasto 0,2 s dopo l'ultima parola.", "",
+              "| Misura | " + " | ".join(sorted(e2e)) + " |", "|---|" + "---|" * len(e2e)]
+        for key, label in (("key_up_to_transcript_ms", "dal rilascio del tasto al transcript nel gioco (ms)"),
+                           ("key_up_to_first_word_ms", "dal rilascio alla prima parola della risposta, senza il modello (ms)"),
+                           ("transcript_to_the_crew_turn_ms", "dal transcript al turno dell'equipaggio (ms)"),
+                           ("the_crew_line_queued_to_first_word_ms", "dalla riga in coda alla prima parola (ms)"),
+                           ("key_down_to_cancel_ms", "dal tasto premuto al `cancel` di chi parlava (ms)"),
+                           ("cancel_fade_ms", "dissolvenza chiesta al gioco (ms)"),
+                           ("over_key_up_to_first_word_ms", "dopo aver interrotto un ufficiale: dal rilascio alla prima parola (ms)"),
+                           ("typed_to_first_word_ms", "ordine scritto: dall'invio alla prima parola (ms)"),
+                           ("load_avg", "carico medio della macchina")):
+            L.append(f"| {label} | " + " | ".join(str(e2e[k].get(key, "—")) for k in sorted(e2e)) + " |")
+        L.append("")
+        for k in sorted(e2e):
+            if e2e[k].get("problems"):
+                L.append(f"**{k}: problemi** — " + "; ".join(e2e[k]["problems"]))
+        L.append("")
     L += decisions_lines(stt, live, tts, floor, mem, other)
+    L += ["## Limiti di queste misure", "",
+          "- **Il parlato è sintetico** (Pocket TTS con l'accento del suo modello e voci di sistema macOS), non persone: il WER comprende anche gli errori della sintesi (l'italiano di Pocket è la "
+          "lingua meno intelligibile) e i nomi del gioco vengono pronunciati all'inglese o alla lingua della frase. Con una persona vera i numeri saranno diversi, in un senso o nell'altro; "
+          "i confronti tra motori, condizioni e lingue restano validi.",
+          "- **Gli alias del glossario sono stati ricavati da queste stesse trascrizioni**: la percentuale di nomi trovati è misurata sul campione da cui sono nati (le regole generali, cioè il "
+          "nome dell'ufficiale a inizio frase, la vocale iniziale persa, i nomi a pezzi, no).",
+          "- **La macchina era occupata** (editor di Unreal e altri agenti): i tempi sono quelli di un Mac già carico; il carico medio è accanto a ogni misura.",
+          "- **Microfono finto**: la cattura e il pre-roll sono provati contro un dispositivo finto che consegna blocchi da 20 ms in tempo reale; il microfono vero, le cuffie Bluetooth e il "
+          "permesso di sistema non si sono potuti provare qui.",
+          "- **Il gioco non c'è**: la colla della mente è provata con un gioco finto; come il gioco riproduce l'audio (coda procedurale, attenuazione, musica) è nella diagnosi di "
+          "`docs/protocollo_voce.md` e va verificato col gioco vero dopo le correzioni C++.", ""]
     out.write_text("\n".join(L) + "\n", encoding="utf-8")
     print("REPORT", out)
 

@@ -15,8 +15,10 @@ from functools import lru_cache
 
 log = logging.getLogger("astra.lang")
 
-# languages the crew can be addressed in (crew.py LANG_NAMES) plus a few that people speak to games
-CANDIDATES = ("it", "en", "es", "fr", "de", "pt", "nl", "ru", "pl", "ja", "zh", "ar", "ko", "tr")
+# languages the crew can be addressed in (crew.py LANG_NAMES) plus the ones a voice exists for here (tts.py SYSTEM_VOICES) or that
+# people speak to games. More candidates cost the seven that matter almost nothing (98.2 % -> 98.0 % of the benchmark phrases right).
+CANDIDATES = ("it", "en", "es", "fr", "de", "pt", "nl", "ru", "pl", "ja", "zh", "ar", "ko", "tr",
+              "sv", "da", "fi", "el", "cs", "uk", "ro", "hu", "sk", "hi", "he", "th")
 TTS_LANGS = ("it", "en", "es", "fr", "de", "pt", "nl")             # the ones the local voices speak natively
 
 # words a bridge officer hears: enough to settle a short order (accents stripped, lower case)
@@ -75,7 +77,8 @@ def _detector():
     from lingua import Language as L, LanguageDetectorBuilder
     table = {"it": L.ITALIAN, "en": L.ENGLISH, "es": L.SPANISH, "fr": L.FRENCH, "de": L.GERMAN, "pt": L.PORTUGUESE,
              "nl": L.DUTCH, "ru": L.RUSSIAN, "pl": L.POLISH, "ja": L.JAPANESE, "zh": L.CHINESE, "ar": L.ARABIC,
-             "ko": L.KOREAN, "tr": L.TURKISH}
+             "ko": L.KOREAN, "tr": L.TURKISH, "sv": L.SWEDISH, "da": L.DANISH, "fi": L.FINNISH, "el": L.GREEK, "cs": L.CZECH,
+             "uk": L.UKRAINIAN, "ro": L.ROMANIAN, "hu": L.HUNGARIAN, "sk": L.SLOVAK, "hi": L.HINDI, "he": L.HEBREW, "th": L.THAI}
     det = LanguageDetectorBuilder.from_languages(*table.values()).build()
     back = {v: k for k, v in table.items()}
     return det, back
