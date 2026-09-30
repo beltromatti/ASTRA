@@ -331,8 +331,24 @@ async def recogniser() -> None:
     check("recogniser: the game's names are corrected in the result", tr.text == "Tattico, fuoco sull'Acheron" and tr.fixes, tr.text)
 
 
+def speech_rules() -> None:
+    """The floor's text rules for a line that was cut off (astra_mind/speech.py): where it goes on, and the short version of a long rest."""
+    from astra_mind.speech import _boil_down, _tail
+    t = "Aquila, this is Archon Solm. You are in our space. Withdraw at once. Stand down within two minutes."
+    check("tail: cut in the first sentence starts again from its beginning", _tail(t, 0.05) == t)
+    k = t.index("You are")
+    check("tail: cut in a later sentence goes on from the start of that sentence", _tail(t, (k + 8) / len(t)) == t[k:], str(_tail(t, (k + 8) / len(t))))
+    k2 = t.index("Withdraw")
+    check("tail: a sentence that was nearly over is not said again", _tail(t, (k2 - 3) / len(t)) == t[k2:], str(_tail(t, (k2 - 3) / len(t))))
+    check("tail: nothing is left when the end of the last sentence was heard", _tail(t, 0.985) is None)
+    check("tail: one sentence is said again only if hardly begun", _tail("Contact lost on the long range plot", 0.3) is not None
+          and _tail("Contact lost on the long range plot", 0.7) is None)
+    check("boil down: two sentences stay, four become the first and the last",
+          _boil_down("One here. Two here.") == "One here. Two here." and _boil_down(t) == "Aquila, this is Archon Solm. Stand down within two minutes.")
+
+
 def main() -> int:
-    for fn in (units, glossary_and_language, speech_text):
+    for fn in (units, glossary_and_language, speech_text, speech_rules):
         try:
             fn()
         except Exception:  # noqa: BLE001

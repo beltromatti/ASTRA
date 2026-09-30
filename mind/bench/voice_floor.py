@@ -374,8 +374,8 @@ async def s02_barge_in() -> list[str]:
         later = [tr.line[i]["text"] for i in firsts[1:]]
         if not any("Two new contacts" in t for t in later):
             bad.append("the waiting report was never said")
-        if not any(t.startswith("Captain, all decks") for t in later):
-            bad.append("the interrupted report was not said again")
+        if not any(t.startswith("Engineering confirms") for t in later):
+            bad.append("the rest of the interrupted report (from the sentence that was cut) was not said again")
         return bad
 
 
@@ -415,10 +415,14 @@ async def s04_no_speech() -> list[str]:
         await b.settle(1.0)
         tr = b.trace()
         bad = check(tr, b.enq)
-        if b.ids["r2"] not in tr.begin:
+        after = sorted(t for t in tr.begin.values() if t >= t_up)
+        if not after or after[0] - t_up > 0.7:
+            bad.append(f"nobody went on within 0.7 s of a key press with no speech ({after[0] - t_up:.2f} s)" if after else "nobody went on")
+        texts = [tr.line[i]["text"] for i in tr.order() if tr.begin[i] >= t_up]
+        if not any("Weapons are cold" in t for t in texts):
             bad.append("the held report was never said")
-        elif tr.begin[b.ids["r2"]] - t_up > 0.7:
-            bad.append(f"the held report waited {tr.begin[b.ids['r2']] - t_up:.2f} s after a key press with no speech")
+        if not any("Nothing new" in t for t in texts):
+            bad.append("the report the key had cut off was not said again (it had hardly begun)")
         return bad
 
 
@@ -426,7 +430,7 @@ async def s05_floor_timeout() -> list[str]:
     """No answer comes within the timeout: the others go on, and a late answer still goes first."""
     async with Bridge() as b:
         await b.say("r1", "sensors", "Sensors. Contact lost on the long range plot, recommend an active sweep.")
-        await asyncio.sleep(0.1)                                          # (the report has just begun: the key cuts it, it is said again)
+        await asyncio.sleep(0.1)                                          # (the report has just begun: the key cuts it, the rest of it is said again)
         b.voice.captain_begin()
         await asyncio.sleep(0.5)
         b.voice.captain_end(None)
@@ -434,7 +438,7 @@ async def s05_floor_timeout() -> list[str]:
         await asyncio.sleep(speech.TURN_TIMEOUT_S + 1.0)
         tr = b.trace()
         bad = []
-        again = [i for i in tr.order() if tr.begin[i] > t_up and tr.line[i]["text"].startswith("Sensors. Contact lost")]
+        again = [i for i in tr.order() if tr.begin[i] > t_up and "Contact lost on the long range plot" in tr.line[i]["text"]]
         if not again:
             bad.append("the report stayed held past the timeout")
         elif not (speech.TURN_TIMEOUT_S - 0.5 <= tr.begin[again[0]] - t_up <= speech.TURN_TIMEOUT_S + 1.0):
@@ -922,9 +926,207 @@ async def s26_first_version_engine() -> list[str]:
         return bad
 
 
+ARCHON = ("Aquila, this is Archon Varek Solm of the Kharon Mandate. You have entered space that belongs to the Outer Worlds. "
+          "Your presence here is an insult to every ship that fell at the gates. I give you one chance to withdraw before my fleet opens fire. "
+          "Stand down your weapons and surrender your vessel within two minutes.")
+
+
+async def s27_live_replay() -> list[str]:
+    """The live test's sequence (game clock): reports queued, an enemy message in flight, and three typed orders answered about a second
+    after each: every answer starts within a second and before anything queued; stale reports are dropped, not said late; the
+    enemy's message is cut and comes back short, after the answers."""
+    async with Bridge() as b:
+        await asyncio.sleep(44.0)
+        born: dict[str, float] = {}
+        orders: dict[str, float] = {}
+
+        async def report(key: str, speaker: str, text: str, at: float, event_at: float, urgent: bool = False) -> None:
+            """A report turn's line: produced at `at` for an event that happened at `event_at` (a task of its own, like a model call)."""
+            await asyncio.sleep(max(0.0, at - b.t()))
+            b.voice.low_priority = True
+            b.voice.report_since = event_at
+            born[key] = event_at
+            await b.say(key, speaker, text)
+
+        async def hail(key: str, speaker: str, text: str, at: float) -> None:
+            """A message from the enemy on the open channel (the enemy module's own task: no report flags, not part of a Captain's turn)."""
+            await asyncio.sleep(max(0.0, at - b.t()))
+            await b.say(key, speaker, text)
+
+        async def order(key: str, at: float, delay: float, speaker: str, text: str) -> None:
+            """A typed order at `at`: what the server does (the floor is taken, whoever talks stops), then the crew's turn, whose model
+            call is a task made after the turn began, answers `delay` seconds later."""
+            await asyncio.sleep(max(0.0, at - b.t()))
+            orders[key] = b.t()
+            b.voice.captain_input()
+            b.voice.captain_speaks()
+
+            async def turn() -> None:
+                b.voice.captain_turn_begin()
+                try:
+                    async def model_call() -> None:
+                        await asyncio.sleep(delay)
+                        await b.say(key, speaker, text)                 # (no flag: the turn says it is an answer)
+                    await asyncio.ensure_future(model_call())
+                    await asyncio.sleep(1.5)                            # the rest of the turn (the ship carries the order out)
+                finally:
+                    b.voice.captain_turn_end()
+            await turn()
+
+        jobs = [
+            report("nair", "sensors", "Sensors. Contact T-22 bearing zero nine zero, range ninety kilometres, closing slowly.", 47.0, 46.6),
+            report("mensah", "engineering", "Engineering. Reactor at eighty percent, coolant loop two is warm but holding.", 53.0, 52.7),
+            hail("archon", "solm", ARCHON, 55.0),
+            report("nair2", "sensors", "Sensors. Second contact bearing one eight zero, range sixty kilometres.", 60.0, 59.6),
+            report("price", "flight", "Flight. Alpha squadron is launching, six fighters away in three minutes.", 67.5, 45.2),
+            order("o1", 57.9, 0.88, "helm", "Helm, aye. Coming to heading two one seven and holding it."),
+            order("o2", 67.4, 1.46, "ops", "Ops, aye. The Cocytus is on the main screen."),
+            order("o3", 76.6, 0.95, "tactical", "Tactical, aye. Firing on the Cocytus until she goes down."),
+        ]
+        await asyncio.gather(*[asyncio.ensure_future(j) for j in jobs])
+        await b.settle(3.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        # (1) every answer starts within a second of being said, before anything else queued, and cuts the line in flight
+        for key in ("o1", "o2", "o3"):
+            aid = b.ids[key]
+            if aid not in tr.begin:
+                bad.append(f"the answer {key} was never said")
+                continue
+            wait = tr.begin[aid] - b.enq[aid]
+            if wait > 1.0:
+                bad.append(f"the answer {key} started {wait:.2f} s after it was said (the order was {b.enq[aid] - orders[key]:.2f} s before)")
+            since = [i for i in tr.order() if orders[key] < tr.begin[i] < tr.begin[aid] and tr.line[i]["priority"] != "answer"]
+            if since:
+                bad.append(f"after the order {key}, {[tr.line[i]['speaker'] for i in since]} began before the answer")
+            ahead = [i for i in tr.order() if tr.begin[i] <= orders[key] < tr.end.get(i, tr.begin[i]) and tr.line[i]["priority"] != "answer"]
+            for i in ahead:
+                if tr.reason.get(i) != "cut" or tr.cancel_t.get(i, 1e9) - orders[key] > 0.6:
+                    bad.append(f"line {i} ({tr.line[i]['speaker']}) was in flight at the order {key} and was not stopped within 0.6 s")
+        # (2) a report is said within REPORT_MAX_AGE_S of its event, or dropped and declared
+        limit = speech.REPORT_MAX_AGE_S[Prio.NORMAL]
+        for key, ev in born.items():
+            lid = b.ids[key]
+            if lid in tr.begin and tr.begin[lid] > ev + limit + 0.01 and key != "archon":
+                bad.append(f"the report {key} began {tr.begin[lid] - ev:.1f} s after its event (limit {limit:.0f} s)")
+        if tr.dropped.get(b.ids["price"]) != "expired":
+            bad.append(f"the report of the 22-second-old launch was {tr.dropped.get(b.ids['price'])!r}, not dropped as expired")
+        if b.ids["nair2"] in tr.begin and tr.begin[b.ids["nair2"]] > 59.6 + limit:
+            bad.append("a report that had waited past its age was said late")
+        # (3) the enemy's message: cut by the orders that find it in flight, and what is left of it comes back short, after the answer
+        arch = [i for i in tr.order() if tr.line[i]["speaker"] == "solm"]
+        cuts = [i for i in arch if tr.reason.get(i) == "cut"]
+        if not cuts:
+            bad.append("the enemy's message was not cut by an order")
+        for i in cuts:
+            if not any(0.0 <= tr.cancel_t[i] - t <= 0.6 for t in orders.values()):
+                bad.append(f"the enemy's message (line {i}) was cut at {tr.cancel_t[i]:.2f}, not within 0.6 s of an order")
+        if not arch or tr.reason.get(arch[-1]) != "done":
+            bad.append("the end of the enemy's message was never said")
+        else:
+            last = arch[-1]
+            dur = tr.end[last] - tr.begin[last]
+            if dur > speech.RESUME_MAX_S + 1.0:
+                bad.append(f"what was left of the message took the floor for {dur:.1f} s")
+            if "Stand down" not in tr.line[last]["text"]:
+                bad.append("the point of the message (what it asks) was not said")
+            if tr.begin[last] < tr.end[b.ids["o3"]]:
+                bad.append("the rest of the message came before the last answer")
+        return bad
+
+
+async def s28_typed_order_over_an_answer() -> list[str]:
+    """A typed order arrives while the answer to the previous one is being said: that answer is finished (a typed order talks over nobody), the new
+    one follows; a spoken order (the key) does stop it."""
+    async with Bridge() as b:
+        await b.say("a1", "helm", "Helm, aye. Coming to heading two one seven and holding it steady, Captain.", answer=True)
+        await asyncio.sleep(1.0)
+        b.voice.captain_input()
+        await asyncio.sleep(1.0)
+        await b.say("a2", "ops", "Ops, aye. The Cocytus is on the main screen.", answer=True)
+        await b.settle(2.0)
+        await b.say("a3", "tactical", "Tactical, aye. Firing on the Cocytus until she goes down, standing by.", answer=True)
+        await asyncio.sleep(1.0)
+        t_key = b.t()
+        b.voice.captain_begin()
+        await asyncio.sleep(1.0)
+        b.voice.captain_end(False)
+        await b.settle(1.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        if tr.reason.get(b.ids["a1"]) != "done":
+            bad.append(f"the answer to the earlier order was {tr.reason.get(b.ids['a1'])!r}: a typed order cut it")
+        if b.ids["a2"] not in tr.begin or tr.begin[b.ids["a2"]] < tr.end[b.ids["a1"]]:
+            bad.append("the new answer did not follow the earlier one")
+        if tr.reason.get(b.ids["a3"]) != "cut" or tr.cancel_t.get(b.ids["a3"], 1e9) - t_key > 0.6:
+            bad.append("a spoken order (the key down) did not stop the answer in flight within 0.6 s")
+        return bad
+
+
+async def s29_report_age() -> list[str]:
+    """A report is worth saying for a few seconds after its event: older it is dropped and declared, a warning of danger lasts longer, a producer's
+    own expiry is respected, and with no event time the age counts from the moment the line was queued."""
+    async with Bridge() as b:
+        await asyncio.sleep(100.0)
+        now = b.t()
+
+        async def one(key: str, flag: str, born: float | None, text: str, **kw) -> None:  # noqa: ANN003
+            async def go() -> None:
+                if flag == "urgent":
+                    b.voice.urgent = True
+                else:
+                    b.voice.low_priority = True
+                b.voice.report_since = born
+                await b.say(key, "sensors", text, **kw)
+            await asyncio.ensure_future(go())
+
+        await one("fresh", "report", now - 5.0, "Sensors. Contact bearing zero nine zero.")
+        await one("stale", "report", now - 25.0, "Sensors. Contact bearing one eight zero.")
+        await one("urgent_old", "urgent", now - 25.0, "Missiles inbound, bearing two seven zero!")
+        await one("urgent_stale", "urgent", now - 35.0, "Hull breach on deck four!")
+        await one("own_expiry", "report", now - 25.0, "Sensors. Contact bearing two seven zero.", expires_s=40.0)
+        await b.settle(1.0)
+        # no event time: counted from the moment the line was queued, behind an answer that is long (an answer is never cut down)
+        await b.say("busy", "xo", LONG + " " + LONG + " " + LONG, answer=True)
+        await one("waits", "report", None, "Sensors. New contact, bearing zero four five.")
+        await b.settle(1.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        for key, said in (("fresh", True), ("urgent_old", True), ("own_expiry", True), ("stale", False), ("urgent_stale", False), ("waits", False)):
+            lid = b.ids[key]
+            if said and lid not in tr.begin:
+                bad.append(f"{key}: not said ({tr.dropped.get(lid)!r})")
+            if not said and (lid in tr.begin or tr.dropped.get(lid) != "expired"):
+                bad.append(f"{key}: {'said late' if lid in tr.begin else repr(tr.dropped.get(lid))}, not dropped as expired")
+        return bad
+
+
+async def s30_reply_replaces_the_rest() -> list[str]:
+    """The Captain talks over the enemy's long message and it answers him: the reply is heard, and the rest of the message is not said after it."""
+    async with Bridge() as b:
+        await b.say("hail", "solm", ARCHON)
+        await asyncio.sleep(4.0)
+        b.voice.captain_begin()
+        await asyncio.sleep(1.0)
+        b.voice.captain_end(None)
+        await asyncio.sleep(0.4)
+        b.voice.captain_turn_begin()
+        await b.say("reply", "solm", "Captain, I hear you. We shall speak again.", answer=True)
+        b.voice.captain_turn_end()
+        await b.settle(2.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        said = [tr.line[i]["text"] for i in tr.order() if tr.line[i]["speaker"] == "solm"]
+        if tr.reason.get(b.ids["hail"]) != "cut":
+            bad.append("the message was not cut by the Captain")
+        if len(said) != 2 or not said[1].startswith("Captain, I hear you"):
+            bad.append(f"expected the message, cut, then the reply and nothing more from the enemy; heard: {said!r}")
+        return bad
+
+
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
              s10_shorten, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
-             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio, s24_startup_delay, s25_hook, s26_first_version_engine]
+             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio, s24_startup_delay, s25_hook, s26_first_version_engine, s27_live_replay, s28_typed_order_over_an_answer, s29_report_age, s30_reply_replaces_the_rest]
 
 
 def main() -> int:

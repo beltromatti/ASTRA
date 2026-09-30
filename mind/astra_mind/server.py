@@ -41,7 +41,7 @@ from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
 from .stt import Recognizer
 from .voice_lang import resolve_language
-from .speech import Voice
+from .speech import REPORT_LATE_S, REPORT_SKIP_S, Voice
 from .tts import TTSEngine
 from .voice_qos import boost_thread
 
@@ -107,6 +107,9 @@ EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
 import re as _re  # noqa: E402
 # events whose report is a warning of danger: the crew says them before any routine talk (voice priority URGENT)
 _URGENT_EVENT = _re.compile(r"missiles? inbound|rockets? inbound|hull integrity critical|containment failing|abandon ship|breach", _re.I)
+# events that are not news but a request to speak (the flight controller calls, the after-action report, the fleet net's news, a visitor
+# at the door): they are reported whenever the bridge is quiet, however long that took
+_NOT_PERISHABLE = _re.compile(r"^(flight: controller call|bridge: after-action|comms: fleet net news)|has come to the Captain's quarters in person", _re.I)
 _GM_ADDRESS = _re.compile(r"^\W*(regista|director|narrat\w*|game ?master|gm|réalisateur|directeur|director de juego|spielleiter|erzähler)\b[\s,:;.!-]*", _re.I)
 
 # the Captain talking to someone on the bridge (not to the enemy on an open channel): names and roles, several languages
@@ -129,6 +132,16 @@ def speaker_identity(speaker: str) -> tuple[str, str, bool]:
 
 def addressed_to_crew(text: str) -> bool:
     return bool(_CREW_ADDRESS.match(text.strip()))
+
+
+class _TurnQueue(asyncio.Queue):
+    """The turns waiting for the crew. An event that goes in is stamped with the time it arrived (loop time, a fourth item): a report of it is
+    worth saying only while it is news, and the wait for a quiet bridge must not make old news of it unnoticed."""
+
+    def put_nowait(self, item) -> None:  # noqa: ANN001
+        if isinstance(item, tuple) and len(item) == 2 and str(item[0]).startswith("\x00event:"):
+            item = (item[0], item[1], None, asyncio.get_running_loop().time())
+        super().put_nowait(item)
 
 
 class Mind:
@@ -168,7 +181,7 @@ class Mind:
         self.agent.mood = lambda: self.director.mood
         self.agent.bonds = lambda: "\n".join(f"- {line}" for line in self.director.bonds_lines())
         self.agent.standing = self.director.standing        # one list: the agent keeps it, the story saves it
-        self.turns: asyncio.Queue = asyncio.Queue()
+        self.turns: asyncio.Queue = _TurnQueue()
         self.exchange = Exchange()               # who spoke last on the channel: an exchange going on (the router reads it)
         self.watch = Watch()                     # the officers' initiative watch (initiative.py)
         self._ptt_ctx: dict[str, Any] | None = None   # the game's `context` for the words being spoken (ptt)
@@ -565,23 +578,28 @@ class Mind:
             try:
                 self.agent.ship = self.game if (self.game and self.game.state) else self.local
                 if text.startswith("\x00event:"):
-                    # let the bridge fall quiet first (reports must not pile up behind the voices), then coalesce:
-                    # everything that happened meanwhile becomes one report turn; the Captain's words are never merged
-                    # or delayed behind events
-                    while (self.voice.busy_s() > 1.2 or self.voice.held) and self.turns.empty():
+                    # let the bridge fall quiet first (reports must not pile up behind the voices; a warning of danger waits for
+                    # nobody), then coalesce: everything that happened meanwhile becomes one report turn; the Captain's words
+                    # are never merged or delayed behind events
+                    while not _URGENT_EVENT.search(text) and (self.voice.busy_s() > 1.2 or self.voice.held) and self.turns.empty():
                         await asyncio.sleep(0.2)
                     events = [text[len("\x00event:"):]]
+                    when = [rest[1] if len(rest) > 1 else None]           # (the time each one arrived: see _TurnQueue)
                     pending = []
                     while not self.turns.empty():
                         nxt = self.turns.get_nowait()
-                        (events if nxt[0].startswith("\x00event:") else pending).append(
-                            nxt[0][len("\x00event:"):] if nxt[0].startswith("\x00event:") else nxt)
+                        if nxt[0].startswith("\x00event:"):
+                            events.append(nxt[0][len("\x00event:"):])
+                            when.append(nxt[3] if len(nxt) > 3 else None)
+                        else:
+                            pending.append(nxt)
                     for p in pending:
                         await self.turns.put(p)
                     if pending:
                         continue          # the Captain spoke: answer first, the events stay in the state/history
                     transmissions = [e for e in events if e.startswith("transmission:")]
-                    events = [e for e in events if not e.startswith("transmission:")]
+                    keep = [i for i, e in enumerate(events) if not e.startswith("transmission:")]
+                    events, when = [events[i] for i in keep], [when[i] for i in keep]
                     for tr in transmissions:
                         # "transmission: T-22 — why": that captain calls the Aquila (arrival, succession, broken ceasefire)
                         m = _re.match(r"transmission:\s*(T-\d+)\s*—\s*(.*)", tr)
@@ -595,11 +613,26 @@ class Mind:
                                        "wants the Gates for his people; proud, laconic, honest.",
                                 "voice": "stuart_bell"})
                         if m and self.enemy.open_channel(m.group(1)):
-                            await self.enemy.respond(f"[Situation: {m.group(2)}. You are the one opening this channel: make "
-                                                     "your transmission to the Aquila's captain.]", self.lang, self._battle_state())
+                            written = await self.voice.preemptible(self.enemy.respond(
+                                f"[Situation: {m.group(2)}. You are the one opening this channel: make "
+                                "your transmission to the Aquila's captain.]", self.lang, self._battle_state()))
+                            if written is None:      # the Captain took the floor while the message was being written: it is written after his order
+                                await self.turns.put(("\x00event:" + tr, self.lang))
+                    # news that waited too long for a quiet bridge is no news any more: when even the newest of it is old, nothing is reported
+                    # (it stays in the ship's state); in a fresh batch the old items say how old they are, so the crew speaks of them in the
+                    # past or not at all
                     if not events:
                         continue
+                    now_t = asyncio.get_running_loop().time()
+                    newest = max((w for w in when if w is not None), default=None)
+                    if newest is not None and all(w is not None for w in when) and now_t - newest > REPORT_SKIP_S \
+                            and not any(_URGENT_EVENT.search(e) or _NOT_PERISHABLE.search(e) for e in events):
+                        log.info("%d event(s) not reported: the newest was %.0f s ago, the bridge was busy: %s", len(events), now_t - newest,
+                                 " | ".join(e[:70] for e in events))
+                        continue
+                    events = [e if w is None or now_t - w <= REPORT_LATE_S else f"{e} [happened {now_t - w:.0f} s ago]" for e, w in zip(events, when)]
                     self.voice.low_priority = True
+                    self.voice.report_since = newest              # (a report is worth saying for a few seconds after its news; see speech.py)
                     if any(_URGENT_EVENT.search(e) for e in events):
                         self.voice.urgent = True          # (danger now: it does not wait behind small talk or a routine report)
                     try:
@@ -610,6 +643,7 @@ class Mind:
                         t = await self._event_turn(events, ask)
                     finally:
                         self.voice.low_priority = False
+                        self.voice.report_since = None
                     log.info("event turn %.2fs: %s", t.t_end, " | ".join(f"{s}: {x}" for s, x in t.lines) or "(no report)")
                     continue
                 self.voice.captain_turn_begin()               # what is said from here to the end of this turn answers the Captain

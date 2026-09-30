@@ -508,15 +508,23 @@ async def sec_mic(args) -> None:  # noqa: ANN001
 
 
 # ------------------------------------------------------------------------------------------------ the floor
-async def sec_floor(args) -> None:  # noqa: ANN001
+def virtual_scenarios() -> list[dict]:
+    """The scripted scenarios of the floor and the replay of the live test, each in a loop of its own in virtual time. Run in a thread: a
+    loop cannot be started from inside the one this section runs in."""
     from . import voice_floor as vf
+    from . import voice_replay as vr
     rows = []
-    for sc in vf.SCENARIOS:
+    for sc in [*vf.SCENARIOS, *vr.SCENARIOS]:
         try:
             bad = vf.run(sc())
         except Exception as e:  # noqa: BLE001
             bad = [f"crashed {e!r}"]
         rows.append({"name": sc.__name__, "doc": (sc.__doc__ or "").strip().splitlines()[0], "bad": bad})
+    return rows
+
+
+async def sec_floor(args) -> None:  # noqa: ANN001
+    rows = await asyncio.get_running_loop().run_in_executor(None, virtual_scenarios)
     print(f"{sum(1 for r in rows if not r['bad'])}/{len(rows)} scenarios pass")
     real = await real_floor()
     save("floor", {"scenarios": rows, "real": real})
@@ -942,7 +950,9 @@ def report(args) -> None:  # noqa: ANN001
     if floor:
         ok = sum(1 for r in floor["scenarios"] if not r["bad"])
         L += ["## 7. Il palco del parlato", "", f"Scenari con orologio virtuale: **{ok}/{len(floor['scenarios'])}** superati (invarianti: nessun sottotitolo senza audio, una voce alla volta, "
-              "nessuna riga persa in silenzio, audio a passo, pause naturali, Capitano per primo, sottotitolo abbastanza lungo).", "",
+              "nessuna riga persa in silenzio, audio a passo, pause naturali, Capitano per primo, sottotitolo abbastanza lungo). Gli scenari `s*` provano il palco da solo "
+              "(`bench/voice_floor.py`); gli `r*` rifanno la sequenza del test dal vivo del capo (rapporti in coda, un messaggio lungo del nemico, tre ordini scritti) attraverso "
+              "il server vero, con l'agente, il router e la selezione delle priorità, e solo il modello di linguaggio e le voci finti (`bench/voice_replay.py`).", "",
               "| Scenario | esito |", "|---|---|"]
         for r in floor["scenarios"]:
             L.append(f"| {r['name']}: {r['doc']} | {'ok' if not r['bad'] else 'FALLITO: ' + '; '.join(r['bad'])} |")

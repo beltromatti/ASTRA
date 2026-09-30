@@ -15,6 +15,8 @@ Producers call `voice.say(speaker, text, lang, tone, ...)`; the optional keyword
     expires_s seconds after which an unsaid line is dropped (defaults per priority)
     stale_if  a callable: when it returns True at the time the line would start, the line is dropped
     answer    shorthand for priority=ANSWER
+A report (a line said inside a report turn: `voice.low_priority` / `voice.urgent`) is worth saying only for a few seconds after
+the event it tells of (`report_since`, else after it was queued): older, it is dropped and declared, never said late.
 
 Game protocol (JSON text frames and binary audio); docs/protocollo_voce.md has the whole story:
     line{id,speaker,name,text,lang,tone,channel,priority,answer,topic,est_s,hold_s,rate}    a line is about to be heard
@@ -52,6 +54,12 @@ class Prio(enum.IntEnum):
 PRIO_NAMES = {Prio.ANSWER: "answer", Prio.URGENT: "urgent", Prio.NORMAL: "normal", Prio.LOW: "low"}
 # how long an unsaid line stays worth saying (seconds after it was queued); 0: until it is said
 DEFAULT_EXPIRY = {Prio.ANSWER: 90.0, Prio.URGENT: 25.0, Prio.NORMAL: 60.0, Prio.LOW: 15.0}
+# a report (a line of a report turn) still unsaid this long after the event it tells of is old news: dropped, never said late
+REPORT_MAX_AGE_S = {Prio.URGENT: 30.0, Prio.NORMAL: 18.0}
+REPORT_SKIP_S = 12.0            # (for the producers of report turns) news whose newest item is older than this is not worth a report at all
+REPORT_LATE_S = 8.0             # ... and an item older than this in a batch that is reported says how old it is
+RESUME_MAX_S = 10.0             # what is left of a line that was cut off, if longer than this, is boiled down to its first and last sentence
+MAX_RESUMES = 3                 # a line is taken up again at most this many times
 
 LEAD_S = 0.45                   # audio is never sent more than this ahead of real time (so a stop is heard within it)
 CUT_WINDOW_S = 0.5              # a stop looks for the end of a phrase this far ahead, else fades out at once
@@ -72,6 +80,7 @@ _SENTENCE = re.compile(r"(?<=[.!?…])\s+")
 
 # context flags of the producer's task (a contextvar: what a task sets is seen by its own say() calls and no one else's)
 _ANSWERING: contextvars.ContextVar[bool] = contextvars.ContextVar("astra_answering", default=False)
+_BORN: contextvars.ContextVar[float | None] = contextvars.ContextVar("astra_report_since", default=None)
 _CLASS: contextvars.ContextVar[Prio | None] = contextvars.ContextVar("astra_voice_class", default=None)
 
 
@@ -104,7 +113,35 @@ class Line:
     cut_at: float | None = None                  # loop time the line must stop at (barge-in)
     cut_reason: str = ""
     cut_fade_ms: int = FADE_CUT_MS
-    resumed: bool = False
+    resumes: int = 0                             # how many times it has been taken up again after a cut
+
+
+def _sentences(text: str) -> list[str]:
+    return [p for p in _SENTENCE.split(text) if p]
+
+
+def _boil_down(text: str) -> str:
+    """A long message in two sentences: how it opens and its point (the last one). Three sentences or more only."""
+    parts = _sentences(text)
+    return text if len(parts) <= 2 else f"{parts[0]} {parts[-1]}"
+
+
+def _tail(text: str, played: float) -> str | None:
+    """What is left of a line stopped after `played` (0..1) of it: from the start of the sentence that was being said (the listener needs
+    its beginning), or from the next one when that was nearly over; None when nothing worth saying is left."""
+    parts = _sentences(text)
+    if len(parts) < 2:
+        return text if played < 0.5 else None
+    starts, pos = [], 0
+    for part in parts:
+        i = text.find(part, pos)
+        starts.append(i)
+        pos = i + len(part)
+    cut = played * len(text)
+    k = max(i for i, st in enumerate(starts) if st <= cut)
+    if starts[k] + len(parts[k]) - cut < 0.25 * len(parts[k]):
+        k += 1
+    return " ".join(parts[k:]) if k < len(parts) else None
 
 
 def _as_stream(obj, sample_rate: int) -> SpeechStream:  # noqa: ANN001
@@ -212,6 +249,16 @@ class Voice:
         """True inside the task that is answering the Captain: every line it says is an answer."""
         return _ANSWERING.get()
 
+    @property
+    def report_since(self) -> float | None:
+        """Loop time of the event the task's report lines tell of (set by the producer around a report turn; per task). A report still
+        unsaid `REPORT_MAX_AGE_S` after it is dropped. None: counted from the moment the line was queued."""
+        return _BORN.get()
+
+    @report_since.setter
+    def report_since(self, value: float | None) -> None:
+        _BORN.set(value)
+
     def captain_turn_begin(self) -> None:
         """The task calling this is about to answer the Captain (the server's turn worker, for a spoken or typed order). Until it
         ends (`captain_turn_end`) the reports wait: the crew's model streams its officers' lines a second or two apart, and a
@@ -313,8 +360,18 @@ class Voice:
             self._drop_info(lid, speaker, text, "no_listener", prio)
             return lid
         exp = DEFAULT_EXPIRY[prio] if expires_s is None else expires_s
+        deadline = (now + exp) if exp else None
+        if expires_s is None and prio in REPORT_MAX_AGE_S and _CLASS.get() == prio:
+            # a line of a report turn: worth saying for a few seconds after the event, not after the bridge has had time to move on
+            born = _BORN.get()
+            limit = (now if born is None else born) + REPORT_MAX_AGE_S[prio]
+            deadline = limit if deadline is None else min(deadline, limit)
+            if now >= limit:
+                log.info("line %d (%s): a report of something that happened %.0f s ago is old news", lid, speaker, now - (born or now))
+                self._drop_info(lid, speaker, text, "expired", prio)
+                return lid
         line = Line(id=lid, speaker=speaker, text=text, lang=lang, tone=tone or "calm", prio=prio, topic=topic,
-                    expires=(now + exp) if exp else None, stale_if=stale_if, enq=now, name=name, crew=crew)
+                    expires=deadline, stale_if=stale_if, enq=now, name=name, crew=crew)
         line.est_s = self._estimate(text, lang)
         self._enqueue(line)
         return lid
@@ -341,6 +398,10 @@ class Voice:
                 else:
                     self._drop(line, "superseded")
                     return
+        # someone cut off who now answers the Captain says no more of what he was saying: the reply takes the place of the rest
+        if line.prio == Prio.ANSWER and not line.crew:
+            for old in [l for l in self._queue if l.speaker == line.speaker and l.resumes]:
+                self._drop(old, "superseded")
         # the same officer's next sentence joins the one still waiting (one breath, one subtitle)
         if self._queue and self._can_merge(self._queue[-1], line):
             self._merge(self._queue[-1], line)
@@ -436,9 +497,10 @@ class Voice:
         return n
 
     # ------------------------------------------------------------------------------------------ the Captain
-    def captain_begin(self) -> None:
+    def captain_begin(self, cut_answers: bool = True) -> None:
         """The Captain starts to speak (push-to-talk down) or an order is typed: whoever talks stops at the end of the phrase
-        (within half a second) and nobody starts until his order has been answered."""
+        (within half a second) and nobody starts until his order has been answered. `cut_answers` False: an answer to his earlier
+        order that is being said is finished (a typed order talks over nobody)."""
         self._captain_down = True
         self._down_t = self._now()
         self._turn_pending = True
@@ -446,7 +508,7 @@ class Voice:
         self.stats["captain_begin"] += 1
         self.drop_low_priority()
         if self._cur is not None:
-            self._request_cut(self._cur, "captain", also_answers=True)
+            self._request_cut(self._cur, "captain", also_answers=cut_answers)
         self._set_floor("captain")
         self._wake()
 
@@ -461,8 +523,9 @@ class Voice:
         self._wake()
 
     def captain_input(self) -> None:
-        """A typed order arrives: begin and end in one."""
-        self.captain_begin()
+        """A typed order arrives: begin and end in one. Whoever was talking is stopped, unless it is the answer to his earlier order
+        (that is finished: a typed order talks over nobody, and the answer to it follows)."""
+        self.captain_begin(cut_answers=False)
         self.captain_end(True)
 
     def captain_speaks(self) -> None:
@@ -577,11 +640,20 @@ class Voice:
                 self._start_synth(nxt)
 
     def _shape(self, line: Line) -> None:
-        """Before a line is made: with a long backlog a line of little importance is cut to its first sentence."""
-        backlog = sum(self._estimate(l.text, l.lang) for l in self._queue)
+        """Before a line is made: with a long backlog a line of little importance is cut down (a crew line to its first sentence, a
+        message from outside to how it opens and what it asks). A crew line counts in the backlog itself (they are meant to be short: a
+        long one is cut whatever waits); a story voice is cut only by the speech waiting besides it (what is being said and what is queued)."""
+        backlog = sum(self._estimate(l.text, l.lang) for l in self._queue if l is not line)
+        if line.crew:
+            backlog += self._estimate(line.text, line.lang)
+        elif self._cur is not None:
+            backlog += self._remaining(self._cur)
         if line.prio >= Prio.NORMAL and backlog > BACKLOG_SHORTEN_S and len(line.text) > 170:
             parts = _SENTENCE.split(line.text)
-            short = parts[0] if len(parts[0]) >= 45 or len(parts) == 1 else " ".join(parts[:2])
+            if line.crew:
+                short = parts[0] if len(parts[0]) >= 45 or len(parts) == 1 else " ".join(parts[:2])
+            else:
+                short = _boil_down(line.text)              # a message from outside the bridge: how it opens and what it asks
             if len(short) < len(line.text) - 20:
                 log.info("line %d shortened (%d -> %d chars, %.0f s of speech waiting)", line.id, len(line.text), len(short), backlog)
                 self.stats["shortened"] += 1
@@ -831,19 +903,36 @@ class Voice:
         self._wake()
 
     def _after_cut(self, line: Line, sent: float) -> None:
-        """A line stopped half way: said enough, or worth saying again whole once the floor is free."""
-        played = min(1.0, max(0.0, (self._now() - line.t_begin) / max(line.est_s, 0.5)))
-        if line.prio in (Prio.NORMAL, Prio.URGENT) and line.cut_reason in ("captain", "answer_first", "urgent_first") \
-                and played < 0.5 and not line.resumed and self._now() - line.enq < 25.0:
-            self._n += 1
-            again = Line(id=self._n, speaker=line.speaker, text=line.text, lang=line.lang, tone=line.tone, prio=line.prio,
-                         topic=line.topic, expires=self._now() + 20.0, stale_if=line.stale_if, enq=self._now(), name=line.name,
-                         crew=line.crew, resumed=True)
-            again.est_s = self._estimate(again.text, again.lang)
-            self.enqueued[again.id] = again.enq
-            self._queue.append(again)
-            self.stats["resumed"] += 1
-            log.info("line %d was cut at %.0f %%: said again as line %d after the floor is free", line.id, played * 100, again.id)
+        """A line stopped half way: what was not heard is said once the floor is free, from the sentence that was being said (a hail, a
+        briefing, a report alike: the listener needs the beginning of what was cut, not the beginning of the whole). If what is left is
+        long it is boiled down to its first and last sentence, so an interrupted message never takes the floor for its whole length a
+        second time; a line cut again goes on again (`MAX_RESUMES` times, while it is still news). It keeps its place at the front of its
+        class, ahead of what was queued after it. Answers and chatter are not taken up again: he has spoken since, and small talk is not worth it."""
+        now = self._now()
+        played = min(1.0, max(0.0, (now - line.t_begin) / max(line.est_s, 0.5)))
+        text: str | None = None
+        if line.prio not in (Prio.NORMAL, Prio.URGENT) or line.cut_reason not in ("captain", "answer_first", "urgent_first"):
+            why = "not repeated"
+        elif now - line.enq >= (25.0 if line.crew else 60.0) or line.resumes >= MAX_RESUMES:
+            why = "too old to say again"
+        elif not line.crew and any(l.speaker == line.speaker and l.prio == Prio.ANSWER for l in self._queue):
+            why = "the reply to the Captain takes its place"
         else:
-            log.info("line %d was cut at %.0f %%: %s", line.id, played * 100,
-                     "heard enough" if played >= 0.5 else "not worth repeating")
+            text = _tail(line.text, played)
+            if text is not None and self._estimate(text, line.lang) > RESUME_MAX_S:
+                text = _boil_down(text)
+            why = "heard enough"
+        if not text:
+            log.info("line %d was cut at %.0f %%: %s", line.id, played * 100, why)
+            return
+        self._n += 1
+        exp = now + (20.0 if line.crew else 40.0)
+        again = Line(id=self._n, speaker=line.speaker, text=text, lang=line.lang, tone=line.tone, prio=line.prio, topic=line.topic,
+                     expires=exp if line.expires is None else min(exp, line.expires), stale_if=line.stale_if, enq=line.enq,
+                     name=line.name, crew=line.crew, resumes=line.resumes + 1)
+        again.est_s = self._estimate(again.text, again.lang)
+        self.enqueued[again.id] = now
+        self._queue.append(again)
+        self.stats["resumed"] += 1
+        log.info("line %d was cut at %.0f %%: %s said again as line %d after the floor is free", line.id, played * 100,
+                 "the rest of it is" if text != line.text else "it is", again.id)
