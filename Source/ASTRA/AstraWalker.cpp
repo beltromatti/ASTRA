@@ -9,6 +9,9 @@
 #include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Materials/MaterialInterface.h"
+#include "ASTRA.h"
+
+DECLARE_CYCLE_STAT(TEXT("Walkers"), STAT_AstraWalkers, STATGROUP_Astra);
 
 AAstraWalker::AAstraWalker()
 {
@@ -61,6 +64,7 @@ void AAstraWalker::BeginPlay()
 
 void AAstraWalker::Tick(float DeltaSeconds)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraWalkers);
 	Super::Tick(DeltaSeconds);
 	if (Route.Num() < 2)
 	{

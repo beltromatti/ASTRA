@@ -32,6 +32,8 @@
 #include "Widgets/SWeakWidget.h"
 #include "Widgets/Text/STextBlock.h"
 
+DECLARE_CYCLE_STAT(TEXT("Campaign"), STAT_AstraCampaign, STATGROUP_Astra);
+
 namespace
 {
 	// testing and automation: start without the menu (console, or -astra_campaign=new|continue on the command line)
@@ -440,6 +442,7 @@ void UAstraCampaignSubsystem::NewCommand(const FString& System)
 
 void UAstraCampaignSubsystem::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraCampaign);
 	// console or command-line starts (tests, automation, "new campaign" from the menu mid-game)
 	if (!GCampaignRequest.IsEmpty() && !bStarted)
 	{

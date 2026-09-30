@@ -46,6 +46,8 @@
 #include "Serialization/JsonSerializer.h"
 #include "Sound/SoundBase.h"
 
+DECLARE_CYCLE_STAT(TEXT("Ship"), STAT_AstraShip, STATGROUP_Astra);
+
 namespace
 {
 	const FName TagSky(TEXT("ASTRA.Sky"));
@@ -2512,6 +2514,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 
 void UAstraShipSubsystem::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraShip);
 	if (bShipLost)
 	{
 		// a dead ship: no heat, no ward, no helm; only the pods drifting and the loss's own timing

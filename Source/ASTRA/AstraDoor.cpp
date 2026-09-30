@@ -10,6 +10,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
+#include "ASTRA.h"
+
+DECLARE_CYCLE_STAT(TEXT("Doors"), STAT_AstraDoors, STATGROUP_Astra);
 
 AAstraDoor::AAstraDoor()
 {
@@ -59,6 +62,7 @@ void AAstraDoor::Sound(bool bOpening)
 
 void AAstraDoor::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraDoors);
 	Super::Tick(DeltaTime);
 	bool bNear = false;
 	if (!bLocked)

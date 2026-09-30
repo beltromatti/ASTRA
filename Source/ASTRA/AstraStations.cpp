@@ -7,6 +7,8 @@
 #include "Dom/JsonObject.h"
 #include "Engine/World.h"
 
+DECLARE_CYCLE_STAT(TEXT("Stations"), STAT_AstraStations, STATGROUP_Astra);
+
 namespace
 {
 	constexpr float TickStep = 0.1f;                       // the executors run at 10 Hz
@@ -770,6 +772,7 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 // ------------------------------------------------------------------------------------------------ the executors
 void UAstraStationsSubsystem::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraStations);
 	if (!GetWorld() || Stations.Num() == 0)
 	{
 		return;

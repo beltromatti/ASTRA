@@ -15,6 +15,8 @@
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundWaveProcedural.h"
 
+DECLARE_CYCLE_STAT(TEXT("Crew"), STAT_AstraCrew, STATGROUP_Astra);
+
 AAstraCrewMember::AAstraCrewMember()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -337,6 +339,7 @@ bool AAstraCrewMember::IsSpeaking() const
 
 void AAstraCrewMember::Tick(float DeltaSeconds)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraCrew);
 	Super::Tick(DeltaSeconds);
 	if (VisitPhase == 1 || VisitPhase == 3)
 	{

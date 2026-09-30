@@ -10,6 +10,9 @@
 #include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "ASTRA.h"
+
+DECLARE_CYCLE_STAT(TEXT("Holo table"), STAT_AstraHolo, STATGROUP_Astra);
 
 namespace
 {
@@ -196,6 +199,7 @@ void AAstraHoloTable::FaceViewer(USceneComponent* C, const FVector& ViewerLocal)
 
 void AAstraHoloTable::Tick(float DeltaTime)
 {
+	SCOPE_CYCLE_COUNTER(STAT_AstraHolo);
 	Super::Tick(DeltaTime);
 	Time += DeltaTime;
 	FVector ViewerLocal = FVector(-300.f, 0.f, 170.f);
