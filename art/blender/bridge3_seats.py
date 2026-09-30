@@ -195,7 +195,8 @@ def chair_shell_parts(b: Parts, scale: float = 1.0, command: bool = False, capta
         q, ang, nrm = on_profile(prof, "back", g, 0.0505)
         fine.cbox((q.x, 0.0, q.y), (0.004, 2 * laws.w("back", g) * 0.66, 0.006), L.STRUCT, Ry(-(ang - 90.0)))
     # ---- the fin behind the back: a slim plate with a lit rear edge in the department colour
-    q_lo, _, _ = on_profile(prof, "back", 0.18, -laws.th("back", 0.18))
+    g_fin = 0.42 if command else 0.18                              # command chairs: the fin starts above the name plate
+    q_lo, _, _ = on_profile(prof, "back", g_fin, -laws.th("back", g_fin))
     q_hi, _, _ = on_profile(prof, "back", 0.98, -laws.th("back", 0.98))
     z0f, zt = q_lo.y - 0.02, q_hi.y - 0.02
     fin = [(q_lo.x - 0.005, z0f), (q_lo.x - 0.08 * s, z0f + 0.03), (q_lo.x - 0.13 * s, z0f + 0.25), (q_lo.x - 0.095 * s, (z0f + zt) / 2 + 0.12),
@@ -203,18 +204,19 @@ def chair_shell_parts(b: Parts, scale: float = 1.0, command: bool = False, capta
     fb.extrude_y(fin, -0.016, 0.016, L.TRIM if not command else L.STRUCT)
     em.lamp_cbox((q_lo.x - 0.105 * s, 0.0, (z0f + zt) / 2 - 0.02), (0.008, 0.022, (zt - z0f) * 0.68), dept, L.LAMP, Ry(-4))
     for z in (0.66, 0.90, 1.12):                                 # clamp bands round the fin
-        if z < zt - 0.04:
+        if z0f + 0.04 < z < zt - 0.04:
             fb.box((q_lo.x - 0.058 * s - 0.01 * (z - 0.6), -0.022, z - 0.02), (q_lo.x + 0.01, 0.022, z + 0.02), L.TRIM)
     # ---- the back of the shell: a name-plate boss, a release handle with a warning lamp, rivets
-    qb, angb, _ = on_profile(prof, "back", 0.30, -laws.th("back", 0.30) - 0.014)
+    qb, angb, _ = on_profile(prof, "back", 0.24, -laws.th("back", 0.24) - 0.014)
     if command:
         bw, bh = 0.20, 0.09
         xr = qb.x - 0.01
         fb.box((xr, -bw * s, qb.y - bh), (xr + 0.05, bw * s, qb.y + bh), L.TRIM)
         fine.cbox((xr - 0.0005, 0.0, qb.y), (0.001, bw * 1.8 * s, bh * 1.22), L.STRUCT)
-    qh, _, _ = on_profile(prof, "back", 0.62, -laws.th("back", 0.62) - 0.02)
-    fine.box((qh.x - 0.03, -0.05, qh.y - 0.02), (qh.x + 0.03, 0.05, qh.y + 0.02), L.RUBBER)
-    em.lamp_box((qh.x - 0.0325, -0.03, qh.y + 0.022), (qh.x - 0.031, 0.03, qh.y + 0.031), "amber", L.LAMP_DIM)
+    qh, _, _ = on_profile(prof, "back", 0.52, -laws.th("back", 0.52) - 0.02)
+    hy = 0.115 * s if command else 0.0                             # the release handle beside the fin on the command chairs
+    fine.box((qh.x - 0.03, hy - 0.05, qh.y - 0.02), (qh.x + 0.055, hy + 0.05, qh.y + 0.02), L.RUBBER)
+    em.lamp_box((qh.x - 0.0325, hy - 0.03, qh.y + 0.022), (qh.x - 0.031, hy + 0.03, qh.y + 0.031), "amber", L.LAMP_DIM)
     for sd in (-1, 1):
         for g in (0.12, 0.42, 0.72):
             for yy in (0.10, 0.17):
@@ -317,6 +319,6 @@ def build_chair_command(name: str, captain: bool, screens: list[str]):
             infos.append(info)
     # the name plate on the boss at the back of the chair (towards the tactical officer behind it)
     laws = Laws(scale, True)
-    qb, _, _ = on_profile(prof, "back", 0.30, -laws.th("back", 0.30) - 0.014)
+    qb, _, _ = on_profile(prof, "back", 0.24, -laws.th("back", 0.24) - 0.014)
     b.body.label((qb.x - 0.0115, 0.0, qb.y), 0.34 * scale, 0.043, (-1, 0, 0), "st_captain" if captain else "st_xo", up=(0, 0, 1))
     return b.build(name, uv_meter=0.25), infos
