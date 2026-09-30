@@ -1287,7 +1287,7 @@
    "bounds": [-8.5, -7.4, 10.4, 7.4],
    "z": [-0.9, 4.9],
    "status": "existing",
-   "doors": ["bridge_door_port", "bridge_door_port", "bridge_door_starboard", "bridge_door_starboard"],
+   "doors": ["bridge_door_port", "bridge_door_starboard"],
    "dept": "command",
    "systems": ["command", "sensors", "comms", "helm", "tactical"],
    "stations": [
@@ -1330,7 +1330,7 @@
    "bounds": [-20.8, -5.5, -8.5, -2.3],
    "z": [0.0, 3.0],
    "status": "existing",
-   "doors": ["bridge_door_port", "bridge_door_port", "ready_room_door", "ready_room_door"],
+   "doors": ["bridge_door_port", "ready_room_door"],
    "dept": "command",
    "systems": ["power_bus", "life_support"],
    "stations": [],
@@ -1347,7 +1347,7 @@
    "bounds": [-20.8, 2.3, -8.5, 5.5],
    "z": [0.0, 3.0],
    "status": "existing",
-   "doors": ["bridge_door_starboard", "bridge_door_starboard", "quarters_door", "quarters_door"],
+   "doors": ["bridge_door_starboard", "quarters_door"],
    "dept": "command",
    "systems": ["power_bus", "life_support"],
    "stations": [],
@@ -1381,7 +1381,7 @@
    "bounds": [-30.5, -0.7, -21.3, 8.5],
    "z": [-0.3, 3.4],
    "status": "existing",
-   "doors": ["quarters_door", "quarters_door"],
+   "doors": ["quarters_door"],
    "dept": "command",
    "systems": ["power_bus", "life_support"],
    "stations": [],
@@ -1399,7 +1399,7 @@
    "bounds": [-20.2, -2.0, -9.0, 2.0],
    "z": [0.0, 3.0],
    "status": "planned",
-   "doors": ["ready_room_door", "ready_room_door"],
+   "doors": ["ready_room_door"],
    "dept": "command",
    "systems": ["power_bus"],
    "stations": [],
@@ -1415,7 +1415,7 @@
    "bounds": [-200.3, -3.9, -175.7, 3.9],
    "z": [-46.3, -42.4],
    "status": "existing",
-   "doors": ["berths_entrance", "berths_entrance"],
+   "doors": ["berths_entrance"],
    "dept": "services",
    "systems": ["power_bus", "life_support"],
    "stations": [
@@ -1440,7 +1440,7 @@
    "bounds": [-160.3, -10.3, -121.7, 10.3],
    "z": [-46.3, -41.95],
    "status": "existing",
-   "doors": ["mess_entrance", "mess_entrance"],
+   "doors": ["mess_entrance"],
    "dept": "services",
    "systems": ["food_service", "power_bus", "life_support"],
    "stations": [
@@ -1475,7 +1475,7 @@
    "bounds": [-262.3, -9.3, -231.7, 9.3],
    "z": [-54.3, -49.5],
    "status": "existing",
-   "doors": ["medbay_entrance", "medbay_entrance"],
+   "doors": ["medbay_entrance"],
    "dept": "medical",
    "systems": ["medical", "power_bus", "life_support"],
    "stations": [
@@ -1527,7 +1527,7 @@
    "bounds": [-372.5, -14.5, -329.5, 14.5],
    "z": [-61.0, -43.5],
    "status": "existing",
-   "doors": ["engineering_entrance", "engineering_entrance"],
+   "doors": ["engineering_entrance"],
    "dept": "engineering",
    "systems": ["reactor", "power_bus", "coolant", "engines"],
    "stations": [
@@ -1577,7 +1577,7 @@
    "bounds": [59.5, -28.5, 218.0, 28.5],
    "z": [-73.4, -52.5],
    "status": "existing",
-   "doors": ["flight_deck_entrance", "flight_deck_entrance"],
+   "doors": ["flight_deck_entrance"],
    "dept": "flight",
    "systems": ["launch_tubes", "catapults", "power_bus", "life_support"],
    "stations": [],
@@ -67214,7 +67214,7 @@
   {
    "id": "mess_entrance",
    "deck": 4,
-   "pos": [-121.85, 0.0, -46.3],
+   "pos": [-121.85, 0.0, -46.0],
    "yaw": 0.0,
    "width": 3.0,
    "height": 3.2,
@@ -67229,7 +67229,7 @@
   {
    "id": "berths_entrance",
    "deck": 4,
-   "pos": [-175.85, 0.0, -46.3],
+   "pos": [-175.85, 0.0, -46.0],
    "yaw": 0.0,
    "width": 3.0,
    "height": 3.0,
@@ -67244,7 +67244,7 @@
   {
    "id": "medbay_entrance",
    "deck": 6,
-   "pos": [-231.85, 0.0, -54.3],
+   "pos": [-231.85, 0.0, -54.0],
    "yaw": 0.0,
    "width": 3.0,
    "height": 3.2,
@@ -67259,7 +67259,7 @@
   {
    "id": "engineering_entrance",
    "deck": 7,
-   "pos": [-329.85, 0.0, -61.0],
+   "pos": [-329.85, 0.0, -58.0],
    "yaw": 0.0,
    "width": 3.0,
    "height": 3.2,
@@ -67274,7 +67274,7 @@
   {
    "id": "flight_deck_entrance",
    "deck": 9,
-   "pos": [59.85, 0.0, -73.4],
+   "pos": [59.85, 0.0, -72.8],
    "yaw": 0.0,
    "width": 3.0,
    "height": 3.2,
@@ -67443,6 +67443,30 @@
    },
    "decks": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
    "pos": [-448.0, 6.0]
+  }
+ ],
+ "transit": [
+  {
+   "id": "spine_shuttle",
+   "kind": "shuttle",
+   "name": "Spine Shuttle",
+   "deck": 5,
+   "y": 0.0,
+   "z": -50.0,
+   "x_fwd": 184.0,
+   "x_aft": -528.0,
+   "stops": [
+    {"section": "A", "x": 100.0},
+    {"section": "B", "x": -10.0},
+    {"section": "C", "x": -116.0},
+    {"section": "D", "x": -212.0},
+    {"section": "E", "x": -292.0},
+    {"section": "F", "x": -364.0},
+    {"section": "G", "x": -428.0},
+    {"section": "H", "x": -492.0}
+   ],
+   "status": "planned",
+   "note": "a car on the centre line of Deck 5's Spine; the crew boards it at a section stop (route-finder: a 'shuttle' edge between stops, not modelled yet)"
   }
  ],
  "graph": {

@@ -52,7 +52,6 @@ CORRIDOR_SPECS = {
     "T_R": ("wall", "branch", "open", "open"),
     "X": ("branch", "branch", "open", "open"),
     "End": ("wall", "wall", "open", "closed"),
-    "Corner_L": ("wall", "wall", "open", "open"),     # a turn to port: special geometry (see ship_corridor.corner)
 }
 # which module names exist for which tone (the whole family is built for both tones)
 TONE_FAMILY = ["Straight_A", "Straight_B", "Straight_C", "Door_L_A", "Door_L_B", "Door_R_A", "Door_R_B", "Door_LR", "Gate_L",

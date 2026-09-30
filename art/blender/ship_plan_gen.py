@@ -163,7 +163,7 @@ def existing_graph(B: Builder, decks: dict) -> None:
             B.link(f"{cid}.hub", st["id"], "walk", width=1.0)
         note = "the lift alcove of the room's builder: two static leaves (Mess/Lift etc.) close it; the plan treats it as the room's door"
         did = f"{cid}_entrance"
-        B.door(did, plane, (e["x"] + (0.15 if e["wall"] == "fwd" else -0.15), e["y"], z), 0.0, e["w"], e["h"], cid, None, kind="gate", wall=e["wall"],
+        B.door(did, plane, (e["x"] + (0.15 if e["wall"] == "fwd" else -0.15), e["y"], e.get("z", z)), 0.0, e["w"], e["h"], cid, None, kind="gate", wall=e["wall"],
                locked=False, existing=True, note=note)
         rec["entrance_door"] = did
     # the Mess and the Berthing open on the concourse and the lobby of Deck 4
@@ -327,6 +327,18 @@ def systems_table(B: Builder) -> dict:
     return {k: {"name": names.get(k, k), "compartments": v} for k, v in sorted(hosts.items())}
 
 
+def spine_shuttle() -> dict:
+    """The Spine's internal shuttle (docs/BIBBIA.md §6: "the central corridor along the ship with the internal shuttle"): reserved on Deck 5
+    (Science & Transport), a car on the centre line of the Spine from the forward end of the deck to the stern with a stop in every section.
+    Planned only: the plan's Deck 5 is a coarse deck; the car and its rails are not built."""
+    d = 5
+    env = P.envelope(d)
+    stops = [{"section": letter, "x": rnd((x0 + x1) / 2)} for (letter, x0, x1) in P.sections(d)]
+    return {"id": "spine_shuttle", "kind": "shuttle", "name": "Spine Shuttle", "deck": d, "y": 0.0, "z": P.deck_z(d)[0],
+            "x_fwd": env["x_fwd"], "x_aft": env["x_aft"], "stops": stops, "status": "planned",
+            "note": "a car on the centre line of Deck 5's Spine; the crew boards it at a section stop (route-finder: a 'shuttle' edge between stops, not modelled yet)"}
+
+
 def build_plan(only_decks: bool = False) -> dict:
     B = Builder()
     existing(B)
@@ -348,9 +360,12 @@ def build_plan(only_decks: bool = False) -> dict:
     lift = lift_network(B)
     plan = {"id": "ASN_Aquila_Plan", "version": 1, "generator": "art/blender/ship_plan_gen.py", "frame": FRAME}
     plan["decks"] = [deck_record(d) for d in range(1, 13)]
+    for c in B.comps.values():                                  # a door that two builders both added once
+        c["doors"] = list(dict.fromkeys(c.get("doors", [])))
     plan["compartments"] = list(B.comps.values())
     plan["doors"] = list(B.doors.values())
     plan["vertical"] = [lift] + stairs
+    plan["transit"] = [spine_shuttle()]
     plan["graph"] = {"nodes": list(B.nodes.values()), "edges": B.edges}
     plan["systems"] = systems_table(B)
     plan["placements"] = {str(d): v for d, v in B.placements.items() if v}
