@@ -55,6 +55,11 @@ DEFAULT_LANES: dict[str, dict[str, tuple[str, dict[str, Any]]]] = {
 LANE_OF_MODE = {name: md.lane for name, md in station_model.MODE_INDEX.items()}
 TARGET_MODES = ("intercept", "keep_on_bow", "follow", "broadside", "orbit", "formation")     # the helm modes about a ship
 RAIL_KM, LASER_KM, RAIL_PCT_S, LASER_PCT_S = 10.0, 4.0, 2.4, 1.6      # a railgun volley every 7 s is ~2.4 %/s on average here
+# the game's power profiles (UAstraShipSubsystem / AstraStations.cpp `Profile`): shields weapons engines sensors life_support flight_deck
+PROFILES = {"balanced": (100, 100, 100, 100, 100, 100), "combat": (150, 150, 100, 110, 80, 100), "evasive": (130, 90, 150, 100, 80, 90),
+            "silent": (80, 60, 40, 60, 80, 60), "shields": (150, 110, 100, 100, 80, 90), "weapons": (120, 150, 100, 100, 80, 90),
+            "engines": (110, 100, 150, 100, 80, 80)}
+SYSTEMS = ("shields", "weapons", "engines", "sensors", "life_support", "flight_deck")
 
 
 @dataclass
@@ -127,6 +132,10 @@ class LocalShip:
         self._script: list[tuple[float, str, Any]] = []
         self._focus_t: dict[str, float] = {}
         self.helm_note = ""                   # the helm's own line when a legacy command (a gate transit) has it
+        self.engaged_id = ""                  # the contact tactical is firing on now (what `action` means first)
+        self.battle_short = False             # the reactor past its limits: 800% to allocate, +0.3 %/s of heat
+        self.power_budget = 700.0
+        self.heat = float(self.state["thermal"]["heat_pct"])
         for sid, lanes in DEFAULT_LANES.items():
             self.lanes[sid] = {lane: {"mode": m, "params": dict(p), "until": "order", "set_by": "default", "since": 0.0, "status": ""}
                                for lane, (m, p) in lanes.items()}
@@ -179,9 +188,21 @@ class LocalShip:
         s = str(cid or "").lower()
         return next((c for c in self.contacts.values() if c.alive and c.id.lower() == s), None)
 
+    def action_target(self) -> Contact | None:
+        """What the fight is about now (the game's ActionTargetId): tactical's target, else the nearest hostile inside 90 km."""
+        cur = self._contact(self.engaged_id) if self.engaged_id else None
+        if cur:
+            return cur
+        near = sorted((c for c in self.contacts.values() if c.alive and c.status.startswith("hostile")),
+                      key=lambda c: self.range_bearing(c)[0])
+        return next((c for c in near if not c.classified or self.range_bearing(c)[0] < 90.0), None)
+
     def _resolve(self, ref: Any) -> Contact | None:
-        """A target reference: a contact id or a selector."""
+        """A target reference: a contact id, `action` (what the fight is about now), or one of the mind-side selectors the
+        offline tests use."""
         r = str(ref or "").strip()
+        if r.lower() == "action":
+            return self.action_target()
         hostile = [c for c in self.contacts.values() if c.alive and c.status.startswith("hostile") and c.classified]
         if r == "nearest_hostile":
             return min(hostile, key=lambda c: self.range_bearing(c)[0], default=None)
@@ -211,11 +232,15 @@ class LocalShip:
         s["heading_deg"], s["speed_mps"] = round(self.heading) % 360, round(self.speed)
         if self.contacts:
             s["contacts"] = [c.as_json(self) for c in self.contacts.values() if c.alive]
+        s["thermal"]["heat_pct"] = round(self.heat)
+        s["power_budget"] = f"{sum(s['power_pct'].values()):.0f}% of {self.power_budget:.0f}% allocated (six systems at 100% = 600%)"
         self._sync_legacy()
         if self.stations_on:
             s["sim_time_s"] = round(self.t, 1)
             s["stations"] = self._stations_json()
             s["viewscreen"] = self._viewscreen_line()
+            a = self.action_target()
+            s["action_target"] = a.id if a else ""                      # (top level, next to `stations`: what "action" means now)
         return s
 
     def _viewscreen_line(self) -> str:
@@ -227,6 +252,8 @@ class LocalShip:
         z = f", zoom x{zoom}" if zoom not in ("", None) else ""
         if m == "viewscreen_target" and tgt:
             return f"target: ordered, {tgt.id} ({tgt.name}){z or ', zoom x8'}"
+        if m == "viewscreen_target" and str(p.get("target", "")).lower() == "action":
+            return "target: waiting for the action (no fight), forward view"
         if m == "viewscreen_auto":
             pick = self._resolve("tactical_target") or self._resolve("nearest_hostile")
             return f"auto: target, {pick.id} ({pick.name}), zoom x8" if pick else "auto: forward view"
@@ -372,6 +399,8 @@ class LocalShip:
 
     def _tick(self, dt: float) -> None:
         self.t += dt
+        if self.battle_short:
+            self.heat = min(100.0, self.heat + 0.3 * dt)                    # (the reactor runs hot)
         # the timeline
         for item in [i for i in self._script if i[0] <= self.t]:
             self._script.remove(item)
@@ -444,28 +473,47 @@ class LocalShip:
 
 
 
-    def _tick_fire(self, dt: float) -> None:
+    def _pick_target(self) -> Contact | None:
+        """Who tactical fires on now: the first live target of an engage list; `hostiles` = the best hostile warship in reach (stay on
+        the one being fought while it is inside 25 km, else whoever fires on us first inside 30 km, else the nearest; never a chase);
+        weapons free / return fire = the nearest that qualifies."""
         eng = self.lanes["tactical"]["engagement"]
-        shooters: list[Contact] = []
-        if eng["mode"] == "engage":
-            for t in eng["params"].get("targets", []):
-                if t == "hostiles":
-                    shooters = [c for c in self.contacts.values() if c.alive and c.status.startswith("hostile") and c.classified]
-                else:
-                    c = self._resolve(t)
-                    if c:
-                        shooters.append(c)
-                if shooters:
-                    break
-        elif eng["mode"] == "weapons_free":
-            rng_cap = float(eng["params"].get("range_km", RAIL_KM))
-            shooters = [c for c in self.contacts.values() if c.alive and c.status.startswith("hostile") and c.classified
-                        and self.range_bearing(c)[0] <= rng_cap]
-        elif eng["mode"] == "return_fire":
-            shooters = [c for c in self.contacts.values() if c.alive and c.firing and c.classified]
-        if not shooters or self.state["power_pct"]["weapons"] < 5:
+        m, p = eng["mode"], eng["params"]
+        hostile = sorted((c for c in self.contacts.values() if c.alive and c.status.startswith("hostile") and c.classified),
+                         key=lambda c: self.range_bearing(c)[0])
+        if m == "engage":
+            for t in p.get("targets", []):
+                if str(t).lower() == "hostiles":
+                    cur = self._contact(self.engaged_id)
+                    if cur and cur in hostile and self.range_bearing(cur)[0] < 25.0:
+                        return cur
+                    best = None
+                    for c in hostile:
+                        if best is None or (c.firing and not best.firing and self.range_bearing(c)[0] < 30.0):
+                            best = c
+                    if best:
+                        return best
+                    continue
+                c = self._resolve(t)
+                if c:
+                    return c
+            return None
+        if m == "weapons_free":
+            cap = float(p.get("range_km", 25.0))
+            return next((c for c in hostile if self.range_bearing(c)[0] <= cap), None)
+        if m == "return_fire":
+            return next((c for c in hostile if c.firing), None)
+        return None
+
+    def _tick_fire(self, dt: float) -> None:
+        c = self._pick_target()
+        eng = self.lanes["tactical"]["engagement"]
+        new = c.id if c else ""
+        if new != self.engaged_id and c is not None and self.engaged_id:
+            self._emit(f"tactical: engaging {c.name or c.id} (was {self.engaged_id})")
+        self.engaged_id = new
+        if c is None or eng["mode"] == "hold_fire" or self.state["power_pct"]["weapons"] < 5:
             return
-        c = min(shooters, key=lambda x: self.range_bearing(x)[0]) if eng["params"].get("priority") == "nearest" else shooters[0]
         rng = self.range_bearing(c)[0]
         rate = (RAIL_PCT_S if rng <= RAIL_KM else 0.0) + (LASER_PCT_S if rng <= LASER_KM else 0.0)
         if rate:
@@ -477,30 +525,45 @@ class LocalShip:
     def _tick_release(self) -> None:
         """The modes that end: the console returns to its default and reports it (the game's Expire)."""
         h = self.lanes["helm"]["course"]
-        if h["mode"] in TARGET_MODES and h["params"].get("target") and not self._resolve(h["params"].get("target")):
+        if (h["mode"] in TARGET_MODES and h["params"].get("target") and str(h["params"]["target"]).lower() != "action"
+                and not self._resolve(h["params"].get("target"))):
             self._expire("helm", "course", f"{h['params'].get('target')} is no longer on the plot")
-        elif h["until"].startswith("time:") and self.t - h["since"] >= float(h["until"][5:]):
-            self._expire("helm", "course", "the time set for it is up")
-        for sid, lanes in self.lanes.items():                    # (only the helm falls back when its time is up; the others lapse to `order`)
-            for ls in lanes.values():
-                if sid != "helm" and ls["until"].startswith("time:") and self.t - ls["since"] >= float(ls["until"][5:]):
-                    ls["until"] = "order"
+        for sid, lanes in self.lanes.items():                    # a time limit sends ANY aspect back to its default mode
+            for lane, ls in list(lanes.items()):
+                if ls["until"].startswith("time:") and self.t - ls["since"] >= float(ls["until"][5:]):
+                    dm, dp = DEFAULT_LANES[sid].get(lane, (ls["mode"], ls["params"]))
+                    # (the game compares the modes by ITS name: `combat` is not `balanced`, though both are a power profile)
+                    same = self._native(sid, lane, ls)[1] == self._native(sid, lane, {"mode": dm, "params": dp, "until": "order"})[1]
+                    if same:
+                        ls["until"] = "order"
+                    else:
+                        if lane == "reactor" and self.battle_short:
+                            self._set_battle_short(False)        # (back inside its limits: the ship follows the console)
+                        elif lane == "power":
+                            self._apply_power(dict(zip(SYSTEMS, map(float, PROFILES["balanced"]))))
+                        elif lane == "emcon":
+                            self.state["emcon"] = str(dp.get("level", "restricted"))
+                        self._expire(sid, lane, "the time set for it is up")
         eng = self.lanes["tactical"]["engagement"]
-        if eng["mode"] == "engage" and not any(self._resolve(t) for t in eng["params"].get("targets", [])):
+        if eng["mode"] == "engage" and not any(str(t).lower() == "hostiles" for t in eng["params"].get("targets", [])) \
+                and not any(self._resolve(t) for t in eng["params"].get("targets", [])):
             self._expire("tactical", "engagement", "the targets are down or gone")
         vs = self.lanes["ops"]["viewscreen"]
-        if vs["mode"] == "viewscreen_target" and not self._resolve(vs["params"].get("target")):
+        if vs["mode"] == "viewscreen_target" and str(vs["params"].get("target", "")).lower() != "action" \
+                and not self._resolve(vs["params"].get("target")):
             self._emit(f"ops: viewscreen released — {vs['params'].get('target')} lost, back to auto")
             self._reset_lane("ops", "viewscreen")
         sc = self.lanes["sensors"]["scan"]
         if sc["mode"] == "scan_focus":
-            c = self._contact(sc["params"].get("target"))
-            t0 = self._focus_t.setdefault(str(sc["params"].get("target")), self.t)
-            if c and self.t - t0 >= 6 and not c.classified:
-                c.classified = True
-                self._emit(f"sensors: {c.id} identified — {c.cls} {c.name}, {self.range_bearing(c)[0]:.0f} km, bearing {self.range_bearing(c)[1]:03.0f}")
-            elif not c:
-                self._expire("sensors", "scan", f"{sc['params'].get('target')} is gone")
+            raw = str(sc["params"].get("target"))
+            c = self._resolve(raw) if raw.lower() == "action" else self._contact(raw)
+            if raw.lower() != "action" or c:
+                t0 = self._focus_t.setdefault(c.id if c else raw, self.t)
+                if c and self.t - t0 >= 6 and not c.classified:
+                    c.classified = True
+                    self._emit(f"sensors: {c.id} identified — {c.cls} {c.name}, {self.range_bearing(c)[0]:.0f} km, bearing {self.range_bearing(c)[1]:03.0f}")
+                elif not c:
+                    self._expire("sensors", "scan", f"{raw} is gone")
 
     # ------------------------------------------------------------------------------------------------ commands
     async def execute(self, name: str, a: dict[str, Any], by: str) -> dict[str, Any]:
@@ -534,8 +597,12 @@ class LocalShip:
                 s["shields"].update(state="up", mode=a["mode"])
             return self._ok(f"shields {a['mode']}")
         if name == "route_power":
+            total = sum(a["percent"] if k == a["system"] else v for k, v in s["power_pct"].items())
+            if total > self.power_budget + 0.5:
+                return {"ok": False, "detail": f"reactor budget exceeded: that would allocate {total:.0f}% of the {self.power_budget:.0f}% available — "
+                                               "cut another system first (now: " + ", ".join(f"{k} {v:.0f}" for k, v in s["power_pct"].items()) + ")"}
             s["power_pct"][a["system"]] = a["percent"]
-            return self._ok(f"{a['system']} at {a['percent']}%")
+            return self._ok(f"{a['system']} at {a['percent']}%, {total:.0f}% of the {self.power_budget:.0f}% budget allocated")
         if name == "intercept":
             c = self._contact(a.get("contact_id"))
             if c is None:
@@ -618,6 +685,7 @@ class LocalShip:
                 return {"ok": False, "detail": "no coolant charges left"}
             t["coolant_vents"] -= 1
             t["heat_pct"] = max(0, int(t["heat_pct"] * 0.65))
+            self.heat = float(t["heat_pct"])
             return self._ok(f"coolant vented: heat {t['heat_pct']}%, {t['coolant_vents']} charges left")
         return {"ok": False, "detail": f"unknown tool {name}"}
 
@@ -645,14 +713,17 @@ class LocalShip:
             self.delegation[p["station"]] = p["level"]
             self._act("xo", f"delegation: {p['station']} now on {p['level']}")
             return self._ok(f"{p['station']} now on {p['level']}")
-        # targets must exist (an intercept of nothing is a mistake the console would refuse)
-        if "target" in p and not self._resolve(p["target"]):
-            return {"ok": False, "detail": f"no contact {p['target']} on the plot"}
-        if mode in ("follow", "orbit", "broadside", "formation") and p.get("target") and not self._resolve(p["target"]).classified:
-            return {"ok": False, "detail": f"{p['target']} is only a bearing (no range): the helm can steer down it, not hold a distance"}
-        if mode == "engage":
-            if not p["targets"] or all(t.lower() == "hostiles" for t in p["targets"]):
-                return {"ok": False, "detail": "none of those contacts is a live hostile on the plot"}
+        # targets must exist (an intercept of nothing is a mistake the console would refuse); `action` may wait for a fight
+        tgt = str(p.get("target", ""))
+        if tgt and tgt.lower() != "action" and not self._resolve(tgt):
+            return {"ok": False, "detail": f"no contact {tgt} on the plot"}
+        if mode in ("follow", "orbit", "broadside", "formation") and tgt and self._resolve(tgt) is not None and not self._resolve(tgt).classified:
+            return {"ok": False, "detail": f"{tgt} is only a bearing (no range): the helm can steer down it, not hold a distance"}
+        if mode == "engage" and any(str(t).lower() == "hostiles" for t in p["targets"]):
+            pass                                           # a standing order: the best hostile in reach, new contacts included; it waits when there is none
+        elif mode == "engage":
+            if not p["targets"]:
+                return {"ok": False, "detail": "engage needs a target"}
             bad = [t for t in p["targets"] if not self._resolve(t)]
             if bad:
                 return {"ok": False, "detail": f"no contact {bad[0]} on the plot"}
@@ -662,6 +733,19 @@ class LocalShip:
             blind = [t for t in p["targets"] if not self._resolve(t).classified]
             if blind:
                 return {"ok": False, "detail": f"{blind[0]} is a bearing only: no firing solution yet"}
+        if mode == "power_profile":
+            row = PROFILES[p["profile"]]
+            err = self._apply_power(dict(zip(SYSTEMS, map(float, row))))
+            if err:
+                return {"ok": False, "detail": err}
+        elif mode == "power_custom":
+            err = self._apply_power({k[:-4]: float(v) for k, v in p.items() if k.endswith("_pct")})
+            if err:
+                return {"ok": False, "detail": err}
+        elif mode == "reactor_battle_short":
+            self._set_battle_short(True)
+        elif mode == "reactor_normal":
+            self._set_battle_short(False)
         lane = self._set_lane(st, mode, p, until, set_by)
         if st == "helm":
             self.helm_note = ""
@@ -669,6 +753,9 @@ class LocalShip:
                 self.state["throttle_pct"] = p["speed_pct"]
         if mode == "scan_focus":
             self._focus_t[str(p.get("target"))] = self.t
+            r = self._resolve(p.get("target"))
+            if r:
+                self._focus_t[r.id] = self.t
         if st == "flight":
             sq, kind = p["squadron"], p["type"]
             self.state["squadrons"][sq] = ("on deck, ready" if kind == "hold" else "recovering" if kind == "recall"
@@ -676,6 +763,33 @@ class LocalShip:
         self._sync_legacy()
         status = self._lane_status(st, lane, self.lanes[st][lane])
         return self._ok(f"{st}: {mode}{' ' + str(p) if p else ''} until {until}" + (f" — {status}" if status else ""))
+
+    def _set_battle_short(self, on: bool) -> None:
+        """Engineering's battle short (the game's UAstraShipSubsystem::SetBattleShort): 800% of power to allocate instead of 700%
+        and +0.3 %/s of heat; back to normal, every allocation above nominal comes down in proportion to fit the old budget."""
+        if on == self.battle_short:
+            return
+        self.battle_short = on
+        self.power_budget = 800.0 if on else 700.0
+        if not on:
+            pw = self.state["power_pct"]
+            total, over = sum(pw.values()), sum(max(0.0, v - 100.0) for v in pw.values())
+            if total > self.power_budget and over > 0:
+                k = max(0.0, min(1.0, 1.0 - (total - self.power_budget) / over))
+                for key, v in pw.items():
+                    if v > 100.0:
+                        pw[key] = 100.0 + (v - 100.0) * k
+        self._emit("engineering: battle short — the reactor's limits are overridden: 800% of power to allocate, and she runs hot" if on
+                   else "engineering: the reactor is back inside its limits (700%)", report=False)
+
+    def _apply_power(self, want: dict[str, float]) -> str | None:
+        """Set several systems at once, inside the budget (the game's engineering power modes); an error text or None."""
+        pw = self.state["power_pct"]
+        total = sum(want.get(k, v) for k, v in pw.items())
+        if total > self.power_budget + 0.5:
+            return f"that profile needs {total:.0f}% of a {self.power_budget:.0f}% budget"
+        pw.update(want)
+        return None
 
     def _ok(self, detail: str) -> dict[str, Any]:
         self.events.append(detail)

@@ -48,8 +48,9 @@ scritto come `StationsJson`) e **fallisce se un modo dell'equipaggio esce con pa
 **Cosa fa la mente prima di spedire** (tutto in `stations.py`, provato offline): `broadside.side: best` → `auto`; `shields_sector` → il modo diretto (`forward` `aft` `port` `starboard` `dorsal` `ventral`,
 «fore/front/rear/left/right» sono capiti); `power_profile`/`emcon`/`heat_radiators` → il modo del gioco è il valore scelto; `power_custom` → i nomi dei sistemi senza `_pct`; `mission` →
 aspetto = squadrone, modo = tipo; `delegation` → `station xo`, `params {station, delegation}`; `zoom` è un numero 0,25–8 (moltiplicatore dell'inquadratura) **o** `close` `max` `wide` come nel
-gioco; «tutto fermo/mezza velocità/tutta avanti» = `course` **solo con `speed_pct`** (il C++ tiene la rotta se manca `heading_deg`); e **`engage` con `targets:["hostiles"]`** diventa la lista degli id
-ostili tracciati dal più vicino (il gioco vuole id).
+gioco; «tutto fermo/mezza velocità/tutta avanti» = `course` **solo con `speed_pct`** (il C++ tiene la rotta se manca `heading_deg`). I bersagli vanno **come sono**: gli id (`T-23`), **`action`**
+(rivalutato dal gioco a ogni passo: quello di cui parla il combattimento ora, cioè il bersaglio del tattico, altrimenti l'ostile più vicino; la mente lo offre solo per `keep_on_bow`, `viewscreen target` e `scan focus`)
+e, in un `engage`, **`hostiles`** (un ordine permanente del gioco: l'ostile migliore a portata, i nuovi compresi; la mente non lo espande più).
 
 **Risposta** (`command_result`): la mente la fa leggere all'ufficiale, con i valori veri; i rifiuti del gioco sono già parole adatte (`no contact T-99 on the plot`, `T-31 is only a bearing (no range)…`,
 `none of those contacts is a live hostile on the plot`). Le autorità (`free`/`engaged`/`captain`, delega, ordini permanenti, `transit`/`retreat` mai di iniziativa) le fa rispettare la mente;
@@ -67,7 +68,7 @@ Colonne: **aspetto** · nome dell'equipaggio · **modo del gioco** · parametri 
 | `course` | `hold` | `hold` | face_action?=True | order | free |
 | `course` | `course` | `course` | heading_deg?, mark_deg?, speed_pct? (almeno uno) | order | captain |
 | `course` | `intercept` | `intercept` | target, standoff_km?=6, speed_pct? | target_lost | engaged |
-| `course` | `keep_on_bow` | `keep_on_bow` | target | target_lost | free |
+| `course` | `keep_on_bow` | `keep_on_bow` | target (id \| `action`) | target_lost | free |
 | `course` | `follow` | `follow` | target, distance_km?=2, side?=astern\|port\|starboard\|above\|below | target_lost | engaged |
 | `course` | `orbit` | `orbit` | target, radius_km?=8, direction?=ccw\|cw | target_lost | engaged |
 | `course` | `broadside` | `broadside` | target, side?=port\|starboard\|best (→ `auto`), range_km?=8 | target_lost | engaged |
@@ -76,7 +77,7 @@ Colonne: **aspetto** · nome dell'equipaggio · **modo del gioco** · parametri 
 | `course` | `formation` | `formation` | target? (senza: l'ammiraglia), slot?=astern\|port\|starboard\|above\|below, distance_km?=3 | target_lost | captain |
 | `course` | `transit` | `transit` | system | order | captain |
 
-`hold` è il predefinito e il C++ già porta la prua sull'azione da solo in combattimento (`face_action` vero): l'iniziativa del timone parte da lì.
+`hold` è il predefinito e il C++ già porta la prua sull'azione da solo in combattimento (`face_action` vero): l'iniziativa del timone parte da lì. `intercept` legge `action` solo all'ingresso (la rotta si dà lì): la mente non lo offre.
 
 ### tactical — Voss
 
@@ -85,7 +86,7 @@ Colonne: **aspetto** · nome dell'equipaggio · **modo del gioco** · parametri 
 | `engagement` | `hold_fire` | `hold_fire` | – | order | captain |
 | `engagement` | `return_fire` | `return_fire` | – | order | free |
 | `engagement` | `weapons_free` | `weapons_free` | range_km? | order | captain |
-| `engagement` | `engage` | `engage` | targets, weapons?, fire?=sustained\|volley\|conserve | target_lost | engaged |
+| `engagement` | `engage` | `engage` | targets (id… \| `hostiles`), weapons?, fire?=sustained\|volley\|conserve | target_lost | engaged |
 | `shields` | `shields_balanced` | `balanced` | – | order | free |
 | `shields` | `shields_face_threat` | `face_threat` | – | order | free |
 | `shields` | `shields_sector` | `forward` `aft` `port` `starboard` `dorsal` `ventral` | sector | order | free |
@@ -104,7 +105,7 @@ Colonne: **aspetto** · nome dell'equipaggio · **modo del gioco** · parametri 
 | `emcon` | `emcon` | `silent` `restricted` `full` | level | order | captain |
 | `scan` | `scan_passive` | `passive` | – | order | free |
 | `scan` | `scan_sweep` | `sweep` | every_s?=60 (≥ 15) | order | captain |
-| `scan` | `scan_focus` | `focus` | target | target_lost | free |
+| `scan` | `scan_focus` | `focus` | target (id \| `action`) | target_lost | free |
 
 ### ops — Tanaka (schermo principale, tavolo olografico, datapad, controllo danni)
 
@@ -112,7 +113,7 @@ Colonne: **aspetto** · nome dell'equipaggio · **modo del gioco** · parametri 
 |---|---|---|---|---|---|
 | `viewscreen` | `viewscreen_auto` | `auto` | – | order | free |
 | `viewscreen` | `viewscreen_forward` | `forward` | zoom? | order | free |
-| `viewscreen` | `viewscreen_target` | `target` | target, zoom? | target_lost | free |
+| `viewscreen` | `viewscreen_target` | `target` | target (id \| `action`), zoom? | target_lost | free |
 | `viewscreen` | `viewscreen_tactical` `_fleet` `_sector` `_damage` `_off` | `tactical` `fleet` `sector` `damage` `off` | – | order | free |
 | `viewscreen` | `viewscreen_comms` | `comms` | party? | order | free |
 | `holo` | `holo_tactical` `holo_sector` | `tactical` `sector` | – | order | free |
@@ -132,7 +133,7 @@ Colonne: **aspetto** · nome dell'equipaggio · **modo del gioco** · parametri 
 | `heat` | `heat_auto` | `auto` | – | order | free |
 | `heat` | `heat_radiators` | `extended` `retracted` | state | order | free |
 | `reactor` | `reactor_normal` | `normal` | – | order | free |
-| `reactor` | `reactor_battle_short` | `battle_short` | – | order | captain |
+| `reactor` | `reactor_battle_short` | `battle_short` | – (bilancio 800 % invece di 700 %, +0,3 %/s di calore; `normal` lo riporta a 700 % scalando le assegnazioni sopra il nominale) | order | captain |
 
 ### comms — Martin · flight — Price · xo — Serra
 
@@ -143,7 +144,7 @@ Colonne: **aspetto** · nome dell'equipaggio · **modo del gioco** · parametri 
 | `alpha` `bravo` `drones` | `mission` | il tipo (`cap` `escort` `strike` `ew` `recon` `sar` `hold` `recall`) | squadron, type, target? | order | free |
 | `delegation` | `delegation` | `delegation` | station, level=manual\|advise\|auto (→ `params.station`, `params.delegation`) | order | free |
 
-**Non ci sono** (perché il gioco non li ha o non li accetta, la mente non li offre): `ew`/`sigint` (dichiarati in `ModeTable` ma senza aspetto in `Defaults`), `holo fleet` (`holo_display` lo rifiuta),
+**Non ci sono** (il gioco li ha tolti dalle sue tabelle, la mente non li offre): `ew`/`sigint`, `holo fleet`,
 `listen off`, i profili `offense`/`defense`/`flight_ops` (i profili del gioco sono `combat`/`shields`/`weapons`…), le pagine `weapons`/`flight`/`comms`/`ship` del datapad, `formation` e `rtb_when` per gli squadroni,
 `heat_auto{limit_pct}`. **Stato iniziale** (`Defaults()`): `hold` · `return_fire`, `face_threat`, `pd_auto`, `normal` · `emcon` (della nave), `passive` · `auto`, `tactical`, `auto`, `push` · `balanced`, `auto`, `normal` · `close`, `fleet` · squadroni `hold`.
 
@@ -156,9 +157,11 @@ Come lo scrive `StationsJson()` (la mente lo legge così, senza altro):
                       "status": "INTERCEPT T-23 at 14.2 km · heading 122 mark 0 · 310 m/s (throttle 64%)",
                       "modes": {"course": {"mode": "intercept", "params": {"target": "T-23", "standoff_km": 6}, "until": "target_lost", "set_by": "captain", "for_s": 84}},
                       "recent": ["course intercept: intercepting T-23"]}, "…": {}},
-"viewscreen": "target: ordered, T-23 (Cocytus), zoom x8"
+"viewscreen": "target: ordered, T-23 (Cocytus), zoom x8",
+"action_target": "T-23"
 ```
 
+`action_target` (in cima a `ship_state`, accanto a `stations`) è ciò che «`action`» vuol dire ora: la mente lo scrive nel quadro («the action now: T-23 (Cocytus)», oppure «none — no fight, the consoles on `action` are waiting»).
 La mente ne ricava il **quadro delle console** del prompt (`[course] intercept(target=T-23,standoff_km=6) until target_lost by captain, 84 s ago || <status> | last: …`), la delega, e — per l'iniziativa —
 «le decisioni che il plot lascia aperte» (`Watch.due`: un rilevamento senza scansione, un ostile senza fuoco assegnato, un mirino su un bersaglio sparito). `stations.<id>.supports: [...]` (facoltativo, oggi assente)
 restringerebbe i modi offerti per postazione, per consegnare per gradi. Una postazione assente da `stations` resta sugli strumenti vecchi; senza `stations` la mente usa solo gli strumenti di oggi (compatibilità).
@@ -186,27 +189,28 @@ Quelli che ci sono e che la mente sa usare: `helm|tactical|sensors: <modo> ended
 `tactical: engaging <nave> (was <id>)` / `no firing solution on <nave> (a bearing only): asking the sensors for a track`, `engineering: heat N%: radiators extended…`, `flight: <sq>'s target <T> is gone: … back on combat air patrol`,
 `sensors: new contact …`, `tactical: <T> (<nome>) destroyed`. La nave locale dei test (`local_ship.py`) emette gli stessi testi.
 
-## 8. Richieste al gioco (in ordine di valore; nulla blocca la mente com'è oggi)
+## 8. Richieste al gioco
 
-1. **Un bersaglio «l'azione»** (`target: "action"`) rivalutato a ogni tick, per `keep_on_bow`, `intercept`, `follow`, `viewscreen target`, `scan focus`: il codice ha già `ActionTargetId` (il bersaglio del tattico, altrimenti un ostile entro 90 km). Con quello «il timone
-   continua a farlo» resta vero anche quando il bersaglio cade, senza un turno del modello; oggi dopo ogni abbattimento il controllo d'iniziativa deve rimettere la prua/lo schermo sul successivo. Esporre `action_target` in `stations` per il quadro.
-2. **`targets: ["hostiles"]` nativo** in `engage` (la mente lo espande in id al momento dell'invio: i contatti nuovi non entrano finché il modello non lo rimanda).
-3. **`sensors.ew`/`sigint` e `ops.holo fleet`**: dichiarati nelle tabelle (`ModeTable`, `ModeChoices`) ma senza aspetto in `Defaults()` / rifiutati da `holo_display` (`sensors has no mode 'jam' for ew`). Crearli o toglierli dalle tabelle; la mente non li offre finché non ci sono (basta aggiungerli in `stations.py`).
-4. **`until: time:<s>` fa tornare al predefinito solo il timone**: per le altre postazioni `Tick` lascia il modo e mette `until` a `order`. La mente non ci fa affidamento (l'unico `time:` che manda è `evade`). Se serve anche altrove, `Expire` con il predefinito dell'aspetto.
-5. **`reactor battle_short`** oggi non ha effetto (solo la riga di stato): implementarlo o toglierlo; la mente lo offre come modo «captain» (mai di iniziativa).
-6. **Pagine del datapad**: la mente offre le cinque del gioco; `weapons`, `flight`, `comms` permetterebbero a Tanaka di rispondere a più richieste («mandami lo stato dei caccia»).
-7. **`channel open{party}`** imposta il modo senza aprire nulla (l'apertura resta `hail`); va bene, la mente usa solo `mute`/`unmute` — che oggi il gioco non fa rispettare (§6): se lo farà, basta rispettare lo stesso modo.
-8. **`engage` su un contatto solo-rilevamento** viene accettato (poi chiede ai sensori una traccia): coerente con il prompt della mente, che non lo chiede mai; nessuna richiesta.
-9. **`evade{pattern}`**: il parametro non è letto (la mente non lo manda).
+**Fatte** (`main` 333cb1e, la mente è già allineata): `target: "action"` rivalutato a ogni passo (timone `keep_on_bow`, schermo, scansione; con nessun combattimento il modo aspetta invece di scadere) e `action_target` nello stato; `engage` su `hostiles` come ordine
+permanente; `until: time:<s>` che riporta **qualsiasi** aspetto al modo predefinito; `reactor battle_short` vero (800 %, +0,3 %/s di calore, eventi nei due sensi); `ew`/`sigint`/`holo fleet` tolti dalle tabelle.
+
+**Ancora aperte** (nulla blocca la mente):
+
+1. **`Expire` ricolloca solo l'etichetta.** Un `time:<s>` scaduto su `reactor battle_short`, `power`, `emcon`, `holo`… rimette il modo predefinito nello stato ma **non richiama `Enter`**: la nave resta com'era (battle short ancora acceso con il modo `normal`, profilo di potenza
+   ancora `combat`, EMCON ancora `silent`). La mente per questo **non manda `time:`** per quei modi (il solo `time:` che manda è `evade`, del timone, dove basta la prua). Se si vuole, in `Expire` chiamare `Enter` sul predefinito (o `SetBattleShort(false)` e simili).
+2. **Pagine del datapad**: la mente offre le cinque del gioco; `weapons`, `flight`, `comms` permetterebbero a Tanaka di rispondere a più richieste («mandami lo stato dei caccia»).
+3. **`channel open{party}`** imposta il modo senza aprire nulla (l'apertura resta `hail`); va bene, la mente usa solo `mute`/`unmute` — che il gioco non fa rispettare (§6): se lo farà, basta rispettare lo stesso modo.
+4. **`engage` con `action`** senza combattimento è rifiutato (`none of those contacts is a live hostile`): la mente non lo offre (per «tutti» c'è `hostiles`).
+5. **`evade{pattern}`**: il parametro non è letto (la mente non lo manda). **`engage` su un contatto solo-rilevamento** è accettato (poi chiede ai sensori una traccia): la mente non lo chiede mai.
 
 ## 9. Cosa aggiornare in ARCHITETTURA §4 (il testo del gioco è già avanti rispetto al documento)
 
 1. Lo **stato** implementato è `stations.<id> = {officer, delegation, status, modes: {aspetto: {mode, params?, until, set_by, for_s}}, recent[]}` (non `mode/params/until/set_by/since/last_actions` al livello della postazione).
 2. Il comando è `{station, aspect?, mode, params?, until?, note?, delegation?, by?}`: **`aspect`** esplicito (o dedotto dalla tabella), **`by` dentro `args`** (è lì che `ApplyCommand` lo legge per `set_by`: `captain|officer|xo|auto|default`).
 3. La tabella dei modi è quella del §3 (per aspetto); `flight` ha un aspetto per squadrone; `xo` ha `delegation` con `{station, delegation}`.
-4. `until` ha quattro valori e, per i modi con bersaglio del timone, `target_lost` è ciò che il codice fa sempre (`Expire` → `hold` con report); i predefiniti sono nel §3.
-5. `viewscreen` a livello di `ship_state` (la riga di `Viewscreen->Describe()`), `zoom` = numero 0,25–8 o `close|max|wide`.
-6. Le richieste del §8.
+4. `until` ha quattro valori; `target_lost` per i modi con bersaglio del timone è ciò che il codice fa sempre (`Expire` → `hold` con report, salvo con `action`: aspetta); `time:<s>` riporta l'aspetto al predefinito (§3, e la nota del §8.1); i predefiniti sono nel §3.
+5. `viewscreen` e **`action_target`** a livello di `ship_state`; `zoom` = numero 0,25–8 o `close|max|wide`; `target` = id o `action`; `engage.targets` = id o `hostiles` (ordine permanente).
+6. Le richieste ancora aperte del §8.
 
 ## 10. Come provarlo
 
@@ -214,6 +218,6 @@ Quelli che ci sono e che la mente sa usare: `helm|tactical|sensors: <modo> ended
 2. La mente contro il gioco: nel log della mente compaiono `watch check`, `channel open with …, routed (rules|llm, N ms)` e le `station` inviate (aspetto, modo, `by`).
    Attesi: «Voss, fuoco sul Cocytus» → `station tactical engagement engage {targets:[T-23]}` + una riga breve; «una salva sul Cocytus» → `fire_weapons` (nessun modo); «sullo schermo il Cocytus, ingrandisci» →
    `station ops viewscreen target {target, zoom}`; «Voss, solo su mio ordine» → `station xo delegation`; «ferma la nave» → `station helm course {speed_pct: 0}`.
-3. Offline, 0 $: `cd mind && .venv/bin/python -m unittest bench.stations_unit bench.stations_server` (85 prove: la classe `WireTest` è l'allarme contro la deriva dal C++), poi con il modello vero
+3. Offline, 0 $: `cd mind && .venv/bin/python -m unittest bench.stations_unit bench.stations_server` (93 prove: la classe `WireTest` è l'allarme contro la deriva dal C++), poi con il modello vero
    `-m bench.stations_scenarios --langs it,en` (≈ 0,09 $).
 4. Modelli dei ruoli: `mind/astra_mind/models.py`; per cambiarne uno senza toccare il codice: `ASTRA_MODEL_<RUOLO>=modello@provider1,provider2` (`CREW`, `WATCH`, `ROUTER`, `CHATTER`).

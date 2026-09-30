@@ -45,6 +45,7 @@ class P:
     lo: float | None = None
     hi: float | None = None
     default: Any = None
+    alt: tuple[str, ...] = ()                # words that stand in for the value (a target may be `action`): shown, never enforced
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,12 @@ def _target(required: bool = True, desc: str = "contact id from the plot (T-23)"
     return P("target", STR, desc, required=required)
 
 
+def _action_target() -> P:
+    """A target that may also be `action`: whatever the fight is about now (tactical's target, else the nearest hostile), read again
+    on every tick by the game: the console follows the fight from one target to the next, and waits when there is no fight."""
+    return P("target", STR, "contact id from the plot (T-23), or `action`: whatever the fight is about now", required=True, alt=("action",))
+
+
 def _speed() -> P:
     return P("speed_pct", NUM, "throttle, percent (0-100)", lo=0, hi=100)
 
@@ -98,8 +105,9 @@ def _build() -> dict[str, Station]:
         m("helm", "course", "intercept", "close on a contact and hold the standoff range, broadside inside it; the course follows the target",
           (_target(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40, default=6), _speed()),
           "target_lost", "engaged"),
-        m("helm", "course", "keep_on_bow", "keep the bow on the target (attitude only, speed unchanged): the Captain sees it through the window",
-          (_target(),), "target_lost"),
+        m("helm", "course", "keep_on_bow", "keep the bow on the target (attitude only, speed unchanged): the Captain sees it through the window; "
+          "with target `action` the bow follows the fight from one target to the next by itself, and waits when there is none",
+          (_action_target(),), "target_lost"),
         m("helm", "course", "follow", "shadow a ship at a distance and on a side of it",
           (_target(), P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=2),
            P("side", STR, "which side of the ship to keep", enum=("astern", "port", "starboard", "above", "below"), default="astern")),
@@ -127,7 +135,8 @@ def _build() -> dict[str, Station]:
           (P("range_km", NUM, "only inside this range (default 25 km)", lo=1, hi=40),), "order", "captain"),
         m("tactical", "engagement", "engage",
           "fire on the listed targets until they fall: assigns the weapons, keeps the cadence, moves on to the next in the list",
-          (P("targets", STRS, "contact ids, in order of priority; 'hostiles' = every tracked hostile on the plot", required=True),
+          (P("targets", STRS, "contact ids, in order of priority; 'hostiles' = every hostile warship, as a standing order: the best one "
+             "in reach (whoever fires on us first, else the nearest), new contacts included, it waits when there is none", required=True),
            P("weapons", STRS, "subset of railguns, lasers, missiles, torpedoes (default: railguns, lasers, missiles)"),
            P("fire", STR, "sustained = keep firing; volley = one missile salvo then hold; conserve = fewer missiles, only sure hits",
              enum=("sustained", "volley", "conserve"), default="sustained")),
@@ -155,8 +164,8 @@ def _build() -> dict[str, Station]:
         m("sensors", "scan", "scan_passive", "passive sensors only, keep the picture", (), "order", native="passive"),
         m("sensors", "scan", "scan_sweep", "an active ping every so often (everyone hears it)",
           (P("every_s", NUM, "seconds between pings (at least 15)", lo=15, hi=300, default=60),), "order", "captain", native="sweep"),
-        m("sensors", "scan", "scan_focus", "keep a focused scan on a contact until it is tracked or lost",
-          (_target(),), "target_lost", native="focus"),
+        m("sensors", "scan", "scan_focus", "keep a focused scan on a contact until it is tracked or lost; with target `action` the scan "
+          "follows the fight", (_action_target(),), "target_lost", native="focus"),
     ]
     ops = [
         m("ops", "viewscreen", "viewscreen_auto", "the director picks the subject: the fight, the threat, the strongest event", (), "order",
@@ -164,8 +173,9 @@ def _build() -> dict[str, Station]:
         m("ops", "viewscreen", "viewscreen_forward", "the forward optical view",
           (P("zoom", ZOOM, "close | max | wide, or a factor 0.25-8 on the natural framing (2 = twice as tight)", lo=0.25, hi=8),),
           "order", native="forward"),
-        m("ops", "viewscreen", "viewscreen_target", "the camera on a contact, with the zoom; released when it is lost",
-          (_target(), P("zoom", ZOOM, "close | max | wide, or a factor 0.25-8 on the natural framing (default 1: the subject fills the frame)",
+        m("ops", "viewscreen", "viewscreen_target", "the camera on a contact, with the zoom; released when it is lost; with target `action` "
+          "the screen follows the fight from one target to the next by itself",
+          (_action_target(), P("zoom", ZOOM, "close | max | wide, or a factor 0.25-8 on the natural framing (default 1: the subject fills the frame)",
                         lo=0.25, hi=8)), "target_lost", native="target"),
         m("ops", "viewscreen", "viewscreen_tactical", "the tactical plot on the main screen", (), "order", native="tactical"),
         m("ops", "viewscreen", "viewscreen_fleet", "the fleet: friendly ships and their status", (), "order", native="fleet"),
@@ -200,7 +210,8 @@ def _build() -> dict[str, Station]:
         m("engineering", "heat", "heat_radiators", "radiators fixed",
           (P("state", STR, "extended | retracted", enum=("extended", "retracted"), required=True),), "order"),
         m("engineering", "reactor", "reactor_normal", "the reactor at its normal rating", (), "order", native="normal"),
-        m("engineering", "reactor", "reactor_battle_short", "battle short: safeties bypassed for more output, at a risk",
+        m("engineering", "reactor", "reactor_battle_short", "battle short: the reactor past its safety limits — 800% of power to allocate "
+          "instead of 700%, but +0.3%/s of heat, until `reactor_normal` (allocations above nominal are then scaled down)",
           (), "order", "captain", native="battle_short"),
     ]
     comms = [
@@ -280,6 +291,8 @@ def _param_text(p: P) -> str:
         txt += "=" + "|".join(p.enum)
     elif p.default is not None:
         txt += f"={p.default}"
+    elif p.alt:
+        txt += "=id|" + "|".join(p.alt)
     return txt
 
 
@@ -328,8 +341,10 @@ def tool_description(available: dict[str, Iterable[str] | None] | None = None) -
             "threat...). Use it for anything that should KEEP happening, and pick the mode by the meaning of the Captain's "
             "words. A single act (one salvo, decoys, a hail, one scan ping, a damage-control dispatch) is a one-shot tool "
             "instead. A new mode replaces the old one in the same [lane]; other lanes keep running. `until`: done | "
-            "target_lost | order (until the order changes) | time:<seconds>; leave it out for the mode's default. A target is "
-            "a contact id from the plot (T-23).\n"
+            "target_lost | order (until the order changes) | time:<seconds> (the console goes back to its default mode); leave it "
+            "out for the mode's default. A target is a contact id from the plot (T-23); for keep_on_bow, viewscreen_target and "
+            "scan_focus it may also be `action` = whatever the fight is about now (tactical's target, else the nearest hostile): "
+            "it follows the fight by itself.\n"
             + describe(available) + "\nParameters: " + param_help(available))
 
 
@@ -417,7 +432,7 @@ def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] |
                 if bad:
                     return None, f"unknown weapon group {bad[0]!r} (railguns, lasers, missiles, torpedoes)"
                 items = [i.lower() for i in items]
-            out[p.name] = items
+            out[p.name] = ["hostiles" if i.lower() == "hostiles" else i for i in items]
         else:
             s = str(v).strip()
             if p.enum is not None:
@@ -425,6 +440,8 @@ def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] |
                     if p.name == "sector" else s.lower()
                 if s not in p.enum:
                     return None, f"'{p.name}' must be one of {', '.join(p.enum)}, got {str(v).strip()!r}"
+            elif p.name == "target" and s.lower() == "action":
+                s = "action"
             out[p.name] = s
     if md.name == "course" and not ({"heading_deg", "mark_deg", "speed_pct"} & set(out)):
         return None, "course needs a heading, a mark or a speed"
@@ -468,10 +485,10 @@ _EMCON = {"silent": "silent", "restricted": "restricted", "limited": "restricted
 _RADIATORS = {"extended": "extended", "radiators_extended": "extended", "retracted": "retracted", "radiators_retracted": "retracted"}
 
 
-def to_wire(cmd: dict[str, Any], by: str = "", state: dict[str, Any] | None = None) -> dict[str, Any]:
+def to_wire(cmd: dict[str, Any], by: str = "") -> dict[str, Any]:
     """A checked command (from `normalize`) as the game's `station` command takes it:
     {station, aspect, mode, params, until, note, by}. `by`: "captain" | "officer" (who decided; the game records it as set_by).
-    `state`: the ship state, to expand `hostiles` in an engage into the contacts' ids (the game wants ids)."""
+    Targets go as they are: contact ids, `action`, and `hostiles` in an engage (the game keeps that one as a standing order)."""
     md = MODE_INDEX[cmd["mode"]]
     p = dict(cmd.get("params") or {})
     st = cmd["station"]
@@ -494,28 +511,11 @@ def to_wire(cmd: dict[str, Any], by: str = "", state: dict[str, Any] | None = No
     else:
         if md.name == "broadside" and p.get("side") == "best":
             p["side"] = "auto"
-        if md.name == "engage":
-            p["targets"] = _expand_hostiles(p.get("targets") or [], state)
         out["params"] = p
     if cmd.get("note"):
         out["note"] = cmd["note"]
     if by:
         out["by"] = by
-    return out
-
-
-def _expand_hostiles(targets: list[str], state: dict[str, Any] | None) -> list[str]:
-    """`hostiles` in a target list becomes the ids of the tracked hostile contacts, nearest first (the game takes ids)."""
-    if not any(t.lower() == "hostiles" for t in targets):
-        return targets
-    cs = [c for c in (state or {}).get("contacts", []) or []
-          if str(c.get("status", "")).startswith("hostile") and isinstance(c.get("range_km"), (int, float))]
-    ids = [str(c["id"]) for c in sorted(cs, key=lambda c: c["range_km"])]
-    out: list[str] = []
-    for t in targets:
-        for i in (ids if t.lower() == "hostiles" else [t]):
-            if i not in out:
-                out.append(i)
     return out
 
 
@@ -541,6 +541,10 @@ def internal_of(aspect: str, native: str, params: dict[str, Any] | None = None) 
         return None, {}
     if md.name == "broadside" and p.get("side") == "auto":
         p["side"] = "best"
+    if md.name == "engage" and isinstance(p.get("targets"), list):
+        p["targets"] = ["hostiles" if str(t).lower() == "hostiles" else t for t in p["targets"]]      # (the game stores ids in capitals)
+    if isinstance(p.get("target"), str) and p["target"].lower() == "action":
+        p["target"] = "action"
     if md.name == "power_custom":
         p = {f"{k}_pct": v for k, v in p.items()}
     return md, p
@@ -680,4 +684,11 @@ def board(state: dict[str, Any] | None, titles: dict[str, str] | None = None) ->
         lines.append(head + ": " + " ; ".join(parts) + status + tail)
     if (state or {}).get("viewscreen"):
         lines.append(f"- main screen now: {state['viewscreen']}")
+    action = str((state or {}).get("action_target") or "")
+    if action:
+        who = next((c.get("name") for c in (state or {}).get("contacts", []) or [] if str(c.get("id")) == action and c.get("name")), "")
+        lines.append(f"- the action now (target `action`): {action}" + (f" ({who})" if who else ""))
+    elif any("action" in str((ls.get("params") or {}).get("target", "")) for ss in stations.values() if isinstance(ss, dict)
+             for ls in lanes_of(ss).values()):
+        lines.append("- the action now (target `action`): none — no fight, the consoles on `action` are waiting")
     return "\n".join(lines)
