@@ -1,4 +1,4 @@
-# ASTRA — Architettura, moduli e contratti (v1, 30 settembre 2026)
+# ASTRA — Architettura, moduli e contratti (v1.1, 30 settembre 2026)
 
 Questo documento è il riferimento tecnico per chi sviluppa ASTRA: io (lo sviluppatore principale, "il lead") e gli
 agenti di supporto che lavorano in parallelo su moduli indipendenti. Descrive gli strati del gioco, i moduli con i loro
@@ -47,23 +47,85 @@ Regole che valgono ovunque:
 5. **Pronto per la rete.** Stato autorevole in simulazione, comandi tipizzati, conoscenza per osservatore
    ([MULTIGIOCATORE.md](MULTIGIOCATORE.md)): quello che scriviamo oggi deve poter girare su un server domani.
 
+## 1bis. Come nascono le intelligenze di ASTRA (filosofia di progetto)
+
+La parola chiave del progetto è **intelligenza**, ovunque. Le entità di ASTRA (ufficiali, comandanti, piloti, equipaggio,
+il regista) devono comportarsi come persone intelligenti. I modelli di oggi lo sono: si parte da lì.
+
+1. **L'intelligenza la danno i modelli, guidati da buoni prompt e dal contesto giusto. Non i filtri nel codice.**
+   Nessun taglio delle loro parole, nessuna riscrittura con espressioni regolari, nessuna lista di parole «vietate»,
+   nessun controllo automatico di «verità» su ciò che dicono. Queste reti di sicurezza diventano un imbuto: si aggiusta un
+   caso e se ne rompe un altro. Se un agente sbaglia si corregge il suo prompt (ruolo, carattere, dottrina, maniere),
+   il contesto che riceve, il disegno dei suoi strumenti o il modello scelto per quel ruolo.
+2. **Percezione = ciò che quella persona potrebbe percepire.** Ognuno riceve ciò che il suo ruolo vede e sente: le
+   console della sua postazione (l'equipaggio di plancia, insieme, le console della plancia), ciò che si dice nella stanza
+   e sui canali che ascolta, la nebbia di guerra. Mai la verità nascosta: il vero stato del nemico, i piani del regista,
+   ciò che nessun sensore mostra. Il nemico vede con i sensori della sua parte. Niente barare.
+3. **Azione = gli strumenti che quella persona avrebbe.** Un ufficiale agisce dalla sua console (modalità `station`,
+   azioni istantanee), la stessa interfaccia che userebbe un giocatore umano seduto lì. Un comandante agisce dando ordini
+   dalla sua dottrina (ordini di gruppo), un PNG con le azioni del suo mestiere. Nessun comando «di servizio» fuori dal
+   ruolo.
+4. **Il codice è il corpo e la fisica, non il giudizio.** Il codice fa:
+   - la simulazione;
+   - il lavoro continuo che un agente ha avviato (gli esecutori delle postazioni, come un pilota automatico);
+   - le automazioni che una nave vera ha (difesa di punto, esche contro una salva, esercitazioni). Ognuna ha un
+     ufficiale che la «possiede», è annunciata e si può revocare;
+   - la meccanica della conversazione (chi ha fisicamente la parola, la priorità assoluta della voce del Capitano);
+   - la rete.
+
+   Il codice non decide cosa dice qualcuno, se un rapporto vale ancora la pena, a chi erano rivolte le parole del
+   Capitano.
+5. **Ripensare, non scartare.** Quando il tempo passa (un rapporto rimasto in coda dietro una plancia occupata), l'agente
+   lo ripensa con lo stato di adesso: lo dice aggiornato, lo cambia o lo lascia cadere. Nessun codice lo scarta per età.
+6. **Si valuta ciò che gli agenti fanno, non come lo scrivono.** I banchi controllano i fatti:
+   - quale strumento è stato chiamato, con che bersaglio;
+   - l'esito nella simulazione;
+   - la latenza e il costo.
+
+   Per la qualità del parlato si gioca (il lead prova nel gioco vero) o si usa un modello giudice. Mai espressioni
+   regolari sul testo.
+7. **Il modello giusto per ogni ruolo.** Tetto di costo DeepSeek V4.1 Flash, modelli più piccoli e veloci dove bastano.
+   Per il lavoro di routine dei PNG, cervelli di codice con memoria; un modello quando qualcuno ci parla. Poche chiamate,
+   buone: in un solo turno l'agente agisce e parla; un secondo turno solo per leggere i risultati quando servono.
+8. **Caso per caso.** Questo è un principio, non un dogma. Per ogni meccanismo ci si chiede: è giudizio (→ il modello,
+   col prompt, il contesto e gli strumenti) o meccanica (→ il codice)?
+
+Conseguenze sul codice che c'è (da fare, vedi [PIANO.md](PIANO.md)):
+- `agent.py`: via i filtri sulle battute. Da togliere:
+  - `_tighten`, che taglia le battute lunghe;
+  - `_deconsole`, che riscrive i nomi delle modalità;
+  - i «signorsì» trattenuti per lista di parole;
+  - le euristiche che riconoscono «ragionamenti» e «strumenti» nel testo;
+  - il recupero della prosa come battuta.
+
+  Si parla solo con `speak`. Se il modello non ha parlato, gli si chiede di rispondere (un nuovo turno), senza
+  indovinare dal testo.
+- `router.py`: con un canale aperto, a decidere se le parole del Capitano erano anche per l'interlocutore esterno sarà un
+  modello veloce con il contesto (chi c'è sul canale, cosa ha appena detto, dove guarda il Capitano). È il giudizio
+  dell'ufficiale alle comunicazioni. Sparisce lo strato di regole in cinque lingue. L'equipaggio sente comunque tutto (è
+  nella stanza) e decide da sé se rispondere.
+- `speech.py`: le battute rimaste troppo a lungo in coda vengono ripensate dall'agente (per il punto 5) invece di
+  scadere per soglia. Resta meccanica la priorità assoluta del Capitano sul canale audio.
+- Gli agenti che ricevono lo stato intero della nave lo ricevono perché è la somma delle console della plancia. Il prompt
+  di ogni ufficiale mette davanti la sua console.
+
 ## 2. I moduli
 
 | Modulo | Cosa contiene | File principali | Chi |
 |---|---|---|---|
-| **SIM** | navi, armi, proiettili, sensori, guerra elettronica, danni, squadriglie, flotte | `AstraBattleSubsystem.*`, `AstraShipSubsystem.*`, `AstraCrewRoster.*` | lead |
+| **SIM / GUERRA** | navi, armi, proiettili, sensori, guerra elettronica, danni fisici per sezione e faccia, gruppi di battaglia, squadriglie, flotte, scenari | `AstraBattleSubsystem.*`, `AstraWar*.*`, `data/war/*`, `AstraShipSubsystem.*`, `AstraCrewRoster.*` | GUERRA (agente, F2.1–F2.2) per la battaglia; lead per la nave |
 | **STAZIONI** | il modello delle postazioni e i loro esecutori continui (§4) | `AstraStations.*` (nuovo) | lead |
 | **VISTA** | schermo principale, sovrimpressioni AR, tavolo olografico, console, datapad, HUD del caccia | `AstraScreensSubsystem.*`, `AstraHoloTable.*`, `AstraViewscreen.*` (nuovo) | lead |
 | **GIOCATORE** | input, personaggio, controller, interazione, prima persona | `AstraInput.*`, `ASTRACharacter.*`, `ASTRAPlayerController.*` | lead |
 | **BANCO** | banco di prova per giocare da terminale, misure | `AstraHarness.*`, `tools/play.py`, `tools/perf/*` | lead |
-| **MENTE-EQUIPAGGIO** | agenti di plancia, strumenti delle postazioni, iniziativa, router e acustica, collaborazione fra ufficiali | `mind/astra_mind/{agent,crew,tools,router}.py`, la loro colla in `server.py` | agente di supporto |
-| **VOCE** | riconoscimento, sintesi, turni di parola, sottotitoli (lato mente) | `mind/astra_mind/{speech,stt,tts,audio_in,voice_casting}.py` | agente di supporto |
+| **MENTE-EQUIPAGGIO** | agenti di plancia, strumenti delle postazioni, iniziativa, router e acustica, collaborazione fra ufficiali | `mind/astra_mind/{agent,crew,tools,router}.py`, la loro colla in `server.py` | unito il 30/9; ora lead |
+| **VOCE** | riconoscimento, sintesi, turni di parola, sottotitoli (lato mente e lato gioco: `AstraVoiceWave.*`) | `mind/astra_mind/{speech,stt,tts,audio_in,voice_casting}.py`, `docs/protocollo_voce.md` | unito il 30/9; ora lead |
 | **MENTE-GUERRA** | regista, comandanti nemici e alleati, gerarchie di flotta | `mind/astra_mind/{director,enemy,war,finale,loss}.py` | poi |
-| **ARTE-PLANCIA** | la plancia v3 (geometria, materiali, console, poltrone), da Blender | `art/blender/bridge*.py`, `tools/ue_scripts/build_bridge*.py` | agente di supporto |
-| **ARTE-NAVI / VFX** | navi v3 con pezzi di rottura, armi, motori, scudi, esplosioni | `art/blender/shipgen*.py`, `tools/ue_scripts/make_fx_*.py` | poi |
+| **ARTE-PLANCIA** | la plancia v3 (geometria, materiali, console, poltrone), da Blender | `art/blender/bridge*.py`, `tools/ue_scripts/build_bridge*.py` | unito il 30/9 |
+| **ARTE-NAVI / VFX** | navi v3 con pezzi di rottura (ARTE-NAVI, agente, in corso); armi, motori, scudi, esplosioni (VFX: poi) | `art/blender/shipgen3.py`, `art/blender/ship3_*.py`, `tools/ue_scripts/*ship*v3*`, `make_fx_*.py` | ARTE-NAVI (agente) |
 | **UMANI** | personaggi realistici, animazioni, labiale, IA dei PNG | `Source/ASTRA/AstraCrew*`, `tools/ue_scripts/make_crew_*` | poi |
-| **NAVE-INTERA** | generatore della pianta dell'Aquila, ponti, cunicoli, vita di bordo | `data/ship/*`, `art/blender/ship_*` | poi |
-| **PRESTAZIONI** | impostazioni di resa, risoluzione, upscaling, profili | `Config/*`, eventuale plugin | lead |
+| **NAVE-INTERA** | la pianta dell'Aquila (compartimenti, porte, grafo dei percorsi), il kit dei corridoi e delle stanze, i ponti | `data/ship/aquila_plan.json`, `art/blender/ship_*`, `tools/ue_scripts/build_ship_interior.py`; lato gioco `AstraShipPlan.*` (lead) | NAVE (agente, F4.1) |
+| **PRESTAZIONI** | impostazioni di resa, risoluzione, upscaling, profili, menu SETTINGS | `Config/*`, `AstraSettings.*`, eventuale plugin MetalFX | lead |
 
 Il lead possiede l'integrazione (collegare i moduli, `ApplyCommand`, il protocollo) e **tutte le prove nel gioco vero**:
 sulla macchina c'è un solo editor e una sola GPU.

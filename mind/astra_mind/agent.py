@@ -11,9 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import time
-import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Protocol
 
@@ -49,8 +47,6 @@ class Turn:
     error: str = ""
     cancelled: bool = False               # the Captain spoke over it (or the words were for someone else): no more is said or done
     task: asyncio.Task | None = None      # the model call in flight (what preempt() cancels)
-    dropped: list[str] = field(default_factory=list)   # lines the crew did not voice (bare acknowledgements, lines over the cap)
-    max_lines: int | None = None          # a governor on the lines a turn may voice (the watch: two)
 
 
 class BridgeAgent:
@@ -168,8 +164,7 @@ class BridgeAgent:
         ts = tools_for(state)
         pending: list[tuple[ToolCall, asyncio.Task]] = []
         fired: list[ToolCall] = []
-        held: list[tuple[str, str, str]] = []
-        on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, held, captain=True, gate=gate)
+        on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=True, gate=gate)
         msgs = self._messages(text, lang, state, ctx, note)
         user = f"Captain: {text}"
         self._active.add(turn)
@@ -189,18 +184,16 @@ class BridgeAgent:
             turn.cost += comp.cost
             log.info("llm: provider=%s finish=%s calls=%s content=%r error=%s", comp.provider, comp.finish_reason,
                      [(c.name, c.arguments_raw[:120]) for c in comp.tool_calls], comp.content[:200], comp.error)
-            if not comp.error and not turn.lines and not held and comp.content.strip():
-                # the model answered in prose instead of calling speak: salvage it as the XO's (or tagged officer's) line
-                log.warning("no speak call, salvaging content: %s", comp.content[:200])
-                await self._salvage(comp.content, turn, lang, max_lines=3)
-                if not turn.lines and not pending:
-                    await self._speak_now(msgs, turn, lang, ts)      # nothing sayable came out: ask once more, spoken
+            if not comp.error and not turn.lines and not pending and not turn.cancelled:
+                # the Captain spoke and nobody answered nor did anything: the officers are asked to answer (their own words,
+                # with speak; what the model wrote outside speak is its draft, never voiced as it is)
+                log.warning("no speak call and no action (content: %r): asking for the answer", comp.content[:200])
+                await self._speak_now(msgs, turn, lang, ts, draft=comp.content)
             if comp.error:
                 turn.error = comp.error
                 log.error("LLM error: %s", comp.error)
                 await self.say("xo", _fallback_line(lang), lang, "calm")
             results = await self._collect(pending, turn)
-            await self._flush_held(held, turn, lang, t0, acted=bool(turn.actions))
             main_lines = len(turn.lines)
             failures = [a for a in turn.actions if not a[2].get("ok", False)]
             if not turn.cancelled:
@@ -208,7 +201,7 @@ class BridgeAgent:
                     await self._follow_up(turn, msgs, lang, readback=True)      # orders carried out in silence: read them back
                 elif failures:
                     await self._follow_up(turn, msgs, lang, readback=False)
-            self._record(user, _kept(comp.tool_calls, turn), results, turn, main_lines)
+            self._record(user, comp.tool_calls, results, turn, main_lines)
             turn.t_end = time.perf_counter() - t0
             self.spent += turn.cost
             return turn
@@ -216,23 +209,22 @@ class BridgeAgent:
             self._active.discard(turn)
 
     async def handle_event(self, event: str, lang: str, ask: str | None = None, *, role: str = "crew", system: str | None = None,
-                           history_turns: int | None = None, max_lines: int | None = None, speak_only: bool = False) -> Turn:
+                           history_turns: int | None = None, speak_only: bool = False) -> Turn:
         """A ship event (not the Captain): the responsible officer reports it, and may act within their own authority.
         role: the model role ('crew', or 'watch' for the initiative watch); system: a prompt of its own (the watch's compact one)."""
-        turn = Turn(text=f"[event] {event}", lang=lang, kind="event", max_lines=max_lines)
+        turn = Turn(text=f"[event] {event}", lang=lang, kind="event")
         t0 = time.perf_counter()
         state = self.ship.snapshot()
         ts = tools_for(state)
         allowed = set() if speak_only else self.initiative()         # (chatter only talks)
         pending: list[tuple[ToolCall, asyncio.Task]] = []
         fired: list[ToolCall] = []
-        held: list[tuple[str, str, str]] = []
         user = f"[Ship systems event, not the Captain speaking] {event}"
         hist = self.history if history_turns is None else self._last_turns(history_turns)
         sysmsg = {"role": "system", "content": system} if system else self._system(lang, state)
         msgs: list[dict[str, Any]] = [sysmsg] + hist
         msgs.append({"role": "user", "content": user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing else "")})
-        on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, held, captain=False, allowed=allowed)
+        on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=False, allowed=allowed)
         tools = [t for t in ts.tools if t["function"]["name"] in (allowed | {"speak"})]
         self._active.add(turn)
         try:
@@ -242,17 +234,14 @@ class BridgeAgent:
                 turn.t_end = time.perf_counter() - t0
                 return turn
             turn.cost += comp.cost
-            if not turn.lines and not held and not comp.error and comp.content.strip() and not comp.content.strip().upper().startswith("SILENT"):
-                # the report came back as prose ("sensors: ...") instead of a speak call: voice it anyway, officer by officer
-                log.info("event report salvaged from prose: %s", comp.content[:160])
-                await self._salvage(comp.content, turn, lang, max_lines=2)
+            if not turn.lines and comp.content.strip():
+                log.info("event turn: no speak call (content not voiced): %s", comp.content[:160])
             results = await self._collect(pending, turn)
-            await self._flush_held(held, turn, lang, t0, acted=bool(turn.actions))
             main_lines = len(turn.lines)
             if turn.actions and not turn.lines and not comp.error and not turn.cancelled:
                 await self._follow_up(turn, msgs, lang, readback=True)   # acted on initiative in silence: say so
             if turn.lines or turn.actions:
-                self._record(user, _kept(comp.tool_calls, turn), results, turn, main_lines)
+                self._record(user, comp.tool_calls, results, turn, main_lines)
             turn.t_end = time.perf_counter() - t0
             self.spent += turn.cost
             return turn
@@ -289,8 +278,7 @@ class BridgeAgent:
         log.info("turn interrupted by the Captain: %d call(s) had gone out", len(acts))
 
     def _on_call(self, turn: Turn, lang: str, t0: float, pending: list, ts: Any, state: dict[str, Any], fired: list[ToolCall],
-                 held: list[tuple[str, str, str]], captain: bool, allowed: set[str] | None = None,
-                 gate: "asyncio.Future[bool] | None" = None):
+                 captain: bool, allowed: set[str] | None = None, gate: "asyncio.Future[bool] | None" = None):
         standing_for = {o["department"] for o in self.standing}
 
         async def on_call(call: ToolCall) -> None:
@@ -304,19 +292,11 @@ class BridgeAgent:
                 speaker = args.get("speaker", "xo")
                 st_ = self.ship.snapshot()
                 if speaker not in CREW and speaker not in _patients(st_) and speaker not in _diners(st_):
-                    speaker = "doctor" if str(speaker).startswith("patient") else "xo"
-                line = _tighten((args.get("text") or "").strip())
-                if _looks_like_tool(line):
-                    log.warning("speak contained a tool invocation, not voiced: %s", line)
-                    line = ""
-                line = _deconsole(line, lang)
-                if len(line) < 4:
-                    return                                           # never voice fragments of a cut-off reply
-                tone = args.get("tone", "calm")
-                if captain and is_bare_ack(line):
-                    held.append((speaker, line, tone))               # an "aye" alone says nothing: only voiced if it answers
-                    return                                           # a question (no orders were carried out in this turn)
-                await self._voice(turn, t0, speaker, line, lang, tone)
+                    speaker = "doctor" if str(speaker).startswith("patient") else "xo"   # (a voice must belong to someone aboard)
+                line = (args.get("text") or "").strip()
+                if not line:
+                    return
+                await self._voice(turn, t0, speaker, line, lang, args.get("tone", "calm"))
             elif call.name == "standing_order" and captain:
                 pending.append((call, asyncio.create_task(self._standing_order(args))))     # the mind's own, not the ship's
             elif call.name == "station" and (captain or (allowed is not None and "station" in allowed)):
@@ -329,23 +309,10 @@ class BridgeAgent:
         return on_call
 
     async def _voice(self, turn: Turn, t0: float, speaker: str, line: str, lang: str, tone: str) -> None:
-        if turn.max_lines is not None and len(turn.lines) >= turn.max_lines:
-            turn.dropped.append(line)                                # (what was done stays done; the line was one too many)
-            return
         if turn.t_first_line is None:
             turn.t_first_line = time.perf_counter() - t0
         turn.lines.append((speaker, line))
         await self.say(speaker, line, lang, tone)
-
-    async def _flush_held(self, held: list[tuple[str, str, str]], turn: Turn, lang: str, t0: float, acted: bool) -> None:
-        """Bare acknowledgements: dropped when the turn did something (the read-back that follows says what), kept when they
-        are the whole answer (a plain yes to a question)."""
-        for speaker, line, tone in held:
-            if acted or turn.lines or turn.cancelled:
-                turn.dropped.append(line)
-            else:
-                await self._voice(turn, t0, speaker, line, lang, tone)
-        held.clear()
 
     async def _station(self, args: dict[str, Any], ts: Any, state: dict[str, Any], captain: bool, standing_for: set[str]) -> dict[str, Any]:
         """A `station` call: checked (the mode exists, its parameters make sense, an officer on their own initiative has the
@@ -360,17 +327,6 @@ class BridgeAgent:
         # to the game in its own words: the aspect, the game's mode name, and who decided (the console log and the board show it)
         wire = station_model.to_wire(cmd, by="captain" if captain else "officer")
         return await _safe_execute(self.ship, "station", wire, owner_of("station", cmd))
-
-    async def _salvage(self, content: str, turn: Turn, lang: str, max_lines: int) -> None:
-        for raw in [l for l in content.strip().splitlines() if l.strip()][:max_lines]:
-            spk, line = _parse_prose(raw)
-            if _looks_like_reasoning(line, lang):
-                # the model thinking aloud (in English, about tools and states) is never an officer's line: the
-                # read-back or a second, spoken answer takes its place
-                log.warning("not voiced (reasoning, not speech): %s", line[:160])
-                continue
-            if len(line) >= 4 and not _looks_like_tool(line):
-                await self._voice(turn, time.perf_counter(), spk, _tighten(line), lang, "focused")
 
     async def _collect(self, pending: list, turn: Turn) -> dict[int, dict[str, Any]]:
         """Results of the actions (the simulation is the truth)."""
@@ -398,12 +354,16 @@ class BridgeAgent:
             results[id(call)] = res
         return results
 
-    async def _speak_now(self, msgs, turn: Turn, lang: str, ts: Any) -> None:
-        """A second try when the model wrote notes instead of speaking: the answer to the Captain, spoken, in character."""
-        follow = msgs + [{"role": "user", "content": f"[Answer the Captain now: the officer concerned speaks, in {lang}, one short "
-                                                     "line in character, with speak. No notes, no reasoning.]"}]
+    async def _speak_now(self, msgs, turn: Turn, lang: str, ts: Any, draft: str = "") -> None:
+        """The Captain is still waiting for an answer: the officers are asked to give it, spoken (their draft, if the model
+        wrote one outside speak, is shown back to them as their own notes)."""
+        follow = list(msgs)
+        if draft.strip():
+            follow.append({"role": "assistant", "content": draft.strip()})
+        follow.append({"role": "user", "content": f"[The Captain is waiting for an answer. The officer concerned answers now, in {lang}, "
+                                                  "in character, with speak.]"})
         t0 = time.perf_counter()
-        comp = await self._llm(turn, "crew", follow, [SPEAK], self._on_call(turn, lang, t0, [], ts, {}, [], [], captain=True),
+        comp = await self._llm(turn, "crew", follow, [SPEAK], self._on_call(turn, lang, t0, [], ts, {}, [], captain=True),
                                max_tokens=200)
         turn.cost += comp.cost
 
@@ -420,10 +380,8 @@ class BridgeAgent:
         t0 = time.perf_counter()
         state = self.ship.snapshot()
         comp = await self._llm(turn, "crew", follow, [SPEAK],
-                               self._on_call(turn, lang, t0, [], tools_for(state), state, [], [], captain=True), max_tokens=260)
+                               self._on_call(turn, lang, t0, [], tools_for(state), state, [], captain=True), max_tokens=260)
         turn.cost += comp.cost
-        if not comp.error and comp.content.strip() and not comp.tool_calls and not turn.cancelled:
-            await self._salvage(comp.content, turn, lang, max_lines=3)
 
     def _record(self, user: str, calls: list[ToolCall], results: dict[int, dict[str, Any]], turn: Turn, main_lines: int) -> None:
         """History in the native tool-calling format: the model keeps answering through tools (a text summary of past
@@ -466,118 +424,6 @@ STANDING_ASK = (" Standing orders in force (see them in the rules) are the Capta
 INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
-_TOOLISH = None
-
-
-_EN_FUNCTION_WORDS = {"the", "is", "and", "to", "of", "it's", "but", "so", "this", "that", "with", "let", "check", "order",
-                      "however", "because", "should", "must", "can't", "we", "i", "are", "has", "have", "not", "which"}
-_REASONING_MARKS = ("let me check", "let me think", "let me see", "the tool", "tool call", "function call", "speak(",
-                    "in the state", "state says", "according to the state", "the captain's order stands", "as an ai",
-                    "the model", "i will call", "i should call")
-
-
-def _looks_like_reasoning(text: str, lang: str) -> bool:
-    """The model's notes to itself (what the state says, which tool to call) rather than an officer speaking: English
-    prose when the Captain speaks another language, or the tell-tale phrases of thinking aloud."""
-    t = (text or "").lower()
-    if any(m in t for m in _REASONING_MARKS):
-        return True
-    if any(re.search(r"\b%s\b" % re.escape(n), t) for n in SHIP_TOOL_NAMES if "_" in n):
-        return True                                   # an officer never says "set_target" or "active_scan"
-    if t.startswith("let me ") or " let me carry" in t:
-        return True
-    if lang != "en":
-        words = re.findall(r"[a-z']+", t)
-        if len(words) >= 6 and sum(w in _EN_FUNCTION_WORDS for w in words) / len(words) > 0.2:
-            return True
-    return False
-
-
-def _looks_like_tool(text: str) -> bool:
-    """A 'speak' whose text is a tool invocation (e.g. "set_alert red") must never be voiced."""
-    global _TOOLISH
-    if _TOOLISH is None:
-        _TOOLISH = re.compile(r"^\s*\[?(%s)\b" % "|".join(sorted(SHIP_TOOL_NAMES | {"station", "standing_order"})))
-    return bool(_TOOLISH.match(text))
-
-
-# ------------------------------------------------------------------------------------------------ what officers say
-_CAPTAIN_WORDS = {"captain", "capitano", "capitan", "capitaine", "kapitaen", "kapitan", "sir", "signore", "senor", "monsieur", "herr",
-                  "ma'am", "madam", "signora", "commander", "comandante"}
-_BARE_WORDS = {
-    # English
-    "aye", "ay", "yes", "yeah", "understood", "copy", "copied", "roger", "wilco", "acknowledged", "affirmative", "right", "away", "on", "it",
-    "will", "do", "very", "well", "okay", "ok", "sure", "certainly", "of", "course", "that", "got", "noted", "executing",
-    # Italian
-    "ricevuto", "agli", "ordini", "ai", "suoi", "eseguo", "eseguito", "subito", "si", "certo", "capito", "affermativo", "comandi", "come",
-    "desidera", "sicuro", "va", "bene", "perfetto", "d'accordo", "presente", "pronto",
-    # Spanish
-    "a", "sus", "ordenes", "recibido", "entendido", "enseguida", "afirmativo", "orden", "vale", "claro", "acuerdo",
-    # French
-    "vos", "ordres", "recu", "compris", "tout", "suite", "affirmatif", "oui", "d'accord", "bien",
-    # German
-    "zu", "befehl", "verstanden", "jawohl", "ja", "sofort", "bestaetigt", "gut", "klar",
-}
-
-
-def _plain(text: str) -> list[str]:
-    t = unicodedata.normalize("NFKD", text.lower())
-    t = "".join(c for c in t if not unicodedata.combining(c))
-    return re.findall(r"[a-z']+", t)
-
-
-def is_bare_ack(line: str) -> bool:
-    """An acknowledgement that says nothing ("Aye aye, Captain", "Agli ordini", "Ricevuto, Capitano"): only stock words."""
-    words = [w for w in _plain(line) if w not in _CAPTAIN_WORDS]
-    return 0 < len(words) <= 6 and all(w in _BARE_WORDS for w in words)
-
-
-_MODE_WORDS = {
-    "it": {"keep_on_bow": "prua sul bersaglio", "scan_focus": "scansione mirata", "scan_sweep": "scansione a intervalli",
-           "shields_face_threat": "scudi verso la minaccia", "shields_sector": "scudi su un settore", "viewscreen_target": "schermo sul bersaglio",
-           "viewscreen_auto": "schermo automatico", "weapons_free": "fuoco libero", "hold_fire": "fuoco sospeso", "return_fire": "risposta al fuoco",
-           "heat_auto": "gestione automatica del calore", "datapad_push": "pagina sul datapad", "dc_auto": "controllo danni automatico"},
-    "en": {"keep_on_bow": "bow on the target", "scan_focus": "focused scan", "scan_sweep": "sweeping scan", "shields_face_threat": "shields to the threat",
-           "shields_sector": "shields on a sector", "viewscreen_target": "screen on the target", "viewscreen_auto": "automatic screen",
-           "weapons_free": "weapons free", "hold_fire": "hold fire", "return_fire": "return fire", "heat_auto": "automatic heat management",
-           "datapad_push": "page to the datapad", "dc_auto": "automatic damage control"},
-}
-_IDENT = re.compile(r"\b[a-z]{2,}(?:_[a-z]{2,})+\b")
-
-
-def _deconsole(line: str, lang: str) -> str:
-    """An officer talks like an officer: a mode or tool name that slipped into a spoken line becomes plain words."""
-    words = _MODE_WORDS.get(lang, {})
-
-    def plain(m: "re.Match[str]") -> str:
-        ident = m.group(0)
-        if ident in words:
-            return words[ident]
-        return ident.replace("_", " ") if ident in station_model.MODE_INDEX or ident in SHIP_TOOL_NAMES else ident
-    return _IDENT.sub(plain, line)
-
-
-def _kept(calls: list[ToolCall], turn: Turn) -> list[ToolCall]:
-    """The calls the history should remember: not the bare acknowledgements the crew did not voice (the model would imitate them)."""
-    if not turn.dropped:
-        return calls
-    out = []
-    for c in calls:
-        if c.name == "speak" and _tighten(str((c.arguments() or {}).get("text", "")).strip()) in turn.dropped:
-            continue
-        out.append(c)
-    return out
-
-
-def _tighten(line: str, max_words: int = 45) -> str:
-    """A safety net against runaway lines (the prompt asks for short ones): past `max_words` only the first two sentences stay."""
-    if len(line.split()) <= max_words:
-        return line
-    parts = re.split(r"(?<=[.!?…])\s+", line.strip())
-    out = " ".join(parts[:2])
-    return out if len(out.split()) <= max_words * 1.5 else " ".join(out.split()[:max_words]) + "."
-
-
 async def _safe_execute(ship: ShipLink, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
     try:
         return await ship.execute(name, args, by)
@@ -589,17 +435,6 @@ async def _safe_execute(ship: ShipLink, name: str, args: dict[str, Any], by: str
 
 async def _refuse(why: str) -> dict[str, Any]:
     return {"ok": False, "detail": why}
-
-
-def _parse_prose(content: str) -> tuple[str, str]:
-    c = content.strip()
-    m = re.search(r'speaker\s*=\s*"?(\w+)"?[^\]]*\]\s*(.+?)(?:</speak>|$)', c, re.S)
-    if m and m.group(1).lower() in CREW:
-        return m.group(1).lower(), m.group(2).strip().strip('"«»')
-    m = re.match(r"\s*\[(\w+)\]\s*[:\-]?\s*(.+)", c, re.S) or re.match(r"\s*(\w+)\s*:\s*(.+)", c, re.S)
-    if m and m.group(1).lower() in CREW:
-        return m.group(1).lower(), m.group(2).strip().strip('"«»')
-    return "xo", c.strip('"«»')
 
 
 def _patients(state: dict[str, Any]) -> set[str]:

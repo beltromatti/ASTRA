@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from astra_mind import initiative, models, router, stations as S
-from astra_mind.agent import BridgeAgent, is_bare_ack, _tighten
+from astra_mind.agent import BridgeAgent
 from astra_mind.context import Channel, Context
 from astra_mind.local_ship import LocalShip
 from astra_mind.openrouter import Completion, ToolCall
@@ -174,14 +174,20 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("FAILED", json.dumps(c.llm.requests[1]["messages"]))
         self.assertEqual(len(c.said), 1)
 
-    async def test_a_bare_aye_is_never_voiced_the_readback_takes_its_place(self) -> None:
-        c = Crew(Script([speak("Agli ordini, Capitano.", "tactical"), station("tactical", "engage", targets=["T-23"])]),
-                 Script([speak("Fuoco continuo sul Cocytus fino a distruzione.", "tactical")]))
-        turn = await c.agent.handle("fuoco sul cocytus", "it")
-        self.assertEqual([t for _, t in c.said], ["Fuoco continuo sul Cocytus fino a distruzione."])
-        self.assertEqual(turn.dropped, ["Agli ordini, Capitano."])
-        # and the history does not teach the model to say it
-        self.assertNotIn("Agli ordini", json.dumps(c.agent.history))
+    async def test_a_line_is_voiced_as_the_officer_said_it(self) -> None:
+        # (no code rewrites, trims or holds back what an officer says: the prompt asks for plain, short, content-bearing lines)
+        c = Crew(Script([speak("Agli ordini, Capitano: fuoco continuo sul Cocytus.", "tactical"), station("tactical", "engage", targets=["T-23"])]))
+        await c.agent.handle("fuoco sul cocytus", "it")
+        self.assertEqual([t for _, t in c.said], ["Agli ordini, Capitano: fuoco continuo sul Cocytus."])
+        self.assertEqual(len(c.llm.requests), 1)                                              # it spoke and acted: no second call
+
+    async def test_no_answer_and_nothing_done_asks_the_officers_to_answer(self) -> None:
+        # the model wrote prose instead of speaking: it is not voiced; the officers are asked for their answer, with speak
+        c = Crew(Script([], content="The helm should confirm the heading."), Script([speak("Prua uno-due-zero, Capitano.", "helm")]))
+        await c.agent.handle("dove siamo diretti?", "it")
+        self.assertEqual([t for _, t in c.said], ["Prua uno-due-zero, Capitano."])
+        self.assertEqual(len(c.llm.requests), 2)
+        self.assertIn("The helm should confirm the heading.", json.dumps(c.llm.requests[1]["messages"]))
 
     async def test_a_plain_yes_to_a_question_is_kept(self) -> None:
         c = Crew(Script([speak("Sì, Capitano.", "tactical")]))
@@ -197,26 +203,6 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         said = [m["content"] for m in c.agent.history if m["role"] == "user"]
         self.assertEqual(sum(1 for m in said if m.startswith("Captain:")), 3)                      # all three orders are still there
         self.assertLessEqual(sum(1 for m in said if not m.startswith("Captain:")), 6)             # the checks are capped
-
-    async def test_a_mode_name_in_a_line_is_spoken_as_plain_words(self) -> None:
-        c = Crew(Script([speak("Propongo keep_on_bow su T-24 e scan_focus su T-31.", "helm")]))
-        await c.agent.handle("consigli?", "it")
-        self.assertEqual(c.said[0][1], "Propongo prua sul bersaglio su T-24 e scansione mirata su T-31.")
-
-    async def test_runaway_lines_are_cut(self) -> None:
-        long = "Capitano, la situazione è la seguente. " + " ".join(["parola"] * 80) + ". Poi ancora altro."
-        self.assertLessEqual(len(_tighten(long).split()), 70)
-        c = Crew(Script([speak(long, "xo")]))
-        await c.agent.handle("rapporto", "it")
-        self.assertLessEqual(len(c.said[0][1].split()), 70)
-
-    def test_bare_acks_in_five_languages(self) -> None:
-        for line in ("Aye aye, Captain.", "Agli ordini, Capitano.", "Ricevuto.", "Sì, signore.", "A sus órdenes, Capitán.", "Reçu.",
-                     "À vos ordres, Capitaine.", "Zu Befehl, Kapitän.", "Understood.", "Eseguo."):
-            self.assertTrue(is_bare_ack(line), line)
-        for line in ("Intercetto il Cocytus, tengo sei chilometri.", "Scudi a prua, novanta per cento.", "Aye, Captain: shields fore.",
-                     "Sì, Capitano: siamo a nove chilometri."):
-            self.assertFalse(is_bare_ack(line), line)
 
     async def test_initiative_needs_auto_delegation(self) -> None:
         c = Crew(Script([station("tactical", "engage", targets=["T-24"]), speak("Cocytus giù: passo al Phlegethon.", "tactical")]))
@@ -313,12 +299,12 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(c.said), 1)
         self.assertFalse(turn.cancelled)
 
-    async def test_chatter_only_talks_and_is_capped_at_two_lines(self) -> None:
+    async def test_chatter_only_talks(self) -> None:
         c = Crew(Script([speak("Bel cielo stasera, Marco.", "sensors"), speak("Bugiardo: piove polvere.", "helm"),
-                         speak("Una terza battuta.", "xo"), station("helm", "hold")]), fight=False)
+                         station("helm", "hold")]), fight=False)
         system = __import__("astra_mind.initiative", fromlist=["x"]).chatter_system("it", "steady", "", "", "", [], [])
         await c.agent.handle_event("bridge: a quiet moment on watch", "it", ask="chat", role="chatter", system=system,
-                                   history_turns=2, max_lines=2, speak_only=True)
+                                   history_turns=2, speak_only=True)
         self.assertEqual([t for _, t in c.said], ["Bel cielo stasera, Marco.", "Bugiardo: piove polvere."])
         self.assertEqual({t["function"]["name"] for t in c.llm.requests[0]["tools"]}, {"speak"})
         self.assertEqual(c.ship.lane("helm", "course")["set_by"], "default")                  # the stray station call did nothing
