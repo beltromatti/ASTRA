@@ -125,17 +125,21 @@ def shelf(b: SParts, w: float = 1.0, d: float = 0.34, h: float = 2.0, shelves: i
         for i, z in enumerate(zs[:-1]):
             y = -w / 2 + 0.05
             while y < w / 2 - 0.08:
-                bw = rng.uniform(0.018, 0.045)
+                bw = rng.uniform(0.035, 0.10)                              # a run of two or three books is one box (the soft group: no bevel)
                 bh = rng.uniform(0.18, min(0.30, zs[i + 1] - z - 0.05))
                 if rng.random() < 0.12:
                     y += rng.uniform(0.05, 0.12)
                     continue
-                b.fine.box((-d / 2 + 0.03, y, z + 0.025), (-d / 2 + 0.03 + rng.uniform(0.17, 0.24), y + bw, z + 0.025 + bh), rng.choice(colors))
+                b.soft.box((-d / 2 + 0.03, y, z + 0.025), (-d / 2 + 0.03 + rng.uniform(0.17, 0.24), y + bw, z + 0.025 + bh), rng.choice(colors))
                 y += bw + 0.004
 
 
-def crate(b: SParts, w: float = 0.6, d: float = 0.4, h: float = 0.4, mat: str = CRATE_OLIVE, label: str | None = None) -> None:
-    """A stores crate: shell, lid, corner posts, a tag."""
+def crate(b: SParts, w: float = 0.6, d: float = 0.4, h: float = 0.4, mat: str = CRATE_OLIVE, label: str | None = None, lite: bool = False) -> None:
+    """A stores crate: shell, lid, corner posts, a tag. `lite` (racks, stacks): the shell and the lid only, in the soft group (no bevel)."""
+    if lite:
+        b.soft.box((-d / 2, -w / 2, 0.0), (d / 2, w / 2, h - 0.03), mat)
+        b.soft.box((-d / 2 - 0.006, -w / 2 - 0.006, h - 0.03), (d / 2 + 0.006, w / 2 + 0.006, h), TRIM)
+        return
     b.body.box((-d / 2, -w / 2, 0.0), (d / 2, w / 2, h), mat)
     b.fine.box((-d / 2 - 0.006, -w / 2 - 0.006, h - 0.03), (d / 2 + 0.006, w / 2 + 0.006, h), TRIM)
     for sx in (-d / 2, d / 2 - 0.03):
@@ -183,7 +187,7 @@ def rack(b: SParts, w: float = 2.4, d: float = 0.9, h: float = 2.6, levels: int 
             if ch < 0.2 or y + cw > w / 2 - 0.08:
                 break
             with b.at(T(0.0, y + cw / 2, zc)):
-                crate(b, cw, min(d - 0.12, rng.choice([0.5, 0.6, 0.7])), ch, rng.choice(mats))
+                crate(b, cw, min(d - 0.12, rng.choice([0.5, 0.6, 0.7])), ch, rng.choice(mats), None, True)
             y += cw + rng.uniform(0.02, 0.08)
 
 
@@ -319,10 +323,14 @@ def lamp_standard(b: SParts, h: float = 1.5, cell: str = "white_warm") -> None:
 
 
 def ceiling_light_panel(b: SParts, x0: float, x1: float, y0: float, y1: float, z: float, cell: str = "white_cool", mat: str = LAMP_HOT) -> None:
-    """A luminous ceiling panel with a brushed frame, flush at height z."""
-    b.body.box((x0, y0, z - 0.06), (x1, y1, z), TRIM)
-    b.body.box((x0 + 0.03, y0 + 0.03, z - 0.062), (x1 - 0.03, y1 - 0.03, z - 0.05), STRUCT)
-    b.emit.lamp_box((x0 + 0.05, y0 + 0.05, z - 0.058), (x1 - 0.05, y1 - 0.05, z - 0.052), cell, mat)
+    """A luminous ceiling panel: a brushed ring frame (4 cm bars, 6 cm deep) with a bright lamp face recessed 2 cm inside it, flush at height z."""
+    t = 0.04
+    b.body.box((x0, y0, z - 0.06), (x1, y0 + t, z), TRIM)
+    b.body.box((x0, y1 - t, z - 0.06), (x1, y1, z), TRIM)
+    b.body.box((x0, y0 + t, z - 0.06), (x0 + t, y1 - t, z), TRIM)
+    b.body.box((x1 - t, y0 + t, z - 0.06), (x1, y1 - t, z), TRIM)
+    b.body.box((x0 + t, y0 + t, z - 0.025), (x1 - t, y1 - t, z - 0.01), STRUCT)
+    b.emit.lamp_box((x0 + t, y0 + t, z - 0.04), (x1 - t, y1 - t, z - 0.032), cell, mat)
 
 
 def pipe_run(b: SParts, p0, p1, r: float = 0.06, mat: str = TRIM, clamps: float = 1.2) -> None:

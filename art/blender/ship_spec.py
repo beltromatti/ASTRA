@@ -51,9 +51,9 @@ def _reg(key: str, **kw) -> None:
 # ---- Deck 4: crew services --------------------------------------------------------------------------------------------
 _reg("galley", name="Main Galley", kind="galley", dept="services", L=24.0, D=16.0, h=3.6, plate="galley",
      doors=[door("near", 10.0)], systems=["food_service", "potable_water", "power_bus"],
-     spots=[spot("cook", "work", 8.0, 15.9, 90), spot("cook", "work", 11.0, 15.9, 90), spot("cook", "work", 14.0, 15.9, 90),
-            spot("cook", "work", 17.0, 15.9, 90), spot("cook", "work", 9.0, 8.2, 90), spot("steward", "work", 13.0, 8.2, 90),
-            spot("dishwasher", "work", 21.5, 5.5, 0), spot("chief_cook", "stand", 13.0, 3.2, 90)],
+     spots=[spot("cook", "work", 8.0, 14.3, 90), spot("cook", "work", 10.5, 14.3, 90), spot("cook", "work", 12.5, 14.3, 90),
+            spot("cook", "work", 14.0, 14.3, 90), spot("steward", "work", 8.0, 8.1, -90), spot("steward", "work", 13.5, 8.1, -90),
+            spot("dishwasher", "work", 21.9, 9.9, 0), spot("chief_cook", "stand", 13.4, 3.2, 180)],
      lights=[light(8.0, 6.0, 3.5, 7000, 5000, (7.0, 0.9)), light(17.0, 6.0, 3.5, 7000, 5000, (7.0, 0.9)),
              light(12.0, 12.5, 3.5, 9000, 4800, (16.0, 0.9)), light(3.0, 9.0, 3.5, 3000, 4200, (2.0, 8.0))])
 _reg("galley_pass", name="Galley Pass", kind="galley", dept="services", L=24.0, D=4.0, h=3.4, plate="galley",
@@ -62,28 +62,27 @@ _reg("galley_pass", name="Galley Pass", kind="galley", dept="services", L=24.0, 
      lights=[light(12.0, 2.0, 3.3, 3500, 4800, (14.0, 0.5))])
 _reg("lounge", name="Crew Lounge", kind="lounge", dept="services", L=24.0, D=16.0, h=3.6, plate="lounge",
      doors=[door("near", 10.0), door("far", 14.0)], systems=["power_bus", "entertainment"],
-     spots=[spot("crew", "sit", 4.0, 4.0, 45), spot("crew", "sit", 4.0, 6.5, -45), spot("crew", "sit", 7.6, 5.2, 180),
-            spot("crew", "sit", 4.0, 11.5, 45), spot("crew", "sit", 4.0, 14.0, -45), spot("crew", "sit", 7.6, 12.6, 180),
-            spot("crew", "sit", 14.5, 4.0, 90), spot("crew", "sit", 17.5, 4.0, 90), spot("crew", "sit", 20.0, 4.6, 180),
-            spot("crew", "eat", 19.0, 12.8, 0), spot("crew", "sit", 21.4, 10.0, 180), spot("crew", "sit", 21.4, 12.0, 180)],
+     spots=[spot("crew", "sit", 4.0, 4.0, 45), spot("crew", "sit", 4.0, 6.6, -45), spot("crew", "sit", 7.7, 4.6, 180), spot("crew", "sit", 7.7, 6.0, 180),
+            spot("crew", "sit", 4.0, 11.4, 45), spot("crew", "sit", 4.0, 14.0, -45), spot("crew", "sit", 7.7, 12.0, 180), spot("crew", "sit", 7.7, 13.4, 180),
+            spot("crew", "eat", 15.4, 4.3, 90), spot("crew", "eat", 15.4, 6.5, -90), spot("crew", "eat", 19.6, 4.3, 90), spot("crew", "eat", 20.7, 5.4, 180)]
+           + [spot("crew", "eat", 16.4 + 1.3 * i, 11.5, 90) for i in (0, 2, 4)] + [spot("barista", "work", 19.0, 13.6, -90)],
      lights=[light(6.0, 8.0, 3.5, 5200, 3200, (8.0, 8.0)), light(18.0, 5.0, 3.5, 4200, 3400, (8.0, 3.0)),
              light(18.0, 12.0, 3.5, 4200, 3400, (8.0, 3.0))])
 _reg("games", name="Games Room", kind="lounge", dept="services", L=24.0, D=16.0, h=3.6, plate="games",
      doors=[door("near", 10.0), door("far", 14.0)], systems=["power_bus", "entertainment"],
      spots=[spot("crew", "sit", 5.0, 5.0, 0), spot("crew", "sit", 7.0, 5.0, 180), spot("crew", "sit", 5.0, 11.0, 0), spot("crew", "sit", 7.0, 11.0, 180),
-            spot("crew", "sit", 12.0, 4.0, 0), spot("crew", "sit", 14.0, 4.0, 180), spot("crew", "stand", 19.0, 12.0, 90),
-            spot("crew", "stand", 21.0, 12.0, 90)],
+            spot("crew", "sit", 12.0, 4.0, 0), spot("crew", "sit", 14.0, 4.0, 180), spot("crew", "stand", 17.5, 14.1, 90),
+            spot("crew", "stand", 19.5, 14.1, 90), spot("crew", "stand", 15.0, 8.0, 0), spot("crew", "stand", 19.0, 8.0, 180)],
      lights=[light(6.0, 8.0, 3.5, 4500, 4000, (8.0, 8.0)), light(18.0, 8.0, 3.5, 4500, 3600, (8.0, 8.0))])
 _reg("library", name="Library", kind="library", dept="services", L=16.0, D=16.0, h=3.6, plate="library",
      doors=[door("near", 6.0)], systems=["power_bus"],
-     spots=[spot("crew", "sit", 5.0, 8.0, 90), spot("crew", "sit", 8.0, 8.0, 90), spot("crew", "sit", 11.5, 5.0, 180),
-            spot("librarian", "work", 13.0, 3.0, 0)],
+     spots=[spot("crew", "sit", 5.0, 8.0, 90), spot("crew", "sit", 8.0, 8.0, 90), spot("crew", "sit", 5.0, 10.0, -90), spot("crew", "sit", 11.6, 5.4, 180),
+            spot("crew", "sit", 2.6, 4.6, 0), spot("librarian", "work", 13.6, 3.0, 0)],
      lights=[light(8.0, 8.0, 3.5, 4500, 3300, (8.0, 8.0))])
 _reg("observation", name="Observation Deck", kind="observation", dept="command", L=24.0, D=16.0, h=3.7, plate="observation",
      doors=[door("near", 10.0)], systems=["power_bus"],
-     spots=[spot("crew", "watch", 5.0, 14.0, 90), spot("crew", "watch", 8.0, 14.0, 90), spot("crew", "watch", 11.0, 14.0, 90),
-            spot("crew", "watch", 14.0, 14.0, 90), spot("crew", "watch", 17.0, 14.0, 90), spot("crew", "watch", 20.0, 14.0, 90),
-            spot("crew", "sit", 6.0, 7.0, 0), spot("crew", "sit", 18.0, 7.0, 180)],
+     spots=[spot("crew", "watch", x, 14.0, 90) for x in (5.0, 8.0, 11.0, 14.0, 16.0, 20.0)]
+           + [spot("crew", "sit", 6.0, 7.0, 0), spot("crew", "sit", 9.2, 7.0, 180), spot("crew", "sit", 18.0, 7.0, 180), spot("crew", "sit", 14.8, 7.0, 0)],
      lights=[light(12.0, 9.0, 3.6, 2800, 6500, (10.0, 1.0)), light(5.0, 6.0, 3.6, 1800, 3000, (2.0, 2.0)),
              light(19.0, 6.0, 3.6, 1800, 3000, (2.0, 2.0))])
 _reg("store_dry", name="Dry Stores", kind="storage", dept="flight", L=24.0, D=16.0, h=3.4, plate="stores_dry",
@@ -111,49 +110,66 @@ _reg("hydro", name="Hydroponics Bay", kind="hydroponics", dept="science", L=24.0
      lights=[light(12.0, 8.0, 3.3, 3500, 7000, (20.0, 12.0), 1100)])
 _reg("quiet", name="Quiet Room", kind="chapel", dept="services", L=12.0, D=16.0, h=3.6, plate="chapel",
      doors=[door("near", 6.0)], systems=["power_bus"],
-     spots=[spot("crew", "sit", 4.0, 9.0, 0), spot("crew", "sit", 8.0, 9.0, 180), spot("crew", "sit", 6.0, 12.0, 90)],
+     spots=[spot("crew", "sit", 3.6, 7.6, 90), spot("crew", "sit", 8.4, 7.6, 90), spot("crew", "sit", 3.6, 9.8, 90), spot("crew", "sit", 8.4, 9.8, 90)],
      lights=[light(6.0, 8.0, 3.5, 1500, 2700, (5.0, 5.0))])
 # ---- the rest of the kit (Decks 3, 5, 8, 10, 11 of the canon): built and previewed, placed when their decks are built -------
 _reg("lab", name="Science Lab", kind="lab", dept="science", L=24.0, D=16.0, h=3.6, plate="lab",
      doors=[door("near", 10.0)], systems=["sensors", "power_bus", "data_trunk"],
-     spots=[spot("scientist", "work", 5.0, 13.0, 90, "science"), spot("scientist", "work", 9.0, 13.0, 90, "science"),
-            spot("scientist", "work", 13.0, 13.0, 90, "science"), spot("scientist", "work", 17.0, 13.0, 90, "science"),
-            spot("scientist", "work", 8.5, 7.5, 0, "science"), spot("lead_scientist", "work", 19.0, 6.0, 180, "science")],
+     spots=[spot("scientist", "work", x, 14.4, 90, "science") for x in (5.0, 9.0, 13.0, 17.0)]
+           + [spot("scientist", "work", 10.2, 7.6, -90, "science"), spot("scientist", "work", 13.4, 11.85, -90, "science"),
+              spot("lead_scientist", "work", 20.5, 7.0, 180, "science")],
      lights=[light(6.0, 8.0, 3.5, 6500, 5600, (8.0, 8.0)), light(18.0, 8.0, 3.5, 6500, 5600, (8.0, 8.0))])
 _reg("workshop", name="Machine Shop", kind="workshop", dept="engineering", L=28.0, D=16.0, h=3.7, plate="workshop",
      doors=[door("near", 10.0)], systems=["power_bus", "compressed_air", "damage_control"],
-     spots=[spot("machinist", "work", 7.0, 8.0, 90, "engineering"), spot("machinist", "work", 12.0, 8.0, 90, "engineering"),
-            spot("welder", "work", 22.0, 12.0, 0, "engineering"), spot("fitter", "work", 17.0, 15.5, 90, "engineering")],
+     spots=[spot("machinist", "work", 5.6, 14.2, 90, "engineering"), spot("machinist", "work", 9.0, 14.2, 90, "engineering"),
+            spot("machinist", "work", 12.6, 14.2, 90, "engineering"), spot("fitter", "work", 15.3, 14.3, 90, "engineering"),
+            spot("machinist", "work", 8.2, 7.5, 90, "engineering"), spot("fitter", "work", 13.2, 7.5, 90, "engineering"),
+            spot("welder", "work", 22.9, 11.6, 0, "engineering")],
      lights=[light(9.0, 9.0, 3.7, 7000, 4800, (12.0, 1.0)), light(21.0, 9.0, 3.7, 7000, 4800, (12.0, 1.0)),
              light(14.0, 15.0, 3.7, 5000, 5200, (20.0, 0.8))])
 _reg("armory", name="Armory", kind="armory", dept="security", L=16.0, D=16.0, h=3.4, plate="armory",
      doors=[door("near", 6.0)], systems=["ordnance", "power_bus"],
-     spots=[spot("armorer", "work", 5.0, 3.4, 0, "security"), spot("guard", "stand", 9.0, 2.2, 90, "security")],
+     spots=[spot("armorer", "work", 6.0, 5.4, -90, "security"), spot("guard", "stand", 9.0, 2.4, 90, "security")],
      lights=[light(8.0, 6.0, 3.3, 5500, 5000, (10.0, 1.0)), light(8.0, 12.0, 3.3, 5500, 5000, (10.0, 1.0))])
 _reg("cabins", name="Crew Cabins", kind="cabins", dept="services", L=20.0, D=16.0, h=3.2, plate="cabins",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
-     spots=[spot("sleeper", "sleep", 2.2 + 3.3 * i, 3.0 + 6.4, 90) for i in range(4)],
+     spots=[spot("sleeper", "sleep", 1.34, y, 0) for y in (0.56, 4.56, 8.56, 12.56)] + [spot("sleeper", "sleep", 18.66, y, 180) for y in (0.56, 4.56, 8.56, 12.56)],
      lights=[light(10.0, 8.0, 3.1, 2500, 3400, (14.0, 0.6))])
+
+
+def _variant(base: str, suffix: str, door_x: float) -> None:
+    """The same room with its near door moved to `door_x` (the layout puts some doors on another module of the corridor): another mesh."""
+    import copy
+    spec = copy.deepcopy(PREFABS[base])
+    spec["key"] = f"{base}_{suffix}"
+    spec["mesh"] = PREFABS[base]["mesh"] + suffix.upper()
+    spec["doors"] = [door("near", door_x)] + [d for d in spec["doors"] if d["wall"] != "near"]
+    spec["variant_of"] = base
+    PREFABS[spec["key"]] = spec
+
+
+_variant("observation", "d14", 14.0)
+_variant("store_dry", "d10", 10.0)
 # ---- specials (their own frames: see ship_rooms.py): concourse, stair tower, bow observation ---------------------------------
-_reg("concourse", name="Mess Concourse", kind="concourse", dept="services", L=17.7, D=36.0, h=3.8, plate="concourse", doors=[],
+_reg("concourse", name="Mess Concourse", kind="concourse", dept="services", L=17.7, D=36.0, h=3.7, plate="concourse", doors=[],
      systems=["power_bus", "life_support"], special=True,
-     spots=[spot("crew", "stand", 5.0, 10.0, 90), spot("crew", "sit", 8.0, 16.0, 0), spot("crew", "sit", 8.0, 20.0, 0),
-            spot("crew", "stand", 14.0, 27.0, 180), spot("crew", "sit", 8.0, 24.0, 0), spot("crew", "sit", 8.0, 12.0, 180)],
-     lights=[light(9.0, 18.0, 3.7, 9000, 4200, (10.0, 2.0), 1400), light(9.0, 8.0, 3.7, 5000, 3600, (6.0, 2.0), 1100),
-             light(9.0, 28.0, 3.7, 5000, 3600, (6.0, 2.0), 1100)])
+     spots=[spot("crew", "stand", 4.0, 11.5, 180), spot("crew", "sit", 6.75, 17.0, 0), spot("crew", "sit", 6.75, 19.0, 0), spot("crew", "sit", 11.25, 17.0, 180),
+            spot("crew", "sit", 11.25, 19.0, 180), spot("crew", "sit", 7.0, 1.15, 90), spot("crew", "sit", 8.4, 34.85, -90), spot("crew", "stand", 3.4, 27.0, 0)],
+     lights=[light(9.0, 18.0, 3.6, 9000, 4200, (10.0, 2.0), 1400), light(9.0, 8.0, 3.6, 5000, 3600, (6.0, 2.0), 1100),
+             light(9.0, 28.0, 3.6, 5000, 3600, (6.0, 2.0), 1100)])
 _reg("berth_lobby", name="Berthing Lobby", kind="concourse", dept="services", L=14.6, D=36.0, h=3.6, plate=None, doors=[],
      systems=["power_bus", "life_support"], special=True,
-     spots=[spot("crew", "sit", 4.0, 9.0, 0), spot("crew", "stand", 9.0, 24.0, 180)],
+     spots=[spot("crew", "sit", 12.4, 7.2, 180), spot("crew", "sit", 12.4, 8.8, 180), spot("crew", "sit", 8.7, 6.6, 0), spot("crew", "sit", 12.4, 27.2, 180),
+            spot("crew", "sit", 12.4, 28.8, 180), spot("crew", "sit", 8.7, 29.4, 0)],
      lights=[light(7.3, 18.0, 3.5, 4500, 3600, (8.0, 3.0), 1200), light(7.3, 8.0, 3.5, 2500, 3200, (5.0, 2.0), 900),
              light(7.3, 28.0, 3.5, 2500, 3200, (5.0, 2.0), 900)])
 _reg("stair_tower", name="Stair Tower", kind="stairs", dept="neutral", L=8.0, D=8.0, h=3.4, plate="stairs", doors=[door("near", 2.0)],
      systems=["power_bus"], special=True, spots=[], lights=[light(4.0, 4.0, 3.3, 3000, 4500, (3.0, 3.0), 800)])
-_reg("bow_obs", name="Bow Observation", kind="observation", dept="command", L=20.0, D=32.0, h=3.8, plate="bow_obs", doors=[],
+_reg("bow_obs", name="Bow Observation", kind="observation", dept="command", L=20.0, D=32.0, h=3.7, plate="bow_obs", doors=[],
      systems=["power_bus"], special=True,
-     spots=[spot("crew", "watch", 4.0 + 3.0 * i, 26.0, 90) for i in range(5)] + [spot("crew", "sit", 6.0, 12.0, 90)],
-     lights=[light(10.0, 16.0, 3.7, 3200, 6200, (12.0, 1.0), 1200)])
-
-
+     spots=[spot("crew", "watch", 17.6, 6.0 + 4.5 * i, 0) for i in range(6)]
+           + [spot("crew", "sit", 11.6, 5.5, 0), spot("crew", "sit", 11.6, 7.5, 0), spot("crew", "sit", 11.6, 24.5, 0), spot("crew", "sit", 11.6, 26.5, 0)],
+     lights=[light(10.0, 16.0, 3.6, 3200, 6200, (12.0, 1.0), 1200)])
 # ---- planned rooms: typed compartments of the decks that are not modelled yet (no mesh), with real dimensions ------------------
 def _plan(key: str, name: str, kind: str, dept: str, L: float, D: float, h: float, systems: list, roles=("crew",), n: int = 3, dx: float = 6.0,
           act: str = "work", lm: float = 4500.0, temp: float = 4500.0, plate: str | None = None) -> None:

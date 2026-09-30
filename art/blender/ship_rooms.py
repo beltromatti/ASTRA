@@ -28,7 +28,8 @@ class Style:
 
     def __init__(self, floor: str = DECK, floor_mode: str = "plates", wall_lo: str = COMPOSITE, wall_hi: str = COMPOSITE, trim: str = TRIM,
                  ceil: str = COMPOSITE, accent: str = "cool_dim", strip: str = "white_cool", wain_h: float = 1.05, ribs: bool = True,
-                 rib_mat: str = TRIM, skirt: str = STRUCT, light_mode: str = "strips", rail: bool = True, cove: str | None = None) -> None:
+                 rib_mat: str = TRIM, skirt: str = STRUCT, light_mode: str = "strips", rail: bool = True, cove: str | None = None,
+                 seams: bool = True, cove_on: bool = True) -> None:
         self.__dict__.update(locals())
         del self.__dict__["self"]
 
@@ -135,8 +136,9 @@ def wall_finish(b: SParts, name: str, L: float, D: float, H: float, st: Style, d
 
 
 def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far_door: bool = True, windows_far: list | None = None,
-                seed: int = 1) -> None:
-    """Floor, ceiling and the four walls of a room."""
+                seed: int = 1, skip: tuple = (), bare: tuple = ("near",)) -> None:
+    """Floor, ceiling and the four walls of a room. `skip`: walls not built here (the caller builds them: window walls); `bare`: walls that
+    belong to a corridor (a finish layer only, no structure of their own)."""
     L, D, H = spec["L"], spec["D"], spec["h"]
     doors = doors if doors is not None else spec["doors"]
     fb, fine, em = b.body, b.fine, b.emit
@@ -158,17 +160,21 @@ def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far
         fb.box((0.0, 0.0, -0.012), (L, D, 0.0), st.floor)
         step = 4.0
         for k in range(1, int(L // step) + 1):
-            if k * step < L:
+            if k * step < L and st.seams:
                 fine.box((k * step - 0.01, 0.0, 0.0), (k * step + 0.01, D, 0.003), st.trim)
     # ceiling: structure and finish
     fb.box((0.0, 0.0, H), (L, D, H + 0.30), STRUCT)
     fb.box((WS + WF, FIN + WF, H - 0.05), (L - WS - WF, D - WS - WF, H), st.ceil)
     # walls
     for name in ("left", "right", "far", "near"):
+        if name in skip:
+            continue
         d_list = doors
         if name == "far" and not far_door:
             d_list = [d for d in doors if d["wall"] != "far"]
-        wall_finish(b, name, L, D, H, st, d_list, structure=(name != "near"))
+        wall_finish(b, name, L, D, H, st, d_list, structure=(name not in bare))
+    if not st.cove_on:
+        return
     # a cove of light along the perimeter, facing up: the ceiling gets its bounce (and the room its glow) from it
     cell = st.cove or st.accent
     z = H - 0.20
@@ -234,3 +240,38 @@ def ceiling_panels(b: SParts, L: float, D: float, H: float, nx: int, ny: int, ce
             cx = margin + (i + 0.5) * (L - 2 * margin) / nx
             cy = margin + (j + 0.5) * (D - 2 * margin) / ny
             F.ceiling_light_panel(b, cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2, H - 0.05, cell, mat)
+
+
+def window_wall(b: SParts, wall: str, L: float, D: float, H: float, st: Style, bays: int, pier: float = 0.45, sill: float = 0.55, head: float = 3.15,
+                doors: list | None = None, glass: bool = True) -> list[tuple[float, float]]:
+    """A wall of tall windows: `wall` is 'far' (y = D) or 'right' (x = L). The structure keeps piers between `bays` openings (sill .. head), a
+    finish layer, brushed reveals, one mullion per bay and a glass pane; returns the (s0, s1) span of every bay along the wall (its own s axis,
+    the same as wall_finish: 'far' along +x, 'right' along -y)."""
+    sl = wall_len(wall, L, D)
+    M = wall_matrix(wall, L, D)
+    s_lo, s_hi = (WS if wall == "far" else WS), sl - WS
+    w = ((s_hi - s_lo) - (bays + 1) * pier) / bays
+    spans = []
+    fb, fine = b.body, b.fine
+    with b.at(M):
+        fb.box((0.0, 0.0, 0.0), (sl, WS, sill), STRUCT)
+        fb.box((0.0, 0.0, head), (sl, WS, H), STRUCT)
+        fb.box((0.0, -WF, 0.0), (sl, 0.0, sill), st.wall_lo)
+        fb.box((0.0, -WF, head), (sl, 0.0, H), st.wall_hi)
+        fb.box((0.0, -WF - 0.05, sill - 0.04), (sl, 0.0, sill + 0.02), st.trim)                       # the sill: a brushed ledge
+        x = s_lo
+        for k in range(bays + 1):
+            fb.box((x, 0.0, sill), (x + pier, WS, head), STRUCT)
+            fb.box((x, -WF, sill), (x + pier, 0.0, head), st.wall_hi)
+            x += pier
+            if k < bays:
+                spans.append((x, x + w))
+                fine.box((x - 0.03, -WF - 0.03, sill), (x, WS, head), TRIM)                          # reveals
+                fine.box((x + w, -WF - 0.03, sill), (x + w + 0.03, WS, head), TRIM)
+                fine.box((x, -WF - 0.03, head - 0.03), (x + w, WS, head), TRIM)
+                if glass:
+                    fine.box((x, WS / 2 - 0.006, sill + 0.02), (x + w, WS / 2 + 0.006, head - 0.03), GLASS)
+                    fine.box((x + w / 2 - 0.025, WS / 2 - 0.02, sill + 0.02), (x + w / 2 + 0.025, WS / 2 + 0.02, head - 0.03), TRIM)      # mullion
+                x += w
+        fb.box((0.0, -WF - 0.06, H - 0.06), (sl, 0.0, H), st.trim)                                     # cornice
+    return spans

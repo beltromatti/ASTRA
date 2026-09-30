@@ -24,7 +24,7 @@ STRUCT_T = 0.3                 # floor structure below / ceiling structure above
 ROOM_WALL = 0.25               # the wall of a room prefab on its own side (finish + structure)
 DOOR_W, DOOR_H = 1.6, 2.4      # the standard pressure door (AAstraDoor: width 160, height 240)
 GATE_W, GATE_H = 3.2, 3.0      # a wide portal into a big space (two door leaves)
-BLAST_W, BLAST_H = 2.4, 2.5    # the section blast door
+BLAST_W, BLAST_H = 2.0, 2.5    # the section blast door (2.0 wide: its two leaves slide into the frame's pillars and stay inside the 4 m slot)
 HATCH_W, HATCH_H = 1.0, 2.0    # a cabin door
 
 # palette cells of the corridor accents (tone -> (ribs/guide, ceiling strip))

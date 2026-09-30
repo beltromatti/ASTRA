@@ -215,7 +215,7 @@ def store_room(key: str, name: str, cold: bool = False):
         place(b, px, yf - 1.6, 90, F.pallet, 1.2, 0.8)
         for j in range(rng.randint(2, 4)):
             place(b, px + rng.uniform(-0.15, 0.15), yf - 1.6 + rng.uniform(-0.2, 0.2), 90 + rng.uniform(-8, 8), F.crate, 0.55, 0.4, 0.4, rng.choice(mats),
-                  None, z=0.145 + j * 0.4)
+                  None, True, z=0.145 + j * 0.4)
     luminaire_strips(b, L, D, H, [5.0, 12.0], "ice" if cold else "white_cool", 2.0, L - 2.0, LAMP_HOT)
     if cold:
         for y in (6.0, 12.0):
@@ -225,6 +225,11 @@ def store_room(key: str, name: str, cold: bool = False):
 
 def store_dry(name: str = "SM_SHIP_StoreDry"):
     return store_room("store_dry", name, False)
+
+
+def store_dry_d10(name: str = "SM_SHIP_StoreDryD10"):
+    """The dry stores with the door at x 10 (where the layout needs it): same room, the storekeeper's corner and the racks follow the door."""
+    return store_room("store_dry_d10", name, False)
 
 
 def store_cold(name: str = "SM_SHIP_StoreCold"):
@@ -255,13 +260,13 @@ def hold(name: str = "SM_SHIP_Hold"):
         for j in range(2):
             place(b, x, 3.4 + 2.8 + j * 5.8, 0, iso_box, 5.6, 2.4, 2.4, rng.choice(CRATES))
         if i == 0:
-            place(b, x, 3.4 + 2.8, 0, iso_box, 5.6, 2.4, 2.4, CRATE_OLIVE, z=2.4)
+            place(b, x, 3.4 + 2.8, 0, iso_box, 5.6, 2.4, 0.9, CRATE_OLIVE, z=2.4)
     for j in range(3):
         for i in range(3):
             px, py = 11.0 + i * 1.4, 4.0 + j * 3.5
             place(b, px, py, 0, F.pallet, 1.2, 0.8)
             for k in range(rng.randint(2, 4)):
-                place(b, px, py, rng.uniform(-6, 6), F.crate, 0.6, 0.45, 0.4, rng.choice(CRATES), None, z=0.145 + k * 0.4)
+                place(b, px, py, rng.uniform(-6, 6), F.crate, 0.6, 0.45, 0.4, rng.choice(CRATES), None, True, z=0.145 + k * 0.4)
     for j in range(3):
         place(b, 20.5, 3.0 + j * 2.6, 0, F.barrel, 0.28, 0.85, rng.choice([CRATE_BLUE, CRATE_ORANGE, CRATE_OLIVE]))
         place(b, 21.3, 3.0 + j * 2.6, 0, F.barrel, 0.28, 0.85, rng.choice([CRATE_BLUE, CRATE_ORANGE, CRATE_OLIVE]))

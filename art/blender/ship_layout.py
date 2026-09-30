@@ -500,10 +500,10 @@ class Deck:
         z = self.z0 + 2.98
         folder = f"Interior/Deck{self.deck:02d}/Signs"
         if aft:                                                                    # seen when walking aft: on the frame's forward face
-            self.B.place(self.deck, f"SM_SHIP_Sign_{self.deck}{aft}", (bx + 0.03, ps.pos, z), 180.0, folder,
+            self.B.place(self.deck, f"SM_SHIP_Sign_{self.deck}{aft}", (bx + 0.045, ps.pos, z), 180.0, folder,
                          f"{self.tag}_sign_{ps.pid.lower()}_{aft}_fwdface", "sign")
         if fwd:                                                                    # seen when walking forward: on the aft face
-            self.B.place(self.deck, f"SM_SHIP_Sign_{self.deck}{fwd}", (bx - 0.6 - 0.10 - 0.07, ps.pos, z), 0.0, folder,
+            self.B.place(self.deck, f"SM_SHIP_Sign_{self.deck}{fwd}", (bx - 0.673, ps.pos, z), 0.0, folder,
                          f"{self.tag}_sign_{ps.pid.lower()}_{fwd}_aftface", "sign")
 
     # ------------------------------------------------------------------------------------------------------------- doors

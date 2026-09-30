@@ -172,6 +172,9 @@ def make_preview_materials() -> None:
     """Every material of the scene by slot name: the bridge v3's (MI_ASTRA_*, MI_BRG3_*) and the ship's MI_SHIP_*."""
     _fix_palette_path()
     PV.make_materials({})
+    for im in bpy.data.images:                       # the palette keeps the alert weight in its alpha: the preview must not premultiply the colour by it
+        if "Lamps" in im.name:
+            im.alpha_mode = "CHANNEL_PACKED"
     pbr = PV.pbr
     pbr(LAMINATE, (0.42, 0.46, 0.50), "PanelPaint", 1.0, (0.28, 0.42), 0.0, 0.0, 0.25, 0.3)
     pbr(STEEL, (0.62, 0.64, 0.66), "Brushed", 1.0, (0.20, 0.36), 0.0, 1.0, 0.5, 0.6)

@@ -78,12 +78,31 @@ def look_camera(name: str, eye, target, fov: float = 80.0):
     return PV.add_camera(name, eye, yaw, pitch, fov)
 
 
-def spec_lights(spec: dict, origin=(0.0, 0.0, 0.0), yaw: float = 0.0, gain: float = 1.0, shadows: bool = False) -> list:
-    """The zone lights of a prefab spec (ship_spec) as Blender area lights at the prefab's placement (layout coordinates)."""
+def spec_lights(spec: dict, origin=(0.0, 0.0, 0.0), yaw: float = 0.0, gain: float = 1.0, shadows: bool = False, bounce: float = 0.9) -> list:
+    """The zone lights of a prefab spec (ship_spec) as Blender area lights at the prefab's placement (layout coordinates).
+    `bounce` adds one big dim area light under the ceiling facing up: the room's ceiling and upper walls get the bounce that Lumen gives
+    them in the game (Eevee's screen-space GI does not reach them in a sealed room). Preview only."""
     import ship_plan as P
     out = []
     kelvin = None
     import bridge3_layout as LAY
+    if bounce > 0.0:
+        L_, D_, H_ = spec["L"], spec["D"], spec["h"]
+        c = P.place_local(origin, yaw, L_ / 2, D_ / 2, H_ - 0.30)
+        sx, sy = (L_ * 0.9, D_ * 0.9)
+        if (yaw % 180.0) != 0.0:
+            sx, sy = sy, sx
+        ld = bpy.data.lights.new("bounce", "AREA")
+        ld.shape = "RECTANGLE"
+        ld.size, ld.size_y = sx, sy
+        ld.energy = bounce * L_ * D_ * 1.0
+        ld.color = (1.0, 0.96, 0.9)
+        ld.use_shadow = False
+        o = bpy.data.objects.new("bounce", ld)
+        bpy.context.scene.collection.objects.link(o)
+        o.location = (c[0], -c[1], c[2])
+        o.rotation_euler = (math.pi, 0.0, 0.0)               # facing up
+        out.append(o)
     for l in spec.get("lights", []):
         w = P.place_local(origin, yaw, l["pos"][0], l["pos"][1], l["pos"][2])
         col = LAY.kelvin_to_rgb(l.get("temperature", 4500))
