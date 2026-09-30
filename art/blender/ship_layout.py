@@ -527,7 +527,10 @@ class Deck:
                     y = ps.pos + d["side"] * (HW - 0.06)
                     z = self.z0 + (2.72 if d["kind"] == "door" else 3.05)
                     yaw = -90.0 if d["side"] > 0 else 90.0
-                    B.place(self.deck, f"SM_SHIP_Plate_{r['spec']['plate']}", (d["xw"], y, z), yaw, f"Interior/Deck{self.deck:02d}/Plates",
+                    plate = r["spec"]["plate"]
+                    if plate == "stairs":                                   # the plate says where the flights go from this deck
+                        plate = f"stairs_{self.deck}"
+                    B.place(self.deck, f"SM_SHIP_Plate_{plate}", (d["xw"], y, z), yaw, f"Interior/Deck{self.deck:02d}/Plates",
                             f"{self.tag}_plate_{r['cid'][len(self.tag) + 1:]}", "plate")
                 nid = f"{r['cid']}.in{k}"                                 # a node just inside the room, behind the door
                 B.node(nid, self.deck, d["xw"], d["y_wall"] + d["side"] * 1.2, self.z0, "door_in", r["cid"])

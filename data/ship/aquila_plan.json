@@ -83913,7 +83913,7 @@
     "cls": "plate"
    },
    {
-    "mesh": "SM_SHIP_Plate_stairs",
+    "mesh": "SM_SHIP_Plate_stairs_4",
     "pos": [46.0, 1.49, -43.28],
     "yaw": -90.0,
     "folder": "Interior/Deck04/Plates",
@@ -84041,7 +84041,7 @@
     "cls": "plate"
    },
    {
-    "mesh": "SM_SHIP_Plate_stairs",
+    "mesh": "SM_SHIP_Plate_stairs_4",
     "pos": [-86.0, -1.49, -43.28],
     "yaw": 90.0,
     "folder": "Interior/Deck04/Plates",
@@ -84337,7 +84337,7 @@
     "cls": "plate"
    },
    {
-    "mesh": "SM_SHIP_Plate_stairs",
+    "mesh": "SM_SHIP_Plate_stairs_4",
     "pos": [-298.0, 1.49, -43.28],
     "yaw": -90.0,
     "folder": "Interior/Deck04/Plates",
@@ -84401,7 +84401,7 @@
     "cls": "plate"
    },
    {
-    "mesh": "SM_SHIP_Plate_stairs",
+    "mesh": "SM_SHIP_Plate_stairs_4",
     "pos": [-450.0, 1.49, -43.28],
     "yaw": -90.0,
     "folder": "Interior/Deck04/Plates",

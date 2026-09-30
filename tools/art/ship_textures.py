@@ -52,13 +52,17 @@ ROOMS = {
     "workshop": ("WORKSHOP", "MACHINE SHOP", "engineering"), "armory": ("ARMORY", "SECURITY · AUTHORIZED ONLY", "security"),
     "cabins": ("CREW CABINS", "QUIET", "services"), "dc": ("DAMAGE CONTROL", "REPAIR LOCKER", "engineering"),
     "machinery": ("MACHINERY SPACE", "AUTHORIZED PERSONNEL", "engineering"), "lift": ("LIFT", "DECKS 1 · 3 · 4 · 6 · 7 · 9", "command"),
-    "stairs": ("STAIRS", "UP DECK 3 · DOWN DECK 5", "neutral"), "shuttle": ("SPINE SHUTTLE", "DECK 5 PLATFORM", "command"),
+    "stairs": ("STAIRS", "UP · DOWN", "neutral"), "shuttle": ("SPINE SHUTTLE", "DECK 5 PLATFORM", "command"),
     "bow_obs": ("BOW OBSERVATION", "FORWARD VIEW", "command"), "restricted": ("RESTRICTED", "AUTHORIZED PERSONNEL ONLY", "security"),
     "deck5": ("DECK 5", "SECTION B · RESTRICTED", "science"), "deck3": ("DECK 3", "SECTION B · RESTRICTED", "services"),
     "berthing": ("CREW BERTHING", "RED WATCH · QUIET", "services"), "mess_lobby": ("MESS HALL", "MAIN ENTRANCE", "services"),
     "directory": ("SHIP DIRECTORY", "DECKS 1-12 · SECTIONS A-H", "command"), "dumbwaiter": ("DUMBWAITER", "GALLEY · MESS", "services"),
     "ready": ("READY ROOM", "", "command"), "trunk": ("ESCAPE TRUNK", "DECK 3 / DECK 5", "neutral"),
+    "medbay": ("MEDBAY", "MEDICAL · AUTHORIZED", "medical"), "surgery": ("SURGERY", "STERILE AREA", "medical"),
+    "quarantine": ("QUARANTINE", "ISOLATION WARD", "medical"), "pharmacy": ("PHARMACY", "CONTROLLED SUBSTANCES", "medical"),
 }
+for _d in range(2, 13):                 # the plate over a stair tower's door says where the flights go from this deck
+    ROOMS[f"stairs_{_d}"] = ("STAIRS", f"UP DECK {_d - 1} · DOWN DECK {_d + 1}" if _d < 12 else "UP DECK 11", "neutral")
 
 CODES_DECK = 4                 # the small codes ("4C-07") are drawn for this deck only
 CODES_PER_SECTION = 12
