@@ -2975,24 +2975,30 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 {
 	FlickerTime = 0.6f;
 	FString Where;
-	if (HullDamage > 8.f && BridgeFX)
+	const double HitAt = GetWorld()->GetTimeSeconds();
+	// the shock runs through the frame: a fixture or a console on the bridge shorts out. A breaker that has just tripped holds
+	// for a while: at most one every 8 s, a heavy blow after 2 s (with the war's physical damage the hits come many a minute)
+	if (HullDamage > 8.f && BridgeFX && HitAt - LastBridgeBurst > (HullDamage > 35.f ? 2.0 : 8.0))
 	{
-		// the shock runs through the frame: a fixture or a console on the bridge shorts out
 		const float Strength = FMath::Clamp(HullDamage / 60.f, 0.2f, 1.f);
 		if (FMath::FRand() < 0.35f + 0.5f * Strength)
 		{
 			BridgeFX->RandomBurst(Strength);
+			LastBridgeBurst = HitAt;
 		}
 		if (HullDamage > 35.f)
 		{
 			BridgeFX->RandomBurst(Strength * 0.7f);
+			LastBridgeBurst = HitAt;
 		}
 	}
 	if (HullDamage > 5.f)
 	{
 		RadiatorHit();
 	}
-	if (HullDamage > 8.f)
+	// a blow that gets through does harm inside in proportion to its force: a graze may only buckle plating (the hull's own
+	// damage), a heavy hit almost always starts something (until DISTRUZIONE puts it where the hit really landed)
+	if (HullDamage > 8.f && FMath::FRand() < FMath::Clamp(HullDamage / 45.f, 0.2f, 1.f))
 	{
 		// where did it land? a compartment (decks 1-12, sections A-H) and what it does there
 		FAstraDamage D;

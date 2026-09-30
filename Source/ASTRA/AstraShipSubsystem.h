@@ -342,6 +342,7 @@ private:
 	bool bBattleShort = false;        // the reactor's safety limits overridden: more power, more heat, a risk to the core
 	float HullPct = 100.f;
 	double LastHitReport = -100.0;
+	double LastBridgeBurst = -100.0;   // the last console or fixture that shorted out on the bridge (game time)
 	float FlickerTime = 0.f;
 	float RailDraw = 0.f;              // 1 at a railgun volley, fading: the lights sag
 	FString HullNumber = TEXT("CVC-01");
