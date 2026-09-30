@@ -796,7 +796,10 @@ def decisions_lines(stt, live, tts, floor, mem, other) -> list[str]:  # noqa: AN
                  "voci sostituite dove una è poco comprensibile in una lingua (una sostituta per un solo ufficiale).")
     if floor:
         D.append("8. **Palco del parlato**: il Capitano prende la parola al tasto (chi parla si ferma alla pausa entro mezzo secondo), la sua risposta passa prima di tutto, "
-                 "le altre righe sono dette, unite, accorciate o scartate secondo regole chiare e mai in silenzio.")
+                 "le altre righe sono dette, unite, accorciate o scartate secondo regole chiare e mai in silenzio. Dal test dal vivo del capo (risposte suonate 30-45 s dopo, dietro rapporti "
+                 "vecchi e un messaggio del nemico di 20 s): la risposta a un ordine passa prima di ogni rapporto e di ogni voce da fuori; un ordine scritto ferma chi parla ma non una risposta "
+                 "già in corso (il tasto sì); una notizia vecchia non si dice in ritardo (18 s dalla notizia, un turno di evento non si fa se anche l'ultima notizia ha più di 12 s); un messaggio "
+                 "lungo interrotto riprende dalla frase tagliata, ridotto a prima e ultima frase se il resto supera 10 s; un avviso di pericolo non aspetta un ponte silenzioso.")
     D.append("")
     return D
 
@@ -986,7 +989,8 @@ def report(args) -> None:  # noqa: ANN001
                            ("key_down_to_cancel_ms", "dal tasto premuto al `cancel` di chi parlava (ms)"),
                            ("cancel_fade_ms", "dissolvenza chiesta al gioco (ms)"),
                            ("over_key_up_to_first_word_ms", "dopo aver interrotto un ufficiale: dal rilascio alla prima parola (ms)"),
-                           ("typed_to_first_word_ms", "ordine scritto: dall'invio alla prima parola (ms)"),
+                           ("typed_to_first_word_ms", "ordine scritto su un ponte silenzioso: dall'invio alla prima parola (ms)"),
+                           ("typed_over_an_answer_second_begins_after_first_ends_ms", "secondo ordine scritto mentre la prima risposta suona: la seconda comincia dopo la fine della prima (ms)"),
                            ("load_avg", "carico medio della macchina")):
             L.append(f"| {label} | " + " | ".join(str(e2e[k].get(key, "—")) for k in sorted(e2e)) + " |")
         L.append("| ritardo del ciclo degli eventi mentre la mente ascolta, pensa e parla: mediana / p99 / massimo (ms), tick oltre 50 ms | " +
@@ -1007,6 +1011,8 @@ def report(args) -> None:  # noqa: ANN001
           "- **La macchina era occupata** (editor di Unreal e altri agenti): i tempi sono quelli di un Mac già carico; il carico medio è accanto a ogni misura.",
           "- **Microfono finto**: la cattura e il pre-roll sono provati contro un dispositivo finto che consegna blocchi da 20 ms in tempo reale; il microfono vero, le cuffie Bluetooth e il "
           "permesso di sistema non si sono potuti provare qui.",
+          "- **I rifacimenti del test dal vivo (`r1`…`r4`) usano un modello di linguaggio e voci finti**: provano l'ordine e i tempi che decide la mente (priorità, tagli, notizie vecchie, "
+          "riprese), non la qualità di ciò che l'equipaggio scrive; il test dal vivo vero, con il gioco e le voci vere, resta da rifare dopo l'unione.",
           "- **Il gioco non c'è**: la colla della mente è provata con un gioco finto; come il gioco riproduce l'audio (coda procedurale, attenuazione, musica) è nella diagnosi di "
           "`docs/protocollo_voce.md` e va verificato col gioco vero dopo le correzioni C++.", ""]
     out.write_text("\n".join(italian_numbers("\n".join(L).split("\n"))) + "\n", encoding="utf-8")

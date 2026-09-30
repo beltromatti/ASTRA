@@ -221,13 +221,30 @@ async def main() -> int:
     floor = [(round((t - t_down) * 1000), m.get("state")) for t, m in ws.since(t_down, "floor")]
     out["floor_after_key_down"] = floor
 
-    # ---------------------------------------------------------------- 3. a typed order
+    # ---------------------------------------------------------------- 3. a typed order (on a quiet bridge: the answer to the last order has finished)
+    while mind.voice.busy_s() > 0.05 or mind.voice.held:
+        await asyncio.sleep(0.1)
+    await asyncio.sleep(1.0)
     t_typed = ws.push({"type": "player_text", "text": text.split(",")[0] + ", avanti tutta.", "lang": lang})
     ans3 = await ws.wait_for(t_typed, "audio_begin", timeout=10.0)
     if ans3 is None:
         bad.append("no answer to a typed order")
     else:
         out["typed_to_first_word_ms"] = round((ans3[0] - t_typed) * 1000)
+
+    # ---------------------------------------------------------------- 4. a second typed order while the answer to the first is being said
+    await asyncio.sleep(0.4)
+    t_second = ws.push({"type": "player_text", "text": text.split(",")[0] + ", a tutta forza.", "lang": lang})
+    ans4 = await ws.wait_for(t_second, "audio_begin", timeout=15.0)
+    end3 = await ws.wait_for(t_typed, "audio_end", lambda m: m.get("line") == (ans3[1].get("line") if ans3 else -1), timeout=10.0)
+    if ans4 is None or end3 is None or ans3 is None:
+        bad.append("no answer to a second typed order, or the first answer never ended")
+    else:
+        out["typed_over_an_answer_second_begins_after_first_ends_ms"] = round((ans4[0] - end3[0]) * 1000)
+        if end3[1].get("reason") != "done":
+            bad.append("the answer to the first typed order was cut by the second (a typed order talks over nobody)")
+        if ans4[0] < end3[0]:
+            bad.append("the second answer began before the first had ended")
 
     await asyncio.sleep(2.0)
     if lags:
