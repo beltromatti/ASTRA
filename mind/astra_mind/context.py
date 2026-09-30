@@ -143,7 +143,7 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
         if ch and (ch.get("party") or ch.get("open")):
             party = str(ch.get("party") or "")
             channel = Channel(party=party, name=(names or {}).get(party, party), kind=str(ch.get("kind") or _kind(party, state)),
-                              open=bool(ch.get("open", True)), muted=bool(ch.get("muted", False)),
+                              open=bool(ch.get("open", True)), muted=bool(ch.get("muted", False)) or _comms_muted(state),
                               heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party),
                               screen=bool(ch.get("screen", False)) or _on_screen(state, party))
         slug = str(raw.get("place") or "bridge")
@@ -156,10 +156,18 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
     channel = None
     if enemy is not None and getattr(enemy, "open", False):
         party = str(getattr(enemy, "contact", "") or "")
-        channel = Channel(party=party, name=(names or {}).get(party, party), kind="enemy", open=True, muted=False,
+        channel = Channel(party=party, name=(names or {}).get(party, party), kind="enemy", open=True, muted=_comms_muted(state),
                           heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), screen=_on_screen(state, party))
     return Context(place=place, in_earshot=earshot_from_state(place, state), facing=None, channel=channel,
                    pawn="falcon" if place == "falcon" else "seated", source="inferred", asleep=asleep)
+
+
+def _comms_muted(state: dict[str, Any] | None) -> bool:
+    """Comms' channel mode is `mute`: the Captain's voice must not go out (the game keeps the mode; the mind is who enforces it —
+    the game's own `context.channel.muted` is always false today)."""
+    ch = (((state or {}).get("stations") or {}).get("comms") or {}).get("modes", {})
+    ch = ch.get("channel") if isinstance(ch, dict) else None
+    return isinstance(ch, dict) and str(ch.get("mode", "")).lower() == "mute"
 
 
 def _on_screen(state: dict[str, Any] | None, party: str) -> bool:

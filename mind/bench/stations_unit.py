@@ -11,8 +11,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import pathlib
+import tempfile
 import time
 import unittest
+import unittest.mock
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -774,6 +777,26 @@ class WireTest(unittest.IsolatedAsyncioTestCase):
         lane = S.lanes_of(st)["course"]
         self.assertEqual((lane["mode"], lane["params"]), ("warp_jump", {"x": 1}))
         self.assertIn("warp_jump", S.board({"stations": {"helm": st}}))
+
+    def test_the_call_that_reaches_the_spend_cap_is_still_recorded(self) -> None:
+        led = models.Ledger()
+        led.write_file, led.cap = False, 0.0
+        led.prior = lambda: 0.0                                                   # type: ignore[method-assign]
+        comp = Completion(model="m", provider="p", cost=0.002)
+        led.write_file = True
+        with unittest.mock.patch.object(models, "CACHE", pathlib.Path(tempfile.mkdtemp())):
+            with self.assertRaises(models.SpendCapReached):
+                led.add("router", "m", comp)
+            self.assertEqual((led.calls, round(led.total, 4)), (1, 0.002))                  # billed: written down, then stopped
+
+    def test_comms_mute_mode_makes_the_channel_muted_for_the_router(self) -> None:
+        from astra_mind.context import parse
+        raw = {"place": "bridge", "channel": {"party": "T-23", "open": True, "muted": False}}      # (the game's own flag is always false)
+        state = {"stations": {"comms": {"modes": {"channel": {"mode": "mute"}}}}}
+        self.assertTrue(parse(raw, state).channel.muted)
+        state["stations"]["comms"]["modes"]["channel"]["mode"] = "unmute"
+        self.assertFalse(parse(raw, state).channel.muted)
+        self.assertFalse(parse(raw, {}).channel.muted)
 
     async def test_the_local_ship_speaks_the_games_language(self) -> None:
         ship = LocalShip(fight=True)

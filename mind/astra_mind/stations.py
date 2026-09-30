@@ -22,7 +22,7 @@ from typing import Any, Iterable
 
 # ------------------------------------------------------------------------------------------------ parameter kinds
 NUM, INT, STR, BOOL, STRS, ZOOM = "number", "integer", "string", "boolean", "strings", "zoom"
-ZOOM_WORDS = ("close", "wide", "max")             # (a zoom is a magnification, or one of these words: the game knows what they mean)
+ZOOM_WORDS = ("close", "wide", "max")             # (a zoom is a factor on the natural framing, 0.25-8, or a word: close = 2, max = 4, wide = 0.4)
 
 UNTIL_WORDS = ("done", "target_lost", "order")           # and "time:<seconds>"
 DELEGATIONS = ("manual", "advise", "auto")
@@ -162,10 +162,11 @@ def _build() -> dict[str, Station]:
         m("ops", "viewscreen", "viewscreen_auto", "the director picks the subject: the fight, the threat, the strongest event", (), "order",
           native="auto"),
         m("ops", "viewscreen", "viewscreen_forward", "the forward optical view",
-          (P("zoom", ZOOM, "a magnification 1-49, or close | wide | max", lo=1, hi=100),), "order", native="forward"),
+          (P("zoom", ZOOM, "close | max | wide, or a factor 0.25-8 on the natural framing (2 = twice as tight)", lo=0.25, hi=8),),
+          "order", native="forward"),
         m("ops", "viewscreen", "viewscreen_target", "the camera on a contact, with the zoom; released when it is lost",
-          (_target(), P("zoom", ZOOM, "a magnification 1-49, or close | wide | max (default: fits the range)", lo=1, hi=100)),
-          "target_lost", native="target"),
+          (_target(), P("zoom", ZOOM, "close | max | wide, or a factor 0.25-8 on the natural framing (default 1: the subject fills the frame)",
+                        lo=0.25, hi=8)), "target_lost", native="target"),
         m("ops", "viewscreen", "viewscreen_tactical", "the tactical plot on the main screen", (), "order", native="tactical"),
         m("ops", "viewscreen", "viewscreen_fleet", "the fleet: friendly ships and their status", (), "order", native="fleet"),
         m("ops", "viewscreen", "viewscreen_comms", "the open channel's party on screen",
@@ -274,7 +275,7 @@ def _param_text(p: P) -> str:
     """One parameter as the officer reads it: name, ? if optional, the choices or the default."""
     txt = p.name + ("" if p.required else "?")
     if p.kind == ZOOM:
-        return txt + "=1-49|close|wide|max"
+        return txt + "=close|max|wide|0.25-8"
     if p.enum is not None:
         txt += "=" + "|".join(p.enum)
     elif p.default is not None:
@@ -394,7 +395,7 @@ def normalize(args: dict[str, Any], available: dict[str, Iterable[str] | None] |
             x = _num(str(v).lower().lstrip("x")) if isinstance(v, str) else _num(v)
             if x is None:
                 return None, f"'zoom' must be a number or one of {', '.join(ZOOM_WORDS)}, got {v!r}"
-            out[p.name] = round(min(max(x, p.lo or 1), p.hi or 100), 2)
+            out[p.name] = round(min(max(x, p.lo if p.lo is not None else 1), p.hi if p.hi is not None else 8), 2)
             continue
         if p.kind in (NUM, INT):
             x = _num(v)

@@ -230,6 +230,26 @@ async def sc_bow_on_it(llm: OpenRouter, lang: str) -> Result:
     return sc.res
 
 
+async def sc_speed(llm: OpenRouter, lang: str) -> Result:
+    sc = Scenario("all stop and half speed: the helm's course with a speed, the heading stays", lang)
+    h = Harness(llm, lang)
+    h.ship.state["throttle_pct"] = 60
+    heading0 = round(h.ship.heading)
+    for text, want in (({"it": "ferma la nave", "en": "all stop"}[lang], 0), ({"it": "mezza velocità", "en": "half speed"}[lang], 50)):
+        turn = await h.captain(text)
+        calls = h.modes("helm", "course")
+        last = calls[-1] if calls else None
+        sc.must(f"{text!r} -> helm course with speed_pct {want}", bool(last) and abs(float(last["params"].get("speed_pct", -99)) - want) <= 5,
+                f"{h.ship.log[-2:]}")
+        sc.must("the heading is not touched", not last or "heading_deg" not in last["params"] or abs(last["params"]["heading_deg"] - heading0) < 1,
+                f"{last}")
+        sc.spoke_well(h)
+        sc.res.transcript.append(transcript(h, text, turn, h.lines))
+    sc.res.cost = h.cost
+    sc.res.turns += h.turns
+    return sc.res
+
+
 async def sc_viewscreen(llm: OpenRouter, lang: str) -> Result:
     sc = Scenario("on the screen = Ops' viewscreen, with zoom", lang)
     h = Harness(llm, lang)
@@ -593,7 +613,7 @@ async def sc_routing(llm: OpenRouter, lang: str) -> Result:
 
 
 SCENARIOS: list[Callable[[OpenRouter, str], Any]] = [
-    sc_engage_until_it_falls, sc_one_volley, sc_fire_at_will, sc_follow_until_ordered, sc_bow_on_it, sc_viewscreen, sc_datapad,
+    sc_engage_until_it_falls, sc_one_volley, sc_fire_at_will, sc_follow_until_ordered, sc_bow_on_it, sc_speed, sc_viewscreen, sc_datapad,
     sc_delegation, sc_other_consoles, sc_coordination, sc_questions, sc_out_of_reach, sc_legacy_build, sc_standing_order,
     sc_initiative_after_a_kill, sc_initiative_new_contact, sc_delegation_advise, sc_advise_then_go, sc_correction, sc_report_on_request,
     sc_typed_noise, sc_mess_and_medbay, sc_routing,

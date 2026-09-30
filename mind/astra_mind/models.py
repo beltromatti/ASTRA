@@ -94,8 +94,14 @@ class Ledger:
             return 0.0
 
     def add(self, role_name: str, model: str, comp: Completion) -> None:
-        if self.cap is not None and self.write_file and self.prior() + comp.cost > self.cap:
+        """Record a call (it has been made and billed already: it is written down even when it is the one that reaches the cap,
+        and only then the bench is stopped)."""
+        over = self.cap is not None and self.write_file and self.prior() + comp.cost > self.cap
+        self._record(role_name, model, comp)
+        if over:
             raise SpendCapReached(f"the spend cap of {self.cap:.3f} $ is reached ({self.prior():.4f} $ in the log)")
+
+    def _record(self, role_name: str, model: str, comp: Completion) -> None:
         self.calls += 1
         self.total += comp.cost
         self.by_role[role_name] += comp.cost
