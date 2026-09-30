@@ -78,6 +78,15 @@ void AAstraHoloTable::BeginPlay()
 	GridMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_HoloGrid.M_ASTRA_HoloGrid"));
 	TextMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_HoloText.M_ASTRA_HoloText"));
 
+	PlotFrame = NewObject<USceneComponent>(this, TEXT("PlotFrame"));
+	PlotFrame->SetupAttachment(Root);
+	PlotFrame->RegisterComponent();
+	TextMID = TextMat ? UMaterialInstanceDynamic::Create(TextMat, this) : nullptr;
+	if (TextMID)
+	{
+		TextMID->SetScalarParameterValue(TEXT("Intensity"), 12.f * Brightness);
+	}
+
 	// the projector disc on the table top
 	Disc = NewObject<UStaticMeshComponent>(this, TEXT("HoloDisc"));
 	Disc->SetupAttachment(Root);
@@ -99,7 +108,7 @@ void AAstraHoloTable::BeginPlay()
 		UStaticMeshComponent* R = Pooled(Rings, i, RingMesh);
 		SetColor(R, ColAstra, i == 0 ? 20.f : 10.f);
 		UTextRenderComponent* T = PooledText(RingLabels, i);
-		T->SetWorldSize(3.4f);
+		T->SetWorldSize(4.2f);
 		T->SetTextRenderColor(FColor(120, 200, 255));
 	}
 }
@@ -109,7 +118,7 @@ UStaticMeshComponent* AAstraHoloTable::Pooled(TArray<TObjectPtr<UStaticMeshCompo
 	while (Pool.Num() <= Index)
 	{
 		UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
-		C->SetupAttachment(Root);
+		C->SetupAttachment(PlotFrame);
 		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		C->SetCastShadow(false);
 		C->SetMobility(EComponentMobility::Movable);
@@ -134,11 +143,11 @@ UTextRenderComponent* AAstraHoloTable::PooledText(TArray<TObjectPtr<UTextRenderC
 	while (Pool.Num() <= Index)
 	{
 		UTextRenderComponent* T = NewObject<UTextRenderComponent>(this);
-		T->SetupAttachment(Root);
+		T->SetupAttachment(PlotFrame);
 		T->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		T->SetCastShadow(false);
 		T->RegisterComponent();
-		T->SetTextMaterial(TextMat);
+		T->SetTextMaterial(TextMID ? static_cast<UMaterialInterface*>(TextMID) : TextMat.Get());
 		T->SetHorizontalAlignment(EHTA_Center);
 		T->SetVerticalAlignment(EVRTA_TextBottom);
 		T->SetWorldSize(3.f);
@@ -164,12 +173,12 @@ void AAstraHoloTable::HideTextFrom(TArray<TObjectPtr<UTextRenderComponent>>& Poo
 	}
 }
 
-void AAstraHoloTable::SetColor(UStaticMeshComponent* C, const FLinearColor& Color, float Intensity)
+void AAstraHoloTable::SetColor(UStaticMeshComponent* C, const FLinearColor& Color, float Intensity) const
 {
 	if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0)))
 	{
 		M->SetVectorParameterValue(TEXT("Color"), Color);
-		M->SetScalarParameterValue(TEXT("Intensity"), Intensity);
+		M->SetScalarParameterValue(TEXT("Intensity"), Intensity * Brightness);
 	}
 }
 
@@ -193,8 +202,9 @@ FVector AAstraHoloTable::PlotPoint(const FVector& RelCm) const
 
 void AAstraHoloTable::FaceViewer(USceneComponent* C, const FVector& ViewerLocal) const
 {
+	// the text turns to face the viewer entirely (the plot may be tilted: the words stay square to the eye)
 	const FVector D = ViewerLocal - C->GetRelativeLocation();
-	C->SetRelativeRotation(FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X)), 0.f));
+	C->SetRelativeRotation(D.Rotation());
 }
 
 void AAstraHoloTable::Tick(float DeltaTime)
@@ -202,11 +212,27 @@ void AAstraHoloTable::Tick(float DeltaTime)
 	SCOPE_CYCLE_COUNTER(STAT_AstraHolo);
 	Super::Tick(DeltaTime);
 	Time += DeltaTime;
-	FVector ViewerLocal = FVector(-300.f, 0.f, 170.f);
+	FVector ViewerRoot = FVector(-430.f, 0.f, 100.f);   // (the Captain's chair)
 	if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
 	{
-		ViewerLocal = GetActorTransform().InverseTransformPosition(Cam->GetCameraLocation());
+		ViewerRoot = GetActorTransform().InverseTransformPosition(Cam->GetCameraLocation());
 	}
+	// the projector angles the plot towards whoever looks at it from afar, about the plot's centre: from the chair
+	// (4 m back, barely above the plane) it is seen face on instead of edge on; leaning over the table, it lies flat
+	const FVector Centre(0.f, 0.f, PlaneHeight);
+	const FVector ToViewer = ViewerRoot - Centre;
+	const float Horiz = FVector2D(ToViewer.X, ToViewer.Y).Size();
+	const float Elev = FMath::RadiansToDegrees(FMath::Atan2(ToViewer.Z, FMath::Max(Horiz, 1.f)));
+	const float WantTilt = FMath::Clamp(70.f - Elev, 0.f, MaxTilt) * FMath::Clamp((Horiz - PlotRadius - 50.f) / 200.f, 0.f, 1.f);
+	Tilt = FMath::FInterpTo(Tilt, WantTilt, DeltaTime, 2.f);
+	const float WantAz = FMath::RadiansToDegrees(FMath::Atan2(ToViewer.Y, ToViewer.X));
+	TiltAzimuth += FMath::Clamp(FMath::FindDeltaAngleDegrees(TiltAzimuth, WantAz), -90.f * DeltaTime, 90.f * DeltaTime);
+	const FVector Towards = FRotator(0.f, TiltAzimuth, 0.f).Vector();
+	const FQuat Q(FVector::CrossProduct(FVector::UpVector, Towards).GetSafeNormal(), FMath::DegreesToRadians(Tilt));
+	// tilted, the plot rises so that its near edge stays above the table top (a hologram does not sink into its table)
+	const float Lift = FMath::Max(0.f, PlotRadius * FMath::Sin(FMath::DegreesToRadians(Tilt)) + 5.f - PlaneHeight);
+	PlotFrame->SetRelativeLocationAndRotation(Centre - Q.RotateVector(Centre) + FVector(0.f, 0.f, Lift), Q);
+	const FVector ViewerLocal = PlotFrame->GetRelativeTransform().InverseTransformPosition(ViewerRoot);
 	// the plot the crew put up: the battle around the Aquila, or the sector at war (a quick cross-fade between them)
 	const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
 	const bool bSector = Ship && Ship->GetHoloMode() == TEXT("sector") && Ship->GetSector().Num() > 0;
@@ -233,12 +259,63 @@ void AAstraHoloTable::Tick(float DeltaTime)
 
 void AAstraHoloTable::HideTactical()
 {
-	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders, &Strobes})
+	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders, &Strobes, &Ticks, &Threats, &TargetLine})
 	{
 		HideFrom(*Pool, 0);
 	}
-	HideTextFrom(Labels, 0);
-	HideTextFrom(RingLabels, 0);
+	for (TArray<TObjectPtr<UTextRenderComponent>>* Pool : {&Labels, &RingLabels, &TickLabels, &TargetLabel})
+	{
+		HideTextFrom(*Pool, 0);
+	}
+}
+
+void AAstraHoloTable::PlaceLine(UStaticMeshComponent* L, const FVector& A, const FVector& B, float Thickness, const FLinearColor& Color, float Intensity)
+{
+	const FVector D = B - A;
+	L->SetRelativeLocationAndRotation(A, D.Rotation());
+	L->SetRelativeScale3D(FVector(FMath::Max(D.Size(), 0.1f) / 100.f, Thickness, Thickness));
+	SetColor(L, Color, Intensity);
+}
+
+void AAstraHoloTable::TickBearings(const UAstraBattleSubsystem* Battle, const FVector& ViewerLocal, float Fade)
+{
+	// the crew's bearings are true bearings (the system's frame: 000 along its x axis, clockwise seen from above); the
+	// plot keeps the bow forward, so the ring of bearings turns with the ship — a head-up radar with a true bearing ring
+	FVector North(1.f, 0.f, 0.f), East(0.f, 1.f, 0.f);
+	if (Battle)
+	{
+		const FVector O = Battle->WorldOf(Battle->PlayerPos());
+		North = (Battle->WorldOf(Battle->PlayerPos() + FVector(1000.0, 0.0, 0.0)) - O).GetSafeNormal2D();
+		East = (Battle->WorldOf(Battle->PlayerPos() + FVector(0.0, 1000.0, 0.0)) - O).GetSafeNormal2D();
+		if (North.IsNearlyZero() || East.IsNearlyZero())
+		{
+			North = FVector(1.f, 0.f, 0.f);   // the ship pointing straight up or down: no heading to show
+			East = FVector(0.f, 1.f, 0.f);
+		}
+	}
+	const float R = PlotRadius + 2.f;
+	const FVector C(0.f, 0.f, PlaneHeight);
+	int32 NT = 0;
+	for (int32 Deg = 0; Deg < 360; Deg += 10)
+	{
+		const float A = FMath::DegreesToRadians((float)Deg);
+		const FVector Dir = (North * FMath::Cos(A) + East * FMath::Sin(A)).GetSafeNormal();
+		const bool bMajor = Deg % 30 == 0;
+		const float Len = Deg % 90 == 0 ? 6.f : (bMajor ? 4.f : 2.f);
+		PlaceLine(Pooled(Ticks, NT++, LineMesh), C + Dir * R, C + Dir * (R + Len), bMajor ? 0.22f : 0.14f, ColAstra, (bMajor ? 14.f : 8.f) * Fade);
+		if (bMajor)
+		{
+			UTextRenderComponent* T = PooledText(TickLabels, Deg / 30);
+			T->SetRelativeLocation(C + Dir * (R + Len + 4.5f) + FVector(0.f, 0.f, -1.5f));
+			T->SetText(FText::FromString(FString::Printf(TEXT("%03d"), Deg)));
+			T->SetWorldSize(4.0f);
+			T->SetTextRenderColor(FColor(120, 200, 255, 255));
+			FaceViewer(T, ViewerLocal);
+		}
+	}
+	// the bow: a bright wedge on the rim straight ahead, where the view through the window looks
+	PlaceLine(Pooled(Ticks, NT++, LineMesh), C + FVector(R, 0.f, 0.f), C + FVector(R + 9.f, 0.f, 0.f), 0.5f, ColAquila, 40.f * Fade);
+	HideFrom(Ticks, NT);
 }
 
 void AAstraHoloTable::HideSector()
@@ -270,7 +347,7 @@ void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, fl
 	const FVector South = FRotator(0.f, SectorYaw, 0.f).Vector();
 	const FVector North = -South;
 	const FVector East = FVector::CrossProduct(FVector::UpVector, North);
-	const float Z = 9.f;   // just above the table top
+	const float Z = PlaneHeight - 6.f;   // floating like the tactical plot (and angled with it towards the viewer)
 	auto Where = [&](const FAstraSectorSystem& S)
 	{
 		const FVector2D D = S.Pos - Centre;
@@ -382,8 +459,11 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		FaceViewer(T, ViewerLocal);
 	}
 
+	TickBearings(Battle, ViewerLocal, Fade);
+
 	int32 NI = 0, NL = 0, ND = 0, NB = 0, NS = 0;
 	TArray<FVector4> PlacedLabels;
+	TMap<FString, FVector> PlotOf;   // contact id -> where it is on the plot (for the lines below)
 	// the viewer's picture plane (for label decluttering), seen from the player towards the table centre
 	const FVector ViewDir = (FVector(0, 0, PlaneHeight) - ViewerLocal).GetSafeNormal();
 	const FVector ViewRight = FVector::CrossProduct(FVector::UpVector, ViewDir).GetSafeNormal();
@@ -398,9 +478,13 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		if (B.Kind == 0)
 		{
 			const FLinearColor Col = BlipColor(B);
+			if (!B.Contact.IsEmpty() && !B.bBearingOnly)
+			{
+				PlotOf.Add(B.Contact, P);
+			}
 			// bright enough for a bridge in sunlight, big enough to read from the chair (the v3 table is 2.7 m across)
 			const float Base = (B.bPlayer ? 80.f : 60.f) * (bBeyond ? 0.45f : 1.f) * (B.bRetreating ? 0.6f : 1.f) * (B.bTargeted ? Pulse * 1.5f : 1.f);
-			const float Size = (B.bPlayer ? 18.f : 14.5f) * B.Size;
+			const float Size = (B.bPlayer ? 22.f : 18.f) * B.Size;
 			UStaticMeshComponent* Icon = Pooled(Icons, NI, B.bUnknown ? UnknownMesh.Get() : ShipMesh.Get());
 			Icon->SetRelativeLocationAndRotation(P, B.bUnknown ? FRotator(0.f, Time * 40.f, 0.f) : B.Rot.Rotator());
 			Icon->SetRelativeScale3D(FVector(Size / 100.f));
@@ -454,9 +538,9 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			if (B.bTargeted) { Sub += TEXT("  [TARGET]"); }
 			T->SetText(FText::FromString(Sub.IsEmpty() ? Title : Title + TEXT("<br>") + Sub));
 			T->SetTextRenderColor(Col.ToFColor(true));
-			T->SetWorldSize(B.bPlayer ? 5.0f : 4.4f);   // (WS below)
+			T->SetWorldSize(B.bPlayer ? 6.0f : 5.4f);   // (WS below)
 			// declutter in the viewer's picture plane: a label that would cover another climbs just above it
-			const float WS = B.bPlayer ? 5.0f : 4.4f;
+			const float WS = B.bPlayer ? 6.0f : 5.4f;
 			const float W = FMath::Max(Title.Len(), Sub.Len()) * WS * 0.52f;
 			const float H = (Sub.IsEmpty() ? 1.f : 2.f) * WS * 1.05f;
 			const FVector Anchor = P + FVector(0, 0, Size * 0.3f + 1.2f);
@@ -505,6 +589,55 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			SetColor(X, FLinearColor(1.f, 0.55f, 0.2f), 40.f * B.Fade);
 		}
 	}
+	// who is firing on us: a thin red line from each shooter the plot shows to the Aquila, flickering like tracer fire
+	const FVector Us(0.f, 0.f, PlaneHeight);
+	int32 NT = 0;
+	FString Target;
+	float TargetKm = 0.f;
+	if (Battle)
+	{
+		TArray<UAstraBattleSubsystem::FContactView> Cs;
+		Battle->GetContacts(Cs);
+		for (const UAstraBattleSubsystem::FContactView& C : Cs)
+		{
+			const FVector* At = C.bFiringAtUs ? PlotOf.Find(C.ContactId) : nullptr;
+			if (At)
+			{
+				const float Flick = 0.6f + 0.4f * FMath::Abs(FMath::Sin(Time * 9.f + NT * 1.7f));
+				PlaceLine(Pooled(Threats, NT++, LineMesh), *At, Us, 0.2f, ColHostile, 16.f * Flick * Fade);
+			}
+		}
+		const UAstraBattleSubsystem::FFireControl FC = Battle->GetFireControl();
+		Target = FC.Target;
+		TargetKm = FC.TargetRangeKm;
+	}
+	HideFrom(Threats, NT);
+	// our target under fire control: a line from the Aquila with its distance at the middle
+	const FVector* TargetAt = Target.IsEmpty() ? nullptr : PlotOf.Find(Target);
+	if (TargetAt)
+	{
+		UStaticMeshComponent* L = Pooled(TargetLine, 0, LineMesh);
+		PlaceLine(L, Us, *TargetAt, 0.3f, ColAquila, 22.f * Fade);
+		if (TargetKm > 0.f)
+		{
+			UTextRenderComponent* T = PooledText(TargetLabel, 0);
+			T->SetRelativeLocation((Us + *TargetAt) * 0.5f + FVector(0.f, 0.f, 1.5f));
+			T->SetText(FText::FromString(RangeText(TargetKm)));
+			T->SetWorldSize(4.4f);
+			T->SetTextRenderColor(ColAquila.ToFColor(true));
+			FaceViewer(T, ViewerLocal);
+		}
+		else
+		{
+			HideTextFrom(TargetLabel, 0);
+		}
+	}
+	else
+	{
+		HideFrom(TargetLine, 0);
+		HideTextFrom(TargetLabel, 0);
+	}
+
 	HideFrom(Icons, NI);
 	HideFrom(Stems, NI);
 	HideFrom(Vectors, NI);

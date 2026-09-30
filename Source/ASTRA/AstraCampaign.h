@@ -40,6 +40,9 @@ public:
 	void ShowMenu(bool bInGame);
 	void HideMenu();
 	bool IsMenuOpen() const { return MenuWidget.IsValid(); }
+	/** The SETTINGS page in the menu's place (BACK returns to the menu). */
+	void ShowSettings();
+	void HideSettings();
 
 private:
 	bool bStarted = false;
@@ -49,6 +52,8 @@ private:
 	FString PendingMode;
 	TSharedPtr<SAstraMainMenu> Menu;
 	TSharedPtr<SWidget> MenuWidget;
+	TSharedPtr<SWidget> SettingsWidget;
+	TSharedPtr<class SAstraSettingsPage> SettingsPage;
 	FDelegateHandle ShipEventHandle;
 
 	FString SavePath() const;

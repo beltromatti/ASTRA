@@ -24,7 +24,8 @@
 #include "WebSocketsModule.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "Sound/SoundWaveProcedural.h"
+#include "AstraSettings.h"
+#include "AstraVoiceWave.h"
 
 namespace
 {
@@ -169,6 +170,20 @@ void UAstraMindSubsystem::Connect()
 	{
 		UE_LOG(LogASTRA, Log, TEXT("[Mind] closed (%d) %s"), Code, *Reason);
 		NextConnectTime = FPlatformTime::Seconds() + 2.0;
+		// nobody has the floor any more (the music comes back), and the lines in flight will not be finished
+		FloorState = TEXT("idle");
+		VoiceProtocol = 1;
+		for (TPair<int32, FVoiceLine>& P : Voices)
+		{
+			if (UAudioComponent* C = P.Value.Comp.Get())
+			{
+				C->FadeOut(0.3f, 0.f);
+			}
+		}
+		Voices.Reset();
+		ExternalLineId = -1;
+		ExternalSpeaker.Reset();
+		ExternalLine.Reset();
 	});
 	Socket->OnMessage().AddUObject(this, &UAstraMindSubsystem::OnText);
 	Socket->OnRawMessage().AddUObject(this, &UAstraMindSubsystem::OnBinary);
@@ -290,6 +305,7 @@ void UAstraMindSubsystem::AddContext(const TSharedRef<FJsonObject>& Msg) const
 
 void UAstraMindSubsystem::PushToTalk(bool bDown)
 {
+	bTalkKeyDown = bDown;
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("ptt"));
 	M->SetBoolField(TEXT("down"), bDown);
@@ -348,6 +364,7 @@ bool UAstraMindSubsystem::Tick(float DeltaTime)
 {
 	const double Now = FPlatformTime::Seconds();
 	BindShipEvents();   // even before the mind answers: the reports raised meanwhile are queued
+	TickVoices();
 	if (!Socket.IsValid() || (!Socket->IsConnected() && Now >= NextConnectTime))
 	{
 		if (Now >= NextConnectTime)
@@ -403,20 +420,27 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 	else if (Type == TEXT("line"))
 	{
 		const int32 Id = (int32)Msg->GetNumberField(TEXT("id"));
-		const FString Speaker = Msg->GetStringField(TEXT("speaker"));
-		LineSpeakers.Add(Id, Speaker);
 		LineTexts.Add(Id, TPair<FString, FString>(Msg->GetStringField(TEXT("name")), Msg->GetStringField(TEXT("text"))));
-		UE_LOG(LogASTRA, Log, TEXT("[Crew] %s: %s"), *Speaker, *Msg->GetStringField(TEXT("text")));
+		UE_LOG(LogASTRA, Log, TEXT("[Crew] %s: %s"), *Msg->GetStringField(TEXT("speaker")), *Msg->GetStringField(TEXT("text")));
 	}
 	else if (Type == TEXT("audio_begin"))
 	{
 		const int32 Id = (int32)Msg->GetNumberField(TEXT("line"));
-		// the subtitle comes up with the voice
+		const FString Speaker = Msg->GetStringField(TEXT("speaker"));
+		const int32 Rate = (int32)Msg->GetNumberField(TEXT("rate"));
+		// the subtitle comes up with the voice and stays as long as the audio and a second, or as long as reading it
+		// takes, whichever is longer (protocollo_voce §3.1: the mind says how long)
 		if (const TPair<FString, FString>* T = LineTexts.Find(Id))
 		{
+			double EstS = 0.0, HoldS = 0.0;
+			Msg->TryGetNumberField(TEXT("est_s"), EstS);
+			if (!Msg->TryGetNumberField(TEXT("hold_s"), HoldS) || HoldS <= 0.0)
+			{
+				HoldS = FMath::Min(12.0, FMath::Max(EstS + 1.0, 1.4 + T->Value.Len() / 17.0));
+			}
 			if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GameWorld(), 0)))
 			{
-				PC->Subtitle(Id, Msg->GetStringField(TEXT("speaker")), T->Key, T->Value);
+				PC->Subtitle(Id, Speaker, T->Key, T->Value, (float)HoldS, true);
 			}
 			HeardLines.Add(*T);
 			if (HeardLines.Num() > 12)
@@ -425,7 +449,7 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			}
 			LineTexts.Remove(Id);
 		}
-		AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Msg->GetStringField(TEXT("speaker")));
+		AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Speaker);
 		if (!Crew)
 		{
 			// not one of ours: a voice over a channel (the main viewscreen shows who is speaking)
@@ -436,35 +460,48 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 				ExternalLine = T->Value;
 			}
 		}
-		// an officer the Captain can hear in person speaks from their station; one far away (the Captain on the flight
-		// deck, in a Falcon, down on New Ravenna) comes over the intercom or the radio
-		bool bNear = false;
-		if (Crew)
+		// an officer the Captain can hear in person speaks from their station; one far away or behind a wall (the Chief
+		// in Engineering, anyone while the Captain is on the flight deck, in a Falcon, down on New Ravenna) comes over the
+		// intercom or the radio
+		const bool bInPerson = Crew && !HeardOnRadio(Crew);
+		FVoiceLine V;
+		UAstraVoiceWave* Wave = nullptr;
+		if (bInPerson)
 		{
-			if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(GameWorld(), 0))
-			{
-				bNear = FVector::Dist(Cam->GetCameraLocation(), Crew->GetActorLocation()) < 2500.f;
-			}
-			// the people in the Medbay and the Mess Hall speak only while the Captain is there: always in person, from
-			// their place (a far table is simply quieter, never a voice on the radio)
-			bNear |= Crew->StationId.StartsWith(TEXT("mess")) || Crew->StationId.StartsWith(TEXT("patient"));
-		}
-		if (Crew && bNear)
-		{
-			Crew->BeginLine(Id, (int32)Msg->GetNumberField(TEXT("rate")));
+			Wave = Crew->BeginLine(Id, Rate);
+			V.Crew = Crew;
+			V.Comp = Crew->GetVoice();
 		}
 		else
 		{
-			if (Crew)
-			{
-				LineSpeakers.Remove(Id);   // not a spoken line at the station: its audio goes to the radio
-			}
-			BeginChannelLine(Id, (int32)Msg->GetNumberField(TEXT("rate")));
+			Wave = BeginChannelLine(Id, Rate);
+			V.Comp = ChannelAudio;
+		}
+		if (!Wave)
+		{
+			SendVoiceStatus(Id, TEXT("failed"), bInPerson ? TEXT("the officer's voice did not start (Play)") : TEXT("the radio did not start (no audio component or Play)"));
+		}
+		else
+		{
+			V.Wave = Wave;
+			V.From = Wave->GetQueued();
+			Voices.Add(Id, V);
 		}
 	}
 	else if (Type == TEXT("audio_end"))
 	{
 		const int32 Id = (int32)Msg->GetNumberField(TEXT("line"));
+		FString Reason;
+		Msg->TryGetStringField(TEXT("reason"), Reason);
+		if (Reason == TEXT("cut"))
+		{
+			CancelVoice(Id, 0.14f);   // follows a cancel (already done); without one, it is one
+			return;
+		}
+		if (FVoiceLine* V = Voices.Find(Id))
+		{
+			V->bEnded = true;
+		}
 		if (Id == ExternalLineId)
 		{
 			ExternalLineId = -1;
@@ -475,13 +512,22 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 		{
 			PC->SubtitleEnd(Id);
 		}
-		if (const FString* Sp = LineSpeakers.Find(Id))
-		{
-			if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), *Sp))
-			{
-				Crew->EndLine(Id);
-			}
-		}
+	}
+	else if (Type == TEXT("cancel"))
+	{
+		// stop this line now: the Captain took the floor, an answer or a warning comes first (protocollo_voce §3.2)
+		double FadeMs = 140.0;
+		Msg->TryGetNumberField(TEXT("fade_ms"), FadeMs);
+		CancelVoice((int32)Msg->GetNumberField(TEXT("line")), (float)(FadeMs / 1000.0));
+	}
+	else if (Type == TEXT("floor"))
+	{
+		Msg->TryGetStringField(TEXT("state"), FloorState);
+	}
+	else if (Type == TEXT("line_dropped"))
+	{
+		UE_LOG(LogASTRA, Verbose, TEXT("[Mind] line %d dropped (%s): %s"), (int32)Msg->GetNumberField(TEXT("id")),
+		       *Msg->GetStringField(TEXT("reason")), *Msg->GetStringField(TEXT("text")));
 	}
 	else if (Type == TEXT("transcript"))
 	{
@@ -490,6 +536,11 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 	}
 	else if (Type == TEXT("status"))
 	{
+		double Voice = 0.0;
+		if (Msg->TryGetNumberField(TEXT("voice"), Voice))
+		{
+			VoiceProtocol = (int32)Voice;
+		}
 		FString Mic;
 		if (Msg->TryGetStringField(TEXT("mic"), Mic))
 		{
@@ -507,15 +558,23 @@ void UAstraMindSubsystem::OnBinary(const void* Data, SIZE_T Size, SIZE_T BytesRe
 	}
 	int32 LineId = 0;
 	FMemory::Memcpy(&LineId, BinaryBuffer.GetData(), 4);
-	if (LineId == ChannelLine && ChannelWave)
+	// a line's audio: uint32 id + PCM16 mono, at listening pace (a line stopped by a cancel has no record: dropped)
+	if (FVoiceLine* V = Voices.Find(LineId))
 	{
-		ChannelWave->QueueAudio(BinaryBuffer.GetData() + 4, BinaryBuffer.Num() - 4);
-	}
-	else if (const FString* Sp = LineSpeakers.Find(LineId))
-	{
-		if (AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), *Sp))
+		if (UAstraVoiceWave* Wave = V->Wave.Get())
 		{
-			Crew->QueueVoice(LineId, BinaryBuffer.GetData() + 4, BinaryBuffer.Num() - 4);
+			const uint8* Pcm = BinaryBuffer.GetData() + 4;
+			const int32 N = (BinaryBuffer.Num() - 4) & ~1;
+			Wave->Queue(Pcm, N);
+			V->Bytes += N;
+			if (V->FirstBytesAt < 0.0)
+			{
+				V->FirstBytesAt = FPlatformTime::Seconds();
+			}
+			if (AAstraCrewMember* Crew = V->Crew.Get())
+			{
+				Crew->HearVoice(Pcm, N);
+			}
 		}
 	}
 	BinaryBuffer.Reset();
@@ -558,37 +617,227 @@ void UAstraMindSubsystem::HandleCommand(const TSharedPtr<FJsonObject>& Msg)
 	Send(R);
 }
 
-void UAstraMindSubsystem::BeginChannelLine(int32 LineId, int32 Rate)
+UAstraVoiceWave* UAstraMindSubsystem::BeginChannelLine(int32 LineId, int32 Rate)
 {
 	UWorld* World = GameWorld();
 	if (!World)
 	{
-		return;
+		return nullptr;
 	}
-	if (!ChannelAudio || !IsValid(ChannelAudio))
+	if (ChannelAudio && (!IsValid(ChannelAudio) || ChannelAudio->GetWorld() != World))
 	{
-		// a 2D "radio": band-limited like a comms channel (the Interpreter's translation of the enemy's voice)
-		ChannelAudio = UGameplayStatics::CreateSound2D(World, nullptr, 1.f, 1.f, 0.f, nullptr, true, false);
+		ChannelAudio = nullptr;   // another world
+		ChannelWave = nullptr;
+	}
+	if (ChannelAudio && ChannelWave && ChannelWave->GetRate() == Rate && ChannelAudio->IsPlaying() && ChannelWave->GetAvailableAudioByteCount() > 0)
+	{
+		// the last line is still sounding (the game fell behind the mind's clock): this one follows it, never cuts it
+		UE_LOG(LogASTRA, Log, TEXT("[Mind] channel voice (line %d, after the last one)"), LineId);
+		return ChannelWave;
+	}
+	ChannelWave = NewObject<UAstraVoiceWave>(this);
+	ChannelWave->Setup(Rate);
+	if (!ChannelAudio)
+	{
+		// a 2D "radio": band-limited like a comms channel (the Interpreter's translation of the enemy's voice); the
+		// engine makes no component for a null sound, so the wave comes first
+		ChannelAudio = UGameplayStatics::CreateSound2D(World, ChannelWave, 1.f, 1.f, 0.f, nullptr, true, false);
 		if (ChannelAudio)
 		{
 			ChannelAudio->SetLowPassFilterEnabled(true);
 			ChannelAudio->SetLowPassFilterFrequency(3600.f);
 			ChannelAudio->SetHighPassFilterEnabled(true);
 			ChannelAudio->SetHighPassFilterFrequency(320.f);
+			ChannelAudio->bOverridePriority = true;
+			ChannelAudio->Priority = 4.f;
+			ChannelAudio->bIsUISound = false;
 		}
+	}
+	else
+	{
+		ChannelAudio->SetSound(ChannelWave);
 	}
 	if (!ChannelAudio)
 	{
-		return;
+		return nullptr;
 	}
-	ChannelLine = LineId;
-	ChannelWave = NewObject<USoundWaveProcedural>(this);
-	ChannelWave->SetSampleRate(Rate);
-	ChannelWave->NumChannels = 1;
-	ChannelWave->Duration = INDEFINITELY_LOOPING_DURATION;
-	ChannelWave->SoundGroup = SOUNDGROUP_Voice;
-	ChannelWave->bLooping = false;
-	ChannelAudio->SetSound(ChannelWave);
+	// the band takes ~3.5 dB of loudness away: the radio must not sound quieter than a voice in the room (§4.1)
+	ChannelAudio->SetVolumeMultiplier(1.5f * FAstraSettings::Get().Voices);
 	ChannelAudio->Play();
 	UE_LOG(LogASTRA, Log, TEXT("[Mind] channel voice (line %d)"), LineId);
+	return ChannelAudio->IsPlaying() ? ChannelWave.Get() : nullptr;
+}
+
+bool UAstraMindSubsystem::HeardOnRadio(const AAstraCrewMember* Crew)
+{
+	// the people in the Medbay and the Mess Hall speak only while the Captain is there: always in person, from their
+	// place (a far table is simply quieter, never a voice on the radio)
+	if (Crew->StationId.StartsWith(TEXT("mess")) || Crew->StationId.StartsWith(TEXT("patient")))
+	{
+		return false;
+	}
+	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(GameWorld(), 0);
+	if (!Cam)
+	{
+		return false;
+	}
+	const FVector Eye = Cam->GetCameraLocation();
+	const float Dist = FVector::Dist(Eye, Crew->GetActorLocation());
+	// one decision per officer, a line at a time (never mid-line): to the intercom beyond 28 m, back in the room under
+	// 22 m (protocollo_voce §4.3) — a Captain standing about 25 m away does not hear the same officer swap from the
+	// room to the radio and back from one line to the next
+	bool* Radio = OnRadio.Find(Crew->StationId);
+	if (!Radio)
+	{
+		Radio = &OnRadio.Add(Crew->StationId, Dist > 2500.f);
+	}
+	if (*Radio && Dist < 2200.f)
+	{
+		*Radio = false;
+	}
+	else if (!*Radio && Dist > 2800.f)
+	{
+		*Radio = true;
+	}
+	// a wall, a bulkhead or a closed door between them: the intercom, however near
+	return *Radio || !Crew->CanBeHeardFrom(Eye, UGameplayStatics::GetPlayerPawn(GameWorld(), 0));
+}
+
+void UAstraMindSubsystem::CancelVoice(int32 LineId, float FadeSeconds)
+{
+	if (FVoiceLine* V = Voices.Find(LineId))
+	{
+		UE_LOG(LogASTRA, Log, TEXT("[Mind] voice of line %d: stopped (fade %.2f s)"), LineId, FadeSeconds);
+		const TWeakObjectPtr<UAstraVoiceWave> Wave = V->Wave;
+		if (AAstraCrewMember* Crew = V->Crew.Get())
+		{
+			Crew->CancelLine(FadeSeconds);
+		}
+		else if (ChannelAudio && Wave.Get() == ChannelWave)
+		{
+			ChannelAudio->FadeOut(FMath::Max(FadeSeconds, 0.02f), 0.f);
+			ChannelWave = nullptr;   // the next line starts on a new wave
+		}
+		// the line stops here, and with it any earlier line still sounding on the same wave
+		for (auto It = Voices.CreateIterator(); It; ++It)
+		{
+			if (It.Value().Wave == Wave)
+			{
+				It.RemoveCurrent();
+			}
+		}
+	}
+	LineTexts.Remove(LineId);
+	if (LineId == ExternalLineId)
+	{
+		ExternalLineId = -1;
+		ExternalSpeaker.Reset();
+		ExternalLine.Reset();
+	}
+	if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GameWorld(), 0)))
+	{
+		PC->SubtitleCancel(LineId);
+	}
+}
+
+void UAstraMindSubsystem::SendVoiceStatus(int32 LineId, const TCHAR* State, const FString& Detail)
+{
+	UE_LOG(LogASTRA, Log, TEXT("[Mind] voice of line %d: %s %s"), LineId, State, *Detail);
+	if (VoiceProtocol < 2)
+	{
+		return;
+	}
+	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+	M->SetStringField(TEXT("type"), TEXT("voice_status"));
+	M->SetNumberField(TEXT("line"), LineId);
+	M->SetStringField(TEXT("state"), State);
+	M->SetStringField(TEXT("detail"), Detail);
+	Send(M);
+}
+
+void UAstraMindSubsystem::TickVoices()
+{
+	if (!Voices.Num())
+	{
+		return;
+	}
+	const double Now = FPlatformTime::Seconds();
+	// a paused game pauses its voices: nothing is played, and that is neither a stall nor a failure
+	const UWorld* World = GameWorld();
+	const bool bPaused = World && World->IsPaused();
+	if (bPaused || bVoicesPaused)
+	{
+		bVoicesPaused = bPaused;
+		for (TPair<int32, FVoiceLine>& P : Voices)
+		{
+			P.Value.FirstBytesAt = P.Value.FirstBytesAt < 0.0 ? -1.0 : Now;
+			P.Value.EmptySince = -1.0;
+		}
+		return;
+	}
+	for (auto It = Voices.CreateIterator(); It; ++It)
+	{
+		FVoiceLine& V = It.Value();
+		UAstraVoiceWave* Wave = V.Wave.Get();
+		if (!Wave)
+		{
+			It.RemoveCurrent();   // the world went away
+			continue;
+		}
+		const int64 Played = Wave->GetPlayed();
+		if (!V.bStarted)
+		{
+			if (Played > V.From)
+			{
+				V.bStarted = true;
+				SendVoiceStatus(It.Key(), TEXT("started"), FString());
+			}
+			else if (V.FirstBytesAt >= 0.0 && Now - V.FirstBytesAt > 2.0)
+			{
+				// its audio came and none of it was played: the voice is not sounding (a component out of the mix?)
+				SendVoiceStatus(It.Key(), TEXT("failed"), FString::Printf(TEXT("nothing played in 2 s (%s)"), V.Crew.IsValid() ? TEXT("in person") : TEXT("radio")));
+				It.RemoveCurrent();
+				continue;
+			}
+			else
+			{
+				continue;
+			}
+		}
+		const bool bDrained = Played >= V.From + V.Bytes;
+		if (V.bEnded && bDrained)
+		{
+			SendVoiceStatus(It.Key(), TEXT("finished"), FString());
+			// heard to its end: the voice lets go of its audio channel, unless the next line already follows on the wave
+			bool bNext = false;
+			for (const TPair<int32, FVoiceLine>& O : Voices)
+			{
+				bNext |= O.Key != It.Key() && O.Value.Wave == V.Wave;
+			}
+			UAudioComponent* Comp = V.Comp.Get();
+			if (!bNext && Comp && Comp->Sound == Wave)
+			{
+				Comp->Stop();
+			}
+			It.RemoveCurrent();
+			continue;
+		}
+		if (!V.bEnded && bDrained)
+		{
+			// the queue ran dry before the line's end (a long frame of the game, a slow link): heard as a gap
+			if (V.EmptySince < 0.0)
+			{
+				V.EmptySince = Now;
+			}
+			else if (!V.bStallSaid && Now - V.EmptySince > 0.25)
+			{
+				V.bStallSaid = true;
+				SendVoiceStatus(It.Key(), TEXT("stalled"), TEXT("the audio queue ran dry for more than 250 ms"));
+			}
+		}
+		else
+		{
+			V.EmptySince = -1.0;
+		}
+	}
 }

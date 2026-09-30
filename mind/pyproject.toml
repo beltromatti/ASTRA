@@ -10,9 +10,15 @@ dependencies = [
     "websockets>=14",
     "pocket-tts>=1.0",
     "numpy>=2.0",
+    "scipy>=1.13",
+    "num2words>=0.5.13",
     "soundfile>=0.12",
     "sounddevice>=0.5",
 ]
+
+[project.optional-dependencies]
+# speech recognition that runs anywhere (Windows, Linux, a Mac without the Neural Engine helper): uv sync --extra portable
+portable = ["faster-whisper>=1.1", "sherpa-onnx>=1.12", "sherpa-onnx-core>=1.12"]
 
 [project.scripts]
 astra-bench = "astra_mind.bench.run:main"

@@ -1,5 +1,5 @@
 // ASTRA — the score follows the war: calm on the bridge, tension when contacts close, the battle, the aftermath; the
-// Janus lane's swell breaks exactly on the crossing. The music steps back whenever an officer speaks.
+// Janus lane's swell breaks exactly on the crossing. The music steps back whenever someone has the floor.
 
 #pragma once
 
@@ -42,7 +42,8 @@ private:
 	float Since = 100.f;          // seconds in the current mood
 	float EvalT = 0.f;
 	float BattleHold = 0.f;       // the battle music outlasts the last shot for a while
-	float Duck = 1.f;             // < 1 while an officer speaks
+	float Duck = 1.f;             // < 1 while someone has the floor
+	float DuckHold = 0.f;         // seconds the music stays down after the floor falls quiet
 	bool bTransitPlayed = false;
 	float AfterTransit = -1.f;    // seconds since the crossing (music resumes after the arrival)
 

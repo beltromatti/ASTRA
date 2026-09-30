@@ -7,8 +7,8 @@
 ## Piano v0.3 — dove siamo (aggiornato a ogni passo)
 | Fase | Stato |
 |---|---|
-| **F0** Fondamenta per lavorare in parallelo | ✓ controlli in prima persona (mancavano gli asset di input: WASD e mouse non avevano mai funzionato); ✓ banco di prova da terminale (`tools/play.py`, `-astra_harness`); ✓ architettura, piano, stile v0.2; agenti di supporto: VOCE in corso |
-| **F1** La plancia viva | in corso: ✓ **postazioni vere** (modalità persistenti eseguite dal codice a 10 Hz: il timone tiene la prua sull'azione, il tattico ingaggia e passa al bersaglio successivo, scudi verso la minaccia, sensori, macchine; comando unico `station`); ✓ **schermo principale** (telecamera ottica oltre lo scafo con zoom sul soggetto, regia automatica per priorità, sovrimpressione tattica con nomi/classi/distanze/barre, frecce fuori campo; ops lo comanda: auto/forward/target/tactical/fleet/sector/comms/damage/off; costo ≈1,5–3 ms); ✓ **contesto v2** delle parole del Capitano (luogo, chi sente, chi guarda, canale aperto); ✓ **superfici di controllo** delle console (modi in vigore come pulsanti accesi, chi li ha dati, ultime azioni). ✓ **datapad a pagine** (panoramica, dossier del contatto, danni, flotta, ordini) spinto da ops; ✓ **squadre di riparazione automatiche**; ✓ **iniziativa degli ufficiali in codice** (pattuglia di Alpha, esche, potenza di combattimento: sul banco l'Aquila non si perde più in 6 semi su 6, contro 3 persi su 6 senza); ✓ **HUD del Falcon** con il quadro del datalink; ✓ **MENTE-EQUIPAGGIO unito** (ufficiali agenti col vocabolario vero del gioco, priorità al Capitano, iniziativa, router v2 con contesto: 85 test); ✓ **plancia v3 nel gioco** (30 modelli Nanite, console a ventaglio, cupola, poltrone monoscocca, tavolo olografico davanti alla poltrona, ~60 fps in battaglia a 1600×900). Da fare: prova completa della mente in gioco, voce (VOCE, in corso), rifiniture della plancia v3 (luce del sole sul pozzo, ologramma del tavolo più ricco) |
+| **F0** Fondamenta per lavorare in parallelo | ✓ controlli in prima persona (mancavano gli asset di input: WASD e mouse non avevano mai funzionato); ✓ banco di prova da terminale (`tools/play.py`, `-astra_harness`); ✓ architettura, piano, stile v0.2; ✓ VOCE unita (vedi F1) |
+| **F1** La plancia viva | in corso: ✓ **postazioni vere** (modalità persistenti eseguite dal codice a 10 Hz: il timone tiene la prua sull'azione, il tattico ingaggia e passa al bersaglio successivo, scudi verso la minaccia, sensori, macchine; comando unico `station`); ✓ **schermo principale** (telecamera ottica oltre lo scafo con zoom sul soggetto, regia automatica per priorità, sovrimpressione tattica con nomi/classi/distanze/barre, frecce fuori campo; ops lo comanda: auto/forward/target/tactical/fleet/sector/comms/damage/off; costo ≈1,5–3 ms); ✓ **contesto v2** delle parole del Capitano (luogo, chi sente, chi guarda, canale aperto); ✓ **superfici di controllo** delle console (modi in vigore come pulsanti accesi, chi li ha dati, ultime azioni). ✓ **datapad a pagine** (panoramica, dossier del contatto, danni, flotta, ordini) spinto da ops; ✓ **squadre di riparazione automatiche**; ✓ **iniziativa degli ufficiali in codice** (pattuglia di Alpha, esche, potenza di combattimento: sul banco l'Aquila non si perde più in 6 semi su 6, contro 3 persi su 6 senza); ✓ **HUD del Falcon** con il quadro del datalink; ✓ **MENTE-EQUIPAGGIO unito** (ufficiali agenti col vocabolario vero del gioco, priorità al Capitano, iniziativa, router v2 con contesto: 85 test); ✓ **plancia v3 nel gioco** (30 modelli Nanite, console a ventaglio, cupola, poltrone monoscocca, tavolo olografico davanti alla poltrona, ~60 fps in battaglia a 1600×900). ✓ **VOCE unita e provata nel gioco** (Parakeet Ultra sul Neural Engine, rilascio→testo ≈0,2 s; sintesi ×1,12 a −19 LUFS; palco con il Capitano in priorità assoluta, risposta prima di tutto, righe tagliate riprese, notizie vecchie scartate; lato gioco del protocollo v2: le voci esterne e lontane ora si sentono — prima `BeginChannelLine` non suonava mai —, sottotitoli con `hold_s`, `cancel` con dissolvenza, `voice_status` alla mente, attenuazione naturale a bordo, vicino/radio con isteresi 22/28 m e muri, musica abbassata dal messaggio `floor`; la mente non si blocca più aprendo il microfono). Da fare: rifiniture della plancia v3 (luce del sole sul pozzo, ologramma del tavolo più ricco) |
 | **F2** La guerra grande | da fare |
 | **F3** Persone vere | da fare (MetaHuman: autorizzazione Epic in RICHIESTE) |
 | **F4** La nave intera e la distruzione | da fare |
@@ -16,19 +16,28 @@
 | **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | da fare |
 
 **Agenti di supporto attivi** (worktree in `.claude/worktrees/`, rami `worktree-*`; il lead prova nel gioco, unisce, rimanda i difetti):
-- **VOCE** (`agent-a7f749a395e3717dd`) — riconoscimento più rapido in tutte le lingue, sintesi più veloce e con volume costante, turni di parola con priorità al Capitano, niente sottotitoli senza voce (`mind/astra_mind/{speech,stt,tts,audio_in}.py`, `docs/protocollo_voce.md`).
 - **GUERRA** — fase F2.1–F2.2: danni fisici (scudi per faccia, corazza e struttura per sezione, sottosistemi, relitti disattivati), gerarchie e intelligenza di gruppo (gruppi di battaglia, squadriglie, caccia che evitano la difesa di punto), prova di scala; tutto misurato col banco senza grafica (`docs/GUERRA.md`).
 - **NAVE** — fase F4.1: la pianta dell'Aquila (`data/ship/aquila_plan.json`: 12 ponti, sezioni A–H, compartimenti, grafo dei percorsi) e il primo ponte completo (Deck 4) con kit di corridoi e stanze da Blender e script d'import (lo esegue il lead); richiede al C++ luci di zona (fatto: `UAstraZoneLights`) e percorsi sul grafo.
-- ~~MENTE-EQUIPAGGIO~~ (unito il 30/9, con il seguito: bersaglio action, hostiles, battle short, pre-riscaldamento; 93 test) · ~~ARTE-PLANCIA~~ (unito e importato il 30/9).
+- **ARTE-NAVI** — gli esterni delle navi v3 alla qualità di EVE Online (piastre e dettagli che reggono lo zoom ×300 dello schermo principale, materiali a strati con usura, luci di navigazione), pezzi di sezione per la rottura con tagli bruciati, decalcomanie di danno, anteprime (`art/blender/`, `tools/ue_scripts/`; l'import lo esegue il lead).
+- ~~MENTE-EQUIPAGGIO~~ (unito il 30/9, con il seguito: bersaglio action, hostiles, battle short, pre-riscaldamento; 93 test) · ~~ARTE-PLANCIA~~ (unito e importato il 30/9) · ~~VOCE~~ (unita il 30/9: 30 scenari del palco, 5 rifacimenti del test dal vivo, `docs/bench/voce_2026-09-30.md`).
 
 **Banco della guerra senza grafica**: `tools/war.py run|report|ship|ab` (commandlet `AstraWarSim`, ~1000× il tempo reale, deterministico per seme; vedi [GUERRA.md](GUERRA.md)).
 
 **Strumenti di prova del lead** (gioco con `tools/play.py launch --nomind`; `tools/play.py tp X Y YAW PITCH` per le foto): `astra.battle.time 170` (arriva il gruppo d'attacco), `astra.cmd station {...}`, `astra.viewscreen.dump` (l'immagine dello schermo principale a piena risoluzione), `astra.screens.dump <Pagina>` (una console su PNG), `/state` con `context`.
 
-## Prestazioni (30/9, finestra 1600×900, plancia v3 in battaglia; misure sporche quando gli agenti compilano)
-- La cattura dello schermo principale raddoppiava il thread di rendering (36 ms): ora vede solo gli attori dello spazio → ~16 ms.
-- GPU per passaggio a 70% (ProfileGPU): luci differite ~6 ms (17 luci in un passaggio a cluster, il sole con l'ombra virtuale 1,35 ms), ombre 2 ms, Nanite 2,3 ms, base pass 1,8 ms, Lumen 2 ms, traslucidi 1,3 ms, post 1 ms; la cattura ~3 ms per immagine.
-- Fatto: bias dell'ombra virtuale del sole a 0 (−3 ms), cattura a 20 Hz (−0,7 ms), nitidezza dopo TSR. La risoluzione dinamica restava al 40% (pixel grossi): il thread di gioco (~13 ms) e quello di rendering sono ora il limite insieme alla GPU. Prossimo: misure a macchina scarica con `tools/play.py perf`, costo del thread di gioco (tick degli attori ~7 ms), luci della plancia.
+## Prestazioni (misure pulite 30/9 sera: macchina scarica, finestra 1600×900, plancia v3 in battaglia, prove A/B alternate)
+- **Costo GPU**: ~27 ms al 100 %, ~17,5 al 70 %, ~12,6 al 50 %, ~12 al 40 %: un costo fisso di ~9–10 ms (ombre ~1,6, GI Lumen ~1,1,
+  post-processing ~1,1, riflessi ~0,8, TSR ~0,7 più la sua parte alla risoluzione d'uscita, traslucidi ~0,7, personaggi ~0,6,
+  Nanite) più ~14 ms per milione di pixel. La telecamera dello schermo principale a 20 Hz costa ormai ~0.
+- **Al 70 %, spegnendo una cosa per volta**: TSR→TAA −2,9 ms, ombre dinamiche −3,6 (sole ~2,2, due spot ~1,1), riflessi Lumen −2,6
+  (quasi tutti dalle superfici ruvide), 17 luci rettangolari −1,8, GI Lumen −1,4, traslucidi −1,0; le ombre virtuali restano la
+  scelta giusta (le mappe classiche +4,4 ms); qualità di aggiornamento di TSR e densità delle sonde GI: nessun guadagno.
+- **Applicato** (MacEngine.ini): riflessi tracciati solo sotto rugosità 0,25 e filtro del sole 4×2 raggi: −2,5 ms a chip caldo.
+  TSR resta: a parità di costo è più nitido di TAA con più pixel (TAA perde le righe sottili e fa scalini sul bordo delle ombre).
+- **Risultato**: la risoluzione dinamica si assesta al ~50–55 % a 60 fps (prima ~45 %); per il 70 % servono ~5 ms. Strade: raggi
+  delle luci grandi (12–18 m, ~1 ms), materiali della plancia più leggeri (la loro ombreggiatura Nanite ~3 ms al 70 %), un
+  upscaler MetalFX al posto di TSR (da valutare: plugin nostro), la modalità 30 fps del menu (immagine quasi piena).
+- Il chip senza ventola si scalda in pochi minuti (la stessa scena passa da 17 a 21 ms): misure sempre alternate A/B.
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -50,6 +59,7 @@
 | 2026-09-29 | 10,00 $ | 3,12 $ | **prima partita dell'utente** con l'app (≈35 minuti, due sessioni: 0,33 $, cioè ≈0,5–0,6 $ l'ora di gioco con regista, nemici e memoria) |
 | 2026-09-30 | 10,00 $ | 3,56 $ | agenti di supporto: prove del router su più modelli (MENTE-EQUIPAGGIO ≈0,22 $ in 1192 chiamate) |
 | 2026-09-30 | 10,00 $ | 3,84 $ | MENTE-EQUIPAGGIO completato (0,40 $ in tutto), prova della mente nel gioco vero |
+| 2026-09-30 | 10,00 $ | 3,93 $ | prova dal vivo della voce v2 (una battaglia intera fino all'abbandono nave) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
@@ -458,8 +468,10 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 - [x] **Umore dell'equipaggio**: a ogni svolta il regista scrive come si sente la plancia e perché, nominando gli ufficiali (lutto per i caduti, orgoglio, stanchezza, dubbi su un ordine, rabbia), e lo fa evolvere di beat in beat (salvato in `story.json`). Colora il modo in cui gli ufficiali parlano senza mai dichiararlo, e affiora nei momenti di quiete. Esempio reale dopo la prima battaglia: *«Exhausted but proud… Grief for the Vigilant sits under everything — Mensah's repair gangs work in silence, Price counts seven Hammers where there were eight»*; alla domanda sul morale Serra risponde «stanchi, ma orgogliosi di aver tenuto Aurelia. Il dolore per il Vigilant è ancora aperto…»
 
 ## Prossimi passi
+- **Dalla prova dal vivo del 30/9 (dopo la voce v2), da correggere**: righe dell'equipaggio ripetute uguali a ~8 s di distanza (Voss «Il Lethe è a quarantadue chilometri…» a 50,4 e 58,8 s; Nair a 65,5 e 74,3; Serra a 83,3 e 90,9: guardare il palco della voce, ripresa dopo un taglio o rapporto riaccodato); il timoniere dice «prua due-otto-zero» mentre il comando dice rilevamento 212 (inventa la rotta); «caccia classe Lethe» per una fregata. Prestazioni: rifare le prove A/B a macchina scarica (a caldo la stessa scena va da 18 a 38 ms di GPU); indizi: risoluzione, ombre dinamiche, riflessi Lumen, TSR, traslucidi.
+- **In attesa degli aiutanti**: GUERRA (API delle portate delle armi per tavolo e schermo, contratto `group_order` e viste per parte per le menti), NAVE (piano e ponte 4: `UAstraShipPlan` è già pronto in main), ARTE-NAVI (navi v3).
 0. **Dalla prima partita dell'utente** (29/9, 15:43–16:15, dal log della mente; nessun crash):
-   - ha dato due ordini a voce (riconoscimento 1,8–1,9 s per frasi brevi) e poi solo **scritti**: capire perché; mancano ancora le conferme istantanee e il classificatore d'intenti locale previsti dalla ricerca (09, 13);
+   - ha dato due ordini a voce (riconoscimento 1,8–1,9 s per frasi brevi) e poi solo **scritti**: capire perché (ora il riconoscimento è ≈0,2 s dal rilascio del tasto e le voci esterne si sentono: VOCE, 30/9); mancano ancora le conferme istantanee e il classificatore d'intenti locale previsti dalla ricerca (09, 13);
    - con il canale nemico aperto, «rapporto armamenti» e «ci sono navi nemiche» sono finiti **al comandante del Mandato**: il router va corretto (in dubbio, all'equipaggio);
    - voleva **vedere** i nemici («portaci a contatto visivo», «voglio vedere a schermo i nemici»): serve lo schermo principale che inquadra il bersaglio («On screen!»);
    - molte domande di stato (velocità, portata, quante navi) e fuoco ordinato a 16 km con i railgun a 10: portate e distanze vanno lette a colpo d'occhio;
@@ -469,7 +481,7 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 2. **Altri ponti**: armeria, la Spina; volti veri per l'equipaggio (MetaHuman, attende l'autorizzazione Epic in RICHIESTE.md); esterno della plancia; conversazioni sussurrate al tavolo degli alloggi.
 3. **Pilotaggio**: missioni di scorta ordinate da Price; i caccia visti dall'hangar.
 4. **Mondi generati**: guarnigioni a terra visibili (mezzi, cattura), edifici più vari, luci della città.
-5. **Distribuzione, seconda parte**: la firma per altri Mac (serve un account sviluppatore Apple); un menu delle impostazioni grafiche nel gioco; una cache PSO registrata (niente scatti alla prima comparsa di un effetto).
+5. **Distribuzione, seconda parte**: la firma per altri Mac (serve un account sviluppatore Apple); ~~un menu delle impostazioni grafiche nel gioco~~ (fatto il 30/9: SETTINGS nel menu — qualità, nitidezza come soglia della risoluzione dinamica 70/55/40 %, 30 o 60 fps, volumi di musica e voci, sottotitoli; salvate in GameUserSettings.ini); una cache PSO registrata (niente scatti alla prima comparsa di un effetto).
 6. **M8, preparazione al multigiocatore**: progetto scritto in `docs/MULTIGIOCATORE.md`; primi passi senza rischi: la nave del giocatore come indice (non più `Ships[0]`) e la conoscenza dei sensori per osservatore.
 
 ## Come provarlo (per l'utente)

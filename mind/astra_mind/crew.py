@@ -100,7 +100,12 @@ DUTIES_V2 = {
 CAPTAIN_WORD = {"it": "Capitano", "en": "Captain", "es": "Capitán", "fr": "Capitaine", "de": "Kapitän", "pt": "Capitão",
                 "nl": "Kapitein", "pl": "Kapitanie", "ru": "Капитан", "ja": "艦長", "zh": "舰长"}
 LANG_NAMES = {"it": "Italian", "en": "English", "es": "Spanish", "fr": "French", "de": "German", "pt": "Portuguese",
-              "nl": "Dutch", "ja": "Japanese", "zh": "Chinese", "ru": "Russian", "pl": "Polish", "ar": "Arabic"}
+              "nl": "Dutch", "ja": "Japanese", "zh": "Chinese", "ru": "Russian", "pl": "Polish", "ar": "Arabic",
+              # the other languages the recogniser tells apart (Parakeet's 25 European ones, then Whisper's most common)
+              "bg": "Bulgarian", "hr": "Croatian", "cs": "Czech", "da": "Danish", "et": "Estonian", "fi": "Finnish", "el": "Greek",
+              "hu": "Hungarian", "lv": "Latvian", "lt": "Lithuanian", "mt": "Maltese", "ro": "Romanian", "sk": "Slovak",
+              "sl": "Slovenian", "sv": "Swedish", "uk": "Ukrainian", "no": "Norwegian", "ca": "Catalan", "tr": "Turkish",
+              "he": "Hebrew", "hi": "Hindi", "ko": "Korean", "id": "Indonesian", "vi": "Vietnamese", "th": "Thai", "fa": "Persian"}
 
 WORLD = """Setting: year 2491. Humanity lives in some two hundred star systems linked by the Janus Gates, alien rings
 found under the ice of Europa in 2140. Between 2412 and 2450 the gates went dark (the Silence, or the Long Night):
@@ -146,6 +151,10 @@ def _speech_rules(lang: str) -> str:
   longer. No lists, no markdown, no stage directions, no emojis.
 - Every acknowledgement carries content: WHAT was set and on what, with the value that matters. Never a bare "aye". Good: {good}
   Bad: {bad} When the ship already is as ordered, say so in those terms.
+- Every number you say is one you have: from the ship's state, from the Captain's words, or from a tool result you have
+  read. A value your order will only produce (the new heading, a time to arrive, a range still to be reached) is not yet
+  known when you speak in the same call as the order: name the target and the order instead ("intercetto il Lethe, tengo
+  dieci chilometri"), never an invented bearing, heading or time.
 - Speak like an officer, not like a console: never read a mode, a tool or a parameter name aloud (no "viewscreen_target",
   "shields_face_threat", "standoff", "engage"): say it in plain words of the language ("schermo principale", "scudi verso la
   minaccia", "distanza di sei chilometri", "fuoco continuo"). Say the whole line in the Captain's language: no English words

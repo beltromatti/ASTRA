@@ -1,6 +1,9 @@
 // ASTRA — the adaptive score.
 
 #include "AstraMusicSubsystem.h"
+#include "AstraMindSubsystem.h"
+#include "AstraSettings.h"
+#include "Engine/GameInstance.h"
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
@@ -114,7 +117,7 @@ void UAstraMusicSubsystem::Play(EAstraMood NewMood, float Fade)
 	if (Current)
 	{
 		Current->bIsUISound = false;
-		Current->SetVolumeMultiplier(GMusicVolume * Duck);
+		Current->SetVolumeMultiplier(GMusicVolume * FAstraSettings::Get().Music * Duck);
 		// a battle starts at the top (the drums); the others at a random place, so the calm never sounds the same
 		const float Start = NewMood == EAstraMood::Battle ? 0.f : FMath::FRandRange(0.f, FMath::Max(0.f, S->GetDuration() - 30.f));
 		Current->FadeIn(NewMood == EAstraMood::Battle ? FMath::Min(Fade, 1.5f) : Fade, 1.f, Start);
@@ -126,16 +129,31 @@ void UAstraMusicSubsystem::Tick(float DeltaTime)
 {
 	SCOPE_CYCLE_COUNTER(STAT_AstraMusic);
 	Since += DeltaTime;
-	// the officers must be understood: the music steps back while any of them speaks
-	bool bSpeaking = false;
-	for (TActorIterator<AAstraCrewMember> It(GetWorld()); It && !bSpeaking; ++It)
+	// the voices must be understood: the music steps back while someone has the floor — an officer, a voice on the
+	// radio, the Captain speaking — as the mind says (protocollo_voce §4.4); a mind that does not say: while an officer's
+	// voice sounds. Down in 0.15 s, held half a second after the floor falls quiet (no pumping between two lines), up
+	// in 0.8 s.
+	bool bFloor = false;
+	const UGameInstance* GI = GetWorld()->GetGameInstance();
+	const UAstraMindSubsystem* Mind = GI ? GI->GetSubsystem<UAstraMindSubsystem>() : nullptr;
+	if (Mind && Mind->SaysFloor())
 	{
-		bSpeaking = It->IsSpeaking();
+		bFloor = Mind->IsFloorTaken();
 	}
-	Duck = FMath::FInterpTo(Duck, bSpeaking ? 0.55f : 1.f, DeltaTime, bSpeaking ? 6.f : 1.2f);
+	else
+	{
+		for (TActorIterator<AAstraCrewMember> It(GetWorld()); It && !bFloor; ++It)
+		{
+			bFloor = It->IsSpeaking();
+		}
+	}
+	DuckHold = bFloor ? 0.5f : DuckHold - DeltaTime;
+	// while the Captain holds the talk key the music drops further (-12 dB): less of it reaches the microphone
+	const float DuckTo = Mind && Mind->IsCaptainTalking() ? 0.25f : (DuckHold > 0.f ? 0.55f : 1.f);
+	Duck = FMath::FInterpConstantTo(Duck, DuckTo, DeltaTime, (1.f - 0.55f) / (DuckTo < Duck ? 0.15f : 0.8f));
 	if (Current)
 	{
-		Current->SetVolumeMultiplier(GMusicVolume * Duck);
+		Current->SetVolumeMultiplier(GMusicVolume * FAstraSettings::Get().Music * Duck);
 	}
 	// the Janus lane: the swell is timed so that its hit lands on the crossing
 	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
@@ -154,7 +172,7 @@ void UAstraMusicSubsystem::Tick(float DeltaTime)
 			Stinger = UGameplayStatics::CreateSound2D(GetWorld(), TransitCue, 1.f, 1.f, 0.f, nullptr, false, true);
 			if (Stinger)
 			{
-				Stinger->SetVolumeMultiplier(FMath::Min(1.f, GMusicVolume * 1.8f));
+				Stinger->SetVolumeMultiplier(FMath::Min(1.f, GMusicVolume * FAstraSettings::Get().Music * 1.8f));
 				Stinger->Play(FMath::Max(0.f, 8.f - LaneLeft));
 			}
 		}

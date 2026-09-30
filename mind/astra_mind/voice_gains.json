@@ -1,0 +1,758 @@
+{
+ "de/alba": {
+  "lufs": -23.23,
+  "peak": -6.53
+ },
+ "de/anna": {
+  "lufs": -24.43,
+  "peak": -7.04
+ },
+ "de/azelma": {
+  "lufs": -23.17,
+  "peak": -7.55
+ },
+ "de/bill_boerst": {
+  "lufs": -27.22,
+  "peak": -11.52
+ },
+ "de/caro_davy": {
+  "lufs": -24.77,
+  "peak": -10.11
+ },
+ "de/charles": {
+  "lufs": -26.69,
+  "peak": -10.23
+ },
+ "de/cosette": {
+  "lufs": -27.61,
+  "peak": -13.16
+ },
+ "de/daan": {
+  "lufs": -25.28,
+  "peak": -9.05
+ },
+ "de/eponine": {
+  "lufs": -24.96,
+  "peak": -10.12
+ },
+ "de/estelle": {
+  "lufs": -24.88,
+  "peak": -11.19
+ },
+ "de/eve": {
+  "lufs": -23.33,
+  "peak": -8.41
+ },
+ "de/fantine": {
+  "lufs": -24.39,
+  "peak": -9.57
+ },
+ "de/george": {
+  "lufs": -24.54,
+  "peak": -9.17
+ },
+ "de/giovanni": {
+  "lufs": -26.94,
+  "peak": -10.47
+ },
+ "de/jane": {
+  "lufs": -25.78,
+  "peak": -10.23
+ },
+ "de/javert": {
+  "lufs": -30.05,
+  "peak": -14.84
+ },
+ "de/jean": {
+  "lufs": -23.65,
+  "peak": -7.09
+ },
+ "de/juergen": {
+  "lufs": -26.66,
+  "peak": -10.93
+ },
+ "de/lola": {
+  "lufs": -25.16,
+  "peak": -10.2
+ },
+ "de/marius": {
+  "lufs": -27.01,
+  "peak": -10.86
+ },
+ "de/mary": {
+  "lufs": -23.67,
+  "peak": -8.87
+ },
+ "de/michael": {
+  "lufs": -25.99,
+  "peak": -8.85
+ },
+ "de/paul": {
+  "lufs": -25.07,
+  "peak": -9.64
+ },
+ "de/peter_yearsley": {
+  "lufs": -27.44,
+  "peak": -12.1
+ },
+ "de/rafael": {
+  "lufs": -26.16,
+  "peak": -9.77
+ },
+ "de/stuart_bell": {
+  "lufs": -28.13,
+  "peak": -14.01
+ },
+ "de/vera": {
+  "lufs": -25.0,
+  "peak": -10.17
+ },
+ "en/alba": {
+  "lufs": -20.08,
+  "peak": -5.4
+ },
+ "en/anna": {
+  "lufs": -18.66,
+  "peak": -4.7
+ },
+ "en/azelma": {
+  "lufs": -18.96,
+  "peak": -5.18
+ },
+ "en/bill_boerst": {
+  "lufs": -25.59,
+  "peak": -12.34
+ },
+ "en/caro_davy": {
+  "lufs": -23.57,
+  "peak": -9.3
+ },
+ "en/charles": {
+  "lufs": -22.22,
+  "peak": -5.48
+ },
+ "en/cosette": {
+  "lufs": -31.29,
+  "peak": -17.36
+ },
+ "en/daan": {
+  "lufs": -22.27,
+  "peak": -5.9
+ },
+ "en/eponine": {
+  "lufs": -19.66,
+  "peak": -4.91
+ },
+ "en/estelle": {
+  "lufs": -20.65,
+  "peak": -5.69
+ },
+ "en/eve": {
+  "lufs": -20.36,
+  "peak": -5.29
+ },
+ "en/fantine": {
+  "lufs": -19.83,
+  "peak": -6.64
+ },
+ "en/george": {
+  "lufs": -18.74,
+  "peak": -3.62
+ },
+ "en/giovanni": {
+  "lufs": -27.37,
+  "peak": -11.85
+ },
+ "en/jane": {
+  "lufs": -20.08,
+  "peak": -5.97
+ },
+ "en/javert": {
+  "lufs": -27.34,
+  "peak": -12.46
+ },
+ "en/jean": {
+  "lufs": -19.03,
+  "peak": -2.7
+ },
+ "en/juergen": {
+  "lufs": -28.02,
+  "peak": -11.87
+ },
+ "en/lola": {
+  "lufs": -19.84,
+  "peak": -7.12
+ },
+ "en/marius": {
+  "lufs": -31.37,
+  "peak": -14.05
+ },
+ "en/mary": {
+  "lufs": -18.89,
+  "peak": -4.88
+ },
+ "en/michael": {
+  "lufs": -20.72,
+  "peak": -4.85
+ },
+ "en/paul": {
+  "lufs": -19.4,
+  "peak": -3.94
+ },
+ "en/peter_yearsley": {
+  "lufs": -30.21,
+  "peak": -13.92
+ },
+ "en/rafael": {
+  "lufs": -26.69,
+  "peak": -10.01
+ },
+ "en/stuart_bell": {
+  "lufs": -33.44,
+  "peak": -17.51
+ },
+ "en/vera": {
+  "lufs": -19.89,
+  "peak": -4.76
+ },
+ "es/alba": {
+  "lufs": -25.33,
+  "peak": -9.59
+ },
+ "es/anna": {
+  "lufs": -25.82,
+  "peak": -10.26
+ },
+ "es/azelma": {
+  "lufs": -24.77,
+  "peak": -9.16
+ },
+ "es/bill_boerst": {
+  "lufs": -27.24,
+  "peak": -12.51
+ },
+ "es/caro_davy": {
+  "lufs": -25.97,
+  "peak": -10.45
+ },
+ "es/charles": {
+  "lufs": -28.93,
+  "peak": -11.44
+ },
+ "es/cosette": {
+  "lufs": -28.75,
+  "peak": -13.91
+ },
+ "es/daan": {
+  "lufs": -24.44,
+  "peak": -7.72
+ },
+ "es/eponine": {
+  "lufs": -25.43,
+  "peak": -10.27
+ },
+ "es/estelle": {
+  "lufs": -24.4,
+  "peak": -9.66
+ },
+ "es/eve": {
+  "lufs": -24.64,
+  "peak": -8.05
+ },
+ "es/fantine": {
+  "lufs": -25.04,
+  "peak": -9.8
+ },
+ "es/george": {
+  "lufs": -24.39,
+  "peak": -8.09
+ },
+ "es/giovanni": {
+  "lufs": -26.24,
+  "peak": -9.83
+ },
+ "es/jane": {
+  "lufs": -26.24,
+  "peak": -10.49
+ },
+ "es/javert": {
+  "lufs": -28.4,
+  "peak": -12.03
+ },
+ "es/jean": {
+  "lufs": -25.95,
+  "peak": -9.52
+ },
+ "es/juergen": {
+  "lufs": -27.47,
+  "peak": -10.44
+ },
+ "es/lola": {
+  "lufs": -24.62,
+  "peak": -8.96
+ },
+ "es/marius": {
+  "lufs": -25.07,
+  "peak": -8.25
+ },
+ "es/mary": {
+  "lufs": -24.37,
+  "peak": -9.31
+ },
+ "es/michael": {
+  "lufs": -26.85,
+  "peak": -10.96
+ },
+ "es/paul": {
+  "lufs": -25.18,
+  "peak": -8.47
+ },
+ "es/peter_yearsley": {
+  "lufs": -26.02,
+  "peak": -8.51
+ },
+ "es/rafael": {
+  "lufs": -25.74,
+  "peak": -8.31
+ },
+ "es/stuart_bell": {
+  "lufs": -29.01,
+  "peak": -13.16
+ },
+ "es/vera": {
+  "lufs": -24.85,
+  "peak": -9.38
+ },
+ "fr/alba": {
+  "lufs": -19.53,
+  "peak": -5.92
+ },
+ "fr/anna": {
+  "lufs": -19.74,
+  "peak": -6.07
+ },
+ "fr/azelma": {
+  "lufs": -20.15,
+  "peak": -6.15
+ },
+ "fr/bill_boerst": {
+  "lufs": -27.75,
+  "peak": -12.57
+ },
+ "fr/caro_davy": {
+  "lufs": -25.15,
+  "peak": -11.16
+ },
+ "fr/charles": {
+  "lufs": -23.24,
+  "peak": -8.32
+ },
+ "fr/cosette": {
+  "lufs": -31.03,
+  "peak": -16.83
+ },
+ "fr/daan": {
+  "lufs": -27.41,
+  "peak": -10.54
+ },
+ "fr/eponine": {
+  "lufs": -20.53,
+  "peak": -7.03
+ },
+ "fr/estelle": {
+  "lufs": -22.85,
+  "peak": -9.21
+ },
+ "fr/eve": {
+  "lufs": -21.36,
+  "peak": -6.21
+ },
+ "fr/fantine": {
+  "lufs": -19.64,
+  "peak": -6.31
+ },
+ "fr/george": {
+  "lufs": -21.66,
+  "peak": -6.61
+ },
+ "fr/giovanni": {
+  "lufs": -25.33,
+  "peak": -9.4
+ },
+ "fr/jane": {
+  "lufs": -20.39,
+  "peak": -6.66
+ },
+ "fr/javert": {
+  "lufs": -25.97,
+  "peak": -11.11
+ },
+ "fr/jean": {
+  "lufs": -21.5,
+  "peak": -8.27
+ },
+ "fr/juergen": {
+  "lufs": -30.71,
+  "peak": -14.47
+ },
+ "fr/lola": {
+  "lufs": -20.73,
+  "peak": -7.5
+ },
+ "fr/marius": {
+  "lufs": -32.4,
+  "peak": -16.15
+ },
+ "fr/mary": {
+  "lufs": -20.7,
+  "peak": -6.64
+ },
+ "fr/michael": {
+  "lufs": -20.78,
+  "peak": -6.49
+ },
+ "fr/paul": {
+  "lufs": -20.12,
+  "peak": -5.3
+ },
+ "fr/peter_yearsley": {
+  "lufs": -31.61,
+  "peak": -14.1
+ },
+ "fr/rafael": {
+  "lufs": -29.93,
+  "peak": -12.93
+ },
+ "fr/stuart_bell": {
+  "lufs": -33.99,
+  "peak": -17.81
+ },
+ "fr/vera": {
+  "lufs": -21.52,
+  "peak": -6.93
+ },
+ "it/alba": {
+  "lufs": -20.91,
+  "peak": -5.58
+ },
+ "it/anna": {
+  "lufs": -20.98,
+  "peak": -6.16
+ },
+ "it/azelma": {
+  "lufs": -21.7,
+  "peak": -7.03
+ },
+ "it/bill_boerst": {
+  "lufs": -27.0,
+  "peak": -11.26
+ },
+ "it/caro_davy": {
+  "lufs": -24.84,
+  "peak": -9.64
+ },
+ "it/charles": {
+  "lufs": -25.09,
+  "peak": -8.66
+ },
+ "it/cosette": {
+  "lufs": -28.85,
+  "peak": -13.27
+ },
+ "it/daan": {
+  "lufs": -28.08,
+  "peak": -10.12
+ },
+ "it/eponine": {
+  "lufs": -20.25,
+  "peak": -5.5
+ },
+ "it/estelle": {
+  "lufs": -22.87,
+  "peak": -8.93
+ },
+ "it/eve": {
+  "lufs": -21.07,
+  "peak": -4.74
+ },
+ "it/fantine": {
+  "lufs": -21.64,
+  "peak": -7.37
+ },
+ "it/george": {
+  "lufs": -22.46,
+  "peak": -5.59
+ },
+ "it/giovanni": {
+  "lufs": -26.94,
+  "peak": -10.16
+ },
+ "it/jane": {
+  "lufs": -21.7,
+  "peak": -6.05
+ },
+ "it/javert": {
+  "lufs": -27.77,
+  "peak": -12.16
+ },
+ "it/jean": {
+  "lufs": -22.84,
+  "peak": -8.03
+ },
+ "it/juergen": {
+  "lufs": -29.28,
+  "peak": -11.87
+ },
+ "it/lola": {
+  "lufs": -22.48,
+  "peak": -7.28
+ },
+ "it/marius": {
+  "lufs": -30.8,
+  "peak": -13.03
+ },
+ "it/mary": {
+  "lufs": -22.52,
+  "peak": -6.45
+ },
+ "it/michael": {
+  "lufs": -25.0,
+  "peak": -9.08
+ },
+ "it/paul": {
+  "lufs": -22.6,
+  "peak": -6.71
+ },
+ "it/peter_yearsley": {
+  "lufs": -29.2,
+  "peak": -12.52
+ },
+ "it/rafael": {
+  "lufs": -29.1,
+  "peak": -12.54
+ },
+ "it/stuart_bell": {
+  "lufs": -32.32,
+  "peak": -15.06
+ },
+ "it/vera": {
+  "lufs": -22.24,
+  "peak": -7.5
+ },
+ "nl/alba": {
+  "lufs": -25.41,
+  "peak": -9.5
+ },
+ "nl/anna": {
+  "lufs": -26.58,
+  "peak": -10.77
+ },
+ "nl/azelma": {
+  "lufs": -24.86,
+  "peak": -10.06
+ },
+ "nl/bill_boerst": {
+  "lufs": -27.69,
+  "peak": -10.53
+ },
+ "nl/caro_davy": {
+  "lufs": -26.79,
+  "peak": -11.42
+ },
+ "nl/charles": {
+  "lufs": -28.0,
+  "peak": -11.03
+ },
+ "nl/cosette": {
+  "lufs": -28.44,
+  "peak": -12.23
+ },
+ "nl/daan": {
+  "lufs": -26.52,
+  "peak": -10.52
+ },
+ "nl/eponine": {
+  "lufs": -26.32,
+  "peak": -10.44
+ },
+ "nl/estelle": {
+  "lufs": -25.36,
+  "peak": -11.4
+ },
+ "nl/eve": {
+  "lufs": -26.33,
+  "peak": -9.32
+ },
+ "nl/fantine": {
+  "lufs": -25.82,
+  "peak": -11.62
+ },
+ "nl/george": {
+  "lufs": -26.86,
+  "peak": -9.76
+ },
+ "nl/giovanni": {
+  "lufs": -27.09,
+  "peak": -11.64
+ },
+ "nl/jane": {
+  "lufs": -27.85,
+  "peak": -12.98
+ },
+ "nl/javert": {
+  "lufs": -29.42,
+  "peak": -13.14
+ },
+ "nl/jean": {
+  "lufs": -27.08,
+  "peak": -9.55
+ },
+ "nl/juergen": {
+  "lufs": -28.9,
+  "peak": -11.95
+ },
+ "nl/lola": {
+  "lufs": -26.49,
+  "peak": -11.45
+ },
+ "nl/marius": {
+  "lufs": -27.38,
+  "peak": -11.16
+ },
+ "nl/mary": {
+  "lufs": -24.71,
+  "peak": -9.87
+ },
+ "nl/michael": {
+  "lufs": -28.33,
+  "peak": -11.96
+ },
+ "nl/paul": {
+  "lufs": -25.64,
+  "peak": -9.31
+ },
+ "nl/peter_yearsley": {
+  "lufs": -29.25,
+  "peak": -12.07
+ },
+ "nl/rafael": {
+  "lufs": -26.47,
+  "peak": -10.03
+ },
+ "nl/stuart_bell": {
+  "lufs": -30.11,
+  "peak": -15.72
+ },
+ "nl/vera": {
+  "lufs": -25.96,
+  "peak": -11.64
+ },
+ "pt/alba": {
+  "lufs": -26.9,
+  "peak": -10.61
+ },
+ "pt/anna": {
+  "lufs": -25.15,
+  "peak": -10.25
+ },
+ "pt/azelma": {
+  "lufs": -22.91,
+  "peak": -8.87
+ },
+ "pt/bill_boerst": {
+  "lufs": -26.72,
+  "peak": -10.67
+ },
+ "pt/caro_davy": {
+  "lufs": -26.03,
+  "peak": -11.78
+ },
+ "pt/charles": {
+  "lufs": -27.18,
+  "peak": -10.71
+ },
+ "pt/cosette": {
+  "lufs": -29.57,
+  "peak": -13.67
+ },
+ "pt/daan": {
+  "lufs": -24.2,
+  "peak": -7.76
+ },
+ "pt/eponine": {
+  "lufs": -25.46,
+  "peak": -9.56
+ },
+ "pt/estelle": {
+  "lufs": -24.54,
+  "peak": -10.96
+ },
+ "pt/eve": {
+  "lufs": -24.7,
+  "peak": -8.34
+ },
+ "pt/fantine": {
+  "lufs": -25.4,
+  "peak": -11.54
+ },
+ "pt/george": {
+  "lufs": -25.75,
+  "peak": -9.24
+ },
+ "pt/giovanni": {
+  "lufs": -25.14,
+  "peak": -8.54
+ },
+ "pt/jane": {
+  "lufs": -24.85,
+  "peak": -9.58
+ },
+ "pt/javert": {
+  "lufs": -27.74,
+  "peak": -11.69
+ },
+ "pt/jean": {
+  "lufs": -26.44,
+  "peak": -10.43
+ },
+ "pt/juergen": {
+  "lufs": -27.39,
+  "peak": -10.77
+ },
+ "pt/lola": {
+  "lufs": -28.45,
+  "peak": -11.12
+ },
+ "pt/marius": {
+  "lufs": -24.16,
+  "peak": -7.12
+ },
+ "pt/mary": {
+  "lufs": -26.4,
+  "peak": -11.2
+ },
+ "pt/michael": {
+  "lufs": -25.54,
+  "peak": -10.5
+ },
+ "pt/paul": {
+  "lufs": -25.37,
+  "peak": -9.14
+ },
+ "pt/peter_yearsley": {
+  "lufs": -26.45,
+  "peak": -10.17
+ },
+ "pt/rafael": {
+  "lufs": -26.05,
+  "peak": -9.91
+ },
+ "pt/stuart_bell": {
+  "lufs": -28.33,
+  "peak": -13.62
+ },
+ "pt/vera": {
+  "lufs": -26.92,
+  "peak": -11.4
+ }
+}

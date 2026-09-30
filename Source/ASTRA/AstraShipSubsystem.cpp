@@ -1688,20 +1688,9 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 			}
 			const FVector Head = It->GetActorLocation() + FVector(0.f, 0.f, It->Posture == EAstraCrewPosture::Standing ? 70.f : 30.f);
 			const float Dist = FVector::Dist(Eye, Head);
-			if (Dist > 1600.f)
+			if (Dist > 1600.f || !It->CanBeHeardFrom(Eye, P))
 			{
-				continue;
-			}
-			// the voice carries over consoles and chairs: blocked only when no line reaches just above the head
-			FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraEarshot), false, P);
-			Q.AddIgnoredActor(*It);
-			FHitResult Hit;
-			const FVector Over[2] = {Head + FVector(0.f, 0.f, 60.f), It->GetActorLocation() + FVector(0.f, 0.f, 190.f)};
-			const bool bHeard = Dist < 400.f || !GetWorld()->LineTraceSingleByChannel(Hit, Eye, Over[0], ECC_Visibility, Q)
-			                                  || !GetWorld()->LineTraceSingleByChannel(Hit, Eye, Over[1], ECC_Visibility, Q);
-			if (!bHeard)
-			{
-				continue;                  // a wall, a door, a bulkhead
+				continue;                  // too far, or a wall, a door, a bulkhead between them
 			}
 			Ear.Add(MakeShared<FJsonValueString>(It->StationId));
 			const float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Look, (Head - Eye).GetSafeNormal()), -1.f, 1.f)));

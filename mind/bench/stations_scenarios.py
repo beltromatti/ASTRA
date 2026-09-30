@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
+import unicodedata
 import sys
 import time
 from dataclasses import dataclass, field
@@ -20,7 +22,7 @@ from typing import Any, Callable
 from lingua import Language, LanguageDetectorBuilder
 
 from astra_mind import initiative, models, router, stations as S
-from astra_mind.agent import BridgeAgent, Turn, is_bare_ack
+from astra_mind.agent import BridgeAgent, Turn
 from astra_mind.context import Channel, Context
 from astra_mind.local_ship import LocalShip
 from astra_mind.openrouter import OpenRouter
@@ -75,7 +77,7 @@ class Harness:
         chk = w.tick(state, 1000.0, flags, None, -100.0, False)
         if chk is None:
             return None, None
-        turn = await self.agent.handle_event(chk.text, self.lang, ask=initiative.watch_ask(self.lang), role="watch", history_turns=4, max_lines=2,
+        turn = await self.agent.handle_event(chk.text, self.lang, ask=initiative.watch_ask(self.lang), role="watch", history_turns=4,
                                              system=initiative.watch_system(self.lang, state, self.agent.standing_lines(),
                                                                             self.agent.style(), initiative.recent_orders(self.agent.history)))
         self.cost += turn.cost
@@ -139,6 +141,41 @@ class Scenario:
         want = lang or h.lang
         wrong = [t for _, t in lines if len(t.split()) >= 5 and not looks_like(t, want)]
         self.must(f"language {want}", not wrong, f"{wrong}")
+
+
+# ------------------------------------------------------------------------------------------------ an evaluation aid
+# (the runtime voices what the officers say as they say it; this word list only grades the bench's transcripts until a
+# model judge replaces it: docs/ARCHITETTURA.md §1bis)
+_CAPTAIN_WORDS = {"captain", "capitano", "capitan", "capitaine", "kapitaen", "kapitan", "sir", "signore", "senor", "monsieur", "herr",
+                  "ma'am", "madam", "signora", "commander", "comandante"}
+_BARE_WORDS = {
+    # English
+    "aye", "ay", "yes", "yeah", "understood", "copy", "copied", "roger", "wilco", "acknowledged", "affirmative", "right", "away", "on", "it",
+    "will", "do", "very", "well", "okay", "ok", "sure", "certainly", "of", "course", "that", "got", "noted", "executing",
+    # Italian
+    "ricevuto", "agli", "ordini", "ai", "suoi", "eseguo", "eseguito", "subito", "si", "certo", "capito", "affermativo", "comandi", "come",
+    "desidera", "sicuro", "va", "bene", "perfetto", "d'accordo", "presente", "pronto",
+    # Spanish
+    "a", "sus", "ordenes", "recibido", "entendido", "enseguida", "afirmativo", "orden", "vale", "claro", "acuerdo",
+    # French
+    "vos", "ordres", "recu", "compris", "tout", "suite", "affirmatif", "oui", "d'accord", "bien",
+    # German
+    "zu", "befehl", "verstanden", "jawohl", "ja", "sofort", "bestaetigt", "gut", "klar",
+}
+
+
+def _plain(text: str) -> list[str]:
+    t = unicodedata.normalize("NFKD", text.lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return re.findall(r"[a-z']+", t)
+
+
+def is_bare_ack(line: str) -> bool:
+    """An acknowledgement that says nothing ("Aye aye, Captain", "Agli ordini", "Ricevuto, Capitano"): only stock words."""
+    words = [w for w in _plain(line) if w not in _CAPTAIN_WORDS]
+    return 0 < len(words) <= 6 and all(w in _BARE_WORDS for w in words)
+
+
 
 
 def transcript(h: Harness, text: str, turn: Turn | None, lines: list[tuple[str, str]]) -> str:
@@ -618,7 +655,7 @@ async def sc_mess_and_medbay(llm: OpenRouter, lang: str) -> Result:
 
 
 async def sc_routing(llm: OpenRouter, lang: str) -> Result:
-    sc = Scenario("routing with an open channel (rules + small model)", lang)
+    sc = Scenario("an open channel: what comms lets out (a small model)", lang)
     ch = Channel(party="T-23", name="Ferryman Irina Vael (the Cocytus)")
     ctx = Context(channel=ch)
     cases = {"it": [("rapporto armamenti", "crew"), ("ci sono navi nemiche", "crew"), ("qui il capitano dell'Aquila, fermatevi o verrete annientati", "external"),
@@ -627,8 +664,9 @@ async def sc_routing(llm: OpenRouter, lang: str) -> Result:
                     ("Tactical, lock missiles on the Cocytus", "crew")]}[lang]
     for text, want in cases:
         t0 = time.perf_counter()
-        r = await router.route(llm, text, ctx)
-        sc.must(f"{text!r} -> {want}", r.dest == want, f"{r.dest} via {r.how} in {(time.perf_counter() - t0) * 1000:.0f} ms")
+        r = await router.for_party(llm, text, ctx)
+        got = "external" if r.external else "crew"
+        sc.must(f"{text!r} -> {want}", got == want, f"{got} ({r.external!r}) via {r.how} in {(time.perf_counter() - t0) * 1000:.0f} ms")
     sc.res.transcript.append("routes: " + "; ".join(f"{t!r}" for t, _ in cases))
     return sc.res
 
