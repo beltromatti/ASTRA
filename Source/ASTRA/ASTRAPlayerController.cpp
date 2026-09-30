@@ -325,6 +325,24 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 	bSeated = bSit;
 }
 
+void AASTRAPlayerController::AstraBoardFalcon()
+{
+	APawn* Me = GetPawn();
+	if (!Cast<ACharacter>(Me))
+	{
+		return;
+	}
+	TActorIterator<AAstraHangar> It(GetWorld());
+	if (It)
+	{
+		if (bSeated)
+		{
+			SetSeated(false);
+		}
+		BoardFalcon(*It, Me);
+	}
+}
+
 void AASTRAPlayerController::BoardFalcon(AAstraHangar* Hangar, APawn* Walker)
 {
 	// a moment of dark (climbing the ladder, strapping in), then the cockpit on Alpha's catapult

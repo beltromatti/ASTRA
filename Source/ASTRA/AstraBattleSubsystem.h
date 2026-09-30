@@ -366,6 +366,7 @@ public:
 	/** Recovered through the bow tube (bLanded) or the pod picked up after an ejection: the craft leaves the battle. */
 	void EndPiloted(bool bLanded);
 	bool IsPiloting() const { return PilotedId >= 0; }
+	int32 GetPilotedId() const { return PilotedId; }
 	/** Where the Captain is, for the crew: flying (with range and state) or "" when aboard. */
 	FString PilotSummary() const;
 	/** Bridge world (cm) -> system frame (m), and back for rotations. */
