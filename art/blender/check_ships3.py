@@ -112,6 +112,14 @@ def main() -> None:
         results[name] = r
         bad += 1 if r["problems"] else 0
         print(json.dumps(r))
+    # the build-time checks the generator wrote into the manifest (the Aquila against its interiors and the plan's decks)
+    for name, e in meshes.items():
+        ck = e.get("checks")
+        if not ck or (args["only"] and not any(o in (name, name.split("_")[-1]) for o in args["only"])):
+            continue
+        fails = [k for k, v in ck.items() if k == "ok" and v is False] + (["nave"] if isinstance(ck.get("nave"), dict) and ck["nave"].get("ok") is False else [])
+        print(json.dumps({"mesh": name, "build_checks": "ok" if not fails else fails, "nave": {k: v for k, v in (ck.get("nave") or {}).items() if k.startswith("deck") or k == "ok"}}))
+        bad += 1 if fails else 0
     # pieces against the whole ship
     for name, e in meshes.items():
         if e["class"] != "section" or name not in results:

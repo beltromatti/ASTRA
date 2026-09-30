@@ -399,4 +399,4 @@ def build_harpy(c: Ctx) -> dict:
     landing_gear(c, [(L * 0.28, 0.0, -h * 0.7), (-L * 0.15, w * 1.1, -h * 0.7), (-L * 0.15, -w * 1.1, -h * 0.7)], -1.4)
     H.scatter_details(c, plates, st)
     MD.patches(c, plates, st, p=0.25)
-    return {"length_m": 17.0, "cam_az": -35.0, "cam_el": 18.0, "cam_dist": 2.3, "sun_az": -50.0, "sun_el": 32.0, "closeups": [], "cuts": None}
+    return {"length_m": 17.0, "cam_az": -35.0, "cam_el": 18.0, "cam_dist": 2.3, "sun_az": -50.0, "sun_el": 32.0, "exposure": 0.7, "closeups": [], "cuts": None}
