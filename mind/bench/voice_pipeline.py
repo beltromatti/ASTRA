@@ -728,6 +728,64 @@ def summary_lines(stt, live, lang, other, tts, floor, mem) -> list[str]:  # noqa
     return S
 
 
+def decisions_lines(stt, live, tts, floor, mem, other) -> list[str]:  # noqa: ANN001
+    """What was decided on these measurements, with the numbers that decided it (whatever sections were run)."""
+    D: list[str] = ["## Decisioni prese su queste misure", ""]
+    base = {n: d for n, d in (stt or {}).items() if "@" not in n}
+
+    def med(rows, key="wall"):  # noqa: ANN001, ANN202
+        return statistics.median([x[key] for x in rows]) if rows else float("nan")
+
+    pk, wb, wt, v3 = base.get("parakeet-ultra"), base.get("whisperkit-baseline"), base.get("whisperkit-tuned"), base.get("parakeet-v3")
+    if pk and wb:
+        pair = stt_anchor_rows(base, "whisperkit-baseline")
+        if pair:
+            an, mine, theirs = pair
+            D.append(f"1. **Il motore di riconoscimento è Parakeet Ultra sul Neural Engine.** Mediana {fmt_ms(med(theirs))} ms contro {fmt_ms(med(mine))} ms di Whisper large-v3-turbo "
+                     f"sulle stesse frasi (×{med(mine) / max(1e-9, med(theirs)):.0f} più veloce); WER pulito {wer_cond(theirs, 'clean')} contro {wer_cond(mine, 'clean')}, "
+                     f"rumoroso {wer_cond(theirs, 'noisy')} contro {wer_cond(mine, 'noisy')}, difficile {wer_cond(theirs, 'hard')} contro {wer_cond(mine, 'hard')}. "
+                     "Whisper resta per le lingue che Parakeet non conosce (giapponese, cinese, coreano, arabo, turco…).")
+    if pk and v3:
+        D.append(f"2. **Ultra e non v3**: stessa velocità, WER pulito {wer_cond(pk['rows'], 'clean')} contro {wer_cond(v3['rows'], 'clean')} e in condizioni difficili "
+                 f"{wer_cond(pk['rows'], 'hard')} contro {wer_cond(v3['rows'], 'hard')}.")
+    if wb and wt:
+        D.append(f"3. **I flag di WhisperKit non si toccano.** «Tarato» (senza fallback di temperatura né divisione in blocchi) guadagna {100 * (1 - med(wt['rows']) / med(wb['rows'])):.0f} % di tempo "
+                 f"e nel rumore peggiora molto (WER difficile {wer_cond(wt['rows'], 'hard')} contro {wer_cond(wb['rows'], 'hard')}): il fallback di temperatura serve quando l'audio è brutto.")
+    if pk and wb:
+        D.append("4. **Il secondo parere di Whisper non si chiede per confidenza bassa sulle lingue europee**: sulle stesse frasi Whisper non fa meglio di Parakeet, e chiedergli "
+                 "un parere su ogni frase con confidenza sotto 0,86 avrebbe fatto attendere circa il 6 % delle frasi pulite, il 14 % delle rumorose e il 54 % di quelle in battaglia "
+                 "di 1,8 s per un risultato in media peggiore. La regola è: confidenza sotto 0,84 **e** nessuna parola di plancia nel testo (è quello che Parakeet scrive per una lingua "
+                 "che non conosce: 6 frasi su 6 in sei lingue non europee; 0,5 % delle frasi europee pulite, 1 % delle rumorose, 11 % delle difficili).")
+    variants = [n for n in base if n.startswith(("whisperkit-turbo632", "whisperkit-small216", "faster-whisper", "parakeet-onnx"))]
+    if variants:
+        parts = []
+        for n in variants:
+            pair = stt_anchor_rows(base, n)
+            if pair:
+                an, mine, theirs = pair
+                parts.append(f"{n}: mediana {fmt_ms(med(mine))} ms (Parakeet Ultra {fmt_ms(med(theirs))} ms), WER pulito {wer_cond(mine, 'clean')} (Ultra {wer_cond(theirs, 'clean')}), "
+                             f"rumoroso {wer_cond(mine, 'noisy')} (Ultra {wer_cond(theirs, 'noisy')})")
+        if parts:
+            D.append("5. **Le alternative provate** (stesso campione, motori alternati): " + "; ".join(parts) + ".")
+    if live:
+        d = live.get("parakeet-ultra")
+        if d:
+            lat = [x["latency"] + 0.1 for x in d["rows"]]
+            D.append(f"6. **Bozze mentre il tasto è premuto**: dal rilascio al testo mediana {fmt_ms(statistics.median(lat))} ms, massimo {fmt_ms(max(lat))} ms "
+                     f"({100 * np.mean([x['partial_hit'] for x in d['rows']]):.0f} % delle risposte già pronte alla pressione del tasto).")
+    if tts:
+        d = tts.get("tts") or next(iter(tts.values()))
+        rows = d["rows"]
+        D.append(f"7. **Sintesi**: velocità ×{d['speed']} (le righe durano {100 * (1 - np.mean([x['new']['dur'] for x in rows]) / np.mean([x['old']['dur'] for x in rows])):.0f} % di meno con le pause accorciate), "
+                 f"volume uniforme a {d['target_lufs']} LUFS (σ {np.std([x['old']['lufs'] for x in rows]):.1f} → {np.std([x['new']['lufs'] for x in rows]):.1f} dB), "
+                 "voci sostituite dove una è poco comprensibile in una lingua (una sostituta per un solo ufficiale).")
+    if floor:
+        D.append("8. **Palco del parlato**: il Capitano prende la parola al tasto (chi parla si ferma alla pausa entro mezzo secondo), la sua risposta passa prima di tutto, "
+                 "le altre righe sono dette, unite, accorciate o scartate secondo regole chiare e mai in silenzio.")
+    D.append("")
+    return D
+
+
 def report(args) -> None:  # noqa: ANN001
     out = REPO_ROOT / "docs" / "bench" / f"voce_{TODAY}.md"
     L: list[str] = [f"# Voce: riconoscimento, sintesi, palco del parlato — {TODAY}", ""]
@@ -886,6 +944,7 @@ def report(args) -> None:  # noqa: ANN001
             if k in mem:
                 L.append(f"| {label} | {mem[k]} |")
         L.append("")
+    L += decisions_lines(stt, live, tts, floor, mem, other)
     out.write_text("\n".join(L) + "\n", encoding="utf-8")
     print("REPORT", out)
 

@@ -51,7 +51,7 @@ _UNIT_AFTER = re.compile(r"(\d)\s?(km/h|km/s|m/s|%|°|km|m)(?![A-Za-z])")
 def _say_int(n: int, lang: str) -> str:
     if num2words is None or n > 9_999_999:
         return " ".join(_DIGITS[lang][int(c)] for c in str(n))
-    return num2words(n, lang=_N2W[lang])
+    return num2words(n, lang=_N2W[lang]).replace(",", "")           # (English writes "one thousand, two hundred": a comma is a pause)
 
 
 def _digit_by_digit(s: str, lang: str) -> str:
@@ -79,11 +79,16 @@ def speakable(text: str, lang: str) -> str:
     def with_unit(m: re.Match) -> str:
         return f"{m.group(1)} {units[m.group(2)]}"
     t = _UNIT_AFTER.sub(lambda m: with_unit(m), t)
-    # decimals: 3,5 (or 3.5 in English) -> three point five
-    dec = r"(\d+)\.(\d+)" if lang == "en" else r"(\d+),(\d+)"
-    t = re.sub(dec, lambda m: f"{_say_int(int(m.group(1)), lang)} {_POINT[lang]} {_digit_by_digit(m.group(2), lang) if len(m.group(2)) > 1 else _say_int(int(m.group(2)), lang)}", t)
-    # a dot between groups of three digits is a thousands separator outside English: 1.200 -> 1200
-    if lang != "en":
+    # decimals: 3,5 (3.5 in English; outside English a dot with one or two decimals too: a model writing Italian often writes 3.2)
+    def decimal(m: re.Match) -> str:
+        return f"{_say_int(int(m.group(1)), lang)} {_POINT[lang]} {_digit_by_digit(m.group(2), lang) if len(m.group(2)) > 1 else _say_int(int(m.group(2)), lang)}"
+    if lang == "en":
+        t = re.sub(r"(?<=\d),(?=\d{3}\b)", "", t)                       # a comma between groups of three digits: 1,200 -> 1200
+        t = re.sub(r"(\d+)\.(\d+)", decimal, t)
+    else:
+        t = re.sub(r"(\d+),(\d+)", decimal, t)
+        t = re.sub(r"(?<![\d.])(\d+)\.(\d{1,2})\b(?!\.\d)", decimal, t)
+        # a dot between groups of three digits is a thousands separator outside English: 1.200 -> 1200
         t = re.sub(r"(?<=\d)\.(?=\d{3}\b)", "", t)
     t = re.sub(r"\d+", lambda m: _say_int(int(m.group(0)), lang) if len(m.group(0)) <= 7 else _digit_by_digit(m.group(0), lang), t)
     t = t.replace("&", " and ").replace("+", " plus ")

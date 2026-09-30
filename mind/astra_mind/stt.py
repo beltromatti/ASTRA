@@ -40,6 +40,7 @@ ESCALATE_CONF = 0.84                # below this confidence, and with no word of
                                     # in noise, or with a crew word in them, are not worth the two seconds: Whisper is no better at them
 PAD_MS = 220.0                      # silence kept around the speech: the ends of words are quiet
 BOOT_WAIT_S = 4.0                   # how long a first phrase waits for the fast engine before the other one answers it
+SECOND_WAIT_S = 12.0                # ... and for the second engine to start when the phrase is the first that needs it
 IDLE_RELEASE_S = 600.0              # the second engine is let go after this long without a phrase
 
 # things Whisper "hears" in silence or noise (its training data is full of subtitle credits)
@@ -214,6 +215,15 @@ class Recognizer:
         """Is this engine up? One that has not been tried is started now; the first engine, still starting in the
         background, is waited for only when `wait`."""
         state = self._up.get(backend.name)
+        if state is False and getattr(backend, "starting", False):
+            # it did not come up in time but its server is still working on it: it may be ready by now (a quick look, no waiting)
+            try:
+                if await backend.ready():
+                    self._up[backend.name] = True
+                    return True
+            except Exception:  # noqa: BLE001
+                pass
+            return False
         if state is not None:
             return state
         if backend is self.primary:
@@ -225,7 +235,12 @@ class Recognizer:
                 return False
             return bool(self._up.get(backend.name))
         try:
-            self._up[backend.name] = await backend.start()
+            # the second engine is started by the first phrase that needs it: a phrase does not wait minutes for a model that is
+            # still compiling (the first start on a machine): it goes without, and the engine is picked up when it is ready
+            self._up[backend.name] = await asyncio.wait_for(backend.start(), timeout=SECOND_WAIT_S)
+        except asyncio.TimeoutError:
+            log.warning("%s is not ready yet: this phrase goes without it", backend.name)
+            self._up[backend.name] = False
         except Exception:  # noqa: BLE001
             log.exception("%s failed to start", backend.name)
             self._up[backend.name] = False
@@ -380,6 +395,8 @@ def main() -> None:
     ap.add_argument("--fetch", action="store_true",
                     help="download what this machine needs: the Parakeet model through the helper (Apple Silicon) or the ONNX export (elsewhere)")
     ap.add_argument("--fetch-portable", action="store_true", help="download the ONNX export of Parakeet (any platform, ~490 MB)")
+    ap.add_argument("--warm-whisper", action="store_true",
+                    help="start WhisperKit once so the Neural Engine compiles its model (minutes, the first time on a machine only)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)                     # (its lines carry the download's long signed address)
@@ -387,6 +404,12 @@ def main() -> None:
     print("Parakeet (ONNX, CPU, any platform):", "yes" if SherpaParakeetBackend.available() else "no (uv sync --extra portable; --fetch-portable)")
     print("WhisperKit:", "yes" if WhisperKitBackend.available() else "no (whisperkit-cli)")
     print("faster-whisper:", "yes" if FasterWhisperBackend.available() else "no (uv sync --extra portable)")
+    if args.warm_whisper:
+        async def warm() -> None:
+            b = WhisperKitBackend()
+            print("WhisperKit ready:", await b.start(timeout_s=1800.0))
+            b.stop()
+        asyncio.run(warm())
     if args.fetch_portable or (args.fetch and not ParakeetBackend.available()):
         print("Parakeet (ONNX) model:", fetch_sherpa_model())
     elif args.fetch:

@@ -149,6 +149,9 @@ def speech_text() -> None:
     check("text: Spanish and French numbers", speakable("Rumbo 217, 50 %", "es") == "Rumbo dos uno siete, cincuenta por ciento"
           and speakable("Cap 217, 45 km", "fr") == "Cap deux un sept, quarante-cinq kilomètres")
     check("text: decimals and thousands (Italian)", speakable("3,5 km/s e 1.200 metri", "it") == "tre virgola cinque chilometri al secondo e milleduecento metri")
+    check("text: a decimal written with a dot outside English, a comma thousand in English",
+          speakable("Velocità 3.2 km/s a 1.200 m", "it") == "Velocità tre virgola due chilometri al secondo a milleduecento metri"
+          and speakable("range 1,200 metres", "en") == "range one thousand two hundred metres")
     check("text: em dashes, brackets and ellipses become pauses", speakable("Quota (12 km) — sotto…", "it") == "Quota, dodici chilometri, sotto.")
     check("text: a language without a front end is left alone", speakable("今日は217です", "ja") == "今日は217です")
     check("text: words are untouched", speakable("Agli ordini, Capitano.", "it") == "Agli ordini, Capitano.")
@@ -197,6 +200,38 @@ async def recogniser() -> None:
     r2 = Recognizer(backends=[Fake("parakeet", frozenset({"it", "en"}), "x", 0.9), Fake("whisperkit", None, "Timoniere, rotta due uno sette", None, lang="it")], prior="ja")
     tr = await r2.recognise(speech_pcm())
     check("recogniser: a Captain speaking a language the fast engine lacks goes straight to the other", tr.backend == "whisperkit" and r2.backends[0].calls == 0)
+
+    # a second engine that is still compiling its model: the phrase goes without it, and it is taken up when it is ready
+    import astra_mind.stt as stt_module
+
+    class SlowStart(Fake):
+        starting = False
+        is_ready = False
+
+        async def start(self) -> bool:
+            self.starting = True
+            await asyncio.sleep(30.0)
+            self.is_ready = True
+            return True
+
+        async def ready(self) -> bool:
+            return self.is_ready
+
+    slow2 = SlowStart("whisperkit", None, "Kancho, jikai.", None, lang="ja")
+    r12 = Recognizer(backends=[Fake("parakeet", frozenset({"it"}), "Kancho, Harimichinihakujna na Zensoku", 0.7, fast=True), slow2], prior="it")
+    await r12.ready()
+    was = stt_module.SECOND_WAIT_S
+    stt_module.SECOND_WAIT_S = 0.2
+    try:
+        t0 = time.perf_counter()
+        tr = await r12.recognise(speech_pcm())
+        check("recogniser: a second engine still compiling does not hold the phrase (it goes without it)",
+              not tr.escalated and tr.text.startswith("Kancho, Harimichinihakujna") and time.perf_counter() - t0 < 1.5, f"{time.perf_counter() - t0:.2f}s escalated={tr.escalated}")
+        slow2.is_ready = True
+        tr = await r12.recognise(speech_pcm())
+        check("recogniser: ... and is picked up once its server is ready", tr.escalated and tr.text == "Kancho, jikai.", f"escalated={tr.escalated} {tr.text!r}")
+    finally:
+        stt_module.SECOND_WAIT_S = was
 
     r10 = Recognizer(backends=[Fake("parakeet", frozenset({"it"}), "x", 0.9, fast=True), Fake("whisperkit", None, "y", None, lang="ja")], prior="ja")
     await r10.ready()

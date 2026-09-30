@@ -263,27 +263,36 @@ class WhisperKitBackend(SttBackend):
         except httpx.HTTPError:
             return False
 
-    async def start(self) -> bool:
+    @property
+    def starting(self) -> bool:
+        """Its server is still coming up (the first start on a machine compiles the model for the Neural Engine: minutes): it may be
+        ready later, and the recogniser asks again before giving up on it."""
+        return self._proc is not None and self._proc.poll() is None
+
+    async def start(self, timeout_s: float = 300.0) -> bool:
         async with self._start_lock:
             if await self.ready():
                 return True
-            exe = shutil.which("whisperkit-cli")
-            if not exe or not self.model_dir.exists():
-                log.warning("WhisperKit unavailable (cli: %s, model: %s)", bool(exe), self.model_dir.exists())
-                return False
-            log.info("starting WhisperKit server (port %d)", self.port)
-            self._proc = subprocess.Popen([exe, "serve", "--model-path", str(self.model_dir), "--port", str(self.port), "--host", "127.0.0.1",
-                                           *self.extra_args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if self.starting:
+                exe = True                                     # (one already launched by an earlier call: wait for that one)
+            else:
+                exe = shutil.which("whisperkit-cli")
+                if not exe or not self.model_dir.exists():
+                    log.warning("WhisperKit unavailable (cli: %s, model: %s)", bool(exe), self.model_dir.exists())
+                    return False
+                log.info("starting WhisperKit server (port %d)", self.port)
+                self._proc = subprocess.Popen([exe, "serve", "--model-path", str(self.model_dir), "--port", str(self.port), "--host", "127.0.0.1",
+                                               *self.extra_args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             t0 = time.perf_counter()
-            while time.perf_counter() - t0 < 300:
+            while time.perf_counter() - t0 < timeout_s:
                 if await self.ready():
                     log.info("WhisperKit ready in %.1f s", time.perf_counter() - t0)
                     return True
-                if self._proc.poll() is not None:
-                    log.error("WhisperKit server exited (code %s)", self._proc.returncode)
+                if self._proc is None or self._proc.poll() is not None:
+                    log.error("WhisperKit server exited (code %s)", self._proc.returncode if self._proc else "?")
                     return False
                 await asyncio.sleep(0.4)
-            log.error("WhisperKit did not start")
+            log.error("WhisperKit is not ready after %.0f s (it may still be compiling its model)", timeout_s)
             return False
 
     async def transcribe(self, pcm16: bytes, *, lang: str | None = None, prompt: str | None = None) -> BackendResult:
