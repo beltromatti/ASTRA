@@ -426,6 +426,16 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			LineTexts.Remove(Id);
 		}
 		AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Msg->GetStringField(TEXT("speaker")));
+		if (!Crew)
+		{
+			// not one of ours: a voice over a channel (the main viewscreen shows who is speaking)
+			ExternalLineId = Id;
+			if (const TPair<FString, FString>* T = HeardLines.Num() ? &HeardLines.Last() : nullptr)
+			{
+				ExternalSpeaker = T->Key;
+				ExternalLine = T->Value;
+			}
+		}
 		// an officer the Captain can hear in person speaks from their station; one far away (the Captain on the flight
 		// deck, in a Falcon, down on New Ravenna) comes over the intercom or the radio
 		bool bNear = false;
@@ -455,6 +465,12 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 	else if (Type == TEXT("audio_end"))
 	{
 		const int32 Id = (int32)Msg->GetNumberField(TEXT("line"));
+		if (Id == ExternalLineId)
+		{
+			ExternalLineId = -1;
+			ExternalSpeaker.Reset();
+			ExternalLine.Reset();
+		}
 		if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(UGameplayStatics::GetPlayerController(GameWorld(), 0)))
 		{
 			PC->SubtitleEnd(Id);

@@ -17,11 +17,18 @@
 
 **Agenti di supporto attivi** (worktree in `.claude/worktrees/`, rami `worktree-*`; il lead prova nel gioco, unisce, rimanda i difetti):
 - **VOCE** (`agent-a7f749a395e3717dd`) — riconoscimento più rapido in tutte le lingue, sintesi più veloce e con volume costante, turni di parola con priorità al Capitano, niente sottotitoli senza voce (`mind/astra_mind/{speech,stt,tts,audio_in}.py`, `docs/protocollo_voce.md`).
-- ~~MENTE-EQUIPAGGIO~~ (unito il 30/9; richieste al C++ in `docs/contratto_postazioni.md` §8) · ~~ARTE-PLANCIA~~ (unito e importato il 30/9).
+- **GUERRA** — fase F2.1–F2.2: danni fisici (scudi per faccia, corazza e struttura per sezione, sottosistemi, relitti disattivati), gerarchie e intelligenza di gruppo (gruppi di battaglia, squadriglie, caccia che evitano la difesa di punto), prova di scala; tutto misurato col banco senza grafica (`docs/GUERRA.md`).
+- **NAVE** — fase F4.1: la pianta dell'Aquila (`data/ship/aquila_plan.json`: 12 ponti, sezioni A–H, compartimenti, grafo dei percorsi) e il primo ponte completo (Deck 4) con kit di corridoi e stanze da Blender e script d'import (lo esegue il lead); richiede al C++ luci di zona (fatto: `UAstraZoneLights`) e percorsi sul grafo.
+- ~~MENTE-EQUIPAGGIO~~ (unito il 30/9, con il seguito: bersaglio action, hostiles, battle short, pre-riscaldamento; 93 test) · ~~ARTE-PLANCIA~~ (unito e importato il 30/9).
 
 **Banco della guerra senza grafica**: `tools/war.py run|report|ship|ab` (commandlet `AstraWarSim`, ~1000× il tempo reale, deterministico per seme; vedi [GUERRA.md](GUERRA.md)).
 
 **Strumenti di prova del lead** (gioco con `tools/play.py launch --nomind`; `tools/play.py tp X Y YAW PITCH` per le foto): `astra.battle.time 170` (arriva il gruppo d'attacco), `astra.cmd station {...}`, `astra.viewscreen.dump` (l'immagine dello schermo principale a piena risoluzione), `astra.screens.dump <Pagina>` (una console su PNG), `/state` con `context`.
+
+## Prestazioni (30/9, finestra 1600×900, plancia v3 in battaglia; misure sporche quando gli agenti compilano)
+- La cattura dello schermo principale raddoppiava il thread di rendering (36 ms): ora vede solo gli attori dello spazio → ~16 ms.
+- GPU per passaggio a 70% (ProfileGPU): luci differite ~6 ms (17 luci in un passaggio a cluster, il sole con l'ombra virtuale 1,35 ms), ombre 2 ms, Nanite 2,3 ms, base pass 1,8 ms, Lumen 2 ms, traslucidi 1,3 ms, post 1 ms; la cattura ~3 ms per immagine.
+- Fatto: bias dell'ombra virtuale del sole a 0 (−3 ms), cattura a 20 Hz (−0,7 ms), nitidezza dopo TSR. La risoluzione dinamica restava al 40% (pixel grossi): il thread di gioco (~13 ms) e quello di rendering sono ora il limite insieme alla GPU. Prossimo: misure a macchina scarica con `tools/play.py perf`, costo del thread di gioco (tick degli attori ~7 ms), luci della plancia.
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -42,6 +49,7 @@
 | 2026-09-29 | 10,00 $ | 2,79 $ | misure di prestazioni per l'app (la mente partiva anche nelle prove: ora `-astra_nomind`) |
 | 2026-09-29 | 10,00 $ | 3,12 $ | **prima partita dell'utente** con l'app (≈35 minuti, due sessioni: 0,33 $, cioè ≈0,5–0,6 $ l'ora di gioco con regista, nemici e memoria) |
 | 2026-09-30 | 10,00 $ | 3,56 $ | agenti di supporto: prove del router su più modelli (MENTE-EQUIPAGGIO ≈0,22 $ in 1192 chiamate) |
+| 2026-09-30 | 10,00 $ | 3,84 $ | MENTE-EQUIPAGGIO completato (0,40 $ in tutto), prova della mente nel gioco vero |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 

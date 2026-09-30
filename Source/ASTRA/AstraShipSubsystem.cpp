@@ -1650,6 +1650,11 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	                                                                                                          : TEXT("DECK 1 · CORRIDORS");
 }
 
+FString UAstraShipSubsystem::GetViewscreenDescription() const
+{
+	return Viewscreen ? Viewscreen->Describe() : FString(TEXT("off (no viewscreen)"));
+}
+
 TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 {
 	TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();

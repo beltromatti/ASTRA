@@ -99,6 +99,8 @@ protected:
 	void TogglePad();
 	UFUNCTION(Exec) void AstraPad() { TogglePad(); }
 	void TickPad(float DeltaTime);
+	/** Brackets and names on the bow window (AstraWindowHud). */
+	TSharedPtr<class FAstraWindowHud> WindowHud;
 	UPROPERTY() TObjectPtr<class UStaticMeshComponent> PadMesh;
 	bool bPadUp = false;
 	float PadAlpha = 0.f;

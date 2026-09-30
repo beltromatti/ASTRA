@@ -1,6 +1,8 @@
 #include "AstraViewscreen.h"
 #include "ASTRA.h"
 #include "AstraShipSubsystem.h"
+#include "AstraMindSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "AstraStations.h"
 #include "CanvasItem.h"
 #include "Camera/PlayerCameraManager.h"
@@ -826,6 +828,7 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	TMap<EAstraSide, TPair<FVector2D, int32>> CraftGroups;
 	struct FLabelReq { const FContact* C; FBox2D Box; FLinearColor Col; int32 Order; };
 	TArray<FLabelReq> Pending;
+	TArray<FVector2D> ArrowTags;
 	for (const FContact& C : Contacts)
 	{
 		const FVector World = B->WorldOf(C.Pos);
@@ -850,7 +853,18 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 				D.Line(Tip, Tip - Dir * 16.f * S + Side * 8.f * S, Col, 2.f);
 				D.Line(Tip, Tip - Dir * 16.f * S - Side * 8.f * S, Col, 2.f);
 				const FString Tag = C.RangeKm >= 0.0 ? FString::Printf(TEXT("%s %.0f km"), *C.ContactId, C.RangeKm) : C.ContactId;
-				const FVector2D At = Tip - Dir * 30.f * S;
+				FVector2D At = Tip - Dir * 30.f * S;
+				// two arrows on the same edge: the second label steps below the first
+				for (int32 Try = 0; Try < 4; ++Try)
+				{
+					const bool bClash = ArrowTags.ContainsByPredicate([&](const FVector2D& Q) { return FMath::Abs(Q.X - At.X) < 160.f * S && FMath::Abs(Q.Y - At.Y) < PxData * 1.2f; });
+					if (!bClash)
+					{
+						break;
+					}
+					At.Y += PxData * 1.3f;
+				}
+				ArrowTags.Add(At);
 				D.Text(At.X, At.Y - PxData * 0.5f, Tag, true, PxData, Col, Dir.X > 0.3f ? 2 : (Dir.X < -0.3f ? 0 : 1));
 			}
 			continue;
@@ -904,6 +918,14 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	// already written: right of its box, left, below, above; else only its id; else nothing (the box says enough)
 	Pending.Sort([](const FLabelReq& A, const FLabelReq& B) { return A.Order < B.Order; });
 	TArray<FBox2D> Taken;
+	const FString Party = Ship ? Ship->GetChannelParty() : FString();
+	const bool bCard = Mode == TEXT("comms") && !Party.IsEmpty();
+	const FBox2D CardBox(FVector2D((Width - Width * 0.46f) * 0.5f, Top + (Bottom - Top - Height * 0.46f) * 0.5f),
+	                     FVector2D((Width + Width * 0.46f) * 0.5f, Top + (Bottom - Top + Height * 0.46f) * 0.5f));
+	if (bCard)
+	{
+		Taken.Add(CardBox);               // the voice on the channel has the middle of the screen
+	}
 	auto Free = [&Taken, Width, Top, Bottom](const FBox2D& Q)
 	{
 		if (Q.Min.X < 4.f || Q.Max.X > Width - 4.f || Q.Min.Y < Top || Q.Max.Y > Bottom)
@@ -1011,6 +1033,54 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 			D.Line(P + FVector2D(0, r), P + FVector2D(-r, 0), ColAlarm, 1.8f);
 			D.Line(P + FVector2D(-r, 0), P + FVector2D(0, -r), ColAlarm, 1.8f);
 		}
+	}
+	// a voice on the channel: in comms mode a card over the party's ship (who, whose, the voice); otherwise a banner
+	const UAstraMindSubsystem* Mind = W->GetGameInstance() ? W->GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr;
+	const FString Voice = Mind ? Mind->GetExternalSpeaker() : FString();
+	if (bCard)
+	{
+		const float CW = CardBox.GetSize().X, CH = CardBox.GetSize().Y, CX = CardBox.Min.X, CY = CardBox.Min.Y;
+		D.Tile(CX, CY, CW, CH, FLinearColor(0.f, 0.02f, 0.05f, 0.62f));
+		const FLinearColor Acc = Party.StartsWith(TEXT("T-")) ? ColMandate : ColAstra;
+		D.Line(FVector2D(CX, CY), FVector2D(CX + CW, CY), Acc, 2.f);
+		D.Line(FVector2D(CX, CY + CH), FVector2D(CX + CW, CY + CH), Acc, 2.f);
+		D.Text(CX + 18.f * S, CY + 12.f * S, Party.StartsWith(TEXT("T-")) ? TEXT("KHARON MANDATE · OPEN CHANNEL") : TEXT("ASTRA 7TH FLEET · COMMAND NET"), true, PxData, Dimmed(Acc, 0.9f));
+		// who is on the other end: the voice while it speaks, else the commander named in the ship's class, else the ship
+		FString Who = Voice.ToUpper();
+		if (Who.IsEmpty())
+		{
+			if (const FContact* PC = FindC(Contacts, Party))
+			{
+				FString Head, Cmdr;
+				Who = PC->Class.Split(TEXT("flagship of "), &Head, &Cmdr) ? Cmdr.Replace(TEXT(")"), TEXT("")).ToUpper() : PC->Label.ToUpper();
+			}
+			else
+			{
+				Who = Party.ToUpper();
+			}
+		}
+		int32 Paren = INDEX_NONE;
+		if (Who.FindChar(TEXT('('), Paren))
+		{
+			Who = Who.Left(Paren).TrimEnd();
+		}
+		D.Text(CX + 18.f * S, CY + 44.f * S, Who, false, 40.f * S, ColText);
+		// the voice: a line that moves while they speak, flat while they listen
+		FVector2D Prev(CX + 18.f * S, CY + CH * 0.72f);
+		for (int32 k = 1; k <= 80; ++k)
+		{
+			const float X = CX + 18.f * S + (CW - 36.f * S) * k / 80.f;
+			const float A = Voice.IsEmpty() ? 1.5f * S : 22.f * S * (0.35f + 0.65f * FMath::Abs(FMath::Sin((float)Now * 2.3f + k * 0.11f)));
+			const FVector2D Q(X, CY + CH * 0.72f + A * FMath::Sin((float)Now * 17.f + k * 0.9f) * FMath::Sin(k * 0.23f + (float)Now));
+			D.Line(Prev, Q, Acc, 2.f);
+			Prev = Q;
+		}
+		D.Text(CX + 18.f * S, CY + CH - 30.f * S, Voice.IsEmpty() ? TEXT("LISTENING") : TEXT("SPEAKING"), true, PxData, Voice.IsEmpty() ? ColDim : Acc);
+	}
+	else if (!Voice.IsEmpty())
+	{
+		D.Tile(14.f * S, Top + 8.f * S, D.Width(TEXT("INCOMING  ") + Voice.ToUpper(), true, PxData) + 20.f * S, PxData * 1.5f, FLinearColor(0.f, 0.f, 0.f, 0.6f));
+		D.Text(24.f * S, Top + 10.f * S, TEXT("INCOMING  ") + Voice.ToUpper(), true, PxData, ColMandate);
 	}
 	// the bars: what is on screen and why (top), the Aquila (bottom)
 	D.Tile(0.f, 0.f, Width, Top, FLinearColor(0.f, 0.f, 0.f, 0.42f));

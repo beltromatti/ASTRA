@@ -180,6 +180,8 @@ public:
 	/** Where the Captain's words go (protocol v2 `context`, docs/ARCHITETTURA.md §3): the place, the crew who hear them
 	 *  (distance and walls), the one the Captain is looking at, the open channel, how the Captain is (on foot, seated...). */
 	TSharedRef<FJsonObject> CaptainContext() const;
+	/** What the main viewscreen shows now ("off (the bare window)" when it is off). */
+	FString GetViewscreenDescription() const;
 	/** The comms channel open now ("" when none): the other party's contact id. */
 	const FString& GetChannelParty() const { return ChannelParty; }
 	/** The Captain's standing orders in force ("tactical: weapons free on hostiles inside 10 km"), from the crew's mind. */

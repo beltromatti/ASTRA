@@ -47,6 +47,8 @@ private:
 	int32 ConnectFailures = 0;
 	TArray<uint8> BinaryBuffer;
 	TMap<int32, FString> LineSpeakers;
+	FString ExternalSpeaker, ExternalLine;
+	int32 ExternalLineId = -1;
 	UPROPERTY() TObjectPtr<class UAudioComponent> ChannelAudio;
 	UPROPERTY() TObjectPtr<class USoundWaveProcedural> ChannelWave;
 	int32 ChannelLine = -1;
@@ -70,6 +72,10 @@ public:
 	UWorld* GameWorld() const;
 	/** The last lines the crew spoke (name, text), as heard: the Captain's datapad keeps a comms log. */
 	const TArray<TPair<FString, FString>>& GetHeardLines() const { return HeardLines; }
+	/** Someone not of the crew speaking now over a channel (the Archon, the Admiral, a controller): their name, else "". */
+	const FString& GetExternalSpeaker() const { return ExternalSpeaker; }
+	/** What they are saying (the line in flight). */
+	const FString& GetExternalLine() const { return ExternalLine; }
 
 private:
 	TArray<TPair<FString, FString>> HeardLines;

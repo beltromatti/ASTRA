@@ -4,6 +4,8 @@
 cd "$(dirname "$0")/.."
 PY=/opt/homebrew/bin/python3.13
 EDITOR_BIN="UnrealEditor.app/Contents/MacOS/UnrealEditor"
+# a game started by the playtest harness runs the same binary: close it first
+pgrep -f "astra_harness_port" >/dev/null && $PY tools/play.py quit >/dev/null 2>&1
 if pgrep -f "$EDITOR_BIN" >/dev/null; then
   $PY tools/ue.py pie stop >/dev/null 2>&1
   $PY tools/ue.py py "import unreal
