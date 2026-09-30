@@ -237,6 +237,7 @@ bool UAstraScreensSubsystem::IsLive(const FString& Name)
 	                                   TEXT("Ops_C"), TEXT("Sensors_A"), TEXT("Sensors_B"), TEXT("Eng_A"), TEXT("Eng_B"),
 	                                   TEXT("Mess_News"), TEXT("Mess_Memorial"), TEXT("Pad"),
 	                                   // the control surfaces: the desk panels, and the third monitor where it had a static page
+	                                   TEXT("Comms_A"), TEXT("Comms_B"), TEXT("Flight_A"), TEXT("Flight_B"),
 	                                   TEXT("Helm_Touch"), TEXT("Ops_Touch"), TEXT("Sensors_Touch"), TEXT("Eng_Touch"), TEXT("Flight_Touch"),
 	                                   TEXT("Comms_Touch"), TEXT("Helm_C"), TEXT("Sensors_C"), TEXT("Eng_C"), TEXT("Flight_C"), TEXT("Comms_C")};
 	return Live.Contains(Name);
@@ -404,6 +405,8 @@ void UAstraScreensSubsystem::DrawPage(const FString& Name, UCanvas* Canvas, int3
 				DrawControls(Canvas, Width, Height, *Id);
 			}
 		}
+		else if (Station == TEXT("Comms")) { DrawComms(Canvas, Width, Height, Slot); }
+		else if (Station == TEXT("Flight")) { DrawFlight(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Helm")) { DrawHelm(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Ops")) { DrawOps(Canvas, Width, Height, Slot); }
 		else if (Station == TEXT("Sensors")) { DrawSensors(Canvas, Width, Height, Slot); }
@@ -1619,10 +1622,16 @@ void UAstraScreensSubsystem::DrawPadFleet(UCanvas* C, int32 W, int32 H)
 	P.Line(MX, 350, RX, 350, DIM);
 	P.Text(MX, 358, TEXT("AQUILA AIR GROUP"), false, 18, CYAN);
 	float QY = 388.f;
-	for (const auto& KV : Ship->GetSquadrons())
+	const TSharedRef<FJsonObject> Sq = Battle->SquadronsJson();
+	for (const auto& KV : Sq->Values)
 	{
-		P.Text(MX, QY, KV.Key.ToUpper(), true, 17, TEXTC, 0, true);
-		P.Text(MX + 120, QY, KV.Value.ToUpper().Left(80), true, 15, TEXTC);
+		FString V;
+		if (!KV.Value.IsValid() || !KV.Value->TryGetString(V))
+		{
+			continue;
+		}
+		P.Text(MX, QY, FString(*KV.Key).ToUpper(), true, 17, TEXTC, 0, true);
+		P.Text(MX + 120, QY, V.ToUpper().Left(80), true, 15, TEXTC);
 		QY += 26.f;
 	}
 	P.Line(MX, 480, RX, 480, DIM);
@@ -1689,5 +1698,156 @@ void UAstraScreensSubsystem::DrawPadOrders(UCanvas* C, int32 W, int32 H)
 	for (int32 i = 0; i < FMath::Min(Orders.Num(), 4); ++i)
 	{
 		P.Text(MX, Y + 40 + i * 22, (TEXT("· ") + Orders[Orders.Num() - 1 - i]).Left(96), true, 15, TEXTC);
+	}
+}
+
+void UAstraScreensSubsystem::DrawComms(UCanvas* C, int32 W, int32 H, const FString& Slot)
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraMindSubsystem* Mind = GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<UAstraMindSubsystem>() : nullptr;
+	if (!Ship)
+	{
+		return;
+	}
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	const FString Party = Ship->GetChannelParty();
+	P.Header(W, Slot == TEXT("A") ? TEXT("Communications · Traffic") : TEXT("Communications · Channel"),
+	         Party.IsEmpty() ? FString(TEXT("NO CHANNEL OPEN")) : FString::Printf(TEXT("CHANNEL OPEN · %s"), *Party.ToUpper()), COMMAND);
+	if (Slot == TEXT("B"))
+	{
+		// the channel: who is on it, and a live waveform while it is open
+		P.Panel(20, 60, W - 20, 250, TEXT("Channel"));
+		P.Text(40, 100, Party.IsEmpty() ? FString(TEXT("STANDING BY")) : Party.ToUpper(), false, 54, Party.IsEmpty() ? DIM : AMBER);
+		P.Text(40, 170, Party.IsEmpty() ? FString(TEXT("FLEET NET MONITORED · ALL FREQUENCIES")) : FString(TEXT("OPEN · TWO-WAY · ENCRYPTED")), true, 18, CYAN);
+		const float Base = 330.f;
+		P.Panel(20, 270, W - 20, H - 20, TEXT("Signal"));
+		FVector2D Prev(40.f, Base + 60.f);
+		for (int32 x = 0; x <= 120; ++x)
+		{
+			const float T = Time * 3.f + x * 0.21f;
+			const float A = Party.IsEmpty() ? 4.f : 38.f * (0.4f + 0.6f * FMath::Abs(FMath::Sin(Time * 1.7f + x * 0.05f)));
+			const FVector2D Q(40.f + (W - 80.f) * x / 120.f, Base + 60.f + A * FMath::Sin(T) * FMath::Sin(T * 0.37f + 1.f));
+			P.Line(Prev.X, Prev.Y, Q.X, Q.Y, Party.IsEmpty() ? DIM : CYAN, 2.f);
+			Prev = Q;
+		}
+		return;
+	}
+	// A: the traffic heard, newest at the bottom; then the ship's recent events
+	P.Panel(20, 60, W - 20, H * 0.62f, TEXT("Heard"));
+	TArray<TPair<FString, FString>> Lines;
+	if (Mind)
+	{
+		const TArray<TPair<FString, FString>>& Heard = Mind->GetHeardLines();
+		for (int32 i = FMath::Max(0, Heard.Num() - 7); i < Heard.Num(); ++i)
+		{
+			Lines.Add(Heard[i]);
+		}
+	}
+	float Y = 100.f;
+	for (const TPair<FString, FString>& L : Lines)
+	{
+		FString Who = L.Key;
+		int32 Paren = INDEX_NONE;
+		if (Who.FindChar(TEXT('('), Paren))
+		{
+			Who = Who.Left(Paren).TrimEnd();
+		}
+		P.Text(40, Y, Who.ToUpper().Left(28), true, 15, CYAN);
+		int32 k = 0;
+		for (const FString& Seg : Wrap(L.Value, 66))
+		{
+			if (k++ < 2)
+			{
+				P.Text(300, Y, Seg, true, 15, TEXTC);
+				Y += 20.f;
+			}
+		}
+		Y += 6.f;
+		if (Y > H * 0.62f - 24.f)
+		{
+			break;
+		}
+	}
+	if (Lines.Num() == 0)
+	{
+		P.Text(40, 100, TEXT("QUIET ON ALL CHANNELS"), true, 16, DIM);
+	}
+	P.Panel(20, H * 0.62f + 16.f, W - 20, H - 20, TEXT("Log"));
+	const TArray<FString>& Ev = Ship->GetRecentEvents();
+	float EY = H * 0.62f + 56.f;
+	for (int32 i = FMath::Max(0, Ev.Num() - 5); i < Ev.Num(); ++i)
+	{
+		P.Text(40, EY, Ev[i].Left(110), true, 14, i == Ev.Num() - 1 ? TEXTC : DIM);
+		EY += 20.f;
+	}
+}
+
+void UAstraScreensSubsystem::DrawFlight(UCanvas* C, int32 W, int32 H, const FString& Slot)
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	if (!Ship || !Battle)
+	{
+		return;
+	}
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	P.Header(W, Slot == TEXT("A") ? TEXT("Flight Operations · Air Group") : TEXT("Flight Operations · In Flight"), TEXT("CAG · DECK 9"), AMBER);
+	TArray<UAstraBattleSubsystem::FContactView> Cs;
+	Battle->GetContacts(Cs);
+	int32 Ours = 0, Theirs = 0;
+	for (const UAstraBattleSubsystem::FContactView& Ct : Cs)
+	{
+		Ours += (Ct.bCraft && Ct.Side == EAstraSide::Astra) ? 1 : 0;
+		Theirs += (Ct.bCraft && Ct.Side == EAstraSide::Mandate) ? 1 : 0;
+	}
+	if (Slot == TEXT("A"))
+	{
+		// the three groups: what each is doing, one panel each
+		float Y = 60.f;
+		const float PH = (H - 80.f) / 3.f;
+		// the battle's own state of each group (the ship's table only holds the start of the campaign)
+		TArray<TPair<FString, FString>> Groups;
+		const TSharedRef<FJsonObject> Sq = Battle->SquadronsJson();   // held: a temporary's Values would dangle in the loop
+		for (const auto& KV : Sq->Values)
+		{
+			FString V;
+			if (KV.Value.IsValid() && KV.Value->TryGetString(V))
+			{
+				Groups.Add({FString(*KV.Key), V});
+			}
+		}
+		for (const TPair<FString, FString>& KV : Groups)
+		{
+			P.Panel(20, Y, W - 20, Y + PH - 10.f, KV.Key);
+			const bool bUp = KV.Value.Contains(TEXT("airborne")) || KV.Value.Contains(TEXT("CAP")) || KV.Value.Contains(TEXT("strike")) || KV.Value.Contains(TEXT("escort"));
+			P.Text(40, Y + 44.f, bUp ? TEXT("IN FLIGHT") : TEXT("ON DECK"), false, 34, bUp ? AMBER : GREEN);
+			int32 k = 0;
+			for (const FString& Seg : Wrap(KV.Value.ToUpper(), 60))
+			{
+				if (k < 3)
+				{
+					P.Text(340, Y + 44.f + 22.f * k++, Seg, true, 16, TEXTC);
+				}
+			}
+			Y += PH;
+		}
+		return;
+	}
+	// B: the sky around the Aquila: our craft and theirs
+	P.Panel(20, 60, W - 20, 220, TEXT("Sky"));
+	P.Text(40, 100, FString::Printf(TEXT("%d"), Ours), false, 64, CYAN);
+	P.Text(40, 176, TEXT("OURS IN FLIGHT"), true, 16, CYAN);
+	P.Text(W - 40, 100, FString::Printf(TEXT("%d"), Theirs), false, 64, Theirs ? RED : DIM, 2);
+	P.Text(W - 40, 176, TEXT("ENEMY CRAFT"), true, 16, Theirs ? RED : DIM, 2);
+	P.Panel(20, 240, W - 20, H - 20, TEXT("Flight line"));
+	int32 k = 0;
+	for (const FString& Seg : Wrap(Battle->FlightLine(), 60))
+	{
+		if (k < 12)
+		{
+			P.Text(40, 280 + 22.f * k++, Seg, true, 16, TEXTC);
+		}
 	}
 }
