@@ -120,11 +120,12 @@ namespace Core
 		id<MTLComputePipelineState> MotionPipeline_ = nil;
 		id<MTLComputePipelineState> ExposurePipeline_ = nil;
 		id<MTLComputePipelineState> DebugPipeline_ = nil;
-		id<MTLTexture> MotionTexture_ = nil;     // what the scaler reads as motion vectors
+		id<MTLTexture> MotionTexture_ = nil;     // what the scaler reads as motion vectors, as big as the color texture it goes with
 		id<MTLTexture> ExposureTexture_ = nil;   // 1x1 R16F
 		id<MTLTexture> DummyVelocity_ = nil;     // bound when there is no velocity texture
 		id<MTLTexture> DummyEye_ = nil;          // same for the eye adaptation texture
-		id<MTLTexture> ColorCopy_ = nil;         // when the rendered rectangle does not start at the texture's corner
+		id<MTLTexture> ColorCopy_ = nil;         // a view that does not start at the textures' corner (letterboxing) has its rectangle of
+		id<MTLTexture> DepthCopy_ = nil;         // color and depth copied to these, of the output's size, for the scaler
 
 		std::atomic<bool> bFailed_{ false };
 		mutable std::mutex Mutex_;               // guards FailureReason_ and Timings_

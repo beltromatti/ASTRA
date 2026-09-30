@@ -10,6 +10,9 @@ status=0
 echo "== probe_core (the plugin's Metal code, pipelined frames, bad frames refused)"
 ./.build/probe_core 2>&1 | grep -v "core log" | grep -E "FAIL|PASS|PSNR|frames completed" || status=1
 ./.build/probe_core > /dev/null 2>&1 || { echo "probe_core FAILED"; status=1; }
+# MetalFX has its own assertions in Metal's validation layer (color, depth and motion of one size, usages, scale range): the
+# plugin's Metal code must be clean there, it is what the game runs under when started with MTL_DEBUG_LAYER=1
+if MTL_DEBUG_LAYER=1 ./.build/probe_core > /dev/null 2>&1; then echo "probe_core under the Metal validation layer: clean"; else echo "probe_core FAILED under the Metal validation layer"; status=1; fi
 echo "== probe_motion (motion kernel vs geometric truth)"
 ./.build/probe_motion | tail -3 || status=1
 ./.build/probe_motion > /dev/null 2>&1 || { echo "probe_motion FAILED"; status=1; }

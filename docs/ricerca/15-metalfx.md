@@ -111,9 +111,9 @@ anche la scrittura del frame dopo contro la lettura di MetalFX.
 
 | Cosa | Unreal | MetalFX | Come |
 |---|---|---|---|
-| colore | `PF_FloatRGBA` (RGBA16F), rettangolo `ViewRect` | `colorTexture` RGBA16F, contenuto nell'angolo (0,0) | diretto; se `ViewRect.Min` ≠ 0 una copia blit |
-| profondità | `PF_DepthStencil` = `Depth32Float_Stencil8`, **reversed Z** (1 vicino, 0 lontano) | qualunque formato di profondità va bene (accettato anche D32F_S8 nel descrittore) | diretta, `depthReversed = YES` |
-| movimento | `Velocity`: RG16 o RGBA16 UNORM codificato (`FVelocityRendering::GetFormat`; se manca un 1×1 nero), **solo i pixel che disegnano velocità** (oggetti in moto, ossa); gli altri sono 0 | `motionTexture` RG16F: *pixel del rettangolo di ingresso, posizione precedente meno attuale, x a destra, y in giù* | kernel `astra_motion`: dinamici = decodifica della codifica di Unreal (`Common.ush`), statici = riproiezione della profondità con `ClipToPrevClip` come fa TSR |
+| colore | `PF_FloatRGBA` (RGBA16F), rettangolo `ViewRect` | `colorTexture` RGBA16F, contenuto nell'angolo (0,0) | diretto; se `ViewRect.Min` ≠ 0 (vista con bande nere) colore e profondità sono copiati all'angolo di due texture nostre grandi come l'uscita |
+| profondità | `PF_DepthStencil` = `Depth32Float_Stencil8`, **reversed Z** (1 vicino, 0 lontano) | qualunque formato di profondità va bene (accettato anche D32F_S8 nel descrittore) | diretta (o la copia), `depthReversed = YES`; il layer di validazione di MetalFX chiede la stessa larghezza e altezza per colore, profondità e movimento |
+| movimento | `Velocity`: RG16 o RGBA16 UNORM codificato (`FVelocityRendering::GetFormat`; se manca un 1×1 nero), **solo i pixel che disegnano velocità** (oggetti in moto, ossa); gli altri sono 0 | `motionTexture` RG16F: *pixel del rettangolo di ingresso, posizione precedente meno attuale, x a destra, y in giù* | grande quanto la texture del colore (rifatta solo se quella cambia dimensione: le texture di scena di Unreal sono arrotondate a multipli di 8, per esempio 1712×1112 per un'uscita di 1710×1107); kernel `astra_motion`: dinamici = decodifica della codifica di Unreal (`Common.ush`), statici = riproiezione della profondità con `ClipToPrevClip` come fa TSR |
 | jitter | `TemporalJitterPixels` = spostamento dell'immagine in pixel (+x destra, +y giù) | `jitterOffsetX/Y` | **identico, senza cambiare segno** (provato con un PSNR contro la verità) |
 | esposizione | colore × `PreExposure`; il tonemapper moltiplica per `Exposure` (eye adaptation `x`) | `preExposure` e `exposureTexture` (R16F 1×1) | `preExposure = View.PreExposure`; kernel `astra_exposure` copia `EyeAdaptation.x` |
 | risoluzione dinamica | rettangolo che varia frame per frame dentro texture allocate al limite alto | `inputContentProperties`: fattore di scala = uscita / ingresso in **[1, 3]** (supportato da M4), `inputContentWidth/Height` per frame | scaler creato **per dimensione d'uscita** (ingresso massimo = uscita); `GetMin/MaxUpsampleResolutionFraction` = 1/3…1 |
@@ -138,7 +138,7 @@ Esiti delle sonde (macchina: MacBook Air M4, macOS 26.6, Xcode 26.2, tutto con i
   rettangolo, profondità `Depth32Float_Stencil8`, velocità UNORM, frame committati uno dietro l'altro **senza attese** (il command buffer di MetalFX in mezzo a quelli del «renderer»: solo il hazard tracking li ordina):
   19,74 dB (come `probe_e2e`), identico con texture più grandi, con il rettangolo che non parte dall'angolo (la copia) e con la risoluzione dinamica che cambia a ogni frame (20,05 dB);
   i frame sbagliati (colore senza tracking, formato, dimensione dell'uscita, uso mancante, rettangolo fuori) sono rifiutati con il motivo; rettangoli fuori scala vengono stretti (un avviso) invece di arrivare a MetalFX;
-  **NaN, ±Inf e valori negativi nel colore non avvelenano l'uscita** (MetalFX li assorbe: 0 valori non finiti anche nel frame avvelenato, quindi nessun passo di pulizia); uno scaler fallito produce un'uscita nera; gli oggetti che il chiamante fa tenere in vita (`KeepAlive`, le texture RHI) si rilasciano solo a command buffer finito;
+  **NaN, ±Inf e valori negativi nel colore non avvelenano l'uscita** (MetalFX li assorbe: 0 valori non finiti anche nel frame avvelenato, quindi nessun passo di pulizia); uno scaler fallito produce un'uscita nera; gli oggetti che il chiamante fa tenere in vita (`KeepAlive`, le texture RHI) si rilasciano solo a command buffer finito; **pulito anche sotto il layer di validazione di Metal** (`MTL_DEBUG_LAYER=1`, dove MetalFX asserisce se colore, profondità e movimento non hanno la stessa dimensione: il motivo della texture del movimento grande quanto il colore);
   `probe_core soak 6000`: 6000 frame con rettangolo, offset, reset, velocità ed esposizione che cambiano, i tempi letti da un altro thread: 6000 completati, 0 errori, niente in volo alla fine.
 - `probe_memory`: lo scaler tiene ~48 MB a 1600×900 e ~83 MB a 1710×1107 (vedi §5). `probe_hazard`: vedi §3.3.
 - Controllo dei simboli del plugin compilato (`nm -u` contro gli export dei moduli del motore): ogni simbolo di Unreal che usa è esportato (non usa nulla di `MetalRHI` oltre alle chiamate virtuali
@@ -172,7 +172,7 @@ un guadagno di ~1 ms e più, e un'immagine che `probe_e2e` dice migliore di un s
 
 ## 6. Limiti e rischi noti
 1. **Nessuna prova nel gioco vero** (agente senza editor): l'ordine dei command buffer, la correttezza dei vettori di moto nel gioco e l'immagine sono da verificare dal lead
-   (vedi il rapporto finale e `r.AstraMetalFX.Debug`).
+   (§7 e `r.AstraMetalFX.Debug`).
 2. Le traslucenze sono composte prima dell'upscaler (§2); niente reactive mask né maschera dei pixel con animazione.
 3. Il tempo GPU di MetalFX non entra nella misura della risoluzione dinamica (§3.4).
 4. Una sola vista (niente split screen, niente scene capture: tengono TSR), colore RGBA16F (il formato di scena predefinito), nessun Windows (resta TSR).

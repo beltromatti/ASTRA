@@ -239,7 +239,10 @@ namespace Core
 			}
 
 			const MTLTextureUsage ReadWrite = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
-			Self->MotionTexture_ = MakeTexture(Device, kMotionFormat, OutputW, OutputH, ReadWrite, @"AstraMetalFX motion");
+			// The motion texture follows the size of the color texture it is used with (see Encode). Unreal rounds its scene textures
+			// up to multiples of 8 (QuantizeSceneBufferSize): start with that, so the first frame does not have to allocate on the
+			// Metal submission thread.
+			Self->MotionTexture_ = MakeTexture(Device, kMotionFormat, (OutputW + 7) & ~7, (OutputH + 7) & ~7, ReadWrite, @"AstraMetalFX motion");
 			Self->ExposureTexture_ = MakeTexture(Device, MTLPixelFormatR16Float, 1, 1, ReadWrite, @"AstraMetalFX exposure");
 			Self->DummyVelocity_ = MakeTexture(Device, MTLPixelFormatRGBA16Unorm, 1, 1, MTLTextureUsageShaderRead, @"AstraMetalFX dummy velocity");
 			Self->DummyEye_ = MakeTexture(Device, MTLPixelFormatRGBA32Float, 1, 1, MTLTextureUsageShaderRead, @"AstraMetalFX dummy eye adaptation");
@@ -362,6 +365,40 @@ namespace Core
 					Frame.ViewW, Frame.ViewH, OutputW_, OutputH_, ContentW, ContentH));
 			}
 
+			// MetalFX wants the rendered rectangle at the corner of its input textures: when the host's does not start there (a
+			// letterboxed view) color and depth are copied to textures of our own first.
+			id<MTLTexture> ColorInput = Frame.Color;
+			id<MTLTexture> DepthInput = Frame.Depth;
+			const bool bCopy = Frame.ViewMinX != 0 || Frame.ViewMinY != 0;
+			if (bCopy)
+			{
+				if (!ColorCopy_ || !DepthCopy_)
+				{
+					ColorCopy_ = MakeTexture(Frame.Color.device, kColorFormat, (NSUInteger)OutputW_, (NSUInteger)OutputH_, MTLTextureUsageShaderRead, @"AstraMetalFX color copy");
+					DepthCopy_ = MakeTexture(Frame.Color.device, kDepthFormat, (NSUInteger)OutputW_, (NSUInteger)OutputH_, Scaler_.depthTextureUsage, @"AstraMetalFX depth copy");
+					if (!ColorCopy_ || !DepthCopy_)
+					{
+						Fail("the copies of the scene textures cannot be allocated");
+						return;
+					}
+				}
+				ColorInput = ColorCopy_;
+				DepthInput = DepthCopy_;
+			}
+			// The motion texture is as big as the color texture (MetalFX's validation layer asserts otherwise, although it only reads the
+			// rectangle): Unreal's scene textures are the output's size when the dynamic resolution's upper bound is 100%, smaller when
+			// it is lower. It is rebuilt only when that size changes (a window resize); frames in flight keep the old one.
+			if (!MotionTexture_ || MotionTexture_.width != ColorInput.width || MotionTexture_.height != ColorInput.height)
+			{
+				MotionTexture_ = MakeTexture(ColorInput.device, kMotionFormat, ColorInput.width, ColorInput.height,
+					MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite, @"AstraMetalFX motion");
+				if (!MotionTexture_)
+				{
+					Fail("the motion texture cannot be allocated");
+					return;
+				}
+			}
+
 			id<MTLCommandBuffer> CommandBuffer = [Queue commandBuffer];
 			CommandBuffer.label = @"AstraMetalFX";
 
@@ -398,24 +435,20 @@ namespace Core
 				[Encoder endEncoding];
 			}
 
-			// MetalFX wants the rendered rectangle at the corner of the color texture: copy it when the host's does not start there.
-			id<MTLTexture> ColorInput = Frame.Color;
-			if (Frame.ViewMinX != 0 || Frame.ViewMinY != 0)
+			if (bCopy)
 			{
-				if (!ColorCopy_)
-				{
-					ColorCopy_ = MakeTexture(Frame.Color.device, kColorFormat, (NSUInteger)OutputW_, (NSUInteger)OutputH_, MTLTextureUsageShaderRead, @"AstraMetalFX color copy");
-				}
 				id<MTLBlitCommandEncoder> Blit = [CommandBuffer blitCommandEncoder];
+				Blit.label = @"AstraMetalFX copy to the corner";
 				[Blit copyFromTexture:Frame.Color sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(Frame.ViewMinX, Frame.ViewMinY, 0)
 					sourceSize:MTLSizeMake(ContentW, ContentH, 1) toTexture:ColorCopy_ destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
+				[Blit copyFromTexture:Frame.Depth sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(Frame.ViewMinX, Frame.ViewMinY, 0)
+					sourceSize:MTLSizeMake(ContentW, ContentH, 1) toTexture:DepthCopy_ destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0, 0, 0)];
 				[Blit endEncoding];
-				ColorInput = ColorCopy_;
 			}
 
 			id<MTLFXTemporalScaler> Scaler = Scaler_;
 			Scaler.colorTexture = ColorInput;
-			Scaler.depthTexture = Frame.Depth;
+			Scaler.depthTexture = DepthInput;
 			Scaler.motionTexture = MotionTexture_;
 			Scaler.outputTexture = Frame.Output;
 			Scaler.exposureTexture = ExposureTexture_;
