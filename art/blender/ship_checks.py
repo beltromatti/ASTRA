@@ -70,6 +70,12 @@ def check(plan: dict, verbose: bool = True) -> dict:
     boxes = [(c["id"], [c["bounds"][0], c["bounds"][1], c["bounds"][2], c["bounds"][3], c["z"][0], c["z"][1]]) for c in comps.values()]
     for (ca, ba), (cb, bb) in _sorted_pairs(boxes):
         if P.box_overlap(ba, bb, TOL):
+            # a corridor that runs up to the entrance of an existing room enters its wall (up to 0.6 m: the wall's thickness and the door's trim)
+            pair = (comps[ca], comps[cb])
+            corr = [c for c in pair if c["kind"] == "corridor" and c.get("status") == "built"]
+            room = [c for c in pair if c.get("status") == "existing" and c.get("entrance")]
+            if corr and room and min(ba[2], bb[2]) - max(ba[0], bb[0]) <= 0.6 + 1e-6:
+                continue
             n_pairs += 1
             problems.append(f"overlap: {ca} {[round(v, 1) for v in ba]} and {cb} {[round(v, 1) for v in bb]}")
     stats["overlap_pairs"] = n_pairs

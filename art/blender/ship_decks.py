@@ -29,8 +29,10 @@ PROGRAMME = {
         "B": ["transporter", "lab", "lab", "sensor_archive"], "C": ["lab", "transporter", "sensor_room", "lab"], "D": ["lab", "hydro", "lab", "sensor_archive"],
         "E": ["radiator_pumps", "machinery", "lab"], "F": ["radiator_pumps", "machinery", "sensor_room"], "G": ["radiator_pumps", "machinery"],
         "H": ["machinery", "dc_locker"]},
-    6: {"default": ["quarantine", "pharmacy", "dc_locker", "surgery"], "A": ["surgery", "pharmacy", "dc_locker"],
-        "B": ["quarantine", "pharmacy", "surgery", "dc_locker"], "C": ["surgery", "dc_locker", "quarantine"], "D": ["quarantine", "pharmacy", "surgery"],
+    6: {"default": ["store_cold", "laundry", "heads", "store_dry", "cabins", "quiet", "library", "hydro", "lab"],
+        "A": ["store_dry", "store_cold", "laundry", "heads", "hold"], "B": ["cabins", "store_dry", "lab", "heads", "laundry", "store_cold", "quiet", "library"],
+        "C": ["store_cold", "cabins", "lab", "dc_locker", "store_dry", "heads"], "D": ["cabins", "store_dry", "laundry", "heads", "hydro"],
+        "E": ["hydro", "store_cold", "heads", "lab"], "F": ["cabins", "library", "quiet", "laundry"], "G": ["store_dry", "laundry", "heads", "quiet"],
         "H": ["machinery", "dc_locker"]},
     7: {"default": ["power_control", "machinery", "dc_locker", "machinery"], "A": ["power_control", "machinery"], "B": ["power_control", "machinery", "dc_locker"],
         "E": ["radiator_pumps", "machinery"], "F": ["power_control", "machinery", "dc_locker"], "G": ["radiator_pumps", "machinery", "power_control"],
@@ -43,6 +45,12 @@ PROGRAMME = {
     11: {"default": ["workshop", "fab_shop", "repair_bay", "dc_locker"], "A": ["repair_bay", "dc_locker", "workshop"], "H": ["machinery", "dc_locker"]},
     12: {"default": ["tank", "reaction_mass", "crawlway", "tank"], "A": ["tank", "crawlway"], "H": ["crawlway", "tank"]},
 }
+
+
+UNIQUE = {6: {"surgery", "quarantine", "pharmacy"}}      # rooms that stand once on their deck
+# rooms placed first, at a fixed place: (key, side of the Spine, x of the room's forward edge). Deck 6: the medical rooms next to the Medbay's entrance,
+# on the starboard side of the Spine (the Medbay's own door is at x -232)
+PINNED = {6: [("pharmacy", +1, -216.0), ("surgery", +1, -200.0), ("quarantine", +1, -176.0)]}
 
 
 def obstacles(deck: int) -> list[list[float]]:
@@ -79,6 +87,26 @@ def free_pieces(deck: int, y_c: float, env: dict, obs: list, x_hi: float, x_lo: 
     return [p for p in pieces if p[1] - p[0] >= min_len]
 
 
+def reach_rooms(deck: int, y_c: float, pieces: list, reach: float = 8.0) -> list:
+    """On a built deck a passage that stops in front of the entrance of an existing room that stands on this deck's plane (the Medbay on Deck 6) runs on to the
+    room's wall, so that the corridor meets the door: the piece that ends within `reach` m of the entrance wall is extended to the grid line at or just beyond the
+    wall's outer face (it runs up to 0.4 m into the wall)."""
+    z0, _z1 = P.deck_z(deck)
+    out = [list(p) for p in pieces]
+    for r in P.existing_rooms(0.0):
+        e = r.get("entrance")
+        bx = r["box"]
+        if not e or abs(e["z"] - z0) > 0.6 or not (bx[1] < y_c < bx[3]):
+            continue
+        for p in out:
+            if e["wall"] == "fwd" and 0.0 <= p[0] - bx[2] <= reach:              # the piece lies forward of the room: its aft end meets the forward wall
+                a = GRID0 + MOD * int((bx[2] - GRID0) // MOD)
+                p[0] = a if a <= bx[2] + 1e-6 else a - MOD
+            elif e["wall"] == "aft" and 0.0 <= bx[0] - p[1] <= reach:            # the piece lies aft of the room: its forward end meets the aft wall
+                p[1] = GRID0 + MOD * (int((bx[0] - GRID0) // MOD) + 1)
+    return [tuple(p) for p in out]
+
+
 def rooms_for(deck: int, sec: str, side: int, k0: int) -> list[str]:
     prog = PROGRAMME[deck]
     cyc = prog.get(sec, prog["default"])
@@ -88,7 +116,8 @@ def rooms_for(deck: int, sec: str, side: int, k0: int) -> list[str]:
     return [cyc[(k0 + i + (0 if side > 0 else 1)) % n] for i in range(n)]
 
 
-def fill_lane(deck: int, ps: Passage, side: int, env: dict, obs: list, partner: Passage | None, placed: list, force: bool = False) -> list:
+def fill_lane(deck: int, ps: Passage, side: int, env: dict, obs: list, partner: Passage | None, placed: list, force: bool = False,
+              used: set | None = None) -> list:
     """The item list of a lane along passage piece `ps` on `side`: rooms of the programme packed from the forward end aft. `force`: a cross link
     in the first free slot (a piece must never be cut off from the side passages)."""
     secs = P.sections(deck)
@@ -131,8 +160,21 @@ def fill_lane(deck: int, ps: Passage, side: int, env: dict, obs: list, partner: 
             items.append(("gap", gap))
             x -= gap
             continue
-        key = cyc[k % len(cyc)]
-        k += 1
+        unique = UNIQUE.get(deck, set())
+        key = None
+        for j in range(len(cyc)):                                               # the next room of the cycle that may still stand on this deck
+            cand = cyc[(k + j) % len(cyc)]
+            if cand in unique and used is not None and cand in used:
+                continue
+            key = cand
+            k += j + 1
+            break
+        if key is None:
+            k += 1
+            gap = min(x - lo, 8.0)
+            items.append(("gap", gap))
+            x -= gap
+            continue
         spec = SP.PREFABS[key]
         L, D = spec["L"], spec["D"]
         if x - L < lo - 1e-6:
@@ -149,25 +191,33 @@ def fill_lane(deck: int, ps: Passage, side: int, env: dict, obs: list, partner: 
             continue
         items.append((key,))
         placed.append(rect)
+        if used is not None and key in unique:
+            used.add(key)
         x -= L
     if x - ps.a0 > 1e-6:
         items.append(("gap", x - ps.a0))
     return items
 
 
-def plan_deck(B: Builder, deck: int, towers: list | None = None) -> Deck:
-    """`towers`: [(x_min, side)] stair-tower columns of the built deck, reserved on this deck too (each is an 8 x 8 m room off the Spine)."""
-    D = Deck(B, deck, f"d{deck}", coarse=True)
+def plan_deck(B: Builder, deck: int, towers: list | None = None, coarse: bool = True) -> Deck:
+    """`towers`: [(x_min, side)] stair-tower columns of the built deck, reserved on this deck too (each is an 8 x 8 m room off the Spine).
+    `coarse=False`: the deck is built for real (corridor modules, the rooms of the programme that have meshes, plates, signs); a room of the programme
+    without a mesh yet stays a planned compartment behind a plain wall (its door is in the plan, locked, and no opening is cut in the corridor)."""
+    D = Deck(B, deck, f"d{deck}", coarse=coarse)
     env = D.env
     obs = obstacles(deck)
     xh = (int(env["x_fwd"] // MOD)) * MOD
     xl = -524.0 if deck >= 3 else (int((env["x_aft"] + MOD) // MOD)) * MOD
     if deck == 2:
         xl = -496.0
-    sp = [D.passage(f"SP{i}", "S", "x", SP_Y, a0, a1, "Spine") for i, (a0, a1) in enumerate(free_pieces(deck, SP_Y, env, obs, xh, xl))]
+    spine = free_pieces(deck, SP_Y, env, obs, xh, xl)
+    if not coarse:
+        spine = reach_rooms(deck, SP_Y, spine)
+    sp = [D.passage(f"SP{i}", "S", "x", SP_Y, a0, a1, "Spine") for i, (a0, a1) in enumerate(spine)]
     sbp = [D.passage(f"SB{i}", "P", "x", SBP_Y, a0, a1, "Starboard Passage") for i, (a0, a1) in enumerate(free_pieces(deck, SBP_Y, env, obs, xh, xl))]
     pp = [D.passage(f"PO{i}", "P", "x", PP_Y, a0, a1, "Port Passage") for i, (a0, a1) in enumerate(free_pieces(deck, PP_Y, env, obs, xh, xl))]
     placed: list = []
+    used: set = set()
     for (tx, tside) in (towers or []):
         for ps in sp:
             if ps.a0 <= tx and tx + 8.0 <= ps.a1:
@@ -176,19 +226,37 @@ def plan_deck(B: Builder, deck: int, towers: list | None = None) -> Deck:
                 if not hits(rect, obs) and hw > 12.0:
                     D.lane(ps.pid, tside, tx + 8.0, [("stair_tower", {"id": f"d{deck}_stair_{int(abs(tx))}{'n' if tx < 0 else 'p'}"})], "stairs")
                     placed.append(rect)
+    for (key, side, xs) in PINNED.get(deck, []) if not coarse else []:
+        spec = SP.PREFABS[key]
+        ps = next((q for q in sp if q.a0 <= xs - spec["L"] and xs <= q.a1), None)
+        if ps is None:
+            B.notes.append(f"deck {deck}: {key} cannot stand at x {xs} (no Spine there)")
+            continue
+        ya, yb = ps.pos + side * SLOT_HW, ps.pos + side * (SLOT_HW + spec["D"])
+        rect = [xs - spec["L"], min(ya, yb), xs, max(ya, yb)]
+        if hits(rect, obs) or any(P.rect_overlap(rect, r, 0.05) for r in placed):
+            B.notes.append(f"deck {deck}: {key} cannot stand at x {xs} (something is in the way)")
+            continue
+        D.lane(ps.pid, side, xs, [(key,)], "pinned")
+        placed.append(rect)
+        used.add(key)
     for ps in sp:
         for side, partners in ((+1, sbp), (-1, pp)):
             partner = next((p for p in partners if p.a0 <= ps.a0 + 2 and p.a1 >= ps.a1 - 2), None) or (partners[0] if partners else None)
             partner = partner if partner and partner.a0 <= ps.a1 and partner.a1 >= ps.a0 else None
             snap = list(placed)
-            items = fill_lane(deck, ps, side, env, obs, partner, placed)
+            items = fill_lane(deck, ps, side, env, obs, partner, placed, used=used)
             if partner is not None and not any(it[0] == "link" for it in items) and side > 0:
                 placed[:] = snap
-                items = fill_lane(deck, ps, side, env, obs, partner, placed, force=True)
+                items = fill_lane(deck, ps, side, env, obs, partner, placed, force=True, used=used)
             D.lane(ps.pid, side, ps.a1, items, "I_s" if side > 0 else "I_p")
     # outer lanes off the side passages, only where the hull is wide enough for 16 m rooms
     for group, side in ((sbp, +1), (pp, -1)):
         for ps in group:
-            items = fill_lane(deck, ps, side, env, obs, None, placed)
+            items = fill_lane(deck, ps, side, env, obs, None, placed, used=used)
             D.lane(ps.pid, side, ps.a1, items, "O_s" if side > 0 else "O_p")
+    if not coarse:
+        dropped = D.resolve_conflicts()
+        if dropped:
+            B.notes.append(f"deck {deck}: {len(dropped)} rooms of the programme left out where their door would meet a cross link: {sorted(set(dropped))}")
     return D

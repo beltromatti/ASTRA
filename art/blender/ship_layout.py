@@ -245,6 +245,83 @@ class Deck:
                 if abs(ps.a0 - xmax) < 1e-6 and xmax != secs[0][2]:
                     ps.mark(0, bulk=True, bulk_x=xmax, bulk_aft=True)
 
+    # ---------------------------------------------------------------------------------------------------------- conflicts
+    SUPPORTED = {("wall", "wall"), ("door", "wall"), ("wall", "door"), ("door", "door"), ("gate", "wall"), ("wall", "gate"), ("gate", "gate"),
+                 ("branch", "wall"), ("wall", "branch"), ("branch", "branch")}
+
+    def room_openings(self, r: dict) -> list[tuple[str, float, int, str]]:
+        """(passage id, x of the door, room side, kind) of every door of a room that cuts an opening in a corridor wall (none for a room not modelled yet on
+        a built deck: its wall stays plain)."""
+        if r.get("done"):
+            return []
+        spec = r["spec"]
+        if (not self.coarse) and spec.get("mesh") is None and not r["opt"].get("built"):
+            return []
+        out = []
+        for d in spec["doors"]:
+            dx = r["opt"].get("door_x", d["x"]) if d["wall"] == "near" else r["opt"].get("far_door_x", d["x"])
+            xw = r["origin"][0] + (dx if r["yaw"] == 0.0 else -dx)
+            kind = "gate" if d["w"] > 2.0 else "door"
+            if d["wall"] == "near":
+                out.append((r["pid"], xw, r["side"], kind))
+            elif d["wall"] == "far":
+                yf = r["y_near"] + r["side"] * spec["D"]
+                other = next((p for p in self.passages.values() if p.along == "x" and abs(abs(yf - p.pos) - SLOT_HW) < 1e-6), None)
+                if other is not None:
+                    out.append((other.pid, xw, -r["side"], kind))
+        return out
+
+    def resolve_conflicts(self) -> list[str]:
+        """A corridor module cannot carry a branch on one side and a door (or a gate) on the other, nor an opening on a bulkhead or an end wall. Drop the rooms of the
+        lanes whose doors would meet such a neighbour (the layout of a built deck made from a programme does not look at the other side of the corridor); returns the
+        ids of the rooms dropped."""
+        self.section_bulkheads()
+        dropped: list[str] = []
+        for _ in range(400):
+            sides: dict[tuple[str, int], dict[str, list]] = {}
+            for lk in self.links:
+                pa, pb = self.passages[lk["a"]], self.passages[lk["b"]]
+                s_ = 1 if pb.pos > pa.pos else -1
+                for ps, sd in ((pa, "R" if s_ > 0 else "L"), (pb, "L" if s_ > 0 else "R")):
+                    try:
+                        i = ps.center_index(lk["x"])
+                    except ValueError:
+                        continue
+                    sides.setdefault((ps.pid, i), {}).setdefault(sd, []).append(("branch", lk))
+            for r in self.rooms:
+                for (pid, xw, rs, kind) in self.room_openings(r):
+                    try:
+                        i = self.passages[pid].center_index(xw)
+                    except ValueError:
+                        continue
+                    sides.setdefault((pid, i), {}).setdefault("R" if rs > 0 else "L", []).append((kind, r))
+            victim = None
+            for (pid, i), sd in sides.items():
+                e = self.passages[pid].ev.get(i, {})
+                closed = bool(e.get("bulk") or e.get("end"))
+                kinds = {k: {c[0] for c in v} for k, v in sd.items()}
+                multi = any(len(v) > 1 for v in kinds.values())                     # two different kinds on one side of a module
+                lk_ = next(iter(kinds["L"])) if len(kinds.get("L", ())) == 1 else "wall"
+                rk_ = next(iter(kinds["R"])) if len(kinds.get("R", ())) == 1 else "wall"
+                bad = closed or multi or (lk_, rk_) not in self.SUPPORTED
+                if not bad:
+                    continue
+                owners = [c[1] for v in sd.values() for c in v if c[1] is not None]
+                if owners:
+                    # a room goes before a cross link, a cross link before a stair tower
+                    owners.sort(key=lambda o: (2 if "spec" in o and o["spec"]["key"] == "stair_tower" else 1 if "spec" not in o else 0))
+                    victim = owners[0]
+                    break
+            if victim is None:
+                return dropped
+            if "spec" in victim:
+                self.rooms.remove(victim)
+                dropped.append(victim["spec"]["key"])
+            else:
+                self.links.remove(victim)
+                dropped.append(f"link {victim['a']}-{victim['b']}")
+        raise RuntimeError("resolve_conflicts: no end to it")
+
     def ends(self, pid: str, fwd: str | None = None, aft: str | None = None) -> None:
         """Close a passage's ends ('wall' -> an End module); leave None where it opens into a hall."""
         ps = self.passages[pid]
@@ -335,13 +412,16 @@ class Deck:
         ps = self.passages[pid]
         i = ps.center_index(xw)
         kind = "gate" if d["w"] > 2.0 else "door"
-        ps.side(i, "R" if room_side > 0 else "L", kind)
+        blank = (not self.coarse) and r["spec"].get("mesh") is None and not r["opt"].get("built")     # a room not modelled yet on a built deck
+        if not blank:
+            ps.side(i, "R" if room_side > 0 else "L", kind)
         did = d.get("id") or (f"{self.tag}_door_{cid[len(self.tag) + 1:]}" + ("_far" if d["wall"] == "far" else ""))
         pos = (xw, y_wall - room_side * WALL_T / 2, self.z0)
         r.setdefault("doors", []).append(dict(id=did, pos=pos, w=d["w"], h=d["h"], pid=pid, i=i, side=room_side, kind=kind, wall=d["wall"], xw=xw,
                                                y_wall=y_wall))
+        extra = {"planned": True, "locked": True} if blank else {}
         self.B.door(did, self.deck, pos, 90.0, d["w"], d["h"], cid, None, kind=kind, wall=d["wall"], passage=pid,
-                    plate=r["spec"].get("plate") if d["wall"] == "near" else None, side=room_side)
+                    plate=r["spec"].get("plate") if d["wall"] == "near" else None, side=room_side, **extra)
         # the passage-side compartment is filled in by finish_doors, once the corridor segments exist
 
     # --------------------------------------------------------------------------------------------------------------- links

@@ -106,6 +106,8 @@ def existing(B: Builder) -> None:
         note="floor z -72.8 (the launch tubes open into the bow mouths); the volume 20 m tall crosses the planes of Decks 6-11 at x 60..218, |y| < 29")
 
 
+BUILT_DECKS = (4, 6)    # the decks with meshes: Deck 4 by hand (ship_deck4.py), the others from their programme (ship_decks.plan_deck(coarse=False))
+
 PROGRAMME = {   # docs/BIBBIA.md §6: the twelve decks
     1: "Bridge, Captain's quarters, ready room, command corridors",
     2: "CIC (combat information centre), briefing room, department offices, communications",
@@ -190,6 +192,13 @@ def existing_graph(B: Builder, decks: dict) -> None:
         seg = B.comps[best["comp"]]
         sb = seg["bounds"]
         wall_x = rec["bounds"][2] if rec["entrance"]["wall"] == "fwd" else rec["bounds"][0]     # the outer face of the room's wall
+        if seg["status"] == "built" and min(abs(wall_x - sb[0]), abs(wall_x - sb[2])) < 0.6:     # a built passage that runs right up to the door: no lobby
+            B.link(best["id"], f"{cid}.in", "door", door=door["id"], width=door["width"])
+            door["b"] = best["comp"]
+            for c_ in (best["comp"], cid):
+                if door["id"] not in B.comps[c_]["doors"]:
+                    B.comps[c_]["doors"].append(door["id"])
+            continue
         lo, hi = (wall_x, sb[0]) if wall_x < sb[0] else (sb[2], wall_x)
         lid = f"{cid}_lobby"
         B.comp(lid, deck, "vestibule", f"{rec['name']} lobby", [lo, -1.55, hi, 1.55], (seg["z"][0], seg["z"][1]), status="planned",
@@ -350,7 +359,7 @@ def build_plan(only_decks: bool = False) -> dict:
     d4_open_ends(B, d4)
     decks = {4: d4}
     for n in (2, 3, 5, 6, 7, 8, 9, 10, 11, 12):
-        dk = DK.plan_deck(B, n, D4.STAIR_COLUMNS)
+        dk = DK.plan_deck(B, n, D4.STAIR_COLUMNS, coarse=n not in BUILT_DECKS)
         dk.emit()
         dk.finish_doors()
         decks[n] = dk
