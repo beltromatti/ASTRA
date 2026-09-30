@@ -1033,6 +1033,10 @@ void UAstraStationsSubsystem::Expire(const FString& Station, const FString& Aspe
 	A->Until = TEXT("order");
 	A->SetBy = TEXT("auto");
 	A->Since = Now;
+	// the console's mode and the ship agree again: the fallback's one-shot effects (a power profile, the reactor's limits,
+	// EMCON, the holo table...) are applied as when an officer sets it
+	FString Detail;
+	Enter(Station, AspectName, *A, Detail);
 	Act(Station, FString::Printf(TEXT("%s ended (%s): back to %s"), *Was.Replace(TEXT("_"), TEXT(" ")), *Why, *Fallback.Replace(TEXT("_"), TEXT(" "))), true);
 }
 
