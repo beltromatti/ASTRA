@@ -26,7 +26,7 @@ LIGHTS = {"A": ((1.0, 0.90, 0.75), 40.0, (0.55, 0.78, 1.0), 90.0, 0.65),
           "G": ((1.0, 0.95, 0.85), 30.0, (0.90, 0.90, 1.0), 60.0, 0.55)}
 
 # radiators: (dark panel colour, glow colour, glow intensity at rest: the game raises it with the ship's heat)
-RADIATOR = {"A": ("#2A2D31", (1.0, 0.24, 0.05), 0.0), "M": ("#2A1A10", (1.0, 0.24, 0.04), 14.0), "G": ("#303236", (1.0, 0.33, 0.07), 0.0)}
+RADIATOR = {"A": ("#2A2D31", (1.0, 0.24, 0.05), 0.0), "M": ("#2A1A10", (1.0, 0.20, 0.03), 14.0), "G": ("#303236", (1.0, 0.33, 0.07), 0.0)}
 
 # running lights (ASTRA: red port, green starboard, white stern; Mandate: a single red pulse)
 NAVS = {"A": ((1.0, 0.05, 0.03), (0.1, 1.0, 0.2), (1.0, 0.95, 0.9)), "M": ((1.0, 0.06, 0.03), (1.0, 0.06, 0.03), (1.0, 0.06, 0.03)),

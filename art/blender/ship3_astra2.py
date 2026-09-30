@@ -343,7 +343,7 @@ def _build(c: Ctx, spec: dict, extra: dict) -> dict:
 
 def build_praetorian(c: Ctx) -> dict:
     return _build(c, PRAETORIAN, {"cam_az": -30.0, "cam_el": 16.0, "cam_dist": 1.9, "sun_az": -50.0, "sun_el": 26.0,
-                                  "closeups": [{"name": "tower", "target": [-95.0, -20.0, 75.0], "normal": [-0.3, -0.9, 0.3], "distance": 120.0, "span": 50.0},
+                                  "closeups": [{"name": "tower", "target": [-95.0, -14.0, 142.0], "normal": [-0.25, -0.9, 0.35], "distance": 120.0, "span": 50.0},
                                                {"name": "turrets", "target": [350.0, 0.0, 44.0], "normal": [-0.4, -0.5, 0.75], "distance": 130.0, "span": 50.0}],
                                   "pieces_gap": 0.09, "pieces_dist": 2.3})
 

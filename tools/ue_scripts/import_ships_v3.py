@@ -69,7 +69,10 @@ def fbx_options():
             notes.append(f"mesh_type_to_import: {ex}")
         data = ui.get_editor_property("static_mesh_import_data")
         for k, v in (("combine_meshes", True), ("generate_lightmap_u_vs", False), ("auto_generate_collision", False), ("build_nanite", True),
-                     ("remove_degenerates", False), ("one_convex_hull_per_ucx", False)):
+                     ("remove_degenerates", False), ("one_convex_hull_per_ucx", False),
+                     ("normal_import_method", getattr(getattr(unreal, "FBXNormalImportMethod", None), "FBXNIM_IMPORT_NORMALS", None))):   # keep the smooth shading of domes and bells
+            if v is None:
+                continue
             try:
                 data.set_editor_property(k, v)
             except Exception as ex:

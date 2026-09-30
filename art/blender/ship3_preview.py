@@ -317,7 +317,7 @@ def radiator_material(name: str, fac: str, glow: float) -> bpy.types.Material:
     bsdf.inputs["Metallic"].default_value = 0.4
     if glow > 0:
         wr, wg, wb, wa, tc = wear_channels(mt)
-        var = mt.add(mt.mul(wb, 0.7), mt.mul(wr, 0.5))
+        var = mt.add(mt.mul(mt.sub(wr, 0.5), 1.2), mt.add(mt.mul(wb, 0.4), 0.7))
         bsdf.inputs["Emission Color"].default_value = (*ember, 1.0)
         st = mt.mul(var, glow)
         mt.l(st[0], st[1], bsdf, "Emission Strength")
@@ -360,7 +360,7 @@ def make_materials(fac: str) -> dict:
     out["Glow"] = glow_material(pre + "Glow", fac, PAL.LIGHTS[fac][3] * 0.6)
     out["Nav"] = nav_material(pre + "Nav")
     out["Glass"] = glass_material(pre + "Glass")
-    out["Radiator"] = radiator_material(pre + "Radiator", fac, 1.5 if fac == "M" else 0.0)
+    out["Radiator"] = radiator_material(pre + "Radiator", fac, 0.8 if fac == "M" else 0.0)
     out["Cut"] = cut_material(pre + "Cut")
     out["Decal"] = hull_material(pre + "Decal", fac, "Marking")
     return out
@@ -599,6 +599,33 @@ def configure(w: int = 1600, h: int = 900, samples: int = 24, exposure: float = 
     sc.view_settings.exposure = exposure
     sc.render.image_settings.file_format = "JPEG"
     sc.render.image_settings.quality = 88
+    add_glare()
+
+
+def add_glare(threshold: float = 12.0, strength: float = 0.4, size: float = 0.55) -> bool:
+    """A soft bloom from the compositor on what is far brighter than the lit hull (drive glow, running lights): the Blender 5 compositor
+    tree is a node group on the scene. Returns False when the API is not there (the previews then just have no bloom)."""
+    try:
+        sc = bpy.context.scene
+        old = bpy.data.node_groups.get("ShipComp")
+        if old:
+            bpy.data.node_groups.remove(old)
+        ng = bpy.data.node_groups.new("ShipComp", "CompositorNodeTree")
+        ng.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+        rl = ng.nodes.new("CompositorNodeRLayers")
+        gl = ng.nodes.new("CompositorNodeGlare")
+        go = ng.nodes.new("NodeGroupOutput")
+        gl.inputs["Type"].default_value = "Bloom"
+        gl.inputs["Quality"].default_value = "High"
+        gl.inputs["Threshold"].default_value = threshold
+        gl.inputs["Strength"].default_value = strength
+        gl.inputs["Size"].default_value = size
+        ng.links.new(rl.outputs["Image"], gl.inputs["Image"])
+        ng.links.new(gl.outputs["Image"], go.inputs[0])
+        sc.compositing_node_group = ng
+        return True
+    except Exception:
+        return False
 
 
 def render(cam, path: str) -> str:

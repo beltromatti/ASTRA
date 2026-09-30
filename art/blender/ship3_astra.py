@@ -598,10 +598,10 @@ def build_aquila(c: Ctx) -> dict:
     a.build()
     faces = a.caps()
     info = {"cuts": list(a.cuts), "cut_faces": faces, "length_m": 800.0, "checks": dict(aquila_checks(c.g), nave=nave_checks(c.g)),
-            "cam_az": -32.0, "cam_el": 18.0, "cam_dist": 1.9, "sun_az": -50.0, "sun_el": 26.0,
+            "cam_az": -55.0, "cam_el": 20.0, "cam_dist": 1.9, "sun_az": -50.0, "sun_el": 26.0,
             "closeups": [{"name": "flank", "target": [60.0, -50.0, 3.0], "normal": [0.0, -1.0, 0.0], "distance": 110.0, "span": 50.0},
                          {"name": "bowdeck", "target": [285.0, 0.0, 24.0], "normal": [-0.35, -0.55, 0.75], "distance": 110.0, "span": 50.0},
                          {"name": "belly", "target": [-45.0, 0.0, -27.0], "normal": [0.2, -0.25, -0.95], "distance": 110.0, "span": 50.0, "key_el": -38.0},
                          {"name": "island", "target": [132.0, -19.0, 34.0], "normal": [0.55, -0.75, 0.3], "distance": 90.0, "span": 50.0}],
-            "pieces_gap": 0.10, "pieces_az": 24.0, "pieces_dist": 2.4}
+            "pieces_gap": 0.10}
     return info
