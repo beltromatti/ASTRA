@@ -5,6 +5,7 @@
 // (dynamic resolution) or do not start at the corner, bad frames that must be refused.
 // Exits non-zero when a check fails. Usage: probe_core
 #include "probe_scene.h"
+#include <thread>
 #include "../../Plugins/AstraMetalFX/Source/AstraMetalFX/Private/AstraMetalFXCore.mm"
 
 using namespace AstraMetalFX::Core;
@@ -186,7 +187,7 @@ static double Psnr(const std::vector<float>& A, const std::vector<float>& GT, in
 	return 10.0 * log10(1.0 / (Se / (double)N));
 }
 
-int main()
+int main(int argc, char** argv)
 {
 	@autoreleasepool
 	{
@@ -194,6 +195,39 @@ int main()
 		FRig R; R.Init();
 		std::vector<std::string> Logs;
 		SetLogger([&](ELogLevel L, const std::string& S) { Logs.push_back(S); printf("    core log [%s]: %s\n", L == ELogLevel::Log ? "log" : (L == ELogLevel::Warning ? "warning" : "ERROR"), S.c_str()); });
+
+		if (argc > 1 && strcmp(argv[1], "soak") == 0)
+		{
+			// A long run: content size changing every frame, resets now and then, the timings polled from another thread while
+			// the completion handlers update them, frames committed without waiting. No crash, no error, everything completes.
+			int N = argc > 2 ? atoi(argv[2]) : 5000;
+			std::string E2;
+			std::shared_ptr<FScaler> Sk = FScaler::Create(R.Dev, OutW, OutH, E2);
+			FTextures T = MakeTextures(R, 1024, 600, OutW, OutH, 960, 540);
+			std::atomic<bool> bStop{ false };
+			std::atomic<uint64_t> Polls{ 0 };
+			std::thread Poller([&]() { while (!bStop.load()) { FTimings X = Sk->Timings(); (void)X; (void)FScaler::CommandBuffersInFlight(); Polls.fetch_add(1); usleep(200); } });
+			double T0 = NowMs();
+			for (int F = 0; F < N; ++F)
+			{
+				float Fr = 0.34f + 0.66f * (0.5f + 0.5f * sinf(F * 0.37f));
+				int CW = (int)ceilf(OutW * Fr), CH = (int)ceilf(OutH * Fr);
+				float Jx = Halton(F % 26 + 1, 2) - 0.5f, Jy = Halton(F % 26 + 1, 3) - 0.5f;
+				float C2P[16]; RenderInputs(R, T, F % 500, CW, CH, (F % 7 == 0) ? 8 : 0, (F % 7 == 0) ? 4 : 0, Jx, Jy, C2P);
+				auto Fr_ = MakeFrame(T, CW, CH, (F % 7 == 0) ? 8 : 0, (F % 7 == 0) ? 4 : 0, Jx, Jy, C2P, F % 331 == 0, F % 3 != 0, F % 5 != 0);
+				if (!Sk->Validate(*Fr_).empty()) { printf("refused at %d: %s\n", F, Sk->Validate(*Fr_).c_str()); ++GFailures; break; }
+				Sk->Encode(R.Q, Fr_);
+				if (F % 64 == 63) { id<MTLCommandBuffer> CB = [R.Q commandBuffer]; [CB commit]; [CB waitUntilCompleted]; }   // keep the queue from running away
+			}
+			WaitAll(R);
+			bStop.store(true); Poller.join();
+			FTimings Tm = Sk->Timings();
+			printf("soak: %d frames in %.0f ms (%.3f ms per frame of wall time), %llu completed, %llu errors, %llu timing polls, average GPU %.3f ms\n",
+				N, NowMs() - T0, (NowMs() - T0) / N, Tm.Frames, Tm.Errors, Polls.load(), Tm.AverageMs);
+			Check(Tm.Frames == (uint64_t)N && Tm.Errors == 0 && !Sk->Failed() && FScaler::CommandBuffersInFlight() == 0, "every frame completed, no error, nothing in flight");
+			printf("%s\n", GFailures == 0 ? "PASS" : "FAIL");
+			return GFailures == 0 ? 0 : 2;
+		}
 
 		printf("create\n");
 		std::string Err;

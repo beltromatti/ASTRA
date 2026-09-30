@@ -123,7 +123,15 @@ Esiti delle sonde (macchina: MacBook Air M4, macOS 26.6, Xcode 26.2, tutto con i
   di Unreal a 16 bit, rettangolo non nell'angolo): errore massimo **0,017 px** sui pixel statici (movimenti fino a 40 px), 0,0016 px sui dinamici, esposizione giusta.
 - `probe_e2e`: scena 3D (pavimento e parete con pattern ad alta frequenza), camera in moto, jitter di Unreal, profondità reversed-Z in D32F_S8, moto dal kernel:
   MetalFX **19,7–20,7 dB** contro 15,8–16,7 dB del solo bilinear del frame corrente; con moto nullo o invertito 15,6–16,2 dB (quindi il moto conta e il kernel lo dà giusto).
-- `probe_hazard`: vedi §3.3.
+- `probe_core` (il codice vero del plugin, `AstraMetalFXCore.mm`, compilato nel programma di prova, senza Unreal): texture da un heap *placement tracked* con le flag d'uso di Unreal, più grandi del
+  rettangolo, profondità `Depth32Float_Stencil8`, velocità UNORM, frame committati uno dietro l'altro **senza attese** (il command buffer di MetalFX in mezzo a quelli del «renderer»: solo il hazard tracking li ordina):
+  19,74 dB (come `probe_e2e`), identico con texture più grandi, con il rettangolo che non parte dall'angolo (la copia) e con la risoluzione dinamica che cambia a ogni frame (20,05 dB);
+  i frame sbagliati (colore senza tracking, formato, dimensione dell'uscita, uso mancante, rettangolo fuori) sono rifiutati con il motivo; rettangoli fuori scala vengono stretti (un avviso) invece di arrivare a MetalFX;
+  **NaN, ±Inf e valori negativi nel colore non avvelenano l'uscita** (MetalFX li assorbe: 0 valori non finiti anche nel frame avvelenato, quindi nessun passo di pulizia); uno scaler fallito produce un'uscita nera;
+  `probe_core soak 6000`: 6000 frame con rettangolo, offset, reset, velocità ed esposizione che cambiano, i tempi letti da un altro thread: 6000 completati, 0 errori, niente in volo alla fine.
+- `probe_memory`: lo scaler tiene ~48 MB a 1600×900 e ~83 MB a 1710×1107 (vedi §5). `probe_hazard`: vedi §3.3.
+- Controllo dei simboli del plugin compilato (`nm -u` contro gli export dei moduli del motore): ogni simbolo di Unreal che usa è esportato (non usa nulla di `MetalRHI` oltre alle chiamate virtuali
+  di `IMetalDynamicRHI`); il resto sono libSystem, libc++, runtime Objective-C e i framework Metal/MetalFX (legati in modo debole).
 
 ## 5. Costo di MetalFX su questo Mac (M4 10 core)
 
@@ -133,18 +141,19 @@ puro, con la GPU tenuta occupata); «uno dopo l'altro» = command buffer consecu
 **Attenzione al rumore**: l'Air senza ventola cambia frequenza secondo lo stato termico e la macchina era condivisa (l'editor del lead sulla GPU, le
 compilazioni degli altri agenti): un singolo command buffer oscilla fra 0,5 e 10+ ms, per questo i valori sono minimo–mediana di più serie.
 
-| ingresso → uscita | scala | in un command buffer (min–mediana) | uno dopo l'altro (min–mediana) |
-|---|---|---|---|
-| 960×540 → 1600×900 | 60 % | 1,4–1,6 ms | 1,2–1,4 ms |
-| 1120×630 → 1600×900 | 70 % | 1,7–2,2 ms | 1,4–1,8 ms |
-| 1600×900 → 1600×900 | 100 % (come un TAA) | 2,1–2,3 ms | 2,0–2,1 ms |
-| 855×554 → 1710×1107 | 50 % | 2,1–2,9 ms | 1,8–2,0 ms |
-| 940×609 → 1710×1107 | 55 % | 2,1–2,3 ms | 1,8–2,0 ms |
-| 1197×775 → 1710×1107 | 70 % | 2,1–2,6 ms | 2,1–2,2 ms |
-| texture 1600×900 (come in Unreal), rettangolo 960×540 o 1120×630 | | 1,4–2,0 ms | 1,25–1,5 ms |
-| texture 1712×1112, rettangolo 940×609 o 1197×775 → 1710×1107 | | 2,0–3,3 ms | 1,6–2,0 ms |
+| ingresso → uscita | scala | intervallo fra le serie (minimo dei «uno dopo l'altro» – mediana degli «in un command buffer») |
+|---|---|---|
+| 960×540 → 1600×900 | 60 % | 1,2 – 2,2 ms |
+| 1120×630 → 1600×900 | 70 % | 1,5 – 2,2 ms |
+| 1600×900 → 1600×900 | 100 % (come un TAA) | 2,0 – 2,6 ms |
+| 960×540 o 1120×630 → 1710×1107 (proporzioni diverse dall'uscita) | | 2,1 – 2,6 ms |
+| 855×554 → 1710×1107 | 50 % | 1,8 – 2,9 ms |
+| 940×609 → 1710×1107 | 55 % | 1,8 – 2,3 ms |
+| 1197×775 → 1710×1107 | 70 % | 2,1 – 2,6 ms |
+| texture 1600×900 (come in Unreal), rettangolo 960×540 o 1120×630 | | 1,25 – 2,0 ms |
+| texture 1712×1112, rettangolo 940×609 o 1197×775 → 1710×1107 | | 1,6 – 3,3 ms |
 
-Il costo dipende soprattutto dall'**uscita** (poco dalla scala): ~1,4 ms a 960×540 → 1600×900, ~2 ms a 1710×1107. Con il chip fresco e la GPU libera il singolo command buffer è sceso a 0,5–1,0 ms;
+(due giri completi di misure a distanza di ore, con la macchina in stati termici diversi: lo stesso caso è passato da 1,4 a 2,2 ms.) Il costo dipende soprattutto dall'**uscita** (poco dalla scala): ~1,2–2,2 ms a 1600×900, ~1,8–2,9 ms a 1710×1107. Con il chip fresco e la GPU libera il singolo command buffer è sceso a 0,5–1,0 ms;
 con la macchina tranquilla il plugin intero (kernel di moto + scaler) a 528×297 → 960×540 ha misurato 0,58 ms di media su 192 frame (`probe_core`). **Da aspettarsi ~1,5–2,5 ms** a 1600×900–1710×1107
 sotto carico, da confrontare con i ~2,9 ms che il lead ha misurato per TSR contro TAA a 1600×900 al 70 % (il TAA stesso costa qualcosa, il TSR intero sta sui 3–3,5 ms):
 un guadagno di ~1 ms e più, e un'immagine che `probe_e2e` dice migliore di un semplice filtro. Il costo della CPU del thread di sottomissione è ~25 µs per frame. Memoria (`probe_memory`, `device.currentAllocatedSize`): lo scaler tiene ~48 MB a 1600×900 e ~83 MB a 1710×1107
