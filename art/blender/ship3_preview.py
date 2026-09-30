@@ -236,7 +236,7 @@ def hull_material(name: str, fac: str, part: str, tone_amount: float | None = No
     return mt.m
 
 
-def light_material(name: str, fac: str, strength: float = 5.5, lit_fraction: float | None = None) -> bpy.types.Material:
+def light_material(name: str, fac: str, strength: float = 2.6, lit_fraction: float | None = None) -> bpy.types.Material:
     """Windows and light strips: each pane (UVMap_D2.y = its id) is lit or dark, as M_ASTRA_ShipLight Mode 0."""
     col, _, _, _, lit = PAL.LIGHTS[fac]
     lit = lit if lit_fraction is None else lit_fraction
@@ -485,10 +485,11 @@ def _sun_at(o, to_light: Vector) -> None:
     o.rotation_euler = (-to_light).to_track_quat("-Z", "Y").to_euler()
 
 
-def rig(cam_loc, target, key_az: float = 55.0, key_el: float = 32.0, key: float = 4.2, fill: float = 0.5, rim: float = 1.4,
+def rig(cam_loc, target, key_az: float = 72.0, key_el: float = 28.0, key: float = 5.0, fill: float = 0.7, rim: float = 0.0,
         side: float = 1.0, world: float = 1.0) -> None:
-    """The Aurelia light, placed against the view: the orange star as the key from behind the camera and to one side (`side` = +1
-    or -1) so the plates show their relief, a teal fill from the other side (the nebula), a small orange kicker from behind."""
+    """The Aurelia light, placed against the view: the orange star as the key, `key_az` degrees off the camera axis (90 = across the
+    frame, `side` = +1 or -1 picks the side) so the plates show their relief, and a soft teal fill from the camera's side (the
+    nebula: shadows read teal). `rim` adds a small orange kicker from behind the subject."""
     for o in [o for o in bpy.data.objects if o.type == "LIGHT"]:
         bpy.data.objects.remove(o, do_unlink=True)
     set_world(world)
@@ -500,12 +501,13 @@ def rig(cam_loc, target, key_az: float = 55.0, key_el: float = 32.0, key: float 
         return Vector((math.cos(e) * math.cos(az), math.cos(e) * math.sin(az), math.sin(e)))
 
     a = az0 + math.pi - side * math.radians(key_az)
-    k = add_light("SUN", "Aurelia", (1.0, 0.80, 0.60), key, size=0.53)
+    k = add_light("SUN", "Aurelia", (1.0, 0.86, 0.70), key, size=0.53)
     _sun_at(k, dirto(a, el))
-    f = add_light("SUN", "TealVeil", (0.30, 0.78, 0.82), fill, size=10.0)
-    _sun_at(f, dirto(az0 + math.pi + side * math.radians(key_az * 1.3), math.radians(12.0)))
-    r = add_light("SUN", "Kicker", (1.0, 0.62, 0.38), rim, size=1.0)
-    _sun_at(r, dirto(az0 - side * math.radians(28.0), math.radians(18.0)))
+    f = add_light("SUN", "TealVeil", (0.32, 0.80, 0.84), fill, size=12.0)
+    _sun_at(f, dirto(az0 + math.pi + side * math.radians(28.0), math.radians(14.0)))
+    if rim > 0:
+        r = add_light("SUN", "Kicker", (1.0, 0.66, 0.42), rim, size=1.0)
+        _sun_at(r, dirto(az0 - side * math.radians(20.0), math.radians(16.0)))
 
 
 def camera(name: str, loc, target, lens: float = 50.0, clip_end: float = 60000.0, roll: float = 0.0):

@@ -29,8 +29,8 @@ def view_dir(az_deg: float, el_deg: float) -> np.ndarray:
     return np.array([math.cos(el) * math.cos(az + math.pi / 2), -math.cos(el) * math.sin(az + math.pi / 2), math.sin(el)])
 
 
-def shot(name: str, pts: np.ndarray, d: np.ndarray, path: str, size, lens: float = 50.0, side: float = 1.0, key_az: float = 55.0,
-         key_el: float = 32.0, margin: float = 0.06) -> None:
+def shot(name: str, pts: np.ndarray, d: np.ndarray, path: str, size, lens: float = 50.0, side: float = 1.0, key_az: float = 72.0,
+         key_el: float = 28.0, margin: float = 0.06) -> None:
     w, h = size
     cam, tgt = PV.fit_camera(name, pts, d, lens=lens, aspect=w / h, margin=margin)
     PV.rig(cam.location, tgt, key_az=key_az, key_el=key_el, side=side)
@@ -61,7 +61,7 @@ def render_previews(name: str, short_name: str, spec: dict, res: dict, obj, args
                 dist = cu.get("distance", 110.0)
                 span = cu.get("span", 50.0)
                 cam = PV.camera("cam", tuple(tgt + nrm * dist), tuple(tgt), PV.close_up_lens(dist, span, 36.0))
-                PV.rig(cam.location, tgt, key_az=cu.get("key_az", 62.0), key_el=cu.get("key_el", 28.0), side=cu.get("side", side))
+                PV.rig(cam.location, tgt, key_az=cu.get("key_az", 75.0), key_el=cu.get("key_el", 26.0), side=cu.get("side", side))
                 PV.render(cam, os.path.join(outd, f"{sn}_closeup_{cu.get('name', i)}.jpg"))
     cuts = info.get("cuts")
     if not cuts or not ("pieces" in args["views"] or "cutface" in args["views"]):
