@@ -91,6 +91,12 @@ private:
 	void TickEngineering();
 	void TickFlight();
 	void TickOps();
+	/** The officers' own initiative on delegation auto (what a good officer does without being told, and says). */
+	void TickReflexes();
+	bool Reflex(const TCHAR* Station, const TCHAR* AspectName, const TCHAR* Mode, const FString& Report);
+	double LastFightAt = -1e9;              // the last time the enemy was near or firing
+	double LastDecoysAt = -1e9;
+	double NextReflexAt = 0.0;
 	void Expire(const FString& Station, const FString& AspectName, const FString& Fallback, const FString& Why);
 	void UpdateStatus();
 };

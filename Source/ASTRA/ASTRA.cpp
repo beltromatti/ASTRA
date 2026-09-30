@@ -11,6 +11,8 @@
 #include "Misc/Parse.h"
 #include "UnrealEngine.h"
 
+bool GAstraDeterministic = false;
+
 class FASTRAGameModule : public FDefaultGameModuleImpl
 {
 public:

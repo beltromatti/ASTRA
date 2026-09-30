@@ -203,7 +203,7 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	Roster.Generate();
-	CasualtyRng.Initialize((int32)(FDateTime::Now().GetTicks() & 0x7fffffff));
+	CasualtyRng.Initialize(GAstraDeterministic ? FMath::Rand() : (int32)(FDateTime::Now().GetTicks() & 0x7fffffff));
 	FActorSpawnParameters FXP;
 	FXP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	BridgeFX = InWorld.SpawnActor<AAstraBridgeFX>(FVector::ZeroVector, FRotator::ZeroRotator, FXP);

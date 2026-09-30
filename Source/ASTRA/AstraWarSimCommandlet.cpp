@@ -35,6 +35,11 @@ int32 UAstraWarSimCommandlet::Main(const FString& Params)
 	FString Exec;
 	FParse::Value(*Params, TEXT("exec="), Exec, false);
 	Step = FMath::Clamp(Step, 0.02f, 0.1f);
+	int32 Seed = 1;
+	FParse::Value(*Params, TEXT("seed="), Seed);
+	FMath::RandInit(Seed);           // the same seed, the same battle: comparisons change one thing at a time
+	FMath::SRandInit(Seed);
+	GAstraDeterministic = true;
 
 	// a game world with its subsystems and no level: the battle needs no content (meshes that do not load are skipped)
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("AstraWarSim"));
@@ -60,14 +65,18 @@ int32 UAstraWarSimCommandlet::Main(const FString& Params)
 		Events.Add(MakeShared<FJsonValueObject>(E));
 		UE_LOG(LogASTRA, Display, TEXT("[WarSim] %7.1f %s%s"), B->GetBattleTime(), bReport ? TEXT("REPORT ") : TEXT(""), *Text);
 	});
+	// the variant's commands first (console variables, spawns, station modes), before the first tick
+	TArray<FString> Cmds;
+	Exec.ParseIntoArray(Cmds, TEXT(";"));
+	for (const FString& C : Cmds)
+	{
+		GEngine->Exec(World, *C.TrimStartAndEnd());   // astra.cmd: single quotes stand for double quotes
+	}
 	B->StartCampaign();
 	if (Jump >= 0.f)
 	{
 		GEngine->Exec(World, *FString::Printf(TEXT("astra.battle.time %f"), Jump));
 	}
-	TArray<FString> Cmds;
-	Exec.ParseIntoArray(Cmds, TEXT(";"));
-	bool bExecDone = false;
 
 	const double Wall0 = FPlatformTime::Seconds();
 	double NextFrame = 0.0;
@@ -80,15 +89,6 @@ int32 UAstraWarSimCommandlet::Main(const FString& Params)
 		{
 			// the world tick did not reach the tickable subsystems: tick them as the engine loop would
 			FTickableGameObject::TickObjects(World, LEVELTICK_All, false, Step);
-		}
-		if (!bExecDone && i == 2)
-		{
-			bExecDone = true;
-			for (const FString& C : Cmds)
-			{
-				// the console's quoting: single quotes stand for double quotes in astra.cmd
-				GEngine->Exec(World, *C.TrimStartAndEnd());
-			}
 		}
 		if (B->GetBattleTime() >= NextFrame)
 		{

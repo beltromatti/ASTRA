@@ -804,7 +804,120 @@ void UAstraStationsSubsystem::Tick(float DeltaTime)
 	TickEngineering();
 	TickFlight();
 	TickOps();
+	TickReflexes();
 	UpdateStatus();
+}
+
+bool UAstraStationsSubsystem::Reflex(const TCHAR* Station, const TCHAR* AspectName, const TCHAR* Mode, const FString& Report)
+{
+	TSharedPtr<FJsonObject> Args = MakeShared<FJsonObject>();
+	Args->SetStringField(TEXT("station"), Station);
+	Args->SetStringField(TEXT("aspect"), AspectName);
+	Args->SetStringField(TEXT("mode"), Mode);
+	FString Detail;
+	if (!SetMode(Args, TEXT("auto"), Detail))
+	{
+		return false;
+	}
+	Act(Station, Report, true);     // the officer says it (a report: the crew's voice, the Captain's timeline)
+	return true;
+}
+
+namespace
+{
+	TAutoConsoleVariable<int32> CVarStationReflexes(TEXT("astra.stations.reflexes"), 7,
+		TEXT("The officers' own initiative on delegation auto, for comparisons: bits 1 CAP, 2 decoys, 4 combat power (0 = none)"));
+}
+
+void UAstraStationsSubsystem::TickReflexes()
+{
+	const int32 Bits = CVarStationReflexes.GetValueOnGameThread();
+	if (Bits == 0)
+	{
+		return;
+	}
+	// once a second; never over a mode the Captain or an officer chose (set_by captain/officer), only over the defaults
+	// and over what the reflexes themselves set
+	if (Now < NextReflexAt)
+	{
+		return;
+	}
+	NextReflexAt = Now + 1.0;
+	UAstraShipSubsystem* Sh = Ship();
+	UAstraBattleSubsystem* B = Battle();
+	if (!Sh || !B)
+	{
+		return;
+	}
+	TArray<FContact> Cs;
+	B->GetContacts(Cs);
+	int32 CraftNear = 0, WarshipsNear = 0;
+	bool bUnderFire = false;
+	for (const FContact& C : Cs)
+	{
+		if (C.Side != EAstraSide::Mandate)
+		{
+			continue;
+		}
+		CraftNear += (C.bCraft && C.RangeKm >= 0.0 && C.RangeKm < 45.0) ? 1 : 0;
+		WarshipsNear += (!C.bCraft && C.Track >= 2 && C.RangeKm < 60.0) ? 1 : 0;
+		bUnderFire |= C.bFiringAtUs;
+	}
+	const bool bFight = CraftNear > 0 || WarshipsNear > 0 || bUnderFire;
+	if (bFight)
+	{
+		LastFightAt = Now;
+	}
+	auto Free = [](const FAstraStationAspect* A) { return A && (A->SetBy == TEXT("default") || A->SetBy == TEXT("auto")); };
+	auto OnAuto = [this](const TCHAR* Id) { const FAstraStation* S = Stations.Find(Id); return S && S->Delegation == TEXT("auto"); };
+
+	// flight: Alpha up on combat air patrol over the Aquila when the enemy comes near; back aboard after three quiet minutes
+	if ((Bits & 1) && OnAuto(TEXT("flight")))
+	{
+		const FAstraStationAspect* Al = Aspect(TEXT("flight"), TEXT("alpha"));
+		if (bFight && Free(Al) && (Al->Mode == TEXT("hold") || Al->Mode == TEXT("recall")))
+		{
+			Reflex(TEXT("flight"), TEXT("alpha"), TEXT("cap"), CraftNear ? FString::Printf(TEXT("launching Alpha on combat air patrol: %d enemy craft inbound"), CraftNear)
+			                                                             : FString(TEXT("launching Alpha on combat air patrol over the Aquila")));
+		}
+		else if (!bFight && Now - LastFightAt > 180.0 && Al && Al->SetBy == TEXT("auto") && Al->Mode == TEXT("cap"))
+		{
+			Reflex(TEXT("flight"), TEXT("alpha"), TEXT("recall"), TEXT("the sky is quiet: recalling Alpha to rearm"));
+		}
+	}
+	// tactical: decoys into a missile salvo closing on us (two launches a minute at most: the stock is small)
+	if ((Bits & 2) && OnAuto(TEXT("tactical")))
+	{
+		TArray<FVector> Missiles;
+		B->GetInboundMissiles(Missiles);
+		int32 Close = 0;
+		for (const FVector& M : Missiles)
+		{
+			Close += FVector::Dist(M, B->PlayerPos()) < 12000.0 ? 1 : 0;
+		}
+		if (Close >= 2 && Now - LastDecoysAt > 30.0)
+		{
+			LastDecoysAt = Now;
+			FString Detail;
+			if (Command(TEXT("launch_decoys"), nullptr, Detail))
+			{
+				Act(TEXT("tactical"), FString::Printf(TEXT("decoys away: %d missiles closing"), Close), true);
+			}
+		}
+	}
+	// engineering: power to shields and weapons while the fight lasts, back to balanced two quiet minutes after
+	if ((Bits & 4) && OnAuto(TEXT("engineering")))
+	{
+		const FAstraStationAspect* Pw = Aspect(TEXT("engineering"), TEXT("power"));
+		if (bFight && Free(Pw) && Pw->Mode == TEXT("balanced"))
+		{
+			Reflex(TEXT("engineering"), TEXT("power"), TEXT("combat"), TEXT("combat power: shields and weapons up, life support and engines trimmed"));
+		}
+		else if (!bFight && Now - LastFightAt > 120.0 && Pw && Pw->SetBy == TEXT("auto") && Pw->Mode == TEXT("combat"))
+		{
+			Reflex(TEXT("engineering"), TEXT("power"), TEXT("balanced"), TEXT("fight's over: power back to balanced"));
+		}
+	}
 }
 
 void UAstraStationsSubsystem::TickOps()

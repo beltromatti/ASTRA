@@ -30,18 +30,49 @@ def cmd_run(a: argparse.Namespace) -> None:
             "-FullStdOutLogOutput"]
     if a.jump >= 0:
         args.append(f"-jump={a.jump}")
+    args.append(f"-seed={a.seed}")
     if a.exec:
         args.append(f'-exec={a.exec}')
     t0 = time.time()
     log = ROOT / "Saved" / "War" / "last_run.log"
     with open(log, "w") as f:
         r = subprocess.run(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
+    if getattr(a, "quiet", False):
+        if r.returncode != 0:
+            print(f"   exit {r.returncode} (log {log})")
+        return
     lines = [l for l in log.read_text(errors="replace").splitlines() if "[WarSim]" in l or "Error" in l]
     for l in lines[-12:]:
         print(l[l.find("[WarSim]"):] if "[WarSim]" in l else l)
     print(f"exit {r.returncode} in {time.time() - t0:.0f} s; log {log}")
     if out.exists():
         report(out)
+
+
+def outcome(path: Path) -> dict:
+    d = load(str(path))
+    fin = d["final"]["ships"]
+    o = {}
+    for side in ("astra", "mandate"):
+        caps = [s for s in fin if s["side"] == side and not s["craft"]]
+        craft = [s for s in fin if s["side"] == side and s["craft"]]
+        o[side] = (sum(1 for s in caps if s["alive"]), len(caps), sum(1 for s in craft if s["alive"]), len(craft))
+    aq = next((s for s in fin if s["c"] == "AQUILA"), None)
+    o["aquila"] = f"{aq.get('hull', 0):.0f}%" if aq and aq["alive"] else "LOST"
+    return o
+
+
+def cmd_ab(a: argparse.Namespace) -> None:
+    for name, ex in (("A", a.a), ("B", a.b)):
+        print(f"== variant {name}: {ex or '(as is)'}")
+        for seed in range(1, a.seeds + 1):
+            out = ROOT / "Saved" / "War" / f"ab_{name}_{seed}.json"
+            ns = argparse.Namespace(seconds=a.seconds, jump=a.jump, step=0.1, every=10, exec=ex, out=str(out.relative_to(ROOT)),
+                                    seed=seed, quiet=True)
+            cmd_run(ns)
+            o = outcome(out)
+            print(f"   seed {seed}: Aquila {o['aquila']:5}  ASTRA warships {o['astra'][0]}/{o['astra'][1]} craft {o['astra'][2]}/{o['astra'][3]}"
+                  f"  ·  Mandate warships {o['mandate'][0]}/{o['mandate'][1]} craft {o['mandate'][2]}/{o['mandate'][3]}")
 
 
 def load(path: str) -> dict:
@@ -114,7 +145,16 @@ def main() -> None:
     p.add_argument("--every", type=float, default=5)
     p.add_argument("--exec", default="")
     p.add_argument("--out", default="Saved/War/run.json")
+    p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--quiet", action="store_true")
     p.set_defaults(fn=cmd_run)
+    p = sub.add_parser("ab", help="compare: the same scenario over several seeds, with and without an --exec change")
+    p.add_argument("--seconds", type=float, default=900)
+    p.add_argument("--jump", type=float, default=160)
+    p.add_argument("--seeds", type=int, default=4)
+    p.add_argument("--a", default="", help="exec for variant A")
+    p.add_argument("--b", default="", help="exec for variant B")
+    p.set_defaults(fn=cmd_ab)
     p = sub.add_parser("report")
     p.add_argument("path")
     p.set_defaults(fn=cmd_report)
