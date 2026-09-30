@@ -89,6 +89,7 @@ void AAstraLifeBody::Bind(UAstraLifeSubsystem* InOwner, int32 InPerson)
 	FaceBlend = 0.f;
 	SinceSpoke = 100.f;
 	TimeAcc = 0.f;
+	Ticks = 0;
 	bFresh = true;
 	InOwner->Sim().SetBodied(InPerson, true);
 	SetActorTickEnabled(true);
@@ -149,7 +150,7 @@ void AAstraLifeBody::SetMode(EMode M, const FAstraLifePerson& P)
 	case EMode::Stand:
 	{
 		SetActorHiddenInGame(false);
-		if (Old == EMode::Sit || Old == EMode::Lie || Old == EMode::Off)
+		if (Old != EMode::Walk && Old != EMode::Stand)
 		{
 			Posture = EAstraCrewPosture::Standing;
 			ReclineDeg = 20.f;
@@ -310,6 +311,7 @@ void AAstraLifeBody::Tick(float DeltaSeconds)
 	const float Dt = bFresh ? 0.f : TimeAcc;
 	bFresh = false;
 	TimeAcc = 0.f;
+	++Ticks;
 	Shadows(Dist < CVarShadowM.GetValueOnGameThread() * 100.f);
 
 	// what they are doing now: the walk the person is on, or the pose of the place they are at
@@ -336,6 +338,7 @@ void AAstraLifeBody::Tick(float DeltaSeconds)
 	SetMode(Want, P);
 	if (Want == EMode::Shaft)
 	{
+		SetActorTickInterval(0.2f);                          // in a lift or a tower: nobody sees them
 		return;
 	}
 	if (Was == EMode::Shaft || Was == EMode::Off)
@@ -365,4 +368,7 @@ void AAstraLifeBody::Tick(float DeltaSeconds)
 	default:
 		break;
 	}
+	// how often to think next: every frame while anyone could see them, rarely when nobody can; a pose that breathes is the crew member's own
+	// (its base class would leave a half-second heartbeat behind, which a walk must not inherit)
+	SetActorTickInterval(SeenRecently(0.4f) || IsSpeaking() ? 0.f : (Mode == EMode::Sit || Mode == EMode::Lie ? 0.5f : 0.1f));
 }

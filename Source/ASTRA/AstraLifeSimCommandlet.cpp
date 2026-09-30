@@ -2,6 +2,8 @@
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraDoor.h"
+#include "AstraLifeBody.h"
 #include "AstraLifeSim.h"
 #include "AstraLifeSubsystem.h"
 #include "AstraShipPlan.h"
@@ -191,6 +193,165 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 			}
 		}
 		Check(TEXT("everyone can get everywhere"), Failed == 0, FString::Printf(TEXT("%d routes tried, %d without a way%s"), Tried, Failed, Failed ? *(TEXT("; first: ") + FirstFail) : TEXT("")));
+	}
+
+	// ======================================================================================================== the Captain's walk (bodies, headless)
+	if (Scenario == TEXT("walk"))
+	{
+		// A Captain of the test's own walks the ship (Deck 4: the Mess, the Concourse, the Berthing; lifts to the Medbay, Main Engineering,
+		// the Flight Deck) while the ship lives. Without a renderer the bodies have no meshes, but everything else of them is real: the
+		// pool, the people they carry, their walks, their doors. Checked: the pool's cap, that bodies appear where the people are, that
+		// nobody is made in front of the Captain's eyes except where a lift opens, that a body is where its person is.
+		struct FLeg { FString Name; FVector From, To; bool bJump; };
+		const FLeg Legs[] = {
+			{TEXT("the Mess Hall"), FVector(-12460, 0, -4600), FVector(-14000, 0, -4600), true},
+			{TEXT("across the Concourse"), FVector(-14000, 0, -4600), FVector(-11910, 900, -4600), false},
+			{TEXT("aft to the Berthing"), FVector(-11910, 900, -4600), FVector(-17200, 0, -4600), false},
+			{TEXT("the Medbay"), FVector(-23460, 0, -5400), FVector(-24500, 0, -5400), true},
+			{TEXT("Main Engineering"), FVector(-33260, 0, -5800), FVector(-35000, 0, -5800), true},
+			{TEXT("the Flight Deck"), FVector(6250, 0, -7280), FVector(12000, 0, -7280), true}};
+		struct FSpawnLog { int32 Person; float DistM; bool bLift; bool bFront; bool bSettle; bool bDoor; };
+		TArray<FSpawnLog> Spawns;
+		TArray<bool> HadBody;
+		HadBody.Init(false, N);
+		TArray<bool> WasInShaft;
+		WasInShaft.Init(false, N);
+		int32 MaxBodies = 0, TotalSpawns = 0, TotalDrops = 0, DoorMax = 0;
+		double TickRateSum = 0.0;
+		int32 TickBodies = 0;
+		float SinceJump = 0.f;
+		float WalkClock = 0.f;
+		TArray<float> BornAt;
+		BornAt.Init(0.f, N);
+		TArray<FVector> PrevPos;
+		PrevPos.Init(FVector::ZeroVector, N);
+		float WorstSpread = 0.f;
+		double BodiesMsSum = 0.0, BodiesMsMax = 0.0;
+		int64 BodyTicks = 0;
+		const float StepW = FMath::Min(Step, 0.0333f);
+		FVector Feet = Legs[0].From;
+		for (const FLeg& Leg : Legs)
+		{
+			TArray<FVector> Route;
+			if (Leg.bJump)
+			{
+				Feet = Leg.From;                                 // a lift: the screen fades, the Captain is somewhere else
+				SinceJump = 0.f;
+			}
+			if (!Plan->FindRoute(Feet, Leg.To, Route) || Route.Num() < 2)
+			{
+				Route = {Feet, Leg.To};
+			}
+			int32 Seg = 0;
+			float F = 0.f;
+			float Dwell = 40.f;                                  // and then a look around before the next leg
+			int32 BodiesHere = 0, MaxHere = 0, SpawnsHere = 0;
+			float Elapsed = 0.f;
+			while (Elapsed < 240.f && (Seg + 1 < Route.Num() || Dwell > 0.f))
+			{
+				if (Seg + 1 < Route.Num())
+				{
+					const float Len = (float)FVector::Dist(Route[Seg], Route[Seg + 1]);
+					F += Len > 1.f ? (135.f * StepW) / Len : 1.f;
+					if (F >= 1.f) { ++Seg; F = 0.f; }
+					Feet = Seg + 1 < Route.Num() ? FMath::Lerp(Route[Seg], Route[Seg + 1], F) : Route.Last();
+				}
+				else
+				{
+					Dwell -= StepW;
+				}
+				const FVector Look = Seg + 1 < Route.Num() ? (Route[Seg + 1] - Route[Seg]).GetSafeNormal() : FVector::ForwardVector;
+				Life->SetTestCaptain(Feet, Feet + FVector(0, 0, 160), Look);
+				TickWorld(StepW);
+				for (int32 i = 0; i < N; ++i)
+				{
+					if (AAstraLifeBody* Bd = Life->BodyOfPerson(i)) { Bd->TickForTest(StepW); }       // (a headless world does not tick its actors: the bodies think when the test says)
+				}
+				Elapsed += StepW;
+				SinceJump += StepW;
+				WalkClock += StepW;
+				int32 NowBodies = 0;
+				for (int32 i = 0; i < N; ++i)
+				{
+					const AAstraLifeBody* B = Life->BodyOfPerson(i);
+					const FAstraLifePerson& P = Sim.Person(i);
+					const bool bHas = B != nullptr;
+					if (bHas)
+					{
+						++NowBodies;
+						const float Spread = (float)FVector::Dist2D(B->GetActorLocation(), P.Pos);
+						// a body stands where its person does (a step to the right of the route, a step round somebody)
+						if (B->IsWalking() && P.Phase == FAstraLifePerson::EPhase::Walking && !P.Route.InShaft()) { WorstSpread = FMath::Max(WorstSpread, Spread); }
+					}
+					if (bHas && !HadBody[i])
+					{
+						++TotalSpawns;
+						++SpawnsHere;
+						const FVector2D To = FVector2D(P.Pos.X - Feet.X, P.Pos.Y - Feet.Y).GetSafeNormal();
+						const bool bFront = FVector2D::DotProduct(To, FVector2D(Look.X, Look.Y).GetSafeNormal()) > 0.5f;    // within 60 degrees of where the Captain looks
+						// out of a room the ship has not built (nothing to see there): they step through its door into the place that is built
+						const int32 Before = Map.CompartmentAt(PrevPos[i] + FVector(0, 0, 30));
+						const bool bDoor = Before != INDEX_NONE && Map.Comps[Before].Status == EAstraRoomStatus::Planned;
+						BornAt[i] = WalkClock;
+						Spawns.Add({i, (float)FVector::Dist2D(P.Pos, Feet) / 100.f, WasInShaft[i], bFront, SinceJump < 3.f, bDoor});
+					}
+					else if (!bHas && HadBody[i])
+					{
+						++TotalDrops;
+					}
+					HadBody[i] = bHas;
+					PrevPos[i] = P.Pos;
+					WasInShaft[i] = P.Phase == FAstraLifePerson::EPhase::Walking && P.Route.InShaft();
+				}
+				MaxBodies = FMath::Max(MaxBodies, NowBodies);
+				MaxHere = FMath::Max(MaxHere, NowBodies);
+				BodiesHere = NowBodies;
+				int32 DoorWalkers = 0;
+				for (const TWeakObjectPtr<const AActor>& W : AstraDoors::Walkers()) { DoorWalkers += W.IsValid() ? 1 : 0; }
+				DoorMax = FMath::Max(DoorMax, DoorWalkers);
+				BodiesMsSum += Life->GetCost().BodiesMs;
+				BodiesMsMax = FMath::Max(BodiesMsMax, Life->GetCost().BodiesMsMax);
+				++BodyTicks;
+			}
+			UE_LOG(LogASTRA, Display, TEXT("[Life] walk %s: %d bodies at the end (most %d), %d made on the way"), *Leg.Name, BodiesHere, MaxHere, SpawnsHere);
+		}
+		for (int32 i = 0; i < N; ++i)
+		{
+			if (const AAstraLifeBody* B = Life->BodyOfPerson(i))
+			{
+				const float Lived = WalkClock - BornAt[i];
+				if (Lived > 20.f) { TickRateSum += B->TicksRun() / Lived; ++TickBodies; }
+			}
+		}
+		Life->ClearTestCaptain();
+		const int32 Cap = Map.Vis.MaxBodies + 4;
+		Check(TEXT("the pool keeps its cap"), MaxBodies <= Cap && MaxBodies > 0, FString::Printf(TEXT("at most %d bodies at once (the cap is %d plus a few still in view)"), MaxBodies, Map.Vis.MaxBodies));
+		int32 Pops = 0, Lifts = 0, Settling = 0, Doors = 0;
+		float Nearest = 1.0e9f;
+		for (const FSpawnLog& S : Spawns)
+		{
+			if (S.bLift) { ++Lifts; continue; }
+			if (S.bSettle) { ++Settling; continue; }                    // the first moments after a jump: the picture is still fading in
+			if (S.bDoor) { ++Doors; continue; }
+			if (S.DistM < 40.f && S.bFront) { ++Pops; Nearest = FMath::Min(Nearest, S.DistM); }
+		}
+		Check(TEXT("nobody appears in front of the Captain"), Pops <= 5,
+		      FString::Printf(TEXT("%d bodies made, %d released, %d at a jump, %d out of a lift, %d out of a room not built; %d made within 40 m and in front of the Captain (nearest %.0f m)"),
+		                      TotalSpawns, TotalDrops, Settling, Lifts, Doors, Pops, Nearest < 1.0e8f ? Nearest : 0.f));
+		Check(TEXT("the bodies think"), TickBodies > 0 && TickRateSum / TickBodies > 1.5, FString::Printf(TEXT("%.1f thoughts a second on average for the %d bodies alive for more than 20 s (nobody sees them here: every tenth or half second)"), TickBodies ? TickRateSum / TickBodies : 0.0, TickBodies));
+		Check(TEXT("a body is where its person is"), WorstSpread < 200.f, FString::Printf(TEXT("the widest a walking body strayed from the route: %.0f cm"), WorstSpread));
+		Check(TEXT("the doors know the walkers"), DoorMax <= Cap, FString::Printf(TEXT("%d walkers on the doors' list at most"), DoorMax));
+		Check(TEXT("the bodies' manager is cheap"), BodiesMsSum / FMath::Max<int64>(1, BodyTicks) < 0.3,
+		      FString::Printf(TEXT("%.3f ms a frame on average (it runs four times a second, %.2f ms at worst)"), BodiesMsSum / FMath::Max<int64>(1, BodyTicks), BodiesMsMax));
+		bool bAllW = true;
+		int32 Failed = 0;
+		for (const FCheck& C : Checks) { bAllW &= C.bPass; Failed += C.bPass ? 0 : 1; }
+		UE_LOG(LogASTRA, Display, TEXT("[Life] walk: %d checks, %d failed"), Checks.Num(), Failed);
+		UE_LOG(LogASTRA, Display, TEXT("[Life] VERDICT: %s"), bAllW ? TEXT("PASS") : TEXT("FAIL"));
+		Life->ReleaseAllBodies();
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return bAllW ? 0 : 1;
 	}
 
 	// ======================================================================================================== the day

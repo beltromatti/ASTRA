@@ -61,6 +61,13 @@ public:
 	/** The tests feed the simulation their own incidents: the ship's are not passed on while this is off. */
 	void SetShipFeed(bool bOn) { bFeed = bOn; }
 
+	/** The tests' own Captain (no pawn, no renderer needed): where the feet and the eye are, and which way they look. Bodies are made
+	 *  and kept for them as for the real one. */
+	void SetTestCaptain(const FVector& InFeet, const FVector& InEye, const FVector& InLook) { bTestCaptain = true; TestFeet = InFeet; TestEye = InEye; TestLook = InLook; }
+	void ClearTestCaptain() { bTestCaptain = false; }
+	/** Where a person's body is (null: no body), for the tests. */
+	AAstraLifeBody* BodyOfPerson(int32 Person) const;
+
 	/** Who is in a deck's section (fit, physically there): a hit there hurts them. Roster indices. Empty when life is not running. */
 	TArray<int32> RosterIn(int32 Deck, TCHAR Section) const;
 
@@ -84,6 +91,7 @@ public:
 	// the bodies read these
 	UAstraShipPlan* GetPlan() const { return Plan.Get(); }
 	const FVector& Eye() const { return EyeCm; }
+	const FVector& Look() const { return LookDir; }
 	const TArray<TObjectPtr<AAstraLifeBody>>& PoolView() const { return Pool; }
 
 private:
@@ -101,14 +109,20 @@ private:
 	int32 NumActiveBodies = 0;
 	double RouteBudgetS = 0.00012;
 	bool bFeed = true;
+	bool bTestCaptain = false;
+	FVector TestFeet = FVector::ZeroVector, TestEye = FVector::ZeroVector, TestLook = FVector::ForwardVector;
 
 	// --- bodies
 	UPROPERTY() TArray<TObjectPtr<AAstraLifeBody>> Pool;
 	TMap<int32, int32> BodyOf;              // person -> pool index
 	FVector LastCaptain = FVector::ZeroVector;
 	FVector EyeCm = FVector::ZeroVector;
+	FVector LookDir = FVector::ForwardVector;
 	bool bCaptainSeen = false;
+	float JumpGraceS = 0.f;           // after a jump (a lift, a fade) the picture is still coming back: bodies are made in view, in a few frames
 	void ManageBodies();
+	void PrewarmPool();
+	bool CanAppearUnseen(const FVector& Where) const;
 	AAstraLifeBody* TakeBody();
 	void ReleaseBody(int32 Person);
 

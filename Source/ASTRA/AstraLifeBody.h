@@ -31,6 +31,13 @@ public:
 	/** Back to the pool: hidden, silent, not ticking. */
 	void Unbind();
 
+	/** How many times the body has thought since it became this person (the tests). */
+	int64 TicksRun() const { return Ticks; }
+	/** Out on its feet, walking a route (not in a lift, not at its post): the pose where it must be where its person is. */
+	bool IsWalking() const { return Mode == EMode::Walk; }
+	/** A headless world does not tick its actors the way a game does: the tests drive the bodies themselves. */
+	void TickForTest(float Dt) { Tick(Dt); }
+
 	/** Seen by the camera lately (their own mesh or their seated pose). */
 	bool SeenRecently(float Within = 0.5f) const;
 
@@ -52,6 +59,7 @@ private:
 	FVector2D Offset = FVector2D::ZeroVector;   // keeping right, stepping round the Captain and each other (cm)
 	float BlockedS = 0.f;
 	float ShaftT = 0.f;
+	int64 Ticks = 0;
 	bool bFresh = false;              // just bound: the first tick runs at once, whoever sees it
 
 	UPROPERTY() TObjectPtr<UAnimSequence> IdleAnim;

@@ -183,13 +183,23 @@ void UAstraLifeSubsystem::Tick(float DeltaTime)
 		}
 	}
 	FVector Focus = FVector::ZeroVector;
-	if (const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0))
+	if (bTestCaptain)
 	{
-		Focus = Pawn->GetActorLocation();
+		Focus = TestFeet;
+		EyeCm = TestEye;
+		LookDir = TestLook;
 	}
-	if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+	else
 	{
-		EyeCm = Cam->GetCameraLocation();
+		if (const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0))
+		{
+			Focus = Pawn->GetActorLocation();
+		}
+		if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
+		{
+			EyeCm = Cam->GetCameraLocation();
+			LookDir = Cam->GetCameraRotation().Vector();
+		}
 	}
 	Life.Tick(DeltaTime, TimeScale, RouteBudgetS, Focus);
 	const double SimMs = (FPlatformTime::Seconds() - T0) * 1000.0;
@@ -205,7 +215,29 @@ void UAstraLifeSubsystem::Tick(float DeltaTime)
 		Cost.BodiesMs = (FPlatformTime::Seconds() - B0) * 1000.0;
 		Cost.BodiesMsMax = FMath::Max(Cost.BodiesMsMax * 0.998, Cost.BodiesMs);
 	}
+	PrewarmPool();
 	SET_DWORD_STAT(STAT_AstraLifeBodyCount, NumActiveBodies);
+}
+
+void UAstraLifeSubsystem::PrewarmPool()
+{
+	// the pool is made a couple at a time while the Captain is still on the bridge: a body is never spawned in front of anyone, and a lift's
+	// arrival finds them ready
+	if (!MapPtr.IsValid() || (!FApp::CanEverRender() && !bTestCaptain) || Pool.Num() >= MapPtr->Vis.MaxBodies || !GetWorld())
+	{
+		return;
+	}
+	for (int32 i = 0; i < 2 && Pool.Num() < MapPtr->Vis.MaxBodies; ++i)
+	{
+		FActorSpawnParameters P;
+		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		P.ObjectFlags |= RF_Transient;
+		if (AAstraLifeBody* B = GetWorld()->SpawnActor<AAstraLifeBody>(FVector(0.f, 0.f, -2.0e5), FRotator::ZeroRotator, P))
+		{
+			B->SetActorHiddenInGame(true);
+			Pool.Add(B);
+		}
+	}
 }
 
 // ====================================================================================================== the clock
@@ -409,6 +441,12 @@ FString UAstraLifeSubsystem::InfoText() const
 
 // ====================================================================================================== the bodies
 
+AAstraLifeBody* UAstraLifeSubsystem::BodyOfPerson(int32 Person) const
+{
+	const int32* I = BodyOf.Find(Person);
+	return I && Pool.IsValidIndex(*I) ? Pool[*I].Get() : nullptr;
+}
+
 AAstraLifeBody* UAstraLifeSubsystem::BodyOfRoster(int32 RosterIdx) const
 {
 	const int32 P = Life.PersonOfRoster(RosterIdx);
@@ -467,24 +505,62 @@ AAstraLifeBody* UAstraLifeSubsystem::TakeBody()
 	return B;
 }
 
+bool UAstraLifeSubsystem::CanAppearUnseen(const FVector& At) const
+{
+	// nobody pops into view: a body is made where the Captain is not looking (outside the frustum's width), or cannot see (a wall, a bulkhead),
+	// or cannot make out (beyond 45 m); the people who are in plain view keep waiting until they are not
+	const FVector Head = At + FVector(0.f, 0.f, 150.f);
+	const FVector To = Head - EyeCm;
+	const float D = (float)To.Size();
+	if (D > 4500.f)
+	{
+		return true;
+	}
+	const FVector2D L(LookDir.X, LookDir.Y), T2(To.X, To.Y);
+	if (!L.IsNearlyZero() && !T2.IsNearlyZero() && FVector2D::DotProduct(L.GetSafeNormal(), T2.GetSafeNormal()) < 0.42f)     // more than 65 degrees off the line of sight
+	{
+		return true;
+	}
+	if (UWorld* W = GetWorld())
+	{
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraLifeAppear), false);
+		if (const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0))
+		{
+			Q.AddIgnoredActor(Pawn);
+		}
+		FHitResult Hit;
+		return W->LineTraceSingleByChannel(Hit, EyeCm, Head, ECC_Visibility, Q);
+	}
+	return false;
+}
+
 void UAstraLifeSubsystem::ManageBodies()
 {
 	SCOPE_CYCLE_COUNTER(STAT_AstraLifeBodies);
-	if (!FApp::CanEverRender() || !MapPtr.IsValid())
+	if ((!FApp::CanEverRender() && !bTestCaptain) || !MapPtr.IsValid())
 	{
 		return;
 	}
-	const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0);
-	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0);
-	if (!Pawn || !Cam || !Pawn->IsA<ACharacter>())
+	FVector Feet = TestFeet;
+	if (!bTestCaptain)
 	{
-		ReleaseAllBodies();                              // the Captain is in a Falcon, a pod: nobody walks for them
-		bCaptainSeen = false;
-		return;
+		const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0);
+		const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0);
+		if (!Pawn || !Cam || !Pawn->IsA<ACharacter>())
+		{
+			ReleaseAllBodies();                          // the Captain is in a Falcon, a pod: nobody walks for them
+			bCaptainSeen = false;
+			return;
+		}
+		Feet = Pawn->GetActorLocation() - FVector(0.f, 0.f, Pawn->GetDefaultHalfHeight());
 	}
 	const FAstraLifeMap& Map = *MapPtr;
-	const FVector Feet = Pawn->GetActorLocation() - FVector(0.f, 0.f, Pawn->GetDefaultHalfHeight());
-	const bool bJump = !bCaptainSeen || FVector::Dist(Feet, LastCaptain) > 1500.f;      // a lift, a fade: nobody may be missing when the picture returns
+	if (!bCaptainSeen || FVector::Dist(Feet, LastCaptain) > 1500.f)
+	{
+		JumpGraceS = 1.6f;                               // a lift, a fade: nobody may be missing when the picture returns
+	}
+	const bool bJump = JumpGraceS > 0.f;
+	JumpGraceS = FMath::Max(0.f, JumpGraceS - 0.25f);
 	bCaptainSeen = true;
 	LastCaptain = Feet;
 	// the vertical band: a deck, or the whole height of a hall the Captain stands in
@@ -495,8 +571,10 @@ void UAstraLifeSubsystem::ManageBodies()
 		Band = FMath::Max(Band, Map.Comps[Here].Box.Max.Z - Map.Comps[Here].Box.Min.Z + 100.f);
 	}
 	const float Spawn2 = FMath::Square(Map.Vis.SpawnM * 100.f), Keep2 = FMath::Square(Map.Vis.DespawnM * 100.f);
-	struct FCand { int32 P; float D2; };
+	struct FCand { int32 P; float D2; float Score; };
 	TArray<FCand> Cand;
+	const FVector2D Look2(LookDir.X, LookDir.Y);
+	const FVector2D LookN = Look2.GetSafeNormal();
 	for (int32 i = 0; i < Life.NumPeople(); ++i)
 	{
 		const FAstraLifePerson& P = Life.Person(i);
@@ -514,14 +592,28 @@ void UAstraLifeSubsystem::ManageBodies()
 			continue;
 		}
 		const float D2 = (float)FVector::DistSquared2D(P.Pos, Feet);
-		if (D2 <= (BodyOf.Contains(i) ? Keep2 : Spawn2))
+		const bool bHas = BodyOf.Contains(i);
+		if (D2 <= (bHas ? Keep2 : Spawn2))
 		{
-			Cand.Add({i, D2});
+			// who has a body when there are more people than bodies: the nearest, but those who are in front of the Captain before those behind
+			// (beyond a few metres), and whoever has one keeps it unless somebody is well nearer (nobody flickers at the edge of the cap)
+			float Score = FMath::Sqrt(D2);
+			if (Score > 600.f && !LookN.IsNearlyZero())
+			{
+				const FVector2D To = FVector2D(P.Pos.X - Feet.X, P.Pos.Y - Feet.Y).GetSafeNormal();
+				if (FVector2D::DotProduct(To, LookN) < 0.35f)
+				{
+					Score *= 1.4f;
+				}
+			}
+			Cand.Add({i, D2, bHas ? Score * 0.7f : Score});
 		}
 	}
-	Cand.Sort([](const FCand& A, const FCand& B) { return A.D2 < B.D2; });
-	// the nearest that stand where the ship has been built (a person in a deck not yet modelled has nothing to stand on)
+	Cand.Sort([](const FCand& A, const FCand& B) { return A.Score < B.Score; });
+	// the nearest that stand where the ship has been built (a person in a deck not yet modelled has nothing to stand on); one who has no body yet
+	// waits while the Captain can see the place they stand (unless the Captain has just arrived: the fade covers it)
 	TSet<int32> Want;
+	int32 Traced = 0;
 	for (const FCand& C : Cand)
 	{
 		if (Want.Num() >= Map.Vis.MaxBodies)
@@ -533,6 +625,16 @@ void UAstraLifeSubsystem::ManageBodies()
 		if (Room != INDEX_NONE && Map.Comps[Room].Status == EAstraRoomStatus::Planned)
 		{
 			continue;
+		}
+		if (!bJump && !BodyOf.Contains(C.P))
+		{
+			// (a few traces a call: the rest wait for the next)
+			if (Traced >= 12 || !CanAppearUnseen(P.Pos))
+			{
+				++Traced;
+				continue;
+			}
+			++Traced;
 		}
 		Want.Add(C.P);
 	}
@@ -562,7 +664,7 @@ void UAstraLifeSubsystem::ManageBodies()
 		{
 			continue;
 		}
-		if (!bJump && Made >= 3)
+		if (Made >= (bJump ? 8 : 3))                     // (a body's making is a part of a frame: a few at a time, the nearest first)
 		{
 			break;
 		}
