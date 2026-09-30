@@ -53,6 +53,12 @@ namespace Core
 		uint64_t Errors = 0;
 	};
 
+	/**
+	 * Fills a texture with black (a render pass clear, the texture needs the render target usage): what the host's frame gets
+	 * instead of an upscaled image when the scaler cannot run, so the tonemapper never reads uninitialised memory.
+	 */
+	void ClearTexture(id<MTLCommandQueue> Queue, id<MTLTexture> Texture);
+
 	/** A MetalFX temporal scaler for one output size with its private textures and kernels. Creating it is slow: a worker thread. */
 	class FScaler : public std::enable_shared_from_this<FScaler>
 	{

@@ -26,6 +26,7 @@
 #include "RHI.h"
 #include "RHIResources.h"
 
+#include <atomic>
 #include <mutex>
 
 namespace AstraMetalFX
@@ -146,7 +147,7 @@ namespace AstraMetalFX
 	{
 		@autoreleasepool
 		{
-			if (!Impl.IsValid() || !Impl->Scaler || Impl->Scaler->Failed() || !IsRHIMetal())
+			if (!Impl.IsValid() || !Impl->Scaler || !IsRHIMetal())
 			{
 				return;
 			}
@@ -154,6 +155,25 @@ namespace AstraMetalFX
 			// The native Metal texture behind an RHI texture (FRHITexture::GetNativeResource: "designed to provide plugins with
 			// access to the underlying resource"). Retained by the frame input until the GPU has completed the command buffer.
 			auto Native = [](FRHITexture* Texture) -> id<MTLTexture> { return Texture ? (__bridge id<MTLTexture>)Texture->GetNativeResource() : nil; };
+
+			// A scaler that cannot run still owes the renderer a valid image this frame (frames already in the pipeline were
+			// set up before the failure was noticed): black, until the game view is switched to TSR.
+			auto ClearInstead = [this, &Frame, &Native]()
+			{
+				id<MTLTexture> Output = Native(Frame.Output);
+				if (Output)
+				{
+					GetIMetalDynamicRHI()->RHIRunOnQueue([Output](MTL::CommandQueue* Queue)
+					{
+						Core::ClearTexture((__bridge id<MTLCommandQueue>)Queue, Output);
+					}, /*bWaitForSubmission=*/false);
+				}
+			};
+			if (Impl->Scaler->Failed())
+			{
+				ClearInstead();
+				return;
+			}
 
 			std::shared_ptr<Core::FFrameInput> Input = std::make_shared<Core::FFrameInput>();
 			Input->Color = Native(Frame.SceneColor);
@@ -176,6 +196,7 @@ namespace AstraMetalFX
 			if (!Problem.empty())
 			{
 				Impl->Scaler->Fail(Problem);
+				ClearInstead();
 				return;
 			}
 
@@ -185,7 +206,15 @@ namespace AstraMetalFX
 			{
 				@autoreleasepool
 				{
+					const double Start = FPlatformTime::Seconds();
 					Scaler->Encode((__bridge id<MTLCommandQueue>)Queue, ConstInput);
+					// Encoding takes tens of microseconds; anything slower stalls the Metal submission thread, and with it the GPU.
+					const double Ms = (FPlatformTime::Seconds() - Start) * 1000.0;
+					static std::atomic<int> Reports{ 0 };
+					if (Ms > 4.0 && Reports.fetch_add(1) < 8)
+					{
+						UE_LOG(LogAstraMetalFX, Warning, TEXT("encoding a MetalFX frame took %.1f ms on the Metal submission thread"), Ms);
+					}
 				}
 			}, /*bWaitForSubmission=*/false);
 		}

@@ -94,6 +94,8 @@ namespace Core
 			MTLTextureDescriptor* Desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:Format width:Width height:Height mipmapped:NO];
 			Desc.usage = Usage;
 			Desc.storageMode = MTLStorageModePrivate;
+			// Our own textures are written by one frame's command buffer and read by the next: Metal orders them (tracked).
+			Desc.hazardTrackingMode = MTLHazardTrackingModeTracked;
 			id<MTLTexture> Texture = [Device newTextureWithDescriptor:Desc];
 			Texture.label = Label;
 			return Texture;
@@ -114,6 +116,29 @@ namespace Core
 	void SetLogger(std::function<void(ELogLevel, const std::string&)> Logger)
 	{
 		GLogger = std::move(Logger);
+	}
+
+	void ClearTexture(id<MTLCommandQueue> Queue, id<MTLTexture> Texture)
+	{
+		@autoreleasepool
+		{
+			if (!Texture || !(Texture.usage & MTLTextureUsageRenderTarget))
+			{
+				return;
+			}
+			MTLRenderPassDescriptor* Pass = [MTLRenderPassDescriptor renderPassDescriptor];
+			Pass.colorAttachments[0].texture = Texture;
+			Pass.colorAttachments[0].loadAction = MTLLoadActionClear;
+			Pass.colorAttachments[0].storeAction = MTLStoreActionStore;
+			Pass.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+			id<MTLCommandBuffer> CommandBuffer = [Queue commandBuffer];
+			CommandBuffer.label = @"AstraMetalFX clear";
+			id<MTLRenderCommandEncoder> Encoder = [CommandBuffer renderCommandEncoderWithDescriptor:Pass];
+			[Encoder endEncoding];
+			GInFlight.fetch_add(1);
+			[CommandBuffer addCompletedHandler:^(id<MTLCommandBuffer>) { GInFlight.fetch_sub(1); }];
+			[CommandBuffer commit];
+		}
 	}
 
 	std::string FScaler::QueryUnsupportedReason(id<MTLDevice> Device)

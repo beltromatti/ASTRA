@@ -127,22 +127,28 @@ Esiti delle sonde (macchina: MacBook Air M4, macOS 26.6, Xcode 26.2, tutto con i
 
 ## 5. Costo di MetalFX su questo Mac (M4 10 core)
 
-`probe_cost`, il solo `encodeToCommandBuffer:` in un command buffer suo (a cui il plugin aggiunge ~0,05–0,1 ms di kernel di preparazione: 0,075 ms a 640×360).
-**Attenzione al rumore**: la macchina era carica (l'editor del lead sulla GPU, compilazioni di altri agenti), e l'Air senza ventola cambia frequenza: i tempi di un singolo
-command buffer variano di un fattore 3–10; i numeri affidabili sono il minimo su più serie di 60 frame consecutivi («back-to-back»):
+`probe_cost`: il solo `encodeToCommandBuffer:` dello scaler (a cui il plugin aggiunge ~0,05–0,1 ms di kernel di preparazione: 0,075 ms a 640×360). Due misure
+complementari, entrambe sulla GPU sotto carico continuo: «in un command buffer» = 30 scaler di fila nello stesso command buffer, tempo GPU / 30 (il costo
+puro, con la GPU tenuta occupata); «uno dopo l'altro» = command buffer consecutivi, tempo di parete / frame (include il passaggio fra command buffer).
+**Attenzione al rumore**: l'Air senza ventola cambia frequenza secondo lo stato termico e la macchina era condivisa (l'editor del lead sulla GPU, le
+compilazioni degli altri agenti): un singolo command buffer oscilla fra 0,5 e 10+ ms, per questo i valori sono minimo–mediana di più serie.
 
-| ingresso → uscita | scala | minimo back-to-back | mediana |
+| ingresso → uscita | scala | in un command buffer (min–mediana) | uno dopo l'altro (min–mediana) |
 |---|---|---|---|
-| 960×540 → 1600×900 | 60 % | 1,3–1,5 ms | 1,6 ms |
-| 1120×630 → 1600×900 | 70 % | 1,5–1,7 ms | 2,1–2,3 ms |
-| 1600×900 → 1600×900 | 100 % (come un TAA) | 2,1 ms | 2,8 ms |
-| 855×554 → 1710×1107 | 50 % | 1,9 ms | 2,1 ms |
-| 940×609 → 1710×1107 | 55 % | 2,0 ms | 2,05 ms |
-| 1197×775 → 1710×1107 | 70 % | 2,1 ms | 2,2 ms |
-| texture 1600×900, rettangolo 960×540 o 1120×630 (come in Unreal) | | 1,3–1,5 ms | 1,6–2,1 ms |
+| 960×540 → 1600×900 | 60 % | 1,4–1,6 ms | 1,2–1,4 ms |
+| 1120×630 → 1600×900 | 70 % | 1,7–2,2 ms | 1,4–1,8 ms |
+| 1600×900 → 1600×900 | 100 % (come un TAA) | 2,1–2,3 ms | 2,0–2,1 ms |
+| 855×554 → 1710×1107 | 50 % | 2,1–2,9 ms | 1,8–2,0 ms |
+| 940×609 → 1710×1107 | 55 % | 2,1–2,3 ms | 1,8–2,0 ms |
+| 1197×775 → 1710×1107 | 70 % | 2,1–2,6 ms | 2,1–2,2 ms |
+| texture 1600×900 (come in Unreal), rettangolo 960×540 o 1120×630 | | 1,4–2,0 ms | 1,25–1,5 ms |
+| texture 1712×1112, rettangolo 940×609 o 1197×775 → 1710×1107 | | 2,0–3,3 ms | 1,6–2,0 ms |
 
-Il costo dipende poco dalla scala e soprattutto dall'uscita. Con il chip freddo e la GPU libera i singoli command buffer sono scesi fino a 0,5–1,0 ms: **aspettarsi
-~1–2 ms**, da confrontare con i ~2,9 ms di TSR misurati dal lead a 1600×900 (al 70 %). Il costo sulla CPU del thread di sottomissione è ~25 µs per frame.
+Il costo dipende soprattutto dall'**uscita** (poco dalla scala): ~1,4 ms a 960×540 → 1600×900, ~2 ms a 1710×1107. Con il chip fresco e la GPU libera il singolo command buffer è sceso a 0,5–1,0 ms;
+con la macchina tranquilla il plugin intero (kernel di moto + scaler) a 528×297 → 960×540 ha misurato 0,58 ms di media su 192 frame (`probe_core`). **Da aspettarsi ~1,5–2,5 ms** a 1600×900–1710×1107
+sotto carico, da confrontare con i ~2,9 ms che il lead ha misurato per TSR contro TAA a 1600×900 al 70 % (il TAA stesso costa qualcosa, il TSR intero sta sui 3–3,5 ms):
+un guadagno di ~1 ms e più, e un'immagine che `probe_e2e` dice migliore di un semplice filtro. Il costo della CPU del thread di sottomissione è ~25 µs per frame. Memoria (`probe_memory`, `device.currentAllocatedSize`): lo scaler tiene ~48 MB a 1600×900 e ~83 MB a 1710×1107
+(157 MB a 2560×1440), più le texture del plugin (vettori di moto 7,6 MB e l'uscita 15 MB a 1710×1107): come la storia di TSR, che non viene più allocata.
 
 ## 6. Limiti e rischi noti
 1. **Nessuna prova nel gioco vero** (agente senza editor): l'ordine dei command buffer, la correttezza dei vettori di moto nel gioco e l'immagine sono da verificare dal lead
@@ -153,3 +159,29 @@ Il costo dipende poco dalla scala e soprattutto dall'uscita. Con il chip freddo 
 5. Il layout di `FMetalRHICommandContext`, `MetalRHI` privato ecc. non sono usati: se Epic cambia `RHIRunOnQueue` o la sequenza `ImmediateFlush`+`EnqueueLambda` il plugin va riverificato
    a ogni aggiornamento del motore (UE 5.8.3 è fissato per il progetto).
 6. Metal 4: lo scaler è quello classico su `MTLCommandBuffer` (il RHI di 5.8 non usa command buffer Metal 4).
+
+## 7. Come si prova nel gioco (per il lead)
+
+1. Compila con l'editor chiuso (`tools/ricompila.sh`, o `Build.sh ASTRAEditor Mac Development …`): il plugin è in `ASTRA.uproject` (solo Mac) e si compila con il progetto.
+2. All'avvio il log dice `MetalFX upscaler ready`, poi `building the MetalFX scaler for an output of WxH` e `MetalFX scaler N ready` / `was built in X s`: per qualche secondo (la prima
+   volta in assoluto sulla macchina 2–3 s, poi 0,2–0,6 s) la vista di gioco usa TSR, poi passa a MetalFX da sola. Se cambia la dimensione della finestra si ricostruisce (TSR nel frattempo).
+3. `astra.metalfx.status` (console o `astra.cmd`): `ACTIVE` o il motivo per cui no, l'uscita, il tempo GPU dell'ultimo frame e la media. `stat AstraMetalFX` lo mostra a schermo (build Development).
+   `r.AstraMetalFX.LogInterval 5` lo scrive nel log ogni 5 s.
+4. **Confronto TSR / MetalFX**: `r.AstraMetalFX 0` e `1` a caldo (la storia ricomincia a ogni cambio). A parità di costo: fissa `r.DynamicRes.OperationMode 0` e lo stesso `r.ScreenPercentage`, leggi il tempo GPU
+   totale (banco `tools/perf`/`stat gpu`) **più** il tempo di `stat AstraMetalFX` (il RHI non vede il command buffer di MetalFX, §3.4), poi alza il `r.ScreenPercentage` di MetalFX finché i totali pareggiano.
+   Con la risoluzione dinamica accesa, abbassa `r.DynamicRes.FrameTimeBudget` del costo di MetalFX (o conta sul 10 % di margine `r.DynamicRes.TargetedGPUHeadRoomPercentage`, che è circa quello).
+5. **Diagnosi**: `r.AstraMetalFX.Debug 1` mostra i vettori di moto (fermo e senza oggetti in moto: tutto scuro; girando la testa un colore uniforme per direzione; un oggetto in moto ha un colore suo);
+   `2` colora di rosso i pixel che prendono il moto dal velocity buffer (gli altri lo prendono dalla camera). Se l'immagine ha fantasmi, scie o lampeggia: prima questi due, poi il log
+   (`LogAstraMetalFX`: ogni errore e il motivo per cui è tornato a TSR), poi `r.AstraMetalFX 0`.
+   Per vedere le asserzioni di MetalFX e di Metal (un contenuto fuori scala, una texture sbagliata) avvia il gioco con `MTL_DEBUG_LAYER=1` nell'ambiente.
+6. **Messa a punto** (non fatta: serve l'occhio del lead): `r.Tonemapper.Sharpen` (0,6 compensa la morbidezza di TSR, con MetalFX può bastare meno); `r.ViewTextureMipBias.Offset`
+   (−0,3 di base, che a 55 % dà un mip bias di −1,16: si può provare −0,5 per texture più nitide da ricostruire); `r.TemporalAASamples` (8 di base, scalato da Unreal con `1/scala²`: a 55 % sono 26 fasi di jitter).
+
+## 8. File
+- `Plugins/AstraMetalFX/` — `AstraMetalFX.uplugin`; `Source/AstraMetalFX/`: `AstraMetalFX.Build.cs`; `Public/AstraMetalFXModule.h` (stato e cvar documentati); `Private/`:
+  `AstraMetalFXModule.cpp`, `AstraMetalFXManager.{h,cpp}` (cvar, contesto costruito su thread di lavoro, fallback, contatori), `AstraMetalFXViewExtension.{h,cpp}` (TSR o MetalFX per vista),
+  `AstraMetalFXUpscaler.{h,cpp}` (l'`ITemporalUpscaler`, il pass RDG, la storia), `AstraMetalFXBridge.{h,mm}` (Unreal ↔ Metal: `GetNativeResource`, `RHIRunOnQueue`),
+  `AstraMetalFXCore.{h,mm}` (tutto il Metal senza Unreal), `AstraMetalFXKernels.inl` (i kernel MSL).
+- `tools/metalfx_probe/` — `build.sh`, `run_all.sh` (le verifiche che contano), le sonde: `probe_create`, `probe_cost`, `probe_formats`, `probe_quality`, `probe_hazard` (studio dell'API),
+  `probe_motion`, `probe_e2e`, `probe_core` (il plugin contro la verità).
+

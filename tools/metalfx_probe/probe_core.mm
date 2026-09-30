@@ -306,6 +306,19 @@ int main()
 			S3->Encode(R.Q, MakeFrame(T, 528, 297, 0, 0, 0, 0, C2P, true, false, false));
 			WaitAll(R);
 			Check(S3->Timings().Frames == 0, "a failed scaler encodes nothing");
+			// What the host does instead for such a frame: a black output, never uninitialised memory.
+			{
+				std::shared_ptr<FScaler> S4 = FScaler::Create(R.Dev, OutW, OutH, Err);
+				S4->Encode(R.Q, MakeFrame(T, 528, 297, 0, 0, 0, 0, C2P, true, false, false));
+				WaitAll(R);
+				std::vector<float> Before = Luma(R, T.Output, OutW, OutH);
+				double SumBefore = 0; for (float V : Before) SumBefore += V;
+				ClearTexture(R.Q, T.Output);
+				WaitAll(R);
+				std::vector<float> After = Luma(R, T.Output, OutW, OutH);
+				double SumAfter = 0; for (float V : After) SumAfter += V;
+				Check(SumBefore > 1000.0 && SumAfter == 0.0, "ClearTexture turns an upscaled image into black");
+			}
 		}
 
 		FScaler::ReleaseSharedResources();
