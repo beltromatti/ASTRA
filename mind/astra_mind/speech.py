@@ -14,9 +14,13 @@ Producers call `voice.say(speaker, text, lang, tone, ...)`; the optional keyword
     topic     a key ("contact:T-21", "heat"): a newer line on a topic replaces an older one that has not been said yet
     expires_s seconds after which an unsaid line is dropped (defaults per priority)
     stale_if  a callable: when it returns True at the time the line would start, the line is dropped
+    rethink   a coroutine function (text, waited_s, cut_after) -> the text to say now, or None: when a line has waited long
+              (`RETHINK_AFTER_S`) or was cut off half way, whoever was going to say it thinks again with the ship as it is now —
+              says it updated, changes it, or lets it go (docs/ARCHITETTURA.md §1bis: the agents re-think, the code does not drop
+              or shorten what they say). Without it (a canned line) a cut line resumes from the sentence that was cut off
     answer    shorthand for priority=ANSWER
-A report (a line said inside a report turn: `voice.low_priority` / `voice.urgent`) is worth saying only for a few seconds after
-the event it tells of (`report_since`, else after it was queued): older, it is dropped and declared, never said late.
+A report (a line said inside a report turn: `voice.low_priority` / `voice.urgent`) that has become old news is re-thought by whoever
+was going to say it (the `rethink` hook); a line without one is dropped and declared, never said late.
 
 Game protocol (JSON text frames and binary audio); docs/protocollo_voce.md has the whole story:
     line{id,speaker,name,text,lang,tone,channel,priority,answer,topic,est_s,hold_s,rate}    a line is about to be heard
@@ -37,7 +41,7 @@ import re
 import struct
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Awaitable, Callable
 
 from .tts import SpeechStream, TTSEngine
 
@@ -56,9 +60,9 @@ PRIO_NAMES = {Prio.ANSWER: "answer", Prio.URGENT: "urgent", Prio.NORMAL: "normal
 DEFAULT_EXPIRY = {Prio.ANSWER: 90.0, Prio.URGENT: 25.0, Prio.NORMAL: 60.0, Prio.LOW: 15.0}
 # a report (a line of a report turn) still unsaid this long after the event it tells of is old news: dropped, never said late
 REPORT_MAX_AGE_S = {Prio.URGENT: 30.0, Prio.NORMAL: 18.0}
-REPORT_SKIP_S = 12.0            # (for the producers of report turns) news whose newest item is older than this is not worth a report at all
-REPORT_LATE_S = 8.0             # ... and an item older than this in a batch that is reported says how old it is
-RESUME_MAX_S = 10.0             # what is left of a line that was cut off, if longer than this, is boiled down to its first and last sentence
+REPORT_LATE_S = 8.0             # (for the producers of report turns) an item older than this says how old it is: the officer judges it
+RETHINK_AFTER_S = 8.0           # a line with a rethink hook that has waited this long (or was cut off) is thought again before it is said
+RETHINK_TIMEOUT_S = 4.0         # ... a re-think that does not answer in this time lets the line go (declared: `rethink_timeout`)
 MAX_RESUMES = 3                 # a line is taken up again at most this many times
 
 LEAD_S = 0.45                   # audio is never sent more than this ahead of real time (so a stop is heard within it)
@@ -70,7 +74,6 @@ TURN_TIMEOUT_S = 8.0            # the floor is held for the Captain's order at m
 TURN_OPEN_MAX_S = 25.0          # a Captain's turn (the crew's model writing the answer) keeps the reports quiet at most this long
 KEY_STUCK_S = 45.0              # a key held down this long is taken as released (a "key up" that never arrived must not silence the crew)
 MAX_QUEUED = 10                 # more unsaid lines than this and the least important are dropped
-BACKLOG_SHORTEN_S = 14.0        # with this much speech waiting, long lines of little importance are cut to their first sentence
 MERGE_MAX_CHARS = 240
 SYNTH_TIMEOUT_S = 12.0          # a line whose first audio takes longer than this is given up (logged, never silent)
 CPS_START = 16.5                # spoken characters per second (learned per language as lines are heard)
@@ -114,16 +117,15 @@ class Line:
     cut_reason: str = ""
     cut_fade_ms: int = FADE_CUT_MS
     resumes: int = 0                             # how many times it has been taken up again after a cut
+    rethink: "Callable[[str, float, str], Awaitable[str | None]] | None" = None
+    rethinking: "asyncio.Task | None" = None     # a re-think under way: the line waits for it
+    thought_t: float = 0.0                       # loop time it was last thought again (or queued)
+    cut_after: str = ""                          # what was heard of it before it was cut off (for the re-think)
+    born: float = 0.0                            # loop time of the news it tells (a report), else when it was queued
 
 
 def _sentences(text: str) -> list[str]:
     return [p for p in _SENTENCE.split(text) if p]
-
-
-def _boil_down(text: str) -> str:
-    """A long message in two sentences: how it opens and its point (the last one). Three sentences or more only."""
-    parts = _sentences(text)
-    return text if len(parts) <= 2 else f"{parts[0]} {parts[-1]}"
 
 
 def _tail(text: str, played: float) -> str | None:
@@ -340,7 +342,8 @@ class Voice:
 
     # ------------------------------------------------------------------------------------------ enqueue
     async def say(self, speaker: str, text: str, lang: str, tone: str, *, priority: Prio | str | None = None, topic: str | None = None,
-                  expires_s: float | None = None, stale_if: Callable[[], bool] | None = None, answer: bool | None = None) -> int:
+                  expires_s: float | None = None, stale_if: Callable[[], bool] | None = None, answer: bool | None = None,
+                  rethink: "Callable[[str, float, str], Awaitable[str | None]] | None" = None) -> int:
         """Queue a line; returns its id. Nothing is sent to the game until the line's turn comes (see the module docstring)."""
         text = (text or "").strip()
         self._n += 1
@@ -361,17 +364,21 @@ class Voice:
             return lid
         exp = DEFAULT_EXPIRY[prio] if expires_s is None else expires_s
         deadline = (now + exp) if exp else None
+        born = now
         if expires_s is None and prio in REPORT_MAX_AGE_S and _CLASS.get() == prio:
-            # a line of a report turn: worth saying for a few seconds after the event, not after the bridge has had time to move on
-            born = _BORN.get()
-            limit = (now if born is None else born) + REPORT_MAX_AGE_S[prio]
-            deadline = limit if deadline is None else min(deadline, limit)
-            if now >= limit:
-                log.info("line %d (%s): a report of something that happened %.0f s ago is old news", lid, speaker, now - (born or now))
-                self._drop_info(lid, speaker, text, "expired", prio)
-                return lid
+            # a line of a report turn tells of news: with a rethink hook, whoever says it thinks again when it has waited (see _reap);
+            # without one, it is worth saying for a few seconds after the event, never late
+            born = _BORN.get() if _BORN.get() is not None else now
+            if rethink is None:
+                limit = born + REPORT_MAX_AGE_S[prio]
+                deadline = limit if deadline is None else min(deadline, limit)
+                if now >= limit:
+                    log.info("line %d (%s): a report of something that happened %.0f s ago is old news", lid, speaker, now - born)
+                    self._drop_info(lid, speaker, text, "expired", prio)
+                    return lid
         line = Line(id=lid, speaker=speaker, text=text, lang=lang, tone=tone or "calm", prio=prio, topic=topic,
-                    expires=deadline, stale_if=stale_if, enq=now, name=name, crew=crew)
+                    expires=deadline if rethink is None else None, stale_if=stale_if, enq=now, name=name, crew=crew,
+                    rethink=rethink, thought_t=born, born=born)
         line.est_s = self._estimate(text, lang)
         self._enqueue(line)
         return lid
@@ -474,6 +481,39 @@ class Voice:
                         self._drop(l, "stale")
                 except Exception:  # noqa: BLE001
                     log.exception("stale_if failed")
+
+    def _start_rethink(self, line: Line, now: float) -> None:
+        """Whoever was going to say the line thinks again, with the ship as it is now; the line waits for the answer (the floor goes on)."""
+        waited = now - line.born
+        cut_after = line.cut_after
+
+        async def go() -> None:
+            try:
+                new = await asyncio.wait_for(line.rethink(line.text, waited, cut_after), timeout=RETHINK_TIMEOUT_S)
+                why = "rethought"
+            except asyncio.TimeoutError:
+                new, why = None, "rethink_timeout"
+            except Exception:  # noqa: BLE001
+                log.exception("line %d: the re-think failed", line.id)
+                new, why = None, "rethink_failed"
+            line.rethinking = None
+            if line.state != "queued":
+                return
+            if not new or not new.strip():
+                log.info("line %d (%s) thought again after %.0f s: not worth saying now", line.id, line.speaker, waited)
+                self.stats["rethought_dropped"] += 1
+                self._drop(line, why)
+                return
+            new = new.strip()
+            self.stats["rethought"] += 1
+            if new != line.text:
+                log.info("line %d (%s) thought again after %.0f s: %r -> %r", line.id, line.speaker, waited, line.text[:60], new[:60])
+                line.text, line.est_s = new, self._estimate(new, line.lang)
+                self._reset_synth(line)
+            line.thought_t, line.born, line.cut_after = self._now(), self._now(), ""
+            self._wake()
+
+        line.rethinking = asyncio.get_running_loop().create_task(go())
 
     def drop_low_priority(self) -> int:
         """The Captain speaks: chatter is no longer worth saying (reports wait their turn: see `captain_begin`)."""
@@ -608,8 +648,19 @@ class Voice:
         """The line that would be said next: the most important, the oldest of them; while the floor is the Captain's, only
         answers count."""
         self._reap()
-        pool = [l for l in self._queue if l.prio == Prio.ANSWER] if self.held else self._queue
-        return min(pool, key=lambda l: (l.prio, l.enq, l.id), default=None)
+        pool = [l for l in self._queue if l.prio == Prio.ANSWER] if self.held else list(self._queue)
+        cur = self._cur
+        due = cur is None or cur.state != "playing" or self._remaining(cur) < 1.5     # the next line's turn is now or nearly
+        while True:
+            line = min((l for l in pool if l.rethinking is None), key=lambda l: (l.prio, l.enq, l.id), default=None)
+            if line is None:
+                return None
+            if due and line.rethink is not None and (line.cut_after or self._now() - line.thought_t > RETHINK_AFTER_S):
+                # its turn has come but it has waited (or was cut off): whoever says it thinks again first — just in time, once —
+                # and meanwhile the next line may go
+                self._start_rethink(line, self._now())
+                continue
+            return line
 
     def _reset_synth(self, line: Line, keep_lines: bool = False) -> None:
         if line.stream is not None:
@@ -639,28 +690,7 @@ class Voice:
             if nxt is not None and (not self.held or nxt.prio == Prio.ANSWER):
                 self._start_synth(nxt)
 
-    def _shape(self, line: Line) -> None:
-        """Before a line is made: with a long backlog a line of little importance is cut down (a crew line to its first sentence, a
-        message from outside to how it opens and what it asks). A crew line counts in the backlog itself (they are meant to be short: a
-        long one is cut whatever waits); a story voice is cut only by the speech waiting besides it (what is being said and what is queued)."""
-        backlog = sum(self._estimate(l.text, l.lang) for l in self._queue if l is not line)
-        if line.crew:
-            backlog += self._estimate(line.text, line.lang)
-        elif self._cur is not None:
-            backlog += self._remaining(self._cur)
-        if line.prio >= Prio.NORMAL and backlog > BACKLOG_SHORTEN_S and len(line.text) > 170:
-            parts = _SENTENCE.split(line.text)
-            if line.crew:
-                short = parts[0] if len(parts[0]) >= 45 or len(parts) == 1 else " ".join(parts[:2])
-            else:
-                short = _boil_down(line.text)              # a message from outside the bridge: how it opens and what it asks
-            if len(short) < len(line.text) - 20:
-                log.info("line %d shortened (%d -> %d chars, %.0f s of speech waiting)", line.id, len(line.text), len(short), backlog)
-                self.stats["shortened"] += 1
-                line.text, line.est_s = short, self._estimate(short, line.lang)
-
     def _start_synth(self, line: Line) -> None:
-        self._shape(line)
         voice = self.who(line.speaker)[1]
         can = getattr(self.tts, "can_speak", None)
         lang = line.lang if (can is None or can(line.lang)) else "en"
@@ -903,11 +933,11 @@ class Voice:
         self._wake()
 
     def _after_cut(self, line: Line, sent: float) -> None:
-        """A line stopped half way: what was not heard is said once the floor is free, from the sentence that was being said (a hail, a
-        briefing, a report alike: the listener needs the beginning of what was cut, not the beginning of the whole). If what is left is
-        long it is boiled down to its first and last sentence, so an interrupted message never takes the floor for its whole length a
-        second time; a line cut again goes on again (`MAX_RESUMES` times, while it is still news). It keeps its place at the front of its
-        class, ahead of what was queued after it. Answers and chatter are not taken up again: he has spoken since, and small talk is not worth it."""
+        """A line stopped half way. With a rethink hook, whoever was saying it thinks again, knowing what was heard before the cut (they
+        may go on, say it differently, or let it go: the Captain has spoken since). Without one, what was not heard is said once the
+        floor is free, from the sentence that was being said (the listener needs the beginning of what was cut). A line cut again goes on
+        again (`MAX_RESUMES` times). It keeps its place at the front of its class, ahead of what was queued after it. Answers and chatter
+        are not taken up again: he has spoken since, and small talk is not worth it."""
         now = self._now()
         played = min(1.0, max(0.0, (now - line.t_begin) / max(line.est_s, 0.5)))
         text: str | None = None
@@ -917,10 +947,11 @@ class Voice:
             why = "too old to say again"
         elif not line.crew and any(l.speaker == line.speaker and l.prio == Prio.ANSWER for l in self._queue):
             why = "the reply to the Captain takes its place"
+        elif line.rethink is not None:
+            text = line.text
+            why = "thought again"
         else:
             text = _tail(line.text, played)
-            if text is not None and self._estimate(text, line.lang) > RESUME_MAX_S:
-                text = _boil_down(text)
             why = "heard enough"
         if not text:
             log.info("line %d was cut at %.0f %%: %s", line.id, played * 100, why)
@@ -928,8 +959,10 @@ class Voice:
         self._n += 1
         exp = now + (20.0 if line.crew else 40.0)
         again = Line(id=self._n, speaker=line.speaker, text=text, lang=line.lang, tone=line.tone, prio=line.prio, topic=line.topic,
-                     expires=exp if line.expires is None else min(exp, line.expires), stale_if=line.stale_if, enq=line.enq,
-                     name=line.name, crew=line.crew, resumes=line.resumes + 1)
+                     expires=None if line.rethink else (exp if line.expires is None else min(exp, line.expires)), stale_if=line.stale_if,
+                     enq=line.enq, name=line.name, crew=line.crew, resumes=line.resumes + 1, rethink=line.rethink,
+                     thought_t=line.thought_t, born=line.born,
+                     cut_after=line.text[:max(0, int(played * len(line.text)))].strip() if line.rethink else "")
         again.est_s = self._estimate(again.text, again.lang)
         self.enqueued[again.id] = now
         self._queue.append(again)

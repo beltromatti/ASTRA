@@ -10,7 +10,7 @@ Set globals before running to change the defaults:
   DECKS = [4, 6]              the decks to (re)place from the plan's "placements" (their folders Interior/Deck<NN>/... are emptied first, nothing else is)
   REBUILD_KIT = True          delete /Game/ASTRA/Kit/Ship and import the FBX files again (a reimport keeps slots the new FBX no longer has)
   LOCK_STAIRS = True          the stair-tower doors of a deck stay locked while the deck above or below is not built (nothing there yet)
-  REMOVE_LIFT_LEAVES = False  open the entrances of the existing rooms that a built deck now runs up to: destroy the static lift leaves that close their alcoves
+  REMOVE_LIFT_LEAVES = True   open the entrances of the existing rooms that a built deck now runs up to: destroy the static lift leaves that close their alcoves
                               (folders "Mess/Lift", "Berths/Lift" on Deck 4, "Medbay/Lift" on Deck 6) and put a sliding door (AAstraDoor) in the opening; only once
                               AstraHangar's landings point to the new lift banks (docs/NAVE.md, "Lift"), because the lift's own doors go with the leaves
   SAVE_LEVEL = True
@@ -46,7 +46,7 @@ DATA_DIR = unreal.Paths.project_content_dir() + "ASTRA/Data"
 DECKS = globals().get("DECKS", [4, 6])
 REBUILD_KIT = globals().get("REBUILD_KIT", True)
 LOCK_STAIRS = globals().get("LOCK_STAIRS", True)
-REMOVE_LIFT_LEAVES = globals().get("REMOVE_LIFT_LEAVES", False)
+REMOVE_LIFT_LEAVES = globals().get("REMOVE_LIFT_LEAVES", True)
 SAVE_LEVEL = globals().get("SAVE_LEVEL", True)
 
 eal = unreal.EditorAssetLibrary
@@ -286,7 +286,8 @@ def add_light(cid, ld, deck):
     c.set_editor_property("cast_shadows", bool(ld.get("shadows", False)))
     a.set_actor_label(ld["id"])
     a.set_folder_path(f"Interior/Deck{deck:02d}/Lights")
-    a.tags = [unreal.Name(f"ASTRA.ZoneLight.{cid}")]
+    # (the zone: switched on near the Captain by UAstraZoneLights; ShipLight: dimmed and tinted with the ship's alert states)
+    a.tags = [unreal.Name(f"ASTRA.ZoneLight.{cid}"), unreal.Name("ASTRA.ShipLight")]
     return a
 
 
@@ -348,6 +349,15 @@ for d in DECKS:
     report[d] = {"meshes": counts, "expected": expect, "doors": doors, "locked": locked, "zone_lights": lights}
 if REMOVE_LIFT_LEAVES:
     open_existing_entrances()
+if 4 in DECKS:
+    # the lift's Deck 4 stop is now the Mess Concourse's lift bank (the Mess Hall is reached from the concourse, not from its old
+    # alcove): the hangar's lift sends the Captain there
+    node = next((n for n in PLAN_DATA["graph"]["nodes"] if n["id"] == "lift.d4_concourse"), None)
+    hangars = [a for a in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors() if a.get_class().get_name() == "AstraHangar"]
+    if node and hangars:
+        for h in hangars:
+            h.set_editor_property("mess_landing", V(node["p"][0] * M, node["p"][1] * M, node["p"][2] * M))
+        log.append(f"mess landing -> lift.d4_concourse {node['p']}")
 if SAVE_LEVEL:
     les.save_current_level()
 print(json.dumps({"log": log, "bounds_problems": bad, "decks": report}, indent=1))

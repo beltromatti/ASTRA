@@ -41,7 +41,7 @@ from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
 from .stt import Recognizer
 from .voice_lang import resolve_language
-from .speech import REPORT_LATE_S, REPORT_SKIP_S, Voice
+from .speech import REPORT_LATE_S, Voice
 from .tts import TTSEngine
 from .voice_qos import boost_thread
 
@@ -142,7 +142,7 @@ class Mind:
         self.clients: set = set()
         self.game: GameShip | None = None
         self.voice = Voice(self.tts, self._sink, speaker_identity)
-        self.agent = BridgeAgent(self.llm, self.local, self.voice.say)
+        self.agent = BridgeAgent(self.llm, self.local, self._crew_say)
         self.enemy = EnemyAgent(self.llm, self._say_external, self._enemy_command)
         self.port = FieldControl(self.llm, self._say_external, self._register_field)
         self.mess = MessTalk(self.llm, self.voice.say)
@@ -612,11 +612,8 @@ class Mind:
                         continue
                     now_t = asyncio.get_running_loop().time()
                     newest = max((w for w in when if w is not None), default=None)
-                    if newest is not None and all(w is not None for w in when) and now_t - newest > REPORT_SKIP_S \
-                            and not any(_URGENT_EVENT.search(e) or _NOT_PERISHABLE.search(e) for e in events):
-                        log.info("%d event(s) not reported: the newest was %.0f s ago, the bridge was busy: %s", len(events), now_t - newest,
-                                 " | ".join(e[:70] for e in events))
-                        continue
+                    # (news that waited for a quiet bridge still goes to the officers, with its age: whether it is worth saying now is
+                    # theirs to judge — docs/ARCHITETTURA.md §1bis)
                     fresh_events = list(events)
                     events = [e if w is None or now_t - w <= REPORT_LATE_S else f"{e} [happened {now_t - w:.0f} s ago]" for e, w in zip(events, when)]
                     self.voice.low_priority = True
@@ -682,6 +679,12 @@ class Mind:
                 self.voice.captain_turn_end()             # (no line came out of the Captain's turn: his floor is released)
 
     # ---------------------------------------------------------------------------------------------- the Captain's words
+    async def _crew_say(self, speaker: str, text: str, lang: str, tone: str) -> int:
+        """A line of the crew's: when its turn comes after a wait (or after being cut off), its officer thinks it again first."""
+        async def rethink(t: str, waited: float, cut_after: str) -> str | None:
+            return await self.agent.rethink(speaker, t, waited, cut_after, lang)
+        return await self.voice.say(speaker, text, lang, tone, rethink=rethink)
+
     def _party_names(self) -> dict[str, str]:
         names = {cid: f'{c["name"]} ({c["ship"]})' for cid, c in COMMANDERS.items()}
         # the fleet channel reaches the admiral and every allied ship: comms knows which ships those are (the plot shows them)

@@ -332,8 +332,8 @@ async def recogniser() -> None:
 
 
 def speech_rules() -> None:
-    """The floor's text rules for a line that was cut off (astra_mind/speech.py): where it goes on, and the short version of a long rest."""
-    from astra_mind.speech import _boil_down, _tail
+    """Where a line without a rethink hook (a voice from outside: the missed part is replayed) goes on after a cut (astra_mind/speech.py)."""
+    from astra_mind.speech import _tail
     t = "Aquila, this is Archon Solm. You are in our space. Withdraw at once. Stand down within two minutes."
     check("tail: cut in the first sentence starts again from its beginning", _tail(t, 0.05) == t)
     k = t.index("You are")
@@ -343,8 +343,6 @@ def speech_rules() -> None:
     check("tail: nothing is left when the end of the last sentence was heard", _tail(t, 0.985) is None)
     check("tail: one sentence is said again only if hardly begun", _tail("Contact lost on the long range plot", 0.3) is not None
           and _tail("Contact lost on the long range plot", 0.7) is None)
-    check("boil down: two sentences stay, four become the first and the last",
-          _boil_down("One here. Two here.") == "One here. Two here." and _boil_down(t) == "Aquila, this is Archon Solm. Stand down within two minutes.")
 
 
 def main() -> int:

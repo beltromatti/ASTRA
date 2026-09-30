@@ -176,6 +176,12 @@ Ora `voice_status` lo dice: nel log della mente (`~/Library/Application Support/
 
 ## 5. Il palco del parlato lato mente (per chi scrive produttori Python)
 
+**Aggiornamento 30/9 sera (principio delle intelligenze, [ARCHITETTURA §1bis](ARCHITETTURA.md)).** Il palco non riscrive né scarta più per regola ciò che dicono le persone.
+- **Battute dell'equipaggio.** Portano l'aggancio `rethink` (server `_crew_say` → `agent.rethink`). Quando arriva il loro turno dopo più di `RETHINK_AFTER_S` (8 s) di attesa, o dopo essere state interrotte, l'ufficiale le ripensa con lo stato di adesso: le dice aggiornate, le cambia o tace (`line_dropped{reason:"rethought"}`). Il ripensamento avviene una volta sola, quando la voce corrente sta per finire, e intanto il palco va avanti.
+- **Voci dall'esterno.** Senza aggancio, la parte persa di un messaggio interrotto si ripete com'era, dalla frase interrotta: chi parla alla radio non ha smesso, è la plancia che ha dato la precedenza al Capitano.
+- **Regole tolte.** Via il riassunto «prima e ultima frase», il taglio alla prima frase quando c'è coda e il salto dei turni di rapporto per notizie «troppo vecchie». Le notizie arrivano agli ufficiali con la loro età (`[happened N s ago]`) e sono loro a giudicare.
+- **Meccanica che resta.** La priorità del Capitano, un oratore alla volta, la chiacchiera che tace quando il Capitano parla, lo scarto dichiarato delle righe senza aggancio.
+
 `voice.say(speaker, text, lang, tone, *, priority=None, topic=None, expires_s=None, stale_if=None, answer=None)` — l'unica chiamata necessaria (le firme e gli attributi che il server usava prima continuano a funzionare: `busy_s()`, `busy_until`, `low_priority`, `drop_low_priority()`, `q.join()`, `first_audio`, `enqueued`).
 
 | Priorità | Chi | Scadenza di default | Regola |

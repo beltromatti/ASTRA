@@ -784,7 +784,7 @@ void UAstraShipSubsystem::RadiatorHit()
 	// a wing torn: an incident damage control can repair (each repair gives back a quarter of the radiators)
 	FAstraDamage D;
 	D.Id = NextDamageId++;
-	D.Deck = 5;
+	D.Deck = 7;                                   // the radiators are Engineering & Power's (Deck 7, sections E-G)
 	D.Kind = TEXT("radiator damage");
 	for (const TCHAR Sec : {TEXT('E'), TEXT('F'), TEXT('G')})
 	{
