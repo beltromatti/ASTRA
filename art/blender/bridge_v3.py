@@ -14,7 +14,7 @@ Options:
 
 Preview environment variables (Eevee, all optional): BRG3_HOLO=1 (a placeholder tactical plot over the table), BRG3_VIEWSCREEN=on (a placeholder
 image on the main viewscreen: planet, two ships), BRG3_NOCEILING=1 (cutaway), BRG3_EXPOSURE=<EV>, BRG3_GAIN=<x> (light gain), BRG3_SKY=<strength>,
-BRG3_SAMPLES=<n> (studio), BRG3_TARGET=x,y,z and BRG3_FOV=<deg> (studio camera), BRG3_DEBUG_MATS=1 (studio: one flat colour per material slot).
+BRG3_CURVED=1 (curved viewscreen without editing the data), BRG3_SAMPLES=<n> (studio), BRG3_TARGET=x,y,z and BRG3_FOV=<deg> (studio camera), BRG3_DEBUG_MATS=1 (studio: one flat colour per material slot).
 
 Layout coordinates (data file): X forward, Y starboard, Z up, metres. Every builder works in that frame (bridge3_lib.FB
 mirrors Y on the way out, the U() convention of bridge.py v2), so the FBX meshes land exactly on the data in Unreal.
@@ -60,7 +60,10 @@ DATA_PATH = os.path.join(ROOT, "data", "ship", "aquila_bridge.json")
 
 def load_data() -> dict:
     with open(DATA_PATH, encoding="utf-8") as fh:
-        return json.load(fh)
+        D = json.load(fh)
+    if os.environ.get("BRG3_CURVED"):                 # try the curved viewscreen without touching the data file
+        D["viewscreen"]["curved"] = True
+    return D
 
 
 def parse_args() -> dict:

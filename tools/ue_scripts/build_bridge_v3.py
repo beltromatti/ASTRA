@@ -117,6 +117,8 @@ for pl in LAY.placements(DATA):
             if mat:
                 smc.set_material_by_name(slot, mat)
     if LAY.is_translucent(pl["mesh"]):
+        # (SM_BRG3_ViewscreenImage stays invisible - MI opacity 0 - while AAstraViewscreen (C++) draws its own flat 7.2 x 3.0 m quad
+        # at (900, 0, 120) cm: the same rectangle; bind the feed to this slot instead once the C++ quad is retired)
         smc.set_editor_property("cast_shadow", False)
         if "Glass" not in pl["mesh"]:
             smc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)       # holograms and the image plane: nothing to bump into
