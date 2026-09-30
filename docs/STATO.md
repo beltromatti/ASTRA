@@ -8,15 +8,19 @@
 | Fase | Stato |
 |---|---|
 | **F0** Fondamenta per lavorare in parallelo | ✓ controlli in prima persona (mancavano gli asset di input: WASD e mouse non avevano mai funzionato); ✓ banco di prova da terminale (`tools/play.py`, `-astra_harness`); ✓ architettura, piano, stile v0.2; agenti di supporto: VOCE in corso |
-| **F1** La plancia viva | in corso: modello delle postazioni, schermo principale, tavolo olografico davanti, equipaggio agente, router, voce, plancia v3 |
+| **F1** La plancia viva | in corso: ✓ **postazioni vere** (modalità persistenti eseguite dal codice a 10 Hz: il timone tiene la prua sull'azione, il tattico ingaggia e passa al bersaglio successivo, scudi verso la minaccia, sensori, macchine; comando unico `station`); ✓ **schermo principale** (telecamera ottica oltre lo scafo con zoom sul soggetto, regia automatica per priorità, sovrimpressione tattica con nomi/classi/distanze/barre, frecce fuori campo; ops lo comanda: auto/forward/target/tactical/fleet/sector/comms/damage/off; costo ≈1,5–3 ms); ✓ **contesto v2** delle parole del Capitano (luogo, chi sente, chi guarda, canale aperto); ✓ **superfici di controllo** delle console (modi in vigore come pulsanti accesi, chi li ha dati, ultime azioni). Da fare: tavolo olografico davanti, datapad spinto da ops, router e equipaggio agente (MENTE-EQUIPAGGIO), voce (VOCE), plancia v3 (ARTE-PLANCIA), HUD del Falcon |
 | **F2** La guerra grande | da fare |
 | **F3** Persone vere | da fare (MetaHuman: autorizzazione Epic in RICHIESTE) |
 | **F4** La nave intera e la distruzione | da fare |
 | **F5** Abbordaggi e prima persona | da fare (i controlli a piedi di F0 sono la base) |
 | **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | da fare |
 
-**Agenti di supporto attivi** (worktree in `.claude/worktrees/`, rami `worktree-*`):
-- **VOCE** — riconoscimento più rapido in tutte le lingue, sintesi più veloce e con volume costante, turni di parola con priorità al Capitano, niente sottotitoli senza voce (`mind/astra_mind/{speech,stt,tts,audio_in}.py`, `docs/protocollo_voce.md`).
+**Agenti di supporto attivi** (worktree in `.claude/worktrees/`, rami `worktree-*`; il lead prova nel gioco, unisce, rimanda i difetti):
+- **VOCE** (`agent-a7f749a395e3717dd`) — riconoscimento più rapido in tutte le lingue, sintesi più veloce e con volume costante, turni di parola con priorità al Capitano, niente sottotitoli senza voce (`mind/astra_mind/{speech,stt,tts,audio_in}.py`, `docs/protocollo_voce.md`).
+- **MENTE-EQUIPAGGIO** (`agent-a0079afd204694b5e`) — ufficiali come agenti delle loro postazioni (strumento `station`, ordini una tantum/continui, iniziativa, battute brevi), router con acustica della stanza e `context` v2 (`mind/astra_mind/`, `docs/contratto_postazioni.md`).
+- **ARTE-PLANCIA** (`agent-afa8075bd1d690939`) — plancia v3 futuristica (console vere con slot `SCREEN_<postazione>_<n>`, tavolo olografico davanti alla poltrona, cornice dello schermo principale) in Blender → FBX → script d'import (lo esegue il lead).
+
+**Strumenti di prova del lead** (gioco con `tools/play.py launch --nomind`): `astra.battle.time 170` (arriva il gruppo d'attacco), `astra.cmd station {...}`, `astra.viewscreen.dump` (l'immagine dello schermo principale a piena risoluzione), `astra.screens.dump <Pagina>` (una console su PNG), `/state` con `context`.
 
 ## Credito AI (OpenRouter)
 | Data | Credito totale | Speso | Note |
@@ -36,6 +40,7 @@
 | 2026-09-29 | 10,00 $ | 2,70 $ | stile di comando del Capitano, rapporto post-azione, quadro cieco, controllore di volo, notizie da casa, prove offline dell'equipaggio |
 | 2026-09-29 | 10,00 $ | 2,79 $ | misure di prestazioni per l'app (la mente partiva anche nelle prove: ora `-astra_nomind`) |
 | 2026-09-29 | 10,00 $ | 3,12 $ | **prima partita dell'utente** con l'app (≈35 minuti, due sessioni: 0,33 $, cioè ≈0,5–0,6 $ l'ora di gioco con regista, nemici e memoria) |
+| 2026-09-30 | 10,00 $ | 3,56 $ | agenti di supporto: prove del router su più modelli (MENTE-EQUIPAGGIO ≈0,22 $ in 1192 chiamate) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
