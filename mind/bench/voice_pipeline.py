@@ -152,7 +152,7 @@ async def sec_stt(args) -> None:  # noqa: ANN001
                 rows[bname].append({"lang": c.lang, "speaker": c.speaker, "cond": c.condition, "dur": c.seconds, "wall": wall, "decode": tr.decode_s,
                                     "wer": wer_fn(c.text, tr.text), "wer_raw": wer_fn(c.text, tr.raw), "n_ent": len(c.entities),
                                     "ent_raw": entities_found(tr.raw, c.entities), "ent_fix": entities_found(tr.text, c.entities),
-                                    "lang_out": tr.lang, "conf": tr.conf, "text": tr.text, "ref": c.text})
+                                    "lang_out": tr.lang, "conf": tr.conf, "text": tr.text, "raw": tr.raw, "ref": c.text, "ents": c.entities})
             if i % 60 == 0:
                 print(f"  {i}/{len(clips)} clips ({time.perf_counter() - t_all:.0f} s)", flush=True)
         for bname, r in rows.items():
@@ -601,6 +601,23 @@ async def sec_mem(args) -> None:  # noqa: ANN001
         await w.start()
         res["whisperkit_server"] = rss_mb(w._proc.pid) if w._proc else 0.0
         w.stop()
+    # the portable engines, loaded into this process one after the other: what each adds
+    noise = f32_to_pcm16(np.random.default_rng(0).standard_normal(16000 * 2).astype(np.float32) * 0.1)
+    sherpa_dir = Path(os.environ["BENCH_SHERPA"]) if os.environ.get("BENCH_SHERPA") else None
+    if SherpaParakeetBackend.available(sherpa_dir):
+        before = rss_mb(os.getpid())
+        sb = SherpaParakeetBackend(model_dir=sherpa_dir)
+        await sb.start()
+        await sb.transcribe(noise)
+        res["parakeet_onnx_added"] = rss_mb(os.getpid()) - before
+        sb.stop()
+    if FasterWhisperBackend.available():
+        before = rss_mb(os.getpid())
+        fb = FasterWhisperBackend(model="small")
+        if await fb.start():
+            await fb.transcribe(noise)
+            res["faster_whisper_small_added"] = rss_mb(os.getpid()) - before
+        fb.stop()
     print(json.dumps({k: round(v) for k, v in res.items()}, indent=1))
     save("mem", {k: round(v) for k, v in res.items()})
 
@@ -614,9 +631,10 @@ def report(args) -> None:  # noqa: ANN001
     out = REPO_ROOT / "docs" / "bench" / f"voce_{TODAY}.md"
     L: list[str] = [f"# Voce: riconoscimento, sintesi, palco del parlato — {TODAY}", ""]
     stt, live, lang, other, tts, mic, floor, mem = (load(s) for s in ("stt", "live", "lang", "other", "tts", "mic", "floor", "mem"))
-    L += ["Macchina: MacBook Air M4 16 GB. **Durante le misure l'editor di Unreal era aperto** (carico medio 7–10 su 10 core): i tempi sono quelli di un Mac già "
-          "occupato, non di uno libero. Il parlato di prova è sintetico (Pocket TTS e voci di sistema macOS), non registrazioni di persone: misura le differenze "
-          "tra motori, il peso dei nomi del gioco, del rumore e della lingua, non la precisione assoluta su una persona stanca con il microfono del portatile.", ""]
+    L += ["Macchina: MacBook Air M4 16 GB. **Durante le misure l'editor di Unreal era aperto e altri agenti compilavano** (il carico medio, su 10 core, è scritto accanto a "
+          "ogni misura): i tempi sono quelli di un Mac già occupato, non di uno libero. Il parlato di prova è sintetico (Pocket TTS e voci di sistema macOS), non registrazioni "
+          "di persone: misura le differenze tra motori, il peso dei nomi del gioco, del rumore e della lingua, non la precisione assoluta su una persona stanca con il "
+          "microfono del portatile. Dove più motori sono confrontati, si alternano clip per clip (quello che il resto della macchina fa in quel momento lo fa a tutti).", ""]
     if stt:
         L += ["## 1. Riconoscimento vocale", ""]
         L += ["Frasi d'ordine (2–7 s) in sette lingue, cinque voci per frase (tre Pocket TTS, due voci di sistema), tre condizioni: pulito, rumoroso (15 dB sopra "
@@ -663,7 +681,8 @@ def report(args) -> None:  # noqa: ANN001
         L.append("")
     if live:
         L += ["## 2. Dal rilascio del tasto al testo (parlato ricevuto in tempo reale, decodifica incrementale)", "",
-              "Il parlato arriva a blocchi di 20 ms come dal microfono; il tasto si rilascia 220 ms dopo l'ultima parola. Latenza = da `finish()` al testo.", "",
+              "Il parlato arriva a blocchi di 20 ms come dal microfono; il tasto si rilascia 220 ms dopo l'ultima parola. Latenza = da `finish()` al testo; "
+              "a questa si aggiungono i 100 ms di post-roll del microfono (l'ultimo suono deve uscire dai buffer del sistema), quindi **dal rilascio del tasto al testo** = latenza + 0,1 s.", "",
               "| Motore | frasi | mediana ms | p95 ms | max ms | risposta da una decodifica parziale | WER |", "|---|---|---|---|---|---|---|"]
         for name, d in live.items():
             r = d["rows"]
@@ -691,11 +710,16 @@ def report(args) -> None:  # noqa: ANN001
                      f"{'—' if sp.get('first_ms') is None else f'{sp['first_ms']:.0f} ms, {sp['lufs']:.1f}'} |")
         L.append("")
     if tts:
-        L += ["## 5. Sintesi vocale", ""]
+        L += ["## 5. Sintesi vocale", "",
+              "Le dieci voci degli ufficiali, quattro frasi per lingua (tre battute di plancia e una piena di nomi di navi). «Prima» è il percorso della prima versione "
+              "(modello grezzo, voce originale, blocchi convertiti a PCM16 così come escono); «dopo» è la catena attuale (numeri in lettere, pause accorciate, velocità, "
+              "volume uniforme, limitatore) con le sostituzioni di voce del casting dove una voce è poco comprensibile in una lingua. «Primo suono» = dal via della "
+              "generazione al primo blocco sopra −50 dBFS; RTF = secondi di calcolo per secondo di parlato (sotto 1 si genera più in fretta di quanto si ascolta).", ""]
         for key, d in tts.items():
             rows = d["rows"]
             L += [f"### {key} (carico medio {d['load_avg']:.1f}; velocità x{d['speed']}, obiettivo {d['target_lufs']} LUFS)", "",
-                  "| Lingua | durata prima→dopo | primo suono ms prima→dopo | primo chunk ms | LUFS prima (min…max, σ) | LUFS dopo (min…max, σ) | WER prima→dopo |", "|---|---|---|---|---|---|---|"]
+                  "| Lingua | durata prima→dopo | primo suono ms prima→dopo | primo chunk ms | RTF prima→dopo (s di calcolo per s di parlato) | LUFS prima (min…max, σ) | LUFS dopo (min…max, σ) | WER prima→dopo |",
+                  "|---|---|---|---|---|---|---|---|"]
             for lg in sorted({r["lang"] for r in rows}):
                 r = [x for x in rows if x["lang"] == lg]
                 lo = [x["old"]["lufs"] for x in r]
@@ -703,7 +727,9 @@ def report(args) -> None:  # noqa: ANN001
                 L.append(f"| {lg} | {np.mean([x['old']['dur'] for x in r]):.2f} → {np.mean([x['new']['dur'] for x in r]):.2f} s "
                          f"({100 * (np.mean([x['new']['dur'] for x in r]) / np.mean([x['old']['dur'] for x in r]) - 1):+.0f} %) | "
                          f"{fmt_ms(statistics.median([x['old']['first_sound'] or 0 for x in r]))} → {fmt_ms(statistics.median([x['new']['first_sound'] or 0 for x in r]))} | "
-                         f"{fmt_ms(statistics.median([x['new']['first_chunk'] or 0 for x in r]))} | {min(lo):.1f}…{max(lo):.1f}, {np.std(lo):.1f} | {min(ln):.1f}…{max(ln):.1f}, {np.std(ln):.1f} | "
+                         f"{fmt_ms(statistics.median([x['new']['first_chunk'] or 0 for x in r]))} | "
+                         f"{np.mean([x['old']['total'] / x['old']['dur'] for x in r]):.2f} → {np.mean([x['new']['total'] / x['new']['dur'] for x in r]):.2f} | "
+                         f"{min(lo):.1f}…{max(lo):.1f}, {np.std(lo):.1f} | {min(ln):.1f}…{max(ln):.1f}, {np.std(ln):.1f} | "
                          f"{100 * np.mean([x['old']['wer'] for x in r]):.1f} → {100 * np.mean([x['new']['wer'] for x in r]):.1f} % |")
             allo = [x["old"]["lufs"] for x in rows]
             alln = [x["new"]["lufs"] for x in rows]
@@ -730,7 +756,9 @@ def report(args) -> None:  # noqa: ANN001
         for k, label in (("start", "Python appena avviato"), ("imports", "dopo gli import della mente (torch, lingua, pydantic…)"), ("tts_en", "+ Pocket TTS inglese, dieci voci"),
                          ("tts_it", "+ Pocket TTS italiano, dieci voci"), ("lingua", "+ rilevatore di lingua"), ("python_with_stt", "+ sessione di riconoscimento"),
                          ("astra_stt_helper", "processo a parte: helper Parakeet (il modello vive nel Neural Engine)"),
-                         ("whisperkit_server", "processo a parte: server WhisperKit large-v3-turbo (solo se serve la lingua di riserva)")):
+                         ("whisperkit_server", "processo a parte: server WhisperKit large-v3-turbo (solo se serve la lingua di riserva)"),
+                         ("parakeet_onnx_added", "percorso portabile: Parakeet ONNX su CPU, aggiunto al processo Python"),
+                         ("faster_whisper_small_added", "percorso portabile: faster-whisper small (int8), aggiunto al processo Python")):
             if k in mem:
                 L.append(f"| {label} | {mem[k]} |")
         L.append("")

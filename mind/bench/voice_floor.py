@@ -24,7 +24,7 @@ import traceback
 from dataclasses import dataclass, field
 
 from astra_mind import speech
-from astra_mind.speech import LEAD_S, Prio, Voice
+from astra_mind.speech import KEY_STUCK_S, LEAD_S, Prio, Voice
 from astra_mind.tts import SpeechStream
 
 RATE = 24000
@@ -299,8 +299,12 @@ class Bridge:
         self.enq[lid] = asyncio.get_running_loop().time()
         return lid
 
-    async def settle(self, extra: float = 1.0) -> None:
-        await self.voice.q.join()
+    async def settle(self, extra: float = 1.0, limit: float = 240.0) -> None:
+        """Wait (in virtual time) until everything queued has been said or dropped; a floor that never gets there fails the
+        scenario's own checks instead of hanging the run."""
+        t0 = self.t()
+        while (self.voice._queue or self.voice._cur is not None) and self.t() - t0 < limit:
+            await asyncio.sleep(0.02)
         await asyncio.sleep(extra)
 
     def trace(self) -> Trace:
@@ -693,9 +697,55 @@ async def s18_compat() -> list[str]:
         return bad
 
 
+async def s19_stuck_key() -> list[str]:
+    """The game's 'key up' never arrives: the crew is not silenced for good (a key down for KEY_STUCK_S is taken as released)."""
+    async with Bridge() as b:
+        b.voice.captain_begin()
+        await b.say("r", "sensors", SENT)
+        await asyncio.sleep(KEY_STUCK_S - 5.0)
+        bad = []
+        if b.ids["r"] in b.trace().begin:
+            bad.append("a report was said while the key was (as far as the mind knew) still down")
+        await asyncio.sleep(10.0)
+        await b.settle(1.0)
+        tr = b.trace()
+        bad += check(tr, b.enq)
+        if b.ids["r"] not in tr.begin:
+            bad.append("the crew stayed silent after the key had been down for too long")
+        if tr.floor and tr.floor[-1][1] != "idle":
+            bad.append(f"the floor ended as {tr.floor[-1][1]}")
+        return bad
+
+
+async def s20_new_session() -> list[str]:
+    """The game goes away with the key down and comes back: the new session starts with a free floor and nothing left over."""
+    async with Bridge() as b:
+        await b.say("old", "xo", LONG)
+        await asyncio.sleep(1.5)
+        b.voice.captain_begin()
+        await asyncio.sleep(0.5)
+        b.voice.muted = True
+        await b.voice.clear("no_listener")                        # the connection closed, the key still 'down'
+        await asyncio.sleep(0.5)
+        b.voice.muted = False                                      # a new connection
+        await b.voice.clear("new_session")
+        t0 = b.t()
+        await b.say("new", "sensors", "Sensors. Contact bearing two seven zero, range forty.")
+        await b.settle(1.0)
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        if b.ids["new"] not in tr.begin:
+            bad.append("the first line of the new session was never said")
+        elif tr.begin[b.ids["new"]] - t0 > 0.8:
+            bad.append(f"the first line of the new session waited {tr.begin[b.ids['new']] - t0:.2f} s")
+        if b.voice.held:
+            bad.append("the floor is still held")
+        return bad
+
+
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
              s10_shorten, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
-             s17_flags, s18_compat]
+             s17_flags, s18_compat, s19_stuck_key, s20_new_session]
 
 
 def main() -> int:

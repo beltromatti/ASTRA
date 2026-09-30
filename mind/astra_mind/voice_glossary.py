@@ -94,6 +94,13 @@ _TERMS: list[tuple[str, tuple[str, ...], bool]] = [
 ]
 
 _PLAIN = re.compile(r"[^\W\d_]+", re.UNICODE)
+# the words that come before a surname when an officer is addressed ("Doctor Lindqvist"), in the supported languages
+_TITLES = frozenset("""doctor doctora dottore dottoressa docteur doutor doutora dokter arzt ärztin dr lieutenant tenente teniente tenent
+leutnant luitenant ensign guardiamarina alférez alferez enseigne fähnrich vaandrig commander comandante kommandant commandant
+chief capo jefe chef""".split())
+# ALL-CAPS words a recogniser writes for a name it read as letters or an acronym ("LET" for Lethe); in lower case they are words
+_CAPS_ALIASES = {"LET": "Lethe", "STIX": "Styx"}
+_LABIAL = str.maketrans({"b": "v", "f": "v", "w": "v"})
 
 
 def _fold(s: str) -> str:
@@ -138,6 +145,7 @@ class Glossary:
     def __init__(self) -> None:
         self.terms: list[Term] = []
         self._alias: dict[str, Term] = {}
+        self.roster: list[Term] = []                # the officers' surnames: the names a Captain calls out at the start of an order
         for text, aliases, fuzzy in _TERMS:
             self.add(text, aliases, fuzzy)
         self._load_game_names()
@@ -159,6 +167,9 @@ class Glossary:
                 if _fold(o.name.split()[-1]) not in have:
                     self.add(o.name.split()[-1], (), fuzzy=False)
                     have.add(_fold(o.name.split()[-1]))
+                term = self._alias.get(_fold(o.name.split()[-1]))
+                if term is not None and term not in self.roster:
+                    self.roster.append(term)
         except Exception:  # noqa: BLE001
             pass
         try:
@@ -218,8 +229,10 @@ class Glossary:
                     break
             if not done:
                 i += 1
+        self._vocative(text, words, edits)
         if not edits:
             return text, []
+        edits.sort()
         out, last = [], 0
         for a, b, _, new in edits:
             out.append(text[last:a])
@@ -228,7 +241,60 @@ class Glossary:
         out.append(text[last:])
         return "".join(out), [(h, n) for _, _, h, n in edits]
 
+    # ------------------------------------------------------------------------------------------ an officer called by name
+    def _vocative(self, text: str, words: list[tuple[int, int, str]], edits: list[tuple[int, int, str, str]]) -> None:
+        """"Mensa, what is the reactor temperature?": the first word of an order, or the last after a comma, is very often the
+        name of the officer it is for, and there are only ten of them, so a near-miss there ("Mansa", "Boss" for Voss,
+        "Lind" for Lindqvist) is read as the name. Elsewhere in the sentence a near-miss is left alone."""
+        if not self.roster or not words:
+            return
+
+        def free(a: int, b: int) -> bool:
+            return not any(a < eb and ea < b for ea, eb, _, _ in edits)
+
+        def joined(seg: list[tuple[int, int, str]]) -> bool:      # the words of a name are separated by spaces, not by punctuation
+            return all(not re.search(r"[^\s'’\-]", text[seg[k][1]:seg[k + 1][0]]) for k in range(len(seg) - 1))
+
+        cands: list[list[tuple[int, int, str]]] = []
+        s = 1 if _fold(words[0][2]) in _TITLES and len(words) > 1 else 0          # "Doctor Lindqvist": the title is not the name
+        for n in (1, 2):                                                          # the start: one or two words, then a pause
+            seg = words[s:s + n]
+            if len(seg) == n and joined(seg) and (re.match(r"\s*[,:;.!?…—]", text[seg[-1][1]:]) or not text[seg[-1][1]:].strip()):
+                cands.append(seg)
+                break
+        for n in (1, 2):                                                          # the end: after a comma, one or two words
+            seg = words[-n:]
+            if len(seg) == n and len(words) > s + n and joined(seg) and re.search(r"[,:;]\s*$", text[:seg[0][0]]) \
+                    and re.fullmatch(r"\s*[.!?…]*\s*", text[seg[-1][1]:]):
+                cands.append(seg)
+                break
+        for seg in cands:
+            a, b = seg[0][0], seg[-1][1]
+            heard = text[a:b]
+            if not free(a, b):
+                continue
+            term = self._roster_match("".join(w[2] for w in seg))
+            if term is not None and heard != term.text and _fold(heard) != _fold(term.text):
+                edits.append((a, b, heard, term.text))
+
+    def _roster_match(self, seg: str) -> Term | None:
+        ks = phon(seg).translate(_LABIAL)                       # b/f/v/w sound alike to a recogniser ("Boss", "Foss" for Voss)
+        if len(ks) < 3:
+            return None
+        best, best_sim = None, 0.0
+        for t in self.roster:
+            kn = t.key.translate(_LABIAL)
+            cut = len(ks) >= 4 and kn.startswith(ks)              # a name cut short ("Lind" for Lindqvist)
+            if ks[0] != kn[0] or (abs(len(ks) - len(kn)) > 2 and not cut):
+                continue
+            sim = max(_sim(ks, kn), 0.85) if cut else _sim(ks, kn)
+            if sim > best_sim:
+                best, best_sim = t, sim
+        return best if best is not None and best_sim >= (0.75 if len(ks) <= 4 else 0.66) else None
+
     def _match(self, heard: str, n_words: int = 1) -> Term | None:
+        if heard in _CAPS_ALIASES:
+            return self._alias.get(_fold(_CAPS_ALIASES[heard]))
         f = _fold(heard)
         t = self._alias.get(f)
         if t is not None:
@@ -241,20 +307,21 @@ class Glossary:
         if t is not None:
             return t
         k = phon(heard)
-        if len(k) < 6:
+        if len(k) < 5:
             return None
         best, best_sim = None, 0.0
         for cand in self.terms:
             # a near-match must have as many words as the name (else "Janus gate to" would swallow the "to")
-            if not cand.fuzzy or cand.n_words != n_words or abs(len(cand.key) - len(k)) > 2:
+            if not cand.fuzzy or cand.n_words != n_words:
                 continue
-            s = _sim(k, cand.key)
-            if s > best_sim:
-                best, best_sim = cand, s
-        # long names tolerate one slip in six letters or so; the first sound must agree
-        if best is not None and best_sim >= 0.80 and best.key[0] == k[0]:
-            return best
-        return None
+            if cand.key[0] in "aeiou" and k == cand.key[1:]:      # the unstressed first vowel lost: "Queron", "Cheron" for Acheron
+                return cand
+            # long names tolerate one slip in six letters or so; the first sound must agree
+            if len(k) >= 6 and abs(len(cand.key) - len(k)) <= 2 and k[0] == cand.key[0]:
+                s = _sim(k, cand.key)
+                if s > best_sim:
+                    best, best_sim = cand, s
+        return best if best is not None and best_sim >= 0.80 else None
 
 
 GLOSSARY = Glossary()

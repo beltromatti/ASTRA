@@ -59,6 +59,7 @@ FADE_CUT_MS = 140               # fade-out of a stop in the middle of a word
 FADE_PAUSE_MS = 40              # ... at a pause
 PLAYBACK_LAG_S = 0.06           # the game starts playing this long after a chunk is sent
 TURN_TIMEOUT_S = 8.0            # the floor is held for the Captain's order at most this long after he let go of the key
+KEY_STUCK_S = 45.0              # a key held down this long is taken as released (a "key up" that never arrived must not silence the crew)
 MAX_QUEUED = 10                 # more unsaid lines than this and the least important are dropped
 BACKLOG_SHORTEN_S = 14.0        # with this much speech waiting, long lines of little importance are cut to their first sentence
 MERGE_MAX_CHARS = 240
@@ -133,6 +134,7 @@ class Voice:
         self._last_end = float("-inf")          # loop time the last line stopped being heard
         self._last_speaker = ""
         self._captain_down = False              # the key is held / an order is being typed
+        self._down_t = 0.0                      # loop time the key went down
         self._turn_pending = False              # the Captain has spoken and his answer has not started yet
         self._hold_until = 0.0
         self._synth_line: Line | None = None    # the line whose audio is being made (or was made last)
@@ -382,6 +384,10 @@ class Voice:
             self._drop(l, reason)
         if self._cur is not None:
             self._request_cut(self._cur, reason, also_answers=True)
+        self._captain_down = self._turn_pending = False        # (the game went away with the key down, or a new game begins: nobody holds the floor)
+        self._hold_until = 0.0
+        self._set_floor(self._floor_state())
+        self._wake()
         return n
 
     # ------------------------------------------------------------------------------------------ the Captain
@@ -389,6 +395,7 @@ class Voice:
         """The Captain starts to speak (push-to-talk down) or an order is typed: whoever talks stops at the end of the phrase
         (within half a second) and nobody starts until his order has been answered."""
         self._captain_down = True
+        self._down_t = self._now()
         self._turn_pending = True
         self._hold_until = 0.0
         self.stats["captain_begin"] += 1
@@ -417,7 +424,13 @@ class Voice:
     def held(self) -> bool:
         """The floor belongs to the Captain: only answers may start."""
         if self._captain_down:
-            return True
+            if self._now() - self._down_t <= KEY_STUCK_S:
+                return True
+            log.warning("the key has been down for %.0f s: taken as released (a 'key up' that never came)", KEY_STUCK_S)
+            self._captain_down = False
+            self._turn_pending = False                # nobody is waiting for an order that was never finished
+            self._set_floor(self._floor_state())
+            return False
         if self._turn_pending:
             if self._hold_until and self._now() > self._hold_until:
                 self._turn_pending = False
@@ -581,7 +594,11 @@ class Voice:
             if line is None:
                 self._set_floor(self._floor_state())
                 # idle, or holding the floor for the Captain's order: wake when the hold runs out
-                wait = max(0.01, self._hold_until - self._now()) if (self._turn_pending and self._hold_until) else None
+                wait = None
+                if self._captain_down:                       # (a key held for too long is let go of: see KEY_STUCK_S)
+                    wait = max(0.05, self._down_t + KEY_STUCK_S - self._now())
+                elif self._turn_pending and self._hold_until:
+                    wait = max(0.01, self._hold_until - self._now())
                 await self._wait(wait)
                 continue
             now = self._now()

@@ -96,7 +96,7 @@ Tutti JSON in frame di testo, tranne l'audio (frame binario). Formato dell'audio
 ### 3.2 Audio di una riga
 
 1. A `audio_begin`: nuova `USoundWaveProcedural` (`SetSampleRate(rate)`, mono, `bLooping=false`), componente audio in `Play()`.
-2. A ogni frame binario: `QueueAudio`. La coda non supera mai ~0,5 s (la mente va a passo).
+2. A ogni frame binario: `QueueAudio`. La coda non supera mai ~0,5 s (la mente va a passo: `LEAD_S = 0,45` in `speech.py`). Uno scatto del gioco più lungo di quello (un caricamento, la compilazione di uno shader) svuota la coda e la voce si interrompe per un attimo: la mente non può accorgersene da sola, lo sa solo se il gioco manda `voice_status: stalled` (che registra nel log come avviso). Se il gioco implementa `cancel` (punto 3) si può portare `LEAD_S` a 0,8 s per assorbire scatti più lunghi: l'unico costo è che un gioco che ignora `cancel` finirebbe la riga in corso fino a 0,8 s dopo.
 3. **A `cancel`**: `Voice->FadeOut(fade_ms/1000, 0.f)`, poi `CurrentWave->ResetAudio()` e stop della componente; se la mente manda anche `audio_end{reason:"cut"}` va ignorato. Con un gioco che ignora `cancel` la voce finisce comunque entro 0,45 s (è quanto audio c'è in coda).
 4. Non chiamare `SetSound` su una componente che sta ancora suonando la riga precedente: con il protocollo 2 due righe dello stesso ufficiale non si sovrappongono (l'audio di una finisce prima che parta l'altra), ma un `cancel` mancato la troncherebbe.
 5. Mandare `voice_status` (sezione 2.2). In particolare **`failed` quando `Play()` non parte o il componente manca**.
@@ -192,9 +192,11 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 | `ASTRA_TTS_LUFS` | −19 | volume di ogni voce |
 | `ASTRA_TTS_PAUSE_MS` | 300 | pausa più lunga tenuta dentro una riga |
 | `ASTRA_TTS_RESIDENT` | 2 | modelli di lingua tenuti in memoria (~430 MB l'uno) |
-| `ASTRA_STT` | `parakeet` | motore preferito: `parakeet`, `whisperkit`, `faster-whisper` |
+| `ASTRA_STT` | `parakeet` | motore provato per primo: `parakeet` (Neural Engine), `parakeet-onnx` (CPU), `whisperkit`, `faster-whisper` |
 | `ASTRA_STT_MODEL` | `ultra` | modello Parakeet: `ultra`, `v3`, `redux` |
 | `ASTRA_STT_BIN` | — | percorso dell'helper `astra-stt` |
+| `ASTRA_SHERPA_MODEL` | `<modelli>/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` | modello del Parakeet su CPU (`python -m astra_mind.stt --fetch-portable`) |
+| `ASTRA_FW_MODEL` | `small` | modello di faster-whisper |
 | `ASTRA_VOICE_MODELS` | `<home>/voice/models` | dove cercare i modelli di Whisper/Parakeet |
 | `ASTRA_MIC` | `auto` | `always` (microfono sempre aperto), `ptt` (aperto solo a tasto premuto), `auto` |
 | `ASTRA_VOICE_QOS` | 1 | priorità dei thread della voce (macOS) |
@@ -202,7 +204,25 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 ## 7. Come si prova (dalla cartella `mind/`)
 
 ```
-uv run python -m bench.voice_units            # 56 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti)
-uv run python -m bench.voice_floor -v         # 18 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
+uv run python -m bench.voice_units            # 63 controlli veloci (audio, nomi, lingua, riconoscitore con motori finti)
+uv run python -m bench.voice_floor -v         # 20 scenari del palco con orologio virtuale (-v: la cronologia vista dal gioco)
+uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-tuned   # riconoscimento: WER e latenza, motori alternati clip per clip
+uv run python -m bench.voice_pipeline live tts mic floor mem   # (una sezione per volta) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
 uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)
+uv run python -m astra_mind.stt               # quali motori di riconoscimento ci sono su questa macchina
+uv run python -m astra_mind.tts               # quali modelli e voci sono in cache
 ```
+
+## 8. Installazione e pacchetto (per chi assembla l'app)
+
+| Cosa | Dove | Come si ottiene | Peso |
+|---|---|---|---|
+| Ambiente Python (scipy, num2words nuovi) | `mind/.venv` (nell'app: lo crea uv al primo avvio) | `uv sync` | — |
+| Helper `astra-stt` (Parakeet sul Neural Engine) | `mind/stt_server/bin/astra-stt` (trovato da solo anche in `<app>/Contents/Resources/mind/stt_server/bin/`) | `mind/stt_server/build.sh` (Xcode 26.2; la compilazione sta in `~/Library/Caches/ASTRA`, non dentro `mind/`) | 17 MB |
+| Modello Parakeet Ultra (Core ML int8) | `<modelli>/parakeet-ultra-coreml` se c'è, altrimenti `~/Library/Application Support/FluidAudio/Models` | `uv run python -m astra_mind.stt --fetch` (scarica ~600 MB e compila per il Neural Engine: 1–3 minuti la prima volta, poi 0,5 s). **Per un'app che non deve toccare la rete**: copiare quella cartella in `voice/models/` (che `tools/pacchetto.sh` già copia in Application Support) | 600 MB |
+| WhisperKit (riserva: lingue oltre le 25 europee e frasi che Parakeet non riconosce con sicurezza) | `whisperkit-cli` (Homebrew) e `<modelli>/models/argmaxinc/whisperkit-coreml/…turbo` | già presenti | 1,6 GB, si carica solo se serve e si scarica dopo 10 minuti di inattività |
+| Pocket TTS, sette lingue | cache Hugging Face (`~/.cache/huggingface`, usata senza rete quando c'è tutto) | `uv run python -m astra_mind.tts --fetch` (~440 MB per lingua; due lingue restano in memoria) | 3 GB |
+| Guadagni e sostituzioni delle voci | `mind/astra_mind/voice_gains.json`, `voice_overrides.json` | nel repository; si rigenerano con `uv run python -m astra_mind.voice_casting` (25 minuti) | 20 KB |
+| Windows / Linux / Mac senza il helper | Parakeet ONNX su CPU e faster-whisper | `uv sync --extra portable` e `uv run python -m astra_mind.stt --fetch-portable` (~490 MB) | — |
+
+`tools/pacchetto.sh` copia `mind/` con `rsync`: la cartella di compilazione di Swift non deve finirci (900 MB); con `build.sh` com'è ora non si trova più dentro `mind/`, ma per le cartelle `.build` già esistenti conviene aggiungere `--exclude .build --exclude .swiftpm`.

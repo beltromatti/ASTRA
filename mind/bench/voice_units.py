@@ -114,6 +114,18 @@ def glossary_and_language() -> None:
     check("glossary: Styx from 'sticks'", fix("keep the railguns on the sticks") == "keep the railguns on the Styx")
     check("glossary: ordinary words are left alone", fix("la serra è vicina alla terra, il price è alto, la mensa chiude") == "la serra è vicina alla terra, il price è alto, la mensa chiude")
     check("glossary: nothing to fix, nothing changed", GLOSSARY.correct("Avanti tutta.")[1] == [])
+    check("glossary: an officer called out first is read as the name (Mensa -> Mensah)", fix("Mensa, qual è la temperatura del reattore?") == "Mensah, qual è la temperatura del reattore?")
+    check("glossary: ... even split in two", fix("Men sa, wie hoch ist die Temperatur?") == "Mensah, wie hoch ist die Temperatur?")
+    check("glossary: Boss and Foss are Voss at the start of an order", fix("Boss, fire the missiles.") == "Voss, fire the missiles." and fix("Foss, starten Sie Raketen.") == "Voss, starten Sie Raketen.")
+    check("glossary: a name cut short after a title", fix("Doutora Lind, como estão os feridos?") == "Doutora Lindqvist, como estão os feridos?")
+    check("glossary: the name at the end of an order", fix("How is the reactor, Mansa?") == "How is the reactor, Mensah?")
+    check("glossary: ordinary first and last words are not names",
+          all(fix(s) == s for s in ("Bene, avanti tutta.", "Fuoco, subito!", "Yes, sir.", "Perfetto, grazie.", "Focus fire on the target.", "Fire, now.",
+                                    "Tattico, fuoco a volontà.", "Sensori, rapporto.", "Timoniere, indietro adagio.", "Avanti tutta, grazie.", "Copy that, sir.",
+                                    "Rapporto danni, subito.", "Tank the damage, ops.")))
+    check("glossary: a lost first vowel (Queron, Cheron -> Acheron)", fix("Tattico, fuoco sulla Queron.") == "Tattico, fuoco sulla Acheron."
+          and fix("fire on the Cheron") == "fire on the Acheron")
+    check("glossary: LET in capitals is Lethe, 'let' is a word", fix("lancez les missiles sur le LET") == "lancez les missiles sur le Lethe" and fix("Let me know when ready.") == "Let me know when ready.")
     check("glossary: the prompt lists names and stays short", "Praetorian" in GLOSSARY.prompt() and len(GLOSSARY.prompt()) < 500)
     check("phonetic key ignores accents and doubled letters", phon("Praetórian") == phon("Pretorian"))
 

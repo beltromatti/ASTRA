@@ -352,6 +352,7 @@ def main() -> None:
     ap.add_argument("--fetch-portable", action="store_true", help="download the ONNX export of Parakeet (any platform, ~490 MB)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)                     # (its lines carry the download's long signed address)
     print("Parakeet (Neural Engine):", "yes" if ParakeetBackend.available() else "no (build it: mind/stt_server/build.sh)")
     print("Parakeet (ONNX, CPU, any platform):", "yes" if SherpaParakeetBackend.available() else "no (uv sync --extra portable; --fetch-portable)")
     print("WhisperKit:", "yes" if WhisperKitBackend.available() else "no (whisperkit-cli)")

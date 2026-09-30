@@ -119,7 +119,7 @@ class ParakeetBackend(SttBackend):
             if self._proc and self._proc.returncode is None and self._ready.is_set():
                 return True
             if self.binary is None or not self.binary.exists():
-                log.warning("Parakeet unavailable: no astra-stt binary (build it: cd mind/stt_server && swift build -c release)")
+                log.warning("Parakeet unavailable: no astra-stt binary (build it: mind/stt_server/build.sh)")
                 return False
             if time.monotonic() - self._last_start < 5.0 and self._failed:
                 return False                                        # do not spin restarting a helper that dies at once
