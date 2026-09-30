@@ -1,4 +1,4 @@
-# La Bibbia di ASTRA (bozza v0.2)
+# La Bibbia di ASTRA (bozza v0.3)
 
 *Proposta di Claude, da plasmare con le tue idee (docs/IDEE.md). È anche la "memoria comune" di tutte le AI del gioco: ogni personaggio conosce questo mondo e ne rispetta le regole.*
 
@@ -50,7 +50,8 @@ Quando i Gates si riaprirono, nel 2450, i Core Worlds tornarono a commerciare co
 - **Non sono mostri.** Hanno ragioni vere, ferite vere e un codice d'onore: rispettano chi si arrende e disprezzano chi mente.
 - **Navi:** nomi dell'oltretomba (*Styx*, *Acheron*, *Lethe*, *Cocytus*, *Phlegethon*, *Avernus*, *Kharon*…).
 - **Dottrina:** attacchi rapidi e concentrati, missili a saturazione, silenzio elettronico, abbordaggi.
-- **Gradi:** Archon (ammiraglio), Ferryman (capitano), Warden (ufficiale), Oarsman (marinaio).
+- **Classi in servizio:** incrociatore *Acheron*-class (nave comando, 520 m, batterie di rotaie, 48 celle VLS, hangar di caccia d'attacco), cacciatorpediniere *Styx*-class (340 m, rotaia spinale e missili, caccia in gruppi di tre), fregata *Lethe*-class (220 m, laser e pochi missili, esploratrice e razziatrice), caccia d'attacco **Harpy** (cannoni e missili antinave), **emettitori esca** (droni che imitano la firma di una nave da guerra), scialuppe d'abbordaggio **Skiff** (dieci fanti ciascuna).
+- **Gradi:** Archon (ammiraglio), Ferryman (capitano), Warden (ufficiale), Oarsman (marinaio). I fanti di bordo sono la **Ferry Guard**.
 
 ### Gli altri
 - **The Free Guilds:** mercanti e minatori neutrali (i mercantili "unknown" sui sensori).
@@ -70,6 +71,8 @@ Quando i Gates si riaprirono, nel 2450, i Core Worlds tornarono a commerciare co
 | **Containment fields** | Schermi energetici che tappano gli squarci e isolano il reattore; senza energia cedono. |
 | **The Interpreter** | Impianto neurale universale di traduzione, standard nella Navy. Tutti ti sentono nella tua lingua e tu senti tutti nella tua; le trasmissioni nemiche passano dal traduttore di bordo con lievi artefatti. |
 | **Quantum relays** | Comunicazioni in tempo reale in tutto il sistema. Tra sistemi diversi i messaggi viaggiano solo attraverso i Gates. |
+| **Lattice transport** (in plancia: "the transporter") | Una persona o un carico fino a 2 t alla volta, da piattaforma a piattaforma o a coordinate, entro **30.000 km**. Regole: nessuno **scudo attivo** né a bordo né al punto d'arrivo (lo scudo spezza il fascio: per portare una squadra su una nave nemica bisogna prima abbatterne gli scudi in quel settore); il **disturbo elettronico** forte impedisce l'aggancio del segnale; niente trasporto mentre la nave accelera o vira forte (il puntamento perde la presa), né attraverso il campo di un Gate; un ciclo dura 8 s e costa energia (40 MW per ciclo: in battaglia si sottrae agli scudi); il buffer tiene uno schema per 90 s al massimo. L'Aquila ha una **Transporter Room** con sei piattaforme (Deck 5) e due piattaforme d'emergenza nell'infermeria. |
+| **Boarding** | Le navette d'assalto agganciano lo scafo e aprono un varco con un collare a plasma; i fanti combattono corridoio per corridoio. Le paratie di sezione si chiudono sotto abbordaggio; i campi di contenimento isolano i varchi. |
 
 ## 5. Il teatro dell'alpha: the Aurelia System
 **Aurelia** è una stella arancione con un cielo da tramonto perenne, sullo sfondo della nebulosa verde-azzurra **the Teal Veil**.
@@ -117,17 +120,21 @@ La frontiera tra i Core Worlds e gli Outer Worlds. Undici sistemi, ognuno con il
   - **Alpha Squadron**: 8 caccia *Falcon*
   - **Bravo Squadron**: 8 cacciabombardieri *Hammer*
   - 12 droni *Wasp* per guerra elettronica e ricognizione
-- **Luoghi percorribili nell'alpha:**
-  - **Bridge**, con finestroni panoramici
-  - **The Spine**, il corridoio centrale con navetta interna
-  - **Engineering** e reattore
-  - **Flight Deck**
-  - **Medbay**
-  - **Crew Quarters**
-  - **Mess Hall**
-  - **Armory**
-  - maintenance crawlways
-- **Codici di ponte e sezione** sulla segnaletica, per esempio "DECK 4 · SECTION C".
+- **I dodici ponti** (dall'alto; sezioni A–H da prua a poppa lungo lo scafo; segnaletica "DECK 4 · SECTION C"):
+  - **Deck 1** — Bridge, Captain's quarters, ready room, corridoi di comando.
+  - **Deck 2** — CIC (centro informazioni di combattimento), sala riunioni, uffici dei reparti, comunicazioni.
+  - **Deck 3** — alloggi dell'equipaggio (Crew Berthing), alloggi degli ufficiali, palestra.
+  - **Deck 4** — Mess Hall, cucina (galley), sala comune (lounge), osservatorio.
+  - **Deck 5** — laboratori scientifici, Transporter Room, archivio dei sensori.
+  - **Deck 6** — Medbay, chirurgia, quarantena, farmacia.
+  - **Deck 7** — Main Engineering, reattore, sala di controllo della potenza, radiatori.
+  - **Deck 8** — Armory, caserma dei fanti (Marine Barracks), poligono, hangar delle navette d'assalto.
+  - **Deck 9** — Flight Deck (tubi di lancio, stalli, officina dei velivoli, cabina di controllo).
+  - **Deck 10** — stive, depositi di munizioni, rifornimenti.
+  - **Deck 11** — officine, fabbricazione, riparazioni, squadre del damage control.
+  - **Deck 12** — chiglia: serbatoi, massa di reazione, cunicoli di manutenzione (maintenance crawlways).
+  - **The Spine** — il corridoio centrale lungo la nave, con la navetta interna; ascensori e scale collegano i ponti.
+- **Fanti di marina:** 80, al comando del Major Tomás Reyes; due navette d'assalto *Kestrel* (dodici fanti ciascuna) sul Deck 8.
 
 ## 7. L'equipaggio principale (proposta)
 | Ruolo | Nome | Carattere (usato dalle AI) |
@@ -141,6 +148,11 @@ La frontiera tra i Core Worlds e gli Outer Worlds. Undici sistemi, ognuno con il
 | CAG (Commander Air Group) | Lieutenant Commander **Ada Kovač**, callsign **"Hex"** | Asso del Falcon, feroce con i suoi piloti. |
 | Chief Medical Officer | Surgeon Commander **Dr. Irene Lindqvist** | Pragmatica, dice sempre la verità, anche quella che non vuoi sentire. |
 | Security & Marines | Major **Tomás Reyes** | Protettivo, diffidente verso Voss. |
+| Sensors | Lieutenant **Priya Nair** | Occhio e pazienza: vede il contatto prima di tutti e non lo dichiara finché non è sicura. |
+| Engineering (plancia) | Lieutenant Junior Grade **Kofi Mensah** | L'uomo della potenza in plancia: bilanci, calore, reattore; parla con la sala macchine di Okonkwo. |
+| Flight Control (plancia) | Lieutenant **Jonah Price** | Il controllore di volo: lanci, recuperi, la voce che i piloti sentono in cuffia. |
+
+**La flotta alleata:** Vice Admiral **Adrian Rourke**, comandante della 7th Fleet, sulla corazzata **ASN Praetorian** (BB); il cacciatorpediniere **ASN Vigilant** (DD) di scorta.
 
 **Nemico ricorrente:** l'Archon **Varek Solm**, comandante della flotta d'invasione. Ha perso la famiglia durante il Silence; con lui si può parlare, ma non si può ingannarlo.
 
