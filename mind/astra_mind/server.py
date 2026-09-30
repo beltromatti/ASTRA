@@ -789,6 +789,8 @@ class Mind:
                     self.port.reset()
                     self.watch.reset()
                     self.exchange.reset()
+                    if isinstance(self.llm, OpenRouter):
+                        asyncio.create_task(self._warm_up())         # (the session's first report should not pay for a cold route)
                     log.info("new game session: conversation reset (the war waits for the Captain's choice)")
                 elif kind == "campaign":
                     # the Captain chose in the title menu: a new war, or the saved one
@@ -891,6 +893,15 @@ class Mind:
         finally:
             self.clients.discard(ws)
             log.info("game disconnected")
+
+    async def _warm_up(self) -> None:
+        """One minimal request through the crew's route (connection, provider, prompt cache) while the game is still starting."""
+        try:
+            await asyncio.sleep(0.4)                                 # (the game's first ship_state is in: the prompt is the real one)
+            self.agent.ship = self.game if (self.game and self.game.state) else self.local
+            log.info("crew route warmed in %.2fs", await self.agent.warm_up(self.lang))
+        except Exception as exc:  # noqa: BLE001
+            log.info("warm-up skipped: %s", exc)
 
     async def _recognise(self, pcm: bytes, ctx: dict[str, Any] | None = None) -> None:
         if len(pcm) < 16000 * 2 * 0.3:

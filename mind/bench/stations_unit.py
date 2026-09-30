@@ -154,6 +154,16 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         # the history keeps the call and its result in the native format (the model must know what was set)
         self.assertTrue(any(m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "station" for m in c.agent.history))
 
+    async def test_the_warm_up_asks_for_one_token_and_leaves_no_trace(self) -> None:
+        c = Crew(Script(content="ok"))
+        dt = await c.agent.warm_up("it")
+        self.assertGreaterEqual(dt, 0.0)
+        self.assertEqual(len(c.llm.requests), 1)
+        req = c.llm.requests[0]
+        self.assertIn("station", {t["function"]["name"] for t in req["tools"]})               # (the crew's own tools: the cached head is the real one)
+        self.assertTrue(req["messages"][-1]["content"].startswith("[the bridge is manned"))
+        self.assertEqual((c.said, c.agent.history), ([], []))                                 # nothing said, nothing remembered
+
     async def test_a_bad_station_call_is_refused_and_the_officer_says_why(self) -> None:
         c = Crew(Script([station("helm", "intercept")]),                                        # no target
                  Script([speak("Non ho un bersaglio, Capitano: quale contatto?")]))          # the follow-up
@@ -732,12 +742,19 @@ class WireTest(unittest.IsolatedAsyncioTestCase):
         cmd, err = S.normalize({"station": "helm", "mode": "course", "params": {}})
         self.assertIsNone(cmd)
 
-    def test_all_hostiles_become_the_ids_the_game_takes(self) -> None:
-        state = LocalShip(fight=True).snapshot()
-        cmd, _ = S.normalize({"station": "tactical", "mode": "engage", "params": {"targets": ["hostiles"]}})
-        self.assertEqual(S.to_wire(cmd, state=state)["params"]["targets"], ["T-23", "T-24"])          # nearest first
+    def test_hostiles_and_action_go_through_as_words_the_game_keeps(self) -> None:
+        cmd, _ = S.normalize({"station": "tactical", "mode": "engage", "params": {"targets": ["Hostiles"]}})
+        self.assertEqual(S.to_wire(cmd)["params"]["targets"], ["hostiles"])                            # (a standing order: the game expands it every tick)
         cmd, _ = S.normalize({"station": "tactical", "mode": "engage", "params": {"targets": ["T-24", "hostiles"]}})
-        self.assertEqual(S.to_wire(cmd, state=state)["params"]["targets"], ["T-24", "T-23"])
+        self.assertEqual(S.to_wire(cmd)["params"]["targets"], ["T-24", "hostiles"])
+        for st_id, mode in (("helm", "keep_on_bow"), ("ops", "viewscreen_target"), ("sensors", "scan_focus")):
+            cmd, err = S.normalize({"station": st_id, "mode": mode, "params": {"target": "ACTION"}})
+            self.assertEqual(cmd["params"]["target"], "action", (mode, err))
+            self.assertEqual(S.to_wire(cmd)["params"]["target"], "action")
+        text = S.tool_description()
+        self.assertIn("`action`", text)
+        self.assertIn("keep_on_bow(target=id|action)", text)
+        self.assertIn("800%", S.MODE_INDEX["reactor_battle_short"].summary)
 
     def test_what_the_game_would_refuse_is_refused_the_same_way(self) -> None:
         for args in ({"station": "sensors", "aspect": "ew", "mode": "jam", "params": {"target": "T-23"}},
@@ -820,6 +837,113 @@ class WireTest(unittest.IsolatedAsyncioTestCase):
         ship.advance(40)
         want = ship.range_bearing(ship.contacts["T-23"])[1]
         self.assertLess(abs(((ship.heading - want) + 540) % 360 - 180), 40)
+
+    # ---- what main's game side does since 333cb1e: "action", hostiles as a standing order, a time limit for any aspect, battle short
+    async def test_the_bow_on_the_action_waits_without_a_fight_and_follows_the_fight_with_one(self) -> None:
+        calm = LocalShip(fight=False)
+        res = await calm.execute("station", {"station": "helm", "aspect": "course", "mode": "keep_on_bow", "params": {"target": "action"},
+                                             "until": "target_lost", "by": "captain"}, "helm")
+        self.assertTrue(res["ok"], res)                                                   # accepted with no fight on
+        calm.advance(10)
+        self.assertEqual(calm.snapshot()["stations"]["helm"]["modes"]["course"]["mode"], "keep_on_bow")         # it waits, it does not expire
+        self.assertEqual(calm.snapshot()["action_target"], "")
+        ship = LocalShip(fight=True)
+        await ship.execute("station", {"station": "helm", "aspect": "course", "mode": "keep_on_bow", "params": {"target": "action"}, "by": "captain"}, "helm")
+        self.assertEqual(ship.snapshot()["action_target"], "T-23")                       # the nearest hostile
+        ship.advance(40)
+        off = lambda cid: abs(((ship.heading - ship.range_bearing(ship.contacts[cid])[1]) + 540) % 360 - 180)      # noqa: E731
+        self.assertLess(off("T-23"), 25)
+        await ship.execute("station", {"station": "tactical", "aspect": "engagement", "mode": "engage", "params": {"targets": ["T-24"]}, "by": "captain"}, "tactical")
+        ship.advance(1)
+        self.assertEqual(ship.snapshot()["action_target"], "T-24")                       # tactical's target is what the fight is about
+        before = off("T-24")
+        ship.advance(60)
+        self.assertLess(off("T-24"), before)                                             # the bow is coming round to the new target
+        self.assertLess(off("T-24"), 45)
+
+    async def test_the_screen_and_the_scan_on_the_action_follow_it_too(self) -> None:
+        ship = LocalShip(fight=True)
+        for st_id, aspect, mode in (("ops", "viewscreen", "target"), ("sensors", "scan", "focus")):
+            res = await ship.execute("station", {"station": st_id, "aspect": aspect, "mode": mode, "params": {"target": "action"}, "by": "captain"}, st_id)
+            self.assertTrue(res["ok"], res)
+        self.assertIn("T-23", ship.snapshot()["viewscreen"])
+        ship.advance(80)                                                                  # T-23 falls: the screen is not released, it moves on
+        st = ship.snapshot()["stations"]
+        self.assertEqual(st["ops"]["modes"]["viewscreen"]["mode"], "target")
+        self.assertEqual(st["sensors"]["modes"]["scan"]["mode"], "focus")
+        self.assertFalse(any(r.startswith("ops: viewscreen released") for r in ship.take_reports()))
+
+    async def test_engage_hostiles_is_a_standing_order_that_outlives_the_targets(self) -> None:
+        ship = LocalShip(fight=True)
+        res = await ship.execute("station", {"station": "tactical", "aspect": "engagement", "mode": "engage", "params": {"targets": ["hostiles"]},
+                                             "until": "target_lost", "by": "captain"}, "tactical")
+        self.assertTrue(res["ok"], res)
+        ship.advance(120)
+        self.assertFalse(ship.contacts["T-23"].alive)                                     # the first one fell (the second circles out of reach)
+        reports = ship.take_reports()
+        self.assertTrue(any("engaging" in r and "was T-23" in r for r in reports), reports)         # it moved on to the next by itself
+        self.assertFalse(any("ended" in r and r.startswith("tactical:") for r in reports), reports)  # and the order still stands
+        self.assertEqual(ship.snapshot()["stations"]["tactical"]["modes"]["engagement"]["mode"], "engage")
+        empty = LocalShip(fight=False)                                                    # nothing hostile on the plot: it waits, it is accepted
+        res = await empty.execute("station", {"station": "tactical", "aspect": "engagement", "mode": "engage", "params": {"targets": ["hostiles"]}}, "tactical")
+        self.assertTrue(res["ok"], res)
+
+    async def test_a_time_limit_sends_any_aspect_back_to_its_default(self) -> None:
+        ship = LocalShip(fight=True)
+        await ship.execute("station", {"station": "tactical", "aspect": "shields", "mode": "forward", "params": {"sector": "forward"}, "until": "time:5"}, "tactical")
+        await ship.execute("station", {"station": "engineering", "aspect": "power", "mode": "combat", "until": "time:5"}, "engineering")
+        await ship.execute("station", {"station": "sensors", "aspect": "emcon", "mode": "silent", "until": "time:5"}, "sensors")
+        self.assertEqual(ship.state["power_pct"]["shields"], 150)
+        ship.advance(7)
+        st = ship.snapshot()["stations"]
+        self.assertEqual(st["tactical"]["modes"]["shields"]["mode"], "face_threat")
+        self.assertEqual(st["engineering"]["modes"]["power"]["mode"], "balanced")
+        self.assertEqual(st["sensors"]["modes"]["emcon"]["mode"], "restricted")
+        self.assertEqual((ship.state["power_pct"]["shields"], ship.state["emcon"]), (100, "restricted"))     # the ship followed the console
+        reports = ship.take_reports()
+        self.assertIn("tactical: shields sector ended (the time set for it is up): back to shields face threat", reports)
+
+    async def test_battle_short_is_800_percent_and_heat_and_normal_scales_it_back(self) -> None:
+        ship = LocalShip(fight=False)
+        for system, pct in (("shields", 150), ("weapons", 150)):
+            self.assertTrue((await ship.execute("route_power", {"system": system, "percent": pct}, "ops"))["ok"])       # 700% of 700%
+        refused = await ship.execute("route_power", {"system": "engines", "percent": 150}, "ops")
+        self.assertFalse(refused["ok"])
+        self.assertIn("budget exceeded", refused["detail"])
+        res = await ship.execute("station", {"station": "engineering", "aspect": "reactor", "mode": "battle_short", "by": "captain"}, "engineering")
+        self.assertTrue(res["ok"], res)
+        self.assertIn("of 800%", ship.snapshot()["power_budget"])
+        self.assertTrue((await ship.execute("route_power", {"system": "engines", "percent": 150}, "ops"))["ok"])       # 750% of 800%
+        heat0 = ship.snapshot()["thermal"]["heat_pct"]
+        ship.advance(60)
+        self.assertGreaterEqual(ship.snapshot()["thermal"]["heat_pct"], heat0 + 17)                                  # +0.3 %/s
+        await ship.execute("station", {"station": "engineering", "aspect": "reactor", "mode": "normal"}, "engineering")
+        snap = ship.snapshot()
+        self.assertIn("of 700%", snap["power_budget"])
+        self.assertLessEqual(sum(snap["power_pct"].values()), 700.5)                                                 # the over-nominal comes down
+        self.assertGreater(snap["power_pct"]["shields"], 100)
+        self.assertTrue(any("back inside its limits" in e for e in ship.events))
+
+    def test_the_watch_does_not_list_hostiles_a_standing_order_already_covers(self) -> None:
+        ship = LocalShip(fight=True)
+        state = ship.snapshot()
+        state["stations"]["tactical"]["modes"]["engagement"] = {"mode": "engage", "params": {"targets": ["HOSTILES"]}, "until": "target_lost",
+                                                                "set_by": "captain", "for_s": 5}           # (the game stores the words in capitals)
+        self.assertFalse(any("no fire assigned" in d for d in initiative.Watch.due(state)))
+        state["stations"]["tactical"]["modes"]["engagement"] = {"mode": "return_fire", "until": "order", "set_by": "default", "for_s": 5}
+        self.assertTrue(any("no fire assigned" in d for d in initiative.Watch.due(state)))
+
+    def test_the_board_says_what_the_action_is_now(self) -> None:
+        state = LocalShip(fight=True).snapshot()
+        self.assertEqual(state["action_target"], "T-23")
+        self.assertIn("the action now (target `action`): T-23 (Cocytus)", S.board(state))
+        calm = LocalShip(fight=False).snapshot()
+        calm["stations"]["helm"]["modes"]["course"] = {"mode": "keep_on_bow", "params": {"target": "action"}, "until": "target_lost", "set_by": "captain", "for_s": 3}
+        self.assertIn("none — no fight", S.board(calm))
+        lane = S.lanes_of(calm["stations"]["helm"])["course"]
+        self.assertEqual((lane["mode"], lane["params"]), ("keep_on_bow", {"target": "action"}))
+        self.assertEqual(S.lanes_of({"modes": {"engagement": {"mode": "engage", "params": {"targets": ["HOSTILES"]}}}})["engagement"]["params"],
+                         {"targets": ["hostiles"]})
 
     async def test_expiries_are_reported_in_the_games_words(self) -> None:
         ship = LocalShip(fight=True)
