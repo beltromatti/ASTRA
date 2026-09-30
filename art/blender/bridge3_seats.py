@@ -96,12 +96,15 @@ def chair_shell_parts(b: Parts, scale: float = 1.0, command: bool = False, capta
     fb.loft(shell_rings(prof, wtab, btab, 15, 0.038, span=(0.0, 0.60)), base_mat, caps=True)
     fb.loft(shell_rings(prof, wtab, btab, 15, 0.038, span=(0.625, 0.885)), band_mat, caps=True)
     fb.loft(shell_rings(prof, wtab, btab, 13, 0.038, span=(0.905, 1.0)), base_mat, caps=True)
-    # leather cushions in segments (a bucket-seat look), nearly the full width of the shell; the reveals between them are dark
-    pads = [((0.04, 0.27), 0.93), ((0.29, 0.50), 0.93), ((0.55, 0.65), 0.90), ((0.675, 0.785), 0.92), ((0.81, 0.885), 0.92)]
+    # leather cushions: the seat in two segments, one long back cushion with two stitched grooves, a headrest pad
+    pads = [((0.04, 0.27), 0.93), ((0.29, 0.50), 0.93), ((0.55, 0.885), 0.92)]
     for (sp, vs) in pads:
         soft.loft(shell_rings(prof, [(t, w * 0.96) for t, w in wtab], btab, 13, 0.05, v_span=vs, lift=0.054, span=sp), L.LEATHER, caps=True)
-    soft.loft(shell_rings(prof, [(0.0, 0.14 * s), (1.0, 0.14 * s)], [(0.0, 0.03), (1.0, 0.03)], 11, 0.045, v_span=0.72, lift=0.049,
+    soft.loft(shell_rings(prof, [(0.0, 0.14 * s), (1.0, 0.14 * s)], [(0.0, 0.03), (1.0, 0.03)], 11, 0.045, v_span=0.70, lift=0.049,
                           span=(0.925, 0.99)), L.LEATHER, caps=True)
+    for z in (0.79, 0.94):                                       # stitched grooves across the back cushion
+        zz = z * (top / 1.30) if not command else z * (top / 1.30)
+        fine.box((-0.262 * s - 0.03 * (zz - 0.79), -0.19 * s, zz), (-0.226 * s, 0.19 * s, zz + 0.006), L.STRUCT)
     # the shark-fin spine behind the shell: a slim plate with a lit rear edge in the department colour
     z0f, zt = 0.60, top - 0.05
     fin = [(-0.285 * s, z0f), (-0.36 * s, z0f + 0.03), (-0.415 * s, z0f + 0.25), (-0.385 * s, (z0f + zt) / 2 + 0.12), (-0.30 * s, zt),
@@ -152,7 +155,9 @@ def armrest_pod(b: Parts, sd: int, slot: str | None, dept: str, scale: float = 1
     top = 0.755
     x0, x1 = -0.16, 0.34
     prof = [(x0, 0.655), (x0, top + 0.025), (x1 - 0.12, top + 0.01), (x1, top - 0.03), (x1, 0.665), (0.0, 0.645)]
-    fb.extrude_y(prof, y0 - 0.088, y0 + 0.088, L.IVORY)
+    fb.extrude_y(prof, y0 - 0.088, y0 + 0.088, L.COMPOSITE)
+    fb.extrude_y([(x0 + 0.01, top + 0.012), (x0 + 0.01, top + 0.03), (x1 - 0.12, top + 0.014), (x1 - 0.005, top - 0.026), (x1 - 0.005, top - 0.034),
+                  (x1 - 0.12, top + 0.004)], y0 - 0.091, y0 + 0.091, L.IVORY)
     fb.box((x0 + 0.045, y0 - 0.076, top + 0.004), (x1 - 0.13, y0 + 0.076, top + 0.012), L.DGLASS)
     em.lamp_box((x0 + 0.03, y0 + sd * 0.089, top - 0.05), (x1 - 0.05, y0 + sd * 0.093, top - 0.038), dept, L.LAMP)
     info = None

@@ -125,8 +125,8 @@ def fan_body(b: Parts, F: Fan, dept: str, station: str, spine: bool = True) -> N
         with fb.at(T((r1 + 0.03) * c, (r1 + 0.03) * s, 0) @ Rz(th)):
             fb.cyl((0.0, -0.20, 0.10), (0.0, -0.20, 0.55), 0.022, L.RUBBER, seg=10)
             fb.cyl((0.0, -0.16, 0.10), (0.0, -0.16, 0.55), 0.016, L.TRIM, seg=10)
-    # the wrist rest
-    fine.arc_sweep([(0.53, F.zs(0.53) - 0.002), (0.61, F.zs(0.61) - 0.002), (0.61, F.zs(0.61) + 0.014), (0.53, F.zs(0.53) + 0.014)], 0, 0, 0,
+    # the wrist rest: a padded rest whose top (0.872 m) is where the officers' hands lie
+    fine.arc_sweep([(0.53, F.zs(0.53) - 0.004), (0.61, F.zs(0.61) - 0.004), (0.61, 0.868), (0.575, 0.874), (0.53, 0.868)], 0, 0, 0,
                    -30, 30, L.RUBBER, seg=16)
 
 

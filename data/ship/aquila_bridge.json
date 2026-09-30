@@ -94,6 +94,19 @@
     {"id": "Holo_Glow", "type": "point", "pos": [4.3, 0.0, 0.75], "color": [110, 190, 255], "lumens": 350, "shadows": false, "radius": 450, "specular": 0.0,
      "note": "the plot itself glows; a strong light only makes a hot spot on the table top"}
   ],
+  "routes": {
+    "note": "walking routes of the officers to the starboard door (the Captain's quarters are that way): [x, y, level]; VisitRouteFor in AstraShipSubsystem.cpp still has the v2 waypoints (tables moved, stations moved). The helm goes round the table and up the PORT stairs, the ops up the starboard ones; 0.5 m clearance verified by art/blender/bridge3_checks.py",
+    "to_starboard_door": {
+      "helm": [[6.0, -2.2, "well"], [5.1, -2.7, "well"], [3.6, -3.3, "well"], [3.3, -4.7, "well"], [2.25, -4.7, "upper"], [0.3, -5.2, "upper"], [-5.5, -4.6, "upper"], [-7.3, -2.7, "upper"], [-7.3, 2.6, "upper"], [-7.7, 3.9, "upper"]],
+      "ops": [[6.0, 2.2, "well"], [5.1, 2.7, "well"], [3.6, 3.3, "well"], [3.3, 4.7, "well"], [2.25, 4.7, "upper"], [0.3, 5.2, "upper"], [-5.5, 4.5, "upper"], [-7.7, 3.9, "upper"]],
+      "tactical": [[-2.95, 0.0, "upper"], [-2.4, 2.6, "upper"], [-7.6, 3.6, "upper"]],
+      "xo": [[-0.15, -2.05, "dais"], [-0.7, -2.25, "dais"], [-0.95, -2.4, "upper"], [-5.0, -2.6, "upper"], [-7.2, -2.0, "upper"], [-7.2, 2.0, "upper"], [-7.7, 3.6, "upper"]],
+      "comms": [[0.1, -6.75, "upper"], [0.3, -5.2, "upper"], [-5.5, -4.6, "upper"], [-7.3, -2.7, "upper"], [-7.3, 2.6, "upper"], [-7.7, 3.9, "upper"]],
+      "sensors": [[-3.28, -6.33, "upper"], [-3.0, -5.2, "upper"], [-7.3, -2.7, "upper"], [-7.3, 2.6, "upper"], [-7.7, 3.9, "upper"]],
+      "engineering": [[0.1, 6.75, "upper"], [0.3, 5.2, "upper"], [-5.5, 4.5, "upper"], [-7.7, 3.9, "upper"]],
+      "flight": [[-3.28, 6.33, "upper"], [-3.2, 5.0, "upper"], [-7.6, 4.0, "upper"]]
+    }
+  },
   "screens": {
     "SCREEN_captain_1": {"page": "Touch", "instance": "MI_ASTRA_ScreenTouch", "surface": "armrest"},
     "SCREEN_captain_2": {"page": "Touch", "instance": "MI_ASTRA_ScreenTouch", "surface": "armrest"},
