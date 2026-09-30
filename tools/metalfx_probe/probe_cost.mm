@@ -139,8 +139,18 @@ static void RunCase(id<MTLDevice> Dev, id<MTLCommandQueue> Q, id<MTLLibrary> Lib
 		RoundMs.Add((NowMs() - W0) / N);
 	}
 
-	printf("%-44s : back-to-back min %.3f med %.3f ms | CB gpu min %.3f p10 %.3f med %.3f | encode cpu med %.0f us\n",
-		C.Label, RoundMs.Percentile(0.0), RoundMs.Median(), GpuMs.Percentile(0.0), GpuMs.Percentile(0.1), GpuMs.Median(), EncodeUs.Median());
+	// Pure scaler time with the GPU kept busy: N scaler runs inside ONE command buffer (they serialise on the history), GPU time / N.
+	FStats InCb;
+	for (int R = 0; R < 9; ++R)
+	{
+		const int Inner = 30;
+		double Ms = RunCB(Q, ^(id<MTLCommandBuffer> CB) {
+			for (int k = 0; k < Inner; ++k) { S.jitterOffsetX = Halton(k % 16 + 1, 2) - 0.5f; S.jitterOffsetY = Halton(k % 16 + 1, 3) - 0.5f; S.reset = NO; [S encodeToCommandBuffer:CB]; }
+		});
+		InCb.Add(Ms / Inner);
+	}
+	printf("%-44s : in one CB min %.3f med %.3f ms | back-to-back CBs min %.3f med %.3f | single CB gpu min %.3f | encode cpu %.0f us\n",
+		C.Label, InCb.Percentile(0.0), InCb.Median(), RoundMs.Percentile(0.0), RoundMs.Median(), GpuMs.Percentile(0.0), EncodeUs.Median());
 }
 
 int main(int argc, char** argv)

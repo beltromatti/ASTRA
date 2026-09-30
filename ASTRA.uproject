@@ -89,6 +89,13 @@
 			"TargetAllowList": [
 				"Editor"
 			]
+		},
+		{
+			"Name": "AstraMetalFX",
+			"Enabled": true,
+			"PlatformAllowList": [
+				"Mac"
+			]
 		}
 	]
 }
