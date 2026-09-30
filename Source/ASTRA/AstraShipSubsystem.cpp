@@ -419,6 +419,27 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 			{
 				RadiatorGlow = C->CreateDynamicMaterialInstance(Slot);   // her radiators glow with her heat (TickHeat)
 			}
+			if (M->GetName() == TEXT("SM_SHIP_ASTRA_Aquila"))
+			{
+				// her own hull is the only one seen from a few metres (through the bridge's windows): the wear map, drawn for
+				// hulls seen from hundreds of metres, would lay scratches like cracks and soot streaks a metre wide there.
+				// Four times finer, and quieter scratches and streaks, on her paint only.
+				for (const TCHAR* Part : {TEXT("MI_HULL_A_Plate"), TEXT("MI_HULL_A_Frame"), TEXT("MI_HULL_A_Livery"), TEXT("MI_HULL_A_Trim"), TEXT("MI_HULL_A_Marking")})
+				{
+					const int32 S = C->GetMaterialIndex(Part);
+					if (S == INDEX_NONE)
+					{
+						continue;
+					}
+					if (UMaterialInstanceDynamic* Mid = C->CreateDynamicMaterialInstance(S))
+					{
+						Mid->SetScalarParameterValue(TEXT("WearScale"), 2.0f);
+						Mid->SetScalarParameterValue(TEXT("ScratchAmount"), 0.12f);
+						Mid->SetScalarParameterValue(TEXT("StreakAmount"), 0.05f);
+						Mid->SetScalarParameterValue(TEXT("DirtBlotch"), 0.12f);
+					}
+				}
+			}
 			if (!It->FindComponentByClass<UAstraNavLights>())
 			{
 				// her running lights (no strobe over the bridge: the Captain looks out of it)

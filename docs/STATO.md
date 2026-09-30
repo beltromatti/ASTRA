@@ -41,6 +41,13 @@
   dinamica al 41 % (prima 50–55 %): il materiale v3 è pesante (382 istruzioni) e la cattura dello schermo principale disegna la nave
   inquadrata a tutto schermo. Con gli aiutanti al lavoro (2 simulazioni + 1 compilazione) il render thread sale a 30 ms (40 fps):
   le misure si fanno sempre con i loro processi sospesi (`kill -STOP`/`-CONT`).
+- **Schermo principale nitido** (1/10 notte): la cattura della telecamera aveva l'antialiasing temporale spento (default delle
+  catture 2D in UE: ripiego su FXAA) e le navi v3 erano «a puntini»; ora ha il suo TSR (storia propria) e rende a 640x267 con
+  mipmap, le scritte a 1280x534: la Praetorian a x6–x10 si legge come in un film. Costo a 20 Hz con uno scafo a tutto schermo
+  ~1,5–2 ms (una cattura rende sempre al 100 % del suo bersaglio, senza risoluzione dinamica). Prima: 1280x534 senza AA, ~3 ms.
+- Ripartizione GPU al 70 % in battaglia (CSV `csvprofile` con `r.GPUCsvStatsEnabled 1`): ombre 2,1 + proiezione 0,7, luci locali
+  3,1 (clustered 1,6 + deferred 1,5), Nanite 2,7, traslucidi 1,3, GI di Lumen 1,3 + scena 0,9, post 0,75. Prove A/B: raggi delle
+  luci di plancia a 0,7 → −0,6 ms, ombre dei due faretti → −0,5 ms (comandi `astra.lights.radius|shadows`, non ancora applicati).
 
 ## Prestazioni (misure pulite 30/9 sera: macchina scarica, finestra 1600×900, plancia v3 in battaglia, prove A/B alternate)
 - **Costo GPU**: ~27 ms al 100 %, ~17,5 al 70 %, ~12,6 al 50 %, ~12 al 40 %: un costo fisso di ~9–10 ms (ombre ~1,6, GI Lumen ~1,1,

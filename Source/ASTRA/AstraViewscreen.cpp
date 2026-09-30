@@ -271,6 +271,10 @@ void AAstraViewscreen::BeginPlay()
 	// what a sensor feed of ships in sunlight does not need, at 30 Hz next to the bridge's own frame: no shadow maps (the
 	// ships cast none), no screen-space or distance-field effects, no fog
 	FEngineShowFlags& SF = Capture->ShowFlags;
+	// a 2D scene capture turns temporal anti-aliasing off by default (legacy behaviour) and falls back to FXAA: a v3 hull's
+	// plates, windows and greebles are sub-pixel at a few kilometres and sparkled like salt. With its persistent state the
+	// capture keeps its own TSR history, like the eye's.
+	SF.SetTemporalAA(true);
 	SF.SetMotionBlur(false);
 	SF.SetDynamicShadows(false);
 	SF.SetContactShadows(false);
