@@ -104,11 +104,14 @@ async def main() -> int:
     mind.lang = lang
     mind.stt.prior = lang
     replies: list[str] = []
+    marks: dict[str, float] = {}
 
     async def stub_handle(text: str, language: str):  # noqa: ANN202
         """The crew's model, replaced: the helm answers with a canned line, as a turn that produced one line."""
         replies.append(text)
+        marks["agent_called"] = time.perf_counter()
         await mind.agent.say("helm", REPLY[lang], language, "focused")
+        marks["agent_said"] = time.perf_counter()
         return SimpleNamespace(actions=[], lines=[("helm", REPLY[lang])], t_first_line=0.0, t_end=0.0, cost=0.0, error=None)
 
     async def no_model(*_a, **_k):  # noqa: ANN002, ANN003, ANN202
@@ -168,6 +171,9 @@ async def main() -> int:
     if ans is not None:
         out["key_up_to_first_word_ms"] = round((ans[0] - t_up) * 1000)
         out["transcript_to_first_word_ms"] = round((ans[0] - tr[0]) * 1000) if tr else None
+        if tr and "agent_called" in marks:
+            out["transcript_to_the_crew_turn_ms"] = round((marks["agent_called"] - tr[0]) * 1000)
+            out["the_crew_line_queued_to_first_word_ms"] = round((ans[0] - marks["agent_said"]) * 1000)
     else:
         bad.append("the answer never began")
     await asyncio.sleep(3.0)
@@ -221,7 +227,7 @@ async def main() -> int:
     ws.inbox.put_nowait(None)
     for t in tasks:
         t.cancel()
-    mind.stt.stop_server()
+    await mind.stt.close()
     mind.mic.close()
     if bad:
         print("PROBLEMS:", *bad, sep="\n  - ")

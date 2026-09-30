@@ -205,17 +205,15 @@ async def recogniser() -> None:
     import astra_mind.stt as stt_module
 
     class SlowStart(Fake):
-        starting = False
-        is_ready = False
+        loaded = False                       # (what WhisperKitBackend calls a model that is loaded and has decoded a request)
 
         async def start(self) -> bool:
-            self.starting = True
             await asyncio.sleep(30.0)
-            self.is_ready = True
+            self.loaded = True
             return True
 
         async def ready(self) -> bool:
-            return self.is_ready
+            return True
 
     slow2 = SlowStart("whisperkit", None, "Kancho, jikai.", None, lang="ja")
     r12 = Recognizer(backends=[Fake("parakeet", frozenset({"it"}), "Kancho, Harimichinihakujna na Zensoku", 0.7, fast=True), slow2], prior="it")
@@ -227,7 +225,7 @@ async def recogniser() -> None:
         tr = await r12.recognise(speech_pcm())
         check("recogniser: a second engine still compiling does not hold the phrase (it goes without it)",
               not tr.escalated and tr.text.startswith("Kancho, Harimichinihakujna") and time.perf_counter() - t0 < 1.5, f"{time.perf_counter() - t0:.2f}s escalated={tr.escalated}")
-        slow2.is_ready = True
+        slow2.loaded = True
         tr = await r12.recognise(speech_pcm())
         check("recogniser: ... and is picked up once its server is ready", tr.escalated and tr.text == "Kancho, jikai.", f"escalated={tr.escalated} {tr.text!r}")
     finally:

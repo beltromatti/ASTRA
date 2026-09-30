@@ -249,6 +249,8 @@ class WhisperKitBackend(SttBackend):
         self._client = httpx.AsyncClient(timeout=30.0)
         self.url = f"http://127.0.0.1:{port}/v1/audio/transcriptions"
         self._start_lock = asyncio.Lock()
+        self._warm_task: asyncio.Task | None = None
+        self._loaded = False
         self.last_used = time.monotonic()
 
     @staticmethod
@@ -256,6 +258,7 @@ class WhisperKitBackend(SttBackend):
         return shutil.which("whisperkit-cli") is not None
 
     async def ready(self) -> bool:
+        """The server answers. (It does so before its model is loaded: see `loaded`.)"""
         import httpx
         try:
             r = await self._client.get(f"http://127.0.0.1:{self.port}/", timeout=1.0)
@@ -264,18 +267,17 @@ class WhisperKitBackend(SttBackend):
             return False
 
     @property
-    def starting(self) -> bool:
-        """Its server is still coming up (the first start on a machine compiles the model for the Neural Engine: minutes): it may be
-        ready later, and the recogniser asks again before giving up on it."""
-        return self._proc is not None and self._proc.poll() is None
+    def loaded(self) -> bool:
+        """The model has been loaded and has decoded a request: a phrase sent now is decoded, not queued behind a compilation."""
+        return self._loaded
 
-    async def start(self, timeout_s: float = 300.0) -> bool:
-        async with self._start_lock:
-            if await self.ready():
-                return True
-            if self.starting:
-                exe = True                                     # (one already launched by an earlier call: wait for that one)
-            else:
+    async def _come_up(self) -> bool:
+        """Start the server if nobody has, wait for it to answer, then send one real request: the server answers `GET /` before its
+        model is loaded, the first request loads it, and on the first start on a machine that means compiling it for the Neural
+        Engine (minutes). A request sent meanwhile would wait for all of that (and time out)."""
+        t0 = time.perf_counter()
+        if not await self.ready():
+            if self._proc is None or self._proc.poll() is not None:
                 exe = shutil.which("whisperkit-cli")
                 if not exe or not self.model_dir.exists():
                     log.warning("WhisperKit unavailable (cli: %s, model: %s)", bool(exe), self.model_dir.exists())
@@ -283,21 +285,45 @@ class WhisperKitBackend(SttBackend):
                 log.info("starting WhisperKit server (port %d)", self.port)
                 self._proc = subprocess.Popen([exe, "serve", "--model-path", str(self.model_dir), "--port", str(self.port), "--host", "127.0.0.1",
                                                *self.extra_args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            t0 = time.perf_counter()
-            while time.perf_counter() - t0 < timeout_s:
-                if await self.ready():
-                    log.info("WhisperKit ready in %.1f s", time.perf_counter() - t0)
-                    return True
+            while not await self.ready():
                 if self._proc is None or self._proc.poll() is not None:
                     log.error("WhisperKit server exited (code %s)", self._proc.returncode if self._proc else "?")
                     return False
+                if time.perf_counter() - t0 > 120.0:
+                    log.error("WhisperKit server does not answer")
+                    return False
                 await asyncio.sleep(0.4)
-            log.error("WhisperKit is not ready after %.0f s (it may still be compiling its model)", timeout_s)
-            return False
+        try:
+            files = {"file": ("warm.wav", pcm16_to_wav(bytes(2 * 16000)), "audio/wav")}
+            r = await self._client.post(self.url, data={"model": "large-v3-turbo", "response_format": "json", "temperature": "0"}, files=files,
+                                        timeout=1800.0)
+            self._loaded = r.status_code == 200
+        except Exception as exc:  # noqa: BLE001
+            log.error("WhisperKit did not load its model: %s", exc)
+            self._loaded = False
+        if self._loaded:
+            log.info("WhisperKit ready in %.1f s", time.perf_counter() - t0)
+        return self._loaded
+
+    async def start(self, timeout_s: float = 300.0) -> bool:
+        """Up and loaded, within `timeout_s`; when it is not (a first start compiling its model), False now and `loaded` turns True later,
+        which the recogniser notices."""
+        async with self._start_lock:
+            if self._loaded and await self.ready():
+                return True
+            self._loaded = False
+            if self._warm_task is None or self._warm_task.done():
+                self._warm_task = asyncio.create_task(self._come_up())
+            try:
+                return bool(await asyncio.wait_for(asyncio.shield(self._warm_task), timeout=timeout_s))
+            except asyncio.TimeoutError:
+                log.error("WhisperKit is not ready after %.0f s (it may still be compiling its model: it is picked up when it is)", timeout_s)
+                return False
 
     async def transcribe(self, pcm16: bytes, *, lang: str | None = None, prompt: str | None = None) -> BackendResult:
-        if not await self.ready() and not await self.start():
-            raise RuntimeError("WhisperKit is not available")
+        if not (self._loaded and await self.ready()):
+            if not await self.start():
+                raise RuntimeError("WhisperKit is not available")
         data = {"model": "large-v3-turbo", "response_format": "verbose_json", "temperature": "0"}
         if prompt:
             data["prompt"] = prompt
@@ -315,6 +341,10 @@ class WhisperKitBackend(SttBackend):
     def stop(self) -> None:
         """The server this mind started goes with it: a mind that stops must not leave the model loaded behind it (a
         server found already running, started by someone else, is left alone)."""
+        self._loaded = False
+        if self._warm_task is not None and not self._warm_task.done():
+            self._warm_task.cancel()
+        self._warm_task = None
         if self._proc and self._proc.poll() is None:
             self._proc.terminate()
             try:

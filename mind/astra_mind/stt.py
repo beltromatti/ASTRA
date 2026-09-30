@@ -215,14 +215,12 @@ class Recognizer:
         """Is this engine up? One that has not been tried is started now; the first engine, still starting in the
         background, is waited for only when `wait`."""
         state = self._up.get(backend.name)
-        if state is False and getattr(backend, "starting", False):
-            # it did not come up in time but its server is still working on it: it may be ready by now (a quick look, no waiting)
-            try:
-                if await backend.ready():
-                    self._up[backend.name] = True
-                    return True
-            except Exception:  # noqa: BLE001
-                pass
+        if state is False and hasattr(backend, "loaded"):
+            # it did not come up in time but its server has gone on working on it (a model compiling for the Neural Engine): it may be
+            # ready by now (a look, no waiting)
+            if backend.loaded and await backend.ready():
+                self._up[backend.name] = True
+                return True
             return False
         if state is not None:
             return state

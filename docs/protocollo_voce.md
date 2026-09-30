@@ -210,6 +210,9 @@ uv run python -m bench.voice_floor -v         # 20 scenari del palco con orologi
 uv run python -m bench.voice_pipeline stt --backends parakeet-ultra,whisperkit-baseline   # riconoscimento: WER e latenza, motori alternati clip per clip
 uv run python -m bench.voice_pipeline live tts mic floor mem   # (più sezioni di seguito) dal tasto al testo, sintesi, microfono, palco con voce vera, memoria
 uv run python -m bench.voice_pipeline report  # il rapporto in docs/bench/voce_<data>.md (dopo aver girato le sezioni)
+uv run python -m bench.voice_e2e --lang it  # tutto il collegamento da capo a fondo: gioco finto, microfono finto che suona un ordine registrato, riconoscimento e voci
+                                             # veri, palco vero, modello di linguaggio finto (nessuna chiamata di rete): dal rilascio del tasto al testo, alla prima parola
+                                             # della risposta, dalla pressione all'officer che tace
 uv run python -m astra_mind.stt               # quali motori di riconoscimento ci sono su questa macchina
 uv run python -m astra_mind.tts               # quali modelli e voci sono in cache
 ```
