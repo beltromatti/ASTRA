@@ -15,9 +15,9 @@ Set globals before running to change the defaults:
                               as a whole)
   LOCK_STAIRS = True          the stair-tower doors of a deck stay locked while the deck above or below has no map yet, from this run or an earlier one (the well would drop
                               into nothing): building decks in stages, run the earlier ones again once their neighbours are in
-  REMOVE_LIFT_LEAVES = True   open the entrances of the existing rooms that a built deck now runs up to: destroy the static lift leaves that close their alcoves
-                              (folders "Mess/Lift", "Berths/Lift" on Deck 4, "Medbay/Lift" on Deck 6) and put a sliding door (AAstraDoor) in the opening; only once
-                              AstraHangar's landings point to the new lift banks (docs/NAVE.md, "Lift"), because the lift's own doors go with the leaves
+  REMOVE_LIFT_LEAVES = True   open the entrances of the existing rooms that a built deck now runs up to: destroy the static leaves that close their old alcoves (folders "Mess/Lift",
+                              "Berths/Lift" on Deck 4, "Medbay/Lift" on Deck 6) and put a sliding door (AAstraDoor) in the opening, once (the old lift is gone: the turbolifts are the
+                              plan's `vertical[]`, built at the start of play by UAstraLiftSubsystem)
   OPEN_READY_ROOM = True      the Captain's ready room (Deck 1) opens on the bridge's port corridor: the window module the bridge builder placed there (label "CorrPort_Window") and
                               the two panels of its first inner-wall bay ("CorrPort1_0_*_R") are destroyed in L_Bridge; the deck's map holds SM_SHIP_BridgeCorridorDoor in their place.
                               Run this script after build_bridge_v3.py (which would place them again)
@@ -273,7 +273,7 @@ def place_doors(deck):
     built = built_decks() | set(DECKS)
     n, locked = 0, 0
     for d in PLAN_DATA["doors"]:
-        if d["deck"] != deck or d.get("existing") or d.get("planned"):
+        if d["deck"] != deck or d.get("existing") or d.get("planned") or d.get("lift"):          # (a lift's landing door is the lift engine's: UAstraLiftSubsystem builds it from vertical[])
             continue
         ends = [comps.get(d.get("a")), comps.get(d.get("b"))]
         if any(c is not None and c.get("status") == "planned" and c.get("prefab") is None and c.get("kind") not in ("corridor", "vestibule") for c in ends):
@@ -387,11 +387,15 @@ def open_existing_entrances():
             if str(a.get_folder_path()) == folder:
                 eas.destroy_actor(a)
                 n += 1
+        label = f"Door_{door['id']}"
+        if any(a.get_actor_label() == label for a in eas.get_all_level_actors()):
+            opened.append(f"{cid}: {n} leaves removed, the door is there already")
+            continue
         x, y, z = door["pos"]
         a = eas.spawn_actor_from_class(unreal.AstraDoor, V(x * M, y * M, z * M), R(yaw=door.get("yaw", 0.0)))
         a.set_editor_property("width", float(door["width"]) * M)
         a.set_editor_property("height", float(door["height"]) * M)
-        a.set_actor_label(f"Door_{door['id']}")
+        a.set_actor_label(label)
         a.set_folder_path(f"Interior/Deck{door['deck']:02d}/Doors")
         opened.append(f"{cid}: {n} leaves removed, door placed")
     log.append(f"existing entrances opened: {opened}")
@@ -433,15 +437,6 @@ if REMOVE_LIFT_LEAVES:
     open_existing_entrances()
 if OPEN_READY_ROOM:
     open_ready_room_wall()
-if 4 in DECKS:
-    # the lift's Deck 4 stop is now the Mess Concourse's lift bank (the Mess Hall is reached from the concourse, not from its old alcove): the hangar's lift
-    # sends the Captain there
-    node = next((n for n in PLAN_DATA["graph"]["nodes"] if n["id"] == "lift.d4_concourse"), None)
-    hangars = [a for a in eas.get_all_level_actors() if a.get_class().get_name() == "AstraHangar"]
-    if node and hangars:
-        for h in hangars:
-            h.set_editor_property("mess_landing", V(node["p"][0] * M, node["p"][1] * M, node["p"][2] * M))
-        log.append(f"mess landing -> lift.d4_concourse {node['p']}")
 wire_streaming(world, DECKS)                                               # last: the persistent level is still the current level for the actors above
 if SAVE_LEVEL:
     saved = unreal.EditorLoadingAndSavingUtils.save_map(world, LEVEL)

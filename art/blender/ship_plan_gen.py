@@ -317,6 +317,13 @@ def main() -> None:
           "placements", {k: len(v) for k, v in plan["placements"].items()})
     P.save(plan, out)
     print("wrote", out)
+    if out == P.PLAN_PATH:                                      # the game's thin copy, as tools/ue_scripts/build_ship_interior.py writes it (no placements, notes, systems)
+        slim = {k: v for k, v in plan.items() if k not in ("placements", "notes", "systems")}
+        dst = os.path.join(P.ROOT, "Content", "ASTRA", "Data", "aquila_plan.json")
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(dst, "w", encoding="utf-8") as fh:
+            json.dump(slim, fh, separators=(",", ":"), ensure_ascii=False)
+        print("wrote", dst, f"({os.path.getsize(dst) // 1024} KB)")
 
 
 if __name__ == "__main__":

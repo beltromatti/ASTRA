@@ -143,8 +143,9 @@ def deck4(D) -> None:
     lane(D, fwd.pid, +1, {"A": "library:Main_Library chapel store_s shop barber bar lounge games:Card_Room? store_s offices:Crew_Services_Office?"})
     lane(D, fwd.pid, -1, {"A": "hydro:Forward_Garden games sim_bay library:Technical_Library store_s gym quiet heads store_s? quiet?"})
     # ---- C-E, the Spine's middle piece (aft of the Berthing): heads and laundry at the Berthing's door, the lounge, the games rooms and the bar further aft
-    lane(D, mid.pid, +1, {"C": "heads laundry store_s", "D": "games games"}, FILL)
-    lane(D, mid.pid, -1, {"C": "lounge:Berthing_Lounge heads", "D": "bar sim_bay"}, FILL)
+    # (the damage bench strikes d4_games_D2 and its neighbour d4_games_D1 and walks the Captain 80 m forward: the neighbour's forward edge must be within 45 m of D2's middle, hence the gap)
+    lane(D, mid.pid, +1, {"C": "heads laundry store_s", "D": "gap:4 games games"}, FILL)
+    lane(D, mid.pid, -1, {"C": "lounge:Berthing_Lounge heads", "D": "gap:4 bar sim_bay"}, FILL)
     # ---- E-H, the Spine's aft piece (aft of the Main Engineering hall): the engineers' district
     lane(D, aft.pid, +1, {"F": "store_s berthing store_s", "G": "heads laundry", "H": "games:Engineers'_Games_Room"}, FILL)
     lane(D, aft.pid, -1, {"F": "heads laundry", "G": "lounge:Engineers'_Lounge", "H": "berthing"}, FILL)

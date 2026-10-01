@@ -96,6 +96,11 @@ LIFT_DOOR_W, LIFT_DOOR_H = 1.6, 2.4    # the landing opening in the lobby's wall
 TRUNK_IN = 1.2                 # a Jefferies trunk's clear width and depth (a ladder shaft)
 TRUNK_HATCH = (1.0, 2.0)       # the hatch from a passage to a trunk cell
 
+# ------------------------------------------------------------------------------------------------ wayfinding (ship_signs.py builds the meshes, ship_wayfinding.py places them)
+WAY_ROW_H = 0.30               # a blade sign's row (pictogram, destination, arrow) is this tall; a blade is its frame (SM_SHIP_WayBlade_<rows>) with one SM_SHIP_WayRow_<dest><arrow> per row
+WAY_HANGER = 0.26              # the rods from the ceiling to the top of the frame
+WAY_FRAME_PAD = 0.03           # the frame's margin above the first row
+
 
 # ------------------------------------------------------------------------------------------------ vertical links
 STAIR_RISE = 4.0               # deck to deck

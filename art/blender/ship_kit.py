@@ -135,8 +135,10 @@ def registry(needed: set[str]) -> dict[str, tuple]:
                 reg[m] = ("sign", int(body[:-1]), body[-1])
         elif m.startswith("SM_SHIP_Plate_"):
             reg[m] = ("plate", m[len("SM_SHIP_Plate_"):])
-        elif m.startswith("SM_SHIP_Way_"):                                           # SM_SHIP_Way_liftA_podsL: a blade sign (rows of destination and direction)
-            reg[m] = ("way", m[len("SM_SHIP_Way_"):])
+        elif m.startswith("SM_SHIP_WayBlade_"):                                      # SM_SHIP_WayBlade_2: the frame of a blade sign with two rows
+            reg[m] = ("blade", int(m[len("SM_SHIP_WayBlade_"):]))
+        elif m.startswith("SM_SHIP_WayRow_"):                                        # SM_SHIP_WayRow_liftA: a row: the lifts are ahead
+            reg[m] = ("wayrow", m[len("SM_SHIP_WayRow_"):])
         elif m.startswith("SM_SHIP_Frame_"):                                         # SM_SHIP_Frame_134: the frame number
             reg[m] = ("frame", int(m[len("SM_SHIP_Frame_"):]))
         elif m.startswith("SM_SHIP_Directory_"):                                     # SM_SHIP_Directory_4: the deck's directory screen
@@ -164,9 +166,9 @@ def build_mesh(name: str, item: tuple):
     if kind == "plate":
         import ship_signs as SS
         return SS.plate(name, item[1])
-    if kind in ("way", "frame", "directory"):
+    if kind in ("blade", "wayrow", "frame", "directory"):
         import ship_signs as SS
-        return {"way": SS.way, "frame": SS.frame_plate, "directory": SS.directory}[kind](name, item[1])
+        return {"blade": SS.way_blade, "wayrow": SS.way_row_mesh, "frame": SS.frame_plate, "directory": SS.directory}[kind](name, item[1])
     raise ValueError(item)
 
 

@@ -40,6 +40,7 @@ REQUIRED = {"dentist": 1, "morgue": 1, "counselling": 1, "pharmacy": 1, "surgery
             "chapel": 1, "barber": 1, "bar": 1, "library": 1, "gym": 2, "sim_bay": 1, "observation": 1, "shop": 1, "wardroom": 1, "galley": 1, "transporter": 1,
             "airlock": 6, "pod_bay": 20, "suit_locker": 4, "shuttle_stop": 6, "berthing": 10}
 REACH_P90 = 100.0                                               # a warning: more than this many metres of corridor to the nearest lift lobby for one corridor point in ten
+REACH_P90_KEEL = 110.0                                          # (the keel's bow end is tanks and crawlways: nobody lives there)
 
 
 def _check_programme(plan: dict, comps: dict, problems: list, warnings: list, stats: dict) -> None:
@@ -182,8 +183,9 @@ def _check_reach(nodes: dict, edges: list, problems: list, warnings: list, stats
             continue
         q = lambda f: cor[min(len(cor) - 1, int(f * len(cor)))]
         out[deck] = {"median": round(q(0.5), 1), "p90": round(q(0.9), 1), "max": round(cor[-1], 1)}
-        if q(0.9) > REACH_P90:
-            warnings.append(f"deck {deck}: one corridor point in ten is more than {REACH_P90:.0f} m of walk from a turbolift lobby (p90 {q(0.9):.0f} m)")
+        lim = REACH_P90_KEEL if deck == 12 else REACH_P90
+        if q(0.9) > lim:
+            warnings.append(f"deck {deck}: one corridor point in ten is more than {lim:.0f} m of walk from a turbolift lobby (p90 {q(0.9):.0f} m)")
     stats["lift_walk_m"] = out
 
 

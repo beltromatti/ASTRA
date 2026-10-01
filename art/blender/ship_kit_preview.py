@@ -581,17 +581,26 @@ def car(args: dict, plan, reg: dict, objs: dict) -> list[str]:
 
 def signs(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     """The wayfinding in place: a row of Spine modules with blade signs hung back to back (and a frame plate on a bulkhead), and a lift lobby with its directory over the bench."""
-    blades = [n for n in objs if n.startswith("SM_SHIP_Way_")]
-    if not blades or "SM_SHIP_P_Straight_A" not in objs or "SM_SHIP_LiftBank" not in objs:
+    frames_b = sorted(n for n in objs if n.startswith("SM_SHIP_WayBlade_"))
+    rows_m = sorted(n for n in objs if n.startswith("SM_SHIP_WayRow_"))
+    if not frames_b or not rows_m or "SM_SHIP_P_Straight_A" not in objs or "SM_SHIP_LiftBank" not in objs:
         return []
     SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
     for k in range(-5, 5):
         SP.instance(objs["SM_SHIP_P_Straight_A"], (4.0 * k, 0.0, 0.0), 0, f"inst_mod{k}")
     z = 3.4
-    for k, (nm, sx) in enumerate(((blades[0], 1), (blades[min(1, len(blades) - 1)], -1))):
-        SP.instance(objs[nm], (2.0 + sx * 0.03, 0.0, z), 0.0 if sx > 0 else 180.0, f"inst_blade{k}")
-    if blades[2:]:
-        SP.instance(objs[blades[2]], (-14.0, 0.0, z), 180.0, "inst_blade_b")
+    import ship_catalog as CAT
+
+    def blade(x: float, yaw: float, rows: list, tag: str) -> None:
+        sx = 1.0 if yaw == 0.0 else -1.0
+        px = x + sx * 0.03
+        SP.instance(objs[f"SM_SHIP_WayBlade_{len(rows)}"], (px, 0.0, z), yaw, f"inst_blade_{tag}")
+        for k, r in enumerate(rows):
+            SP.instance(objs[f"SM_SHIP_WayRow_{r}"], (px, 0.0, z - CAT.WAY_HANGER - CAT.WAY_FRAME_PAD - (k + 0.5) * CAT.WAY_ROW_H), yaw, f"inst_row_{tag}{k}")
+    codes = [n[len("SM_SHIP_WayRow_"):] for n in rows_m]
+    blade(2.0, 0.0, codes[:3], "a")
+    blade(2.0, 180.0, codes[3:5] or codes[:2], "b")
+    blade(-14.0, 180.0, codes[:2], "c")
     SP.instance(objs["SM_SHIP_LiftBank"], (30.0, 0.0, 0.0), 0, "inst_lobby")
     dirs = [n for n in objs if n.startswith("SM_SHIP_Directory_")]
     frames = [n for n in objs if n.startswith("SM_SHIP_Frame_")]

@@ -36,7 +36,7 @@ SHUTTLE_DECK, SHUTTLE_Y = 5, 30.0     # the Spine Shuttle's tunnel runs along th
 # The turbolift banks: two shafts side by side, 8 m x 16 m, in the lane of the passage `pid` ("SP" = the Spine's pieces, "SBP"/"PP" = a side passage's outer lane), at x_fwd (the
 # forward edge). Both shafts of a bank serve the same decks. A bank is a lobby (and a cross link) where it stops and the lift's service room where it passes.
 BANKS = [
-    dict(id="f", name="Flight", x=52.0, pid="SP", side=+1, decks=range(4, 12), why="the bow: the Flight Deck's alcove, the assault bay, flight operations, the magazines"),
+    dict(id="f", name="Flight", x=52.0, pid="SP", side=+1, decks=range(4, 13), why="the bow: the Flight Deck's alcove, the assault bay, flight operations, the magazines, the keel's forward end"),
     dict(id="c", name="Concourse", x=-80.0, pid="SP", side=+1, decks=range(2, 10), why="the crew's centre: the Concourse and the Mess, the library and the shops, the CIC above, the Medbay below"),
     dict(id="d", name="Berthing", x=-204.0, pid="SP", side=-1, decks=range(2, 10), why="the Berthing, the officers' country and the medical complex"),
     dict(id="e", name="Engineering", x=-308.0, pid="SP", side=-1, decks=range(2, 13), why="Main Engineering's entrance, the life-support plants, the stores and the workshops below"),
@@ -95,7 +95,8 @@ def new_deck(B: Builder, deck: int, keel: bool = False) -> Deck:
     spine = DK.reach_rooms(deck, SP_Y, DK.free_pieces(deck, SP_Y, env, obs, xh, xl))
     K = "K" if keel else None
     for i, (a0, a1) in enumerate(spine):
-        D.passage(f"SP{i}", K or "S", "x", SP_Y, a0, a1, "Keel Crawlway" if keel else "Spine")
+        # (the damage bench, Source/ASTRA/AstraDamageSimCommandlet.cpp, breaches the Spine of Deck 4 in Section D by its name, d4_spm_D3: that piece keeps the old "main Spine" id)
+        D.passage("SPM" if deck == 4 and a0 <= -312.0 and a1 >= -296.0 else f"SP{i}", K or "S", "x", SP_Y, a0, a1, "Keel Crawlway" if keel else "Spine")
     for i, (a0, a1) in enumerate(DK.free_pieces(deck, SBP_Y, env, obs, xh, xl)):
         D.passage(f"SB{i}", K or "P", "x", SBP_Y, a0, a1, "Starboard Crawlway" if keel else "Starboard Passage")
     for i, (a0, a1) in enumerate(DK.free_pieces(deck, PP_Y, env, obs, xh, xl)):

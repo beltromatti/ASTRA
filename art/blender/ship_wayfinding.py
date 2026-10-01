@@ -2,7 +2,7 @@
 
 A ship this big is read from its signs. Four kinds, all placed as `sign` instances of the plan (the signs of NAVE-2, the section signs on the blast doors' frames, stay):
 
-  blade signs   SM_SHIP_Way_<rows>, hung from the ceiling across the Spine and the passages at their junctions, at the lobbies' gates and at most every 48 m between: a pair back to
+  blade signs   SM_SHIP_WayBlade_<n> (the frame) with SM_SHIP_WayRow_<dest><arrow> on it for every row, hung from the ceiling across the Spine and the passages at their junctions, at the lobbies' gates and at most every 48 m between: a pair back to
                 back, one face for each way of walking. A row is a pictogram, a destination and an arrow; the arrows are not drawn by hand: for every sign and every destination the
                 walk graph is searched (Dijkstra, from the destinations backwards) and the first stretch of the shortest path says where it lies for the one who reads the sign: ahead, to
                 the left, to the right (what lies behind is on the other face). Destinations: the turbolifts, the stairs, the Medbay, the lifepods, and by deck the bridge, the Mess
@@ -11,15 +11,15 @@ A ship this big is read from its signs. Four kinds, all placed as `sign` instanc
                 the lobbies.
   directories   SM_SHIP_Directory_<deck>: the screen with the deck's main places by section, on the wall of every turbolift lobby over the bench.
 
-The meshes are named by what they say (a blade is `SM_SHIP_Way_liftA_podsL_medR`: lifts ahead, lifepods to the left, the Medbay to the right), so a deck uses a few dozen different ones
-and the kit builds exactly those the plan needs."""
+A blade is a frame of one to three rows and a mesh for each row (`SM_SHIP_WayRow_liftA`: the lifts are ahead; `podsL`: the lifepods to the left): thirty small meshes say everything, and the
+kit builds exactly those the plan needs."""
 from __future__ import annotations
 
 import heapq
 import math
 
 import ship_plan as P
-from ship_catalog import CLEAR_H, MOD
+from ship_catalog import CLEAR_H, MOD, WAY_FRAME_PAD, WAY_HANGER, WAY_ROW_H
 
 FRAME_X0 = 216.0                     # the bow: frame 0
 BLADE_GAP = 48.0                     # no stretch of a passage longer than this without a blade
@@ -182,7 +182,7 @@ def plan(B, decks: dict) -> dict:
                     continue
                 a = ps.a0 + i * MOD + MOD / 2
                 x, y = (a, ps.pos) if ps.along == "x" else (ps.pos, a)
-                placed = 0
+                faces = []
                 for sgn in (1, -1):
                     normal = (sgn, 0) if ps.along == "x" else (0, sgn)
                     heading = (-normal[0], -normal[1])
@@ -193,13 +193,18 @@ def plan(B, decks: dict) -> dict:
                             rows.append(f"{dest}{arrow}")
                         if len(rows) == ROWS:
                             break
-                    if not rows:
-                        continue
-                    code = "_".join(rows)
+                    if rows:
+                        faces.append((sgn, normal, rows))
+                frame = max((len(r) for _, _, r in faces), default=0)               # (the two faces of a pair share a frame: the shorter one has a blank row or two)
+                for sgn, normal, rows in faces:
                     yaw = {(1, 0): 0.0, (-1, 0): 180.0, (0, 1): 90.0, (0, -1): -90.0}[normal]
-                    B.place(d, f"SM_SHIP_Way_{code}", (x + normal[0] * OFF, y + normal[1] * OFF, z), yaw, folder, f"d{d}_way_{pid.lower()}_{i:03d}_{'p' if sgn > 0 else 'n'}", "sign")
-                    codes.add(code)
-                    placed += 1
+                    px, py = x + normal[0] * OFF, y + normal[1] * OFF
+                    label = f"d{d}_way_{pid.lower()}_{i:03d}_{'p' if sgn > 0 else 'n'}"
+                    B.place(d, f"SM_SHIP_WayBlade_{frame}", (px, py, z), yaw, folder, label, "sign")                          # the frame, and a mesh for every row on it
+                    for k, row in enumerate(rows):
+                        B.place(d, f"SM_SHIP_WayRow_{row}", (px, py, z - WAY_HANGER - WAY_FRAME_PAD - (k + 0.5) * WAY_ROW_H), yaw, folder, f"{label}_r{k}", "sign")
+                    codes.add("_".join(rows))
+                placed = len(faces)
                 stats["blades"] += 1 if placed else 0
                 stats["faces"] += placed
         stats["codes"][d] = len(codes)
