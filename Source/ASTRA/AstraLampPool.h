@@ -57,6 +57,9 @@ public:
 	void Advance(float Seconds);
 	/** Lamp indices lit now, for the tests. */
 	TArray<int32> LitLamps() const;
+	/** What the damage inside the ship leaves of each lamp that is lit now (the bench of DISTRUZIONE checks it follows the model). */
+	struct FLampDamage { int32 Lamp = INDEX_NONE; float Mains = 1.f, Strips = 0.f, Flicker = 0.f, Mix = 0.f, Intensity = 0.f; };
+	TArray<FLampDamage> LitDamage() const;
 
 private:
 	struct FSlot

@@ -4,6 +4,7 @@
 
 #include "ASTRA.h"
 #include "Algo/Count.h"
+#include "AstraDamageFx.h"
 #include "AstraDamageModel.h"
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
@@ -128,8 +129,8 @@ void FAstraLampPicker::Pick(const UAstraShipPlan& Plan, const FVector& Eye, cons
 bool UAstraLampPool::ShouldCreateSubsystem(UObject* Outer) const
 {
 	const UWorld* World = Cast<UWorld>(Outer);
-	// (a headless bench has no scene to put lights in)
-	return World && (World->WorldType == EWorldType::Game || World->WorldType == EWorldType::PIE) && FApp::CanEverRender();
+	// (a headless bench has no scene to put lights in, unless it asks for them: the damage bench checks the lights follow the damage)
+	return World && (World->WorldType == EWorldType::Game || World->WorldType == EWorldType::PIE) && (FApp::CanEverRender() || GAstraDamageFxInBench);
 }
 
 void UAstraLampPool::OnWorldBeginPlay(UWorld& InWorld)
@@ -452,6 +453,26 @@ TArray<int32> UAstraLampPool::LitLamps() const
 		if (S.Lamp != INDEX_NONE && S.Target > 0.f)
 		{
 			Out.Add(S.Lamp);
+		}
+	}
+	return Out;
+}
+
+TArray<UAstraLampPool::FLampDamage> UAstraLampPool::LitDamage() const
+{
+	TArray<FLampDamage> Out;
+	for (const FSlot& S : Slots)
+	{
+		if (S.Lamp != INDEX_NONE && S.Target > 0.f)
+		{
+			FLampDamage D;
+			D.Lamp = S.Lamp;
+			D.Mains = S.Mains;
+			D.Strips = S.Strips;
+			D.Flicker = S.Flicker;
+			D.Mix = S.Mix;
+			D.Intensity = S.Applied;
+			Out.Add(D);
 		}
 	}
 	return Out;

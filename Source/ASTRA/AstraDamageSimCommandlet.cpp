@@ -4,6 +4,7 @@
 #include "AstraDamageMap.h"
 #include "AstraDamageFx.h"
 #include "AstraDamageModel.h"
+#include "AstraLampPool.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraLifeSubsystem.h"
 #include "AstraShipPlan.h"
@@ -933,6 +934,39 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 			W.Run(6.f, 0.05f);
 			DmCheck(TEXT("it lets go when the Captain is far"), Fx->NumParts() == 0, FString::Printf(TEXT("the Captain 80 m away: %d parts still on"), Fx->NumParts()));
 			// the pressure bulkheads and the doors of decks that load late
+			// the lamps follow the damage: the pool lights the lamps of the room he stands in; the room loses its power and they go to the red strips
+			if (UAstraLampPool* Pool = W.World->GetSubsystem<UAstraLampPool>())
+			{
+				W.Ship->ResetInterior();
+				const FVector Feet = Map.Comps[Room].Box.GetCenter() - FVector(0.f, 0.f, 150.f);
+				Pool->SetTestCaptain(Eye, FVector(Feet.X, Feet.Y, Map.Comps[Room].Box.Min.Z + 5.f));
+				Pool->ReselectNow();
+				Pool->Advance(1.f);
+				const TArray<UAstraLampPool::FLampDamage> Whole = Pool->LitDamage();
+				bool bAllWhole = Whole.Num() > 0;
+				for (const UAstraLampPool::FLampDamage& L : Whole) { bAllWhole &= L.Mains > 0.99f && L.Strips <= 0.f && L.Mix <= 0.f; }
+				FAstraImpactResult R4;
+				In.Overload(Room, 0.95f, R4);
+				W.Run(1.f, 0.05f);
+				Pool->ReselectNow();
+				Pool->Advance(0.5f);
+				const TArray<UAstraLampPool::FLampDamage> Dark = Pool->LitDamage();
+				int32 Red = 0, InRoom = 0;
+				float RatioSum = 0.f;
+				for (const UAstraLampPool::FLampDamage& L : Dark)
+				{
+					InRoom += L.Mains < 0.1f ? 1 : 0;
+					if (L.Mains < 0.1f && L.Strips > 0.1f && L.Mix > 0.8f)
+					{
+						++Red;
+						const UAstraLampPool::FLampDamage* Before = Whole.FindByPredicate([&L](const UAstraLampPool::FLampDamage& W0) { return W0.Lamp == L.Lamp; });
+						RatioSum += Before && Before->Intensity > 1.f ? L.Intensity / Before->Intensity : 0.f;
+					}
+				}
+				const float Ratio = Red ? RatioSum / Red : 0.f;
+				DmCheck(TEXT("the lamps follow the damage"), bAllWhole && Dark.Num() > 0 && Red >= 1 && Ratio > 0.08f && Ratio < 0.25f, FString::Printf(TEXT("%d lamps lit while whole (all at full: %s); after the room lost its power %d of %d lit ones burn the red strips only (%d in the room), at %.0f %% of their light"), Whole.Num(), bAllWhole ? TEXT("yes") : TEXT("NO"), Red, Dark.Num(), InRoom, 100.f * Ratio));
+				UE_LOG(LogASTRA, Display, TEXT("[Damage] lamp pool: %s"), *Pool->Describe());
+			}
 			W.Ship->ResetInterior();
 			Fx->SetTestEye(Eye);
 			const int32 Tract = Map.CompByName.FindRef(FName(TEXT("d4_spm_D3")), INDEX_NONE);
