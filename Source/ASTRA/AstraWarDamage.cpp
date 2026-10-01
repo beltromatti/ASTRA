@@ -458,12 +458,17 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 	static AstraWar::FTuneVar KScatter(TEXT("hit_scatter"), 0.5f);
 	FVector N;
 	int32 F, Sec;
+	FVector HitHull = FVector::ZeroVector, HitBox = FVector::ZeroVector;      // where it struck, in the hull mesh's frame (m) and on the box (-1..1): DISTRUZIONE
+	bool bHitBox = false;
 	if (To.Box.Valid())
 	{
 		// the hull is a box of the mesh's own measures: the face is the one the point lies on, the section comes from where along
 		// the hull it is against the class's cut planes; the fall of shot and the gunners' choice of aim scatter the hits along it
 		const FVector Lp = To.Att.UnrotateVector(HitPos - To.Pos) - FVector(To.Box.Mid, 0.0, 0.0);
 		const FVector R(Lp.X / To.Box.Hx, Lp.Y / To.Box.Hy, Lp.Z / To.Box.Hz);          // 1 on the surface, along each axis
+		HitHull = Lp + FVector(To.Box.Mid, 0.0, 0.0);
+		HitBox = R;
+		bHitBox = true;
 		const FVector A = R.GetAbs();
 		if (A.X >= A.Y && A.X >= A.Z)
 		{
@@ -578,7 +583,28 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 			// what the shields stop becomes heat in the emitters (half what it was before GUERRA: with the war's volumes of fire a focused
 			// attack took the Aquila from 26 to 95 % in thirty seconds, and the heat, not the enemy, killed her)
 			Ship->AddHeat(ShieldTook * 0.006f * (Type == EAstraDamageType::Energy ? 1.5f : 1.f));
-			Ship->OnHullHit(Felt, ShieldTook, FromDir);
+			if (bHitBox)
+			{
+				// what is left of the blow goes inside, to the compartments behind the plating where it struck (docs/DISTRUZIONE.md)
+				FAstraHullHit Hit;
+				Hit.HullM = HitHull;
+				Hit.Box = HitBox;
+				Hit.Dir = To.Att.UnrotateVector(FromDir.GetSafeNormal());
+				Hit.Facing = F;
+				Hit.Section = Sec;
+				Hit.Type = (uint8)Type;
+				Hit.Kind = (uint8)Kind;
+				Hit.Damage = Damage;
+				Hit.ShieldTook = ShieldTook;
+				Hit.PlateTook = PlateTook;
+				Hit.StructTook = StructTook;
+				Hit.Felt = Felt;
+				Ship->OnHullHit(Hit);
+			}
+			else
+			{
+				Ship->OnHullHit(Felt, ShieldTook, FromDir);
+			}
 		}
 		if (USoundBase* Snd = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Impact.SW_Impact")))
 		{

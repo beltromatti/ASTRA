@@ -264,22 +264,28 @@ bool UAstraShipPlan::Load() const
 	return Nodes.Num() > 0;
 }
 
-float UAstraShipPlan::EdgeCost(const FAstraPlanEdge& E, bool bKeys) const
+float UAstraShipPlan::EdgeCost(const FAstraPlanEdge& E, bool bKeys, bool bThroughSealed) const
 {
+	float Extra = 0.f;
 	if (Doors.IsValidIndex(E.Door))
 	{
 		const FAstraPlanDoor& D = Doors[E.Door];
-		if (D.bSealed || (D.bLocked && !bKeys))
+		if (D.bSealed && !bThroughSealed)
 		{
 			return -1.f;
 		}
+		if (D.bLocked && !bKeys)
+		{
+			return -1.f;
+		}
+		Extra = D.bSealed ? 14.f : 0.f;         // a suited party cycles the hatch of a shut bulkhead
 	}
 	switch (E.Kind)
 	{
-	case FAstraPlanEdge::EKind::Stair: return E.LenM * 1.8f;          // climbing is slower than walking
-	case FAstraPlanEdge::EKind::Lift:  return 12.f + E.LenM * 0.3f;   // a short wait for the car, then a quick ride
-	case FAstraPlanEdge::EKind::Door:  return E.LenM + 1.f;           // a door to open
-	default:                    return E.LenM;
+	case FAstraPlanEdge::EKind::Stair: return E.LenM * 1.8f + Extra;          // climbing is slower than walking
+	case FAstraPlanEdge::EKind::Lift:  return 12.f + E.LenM * 0.3f + Extra;   // a short wait for the car, then a quick ride
+	case FAstraPlanEdge::EKind::Door:  return E.LenM + 1.f + Extra;           // a door to open
+	default:                    return E.LenM + Extra;
 	}
 }
 
@@ -350,7 +356,7 @@ void UAstraShipPlan::SetDoorSealed(const FString& DoorId, bool bSealed)
 	}
 }
 
-bool UAstraShipPlan::FindRoute(const FVector& From, const FVector& To, TArray<FVector>& Out, float* OutMetres, bool bKeys) const
+bool UAstraShipPlan::FindRoute(const FVector& From, const FVector& To, TArray<FVector>& Out, float* OutMetres, bool bKeys, bool bThroughSealed) const
 {
 	Out.Reset();
 	const int32 S = NearestNode(From), G = NearestNode(To);

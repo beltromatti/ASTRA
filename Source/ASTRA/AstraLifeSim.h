@@ -134,7 +134,8 @@ struct FAstraLifeStats
 class ASTRA_API FAstraLifeSim
 {
 public:
-	using FRouter = TFunction<bool(const FVector& From, const FVector& To, TArray<FVector>& Out)>;
+	/** A route over the ship's plan; bRepair: a damage-control party's (it goes through the pressure bulkheads that are shut: its people are suited and cycle the hatch). */
+	using FRouter = TFunction<bool(const FVector& From, const FVector& To, TArray<FVector>& Out, bool bRepair)>;
 
 	// ------------------------------------------------------------------------------------------------ set up
 	/** The people of the roster on the plan's map: watches, homes, posts, battle stations, tastes, all from the seed; then everyone where the
@@ -196,6 +197,10 @@ public:
 	 *  long a party takes to get there: what the ship should say when it dispatches a team. */
 	FVector SiteOf(int32 Deck, TCHAR Section, int32 IncidentId, int32* OutComp = nullptr) const;
 	float RepairEtaSeconds(int32 Deck, TCHAR Section, int32 IncidentId) const;
+	/** The same for an incident that knows its compartment (DISTRUZIONE): the party goes to that room (a corridor tract, a store), or to the
+	 *  nearest place that is open when the room is walled off. */
+	FVector SiteOfIncident(const FAstraDamage& D, int32* OutComp = nullptr) const;
+	float RepairEtaFor(const FAstraDamage& D) const;
 	/** A test hook: a person's schedule at an hour (their act and block), ignoring the ship's state. */
 	EAstraLifeAct ScheduleAt(int32 Person, double ShipSec, int32* OutBlock = nullptr) const;
 

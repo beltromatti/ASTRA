@@ -6,6 +6,9 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "Dom/JsonObject.h"
 #include "AstraCrewRoster.h"
+#include "AstraDamageTypes.h"
+#include "AstraDamageModel.h"
+#include "Async/Future.h"
 #include "AstraShipSubsystem.generated.h"
 
 class UMaterialInstanceDynamic;
@@ -33,23 +36,6 @@ struct FAstraContact
 	UPROPERTY(BlueprintReadOnly) FString Status;
 	UPROPERTY(BlueprintReadOnly) float RangeKm = 0.f;
 	UPROPERTY(BlueprintReadOnly) float BearingDeg = 0.f;
-};
-
-/** One incident inside the hull (a hit's consequences) and the damage-control team working on it. */
-struct FAstraDamage
-{
-	int32 Id = 0;
-	int32 Deck = 1;
-	TCHAR Section = TEXT('A');
-	FString Kind;               // "hull breach" | "fire" | "conduit damage"
-	FString System;             // conduit damage: the system that loses power through it
-	int32 Team = -1;            // damage-control team on it (0..3), -1 = unattended
-	float Travel = 0.f;         // s until the team is on scene
-	float Travel0 = 0.f;        // s the walk took from the teams' station (Deck 6) when it was sent: the holo table moves it
-	float Work = 30.f;          // s of work on scene
-	float Progress = 0.f;       // 0..1
-	float SpreadT = 25.f;       // fires: next chance to spread / burn the structure
-	FString Where() const { return FString::Printf(TEXT("deck %d section %c"), Deck, Section); }
 };
 
 /** How a star system looks from the ship: its star, its main world, the tint of its sky (set on a Janus transit). */
@@ -125,8 +111,6 @@ public:
 	float HeatFactor() const;
 	/** The radiators shed heat and glow: extended or the vent's plume make the Aquila easier to find (enemy detection). */
 	float SignatureBoost() const { return (bRadiatorsOut ? 0.35f : 0.f) + (VentPlumeT > 0.f ? 1.f : 0.f); }
-	/** A hit on the flanks while the radiators are out may tear one of them. */
-	void RadiatorHit(float HullDamage);
 	const TMap<FString, float>& GetPowerPct() const { return PowerPct; }
 	const TArray<FAstraDamage>& GetDamage() const { return Damage; }
 	const TArray<FString>& GetRecentEvents() const { return RecentEvents; }
@@ -215,8 +199,18 @@ public:
 	/** The level of the sea (world z, cm) on the world below; very low when it has none. */
 	float SurfaceSeaZ() const;
 
-	/** The battle simulation reports a hit on our hull: compartments, lights, reports. */
+	/** The battle simulation reports a blow on our hull that got through the shield, the plate and the structure (docs/DISTRUZIONE.md): the
+	 *  damage model puts it in the compartments behind the plating where it struck; the lights, the bridge and the report follow. */
+	void OnHullHit(const FAstraHullHit& Hit);
+	/** A blow of HullDamage from a direction (a console test, the old callers): a point on the hull facing that way is chosen for it. */
 	void OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir);
+	/** The damage model: the state of every compartment that is not as it was built, the incidents, the people hurt (docs/DISTRUZIONE.md). */
+	const FAstraDamageModel& GetInterior() const { return Interior; }
+	FAstraDamageModel& GetInterior() { return Interior; }
+	/** The Captain's state under the air and the fire (the screens' vignette, the harness). */
+	const FAstraDmgCaptain& GetCaptainHealth() const { return Interior.Captain(); }
+	/** A plan door's actor (the sliding door in the level), found by where it stands; null when the level has none there (its deck is not loaded). */
+	class AAstraDoor* DoorActorOf(FName DoorId);
 	/** The campaign save: the system the Aquila is in, the crew's losses. */
 	TSharedRef<FJsonObject> SaveJson() const;
 	void ResumeFrom(const TSharedPtr<FJsonObject>& Save);
@@ -283,6 +277,29 @@ private:
 	bool bHomeCaptured = false;
 	void CaptureHomeSky();
 	int32 NextDamageId = 1;
+	// --- DISTRUZIONE: the damage inside the hull
+	FAstraDamageModel Interior;
+	TFuture<TSharedPtr<FAstraDamageMap>> InteriorFuture;
+	bool bInteriorLoading = false;
+	float CaptainProbeT = 0.f;
+	float ThermalStress = 0.f;        // overheated conduits: a failure when it reaches 1
+	int32 ThermalSeq = 0;
+	float RadiatorStress = 0.f;       // blows on the radiator wings: one is torn when it reaches 1
+	struct FHitReport { TArray<FString> Lines; TArray<FString> People; int32 Hits = 0; double Since = -100.0; };
+	FHitReport HitReport;             // what the last blows did, told in one report
+	TMap<FName, TWeakObjectPtr<class AAstraDoor>> DoorActors;
+	bool bDoorsMapped = false;
+	double DoorsMappedAt = -100.0;
+	// the Captain's fate under the hazards: down, carried to the Medbay, or dead
+	int32 CaptainFate = 0;            // 0 well, 1 down, 2 dead
+	float CaptainFateT = 0.f;
+	bool bCaptainFadeSet = false;
+	void StartInterior();
+	void TickInterior(float DeltaTime);
+	void TickCaptainFate(float DeltaTime);
+	void FlushHitReport(bool bForce);
+	void RadiatorHit(const FAstraHullHit& Hit);
+	int32 InteriorCompOf(const FVector& Cm) const;
 	FAstraCrewRoster Roster;          // the 560 aboard, by name: the crew's cost
 	// heat
 	float HeatPct = 12.f;

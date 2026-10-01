@@ -136,10 +136,10 @@ void UAstraLifeSubsystem::TryStart()
 	}
 	TimeScale = MapPtr->TimeScale;
 	Life.Init(MapPtr.ToSharedRef(), Ship->GetRoster(), LifeSeed, MapPtr->StartHour);
-	Life.SetRouter([PlanRef = Plan](const FVector& From, const FVector& To, TArray<FVector>& Out)
+	Life.SetRouter([PlanRef = Plan](const FVector& From, const FVector& To, TArray<FVector>& Out, bool bRepair)
 	{
 		const UAstraShipPlan* P = PlanRef.Get();
-		return P && P->FindRoute(From, To, Out);
+		return P && P->FindRoute(From, To, Out, nullptr, false, bRepair);       // a damage-control party goes through a shut pressure bulkhead
 	});
 	Life.SyncRoster(Ship->GetRoster());
 	Life.SyncDamage(Ship->GetDamage());
