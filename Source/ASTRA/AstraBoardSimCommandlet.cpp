@@ -603,7 +603,8 @@ struct FBoardFight
 	double FirstContact = -1.0;
 };
 
-static FBoardFight RunBoarding(FRig& Rig, int32 Seed, int32 Boarders, int32 Duty, int32 Qrf, const TCHAR* BreachId, const TCHAR* ObjectiveId, bool bSealed, float MusterS)
+static FBoardFight RunBoarding(FRig& Rig, int32 Seed, int32 Boarders, int32 Duty, int32 Qrf, const TCHAR* BreachId, const TCHAR* ObjectiveId, bool bSealed, float MusterS,
+                               const TFunction<void(FAstraBoardSim&)>& PerSecond = nullptr, int32 CaptainComp = INDEX_NONE)
 {
 	FBoardFight F;
 	const int32 Breach = Rig.Comp(BreachId), Obj = Rig.Comp(ObjectiveId);
@@ -662,6 +663,10 @@ static FBoardFight RunBoarding(FRig& Rig, int32 Seed, int32 Boarders, int32 Duty
 		Sim.AddMarine(FString::Printf(TEXT("Marine %d"), ++Made), INDEX_NONE, M.Inset(Armory, M.CentreOf(Armory) + FVector(R.FRandRange(-500.f, 500.f), R.FRandRange(-300.f, 300.f), 0.f), 60.f), i % 6 == 0, Sq);
 	}
 	F.Marines = Made;
+	if (CaptainComp != INDEX_NONE)
+	{
+		Sim.AddCaptain(M.CentreOf(CaptainComp));
+	}
 	if (bSealed)
 	{
 		// the section bulkheads round the breach are shut
@@ -673,7 +678,7 @@ static FBoardFight RunBoarding(FRig& Rig, int32 Seed, int32 Boarders, int32 Duty
 			}
 		}
 	}
-	F.R = RunSim(Sim, 600.0);
+	F.R = RunSim(Sim, 600.0, PerSecond);
 	F.FirstContact = F.R.Book.FirstContactT;
 	return F;
 }
@@ -771,6 +776,159 @@ static void BoardScenarioBoard(FRig& Rig, int32 Seed, int32 Seeds, int32 Boarder
 		}
 	}
 	BRecord->SetObjectField(TEXT("board"), Rec);
+}
+
+// ================================================================================================================== the marines' orders
+
+/** What the commander's orders do to the fight (docs/ABBORDAGGI.md): the same boarding fought again, with the same seeds, under the orders the Major would give at the times he would give
+ *  them. The drill alone is the baseline; an order is a tool, and a tool that makes the marines worse than the drill is a cost the mind must know. Also checks that every task runs: a
+ *  hold, an advance, an assault, a fall back reach their places, 'follow' gathers the squads round the Captain, 'stand down' gives them back to the drill. */
+static void BoardScenarioOrders(FRig& Rig, int32 Seed, int32 Seeds)
+{
+	const int32 Obj = Rig.Comp(TEXT("engineering")), Breach = Rig.Comp(TEXT("d7_capacitors_D2")), Armory = Rig.Comp(TEXT("d8_armory_C1")), Lane = Rig.Comp(TEXT("d8_sp1_C4"));
+	if (Obj == INDEX_NONE || Breach == INDEX_NONE || Armory == INDEX_NONE || Lane == INDEX_NONE)
+	{
+		BCheck("orders", false, TEXT("rooms not found in the plan"));
+		return;
+	}
+	const FAstraBoardMap& M = *Rig.Map;
+	TArray<int32> In;                                          // the rooms that open onto Main Engineering: where a squad can hold the way in
+	for (const FBoardPortal& P : M.GetPortals())
+	{
+		const int32 O = P.A == Obj ? P.B : (P.B == Obj ? P.A : INDEX_NONE);
+		if (O != INDEX_NONE && !In.Contains(O))
+		{
+			In.Add(O);
+		}
+	}
+	if (In.IsEmpty())
+	{
+		BCheck("orders", false, TEXT("Main Engineering has no way in"));
+		return;
+	}
+	BNote(FString::Printf(TEXT("%d ways into Main Engineering; the breach is %s"), In.Num(), *M.Describe(Breach)));
+	const auto Each = [](FAstraBoardSim& S, const TFunction<void(const FSquad&, int32 Index)>& F, bool bReactionOnly)
+	{
+		int32 I = 0;
+		for (const FSquad& Sq : S.Squads())
+		{
+			if (Sq.Side == ESide::Aquila && (!bReactionOnly || Sq.Name.StartsWith(TEXT("Reaction"))))
+			{
+				F(Sq, I++);
+			}
+		}
+	};
+	const auto Give = [&M](FAstraBoardSim& S, const FSquad& Sq, ETask T, int32 Comp) { S.Order(Sq.Id, T, Comp, M.CentreOf(Comp), 800.f, TEXT("bench")); };
+	struct FPlan
+	{
+		const TCHAR* Name;
+		TFunction<void(FAstraBoardSim&, int32)> Act;         // every second of the fight, with the second
+	};
+	const FPlan Plans[] = {
+		{TEXT("the drill alone"), nullptr},
+		{TEXT("the reaction team holds the ways into Engineering (at 20 s)"), [&](FAstraBoardSim& S, int32 T)
+			{
+				if (T == 20) { Each(S, [&](const FSquad& Sq, int32 I) { Give(S, Sq, ETask::Hold, In[I % In.Num()]); }, true); }
+			}},
+		{TEXT("every squad holds the ways into Engineering (at 20 s)"), [&](FAstraBoardSim& S, int32 T)
+			{
+				if (T == 20) { Each(S, [&](const FSquad& Sq, int32 I) { Give(S, Sq, ETask::Hold, In[I % In.Num()]); }, false); }
+			}},
+		{TEXT("every squad advances on the breach (at 80 s)"), [&](FAstraBoardSim& S, int32 T)
+			{
+				if (T == 80) { Each(S, [&](const FSquad& Sq, int32) { Give(S, Sq, ETask::Advance, Breach); }, false); }
+			}},
+		{TEXT("every squad assaults the breach (at 80 s)"), [&](FAstraBoardSim& S, int32 T)
+			{
+				if (T == 80) { Each(S, [&](const FSquad& Sq, int32) { Give(S, Sq, ETask::Assault, Breach); }, false); }
+			}},
+		{TEXT("every squad falls back to the armory (at 100 s)"), [&](FAstraBoardSim& S, int32 T)
+			{
+				if (T == 100) { Each(S, [&](const FSquad& Sq, int32) { Give(S, Sq, ETask::FallBack, Armory); }, false); }
+			}},
+		{TEXT("held at the ways in at 20 s, given back to the drill at 70 s"), [&](FAstraBoardSim& S, int32 T)
+			{
+				if (T == 20) { Each(S, [&](const FSquad& Sq, int32 I) { Give(S, Sq, ETask::Hold, In[I % In.Num()]); }, false); }
+				if (T == 70) { Each(S, [&](const FSquad& Sq, int32) { S.Respond(Sq.Id); }, false); }
+			}},
+	};
+	TSharedRef<FJsonObject> Rec = MakeShared<FJsonObject>();
+	int32 Bad = 0, Hung = 0;
+	for (int32 Boarders : {10, 20})
+	{
+		BNote(FString::Printf(TEXT("%d boarders, sealed, the watch and the reaction team (the same %d seeds for every plan):"), Boarders, Seeds));
+		for (int32 pi = 0; pi < UE_ARRAY_COUNT(Plans); ++pi)
+		{
+			int32 Wins[4] = {0, 0, 0, 0};
+			double T = 0.0, LossA = 0.0, LossM = 0.0;
+			for (int32 s = 0; s < Seeds; ++s)
+			{
+				const FPlan& P = Plans[pi];
+				const TFunction<void(FAstraBoardSim&)> Hook = P.Act ? TFunction<void(FAstraBoardSim&)>([&P](FAstraBoardSim& S) { P.Act(S, FMath::RoundToInt(S.Time())); }) : nullptr;
+				const FBoardFight F = RunBoarding(Rig, Seed + s, Boarders, 24, 12, TEXT("d7_capacitors_D2"), TEXT("engineering"), true, 25.f, Hook);
+				Wins[F.R.Outcome == EOutcome::AquilaHolds ? 0 : F.R.Outcome == EOutcome::MandateRepelled ? 1 : F.R.Outcome == EOutcome::MandateTakes ? 2 : 3]++;
+				T += F.R.T;
+				LossA += F.R.Book.Killed[0] + F.R.Book.Down[0];
+				LossM += F.R.Book.Killed[1] + F.R.Book.Down[1];
+				Bad += F.R.BadPos;
+			}
+			Hung += Wins[3];
+			BNote(FString::Printf(TEXT("    %-66s the marines hold %2d, the Mandate break off %2d, the Mandate take Engineering %2d, no end %d; ends at %3.0f s; marines lost %4.1f, Mandate %4.1f"),
+			                      Plans[pi].Name, Wins[0], Wins[1], Wins[2], Wins[3], T / Seeds, LossA / Seeds, LossM / Seeds));
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetNumberField(TEXT("boarders"), Boarders);
+			O->SetStringField(TEXT("plan"), Plans[pi].Name);
+			O->SetNumberField(TEXT("holds"), Wins[0]);
+			O->SetNumberField(TEXT("repelled"), Wins[1]);
+			O->SetNumberField(TEXT("takes"), Wins[2]);
+			O->SetNumberField(TEXT("end_s"), T / Seeds);
+			O->SetNumberField(TEXT("loss_marines"), LossA / Seeds);
+			Rec->SetObjectField(FString::Printf(TEXT("b%d_plan%d"), Boarders, pi), O);
+		}
+	}
+	BCheck("orders: nobody leaves the plan", Bad == 0, FString::Printf(TEXT("%d positions off the plan under every order"), Bad));
+	BCheck("orders: every fight ends", Hung == 0, FString::Printf(TEXT("%d fights with no end in 600 s under any order"), Hung));
+	// 'follow': the squads gather round the Captain wherever he stands (a corridor on Deck 8), and a fight goes on round him
+	{
+		const int32 Marks[] = {30, 50, 70, 90};
+		double Near[UE_ARRAY_COUNT(Marks)] = {0.0, 0.0, 0.0, 0.0}, All[UE_ARRAY_COUNT(Marks)] = {0.0, 0.0, 0.0, 0.0};
+		for (int32 s = 0; s < FMath::Min(Seeds, 8); ++s)
+		{
+			const TFunction<void(FAstraBoardSim&)> Hook = [&](FAstraBoardSim& S)
+			{
+				const int32 T = FMath::RoundToInt(S.Time());
+				if (T == 10)
+				{
+					Each(S, [&](const FSquad& Sq, int32) { S.Order(Sq.Id, ETask::Follow, INDEX_NONE, FVector::ZeroVector, 0.f, TEXT("bench")); }, false);
+				}
+				for (int32 k = 0; k < UE_ARRAY_COUNT(Marks); ++k)
+				{
+					if (T == Marks[k])
+					{
+						const FUnit* C = S.Unit(S.CaptainId());
+						for (const FUnit& U : S.Units())
+						{
+							if (C && U.Side == ESide::Aquila && !U.bExternal && U.Able())
+							{
+								All[k] += 1.0;
+								Near[k] += FVector::Dist2D(U.Pos, C->Pos) < 1500.0 ? 1.0 : 0.0;
+							}
+						}
+					}
+				}
+			};
+			RunBoarding(Rig, Seed + s, 4, 24, 12, TEXT("d7_capacitors_D2"), TEXT("engineering"), true, 25.f, Hook, Lane);
+		}
+		FString Row;
+		for (int32 k = 0; k < UE_ARRAY_COUNT(Marks); ++k)
+		{
+			Row += FString::Printf(TEXT("%s%.0f%% at %d s"), k ? TEXT(", ") : TEXT(""), All[k] > 0.0 ? 100.0 * Near[k] / All[k] : 0.0, Marks[k]);
+		}
+		BNote(FString::Printf(TEXT("follow, ordered at 10 s: the able marines within 15 m of the Captain: %s"), *Row));
+		const int32 Last = UE_ARRAY_COUNT(Marks) - 1;
+		BCheck("orders: follow gathers the squads", All[Last] > 0.0 && Near[Last] >= 0.8 * All[Last], FString::Printf(TEXT("%.0f of %.0f able marines within 15 m of the Captain %d s after the order"), Near[Last], All[Last], Marks[Last] - 10));
+	}
+	BRecord->SetObjectField(TEXT("orders"), Rec);
 }
 
 // ================================================================================================================== the rules
@@ -939,6 +1097,10 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	if (Want(TEXT("board")))
 	{
 		BoardScenarioBoard(Rig, Seed, Seeds, Boarders);
+	}
+	if (Scenario == TEXT("orders"))                    // (on request only: a fight for each plan and seed)
+	{
+		BoardScenarioOrders(Rig, Seed, Seeds);
 	}
 	int32 Failed = 0;
 	for (const FBCheck& C : BChecks)

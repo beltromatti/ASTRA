@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ABBORDAGGI, fighting inside the ASN Aquila (Source/ASTRA/AstraBoard*.cpp, docs/ABBORDAGGI.md): the headless bench.
 
-  tools/boarding.py run [--scenario all|map|rules|duel|squad|flank|board] [--seed 1] [--seeds 20] [--boarders 10] [--set "MandateSkill=0.8,HoldS=60"]
+  tools/boarding.py run [--scenario all|map|rules|duel|squad|flank|board|orders] [--seed 1] [--seeds 20] [--boarders 10] [--set "MandateSkill=0.8,HoldS=60"]
                                        the commandlet AstraBoardSim: the plan as the soldiers see it (portals, corners, lines of sight, routes), duels and
                                        squad fights in a corridor (who wins, how fast, with corners and without, with the flank and without), and whole
                                        boardings of the real ship (a Mandate boarding party through a breach, the marines on watch and the reaction
@@ -68,7 +68,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")
