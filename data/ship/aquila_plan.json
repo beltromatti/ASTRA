@@ -20292,33 +20292,135 @@
    "crew_slots": 7
   },
   {
+   "id": "d5_lab_astro_B1",
+   "deck": 5,
+   "section": "B",
+   "kind": "lab",
+   "name": "Astrometrics",
+   "bounds": [-12.0, 22.0, 12.0, 38.0],
+   "z": [-50.0, -46.1],
+   "status": "built",
+   "doors": ["d5_door_lab_astro_B1"],
+   "dept": "science",
+   "prefab": "lab_astro",
+   "mesh": "SM_SHIP_LabAstro",
+   "pos": [-12.0, 22.0, -50.0],
+   "yaw": 0.0,
+   "systems": ["sensors", "power_bus", "data_trunk"],
+   "stations": [
+    {"id": "d5_lab_astro_B1.s0", "role": "astrometrist", "kind": "sit", "pos": [3.118, 32.0, -50.0], "yaw": 210.0, "dept": "science"},
+    {"id": "d5_lab_astro_B1.s1", "role": "astrometrist", "kind": "sit", "pos": [0.0, 33.8, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_astro_B1.s2", "role": "astrometrist", "kind": "sit", "pos": [-3.118, 28.4, -50.0], "yaw": 30.0, "dept": "science"},
+    {"id": "d5_lab_astro_B1.s3", "role": "astrometrist", "kind": "sit", "pos": [0.0, 26.6, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_astro_B1.s4", "role": "lead_scientist", "kind": "stand", "pos": [-9.0, 30.0, -50.0], "yaw": 0.0, "dept": "science"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [0.0, 30.2, -46.5],
+     "lumens": 2200,
+     "temperature": 7500,
+     "size": [8.0, 8.0],
+     "radius": 900,
+     "shadows": false,
+     "id": "d5_lab_astro_B1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [0.0, 36.0, -46.5],
+     "lumens": 1500,
+     "temperature": 7500,
+     "size": [18.0, 1.0],
+     "radius": 900,
+     "shadows": false,
+     "id": "d5_lab_astro_B1.l1"
+    }
+   ],
+   "plate": "lab_astro",
+   "lane": "O_s",
+   "size": [24.0, 16.0, 3.6],
+   "crew_slots": 5
+  },
+  {
+   "id": "d5_lab_B3",
+   "deck": 5,
+   "section": "B",
+   "kind": "lab",
+   "name": "Science Lab",
+   "bounds": [-36.0, 22.0, -12.0, 38.0],
+   "z": [-50.0, -46.1],
+   "status": "built",
+   "doors": ["d5_door_lab_B3"],
+   "dept": "science",
+   "prefab": "lab",
+   "mesh": "SM_SHIP_Lab",
+   "pos": [-36.0, 22.0, -50.0],
+   "yaw": 0.0,
+   "systems": ["sensors", "power_bus", "data_trunk"],
+   "stations": [
+    {"id": "d5_lab_B3.s0", "role": "scientist", "kind": "sit", "pos": [-31.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_B3.s1", "role": "scientist", "kind": "sit", "pos": [-27.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_B3.s2", "role": "scientist", "kind": "sit", "pos": [-23.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_B3.s3", "role": "scientist", "kind": "sit", "pos": [-19.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_B3.s4", "role": "scientist", "kind": "sit", "pos": [-25.8, 29.6, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_B3.s5", "role": "scientist", "kind": "sit", "pos": [-22.6, 33.85, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_B3.s6", "role": "lead_scientist", "kind": "work", "pos": [-15.5, 29.0, -50.0], "yaw": 180.0, "dept": "science"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-30.0, 30.0, -46.5],
+     "lumens": 6500,
+     "temperature": 5600,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d5_lab_B3.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-18.0, 30.0, -46.5],
+     "lumens": 6500,
+     "temperature": 5600,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d5_lab_B3.l1"
+    }
+   ],
+   "plate": "lab",
+   "lane": "O_s",
+   "size": [24.0, 16.0, 3.6],
+   "crew_slots": 7
+  },
+  {
    "id": "d5_lab_bio_B2",
    "deck": 5,
    "section": "B",
    "kind": "lab",
    "name": "Biology Lab",
-   "bounds": [-12.0, 22.0, 12.0, 38.0],
+   "bounds": [-60.0, 22.0, -36.0, 38.0],
    "z": [-50.0, -46.1],
    "status": "built",
    "doors": ["d5_door_lab_bio_B2"],
    "dept": "science",
    "prefab": "lab_bio",
    "mesh": "SM_SHIP_LabBio",
-   "pos": [-12.0, 22.0, -50.0],
+   "pos": [-60.0, 22.0, -50.0],
    "yaw": 0.0,
    "systems": ["sensors", "power_bus", "data_trunk", "life_support"],
    "stations": [
-    {"id": "d5_lab_bio_B2.s0", "role": "biologist", "kind": "work", "pos": [-6.1, 30.6, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B2.s1", "role": "biologist", "kind": "work", "pos": [5.15, 28.6, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_bio_B2.s2", "role": "lab_technician", "kind": "work", "pos": [10.4, 32.4, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B2.s3", "role": "lab_technician", "kind": "work", "pos": [10.4, 34.6, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B2.s4", "role": "lead_scientist", "kind": "sit", "pos": [1.4, 24.0, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_bio_B2.s5", "role": "biologist", "kind": "stand", "pos": [-2.0, 35.4, -50.0], "yaw": 90.0, "dept": "science"}
+    {"id": "d5_lab_bio_B2.s0", "role": "biologist", "kind": "work", "pos": [-54.1, 30.6, -50.0], "yaw": 0.0, "dept": "science"},
+    {"id": "d5_lab_bio_B2.s1", "role": "biologist", "kind": "work", "pos": [-42.85, 28.6, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_bio_B2.s2", "role": "lab_technician", "kind": "work", "pos": [-37.6, 32.4, -50.0], "yaw": 0.0, "dept": "science"},
+    {"id": "d5_lab_bio_B2.s3", "role": "lab_technician", "kind": "work", "pos": [-37.6, 34.6, -50.0], "yaw": 0.0, "dept": "science"},
+    {"id": "d5_lab_bio_B2.s4", "role": "lead_scientist", "kind": "sit", "pos": [-46.6, 24.0, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_bio_B2.s5", "role": "biologist", "kind": "stand", "pos": [-50.0, 35.4, -50.0], "yaw": 90.0, "dept": "science"}
    ],
    "lights": [
     {
      "type": "rect",
-     "pos": [-6.0, 30.0, -46.5],
+     "pos": [-54.0, 30.0, -46.5],
      "lumens": 6500,
      "temperature": 5600,
      "size": [8.0, 8.0],
@@ -20328,7 +20430,7 @@
     },
     {
      "type": "rect",
-     "pos": [6.0, 30.0, -46.5],
+     "pos": [-42.0, 30.0, -46.5],
      "lumens": 6500,
      "temperature": 5600,
      "size": [8.0, 8.0],
@@ -20343,100 +20445,49 @@
    "crew_slots": 6
   },
   {
-   "id": "d5_lab_bio_B3",
+   "id": "d5_lab_bio_C1",
    "deck": 5,
-   "section": "B",
+   "section": "C",
    "kind": "lab",
    "name": "Biology Lab",
-   "bounds": [-36.0, 22.0, -12.0, 38.0],
+   "bounds": [-88.0, 22.0, -64.0, 38.0],
    "z": [-50.0, -46.1],
    "status": "built",
-   "doors": ["d5_door_lab_bio_B3"],
+   "doors": ["d5_door_lab_bio_C1"],
    "dept": "science",
    "prefab": "lab_bio",
    "mesh": "SM_SHIP_LabBio",
-   "pos": [-36.0, 22.0, -50.0],
+   "pos": [-88.0, 22.0, -50.0],
    "yaw": 0.0,
    "systems": ["sensors", "power_bus", "data_trunk", "life_support"],
    "stations": [
-    {"id": "d5_lab_bio_B3.s0", "role": "biologist", "kind": "work", "pos": [-30.1, 30.6, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B3.s1", "role": "biologist", "kind": "work", "pos": [-18.85, 28.6, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_bio_B3.s2", "role": "lab_technician", "kind": "work", "pos": [-13.6, 32.4, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B3.s3", "role": "lab_technician", "kind": "work", "pos": [-13.6, 34.6, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B3.s4", "role": "lead_scientist", "kind": "sit", "pos": [-22.6, 24.0, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_bio_B3.s5", "role": "biologist", "kind": "stand", "pos": [-26.0, 35.4, -50.0], "yaw": 90.0, "dept": "science"}
+    {"id": "d5_lab_bio_C1.s0", "role": "biologist", "kind": "work", "pos": [-82.1, 30.6, -50.0], "yaw": 0.0, "dept": "science"},
+    {"id": "d5_lab_bio_C1.s1", "role": "biologist", "kind": "work", "pos": [-70.85, 28.6, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_bio_C1.s2", "role": "lab_technician", "kind": "work", "pos": [-65.6, 32.4, -50.0], "yaw": 0.0, "dept": "science"},
+    {"id": "d5_lab_bio_C1.s3", "role": "lab_technician", "kind": "work", "pos": [-65.6, 34.6, -50.0], "yaw": 0.0, "dept": "science"},
+    {"id": "d5_lab_bio_C1.s4", "role": "lead_scientist", "kind": "sit", "pos": [-74.6, 24.0, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_bio_C1.s5", "role": "biologist", "kind": "stand", "pos": [-78.0, 35.4, -50.0], "yaw": 90.0, "dept": "science"}
    ],
    "lights": [
     {
      "type": "rect",
-     "pos": [-30.0, 30.0, -46.5],
+     "pos": [-82.0, 30.0, -46.5],
      "lumens": 6500,
      "temperature": 5600,
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_bio_B3.l0"
+     "id": "d5_lab_bio_C1.l0"
     },
     {
      "type": "rect",
-     "pos": [-18.0, 30.0, -46.5],
+     "pos": [-70.0, 30.0, -46.5],
      "lumens": 6500,
      "temperature": 5600,
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_bio_B3.l1"
-    }
-   ],
-   "plate": "lab_bio",
-   "lane": "O_s",
-   "size": [24.0, 16.0, 3.6],
-   "crew_slots": 6
-  },
-  {
-   "id": "d5_lab_bio_B4",
-   "deck": 5,
-   "section": "B",
-   "kind": "lab",
-   "name": "Biology Lab",
-   "bounds": [-60.0, 22.0, -36.0, 38.0],
-   "z": [-50.0, -46.1],
-   "status": "built",
-   "doors": ["d5_door_lab_bio_B4"],
-   "dept": "science",
-   "prefab": "lab_bio",
-   "mesh": "SM_SHIP_LabBio",
-   "pos": [-60.0, 22.0, -50.0],
-   "yaw": 0.0,
-   "systems": ["sensors", "power_bus", "data_trunk", "life_support"],
-   "stations": [
-    {"id": "d5_lab_bio_B4.s0", "role": "biologist", "kind": "work", "pos": [-54.1, 30.6, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B4.s1", "role": "biologist", "kind": "work", "pos": [-42.85, 28.6, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_bio_B4.s2", "role": "lab_technician", "kind": "work", "pos": [-37.6, 32.4, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B4.s3", "role": "lab_technician", "kind": "work", "pos": [-37.6, 34.6, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_B4.s4", "role": "lead_scientist", "kind": "sit", "pos": [-46.6, 24.0, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_bio_B4.s5", "role": "biologist", "kind": "stand", "pos": [-50.0, 35.4, -50.0], "yaw": 90.0, "dept": "science"}
-   ],
-   "lights": [
-    {
-     "type": "rect",
-     "pos": [-54.0, 30.0, -46.5],
-     "lumens": 6500,
-     "temperature": 5600,
-     "size": [8.0, 8.0],
-     "radius": 900.0,
-     "shadows": false,
-     "id": "d5_lab_bio_B4.l0"
-    },
-    {
-     "type": "rect",
-     "pos": [-42.0, 30.0, -46.5],
-     "lumens": 6500,
-     "temperature": 5600,
-     "size": [8.0, 8.0],
-     "radius": 900.0,
-     "shadows": false,
-     "id": "d5_lab_bio_B4.l1"
+     "id": "d5_lab_bio_C1.l1"
     }
    ],
    "plate": "lab_bio",
@@ -20450,29 +20501,29 @@
    "section": "C",
    "kind": "lab",
    "name": "Science Lab",
-   "bounds": [-88.0, 22.0, -64.0, 38.0],
+   "bounds": [-112.0, 22.0, -88.0, 38.0],
    "z": [-50.0, -46.1],
    "status": "built",
    "doors": ["d5_door_lab_C1"],
    "dept": "science",
    "prefab": "lab",
    "mesh": "SM_SHIP_Lab",
-   "pos": [-88.0, 22.0, -50.0],
+   "pos": [-112.0, 22.0, -50.0],
    "yaw": 0.0,
    "systems": ["sensors", "power_bus", "data_trunk"],
    "stations": [
-    {"id": "d5_lab_C1.s0", "role": "scientist", "kind": "sit", "pos": [-83.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_C1.s1", "role": "scientist", "kind": "sit", "pos": [-79.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_C1.s2", "role": "scientist", "kind": "sit", "pos": [-75.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_C1.s3", "role": "scientist", "kind": "sit", "pos": [-71.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_C1.s4", "role": "scientist", "kind": "sit", "pos": [-77.8, 29.6, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_C1.s5", "role": "scientist", "kind": "sit", "pos": [-74.6, 33.85, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_C1.s6", "role": "lead_scientist", "kind": "work", "pos": [-67.5, 29.0, -50.0], "yaw": 180.0, "dept": "science"}
+    {"id": "d5_lab_C1.s0", "role": "scientist", "kind": "sit", "pos": [-107.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C1.s1", "role": "scientist", "kind": "sit", "pos": [-103.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C1.s2", "role": "scientist", "kind": "sit", "pos": [-99.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C1.s3", "role": "scientist", "kind": "sit", "pos": [-95.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C1.s4", "role": "scientist", "kind": "sit", "pos": [-101.8, 29.6, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_C1.s5", "role": "scientist", "kind": "sit", "pos": [-98.6, 33.85, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_C1.s6", "role": "lead_scientist", "kind": "work", "pos": [-91.5, 29.0, -50.0], "yaw": 180.0, "dept": "science"}
    ],
    "lights": [
     {
      "type": "rect",
-     "pos": [-82.0, 30.0, -46.5],
+     "pos": [-106.0, 30.0, -46.5],
      "lumens": 6500,
      "temperature": 5600,
      "size": [8.0, 8.0],
@@ -20482,7 +20533,7 @@
     },
     {
      "type": "rect",
-     "pos": [-70.0, 30.0, -46.5],
+     "pos": [-94.0, 30.0, -46.5],
      "lumens": 6500,
      "temperature": 5600,
      "size": [8.0, 8.0],
@@ -20497,33 +20548,85 @@
    "crew_slots": 7
   },
   {
+   "id": "d5_lab_C2",
+   "deck": 5,
+   "section": "C",
+   "kind": "lab",
+   "name": "Science Lab",
+   "bounds": [-136.0, 22.0, -112.0, 38.0],
+   "z": [-50.0, -46.1],
+   "status": "built",
+   "doors": ["d5_door_lab_C2"],
+   "dept": "science",
+   "prefab": "lab",
+   "mesh": "SM_SHIP_Lab",
+   "pos": [-136.0, 22.0, -50.0],
+   "yaw": 0.0,
+   "systems": ["sensors", "power_bus", "data_trunk"],
+   "stations": [
+    {"id": "d5_lab_C2.s0", "role": "scientist", "kind": "sit", "pos": [-131.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C2.s1", "role": "scientist", "kind": "sit", "pos": [-127.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C2.s2", "role": "scientist", "kind": "sit", "pos": [-123.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C2.s3", "role": "scientist", "kind": "sit", "pos": [-119.0, 36.4, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C2.s4", "role": "scientist", "kind": "sit", "pos": [-125.8, 29.6, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_C2.s5", "role": "scientist", "kind": "sit", "pos": [-122.6, 33.85, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_C2.s6", "role": "lead_scientist", "kind": "work", "pos": [-115.5, 29.0, -50.0], "yaw": 180.0, "dept": "science"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-130.0, 30.0, -46.5],
+     "lumens": 6500,
+     "temperature": 5600,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d5_lab_C2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-118.0, 30.0, -46.5],
+     "lumens": 6500,
+     "temperature": 5600,
+     "size": [8.0, 8.0],
+     "radius": 900.0,
+     "shadows": false,
+     "id": "d5_lab_C2.l1"
+    }
+   ],
+   "plate": "lab",
+   "lane": "O_s",
+   "size": [24.0, 16.0, 3.6],
+   "crew_slots": 7
+  },
+  {
    "id": "d5_sensor_room_C2",
    "deck": 5,
    "section": "C",
    "kind": "sensors",
    "name": "Sensor Array Room",
-   "bounds": [-104.0, 22.0, -88.0, 38.0],
+   "bounds": [-152.0, 22.0, -136.0, 38.0],
    "z": [-50.0, -46.1],
    "status": "built",
    "doors": ["d5_door_sensor_room_C2"],
    "dept": "science",
    "prefab": "sensor_room",
    "mesh": "SM_SHIP_SensorRoom",
-   "pos": [-104.0, 22.0, -50.0],
+   "pos": [-152.0, 22.0, -50.0],
    "yaw": 0.0,
    "systems": ["sensors", "data_trunk", "coolant", "power_bus"],
    "stations": [
-    {"id": "d5_sensor_room_C2.s0", "role": "sensor_operator", "kind": "sit", "pos": [-100.6, 28.9, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_sensor_room_C2.s1", "role": "sensor_operator", "kind": "sit", "pos": [-96.0, 28.9, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_sensor_room_C2.s2", "role": "sensor_operator", "kind": "sit", "pos": [-91.4, 28.9, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_sensor_room_C2.s3", "role": "sensor_supervisor", "kind": "stand", "pos": [-98.0, 33.0, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_sensor_room_C2.s4", "role": "sensor_tech", "kind": "work", "pos": [-101.8, 29.0, -50.0], "yaw": 180.0, "dept": "science"},
-    {"id": "d5_sensor_room_C2.s5", "role": "sensor_tech", "kind": "work", "pos": [-90.2, 29.0, -50.0], "yaw": 0.0, "dept": "science"}
+    {"id": "d5_sensor_room_C2.s0", "role": "sensor_operator", "kind": "sit", "pos": [-148.6, 28.9, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_sensor_room_C2.s1", "role": "sensor_operator", "kind": "sit", "pos": [-144.0, 28.9, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_sensor_room_C2.s2", "role": "sensor_operator", "kind": "sit", "pos": [-139.4, 28.9, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_sensor_room_C2.s3", "role": "sensor_supervisor", "kind": "stand", "pos": [-146.0, 33.0, -50.0], "yaw": 0.0, "dept": "science"},
+    {"id": "d5_sensor_room_C2.s4", "role": "sensor_tech", "kind": "work", "pos": [-149.8, 29.0, -50.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d5_sensor_room_C2.s5", "role": "sensor_tech", "kind": "work", "pos": [-138.2, 29.0, -50.0], "yaw": 0.0, "dept": "science"}
    ],
    "lights": [
     {
      "type": "rect",
-     "pos": [-96.0, 28.0, -46.5],
+     "pos": [-144.0, 28.0, -46.5],
      "lumens": 4200,
      "temperature": 6000,
      "size": [12.0, 2.0],
@@ -20533,7 +20636,7 @@
     },
     {
      "type": "rect",
-     "pos": [-96.0, 34.0, -46.5],
+     "pos": [-144.0, 34.0, -46.5],
      "lumens": 3000,
      "temperature": 5600,
      "size": [8.0, 3.0],
@@ -20545,117 +20648,6 @@
    "plate": "sensors",
    "lane": "O_s",
    "size": [16.0, 16.0, 3.6],
-   "crew_slots": 6
-  },
-  {
-   "id": "d5_lab_phys_C1",
-   "deck": 5,
-   "section": "C",
-   "kind": "lab",
-   "name": "Physics Lab",
-   "bounds": [-128.0, 22.0, -104.0, 38.0],
-   "z": [-50.0, -46.0],
-   "status": "built",
-   "doors": ["d5_door_lab_phys_C1"],
-   "dept": "science",
-   "prefab": "lab_phys",
-   "mesh": "SM_SHIP_LabPhys",
-   "pos": [-128.0, 22.0, -50.0],
-   "yaw": 0.0,
-   "systems": ["sensors", "power_bus", "data_trunk", "coolant"],
-   "stations": [
-    {"id": "d5_lab_phys_C1.s0", "role": "physicist", "kind": "sit", "pos": [-123.0, 24.8, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_phys_C1.s1", "role": "physics_technician", "kind": "work", "pos": [-119.0, 31.4, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_phys_C1.s2", "role": "physics_technician", "kind": "work", "pos": [-108.4, 31.2, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_phys_C1.s3", "role": "cryo_technician", "kind": "work", "pos": [-107.7, 26.2, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_phys_C1.s4", "role": "physicist", "kind": "work", "pos": [-116.0, 35.7, -50.0], "yaw": 90.0, "dept": "science"}
-   ],
-   "lights": [
-    {
-     "type": "rect",
-     "pos": [-120.0, 26.0, -46.3],
-     "lumens": 3500,
-     "temperature": 6000,
-     "size": [6.0, 6.0],
-     "radius": 900.0,
-     "shadows": false,
-     "id": "d5_lab_phys_C1.l0"
-    },
-    {
-     "type": "rect",
-     "pos": [-116.0, 33.0, -46.3],
-     "lumens": 6500,
-     "temperature": 5600,
-     "size": [14.0, 4.0],
-     "radius": 900.0,
-     "shadows": false,
-     "id": "d5_lab_phys_C1.l1"
-    },
-    {
-     "type": "rect",
-     "pos": [-108.4, 33.0, -46.3],
-     "lumens": 4000,
-     "temperature": 5600,
-     "size": [5.0, 5.0],
-     "radius": 900.0,
-     "shadows": false,
-     "id": "d5_lab_phys_C1.l2"
-    }
-   ],
-   "plate": "lab_phys",
-   "lane": "O_s",
-   "size": [24.0, 16.0, 3.7],
-   "crew_slots": 5
-  },
-  {
-   "id": "d5_lab_bio_C1",
-   "deck": 5,
-   "section": "C",
-   "kind": "lab",
-   "name": "Biology Lab",
-   "bounds": [-152.0, 22.0, -128.0, 38.0],
-   "z": [-50.0, -46.1],
-   "status": "built",
-   "doors": ["d5_door_lab_bio_C1"],
-   "dept": "science",
-   "prefab": "lab_bio",
-   "mesh": "SM_SHIP_LabBio",
-   "pos": [-152.0, 22.0, -50.0],
-   "yaw": 0.0,
-   "systems": ["sensors", "power_bus", "data_trunk", "life_support"],
-   "stations": [
-    {"id": "d5_lab_bio_C1.s0", "role": "biologist", "kind": "work", "pos": [-146.1, 30.6, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_C1.s1", "role": "biologist", "kind": "work", "pos": [-134.85, 28.6, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_bio_C1.s2", "role": "lab_technician", "kind": "work", "pos": [-129.6, 32.4, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_C1.s3", "role": "lab_technician", "kind": "work", "pos": [-129.6, 34.6, -50.0], "yaw": 0.0, "dept": "science"},
-    {"id": "d5_lab_bio_C1.s4", "role": "lead_scientist", "kind": "sit", "pos": [-138.6, 24.0, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_bio_C1.s5", "role": "biologist", "kind": "stand", "pos": [-142.0, 35.4, -50.0], "yaw": 90.0, "dept": "science"}
-   ],
-   "lights": [
-    {
-     "type": "rect",
-     "pos": [-146.0, 30.0, -46.5],
-     "lumens": 6500,
-     "temperature": 5600,
-     "size": [8.0, 8.0],
-     "radius": 900.0,
-     "shadows": false,
-     "id": "d5_lab_bio_C1.l0"
-    },
-    {
-     "type": "rect",
-     "pos": [-134.0, 30.0, -46.5],
-     "lumens": 6500,
-     "temperature": 5600,
-     "size": [8.0, 8.0],
-     "radius": 900.0,
-     "shadows": false,
-     "id": "d5_lab_bio_C1.l1"
-    }
-   ],
-   "plate": "lab_bio",
-   "lane": "O_s",
-   "size": [24.0, 16.0, 3.6],
    "crew_slots": 6
   },
   {
@@ -21072,28 +21064,28 @@
    "crew_slots": 6
   },
   {
-   "id": "d5_radiator_pumps_G1",
+   "id": "d5_machinery_G2",
    "deck": 5,
    "section": "G",
    "kind": "machinery",
-   "name": "Radiator Manifold",
+   "name": "Machinery Space",
    "bounds": [-424.0, 22.0, -400.0, 38.0],
    "z": [-50.0, -46.0],
    "status": "built",
-   "doors": ["d5_door_radiator_pumps_G1"],
+   "doors": ["d5_door_machinery_G2"],
    "dept": "engineering",
-   "prefab": "radiator_pumps",
-   "mesh": "SM_SHIP_RadiatorPumps",
+   "prefab": "machinery",
+   "mesh": "SM_SHIP_Machinery",
    "pos": [-424.0, 22.0, -50.0],
    "yaw": 0.0,
-   "systems": ["coolant", "radiators", "power_bus"],
+   "systems": ["power_bus", "coolant", "compressed_air", "life_support", "potable_water"],
    "stations": [
-    {"id": "d5_radiator_pumps_G1.s0", "role": "machinist", "kind": "work", "pos": [-418.4, 31.4, -50.0], "yaw": 0.0, "dept": "engineering"},
-    {"id": "d5_radiator_pumps_G1.s1", "role": "machinist", "kind": "work", "pos": [-414.0, 31.4, -50.0], "yaw": 0.0, "dept": "engineering"},
-    {"id": "d5_radiator_pumps_G1.s2", "role": "pump_tender", "kind": "work", "pos": [-409.6, 31.4, -50.0], "yaw": 0.0, "dept": "engineering"},
-    {"id": "d5_radiator_pumps_G1.s3", "role": "coolant_tender", "kind": "work", "pos": [-405.0, 29.2, -50.0], "yaw": 0.0, "dept": "engineering"},
-    {"id": "d5_radiator_pumps_G1.s4", "role": "machinist", "kind": "sit", "pos": [-416.6, 23.1, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_radiator_pumps_G1.s5", "role": "engineer", "kind": "stand", "pos": [-408.4, 24.4, -50.0], "yaw": 90.0, "dept": "engineering"}
+    {"id": "d5_machinery_G2.s0", "role": "machinist", "kind": "work", "pos": [-420.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_machinery_G2.s1", "role": "machinist", "kind": "work", "pos": [-416.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_machinery_G2.s2", "role": "machinist", "kind": "work", "pos": [-412.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_machinery_G2.s3", "role": "water_tender", "kind": "work", "pos": [-405.4, 32.4, -50.0], "yaw": 0.0, "dept": "engineering"},
+    {"id": "d5_machinery_G2.s4", "role": "machinist", "kind": "sit", "pos": [-410.0, 23.0, -50.0], "yaw": 270.0, "dept": "engineering"},
+    {"id": "d5_machinery_G2.s5", "role": "machinist", "kind": "work", "pos": [-417.0, 28.1, -50.0], "yaw": 90.0, "dept": "engineering"}
    ],
    "lights": [
     {
@@ -21104,62 +21096,11 @@
      "size": [12.0, 1.0],
      "radius": 1000,
      "shadows": false,
-     "id": "d5_radiator_pumps_G1.l0"
-    },
-    {
-     "type": "rect",
-     "pos": [-406.0, 30.0, -46.4],
-     "lumens": 5000,
-     "temperature": 4500,
-     "size": [10.0, 1.0],
-     "radius": 1000,
-     "shadows": false,
-     "id": "d5_radiator_pumps_G1.l1"
-    }
-   ],
-   "plate": "pumps",
-   "lane": "O_s",
-   "size": [24.0, 16.0, 3.7],
-   "crew_slots": 6
-  },
-  {
-   "id": "d5_machinery_G2",
-   "deck": 5,
-   "section": "G",
-   "kind": "machinery",
-   "name": "Machinery Space",
-   "bounds": [-448.0, 22.0, -424.0, 38.0],
-   "z": [-50.0, -46.0],
-   "status": "built",
-   "doors": ["d5_door_machinery_G2"],
-   "dept": "engineering",
-   "prefab": "machinery",
-   "mesh": "SM_SHIP_Machinery",
-   "pos": [-448.0, 22.0, -50.0],
-   "yaw": 0.0,
-   "systems": ["power_bus", "coolant", "compressed_air", "life_support", "potable_water"],
-   "stations": [
-    {"id": "d5_machinery_G2.s0", "role": "machinist", "kind": "work", "pos": [-444.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_machinery_G2.s1", "role": "machinist", "kind": "work", "pos": [-440.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_machinery_G2.s2", "role": "machinist", "kind": "work", "pos": [-436.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_machinery_G2.s3", "role": "water_tender", "kind": "work", "pos": [-429.4, 32.4, -50.0], "yaw": 0.0, "dept": "engineering"},
-    {"id": "d5_machinery_G2.s4", "role": "machinist", "kind": "sit", "pos": [-434.0, 23.0, -50.0], "yaw": 270.0, "dept": "engineering"},
-    {"id": "d5_machinery_G2.s5", "role": "machinist", "kind": "work", "pos": [-441.0, 28.1, -50.0], "yaw": 90.0, "dept": "engineering"}
-   ],
-   "lights": [
-    {
-     "type": "rect",
-     "pos": [-440.0, 30.0, -46.4],
-     "lumens": 5000,
-     "temperature": 4500,
-     "size": [12.0, 1.0],
-     "radius": 1000,
-     "shadows": false,
      "id": "d5_machinery_G2.l0"
     },
     {
      "type": "rect",
-     "pos": [-430.0, 30.0, -46.4],
+     "pos": [-406.0, 30.0, -46.4],
      "lumens": 4500,
      "temperature": 4500,
      "size": [8.0, 1.0],
@@ -21179,26 +21120,26 @@
    "section": "G",
    "kind": "damage_control",
    "name": "Damage Control Locker",
-   "bounds": [-460.0, 22.0, -448.0, 38.0],
+   "bounds": [-436.0, 22.0, -424.0, 38.0],
    "z": [-50.0, -46.3],
    "status": "built",
    "doors": ["d5_door_dc_locker_G3"],
    "dept": "engineering",
    "prefab": "dc_locker",
    "mesh": "SM_SHIP_DcLocker",
-   "pos": [-460.0, 22.0, -50.0],
+   "pos": [-436.0, 22.0, -50.0],
    "yaw": 0.0,
    "systems": ["damage_control", "supply"],
    "stations": [
-    {"id": "d5_dc_locker_G3.s0", "role": "dc_technician", "kind": "stand", "pos": [-455.6, 35.2, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_dc_locker_G3.s1", "role": "dc_technician", "kind": "work", "pos": [-454.0, 28.2, -50.0], "yaw": 270.0, "dept": "engineering"},
-    {"id": "d5_dc_locker_G3.s2", "role": "dc_technician", "kind": "stand", "pos": [-458.0, 30.0, -50.0], "yaw": 180.0, "dept": "engineering"},
-    {"id": "d5_dc_locker_G3.s3", "role": "dc_technician", "kind": "stand", "pos": [-449.8, 30.0, -50.0], "yaw": 0.0, "dept": "engineering"}
+    {"id": "d5_dc_locker_G3.s0", "role": "dc_technician", "kind": "stand", "pos": [-431.6, 35.2, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_dc_locker_G3.s1", "role": "dc_technician", "kind": "work", "pos": [-430.0, 28.2, -50.0], "yaw": 270.0, "dept": "engineering"},
+    {"id": "d5_dc_locker_G3.s2", "role": "dc_technician", "kind": "stand", "pos": [-434.0, 30.0, -50.0], "yaw": 180.0, "dept": "engineering"},
+    {"id": "d5_dc_locker_G3.s3", "role": "dc_technician", "kind": "stand", "pos": [-425.8, 30.0, -50.0], "yaw": 0.0, "dept": "engineering"}
    ],
    "lights": [
     {
      "type": "rect",
-     "pos": [-454.0, 27.0, -46.7],
+     "pos": [-430.0, 27.0, -46.7],
      "lumens": 4200,
      "temperature": 5000,
      "size": [6.0, 1.0],
@@ -21208,7 +21149,7 @@
     },
     {
      "type": "rect",
-     "pos": [-454.0, 33.0, -46.7],
+     "pos": [-430.0, 33.0, -46.7],
      "lumens": 4200,
      "temperature": 5000,
      "size": [6.0, 1.0],
@@ -21223,53 +21164,55 @@
    "crew_slots": 4
   },
   {
-   "id": "d5_dc_locker_H2",
+   "id": "d5_radiator_pumps_G1",
    "deck": 5,
-   "section": "H",
-   "kind": "damage_control",
-   "name": "Damage Control Locker",
-   "bounds": [-476.0, 22.0, -464.0, 38.0],
-   "z": [-50.0, -46.3],
+   "section": "G",
+   "kind": "machinery",
+   "name": "Radiator Manifold",
+   "bounds": [-460.0, 22.0, -436.0, 38.0],
+   "z": [-50.0, -46.0],
    "status": "built",
-   "doors": ["d5_door_dc_locker_H2"],
+   "doors": ["d5_door_radiator_pumps_G1"],
    "dept": "engineering",
-   "prefab": "dc_locker",
-   "mesh": "SM_SHIP_DcLocker",
-   "pos": [-476.0, 22.0, -50.0],
+   "prefab": "radiator_pumps",
+   "mesh": "SM_SHIP_RadiatorPumps",
+   "pos": [-460.0, 22.0, -50.0],
    "yaw": 0.0,
-   "systems": ["damage_control", "supply"],
+   "systems": ["coolant", "radiators", "power_bus"],
    "stations": [
-    {"id": "d5_dc_locker_H2.s0", "role": "dc_technician", "kind": "stand", "pos": [-471.6, 35.2, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_dc_locker_H2.s1", "role": "dc_technician", "kind": "work", "pos": [-470.0, 28.2, -50.0], "yaw": 270.0, "dept": "engineering"},
-    {"id": "d5_dc_locker_H2.s2", "role": "dc_technician", "kind": "stand", "pos": [-474.0, 30.0, -50.0], "yaw": 180.0, "dept": "engineering"},
-    {"id": "d5_dc_locker_H2.s3", "role": "dc_technician", "kind": "stand", "pos": [-465.8, 30.0, -50.0], "yaw": 0.0, "dept": "engineering"}
+    {"id": "d5_radiator_pumps_G1.s0", "role": "machinist", "kind": "work", "pos": [-454.4, 31.4, -50.0], "yaw": 0.0, "dept": "engineering"},
+    {"id": "d5_radiator_pumps_G1.s1", "role": "machinist", "kind": "work", "pos": [-450.0, 31.4, -50.0], "yaw": 0.0, "dept": "engineering"},
+    {"id": "d5_radiator_pumps_G1.s2", "role": "pump_tender", "kind": "work", "pos": [-445.6, 31.4, -50.0], "yaw": 0.0, "dept": "engineering"},
+    {"id": "d5_radiator_pumps_G1.s3", "role": "coolant_tender", "kind": "work", "pos": [-441.0, 29.2, -50.0], "yaw": 0.0, "dept": "engineering"},
+    {"id": "d5_radiator_pumps_G1.s4", "role": "machinist", "kind": "sit", "pos": [-452.6, 23.1, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_radiator_pumps_G1.s5", "role": "engineer", "kind": "stand", "pos": [-444.4, 24.4, -50.0], "yaw": 90.0, "dept": "engineering"}
    ],
    "lights": [
     {
      "type": "rect",
-     "pos": [-470.0, 27.0, -46.7],
-     "lumens": 4200,
-     "temperature": 5000,
-     "size": [6.0, 1.0],
-     "radius": 900,
+     "pos": [-452.0, 30.0, -46.4],
+     "lumens": 5000,
+     "temperature": 4500,
+     "size": [12.0, 1.0],
+     "radius": 1000,
      "shadows": false,
-     "id": "d5_dc_locker_H2.l0"
+     "id": "d5_radiator_pumps_G1.l0"
     },
     {
      "type": "rect",
-     "pos": [-470.0, 33.0, -46.7],
-     "lumens": 4200,
-     "temperature": 5000,
-     "size": [6.0, 1.0],
-     "radius": 900,
+     "pos": [-442.0, 30.0, -46.4],
+     "lumens": 5000,
+     "temperature": 4500,
+     "size": [10.0, 1.0],
+     "radius": 1000,
      "shadows": false,
-     "id": "d5_dc_locker_H2.l1"
+     "id": "d5_radiator_pumps_G1.l1"
     }
    ],
-   "plate": "dc",
+   "plate": "pumps",
    "lane": "O_s",
-   "size": [12.0, 16.0, 3.4],
-   "crew_slots": 4
+   "size": [24.0, 16.0, 3.7],
+   "crew_slots": 6
   },
   {
    "id": "d5_machinery_b_H1",
@@ -21277,27 +21220,27 @@
    "section": "H",
    "kind": "machinery",
    "name": "Compressor Room",
-   "bounds": [-500.0, 22.0, -476.0, 38.0],
+   "bounds": [-488.0, 22.0, -464.0, 38.0],
    "z": [-50.0, -46.0],
    "status": "built",
    "doors": ["d5_door_machinery_b_H1"],
    "dept": "engineering",
    "prefab": "machinery_b",
    "mesh": "SM_SHIP_MachineryB",
-   "pos": [-500.0, 22.0, -50.0],
+   "pos": [-488.0, 22.0, -50.0],
    "yaw": 0.0,
    "systems": ["power_bus", "compressed_air"],
    "stations": [
-    {"id": "d5_machinery_b_H1.s0", "role": "machinist", "kind": "work", "pos": [-496.0, 29.2, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_machinery_b_H1.s1", "role": "machinist", "kind": "work", "pos": [-491.6, 29.2, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_machinery_b_H1.s2", "role": "machinist", "kind": "work", "pos": [-484.2, 31.0, -50.0], "yaw": 0.0, "dept": "engineering"},
-    {"id": "d5_machinery_b_H1.s3", "role": "machinist", "kind": "sit", "pos": [-488.0, 25.0, -50.0], "yaw": 270.0, "dept": "engineering"},
-    {"id": "d5_machinery_b_H1.s4", "role": "engineer", "kind": "stand", "pos": [-480.0, 28.5, -50.0], "yaw": 180.0, "dept": "engineering"}
+    {"id": "d5_machinery_b_H1.s0", "role": "machinist", "kind": "work", "pos": [-484.0, 29.2, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_machinery_b_H1.s1", "role": "machinist", "kind": "work", "pos": [-479.6, 29.2, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_machinery_b_H1.s2", "role": "machinist", "kind": "work", "pos": [-472.2, 31.0, -50.0], "yaw": 0.0, "dept": "engineering"},
+    {"id": "d5_machinery_b_H1.s3", "role": "machinist", "kind": "sit", "pos": [-476.0, 25.0, -50.0], "yaw": 270.0, "dept": "engineering"},
+    {"id": "d5_machinery_b_H1.s4", "role": "engineer", "kind": "stand", "pos": [-468.0, 28.5, -50.0], "yaw": 180.0, "dept": "engineering"}
    ],
    "lights": [
     {
      "type": "rect",
-     "pos": [-492.0, 30.0, -46.4],
+     "pos": [-480.0, 30.0, -46.4],
      "lumens": 5000,
      "temperature": 4500,
      "size": [12.0, 1.0],
@@ -21307,7 +21250,7 @@
     },
     {
      "type": "rect",
-     "pos": [-482.0, 30.0, -46.4],
+     "pos": [-470.0, 30.0, -46.4],
      "lumens": 4500,
      "temperature": 4500,
      "size": [8.0, 1.0],
@@ -21327,28 +21270,28 @@
    "section": "H",
    "kind": "machinery",
    "name": "Machinery Space",
-   "bounds": [-524.0, 22.0, -500.0, 38.0],
+   "bounds": [-512.0, 22.0, -488.0, 38.0],
    "z": [-50.0, -46.0],
    "status": "built",
    "doors": ["d5_door_machinery_H2"],
    "dept": "engineering",
    "prefab": "machinery",
    "mesh": "SM_SHIP_Machinery",
-   "pos": [-524.0, 22.0, -50.0],
+   "pos": [-512.0, 22.0, -50.0],
    "yaw": 0.0,
    "systems": ["power_bus", "coolant", "compressed_air", "life_support", "potable_water"],
    "stations": [
-    {"id": "d5_machinery_H2.s0", "role": "machinist", "kind": "work", "pos": [-520.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_machinery_H2.s1", "role": "machinist", "kind": "work", "pos": [-516.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_machinery_H2.s2", "role": "machinist", "kind": "work", "pos": [-512.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
-    {"id": "d5_machinery_H2.s3", "role": "water_tender", "kind": "work", "pos": [-505.4, 32.4, -50.0], "yaw": 0.0, "dept": "engineering"},
-    {"id": "d5_machinery_H2.s4", "role": "machinist", "kind": "sit", "pos": [-510.0, 23.0, -50.0], "yaw": 270.0, "dept": "engineering"},
-    {"id": "d5_machinery_H2.s5", "role": "machinist", "kind": "work", "pos": [-517.0, 28.1, -50.0], "yaw": 90.0, "dept": "engineering"}
+    {"id": "d5_machinery_H2.s0", "role": "machinist", "kind": "work", "pos": [-508.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_machinery_H2.s1", "role": "machinist", "kind": "work", "pos": [-504.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_machinery_H2.s2", "role": "machinist", "kind": "work", "pos": [-500.6, 34.6, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_machinery_H2.s3", "role": "water_tender", "kind": "work", "pos": [-493.4, 32.4, -50.0], "yaw": 0.0, "dept": "engineering"},
+    {"id": "d5_machinery_H2.s4", "role": "machinist", "kind": "sit", "pos": [-498.0, 23.0, -50.0], "yaw": 270.0, "dept": "engineering"},
+    {"id": "d5_machinery_H2.s5", "role": "machinist", "kind": "work", "pos": [-505.0, 28.1, -50.0], "yaw": 90.0, "dept": "engineering"}
    ],
    "lights": [
     {
      "type": "rect",
-     "pos": [-516.0, 30.0, -46.4],
+     "pos": [-504.0, 30.0, -46.4],
      "lumens": 5000,
      "temperature": 4500,
      "size": [12.0, 1.0],
@@ -21358,7 +21301,7 @@
     },
     {
      "type": "rect",
-     "pos": [-506.0, 30.0, -46.4],
+     "pos": [-494.0, 30.0, -46.4],
      "lumens": 4500,
      "temperature": 4500,
      "size": [8.0, 1.0],
@@ -21371,6 +21314,55 @@
    "lane": "O_s",
    "size": [24.0, 16.0, 3.7],
    "crew_slots": 6
+  },
+  {
+   "id": "d5_dc_locker_H2",
+   "deck": 5,
+   "section": "H",
+   "kind": "damage_control",
+   "name": "Damage Control Locker",
+   "bounds": [-524.0, 22.0, -512.0, 38.0],
+   "z": [-50.0, -46.3],
+   "status": "built",
+   "doors": ["d5_door_dc_locker_H2"],
+   "dept": "engineering",
+   "prefab": "dc_locker",
+   "mesh": "SM_SHIP_DcLocker",
+   "pos": [-524.0, 22.0, -50.0],
+   "yaw": 0.0,
+   "systems": ["damage_control", "supply"],
+   "stations": [
+    {"id": "d5_dc_locker_H2.s0", "role": "dc_technician", "kind": "stand", "pos": [-519.6, 35.2, -50.0], "yaw": 90.0, "dept": "engineering"},
+    {"id": "d5_dc_locker_H2.s1", "role": "dc_technician", "kind": "work", "pos": [-518.0, 28.2, -50.0], "yaw": 270.0, "dept": "engineering"},
+    {"id": "d5_dc_locker_H2.s2", "role": "dc_technician", "kind": "stand", "pos": [-522.0, 30.0, -50.0], "yaw": 180.0, "dept": "engineering"},
+    {"id": "d5_dc_locker_H2.s3", "role": "dc_technician", "kind": "stand", "pos": [-513.8, 30.0, -50.0], "yaw": 0.0, "dept": "engineering"}
+   ],
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-518.0, 27.0, -46.7],
+     "lumens": 4200,
+     "temperature": 5000,
+     "size": [6.0, 1.0],
+     "radius": 900,
+     "shadows": false,
+     "id": "d5_dc_locker_H2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-518.0, 33.0, -46.7],
+     "lumens": 4200,
+     "temperature": 5000,
+     "size": [6.0, 1.0],
+     "radius": 900,
+     "shadows": false,
+     "id": "d5_dc_locker_H2.l1"
+    }
+   ],
+   "plate": "dc",
+   "lane": "O_s",
+   "size": [12.0, 16.0, 3.4],
+   "crew_slots": 4
   },
   {
    "id": "d5_sensor_room_A3",
@@ -21554,7 +21546,7 @@
    "crew_slots": 5
   },
   {
-   "id": "d5_lab_bio_B5",
+   "id": "d5_lab_bio_B3",
    "deck": 5,
    "section": "B",
    "kind": "lab",
@@ -21562,7 +21554,7 @@
    "bounds": [-4.0, -38.0, 20.0, -22.0],
    "z": [-50.0, -46.1],
    "status": "built",
-   "doors": ["d5_door_lab_bio_B5"],
+   "doors": ["d5_door_lab_bio_B3"],
    "dept": "science",
    "prefab": "lab_bio",
    "mesh": "SM_SHIP_LabBio",
@@ -21570,12 +21562,12 @@
    "yaw": 180.0,
    "systems": ["sensors", "power_bus", "data_trunk", "life_support"],
    "stations": [
-    {"id": "d5_lab_bio_B5.s0", "role": "biologist", "kind": "work", "pos": [14.1, -30.6, -50.0], "yaw": 180.0, "dept": "science"},
-    {"id": "d5_lab_bio_B5.s1", "role": "biologist", "kind": "work", "pos": [2.85, -28.6, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_bio_B5.s2", "role": "lab_technician", "kind": "work", "pos": [-2.4, -32.4, -50.0], "yaw": 180.0, "dept": "science"},
-    {"id": "d5_lab_bio_B5.s3", "role": "lab_technician", "kind": "work", "pos": [-2.4, -34.6, -50.0], "yaw": 180.0, "dept": "science"},
-    {"id": "d5_lab_bio_B5.s4", "role": "lead_scientist", "kind": "sit", "pos": [6.6, -24.0, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_bio_B5.s5", "role": "biologist", "kind": "stand", "pos": [10.0, -35.4, -50.0], "yaw": 270.0, "dept": "science"}
+    {"id": "d5_lab_bio_B3.s0", "role": "biologist", "kind": "work", "pos": [14.1, -30.6, -50.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d5_lab_bio_B3.s1", "role": "biologist", "kind": "work", "pos": [2.85, -28.6, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_bio_B3.s2", "role": "lab_technician", "kind": "work", "pos": [-2.4, -32.4, -50.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d5_lab_bio_B3.s3", "role": "lab_technician", "kind": "work", "pos": [-2.4, -34.6, -50.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d5_lab_bio_B3.s4", "role": "lead_scientist", "kind": "sit", "pos": [6.6, -24.0, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_bio_B3.s5", "role": "biologist", "kind": "stand", "pos": [10.0, -35.4, -50.0], "yaw": 270.0, "dept": "science"}
    ],
    "lights": [
     {
@@ -21586,7 +21578,7 @@
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_bio_B5.l0"
+     "id": "d5_lab_bio_B3.l0"
     },
     {
      "type": "rect",
@@ -21596,7 +21588,7 @@
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_bio_B5.l1"
+     "id": "d5_lab_bio_B3.l1"
     }
    ],
    "plate": "lab_bio",
@@ -21675,7 +21667,7 @@
    "crew_slots": 5
   },
   {
-   "id": "d5_lab_bio_B6",
+   "id": "d5_lab_bio_B4",
    "deck": 5,
    "section": "B",
    "kind": "lab",
@@ -21683,7 +21675,7 @@
    "bounds": [-44.0, -38.0, -20.0, -22.0],
    "z": [-50.0, -46.1],
    "status": "built",
-   "doors": ["d5_door_lab_bio_B6"],
+   "doors": ["d5_door_lab_bio_B4"],
    "dept": "science",
    "prefab": "lab_bio",
    "mesh": "SM_SHIP_LabBio",
@@ -21691,12 +21683,12 @@
    "yaw": 180.0,
    "systems": ["sensors", "power_bus", "data_trunk", "life_support"],
    "stations": [
-    {"id": "d5_lab_bio_B6.s0", "role": "biologist", "kind": "work", "pos": [-25.9, -30.6, -50.0], "yaw": 180.0, "dept": "science"},
-    {"id": "d5_lab_bio_B6.s1", "role": "biologist", "kind": "work", "pos": [-37.15, -28.6, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_bio_B6.s2", "role": "lab_technician", "kind": "work", "pos": [-42.4, -32.4, -50.0], "yaw": 180.0, "dept": "science"},
-    {"id": "d5_lab_bio_B6.s3", "role": "lab_technician", "kind": "work", "pos": [-42.4, -34.6, -50.0], "yaw": 180.0, "dept": "science"},
-    {"id": "d5_lab_bio_B6.s4", "role": "lead_scientist", "kind": "sit", "pos": [-33.4, -24.0, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_bio_B6.s5", "role": "biologist", "kind": "stand", "pos": [-30.0, -35.4, -50.0], "yaw": 270.0, "dept": "science"}
+    {"id": "d5_lab_bio_B4.s0", "role": "biologist", "kind": "work", "pos": [-25.9, -30.6, -50.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d5_lab_bio_B4.s1", "role": "biologist", "kind": "work", "pos": [-37.15, -28.6, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_bio_B4.s2", "role": "lab_technician", "kind": "work", "pos": [-42.4, -32.4, -50.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d5_lab_bio_B4.s3", "role": "lab_technician", "kind": "work", "pos": [-42.4, -34.6, -50.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d5_lab_bio_B4.s4", "role": "lead_scientist", "kind": "sit", "pos": [-33.4, -24.0, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_bio_B4.s5", "role": "biologist", "kind": "stand", "pos": [-30.0, -35.4, -50.0], "yaw": 270.0, "dept": "science"}
    ],
    "lights": [
     {
@@ -21707,7 +21699,7 @@
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_bio_B6.l0"
+     "id": "d5_lab_bio_B4.l0"
     },
     {
      "type": "rect",
@@ -21717,7 +21709,7 @@
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_bio_B6.l1"
+     "id": "d5_lab_bio_B4.l1"
     }
    ],
    "plate": "lab_bio",
@@ -21847,7 +21839,7 @@
    "crew_slots": 6
   },
   {
-   "id": "d5_lab_phys_C2",
+   "id": "d5_lab_phys_C1",
    "deck": 5,
    "section": "C",
    "kind": "lab",
@@ -21855,7 +21847,7 @@
    "bounds": [-104.0, -38.0, -80.0, -22.0],
    "z": [-50.0, -46.0],
    "status": "built",
-   "doors": ["d5_door_lab_phys_C2"],
+   "doors": ["d5_door_lab_phys_C1"],
    "dept": "science",
    "prefab": "lab_phys",
    "mesh": "SM_SHIP_LabPhys",
@@ -21863,11 +21855,11 @@
    "yaw": 180.0,
    "systems": ["sensors", "power_bus", "data_trunk", "coolant"],
    "stations": [
-    {"id": "d5_lab_phys_C2.s0", "role": "physicist", "kind": "sit", "pos": [-85.0, -24.8, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_phys_C2.s1", "role": "physics_technician", "kind": "work", "pos": [-89.0, -31.4, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_phys_C2.s2", "role": "physics_technician", "kind": "work", "pos": [-99.6, -31.2, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_phys_C2.s3", "role": "cryo_technician", "kind": "work", "pos": [-100.3, -26.2, -50.0], "yaw": 180.0, "dept": "science"},
-    {"id": "d5_lab_phys_C2.s4", "role": "physicist", "kind": "work", "pos": [-92.0, -35.7, -50.0], "yaw": 270.0, "dept": "science"}
+    {"id": "d5_lab_phys_C1.s0", "role": "physicist", "kind": "sit", "pos": [-85.0, -24.8, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_phys_C1.s1", "role": "physics_technician", "kind": "work", "pos": [-89.0, -31.4, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_phys_C1.s2", "role": "physics_technician", "kind": "work", "pos": [-99.6, -31.2, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_phys_C1.s3", "role": "cryo_technician", "kind": "work", "pos": [-100.3, -26.2, -50.0], "yaw": 180.0, "dept": "science"},
+    {"id": "d5_lab_phys_C1.s4", "role": "physicist", "kind": "work", "pos": [-92.0, -35.7, -50.0], "yaw": 270.0, "dept": "science"}
    ],
    "lights": [
     {
@@ -21878,7 +21870,7 @@
      "size": [6.0, 6.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_phys_C2.l0"
+     "id": "d5_lab_phys_C1.l0"
     },
     {
      "type": "rect",
@@ -21888,7 +21880,7 @@
      "size": [14.0, 4.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_phys_C2.l1"
+     "id": "d5_lab_phys_C1.l1"
     },
     {
      "type": "rect",
@@ -21898,7 +21890,7 @@
      "size": [5.0, 5.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_phys_C2.l2"
+     "id": "d5_lab_phys_C1.l2"
     }
    ],
    "plate": "lab_phys",
@@ -21958,7 +21950,7 @@
    "crew_slots": 6
   },
   {
-   "id": "d5_lab_C2",
+   "id": "d5_lab_C3",
    "deck": 5,
    "section": "C",
    "kind": "lab",
@@ -21966,7 +21958,7 @@
    "bounds": [-152.0, -38.0, -128.0, -22.0],
    "z": [-50.0, -46.1],
    "status": "built",
-   "doors": ["d5_door_lab_C2"],
+   "doors": ["d5_door_lab_C3"],
    "dept": "science",
    "prefab": "lab",
    "mesh": "SM_SHIP_Lab",
@@ -21974,13 +21966,13 @@
    "yaw": 180.0,
    "systems": ["sensors", "power_bus", "data_trunk"],
    "stations": [
-    {"id": "d5_lab_C2.s0", "role": "scientist", "kind": "sit", "pos": [-133.0, -36.4, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_C2.s1", "role": "scientist", "kind": "sit", "pos": [-137.0, -36.4, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_C2.s2", "role": "scientist", "kind": "sit", "pos": [-141.0, -36.4, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_C2.s3", "role": "scientist", "kind": "sit", "pos": [-145.0, -36.4, -50.0], "yaw": 270.0, "dept": "science"},
-    {"id": "d5_lab_C2.s4", "role": "scientist", "kind": "sit", "pos": [-138.2, -29.6, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_C2.s5", "role": "scientist", "kind": "sit", "pos": [-141.4, -33.85, -50.0], "yaw": 90.0, "dept": "science"},
-    {"id": "d5_lab_C2.s6", "role": "lead_scientist", "kind": "work", "pos": [-148.5, -29.0, -50.0], "yaw": 0.0, "dept": "science"}
+    {"id": "d5_lab_C3.s0", "role": "scientist", "kind": "sit", "pos": [-133.0, -36.4, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_C3.s1", "role": "scientist", "kind": "sit", "pos": [-137.0, -36.4, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_C3.s2", "role": "scientist", "kind": "sit", "pos": [-141.0, -36.4, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_C3.s3", "role": "scientist", "kind": "sit", "pos": [-145.0, -36.4, -50.0], "yaw": 270.0, "dept": "science"},
+    {"id": "d5_lab_C3.s4", "role": "scientist", "kind": "sit", "pos": [-138.2, -29.6, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C3.s5", "role": "scientist", "kind": "sit", "pos": [-141.4, -33.85, -50.0], "yaw": 90.0, "dept": "science"},
+    {"id": "d5_lab_C3.s6", "role": "lead_scientist", "kind": "work", "pos": [-148.5, -29.0, -50.0], "yaw": 0.0, "dept": "science"}
    ],
    "lights": [
     {
@@ -21991,7 +21983,7 @@
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_C2.l0"
+     "id": "d5_lab_C3.l0"
     },
     {
      "type": "rect",
@@ -22001,7 +21993,7 @@
      "size": [8.0, 8.0],
      "radius": 900.0,
      "shadows": false,
-     "id": "d5_lab_C2.l1"
+     "id": "d5_lab_C3.l1"
     }
    ],
    "plate": "lab",
@@ -23790,7 +23782,7 @@
    "bounds": [-524.0, 18.0, -508.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_machinery_H2"],
+   "doors": ["d5_door_dc_locker_H2"],
    "passage": "SB0",
    "modules": [0, 3],
    "tone": "P",
@@ -23817,7 +23809,7 @@
    "bounds": [-508.0, 18.0, -492.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": [],
+   "doors": ["d5_door_machinery_H2"],
    "passage": "SB0",
    "modules": [4, 7],
    "tone": "P",
@@ -23871,7 +23863,7 @@
    "bounds": [-476.0, 18.0, -460.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_dc_locker_H2"],
+   "doors": [],
    "passage": "SB0",
    "modules": [12, 15],
    "tone": "P",
@@ -23898,7 +23890,7 @@
    "bounds": [-460.0, 18.0, -444.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_dc_locker_G3"],
+   "doors": ["d5_door_radiator_pumps_G1"],
    "passage": "SB0",
    "modules": [16, 19],
    "tone": "P",
@@ -23925,7 +23917,7 @@
    "bounds": [-444.0, 18.0, -428.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_machinery_G2"],
+   "doors": ["d5_door_dc_locker_G3"],
    "passage": "SB0",
    "modules": [20, 23],
    "tone": "P",
@@ -23952,7 +23944,7 @@
    "bounds": [-428.0, 18.0, -412.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_radiator_pumps_G1"],
+   "doors": ["d5_door_machinery_G2"],
    "passage": "SB0",
    "modules": [24, 27],
    "tone": "P",
@@ -24411,7 +24403,7 @@
    "bounds": [-156.0, 18.0, -140.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_bio_C1"],
+   "doors": ["d5_door_sensor_room_C2"],
    "passage": "SB0",
    "modules": [92, 95],
    "tone": "P",
@@ -24438,7 +24430,7 @@
    "bounds": [-140.0, 18.0, -124.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": [],
+   "doors": ["d5_door_lab_C2"],
    "passage": "SB0",
    "modules": [96, 99],
    "tone": "P",
@@ -24465,7 +24457,7 @@
    "bounds": [-124.0, 18.0, -108.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_phys_C1"],
+   "doors": [],
    "passage": "SB0",
    "modules": [100, 103],
    "tone": "P",
@@ -24492,7 +24484,7 @@
    "bounds": [-108.0, 18.0, -92.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_sensor_room_C2"],
+   "doors": ["d5_door_lab_C1"],
    "passage": "SB0",
    "modules": [104, 107],
    "tone": "P",
@@ -24519,7 +24511,7 @@
    "bounds": [-92.0, 18.0, -76.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_C1"],
+   "doors": ["d5_door_lab_bio_C1"],
    "passage": "SB0",
    "modules": [108, 111],
    "tone": "P",
@@ -24600,7 +24592,7 @@
    "bounds": [-56.0, 18.0, -40.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_bio_B4"],
+   "doors": ["d5_door_lab_bio_B2"],
    "passage": "SB0",
    "modules": [117, 120],
    "tone": "P",
@@ -24627,7 +24619,7 @@
    "bounds": [-40.0, 18.0, -24.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_bio_B3"],
+   "doors": ["d5_door_lab_B3"],
    "passage": "SB0",
    "modules": [121, 124],
    "tone": "P",
@@ -24681,7 +24673,7 @@
    "bounds": [-8.0, 18.0, 8.0, 22.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_bio_B2"],
+   "doors": ["d5_door_lab_astro_B1"],
    "passage": "SB0",
    "modules": [129, 132],
    "tone": "P",
@@ -25653,7 +25645,7 @@
    "bounds": [-140.0, -22.0, -124.0, -18.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_C2"],
+   "doors": ["d5_door_lab_C3"],
    "passage": "PO0",
    "modules": [96, 99],
    "tone": "P",
@@ -25734,7 +25726,7 @@
    "bounds": [-92.0, -22.0, -76.0, -18.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_phys_C2"],
+   "doors": ["d5_door_lab_phys_C1"],
    "passage": "PO0",
    "modules": [108, 111],
    "tone": "P",
@@ -25842,7 +25834,7 @@
    "bounds": [-40.0, -22.0, -24.0, -18.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_bio_B6"],
+   "doors": ["d5_door_lab_bio_B4"],
    "passage": "PO0",
    "modules": [121, 124],
    "tone": "P",
@@ -25923,7 +25915,7 @@
    "bounds": [8.0, -22.0, 24.0, -18.0],
    "z": [-50.0, -46.6],
    "status": "built",
-   "doors": ["d5_door_lab_bio_B5"],
+   "doors": ["d5_door_lab_bio_B3"],
    "passage": "PO0",
    "modules": [133, 136],
    "tone": "P",
@@ -85819,31 +85811,47 @@
    "side": 1
   },
   {
-   "id": "d5_door_lab_bio_B2",
+   "id": "d5_door_lab_astro_B1",
    "deck": 5,
    "pos": [-2.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_lab_bio_B2",
+   "a": "d5_lab_astro_B1",
    "b": "d5_sb0_B2",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
-   "plate": "lab_bio",
+   "plate": "lab_astro",
    "side": 1
   },
   {
-   "id": "d5_door_lab_bio_B3",
+   "id": "d5_door_lab_B3",
    "deck": 5,
    "pos": [-26.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_lab_bio_B3",
+   "a": "d5_lab_B3",
    "b": "d5_sb0_B4",
+   "locked": false,
+   "wall": "near",
+   "passage": "SB0",
+   "plate": "lab",
+   "side": 1
+  },
+  {
+   "id": "d5_door_lab_bio_B2",
+   "deck": 5,
+   "pos": [-50.0, 21.775, -50.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d5_lab_bio_B2",
+   "b": "d5_sb0_B5",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
@@ -85851,15 +85859,15 @@
    "side": 1
   },
   {
-   "id": "d5_door_lab_bio_B4",
+   "id": "d5_door_lab_bio_C1",
    "deck": 5,
-   "pos": [-50.0, 21.775, -50.0],
+   "pos": [-78.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_lab_bio_B4",
-   "b": "d5_sb0_B5",
+   "a": "d5_lab_bio_C1",
+   "b": "d5_sb0_C1",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
@@ -85869,13 +85877,29 @@
   {
    "id": "d5_door_lab_C1",
    "deck": 5,
-   "pos": [-78.0, 21.775, -50.0],
+   "pos": [-102.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
    "a": "d5_lab_C1",
-   "b": "d5_sb0_C1",
+   "b": "d5_sb0_C2",
+   "locked": false,
+   "wall": "near",
+   "passage": "SB0",
+   "plate": "lab",
+   "side": 1
+  },
+  {
+   "id": "d5_door_lab_C2",
+   "deck": 5,
+   "pos": [-126.0, 21.775, -50.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d5_lab_C2",
+   "b": "d5_sb0_C4",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
@@ -85885,49 +85909,17 @@
   {
    "id": "d5_door_sensor_room_C2",
    "deck": 5,
-   "pos": [-98.0, 21.775, -50.0],
+   "pos": [-146.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
    "a": "d5_sensor_room_C2",
-   "b": "d5_sb0_C2",
-   "locked": false,
-   "wall": "near",
-   "passage": "SB0",
-   "plate": "sensors",
-   "side": 1
-  },
-  {
-   "id": "d5_door_lab_phys_C1",
-   "deck": 5,
-   "pos": [-118.0, 21.775, -50.0],
-   "yaw": 90.0,
-   "width": 1.6,
-   "height": 2.4,
-   "kind": "door",
-   "a": "d5_lab_phys_C1",
-   "b": "d5_sb0_C3",
-   "locked": false,
-   "wall": "near",
-   "passage": "SB0",
-   "plate": "lab_phys",
-   "side": 1
-  },
-  {
-   "id": "d5_door_lab_bio_C1",
-   "deck": 5,
-   "pos": [-142.0, 21.775, -50.0],
-   "yaw": 90.0,
-   "width": 1.6,
-   "height": 2.4,
-   "kind": "door",
-   "a": "d5_lab_bio_C1",
    "b": "d5_sb0_C5",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
-   "plate": "lab_bio",
+   "plate": "sensors",
    "side": 1
   },
   {
@@ -86075,31 +86067,15 @@
    "side": 1
   },
   {
-   "id": "d5_door_radiator_pumps_G1",
+   "id": "d5_door_machinery_G2",
    "deck": 5,
    "pos": [-414.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_radiator_pumps_G1",
-   "b": "d5_sb0_G1",
-   "locked": false,
-   "wall": "near",
-   "passage": "SB0",
-   "plate": "pumps",
-   "side": 1
-  },
-  {
-   "id": "d5_door_machinery_G2",
-   "deck": 5,
-   "pos": [-438.0, 21.775, -50.0],
-   "yaw": 90.0,
-   "width": 1.6,
-   "height": 2.4,
-   "kind": "door",
    "a": "d5_machinery_G2",
-   "b": "d5_sb0_G2",
+   "b": "d5_sb0_G1",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
@@ -86109,13 +86085,13 @@
   {
    "id": "d5_door_dc_locker_G3",
    "deck": 5,
-   "pos": [-454.0, 21.775, -50.0],
+   "pos": [-430.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
    "a": "d5_dc_locker_G3",
-   "b": "d5_sb0_G3",
+   "b": "d5_sb0_G2",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
@@ -86123,25 +86099,25 @@
    "side": 1
   },
   {
-   "id": "d5_door_dc_locker_H2",
+   "id": "d5_door_radiator_pumps_G1",
    "deck": 5,
-   "pos": [-470.0, 21.775, -50.0],
+   "pos": [-450.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_dc_locker_H2",
-   "b": "d5_sb0_H0",
+   "a": "d5_radiator_pumps_G1",
+   "b": "d5_sb0_G3",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
-   "plate": "dc",
+   "plate": "pumps",
    "side": 1
   },
   {
    "id": "d5_door_machinery_b_H1",
    "deck": 5,
-   "pos": [-490.0, 21.775, -50.0],
+   "pos": [-478.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
@@ -86157,17 +86133,33 @@
   {
    "id": "d5_door_machinery_H2",
    "deck": 5,
-   "pos": [-514.0, 21.775, -50.0],
+   "pos": [-502.0, 21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
    "a": "d5_machinery_H2",
-   "b": "d5_sb0_H3",
+   "b": "d5_sb0_H2",
    "locked": false,
    "wall": "near",
    "passage": "SB0",
    "plate": "machinery",
+   "side": 1
+  },
+  {
+   "id": "d5_door_dc_locker_H2",
+   "deck": 5,
+   "pos": [-518.0, 21.775, -50.0],
+   "yaw": 90.0,
+   "width": 1.6,
+   "height": 2.4,
+   "kind": "door",
+   "a": "d5_dc_locker_H2",
+   "b": "d5_sb0_H3",
+   "locked": false,
+   "wall": "near",
+   "passage": "SB0",
+   "plate": "dc",
    "side": 1
   },
   {
@@ -86219,14 +86211,14 @@
    "side": -1
   },
   {
-   "id": "d5_door_lab_bio_B5",
+   "id": "d5_door_lab_bio_B3",
    "deck": 5,
    "pos": [10.0, -21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_lab_bio_B5",
+   "a": "d5_lab_bio_B3",
    "b": "d5_po0_B1",
    "locked": false,
    "wall": "near",
@@ -86251,14 +86243,14 @@
    "side": -1
   },
   {
-   "id": "d5_door_lab_bio_B6",
+   "id": "d5_door_lab_bio_B4",
    "deck": 5,
    "pos": [-30.0, -21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_lab_bio_B6",
+   "a": "d5_lab_bio_B4",
    "b": "d5_po0_B4",
    "locked": false,
    "wall": "near",
@@ -86299,14 +86291,14 @@
    "side": -1
   },
   {
-   "id": "d5_door_lab_phys_C2",
+   "id": "d5_door_lab_phys_C1",
    "deck": 5,
    "pos": [-90.0, -21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_lab_phys_C2",
+   "a": "d5_lab_phys_C1",
    "b": "d5_po0_C1",
    "locked": false,
    "wall": "near",
@@ -86331,14 +86323,14 @@
    "side": -1
   },
   {
-   "id": "d5_door_lab_C2",
+   "id": "d5_door_lab_C3",
    "deck": 5,
    "pos": [-138.0, -21.775, -50.0],
    "yaw": 90.0,
    "width": 1.6,
    "height": 2.4,
    "kind": "door",
-   "a": "d5_lab_C2",
+   "a": "d5_lab_C3",
    "b": "d5_po0_C4",
    "locked": false,
    "wall": "near",
@@ -109151,12 +109143,136 @@
     "act": "work",
     "yaw": 180.0
    },
-   {"id": "d5_lab_bio_B2.in0", "deck": 5, "p": [-2.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_B2"},
-   {"id": "d5_lab_bio_B2.hub", "deck": 5, "p": [0.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_B2"},
+   {"id": "d5_lab_astro_B1.in0", "deck": 5, "p": [-2.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_astro_B1"},
+   {"id": "d5_lab_astro_B1.hub", "deck": 5, "p": [0.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_astro_B1"},
+   {
+    "id": "d5_lab_astro_B1.s0",
+    "deck": 5,
+    "p": [3.118, 32.0, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_astro_B1",
+    "role": "astrometrist",
+    "act": "sit",
+    "yaw": 210.0
+   },
+   {
+    "id": "d5_lab_astro_B1.s1",
+    "deck": 5,
+    "p": [0.0, 33.8, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_astro_B1",
+    "role": "astrometrist",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d5_lab_astro_B1.s2",
+    "deck": 5,
+    "p": [-3.118, 28.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_astro_B1",
+    "role": "astrometrist",
+    "act": "sit",
+    "yaw": 30.0
+   },
+   {
+    "id": "d5_lab_astro_B1.s3",
+    "deck": 5,
+    "p": [0.0, 26.6, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_astro_B1",
+    "role": "astrometrist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_astro_B1.s4",
+    "deck": 5,
+    "p": [-9.0, 30.0, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_astro_B1",
+    "role": "lead_scientist",
+    "act": "stand",
+    "yaw": 0.0
+   },
+   {"id": "d5_lab_B3.in0", "deck": 5, "p": [-26.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_B3"},
+   {"id": "d5_lab_B3.hub", "deck": 5, "p": [-24.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_B3"},
+   {
+    "id": "d5_lab_B3.s0",
+    "deck": 5,
+    "p": [-31.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_B3",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_B3.s1",
+    "deck": 5,
+    "p": [-27.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_B3",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_B3.s2",
+    "deck": 5,
+    "p": [-23.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_B3",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_B3.s3",
+    "deck": 5,
+    "p": [-19.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_B3",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_B3.s4",
+    "deck": 5,
+    "p": [-25.8, 29.6, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_B3",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d5_lab_B3.s5",
+    "deck": 5,
+    "p": [-22.6, 33.85, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_B3",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d5_lab_B3.s6",
+    "deck": 5,
+    "p": [-15.5, 29.0, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_B3",
+    "role": "lead_scientist",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {"id": "d5_lab_bio_B2.in0", "deck": 5, "p": [-50.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_B2"},
+   {"id": "d5_lab_bio_B2.hub", "deck": 5, "p": [-48.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_B2"},
    {
     "id": "d5_lab_bio_B2.s0",
     "deck": 5,
-    "p": [-6.1, 30.6, -50.0],
+    "p": [-54.1, 30.6, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_B2",
     "role": "biologist",
@@ -109166,7 +109282,7 @@
    {
     "id": "d5_lab_bio_B2.s1",
     "deck": 5,
-    "p": [5.15, 28.6, -50.0],
+    "p": [-42.85, 28.6, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_B2",
     "role": "biologist",
@@ -109176,7 +109292,7 @@
    {
     "id": "d5_lab_bio_B2.s2",
     "deck": 5,
-    "p": [10.4, 32.4, -50.0],
+    "p": [-37.6, 32.4, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_B2",
     "role": "lab_technician",
@@ -109186,7 +109302,7 @@
    {
     "id": "d5_lab_bio_B2.s3",
     "deck": 5,
-    "p": [10.4, 34.6, -50.0],
+    "p": [-37.6, 34.6, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_B2",
     "role": "lab_technician",
@@ -109196,7 +109312,7 @@
    {
     "id": "d5_lab_bio_B2.s4",
     "deck": 5,
-    "p": [1.4, 24.0, -50.0],
+    "p": [-46.6, 24.0, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_B2",
     "role": "lead_scientist",
@@ -109206,329 +109322,19 @@
    {
     "id": "d5_lab_bio_B2.s5",
     "deck": 5,
-    "p": [-2.0, 35.4, -50.0],
+    "p": [-50.0, 35.4, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_B2",
     "role": "biologist",
     "act": "stand",
     "yaw": 90.0
    },
-   {"id": "d5_lab_bio_B3.in0", "deck": 5, "p": [-26.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_B3"},
-   {"id": "d5_lab_bio_B3.hub", "deck": 5, "p": [-24.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_B3"},
-   {
-    "id": "d5_lab_bio_B3.s0",
-    "deck": 5,
-    "p": [-30.1, 30.6, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B3",
-    "role": "biologist",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_lab_bio_B3.s1",
-    "deck": 5,
-    "p": [-18.85, 28.6, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B3",
-    "role": "biologist",
-    "act": "work",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_bio_B3.s2",
-    "deck": 5,
-    "p": [-13.6, 32.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B3",
-    "role": "lab_technician",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_lab_bio_B3.s3",
-    "deck": 5,
-    "p": [-13.6, 34.6, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B3",
-    "role": "lab_technician",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_lab_bio_B3.s4",
-    "deck": 5,
-    "p": [-22.6, 24.0, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B3",
-    "role": "lead_scientist",
-    "act": "sit",
-    "yaw": 270.0
-   },
-   {
-    "id": "d5_lab_bio_B3.s5",
-    "deck": 5,
-    "p": [-26.0, 35.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B3",
-    "role": "biologist",
-    "act": "stand",
-    "yaw": 90.0
-   },
-   {"id": "d5_lab_bio_B4.in0", "deck": 5, "p": [-50.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_B4"},
-   {"id": "d5_lab_bio_B4.hub", "deck": 5, "p": [-48.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_B4"},
-   {
-    "id": "d5_lab_bio_B4.s0",
-    "deck": 5,
-    "p": [-54.1, 30.6, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B4",
-    "role": "biologist",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_lab_bio_B4.s1",
-    "deck": 5,
-    "p": [-42.85, 28.6, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B4",
-    "role": "biologist",
-    "act": "work",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_bio_B4.s2",
-    "deck": 5,
-    "p": [-37.6, 32.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B4",
-    "role": "lab_technician",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_lab_bio_B4.s3",
-    "deck": 5,
-    "p": [-37.6, 34.6, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B4",
-    "role": "lab_technician",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_lab_bio_B4.s4",
-    "deck": 5,
-    "p": [-46.6, 24.0, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B4",
-    "role": "lead_scientist",
-    "act": "sit",
-    "yaw": 270.0
-   },
-   {
-    "id": "d5_lab_bio_B4.s5",
-    "deck": 5,
-    "p": [-50.0, 35.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_bio_B4",
-    "role": "biologist",
-    "act": "stand",
-    "yaw": 90.0
-   },
-   {"id": "d5_lab_C1.in0", "deck": 5, "p": [-78.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_C1"},
-   {"id": "d5_lab_C1.hub", "deck": 5, "p": [-76.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_C1"},
-   {
-    "id": "d5_lab_C1.s0",
-    "deck": 5,
-    "p": [-83.0, 36.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_C1",
-    "role": "scientist",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_C1.s1",
-    "deck": 5,
-    "p": [-79.0, 36.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_C1",
-    "role": "scientist",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_C1.s2",
-    "deck": 5,
-    "p": [-75.0, 36.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_C1",
-    "role": "scientist",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_C1.s3",
-    "deck": 5,
-    "p": [-71.0, 36.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_C1",
-    "role": "scientist",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_C1.s4",
-    "deck": 5,
-    "p": [-77.8, 29.6, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_C1",
-    "role": "scientist",
-    "act": "sit",
-    "yaw": 270.0
-   },
-   {
-    "id": "d5_lab_C1.s5",
-    "deck": 5,
-    "p": [-74.6, 33.85, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_C1",
-    "role": "scientist",
-    "act": "sit",
-    "yaw": 270.0
-   },
-   {
-    "id": "d5_lab_C1.s6",
-    "deck": 5,
-    "p": [-67.5, 29.0, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_C1",
-    "role": "lead_scientist",
-    "act": "work",
-    "yaw": 180.0
-   },
-   {"id": "d5_sensor_room_C2.in0", "deck": 5, "p": [-98.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_sensor_room_C2"},
-   {"id": "d5_sensor_room_C2.hub", "deck": 5, "p": [-96.0, 30.0, -50.0], "kind": "room", "comp": "d5_sensor_room_C2"},
-   {
-    "id": "d5_sensor_room_C2.s0",
-    "deck": 5,
-    "p": [-100.6, 28.9, -50.0],
-    "kind": "station",
-    "comp": "d5_sensor_room_C2",
-    "role": "sensor_operator",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_sensor_room_C2.s1",
-    "deck": 5,
-    "p": [-96.0, 28.9, -50.0],
-    "kind": "station",
-    "comp": "d5_sensor_room_C2",
-    "role": "sensor_operator",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_sensor_room_C2.s2",
-    "deck": 5,
-    "p": [-91.4, 28.9, -50.0],
-    "kind": "station",
-    "comp": "d5_sensor_room_C2",
-    "role": "sensor_operator",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_sensor_room_C2.s3",
-    "deck": 5,
-    "p": [-98.0, 33.0, -50.0],
-    "kind": "station",
-    "comp": "d5_sensor_room_C2",
-    "role": "sensor_supervisor",
-    "act": "stand",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_sensor_room_C2.s4",
-    "deck": 5,
-    "p": [-101.8, 29.0, -50.0],
-    "kind": "station",
-    "comp": "d5_sensor_room_C2",
-    "role": "sensor_tech",
-    "act": "work",
-    "yaw": 180.0
-   },
-   {
-    "id": "d5_sensor_room_C2.s5",
-    "deck": 5,
-    "p": [-90.2, 29.0, -50.0],
-    "kind": "station",
-    "comp": "d5_sensor_room_C2",
-    "role": "sensor_tech",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {"id": "d5_lab_phys_C1.in0", "deck": 5, "p": [-118.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_phys_C1"},
-   {"id": "d5_lab_phys_C1.hub", "deck": 5, "p": [-116.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_phys_C1"},
-   {
-    "id": "d5_lab_phys_C1.s0",
-    "deck": 5,
-    "p": [-123.0, 24.8, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_phys_C1",
-    "role": "physicist",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_phys_C1.s1",
-    "deck": 5,
-    "p": [-119.0, 31.4, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_phys_C1",
-    "role": "physics_technician",
-    "act": "work",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_phys_C1.s2",
-    "deck": 5,
-    "p": [-108.4, 31.2, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_phys_C1",
-    "role": "physics_technician",
-    "act": "work",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_lab_phys_C1.s3",
-    "deck": 5,
-    "p": [-107.7, 26.2, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_phys_C1",
-    "role": "cryo_technician",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_lab_phys_C1.s4",
-    "deck": 5,
-    "p": [-116.0, 35.7, -50.0],
-    "kind": "station",
-    "comp": "d5_lab_phys_C1",
-    "role": "physicist",
-    "act": "work",
-    "yaw": 90.0
-   },
-   {"id": "d5_lab_bio_C1.in0", "deck": 5, "p": [-142.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_C1"},
-   {"id": "d5_lab_bio_C1.hub", "deck": 5, "p": [-140.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_C1"},
+   {"id": "d5_lab_bio_C1.in0", "deck": 5, "p": [-78.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_C1"},
+   {"id": "d5_lab_bio_C1.hub", "deck": 5, "p": [-76.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_C1"},
    {
     "id": "d5_lab_bio_C1.s0",
     "deck": 5,
-    "p": [-146.1, 30.6, -50.0],
+    "p": [-82.1, 30.6, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_C1",
     "role": "biologist",
@@ -109538,7 +109344,7 @@
    {
     "id": "d5_lab_bio_C1.s1",
     "deck": 5,
-    "p": [-134.85, 28.6, -50.0],
+    "p": [-70.85, 28.6, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_C1",
     "role": "biologist",
@@ -109548,7 +109354,7 @@
    {
     "id": "d5_lab_bio_C1.s2",
     "deck": 5,
-    "p": [-129.6, 32.4, -50.0],
+    "p": [-65.6, 32.4, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_C1",
     "role": "lab_technician",
@@ -109558,7 +109364,7 @@
    {
     "id": "d5_lab_bio_C1.s3",
     "deck": 5,
-    "p": [-129.6, 34.6, -50.0],
+    "p": [-65.6, 34.6, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_C1",
     "role": "lab_technician",
@@ -109568,7 +109374,7 @@
    {
     "id": "d5_lab_bio_C1.s4",
     "deck": 5,
-    "p": [-138.6, 24.0, -50.0],
+    "p": [-74.6, 24.0, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_C1",
     "role": "lead_scientist",
@@ -109578,12 +109384,218 @@
    {
     "id": "d5_lab_bio_C1.s5",
     "deck": 5,
-    "p": [-142.0, 35.4, -50.0],
+    "p": [-78.0, 35.4, -50.0],
     "kind": "station",
     "comp": "d5_lab_bio_C1",
     "role": "biologist",
     "act": "stand",
     "yaw": 90.0
+   },
+   {"id": "d5_lab_C1.in0", "deck": 5, "p": [-102.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_C1"},
+   {"id": "d5_lab_C1.hub", "deck": 5, "p": [-100.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_C1"},
+   {
+    "id": "d5_lab_C1.s0",
+    "deck": 5,
+    "p": [-107.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C1",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_C1.s1",
+    "deck": 5,
+    "p": [-103.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C1",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_C1.s2",
+    "deck": 5,
+    "p": [-99.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C1",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_C1.s3",
+    "deck": 5,
+    "p": [-95.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C1",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_C1.s4",
+    "deck": 5,
+    "p": [-101.8, 29.6, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C1",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d5_lab_C1.s5",
+    "deck": 5,
+    "p": [-98.6, 33.85, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C1",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d5_lab_C1.s6",
+    "deck": 5,
+    "p": [-91.5, 29.0, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C1",
+    "role": "lead_scientist",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {"id": "d5_lab_C2.in0", "deck": 5, "p": [-126.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_lab_C2"},
+   {"id": "d5_lab_C2.hub", "deck": 5, "p": [-124.0, 30.0, -50.0], "kind": "room", "comp": "d5_lab_C2"},
+   {
+    "id": "d5_lab_C2.s0",
+    "deck": 5,
+    "p": [-131.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C2",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_C2.s1",
+    "deck": 5,
+    "p": [-127.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C2",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_C2.s2",
+    "deck": 5,
+    "p": [-123.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C2",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_C2.s3",
+    "deck": 5,
+    "p": [-119.0, 36.4, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C2",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_lab_C2.s4",
+    "deck": 5,
+    "p": [-125.8, 29.6, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C2",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d5_lab_C2.s5",
+    "deck": 5,
+    "p": [-122.6, 33.85, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C2",
+    "role": "scientist",
+    "act": "sit",
+    "yaw": 270.0
+   },
+   {
+    "id": "d5_lab_C2.s6",
+    "deck": 5,
+    "p": [-115.5, 29.0, -50.0],
+    "kind": "station",
+    "comp": "d5_lab_C2",
+    "role": "lead_scientist",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {"id": "d5_sensor_room_C2.in0", "deck": 5, "p": [-146.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_sensor_room_C2"},
+   {"id": "d5_sensor_room_C2.hub", "deck": 5, "p": [-144.0, 30.0, -50.0], "kind": "room", "comp": "d5_sensor_room_C2"},
+   {
+    "id": "d5_sensor_room_C2.s0",
+    "deck": 5,
+    "p": [-148.6, 28.9, -50.0],
+    "kind": "station",
+    "comp": "d5_sensor_room_C2",
+    "role": "sensor_operator",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_sensor_room_C2.s1",
+    "deck": 5,
+    "p": [-144.0, 28.9, -50.0],
+    "kind": "station",
+    "comp": "d5_sensor_room_C2",
+    "role": "sensor_operator",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_sensor_room_C2.s2",
+    "deck": 5,
+    "p": [-139.4, 28.9, -50.0],
+    "kind": "station",
+    "comp": "d5_sensor_room_C2",
+    "role": "sensor_operator",
+    "act": "sit",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_sensor_room_C2.s3",
+    "deck": 5,
+    "p": [-146.0, 33.0, -50.0],
+    "kind": "station",
+    "comp": "d5_sensor_room_C2",
+    "role": "sensor_supervisor",
+    "act": "stand",
+    "yaw": 0.0
+   },
+   {
+    "id": "d5_sensor_room_C2.s4",
+    "deck": 5,
+    "p": [-149.8, 29.0, -50.0],
+    "kind": "station",
+    "comp": "d5_sensor_room_C2",
+    "role": "sensor_tech",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {
+    "id": "d5_sensor_room_C2.s5",
+    "deck": 5,
+    "p": [-138.2, 29.0, -50.0],
+    "kind": "station",
+    "comp": "d5_sensor_room_C2",
+    "role": "sensor_tech",
+    "act": "work",
+    "yaw": 0.0
    },
    {"id": "d5_hydro_D1.in0", "deck": 5, "p": [-190.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_hydro_D1"},
    {"id": "d5_hydro_D1.hub", "deck": 5, "p": [-188.0, 30.0, -50.0], "kind": "room", "comp": "d5_hydro_D1"},
@@ -109983,74 +109995,12 @@
     "act": "work",
     "yaw": 0.0
    },
-   {"id": "d5_radiator_pumps_G1.in0", "deck": 5, "p": [-414.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_radiator_pumps_G1"},
-   {"id": "d5_radiator_pumps_G1.hub", "deck": 5, "p": [-412.0, 30.0, -50.0], "kind": "room", "comp": "d5_radiator_pumps_G1"},
-   {
-    "id": "d5_radiator_pumps_G1.s0",
-    "deck": 5,
-    "p": [-418.4, 31.4, -50.0],
-    "kind": "station",
-    "comp": "d5_radiator_pumps_G1",
-    "role": "machinist",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_radiator_pumps_G1.s1",
-    "deck": 5,
-    "p": [-414.0, 31.4, -50.0],
-    "kind": "station",
-    "comp": "d5_radiator_pumps_G1",
-    "role": "machinist",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_radiator_pumps_G1.s2",
-    "deck": 5,
-    "p": [-409.6, 31.4, -50.0],
-    "kind": "station",
-    "comp": "d5_radiator_pumps_G1",
-    "role": "pump_tender",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_radiator_pumps_G1.s3",
-    "deck": 5,
-    "p": [-405.0, 29.2, -50.0],
-    "kind": "station",
-    "comp": "d5_radiator_pumps_G1",
-    "role": "coolant_tender",
-    "act": "work",
-    "yaw": 0.0
-   },
-   {
-    "id": "d5_radiator_pumps_G1.s4",
-    "deck": 5,
-    "p": [-416.6, 23.1, -50.0],
-    "kind": "station",
-    "comp": "d5_radiator_pumps_G1",
-    "role": "machinist",
-    "act": "sit",
-    "yaw": 90.0
-   },
-   {
-    "id": "d5_radiator_pumps_G1.s5",
-    "deck": 5,
-    "p": [-408.4, 24.4, -50.0],
-    "kind": "station",
-    "comp": "d5_radiator_pumps_G1",
-    "role": "engineer",
-    "act": "stand",
-    "yaw": 90.0
-   },
-   {"id": "d5_machinery_G2.in0", "deck": 5, "p": [-438.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_machinery_G2"},
-   {"id": "d5_machinery_G2.hub", "deck": 5, "p": [-436.0, 30.0, -50.0], "kind": "room", "comp": "d5_machinery_G2"},
+   {"id": "d5_machinery_G2.in0", "deck": 5, "p": [-414.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_machinery_G2"},
+   {"id": "d5_machinery_G2.hub", "deck": 5, "p": [-412.0, 30.0, -50.0], "kind": "room", "comp": "d5_machinery_G2"},
    {
     "id": "d5_machinery_G2.s0",
     "deck": 5,
-    "p": [-444.6, 34.6, -50.0],
+    "p": [-420.6, 34.6, -50.0],
     "kind": "station",
     "comp": "d5_machinery_G2",
     "role": "machinist",
@@ -110060,7 +110010,7 @@
    {
     "id": "d5_machinery_G2.s1",
     "deck": 5,
-    "p": [-440.6, 34.6, -50.0],
+    "p": [-416.6, 34.6, -50.0],
     "kind": "station",
     "comp": "d5_machinery_G2",
     "role": "machinist",
@@ -110070,7 +110020,7 @@
    {
     "id": "d5_machinery_G2.s2",
     "deck": 5,
-    "p": [-436.6, 34.6, -50.0],
+    "p": [-412.6, 34.6, -50.0],
     "kind": "station",
     "comp": "d5_machinery_G2",
     "role": "machinist",
@@ -110080,7 +110030,7 @@
    {
     "id": "d5_machinery_G2.s3",
     "deck": 5,
-    "p": [-429.4, 32.4, -50.0],
+    "p": [-405.4, 32.4, -50.0],
     "kind": "station",
     "comp": "d5_machinery_G2",
     "role": "water_tender",
@@ -110090,7 +110040,7 @@
    {
     "id": "d5_machinery_G2.s4",
     "deck": 5,
-    "p": [-434.0, 23.0, -50.0],
+    "p": [-410.0, 23.0, -50.0],
     "kind": "station",
     "comp": "d5_machinery_G2",
     "role": "machinist",
@@ -110100,19 +110050,19 @@
    {
     "id": "d5_machinery_G2.s5",
     "deck": 5,
-    "p": [-441.0, 28.1, -50.0],
+    "p": [-417.0, 28.1, -50.0],
     "kind": "station",
     "comp": "d5_machinery_G2",
     "role": "machinist",
     "act": "work",
     "yaw": 90.0
    },
-   {"id": "d5_dc_locker_G3.in0", "deck": 5, "p": [-454.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_dc_locker_G3"},
-   {"id": "d5_dc_locker_G3.hub", "deck": 5, "p": [-454.0, 30.0, -50.0], "kind": "room", "comp": "d5_dc_locker_G3"},
+   {"id": "d5_dc_locker_G3.in0", "deck": 5, "p": [-430.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_dc_locker_G3"},
+   {"id": "d5_dc_locker_G3.hub", "deck": 5, "p": [-430.0, 30.0, -50.0], "kind": "room", "comp": "d5_dc_locker_G3"},
    {
     "id": "d5_dc_locker_G3.s0",
     "deck": 5,
-    "p": [-455.6, 35.2, -50.0],
+    "p": [-431.6, 35.2, -50.0],
     "kind": "station",
     "comp": "d5_dc_locker_G3",
     "role": "dc_technician",
@@ -110122,7 +110072,7 @@
    {
     "id": "d5_dc_locker_G3.s1",
     "deck": 5,
-    "p": [-454.0, 28.2, -50.0],
+    "p": [-430.0, 28.2, -50.0],
     "kind": "station",
     "comp": "d5_dc_locker_G3",
     "role": "dc_technician",
@@ -110132,7 +110082,7 @@
    {
     "id": "d5_dc_locker_G3.s2",
     "deck": 5,
-    "p": [-458.0, 30.0, -50.0],
+    "p": [-434.0, 30.0, -50.0],
     "kind": "station",
     "comp": "d5_dc_locker_G3",
     "role": "dc_technician",
@@ -110142,61 +110092,81 @@
    {
     "id": "d5_dc_locker_G3.s3",
     "deck": 5,
-    "p": [-449.8, 30.0, -50.0],
+    "p": [-425.8, 30.0, -50.0],
     "kind": "station",
     "comp": "d5_dc_locker_G3",
     "role": "dc_technician",
     "act": "stand",
     "yaw": 0.0
    },
-   {"id": "d5_dc_locker_H2.in0", "deck": 5, "p": [-470.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_dc_locker_H2"},
-   {"id": "d5_dc_locker_H2.hub", "deck": 5, "p": [-470.0, 30.0, -50.0], "kind": "room", "comp": "d5_dc_locker_H2"},
+   {"id": "d5_radiator_pumps_G1.in0", "deck": 5, "p": [-450.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_radiator_pumps_G1"},
+   {"id": "d5_radiator_pumps_G1.hub", "deck": 5, "p": [-448.0, 30.0, -50.0], "kind": "room", "comp": "d5_radiator_pumps_G1"},
    {
-    "id": "d5_dc_locker_H2.s0",
+    "id": "d5_radiator_pumps_G1.s0",
     "deck": 5,
-    "p": [-471.6, 35.2, -50.0],
+    "p": [-454.4, 31.4, -50.0],
     "kind": "station",
-    "comp": "d5_dc_locker_H2",
-    "role": "dc_technician",
-    "act": "stand",
+    "comp": "d5_radiator_pumps_G1",
+    "role": "machinist",
+    "act": "work",
+    "yaw": 0.0
+   },
+   {
+    "id": "d5_radiator_pumps_G1.s1",
+    "deck": 5,
+    "p": [-450.0, 31.4, -50.0],
+    "kind": "station",
+    "comp": "d5_radiator_pumps_G1",
+    "role": "machinist",
+    "act": "work",
+    "yaw": 0.0
+   },
+   {
+    "id": "d5_radiator_pumps_G1.s2",
+    "deck": 5,
+    "p": [-445.6, 31.4, -50.0],
+    "kind": "station",
+    "comp": "d5_radiator_pumps_G1",
+    "role": "pump_tender",
+    "act": "work",
+    "yaw": 0.0
+   },
+   {
+    "id": "d5_radiator_pumps_G1.s3",
+    "deck": 5,
+    "p": [-441.0, 29.2, -50.0],
+    "kind": "station",
+    "comp": "d5_radiator_pumps_G1",
+    "role": "coolant_tender",
+    "act": "work",
+    "yaw": 0.0
+   },
+   {
+    "id": "d5_radiator_pumps_G1.s4",
+    "deck": 5,
+    "p": [-452.6, 23.1, -50.0],
+    "kind": "station",
+    "comp": "d5_radiator_pumps_G1",
+    "role": "machinist",
+    "act": "sit",
     "yaw": 90.0
    },
    {
-    "id": "d5_dc_locker_H2.s1",
+    "id": "d5_radiator_pumps_G1.s5",
     "deck": 5,
-    "p": [-470.0, 28.2, -50.0],
+    "p": [-444.4, 24.4, -50.0],
     "kind": "station",
-    "comp": "d5_dc_locker_H2",
-    "role": "dc_technician",
-    "act": "work",
-    "yaw": 270.0
-   },
-   {
-    "id": "d5_dc_locker_H2.s2",
-    "deck": 5,
-    "p": [-474.0, 30.0, -50.0],
-    "kind": "station",
-    "comp": "d5_dc_locker_H2",
-    "role": "dc_technician",
+    "comp": "d5_radiator_pumps_G1",
+    "role": "engineer",
     "act": "stand",
-    "yaw": 180.0
+    "yaw": 90.0
    },
-   {
-    "id": "d5_dc_locker_H2.s3",
-    "deck": 5,
-    "p": [-465.8, 30.0, -50.0],
-    "kind": "station",
-    "comp": "d5_dc_locker_H2",
-    "role": "dc_technician",
-    "act": "stand",
-    "yaw": 0.0
-   },
-   {"id": "d5_machinery_b_H1.in0", "deck": 5, "p": [-490.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_machinery_b_H1"},
-   {"id": "d5_machinery_b_H1.hub", "deck": 5, "p": [-488.0, 30.0, -50.0], "kind": "room", "comp": "d5_machinery_b_H1"},
+   {"id": "d5_machinery_b_H1.in0", "deck": 5, "p": [-478.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_machinery_b_H1"},
+   {"id": "d5_machinery_b_H1.hub", "deck": 5, "p": [-476.0, 30.0, -50.0], "kind": "room", "comp": "d5_machinery_b_H1"},
    {
     "id": "d5_machinery_b_H1.s0",
     "deck": 5,
-    "p": [-496.0, 29.2, -50.0],
+    "p": [-484.0, 29.2, -50.0],
     "kind": "station",
     "comp": "d5_machinery_b_H1",
     "role": "machinist",
@@ -110206,7 +110176,7 @@
    {
     "id": "d5_machinery_b_H1.s1",
     "deck": 5,
-    "p": [-491.6, 29.2, -50.0],
+    "p": [-479.6, 29.2, -50.0],
     "kind": "station",
     "comp": "d5_machinery_b_H1",
     "role": "machinist",
@@ -110216,7 +110186,7 @@
    {
     "id": "d5_machinery_b_H1.s2",
     "deck": 5,
-    "p": [-484.2, 31.0, -50.0],
+    "p": [-472.2, 31.0, -50.0],
     "kind": "station",
     "comp": "d5_machinery_b_H1",
     "role": "machinist",
@@ -110226,7 +110196,7 @@
    {
     "id": "d5_machinery_b_H1.s3",
     "deck": 5,
-    "p": [-488.0, 25.0, -50.0],
+    "p": [-476.0, 25.0, -50.0],
     "kind": "station",
     "comp": "d5_machinery_b_H1",
     "role": "machinist",
@@ -110236,19 +110206,19 @@
    {
     "id": "d5_machinery_b_H1.s4",
     "deck": 5,
-    "p": [-480.0, 28.5, -50.0],
+    "p": [-468.0, 28.5, -50.0],
     "kind": "station",
     "comp": "d5_machinery_b_H1",
     "role": "engineer",
     "act": "stand",
     "yaw": 180.0
    },
-   {"id": "d5_machinery_H2.in0", "deck": 5, "p": [-514.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_machinery_H2"},
-   {"id": "d5_machinery_H2.hub", "deck": 5, "p": [-512.0, 30.0, -50.0], "kind": "room", "comp": "d5_machinery_H2"},
+   {"id": "d5_machinery_H2.in0", "deck": 5, "p": [-502.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_machinery_H2"},
+   {"id": "d5_machinery_H2.hub", "deck": 5, "p": [-500.0, 30.0, -50.0], "kind": "room", "comp": "d5_machinery_H2"},
    {
     "id": "d5_machinery_H2.s0",
     "deck": 5,
-    "p": [-520.6, 34.6, -50.0],
+    "p": [-508.6, 34.6, -50.0],
     "kind": "station",
     "comp": "d5_machinery_H2",
     "role": "machinist",
@@ -110258,7 +110228,7 @@
    {
     "id": "d5_machinery_H2.s1",
     "deck": 5,
-    "p": [-516.6, 34.6, -50.0],
+    "p": [-504.6, 34.6, -50.0],
     "kind": "station",
     "comp": "d5_machinery_H2",
     "role": "machinist",
@@ -110268,7 +110238,7 @@
    {
     "id": "d5_machinery_H2.s2",
     "deck": 5,
-    "p": [-512.6, 34.6, -50.0],
+    "p": [-500.6, 34.6, -50.0],
     "kind": "station",
     "comp": "d5_machinery_H2",
     "role": "machinist",
@@ -110278,7 +110248,7 @@
    {
     "id": "d5_machinery_H2.s3",
     "deck": 5,
-    "p": [-505.4, 32.4, -50.0],
+    "p": [-493.4, 32.4, -50.0],
     "kind": "station",
     "comp": "d5_machinery_H2",
     "role": "water_tender",
@@ -110288,7 +110258,7 @@
    {
     "id": "d5_machinery_H2.s4",
     "deck": 5,
-    "p": [-510.0, 23.0, -50.0],
+    "p": [-498.0, 23.0, -50.0],
     "kind": "station",
     "comp": "d5_machinery_H2",
     "role": "machinist",
@@ -110298,12 +110268,54 @@
    {
     "id": "d5_machinery_H2.s5",
     "deck": 5,
-    "p": [-517.0, 28.1, -50.0],
+    "p": [-505.0, 28.1, -50.0],
     "kind": "station",
     "comp": "d5_machinery_H2",
     "role": "machinist",
     "act": "work",
     "yaw": 90.0
+   },
+   {"id": "d5_dc_locker_H2.in0", "deck": 5, "p": [-518.0, 23.2, -50.0], "kind": "door_in", "comp": "d5_dc_locker_H2"},
+   {"id": "d5_dc_locker_H2.hub", "deck": 5, "p": [-518.0, 30.0, -50.0], "kind": "room", "comp": "d5_dc_locker_H2"},
+   {
+    "id": "d5_dc_locker_H2.s0",
+    "deck": 5,
+    "p": [-519.6, 35.2, -50.0],
+    "kind": "station",
+    "comp": "d5_dc_locker_H2",
+    "role": "dc_technician",
+    "act": "stand",
+    "yaw": 90.0
+   },
+   {
+    "id": "d5_dc_locker_H2.s1",
+    "deck": 5,
+    "p": [-518.0, 28.2, -50.0],
+    "kind": "station",
+    "comp": "d5_dc_locker_H2",
+    "role": "dc_technician",
+    "act": "work",
+    "yaw": 270.0
+   },
+   {
+    "id": "d5_dc_locker_H2.s2",
+    "deck": 5,
+    "p": [-522.0, 30.0, -50.0],
+    "kind": "station",
+    "comp": "d5_dc_locker_H2",
+    "role": "dc_technician",
+    "act": "stand",
+    "yaw": 180.0
+   },
+   {
+    "id": "d5_dc_locker_H2.s3",
+    "deck": 5,
+    "p": [-513.8, 30.0, -50.0],
+    "kind": "station",
+    "comp": "d5_dc_locker_H2",
+    "role": "dc_technician",
+    "act": "stand",
+    "yaw": 0.0
    },
    {"id": "d5_sensor_room_A3.in0", "deck": 5, "p": [86.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_sensor_room_A3"},
    {"id": "d5_sensor_room_A3.hub", "deck": 5, "p": [84.0, -30.0, -50.0], "kind": "room", "comp": "d5_sensor_room_A3"},
@@ -110471,64 +110483,64 @@
     "act": "stand",
     "yaw": 180.0
    },
-   {"id": "d5_lab_bio_B5.in0", "deck": 5, "p": [10.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_B5"},
-   {"id": "d5_lab_bio_B5.hub", "deck": 5, "p": [8.0, -30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_B5"},
+   {"id": "d5_lab_bio_B3.in0", "deck": 5, "p": [10.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_B3"},
+   {"id": "d5_lab_bio_B3.hub", "deck": 5, "p": [8.0, -30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_B3"},
    {
-    "id": "d5_lab_bio_B5.s0",
+    "id": "d5_lab_bio_B3.s0",
     "deck": 5,
     "p": [14.1, -30.6, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B5",
+    "comp": "d5_lab_bio_B3",
     "role": "biologist",
     "act": "work",
     "yaw": 180.0
    },
    {
-    "id": "d5_lab_bio_B5.s1",
+    "id": "d5_lab_bio_B3.s1",
     "deck": 5,
     "p": [2.85, -28.6, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B5",
+    "comp": "d5_lab_bio_B3",
     "role": "biologist",
     "act": "work",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_bio_B5.s2",
+    "id": "d5_lab_bio_B3.s2",
     "deck": 5,
     "p": [-2.4, -32.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B5",
+    "comp": "d5_lab_bio_B3",
     "role": "lab_technician",
     "act": "work",
     "yaw": 180.0
    },
    {
-    "id": "d5_lab_bio_B5.s3",
+    "id": "d5_lab_bio_B3.s3",
     "deck": 5,
     "p": [-2.4, -34.6, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B5",
+    "comp": "d5_lab_bio_B3",
     "role": "lab_technician",
     "act": "work",
     "yaw": 180.0
    },
    {
-    "id": "d5_lab_bio_B5.s4",
+    "id": "d5_lab_bio_B3.s4",
     "deck": 5,
     "p": [6.6, -24.0, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B5",
+    "comp": "d5_lab_bio_B3",
     "role": "lead_scientist",
     "act": "sit",
     "yaw": 90.0
    },
    {
-    "id": "d5_lab_bio_B5.s5",
+    "id": "d5_lab_bio_B3.s5",
     "deck": 5,
     "p": [10.0, -35.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B5",
+    "comp": "d5_lab_bio_B3",
     "role": "biologist",
     "act": "stand",
     "yaw": 270.0
@@ -110585,64 +110597,64 @@
     "act": "stand",
     "yaw": 180.0
    },
-   {"id": "d5_lab_bio_B6.in0", "deck": 5, "p": [-30.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_B6"},
-   {"id": "d5_lab_bio_B6.hub", "deck": 5, "p": [-32.0, -30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_B6"},
+   {"id": "d5_lab_bio_B4.in0", "deck": 5, "p": [-30.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_lab_bio_B4"},
+   {"id": "d5_lab_bio_B4.hub", "deck": 5, "p": [-32.0, -30.0, -50.0], "kind": "room", "comp": "d5_lab_bio_B4"},
    {
-    "id": "d5_lab_bio_B6.s0",
+    "id": "d5_lab_bio_B4.s0",
     "deck": 5,
     "p": [-25.9, -30.6, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B6",
+    "comp": "d5_lab_bio_B4",
     "role": "biologist",
     "act": "work",
     "yaw": 180.0
    },
    {
-    "id": "d5_lab_bio_B6.s1",
+    "id": "d5_lab_bio_B4.s1",
     "deck": 5,
     "p": [-37.15, -28.6, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B6",
+    "comp": "d5_lab_bio_B4",
     "role": "biologist",
     "act": "work",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_bio_B6.s2",
+    "id": "d5_lab_bio_B4.s2",
     "deck": 5,
     "p": [-42.4, -32.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B6",
+    "comp": "d5_lab_bio_B4",
     "role": "lab_technician",
     "act": "work",
     "yaw": 180.0
    },
    {
-    "id": "d5_lab_bio_B6.s3",
+    "id": "d5_lab_bio_B4.s3",
     "deck": 5,
     "p": [-42.4, -34.6, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B6",
+    "comp": "d5_lab_bio_B4",
     "role": "lab_technician",
     "act": "work",
     "yaw": 180.0
    },
    {
-    "id": "d5_lab_bio_B6.s4",
+    "id": "d5_lab_bio_B4.s4",
     "deck": 5,
     "p": [-33.4, -24.0, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B6",
+    "comp": "d5_lab_bio_B4",
     "role": "lead_scientist",
     "act": "sit",
     "yaw": 90.0
    },
    {
-    "id": "d5_lab_bio_B6.s5",
+    "id": "d5_lab_bio_B4.s5",
     "deck": 5,
     "p": [-30.0, -35.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_bio_B6",
+    "comp": "d5_lab_bio_B4",
     "role": "biologist",
     "act": "stand",
     "yaw": 270.0
@@ -110761,54 +110773,54 @@
     "act": "work",
     "yaw": 180.0
    },
-   {"id": "d5_lab_phys_C2.in0", "deck": 5, "p": [-90.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_lab_phys_C2"},
-   {"id": "d5_lab_phys_C2.hub", "deck": 5, "p": [-92.0, -30.0, -50.0], "kind": "room", "comp": "d5_lab_phys_C2"},
+   {"id": "d5_lab_phys_C1.in0", "deck": 5, "p": [-90.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_lab_phys_C1"},
+   {"id": "d5_lab_phys_C1.hub", "deck": 5, "p": [-92.0, -30.0, -50.0], "kind": "room", "comp": "d5_lab_phys_C1"},
    {
-    "id": "d5_lab_phys_C2.s0",
+    "id": "d5_lab_phys_C1.s0",
     "deck": 5,
     "p": [-85.0, -24.8, -50.0],
     "kind": "station",
-    "comp": "d5_lab_phys_C2",
+    "comp": "d5_lab_phys_C1",
     "role": "physicist",
     "act": "sit",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_phys_C2.s1",
+    "id": "d5_lab_phys_C1.s1",
     "deck": 5,
     "p": [-89.0, -31.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_phys_C2",
+    "comp": "d5_lab_phys_C1",
     "role": "physics_technician",
     "act": "work",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_phys_C2.s2",
+    "id": "d5_lab_phys_C1.s2",
     "deck": 5,
     "p": [-99.6, -31.2, -50.0],
     "kind": "station",
-    "comp": "d5_lab_phys_C2",
+    "comp": "d5_lab_phys_C1",
     "role": "physics_technician",
     "act": "work",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_phys_C2.s3",
+    "id": "d5_lab_phys_C1.s3",
     "deck": 5,
     "p": [-100.3, -26.2, -50.0],
     "kind": "station",
-    "comp": "d5_lab_phys_C2",
+    "comp": "d5_lab_phys_C1",
     "role": "cryo_technician",
     "act": "work",
     "yaw": 180.0
    },
    {
-    "id": "d5_lab_phys_C2.s4",
+    "id": "d5_lab_phys_C1.s4",
     "deck": 5,
     "p": [-92.0, -35.7, -50.0],
     "kind": "station",
-    "comp": "d5_lab_phys_C2",
+    "comp": "d5_lab_phys_C1",
     "role": "physicist",
     "act": "work",
     "yaw": 270.0
@@ -110875,74 +110887,74 @@
     "act": "stand",
     "yaw": 270.0
    },
-   {"id": "d5_lab_C2.in0", "deck": 5, "p": [-138.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_lab_C2"},
-   {"id": "d5_lab_C2.hub", "deck": 5, "p": [-140.0, -30.0, -50.0], "kind": "room", "comp": "d5_lab_C2"},
+   {"id": "d5_lab_C3.in0", "deck": 5, "p": [-138.0, -23.2, -50.0], "kind": "door_in", "comp": "d5_lab_C3"},
+   {"id": "d5_lab_C3.hub", "deck": 5, "p": [-140.0, -30.0, -50.0], "kind": "room", "comp": "d5_lab_C3"},
    {
-    "id": "d5_lab_C2.s0",
+    "id": "d5_lab_C3.s0",
     "deck": 5,
     "p": [-133.0, -36.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_C2",
+    "comp": "d5_lab_C3",
     "role": "scientist",
     "act": "sit",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_C2.s1",
+    "id": "d5_lab_C3.s1",
     "deck": 5,
     "p": [-137.0, -36.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_C2",
+    "comp": "d5_lab_C3",
     "role": "scientist",
     "act": "sit",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_C2.s2",
+    "id": "d5_lab_C3.s2",
     "deck": 5,
     "p": [-141.0, -36.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_C2",
+    "comp": "d5_lab_C3",
     "role": "scientist",
     "act": "sit",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_C2.s3",
+    "id": "d5_lab_C3.s3",
     "deck": 5,
     "p": [-145.0, -36.4, -50.0],
     "kind": "station",
-    "comp": "d5_lab_C2",
+    "comp": "d5_lab_C3",
     "role": "scientist",
     "act": "sit",
     "yaw": 270.0
    },
    {
-    "id": "d5_lab_C2.s4",
+    "id": "d5_lab_C3.s4",
     "deck": 5,
     "p": [-138.2, -29.6, -50.0],
     "kind": "station",
-    "comp": "d5_lab_C2",
+    "comp": "d5_lab_C3",
     "role": "scientist",
     "act": "sit",
     "yaw": 90.0
    },
    {
-    "id": "d5_lab_C2.s5",
+    "id": "d5_lab_C3.s5",
     "deck": 5,
     "p": [-141.4, -33.85, -50.0],
     "kind": "station",
-    "comp": "d5_lab_C2",
+    "comp": "d5_lab_C3",
     "role": "scientist",
     "act": "sit",
     "yaw": 90.0
    },
    {
-    "id": "d5_lab_C2.s6",
+    "id": "d5_lab_C3.s6",
     "deck": 5,
     "p": [-148.5, -29.0, -50.0],
     "kind": "station",
-    "comp": "d5_lab_C2",
+    "comp": "d5_lab_C3",
     "role": "lead_scientist",
     "act": "work",
     "yaw": 0.0
@@ -146138,7 +146150,23 @@
    {"a": "d5_lab_B2.hub", "b": "d5_lab_B2.s4", "len": 1.84, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_B2.hub", "b": "d5_lab_B2.s5", "len": 4.1, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_B2.hub", "b": "d5_lab_B2.s6", "len": 8.56, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.130", "b": "d5_lab_bio_B2.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_B2", "w": 1.6},
+   {"a": "d5.SB0.130", "b": "d5_lab_astro_B1.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_astro_B1", "w": 1.6},
+   {"a": "d5_lab_astro_B1.in0", "b": "d5_lab_astro_B1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_lab_astro_B1.hub", "b": "d5_lab_astro_B1.s0", "len": 3.7, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_astro_B1.hub", "b": "d5_lab_astro_B1.s1", "len": 3.8, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_astro_B1.hub", "b": "d5_lab_astro_B1.s2", "len": 3.5, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_astro_B1.hub", "b": "d5_lab_astro_B1.s3", "len": 3.4, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_astro_B1.hub", "b": "d5_lab_astro_B1.s4", "len": 9.0, "kind": "walk", "w": 1.0},
+   {"a": "d5.SB0.124", "b": "d5_lab_B3.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_B3", "w": 1.6},
+   {"a": "d5_lab_B3.in0", "b": "d5_lab_B3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_lab_B3.hub", "b": "d5_lab_B3.s0", "len": 9.48, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_B3.hub", "b": "d5_lab_B3.s1", "len": 7.07, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_B3.hub", "b": "d5_lab_B3.s2", "len": 6.48, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_B3.hub", "b": "d5_lab_B3.s3", "len": 8.12, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_B3.hub", "b": "d5_lab_B3.s4", "len": 1.84, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_B3.hub", "b": "d5_lab_B3.s5", "len": 4.1, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_B3.hub", "b": "d5_lab_B3.s6", "len": 8.56, "kind": "walk", "w": 1.0},
+   {"a": "d5.SB0.118", "b": "d5_lab_bio_B2.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_B2", "w": 1.6},
    {"a": "d5_lab_bio_B2.in0", "b": "d5_lab_bio_B2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_lab_bio_B2.hub", "b": "d5_lab_bio_B2.s0", "len": 6.13, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_bio_B2.hub", "b": "d5_lab_bio_B2.s1", "len": 5.34, "kind": "walk", "w": 1.0},
@@ -146146,23 +146174,15 @@
    {"a": "d5_lab_bio_B2.hub", "b": "d5_lab_bio_B2.s3", "len": 11.37, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_bio_B2.hub", "b": "d5_lab_bio_B2.s4", "len": 6.16, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_bio_B2.hub", "b": "d5_lab_bio_B2.s5", "len": 5.76, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.124", "b": "d5_lab_bio_B3.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_B3", "w": 1.6},
-   {"a": "d5_lab_bio_B3.in0", "b": "d5_lab_bio_B3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s0", "len": 6.13, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s1", "len": 5.34, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s2", "len": 10.67, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s3", "len": 11.37, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s4", "len": 6.16, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s5", "len": 5.76, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.118", "b": "d5_lab_bio_B4.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_B4", "w": 1.6},
-   {"a": "d5_lab_bio_B4.in0", "b": "d5_lab_bio_B4.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s0", "len": 6.13, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s1", "len": 5.34, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s2", "len": 10.67, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s3", "len": 11.37, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s4", "len": 6.16, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s5", "len": 5.76, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.111", "b": "d5_lab_C1.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_C1", "w": 1.6},
+   {"a": "d5.SB0.111", "b": "d5_lab_bio_C1.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_C1", "w": 1.6},
+   {"a": "d5_lab_bio_C1.in0", "b": "d5_lab_bio_C1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s0", "len": 6.13, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s1", "len": 5.34, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s2", "len": 10.67, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s3", "len": 11.37, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s4", "len": 6.16, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s5", "len": 5.76, "kind": "walk", "w": 1.0},
+   {"a": "d5.SB0.105", "b": "d5_lab_C1.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_C1", "w": 1.6},
    {"a": "d5_lab_C1.in0", "b": "d5_lab_C1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_lab_C1.hub", "b": "d5_lab_C1.s0", "len": 9.48, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_C1.hub", "b": "d5_lab_C1.s1", "len": 7.07, "kind": "walk", "w": 1.0},
@@ -146171,7 +146191,16 @@
    {"a": "d5_lab_C1.hub", "b": "d5_lab_C1.s4", "len": 1.84, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_C1.hub", "b": "d5_lab_C1.s5", "len": 4.1, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_C1.hub", "b": "d5_lab_C1.s6", "len": 8.56, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.106", "b": "d5_sensor_room_C2.in0", "len": 3.2, "kind": "door", "door": "d5_door_sensor_room_C2", "w": 1.6},
+   {"a": "d5.SB0.099", "b": "d5_lab_C2.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_C2", "w": 1.6},
+   {"a": "d5_lab_C2.in0", "b": "d5_lab_C2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s0", "len": 9.48, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s1", "len": 7.07, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s2", "len": 6.48, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s3", "len": 8.12, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s4", "len": 1.84, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s5", "len": 4.1, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s6", "len": 8.56, "kind": "walk", "w": 1.0},
+   {"a": "d5.SB0.094", "b": "d5_sensor_room_C2.in0", "len": 3.2, "kind": "door", "door": "d5_door_sensor_room_C2", "w": 1.6},
    {"a": "d5_sensor_room_C2.in0", "b": "d5_sensor_room_C2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_sensor_room_C2.hub", "b": "d5_sensor_room_C2.s0", "len": 4.73, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_room_C2.hub", "b": "d5_sensor_room_C2.s1", "len": 1.1, "kind": "walk", "w": 1.0},
@@ -146179,21 +146208,6 @@
    {"a": "d5_sensor_room_C2.hub", "b": "d5_sensor_room_C2.s3", "len": 3.61, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_room_C2.hub", "b": "d5_sensor_room_C2.s4", "len": 5.89, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_room_C2.hub", "b": "d5_sensor_room_C2.s5", "len": 5.89, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.101", "b": "d5_lab_phys_C1.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_phys_C1", "w": 1.6},
-   {"a": "d5_lab_phys_C1.in0", "b": "d5_lab_phys_C1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s0", "len": 8.72, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s1", "len": 3.31, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s2", "len": 7.69, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s3", "len": 9.13, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s4", "len": 5.7, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.095", "b": "d5_lab_bio_C1.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_C1", "w": 1.6},
-   {"a": "d5_lab_bio_C1.in0", "b": "d5_lab_bio_C1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s0", "len": 6.13, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s1", "len": 5.34, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s2", "len": 10.67, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s3", "len": 11.37, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s4", "len": 6.16, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_C1.hub", "b": "d5_lab_bio_C1.s5", "len": 5.76, "kind": "walk", "w": 1.0},
    {"a": "d5.SB0.083", "b": "d5_hydro_D1.in0", "len": 3.2, "kind": "door", "door": "d5_door_hydro_D1", "w": 1.6},
    {"a": "d5_hydro_D1.in0", "b": "d5_hydro_D1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_hydro_D1.hub", "b": "d5_hydro_D1.s0", "len": 4.08, "kind": "walk", "w": 1.0},
@@ -146250,15 +146264,7 @@
    {"a": "d5_sensor_room_F2.hub", "b": "d5_sensor_room_F2.s3", "len": 3.61, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_room_F2.hub", "b": "d5_sensor_room_F2.s4", "len": 5.89, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_room_F2.hub", "b": "d5_sensor_room_F2.s5", "len": 5.89, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.027", "b": "d5_radiator_pumps_G1.in0", "len": 3.2, "kind": "door", "door": "d5_door_radiator_pumps_G1", "w": 1.6},
-   {"a": "d5_radiator_pumps_G1.in0", "b": "d5_radiator_pumps_G1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s0", "len": 6.55, "kind": "walk", "w": 1.0},
-   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s1", "len": 2.44, "kind": "walk", "w": 1.0},
-   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s2", "len": 2.78, "kind": "walk", "w": 1.0},
-   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s3", "len": 7.05, "kind": "walk", "w": 1.0},
-   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s4", "len": 8.29, "kind": "walk", "w": 1.0},
-   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s5", "len": 6.66, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.021", "b": "d5_machinery_G2.in0", "len": 3.2, "kind": "door", "door": "d5_door_machinery_G2", "w": 1.6},
+   {"a": "d5.SB0.027", "b": "d5_machinery_G2.in0", "len": 3.2, "kind": "door", "door": "d5_door_machinery_G2", "w": 1.6},
    {"a": "d5_machinery_G2.in0", "b": "d5_machinery_G2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_machinery_G2.hub", "b": "d5_machinery_G2.s0", "len": 9.75, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_G2.hub", "b": "d5_machinery_G2.s1", "len": 6.51, "kind": "walk", "w": 1.0},
@@ -146266,26 +146272,28 @@
    {"a": "d5_machinery_G2.hub", "b": "d5_machinery_G2.s3", "len": 7.02, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_G2.hub", "b": "d5_machinery_G2.s4", "len": 7.28, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_G2.hub", "b": "d5_machinery_G2.s5", "len": 5.35, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.017", "b": "d5_dc_locker_G3.in0", "len": 3.2, "kind": "door", "door": "d5_door_dc_locker_G3", "w": 1.6},
+   {"a": "d5.SB0.023", "b": "d5_dc_locker_G3.in0", "len": 3.2, "kind": "door", "door": "d5_door_dc_locker_G3", "w": 1.6},
    {"a": "d5_dc_locker_G3.in0", "b": "d5_dc_locker_G3.hub", "len": 6.8, "kind": "walk", "w": 1.5},
    {"a": "d5_dc_locker_G3.hub", "b": "d5_dc_locker_G3.s0", "len": 5.44, "kind": "walk", "w": 1.0},
    {"a": "d5_dc_locker_G3.hub", "b": "d5_dc_locker_G3.s1", "len": 1.8, "kind": "walk", "w": 1.0},
    {"a": "d5_dc_locker_G3.hub", "b": "d5_dc_locker_G3.s2", "len": 4.0, "kind": "walk", "w": 1.0},
    {"a": "d5_dc_locker_G3.hub", "b": "d5_dc_locker_G3.s3", "len": 4.2, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.013", "b": "d5_dc_locker_H2.in0", "len": 3.2, "kind": "door", "door": "d5_door_dc_locker_H2", "w": 1.6},
-   {"a": "d5_dc_locker_H2.in0", "b": "d5_dc_locker_H2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
-   {"a": "d5_dc_locker_H2.hub", "b": "d5_dc_locker_H2.s0", "len": 5.44, "kind": "walk", "w": 1.0},
-   {"a": "d5_dc_locker_H2.hub", "b": "d5_dc_locker_H2.s1", "len": 1.8, "kind": "walk", "w": 1.0},
-   {"a": "d5_dc_locker_H2.hub", "b": "d5_dc_locker_H2.s2", "len": 4.0, "kind": "walk", "w": 1.0},
-   {"a": "d5_dc_locker_H2.hub", "b": "d5_dc_locker_H2.s3", "len": 4.2, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.008", "b": "d5_machinery_b_H1.in0", "len": 3.2, "kind": "door", "door": "d5_door_machinery_b_H1", "w": 1.6},
+   {"a": "d5.SB0.018", "b": "d5_radiator_pumps_G1.in0", "len": 3.2, "kind": "door", "door": "d5_door_radiator_pumps_G1", "w": 1.6},
+   {"a": "d5_radiator_pumps_G1.in0", "b": "d5_radiator_pumps_G1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s0", "len": 6.55, "kind": "walk", "w": 1.0},
+   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s1", "len": 2.44, "kind": "walk", "w": 1.0},
+   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s2", "len": 2.78, "kind": "walk", "w": 1.0},
+   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s3", "len": 7.05, "kind": "walk", "w": 1.0},
+   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s4", "len": 8.29, "kind": "walk", "w": 1.0},
+   {"a": "d5_radiator_pumps_G1.hub", "b": "d5_radiator_pumps_G1.s5", "len": 6.66, "kind": "walk", "w": 1.0},
+   {"a": "d5.SB0.011", "b": "d5_machinery_b_H1.in0", "len": 3.2, "kind": "door", "door": "d5_door_machinery_b_H1", "w": 1.6},
    {"a": "d5_machinery_b_H1.in0", "b": "d5_machinery_b_H1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_machinery_b_H1.hub", "b": "d5_machinery_b_H1.s0", "len": 8.04, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_b_H1.hub", "b": "d5_machinery_b_H1.s1", "len": 3.69, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_b_H1.hub", "b": "d5_machinery_b_H1.s2", "len": 3.93, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_b_H1.hub", "b": "d5_machinery_b_H1.s3", "len": 5.0, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_b_H1.hub", "b": "d5_machinery_b_H1.s4", "len": 8.14, "kind": "walk", "w": 1.0},
-   {"a": "d5.SB0.002", "b": "d5_machinery_H2.in0", "len": 3.2, "kind": "door", "door": "d5_door_machinery_H2", "w": 1.6},
+   {"a": "d5.SB0.005", "b": "d5_machinery_H2.in0", "len": 3.2, "kind": "door", "door": "d5_door_machinery_H2", "w": 1.6},
    {"a": "d5_machinery_H2.in0", "b": "d5_machinery_H2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_machinery_H2.hub", "b": "d5_machinery_H2.s0", "len": 9.75, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_H2.hub", "b": "d5_machinery_H2.s1", "len": 6.51, "kind": "walk", "w": 1.0},
@@ -146293,6 +146301,12 @@
    {"a": "d5_machinery_H2.hub", "b": "d5_machinery_H2.s3", "len": 7.02, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_H2.hub", "b": "d5_machinery_H2.s4", "len": 7.28, "kind": "walk", "w": 1.0},
    {"a": "d5_machinery_H2.hub", "b": "d5_machinery_H2.s5", "len": 5.35, "kind": "walk", "w": 1.0},
+   {"a": "d5.SB0.001", "b": "d5_dc_locker_H2.in0", "len": 3.2, "kind": "door", "door": "d5_door_dc_locker_H2", "w": 1.6},
+   {"a": "d5_dc_locker_H2.in0", "b": "d5_dc_locker_H2.hub", "len": 6.8, "kind": "walk", "w": 1.5},
+   {"a": "d5_dc_locker_H2.hub", "b": "d5_dc_locker_H2.s0", "len": 5.44, "kind": "walk", "w": 1.0},
+   {"a": "d5_dc_locker_H2.hub", "b": "d5_dc_locker_H2.s1", "len": 1.8, "kind": "walk", "w": 1.0},
+   {"a": "d5_dc_locker_H2.hub", "b": "d5_dc_locker_H2.s2", "len": 4.0, "kind": "walk", "w": 1.0},
+   {"a": "d5_dc_locker_H2.hub", "b": "d5_dc_locker_H2.s3", "len": 4.2, "kind": "walk", "w": 1.0},
    {"a": "d5.PO0.152", "b": "d5_sensor_room_A3.in0", "len": 3.2, "kind": "door", "door": "d5_door_sensor_room_A3", "w": 1.6},
    {"a": "d5_sensor_room_A3.in0", "b": "d5_sensor_room_A3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_sensor_room_A3.hub", "b": "d5_sensor_room_A3.s0", "len": 4.73, "kind": "walk", "w": 1.0},
@@ -146315,14 +146329,14 @@
    {"a": "d5_sensor_archive_B2.hub", "b": "d5_sensor_archive_B2.s2", "len": 2.0, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_archive_B2.hub", "b": "d5_sensor_archive_B2.s3", "len": 1.64, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_archive_B2.hub", "b": "d5_sensor_archive_B2.s4", "len": 4.71, "kind": "walk", "w": 1.0},
-   {"a": "d5.PO0.133", "b": "d5_lab_bio_B5.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_B5", "w": 1.6},
-   {"a": "d5_lab_bio_B5.in0", "b": "d5_lab_bio_B5.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_lab_bio_B5.hub", "b": "d5_lab_bio_B5.s0", "len": 6.13, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B5.hub", "b": "d5_lab_bio_B5.s1", "len": 5.34, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B5.hub", "b": "d5_lab_bio_B5.s2", "len": 10.67, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B5.hub", "b": "d5_lab_bio_B5.s3", "len": 11.37, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B5.hub", "b": "d5_lab_bio_B5.s4", "len": 6.16, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B5.hub", "b": "d5_lab_bio_B5.s5", "len": 5.76, "kind": "walk", "w": 1.0},
+   {"a": "d5.PO0.133", "b": "d5_lab_bio_B3.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_B3", "w": 1.6},
+   {"a": "d5_lab_bio_B3.in0", "b": "d5_lab_bio_B3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s0", "len": 6.13, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s1", "len": 5.34, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s2", "len": 10.67, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s3", "len": 11.37, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s4", "len": 6.16, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B3.hub", "b": "d5_lab_bio_B3.s5", "len": 5.76, "kind": "walk", "w": 1.0},
    {"a": "d5.PO0.128", "b": "d5_sensor_archive_B3.in0", "len": 3.2, "kind": "door", "door": "d5_door_sensor_archive_B3", "w": 1.6},
    {"a": "d5_sensor_archive_B3.in0", "b": "d5_sensor_archive_B3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_sensor_archive_B3.hub", "b": "d5_sensor_archive_B3.s0", "len": 7.78, "kind": "walk", "w": 1.0},
@@ -146330,14 +146344,14 @@
    {"a": "d5_sensor_archive_B3.hub", "b": "d5_sensor_archive_B3.s2", "len": 2.0, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_archive_B3.hub", "b": "d5_sensor_archive_B3.s3", "len": 1.64, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_archive_B3.hub", "b": "d5_sensor_archive_B3.s4", "len": 4.71, "kind": "walk", "w": 1.0},
-   {"a": "d5.PO0.123", "b": "d5_lab_bio_B6.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_B6", "w": 1.6},
-   {"a": "d5_lab_bio_B6.in0", "b": "d5_lab_bio_B6.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_lab_bio_B6.hub", "b": "d5_lab_bio_B6.s0", "len": 6.13, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B6.hub", "b": "d5_lab_bio_B6.s1", "len": 5.34, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B6.hub", "b": "d5_lab_bio_B6.s2", "len": 10.67, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B6.hub", "b": "d5_lab_bio_B6.s3", "len": 11.37, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B6.hub", "b": "d5_lab_bio_B6.s4", "len": 6.16, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_bio_B6.hub", "b": "d5_lab_bio_B6.s5", "len": 5.76, "kind": "walk", "w": 1.0},
+   {"a": "d5.PO0.123", "b": "d5_lab_bio_B4.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_B4", "w": 1.6},
+   {"a": "d5_lab_bio_B4.in0", "b": "d5_lab_bio_B4.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s0", "len": 6.13, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s1", "len": 5.34, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s2", "len": 10.67, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s3", "len": 11.37, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s4", "len": 6.16, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_bio_B4.hub", "b": "d5_lab_bio_B4.s5", "len": 5.76, "kind": "walk", "w": 1.0},
    {"a": "d5.PO0.118", "b": "d5_sensor_archive_B4.in0", "len": 3.2, "kind": "door", "door": "d5_door_sensor_archive_B4", "w": 1.6},
    {"a": "d5_sensor_archive_B4.in0", "b": "d5_sensor_archive_B4.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_sensor_archive_B4.hub", "b": "d5_sensor_archive_B4.s0", "len": 7.78, "kind": "walk", "w": 1.0},
@@ -146353,13 +146367,13 @@
    {"a": "d5_sensor_room_C3.hub", "b": "d5_sensor_room_C3.s3", "len": 3.61, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_room_C3.hub", "b": "d5_sensor_room_C3.s4", "len": 5.89, "kind": "walk", "w": 1.0},
    {"a": "d5_sensor_room_C3.hub", "b": "d5_sensor_room_C3.s5", "len": 5.89, "kind": "walk", "w": 1.0},
-   {"a": "d5.PO0.108", "b": "d5_lab_phys_C2.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_phys_C2", "w": 1.6},
-   {"a": "d5_lab_phys_C2.in0", "b": "d5_lab_phys_C2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_lab_phys_C2.hub", "b": "d5_lab_phys_C2.s0", "len": 8.72, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_phys_C2.hub", "b": "d5_lab_phys_C2.s1", "len": 3.31, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_phys_C2.hub", "b": "d5_lab_phys_C2.s2", "len": 7.69, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_phys_C2.hub", "b": "d5_lab_phys_C2.s3", "len": 9.13, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_phys_C2.hub", "b": "d5_lab_phys_C2.s4", "len": 5.7, "kind": "walk", "w": 1.0},
+   {"a": "d5.PO0.108", "b": "d5_lab_phys_C1.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_phys_C1", "w": 1.6},
+   {"a": "d5_lab_phys_C1.in0", "b": "d5_lab_phys_C1.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s0", "len": 8.72, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s1", "len": 3.31, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s2", "len": 7.69, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s3", "len": 9.13, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_phys_C1.hub", "b": "d5_lab_phys_C1.s4", "len": 5.7, "kind": "walk", "w": 1.0},
    {"a": "d5.PO0.102", "b": "d5_lab_bio_C2.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_bio_C2", "w": 1.6},
    {"a": "d5_lab_bio_C2.in0", "b": "d5_lab_bio_C2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_lab_bio_C2.hub", "b": "d5_lab_bio_C2.s0", "len": 6.13, "kind": "walk", "w": 1.0},
@@ -146368,15 +146382,15 @@
    {"a": "d5_lab_bio_C2.hub", "b": "d5_lab_bio_C2.s3", "len": 11.37, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_bio_C2.hub", "b": "d5_lab_bio_C2.s4", "len": 6.16, "kind": "walk", "w": 1.0},
    {"a": "d5_lab_bio_C2.hub", "b": "d5_lab_bio_C2.s5", "len": 5.76, "kind": "walk", "w": 1.0},
-   {"a": "d5.PO0.096", "b": "d5_lab_C2.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_C2", "w": 1.6},
-   {"a": "d5_lab_C2.in0", "b": "d5_lab_C2.hub", "len": 7.09, "kind": "walk", "w": 1.5},
-   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s0", "len": 9.48, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s1", "len": 7.07, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s2", "len": 6.48, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s3", "len": 8.12, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s4", "len": 1.84, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s5", "len": 4.1, "kind": "walk", "w": 1.0},
-   {"a": "d5_lab_C2.hub", "b": "d5_lab_C2.s6", "len": 8.56, "kind": "walk", "w": 1.0},
+   {"a": "d5.PO0.096", "b": "d5_lab_C3.in0", "len": 3.2, "kind": "door", "door": "d5_door_lab_C3", "w": 1.6},
+   {"a": "d5_lab_C3.in0", "b": "d5_lab_C3.hub", "len": 7.09, "kind": "walk", "w": 1.5},
+   {"a": "d5_lab_C3.hub", "b": "d5_lab_C3.s0", "len": 9.48, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C3.hub", "b": "d5_lab_C3.s1", "len": 7.07, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C3.hub", "b": "d5_lab_C3.s2", "len": 6.48, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C3.hub", "b": "d5_lab_C3.s3", "len": 8.12, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C3.hub", "b": "d5_lab_C3.s4", "len": 1.84, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C3.hub", "b": "d5_lab_C3.s5", "len": 4.1, "kind": "walk", "w": 1.0},
+   {"a": "d5_lab_C3.hub", "b": "d5_lab_C3.s6", "len": 8.56, "kind": "walk", "w": 1.0},
    {"a": "d5.PO0.084", "b": "d5_hydro_D4.in0", "len": 3.2, "kind": "door", "door": "d5_door_hydro_D4", "w": 1.6},
    {"a": "d5_hydro_D4.in0", "b": "d5_hydro_D4.hub", "len": 7.09, "kind": "walk", "w": 1.5},
    {"a": "d5_hydro_D4.hub", "b": "d5_hydro_D4.s0", "len": 4.08, "kind": "walk", "w": 1.0},
@@ -154067,32 +154081,32 @@
     "engineering", "d4_store_cold_A1", "d4_store_cold_C1", "d4_store_cold_E1", "d2_sensor_room_D1", "d2_sensor_room_D2", "d2_sensor_room_F1",
     "d2_machinery_G1", "d2_sensor_room_C1", "d2_sensor_room_C2", "d2_sensor_room_F2", "d2_sensor_room_G1", "d2_machinery_G2", "d5_transporter_B1",
     "d5_machinery_H1", "d5_machinery_G1", "d5_sensor_room_A1", "d5_lab_phys_A1", "d5_sensor_room_A2", "d5_lab_phys_A2", "d5_sensor_room_C1",
-    "d5_sensor_room_C2", "d5_lab_phys_C1", "d5_radiator_pumps_E1", "d5_sensor_room_F1", "d5_radiator_pumps_F1", "d5_sensor_room_F2",
-    "d5_radiator_pumps_G1", "d5_machinery_G2", "d5_machinery_H2", "d5_sensor_room_A3", "d5_lab_phys_A3", "d5_sensor_room_C3", "d5_lab_phys_C2",
-    "d5_machinery_E1", "d5_machinery_E2", "d5_radiator_pumps_G2", "d5_machinery_G3", "d5_machinery_H3", "d6_machinery_H1", "d6_store_cold_E1",
-    "d6_store_cold_A1", "d6_store_cold_B1", "d6_store_cold_C1", "d6_store_cold_C2", "d6_machinery_H2", "d6_store_cold_A2", "d6_store_cold_B2",
-    "d6_store_cold_B3", "d6_store_cold_E2", "d7_radiator_pumps_G1", "d7_machinery_H1", "d7_machinery_G1", "d7_machinery_H2", "d7_radiator_pumps_E1",
-    "d7_machinery_E1", "d7_machinery_B1", "d7_capacitors_B1", "d7_machinery_B2", "d7_capacitors_B2", "d7_radiator_pumps_C1", "d7_capacitors_C1",
-    "d7_machinery_C1", "d7_radiator_pumps_C2", "d7_capacitors_C2", "d7_machinery_C2", "d7_capacitors_D1", "d7_machinery_B3", "d7_capacitors_B3",
-    "d7_machinery_B4", "d7_capacitors_B4", "d7_radiator_pumps_C3", "d7_capacitors_C3", "d7_machinery_C3", "d7_radiator_pumps_E2",
-    "d7_capacitors_F1", "d7_radiator_pumps_G2", "d7_machinery_H3", "d7_radiator_pumps_C4", "d7_capacitors_C4", "d7_machinery_C4",
-    "d7_capacitors_D2", "d7_machinery_E2", "d7_machinery_E3", "d7_machinery_F1", "d7_capacitors_F2", "d7_machinery_G2", "d7_machinery_H4",
-    "d8_machinery_G1", "d8_machinery_H1", "d8_machinery_H2", "d8_machinery_G2", "d8_machinery_E1", "d8_machinery_E2", "d8_machinery_F1",
-    "d8_machinery_E3", "d8_machinery_G3", "d8_machinery_H3", "d8_machinery_H4", "d8_machinery_E4", "d8_machinery_F2", "d8_machinery_G4",
-    "d9_machinery_G1", "d9_machinery_H1", "d9_machinery_H2", "d9_machinery_H3", "d9_machinery_E1", "d9_machinery_G2", "d9_machinery_H4",
-    "d9_machinery_H5", "d9_machinery_H6", "d9_machinery_H7", "d9_machinery_E2", "d10_store_cold_C1", "d10_store_cold_D1", "d10_machinery_E1",
-    "d10_store_cold_F1", "d10_store_cold_D2", "d10_machinery_E2", "d10_machinery_G1", "d10_machinery_H1", "d10_store_cold_C2", "d10_store_cold_D3",
-    "d10_machinery_E3", "d10_store_cold_F2", "d10_store_cold_F3", "d10_store_cold_D4", "d10_machinery_E4", "d10_machinery_G2", "d10_machinery_H2",
-    "d11_machinery_H1", "d11_machinery_E1", "d11_machinery_E2", "d11_machinery_F1", "d11_machinery_F2", "d11_machinery_G1", "d11_machinery_H2",
-    "d11_machinery_E3", "d11_machinery_E4", "d11_machinery_F3", "d11_machinery_F4", "d12_tank_A1", "d12_tank_A2", "d12_crawlway_A1", "d12_tank_A3",
-    "d12_crawlway_B1", "d12_crawlway_B2", "d12_crawlway_C1", "d12_tank_C1", "d12_crawlway_C2", "d12_tank_D1", "d12_tank_E1", "d12_tank_E2",
-    "d12_tank_F1", "d12_crawlway_F1", "d12_tank_F2", "d12_tank_H1", "d12_crawlway_A2", "d12_tank_A4", "d12_tank_A5", "d12_crawlway_A3",
-    "d12_tank_B1", "d12_tank_B2", "d12_tank_B3", "d12_crawlway_D1", "d12_crawlway_D2", "d12_crawlway_D3", "d12_crawlway_D4", "d12_tank_E3",
-    "d12_crawlway_E1", "d12_tank_E4", "d12_crawlway_E2", "d12_tank_F3", "d12_tank_G1", "d12_crawlway_G1", "d12_tank_H2", "d12_crawlway_B3",
-    "d12_crawlway_B4", "d12_crawlway_C3", "d12_tank_C2", "d12_crawlway_C4", "d12_tank_C3", "d12_tank_D2", "d12_tank_D3", "d12_tank_E5",
-    "d12_tank_E6", "d12_tank_E7", "d12_tank_F4", "d12_crawlway_F2", "d12_tank_F5", "d12_tank_G2", "d12_crawlway_H1", "d12_tank_B4", "d12_tank_B5",
-    "d12_tank_B6", "d12_tank_C4", "d12_crawlway_D5", "d12_crawlway_D6", "d12_crawlway_D7", "d12_crawlway_D8", "d12_crawlway_E3", "d12_tank_E8",
-    "d12_crawlway_E4", "d12_tank_E9", "d12_tank_F6", "d12_crawlway_G2", "d12_tank_G3", "d12_crawlway_H2"
+    "d5_sensor_room_C2", "d5_radiator_pumps_E1", "d5_sensor_room_F1", "d5_radiator_pumps_F1", "d5_sensor_room_F2", "d5_machinery_G2",
+    "d5_radiator_pumps_G1", "d5_machinery_H2", "d5_sensor_room_A3", "d5_lab_phys_A3", "d5_sensor_room_C3", "d5_lab_phys_C1", "d5_machinery_E1",
+    "d5_machinery_E2", "d5_radiator_pumps_G2", "d5_machinery_G3", "d5_machinery_H3", "d6_machinery_H1", "d6_store_cold_E1", "d6_store_cold_A1",
+    "d6_store_cold_B1", "d6_store_cold_C1", "d6_store_cold_C2", "d6_machinery_H2", "d6_store_cold_A2", "d6_store_cold_B2", "d6_store_cold_B3",
+    "d6_store_cold_E2", "d7_radiator_pumps_G1", "d7_machinery_H1", "d7_machinery_G1", "d7_machinery_H2", "d7_radiator_pumps_E1", "d7_machinery_E1",
+    "d7_machinery_B1", "d7_capacitors_B1", "d7_machinery_B2", "d7_capacitors_B2", "d7_radiator_pumps_C1", "d7_capacitors_C1", "d7_machinery_C1",
+    "d7_radiator_pumps_C2", "d7_capacitors_C2", "d7_machinery_C2", "d7_capacitors_D1", "d7_machinery_B3", "d7_capacitors_B3", "d7_machinery_B4",
+    "d7_capacitors_B4", "d7_radiator_pumps_C3", "d7_capacitors_C3", "d7_machinery_C3", "d7_radiator_pumps_E2", "d7_capacitors_F1",
+    "d7_radiator_pumps_G2", "d7_machinery_H3", "d7_radiator_pumps_C4", "d7_capacitors_C4", "d7_machinery_C4", "d7_capacitors_D2", "d7_machinery_E2",
+    "d7_machinery_E3", "d7_machinery_F1", "d7_capacitors_F2", "d7_machinery_G2", "d7_machinery_H4", "d8_machinery_G1", "d8_machinery_H1",
+    "d8_machinery_H2", "d8_machinery_G2", "d8_machinery_E1", "d8_machinery_E2", "d8_machinery_F1", "d8_machinery_E3", "d8_machinery_G3",
+    "d8_machinery_H3", "d8_machinery_H4", "d8_machinery_E4", "d8_machinery_F2", "d8_machinery_G4", "d9_machinery_G1", "d9_machinery_H1",
+    "d9_machinery_H2", "d9_machinery_H3", "d9_machinery_E1", "d9_machinery_G2", "d9_machinery_H4", "d9_machinery_H5", "d9_machinery_H6",
+    "d9_machinery_H7", "d9_machinery_E2", "d10_store_cold_C1", "d10_store_cold_D1", "d10_machinery_E1", "d10_store_cold_F1", "d10_store_cold_D2",
+    "d10_machinery_E2", "d10_machinery_G1", "d10_machinery_H1", "d10_store_cold_C2", "d10_store_cold_D3", "d10_machinery_E3", "d10_store_cold_F2",
+    "d10_store_cold_F3", "d10_store_cold_D4", "d10_machinery_E4", "d10_machinery_G2", "d10_machinery_H2", "d11_machinery_H1", "d11_machinery_E1",
+    "d11_machinery_E2", "d11_machinery_F1", "d11_machinery_F2", "d11_machinery_G1", "d11_machinery_H2", "d11_machinery_E3", "d11_machinery_E4",
+    "d11_machinery_F3", "d11_machinery_F4", "d12_tank_A1", "d12_tank_A2", "d12_crawlway_A1", "d12_tank_A3", "d12_crawlway_B1", "d12_crawlway_B2",
+    "d12_crawlway_C1", "d12_tank_C1", "d12_crawlway_C2", "d12_tank_D1", "d12_tank_E1", "d12_tank_E2", "d12_tank_F1", "d12_crawlway_F1",
+    "d12_tank_F2", "d12_tank_H1", "d12_crawlway_A2", "d12_tank_A4", "d12_tank_A5", "d12_crawlway_A3", "d12_tank_B1", "d12_tank_B2", "d12_tank_B3",
+    "d12_crawlway_D1", "d12_crawlway_D2", "d12_crawlway_D3", "d12_crawlway_D4", "d12_tank_E3", "d12_crawlway_E1", "d12_tank_E4", "d12_crawlway_E2",
+    "d12_tank_F3", "d12_tank_G1", "d12_crawlway_G1", "d12_tank_H2", "d12_crawlway_B3", "d12_crawlway_B4", "d12_crawlway_C3", "d12_tank_C2",
+    "d12_crawlway_C4", "d12_tank_C3", "d12_tank_D2", "d12_tank_D3", "d12_tank_E5", "d12_tank_E6", "d12_tank_E7", "d12_tank_F4", "d12_crawlway_F2",
+    "d12_tank_F5", "d12_tank_G2", "d12_crawlway_H1", "d12_tank_B4", "d12_tank_B5", "d12_tank_B6", "d12_tank_C4", "d12_crawlway_D5",
+    "d12_crawlway_D6", "d12_crawlway_D7", "d12_crawlway_D8", "d12_crawlway_E3", "d12_tank_E8", "d12_crawlway_E4", "d12_tank_E9", "d12_tank_F6",
+    "d12_crawlway_G2", "d12_tank_G3", "d12_crawlway_H2"
    ]
   },
   "damage_control": {
@@ -154131,9 +154145,9 @@
     "d2_offices_F2", "d2_sensor_room_G1", "d2_comms_center_H2", "d3_offices_D1", "d3_records_C1", "d3_offices_E1", "d3_offices_E2", "d3_offices_F1",
     "d3_offices_G1", "d3_offices_B1", "d3_offices_A1", "d3_offices_A2", "d5_transporter_B1", "d5_lab_bio_A1", "d5_sensor_room_A1", "d5_lab_phys_A1",
     "d5_lab_B1", "d5_lab_A1", "d5_lab_bio_A2", "d5_sensor_room_A2", "d5_lab_phys_A2", "d5_lab_A2", "d5_sensor_archive_B1", "d5_lab_bio_B1",
-    "d5_sensor_room_C1", "d5_lab_B2", "d5_lab_bio_B2", "d5_lab_bio_B3", "d5_lab_bio_B4", "d5_lab_C1", "d5_sensor_room_C2", "d5_lab_phys_C1",
-    "d5_lab_bio_C1", "d5_sensor_room_F1", "d5_sensor_room_F2", "d5_sensor_room_A3", "d5_lab_phys_A3", "d5_sensor_archive_B2", "d5_lab_bio_B5",
-    "d5_sensor_archive_B3", "d5_lab_bio_B6", "d5_sensor_archive_B4", "d5_sensor_room_C3", "d5_lab_phys_C2", "d5_lab_bio_C2", "d5_lab_C2",
+    "d5_sensor_room_C1", "d5_lab_B2", "d5_lab_astro_B1", "d5_lab_B3", "d5_lab_bio_B2", "d5_lab_bio_C1", "d5_lab_C1", "d5_lab_C2",
+    "d5_sensor_room_C2", "d5_sensor_room_F1", "d5_sensor_room_F2", "d5_sensor_room_A3", "d5_lab_phys_A3", "d5_sensor_archive_B2", "d5_lab_bio_B3",
+    "d5_sensor_archive_B3", "d5_lab_bio_B4", "d5_sensor_archive_B4", "d5_sensor_room_C3", "d5_lab_phys_C1", "d5_lab_bio_C2", "d5_lab_C3",
     "d5_sensor_archive_D1", "d6_lab_B1", "d6_lab_B2", "d6_lab_B3", "d6_lab_B4", "d6_lab_C1", "d6_lab_E1", "d7_power_control_G1",
     "d7_power_control_B1", "d7_power_control_D1", "d7_power_control_B2", "d7_power_control_D2", "d7_power_control_F1", "d7_power_control_G2",
     "d9_flight_ops_C1", "d9_flight_ops_D1", "d9_flight_ops_C2", "d9_flight_ops_C3", "d9_flight_ops_D2", "d11_fab_shop_C1", "d11_fab_shop_D1",
@@ -154177,22 +154191,22 @@
     "d3_staterooms_A1", "d3_staterooms_A2", "d3_staterooms_B1", "d3_gym_A1", "d3_gym_A2", "d5_shuttle_stop_A1", "d5_shuttle_stop_B1",
     "d5_shuttle_stop_C1", "d5_shuttle_stop_D1", "d5_shuttle_stop_E1", "d5_shuttle_stop_G1", "d5_shuttle_stop_H1", "d5_machinery_H1",
     "d5_machinery_G1", "d5_lab_bio_A1", "d5_hydro_A1", "d5_hydro_A2", "d5_lab_bio_A2", "d5_lab_bio_B1", "d5_hydro_A3", "d5_lab_bio_B2",
-    "d5_lab_bio_B3", "d5_lab_bio_B4", "d5_lab_bio_C1", "d5_hydro_D1", "d5_hydro_D2", "d5_hydro_D3", "d5_machinery_G2", "d5_machinery_H2",
-    "d5_lab_bio_B5", "d5_lab_bio_B6", "d5_lab_bio_C2", "d5_hydro_D4", "d5_hydro_D5", "d5_machinery_E1", "d5_machinery_E2", "d5_machinery_G3",
-    "d5_machinery_H3", "d6_quarantine_C1", "d6_hydro_E1", "d6_cabins_F1", "d6_machinery_H1", "d6_cabins_C1", "d6_cabins_D1", "d6_cabins_B1",
-    "d6_cabins_B2", "d6_cabins_C2", "d6_cabins_C3", "d6_cabins_B3", "d6_cabins_B4", "d6_cabins_D2", "d6_hydro_E2", "d6_cabins_F2",
-    "d6_machinery_H2", "d6_cabins_C4", "d6_cabins_C5", "d6_cabins_C6", "d6_cabins_D3", "d7_machinery_H1", "d7_machinery_G1", "d7_machinery_H2",
-    "d7_machinery_E1", "d7_machinery_B1", "d7_machinery_B2", "d7_machinery_C1", "d7_machinery_C2", "d7_machinery_B3", "d7_machinery_B4",
-    "d7_machinery_C3", "d7_machinery_H3", "d7_machinery_C4", "d7_machinery_E2", "d7_machinery_E3", "d7_machinery_F1", "d7_machinery_G2",
-    "d7_machinery_H4", "d8_machinery_G1", "d8_machinery_H1", "d8_machinery_H2", "d8_machinery_G2", "d8_barracks_C1", "d8_barracks_D1",
-    "d8_barracks_D2", "d8_barracks_D3", "d8_machinery_E1", "d8_machinery_E2", "d8_machinery_F1", "d8_barracks_B1", "d8_barracks_C2",
-    "d8_barracks_D4", "d8_barracks_D5", "d8_barracks_D6", "d8_barracks_D7", "d8_machinery_E3", "d8_machinery_G3", "d8_machinery_H3",
-    "d8_machinery_H4", "d8_machinery_E4", "d8_machinery_F2", "d8_machinery_G4", "d9_pilot_ready_D1", "d9_machinery_G1", "d9_machinery_H1",
-    "d9_machinery_H2", "d9_machinery_H3", "d9_pilot_ready_C1", "d9_pilot_ready_C2", "d9_machinery_E1", "d9_pilot_ready_D2", "d9_machinery_G2",
-    "d9_machinery_H4", "d9_machinery_H5", "d9_machinery_H6", "d9_machinery_H7", "d9_pilot_ready_C3", "d9_pilot_ready_C4", "d9_machinery_E2",
-    "d10_machinery_E1", "d10_machinery_E2", "d10_machinery_G1", "d10_machinery_H1", "d10_machinery_E3", "d10_machinery_E4", "d10_machinery_G2",
-    "d10_machinery_H2", "d11_machinery_H1", "d11_machinery_E1", "d11_machinery_E2", "d11_machinery_F1", "d11_machinery_F2", "d11_machinery_G1",
-    "d11_machinery_H2", "d11_machinery_E3", "d11_machinery_E4", "d11_machinery_F3", "d11_machinery_F4", "engineering_lobby", "flight_deck_lobby"
+    "d5_lab_bio_C1", "d5_hydro_D1", "d5_hydro_D2", "d5_hydro_D3", "d5_machinery_G2", "d5_machinery_H2", "d5_lab_bio_B3", "d5_lab_bio_B4",
+    "d5_lab_bio_C2", "d5_hydro_D4", "d5_hydro_D5", "d5_machinery_E1", "d5_machinery_E2", "d5_machinery_G3", "d5_machinery_H3", "d6_quarantine_C1",
+    "d6_hydro_E1", "d6_cabins_F1", "d6_machinery_H1", "d6_cabins_C1", "d6_cabins_D1", "d6_cabins_B1", "d6_cabins_B2", "d6_cabins_C2",
+    "d6_cabins_C3", "d6_cabins_B3", "d6_cabins_B4", "d6_cabins_D2", "d6_hydro_E2", "d6_cabins_F2", "d6_machinery_H2", "d6_cabins_C4",
+    "d6_cabins_C5", "d6_cabins_C6", "d6_cabins_D3", "d7_machinery_H1", "d7_machinery_G1", "d7_machinery_H2", "d7_machinery_E1", "d7_machinery_B1",
+    "d7_machinery_B2", "d7_machinery_C1", "d7_machinery_C2", "d7_machinery_B3", "d7_machinery_B4", "d7_machinery_C3", "d7_machinery_H3",
+    "d7_machinery_C4", "d7_machinery_E2", "d7_machinery_E3", "d7_machinery_F1", "d7_machinery_G2", "d7_machinery_H4", "d8_machinery_G1",
+    "d8_machinery_H1", "d8_machinery_H2", "d8_machinery_G2", "d8_barracks_C1", "d8_barracks_D1", "d8_barracks_D2", "d8_barracks_D3",
+    "d8_machinery_E1", "d8_machinery_E2", "d8_machinery_F1", "d8_barracks_B1", "d8_barracks_C2", "d8_barracks_D4", "d8_barracks_D5",
+    "d8_barracks_D6", "d8_barracks_D7", "d8_machinery_E3", "d8_machinery_G3", "d8_machinery_H3", "d8_machinery_H4", "d8_machinery_E4",
+    "d8_machinery_F2", "d8_machinery_G4", "d9_pilot_ready_D1", "d9_machinery_G1", "d9_machinery_H1", "d9_machinery_H2", "d9_machinery_H3",
+    "d9_pilot_ready_C1", "d9_pilot_ready_C2", "d9_machinery_E1", "d9_pilot_ready_D2", "d9_machinery_G2", "d9_machinery_H4", "d9_machinery_H5",
+    "d9_machinery_H6", "d9_machinery_H7", "d9_pilot_ready_C3", "d9_pilot_ready_C4", "d9_machinery_E2", "d10_machinery_E1", "d10_machinery_E2",
+    "d10_machinery_G1", "d10_machinery_H1", "d10_machinery_E3", "d10_machinery_E4", "d10_machinery_G2", "d10_machinery_H2", "d11_machinery_H1",
+    "d11_machinery_E1", "d11_machinery_E2", "d11_machinery_F1", "d11_machinery_F2", "d11_machinery_G1", "d11_machinery_H2", "d11_machinery_E3",
+    "d11_machinery_E4", "d11_machinery_F3", "d11_machinery_F4", "engineering_lobby", "flight_deck_lobby"
    ]
   },
   "lift": {"name": "Lift", "compartments": ["lift_housing_bridge"]},
@@ -154251,11 +154265,11 @@
     "d3_gym_A2", "d3_offices_A2", "d5_stair_44p", "d5_stair_92n", "d5_stair_300n", "d5_stair_452n", "d5_transporter_B1", "d5_shuttle_stop_A1",
     "d5_shuttle_stop_B1", "d5_shuttle_stop_C1", "d5_shuttle_stop_D1", "d5_shuttle_stop_E1", "d5_shuttle_stop_G1", "d5_shuttle_stop_H1",
     "d5_machinery_H1", "d5_machinery_G1", "d5_lab_bio_A1", "d5_sensor_room_A1", "d5_lab_phys_A1", "d5_lab_B1", "d5_lab_A1", "d5_lab_bio_A2",
-    "d5_sensor_room_A2", "d5_lab_phys_A2", "d5_lab_A2", "d5_sensor_archive_B1", "d5_lab_bio_B1", "d5_sensor_room_C1", "d5_lab_B2", "d5_lab_bio_B2",
-    "d5_lab_bio_B3", "d5_lab_bio_B4", "d5_lab_C1", "d5_sensor_room_C2", "d5_lab_phys_C1", "d5_lab_bio_C1", "d5_radiator_pumps_E1",
-    "d5_sensor_room_F1", "d5_radiator_pumps_F1", "d5_sensor_room_F2", "d5_radiator_pumps_G1", "d5_machinery_G2", "d5_machinery_b_H1",
-    "d5_machinery_H2", "d5_sensor_room_A3", "d5_lab_phys_A3", "d5_sensor_archive_B2", "d5_lab_bio_B5", "d5_sensor_archive_B3", "d5_lab_bio_B6",
-    "d5_sensor_archive_B4", "d5_sensor_room_C3", "d5_lab_phys_C2", "d5_lab_bio_C2", "d5_lab_C2", "d5_sensor_archive_D1", "d5_machinery_E1",
+    "d5_sensor_room_A2", "d5_lab_phys_A2", "d5_lab_A2", "d5_sensor_archive_B1", "d5_lab_bio_B1", "d5_sensor_room_C1", "d5_lab_B2",
+    "d5_lab_astro_B1", "d5_lab_B3", "d5_lab_bio_B2", "d5_lab_bio_C1", "d5_lab_C1", "d5_lab_C2", "d5_sensor_room_C2", "d5_radiator_pumps_E1",
+    "d5_sensor_room_F1", "d5_radiator_pumps_F1", "d5_sensor_room_F2", "d5_machinery_G2", "d5_radiator_pumps_G1", "d5_machinery_b_H1",
+    "d5_machinery_H2", "d5_sensor_room_A3", "d5_lab_phys_A3", "d5_sensor_archive_B2", "d5_lab_bio_B3", "d5_sensor_archive_B3", "d5_lab_bio_B4",
+    "d5_sensor_archive_B4", "d5_sensor_room_C3", "d5_lab_phys_C1", "d5_lab_bio_C2", "d5_lab_C3", "d5_sensor_archive_D1", "d5_machinery_E1",
     "d5_machinery_b_E1", "d5_machinery_E2", "d5_machinery_b_F1", "d5_machinery_b_F2", "d5_radiator_pumps_G2", "d5_machinery_G3",
     "d5_machinery_b_H2", "d5_machinery_H3", "d6_stair_44p", "d6_stair_92n", "d6_stair_300n", "d6_stair_452n", "d6_surgery_C1", "d6_cabins_F1",
     "d6_machinery_H1", "d6_library_F1", "d6_laundry_F1", "d6_quiet_G1", "d6_laundry_G1", "d6_cabins_C1", "d6_cabins_D1", "d6_laundry_A1",
@@ -154332,11 +154346,11 @@
     "bridge", "d2_point_defense_B1", "d2_sensor_room_D1", "d2_sensor_room_D2", "d2_point_defense_E1", "d2_sensor_room_F1", "d2_point_defense_B2",
     "d2_sensor_room_C1", "d2_sensor_room_C2", "d2_point_defense_D1", "d2_point_defense_D2", "d2_point_defense_E2", "d2_sensor_room_F2",
     "d2_sensor_room_G1", "d2_point_defense_H1", "d5_lab_bio_A1", "d5_sensor_room_A1", "d5_lab_phys_A1", "d5_lab_B1", "d5_lab_A1", "d5_lab_bio_A2",
-    "d5_sensor_room_A2", "d5_lab_phys_A2", "d5_lab_A2", "d5_sensor_archive_B1", "d5_lab_bio_B1", "d5_sensor_room_C1", "d5_lab_B2", "d5_lab_bio_B2",
-    "d5_lab_bio_B3", "d5_lab_bio_B4", "d5_lab_C1", "d5_sensor_room_C2", "d5_lab_phys_C1", "d5_lab_bio_C1", "d5_sensor_room_F1", "d5_sensor_room_F2",
-    "d5_sensor_room_A3", "d5_lab_phys_A3", "d5_sensor_archive_B2", "d5_lab_bio_B5", "d5_sensor_archive_B3", "d5_lab_bio_B6", "d5_sensor_archive_B4",
-    "d5_sensor_room_C3", "d5_lab_phys_C2", "d5_lab_bio_C2", "d5_lab_C2", "d5_sensor_archive_D1", "d6_lab_B1", "d6_lab_B2", "d6_lab_B3", "d6_lab_B4",
-    "d6_lab_C1", "d6_lab_E1"
+    "d5_sensor_room_A2", "d5_lab_phys_A2", "d5_lab_A2", "d5_sensor_archive_B1", "d5_lab_bio_B1", "d5_sensor_room_C1", "d5_lab_B2",
+    "d5_lab_astro_B1", "d5_lab_B3", "d5_lab_bio_B2", "d5_lab_bio_C1", "d5_lab_C1", "d5_lab_C2", "d5_sensor_room_C2", "d5_sensor_room_F1",
+    "d5_sensor_room_F2", "d5_sensor_room_A3", "d5_lab_phys_A3", "d5_sensor_archive_B2", "d5_lab_bio_B3", "d5_sensor_archive_B3", "d5_lab_bio_B4",
+    "d5_sensor_archive_B4", "d5_sensor_room_C3", "d5_lab_phys_C1", "d5_lab_bio_C2", "d5_lab_C3", "d5_sensor_archive_D1", "d6_lab_B1", "d6_lab_B2",
+    "d6_lab_B3", "d6_lab_B4", "d6_lab_C1", "d6_lab_E1"
    ]
   },
   "supply": {
@@ -172093,8 +172107,26 @@
     "comp": "d5_lab_B2"
    },
    {
-    "mesh": "SM_SHIP_LabBio",
+    "mesh": "SM_SHIP_LabAstro",
     "pos": [-12.0, 22.0, -50.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck05/Rooms/B",
+    "label": "d5_lab_astro_B1",
+    "cls": "room",
+    "comp": "d5_lab_astro_B1"
+   },
+   {
+    "mesh": "SM_SHIP_Lab",
+    "pos": [-36.0, 22.0, -50.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck05/Rooms/B",
+    "label": "d5_lab_B3",
+    "cls": "room",
+    "comp": "d5_lab_B3"
+   },
+   {
+    "mesh": "SM_SHIP_LabBio",
+    "pos": [-60.0, 22.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Rooms/B",
     "label": "d5_lab_bio_B2",
@@ -172103,25 +172135,16 @@
    },
    {
     "mesh": "SM_SHIP_LabBio",
-    "pos": [-36.0, 22.0, -50.0],
+    "pos": [-88.0, 22.0, -50.0],
     "yaw": 0.0,
-    "folder": "Interior/Deck05/Rooms/B",
-    "label": "d5_lab_bio_B3",
+    "folder": "Interior/Deck05/Rooms/C",
+    "label": "d5_lab_bio_C1",
     "cls": "room",
-    "comp": "d5_lab_bio_B3"
-   },
-   {
-    "mesh": "SM_SHIP_LabBio",
-    "pos": [-60.0, 22.0, -50.0],
-    "yaw": 0.0,
-    "folder": "Interior/Deck05/Rooms/B",
-    "label": "d5_lab_bio_B4",
-    "cls": "room",
-    "comp": "d5_lab_bio_B4"
+    "comp": "d5_lab_bio_C1"
    },
    {
     "mesh": "SM_SHIP_Lab",
-    "pos": [-88.0, 22.0, -50.0],
+    "pos": [-112.0, 22.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Rooms/C",
     "label": "d5_lab_C1",
@@ -172129,31 +172152,22 @@
     "comp": "d5_lab_C1"
    },
    {
+    "mesh": "SM_SHIP_Lab",
+    "pos": [-136.0, 22.0, -50.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck05/Rooms/C",
+    "label": "d5_lab_C2",
+    "cls": "room",
+    "comp": "d5_lab_C2"
+   },
+   {
     "mesh": "SM_SHIP_SensorRoom",
-    "pos": [-104.0, 22.0, -50.0],
+    "pos": [-152.0, 22.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Rooms/C",
     "label": "d5_sensor_room_C2",
     "cls": "room",
     "comp": "d5_sensor_room_C2"
-   },
-   {
-    "mesh": "SM_SHIP_LabPhys",
-    "pos": [-128.0, 22.0, -50.0],
-    "yaw": 0.0,
-    "folder": "Interior/Deck05/Rooms/C",
-    "label": "d5_lab_phys_C1",
-    "cls": "room",
-    "comp": "d5_lab_phys_C1"
-   },
-   {
-    "mesh": "SM_SHIP_LabBio",
-    "pos": [-152.0, 22.0, -50.0],
-    "yaw": 0.0,
-    "folder": "Interior/Deck05/Rooms/C",
-    "label": "d5_lab_bio_C1",
-    "cls": "room",
-    "comp": "d5_lab_bio_C1"
    },
    {
     "mesh": "SM_SHIP_Hydro",
@@ -172237,17 +172251,8 @@
     "comp": "d5_sensor_room_F2"
    },
    {
-    "mesh": "SM_SHIP_RadiatorPumps",
-    "pos": [-424.0, 22.0, -50.0],
-    "yaw": 0.0,
-    "folder": "Interior/Deck05/Rooms/G",
-    "label": "d5_radiator_pumps_G1",
-    "cls": "room",
-    "comp": "d5_radiator_pumps_G1"
-   },
-   {
     "mesh": "SM_SHIP_Machinery",
-    "pos": [-448.0, 22.0, -50.0],
+    "pos": [-424.0, 22.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Rooms/G",
     "label": "d5_machinery_G2",
@@ -172256,7 +172261,7 @@
    },
    {
     "mesh": "SM_SHIP_DcLocker",
-    "pos": [-460.0, 22.0, -50.0],
+    "pos": [-436.0, 22.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Rooms/G",
     "label": "d5_dc_locker_G3",
@@ -172264,17 +172269,17 @@
     "comp": "d5_dc_locker_G3"
    },
    {
-    "mesh": "SM_SHIP_DcLocker",
-    "pos": [-476.0, 22.0, -50.0],
+    "mesh": "SM_SHIP_RadiatorPumps",
+    "pos": [-460.0, 22.0, -50.0],
     "yaw": 0.0,
-    "folder": "Interior/Deck05/Rooms/H",
-    "label": "d5_dc_locker_H2",
+    "folder": "Interior/Deck05/Rooms/G",
+    "label": "d5_radiator_pumps_G1",
     "cls": "room",
-    "comp": "d5_dc_locker_H2"
+    "comp": "d5_radiator_pumps_G1"
    },
    {
     "mesh": "SM_SHIP_MachineryB",
-    "pos": [-500.0, 22.0, -50.0],
+    "pos": [-488.0, 22.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Rooms/H",
     "label": "d5_machinery_b_H1",
@@ -172283,12 +172288,21 @@
    },
    {
     "mesh": "SM_SHIP_Machinery",
-    "pos": [-524.0, 22.0, -50.0],
+    "pos": [-512.0, 22.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Rooms/H",
     "label": "d5_machinery_H2",
     "cls": "room",
     "comp": "d5_machinery_H2"
+   },
+   {
+    "mesh": "SM_SHIP_DcLocker",
+    "pos": [-524.0, 22.0, -50.0],
+    "yaw": 0.0,
+    "folder": "Interior/Deck05/Rooms/H",
+    "label": "d5_dc_locker_H2",
+    "cls": "room",
+    "comp": "d5_dc_locker_H2"
    },
    {
     "mesh": "SM_SHIP_SensorRoom",
@@ -172322,9 +172336,9 @@
     "pos": [20.0, -22.0, -50.0],
     "yaw": 180.0,
     "folder": "Interior/Deck05/Rooms/B",
-    "label": "d5_lab_bio_B5",
+    "label": "d5_lab_bio_B3",
     "cls": "room",
-    "comp": "d5_lab_bio_B5"
+    "comp": "d5_lab_bio_B3"
    },
    {
     "mesh": "SM_SHIP_SensorArchive",
@@ -172340,9 +172354,9 @@
     "pos": [-20.0, -22.0, -50.0],
     "yaw": 180.0,
     "folder": "Interior/Deck05/Rooms/B",
-    "label": "d5_lab_bio_B6",
+    "label": "d5_lab_bio_B4",
     "cls": "room",
-    "comp": "d5_lab_bio_B6"
+    "comp": "d5_lab_bio_B4"
    },
    {
     "mesh": "SM_SHIP_SensorArchive",
@@ -172367,9 +172381,9 @@
     "pos": [-80.0, -22.0, -50.0],
     "yaw": 180.0,
     "folder": "Interior/Deck05/Rooms/C",
-    "label": "d5_lab_phys_C2",
+    "label": "d5_lab_phys_C1",
     "cls": "room",
-    "comp": "d5_lab_phys_C2"
+    "comp": "d5_lab_phys_C1"
    },
    {
     "mesh": "SM_SHIP_LabBio",
@@ -172385,9 +172399,9 @@
     "pos": [-128.0, -22.0, -50.0],
     "yaw": 180.0,
     "folder": "Interior/Deck05/Rooms/C",
-    "label": "d5_lab_C2",
+    "label": "d5_lab_C3",
     "cls": "room",
-    "comp": "d5_lab_C2"
+    "comp": "d5_lab_C3"
    },
    {
     "mesh": "SM_SHIP_Hydro",
@@ -174085,7 +174099,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-520.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174093,10 +174107,10 @@
     "cls": "module",
     "passage": "SB0",
     "index": 1,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_B"
    },
    {
-    "mesh": "SM_SHIP_P_Door_R_A",
+    "mesh": "SM_SHIP_P_Straight_C",
     "pos": [-516.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174104,7 +174118,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 2,
-    "suffix": "Door_R_A"
+    "suffix": "Straight_C"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -174129,7 +174143,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-504.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174137,7 +174151,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 5,
-    "suffix": "Straight_C"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -174162,7 +174176,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Door_R_A",
+    "mesh": "SM_SHIP_P_Straight_C",
     "pos": [-492.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174170,7 +174184,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 8,
-    "suffix": "Door_R_A"
+    "suffix": "Straight_C"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -174195,7 +174209,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-480.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174203,7 +174217,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 11,
-    "suffix": "Straight_C"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -174217,7 +174231,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Door_R_B",
+    "mesh": "SM_SHIP_P_Straight_B",
     "pos": [-472.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174225,7 +174239,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 13,
-    "suffix": "Door_R_B"
+    "suffix": "Straight_B"
    },
    {
     "mesh": "SM_SHIP_P_T_L",
@@ -174277,7 +174291,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Door_R_B",
+    "mesh": "SM_SHIP_P_Straight_C",
     "pos": [-456.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174285,10 +174299,10 @@
     "cls": "module",
     "passage": "SB0",
     "index": 17,
-    "suffix": "Door_R_B"
+    "suffix": "Straight_C"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_A",
+    "mesh": "SM_SHIP_P_Door_R_A",
     "pos": [-452.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174296,7 +174310,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 18,
-    "suffix": "Straight_A"
+    "suffix": "Door_R_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_B",
@@ -174321,7 +174335,7 @@
     "suffix": "Straight_C"
    },
    {
-    "mesh": "SM_SHIP_P_Door_R_B",
+    "mesh": "SM_SHIP_P_Straight_A",
     "pos": [-440.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174329,7 +174343,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 21,
-    "suffix": "Door_R_B"
+    "suffix": "Straight_A"
    },
    {
     "mesh": "SM_SHIP_P_Straight_B",
@@ -174343,7 +174357,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_C",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-432.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -174351,7 +174365,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 23,
-    "suffix": "Straight_C"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -175188,7 +175202,7 @@
     "suffix": "Straight_A"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_B",
+    "mesh": "SM_SHIP_P_Door_R_A",
     "pos": [-148.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -175196,10 +175210,10 @@
     "cls": "module",
     "passage": "SB0",
     "index": 94,
-    "suffix": "Straight_B"
+    "suffix": "Door_R_A"
    },
    {
-    "mesh": "SM_SHIP_P_Door_R_B",
+    "mesh": "SM_SHIP_P_Straight_C",
     "pos": [-144.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -175207,7 +175221,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 95,
-    "suffix": "Door_R_B"
+    "suffix": "Straight_C"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -175243,7 +175257,7 @@
     "suffix": "Straight_C"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_A",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-128.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -175251,7 +175265,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 99,
-    "suffix": "Straight_A"
+    "suffix": "Door_R_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_B",
@@ -175265,7 +175279,7 @@
     "suffix": "Straight_B"
    },
    {
-    "mesh": "SM_SHIP_P_Door_R_B",
+    "mesh": "SM_SHIP_P_Straight_C",
     "pos": [-120.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -175273,7 +175287,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 101,
-    "suffix": "Door_R_B"
+    "suffix": "Straight_C"
    },
    {
     "mesh": "SM_SHIP_P_Straight_A",
@@ -175309,7 +175323,7 @@
     "suffix": "Straight_C"
    },
    {
-    "mesh": "SM_SHIP_P_Straight_A",
+    "mesh": "SM_SHIP_P_Door_R_B",
     "pos": [-104.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -175317,10 +175331,10 @@
     "cls": "module",
     "passage": "SB0",
     "index": 105,
-    "suffix": "Straight_A"
+    "suffix": "Door_R_B"
    },
    {
-    "mesh": "SM_SHIP_P_Door_R_A",
+    "mesh": "SM_SHIP_P_Straight_B",
     "pos": [-100.0, 20.0, -50.0],
     "yaw": 0.0,
     "folder": "Interior/Deck05/Passages/SB0",
@@ -175328,7 +175342,7 @@
     "cls": "module",
     "passage": "SB0",
     "index": 106,
-    "suffix": "Door_R_A"
+    "suffix": "Straight_B"
    },
    {
     "mesh": "SM_SHIP_P_Straight_C",
@@ -178874,19 +178888,19 @@
     "cls": "plate"
    },
    {
-    "mesh": "SM_SHIP_Plate_lab_bio",
+    "mesh": "SM_SHIP_Plate_lab_astro",
     "pos": [-2.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_bio_B2",
+    "label": "d5_plate_lab_astro_B1",
     "cls": "plate"
    },
    {
-    "mesh": "SM_SHIP_Plate_lab_bio",
+    "mesh": "SM_SHIP_Plate_lab",
     "pos": [-26.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_bio_B3",
+    "label": "d5_plate_lab_B3",
     "cls": "plate"
    },
    {
@@ -178894,39 +178908,39 @@
     "pos": [-50.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_bio_B4",
+    "label": "d5_plate_lab_bio_B2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_lab_bio",
+    "pos": [-78.0, 21.49, -47.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck05/Plates",
+    "label": "d5_plate_lab_bio_C1",
     "cls": "plate"
    },
    {
     "mesh": "SM_SHIP_Plate_lab",
-    "pos": [-78.0, 21.49, -47.28],
+    "pos": [-102.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
     "label": "d5_plate_lab_C1",
     "cls": "plate"
    },
    {
+    "mesh": "SM_SHIP_Plate_lab",
+    "pos": [-126.0, 21.49, -47.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck05/Plates",
+    "label": "d5_plate_lab_C2",
+    "cls": "plate"
+   },
+   {
     "mesh": "SM_SHIP_Plate_sensors",
-    "pos": [-98.0, 21.49, -47.28],
+    "pos": [-146.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
     "label": "d5_plate_sensor_room_C2",
-    "cls": "plate"
-   },
-   {
-    "mesh": "SM_SHIP_Plate_lab_phys",
-    "pos": [-118.0, 21.49, -47.28],
-    "yaw": -90.0,
-    "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_phys_C1",
-    "cls": "plate"
-   },
-   {
-    "mesh": "SM_SHIP_Plate_lab_bio",
-    "pos": [-142.0, 21.49, -47.28],
-    "yaw": -90.0,
-    "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_bio_C1",
     "cls": "plate"
    },
    {
@@ -179002,16 +179016,8 @@
     "cls": "plate"
    },
    {
-    "mesh": "SM_SHIP_Plate_pumps",
-    "pos": [-414.0, 21.49, -47.28],
-    "yaw": -90.0,
-    "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_radiator_pumps_G1",
-    "cls": "plate"
-   },
-   {
     "mesh": "SM_SHIP_Plate_machinery",
-    "pos": [-438.0, 21.49, -47.28],
+    "pos": [-414.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
     "label": "d5_plate_machinery_G2",
@@ -179019,23 +179025,23 @@
    },
    {
     "mesh": "SM_SHIP_Plate_dc",
-    "pos": [-454.0, 21.49, -47.28],
+    "pos": [-430.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
     "label": "d5_plate_dc_locker_G3",
     "cls": "plate"
    },
    {
-    "mesh": "SM_SHIP_Plate_dc",
-    "pos": [-470.0, 21.49, -47.28],
+    "mesh": "SM_SHIP_Plate_pumps",
+    "pos": [-450.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_dc_locker_H2",
+    "label": "d5_plate_radiator_pumps_G1",
     "cls": "plate"
    },
    {
     "mesh": "SM_SHIP_Plate_machinery",
-    "pos": [-490.0, 21.49, -47.28],
+    "pos": [-478.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
     "label": "d5_plate_machinery_b_H1",
@@ -179043,10 +179049,18 @@
    },
    {
     "mesh": "SM_SHIP_Plate_machinery",
-    "pos": [-514.0, 21.49, -47.28],
+    "pos": [-502.0, 21.49, -47.28],
     "yaw": -90.0,
     "folder": "Interior/Deck05/Plates",
     "label": "d5_plate_machinery_H2",
+    "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_Plate_dc",
+    "pos": [-518.0, 21.49, -47.28],
+    "yaw": -90.0,
+    "folder": "Interior/Deck05/Plates",
+    "label": "d5_plate_dc_locker_H2",
     "cls": "plate"
    },
    {
@@ -179078,7 +179092,7 @@
     "pos": [10.0, -21.49, -47.28],
     "yaw": 90.0,
     "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_bio_B5",
+    "label": "d5_plate_lab_bio_B3",
     "cls": "plate"
    },
    {
@@ -179094,7 +179108,7 @@
     "pos": [-30.0, -21.49, -47.28],
     "yaw": 90.0,
     "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_bio_B6",
+    "label": "d5_plate_lab_bio_B4",
     "cls": "plate"
    },
    {
@@ -179118,7 +179132,7 @@
     "pos": [-90.0, -21.49, -47.28],
     "yaw": 90.0,
     "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_phys_C2",
+    "label": "d5_plate_lab_phys_C1",
     "cls": "plate"
    },
    {
@@ -179134,7 +179148,7 @@
     "pos": [-138.0, -21.49, -47.28],
     "yaw": 90.0,
     "folder": "Interior/Deck05/Plates",
-    "label": "d5_plate_lab_C2",
+    "label": "d5_plate_lab_C3",
     "cls": "plate"
    },
    {

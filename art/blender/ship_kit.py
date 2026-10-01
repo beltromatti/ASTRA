@@ -11,6 +11,7 @@ Options:
   --no-checks         skip the mesh checks and the route ray casts
   --preview <dir>     render previews into <dir> (Eevee, headless): --views rooms,modules,d4   (default: none); --samples N; --room-views door,corner_a,far
   --save-blend <f>    write the built meshes as a .blend
+  --stats <f>         write the triangle count and the material slots of every built mesh as JSON (ship_budget.py reads it: the budget of a deck without exporting the FBX files)
 
 Everything is in the ship's layout frame (X forward, Y starboard, Z up, metres; FB mirrors Y on the way out, so the FBX meshes land on the plan in
 Unreal). The corridor modules (SM_SHIP_<S|P>_<name>, 4 x 4 m, origin on the floor at the aft end of the centre line) and the room prefabs (origin on
@@ -362,7 +363,7 @@ class RouteChecker:
 def parse_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out = {"out_dir": DEFAULT_OUT, "only": None, "plan": None, "export": True, "checks": True, "preview": None, "views": ["rooms"], "samples": 24,
-           "room_views": None, "save_blend": None, "spots": False}
+           "room_views": None, "save_blend": None, "spots": False, "stats": None}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -392,6 +393,9 @@ def parse_args() -> dict:
             i += 1
         elif a == "--save-blend":
             out["save_blend"] = argv[i + 1]
+            i += 1
+        elif a == "--stats":
+            out["stats"] = argv[i + 1]
             i += 1
         elif not a.startswith("--"):
             out["out_dir"] = a
@@ -428,6 +432,9 @@ def main() -> None:
     print("built", len(objs), "meshes in", round(time.time() - t0, 1), "s; tris", total)
     for pr in problems:
         print("  MESH PROBLEM:", pr)
+    if args["stats"]:
+        with open(args["stats"], "w", encoding="utf-8") as fh:
+            json.dump({n: {"tris": st["tris"], "slots": st["materials"], "size_m": st["size_m"]} for n, st in sorted(stats.items())}, fh, indent=0)
 
     route = None
     if args["checks"] and plan and (not args["only"] or args["spots"]):

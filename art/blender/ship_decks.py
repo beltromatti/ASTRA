@@ -268,10 +268,12 @@ def plan_deck(B: Builder, deck: int, towers: list | None = None, coarse: bool = 
         for side, partners in ((+1, sbp), (-1, pp)):
             partner = next((p for p in partners if p.a0 <= ps.a0 + 2 and p.a1 >= ps.a1 - 2), None) or (partners[0] if partners else None)
             partner = partner if partner and partner.a0 <= ps.a1 and partner.a1 >= ps.a0 else None
-            snap = list(placed)
+            snap, snap_used = list(placed), set(used)
             items = fill_lane(deck, ps, side, env, obs, partner, placed, used=used)
             if partner is not None and not any(it[0] == "link" for it in items) and side > 0:
                 placed[:] = snap
+                used.clear()                                                    # the rooms of the discarded try are free again (a unique room must not be lost with it)
+                used.update(snap_used)
                 items = fill_lane(deck, ps, side, env, obs, partner, placed, force=True, used=used)
             D.lane(ps.pid, side, ps.a1, items, "I_s" if side > 0 else "I_p")
     # outer lanes off the side passages, only where the hull is wide enough for 16 m rooms
