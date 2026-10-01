@@ -104,6 +104,7 @@ private:
 	TWeakObjectPtr<UAstraShipPlan> Plan;
 	float TimeScale = 12.f;
 	float PollT = 0.f;
+	float PrewarmT = 0.f;
 	float BodyT = 0.f;
 	FCost Cost;
 	int32 NumActiveBodies = 0;
@@ -121,7 +122,7 @@ private:
 	bool bCaptainSeen = false;
 	float JumpGraceS = 0.f;           // after a jump (a lift, a fade) the picture is still coming back: bodies are made in view, in a few frames
 	void ManageBodies();
-	void PrewarmPool();
+	void PrewarmPool(float DeltaTime);
 	bool CanAppearUnseen(const FVector& Where) const;
 	AAstraLifeBody* TakeBody();
 	void ReleaseBody(int32 Person);

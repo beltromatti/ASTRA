@@ -18,7 +18,7 @@ const TCHAR* AstraLifeActName(EAstraLifeAct A)
 
 namespace
 {
-	bool ReadJson(const FString& Path, TSharedPtr<FJsonObject>& Out)
+	bool LifeReadJson(const FString& Path, TSharedPtr<FJsonObject>& Out)
 	{
 		FString Text;
 		if (!FFileHelper::LoadFileToString(Text, *Path))
@@ -28,7 +28,7 @@ namespace
 		return FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Out) && Out.IsValid();
 	}
 
-	FString FindData(const TCHAR* File)
+	FString LifeFindData(const TCHAR* File)
 	{
 		// staged with the game (Content/ASTRA/Data, always packaged as a loose file), else the repository's copy
 		const FString A = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("ASTRA/Data"), File);
@@ -39,12 +39,12 @@ namespace
 		return FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship"), File);
 	}
 
-	FVector Metres(const TArray<TSharedPtr<FJsonValue>>* A)
+	FVector LifeMetres(const TArray<TSharedPtr<FJsonValue>>* A)
 	{
 		return A && A->Num() >= 3 ? FVector((*A)[0]->AsNumber(), (*A)[1]->AsNumber(), (*A)[2]->AsNumber()) * 100.0 : FVector::ZeroVector;
 	}
 
-	EAstraPlaceKind PlaceKindOf(const FString& K)
+	EAstraPlaceKind LifePlaceKindOf(const FString& K)
 	{
 		if (K == TEXT("sit")) { return EAstraPlaceKind::Sit; }
 		if (K == TEXT("stand")) { return EAstraPlaceKind::Stand; }
@@ -55,7 +55,7 @@ namespace
 		return EAstraPlaceKind::Hub;
 	}
 
-	float DefaultHeight(EAstraPlaceKind K)
+	float LifeDefaultHeight(EAstraPlaceKind K)
 	{
 		switch (K)
 		{
@@ -66,7 +66,7 @@ namespace
 		}
 	}
 
-	FVector2D Range(const TSharedPtr<FJsonObject>& O, const TCHAR* Field, const FVector2D& Default)
+	FVector2D LifeRange(const TSharedPtr<FJsonObject>& O, const TCHAR* Field, const FVector2D& Default)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
 		if (O.IsValid() && O->TryGetArrayField(Field, A) && A->Num() >= 2)
@@ -76,7 +76,7 @@ namespace
 		return Default;
 	}
 
-	double Num(const TSharedPtr<FJsonObject>& O, const TCHAR* Field, double Default)
+	double LifeNum(const TSharedPtr<FJsonObject>& O, const TCHAR* Field, double Default)
 	{
 		double V = Default;
 		if (O.IsValid())
@@ -86,7 +86,7 @@ namespace
 		return V;
 	}
 
-	TArray<FAstraLifeSelector> Selectors(const TSharedPtr<FJsonObject>& O, const TCHAR* Field)
+	TArray<FAstraLifeSelector> LifeSelectors(const TSharedPtr<FJsonObject>& O, const TCHAR* Field)
 	{
 		TArray<FAstraLifeSelector> Out;
 		const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
@@ -123,7 +123,7 @@ namespace
 					Sel.Decks.Add((int32)DV->AsNumber());
 				}
 			}
-			Sel.Weight = (float)Num(S, TEXT("weight"), 1.0);
+			Sel.Weight = (float)LifeNum(S, TEXT("weight"), 1.0);
 			Out.Add(MoveTemp(Sel));
 		}
 		return Out;
@@ -134,7 +134,7 @@ bool FAstraLifeMap::Load(FString& OutError)
 {
 	const double T0 = FPlatformTime::Seconds();
 	TSharedPtr<FJsonObject> Plan;
-	if (!ReadJson(FindData(TEXT("aquila_plan.json")), Plan))
+	if (!LifeReadJson(LifeFindData(TEXT("aquila_plan.json")), Plan))
 	{
 		OutError = TEXT("no ship's plan (aquila_plan.json)");
 		return false;
@@ -147,10 +147,10 @@ bool FAstraLifeMap::Load(FString& OutError)
 		for (const TSharedPtr<FJsonValue>& V : *List)
 		{
 			const TSharedPtr<FJsonObject> D = V->AsObject();
-			const int32 Id = D.IsValid() ? (int32)Num(D, TEXT("id"), 0) : 0;
+			const int32 Id = D.IsValid() ? (int32)LifeNum(D, TEXT("id"), 0) : 0;
 			if (Id >= 1 && Id < DeckFloorCm.Num())
 			{
-				DeckFloorCm[Id] = (float)(Num(D, TEXT("z"), 0.0) * 100.0);
+				DeckFloorCm[Id] = (float)(LifeNum(D, TEXT("z"), 0.0) * 100.0);
 			}
 		}
 	}
@@ -189,13 +189,13 @@ bool FAstraLifeMap::Load(FString& OutError)
 			O->TryGetStringField(TEXT("name"), C.Name);
 			FString Sec;
 			C.Section = O->TryGetStringField(TEXT("section"), Sec) && Sec.Len() ? Sec[0] : TEXT('A');
-			C.Deck = (int16)Num(O, TEXT("deck"), 0);
+			C.Deck = (int16)LifeNum(O, TEXT("deck"), 0);
 			FString Dept;
 			C.Dept = O->TryGetStringField(TEXT("dept"), Dept) ? FName(*Dept) : NAME_None;
 			FString St;
 			O->TryGetStringField(TEXT("status"), St);
 			C.Status = St == TEXT("existing") ? EAstraRoomStatus::Existing : St == TEXT("built") ? EAstraRoomStatus::Built : EAstraRoomStatus::Planned;
-			C.Slots = (int32)FMath::Max(Num(O, TEXT("crew_slots"), 0.0), Num(O, TEXT("capacity"), 0.0));
+			C.Slots = (int32)FMath::Max(LifeNum(O, TEXT("crew_slots"), 0.0), LifeNum(O, TEXT("capacity"), 0.0));
 			C.Box = FBox(FVector((*B)[0]->AsNumber(), (*B)[1]->AsNumber(), (*Z)[0]->AsNumber()) * 100.0,
 			             FVector((*B)[2]->AsNumber(), (*B)[3]->AsNumber(), (*Z)[1]->AsNumber()) * 100.0);
 			C.bCorridor = C.Kind == TEXT("corridor") || C.Kind == TEXT("vestibule");
@@ -257,7 +257,7 @@ bool FAstraLifeMap::Load(FString& OutError)
 				FAstraLifePlace H;
 				H.Id = Comps[*CI].Id;
 				H.Comp = *CI;
-				H.Pos = Metres(P);
+				H.Pos = LifeMetres(P);
 				H.Kind = EAstraPlaceKind::Hub;
 				H.Deck = Comps[*CI].Deck;
 				H.Capacity = (int16)FMath::Clamp(FMath::Max(1, Comps[*CI].Slots), 1, 400);
@@ -265,7 +265,7 @@ bool FAstraLifeMap::Load(FString& OutError)
 			}
 			else if (Kind == TEXT("stair"))
 			{
-				WellOf.Add(CompId, Metres(P));
+				WellOf.Add(CompId, LifeMetres(P));
 			}
 		}
 		// the towers (for walking the flights when both decks exist)
@@ -281,8 +281,8 @@ bool FAstraLifeMap::Load(FString& OutError)
 			{
 				continue;
 			}
-			T.Origin = Metres(Pos);
-			T.YawDeg = (float)Num(RoomJson[i], TEXT("yaw"), 0.0);
+			T.Origin = LifeMetres(Pos);
+			T.YawDeg = (float)LifeNum(RoomJson[i], TEXT("yaw"), 0.0);
 			T.Deck = Comps[i].Deck;
 			T.bBuilt = Comps[i].Status != EAstraRoomStatus::Planned;
 			const FVector* W = WellOf.Find(Comps[i].Id.ToString());
@@ -312,7 +312,7 @@ bool FAstraLifeMap::Load(FString& OutError)
 	}
 	// ---- the tables of life, and the halls' posts; the berthing's racks and the Mess's extra seats are baked into the life file
 	TSharedPtr<FJsonObject> Life;
-	if (ReadJson(FindData(TEXT("aquila_life.json")), Life))
+	if (LifeReadJson(LifeFindData(TEXT("aquila_life.json")), Life))
 	{
 		LoadLife(Life);
 		AddHalls(Life);
@@ -337,11 +337,11 @@ bool FAstraLifeMap::Load(FString& OutError)
 					FAstraLifePlace P;
 					P.Id = FName(*S->GetStringField(TEXT("id")));
 					P.Comp = *CI;
-					P.Pos = FVector(Num(S, TEXT("x"), 0.0), Num(S, TEXT("y"), 0.0), Num(S, TEXT("z"), 0.0)) * 100.0;
-					P.Yaw = (float)Num(S, TEXT("yaw"), 0.0);
+					P.Pos = FVector(LifeNum(S, TEXT("x"), 0.0), LifeNum(S, TEXT("y"), 0.0), LifeNum(S, TEXT("z"), 0.0)) * 100.0;
+					P.Yaw = (float)LifeNum(S, TEXT("yaw"), 0.0);
 					P.Kind = Kind;
 					P.Deck = Comps[*CI].Deck;
-					P.Height = (float)Num(S, TEXT("height_cm"), DefaultHeight(Kind));
+					P.Height = (float)LifeNum(S, TEXT("height_cm"), LifeDefaultHeight(Kind));
 					FString Role, Ext;
 					if (S->TryGetStringField(TEXT("role"), Role))
 					{
@@ -390,11 +390,11 @@ void FAstraLifeMap::AddStations(const TSharedPtr<FJsonObject>& Room, int32 CompI
 		FAstraLifePlace Pl;
 		Pl.Id = FName(*S->GetStringField(TEXT("id")));
 		Pl.Comp = CompIdx;
-		Pl.Pos = Metres(P);
-		Pl.Yaw = (float)Num(S, TEXT("yaw"), 0.0);
-		Pl.Kind = PlaceKindOf(S->GetStringField(TEXT("kind")));
+		Pl.Pos = LifeMetres(P);
+		Pl.Yaw = (float)LifeNum(S, TEXT("yaw"), 0.0);
+		Pl.Kind = LifePlaceKindOf(S->GetStringField(TEXT("kind")));
 		Pl.Deck = Comps[CompIdx].Deck;
-		Pl.Height = DefaultHeight(Pl.Kind);
+		Pl.Height = LifeDefaultHeight(Pl.Kind);
 		FString Ext, Role;
 		if (S->TryGetStringField(TEXT("station"), Ext) && !Ext.IsEmpty())
 		{
@@ -442,9 +442,9 @@ void FAstraLifeMap::AddHalls(const TSharedPtr<FJsonObject>& Life)
 			P.Comp = *CI;
 			// on the hall's floor (its box reaches a little below it: the slab)
 			const double Floor = Comps[*CI].Hub != INDEX_NONE ? Places[Comps[*CI].Hub].Pos.Z : Comps[*CI].Box.Min.Z;
-			P.Pos = FVector(Num(S, TEXT("x"), 0.0) * 100.0, Num(S, TEXT("y"), 0.0) * 100.0, Floor);
-			P.Yaw = (float)Num(S, TEXT("yaw"), 0.0);
-			P.Kind = PlaceKindOf(S->GetStringField(TEXT("kind")));
+			P.Pos = FVector(LifeNum(S, TEXT("x"), 0.0) * 100.0, LifeNum(S, TEXT("y"), 0.0) * 100.0, Floor);
+			P.Yaw = (float)LifeNum(S, TEXT("yaw"), 0.0);
+			P.Kind = LifePlaceKindOf(S->GetStringField(TEXT("kind")));
 			P.Deck = Comps[*CI].Deck;
 			FString Role;
 			if (S->TryGetStringField(TEXT("role"), Role))
@@ -460,8 +460,8 @@ void FAstraLifeMap::LoadLife(const TSharedPtr<FJsonObject>& Life)
 {
 	if (const TSharedPtr<FJsonObject>* Clock = nullptr; Life->TryGetObjectField(TEXT("clock"), Clock))
 	{
-		TimeScale = (float)Num(*Clock, TEXT("time_scale"), TimeScale);
-		StartHour = (float)Num(*Clock, TEXT("start_hour"), StartHour);
+		TimeScale = (float)LifeNum(*Clock, TEXT("time_scale"), TimeScale);
+		StartHour = (float)LifeNum(*Clock, TEXT("start_hour"), StartHour);
 	}
 	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
 	if (Life->TryGetArrayField(TEXT("watches"), List))
@@ -471,7 +471,7 @@ void FAstraLifeMap::LoadLife(const TSharedPtr<FJsonObject>& Life)
 			const TSharedPtr<FJsonObject> W = V->AsObject();
 			if (W.IsValid())
 			{
-				Watches.Add({W->GetStringField(TEXT("name")), (float)Num(W, TEXT("start"), 0.0)});
+				Watches.Add({W->GetStringField(TEXT("name")), (float)LifeNum(W, TEXT("start"), 0.0)});
 			}
 		}
 	}
@@ -481,42 +481,42 @@ void FAstraLifeMap::LoadLife(const TSharedPtr<FJsonObject>& Life)
 	}
 	if (const TSharedPtr<FJsonObject>* D = nullptr; Life->TryGetObjectField(TEXT("day"), D))
 	{
-		Day.DutyFirst = (float)Num(*D, TEXT("duty_first"), Day.DutyFirst);
-		Day.MealLen = (float)Num(*D, TEXT("meal_len"), Day.MealLen);
-		Day.WindDown = (float)Num(*D, TEXT("wind_down"), Day.WindDown);
-		Day.SleepStart = (float)Num(*D, TEXT("sleep_start"), Day.SleepStart);
-		Day.SleepLen = (float)Num(*D, TEXT("sleep_len"), Day.SleepLen);
-		Day.MealBefore = (float)Num(*D, TEXT("meal_before"), Day.MealBefore);
+		Day.DutyFirst = (float)LifeNum(*D, TEXT("duty_first"), Day.DutyFirst);
+		Day.MealLen = (float)LifeNum(*D, TEXT("meal_len"), Day.MealLen);
+		Day.WindDown = (float)LifeNum(*D, TEXT("wind_down"), Day.WindDown);
+		Day.SleepStart = (float)LifeNum(*D, TEXT("sleep_start"), Day.SleepStart);
+		Day.SleepLen = (float)LifeNum(*D, TEXT("sleep_len"), Day.SleepLen);
+		Day.MealBefore = (float)LifeNum(*D, TEXT("meal_before"), Day.MealBefore);
 		if (const TSharedPtr<FJsonObject>* J = nullptr; (*D)->TryGetObjectField(TEXT("jitter"), J))
 		{
-			Day.J1 = Range(*J, TEXT("j1"), Day.J1);
-			Day.J2 = Range(*J, TEXT("j2"), Day.J2);
-			Day.J3 = Range(*J, TEXT("j3"), Day.J3);
-			Day.J4 = Range(*J, TEXT("j4"), Day.J4);
-			Day.JSleep = Range(*J, TEXT("sleep_len"), Day.JSleep);
+			Day.J1 = LifeRange(*J, TEXT("j1"), Day.J1);
+			Day.J2 = LifeRange(*J, TEXT("j2"), Day.J2);
+			Day.J3 = LifeRange(*J, TEXT("j3"), Day.J3);
+			Day.J4 = LifeRange(*J, TEXT("j4"), Day.J4);
+			Day.JSleep = LifeRange(*J, TEXT("sleep_len"), Day.JSleep);
 		}
-		Day.WakeDelayS = Range(*D, TEXT("wake_delay_s"), Day.WakeDelayS);
+		Day.WakeDelayS = LifeRange(*D, TEXT("wake_delay_s"), Day.WakeDelayS);
 	}
 	if (const TSharedPtr<FJsonObject>* S = nullptr; Life->TryGetObjectField(TEXT("speed"), S))
 	{
-		Speed.WalkCmS = (float)Num(*S, TEXT("walk_cm_s"), Speed.WalkCmS);
-		Speed.HurryCmS = (float)Num(*S, TEXT("hurry_cm_s"), Speed.HurryCmS);
-		Speed.Spread = (float)Num(*S, TEXT("spread"), Speed.Spread);
-		Speed.StairsS = (float)Num(*S, TEXT("stairs_s"), Speed.StairsS);
-		Speed.LiftS = (float)Num(*S, TEXT("lift_s"), Speed.LiftS);
+		Speed.WalkCmS = (float)LifeNum(*S, TEXT("walk_cm_s"), Speed.WalkCmS);
+		Speed.HurryCmS = (float)LifeNum(*S, TEXT("hurry_cm_s"), Speed.HurryCmS);
+		Speed.Spread = (float)LifeNum(*S, TEXT("spread"), Speed.Spread);
+		Speed.StairsS = (float)LifeNum(*S, TEXT("stairs_s"), Speed.StairsS);
+		Speed.LiftS = (float)LifeNum(*S, TEXT("lift_s"), Speed.LiftS);
 	}
 	if (const TSharedPtr<FJsonObject>* V = nullptr; Life->TryGetObjectField(TEXT("visibility"), V))
 	{
-		Vis.MaxBodies = (int32)Num(*V, TEXT("max_bodies"), Vis.MaxBodies);
-		Vis.SpawnM = (float)Num(*V, TEXT("spawn_m"), Vis.SpawnM);
-		Vis.DespawnM = (float)Num(*V, TEXT("despawn_m"), Vis.DespawnM);
-		Vis.DeckBandCm = (float)Num(*V, TEXT("deck_band_cm"), Vis.DeckBandCm);
+		Vis.MaxBodies = (int32)LifeNum(*V, TEXT("max_bodies"), Vis.MaxBodies);
+		Vis.SpawnM = (float)LifeNum(*V, TEXT("spawn_m"), Vis.SpawnM);
+		Vis.DespawnM = (float)LifeNum(*V, TEXT("despawn_m"), Vis.DespawnM);
+		Vis.DeckBandCm = (float)LifeNum(*V, TEXT("deck_band_cm"), Vis.DeckBandCm);
 	}
 	if (const TSharedPtr<FJsonObject>* W = nullptr; Life->TryGetObjectField(TEXT("room_weights"), W))
 	{
-		StatusWeight[0] = (float)Num(*W, TEXT("planned"), StatusWeight[0]);
-		StatusWeight[1] = (float)Num(*W, TEXT("built"), StatusWeight[1]);
-		StatusWeight[2] = (float)Num(*W, TEXT("existing"), StatusWeight[2]);
+		StatusWeight[0] = (float)LifeNum(*W, TEXT("planned"), StatusWeight[0]);
+		StatusWeight[1] = (float)LifeNum(*W, TEXT("built"), StatusWeight[1]);
+		StatusWeight[2] = (float)LifeNum(*W, TEXT("existing"), StatusWeight[2]);
 	}
 	if (const TSharedPtr<FJsonObject>* Jobs = nullptr; Life->TryGetObjectField(TEXT("jobs"), Jobs))
 	{
@@ -545,17 +545,17 @@ void FAstraLifeMap::LoadLife(const TSharedPtr<FJsonObject>& Life)
 			const FString Cls = O->TryGetStringField(TEXT("class"), S) ? S : FString(TEXT("rating"));
 			D.Class = Cls == TEXT("officer") ? EAstraLifeClass::Officer : Cls == TEXT("marine") ? EAstraLifeClass::Marine : EAstraLifeClass::Rating;
 			O->TryGetStringField(TEXT("job"), D.Job);
-			D.Duty = Selectors(O, TEXT("duty"));
-			D.Battle = Selectors(O, TEXT("battle"));
+			D.Duty = LifeSelectors(O, TEXT("duty"));
+			D.Battle = LifeSelectors(O, TEXT("battle"));
 			O->TryGetBoolField(TEXT("yellow"), D.bYellow);
 			Depts.Add(DeptKey, MoveTemp(D));
 		}
 	}
 	if (const TSharedPtr<FJsonObject>* Hm = nullptr; Life->TryGetObjectField(TEXT("homes"), Hm))
 	{
-		HomeMarine = Selectors(*Hm, TEXT("marine"));
-		HomeOfficer = Selectors(*Hm, TEXT("officer"));
-		HomeRating = Selectors(*Hm, TEXT("rating"));
+		HomeMarine = LifeSelectors(*Hm, TEXT("marine"));
+		HomeOfficer = LifeSelectors(*Hm, TEXT("officer"));
+		HomeRating = LifeSelectors(*Hm, TEXT("rating"));
 	}
 	if (const TSharedPtr<FJsonObject>* Lz = nullptr; Life->TryGetObjectField(TEXT("leisure"), Lz))
 	{
@@ -578,7 +578,7 @@ void FAstraLifeMap::LoadLife(const TSharedPtr<FJsonObject>& Life)
 						L.Kinds.Add(FName(*KV->AsString()));
 					}
 				}
-				L.Taste = Range(O, TEXT("taste"), L.Taste);
+				L.Taste = LifeRange(O, TEXT("taste"), L.Taste);
 				O->TryGetStringField(TEXT("label"), L.Label);
 				Leisure.Add(MoveTemp(L));
 			}
@@ -609,10 +609,10 @@ void FAstraLifeMap::LoadLife(const TSharedPtr<FJsonObject>& Life)
 	}
 	if (const TSharedPtr<FJsonObject>* T = nullptr; Life->TryGetObjectField(TEXT("teams"), T))
 	{
-		Teams.Count = (int32)Num(*T, TEXT("count"), Teams.Count);
-		Teams.Size = (int32)Num(*T, TEXT("size"), Teams.Size);
-		Teams.Min = (int32)Num(*T, TEXT("min"), Teams.Min);
-		Teams.JogCmS = (float)Num(*T, TEXT("jog_cm_s"), Teams.JogCmS);
+		Teams.Count = (int32)LifeNum(*T, TEXT("count"), Teams.Count);
+		Teams.Size = (int32)LifeNum(*T, TEXT("size"), Teams.Size);
+		Teams.Min = (int32)LifeNum(*T, TEXT("min"), Teams.Min);
+		Teams.JogCmS = (float)LifeNum(*T, TEXT("jog_cm_s"), Teams.JogCmS);
 		(*T)->TryGetStringField(TEXT("dept"), Teams.Dept);
 		(*T)->TryGetStringField(TEXT("backup_dept"), Teams.BackupDept);
 		const TArray<TSharedPtr<FJsonValue>>* K = nullptr;

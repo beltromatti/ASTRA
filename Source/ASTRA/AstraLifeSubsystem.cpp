@@ -215,28 +215,30 @@ void UAstraLifeSubsystem::Tick(float DeltaTime)
 		Cost.BodiesMs = (FPlatformTime::Seconds() - B0) * 1000.0;
 		Cost.BodiesMsMax = FMath::Max(Cost.BodiesMsMax * 0.998, Cost.BodiesMs);
 	}
-	PrewarmPool();
+	PrewarmPool(DeltaTime);
 	SET_DWORD_STAT(STAT_AstraLifeBodyCount, NumActiveBodies);
 }
 
-void UAstraLifeSubsystem::PrewarmPool()
+void UAstraLifeSubsystem::PrewarmPool(float DeltaTime)
 {
-	// the pool is made a couple at a time while the Captain is still on the bridge: a body is never spawned in front of anyone, and a lift's
-	// arrival finds them ready
+	// The pool is made one body at a time, a few times a second, while the Captain is still on the bridge: nobody sees a body being spawned,
+	// no frame carries more than one, and a lift's arrival finds them ready. A frame that is already long (a level streaming, a hitch) waits.
 	if (!MapPtr.IsValid() || (!FApp::CanEverRender() && !bTestCaptain) || Pool.Num() >= MapPtr->Vis.MaxBodies || !GetWorld())
 	{
 		return;
 	}
-	for (int32 i = 0; i < 2 && Pool.Num() < MapPtr->Vis.MaxBodies; ++i)
+	if ((PrewarmT -= DeltaTime) > 0.f || DeltaTime > 0.04f)
 	{
-		FActorSpawnParameters P;
-		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		P.ObjectFlags |= RF_Transient;
-		if (AAstraLifeBody* B = GetWorld()->SpawnActor<AAstraLifeBody>(FVector(0.f, 0.f, -2.0e5), FRotator::ZeroRotator, P))
-		{
-			B->SetActorHiddenInGame(true);
-			Pool.Add(B);
-		}
+		return;
+	}
+	PrewarmT = 0.12f;
+	FActorSpawnParameters P;
+	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	P.ObjectFlags |= RF_Transient;
+	if (AAstraLifeBody* B = GetWorld()->SpawnActor<AAstraLifeBody>(FVector(0.f, 0.f, -2.0e5), FRotator::ZeroRotator, P))
+	{
+		B->SetActorHiddenInGame(true);
+		Pool.Add(B);
 	}
 }
 
