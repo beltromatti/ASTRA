@@ -1,0 +1,22 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "ASTRA MetalFX",
+	"Description": "Apple MetalFX temporal upscaler in place of TSR on the Mac (Metal RHI). Every other platform keeps TSR untouched; if MetalFX cannot run it falls back to TSR and logs why. Switch: r.AstraMetalFX 0/1.",
+	"Category": "Rendering",
+	"CreatedBy": "ASTRA",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"SupportedTargetPlatforms": [ "Mac" ],
+	"Modules": [
+		{
+			"Name": "AstraMetalFX",
+			"Type": "Runtime",
+			"LoadingPhase": "PostEngineInit",
+			"PlatformAllowList": [ "Mac" ]
+		}
+	]
+}
