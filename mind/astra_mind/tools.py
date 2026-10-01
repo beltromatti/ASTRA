@@ -167,7 +167,7 @@ STANDING = _fn("standing_order", "Record (or cancel) a STANDING ORDER: an order 
 # lets it through only when the Captain is the senior officer present (war_minds.WarMinds.captain_is_senior). A REQUEST to an allied captain is
 # `fleet_request`; an ORDER is this.
 GROUP_ORDER = _fn("group_order", "XO: the Captain's DIRECT ORDER to one of our battle groups (the groups and their captains are in the fleet board "
-                                "of your prompt): it takes effect at once and stands until changed or `for_s` runs out; the answer says what the "
+                                "in [The bridge now]): it takes effect at once and stands until changed or `for_s` runs out; the answer says what the "
                                 "group will do or why it cannot. Only while the Captain is the senior officer present, and only when the Captain "
                                 "orders it (a plain request to an allied captain is Communications' fleet_request, and he judges it). "
                                 "attack: every ship that can reach `target` fires on it and the group closes to `range_km`; pin: hold the enemy "
