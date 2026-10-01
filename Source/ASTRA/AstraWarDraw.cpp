@@ -16,59 +16,63 @@ using namespace AstraDraw;
 
 namespace
 {
-	TAutoConsoleVariable<int32> CVarDraw(TEXT("astra.war.draw"), 1,
+	TAutoConsoleVariable<int32> CVarWarDraw(TEXT("astra.war.draw"), 1,
 		TEXT("The war's craft and lamps as instances (1), or as actors with their own running-light components (0: the old way; ships already in the sky keep the way they were made)"));
-	TAutoConsoleVariable<float> CVarHullKm(TEXT("astra.war.draw.hull_km"), 80.f, TEXT("A craft's hull is drawn out to this range from the Aquila (km); beyond, only its glow"));
-	TAutoConsoleVariable<float> CVarLamps(TEXT("astra.war.lamps"), 1.f, TEXT("Strength of the instanced running lights (0 none)"));
-	TAutoConsoleVariable<float> CVarCraftLampKm(TEXT("astra.war.lamps.craft_km"), 30.f, TEXT("A craft's strobe fades out by this range (km); its steady lights by half of it"));
+	TAutoConsoleVariable<float> CVarWarDrawHullKm(TEXT("astra.war.draw.hull_km"), 80.f, TEXT("A craft's hull is drawn out to this range from the Aquila (km); beyond, only its glow"));
+	TAutoConsoleVariable<float> CVarWarLamps(TEXT("astra.war.lamps"), 1.f, TEXT("Strength of the instanced running lights (0 none)"));
+	TAutoConsoleVariable<float> CVarWarLampsCraftKm(TEXT("astra.war.lamps.craft_km"), 30.f, TEXT("A craft's strobe fades out by this range (km); its steady lights by half of it"));
 
-	const FTransform& HiddenXf()
+	const FTransform& DrawHiddenXf()
 	{
 		static const FTransform X(FQuat::Identity, FVector::ZeroVector, FVector(0.0001));
 		return X;
 	}
 
-	uint32 Mix(uint32 A)
+	uint32 DrawMix(uint32 A)
 	{
 		A ^= A >> 16; A *= 0x7FEB352Du; A ^= A >> 15; A *= 0x846CA68Bu; A ^= A >> 16;
 		return A;
 	}
 
-	/** An instanced component for the war's drawing, set up like the effects' layers (no shadow, no collision, no culling by distance: it holds hundreds of things
-	 *  over tens of kilometres). */
-	UInstancedStaticMeshComponent* MakeComp(AActor* Host, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 NumData, bool bMotionVectors)
+}
+
+// An instanced component for the war's drawing, set up like the effects' layers (no shadow, no collision, no culling by distance: it holds hundreds of things over tens of kilometres).
+UInstancedStaticMeshComponent* AstraDraw::MakeComp(AActor* Owner, USceneComponent* Parent, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity,
+                                                   int32 NumData, bool bMotionVectors, bool bLit)
+{
+	UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(Owner, Name);
+	C->SetupAttachment(Parent);
+	C->SetMobility(EComponentMobility::Movable);
+	C->SetStaticMesh(Mesh);
+	if (Mat)
 	{
-		UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(Host, Name);
-		C->SetupAttachment(Host->GetRootComponent());
-		C->SetMobility(EComponentMobility::Movable);
-		C->SetStaticMesh(Mesh);
-		if (Mat)
-		{
-			C->SetMaterial(0, Mat);
-		}
-		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		C->bDisableCollision = true;
-		C->SetCanEverAffectNavigation(false);
-		C->SetGenerateOverlapEvents(false);
-		C->SetCastShadow(false);                        // km-scale shadows are invisible and cost VSM pages
-		C->bCastDynamicShadow = false;
-		C->bAffectDynamicIndirectLighting = false;
-		C->bAffectDistanceFieldLighting = false;
-		C->bNeverDistanceCull = true;
-		C->bUseAsOccluder = false;
-		C->SetReceivesDecals(false);
-		C->SetLightingChannels(true, true, false);      // outside the hull: the star's light and the planet's, like the ships
-		C->SetNumCustomDataFloats(NumData);
-		if (bMotionVectors)
-		{
-			C->SetHasPerInstancePrevTransforms(true);   // a hull that moves is given where it was, so that the temporal upscaler sees its motion (the engine has no way to know)
-		}
-		TArray<FTransform> Init;
-		Init.Init(HiddenXf(), Capacity);
-		C->AddInstances(Init, false, false, false);
-		C->RegisterComponent();
-		return C;
+		C->SetMaterial(0, Mat);
 	}
+	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	C->bDisableCollision = true;
+	C->SetCanEverAffectNavigation(false);
+	C->SetGenerateOverlapEvents(false);
+	C->SetCastShadow(false);                        // km-scale shadows are invisible and cost VSM pages
+	C->bCastDynamicShadow = false;
+	C->bAffectDynamicIndirectLighting = false;
+	C->bAffectDistanceFieldLighting = false;
+	C->bNeverDistanceCull = true;
+	C->bUseAsOccluder = false;
+	C->SetReceivesDecals(false);
+	if (bLit)
+	{
+		C->SetLightingChannels(true, true, false);  // outside the hull: the star's light and the planet's, like the ships
+	}
+	C->SetNumCustomDataFloats(NumData);
+	if (bMotionVectors)
+	{
+		C->SetHasPerInstancePrevTransforms(true);   // a hull that moves is given where it was, so that the temporal upscaler sees its motion (the engine has no way to know)
+	}
+	TArray<FTransform> Init;
+	Init.Init(DrawHiddenXf(), Capacity);
+	C->AddInstances(Init, false, false, false);
+	C->RegisterComponent();
+	return C;
 }
 
 // ------------------------------------------------------------------------------------------------------------------ setup
@@ -119,7 +123,7 @@ void UAstraWarDraw::Init(UAstraBattleSubsystem* InOwner)
 	Host->Tags.Add(TEXT("ASTRA.Sky"));                  // the main viewscreen's camera shows what is out there: tagged like the sky
 	Lamps.Init(CapLamps);
 	Lamps.NumData = AstraFx::Stride;
-	if (UInstancedStaticMeshComponent* C = MakeComp(Host, TEXT("DrawLamps"), SphereMesh, MatGlow, CapLamps, AstraFx::Stride, false))
+	if (UInstancedStaticMeshComponent* C = MakeComp(Host, Host->GetRootComponent(), TEXT("DrawLamps"), SphereMesh, MatGlow, CapLamps, AstraFx::Stride, false, true))
 	{
 		C->SetTranslucentSortPriority(4);
 		Lamps.Comp = C;
@@ -130,7 +134,7 @@ void UAstraWarDraw::Init(UAstraBattleSubsystem* InOwner)
 
 bool UAstraWarDraw::IsActive() const
 {
-	return (bLive || bSim) && CVarDraw.GetValueOnGameThread() != 0;
+	return (bLive || bSim) && CVarWarDraw.GetValueOnGameThread() != 0;
 }
 
 void UAstraWarDraw::Prewarm()
@@ -163,6 +167,23 @@ int32 UAstraWarDraw::KindFor(const FString& Mesh)
 			UE_LOG(LogASTRA, Warning, TEXT("[WarDraw] no mesh %s: its craft stay actors"), *Mesh);
 			return -1;
 		}
+		// the hull's materials must be flagged "Used with Instanced Static Meshes": the engine cannot set the flag in a game (only in an editor that is not playing), and a Nanite
+		// instance whose material is not flagged is drawn with the default material (NaniteResources.cpp); better actors than grey craft
+		FString Unflagged;
+		for (const FStaticMaterial& SM : M->GetStaticMaterials())
+		{
+			if (SM.MaterialInterface && !SM.MaterialInterface->GetUsageByFlag(MATUSAGE_InstancedStaticMeshes))
+			{
+				Unflagged += SM.MaterialInterface->GetName() + TEXT(" ");
+			}
+		}
+		if (!Unflagged.IsEmpty())
+		{
+			Kinds[Idx].bFailed = true;
+			UE_LOG(LogASTRA, Warning, TEXT("[WarDraw] %s: its materials (%s) are not flagged 'Used with Instanced Static Meshes', so its craft stay actors; run tools/ue_scripts/make_scala_materials.py in the editor, once"),
+			       *Mesh, *Unflagged.TrimEnd());
+			return -1;
+		}
 		Kinds[Idx].StaticMesh = M;
 		Meshes.Add(M);
 		MakePage(Idx, 0);                               // the first page of the main set, ready before the first craft needs it
@@ -174,13 +195,13 @@ FPage* UAstraWarDraw::MakePage(int32 KindIdx, int32 SetIdx)
 {
 	FKind& Kd = Kinds[KindIdx];
 	FPage& P = Kd.Sets[SetIdx].Pages.AddDefaulted_GetRef();
-	P.Xf.Init(HiddenXf(), PageSize);
-	P.PrevXf.Init(HiddenXf(), PageSize);
+	P.Xf.Init(DrawHiddenXf(), PageSize);
+	P.PrevXf.Init(DrawHiddenXf(), PageSize);
 	P.Owner.Init(-1, PageSize);
 	if (bLive && Kd.StaticMesh && Host)
 	{
 		const FString Name = FString::Printf(TEXT("Draw_%s_%d_%d"), *Kd.Mesh, SetIdx, Kd.Sets[SetIdx].Pages.Num());
-		P.Comp = MakeComp(Host, *Name, Kd.StaticMesh, nullptr, PageSize, 0, true);
+		P.Comp = MakeComp(Host, Host->GetRootComponent(), *Name, Kd.StaticMesh, nullptr, PageSize, 0, true, true);
 	}
 	return &P;
 }
@@ -261,8 +282,8 @@ void UAstraWarDraw::Release(const FRef& R)
 	FSet& St = Kinds[R.Kind].Sets[R.Set];
 	FPage& P = St.Pages[R.Slot / PageSize];
 	const int32 L = R.Slot % PageSize;
-	P.Xf[L] = HiddenXf();
-	P.PrevXf[L] = HiddenXf();
+	P.Xf[L] = DrawHiddenXf();
+	P.PrevXf[L] = DrawHiddenXf();
 	P.Owner[L] = -1;
 	--P.Live;
 	--St.Live;
@@ -313,7 +334,7 @@ void UAstraWarDraw::StageLamps(const FAstraBattleShip& S, double Dist2)
 		return;
 	}
 	const TArray<FAstraNavLamp>& Set = LampSets[S.LampSet];
-	const uint32 H = Mix((uint32)S.Id);
+	const uint32 H = DrawMix((uint32)S.Id);
 	for (int32 i = 0; i < Set.Num(); ++i)
 	{
 		const FAstraNavLamp& L = Set[i];
@@ -409,11 +430,11 @@ void UAstraWarDraw::HideAll()
 			{
 				for (FTransform& X : P.Xf)
 				{
-					X = HiddenXf();
+					X = DrawHiddenXf();
 				}
 				for (FTransform& X : P.PrevXf)
 				{
-					X = HiddenXf();
+					X = DrawHiddenXf();
 				}
 				for (int32& O : P.Owner)
 				{
@@ -453,9 +474,9 @@ void UAstraWarDraw::Tick(float InDt)
 	{
 		Fx = FMath::Clamp(V->GetValueOnGameThread(), 0.1f, 6.f);       // the effects' own brightness: the lamps follow the exposure the lead sets for them
 	}
-	LampGain = FMath::Max(0.f, CVarLamps.GetValueOnGameThread()) * Fx;
-	HullKm2 = FMath::Square((double)FMath::Max(1.f, CVarHullKm.GetValueOnGameThread()));
-	CraftLampKm = FMath::Max(2.f, CVarCraftLampKm.GetValueOnGameThread());
+	LampGain = FMath::Max(0.f, CVarWarLamps.GetValueOnGameThread()) * Fx;
+	HullKm2 = FMath::Square((double)FMath::Max(1.f, CVarWarDrawHullKm.GetValueOnGameThread()));
+	CraftLampKm = FMath::Max(2.f, CVarWarLampsCraftKm.GetValueOnGameThread());
 	Lamps.Begin();
 	Hulls = 0;
 	NearNow = 0;

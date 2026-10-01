@@ -31,10 +31,18 @@ class UPrimitiveComponent;
 class UStaticMesh;
 struct FAstraBattleShip;
 
+class USceneComponent;
+
 namespace AstraDraw
 {
 	constexpr int32 PageSize = 96;          // instances in one component of a hull layer (a bigger battle grows more pages)
 	constexpr int32 CapLamps = 1400;        // lamps in the one layer of them
+
+	/** An instanced component the war's drawing is made of (the holo table's dots too): attached to Parent of Owner, no shadow, no collision, no culling by distance (it
+	 *  holds hundreds of things over tens of kilometres), Capacity instances hidden to begin with, NumData custom floats an instance; bMotionVectors gives each instance
+	 *  a previous transform (the temporal upscaler's velocity: a hull that moves 14 m a frame needs it), bLit the star's and the planet's lighting channels. */
+	ASTRA_API UInstancedStaticMeshComponent* MakeComp(AActor* Owner, USceneComponent* Parent, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity,
+	                                                  int32 NumData, bool bMotionVectors, bool bLit);
 
 	/** One instanced component of a hull layer: stable slots (a craft keeps its slot while it flies, so the upscaler's motion vectors are true). */
 	struct FPage

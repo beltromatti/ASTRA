@@ -62,6 +62,11 @@ def build_args(a: argparse.Namespace, out: Path) -> list[str]:
         args.append(f'-at={a.at}')
     if getattr(a, "views", False):
         args.append("-views")                              # each frame also carries what the two minds are given of their groups
+    if getattr(a, "aquila", False):
+        args.append("-aquila")                             # the Aquila stays in the scenario (at the origin, with the ASTRA side)
+    if getattr(a, "holo_at", ""):
+        args.append(f"-holo_at={a.holo_at}")               # the holo table's plan at those battle times (docs/SCALA.md)
+        args.append(f"-holo_out={ROOT / 'Saved' / 'War' / 'holo'}")
     return args
 
 
@@ -574,6 +579,8 @@ def main() -> None:
         p.add_argument("--scenario", default="")
         p.add_argument("--at", default="", help='commands at battle times: "200=astra.cmd ...|300=..."')
         p.add_argument("--views", action="store_true", help="record the side views (your_groups, enemy_groups, group_events) in every frame")
+        p.add_argument("--aquila", action="store_true", help="keep the Aquila in the scenario (at the origin, with the ASTRA side): the game's scale test from the bridge")
+        p.add_argument("--holo-at", default="", help='the holo table\'s plan at these battle times ("60,120"): Saved/War/holo_<t>.json, drawn by tools/art/holo_plan_preview.py')
 
     p = sub.add_parser("run")
     common(p, 900, -1)

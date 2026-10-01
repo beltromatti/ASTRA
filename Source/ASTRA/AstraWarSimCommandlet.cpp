@@ -1,6 +1,7 @@
 #include "AstraWarSimCommandlet.h"
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraHoloPlan.h"
 #include "AstraShipSubsystem.h"
 #include "AstraStations.h"
 #include "Dom/JsonObject.h"
@@ -170,6 +171,137 @@ namespace
 
 namespace
 {
+	/** The tactical plot's plan for the battle as it stands (AstraHoloPlan.h), as the Captain in the chair would see it, written for tools/art/holo_plan_preview.py to draw:
+	 *  the readability of the holo table at two hundred contacts is checked on pictures, offline. */
+	void DumpHoloPlan(UAstraBattleSubsystem* B, float Heading, const FString& Path, AstraHoloPlan::FState& State)
+	{
+		using namespace AstraHoloPlan;
+		FParams Par;
+		float Tilt = 0.f;
+		Par.ViewerLocal = ViewerInPlotFrame(FVector(-430.f, 0.f, 100.f), Par.PlotRadius, Par.PlaneHeight, 32.f, Tilt);   // (the Captain's chair)
+		Par.HeadingDeg = Heading;
+		const TArray<FAstraHoloBlip>& Blips = B->HoloBlips();
+		static const float Ladder[] = {5.f, 10.f, 15.f, 20.f, 30.f, 40.f, 60.f, 80.f, 120.f, 160.f};
+		float Far = 4.f;
+		for (const FAstraHoloBlip& Bl : Blips)
+		{
+			if (Bl.Kind == 0 && !Bl.bPlayer && Bl.RangeKm < 160.f)
+			{
+				Far = FMath::Max(Far, Bl.RangeKm * 1.05f);
+			}
+		}
+		Par.RangeKm = Ladder[UE_ARRAY_COUNT(Ladder) - 1];
+		for (const float R : Ladder)
+		{
+			if (R >= Far)
+			{
+				Par.RangeKm = R;
+				break;
+			}
+		}
+		FPlan Plan;
+		Make(Blips, Par, State, Plan);
+		FVector Right, Up;
+		ViewBasis(Par, Right, Up);
+		const auto Pic = [&](const FVector& P) { return TArray<TSharedPtr<FJsonValue>>({MakeShared<FJsonValueNumber>(FVector::DotProduct(P, Right)), MakeShared<FJsonValueNumber>(FVector::DotProduct(P, Up))}); };
+		static const TCHAR* const Sides[4] = {TEXT("astra"), TEXT("hostile"), TEXT("unknown"), TEXT("neutral")};
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetNumberField(TEXT("t"), B->GetBattleTime());
+		J->SetNumberField(TEXT("range_km"), Par.RangeKm);
+		J->SetNumberField(TEXT("plot_radius"), Par.PlotRadius);
+		J->SetNumberField(TEXT("tilt_deg"), Tilt);
+		J->SetBoolField(TEXT("dense"), Plan.bDense);
+		J->SetNumberField(TEXT("dropped"), Plan.Dropped);
+		J->SetNumberField(TEXT("blips"), Blips.Num());
+		TArray<TSharedPtr<FJsonValue>> Rings, Icons, Craft, Missiles, Labels, Clusters, Threats;
+		for (int32 i = 0; i < 3; ++i)
+		{
+			const float R = RadiusOf(Par, Par.RangeKm / (float)(1 << (2 * i)));
+			TArray<TSharedPtr<FJsonValue>> Pts;
+			for (int32 k = 0; k <= 72; ++k)
+			{
+				const float A = 2.f * PI * k / 72.f;
+				Pts.Add(MakeShared<FJsonValueArray>(Pic(FVector(R * FMath::Cos(A), R * FMath::Sin(A), Par.PlaneHeight))));
+			}
+			Rings.Add(MakeShared<FJsonValueArray>(Pts));
+		}
+		for (const FIcon& Ic : Plan.Icons)
+		{
+			const FAstraHoloBlip& Bl = Blips[Ic.Blip];
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetArrayField(TEXT("p"), Pic(Ic.P));
+			O->SetNumberField(TEXT("r"), Ic.Radius);
+			O->SetNumberField(TEXT("size"), Ic.Size);
+			O->SetStringField(TEXT("side"), Bl.bPlayer ? TEXT("aquila") : Sides[Bl.bUnknown ? 2 : (Bl.Side == EAstraSide::Astra ? 0 : ((Bl.bHostile || Bl.Side == EAstraSide::Mandate) ? 1 : 3))]);
+			O->SetBoolField(TEXT("must"), Ic.bMust);
+			O->SetBoolField(TEXT("beyond"), Ic.bBeyond);
+			O->SetStringField(TEXT("id"), Bl.Contact);
+			Icons.Add(MakeShared<FJsonValueObject>(O));
+		}
+		for (int32 s = 0; s < 3; ++s)
+		{
+			for (const FDot& D : Plan.CraftDots[s])
+			{
+				TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+				O->SetArrayField(TEXT("p"), Pic(D.P));
+				O->SetStringField(TEXT("side"), Sides[s == 0 ? 0 : (s == 1 ? 1 : 2)]);
+				Craft.Add(MakeShared<FJsonValueObject>(O));
+			}
+		}
+		for (int32 s = 0; s < 2; ++s)
+		{
+			for (const FDot& D : Plan.MissileDots[s])
+			{
+				TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+				O->SetArrayField(TEXT("p"), Pic(D.P));
+				O->SetStringField(TEXT("side"), Sides[s]);
+				Missiles.Add(MakeShared<FJsonValueObject>(O));
+			}
+		}
+		for (const FLabel& L : Plan.Labels)
+		{
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetStringField(TEXT("text"), L.Text);
+			O->SetArrayField(TEXT("p"), Pic(L.Pos));
+			O->SetArrayField(TEXT("from"), Pic(L.From));
+			O->SetNumberField(TEXT("size"), L.Size);
+			O->SetNumberField(TEXT("w"), L.Box.X);
+			O->SetNumberField(TEXT("h"), L.Box.Y);
+			O->SetBoolField(TEXT("tag"), L.bTag);
+			O->SetBoolField(TEXT("leader"), L.bLeader);
+			TArray<TSharedPtr<FJsonValue>> C = {MakeShared<FJsonValueNumber>(L.Col.R), MakeShared<FJsonValueNumber>(L.Col.G), MakeShared<FJsonValueNumber>(L.Col.B)};
+			O->SetArrayField(TEXT("col"), C);
+			Labels.Add(MakeShared<FJsonValueObject>(O));
+		}
+		for (const FCluster& C : Plan.Clusters)
+		{
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetArrayField(TEXT("p"), Pic(C.Centre));
+			O->SetNumberField(TEXT("n"), C.Icons.Num());
+			O->SetStringField(TEXT("side"), Sides[FMath::Min<int32>(C.Key, 3)]);
+			Clusters.Add(MakeShared<FJsonValueObject>(O));
+		}
+		for (const int32 k : Plan.Threats)
+		{
+			Threats.Add(MakeShared<FJsonValueArray>(Pic(Plan.Icons[k].P)));
+		}
+		J->SetArrayField(TEXT("rings"), Rings);
+		J->SetArrayField(TEXT("icons"), Icons);
+		J->SetArrayField(TEXT("craft"), Craft);
+		J->SetArrayField(TEXT("missiles"), Missiles);
+		J->SetArrayField(TEXT("labels"), Labels);
+		J->SetArrayField(TEXT("clusters"), Clusters);
+		J->SetArrayField(TEXT("threats"), Threats);
+		J->SetArrayField(TEXT("us"), Pic(FVector(0.f, 0.f, Par.PlaneHeight)));
+		FString Json;
+		const TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Json);
+		FJsonSerializer::Serialize(J, W);
+		IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
+		FFileHelper::SaveStringToFile(Json, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+		UE_LOG(LogASTRA, Display, TEXT("[WarSim] holo plan at %.0f s: %d blips, %d ships, %d craft, %d labels (%d dropped), %d groups, range %.0f km -> %s"), B->GetBattleTime(), Blips.Num(),
+		       Plan.Icons.Num(), Plan.CraftDots[0].Num() + Plan.CraftDots[1].Num() + Plan.CraftDots[2].Num(), Plan.Labels.Num(), Plan.Dropped, Plan.Clusters.Num(), Par.RangeKm, *Path);
+	}
+
 	/** One battle from one seed: a fresh world, the variant's commands, the ticks, the record. */
 	bool RunOneBattle(const FString& Params, int32 Seed, const FString& Out)
 	{
@@ -186,6 +318,21 @@ namespace
 		float PlotAt = 120.f;                                      // when the cost of making the plot's lists is timed (-plot_at=<battle seconds>)
 		FParse::Value(*Params, TEXT("plot_at="), PlotAt);
 		TSharedPtr<FJsonObject> PlotJson;
+		TArray<float> HoloAt;                                      // -holo_at=60,120: the holo table's plan for the battle at those times, written to <holo_out>_<t>.json
+		FString HoloOut = FPaths::ProjectSavedDir() / TEXT("War/holo");
+		{
+			FString List;
+			FParse::Value(*Params, TEXT("holo_at="), List, false);          // (a list: it must not stop at the first comma)
+			FParse::Value(*Params, TEXT("holo_out="), HoloOut, false);
+			TArray<FString> Items;
+			List.ParseIntoArray(Items, TEXT(","));
+			for (const FString& It : Items)
+			{
+				HoloAt.Add(FCString::Atof(*It));
+			}
+		}
+		int32 NextHolo = 0;
+		AstraHoloPlan::FState HoloState;
 		FMindLink Mind;                                            // the minds in the loop (-mind=<dir>)
 		FParse::Value(*Params, TEXT("mind="), Mind.Dir, false);
 		FParse::Value(*Params, TEXT("mind_dt="), Mind.Dt);
@@ -302,6 +449,11 @@ namespace
 				PlotJson->SetNumberField(TEXT("blips"), NBlips);
 				PlotJson->SetNumberField(TEXT("contacts_build_ms"), FMath::RoundToDouble(Ms[0] / Rounds * 1000.0) / 1000.0);
 				PlotJson->SetNumberField(TEXT("blips_build_ms"), FMath::RoundToDouble(Ms[1] / Rounds * 1000.0) / 1000.0);
+			}
+			while (NextHolo < HoloAt.Num() && B->GetBattleTime() >= HoloAt[NextHolo])
+			{
+				DumpHoloPlan(B, Ship->GetHeadingDeg(), FString::Printf(TEXT("%s_%d.json"), *HoloOut, FMath::RoundToInt(HoloAt[NextHolo])), HoloState);
+				++NextHolo;
 			}
 			const float T0 = B->GetBattleTime();
 			const double W0 = FPlatformTime::Seconds();
