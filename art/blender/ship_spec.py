@@ -21,8 +21,12 @@ def door(wall: str, x: float, w: float = DOOR_W, h: float = DOOR_H) -> dict:
     return {"wall": wall, "x": x, "w": w, "h": h}
 
 
-def spot(role: str, kind: str, x: float, y: float, yaw: float, dept: str = "services") -> dict:
-    return {"role": role, "kind": kind, "x": x, "y": y, "yaw": yaw, "dept": dept}
+def spot(role: str, kind: str, x: float, y: float, yaw: float, dept: str = "services", dz: float = 0.0) -> dict:
+    """`dz`: how far above the room's floor the person stands (a pad on a dais, a gantry): the station's z is the floor's plus this."""
+    d = {"role": role, "kind": kind, "x": x, "y": y, "yaw": yaw, "dept": dept}
+    if dz:
+        d["dz"] = dz
+    return d
 
 
 def light(x: float, y: float, z: float, lm: float, temp: float = 4500.0, size=(4.0, 1.0), radius: float = 900.0, shadows: bool = False,
@@ -77,7 +81,7 @@ _reg("games", name="Games Room", kind="lounge", dept="services", L=24.0, D=16.0,
 _reg("library", name="Library", kind="library", dept="services", L=16.0, D=16.0, h=3.6, plate="library",
      doors=[door("near", 6.0)], systems=["power_bus"],
      spots=[spot("crew", "sit", 5.0, 8.0, 90), spot("crew", "sit", 8.0, 8.0, 90), spot("crew", "sit", 5.0, 10.0, -90), spot("crew", "sit", 11.6, 5.4, 180),
-            spot("crew", "sit", 2.6, 4.6, 0), spot("librarian", "work", 13.6, 3.0, 0)],
+            spot("crew", "sit", 2.6, 4.6, 0), spot("librarian", "work", 13.15, 3.0, 0)],
      lights=[light(8.0, 8.0, 3.5, 4500, 3300, (8.0, 8.0))])
 _reg("observation", name="Observation Deck", kind="observation", dept="command", L=24.0, D=16.0, h=3.7, plate="observation",
      doors=[door("near", 10.0)], systems=["power_bus"],
@@ -106,7 +110,7 @@ _reg("laundry", name="Laundry", kind="laundry", dept="services", L=12.0, D=16.0,
      lights=[light(6.0, 8.0, 3.3, 5000, 4800, (6.0, 8.0))])
 _reg("hydro", name="Hydroponics Bay", kind="hydroponics", dept="science", L=24.0, D=16.0, h=3.4, plate="hydro",
      doors=[door("near", 10.0)], systems=["life_support", "potable_water", "food_service"],
-     spots=[spot("botanist", "work", 8.0, 8.0, 0, "science"), spot("botanist", "work", 16.0, 8.0, 180, "science")],
+     spots=[spot("botanist", "work", 8.0, 7.2, 0, "science"), spot("botanist", "work", 16.0, 7.2, 180, "science")],
      lights=[light(12.0, 8.0, 3.3, 3500, 7000, (20.0, 12.0), 1100)])
 _reg("quiet", name="Quiet Room", kind="chapel", dept="services", L=12.0, D=16.0, h=3.6, plate="chapel",
      doors=[door("near", 6.0)], systems=["power_bus"],
@@ -115,8 +119,8 @@ _reg("quiet", name="Quiet Room", kind="chapel", dept="services", L=12.0, D=16.0,
 # ---- the rest of the kit (Decks 3, 5, 8, 10, 11 of the canon): built and previewed, placed when their decks are built -------
 _reg("lab", name="Science Lab", kind="lab", dept="science", L=24.0, D=16.0, h=3.6, plate="lab",
      doors=[door("near", 10.0)], systems=["sensors", "power_bus", "data_trunk"],
-     spots=[spot("scientist", "work", x, 14.4, 90, "science") for x in (5.0, 9.0, 13.0, 17.0)]
-           + [spot("scientist", "work", 10.2, 7.6, -90, "science"), spot("scientist", "work", 13.4, 11.85, -90, "science"),
+     spots=[spot("scientist", "sit", x, 14.4, 90, "science") for x in (5.0, 9.0, 13.0, 17.0)]
+           + [spot("scientist", "sit", 10.2, 7.6, -90, "science"), spot("scientist", "sit", 13.4, 11.85, -90, "science"),
               spot("lead_scientist", "work", 20.5, 7.0, 180, "science")],
      lights=[light(6.0, 8.0, 3.5, 6500, 5600, (8.0, 8.0)), light(18.0, 8.0, 3.5, 6500, 5600, (8.0, 8.0))])
 _reg("workshop", name="Machine Shop", kind="workshop", dept="engineering", L=28.0, D=16.0, h=3.7, plate="workshop",
@@ -139,7 +143,7 @@ _reg("cabins", name="Crew Cabins", kind="cabins", dept="services", L=20.0, D=16.
 # ---- Deck 6: the medical rooms around the Medbay (docs/BIBBIA.md §6: Medbay, surgery, quarantine, pharmacy) ---------------------
 _reg("surgery", name="Surgery", kind="surgery", dept="medical", L=16.0, D=16.0, h=3.6, plate="surgery",
      doors=[door("near", 6.0)], systems=["medical", "power_bus"],
-     spots=[spot("surgeon", "work", 3.9, 9.0, 0, "medical"), spot("nurse", "work", 6.6, 9.0, 180, "medical"), spot("surgeon", "work", 9.9, 9.0, 0, "medical"),
+     spots=[spot("surgeon", "work", 3.9, 9.6, 0, "medical"), spot("nurse", "work", 6.6, 9.0, 180, "medical"), spot("surgeon", "work", 9.9, 9.6, 0, "medical"),
             spot("nurse", "work", 12.6, 9.0, 180, "medical")],
      lights=[light(5.0, 9.0, 3.5, 6500, 6000, (4.0, 3.0)), light(11.0, 9.0, 3.5, 6500, 6000, (4.0, 3.0)), light(8.0, 13.5, 3.5, 3500, 5600, (12.0, 1.0))])
 _reg("quarantine", name="Quarantine Ward", kind="quarantine", dept="medical", L=24.0, D=16.0, h=3.6, plate="quarantine",
@@ -149,7 +153,7 @@ _reg("quarantine", name="Quarantine Ward", kind="quarantine", dept="medical", L=
      lights=[light(12.0, 4.5, 3.5, 6000, 6000, (14.0, 1.0)), light(12.0, 12.8, 3.5, 4500, 5200, (20.0, 1.0))])
 _reg("pharmacy", name="Pharmacy", kind="pharmacy", dept="medical", L=12.0, D=16.0, h=3.4, plate="pharmacy",
      doors=[door("near", 6.0)], systems=["medical", "supply"],
-     spots=[spot("pharmacist", "work", 6.0, 5.4, -90, "medical"), spot("pharmacist", "work", 6.0, 7.4, 90, "medical")],
+     spots=[spot("pharmacist", "work", 6.0, 5.4, -90, "medical"), spot("pharmacist", "work", 6.45, 7.4, 90, "medical")],
      lights=[light(6.0, 8.0, 3.3, 4200, 5600, (6.0, 8.0))])
 
 
@@ -183,7 +187,7 @@ _reg("stair_tower", name="Stair Tower", kind="stairs", dept="neutral", L=8.0, D=
      systems=["power_bus"], special=True, spots=[], lights=[light(4.0, 4.0, 3.3, 3000, 4500, (3.0, 3.0), 800)])
 _reg("bow_obs", name="Bow Observation", kind="observation", dept="command", L=20.0, D=32.0, h=3.7, plate="bow_obs", doors=[],
      systems=["power_bus"], special=True,
-     spots=[spot("crew", "watch", 17.6, 6.0 + 4.5 * i, 0) for i in range(6)]
+     spots=[spot("crew", "watch", 17.45 if i == 5 else 17.6, 6.0 + 4.5 * i - (0.06 if i == 5 else 0.0), 0) for i in range(6)]
            + [spot("crew", "sit", 11.6, 5.5, 0), spot("crew", "sit", 11.6, 7.5, 0), spot("crew", "sit", 11.6, 24.5, 0), spot("crew", "sit", 11.6, 26.5, 0)],
      lights=[light(10.0, 16.0, 3.6, 3200, 6200, (12.0, 1.0), 1200)])
 # ---- planned rooms: typed compartments of the decks that are not modelled yet (no mesh), with real dimensions ------------------
@@ -229,6 +233,87 @@ _plan("tank", "Fuel & Coolant Tank", "tank", "neutral", 32.0, 16.0, 3.4, ["coola
 _plan("reaction_mass", "Reaction-Mass Tank", "tank", "neutral", 40.0, 16.0, 3.4, ["reaction_mass"], ("machinist",), 1, 18.0)
 _plan("crawlway", "Maintenance Crawlway Hub", "crawlway", "engineering", 16.0, 16.0, 3.0, ["power_bus", "data_trunk", "coolant"], ("dc_tech",), 2, 6.0)
 _plan("cargo_hold", "Cargo Hold", "storage", "flight", 32.0, 16.0, 3.7, ["supply"], ("handler",), 2, 10.0)
+
+
+# ================================================================================================================ NAVE-2: the other decks
+# Rooms with meshes: these replace the planned entries above (a later registration of the same key wins). The sizes stay those of the planned rooms so
+# that the plans of the decks do not move; doors on a module centre (x = 2 mod 4); `dz` is the height above the floor of a place on a platform.
+_reg("transporter", name="Transporter Room", kind="transporter", dept="science", L=24.0, D=16.0, h=3.7, plate="transporter",
+     doors=[door("near", 10.0)], systems=["transporter", "power_bus", "data_trunk", "coolant"],
+     spots=[spot("transporter_chief", "sit", 22.6, 3.0, 0, "science"), spot("transport_operator", "sit", 8.4, 7.0, 0, "science"),
+            spot("transport_operator", "sit", 8.4, 10.2, 0, "science"), spot("engineer", "work", 7.4, 13.4, 90, "engineering"),
+            spot("technician", "work", 4.6, 10.8, 90, "science"), spot("technician", "stand", 3.2, 5.2, 90, "science"),
+            spot("visitor", "stand", 19.0, 8.6, 180, "science", 0.312), spot("visitor", "stand", 15.0, 8.6, 0, "science", 0.312)],
+     lights=[light(17.0, 8.6, 3.7, 5600, 6000, (6.0, 6.0), 1200), light(8.0, 8.6, 3.7, 4200, 5600, (5.0, 4.0), 1000), light(4.6, 13.0, 3.7, 2400, 6000, (3.0, 3.0), 800),
+             light(12.0, 14.0, 3.7, 3000, 5600, (14.0, 1.0), 900)])
+
+
+import math as _m
+
+
+def _ring_spots(role: str, kind: str, cx: float, cy: float, r: float, angles, dept: str, face_in: bool = True) -> list:
+    """Places on a circle round (cx, cy) at the given angles (degrees), facing the middle."""
+    return [spot(role, kind, cx + r * _m.cos(_m.radians(a)), cy + r * _m.sin(_m.radians(a)), (a + 180.0) % 360.0 if face_in else a % 360.0, dept) for a in angles]
+
+
+_reg("sensor_archive", name="Sensor Archive", kind="archive", dept="science", L=16.0, D=16.0, h=3.4, plate="archive",
+     doors=[door("near", 6.0)], systems=["sensors", "data_trunk", "power_bus"],
+     spots=[spot("archivist", "sit", 11.4, 1.0, 90, "science"), spot("archive_technician", "work", 1.8, 1.8, 270, "science"),
+            spot("archive_technician", "work", 6.0, 8.0, 0, "science"), spot("archive_technician", "work", 9.3, 9.0, 180, "science"),
+            spot("analyst", "stand", 12.6, 9.0, 0, "science")],
+     lights=[light(6.0, 9.5, 3.3, 2600, 7000, (1.2, 10.0), 900), light(9.3, 9.5, 3.3, 2600, 7000, (1.2, 10.0), 900), light(12.6, 9.5, 3.3, 2600, 7000, (1.2, 10.0), 900),
+             light(8.0, 2.4, 3.3, 3000, 5000, (6.0, 2.0), 800)])
+_reg("sensor_room", name="Sensor Array Room", kind="sensors", dept="science", L=16.0, D=16.0, h=3.6, plate="sensors",
+     doors=[door("near", 6.0)], systems=["sensors", "data_trunk", "coolant", "power_bus"],
+     spots=[spot("sensor_operator", "sit", 3.4, 6.9, 90, "science"), spot("sensor_operator", "sit", 8.0, 6.9, 90, "science"),
+            spot("sensor_operator", "sit", 12.6, 6.9, 90, "science"), spot("sensor_supervisor", "stand", 6.0, 11.0, 0, "science"),
+            spot("sensor_tech", "work", 2.2, 7.0, 180, "science"), spot("sensor_tech", "work", 13.8, 7.0, 0, "science")],
+     lights=[light(8.0, 6.0, 3.5, 4200, 6000, (12.0, 2.0), 1000), light(8.0, 12.0, 3.5, 3000, 5600, (8.0, 3.0), 900)])
+_reg("lab_bio", name="Biology Lab", kind="lab", dept="science", L=24.0, D=16.0, h=3.6, plate="lab_bio",
+     doors=[door("near", 10.0)], systems=["sensors", "power_bus", "data_trunk", "life_support"],
+     spots=[spot("biologist", "work", 5.9, 8.6, 0, "science"), spot("biologist", "work", 17.15, 6.6, 90, "science"),
+            spot("lab_technician", "work", 22.4, 10.4, 0, "science"), spot("lab_technician", "work", 22.4, 12.6, 0, "science"),
+            spot("lead_scientist", "sit", 13.4, 2.0, 270, "science"), spot("biologist", "stand", 10.0, 13.4, 90, "science")],
+     lights=[light(6.0, 8.0, 3.5, 6500, 5600, (8.0, 8.0)), light(18.0, 8.0, 3.5, 6500, 5600, (8.0, 8.0))])
+_reg("lab_astro", name="Astrometrics", kind="lab", dept="science", L=24.0, D=16.0, h=3.6, plate="lab_astro",
+     doors=[door("near", 10.0)], systems=["sensors", "power_bus", "data_trunk"],
+     spots=_ring_spots("astrometrist", "sit", 12.0, 8.2, 3.6, (30, 90, 210, 270), "science") + [spot("lead_scientist", "stand", 3.0, 8.0, 0, "science")],
+     lights=[light(12.0, 8.2, 3.5, 2200, 7500, (8.0, 8.0), 900), light(12.0, 14.0, 3.5, 1500, 7500, (18.0, 1.0), 900)])
+_reg("lab_phys", name="Physics Lab", kind="lab", dept="science", L=24.0, D=16.0, h=3.7, plate="lab_phys",
+     doors=[door("near", 10.0)], systems=["sensors", "power_bus", "data_trunk", "coolant"],
+     spots=[spot("physicist", "sit", 5.0, 2.8, 90, "science"), spot("physics_technician", "work", 9.0, 9.4, 90, "science"),
+            spot("physics_technician", "work", 19.6, 9.2, 90, "science"), spot("cryo_technician", "work", 20.3, 4.2, 0, "science"),
+            spot("physicist", "work", 12.0, 13.7, 90, "science")],
+     lights=[light(8.0, 4.0, 3.7, 3500, 6000, (6.0, 6.0)), light(12.0, 11.0, 3.7, 6500, 5600, (14.0, 4.0)), light(19.6, 11.0, 3.7, 4000, 5600, (5.0, 5.0))])
+
+
+_reg("radiator_pumps", name="Radiator Manifold", kind="machinery", dept="engineering", L=24.0, D=16.0, h=3.7, plate="pumps",
+     doors=[door("near", 10.0)], systems=["coolant", "radiators", "power_bus"],
+     spots=[spot("machinist", "work", 5.6, 9.4, 0, "engineering"), spot("machinist", "work", 10.0, 9.4, 0, "engineering"), spot("pump_tender", "work", 14.4, 9.4, 0, "engineering"),
+            spot("coolant_tender", "work", 19.0, 7.2, 0, "engineering"), spot("machinist", "sit", 7.4, 1.1, 90, "engineering"), spot("engineer", "stand", 15.6, 2.4, 90, "engineering")],
+     lights=[light(8.0, 8.0, 3.6, 5000, 4500, (12.0, 1.0), 1000), light(18.0, 8.0, 3.6, 5000, 4500, (10.0, 1.0), 1000)])
+_reg("machinery", name="Machinery Space", kind="machinery", dept="engineering", L=24.0, D=16.0, h=3.7, plate="machinery",
+     doors=[door("near", 10.0)], systems=["power_bus", "coolant", "compressed_air", "life_support", "potable_water"],
+     spots=[spot("machinist", "work", 3.4, 12.6, 90, "engineering"), spot("machinist", "work", 7.4, 12.6, 90, "engineering"), spot("machinist", "work", 11.4, 12.6, 90, "engineering"),
+            spot("water_tender", "work", 18.6, 10.4, 0, "engineering"), spot("machinist", "sit", 14.0, 1.0, 270, "engineering"), spot("machinist", "work", 7.0, 6.1, 90, "engineering")],
+     lights=[light(8.0, 8.0, 3.6, 5000, 4500, (12.0, 1.0), 1000), light(18.0, 8.0, 3.6, 4500, 4500, (8.0, 1.0), 1000)])
+_reg("machinery_b", name="Compressor Room", kind="machinery", dept="engineering", L=24.0, D=16.0, h=3.7, plate="machinery",
+     doors=[door("near", 10.0)], systems=["power_bus", "compressed_air"],
+     spots=[spot("machinist", "work", 4.0, 7.2, 90, "engineering"), spot("machinist", "work", 8.4, 7.2, 90, "engineering"), spot("machinist", "work", 15.8, 9.0, 0, "engineering"),
+            spot("machinist", "sit", 12.0, 3.0, 270, "engineering"), spot("engineer", "stand", 20.0, 6.5, 180, "engineering")],
+     lights=[light(8.0, 8.0, 3.6, 5000, 4500, (12.0, 1.0), 1000), light(18.0, 8.0, 3.6, 4500, 4500, (8.0, 1.0), 1000)])
+_reg("dc_locker", name="Damage Control Locker", kind="damage_control", dept="engineering", L=12.0, D=16.0, h=3.4, plate="dc",
+     doors=[door("near", 6.0)], systems=["damage_control", "supply"],
+     spots=[spot("dc_technician", "stand", 4.4, 13.2, 90, "engineering"), spot("dc_technician", "work", 6.0, 6.2, 270, "engineering"),
+            spot("dc_technician", "stand", 2.0, 8.0, 180, "engineering"), spot("dc_technician", "stand", 10.2, 8.0, 0, "engineering")],
+     lights=[light(6.0, 5.0, 3.3, 4200, 5000, (6.0, 1.0), 900), light(6.0, 11.0, 3.3, 4200, 5000, (6.0, 1.0), 900)])
+_reg("power_control", name="Power Control", kind="power", dept="engineering", L=24.0, D=16.0, h=3.6, plate="power",
+     doors=[door("near", 10.0)], systems=["power_bus", "reactor", "data_trunk"],
+     spots=[spot("power_technician", "sit", 3.6, 7.35, 90, "engineering"), spot("power_technician", "sit", 8.0, 7.35, 90, "engineering"),
+            spot("power_technician", "sit", 12.4, 7.35, 90, "engineering"), spot("power_technician", "sit", 3.6, 4.35, 90, "engineering"),
+            spot("power_technician", "sit", 8.0, 4.35, 90, "engineering"), spot("power_supervisor", "stand", 12.4, 10.2, 90, "engineering"),
+            spot("power_technician", "work", 22.0, 6.0, 180, "engineering")],
+     lights=[light(8.0, 6.0, 3.5, 4800, 4500, (12.0, 3.0), 1000), light(18.0, 8.0, 3.5, 3600, 4500, (6.0, 8.0), 900)])
 
 
 def prefab(key: str) -> dict:

@@ -61,6 +61,41 @@ ROOMS = {
     "medbay": ("MEDBAY", "MEDICAL · AUTHORIZED", "medical"), "surgery": ("SURGERY", "STERILE AREA", "medical"),
     "quarantine": ("QUARANTINE", "ISOLATION WARD", "medical"), "pharmacy": ("PHARMACY", "CONTROLLED SUBSTANCES", "medical"),
 }
+# NAVE-2: the rooms of the other decks (docs/NAVE.md §10); their plates are 512 x 64 (the same 8:1 as the older 768 x 96: the plate mesh does not change)
+_OLD_ROOMS = set(ROOMS)
+ROOMS.update({
+    # Deck 2: CIC & Communications
+    "cic": ("COMBAT INFORMATION CENTRE", "CIC · AUTHORIZED PERSONNEL ONLY", "command"), "briefing": ("BRIEFING ROOM", "OPERATIONS BRIEFINGS", "command"),
+    "comms": ("COMMUNICATIONS CENTRE", "FLEET NET · SUBSPACE RELAY", "command"), "offices": ("DEPARTMENT OFFICES", "ADMINISTRATION", "command"),
+    "records": ("RECORDS & ARCHIVE", "SHIP'S LOG · PERSONNEL FILES", "command"), "pdc": ("POINT-DEFENCE CONTROL", "FIRE CONTROL · AUTHORIZED ONLY", "security"),
+    "vls": ("VLS MAGAZINE", "MISSILE HANDLING · NO NAKED FLAME", "security"), "barbette": ("TURRET BARBETTE", "RAILGUN MOUNT · LIVE SHELLS", "security"),
+    "sensors": ("SENSOR ARRAY ROOM", "PASSIVE · ACTIVE · EW", "science"),
+    # Deck 3: Crew Country
+    "wardroom": ("OFFICERS' WARDROOM", "MESS · LOUNGE", "services"), "staterooms": ("OFFICERS' STATEROOMS", "QUIET HOURS", "services"),
+    "gym": ("GYMNASIUM", "PHYSICAL TRAINING", "services"),
+    # Deck 5: Science & Transport
+    "transporter": ("TRANSPORTER ROOM", "AUTHORIZED PERSONNEL ONLY", "science"), "archive": ("SENSOR ARCHIVE", "DATA STACKS · COLD STORAGE", "science"),
+    "lab_bio": ("BIOLOGY LAB", "SAMPLES · QUARANTINE PROTOCOL", "science"), "lab_astro": ("ASTROMETRICS", "STELLAR CARTOGRAPHY", "science"),
+    "lab_phys": ("PHYSICS LAB", "HIGH ENERGY · SHIELDED", "science"), "lab_chem": ("CHEMISTRY LAB", "FUME HOODS · NO FOOD", "science"),
+    "shuttle_stop": ("SPINE SHUTTLE", "PLATFORM · STAND BEHIND THE LINE", "command"),
+    # Deck 7: Engineering & Power
+    "power": ("POWER CONTROL", "GRID · BUS · REACTOR TAPS", "engineering"), "pumps": ("RADIATOR MANIFOLD", "COOLANT LOOPS 1-4", "engineering"),
+    "switchgear": ("SWITCHGEAR", "HIGH VOLTAGE", "engineering"), "capacitors": ("CAPACITOR HALL", "STORED ENERGY · KEEP OUT", "engineering"),
+    # Deck 8: Marines & Armory
+    "barracks": ("MARINE BARRACKS", "A COMPANY · 1ST PLATOON", "security"), "range": ("FIRING RANGE", "LIVE FIRE · HEARING PROTECTION", "security"),
+    "shuttle_bay": ("ASSAULT SHUTTLE BAY", "KESTREL 1 · KESTREL 2", "security"), "kit_room": ("KIT ROOM", "BATTLE DRESS · ARMOUR", "security"),
+    # Deck 9: Flight
+    "flight_ops": ("FLIGHT OPERATIONS", "AIR BOSS · CAG", "flight"), "aircraft_shop": ("AIRCRAFT WORKSHOP", "AVIONICS · AIRFRAME", "flight"),
+    "magazine": ("MUNITIONS MAGAZINE", "ORDNANCE · AUTHORIZED ONLY", "security"), "cargo": ("CARGO HOLD", "SUPPLY · SECURE LOADS", "flight"),
+    "booth": ("CONTROL BOOTH", "PRIMARY FLY", "flight"), "pilot_ready": ("PILOT READY ROOM", "BRIEF · SUIT UP", "flight"),
+    # Deck 10-12
+    "fab": ("FABRICATION SHOP", "PRINTERS · CASTING", "engineering"), "repair": ("REPAIR BAY", "HULL PATCH · SPARES", "engineering"),
+    "tank": ("FUEL & COOLANT TANK", "LEVEL GAUGE · VENT", "neutral"), "mass": ("REACTION-MASS TANK", "PRESSURE VESSEL", "neutral"),
+    "crawl": ("MAINTENANCE CRAWLWAY", "CREW ACCESS · 1 AT A TIME", "engineering"), "hold_bulk": ("BULK HOLD", "PALLETS · CONTAINERS", "flight"),
+    "fire_hall": ("FIRE & DAMAGE CONTROL", "CENTRAL · TEAM 1-4", "engineering"),
+    # Deck 1
+    "ready_room": ("CAPTAIN'S READY ROOM", "PRIVATE · COMMAND", "command"),
+})
 for _d in range(2, 13):                 # the plate over a stair tower's door says where the flights go from this deck
     ROOMS[f"stairs_{_d}"] = ("STAIRS", f"UP DECK {_d - 1} · DOWN DECK {_d + 1}" if _d < 12 else "UP DECK 11", "neutral")
 
@@ -146,7 +181,8 @@ def screen_face(kind: str, w: int = 512, h: int = 288) -> Image.Image:
     d.rectangle((0, 0, w - 1, h - 1), outline=(46, 70, 100, 255), width=3)
     d.rectangle((0, 0, w, 44), fill=(14, 22, 32, 255))
     titles = {"news": "FLEET NET · NEWS", "menu": "TODAY'S MENU", "lab": "SAMPLE 07 · SPECTRUM", "dir": "SHIP DIRECTORY",
-              "sched": "WATCH BILL", "map": "AURELIA MARCH"}
+              "sched": "WATCH BILL", "map": "AURELIA MARCH", "star": "STELLAR CARTOGRAPHY", "tac": "TACTICAL PLOT", "ship": "SHIP STATUS",
+              "data": "ARCHIVE INDEX", "wave": "SIGNAL ANALYSIS"}
     d.text((16, 22), titles.get(kind, kind.upper()), font=f_title, fill=(*ICE, 255), anchor="lm")
     if kind == "news":
         for k, t in enumerate(["7TH FLEET HOLDS AURELIA GATE", "MERIDIAN CONVOY DELAYED 2 DAYS", "CASSIA PRIME: TALKS CONTINUE",
@@ -184,6 +220,57 @@ def screen_face(kind: str, w: int = 512, h: int = 288) -> Image.Image:
                 d.line((*p, *q), fill=(30, 56, 84, 255), width=2)
         for p in pts:
             d.ellipse((p[0] - 5, p[1] - 5, p[0] + 5, p[1] + 5), outline=(*ICE, 255), width=2)
+    elif kind == "star":                                  # a star chart: a field of stars, constellation lines, a ringed target
+        import random
+        rng = random.Random(11)
+        for _ in range(160):
+            x, y = 12 + rng.random() * (w - 24), 54 + rng.random() * (h - 66)
+            r = rng.choice((1, 1, 1, 2))
+            d.ellipse((x - r, y - r, x + r, y + r), fill=(*ICE, 255))
+        pts = [(70 + rng.random() * (w - 140), 80 + rng.random() * (h - 110)) for _ in range(9)]
+        for a, b in zip(pts, pts[1:]):
+            d.line((*a, *b), fill=(*DEPT["science"], 255), width=2)
+        for p in pts:
+            d.ellipse((p[0] - 4, p[1] - 4, p[0] + 4, p[1] + 4), outline=(*ICE, 255), width=2)
+        c = pts[4]
+        for rr in (14, 26):
+            d.ellipse((c[0] - rr, c[1] - rr, c[0] + rr, c[1] + rr), outline=(*DEPT["command"], 255), width=2)
+        d.text((16, h - 20), "AURELIA · SECTOR 7 · 1:40 000 000", font=f_small, fill=(*DIM, 255))
+    elif kind == "tac":                                    # a tactical plot: range rings, a bearing line, contacts
+        import random
+        rng = random.Random(7)
+        cx, cy = w * 0.5, h * 0.60
+        for r in range(1, 5):
+            d.ellipse((cx - r * 62, cy - r * 46, cx + r * 62, cy + r * 46), outline=(30, 56, 84, 255), width=1)
+        d.line((cx, cy, cx + 150, cy - 80), fill=(*DEPT["command"], 255), width=2)
+        d.polygon([(cx, cy - 8), (cx - 6, cy + 6), (cx + 6, cy + 6)], fill=(*ICE, 255))
+        for k in range(6):
+            x, y = cx + (rng.random() - 0.5) * 380, cy + (rng.random() - 0.5) * 150
+            col = DEPT["security"] if k % 3 == 0 else ICE
+            d.rectangle((x - 5, y - 5, x + 5, y + 5), outline=(*col, 255), width=2)
+        d.text((16, h - 20), "TRACKS 12 · HOSTILE 3 · RANGE 28 KM", font=f_small, fill=(*DIM, 255))
+    elif kind == "ship":                                   # the ship's side profile in lines, with the deck lines
+        d.polygon([(30, 150), (90, 120), (330, 118), (440, 140), (490, 150), (440, 176), (90, 178)], outline=(*ICE, 255), width=2)
+        for k in range(1, 7):
+            d.line((60 + k * 62, 124, 60 + k * 62, 172), fill=(30, 56, 84, 255), width=1)
+        for k in range(1, 5):
+            d.line((70, 118 + k * 12, 470, 118 + k * 12), fill=(30, 56, 84, 255), width=1)
+        d.rectangle((190, 96, 330, 120), outline=(*ICE, 255), width=2)
+        d.rectangle((250, 70, 300, 96), outline=(*DEPT["command"], 255), width=2)
+        d.rectangle((330, 140, 392, 160), fill=(*DEPT["medical"], 255))
+        d.text((16, h - 20), "ASN AQUILA · CVC-01 · DECKS 1-12", font=f_small, fill=(*DIM, 255))
+    elif kind == "data":                                   # rows of figures
+        import random
+        rng = random.Random(3)
+        for k in range(11):
+            y = 58 + k * 20
+            d.text((18, y), "%02d  %08X  %6.2f" % (k + 1, rng.getrandbits(32), rng.random() * 100), font=f_small, fill=(*ICE, 255))
+            d.rectangle((300, y + 3, 300 + int(rng.random() * 190), y + 11), fill=(*DEPT["science"], 255))
+    elif kind == "wave":                                   # waveforms
+        for row, (col, amp, fr) in enumerate(((DEPT["science"], 26, 0.16), (DEPT["command"], 18, 0.31), (DEPT["medical"], 22, 0.09))):
+            y0 = 92 + row * 66
+            d.line([(14 + i * 5, y0 + amp * math.sin(i * fr * 3.1 + row)) for i in range(98)], fill=(*col, 255), width=2)
+            d.line((14, y0, w - 14, y0), fill=(30, 44, 60, 255), width=1)
     return img
 
 
@@ -219,12 +306,13 @@ def build() -> None:
     for n in range(1, CODES_PER_SECTION + 1):                       # the numbers on the doors of the cabins (a cabin block is the same on every deck)
         add(f"cabin_{n:02d}", B3.tag(256, 64, f"CABIN {n}"), f"CABIN {n}")
     for key, (title, sub, dept) in ROOMS.items():
-        add(f"room_{key}", B3.plate(768, 96, title, sub, DEPT[dept]), title)
+        w, h = (768, 96) if key in _OLD_ROOMS or key.startswith("stairs_") else (512, 64)
+        add(f"room_{key}", B3.plate(w, h, title, sub, DEPT[dept]), title)
     for k in ("fwd", "aft", "port", "stbd"):
         add(f"arrow_{k}", draw_arrow(k))
     for k in ("stairs", "lift", "ladder", "heads", "galley", "obs", "shuttle"):
         add(f"pict_{k}", draw_pictogram(k))
-    for k in ("news", "menu", "lab", "dir", "sched", "map"):
+    for k in ("news", "menu", "lab", "dir", "sched", "map", "star", "tac", "ship", "data", "wave"):
         add(f"scr_{k}", screen_face(k))
 
     # shelf packing, tallest first

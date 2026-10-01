@@ -25,10 +25,11 @@ PROGRAMME = {
         "E": ["barbette", "point_defense", "offices"], "F": ["barbette", "offices", "sensor_room"], "G": ["sensor_room", "offices", "machinery"]},
     3: {"default": ["staterooms", "staterooms", "offices", "gym"], "A": ["wardroom", "gym", "staterooms"], "B": ["staterooms", "staterooms", "offices"],
         "C": ["staterooms", "gym", "staterooms"], "H": ["machinery", "staterooms"]},
-    5: {"default": ["lab", "sensor_archive", "lab", "sensor_room"], "A": ["lab", "sensor_archive", "sensor_room"],
-        "B": ["transporter", "lab", "lab", "sensor_archive"], "C": ["lab", "transporter", "sensor_room", "lab"], "D": ["lab", "hydro", "lab", "sensor_archive"],
-        "E": ["radiator_pumps", "machinery", "lab"], "F": ["radiator_pumps", "machinery", "sensor_room"], "G": ["radiator_pumps", "machinery"],
-        "H": ["machinery", "dc_locker"]},
+    5: {"default": ["lab", "sensor_archive", "lab_bio", "sensor_room"], "A": ["lab_bio", "lab", "sensor_room", "hydro", "lab_phys"],
+        "B": ["lab", "sensor_archive", "lab_astro", "lab_bio"], "C": ["lab_phys", "lab", "lab_bio", "sensor_room", "lab"],
+        "D": ["lab_astro", "hydro", "lab", "sensor_archive"], "E": ["radiator_pumps", "machinery", "dc_locker", "machinery_b"],
+        "F": ["radiator_pumps", "machinery_b", "sensor_room", "dc_locker"], "G": ["machinery", "radiator_pumps", "dc_locker"],
+        "H": ["machinery_b", "dc_locker", "machinery"]},
     6: {"default": ["store_cold", "laundry", "heads", "store_dry", "cabins", "quiet", "library", "hydro", "lab"],
         "A": ["store_dry", "store_cold", "laundry", "heads", "hold"], "B": ["cabins", "store_dry", "lab", "heads", "laundry", "store_cold", "quiet", "library"],
         "C": ["store_cold", "cabins", "lab", "dc_locker", "store_dry", "heads"], "D": ["cabins", "store_dry", "laundry", "heads", "hydro"],
@@ -47,10 +48,11 @@ PROGRAMME = {
 }
 
 
-UNIQUE = {6: {"surgery", "quarantine", "pharmacy"}}      # rooms that stand once on their deck
+UNIQUE = {5: {"transporter", "lab_astro"}, 6: {"surgery", "quarantine", "pharmacy"}}      # rooms that stand once on their deck
 # rooms placed first, at a fixed place: (key, side of the Spine, x of the room's forward edge). Deck 6: the medical rooms next to the Medbay's entrance,
 # on the starboard side of the Spine (the Medbay's own door is at x -232)
-PINNED = {6: [("pharmacy", +1, -216.0), ("surgery", +1, -200.0), ("quarantine", +1, -176.0)]}
+PINNED = {5: [("transporter", +1, 4.0)],
+          6: [("pharmacy", +1, -216.0), ("surgery", +1, -200.0), ("quarantine", +1, -176.0)]}
 
 
 def obstacles(deck: int) -> list[list[float]]:

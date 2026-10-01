@@ -54,6 +54,12 @@ ROOMS = {
     "surgery": ("ship_rooms_med", "surgery"), "quarantine": ("ship_rooms_med", "quarantine"), "pharmacy": ("ship_rooms_med", "pharmacy"),
     "lab": ("ship_rooms_work", "lab"), "workshop": ("ship_rooms_work", "workshop"), "armory": ("ship_rooms_work", "armory"),
     "cabins": ("ship_rooms_work", "cabins"),
+    # NAVE-2
+    "transporter": ("ship_rooms_science", "transporter"),
+    "sensor_archive": ("ship_rooms_science2", "sensor_archive"), "sensor_room": ("ship_rooms_science2", "sensor_room"),
+    "lab_bio": ("ship_rooms_science2", "lab_bio"), "lab_astro": ("ship_rooms_science2", "lab_astro"), "lab_phys": ("ship_rooms_science2", "lab_phys"),
+    "radiator_pumps": ("ship_rooms_engineering", "radiator_pumps"), "machinery": ("ship_rooms_engineering", "machinery"), "machinery_b": ("ship_rooms_engineering", "machinery_b"),
+    "dc_locker": ("ship_rooms_engineering", "dc_locker"), "power_control": ("ship_rooms_engineering", "power_control"),
 }
 EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHIP_StairTowerBottom": ("ship_rooms_hub", "stair_tower_bottom"),
          "SM_SHIP_LadderTrunk": ("ship_rooms_hub", "ladder_trunk")}
@@ -273,11 +279,64 @@ class RouteChecker:
         return {"deck": deck, "walk_rays": checked, "blocked": blocked, "hub_rays": hub_checked, "hub_blocked": hub_blocked, "blank_doors": blank}
 
 
+    def check_spots(self, deck: int) -> dict:
+        """The places where people stand, work, sit and eat (the compartments' stations: VITA puts a body there) against the room meshes: a person standing needs
+        a clear column (22 cm round, knee to head), a sitter a clear torso above the seat (12 cm round), and there must be a floor under them (the platform of a pad
+        counts: the ray starts half a metre above the place). A place in the way comes with the nearest clear one in the room's own frame (`try`), to put in ship_spec."""
+        plan = self.plan
+        comps = {c["id"]: c for c in plan["compartments"]}
+        bad: list[str] = []
+        tries: dict[str, str] = {}
+        n = 0
+        for p in plan["placements"].get(str(deck), []):
+            if p["cls"] != "room" or p["mesh"] not in self.bvh or p.get("comp") not in comps:
+                continue
+            inv = self._inv(p["pos"], p["yaw"])
+            tree = self.bvh[p["mesh"]]
+            yaw = math.radians(p["yaw"])
+
+            def why_not(x: float, y: float, z: float, kind: str):
+                hs, r = ((1.0, 1.3), 0.12) if kind in ("sit", "eat") else ((0.4, 0.9, 1.4, 1.75), 0.22)
+                for h in hs:
+                    hit = tree.find_nearest(inv @ Vector((x, -y, z + h)), r)
+                    if hit[0] is not None:
+                        return f"{h} m: geometry {hit[3]:.2f} m away"
+                ray = tree.ray_cast(inv @ Vector((x, -y, z + 0.5)), Vector((0.0, 0.0, -1.0)), 0.7)
+                return "no floor under it" if ray[0] is None else None
+
+            for i, st in enumerate(comps[p["comp"]].get("stations", [])):
+                kind = st["kind"]
+                if kind == "sleep":
+                    continue
+                x, y, z = st["pos"]
+                n += 1
+                why = why_not(x, y, z, kind)
+                if why:
+                    bad.append(f"{st['id']} ({kind} {st.get('role', '')}) at ({x:.1f}, {y:.1f}, {z:.2f}): {why}")
+                    spec_key = comps[p["comp"]].get("prefab")
+                    found = None
+                    for rr in (0.15, 0.3, 0.45, 0.6, 0.8, 1.0, 1.3):
+                        for k in range(16):
+                            a = 2 * math.pi * k / 16
+                            if why_not(x + rr * math.cos(a), y + rr * math.sin(a), z, kind) is None:
+                                found = (x + rr * math.cos(a), y + rr * math.sin(a))
+                                break
+                        if found:
+                            break
+                    # to the room's own frame: undo the placement (translate, then turn back by the yaw)
+                    def local(wx, wy):
+                        dx, dy = wx - p["pos"][0], wy - p["pos"][1]
+                        return (round(dx * math.cos(yaw) + dy * math.sin(yaw), 2), round(-dx * math.sin(yaw) + dy * math.cos(yaw), 2))
+                    here = local(x, y)
+                    tries.setdefault(f"{spec_key} s{i}", f"({here[0]}, {here[1]}) -> " + (f"try {local(*found)}" if found else "nothing clear within 1.3 m"))
+        return {"deck": deck, "spots": n, "blocked": bad, "tries": tries}
+
+
 # ------------------------------------------------------------------------------------------------------------------ main
 def parse_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out = {"out_dir": DEFAULT_OUT, "only": None, "plan": None, "export": True, "checks": True, "preview": None, "views": ["rooms"], "samples": 24,
-           "room_views": None, "save_blend": None}
+           "room_views": None, "save_blend": None, "spots": False}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -289,6 +348,8 @@ def parse_args() -> dict:
             i += 1
         elif a == "--no-export":
             out["export"] = False
+        elif a == "--spots":                                    # with --only: run the places check on the rooms that were built (the routes need the whole kit)
+            out["spots"] = True
         elif a == "--no-checks":
             out["checks"] = False
         elif a == "--preview":
@@ -343,15 +404,23 @@ def main() -> None:
         print("  MESH PROBLEM:", pr)
 
     route = None
-    if args["checks"] and plan and not args["only"]:
+    if args["checks"] and plan and (not args["only"] or args["spots"]):
         rc = RouteChecker(plan, objs)
-        route = [rc.check_deck(int(d)) for d in plan.get("placements", {}) if plan["placements"][d]]
+        route = [] if args["only"] else [rc.check_deck(int(d)) for d in plan.get("placements", {}) if plan["placements"][d]]
         for r in route:
             print(f"  deck {r['deck']} routes: {r['walk_rays']} corridor/door rays, {len(r['blocked'])} blocked ({r['blank_doors']} doors of rooms not modelled yet left out);"
                   f" inside rooms {r['hub_blocked']} of {r['hub_rays']} hub rays meet furniture (expected)")
             for s in r["blocked"][:20]:
                 print("    BLOCKED", s)
             problems += [f"deck {r['deck']} route {s}" for s in r["blocked"]]
+        spots = [rc.check_spots(int(d)) for d in plan.get("placements", {}) if plan["placements"][d]]
+        for r in spots:
+            print(f"  deck {r['deck']} places: {r['spots']} checked (standing, working, sitting, eating), {len(r['blocked'])} in the way of furniture")
+            for t in r["blocked"][:12]:
+                print("    IN THE WAY", t)
+            for k, t in sorted(r["tries"].items()):
+                print("    SPEC", k, t)
+            problems += [f"deck {r['deck']} place {t}" for t in r["blocked"]]
 
     if args["export"]:
         out_dir = args["out_dir"]

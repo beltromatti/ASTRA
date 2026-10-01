@@ -204,7 +204,7 @@ class Deck:
         stations = []
         for i, s in enumerate(spec["spots"]):
             w = P.place_local(o3, yaw, s["x"], s["y"])
-            stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0)],
+            stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0 + s.get("dz", 0.0))],
                              "yaw": rnd((s["yaw"] + yaw) % 360.0, 1), "dept": s["dept"]})
         lights = []
         for i, l in enumerate(spec["lights"]):
@@ -372,7 +372,7 @@ class Deck:
         stations = []
         for i, s in enumerate(spec["spots"]):
             w = self.local(r, s["x"], s["y"])
-            stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0)],
+            stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0 + s.get("dz", 0.0))],
                              "yaw": rnd((s["yaw"] + r["yaw"]) % 360.0, 1), "dept": s["dept"]})
         lights = []
         for i, l in enumerate(spec["lights"]):
@@ -629,5 +629,5 @@ class Deck:
         for nid in r["door_nodes"]:
             B.link(nid, hub, "walk", width=1.5)
         for st in rec["stations"]:
-            B.node(st["id"], self.deck, st["pos"][0], st["pos"][1], self.z0, "station", cid, role=st["role"], act=st["kind"], yaw=st["yaw"])
+            B.node(st["id"], self.deck, st["pos"][0], st["pos"][1], st["pos"][2], "station", cid, role=st["role"], act=st["kind"], yaw=st["yaw"])
             B.link(hub, st["id"], "walk", width=1.0)
