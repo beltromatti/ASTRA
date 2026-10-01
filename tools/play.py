@@ -11,6 +11,7 @@
   tools/play.py walk fwd|back|left|right SECONDS [--run]
   tools/play.py look YAW [PITCH]          degrees (right and up positive)
   tools/play.py tp X Y [YAW [PITCH]] [--z Z]  the Captain on foot at a point of the bridge (metres), for pictures
+  tools/play.py find WORDS                actors by tag, name or class, nearest first (where things are, in metres)
   tools/play.py say "text"                a typed order to the crew (like T)
   tools/play.py cmd "console command"
   tools/play.py shot [name] [--noui]      screenshot (with the UI unless --noui): prints the PNG path
@@ -181,6 +182,13 @@ def cmd_look(a: argparse.Namespace) -> None:
     print(json.dumps(call("/look", {"yaw": a.yaw, "pitch": a.pitch})))
 
 
+def cmd_find(a: argparse.Namespace) -> None:
+    r = call("/find", {"q": a.q})
+    print(f"{r.get('found', 0)} found (nearest first)")
+    for o in r.get("actors", []):
+        print(f"  {o['dist_m']:7.1f} m  {o['loc_m']}  {o['name']}  [{o['class']}]  {o['tags']}"[:200])
+
+
 def cmd_tp(a: argparse.Namespace) -> None:
     print(json.dumps(call("/teleport", {"x": a.x, "y": a.y, "z": a.z, "yaw": a.yaw, "pitch": a.pitch})))
 
@@ -286,6 +294,9 @@ def main() -> None:
     p.add_argument("yaw", type=float)
     p.add_argument("pitch", type=float, nargs="?", default=0.0)
     p.set_defaults(fn=cmd_look)
+    p = sub.add_parser("find", help="actors by tag, name or class (any case), nearest first: where things are, in metres")
+    p.add_argument("q")
+    p.set_defaults(fn=cmd_find)
     p = sub.add_parser("tp", help="the Captain on foot at x y [z] metres (bridge frame), looking yaw [pitch]")
     p.add_argument("x", type=float)
     p.add_argument("y", type=float)

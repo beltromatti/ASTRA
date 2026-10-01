@@ -18,6 +18,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/FileManager.h"
@@ -227,6 +228,54 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 		P->SetControlRotation(FRotator(B->HasField(TEXT("pitch")) ? B->GetNumberField(TEXT("pitch")) : 0.0, B->HasField(TEXT("yaw")) ? B->GetNumberField(TEXT("yaw")) : 0.0, 0.0));
 		FAstraTimeline::Record(TEXT("input"), FString::Printf(TEXT("teleport %.1f %.1f %.1f"), At.X / 100.0, At.Y / 100.0, At.Z / 100.0));
 		return FString(TEXT("{\"ok\":true}"));
+	});
+	Bind(TEXT("/find"), EVerb::VERB_POST, [this](const TSharedPtr<FJsonObject>& B, const FHttpServerRequest&)
+	{
+		// the actors whose tag, name or class holds the words (any case), nearest the Captain first: where things are, for a
+		// test's route (the Falcons of Alpha: "ASTRA.Hangar.alpha")
+		const FString Q = B->GetStringField(TEXT("q"));
+		APlayerController* P = PC();
+		UWorld* W = P ? P->GetWorld() : nullptr;
+		const APawn* Me = P ? P->GetPawn() : nullptr;
+		TArray<TPair<double, AActor*>> Hits;
+		for (TActorIterator<AActor> It(W); It && !Q.IsEmpty(); ++It)
+		{
+			AActor* A = *It;
+			bool bMatch = A->GetName().Contains(Q) || A->GetClass()->GetName().Contains(Q);
+			for (const FName& T : A->Tags)
+			{
+				bMatch |= T.ToString().Contains(Q);
+			}
+			if (bMatch)
+			{
+				Hits.Add(TPair<double, AActor*>(Me ? FVector::Dist(A->GetActorLocation(), Me->GetActorLocation()) / 100.0 : 0.0, A));
+			}
+		}
+		Hits.Sort([](const TPair<double, AActor*>& X, const TPair<double, AActor*>& Y) { return X.Key < Y.Key; });
+		TArray<TSharedPtr<FJsonValue>> Out;
+		for (int32 i = 0; i < FMath::Min(Hits.Num(), 30); ++i)
+		{
+			const AActor* A = Hits[i].Value;
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetStringField(TEXT("name"), A->GetName());
+			O->SetStringField(TEXT("class"), A->GetClass()->GetName());
+			TArray<FString> Tags;
+			for (const FName& T : A->Tags)
+			{
+				Tags.Add(T.ToString());
+			}
+			O->SetStringField(TEXT("tags"), FString::Join(Tags, TEXT(",")));
+			const FVector L = A->GetActorLocation() / 100.0;
+			O->SetArrayField(TEXT("loc_m"), {MakeShared<FJsonValueNumber>(FMath::RoundToDouble(L.X * 100.0) / 100.0),
+			                                 MakeShared<FJsonValueNumber>(FMath::RoundToDouble(L.Y * 100.0) / 100.0),
+			                                 MakeShared<FJsonValueNumber>(FMath::RoundToDouble(L.Z * 100.0) / 100.0)});
+			O->SetNumberField(TEXT("dist_m"), FMath::RoundToDouble(Hits[i].Key * 10.0) / 10.0);
+			Out.Add(MakeShared<FJsonValueObject>(O));
+		}
+		TSharedRef<FJsonObject> R = MakeShared<FJsonObject>();
+		R->SetNumberField(TEXT("found"), Hits.Num());
+		R->SetArrayField(TEXT("actors"), Out);
+		return ToJson(R);
 	});
 	Bind(TEXT("/shot"), EVerb::VERB_POST, [this](const TSharedPtr<FJsonObject>& B, const FHttpServerRequest&)
 	{

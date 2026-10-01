@@ -1,6 +1,7 @@
 // ASTRA — the Captain at the stick of a Falcon.
 
 #include "AstraFighterPawn.h"
+#include "Fonts/FontMeasure.h"
 
 #include "ASTRA.h"
 #include "AstraHangar.h"
@@ -177,37 +178,98 @@ public:
 		}
 		// who is out there: the datalink's picture
 		const FLinearColor Friend(0.45f, 0.8f, 1.f, 0.85f), Neutral(1.f, 0.9f, 0.4f, 0.8f), Unknown(0.75f, 0.78f, 0.8f, 0.7f);
-		for (const FData::FMark& M : Data.Marks)
+		// the marks first, then their names, the foes' warships first and the nearest of each kind before the farther, each where it
+		// covers nothing already written (up-right, up-left, down-right, down-left of its mark): a group seen along one line of sight
+		// wrote its names on top of each other
+		TArray<FSlateRect> Taken;
+		TArray<int32> Named;
+		for (int32 i = 0; i < Data.Marks.Num(); ++i)
 		{
+			const FData::FMark& M = Data.Marks[i];
 			const FLinearColor Col = M.Side == 2 ? Foe : (M.Side == 1 ? Friend : (M.Side == 3 ? Neutral : Unknown));
 			const FVector2D At = M.Pos * Size;
+			const float H = (M.bCraft ? 6.f : M.Box) * U;
 			if (M.bCraft)
 			{
-				const float D = 6.f * U;
-				Lines({At + FVector2D(0, -D), At + FVector2D(D, 0), At + FVector2D(0, D), At + FVector2D(-D, 0), At + FVector2D(0, -D)}, Col, 1.5f);
+				Lines({At + FVector2D(0, -H), At + FVector2D(H, 0), At + FVector2D(0, H), At + FVector2D(-H, 0), At + FVector2D(0, -H)}, Col, 1.5f);
 			}
 			else
 			{
-				Bracket(At, M.Box * U, Col);
+				Bracket(At, H, Col);
 			}
+			Taken.Add(FSlateRect(At.X - H, At.Y - H, At.X + H, At.Y + H));
 			if (!M.Name.IsEmpty())
 			{
-				const float Off = (M.bCraft ? 9.f : M.Box + 6.f) * U;
-				Text(At + FVector2D(Off, -Off), M.Name, Col, true);
+				Named.Add(i);
+			}
+		}
+		Named.Sort([this](int32 A, int32 B)
+		{
+			const FData::FMark& Ma = Data.Marks[A];
+			const FData::FMark& Mb = Data.Marks[B];
+			const int32 Ra = (Ma.Side == 2 ? 0 : 2) + (Ma.bCraft ? 1 : 0), Rb = (Mb.Side == 2 ? 0 : 2) + (Mb.bCraft ? 1 : 0);
+			return Ra != Rb ? Ra < Rb : Ma.Box > Mb.Box;
+		});
+		const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+		for (const int32 i : Named)
+		{
+			const FData::FMark& M = Data.Marks[i];
+			const FLinearColor Col = M.Side == 2 ? Foe : (M.Side == 1 ? Friend : (M.Side == 3 ? Neutral : Unknown));
+			const FVector2D At = M.Pos * Size;
+			const float Off = (M.bCraft ? 9.f : M.Box + 6.f) * U;
+			const FVector2D NameSz = Measure->Measure(M.Name, Small);
+			const FVector2D SubSz = M.Sub.IsEmpty() ? FVector2D::ZeroVector : Measure->Measure(M.Sub, Small);
+			const FVector2D Block(FMath::Max(NameSz.X, SubSz.X), M.Sub.IsEmpty() ? NameSz.Y : 15.f * U + SubSz.Y);
+			const FVector2D Tries[4] = {At + FVector2D(Off, -Off), At + FVector2D(-Off - Block.X, -Off), At + FVector2D(Off, Off - Block.Y * 0.3f),
+			                            At + FVector2D(-Off - Block.X, Off - Block.Y * 0.3f)};
+			for (const FVector2D& T : Tries)
+			{
+				const FSlateRect R(T.X - 2.f, T.Y - 2.f, T.X + Block.X + 2.f, T.Y + Block.Y + 2.f);
+				bool bClear = R.Left > 2.f && R.Top > 2.f && R.Right < Size.X - 2.f && R.Bottom < Size.Y - 2.f;
+				for (int32 k = 0; k < Taken.Num() && bClear; ++k)
+				{
+					bClear = !FSlateRect::DoRectanglesIntersect(R, Taken[k]);
+				}
+				if (!bClear)
+				{
+					continue;
+				}
+				Taken.Add(R);
+				Text(T, M.Name, Col, true);
 				if (!M.Sub.IsEmpty())
 				{
-					Text(At + FVector2D(Off, -Off + 15.f * U), M.Sub, FLinearColor(Col.R, Col.G, Col.B, Col.A * 0.75f), true);
+					Text(T + FVector2D(0.f, 15.f * U), M.Sub, FLinearColor(Col.R, Col.G, Col.B, Col.A * 0.75f), true);
 				}
+				break;
 			}
 		}
 		for (const FData::FEdge& E : Data.Edges)
 		{
+			// threats in the same quarter would write on top of each other: the arrow stays on the ring, its words stack in a
+			// column beside it until clear
 			const FVector2D Dir(FMath::Cos(E.Angle), FMath::Sin(E.Angle));
-			const FVector2D P = C + Dir * 330.f * U;
 			const FVector2D N(-Dir.Y, Dir.X);
 			const FLinearColor Col = E.bFoe ? Foe : Friend;
+			const FVector2D TextSz = Measure->Measure(E.Text, Small);
+			const FVector2D P = C + Dir * 330.f * U;
 			Lines({P - Dir * 12.f * U + N * 9.f * U, P + Dir * 6.f * U, P - Dir * 12.f * U - N * 9.f * U}, Col, 2.f);
-			Text(P + Dir * 14.f * U + FVector2D(-20.f, -8.f) * U, E.Text, Col, true);
+			for (int32 Step = 0; Step < 6; ++Step)
+			{
+				const FVector2D At = P + Dir * 14.f * U + FVector2D(-20.f, -8.f + (TextSz.Y / FMath::Max(U, 0.01f) + 3.f) * (Step % 2 ? (Step + 1) / 2 : -(Step / 2))) * U;
+				const FSlateRect R(At.X - 2.f, At.Y - 2.f, At.X + TextSz.X + 2.f, At.Y + TextSz.Y + 2.f);
+				bool bClear = true;
+				for (int32 k = 0; k < Taken.Num() && bClear; ++k)
+				{
+					bClear = !FSlateRect::DoRectanglesIntersect(R, Taken[k]);
+				}
+				if (!bClear)
+				{
+					continue;                // (six places taken: the arrow alone says where)
+				}
+				Taken.Add(R);
+				Text(At, E.Text, Col, true);
+				break;
+			}
 		}
 		// the lock and the lead
 		if (Data.bLock)
