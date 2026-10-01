@@ -1093,3 +1093,33 @@ una richiesta alla Vigilant a 235 s, una domanda a 300 s, un ordine diretto a 38
    bench.voice_units bench.war_minds_unit bench.war_server bench.war_director_unit` (181 prove, nessuna rete; due di `npc_server` falliscono anche su
    main). Dal vivo (pochi decimi di centesimo l'una): `python -m bench.war_crew_live`, `python -m bench.war_director_live`,
    `python -m bench.war_scenes_live`.
+
+## 9. La guerra della campagna a scala di flotte (CAMPAGNA, il lead, 2/10)
+
+Il motore regge una battaglia di flotta (SCALA) e le menti pensano per gruppi (MENTE-GUERRA), ma la campagna restava piccola: il regista
+dimensionava le incursioni a 1–4 navi e i rinforzi a 1–2 cacciatorpediniere, con tagli nel codice a 8 navi. Ora:
+
+- **Forze in gruppi di battaglia** (`groups` in un beat `raid`, `reinforcements` o `decisive`): ogni gruppo ha nome, formazione (`wedge`,
+  `line`, `column`, `screen`), navi con il capo per primo (al più 10), stormi delle sue portaerei (`wings`: `carrier` = indice della nave,
+  `kind` fighter/bomber/drone, `n`, `mission`), il suo posto (`offset_km`: verso l'Aquila e alla sua destra, dal punto d'arrivo del beat) e il
+  suo obiettivo (`goes_for`: `aquila`, `escorts`, `gate`, o un contatto). Al più 40 navi per beat (`MaxBeatShips`). Il Mandato entra al buio con la
+  nebbia di guerra (scoperto dai sensori), la 7th Fleet è sul piano. Gli id dei contatti seguono l'ordine dei gruppi (il capo di ogni gruppo per
+  primo): la mente dà a ogni capo del Mandato il suo `commander` (una mente e una voce) e a ogni nave alleata il suo `captain`
+  (`Director._register_groups`). Un beat può arrivare in un punto fisso (`at_m`, metri nel sistema: la bocca del Janus Gate).
+- **Il regista a scala di flotte** (`director.py`): incursioni da un gruppo (2–6 navi) a vere forze (10–30), la 7th Fleet che risponde con gruppi,
+  la battaglia decisiva di 20–40 navi contro la flotta radunata; la guerra cresce per la sua logica (sonde e incursioni prima delle forze, forze
+  prima dell'assalto); mai truccare. Una campagna nuova comincia con i fili `OPENING_THREADS` (la flotta d'interdizione del Mandato si raduna
+  oltre il Gate; la 7th Fleet tiene New Ravenna). Dal vivo (`bench.war_director_live`, 0,007 $): una prima sonda da 4 navi, un rifornimento dopo una
+  vittoria, `none` in una battaglia che va da sola.
+- **L'apertura cresce in una battaglia di flotta** (`TickScenario`, terza fase): 330 s (`VanguardAfterS`) dopo il gruppo d'attacco di Solm il
+  Janus Gate si attiva; 50 s dopo l'**avanguardia della flotta d'interdizione** esce dalla bocca del Gate in tre gruppi (la portaerei Nyx con 8
+  caccia e 4 bombardieri e una Styx di scorta, T-31–T-32; la linea di Styx di Ferryman Ilse Dorn, T-33–T-36; il cuneo di Lethe di Ferryman Cael
+  Morrow, T-37–T-38; comanda Warden Sabine Thale, sotto Solm nella catena); la Flotta annuncia il **gruppo di battaglia Constance** (la Praetorian
+  ASN Constance di Captain Ines Aldana, T-03, e tre Vigilant con il loro stormo, T-04–T-06), che arriva da New Ravenna 170 s dopo. Non dopo una
+  resa o sotto una tregua. Provato con la mente: 11 ostili e 6 amici, caccia, siluri, incendi a bordo (fino a 16), ~0,3 $/ora, 60 fps con gli
+  aiutanti fermi.
+- **Il timone tiene la distanza** (`keep_on_bow` con `standoff_km`) e ha la **retro-spinta** (fino al 30 % della velocità piena,
+  `UAstraShipSubsystem::ReverseThrottlePct`): frena da 480 m/s in tempo e indietreggia se il bersaglio entra.
+
+Prove nel gioco senza mente: `astra.cmd director_beat {'beat':{'type':'raid','delay_s':5,'range_km':45,'bearing_deg':60,'groups':[...]}}`;
+l'apertura intera in pochi minuti: `astra.battle.time 170`, poi `astra.battle.time 510` (la terza fase parte subito).
