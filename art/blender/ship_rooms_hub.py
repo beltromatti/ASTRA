@@ -212,20 +212,21 @@ def _slab(b: SParts, x0: float, y0: float, x1: float, y1: float) -> None:
     b.body.box((x0, y0, -0.012), (x1, y1, 0.0), DECK)
 
 
-def _flight(b: SParts, xr: tuple[float, float], y_start: float, dirn: int, z_start: float) -> None:
-    """Ten steps: treads with a nosing, risers, two stringers under the treads; y_start is the foot of the flight, dirn +1 goes towards +y."""
+def _flight(b: SParts, xr: tuple[float, float], y_start: float, dirn: int, z_start: float, riser: float = RISER, tread: float = TREAD, nstep: int = NSTEP) -> None:
+    """A flight of `nstep` steps (ten for the usual 4 m rise): treads with a nosing, risers, two stringers under the treads; y_start is the foot of the flight, dirn +1 goes
+    towards +y."""
     x0, x1 = xr
-    for k in range(1, NSTEP + 1):
-        za, zb = z_start + RISER * (k - 1), z_start + RISER * k
-        ya = y_start + dirn * (k - 1) * TREAD
-        yb = y_start + dirn * k * TREAD
+    for k in range(1, nstep + 1):
+        za, zb = z_start + riser * (k - 1), z_start + riser * k
+        ya = y_start + dirn * (k - 1) * tread
+        yb = y_start + dirn * k * tread
         lo, hi = min(ya, yb), max(ya, yb)
         b.body.box((x0, lo - (0.02 if dirn > 0 else 0.0), zb - 0.045), (x1, hi + (0.02 if dirn < 0 else 0.0), zb), STEEL)
         yr = ya
         b.fine.box((x0 + 0.03, yr - 0.011, za), (x1 - 0.03, yr + 0.011, zb - 0.04), STRUCT)
         b.fine.box((x0 + 0.05, min(ya, yb) + 0.02, zb - 0.052), (x1 - 0.05, max(ya, yb) - 0.02, zb - 0.045), RUBBER)                 # the anti-slip strip
-    rise = RISER * NSTEP
-    ye = y_start + dirn * NSTEP * TREAD
+    rise = riser * nstep
+    ye = y_start + dirn * nstep * tread
     prof = [(y_start, z_start - 0.35), (ye, z_start + rise - 0.35), (ye, z_start + rise - 0.05), (y_start, z_start - 0.05)]
     for xs in ((x0 - 0.04, x0 + 0.02), (x1 - 0.02, x1 + 0.04)):
         b.body.extrude_x(prof, xs[0], xs[1], STRUCT)
@@ -233,17 +234,20 @@ def _flight(b: SParts, xr: tuple[float, float], y_start: float, dirn: int, z_sta
     b.emit.lamp_box((x1 - 0.03 if dirn > 0 else x0 + 0.0, min(y_start, ye), z_start), (x1 if dirn > 0 else x0 + 0.03, min(y_start, ye) + 0.001, z_start + 0.001), "cool_dim", LAMP_DIM)
 
 
-def stair_tower(name: str = "SM_SHIP_StairTower", top: bool = False, bottom: bool = False):
+def stair_tower(name: str = "SM_SHIP_StairTower", top: bool = False, bottom: bool = False, deep: bool = False, cap: bool = False):
     """One deck of a stair tower: 8 x 8 m in plan, the shaft 4.0 m tall (this deck's floor to the floor above). The entry hall (the door at
     x 2 of the near wall) is on the deck's floor; two switchback flights rise from it through a well to the deck above (flight A along +y at
     x .45..2.05, the half landing at 2.0 m, flight B back along -y at x 2.45..4.05 arriving on the floor above at y 3.8); a ladder trunk stands
     in the other half (a hatch in the floor against the far wall, the ladder climbs through the hatch of the deck above). `top` closes the
-    shaft with a roof, `bottom` closes the well with a floor."""
+    shaft with a roof, `bottom` closes the well with a floor. `deep`: the 5.3 m rise of Deck 3 to Deck 2 (twelve steps of 22 cm and a 24 cm tread a flight, the shaft 5.3 m);
+    `cap`: the top of the column (Deck 2): the hall, the well the flights of the deck below arrive through and the roof, no flights of its own."""
     spec, L, D, H = _dims("stair_tower")
     b = SParts(bevel=0.005, fine_bevel=0.003)
     st = Style(floor=DECK, floor_mode="covering", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.05, ceil=COMPOSITE, accent="cool_dim", ribs=False,
                skirt=STRUCT, seams=False)
-    hz = SHAFT_H
+    riser, tread, nstep = (5.3 / 24.0, 0.24, 12) if deep else (RISER, TREAD, NSTEP)
+    hz = 5.3 if deep else 3.9 if cap else SHAFT_H
+    y_land = Y_HALL + nstep * tread
     doors = spec["doors"]
     for wname in ("left", "right", "far", "near"):
         wall_finish(b, wname, L, D, hz, st, doors, structure=(wname != "near"))
@@ -261,28 +265,29 @@ def stair_tower(name: str = "SM_SHIP_StairTower", top: bool = False, bottom: boo
         b.body.box((hx0 - 0.05, hy0, 0.0), (hx0, hy1, 0.10), TRIM)
         b.body.box((hx1, hy0, 0.0), (hx1 + 0.05, hy1, 0.10), TRIM)
         b.emit.lamp_box((hx0 - 0.05, hy0 - 0.052, 0.04), (hx1 + 0.05, hy0 - 0.049, 0.06), "amber", LAMP_DIM)
-    # the flights and the half landing
-    _flight(b, FLIGHT_X, Y_HALL, +1, 0.0)
-    _flight(b, FLIGHT_X2, Y_LAND, -1, RISER * NSTEP)
-    b.body.box((WS, Y_LAND, RISER * NSTEP - 0.35), (4.05, D - WS, RISER * NSTEP), STRUCT)
-    b.body.box((WS, Y_LAND, RISER * NSTEP - 0.012), (4.05, D - WS, RISER * NSTEP), DECK)
-    b.fine.box((WS, Y_LAND, RISER * NSTEP - 0.35), (4.05, Y_LAND + 0.03, RISER * NSTEP), TRIM)
-    # rails: the wall side of flight A, the well sides, the edge of the hall's slab and of the landing, the outer side of flight B
-    z_top = RISER * NSTEP
-    handrail(b, (FLIGHT_X[0] - 0.12, Y_HALL, 0.0), (FLIGHT_X[0] - 0.12, Y_LAND, z_top), 0.95, 1.4)
-    handrail(b, (FLIGHT_X[1] + 0.1, Y_HALL, 0.0), (FLIGHT_X[1] + 0.1, Y_LAND, z_top), 0.95, 1.4)
-    handrail(b, (FLIGHT_X2[0] - 0.1, Y_LAND, z_top), (FLIGHT_X2[0] - 0.1, Y_HALL, 2 * z_top), 0.95, 1.4)
-    handrail(b, (FLIGHT_X2[1] + 0.1, Y_LAND, z_top), (FLIGHT_X2[1] + 0.1, Y_HALL, 2 * z_top), 0.95, 1.4)
+    # the flights and the half landing (the cap of a column has none: the flights of the deck below arrive through its well)
+    z_top = riser * nstep
+    if not cap:
+        _flight(b, FLIGHT_X, Y_HALL, +1, 0.0, riser, tread, nstep)
+        _flight(b, FLIGHT_X2, y_land, -1, z_top, riser, tread, nstep)
+        b.body.box((WS, y_land, z_top - 0.35), (4.05, D - WS, z_top), STRUCT)
+        b.body.box((WS, y_land, z_top - 0.012), (4.05, D - WS, z_top), DECK)
+        b.fine.box((WS, y_land, z_top - 0.35), (4.05, y_land + 0.03, z_top), TRIM)
+        # rails: the wall side of flight A, the well sides, the edge of the hall's slab and of the landing, the outer side of flight B
+        handrail(b, (FLIGHT_X[0] - 0.12, Y_HALL, 0.0), (FLIGHT_X[0] - 0.12, y_land, z_top), 0.95, 1.4)
+        handrail(b, (FLIGHT_X[1] + 0.1, Y_HALL, 0.0), (FLIGHT_X[1] + 0.1, y_land, z_top), 0.95, 1.4)
+        handrail(b, (FLIGHT_X2[0] - 0.1, y_land, z_top), (FLIGHT_X2[0] - 0.1, Y_HALL, 2 * z_top), 0.95, 1.4)
+        handrail(b, (FLIGHT_X2[1] + 0.1, y_land, z_top), (FLIGHT_X2[1] + 0.1, Y_HALL, 2 * z_top), 0.95, 1.4)
+        handrail(b, (4.05, y_land, z_top), (4.05, D - WS, z_top), 1.05, 1.0, True)
     handrail(b, (4.05, Y_HALL, 0.0), (4.05, D - WS, 0.0), 1.05, 1.0, True)
-    handrail(b, (4.05, Y_LAND, z_top), (4.05, D - WS, z_top), 1.05, 1.0, True)
     handrail(b, (FLIGHT_X[1], Y_HALL, 0.0), (FLIGHT_X2[0], Y_HALL, 0.0), 1.05, 0.4)
     # the ladder against the far wall: two rails, rungs, standoff brackets; it climbs through the hatch above
     yl = D - WS - WF - 0.14
     for xr in (hx0 + 0.20, hx1 - 0.20):
-        b.body.box((xr - 0.02, yl - 0.02, 0.0), (xr + 0.02, yl + 0.02, SHAFT_H + 1.1), TRIM)
-    for k in range(int((SHAFT_H + 1.0) / 0.3)):
+        b.body.box((xr - 0.02, yl - 0.02, 0.0), (xr + 0.02, yl + 0.02, hz + 1.1), TRIM)
+    for k in range(int((hz + 1.0) / 0.3)):
         b.fine.cyl((hx0 + 0.20, yl, 0.25 + 0.3 * k), (hx1 - 0.20, yl, 0.25 + 0.3 * k), 0.011, TRIM, seg=6)
-    for zb in (0.4, 1.4, 2.4, 3.4, 4.4):
+    for zb in (0.4, 1.4, 2.4, 3.4, 4.4, 5.4)[:6 if deep else 5]:
         for xr in (hx0 + 0.20, hx1 - 0.20):
             b.fine.box((xr - 0.015, yl + 0.02, zb), (xr + 0.015, D - WS - WF, zb + 0.05), STRUCT)
     on_wall(b, "far", L, D, W.pictogram_plate, b.body, 5.5, 1.6, 0.36, "pict_ladder")
@@ -295,12 +300,13 @@ def stair_tower(name: str = "SM_SHIP_StairTower", top: bool = False, bottom: boo
     # lights: two panels on the underside of the floor above, light lines at the flights and the landing
     F.ceiling_light_panel(b, 1.0, 2.6, 1.2, 1.8, 3.68, "white_cool", LAMP_HOT)
     F.ceiling_light_panel(b, 5.4, 7.0, 1.2, 1.8, 3.68, "white_cool", LAMP_HOT)
-    lamp_strip(b.emit, (WS + WF + 0.02, Y_HALL, 1.0), (WS + WF + 0.02, Y_LAND, 3.0), 0.05, 0.006, "cool_dim", LAMP_DIM)
+    if not cap:
+        lamp_strip(b.emit, (WS + WF + 0.02, Y_HALL, 1.0), (WS + WF + 0.02, y_land, 3.0), 0.05, 0.006, "cool_dim", LAMP_DIM)
     lamp_strip(b.emit, (0.6, D - WS - WF - 0.02, 2.8), (3.9, D - WS - WF - 0.02, 2.8), 0.05, 0.006, "white_cool", LAMP)
     lamp_strip(b.emit, (0.6, D - WS - WF - 0.02, 0.9), (3.9, D - WS - WF - 0.02, 0.9), 0.05, 0.006, "cool_dim", LAMP_DIM)
-    if top:
-        b.body.box((0.0, 0.0, SHAFT_H - 0.3), (L, D, SHAFT_H), STRUCT)
-        F.ceiling_light_panel(b, 1.2, 2.8, 5.2, 5.8, SHAFT_H - 0.3, "white_cool", LAMP_HOT)
+    if top or cap:
+        b.body.box((0.0, 0.0, hz - 0.3), (L, D, hz), STRUCT)
+        F.ceiling_light_panel(b, 1.2, 2.8, 5.2, 5.8, hz - 0.3, "white_cool", LAMP_HOT)
     return b.build(name)
 
 
@@ -310,6 +316,14 @@ def stair_tower_top(name: str = "SM_SHIP_StairTowerTop"):
 
 def stair_tower_bottom(name: str = "SM_SHIP_StairTowerBottom"):
     return stair_tower(name, bottom=True)
+
+
+def stair_tower_deep(name: str = "SM_SHIP_StairTower53"):
+    return stair_tower(name, deep=True)
+
+
+def stair_tower_cap(name: str = "SM_SHIP_StairTowerCap"):
+    return stair_tower(name, cap=True)
 
 
 # --------------------------------------------------------------------------------------------------------------- ladder trunk

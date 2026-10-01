@@ -24,8 +24,8 @@ from mathutils import Matrix
 import ship_lib as SL
 import ship_walls as SW
 from bridge3_lib import Rz
-from ship_catalog import (BLAST_H, BLAST_W, CLEAR_H, CORRIDOR_SPECS, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONES, WALL_T)
-from ship_lib import (COMPOSITE, DECK, IVORY, LAMP, LAMP_DIM, LAMP_HOT, RUBBER, STRUCT, TRIM, SParts)
+from ship_catalog import (BLAST_H, BLAST_W, CLEAR_H, CORRIDOR_SPECS, CRAWL_H, CRAWL_HW, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONES, WALL_T)
+from ship_lib import (COMPOSITE, CRATE_BLUE, CRATE_ORANGE, DECK, IVORY, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, SParts)
 
 H = CLEAR_H
 FLOOR_T = 0.30
@@ -283,6 +283,110 @@ def blast_frame(b: SParts, tn: dict) -> None:
     fb.box((x0 - 0.045, -0.9, BLAST_H + 0.26), (x0 - 0.02, 0.9, H - 0.14), SL.DGLASS)         # the sign field over the opening
 
 
+# -------------------------------------------------------------------------------------------------------------- the keel's crawlways
+def _crawl_matrix(side: int) -> Matrix:
+    m = Matrix.Identity(4)
+    m[1][1] = float(side)
+    m[1][3] = side * CRAWL_HW
+    return m
+
+
+def build_crawl_module(name: str, suffix: str) -> "bpy.types.Object":
+    """A module of the keel's crawlways (tone K, Deck 12): the same names, 4 x 4 m cell and openings as the corridor modules, but a 1.7 m wide and 2.5 m high tunnel in the middle
+    of the slot: 1.15 m thick walls with pipe bundles in three rows, a cable tray and a hull frame every 2 m; a roof 1.2 m thick with a pipe run and a dim lamp strip; a grating floor
+    with low amber guide lights. A room's hatch (1.6 x 2.4) or a side crawlway (1.7 wide) is a short tunnel through the wall."""
+    left, right, aft, fwd = CORRIDOR_SPECS[suffix.split("#")[0]]
+    tn = TONES["K"]
+    seed = sum(ord(c) for c in name) * 7 + 13
+    rng = random.Random(seed)
+    b = SParts(bevel=0.006, fine_bevel=0.0)
+    fb, fine, em, soft = b.body, b.fine, b.emit, b.soft
+    kw, kh = CRAWL_HW, CRAWL_H
+    tw = SLOT_HW - kw
+    # floor: structure, plates over the clear width, guide lights, a chevron
+    fb.box((-OV, -SLOT_HW, -FLOOR_T), (MOD + OV, SLOT_HW, -0.012), STRUCT)
+    for j in range(2):
+        for (a, c) in ((0.0, 2.0), (2.0, 4.0)) if j == 0 else ((0.0, 1.0), (1.0, 3.0), (3.0, 4.0)):
+            faces = fb.box((a - (OV if a == 0.0 else 0.0) + 0.008, -kw + j * kw + 0.008, -0.012), (c + (OV if c == MOD else 0.0) - 0.008, -kw + (j + 1) * kw - 0.008, 0.0), DECK)
+            plate_uv(fb, faces, rng, 1.0)
+    for y in (-0.62, 0.62):
+        em.lamp_box((0.15, y - 0.012, 0.0), (MOD - 0.15, y + 0.012, 0.004), tn["accent_dim"], LAMP_DIM)
+    SL.lamp_strip(em, (1.8, -0.2, 0.002), (2.2, 0.0, 0.002), 0.03, 0.004, tn["accent"], LAMP_DIM)
+    SL.lamp_strip(em, (1.8, 0.2, 0.002), (2.2, 0.0, 0.002), 0.03, 0.004, tn["accent"], LAMP_DIM)
+    # roof: a thick slab, pipe runs, a cable tray and the dim strip along the middle
+    fb.box((-OV, -SLOT_HW, kh), (MOD + OV, SLOT_HW, kh + 1.2), STRUCT)
+    for k, (y, r, mat) in enumerate(((-0.52, 0.07, CRATE_BLUE), (-0.34, 0.05, TRIM), (0.5, 0.09, STEEL), (0.28, 0.045, CRATE_ORANGE))):
+        soft.cyl((-OV, y, kh - r - 0.02), (MOD + OV, y, kh - r - 0.02), r, mat, seg=8)
+    for s in (0.5, 2.5):
+        soft.box((s - 0.03, -0.62, kh - 0.2), (s + 0.03, 0.62, kh), STRUCT)
+    em.lamp_box((0.1, -0.08, kh - 0.03), (MOD - 0.1, 0.08, kh - 0.018), tn["strip"], LAMP_DIM)
+    # the walls
+    ribs = (0.0, 2.0)
+    for side, kind in ((-1, left), (1, right)):
+        with b.at(_crawl_matrix(side)):
+            op = {"door": (2.0 - DOOR_W / 2, 2.0 + DOOR_W / 2, DOOR_H), "gate": (0.8, 3.2, kh), "branch": (2.0 - kw, 2.0 + kw, kh)}.get(kind)
+            if op is None:
+                fb.box((-OV, 0.0, 0.0), (MOD + OV, tw, kh), STRUCT)
+            else:
+                a, c, oh = op
+                fb.box((-OV, 0.0, 0.0), (a, tw, kh), STRUCT)
+                fb.box((c, 0.0, 0.0), (MOD + OV, tw, kh), STRUCT)
+                if oh < kh:
+                    fb.box((a, 0.0, oh), (c, tw, kh), STRUCT)
+            spans = [(0.0, MOD)] if op is None else [(0.0, op[0] - 0.02), (op[1] + 0.02, MOD)]
+            for (s0, s1) in spans:
+                if s1 - s0 < 0.2:
+                    continue
+                fb.box((s0 + 0.02, -0.04, 0.1), (s1 - 0.02, 0.0, 0.95), COMPOSITE)                                      # the lower panel
+                for z, mats in ((0.42, (CRATE_BLUE, TRIM)), (1.0, (STEEL, CRATE_ORANGE, TRIM)), (1.55, (PAINT_RED, CRATE_BLUE))):
+                    for j, mat in enumerate(mats):
+                        r = 0.05 + 0.012 * ((j + int(z * 10)) % 3)
+                        soft.cyl((s0 + 0.02, -r - 0.02, z + j * 0.11), (s1 - 0.02, -r - 0.02, z + j * 0.11), r, mat, seg=8)
+                soft.box((s0 + 0.02, -0.1, 2.0), (s1 - 0.02, 0.0, 2.04), STRUCT)                                          # the cable tray
+                for k in range(3):
+                    soft.cyl((s0 + 0.02, -0.03 - 0.025 * k, 2.06), (s1 - 0.02, -0.03 - 0.025 * k, 2.06), 0.012, RUBBER, seg=5)
+            for s in ribs:                                                                                                  # a hull frame every 2 m
+                if op is not None and op[0] - 0.4 < s < op[1] + 0.4:
+                    continue
+                fb.box((s - 0.07, -0.16, 0.0), (s + 0.07, 0.0, kh), TRIM)
+                fb.box((s - 0.07, -0.16, kh - 0.12), (s + 0.07, 0.0, kh), STRUCT)
+                em.lamp_box((s - 0.006, -0.162, 0.3), (s + 0.006, -0.158, kh - 0.4), tn["accent_dim"], LAMP_DIM)
+            if op is not None and kind in ("door", "gate"):                                                                 # the hatch tunnel: brushed lining, a threshold, a status lamp
+                a, c, oh = op
+                fine.box((a - 0.04, 0.0, 0.0), (a, tw, oh + 0.04), TRIM)
+                fine.box((c, 0.0, 0.0), (c + 0.04, tw, oh + 0.04), TRIM)
+                fine.box((a - 0.04, 0.0, oh), (c + 0.04, tw, oh + 0.04), TRIM)
+                fine.box((a, 0.0, 0.0), (c, tw, 0.012), TRIM)
+                em.lamp_box((c + 0.06, -0.12, 1.55), (c + 0.1, -0.08, 1.62), "green", LAMP_DIM)
+                em.lamp_box((a - 0.02, 0.01, 2.3), (c + 0.02, 0.012 + 0.01, 2.34), "amber", LAMP_DIM)
+            elif op is not None and kind == "branch":                                                                       # the mouth of a side crawlway
+                a, c, oh = op
+                fine.box((a - 0.05, 0.0, 0.0), (a, tw, kh), TRIM)
+                fine.box((c, 0.0, 0.0), (c + 0.05, tw, kh), TRIM)
+                em.lamp_box((a - 0.006, -0.01, 0.3), (a, 0.0, kh - 0.4), tn["accent"], LAMP_DIM)
+                em.lamp_box((c, -0.01, 0.3), (c + 0.006, 0.0, kh - 0.4), tn["accent"], LAMP_DIM)
+    # the ends
+    if fwd == "closed":
+        fb.box((MOD - 0.42, -kw - 0.02, 0.0), (MOD + OV, kw + 0.02, kh), STRUCT)
+        fine.box((MOD - 0.47, -0.62, 0.02), (MOD - 0.42, 0.62, 0.3), TRIM)
+        fine.box((MOD - 0.47, -0.62, 0.3), (MOD - 0.42, 0.62, kh - 0.2), COMPOSITE)
+        em.lamp_box((MOD - 0.48, 0.4, 1.8), (MOD - 0.47, 0.44, 1.9), "amber", LAMP)
+        em.label((MOD - 0.49, 0.0, 2.1), 0.8, 0.2, (-1, 0, 0), "tag_08")
+    elif fwd == "blast":
+        x0, x1 = 3.40, MOD + OV
+        hx, oh = 0.6, 1.95
+        fb.box((x0, -kw - 0.02, 0.0), (x1, -hx, kh), STRUCT)
+        fb.box((x0, hx, 0.0), (x1, kw + 0.02, kh), STRUCT)
+        fb.box((x0, -hx, oh), (x1, hx, kh), STRUCT)
+        for sgn in (-1, 1):
+            fine.box((x0 - 0.1, sgn * hx - (0.14 if sgn < 0 else 0.0), 0.0), (x1 - 0.1, sgn * hx + (0.0 if sgn < 0 else 0.14), oh + 0.12), TRIM)
+            fb.label((x0 - 0.103, sgn * (hx + 0.07), oh / 2), oh - 0.1, 0.1, (-1, 0, 0), "hazard_h", up=(0, 1, 0))
+            em.lamp_box((x0 - 0.12, sgn * (hx + 0.05) - 0.03, oh + 0.08), (x0 - 0.1, sgn * (hx + 0.05) + 0.03, oh + 0.14), "red", LAMP)
+        fine.box((x0 - 0.1, -hx - 0.14, oh), (x1 - 0.1, hx + 0.14, oh + 0.12), TRIM)
+        fb.label((x0 - 0.06, 0.0, oh + 0.2), 2 * hx + 0.3, 0.1, (-1, 0, 0), "hazard")
+    return b.build(name)
+
+
 # ----------------------------------------------------------------------------------------------------------------------- a stub
 def build_stub(name: str, tone: str, length: float) -> "bpy.types.Object":
     """A plain stretch of corridor shorter than a module (0.3 .. 3.9 m, origin on the floor on the centre line at its aft end, running to x = length): the vestibule that fills
@@ -327,6 +431,8 @@ def build_stub(name: str, tone: str, length: float) -> "bpy.types.Object":
 
 # ------------------------------------------------------------------------------------------------------- the whole module
 def build_module(name: str, tone: str, suffix: str) -> "bpy.types.Object":
+    if tone == "K":
+        return build_crawl_module(name, suffix)
     left, right, aft, fwd = CORRIDOR_SPECS[suffix.split("#")[0]]
     tn = TONES[tone]
     plan_id = "A"
