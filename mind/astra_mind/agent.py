@@ -18,7 +18,7 @@ from typing import Any, Awaitable, Callable, Protocol
 from . import context as context_model
 from . import models
 from . import stations as station_model
-from .crew import CREW, system_prompt
+from .crew import CREW, bridge_now, system_prompt
 from .openrouter import Completion, OpenRouter, ToolCall
 from .tools import DEPT_TOOLS, LOOKUPS, SHIP_TOOL_NAMES, SPEAK, initiative_names, owner_of, tools_for
 
@@ -113,11 +113,17 @@ class BridgeAgent:
                                                           self.mood(), self.bonds(), self.standing_lines(), self.memories(),
                                                           self.style(), self.home(), hearing)}
 
+    def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None) -> str:
+        """The bridge this moment (crew.bridge_now), for the head of a turn's last message."""
+        hearing = context_model.describe(ctx, self.titles) if ctx else ""
+        return bridge_now(state, self.ship.recent_events(), hearing)
+
     def _messages(self, text: str, lang: str, state: dict[str, Any], ctx: context_model.Context | None = None,
                   note: str = "") -> list[dict[str, Any]]:
+        # the system prompt and the history are the same from call to call (the prompt cache covers them); what changes comes last
         msgs: list[dict[str, Any]] = [self._system(lang, state, ctx)]
         msgs += self.history
-        msgs.append({"role": "user", "content": f"Captain: {text}" + (f"\n[{note}]" if note else "")})
+        msgs.append({"role": "user", "content": self._now(state, ctx) + f"\n\nCaptain: {text}" + (f"\n[{note}]" if note else "")})
         return msgs
 
     def standing_lines(self) -> str:
@@ -225,7 +231,8 @@ class BridgeAgent:
         hist = self.history if history_turns is None else self._last_turns(history_turns)
         sysmsg = {"role": "system", "content": system} if system else self._system(lang, state)
         msgs: list[dict[str, Any]] = [sysmsg] + hist
-        msgs.append({"role": "user", "content": user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing else "")})
+        now = "" if system else self._now(state) + "\n\n"            # (a role with a prompt of its own carries its own view of the ship)
+        msgs.append({"role": "user", "content": now + user + "\n" + (ask or EVENT_ASK) + (STANDING_ASK if self.standing else "")})
         on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=False, allowed=allowed)
         tools = [t for t in ts.tools if t["function"]["name"] in (allowed | {"speak"})]
         self._active.add(turn)
@@ -260,7 +267,7 @@ class BridgeAgent:
         ask = (f"[Before speaking] {waited_s:.0f} seconds ago {who} was about to tell the Captain: «{text}».{cut} The ship has moved on "
                "since (the state above is now). If it still matters to the Captain, they say it now as it stands — updated, short, "
                "in character — with speak. If it no longer matters, they say nothing: do not call speak.")
-        msgs = [self._system(lang, state)] + self._last_turns(4) + [{"role": "user", "content": ask}]
+        msgs = [self._system(lang, state)] + self._last_turns(4) + [{"role": "user", "content": self._now(state) + "\n\n" + ask}]
         said: list[str] = []
 
         async def on_call(call: ToolCall) -> None:

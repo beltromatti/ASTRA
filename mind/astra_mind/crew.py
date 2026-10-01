@@ -164,7 +164,9 @@ def _speech_rules(lang: str) -> str:
   except proper names and the few acronyms sailors keep (EMCON, CAP, VLS).
 - Actions are real. An officer says something was set, or is being done, ONLY if the tool call that does it is in this same
   turn ("Ferri closes in" = a helm `station` call, "Voss retargets" = a tactical one); talk alone changes nothing. What an
-  officer only proposes is worded as a proposal ("propongo di...", "vuole che...?").
+  officer only proposes is worded as a proposal ("propongo di...", "vuole che...?"). A proposal the Captain has heard and not
+  taken up is the Captain's choice: it is not made again unless something has changed that makes it new (then say what changed),
+  and the officer goes on working inside the orders given.
 - The Captain first. Answer the Captain's words before anything else; drop what you were about to report. Never make the
   Captain wait for a report, and never repeat a report the Captain has just heard.
 - The officer who owns the console answers (see duties). The XO answers general questions and advises: a general report on the
@@ -345,9 +347,9 @@ def _duties(stations_on: bool) -> str:
 def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str], campaign: list[str] | None = None,
                   war: str = "", mood: str = "", bonds: str = "", standing: str = "", memories: str = "", style: str = "",
                   home: str = "", hearing: str = "") -> str:
-    """The crew's system prompt. `hearing`: the room (context.describe), empty when it is the plain case."""
+    """The crew's system prompt: what stays the same from one turn to the next. The recent events, the consoles, the room (`hearing`)
+    and the telemetry go with each turn's last message (bridge_now); the two parameters stay for the callers."""
     stations_on = station_model.available_from_state(ship_state) is not None
-    events = "\n".join(f"- {e}" for e in recent_events[-8:]) or "- (none)"
     story = "\n".join(f"- {c}" for c in (campaign or [])[-10:]) or "- (the patrol has just begun)"
     cap = str(ship_state.get("captain", "on the bridge"))
     blocks = [_RULE_BASE]
@@ -361,10 +363,6 @@ def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str
         blocks.append(_RULE_VISITOR)
     if ship_state.get("abandon"):
         blocks.append(_RULE_ABANDON)
-    board = station_model.board(ship_state, {k: v.title for k, v in CREW.items()})
-    state_json = json.dumps({k: v for k, v in ship_state.items() if not k.startswith("_") and (k not in ("stations", "sim_time_s") or not board)},
-                            separators=(",", ":"), ensure_ascii=False)
-    room = f"\nThe room: {hearing}\n" if hearing else ""
     return f"""You are the bridge crew of the ASN Aquila. The player is the ship's Captain.
 You voice every officer on duty. The ship simulation is the truth: you change the ship only through the tools, and you know
 only what the ship state and the reports below tell you.
@@ -417,8 +415,20 @@ Where each officer stands with the Captain (it shows in small ways — warmth or
 an unasked question, loyalty under fire; never announce it)
 {bonds or "- a new ship and a new captain: everyone still taking the measure of them"}
 
-Recent events
-{events}
-{("Consoles now (who runs what, since when, how it is going)" + chr(10) + board + chr(10)) if board else ""}{room}
-Current ship state (live telemetry, JSON)
-{state_json}"""
+What changes from moment to moment (the last events, the consoles, the room, the live telemetry) comes with each turn, in the
+last message: [The bridge now]."""
+
+
+def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: str = "") -> str:
+    """The bridge as it is this moment, for the last message of a crew turn: the recent events, the consoles, the room, the live
+    telemetry. Kept out of the system prompt so that the system prompt and the conversation before this turn are the same from one call
+    to the next: the provider's prompt cache then covers them (with the telemetry inside the system prompt the cache stopped at it, and a
+    battle cost twice as much)."""
+    events = "\n".join(f"- {e}" for e in recent_events[-8:]) or "- (none)"
+    board = station_model.board(ship_state, {k: v.title for k, v in CREW.items()})
+    state_json = json.dumps({k: v for k, v in ship_state.items() if not k.startswith("_") and (k not in ("stations", "sim_time_s") or not board)},
+                            separators=(",", ":"), ensure_ascii=False)
+    room = f"The room: {hearing}\n" if hearing else ""
+    return (f"[The bridge now]\nRecent events\n{events}\n"
+            + (("Consoles now (who runs what, since when, how it is going)\n" + board + "\n") if board else "")
+            + room + f"Current ship state (live telemetry, JSON)\n{state_json}\n[end of the bridge now]")
