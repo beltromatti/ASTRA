@@ -1,143 +1,227 @@
-# NAVE — l'ASN Aquila come nave vera (fasi F4.1 e NAVE-2)
+# NAVE — l'ASN Aquila come nave vera (fasi F4.1, NAVE-2 e NAVE-3)
 
-Il "DNA" della nave (`data/ship/aquila_plan.json`), il kit di moduli e stanze dell'interno (Blender, nel linguaggio della plancia v3) e gli strumenti per metterli nel
-livello e farli girare su un MacBook Air. **Tutti i dodici ponti sono costruiti**: il Ponte 4 (Crew Services) a mano, il Ponte 1 con lo studio del Capitano (Ready Room), gli altri dieci dal
-loro programma (`ship_decks.py`): 7 275 pezzi nel piano (5 241 moduli di corridoio, 833 stanze, 831 targhe, 370 segnali di sezione), 1048 porte, 3 167 lampade, 3 815 posti (`stations`) per la gente di VITA. Sul lato del gioco
-la nave non è più un livello di attori: **istanze** al posto dei moduli, **lampade come dati** con un pool di luci vere, **un sotto-livello per ponte** in streaming (§7bis). Tutto ciò che è scritto nel gioco è in inglese;
-questa pagina è in italiano con i nomi ufficiali.
+Il "DNA" della nave (`data/ship/aquila_plan.json`), il kit di moduli e stanze dell'interno (Blender, nel linguaggio della plancia v3) e gli strumenti per metterli nel livello e farli girare su un MacBook Air. **Tutti i dodici ponti sono costruiti.**
+NAVE-3 ha **ripensato l'interno come lo pianificherebbe una nave vera**: un programma ragionato (§5: ogni spazio sta dove sta per una ragione), un labirinto credibile con corridoi di servizio, gallerie dello scafo e tubi di Jefferies (§6), **34 pozzi di turboascensore** con 291 approdi (§7: il contratto con ASCENSORI), la **navetta della Spine** in un tunnel sul Ponte 5
+con otto fermate (§8) e una segnaletica calcolata sul grafo (§9). Sul lato del gioco la nave non è un livello di attori: **istanze** al posto dei moduli, **lampade come dati** con un pool di luci vere, **un sotto-livello per ponte** in streaming (§11bis). Tutto ciò che è scritto nel gioco è in inglese; questa pagina è in italiano con i nomi ufficiali.
 
-Stato: piano dei 12 ponti completo e verificato (**0 problemi, 0 avvisi**; 2270 compartimenti, 10797 nodi e 10931 archi del grafo, un solo componente connesso); kit di **266 mesh, 6,09 M triangoli, la più pesante 138 k** (`ShuttleBay`);
-prove a raggi lungo tutti gli archi di corridoio e di porta dei 12 ponti: **0 bloccati** (18 522 raggi); 3 398 posti controllati contro l'arredo (i letti no): **0 sul mobilio**; C++ compilato nella worktree dopo l'unione con `main`;
-`tools/life.py check` OK. **Non provato in Unreal** (l'editor è del lead): vedi "Limiti" e §7bis per cosa guardare camminando.
+Stato (piano versione 2): **3 234 compartimenti** (1 065 stanze del programma), 2 028 porte, 13 728 nodi e 15 296 archi del grafo (un solo componente connesso), 4 358 lampade, 4 094 posti (`stations`), 746 posti letto; **0 problemi, 0 avvisi** in `ship_checks.py`;
+`tools/life.py check` OK; `tools/damage.py run --scenario all` **46/46**; kit con prove a raggi lungo tutti gli archi di corridoio e di porta dei 12 ponti: **0 bloccati**, e controllo dei posti (con il sedile sotto chi siede): **0 sul mobilio**.
+**Non provato in Unreal** (l'editor è del lead): vedi §14 e §11bis per cosa guardare camminando.
 
 ## 1. Comandi, nell'ordine
 
 ```
 uv run --python /opt/homebrew/bin/python3.13 --with pillow --with numpy python tools/art/ship_textures.py          # atlante delle etichette: art/_cache/ship/
-python3 art/blender/ship_plan_gen.py                                                                              # piano: data/ship/aquila_plan.json
+python3 art/blender/ship_plan_gen.py                                                                              # piano: data/ship/aquila_plan.json + la copia sottile Content/ASTRA/Data/aquila_plan.json
 python3 art/blender/ship_checks.py                                                                                # controlli del piano (0 problemi attesi)
-python3 tools/life.py check                                                                                       # VITA: i posti e le stanze del piano coprono la vita di bordo
-/Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python-exit-code 1 -P art/blender/ship_kit.py   # FBX + manifest in art/export/ship (qualche minuto)
+python3 tools/life.py check && python3 tools/life.py stage                                                        # VITA: posti, stanze, case; copia il file della vita accanto al piano
+python3 tools/damage.py run --scenario all                                                                        # DISTRUZIONE: 46/46 sul piano vero (serve l'editor compilato per questa copia)
+/Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python-exit-code 1 -P art/blender/ship_kit.py   # FBX + manifest in art/export/ship (una decina di minuti)
 python3 art/blender/ship_budget.py                                                                                # il budget per ponte (legge il manifest o --stats)
 tools/ue.py pyfile tools/ue_scripts/build_ship_interior.py                                                        # il lead: materiali, kit, un sotto-livello per ponte, L_Bridge
 UnrealEditor-Cmd ASTRA.uproject -run=AstraNave -nullrhi -unattended -nosound                                      # il banco senza grafica: lampade, streaming, ponti attorno al Capitano
 ```
 
-Anteprime (Eevee, senza editor): `Blender -b … -P art/blender/ship_kit.py -- --no-export --no-checks --preview docs/progressi/nave --views rooms,modules,d1,d4,d6 --room-views door --samples 28`
-(una stanza: `--only ReadyRoom`, con i nomi delle mesh senza `SM_SHIP_`; i punti di vista di ogni stanza sono in `ship_kit_preview.ROOM_VIEWS`). Solo i conteggi di triangoli, senza esportare:
-`… -- --no-export --stats art/_cache/ship_stats.json`; solo i posti di una stanza: `… -- --no-export --spots --only Barracks`. Piano in pianta: `uv run … --with pillow python tools/art/ship_planview.py 5 out.jpg [--x0 -260 --x1 -60 --scale 6 --graph]`.
-Il piano è la fonte unica: lo leggono `ship_kit.py` (quali targhe e segnali servono), `build_ship_interior.py` e il gioco (`UAstraShipPlan`, che lo cerca in `Content/ASTRA/Data/aquila_plan.json`, dove lo script lo copia, poi in `data/ship/`).
+Anteprime (Eevee, senza editor): `Blender -b … -P art/blender/ship_kit.py -- --no-export --no-checks --preview docs/progressi/nave --views rooms,modules,modules3,car,signs --samples 28`
+(una stanza: `--only ReadyRoom`, con i nomi delle mesh senza `SM_SHIP_`; `--room-views door,corner_a,plan`: la vista `plan` mostra dall'alto **i posti** come dischi colorati con la freccia dello sguardo — verde in piedi, giallo al lavoro, blu seduto, arancio a mensa, rosa a dormire —, il modo più veloce per vedere una sedia senza nessuno o uno sguardo contro il muro; i punti di vista di ogni stanza sono in `ship_kit_preview.ROOM_VIEWS`).
+Solo i conteggi di triangoli, senza esportare: `… -- --no-export --stats art/_cache/ship_stats.json`; solo i posti e le rotte: `… -- --no-export --plan data/ship/aquila_plan.json --spots --only Barracks` (senza `--only` anche le rotte di tutti i ponti). Piano in pianta: `uv run … --with pillow python tools/art/ship_planview.py 5 out.jpg [--x0 -260 --x1 -60 --scale 6 --graph]`.
+Il piano è la fonte unica: lo leggono `ship_kit.py` (quali targhe, cartelli e segnali servono), `build_ship_interior.py` e il gioco (`UAstraShipPlan`, che lo cerca in `Content/ASTRA/Data/aquila_plan.json`, poi in `data/ship/`), VITA, DISTRUZIONE e ASCENSORI.
 
 ## 2. Sistema di riferimento e pila dei ponti
 
-Come tutto il gioco: X a prua, Y a dritta, Z in su, metri (Unreal: cm, stessi assi); l'origine è il punto del pavimento della plancia sotto la poltrona del
-Capitano. Lo scafo `SM_SHIP_ASTRA_Aquila` sta in (-172, 0, -62) m: coordinate dello scafo = mondo + (172, 0, 62). Ponti a passo di 4,0 m (0,3 struttura +
-3,4 libero + 0,3 struttura); le stanze sono alte al più 3,7 m (il soffitto è la struttura del ponte sopra).
+Come tutto il gioco: X a prua, Y a dritta, Z in su, metri (Unreal: cm, stessi assi); l'origine è il punto del pavimento della plancia sotto la poltrona del Capitano. Lo scafo `SM_SHIP_ASTRA_Aquila` sta in (-172, 0, -62) m: coordinate dello scafo = mondo + (172, 0, 62). Ponti a passo di 4,0 m (0,3 struttura + 3,4 libero + 0,3 struttura); le stanze sono alte al più 3,7 m (il soffitto è la struttura del ponte sopra).
 
 | Ponte | Nome | z pavimento | Contenuto (BIBBIA v0.3 §6) | Stato nel piano |
 |---|---|---|---|---|
-| 1 | Command | 0 | Bridge, Captain's quarters, ready room, command corridors | plancia e quarters esistenti; **Ready Room costruita** (§5.4) |
-| 2 | CIC & Communications | -36,7 | CIC, briefing room, department offices, communications | **costruito** (37 stanze); torri con cappuccio |
-| 3 | Crew Country | -42,0 | officers' quarters, gym (e Crew Berthing, vedi §8) | **costruito** (30 stanze); torri da 5,3 m; lo scafo è già aperto sotto il blocco (§8, punto 3) |
-| 4 | Crew Services | -46,0 | Mess Hall, galley, lounge, observation deck | **costruito a mano** (75 stanze) |
-| 5 | Science & Transport | -50,0 | science labs, Transporter Room (sei pedane), sensor archive; la navetta interna della Spine | **costruito** (81 stanze: Transporter Room, Astrometrics, sette fermate della navetta) |
-| 6 | Medical | -54,0 | Medbay, surgery, quarantine, pharmacy | **costruito** (103 stanze): Medbay esistente, sala operatoria, quarantena e farmacia accanto |
-| 7 | Engineering & Power | -58,0 | Main Engineering, reactor, power control, radiators | **costruito** (81 stanze): Engineering esistente, power control, switchgear, capacitor halls |
-| 8 | Marines & Armory | -62,0 | Armory, Marine Barracks, firing range, assault-shuttle bay (due Kestrel) | **costruito** (87 stanze: caserme, poligono a 6 corsie, hangar con due Kestrel) |
-| 9 | Flight | -66,0 (Flight Deck: -72,8) | Flight Deck: launch tubes, bays, aircraft workshop, control booth | **costruito** (88 stanze); il Flight Deck esistente si raggiunge solo in ascensore (§8) |
-| 10 | Holds & Munitions | -70,0 | holds, munitions magazines, stores | **costruito** (80 stanze) |
-| 11 | Workshops & Damage Control | -74,0 | workshops, fabrication, repairs, damage-control teams | **costruito** (82 stanze) |
-| 12 | Keel | -78,0 | tanks, reaction mass, maintenance crawlways | **costruito** (88 stanze) con cunicoli stretti (tono K) |
+| 1 | Command | 0 | Bridge, Captain's quarters, ready room, command corridors | plancia e quarters esistenti; **Ready Room costruita** (§5.3) |
+| 2 | CIC & Communications | -36,7 | CIC, briefing, uffici dei reparti, comunicazioni, torrette | **costruito**: CIC, Auxiliary Control, suite degli ufficiali, VLS, barbette |
+| 3 | Crew Country | -42,0 | alloggi degli ufficiali, palestra, wardroom | **costruito**: wardroom, camere e cabine, uffici e aule |
+| 4 | Crew Services | -46,0 | Mess Hall, cambusa, lounge, osservazione | **costruito**: Mess Concourse, Berthing, bar, cappella, negozio, simulatori |
+| 5 | Science & Transport | -50,0 | laboratori, Transporter Room, archivio sensori; **la navetta interna della Spine** | **costruito**: laboratori, Transporter, nucleo A, impianti; **tunnel e otto fermate della navetta** |
+| 6 | Medical | -54,0 | Medbay, sala operatoria, quarantena, farmacia | **costruito**: il complesso medico con dentista, obitorio, counselling |
+| 7 | Engineering & Power | -58,0 | Main Engineering, reattore, controllo di potenza, radiatori | **costruito**: potenza, centrale ausiliaria, aria-acqua-rifiuti, DC centrale |
+| 8 | Marines & Armory | -62,0 | armeria, caserma, poligono, hangar delle navette d'assalto | **costruito**: caserme, cella, ufficio della sicurezza, nucleo B |
+| 9 | Flight | -66,0 (Flight Deck: -72,8) | Flight Deck: tubi di lancio, hangar, officina, cabina di controllo | **costruito**: operazioni, droni, alloggi dei piloti, stive |
+| 10 | Holds & Munitions | -70,0 | stive, depositi di munizioni, magazzini | **costruito**: il nucleo corazzato |
+| 11 | Workshops & Damage Control | -74,0 | officine, fabbricazione, riparazioni, squadre del DC | **costruito**: il cantiere |
+| 12 | Keel | -78,0 | serbatoi, massa di reazione, cunicoli di manutenzione | **costruito** con cunicoli stretti (tono K) |
 
-Le stanze **esistenti stanno dove sono** (mai spostate): il piano le registra alle posizioni dei loro file di dati (`compartments` con `status: existing`,
-`data`: il file). Volumi speciali: la sala di Main Engineering (14 m) occupa anche i piani dei ponti 4–6 in x -372..-330, |y| < 15 (spazio riservato); il
-Flight Deck (20 m) attraversa i ponti 6–11 in x 60..218, |y| < 29 (`spans_decks`).
-
-**Sezioni A–H** da prua a poppa, per ponte (`decks[].sections`); i limiti stanno su una griglia di 4 m e ogni sezione è una zona con portelli stagni ai confini.
-Punti fissi del canon: Mess B (Ponte 4), Berthing C, Medbay C (Ponte 6), Main Engineering F (Ponte 7), Flight Deck B (Ponte 9). Sul Ponte 4: A [104, -104],
-B [-104, -160], C [-160, -248], D [-248, -320], E [-320, -384], F [-384, -440], G [-440, -484], H [-484, -524].
-
-**Inviluppo** (`decks[].envelope`): la mezza larghezza utile per x, calcolata dalla matematica dello scafo (`shipgen2.astra_ship2`: sezioni ottagonali smussate, blocco
-superiore, isola) meno 1,5 m di parete; nessun compartimento esce dall'inviluppo (controllo).
+Le stanze **esistenti stanno dove sono** (mai spostate): il piano le registra alle posizioni dei loro file di dati (`compartments` con `status: existing`, `data`: il file). Volumi speciali: la sala di Main Engineering (14 m) occupa anche i piani dei ponti 4–6 in x -372..-330, |y| < 15; il Flight Deck (20 m) attraversa i ponti 6–11 in x 60..218, |y| < 29 (`spans_decks`).
+**Sezioni A–H** da prua a poppa, per ponte (`decks[].sections`); i limiti stanno su una griglia di 4 m e ogni sezione è una zona con portelli stagni ai confini. Sul Ponte 4: A [104, -104], B [-104, -160], C [-160, -248], D [-248, -320], E [-320, -384], F [-384, -440], G [-440, -484], H [-484, -524].
+**Inviluppo** (`decks[].envelope`): la mezza larghezza utile per x, calcolata dalla matematica dello scafo meno 1,5 m di parete; nessun compartimento esce dall'inviluppo (controllo).
 
 ## 3. Il reticolo di 4 m
 
-Corridoio = "fessura" di 4 m (3,1 m liberi + 0,45 di parete per lato); moduli lunghi 4 m con l'origine sul pavimento, sull'asse, all'estremità di poppa
-(`x` 0..4); giunzioni 4 × 4; le stanze sono multiple di 4 m e le loro porte cadono sul centro di un modulo (x locale ≡ 2 mod 4). Stanza: origine sul pavimento
-all'angolo lato corridoio, x lungo il corridoio, y **dentro** la stanza; a sinistra (babordo) il layout ruota di 180°, lungo y di ±90°. Porte 1,6 × 2,4 (`AAstraDoor`:
-larghezza 160, altezza 240), cancelli 3,2 × 3,0, portello stagno di sezione 2,0 × 2,5 (le due ante scorrono nei pilastri e restano nella fessura), boccaporti cabina 0,95 × 2,1.
+Corridoio = "fessura" di 4 m (3,1 m liberi + 0,45 di parete per lato); moduli lunghi 4 m con l'origine sul pavimento, sull'asse, all'estremità di poppa (`x` 0..4); giunzioni 4 × 4; le stanze sono multiple di 4 m e le loro porte cadono sul centro di un modulo (x locale ≡ 2 mod 4). Stanza: origine sul pavimento
+all'angolo lato corridoio, x lungo il corridoio, y **dentro** la stanza; a sinistra (babordo) il layout ruota di 180°, lungo y di ±90°. Porte 1,6 × 2,4 (`AAstraDoor`), cancelli 3,2 × 3,0, portello stagno di sezione 2,0 × 2,5, boccaporti 0,95 × 2,1.
+I toni dei corridoi sono cinque (S, P, K, V, T: tabella del §6); i tronchi della Spine finiscono contro le grandi sale delle stanze esistenti (`reach_rooms`): un raccordo (`SM_SHIP_<tono>_Stub<cm>`) chiude lo spazio che resta. **Torri delle scale** (colonne a x +44, −92, −300, −452 …): `SM_SHIP_StairTower` (due rampe a tornante, 4 m di dislivello), `…Top`/`…Bottom`, `…Cap` sul Ponte 2, `…53` sul 3 (5,3 m attraverso il ponte corazzato).
 
-**The Spine** (tono S, accento "command", luce bianco-fredda) è il corridoio centrale (y = 0) e i due **Starboard/Port Passage** (tono P, "engineering", caldo) a y = ±20;
-i collegamenti a croce le uniscono attraverso le corsie interne (16 m di profondità) e le corsie esterne (16 m, dal passaggio verso lo scafo). Sui ponti con grandi sale (Mess sul 4, Medbay sul 6, Engineering sui 4–7, Flight Deck
-sui 6–11) la Spine è spezzata in tronchi: il traffico passa dai passaggi laterali; ogni tronco ha una corsia interna di dritta con un collegamento a croce (un tronco non resta mai isolato).
+## 4. Lo schema del piano (`data/ship/aquila_plan.json`, versione 2)
 
-**Tono K — i cunicoli della chiglia (Ponte 12).** Sulla chiglia i tre passaggi sono cunicoli di manutenzione (`SM_SHIP_K_*`, 16 mesh: dritti, con porta a sinistra o a destra, `T`, `X`, paratia, fine): 1,7 m di larghezza utile e 2,5 m di altezza dentro la stessa fessura di 4 m, pareti
-spesse con file di tubi, nervature ogni 2 m, soffitto pieno e portelli stagni 1,2 × 1,95; luce ambra bassa (1500 lm per modulo); le targhe delle stanze stanno sulla parete accanto al portello, non sopra. Sono l'unico posto in cui il Capitano va a testa bassa:
-il personaggio (capsula da ~70 cm) passa con ~50 cm per lato (nei portelli, 1,2 m, con ~25).
-
-**Raccordi (`SM_SHIP_<tono>_Stub<cm>`).** Dove un passaggio finisce a una parete fuori griglia di una stanza esistente (Medbay, Main Engineering, Flight Deck), il tronco si ferma sulla prima linea della griglia e un
-raccordo liscio di corridoio (lungo quanto serve: 1,5 m davanti a Main Engineering sul Ponte 7, 3,5 m davanti al Flight Deck sul 9) chiude lo spazio che resta; il piano lo posa dove crea l'atrio (`<stanza>_lobby`).
-
-**Torri delle scale** (una colonna ogni 150–350 m: `stair_44p`, `stair_92n`, `stair_300n`, `stair_452n`): `SM_SHIP_StairTower` (due rampe a tornante, 4 m di dislivello), `…Top`/`…Bottom` per le estremità, `…StairTowerCap` sul Ponte 2 (il pozzo si chiude sul soffitto del blocco),
-`…StairTower53` sul Ponte 3 (la scala da Deck 2 a Deck 3 scende di 5,3 m attraverso il ponte corazzato) e `SM_SHIP_LadderTrunk` (scala a pioli, per l'uscita di sicurezza).
-
-## 4. Lo schema del piano (`data/ship/aquila_plan.json`, versione 1)
-
-Compatto, generato (`ship_plan_gen.py`), letto dal gioco (`UAstraShipPlan`: **campi, tipi di arco e `p` in metri sono stabili**; i campi aggiunti da NAVE-2 sono in corsivo). Chiavi: `id, version,
-generator, frame, decks, compartments, doors, vertical, transit, graph{nodes, edges}, systems, placements, notes`.
+Compatto, generato (`ship_plan_gen.py`), letto dal gioco (`UAstraShipPlan`: **campi, tipi di arco e `p` in metri sono stabili**; quelli aggiunti da NAVE-3 sono in corsivo). Chiavi: `id, version (2), generator, frame, decks, compartments, doors, vertical, transit, graph{nodes, edges}, systems, placements, notes`.
 
 - `decks[]`: `id, name, programme, z, clear, ceiling, structure, pitch, volume, envelope{x_fwd, x_aft, half_width[[x, hw]…]}, sections[{id, x:[min, max]}]`.
-- `compartments[]`: `id, deck, section, kind, name, bounds[x0, y0, x1, y1] (mondo, m), z[pavimento, soffitto], status (built | planned | existing), doors[], dept, systems[],
-  stations[], lights[]`; le stanze fatte: `prefab, mesh, pos, yaw, plate, lane, size[L, D, h], crew_slots`; i corridoi: `passage, modules[i0, i1], tone` (*`tone` ora anche `K`*); le esistenti: `plane`
-  (il ponte su cui poggiano), `label_deck` (il numero scritto sulla porta, se diverso), `entrance, data, capacity, spans_decks, note`.
-  - `stations[]`: dove sta la gente: `id, role, kind (sit | stand | work | eat | sleep | watch), pos[x, y, z], yaw, dept` (le usa VITA; i posti seguono l'arredo vero; *z = pavimento + `dz` della scheda* per chi sta su una pedana, su un tapis roulant, in una vettura).
-  - `lights[]`: `id, type (rect), pos, lumens, temperature, size[x, y], radius, shadows` (in assi del mondo): *sono le lampade* (§7bis): dati, non attori.
-- `doors[]`: `id, deck, pos[x, y, z], yaw (90 = porta in un muro lungo x), width, height, kind (door | gate | blast | sliding), a, b (compartimenti), locked`, più `wall, passage, plate,
-  side, boundary` (blast: `[sezione aft, sezione fwd]`), `existing` (i portali delle stanze esistenti: il piano li chiama cancelli, le loro ante statiche restano), `planned` (la porta di una stanza non modellata: un muro pieno, chiusa a chiave; *oggi non ce n'è nessuna sui ponti costruiti*).
-- `graph.nodes[]`: `id, deck, p[x, y, z], kind (corridor | door_in | room | station | stair | lift | lift_core), comp`. `graph.edges[]`: `a, b, len, kind (walk | door | stair | lift),
-  door, w, blast, cost`. Un nodo di corridoio per modulo (ponti costruiti) o per compartimento da 16 m (grossolani, oggi nessuno); ogni stanza ha un nodo dietro ogni porta, un `hub` al centro, un nodo per
-  posto; i portelli stagni sono archi `door` con `blast: true`. Un arco `door`/`walk` tra due quote lontane più di 1,5 m (la porta del Flight Deck è 6,8 m sotto il corridoio del Ponte 9) VITA lo percorre come un ascensore. Un solo componente connesso (verificato).
-- `vertical[]`: `lift_main` (turboascensore: `landings[]` con `deck, plane, room, pos, node, existing`, `ride`) e una colonna di scale per torre (`stair_<x><n|p>`: `nodes`, `towers` per ponte).
-- `transit[]`: `spine_shuttle` (Ponte 5): *`stops[]` con `section, x, room, node`* (le fermate costruite: A, B, C, D, E, G, H), `status: "stops built"`; non c'è ancora una vettura che corre né un arco `shuttle` nel grafo.
-- `systems`: per sistema di bordo (reactor, power_bus, coolant, radiators, sensors, comms, weapons, ordnance, life_support…) i compartimenti che lo ospitano (i corridoi portano i bus e non sono elencati).
-- `placements{ponte: [...]}`: cosa mettere nel livello: `mesh, pos, yaw, folder, label, cls (module | room | sign | plate), comp` (*oggi anche sul Ponte 1: stanza, modulo con la porta, targa*).
+- `compartments[]`: `id, deck, section, kind, name, bounds[x0, y0, x1, y1] (mondo, m), z[pavimento, soffitto], status (built | planned | existing), doors[], dept, systems[], stations[], lights[]`; le stanze fatte: `prefab, mesh, pos, yaw, plate, lane, size[L, D, h], crew_slots`; i corridoi: `passage, modules[i0, i1], tone` (*S, P, K, V, T*);
+  le esistenti: `plane, label_deck, entrance, data, capacity, spans_decks, note`. *Nuovi `kind`*: `lobby` (lobby degli ascensori), `lift` (il pozzo: compartimento che attraversa i ponti, `spans_decks, shaft`), `trunk` (cella di un tubo di Jefferies), `tunnel` e `transit` (la navetta), `lifepod`, `airlock`, `dental`, `morgue`, `counselling`, `brig`, `security`, `computer`, `simulator`, `shop`, `chapel`…
+  - `stations[]`: `id, role, kind (sit | stand | work | eat | sleep | watch), pos[x, y, z], yaw, dept` (le usa VITA; i posti seguono l'arredo vero: **chi siede ha un sedile sotto i fianchi**, controllato; *z = pavimento + `dz`* per chi sta su una pedana o in un simulatore).
+  - `lights[]`: `id, type (rect), pos, lumens, temperature, size[x, y], radius, shadows`: *sono le lampade*, dati e non attori.
+- `doors[]`: `id, deck, pos[x, y, z], yaw, width, height, kind (door | gate | blast | sliding), a, b, locked`, più `wall, passage, plate, side, boundary` (blast: `[sezione aft, sezione fwd]`), `existing`, `planned`, *`lift`: l'id del pozzo, per le porte d'approdo (di ASCENSORI: `build_ship_interior.py` le salta)*.
+- `graph.nodes[]`: `id, deck, p[x, y, z], kind (corridor | door_in | room | station | stair | lift | lift_car | trunk | platform), comp, passage`. `graph.edges[]`: `a, b, len, kind (walk | door | stair | lift | shuttle), door, w, blast, cost`, *`shaft`* (gli archi `lift`), *`ladder: true`* (gli archi `stair` dei tubi di Jefferies).
+  Un nodo di corridoio per modulo; ogni stanza ha un nodo dietro ogni porta, un `hub` al centro, un nodo per posto; i portelli stagni sono archi `door` con `blast: true`. Un arco `door`/`walk` tra due quote lontane più di 1,5 m (la porta del Flight Deck è 6,8 m sotto il corridoio del Ponte 9) VITA lo percorre come un ascensore. Un solo componente connesso (verificato).
+- *`vertical[]`* (§7): `turbolift | bridge | service | cargo` (pozzi con `landings[]`), `stair` (una colonna di scale per torre: `nodes`, `towers`) e `trunk` (tubi di Jefferies: `nodes` per ponte, `trunks`). *`transit[]`* (§8): `spine_shuttle` con `path[]`, `stops[]` (le otto fermate A–H), `car{mesh, length}`, `speed, accel, dwell, gauge`.
+- `systems`: per sistema di bordo i compartimenti che lo ospitano. `placements{ponte: [...]}`: cosa mettere nel livello: `mesh, pos, yaw, folder, label, cls (module | room | sign | plate), comp`.
 
-Controlli del piano (`ship_checks.py`): dentro l'inviluppo; nessuna sovrapposizione in 3D; porte sui muri (≤ 0,65 m dai limiti del compartimento) e di misura giusta (≥ 0,9 × 1,9 m);
-grafo connesso, ogni compartimento raggiunto, archi sensati, scale e ascensore raggiungibili; nessuna stanza a cavallo di due sezioni; punti fissi del canon; ogni sezione con almeno un compartimento; **il programma: ogni stanza del kit ha almeno un posizionamento e nessuna stanza fissata "cannot stand"**.
-Risultato del piano attuale: 2270 compartimenti, 1056 porte, 10797 nodi, 10931 archi, **0 problemi, 0 avvisi**.
+Controlli del piano (`ship_checks.py`): dentro l'inviluppo; nessuna sovrapposizione in 3D; porte sui muri e di misura giusta; grafo connesso, ogni compartimento raggiunto; nessuna stanza a cavallo di due sezioni; punti fissi del canon; **il programma** (le stanze richieste, i posti letto e le scialuppe per tutti: §5); **la rete verticale** (ogni pozzo ferma dove dice, pozzi e lobby dove i record li mettono, scale e tubi senza ponti mancanti, **nodo di attesa a 0 cm dalla posizione davanti alla porta d'approdo**,
+la navetta con un arco `shuttle` tra le fermate e un tunnel lungo tutto il percorso); la **distanza a piedi dall'ascensore più vicino** per ponte (avviso sopra 100 m al 90° percentile; 110 per la chiglia). Risultato del piano attuale: **0 problemi, 0 avvisi**.
 
-## 5. I ponti
+## 5. Il programma: la nave progettata come una nave vera (NAVE-3)
 
-### 5.1 Il Ponte 4 (Crew Services, z -46): a mano
+Il piano di NAVE-2 riempiva le corsie in modo ciclico (125 armadietti del damage control, 23 lavanderie, nessun dentista, nessuna cella, nessun nucleo di calcolo). NAVE-3 lo rifà **dal progetto, non dal ciclo**: ogni spazio sta dove sta per una ragione, e la ragione è scritta accanto allo spazio
+(`ship_design.py`: le strutture fisse e il loro `why`; `ship_design_decks.py`, `ship_design_decks2.py`: un programma per ponte, con il commento del perché). Il metodo ha quattro livelli, nell'ordine in cui si decidono:
 
-Costruito da `ship_deck4.py` con il motore `ship_layout.py` (Builder/Passage/Deck): passaggi, corsie con elenchi espliciti (le somme tornano al metro), collegamenti a croce, torri delle scale,
-specials a mano. Mappa (immagini `docs/progressi/nave/d4_plan*.jpg`):
+1. **Le strutture fisse** (`ship_design.py`): i passaggi (la Spine y 0, lo Starboard e il Port Passage y ±20), le **banche degli ascensori** (§7), le **torri delle scale** con il loro posto del damage control, le **colonne dei tubi di Jefferies** (§6), le **gallerie dello scafo** (§6) e il banco di comando sotto la plancia. Stanno alle stesse x su ogni ponte che le serve: una colonna è una colonna.
+2. **I programmi** (`ship_design_decks*.py`): per ogni ponte e sezione un elenco di stanze con una sintassi minima (`key`, `key*N`, `key:Nome_Con_Trattini`, `key?` se facoltativa, `pool`, `gap:N`): non un ciclo, una lista scritta. Le stanze **esistenti** (plancia, alloggi del Capitano, Mess Hall, Medbay, Berths, Main Engineering, Flight Deck) restano dove sono e il resto si organizza attorno.
+3. **L'impaginatore** (`ship_layout.py`, `Deck.flow`): riempie ogni corsia da 16 m (o da 8 m, o da 4 m: le stanze di servizio) dalla paratia di prua della sezione verso poppa, **attorno alle strutture fisse**, rispettando le regole di occupazione del corridoio (un modulo con un ramo da una parte non ha una porta dall'altra; due porte sullo stesso modulo no) e il confine di sezione (nessuna stanza lo scavalca). Una stanza che non sta
+   **non sparisce in silenzio**: il piano si ferma con un errore (`DesignError`) o la mette tra gli opzionali `?`.
+4. **I controlli** (`ship_checks.py`, `_check_programme`): ogni stanza che il programma deve avere c'è (`REQUIRED`: dentista, obitorio, nucleo di calcolo A e B, cella, ufficio della sicurezza, centrali del damage control, impianti dell'aria, dell'acqua e dei rifiuti…); **posti letto per 560 persone più la riserva del 10 %** (616: oggi 746, di cui 662 nelle stanze nuove e 84 negli esistenti), **scialuppe per tutti** (40 capsule da 20 posti = 800), nessuna stanza fuori dall'inviluppo o a cavallo di una paratia.
 
-- **A** [104 → -104] — the forward recreation deck: Bow Observation (20 × 32, finestra panoramica a prua), Library, Games Room, Quiet Room, Hydroponics Bay, stores, heads, laundry, Crew Lounge accanto
-  al Concourse, due Observation Deck sui fianchi; la torre delle scale di prua (x 44).
-- **B** [-104 → -160] — the hub: **Mess Concourse** (17,7 × 36: portale della Mess Hall, banco degli ascensori, stele con la mappa, isola di piante, panche), Mess Hall (esistente), Main Galley con Galley Pass,
-  Dry Stores, un Observation Deck; la torre delle scale (x -92).
-- **C** [-160 → -248] — Berthing Lobby (atrio di Crew Berthing, esistente), Cold Stores, stores.
-- **D–G** — la Spine verso poppa (la sala Engineering occupa il centro tra x -329 e -373: i passaggi laterali portano il traffico), stanze interne ed esterne fino a x -484 (l'inviluppo si stringe a poppa),
-  torri delle scale a x -300 e -452. **H** ha solo corridoi e stores interni.
-- Numeri: 202 compartimenti (125 tratti di corridoio da 16 m), 455 moduli, 75 stanze, 72 targhe, 38 segnali di sezione; 74 porte, 10 cancelli, 20 portelli stagni (uno per confine di sezione e passaggio); 242 luci, 290 posti.
-- Segnaletica: targa sopra ogni porta (`SM_SHIP_Plate_<stanza>`, lato corridoio) e segnale di sezione a due facce su ogni portello (`SM_SHIP_Sign_<ponte><sezione>`: "DECK 4 · SECTION E" dice in che sezione sei).
+### 5.1 Chi sta dove, e perché
 
-### 5.2 Gli altri ponti: dal programma
+| Reparto | Dove | Perché lì |
+|---|---|---|
+| Comando | Ponte 1 (plancia, Ready Room); Ponte 2 sezioni A–C: suite degli ufficiali superiori, **CIC** (B), comunicazioni, briefing; **Auxiliary Control** (H) | il CIC è a pochi minuti dagli ascensori di plancia; l'Auxiliary Control è il secondo centro di comando, il più lontano possibile dalla plancia |
+| Armi | Ponte 2 D–G: controllo del fuoco, torri e barbette, **VLS**; Ponte 10: **depositi di munizioni nel nucleo corazzato** (sezioni C–E, il centro, la corazza più spessa); Ponte 8: armeria dei marines e armeria della sicurezza | i depositi stanno il più lontano dallo scafo esterno, con la Spine come via delle munizioni; le torri sotto le torrette che servono |
+| Scienza | Ponte 5 A–C: laboratori, sensori, archivi, **Transporter Room** e **Astrometrics** (B), **nucleo di calcolo A** (C); nucleo B sul Ponte 8 H | vicino ai sensori che guardano a prua; i due nuclei, lontani tra loro (ridondanza) |
+| Medico | Ponte 6, sezione C attorno all'ingresso del Medbay esistente: **due sale operatorie, farmacia, dentista, reparto di isolamento, obitorio, ambulatorio di counselling e cappellano**, laboratorio, archivi; B: riabilitazione, giardino medico, banca del sangue | un complesso a un minuto dalla porta del Medbay e dalla banca d'ascensori D |
+| Sicurezza e marines | Ponte 8: **hangar delle navette d'assalto con due Kestrel**, armeria, kit di abbordaggio (B); caserme, palestra, **poligono** (C); **cella, ufficio della sicurezza**, sala interrogatori, deposito prove (D) | la caserma a un ascensore dalla baia; il Master-at-Arms a pochi minuti da ovunque, tra i marines e la banca del Berthing |
+| Ingegneria e potenza | Ponte 7: **Main Engineering** (esistente), **controllo di potenza, quadri, banchi di condensatori, centrale ausiliaria** davanti alla sala (E: i bus restano corti); **impianti dell'aria, dell'acqua e dei rifiuti** a metà nave (C–D: vicino a chi servono), compressori, pompe dei radiatori (G–H); **damage control centrale** (B, vicino agli ascensori di plancia, con due gemelle: Ponte 8 H e Ponte 11) | chi comanda la macchina è a pochi minuti dalla plancia; le tre centrali del DC sono lontane tra loro |
+| Volo | Ponte 9: operazioni di volo, sale di attesa, officine avioniche, **hangar dei droni**, munizioni degli aerei, alloggi dei piloti; il Flight Deck (esistente) a prua; ascensore merci della banca Flight | tutto ciò che serve a un velivolo a meno di un minuto dal ponte |
+| Logistica | Ponti 10–11: stive, celle frigorifere, magazzini secchi, **fabbricazione e riparazione** (cantiere della nave), ricambi | il cantiere sotto il Flight Deck, i magazzini nel nucleo |
+| Servizi | Ponte 4 (la "via principale" dei marinai: **Mess Concourse** con caffè e negozio, Mess Hall, cambusa, **bar, cappella, negozio, barbiere e sarto, biblioteca, sale giochi, simulatori**, palestra, osservazione, serra); cabine e **bagni, lavanderie e magazzini di sezione** accanto a ogni gruppo di cuccette | gli alloggi non sono un ciclo: **ogni gruppo di 28 cuccette ha i suoi bagni e la sua lavanderia nello stesso nodo** |
+| Alloggi | ufficiali: Ponte 2 (suite), 3 (camere); sottufficiali e equipaggio: **14 sale cuccette da 28** sui Ponti 4, 6, 9, 11 più il Crew Berthing esistente (84); marines: 4 caserme sul Ponte 8; piloti: Ponte 9; **12 cabine singole** sui Ponti 2–3 | vicino a mensa, bagni, lavanderia e al proprio posto di lavoro |
+| Salvataggio | **40 baie di capsule** da 20 posti (800) e **40 camere stagne con armadietti delle tute** (Ponti 5–7, 9, 11) nelle gallerie dello scafo; una stazione del DC a ogni torre | l'uscita è sempre a poche decine di metri da un corridoio |
 
-`ship_decks.plan_deck(coarse=False)` riempie le corsie di un ponte dal suo programma (`PROGRAMME[ponte][sezione | default]`: l'elenco ciclico delle stanze di quella sezione) con le stanze che hanno una mesh. Quello che serve sapere:
+La somma: **1 065 stanze del programma** e 211 tra lobby, torri e pozzi, su **3 234 compartimenti** (con i 1 719 tratti di corridoio, le 168 celle dei tubi e i 33 tratti di tunnel).
 
-- **Stanze uniche e fissate.** `UNIQUE[ponte]` sono le stanze che stanno una volta sola (il CIC sul 2; Transporter Room e Astrometrics sul 5; sala operatoria, quarantena e farmacia sul 6; hangar delle navette e poligono sull'8); `PINNED` le mette per prime in un posto fisso
-  (lato della Spine e x del bordo di prua): **il CIC in sezione B del 2** (a prua di x -60 il blocco è largo solo 16,4 m per lato: la sezione A ha la sola Spine, nessuna stanza da 16 m ci sta), la Transporter Room in sezione B del 5, accanto al Medbay le tre stanze mediche del 6, **l'hangar delle navette (lato di babordo: la torre di prua occupa quello di dritta) e il poligono sull'8**, **le sette fermate della navetta sul 5**.
-  Tre errori di generazione, tutti silenziosi (una stanza che non sta finiva solo in `notes`), corretti in questa consegna: un tentativo di corsia scartato non "consuma" più una stanza unica (l'Astrometrics non compariva); una stanza con due porte sullo stesso muro (l'hangar) prende `_2` per la seconda
-  (prima il piano si fermava con "duplicate door"); il CIC e l'hangar non stavano dove erano fissati o programmati. `ship_checks.py` ora lo verifica: **ogni stanza del kit ha almeno un posizionamento nel piano e nessuna nota "cannot stand" resta** (il piano di prima, con questi due buchi, dà 3 problemi).
-- **Dove la Spine arriva.** I tronchi della Spine finiscono contro le grandi sale di altri ponti (`obstacles`): `reach_rooms` li porta fino alla parete di una stanza esistente che ha qui l'ingresso (Medbay, Main Engineering) e li ferma sulla prima linea della griglia; un raccordo (`…_Stub<cm>`) chiude il resto.
-- **Conflitti.** Il motore toglie le stanze la cui porta incontrerebbe un collegamento a croce sull'altro lato del corridoio (un modulo non può avere un ramo da una parte e una porta dall'altra) e dà la precedenza alle torri delle scale (nota nel piano: oggi una sola stanza, una `radiator_pumps` del 5).
-- **Sezioni.** Nessuna stanza a cavallo di un confine di sezione (i portelli stagni stanno lì).
+### 5.2 Ponte per ponte
 
-### 5.3 Ponte per ponte: le stanze nuove
+| Ponte | Cosa è | Il disegno |
+|---|---|---|
+| 1 Command | la plancia, gli alloggi del Capitano, la **Ready Room** (§5.3) | esistente; la lobby dei due ascensori di plancia sotto il suo pozzo (x −24,3) |
+| 2 CIC & Communications | il cervello della nave | A: suite degli ufficiali superiori; **B: CIC con briefing e comunicazioni**; C: comunicazioni e intelligence; D–G: controllo del fuoco, difesa di punto, barbette, **VLS**; **H: Auxiliary Control**; strisce esterne: cabine degli ufficiali di guardia |
+| 3 Crew Country | gli ufficiali | A: **wardroom**, salotto e biblioteca degli ufficiali, palestra; B: ufficio dell'esecutivo e camere; C–H: uffici dei capi reparto, aule di addestramento, camere con bagni e lavanderie ai nodi; cabine singole lungo i passaggi |
+| 4 Crew Services | la via principale | A: **la strada dei marinai** dal Bow Observation al Concourse (biblioteca, cappella, negozio, barbiere, bar, lounge, sala giochi, serra, simulatori, palestra); B: **Mess Concourse, Mess Hall, cambusa**; C: Berthing e il suo atrio con due sale cuccette, bagni, lavanderia; D: **svago aft** (giochi, bar, simulatori); E–H: il quartiere degli ingegneri attorno a Main Engineering |
+| 5 Science & Transport | scienza e **la navetta** | A–C: laboratori, sensori, archivi, **Transporter, Astrometrics, nucleo A**; D–H: impianti che servono i ponti sopra (refrigerante, pompe, aria, acqua); **la corsia esterna di dritta è il tunnel della navetta** (§8) |
+| 6 Medical | il complesso medico | §5.1; D–H: quartiere degli ingegneri (4 sale cuccette, sottufficiali, lounge, palestra, biblioteca) |
+| 7 Engineering & Power | macchina e potenza | §5.1: sala reattore (esistente), centrale ausiliaria, controllo, quadri, condensatori davanti; aria-acqua-rifiuti a metà nave; DC centrale vicino agli ascensori di plancia |
+| 8 Security & Marines | abbordaggio e ordine | §5.1; E–F: officine accanto alla base della sala di Main Engineering (alta quattro ponti); G–H: nucleo B e DC centrale di poppa |
+| 9 Flight Operations | il ponte di volo | C: operazioni, sale d'attesa, officine, droni; D–E: alloggi dell'Air Group; F–H: stive |
+| 10 Cargo & Magazines | il nucleo corazzato | depositi al centro, stive e celle a prua e a poppa, l'ascensore merci in mezzo alle stive |
+| 11 Fabrication & Repair | il cantiere | riparazione e fabbricazione sotto il Flight Deck, officine, ricambi, la terza centrale del DC |
+| 12 Keel | serbatoi | combustibile, refrigerante, massa di reazione, il sistema di cunicoli (tono K); nessuno ci vive |
 
-Le misure sono interne (lunghezza × profondità × altezza, m); ogni stanza ha il suo arredo vero (nessuna sala vuota) e i suoi posti (`stations`) e lampade nella scheda `ship_spec.py`.
+### 5.3 Il Ponte 1: lo Studio del Capitano (Ready Room)
+
+Il blocco tra i due corridoi della plancia (canon, BIBBIA §6): **12 × 4,2 × 2,9 m** (x da -20,8 a -8,8, y da -2,1 a +2,1), a filo con la parete di poppa della plancia (-8,8) e con la testa dei corridoi (-20,8); il tetto sta a 3,2 m come quello dei corridoi.
+Dentro: sul muro di poppa un **oblò** con un campo di stelle e il bordo di un pianeta sopra una credenza, la **scrivania del Capitano** con la poltrona alta dietro e due sedie per i visitatori, la bandiera e un mappamondo illuminato negli angoli, tre librerie; verso prua un divano di fronte a un tavolino con due poltrone e una lampada,
+un **tavolo olografico** sotto un anello di luce e il **piano tattico** sul muro di prua: una stanza di lavoro, calda, non una sala. Nove posti, quattro lampade, targa `CAPTAIN'S READY ROOM · PRIVATE · COMMAND` sopra la porta.
+
+**La porta.** I corridoi della plancia sono del vecchio kit (`SM_COR_*`, piazzati da `build_bridge_v3.py` come attori di L_Bridge) e non hanno porte nei muri laterali. Il piano mette la porta (**1,4 × 2,2 m**, scorrevole, in (-15,8; -2,2; 0)) nel primo vano di parete del modulo con finestra e sostituisce quel modulo con `SM_SHIP_BridgeCorridorDoor`.
+`build_ship_interior.py` (flag `OPEN_READY_ROOM`) distrugge in L_Bridge il modulo con finestra (`CorrPort_Window`) e i due pannelli del vano (`CorrPort1_0_*_R`): **va lanciato dopo `build_bridge_v3.py`**.
+
+## 6. Il labirinto: corridoi principali e di servizio, gallerie, tubi di Jefferies
+
+Una nave vera non è una scacchiera di corridoi uguali. Sotto la rete principale (la Spine e i due Passage, larghi, luminosi, con i segnali) NAVE-3 mette **la rete di chi fa funzionare la nave**: stretta, bassa, calda di luce, con i suoi cancelli, che il Capitano può prendere per scorciatoia.
+
+| Tono | Cos'è | Misure utili | Dove |
+|---|---|---|---|
+| **S** | la Spine (centrale, y 0) | 3,1 m × 3,4 m, luce bianco-fredda, accento "command" | ponti 2–11 |
+| **P** | Starboard e Port Passage (y ±20) | 3,1 × 3,4, luce calda | ponti 2–11 |
+| **K** | cunicoli: le braccia dei tubi di Jefferies e la chiglia | 1,7 × 2,5, luce ambra, portelli stagni 1,2 × 1,95 | ponte 12 e le braccia su tutti i ponti |
+| **V** | **corridoi di servizio**: le gallerie dello scafo (sotto) | 2,1 × 2,7 m, luce ambra calda, tubi, nervature, armadietti | ponti 5–11, lungo lo scafo |
+| **T** | il **tunnel della navetta** | 3,5 × 3,25, binari e strisce di guida | ponte 5 (§8) |
+
+**Tubi di Jefferies.** Otto **colonne** (x +10, −50, −158, −206, −274, −342, −406, −474), una per lato su ogni ponte: **16 tubi** (`vertical[]` `kind: "trunk"`), scale a pioli 1,2 × 1,2 m che vanno dal ponte più alto della colonna alla chiglia. Dal muro esterno di ogni passaggio parte un **braccio** (un cunicolo K, 16 m dove lo scafo lo consente): il suo primo modulo è la **cella del tubo** (un'alcova con il pozzo della scala, con varianti `Trunk`, `TrunkTop`, `TrunkBottom`), il resto è un cunicolo orizzontale. Un arco `stair` con `ladder: true` unisce due celle di ponti vicini.
+**Gallerie dello scafo** (`ship_design.GALLERIES`, tono V, 36 m): lungo lo scafo dei ponti 5–11, un corridoio di servizio con **camere stagne** (con armadietti delle tute), **baie di capsule di salvataggio** e le stanze di servizio da 8 × 4 m sul lato esterno; il braccio di un tubo sbocca nella galleria (arco nel grafo). Ogni torre delle scale ha dietro la sua **stazione del damage control** (8 × 8 m: armadietto, manichette, respiratori, puntelli, il piano della sezione).
+
+I portelli: ogni cambio di tono e ogni confine di sezione ha il suo (cancello, portello stagno: i `blast` del grafo). **Segnaletica e ordinate** (§9) dicono in che ponte, sezione e frame si è.
+
+## 7. Gli ascensori: la rete e il contratto con ASCENSORI
+
+**Trentaquattro pozzi** (`vertical[]`, 291 approdi): 29 turboascensori, 2 di plancia, 2 di servizio (banche Engineering e Flight), 1 merci (Flight). Una banca è una **lobby 8 × 16 m** (due porte, panche, piante, linee di guida, un elenco del ponte sulla parete) tra la Spine e il passaggio oltre, o in una corsia esterna (una porta sola). I pozzi attraversano più ponti: l'asse è sempre lo stesso, il pavimento e il soffitto della lobby non hanno soletta dentro il pozzo.
+
+| Banca | x | Ponti | Perché lì |
+|---|---|---|---|
+| bridge ×2 | −24,3 | 1–12 e 1–9 | sotto la plancia: il Capitano scende da qui |
+| f Flight | +52 | 4–12 | il bivio verso prua: Flight Deck, baia d'assalto, volo, chiglia di prua (servizio + merci) |
+| c Concourse | −80 | 2–9 | il centro dell'equipaggio: Concourse e Mess, CIC sopra, Medbay sotto |
+| d Berthing | −204 | 2–9 | il Crew Berthing, gli ufficiali, il complesso medico |
+| e Engineering | −308 | 2–12 | l'ingresso di Main Engineering, impianti, officine (con un ascensore di servizio) |
+| g Aft / h Stern | −404 / −444 | 2–12 / 4–12 | gli spazi di poppa, le macchine, la chiglia |
+| m1 m2 n1 n2 k1 k2 r1 r2 s1 s2 | −160, −16, −240, −364, −500 | 4/6–12 | **ascensori laterali** nelle corsie esterne, un paio per lato in ogni zona: da dritta partono dal Ponte 6 (la corsia di dritta del 5 è il tunnel) |
+
+**Distanza a piedi dall'ascensore più vicino** (da ogni punto di corridoio del ponte, misurata sul grafo, in m): mediana / 90° percentile / massimo — Ponte 2: 48 / 84 / 116; 3: 48 / 88 / 132; 4: 40 / 80 / 124; 5: 40 / 92 / 144; 6: 32 / 56 / 88; 7: 32 / 56 / 84; 8: 32 / 60 / 88; 9: 32 / 60 / 88; 10: 40 / 68 / 92; 11: 40 / 68 / 92; 12 (la chiglia): 44 / 100 / 196 (la punta di prua dei serbatoi).
+(NAVE-2 aveva un ascensore finto in tutto.) I punti lontani sono le estremità delle braccia e la corsia di dritta dei Ponti 2–4, dove un pozzo continuo passerebbe sul tunnel del 5.
+
+**Il contratto `vertical[]` (versione 2).** Per ogni pozzo: `id, kind (turbolift | bridge | service | cargo), name, shaft{x, y, w, d, z[fondo, cima]}, car{w, d, h}, landings[], speed, accel, decks`. Un approdo: `deck, z, door[x, y, z], yaw (da dentro la lobby verso il pozzo), lobby (il compartimento), node (il nodo del grafo dove si aspetta)`.
+**Il nodo di attesa sta nel grafo e a 1,5 m davanti alla porta d'approdo (0 cm di scarto: ASCENSORI lo cerca per posizione entro 90 cm; `ship_checks` lo verifica per ogni approdo)**. Le porte d'approdo sono nel piano con il flag `lift: <id del pozzo>`: **sono di ASCENSORI** (`UAstraLiftSubsystem` costruisce vetture, ante, pannelli e voce dal piano all'inizio del gioco); `build_ship_interior.py` le salta.
+Gli archi `lift` collegano le vetture di due fermate (costo = tempo di corsa + porte: 6 m/s, 2 m/s², 4 s); la rete è completa per pozzo (ogni fermata raggiunge ogni altra con una corsa). Le lobby (kit `LiftBank`, `LiftBankO`, `LiftBankB`) hanno le cornici, gli indicatori e i pulsanti; il corpo del pozzo (pareti da 0,2 m) fa parte del kit.
+
+## 8. La navetta della Spine
+
+BIBBIA §6: "il corridoio centrale lungo la nave con la navetta interna". Corre sul **Ponte 5** per tutta la lunghezza della nave, da prua a poppa, in un **tunnel** (tono T, 3,5 m di larghezza, 3,25 di altezza) lungo la mezzeria della corsia esterna di dritta (**y = 30**), tra **otto sale di fermata** (A–H, una per sezione, compresa la F), ciascuna una stanza di quella corsia, 24 × 16 m: la banchina lungo la parete dello Starboard Passage (6,4 m, con striscia tattile, linea gialla, panche, tabelloni, colonne), il letto del binario dietro (due rotaie, traversine, linea di guida), le bocche del tunnel nelle testate; i capolinea (A a prua, H a poppa) hanno la bocca da un lato e **i respingenti** contro la parete chiusa.
+Perché la corsia esterna di dritta: la Spine del Ponte 5 è spezzata dalle sale delle stanze esistenti (Mess, Berths, Medbay, Main Engineering: tronchi da 24 a 304 m) e serve agli ascensori; lo Starboard Passage è continuo, e la corsia oltre è libera: **l'unica linea retta attraverso la nave**. Il prezzo: la banca Mess di dritta (m1) parte dal Ponte 6 e le braccia di Jefferies di dritta sul 5 sono solo la loro cella.
+**Il piano**: un nodo `platform` per sala, archi `shuttle` tra sale consecutive (costo = la corsa in secondi più la sosta; larghezza 0,05 m: dentro il tunnel passa solo un passeggero, e il modello dei danni legge un arco di tipo ignoto come un'apertura di quella larghezza), e il record `transit[]` (versione 2): `id: spine_shuttle, deck, path[], stops[{id, section, x, door[x, y, z], yaw, room, node}], car{mesh: "SpineCar", length: 14}, speed, accel, dwell, gauge`.
+**La vettura non è nelle sale** (ASCENSORI la fa correre): la mesh `SM_SHIP_SpineCar` (14 m, porte sul lato −y = quello della banchina, naso +x) è un pezzo a parte.
+
+## 9. La segnaletica (wayfinding)
+
+Una nave di 744 m si legge dai cartelli. Quattro tipi, tutti istanze del guscio del ponte (nessun attore); i cartelli di sezione di NAVE-2 (sui portelli, a due facce) restano.
+
+- **Cartelli a lama** (`SM_SHIP_WayBlade_<righe>` + `SM_SHIP_WayRow_<meta><direzione>`): appesi al soffitto di traverso alla Spine e ai Passage, **a coppie schiena a schiena** (una faccia per verso di marcia), agli incroci, ai cancelli delle lobby e al più ogni 48 m. Una riga è un pittogramma, un nome (TURBOLIFTS, STAIRS, MEDBAY, LIFEPODS, e per ponte BRIDGE, MESS HALL, ENGINEERING, FLIGHT DECK, SPINE SHUTTLE, BRIG) e una freccia **calcolata, non disegnata a mano**: per ogni cartello e ogni meta si cerca sul grafo il cammino più corto (Dijkstra dalle mete all'indietro) e dai primi 5 m si legge se la meta sta **avanti, a sinistra o a destra** di chi guarda (quel che sta dietro è sull'altra faccia). Al più tre righe, nell'ordine di importanza del ponte.
+- **Ordinate** (`SM_SHIP_Frame_<n>`: "FR 134", una per 4 m da prua, la 0 a x = +216): sotto i cartelli di sezione dei portelli e nelle lobby.
+- **Elenchi dei ponti** (`SM_SHIP_Directory_<ponte>`): lo schermo con i luoghi principali per sezione, sulla parete di ogni lobby di ascensori sopra la panca ("YOU ARE HERE · FOLLOW THE BLADE SIGNS").
+- **Targhe delle stanze** (`SM_SHIP_Plate_*`) sopra ogni porta, come prima.
+Numeri: 969 facce in 508 appese, 504 ordinate, 134 elenchi; **29 mesh** dicono tutto (3 cornici e 26 righe), più 53 ordinate e 11 elenchi.
+
+## 10. Il kit (`art/blender/ship_*.py`)
+
+Linguaggio della plancia v3: composito scuro in cornici di metallo spazzolato, nervature con linee di luce, lampade a palette (`MI_BRG3_Lamps*`: la cella dice il colore), un solo slot per tutte le etichette (`MI_SHIP_Labels`, atlante `T_SHIP_Labels`, 4096 × 6144: 425 tile). Ogni mesh è chiusa alla luce, Nanite (quelle con un vetro restano classiche),
+collisione complessa come semplice, UV a 1 m e per cella per lampade e etichette. Budget: **444 mesh, 7,46 M triangoli in tutto, la più pesante 138 k** (i triangoli in Nanite non sono il costo; il costo è la memoria: FBX su disco, non in git).
+Come "più futuro e meno ufficio" (NAVE-3): corridoi con strisce di luce, pannelli tecnici, condotti, schermi e segnaletica; **l'atrio dell'Aquila non è più una sala vuota** (il Mess Concourse e l'atrio del Berthing sono stati rifatti, §10.2).
+
+| Gruppo | Mesh | Note |
+|---|---|---|
+| Moduli di corridoio (5 toni) | `SM_SHIP_<S|P|K|V|T>_` `Straight_A/B/C, Door_*, Gate_*, Bulkhead, T_L, T_R, X, End` + `Trunk*` (celle dei tubi) | **V**: corridoio di servizio, 2,1 × 2,7 m, luce ambra calda, tubi in vista, nervature, armadietti (`ship_corridor2.py`); **T**: tunnel della navetta con cancello di paratia e respingenti; K con la cella del tubo (alcova con la scala a pioli) |
+| Salute e cura | Dentist, Morgue, Counselling (`ship_rooms_care.py`) | due poltrone da dentista con unità e lampada; parete di cassetti frigoriferi e tavolo autoptico; sala di ascolto con divano, scrivania e un angolo per il cappellano |
+| Sicurezza | Brig (5 celle con sbarre, cuccetta, WC, sgabello e lampada di stato; scrivania di guardia rialzata), SecurityOffice (`ship_rooms_care.py`) | celle 2 e 4 occupate |
+| Impianti | AirPlant, WaterPlant, WastePlant, ComputerCore, AuxReactor, DcCentral (`ship_rooms_plants.py`) | scrubber di CO₂ e elettrolizzatori; serbatoi, filtri, pompe; vasi a pressione e compattatore; file di rack con corridoi freddi; un piccolo reattore su zoccolo; il tavolo del piano dei danni con le console lungo le pareti |
+| Vita di bordo | Barber, Bar, Chapel, Shop, SimBay, Berthing (sala cuccette da 28), Suites, SingleCabins, DroneBay (`ship_rooms_life.py`) | **sedili veri sotto ogni posto**; le cuccette a due livelli con armadietti |
+| Scafo | Airlock, PodBay (con la capsula ovoidale `lifepod` su culla), SuitLocker, DcStation (`ship_rooms_hull.py`) | camera stagne con portello rotondo, armadietti delle tute, capsula da 20 posti con oblò e portello |
+| Ascensori | LiftBank, LiftBankO, LiftBankB (`ship_rooms_lifts.py`) | lobby con cornici delle porte d'approdo, indicatori su/giù, pulsanti, linee di guida; **i pozzi con pareti da 0,2 m** (aperte sulla porta) |
+| Navetta | ShuttleStop, ShuttleStopBow, ShuttleStopStern (`ship_rooms_transit.py`); SpineCar (`ship_craft.py`) | 24 × 16: banchina, binari, bocche del tunnel, respingenti; la vettura da 14 m (bianca con fascia blu, porte aperte sul lato banchina) è una mesh a parte |
+| Segnaletica | WayBlade_1..3, WayRow_<meta><freccia> (26), Frame_<n>, Directory_<ponte> (`ship_signs.py`) | §9 |
+| Snodi | Concourse, BerthLobby (rifatti), StairTower(+Top, Bottom, 53, Cap), LadderTrunk | §10.2 |
+| Il resto | tutte le stanze di NAVE-2 (laboratori, officine, armi, volo, chiglia, social, servizi: `ship_rooms_*.py`) | invariate salvo i posti a sedere |
+
+L'arredo vive in `ship_furniture.py` … `ship_furniture9.py` (nove biblioteche; la nuova: poltrona del dentista, parete dell'obitorio, cella, banco di guardia, panche delle cappelle, sedia del barbiere, simulatore, capsula di salvataggio, scrubber, elettrolizzatore, reattore ausiliario, chiosco…); ogni funzione costruisce un pezzo (origine a terra, fronte +x) e le stanze lo piazzano con `place(b, x, y, yaw, funzione, …)`.
+Gruppi di una mesh (`SParts`): `body` (smussato), `fine`, `soft` (senza smusso: cuscini, libri, piante, **le doghe di una parete**), `emit` (lampade e etichette). Limiti controllati a ogni esportazione: 150 k triangoli a mesh, altezza ≤ 3,7 (struttura compresa ≤ 4,0), ingombro dentro la pianta.
+
+### 10.1 Controlli del kit (a ogni esportazione)
+
+Budget di triangoli, slot noti, UV finite, misure contro la scheda (`ship_spec.py`); **prove a raggi lungo gli archi del grafo** di ogni ponte costruito (altezze 0,35 / 1,0 / 1,75 m, contro le mesh piazzate) e **controllo dei posti** (`check_spots`): chi sta in piedi ha una colonna libera di 22 cm dal ginocchio alla testa, chi siede un torso libero di 12 cm sopra il sedile **e un sedile sotto i fianchi (la prima superficie sotto di lui è a 30–80 cm dal pavimento)**, e sotto c'è il pavimento;
+un posto sul mobilio esce con il punto libero più vicino da scrivere nella scheda. Risultato sul piano finale: **12 ponti, ~25 000 raggi di corridoio e di porta, 0 bloccati; ~4 100 posti controllati, 0 sul mobilio** (dentro le stanze i raggi hub → posto sono topologia: ne toccano l'arredo circa un quarto, atteso).
+Le anteprime sono in `docs/progressi/nave/` (JPG sotto i 250 KB).
+
+### 10.2 Il Mess Concourse e l'atrio del Berthing (la critica del lead: "troppo grande, buio, spoglio")
+
+Il vecchio Concourse (17,7 × 36 × 3,7 m) era un salone vuoto con un'aiuola al centro e due pareti scure. Ora è **una strada, non una sala**: un'**aiuola-giardino con un albero** sotto un anello di luce tra il portale della Mess Hall e la Spine; **da una parte un caffè** (bancone con retrobanco e macchina del caffè, quattro sgabelli, tavoli con sedie, un divano su un tappeto rosso) e **dall'altra il negozio di bordo** (banco con cassa, scaffali, un espositore e una gruccia di abiti, tappeto blu), ciascuno **sotto un controsoffitto basso di luce calda su quattro colonnine** che abbassa la scala e dà un bordo alla zona;
+la parete di poppa (la porta della Mess Hall) **rivestita di doghe di legno retroilluminate**, la parete di prua con **grandi schermi come finestre sulle stelle**; pareti e soffitto chiari su pavimento scuro, un campo di 36 pannelli luminosi, linee di guida sul pavimento, la stele dell'elenco accanto al portale, otto vasi alle estremità. I finti ascensori della vecchia parete di poppa sono spariti (gli ascensori sono le lobby del §7).
+23 posti nel Concourse (prima 8), 7 lampade nei dati (prima 3). **L'atrio del Berthing** (14,6 × 36) ha le stesse doghe attorno alla porta del Crew Berthing, un tappeto-corridoio fino allo schermo del ruolino con tre anelli di luce sospesi, due angoli di salotto sotto un controsoffitto caldo.
+
+### 10.3 Le stanze di NAVE-2 (ancora valide)
+
+Misure interne (lunghezza × profondità × altezza, m); ogni stanza ha il suo arredo vero, i suoi posti (`stations`) e le sue lampade nella scheda `ship_spec.py`.
 
 | Ponte | Stanza (prefab) | Misure | Cosa c'è dentro |
 |---|---|---|---|
@@ -148,8 +232,6 @@ Le misure sono interne (lunghezza × profondità × altezza, m); ogni stanza ha 
 | 3 | `wardroom`, `gym` | 24 × 16 × 3,6 / 3,7 | due tavoli da dieci posti, salotto con bar e acquario; cinque tapis roulant, panche con rastrelliere, sacco, specchi, armadietti |
 | 5 | `transporter` — Transporter Room | 24 × 16 × 3,8 | sei pedane su una pedana rialzata sotto l'anello di emettitori, console, buffer di schema, cabina di decontaminazione, pedana di carico (BIBBIA §3: 8 s a ciclo) |
 | 5 | `lab_astro`, `lab_bio`, `lab_phys`, `sensor_archive`, `sensor_room` | 24 × 16, 24 × 16, 24 × 16, 16 × 16, 16 × 16 | Astrometrics (stanza buia sotto le stelle: trittico di carte, tavolo olografico, sei console); acquari, banchi di crescita, freezer, microscopi; un acceleratore su telaio d'acciaio con rivelatore ad anello e cabina schermata; scaffali dati con la volta fredda |
-| 5 | `radiator_pumps`, `machinery`, `machinery_b`, `dc_locker` | 24 × 16, 24 × 16, 24 × 16, 12 × 16 | collettori e pompe del refrigerante; aria e acqua; aria compressa; il deposito del damage control (armadietti con le manichette, autorespiratori, puntelli) |
-| 5 | `shuttle_stop` — Spine Shuttle Stop | 24 × 12 × 3,7 | banchina con la vettura ferma e le porte aperte (14 m: tre porte, panche, mancorrenti), bocche di galleria alle due testate, linea gialla, panche, schermi, segnali (sette, una per sezione tranne la F) |
 | 7 | `power_control`, `switchgear`, `capacitors` | 24 × 16 × 3,6 / 3,7 | il pannello sinottico della distribuzione con due file di console; due file di quadri ad alta tensione su tappeti isolanti con gabbia di isolamento; due banchi di condensatori su zoccoli a strisce con sbarre |
 | 8 | `shuttle_bay` — Assault-Shuttle Bay | 32 × 16 × 3,7 | **due Kestrel** (11,7 m, rampe giù, collare di perforazione) davanti ai portali di lancio, banco, gabbia dei razzi, trattore, carrelli del carburante e della schiuma |
 | 8 | `barracks`, `kit_room`, `firing_range` | 24 × 16, 16 × 16, 40 × 16 | otto cuccette doppie con armadi e bauli, tavolo lungo, angolo palestra; sei vani armatura e due file di armadietti; **sei corsie da 33 m** con baffle e sagome a 21 e 31 m, cabine di tiro, recinto con due cancelli |
@@ -157,158 +239,103 @@ Le misure sono interne (lunghezza × profondità × altezza, m); ogni stanza ha 
 | 9–10 | `magazine`, `cargo_hold` | 24 × 16, 32 × 16 | due file di rack di missili con l'argano dei munizionamenti e gli irrigatori; container impilati, pallet, carrello elevatore, portello del montacarichi |
 | 11 | `fab_shop`, `repair_bay` | 28 × 16, 32 × 16 | tre stampanti a metallo, forno di fusione, cella robotica con nastro; piastre di scafo, due simulatori, tavolo con il taglio al plasma, due celle di saldatura, tute EVA e puntelli |
 | 12 | `tank`, `reaction_mass`, `crawlway` | 32 × 16, 40 × 16, 16 × 16 × 3,0 | quattro serbatoi orizzontali di 11 m con il manifold; quattro vasi sferici a pressione con l'anello di tubi; l'incrocio dei cunicoli con tre tubi verticali, scala e botola |
-
-Le stanze di servizio dei ponti 4 e 6 (cucina, magazzini, serre, cabine, biblioteca, sale di raccoglimento…) si ripetono dove il programma le chiede (§6); il Ponte 3 usa anche `offices` e `records`.
-
-### 5.4 Il Ponte 1: lo Studio del Capitano (Ready Room)
-
-Il blocco tra i due corridoi della plancia (canon, BIBBIA §6): **12 × 4,2 × 2,9 m** (x da -20,8 a -8,8, y da -2,1 a +2,1), a filo con la parete di poppa della plancia (-8,8) e con la testa dei corridoi (-20,8); il tetto sta a 3,2 m come quello dei corridoi.
-Dentro: sul muro di poppa un **oblò** con un campo di stelle e il bordo di un pianeta sopra una credenza (il modello della nave, una caraffa, una lampada), la **scrivania del Capitano** (legno con intarsio di pelle, tre cassetti per lato) con la poltrona alta dietro e due sedie per i visitatori,
-la bandiera e un mappamondo illuminato negli angoli, tre librerie dal lato della porta; verso prua un divano di fronte a un tavolino con due poltrone e una lampada, un **tavolo olografico** sotto un anello di luce e il **piano tattico** sul muro di prua. Pareti di tessuto sabbia su zoccolo di legno, moquette: è una stanza di lavoro, calda, non una sala.
-Nove posti (visitatori, divano, attorno al tavolo), quattro lampade, targa `CAPTAIN'S READY ROOM · PRIVATE · COMMAND` sopra la porta. Sotto il pavimento un carenaggio di piastre di scafo (`MI_HULL_A_Plate`, l'istanza del progetto) scende nella cima dell'isola tra i due che il costruttore della plancia ha messo sotto i corridoi (`quarters.py`): visto da fuori lo Studio non galleggia.
-
-**La porta.** I corridoi della plancia sono del vecchio kit (`SM_COR_*`, `kit_corridor.py`, piazzati da `build_bridge_v3.py` come attori di L_Bridge: tre moduli da 4 m con la finestra su quello di mezzo, x -20,8 / -16,8 / -12,8) e non hanno porte nei muri laterali. Il piano mette la porta (**1,4 × 2,2 m**, scorrevole, in (-15,8; -2,2; 0)) nel
-**primo vano di parete del modulo con finestra** e sostituisce quel modulo con `SM_SHIP_BridgeCorridorDoor` (`ship_rooms_bridge.corridor_door`: lo stesso modulo con il varco, cornice, soglia e due barre di stato; materiali `MI_ASTRA_*`). `build_ship_interior.py` (flag `OPEN_READY_ROOM`) distrugge in L_Bridge il modulo con finestra (`CorrPort_Window`) e i due pannelli del vano
-(`CorrPort1_0_*_R`): **va lanciato dopo `build_bridge_v3.py`**, che li rimetterebbe. La targa sta sopra l'architrave (il muro sale a 2,5 m e poi smussa: non c'è altro posto).
-
-## 6. Il kit (`art/blender/ship_*.py`)
-
-Linguaggio della plancia v3: composito scuro in cornici di metallo spazzolato, nervature con linee di luce, lampade a palette (`MI_BRG3_Lamps*`: la cella dice il colore: command, engineering, white_warm…), un solo slot per
-tutte le etichette (`MI_SHIP_Labels`, atlante `T_SHIP_Labels`). Ogni mesh è chiusa alla luce (sovrapposizione di 2 cm, soffitti chiusi: lo scafo non ferma il sole), Nanite (quelle con un vetro restano classiche: le tre
-di osservazione), collisione complessa come semplice, UV a 1 m (`box_uv`) e per cella per lampade e etichette. Budget: **266 mesh, 6,09 M triangoli in tutto, la più pesante 138 k** (i triangoli in Nanite non sono il costo;
-il costo è la memoria: qualche centinaio di MB di FBX su disco, non in git).
-
-| Gruppo | Mesh | Note |
-|---|---|---|
-| Moduli di corridoio (3 toni × 16) | `SM_SHIP_<S|P|K>_` `Straight_A/B/C, Door_L_A/B, Door_R_A/B, Door_LR, Gate_L/R/LR, Bulkhead, T_L, T_R, X, End` | 17–57 k triangoli (K: 3–4 k); pannelli, prese d'aria, armadietti, quadri elettrici, estintori, pronto soccorso, condotti, schermi; la Bulkhead porta il portello stagno con strisce di pericolo e il campo del segnale |
-| Stanze di servizio | Galley, GalleyPass, StoreDry(+D10), StoreCold, Hold, Heads, Laundry, Hydro | cucina professionale, scaffali con casse, container ISO, docce, lavatrici, serre a tre ripiani |
-| Stanze sociali | Lounge, Games, Library, Quiet, Observation(+D14), BowObs, Wardroom, Gym | salotti su tappeti, bar con sgabelli, biliardo, libri a file, sala di raccoglimento con anello di luce, finestre con vetro; mensa degli ufficiali con acquario; palestra |
-| Stanze mediche | Surgery, Quarantine, Pharmacy | sala operatoria, reparto di quarantena con sei celle di vetro, farmacia con bancone a gabbia |
-| Stanze di lavoro | Lab, Workshop, Armory, Cabins; LabBio, LabAstro, LabPhys, SensorArchive, SensorRoom; FabShop, RepairBay | banchi con reagenti, tavolo olografico; tornio, fresa, saldatura, carroponte; gabbia e rastrelliere; corridoio comune con otto cabine; i laboratori e le officine del §5.3 |
-| Comando e armi (Ponte 2) | Cic, Briefing, CommsCenter, Offices, Records, VlsMagazine, PointDefense, Barbette | §5.3 |
-| Scienza e trasporto (Ponte 5) | Transporter, ShuttleStop (+ la vettura `ship_craft.spine_car`) | §5.3 |
-| Macchine e potenza | RadiatorPumps, Machinery, MachineryB, DcLocker, PowerControl, Switchgear, Capacitors | §5.3 |
-| Marines e volo | ShuttleBay (+ i due Kestrel `ship_craft.kestrel`), Barracks, KitRoom, FiringRange; FlightOps, PilotReady, AircraftShop, Magazine, CargoHold | §5.3 |
-| Chiglia | Tank, ReactionMass, Crawlway | §5.3 |
-| Plancia | ReadyRoom, BridgeCorridorDoor | §5.4 |
-| Snodi e verticali | Concourse, BerthLobby, StairTower(+Top, +Bottom, +53, +Cap), LadderTrunk | torre: due rampe a tornante, pozzo, scala a pioli con boccaporto; alta un ponte (4 m) o 5,3 m |
-| Segni | `SM_SHIP_Plate_*` (una per stanza e le scale di ogni ponte), `SM_SHIP_Sign_<d><s>` (sezioni A–H dei ponti costruiti), raccordi `SM_SHIP_<S|P|K>_Stub<cm>` | etichette dell'atlante (il nuovo tag `NAVE2_TAGS` a 256 × 64: 3936 di 4096 px usati), lampada sul bordo; i numeri sulle porte delle cabine sono `CABIN 1..12`, uguali su ogni ponte |
-
-L'arredo vive in `ship_furniture.py` … `ship_furniture8.py` (otto biblioteche per tema: sedute e tavoli, cucina, scienza, volo e sicurezza, armi, officine, ufficio e palestra); ogni funzione costruisce un pezzo nel suo sistema di riferimento (origine a terra, fronte +x) e le stanze lo piazzano con `place(b, x, y, yaw, funzione, …)`.
-Gruppi di una mesh (`SParts`): `body` (smussato), `fine` (smussato fine), `soft` (senza smusso, ombreggiatura liscia a 50°: cuscini, libri, piante), `emit` (lampade e etichette dalla palette). Limiti controllati a ogni esportazione: 150 k triangoli a mesh, altezza della stanza ≤ 3,7 (struttura compresa ≤ 4,0), ingombro dentro la pianta
-(−0,25 … +0,25 m di muro).
-
-Materiali: le istanze del progetto (`MI_ASTRA_Structure/Trim/Rubber/Glass…` — anche i corridoi della plancia, `MI_BRG3_Composite/Ivory/DeckPlate/DarkGlass/Lamps*`) e **17 nuove** `MI_SHIP_*` (Laminate, Steel, Fabric×4, Bedding, Wood,
-Crate×4, Leaf, Tile, PaintRed, Soil, Labels), create da `build_ship_interior.py` (padre `M_ASTRA_Hard` con i set di texture già nel progetto; Labels = `M_ASTRA_Screen` con `T_SHIP_Labels`); i valori sono quelli
-delle anteprime. Nessun asset di terzi nuovo (i caratteri Barlow Condensed e IBM Plex Mono sono già in `docs/licenze.csv`).
-
-Controlli del kit (`ship_kit.py`, a ogni esportazione): budget di triangoli, slot noti, UV finite e limitate, misure contro la scheda (`ship_spec.py`), altezza ≤ 4,0 m; **prove a raggi lungo gli archi del grafo** di ogni ponte costruito (altezze 0,35 / 1,0 / 1,75 m, contro le mesh piazzate) e
-**controllo dei posti** (`check_spots`: chi sta in piedi ha una colonna libera di 22 cm dal ginocchio alla testa, chi siede un torso libero di 12 cm sopra il sedile, e sotto c'è il pavimento; un posto sul mobilio esce con il punto libero più vicino da scrivere nella scheda). Risultato sul piano finale:
-**12 ponti, 18 522 raggi di corridoio e di porta, 0 bloccati; 3 398 posti controllati, 0 sul mobilio** (dentro le stanze i raggi hub → posto sono topologia: ne toccano l'arredo circa un quarto, atteso).
-Le anteprime sono in `docs/progressi/nave/` (JPG sotto i 250 KB): ogni stanza nuova in una vista scelta guardandole (`room_<stanza>_<vista>.jpg`: di solito dalla porta), lo Studio del Capitano in quattro viste e la sua porta nel corridoio (`d1_*`), la fermata della navetta in due, i cunicoli (`modules_keel_*`), la pianta di ogni ponte (`plan_d<N>.jpg`) e, dei ponti 4 e 6, le viste dal piano (`d4_*`, `d6_*`).
+| 5 | `radiator_pumps`, `machinery`, `machinery_b` | 24 × 16 | collettori e pompe del refrigerante (la postazione di controllo ha ora la sedia dal lato dello schermo); aria e acqua; aria compressa |
 
 **Mappa dei file** (`art/blender/`):
 
 | File | Cosa contiene |
 |---|---|
-| `ship_plan.py`, `ship_plan_gen.py`, `ship_checks.py` | misure dei ponti e dell'inviluppo; il generatore del piano (`BUILT_DECKS`, le stanze esistenti, il grafo, `spine_shuttle`); i controlli del piano |
-| `ship_layout.py`, `ship_deck4.py`, `ship_decks.py`, `ship_deck1.py` | il motore (Builder, Passage, Deck, corsie, porte, lampade); il Ponte 4 a mano; i programmi, le stanze uniche e fissate degli altri ponti; lo Studio del Capitano |
-| `ship_spec.py` | la scheda di ogni stanza: misure, porte, **posti**, **lampade** (il piano e le mesh leggono gli stessi numeri) |
-| `ship_catalog.py`, `ship_corridor.py`, `ship_walls.py`, `ship_signs.py` | i toni S, P, K e le misure del reticolo; i moduli di corridoio e i raccordi; i pannelli di parete; targhe e segnali |
-| `ship_rooms.py` (conchiglie e `place`), `ship_rooms_service/social/med/work/hub.py` | le stanze del Ponte 4 e 6 e le torri |
-| `ship_rooms_science/science2.py`, `…_engineering.py`, `…_security.py`, `…_flight.py`, `…_workshops.py`, `…_command.py`, `…_quarters.py`, `…_keel.py`, `…_bridge.py`, `…_transit.py` | le stanze di NAVE-2 per tema (§5.3, §5.4) |
-| `ship_furniture.py` … `ship_furniture8.py`, `ship_craft.py`, `ship_lib.py` | l'arredo in otto biblioteche; i velivoli (Kestrel, vettura della navetta); i materiali, la palette, le etichette, `SParts` |
-| `ship_kit.py`, `ship_kit_preview.py`, `ship_preview.py`, `ship_budget.py` | il generatore del kit e dei controlli; le anteprime (`rooms`, `modules`, `d1`, `d4`, `d6`); il budget per ponte |
+| `ship_plan.py`, `ship_plan_gen.py`, `ship_checks.py` | misure dei ponti e dell'inviluppo; il generatore del piano (e la copia sottile per il gioco); i controlli del piano |
+| `ship_layout.py`, `ship_design.py`, `ship_design_decks.py`, `ship_design_decks2.py` | **il motore** (Builder, Passage, Deck, corsie, porte, collegamenti, gallerie e braccia); **le strutture fisse e le gallerie**; **i programmi dei ponti 2–7 e 8–12** |
+| `ship_vertical.py`, `ship_design_shuttle.py`, `ship_wayfinding.py` | **la rete verticale** (pozzi, approdi, scale, tubi); **la navetta**; **la segnaletica** calcolata sul grafo |
+| `ship_spec.py`, `ship_spec3.py` | la scheda di ogni stanza: misure, porte, **posti**, **lampade** (il piano e le mesh leggono gli stessi numeri); `ship_spec3` le stanze di NAVE-3 |
+| `ship_catalog.py`, `ship_corridor.py`, `ship_corridor2.py`, `ship_walls.py`, `ship_signs.py` | i toni S P K V T e le misure; i moduli di corridoio (K e le celle dei tubi in `ship_corridor`, V e T in `ship_corridor2`); i pannelli di parete; targhe, segnali, cartelli |
+| `ship_rooms.py` (conchiglie e `place`), `ship_rooms_*.py` | le stanze per tema; di NAVE-3: `_care`, `_plants`, `_life`, `_hull`, `_lifts`, `_transit` (rifatto), `_hub` (Concourse e Berthing) |
+| `ship_furniture.py` … `ship_furniture9.py`, `ship_craft.py`, `ship_lib.py` | l'arredo; i velivoli (Kestrel, vettura della navetta); i materiali, la palette, le etichette, `SParts` |
+| `ship_kit.py`, `ship_kit_preview.py`, `ship_preview.py`, `ship_budget.py` | il generatore del kit e dei controlli; le anteprime (`rooms`, `modules`, `modules3`, `car`, `signs`, `d1`, `d4`, `d6`, con i posti nella vista `plan`); il budget per ponte |
 
-## 7. Il gioco: cosa legge il piano (fatto dal lead) e cosa c'è da collegare
+## 11. Il gioco: cosa legge il piano
 
-- **`UAstraShipPlan`** (C++) legge `compartments, doors, graph` (nodo più vicino, rotta A*, compartimento di un punto, porte stagne sigillate, porte a chiave), e da NAVE-2 le lampade (`GetLamps()`) e i ponti con i loro sotto-livelli. Il Capitano sa dove sta ("DECK 4 · MESS CONCOURSE · SECTION B") dal compartimento del piano
-  (`AstraShipSubsystem::CaptainPlace`, `PlanRoomName`): **non cambiare `id`, `kind` e `name` dei compartimenti esistenti né il compartimento di tipo `bridge`**.
-- **Porte**: una `AAstraDoor` per porta del piano (larghezza, altezza e yaw del record, cartella `Interior/Doors`, etichetta `Door_<id>`, nel sotto-livello del suo ponte); le ante scorrono di metà larghezza (il mesh è `SM_COR_DoorLeaf`: 8 cm, scorre dentro il muro). Le porte delle torri delle scale restano **chiuse a chiave** finché il ponte sopra o sotto non ha la sua mappa
-  (`LOCK_STAIRS`: con tutti i ponti costruiti nessuna; importando a tappe, rilanciare i ponti già fatti quando arrivano i vicini); le porte di stanze non ancora modellate (`planned`) non si fanno (oggi non ce ne sono); i portali delle stanze esistenti non si toccano salvo `REMOVE_LIFT_LEAVES`.
-- **Ascensore** (`AstraHangar`, sei tappe: Bridge, Hangar, Engineering, Medbay, Mess, Berth): il Concourse ha il suo banco (`lift.d4_concourse`, in **(-119,1; 9,0; -46,0) m**, davanti alle due porte a x -121,45, y 7,6 e 10,4). Da fare (richiesta §8): mettere `MessLanding` lì (e `BerthLanding` nell'atrio, per esempio
-  (-172; 0; -46)), poi togliere le ante statiche delle alcove (`REMOVE_LIFT_LEAVES = True` distrugge le cartelle `Mess/Lift`, `Berths/Lift` e `Medbay/Lift` e mette una porta scorrevole nell'apertura) e riprovare il tragitto; **l'ascensore deve aspettare il sotto-livello della tappa** (§8, punto 1).
-- **Incidenti** (DISTRUZIONE, [DISTRUZIONE.md](DISTRUZIONE.md)): non più un ponte e una sezione a caso. Il modello dei danni gira sulla pianta: un colpo entra dove GUERRA l'ha messo, attraversa i compartimenti dietro la corazza (`bounds`, `kind`, volume) e ciò che fa in ciascuno è fisica (aria, fuoco, fumo, potenza dei `systems` che ci passano); le paratie di sezione sono le porte `blast`
-  (`SetDoorSealed`, i percorsi di VITA le evitano), le squadre vanno al compartimento vero. **Non cambiare `id`, `kind`, `bounds`, `systems`, le porte `blast` e il loro `boundary` senza rilanciare `tools/damage.py run --scenario all`**: il banco controlla che le paratie si chiudano, che l'aria si fermi, che le porte si trovino per posizione.
-- **VITA** legge `compartments[].stations` e il grafo: i corpi nascono e camminano nei ponti caricati (i ponti non caricati restano un modello, §7bis); `tools/life.py check` verifica che ogni lavoro, posto e casa del file della vita risolva sul piano (oggi OK).
+- **`UAstraShipPlan`** (C++) legge `compartments, doors, graph`, le lampade (`GetLamps()`), i ponti con i loro sotto-livelli e, da NAVE-3, `vertical[]` e `transit[]` (**ASCENSORI**: `UAstraLiftSubsystem` costruisce pozzi, vetture, ante, pannelli e voce dal piano all'inizio del gioco; `FindRide` cerca il nodo di attesa per posizione, 90 cm). Il Capitano sa dove sta ("DECK 4 · MESS CONCOURSE · SECTION B") dal compartimento del piano: **non cambiare `id`, `kind` e `name` dei compartimenti esistenti né il compartimento di tipo `bridge`**.
+- **Porte**: una `AAstraDoor` per porta del piano **esclusa quella con il flag `lift`** (nome `Door_<id>`, cartella `Interior/Doors`, nel sotto-livello del ponte). Le porte delle torri delle scale restano chiuse a chiave finché il ponte vicino non ha la mappa (`LOCK_STAIRS`).
+- **Incidenti** (DISTRUZIONE): il modello dei danni gira sulla pianta; le paratie di sezione sono le porte `blast`. **Il banco (`tools/damage.py run --scenario all`) nomina quattro compartimenti del Ponte 4**: `d4_games_D1`, `d4_games_D2`, `d4_store_dry_C1`, `d4_spm_D3` (la Spine in sezione D: per questo il pezzo di Spine del Ponte 4 che la contiene si chiama `SPM`), e un controllo ("lascia andare gli effetti quando il Capitano è lontano") **dipende dalla geometria**:
+  gli effetti stanno dentro 35 m dal Capitano e la stanza vicina `d4_games_D1` deve stare entro 45 m dal centro di `d4_games_D2` (e il bar accanto più indietro di 35 m dopo gli 80 m): per questo due stanze del Ponte 4 hanno 4 m di vuoto davanti (`gap:4`). **Non cambiare** le posizioni di queste quattro stanze senza rilanciare il banco (46/46).
+- **VITA** legge `compartments[].stations` e il grafo; `tools/life.py check` verifica che ogni lavoro, posto e casa del file della vita risolva sul piano (con le stanze nuove: dentista, obitorio, counselling, cella, ufficio della sicurezza, nuclei di calcolo, simulatori, camere stagne e capsule, negozio; case: le sale cuccette dei Ponti 4, 6, 9, 11 e le cabine; **nessun posto letto resta senza un selettore di casa**, controllato).
 
-## 7bis. La nave in scala: istanze, lampade, sotto-livelli (NAVE-2)
+## 11bis. La nave in scala: istanze, lampade, sotto-livelli (NAVE-2, valido anche per NAVE-3)
 
-Il vincolo: ~7000 pezzi, ~1050 porte, ~3200 lampade, memoria di gioco ≤ 9 GB, un ponte che entra in meno di un secondo, mai sotto i 45 fps camminando su un MacBook Air M4. Come attori sarebbero 7000 attori, 7000 componenti e 3200 luci: la soluzione in quattro parti.
+Il vincolo: ~12 000 pezzi, ~1 750 porte-attore, ~4 400 lampade, memoria di gioco ≤ 9 GB, un ponte che entra in meno di un secondo, mai sotto i 45 fps camminando su un MacBook Air M4.
 
-1. **Istanze, non attori** (`AAstraDeckShell`, C++). Un attore per ponte tiene tutte le mesh del ponte come istanze (`AddInstancesChunked`): un componente per mesh **per tratto di 160 m lungo la nave** (un componente si registra e si scarta come un tutt'uno), i trasformi in un solo array piatto, nessun tick. Un ponte ha 509–791 pezzi di 25–65 mesh diverse: **106–190 componenti**
-   (Ponte 4: 190; la plancia: 3; 1649 per l'intera nave). Una copia di ogni mesh in memoria comunque la usino molti ponti.
-2. **Lampade come dati, un pool di luci vere** (`UAstraLampPool`). Le `lights[]` del piano (3165, ~270–350 per ponte) sono un array piatto `FAstraPlanLamp`; il pool sposta **10** `URectLightComponent` (default `astra.lamps.max`, ombre spente) sulle lampade più utili al Capitano: nella sua stanza, nel corridoio dove sta fin dove lo vede, nella stanza dietro una porta
-   quando le è a meno di 9 m; sfumano in 0,35 s (`astra.lamps.fade`), la scelta si rifà 5 volte al secondo (le lampade accese tengono il posto se non sono chiaramente battute). Le lampade emissive delle mesh seguono l'allerta dalla palette; le luci del pool seguono livello di luce e allerta (`astra.lamps.gain` moltiplica i lumen del piano, 6 di default).
-   Le luci delle stanze vecchie (plancia, Mess, Medbay, Engineering, Flight Deck) restano attori del livello persistente con le loro regole. Comandi: `astra.lamps 0|1`, `astra.lamps.info`.
-   **Il danno** (DISTRUZIONE): il pool e le luci delle stanze vecchie seguono la stanza in cui stanno (`FAstraDamageModel::LightOf`): senza potenza restano le strisce di emergenza rosse, con un'alimentazione che cede sfarfallano, un fuoco le fa arancioni, un foro che si svuota rosse, il fumo le attenua, una stanza perduta è al buio (`astra.lamps.info` lo dice per ogni lampada accesa).
-3. **Un sotto-livello per ponte, in streaming** (`UAstraDeckStreaming`). Ogni ponte costruito è una mappa `/Game/ASTRA/Maps/Decks/L_Deck01 … L_Deck12` (`ULevelStreamingDynamic` di L_Bridge, inizialmente scaricato e nascosto) con il suo guscio, le sue porte e nulla più. Il sottosistema tiene caricato il ponte del Capitano e, se non è dentro una sala, i ponti che le sue
-   colonne di scale raggiungono (la plancia, che non ha scale, tiene solo il suo: **sul Ponte 1 c'è una porta sola**); scarica gli altri dopo 20 s (`astra.decks.unload_delay`), controlla a 4 Hz. L'ascensore usa `RequestAt` (chiede), `IsReadyAt` (aspetta) e `ForceReadyAt` (carica subito, bloccante, a schermo nero: l'ultima risorsa). In editor i ponti sono tutti caricati
-   (si guarda la nave intera). Comandi: `astra.decks` (quali ponti ci sono e quali vuole il Capitano), `astra.decks.pin <ponte> [0|1]`, `astra.decks.all 1`. La plancia, le stanze vecchie e il cielo restano nel livello persistente.
-4. **Porte attori, segnaletica istanze.** Le porte si muovono, restano `AAstraDoor` nel sotto-livello del ponte (con il ponte caricato ne tickano ~100 per ponte; sulla plancia una); targhe e segnali sono istanze del guscio.
+1. **Istanze, non attori** (`AAstraDeckShell`). Un attore per ponte tiene tutte le mesh del ponte come istanze (`AddInstancesChunked`): un componente per mesh **per tratto di 160 m lungo la nave**, i trasformi in un solo array piatto, nessun tick. Con NAVE-3 un ponte ha **851–1 426 pezzi** (la segnaletica è circa un quarto dei pezzi in più: le lame e le ordinate sono istanze piccole) di 33–100 mesh diverse.
+2. **Lampade come dati, un pool di luci vere** (`UAstraLampPool`): le `lights[]` del piano sono un array piatto; il pool sposta **10** `URectLightComponent` (ombre spente) sulle lampade più utili al Capitano, sfumano in 0,35 s, la scelta si rifà 5 volte al secondo; `astra.lamps.gain` (6) moltiplica i lumen del piano. Il danno (DISTRUZIONE) le segue (strisce rosse senza potenza, sfarfallio, fuoco).
+3. **Un sotto-livello per ponte, in streaming** (`UAstraDeckStreaming`): `/Game/ASTRA/Maps/Decks/L_Deck01 … L_Deck12`; il Capitano tiene caricato il suo ponte e quelli che le sue scale raggiungono (e, in ascensore, quello della tappa: `RequestAt`).
+4. **Porte attori, segnaletica istanze.** Le porte restano `AAstraDoor` (una lontana dal Capitano tick-a 4 volte al secondo: `AstraDoor.cpp`); i cartelli, le targhe e le ordinate sono istanze del guscio.
 
-**Lo script** (`tools/ue_scripts/build_ship_interior.py`, v2, idempotente, stampa un rapporto JSON): materiali → importazione del kit solo dei file nuovi o cambiati (`Saved/Ship/kit_stamp.json`; `REBUILD_KIT = "all"` rifà tutto) → per ogni ponte con pezzi nel piano una mappa nuova (guscio + porte) → `L_Bridge` con i sotto-livelli collegati → copia sottile del piano in `Content/ASTRA/Data`
-(compartimenti con le lampade, porte, grafo; senza `placements` e `notes`) → apertura delle alcove (`REMOVE_LIFT_LEAVES`) e dello Studio del Capitano (`OPEN_READY_ROOM`). Parametri (globali prima di lanciarlo): `DECKS` (es. `[5, 8]`: solo quei ponti), `REBUILD_KIT`, `CHUNK_M`, `LOCK_STAIRS`, `REMOVE_LIFT_LEAVES`, `OPEN_READY_ROOM`, `SAVE_LEVEL`, `ROOT/LEVEL/DECK_DIR`.
-Il rapporto elenca per ponte i posizionamenti, le istanze, i componenti, le mesh distinte, i triangoli, le porte e quelle chiuse a chiave, e i problemi di misure delle mesh importate.
+**Lo script** (`tools/ue_scripts/build_ship_interior.py`, v2, idempotente, rapporto JSON): materiali → importazione del kit (solo i file nuovi o cambiati; `REBUILD_KIT = "all"` rifà tutto) → per ogni ponte una mappa nuova (guscio + porte **senza quelle `lift`**) → `L_Bridge` con i sotto-livelli → copia sottile del piano in `Content/ASTRA/Data` → apertura delle entrate delle stanze esistenti (`REMOVE_LIFT_LEAVES`: le ante statiche delle vecchie alcove; la porta si mette una volta) e dello Studio (`OPEN_READY_ROOM`).
+Parametri: `DECKS`, `REBUILD_KIT`, `CHUNK_M`, `LOCK_STAIRS`, `REMOVE_LIFT_LEAVES`, `OPEN_READY_ROOM`, `SAVE_LEVEL`, `ROOT/LEVEL/DECK_DIR`.
 
-**Il banco senza grafica** (`UAstraNaveCommandlet`, `-run=AstraNave`): sul piano vero verifica che ogni lampada sta dentro il suo compartimento, che un Capitano che percorre ogni ponte vede accendersi e spegnersi le sue lampade senza sfarfallio, poche alla volta, che la stanza dietro una porta chiusa resta buia finché non le è accanto, che i ponti voluti
-attorno a un Capitano su una colonna di scale, in una sala e nella chiglia sono quelli giusti; con `-load=<ponte>` costruisce un ponte in un mondo senza renderer dalle mesh importate (Ponte 4: **60 ms**, 640 istanze in 190 componenti, 102 porte; il costo vero in cartella è la GPU, che si misura camminando).
-
-**Budget per ponte** (`ship_budget.py`; "triangoli di istanza" = tutte le istanze viste insieme: il tetto, non ciò che sta davanti al Capitano; con Nanite i triangoli sono memoria e disco, non tempo di fotogramma):
+**Budget per ponte** (`ship_budget.py`; "triangoli di istanza" = tutte le istanze viste insieme: il tetto, non ciò che sta davanti al Capitano; con Nanite i triangoli sono memoria e disco):
 
 | Ponte | pezzi | mesh | tri mesh distinte | componenti | porte | lampade | stanze |
 |---|---|---|---|---|---|---|---|
 | 1 | 3 | 3 | 0,06 M | 3 | 1 | 4 | 1 |
-| 2 | 509 | 44 | 1,27 M | 107 | 56 | 171 | 37 |
-| 3 | 523 | 36 | 0,93 M | 106 | 50 | 241 | 30 |
-| 4 | 640 | 65 | 2,19 M | 190 | 102 | 242 | 75 |
-| 5 | 725 | 56 | 1,88 M | 171 | 99 | 327 | 81 |
-| 6 | 705 | 59 | 1,80 M | 182 | 123 | 269 | 103 |
-| 7 | 665 | 43 | 1,41 M | 158 | 101 | 305 | 81 |
-| 8 | 670 | 54 | 1,77 M | 155 | 106 | 311 | 87 |
-| 9 | 682 | 47 | 1,59 M | 146 | 103 | 326 | 88 |
-| 10 | 679 | 43 | 1,44 M | 153 | 98 | 300 | 80 |
-| 11 | 683 | 44 | 1,47 M | 148 | 100 | 321 | 82 |
-| 12 | 791 | 25 | 0,48 M | 130 | 109 | 350 | 88 |
+| 2 | 851 | 95 | 1,70 M | 221 | 96 | 222 | 63 |
+| 3 | 911 | 102 | 1,76 M | 255 | 103 | 282 | 65 |
+| 4 | 1 157 | 129 | 2,70 M | 336 | 164 | 376 | 117 |
+| 5 | 1 426 | 138 | 2,82 M | 368 | 169 | 456 | 113 |
+| 6 | 1 382 | 138 | 2,40 M | 371 | 208 | 480 | 162 |
+| 7 | 1 318 | 136 | 2,66 M | 350 | 179 | 446 | 137 |
+| 8 | 1 199 | 136 | 2,94 M | 337 | 159 | 397 | 118 |
+| 9 | 1 380 | 136 | 2,49 M | 353 | 182 | 460 | 145 |
+| 10 | 1 255 | 96 | 1,74 M | 301 | 153 | 395 | 115 |
+| 11 | 1 350 | 122 | 2,08 M | 348 | 179 | 458 | 139 |
+| 12 | 1 086 | 54 | 0,54 M | 200 | 136 | 382 | 95 |
 
-Il Capitano su un ponte di mezzo ha caricato il suo e i due vicini: ~403–543 componenti, ~208–330 porte, ~654–947 lampade nei dati (10 luci vere). **Sulla plancia in battaglia (il banco di prestazioni del lead) NAVE-2 aggiunge una porta, nessun attore con tick e nessun componente di testo**.
+(NAVE-2: 509–791 pezzi, 106–190 componenti per ponte: il raddoppio è la segnaletica, le stanze di servizio e le nuove banche.) Le porte sono quelle che diventano attori: **le porte d'approdo degli ascensori (`lift`) non sono contate**.
 
-**Cosa guardare camminando** (in ordine, con `astra.decks` e `astra.lamps.info` aperti; fps e memoria con `stat unit` e `stat memory`):
+Il Capitano su un ponte di mezzo ha caricato il suo e i due vicini: **~850–1 090 componenti, ~440–560 porte, ~1 250–1 380 lampade nei dati (10 luci vere); la plancia, in battaglia, ha una porta e nessun componente in più**. Il tetto delle porte-attore residenti è stato portato da 400 a 600 (le stanze e le porte sono il doppio di NAVE-2; una porta lontana tick-a 4 Hz): è il numero da guardare camminando.
 
-1. L'esito dello script: `bounds_problems` vuoto, per ponte le istanze uguali ai pezzi del piano, `existing entrances opened` e `ready room: 3 actors … removed` (il modulo con finestra e due pannelli) la prima volta, **0** la seconda (idempotenza).
-2. **Ponte 1.** Dalla plancia al corridoio di babordo, la porta dello Studio a x -15,8 (la targa sopra): si apre, dentro la luce arriva dal pool (4 lampade), la scrivania sotto l'oblò, il tavolo olografico a prua; il corridoio non ha buchi dove c'era la finestra (la finestra è nel modulo nuovo, il vetro `CorrPort_Glass` è quello di prima).
-3. **L'ascensore dalla plancia al Ponte 4, 6, 7, 9** con la richiesta di caricamento (§8): nessun fotogramma nel vuoto all'arrivo; senza la richiesta l'arrivo può essere su un ponte non ancora caricato.
-4. **Scale.** Dal Ponte 4 giù fino al 12 (e su fino al 2) dalla colonna `stair_92n`: ogni porta di torre si apre, i ponti si caricano davanti al Capitano senza fermare il gioco (`astra.decks`), il Ponte 3 ha la scala da 5,3 m, il Ponte 2 il cappuccio.
-5. **Ponte 5**: Transporter Room (le sei pedane), Astrometrics, una fermata della navetta (la vettura ferma, ci si sale con un gradino di 16 cm). **Ponte 8**: l'hangar con i due Kestrel (la rampa), il poligono (il cancello del recinto sulla linea porta → centro), la caserma. **Ponte 7**: l'ingresso di Main Engineering dal raccordo.
-   **Ponte 9**: il Flight Deck solo in ascensore, la sala operativa. **Ponte 12**: i cunicoli (1,7 m): testa e spalle, la luce ambra, i portelli.
-6. Le luci: entrando in una stanza si accendono le sue lampade in meno di mezzo secondo, mai più di 10 insieme, nessuno scatto uscendo; chi guarda da un corridoio dentro una stanza aperta la vede accesa.
-7. fps camminando sui ponti 4, 5, 8 (i più pieni) e 12; memoria dopo aver percorso tutti i ponti (i vecchi si scaricano dopo 20 s).
+**Cosa guardare camminando** (con `astra.decks` e `astra.lamps.info` aperti; fps e memoria con `stat unit` e `stat memory`):
 
-## 8. Da sistemare fuori dai miei file (richieste al lead)
+1. L'esito dello script: `bounds_problems` vuoto, per ponte le istanze uguali ai pezzi del piano, `existing entrances opened` la prima volta, 0 la seconda.
+2. **Gli ascensori** (ASCENSORI): dalla plancia con i due ascensori di plancia ai Ponti 4, 6, 7, 9; le lobby di una banca (cornici, indicatori, elenco del ponte); la distanza a piedi dall'ascensore più vicino (a occhio ≤ 80 m); i cartelli a lama con le frecce giuste ("TURBOLIFTS →" porta davvero a una lobby).
+3. **Il Ponte 4**: il nuovo **Mess Concourse** (caffè, negozio, giardino, doghe, schermi), la strada dei marinai, l'atrio del Berthing; **il Ponte 5**: la navetta (la banchina, il tunnel, i respingenti ai capolinea; la vettura la fa correre ASCENSORI); **Ponte 6**: il complesso medico (dentista, obitorio, counselling); **Ponte 8**: cella, caserme, hangar con i Kestrel; **Ponte 7**: gli impianti.
+4. **Il labirinto**: da una torre delle scale a una galleria dello scafo (tono V), le camere stagne e le capsule, un tubo di Jefferies (la scala a pioli), un cunicolo K.
+5. Le luci: entrando in una stanza si accendono le sue lampade in meno di mezzo secondo, mai più di 10 insieme. fps camminando sui Ponti 4, 5, 8 (i più pieni) e 12; memoria dopo aver percorso tutti i ponti.
 
-1. **L'ascensore deve aspettare il ponte** (`AstraHangar.cpp`, `RideLift` e `TryUseLift` per l'inizio, `Tick` per l'attesa). All'inizio della corsa: `if (auto* DS = GetWorld()->GetSubsystem<UAstraDeckStreaming>()) DS->RequestAt(RideTo, 30.f);`. Nel `Tick`, dove `Before < 0.9f && LiftT >= 0.9f` fa il teletrasporto: se `!DS->IsReadyAt(RideTo)`
-   tenere l'auto ferma a `LiftT = 0.89f` (a schermo nero), e dopo 6 s di attesa chiamare `DS->ForceReadyAt(RideTo)`; poi proseguire. Senza, chi arriva su un ponte non ancora caricato cade nel vuoto.
-2. **Crew Berthing: "Deck 3" sul piano del Ponte 4.** Il Berthing dice DECK 3 ma poggia a z -46 come la Mess (il piano di Deck 3, -42, è sotto la pelle interna dello scafo). Il piano lo registra su `plane: 4` con `label_deck: 3`, e nell'atrio c'è una targa "DECK 3".
-   Due scelte: (A) tenere "Deck 3" (canon) e alzarlo di 4 m (sotto il blocco: lo scafo è già aperto, punto 3); (B, consigliata) chiamarlo **Deck 4 · Section C** e dire nella BIBBIA che il Ponte 3 ha gli alloggi ufficiali e la palestra (adesso lo sono davvero). Per (B) cambiare: `data/ship/aquila_berths.json` (`name`, `signage`),
-   `AstraShipSubsystem.cpp`, `ASTRAPlayerController.cpp` (la lista delle tappe dell'ascensore), `AstraHangar.cpp` (~413) e il commento di `AstraHangar.h`, i docstring di `build_berths.py`/`berths.py`, e nell'atlante `room_deck3` (l'etichetta dell'atrio).
-3. **Lo scafo sotto il blocco (Ponti 2 e 3): fatto da ARTE-NAVI, da verificare camminando.** Il blocco superiore (x hull -327,6..132,6) e l'isola erano solidi chiusi sopra lo scafo inferiore: la faccia inferiore del blocco pendeva 1,08 m sopra il pavimento del Ponte 3 e il Ponte 2 stava dentro il blocco. ARTE-NAVI (unita il 1/10) ha aperto lo scafo (`art/blender/ship3_astra.py`: il blocco e l'isola poggiano sullo scafo inferiore senza fondo e senza facce nello spazio dei ponti) e il suo controllo `nave_checks` legge **questo piano** (`decks[].envelope`: l'esterno non deve avere vertici dentro nessun ponte). Con i ponti 2 e 3 costruiti: rigenerare lo scafo e controllare camminando sul 2 e sul 3 che non si vedano piani fantasma dall'interno (faccia inferiore del blocco, pareti dell'isola); se si vedono, è lì. Lo scafo non ha collisione né ombra.
-4. **Radiatori sul Ponte 5.** *Fatto da DISTRUZIONE*: `RadiatorHit` mette i danni ai radiatori sul **Ponte 7**, sezioni E–G (ala per ala), e manda la squadra al locale pompe del collettore (`radiator_pumps`) se il piano lo ha.
-5. **Il Flight Deck solo in ascensore.** Il suo ingresso è un'alcova a z -72,8, il corridoio del Ponte 9 è a -66: nessun cammino a piedi (il piano lo sa: arco con salto di 6,8 m che VITA percorre come un ascensore). Se si vuole una rampa o una scala, serve una torre dedicata.
-6. **Il Ponte 1 e `build_bridge_v3.py`**: lo Studio sostituisce un modulo e due pannelli del corridoio; lanciare `build_ship_interior.py` dopo `build_bridge_v3.py` (o far sapere al secondo di saltarli: etichette `CorrPort_Window`, `CorrPort1_0_*_R`).
-7. **Atlante delle etichette** (`tools/art/ship_textures.py`, fuori dalla lista dei file): sono state aggiunte le targhe e i tag dei nuovi ponti (3936 di 4096 px usati: restano ~160 px di altezza; il prossimo gruppo di tag ne vuole un secondo atlante).
-8. **Cottura.** Verificare che `/Game/ASTRA/Maps/Decks` (le dodici mappe) e `/Game/ASTRA/Kit/Ship` finiscano nel pacchetto (i sotto-livelli sono riferimenti deboli di L_Bridge).
-9. **Prestazioni, opzionale.** Con il Capitano su un ponte di mezzo tickano ~320 `AAstraDoor` (ognuna scorre i camminatori vicini): un `TickInterval` di 0,1 s quando la porta è ferma e nessuno è a meno di 6 m basta; la compilazione unity dei file nuovi (`AstraLampPool`, `AstraDeckStreaming`, `AstraDeckShell`, `AstraNaveCommandlet`) è stata provata nella worktree.
+## 12. Prove e risultati (offline)
 
-## 9. Limiti noti
+| Prova | Risultato |
+|---|---|
+| `ship_checks.py` (piano versione 2) | **0 problemi, 0 avvisi**: 3 234 compartimenti, nessuna sovrapposizione, un solo componente connesso, programma completo, 746 posti letto per 560 (+33 %), 800 posti in capsule, pozzi e approdi, nodo di attesa a 0 cm, navetta |
+| `tools/life.py check` | OK; 644 posti letto in 46 stanze, nessuno senza una casa |
+| `tools/damage.py run --scenario all` | **46/46 PASS** (con l'editor compilato di `main` e il piano nuovo) |
+| `ship_kit.py` (kit completo con prove) | 0 problemi di mesh; **0 rotte bloccate, 0 posti sul mobilio** su 12 ponti |
+| Anteprime Eevee | guardate davvero, stanza per stanza (le critiche: sedili senza nessuno, sguardi contro il muro, caschi nel varco di una porta, pozzi chiusi sulle porte, specchi neri, partizione del dentista, atrio vuoto, frecce a specchio: tutte corrette) |
 
-- **Non provato nell'editor.** Il kit e le anteprime sono verificati in Blender (Eevee) e con i raggi; il piano con i controlli e `tools/life.py`; il C++ compilato; lampade e ponti attorno al Capitano dal banco `-run=AstraNave`. Lo script di Unreal (parametri delle istanze, orientamento delle `RectLight`, proprietà `locked` della porta, tolleranza dei limiti dopo l'importazione: 6 cm,
-  l'apertura dello Studio) e tutto ciò che è GPU (tempo di fotogramma, memoria, il carico di un ponte con i proxy di scena) vanno provati dal lead: se l'importazione dice `bounds problems` o una porta non si chiude a chiave, è lì.
-- **La navetta della Spine non corre.** Ci sono le sette fermate (A, B, C, D, E, G, H) con la vettura ferma; non c'è un arco `shuttle` nel grafo né un veicolo che si muove. La sezione F non ha fermata: il suo tronco di Spine libero (20 m) è più corto di una fermata (24 m) e una stanza non può stare a cavallo del portello stagno.
-- Il Ponte 4 in Unreal è scuro nelle anteprime senza luci: le luci del pool (10 alla volta) fanno la stanza; il rimbalzo delle anteprime è finto (una luce d'area sotto il soffitto), Lumen farà il suo.
-- Le porte delle stanze verso il passaggio dal lato lontano (`_far`) esistono nel piano; nel Lounge e nella sala giochi aprono sul passaggio laterale.
-- Sezione E del Ponte 4: solo corridoi e le stanze esterne (la sala Engineering tiene il centro); sezione H solo stores interni. Le stanze esterne finiscono a x -484 (l'inviluppo si stringe).
-- L'Observation Deck e il Bow Observation hanno vetri traslucidi (mesh non Nanite); dietro non c'è altro che il cielo: lo scafo non copre le finestre. Lo stesso per l'oblò dello Studio (un campo di stelle di lampade, non un'immagine del cielo vero).
-- Il reticolo è ortogonale: non c'è un modulo di curva. La scala a pioli autonoma (`SM_SHIP_LadderTrunk`) è pronta ma non piazzata.
-- **VITA e i nuovi luoghi.** I marines non hanno l'hangar (`kinds: ["hangar"]`) tra i luoghi di servizio (armory, range, cabins): nessun fante sta accanto ai Kestrel, mentre gli addetti al Flight Deck e i piloti (che hanno `hangar`) useranno l'hangar delle navette come un secondo hangar; aggiungere
-  `{"kinds": ["hangar"], "dept": "security", "weight": 2}` ai marines in `data/ship/aquila_life.json` (non è un mio file). Lo Studio (`ready_room`) e le fermate (`transit`) non sono tra i luoghi di servizio né di svago del file: restano deserti finché VITA non li elenca (hanno i loro posti, pronti).
-- Le mesh dei ponti grossolani non esistono più (nessun ponte è grossolano), ma `plan_deck(coarse=True)` resta per provare un ponte nuovo: basta toglierlo da `BUILT_DECKS` (`ship_plan_gen.py`).
+**Distanza dall'ascensore più vicino** (§7) e **programma** (§5.1) sono i numeri di progetto: la mediana a piedi dall'ascensore è di 32–48 m su tutti i ponti d'equipaggio, il 90° percentile 56–92 m.
+
+## 13. Richieste al lead (fuori dai miei file)
+
+1. **DISTRUZIONE (C++): profili per i tipi nuovi.** Il modello dei danni tratta `lobby`, `lift` (pozzo), `trunk`, `tunnel`, `transit`, `lifepod`, `airlock`, `dental`, `morgue`, `counselling`, `computer`, `simulator`, `shop` come stanze qualunque per volume. Un pozzo di ascensore o un tubo di Jefferies **non porta fumo e aria da un ponte all'altro** (un compartimento per pozzo): se lo si vuole, serve codice. Gli archi `shuttle` hanno larghezza 0,05 m (il banco li legge come un'apertura); gli archi `stair` con `ladder: true` sono i tubi di Jefferies (nessuna regola nel modello).
+2. **Il banco dei danni nomina compartimenti del Ponte 4 per id** (`d4_games_D1/D2`, `d4_store_dry_C1`, `d4_spm_D3`): reggono finché il layout non cambia; scegliere per tipo e posizione toglierebbe questa dipendenza.
+3. **VITA e la navetta:** il piano ha gli archi `shuttle` e le otto fermate (`platform`); il file della vita non manda nessuno in navetta (non è una regola di casa: il C++ sceglie i percorsi sul grafo; un arco `shuttle` costa tempo di corsa + sosta).
+4. **Atlante e importazione:** `T_SHIP_Labels.png` è ora 4096 × 6144; il kit sono ~430 mesh (la prima importazione è lunga: lasciare `REBUILD_KIT = "changed"` dopo la prima). `Content/ASTRA/Data/aquila_plan.json` (5,5 MB) e `aquila_life.json` sono i file che il gioco legge: vanno nel commit.
+5. **Le stanze vecchie e le loro alcove** (Mess Hall, Berths, Medbay): le entrate sono dei vecchi attori di L_Bridge; `REMOVE_LIFT_LEAVES` toglie le ante statiche (cartelle `Mess/Lift`, `Berths/Lift`, `Medbay/Lift`) e mette la porta: se ASCENSORI le ha già tolte, lo script lo dice (`the door is there already`).
+
+**Ancora aperti da NAVE-2** (non sono cambiati):
+- **Crew Berthing: "Deck 3" sul piano del Ponte 4.** Il Berthing dice DECK 3 ma poggia a z -46 come la Mess. Il piano lo registra su `plane: 4` con `label_deck: 3`. Consigliato: chiamarlo **Deck 4 · Section C** (la BIBBIA: il Ponte 3 ha gli alloggi ufficiali e la palestra, adesso lo sono davvero) cambiando `data/ship/aquila_berths.json`, `AstraShipSubsystem.cpp`, `ASTRAPlayerController.cpp`, i docstring di `build_berths.py`/`berths.py` e l'etichetta `room_deck3`.
+- **Lo scafo sotto il blocco (Ponti 2 e 3)**: aperto da ARTE-NAVI; con i ponti costruiti, controllare camminando sul 2 e sul 3 che non si vedano piani fantasma dall'interno (faccia inferiore del blocco, pareti dell'isola). Lo scafo non ha collisione né ombra.
+- **Il Flight Deck solo in ascensore**: il suo ingresso è un'alcova a z -72,8, il corridoio del Ponte 9 è a -66 (un arco con salto di 6,8 m che VITA percorre come un ascensore); per una rampa serve una torre dedicata.
+- **Il Ponte 1 e `build_bridge_v3.py`**: lo Studio sostituisce un modulo e due pannelli del corridoio; lanciare `build_ship_interior.py` dopo `build_bridge_v3.py`.
+- **Cottura**: verificare che `/Game/ASTRA/Maps/Decks` (le dodici mappe) e `/Game/ASTRA/Kit/Ship` finiscano nel pacchetto (i sotto-livelli sono riferimenti deboli di L_Bridge).
+
+## 14. Limiti noti
+
+- **Non provato nell'editor.** Il kit e le anteprime sono verificati in Blender (Eevee) e con i raggi; il piano con i controlli, `tools/life.py` e il banco dei danni; ciò che è GPU (tempo di fotogramma, memoria, il carico di un ponte con 1 400 istanze) va provato dal lead.
+- **I pozzi e le vetture** non sono mie: il kit ha le lobby e i pozzi (pareti), non le vetture né le ante d'approdo; **la vettura della navetta** è una mesh a parte e la sua corsa è di ASCENSORI.
+- **Le altre navi** (fase C: un piano per ogni classe di `data/war/classes.json`): non ancora, quando il lead lo chiede.
+- Le gallerie e le braccia (toni V e K) non hanno cartelli a lama (solo targhe e ordinate): ci si orienta con i cartelli dei passaggi e con le targhe delle camere stagne e delle capsule.
+- La chiglia (Ponte 12): la punta di prua dei serbatoi dista fino a 196 m dall'ascensore più vicino (solo serbatoi e cunicoli); gli ambienti d'equipaggio sono tutti entro il 90° percentile di 100 m.
+- L'Observation Deck e il Bow Observation hanno vetri traslucidi (mesh non Nanite). Il reticolo è ortogonale (nessuna curva). La scala a pioli autonoma (`SM_SHIP_LadderTrunk`) è pronta ma non piazzata.
+- Il Concourse ha molti più posti (23): VITA lo userà come luogo di svago e come mensa di riserva più di prima.

@@ -161,15 +161,23 @@ _reg("pharmacy", name="Pharmacy", kind="pharmacy", dept="medical", L=12.0, D=16.
 _reg("concourse", name="Mess Concourse", kind="concourse", dept="services", L=17.7, D=36.0, h=3.7, plate="concourse", doors=[],
      systems=["power_bus", "life_support"], special=True,
      spots=[spot("crew", "stand", 4.0, 11.5, 180), spot("crew", "sit", 6.75, 17.0, 0), spot("crew", "sit", 6.75, 19.0, 0), spot("crew", "sit", 11.25, 17.0, 180),
-            spot("crew", "sit", 11.25, 19.0, 180), spot("crew", "sit", 7.0, 0.75, 90), spot("crew", "sit", 8.4, 35.25, -90), spot("crew", "stand", 3.4, 27.0, 0)],
-     lights=[light(9.0, 18.0, 3.6, 9000, 4200, (10.0, 2.0), 1400), light(9.0, 8.0, 3.6, 5000, 3600, (6.0, 2.0), 1100),
-             light(9.0, 28.0, 3.6, 5000, 3600, (6.0, 2.0), 1100)])
+            spot("crew", "sit", 11.25, 19.0, 180), spot("crew", "sit", 7.0, 0.75, 90), spot("crew", "sit", 8.4, 35.25, -90), spot("crew", "stand", 3.4, 27.0, 0),
+            # the café (north): the stools along the counter, the chairs at the two tables, the sofa, the barista behind the bar
+            spot("crew", "sit", 7.95, 5.0, 0), spot("crew", "sit", 7.95, 6.35, 0), spot("crew", "sit", 7.95, 7.7, 0), spot("crew", "sit", 7.95, 9.05, 0),
+            spot("crew", "sit", 5.65, 3.9, 0), spot("crew", "sit", 7.15, 3.9, 180), spot("crew", "sit", 5.65, 11.2, 0), spot("crew", "sit", 7.15, 11.2, 180),
+            spot("crew", "sit", 5.75, 6.9, 0), spot("crew", "sit", 5.75, 8.1, 0), spot("barista", "work", 9.4, 7.5, 180, "services"),
+            # the ship's store (south): the cashier behind the counter, shoppers at the shelves
+            spot("storekeeper", "work", 8.95, 26.2, 180, "services"), spot("crew", "stand", 7.0, 26.2, 0), spot("crew", "stand", 7.8, 28.6, 90), spot("crew", "stand", 6.4, 29.0, 0)],
+     lights=[light(9.0, 18.0, 3.6, 9000, 4200, (10.0, 2.0), 1400), light(7.7, 7.5, 2.85, 4500, 3000, (4.0, 8.0), 700), light(7.7, 28.5, 2.85, 4500, 3200, (4.0, 8.0), 700),
+             light(3.0, 18.0, 3.6, 3500, 3200, (3.0, 8.0), 900), light(15.0, 18.0, 3.6, 3500, 3800, (3.0, 8.0), 900), light(9.0, 2.0, 3.6, 2500, 3600, (8.0, 2.0), 800),
+             light(9.0, 34.0, 3.6, 2500, 3600, (8.0, 2.0), 800)])
 _reg("berth_lobby", name="Berthing Lobby", kind="concourse", dept="services", L=14.6, D=36.0, h=3.6, plate=None, doors=[],
      systems=["power_bus", "life_support"], special=True,
      spots=[spot("crew", "sit", 12.4, 7.2, 180), spot("crew", "sit", 12.4, 8.8, 180), spot("crew", "sit", 8.7, 6.6, 0), spot("crew", "sit", 12.4, 27.2, 180),
             spot("crew", "sit", 12.4, 28.8, 180), spot("crew", "sit", 8.7, 29.4, 0)],
-     lights=[light(7.3, 18.0, 3.5, 4500, 3600, (8.0, 3.0), 1200), light(7.3, 8.0, 3.5, 2500, 3200, (5.0, 2.0), 900),
-             light(7.3, 28.0, 3.5, 2500, 3200, (5.0, 2.0), 900)])
+     lights=[light(7.3, 18.0, 3.5, 4500, 3600, (8.0, 3.0), 1200), light(10.4, 8.0, 2.85, 4000, 3000, (6.0, 6.0), 700), light(10.4, 28.0, 2.85, 4000, 3000, (6.0, 6.0), 700),
+             light(3.5, 18.0, 3.4, 2500, 3200, (3.0, 3.0), 800), light(11.5, 18.0, 3.4, 2500, 3200, (3.0, 3.0), 800), light(7.3, 3.0, 3.4, 1800, 3600, (6.0, 2.0), 700),
+             light(7.3, 33.0, 3.4, 1800, 3600, (6.0, 2.0), 700)])
 _reg("stair_tower", name="Stair Tower", kind="stairs", dept="neutral", L=8.0, D=8.0, h=3.4, plate="stairs", doors=[door("near", 2.0)],
      systems=["power_bus"], special=True, spots=[], lights=[light(4.0, 4.0, 3.3, 3000, 4500, (3.0, 3.0), 800)])
 _reg("bow_obs", name="Bow Observation", kind="observation", dept="command", L=20.0, D=32.0, h=3.7, plate="bow_obs", doors=[],
