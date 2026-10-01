@@ -8,6 +8,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/StaticMeshComponent.h"
+#include "ContentStreaming.h"
 #include "Dom/JsonObject.h"
 #include "Engine/Canvas.h"
 #include "Engine/CanvasRenderTarget2D.h"
@@ -821,6 +822,19 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 	// camera and overlay together (the brackets stay on the image), 30 times a second by default
 	const int32 Hz = CVarViewscreenHz.GetValueOnGameThread();
 	const bool bDue = Hz > 0 && Now - LastCaptureAt >= 1.0 / Hz - 0.004;
+	if (bWatched)
+	{
+		if (UAstraShipSubsystem* ShipSys = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+		{
+			ShipSys->AimSpaceFill(CamRot.GetForwardVector(), DeltaSeconds);
+		}
+		// the texture streamer sizes mips for the views it is told of, and a capture is not one of them: through a x30 zoom a cruiser 25 km
+		// away kept the mips the bridge's own eye needs for a speck, and showed as blocks. The feed's own view, as the engine adds a
+		// player's (UnrealClient AddStreamingViewInfo): its width in pixels and that width over the tangent of its half field of view
+		IStreamingManager::Get().AddViewInformation(Capture->GetComponentLocation(), (float)FeedWidth,
+		                                            (float)FeedWidth / FMath::Tan(FMath::DegreesToRadians(FMath::Max(Fov, 0.05f) * 0.5f)),
+		                                            1.f, false, 0.25f, nullptr, GetWorld());
+	}
 	if (bWatched && bDue)
 	{
 		LastCaptureAt = Now;

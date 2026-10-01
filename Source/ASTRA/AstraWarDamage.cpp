@@ -575,7 +575,9 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 		Shake = FMath::Min(1.f, Shake + (Felt > 20.f ? 0.8f : 0.35f));
 		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 		{
-			Ship->AddHeat(ShieldTook * 0.012f * (Type == EAstraDamageType::Energy ? 1.5f : 1.f));   // what the shields stop becomes heat in the emitters
+			// what the shields stop becomes heat in the emitters (half what it was before GUERRA: with the war's volumes of fire a focused
+			// attack took the Aquila from 26 to 95 % in thirty seconds, and the heat, not the enemy, killed her)
+			Ship->AddHeat(ShieldTook * 0.006f * (Type == EAstraDamageType::Energy ? 1.5f : 1.f));
 			Ship->OnHullHit(Felt, ShieldTook, FromDir);
 		}
 		if (USoundBase* Snd = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Impact.SW_Impact")))
@@ -920,7 +922,7 @@ void UAstraBattleSubsystem::TickShields(FAstraBattleShip& S, float Dt)
 	{
 		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 		{
-			Ship->AddHeat((S.Shield - SumBefore) * 0.06f / D.ShieldScale);   // the emitters recharging run hot
+			Ship->AddHeat((S.Shield - SumBefore) * 0.03f / D.ShieldScale);   // the emitters recharging run hot (halved with the above)
 		}
 	}
 }

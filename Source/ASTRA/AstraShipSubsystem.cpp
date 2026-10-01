@@ -52,6 +52,7 @@ DECLARE_CYCLE_STAT(TEXT("Ship"), STAT_AstraShip, STATGROUP_Astra);
 
 namespace
 {
+	TAutoConsoleVariable<float> CVarSpaceFill(TEXT("astra.light.fill"), 0.f, TEXT("The cool fill on hulls from the main viewscreen camera's side, as a share of the star's light (outside the hull only)"));
 	const FName TagSky(TEXT("ASTRA.Sky"));
 	const FName TagSun(TEXT("ASTRA.Sun"));
 	const FName TagShipLight(TEXT("ASTRA.ShipLight"));
@@ -84,6 +85,17 @@ namespace
 
 	float WrapDeg(float D) { return FMath::Fmod(FMath::Fmod(D, 360.f) + 360.f, 360.f); }
 	float DeltaDeg(float From, float To) { return FMath::FindDeltaAngleDegrees(From, To); }
+
+	FAutoConsoleCommandWithWorldAndArgs CmdLightInfo(TEXT("astra.light.info"),
+		TEXT("Testing: the star's light, the planet's and the fill on the hulls (direction, intensity, channels)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			const UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			if (Ship)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("%s"), *Ship->LightInfo());
+			}
+		}));
 
 	// testing: any ship command as the crew (or the director) would send it; single quotes stand for double quotes
 	FAutoConsoleCommandWithWorldAndArgs CmdPlanet(TEXT("astra.planet"),
@@ -421,6 +433,23 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 			D->SetIntensity(0.f);
 		}
 	}
+	// the night side of a hull is not a hole: a faint cool fill from the side of the main viewscreen's camera (AimSpaceFill), outside the
+	// hull only (channel 1), without shadows — what a film's camera does. Without it a backlit cruiser on the screen is a black cut-out
+	SpaceFill = InWorld.SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator::ZeroRotator, SP);
+	if (SpaceFill)
+	{
+		if (UDirectionalLightComponent* D = Cast<UDirectionalLightComponent>(SpaceFill->GetLightComponent()))
+		{
+			D->SetMobility(EComponentMobility::Movable);
+			D->SetCastShadows(false);
+			D->SetLightingChannels(false, true, false);
+			D->SetAtmosphereSunLight(false);
+			D->SetSpecularScale(0.15f);
+			D->SetLightSourceAngle(40.f);
+			D->SetLightColor(FLinearColor(0.62f, 0.74f, 1.f));
+			D->SetIntensity(0.f);
+		}
+	}
 	// the Aquila's own hull (and any ship or station placed in the level) is outside: channel 1 as well
 	int32 Exterior = 0;
 	for (TActorIterator<AStaticMeshActor> It(&InWorld); It; ++It)
@@ -527,6 +556,38 @@ void UAstraShipSubsystem::SetPlanetFill(const FString& T)
 	else if (T == TEXT("gas_giant")) { PlanetFill = FLinearColor(1.f, 0.84f, 0.62f); PlanetFillGain = 1.4f; }
 	else if (T == TEXT("barren")) { PlanetFill = FLinearColor(0.76f, 0.73f, 0.7f); PlanetFillGain = 0.8f; }
 	else { PlanetFill = FLinearColor(0.42f, 0.6f, 1.f); PlanetFillGain = 1.f; }
+}
+
+FString UAstraShipSubsystem::LightInfo() const
+{
+	auto One = [](const TCHAR* Name, const ADirectionalLight* L) -> FString
+	{
+		if (!L || !L->GetLightComponent())
+		{
+			return FString::Printf(TEXT("%s: none"), Name);
+		}
+		const ULightComponent* C = L->GetLightComponent();
+		return FString::Printf(TEXT("%s: dir %s intensity %.2f visible %d mobility %d channels %d%d%d"), Name, *L->GetActorForwardVector().ToCompactString(),
+		                       C->Intensity, C->IsVisible() ? 1 : 0, (int32)C->Mobility, C->LightingChannels.bChannel0, C->LightingChannels.bChannel1,
+		                       C->LightingChannels.bChannel2);
+	};
+	return One(TEXT("star"), Sun) + TEXT(" | ") + One(TEXT("planet"), PlanetLight) + TEXT(" | ") + One(TEXT("fill"), SpaceFill);
+}
+
+void UAstraShipSubsystem::AimSpaceFill(const FVector& LookDir, float DeltaTime)
+{
+	// the fill comes from where the main viewscreen's camera looks from (a little above it, for shape), turning in about a second when
+	// the screen cuts to another subject: what the Captain studies on it shows its face, whatever side the star lights
+	if (!SpaceFill || LookDir.IsNearlyZero())
+	{
+		return;
+	}
+	const FVector Want = (LookDir.GetSafeNormal() - FVector(0.f, 0.f, 0.35f)).GetSafeNormal();
+	const FQuat Now = FQuat::Slerp(SpaceFill->GetActorQuat(), Want.ToOrientationQuat(), FMath::Clamp(DeltaTime * 2.5f, 0.f, 1.f));
+	if (Now.AngularDistance(SpaceFill->GetActorQuat()) > FMath::DegreesToRadians(0.25f))
+	{
+		SpaceFill->SetActorRotation(Now);
+	}
 }
 
 void UAstraShipSubsystem::UpdatePlanetLight(const FVector& SunNow, const FVector Axes[3])
@@ -814,12 +875,16 @@ float UAstraShipSubsystem::HeatFactor() const
 	return FMath::Lerp(0.8f, 0.55f, FMath::Clamp((H - 0.9f) / 0.1f, 0.f, 1.f));
 }
 
-void UAstraShipSubsystem::RadiatorHit()
+void UAstraShipSubsystem::RadiatorHit(float HullDamage)
 {
-	if (!bRadiatorsOut || RadiatorHealth < 0.3f || FMath::FRand() > 0.3f)
+	// a wing is torn by a blow in proportion to its force, and the next one goes no sooner than 20 s after (a hit lands near the wreck
+	// of the last one): before, every hit had a 30 % chance and all three wings went in fifteen seconds of a focused attack
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (!bRadiatorsOut || RadiatorHealth < 0.3f || Now - LastRadiatorTear < 20.0 || FMath::FRand() > 0.3f * FMath::Clamp(HullDamage / 80.f, 0.1f, 1.f))
 	{
 		return;
 	}
+	LastRadiatorTear = Now;
 	// a wing torn: an incident damage control can repair (each repair gives back a quarter of the radiators)
 	FAstraDamage D;
 	D.Id = NextDamageId++;
@@ -922,7 +987,7 @@ void UAstraShipSubsystem::TickHeat(float DeltaTime)
 	{
 		if ((HeatHarmT -= DeltaTime) <= 0.f)
 		{
-			HeatHarmT = FMath::FRandRange(10.f, 16.f);
+			HeatHarmT = FMath::FRandRange(18.f, 26.f);
 			static const TCHAR* Sys[] = {TEXT("shields"), TEXT("weapons"), TEXT("engines"), TEXT("sensors")};
 			FAstraDamage D;
 			D.Id = NextDamageId++;
@@ -2766,10 +2831,19 @@ void UAstraShipSubsystem::UpdateAttitudeVisuals()
 		// the star's light follows in quarter-degree steps: any turn of a directional light throws its whole shadow cache
 		// away (every virtual shadow page drawn again, each frame of a turn), and a quarter of a degree moves a shadow on
 		// the bridge floor by a centimetre
+		// (the level's star is Stationary: it keeps the light the bridge and the ships were lit with, and a turn of it is refused with a log
+		// line a frame — so it is not asked to. Made Movable it does follow the attitude, but a backlit cruiser is then black on the main
+		// viewscreen, and a fill on lighting channel 1 cannot help: Nanite meshes ignore lighting channels, UE 5.8 NaniteShading.cpp)
 		const FVector Want = (-Delta.UnrotateVector(SunDir0)).GetSafeNormal();
-		if (FVector::DotProduct(Want, Sun->GetActorForwardVector()) < FMath::Cos(FMath::DegreesToRadians(0.25f)))
+		if (Sun->GetRootComponent() && Sun->GetRootComponent()->Mobility == EComponentMobility::Movable &&
+		    FVector::DotProduct(Want, Sun->GetActorForwardVector()) < FMath::Cos(FMath::DegreesToRadians(0.25f)))
 		{
 			Sun->SetActorRotation(Want.Rotation());
+		}
+		if (SpaceFill && SpaceFill->GetLightComponent())
+		{
+			const float SunLux = Sun->GetLightComponent() ? Sun->GetLightComponent()->Intensity : 1200.f;
+			SpaceFill->GetLightComponent()->SetIntensity(SunLux * FMath::Max(0.f, CVarSpaceFill.GetValueOnGameThread()));
 		}
 	}
 }
@@ -2829,6 +2903,10 @@ void UAstraShipSubsystem::SetPlanetside(bool bOn)
 	if (PlanetLight && PlanetLight->GetLightComponent())
 	{
 		PlanetLight->GetLightComponent()->SetVisibility(!bOn);
+	}
+	if (SpaceFill && SpaceFill->GetLightComponent())
+	{
+		SpaceFill->GetLightComponent()->SetVisibility(!bOn);
 	}
 	if (Sun)
 	{
@@ -3000,12 +3078,15 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 float UAstraShipSubsystem::PowerFactor(const FString& System) const
 {
 	const float* P = PowerPct.Find(System);
-	float F = (P ? *P : 100.f) / 100.f;
+	const float F = (P ? *P : 100.f) / 100.f;
+	// each failed conduit takes a fifth of what it carried, but the power finds other routes: never less than 55 % of what is allocated
+	// (multiplied, three conduits on the shields were half the shields, and a long battle a death spiral)
+	int32 N = 0;
 	for (const FAstraDamage& D : Damage)
 	{
-		F *= D.System == System ? 0.8f : 1.f;
+		N += D.System == System ? 1 : 0;
 	}
-	return F;
+	return F * FMath::Max(0.55f, 1.f - 0.15f * N);
 }
 
 int32 UAstraShipSubsystem::FreeDamageTeam() const
@@ -3113,11 +3194,12 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 	}
 	if (HullDamage > 5.f)
 	{
-		RadiatorHit();
+		RadiatorHit(HullDamage);
 	}
 	// a blow that gets through does harm inside in proportion to its force: a graze may only buckle plating (the hull's own
-	// damage), a heavy hit almost always starts something (until DISTRUZIONE puts it where the hit really landed)
-	if (HullDamage > 8.f && FMath::FRand() < FMath::Clamp(HullDamage / 45.f, 0.2f, 1.f))
+	// damage), a heavy hit often starts something (until DISTRUZIONE puts it where the hit really landed). Calibrated on the war's
+	// volumes of fire: before GUERRA hits came a few a minute, now dozens, and nearly every one started a fire, a breach or a conduit
+	if (HullDamage > 8.f && FMath::FRand() < FMath::Clamp(HullDamage / 100.f, 0.1f, 0.7f))
 	{
 		// where did it land? a compartment (decks 1-12, sections A-H) and what it does there
 		FAstraDamage D;
