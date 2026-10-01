@@ -21,6 +21,9 @@ DECLARE_CYCLE_STAT(TEXT("Holo table"), STAT_AstraHolo, STATGROUP_Astra);
 
 namespace
 {
+	TAutoConsoleVariable<float> CVarHoloDots(TEXT("astra.holo.dots"), 1.f,
+		TEXT("Strength of the craft and missile dots on the tactical table (they are instances of the war's glow, M_WAR_Glow, not the table's own material: 1 as made, 0 off)"));
+
 	// a label's text, colour and size, set only when they change: each of UTextRenderComponent's setters makes its render proxy again (new
 	// vertex buffers on the render thread, 3 ms a frame with the table's dozens of labels set every frame)
 	void HoloSetText(UTextRenderComponent* T, const FString& S)
@@ -1087,7 +1090,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 	{
 		AstraFx::FLayer& L = *DotLayer;
 		L.Begin();
-		const float Gain = Fade * Brightness / 3.f;
+		const float Gain = Fade * Brightness / 3.f * FMath::Max(0.f, CVarHoloDots.GetValueOnGameThread());
 		const auto Put = [&L, Gain](const TArray<AstraHoloPlan::FDot>& Dots, const FLinearColor& Col, float Inten)
 		{
 			for (const AstraHoloPlan::FDot& D : Dots)

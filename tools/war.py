@@ -3,6 +3,7 @@
 real time. For the lead and the war module's support agents (in their own worktree, with their own build).
 
   tools/war.py run [--seconds 900] [--jump 170] [--exec "astra.battle.spawn styx 12 30"] [--scenario name] [--out Saved/War/run.json]
+                   [--aquila | --aquila-opts "at=-34,0,0;speed=0"] [--holo-at 60,260]   the Aquila in the scenario (where, how); the holo table's plan (docs/SCALA.md)
   tools/war.py report Saved/War/run.json      the story of the battle: arrivals, kills, damage, withdrawals, the outcome, the books
   tools/war.py ship Saved/War/run.json T-21   one ship through the battle (position, hull, shields, mode, target)
   tools/war.py ab --a "..." --b "..." --seeds 6 [--scenario name] [--jobs 3]
