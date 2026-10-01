@@ -45,6 +45,7 @@ struct FAstraDamage
 	FString System;             // conduit damage: the system that loses power through it
 	int32 Team = -1;            // damage-control team on it (0..3), -1 = unattended
 	float Travel = 0.f;         // s until the team is on scene
+	float Travel0 = 0.f;        // s the walk took from the teams' station (Deck 6) when it was sent: the holo table moves it
 	float Work = 30.f;          // s of work on scene
 	float Progress = 0.f;       // 0..1
 	float SpreadT = 25.f;       // fires: next chance to spread / burn the structure

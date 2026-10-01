@@ -3,8 +3,10 @@
 #include "AstraHoloTable.h"
 
 #include "AstraBattleSubsystem.h"
+#include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
 #include "Camera/PlayerCameraManager.h"
+#include "GameFramework/Pawn.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
@@ -22,6 +24,18 @@ namespace
 	const FLinearColor ColHolding(1.f, 0.62f, 0.12f);
 	const FLinearColor ColNeutral(0.95f, 0.88f, 0.45f);
 	const FLinearColor ColUnknown(0.62f, 0.66f, 0.7f);
+	// the ship plot's damage: a fire, a breach (air going), a damaged conduit or panel
+	const FLinearColor ColFire(1.f, 0.45f, 0.05f);
+	const FLinearColor ColBreach(1.f, 0.07f, 0.12f);
+	const FLinearColor ColConduit(0.95f, 0.85f, 0.2f);
+	int32 DamageSeverity(const FAstraDamage& D)
+	{
+		return D.Kind == TEXT("hull breach") ? 3 : (D.Kind == TEXT("fire") ? 2 : 1);
+	}
+	FLinearColor DamageColor(const FAstraDamage& D)
+	{
+		return D.Kind == TEXT("hull breach") ? ColBreach : (D.Kind == TEXT("fire") ? ColFire : ColConduit);
+	}
 	const float RangeLadderKm[] = {5.f, 10.f, 15.f, 20.f, 30.f, 40.f, 60.f, 80.f, 120.f, 160.f};
 
 	FLinearColor BlipColor(const FAstraHoloBlip& B)
@@ -74,6 +88,7 @@ void AAstraHoloTable::BeginPlay()
 	DiscMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Holo/SM_HOLO_Disc.SM_HOLO_Disc"));
 	LineMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Holo/SM_HOLO_Line.SM_HOLO_Line"));
 	SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	HoloMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_Holo.M_ASTRA_Holo"));
 	GridMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_HoloGrid.M_ASTRA_HoloGrid"));
 	TextMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_HoloText.M_ASTRA_HoloText"));
@@ -81,6 +96,9 @@ void AAstraHoloTable::BeginPlay()
 	PlotFrame = NewObject<USceneComponent>(this, TEXT("PlotFrame"));
 	PlotFrame->SetupAttachment(Root);
 	PlotFrame->RegisterComponent();
+	ShipFrame = NewObject<USceneComponent>(this, TEXT("ShipFrame"));
+	ShipFrame->SetupAttachment(Root);
+	ShipFrame->RegisterComponent();
 	TextMID = TextMat ? UMaterialInstanceDynamic::Create(TextMat, this) : nullptr;
 	if (TextMID)
 	{
@@ -113,12 +131,12 @@ void AAstraHoloTable::BeginPlay()
 	}
 }
 
-UStaticMeshComponent* AAstraHoloTable::Pooled(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index, UStaticMesh* Mesh)
+UStaticMeshComponent* AAstraHoloTable::Pooled(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index, UStaticMesh* Mesh, USceneComponent* Parent)
 {
 	while (Pool.Num() <= Index)
 	{
 		UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
-		C->SetupAttachment(PlotFrame);
+		C->SetupAttachment(Parent ? Parent : PlotFrame.Get());
 		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		C->SetCastShadow(false);
 		C->SetMobility(EComponentMobility::Movable);
@@ -138,12 +156,12 @@ UStaticMeshComponent* AAstraHoloTable::Pooled(TArray<TObjectPtr<UStaticMeshCompo
 	return C;
 }
 
-UTextRenderComponent* AAstraHoloTable::PooledText(TArray<TObjectPtr<UTextRenderComponent>>& Pool, int32 Index)
+UTextRenderComponent* AAstraHoloTable::PooledText(TArray<TObjectPtr<UTextRenderComponent>>& Pool, int32 Index, USceneComponent* Parent)
 {
 	while (Pool.Num() <= Index)
 	{
 		UTextRenderComponent* T = NewObject<UTextRenderComponent>(this);
-		T->SetupAttachment(PlotFrame);
+		T->SetupAttachment(Parent ? Parent : PlotFrame.Get());
 		T->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		T->SetCastShadow(false);
 		T->RegisterComponent();
@@ -236,9 +254,13 @@ void AAstraHoloTable::Tick(float DeltaTime)
 	// the plot the crew put up: the battle around the Aquila, or the sector at war (a quick cross-fade between them)
 	const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
 	const bool bSector = Ship && Ship->GetHoloMode() == TEXT("sector") && Ship->GetSector().Num() > 0;
+	const UAstraShipPlan* Plan = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipPlan>() : nullptr;
+	const bool bShipPlot = Ship && Ship->GetHoloMode() == TEXT("ship") && Plan && Plan->GetDecks().Num() > 0;
 	SectorBlend = FMath::FInterpConstantTo(SectorBlend, bSector ? 1.f : 0.f, DeltaTime, 2.5f);
-	const float TacticalFade = FMath::Clamp(1.f - 2.f * SectorBlend, 0.f, 1.f);
+	ShipBlend = FMath::FInterpConstantTo(ShipBlend, bShipPlot ? 1.f : 0.f, DeltaTime, 2.5f);
+	const float TacticalFade = FMath::Clamp(1.f - 2.f * FMath::Max(SectorBlend, ShipBlend), 0.f, 1.f);
 	const float SectorFade = FMath::Clamp(2.f * SectorBlend - 1.f, 0.f, 1.f);
+	const float ShipFade = FMath::Clamp(2.f * ShipBlend - 1.f, 0.f, 1.f);
 	if (TacticalFade > 0.f)
 	{
 		TickTactical(DeltaTime, ViewerLocal, TacticalFade);
@@ -254,6 +276,14 @@ void AAstraHoloTable::Tick(float DeltaTime)
 	else
 	{
 		HideSector();
+	}
+	if (ShipFade > 0.f)
+	{
+		TickShip(DeltaTime, ViewerRoot, ShipFade);   // upright: the viewer as seen from the table itself
+	}
+	else
+	{
+		HideShip();
 	}
 }
 
@@ -411,6 +441,187 @@ void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, fl
 	HideFrom(SectorNodes, NN);
 	HideFrom(SectorMarks, NM);
 	HideTextFrom(SectorLabels, NT);
+}
+
+void AAstraHoloTable::HideShip()
+{
+	HideFrom(ShipSlabs, 0);
+	HideFrom(ShipMarks, 0);
+	HideFrom(ShipDots, 0);
+	HideTextFrom(ShipLabels, 0);
+}
+
+void AAstraHoloTable::TickShip(float DeltaTime, const FVector& ViewerLocal, float Fade)
+{
+	const UAstraShipPlan* Plan = GetWorld()->GetSubsystem<UAstraShipPlan>();
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	const TArray<FAstraPlanDeck>& Decks = Plan->GetDecks();
+	// a cutaway, as in a ship's manual: the whole ship across the disc, seen from the side, her decks one row each (5 cm
+	// apart, to read them from the chair: a diagram, not a model), each as long as it really is, so the stack draws her
+	// shape; the bridge raised on its island over Deck 2
+	float X0 = 1e9f, X1 = -1e9f;
+	for (const FAstraPlanDeck& D : Decks)
+	{
+		for (const FAstraPlanDeck::FSection& Se : D.Sections)
+		{
+			X0 = FMath::Min(X0, Se.X0);
+			X1 = FMath::Max(X1, Se.X1);
+		}
+	}
+	if (X1 <= X0)
+	{
+		HideShip();
+		return;
+	}
+	const float S = PlotRadius * 1.5f / (X1 - X0);
+	const float Xc = 0.5f * (X0 + X1);
+	const float Pitch = 5.f;
+	const float Mid = PlaneHeight + 4.f;                                    // the hull's middle deck (7) at this height
+	auto RowZ = [&](int32 DeckId) { return Mid + Pitch * (DeckId == 1 ? 6.6f : 7.f - (float)DeckId); };
+	const float Depth = 3.5f;                                                 // the cutaway's thickness
+	// she turns (slowly) to show her side to the viewer, the bow to their right
+	const float WantYaw = FMath::RadiansToDegrees(FMath::Atan2(ViewerLocal.Y, ViewerLocal.X)) - 90.f;
+	ShipYaw = ShipBlend < 0.05f ? WantYaw : ShipYaw + FMath::Clamp(FMath::FindDeltaAngleDegrees(ShipYaw, WantYaw), -60.f * DeltaTime, 60.f * DeltaTime);
+	const FVector Fwd = FRotator(0.f, ShipYaw, 0.f).Vector();
+	const FVector Stbd = FVector::CrossProduct(FVector::UpVector, Fwd);
+	auto Map = [&](float X, float Y, int32 DeckId) { return Fwd * ((X - Xc) * S) + Stbd * FMath::Clamp(Y * S, -Depth, Depth) + FVector(0.f, 0.f, RowZ(DeckId)); };
+	auto FindDeck = [&Decks](int32 Id) { return Decks.FindByPredicate([Id](const FAstraPlanDeck& X) { return X.Id == Id; }); };
+	auto SectionCentre = [&](int32 DeckId, TCHAR Sec, FVector& Out)
+	{
+		const FAstraPlanDeck* D = FindDeck(DeckId);
+		const FAstraPlanDeck::FSection* Se = D ? D->Sections.FindByPredicate([Sec](const FAstraPlanDeck::FSection& X) { return X.Id.Len() > 0 && X.Id[0] == Sec; }) : nullptr;
+		if (!Se)
+		{
+			return false;
+		}
+		Out = Map(0.5f * (Se->X0 + Se->X1), 0.f, DeckId) + FVector(0.f, 0.f, 1.2f);
+		return true;
+	};
+	const TArray<FAstraDamage>& Damage = Ship->GetDamage();
+	const float Pulse = 0.5f + 0.5f * FMath::Sin(Time * 5.f);
+	int32 NS = 0, NM = 0, ND = 0, NT = 0;
+	// labels that would land on each other climb until they are clear
+	TArray<FVector> Placed;
+	auto Label = [&](const FString& Text, FVector At, const FLinearColor& Col, float Size)
+	{
+		for (int32 Guard = 0; Guard < 12; ++Guard)
+		{
+			const bool bClash = Placed.ContainsByPredicate([&At](const FVector& P) { return FVector::Dist2D(P, At) < 14.f && FMath::Abs(P.Z - At.Z) < 5.f; });
+			if (!bClash)
+			{
+				break;
+			}
+			At.Z += 5.f;
+		}
+		Placed.Add(At);
+		UTextRenderComponent* T = PooledText(ShipLabels, NT++, ShipFrame);
+		T->SetText(FText::FromString(Text));
+		T->SetTextRenderColor((Col * FMath::Max(0.25f, Fade)).ToFColor(true));
+		T->SetWorldSize(Size);
+		T->SetRelativeLocation(At);
+		FaceViewer(T, ViewerLocal);
+	};
+
+	// the decks, section by section: faint where all is well, the colour of the worst damage where it is not
+	for (const FAstraPlanDeck& D : Decks)
+	{
+		float Aft = 1e9f;
+		for (const FAstraPlanDeck::FSection& Se : D.Sections)
+		{
+			const float Mx = 0.5f * (Se.X0 + Se.X1);
+			if (Se.Id.IsEmpty())
+			{
+				continue;
+			}
+			Aft = FMath::Min(Aft, Se.X0);
+			const FAstraDamage* Worst = nullptr;
+			for (const FAstraDamage& X : Damage)
+			{
+				if (X.Deck == D.Id && X.Section == Se.Id[0] && (!Worst || DamageSeverity(X) > DamageSeverity(*Worst)))
+				{
+					Worst = &X;
+				}
+			}
+			UStaticMeshComponent* Slab = Pooled(ShipSlabs, NS++, CubeMesh, ShipFrame);
+			Slab->SetRelativeLocationAndRotation(Map(Mx, 0.f, D.Id), FRotator(0.f, ShipYaw, 0.f));
+			Slab->SetRelativeScale3D(FVector((Se.X1 - Se.X0) * S * 0.95f / 100.f, Depth / 100.f, 2.6f / 100.f));
+			SetColor(Slab, Worst ? DamageColor(*Worst) : ColAstra, Fade * (Worst ? 12.f + 16.f * Pulse : 3.2f));
+		}
+		if (Aft < 1e8f)
+		{
+			// the deck's number at her stern end (the bridge's deck by name)
+			Label(D.Id == 1 ? FString(TEXT("BRIDGE")) : FString::Printf(TEXT("%d"), D.Id), Map(Aft, 0.f, D.Id) - Fwd * 4.f + FVector(0.f, 0.f, -1.2f),
+			      ColAstra, D.Id == 1 ? 2.6f : 2.4f);
+		}
+	}
+	// the sections' letters over her hull (Deck 2, the top of the hull)
+	if (const FAstraPlanDeck* Top = FindDeck(2))
+	{
+		for (const FAstraPlanDeck::FSection& Se : Top->Sections)
+		{
+			Label(Se.Id, Map(0.5f * (Se.X0 + Se.X1), 0.f, Top->Id) + FVector(0.f, 0.f, 2.5f), ColAstra * 0.8f, 2.6f);
+		}
+	}
+	// the damage: where it is, what it is, who is on it
+	FVector Station;
+	const bool bStation = SectionCentre(6, TEXT('D'), Station);   // the damage-control teams muster on Deck 6
+	for (const FAstraDamage& X : Damage)
+	{
+		FVector P;
+		if (!SectionCentre(X.Deck, X.Section, P))
+		{
+			continue;
+		}
+		const FLinearColor Col = DamageColor(X);
+		const float Ph = FMath::Frac(Time * 0.8f + X.Id * 0.37f);
+		UStaticMeshComponent* Ring = Pooled(ShipMarks, NM++, RingMesh, ShipFrame);
+		Ring->SetRelativeLocationAndRotation(P, FRotator::ZeroRotator);
+		Ring->SetRelativeScale3D(FVector((2.f + 2.5f * Ph) / 100.f, (2.f + 2.5f * Ph) / 100.f, 1.f));
+		SetColor(Ring, Col, Fade * 20.f * (1.f - Ph));
+		const FString Who = X.Team < 0 ? FString(TEXT("UNATTENDED"))
+		                  : X.Travel > 0.f ? FString::Printf(TEXT("TEAM %d · %.0f S OUT"), X.Team + 1, X.Travel)
+		                                   : FString::Printf(TEXT("TEAM %d · %.0f%%"), X.Team + 1, 100.f * X.Progress);
+		Label(FString::Printf(TEXT("%s · %d%c<br>%s"), *X.Kind.ToUpper(), X.Deck, X.Section, *Who), P + FVector(0.f, 0.f, 3.5f), Col, 2.8f);
+		if (X.Team >= 0 && bStation)
+		{
+			// the team: walking from its station to the damage, then working round it
+			const float K = X.Travel0 > 0.f ? FMath::Clamp(1.f - X.Travel / X.Travel0, 0.f, 1.f) : 1.f;
+			FVector Dot = FMath::Lerp(Station, P, K);
+			if (X.Travel <= 0.f)
+			{
+				const float A = Time * 2.2f + X.Team * 1.6f;
+				Dot = P + (Fwd * FMath::Cos(A) * 2.4f + FVector(0.f, 0.f, FMath::Sin(A) * 1.2f));
+			}
+			UStaticMeshComponent* T = Pooled(ShipDots, ND++, SphereMesh, ShipFrame);
+			T->SetRelativeLocation(Dot);
+			T->SetRelativeScale3D(FVector(1.1f / 100.f));
+			SetColor(T, ColAquila, Fade * 45.f);
+		}
+	}
+	// the Captain, wherever they are
+	if (const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0))
+	{
+		const FVector L = Pawn->GetActorLocation();
+		if (const FAstraPlanDeck* D = FindDeck(Plan->DeckAt(L)))
+		{
+			const FVector P = Map(L.X, L.Y, D->Id) + FVector(0.f, 0.f, 2.f);
+			UStaticMeshComponent* C = Pooled(ShipDots, ND++, SphereMesh, ShipFrame);
+			C->SetRelativeLocation(P);
+			C->SetRelativeScale3D(FVector((1.6f + 0.4f * Pulse) / 100.f));
+			SetColor(C, ColAquila, Fade * 70.f);
+			Label(D->Id == 1 ? FString(TEXT("CAPTAIN")) : FString::Printf(TEXT("CAPTAIN · DECK %d"), D->Id), P + FVector(0.f, 0.f, 3.f), ColAquila, 2.6f);
+		}
+	}
+	// what she is: her name, her hull, what is open
+	const int32 Open = Damage.Num();
+	Label(FString::Printf(TEXT("ASN AQUILA · HULL %.0f%%<br>%s"), Battle ? 100.f * Battle->PlayerHullFraction() : 100.f,
+	                      Open == 0 ? TEXT("NO DAMAGE REPORTED") : *FString::Printf(TEXT("%d INCIDENT%s"), Open, Open == 1 ? TEXT("") : TEXT("S"))),
+	      FVector(0.f, 0.f, RowZ(1) + 12.f), ColAquila, 3.6f);
+	HideFrom(ShipSlabs, NS);
+	HideFrom(ShipMarks, NM);
+	HideFrom(ShipDots, ND);
+	HideTextFrom(ShipLabels, NT);
 }
 
 void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, float Fade)

@@ -107,6 +107,53 @@ bool UAstraShipPlan::Load() const
 	}
 	TMap<FString, int32> CompIndex;
 	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+	if (Root->TryGetArrayField(TEXT("decks"), List))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *List)
+		{
+			const TSharedPtr<FJsonObject> O = V->AsObject();
+			if (!O.IsValid())
+			{
+				continue;
+			}
+			FAstraPlanDeck D;
+			D.Id = (int32)O->GetNumberField(TEXT("id"));
+			O->TryGetStringField(TEXT("name"), D.Name);
+			D.FloorZ = (float)O->GetNumberField(TEXT("z")) * 100.f;
+			const TArray<TSharedPtr<FJsonValue>>* Secs = nullptr;
+			if (O->TryGetArrayField(TEXT("sections"), Secs))
+			{
+				for (const TSharedPtr<FJsonValue>& SV : *Secs)
+				{
+					const TSharedPtr<FJsonObject> SO = SV->AsObject();
+					const TArray<TSharedPtr<FJsonValue>>* X = nullptr;
+					if (SO.IsValid() && SO->TryGetArrayField(TEXT("x"), X) && X->Num() >= 2)
+					{
+						FAstraPlanDeck::FSection Sec;
+						Sec.Id = SO->GetStringField(TEXT("id"));
+						Sec.X0 = (float)FMath::Min((*X)[0]->AsNumber(), (*X)[1]->AsNumber()) * 100.f;
+						Sec.X1 = (float)FMath::Max((*X)[0]->AsNumber(), (*X)[1]->AsNumber()) * 100.f;
+						D.Sections.Add(Sec);
+					}
+				}
+			}
+			const TSharedPtr<FJsonObject>* Env = nullptr;
+			const TArray<TSharedPtr<FJsonValue>>* HW = nullptr;
+			if (O->TryGetObjectField(TEXT("envelope"), Env) && (*Env)->TryGetArrayField(TEXT("half_width"), HW))
+			{
+				for (const TSharedPtr<FJsonValue>& PV : *HW)
+				{
+					const TArray<TSharedPtr<FJsonValue>>& Pair = PV->AsArray();
+					if (Pair.Num() >= 2)
+					{
+						D.HalfWidth.Add(FVector2D(Pair[0]->AsNumber() * 100.0, Pair[1]->AsNumber() * 100.0));
+					}
+				}
+			}
+			Decks.Add(D);
+		}
+		Decks.Sort([](const FAstraPlanDeck& A, const FAstraPlanDeck& B) { return A.Id < B.Id; });
+	}
 	if (Root->TryGetArrayField(TEXT("compartments"), List))
 	{
 		for (const TSharedPtr<FJsonValue>& V : *List)
@@ -379,4 +426,37 @@ bool UAstraShipPlan::FindRoute(const FVector& From, const FVector& To, TArray<FV
 		*OutMetres = Metres;
 	}
 	return true;
+}
+
+float FAstraPlanDeck::HalfWidthAt(float X) const
+{
+	// the envelope's samples run from the bow aft (x falling); between two of them, linearly
+	for (int32 i = 0; i + 1 < HalfWidth.Num(); ++i)
+	{
+		const FVector2D& A = HalfWidth[i];
+		const FVector2D& B = HalfWidth[i + 1];
+		if (X <= FMath::Max(A.X, B.X) && X >= FMath::Min(A.X, B.X))
+		{
+			const double T = FMath::IsNearlyEqual(A.X, B.X) ? 0.0 : (X - A.X) / (B.X - A.X);
+			return (float)FMath::Lerp(A.Y, B.Y, T);
+		}
+	}
+	return 0.f;
+}
+
+int32 UAstraShipPlan::DeckAt(const FVector& Cm) const
+{
+	EnsureLoaded();
+	int32 Best = 0;
+	float BestFloor = -1e9f;
+	for (const FAstraPlanDeck& D : Decks)
+	{
+		// on a deck: at most a deck's height (4 m) above its floor, 1 m below it (a lift car, a sunken well)
+		if (Cm.Z >= D.FloorZ - 100.f && Cm.Z < D.FloorZ + 400.f && D.FloorZ > BestFloor)
+		{
+			Best = D.Id;
+			BestFloor = D.FloorZ;
+		}
+	}
+	return Best;
 }

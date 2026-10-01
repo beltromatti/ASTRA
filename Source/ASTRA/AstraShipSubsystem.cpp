@@ -1842,9 +1842,9 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	if (Name == TEXT("holo_display"))
 	{
 		const FString M = Str(TEXT("mode")).ToLower();
-		if (M != TEXT("tactical") && M != TEXT("sector"))
+		if (M != TEXT("tactical") && M != TEXT("sector") && M != TEXT("ship"))
 		{
-			OutDetail = TEXT("the holo table shows either the tactical plot or the sector map");
+			OutDetail = TEXT("the holo table shows the tactical plot, the sector map or the ship (her decks, the damage and the damage-control teams)");
 			return false;
 		}
 		if (M == TEXT("sector") && Sector.Num() == 0)
@@ -1854,7 +1854,8 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		}
 		HoloMode = M;
 		OutDetail = M == TEXT("sector") ? TEXT("holo table: the sector map (the March, who holds what, the gate links)")
-		                                : TEXT("holo table: tactical plot");
+		          : M == TEXT("ship")   ? FString::Printf(TEXT("holo table: the Aquila, deck by deck — %s"), *DamageSummary())
+		                                : FString(TEXT("holo table: tactical plot"));
 		return true;
 	}
 	if (Name == TEXT("visit"))
@@ -2172,7 +2173,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		const FString Priority = Str(TEXT("priority")).ToLower();
 		const float Speed = Priority == TEXT("critical") ? 0.8f : (Priority == TEXT("low") ? 1.2f : 1.f);
 		D->Team = Team;
-		D->Travel = (6.f + FMath::Abs(D->Deck - 6) * 1.5f) * Speed;
+		D->Travel = D->Travel0 = (6.f + FMath::Abs(D->Deck - 6) * 1.5f) * Speed;
 		D->Work = (D->Kind == TEXT("fire") ? 30.f : (D->Kind == TEXT("hull breach") ? 40.f : 25.f)) * Speed;
 		int32 Busy = 0;
 		for (const FAstraDamage& X : Damage) { Busy += X.Team >= 0 ? 1 : 0; }

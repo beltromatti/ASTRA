@@ -50,6 +50,7 @@ public:
 private:
 	UPROPERTY() TObjectPtr<USceneComponent> Root;
 	UPROPERTY() TObjectPtr<USceneComponent> PlotFrame;   // everything plotted hangs here: tilted towards the viewer about the plot's centre
+	UPROPERTY() TObjectPtr<USceneComponent> ShipFrame;   // the ship plot: a cutaway seen from the side, upright over the table
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> TextMID;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Disc;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Rings;
@@ -75,7 +76,14 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorMarks;
 	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> SectorLabels;
 
+	// the ship plot: the Aquila deck by deck (the plan), the damage where it is, the damage-control teams, the Captain
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ShipSlabs;
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ShipMarks;
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ShipDots;
+	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> ShipLabels;
+
 	UPROPERTY() TObjectPtr<UStaticMesh> ShipMesh;
+	UPROPERTY() TObjectPtr<UStaticMesh> CubeMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> UnknownMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> RingMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> DiscMesh;
@@ -89,8 +97,9 @@ private:
 	float TargetRangeKm = 20.f;
 	float Time = 0.f;
 
-	UStaticMeshComponent* Pooled(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index, UStaticMesh* Mesh);
-	UTextRenderComponent* PooledText(TArray<TObjectPtr<UTextRenderComponent>>& Pool, int32 Index);
+	/** A pooled component on the plot (or on another frame of the table: the ship plot stands upright, untilted). */
+	UStaticMeshComponent* Pooled(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index, UStaticMesh* Mesh, USceneComponent* Parent = nullptr);
+	UTextRenderComponent* PooledText(TArray<TObjectPtr<UTextRenderComponent>>& Pool, int32 Index, USceneComponent* Parent = nullptr);
 	static void HideFrom(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index);
 	static void HideTextFrom(TArray<TObjectPtr<UTextRenderComponent>>& Pool, int32 Index);
 	void SetColor(UStaticMeshComponent* C, const FLinearColor& Color, float Intensity) const;
@@ -101,6 +110,8 @@ private:
 	float TiltAzimuth = 180.f;    // where the viewer is around the table (degrees, actor frame), smoothed
 	float SectorBlend = 0.f;      // 0 tactical .. 1 sector (cross-fade)
 	float SectorYaw = 0.f;        // the sector map turns to face whoever looks at it (south towards the viewer)
+	float ShipBlend = 0.f;        // 0 .. 1 the ship plot (cross-fade)
+	float ShipYaw = 0.f;          // the ship turns to show her side to whoever looks at her, the bow to their right
 	void TickTactical(float DeltaTime, const FVector& ViewerLocal, float Fade);
 	void TickSector(float DeltaTime, const FVector& ViewerLocal, float Fade);
 	void HideTactical();
@@ -108,4 +119,6 @@ private:
 	/** A line on the plot from A to B (actor-local), with its colour and brightness. */
 	void PlaceLine(UStaticMeshComponent* L, const FVector& A, const FVector& B, float Thickness, const FLinearColor& Color, float Intensity);
 	void HideSector();
+	void TickShip(float DeltaTime, const FVector& ViewerLocal, float Fade);
+	void HideShip();
 };

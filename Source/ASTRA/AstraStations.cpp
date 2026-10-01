@@ -668,7 +668,7 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 		}
 		if (AspectName == TEXT("holo"))
 		{
-			return Command(TEXT("holo_display"), Obj({{TEXT("mode"), M == TEXT("ship") ? TEXT("tactical") : M}}), Detail);
+			return Command(TEXT("holo_display"), Obj({{TEXT("mode"), M}}), Detail);
 		}
 		if (AspectName == TEXT("viewscreen") && M == TEXT("target") && !NeedTarget(false))
 		{
