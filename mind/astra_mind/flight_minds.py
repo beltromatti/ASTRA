@@ -147,6 +147,7 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
     (r"^flight: (?:eagle (?:is down|recovered|flew into|has left the plot|has landed|is hit)|the captain's escape pod)", Kind("eagle", False, wing=True)),
     (r"^(?:damage report|damage control): .*\bdeck 9\b", Kind("deck", False)),
 ))
+_EAGLE_END = ("is down", "recovered", "left the plot", "escape pod", "flew into", "has landed")      # the Captain's Falcon is gone (or out of the fight): no more wing
 _OBSERVED = re.compile(r"^(?:flight: (?!controller call)|tactical: \d+ harp)", re.I)       # what goes in the net's log even when it does not wake it
 
 
@@ -494,8 +495,6 @@ class FlightMinds:
         self.stats["events"] += 1
         if k.name == "wing":
             self._wing_event(t)
-        elif k.name == "eagle" and any(s in t.lower() for s in ("is down", "recovered", "left the plot", "escape pod", "flew into", "has landed")):
-            self._wing_off()
         if k.wing and not self.wing and k.name != "wing":
             self._note("(on the boards)", t)
             return False                                    # Eagle's news with no wing to hear it: Price and the XO have it
@@ -544,8 +543,8 @@ class FlightMinds:
             return
         self.state = state
         fl = flying(state)
-        if self._flying and not fl:
-            self._wing_off()
+        if self._flying and not fl and not any(e.kind == "eagle" for e in self._events):
+            self._wing_off()                                  # (an Eagle event still to be read ends the wing after the pulse that reads it)
         self._flying = fl
         if self._task is not None and not self._task.done():
             return
@@ -597,6 +596,7 @@ class FlightMinds:
                                "first_call": None, "tokens_in": 0, "tokens_out": 0, "cached": 0, "error": "", "events": len(events), "captain": bool(inbox)}
         done = False
         me = asyncio.current_task()
+        ending = any(e.kind == "eagle" and any(s in e.text.lower() for s in _EAGLE_END) for e in events)     # the Captain's Falcon is gone: the wing is over after this look
         try:
             lang = (inbox[-1].lang if inbox and inbox[-1].lang else "") or self.lang()
             user = self._compose(state, events, inbox, why, lang)
@@ -637,6 +637,8 @@ class FlightMinds:
             if self.trace is not None:
                 self.trace(rec)
             self._answering = False
+            if ending and rec["error"] != "cancelled":
+                self._wing_off()
             log.info("flight net %.2fs $%.5f (%s): %s", rec["latency"], rec["cost"], "; ".join(why)[:80], " | ".join(rec["tools"]) or "(nothing)")
             try:
                 asyncio.get_running_loop().call_soon(self.kick)                     # (what came in while it ran is looked at now, not at the next state)
