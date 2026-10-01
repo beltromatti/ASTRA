@@ -28,6 +28,7 @@ namespace AstraHoloPlan
 		FVector ViewerLocal = FVector(-430.f, 0.f, 100.f);   // the viewer, in the plot's own frame
 		float HeadingDeg = 0.f;            // the Aquila's, for true bearings
 		int32 MaxLabels = 16;              // text components the plot may use at once
+		float CharW = 0.52f;               // a character's width for its height (the table measures its own font and tells the plan)
 	};
 
 	/** A ship's icon. */

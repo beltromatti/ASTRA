@@ -998,6 +998,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 	Par.ViewerLocal = ViewerLocal;
 	const UAstraShipSubsystem* ShipSys = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
 	Par.HeadingDeg = ShipSys ? ShipSys->GetHeadingDeg() : 0.f;
+	Par.CharW = LabelCharW;
 	AstraHoloPlan::Make(Blips, Par, PlanState, TacticalPlan);
 
 	const FVector Us(0.f, 0.f, PlaneHeight);
@@ -1100,8 +1101,10 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		{
 			const AstraHoloPlan::FLabel& L = TacticalPlan.Labels[i];
 			FLabelSlot& Sl = LabelSlots[SlotOf[i]];
+			bool bNewText = false;
 			if (Time - Sl.TextAt >= 0.25 || Sl.Text.IsEmpty())
 			{
+				bNewText = !Sl.Text.Equals(L.Text, ESearchCase::CaseSensitive);
 				Sl.Text = L.Text;
 				Sl.TextAt = Time;
 			}
@@ -1109,6 +1112,26 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			HoloSetText(T, Sl.Text);
 			HoloSetColor(T, L.Col.ToFColor(true));
 			HoloSetSize(T, L.Size);
+			if (bNewText && L.Size > 0.f)
+			{
+				// the plan reckons a label's width from its characters: measure the font as it really draws (a guess too narrow put
+				// four hostile names on one line from the chair)
+				int32 Longest = 0;
+				TArray<FString> Lines;
+				Sl.Text.ParseIntoArray(Lines, TEXT("<br>"), true);
+				for (const FString& Ln : Lines)
+				{
+					Longest = FMath::Max(Longest, Ln.Len());
+				}
+				if (Longest >= 4)
+				{
+					const float K = (float)T->GetTextLocalSize().Y / (Longest * L.Size);
+					if (K > 0.3f && K < 1.2f)
+					{
+						LabelCharW = FMath::Lerp(LabelCharW, K, 0.25f);
+					}
+				}
+			}
 			T->SetRelativeLocation(L.Pos);
 			FaceViewer(T, ViewerLocal);
 			NL = FMath::Max(NL, SlotOf[i] + 1);

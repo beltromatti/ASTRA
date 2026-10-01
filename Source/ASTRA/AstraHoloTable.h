@@ -133,6 +133,7 @@ private:
 	void FaceViewer(USceneComponent* C, const FVector& ViewerLocal) const;
 	float Tilt = 0.f;             // degrees, smoothed
 	float TiltAzimuth = 180.f;    // where the viewer is around the table (degrees, actor frame), smoothed
+	float LabelCharW = 0.6f;     // a label character's width for its height, as the font really draws (measured: the plan's layout uses it)
 	float SectorBlend = 0.f;      // 0 tactical .. 1 sector (cross-fade)
 	float SectorYaw = 0.f;        // the sector map turns to face whoever looks at it (south towards the viewer)
 	float ShipBlend = 0.f;        // 0 .. 1 the ship plot (cross-fade)

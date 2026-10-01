@@ -39,7 +39,7 @@ namespace AstraHoloPlan
 		}
 
 		/** A label's box from its text: the world size of the text is a character's height (cm); lines are joined with <br>. */
-		FVector2D BoxOf(const FString& Text, float Size)
+		FVector2D BoxOf(const FString& Text, float Size, float CharW)
 		{
 			int32 Longest = 0, Lines = 1;
 			int32 Run = 0;
@@ -58,7 +58,7 @@ namespace AstraHoloPlan
 				}
 			}
 			Longest = FMath::Max(Longest, Run);
-			return FVector2D(Longest * Size * 0.52f, Lines * Size * 1.05f);
+			return FVector2D(Longest * Size * CharW, Lines * Size * 1.05f);
 		}
 
 		uint64 PairKey(int32 A, int32 B)
@@ -435,7 +435,7 @@ namespace AstraHoloPlan
 		const auto Ask = [&](FLabel&& L, const FVector& At3, float Radius, int32 Icon, bool bMust, int32 Prio, int32 Key)
 		{
 			FWant& W = Wants.AddDefaulted_GetRef();
-			const FVector2D Box = BoxOf(L.Text, L.Size);
+			const FVector2D Box = BoxOf(L.Text, L.Size, Par.CharW);
 			W.Key = Key;
 			W.A.At = Pic(At3);
 			W.A.R = Radius;

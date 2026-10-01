@@ -7,6 +7,7 @@
 
 #include "CoreMinimal.h"
 
+class AAstraHoloTable;
 class APlayerController;
 class SWidget;
 
@@ -19,5 +20,6 @@ public:
 
 private:
 	TSharedPtr<class SAstraWindowHudWidget> Widget;
+	TWeakObjectPtr<AAstraHoloTable> HoloTable;   // the names keep off it (its plot names the same ships)
 	float Alpha = 0.f;
 };
