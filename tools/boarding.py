@@ -50,7 +50,10 @@ def cmd_run(a: argparse.Namespace) -> int:
             p.wait()
             print(f"   the boarding bench did not finish in {a.timeout} s: killed (log {log})")
     # a crashed engine leaves its crash reporter running (a window spinning at 100% of a core): the ones of this run's process are closed here
-    subprocess.run(["pkill", "-f", f"CrashReportClient.*pid-{p.pid}"], check=False)
+    if sys.platform != "win32":
+        subprocess.run(["pkill", "-f", f"CrashReportClient.*pid-{p.pid}"], check=False)
+    else:
+        subprocess.run(["taskkill", "/F", "/IM", "CrashReportClient.exe"], check=False, capture_output=True)
     lines = [l for l in log.read_text(errors="replace").splitlines() if "[Board]" in l]
     for l in lines[-200:]:
         print(l[l.find("[Board]"):])
