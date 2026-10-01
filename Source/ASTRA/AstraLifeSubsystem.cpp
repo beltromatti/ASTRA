@@ -5,6 +5,7 @@
 #include "ASTRA.h"
 #include "Async/Async.h"
 #include "AstraLifeBody.h"
+#include "AstraLiftSubsystem.h"
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
 #include "Camera/PlayerCameraManager.h"
@@ -685,6 +686,15 @@ void UAstraLifeSubsystem::ManageBodies()
 		Feet = Pawn->GetActorLocation() - FVector(0.f, 0.f, Pawn->GetDefaultHalfHeight());
 	}
 	const FAstraLifeMap& Map = *MapPtr;
+	if (const UAstraLiftSubsystem* Lifts = bTestCaptain || !GetWorld() ? nullptr : GetWorld()->GetSubsystem<UAstraLiftSubsystem>())
+	{
+		// riding a lift (ASCENSORI): the people are made round the lobby he is going to, before the doors open there, and not round each deck he passes on the way
+		FVector Dest;
+		if (Lifts->RideFeet(Dest))
+		{
+			Feet = Dest;
+		}
+	}
 	if (!bCaptainSeen || FVector::Dist(Feet, LastCaptain) > 1500.f)
 	{
 		JumpGraceS = 1.6f;                               // a lift, a fade: nobody may be missing when the picture returns

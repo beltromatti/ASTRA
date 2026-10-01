@@ -4,6 +4,7 @@
 #include "AstraLiftBrain.h"
 #include "AstraLiftCar.h"
 #include "AstraLiftData.h"
+#include "AstraLiftRider.h"
 #include "AstraLiftSubsystem.h"
 #include "AstraLiftTestRig.h"
 #include "Components/CapsuleComponent.h"
@@ -960,6 +961,257 @@ namespace
 		}
 	}
 
+	// ============================================================================================================================ the crew's riders
+
+	/** A person of the bench: an actor with nothing but a place, and a rider that takes it from a landing to another (the same code that carries the life simulation's bodies). */
+	struct FLiftWalker
+	{
+		AActor* A = nullptr;
+		FAstraLiftRider R;
+		int32 From = INDEX_NONE, To = INDEX_NONE;
+		double BornAt = 0.0, DoneAt = -1.0;
+		bool bBegun = false;
+	};
+
+	AActor* LiftSpawnWalker(FLiftWorldBench& W, const FVector& Feet)
+	{
+		AActor* A = W.World->SpawnActor<AActor>();
+		USceneComponent* Root = NewObject<USceneComponent>(A, TEXT("Root"));
+		Root->SetMobility(EComponentMobility::Movable);
+		A->SetRootComponent(Root);
+		Root->RegisterComponent();
+		A->SetActorLocation(Feet);
+		W.Spawned.Add(A);
+		return A;
+	}
+
+	struct FLiftWalkResult
+	{
+		int32 Done = 0, Failed = 0, DoorViol = 0, InsideViol = 0, MovedInDoorway = 0, SharedSlots = 0, Frames = 0;
+		float MinApart = 1.0e9f, MinFromCaptain = 1.0e9f, Last = 0.f;
+		TArray<double> Waits, Rides, Totals;
+		FString First;
+		int32 CaptainFalls = 0, CaptainUnbased = 0;
+	};
+
+	/** The people go from a landing to another, each at its own time, and the world runs. Optionally with the Captain standing in the car at a place of its own. */
+	FLiftWalkResult LiftRunWalkers(FLiftWorldBench& W, int32 Line, int32 Num, int32 Seed, double Spread, ACharacter* Captain, float MaxSeconds)
+	{
+		FLiftWalkResult Out;
+		const FAstraLiftLine& L = W.Lifts->Network().Lines[Line];
+		AAstraLiftCar* Car = W.Lifts->CarOf(Line);
+		FRandomStream Rand(Seed);
+		TArray<FLiftWalker> People;
+		People.SetNum(Num);
+		const int32 NumStops = L.Stops.Num();
+		for (FLiftWalker& P : People)
+		{
+			P.From = Rand.RandRange(0, NumStops - 1);
+			do { P.To = Rand.RandRange(0, NumStops - 1); } while (P.To == P.From);
+			P.BornAt = Rand.FRand() * Spread;
+		}
+		const float Dt = 1.f / 60.f;
+		const float Walk = 125.f;
+		FString Fall;
+		for (float T = 0.f; T < MaxSeconds; T += Dt)
+		{
+			for (int32 I = 0; I < People.Num(); ++I)
+			{
+				FLiftWalker& P = People[I];
+				if (!P.bBegun && T >= P.BornAt)
+				{
+					const FAstraLiftStop& S = L.Stops[P.From];
+					const FVector Side = FVector::CrossProduct(S.Out, FVector::UpVector).GetSafeNormal();
+					P.A = LiftSpawnWalker(W, S.WaitCm() + Side * Rand.FRandRange(-45.f, 45.f) + S.Out * Rand.FRandRange(-20.f, 60.f));
+					P.bBegun = P.R.Begin(W.Lifts, P.A, 1000 + I, Line, P.From, P.To, L.Stops[P.To].WaitCm());
+					if (!P.bBegun)
+					{
+						++Out.Failed;
+						P.DoneAt = T;
+					}
+				}
+			}
+			W.Step(Dt);
+			int32 Active = 0;
+			for (FLiftWalker& P : People)
+			{
+				if (!P.bBegun || P.DoneAt >= 0.0)
+				{
+					Active += (!P.bBegun && P.DoneAt < 0.0) ? 1 : 0;
+					continue;
+				}
+				const FAstraLiftRider::EStep S = P.R.Tick(Dt, Walk);
+				const FVector Feet = P.A->GetActorLocation();
+				if (P.R.Walking())
+				{
+					// the doors never close on someone: a walker in a doorway has it open, and the car does not move
+					const AAstraLiftLanding* Landing = W.Lifts->LandingOf(Line, P.R.Step() == FAstraLiftRider::EStep::Board ? P.From : P.To);
+					if (Landing && Landing->InDoorway(Feet, 20.f))
+					{
+						if (Landing->GetOpen() < 0.2f)
+						{
+							if (Out.DoorViol++ == 0)
+							{
+								Out.First = FString::Printf(TEXT("t %.1f s: a walker is in the doorway of stop %d with the doors %.2f open (%s)"), T, P.R.Step() == FAstraLiftRider::EStep::Board ? P.From : P.To, Landing->GetOpen(), P.R.StepName());
+							}
+						}
+						if (FMath::Abs(Car->Brain.V()) > 0.5f)
+						{
+							++Out.MovedInDoorway;
+						}
+					}
+				}
+				if (P.R.Step() == FAstraLiftRider::EStep::Inside && P.R.IsAttached() && !Car->Contains(Feet, 10.f))
+				{
+					if (Out.InsideViol++ == 0)
+					{
+						Out.First = FString::Printf(TEXT("t %.1f s: a rider 'inside' stands outside the car at %s (car at s %.0f)"), T, *Car->ToLocal(Feet).ToString(), Car->Brain.S());
+					}
+				}
+				if (S == FAstraLiftRider::EStep::Done || S == FAstraLiftRider::EStep::Failed)
+				{
+					P.DoneAt = T;
+					Out.Done += S == FAstraLiftRider::EStep::Done ? 1 : 0;
+					Out.Failed += S == FAstraLiftRider::EStep::Failed ? 1 : 0;
+					if (S == FAstraLiftRider::EStep::Done)
+					{
+						Out.Waits.Add(P.R.WaitedS());
+						Out.Rides.Add(P.R.RodeS());
+						Out.Totals.Add(T - P.BornAt);
+						if (FVector::Dist2D(Feet, L.Stops[P.To].WaitCm()) > 40.f && Out.First.IsEmpty())
+						{
+							Out.First = FString::Printf(TEXT("a rider finished %.0f cm from where its route goes"), FVector::Dist2D(Feet, L.Stops[P.To].WaitCm()));
+						}
+					}
+					else if (Out.First.IsEmpty())
+					{
+						Out.First = FString::Printf(TEXT("a rider from stop %d to %d gave up (%s) after %.0f s"), P.From, P.To, P.R.StepName(), T - P.BornAt);
+					}
+					continue;
+				}
+				++Active;
+			}
+			// the people in the car keep their distance from each other and from the Captain
+			for (int32 I = 0; I < People.Num(); ++I)
+			{
+				const FLiftWalker& A = People[I];
+				if (!A.bBegun || A.DoneAt >= 0.0 || !A.R.IsAttached() || A.R.Step() != FAstraLiftRider::EStep::Inside)
+				{
+					continue;
+				}
+				if (Captain && Car->Contains(Captain->GetActorLocation(), 0.f))
+				{
+					Out.MinFromCaptain = FMath::Min(Out.MinFromCaptain, FVector::Dist2D(A.A->GetActorLocation(), Captain->GetActorLocation()));
+				}
+				for (int32 J = I + 1; J < People.Num(); ++J)
+				{
+					const FLiftWalker& B = People[J];
+					if (B.bBegun && B.DoneAt < 0.0 && B.R.IsAttached() && B.R.Step() == FAstraLiftRider::EStep::Inside)
+					{
+						const float D = FVector::Dist2D(A.A->GetActorLocation(), B.A->GetActorLocation());
+						Out.MinApart = FMath::Min(Out.MinApart, D);
+						Out.SharedSlots += D < 12.f ? 1 : 0;
+					}
+				}
+			}
+			if (Captain)
+			{
+				UCharacterMovementComponent* M = Captain->GetCharacterMovement();
+				Out.CaptainFalls += M->MovementMode != MOVE_Walking ? 1 : 0;
+				Out.CaptainUnbased += Captain->GetMovementBase() != Car->FloorComponent() ? 1 : 0;
+			}
+			++Out.Frames;
+			if (Active == 0)
+			{
+				Out.Last = T;
+				break;
+			}
+			Out.Last = T;
+		}
+		for (FLiftWalker& P : People)
+		{
+			P.R.Clear();
+		}
+		return Out;
+	}
+
+	void LiftTestRiders(const FAstraLiftNetwork& Net, int32 Num, int32 Seed)
+	{
+		FLiftWorldBench& W = LiftBench();
+		if (!W.Create())
+		{
+			LiftCheck(TEXT("riders: the lifts' subsystem"), false, TEXT("the world has no UAstraLiftSubsystem"));
+			return;
+		}
+		const int32 Tl = Net.FindLine(TEXT("tl_a"));
+		if (Tl == INDEX_NONE)
+		{
+			LiftCheck(TEXT("riders: the test plan's turbolift"), false, TEXT("no line tl_a in the plan"));
+			return;
+		}
+		// ---- the rush: the crew come to the landings at their own times and ride, with the car taking them where they go
+		W.Build(Net);
+		const FLiftWalkResult A = LiftRunWalkers(W, Tl, Num, Seed, 90.0, nullptr, 480.f);
+		const AAstraLiftCar* Car = W.Lifts->CarOf(Tl);
+		bool bFree = true;
+		for (int32 I = 0; I < Car->NumSlots(); ++I)
+		{
+			bFree &= W.Lifts->SlotFree(Tl, I);
+		}
+		const double Worst = A.Totals.Num() ? FMath::Max(A.Totals) : 0.0;
+		LiftCheck(TEXT("riders: the crew ride the real car"), A.Done == Num && A.Failed == 0 && A.InsideViol == 0 && Worst < 240.0 && bFree,
+		      FString::Printf(TEXT("%d of %d delivered in %.0f s; wait avg %.1f, p95 %.1f s; ride avg %.1f s; worst door to door %.0f s; %d failed; the car's places all free again %d %s"),
+		                      A.Done, Num, A.Last, LiftMean(A.Waits), LiftPercentile(A.Waits, 0.95), LiftMean(A.Rides), Worst, A.Failed, bFree, *A.First));
+		LiftCheck(TEXT("riders: the doors never close on a walker"), A.DoorViol == 0 && A.MovedInDoorway == 0,
+		      FString::Printf(TEXT("%d frames with a walker in a doorway and the doors shut, %d with the car moving %s"), A.DoorViol, A.MovedInDoorway, *A.First));
+		LiftCheck(TEXT("riders: nobody stands through anybody in the car"), A.SharedSlots == 0 && A.MinApart > 30.f,
+		      FString::Printf(TEXT("the closest two riders came to %.0f cm, %d frames on the same spot"), A.MinApart > 1.0e8f ? 0.f : A.MinApart, A.SharedSlots));
+
+		// ---- with the Captain in the car, at the place a body would take first: nobody takes it
+		W.Build(Net);
+		const FAstraLiftLine& L = Net.Lines[Tl];
+		AAstraLiftCar* C2 = W.Lifts->CarOf(Tl);
+		const int32 Deck1 = L.FindStopByDeck(1);
+		const FAstraLiftStop& S1 = L.Stops[Deck1];
+		ACharacter* Cap = LiftSpawnCaptain(W, S1.DoorCm + S1.Out * 220.f, FRotator(0.f, L.FrontYaw + 180.f, 0.f));
+		W.Run(0.8f);
+		FString Notice;
+		W.Lifts->CallAt(Tl, Deck1, Notice);
+		LiftWalk(W, Cap, -S1.Out, 12.f, [&]() { return C2->Contains(Cap->GetActorLocation(), 40.f) && C2->Brain.DoorOpen() >= 1.f; });
+		// he walks to the back of the car (where the first place is) and stands there
+		const FVector Back = C2->ToWorld(C2->SlotLocal(0));
+		LiftWalk(W, Cap, (Back - Cap->GetActorLocation()).GetSafeNormal2D(), 6.f, [&]() { return FVector::Dist2D(Back, Cap->GetActorLocation()) < 25.f; });
+		W.Run(0.5f);
+		const FString Before = W.Lifts->Describe().Left(160).Replace(TEXT("\n"), TEXT(" | "));
+		const FLiftWalkResult B = LiftRunWalkers(W, Tl, 6, Seed + 1, 20.0, Cap, 300.f);
+		if (B.Done != 6)
+		{
+			int32 Free = 0;
+			for (int32 I = 0; I < C2->NumSlots(); ++I)
+			{
+				Free += W.Lifts->SlotFree(Tl, I) ? 1 : 0;
+			}
+			UE_LOG(LogASTRA, Display, TEXT("[Lift]   the Captain's car before: %s; after: %s; he stands at %s in it (inside %d, in line %d); %d of %d places free, full %d"), *Before,
+			       *W.Lifts->Describe().Left(160).Replace(TEXT("\n"), TEXT(" | ")), *C2->ToLocal(Cap->GetActorLocation()).ToString(), C2->Contains(Cap->GetActorLocation()), W.Lifts->PlayerLine(),
+			       Free, C2->NumSlots(), !W.Lifts->HasFreeSlot(Tl));
+		}
+		LiftCheck(TEXT("riders: nobody takes the Captain's place"), B.Done == 6 && B.Failed == 0 && B.MinFromCaptain > 45.f && B.CaptainFalls == 0 && B.CaptainUnbased == 0,
+		      FString::Printf(TEXT("%d of 6 delivered; the nearest came within %.0f cm of him (45 needed); he fell %d frames, left the car's floor %d; %d frames on %.0f s %s"),
+		                      B.Done, B.MinFromCaptain > 1.0e8f ? 0.f : B.MinFromCaptain, B.CaptainFalls, B.CaptainUnbased, B.Frames, B.Last, *B.First));
+
+		// ---- the Spine shuttle: the same people on the line along the Spine (its car runs level, with doors along its side)
+		const int32 Sh = Net.FindLine(TEXT("spine_shuttle"));
+		if (Sh != INDEX_NONE)
+		{
+			W.Build(Net);
+			const FLiftWalkResult S = LiftRunWalkers(W, Sh, 8, Seed + 2, 60.0, nullptr, 900.f);
+			LiftCheck(TEXT("riders: the crew ride the Spine shuttle"), S.Done == 8 && S.Failed == 0 && S.InsideViol == 0 && S.DoorViol == 0 && S.MovedInDoorway == 0,
+			      FString::Printf(TEXT("%d of 8 delivered in %.0f s; wait avg %.1f, worst %.1f s; ride avg %.1f s; %d failed; doors shut on a walker %d, car moving with one in a doorway %d, 'inside' outside %d %s"),
+			                      S.Done, S.Last, LiftMean(S.Waits), S.Waits.Num() ? FMath::Max(S.Waits) : 0.0, LiftMean(S.Rides), S.Failed, S.DoorViol, S.MovedInDoorway, S.InsideViol, *S.First));
+		}
+		W.Destroy();
+	}
+
 	void LiftTestVoice(const FAstraLiftNetwork& Net)
 	{
 		FLiftWorldBench& W = LiftBench();
@@ -1317,6 +1569,10 @@ int32 UAstraLiftSimCommandlet::Main(const FString& Params)
 	if (bAll || Scenario == TEXT("ride") || Scenario == TEXT("doors"))
 	{
 		LiftTestWorld(Net, bAll, Scenario);
+	}
+	if (bAll || Scenario == TEXT("riders"))
+	{
+		LiftTestRiders(Net, Riders, Seed);
 	}
 	if (bAll || Scenario == TEXT("voice"))
 	{

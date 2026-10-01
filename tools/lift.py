@@ -6,7 +6,8 @@
   tools/lift.py check [plan.json]          does a plan's `vertical[]` / `transit[]` (version 2) hold the contract? Every landing's door on its shaft's wall, the car
                                            fits, every door on the same side, the stops along the line, the graph nodes there (no engine needed)
   tools/lift.py run [--scenario all|...]   the headless bench (commandlet AstraLiftSim): the motion, the dispatch, a rush hour of riders, a character riding a car
-                                           from Deck 1 to Deck 9, the cost per frame. Needs the editor target built for this checkout.
+                                           from Deck 1 to Deck 9, the crew's riders in the real cars (plan, motion, brain, rush, ride, doors, riders, voice, stream,
+                                           shuttle, perf), the cost per frame. Needs the editor target built for this checkout.
 
 `run` uses -nullrhi: it never opens a window or touches the GPU, so it can run while the game or the editor is open.
 """

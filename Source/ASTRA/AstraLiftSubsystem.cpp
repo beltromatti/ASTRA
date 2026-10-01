@@ -376,6 +376,7 @@ FAstraLiftBrain::FHooks UAstraLiftSubsystem::MakeHooks(int32 Line)
 	H.DeckReady = [this, Line](int32 Stop) { return DeckReady(Line, Stop); };
 	H.WantDeck = [this, Line](int32 Stop) { WantDeck(Line, Stop); };
 	H.ForceDeck = [this, Line](int32 Stop) { ForceDeck(Line, Stop); };
+	H.Full = [this, Line]() { return SlotOwner.IsValidIndex(Line) && SlotOwner[Line].Num() > 0 && !SlotOwner[Line].Contains(INDEX_NONE); };     // (a car with every place taken passes the calls from the landings)
 	return H;
 }
 
@@ -937,7 +938,40 @@ bool UAstraLiftSubsystem::CanBoard(int32 Line, int32 From, int32 To) const
 	const FAstraLiftBrain& B = Car->Brain;
 	const bool bOpen = B.State() == FAstraLiftBrain::EState::Open || (B.State() == FAstraLiftBrain::EState::Opening && B.DoorOpen() > 0.6f);
 	const int32 Dir = To > From ? 1 : -1;
-	return bOpen && B.AtLanding() == From && (B.Heading() == 0 || B.Heading() == Dir) && SlotOwner.IsValidIndex(Line) && SlotOwner[Line].Contains(INDEX_NONE);
+	if (!bOpen || B.AtLanding() != From || (B.Heading() != 0 && B.Heading() != Dir) || !SlotOwner.IsValidIndex(Line))
+	{
+		return false;
+	}
+	return HasFreeSlot(Line);
+}
+
+bool UAstraLiftSubsystem::HasFreeSlot(int32 Line) const
+{
+	if (SlotOwner.IsValidIndex(Line))
+	{
+		for (int32 I = 0; I < SlotOwner[Line].Num(); ++I)
+		{
+			if (SlotFree(Line, I))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool UAstraLiftSubsystem::SlotFree(int32 Line, int32 Slot) const
+{
+	const AAstraLiftCar* Car = CarOf(Line);
+	if (!Car || !SlotOwner.IsValidIndex(Line) || !SlotOwner[Line].IsValidIndex(Slot) || SlotOwner[Line][Slot] != INDEX_NONE)
+	{
+		return false;
+	}
+	if (const APawn* P = Captain(); P && P->IsA<ACharacter>() && Car->Contains(P->GetActorLocation(), 0.f))
+	{
+		return FVector::Dist2D(Car->ToWorld(Car->SlotLocal(Slot)), P->GetActorLocation()) > 50.f;
+	}
+	return true;
 }
 
 int32 UAstraLiftSubsystem::TakeSlot(int32 Line, int32 Who)
@@ -948,7 +982,7 @@ int32 UAstraLiftSubsystem::TakeSlot(int32 Line, int32 Who)
 	}
 	for (int32 I = 0; I < SlotOwner[Line].Num(); ++I)
 	{
-		if (SlotOwner[Line][I] == INDEX_NONE)
+		if (SlotFree(Line, I))
 		{
 			SlotOwner[Line][I] = Who;
 			return I;
@@ -974,7 +1008,7 @@ void UAstraLiftSubsystem::RiderChoose(int32 Line, int32 To)
 	}
 }
 
-bool UAstraLiftSubsystem::CanAlight(int32 Line, int32 To) const
+bool UAstraLiftSubsystem::DoorsOpenAt(int32 Line, int32 Stop) const
 {
 	const AAstraLiftCar* Car = CarOf(Line);
 	if (!Car)
@@ -982,7 +1016,7 @@ bool UAstraLiftSubsystem::CanAlight(int32 Line, int32 To) const
 		return false;
 	}
 	const FAstraLiftBrain& B = Car->Brain;
-	return B.AtLanding() == To && (B.State() == FAstraLiftBrain::EState::Open || (B.State() == FAstraLiftBrain::EState::Opening && B.DoorOpen() > 0.6f));
+	return B.AtLanding() == Stop && (B.State() == FAstraLiftBrain::EState::Open || (B.State() == FAstraLiftBrain::EState::Opening && B.DoorOpen() > 0.6f));
 }
 
 // ================================================================================================================================== report

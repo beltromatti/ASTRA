@@ -138,8 +138,12 @@ public:
 	int32 TakeSlot(int32 Line, int32 Who);
 	void FreeSlot(int32 Line, int32 Slot);
 	void RiderChoose(int32 Line, int32 To);
-	bool CanAlight(int32 Line, int32 To) const;
-	/** Whether the Captain is in the car (his place counts as taken: a body does not stand through him). */
+	/** The doors are open (or well on their way) at a stop with the car standing there: a rider may get out, and one at the landing may walk in. */
+	bool DoorsOpenAt(int32 Line, int32 Stop) const;
+	bool CanAlight(int32 Line, int32 To) const { return DoorsOpenAt(Line, To); }
+	/** A place of the car that nobody holds and the Captain does not stand at (a body does not stand through him: half a metre between them at least). */
+	bool SlotFree(int32 Line, int32 Slot) const;
+	bool HasFreeSlot(int32 Line) const;
 
 	// ------------------------------------------------------------------------------------------------------------------------------- the bench
 	/** The bench's world: no pawn, no listener, no streaming. Overrides stand in for them. */

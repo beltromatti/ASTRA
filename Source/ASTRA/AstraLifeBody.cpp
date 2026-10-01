@@ -7,6 +7,7 @@
 #include "AstraDoor.h"
 #include "AstraLifeSim.h"
 #include "AstraLifeSubsystem.h"
+#include "AstraLiftSubsystem.h"
 #include "AstraShipSubsystem.h"
 #include "Components/AudioComponent.h"
 #include "Components/PoseableMeshComponent.h"
@@ -46,7 +47,7 @@ bool AAstraLifeBody::SeenRecently(float Within) const
 float AAstraLifeBody::ActorYawFor(float FacingYaw) const
 {
 	// the mannequin faces its own +Y: standing, the actor turns a quarter off; seated and lying poses carry their own turn
-	return (Mode == EMode::Walk || Mode == EMode::Stand || Mode == EMode::Off) ? FacingYaw - 90.f : FacingYaw;
+	return (Mode == EMode::Walk || Mode == EMode::Stand || Mode == EMode::Lift || Mode == EMode::Off) ? FacingYaw - 90.f : FacingYaw;
 }
 
 void AAstraLifeBody::Place(const FVector& At, float FacingYaw)
@@ -85,6 +86,7 @@ bool AAstraLifeBody::LooksRight(FString& OutWhy) const
 	{
 	case EMode::Walk:
 	case EMode::Stand:
+	case EMode::Lift:
 		if (IsHidden())                        { OutWhy = TEXT("on its feet but hidden"); return false; }
 		if (!Body->GetSkeletalMeshAsset())     { OutWhy = TEXT("on its feet with no mesh"); return false; }
 		if (!Body->IsVisible())                { OutWhy = TEXT("on its feet but its mesh is not visible"); return false; }
@@ -139,6 +141,9 @@ void AAstraLifeBody::Bind(UAstraLifeSubsystem* InOwner, int32 InPerson)
 		JogAnim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd.MF_Unarmed_Jog_Fwd"));
 	}
 	Mode = EMode::Off;
+	Rider.Clear();
+	RideSeg = INDEX_NONE;
+	bRideWalk = false;
 	Offset = FVector2D::ZeroVector;
 	BlockedS = 0.f;
 	FaceBlend = 0.f;
@@ -165,6 +170,7 @@ void AAstraLifeBody::Unbind()
 			L->Sim().SetBodied(PersonIdx, false);
 		}
 	}
+	Rider.Clear();                                        // (out of the car it rides, and its place in it given back)
 	AstraDoors::RemoveWalker(this);
 	if (IsSpeaking())
 	{
@@ -207,9 +213,10 @@ void AAstraLifeBody::SetMode(EMode M, const FAstraLifePerson& P)
 		return;
 	case EMode::Walk:
 	case EMode::Stand:
+	case EMode::Lift:
 	{
 		SetActorHiddenInGame(false);
-		if (Old != EMode::Walk && Old != EMode::Stand)
+		if (Old != EMode::Walk && Old != EMode::Stand && Old != EMode::Lift)
 		{
 			Posture = EAstraCrewPosture::Standing;
 			ReclineDeg = 20.f;
@@ -356,6 +363,89 @@ void AAstraLifeBody::TickStand(float Dt, const FAstraLifePerson& P)
 	SetActorLocationAndRotation(At, FRotator(0.f, ActorYawFor(Turn), 0.f), false, nullptr, ETeleportType::None);
 }
 
+bool AAstraLifeBody::TickLift(float Dt, const FAstraLifePerson& P)
+{
+	UAstraLifeSubsystem* L = Owner.Get();
+	UWorld* W = GetWorld();
+	UAstraLiftSubsystem* Lifts = W ? W->GetSubsystem<UAstraLiftSubsystem>() : nullptr;
+	const FAstraLifeRoute& R = P.Route;
+	if (!Rider.Active())
+	{
+		if (!L || !Lifts || !Lifts->IsBuilt() || P.Phase != FAstraLifePerson::EPhase::Walking || R.Done())
+		{
+			return false;
+		}
+		const FVector A(R.Pts[R.Seg]);
+		if (R.Seg == RideSeg && A.Equals(RideA, 1.f))
+		{
+			return false;                                    // this stretch of the route has been looked at: it is not a ride, or it has been ridden
+		}
+		RideSeg = R.Seg;
+		RideA = A;
+		const FVector B(R.Pts[R.Seg + 1]);
+		int32 Line = INDEX_NONE, From = INDEX_NONE, To = INDEX_NONE;
+		// (a body made in the middle of a ride, or away from its landing, leaves it to the abstract clock)
+		if (R.F > 0.1f || FVector::Dist2D(GetActorLocation(), A) > 300.f || !Lifts->FindRide(A, B, Line, From, To) || !Rider.Begin(Lifts, this, PersonIdx, Line, From, To, B))
+		{
+			return false;
+		}
+		SetMode(EMode::Lift, P);
+		bRideWalk = false;
+	}
+	else if (!L || !Lifts || P.Phase != FAstraLifePerson::EPhase::Walking || R.Done() || R.Seg != RideSeg || !FVector(R.Pts[R.Seg]).Equals(RideA, 1.f))
+	{
+		EndLift(P, true);                                    // the plan changed under them (an alarm, a damaged door): they are where the person is now
+		return false;
+	}
+	const float Speed = L->Sim().WalkSpeed(P) * 0.85f;       // (a little slower than in a corridor: a lobby, a doorway, a car)
+	const FAstraLiftRider::EStep Step = Rider.Tick(Dt, Speed);
+	if (Rider.Walking() != bRideWalk)
+	{
+		bRideWalk = Rider.Walking();
+		if (UAnimSequence* Anim = bRideWalk ? WalkAnim : IdleAnim)
+		{
+			Body->PlayAnimation(Anim, true);
+			Body->SetPlayRate(bRideWalk ? 1.f : 0.9f);
+		}
+	}
+	if (bRideWalk)
+	{
+		Body->SetPlayRate(FMath::Clamp(Speed / CVarWalkNatural.GetValueOnGameThread(), 0.f, 1.5f));
+	}
+	Turn = FMath::FixedTurn(Turn, Rider.FacingYaw(), 360.f * Dt);
+	SetActorRotation(FRotator(0.f, ActorYawFor(Turn), 0.f));
+	if (Step == FAstraLiftRider::EStep::Done || Step == FAstraLiftRider::EStep::Failed)
+	{
+		EndLift(P, Step == FAstraLiftRider::EStep::Failed);
+		return false;
+	}
+	return true;
+}
+
+void AAstraLifeBody::EndLift(const FAstraLifePerson& P, bool bPutThere)
+{
+	Rider.Clear();                                           // (detached from the car, its place given back, no longer a walker of the doors)
+	bRideWalk = false;
+	Offset = FVector2D::ZeroVector;
+	UAstraLifeSubsystem* L = Owner.Get();
+	if (!L)
+	{
+		return;
+	}
+	FAstraLifeSim& Sim = L->Sim();
+	const FAstraLifeRoute& R = P.Route;
+	if (!R.Done() && R.Seg == RideSeg && FVector(R.Pts[R.Seg]).Equals(RideA, 1.f))
+	{
+		// the person comes out at the far end of the stretch: what the rider lived is the time the abstract ride would have taken
+		const float Speed = Sim.WalkSpeed(P);
+		Sim.MoveBody(PersonIdx, (1.f - R.F) * R.SegSeconds(R.Seg, Speed, Sim.GetMap().Speed) + 0.02f, Speed);
+	}
+	if (bPutThere)
+	{
+		Place(P.Pos, P.Phase == FAstraLifePerson::EPhase::Walking ? FMath::RadiansToDegrees(FMath::Atan2(P.Route.Heading().Y, P.Route.Heading().X)) : P.TargetYaw);
+	}
+}
+
 void AAstraLifeBody::Tick(float DeltaSeconds)
 {
 	SCOPE_CYCLE_COUNTER(STAT_AstraLifeBody);
@@ -367,6 +457,7 @@ void AAstraLifeBody::Tick(float DeltaSeconds)
 	const FAstraLifePerson& P = L->Sim().Person(PersonIdx);
 	if (P.Status == 2 || P.Act == EAstraLifeAct::Dead)
 	{
+		Rider.Clear();
 		SetMode(EMode::Shaft, P);
 		return;
 	}
@@ -384,6 +475,14 @@ void AAstraLifeBody::Tick(float DeltaSeconds)
 	TimeAcc = 0.f;
 	++Ticks;
 	Shadows(Dist < CVarShadowM.GetValueOnGameThread() * 100.f);
+
+	// a ride in a real lift (ASCENSORI): the person's route is on one, and the body calls it, boards it, rides it and steps out; otherwise (no lift built there, a stair, a ride
+	// that was already under way when the body was made) the ride is the abstract one below: hidden for the seconds the simulation gives it
+	if (TickLift(Dt, P))
+	{
+		SetActorTickInterval(bSeen ? 0.f : 0.1f);
+		return;
+	}
 
 	// what they are doing now: the walk the person is on, or the pose of the place they are at
 	EMode Want;
