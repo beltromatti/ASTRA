@@ -1055,8 +1055,12 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 			UE_LOG(LogASTRA, Display, TEXT("[Damage] left in the books: %s | small holes %d, big holes %d, partial wrecks %d, lost %d, short of power %d, smoke or fire %d, locked down %d, short of air or with people exposed %d"), *I.InfoText(), Small, BigHole, Partial, Lost, Dim, Smoky, Locked, Other);
 		}
 		UE_LOG(LogASTRA, Display, TEXT("[Damage] people: %d of the %d blows that reached the interior crossed a room with someone in it; %d people were in the rooms they crossed"), B.OccupiedBlows, B.HitsInside, B.PeopleNear);
-		UE_LOG(LogASTRA, Display, TEXT("[Damage] cost: the whole world tick %.3f ms on average, %.1f ms at worst (%lld ticks, %.0f s of battle in %.0f s)"), CostN ? CostSum / CostN : 0.0, CostMax, CostN, W.Battle->GetBattleTime() - 170.f, FPlatformTime::Seconds() - BattleWall0);
 		TSharedRef<FJsonObject> Sv = MakeShared<FJsonObject>();
+		float ModelAvg = 0.f, ModelMax = 0.f;
+		W.Ship->InteriorCost(ModelAvg, ModelMax);
+		UE_LOG(LogASTRA, Display, TEXT("[Damage] cost: the whole world tick %.3f ms on average, %.1f ms at worst (%lld ticks, %.0f s of battle in %.0f s); the damage model's own tick (the physics steps at 5 Hz, the teams, the screens' list) %.3f ms on average, %.2f ms at worst"), CostN ? CostSum / CostN : 0.0, CostMax, CostN, W.Battle->GetBattleTime() - 170.f, FPlatformTime::Seconds() - BattleWall0, ModelAvg, ModelMax);
+		Sv->SetNumberField(TEXT("model_ms"), ModelAvg);
+		Sv->SetNumberField(TEXT("model_ms_max"), ModelMax);
 		Sv->SetNumberField(TEXT("t_hull_50"), T50);
 		Sv->SetNumberField(TEXT("t_hull_20"), T20);
 		Sv->SetNumberField(TEXT("t_hull_5"), T5);
