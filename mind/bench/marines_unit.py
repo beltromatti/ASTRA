@@ -258,6 +258,14 @@ class People(unittest.IsolatedAsyncioTestCase):
         m = re.search(r"LastNames\[\] = \{(.*?)\};", src.read_text(encoding="utf-8"), re.S)
         self.assertNotIn("Reyes", set(re.findall(r'TEXT\("([^"]+)"\)', m.group(1))))        # (crew_locate must find one Reyes)
 
+    def test_a_squad_is_named_as_the_captain_says_it(self) -> None:
+        self.assertEqual(mm.spoken("Reaction 2", "it"), "Reaction due")
+        self.assertEqual(mm.spoken("Watch 3", "en"), "Watch three")
+        self.assertEqual(mm.spoken("Reserve 1", "fr"), "Reserve un")
+        self.assertEqual(mm.spoken("Reaction 2", "de"), "Reaction zwei")
+        self.assertEqual(mm.spoken("Reaction 2", "ja"), "Reaction 2")                     # (a language with no table: the digit as it is)
+        self.assertEqual(mm.spoken("Watch 12", "it"), "Watch 12")                         # (two digits: left alone)
+
     def test_a_squads_voice_follows_its_name(self) -> None:
         self.assertEqual(mm.squad_key("Reaction 1"), "marine_reaction_1")
         self.assertEqual(mm.squad_key("Watch 12"), "marine_watch_12")
@@ -308,8 +316,8 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
             bed.m.on_event(CONTACT)
             user = bed.m._compose(st, bed.m._events, [], ["news on the net (below)"], "it")
             for needle in ("the bridge: Commander Elena Serra (Executive Officer): Marines, boarders on deck five.", "Sergeant Priya Castillo sees the boarders", "74 s since the alarm",
-                           "Main Engineering) [id engineering]", "marine_reaction_1 — Reaction 1; leader Sergeant Priya Castillo: 6 able", "doing: advance",
-                           "under orders; in contact", "note: hold the Spine junction", "3 still arming or waking", "marine_watch_1 — Watch 1; leader Private Tariq Hassan: 0 able, 2 down, 2 dead",
+                           "Main Engineering) [id engineering]", "marine_reaction_1 — Reaction 1 (said \"Reaction uno\"); leader Sergeant Priya Castillo: 6 able", "marine_reaction_2 — Reaction 2 (said \"Reaction due\")", "doing: advance",
+                           "under orders; in contact", "note: hold the Spine junction", "3 still arming or waking", "marine_watch_1 — Watch 1 (said \"Watch uno\"); leader Private Tariq Hassan: 0 able, 2 down, 2 dead",
                            "6 at deck 5 section C (Corridor 5-C starboard) [id corridor_5c_s], 12 s ago", "[id d7_corridor_B1]", "the default ambush", "[ids corridor_5b, spine_5a]",
                            "BLK-D5-12 between", "SEALED", "BLK-D5-14", "the count: marines 13 able, 3 down, 2 dead", "where the Captain is: in a corridor on deck 6", "Italian", "Capitano",
                            "boarding: contact"):
@@ -325,10 +333,10 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
             st["_marines"]["captain"] = {"where": PLACE, "where_id": "corridor_5c_s", "down": False, "strength_pct": 80}
             bed.m.feed(st)
             board = bed.m._board(st)
-            reaction2 = next(r for r in board.splitlines() if "marine_reaction_2" in r)
-            self.assertIn("in the Captain's room", reaction2)
-            self.assertNotIn("in the Captain's room", next(r for r in board.splitlines() if "marine_reaction_1" in r))
-            self.assertIn("80% strength", board)
+            captain = next(r for r in board.splitlines() if "the Captain in the fight" in r)
+            self.assertIn("in the same room as Sergeant Jonas Weber", captain)
+            self.assertNotIn("Priya Castillo", captain)                                   # (Reaction 1 is elsewhere)
+            self.assertIn("80% strength", captain)
 
     def test_what_is_the_bridges_news_says_so(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -890,7 +898,7 @@ class CaptainTalk(unittest.IsolatedAsyncioTestCase):
         await self.bed.settle(1.0)
         self.assertEqual(self.bed.commands, [("marine_order", {"squad": "Reaction 2", "task": "hold", "place": "captain"}, "marine_reaction_2")])
         self.assertEqual([(l["speaker"], l["answer"]) for l in self.bed.lines], [("marine_reaction_2", True)])
-        self.assertIn("in the Captain's room", self.bed.user())
+        self.assertIn("in the same room as Sergeant Jonas Weber", self.bed.user())
 
     async def test_reyes_orders_on_his_own_in_a_look_and_says_so(self) -> None:
         self.bed.llm.replies = [[("bulkheads", {"action": "seal", "doors": ["BLK-D5-14"], "reason": "the way to the Spine"}),

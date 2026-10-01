@@ -33,6 +33,7 @@ from . import models
 from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
 from .medbay import FREE_VOICES
 from .openrouter import Completion, OpenRouter, ToolCall
+from .voice_text import _DIGITS
 
 log = logging.getLogger("astra.marines")
 
@@ -94,6 +95,15 @@ LEADER_VOICES = {g: [v for v in pool if v != REYES.voice] for g, pool in FREE_VO
 def squad_key(name: str) -> str:
     """The speaker id of a squad's leader on the voice stage (`Reaction 1` -> `marine_reaction_1`): the squad is the voice, whoever leads it now."""
     return "marine_" + (re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_") or "squad")
+
+
+def spoken(name: str, lang: str) -> str:
+    """A squad's name as the Captain says it in his language (`Reaction 2` -> `Reaction due`): the number is a digit on the board and a word in his mouth, and the model must see both
+    to know which squad he named."""
+    digits = _DIGITS.get(lang)
+    if not digits:
+        return name
+    return re.sub(r"\b\d\b", lambda m: digits[int(m.group(0))], name)
 
 
 def leader_voice(name: str, gender: str) -> str:
@@ -166,7 +176,7 @@ def _fn(name: str, desc: str, props: dict[str, Any], required: list[str]) -> dic
 
 
 SAY = _fn("say", "Say one line on the marine net: the Captain and the bridge hear it as a radio voice. One call per line, in speaking order; usually only ONE voice speaks "
-                 "for a piece of news. Radio speech in the Captain's language, short.", {
+                 "for a piece of news. Radio speech in the Captain's language, short. When an order goes with the line, call `order` or `bulkheads` FIRST and `say` after.", {
     "speaker": {"type": "string", "description": "who speaks: `reyes`, or the key of a squad from the board (marine_reaction_1): the squad's leader speaks"},
     "text": {"type": "string", "description": "the spoken line: one short sentence (4-14 words), two only when the second carries something the Captain must decide or know"},
     "tone": {"type": "string", "enum": list(TONES)},
@@ -181,9 +191,10 @@ ORDER = _fn("order", "Give a squad (or several) an order: it takes effect at onc
     "by": {"type": "string", "description": "who gives the order: `reyes`, or the key of a squad from the board (marine_reaction_1)"},
     "squad": {"type": "string", "description": "a squad's name from the board (Reaction 1), or `all`, `reaction`, `watch`, `reserve`"},
     "task": {"type": "string", "enum": list(TASKS)},
-    "place": {"type": "string", "description": "where: a place id from the board (where_id, the likely approach, the ways into Main Engineering, the default ambush), or `captain` "
-                                               "for wherever the Captain is now; leave it out for follow_captain, rescue_captain and stand_down"},
-    "reason": {"type": "string", "description": "one sentence, for the log"}},
+    "place": {"type": "string", "description": "where: a place id from the board (where_id, the likely approach, the ways into Main Engineering, the default ambush), `captain` "
+                                               "for wherever the Captain is now, or a room's name or kind when it is not on the board (medbay, hangar: the game finds it or lists "
+                                               "what fits); leave it out for follow_captain, rescue_captain and stand_down"},
+    "reason": {"type": "string", "description": "one sentence in English, for the log"}},
     ["by", "squad", "task"])
 
 BULKHEADS = _fn("bulkheads", "Security console (Major Reyes): seal or open pressure bulkheads. A sealed bulkhead splits the section: the boarders must cut through it (about twenty "
@@ -191,7 +202,7 @@ BULKHEADS = _fn("bulkheads", "Security console (Major Reyes): seal or open press
                              "out for every bulkhead round the breach.", {
     "action": {"type": "string", "enum": ["seal", "open"]},
     "doors": {"type": "array", "items": {"type": "string"}, "description": "bulkhead ids from the board"},
-    "reason": {"type": "string", "description": "one sentence, for the log"}},
+    "reason": {"type": "string", "description": "one sentence in English, for the log"}},
     ["action"])
 
 REMEMBER = _fn("remember", "Keep one lasting memory of one of the people: what they would still carry weeks from now (a promise the Captain made or broke, an order of his that cost "
@@ -226,7 +237,14 @@ THE FIGHT, AS EVERYONE IN THE DETACHMENT KNOWS IT
   board says what each squad is doing and whether it is under orders.
 - Orders (`order`) are carried out at once and stand until changed: hold, advance, assault, fall_back, follow_captain, rescue_captain, stand_down (the tool says what each does). A place is
   named by its id from the board (where a squad is, the boarders' likely approach, the ways into Main Engineering, the default ambush) or `captain` for wherever the Captain is.
+  A place the board does not list can still be named by what it is ("medbay", "Main Engineering", "hangar"): the game finds the room, or lists the ones that fit so that you can name one by its id.
   Bulkheads (`bulkheads`): a sealed one splits the section and buys time, and cuts off whoever is behind it, your own squads included.
+- What a commander knows of his orders, from the drills: the drill is good. Left to themselves the squads usually break a boarding of ten, and often one of twenty, for a handful of
+  marines; the ambush it picks is where the boarders must come through, and the squads fight from cover there. An order that takes a squad off it needs a reason you can say in a line.
+  Main Engineering has few ways in: every squad crowded at its door gives up the corridors behind and loses people when the boarders are many (a hold at the door is for one or two
+  squads; the rest stay on the road). An assault into boarders who hold cover is paid in marines: use it to relieve someone (the Captain, a cut-off squad) or at two to one, never to
+  hurry the end. Falling back from the boarders' road to Engineering hands them the reactor: pull back a squad that is mauled, to a place on that road, never the whole detachment
+  (and say so if the Captain orders it). What you order stands until you give it back to the drill (stand_down).
 - The Captain is a person in this fight: he may come down with a rifle, and he can fall. His life comes before the deck: if he is hit, the squads go to him. He commands; you
   adjust your squads inside his orders.
 - The bridge has its own officers (the XO, Tactical, Operations...): they report the ship's side of it and run the ship. You are the marines: their news is yours, the ship's
@@ -236,8 +254,10 @@ WHEN YOU SPEAK
 - Only when something happens to your marines or to the fight, or when the Captain speaks to you. Silence is normal: when the board shows what the Captain can see and nothing needs
   his decision, call stay_quiet. But a marine who falls is always called, by name, once; the first sight of the boarders is always called; the end of the fight is always reported.
 - Major Reyes speaks for the detachment: the picture, the decision, the number that matters, what he needs from the Captain; and he answers the Captain. A squad leader speaks for
-  his squad when something happens to it (contact, a marine down, a place lost or taken, out of room to fall back) and when the Captain addresses him. One voice for one piece of
-  news, the one it happened to; two voices only if the second adds something the first could not know.
+  his squad, and only of what he has seen or done himself: a contact, a marine down, a place lost or taken, out of room to fall back; and when the Captain addresses him. At the alarm,
+  or while a squad is merely moving, only the Major speaks. One voice for one piece of news, the one it happened to; two voices only if the second adds something the first could not know.
+- The news you are woken by is what you answer: when it is a contact, a marine who fell or the end of the fight, that is the line (the board is there to give it its place and its number,
+  not to replace it with something else on the board).
 - You know only your boards: the squads and their places, what is known of the boarders (as the corridors' sensors and the marines have seen them: it can be old, the board says
   how old), the bulkheads, the net, the fallen, your memories. Never invent a number, a name, a place, a hit or a kill. A marine who is down or dead is named only when the news
   names them, and does not speak again; a squad with no one able has no voice.
@@ -254,12 +274,15 @@ HOW YOU SPEAK
 
 THE CAPTAIN TALKS TO YOU
 - His words come over the net (below, "The Captain says"), from the bridge or from the corridor beside the squad. Answer first. The person he addressed answers (by name, rank,
-  squad or post; if he stands in the same place as a squad leader, that leader is the one at hand); words for the whole net, for "the marines" or for the Major are Reyes's, or the
+  squad or post). The squads' numbers on the board are digits, and he says them in his own language (Reaction Due, Reaction Two, Reaction Deux are all Reaction 2): the squad is the one
+  he names, no other, wherever it stands. Words that name no one, said in the corridor, are the leader's who stands there. Words for the whole net, for "the marines" or for the Major are Reyes's, or the
   leader's of the squad concerned. Words to the bridge's officers (the XO, Tactical, the helm...) are the bridge's, even when they are about the fight: not yours, say nothing, call
   stay_quiet.
-- An order is carried out with a tool, then said in one line: `order` for the squads (Reyes any squad, a leader only his own), `bulkheads` for the doors (Reyes). Call the tool BEFORE
-  you `say` it; the result comes back after your call, so say what you are doing, not that it is done. Without the call nothing happens: never say you send, hold, seal or pull back
-  anyone unless you call the tool for it in this same turn; a worry about a plan is said as a worry ("they will be on three sides there, Captain").
+- An order is carried out with a tool, then said in one line: `order` for the squads (Reyes any squad, a leader only his own), `bulkheads` for the doors (Reyes). In the same turn put
+  the tool call BEFORE the `say` that goes with it; the result comes back after your call, so say what you are doing, not that it is done. Without the call nothing happens (the squad
+  goes on doing what it was doing): a line that says a squad holds, moves, takes a place, falls back, follows or covers ("we hold here", "moving, Captain", "sealing it") is true only
+  if its tool call is in the same turn, and a squad leader who answers the Captain's order to his own squad with such a line has called `order` for it. Never say it otherwise; a worry
+  about a plan is said as a worry ("they will be on three sides there, Captain").
 - You decide HOW, in your trade: "hold the corridor" said with the Captain in it is a hold at `captain`; "with me" is follow_captain; "cover Engineering" is a hold at one of the ways
   into Main Engineering with the squad best placed for it; "all back" is a fall_back, to the place that makes sense. An order that cannot be done (a squad that is not on the board, a
   place or a bulkhead the board does not list) gets one line saying so and what you suggest. A lawful order you do not like gets one line of concern, and then you carry it out.
@@ -589,7 +612,7 @@ class MarineMinds:
                 return []
             return ["news on the net (below)"]
         if self.active and self._seen_on and now - max(self._last, self._news_t) >= self._budget_gap(WATCH_S):
-            return [f"no news for {now - max(self._last, self._news_t):.0f} s: a look at the board, to act if the drill is not enough, or to stay quiet"]
+            return [f"no news for {now - max(self._last, self._news_t):.0f} s: a routine look at the board; stay quiet unless something on it needs a decision, or an order the drill will not make by itself"]
         return []
 
     # ------------------------------------------------------------------------------------------------ the picture
@@ -608,7 +631,7 @@ class MarineMinds:
         if seen:
             self.squads = seen
 
-    def _board(self, state: dict[str, Any]) -> str:
+    def _board(self, state: dict[str, Any], lang: str = "en") -> str:
         """The fight as the marines' board shows it (the game's picture, as text): the facts the people may know, and how old they are."""
         pic = self._pic
         if not pic:
@@ -636,12 +659,11 @@ class MarineMinds:
                 tag.append("under orders")
             if s.get("in_contact"):
                 tag.append("in contact")
-            if cap_at and s.get("where_id") == cap_at:
-                tag.append("in the Captain's room")
             if s.get("still_arming_or_waking"):
                 tag.append(f"{_n(s['still_arming_or_waking'])} still arming or waking")
             at = f"at {s['where']} [id {s['where_id']}]" if s.get("where_id") else "(no one able to place)"
-            lines.append(f"  - {key} — {s['name']}; leader {s.get('leader') or 'none left'}: {_n(s.get('able'))} able, {_n(s.get('down'))} down, {_n(s.get('dead'))} dead; {at}; "
+            said = spoken(str(s["name"]), lang)
+            lines.append(f"  - {key} — {s['name']}" + (f" (said \"{said}\")" if said != s["name"] else "") + f"; leader {s.get('leader') or 'none left'}: {_n(s.get('able'))} able, {_n(s.get('down'))} down, {_n(s.get('dead'))} dead; {at}; "
                          f"doing: {s.get('doing', '?')}" + (f" ({'; '.join(tag)})" if tag else "") + (f"; note: {s['note']}" if s.get("note") else ""))
         if not self.squads:
             lines.append("  (none yet)")
@@ -663,8 +685,10 @@ class MarineMinds:
         c = pic.get("captain")
         if isinstance(c, dict):
             armed = (b.get("captain") or {}).get("armed") if b else ""
+            beside = [str(s.get("leader") or s["name"]) for s in self.squads.values() if cap_at and s.get("where_id") == cap_at and _n(s.get("able")) > 0]
             lines.append(f" the Captain in the fight: at {c.get('where')} [id {c.get('where_id')}], {_n(c.get('strength_pct'))}% strength{' — DOWN' if c.get('down') else ''}"
-                         + (f"; armed: {armed}" if armed else ""))
+                         + (f"; armed: {armed}" if armed else "")
+                         + (f"; in the same room as {', '.join(beside)} (words of his that name no one are theirs; a squad he names is the one that answers)" if beside else ""))
         rec = pic.get("recent") or []
         if rec:
             lines.append(" the fight's own log (newest last): " + " | ".join(str(x) for x in rec[-5:]))
@@ -681,7 +705,7 @@ class MarineMinds:
     def _compose(self, state: dict[str, Any], events: list[Ev], inbox: list[Message], why: list[str], lang: str) -> str:
         now = self.clock()
         good, bad = _RADIO.get(lang, _RADIO["en"])
-        parts = [f"THE NET, newest last (what was said and done, heard and seen)\n{self._recall()}", f"THE FIGHT NOW\n{self._board(state)}"]
+        parts = [f"THE NET, newest last (what was said and done, heard and seen)\n{self._recall()}", f"THE FIGHT NOW\n{self._board(state, lang)}"]
         said = [(t, w) for t, w in self.captain_words if not any(m.t == t for m in inbox)]
         if said:
             parts.append("WHAT THE CAPTAIN HAS SAID ON THE NET IN THIS FIGHT (his orders stand until he changes them)\n" + "\n".join(f" - {max(0, now - t):.0f} s ago: \"{w}\"" for t, w in said))
@@ -837,7 +861,7 @@ class MarineMinds:
         follow = list(msgs) + [{"role": "assistant", "content": draft},
                                {"role": "user", "content": "[What you wrote was not said or done. If the net has something to say or do, do it now with the tools"
                                                            + ("." if STAY_QUIET not in tools else "; if not, call stay_quiet.") + "]"}]
-        comp = await models.chat(self.llm, ROLE, messages=follow, tools=tools, tool_choice="auto", on_tool_call=on_call, max_tokens=240)
+        comp = await models.chat(self.llm, ROLE, messages=follow, tools=tools, tool_choice="auto", on_tool_call=on_call, max_tokens=400)
         self._count(rec, comp)
         rec["asked_again"] = True
 
@@ -876,7 +900,7 @@ class MarineMinds:
             elif call.name == "stay_quiet":
                 rec["quiet"] = True
 
-        comp = await models.chat(self.llm, ROLE, messages=follow, tools=[SAY, ORDER, BULKHEADS, STAY_QUIET], tool_choice="auto", on_tool_call=on_call, max_tokens=240)
+        comp = await models.chat(self.llm, ROLE, messages=follow, tools=[SAY, ORDER, BULKHEADS, STAY_QUIET], tool_choice="auto", on_tool_call=on_call, max_tokens=400)
         self._count(rec, comp)
         new = await self._collect(again)
         self._account(rec, new)
@@ -989,7 +1013,7 @@ class MarineMinds:
         cut = f" They had said only «{cut_after}» when the Captain spoke over them." if cut_after else ""
         ask = (f"{waited_s:.0f} seconds ago {radio} was about to say on the net: «{text}».{cut} The fight has moved on (the board below is now). If it still matters to the Captain, "
                "say it now as it stands — updated, short — with say. If not, say nothing: call stay_quiet.")
-        user = f"THE NET, newest last\n{self._recall(8)}\n\nTHE FIGHT NOW\n{self._board(self.state)}\n\n{ask}"
+        user = f"THE NET, newest last\n{self._recall(8)}\n\nTHE FIGHT NOW\n{self._board(self.state, lang)}\n\n{ask}"
         said: list[str] = []
 
         async def on_call(call: ToolCall) -> None:

@@ -72,7 +72,7 @@ ROLES: dict[str, Role] = {r.name: r for r in (
          note="the flight net (flight_minds.py): the CAG, the squadron leaders, their wingmen and the Chief of the Deck; a few radio lines on strong events "
               "and when the Captain calls them, a squadron's mission when he orders it; ONE call voices the whole cast; the prompt is long and stable, the "
               "picture short"),
-    Role("marines", DEEPSEEK, _DS, max_tokens=380, temperature=0.6, first_token_s=4.0, fallback="chatter",
+    Role("marines", DEEPSEEK, _DS, max_tokens=520, temperature=0.6, first_token_s=4.0, fallback="chatter",
          note="the marine net (marines.py), only while boarders are aboard: Major Reyes and the squad leaders; a few radio lines on news and when the Captain calls them, squad "
               "orders and bulkheads when he orders them or the drill is not enough; ONE call voices the whole cast; the prompt is long and stable, the picture short"),
 )}
