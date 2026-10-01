@@ -547,7 +547,27 @@ void AAstraViewscreen::Direct(float Dt)
 					Hostiles.Add(C.ContactId);
 				}
 			}
-			if (Hostiles.Num() >= 2)
+			// only when the group makes a picture: from inside a melee it is all round the compass, and the frame that holds
+			// it all (75°) shows dots
+			double Spread = 180.0;
+			if (Hostiles.Num() >= 2 && B)
+			{
+				FVector Mean = FVector::ZeroVector;
+				for (const FString& Id : Hostiles)
+				{
+					if (const FContact* G = FindC(Cs, Id)) { Mean += B->WorldOf(G->Pos).GetSafeNormal(); }
+				}
+				Mean = Mean.GetSafeNormal();
+				Spread = 0.0;
+				for (const FString& Id : Hostiles)
+				{
+					if (const FContact* G = FindC(Cs, Id))
+					{
+						Spread = FMath::Max(Spread, FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Mean, B->WorldOf(G->Pos).GetSafeNormal()), -1.0, 1.0))));
+					}
+				}
+			}
+			if (Hostiles.Num() >= 2 && Spread <= 14.0)
 			{
 				const FString Name = FString::Printf(TEXT("%d hostiles"), Hostiles.Num());
 				Best = {EShot::Group, FString(), Name, TEXT("TACTICAL"), 4, 6.0, FVector::ZeroVector, MoveTemp(Hostiles)};
@@ -923,7 +943,9 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 				D.Line(Tip, Tip - Dir * 16.f * S - Side * 8.f * S, Col, 2.f);
 				const FString Tag = C.RangeKm >= 0.0 ? FString::Printf(TEXT("%s %.0f km"), *C.ContactId, C.RangeKm) : C.ContactId;
 				FVector2D At = Tip - Dir * 30.f * S;
-				// two arrows on the same edge: the second label steps below the first
+				// two arrows on the same edge: the second label steps away from the nearer bar (never over the status lines)
+				const float StepY = At.Y > (Top + Bottom) * 0.5f ? -PxData * 1.3f : PxData * 1.3f;
+				At.Y = FMath::Clamp(At.Y, Top + PxData, Bottom - PxData);
 				for (int32 Try = 0; Try < 4; ++Try)
 				{
 					const bool bClash = ArrowTags.ContainsByPredicate([&](const FVector2D& Q) { return FMath::Abs(Q.X - At.X) < 160.f * S && FMath::Abs(Q.Y - At.Y) < PxData * 1.2f; });
@@ -931,7 +953,7 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 					{
 						break;
 					}
-					At.Y += PxData * 1.3f;
+					At.Y = FMath::Clamp(At.Y + StepY, Top + PxData, Bottom - PxData);
 				}
 				ArrowTags.Add(At);
 				D.Text(At.X, At.Y - PxData * 0.5f, Tag, true, PxData, Col, Dir.X > 0.3f ? 2 : (Dir.X < -0.3f ? 0 : 1));

@@ -106,9 +106,12 @@ def _build() -> dict[str, Station]:
           (_target(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40, default=6), _speed()),
           "target_lost", "engaged"),
         m("helm", "course", "keep_on_bow", "keep the bow on the target: the Captain sees it through the window; with target `action` the bow "
-          "follows the fight from one target to the next by itself, and waits when there is none. It turns the ship; her speed stays "
-          "as it is unless speed_pct is given in the same order (pointing at an enemy at cruise speed closes on it)",
-          (_action_target(), _speed()), "target_lost"),
+          "follows the fight from one target to the next by itself, and waits when there is none. It turns the ship; with standoff_km the "
+          "console also holds that range by itself (closes, slows in time, matches the target's run, stops if it closes inside); "
+          "otherwise her speed stays as it is unless speed_pct is given in the same order (pointing at an enemy at cruise speed "
+          "closes on it and runs past)",
+          (_action_target(), _speed(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40)),
+          "target_lost"),
         m("helm", "course", "follow", "shadow a ship at a distance and on a side of it",
           (_target(), P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=2),
            P("side", STR, "which side of the ship to keep", enum=("astern", "port", "starboard", "above", "below"), default="astern")),

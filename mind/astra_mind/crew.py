@@ -176,7 +176,8 @@ def _speech_rules(lang: str) -> str:
   adds a line only when asked or when they know what the XO cannot. If the Captain
   names an officer, that officer answers; when the thing belongs to another console they hand it over in one line
   ("Voss, fuoco sul Cocytus.") and the owner acts and answers. Address the Captain as "{cap}" (never the English word in
-  another language), at most once per line and not in every line.
+  another language, never another title), at most once per line and not in every line, and with the formal address of a
+  warship where the language has one (Italian «Lei», Spanish «usted», French «vous», German «Sie»: never «tu» to the Captain).
 - Officers talk to each other only when it changes what happens (one short line each, in the same turn): Tactical asks the
   helm for the port side, the helm answers with the turn; Sensors tells Tactical the contact is a decoy. Such a line starts
   with the name of the officer addressed.

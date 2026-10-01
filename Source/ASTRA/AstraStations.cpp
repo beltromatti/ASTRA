@@ -505,7 +505,7 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 			// keep_on_bow turns the ship, not her speed: with speed_pct the helm sets the throttle in the same order (the bow on
 			// a group at cruise speed closes on it; holding a range is the helm's call, with this one console)
 			FString SpeedNote;
-			if (M == TEXT("keep_on_bow") && A.Params.IsValid() && A.Params->HasField(TEXT("speed_pct")))
+			if (M == TEXT("keep_on_bow") && A.Params.IsValid() && A.Params->HasField(TEXT("speed_pct")) && !A.Params->HasField(TEXT("standoff_km")))
 			{
 				Sh->SetThrottle(FMath::Clamp((float)Num(A.Params, TEXT("speed_pct"), Sh->GetThrottlePct()), 0.f, 100.f));
 				SpeedNote = FString::Printf(TEXT(", throttle %.0f%%"), Sh->GetThrottlePct());
@@ -1130,6 +1130,17 @@ void UAstraStationsSubsystem::TickHelm()
 	if (M == TEXT("keep_on_bow"))
 	{
 		Steer(T->Pos + T->Vel * 2.0);
+		const double Hold = Num(A->Params, TEXT("standoff_km"), -1.0) * 1000.0;
+		if (Hold > 0.0)
+		{
+			// the console holds the range: closes no faster than she can still stop in (the drive answers in ~5 s), matches
+			// the target's run once there, and stops if the target closes inside it (what then is the helm's call)
+			const FVector Los = (T->Pos - P).GetSafeNormal();
+			const double Away = FVector::DotProduct(T->Vel, Los);
+			const double Err = FVector::Dist(P, T->Pos) - Hold;
+			const double Close = Err > 0.0 ? FMath::Min(480.0, FMath::Sqrt(2.0 * 40.0 * Err)) : Err * 0.05;
+			SpeedFor(Away + Close);
+		}
 		return;
 	}
 	if (M == TEXT("follow") || M == TEXT("formation"))
