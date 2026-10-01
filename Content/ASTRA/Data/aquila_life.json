@@ -148,6 +148,10 @@
         {
           "kinds": ["wardroom"],
           "weight": 0.5
+        },
+        {
+          "kinds": ["cic"],
+          "weight": 2
         }
       ],
       "battle": [
@@ -170,6 +174,10 @@
         {
           "kinds": ["comms"],
           "weight": 1
+        },
+        {
+          "kinds": ["cic"],
+          "weight": 0.5
         }
       ],
       "battle": [
@@ -204,6 +212,10 @@
         {
           "kinds": ["transporter"],
           "weight": 0.5
+        },
+        {
+          "kinds": ["cic"],
+          "weight": 1.5
         }
       ],
       "battle": [
@@ -395,6 +407,10 @@
         {
           "kinds": ["armory"],
           "weight": 0.5
+        },
+        {
+          "kinds": ["cic"],
+          "weight": 1
         }
       ],
       "battle": [
@@ -503,6 +519,11 @@
           "kinds": ["cabins"],
           "dept": "security",
           "weight": 1
+        },
+        {
+          "kinds": ["hangar"],
+          "dept": "security",
+          "weight": 2
         }
       ],
       "battle": [
