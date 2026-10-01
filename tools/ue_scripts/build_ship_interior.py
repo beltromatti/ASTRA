@@ -13,7 +13,8 @@ Set globals before running to change the defaults:
                               /Game/ASTRA/Kit/Ship and import everything; "none": use the meshes as they are
   CHUNK_M = 160.0             the instanced meshes of a deck are split into runs of this many metres along the ship (a component culls and registers
                               as a whole)
-  LOCK_STAIRS = True          the stair-tower doors of a deck stay locked while the deck above or below is not built (the well would drop into nothing)
+  LOCK_STAIRS = True          the stair-tower doors of a deck stay locked while the deck above or below has no map yet, from this run or an earlier one (the well would drop
+                              into nothing): building decks in stages, run the earlier ones again once their neighbours are in
   REMOVE_LIFT_LEAVES = True   open the entrances of the existing rooms that a built deck now runs up to: destroy the static lift leaves that close their alcoves
                               (folders "Mess/Lift", "Berths/Lift" on Deck 4, "Medbay/Lift" on Deck 6) and put a sliding door (AAstraDoor) in the opening; only once
                               AstraHangar's landings point to the new lift banks (docs/NAVE.md, "Lift"), because the lift's own doors go with the leaves
@@ -258,8 +259,9 @@ def copy_plan():
 
 # -------------------------------------------------------------------------------------------------------------------- the decks
 def built_decks():
-    """The decks that have placements in the plan (their stairs can be used)."""
-    return {int(d) for d, v in PLAN_DATA["placements"].items() if v}
+    """The decks whose map exists, from this run or an earlier one (their stairs can be used): a run of a few decks leaves the doors of the towers that lead to a missing deck locked
+    (the well would drop into nothing); run the script again for those decks when their neighbour has its map."""
+    return {d for d in range(1, 13) if eal.does_asset_exist(deck_path(d))}
 
 
 def deck_path(deck):

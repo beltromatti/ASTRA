@@ -422,6 +422,10 @@ class Deck:
         if not blank:
             ps.side(i, "R" if room_side > 0 else "L", kind)
         did = d.get("id") or (f"{self.tag}_door_{cid[len(self.tag) + 1:]}" + ("_far" if d["wall"] == "far" else ""))
+        if not d.get("id"):                                                  # a room with two doors on one wall (the shuttle bay's): the second is `_2`, the third `_3`
+            base, n = did, 2
+            while did in self.B.doors:
+                did, n = f"{base}_{n}", n + 1
         pos = (xw, y_wall - room_side * WALL_T / 2, self.z0)
         r.setdefault("doors", []).append(dict(id=did, pos=pos, w=d["w"], h=d["h"], pid=pid, i=i, side=room_side, kind=kind, wall=d["wall"], xw=xw,
                                                y_wall=y_wall))
@@ -624,7 +628,7 @@ class Deck:
                     if plate == "stairs":                                   # the plate says where the flights go from this deck
                         plate = f"stairs_{self.deck}"
                     B.place(self.deck, f"SM_SHIP_Plate_{plate}", (xp, y, z), yaw, f"Interior/Deck{self.deck:02d}/Plates",
-                            f"{self.tag}_plate_{r['cid'][len(self.tag) + 1:]}", "plate")
+                            f"{self.tag}_plate_{r['cid'][len(self.tag) + 1:]}" + (f"_{k + 1}" if k else ""), "plate")
                 nid = f"{r['cid']}.in{k}"                                 # a node just inside the room, behind the door
                 B.node(nid, self.deck, d["xw"], d["y_wall"] + d["side"] * 1.2, self.z0, "door_in", r["cid"])
                 B.link(mod_node, nid, "door", door=d["id"], width=d["w"])

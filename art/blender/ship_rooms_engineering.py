@@ -231,7 +231,7 @@ def radiator_pumps(name: str = "SM_SHIP_RadiatorPumps"):
         H.pipe_bundle(b, (21.0 - 0.0, y + 1.8, 2.0), (21.0, yf - 1.0, 2.0), 2, 0.07, 0.03, (1, 0, 0), None, 2.0)
     # a second row: skids and expansion tanks along the left, two pipe racks across the room
     for k, y in enumerate((4.0, 6.6, 9.2)):
-        place(b, 2.6, y, 0, H.tank_v, 0.8, 3.0, STEEL, "engineering") if k == 0 else place(b, 2.6, y, 0, skid, 1.6, 1.0, 1.1, k % 3, k)
+        place(b, 2.6, y, 0, H.tank_v, 0.8, 3.0, STEEL, "engineering", "eq_pipe") if k == 0 else place(b, 2.6, y, 0, skid, 1.6, 1.0, 1.1, k % 3, k)
     for k, x in enumerate((6.2, 10.6, 15.0)):
         place(b, x, 5.6, 0, skid, 1.8, 1.1, 1.1, k % 3, 10 + k)
     pipe_rack(b, 13.0, 1.6, 8.8, 2.3, 4, 1)
@@ -263,7 +263,7 @@ def machinery(name: str = "SM_SHIP_Machinery"):
         b.body.box((x - 0.35, yf - 1.5, 3.0), (x + 0.35, yf - 0.5, 3.6), STEEL)
     b.body.box((2.8, yf - 1.6, 3.35), (12.0, yf - 0.9, 3.7), STEEL)
     for k, x in enumerate((17.0, 20.2)):
-        place(b, x, 11.5, 0, H.tank_v, 0.95, 2.9, STEEL, "engineering")
+        place(b, x, 11.5, 0, H.tank_v, 0.95, 2.9, STEEL, "engineering", "eq_water")
     place(b, 18.6, 13.4, 0, H.pump_set, 1.6, "engineering")
     H.pipe_bundle(b, (17.0, 11.5, 0.5), (20.2, 11.5, 0.5), 2, 0.06, 0.03, (0, 1, 0), None, 2.0)
     place(b, 7.0, 7.0, 90, G.workbench, 3.0, 0.8, 0.95, True)

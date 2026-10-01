@@ -319,7 +319,7 @@ _reg("power_control", name="Power Control", kind="power", dept="engineering", L=
 # ---- Deck 8: the Marines' deck ------------------------------------------------------------------------------------------------------------------------
 _reg("shuttle_bay", name="Assault-Shuttle Bay", kind="hangar", dept="security", L=32.0, D=16.0, h=3.7, plate="shuttle_bay",
      doors=[door("near", 14.0), door("near", 18.0)], systems=["launch_tubes", "power_bus", "life_support"],
-     spots=[spot("deck_chief", "sit", 16.0, 13.8, 90, "flight"), spot("deck_hand", "work", 1.7, 3.5, 180, "flight"), spot("deck_hand", "work", 29.6, 4.0, 0, "flight"),
+     spots=[spot("deck_chief", "sit", 16.14, 13.86, 90, "flight"), spot("deck_hand", "work", 1.7, 3.5, 180, "flight"), spot("deck_hand", "work", 29.6, 4.0, 0, "flight"),
             spot("marine", "stand", 8.5, 1.0, 90, "security"), spot("marine", "stand", 23.5, 1.0, 90, "security"), spot("deck_hand", "stand", 16.0, 6.0, 90, "flight"),
             spot("marine", "sit", 4.2, 0.4, 90, "security"), spot("marine", "sit", 27.8, 0.4, 90, "security")],
      lights=[light(8.5, 9.4, 3.6, 6500, 5600, (6.0, 12.0), 1300), light(23.5, 9.4, 3.6, 6500, 5600, (6.0, 12.0), 1300), light(16.0, 7.0, 3.6, 4500, 5000, (4.0, 12.0), 1100),

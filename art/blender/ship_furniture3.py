@@ -130,6 +130,9 @@ def server_rack(b: SParts, w: float = 0.62, d: float = 0.95, h: float = 2.2, see
     b.emit.label((x + 0.037, 0.0, h - 0.10), w - 0.14, (w - 0.14) / 4.0, (1, 0, 0), "small_%02d" % rng.randint(0, 12))
 
 
+RACK_TAGS = ("tag_05", "tag_15", "tag_06", "tag_12")             # the tags a row of racks may carry at its ends: DATA TRUNK, COMM RELAY, POWER 480 V, BREAKER PANEL
+
+
 def rack_row(b: SParts, n: int, w: float = 0.62, d: float = 0.95, h: float = 2.2, accent: str = "cyan", seed: int = 1) -> None:
     """n racks side by side along y (origin at the first one's centre), a cable trough over them."""
     for k in range(n):
@@ -138,7 +141,7 @@ def rack_row(b: SParts, n: int, w: float = 0.62, d: float = 0.95, h: float = 2.2
     b.soft.box((-d / 2 - 0.05, -w / 2, h + 0.03), (d / 2 + 0.05, (n - 0.5) * w, h + 0.2), STRUCT)
     b.soft.box((-d / 2 - 0.04, -w / 2 + 0.02, h + 0.2), (d / 2 + 0.04, (n - 0.5) * w - 0.02, h + 0.215), TRIM)
     for yy, face in ((-w / 2 - 0.002, -1), ((n - 0.5) * w + 0.002, 1)):                                           # the row's end faces: a row tag and a light bar
-        b.emit.label((0.0, yy, h * 0.55), 0.7, 0.175, (0, face, 0), "tag_%02d" % ((seed + (3 if face > 0 else 0)) % 8))
+        b.emit.label((0.0, yy, h * 0.55), 0.7, 0.175, (0, face, 0), RACK_TAGS[(seed + (3 if face > 0 else 0)) % len(RACK_TAGS)])
         b.emit.lamp_box((-0.38, yy + (0.004 if face > 0 else -0.004), 0.3), (0.38, yy + (0.012 if face > 0 else -0.012), 0.33), accent, LAMP_DIM)
 
 
@@ -282,8 +285,9 @@ def duct_run(b: SParts, p0, p1, w: float = 0.6, h: float = 0.4, mat: str = STEEL
             y += ribs
 
 
-def tank_v(b: SParts, r: float = 0.9, h: float = 2.8, mat: str = STEEL, band: str = "science") -> None:
-    """A vertical pressure tank: a cylinder with domed ends, welded bands, a ladder, a level gauge with a lit scale and a stub of pipe at the foot."""
+def tank_v(b: SParts, r: float = 0.9, h: float = 2.8, mat: str = STEEL, band: str = "science", tag: str | None = None) -> None:
+    """A vertical pressure tank: a cylinder with domed ends, welded bands, a ladder, a level gauge with a lit scale and a stub of pipe at the foot; `tag`: the label tile on it
+    (an atlas tile such as eq_water; by default one of the bridge's tags by size)."""
     b.body.cyl((0, 0, 0.30), (0, 0, h - 0.30), r, mat, seg=24)
     b.body.sphere((0, 0, h - 0.30), r, mat, seg=24, rings=8, squash=(1, 1, 0.35))
     b.body.sphere((0, 0, 0.30), r, mat, seg=24, rings=8, squash=(1, 1, 0.35))
@@ -297,7 +301,7 @@ def tank_v(b: SParts, r: float = 0.9, h: float = 2.8, mat: str = STEEL, band: st
     b.emit.lamp_box((r + 0.04, -0.015, 0.7), (r + 0.045, 0.015, h - 0.9), dim(band), LAMP_DIM)
     b.emit.lamp_box((r + 0.04, -0.03, 0.7 + (h - 1.6) * 0.62), (r + 0.05, 0.03, 0.74 + (h - 1.6) * 0.62), "white", LAMP)
     b.fine.cyl((0, r + 0.0, 0.2), (0, r + 0.35, 0.2), 0.06, TRIM, seg=10)
-    b.emit.label((r * 0.7, -r * 0.7, 1.3), 0.5, 0.125, (0.7, -0.7, 0), "tag_%02d" % ((int(r * 10 + h * 10)) % 12))
+    b.emit.label((r * 0.7, -r * 0.7, 1.3), 0.5, 0.125, (0.7, -0.7, 0), tag or "tag_%02d" % ((int(r * 10 + h * 10)) % 12))
 
 
 def pump_set(b: SParts, l: float = 1.6, accent: str = "engineering") -> None:

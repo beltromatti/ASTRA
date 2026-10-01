@@ -64,15 +64,18 @@ PROGRAMME = {
 }
 
 
-UNIQUE = {5: {"transporter", "lab_astro"}, 6: {"surgery", "quarantine", "pharmacy"}, 8: {"shuttle_bay", "firing_range"}}      # rooms that stand once on their deck
+UNIQUE = {2: {"cic"}, 5: {"transporter", "lab_astro"}, 6: {"surgery", "quarantine", "pharmacy"}, 8: {"shuttle_bay", "firing_range"}}      # rooms that stand once on their deck
 # rooms placed first, at a fixed place: (key, side of the Spine, x of the room's forward edge). Deck 6: the medical rooms next to the Medbay's entrance,
 # on the starboard side of the Spine (the Medbay's own door is at x -232)
 # Deck 5 also has the Spine shuttle's stops, one per section on the Spine's pieces between the halls of the decks above and below (A 88..112, B -24..0, C -108..-84, D -228..-204,
 # E -304..-280, G -440..-416, H -504..-480). Section F has none: the 20 m of its Spine that the Main Engineering hall's keep-out leaves are shorter than a stop, and a room may not
 # straddle a section's bulkhead. A stop never takes the whole starboard lane of a piece of Spine (the cross link to the Starboard Passage lives there).
-PINNED = {5: [("transporter", +1, 4.0), ("shuttle_stop", +1, 112.0), ("shuttle_stop", -1, 0.0), ("shuttle_stop", +1, -84.0), ("shuttle_stop", -1, -204.0),
+# Deck 2: the CIC, in the first section where the block is wide enough for a 16 m room (the block is only 16.4 m to a side forward of x -60: Section A has the Spine and nothing else), on the
+# starboard side behind the section's first cross link
+PINNED = {2: [("cic", +1, -68.0)],
+          5: [("transporter", +1, 4.0), ("shuttle_stop", +1, 112.0), ("shuttle_stop", -1, 0.0), ("shuttle_stop", +1, -84.0), ("shuttle_stop", -1, -204.0),
               ("shuttle_stop", -1, -280.0), ("shuttle_stop", +1, -416.0), ("shuttle_stop", -1, -480.0)],
-          8: [("shuttle_bay", +1, 52.0), ("firing_range", -1, 16.0)],
+          8: [("shuttle_bay", -1, 52.0), ("firing_range", -1, 16.0)],      # (the bay on the port side: the bow stair tower (x 44..52) stands on the starboard side of that stretch)
           6: [("pharmacy", +1, -216.0), ("surgery", +1, -200.0), ("quarantine", +1, -176.0)]}
 
 

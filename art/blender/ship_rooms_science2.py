@@ -203,7 +203,7 @@ def lab_phys(name: str = "SM_SHIP_LabPhys"):
     place(b, 5.0, 2.8, 90, H.chair_op, FABRIC_NAVY)
     place(b, 1.4, 3.0, 0, H.rack_row, 4, 0.62, 0.95, 2.2, "science", 7)
     for k in range(3):                                                                                           # cryo dewars, bottles, a bench
-        place(b, 21.4, 3.0 + k * 1.2, 0, H.tank_v, 0.46, 1.7, STEEL, "cyan")
+        place(b, 21.4, 3.0 + k * 1.2, 0, H.tank_v, 0.46, 1.7, STEEL, "cyan", "eq_gas")
     for k in range(4):
         place(b, 23.2, 3.0 + k * 0.4, 0, F.barrel, 0.14, 1.3, [CRATE_BLUE, CRATE_OLIVE, CRATE_GREY, CRATE_BLUE][k])
     H.pipe_bundle(b, (21.4, 3.0, 2.4), (21.4, ybeam, 2.4), 2, 0.04, 0.03, (1, 0, 0), None, 1.5)
