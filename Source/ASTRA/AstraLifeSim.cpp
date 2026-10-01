@@ -894,11 +894,16 @@ void FAstraLifeSim::TargetBunk(FAstraLifePerson& P, int32 Idx, FRandomStream& R)
 
 void FAstraLifeSim::TargetMeal(FAstraLifePerson& P, int32 Idx, FRandomStream& R)
 {
-	const auto IsSeat = [](const FAstraLifePlace& Pl) { return Pl.Kind == EAstraPlaceKind::Eat; };
+	// The Mess Hall seats them at its tables. When it is full a meal is taken at a lounge table or on a bench (a plate on the knees: the other
+	// kinds of the list), and only when there is no seat anywhere a plate standing in the nearest of those halls.
+	const auto IsTable = [](const FAstraLifePlace& Pl) { return Pl.Kind == EAstraPlaceKind::Eat; };
+	const auto IsBench = [](const FAstraLifePlace& Pl) { return (Pl.Kind == EAstraPlaceKind::Eat || Pl.Kind == EAstraPlaceKind::Sit) && Pl.External == NAME_None; };
 	int32 Choice = INDEX_NONE;
-	for (const FName K : Map->MealKinds)
+	int32 Stand = INDEX_NONE;
+	double StandBest = TNumericLimits<double>::Max();
+	for (int32 K = 0; K < Map->MealKinds.Num() && Choice == INDEX_NONE; ++K)
 	{
-		const TArray<int32>* Kin = Map->CompsByKind.Find(K);
+		const TArray<int32>* Kin = Map->CompsByKind.Find(Map->MealKinds[K]);
 		if (!Kin)
 		{
 			continue;
@@ -907,14 +912,20 @@ void FAstraLifeSim::TargetMeal(FAstraLifePerson& P, int32 Idx, FRandomStream& R)
 		double Best = TNumericLimits<double>::Max();
 		for (const int32 CI : *Kin)
 		{
-			if (Map->Comps[CI].bWalled)
+			const FAstraLifeComp& C = Map->Comps[CI];
+			if (C.bWalled)
 			{
 				continue;
 			}
-			const double D = FVector::Dist(Map->Comps[CI].Box.GetCenter(), P.Pos);
+			const double D = FVector::Dist(C.Box.GetCenter(), P.Pos);
+			if (C.Status != EAstraRoomStatus::Planned && C.Hub != INDEX_NONE && D < StandBest)
+			{
+				StandBest = D;
+				Stand = C.Hub;
+			}
 			if (D < Best)
 			{
-				const int32 F = FreePlaceIn(CI, IsSeat, R);
+				const int32 F = FreePlaceIn(CI, K == 0 ? TFunction<bool(const FAstraLifePlace&)>(IsTable) : TFunction<bool(const FAstraLifePlace&)>(IsBench), R);
 				if (F != INDEX_NONE)
 				{
 					Best = D;
@@ -922,14 +933,10 @@ void FAstraLifeSim::TargetMeal(FAstraLifePerson& P, int32 Idx, FRandomStream& R)
 				}
 			}
 		}
-		if (Choice != INDEX_NONE)
-		{
-			break;
-		}
 	}
-	if (Choice == INDEX_NONE && MessComp != INDEX_NONE)
+	if (Choice == INDEX_NONE)
 	{
-		Choice = Map->Comps[MessComp].Hub;                   // no table free: a plate eaten standing in the hall
+		Choice = Stand != INDEX_NONE ? Stand : (MessComp != INDEX_NONE ? Map->Comps[MessComp].Hub : INDEX_NONE);
 	}
 	TargetPlace(P, Idx, Choice);
 }
@@ -1497,8 +1504,7 @@ void FAstraLifeSim::FormParty(const FAstraDamage& D)
 		FAstraLifePerson& P = People[Made.Members[k]];
 		P.Party = D.Id;
 		P.PartySlot = k;
-		const double EstCm = FVector::Dist2D(P.Pos, Made.Site) * 1.5 + 600.0 * FMath::Abs(DeckOfZ(P.Pos.Z) - D.Deck);
-		P.SpeedOverride = (float)FMath::Clamp(EstCm / FMath::Max(4.0, (double)D.Travel), (double)Map->Speed.HurryCmS, (double)Map->Teams.JogCmS);
+		P.SpeedOverride = Map->Teams.JogCmS;             // a party runs: the time it needs is what PartyEtaSeconds said (the ship's own formula does not slow it)
 		Begin(Made.Members[k], {EAstraLifeAct::Repair, 70000000 + D.Id}, false);
 		Remember(Made.Members[k], 2, FString::Printf(TEXT("Sent with a damage-control party to the %s in section %c of deck %d at %s"), *D.Kind, D.Section, D.Deck, *HourText(Clock)));
 	}
@@ -1647,7 +1653,8 @@ void FAstraLifeSim::Goers(int32 Deck, const FVector& Site, TArray<FGoer>& Out) c
 
 float FAstraLifeSim::PartyEtaSeconds(const FVector& Site, int32 Deck) const
 {
-	// the party is on scene when most of it is: the time of its members' ... 60th percentile
+	// The party is on scene when six in ten of it are. The members are the nearest who would go, and the time each needs is that of the plan's
+	// own route at the party's pace (stairs and lifts and the way round included), a sleeper's waking too; without a router, the crow's estimate.
 	TArray<FGoer> G;
 	Goers(Deck, Site, G);
 	const int32 N = FMath::Min(Map->Teams.Size, G.Num());
@@ -1658,7 +1665,24 @@ float FAstraLifeSim::PartyEtaSeconds(const FVector& Site, int32 Deck) const
 	TArray<float> T;
 	for (int32 k = 0; k < N; ++k)
 	{
-		T.Add(G[k].EtaS);
+		const FAstraLifePerson& P = People[G[k].Person];
+		float Eta = G[k].EtaS;
+		TArray<FVector> Pts;
+		if (Router && Router(P.Pos, Site, Pts) && Pts.Num() >= 2)
+		{
+			FAstraLifeRoute R;
+			R.Pts.SetNumUninitialized(Pts.Num());
+			for (int32 i = 0; i < Pts.Num(); ++i)
+			{
+				R.Pts[i] = FVector3f(Pts[i]);
+			}
+			Eta = P.Act == EAstraLifeAct::Sleep ? P.WakeDelayS : 0.f;
+			for (int32 S = 0; S + 1 < R.Pts.Num(); ++S)
+			{
+				Eta += R.SegSeconds(S, Map->Teams.JogCmS, Map->Speed);
+			}
+		}
+		T.Add(Eta);
 	}
 	T.Sort();
 	return T[FMath::Min(N - 1, FMath::CeilToInt(N * 0.6f) - 1)] + 2.f;

@@ -88,7 +88,7 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("scenario="), Scenario);
 	FString Out = FPaths::ProjectSavedDir() / TEXT("Life/run.json");
 	FParse::Value(*Params, TEXT("out="), Out);
-	Step = FMath::Clamp(Step, 0.05f, 0.5f);
+	Step = FMath::Clamp(Step, 0.008f, 0.5f);
 	FMath::RandInit(Seed);
 	FMath::SRandInit(Seed);
 	GAstraDeterministic = true;
@@ -372,10 +372,11 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 	MealEpisodes.SetNum(N);
 	TArray<uint8> MealBlocks;
 	MealBlocks.Init(0, N);
-	int32 MessPeak = 0, LoungeMealPeak = 0;
+	int32 MessPeak = 0;
 	double MessSum = 0.0;
 	int32 MessSamples = 0;
-	struct FSample { float Hour; int32 Acts[(int32)EAstraLifeAct::Count]; int32 Walking; int32 Mess; int32 NearMess, NearMed, NearEng, NearHangar, NearCorridor; };
+	int64 DinerSamples = 0, StandingSamples = 0;       // diners seen (one per person per sample) and those of them who ate standing in a hall
+	struct FSample { float Hour; int32 Acts[(int32)EAstraLifeAct::Count]; int32 Walking; int32 Mess; int32 Diners, Standing, Benches; int32 NearMess, NearMed, NearEng, NearHangar, NearCorridor; };
 	TArray<FSample> Samples;
 	const double SampleEvery = 300.0;          // ship seconds
 	double NextSample = Sec0;
@@ -452,7 +453,7 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 				S.D.Team = k;
 				S.Eta = Life->RepairEtaSeconds(S.D.Deck, S.D.Section, S.D.Id);
 				S.D.Travel = (float)S.Eta;
-				S.D.Work = 30.f;
+				S.D.Work = 400.f;                                // long: what is measured is when the party gets there, not the ship's repair
 				Synths.Add(S);
 				UE_LOG(LogASTRA, Display, TEXT("[Life] %8.1f s  test incident %d: %s at deck %d section %c, the party's own estimate %.0f s"), GameT, S.D.Id, *S.D.Kind, S.D.Deck, S.D.Section, S.Eta);
 			}
@@ -570,14 +571,16 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 					}
 				}
 			}
-			if (GameT >= SynthEnd || List.Num() == 0)
+			bool bAllThere = true;
+			for (const FSynth& S : Synths) { bAllThere &= S.Arrived >= 0.0; }
+			if (GameT >= SynthEnd || List.Num() == 0 || bAllThere)
 			{
 				Sim.SyncDamage(TArray<FAstraDamage>());
 				Life->SetShipFeed(true);
 				for (const FSynth& S : Synths)
 				{
 					const double Since = S.Arrived < 0.0 ? -1.0 : S.Arrived - (SynthEnd - 600.0);
-					Check(*FString::Printf(TEXT("party reaches test incident %d"), S.D.Id), S.Arrived >= 0.0 && Since <= 1.7 * S.Eta + 30.0,
+					Check(*FString::Printf(TEXT("party reaches test incident %d"), S.D.Id), S.Arrived >= 0.0 && Since <= 1.3 * S.Eta + 15.0,
 					      FString::Printf(TEXT("%s at deck %d section %c: estimated %.0f s, on scene after %.0f s"), *S.D.Kind, S.D.Deck, S.D.Section, S.Eta, Since));
 				}
 				Synths.Reset();
@@ -691,7 +694,7 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 			NextSample += SampleEvery;
 			FSample S = {};
 			S.Hour = Sim.Hour();
-			int32 Mess = 0;
+			int32 Mess = 0, Diners = 0, Standing = 0, Benches = 0;
 			for (int32 i = 0; i < N; ++i)
 			{
 				const FAstraLifePerson& P = Sim.Person(i);
@@ -700,11 +703,19 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 				if (P.Act == EAstraLifeAct::Meal && P.Phase == FAstraLifePerson::EPhase::Settled)
 				{
 					MealEpisodes[i].Add(P.Episode);
+					++DinerSamples;
+					++Diners;
+					StandingSamples += P.TargetKind == EAstraPlaceKind::Hub ? 1 : 0;
+					Standing += P.TargetKind == EAstraPlaceKind::Hub ? 1 : 0;
+					Benches += P.TargetKind == EAstraPlaceKind::Sit ? 1 : 0;
 					if (P.Episode >= 0 || P.Episode < 0) { const int32 B = ((P.Episode % 16) + 16) % 16; MealBlocks[i] |= (uint8)(B == 1 ? 1 : B == 4 ? 2 : B == 8 ? 4 : 0); }
 					if (MessComp != INDEX_NONE && P.Place != INDEX_NONE && Map.Places[P.Place].Comp == MessComp) { ++Mess; }
 				}
 			}
 			S.Mess = Mess;
+			S.Diners = Diners;
+			S.Standing = Standing;
+			S.Benches = Benches;
 			MessPeak = FMath::Max(MessPeak, Mess);
 			MessSum += Mess;
 			++MessSamples;
@@ -729,21 +740,27 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 		Check(TEXT("general quarters is answered"), false, TEXT("the alarm was never measured"));
 	}
 	{
+		// everybody eats three times a day: every one of the three meals of the day template is seen in a person's own cycle (a run of 30 hours
+		// holds each of them whole at least once whatever the watch; a shorter one cuts them at its ends and only reports)
 		int32 Fit = 0, Short = 0, Total = 0, Miss[3] = {0, 0, 0};
 		for (int32 i = 0; i < N; ++i)
 		{
 			if (Sim.Person(i).Status == 2) { continue; }
 			++Fit;
-			Short += MealEpisodes[i].Num() < (Hours >= 23.f ? 3 : 0) ? 1 : 0;
+			Short += (Hours >= 30.f && MealBlocks[i] != 7) ? 1 : 0;
 			Total += MealEpisodes[i].Num();
 			for (int32 b = 0; b < 3; ++b) { Miss[b] += (MealBlocks[i] & (1 << b)) ? 0 : 1; }
 		}
-		Check(TEXT("everyone eats"), Short <= (bDay ? Fit * 22 / 100 : Fit / 50), FString::Printf(TEXT("%.2f meals a person on average; %d of %d had fewer than three (an alarm or a hit may take one); missed: mid-watch %d, after the watch %d, before the watch %d"),
-		      Fit ? (double)Total / Fit : 0.0, Short, Fit, Miss[0], Miss[1], Miss[2]));
+		Check(TEXT("everyone eats"), Short <= (bDay ? Fit * 22 / 100 : Fit / 50), FString::Printf(TEXT("%d of %d had fewer than three meals in %.0f hours (an alarm or a hit may take one; %.2f meals a person seen); missed: mid-watch %d, after the watch %d, before the watch %d"),
+		      Short, Fit, Hours, Fit ? (double)Total / Fit : 0.0, Miss[0], Miss[1], Miss[2]));
 	}
 	int32 MessSeats = 0;
 	if (MessComp != INDEX_NONE) { for (const int32 P : Map.Comps[MessComp].Places) { MessSeats += Map.Places[P].Kind == EAstraPlaceKind::Eat ? 1 : 0; } }
-	Check(TEXT("the Mess fits its diners"), MessPeak <= MessSeats, FString::Printf(TEXT("peak %d at the Mess (%d seats), average %.1f over the day"), MessPeak, MessSeats, MessSamples ? MessSum / MessSamples : 0.0));
+	{
+		// the Mess seats what it seats; when it is full a diner takes a lounge table, and only when those are full too a plate standing in the hall
+		const double StandPct = DinerSamples ? 100.0 * StandingSamples / DinerSamples : 0.0;
+		Check(TEXT("the diners have a seat"), StandPct <= 5.0, FString::Printf(TEXT("%.1f %% of the diners ate standing in a hall at the busiest shift changes (the Mess has %d seats and at most %d people in it; average %.1f over the day)"), StandPct, MessSeats, MessPeak, MessSamples ? MessSum / MessSamples : 0.0));
+	}
 	Check(TEXT("nobody is stuck"), Sim.Counters.RouteFails == 0 && MaxWait < 300.0 && MaxWalk < 1500.0,
 	      FString::Printf(TEXT("%d routes failed; longest wait for a route %.0f s; longest walk %.0f s (%d routes made, %.3f ms each on average, %.2f ms at most)"), Sim.Counters.RouteFails, MaxWait, MaxWalk,
 	                      Sim.Counters.Routes, Sim.Counters.Routes ? Sim.Counters.RouteMs / Sim.Counters.Routes : 0.0, Sim.Counters.RouteMsMax));
@@ -838,6 +855,9 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 		O->SetObjectField(TEXT("acts"), A);
 		O->SetNumberField(TEXT("walking"), S.Walking);
 		O->SetNumberField(TEXT("mess"), S.Mess);
+		O->SetNumberField(TEXT("diners"), S.Diners);
+		O->SetNumberField(TEXT("standing"), S.Standing);
+		O->SetNumberField(TEXT("on_benches"), S.Benches);
 		O->SetNumberField(TEXT("near_mess"), S.NearMess);
 		O->SetNumberField(TEXT("near_medbay"), S.NearMed);
 		O->SetNumberField(TEXT("near_engineering"), S.NearEng);

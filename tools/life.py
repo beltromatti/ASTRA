@@ -6,8 +6,9 @@
   tools/life.py bake                   writes into the life file what the plan does not list: the Crew Berthing's 84 racks
                                        (data/ship/aquila_berths.json) and the Mess Hall's extra seats (aquila_mess.json)
   tools/life.py stage                  copies the life file next to the plan for the packaged game (Content/ASTRA/Data)
-  tools/life.py run [--hours 24] ...   the headless day (commandlet AstraLifeSim): a day of ship time, an alarm, three incidents, casualties;
-                                       checks the invariants and prints the verdict. Needs the editor target built for this checkout
+  tools/life.py run [--hours 30] ...   the headless day (commandlet AstraLifeSim): a day of ship time, an alarm, three incidents, casualties;
+                                       checks the invariants and prints the verdict. Needs the editor target built for this checkout.
+                                       --scenario walk: a Captain of the test walks the ship and the bodies are made (pool, pop-ins, doors)
   tools/life.py report Saved/Life/run.json   the record of a run
 
 `run` uses -nullrhi: it never opens a window or touches the GPU, so it can run while the game or the editor is open.
@@ -204,11 +205,11 @@ def main() -> int:
     sub.add_parser("bake").set_defaults(fn=cmd_bake)
     sub.add_parser("stage").set_defaults(fn=cmd_stage)
     r = sub.add_parser("run")
-    r.add_argument("--hours", type=float, default=24.0, help="ship hours to simulate")
+    r.add_argument("--hours", type=float, default=30.0, help="ship hours to simulate (30: every meal of every watch is whole at least once)")
     r.add_argument("--hour", type=float, default=0.0, help="the hour the run starts at")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--step", type=float, default=0.25, help="game seconds per tick")
-    r.add_argument("--scenario", default="day", help="day | quiet")
+    r.add_argument("--scenario", default="day", help="day | quiet | walk (the Captain walks the ship and the bodies are made)")
     r.add_argument("--out", default="Saved/Life/run.json")
     r.add_argument("--timeout", type=int, default=900)
     r.set_defaults(fn=cmd_run)
