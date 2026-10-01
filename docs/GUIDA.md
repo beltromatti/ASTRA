@@ -23,7 +23,8 @@ In volo su un Falcon: **W** per il lancio, **F** per rientrare vicino alla bocca
 
 ## Parlare all'equipaggio
 Chiama l'ufficiale per nome o per ruolo, come faresti in plancia. Qualche esempio:
-- «Timoniere, rotta zero-quattro-cinque, avanti tutta» · «Intercetta il T-41, fermati a sei chilometri»
+- «Timoniere, rotta zero-quattro-cinque, avanti tutta» · «Intercetta il T-41, fermati a sei chilometri» · «Tieni la prua
+  sull'Acheron a otto chilometri» (la console tiene la distanza da sola: chiude, frena in tempo, segue il bersaglio)
 - «Tattico, railgun sul T-41, fuoco sostenuto» · «Una salva di otto missili sul T-40» · «Cessate il fuoco»
 - «Sensori, ping attivo» · «EMCON in silenzio» · «Radiatori dentro»
 - «Price, Alpha in CAP» · «Bravo, attacco con i siluri sul T-40» · «Droni in ricognizione sul T-44»
@@ -87,9 +88,21 @@ distanza non si spara coi railgun.
 - Quando il quadro è cieco, **Nair** ti propone le due opzioni migliori e cosa costano.
 
 ## Il volo
+Lo stormo ha le sue voci sul **canale di volo**: il CAG (Lt. Cmdr. Ada «Hex» Kovac), i capi di Alpha e Bravo, i gregari e il **Chief
+of the Deck** parlano quando succede qualcosa a loro (lanci, abbattimenti, perdite, siluri, rientri, riarmo). Chiedi a Martin di aprire
+il canale («apri il canale di volo») e parla direttamente: «Alpha Lead, copri il Vigilant», «CAG, com'è la situazione?». Price resta
+l'ufficiale di volo in plancia.
+
 Scendi al ponte di volo (ascensore, tasto 6), avvicinati a un Falcon di Alpha e premi **E**. In volo **Price** è il tuo
-controllore: ti chiama le minacce a orologio («due banditi, il tuo due in alto, tre chilometri, in chiusura»). La
-plancia resta all'XO, che ti tiene informato via radio.
+controllore: ti chiama le minacce a orologio («due banditi, il tuo due in alto, tre chilometri, in chiusura»); due Falcon di Alpha
+(Eagle 2 ed Eagle 3) volano con te e ti parlano. La plancia resta all'XO, che ti tiene informato via radio.
+
+## I danni a bordo
+Un colpo che passa la corazza entra davvero nella nave: apre falle (l'aria esce, un campo di contenimento la trattiene finché regge, le
+paratie di sezione si chiudono), accende incendi che passano per le porte aperte, toglie potenza ai sistemi che attraversano quelle
+stanze. Si ferisce e muore chi era lì, con il suo nome; le squadre di riparazione camminano fino al danno. Se cammini per la nave in
+battaglia trovi fumo, fiamme, luci rosse, portelli sigillati. **Puoi morire anche tu**: svieni nell'aria sottile o nel fumo, e se nessuno
+ti porta fuori in tempo il comando passa all'XO.
 
 ## Un equipaggio che pensa
 - Ogni ufficiale ha un carattere, un legame con te che cambia con le tue scelte, e ricorda ciò che gli racconti.
