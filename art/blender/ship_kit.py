@@ -42,6 +42,7 @@ import ship_spec as SPEC  # noqa: E402
 ROOT = SL.ROOT
 DEFAULT_OUT = os.path.join(ROOT, "art", "export", "ship")
 TRI_BUDGET = 150_000                       # per mesh (Nanite: the disk and the import time, not the frame time)
+CAR_HALF_W, CAR_Z0, CAR_Z1 = 1.4, 0.16, 3.06   # the Spine car's envelope on the line's axis (ASCENSORI: 2.8 m wide, 2.9 m high, its floor 0.16 m above the track bed; 14 m long)
 
 # prefab key -> (module, function) of the room builders
 ROOMS = {
@@ -202,6 +203,38 @@ def uv_problems(obj) -> list[str]:
     return out
 
 
+def car_clearance(name: str, item: tuple, obj) -> list[str]:
+    """The tunnel modules (T: the straight cells and the section gate) and the shuttle halls leave the Spine car's envelope clear: the car is moved without sweeping, so what stands in it
+    scrapes the people in it off (and clips its body). A vertex strictly inside the envelope, or a triangle through its faces, is a problem; a terminal's closed end (its wall and the
+    buffers) is left out, the car stops short of it."""
+    if item[0] == "module" and item[1] == "T" and item[2] in ("Straight_A", "Straight_B", "Bulkhead"):
+        axis, x0, x1 = 0.0, -1.0, CAT.MOD + 1.0
+    elif item[0] == "room" and item[1].startswith("shuttle_stop"):
+        spec = SPEC.PREFABS[item[1]]
+        aft, fwd = spec["mouths"]
+        axis, x0, x1 = 8.0, (0.0 if aft else 1.5), spec["L"] - (0.0 if fwd else 1.5)
+    else:
+        return []
+    eps = 0.004
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = obj.evaluated_get(dg)
+    me = ev.to_mesh()
+    try:
+        inside = [tuple(v.co) for v in me.vertices if x0 < v.co.x < x1 and abs(-v.co.y - axis) < CAR_HALF_W - eps and CAR_Z0 + eps < v.co.z < CAR_Z1 - eps]
+        ya, yb = -axis - CAR_HALF_W + eps, -axis + CAR_HALF_W - eps                                    # (Blender's Y is mirrored)
+        za, zb = CAR_Z0 + eps, CAR_Z1 - eps
+        box = [(x0, ya, za), (x1, ya, za), (x1, yb, za), (x0, yb, za), (x0, ya, zb), (x1, ya, zb), (x1, yb, zb), (x0, yb, zb)]
+        quads = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+        crossing = BVHTree.FromObject(obj, dg).overlap(BVHTree.FromPolygons(box, quads))
+        hit = inside[0] if inside else tuple(me.polygons[crossing[0][0]].center) if crossing else None      # (plain tuples: the mesh is freed below)
+        n_cross = len(crossing)
+    finally:
+        ev.to_mesh_clear()
+    if hit is None:
+        return []
+    return [f"{name}: stands in the Spine car's envelope ({len(inside)} vertices inside, {n_cross} triangles through its faces; first near x {hit[0]:.2f}, y {-hit[1]:.2f}, z {hit[2]:.2f})"]
+
+
 def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
     problems = []
     if st["tris"] > TRI_BUDGET:
@@ -235,6 +268,7 @@ def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
         lo, hi = bb["min"], bb["max"]
         if lo[0] < -0.14 or hi[0] > CAT.MOD + 0.03 or abs(lo[1]) > CAT.SLOT_HW + 0.03 or hi[1] > CAT.SLOT_HW + 0.03:      # (the frame rib at the aft end reaches 13 cm back)
             problems.append(f"{name}: bounds {lo} .. {hi} leave the 4 x 4 slot")
+    problems += car_clearance(name, item, obj)
     return problems
 
 
