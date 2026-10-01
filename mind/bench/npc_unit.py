@@ -91,6 +91,20 @@ class ParseAndPick(unittest.TestCase):
         self.assertEqual(got[0].memory, ENGINEER["memory"])
         self.assertTrue(got[0].facing)
 
+    def test_a_row_exactly_as_the_games_life_writes_it_is_read(self) -> None:
+        # printed by the headless bench (tools/life.py run --scenario walk): UAstraLifeSubsystem::ListenersJson, the C++ side of this contract
+        row = json.loads('{"id":"npc341","name":"Crewman Tove Kimura","rank":"Crewman","gender":"f","dept":"weapons","home":"Concord",'
+                         '"job":"fire-control operator","watch":"Gold","doing":"on the way to their post: fire-control operator, Deck 2 · Section B · '
+                         'Point-Defence Control","place":"Deck 4 · Section B · Mess Hall","memory":[],"friends":["Chief Petty Officer Zanele Sato",'
+                         '"Lieutenant Commander Hiroshi Quinn","Petty Officer Nia Rahman"],"dist_m":3.8999999999999999,"angle_deg":17,"facing":true}')
+        got = npc.parse_people({"people": [row]}, {})
+        self.assertEqual(len(got), 1)
+        p = got[0]
+        self.assertEqual((p.id, p.name, p.gender, p.dept, p.watch, p.facing), ("npc341", "Crewman Tove Kimura", "f", "weapons", "Gold", True))
+        self.assertAlmostEqual(p.dist_m, 3.9)
+        self.assertEqual(len(p.friends), 3)
+        self.assertEqual(npc.pick(got), got)
+
     def test_the_ship_state_carries_them_when_the_context_does_not(self) -> None:
         got = npc.parse_people({"place": "corridors"}, {"life": {"people_near": [SENSOR]}})
         self.assertEqual([p.id for p in got], ["npc90"])
