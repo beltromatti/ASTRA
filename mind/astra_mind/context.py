@@ -302,5 +302,6 @@ def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
         else:
             parts.append(f"A channel with {who} is open: what the Captain says TO them goes out on it (Martin lets it through), "
                          f"and you hear every word as well. Words said to {who} are for {who} to answer, not for you: act and "
-                         "speak on what is meant for the bridge (Martin may say in a few words that a message went out, if that helps).")
+                         "speak on what is meant for the bridge. The Captain hears the answer himself, so nobody says that the words went out "
+                         "(Martin speaks about the channel only when they could not: cut, jammed, gone silent).")
     return " ".join(parts)

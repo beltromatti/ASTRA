@@ -40,7 +40,13 @@ COMMANDERS = {
                      "to die doing it; she respects skill in an enemy more than anything.", rank="Ferryman (ship captain)"),
     "T-11": dict(key="hale", name="Warden Tomas Hale", ship="the frigate Lethe, a raider sent ahead of the strike group",
                  voice="jean", bio="A young, ambitious officer eager to prove himself to Archon Solm; reckless, proud.",
-                 rank="Warden (junior commander)"),
+                 rank="Warden (junior commander)",
+                 # his part in the opening: without it a lone frigate facing the picket only had reasons to leave (he withdrew the "whole fleet" half a minute in)
+                 mission="you are the strike group's eyes. The Lethe came through the Janus Gate ahead of it, drive cold, to watch the 7th Fleet's picket at Aurelia (the "
+                         "carrier cruiser ASN Aquila, the battleship Praetorian, the destroyer Vigilant) and to give Archon Solm its picture. The Archon's strike group (the "
+                         "cruiser Acheron and three Styx destroyers) comes through the Gate a few minutes behind you, to seize Janus Gate Aurelia and Keeper Station. Until "
+                         "it is here: watch, stay alive, keep your distance (a frigate alone does not take on a picket, and the Archon needs your eyes); once it is "
+                         "through, you fight in it under the Archon's orders."),
     # the Interdiction Fleet's vanguard, through the Janus Gate after the strike group (the opening's third stage, AstraBattleSubsystem)
     "T-31": dict(key="thale", name="Warden Sabine Thale", ship="the carrier-cruiser Nyx, leading the Interdiction Vanguard", voice="lola",
                  bio="A carrier officer who grew up on ration lines during the Silence; precise, unhurried, a believer in air power "
