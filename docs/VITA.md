@@ -11,7 +11,7 @@ della nave**: dormono nelle brande, mangiano nel Mess Hall, lavorano ai loro pos
 quando suona l'allarme, accorrono sugli incidenti, vanno in Medbay quando sono feriti. Tutte, sempre, ma in due modi:
 
 - **Simulazione leggera per tutti** (`FAstraLifeSim`, codice puro, nessun attore): ogni persona è pensata circa una volta al
-  secondo di gioco; costa in media **0,0024 ms a fotogramma** per l'intera nave (misurato a 60 fps su 30 ore di bordo).
+  secondo di gioco; costa in media **0,002 ms a fotogramma** per l'intera nave (misurato a 60 fps su 30 ore di bordo).
 - **Corpi veri solo dove c'è il Capitano** (`AAstraLifeBody`, una riserva di al più 40 attori): chi è nei compartimenti
   vicini cammina sui percorsi del piano, le porte si aprono per lui, si ferma al suo posto, si siede al tavolo, dorme nella
   sua branda. Chi si allontana torna alla riserva senza che nessuno lo veda sparire; chi serve non appare mai in vista.
@@ -92,16 +92,22 @@ di bordo; la mente le gioca nella lingua del Capitano.
   vedere (una traccia di visibilità trova un muro) o non distingue (oltre 45 m); gli altri aspettano. Alla comparsa del
   Capitano in un posto nuovo (ascensore, dissolvenza) i corpi nascono subito, otto alla volta. Chi non serve più resta finché
   è in vista. Nella prova a piedi del banco: 345 corpi creati, **0 apparsi entro 40 m davanti al Capitano**.
-- **La riserva** si scalda un corpo alla volta (mai uno solo per fotogramma, non in un fotogramma già lungo) mentre il
-  Capitano è in plancia; in tutto 40 attori. Il gestore gira a 4 Hz, costa 0,03 ms a chiamata (1,9 ms nel peggiore, a un salto).
+- **La riserva** si scalda un corpo alla volta (mai più di uno per fotogramma, non in un fotogramma già lungo) mentre il
+  Capitano è in plancia, e le risorse comuni (i due Mannequin, i cicli, le uniformi) si caricano una volta sola in quel momento;
+  in tutto 40 attori. Il gestore gira a 4 Hz, costa 0,02-0,04 ms a chiamata (1-2,5 ms nel peggiore, a un salto, con otto corpi
+  da vestire): il corpo scelto è, se c'è, uno che porta già la mesh del sesso giusto.
 - **Camminata.** Il corpo percorre il tempo-percorso del piano (stesso passo della persona, anche la corsa a 300–360 cm/s),
   tiene la destra (26 cm) e gira intorno al Capitano e agli altri (rallenta davanti, aggira, dopo 2,5 s forza il passaggio);
   l'animazione segue il passo (`MF_Unarmed_Walk_Fwd`, `Jog`); le porte si aprono per lui (`AstraDoors`).
   In ascensore e nelle scale (tempo, non distanza) il corpo è nascosto: nessuno lo vede dentro.
 - **Pose.** In piedi (`MM_Idle` a fase e velocità proprie), seduto al tavolo o alla consolle (le pose procedurali di
-  `AAstraCrewMember`), sdraiato in branda. Se parla col Capitano, si gira verso di lui.
+  `AAstraCrewMember`), sdraiato in branda. Se parla col Capitano, si gira verso di lui. Chi sta in piedi fa un passo di lato se il
+  Capitano gli cammina addosso (nessuno è attraversato) e torna dopo.
 - **Pensa poco quando nessuno guarda.** A ogni fotogramma se visto o in parola; altrimenti ogni 0,1 s (in piedi, in cammino)
-  o 0,5 s (seduto, sdraiato); le ombre si spengono oltre 14 m; il resto è `OnlyTickPoseWhenRendered` e URO della base.
+  o 0,5 s (seduto, sdraiato). La posa da seduto è la più cara (circa 80 ossa ricostruite): entro 8 m a ogni fotogramma, a 8-20 m
+  ogni 0,07 s, oltre ogni 0,15 s. Le ombre si spengono oltre 14 m; il resto è `OnlyTickPoseWhenRendered` e URO della base.
+  Un pensiero del corpo (cammino, posto, posa: il suo codice, non l'animazione del motore) costa 2-5 microsecondi misurati: 40
+  corpi visti a ogni fotogramma sono 0,1-0,2 ms.
 - **Voce.** Il corpo è un `AAstraCrewMember` con `StationId` `npc<n° del ruolino>`: le righe della mente per quel `speaker`
   escono dalla sua bocca, spazializzate; se non ha un corpo (si è allontanato), escono come voce non in scena.
 
@@ -137,9 +143,10 @@ tecnico dei sensori rispondeva al "computer", l'ingegnere a "Number One"). `tool
 
 | Cosa | Numero |
 |---|---|
-| Tutta la nave, a 60 fps, 30 ore di bordo (540 000 fotogrammi) | media **0,0024 ms**, p99 0,084 ms, p99,9 0,31 ms, peggiore 0,53 ms (un percorso lungo) |
+| Tutta la nave, a 60 fps, 30 ore di bordo (540 000 fotogrammi) | media **0,002 ms**, p99 0,06 ms, p99,9 0,24 ms, peggiore 0,41 ms (un percorso lungo) |
 | Un percorso | 0,14–0,16 ms in media, 0,5 ms al peggio (6 700 in 30 ore di bordo: uno ogni 1,3 s di gioco) |
-| Gestore dei corpi | 0,03 ms a chiamata (4 Hz), 1,9 ms al salto |
+| Gestore dei corpi (con i Mannequin veri) | 0,02-0,04 ms a chiamata (4 Hz), 1-2,5 ms al salto |
+| Un pensiero di un corpo | 2-5 microsecondi (40 corpi a ogni fotogramma: 0,1-0,2 ms di codice; la mesh e l'animazione sono del motore) |
 | Corpi | il budget vero: `stat Astra` mostra `Life`, `LifeBodies`, `LifeBody`, `LifeBodyCount`, `LifeWalking` |
 
 I percorsi sono a bilancio di tempo (`RouteBudgetS` 0,12 ms a fotogramma, almeno uno quando qualcuno aspetta; il più vicino
