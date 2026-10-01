@@ -283,6 +283,48 @@ def blast_frame(b: SParts, tn: dict) -> None:
     fb.box((x0 - 0.045, -0.9, BLAST_H + 0.26), (x0 - 0.02, 0.9, H - 0.14), SL.DGLASS)         # the sign field over the opening
 
 
+# ----------------------------------------------------------------------------------------------------------------------- a stub
+def build_stub(name: str, tone: str, length: float) -> "bpy.types.Object":
+    """A plain stretch of corridor shorter than a module (0.3 .. 3.9 m, origin on the floor on the centre line at its aft end, running to x = length): the vestibule that fills
+    the gap between the end of a passage on the 4 m grid and the wall of a room that stands off the grid (Main Engineering). Floor plates, a ceiling with its luminaire, plain wall
+    panels with the rail and the cornice, open at both ends."""
+    tn = TONES[tone]
+    n = float(length)
+    rng = random.Random(sum(ord(c) for c in name) * 7 + 13)
+    b = SParts(bevel=0.006, fine_bevel=0.003)
+    fb, fine, em = b.body, b.fine, b.emit
+    # floor
+    fb.box((-OV, -SLOT_HW, -FLOOR_T), (n + OV, SLOT_HW, -0.012), STRUCT)
+    rw = 2 * HW / 4
+    for j in range(4):
+        faces = fb.box((0.008 - OV, -HW + j * rw + 0.008, -0.012), (n + OV - 0.008, -HW + (j + 1) * rw - 0.008, 0.0), DECK)
+        plate_uv(fb, faces, rng, 1.0)
+    if n > 0.5:
+        for y in (-1.34, 1.34):
+            em.lamp_box((0.15, y - 0.014, 0.0), (n - 0.15, y + 0.014, 0.004), tn["accent_dim"], LAMP_DIM)
+    # ceiling: structure, composite panels either side of the luminaire, the trough and its strip
+    fb.box((-OV, -SLOT_HW, H), (n + OV, SLOT_HW, H + FLOOR_T), STRUCT)
+    for sy in (-1, 1):
+        y0, y1 = (0.36, HW - 0.06) if sy > 0 else (-HW + 0.06, -0.36)
+        fb.box((0.04, y0, H - 0.045), (n - 0.04, y1, H), COMPOSITE)
+    if n > 0.4:
+        fb.box((0.0, -0.33, H - 0.075), (n, -0.29, H - 0.02), TRIM)
+        fb.box((0.0, 0.29, H - 0.075), (n, 0.33, H - 0.02), TRIM)
+        fb.box((0.0, -0.29, H - 0.027), (n, 0.29, H - 0.02), STRUCT)
+        em.lamp_box((min(0.1, n / 4), -0.22, H - 0.034), (n - min(0.1, n / 4), 0.22, H - 0.028), tn["strip"], LAMP_HOT)
+    # walls: structure, a composite panel, the plinth, the rail and the cornice
+    for side in (-1, 1):
+        with b.at(wall_matrix(side)):
+            fb.box((-OV, 0.0, 0.0), (n + OV, WALL_T, H), STRUCT)
+            if n > 0.5:
+                SW.panel(fb, 0.06, n - 0.06, 0.36, H - 0.55, raised=False)
+                SW.plinth(fine, 0.02, n - 0.02, tn["accent_dim"])
+            if n > 1.0:
+                SW.utility_rail(fine, 0.1, n - 0.1, tn["accent_dim"])
+            SW.cornice(fine, 0.0, n, H)
+    return b.build(name)
+
+
 # ------------------------------------------------------------------------------------------------------- the whole module
 def build_module(name: str, tone: str, suffix: str) -> "bpy.types.Object":
     left, right, aft, fwd = CORRIDOR_SPECS[suffix.split("#")[0]]

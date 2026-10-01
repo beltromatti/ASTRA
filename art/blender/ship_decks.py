@@ -8,6 +8,7 @@ they reach. Deck 1 is the bridge complex and is registered by ship_plan_gen.exis
 """
 from __future__ import annotations
 
+import math
 import random
 
 import ship_plan as P
@@ -35,11 +36,14 @@ PROGRAMME = {
         "C": ["store_cold", "cabins", "lab", "dc_locker", "store_dry", "heads"], "D": ["cabins", "store_dry", "laundry", "heads", "hydro"],
         "E": ["hydro", "store_cold", "heads", "lab"], "F": ["cabins", "library", "quiet", "laundry"], "G": ["store_dry", "laundry", "heads", "quiet"],
         "H": ["machinery", "dc_locker"]},
-    7: {"default": ["power_control", "machinery", "dc_locker", "machinery"], "A": ["power_control", "machinery"], "B": ["power_control", "machinery", "dc_locker"],
-        "E": ["radiator_pumps", "machinery"], "F": ["power_control", "machinery", "dc_locker"], "G": ["radiator_pumps", "machinery", "power_control"],
-        "H": ["machinery", "dc_locker", "machinery"]},
-    8: {"default": ["barracks", "barracks", "dc_locker", "machinery"], "A": ["shuttle_bay", "barracks"], "B": ["barracks", "firing_range", "armory"],
-        "C": ["armory", "barracks", "firing_range"], "D": ["barracks", "armory", "barracks"], "H": ["machinery", "dc_locker"]},
+    7: {"default": ["machinery", "dc_locker", "machinery_b", "power_control"], "A": ["machinery", "dc_locker"],
+        "B": ["power_control", "switchgear", "machinery", "dc_locker", "capacitors", "machinery_b"], "C": ["switchgear", "capacitors", "power_control", "machinery", "radiator_pumps"],
+        "D": ["power_control", "machinery_b", "dc_locker", "capacitors"], "E": ["radiator_pumps", "machinery", "switchgear", "dc_locker"],
+        "F": ["power_control", "capacitors", "machinery_b", "dc_locker", "machinery"], "G": ["radiator_pumps", "machinery", "power_control", "switchgear"],
+        "H": ["machinery", "dc_locker", "machinery_b"]},
+    8: {"default": ["store_dry", "hold", "machinery", "dc_locker", "workshop"], "B": ["barracks", "kit_room", "barracks", "lounge", "heads", "armory"],
+        "C": ["armory", "barracks", "laundry", "barracks", "kit_room", "heads", "store_dry"], "D": ["barracks", "hold", "barracks", "store_dry", "laundry", "dc_locker"],
+        "F": ["workshop", "machinery", "dc_locker", "hold"], "G": ["hold", "store_dry", "machinery"], "H": ["machinery", "dc_locker"]},
     9: {"default": ["cargo_hold", "machinery", "cargo_hold"], "A": [], "B": [], "C": ["flight_ops", "aircraft_shop", "magazine"],
         "D": ["aircraft_shop", "flight_ops", "magazine"], "E": ["magazine", "cargo_hold", "flight_ops"], "H": ["machinery", "dc_locker"]},
     10: {"default": ["cargo_hold", "magazine", "hold", "cargo_hold"], "A": ["cargo_hold", "hold", "magazine"], "H": ["machinery", "hold"]},
@@ -48,10 +52,11 @@ PROGRAMME = {
 }
 
 
-UNIQUE = {5: {"transporter", "lab_astro"}, 6: {"surgery", "quarantine", "pharmacy"}}      # rooms that stand once on their deck
+UNIQUE = {5: {"transporter", "lab_astro"}, 6: {"surgery", "quarantine", "pharmacy"}, 8: {"shuttle_bay", "firing_range"}}      # rooms that stand once on their deck
 # rooms placed first, at a fixed place: (key, side of the Spine, x of the room's forward edge). Deck 6: the medical rooms next to the Medbay's entrance,
 # on the starboard side of the Spine (the Medbay's own door is at x -232)
 PINNED = {5: [("transporter", +1, 4.0)],
+          8: [("shuttle_bay", +1, 52.0), ("firing_range", -1, 16.0)],
           6: [("pharmacy", +1, -216.0), ("surgery", +1, -200.0), ("quarantine", +1, -176.0)]}
 
 
@@ -102,10 +107,9 @@ def reach_rooms(deck: int, y_c: float, pieces: list, reach: float = 8.0) -> list
             continue
         for p in out:
             if e["wall"] == "fwd" and 0.0 <= p[0] - bx[2] <= reach:              # the piece lies forward of the room: its aft end meets the forward wall
-                a = GRID0 + MOD * int((bx[2] - GRID0) // MOD)
-                p[0] = a if a <= bx[2] + 1e-6 else a - MOD
-            elif e["wall"] == "aft" and 0.0 <= bx[0] - p[1] <= reach:            # the piece lies aft of the room: its forward end meets the aft wall
-                p[1] = GRID0 + MOD * (int((bx[0] - GRID0) // MOD) + 1)
+                p[0] = GRID0 + MOD * math.ceil((bx[2] - 0.4 - GRID0) / MOD - 1e-9)       # (the first grid line that is not more than 0.4 m inside the wall: a wall that is off
+            elif e["wall"] == "aft" and 0.0 <= bx[0] - p[1] <= reach:            #  the 4 m grid leaves a gap of less than 4 m that the plan fills with a lobby)
+                p[1] = GRID0 + MOD * math.floor((bx[0] + 0.4 - GRID0) / MOD + 1e-9)
     return [tuple(p) for p in out]
 
 

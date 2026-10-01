@@ -379,3 +379,127 @@ def power_control(name: str = "SM_SHIP_PowerControl"):
     ceiling_services(b, L, D, H_, [(3.2, "tray"), (12.5, "tray"), (14.4, "pipes")], 1.0, 23.0, 3)
     ceiling_panels(b, L, D, H_, 4, 3, "white_warm", 1.6, 1.0, 0.5, LAMP_HOT)
     return b.build(name)
+
+
+# ------------------------------------------------------------------------------------------------------------------------ switchgear hall
+def switchgear(name: str = "SM_SHIP_Switchgear"):
+    """24 x 16 x 3.7: the ship's high-voltage switchgear. Two long lineups of cabinets face each other across an aisle laid with insulating mats (the lineup on the far wall
+    runs the whole length, the other the left half); a mimic of the bus on the left wall; an isolation cage with earthing sticks and a lock-out board by the door; the
+    operator's desk, a rack of CO2 bottles and a hazard floor border."""
+    spec, L, D, H_ = _dims("switchgear")
+    b = SParts(bevel=0.005, fine_bevel=0.003)
+    build_shell(b, spec, _style("amber_dim", "white_warm"))
+    yf = D - WS - WF
+    xl, xr = WS + WF, L - WS - WF
+    for xc, bays in ((3.9, 6), (9.6, 5), (15.0, 5), (20.4, 4)):                                                    # the far lineup, facing -y
+        place(b, xc, yf - 0.37, -90, H.hv_cabinet, 0.9, 0.72, 2.2, bays)
+        b.body.box((xc - 0.45 * bays, yf - 0.02, 2.25), (xc + 0.45 * bays, yf, 2.35), TRIM)
+    for xc, bays in ((3.9, 6), (9.6, 5)):                                                                          # the second lineup, facing +y, back to the room
+        place(b, xc, 12.45, 90, H.hv_cabinet, 0.9, 0.72, 2.2, bays)
+    for xc in (3.9, 9.6, 15.0, 20.4):                                                                              # busbar trunking over the far lineup, with drops
+        b.body.box((xc - 2.2, yf - 0.5, 2.55), (xc + 2.2, yf - 0.1, 2.85), STRUCT)
+        b.soft.box((xc - 2.15, yf - 0.46, 2.85), (xc + 2.15, yf - 0.14, 2.9), CRATE_ORANGE)
+    # the aisle: insulating mats with a hazard border, a lock-out board and the earthing sticks at the end of the lineup
+    b.soft.box((0.7, 12.95, 0.0), (L - 1.0, 14.95, 0.012), CRATE_ORANGE)
+    b.soft.box((0.8, 13.05, 0.012), (L - 1.1, 14.85, 0.018), RUBBER)
+    b.emit.label((12.0, 12.97, 0.02), L - 2.0, 0.14, (0, 0, 1), "hazard_h", up=(0, 1, 0))
+    b.emit.label((12.0, 14.93, 0.02), L - 2.0, 0.14, (0, 0, 1), "hazard_h", up=(0, 1, 0))
+    for k in range(4):                                                                                             # earthing sticks hanging on the right wall
+        b.soft.cyl((xr - 0.1, 13.3 + k * 0.4, 0.9), (xr - 0.1, 13.3 + k * 0.4, 2.0), 0.02, CRATE_ORANGE, seg=6)
+        b.soft.box((xr - 0.14, 13.22 + k * 0.4, 1.95), (xr - 0.06, 13.38 + k * 0.4, 2.05), PAINT_RED)
+    # the left wall: a mimic of the bus and a pair of battery racks; by the door the lock-out board
+    place(b, xl + 0.02, 6.4, 0, H.wall_rack_panel, 5.2, 2.5, "scr_ship", "amber")
+    place(b, xl + 0.45, 2.4, 0, H.battery_rack, 1.4, 0.8, 2.0)
+    place(b, xl + 0.45, 3.9, 0, H.battery_rack, 1.4, 0.8, 2.0)
+    b.emit.label_fit((xl + 0.002, 9.6, 2.35), 1.4, "eq_breaker", (1, 0, 0))
+    # a dry transformer in its cage in the right half: a grey block with cooling fins and three porcelain bushings
+    place(b, 19.5, 4.3, 0, H.transformer, 1.6, 1.2, 1.9)
+    for (cx, cy, yw, w) in ((17.5, 4.3, 0.0, 3.4), (19.5, 2.4, 90.0, 4.0), (19.5, 6.2, 90.0, 4.0)):
+        with b.at(frame(cx, cy, 0.0, yw)):
+            G.cage_wall(b, w, 2.4)
+    # the operator's desk: monitors on it, the operator on a chair between it and the wall; the CO2 bottles; a hazard border round the room's middle
+    place(b, 6.4, 2.4, 90, F.desk, 1.8, 0.7, 0.85, STEEL, False)
+    place(b, 6.0, 2.6, -90, F.monitor, 0.5, 0.3, "scr_ship", False, z=0.85)
+    place(b, 6.9, 2.6, -90, F.monitor, 0.5, 0.3, "scr_data", False, z=0.85)
+    place(b, 6.4, 1.45, 90, H.chair_op, FABRIC_RUST)
+    for k in range(5):
+        b.body.cyl((xr - 0.4, 3.0 + k * 0.32, 0.0), (xr - 0.4, 3.0 + k * 0.32, 1.4), 0.12, PAINT_RED, seg=10)
+        b.fine.cyl((xr - 0.4, 3.0 + k * 0.32, 1.4), (xr - 0.4, 3.0 + k * 0.32, 1.5), 0.03, TRIM, seg=6)
+    b.body.box((xr - 0.55, 2.8, 0.9), (xr - 0.2, 4.7, 0.96), STRUCT)
+    b.emit.label_fit((xr - 0.002, 3.7, 1.9), 1.1, "eq_gas", (-1, 0, 0))
+    on_wall(b, "near", L, D, W.first_aid, b.body, L - 12.8, 1.4)
+    on_wall(b, "near", L, D, W.extinguisher, b.body, L - 13.8, 0.0)
+    dress_wall(b, "near", L, D, H_, 1.0, 5.0, 3, accent="amber", accent_dim="amber_dim", kinds=("panelboard", "plain", "safety"))
+    dress_wall(b, "near", L, D, H_, 19.0, 23.0, 4, accent="amber", accent_dim="amber_dim", kinds=("conduits", "plain"))
+    ceiling_services(b, L, D, H_, [(5.0, "tray"), (9.0, "pipes")], 1.0, 23.0, 7)
+    ceiling_panels(b, L, D, H_, 4, 3, "white_warm", 1.6, 1.2, 0.6, LAMP_HOT)
+    return b.build(name)
+
+
+# ------------------------------------------------------------------------------------------------------------------------ capacitor hall
+def capacitor(b: SParts, r: float = 0.42, h: float = 3.0, accent: str = "amber") -> None:
+    """A tall energy capacitor on a steel plinth: a grey ceramic cylinder with lit bands, a domed cap with a terminal and a bus stub, a charge column on the +x side."""
+    b.body.cyl((0, 0, 0.0), (0, 0, 0.16), r + 0.1, STRUCT, seg=16)
+    b.body.cyl((0, 0, 0.16), (0, 0, h - 0.22), r, CRATE_GREY, seg=16)
+    for k in range(4):
+        z = 0.7 + k * 0.6
+        H.ring(b.soft, 0.0, 0.0, z, r - 0.004, 0.025, 0.07, STRUCT, 16)
+        H.lamp_ring(b.emit, 0.0, 0.0, z + 0.075, r + 0.004, 0.012, 0.025, H.dim(accent) if k % 2 else accent, LAMP_DIM, 16)
+    b.body.sphere((0, 0, h - 0.22), r, CRATE_GREY, seg=16, rings=5, squash=(1.0, 1.0, 0.4))
+    b.body.cyl((0, 0, h - 0.1), (0, 0, h), 0.09, TRIM, seg=8)
+    b.soft.cyl((0, 0, h - 0.02), (0, 0, h + 0.04), 0.13, STEEL, seg=8)
+    b.body.box((r - 0.02, -0.05, 0.5), (r + 0.04, 0.05, h - 0.6), STRUCT)
+    b.emit.lamp_box((r + 0.04, -0.02, 0.6), (r + 0.05, 0.02, h - 0.7), H.dim(accent), LAMP_DIM)
+    b.emit.lamp_box((r + 0.04, -0.03, 0.6 + (h - 1.3) * 0.7), (r + 0.06, 0.03, 0.66 + (h - 1.3) * 0.7), "white", LAMP)
+
+
+def capacitors(name: str = "SM_SHIP_Capacitors"):
+    """24 x 16 x 3.7: the ship's stored energy. Two banks of capacitors (four columns by three rows each) stand on yellow-and-black insulating plinths with a lit aisle between
+    them; busbars run over the banks and across to the cabinets on the far wall; the charge controllers and the discharge resistors stand on the side walls; the operator's
+    console faces the room from the entrance wall."""
+    spec, L, D, H_ = _dims("capacitors")
+    b = SParts(bevel=0.005, fine_bevel=0.003)
+    build_shell(b, spec, _style("amber_dim", "white_warm"))
+    yf = D - WS - WF
+    xl, xr = WS + WF, L - WS - WF
+    rows = (5.6, 8.4, 11.2)
+    for gx0 in (4.6, 14.3):
+        xs = [gx0 + k * 1.7 for k in range(4)]
+        b.soft.box((xs[0] - 0.95, rows[0] - 1.05, 0.0), (xs[-1] + 0.95, rows[-1] + 1.05, 0.02), CRATE_ORANGE)                    # the insulating plinth: hazard orange with a rubber top
+        b.soft.box((xs[0] - 0.85, rows[0] - 0.95, 0.02), (xs[-1] + 0.85, rows[-1] + 0.95, 0.04), RUBBER)
+        for sx in (xs[0] - 1.0, xs[-1] + 0.98):
+            b.emit.label((sx, 8.4, 0.045), rows[-1] - rows[0] + 1.9, 0.12, (0, 0, 1), "hazard_h", up=(1, 0, 0))
+        for sy in (rows[0] - 1.0, rows[-1] + 0.98):
+            b.emit.label(((xs[0] + xs[-1]) / 2, sy, 0.045), xs[-1] - xs[0] + 1.9, 0.12, (0, 0, 1), "hazard_h", up=(0, 1, 0))
+        for k, y in enumerate(rows):
+            for j, x in enumerate(xs):
+                place(b, x, y, 0, capacitor, 0.42, 3.0, "amber" if (j + k) % 3 else "engineering")
+            b.body.box((xs[0] - 0.1, y - 0.07, 3.1), (xs[-1] + 0.1, y + 0.07, 3.22), CRATE_ORANGE)                                   # the busbar over each row
+            for x in xs:
+                b.soft.box((x - 0.04, y - 0.04, 3.0), (x + 0.04, y + 0.04, 3.1), TRIM)
+        b.body.box((xs[0] - 0.1, rows[0] - 0.1, 3.22), (xs[0] + 0.1, rows[-1] + 0.1, 3.34), CRATE_ORANGE)                         # the cross bar joining the rows
+    b.body.box((8.3, 8.3, 3.22), (14.5, 8.5, 3.34), CRATE_ORANGE)                                                                   # the main bar between the banks
+    for x in (9.2, 13.7):
+        b.body.box((x - 0.1, 8.3, 3.34), (x + 0.1, 8.5, H_), STRUCT)
+    # the lit aisle between the banks and the guide to the console
+    lamp_strip(b.emit, (11.2, 1.0, 0.006), (11.2, 14.6, 0.006), 0.06, 0.004, "amber", LAMP_DIM)
+    for xx in (10.7, 11.7):
+        lamp_strip(b.emit, (xx, 3.0, 0.006), (xx, 14.4, 0.006), 0.03, 0.004, "engineering", LAMP_DIM)
+    # the far wall: charge controllers (HV cabinets) and a display wall; left wall: discharge resistor banks; right wall: a mimic and the dump switches
+    for xc, bays in ((4.0, 4), (11.2, 4), (19.8, 4)):
+        place(b, xc, yf - 0.37, -90, H.hv_cabinet, 0.9, 0.72, 2.2, bays)
+    place(b, 15.4, yf - 0.02, -90, H.wall_rack_panel, 3.2, 2.2, "scr_wave", "amber")
+    for k, y in enumerate((3.0, 5.6, 8.2)):
+        place(b, xl + 0.4, y, 0, H.battery_rack, 1.4, 0.8, 2.0, "engineering")
+    place(b, xr - 0.02, 9.0, 180, H.wall_rack_panel, 4.4, 2.4, "scr_ship", "amber")
+    place(b, xr - 0.4, 4.6, 180, H.hv_cabinet, 0.9, 0.72, 2.2, 3)
+    b.emit.label_fit((xr - 0.002, 12.6, 2.5), 1.6, "eq_breaker", (-1, 0, 0))
+    # the operator's console on the entrance wall, a chair, a first aid box and an extinguisher
+    place(b, 6.0, 1.1, 90, H.work_console, 3.2, "engineering", 2, ["scr_wave", "scr_ship", "scr_data"], True, True)
+    place(b, 6.0, 2.5, -90, H.chair_op, FABRIC_RUST)
+    on_wall(b, "near", L, D, W.first_aid, b.body, L - 13.0, 1.4)
+    on_wall(b, "near", L, D, W.extinguisher, b.body, L - 13.8, 0.0)
+    dress_wall(b, "near", L, D, H_, 14.5, 23.5, 5, accent="amber", accent_dim="amber_dim", kinds=("plain", "conduits", "vent", "safety"))
+    ceiling_services(b, L, D, H_, [(3.2, "tray"), (14.6, "tray")], 1.0, 23.0, 8)
+    ceiling_panels(b, L, D, H_, 4, 3, "white_warm", 1.6, 1.0, 0.5, LAMP_HOT)
+    return b.build(name)

@@ -137,7 +137,7 @@ _reg("armory", name="Armory", kind="armory", dept="security", L=16.0, D=16.0, h=
      lights=[light(8.0, 6.0, 3.3, 5500, 5000, (10.0, 1.0)), light(8.0, 12.0, 3.3, 5500, 5000, (10.0, 1.0))])
 _reg("cabins", name="Crew Cabins", kind="cabins", dept="services", L=20.0, D=16.0, h=3.2, plate="cabins",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
-     spots=[spot("sleeper", "sleep", 1.34, y, 0) for y in (0.56, 4.56, 8.56, 12.56)] + [spot("sleeper", "sleep", 18.66, y, 180) for y in (0.56, 4.56, 8.56, 12.56)],
+     spots=[spot("sleeper", "sleep", 1.34, y, 180) for y in (0.56, 4.56, 8.56, 12.56)] + [spot("sleeper", "sleep", 18.66, y, 0) for y in (0.56, 4.56, 8.56, 12.56)],
      lights=[light(10.0, 8.0, 3.1, 2500, 3400, (14.0, 0.6))])
 
 # ---- Deck 6: the medical rooms around the Medbay (docs/BIBBIA.md §6: Medbay, surgery, quarantine, pharmacy) ---------------------
@@ -149,7 +149,7 @@ _reg("surgery", name="Surgery", kind="surgery", dept="medical", L=16.0, D=16.0, 
 _reg("quarantine", name="Quarantine Ward", kind="quarantine", dept="medical", L=24.0, D=16.0, h=3.6, plate="quarantine",
      doors=[door("near", 10.0)], systems=["medical", "life_support"],
      spots=[spot("nurse", "work", 13.4, 6.2, 0, "medical"), spot("nurse", "work", 16.4, 4.4, 90, "medical")]
-           + [spot("patient", "sleep", 1.7 + 3.7 * k, 14.59, 270, "medical") for k in range(6)],
+           + [spot("patient", "sleep", 1.7 + 3.7 * k, 14.59, 90, "medical") for k in range(6)],
      lights=[light(12.0, 4.5, 3.5, 6000, 6000, (14.0, 1.0)), light(12.0, 12.8, 3.5, 4500, 5200, (20.0, 1.0))])
 _reg("pharmacy", name="Pharmacy", kind="pharmacy", dept="medical", L=12.0, D=16.0, h=3.4, plate="pharmacy",
      doors=[door("near", 6.0)], systems=["medical", "supply"],
@@ -314,6 +314,53 @@ _reg("power_control", name="Power Control", kind="power", dept="engineering", L=
             spot("power_technician", "sit", 8.0, 4.35, 90, "engineering"), spot("power_supervisor", "stand", 12.4, 10.2, 90, "engineering"),
             spot("power_technician", "work", 22.0, 6.0, 180, "engineering")],
      lights=[light(8.0, 6.0, 3.5, 4800, 4500, (12.0, 3.0), 1000), light(18.0, 8.0, 3.5, 3600, 4500, (6.0, 8.0), 900)])
+
+
+# ---- Deck 8: the Marines' deck ------------------------------------------------------------------------------------------------------------------------
+_reg("shuttle_bay", name="Assault-Shuttle Bay", kind="hangar", dept="security", L=32.0, D=16.0, h=3.7, plate="shuttle_bay",
+     doors=[door("near", 14.0), door("near", 18.0)], systems=["launch_tubes", "power_bus", "life_support"],
+     spots=[spot("deck_chief", "sit", 16.0, 13.8, 90, "flight"), spot("deck_hand", "work", 1.7, 3.5, 180, "flight"), spot("deck_hand", "work", 29.6, 4.0, 0, "flight"),
+            spot("marine", "stand", 8.5, 1.0, 90, "security"), spot("marine", "stand", 23.5, 1.0, 90, "security"), spot("deck_hand", "stand", 16.0, 6.0, 90, "flight"),
+            spot("marine", "sit", 4.2, 0.4, 90, "security"), spot("marine", "sit", 27.8, 0.4, 90, "security")],
+     lights=[light(8.5, 9.4, 3.6, 6500, 5600, (6.0, 12.0), 1300), light(23.5, 9.4, 3.6, 6500, 5600, (6.0, 12.0), 1300), light(16.0, 7.0, 3.6, 4500, 5000, (4.0, 12.0), 1100),
+             light(16.0, 14.4, 3.4, 3000, 4500, (6.0, 2.0), 900)])
+
+
+KESTREL_X, KESTREL_Y = (8.5, 23.5), 9.4                                  # the Kestrels' centre line across the bay and along it (shuttle_bay: nose to the far wall)
+BUNK_X, BUNK_Y = tuple(round(1.9 + k * 2.93, 3) for k in range(8)), 14.75    # the barracks' eight double bunks (heads on the far wall)
+RANGE_LANE_Y, RANGE_BOOTH_X = tuple(round(4.55 + 2.0 * k, 3) for k in range(6)), 5.0    # the range's six lanes and the shooters' place
+
+_reg("barracks", name="Marine Barracks", kind="cabins", dept="security", L=24.0, D=16.0, h=3.4, plate="barracks",
+     doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
+     spots=[spot("marine", "sleep", x, BUNK_Y, 90, "security") for x in BUNK_X] + [spot("marine", "sleep", x, BUNK_Y, 90, "security", 0.96) for x in BUNK_X]
+           + [spot("marine", "sit", x, 7.35, 90, "security") for x in (15.4, 16.5, 17.6)] + [spot("marine", "sit", x, 9.45, -90, "security") for x in (15.4, 16.5, 17.6)]
+           + [spot("marine", "sit", 3.95, y, 180, "security") for y in (5.6, 6.8, 8.0, 9.2)]
+           + [spot("marine", "work", 21.45, 7.15, 180, "security"), spot("sergeant", "stand", 11.4, 2.6, 90, "security")],
+     lights=[light(12.0, 4.0, 3.2, 2400, 3600, (14.0, 1.0), 900), light(12.0, 9.5, 3.2, 2400, 3600, (14.0, 1.0), 900), light(4.0, 7.4, 3.2, 2000, 3400, (4.0, 5.0), 800)])
+_reg("kit_room", name="Kit Room", kind="armory", dept="security", L=16.0, D=16.0, h=3.4, plate="kit_room",
+     doors=[door("near", 6.0)], systems=["power_bus", "ordnance"],
+     spots=[spot("marine", "stand", 2.0, 4.5, 180, "security"), spot("marine", "stand", 2.0, 7.6, 180, "security"), spot("marine", "sit", 2.6, 12.9, 90, "security"),
+            spot("marine", "sit", 9.8, 12.9, 90, "security"), spot("armourer", "work", 3.0, 1.6, -90, "security"), spot("marine", "stand", 8.4, 3.0, 90, "security")],
+     lights=[light(8.0, 5.0, 3.3, 5000, 5600, (12.0, 1.0)), light(8.0, 11.0, 3.3, 5000, 5600, (12.0, 1.0))])
+_reg("firing_range", name="Firing Range", kind="range", dept="security", L=40.0, D=16.0, h=3.6, plate="range",
+     doors=[door("near", 10.0)], systems=["ordnance", "power_bus"],
+     spots=[spot("marine", "work", RANGE_BOOTH_X - 0.3, y, 0, "security") for y in RANGE_LANE_Y]
+           + [spot("range_officer", "sit", 15.0, 1.2, 90, "security"), spot("marine", "stand", 8.0, 1.7, 0, "security"), spot("armourer", "work", 24.0, 1.5, -90, "security")],
+     lights=[light(5.0, 9.5, 3.5, 6000, 5600, (3.0, 12.0), 1200), light(15.0, 9.5, 3.4, 4500, 5200, (6.0, 12.0), 1100), light(26.0, 9.5, 3.4, 3000, 5200, (3.0, 12.0), 1000),
+             light(36.0, 9.5, 3.4, 3000, 5200, (3.0, 12.0), 1000), light(15.0, 1.6, 3.4, 3500, 4800, (10.0, 2.0), 900)])
+
+
+_reg("switchgear", name="Switchgear Hall", kind="power", dept="engineering", L=24.0, D=16.0, h=3.7, plate="switchgear",
+     doors=[door("near", 10.0)], systems=["power_bus", "reactor"],
+     spots=[spot("power_technician", "work", 4.5, 14.2, 90, "engineering"), spot("power_technician", "work", 12.0, 14.2, 90, "engineering"),
+            spot("power_technician", "work", 18.0, 14.2, 90, "engineering"), spot("power_supervisor", "sit", 6.4, 1.45, 90, "engineering"),
+            spot("power_technician", "stand", 12.0, 6.0, 0, "engineering")],
+     lights=[light(8.0, 13.7, 3.5, 4200, 4400, (14.0, 1.0), 1000), light(18.0, 13.7, 3.5, 3600, 4400, (8.0, 1.0), 1000), light(12.0, 6.0, 3.5, 3000, 4800, (12.0, 6.0), 900)])
+_reg("capacitors", name="Capacitor Hall", kind="power", dept="engineering", L=24.0, D=16.0, h=3.7, plate="capacitors",
+     doors=[door("near", 10.0)], systems=["power_bus", "reactor", "coolant"],
+     spots=[spot("power_technician", "sit", 6.0, 2.5, -90, "engineering"), spot("power_technician", "stand", 11.2, 7.0, 90, "engineering"),
+            spot("power_technician", "work", 11.2, 11.6, 90, "engineering"), spot("power_supervisor", "stand", 12.0, 3.0, 90, "engineering")],
+     lights=[light(11.2, 8.4, 3.6, 3800, 3800, (2.0, 12.0), 1000), light(6.0, 8.4, 3.6, 3000, 4200, (6.0, 8.0), 900), light(18.0, 8.4, 3.6, 3000, 4200, (6.0, 8.0), 900)])
 
 
 def prefab(key: str) -> dict:

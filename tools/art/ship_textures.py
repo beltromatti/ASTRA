@@ -107,6 +107,14 @@ EQUIPMENT_TAGS = {"eq_vent": "VENT", "eq_breaker": "BREAKER PANEL", "eq_maint": 
                   "eq_lab": "SAMPLES · DO NOT DISTURB", "eq_tools": "TOOLS · SIGN OUT", "eq_ammo": "AMMUNITION · SECURE",
                   "eq_stores": "SUPPLY · COUNT BEFORE SIGNING", "eq_laundry": "LAUNDRY", "eq_recycle": "RECYCLING", "eq_notice": "NOTICES",
                   "eq_clean": "KEEP CLEAR", "eq_quiet": "QUIET", "eq_watch": "WATCH BILL"}
+# NAVE-2: tags of the new rooms (placed by name from art/blender/ship_rooms_*.py): small tiles (256 x 64) to keep the atlas inside 4096 px
+NAVE2_TAGS = {
+    # Deck 8
+    "eq_k1": "KESTREL 1", "eq_k2": "KESTREL 2", "eq_launch": "LAUNCH TUBE · KEEP CLEAR", "eq_range": "LIVE FIRE · EAR PROTECTION", "eq_clear": "CLEAR WEAPON · SAFE",
+    "eq_lane1": "LANE 1", "eq_lane2": "LANE 2", "eq_lane3": "LANE 3", "eq_lane4": "LANE 4", "eq_lane5": "LANE 5", "eq_lane6": "LANE 6",
+    "eq_helmets": "HELMETS · SIGN OUT", "eq_kit": "PERSONAL KIT", "eq_armour": "BATTLE DRESS · CHECK SEALS", "eq_roster": "SQUAD ROSTER", "eq_gpu": "GROUND POWER",
+    "eq_fuel": "FUEL · NO NAKED FLAME",
+}
 
 
 def draw_arrow(kind: str, s: int = 128) -> Image.Image:
@@ -299,6 +307,8 @@ def build() -> None:
     #      pictograms, screens
     for k, t in EQUIPMENT_TAGS.items():
         add(k, B3.tag(512, 128, t), t)
+    for k, t in NAVE2_TAGS.items():
+        add(k, B3.tag(256, 64, t), t)
     for d in range(1, 13):
         for x in SECTIONS:
             add(f"sec_{d}{x}", B3.plate(512, 64, f"DECK {d} · SECTION {x}", "", DEPT[DECK_TAG[d]]),

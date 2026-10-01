@@ -106,7 +106,7 @@ def existing(B: Builder) -> None:
         note="floor z -72.8 (the launch tubes open into the bow mouths); the volume 20 m tall crosses the planes of Decks 6-11 at x 60..218, |y| < 29")
 
 
-BUILT_DECKS = (4, 5, 6)    # the decks with meshes: Deck 4 by hand (ship_deck4.py), the others from their programme (ship_decks.plan_deck(coarse=False))
+BUILT_DECKS = (4, 5, 6, 7, 8)    # the decks with meshes: Deck 4 by hand (ship_deck4.py), the others from their programme (ship_decks.plan_deck(coarse=False))
 
 PROGRAMME = {   # docs/BIBBIA.md §6: the twelve decks
     1: "Bridge, Captain's quarters, ready room, command corridors",
@@ -205,6 +205,9 @@ def existing_graph(B: Builder, decks: dict) -> None:
                dept=rec["dept"], systems=["power_bus", "life_support"], note="the corridor's end and the room's door meet here: the passage's last bay, "
                "finished with the room's deck")
         B.node(f"{lid}.hub", deck, (lo + hi) / 2, 0.0, seg["z"][0], "corridor", lid)
+        if seg["status"] == "built" and abs(hi - lo) < 3.95:                       # a built deck: a stub of corridor fills the gap (its length is the gap's)
+            B.place(deck, f"SM_SHIP_{seg.get('tone', 'S')}_Stub{int(round(abs(hi - lo) * 100))}", (min(lo, hi), 0.0, seg["z"][0]), 0.0,
+                    f"Interior/Deck{deck:02d}/Corridors/Stubs", f"d{deck}_{cid}_stub", "module", passage=seg.get("passage"), suffix="Stub")
         B.link(best["id"], f"{lid}.hub", "walk", width=3.1)
         B.link(f"{lid}.hub", f"{cid}.in", "door", door=door["id"], width=door["width"])
         door["b"] = lid

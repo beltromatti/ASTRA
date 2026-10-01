@@ -429,3 +429,27 @@ def glovebox(b: SParts, w: float = 1.6, d: float = 0.9, h: float = 1.5) -> None:
     b.fine.box((-0.15, hw, 0.9), (0.15, hw + 0.2, 1.2), TRIM)
     b.emit.lamp_box((d / 2 + 0.005, -0.1, h - 0.09), (d / 2 + 0.012, 0.1, h - 0.07), "green", LAMP)
     b.emit.label((d / 2 + 0.003, 0.0, 0.4), 0.6, 0.15, (1, 0, 0), "eq_lab")
+
+
+def transformer(b: SParts, w: float = 1.6, d: float = 1.2, h: float = 1.9) -> None:
+    """A dry-type power transformer facing +x: a grey steel tank on a base with rows of cooling fins on both sides, a lid, three porcelain bushings with caps on top, a
+    nameplate, a temperature gauge and a lit status."""
+    hw = w / 2
+    b.body.box((-d / 2 - 0.04, -hw - 0.04, 0.0), (d / 2 + 0.04, hw + 0.04, 0.12), STRUCT)
+    b.body.box((-d / 2, -hw, 0.12), (d / 2, hw, h - 0.3), CRATE_GREY)
+    b.body.box((-d / 2 - 0.03, -hw - 0.03, h - 0.3), (d / 2 + 0.03, hw + 0.03, h - 0.24), TRIM)
+    for sy in (-1, 1):
+        for k in range(8):
+            z = 0.3 + k * (h - 0.95) / 7
+            lo, hi = sorted((sy * hw, sy * (hw + 0.07)))
+            b.fine.box((-d / 2 + 0.06, lo, z), (d / 2 - 0.06, hi, z + 0.11), STEEL)
+    for k in range(3):
+        y = (k - 1) * w * 0.3
+        b.body.cyl((0, y, h - 0.24), (0, y, h + 0.05), 0.075, IVORY, seg=12)
+        for j in range(3):
+            b.fine.cyl((0, y, h - 0.2 + j * 0.08), (0, y, h - 0.17 + j * 0.08), 0.11, IVORY, seg=12)
+        b.body.cyl((0, y, h + 0.05), (0, y, h + 0.12), 0.045, TRIM, seg=8)
+    b.fine.box((d / 2, -0.25, 0.9), (d / 2 + 0.012, 0.25, 1.2), TRIM)
+    b.emit.label((d / 2 + 0.014, 0.0, 1.05), 0.46, 0.115, (1, 0, 0), "tag_06")
+    b.fine.cyl((d / 2, 0.45, 1.55), (d / 2 + 0.03, 0.45, 1.55), 0.07, DGLASS, seg=12)
+    b.emit.lamp_box((d / 2, -0.55, 0.3), (d / 2 + 0.012, -0.47, 0.34), "green", LAMP_DIM)

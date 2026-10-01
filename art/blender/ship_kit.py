@@ -60,6 +60,9 @@ ROOMS = {
     "lab_bio": ("ship_rooms_science2", "lab_bio"), "lab_astro": ("ship_rooms_science2", "lab_astro"), "lab_phys": ("ship_rooms_science2", "lab_phys"),
     "radiator_pumps": ("ship_rooms_engineering", "radiator_pumps"), "machinery": ("ship_rooms_engineering", "machinery"), "machinery_b": ("ship_rooms_engineering", "machinery_b"),
     "dc_locker": ("ship_rooms_engineering", "dc_locker"), "power_control": ("ship_rooms_engineering", "power_control"),
+    "shuttle_bay": ("ship_rooms_security", "shuttle_bay"), "barracks": ("ship_rooms_security", "barracks"), "kit_room": ("ship_rooms_security", "kit_room"),
+    "firing_range": ("ship_rooms_security", "firing_range"),
+    "switchgear": ("ship_rooms_engineering", "switchgear"), "capacitors": ("ship_rooms_engineering", "capacitors"),
 }
 EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHIP_StairTowerBottom": ("ship_rooms_hub", "stair_tower_bottom"),
          "SM_SHIP_LadderTrunk": ("ship_rooms_hub", "ladder_trunk")}
@@ -107,6 +110,8 @@ def registry(needed: set[str]) -> dict[str, tuple]:
                 reg[m] = ("sign", int(body[:-1]), body[-1])
         elif m.startswith("SM_SHIP_Plate_"):
             reg[m] = ("plate", m[len("SM_SHIP_Plate_"):])
+        elif m[len("SM_SHIP_"):].startswith(("S_Stub", "P_Stub")):                   # SM_SHIP_S_Stub150: a plain 1.50 m stretch of the Spine
+            reg[m] = ("stub", m[len("SM_SHIP_")], int(m[len("SM_SHIP_S_Stub"):]) / 100.0)
     return reg
 
 
@@ -119,6 +124,9 @@ def build_mesh(name: str, item: tuple):
     if kind in ("room", "vertical"):
         mod = importlib.import_module(item[2])
         return getattr(mod, item[3])(name)
+    if kind == "stub":
+        import ship_corridor as SC
+        return SC.build_stub(name, item[1], item[2])
     if kind == "sign":
         import ship_signs as SS
         return SS.sign(name, item[1], item[2])
@@ -179,6 +187,11 @@ def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
             problems.append(f"{name}: bounds {lo} .. {hi} leave the footprint 0..{L} x 0..{D}")
         if hi[2] > 4.0 + tol and item[1] not in ("stair_tower",):
             problems.append(f"{name}: top at {hi[2]:.2f} m is above the deck pitch (4.0)")
+    if item[0] == "stub":
+        bb = layout_bounds(obj)
+        lo, hi = bb["min"], bb["max"]
+        if lo[0] < -0.14 or hi[0] > item[2] + 0.03 or abs(lo[1]) > CAT.SLOT_HW + 0.03 or hi[1] > CAT.SLOT_HW + 0.03:
+            problems.append(f"{name}: bounds {lo} .. {hi} leave the {item[2]} x 4 slot")
     if item[0] == "module":
         bb = layout_bounds(obj)
         lo, hi = bb["min"], bb["max"]
