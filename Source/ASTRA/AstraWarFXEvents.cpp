@@ -66,9 +66,9 @@ void UAstraWarFX::OnFlash(EAstraFxFlash Kind, const FVector& Pos, float Size, fl
 // ------------------------------------------------------------------------------------------------------------------ explosions
 void UAstraWarFX::Smoke(const FVector& Pos, const FVector& Vel, float Radius, float Life, float Dark, float Delay)
 {
-	if (FMath::FRand() > Room(LSmoke))
+	if (FMath::FRand() > Room(LSmoke) || FVector::DistSquared(Pos, F.Origin) > FMath::Square(90000.0))
 	{
-		return;                              // the smoke is thick enough already
+		return;                              // the smoke is thick enough already, or too far to be more than a dot that no light picks out
 	}
 	if (FPuff* P = AddPuff(Pos, Vel * 0.8f + FMath::VRand() * Radius * 0.12f, Life, Radius * 0.5f, Radius * 1.5f, FLinearColor(0.5f, 0.48f, 0.46f), 70.f, LSmoke, Delay))
 	{
@@ -125,7 +125,7 @@ void UAstraWarFX::Explosion(const FVector& Pos, const FVector& Vel, float Radius
 	const int32 Chunks = FMath::RoundToInt((2.f + 6.f * P) * K);
 	for (int32 i = 0; i < Chunks; ++i)
 	{
-		AddDebris(Pos + FMath::VRand() * R * 0.3f, Vel + FMath::VRand() * FMath::FRandRange(15.f, 40.f + 40.f * P), R * FMath::FRandRange(0.02f, 0.06f), bAstra, FMath::FRandRange(12.f, 24.f));
+		AddDebris(Pos + FMath::VRand() * R * 0.3f, Vel + FMath::VRand() * FMath::FRandRange(15.f, 40.f + 40.f * P), R * FMath::FRandRange(0.02f, 0.06f), bAstra, FMath::FRandRange(9.f, 18.f));
 	}
 	// the flash lights up what is near it
 	AddLight(Pos, 0.3f + 0.35f * P, R * 9.f, 6500.f * R * R * FMath::Sqrt(P), FLinearColor(1.f, 0.72f, 0.42f), Vel, Delay);
@@ -291,7 +291,7 @@ void UAstraWarFX::OnHit(const FAstraBattleShip& To, const FAstraFxHit& H)
 		{
 			for (int32 i = 0; i < 1 + (int32)(T / 40.f); ++i)
 			{
-				AddDebris(H.Pos + Out * 2.f, Vel + (Out + FMath::VRand() * 0.8f) * FMath::FRandRange(15.f, 70.f), FMath::FRandRange(0.6f, 1.6f), bAstra, FMath::FRandRange(8.f, 16.f));
+				AddDebris(H.Pos + Out * 2.f, Vel + (Out + FMath::VRand() * 0.8f) * FMath::FRandRange(15.f, 70.f), FMath::FRandRange(0.6f, 1.6f), bAstra, FMath::FRandRange(6.f, 12.f));
 			}
 		}
 		if (T > 55.f)

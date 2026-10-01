@@ -388,7 +388,10 @@ AstraFx::FSpark* UAstraWarFX::AddSpark(const FVector& Pos, const FVector& Vel, f
 void UAstraWarFX::SparkBurst(const FVector& Pos, const FVector& Dir, float Spread, int32 N, float SpeedLo, float SpeedHi, float LifeLo, float LifeHi,
                              float Len, const FLinearColor& Col, float Inten, const FVector& BaseVel)
 {
-	const float K = FMath::Clamp(Density, 0.2f, 2.f) * FMath::Max(0.12f, RoomSparks());
+	// fewer where they are far (past 60 km a spark is a point: down to a sixth of them at 160 km), fewer still when the pool is filling
+	const float Dist = (float)FVector::Dist(Pos, F.Origin);
+	const float Near = Dist > 60000.f ? FMath::Clamp(1.f - (Dist - 60000.f) / 120000.f, 0.15f, 1.f) : 1.f;
+	const float K = FMath::Clamp(Density, 0.2f, 2.f) * FMath::Max(0.12f, RoomSparks()) * Near;
 	N = FMath::Max(1, FMath::RoundToInt(N * K));
 	for (int32 i = 0; i < N; ++i)
 	{
@@ -416,11 +419,33 @@ void UAstraWarFX::AddLight(const FVector& Pos, float Life, float Radius, float C
 
 void UAstraWarFX::AddDebris(const FVector& Pos, const FVector& Vel, float SizeM, bool bAstra, float Life)
 {
-	if (Debris.Num() >= CapDebrisSim)
+	if (FVector::DistSquared(Pos, F.Origin) > FMath::Square(40000.0))
 	{
-		return;
+		return;                              // (a chunk of metal farther than 40 km is under a pixel: it would only take the place of a near one)
 	}
-	FDebris& D = Debris.AddDefaulted_GetRef();
+	FDebris* Slot;
+	if (Debris.Num() < CapDebrisSim)
+	{
+		Slot = &Debris.AddDefaulted_GetRef();
+	}
+	else
+	{
+		// the pool is full: the chunk furthest through its life makes way (a blast near the eye is worth more than the last one's last chunks)
+		int32 Oldest = 0;
+		float Furthest = -1.f;
+		for (int32 i = 0; i < Debris.Num(); ++i)
+		{
+			const float K = Debris[i].Age / Debris[i].Life;
+			if (K > Furthest)
+			{
+				Furthest = K;
+				Oldest = i;
+			}
+		}
+		Slot = &Debris[Oldest];
+		*Slot = FDebris();
+	}
+	FDebris& D = *Slot;
 	D.Pos = Pos;
 	D.Vel = Vel;
 	D.Att = FQuat(FMath::VRand(), FMath::FRandRange(0.f, 6.28f));

@@ -430,6 +430,17 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 				}
 			}
 		}
+		// a section that burns blows up now and then (one that is gutted, often): a small blast inside the hull, so a ship in flames is never quiet
+		if (bNear && (bGut || D.Burn[sec] > 8.f) && Room(LFire) > 0.25f)
+		{
+			Fx.BlastT[sec] -= Dt * K;
+			if (Fx.BlastT[sec] <= 0.f)
+			{
+				Fx.BlastT[sec] = bGut ? FMath::FRandRange(2.5f, 7.f) : FMath::FRandRange(7.f, 16.f);
+				const FVector Pt = HullPoint(S, sec, FMath::FRand(), FMath::FRandRange(-0.8f, 0.8f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.6f, 0.6f), true);
+				Explosion(Pt, S.Vel, FMath::Clamp(S.Radius * FMath::FRandRange(0.035f, 0.07f), 4.f, 40.f), bAstra, bGut ? 0.38f : 0.25f, 0.f);
+			}
+		}
 		if (bVent)
 		{
 			Fx.EmitVent[sec] += Dt * 14.f * K * Room(LGlow);

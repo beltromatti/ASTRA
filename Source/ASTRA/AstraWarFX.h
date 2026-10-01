@@ -71,7 +71,7 @@ namespace AstraFx
 
 	/** Capacity of each layer (instances) and of the particle lists: the budget of the effects. */
 	constexpr int32 CapDarts = 1500, CapTubes = 1200, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
-	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = 240, CapPieces = 36;
+	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = CapDebris, CapPieces = 36;
 	constexpr int32 MaxLights = 8;
 	constexpr float GlowK = 1.7f;             // a glow's soft falloff reaches ~0.6 of its sphere: spheres are drawn this much larger than the glow they stand for
 
@@ -197,6 +197,7 @@ namespace AstraFx
 		float SpoolT = 0.f;                    // plume flicker clock
 		float Emit[3] = {0.f, 0.f, 0.f};       // per section: fire/smoke emission accumulators
 		float EmitVent[3] = {0.f, 0.f, 0.f};
+		float BlastT[3] = {2.f, 4.f, 6.f};     // per section: seconds to the next secondary blast of a burning one
 		float BreakBlast = 0.f;                // secondary blasts while the hull is breaking
 		FShield Shield;
 		int32 Scars = 0;
