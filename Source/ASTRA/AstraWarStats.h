@@ -116,10 +116,20 @@ struct FAstraWarStats
 	double TickMsSum = 0.0, TickMsMax = 0.0;
 	int32 Ticks = 0;
 	TArray<float> TickMsSamples;                 // for the percentiles (capped)
+	// where the tick's time goes: knowledge+grid, groups, squadrons+scenario, capital ships (AI, weapons, damage), craft, projectiles+effects
+	static constexpr int32 NumPhases = 6;
+	double PhaseNow[NumPhases] = {};             // this tick (reset at its start)
+	double PhaseSum[NumPhases] = {};
+	double PhaseMax[NumPhases] = {};
 	int32 PeakShips = 0, PeakCraft = 0, PeakProjectiles = 0;
 
 	void NoteTick(double Ms)
 	{
+		for (int32 p = 0; p < NumPhases; ++p)
+		{
+			PhaseSum[p] += PhaseNow[p];
+			PhaseMax[p] = FMath::Max(PhaseMax[p], PhaseNow[p]);
+		}
 		TickMsSum += Ms;
 		TickMsMax = FMath::Max(TickMsMax, Ms);
 		++Ticks;

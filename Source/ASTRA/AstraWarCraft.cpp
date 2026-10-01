@@ -134,7 +134,12 @@ FVector UAstraBattleSubsystem::CraftAvoidance(const FAstraBattleShip& S) const
 			continue;                                               // (the ship it launches from and lands on is no obstacle)
 		}
 		const FVector Rel = S.Pos - E.Pos;
-		const double D = Rel.Size();
+		const double D2 = Rel.SizeSquared();
+		if (D2 > FMath::Square(FMath::Max((E.PDRange + E.Radius) * 1.35 + 350.0, E.Radius + 120.0 + Fast * 0.6) + 500.0))
+		{
+			continue;                                               // beyond everything this ship can push a craft with
+		}
+		const double D = FMath::Sqrt(D2);
 		const bool bHostile = AstraSideIdx(E.Side) == 1 - Me && Me >= 0;
 		// the envelope (its PD reach and its radius, with a margin): only ships with point defence that works have one
 		double Env = 0.0;
@@ -241,9 +246,14 @@ FVector UAstraBattleSubsystem::EnvelopeWall(const FAstraBattleShip& S, const FVe
 			continue;
 		}
 		const FVector Rel = S.Pos - E.Pos;
-		const double D = Rel.Size();
 		const double Wall = (double)E.PDRange + E.Radius + 0.75 * Turn + 250.0;
-		if (D < Wall && D > 1.0)
+		const double D2 = Rel.SizeSquared();
+		if (D2 >= Wall * Wall)
+		{
+			continue;
+		}
+		const double D = FMath::Sqrt(D2);
+		if (D > 1.0)
 		{
 			const FVector Out = Rel / D;
 			const double In = FVector::DotProduct(V, Out);
@@ -396,24 +406,31 @@ void UAstraBattleSubsystem::ThinkCraft(FAstraBattleShip& S, float DtT)
 	{
 		FAstraBattleShip* Best = nullptr;
 		double BestD = Reach * Reach;
-		Grid.Query(Around, Reach, [&](int32 J)
+		auto Consider = [&](int32 J)
 		{
 			FAstraBattleShip& O = Ships[J];
 			if (!O.bCraft || !O.bAlive || AstraSideIdx(O.Side) != 1 - Me)
 			{
 				return;
 			}
-			if (!bAny && !Knows(Me, O))
-			{
-				return;
-			}
 			const double D = FVector::DistSquared(O.Pos, Around);
-			if (D < BestD)
+			if (D < BestD && (bAny || Knows(Me, O)))
 			{
 				BestD = D;
 				Best = &O;
 			}
-		});
+		};
+		if (Reach > 9.0 * WarKm && Me >= 0)
+		{
+			for (const int32 J : CraftBySide[1 - Me])      // (a reach of tens of km would touch thousands of grid cells; the enemy's craft are a few hundred)
+			{
+				Consider(J);
+			}
+		}
+		else
+		{
+			Grid.Query(Around, Reach, Consider);
+		}
 		return Best;
 	};
 	FVector Goal = S.Pos + S.Att.GetForwardVector() * 1000.0;

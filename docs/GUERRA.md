@@ -245,13 +245,14 @@ Un gruppo è un pugno di navi con un capo, una formazione (linea, cuneo, colonna
   fissa, chi **chiude** vince, e il vantaggio cresce fino a 2–3 km; un gruppo che tiene il massimo della portata lascia
   indietro metà del cuneo e perde da 0,5 a 2 navi su 6. Per questo la distanza è la leva principale del combattimento e la
   mente può sceglierla (`range_km` in `group_order`, §6.2), mentre il riflesso di riserva resta a una distanza media.
-- **Il bersaglio** (fuoco concentrato, modo 3): per ogni nemico noto, la *minaccia che toglie dal campo per unità di sforzo* =
-  (il danno al secondo che può fare a noi) × (il danno al secondo che le nostre navi possono fargli **adesso**, con la portata
-  vera) ÷ (scafo + scudo della faccia che ci mostra). Ogni nave segue il bersaglio del gruppo se lo raggiunge, altrimenti
-  spara al più vicino che raggiunge; un incrociatore corazzato non vale più del cacciatorpediniere accanto, che muore quattro
-  volte più in fretta e fa la metà del male. (Il banco non distingue questa regola dal "ognuno il più vicino" nei combattimenti
-  da 3 + 3 e 6 + 6 navi: dentro ±0,3 navi; la regola iniziale, per valore di classe, perdeva contro entrambe quando la guida
-  era difettosa. Resta perché serve a un gruppo che sceglie fra bersagli molto diversi, e perché la mente ha `attack`.)
+- **Il bersaglio** (fuoco concentrato, modo 1): per ogni nemico noto un punteggio = il valore della sua classe (il capo del
+  gruppo nemico ×1,15: incrociatori e corazzate valgono più dei cacciatorpediniere) × (0,5 + quanto è battuto: scafo e scudo della
+  faccia che ci mostra) × quanto il gruppo lo raggiunge; con una tenuta del 40 % sul bersaglio in corso (niente tentennamenti),
+  un bonus se mira a ciò che proteggiamo e un malus se fugge. Ogni nave segue il bersaglio del gruppo se lo raggiunge, altrimenti
+  spara al più vicino che raggiunge. **Il banco** (§7.3): la regola batte il "ognuno il più vicino" di 0,6–1,0 navi in
+  combattimenti da 3 + 3 e da 6 + 6, e la regola "minaccia tolta per unità di sforzo" (modi 2 e 3: i cacciatorpediniere muoiono
+  prima, ma senza tener conto della geometria del cuneo) di 0,6–2,3; con due gruppi da 3 il modo 2 fa meglio di 0,8 (un solo caso su
+  quattro). Quel che conta è **concentrare**: spezzare il fuoco costa da una a due navi su sei.
 - **Salve coordinate di missili.** Le navi tengono le celle finché ce ne sono abbastanza per saturare la difesa di punto del
   bersaglio (3 + 1,6 per canale), poi tutte insieme: ognuna parte al suo tempo di volo prima dell'istante comune
   (*time on target*). Una nave a meno di 0,6 s dall'essere pronta è tenuta anch'essa (il pensiero del gruppo gira ogni 0,4 s).
@@ -307,7 +308,7 @@ primo), `sym_medium` (2 + 4), `sym_two` (due gruppi da 3), `sym_air` (incrociato
 |---|---|---|
 | `shield_scale`, `armour_scale`, `struct_scale` | 1, 1, 1,2 | scale globali di scudi, corazza e struttura |
 | `hit_scatter`, `fire_dps`, `breakup_p1`, `breakup_p2` | 0,5, 0,0015, 0,25, 0,7 | dispersione dei colpi lungo lo scafo (× 1,3 della semilunghezza); incendio (quota della struttura al secondo); probabilità di rottura |
-| `focus_a/m` | 3 | bersaglio: 0 nessuna concentrazione (ognuno il più vicino), 1 regola iniziale (valore della classe e quanto è battuto), 2 minaccia/sforzo con margine di avvicinamento, **3 minaccia/sforzo con la portata di adesso** |
+| `focus_a/m` | 1 | bersaglio: 0 nessuna concentrazione (ognuno il più vicino), **1 valore della classe e quanto è battuto**, 2 minaccia tolta per unità di sforzo (con margine di avvicinamento), 3 lo stesso con la portata di adesso |
 | `flank_a/m`, `flank_ratio` | 0, 0,9 | aggiramento automatico (spento); rapporto di forza da cui scatta |
 | `saturate_a/m` | 1 | salve coordinate di missili |
 | `rotate_a/m` | 1 | rotazione delle navi battute |
@@ -486,3 +487,185 @@ o ciò che uno scenario ha messo sulla nave).
    `RepairPlayerSystems(Amount)` quando lavorano.
 4. **Bilanciamento**: col nuovo modello l'apertura è una battaglia pari (vedi §7); la difficoltà va tarata sul gioco vero
    (con le menti e con il Capitano), non sul banco.
+
+## 7. Risultati del banco
+
+*Misurati il 30/9 e l'1/10/2026 col banco senza grafica (`tools/war.py`, commandlet `AstraWarSim`, `-nullrhi`), sul ramo del
+modulo GUERRA con main unito (le navi v3 comprese), all'ultimo commit di questa sezione. Ogni riga dice quanti semi e con che
+scarto: "vantaggio dei superstiti" = navi da guerra vive (o uscite dal teatro) di ASTRA meno quelle del Mandato, media sui semi ±
+errore standard; sotto 2σ una differenza non è una prova. "(a/m/p)" = semi in cui ASTRA era avanti / il Mandato avanti / pari. Tutto
+si rifà coi comandi del §5.8 (i semi sono 1…N e le due parti dello stesso scenario vedono gli stessi numeri casuali: un confronto
+cambia una cosa sola). Le misure di tempo sono prese su un Mac condiviso con altri lavori: dove variano, si dice.*
+
+### 7.1 L'apertura: prima e dopo (12 semi, `tools/war.py batch --seeds 12`, 900 s dal contatto)
+
+Stessa battaglia d'apertura (Aquila + Praetorian + Vigilant contro Acheron + tre Styx + Lethe, otto caccia contro sei Harpy),
+nessun ordine del Capitano, nessuna mente. "Prima" è la simulazione a valori unici e IA vecchia (commit b6cfce2: solo la
+strumentazione del banco); "dopo" è il ramo a questo commit.
+
+| | prima | dopo |
+|---|---|---|
+| esito per seme (ASTRA avanti / Mandato avanti / pari) | 0 / 12 / 0 | **1 / 7 / 4** |
+| vantaggio dei superstiti | −2,08 ± 0,28 | **-0,83 ± 0,28** |
+| scorta ASTRA viva (su 2) | 0,3 ± 0,7 | **2,0 ± 0,0** |
+| navi del Mandato vive (su 5) | 0,1 ± 0,3 | 2,6 ± 0,9 |
+| scafo dell'Aquila a fine prova (media) | 44 % ± 43 | **68,0 % ± 11,3** |
+| caccia ASTRA persi (su 8) | 6,6 ± 2,2 (5,4 alla difesa di punto) | **0,0** |
+| costo per tick della battaglia | 0,008 ms | 0,024 ms |
+
+**La partenza era bimodale**: in 4 semi su 12 l'Aquila usciva intatta (96–100 %), negli altri era distrutta o a meno del 10 % (la
+scorta ASTRA moriva in 10 semi su 12), quindi la media dello scafo diceva poco. "Dopo" le battaglie si assomigliano e sono
+**pari**: senza che il Capitano faccia nulla, l'Aquila resta in media a due terzi di scafo, la scorta sopravvive e il Mandato perde due
+navi su cinque. Con l'ordine `attack` sull'Aquila a tutti i gruppi del Mandato dal secondo 5 (12 semi): scafo dell'Aquila **79,2 % ± 13,2**, scorta ASTRA viva 1,9 su 2, Mandato 2,6 su 5 (vantaggio dei superstiti -0,83 ± 0,23).
+
+I dati dal vivo del lead (un gruppo d'attacco che distrugge l'Aquila 5 minuti dopo l'arrivo, con la mente appesa per 3) non si
+riproducono nel banco. Quel che il banco mostra è dove l'Aquila è fragile: la **poppa**. Il reattore dell'Aquila sta nella sezione
+di poppa: due Acheron a 5 km la mettono fuori in 18 s da poppa contro 51–58 s dalle altre facce (§7.4). Una nave che mostra la poppa
+al nemico senza che il timoniere la giri o il tattico sposti gli scudi è il suo punto debole; i valori (`facing_armour`,
+`shield_alloc`, `systems` dell'`aquila` in `data/war/classes.json`) vanno tarati sul gioco vero, con le menti e il Capitano.
+
+### 7.2 Simmetria (nessuna parte deve vincere sempre)
+
+Le stesse forze a parti invertite (il Mandato è la parte ASTRA ruotata di mezzo giro); il vantaggio dei superstiti deve essere
+zero entro l'errore. Con l'ordine di creazione delle navi invertito (`*_rev`) un difetto che seguisse quell'ordine cambierebbe di segno.
+
+| scenario | semi | ASTRA avanti / Mandato avanti / pari | vantaggio dei superstiti | differenza dei velivoli persi |
+|---|---|---|---|---|
+| sym_small: 1 Acheron + 2 Styx | 96 | 47 / 43 / 6 | +0,22 ± 0,17 | +0,0 ± 0,0 |
+| sym_small_rev (Mandato creato per primo) | 96 | 47 / 48 / 1 | +0,07 ± 0,17 | +0,0 ± 0,0 |
+| sym_medium: 2 Acheron + 4 Styx | 96 | 44 / 51 / 1 | -0,29 ± 0,24 | +0,0 ± 0,0 |
+| sym_two: due gruppi da 3 | 96 | 51 / 45 / 0 | +0,12 ± 0,22 | +0,0 ± 0,0 |
+| sym_two_rev (Mandato per primo) | 96 | 44 / 51 / 1 | -0,09 ± 0,22 | +0,0 ± 0,0 |
+| sym_air: portaerei con 8 caccia e 6 bombardieri | 48 | 22 / 22 / 4 | -0,12 ± 0,25 | +0,0 ± 0,5 |
+| sym_air_rev (Mandato per primo) | 48 | 21 / 22 / 5 | -0,21 ± 0,27 | +0,3 ± 0,6 |
+| sym_fighters: soli caccia | 48 | 0 / 0 / 48 | +0,00 ± 0,00 | -0,2 ± 0,7 |
+
+Tutti zero entro 2σ, in entrambi gli ordini di creazione: nessun lato vince sempre e nessun difetto segue l'ordine. (I soli caccia
+non affondano navi: tutti pari; le perdite di velivoli sono uguali.)
+
+### 7.3 Cosa vale ogni comportamento (A/B: spento o cambiato per la sola parte ASTRA)
+
+Stesso scenario, il comportamento spento (o cambiato) per ASTRA contro il controllo dove entrambe hanno tutto: un numero negativo
+= senza quel comportamento ASTRA va peggio (il comportamento vale). 96 semi per i simmetrici, 48 per i disuguali.
+
+| | sym_small (3 + 3) | sym_medium (6 + 6) | sym_two (2 × 3) | asym_3to2 | asym_2to1 |
+|---|---|---|---|---|---|
+| controllo: tutto acceso per entrambe (vantaggio dei superstiti) | +0,22 ± 0,17 (47/43/6) | -0,29 ± 0,24 (44/51/1) | +0,12 ± 0,22 (51/45/0) | +5,04 ± 0,10 (48/0/0) | +5,88 ± 0,05 (48/0/0) |
+| aggiramento automatico **acceso** (spento per default) | +0,22 ± 0,17 (47/43/6) | -0,79 ± 0,22 (33/62/1) | +0,12 ± 0,22 (51/45/0) | +5,10 ± 0,11 (48/0/0) | +5,85 ± 0,05 (48/0/0) |
+| fuoco: ognuno il più vicino, nessuna concentrazione | -0,64 ± 0,19 (28/68/0) | -0,99 ± 0,26 (31/62/3) | -1,05 ± 0,29 (30/65/1) | +5,00 ± 0,11 (48/0/0) | +5,92 ± 0,04 (48/0/0) |
+| fuoco: minaccia/sforzo con margine di avvicinamento | -0,60 ± 0,16 (23/62/11) | -2,32 ± 0,14 (1/90/5) | +0,79 ± 0,29 (48/40/8) | - | - |
+| fuoco: minaccia/sforzo con la portata di adesso | -0,74 ± 0,14 (13/64/19) | -1,82 ± 0,15 (3/88/5) | +0,23 ± 0,29 (43/49/4) | - | - |
+| salve coordinate di missili **spente** | +0,07 ± 0,15 (45/49/2) | -1,36 ± 0,22 (25/71/0) | -0,39 ± 0,20 (40/54/2) | - | - |
+| rotazione delle navi battute **spenta** | -0,02 ± 0,17 (46/41/9) | -0,82 ± 0,22 (33/62/1) | -0,44 ± 0,21 (38/56/2) | +5,08 ± 0,10 (48/0/0) | +5,88 ± 0,05 (48/0/0) |
+| ritirata automatica **spenta** | +0,03 ± 0,19 (48/45/3) | -0,49 ± 0,25 (45/50/1) | -0,22 ± 0,26 (52/43/1) | +5,04 ± 0,10 (48/0/0) | +5,88 ± 0,05 (48/0/0) |
+| distanza d'ingaggio × 0,7 | +0,02 ± 0,16 (45/49/2) | +0,17 ± 0,23 (51/43/2) | +1,28 ± 0,16 (74/20/2) | - | - |
+| distanza d'ingaggio × 1,25 (5 km) | +0,42 ± 0,17 (58/34/4) | +0,10 ± 0,23 (50/44/2) | -2,15 ± 0,13 (7/88/1) | - | - |
+
+Lettura:
+
+- **Concentrare il fuoco** (la regola per valore e vulnerabilità contro "ognuno spara al più vicino"): vale da 0,6 a 1,0 navi in
+  tutti e tre i simmetrici (−0,64, −0,99, −1,05 senza). Le regole "minaccia per unità di sforzo" (modi 2 e 3) fanno peggio in
+  3 + 3 e 6 + 6 (da −0,6 a −2,3: scelgono i cacciatorpediniere di coda, che la prima fila non raggiunge) e meglio con due gruppi da 3
+  (+0,8 e +0,2): nessuna vince ovunque, la regola per valore è la migliore o la seconda in tutti. Con le portaerei (§7.6) il "più
+  vicino" fa meglio (+1,3): il valore di classe manda il fuoco sulla portaerei invece che sulla scorta che la copre.
+- **Salve coordinate di missili**: nulla in 3 + 3; vale 1,4 navi in 6 + 6 e 0,4 con due gruppi: serve dove c'è una difesa di
+  punto da saturare. Prima di un difetto corretto durante il lavoro (le navi vedevano le celle pronte solo dopo averle già
+  sparate, e il controllo non scattava mai) l'interruttore non cambiava nulla.
+- **Rotazione delle navi battute**: nulla in 3 + 3, vale 0,8 in 6 + 6 e 0,4 con due gruppi.
+- **Ritirata automatica** (il riflesso di un gruppo senza mente): da 0 a 0,5 navi, mai negativa.
+- **Distanza d'ingaggio**: il default (circa 4 km) è a un punto dove ×0,7 o ×1,25 non cambiano più di ±0,4 in 3 + 3 e 6 + 6; con
+  due gruppi da 3 chiudere vale +1,3 e tenere 5 km costa 2,2 navi. La storia è più netta: con la prima versione del gruppo, che teneva la
+  distanza massima della rotaia (7 km), un gruppo che chiudeva a 2,8–4 km guadagnava da 0,5 a 2 navi su 6 contro uno che teneva 7 km
+  (e poi, scendendo ancora, fino a +2,4 e +2,9 a 2,0 km contro 4): chi tiene il massimo lascia indietro metà del cuneo. La distanza è la
+  **leva principale** del combattimento: il default è una distanza media, la mente sceglie la sua (`range_km`).
+- **Aggiramento automatico**: fa peggio in 6 + 6 (−0,5 sul controllo) e uguale altrove: la nave staccata è il bersaglio di tutta la linea.
+  Spento per default; resta come ordine (`flank_left`/`flank_right`).
+- **Superiorità** (3 a 2 e 2 a 1): vinti 48 semi su 48 con 5,0 e 5,9 navi di vantaggio; nessun comportamento sposta nulla (il numero
+  conta più di tutto).
+
+### 7.4 Il duello: il modello dei danni su un bersaglio fermo
+
+Due navi ferme a 5 km sparano a un bersaglio passivo, da ciascuna faccia (6 semi). Ogni cella: danno totale incassato quando il
+bersaglio diventa relitto o muore (tempo in secondi). Riferimento: la simulazione a valori unici, scafo + scudi della classe.
+
+| 2 × tiratore → bersaglio | riferimento (scafo + scudi) | prua | poppa | babordo | tribordo | dorso | ventre |
+|---|---|---|---|---|---|---|---|
+| acheron → praetorian | 7200 | 8992 (106 s) | 6163 (72 s) | 6923 (80 s) | 7076 (80 s) | 6885 (81 s) | 6815 (78 s) |
+| acheron → acheron | 5100 | 5856 (67 s) | 4702 (54 s) | 4212 (48 s) | 4365 (52 s) | 4428 (52 s) | 4236 (50 s) |
+| acheron → aquila | 4100 | 4682 (58 s) | 2228 (18 s) | 4318 (51 s) | 4316 (54 s) | 4322 (54 s) | 4511 (54 s) |
+| styx → styx | 1800 | 1757 (47 s) | 1400 (31 s) | 1632 (39 s) | 1773 (45 s) | 1728 (47 s) | 1437 (35 s) |
+| styx → vigilant | 1700 | 1687 (44 s) | 1475 (36 s) | 1307 (29 s) | 1343 (30 s) | 1303 (28 s) | 1387 (32 s) |
+| lethe → styx | 1800 | 1778 (47 s) | 1531 (35 s) | 1687 (41 s) | 1632 (39 s) | 1531 (35 s) | 1632 (39 s) |
+
+La prua è la faccia più forte (scudi e corazza più grossi); i fianchi e il dorso valgono 0,6–0,9 del riferimento per le navi grosse e
+quasi il riferimento per le piccole; la poppa è debole per l'Aquila (reattore a poppa). I cacciatorpediniere stanno tra 0,65 e 1,0 del
+riferimento a seconda della faccia: il modello a sei facce non fa morire le navi più in fretta, le fa morire diversamente.
+
+### 7.5 La scala
+
+Quindici navi e settantacinque velivoli a parte (trenta navi capitali e centocinquanta caccia, bombardieri e droni in tutto), quattro
+gruppi per parte, 36 km di distanza, 900 s di battaglia; il doppio (60 + 300) per vedere il margine. Costo per tick della battaglia
+(10 Hz: il passo del banco è 0,1 s), media / p95 / p99 / massimo, e dove va il tempo (media in ms):
+
+| scenario e seme | navi + velivoli al massimo | media | p95 | p99 | max | conoscenza | gruppi | navi | velivoli | proiettili ed effetti |
+|---|---|---|---|---|---|---|---|---|---|---|
+| scale_30x150, seme 1 | 30 + 148 | 0,090 | 0,27 | 0,34 | 0,81 | 0,003 | 0,002 | 0,014 | **0,061** | 0,006 |
+| scale_30x150, seme 2 | 30 + 148 | 0,039 | 0,19 | 0,24 | 0,40 | 0,001 | 0,001 | 0,009 | 0,021 | 0,005 |
+| scale_30x150, seme 3 | 30 + 148 | 0,051 | 0,20 | 0,25 | 0,41 | 0,002 | 0,001 | 0,009 | 0,033 | 0,004 |
+| scale_30x150, 3600 s | 30 + 148 | 0,038 | 0,16 | 0,33 | 0,56 | 0,002 | 0,001 | 0,009 | 0,023 | 0,002 |
+| scale_60x300, seme 2 | 60 + 296 | 0,278 | 1,03 | 1,29 | 1,64 | 0,009 | 0,006 | 0,046 | **0,182** | 0,029 |
+| scale_60x300, seme 1 | 60 + 296 | 0,642 | 2,4 | 3,2 | 8,8 | 0,021 | 0,022 | 0,109 | 0,389 | 0,085 |
+
+**Obiettivo del lead: 1 ms per frame con 30 navi e 150 velivoli. Misurato: da 0,04 a 0,09 ms di media, 0,2–0,3 ms al 95° e al 99°
+percentile, 0,4–0,8 ms al massimo**: un decimo del budget, e il picco resta sotto 1 ms. Col doppio di tutto (60 + 300, fuori dall'obiettivo)
+la media è 0,3–0,6 ms e il 95° percentile 1–2,4 ms, con picchi rari (fino a 8,8 ms in un tick, tutto nella voce dei velivoli, su un Mac
+condiviso con altri lavori: le misure di tempo variano da una prova all'altra). I velivoli sono la voce più grossa (circa mezzo
+microsecondo ciascuno al tick). **Ottimizzazioni fatte con questo banco** (campionatore di macOS sul commandlet, risultati
+identici seme per seme prima e dopo): la ricerca dei bersagli dei velivoli (una portata di 30 km toccava migliaia di celle della griglia: ora
+scorre la lista dei velivoli nemici, che sono poche centinaia), la domanda "il Mandato ha cessato il fuoco" (una passata sulle navi per ogni
+velivolo a ogni tick: ora una volta per tick), la conoscenza (le portate dei sensori calcolate una volta per osservatore) e la lista dei
+contatti dell'Aquila (`GetContacts`, letta da molti schermi a ogni frame: classe ed etichetta restano in memoria finché non cambia ciò che si sa). Prima: 60 + 300
+seme 1 aveva media 0,94 ms, p95 3,4, max 6,8; 30 + 150 seme 2 media 0,13, p95 0,57, max 1,7. In `perf.phases` del record il
+tempo di ogni tick è diviso in conoscenza, gruppi, squadriglie, navi, velivoli, proiettili. Il lavoro di scala vero (livelli di dettaglio per ciò che è lontano
+dall'Aquila, disegno a istanze) è F2.3: da lì in poi la voce da guardare è quella dei velivoli.
+
+### 7.6 I velivoli
+
+`sym_air`: un incrociatore con otto caccia e sei bombardieri e due cacciatorpediniere per parte (48 semi). Cosa vale il muro d'inviluppo
+della difesa di punto e altre scelte:
+
+| | vantaggio dei superstiti (a/m/p) | velivoli persi (ASTRA meno Mandato: positivo = ASTRA ne perde meno) |
+|---|---|---|
+| controllo (tutto acceso per entrambe) | −0,12 ± 0,25 (22/22/4) | 0,0 ± 0,5 |
+| muro per i caccia ma non per i bombardieri (**il default**, `wall=3`) contro nessun muro per ASTRA | −0,19 ± 0,28 (19/26/3) | **−4,1 ± 0,5** (ASTRA perde 4 velivoli in più) |
+| muro per **tutti** i velivoli, bombardieri compresi (`wall=1`) | **−2,04 ± 0,15** (2/43/3) | +4,0 ± 0,6 |
+| muro solo per i bombardieri (`wall=2`) | **−2,04 ± 0,14** (1/45/2) | +1,2 ± 0,6 |
+| fuoco: ognuno il più vicino (`focus_a 0`) | **+1,29 ± 0,20** (34/4/10) | −5,1 ± 0,6 |
+| ritirata automatica spenta | −0,25 ± 0,28 (22/21/5) | 0,0 ± 0,5 |
+
+I bombardieri **non devono rispettare** il muro: lo sgancio dei siluri è a 4 km, il muro sta a 3–3,4 km, ma la correzione che li tiene fuori gli
+impedisce di allinearsi in tempo e non sganciano (−2 navi). I caccia e i droni sì: senza muro perdono quattro velivoli in più per lo stesso
+risultato in navi. Perdite tipiche in un duello di portaerei: da 10 a 12 velivoli su 14 per parte, quasi tutti ai cannoni dei caccia, pochissimi alla difesa
+di punto. Scenario dei soli caccia (48 semi): nessuna nave affondata, 0,2 ± 0,7 velivoli di differenza.
+
+### 7.7 Il contratto dei comandanti alla prova
+
+- **`group_order`** provato dal banco con `--at` (esempi veri nel §6.2): ordine accettato e descritto, rifiutato (parte sbagliata per chi
+  ordina, gruppo o bersaglio inesistente, ordine sconosciuto, bersaglio non visto), con `for_s` che scade, con `range_km`
+  (a 2,5 km il gruppo tiene davvero 2,5 km), con `formation` da sola, `group:"all"`.
+- **Viste** (`tools/war.py views`): da 1,2 KB (6 navi) a 4,3 KB al massimo con 15 navi per parte in 4 gruppi (3,2 KB nella prova dei rinforzi,
+  2,6 KB a fine battaglia): "pochi KB". Gli eventi arrivano coi nomi dei gruppi: ritirata, morale che cede, ricomposizione, aggiramento,
+  nave persa, rinforzi, ordine scaduto.
+- **Rinforzi del regista nell'apertura** (`director_beat` incursione a 100 s, rinforzi a 300 s, soccorso a 420 s; seme 5, 1050 s): nessun crash,
+  i gruppi nascono e vengono nominati ("Raid group T-40", "7th Fleet picket: reinforcements arriving: T-43 (vigilant), T-44 (vigilant)"), le
+  ritirate e le ricomposizioni si ripetono come gli eventi dicono; l'Aquila cade a 422 s (due gruppi nemici nuovi su un'apertura non risolta).
+- **Ordini del Capitano** (`fleet_request`, cioè la strada di prima) e `mandate_tactics` con il menu dei gruppi: provati, passano dagli
+  stessi ordini di gruppo.
+
+### 7.8 Cosa resta
+
+- Il giudizio vero (chi attacca chi, quando ritirarsi, a che distanza combattere, se aggirare) è delle menti: il banco non le ha, misura i
+  riflessi e gli strumenti. Quando le menti sono cablate (§6.8) va rifatto il bilanciamento dell'apertura con loro e col Capitano.
+- La poppa debole dell'Aquila e la forza dell'apertura (pari, senza il Capitano) sono valori di `data/war/classes.json`.
+- Il costo dei velivoli è la prima voce se si vuole il doppio: la separazione fra velivoli e la ricerca dei bersagli si possono rendere
+  più radi per i lontani dall'Aquila (F2.3).

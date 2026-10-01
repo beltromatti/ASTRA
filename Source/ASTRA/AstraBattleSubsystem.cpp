@@ -356,6 +356,10 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		explicit FTickTimer(FAstraWarStats& InS) : S(InS) {}
 		~FTickTimer() { S.NoteTick((FPlatformTime::Seconds() - T0) * 1000.0); }
 	} TickTimer(Stats);
+	for (double& Ph : Stats.PhaseNow)
+	{
+		Ph = 0.0;
+	}
 	Time += Dt;
 	if (Time - Stats.WinStart >= 10.f)
 	{
@@ -469,18 +473,28 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		CompactT = 10.f;
 		CompactShips();
 	}
+	double PhaseMark = FPlatformTime::Seconds();
+	auto EndPhase = [this, &PhaseMark](int32 P)
+	{
+		const double Now = FPlatformTime::Seconds();
+		Stats.PhaseNow[P] += (Now - PhaseMark) * 1000.0;
+		PhaseMark = Now;
+	};
 	BuildGrid();
 	if ((KnowledgeT -= Dt) <= 0.f)
 	{
 		KnowledgeT = 0.25f;
 		TickKnowledge();
 	}
+	EndPhase(0);
 	TickGroups(Dt);
+	EndPhase(1);
 	TickPlayer(Dt);
 	TickGateRun(Dt);
 	TickPOIs(Dt);
 	TickScenario(Dt);
 	TickSquadrons(Dt);
+	EndPhase(2);
 	for (FAstraBattleShip& S : Ships)
 	{
 		S.bJammed = false;   // EW drones set it again this tick
@@ -499,9 +513,12 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		}
 		if (S.bCraft)
 		{
+			const double C0 = FPlatformTime::Seconds();
 			TickCraft(S, Dt);
+			Stats.PhaseNow[4] += (FPlatformTime::Seconds() - C0) * 1000.0;
 			continue;
 		}
+		const double Sh0 = FPlatformTime::Seconds();
 		if (!S.bPlayer)
 		{
 			TickAI(S, Dt);
@@ -524,7 +541,9 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 			}
 		}
 		S.ShieldFlash = FMath::Max(0.f, S.ShieldFlash - Dt * 2.5f);
+		Stats.PhaseNow[3] += (FPlatformTime::Seconds() - Sh0) * 1000.0;
 	}
+	PhaseMark = FPlatformTime::Seconds();
 	TickProjectiles(Dt);
 	TickFlashes(Dt);
 	DecoyT = FMath::Max(0.f, DecoyT - Dt);
@@ -536,6 +555,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		LastDecoyReport = Time;
 	}
 	SyncVisuals();
+	EndPhase(5);
 }
 
 float UAstraBattleSubsystem::PlayerSignatureKm() const
@@ -3321,7 +3341,7 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 // ------------------------------------------------------------------------------------------------ flight groups
 bool UAstraBattleSubsystem::bMandateStandDown() const
 {
-	return Ships.ContainsByPredicate([](const FAstraBattleShip& X) { return X.bAlive && X.Side == EAstraSide::Mandate && X.bNegotiated && X.bLeader; });
+	return bStandDownCache;                       // (found once per tick, at BuildGrid: every craft asks it every tick)
 }
 
 void UAstraBattleSubsystem::AddEnemyWing(int32 CarrierIdx, int32 Count, float Delay)

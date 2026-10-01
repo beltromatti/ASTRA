@@ -150,6 +150,18 @@ TSharedRef<FJsonObject> FAstraWarStats::ToJson() const
 		P->SetNumberField(TEXT("ms_p95"), Round(Pct(0.95), 1000.0));
 		P->SetNumberField(TEXT("ms_p99"), Round(Pct(0.99), 1000.0));
 	}
+	{
+		static const TCHAR* const Names[NumPhases] = {TEXT("knowledge_grid"), TEXT("groups"), TEXT("squadrons"), TEXT("ships"), TEXT("craft"), TEXT("projectiles_effects")};
+		TSharedRef<FJsonObject> Ph = MakeShared<FJsonObject>();
+		for (int32 p = 0; p < NumPhases; ++p)
+		{
+			TSharedRef<FJsonObject> One = MakeShared<FJsonObject>();
+			One->SetNumberField(TEXT("ms_avg"), Ticks ? Round(PhaseSum[p] / Ticks, 1000.0) : 0.0);
+			One->SetNumberField(TEXT("ms_max"), Round(PhaseMax[p], 1000.0));
+			Ph->SetObjectField(Names[p], One);
+		}
+		P->SetObjectField(TEXT("phases"), Ph);
+	}
 	P->SetNumberField(TEXT("peak_ships"), PeakShips);
 	P->SetNumberField(TEXT("peak_craft"), PeakCraft);
 	P->SetNumberField(TEXT("peak_projectiles"), PeakProjectiles);

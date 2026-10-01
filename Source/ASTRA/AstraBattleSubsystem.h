@@ -123,6 +123,9 @@ struct FAstraBattleShip
 	bool bSalvo = false;                 // empty the cells at the next chance (all together: saturate point defence)
 	bool bConserve = false;              // fire missiles sparingly
 
+	// what the plot's contact list says of it, kept while the state that decides it is the same (a list of hundreds is read every frame)
+	mutable FString CvLabel, CvClass;
+	mutable uint8 CvKey = 255;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> ShieldBubble = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> DriveFlare = nullptr;   // engine plume, kept visible at long range
@@ -773,6 +776,8 @@ private:
 	int32 NextGroupId = 1, NextFlightId = 1;
 	FAstraWarGrid Grid;
 	TArray<int32> CapIdx;               // this tick: the alive warships (indices in Ships)
+	TArray<int32> CraftBySide[2];       // this tick: the alive craft of each side (a search over a long reach goes down this list, not the grid)
+	bool bStandDownCache = false;       // this tick: the Mandate leader has agreed to terms (bMandateStandDown, asked by every craft)
 	TArray<int32> HulkIdx;              // and the hulks that are obstacles (indices in Wrecks)
 	TMap<int32, int32> IdIndex;         // ship id -> index in Ships
 	float KnowledgeT = 0.f, GroupAssignT = 0.f, CompactT = 0.f;

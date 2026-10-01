@@ -56,6 +56,9 @@ void UAstraBattleSubsystem::BuildGrid()
 	Grid.Reset(Ships.Num());
 	CapIdx.Reset();
 	HulkIdx.Reset();
+	CraftBySide[0].Reset();
+	CraftBySide[1].Reset();
+	bStandDownCache = false;
 	for (int32 i = 0; i < Ships.Num(); ++i)
 	{
 		const FAstraBattleShip& S = Ships[i];
@@ -65,6 +68,11 @@ void UAstraBattleSubsystem::BuildGrid()
 			if (!S.bCraft)
 			{
 				CapIdx.Add(i);
+				bStandDownCache |= S.Side == EAstraSide::Mandate && S.bNegotiated && S.bLeader;
+			}
+			else if (const int32 Sd = AstraSideIdx(S.Side); Sd >= 0)
+			{
+				CraftBySide[Sd].Add(i);
 			}
 		}
 	}
@@ -107,6 +115,19 @@ double UAstraBattleSubsystem::SensorReachM(const FAstraBattleShip& O) const
 
 void UAstraBattleSubsystem::TickKnowledge()
 {
+	// each side's observers, once: where they are and how far they see (a pass over every target against every observer would
+	// compute each reach again and again)
+	struct FObserver { FVector Pos; double Reach; };
+	TArray<FObserver, TInlineAllocator<256>> Observers[2];
+	for (const FAstraBattleShip& O : Ships)
+	{
+		const int32 Sd = AstraSideIdx(O.Side);
+		if (Sd < 0 || !O.bAlive || O.bGhost || O.bDerelict || O.bDisabled || O.bPlayer)
+		{
+			continue;
+		}
+		Observers[Sd].Add({O.Pos, SensorReachM(O)});
+	}
 	// each side's observers against the other's ships
 	for (FAstraBattleShip& T : Ships)
 	{
@@ -140,13 +161,9 @@ void UAstraBattleSubsystem::TickKnowledge()
 		}
 		const float Sig = SignatureOf(T);
 		bool bSeen = false;
-		for (const FAstraBattleShip& O : Ships)
+		for (const FObserver& O : Observers[Them])
 		{
-			if (!O.bAlive || O.bGhost || O.bDerelict || O.bDisabled || O.bPlayer || AstraSideIdx(O.Side) != Them)
-			{
-				continue;
-			}
-			const double Reach = SensorReachM(O) * Sig;
+			const double Reach = O.Reach * Sig;
 			if (FVector::DistSquared(O.Pos, T.Pos) < Reach * Reach)
 			{
 				bSeen = true;

@@ -41,13 +41,21 @@ void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 		V.bFiringAtUs = S.Side == EAstraSide::Mandate && !S.bHoldFire && !S.bDisabled && (S.TargetId == P.Id || S.FireTarget == P.Id);
 		V.RadiusM = S.Radius;
 		const bool bFirm = S.Track >= 2;
-		V.Class = !bUnknown ? S.Class : FString();
-		FString Head, Short;
-		if (!V.Class.Split(TEXT(", "), &Head, &Short))
+		// the class and the label change only when what is known of it does (a list of hundreds is read every frame: the strings are kept)
+		const uint8 Key = (bUnknown ? 1 : 0) | (S.bIdentified ? 2 : 0);
+		if (S.CvKey != Key)
 		{
-			Short = V.Class;             // "Kharon Mandate cruiser, Acheron class" -> "Acheron class"
+			S.CvKey = Key;
+			S.CvClass = !bUnknown ? S.Class : FString();
+			FString Head, Short;
+			if (!S.CvClass.Split(TEXT(", "), &Head, &Short))
+			{
+				Short = S.CvClass;       // "Kharon Mandate cruiser, Acheron class" -> "Acheron class"
+			}
+			S.CvLabel = S.bIdentified ? S.Name : (!S.CvClass.IsEmpty() ? FString::Printf(TEXT("%s (%s)"), *S.ContactId, *Short) : S.ContactId);
 		}
-		V.Label = S.bIdentified ? S.Name : (!V.Class.IsEmpty() ? FString::Printf(TEXT("%s (%s)"), *S.ContactId, *Short) : S.ContactId);
+		V.Class = S.CvClass;
+		V.Label = S.CvLabel;
 		V.BearingDeg = BearingDeg(P.Pos, S.Pos);
 		V.MarkDeg = MarkDeg(P.Pos, S.Pos);
 		if (bFirm)

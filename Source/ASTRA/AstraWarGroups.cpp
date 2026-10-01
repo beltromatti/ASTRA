@@ -203,7 +203,7 @@ void UAstraBattleSubsystem::ThinkGroup(FAstraBattleGroup& G, float DtT)
 	static AstraWar::FTuneVar KRotate[2] = {AstraWar::FTuneVar(TEXT("rotate_a"), 1.f), AstraWar::FTuneVar(TEXT("rotate_m"), 1.f)};
 	// focus_a / focus_m: 0 no concentration of fire (each ship the nearest it can hit), 1 the first scored rule (class value and how battered),
 	// 2 the threat removed per unit of effort to kill (the default)
-	static AstraWar::FTuneVar KFocus[2] = {AstraWar::FTuneVar(TEXT("focus_a"), 3.f), AstraWar::FTuneVar(TEXT("focus_m"), 3.f)};
+	static AstraWar::FTuneVar KFocus[2] = {AstraWar::FTuneVar(TEXT("focus_a"), 1.f), AstraWar::FTuneVar(TEXT("focus_m"), 1.f)};
 	static AstraWar::FTuneVar KFlankRatio(TEXT("flank_ratio"), 0.9f);      // the strength ratio (ours over theirs) from which the group flanks by itself
 	static AstraWar::FTuneVar KRange[2] = {AstraWar::FTuneVar(TEXT("range_ai_a"), 1.f), AstraWar::FTuneVar(TEXT("range_ai_m"), 1.f)};
 	// --- who is in it and where
