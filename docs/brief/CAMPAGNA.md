@@ -1,60 +1,44 @@
-# Brief CAMPAGNA (F2.6, del lead): la guerra della campagna a scala di flotte
+# Brief CAMPAGNA (F2.6, del lead): la guerra della March, a strati
 
-Le parole dell'utente: «la guerra deve essere più grande e di strategia e lunga: non è possibile che io non abbia mai visto la maggior
-parte delle navi nemiche e che a caso mi dicano distrutta una, distrutta l'altra… guerra più grande, spazio più popolato, movimenti di navi
-enormi più lenti, mastodontici e cinematici, caccia e navi più piccole più eleganti e più numerosi che vi scorrazzano in mezzo… tempi di
-guerra più lunghi e tattici ma mai noia: dobbiamo trovare sempre da fare per il Capitano, una guerra dove conta l'intelligenza e mosse
-rapide e ben calibrate come una partita di scacchi blitz, ma con durata di ore… una campagna lunga ore, macrostrategie e sottostrategie,
-divisione in sottosquadre, tattiche di gruppo reali… più peso alle decisioni del Capitano e più strumenti… un regista onnisciente che non si
-vede, tira le fila e fa andare la guerra fino alla conclusione senza spostare le sorti in favore di qualcuno.» Visione, non elenco: decidi tu
-ciò che è meglio per ASTRA.
+Le parole dell'utente: «la guerra deve essere più grande e di strategia e lunga… guerra più grande, spazio più popolato… tempi di guerra
+più lunghi e tattici ma mai noia: dobbiamo trovare sempre da fare per il Capitano, una guerra dove conta l'intelligenza e mosse rapide e
+ben calibrate come una partita di scacchi blitz, ma con durata di ore… una campagna lunga ore, macrostrategie e sottostrategie, divisione
+in sottosquadre, tattiche di gruppo reali… più peso alle decisioni del Capitano e più strumenti… un regista onnisciente che non si vede,
+tira le fila e fa andare la guerra fino alla conclusione senza spostare le sorti in favore di qualcuno.» Visione, non elenco: decidi tu ciò
+che è meglio per ASTRA.
 
 LEGGI: CLAUDE.md; ARCHITETTURA §1bis (prompt, contesto e strumenti veri; il codice per le regole del mondo; niente filtri sulle parole né
 numeri truccati) e §6; PIANO §3 (F2); **GUERRA.md tutto** (§5 com'è fatta, §6 il contratto dei comandanti, §7 il banco, §8 le menti e il
-regista v2); SCALA.md (cosa regge il disegno: `scale_30x150` a 60 fps dalla plancia, `fleet_battle` con 71 navi e 137 velivoli); VOLO.md
-(la rete di volo); DISTRUZIONE.md (i danni interni dell'Aquila); BIBBIA (il teatro di Aurelia, la March, la 7th Fleet, il Mandato).
+regista v2, **§9 la guerra a scala di flotte**); SCALA.md; VOLO.md; DISTRUZIONE.md; BIBBIA (il teatro di Aurelia, la March, la 7th Fleet, il
+Mandato); `mind/astra_mind/war.py` (la mappa della March: sistemi, padroni, minacce, collegamenti).
 
-## Fatto dal lead (2/10 pomeriggio, GUERRA.md §9)
-Le forze in gruppi di battaglia nei beat (fino a 40 navi), il regista a scala di flotte, i fili d'apertura, l'apertura che cresce
-(avanguardia dal Gate e gruppo Constance), la retro-spinta e la distanza tenuta, lo schermo che stacca sulle forze in arrivo. **Resta per chi
-prende il modulo**: il punto 1 (la guerra che va avanti dove l'Aquila non è: luoghi, fronti, battaglie lontane con esiti veri), il punto 3 sulla
-struttura lunga (ore di campagna, tregue utili), il punto 4 (il Capitano a scala di flotta: cosa manca alla plancia per comandarla) e la misura
-del costo su una partita lunga.
+## Fatto dal lead (2/10, GUERRA.md §9)
+La battaglia dove sta l'Aquila è a scala di flotta: i beat portano forze in gruppi di battaglia (fino a 40 navi, ogni comandante una mente e
+una voce), il regista ragiona a scala di flotte, l'apertura cresce in una battaglia di flotta (l'avanguardia dal Gate, il gruppo Constance), il
+timone tiene la distanza con la retro-spinta, lo schermo stacca sulle forze che arrivano. Le menti di guerra comandano tre gruppi per parte a
+1–2 m$ a decisione (~0,3 $/ora una partita intera).
 
-## Dove siamo (2/10 mattina)
-- Il motore regge la scala (SCALA), le menti di guerra pensano per gruppi con la catena di comando e costano poco (0,02–0,17 $/ora
-  nell'apertura), il regista v2 sceglie i beat senza atti leggendo il polso della guerra.
-- Ma la campagna è piccola: l'apertura scritta in `AstraBattleSubsystem::TickScenario` (Aquila, Praetorian, Vigilant, il mercantile;
-  il Lethe, poi a 170 s l'Acheron con tre Styx) e il regista che **nel prompt** dimensiona le incursioni a 1–4 navi, i rinforzi a 1–2
-  cacciatorpediniere, la battaglia decisiva a 4–8 navi (`director.py` ~181), con tagli nel codice (`[:8]`, `[:3]`, `[:2]`).
-- Il lead l'ha giocata il 2/10: l'equipaggio è pronto e veloce, ma la battaglia si riduce a un incrocio di sei navi e a un inseguimento.
-
-## Cosa costruire
-1. **La guerra di Aurelia come guerra di flotte.** La 7th Fleet è una flotta vera nel sistema (gruppi di battaglia con i loro capitani e
-   le loro menti, in posti che hanno un senso: il Janus Gate e la Keeper Station, l'orbita di New Ravenna, l'Arsenale, le raffinerie di
-   Tiberius) e il Mandato arriva con le sue flotte (ammiragli, gruppi, portaerei con stormi). I luoghi contano: chi li tiene, cosa
-   difendono, cosa costa perderli. La guerra **va avanti anche dove l'Aquila non è** (gli scontri lontani risolti dalla stessa simulazione,
-   a risoluzione più bassa, con esiti veri che il Capitano sente sulla rete e vede sul tavolo).
-2. **L'apertura che cresce.** L'aggancio di oggi resta un buon inizio (un contatto freddo, il mercantile, un gruppo d'attacco), ma la
-   battaglia deve allargarsi a una battaglia di flotte nel giro di minuti, con più fronti e scelte vere per il Capitano (dove portare
-   l'Aquila, chi coprire, dove lanciare lo stormo, quando ritirarsi), e durare a lungo senza vuoti.
-3. **Il regista a scala.** Incursioni, rinforzi e battaglie decisive dimensionati per la scala che il motore regge (gruppi interi,
-   portaerei con stormi, decine di navi nelle battaglie grandi), con il ritmo giusto: lunghe ore di campagna con battaglie, tregue utili
-   (riparazioni, rifornimenti, decisioni di schieramento, informazioni da raccogliere) e mai noia. Sempre senza truccare: ciò che arriva in
-   una battaglia in corso si vede arrivare.
-4. **Il Capitano a scala di flotta.** Gli strumenti per comandare quando è il più anziano presente (l'XO e `group_order`, le richieste a
-   Rourke, lo stormo), e le informazioni per decidere: il tavolo nella vista del settore e della flotta, lo schermo principale sulla flotta,
-   i rapporti dei gruppi alleati sulla rete. Chiedi al lead ciò che serve lato plancia.
-5. **Costo**: le menti di guerra a scala di flotta ≤ 0,3 $/ora (seggi, cadenza, cache: misura e riporta); il totale di una partita
-   resta sotto 1 $/ora.
+## Cosa costruire: lo strato strategico
+1. **La guerra va avanti dove l'Aquila non è.** Le flotte delle due parti sono entità della March (dove sono, di cosa sono fatte, rifornimenti,
+   morale, ordini: difendere, razziare, assaltare, rinforzare, ritirarsi), si muovono fra i sistemi attraverso i Gate con tempi veri, e quando
+   si incontrano senza l'Aquila combattono una battaglia risolta dalla stessa simulazione (il banco di GUERRA a bassa risoluzione, o un modello
+   tarato su di esso): esiti veri (perdite, ritirate, sistemi che cambiano padrone), che arrivano al Capitano come notizie e cambiano ciò che il
+   regista può portare. Mai numeri truccati.
+2. **Chi decide la strategia.** Gli ammiragli delle due parti (Rourke per la 7th Fleet, il comando del Mandato) decidono le mosse delle flotte
+   sulla mappa con strumenti veri e cadenza bassa (minuti), con la loro nebbia di guerra; il regista resta lo showrunner (ritmo, beat, tregue
+   utili) e legge la mappa. Il Capitano può pesare: richieste e proposte a Rourke, ordini di Fleet che arrivano all'Aquila (andare dove serve,
+   un transito, una scorta), e ciò che fa sul campo cambia la mappa (un Gate tenuto, una flotta fermata).
+3. **Ore di campagna senza noia.** Il ritmo fra battaglie, tregue con cose da fare (riparare, rifornire, decidere gli schieramenti, raccogliere
+   informazioni, i fili della storia), la battaglia decisiva che chiude un capitolo e la guerra che continua.
+4. **Il Capitano a scala di flotta in plancia.** Ciò che manca per comandare e capire una guerra grande: il tavolo nella vista del settore con le
+   flotte e i fronti, i rapporti della rete della flotta, lo schermo principale sulla flotta. Chiedi al lead ciò che serve lato plancia.
+5. **Costo**: lo strato strategico con le sue menti ≤ 0,1 $/ora (cadenza, cache); il totale di una partita sotto 1 $/ora. Misura e riporta.
 
 ## Prove
-Il banco senza grafica (`tools/war.py`, l'apertura con `--opening`, `fleet_battle`, molti semi): durata, esiti, perdite, simmetria, che
-le mosse del Capitano contino (A/B con un Capitano passivo e uno sensato); la mente con un modello finto, poi poche prove dal vivo
-(≤ 0,15 $, riportane il costo). Il lead prova nel gioco.
+Il banco senza grafica (`tools/war.py` per le battaglie; un banco nuovo della March che fa correre ore di guerra in secondi: esiti, durata,
+simmetria, che il Capitano conti), la mente con un modello finto, poi poche prove dal vivo (≤ 0,15 $, riportane il costo). Il lead prova nel gioco.
 
 ## File tuoi
-`AstraBattleSubsystem.*` per l'apertura, gli scenari e le battaglie lontane (attento: SCALA, VOLO e DISTRUZIONE ci hanno lavorato: leggi prima
-di cambiare), `data/war/*`, nella mente `director.py`, `war_minds.py`, `war.py`, `enemy.py` (e le loro prove), `tools/war.py`,
-`docs/GUERRA.md`. Non tuoi: la plancia (il lead), la nave e i suoi interni (NAVE-3, ASCENSORI, FLOTTA-VIVA), gli abbordaggi (ABBORDAGGI: la
-navetta d'assalto che aggancia è il suo evento; tu puoi farne una mossa del Mandato quando sarà unito).
+Da concordare con il lead all'avvio: lo strato strategico (nuovi file nella mente e, se serve, un banco nel commandlet di GUERRA),
+`war.py`, `director.py` (con cura: il lead ci ha appena lavorato), `docs/GUERRA.md` (§10). Non tuoi: la plancia (il lead), la nave e i suoi
+interni (NAVE-3, ASCENSORI, FLOTTA-VIVA), gli abbordaggi (ABBORDAGGI).
