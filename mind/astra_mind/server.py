@@ -121,9 +121,12 @@ EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402
 # events whose report is a warning of danger: the crew says them before any routine talk (voice priority URGENT)
-_URGENT_EVENT = _re.compile(r"missiles? inbound|rockets? inbound|hull integrity critical|containment failing|abandon ship|breach", _re.I)
+_URGENT_EVENT = _re.compile(r"inbound|torpedo|hull integrity critical|containment failing|abandon ship|breach|new contacts|is cycling|"
+                           r"coming through|the Mandate has found us", _re.I)
 URGENT_GATHER_S = 0.6          # what comes with a warning of danger joins it (a hit: its breach, fire and wounded arrive together)
 URGENT_WAIT_S = 3.0            # ... and it waits for the line being said to end, this long at most
+ROUTINE_WAIT_S = 15.0          # routine news waits for a quiet bridge this long at most: in a fleet battle the bridge is never quiet,
+                               # and news held back for minutes (the gate cycling, told five minutes late) is worse than a busy floor
 # events that are not news but a request to speak (the flight controller calls, the after-action report, the fleet net's news, a visitor
 # at the door): they are reported whenever the bridge is quiet, however long that took
 _NOT_PERISHABLE = _re.compile(r"^(flight: controller call|bridge: after-action|comms: fleet net news)|has come to the Captain's quarters in person", _re.I)
@@ -684,7 +687,7 @@ class Mind:
                             else:
                                 pending.append(nxt)
                         waited = asyncio.get_running_loop().time() - t_in
-                        if pending or (not urgent and self.voice.busy_s() <= 1.2 and not self.voice.held) or \
+                        if pending or (not urgent and ((self.voice.busy_s() <= 1.2 and not self.voice.held) or waited >= ROUTINE_WAIT_S)) or \
                                 (urgent and waited >= URGENT_GATHER_S and (self.voice.speaking_s() < 0.8 or waited >= URGENT_WAIT_S)):
                             break
                         await asyncio.sleep(0.1)
