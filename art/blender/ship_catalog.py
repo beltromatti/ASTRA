@@ -97,7 +97,9 @@ TRUNK_IN = 1.2                 # a Jefferies trunk's clear width and depth (a la
 TRUNK_NICHE = (1.45, 2.55)     # the trunk cell's ladder niche: its extent along the cell (m from the cell's aft end); the niche is 1.1 m deep, in the cell's aft wall (world -x: the cell is placed at yaw 90)
 TRUNK_RUNG_T = 1.01            # the rungs' axis: this far into the niche from the walkway's wall face (the walkway's half width, CRAWL_HW, is where the niche starts)
 TRUNK_CLIMB_GAP = 0.35         # where a climber's body centre goes: this far in front of the rungs' axis
-TRUNK_RUNG_PITCH = 0.30        # the rungs' spacing; the rails stand 0.44 m apart
+TRUNK_RUNG_PITCH = 4.0 / 14    # the rungs' spacing: 14 to a deck (the deck pitch, 4 m), so the pattern is the same on every deck and the ladder runs unbroken through the floors (0.2857 m)
+TRUNK_RUNG_Z0 = -0.13          # a deck's first rung: this far under its floor; rung k is at z0 + k * pitch
+TRUNK_RAIL_GAP = 0.44          # the rails stand this far apart
 TRUNK_HATCH = (1.0, 2.0)       # the hatch from a passage to a trunk cell
 
 # ------------------------------------------------------------------------------------------------ wayfinding (ship_signs.py builds the meshes, ship_wayfinding.py places them)

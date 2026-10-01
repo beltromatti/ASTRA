@@ -146441,10 +146441,11 @@
    ],
    "ends": {"top": {"deck": 3, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -146583,10 +146584,11 @@
    ],
    "ends": {"top": {"deck": 3, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -146725,10 +146727,11 @@
    ],
    "ends": {"top": {"deck": 3, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -146867,10 +146870,11 @@
    ],
    "ends": {"top": {"deck": 3, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -147021,10 +147025,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -147175,10 +147180,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -147329,10 +147335,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -147483,10 +147490,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -147637,10 +147645,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -147791,10 +147800,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -147945,10 +147955,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -148099,10 +148110,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -148253,10 +148265,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -148407,10 +148420,11 @@
    ],
    "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -148537,10 +148551,11 @@
    ],
    "ends": {"top": {"deck": 4, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -148667,10 +148682,11 @@
    ],
    "ends": {"top": {"deck": 4, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
    "rungs": {
-    "pitch": 0.3,
+    "pitch": 0.2857,
+    "per_deck": 14,
     "rail_gap": 0.44,
     "z0": -0.13,
-    "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   }
  ],

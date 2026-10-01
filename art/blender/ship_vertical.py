@@ -11,7 +11,7 @@ import math
 import ship_design as DS
 import ship_plan as P
 import ship_spec as SP
-from ship_catalog import CRAWL_HW, MOD, SLOT_HW, TRUNK_CLIMB_GAP, TRUNK_NICHE, TRUNK_RUNG_PITCH, TRUNK_RUNG_T
+from ship_catalog import CRAWL_HW, MOD, SLOT_HW, STAIR_RISE, TRUNK_CLIMB_GAP, TRUNK_NICHE, TRUNK_RAIL_GAP, TRUNK_RUNG_PITCH, TRUNK_RUNG_T, TRUNK_RUNG_Z0
 from ship_layout import Builder, rnd
 
 LIFT_SPEED, LIFT_ACCEL = 6.0, 2.0          # m/s and m/s²: the contract's numbers (ASCENSORI tunes them)
@@ -213,4 +213,6 @@ def _climb(B: Builder, ds: list, nodes: dict) -> dict:
                     "hole": [rnd(x - CRAWL_HW - 1.1), rnd(y - 2.0 + a), rnd(x - CRAWL_HW), rnd(y - 2.0 + c)],
                     "closed": "hatch" if d == top else "toe_plate" if d == bottom else None})
     return {"landings": lan, "ends": {"top": {"deck": top, "closed": "hatch"}, "bottom": {"deck": bottom, "closed": "toe_plate"}},
-            "rungs": {"pitch": TRUNK_RUNG_PITCH, "rail_gap": 0.44, "z0": -0.13, "note": "the first rung is 13 cm under a deck's floor and they go on every `pitch` m; the column is open (the floor has the hole `hole`) except at its two ends"}}
+            "rungs": {"pitch": rnd(TRUNK_RUNG_PITCH, 4), "per_deck": round(STAIR_RISE / TRUNK_RUNG_PITCH), "rail_gap": TRUNK_RAIL_GAP, "z0": TRUNK_RUNG_Z0,
+                      "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor "
+                              "has the hole `hole`) except at its two ends"}}
