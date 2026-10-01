@@ -1207,7 +1207,7 @@ void AAstraViewscreen::LogWhatIsInView() const
 
 void AAstraViewscreen::RebuildShowList()
 {
-	static const FName TagSky(TEXT("ASTRA.Sky"));
+	static const FName SkyTag(TEXT("ASTRA.Sky"));   // (not TagSky: AstraShipSubsystem.cpp has one at file scope, and a unity block would see both)
 	static const FName TagPlanet(TEXT("ASTRA.Planet.NewRavenna"));
 	Capture->ShowOnlyActors.Reset();
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
@@ -1217,7 +1217,7 @@ void AAstraViewscreen::RebuildShowList()
 		{
 			continue;
 		}
-		bool bSpace = A->ActorHasTag(TagSky) || A->GetActorLocation().SizeSquared() > FMath::Square(60000.0);   // beyond 600 m: out there
+		bool bSpace = A->ActorHasTag(SkyTag) || A->GetActorLocation().SizeSquared() > FMath::Square(60000.0);   // beyond 600 m: out there
 		if (!bSpace)
 		{
 			// the Aquila's own hull (its frame is 183 m from the bridge): seen from outside in the damage view
