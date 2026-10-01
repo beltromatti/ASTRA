@@ -1071,7 +1071,15 @@ class WarMinds:
         assert cmd is not None
         side = seat.side
         where = self.where(state)
-        mission = f"Your orders: {cmd.mission}" if cmd.mission else ""
+        from .enemy import COMMANDERS as OPENING_COMMANDERS, OPENING_MISSION    # (here: enemy.py imports this module)
+        if cmd.mission:
+            mission = f"Your orders: {cmd.mission}"
+        elif side == "mandate" and cmd.contact in OPENING_COMMANDERS:
+            # the strike group's purpose in the opening (enemy.OPENING_MISSION, the same the channel persona is given): without it a picket
+            # stronger than you is only a reason to leave, and the campaign's first battle was a pass at 40 km and a withdrawal
+            mission = OPENING_MISSION
+        else:
+            mission = ""
         lang = self.lang()
         admiral = self.minds.get("mandate/admiral")
         chain, voices, ships = "", "", ""
