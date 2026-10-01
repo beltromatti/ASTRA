@@ -167,7 +167,7 @@ class BridgeAgent:
         turn = Turn(text=text, lang=lang, kind="captain")
         t0 = time.perf_counter()
         state = self.ship.snapshot()
-        ts = tools_for(state)
+        ts = tools_for(state, ctx)                                   # (inside a lift car: the ship's computer has `lift_go`)
         pending: list[tuple[ToolCall, asyncio.Task]] = []
         fired: list[ToolCall] = []
         on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=True, gate=gate)
@@ -206,9 +206,9 @@ class BridgeAgent:
             looked_up = any(n in LOOKUPS for n, _, _ in turn.actions)
             if not turn.cancelled:
                 if turn.actions and not comp.error and (not turn.lines or looked_up):
-                    await self._follow_up(turn, msgs, lang, readback=True)      # orders carried out in silence, or a file read: say what
+                    await self._follow_up(turn, msgs, lang, readback=True, ts=ts)      # orders carried out in silence, or a file read: say what
                 elif failures:
-                    await self._follow_up(turn, msgs, lang, readback=False)
+                    await self._follow_up(turn, msgs, lang, readback=False, ts=ts)
             self._record(user, comp.tool_calls, results, turn, main_lines)
             turn.t_end = time.perf_counter() - t0
             self.spent += turn.cost
@@ -323,7 +323,9 @@ class BridgeAgent:
             if call.name == "speak":
                 speaker = args.get("speaker", "xo")
                 st_ = self.ship.snapshot()
-                if speaker not in CREW and speaker not in _patients(st_) and speaker not in _diners(st_):
+                if speaker == "computer" and ts.lift:
+                    pass                                            # the ship's computer, in a lift car
+                elif speaker not in CREW and speaker not in _patients(st_) and speaker not in _diners(st_):
                     speaker = "doctor" if str(speaker).startswith("patient") else "xo"   # (a voice must belong to someone aboard)
                 line = (args.get("text") or "").strip()
                 if not line:
@@ -400,7 +402,7 @@ class BridgeAgent:
                                max_tokens=200)
         turn.cost += comp.cost
 
-    async def _follow_up(self, turn: Turn, msgs, lang: str, readback: bool) -> None:
+    async def _follow_up(self, turn: Turn, msgs, lang: str, readback: bool, ts: Any = None) -> None:
         notes = "\n".join(f"- {n}({json.dumps(a, ensure_ascii=False)}) {'ok' if r.get('ok') else 'FAILED'}: {r.get('detail', '')}"
                           for n, a, r in turn.actions if readback or not r.get("ok", False))
         lookup = readback and any(n in LOOKUPS for n, _, _ in turn.actions)
@@ -418,7 +420,7 @@ class BridgeAgent:
         t0 = time.perf_counter()
         state = self.ship.snapshot()
         comp = await self._llm(turn, "crew", follow, [SPEAK],
-                               self._on_call(turn, lang, t0, [], tools_for(state), state, [], captain=True), max_tokens=260)
+                               self._on_call(turn, lang, t0, [], ts or tools_for(state), state, [], captain=True), max_tokens=260)   # (the turn's own tools: in a lift car the computer may speak)
         turn.cost += comp.cost
 
     def _record(self, user: str, calls: list[ToolCall], results: dict[int, dict[str, Any]], turn: Turn, main_lines: int) -> None:

@@ -17,10 +17,11 @@ def _fn(name: str, desc: str, props: dict[str, Any], required: list[str]) -> dic
 PATIENTS = [f"patient{i}" for i in range(1, 13)]   # the Medbay's twelve beds (the wounded speak as their bed)
 MESS = [f"mess{i}" for i in range(1, 13)] + ["mess_cook"]   # the Mess Hall's places at table, and its cook
 
-SPEAK = _fn("speak", "Someone aboard speaks aloud: an officer, a wounded crewman in the Medbay, or someone off duty in "
-                     "the Mess Hall (one call per line, in speaking order). Short and specific: one sentence, and an "
+SPEAK = _fn("speak", "Someone aboard speaks aloud: an officer, a wounded crewman in the Medbay, someone off duty in "
+                     "the Mess Hall, or the ship's computer (`computer`: only in a lift, where it answers the Captain's travel orders) "
+                     "(one call per line, in speaking order). Short and specific: one sentence, and an "
                      "acknowledgement always says WHAT was set or answered (never a bare 'aye').", {
-    "speaker": {"type": "string", "enum": list(CREW) + PATIENTS + MESS},
+    "speaker": {"type": "string", "enum": list(CREW) + PATIENTS + MESS + ["computer"]},
     "text": {"type": "string", "description": "The spoken line, in the Captain's language: usually one short sentence "
                                               "(6-16 words); two only when the second carries something needed; more only "
                                               "when the Captain asked for a report or an explanation"},
@@ -184,7 +185,18 @@ GROUP_ORDER = _fn("group_order", "XO: the Captain's DIRECT ORDER to one of our b
     ["group", "order"])
 
 ALL_TOOLS = [SPEAK, STANDING] + SHIP_TOOLS
-SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS} | {"group_order"}
+SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS} | {"group_order", "lift_go"}
+
+
+def lift_tool(lift: Any) -> dict[str, Any]:
+    """`lift_go`: the ship's computer takes the lift car the Captain is in to one of its stops. It exists only while the Captain is in a car (the game's `context.lift`),
+    and its `destination` is one of THAT car's stops — the model chooses an id from the list, the code does not read the Captain's words (docs/ARCHITETTURA.md §1bis)."""
+    ids = list(lift.ids)
+    listing = "; ".join(s.text for s in lift.stops)
+    return _fn("lift_go", f"Lift: the ship's computer takes the car the Captain is in ({lift.name}) to one of its stops: the car really moves (the doors close, it runs to the stop, "
+                          "the doors open there); the Captain stays aboard. Call it when he asks to go somewhere and the stop is on this car's list; the result says when the car "
+                          "gets there. Never for a place this car does not serve.", {
+        "destination": {"type": "string", "enum": ids, "description": f"the stop to take him to: {listing}"}}, ["destination"])
 LOOKUPS = {"crew_locate"}            # tools that only read: what they find goes back to the officer, who then tells the Captain
 
 
@@ -217,7 +229,7 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "dispatch_damage_control": "ops", "hail": "comms", "set_emcon": "sensors", "active_scan": "sensors",
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
-          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops"}
+          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "lift_go": "computer"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
@@ -227,6 +239,7 @@ class ToolSet:
     tools: list[dict[str, Any]]
     names: set[str]
     available: dict[str, list[str] | None] | None       # the consoles on line (None: an older build, legacy tools only)
+    lift: bool = False                                   # the Captain is in a lift car: `lift_go` is on the list and the ship's computer may speak
 
     @property
     def stations(self) -> bool:
@@ -239,8 +252,19 @@ def has_groups(state: dict[str, Any] | None) -> bool:
     return isinstance(g, dict) and bool(g.get("your_groups"))
 
 
-def tools_for(state: dict[str, Any] | None) -> ToolSet:
-    """The tools that fit the game build (`stations` in its state or not)."""
+def tools_for(state: dict[str, Any] | None, ctx: Any = None) -> ToolSet:
+    """The tools that fit the game build (`stations` in its state or not), and the room: inside a lift car (`ctx.lift`, from the game's context) the ship's computer
+    has `lift_go`."""
+    ts = _tools_for_build(state)
+    lift = getattr(ctx, "lift", None)
+    if lift is not None and lift.stops:
+        ts.tools.append(lift_tool(lift))
+        ts.names.add("lift_go")
+        ts.lift = True
+    return ts
+
+
+def _tools_for_build(state: dict[str, Any] | None) -> ToolSet:
     avail = station_model.available_from_state(state)
     if avail is None:
         return ToolSet(list(ALL_TOOLS), {t["function"]["name"] for t in ALL_TOOLS}, None)

@@ -117,6 +117,7 @@ from .memory import MemoryKeeper  # noqa: E402
 from .npc import Npcs  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
+EXTERNAL_SPEAKERS["computer"] = ("Ship's computer", "estelle")          # the lifts' voice (a car the Captain is in: tools.lift_tool)
 
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402

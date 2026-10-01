@@ -2,7 +2,7 @@
 utterance (docs/ARCHITETTURA.md §3, `player_text.context`).
 
 The game sends it with every word of the Captain's (`place`, `in_earshot`, `facing`, `channel{party, open, muted}`,
-`pawn`). A build that does not send it yet gets the same picture inferred from what the mind already knows: the ship state
+`pawn`, and `lift` while he is inside a lift car). A build that does not send it yet gets the same picture inferred from what the mind already knows: the ship state
 (`captain`, `medbay`, `mess`, `visitor`, `surface`) and the mind's own channel with the enemy commander. Nothing here decides
 anything: it describes the room, and the router and the crew's prompt use it."""
 from __future__ import annotations
@@ -51,6 +51,39 @@ class Channel:
         return self.heard_s is not None and self.heard_s <= 25.0
 
 
+@dataclass(frozen=True)
+class LiftStop:
+    """A stop of the lift car the Captain is in: its id (what `lift_go` takes), what the panel calls it, the deck's name and the notable places on it."""
+    id: str
+    label: str = ""
+    deck_name: str = ""
+    places: tuple[str, ...] = ()
+
+    @property
+    def text(self) -> str:
+        head = self.label + (f", {self.deck_name}" if self.deck_name else "")
+        return f"{self.id} = {head}" + (f" ({', '.join(self.places)})" if self.places else "")
+
+
+@dataclass(frozen=True)
+class Lift:
+    """The lift car the Captain is inside (the game's `context.lift`): which one, where it stands or goes, and the stops it serves (docs/ASCENSORI.md)."""
+    car: str = ""
+    name: str = ""
+    kind: str = "turbolift"             # turbolift | service | cargo | shuttle
+    at: str = ""                        # the stop it stands at (or has just left)
+    moving: bool = False
+    going_to: str = ""
+    stops: tuple[LiftStop, ...] = ()
+
+    def stop(self, stop_id: str) -> LiftStop | None:
+        return next((s for s in self.stops if s.id == stop_id), None)
+
+    @property
+    def ids(self) -> tuple[str, ...]:
+        return tuple(s.id for s in self.stops)
+
+
 @dataclass
 class Context:
     place: str = "bridge"
@@ -60,6 +93,7 @@ class Context:
     pawn: str = "seated"                # on_foot | seated | falcon | pod
     source: str = "inferred"            # game | inferred
     asleep: bool = False
+    lift: Lift | None = None            # the lift car he is inside, with the stops it serves
 
     @property
     def on_bridge(self) -> bool:
@@ -108,6 +142,21 @@ def known_speakers(ids: Any) -> tuple[str, ...]:
         if x in CREW or x == "mess_cook" or re.fullmatch(r"(patient|mess)\d+", x):
             out.append(x)
     return tuple(out)
+
+
+def parse_lift(raw: Any) -> Lift | None:
+    """The game's `context.lift` (a car and its stops), or None when the Captain is in no car or the record has no stop to go to."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("stops"), list):
+        return None
+    stops = []
+    for s in raw["stops"]:
+        if isinstance(s, dict) and s.get("id"):
+            stops.append(LiftStop(id=str(s["id"]), label=str(s.get("label") or ""), deck_name=str(s.get("deck_name") or ""),
+                                  places=tuple(str(p) for p in (s.get("places") or []) if p)))
+    if not stops:
+        return None
+    return Lift(car=str(raw.get("car") or ""), name=str(raw.get("name") or raw.get("car") or "the lift"), kind=str(raw.get("kind") or "turbolift"),
+                at=str(raw.get("at") or ""), moving=bool(raw.get("moving")), going_to=str(raw.get("going_to") or ""), stops=tuple(stops))
 
 
 def place_from_state(state: dict[str, Any] | None) -> tuple[str, bool]:
@@ -164,7 +213,7 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
         listed = known_speakers(raw.get("in_earshot")) if raw.get("in_earshot") is not None else earshot_from_state(place, state)
         return Context(place=place, in_earshot=listed or (BRIDGE if place == "bridge" else ()),
                        facing=(str(raw["facing"]) if raw.get("facing") else None), channel=channel,
-                       pawn=str(raw.get("pawn") or "seated"), source="game", asleep=place_from_state(state)[1])
+                       pawn=str(raw.get("pawn") or "seated"), source="game", asleep=place_from_state(state)[1], lift=parse_lift(raw.get("lift")))
     place, asleep = place_from_state(state)
     channel = None
     if enemy is not None and getattr(enemy, "open", False):
@@ -212,10 +261,26 @@ def _kind(party: str, state: dict[str, Any] | None = None) -> str:
     return "enemy"
 
 
+def describe_lift(lift: Lift) -> str:
+    """The Captain inside a lift car: what the ship's computer does there and which stops it can take him to."""
+    label = lambda stop_id: (lift.stop(stop_id).label if lift.stop(stop_id) else stop_id) or stop_id          # noqa: E731
+    where = (f"moving towards {label(lift.going_to)}" if lift.moving and lift.going_to else f"standing at {label(lift.at)}" if lift.at else "")
+    shuttle = lift.kind == "shuttle"
+    return (f"The Captain is inside {lift.name}, a {'shuttle car on the Spine line' if shuttle else lift.kind + ' car'}" + (f", {where}" if where else "") + ". "
+            "The ship's computer runs every lift and shuttle and takes the Captain where he says, as a real ship's computer would: a stop named in any way "
+            "(a number, a deck's name, a place on it, a section, \"the bridge\", \"Main Engineering\", \"down\", \"one up\", \"where the wounded are\"), "
+            "in any language. When he asks for it, CALL `lift_go` with the stop that fits (it moves the car for real) and then the computer — speaker `computer`, "
+            "never an officer — confirms in ONE very short line in the Captain's language that names where it goes (never read an id aloud). If what he asked "
+            "fits no stop of this car, call nothing: the computer says so in one short line and names what this car serves. The officers stay out of the lift: "
+            "they answer only what is meant for them. The stops of this car (id = label, deck name, notable places): " + "; ".join(s.text for s in lift.stops) + ".")
+
+
 def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
     """The room, in a sentence or two, for the crew's prompt (empty when it is the ordinary case: the bridge, no channel)."""
     t = titles or {}
     parts = []
+    if ctx.lift:
+        parts.append(describe_lift(ctx.lift))
     if ctx.place != "bridge":
         parts.append(f"The Captain is not on the bridge ({ctx.place.replace('_', ' ')}): the officers hear over the intercom and "
                      "answer when they are called or when it concerns their station.")
