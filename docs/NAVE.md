@@ -246,7 +246,7 @@ Misure interne (lunghezza × profondità × altezza, m); ogni stanza ha il suo a
 | File | Cosa contiene |
 |---|---|
 | `ship_plan.py`, `ship_plan_gen.py`, `ship_checks.py` | misure dei ponti e dell'inviluppo; il generatore del piano (e la copia sottile per il gioco); i controlli del piano |
-| `ship_layout.py`, `ship_design.py`, `ship_design_decks.py`, `ship_design_decks2.py` | **il motore** (Builder, Passage, Deck, corsie, porte, collegamenti, gallerie e braccia); **le strutture fisse e le gallerie**; **i programmi dei ponti 2–7 e 8–12** |
+| `ship_layout.py`, `ship_design.py`, `ship_decks.py`, `ship_design_decks.py`, `ship_design_decks2.py` | **il motore** (Builder, Passage, Deck, corsie, porte, collegamenti, gallerie e braccia); **le strutture fisse e le gallerie**; la geometria dei passaggi (`ship_decks.py`: dove passano e come toccano le stanze esistenti); **i programmi dei ponti 2–7 e 8–12** |
 | `ship_vertical.py`, `ship_design_shuttle.py`, `ship_wayfinding.py` | **la rete verticale** (pozzi, approdi, scale, tubi); **la navetta**; **la segnaletica** calcolata sul grafo |
 | `ship_spec.py`, `ship_spec3.py` | la scheda di ogni stanza: misure, porte, **posti**, **lampade** (il piano e le mesh leggono gli stessi numeri); `ship_spec3` le stanze di NAVE-3 |
 | `ship_catalog.py`, `ship_corridor.py`, `ship_corridor2.py`, `ship_walls.py`, `ship_signs.py` | i toni S P K V T e le misure; i moduli di corridoio (K e le celle dei tubi in `ship_corridor`, V e T in `ship_corridor2`); i pannelli di parete; targhe, segnali, cartelli |

@@ -2,7 +2,9 @@
 to read a layout. Pure PIL, no Blender.
 
 Run: uv run --python /opt/homebrew/bin/python3.13 --with pillow python tools/art/ship_planview.py <deck> <out.jpg> [--x0 X --x1 X]
-     [--scale PX_PER_M] [--plan path] [--graph]  (x0 = the aft limit, x1 = the forward limit of the window, metres)
+     [--scale PX_PER_M] [--plan path] [--graph] [--by kind]  (x0 = the aft limit, x1 = the forward limit of the window, metres)
+Rooms are coloured by department (command blue, engineering orange, science violet, medical teal, security red, flight yellow, services green, neutral grey; NAVE-3), the corridors by tone (the Spine
+and the Passages blue, the crawlways and the service galleries brown, the shuttle's tunnel cyan), the lift lobbies and shafts white, the Jefferies cells brown; `--by kind` gives the old colours.
 """
 from __future__ import annotations
 
@@ -24,6 +26,12 @@ KIND_COLOUR = {"corridor": (46, 60, 82), "mess": (200, 150, 70), "berthing": (15
                "hangar": (200, 180, 40), "bridge": (62, 123, 250), "quarters": (62, 123, 250), "lift": (200, 200, 200)}
 
 
+DEPT_COLOUR = {"command": (62, 123, 250), "engineering": (255, 159, 28), "science": (150, 100, 230), "medical": (46, 196, 182), "security": (220, 70, 70), "flight": (210, 190, 50),
+               "services": (100, 170, 100), "neutral": (150, 150, 150)}
+TONE_COLOUR = {"S": (60, 80, 112), "P": (50, 64, 88), "K": (96, 72, 48), "V": (120, 92, 44), "T": (60, 120, 150)}
+KIND_OVERRIDE = {"lobby": (235, 235, 235), "lift": (200, 225, 255), "stairs": (190, 190, 70), "trunk": (170, 120, 70), "tunnel": (60, 120, 150), "transit": (70, 170, 200)}
+
+
 def main() -> None:
     argv = sys.argv[1:]
     deck = int(argv[0])
@@ -33,6 +41,7 @@ def main() -> None:
         if k in argv:
             opt[k] = argv[argv.index(k) + 1]
     show_graph = "--graph" in argv
+    by_kind = "--by" in argv and argv[argv.index("--by") + 1] == "kind"
     plan = json.load(open(opt["--plan"], encoding="utf-8"))
     comps = [c for c in plan["compartments"] if c["deck"] == deck or c.get("plane") == deck]
     doors = [d for d in plan["doors"] if d["deck"] == deck]
@@ -67,7 +76,12 @@ def main() -> None:
                 d.text(P(xm, -ymax + 1.0), s["id"], font=f, fill=(200, 90, 90), anchor="mm")
     for c in comps:
         b = c["bounds"]
-        colour = KIND_COLOUR.get(c["kind"], (80, 80, 80))
+        if by_kind:
+            colour = KIND_COLOUR.get(c["kind"], (80, 80, 80))
+        elif c["kind"] == "corridor":
+            colour = TONE_COLOUR.get(c.get("tone"), (46, 60, 82))
+        else:
+            colour = KIND_OVERRIDE.get(c["kind"]) or DEPT_COLOUR.get(c.get("dept"), (80, 80, 80))
         a1, a2 = P(b[2], b[1]), P(b[0], b[3])
         if c["kind"] == "corridor":
             d.rectangle([a1, a2], fill=colour, outline=(20, 24, 32))
@@ -99,6 +113,12 @@ def main() -> None:
         for n in nodes.values():
             x, y = P(n["p"][0], n["p"][1])
             d.ellipse((x - 1.5, y - 1.5, x + 1.5, y + 1.5), fill=(200, 255, 200))
+    if not by_kind:                                                                                       # the legend
+        lx = 24
+        for k, col in list(DEPT_COLOUR.items()) + [("Spine / Passages", TONE_COLOUR["S"]), ("service / crawl", TONE_COLOUR["V"]), ("shuttle tunnel", TONE_COLOUR["T"]), ("lifts", KIND_OVERRIDE["lobby"])]:
+            d.rectangle((lx, H - 22, lx + 12, H - 10), fill=col)
+            d.text((lx + 16, H - 16), k, font=fs, fill=(190, 190, 190), anchor="lm")
+            lx += 24 + int(d.textlength(k, font=fs))
     # x ruler
     step = 20
     xr = math.ceil(x0 / step) * step

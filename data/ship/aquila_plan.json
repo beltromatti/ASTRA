@@ -1639,23 +1639,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [30.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [33.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A1.l0"
     },
     {
      "type": "rect",
-     "pos": [18.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [27.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [21.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [15.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A1.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [24.0, -3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A1.l4"
     }
    ],
    "plate": "suites",
@@ -1726,23 +1756,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [10.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [7.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A2.l0"
     },
     {
      "type": "rect",
-     "pos": [22.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [13.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [19.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [25.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A2.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [16.0, 3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A2.l4"
     }
    ],
    "plate": "suites",
@@ -1779,23 +1839,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [6.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [9.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A3.l0"
     },
     {
      "type": "rect",
-     "pos": [-6.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [3.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A3.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-3.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A3.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-9.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A3.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [0.0, -3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A3.l4"
     }
    ],
    "plate": "suites",
@@ -1832,23 +1922,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-14.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-17.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A4.l0"
     },
     {
      "type": "rect",
-     "pos": [-2.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-11.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A4.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-5.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A4.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [1.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A4.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [-8.0, 3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A4.l4"
     }
    ],
    "plate": "suites",
@@ -1885,23 +2005,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-38.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-41.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A5.l0"
     },
     {
      "type": "rect",
-     "pos": [-26.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-35.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A5.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-29.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A5.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-23.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A5.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [-32.0, 3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A5.l4"
     }
    ],
    "plate": "suites",
@@ -1938,23 +2088,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-34.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-31.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A6.l0"
     },
     {
      "type": "rect",
-     "pos": [-46.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-37.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A6.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-43.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A6.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-49.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A6.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [-40.0, -3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A6.l4"
     }
    ],
    "plate": "suites",
@@ -2343,13 +2523,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-136.0, -24.0, -33.6],
-     "lumens": 1500,
+     "pos": [-128.0, -24.0, -33.6],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d2_single_cabins_C1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-136.0, -24.0, -33.6],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_single_cabins_C1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-144.0, -24.0, -33.6],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_single_cabins_C1.l2"
     }
    ],
    "plate": "cabins_row",
@@ -2384,13 +2584,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-136.0, 24.0, -33.6],
-     "lumens": 1500,
+     "pos": [-144.0, 24.0, -33.6],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d2_single_cabins_C2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-136.0, 24.0, -33.6],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_single_cabins_C2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-128.0, 24.0, -33.6],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_single_cabins_C2.l2"
     }
    ],
    "plate": "cabins_row",
@@ -9483,13 +9703,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-288.0, -24.0, -38.9],
-     "lumens": 1500,
+     "pos": [-280.0, -24.0, -38.9],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d3_single_cabins_D1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-288.0, -24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_D1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-296.0, -24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_D1.l2"
     }
    ],
    "plate": "cabins_row",
@@ -9524,13 +9764,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-288.0, 24.0, -38.9],
-     "lumens": 1500,
+     "pos": [-296.0, 24.0, -38.9],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d3_single_cabins_D2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-288.0, 24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_D2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-280.0, 24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_D2.l2"
     }
    ],
    "plate": "cabins_row",
@@ -10495,13 +10755,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-420.0, -24.0, -38.9],
-     "lumens": 1500,
+     "pos": [-412.0, -24.0, -38.9],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d3_single_cabins_F1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-420.0, -24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_F1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-428.0, -24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_F1.l2"
     }
    ],
    "plate": "cabins_row",
@@ -10536,13 +10816,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-420.0, 24.0, -38.9],
-     "lumens": 1500,
+     "pos": [-428.0, 24.0, -38.9],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d3_single_cabins_F2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-420.0, 24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_F2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-412.0, 24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_F2.l2"
     }
    ],
    "plate": "cabins_row",
@@ -15450,7 +15750,7 @@
     {
      "type": "rect",
      "pos": [20.0, 10.0, -42.4],
-     "lumens": 1800,
+     "lumens": 2600,
      "temperature": 2700,
      "size": [6.0, 6.0],
      "radius": 900,
@@ -15460,12 +15760,22 @@
     {
      "type": "rect",
      "pos": [20.0, 16.0, -42.4],
-     "lumens": 2200,
+     "lumens": 2600,
      "temperature": 3000,
      "size": [6.0, 1.0],
      "radius": 800,
      "shadows": false,
      "id": "d4_chapel_A1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [20.0, 5.0, -42.4],
+     "lumens": 1400,
+     "temperature": 2800,
+     "size": [8.0, 1.0],
+     "radius": 700,
+     "shadows": false,
+     "id": "d4_chapel_A1.l2"
     }
    ],
    "plate": "chapel_nave",
@@ -17263,23 +17573,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-180.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-182.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_C1.l0"
     },
     {
      "type": "rect",
-     "pos": [-170.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-170.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_C1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-182.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_C1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-170.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_C1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -17602,23 +17932,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-224.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-226.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_C2.l0"
     },
     {
      "type": "rect",
-     "pos": [-214.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-214.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_C2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-226.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_C2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-214.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_C2.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -18866,23 +19216,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-360.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-362.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_E1.l0"
     },
     {
      "type": "rect",
-     "pos": [-350.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-350.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_E1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-362.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_E1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-350.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_E1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -19392,23 +19762,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-416.0, -30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-414.0, -26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_F1.l0"
     },
     {
      "type": "rect",
-     "pos": [-426.0, -30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-426.0, -26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_F1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-414.0, -34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_F1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-426.0, -34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_F1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -19499,23 +19889,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-424.0, 10.0, -42.8],
-     "lumens": 1800,
+     "pos": [-426.0, 6.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_F2.l0"
     },
     {
      "type": "rect",
-     "pos": [-414.0, 10.0, -42.8],
-     "lumens": 1800,
+     "pos": [-414.0, 6.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_F2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-426.0, 14.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_F2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-414.0, 14.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_F2.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -20265,23 +20675,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-500.0, -10.0, -42.8],
-     "lumens": 1800,
+     "pos": [-498.0, -6.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_H1.l0"
     },
     {
      "type": "rect",
-     "pos": [-510.0, -10.0, -42.8],
-     "lumens": 1800,
+     "pos": [-510.0, -6.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_H1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-498.0, -14.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_H1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-510.0, -14.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_H1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -41494,23 +41924,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-384.0, -10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-382.0, -6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_E1.l0"
     },
     {
      "type": "rect",
-     "pos": [-394.0, -10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-394.0, -6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_E1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-382.0, -14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_E1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-394.0, -14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_E1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -41567,23 +42017,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-392.0, 10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-394.0, 6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_E2.l0"
     },
     {
      "type": "rect",
-     "pos": [-382.0, 10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-382.0, 6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_E2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-394.0, 14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_E2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-382.0, 14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_E2.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -42288,23 +42758,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-436.0, 10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-438.0, 6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_F1.l0"
     },
     {
      "type": "rect",
-     "pos": [-426.0, 10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-426.0, 6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_F1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-438.0, 14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_F1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-426.0, 14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_F1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -43025,23 +43515,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-508.0, -10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-506.0, -6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_H1.l0"
     },
     {
      "type": "rect",
-     "pos": [-518.0, -10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-518.0, -6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_H1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-506.0, -14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_H1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-518.0, -14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_H1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -71673,23 +72183,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-136.0, -10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-134.0, -6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E1.l0"
     },
     {
      "type": "rect",
-     "pos": [-146.0, -10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-146.0, -6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-134.0, -14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-146.0, -14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -72582,23 +73112,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-184.0, -10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-182.0, -6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E2.l0"
     },
     {
      "type": "rect",
-     "pos": [-194.0, -10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-194.0, -6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-182.0, -14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-194.0, -14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E2.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -72655,23 +73205,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-192.0, 10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-194.0, 6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E3.l0"
     },
     {
      "type": "rect",
-     "pos": [-182.0, 10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-182.0, 6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E3.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-194.0, 14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E3.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-182.0, 14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E3.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -94729,23 +95299,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-244.0, 10.0, -70.8],
-     "lumens": 1800,
+     "pos": [-246.0, 6.0, -70.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d11_berthing_E1.l0"
     },
     {
      "type": "rect",
-     "pos": [-234.0, 10.0, -70.8],
-     "lumens": 1800,
+     "pos": [-234.0, 6.0, -70.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d11_berthing_E1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-246.0, 14.0, -70.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d11_berthing_E1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-234.0, 14.0, -70.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d11_berthing_E1.l3"
     }
    ],
    "plate": "berthing_bay",
