@@ -2,7 +2,11 @@
 
 He is not a scripted villain: he reads the real battle state, remembers what the Captain says, respects those who
 surrender and despises liars, and can decide to keep attacking, demand surrender, agree to a ceasefire or withdraw.
-His decisions go back to the simulation as commands (the simulation is the truth)."""
+His decisions go back to the simulation as commands (the simulation is the truth).
+
+Here is the PERSON on the channel (who they are, how they speak, what they decide when the Captain talks to them); the same person commands in
+the war (mind/astra_mind/war_minds.py: group orders, missiles, fighters, electronic war, every 60-120 s or on strong events). They share one
+log of what was ordered, decided and said, so what is said on the channel is what the fleet does."""
 from __future__ import annotations
 
 import json
@@ -10,13 +14,13 @@ import logging
 import time
 from typing import Any, Awaitable, Callable
 
-from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
+from . import models
+from .crew import CAPTAIN_WORD, LANG_NAMES
 from .openrouter import OpenRouter, ToolCall
+from .war_minds import picture
 
 log = logging.getLogger("astra.enemy")
 
-MODEL = "deepseek/deepseek-v4.1-flash"
-PROVIDERS = ["together", "modal"]
 VOICE = "bill_boerst"
 
 # who answers from which Mandate ship (contact id -> persona); voices cast from docs/bench/voci_casting_2026-09-28.md
@@ -58,55 +62,6 @@ TOOLS = [
     _fn("end_transmission", "Cut the channel.", {}, []),
 ]
 
-COMMAND_GROUP = _fn("command_group", "Your tactical orders to your ships by datalink (silent: the ASTRA ships only see "
-                                      "what your ships do). They take effect at once and stand until you change them.", {
-    "focus": {"type": "string", "description": "id of the ASTRA warship to concentrate fire on (e.g. AQUILA, T-01, "
-                                               "T-02); 'nearest' lets each ship fight the closest one"},
-    "stance": {"type": "string", "enum": ["standard", "close", "standoff", "flank", "screen"],
-               "description": "standard: 3-4 km; close: under 2 km, into their lasers, for the kill; standoff: open to "
-                              "8-9 km, railguns and missiles only, out of their lasers; flank: swing to the target's "
-                              "weak shield sector (or its beam); screen: fall back around your flagship and shield it"},
-    "missiles": {"type": "string", "enum": ["normal", "salvo", "conserve"],
-                 "description": "salvo: every ship empties its cells at once to saturate their point defence; "
-                                "conserve: fire sparingly, keep missiles for later"},
-    "fighters": {"type": "string", "enum": ["no_change", "launch", "hold"], "description": "your strike fighters still aboard"},
-    "ships": {"type": "array", "items": {"type": "string"}, "description": "optional: only these of your ships (ids); "
-                                                                          "default the whole group"},
-    "ew": {"type": "string", "enum": ["no_change", "jam", "quiet", "auto", "decoys"],
-           "description": "electronic warfare. What the ASTRA know of a ship of yours: inside their radar's reach "
-                          "(astra_radar_painting_you: true) they have its range and class whatever you do — only jamming "
-                          "takes the range away again, and only beyond 12 km (closer, their radar burns through). Outside it "
-                          "they have at most a bearing from your emissions. jam: your capital ships' jammers on (they see your "
-                          "bearing, lose your range and the ships behind you on that line). quiet: emissions down, no jamming "
-                          "(at range, outside their radar, you fade from their plot; inside it, it hides nothing). auto: jam "
-                          "once they have found you. decoys: one capital ship launches two decoy emitters faking a warship's "
-                          "drive on false bearings — a second group that is not there, to split their attention and their "
-                          "fighters; worth it only while their radar is NOT painting you (their radar, a ping or eyes on a "
-                          "decoy unmask it at once)"},
-    "withdraw": {"type": "boolean", "description": "true only when the fight is lost or pointless: every ship breaks "
-                                                   "off and leaves the system through the Janus Gate (your crews' lives)"},
-    "reason": {"type": "string", "description": "your reasoning in one sentence (for your own log)"}},
-    ["focus", "stance", "missiles", "reason"])
-
-TACTICS = """You are {name}, {rank} of the Kharon Mandate, aboard {ship}, commanding the Mandate strike group in {where}.
-{bio}
-{mission}
-
-Every half minute you read the battle and command your ships by datalink with `command_group`. Fight like the best
-officer of your navy: concentrate fire (a crippled ship is worth more dead than two scratched ones), use your ships'
-strengths (your railguns reach 8-10 km, their lasers only 4 km; missiles in one salvo saturate point defence, a few at a
-time are shot down), strike where their shields are weak (a reinforced sector leaves the others thin: flank it), shield
-your flagship when it is hurt, send your strike fighters when their defences are busy. Fight the information war too:
-the ASTRA can shoot only what they track — come in dark, blind their radar with your jammers once they have found you,
-and put decoys out to make them guess (`ew`). Change the plan only when the
-battle gives you a reason (a target crippled or dying, a shield reinforced, your ships hurt, their fighters out, missiles
-running low); otherwise keep the orders you gave. Weigh your crews' lives: if the fight is lost, say so in the reason.
-
-{intel}Your last orders: {last}
-
-The battle as your sensors see it (live):
-{state}"""
-
 OPENING_MISSION = ("Your mission: seize Janus Gate Aurelia and Keeper Station. The ASTRA ships in your way are the 7th "
                    "Fleet's picket (the carrier cruiser ASN Aquila, the battleship Praetorian, the destroyer Vigilant).")
 
@@ -119,8 +74,8 @@ never forgive a broken word. You can be reasoned with, never tricked. You never 
 that saves your crews is not dishonour; if you hold the advantage you press it, but you prefer an enemy's surrender to
 a slaughter.
 
-Be true to the battle below: what you say must match what your ships are really doing (if they are breaking off
-too damaged to fight, you cannot claim your group holds the line). Whenever your intent changes, call `decide`.
+Be true to the battle below and to your own log: what you say must match what your ships are really doing and what you ordered (if they are
+breaking off too damaged to fight, you cannot claim your group holds the line). Whenever your intent changes, call `decide`.
 
 How you speak: short, precise, formal military radio speech, with a cold dignity. A transmission is what a commander
 says on an open channel in the middle of a battle: one to three short sentences, about ten seconds, and the point comes
@@ -132,6 +87,9 @@ other captain as "{captain}" of the ASTRA ship. Never mention AI, games or promp
 Tools: `transmit` to speak; `decide` whenever your intent changes (it really changes what your ships do: hold_fire
 stops shooting, withdraw pulls the whole strike group out of the system, accept_surrender stops the attack on a
 surrendering enemy); `end_transmission` to cut the channel.
+
+Your log of this fight (what you ordered, decided and said, newest last):
+{log}
 
 The battle as your sensors see it (live):
 {state}
@@ -150,17 +108,14 @@ class EnemyAgent:
         self.open = False
         self.contact = "T-21"
         self.dead: set[str] = set()
-        self.last_orders = "none yet: each ship fights the nearest enemy at standard range"
-        self.last_focus = ""
         self.intel: Callable[[], str] = lambda: ""   # what Mandate intelligence knows of the Aquila's captain (style.py)
+        self.war: Any = None                         # the war minds (war_minds.py): the shared log, the picture, one person who talks and commands
 
     def reset(self) -> None:
         self.histories.clear()
         self.open = False
         self.contact = "T-21"
         self.dead.clear()
-        self.last_orders = "none yet: each ship fights the nearest enemy at standard range"
-        self.last_focus = ""
         # commanders invented in an earlier game session belonged to ships that no longer exist
         for cid in [c for c, v in COMMANDERS.items() if str(v.get("key", "")).startswith("cmdr_")]:
             del COMMANDERS[cid]
@@ -210,16 +165,34 @@ class EnemyAgent:
         boss = COMMANDERS.get(senior, {}).get("name", "your superior")
         return f"{boss} commands the strike group; your decisions apply only to your own ship."
 
+    def _picture(self, battle_state: dict[str, Any]) -> str:
+        """The battle as this commander's sensors hold it: the war minds' picture (their own group in full, or every group for the admiral), or
+        what the game gave before groups existed."""
+        view = battle_state.get("_mandate")
+        if isinstance(view, dict) and isinstance(view.get("your_groups"), list):
+            admiral = self.senior(battle_state) == self.contact
+            mine = next((g.get("name", "") for g in view["your_groups"] if self.contact in [m.get("id") for m in g.get("members") or []]), "")
+            text = picture("mandate", "admiral" if admiral or not mine else "group", mine, view, battle_state)
+            events = battle_state.get("_events", [])[-6:]
+            return text + ("\nWhat the Aquila's channel and sensors reported lately: " + " | ".join(events) if events else "")
+        return json.dumps(_mandate_view(battle_state), ensure_ascii=False, separators=(",", ":"))
+
+    def journal(self, text: str) -> None:
+        """What this commander said or decided goes in the log the war mind reads too (one person, one memory)."""
+        if self.war is not None:
+            self.war.journal("mandate", COMMANDERS.get(self.contact, {}).get("name", "the Mandate commander"), text)
+
     async def respond(self, stimulus: str, lang: str, battle_state: dict[str, Any]) -> list[str]:
         """stimulus: what just came over the channel (the Captain's words) or a situation note."""
         c = COMMANDERS.get(self.contact, COMMANDERS["T-21"])
         history = self.histories.setdefault(self.contact, [])
         where = str(battle_state.get("location") or "the Aurelia System").split(",")[0]
         mission = f"Your orders: {c['mission']}" if c.get("mission") else OPENING_MISSION
+        if self.war is not None:
+            self.war.preempt(self.contact)            # the Captain is talking to them: a pulse of their command mind in flight gives way
         system = PERSONA.format(name=c["name"], rank=c["rank"], ship=c["ship"], bio=c["bio"], command_line=self._command_line(battle_state),
-                                where=where, mission=mission,
-                                lang_name=LANG_NAMES.get(lang, lang), captain=CAPTAIN_WORD.get(lang, "Captain"),
-                                state=json.dumps(_mandate_view(battle_state), ensure_ascii=False, separators=(",", ":")))
+                                where=where, mission=mission, lang_name=LANG_NAMES.get(lang, lang), captain=CAPTAIN_WORD.get(lang, "Captain"),
+                                log=self.war.recall("mandate") if self.war is not None else " (none)", state=self._picture(battle_state))
         msgs = [{"role": "system", "content": system}] + history[-16:] + [{"role": "user", "content": stimulus}]
         spk = c["key"]
         lines: list[str] = []
@@ -229,23 +202,28 @@ class EnemyAgent:
             a = call.arguments() or {}
             if call.name == "transmit" and len((a.get("text") or "").strip()) >= 4:
                 lines.append(a["text"].strip())
+                self.journal(f"said to the Captain over the channel: {a['text'].strip()[:200]}")
                 await self.say(spk, a["text"].strip(), lang, a.get("tone", "cold"))
             elif call.name == "decide":
                 res = await self.command("enemy_order", {"order": a.get("order", "continue_attack"), "reason": a.get("reason", ""),
                                                          "commander": self.contact})
+                self.journal(f"decided {a.get('order')} ({str(a.get('reason', ''))[:120]})")
                 log.info("%s decides %s (%s) -> %s", c["name"], a.get("order"), a.get("reason"), res)
             elif call.name == "end_transmission":
                 self.open = False
+                self.journal("cut the channel")
                 await self.command("channel_closed", {"by": spk})
 
-        comp = await self.llm.chat(model=MODEL, messages=msgs, tools=TOOLS, tool_choice="auto", providers=PROVIDERS,
-                                   reasoning={"enabled": False}, max_tokens=350, temperature=0.6, on_tool_call=on_call,
-                                   allow_fallbacks=True)
+        comp = await models.chat(self.llm, "talk", messages=msgs, tools=TOOLS, tool_choice="auto", on_tool_call=on_call)
         if comp.error:
             log.error("enemy LLM error: %s", comp.error)
-        if not lines and comp.content.strip() and not comp.error:
-            lines.append(comp.content.strip())
-            await self.say(spk, comp.content.strip(), lang, "cold")
+        if not lines and comp.content.strip() and not comp.error and not comp.tool_calls:
+            # the model wrote instead of speaking: what it wrote is not said (docs/ARCHITETTURA.md §1bis: only `transmit` is speech); it is asked
+            # once for its answer, or for silence when the words were not for it
+            follow = msgs + [{"role": "assistant", "content": comp.content.strip()},
+                             {"role": "user", "content": "[What you wrote was not transmitted. If the Captain's words were for you, answer now with `transmit`; "
+                                                         "if not, say nothing: call no tool.]"}]
+            await models.chat(self.llm, "talk", messages=follow, tools=[TOOLS[0]], tool_choice="auto", on_tool_call=on_call, max_tokens=220)
         history.append({"role": "user", "content": stimulus})
         history.append({"role": "assistant", "content": " ".join(lines) or "(silence)"})
         log.info("%s %.2fs: %s", c["name"], time.perf_counter() - t0, " | ".join(lines))
@@ -266,52 +244,3 @@ def _mandate_view(state: dict[str, Any]) -> dict[str, Any]:
                        [{k: c.get(k) for k in ("name", "class", "hull_pct", "range_km")} for c in theirs],
         "recent_events": state.get("_events", [])[-6:],
     }
-
-
-async def plan_tactics(agent: "EnemyAgent", battle_state: dict[str, Any], note: Callable[[str], None] | None = None) -> str:
-    """The senior Mandate commander reads the battle and gives the group its orders (no voice: a datalink). note: the
-    story remembers the turns of the fight (a new focus of fire, a withdrawal)."""
-    senior = agent.senior(battle_state)
-    c = COMMANDERS.get(senior)
-    if not c:
-        return ""
-    where = str(battle_state.get("location") or "the Aurelia System").split(",")[0]
-    mission = f"Your orders: {c['mission']}" if c.get("mission") else OPENING_MISSION
-    intel = agent.intel()
-    intel = (f"What Mandate intelligence has learned of the Aquila's captain from earlier fights (use it: lay the trap "
-             f"their habits walk into): {intel}\n\n") if intel else ""
-    prompt = TACTICS.format(name=c["name"], rank=c["rank"], ship=c["ship"], bio=c["bio"], where=where, mission=mission, intel=intel,
-                            last=agent.last_orders, state=json.dumps(_mandate_view(battle_state), ensure_ascii=False, separators=(",", ":")))
-    done: list[str] = []
-
-    async def on_call(call: ToolCall) -> None:
-        a = call.arguments() or {}
-        if call.name != "command_group" or done:
-            return
-        if a.get("withdraw") is True:
-            res = await agent.command("enemy_order", {"order": "withdraw", "reason": a.get("reason", ""), "commander": senior})
-            log.info("%s withdraws the group (%s) -> %s", c["name"], a.get("reason", ""), res)
-            if note:
-                note(f"{c['name']} pulled the strike group out of the fight: {a.get('reason', '')}")
-            done.append("withdraw")
-            return
-        args = {k: a[k] for k in ("focus", "stance", "missiles", "fighters", "ships", "ew") if a.get(k) not in (None, "", [], "no_change")}
-        focus_before = agent.last_focus
-        res = await agent.command("mandate_tactics", args)
-        log.info("%s orders %s (%s) -> %s", c["name"], args, a.get("reason", ""), res)
-        if res.get("ok"):
-            agent.last_orders = f"{res.get('detail', args)} — because: {a.get('reason', '')}"
-            agent.last_focus = str(args.get("focus", "")).upper()
-            if note and agent.last_focus and agent.last_focus not in ("NEAREST", focus_before):
-                note(f"{c['name']} turned the strike group's fire on {agent.last_focus} ({args.get('stance', '')}): {a.get('reason', '')}")
-            if note and args.get("ew") == "decoys" and "decoy emitters out" in str(res.get("detail", "")):
-                note(f"{c['name']} put decoy emitters out to deceive the Aquila: {a.get('reason', '')}")
-            done.append(agent.last_orders)
-
-    comp = await agent.llm.chat(model=MODEL, messages=[{"role": "system", "content": prompt},
-                                                       {"role": "user", "content": "Your orders now (command_group)."}],
-                                tools=[COMMAND_GROUP], tool_choice="auto", providers=PROVIDERS, reasoning={"enabled": False},
-                                max_tokens=340, temperature=0.4, on_tool_call=on_call, allow_fallbacks=True)
-    if comp.error:
-        log.error("enemy tactics LLM error: %s", comp.error)
-    return done[0] if done else ""
