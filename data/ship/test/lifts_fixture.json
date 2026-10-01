@@ -1,0 +1,1298 @@
+{
+ "id": "ASN_Aquila_Lifts_Fixture",
+ "version": 2,
+ "generator": "tools/lift.py fixture (docs/ASCENSORI.md): a test plan with the lift contract of docs/brief/NAVE-3.md, not the ship",
+ "frame": "X forward, Y starboard, Z up, metres; the plan's own decks and heights",
+ "decks": [
+  {
+   "id": 1,
+   "name": "Command",
+   "z": 0.0
+  },
+  {
+   "id": 2,
+   "name": "CIC & Communications",
+   "z": -36.7
+  },
+  {
+   "id": 3,
+   "name": "Crew Country",
+   "z": -42.0
+  },
+  {
+   "id": 4,
+   "name": "Crew Services",
+   "z": -46.0
+  },
+  {
+   "id": 5,
+   "name": "Science & Transport",
+   "z": -50.0,
+   "sections": [
+    {
+     "id": "A",
+     "x": [
+      104,
+      -12
+     ]
+    },
+    {
+     "id": "B",
+     "x": [
+      -12,
+      -104.0
+     ]
+    },
+    {
+     "id": "C",
+     "x": [
+      -104,
+      -160
+     ]
+    },
+    {
+     "id": "D",
+     "x": [
+      -160,
+      -248
+     ]
+    },
+    {
+     "id": "E",
+     "x": [
+      -248,
+      -320
+     ]
+    },
+    {
+     "id": "F",
+     "x": [
+      -320,
+      -384
+     ]
+    },
+    {
+     "id": "G",
+     "x": [
+      -384,
+      -440
+     ]
+    },
+    {
+     "id": "H",
+     "x": [
+      -440,
+      -524
+     ]
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Medical",
+   "z": -54.0
+  },
+  {
+   "id": 7,
+   "name": "Engineering & Power",
+   "z": -58.0
+  },
+  {
+   "id": 8,
+   "name": "Marines & Armory",
+   "z": -62.0
+  },
+  {
+   "id": 9,
+   "name": "Flight",
+   "z": -66.0
+  },
+  {
+   "id": 10,
+   "name": "Holds & Munitions",
+   "z": -70.0
+  },
+  {
+   "id": 11,
+   "name": "Workshops & Damage Control",
+   "z": -74.0
+  },
+  {
+   "id": 12,
+   "name": "Keel",
+   "z": -78.0
+  }
+ ],
+ "compartments": [
+  {
+   "id": "bridge",
+   "deck": 1,
+   "kind": "bridge",
+   "name": "Bridge",
+   "status": "existing",
+   "bounds": [
+    -8.5,
+    -7.4,
+    10.4,
+    7.4
+   ],
+   "z": [
+    0.0,
+    3.4
+   ]
+  },
+  {
+   "id": "ready_room",
+   "deck": 1,
+   "kind": "ready_room",
+   "name": "Captain's Ready Room",
+   "status": "built",
+   "bounds": [
+    -20.8,
+    -2.1,
+    -8.8,
+    2.1
+   ],
+   "z": [
+    0.0,
+    3.4
+   ]
+  },
+  {
+   "id": "cic",
+   "deck": 2,
+   "kind": "cic",
+   "name": "Combat Information Centre",
+   "status": "built",
+   "bounds": [
+    -80,
+    -8,
+    -48,
+    8
+   ],
+   "z": [
+    -36.7,
+    -33.300000000000004
+   ]
+  },
+  {
+   "id": "wardroom",
+   "deck": 3,
+   "kind": "wardroom",
+   "name": "Wardroom",
+   "status": "built",
+   "bounds": [
+    -75,
+    -16,
+    -51,
+    0
+   ],
+   "z": [
+    -42.0,
+    -38.6
+   ]
+  },
+  {
+   "id": "mess",
+   "deck": 4,
+   "kind": "mess",
+   "name": "Mess Hall",
+   "status": "existing",
+   "bounds": [
+    -160.3,
+    -10.3,
+    -121.7,
+    10.3
+   ],
+   "z": [
+    -46.0,
+    -42.6
+   ]
+  },
+  {
+   "id": "berthing",
+   "deck": 4,
+   "kind": "berthing",
+   "name": "Crew Berthing",
+   "status": "existing",
+   "bounds": [
+    -200.3,
+    -3.9,
+    -175.7,
+    3.9
+   ],
+   "z": [
+    -46.0,
+    -42.6
+   ]
+  },
+  {
+   "id": "lounge",
+   "deck": 4,
+   "kind": "lounge",
+   "name": "Crew Lounge",
+   "status": "built",
+   "bounds": [
+    -70,
+    -20,
+    -50,
+    -4
+   ],
+   "z": [
+    -46.0,
+    -42.6
+   ]
+  },
+  {
+   "id": "transporter",
+   "deck": 5,
+   "kind": "transporter",
+   "name": "Transporter Room",
+   "status": "built",
+   "bounds": [
+    -30,
+    -16,
+    -6,
+    0
+   ],
+   "z": [
+    -50.0,
+    -46.6
+   ]
+  },
+  {
+   "id": "lab_astro",
+   "deck": 5,
+   "kind": "lab",
+   "name": "Astrometrics",
+   "status": "built",
+   "bounds": [
+    -250,
+    -16,
+    -226,
+    0
+   ],
+   "z": [
+    -50.0,
+    -46.6
+   ]
+  },
+  {
+   "id": "medbay",
+   "deck": 6,
+   "kind": "medbay",
+   "name": "Medbay",
+   "status": "existing",
+   "bounds": [
+    -262.3,
+    -9.3,
+    -231.7,
+    9.3
+   ],
+   "z": [
+    -54.0,
+    -50.6
+   ]
+  },
+  {
+   "id": "engineering",
+   "deck": 7,
+   "kind": "engineering",
+   "name": "Main Engineering",
+   "status": "existing",
+   "bounds": [
+    -372.5,
+    -14.5,
+    -329.5,
+    14.5
+   ],
+   "z": [
+    -58.0,
+    -54.6
+   ]
+  },
+  {
+   "id": "power",
+   "deck": 7,
+   "kind": "power",
+   "name": "Power Control",
+   "status": "built",
+   "bounds": [
+    -310,
+    -16,
+    -286,
+    0
+   ],
+   "z": [
+    -58.0,
+    -54.6
+   ]
+  },
+  {
+   "id": "armory",
+   "deck": 8,
+   "kind": "armory",
+   "name": "Armory",
+   "status": "built",
+   "bounds": [
+    -90,
+    -16,
+    -66,
+    0
+   ],
+   "z": [
+    -62.0,
+    -58.6
+   ]
+  },
+  {
+   "id": "range",
+   "deck": 8,
+   "kind": "range",
+   "name": "Firing Range",
+   "status": "built",
+   "bounds": [
+    -40,
+    -16,
+    0,
+    0
+   ],
+   "z": [
+    -62.0,
+    -58.6
+   ]
+  },
+  {
+   "id": "flight_deck",
+   "deck": 9,
+   "kind": "hangar",
+   "name": "Flight Deck",
+   "status": "existing",
+   "bounds": [
+    59.5,
+    -28.5,
+    218.0,
+    28.5
+   ],
+   "z": [
+    -66.0,
+    -62.6
+   ]
+  },
+  {
+   "id": "flight_ops",
+   "deck": 9,
+   "kind": "flight_ops",
+   "name": "Flight Operations",
+   "status": "built",
+   "bounds": [
+    20,
+    -16,
+    44,
+    0
+   ],
+   "z": [
+    -66.0,
+    -62.6
+   ]
+  }
+ ],
+ "vertical": [
+  {
+   "id": "lift_main",
+   "kind": "turbolift",
+   "name": "Turbolift",
+   "decks": [
+    1,
+    4,
+    6,
+    7,
+    9
+   ],
+   "landings": [
+    {
+     "deck": 1,
+     "room": "corridor_1a_port",
+     "pos": [
+      -18.6,
+      -3.9,
+      0.2
+     ],
+     "node": "lift.bridge",
+     "existing": true
+    }
+   ],
+   "ride": {
+    "fade_s": 0.4
+   }
+  },
+  {
+   "id": "stair_92n",
+   "nodes": [],
+   "towers": {}
+  },
+  {
+   "id": "tl_a",
+   "kind": "bridge",
+   "name": "Turbolift 1",
+   "shaft": {
+    "x": -60.0,
+    "y": 6.0,
+    "w": 2.8,
+    "d": 2.8,
+    "z": [
+     -66.0,
+     0.0
+    ]
+   },
+   "car": {
+    "w": 2.4,
+    "d": 2.4,
+    "h": 2.6
+   },
+   "landings": [
+    {
+     "deck": 9,
+     "z": -66.0,
+     "door": [
+      -60.0,
+      4.6,
+      -66.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d9",
+     "node": "lift.tl_a.d9"
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "door": [
+      -60.0,
+      4.6,
+      -62.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d8",
+     "node": "lift.tl_a.d8"
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "door": [
+      -60.0,
+      4.6,
+      -58.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d7",
+     "node": "lift.tl_a.d7"
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "door": [
+      -60.0,
+      4.6,
+      -54.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d6",
+     "node": "lift.tl_a.d6"
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "door": [
+      -60.0,
+      4.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d5",
+     "node": "lift.tl_a.d5"
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "door": [
+      -60.0,
+      4.6,
+      -46.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d4",
+     "node": "lift.tl_a.d4"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "door": [
+      -60.0,
+      4.6,
+      -42.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d3",
+     "node": "lift.tl_a.d3"
+    },
+    {
+     "deck": 2,
+     "z": -36.7,
+     "door": [
+      -60.0,
+      4.6,
+      -36.7
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d2",
+     "node": "lift.tl_a.d2"
+    },
+    {
+     "deck": 1,
+     "z": 0.0,
+     "door": [
+      -60.0,
+      4.6,
+      0.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a_d1",
+     "node": "lift.tl_a.d1"
+    }
+   ],
+   "speed": 8.0,
+   "accel": 2.5
+  },
+  {
+   "id": "tl_a2",
+   "kind": "turbolift",
+   "name": "Turbolift 2",
+   "shaft": {
+    "x": -64.0,
+    "y": 6.0,
+    "w": 2.8,
+    "d": 2.8,
+    "z": [
+     -66.0,
+     0.0
+    ]
+   },
+   "car": {
+    "w": 2.4,
+    "d": 2.4,
+    "h": 2.6
+   },
+   "landings": [
+    {
+     "deck": 9,
+     "z": -66.0,
+     "door": [
+      -64.0,
+      4.6,
+      -66.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d9",
+     "node": "lift.tl_a2.d9"
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "door": [
+      -64.0,
+      4.6,
+      -62.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d8",
+     "node": "lift.tl_a2.d8"
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "door": [
+      -64.0,
+      4.6,
+      -58.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d7",
+     "node": "lift.tl_a2.d7"
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "door": [
+      -64.0,
+      4.6,
+      -54.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d6",
+     "node": "lift.tl_a2.d6"
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "door": [
+      -64.0,
+      4.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d5",
+     "node": "lift.tl_a2.d5"
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "door": [
+      -64.0,
+      4.6,
+      -46.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d4",
+     "node": "lift.tl_a2.d4"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "door": [
+      -64.0,
+      4.6,
+      -42.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d3",
+     "node": "lift.tl_a2.d3"
+    },
+    {
+     "deck": 2,
+     "z": -36.7,
+     "door": [
+      -64.0,
+      4.6,
+      -36.7
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d2",
+     "node": "lift.tl_a2.d2"
+    },
+    {
+     "deck": 1,
+     "z": 0.0,
+     "door": [
+      -64.0,
+      4.6,
+      0.0
+     ],
+     "yaw": 90,
+     "lobby": "fx_tl_a2_d1",
+     "node": "lift.tl_a2.d1"
+    }
+   ],
+   "speed": 8.0,
+   "accel": 2.5
+  },
+  {
+   "id": "sv_b",
+   "kind": "service",
+   "name": "Service Lift 3",
+   "shaft": {
+    "x": -150.0,
+    "y": 14.0,
+    "w": 3.2,
+    "d": 2.8,
+    "z": [
+     -78.0,
+     -46.0
+    ]
+   },
+   "car": {
+    "w": 2.8,
+    "d": 2.4,
+    "h": 2.8
+   },
+   "landings": [
+    {
+     "deck": 12,
+     "z": -78.0,
+     "door": [
+      -148.6,
+      14.0,
+      -78.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d12",
+     "node": "lift.sv_b.d12"
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "door": [
+      -148.6,
+      14.0,
+      -74.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d11",
+     "node": "lift.sv_b.d11"
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "door": [
+      -148.6,
+      14.0,
+      -70.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d10",
+     "node": "lift.sv_b.d10"
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "door": [
+      -148.6,
+      14.0,
+      -66.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d9",
+     "node": "lift.sv_b.d9"
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "door": [
+      -148.6,
+      14.0,
+      -62.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d8",
+     "node": "lift.sv_b.d8"
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "door": [
+      -148.6,
+      14.0,
+      -58.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d7",
+     "node": "lift.sv_b.d7"
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "door": [
+      -148.6,
+      14.0,
+      -54.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d6",
+     "node": "lift.sv_b.d6"
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "door": [
+      -148.6,
+      14.0,
+      -50.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d5",
+     "node": "lift.sv_b.d5"
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "door": [
+      -148.6,
+      14.0,
+      -46.0
+     ],
+     "yaw": 0,
+     "lobby": "fx_sv_b_d4",
+     "node": "lift.sv_b.d4"
+    }
+   ],
+   "speed": 5.0,
+   "accel": 1.5
+  }
+ ],
+ "transit": [
+  {
+   "id": "spine_shuttle",
+   "kind": "shuttle",
+   "name": "Spine Shuttle",
+   "deck": 5,
+   "path": [
+    [
+     100.0,
+     40.0,
+     -50.0
+    ],
+    [
+     -492.0,
+     40.0,
+     -50.0
+    ]
+   ],
+   "stops": [
+    {
+     "id": "stop_A",
+     "section": "A",
+     "x": 100.0,
+     "door": [
+      100.0,
+      38.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "room": "d5_shuttle_stop_A1",
+     "node": "fx_shuttle_A"
+    },
+    {
+     "id": "stop_B",
+     "section": "B",
+     "x": -12.0,
+     "door": [
+      -12.0,
+      38.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "room": "d5_shuttle_stop_B1",
+     "node": "fx_shuttle_B"
+    },
+    {
+     "id": "stop_C",
+     "section": "C",
+     "x": -96.0,
+     "door": [
+      -96.0,
+      38.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "room": "d5_shuttle_stop_C1",
+     "node": "fx_shuttle_C"
+    },
+    {
+     "id": "stop_D",
+     "section": "D",
+     "x": -216.0,
+     "door": [
+      -216.0,
+      38.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "room": "d5_shuttle_stop_D1",
+     "node": "fx_shuttle_D"
+    },
+    {
+     "id": "stop_E",
+     "section": "E",
+     "x": -292.0,
+     "door": [
+      -292.0,
+      38.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "room": "d5_shuttle_stop_E1",
+     "node": "fx_shuttle_E"
+    },
+    {
+     "id": "stop_G",
+     "section": "G",
+     "x": -428.0,
+     "door": [
+      -428.0,
+      38.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "room": "d5_shuttle_stop_G1",
+     "node": "fx_shuttle_G"
+    },
+    {
+     "id": "stop_H",
+     "section": "H",
+     "x": -492.0,
+     "door": [
+      -492.0,
+      38.6,
+      -50.0
+     ],
+     "yaw": 90,
+     "room": "d5_shuttle_stop_H1",
+     "node": "fx_shuttle_H"
+    }
+   ],
+   "car": {
+    "mesh": "SpineCar",
+    "length": 14.0,
+    "w": 2.8,
+    "h": 2.9,
+    "floor": 0.16
+   },
+   "speed": 16.0,
+   "accel": 2.2
+  }
+ ],
+ "graph": {
+  "nodes": [
+   {
+    "id": "lift.tl_a.d9",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     -66.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a.d8",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     -62.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a.d7",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     -58.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a.d6",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     -54.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a.d5",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a.d4",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     -46.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a.d3",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     -42.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a.d2",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     -36.7
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a.d1",
+    "deck": 0,
+    "p": [
+     -60.0,
+     3.4,
+     0.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d9",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     -66.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d8",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     -62.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d7",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     -58.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d6",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     -54.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d5",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d4",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     -46.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d3",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     -42.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d2",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     -36.7
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.tl_a2.d1",
+    "deck": 0,
+    "p": [
+     -64.0,
+     3.4,
+     0.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d12",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -78.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d11",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -74.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d10",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -70.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d9",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -66.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d8",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -62.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d7",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -58.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d6",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -54.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d5",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "lift.sv_b.d4",
+    "deck": 0,
+    "p": [
+     -147.4,
+     14.0,
+     -46.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "fx_shuttle_A",
+    "deck": 0,
+    "p": [
+     100.0,
+     35.4,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "fx_shuttle_B",
+    "deck": 0,
+    "p": [
+     -12.0,
+     35.4,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "fx_shuttle_C",
+    "deck": 0,
+    "p": [
+     -96.0,
+     35.4,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "fx_shuttle_D",
+    "deck": 0,
+    "p": [
+     -216.0,
+     35.4,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "fx_shuttle_E",
+    "deck": 0,
+    "p": [
+     -292.0,
+     35.4,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "fx_shuttle_G",
+    "deck": 0,
+    "p": [
+     -428.0,
+     35.4,
+     -50.0
+    ],
+    "kind": "lift"
+   },
+   {
+    "id": "fx_shuttle_H",
+    "deck": 0,
+    "p": [
+     -492.0,
+     35.4,
+     -50.0
+    ],
+    "kind": "lift"
+   }
+  ],
+  "edges": []
+ }
+}
