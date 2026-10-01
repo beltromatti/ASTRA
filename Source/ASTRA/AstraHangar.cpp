@@ -386,8 +386,10 @@ void AAstraHangar::Tick(float DeltaTime)
 			Rider->SetActorLocation(RideTo + FVector(0, 0, Half), false, nullptr, ETeleportType::TeleportPhysics);
 			if (AController* Ctl = Rider->GetController())
 			{
-				// out of the car facing into the deck: aft into Main Engineering and the Medbay, forward on the others
-				Ctl->SetControlRotation(FRotator(0.f, RideToLanding >= 2 ? 180.f : (RideToLanding == 1 ? GetActorRotation().Yaw : 0.f), 0.f));
+				// out of the car facing into the deck: aft into Main Engineering and the Medbay, forward on the others (the Mess and the
+				// Berthing come out of the Deck 4 lift banks, whose doors are on the aft wall: forward too)
+				const bool bAft = RideToLanding == 2 || RideToLanding == 3;
+				Ctl->SetControlRotation(FRotator(0.f, bAft ? 180.f : (RideToLanding == 1 ? GetActorRotation().Yaw : 0.f), 0.f));
 			}
 			SetZoneLights(IsPawnInHangar(Rider.Get()));
 			if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))

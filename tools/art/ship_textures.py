@@ -217,7 +217,7 @@ def screen_face(kind: str, w: int = 512, h: int = 288) -> Image.Image:
             d.text((20, y), f"DECK {k + 1:>2}", font=f_small, fill=(*ICE, 255))
             d.line((90, y + 9, w - 20, y + 9), fill=(30, 44, 60, 255), width=1)
     elif kind == "sched":
-        for k, t in enumerate(["RED WATCH   0000-0800", "BLUE WATCH  0800-1600", "GOLD WATCH  1600-2400", "MESS: 0630 1130 1730 2330"]):
+        for k, t in enumerate(["RED WATCH   0000-0800", "GOLD WATCH  0800-1600", "BLUE WATCH  1600-2400", "MESS: 0630 1130 1730 2330"]):
             d.text((20, 64 + k * 38), t, font=f_mono, fill=(*ICE, 255))
     elif kind == "map":
         import random

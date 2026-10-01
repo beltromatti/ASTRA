@@ -220,13 +220,22 @@ void AASTRAPlayerController::ToggleSeat()
 				if (Ship && Ship->IsAbandoning())
 				{
 					Ship->BoardLifepod(*It, this);
+					return;
 				}
-				else
+				// sealed: a word on it, unless the lift is right here (pod 1-A is beside the bridge's lift doors: the lift is what the
+				// Captain came for, and E always answered "sealed")
+				bool bLiftHere = false;
+				for (TActorIterator<AAstraHangar> H(GetWorld()); H && !bLiftHere; ++H)
+				{
+					bLiftHere = H->LiftLandingNear(Me) >= 0;
+				}
+				if (!bLiftHere)
 				{
 					Subtitle(-1 - It->PodName.Len(), TEXT("notice"), FString::Printf(TEXT("LIFEPOD %s"), *It->PodName),
 					         TEXT("Sealed. It opens on ABANDON SHIP."));
+					return;
 				}
-				return;
+				break;
 			}
 		}
 	}
