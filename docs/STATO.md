@@ -25,8 +25,14 @@
   (riflessi, caccia, missili, esche, danni, calore al 97 %, scafo 88 % in 2,5 minuti senza mente), 59,7 fps a macchina scarica. Difetti
   trovati e corretti su main: scintille delle console a ogni colpo (4 in 15 s) e incendi interni a ogni colpo (sei ponti in 30 s).
   Da fare all'unione: `PlayerEngineFactor()` al timone, `RepairPlayerSystems()` dalle squadre, `GetWeaponRanges()` su tavolo e schermo.
-- **METALFX**: il plugin parte, costruisce lo scaler (2,8 s) e poi si spegne: il colore che arriva all'upscaler nel gioco vero è
-  RG11B10Float, il plugin voleva RGBA16F. Rimandato all'aiutante.
+- **METALFX**: al primo giro il plugin si spegneva (il colore che arriva all'upscaler nel gioco vero è R11G11B10F, voleva RGBA16F);
+  corretto dall'aiutante in un'ora. Al secondo giro **funziona**: 1,3 ms di MetalFX, a pari risoluzione (50 %) ~1 ms meno del TSR e
+  immagine alla pari; con la risoluzione dinamica si assesta al **54 %** contro il 40–42 % del TSR (+70 % di pixel). Da sistemare
+  prima dell'unione: la risoluzione dinamica non vede il suo 1,3 ms (56–57 fps) e il render thread sale a ~19 ms; poi la prova del moto.
+
+**Fatto dal lead il 1/10 notte:** la **mappa olografica della nave** (`holo ship`): lo spaccato dell'Aquila sul tavolo, ponte per
+riga, sezioni col colore del danno, incidenti con squadra e progresso, squadre che camminano dal Ponte 6, il Capitano dov'è; ops e la
+mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le navi scansionate (`GetDamageView` di GUERRA).
 
 **Banco della guerra senza grafica**: `tools/war.py run|report|ship|ab` (commandlet `AstraWarSim`, ~1000× il tempo reale, deterministico per seme; vedi [GUERRA.md](GUERRA.md)).
 
