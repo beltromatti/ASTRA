@@ -561,6 +561,8 @@ def cmd_ship(a: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "mind":
+        cmd_mind(argparse.Namespace(rest=sys.argv[2:]))        # (the arena has options of its own: they go through untouched, `--help` included)
     ap = argparse.ArgumentParser(prog="war.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
