@@ -87,6 +87,19 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
   - L'«anello scuro» di VFX era il Janus Gate dietro la fila di campioni: gli effetti sono a posto.
   - Aiutanti: **MENTE-GUERRA** e **NAVE-2** ripresi dopo il limite di sessione; **DISTRUZIONE** avviato (brief aggiornato con la
     spirale dei danni interni, il tampone e il metro `tools/survive.sh`). **App aggiornata** in `~/Applications/ASTRA.app` (Development, 1/10 12:52, provata: parte, plancia, effetti di guerra, VITA, MetalFX).
+- **1/10 tardo pomeriggio — tre moduli uniti e provati nel gioco:**
+  - **MENTE-GUERRA** (ammiraglio del Mandato con nebbia di guerra e catena di comando, capitani alleati che comandano e parlano,
+    l'XO con `group_order`, regista v2): nel gioco vero la successione funziona (Hale → Solm → Kade), le decisioni costano 0,3–2 m$.
+    Difetto trovato e corretto: i comandanti dell'apertura non avevano la missione (prendere il Janus Gate) e l'Archon si ritirava a
+    40 km senza combattere; ora attacca la Praetorian a 4,5 km (Acheron al 48 % dopo 3,5 minuti). `ASTRA_WAR_FORMATION=1` (linea a
+    3 km, battaglie due volte più sanguinose) resta spento: da decidere giocando.
+  - **NAVE-2**: tutti i dodici ponti generati nell'editor (`build_ship_interior.py`: 266 mesh con Nanite, una mappa per ponte in
+    streaming, 3167 lampade come dati con un pool di 14 luci) e percorsi: Studio del Capitano, Transporter Room, poligono, cunicoli del
+    Ponte 12, ascensori per Berthing, Mess e Medbay (le alcove vecchie aperte con porte scorrevoli, l'ascensore aspetta al buio il
+    ponte di arrivo), 54–60 fps. La bacheca dei turni corretta (Gold 08–16, Blue 16–24 come VITA).
+  - Il banco di scala dalla plancia: `astra.war.scenario scale_30x150 aquila` (57–58 fps, game thread 13,8 ms: il punto di partenza
+    di SCALA).
+  - **Aiutanti ora**: DISTRUZIONE (danni interni), SCALA (velivoli a istanze, livelli di dettaglio), VOLO (piloti e ponte di volo).
 - **Aiutanti al lavoro** (brief in `docs/brief/`): **MENTE-GUERRA** (ammiragli, comandanti, alleati che parlano, l'XO con
   `group_order`, la mente nel giro del banco, poi il regista v2), **VFX** (armi, scudi, esplosioni, rotture coi pezzi v3, danni sugli
   scafi, motori), **NAVE-2** (tutti i ponti: stanze nuove, istanze, luci come dati, un sotto-livello per ponte). Poi DISTRUZIONE,
