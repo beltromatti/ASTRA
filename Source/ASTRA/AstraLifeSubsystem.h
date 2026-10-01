@@ -56,7 +56,7 @@ public:
 
 	/** What a damage-control party needs to get to an incident in a deck and section, in seconds: the number the ship should give as "on scene
 	 *  in" when it dispatches a team (the repair then begins when the party is there). 0 when life is not running. */
-	float RepairEtaSeconds(int32 Deck, TCHAR Section, int32 IncidentId) const { return IsRunning() ? Life.RepairEtaSeconds(Deck, Section, IncidentId) : 0.f; }
+	float RepairEtaSeconds(int32 InDeck, TCHAR InSection, int32 IncidentId) const { return IsRunning() ? Life.RepairEtaSeconds(InDeck, InSection, IncidentId) : 0.f; }
 
 	/** The tests feed the simulation their own incidents: the ship's are not passed on while this is off. */
 	void SetShipFeed(bool bOn) { bFeed = bOn; }

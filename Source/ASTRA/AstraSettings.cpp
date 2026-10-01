@@ -19,7 +19,7 @@
 
 namespace
 {
-	const TCHAR* Section = TEXT("ASTRA.Settings");
+	const TCHAR* SettingsSection = TEXT("ASTRA.Settings");
 	const FLinearColor Ink(0.86f, 0.9f, 0.95f);
 	const FLinearColor Dim(0.52f, 0.58f, 0.66f);
 	const FLinearColor Accent(0.42f, 0.78f, 1.f);
@@ -43,12 +43,12 @@ FAstraSettings& FAstraSettings::Get()
 	if (!bLoaded && GConfig)
 	{
 		bLoaded = true;
-		GConfig->GetInt(Section, TEXT("Quality"), S.Quality, GGameUserSettingsIni);
-		GConfig->GetInt(Section, TEXT("Image"), S.Image, GGameUserSettingsIni);
-		GConfig->GetInt(Section, TEXT("FrameRate"), S.FrameRate, GGameUserSettingsIni);
-		GConfig->GetFloat(Section, TEXT("Music"), S.Music, GGameUserSettingsIni);
-		GConfig->GetFloat(Section, TEXT("Voices"), S.Voices, GGameUserSettingsIni);
-		GConfig->GetBool(Section, TEXT("Subtitles"), S.bSubtitles, GGameUserSettingsIni);
+		GConfig->GetInt(SettingsSection, TEXT("Quality"), S.Quality, GGameUserSettingsIni);
+		GConfig->GetInt(SettingsSection, TEXT("Image"), S.Image, GGameUserSettingsIni);
+		GConfig->GetInt(SettingsSection, TEXT("FrameRate"), S.FrameRate, GGameUserSettingsIni);
+		GConfig->GetFloat(SettingsSection, TEXT("Music"), S.Music, GGameUserSettingsIni);
+		GConfig->GetFloat(SettingsSection, TEXT("Voices"), S.Voices, GGameUserSettingsIni);
+		GConfig->GetBool(SettingsSection, TEXT("Subtitles"), S.bSubtitles, GGameUserSettingsIni);
 		S.Quality = FMath::Clamp(S.Quality, -1, 3);
 		S.Image = FMath::Clamp(S.Image, 0, 2);
 		S.FrameRate = S.FrameRate <= 30 ? 30 : 60;
@@ -64,12 +64,12 @@ void FAstraSettings::Save() const
 	{
 		return;
 	}
-	GConfig->SetInt(Section, TEXT("Quality"), Quality, GGameUserSettingsIni);
-	GConfig->SetInt(Section, TEXT("Image"), Image, GGameUserSettingsIni);
-	GConfig->SetInt(Section, TEXT("FrameRate"), FrameRate, GGameUserSettingsIni);
-	GConfig->SetFloat(Section, TEXT("Music"), Music, GGameUserSettingsIni);
-	GConfig->SetFloat(Section, TEXT("Voices"), Voices, GGameUserSettingsIni);
-	GConfig->SetBool(Section, TEXT("Subtitles"), bSubtitles, GGameUserSettingsIni);
+	GConfig->SetInt(SettingsSection, TEXT("Quality"), Quality, GGameUserSettingsIni);
+	GConfig->SetInt(SettingsSection, TEXT("Image"), Image, GGameUserSettingsIni);
+	GConfig->SetInt(SettingsSection, TEXT("FrameRate"), FrameRate, GGameUserSettingsIni);
+	GConfig->SetFloat(SettingsSection, TEXT("Music"), Music, GGameUserSettingsIni);
+	GConfig->SetFloat(SettingsSection, TEXT("Voices"), Voices, GGameUserSettingsIni);
+	GConfig->SetBool(SettingsSection, TEXT("Subtitles"), bSubtitles, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 }
 

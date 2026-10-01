@@ -208,7 +208,10 @@ void UAstraBattleSubsystem::BuildDurability(FAstraBattleShip& S, float Hull, flo
 		S.Shield = S.ShieldMax = Shield;
 		return;
 	}
-	static AstraWar::FTuneVar KShield(TEXT("shield_scale"), 1.f), KArmour(TEXT("armour_scale"), 1.f), KStruct(TEXT("struct_scale"), 1.2f);
+	// the pace of the war (the lead, 1/10, from the game: a carrier cruiser caught alone by four warships went from 99 % to 19 % in
+	// 100 s, no time left to answer): every hull, plate and shield half as tough again as GUERRA's bench tuning; uniform, so the
+	// balance between the classes and the bench's symmetry hold, and a mistake still costs dearly but leaves minutes to answer it
+	static AstraWar::FTuneVar KShield(TEXT("shield_scale"), 1.5f), KArmour(TEXT("armour_scale"), 1.5f), KStruct(TEXT("struct_scale"), 1.8f);
 	FAstraShipDamage& D = S.Dmg;
 	D = FAstraShipDamage();
 	D.bModel = true;
