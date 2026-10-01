@@ -109,17 +109,19 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn(("helm", "Rotta zero-nove-zero, Capitano."), self.game.lines())    # and the bridge answered, as before
 
     async def test_nobody_near_nobody_asked(self) -> None:
+        # who can hear is the game's to say (AstraLifeSubsystem::ListenersJson: 16 m, walls, doors): with nobody in its list the crew
+        # members' model is not asked at all and the bridge answers (whoever the game lists is asked, at any distance it gives)
         self.model.crew = [("speak", {"speaker": "xo", "text": "Agli ordini.", "tone": "calm"})]
         await self.say("XO, rapporto", None, wait=0.6)
-        await self.say("XO, rapporto", [dict(ENGINEER, dist_m=20.0, facing=False)], wait=0.6)     # too far to be spoken to
+        await self.say("XO, rapporto", [], wait=0.6)
         self.assertEqual(self.calls("npc"), [])
         self.assertEqual(len(self.calls("crew")), 2)
 
     async def test_the_officers_are_told_the_captain_is_among_the_crew(self) -> None:
         self.model.npc = []
         await self.say("come va?", [ENGINEER], wait=0.8)
-        crew = self.calls("crew")[0]["user"]
-        self.assertIn("face to face with crew members", crew)
+        crew = self.calls("crew")[0]["prompt"]                                  # (the note comes with the turn's last message)
+        self.assertIn("among crew members who can hear", crew)
         self.assertIn("Petty Officer Amara Diallo", crew)
         room = self.calls("crew")[0]["system"]
         self.assertNotIn("npc17", room)                                          # the officers' room does not name the life's ids
