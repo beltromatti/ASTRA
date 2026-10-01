@@ -202,7 +202,9 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
             await c.agent.handle_event(f"tactical: something {i}", "it")
         said = [m["content"] for m in c.agent.history if m["role"] == "user"]
         self.assertEqual(sum(1 for m in said if m.startswith("Captain:")), 3)                      # all three orders are still there
-        self.assertLessEqual(sum(1 for m in said if not m.startswith("Captain:")), 6)             # the checks are capped
+        checks = sum(1 for m in said if not m.startswith("Captain:"))
+        self.assertLessEqual(checks, 2 * c.agent.history_turns - 3)                                # the checks are capped (cut back to six
+        self.assertLess(checks, 20)                                                                 # when the history passes twice its limit)
 
     async def test_initiative_needs_auto_delegation(self) -> None:
         c = Crew(Script([station("tactical", "engage", targets=["T-24"]), speak("Cocytus giù: passo al Phlegethon.", "tactical")]))

@@ -90,7 +90,10 @@ class BridgeAgent:
         watch checks, chatter: at most the last six since then) — a fight full of checks must not push the Captain's orders out."""
         starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
         captain = [i for i in starts if str(self.history[i].get("content", "")).startswith("Captain:")]
-        if len(starts) <= self.history_turns and len(captain) <= self.history_turns:
+        # the history grows append-only up to twice the limit, then is cut back to it: the provider caches a prompt's unchanged
+        # prefix, and a trim at every turn (a battle's reports come every few seconds) left only the system prompt cached — the
+        # crew's turns paid for ~10k fresh tokens each instead of ~2k
+        if len(starts) <= 2 * self.history_turns and len(captain) <= self.history_turns:
             return
         first = captain[-self.history_turns] if len(captain) > self.history_turns else (captain[0] if captain else starts[0])
         keep = [i for i in starts if i >= first]
