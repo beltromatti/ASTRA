@@ -322,6 +322,10 @@ class Voice:
             return self._cur.t_begin + max(self._cur.est_s, self._cur.sent_s) + 0.3
         return self._last_end + 0.3 if self._last_end > float("-inf") else 0.0
 
+    def speaking_s(self) -> float:
+        """Seconds left of the line being said now (0: nobody is speaking)."""
+        return self._remaining(self._cur) if self._cur is not None and self._cur.state == "playing" else 0.0
+
     def busy_s(self) -> float:
         """Seconds of speech still ahead (being said + waiting, estimated)."""
         left = 0.0
@@ -658,8 +662,11 @@ class Voice:
                 return None
             if due and line.rethink is not None and (line.cut_after or self._now() - line.thought_t > RETHINK_AFTER_S):
                 # its turn has come but it has waited (or was cut off): whoever says it thinks again first — just in time, once —
-                # and meanwhile the next line may go
-                self._start_rethink(line, self._now())
+                # and meanwhile the next line may go. One re-think at a time: the lines behind it are thought again when their own
+                # turn comes (all of them at once, in a busy battle, were a dozen model calls for lines that then waited again)
+                pool = [l for l in pool if l is not line]
+                if not any(l.rethinking is not None for l in self._queue):
+                    self._start_rethink(line, self._now())
                 continue
             return line
 
