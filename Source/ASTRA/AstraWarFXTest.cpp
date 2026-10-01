@@ -9,6 +9,8 @@
 //   astra.fx.burn [on T]                            fires and venting in every section, one gutted
 //   astra.fx.break <bow|mid|stern|reactor|disable> [on T]   the ship's end, the way the war ends ships
 //   astra.fx.clear                                  the scene's ships go (no explosion)
+//   astra.fx.swatch [seconds 40]                    a lineup of every kind of effect 1.2 km ahead of the bridge, in both sides' colours: the material check
+//                                                   (needs no ships; if one of these looks wrong, the material is what is wrong, not the war)
 //   astra.fx.stats                                  what the effects hold and what they cost
 
 #include "AstraWarFX.h"
@@ -22,6 +24,8 @@ struct FAstraWarFXTest
 	static TArray<FString> Queue;
 	static TArray<FPending> Pending;
 	static TArray<int32> SceneIds;
+	static float SwatchT;                  // seconds the lineup has left (0: none)
+	static float SwatchRespawn;            // until the particles that live and die are thrown again
 
 	static FVector Polar(double RangeM, double BearingDeg, double MarkDeg)
 	{
@@ -275,6 +279,16 @@ struct FAstraWarFXTest
 				To->bShieldsUp = true;
 			}
 		}
+		else if (Name == TEXT("swatch"))
+		{
+			const float Secs = FCString::Atof(*Arg(0, TEXT("40")));
+			SwatchT = Secs <= 0.f ? 0.f : FMath::Clamp(Secs, 1.f, 600.f);
+			SwatchRespawn = 0.f;
+			if (SwatchT > 0.f && !Fx.IsLive())
+			{
+				UE_LOG(LogASTRA, Warning, TEXT("[WarFX] swatch: the effects are not drawing (materials missing? run tools/ue_scripts/make_war_fx.py)"));
+			}
+		}
 		else if (Name == TEXT("burn"))
 		{
 			if (FAstraBattleShip* T = Pick(Fx, Arg(0, TEXT("T"))))
@@ -316,6 +330,125 @@ struct FAstraWarFXTest
 		}
 	}
 
+	/** The lineup of astra.fx.swatch, written straight into the layers in world centimetres (x ahead of the bridge, y to starboard, z up), eight columns
+	 *  200 m apart, 1.2 km ahead. Above: glows (a soft ball, a flash, a flare, the limb of a blast wave) that age together, again and again. At eye level, the long
+	 *  thin things lying sideways, head to starboard: an ASTRA and a Mandate slug, a spark, a missile with its trail, an ASTRA and a Mandate laser, a cannon's
+	 *  and a point-defence tracer. Below: the two drives' plumes, a cold and a hot chunk of hull, two fireballs and two clouds of smoke. What lives and dies
+	 *  (the fire, the smoke) is thrown again every few seconds. */
+	static void DrawSwatch(UAstraWarFX& Fx)
+	{
+		if (SwatchT <= 0.f)
+		{
+			return;
+		}
+		SwatchT -= Fx.Dt;
+		SwatchRespawn -= Fx.Dt;
+		using namespace AstraFx;
+		const double Ahead = 1200.0, Step = 200.0;       // m
+		const auto W = [&](double Col, double Up) { return FVector(Ahead, (Col - 3.5) * Step, Up) * 100.0; };
+		const auto Sys = [&](double Col, double Up) { return Fx.F.Origin + Fx.F.Att.RotateVector(W(Col, Up) / 100.0 + Fx.F.Bridge); };
+		const FQuat Side = FQuat::FindBetweenNormals(FVector::ZAxisVector, FVector::YAxisVector);        // a tube's axis along +y: seen from its side
+		const float Gain = Fx.Intensity;
+		const FLinearColor Ac = ShotColor(true, EAstraHitKind::Rail), Mc = ShotColor(false, EAstraHitKind::Rail);
+		const FLinearColor Al = ShotColor(true, EAstraHitKind::Laser), Ml = ShotColor(false, EAstraHitKind::Laser);
+		FTransform* X;
+
+		// row A, above: the glows
+		{
+			const float Age = 0.85f * FMath::Frac(Fx.Clock / 2.6f);
+			struct FGlowSpec { float Kind; FLinearColor Col; float R; float Inten; };
+			const FGlowSpec Specs[8] = {
+				{0.f, Ac, 40.f, 220.f}, {1.f, FLinearColor(1.f, 0.97f, 0.9f), 50.f, 300.f}, {1.f, Mc, 50.f, 400.f}, {2.f, Mc, 36.f, 300.f},
+				{3.f, FLinearColor(1.f, 0.7f, 0.4f), 70.f, 140.f}, {0.f, Mc, 40.f, 220.f}, {1.f, Al, 30.f, 260.f}, {1.f, Ml, 30.f, 260.f}};
+			for (int32 i = 0; i < 8; ++i)
+			{
+				if (float* D = Fx.Glows.Next(X))
+				{
+					const float R = Specs[i].R * (Specs[i].Kind == 3.f ? 1.f : GlowK);         // (the blast wave's shell is drawn at its own size)
+					*X = FTransform(FQuat::Identity, W(i, 250.0), FVector(R * 2.f));
+					Fill(D, Specs[i].Col, Specs[i].Inten * Gain, Age, Specs[i].Kind, 0.f, 0.37f * i, R * 2.f, 0.f);
+				}
+			}
+		}
+
+		// row B, at eye level: slugs and a spark
+		for (int32 i = 0; i < 3; ++i)
+		{
+			if (float* D = Fx.Darts.Next(X))
+			{
+				const bool bSpark = i == 2;
+				const float Len = bSpark ? 24.f : 110.f, Wd = bSpark ? 1.4f : 6.f;
+				*X = FTransform(Side, W(i, 0.0), FVector(Wd, Wd, Len));
+				Fill(D, bSpark ? FLinearColor(1.f, 0.7f, 0.32f) : (i == 1 ? Mc : Ac), (bSpark ? 260.f : 700.f) * Gain, 0.f, bSpark ? 3.f : 0.f, 0.f, 0.3f, Wd, Len);
+			}
+		}
+		// a missile: its glowing head and the trail of beads behind it (young at the head, old at the tail), as the war draws them
+		{
+			const double HeadY = 70.0, Bead = 18.0;                 // m
+			if (float* D = Fx.Glows.Next(X))
+			{
+				const float R = 7.f * GlowK;
+				*X = FTransform(FQuat::Identity, W(3, 0.0) + FVector(0.0, HeadY * 100.0, 0.0), FVector(R * 2.f));
+				Fill(D, FLinearColor(1.f, 0.85f, 0.6f), 260.f * Gain, 0.f, 0.f, 0.f, 0.f, R * 2.f, 0.f);
+			}
+			for (int32 k = 0; k < FTrack::TrailPts; ++k)
+			{
+				if (float* D = Fx.Darts.Next(X))
+				{
+					const float AgeTail = (float)(k + 1) / (float)FTrack::TrailPts, AgeHead = (float)k / (float)FTrack::TrailPts;
+					const float Wd = 2.2f * (1.f + 2.2f * AgeTail), Len = (float)Bead * 1.7f;
+					*X = FTransform(Side, W(3, 0.0) + FVector(0.0, (HeadY - (k + 0.5) * Bead) * 100.0, 0.0), FVector(Wd, Wd, Len));
+					Fill(D, Mc, 65.f * Gain, AgeTail, 2.f, AgeHead, 0.3f, Wd, Len);
+				}
+			}
+		}
+		// beams and tracers
+		for (int32 i = 4; i < 8; ++i)
+		{
+			if (float* D = Fx.Tubes.Next(X))
+			{
+				const bool bLaser = i < 6, bAstra = (i & 1) == 0;
+				const float Len = bLaser ? 160.f : 70.f, Wd = bLaser ? 5.f : (i == 6 ? 1.1f : 0.9f);
+				*X = FTransform(Side, W(i, 0.0), FVector(Wd, Wd, Len));
+				Fill(D, bLaser ? (bAstra ? Al : Ml) : ShotColor(bAstra, i == 6 ? EAstraHitKind::Cannon : EAstraHitKind::PointDefence),
+				     (bLaser ? 520.f : (i == 6 ? 420.f : 360.f)) * Gain, 0.f, bLaser ? 1.f : 4.f, Len, 0.4f, Wd, Len);
+			}
+		}
+
+		// row C, below: the plumes (ASTRA's blue-white, the Mandate's amber: lip at the port end), the chunks of hull, then the fire and the smoke thrown below
+		for (int32 i = 0; i < 2; ++i)
+		{
+			if (float* D = Fx.Plumes.Next(X))
+			{
+				const float Len = 90.f, Wd = 6.6f;
+				*X = FTransform(Side, W(i, -250.0), FVector(Wd, Wd, Len));
+				Fill(D, i ? FLinearColor(1.f, 0.62f, 0.3f) : FLinearColor(0.78f, 0.9f, 1.f), 70.f * Gain * 0.85f, Fx.Clock, (float)i, 0.f, 0.3f, Wd, Len);
+			}
+		}
+		for (int32 i = 0; i < 2; ++i)
+		{
+			if (float* D = Fx.DebrisL.Next(X))
+			{
+				*X = FTransform(FQuat(FVector(1.0, 0.6, 0.3).GetSafeNormal(), Fx.Clock * 0.35f), W(2 + i, -250.0), FVector(26.f, 14.f, 5.f));
+				Fill(D, i ? FLinearColor(0.07f, 0.062f, 0.055f) : FLinearColor(0.5f, 0.49f, 0.46f), i ? 55.f : 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f);
+			}
+		}
+		if (SwatchRespawn <= 0.f)
+		{
+			SwatchRespawn = 3.4f;
+			const FVector Vel = Fx.F.Vel;                           // (they keep up with the Aquila: what is thrown here stays here)
+			for (int32 i = 0; i < 2; ++i)
+			{
+				if (FPuff* P = Fx.AddPuff(Sys(4 + i, -250.0), Vel, 2.6f, 20.f, 50.f, FLinearColor(1.f, 0.6f, 0.24f), 190.f, LFire))
+				{
+					P->P1 = 0.5f * (float)i;
+				}
+			}
+			Fx.Smoke(Sys(6, -250.0), Vel, 40.f, 6.5f, 0.85f);
+			Fx.Smoke(Sys(7, -250.0), Vel, 40.f, 6.5f, 0.35f);       // a paler cloud
+		}
+	}
+
 	static void Pump(UAstraWarFX& Fx, float Dt)
 	{
 		TArray<FString> Lines = MoveTemp(Queue);
@@ -346,10 +479,13 @@ struct FAstraWarFXTest
 TArray<FString> FAstraWarFXTest::Queue;
 TArray<FAstraWarFXTest::FPending> FAstraWarFXTest::Pending;
 TArray<int32> FAstraWarFXTest::SceneIds;
+float FAstraWarFXTest::SwatchT = 0.f;
+float FAstraWarFXTest::SwatchRespawn = 0.f;
 
 void UAstraWarFX::RunTests()
 {
 	FAstraWarFXTest::Pump(*this, Dt);
+	FAstraWarFXTest::DrawSwatch(*this);
 }
 
 namespace
@@ -370,4 +506,5 @@ ASTRA_FX_COMMAND(shield, "Hit a shield sector in the test scene: astra.fx.shield
 ASTRA_FX_COMMAND(hit, "One blow that gets through, in the test scene: astra.fx.hit <rail|laser|missile|torpedo|cannon> [damage 40] [facing bow] [on T|A|S|aquila]");
 ASTRA_FX_COMMAND(burn, "Fires and venting in every section of a test ship: astra.fx.burn [on T|A|S]");
 ASTRA_FX_COMMAND(break, "End a test ship: astra.fx.break <bow|mid|stern|reactor|disable> [on T|A|S]");
+ASTRA_FX_COMMAND(swatch, "A lineup of every kind of effect 1.2 km ahead of the bridge, in both sides' colours (the material check): astra.fx.swatch [seconds 40]; 0 puts it away");
 ASTRA_FX_COMMAND(stats, "What the war's effects hold and what they cost");

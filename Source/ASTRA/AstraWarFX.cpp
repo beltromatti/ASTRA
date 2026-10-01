@@ -133,7 +133,13 @@ bool UAstraWarFX::LoadAssets()
 	DamageMats.Reset();
 	for (const TCHAR* N : Dmg)
 	{
-		DamageMats.Add(LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Materials/Instances/MI_ShipDamage_%s.MI_ShipDamage_%s"), N, N)));
+		// the war's own decal (make_war_fx.py) first; the ship generator's, as it stands, if that has not been made yet
+		UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Materials/Instances/MI_WAR_Damage_%s.MI_WAR_Damage_%s"), N, N), nullptr, LOAD_Quiet | LOAD_NoWarn);
+		if (!M)
+		{
+			M = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Materials/Instances/MI_ShipDamage_%s.MI_ShipDamage_%s"), N, N), nullptr, LOAD_Quiet | LOAD_NoWarn);
+		}
+		DamageMats.Add(M);
 	}
 	const bool bOk = SphereMesh && CylinderMesh && CubeMesh && MatDart && MatTube && MatGlow && MatFire && MatSmoke && MatPlume && MatShield;
 	if (!bOk)
