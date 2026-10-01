@@ -276,6 +276,7 @@ void FAstraBoardSim::SetCaptain(const FVector& Pos, float Yaw, bool bLow, float 
 	if (U.Act != EAct::Gone && U.Act != EAct::Dead)
 	{
 		U.Act = bDown ? EAct::Down : EAct::Idle;
+		bCaptainRescueTold &= bDown;               // up again: the next fall is told afresh
 	}
 }
 

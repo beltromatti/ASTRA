@@ -1019,6 +1019,37 @@ static void BoardScenarioOrders(FRig& Rig, int32 Seed, int32 Seeds)
 		const int32 Last = UE_ARRAY_COUNT(Marks) - 1;
 		BCheck("orders: follow gathers the squads", All[Last] > 0.0 && Near[Last] >= 0.8 * All[Last], FString::Printf(TEXT("%.0f of %.0f able marines within 15 m of the Captain %d s after the order"), Near[Last], All[Last], Marks[Last] - 10));
 	}
+	// a Captain who falls: the two squads nearest to him go to him by the drill alone (no order) and stay round him, and it is told once
+	{
+		const int32 Tries = FMath::Min(Seeds, 8);
+		double Near = 0.0;
+		int32 Told = 0;
+		for (int32 s = 0; s < Tries; ++s)
+		{
+			double InCircle = 0.0;
+			const TFunction<void(FAstraBoardSim&)> Hook = [&](FAstraBoardSim& S)
+			{
+				const int32 T = FMath::RoundToInt(S.Time());
+				const FUnit* C = S.Unit(S.CaptainId());
+				if (T == 25 && C)
+				{
+					S.SetCaptain(C->Pos, C->Yaw, true, 0.f, true);
+				}
+				if (T == 75 && C)
+				{
+					for (const FUnit& U : S.Units())
+					{
+						InCircle += (U.Side == ESide::Aquila && !U.bExternal && U.Able() && FVector::Dist2D(U.Pos, C->Pos) < 800.0) ? 1.0 : 0.0;
+					}
+				}
+			};
+			const FBoardFight F = RunBoarding(Rig, Seed + s, 4, 24, 12, *BenchBreach(Rig), TEXT("engineering"), true, 25.f, Hook, Lane);
+			Near += InCircle;
+			Told += F.R.Book.Rescues > 0 ? 1 : 0;
+		}
+		BNote(FString::Printf(TEXT("the Captain falls at 25 s: %.1f able marines within 8 m of him 50 s later, the rescue told in %d of %d fights"), Near / Tries, Told, Tries));
+		BCheck("orders: a fallen Captain is reached", Near / Tries >= 6.0 && Told >= (Tries + 1) / 2, FString::Printf(TEXT("%.1f marines round him, told in %d of %d"), Near / Tries, Told, Tries));
+	}
 	BRecord->SetObjectField(TEXT("orders"), Rec);
 }
 

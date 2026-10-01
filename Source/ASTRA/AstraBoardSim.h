@@ -328,6 +328,7 @@ private:
 	double Clock = 0.0;
 	double Acc = 0.0;
 	int32 CaptainUnit = INDEX_NONE;
+	bool bCaptainRescueTold = false;          // the marines' reaching the Captain has been told for this fall
 	float SensorT = 0.f;
 	TArray<FVector> BreachRoute;
 	// boarders still to come in

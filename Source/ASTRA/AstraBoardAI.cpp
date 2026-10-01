@@ -829,6 +829,24 @@ void FAstraBoardSim::PlanMarines(FSquad& S)
 		}
 		Radius = 800.f;
 		S.TargetPos = At;
+		// the Captain is down: the two squads nearest to him go to him and stay round him until he is carried out or on his feet (the drill's first duty, whatever else they were
+		// doing); the mind may send more, or take them off with an order of its own
+		if (const FUnit* Cap = Unit(CaptainUnit); Cap && Cap->Act == EAct::Down)
+		{
+			int32 Nearer = 0;
+			const float MyD = (float)FVector::Dist(L.Pos, Cap->Pos);
+			for (const FSquad& O : Teams)
+			{
+				if (O.Id != S.Id && O.Side == ESide::Aquila && O.MusterT <= 0.f && O.Leader != INDEX_NONE && People[O.Leader].Able() && FVector::Dist(People[O.Leader].Pos, Cap->Pos) < MyD)
+				{
+					++Nearer;
+				}
+			}
+			if (Nearer < 2)
+			{
+				Task = ETask::Rescue;
+			}
+		}
 	}
 	switch (Task)
 	{
@@ -890,8 +908,12 @@ void FAstraBoardSim::PlanMarines(FSquad& S)
 			}
 			if (bClear)
 			{
-				Emit(EEvent::Rescue, S.Leader, CaptainUnit, C->Pos, C->Pos, 0.f, false, S.Name);
-				++Stats.Rescues;
+				if (!bCaptainRescueTold)
+				{
+					bCaptainRescueTold = true;
+					Emit(EEvent::Rescue, S.Leader, CaptainUnit, C->Pos, C->Pos, 0.f, false, S.Name);
+					++Stats.Rescues;
+				}
 				S.Task = ETask::Idle;
 				S.bOrdered = false;
 			}

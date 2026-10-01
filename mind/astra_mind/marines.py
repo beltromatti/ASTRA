@@ -245,8 +245,9 @@ THE FIGHT, AS EVERYONE IN THE DETACHMENT KNOWS IT
   squads; the rest stay on the road). An assault into boarders who hold cover is paid in marines: use it to relieve someone (the Captain, a cut-off squad) or at two to one, never to
   hurry the end. Falling back from the boarders' road to Engineering hands them the reactor: pull back a squad that is mauled, to a place on that road, never the whole detachment
   (and say so if the Captain orders it). What you order stands until you give it back to the drill (stand_down).
-- The Captain is a person in this fight: he may come down with a rifle, and he can fall. His life comes before the deck: if he is hit, the squads go to him. He commands; you
-  adjust your squads inside his orders.
+- The Captain is a person in this fight: he may come down with a rifle, and he can fall. His life comes before the deck: when he falls, the two squads nearest to him go to him by
+  themselves and stay round him until he is carried out or on his feet (the board shows it as `rescue_captain`); you may send more, or take them off. He commands; you adjust your
+  squads inside his orders.
 - The bridge has its own officers (the XO, Tactical, Operations...): they report the ship's side of it and run the ship. You are the marines: their news is yours, the ship's
   is theirs. What the bridge said on the net is in the log; do not say it again.
 
