@@ -24,8 +24,9 @@ _spec = importlib.util.spec_from_file_location("war_fx_hlsl_check", os.path.join
 W = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(W)               # type: ignore[union-attr]
 
-F, F3 = W.F, W.F3
+F, F2, F3 = W.F, W.F2, W.F3
 SNIPPETS = {
+    "SCREEN_UV": (H.SCREEN_UV, F2, [("LP", F3)]),
     "SPARKLE": (H.SPARKLE, F3, [("Fr", F), ("Col", F3), ("Inten", F), ("Age", F), ("Seed", F), ("Tm", F)]),
     "COLUMN": (H.COLUMN, F3, [("Fr", F), ("LZ", F), ("Col", F3), ("Inten", F), ("Prog", F), ("Dir", F), ("Fade", F), ("Seed", F), ("Tm", F)]),
     "RING": (H.RING, F3, [("LP", F3), ("Col", F3), ("Inten", F), ("Mode", F), ("Seed", F), ("Tm", F)]),
@@ -41,7 +42,12 @@ def compile_all() -> int:
     for name, (code, ret, inputs) in SNIPPETS.items():
         path = os.path.join(folder, name + ".hlsl")
         with open(path, "w") as fh:
-            fh.write(W.wrapper(code, ret, inputs))
+            if ret == F2:                                   # (the war's wrapper knows float, float3 and float4)
+                params = ", ".join(f"{t} {n}" for n, t in inputs)
+                args = ", ".join(W.CONSTS[t] for _, t in inputs)
+                fh.write(f"float2 CustomExpression0({params})\n{{\n{code}\n}}\n\nfloat4 main() : SV_Target\n{{\n    return float4(CustomExpression0({args}), 0, 1);\n}}\n")
+            else:
+                fh.write(W.wrapper(code, ret, inputs))
         r = subprocess.run([exe, path], capture_output=True, text=True)
         msgs = [l for l in (r.stdout + r.stderr).splitlines() if "DXIL signing" not in l and l.strip() and l.strip() != "COMPILED"]
         ok = r.returncode == 0

@@ -158,7 +158,7 @@ private:
 	FRandomStream Rng = FRandomStream(8197);
 	TSharedPtr<SAstraXportOverlay> Overlay;
 	bool bOverlayOn = false;
-	float ViewAge = 0.f, ViewSeconds = 3.6f, ViewDir = 1.f, ViewHold = 0.f, ViewShown = 0.f;
+	float ViewAge = 0.f, ViewSeconds = 3.6f, ViewDir = 1.f, ViewHold = 0.f, ViewShown = 0.f, ShownWash = 0.f, ShownCells = 0.f;
 	bool bViewRemat = false, bViewActive = false, bViewEnding = false;
 	float EmitterWritten = -1.f;
 	bool bPadsDirty = true, bWasBusy = false;

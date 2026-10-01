@@ -244,6 +244,28 @@ class Turns(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.chief.journal.record["refused"], 1)
         self.assertEqual(len(r.calls), 1)                                     # the console did not carry it out behind her back
 
+    async def test_an_order_carried_out_in_silence_is_told_to_the_captain(self) -> None:
+        # the model acted and said nothing: the Captain asked, so she is asked once more what she did (a model that has acted tends to think it is done)
+        r = self.r
+        r.llm.queue = [[("transport", {"who": ["Lieutenant Sato"], "to": "Main Engineering"})], [("say", {"text": "Lieutenant Sato is on her way: lock in one and a half seconds.", "tone": "calm"})]]
+        await r.chief.order({"action": "beam", "who": ["Lieutenant Sato"], "to": "Main Engineering"}, "ops")
+        await r.settle()
+        self.assertEqual(len(r.llm.requests), 2)
+        self.assertIn("for an order carried out", r.llm.user_of(1))
+        self.assertEqual(len(r.voice.lines), 1)
+        self.assertEqual(len(r.calls), 1)                                     # and the order was not carried out twice
+
+    async def test_a_news_turn_that_acts_is_not_asked_to_speak(self) -> None:
+        # news is not an answer to the Captain: silence stays a fine answer to it
+        r = self.r
+        r.llm.queue = [[("energize", {})]]
+        r.chief.on_event("transporter: X5: lock held on the Captain, quality 100%: waiting for the word to energize")
+        r.now += transporter.SETTLE_S + 0.1
+        r.chief.kick()
+        await r.settle()
+        self.assertEqual(len(r.llm.requests), 1)
+        self.assertEqual(r.voice.lines, [])
+
     async def test_a_chief_who_failed_leaves_the_order_to_the_console_and_the_bridge_is_told(self) -> None:
         r = self.r
         r.llm.error = "the model is down"

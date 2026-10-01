@@ -491,15 +491,24 @@ class TransporterRoom:
                 rec["error"] = comp.error[:120]
             if pending:
                 await asyncio.gather(*pending, return_exceptions=True)
-            # a second look only to read what her tools found: a refusal or a lookup (the model spoke before it knew)
-            needs_read = any((not r.get("ok")) or c.name in LOOKUPS for c, r in results)
-            if needs_read and not passed and not comp.error:
-                notes = "\n".join(f"- {c.name}({json.dumps(c.arguments() or {}, ensure_ascii=False)}) {'ok' if r.get('ok') else 'REFUSED'}: {r.get('detail', '')}" for c, r in results)
+            # up to two more looks, only to read what her tools found: a refusal or a lookup (the model spoke before it knew, or called the console wrongly and can try again), or an
+            # order carried out in silence (the Captain asked: he is told). Nothing is read twice, and nothing is read when the news was her only job (silence is a fine answer to it)
+            first_error = comp.error
+            seen = 0
+            for _ in range(2):
+                fresh = results[seen:]
+                needs_read = any((not r.get("ok")) or c.name in LOOKUPS for c, r in fresh)
+                acted_silently = bool(fresh) and not said and kind in ("captain", "order")
+                if not (needs_read or acted_silently) or passed or comp.error:
+                    break
+                notes = "\n".join(f"- {'[new] ' if i >= seen else ''}{c.name}({json.dumps(c.arguments() or {}, ensure_ascii=False)}) {'ok' if r.get('ok') else 'REFUSED'}: {r.get('detail', '')}"
+                                  for i, (c, r) in enumerate(results))
+                seen = len(results)
                 follow = messages + [
                     {"role": "assistant", "content": " ".join(f"[you said] {s}" for s in said) or "(nothing said yet)"},
-                    {"role": "user", "content": f"[Console results]\n{notes}\nTell the Captain what the console found, straight and short, in his language: if something was refused, "
-                                                "the reason and the way round (if what you said before was not true, put it right); for a lookup, what it says. Use `say`. You may call "
-                                                "a tool again if there is a better way."}]
+                    {"role": "user", "content": f"[Console results]\n{notes}\nTell the Captain what the console found or did, straight and short, in his language: if something was refused, "
+                                                "the reason and the way round (if what you said before was not true, put it right); for a lookup, what it says; for an order carried out, "
+                                                "what you set, with the lock time the console gave. Use `say`. You may call a tool again if there is a better way."}]
                 pending2: list[asyncio.Task] = []
 
                 async def on_call2(call: ToolCall) -> None:
@@ -513,14 +522,19 @@ class TransporterRoom:
                     elif call.name in ACTION_TOOLS:
                         pending2.append(asyncio.create_task(run_tool(call, args)))
 
-                comp2 = await models.chat(self.llm, ROLE, messages=follow, tools=[SAY, TRANSPORT, ENERGIZE, ABORT], tool_choice="auto", on_tool_call=on_call2, max_tokens=240)
+                # only `say` is offered when all that is left is to tell the Captain (as the crew's own follow-up does: a model that has acted tends to think it is done); a refusal or a
+                # lookup may be worth another call, so her tools stay
+                retry = any((not r.get("ok")) or c.name in LOOKUPS for c, r in fresh)
+                comp2 = await models.chat(self.llm, ROLE, messages=follow, tools=[SAY, TRANSPORT, ENERGIZE, ABORT] if retry else [SAY], tool_choice="auto", on_tool_call=on_call2, max_tokens=240)
                 rec["cost"] += comp2.cost
                 if pending2:
                     await asyncio.gather(*pending2, return_exceptions=True)
+                if comp2.error:
+                    break
             if kind == "order":
                 self.stats["orders"] += 1
                 # the Chief neither acted nor spoke (a model that failed or stalled): the order stands as typed
-                if (comp.error or (not said and acted["n"] == 0 and not passed)) and order is not None:
+                if (first_error or (not said and acted["n"] == 0 and not passed)) and order is not None:
                     await self._console_alone(order, by, rec)
         except asyncio.TimeoutError:
             rec["error"] = "timeout"

@@ -816,9 +816,9 @@ void UAstraTransportFx::BeginCaptainView(bool bRematerialize, float Seconds)
 	ViewSeconds = FMath::Max(0.4f, Seconds);
 	ViewAge = 0.f;
 	ViewDir = 1.f;
+	ViewHold = 0.f;                                          // (a recomposition starts white by itself and clears; a dematerialization is held white at the pattern's departure)
 	if (bRematerialize)
 	{
-		ViewHold = 1.f;
 		ViewShown = 1.f;
 	}
 }
@@ -830,6 +830,7 @@ void UAstraTransportFx::ReverseCaptainView()
 
 void UAstraTransportFx::EndCaptainView()
 {
+	bViewActive = false;                                     // what is on the screen fades out (a transport that failed, one that ended)
 	bViewEnding = true;
 }
 
@@ -910,14 +911,19 @@ void UAstraTransportFx::StepOverlay(float Dt)
 	{
 		ViewShown = FMath::Min(1.f, ViewShown + Dt / 0.15f);
 	}
+	if (bViewActive)
+	{
+		ShownWash = Wash;
+		ShownCells = Cells;
+	}
 	if (!Overlay.IsValid())
 	{
 		Overlay = SNew(SAstraXportOverlay);
 		VC->AddViewportWidgetContent(Overlay.ToSharedRef(), 70);
 		bOverlayOn = true;
 	}
-	Overlay->Wash = Wash;
-	Overlay->Cells = Cells;
+	Overlay->Wash = ShownWash;
+	Overlay->Cells = ShownCells;
 	Overlay->Clock = (float)Clock;
 	Overlay->Alpha = FMath::Clamp(ViewShown, 0.f, 1.f);
 }

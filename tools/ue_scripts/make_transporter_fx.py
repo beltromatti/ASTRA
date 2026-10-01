@@ -9,6 +9,7 @@ Makes, in /Game/ASTRA/Materials (all unlit and additive: they draw light, never 
   M_XPORT_Ring      instanced   a pad's ring on the floor: its colour and its motion say what the lock is doing
   M_XPORT_Ghost     skeletal    the figure of light that stands in for a body while it is carried: the body's own mesh, eaten from the feet up (or formed from the feet up);
                                 parameters per body (FeetZ, Height, Prog, Dir, Gain, Col) set by the game
+  M_XPORT_Screen    opaque      the wall display's picture (the canvas render target, parameter ScreenTexture, brightness Intensity), laid on the engine's plane by its local position
 The per-instance custom data the three instanced materials read is in AstraTransportFx.h (AstraXportFx::Stride): 0-2 colour, 3 intensity, 4 progress or age, 5 direction or
 mode, 6 fade, 7 seed. The shaders are in tools/ue_scripts/transporter_fx_hlsl.py (compiled by tools/art/transporter_fx_check.py with the engine's DXC). The brightness of
 all of it is the console variable astra.xport.gain: an interior exposure that wants more or less light does not need new materials.
@@ -167,6 +168,21 @@ def make_ring():
     finish(m)
 
 
+def make_screen():
+    m = fresh("M_XPORT_Screen", instanced=False)
+    m.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    lp = local_position(m, -900, 0)
+    uv = custom(m, H.SCREEN_UV, [("LP", (lp, ""))], -600, 0, out=FLOAT.CMOT_FLOAT2)
+    tex = E(m, unreal.MaterialExpressionTextureSampleParameter2D, -300, 0, parameter_name="ScreenTexture", group="Transporter")
+    link(uv, "", tex, "UVs")
+    inten = scalar(m, "Intensity", 3.0, -300, 220)
+    mul = E(m, unreal.MaterialExpressionMultiply, 0, 60)
+    link(tex, "RGB", mul, "A")
+    link(inten, "", mul, "B")
+    mel.connect_material_property(mul, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(m)
+
+
 def make_ghost():
     m = fresh("M_XPORT_Ghost", instanced=False, skeletal=True)
     wp = E(m, unreal.MaterialExpressionWorldPosition, -900, -260)
@@ -184,7 +200,7 @@ def make_ghost():
     finish(m)
 
 
-for fn in (make_sparkle, make_column, make_ring, make_ghost):
+for fn in (make_sparkle, make_column, make_ring, make_ghost, make_screen):
     try:
         fn()
     except Exception as exc:  # noqa: BLE001

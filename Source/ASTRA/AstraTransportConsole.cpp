@@ -158,9 +158,11 @@ AAstraTransportConsole::AAstraTransportConsole()
 void AAstraTransportConsole::Place(const FVector& CentreCm, float YawDeg, const FVector2D& SizeCm)
 {
 	Size = SizeCm;
-	// the engine's Plane is 100 x 100 cm lying in XY, facing +Z: stand it up, its face along the actor's +X (the way the room's wall panel faces: yaw)
-	SetActorLocationAndRotation(CentreCm, FRotator(90.f, YawDeg, 0.f));
-	SetActorScale3D(FVector(SizeCm.Y / 100.0, SizeCm.X / 100.0, 1.0));
+	// the engine's Plane is 100 x 100 cm lying in XY, facing +Z: stand it up with its face along the way the screen faces (the yaw), its local y up and so its local x to the
+	// viewer's right (M_XPORT_Screen lays the picture by that local position, whatever the plane's own texture mapping is); a centimetre off the wall's panel
+	const FVector Face = FRotator(0.f, YawDeg, 0.f).Vector();
+	SetActorLocationAndRotation(CentreCm + Face * 1.0, FRotationMatrix::MakeFromZY(Face, FVector::UpVector).ToQuat());
+	SetActorScale3D(FVector(SizeCm.X / 100.0, SizeCm.Y / 100.0, 1.0));
 }
 
 void AAstraTransportConsole::EnsureTarget()
@@ -179,7 +181,11 @@ void AAstraTransportConsole::EnsureTarget()
 	Target = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(this, UCanvasRenderTarget2D::StaticClass(), W, H);
 	Target->ClearColor = XcBG;
 	Target->OnCanvasRenderTargetUpdate.AddDynamic(this, &AAstraTransportConsole::Draw);
-	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_Screen.M_ASTRA_Screen"));
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_XPORT_Screen.M_XPORT_Screen"), nullptr, LOAD_Quiet | LOAD_NoWarn);
+	if (!Base)
+	{
+		UE_LOG(LogASTRA, Warning, TEXT("[XportFx] M_XPORT_Screen is missing: the wall display stays dark; run tools/ue_scripts/make_transporter_fx.py in the editor"));
+	}
 	if (Base && Panel)
 	{
 		Mid = UMaterialInstanceDynamic::Create(Base, this);

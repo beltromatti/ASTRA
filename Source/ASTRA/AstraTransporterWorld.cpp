@@ -195,21 +195,12 @@ void UAstraTransporterSubsystem::FillRoom(FRoomState& Out, const FString& CompId
 	Out = RoomOf(CompId, Name);
 }
 
-bool UAstraTransporterSubsystem::FillShip(FHull& Out, const FString& ContactId) const
+namespace
 {
-	const UAstraBattleSubsystem* B = Battle();
-	if (!B)
+	/** One contact of the plot as a hull for the rules: what the sensors give (position, size), what the damage view lets be known (attitude, the shield sectors of a ship that is firmly tracked and classified, or of
+	 *  our own side by datalink); the box is the class's own measures. A hull whose faces are not known says so (the rules refuse to aim at it). */
+	bool XpFillHull(const UAstraBattleSubsystem* B, const UAstraBattleSubsystem::FContactView& C, FHull& Out)
 	{
-		return false;
-	}
-	const FString Want = XpContactKey(ContactId);
-	for (const UAstraBattleSubsystem::FContactView& C : B->Contacts())
-	{
-		const bool bSame = C.ContactId.Equals(ContactId, ESearchCase::IgnoreCase) || (!Want.IsEmpty() && XpContactKey(C.ContactId) == Want);
-		if (!bSame)
-		{
-			continue;
-		}
 		Out = FHull();
 		Out.bPresent = true;
 		Out.Id = C.ContactId;
@@ -263,6 +254,23 @@ bool UAstraTransporterSubsystem::FillShip(FHull& Out, const FString& ContactId) 
 		Out.Half = Half;
 		Out.Centre = Out.Pos + Out.Att.RotateVector(FVector(Mid, 0.0, 0.0));
 		return true;
+	}
+}
+
+bool UAstraTransporterSubsystem::FillShip(FHull& Out, const FString& ContactId) const
+{
+	const UAstraBattleSubsystem* B = Battle();
+	if (!B)
+	{
+		return false;
+	}
+	const FString Want = XpContactKey(ContactId);
+	for (const UAstraBattleSubsystem::FContactView& C : B->Contacts())
+	{
+		if (C.ContactId.Equals(ContactId, ESearchCase::IgnoreCase) || (!Want.IsEmpty() && XpContactKey(C.ContactId) == Want))
+		{
+			return XpFillHull(B, C, Out);
+		}
 	}
 	return false;
 }
@@ -324,7 +332,7 @@ void UAstraTransporterSubsystem::BuildEnv(FEnv& Out) const
 		for (const UAstraBattleSubsystem::FContactView& C : B->Contacts())
 		{
 			FHull H;
-			if (FillShip(H, C.ContactId))
+			if (!C.bCraft && XpFillHull(B, C, H))                  // (a craft neither jams nor opens a face: it has no pad)
 			{
 				Out.Others.Add(H);
 			}
