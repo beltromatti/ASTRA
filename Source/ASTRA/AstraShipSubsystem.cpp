@@ -3319,7 +3319,27 @@ void UAstraShipSubsystem::OnDoorPlaced(AAstraDoor* Door)
 
 void UAstraShipSubsystem::ApplyDoorSeal(int32 DoorIndex, AAstraDoor* Door, bool bSealed)
 {
-	Door->bLocked = bSealed;                                   // shut, and it stays shut
+	// shut, and it stays shut; opened, it goes back to what the level made it (a door the level keeps locked does not come unlocked because a bulkhead did)
+	if (bSealed)
+	{
+		if (DoorIndex != INDEX_NONE && !DoorLockMemory.Contains(DoorIndex))
+		{
+			DoorLockMemory.Add(DoorIndex, Door->bLocked);
+		}
+		Door->bLocked = true;
+	}
+	else
+	{
+		bool bWas = false;
+		if (DoorIndex != INDEX_NONE && DoorLockMemory.RemoveAndCopyValue(DoorIndex, bWas))
+		{
+			Door->bLocked = bWas;
+		}
+		else
+		{
+			Door->bLocked = false;
+		}
+	}
 	if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr)
 	{
 		Fx->DressDoor(Door, bSealed);

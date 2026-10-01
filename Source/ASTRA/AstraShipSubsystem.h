@@ -304,6 +304,7 @@ private:
 	FHitReport HitReport;             // what the last blows did, told in one report
 	TMap<FName, TWeakObjectPtr<class AAstraDoor>> DoorActors;
 	FDelegateHandle DoorPlacedHandle;
+	TMap<int32, bool> DoorLockMemory;   // plan door -> whether its actor was locked by the level before a bulkhead sealed it (a sealed one is shut; it goes back as it was)
 	void OnDoorPlaced(class AAstraDoor* Door);
 	void ApplyDoorSeal(int32 DoorIndex, class AAstraDoor* Door, bool bSealed);
 	// the Captain's fate under the hazards: down, carried to the Medbay, or dead

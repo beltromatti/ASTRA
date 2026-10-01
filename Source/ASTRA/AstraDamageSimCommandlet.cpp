@@ -950,7 +950,12 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 				int32 Plain = INDEX_NONE;
 				for (int32 i = 0; i < Map.Doors.Num() && Plain == INDEX_NONE; ++i) { Plain = !Map.Doors[i].bBlast && Map.Doors[i].Deck == 4 ? i : INDEX_NONE; }
 				AAstraDoor* Ordinary = W.World->SpawnActor<AAstraDoor>(Map.Doors[Plain].PosCm, FRotator::ZeroRotator, SP);
-				for (AAstraDoor* D : {Late, Ordinary})
+				AAstraDoor* Kept = W.World->SpawnActor<AAstraDoor>(Map.Doors[Sealed[1]].PosCm, FRotator(0.f, Map.Doors[Sealed[1]].Yaw, 0.f), SP);
+				if (Kept)
+				{
+					Kept->bLocked = true;                      // a door the level keeps locked (a stair tower's)
+				}
+				for (AAstraDoor* D : {Late, Ordinary, Kept})
 				{
 					if (D && !D->HasActorBegunPlay())
 					{
@@ -966,7 +971,7 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 				const bool bSigned = Fx->GetStats().Signs >= 1;
 				W.Ship->ResetInterior();
 				W.Run(1.f, 0.05f);
-				DmCheck(TEXT("and opens again with the bulkhead"), Late && !Late->bLocked && Fx->GetStats().Signs == 0 && bSigned, FString::Printf(TEXT("after the bulkheads open: the door is %s, signs on %d (it wore one: %s)"), Late && Late->bLocked ? TEXT("STILL SHUT") : TEXT("free"), Fx->GetStats().Signs, bSigned ? TEXT("yes") : TEXT("NO")));
+				DmCheck(TEXT("and opens again with the bulkhead"), Late && !Late->bLocked && Kept && Kept->bLocked && Fx->GetStats().Signs == 0 && bSigned, FString::Printf(TEXT("after the bulkheads open: the door is %s, signs on %d (it wore one: %s); a door the level keeps locked stays %s"), Late && Late->bLocked ? TEXT("STILL SHUT") : TEXT("free"), Fx->GetStats().Signs, bSigned ? TEXT("yes") : TEXT("NO"), Kept && Kept->bLocked ? TEXT("locked") : TEXT("UNLOCKED")));
 				In.Strike(Tract, 55.f, 0, Map.Comps[Tract].Box.GetCenter(), true, R2);
 				W.Run(15.f, 0.05f);
 				DmCheck(TEXT("it shuts again when the section is sealed again"), Late && Late->bLocked && Fx->GetStats().Signs >= 1, FString::Printf(TEXT("the door is %s, signs on %d"), Late && Late->bLocked ? TEXT("shut") : TEXT("OPEN"), Fx->GetStats().Signs));
