@@ -24,16 +24,16 @@
 
 namespace
 {
-	struct FCheck
+	struct FNaveCheck
 	{
 		FString Name;
 		bool bPass = true;
 	};
-	TArray<FCheck> Checks;
+	TArray<FNaveCheck> NaveChecks;
 
-	void Check(const TCHAR* Name, bool bPass, const FString& Detail)
+	void NaveCheck(const TCHAR* Name, bool bPass, const FString& Detail)
 	{
-		Checks.Add({Name, bPass});
+		NaveChecks.Add({Name, bPass});
 		UE_LOG(LogASTRA, Display, TEXT("[Nave] %s %-34s %s"), bPass ? TEXT("PASS") : TEXT("FAIL"), Name, *Detail);
 	}
 }
@@ -64,7 +64,7 @@ namespace
 		if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/aquila_plan.json"))) ||
 		    !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
 		{
-			Check(TEXT("load: the plan"), false, TEXT("data/ship/aquila_plan.json does not read"));
+			NaveCheck(TEXT("load: the plan"), false, TEXT("data/ship/aquila_plan.json does not read"));
 			return;
 		}
 		const TSharedPtr<FJsonObject>& Placements = Root->GetObjectField(TEXT("placements"));
@@ -75,7 +75,7 @@ namespace
 			const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
 			if (!Placements->TryGetArrayField(FString::FromInt(Deck), List))
 			{
-				Check(TEXT("load: placements"), false, FString::Printf(TEXT("deck %d has none"), Deck));
+				NaveCheck(TEXT("load: placements"), false, FString::Printf(TEXT("deck %d has none"), Deck));
 				continue;
 			}
 			TMap<FString, TArray<FTransform>> ByMesh;
@@ -159,11 +159,11 @@ namespace
 				}
 				if (!bControl)
 				{
-					Check(TEXT("load: the floor holds (ISM collision)"), true, TEXT("skipped: this headless world makes no physics, not even for a plain static mesh actor"));
+					NaveCheck(TEXT("load: the floor holds (ISM collision)"), true, TEXT("skipped: this headless world makes no physics, not even for a plain static mesh actor"));
 				}
 				else
 				{
-					Check(TEXT("load: the floor holds (ISM collision)"), bHit && FMath::Abs(Hit.ImpactPoint.Z - At.Z) < 8.f,
+					NaveCheck(TEXT("load: the floor holds (ISM collision)"), bHit && FMath::Abs(Hit.ImpactPoint.Z - At.Z) < 8.f,
 					      FString::Printf(TEXT("deck %d: a trace down at (%.0f, %.0f) %s %s at z %.1f cm over the floor"), Deck, At.X, At.Y, bHit ? TEXT("hit") : TEXT("missed"),
 					                      Hit.GetComponent() ? *Hit.GetComponent()->GetName() : TEXT("-"), bHit ? Hit.ImpactPoint.Z - At.Z : 0.f));
 				}
@@ -185,7 +185,7 @@ namespace
 				PhysMs = (FPlatformTime::Seconds() - P0) * 1000.0;
 				UE_LOG(LogASTRA, Display, TEXT("[Nave]   physics scene %s: the instances' bodies made again in %.1f ms"), World->GetPhysicsScene() ? TEXT("present") : TEXT("ABSENT"), PhysMs);
 			}
-			Check(TEXT("load: a deck comes in under a second"), Missing == 0 && (T3 - T0) < 1.0,
+			NaveCheck(TEXT("load: a deck comes in under a second"), Missing == 0 && (T3 - T0) < 1.0,
 			      FString::Printf(TEXT("deck %d: %.0f ms (meshes %.0f, %d instances in %d components %.0f ms - the longest component %.1f ms, %d doors %.0f ms); a frame after: %.1f ms; %d meshes missing"),
 			                      Deck, (T3 - T0) * 1000.0, (T1 - T0) * 1000.0, Shell->NumInstances(), Comps, (T2 - T1) * 1000.0, WorstAdd, Doors, (T3 - T2) * 1000.0, WorstTick, Missing));
 			// out again: the actors go, then a collection
@@ -197,7 +197,7 @@ namespace
 			}
 			World->Tick(LEVELTICK_All, 1.f / 60.f);
 			CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
-			Check(TEXT("load: and out again"), true, FString::Printf(TEXT("deck %d: %.0f ms to destroy and collect"), Deck, (FPlatformTime::Seconds() - U0) * 1000.0));
+			NaveCheck(TEXT("load: and out again"), true, FString::Printf(TEXT("deck %d: %.0f ms to destroy and collect"), Deck, (FPlatformTime::Seconds() - U0) * 1000.0));
 		}
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
@@ -211,7 +211,7 @@ int32 UAstraNaveCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("step="), StepCm);
 	FParse::Value(*Params, TEXT("max="), MaxLit);
 	const bool bVerbose = FParse::Param(*Params, TEXT("verbose"));
-	Checks.Reset();
+	NaveChecks.Reset();
 	FString LoadList;
 	if (FParse::Value(*Params, TEXT("load="), LoadList, false))
 	{
@@ -219,7 +219,7 @@ int32 UAstraNaveCommandlet::Main(const FString& Params)
 		LoadList.ParseIntoArray(Decks, TEXT(","));
 		LoadTest(Decks);
 		int32 Failed = 0;
-		for (const FCheck& C : Checks) { Failed += C.bPass ? 0 : 1; }
+		for (const FNaveCheck& C : NaveChecks) { Failed += C.bPass ? 0 : 1; }
 		return Failed ? 1 : 0;
 	}
 	UAstraShipPlan* Plan = NewObject<UAstraShipPlan>(GetTransientPackage());
@@ -253,9 +253,9 @@ int32 UAstraNaveCommandlet::Main(const FString& Params)
 	{
 		PerDeckText += FString::Printf(TEXT(" d%d:%d"), D, PerDeck[D]);
 	}
-	Check(TEXT("lamps in the plan"), Lamps.Num() > 0, FString::Printf(TEXT("%d lamps (%s )"), Lamps.Num(), *PerDeckText));
-	Check(TEXT("every lamp inside its room"), Outside == 0, FString::Printf(TEXT("%d outside"), Outside));
-	Check(TEXT("every lamp has light and reach"), Dark == 0, FString::Printf(TEXT("%d without"), Dark));
+	NaveCheck(TEXT("lamps in the plan"), Lamps.Num() > 0, FString::Printf(TEXT("%d lamps (%s )"), Lamps.Num(), *PerDeckText));
+	NaveCheck(TEXT("every lamp inside its room"), Outside == 0, FString::Printf(TEXT("%d outside"), Outside));
+	NaveCheck(TEXT("every lamp has light and reach"), Dark == 0, FString::Printf(TEXT("%d without"), Dark));
 
 	// ---- 2. a Captain walks the Spine of every deck that has lamps
 	double WorstChanges = 0.0, SumChanges = 0.0, SumNearChanges = 0.0, SumLit = 0.0, WorstMs = 0.0, SumMs = 0.0;
@@ -325,13 +325,13 @@ int32 UAstraNaveCommandlet::Main(const FString& Params)
 			}
 		}
 	}
-	Check(TEXT("walk: lamps near the Captain"), Steps > 0 && Starved == 0, FString::Printf(TEXT("%d steps, avg %.1f lit, %d with fewer than 2"), Steps, Steps ? SumLit / Steps : 0.0, Starved));
+	NaveCheck(TEXT("walk: lamps near the Captain"), Steps > 0 && Starved == 0, FString::Printf(TEXT("%d steps, avg %.1f lit, %d with fewer than 2"), Steps, Steps ? SumLit / Steps : 0.0, Starved));
 	// the lamps at the edge of his reach come and go as he walks (they fade); the ones within 10 m of him must hold their place
-	Check(TEXT("walk: no flicker"), Counted > 0 && SumNearChanges / FMath::Max(1, Counted) < 0.3,
+	NaveCheck(TEXT("walk: no flicker"), Counted > 0 && SumNearChanges / FMath::Max(1, Counted) < 0.3,
 	      FString::Printf(TEXT("%.2f lamp changes a step of %.1f m, %.2f of them within 10 m (worst step %.0f)"), SumChanges / FMath::Max(1, Counted), StepCm / 100.f,
 	                      SumNearChanges / FMath::Max(1, Counted), WorstChanges));
-	Check(TEXT("walk: only his deck"), OffDeck == 0, FString::Printf(TEXT("%d lamps off his deck"), OffDeck));
-	Check(TEXT("walk: cheap"), WorstMs < 2.0, FString::Printf(TEXT("%.3f ms average, %.3f ms worst per pick (the pool picks 5 times a second)"), Steps ? SumMs / Steps : 0.0, WorstMs));
+	NaveCheck(TEXT("walk: only his deck"), OffDeck == 0, FString::Printf(TEXT("%d lamps off his deck"), OffDeck));
+	NaveCheck(TEXT("walk: cheap"), WorstMs < 2.0, FString::Printf(TEXT("%.3f ms average, %.3f ms worst per pick (the pool picks 5 times a second)"), Steps ? SumMs / Steps : 0.0, WorstMs));
 
 	// ---- 3. a room behind a closed door stays dark: stand in the middle of a built room and then at its door
 	int32 RoomTests = 0, RoomLeaks = 0, DoorLights = 0, DoorTests = 0;
@@ -388,8 +388,8 @@ int32 UAstraNaveCommandlet::Main(const FString& Params)
 			break;
 		}
 	}
-	Check(TEXT("room: closed door keeps the next dark"), RoomTests > 0 && RoomLeaks == 0, FString::Printf(TEXT("%d rooms from their middle: %d lamps through a wall"), RoomTests, RoomLeaks));
-	Check(TEXT("room: at its door the corridor lights"), DoorTests > 0 && DoorLights >= DoorTests * 9 / 10, FString::Printf(TEXT("%d of %d rooms"), DoorLights, DoorTests));
+	NaveCheck(TEXT("room: closed door keeps the next dark"), RoomTests > 0 && RoomLeaks == 0, FString::Printf(TEXT("%d rooms from their middle: %d lamps through a wall"), RoomTests, RoomLeaks));
+	NaveCheck(TEXT("room: at its door the corridor lights"), DoorTests > 0 && DoorLights >= DoorTests * 9 / 10, FString::Printf(TEXT("%d of %d rooms"), DoorLights, DoorTests));
 
 	// ---- 4. the decks wanted around the Captain
 	auto Has = [](const TArray<int32>& A, std::initializer_list<int32> Want)
@@ -406,11 +406,11 @@ int32 UAstraNaveCommandlet::Main(const FString& Params)
 	const TArray<int32> D12 = UAstraDeckStreaming::DecksFor(*Plan, 12, false);
 	const TArray<int32> D9H = UAstraDeckStreaming::DecksFor(*Plan, 9, true);
 	const TArray<int32> D1 = UAstraDeckStreaming::DecksFor(*Plan, 1, false);
-	Check(TEXT("decks: a middle deck"), Has(D5, {4, 5, 6}), FString::Printf(TEXT("deck 5 wants %d decks"), D5.Num()));
-	Check(TEXT("decks: the top of the stairs"), Has(D2, {2, 3}), FString::Printf(TEXT("deck 2 wants %d decks"), D2.Num()));
-	Check(TEXT("decks: the keel"), Has(D12, {11, 12}), FString::Printf(TEXT("deck 12 wants %d decks"), D12.Num()));
-	Check(TEXT("decks: in a hall only its own"), Has(D9H, {9}), TEXT("the Flight Deck's hall wants deck 9"));
-	Check(TEXT("decks: the bridge has no stairs"), Has(D1, {1}), TEXT("deck 1 wants itself"));
+	NaveCheck(TEXT("decks: a middle deck"), Has(D5, {4, 5, 6}), FString::Printf(TEXT("deck 5 wants %d decks"), D5.Num()));
+	NaveCheck(TEXT("decks: the top of the stairs"), Has(D2, {2, 3}), FString::Printf(TEXT("deck 2 wants %d decks"), D2.Num()));
+	NaveCheck(TEXT("decks: the keel"), Has(D12, {11, 12}), FString::Printf(TEXT("deck 12 wants %d decks"), D12.Num()));
+	NaveCheck(TEXT("decks: in a hall only its own"), Has(D9H, {9}), TEXT("the Flight Deck's hall wants deck 9"));
+	NaveCheck(TEXT("decks: the bridge has no stairs"), Has(D1, {1}), TEXT("deck 1 wants itself"));
 	// the Flight Deck stands on the Deck 9 plane although its floor is 6.8 m lower and its hall crosses six decks
 	const FAstraPlanCompartment* Hangar = nullptr;
 	for (const FAstraPlanCompartment& C : Comps)
@@ -423,14 +423,14 @@ int32 UAstraNaveCommandlet::Main(const FString& Params)
 	if (Hangar)
 	{
 		const int32 DeckInHall = Plan->DeckOfPoint(Hangar->Box.GetCenter());
-		Check(TEXT("decks: the hall's own plane"), DeckInHall == Hangar->Plane, FString::Printf(TEXT("the Flight Deck's centre is on plane %d (compartment plane %d)"), DeckInHall, Hangar->Plane));
+		NaveCheck(TEXT("decks: the hall's own plane"), DeckInHall == Hangar->Plane, FString::Printf(TEXT("the Flight Deck's centre is on plane %d (compartment plane %d)"), DeckInHall, Hangar->Plane));
 	}
 
 	int32 Failed = 0;
-	for (const FCheck& C : Checks)
+	for (const FNaveCheck& C : NaveChecks)
 	{
 		Failed += C.bPass ? 0 : 1;
 	}
-	UE_LOG(LogASTRA, Display, TEXT("[Nave] %d checks, %d failed"), Checks.Num(), Failed);
+	UE_LOG(LogASTRA, Display, TEXT("[Nave] %d checks, %d failed"), NaveChecks.Num(), Failed);
 	return Failed ? 1 : 0;
 }

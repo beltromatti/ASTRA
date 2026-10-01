@@ -205,12 +205,15 @@ persona, cosa fa e ricorda), `astra.life.hour`, `astra.life.scale`; variabili `a
    (la mente legge `life.clock` per datare le memorie e, se il contesto non ha `people`, `life.people_near`).
 4. **I tempi di arrivo delle squadre**: in `dispatch_damage_control`, il `Travel` della squadra può venire da
    `Life->RepairEtaSeconds(Deck, Section, Id)` (secondi veri sui percorsi) invece della formula: la riparazione comincia
-   quando la squadra è lì.
+   quando la squadra è lì. *Fatto da DISTRUZIONE* ([DISTRUZIONE.md](DISTRUZIONE.md) §2.7): la squadra cammina fino al compartimento vero
+   (`RepairEtaFor`, anche attraverso una paratia chiusa) e lavora attraverso il modello.
 5. **Chi si fa male**: la scelta delle vittime di un colpo può usare `Life->RosterIn(Deck, Section)` (chi è davvero in quella
-   sezione, indici del ruolino): i ponti del ruolino sono quelli vecchi, quelli della pianta sono altri.
+   sezione, indici del ruolino): i ponti del ruolino sono quelli vecchi, quelli della pianta sono altri. *Fatto da DISTRUZIONE*:
+   il modello chiede a VITA chi è fisicamente in ogni stanza toccata (`PeopleInComp`) e fa male solo a loro; il ruolino li marca feriti o morti con la causa.
 6. **I posti del livello** (Mess, Berthing, Medbay): `Life->Sim().WhoIsAt(<station id>)` dice chi dovrebbe stare in un posto
    di un attore esistente (`mess1`..., `sleeperK`, `patientN`).
-7. **Porte stagne**: quando se ne sigilla una, `Life->Sim().PlanChanged()` rifà i percorsi in corso.
+7. **Porte stagne**: quando se ne sigilla una, `Life->Sim().PlanChanged()` rifà i percorsi in corso. *Fatto da DISTRUZIONE*: le paratie di sezione
+   chiuse dal modello passano per `UAstraShipPlan::SetDoorSealed` e `PlanChanged`; la rotta di una squadra può attraversarne una chiusa (costo +14 m).
 8. **Compilazione unity**: i file di VITA danno ai loro aiutanti nomi propri (`Life...`: `Metres` e `Num` di `AstraShipPlan` e
    `AstraStations` avevano la stessa firma nello spazio anonimo) e nessun nome dei miei file coincide con uno degli altri
    (controllato a mano); `TagSky` è già risolto in main (`SkyTag`). I miei build di prova sono con `-DisableUnity`: una

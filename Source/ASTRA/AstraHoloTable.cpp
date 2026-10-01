@@ -3,6 +3,7 @@
 #include "AstraHoloTable.h"
 
 #include "AstraBattleSubsystem.h"
+#include "AstraDamageModel.h"
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
 #include "AstraWarDraw.h"
@@ -787,26 +788,64 @@ void AAstraHoloTable::TickShip(float DeltaTime, const FVector& ViewerLocal, floa
 			Label(Se.Id, Map(0.5f * (Se.X0 + Se.X1), 0.f, Top->Id) + FVector(0.f, 0.f, 2.5f), ColAstra * 0.8f, 2.6f);
 		}
 	}
-	// the damage: where it is, what it is, who is on it
+	// the damage: where it is (the compartment itself, along its deck's row), what it is, who is on it
+	const FAstraDamageModel* Interior = Ship->GetInterior().IsReady() ? &Ship->GetInterior() : nullptr;
 	FVector Station;
 	const bool bStation = SectionCentre(6, TEXT('D'), Station);   // the damage-control teams muster on Deck 6
-	for (const FAstraDamage& X : Damage)
+	// the worst few are labelled (a table of thirty labels is not a table): the unattended first, by how bad
+	TArray<int32> Worst;
+	for (int32 i = 0; i < Damage.Num(); ++i)
 	{
+		Worst.Add(i);
+	}
+	Worst.Sort([&Damage](int32 A, int32 B)
+	{
+		const FAstraDamage& X = Damage[A];
+		const FAstraDamage& Y = Damage[B];
+		return (X.Team < 0) != (Y.Team < 0) ? X.Team < 0 : (DamageSeverity(X) != DamageSeverity(Y) ? DamageSeverity(X) > DamageSeverity(Y) : X.Severity > Y.Severity);
+	});
+	TSet<int32> Labelled;
+	for (int32 k = 0; k < FMath::Min(Worst.Num(), 8); ++k)
+	{
+		Labelled.Add(Worst[k]);
+	}
+	for (int32 i = 0; i < Damage.Num(); ++i)
+	{
+		const FAstraDamage& X = Damage[i];
 		FVector P;
-		if (!SectionCentre(X.Deck, X.Section, P))
+		float LenCm = 0.f;
+		if (Interior && Interior->GetMap().Comps.IsValidIndex(X.Comp))
+		{
+			const FBox& Box = Interior->GetMap().Comps[X.Comp].Box;
+			P = Map(Box.GetCenter().X, 0.f, X.Deck) + FVector(0.f, 0.f, 1.2f);
+			LenCm = Box.GetSize().X;
+		}
+		else if (!SectionCentre(X.Deck, X.Section, P))
 		{
 			continue;
 		}
 		const FLinearColor Col = DamageColor(X);
+		if (LenCm > 0.f)
+		{
+			// the compartment itself, lit along its deck's row
+			UStaticMeshComponent* Mark = Pooled(ShipSlabs, NS++, CubeMesh, ShipFrame);
+			Mark->SetRelativeLocationAndRotation(P - FVector(0.f, 0.f, 1.2f), FRotator(0.f, ShipYaw, 0.f));
+			Mark->SetRelativeScale3D(FVector(FMath::Max(LenCm * S * 0.95f, 1.4f) / 100.f, Depth * 1.25f / 100.f, 3.f / 100.f));
+			SetColor(Mark, Col, Fade * (16.f + 18.f * Pulse));
+		}
 		const float Ph = FMath::Frac(Time * 0.8f + X.Id * 0.37f);
 		UStaticMeshComponent* Ring = Pooled(ShipMarks, NM++, RingMesh, ShipFrame);
 		Ring->SetRelativeLocationAndRotation(P, FRotator::ZeroRotator);
 		Ring->SetRelativeScale3D(FVector((2.f + 2.5f * Ph) / 100.f, (2.f + 2.5f * Ph) / 100.f, 1.f));
 		SetColor(Ring, Col, Fade * 20.f * (1.f - Ph));
-		const FString Who = X.Team < 0 ? FString(TEXT("UNATTENDED"))
-		                  : X.Travel > 0.f ? FString::Printf(TEXT("TEAM %d · %.0f S OUT"), X.Team + 1, X.Travel)
-		                                   : FString::Printf(TEXT("TEAM %d · %.0f%%"), X.Team + 1, 100.f * X.Progress);
-		Label(FString::Printf(TEXT("%s · %d%c<br>%s"), *X.Kind.ToUpper(), X.Deck, X.Section, *Who), P + FVector(0.f, 0.f, 3.5f), Col, 2.8f);
+		if (Labelled.Contains(i))
+		{
+			const FString Who = X.Team < 0 ? FString(TEXT("UNATTENDED"))
+			                  : X.Travel > 0.f ? FString::Printf(TEXT("TEAM %d · %.0f S OUT"), X.Team + 1, X.Travel)
+			                                   : FString::Printf(TEXT("TEAM %d · %.0f%%"), X.Team + 1, 100.f * X.Progress);
+			const FString Place = X.Place.IsEmpty() ? FString() : FString::Printf(TEXT("<br>%s"), *X.Place.ToUpper().Left(26));
+			Label(FString::Printf(TEXT("%s · %d%c%s<br>%s"), *X.Kind.ToUpper(), X.Deck, X.Section, *Place, *Who), P + FVector(0.f, 0.f, 3.5f), Col, 2.8f);
+		}
 		if (X.Team >= 0 && bStation)
 		{
 			// the team: walking from its station to the damage, then working round it
@@ -821,6 +860,23 @@ void AAstraHoloTable::TickShip(float DeltaTime, const FVector& ViewerLocal, floa
 			T->SetRelativeLocation(Dot);
 			T->SetRelativeScale3D(FVector(1.1f / 100.f));
 			SetColor(T, ColAquila, Fade * 45.f);
+		}
+	}
+	// the pressure bulkheads that are shut: a bar across the deck, where it is (a section that is sealed off reads at a glance)
+	int32 Sealed = 0;
+	if (Interior)
+	{
+		for (const int32 DoorIndex : Interior->SealedDoors())
+		{
+			const FAstraDmgDoor& Door = Interior->GetMap().Doors[DoorIndex];
+			if (++Sealed > 24)
+			{
+				break;
+			}
+			UStaticMeshComponent* Bar = Pooled(ShipSlabs, NS++, CubeMesh, ShipFrame);
+			Bar->SetRelativeLocationAndRotation(Map(Door.PosCm.X, 0.f, Door.Deck) + FVector(0.f, 0.f, 0.2f), FRotator(0.f, ShipYaw, 0.f));
+			Bar->SetRelativeScale3D(FVector(0.55f / 100.f, Depth * 1.4f / 100.f, 3.4f / 100.f));
+			SetColor(Bar, FLinearColor(0.85f, 0.95f, 1.f), Fade * 30.f);
 		}
 	}
 	// the Captain, wherever they are
@@ -839,8 +895,9 @@ void AAstraHoloTable::TickShip(float DeltaTime, const FVector& ViewerLocal, floa
 	}
 	// what she is: her name, her hull, what is open
 	const int32 Open = Damage.Num();
-	Label(FString::Printf(TEXT("ASN AQUILA · HULL %.0f%%<br>%s"), Battle ? 100.f * Battle->PlayerHullFraction() : 100.f,
-	                      Open == 0 ? TEXT("NO DAMAGE REPORTED") : *FString::Printf(TEXT("%d INCIDENT%s"), Open, Open == 1 ? TEXT("") : TEXT("S"))),
+	const FString Report = Open == 0 ? FString(TEXT("NO DAMAGE REPORTED")) : FString::Printf(TEXT("%d INCIDENT%s%s"), Open, Open == 1 ? TEXT("") : TEXT("S"),
+	                                                                                      Sealed > 0 ? *FString::Printf(TEXT(" · %d SEALED"), Sealed) : TEXT(""));
+	Label(FString::Printf(TEXT("ASN AQUILA · HULL %.0f%%<br>%s"), Battle ? 100.f * Battle->PlayerHullFraction() : 100.f, *Report),
 	      FVector(0.f, 0.f, RowZ(1) + 12.f), ColAquila, 3.6f);
 	HideFrom(ShipSlabs, NS);
 	HideFrom(ShipMarks, NM);

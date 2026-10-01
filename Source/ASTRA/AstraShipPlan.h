@@ -101,9 +101,10 @@ public:
 	int32 NearestNode(const FVector& Cm, int32 Deck = INDEX_NONE) const;
 
 	/** A route over the walk graph from one point to another (world cm): A* on the walking time, sealed doors shut, locked
-	 *  ones open only with bKeys, stairs slower than a corridor, a lift a short wait and a quick ride. Out: the points
+	 *  ones open only with bKeys (bThroughSealed: a damage-control party in suits cycles through the hatch of a shut one, at the cost of a
+	 *  short wait), stairs slower than a corridor, a lift a short wait and a quick ride. Out: the points
 	 *  from the start to the goal, both included. False: no way (a sealed section, a missing plan). */
-	bool FindRoute(const FVector& From, const FVector& To, TArray<FVector>& Out, float* OutMetres = nullptr, bool bKeys = false) const;
+	bool FindRoute(const FVector& From, const FVector& To, TArray<FVector>& Out, float* OutMetres = nullptr, bool bKeys = false, bool bThroughSealed = false) const;
 
 	/** The compartment a point is in (world cm), or null. */
 	const FAstraPlanCompartment* CompartmentAt(const FVector& Cm) const;
@@ -146,5 +147,5 @@ private:
 	mutable TArray<TPair<int32, int32>> StairLinks; // deck pairs joined by a stair edge
 
 	bool Load() const;
-	float EdgeCost(const FAstraPlanEdge& E, bool bKeys) const;   // metres of walking it is worth; < 0: impassable
+	float EdgeCost(const FAstraPlanEdge& E, bool bKeys, bool bThroughSealed = false) const;   // metres of walking it is worth; < 0: impassable
 };

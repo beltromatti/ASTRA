@@ -4,6 +4,7 @@
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraDamageModel.h"
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
 #include "AstraStations.h"
@@ -194,7 +195,19 @@ namespace
 
 	FString KindShort(const FString& Kind)
 	{
-		return Kind == TEXT("fire") ? TEXT("FIRE") : (Kind == TEXT("hull breach") ? TEXT("BREACH") : TEXT("CONDUIT"));
+		return Kind == TEXT("fire") ? TEXT("FIRE") : (Kind == TEXT("hull breach") ? TEXT("BREACH") : (Kind.Contains(TEXT("radiator")) ? TEXT("RADIATOR") : TEXT("CONDUIT")));
+	}
+
+	/** How urgent an incident is on a damage board: the unattended first, then a breach (the air goes) before a fire (it spreads) before power, then how bad. */
+	float IncidentRank(const FAstraDamage& D)
+	{
+		return (D.Team < 0 ? 100.f : 0.f) + (D.Kind.Contains(TEXT("breach")) ? 30.f : (D.Kind.Contains(TEXT("fire")) ? 20.f : 10.f)) + 9.f * D.Severity;
+	}
+
+	/** What a conduit incident costs, in words: the allocations that pass through the room and the power it has left. */
+	FString ConduitText(const FAstraDamage& D)
+	{
+		return D.System.IsEmpty() ? FString() : FString::Printf(TEXT("%s · POWER %.0f %%"), *D.System.ToUpper(), 100.f * FMath::Clamp(1.f - D.Severity, 0.f, 1.f));
 	}
 
 	FLinearColor KindColor(const FString& Kind)
@@ -452,30 +465,54 @@ void UAstraScreensSubsystem::DrawMaster(UCanvas* C, int32 W, int32 H)
 			P.Frame(X, Y, CW, CH, RGB(20, 40, 64));
 		}
 	}
+	// a cell is a deck and a section; the worst incident in it shows (the place it is in, the team on it), and how many more there are
+	struct FBoardCell { const FAstraDamage* Worst = nullptr; int32 N = 0; };
+	TArray<FBoardCell> Cells;
+	Cells.SetNum(12 * 8);
 	for (const FAstraDamage& D : Ship->GetDamage())
 	{
-		const int32 r = FMath::Clamp(D.Deck - 1, 0, 11), c = FMath::Clamp(int32(D.Section - TEXT('A')), 0, 7);
-		const float X = GX + c * (CW + Gap), Y = GY + r * (CH + Gap);
+		FBoardCell& Cell = Cells[FMath::Clamp(D.Deck - 1, 0, 11) * 8 + FMath::Clamp(int32(D.Section - TEXT('A')), 0, 7)];
+		++Cell.N;
+		if (!Cell.Worst || IncidentRank(D) > IncidentRank(*Cell.Worst))
+		{
+			Cell.Worst = &D;
+		}
+	}
+	for (int32 Index = 0; Index < Cells.Num(); ++Index)
+	{
+		if (!Cells[Index].Worst)
+		{
+			continue;
+		}
+		const FAstraDamage& D = *Cells[Index].Worst;
+		const float X = GX + (Index % 8) * (CW + Gap), Y = GY + (Index / 8) * (CH + Gap);
 		FLinearColor K = KindColor(D.Kind);
 		const float A = D.Team < 0 ? P.Pulse(D.Kind == TEXT("fire") ? 1.6f : 0.8f) : 0.55f;
 		P.Rect(X, Y, CW, CH, FLinearColor(K.R, K.G, K.B, 0.35f * A + 0.1f));
 		P.Frame(X, Y, CW, CH, K, 2.f);
-		P.Text(X + 8, Y + 4, KindShort(D.Kind), true, 15, TEXTC, 0, true);
+		P.Text(X + 8, Y + 3, KindShort(D.Kind), true, 15, TEXTC, 0, true);
 		if (D.Team >= 0)
 		{
-			P.Text(X + CW - 8, Y + 4, FString::Printf(TEXT("T%d"), D.Team + 1), true, 15, CYAN, 2, true);
-			if (D.Travel > 0.f)
-			{
-				P.Text(X + 8, Y + 26, TEXT("EN ROUTE"), true, 13, CYAN);
-			}
-			else
-			{
-				P.Rect(X + 6, Y + CH - 12, (CW - 12) * FMath::Clamp(D.Progress, 0.f, 1.f), 6, CYAN);
-			}
+			P.Text(X + CW - 8, Y + 3, FString::Printf(TEXT("T%d"), D.Team + 1), true, 15, CYAN, 2, true);
 		}
 		else
 		{
-			P.Text(X + 8, Y + 26, TEXT("NO TEAM"), true, 13, K);
+			P.Text(X + CW - 8, Y + 4, Cells[Index].N > 1 ? FString::Printf(TEXT("NO TEAM +%d"), Cells[Index].N - 1) : FString(TEXT("NO TEAM")), true, 12, K, 2);
+		}
+		if (!D.Place.IsEmpty())
+		{
+			P.Text(X + 8, Y + 22, D.Place.ToUpper().Left(14), true, 12, TEXTC * 0.85f);
+		}
+		if (D.Team >= 0 && D.Travel > 0.f)
+		{
+			// the team on its way: a marker walking along a thin track
+			const float Walk = D.Travel0 > 0.f ? FMath::Clamp(1.f - D.Travel / D.Travel0, 0.f, 1.f) : 0.f;
+			P.Rect(X + 6, Y + CH - 9, CW - 12, 1.5f, DIM);
+			P.Rect(X + 6 + (CW - 24) * Walk, Y + CH - 12, 12, 6, CYAN);
+		}
+		else if (D.Team >= 0)
+		{
+			P.Rect(X + 6, Y + CH - 11, (CW - 12) * FMath::Clamp(D.Progress, 0.f, 1.f), 6, CYAN);
 		}
 	}
 
@@ -945,7 +982,7 @@ void UAstraScreensSubsystem::DrawOps(UCanvas* C, int32 W, int32 H, const FString
 		                                                                        : FString::Printf(TEXT("TEAM %d · %.0f %%"), D.Team + 1, 100.f * D.Progress));
 		if (!D.System.IsEmpty())
 		{
-			St = FString::Printf(TEXT("%s -20 %% · %s"), *D.System.ToUpper(), *St);
+			St = ConduitText(D) + TEXT(" · ") + St;
 		}
 		P.Text(W - 36, Y + 12, St, true, 18, D.Team < 0 ? KindColor(D.Kind) : CYAN, 2);
 	}
@@ -1092,7 +1129,7 @@ void UAstraScreensSubsystem::DrawEngineering(UCanvas* C, int32 W, int32 H, const
 		const float Y = 64.f + Row++ * 60.f;
 		P.Rect(20, Y, W - 40, 50, PANEL);
 		P.Rect(20, Y, 8, 50, YELLOW);
-		P.Text(40, Y + 12, FString::Printf(TEXT("%s · %s -20 %%"), *D.Where().ToUpper(), *D.System.ToUpper()), true, 20, TEXTC, 0, true);
+		P.Text(40, Y + 12, FString::Printf(TEXT("%s · %s"), *D.Where().ToUpper(), *ConduitText(D)), true, 20, TEXTC, 0, true);
 		P.Text(W - 36, Y + 14, D.Team < 0 ? FString(TEXT("NO TEAM")) : FString::Printf(TEXT("TEAM %d"), D.Team + 1), true, 18, D.Team < 0 ? YELLOW : CYAN, 2);
 	}
 	if (Row == 0)
@@ -1544,6 +1581,7 @@ void UAstraScreensSubsystem::DrawPadDamage(UCanvas* C, int32 W, int32 H)
 	P.Bar(MX + BW + 20, 62, BW, 16, Sh, TEXT("Shields"), FString::Printf(TEXT("%.0f %%"), 100.f * Sh), Level(Sh));
 	P.Bar(MX + 2 * (BW + 20), 62, BW, 16, FMath::Clamp(He, 0.f, 1.f), TEXT("Heat"), FString::Printf(TEXT("%.0f %%"), 100.f * He), He > 0.9f ? RED : (He > 0.7f ? AMBER : CYAN));
 	const TArray<FAstraDamage>& Dmg = Ship->GetDamage();
+	const FAstraDamageModel* Interior = Ship->GetInterior().IsReady() ? &Ship->GetInterior() : nullptr;
 	int32 Busy = 0;
 	for (const FAstraDamage& D : Dmg) { Busy += D.Team >= 0 ? 1 : 0; }
 	// the ship in cutaway, as on the holo table: a row per deck (the bridge on its island), sections A-H, the damage where it is
@@ -1580,7 +1618,8 @@ void UAstraScreensSubsystem::DrawPadDamage(UCanvas* C, int32 W, int32 H)
 					if (X.Deck == D.Id && X.Section == Se.Id[0] && Sev > Worst)
 					{
 						Worst = Sev;
-						Col = (Sev == 3 ? RED : (Sev == 2 ? AMBER : YELLOW)) * Pulse;
+						// the section is washed in the colour; the compartment itself, drawn below, is the bright one (an incident the plan has no compartment for is the section's)
+						Col = (Sev == 3 ? RED : (Sev == 2 ? AMBER : YELLOW)) * (Interior && Interior->GetMap().Comps.IsValidIndex(X.Comp) ? 0.4f : Pulse);
 					}
 				}
 				Col.A = 1.f;
@@ -1592,6 +1631,27 @@ void UAstraScreensSubsystem::DrawPadDamage(UCanvas* C, int32 W, int32 H)
 			for (const FAstraPlanDeck::FSection& Se : Top->Sections)
 			{
 				P.Text(PX(0.5f * (Se.X0 + Se.X1)) - 4.f, CT - 1.f + Row * 0.f - 12.f, Se.Id, true, 11, DIM);
+			}
+		}
+		// the compartments that are hurt, where they are along their deck's row, and the pressure bulkheads that are shut
+		if (Interior)
+		{
+			for (const FAstraDamage& X : Dmg)
+			{
+				if (!Interior->GetMap().Comps.IsValidIndex(X.Comp))
+				{
+					continue;
+				}
+				const FBox& Box = Interior->GetMap().Comps[X.Comp].Box;
+				const int32 Sev = X.Kind.Contains(TEXT("breach")) ? 3 : (X.Kind.Contains(TEXT("fire")) ? 2 : 1);
+				FLinearColor Col = (Sev == 3 ? RED : (Sev == 2 ? AMBER : YELLOW)) * Pulse;
+				Col.A = 1.f;
+				P.Rect(PX(Box.Min.X), RowY(X.Deck) - 1.f, FMath::Max(3.f, (Box.Max.X - Box.Min.X) * Sx), Row - 1.f, Col);
+			}
+			for (const int32 DoorIndex : Interior->SealedDoors())
+			{
+				const FAstraDmgDoor& Door = Interior->GetMap().Doors[DoorIndex];
+				P.Rect(PX(Door.PosCm.X) - 1.f, RowY(Door.Deck) - 2.f, 2.f, Row + 1.f, TEXTC);
 			}
 		}
 		// the damage-control teams (from their station on Deck 6) and the Captain
@@ -1631,25 +1691,46 @@ void UAstraScreensSubsystem::DrawPadDamage(UCanvas* C, int32 W, int32 H)
 	P.Line(MX, ListTop - 40.f, RX, ListTop - 40.f, DIM);
 	P.Text(MX, ListTop - 32.f, TEXT("INCIDENTS"), false, 18, CYAN);
 	P.Text(RX, ListTop - 30.f, FString::Printf(TEXT("%d OPEN  ·  %d OF %d DAMAGE-CONTROL TEAMS OUT"), Dmg.Num(), Busy, Ship->GetNumDamageTeams()), true, 16, Dmg.Num() ? AMBER : GREEN, 2);
+	if (Interior)
+	{
+		// what the ship has done about it: the section bulkheads shut and the containment fields on the breaches
+		const int32 Sealed = Interior->SealedDoors().Num(), Fields = Interior->Power().Fields;
+		if (Sealed > 0 || Fields > 0)
+		{
+			P.Text(MX + 130.f, ListTop - 28.f, FString::Printf(TEXT("%d BULKHEAD%s SEALED · %d FIELD%s"), Sealed, Sealed == 1 ? TEXT("") : TEXT("S"), Fields, Fields == 1 ? TEXT("") : TEXT("S")), true, 14, CYAN);
+		}
+	}
 	if (Dmg.Num() == 0)
 	{
 		P.Text(MX, ListTop + 2.f, TEXT("NONE  ·  ALL DECKS PRESSURIZED"), true, 18, GREEN);
 	}
-	const int32 MaxRows = FMath::Max(3, FMath::FloorToInt((490.f - ListTop) / 27.f));
-	for (int32 i = 0; i < FMath::Min(Dmg.Num(), MaxRows); ++i)
+	TArray<const FAstraDamage*> Sorted;
+	for (const FAstraDamage& D : Dmg)
 	{
-		const FAstraDamage& D = Dmg[i];
+		Sorted.Add(&D);
+	}
+	Sorted.StableSort([](const FAstraDamage& A, const FAstraDamage& B) { return IncidentRank(A) > IncidentRank(B); });
+	const int32 MaxRows = FMath::Max(3, FMath::FloorToInt((490.f - ListTop) / 27.f));
+	for (int32 i = 0; i < FMath::Min(Sorted.Num(), MaxRows); ++i)
+	{
+		const FAstraDamage& D = *Sorted[i];
 		const float Y = ListTop + i * 27.f;
 		const FLinearColor KC = D.Kind.Contains(TEXT("breach")) ? RED : (D.Kind.Contains(TEXT("fire")) ? AMBER : YELLOW);
-		P.Text(MX, Y, FString::Printf(TEXT("DECK %2d  %c"), D.Deck, D.Section), true, 17, TEXTC);
-		P.Text(MX + 130, Y, (D.Kind + (D.System.IsEmpty() ? FString() : FString::Printf(TEXT(" (%s)"), *D.System))).ToUpper().Left(40), true, 17, KC);
+		P.Text(MX, Y, FString::Printf(TEXT("D%-2d %c  %s"), D.Deck, D.Section, *D.Place.ToUpper().Left(18)), true, 17, TEXTC);
+		P.Text(MX + 270, Y, KindShort(D.Kind), true, 17, KC);
+		// how it stands: the field on the hole and the air that is left, the fire and the smoke, the power a conduit's room has and what runs through it
+		const FString Detail = (D.System.IsEmpty() ? FString() : D.System + TEXT(" · ")) + D.Note;
+		if (!Detail.IsEmpty())
+		{
+			P.Text(MX + 385, Y + 3, Detail.ToUpper().Left(40), true, 13, DIM);
+		}
 		const FString Team = D.Team < 0 ? FString(TEXT("UNATTENDED")) : (D.Travel > 0.f ? FString::Printf(TEXT("TEAM %d  EN ROUTE %.0f S"), D.Team + 1, D.Travel)
 		                                                                              : FString::Printf(TEXT("TEAM %d  %.0f %%"), D.Team + 1, 100.f * D.Progress));
-		P.Text(RX, Y, Team, true, 17, D.Team < 0 ? RED : (D.Travel > 0.f ? AMBER : GREEN), 2);
+		P.Text(RX, Y, Team, true, 15, D.Team < 0 ? RED : (D.Travel > 0.f ? AMBER : GREEN), 2);
 	}
-	if (Dmg.Num() > MaxRows)
+	if (Sorted.Num() > MaxRows)
 	{
-		P.Text(RX, ListTop + MaxRows * 27, FString::Printf(TEXT("+%d MORE"), Dmg.Num() - MaxRows), true, 14, DIM, 2);
+		P.Text(RX, ListTop + MaxRows * 27, FString::Printf(TEXT("+%d MORE"), Sorted.Num() - MaxRows), true, 14, DIM, 2);
 	}
 	P.Line(MX, 500, RX, 500, DIM);
 	P.Text(MX, 508, TEXT("CASUALTIES"), false, 18, CYAN);

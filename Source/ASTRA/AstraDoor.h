@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "AstraDoor.generated.h"
 
+class AAstraDoor;
 class UStaticMeshComponent;
 
 /** The doors' list of walkers: anyone who goes about the ship on their own feet and whom the doors open for, besides the player's pawn
@@ -18,6 +19,12 @@ namespace AstraDoors
 	ASTRA_API void AddWalker(const AActor* Walker);
 	ASTRA_API void RemoveWalker(const AActor* Walker);
 	ASTRA_API const TArray<TWeakObjectPtr<const AActor>>& Walkers();
+
+	/** The door actors that are in the world now (the decks' doors come with the decks and go with them), and a delegate fired when one begins play: the
+	 *  damage code (UAstraShipSubsystem) matches an actor to its door of the plan by where it stands, and shuts it when a pressure bulkhead is sealed there. */
+	ASTRA_API const TArray<TWeakObjectPtr<AAstraDoor>>& Loaded();
+	DECLARE_MULTICAST_DELEGATE_OneParam(FPlaced, AAstraDoor*);
+	ASTRA_API FPlaced& OnPlaced();
 }
 
 UCLASS()
@@ -28,6 +35,7 @@ class ASTRA_API AAstraDoor : public AActor
 public:
 	AAstraDoor();
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	virtual void Tick(float DeltaTime) override;
 
 	/** Clear opening (cm). The leaves are the corridor kit's (1.4 m x 2.3 m for the pair), scaled to fit. */

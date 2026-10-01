@@ -9,6 +9,8 @@
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraBridgeFX.h"
+#include "AstraDamageFx.h"
+#include "AstraDoor.h"
 #include "AstraHangar.h"
 #include "AstraPatient.h"
 #include "AstraQuarters.h"
@@ -19,6 +21,7 @@
 #include "AstraCampaign.h"
 #include "ASTRAPlayerController.h"
 #include "AstraFighterPawn.h"
+#include "Async/Async.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/PlayerController.h"
 #include "AstraWorldGen.h"
@@ -49,6 +52,7 @@
 #include "Sound/SoundBase.h"
 
 DECLARE_CYCLE_STAT(TEXT("Ship"), STAT_AstraShip, STATGROUP_Astra);
+DECLARE_CYCLE_STAT(TEXT("Interior"), STAT_AstraInterior, STATGROUP_Astra);
 
 namespace
 {
@@ -167,6 +171,90 @@ namespace
 				Ship->OnHullHit(Dmg, 0.f, FMath::VRand());
 			}
 		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdDamageInfo(TEXT("astra.damage.info"),
+		TEXT("DISTRUZIONE: the damage inside the hull: what is in play, the incidents, the books, what the model costs"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			const UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			if (!Ship)
+			{
+				return;
+			}
+			const FAstraDamageModel& I = Ship->GetInterior();
+			float Avg = 0.f, Max = 0.f;
+			Ship->InteriorCost(Avg, Max);
+			UE_LOG(LogASTRA, Display, TEXT("[Damage] %s | cost %.3f ms a tick (worst %.2f)"), I.IsReady() ? *I.InfoText() : TEXT("the damage model is not up (the plan is still loading or missing)"), Avg, Max);
+			if (I.IsReady())
+			{
+				UE_LOG(LogASTRA, Display, TEXT("[Damage] power the ship's distribution still carries: shields %.2f weapons %.2f engines %.2f sensors %.2f life support %.2f flight deck %.2f"),
+				       I.Power().Factor[0], I.Power().Factor[1], I.Power().Factor[2], I.Power().Factor[3], I.Power().Factor[4], I.Power().Factor[5]);
+				const FAstraDmgCaptain& C = I.Captain();
+				UE_LOG(LogASTRA, Display, TEXT("[Damage] the Captain: %s, peril %.2f (hypoxia %.1f, burn %.1f, smoke %.1f, trauma %.1f)"),
+				       C.State == FAstraDmgCaptain::EState::Well ? TEXT("well") : (C.State == FAstraDmgCaptain::EState::Impaired ? TEXT("impaired") : (C.State == FAstraDmgCaptain::EState::Down ? TEXT("down") : TEXT("dead"))),
+				       C.Peril, C.Hypoxia, C.Burn, C.Smoke, C.Trauma);
+				for (const FAstraDamage& D : Ship->GetDamage())
+				{
+					UE_LOG(LogASTRA, Display, TEXT("[Damage]    #%d %s: %s (%s) severity %.2f%s"), D.Id, *D.Where(), *D.Kind, *D.Note, D.Severity, D.Team >= 0 ? *FString::Printf(TEXT(", team %d"), D.Team + 1) : TEXT(""));
+				}
+			}
+		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdDamageStrike(TEXT("astra.damage.strike"),
+		TEXT("Testing: astra.damage.strike [here | a compartment's id or part of its name] [energy 40] [kinetic|energy|explosive] [nohole]: a blow into a compartment ('here': the one the Captain is in)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			if (!Ship || !Ship->GetInterior().IsReady())
+			{
+				UE_LOG(LogASTRA, Warning, TEXT("[Damage] the damage model is not up"));
+				return;
+			}
+			FAstraDamageModel& I = Ship->GetInterior();
+			const FString Where = A.Num() ? A[0] : FString(TEXT("here"));
+			int32 Comp = INDEX_NONE;
+			if (Where.Equals(TEXT("here"), ESearchCase::IgnoreCase))
+			{
+				if (const APawn* P = UGameplayStatics::GetPlayerPawn(World, 0))
+				{
+					Comp = Ship->InteriorCompOf(P->GetActorLocation());
+				}
+			}
+			else if (const int32* Id = I.GetMap().CompByName.Find(FName(*Where)))
+			{
+				Comp = *Id;
+			}
+			else
+			{
+				for (int32 i = 0; i < I.GetMap().Comps.Num() && Comp == INDEX_NONE; ++i)
+				{
+					Comp = I.GetMap().Comps[i].Name.Contains(Where, ESearchCase::IgnoreCase) && !I.GetMap().Comps[i].bCorridor ? i : INDEX_NONE;
+				}
+			}
+			if (Comp == INDEX_NONE)
+			{
+				UE_LOG(LogASTRA, Warning, TEXT("[Damage] no such compartment (a compartment id such as d4_galley_B1, part of a name such as Galley, or here)"));
+				return;
+			}
+			const float Energy = A.Num() > 1 ? FCString::Atof(*A[1]) : 40.f;
+			const FString T = A.Num() > 2 ? A[2].ToLower() : FString(TEXT("kinetic"));
+			const uint8 Type = T.StartsWith(TEXT("en")) ? 1 : (T.StartsWith(TEXT("ex")) ? 2 : 0);
+			const bool bHole = !(A.Num() > 3 && A[3].StartsWith(TEXT("no")));
+			FAstraImpactResult R;
+			I.Strike(Comp, Energy, Type, I.GetMap().Comps[Comp].Box.GetCenter(), bHole, R);
+			if (UAstraDamageFx* Fx = World->GetSubsystem<UAstraDamageFx>())
+			{
+				Fx->OnBlow(R, Energy);                       // the boom and the sparks too, as for a real blow
+			}
+			UE_LOG(LogASTRA, Display, TEXT("[Damage] a blow of %.0f into %s: %s%s"), Energy, *I.GetMap().Describe(Comp), R.Lines.Num() ? *FString::Join(R.Lines, TEXT("; ")) : TEXT("nothing came of it"),
+			       R.Killed + R.Wounded ? *FString::Printf(TEXT(" — %d killed, %d wounded"), R.Killed, R.Wounded) : TEXT(""));
+		}));
+	FAutoConsoleCommandWithWorld CmdDamageReset(TEXT("astra.damage.reset"), TEXT("Testing: everything the damage model has in play is made whole at once (the bulkheads open, the incidents go)"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+		{
+			if (UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr)
+			{
+				Ship->ResetInterior();
+			}
+		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdHeat(TEXT("astra.heat"),
 		TEXT("Testing: astra.heat <percent> sets the ship's thermal load"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
@@ -260,6 +348,8 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Mark0 = MarkDeg;
 	CollectSceneRefs(InWorld);
 	UpdateAttitudeVisuals();
+	StartInterior();
+	DoorPlacedHandle = AstraDoors::OnPlaced().AddUObject(this, &UAstraShipSubsystem::OnDoorPlaced);
 	// the bridge at rest: reactor hum through the deck, air handling, far electronics (a seamless loop)
 	if (USoundBase* Amb = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Bridge_Ambience.SW_Bridge_Ambience")))
 	{
@@ -875,39 +965,6 @@ float UAstraShipSubsystem::HeatFactor() const
 	return FMath::Lerp(0.8f, 0.55f, FMath::Clamp((H - 0.9f) / 0.1f, 0.f, 1.f));
 }
 
-void UAstraShipSubsystem::RadiatorHit(float HullDamage)
-{
-	// a wing is torn by a blow in proportion to its force, and the next one goes no sooner than 20 s after (a hit lands near the wreck
-	// of the last one): before, every hit had a 30 % chance and all three wings went in fifteen seconds of a focused attack
-	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
-	if (!bRadiatorsOut || RadiatorHealth < 0.3f || Now - LastRadiatorTear < 20.0 || FMath::FRand() > 0.3f * FMath::Clamp(HullDamage / 80.f, 0.1f, 1.f))
-	{
-		return;
-	}
-	LastRadiatorTear = Now;
-	// a wing torn: an incident damage control can repair (each repair gives back a quarter of the radiators)
-	FAstraDamage D;
-	D.Id = NextDamageId++;
-	D.Deck = 7;                                   // the radiators are Engineering & Power's (Deck 7, sections E-G)
-	D.Kind = TEXT("radiator damage");
-	for (const TCHAR Sec : {TEXT('E'), TEXT('F'), TEXT('G')})
-	{
-		if (!Damage.ContainsByPredicate([Sec](const FAstraDamage& X) { return X.Kind == TEXT("radiator damage") && X.Section == Sec; }))
-		{
-			D.Section = Sec;
-			RadiatorHealth = FMath::Max(0.25f, RadiatorHealth - 0.25f);
-			Damage.Add(D);
-			if (Damage.Num() > 16)
-			{
-				Damage.RemoveAt(0);
-			}
-			Event(FString::Printf(TEXT("engineering: a radiator wing torn by the hit at %s — the radiators shed %.0f %% of their heat until "
-			                           "damage control repairs them"), *D.Where(), 100.f * RadiatorHealth), true);
-			return;
-		}
-	}
-}
-
 void UAstraShipSubsystem::SetBattleShort(bool bOn)
 {
 	if (bOn == bBattleShort)
@@ -982,35 +1039,27 @@ void UAstraShipSubsystem::TickHeat(float DeltaTime)
 		HeatStage = 0;
 		Event(FString::Printf(TEXT("engineering: heat back down to %.0f %%, systems nominal"), HeatPct), false);
 	}
-	// critical: conduits give way, people in the engine spaces get burned
+	// critical: the conduits of the reactor and coolant rooms run past what they carry and give way one after another, the nearest to Main Engineering first;
+	// whoever is at the panels is scorched (the heat is the ship's, where it does its harm is the rooms that carry it)
 	if (HeatPct >= 92.f)
 	{
-		if ((HeatHarmT -= DeltaTime) <= 0.f)
+		ThermalStress += DeltaTime * (1.f + (HeatPct - 92.f) / 6.f) / 22.f;
+		if (ThermalStress >= 1.f && Interior.IsReady())
 		{
-			HeatHarmT = FMath::FRandRange(18.f, 26.f);
-			static const TCHAR* Sys[] = {TEXT("shields"), TEXT("weapons"), TEXT("engines"), TEXT("sensors")};
-			FAstraDamage D;
-			D.Id = NextDamageId++;
-			D.Deck = FMath::RandRange(7, 10);
-			D.Section = TEXT("ABCDEFGH")[FMath::RandRange(0, 7)];
-			D.Kind = TEXT("conduit damage");
-			D.System = Sys[FMath::RandRange(0, 3)];
-			const FString Burns = FMath::FRand() < 0.35f ? Roster.Casualties(D.Deck, 1, 0, CasualtyRng, TEXT("fire")) : FString();
-			if (!Damage.ContainsByPredicate([&D](const FAstraDamage& X) { return X.Deck == D.Deck && X.Section == D.Section && X.Kind == D.Kind; }))
+			ThermalStress = 0.f;
+			const int32 Room = Interior.PickHeatRoom(ThermalSeq++);
+			if (Room != INDEX_NONE)
 			{
-				Damage.Add(D);
-				if (Damage.Num() > 16)
-				{
-					Damage.RemoveAt(0);
-				}
+				FAstraImpactResult R;
+				Interior.Overload(Room, 0.55f, R);
+				Event(FString::Printf(TEXT("engineering: a power conduit overheated and failed at %s (%s power down)%s"), *Interior.GetMap().Describe(Room), *Interior.SystemsText(Room),
+				                      R.People.Num() ? *(FString(TEXT(" — casualties: ")) + FString::Join(R.People, TEXT("; "))) : TEXT("")), true);
 			}
-			Event(FString::Printf(TEXT("engineering: a power conduit overheated and failed at %s (%s power -20%%)%s"), *D.Where(), *D.System,
-			                      Burns.IsEmpty() ? TEXT("") : *(FString(TEXT(" — casualties: ")) + Burns)), true);
 		}
 	}
 	else
 	{
-		HeatHarmT = 6.f;
+		ThermalStress = FMath::Max(0.f, ThermalStress - DeltaTime * 0.05f);
 	}
 	// the Aquila's radiator panels glow with her heat (dull red when hot, bright when critical)
 	if (RadiatorGlow)
@@ -2295,16 +2344,45 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	if (Name == TEXT("dispatch_damage_control"))
 	{
 		const int32 Deck = (int32)Num(TEXT("deck"), 0);
-		FString Sec = Str(TEXT("section")).ToUpper().TrimStartAndEnd();
+		const FString SecRaw = Str(TEXT("section")).TrimStartAndEnd();
+		FString Sec = SecRaw.ToUpper();
 		Sec.RemoveFromStart(TEXT("SECTION "));
 		const TCHAR SecC = Sec.Len() ? Sec[0] : TEXT('?');
-		// one incident by its id (ops' own dispatcher), else the first at that deck and section (a fire and a breach can
-		// share a section: the unattended one first)
+		const FString Task = Str(TEXT("task")).ToLower();
+		// what the task asks for: firefighting a fire, sealing a breach, repairing the rest ("rescue" and no task: anything)
+		auto Fits = [&Task](const FAstraDamage& X)
+		{
+			return Task == TEXT("firefight") ? X.Kind == TEXT("fire") : (Task == TEXT("seal_breach") ? X.Kind == TEXT("hull breach")
+			     : (Task == TEXT("repair") ? (X.Kind != TEXT("fire") && X.Kind != TEXT("hull breach")) : true));
+		};
+		auto Worst = [this](TFunctionRef<bool(const FAstraDamage&)> Pred) -> FAstraDamage*
+		{
+			FAstraDamage* Best = nullptr;
+			for (FAstraDamage& X : Damage)
+			{
+				const float Kx = X.Kind == TEXT("hull breach") ? 2.f : (X.Kind == TEXT("fire") ? 1.f : 0.f);
+				if (Pred(X) && (!Best || Kx + X.Severity > (Best->Kind == TEXT("hull breach") ? 2.f : (Best->Kind == TEXT("fire") ? 1.f : 0.f)) + Best->Severity))
+				{
+					Best = &X;
+				}
+			}
+			return Best;
+		};
+		// one incident by its id (ops' own dispatcher), else the worst unattended one at that deck and section that the task fits (a fire and a breach
+		// can share a section), else one named by its place ("the Main Galley"), else any unattended one on the deck
 		const int32 IncidentId = (int32)Num(TEXT("id"), -1.0);
 		FAstraDamage* D = IncidentId >= 0 ? Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Id == IncidentId; }) : nullptr;
 		if (!D)
 		{
-			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC && X.Team < 0; });
+			D = Worst([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC && X.Team < 0 && Fits(X); });
+		}
+		if (!D)
+		{
+			D = Worst([&](const FAstraDamage& X) { return X.Deck == Deck && X.Section == SecC && X.Team < 0; });
+		}
+		if (!D && SecRaw.Len() > 1)
+		{
+			D = Worst([&](const FAstraDamage& X) { return X.Team < 0 && !X.Place.IsEmpty() && X.Place.Contains(SecRaw, ESearchCase::IgnoreCase); });
 		}
 		if (!D)
 		{
@@ -2319,7 +2397,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		}
 		if (!D)
 		{
-			D = Damage.FindByPredicate([&](const FAstraDamage& X) { return X.Deck == Deck && X.Team < 0; });
+			D = Worst([&](const FAstraDamage& X) { return X.Deck == Deck && X.Team < 0; });
 		}
 		if (!D)
 		{
@@ -2335,15 +2413,17 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		const FString Priority = Str(TEXT("priority")).ToLower();
 		const float Speed = Priority == TEXT("critical") ? 0.8f : (Priority == TEXT("low") ? 1.2f : 1.f);
 		D->Team = Team;
-		// the walk the team really has, on the ship's plan (VITA), else the old estimate
+		// the walk the team really has, on the ship's plan (VITA), to that very compartment; else the old estimate
 		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
-		const float Eta = Life ? Life->RepairEtaSeconds(D->Deck, D->Section, D->Id) : 0.f;
+		const float Eta = Life ? (D->CompId.IsNone() ? Life->RepairEtaSeconds(D->Deck, D->Section, D->Id) : Life->RepairEtaFor(*D)) : 0.f;
 		D->Travel = D->Travel0 = (Eta > 0.f ? Eta : (6.f + FMath::Abs(D->Deck - 6) * 1.5f)) * Speed;
-		D->Work = (D->Kind == TEXT("fire") ? 30.f : (D->Kind == TEXT("hull breach") ? 40.f : 25.f)) * Speed;
+		D->Work = (D->Comp != INDEX_NONE && Interior.IsReady() ? Interior.WorkSeconds(*D) : (D->Kind == TEXT("fire") ? 30.f : (D->Kind == TEXT("hull breach") ? 40.f : 25.f))) * Speed;
+		D->Progress = 0.f;
+		D->Baseline = 0.f;
 		int32 Busy = 0;
 		for (const FAstraDamage& X : Damage) { Busy += X.Team >= 0 ? 1 : 0; }
-		OutDetail = FString::Printf(TEXT("team %d en route to the %s at %s: on scene in %.0f s, about %.0f s of work; %d team%s still free"),
-		                            Team + 1, *D->Kind, *D->Where(), D->Travel, D->Work, NumDamageTeams - Busy, NumDamageTeams - Busy == 1 ? TEXT("") : TEXT("s"));
+		OutDetail = FString::Printf(TEXT("team %d en route to the %s at %s%s%s: on scene in %.0f s, about %.0f s of work; %d team%s still free"),
+		                            Team + 1, *D->Kind, *D->Where(), D->Note.IsEmpty() ? TEXT("") : TEXT(" — "), *D->Note, D->Travel, D->Work, NumDamageTeams - Busy, NumDamageTeams - Busy == 1 ? TEXT("") : TEXT("s"));
 		return true;
 	}
 	if (Name == TEXT("hail"))
@@ -2568,7 +2648,9 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		S->SetObjectField(TEXT("_astra_groups"), Battle->SideGroupsJson(0));   // the ASTRA groups, for the allied commanders (docs/GUERRA.md)
 		// where the Captain is: in a Falcon the XO has the conn and the Captain speaks by radio
 		const FString Flying = Battle->PilotSummary();
-		S->SetStringField(TEXT("captain"), !Flying.IsEmpty() ? Flying : CaptainAboard());
+		S->SetStringField(TEXT("captain"), CaptainFate == 2 ? FString::Printf(TEXT("DEAD — %s; the Executive Officer commands the Aquila"), *Interior.Captain().Why)
+		                                  : (CaptainFate == 1 ? FString::Printf(TEXT("down, unconscious (%s); the XO has the conn"), *Interior.Captain().Cause)
+		                                  : (!Flying.IsEmpty() ? Flying : CaptainAboard())));
 		S->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(100.f * Battle->PlayerHullFraction()));
 		Sh->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()));
 	}
@@ -2583,21 +2665,47 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	S->SetStringField(TEXT("bearing_convention"), TEXT("bearings are true bearings in the system plane, like headings: steer to a contact's bearing to point at it"));
 	TArray<TSharedPtr<FJsonValue>> Dmg;
 	int32 Busy = 0;
-	for (const FAstraDamage& D : Damage)
 	{
-		Busy += D.Team >= 0 ? 1 : 0;
-		FString Line = FString::Printf(TEXT("%s: %s"), *D.Where(), *D.Kind);
-		if (!D.System.IsEmpty())
+		// the worst first (a dozen are plenty for a mind: the rest are counted)
+		TArray<int32> Order;
+		for (int32 i = 0; i < Damage.Num(); ++i)
 		{
-			Line += FString::Printf(TEXT(" (%s power -20%%)"), *D.System);
+			Busy += Damage[i].Team >= 0 ? 1 : 0;
+			Order.Add(i);
 		}
-		Line += D.Team < 0 ? FString(TEXT(" — unattended")) :
-		        (D.Travel > 0.f ? FString::Printf(TEXT(" — team %d on the way (%.0f s)"), D.Team + 1, D.Travel)
-		                        : FString::Printf(TEXT(" — team %d working, %.0f%% done"), D.Team + 1, 100.f * D.Progress));
-		Dmg.Add(MakeShared<FJsonValueString>(Line));
+		Order.Sort([this](int32 A, int32 B)
+		{
+			const FAstraDamage& X = Damage[A];
+			const FAstraDamage& Y = Damage[B];
+			const float Kx = X.Kind == TEXT("hull breach") ? 2.f : (X.Kind == TEXT("fire") ? 1.f : 0.f), Ky = Y.Kind == TEXT("hull breach") ? 2.f : (Y.Kind == TEXT("fire") ? 1.f : 0.f);
+			return Kx + X.Severity > Ky + Y.Severity;
+		});
+		for (int32 k = 0; k < FMath::Min(12, Order.Num()); ++k)
+		{
+			const FAstraDamage& D = Damage[Order[k]];
+			FString Line = FString::Printf(TEXT("%s: %s"), *D.Where(), *D.Kind);
+			if (!D.Note.IsEmpty())
+			{
+				Line += FString::Printf(TEXT(" — %s"), *D.Note);
+			}
+			if (!D.System.IsEmpty())
+			{
+				Line += FString::Printf(TEXT(" (%s power down)"), *D.System);
+			}
+			Line += D.Team < 0 ? FString(TEXT(" — unattended")) :
+			        (D.Travel > 0.f ? FString::Printf(TEXT(" — team %d on the way (%.0f s)"), D.Team + 1, D.Travel)
+			                        : FString::Printf(TEXT(" — team %d working, %.0f%% done"), D.Team + 1, 100.f * D.Progress));
+			Dmg.Add(MakeShared<FJsonValueString>(Line));
+		}
+		if (Order.Num() > 12)
+		{
+			Dmg.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("(and %d more, lesser incidents)"), Order.Num() - 12)));
+		}
 	}
 	S->SetArrayField(TEXT("damage"), Dmg);
-	S->SetStringField(TEXT("damage_control"), FString::Printf(TEXT("%d teams, %d free"), NumDamageTeams, NumDamageTeams - Busy));
+	S->SetStringField(TEXT("damage_control"), FString::Printf(TEXT("%d teams, %d free%s%s"), NumDamageTeams, NumDamageTeams - Busy,
+	                  Interior.SealedDoors().Num() ? *FString::Printf(TEXT("; %d pressure bulkheads shut"), Interior.SealedDoors().Num()) : TEXT(""),
+	                  Interior.NumWrecked() ? *FString::Printf(TEXT("; %d compartments gutted"), Interior.NumWrecked()) : TEXT("")));
 	S->SetStringField(TEXT("casualties"), Roster.Summary());
 	if (Roster.GetHurt().Num())
 	{
@@ -2707,6 +2815,7 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 		UpdateAlertVisuals(DeltaTime);
 		return;
 	}
+	TickInterior(DeltaTime);
 	TickHeat(DeltaTime);
 	// the Medbay: the doctors' rounds every minute (conditions change, the healed go back to duty, some die), the beds
 	// follow the roster
@@ -3065,28 +3174,633 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 		UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), ShipMPC, TEXT("AlertPulse"), AlertBlend);
 		UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), ShipMPC, TEXT("LightLevel"), LightLevel);
 	}
+	// the damage inside the ship reaches the older rooms' lights by the compartment each stands in (the lamp pool does the same for the decks')
+	if (!bShipLightCompsKnown && Interior.IsReady())
+	{
+		bShipLightCompsKnown = true;
+		ShipLightComp.Reset();
+		for (const ALight* L : ShipLights)
+		{
+			ShipLightComp.Add(L ? InteriorCompOf(L->GetActorLocation()) : INDEX_NONE);
+		}
+		ShipLightUnsteady.Init(1.f, ShipLights.Num());
+	}
+	ShipLightFlickT += DeltaTime;
+	const bool bShipFlicker = ShipLightFlickT >= 0.08f;
+	if (bShipFlicker)
+	{
+		ShipLightFlickT = 0.f;
+	}
 	for (int32 i = 0; i < ShipLights.Num(); ++i)
 	{
 		if (ULightComponent* LC = ShipLights[i] ? ShipLights[i]->GetLightComponent() : nullptr)
 		{
-			LC->SetIntensity(ShipLightBase[i] * LightLevel);
-			LC->SetLightColor(FMath::Lerp(ShipLightColorBase[i], FLinearColor(1.f, 0.55f, 0.5f), AlertBlend * 0.35f));
+			float Share = LightLevel;
+			FLinearColor Color = FMath::Lerp(ShipLightColorBase[i], FLinearColor(1.f, 0.55f, 0.5f), AlertBlend * 0.35f);
+			if (bShipLightCompsKnown && ShipLightComp.IsValidIndex(i) && ShipLightComp[i] != INDEX_NONE && Interior.Find(ShipLightComp[i]))
+			{
+				const FAstraDmgLight D = Interior.LightOf(ShipLightComp[i]);
+				if (bShipFlicker)
+				{
+					ShipLightUnsteady[i] = D.Flicker > 0.f && FMath::FRand() < D.Flicker * 0.55f ? FMath::Lerp(0.05f, 0.55f, FMath::FRand()) : 1.f;
+				}
+				Share = (D.Mains * LightLevel + D.Strips) * ShipLightUnsteady[i];
+				Color = D.Mix > 0.f ? FMath::Lerp(Color, D.Tint, D.Mix) : Color;
+			}
+			LC->SetIntensity(ShipLightBase[i] * Share);
+			LC->SetLightColor(Color);
 		}
 	}
 }
 
+// ------------------------------------------------------------------------------------------------ the damage inside (DISTRUZIONE)
+namespace
+{
+	// the Aquila's hull as the war model boxes it (data/war/classes.json: x from the stern to the bow end, the width, the height)
+	constexpr double ShipBoxMid = -7.53, ShipBoxHx = 399.73, ShipBoxHy = 69.857, ShipBoxHz = 46.2;
+	constexpr double ShipHullToPlanX = 172.0;       // the plan's frame is the hull mesh's, moved (docs/NAVE.md)
+
+	/** The word a hazard's injury is filed under at the roster (its table of injuries). */
+	const TCHAR* ShipHarmCause(EAstraDmgHarm C)
+	{
+		switch (C)
+		{
+		case EAstraDmgHarm::Decompression: return TEXT("hull breach");
+		case EAstraDmgHarm::Fire:
+		case EAstraDmgHarm::Smoke:         return TEXT("fire");
+		case EAstraDmgHarm::Electric:      return TEXT("conduit damage");
+		default:                           return TEXT("");
+		}
+	}
+}
+
+void UAstraShipSubsystem::StartInterior()
+{
+	// the plan's rooms and doors are read on a worker: the game does not wait for them (the first blow comes minutes later)
+	bInteriorLoading = true;
+	InteriorFuture = Async(EAsyncExecution::ThreadPool, []() -> TSharedPtr<FAstraDamageMap>
+	{
+		TSharedPtr<FAstraDamageMap> M = MakeShared<FAstraDamageMap>();
+		FString Err;
+		if (!M->Load(Err))
+		{
+			UE_LOG(LogASTRA, Log, TEXT("[Damage] %s: nothing breaks inside the hull"), *Err);
+			return nullptr;
+		}
+		return M;
+	});
+}
+
+int32 UAstraShipSubsystem::InteriorCompOf(const FVector& Cm) const
+{
+	const UAstraShipPlan* Plan = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipPlan>() : nullptr;
+	const FAstraPlanCompartment* C = Plan ? Plan->CompartmentAt(Cm) : nullptr;
+	return C && Interior.IsReady() ? Interior.GetMap().CompByName.FindRef(FName(*C->Id), INDEX_NONE) : INDEX_NONE;
+}
+
+AAstraDoor* UAstraShipSubsystem::DoorActorOf(FName DoorId)
+{
+	if (!Interior.IsReady() || !GetWorld())
+	{
+		return nullptr;
+	}
+	if (const TWeakObjectPtr<AAstraDoor>* A = DoorActors.Find(DoorId))
+	{
+		if (A->IsValid())
+		{
+			return A->Get();
+		}
+	}
+	// the doors of the plan, by where they stand (the level's actors are labelled with the plan's ids, but a packaged game has no labels): among the door
+	// actors that are in the world now (a deck that is not loaded has none)
+	const int32* Di = Interior.GetMap().DoorByName.Find(DoorId);
+	if (!Di)
+	{
+		return nullptr;
+	}
+	const FVector& At = Interior.GetMap().Doors[*Di].PosCm;
+	for (const TWeakObjectPtr<AAstraDoor>& W : AstraDoors::Loaded())
+	{
+		AAstraDoor* D = W.Get();
+		if (D && FVector::DistSquared(At, D->GetActorLocation()) < 40.0 * 40.0)
+		{
+			DoorActors.FindOrAdd(DoorId) = D;
+			return D;
+		}
+	}
+	return nullptr;
+}
+
+AAstraBridgeFX* UAstraShipSubsystem::GetBridgeFX() const
+{
+	return BridgeFX;
+}
+
+void UAstraShipSubsystem::Deinitialize()
+{
+	AstraDoors::OnPlaced().Remove(DoorPlacedHandle);
+	Super::Deinitialize();
+}
+
+void UAstraShipSubsystem::OnDoorPlaced(AAstraDoor* Door)
+{
+	// a deck has streamed in: a door of it that stands where a pressure bulkhead is sealed shuts (the seal was made while the deck was not there to shut)
+	if (!Door || !Interior.IsReady())
+	{
+		return;
+	}
+	const int32 Di = Interior.GetMap().DoorNear(Door->GetActorLocation(), 40.f);
+	if (Di == INDEX_NONE)
+	{
+		return;
+	}
+	DoorActors.FindOrAdd(Interior.GetMap().Doors[Di].Id) = Door;
+	if (Interior.SealedDoors().Contains(Di))
+	{
+		ApplyDoorSeal(Di, Door, true);
+	}
+}
+
+void UAstraShipSubsystem::ApplyDoorSeal(int32 DoorIndex, AAstraDoor* Door, bool bSealed)
+{
+	// shut, and it stays shut; opened, it goes back to what the level made it (a door the level keeps locked does not come unlocked because a bulkhead did)
+	if (bSealed)
+	{
+		if (DoorIndex != INDEX_NONE && !DoorLockMemory.Contains(DoorIndex))
+		{
+			DoorLockMemory.Add(DoorIndex, Door->bLocked);
+		}
+		Door->bLocked = true;
+	}
+	else
+	{
+		bool bWas = false;
+		if (DoorIndex != INDEX_NONE && DoorLockMemory.RemoveAndCopyValue(DoorIndex, bWas))
+		{
+			Door->bLocked = bWas;
+		}
+		else
+		{
+			Door->bLocked = false;
+		}
+	}
+	if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr)
+	{
+		Fx->DressDoor(Door, bSealed);
+	}
+}
+
+void UAstraShipSubsystem::TickInterior(float DeltaTime)
+{
+	if (bInteriorLoading && InteriorFuture.IsReady())
+	{
+		bInteriorLoading = false;
+		TSharedPtr<FAstraDamageMap> M = InteriorFuture.Get();
+		if (M.IsValid())
+		{
+			FAstraDmgHooks H;
+			H.Event = [this](const FString& Text, bool bReport) { Event(Text, bReport); };
+			H.PeopleIn = [this](const FAstraDmgComp& C, TArray<FAstraDmgPerson>& Out)
+			{
+				const UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr;
+				const int32* Ci = Life && Life->IsRunning() ? Life->Sim().GetMap().CompByName.Find(C.Id) : nullptr;
+				if (!Ci)
+				{
+					return;
+				}
+				TArray<int32> People;
+				Life->Sim().PeopleInComp(*Ci, People);
+				for (const int32 P : People)
+				{
+					const FAstraLifePerson& Pr = Life->Sim().Person(P);
+					FAstraDmgPerson X;
+					X.Roster = Pr.Roster;
+					X.PosCm = Pr.Pos;
+					X.bSuited = Pr.Party != INDEX_NONE;       // a damage-control party at work wears suits
+					X.bAtPost = Pr.Act == EAstraLifeAct::Battle || Pr.Act == EAstraLifeAct::Duty;
+					Out.Add(X);
+				}
+			};
+			H.Harm = [this](int32 Who, bool bKill, EAstraDmgHarm Cause) -> FString
+			{
+				const TArray<FAstraCrewman>& P = Roster.Get();
+				if (!P.IsValidIndex(Who) || P[Who].Status != 0)
+				{
+					return FString();                        // already hurt or fallen: nobody else is taken in their place
+				}
+				const TArray<int32> Single = {Who};
+				return Roster.Casualties(P[Who].Deck, bKill ? 0 : 1, bKill ? 1 : 0, CasualtyRng, ShipHarmCause(Cause), &Single);
+			};
+			H.SealDoor = [this](FName Id, bool bSealed)
+			{
+				if (UAstraShipPlan* Plan = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipPlan>() : nullptr)
+				{
+					Plan->SetDoorSealed(Id.ToString(), bSealed);
+				}
+				const int32 Di = Interior.GetMap().DoorByName.FindRef(Id, INDEX_NONE);
+				if (AAstraDoor* A = DoorActorOf(Id))
+				{
+					ApplyDoorSeal(Di, A, bSealed);
+				}
+				if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr; Fx && Di != INDEX_NONE)
+				{
+					Fx->OnBulkhead(Interior.GetMap().Doors[Di].PosCm, bSealed);
+				}
+			};
+			H.PlanChanged = [this]()
+			{
+				if (UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; Life && Life->IsRunning())
+				{
+					Life->Sim().PlanChanged();                 // the routes being walked may cross a door that has shut
+				}
+			};
+			H.AddHeat = [this](float Pct) { AddHeat(Pct); };
+			H.StructureBurn = [this](float Points)
+			{
+				if (UAstraBattleSubsystem* B = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+				{
+					B->PlayerInternalDamage(Points);
+				}
+			};
+			H.Alert = [this]() { return Alert == EAstraAlert::Red ? 2 : (Alert == EAstraAlert::Yellow ? 1 : 0); };
+			Interior.Init(M.ToSharedRef(), H, GAstraDeterministic ? 7001 : (int32)(FDateTime::Now().GetTicks() & 0x7fffffff));
+		}
+	}
+	if (!Interior.IsReady())
+	{
+		return;
+	}
+	{
+		SCOPE_CYCLE_COUNTER(STAT_AstraInterior);
+		const double T0 = FPlatformTime::Seconds();
+		Interior.Tick(DeltaTime, Damage);
+		const float Ms = (float)((FPlatformTime::Seconds() - T0) * 1000.0);
+		InteriorMsAvg = InteriorMsAvg * 0.98f + Ms * 0.02f;
+		InteriorMsMax = FMath::Max(InteriorMsMax * 0.9995f, Ms);
+	}
+	FlushHitReport(false);
+	// a section of the hull the war has gutted takes what lived in it (the war's structure is the war's; the rooms and the people are ours)
+	if ((GutT -= DeltaTime) <= 0.f)
+	{
+		GutT = 1.f;
+		const UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+		UAstraBattleSubsystem::FDamageView V;
+		if (Battle && Battle->GetDamageView(TEXT("AQUILA"), V))
+		{
+			static const TCHAR* Names[3] = {TEXT("bow"), TEXT("mid"), TEXT("stern")};
+			const float Bow = (float)((V.CutBowX - ShipHullToPlanX) * 100.0), Stern = (float)((V.CutSternX - ShipHullToPlanX) * 100.0);
+			for (int32 Sec = 0; Sec < 3; ++Sec)
+			{
+				if (V.bGutted[Sec] && !(GutDone & (1 << Sec)))
+				{
+					GutDone |= 1 << Sec;
+					FAstraImpactResult R;
+					Interior.GutSection(Sec == 0 ? Bow : (Sec == 1 ? Stern : -1.0e7f), Sec == 0 ? 1.0e7f : (Sec == 1 ? Bow : Stern), Names[Sec], R);
+				}
+				else if (!V.bGutted[Sec])
+				{
+					GutDone &= ~(1 << Sec);            // patched up in the war's books (the rooms stay lost until the yards)
+				}
+			}
+		}
+	}
+	TickCaptainFate(DeltaTime);
+}
+
+void UAstraShipSubsystem::ResetInterior()
+{
+	Interior.Reset();
+	Damage.RemoveAll([](const FAstraDamage& D) { return D.Comp != INDEX_NONE; });
+	HitReport = FHitReport();
+}
+
+void UAstraShipSubsystem::TickCaptainFate(float DeltaTime)
+{
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	const ACharacter* Walker = Cast<ACharacter>(Pawn);
+	if (CaptainFate == 2)
+	{
+		// the end: the card, then the last save
+		if ((CaptainFateT += DeltaTime) > 9.f && GetWorld())
+		{
+			CaptainFateT = -1.0e6f;
+			const UAstraCampaignSubsystem* Camp = GetWorld()->GetSubsystem<UAstraCampaignSubsystem>();
+			UGameplayStatics::OpenLevel(GetWorld(), FName(*UGameplayStatics::GetCurrentLevelName(GetWorld())), true,
+			                            Camp && Camp->HasSave() ? TEXT("astra_campaign=continue") : TEXT("astra_campaign=new"));
+		}
+		return;
+	}
+	if ((CaptainProbeT -= DeltaTime) > 0.f)
+	{
+		return;
+	}
+	const float Dt = 0.25f + FMath::Max(0.f, -CaptainProbeT);
+	CaptainProbeT = 0.25f;
+	// a Captain who is not walking the ship (in a Falcon, on a planet, in a pod) is out of its compartments' reach
+	const bool bAboard = bTestCaptain || (Walker && !Cast<AAstraFighterPawn>(Pawn) && !bPlanetside && !bAbandon);
+	const FVector Feet = bTestCaptain ? TestCaptainCm : (bAboard ? Pawn->GetActorLocation() : FVector::ZeroVector);
+	const int32 Comp = bAboard ? InteriorCompOf(Feet) : INDEX_NONE;
+	Interior.TickCaptain(Dt, Comp, Feet);
+	const FAstraDmgCaptain& Cap = Interior.Captain();
+	const FAstraDmgState* Here = Comp != INDEX_NONE ? Interior.Find(Comp) : nullptr;
+	const FString Place = Comp != INDEX_NONE ? Interior.GetMap().Describe(Comp) : FString(TEXT("somewhere aboard"));
+	APlayerCameraManager* Cam = PC ? PC->PlayerCameraManager : nullptr;
+	if (CaptainFate == 0)
+	{
+		if (Cam)
+		{
+			// the air going, the smoke, the pain: the edges of the sight close in (and sound goes thin) as they get worse
+			const float PerilFade = Cap.State == FAstraDmgCaptain::EState::Well ? 0.f : FMath::Clamp((Cap.Peril - 0.3f) / 0.7f, 0.f, 0.9f) * 0.8f;
+			// thick smoke closes the room in grey-brown before it hurts him (the puffs seen from the inside are not drawn: the eye is in them)
+			const float SmokeFade = Here ? FMath::Clamp(Here->Smoke - 0.2f, 0.f, 1.f) * 0.6f : 0.f;
+			const float Fade = FMath::Max(PerilFade, SmokeFade);
+			if (Fade > 0.01f || bCaptainFadeSet)
+			{
+				Cam->SetManualCameraFade(Fade, PerilFade >= SmokeFade ? FLinearColor::Black : FLinearColor(0.07f, 0.06f, 0.05f), PerilFade >= SmokeFade);
+				bCaptainFadeSet = Fade > 0.01f;
+			}
+		}
+		if (Cap.State == FAstraDmgCaptain::EState::Down)
+		{
+			CaptainFate = 1;
+			CaptainFateT = 0.f;
+			if (PC)
+			{
+				PC->SetIgnoreMoveInput(true);
+				PC->SetIgnoreLookInput(true);
+			}
+			if (Cam)
+			{
+				Cam->SetManualCameraFade(1.f, FLinearColor::Black, true);
+				bCaptainFadeSet = true;
+			}
+			Event(FString::Printf(TEXT("ship: the Captain is down — %s in %s; the XO has the conn and is sending the nearest damage-control team to the Captain"), *Cap.Cause, *Place), true);
+		}
+	}
+	else if (CaptainFate == 1)
+	{
+		CaptainFateT += Dt;
+		if (Cap.State == FAstraDmgCaptain::EState::Dead)
+		{
+			CaptainFate = 2;
+			CaptainFateT = 0.f;
+			if (AASTRAPlayerController* AstraPC = Cast<AASTRAPlayerController>(PC))
+			{
+				AstraPC->StoryCard(TEXT("THE CAPTAIN IS LOST"), FString::Printf(TEXT("ASN AQUILA · %s · %s"), *Place.ToUpper(), *Cap.Why.ToUpper()), 7.f, true);
+			}
+			Event(FString::Printf(TEXT("ship: the Captain is dead — %s. The Executive Officer has command of the Aquila"), *Cap.Why), true);
+			UE_LOG(LogASTRA, Log, TEXT("[Damage] the Captain %s"), *Cap.Why);
+			return;
+		}
+		// carried out once the compartment is fit again or a team has reached it
+		const bool bFit = !Here || (Here->Air > 0.6f && Here->Fire < 0.2f && Here->Smoke < 0.5f && Here->Heat < 0.45f);
+		if (CaptainFateT > 6.f && (bFit || (Here && Here->TeamT > 0.f)))
+		{
+			Interior.CaptainRescued();
+			CaptainFate = 0;
+			if (PC)
+			{
+				PC->ResetIgnoreMoveInput();
+				PC->ResetIgnoreLookInput();
+			}
+			if (Cam)
+			{
+				Cam->SetManualCameraFade(0.f, FLinearColor::Black, false);
+				Cam->StartCameraFade(1.f, 0.f, 4.f, FLinearColor::Black, false, false);
+				bCaptainFadeSet = false;
+			}
+			if (Pawn)
+			{
+				for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
+				{
+					if (!It->MedbayLanding.IsNearlyZero())
+					{
+						const_cast<APawn*>(Pawn)->SetActorLocation(It->MedbayLanding + FVector(0, 0, 100), false, nullptr, ETeleportType::TeleportPhysics);
+						break;
+					}
+				}
+			}
+			Event(TEXT("medbay: the Captain was carried out alive and is awake in the Medbay, winded and hurt; the XO hands the conn back"), true);
+		}
+	}
+}
+
+void UAstraShipSubsystem::FlushHitReport(bool bForce)
+{
+	if (HitReport.Hits == 0 || !GetWorld())
+	{
+		return;
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (!bForce && Now - LastHitReport < 6.0)
+	{
+		return;
+	}
+	LastHitReport = Now;
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	const int32 Sh = Battle ? FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()) : 0;
+	const int32 Hu = Battle ? FMath::RoundToInt(100.f * Battle->PlayerHullFraction()) : 100;
+	FString Where = FString::Join(HitReport.Lines, TEXT("; "));
+	if (HitReport.People.Num())
+	{
+		const int32 Shown = FMath::Min(HitReport.People.Num(), 3);
+		TArray<FString> Names;
+		for (int32 i = 0; i < Shown; ++i)
+		{
+			Names.Add(HitReport.People[i]);
+		}
+		Where += (Where.IsEmpty() ? TEXT("casualties: ") : TEXT(" — casualties: ")) + FString::Join(Names, TEXT("; "));
+		if (HitReport.People.Num() > Shown)
+		{
+			Where += FString::Printf(TEXT("; and %d more"), HitReport.People.Num() - Shown);
+		}
+	}
+	Event(!Where.IsEmpty() ? FString::Printf(TEXT("damage report: we've been hit — %s; shields %d%%, hull %d%%"), *Where, Sh, Hu)
+	                       : FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), true);
+	HitReport = FHitReport();
+}
+
+void UAstraShipSubsystem::TickDamage(float DeltaTime)
+{
+	// the damage-control teams: they walk (the ship's clock for it is VITA's own estimate of the walk), then work the hazard down; what the
+	// damage model owns they work through it (a fire goes out when the fire is out), what the ship owns (a radiator wing) they work by the clock
+	UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	for (int32 i = Damage.Num() - 1; i >= 0; --i)
+	{
+		if (i >= Damage.Num())
+		{
+			continue;
+		}
+		FAstraDamage& D = Damage[i];
+		if (D.Team < 0)
+		{
+			continue;
+		}
+		if (D.Travel > 0.f)
+		{
+			D.Travel -= DeltaTime;
+			continue;
+		}
+		if (Battle)
+		{
+			// a team at work on the spot also mends what the war broke there: engines, sensors, mounts (GUERRA)
+			Battle->RepairPlayerSystems(0.006f * DeltaTime);
+		}
+		if (D.Comp != INDEX_NONE && Interior.IsReady())
+		{
+			Interior.Work(D, DeltaTime, Damage);
+			continue;                                                       // (it closes the incident itself)
+		}
+		D.Progress += DeltaTime / D.Work;
+		if (D.Progress >= 1.f)
+		{
+			if (D.Kind == TEXT("radiator damage"))
+			{
+				RadiatorHealth = FMath::Min(1.f, RadiatorHealth + 0.25f);
+			}
+			const FString Text = FString::Printf(TEXT("damage control: the %s at %s %s (team %d free again)"), *D.Kind, *D.Where(),
+			                                     D.Kind == TEXT("radiator damage") ? TEXT("is repaired, the panel sheds heat again") : TEXT("is repaired, power restored"), D.Team + 1);
+			Damage.RemoveAt(i);
+			Event(Text, false);
+		}
+	}
+}
+
+void UAstraShipSubsystem::RadiatorHit(const FAstraHullHit& Hit)
+{
+	// The radiator wings stand out along the flanks aft (sections E to G of Deck 7): a blow that lands on a flank, or on the top, over them wears
+	// one down, and when what has landed there is enough one is torn, though no sooner than 20 s after the last (a hit lands near the wreck of the last).
+	if (!bRadiatorsOut || RadiatorHealth < 0.3f || !GetWorld())
+	{
+		return;
+	}
+	const bool bWing = (Hit.Facing == 2 || Hit.Facing == 3 || Hit.Facing == 4) && Hit.HullM.X >= -312.0 && Hit.HullM.X <= -148.0;
+	if (!bWing)
+	{
+		return;
+	}
+	RadiatorStress += Hit.Felt / 70.f;
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (RadiatorStress < 1.f || Now - LastRadiatorTear < 20.0)
+	{
+		return;
+	}
+	// which wing: by where along the hull it struck
+	const double PlanX = Hit.HullM.X - ShipHullToPlanX;
+	const TCHAR First = PlanX > -384.0 ? TEXT('E') : (PlanX > -440.0 ? TEXT('F') : TEXT('G'));
+	for (int32 k = 0; k < 3; ++k)
+	{
+		const TCHAR Sec = (TCHAR)(TEXT('E') + (First - TEXT('E') + k) % 3);
+		if (Damage.ContainsByPredicate([Sec](const FAstraDamage& X) { return X.Kind == TEXT("radiator damage") && X.Section == Sec; }))
+		{
+			continue;
+		}
+		FAstraDamage D;
+		D.Id = Interior.IsReady() ? Interior.NewIncidentId() : NextDamageId++;
+		D.Deck = 7;                                   // the radiators are Engineering & Power's (Deck 7, sections E-G)
+		D.Section = Sec;
+		D.Kind = TEXT("radiator damage");
+		D.Place = TEXT("radiator wing");
+		D.Work = 30.f;
+		// the pump room that serves the wing, where the plan has it (a party goes there)
+		if (Interior.IsReady())
+		{
+			for (const int32 C : Interior.GetMap().Hosts[(int32)EAstraDmgSystem::PowerBus])
+			{
+				const FAstraDmgComp& Cm = Interior.GetMap().Comps[C];
+				if (Cm.Deck == 7 && Cm.Section == Sec && Cm.Name.Contains(TEXT("Radiator")))
+				{
+					D.CompId = Cm.Id;
+					break;
+				}
+			}
+		}
+		RadiatorStress = 0.f;
+		LastRadiatorTear = Now;
+		RadiatorHealth = FMath::Max(0.25f, RadiatorHealth - 0.25f);
+		Damage.Add(D);
+		Event(FString::Printf(TEXT("engineering: a radiator wing torn by the hit at %s — the radiators shed %.0f %% of their heat until damage control repairs them"), *D.Where(), 100.f * RadiatorHealth), true);
+		return;
+	}
+}
+
+void UAstraShipSubsystem::OnHullHit(const FAstraHullHit& Hit)
+{
+	FlickerTime = 0.6f;
+	const double HitAt = GetWorld()->GetTimeSeconds();
+	FAstraImpactResult Res;
+	if (Interior.IsReady())
+	{
+		Interior.Impact(Hit, Res);
+		if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr)
+		{
+			Fx->OnBlow(Res, Hit.Felt);
+		}
+	}
+	// the shock runs through the frame: a fixture or a console on the bridge shorts out, the more the harder the blow and the nearer the bridge. A breaker
+	// that has just tripped holds for a while: at most one every 8 s, a heavy shock after 2 s
+	if (Hit.Felt > 8.f && BridgeFX)
+	{
+		const double DistM = (Hit.HullM - FVector(ShipHullToPlanX, 0.0, 62.0)).Size();
+		const float Shock = FMath::Clamp(Hit.Felt / 45.f, 0.f, 1.3f) / (1.f + FMath::Square((float)DistM / 80.f));
+		if (Shock >= 0.2f && HitAt - LastBridgeBurst > (Shock > 0.6f ? 2.0 : 8.0))
+		{
+			BridgeFX->RandomBurst(FMath::Clamp(Shock, 0.2f, 1.f));
+			LastBridgeBurst = HitAt;
+		}
+	}
+	if (Hit.Felt > 5.f)
+	{
+		RadiatorHit(Hit);
+	}
+	// what it did, in one report for the blows of the last seconds
+	for (const FString& L : Res.Lines)
+	{
+		HitReport.Lines.AddUnique(L);
+	}
+	for (const FString& P : Res.People)
+	{
+		HitReport.People.Add(P);
+	}
+	++HitReport.Hits;
+	FlushHitReport(false);
+}
+
+void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir)
+{
+	// a blow that is only a size and a direction (the console's test hits): it lands on the face that looks the way it came from, at a point of it
+	FAstraHullHit H;
+	const FVector Out = (-FromDir).GetSafeNormal();
+	H.Facing = AstraFacingOf(Out);
+	FVector B(FMath::FRandRange(-0.9f, 0.9f), FMath::FRandRange(-0.9f, 0.9f), FMath::FRandRange(-0.9f, 0.9f));
+	switch (H.Facing)
+	{
+	case 0: B.X = 1.f; break;
+	case 1: B.X = -1.f; break;
+	case 2: B.Y = -1.f; break;
+	case 3: B.Y = 1.f; break;
+	case 4: B.Z = 1.f; break;
+	default: B.Z = -1.f; break;
+	}
+	H.Box = B;
+	H.HullM = FVector(ShipBoxMid + B.X * ShipBoxHx, B.Y * ShipBoxHy, B.Z * ShipBoxHz);
+	H.Dir = FromDir.GetSafeNormal();
+	H.Section = H.HullM.X > 236.0 ? 0 : (H.HullM.X < -105.0 ? 2 : 1);
+	H.Damage = HullDamage + ShieldDamage;
+	H.ShieldTook = ShieldDamage;
+	H.StructTook = HullDamage;
+	H.Felt = HullDamage;
+	OnHullHit(H);
+}
+
 float UAstraShipSubsystem::PowerFactor(const FString& System) const
 {
+	// the allocation the crew set, times what the ship's distribution still carries of it: the compartments the systems run through that have been hit
+	// (docs/DISTRUZIONE.md; the backup ring keeps half of an allocation even when every one of them is lost)
 	const float* P = PowerPct.Find(System);
 	const float F = (P ? *P : 100.f) / 100.f;
-	// each failed conduit takes a fifth of what it carried, but the power finds other routes: never less than 55 % of what is allocated
-	// (multiplied, three conduits on the shields were half the shields, and a long battle a death spiral)
-	int32 N = 0;
-	for (const FAstraDamage& D : Damage)
-	{
-		N += D.System == System ? 1 : 0;
-	}
-	return F * FMath::Max(0.55f, 1.f - 0.15f * N);
+	return F * Interior.CategoryFactor(System);
 }
 
 int32 UAstraShipSubsystem::FreeDamageTeam() const
@@ -3110,144 +3824,6 @@ FString UAstraShipSubsystem::DamageSummary() const
 		                       D.Team >= 0 ? *FString::Printf(TEXT(" (team %d)"), D.Team + 1) : TEXT(" (unattended)"));
 	}
 	return Out.IsEmpty() ? TEXT("none") : Out;
-}
-
-void UAstraShipSubsystem::TickDamage(float DeltaTime)
-{
-	UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
-	for (int32 i = Damage.Num() - 1; i >= 0; --i)
-	{
-		FAstraDamage& D = Damage[i];
-		if (D.Team >= 0)
-		{
-			if (D.Travel > 0.f)
-			{
-				D.Travel -= DeltaTime;
-				continue;
-			}
-			D.Progress += DeltaTime / D.Work;
-			if (Battle)
-			{
-				// a team at work on the spot also mends what the war broke there: engines, sensors, mounts (GUERRA)
-				Battle->RepairPlayerSystems(0.006f * DeltaTime);
-			}
-			if (D.Progress >= 1.f)
-			{
-				const FString Done = D.Kind == TEXT("fire") ? TEXT("is out") : (D.Kind == TEXT("hull breach") ? TEXT("is sealed")
-				                   : (D.Kind == TEXT("radiator damage") ? TEXT("is repaired, the panel sheds heat again") : TEXT("is repaired, power restored")));
-				if (D.Kind == TEXT("radiator damage"))
-				{
-					RadiatorHealth = FMath::Min(1.f, RadiatorHealth + 0.25f);
-				}
-				const bool bSay = D.Kind != TEXT("conduit damage");
-				const FString Text = FString::Printf(TEXT("damage control: the %s at %s %s (team %d free again)"), *D.Kind, *D.Where(), *Done, D.Team + 1);
-				Damage.RemoveAt(i);
-				Event(Text, bSay);
-			}
-		}
-		else if (D.Kind == TEXT("fire") && (D.SpreadT -= DeltaTime) <= 0.f)
-		{
-			// an unattended fire eats the structure and may spread to the next section
-			D.SpreadT = 25.f;
-			if (Battle)
-			{
-				Battle->PlayerInternalDamage(20.f);
-			}
-			if (FMath::FRand() < 0.4f && D.Section < TEXT('H'))
-			{
-				FAstraDamage N;
-				N.Id = NextDamageId++;
-				N.Deck = D.Deck;
-				N.Section = D.Section + 1;
-				N.Kind = TEXT("fire");
-				const FString Text = FString::Printf(TEXT("damage report: the unattended fire at %s has spread to section %c"), *D.Where(), N.Section);
-				if (!Damage.ContainsByPredicate([&N](const FAstraDamage& X) { return X.Deck == N.Deck && X.Section == N.Section; }))
-				{
-					Damage.Add(N);
-					Event(Text, true);
-				}
-			}
-		}
-	}
-}
-
-void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const FVector& FromDir)
-{
-	FlickerTime = 0.6f;
-	FString Where;
-	const double HitAt = GetWorld()->GetTimeSeconds();
-	// the shock runs through the frame: a fixture or a console on the bridge shorts out. A breaker that has just tripped holds
-	// for a while: at most one every 8 s, a heavy blow after 2 s (with the war's physical damage the hits come many a minute)
-	if (HullDamage > 8.f && BridgeFX && HitAt - LastBridgeBurst > (HullDamage > 35.f ? 2.0 : 8.0))
-	{
-		const float Strength = FMath::Clamp(HullDamage / 60.f, 0.2f, 1.f);
-		if (FMath::FRand() < 0.35f + 0.5f * Strength)
-		{
-			BridgeFX->RandomBurst(Strength);
-			LastBridgeBurst = HitAt;
-		}
-		if (HullDamage > 35.f)
-		{
-			BridgeFX->RandomBurst(Strength * 0.7f);
-			LastBridgeBurst = HitAt;
-		}
-	}
-	if (HullDamage > 5.f)
-	{
-		RadiatorHit(HullDamage);
-	}
-	// a blow that gets through does harm inside in proportion to its force: a graze may only buckle plating (the hull's own
-	// damage), a heavy hit often starts something (until DISTRUZIONE puts it where the hit really landed). Calibrated on the war's
-	// volumes of fire: before GUERRA hits came a few a minute, now dozens, and nearly every one started a fire, a breach or a conduit
-	if (HullDamage > 8.f && FMath::FRand() < FMath::Clamp(HullDamage / 100.f, 0.1f, 0.7f))
-	{
-		// where did it land? a compartment (decks 1-12, sections A-H) and what it does there
-		FAstraDamage D;
-		D.Id = NextDamageId++;
-		D.Deck = FMath::RandRange(2, 11);
-		D.Section = TEXT("ABCDEFGH")[FMath::RandRange(0, 7)];
-		const float Roll = FMath::FRand();
-		D.Kind = Roll < 0.35f ? TEXT("hull breach") : (Roll < 0.65f ? TEXT("fire") : TEXT("conduit damage"));
-		if (D.Kind == TEXT("conduit damage"))
-		{
-			static const TCHAR* Conduits[] = {TEXT("shields"), TEXT("weapons"), TEXT("engines"), TEXT("sensors")};
-			D.System = Conduits[FMath::RandRange(0, 3)];
-		}
-		Where = FString::Printf(TEXT("%s: %s%s"), *D.Where(), *D.Kind, D.System.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s power -20%%)"), *D.System));
-		// people were in that compartment
-		const float Roll2 = FMath::FRand();
-		int32 W = 0, K = 0;
-		if (D.Kind == TEXT("hull breach")) { W = Roll2 < 0.4f ? FMath::RandRange(1, 3) : 0; K = Roll2 < 0.1f ? 1 : 0; }
-		else if (D.Kind == TEXT("fire")) { W = Roll2 < 0.35f ? FMath::RandRange(1, 2) : 0; }
-		else { W = Roll2 < 0.1f ? 1 : 0; }
-		// who was really in that section when it was hit (VITA), else the deck's people
-		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
-		const TArray<int32> There = (W || K) && Life ? Life->RosterIn(D.Deck, D.Section) : TArray<int32>();
-		const FString Names = (W || K) ? Roster.Casualties(D.Deck, W, K, CasualtyRng, D.Kind, &There) : FString();
-		if (!Names.IsEmpty())
-		{
-			Where += TEXT(" — casualties: ") + Names;
-		}
-		if (!Damage.ContainsByPredicate([&D](const FAstraDamage& X) { return X.Deck == D.Deck && X.Section == D.Section && X.Kind == D.Kind; }))
-		{
-			Damage.Add(D);
-			if (Damage.Num() > 16)
-			{
-				Damage.RemoveAt(0);
-			}
-		}
-	}
-	const double Now = GetWorld()->GetTimeSeconds();
-	if (Now - LastHitReport > 6.0)
-	{
-		LastHitReport = Now;
-		const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
-		const int32 Sh = Battle ? FMath::RoundToInt(100.f * Battle->PlayerShieldFraction()) : 0;
-		const int32 Hu = Battle ? FMath::RoundToInt(100.f * Battle->PlayerHullFraction()) : 100;
-		Event(!Where.IsEmpty()
-			? FString::Printf(TEXT("damage report: we've been hit — %s; shields %d%%, hull %d%%"), *Where, Sh, Hu)
-			: FString::Printf(TEXT("shields took a hit, holding at %d%%"), Sh), true);
-	}
 }
 
 void UAstraShipSubsystem::PlayAlertSound(EAstraAlert NewAlert)

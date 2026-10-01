@@ -1231,7 +1231,7 @@ bool FAstraLifeSim::RouteOne()
 	bool bOk = false;
 	if (Router)
 	{
-		bOk = Router(P.Pos, P.Target, Pts);
+		bOk = Router(P.Pos, P.Target, Pts, P.Party != INDEX_NONE);
 	}
 	else
 	{
@@ -1508,7 +1508,7 @@ void FAstraLifeSim::FormParty(const FAstraDamage& D)
 	Pt.Deck = D.Deck;
 	Pt.Section = D.Section;
 	Pt.Kind = D.Kind;
-	Pt.Site = SiteOf(D.Deck, D.Section, D.Id, &Pt.SiteComp);
+	Pt.Site = SiteOfIncident(D, &Pt.SiteComp);
 	Pt.ShipTravel0 = D.Travel;
 	Pt.DispatchedAt = Clock;
 	if (!Map->Comps.IsValidIndex(Pt.SiteComp))
@@ -1636,6 +1636,51 @@ float FAstraLifeSim::RepairEtaSeconds(int32 Deck, TCHAR Section, int32 IncidentI
 	return PartyEtaSeconds(SiteOf(Deck, Section, IncidentId), Deck);
 }
 
+FVector FAstraLifeSim::SiteOfIncident(const FAstraDamage& D, int32* OutComp) const
+{
+	int32 Comp = D.CompId.IsNone() ? INDEX_NONE : Map->CompByName.FindRef(D.CompId, INDEX_NONE);
+	if (Comp == INDEX_NONE)
+	{
+		return SiteOf(D.Deck, D.Section, D.Id, OutComp);                 // an incident that is only a deck and a section
+	}
+	if (Map->Comps[Comp].bWalled)
+	{
+		// a room the level does not open (a planned one on a built deck): the team works from the nearest place that is
+		const FBox Wall = Map->Comps[Comp].Box;
+		int32 Best = INDEX_NONE;
+		double BestD = TNumericLimits<double>::Max();
+		for (int32 i = 0; i < Map->Comps.Num(); ++i)
+		{
+			const FAstraLifeComp& C = Map->Comps[i];
+			if (C.bWalled || C.Deck != Map->Comps[Comp].Deck || C.Kind == TEXT("stairs") || C.Kind == TEXT("lift"))
+			{
+				continue;
+			}
+			const double Dist = FMath::Sqrt(Wall.ComputeSquaredDistanceToBox(C.Box));
+			if (Dist < BestD)
+			{
+				BestD = Dist;
+				Best = i;
+			}
+		}
+		if (Best != INDEX_NONE)
+		{
+			Comp = Best;
+		}
+	}
+	if (OutComp)
+	{
+		*OutComp = Comp;
+	}
+	const FAstraLifeComp& C = Map->Comps[Comp];
+	return C.bCorridor || C.Hub == INDEX_NONE ? FVector(C.Box.GetCenter().X, C.Box.GetCenter().Y, C.Box.Min.Z) : Map->Places[C.Hub].Pos;
+}
+
+float FAstraLifeSim::RepairEtaFor(const FAstraDamage& D) const
+{
+	return PartyEtaSeconds(SiteOfIncident(D), D.Deck);
+}
+
 int32 FAstraLifeSim::DeckOfZ(double Z) const
 {
 	int32 Best = 1;
@@ -1694,7 +1739,7 @@ float FAstraLifeSim::PartyEtaSeconds(const FVector& Site, int32 Deck) const
 		const FAstraLifePerson& P = People[G[k].Person];
 		float Eta = G[k].EtaS;
 		TArray<FVector> Pts;
-		if (Router && Router(P.Pos, Site, Pts) && Pts.Num() >= 2)
+		if (Router && Router(P.Pos, Site, Pts, true) && Pts.Num() >= 2)
 		{
 			FAstraLifeRoute R;
 			R.Pts.SetNumUninitialized(Pts.Num());
