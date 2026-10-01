@@ -40,6 +40,41 @@ namespace
 		}
 		return V;
 	}
+
+	/** A place named in an order: the plan's id, or else the one room of that kind or name ("medbay", "Main Engineering"); when several fit they are listed, so that the order names one of them. */
+	int32 BdResolvePlace(const FAstraDamageMap& D, const FString& Said, FString& OutWhy)
+	{
+		if (const int32* P = D.CompByName.Find(FName(*Said)))
+		{
+			return *P;
+		}
+		const FString Q = Said.TrimStartAndEnd().ToLower();
+		TArray<int32> Hits;
+		for (int32 i = 0; i < D.Comps.Num(); ++i)
+		{
+			const FAstraDmgComp& C = D.Comps[i];
+			if (C.Name.ToLower() == Q || C.Kind.ToString().ToLower() == Q)
+			{
+				Hits.Add(i);
+			}
+		}
+		if (Hits.Num() == 1)
+		{
+			return Hits[0];
+		}
+		if (Hits.IsEmpty())
+		{
+			OutWhy = FString::Printf(TEXT("the plan has no place '%s' (use an id from the picture: where_id, likely_approach, objective_entrances)"), *Said);
+			return INDEX_NONE;
+		}
+		FString List;
+		for (int32 i = 0; i < FMath::Min(6, Hits.Num()); ++i)
+		{
+			List += FString::Printf(TEXT("%s%s [%s]"), i ? TEXT("; ") : TEXT(""), *D.Comps[Hits[i]].Id.ToString(), *D.Describe(Hits[i]));
+		}
+		OutWhy = FString::Printf(TEXT("'%s' fits %d places (%s%s): name one by its id"), *Said, Hits.Num(), *List, Hits.Num() > 6 ? TEXT("; ...") : TEXT(""));
+		return INDEX_NONE;
+	}
 }
 
 // ================================================================================================================== what the minds read
@@ -52,6 +87,8 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 		return J;
 	}
 	const auto CompId = [this](int32 C) { return Dmg->Comps.IsValidIndex(C) ? Dmg->Comps[C].Id.ToString() : FString(); };
+	const UAstraShipSubsystem* ShipS = ShipSub();
+	const TArray<FAstraCrewman>* Crew = ShipS ? &ShipS->GetRoster().Get() : nullptr;
 	J->SetNumberField(TEXT("elapsed_s"), FMath::RoundToInt(Since));
 	J->SetStringField(TEXT("breach"), BreachText);
 	J->SetStringField(TEXT("objective"), Map->Describe(Fight.Mission().Objective));
@@ -90,6 +127,13 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 		{
 			const FUnit& L = Fight.Units()[S.Leader];
 			O->SetStringField(TEXT("leader"), L.Name);
+			// who the leader is as a person (the mind gives them a voice of their own and the rank to speak with)
+			if (const int32* R = RosterOfUnit.Find(S.Leader); R && Crew && Crew->IsValidIndex(*R))
+			{
+				O->SetStringField(TEXT("leader_id"), FString::Printf(TEXT("npc%d"), *R));
+				O->SetStringField(TEXT("leader_rank"), (*Crew)[*R].Rank);
+				O->SetStringField(TEXT("leader_gender"), (*Crew)[*R].bFemale ? TEXT("f") : TEXT("m"));
+			}
 			O->SetStringField(TEXT("where"), Map->Describe(L.Comp));
 			O->SetStringField(TEXT("where_id"), CompId(L.Comp));
 		}
@@ -171,6 +215,36 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 		}
 	}
 	J->SetArrayField(TEXT("likely_approach"), Approach);
+	// the rooms that open onto the objective (where a squad can hold the way in), and the marines' own default ambush: both named by the plan's ids, so that an order can name them
+	{
+		TArray<TSharedPtr<FJsonValue>> Doors2;
+		TSet<int32> Seen2;
+		const int32 Obj = Fight.Mission().Objective;
+		for (const FBoardPortal& P : Map->GetPortals())
+		{
+			const int32 Other = P.A == Obj ? P.B : (P.B == Obj ? P.A : INDEX_NONE);
+			if (Other == INDEX_NONE || Seen2.Contains(Other) || !Map->GetComps().IsValidIndex(Other) || Doors2.Num() >= 8)
+			{
+				continue;
+			}
+			Seen2.Add(Other);
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetStringField(TEXT("id"), CompId(Other));
+			O->SetStringField(TEXT("name"), Map->Describe(Other));
+			Doors2.Add(MakeShared<FJsonValueObject>(O));
+		}
+		J->SetArrayField(TEXT("objective_entrances"), Doors2);
+		const int32 Amb = Fight.AmbushPortal();
+		if (Amb != INDEX_NONE && Map->GetPortals().IsValidIndex(Amb))
+		{
+			const FBoardPortal& P = Map->GetPortals()[Amb];
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetStringField(TEXT("between"), FString::Printf(TEXT("%s | %s"), *Map->Describe(P.A), *Map->Describe(P.B)));
+			O->SetStringField(TEXT("id_a"), CompId(P.A));
+			O->SetStringField(TEXT("id_b"), CompId(P.B));
+			J->SetObjectField(TEXT("default_ambush"), O);
+		}
+	}
 	// the Captain
 	if (const FUnit* C = Fight.Unit(Fight.CaptainId()); C && bCaptainIn)
 	{
@@ -319,6 +393,7 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 		}
 		const TArray<TSharedPtr<FJsonValue>>* Doors = nullptr;
 		int32 N = 0;
+		FString Unknown;
 		if (Args.IsValid() && Args->TryGetArrayField(TEXT("doors"), Doors))
 		{
 			for (const TSharedPtr<FJsonValue>& V : *Doors)
@@ -328,6 +403,10 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 				{
 					SealDoor(*Di, bSealed);
 					++N;
+				}
+				else
+				{
+					Unknown += (Unknown.IsEmpty() ? TEXT("") : TEXT(", ")) + V->AsString();
 				}
 			}
 		}
@@ -345,6 +424,10 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 			}
 		}
 		OutDetail = FString::Printf(TEXT("%d pressure bulkheads %s"), N, bSealed ? TEXT("sealed") : TEXT("opened"));
+		if (!Unknown.IsEmpty())
+		{
+			OutDetail += FString::Printf(TEXT("; no bulkhead is called %s (the picture's bulkheads list the ids)"), *Unknown);
+		}
 		return N > 0;
 	}
 	if (Name == TEXT("marine_order"))
@@ -378,13 +461,13 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 		FVector At = FVector::ZeroVector;
 		if (!PlaceId.IsEmpty() && !PlaceId.Equals(TEXT("captain"), ESearchCase::IgnoreCase) && !PlaceId.Equals(TEXT("here"), ESearchCase::IgnoreCase))
 		{
-			const int32* P = Dmg->CompByName.Find(FName(*PlaceId));
-			if (!P)
+			FString Why;
+			Comp = BdResolvePlace(*Dmg, PlaceId, Why);
+			if (Comp == INDEX_NONE)
 			{
-				OutDetail = FString::Printf(TEXT("the plan has no place '%s' (use a where_id from the picture)"), *PlaceId);
+				OutDetail = Why;
 				return false;
 			}
-			Comp = *P;
 			At = Map->CentreOf(Comp);
 		}
 		else if (const FUnit* C = Fight.Unit(Fight.CaptainId()))

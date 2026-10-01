@@ -24,7 +24,7 @@ namespace
 		TEXT("Ricci"), TEXT("Patel"), TEXT("Halvorsen"), TEXT("Aziz"), TEXT("Navarro"), TEXT("Eriksen"), TEXT("Dlamini"), TEXT("Nakamura"),
 		TEXT("Ortega"), TEXT("Volkov"), TEXT("Schreiber"), TEXT("Costa"), TEXT("Kimura"), TEXT("Bello"), TEXT("Serrano"), TEXT("Orlov"),
 		TEXT("Sharma"), TEXT("Holm"), TEXT("El-Amin"), TEXT("Ferreira"), TEXT("Lund"), TEXT("Boateng"), TEXT("Romano"), TEXT("Mehta"),
-		TEXT("Strand"), TEXT("Castillo"), TEXT("Hosseini"), TEXT("Watanabe"), TEXT("Nwosu"), TEXT("Novak"), TEXT("Reyes"), TEXT("Dahl"),
+		TEXT("Strand"), TEXT("Castillo"), TEXT("Hosseini"), TEXT("Watanabe"), TEXT("Nwosu"), TEXT("Novak"), TEXT("Reynoso"), TEXT("Dahl"),    // (not "Reyes": Major Tomás Reyes commands the marines, and the locator must find one)
 		TEXT("Farahani"), TEXT("Adeyemi"), TEXT("Marchetti"), TEXT("Zhang"), TEXT("Obi"), TEXT("Keller"), TEXT("Kahale"), TEXT("Nasser"),
 		TEXT("Solberg"), TEXT("Medina"), TEXT("Ishikawa"), TEXT("Yilmaz"), TEXT("Barros"), TEXT("Voigt"), TEXT("Mokoena"), TEXT("Lopes"),
 		TEXT("Hayashi"), TEXT("Qureshi"), TEXT("Ivanova"), TEXT("Brandt"), TEXT("Owusu"), TEXT("Conti"), TEXT("Wallin"), TEXT("Carter"),

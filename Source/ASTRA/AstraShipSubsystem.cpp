@@ -2817,6 +2817,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && Board->IsActive())
 	{
 		S->SetObjectField(TEXT("boarding"), Board->Snapshot());  // ABBORDAGGI: boarders aboard: the fight as the bridge knows it
+		S->SetObjectField(TEXT("_marines"), Board->MarinesPicture());   // (and as the marines' net reads it: squads, places, bulkheads; the `_` keeps it out of the bridge crew's board)
 	}
 	return S;
 }
