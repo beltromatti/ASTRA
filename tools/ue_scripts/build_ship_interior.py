@@ -451,11 +451,15 @@ def open_bridge_lift_housing():
     x0, y0, x1, y1 = (v * M for v in SHAFTS_BOX)
     others = []
     for a in eas.get_all_level_actors():
-        if a.get_component_by_class(unreal.StaticMeshComponent) is None:
-            continue
-        origin, ext = a.get_actor_bounds(False)
-        if origin.x + ext.x > x0 and origin.x - ext.x < x1 and origin.y + ext.y > y0 and origin.y - ext.y < y1 and origin.z - ext.z < 50.0 and origin.z + ext.z > -100.0:
-            others.append(f"{a.get_actor_label()} ({a.get_folder_path()})")
+        try:                                                                       # (only a list for the log: it must not stop the run)
+            if a.get_component_by_class(unreal.StaticMeshComponent) is None:
+                continue
+            origin, ext = a.get_actor_bounds(False)
+            if origin.x + ext.x > x0 and origin.x - ext.x < x1 and origin.y + ext.y > y0 and origin.y - ext.y < y1 and origin.z - ext.z < 50.0 and origin.z + ext.z > -100.0:
+                others.append(f"{a.get_actor_label()} ({a.get_folder_path()})")
+        except Exception as ex:
+            others.append(f"(the bounds of {a.get_actor_label()} could not be read: {ex})")
+            break
     log.append(f"bridge lift housing: {len(gone)} old actors removed {sorted(gone)}, collision off on {quiet}" + ("" if gone else " (nothing to remove: already open, or built differently)"))
     log.append(f"bridge lift housing: other actors in the shafts' footprint at the deck's floor (their collision may still hold a rider): {others[:16]}")
 
