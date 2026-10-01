@@ -255,7 +255,11 @@ class MandateSeatsTests(Fixture):
         g2 = group("Vanguard", 2, [member("M-02"), member("M-03")])
         await self.feed(mandate_state([g2], ENEMIES(), [ev(1, "Vanguard: lost M-01 (acheron), the reactor went; 2 of 3 ships left")], boss="M-02"), 3)
         self.assertEqual(self.minds.minds["mandate/admiral"].commander.contact, "M-02")
-        self.assertIn("now commands", self.minds.recall("mandate"))
+        self.assertIn("passed from Archon Varek Solm", self.minds.recall("mandate"))
+        await asyncio.sleep(0.01)
+        last = self.llm.calls[-1]                                                      # the new commander looks at once, in those words
+        self.assertIn("you have just taken command of the fleet from Archon Varek Solm", last["user"])
+        self.assertIn("passed from Archon Varek Solm", last["user"])                    # and reads what the one before ordered and said
 
     async def test_the_admiral_may_speak_only_while_a_channel_is_open(self) -> None:
         st = mandate_state([VANGUARD()], ENEMIES())

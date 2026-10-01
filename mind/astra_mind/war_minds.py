@@ -70,6 +70,8 @@ FORMATIONS = ("line", "wedge", "column", "screen")
 ALLIES: dict[str, dict[str, Any]] = {
     "T-01": dict(key="castellan", name="Captain Rhea Castellan", rank="Captain", ship="the battleship ASN Praetorian, the 7th Fleet's flagship at Aurelia",
                  voice="estelle", gender="f", precedence=1,
+                 mission="Fleet's orders for the Aurelia picket: hold the approach to New Ravenna and the Janus Gate with the Aquila as the heart of the line; the "
+                         "picket fights where the carrier can support it and keeps her covered; the Aquila's captain commands the picket in action.",
                  bio="Twenty-six years in the fleet, the last three as the Praetorian's captain. Formal, patient and unsentimental: she has buried "
                      "crews before and wastes no ship. She trusts Vice Admiral Rourke and serves the Aquila's captain with the loyalty the service "
                      "demands and the honest opinion nobody asked for. She speaks in plain complete sentences and never raises her voice."),
@@ -96,6 +98,12 @@ BENCH_ADMIRAL = dict(key="marsh", name="Rear Admiral Ione Marsh", rank="Rear Adm
                      bio="Commands the ASTRA fleet in this action; experienced, economical with words, unwilling to waste ships.")
 
 RANK_ORDER = ("fleet admiral", "vice admiral", "rear admiral", "commodore", "captain", "commander", "lieutenant commander", "lieutenant", "ensign")
+
+
+def _place(state: dict[str, Any]) -> str:
+    """Where the fight is, as a sentence has it: "the Aurelia System"."""
+    p = str(state.get("location") or "the Aurelia System").split(",")[0].strip()
+    return p if p.lower().startswith(("the ", "a ")) else "the " + p
 
 
 def rank_index(rank: str) -> int:
@@ -195,7 +203,7 @@ TRANSMIT = _fn("transmit", "Say something over the open channel to the Captain o
 # ------------------------------------------------------------------------------------------------ the picture (what a commander reads)
 def _pct(v: Any) -> str:
     try:
-        return f"{float(v):.0f}%"
+        return f"{min(100.0, float(v)):.0f}%"
     except (TypeError, ValueError):
         return "?"
 
@@ -411,9 +419,9 @@ You think when something concerns your group: a loss, your morale breaking, your
 cannot do what the admiral wants, or you see what they do not, `report` it (urgent only if they must decide now). Otherwise act for your group
 or call `no_change`. A report is two sentences at most. Your orders carry a `reason`."""
 
-ASTRA_COMMANDER = """You are {name}, {rank} of the ASTRA Navy, {ship}. {bio}
-You command {group}: {ships}. You are an officer of the 7th Fleet defending the {where} system, and you fight beside the ASN Aquila, the first of her
-class, whose captain (the player's character; "the Captain") is on the other end of the fleet net.
+ASTRA_COMMANDER = """You are {name} of the ASTRA Navy, commanding {ship}. {bio}
+You command {group}: {ships}. You are an officer of the 7th Fleet defending {where}, and you fight beside the ASN Aquila, the first of her class,
+whose captain (the Captain) is on the other end of the fleet net. {mission}
 
 {world}
 
@@ -436,7 +444,7 @@ The chain of command and the Captain's words
 - When he speaks to the whole fleet, the senior allied captain answers for it; the others add a word only if their answer is different.
 - Words that were plainly for someone else (the admiral at Fleet, another ship) are not yours: do nothing."""
 
-ASTRA_BENCH_ADMIRAL = """You are {name}, {rank} of the ASTRA Navy, {ship}, commanding the ASTRA forces in this action. {bio}
+ASTRA_BENCH_ADMIRAL = """You are {name} of the ASTRA Navy, commanding the ASTRA forces in this action. {bio}
 
 {doctrine}
 
@@ -458,7 +466,7 @@ def system_prompt(seat: "Seat", cmd: "Commander", where: str, mission: str, chai
     if seat.side == "mandate":
         return MANDATE_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, mission=mission, doctrine=DOCTRINE, where=where,
                                         group=seat.group, admiral_name=admiral_name or "the admiral")
-    return ASTRA_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, group=seat.group, ships=ships, where=where,
+    return ASTRA_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, group=seat.group, ships=ships, where=where, mission=mission,
                                   world=WORLD, doctrine=DOCTRINE, chain=chain, voices=voices)
 
 
@@ -523,6 +531,7 @@ class Mind:
     intent: str = ""                                    # the last `reason` of the admiral (a subordinate's orders)
     known_enemy: set[str] = field(default_factory=set)
     new_enemy: list[str] = field(default_factory=list)
+    takeover: str = ""                                  # a new commander took the seat (a succession): they look at once
     aquila_km: float | None = None                      # (ASTRA group) how far from the Aquila it was at the last look
     why_extra: list[str] = field(default_factory=list)  # facts that woke it besides the events (the Aquila drawing away), told at the next look
     stats: dict[str, float] = field(default_factory=lambda: {"pulses": 0, "cost": 0.0, "latency": 0.0, "first_call": 0.0, "orders": 0, "failed": 0,
@@ -564,7 +573,7 @@ class WarMinds:
         self.register_voice = register_voice or (lambda key, name, voice: None)
         self.sides = sides
         self.astra_admiral = astra_admiral              # the bench: ASTRA has an admiral seat (the Captain's fleet command), as the Mandate does
-        self.where = where or (lambda st: str(st.get("location") or "the Aurelia System").split(",")[0])
+        self.where = where or (lambda st: _place(st))
         self.note_story = note or (lambda text: None)    # the campaign log of the story (director.note)
         self.trace = trace                               # the bench keeps every pulse with its prompts
         self.minds: dict[str, Mind] = {}
@@ -677,7 +686,8 @@ class WarMinds:
                 if side == "astra" and seat.kind == "admiral":
                     cmd = Commander(contact=leader, side="astra", **BENCH_ADMIRAL)
                 if mind.commander is not None and mind.commander.contact != cmd.contact:
-                    self.journal(side, "command", f"{cmd.name} ({cmd.contact}) now commands {seat.group or 'the fleet'}; {mind.commander.name} is gone")
+                    self.journal(side, "command", f"the command of {seat.group or 'the fleet'} passed from {mind.commander.name} to {cmd.name} ({cmd.contact})")
+                    mind.takeover = f"you have just taken command of {seat.group or 'the fleet'} from {mind.commander.name}"
                 mind.commander = cmd
             self._feed_mind(mind, view, state, events, active, now)
 
@@ -745,7 +755,10 @@ class WarMinds:
         gap = now - mind.last_think
         why: list[str] = []
         urgent = [m for m in mind.inbox if m.urgent or m.src == "captain"]
-        if urgent:
+        if mind.takeover and mind.engaged_since is not None:
+            why.append(mind.takeover + ": look at the whole picture and set your orders")
+            mind.takeover = ""
+        elif urgent:
             why.append("a word for you that cannot wait (below)")
         elif mind.engaged_since is None:
             return

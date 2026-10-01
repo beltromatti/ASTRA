@@ -33,6 +33,9 @@ from astra_mind import models, war_minds  # noqa: E402
 from astra_mind.enemy import COMMANDERS  # noqa: E402
 
 ENGINE = Path("/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd")
+# main's pace of the war (the lead, 1/10: every hull, plate and shield half as tough again): this branch's code has the older base values, so the bench
+# sets them (docs/GUERRA.md §8). `--tune ""` for the branch's own.
+TUNE = "astra.war.tune shield_scale 1.5;astra.war.tune armour_scale 1.5;astra.war.tune struct_scale 1.8"
 WAR = ROOT / "Saved" / "War"
 MAX_PROCESSES = 2                                       # engine processes at once (each is ~1.5 GB; the machine is shared)
 log = logging.getLogger("astra.arena")
@@ -119,8 +122,9 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
         args.append(f"-scenario={a.scenario}")
     if a.opening and a.jump is not None:
         args.append(f"-jump={a.jump}")
-    if a.exec:
-        args.append(f"-exec={a.exec}")
+    ex = ";".join(x for x in (a.tune, a.exec) if x)
+    if ex:
+        args.append(f"-exec={ex}")
     logf = open(WAR / f"{tag}_{seed}.log", "w")
     proc = await asyncio.create_subprocess_exec(*args, stdout=logf, stderr=subprocess.STDOUT, cwd=str(ROOT))
     link = Link()
@@ -243,6 +247,7 @@ def main() -> None:
     ap.add_argument("--speed", type=float, default=1.0, help="pace of the battle while a mind thinks (1 = the game's)")
     ap.add_argument("--wall-limit", type=float, default=3600.0)
     ap.add_argument("--exec", default="")
+    ap.add_argument("--tune", default=TUNE, help="the war's tuning constants (default: main's pace of the war)")
     ap.add_argument("--tag", default="")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args()
