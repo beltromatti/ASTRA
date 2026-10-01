@@ -162,7 +162,10 @@ void AASTRAPlayerController::SetupInputComponent()
 			Subsystem->AddMappingContext(GetInputSet()->OnFoot, 0);
 			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
 			{
-				Subsystem->AddMappingContext(CurrentContext, 0);
+				if (CurrentContext)       // (the template's slots, left empty in the blueprint)
+				{
+					Subsystem->AddMappingContext(CurrentContext, 0);
+				}
 			}
 
 			// only add these IMCs if we're not using mobile touch input
@@ -170,7 +173,10 @@ void AASTRAPlayerController::SetupInputComponent()
 			{
 				for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
 				{
-					Subsystem->AddMappingContext(CurrentContext, 0);
+					if (CurrentContext)
+					{
+						Subsystem->AddMappingContext(CurrentContext, 0);
+					}
 				}
 			}
 		}

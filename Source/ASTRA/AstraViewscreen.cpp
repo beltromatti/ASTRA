@@ -33,6 +33,8 @@ DECLARE_CYCLE_STAT(TEXT("Viewscreen"), STAT_AstraViewscreen, STATGROUP_Astra);
 namespace
 {
 	TAutoConsoleVariable<int32> CVarViewscreenHz(TEXT("astra.viewscreen.hz"), 30, TEXT("Main viewscreen: optical feed and overlay refreshes per second (0 = frozen)"));
+	TAutoConsoleVariable<int32> CVarViewscreenWidth(TEXT("astra.viewscreen.width"), 0,
+		TEXT("Main viewscreen: the optical feed's width in pixels (0 = the actor's FeedWidth; the height keeps the screen's 2.4:1)"));
 	TAutoConsoleVariable<float> CVarViewscreenFill(TEXT("astra.viewscreen.fill"), 0.35f,
 		TEXT("Main viewscreen: the sensors' fill from the camera's side, as a fraction of the star's light (a ship against the star is not a black cut-out; 0 = off)"));
 	FAutoConsoleCommandWithWorldAndArgs CmdViewscreenDump(TEXT("astra.viewscreen.dump"),
@@ -877,6 +879,14 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 	// camera and overlay together (the brackets stay on the image), 30 times a second by default
 	const int32 Hz = CVarViewscreenHz.GetValueOnGameThread();
 	const bool bDue = Hz > 0 && Now - LastCaptureAt >= 1.0 / Hz - 0.004;
+	if (const int32 Want = CVarViewscreenWidth.GetValueOnGameThread(); Want >= 320 && Want <= 2048 && Want != FeedWidth && Feed)
+	{
+		// a new size for the feed (testing the cost of a sharper image): the capture's history starts again
+		FeedHeight = FMath::RoundToInt(Want * 267.f / 640.f);
+		FeedWidth = Want;
+		Feed->InitAutoFormat(FeedWidth, FeedHeight);
+		Feed->UpdateResourceImmediate(true);
+	}
 	if (bWatched)
 	{
 		if (UAstraShipSubsystem* ShipSys = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
