@@ -7,6 +7,7 @@
 #include "CoreMinimal.h"
 #include "AstraMetalFXBridge.h"
 #include "AstraMetalFXModule.h"
+#include "Containers/Ticker.h"
 #include "HAL/CriticalSection.h"
 #include "Stats/Stats.h"
 #include <atomic>
@@ -78,6 +79,16 @@ public:
 
 private:
 	void StartBuild(FIntPoint OutputSize, uint32 ColorFormat);
+
+	/**
+	 * Game thread, a few times a second: the dynamic resolution only sees the GPU time of Unreal's own command buffers, not our
+	 * MetalFX one (the RHI times the command buffers it creates). While MetalFX upscales the game view the target of the heuristic
+	 * is lowered by MetalFX's average GPU time: r.DynamicRes.TargetedGPUHeadRoomPercentage, a percentage of the budget, goes up by
+	 * 100 * MetalFX ms / r.DynamicRes.FrameTimeBudget, and comes back when MetalFX stops. The budget itself is the game's (its settings
+	 * page sets it): it is only read.
+	 */
+	bool TickDynamicResolution(float DeltaTime);
+	void ReleaseDynamicResolution();
 	uint32 PredictColorFormat() const;
 
 	bool bStarted = false;
@@ -88,6 +99,11 @@ private:
 	std::atomic<uint32> DeclineEpoch{ 0 };
 	std::atomic<const TCHAR*> LastDeclineReason{ nullptr };
 	std::atomic<double> LastDeclineTime{ 0.0 };
+	FTSTicker::FDelegateHandle DynamicResolutionTicker;
+	bool bCompensating = false;       // game thread (the ticker): the headroom cvar is currently raised by us
+	float BaseHeadroomPercent = 0.0f;  // what it was before, or what somebody set it to since
+	float WrittenHeadroomPercent = 0.0f;
+	std::atomic<float> ExtraHeadroomPercent{ 0.0f };   // what we add right now, for the status
 	bool bUpscalingNow = false;   // game thread: what the game view did last frame, to log the switches between MetalFX and TSR
 	std::atomic<int32> BuildsInFlight{ 0 };
 	std::atomic<uint32> WantedColorFormat{ 0 };   // MTLPixelFormat of the scene color the scalers are wanted for

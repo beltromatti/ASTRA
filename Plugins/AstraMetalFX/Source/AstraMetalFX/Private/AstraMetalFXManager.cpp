@@ -34,6 +34,21 @@ static TAutoConsoleVariable<int32> CVarAstraMetalFXDebug(
 	TEXT("  2: pixels that take their motion from the velocity buffer (moving objects) in red, the rest is camera motion"),
 	ECVF_RenderThreadSafe);
 
+static TAutoConsoleVariable<int32> CVarAstraMetalFXDynamicRes(
+	TEXT("r.AstraMetalFX.DynamicResCompensation"),
+	1,
+	TEXT("The dynamic resolution only sees the GPU time of Unreal's own command buffers, not MetalFX's (the plugin's command buffer).\n")
+	TEXT("  0: off\n")
+	TEXT("  1: while MetalFX upscales the game view, r.DynamicRes.TargetedGPUHeadRoomPercentage is raised by MetalFX's average GPU time as a\n")
+	TEXT("     percentage of r.DynamicRes.FrameTimeBudget, and given back when MetalFX stops (the budget itself is left alone)"),
+	ECVF_Default);
+
+static TAutoConsoleVariable<float> CVarAstraMetalFXDynamicResScale(
+	TEXT("r.AstraMetalFX.DynamicResCompensation.Scale"),
+	1.0f,
+	TEXT("Multiplier of the MetalFX GPU time the dynamic resolution is told about (1: exactly what the plugin measures; more if frames still run long)."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<float> CVarAstraMetalFXLogInterval(
 	TEXT("r.AstraMetalFX.LogInterval"),
 	0.0f,
@@ -58,6 +73,16 @@ static FAutoConsoleCommandWithOutputDevice GAstraMetalFXStatusCommand(
 			Status.Reason.IsEmpty() ? TEXT("") : TEXT(" | why not: "), *Status.Reason);
 		Ar.Logf(TEXT("MetalFX: output %dx%d, scene color %s, GPU %.3f ms last, %.3f ms average over %llu frames, %llu fallback frames, %llu errors"),
 			Status.OutputSize.X, Status.OutputSize.Y, *Status.ColorFormat, Status.LastGpuMs, Status.AverageGpuMs, Status.FramesUpscaled, Status.FallbackFrames, Status.Errors);
+		Ar.Logf(TEXT("MetalFX: CPU per frame (average): pass %.0f us on the render thread (flush to the RHI thread %.0f us), submit %.0f us on the RHI thread, encode %.0f us on the Metal submission thread; nothing in it waits for the GPU"),
+			Status.CpuPassUs, Status.CpuFlushUs, Status.CpuSubmitUs, Status.CpuEncodeUs);
+		if (Status.DynamicResExtraHeadroomPercent > 0.0f)
+		{
+			Ar.Logf(TEXT("MetalFX: the dynamic resolution is told about the MetalFX time: r.DynamicRes.TargetedGPUHeadRoomPercentage raised by %.2f points"), Status.DynamicResExtraHeadroomPercent);
+		}
+		else
+		{
+			Ar.Log(TEXT("MetalFX: the dynamic resolution is not corrected for the MetalFX time (r.AstraMetalFX.DynamicResCompensation 0, or MetalFX is not upscaling)"));
+		}
 	}));
 
 FAstraMetalFXManager& FAstraMetalFXManager::Get()
@@ -107,6 +132,7 @@ void FAstraMetalFXManager::Startup()
 	bSupported = true;
 	WantedColorFormat.store(PredictColorFormat());
 	ViewExtension = FSceneViewExtensions::NewExtension<FAstraMetalFXViewExtension>();
+	DynamicResolutionTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateRaw(this, &FAstraMetalFXManager::TickDynamicResolution), 0.25f);
 	UE_LOG(LogAstraMetalFX, Log, TEXT("MetalFX upscaler ready: r.AstraMetalFX is %s, scene color expected in %s"), IsEnabledByCVar() ? TEXT("on") : TEXT("off"),
 		*AstraMetalFX::ColorFormatName(WantedColorFormat.load()));
 
@@ -141,6 +167,12 @@ void FAstraMetalFXManager::Shutdown()
 	bStarted = false;
 	bDisabled.store(true);
 	ViewExtension.Reset();
+	if (DynamicResolutionTicker.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(DynamicResolutionTicker);
+		DynamicResolutionTicker.Reset();
+	}
+	ReleaseDynamicResolution();
 
 #if PLATFORM_MAC
 	// Nothing of ours may be left running when the module's code goes away: builds, the render thread's frames, the Metal
@@ -310,6 +342,84 @@ void FAstraMetalFXManager::NoteUpscaledFrame(FIntPoint OutputSize)
 	}
 }
 
+bool FAstraMetalFXManager::TickDynamicResolution(float DeltaTime)
+{
+	IConsoleVariable* Headroom = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DynamicRes.TargetedGPUHeadRoomPercentage"));
+	IConsoleVariable* Budget = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DynamicRes.FrameTimeBudget"));
+	if (!Headroom || !Budget)
+	{
+		return true;
+	}
+
+	// MetalFX now: it upscaled the game view in the last half second, and what it costs on the GPU.
+	float MetalFxMs = 0.0f;
+	bool bUpscaling = false;
+	{
+		FScopeLock ScopeLock(&Lock);
+		bUpscaling = LastUsed.IsValid() && (FPlatformTime::Seconds() - LastActiveTime) < 0.5;
+		if (bUpscaling)
+		{
+			MetalFxMs = LastUsed->GetTimings().AverageMs;
+		}
+	}
+	MetalFxMs *= FMath::Max(CVarAstraMetalFXDynamicResScale.GetValueOnGameThread(), 0.0f);
+	const bool bWanted = bUpscaling && MetalFxMs > 0.0f && CVarAstraMetalFXDynamicRes.GetValueOnGameThread() != 0;
+
+	// Somebody else changed the headroom while we had it raised (a console command, a settings page): their value is the new base.
+	if (bCompensating && FMath::Abs(Headroom->GetFloat() - WrittenHeadroomPercent) > 0.01f)
+	{
+		bCompensating = false;
+	}
+
+	if (bWanted)
+	{
+		if (!bCompensating)
+		{
+			BaseHeadroomPercent = Headroom->GetFloat();
+		}
+		const float BudgetMs = FMath::Max(Budget->GetFloat(), 1.0f);
+		const float ExtraPercent = 100.0f * MetalFxMs / BudgetMs;
+		const float Target = FMath::Min(BaseHeadroomPercent + ExtraPercent, 60.0f);
+		if (!bCompensating || FMath::Abs(Target - WrittenHeadroomPercent) > 0.1f)
+		{
+			// With the priority the variable has now: a higher one (the console) is not overridden by raising it, a lower one is not
+			// locked out of later changes.
+			Headroom->SetWithCurrentPriority(Target);
+			WrittenHeadroomPercent = Headroom->GetFloat();
+			if (!bCompensating)
+			{
+				UE_LOG(LogAstraMetalFX, Log, TEXT("the dynamic resolution is told about MetalFX's %.2f ms: r.DynamicRes.TargetedGPUHeadRoomPercentage %.1f -> %.1f (budget %.2f ms)"),
+					MetalFxMs, BaseHeadroomPercent, WrittenHeadroomPercent, BudgetMs);
+			}
+			bCompensating = true;
+		}
+		ExtraHeadroomPercent.store(WrittenHeadroomPercent - BaseHeadroomPercent);
+	}
+	else if (bCompensating)
+	{
+		ReleaseDynamicResolution();
+	}
+	return true;
+}
+
+void FAstraMetalFXManager::ReleaseDynamicResolution()
+{
+	if (!bCompensating)
+	{
+		return;
+	}
+	bCompensating = false;
+	ExtraHeadroomPercent.store(0.0f);
+	if (IConsoleVariable* Headroom = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DynamicRes.TargetedGPUHeadRoomPercentage")))
+	{
+		if (FMath::Abs(Headroom->GetFloat() - WrittenHeadroomPercent) <= 0.01f)   // still ours: give it back
+		{
+			Headroom->SetWithCurrentPriority(BaseHeadroomPercent);
+			UE_LOG(LogAstraMetalFX, Log, TEXT("MetalFX is not upscaling any more: r.DynamicRes.TargetedGPUHeadRoomPercentage back to %.1f"), BaseHeadroomPercent);
+		}
+	}
+}
+
 void FAstraMetalFXManager::PublishFrame(const FContextPtr& Context)
 {
 	const AstraMetalFX::FGpuTimings Timings = Context->GetTimings();
@@ -332,8 +442,10 @@ void FAstraMetalFXManager::PublishFrame(const FContextPtr& Context)
 	}
 	if (bLog)
 	{
-		UE_LOG(LogAstraMetalFX, Log, TEXT("MetalFX %dx%d: GPU %.3f ms (last), %.3f ms (average), %llu frames, %llu errors"),
-			Context->GetOutputSize().X, Context->GetOutputSize().Y, Timings.LastMs, Timings.AverageMs, Timings.Frames, Timings.Errors);
+		const AstraMetalFX::FCpuTimings Cpu = AstraMetalFX::GetCpuTimings();
+		UE_LOG(LogAstraMetalFX, Log, TEXT("MetalFX %dx%d: GPU %.3f ms (last), %.3f ms (average), %llu frames, %llu errors; CPU pass %.0f us (flush %.0f), submit %.0f us, encode %.0f us"),
+			Context->GetOutputSize().X, Context->GetOutputSize().Y, Timings.LastMs, Timings.AverageMs, Timings.Frames, Timings.Errors,
+			Cpu.PassUs, Cpu.FlushUs, Cpu.SubmitUs, Cpu.EncodeUs);
 	}
 }
 
@@ -375,6 +487,12 @@ FAstraMetalFXStatus FAstraMetalFXManager::GetStatus() const
 			Status.Reason = TEXT("the game's main view did not use it in the last frames (TSR)");
 		}
 	}
+	const AstraMetalFX::FCpuTimings Cpu = AstraMetalFX::GetCpuTimings();
+	Status.CpuPassUs = Cpu.PassUs;
+	Status.CpuFlushUs = Cpu.FlushUs;
+	Status.CpuSubmitUs = Cpu.SubmitUs;
+	Status.CpuEncodeUs = Cpu.EncodeUs;
+	Status.DynamicResExtraHeadroomPercent = ExtraHeadroomPercent.load();
 	if (Shown.IsValid())
 	{
 		const AstraMetalFX::FGpuTimings Timings = Shown->GetTimings();

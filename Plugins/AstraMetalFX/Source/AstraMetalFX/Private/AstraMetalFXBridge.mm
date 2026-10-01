@@ -79,6 +79,29 @@ namespace AstraMetalFX
 		}
 	}
 
+	namespace
+	{
+		// One writer per stage (the render thread, the RHI thread, the Metal submission thread): plain load/store is enough.
+		std::atomic<float> GCpuAverageUs[4] = { { 0.0f }, { 0.0f }, { 0.0f }, { 0.0f } };
+	}
+
+	void NoteCpuTime(ECpuStage Stage, double Microseconds)
+	{
+		std::atomic<float>& Average = GCpuAverageUs[(int32)Stage];
+		const float Old = Average.load(std::memory_order_relaxed);
+		Average.store(Old <= 0.0f ? (float)Microseconds : Old * 0.95f + (float)Microseconds * 0.05f, std::memory_order_relaxed);
+	}
+
+	FCpuTimings GetCpuTimings()
+	{
+		FCpuTimings Result;
+		Result.PassUs = GCpuAverageUs[(int32)ECpuStage::Pass].load(std::memory_order_relaxed);
+		Result.FlushUs = GCpuAverageUs[(int32)ECpuStage::Flush].load(std::memory_order_relaxed);
+		Result.SubmitUs = GCpuAverageUs[(int32)ECpuStage::Submit].load(std::memory_order_relaxed);
+		Result.EncodeUs = GCpuAverageUs[(int32)ECpuStage::Encode].load(std::memory_order_relaxed);
+		return Result;
+	}
+
 	bool SupportsColorFormat(uint32 ColorFormat)
 	{
 		return Core::SupportsColorFormat((MTLPixelFormat)ColorFormat);
@@ -176,6 +199,12 @@ namespace AstraMetalFX
 
 	void FScalerContext::Submit(const FFrame& Frame)
 	{
+		struct FSubmitTimer
+		{
+			const double Start = FPlatformTime::Seconds();
+			~FSubmitTimer() { NoteCpuTime(ECpuStage::Submit, (FPlatformTime::Seconds() - Start) * 1e6); }
+		} SubmitTimer;
+
 		@autoreleasepool
 		{
 			if (!Impl.IsValid() || !Impl->Scaler || !IsRHIMetal())
@@ -259,6 +288,7 @@ namespace AstraMetalFX
 					Scaler->Encode((__bridge id<MTLCommandQueue>)Queue, ConstInput);
 					// Encoding takes tens of microseconds; anything slower stalls the Metal submission thread, and with it the GPU.
 					const double Ms = (FPlatformTime::Seconds() - Start) * 1000.0;
+					NoteCpuTime(ECpuStage::Encode, Ms * 1000.0);
 					static std::atomic<int> Reports{ 0 };
 					if (Ms > 4.0 && Reports.fetch_add(1) < 8)
 					{

@@ -25,6 +25,12 @@ struct FAstraMetalFXStatus
 	float LastGpuMs = 0.0f;     // GPU time of the last MetalFX command buffer: motion kernel, exposure and the scaler
 	float AverageGpuMs = 0.0f;
 	uint64 FramesUpscaled = 0;
+	float DynamicResExtraHeadroomPercent = 0.0f;   // what the plugin adds to r.DynamicRes.TargetedGPUHeadRoomPercentage so that the dynamic resolution
+	                                              // counts MetalFX's GPU time (0: not compensating); see r.AstraMetalFX.DynamicResCompensation
+	float CpuPassUs = 0.0f;      // CPU time of the plugin's pass on the render thread per frame, of which the flush (CpuFlushUs)
+	float CpuFlushUs = 0.0f;
+	float CpuSubmitUs = 0.0f;    // the submission on the RHI thread
+	float CpuEncodeUs = 0.0f;    // the encoding on Metal's submission thread
 	uint64 FallbackFrames = 0;   // frames that got a bilinear stretch instead of MetalFX (a format change in flight, a failure)
 	uint64 Errors = 0;
 };

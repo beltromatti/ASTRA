@@ -103,9 +103,26 @@ anche la scrittura del frame dopo contro la lettura di MetalFX.
 ### 3.4 Costi e rischi del taglio
 - Un command buffer in più e una sottomissione in più per frame (Metal RHI ne fa già una per il present). Nessuna attesa della CPU.
 - Il lavoro di MetalFX **non compare nei tempi GPU di Unreal** (`stat gpu`, il tempo che usa la risoluzione dinamica): il RHI misura
-  i *suoi* command buffer. La risoluzione dinamica vede quindi la GPU più libera di quanto sia, di quanto costa MetalFX
-  (~1–2 ms): con MetalFX attivo conviene abbassare `r.DynamicRes.FrameTimeBudget` di quel tanto (il costo si legge con
-  `astra.metalfx.status` o `stat AstraMetalFX`).
+  i *suoi* command buffer (`FRHIGPUFrameTimeHistory`, alimentata dalla sua coda degli eventi; nessun aggancio pubblico per aggiungervi
+  tempo di terzi). La risoluzione dinamica vede quindi la GPU più libera di quanto sia, di quanto costa MetalFX (~1,3 ms misurati nel gioco
+  vero): sale troppo e gli fps scendono (56–57 contro 57,5–59,7 di TSR nella prova del lead). Il plugin lo compensa da sé:
+  `r.AstraMetalFX.DynamicResCompensation` (1 di base) alza `r.DynamicRes.TargetedGPUHeadRoomPercentage` (la quota del budget che
+  l'euristica tiene libera: il suo obiettivo è `FrameTimeBudget × (1 − quota)`) di `100 × tempo GPU medio di MetalFX / FrameTimeBudget`
+  punti mentre MetalFX scala la vista di gioco (ogni 0,25 s, dal thread di gioco), e la restituisce quando MetalFX si ferma o si spegne.
+  Il budget lo mette la pagina SETTINGS (`AstraSettings.cpp`: 1000/fps) e il plugin lo legge soltanto; se qualcuno cambia la quota mentre è
+  alzata (la console), il suo valore diventa la base nuova. `r.AstraMetalFX.DynamicResCompensation.Scale` (1) moltiplica il tempo che si
+  dice alla risoluzione dinamica, per tarare a mano. Il costo si legge con `astra.metalfx.status` o `stat AstraMetalFX`.
+- **Il plugin non aspetta mai la GPU, in nessun thread** (letto sul codice di 5.8 e misurato: `astra.metalfx.status` stampa i µs di CPU per frame di ogni stadio).
+  (1) Il pass RDG è inline sul render thread e fa `ImmediateFlush(DispatchToRHIThread)`: con il thread RHI dedicato (di base su Mac SM5: `GRHISupportsRHIThread`,
+  `FRHIThread::TargetMode` dedicato) `FRHICommandListExecutor::Submit` non aspetta, perché `bWaitForCompletion` vale solo con `FlushRHIThread` o senza thread RHI separato;
+  i command list paralleli già registrati da RDG vengono accodati al dispatch senza aspettarli (`FlushParallel`/`QueueAsyncCommandListSubmit`) e l'attesa dei loro task di
+  registrazione resta a fine `Execute`, come con TSR. (2) `Submit`, sul thread RHI, accoda un payload (`RHIRunOnQueue(…, false)`: nessun evento da aspettare). (3) Il callback sul
+  thread di sottomissione codifica e committa (decine di µs, nessun `waitUntil…`). (4) Il completion handler gira su un thread di Metal e non tocca nulla che altri aspettino.
+  Quello che MetalFX costa davvero per frame: una chiusura di sottomissione in più a metà frame (un command buffer di Unreal in più, e i task RDG dopo il pass in un
+  insieme parallelo separato) e la serializzazione sulla GPU «Unreal → MetalFX → Unreal» (la GPU non sovrappone la fine di un command buffer e l'inizio del successivo se
+  dipendono: bolle di ~0,1–0,3 ms che non stanno nel tempo di nessuno dei due). Se il render thread misura di più con MetalFX, il confronto che distingue una attesa vera da un
+  GPU al limite è a risoluzione fissa (`r.DynamicRes.OperationMode 0`, stesso `r.ScreenPercentage`, `r.AstraMetalFX 0/1`): con la risoluzione dinamica accesa e il GPU al
+  limite il render thread aspetta il GPU nel presente (il drawable), e il tempo del render thread cresce con il carico GPU, non con il plugin.
 - Il callback gira sul thread di sottomissione di Metal: niente di lento lì (creare uno scaler costa 0,2–3 s: si fa prima, su un
   thread di lavoro; il callback tocca solo oggetti già pronti).
 - Una texture di Unreal resta viva per MetalFX finché il suo command buffer non è finito: il plugin ne tiene un riferimento
@@ -182,7 +199,8 @@ un guadagno di ~1 ms e più, e un'immagine che `probe_e2e` dice migliore di un s
 1. **Nessuna prova nel gioco vero** (agente senza editor): l'ordine dei command buffer, la correttezza dei vettori di moto nel gioco e l'immagine sono da verificare dal lead
    (§7 e `r.AstraMetalFX.Debug`).
 2. Le traslucenze sono composte prima dell'upscaler (§2); niente reactive mask né maschera dei pixel con animazione.
-3. Il tempo GPU di MetalFX non entra nella misura della risoluzione dinamica (§3.4).
+3. Il tempo GPU di MetalFX non entra nella misura della risoluzione dinamica: il plugin la compensa alzando la quota di margine (§3.4); le bolle fra i command buffer
+   (il GPU non può sovrapporre la fine di quello di Unreal e l'inizio di MetalFX) non sono nella misura di nessuno dei due: se gli fps restano corti, `DynamicResCompensation.Scale` 1,2–1,5.
 4. Una sola vista (niente split screen, niente scene capture: tengono TSR), colore RGBA16F, R11G11B10F o RGB10A2 (un altro formato spegne MetalFX per la sessione, con il motivo nel log), nessun Windows (resta TSR).
    Se il formato indovinato all'avvio è sbagliato, o cambia a caldo (qualità, DOF), si vedono 1–2 frame stirati e qualche decimo di secondo di TSR, poi MetalFX.
 5. Il layout di `FMetalRHICommandContext`, `MetalRHI` privato ecc. non sono usati: se Epic cambia `RHIRunOnQueue` o la sequenza `ImmediateFlush`+`EnqueueLambda` il plugin va riverificato
@@ -199,7 +217,7 @@ un guadagno di ~1 ms e più, e un'immagine che `probe_e2e` dice migliore di un s
 4. **Confronto TSR / MetalFX**: `r.AstraMetalFX 0` e `1` a caldo (la storia ricomincia a ogni cambio; vale anche `r.TemporalAA.Upscaler 0`,
    l'interruttore del motore per gli upscaler di terze parti, che rimette TSR: il plugin lo riconosce). A parità di costo: fissa `r.DynamicRes.OperationMode 0` e lo stesso `r.ScreenPercentage`, leggi il tempo GPU
    totale (banco `tools/perf`/`stat gpu`) **più** il tempo di `stat AstraMetalFX` (il RHI non vede il command buffer di MetalFX, §3.4), poi alza il `r.ScreenPercentage` di MetalFX finché i totali pareggiano.
-   Con la risoluzione dinamica accesa, abbassa `r.DynamicRes.FrameTimeBudget` del costo di MetalFX (o conta sul 10 % di margine `r.DynamicRes.TargetedGPUHeadRoomPercentage`, che è circa quello).
+   Con la risoluzione dinamica accesa il plugin corregge da sé il margine della risoluzione dinamica (§3.4): `astra.metalfx.status` dice di quanti punti; `r.AstraMetalFX.DynamicResCompensation 0` per un confronto senza correzione.
 5. **Diagnosi**: `r.AstraMetalFX.Debug 1` mostra i vettori di moto (fermo e senza oggetti in moto: tutto scuro; girando la testa un colore uniforme per direzione; un oggetto in moto ha un colore suo);
    `2` colora di rosso i pixel che prendono il moto dal velocity buffer (gli altri lo prendono dalla camera). Se l'immagine ha fantasmi, scie o lampeggia: prima questi due, poi il log
    (`LogAstraMetalFX`: ogni errore e il motivo per cui è tornato a TSR), poi `r.AstraMetalFX 0`.

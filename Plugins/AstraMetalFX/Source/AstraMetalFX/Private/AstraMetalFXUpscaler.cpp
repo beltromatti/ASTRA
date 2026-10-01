@@ -102,13 +102,6 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 	Outputs.FullRes = FScreenPassTexture(OutputTexture, Inputs.OutputViewRect);
 	Outputs.NewHistory = MakeRefCount<FHistory>(Context, View.ViewMatrices, OutputSize, DeclineEpoch);
 
-	if (!Context->IsHealthy())
-	{
-		// A frame failed: the manager switches to TSR from the next frame on. This one must still hand the tonemapper something valid.
-		AddClearRenderTargetPass(GraphBuilder, OutputTexture, FLinearColor::Black);
-		return Outputs;
-	}
-
 	// Camera motion: from the previous frame's matrices (kept in the history), moved with the world if it was rebased.
 	FViewMatrices PreviousMatrices = Prev ? Prev->ViewMatrices : View.ViewMatrices;
 	if (Prev && !View.OriginOffsetThisFrame.IsZero())
@@ -128,6 +121,9 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 	{
 		Manager.NoteColorFormat(SceneColorFormat);
 	}
+	// A scaler that failed (the manager switches the game view to TSR from the next frame on) still owes this frame, already in the
+	// pipeline, a valid image: it takes the same bilinear stretch.
+	const bool bFallbackFrame = bColorFormatMismatch || !Context->IsHealthy();
 
 	AstraMetalFX::FFrame Frame;
 	Frame.ViewRect = InputRect;
@@ -135,7 +131,7 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 	Frame.Jitter = Inputs.TemporalJitterPixels;
 	Frame.PreExposure = Inputs.PreExposure;
 	Frame.bReset = bReset;
-	Frame.bFallback = bColorFormatMismatch;
+	Frame.bFallback = bFallbackFrame;
 	Frame.DebugView = Manager.GetDebugView();
 	Frame.FrameNumber = View.Family ? View.Family->FrameNumber : 0;
 	const FMatrix44f ClipToPrevClip = ComputeClipToPrevClip(View.ViewMatrices, PreviousMatrices);
@@ -160,11 +156,12 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 	// the Metal RHI itself uses for the present and Epic's NNE plugin uses to run an external library in the middle of a frame.
 	GraphBuilder.AddPass(
 		RDG_EVENT_NAME("AstraMetalFX %dx%d -> %dx%d%s", InputRect.Width(), InputRect.Height(), OutputSize.X, OutputSize.Y,
-			bColorFormatMismatch ? TEXT(" (fallback: other scene color format)") : (bReset ? TEXT(" (reset)") : TEXT(""))),
+			bFallbackFrame ? (bColorFormatMismatch ? TEXT(" (fallback: other scene color format)") : TEXT(" (fallback: the scaler failed)")) : (bReset ? TEXT(" (reset)") : TEXT(""))),
 		PassParameters,
 		ERDGPassFlags::Compute | ERDGPassFlags::NeverCull,
 		[Context = Context, Frame, SceneColor, SceneDepth, SceneVelocity, EyeAdaptation, OutputTexture](FRHICommandListImmediate& RHICmdList) mutable
 		{
+			const double PassStart = FPlatformTime::Seconds();
 			Frame.SceneColor = SceneColor->GetRHI();
 			Frame.SceneDepth = SceneDepth->GetRHI();
 			Frame.SceneVelocity = SceneVelocity ? SceneVelocity->GetRHI() : nullptr;
@@ -175,11 +172,14 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 			TRefCountPtr<FRHITexture> KeepColor(Frame.SceneColor), KeepDepth(Frame.SceneDepth), KeepVelocity(Frame.SceneVelocity),
 				KeepEye(Frame.EyeAdaptation), KeepOutput(Frame.Output);
 
+			const double FlushStart = FPlatformTime::Seconds();
 			RHICmdList.ImmediateFlush(EImmediateFlushType::DispatchToRHIThread);
+			AstraMetalFX::NoteCpuTime(AstraMetalFX::ECpuStage::Flush, (FPlatformTime::Seconds() - FlushStart) * 1e6);
 			RHICmdList.EnqueueLambda(TEXT("AstraMetalFX"), [Context, Frame, KeepColor, KeepDepth, KeepVelocity, KeepEye, KeepOutput](FRHICommandListImmediate&)
 			{
 				Context->Submit(Frame);
 			});
+			AstraMetalFX::NoteCpuTime(AstraMetalFX::ECpuStage::Pass, (FPlatformTime::Seconds() - PassStart) * 1e6);
 		});
 
 	Manager.PublishFrame(Context);

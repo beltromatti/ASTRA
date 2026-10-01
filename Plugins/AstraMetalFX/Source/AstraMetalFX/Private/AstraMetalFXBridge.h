@@ -28,6 +28,29 @@ namespace AstraMetalFX
 	uint32 DefaultColorFormat();
 	FString ColorFormatName(uint32 ColorFormat);
 
+	/**
+	 * Where the plugin spends CPU time in a frame, as exponential averages in microseconds. None of these stages waits for the GPU:
+	 * the flush only hands the recorded work to the RHI thread (the renderer does it itself at its dispatch hints), the submission
+	 * is a call that enqueues a payload, the encoding takes tens of microseconds. astra.metalfx.status prints them.
+	 */
+	enum class ECpuStage : uint8
+	{
+		Pass,     // the whole RDG pass of the upscaler, render thread
+		Flush,    // ...of which RHICmdList.ImmediateFlush(DispatchToRHIThread)
+		Submit,   // FScalerContext::Submit, RHI thread
+		Encode    // encoding and committing the Metal command buffer, Metal submission thread
+	};
+	void NoteCpuTime(ECpuStage Stage, double Microseconds);
+
+	struct FCpuTimings
+	{
+		float PassUs = 0.0f;
+		float FlushUs = 0.0f;
+		float SubmitUs = 0.0f;
+		float EncodeUs = 0.0f;
+	};
+	FCpuTimings GetCpuTimings();
+
 	/** One frame of work for the upscaler, all plain data. The textures are the RHI's; the bridge retains their native handles. */
 	struct FFrame
 	{
