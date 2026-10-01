@@ -39,8 +39,13 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
   dinamica al 45–48 % contro 41–43 % del TSR (la compensazione alza `TargetedGPUHeadRoomPercentage` del suo 1,3 ms); a risoluzione
   fissa il render thread non aspetta. Da fare: guardare il moto (`r.AstraMetalFX.Debug 1|2`), tarare `r.Tonemapper.Sharpen`, togliere
   il worktree `agent-a90bd4087f2057aa8` (modulo chiuso).
-- **GUERRA** e **VITA** stanno finendo (rapporti in arrivo): unirli e fare i passi d'integrazione di GUERRA.md §6.8 (motori al timone,
-  riparazioni, gittate su tavolo e schermo, `holo ship` delle navi scansionate) e di VITA.md §7.
+- **GUERRA ha chiuso** (ramo `worktree-agent-a05c7a46bb8cc857f`, commit finale **7e375cf**, main già unito e compilato nel suo ramo):
+  colpi sulla scatola vera degli scafi v3, rottura sul taglio vero (`CutBowX/CutSternX` negli eventi), apertura su 12 semi da 0/12/0 a
+  1/7/4 (scafo dell'Aquila a fine prova 68 % ± 11), simmetria entro 2σ su 96 semi, 30 navi + 150 velivoli a 0,04–0,09 ms per tick.
+  Da fare alla ripresa: unirlo, poi GUERRA.md §6.8 (menti su `group_order`, effetti da `ConsumeDeathEvents`/`GetDamageView`,
+  `PlayerEngineFactor()` al timone, `RepairPlayerSystems()` dalle squadre, `GetContacts` a cadenza più bassa negli schermi, tarare la
+  poppa dell'Aquila — fragile: 18 s contro due Acheron — e la forza dell'apertura nel gioco vero), togliere il suo worktree, avviare
+  MENTE-GUERRA. **VITA** sta finendo: unirla e fare VITA.md §7.
 - **Prossimi moduli, brief pronti** in `docs/brief/`: MENTE-GUERRA (al posto di GUERRA), NAVE-2 (gli altri ponti, a istanze e a
   livelli), VFX (la guerra bella, nomi per nave, tetto dell'isola), DISTRUZIONE (dopo VITA).
 
