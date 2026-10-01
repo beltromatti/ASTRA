@@ -29,13 +29,20 @@ che la cattura mostra), `AstraHoloTable.cpp` (il tavolo con decine di contatti).
 4. **Gli scenari grandi giocabili**: un modo per lanciare nel gioco vero `scale_30x150` (e una battaglia di flotta di campagna con
    rinforzi) per le prove del lead, e le misure.
 
+## La misura di partenza (1/10, il lead, aiutanti in pausa)
+`astra.war.scenario scale_30x150 aquila` (l'opzione nuova tiene l'Aquila nella battaglia, all'origine con la parte ASTRA: nella
+sandbox normale era a un milione di km e non si disegnava nulla), 90 s dopo, seduto in plancia: **57–58 fps** al limite dei 60, **game
+thread 13,8 ms** (WorldTickMisc 3,95, EndOfFrameUpdates 3,42, Tickables 2,53, TickActors 1,53), **render thread 14,8 ms**
+(RenderOther 3,9, UpdatePrimitiveTransform 1,27, attesa visibilità 1,65), GPU 12,8 ms a risoluzione dinamica ~47 %. Il game thread
+è il primo a cedere: gli attori dei velivoli e le trasformazioni dei loro componenti a ogni fotogramma.
+
 ## Il metro (il lead lo rifà nel gioco)
-- Con `scale_30x150` sulla plancia (seduto al posto del Capitano, schermo principale acceso): ≥ 55 fps mediani a 1600x900 (risoluzione
+- Con `astra.war.scenario scale_30x150 aquila` sulla plancia (seduto al posto del Capitano, schermo principale acceso): ≥ 55 fps mediani a 1600x900 (risoluzione
   dinamica ≥ 40 %), game thread ≤ 8 ms, render thread ≤ 12 ms; memoria del gioco ≤ 9 GB.
 - Nessuna regressione nell'apertura (oggi 58–60 fps).
 Prove offline: il banco `tools/war.py` (simulazione) e un banco di disegno senza finestra se serve; la grafica la prova il lead.
 
 ## Coordinamento
-MENTE-GUERRA lavora in `mind/` e in `AstraWarSimCommandlet`/`tools/war.py`: non toccarli (se ti serve uno scenario nuovo, aggiungi
+MENTE-GUERRA è unito in main (le menti in `mind/`; il banco con la mente nel giro in `AstraWarSimCommandlet`/`tools/war.py mind`): non toccare `mind/` (se ti serve uno scenario nuovo, aggiungi
 il file in `data/war/scenarios/`). DISTRUZIONE lavora sui danni interni dell'Aquila (AstraShipSubsystem, pianta, VITA): non toccarli.
 Regole di memoria: al massimo 2 commandlet alla volta, UBT limitato a 4 azioni, mai due editor.

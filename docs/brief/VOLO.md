@@ -31,5 +31,9 @@ dal vivo da pochi centesimi (come `bench/npc_live.py`): parlano quando devono, t
 agiscono. Il lead prova nel gioco in battaglia e in volo.
 
 ## Coordinamento
-MENTE-GUERRA ha riscritto `server.py` (comandanti, alleati, il canale della flotta, la cadenza delle menti): parti dal suo lavoro
-unito in main e aggancia il volo accanto al canale della flotta, senza duplicarlo.
+MENTE-GUERRA è unito in main (1/10): `mind/astra_mind/war_minds.py` (WarMinds: seggi, cadenza, quadro per parte, `group_order`,
+la catena di comando), i capitani alleati che parlano sulla rete (`server._ally_say`, `_fleet_request`, `_war_look`), il regista v2 in
+`director.py`, GUERRA.md §8. Aggancia il volo accanto al canale della flotta con lo stesso schema, senza duplicarlo. Il prompt
+dell'equipaggio è diviso (`crew.system_prompt` stabile, `crew.bridge_now` nell'ultimo messaggio di ogni turno: la cache del provider
+copre il resto): ciò che cambia a ogni turno va in `bridge_now`. Costo misurato nel gioco: equipaggio 0,76 $/ora, menti di guerra
+0,02-0,17 $/ora; il totale deve restare sotto 1 $/ora.
