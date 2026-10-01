@@ -633,9 +633,12 @@ void UAstraDamageFx::Animate(float Dt)
 			if (bParams)
 			{
 				const bool bMist = I.Kind == EPart::Mist;
+				// a puff is a one-sided sphere: from inside it is not drawn, so it thins out as the eye comes into it (the room's smoke is then the grey of the screen)
+				const float Radius = 0.5f * I.Size;
+				const float Away = FMath::Clamp(((float)FVector::Dist(LastEye, I.Pos) - 0.6f * Radius) / FMath::Max(1.f, 0.5f * Radius), 0.f, 1.f);
 				Mid->SetVectorParameterValue(TEXT("Color"), bMist ? FLinearColor(0.55f, 0.58f, 0.62f) : FLinearColor(0.13f, 0.125f, 0.12f));
 				Mid->SetScalarParameterValue(TEXT("Intensity"), (bMist ? 22.f : 14.f) * SmokeK);
-				Mid->SetScalarParameterValue(TEXT("Opacity"), FMath::Clamp(I.Strength * I.Level, 0.f, 0.92f));
+				Mid->SetScalarParameterValue(TEXT("Opacity"), FMath::Clamp(I.Strength * I.Level * (bHaveEye ? Away : 1.f), 0.f, 0.92f));
 			}
 			break;
 		}
@@ -874,10 +877,10 @@ void UAstraDamageFx::StepScars(float Dt)
 			// (re)pointed at this wall: it projects along its X axis into the wall, from a little inside the room
 			S->Comp = V.Comp;
 			const float Half = FMath::Clamp(V.RadiusCm * 2.4f, 90.f, 280.f);
-			S->Decal->DecalSize = FVector(120.f, Half, Half);
+			S->Decal->DecalSize = FVector(55.f, Half, Half);                       // (half extents: shallow, so it paints the wall and what is against it, not the room)
 			FRotator R = FRotationMatrix::MakeFromX(V.Normal).Rotator();
 			R.Roll = (float)(V.Comp % 360);
-			S->Decal->SetWorldLocationAndRotation(V.At - V.Normal * 30.f, R);
+			S->Decal->SetWorldLocationAndRotation(V.At - V.Normal * 25.f, R);
 		}
 		S->Target = 1.f;
 	}
