@@ -27,6 +27,15 @@ potenza persa, il fuoco passa alla Mess Hall e alla Spine, ops manda la squadra 
 solo ascensore finto (sei fermate in punti diversi, uno schermo nero e un salto: ci sono passato senza volerlo), il Concourse grande, buio
 e spoglio, il programma delle stanze a ciclo, l'equipaggio di manichini: da qui NAVE-3 e ASCENSORI.
 
+**2/10 pomeriggio — CAMPAGNA, la guerra a scala di flotte (il lead, [GUERRA.md §9](GUERRA.md)):** i beat del regista portano forze in
+gruppi di battaglia (fino a 40 navi, ognuna col suo comandante o capitano, mente e voce), il regista ragiona a scala di flotte (sonde, forze,
+assalto; la 7th Fleet risponde con gruppi), una campagna nuova comincia con la flotta d'interdizione che si raduna oltre il Gate. **L'apertura
+cresce in una battaglia di flotta**: 5,5 minuti dopo Solm l'avanguardia (Thale, Dorn, Morrow: 8 navi, 12 velivoli) esce dal Gate, il gruppo
+Constance (Aldana, 4 navi e lo stormo) arriva da New Ravenna. Provato con la mente: le menti di guerra comandano tre gruppi del Mandato e due
+alleati (1–2 m$ a decisione), ~0,3 $/ora in tutto, 60 fps con gli aiutanti fermi. Il timone ha la **retro-spinta** e tiene la distanza; lo
+schermo principale stacca sulle forze che arrivano (INCOMING / ARRIVING). Il brief CAMPAGNA resta per ciò che manca: la guerra lontana
+dall'Aquila (fronti, battaglie risolte dalla simulazione), la struttura lunga della campagna.
+
 **2/10 — il lead gioca da Capitano (l'apertura con la mente, ~10 minuti, ~0,04 $) e rifinisce ciò che trova:**
 - **Funziona bene**: il XO accoglie e fa il punto in italiano; un ordine con due destinatari («Timoniere… Tattico…») è eseguito da entrambi
   in 1–1,5 s con le loro conferme; Tanaka mette un contatto sullo schermo principale e la pagina dell'Acheron sul datapad in 1 s; l'Archon

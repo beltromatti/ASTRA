@@ -14,7 +14,14 @@ numeri truccati) e §6; PIANO §3 (F2); **GUERRA.md tutto** (§5 com'è fatta, �
 regista v2); SCALA.md (cosa regge il disegno: `scale_30x150` a 60 fps dalla plancia, `fleet_battle` con 71 navi e 137 velivoli); VOLO.md
 (la rete di volo); DISTRUZIONE.md (i danni interni dell'Aquila); BIBBIA (il teatro di Aurelia, la March, la 7th Fleet, il Mandato).
 
-## Dove siamo (2/10)
+## Fatto dal lead (2/10 pomeriggio, GUERRA.md §9)
+Le forze in gruppi di battaglia nei beat (fino a 40 navi), il regista a scala di flotte, i fili d'apertura, l'apertura che cresce
+(avanguardia dal Gate e gruppo Constance), la retro-spinta e la distanza tenuta, lo schermo che stacca sulle forze in arrivo. **Resta per chi
+prende il modulo**: il punto 1 (la guerra che va avanti dove l'Aquila non è: luoghi, fronti, battaglie lontane con esiti veri), il punto 3 sulla
+struttura lunga (ore di campagna, tregue utili), il punto 4 (il Capitano a scala di flotta: cosa manca alla plancia per comandarla) e la misura
+del costo su una partita lunga.
+
+## Dove siamo (2/10 mattina)
 - Il motore regge la scala (SCALA), le menti di guerra pensano per gruppi con la catena di comando e costano poco (0,02–0,17 $/ora
   nell'apertura), il regista v2 sceglie i beat senza atti leggendo il polso della guerra.
 - Ma la campagna è piccola: l'apertura scritta in `AstraBattleSubsystem::TickScenario` (Aquila, Praetorian, Vigilant, il mercantile;
