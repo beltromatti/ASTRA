@@ -1,10 +1,26 @@
 #include "AstraNaveCommandlet.h"
 
 #include "ASTRA.h"
+#include "AstraDeckShell.h"
 #include "AstraDeckStreaming.h"
+#include "AstraDoor.h"
 #include "AstraLampPool.h"
 #include "AstraShipPlan.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/Engine.h"
+#include "Dom/JsonObject.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "EngineUtils.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+#include "Engine/World.h"
+#include "HAL/PlatformProcess.h"
 #include "HAL/PlatformTime.h"
+#include "UObject/UObjectGlobals.h"
 
 namespace
 {
@@ -31,6 +47,163 @@ UAstraNaveCommandlet::UAstraNaveCommandlet()
 	ShowErrorCount = true;
 }
 
+namespace
+{
+	/** The game thread's side of bringing a deck in (a headless world: no renderer, so no scene proxies and no GPU, but real actors, real components'
+	 *  registration and the physics bodies of every instance): the deck's shell and doors are built in a world as the level's own load would, from the plan's
+	 *  placements and the kit's meshes; timed in the three parts that cost: loading the meshes, registering the instances, spawning the doors. */
+	void LoadTest(const TArray<FString>& Decks)
+	{
+		UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("AstraNaveLoad"));
+		FWorldContext& Ctx = GEngine->CreateNewWorldContext(EWorldType::Game);
+		Ctx.SetCurrentWorld(World);
+		World->InitializeActorsForPlay(FURL());
+		World->BeginPlay();
+		FString Text;
+		TSharedPtr<FJsonObject> Root;
+		if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/aquila_plan.json"))) ||
+		    !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+		{
+			Check(TEXT("load: the plan"), false, TEXT("data/ship/aquila_plan.json does not read"));
+			return;
+		}
+		const TSharedPtr<FJsonObject>& Placements = Root->GetObjectField(TEXT("placements"));
+		const TArray<TSharedPtr<FJsonValue>>& AllDoors = Root->GetArrayField(TEXT("doors"));
+		for (const FString& D : Decks)
+		{
+			const int32 Deck = FCString::Atoi(*D);
+			const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+			if (!Placements->TryGetArrayField(FString::FromInt(Deck), List))
+			{
+				Check(TEXT("load: placements"), false, FString::Printf(TEXT("deck %d has none"), Deck));
+				continue;
+			}
+			TMap<FString, TArray<FTransform>> ByMesh;
+			for (const TSharedPtr<FJsonValue>& V : *List)
+			{
+				const TSharedPtr<FJsonObject> P = V->AsObject();
+				const TArray<TSharedPtr<FJsonValue>>& Pos = P->GetArrayField(TEXT("pos"));
+				ByMesh.FindOrAdd(P->GetStringField(TEXT("mesh"))).Add(FTransform(FRotator(0.f, (float)P->GetNumberField(TEXT("yaw")), 0.f),
+					FVector(Pos[0]->AsNumber(), Pos[1]->AsNumber(), Pos[2]->AsNumber()) * 100.0));
+			}
+			const double T0 = FPlatformTime::Seconds();
+			TMap<FString, UStaticMesh*> Meshes;
+			for (const TPair<FString, TArray<FTransform>>& KV : ByMesh)
+			{
+				Meshes.Add(KV.Key, LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Kit/Ship/%s.%s"), *KV.Key, *KV.Key)));
+			}
+			const double T1 = FPlatformTime::Seconds();
+			AAstraDeckShell* Shell = World->SpawnActor<AAstraDeckShell>(FVector::ZeroVector, FRotator::ZeroRotator);
+			Shell->Deck = Deck;
+			int32 Missing = 0;
+			double WorstAdd = 0.0;
+			for (const TPair<FString, TArray<FTransform>>& KV : ByMesh)
+			{
+				UStaticMesh* M = Meshes[KV.Key];
+				if (!M) { ++Missing; continue; }
+				const double A0 = FPlatformTime::Seconds();
+				Shell->AddInstancesChunked(M, KV.Value, 16000.f);
+				WorstAdd = FMath::Max(WorstAdd, (FPlatformTime::Seconds() - A0) * 1000.0);
+			}
+			const double T2 = FPlatformTime::Seconds();
+			int32 Doors = 0;
+			for (const TSharedPtr<FJsonValue>& V : AllDoors)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				bool bFlag = false;
+				if ((int32)O->GetNumberField(TEXT("deck")) != Deck || (O->TryGetBoolField(TEXT("existing"), bFlag) && bFlag) || (O->TryGetBoolField(TEXT("planned"), bFlag) && bFlag))
+				{
+					continue;
+				}
+				const TArray<TSharedPtr<FJsonValue>>& Pos = O->GetArrayField(TEXT("pos"));
+				AAstraDoor* Door = World->SpawnActor<AAstraDoor>(FVector(Pos[0]->AsNumber(), Pos[1]->AsNumber(), Pos[2]->AsNumber()) * 100.0, FRotator(0.f, (float)O->GetNumberField(TEXT("yaw")), 0.f));
+				Door->Width = (float)O->GetNumberField(TEXT("width")) * 100.f;
+				Door->Height = (float)O->GetNumberField(TEXT("height")) * 100.f;
+				++Doors;
+			}
+			const double T3 = FPlatformTime::Seconds();
+			double WorstTick = 0.0;
+			for (int32 i = 0; i < 30; ++i)
+			{
+				const double F0 = FPlatformTime::Seconds();
+				World->Tick(LEVELTICK_All, 1.f / 60.f);
+				WorstTick = FMath::Max(WorstTick, (FPlatformTime::Seconds() - F0) * 1000.0);
+			}
+			int32 Comps = Shell->NumInstanceComponents();
+			// the floor under a corridor module must hold a capsule: a trace down from 1.5 m above the middle of the first straight module of the deck
+			{
+				FVector At = FVector::ZeroVector;
+				for (const TSharedPtr<FJsonValue>& V : *List)
+				{
+					const TSharedPtr<FJsonObject> P = V->AsObject();
+					if (P->GetStringField(TEXT("mesh")).StartsWith(TEXT("SM_SHIP_S_Straight")) && FMath::IsNearlyZero(P->GetNumberField(TEXT("yaw"))))
+					{
+						const TArray<TSharedPtr<FJsonValue>>& Pos = P->GetArrayField(TEXT("pos"));
+						At = FVector(Pos[0]->AsNumber() + 2.0, Pos[1]->AsNumber(), Pos[2]->AsNumber()) * 100.0;
+						break;
+					}
+				}
+				FHitResult Hit;
+				bool bHit = World->LineTraceSingleByChannel(Hit, At + FVector(0.f, 0.f, 150.f), At - FVector(0.f, 0.f, 100.f), ECC_Pawn);
+				// the control: the same mesh as a static mesh actor, 50 m off, traced the same way. A headless world may make no physics at all (the commandlet
+				// runs without a renderer): then neither the control nor the instances answer, and the check says so instead of failing
+				bool bControl = false;
+				if (UStaticMesh* Mod = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Kit/Ship/SM_SHIP_S_Straight_A.SM_SHIP_S_Straight_A")))
+				{
+					AStaticMeshActor* SMA = World->SpawnActor<AStaticMeshActor>(FVector(At.X, At.Y + 5000.f, At.Z), FRotator::ZeroRotator);
+					SMA->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+					SMA->GetStaticMeshComponent()->SetStaticMesh(Mod);
+					SMA->GetStaticMeshComponent()->SetMobility(EComponentMobility::Static);
+					FHitResult H2;
+					bControl = World->LineTraceSingleByChannel(H2, FVector(At.X, At.Y + 5000.f, At.Z + 150.f), FVector(At.X, At.Y + 5000.f, At.Z - 100.f), ECC_Pawn);
+				}
+				if (!bControl)
+				{
+					Check(TEXT("load: the floor holds (ISM collision)"), true, TEXT("skipped: this headless world makes no physics, not even for a plain static mesh actor"));
+				}
+				else
+				{
+					Check(TEXT("load: the floor holds (ISM collision)"), bHit && FMath::Abs(Hit.ImpactPoint.Z - At.Z) < 8.f,
+					      FString::Printf(TEXT("deck %d: a trace down at (%.0f, %.0f) %s %s at z %.1f cm over the floor"), Deck, At.X, At.Y, bHit ? TEXT("hit") : TEXT("missed"),
+					                      Hit.GetComponent() ? *Hit.GetComponent()->GetName() : TEXT("-"), bHit ? Hit.ImpactPoint.Z - At.Z : 0.f));
+				}
+			}
+			// the physics bodies of the instances (a collision per instance: the Captain walks on them): made again on purpose, to time them
+			double PhysMs = 0.0;
+			{
+				TArray<UInstancedStaticMeshComponent*> IC;
+				Shell->GetComponents<UInstancedStaticMeshComponent>(IC);
+				if (IC.Num())
+				{
+					const UInstancedStaticMeshComponent* C0 = IC[0];
+					UE_LOG(LogASTRA, Display, TEXT("[Nave]   %s: collision %d, profile %s, registered %d, physics state %d, instance bodies %d, complex-as-simple %d"), *C0->GetName(),
+					       (int32)C0->GetCollisionEnabled(), *C0->GetCollisionProfileName().ToString(), C0->IsRegistered(), C0->IsPhysicsStateCreated(), C0->GetInstanceBodies().Num(),
+					       C0->GetStaticMesh() && C0->GetStaticMesh()->GetBodySetup() ? (int32)C0->GetStaticMesh()->GetBodySetup()->CollisionTraceFlag : -1);
+				}
+				const double P0 = FPlatformTime::Seconds();
+				for (UInstancedStaticMeshComponent* C : IC) { C->RecreatePhysicsState(); }
+				PhysMs = (FPlatformTime::Seconds() - P0) * 1000.0;
+				UE_LOG(LogASTRA, Display, TEXT("[Nave]   physics scene %s: the instances' bodies made again in %.1f ms"), World->GetPhysicsScene() ? TEXT("present") : TEXT("ABSENT"), PhysMs);
+			}
+			Check(TEXT("load: a deck comes in under a second"), Missing == 0 && (T3 - T0) < 1.0,
+			      FString::Printf(TEXT("deck %d: %.0f ms (meshes %.0f, %d instances in %d components %.0f ms - the longest component %.1f ms, %d doors %.0f ms); a frame after: %.1f ms; %d meshes missing"),
+			                      Deck, (T3 - T0) * 1000.0, (T1 - T0) * 1000.0, Shell->NumInstances(), Comps, (T2 - T1) * 1000.0, WorstAdd, Doors, (T3 - T2) * 1000.0, WorstTick, Missing));
+			// out again: the actors go, then a collection
+			const double U0 = FPlatformTime::Seconds();
+			Shell->Destroy();
+			for (TActorIterator<AAstraDoor> It(World); It; ++It)
+			{
+				It->Destroy();
+			}
+			World->Tick(LEVELTICK_All, 1.f / 60.f);
+			CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+			Check(TEXT("load: and out again"), true, FString::Printf(TEXT("deck %d: %.0f ms to destroy and collect"), Deck, (FPlatformTime::Seconds() - U0) * 1000.0));
+		}
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+	}
+}
+
 int32 UAstraNaveCommandlet::Main(const FString& Params)
 {
 	float StepCm = 200.f;
@@ -39,6 +212,16 @@ int32 UAstraNaveCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("max="), MaxLit);
 	const bool bVerbose = FParse::Param(*Params, TEXT("verbose"));
 	Checks.Reset();
+	FString LoadList;
+	if (FParse::Value(*Params, TEXT("load="), LoadList, false))
+	{
+		TArray<FString> Decks;
+		LoadList.ParseIntoArray(Decks, TEXT(","));
+		LoadTest(Decks);
+		int32 Failed = 0;
+		for (const FCheck& C : Checks) { Failed += C.bPass ? 0 : 1; }
+		return Failed ? 1 : 0;
+	}
 	UAstraShipPlan* Plan = NewObject<UAstraShipPlan>(GetTransientPackage());
 	if (!Plan->EnsureLoaded())
 	{

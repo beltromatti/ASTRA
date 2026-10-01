@@ -3,6 +3,7 @@
 #include "AstraDeckShell.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/CollisionProfile.h"
 #include "Engine/StaticMesh.h"
 
 AAstraDeckShell::AAstraDeckShell()
@@ -36,6 +37,7 @@ int32 AAstraDeckShell::AddInstancesChunked(UStaticMesh* Mesh, const TArray<FTran
 		C->SetupAttachment(GetRootComponent());
 		C->CreationMethod = EComponentCreationMethod::Instance;      // saved with the level like a component added in the editor
 		C->SetStaticMesh(Mesh);
+		C->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);      // architecture: static, blocks everything (as a static mesh actor's default)
 		C->RegisterComponent();              // (registered first: the world-space instance transforms are taken against its placed transform)
 		AddInstanceComponent(C);
 		C->PreAllocateInstancesMemory(Run.Value.Num());

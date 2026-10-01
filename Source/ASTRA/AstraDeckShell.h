@@ -31,7 +31,7 @@ public:
 	 *  registers as a whole: a 500 m long deck in one component per mesh would never be culled and would register in one stall). Returns the number
 	 *  of instances added. */
 	UFUNCTION(BlueprintCallable, Category = "Deck")
-	int32 AddInstancesChunked(UStaticMesh* Mesh, const TArray<FTransform>& WorldTransforms, float ChunkCm = 9600.f);
+	int32 AddInstancesChunked(UStaticMesh* Mesh, const TArray<FTransform>& WorldTransforms, float ChunkCm = 16000.f);
 
 	/** Removes every instance component (the build script rebuilds a deck from scratch). */
 	UFUNCTION(BlueprintCallable, Category = "Deck")
