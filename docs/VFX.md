@@ -17,8 +17,8 @@ quello che disegna torna alla guerra. Tre regole guidano tutto:
 1. **Nessun attore per colpo, per scintilla, per fiamma.** Ogni genere di effetto è un livello di istanze
    (`UInstancedStaticMeshComponent`, un solo componente e un solo materiale per livello, quindi una chiamata di disegno), scritto in
    blocco una volta a frame: le trasformazioni e 12 numeri per istanza (§3). Gli unici attori sono quelli che servono davvero:
-   un guscio per nave per gli scudi (creato alla prima ondulazione, distrutto dopo 30 s di quiete), i tre pezzi di una nave spezzata,
-   e il guasto sullo scafo (un decal).
+   un guscio per nave capitale per gli scudi (creato quando la nave è vicina, invisibile finché non ondeggia, distrutto con la nave), i tre
+   pezzi di una nave spezzata, e il guasto sullo scafo (un decal).
 2. **La simulazione degli effetti è C++ semplice, nel riferimento del sistema (metri).** Il riferimento dell'Aquila si applica solo
    quando le istanze si scrivono (`FFrame::ToWorld`). Per questo gira anche sul banco senza grafica (`-nullrhi`): lì i livelli
    contano e non disegnano, e il costo degli effetti entra nelle misure della guerra (cvar `astra.fx.sim`).
@@ -102,8 +102,8 @@ onda d'urto; pennacchio: 0 ASTRA, 1 Mandate (P1) e il balbettio del motore malat
 
 Esposizione: fissa nello spazio, EV100 6,6 (STILE §8): un emissivo di ~116 legge come bianco. Intensità usate: colpo 700, fascio 520,
 cannone 420, difesa di punto 360, fuoco 190, bagliori 110–460, pennacchio 70, fumo 70 (colore 0,5/0,48/0,46), guscio dello scudo
-48 × `Gain` (l'intensità). Con l'esposizione del pianeta (8,3) e con quella dello schermo principale (un diaframma più aperto) leggono più chiaro/scuro:
-si regola con `astra.fx.intensity`.
+48 × `Gain` (l'intensità). Con l'esposizione dei mondi (EV 8,3, quasi due stop più scura) gli effetti leggono più deboli, nello schermo principale (EV 5,6, un diaframma più
+aperto) più forti: si regola con `astra.fx.intensity`.
 
 ## 5. Le armi
 
@@ -174,9 +174,8 @@ separazione). Il modulo lo riceve **direttamente da `Destroy()`** (non consuma l
   (`SM_SHIP_<Faction>_<Name>_Sec<Bow|Mid|Stern>`), alla stessa posizione e assetto: *l'immagine non cambia* nell'istante della rottura. (Lo
   schermo principale, che conosce gli attori nuovi solo al giro successivo della sua lista, ogni 0,5 s, per 0,75 s continua a vedere lo scafo
   intero, portato avanti da qui sulla sua rotta: lo scafo è "visibile solo nelle catture" e i pezzi "nascosti nelle catture"; poi i ruoli si
-  pareggiano e lo scafo viene distrutto. Niente salti sul bersaglio nello schermo.) I
-  pezzi si separano con la quantità di moto giusta (il gruppo che si stacca contro il resto, in proporzione alle lunghezze), ruotano
-  piano attorno al loro baricentro, e **le facce di taglio** (`MI_HULL_<f>_Cut`) partono roventi (`Heat` 1 → 0 in ~60 s) e
+  pareggiano e lo scafo viene distrutto. Niente salti sul bersaglio nello schermo.) I pezzi si separano con la quantità di moto giusta (il gruppo
+  che si stacca contro il resto, in proporzione alle lunghezze), ruotano piano attorno al loro baricentro, e **le facce di taglio** (`MI_HULL_<f>_Cut`) partono roventi (`Heat` 1 → 0 in ~60 s) e
   alimentano fuochi, scintille e fumo finché sono calde; le finestre si spengono con un balbettio in 2,5 s. Un lampo e una fontana di
   scintille al punto di rottura, l'onda d'urto, quattro esplosioni lungo le due metà. Ogni pezzo diventa un ostacolo (`Wrecks`) per le navi
   che girano intorno.
@@ -212,7 +211,7 @@ tutto, al massimo 3 per frame, e solo per i colpi che hanno passato scudo e cora
 
 I tetti stanno in `AstraWarFX.h` (`namespace AstraFx`) e sono pensati per il MacBook Air (senza ventola):
 istanze 1500 dardi, 1200 tubi, 700 bagliori, 200 fuochi, 220 fumi, 220 pennacchi, 140 detriti; liste di particelle: 900 nuvole, 1800
-scintille, 360 fasci, 240 detriti simulati; 36 pezzi; 8 luci. **Chi lancia particelle chiede posto** (`Room(livello)`,
+scintille, 360 fasci, 140 detriti simulati (quando sono pieni il più vecchio cede il posto); 36 pezzi; 8 luci. **Chi lancia particelle chiede posto** (`Room(livello)`,
 `RoomSparks()`): più il livello è pieno, meno ne lancia (le scintille scendono fino al 12%, i fuochi fino al 40%): la più grande
 esplosione di una battaglia non spinge fuori le scintille del resto e un fuoco lungo non riempie il cielo di fumo. Un livello che si riempie
 scarta (e conta, `astra.fx.stats`): mai un crash o un'allocazione.
@@ -322,6 +321,8 @@ i dardi, i fasci e i pennacchi, i fogli del fuoco e del fumo.
   `/Game/ASTRA/FX/SM_WAR_Ball` e viene usata.
 - **Cambiare `astra.fx.enable` a battaglia in corso**: i colpi già in volo non hanno l'attore (non lo hanno mai creato) e restano invisibili
   fino alla fine; si cambia prima della battaglia.
+- **Lo schermo principale vede la separazione dei pezzi 0,75 s dopo la plancia** (§8): è il prezzo di non avere salti sul bersaglio; sparirebbe
+  se la lista degli attori dello schermo si potesse aggiornare subito (§18). Lampi, fuoco e scintille della rottura ci sono da subito in entrambi.
 - Il costo **GPU** del fuoco e del fumo traslucenti molto vicini alla telecamera non è misurato (§13).
 
 ## 18. Richieste fuori dal modulo (per il lead)
