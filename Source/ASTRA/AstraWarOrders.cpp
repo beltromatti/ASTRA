@@ -269,7 +269,8 @@ FString UAstraBattleSubsystem::DescribeGroupOrder(const FAstraBattleGroup& G, co
 		}
 		break;
 	case EAstraGroupOrder::Pin:
-		Text = Target ? FString::Printf(TEXT("pinning %s: fire on it from no closer than %.1f km, the group does not commit past that"), *Label(*Target), FMath::Min(G.EngageRange, 9000.f) / WarKm)
+		Text = Target ? FString::Printf(TEXT("pinning %s: fire on it from no closer than %.1f km, the group does not commit past that"), *Label(*Target),
+		                                (G.OrderRangeM > 0.f ? G.OrderRangeM : FMath::Min(G.EngageRange, 9000.f)) / WarKm)
 		              : FString(TEXT("pinning the enemy: holding at long range and keeping its attention without closing"));
 		break;
 	case EAstraGroupOrder::FlankLeft:
@@ -359,7 +360,7 @@ FString UAstraBattleSubsystem::DescribeGroupOrder(const FAstraBattleGroup& G, co
 		break;
 	}
 	FString Tail;
-	if (G.OrderRangeM > 0.f && G.Order != EAstraGroupOrder::Attack && G.Order != EAstraGroupOrder::Withdraw && G.Order != EAstraGroupOrder::Regroup)
+	if (G.OrderRangeM > 0.f && G.Order != EAstraGroupOrder::Attack && G.Order != EAstraGroupOrder::Pin && G.Order != EAstraGroupOrder::Withdraw && G.Order != EAstraGroupOrder::Regroup)
 	{
 		Tail = FString::Printf(TEXT("; it holds %.1f km from its target"), G.OrderRangeM / WarKm);
 	}
