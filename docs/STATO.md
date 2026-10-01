@@ -34,6 +34,16 @@
 riga, sezioni col colore del danno, incidenti con squadra e progresso, squadre che camminano dal Ponte 6, il Capitano dov'è; ops e la
 mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le navi scansionate (`GetDamageView` di GUERRA).
 
+**Ripresa (1/10 ~02:40, limite d'uso raggiunto):**
+- **METALFX unito in main** (plugin `Plugins/AstraMetalFX`, `r.AstraMetalFX=1`): provato nel gioco vero, 60 fps con risoluzione
+  dinamica al 45–48 % contro 41–43 % del TSR (la compensazione alza `TargetedGPUHeadRoomPercentage` del suo 1,3 ms); a risoluzione
+  fissa il render thread non aspetta. Da fare: guardare il moto (`r.AstraMetalFX.Debug 1|2`), tarare `r.Tonemapper.Sharpen`, togliere
+  il worktree `agent-a90bd4087f2057aa8` (modulo chiuso).
+- **GUERRA** e **VITA** stanno finendo (rapporti in arrivo): unirli e fare i passi d'integrazione di GUERRA.md §6.8 (motori al timone,
+  riparazioni, gittate su tavolo e schermo, `holo ship` delle navi scansionate) e di VITA.md §7.
+- **Prossimi moduli, brief pronti** in `docs/brief/`: MENTE-GUERRA (al posto di GUERRA), NAVE-2 (gli altri ponti, a istanze e a
+  livelli), VFX (la guerra bella, nomi per nave, tetto dell'isola), DISTRUZIONE (dopo VITA).
+
 **Banco della guerra senza grafica**: `tools/war.py run|report|ship|ab` (commandlet `AstraWarSim`, ~1000× il tempo reale, deterministico per seme; vedi [GUERRA.md](GUERRA.md)).
 
 **Strumenti di prova del lead** (gioco con `tools/play.py launch --nomind`; `tools/play.py tp X Y YAW PITCH` per le foto): `astra.battle.time 170` (arriva il gruppo d'attacco), `astra.cmd station {...}`, `astra.viewscreen.dump` (l'immagine dello schermo principale a piena risoluzione), `astra.screens.dump <Pagina>` (una console su PNG), `/state` con `context`.
