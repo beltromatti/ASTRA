@@ -60,7 +60,7 @@ def run(minutes: float, every: float, jump: float | None) -> None:
         _play("cmd", f"astra.battle.time {jump:g}")
     SAMPLES.parent.mkdir(parents=True, exist_ok=True)
     end = time.time() + minutes * 60.0
-    with SAMPLES.open("a", encoding="utf-8") as f:
+    with SAMPLES.open("w", encoding="utf-8") as f:            # (a run starts the samples afresh: the report reads one run)
         while time.time() < end:
             time.sleep(every)
             subprocess.run(["pkill", "-f", "CrashReportClient"], capture_output=True)
