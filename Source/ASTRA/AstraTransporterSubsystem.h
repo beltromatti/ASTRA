@@ -362,8 +362,9 @@ private:
 	void Finish(FAstraXportJob& J, EAstraXportPhase End, const FString& Why);
 	void OpenWindow(FAstraXportJob& J);
 	void CloseWindow(const FAstraXportJob* J);
-	void News(const FAstraXportJob& J, const FString& Text, bool bReport) const;
-	void Say(const FString& Text, bool bReport) const;
+	/** What the minds are told (`transporter: ...`); bUrgent marks danger the Chief should read before anything else (a lock lost with someone in the beam, a pattern lost). */
+	void News(const FAstraXportJob& J, const FString& Text, bool bReport, bool bUrgent = false) const;
+	void Say(const FString& Text, bool bReport, bool bUrgent = false) const;
 	FString Who(const FAstraXportJob& J) const;
 	FString RefusalText(const FAstraXportJob& J, const AstraXport::FVerdict& V) const;
 	void SetPadLooks();

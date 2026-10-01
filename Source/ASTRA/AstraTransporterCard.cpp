@@ -413,18 +413,18 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 }
 
 // ================================================================================================ the news
-void UAstraTransporterSubsystem::Say(const FString& Text, bool bReport) const
+void UAstraTransporterSubsystem::Say(const FString& Text, bool bReport, bool bUrgent) const
 {
 	if (UAstraShipSubsystem* S = Ship())
 	{
-		S->PublishEvent(FString::Printf(TEXT("transporter: %s"), *Text), bReport);
+		S->PublishEvent(FString::Printf(TEXT("transporter: %s%s"), bUrgent ? TEXT("URGENT: ") : TEXT(""), *Text), bReport);
 	}
 }
 
-void UAstraTransporterSubsystem::News(const FAstraXportJob& J, const FString& Text, bool bReport) const
+void UAstraTransporterSubsystem::News(const FAstraXportJob& J, const FString& Text, bool bReport, bool bUrgent) const
 {
 	(void)J;
-	Say(Text, bReport);
+	Say(Text, bReport, bUrgent);
 }
 
 // ================================================================================================ reset and info

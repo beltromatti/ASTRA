@@ -243,7 +243,7 @@ namespace
 		void Save(const FString& Dir, const TCHAR* Name) const
 		{
 			IFileManager::Get().MakeDirectory(*Dir, true);
-			FFileHelper::SaveStringToFile(CardText(), *(Dir / Name));
+			FFileHelper::SaveStringToFile(CardText(), *(Dir / Name), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 		}
 	};
 
@@ -585,8 +585,26 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 				AstraXportBenchCheck(TEXT("away: the away team is called back to the pads and nobody is left out there"), bBack && W.Job(TagB) && W.Job(TagB)->Phase == EAstraXportPhase::Done && W.Xp->GetAway().Num() == 0,
 				                     FString::Printf(TEXT("%s | away now %d | %s"), *DB.Left(100), W.Xp->GetAway().Num(), W.Job(TagB) ? *W.Job(TagB)->Outcome.Left(100) : TEXT("?")));
 			}
-			// the Mandate's face is spent: nothing in the rules forbids it any more
+			// a Mandate ship whose shields are gone (a hull that came up with none): the console asks only for ours, and with a window the party goes across
 			GEngine->Exec(W.World, TEXT("astra.war.tune shield_scale 0"));
+			GEngine->Exec(W.World, TEXT("astra.war.spawn acheron mandate 12 0 0 180 static passive id=Z-01 name=Shieldless"));
+			W.Run(1.5f);
+			FString DZ;
+			const bool bZ = W.Send({TEXT("marines 4")}, TEXT("Z-01"), DZ);
+			AstraXportBenchCheck(TEXT("shields: a hostile with none left: the console asks only for ours"), !bZ && DZ.Contains(TEXT("shields_own")) && !DZ.Contains(TEXT("shields_theirs")), DZ.Left(220));
+			FString DZW;
+			const bool bZW = W.Send({TEXT("marines 4")}, TEXT("Z-01"), DZW, {TEXT("window")});
+			const FString TagZ = FXWorld::TagOf(DZW);
+			TSet<uint8> SeenZ;
+			if (bZW)
+			{
+				W.Finish(TagZ, 60.f, SeenZ);
+			}
+			W.Run(3.f);                                    // (Tactical puts the shields back within a second of the window closing)
+			const FAstraXportJob* JZ = W.Job(TagZ);
+			AstraXportBenchCheck(TEXT("shields: with the window the party is across, aboard her, and the Aquila's shields are back up"), bZW && JZ && JZ->Phase == EAstraXportPhase::Done && W.Xp->GetAway().Num() == 4 &&
+			                     W.Xp->GetAway()[0].WhereText.Contains(TEXT("Shieldless")) && W.Ship->AreShieldsUp(), FString::Printf(TEXT("%s | %s"), *DZW.Left(100), JZ ? *JZ->Outcome.Left(120) : TEXT("?")));
+			W.Save(Fixtures, TEXT("card_boarding.json"));
 		}
 	}
 

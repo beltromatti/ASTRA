@@ -693,7 +693,7 @@ int32 UAstraTransportCommandlet::Main(const FString& Params)
 	FString Text;
 	const TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Text);
 	FJsonSerializer::Serialize(XRecord, W);
-	FFileHelper::SaveStringToFile(Text, *Out);
+	FFileHelper::SaveStringToFile(Text, *Out, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	UE_LOG(LogASTRA, Display, TEXT("[Transport] %d checks, %d failed in %.1f s. VERDICT: %s"), XChecks.Num(), Failed, FPlatformTime::Seconds() - Wall0, Failed == 0 ? TEXT("PASS") : TEXT("FAIL"));
 	return Failed == 0 ? 0 : 1;
 }

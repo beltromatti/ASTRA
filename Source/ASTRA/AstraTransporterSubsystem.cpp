@@ -1062,7 +1062,7 @@ void UAstraTransporterSubsystem::OnLockLost(FAstraXportJob& J)
 				Fx->PlaySound(TEXT("Fault"), EmitterCm(), 0.9f, 1.f);
 			}
 			News(J, FString::Printf(TEXT("%s: the lock is lost with %s in the buffer (%s): the console is building it again; the buffer holds %.0f s, or the pattern can be called back to its origin"), *J.Tag,
-			                        *Who(J), *Why, T.BufferHoldS - J.BufferS), true);
+			                        *Who(J), *Why, T.BufferHoldS - J.BufferS), true, true);
 		}
 		break;
 	default:
@@ -1444,7 +1444,7 @@ void UAstraTransporterSubsystem::Finish(FAstraXportJob& J, EAstraXportPhase End,
 	UE_LOG(LogASTRA, Log, TEXT("[Transport] %s"), *LastOutcome);
 	if (End != EAstraXportPhase::Aborted || bWasInBeam)
 	{
-		News(J, LastOutcome, End != EAstraXportPhase::Done || J.By.Len() > 0 || J.bCaptain);
+		News(J, LastOutcome, End != EAstraXportPhase::Done || J.By.Len() > 0 || J.bCaptain, End == EAstraXportPhase::Failed || End == EAstraXportPhase::Lost);
 	}
 	else
 	{

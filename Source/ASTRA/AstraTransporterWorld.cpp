@@ -49,15 +49,15 @@ namespace
 		return S;
 	}
 
-	/** "T-23", "t23", "ship:T-23" -> 23; INDEX_NONE when it is not a contact id. */
-	int32 XpContactNumber(const FString& In)
+	/** "T-23", "t23", "ship:T-23" -> "T23"; "A-01" -> "A1"; empty when it is not a contact id. */
+	FString XpContactKey(const FString& In)
 	{
-		FString S = In.ToLower();
-		S.RemoveFromStart(TEXT("ship:"));
+		FString S = In.ToUpper();
+		S.RemoveFromStart(TEXT("SHIP:"));
 		S.TrimStartAndEndInline();
-		if (S.Len() < 2 || S[0] != TEXT('t'))
+		if (S.Len() < 2 || !FChar::IsAlpha(S[0]))
 		{
-			return INDEX_NONE;
+			return FString();
 		}
 		FString Digits;
 		for (int32 i = 1; i < S.Len(); ++i)
@@ -68,15 +68,10 @@ namespace
 			}
 			else if (S[i] != TEXT('-') && S[i] != TEXT(' '))
 			{
-				return INDEX_NONE;
+				return FString();
 			}
 		}
-		return Digits.IsEmpty() ? INDEX_NONE : FCString::Atoi(*Digits);
-	}
-
-	int32 XpIdNumber(const FString& Id)
-	{
-		return XpContactNumber(Id);
+		return Digits.IsEmpty() ? FString() : FString::Printf(TEXT("%c%d"), S[0], FCString::Atoi(*Digits));
 	}
 
 	int32 XpOwnerIndex(const FString& Owner)
@@ -207,10 +202,10 @@ bool UAstraTransporterSubsystem::FillShip(FHull& Out, const FString& ContactId) 
 	{
 		return false;
 	}
-	const int32 Want = XpContactNumber(ContactId);
+	const FString Want = XpContactKey(ContactId);
 	for (const UAstraBattleSubsystem::FContactView& C : B->Contacts())
 	{
-		const bool bSame = C.ContactId.Equals(ContactId, ESearchCase::IgnoreCase) || (Want != INDEX_NONE && XpIdNumber(C.ContactId) == Want);
+		const bool bSame = C.ContactId.Equals(ContactId, ESearchCase::IgnoreCase) || (!Want.IsEmpty() && XpContactKey(C.ContactId) == Want);
 		if (!bSame)
 		{
 			continue;
@@ -807,7 +802,7 @@ bool UAstraTransporterSubsystem::ResolveSubjects(const FAstraXportOrder& O, TArr
 				{
 					continue;
 				}
-				if (!FromKey.IsEmpty() && XpContactNumber(FromKey) == INDEX_NONE && !(FromKey.Contains(TEXT("surface")) || FromKey.Contains(TEXT("ground")) || FromKey.Contains(TEXT("planet"))) == (A.Where == TEXT("surface")))
+				if (!FromKey.IsEmpty() && XpContactKey(FromKey).IsEmpty() && !(FromKey.Contains(TEXT("surface")) || FromKey.Contains(TEXT("ground")) || FromKey.Contains(TEXT("planet"))) == (A.Where == TEXT("surface")))
 				{
 					continue;
 				}
@@ -1174,14 +1169,14 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 		FString Id;
 		if (B)
 		{
-			const int32 Want = XpContactNumber(Q);
+			const FString Want = XpContactKey(Q);
 			const UAstraBattleSubsystem::FContactView* Best = nullptr;
 			TArray<FString> Same;
 			for (const UAstraBattleSubsystem::FContactView& C : B->Contacts())
 			{
-				if (Want != INDEX_NONE)
+				if (!Want.IsEmpty())
 				{
-					if (XpIdNumber(C.ContactId) == Want)
+					if (XpContactKey(C.ContactId) == Want)
 					{
 						Best = &C;
 						break;
@@ -1231,7 +1226,7 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 			Out.Label = Out.Ship.Name;
 			return true;
 		}
-		if (XpContactNumber(Q) != INDEX_NONE)
+		if (!XpContactKey(Q).IsEmpty())
 		{
 			OutErr = FString::Printf(TEXT("no contact %s on the plot"), *Text);
 			return false;
@@ -1381,7 +1376,7 @@ bool UAstraTransporterSubsystem::MakeRequest(const FAstraXportOrder& O, FAstraXp
 			return false;
 		}
 		const FString Asked = XpNorm(O.From);
-		if (!Asked.IsEmpty() && XpContactNumber(Asked) != INDEX_NONE && From.Kind != EEndKind::Ship)
+		if (!Asked.IsEmpty() && !XpContactKey(Asked).IsEmpty() && From.Kind != EEndKind::Ship)
 		{
 			OutErr = FString::Printf(TEXT("they are not on %s: they are %s"), *O.From, *From.Label);
 			return false;
