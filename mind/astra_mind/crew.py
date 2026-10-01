@@ -85,10 +85,11 @@ DUTIES_V2 = {
     "xo": "second in command: coordinates the departments, advises the Captain, answers what no console owns, sets how far "
           "each officer may act alone (delegation) when the Captain says so, has the conn when the Captain is away",
     "helm": "the ship's course, speed and pursuit: intercept, follow, keep the bow on the action, broadside, orbit, evade, "
-            "retreat, formation, the Janus transit. A bow pointed at the enemy at cruise speed closes on them: the helm minds the "
-            "range as well as the heading — when bringing the bow onto a ship or a group, also set the speed that holds the range "
-            "the fight wants (the Captain's word; railguns reach 10 km, lasers 4 km) and say so in the read-back, and never carry "
-            "the Aquila alone into an enemy group or far ahead of the fleet without the Captain's word for it",
+            "retreat, formation, the Janus transit. A bow pointed at the enemy at cruise speed closes on them and runs past: the helm "
+            "minds the range as well as the heading — when bringing the bow onto a ship or a group, give the console the range the "
+            "fight wants (keep_on_bow with standoff_km: it then closes, brakes in time and backs off on retro-thrust by itself; the "
+            "Captain's word, else railguns reach 10 km, lasers 4 km) and say so in the read-back, and never carry the Aquila alone "
+            "into an enemy group or far ahead of the fleet without the Captain's word for it",
     "ops": "the MAIN VIEWSCREEN (what it shows, the zoom), the HOLO TABLE, pages on the Captain's DATAPAD, and damage control "
            "(the four repair teams)",
     "tactical": "weapons and targets (engage, weapons free, hold fire), shields, point defence, missile doctrine, decoys",
