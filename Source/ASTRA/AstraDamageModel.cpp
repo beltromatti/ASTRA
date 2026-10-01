@@ -918,6 +918,19 @@ void FAstraDamageModel::Step(float Dt)
 		FAstraDmgState& S = KV.Value;
 		S.TeamT = FMath::Max(0.f, S.TeamT - Dt);
 		S.HitAge += Dt;
+		// what is too small to be an incident mends by itself, or the ship would carry every scratch of every battle for good: the plating's sealant closes a
+		// small hole (in about 25 s), the ring reroutes a little lost power (in about 40 s); what the teams are on, or wait for, is left to them
+		if (!S.bGutted)
+		{
+			if (S.Hole > 0.f && S.Hole < DmHoleMin && S.BreachId == 0)
+			{
+				S.Hole = S.Hole - 0.005f * Dt < 0.005f ? 0.f : S.Hole - 0.005f * Dt;
+			}
+			if (S.Power < 1.f && S.Power >= DmPowerMin && S.ConduitId == 0 && S.Wreck < 1.f)
+			{
+				S.Power = FMath::Min(1.f, S.Power + 0.004f * Dt);
+			}
+		}
 		S.Age = S.Calm() ? S.Age + Dt : 0.f;
 		if (S.Age > 3.f)
 		{

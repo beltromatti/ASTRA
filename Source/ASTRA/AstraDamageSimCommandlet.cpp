@@ -657,19 +657,26 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 		const FAstraDamageModel::FBooks& B = W.Ship->GetInterior().Books();
 		DmCheck(TEXT("the open rooms empty their people"), B.Escaped + B.Rescued + B.Killed > 0, FString::Printf(TEXT("in 180 s: %d got out in time, %d were carried out alive, %d died in vacuum (killed so far %d, wounded %d)"), B.Escaped, B.Rescued, Roster.NumKilled() - Killed0, Roster.NumKilled(), Roster.NumWounded()));
 		DmSet(TEXT("astra.damage.fields=1"));
-		// the wounded walk to the Medbay
-		W.Run(240.f, 0.25f);
-		int32 Wounded = 0, InMedbay = 0;
-		for (int32 i = 0; i < Sim.NumPeople(); ++i)
+		// the wounded walk to the Medbay (some have a long way: from the Flight Deck or the stern it is minutes by the lifts and stairs)
+		auto CountWounded = [&Sim](int32& OutWounded, int32& OutSettled, int32& OutSent)
 		{
-			const FAstraLifePerson& P = Sim.Person(i);
-			if (P.Status == 1)
+			OutWounded = OutSettled = OutSent = 0;
+			for (int32 i = 0; i < Sim.NumPeople(); ++i)
 			{
-				++Wounded;
-				InMedbay += (P.Act == EAstraLifeAct::Patient && P.Phase == FAstraLifePerson::EPhase::Settled) ? 1 : 0;
+				const FAstraLifePerson& P = Sim.Person(i);
+				if (P.Status == 1)
+				{
+					++OutWounded;
+					OutSent += P.Act == EAstraLifeAct::Patient ? 1 : 0;
+					OutSettled += (P.Act == EAstraLifeAct::Patient && P.Phase == FAstraLifePerson::EPhase::Settled) ? 1 : 0;
+				}
 			}
-		}
-		DmCheck(TEXT("the wounded reach the Medbay"), Wounded > 0 && InMedbay * 10 >= Wounded * 8, FString::Printf(TEXT("%d of the %d wounded are in the Medbay 4 game minutes after"), InMedbay, Wounded));
+		};
+		W.Run(240.f, 0.25f);
+		int32 Wounded = 0, InMedbay = 0, Sent = 0;
+		CountWounded(Wounded, InMedbay, Sent);
+		DmCheck(TEXT("the wounded reach the Medbay"), Wounded > 0 && Sent == Wounded && InMedbay * 10 >= Wounded * 6,
+		        FString::Printf(TEXT("%d wounded, all sent to the Medbay; %d of them are in it 4 game minutes after (the others are on the way: from the Flight Deck or the stern it is minutes by the lifts and stairs)"), Wounded, InMedbay));
 		// a section the war has gutted takes who lived in it, and only them
 		{
 			int32 InStern = 0, Elsewhere = 0;
@@ -1030,6 +1037,23 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 		UE_LOG(LogASTRA, Display, TEXT("[Damage] survival after the group's arrival (t=180): hull <= 50%% at %.0f s, <= 20%% at %.0f s, <= 5%% at %.0f s, abandon ship at %.0f s (-1: not reached)"), T50, T20, T5, TLost);
 		UE_LOG(LogASTRA, Display, TEXT("[Damage] books: %d blows (%d reached the interior, %.0f energy of %.0f), %d holes, %d fires, %d conduits, %d gutted, %d fields failed, %d bulkheads sealed, %d explosions, %d suppressions; %d killed, %d wounded, %d got out, %d carried out; structure burnt %.0f; most compartments in play %d, most incidents %d"),
 		       B.Hits, B.HitsInside, B.EnergyInside, B.Energy, B.Holes, B.Fires, B.Conduits, B.Wrecks, B.FieldsFailed, B.DoorsSealed, B.Explosions, B.Suppressions, B.Killed, B.Wounded, B.Escaped, B.Rescued, B.StructureBurnt, B.MaxActive, B.MaxIncidents);
+		{
+			// what is still in the books at the end: small holes, partial wrecks, lost power (what the teams do not have an incident for)
+			int32 Small = 0, BigHole = 0, Partial = 0, Lost = 0, Dim = 0, Smoky = 0, Locked = 0, Other = 0;
+			for (const auto& KV : I.States())
+			{
+				const FAstraDmgState& S = KV.Value;
+				Small += (S.Hole >= 0.005f && S.Hole < 0.12f) ? 1 : 0;
+				BigHole += S.Hole >= 0.12f ? 1 : 0;
+				Partial += (S.Wreck > 0.005f && S.Wreck < 1.f) ? 1 : 0;
+				Lost += S.Wreck >= 1.f ? 1 : 0;
+				Dim += S.Power < 0.995f ? 1 : 0;
+				Smoky += (S.Smoke >= 0.02f || S.Fire >= 0.02f) ? 1 : 0;
+				Locked += S.bLocked ? 1 : 0;
+				Other += (S.People.Num() > 0 || S.Air < 0.995f) ? 1 : 0;
+			}
+			UE_LOG(LogASTRA, Display, TEXT("[Damage] left in the books: %s | small holes %d, big holes %d, partial wrecks %d, lost %d, short of power %d, smoke or fire %d, locked down %d, short of air or with people exposed %d"), *I.InfoText(), Small, BigHole, Partial, Lost, Dim, Smoky, Locked, Other);
+		}
 		UE_LOG(LogASTRA, Display, TEXT("[Damage] people: %d of the %d blows that reached the interior crossed a room with someone in it; %d people were in the rooms they crossed"), B.OccupiedBlows, B.HitsInside, B.PeopleNear);
 		UE_LOG(LogASTRA, Display, TEXT("[Damage] cost: the whole world tick %.3f ms on average, %.1f ms at worst (%lld ticks, %.0f s of battle in %.0f s)"), CostN ? CostSum / CostN : 0.0, CostMax, CostN, W.Battle->GetBattleTime() - 170.f, FPlatformTime::Seconds() - BattleWall0);
 		TSharedRef<FJsonObject> Sv = MakeShared<FJsonObject>();
