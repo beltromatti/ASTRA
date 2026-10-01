@@ -4,8 +4,10 @@
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
 #include "AstraStations.h"
+#include "GameFramework/Pawn.h"
 #include "AstraMindSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "CanvasItem.h"
@@ -1549,17 +1551,100 @@ void UAstraScreensSubsystem::DrawPadDamage(UCanvas* C, int32 W, int32 H)
 	const TArray<FAstraDamage>& Dmg = Ship->GetDamage();
 	int32 Busy = 0;
 	for (const FAstraDamage& D : Dmg) { Busy += D.Team >= 0 ? 1 : 0; }
-	P.Line(MX, 120, RX, 120, DIM);
-	P.Text(MX, 128, TEXT("INCIDENTS"), false, 18, CYAN);
-	P.Text(RX, 130, FString::Printf(TEXT("%d OPEN  ·  %d OF %d DAMAGE-CONTROL TEAMS OUT"), Dmg.Num(), Busy, Ship->GetNumDamageTeams()), true, 16, Dmg.Num() ? AMBER : GREEN, 2);
+	// the ship in cutaway, as on the holo table: a row per deck (the bridge on its island), sections A-H, the damage where it is
+	float ListTop = 160.f;
+	const UAstraShipPlan* Plan = GetWorld()->GetSubsystem<UAstraShipPlan>();
+	if (Plan && Plan->GetDecks().Num() > 0)
+	{
+		const TArray<FAstraPlanDeck>& Decks = Plan->GetDecks();
+		float X0 = 1e9f, X1 = -1e9f;
+		for (const FAstraPlanDeck& D : Decks)
+		{
+			for (const FAstraPlanDeck::FSection& Se : D.Sections) { X0 = FMath::Min(X0, Se.X0); X1 = FMath::Max(X1, Se.X1); }
+		}
+		const float CL = MX + 34.f, CR = RX - 6.f, CT = 112.f, Row = 10.f;   // the bow to the right
+		const float Sx = (CR - CL) / FMath::Max(1.f, X1 - X0);
+		auto RowY = [&](int32 Deck) { return CT + Row * (Deck == 1 ? 0.f : Deck - 0.f); };   // the bridge a row above Deck 2
+		auto PX = [&](float X) { return CL + (X - X0) * Sx; };
+		const float Pulse = 0.55f + 0.45f * FMath::Sin(Time * 6.f);
+		for (const FAstraPlanDeck& D : Decks)
+		{
+			const float Y = RowY(D.Id);
+			P.Text(MX, Y - 2.f, D.Id == 1 ? FString(TEXT("BRG")) : FString::Printf(TEXT("%2d"), D.Id), true, 11, DIM);
+			for (const FAstraPlanDeck::FSection& Se : D.Sections)
+			{
+				if (Se.Id.IsEmpty())
+				{
+					continue;
+				}
+				int32 Worst = 0;
+				FLinearColor Col = CYAN * 0.32f;
+				for (const FAstraDamage& X : Dmg)
+				{
+					const int32 Sev = X.Kind.Contains(TEXT("breach")) ? 3 : (X.Kind.Contains(TEXT("fire")) ? 2 : 1);
+					if (X.Deck == D.Id && X.Section == Se.Id[0] && Sev > Worst)
+					{
+						Worst = Sev;
+						Col = (Sev == 3 ? RED : (Sev == 2 ? AMBER : YELLOW)) * Pulse;
+					}
+				}
+				Col.A = 1.f;
+				P.Rect(PX(Se.X0) + 1.f, Y, FMath::Max(1.f, (Se.X1 - Se.X0) * Sx - 2.f), Row - 3.f, Col);
+			}
+		}
+		if (const FAstraPlanDeck* Top = Decks.FindByPredicate([](const FAstraPlanDeck& X) { return X.Id == 2; }))
+		{
+			for (const FAstraPlanDeck::FSection& Se : Top->Sections)
+			{
+				P.Text(PX(0.5f * (Se.X0 + Se.X1)) - 4.f, CT - 1.f + Row * 0.f - 12.f, Se.Id, true, 11, DIM);
+			}
+		}
+		// the damage-control teams (from their station on Deck 6) and the Captain
+		auto SecX = [&](int32 Deck, TCHAR Sec, float& Out)
+		{
+			const FAstraPlanDeck* D = Decks.FindByPredicate([Deck](const FAstraPlanDeck& X) { return X.Id == Deck; });
+			const FAstraPlanDeck::FSection* Se = D ? D->Sections.FindByPredicate([Sec](const FAstraPlanDeck::FSection& X) { return X.Id.Len() > 0 && X.Id[0] == Sec; }) : nullptr;
+			if (Se) { Out = PX(0.5f * (Se->X0 + Se->X1)); }
+			return Se != nullptr;
+		};
+		float StX = 0.f;
+		const bool bSt = SecX(6, TEXT('D'), StX);
+		for (const FAstraDamage& X : Dmg)
+		{
+			float IX = 0.f;
+			if (X.Team < 0 || !bSt || !SecX(X.Deck, X.Section, IX))
+			{
+				continue;
+			}
+			const float K = X.Travel0 > 0.f ? FMath::Clamp(1.f - X.Travel / X.Travel0, 0.f, 1.f) : 1.f;
+			const float TX = FMath::Lerp(StX, IX, K), TY = FMath::Lerp(RowY(6), RowY(X.Deck), K) + 1.5f;
+			P.Rect(TX - 2.5f, TY, 5.f, 5.f, TEXTC);
+		}
+		if (const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0))
+		{
+			const FVector L = Pawn->GetActorLocation();
+			const int32 Deck = Plan->DeckAt(L);
+			if (Deck > 0)
+			{
+				const float CX = PX(L.X), CY = RowY(Deck);
+				P.Frame(CX - 4.f, CY - 2.f, 8.f, Row + 1.f, GREEN, 2.f);
+				P.Text(CX + 7.f, CY - 3.f, TEXT("YOU"), true, 11, GREEN);
+			}
+		}
+		ListTop = CT + Row * 13.f + 50.f;
+	}
+	P.Line(MX, ListTop - 40.f, RX, ListTop - 40.f, DIM);
+	P.Text(MX, ListTop - 32.f, TEXT("INCIDENTS"), false, 18, CYAN);
+	P.Text(RX, ListTop - 30.f, FString::Printf(TEXT("%d OPEN  ·  %d OF %d DAMAGE-CONTROL TEAMS OUT"), Dmg.Num(), Busy, Ship->GetNumDamageTeams()), true, 16, Dmg.Num() ? AMBER : GREEN, 2);
 	if (Dmg.Num() == 0)
 	{
-		P.Text(MX, 162, TEXT("NONE  ·  ALL DECKS PRESSURIZED"), true, 18, GREEN);
+		P.Text(MX, ListTop + 2.f, TEXT("NONE  ·  ALL DECKS PRESSURIZED"), true, 18, GREEN);
 	}
-	for (int32 i = 0; i < FMath::Min(Dmg.Num(), 12); ++i)
+	const int32 MaxRows = FMath::Max(3, FMath::FloorToInt((490.f - ListTop) / 27.f));
+	for (int32 i = 0; i < FMath::Min(Dmg.Num(), MaxRows); ++i)
 	{
 		const FAstraDamage& D = Dmg[i];
-		const float Y = 160.f + i * 27.f;
+		const float Y = ListTop + i * 27.f;
 		const FLinearColor KC = D.Kind.Contains(TEXT("breach")) ? RED : (D.Kind.Contains(TEXT("fire")) ? AMBER : YELLOW);
 		P.Text(MX, Y, FString::Printf(TEXT("DECK %2d  %c"), D.Deck, D.Section), true, 17, TEXTC);
 		P.Text(MX + 130, Y, (D.Kind + (D.System.IsEmpty() ? FString() : FString::Printf(TEXT(" (%s)"), *D.System))).ToUpper().Left(40), true, 17, KC);
@@ -1567,9 +1652,9 @@ void UAstraScreensSubsystem::DrawPadDamage(UCanvas* C, int32 W, int32 H)
 		                                                                              : FString::Printf(TEXT("TEAM %d  %.0f %%"), D.Team + 1, 100.f * D.Progress));
 		P.Text(RX, Y, Team, true, 17, D.Team < 0 ? RED : (D.Travel > 0.f ? AMBER : GREEN), 2);
 	}
-	if (Dmg.Num() > 12)
+	if (Dmg.Num() > MaxRows)
 	{
-		P.Text(RX, 160 + 12 * 27, FString::Printf(TEXT("+%d MORE"), Dmg.Num() - 12), true, 14, DIM, 2);
+		P.Text(RX, ListTop + MaxRows * 27, FString::Printf(TEXT("+%d MORE"), Dmg.Num() - MaxRows), true, 14, DIM, 2);
 	}
 	P.Line(MX, 500, RX, 500, DIM);
 	P.Text(MX, 508, TEXT("CASUALTIES"), false, 18, CYAN);
