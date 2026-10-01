@@ -17,6 +17,10 @@ class UMaterialInstanceDynamic;
 class UPointLightComponent;
 class UStaticMesh;
 class USoundBase;
+class UAstraWarFX;
+struct FAstraWarFXTest;
+enum class EAstraFxFlash : uint8;
+enum class EAstraFxShot : uint8;
 
 UENUM()
 enum class EAstraSide : uint8
@@ -201,6 +205,7 @@ struct FAstraProjectile
 	EAstraHitKind HitKind = EAstraHitKind::Missile;   // what it does on impact (the damage type follows)
 	int8 OwnerSide = -1;                 // the side that fired it (0 ASTRA, 1 Mandate)
 	bool bDecoyChecked = false;          // a missile coming at the Aquila meets her decoys once, on its terminal run
+	int32 FxSlot = -1;                   // what the visual effects keep of it (its trail, where it was drawn from): UAstraWarFX
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Trail = nullptr;   // guided weapons: the exhaust streak behind
 };
@@ -361,6 +366,9 @@ UCLASS()
 class ASTRA_API UAstraBattleSubsystem : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
+
+	friend class UAstraWarFX;            // the war's visual effects read the battle's state (AstraWarFX*.cpp)
+	friend struct FAstraWarFXTest;       // and the console that tries them (astra.fx.*)
 
 public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
@@ -868,8 +876,15 @@ private:
 	void BreakCeasefire(const FAstraBattleShip& Victim);
 	/** The Mandate commander's ship is gone (destroyed or jumped out): the next captain in line takes over and calls. */
 	void OnCommanderLost(const FAstraBattleShip& Old, const TCHAR* How);
+	void AddFlash(const FVector& Pos, float Size, float Life, const FLinearColor& Color, float Intensity, EAstraFxFlash Kind);
 	void AddFlash(const FVector& Pos, float Size, float Life, const FLinearColor& Color, float Intensity);
+	/** A beam or a tracer line (what it is, and the ships at its ends so that it rides on them while it lives). */
+	void AddBeam(const FVector& A, const FVector& B, float Life, const FLinearColor& Color, EAstraFxShot Kind, int32 FromId = -1, int32 ToId = -1);
 	void AddBeam(const FVector& A, const FVector& B, float Life, const FLinearColor& Color);
+	/** The war's visual effects (AstraWarFX.cpp): the shots, the flashes, the shields, the explosions and the broken hulls are drawn by it
+	 *  once its materials are in the project (tools/ue_scripts/make_war_fx.py); until then the older drawing below stands. */
+	UPROPERTY() TObjectPtr<UAstraWarFX> WarFX;
+	bool FxOn() const;
 	void Explode(FAstraBattleShip& S);    // secondary blasts, shockwave, debris, and the hulk left behind
 	void TickWrecks(float Dt);
 	/** Our own guns and launchers, felt through the hull (rate-limited per sound). */

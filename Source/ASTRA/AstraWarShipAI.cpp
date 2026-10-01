@@ -5,6 +5,7 @@
 // (OrderTarget, Stance, salvo, conserve), which the group respects.
 
 #include "AstraBattleSubsystem.h"
+#include "AstraWarFX.h"
 #include "AstraWarClasses.h"
 #include "AstraWarAI.h"
 #include "ASTRA.h"
@@ -573,7 +574,7 @@ void UAstraBattleSubsystem::TickPointDefence(FAstraBattleShip& S)
 		FAstraProjectile& Pr = Projectiles[C.Idx];
 		--Channels;
 		S.PDT = 0.5f;
-		AddBeam(S.Pos + (Pr.Pos - S.Pos).GetSafeNormal() * S.Radius * 0.6, Pr.Pos, 0.12f, FLinearColor(1.f, 0.85f, 0.5f));
+		AddBeam(S.Pos + (Pr.Pos - S.Pos).GetSafeNormal() * S.Radius * 0.6, Pr.Pos, 0.12f, FLinearColor(1.f, 0.85f, 0.5f), EAstraFxShot::PointDefence, S.Id);
 		if (S.bPlayer)
 		{
 			HullSound(TEXT("SW_PD_Burst"), 0.4f, 0.6f);
@@ -585,7 +586,7 @@ void UAstraBattleSubsystem::TickPointDefence(FAstraBattleShip& S)
 			{
 				++Stats.MissilesShot[Pr.OwnerSide];
 			}
-			AddFlash(Pr.Pos, 25.f, 0.6f, FLinearColor(1.f, 0.7f, 0.35f), 60.f);
+			AddFlash(Pr.Pos, 25.f, 0.6f, FLinearColor(1.f, 0.7f, 0.35f), 60.f, EAstraFxFlash::Flak);
 			if (S.bPlayer)
 			{
 				Report(TEXT("tactical: point defense splashed an incoming missile"), false);
@@ -616,7 +617,7 @@ void UAstraBattleSubsystem::TickPointDefence(FAstraBattleShip& S)
 			FAstraBattleShip& C = Ships[K.Idx];
 			--Channels;
 			S.PDT = 0.5f;
-			AddBeam(S.Pos + (C.Pos - S.Pos).GetSafeNormal() * S.Radius * 0.6, C.Pos, 0.1f, FLinearColor(1.f, 0.6f, 0.3f));
+			AddBeam(S.Pos + (C.Pos - S.Pos).GetSafeNormal() * S.Radius * 0.6, C.Pos, 0.1f, FLinearColor(1.f, 0.6f, 0.3f), EAstraFxShot::PointDefence, S.Id);
 			if (C.bPiloted)
 			{
 				if (FMath::FRand() < 0.22f)
