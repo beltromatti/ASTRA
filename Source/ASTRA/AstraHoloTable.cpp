@@ -494,8 +494,7 @@ bool AAstraHoloTable::TickScannedShip(float DeltaTime, const FVector& ViewerLoca
 	{
 		return false;
 	}
-	TArray<UAstraBattleSubsystem::FContactView> Cs;
-	Battle->GetContacts(Cs);
+	const TArray<UAstraBattleSubsystem::FContactView>& Cs = Battle->Contacts();    // (the battle's list for this step, shared: not copied every frame)
 	const UAstraBattleSubsystem::FContactView* C = Cs.FindByPredicate([&Id](const UAstraBattleSubsystem::FContactView& X) { return X.ContactId == Id; });
 	// a diagram of her, side on to the viewer and the bow to their right, like the Aquila's cutaway: three sections between
 	// the true cuts of her break-up pieces, a hull a fifth as tall as long, her six shield faces round it

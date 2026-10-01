@@ -41,7 +41,7 @@ componente.
 | `Source/ASTRA/AstraWarPerf.cpp` | `astra.war.stat` e `astra.war.perf`: cosa tiene e cosa costa la guerra nel gioco vero |
 | `Source/ASTRA/AstraWarSimCommandlet.cpp`, `tools/war.py` | il banco: `--aquila`, `--aquila-opts`, `--holo-at`; nel record `stats.draw` e `stats.plot` |
 | `tools/art/holo_plan_preview.py` | disegna il piano del tavolo da un record del banco e controlla sovrapposizioni (etichetta su etichetta, etichetta su icona) |
-| `tools/ue_scripts/make_scala_materials.py` | da eseguire **una volta** nell'editor: marca i materiali degli scafi dei velivoli "Used with Instanced Static Meshes" (§4.3) |
+| `tools/ue_scripts/make_scala_materials.py` | da eseguire **una volta** nell'editor: marca i materiali degli scafi dei velivoli "Used with Instanced Static Meshes" (§4) |
 | `data/war/scenarios/fleet_battle.json` | la battaglia di flotta da campagna con rinforzi (§9) |
 | `docs/progressi/scala/` | immagini del piano del tavolo sulla battaglia di flotta e sulla scala |
 
@@ -50,6 +50,9 @@ velocità degli effetti seguono l'Aquila quando è viva in una sandbox (prima la
 attorno all'origine era "lontano" per gli effetti).
 
 ## 3. I velivoli a istanze (`UAstraWarDraw`)
+
+*(I missili, i dardi e i traccianti sono già istanze degli effetti di VFX: con `FxOn()` la battaglia non crea più i vecchi attori dei proiettili.
+Qui restano gli scafi dei velivoli e le luci.)*
 
 **Niente attore, niente componente, niente tick per velivolo.** Un velivolo è una riga della simulazione (`FAstraBattleShip`); al
 `SpawnVisual` la battaglia chiede a `UAstraWarDraw::Claim` se lo disegna lei. Se sì (`DrawKind >= 0`) non si crea nessun attore, e la nave
@@ -224,9 +227,9 @@ tools/war.py run --scenario fleet_battle --seconds 900 [--aquila-opts "at=-34,0,
   a 560 s): **fino a 71 navi e 137 velivoli insieme**, più di 800 s di azione (seme 1: l'Aquila a fine prova al 76 %, 38 navi ASTRA e 28 del Mandato
   vive, 160 velivoli del Mandato lanciati e 102 ASTRA). La classe delle navi non ha altra portaerei ASTRA che l'Aquila: il suo stormo parte da lei e
   le due Praetorian ospitano ali (una licenza del banco).
-- **L'Aquila all'origine in `scale_30x150` muore a 90 s circa** (seme 1–4, uguale): è sola tra le due flotte e tutti i bombardieri (30 siluri)
-  vanno su di lei. È la misura del brief (il lead misura a 90 s dal lancio, poco prima), ma per un tratto di misura lungo conviene `at=-34,0,0`
-  (regge 400 s) o `fleet_battle`.
+- **L'Aquila all'origine in `scale_30x150` muore a 90 s circa** (semi 1–4, tutti uguali: scafo al 90 % a 60 s, a zero a 91 s): è ferma e sola tra
+  le due flotte, e i velivoli d'attacco del Mandato la prendono di mira appena lanciati. È la misura del brief (il lead misura a 90 s dal lancio,
+  poco prima), ma per un tratto di misura lungo conviene `at=-34,0,0` (regge 400 s) o `fleet_battle`.
 
 ## 10. Misure (offline: il banco senza grafica)
 
@@ -289,6 +292,9 @@ Tarature (cvar):
   toccato (è un gusto del lead e fuori dal modulo), ma se la GPU o la memoria restano oltre il budget è il primo posto dove guardare:
   `astra.war.stat` conta le decalcomanie.
 - **Gli scafi delle navi capitali restano attori** (30–70): sono pochi, e VFX li usa.
+- **Oltre 80 km lo scafo di un velivolo non si disegna** (`astra.war.draw.hull_km`): a occhio nudo è un quarto di pixel; sullo schermo principale
+  zoomato su un bersaglio lontano un velivolo oltre quella portata comparirebbe all'improvviso. I sensori dell'Aquila non vanno oltre i 55–60 km,
+  quindi di norma non succede; se serve, si alza il cvar.
 - **Simulazione identica, non più veloce**: il modulo non l'ha toccata; il suo costo (0,1–0,3 ms) era già piccolo.
 - **Il banco non vede le prestazioni di render**: la sua misura è il costo CPU del piano, delle liste e della preparazione delle istanze.
 - **L'Aquila all'origine tra le due flotte muore a 90 s** (§9); la misura del brief va fatta prima, oppure con `at=`.
