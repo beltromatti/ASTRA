@@ -288,6 +288,13 @@ struct FAstraWarFXTest
 			{
 				UE_LOG(LogASTRA, Warning, TEXT("[WarFX] swatch: the effects are not drawing (materials missing? run tools/ue_scripts/make_war_fx.py)"));
 			}
+			else if (SwatchT > 0.f)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("[WarFX] swatch for %.0f s, 1.2 km ahead of the bridge, eight columns 200 m apart, left to right. Above: ASTRA ball, white flash, Mandate flash, "
+				                               "Mandate flare, blast-wave ring, Mandate ball, ASTRA laser flash, Mandate laser flash. At eye level: ASTRA slug, Mandate slug, spark, "
+				                               "missile with its trail, ASTRA laser, Mandate laser, ASTRA cannon tracer, point-defence tracer. Below: ASTRA plume, Mandate plume, cold chunk, "
+				                               "hot chunk, two fireballs, a dark and a pale smoke (thrown every 3.4 s)"), SwatchT);
+			}
 		}
 		else if (Name == TEXT("burn"))
 		{
