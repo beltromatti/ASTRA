@@ -18,6 +18,8 @@ class UPointLightComponent;
 class UStaticMesh;
 class USoundBase;
 class UAstraWarFX;
+class UAstraWarDraw;
+class UPrimitiveComponent;
 struct FAstraWarFXTest;
 enum class EAstraFxFlash : uint8;
 enum class EAstraFxShot : uint8;
@@ -131,6 +133,11 @@ struct FAstraBattleShip
 	mutable FString CvLabel, CvClass;
 	mutable uint8 CvKey = 255;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
+	// how the war draws it (AstraWarDraw.cpp): a craft with DrawKind >= 0 is an instance of that kind of hull and has no actor; bDrawLamps: its running lights
+	// are instances of the lamp set LampSet (and it has no running-light component)
+	int16 DrawKind = -1;
+	int16 LampSet = -1;
+	bool bDrawLamps = false;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> ShieldBubble = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> DriveFlare = nullptr;   // engine plume, kept visible at long range
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> ShieldMID = nullptr;
@@ -310,6 +317,9 @@ struct FAstraHoloBlip
 	bool bTargeted = false;                 // our fire control is on it
 	bool bCraft = false;                    // fighter / bomber / drone
 	bool bNoLabel = false;                  // only a flight group's leader is labelled
+	bool bFiringAtUs = false;               // its guns or its commander's orders are on the Aquila
+	int32 Id = -1;                          // the ship's id (the battle's; the plot's own tags and groupings are made from these)
+	int32 Squadron = -1;                    // a craft's flight group (index in the battle's squadrons)
 	float Size = 1.f;                       // 1 capital, ~0.7 escort, ~0.55 small
 	float Fade = 1.f;
 	float RangeKm = 0.f;
@@ -368,6 +378,7 @@ class ASTRA_API UAstraBattleSubsystem : public UTickableWorldSubsystem
 	GENERATED_BODY()
 
 	friend class UAstraWarFX;            // the war's visual effects read the battle's state (AstraWarFX*.cpp)
+	friend class UAstraWarDraw;          // and so does the instanced drawing of its craft and lamps (AstraWarDraw.cpp)
 	friend struct FAstraWarFXTest;       // and the console that tries them (astra.fx.*)
 
 public:
@@ -440,6 +451,13 @@ public:
 	void AquilaBlasts(const FVector& HullCentreW, const FVector& HullExtentW);
 	/** After the loss, when the story moves on (hours, days): the fight stops where it was, no more reports. */
 	void Freeze() { bFrozen = true; }
+	/** The main viewscreen tells the drawing that its camera is zoomed far out on a target: our own craft nearer than WithinKm to the Aquila would cross its lens
+	 *  as huge blurred shapes, so they are drawn in a set the camera is told to leave out (ExemptId, the craft it is showing, is not). */
+	void SetLensHint(bool bActive, double WithinKm, int32 ExemptId);
+	void GetNearLensComponents(TArray<UPrimitiveComponent*>& Out) const;
+	/** What the instanced drawing of the craft and the lamps holds and costs (astra.war.stat), as text and as JSON for the bench's record. */
+	FString DrawStats() const;
+	TSharedRef<FJsonObject> DrawStatsJson() const;
 	/** Battle scars: a burn (and, for a heavy hit, a breach) painted where a hit landed on a hull; hot at first, cooling. */
 	struct FAstraScar
 	{
@@ -534,8 +552,26 @@ public:
 		const AStaticMeshActor* Actor = nullptr;   // what the optical sensors see of it (firm tracks only)
 		AStaticMeshActor* Flare = nullptr;         // its drive plume, sized to be seen from the bridge (not through a zoom)
 	};
-	/** Every contact on the Aquila's plot (not the Aquila herself), nearest first. */
+	/** Every contact on the Aquila's plot (not the Aquila herself), nearest first: a copy of the shared list below, for a caller that keeps or changes its own. */
 	void GetContacts(TArray<FContactView>& Out) const;
+	/** The plot as the Aquila knows it, built once for each step of the battle and shared by everyone who reads it within that step (a dozen readers a frame: the stations'
+	 *  executors, the screens, the holo table, the main viewscreen, the HUDs; with two hundred contacts each used to make its own list). The references hold until the
+	 *  battle's next tick: never keep one. (AstraBattleQueries.cpp, AstraBattleSubsystem.cpp) */
+	const TArray<FContactView>& Contacts() const;
+	/** What the tactical plot draws (ships, craft, missiles, blasts), shared in the same way. */
+	const TArray<FAstraHoloBlip>& HoloBlips() const;
+	/** What the plot holds, counted when its lists are made: the screens' headlines (ships by side, craft by side, missiles in flight). */
+	struct FPlotCounts
+	{
+		int32 HostileShips = 0, FriendlyShips = 0, HostileCraft = 0, FriendlyCraft = 0, Missiles = 0;
+	};
+	const FPlotCounts& PlotCounts() const;
+	/** What the shared lists cost (astra.war.stat): builds and reads since the start, and the time the builds took. */
+	FString PlotStats() const;
+	/** The shared lists are made again for the next reader (the bench uses it to time a build; the end of every battle tick does it already). */
+	void InvalidatePlot() { ++PlotStamp; }
+	/** What a battle tick costs the game thread, since the last report (astra.war.perf): the simulation, moving the hulls, the instanced drawing, the effects. */
+	FString PerfReport(bool bReset);
 	/** The physical state of one warship as the Aquila can know it (AstraWarDamage.cpp), for the visuals and the crew.
 	 *  Detail 0: nothing known (returns false) · 1: what the eye sees (gutted, burning, venting, breaking up, disabled) ·
 	 *  2: + structure by section, armour plates, shield sectors (a firm, classified track) · 3: everything, systems and
@@ -614,7 +650,7 @@ public:
 	bool IsScenarioOver() const { return bScenarioOver; }
 
 	/** The campaign: nothing moves until the Captain chooses (new campaign, or continue a saved one). */
-	void StartCampaign() { bStarted = true; }
+	void StartCampaign();
 	bool IsStarted() const { return bStarted; }
 	/** What a save keeps of the battle side: the Aquila's hull and magazines, her flight groups. */
 	TSharedRef<FJsonObject> SaveJson() const;
@@ -691,6 +727,22 @@ private:
 	FVector BridgeOffset = FVector(172.0, 0.0, 62.0);
 
 	float Time = 0.f;
+	// the shared plot (AstraBattleQueries.cpp): the lists are rebuilt when the stamp moves (the end of each tick, a ship added, a system cleared)
+	uint32 PlotStamp = 1;
+	mutable TArray<FContactView> ContactsCache;
+	mutable TArray<FAstraHoloBlip> BlipsCache;
+	mutable FPlotCounts CountsCache;
+	mutable uint32 ContactsBuiltAt = 0, BlipsBuiltAt = 0;
+	mutable int32 ContactBuilds = 0, ContactReads = 0, BlipBuilds = 0, BlipReads = 0;
+	mutable double ContactMs = 0.0, BlipMs = 0.0;
+	struct FPerfWindow
+	{
+		double Sim = 0.0, Sync = 0.0, Draw = 0.0, Fx = 0.0, Total = 0.0, TotalMax = 0.0;
+		int32 Frames = 0;
+	};
+	FPerfWindow PerfWin;
+	void BuildContacts(TArray<FContactView>& Out) const;
+	void BuildHoloBlips(TArray<FAstraHoloBlip>& Out, FPlotCounts& Counts) const;
 	bool bPlayerTracked = true;
 	bool bPlayerEverTracked = false;   // since hostiles appeared: "lost" needs a track first
 	float PlayerTrackT = 0.f;
@@ -847,7 +899,22 @@ private:
 	int32 SpawnByKey(FName Key, EAstraSide Side, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);
 	/** A flight group aboard a carrier (kind 0 fighter, 1 bomber, 2 drone), launching after Delay seconds; its index. */
 	int32 AddWing(int32 CarrierIdx, int32 Kind, int32 Count, const FString& Mission, float Delay);
-	bool LoadScenario(const FString& Name, FString& OutDetail, bool bWithAquila = false);
+	bool LoadScenario(const FString& Name, FString& OutDetail, bool bWithAquila = false, const TArray<FString>& Options = TArray<FString>());
+	/** One group of a scenario file made (its ships in formation, its wings, a battle group for them): at the start, or as a wave. Its group id (INDEX_NONE: no ships). */
+	int32 SpawnScenarioGroup(const TSharedPtr<FJsonObject>& G, EAstraSide Side, int32 SideIdx, bool bRotated, int32& Spawned, int32& Wings, FString& OutName, FString& OutProtects);
+	/** The "wings" of a group (or of the Aquila): each is a flight group aboard the ship of Made that its "carrier" index names. How many were made. */
+	int32 AddScenarioWings(const TArray<TSharedPtr<FJsonValue>>& List, const TArray<int32>& Made);
+	/** A wave of a scenario file (reinforcements: "waves", in a file of data/war/scenarios): a group that arrives when its time comes. */
+	struct FScenarioWave
+	{
+		float At = 0.f;
+		TSharedPtr<FJsonObject> Group;
+		EAstraSide Side = EAstraSide::Astra;
+		bool bDone = false;
+	};
+	TArray<FScenarioWave> ScenarioWaves;
+	int32 ScenarioCounter[2] = {1, 1};         // the next contact number of each side's scenario ships
+	void TickScenarioWaves();
 
 	// --- the physical model (AstraWarDamage.cpp)
 	void InitShipModel(FAstraBattleShip& S);
@@ -885,6 +952,8 @@ private:
 	 *  once its materials are in the project (tools/ue_scripts/make_war_fx.py); until then the older drawing below stands. */
 	UPROPERTY() TObjectPtr<UAstraWarFX> WarFX;
 	bool FxOn() const;
+	/** The craft and the lamps as instances (AstraWarDraw.cpp): a craft it claims at SpawnVisual has no actor, and no ship it draws the lamps of has a running-light component. */
+	UPROPERTY() TObjectPtr<UAstraWarDraw> WarDraw;
 	void Explode(FAstraBattleShip& S);    // secondary blasts, shockwave, debris, and the hulk left behind
 	void TickWrecks(float Dt);
 	/** Our own guns and launchers, felt through the hull (rate-limited per sound). */

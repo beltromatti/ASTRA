@@ -127,8 +127,7 @@ void FAstraWindowHud::Tick(APlayerController* PC, float DeltaTime)
 	const FString Engaged = St ? St->ActionTarget() : FString();
 	const UAstraShipSubsystem* Ship = W->GetSubsystem<UAstraShipSubsystem>();
 	const bool bScreenOn = !Ship || !Ship->GetViewscreenDescription().StartsWith(TEXT("off"));
-	TArray<UAstraBattleSubsystem::FContactView> Cs;
-	B->GetContacts(Cs);
+	const TArray<UAstraBattleSubsystem::FContactView>& Cs = B->Contacts();
 	const float Fov = FMath::DegreesToRadians(Cam->GetFOVAngle());
 	for (const UAstraBattleSubsystem::FContactView& C : Cs)
 	{

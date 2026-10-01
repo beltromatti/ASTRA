@@ -6,8 +6,10 @@
 #include "AstraDamageModel.h"
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
+#include "AstraWarDraw.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/Pawn.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
@@ -20,6 +22,9 @@ DECLARE_CYCLE_STAT(TEXT("Holo table"), STAT_AstraHolo, STATGROUP_Astra);
 
 namespace
 {
+	TAutoConsoleVariable<float> CVarHoloDots(TEXT("astra.holo.dots"), 1.f,
+		TEXT("Strength of the craft and missile dots on the tactical table (they are instances of the war's glow, M_WAR_Glow, not the table's own material: 1 as made, 0 off)"));
+
 	// a label's text, colour and size, set only when they change: each of UTextRenderComponent's setters makes its render proxy again (new
 	// vertex buffers on the render thread, 3 ms a frame with the table's dozens of labels set every frame)
 	void HoloSetText(UTextRenderComponent* T, const FString& S)
@@ -317,6 +322,13 @@ void AAstraHoloTable::HideTactical()
 	{
 		HideTextFrom(*Pool, 0);
 	}
+	if (DotLayer.IsValid())
+	{
+		if (UInstancedStaticMeshComponent* C = DotLayer->Comp.Get(); C && C->IsVisible())
+		{
+			C->SetVisibility(false);                 // (the craft's and the missiles' dots)
+		}
+	}
 }
 
 void AAstraHoloTable::PlaceLine(UStaticMeshComponent* L, const FVector& A, const FVector& B, float Thickness, const FLinearColor& Color, float Intensity)
@@ -483,8 +495,7 @@ bool AAstraHoloTable::TickScannedShip(float DeltaTime, const FVector& ViewerLoca
 	{
 		return false;
 	}
-	TArray<UAstraBattleSubsystem::FContactView> Cs;
-	Battle->GetContacts(Cs);
+	const TArray<UAstraBattleSubsystem::FContactView>& Cs = Battle->Contacts();    // (the battle's list for this step, shared: not copied every frame)
 	const UAstraBattleSubsystem::FContactView* C = Cs.FindByPredicate([&Id](const UAstraBattleSubsystem::FContactView& X) { return X.ContactId == Id; });
 	// a diagram of her, side on to the viewer and the bow to their right, like the Aquila's cutaway: three sections between
 	// the true cuts of her break-up pieces, a hull a fifth as tall as long, her six shield faces round it
@@ -894,14 +905,50 @@ void AAstraHoloTable::TickShip(float DeltaTime, const FVector& ViewerLocal, floa
 	HideTextFrom(ShipLabels, NT);
 }
 
+
+UStaticMeshComponent* AAstraHoloTable::PooledQuiet(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index, UStaticMesh* Mesh)
+{
+	// (as Pooled, but it leaves the visibility to the caller: a component that is shown and then hidden in the same frame — a stem too short to see — was making
+	// its render state again twice a frame, every frame)
+	while (Pool.Num() <= Index)
+	{
+		UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
+		C->SetupAttachment(PlotFrame.Get());
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCastShadow(false);
+		C->SetMobility(EComponentMobility::Movable);
+		C->RegisterComponent();
+		C->SetStaticMesh(Mesh);
+		C->CreateDynamicMaterialInstance(0, HoloMat);
+		C->SetVisibility(false);
+		Pool.Add(C);
+	}
+	UStaticMeshComponent* C = Pool[Index];
+	if (C->GetStaticMesh() != Mesh)
+	{
+		C->SetStaticMesh(Mesh);
+		if (!Cast<UMaterialInstanceDynamic>(C->GetMaterial(0)))
+		{
+			C->CreateDynamicMaterialInstance(0, HoloMat);
+		}
+	}
+	return C;
+}
+
 void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, float Fade)
 {
 	const UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
-	TArray<FAstraHoloBlip> Blips;
-	if (Battle)
+	static const TArray<FAstraHoloBlip> NoBlips;
+	const TArray<FAstraHoloBlip>& Blips = Battle ? Battle->HoloBlips() : NoBlips;   // (the battle's own list for this step, shared: not made again here)
+
+	// a crowd (a fleet battle: two hundred contacts) is plotted thirty times a second, not every frame: nothing on a table moves, in a thirtieth of a second, that an eye could tell
+	TacticalDt += DeltaTime;
+	if (Blips.Num() > 80 && TacticalDt < 1.f / 30.f - 0.003f)
 	{
-		Battle->GetHoloBlips(Blips);
+		return;
 	}
+	const float Dt = TacticalDt;
+	TacticalDt = 0.f;
 
 	// zoom to keep every ship that matters on the table (up to 160 km)
 	float Far = 4.f;
@@ -921,7 +968,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			break;
 		}
 	}
-	RangeKm = FMath::Exp(FMath::FInterpTo(FMath::Loge(RangeKm), FMath::Loge(TargetRangeKm), DeltaTime, 1.8f));
+	RangeKm = FMath::Exp(FMath::FInterpTo(FMath::Loge(RangeKm), FMath::Loge(TargetRangeKm), Dt, 1.8f));
 
 	// range rings: the plotted range, half and quarter
 	for (int32 i = 0; i < 3; ++i)
@@ -942,157 +989,223 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 
 	TickBearings(Battle, ViewerLocal, Fade);
 
-	int32 NI = 0, NL = 0, ND = 0, NB = 0, NS = 0;
-	TArray<FVector4> PlacedLabels;
-	TMap<FString, FVector> PlotOf;   // contact id -> where it is on the plot (for the lines below)
-	// the viewer's picture plane (for label decluttering), seen from the player towards the table centre
-	const FVector ViewDir = (FVector(0, 0, PlaneHeight) - ViewerLocal).GetSafeNormal();
-	const FVector ViewRight = FVector::CrossProduct(FVector::UpVector, ViewDir).GetSafeNormal();
-	const FVector ViewUp0 = FVector::CrossProduct(ViewDir, ViewRight).GetSafeNormal();
-	const FVector ViewUp = ViewUp0.Z < 0.f ? -ViewUp0 : ViewUp0;
-	const float Pulse = 0.75f + 0.25f * FMath::Sin(Time * 6.f);
-	for (const FAstraHoloBlip& B : Blips)
-	{
-		// a passive bearing has no range: it sits on the rim, along its line
-		const FVector P = PlotPoint(B.bBearingOnly ? B.Rel.GetSafeNormal() * 1.0e12f : B.Rel);
-		const bool bBeyond = B.bBearingOnly || B.Rel.Size() / 100000.f > RangeKm * 1.02f;
-		if (B.Kind == 0)
-		{
-			const FLinearColor Col = BlipColor(B);
-			if (!B.Contact.IsEmpty() && !B.bBearingOnly)
-			{
-				PlotOf.Add(B.Contact, P);
-			}
-			// bright enough for a bridge in sunlight, big enough to read from the chair (the v3 table is 2.7 m across)
-			const float Base = (B.bPlayer ? 80.f : 60.f) * (bBeyond ? 0.45f : 1.f) * (B.bRetreating ? 0.6f : 1.f) * (B.bTargeted ? Pulse * 1.5f : 1.f);
-			const float Size = (B.bPlayer ? 22.f : 18.f) * B.Size;
-			UStaticMeshComponent* Icon = Pooled(Icons, NI, B.bUnknown ? UnknownMesh.Get() : ShipMesh.Get());
-			Icon->SetRelativeLocationAndRotation(P, B.bUnknown ? FRotator(0.f, Time * 40.f, 0.f) : B.Rot.Rotator());
-			Icon->SetRelativeScale3D(FVector(Size / 100.f));
-			SetColor(Icon, Col, Base);
+	// what to put up (AstraHoloPlan.h): the ships' icons, the craft and the missiles as dots, the labels where they cover nothing
+	AstraHoloPlan::FParams Par;
+	Par.PlotRadius = PlotRadius;
+	Par.PlaneHeight = PlaneHeight;
+	Par.MaxDepth = MaxDepth;
+	Par.RangeKm = RangeKm;
+	Par.ViewerLocal = ViewerLocal;
+	const UAstraShipSubsystem* ShipSys = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+	Par.HeadingDeg = ShipSys ? ShipSys->GetHeadingDeg() : 0.f;
+	AstraHoloPlan::Make(Blips, Par, PlanState, TacticalPlan);
 
-			// drop line to the plane (depth cue)
-			const float Dz = P.Z - PlaneHeight;
-			UStaticMeshComponent* Stem = Pooled(Stems, NI, LineMesh);
-			Stem->SetVisibility(FMath::Abs(Dz) > 0.6f);
+	const FVector Us(0.f, 0.f, PlaneHeight);
+	const float Pulse = 0.75f + 0.25f * FMath::Sin(Time * 6.f);
+	int32 NS = 0;
+	const int32 NI = TacticalPlan.Icons.Num();
+	for (int32 k = 0; k < NI; ++k)
+	{
+		const AstraHoloPlan::FIcon& Ic = TacticalPlan.Icons[k];
+		const FAstraHoloBlip& B = Blips[Ic.Blip];
+		const FVector& P = Ic.P;
+		const FLinearColor Col = AstraHoloPlan::ColorOf(B);
+		// bright enough for a bridge in sunlight, big enough to read from the chair (the v3 table is 2.7 m across)
+		const float Base = (B.bPlayer ? 80.f : 60.f) * (Ic.bBeyond ? 0.45f : 1.f) * (B.bRetreating ? 0.6f : 1.f) * (B.bTargeted ? Pulse * 1.5f : 1.f);
+		UStaticMeshComponent* Icon = Pooled(Icons, k, B.bUnknown ? UnknownMesh.Get() : ShipMesh.Get());
+		Icon->SetRelativeLocationAndRotation(P, B.bUnknown ? FRotator(0.f, Time * 40.f, 0.f) : B.Rot.Rotator());
+		Icon->SetRelativeScale3D(FVector(Ic.Size / 100.f));
+		SetColor(Icon, Col, Base);
+
+		// drop line to the plane (a depth cue) and velocity vector (500 m/s = 12 cm): in a crowd only for the ships that matter
+		const bool bDetail = !TacticalPlan.bDense || Ic.bMust;
+		const float Dz = P.Z - PlaneHeight;
+		UStaticMeshComponent* Stem = PooledQuiet(Stems, k, LineMesh);
+		const bool bStem = bDetail && FMath::Abs(Dz) > 0.6f;
+		if (bStem)
+		{
 			Stem->SetRelativeLocationAndRotation(FVector(P.X, P.Y, PlaneHeight), FRotator(Dz > 0.f ? 90.f : -90.f, 0.f, 0.f));
 			Stem->SetRelativeScale3D(FVector(FMath::Max(FMath::Abs(Dz), 0.1f) / 100.f, 0.15f, 0.15f));
 			SetColor(Stem, Col, 12.f);
-
-			// velocity vector: 500 m/s = 12 cm
-			UStaticMeshComponent* Vec = Pooled(Vectors, NI, LineMesh);
-			const float L = FMath::Clamp(B.Speed / 500.f * (B.bCraft ? 3.f : 12.f), 0.f, 24.f);
-			Vec->SetVisibility(L > 0.8f && !B.VelDir.IsNearlyZero());
+		}
+		if (Stem->IsVisible() != bStem)
+		{
+			Stem->SetVisibility(bStem);
+		}
+		UStaticMeshComponent* Vec = PooledQuiet(Vectors, k, LineMesh);
+		const float VecLen = FMath::Clamp(B.Speed / 500.f * 12.f, 0.f, 24.f);
+		const bool bVec = bDetail && VecLen > 0.8f && !B.VelDir.IsNearlyZero();
+		if (bVec)
+		{
 			Vec->SetRelativeLocationAndRotation(P, B.VelDir.Rotation());
-			Vec->SetRelativeScale3D(FVector(L / 100.f, 0.18f, 0.18f));
+			Vec->SetRelativeScale3D(FVector(VecLen / 100.f, 0.18f, 0.18f));
 			SetColor(Vec, Col, 14.f);
-			++NI;
+		}
+		if (Vec->IsVisible() != bVec)
+		{
+			Vec->SetVisibility(bVec);
+		}
+		if (B.bJamming)
+		{
+			// the jamming strobe, as a radar scope shows it: a line of noise from us out along its bearing
+			const FVector ToP = P - Us;
+			UStaticMeshComponent* Strobe = Pooled(Strobes, NS++, LineMesh);
+			Strobe->SetRelativeLocationAndRotation(Us, ToP.Rotation());
+			Strobe->SetRelativeScale3D(FVector(ToP.Size() / 100.f, 0.45f, 0.45f));
+			const float Noise = 0.45f + 0.35f * FMath::Abs(FMath::Sin(Time * 23.f + NS)) + 0.2f * FMath::Sin(Time * 57.f);
+			SetColor(Strobe, Col, 10.f * Noise);
+		}
+	}
 
-			if (B.bJamming)
+	// the labels, where the plan found them room, with a line to what they name when they stand off from it
+	int32 NL = 0, NLead = 0;
+	{
+		// a label keeps its text component from frame to frame (by its key), and its words are changed four times a second at most
+		const int32 NLab = TacticalPlan.Labels.Num();
+		TArray<int32, TInlineAllocator<32>> SlotOf;
+		SlotOf.Init(-1, NLab);
+		LabelSlots.SetNum(FMath::Max(LabelSlots.Num(), NLab));
+		TArray<bool, TInlineAllocator<32>> Used;
+		Used.Init(false, LabelSlots.Num());
+		for (int32 i = 0; i < NLab; ++i)
+		{
+			for (int32 s = 0; s < LabelSlots.Num(); ++s)
 			{
-				// the jamming strobe, as a radar scope shows it: a line of noise from us out along its bearing
-				const FVector C = FVector(0, 0, PlaneHeight);
-				const FVector ToP = P - C;
-				UStaticMeshComponent* Strobe = Pooled(Strobes, NS++, LineMesh);
-				Strobe->SetRelativeLocationAndRotation(C, ToP.Rotation());
-				Strobe->SetRelativeScale3D(FVector(ToP.Size() / 100.f, 0.45f, 0.45f));
-				const float Noise = 0.45f + 0.35f * FMath::Abs(FMath::Sin(Time * 23.f + NS)) + 0.2f * FMath::Sin(Time * 57.f);
-				SetColor(Strobe, Col, 10.f * Noise);
-			}
-
-			if (B.bNoLabel)
-			{
-				if (Leaders.IsValidIndex(NI - 1))
+				if (!Used[s] && LabelSlots[s].Key == TacticalPlan.Labels[i].Key)
 				{
-					Leaders[NI - 1]->SetVisibility(false);
-				}
-				continue;
-			}
-			UTextRenderComponent* T = PooledText(Labels, NL++);
-			const FString Title = B.bPlayer ? FString(TEXT("ASN AQUILA"))
-			                    : (B.Name.IsEmpty() ? FString::Printf(TEXT("%s  %s"), *B.Contact, B.ClassShort.IsEmpty() ? TEXT("UNKNOWN") : *B.ClassShort.ToUpper())
-			                                        : FString::Printf(TEXT("%s  %s"), *B.Name.ToUpper(), *B.Contact));
-			FString Sub = B.bPlayer ? FString() : (B.bBearingOnly ? FString(B.bJamming ? TEXT("JAMMING  NO RANGE") : TEXT("BEARING ONLY  NO RANGE"))
-			                                                      : RangeText(B.RangeKm) + (B.bJamming ? TEXT("  JAMMING") : TEXT("")));
-			if (B.bHoldFire) { Sub += TEXT("  HOLDING FIRE"); }
-			else if (B.bRetreating) { Sub += TEXT("  WITHDRAWING"); }
-			if (B.bTargeted) { Sub += TEXT("  [TARGET]"); }
-			HoloSetText(T, Sub.IsEmpty() ? Title : Title + TEXT("<br>") + Sub);
-			HoloSetColor(T, Col.ToFColor(true));
-			HoloSetSize(T, B.bPlayer ? 6.0f : 5.4f);   // (WS below)
-			// declutter in the viewer's picture plane: a label that would cover another climbs just above it
-			const float WS = B.bPlayer ? 6.0f : 5.4f;
-			const float W = FMath::Max(Title.Len(), Sub.Len()) * WS * 0.52f;
-			const float H = (Sub.IsEmpty() ? 1.f : 2.f) * WS * 1.05f;
-			const FVector Anchor = P + FVector(0, 0, Size * 0.3f + 1.2f);
-			FVector LabelPos = Anchor;
-			for (int32 Pass = 0; Pass < 6; ++Pass)
-			{
-				bool bClash = false;
-				const float X = FVector::DotProduct(LabelPos, ViewRight), Y = FVector::DotProduct(LabelPos, ViewUp);
-				for (const FVector4& Q : PlacedLabels)   // x, y, w, h in the picture plane
-				{
-					if (FMath::Abs(X - Q.X) < (W + Q.Z) * 0.5f && Y < Q.Y + Q.W && Y + H > Q.Y)
-					{
-						LabelPos.Z += (Q.Y + Q.W - Y + 0.4f) / FMath::Max(0.3f, (float)ViewUp.Z);
-						bClash = true;
-						break;
-					}
-				}
-				if (!bClash)
-				{
+					SlotOf[i] = s;
+					Used[s] = true;
 					break;
 				}
 			}
-			PlacedLabels.Add(FVector4(FVector::DotProduct(LabelPos, ViewRight), FVector::DotProduct(LabelPos, ViewUp), W, H));
-			T->SetRelativeLocation(LabelPos);
-			UStaticMeshComponent* Lead = Pooled(Leaders, NI - 1, LineMesh);
-			const float Rise = LabelPos.Z - Anchor.Z;
-			Lead->SetVisibility(Rise > 1.f);
-			Lead->SetRelativeLocationAndRotation(Anchor, FRotator(90.f, 0.f, 0.f));
-			Lead->SetRelativeScale3D(FVector(FMath::Max(Rise, 0.1f) / 100.f, 0.16f, 0.16f));
-			SetColor(Lead, Col, 16.f);
+		}
+		for (int32 i = 0; i < NLab; ++i)
+		{
+			if (SlotOf[i] < 0)
+			{
+				for (int32 s = 0; s < LabelSlots.Num(); ++s)
+				{
+					if (!Used[s])
+					{
+						SlotOf[i] = s;
+						Used[s] = true;
+						LabelSlots[s].Key = TacticalPlan.Labels[i].Key;
+						LabelSlots[s].TextAt = -1.0e9;                     // a new owner: its words at once
+						break;
+					}
+				}
+			}
+		}
+		for (int32 i = 0; i < NLab; ++i)
+		{
+			const AstraHoloPlan::FLabel& L = TacticalPlan.Labels[i];
+			FLabelSlot& Sl = LabelSlots[SlotOf[i]];
+			if (Time - Sl.TextAt >= 0.25 || Sl.Text.IsEmpty())
+			{
+				Sl.Text = L.Text;
+				Sl.TextAt = Time;
+			}
+			UTextRenderComponent* T = PooledText(Labels, SlotOf[i]);
+			HoloSetText(T, Sl.Text);
+			HoloSetColor(T, L.Col.ToFColor(true));
+			HoloSetSize(T, L.Size);
+			T->SetRelativeLocation(L.Pos);
 			FaceViewer(T, ViewerLocal);
+			NL = FMath::Max(NL, SlotOf[i] + 1);
+			if (L.bLeader)
+			{
+				PlaceLine(Pooled(Leaders, NLead++, LineMesh), L.From, L.Pos, 0.16f, L.Col, 16.f);
+			}
 		}
-		else if (B.Kind == 1)
+		// the slots no label has now are free (and their text components hidden below)
+		for (int32 s = 0; s < LabelSlots.Num(); ++s)
 		{
-			UStaticMeshComponent* D = Pooled(Dots, ND++, SphereMesh);
-			D->SetRelativeLocation(P);
-			D->SetRelativeScale3D(FVector(0.012f));
-			SetColor(D, B.Side == EAstraSide::Astra ? ColAquila : ColHostile, bBeyond ? 20.f : 60.f);
-		}
-		else
-		{
-			UStaticMeshComponent* X = Pooled(Blasts, NB++, SphereMesh);
-			const float Grow = 1.f - B.Fade;
-			X->SetRelativeLocation(P);
-			X->SetRelativeScale3D(FVector((2.f + 7.f * Grow) / 100.f));
-			SetColor(X, FLinearColor(1.f, 0.55f, 0.2f), 40.f * B.Fade);
+			if (!Used[s])
+			{
+				LabelSlots[s].Key = MIN_int32;
+				if (Labels.IsValidIndex(s))
+				{
+					Labels[s]->SetVisibility(false);
+				}
+			}
 		}
 	}
-	// who is firing on us: a thin red line from each shooter the plot shows to the Aquila, flickering like tracer fire
-	const FVector Us(0.f, 0.f, PlaneHeight);
+
+	// the craft and the missiles: dots, one instanced component in all (a component each, with a stem and a vector, was four hundred of them)
+	if (!DotLayer.IsValid() && SphereMesh)
+	{
+		UMaterialInterface* Glow = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_WAR_Glow.M_WAR_Glow"));   // (the war's own glow: instanced, a colour and a strength for each dot)
+		if (Glow)
+		{
+			DotLayer = MakeShared<AstraFx::FLayer>();
+			DotLayer->Init(DotCapacity);
+			DotLayer->Comp = AstraDraw::MakeComp(this, PlotFrame.Get(), TEXT("HoloDots"), SphereMesh, Glow, DotCapacity, AstraFx::Stride, false, false);
+		}
+	}
+	if (DotLayer.IsValid())
+	{
+		AstraFx::FLayer& L = *DotLayer;
+		L.Begin();
+		const float Gain = Fade * Brightness / 3.f * FMath::Max(0.f, CVarHoloDots.GetValueOnGameThread());
+		const auto Put = [&L, Gain](const TArray<AstraHoloPlan::FDot>& Dots, const FLinearColor& Col, float Inten)
+		{
+			for (const AstraHoloPlan::FDot& D : Dots)
+			{
+				FTransform* X;
+				float* Dat = L.Next(X);
+				if (!Dat)
+				{
+					return;
+				}
+				*X = FTransform(FQuat::Identity, D.P, FVector(D.Scale));
+				AstraFx::Fill(Dat, Col, Inten * Gain, 0.f, 0.f, 0.f, 0.f, D.Scale, 0.f);
+			}
+		};
+		Put(TacticalPlan.CraftDots[0], ColAstra, 150.f);
+		Put(TacticalPlan.CraftDots[1], ColHostile, 150.f);
+		Put(TacticalPlan.CraftDots[2], ColUnknown, 100.f);
+		Put(TacticalPlan.MissileDots[0], ColAquila, 190.f);
+		Put(TacticalPlan.MissileDots[1], ColHostile, 190.f);
+		L.Flush();
+		if (UInstancedStaticMeshComponent* C = L.Comp.Get())
+		{
+			const bool bShow = L.Count > 0 || L.Prev > 0;
+			if (C->IsVisible() != bShow)
+			{
+				C->SetVisibility(bShow);
+			}
+		}
+	}
+
+	// the explosions
+	int32 NB = 0;
+	for (const int32 bi : TacticalPlan.Blasts)
+	{
+		const FAstraHoloBlip& B = Blips[bi];
+		const FVector P = PlotPoint(B.Rel);
+		UStaticMeshComponent* X = Pooled(Blasts, NB++, SphereMesh);
+		const float Grow = 1.f - B.Fade;
+		X->SetRelativeLocation(P);
+		X->SetRelativeScale3D(FVector((2.f + 7.f * Grow) / 100.f));
+		SetColor(X, FLinearColor(1.f, 0.55f, 0.2f), 40.f * B.Fade);
+	}
+
+	// who is firing on us: a thin red line from each shooter the plot shows (the nearest dozen) to the Aquila, flickering like tracer fire
 	int32 NT = 0;
+	for (const int32 k : TacticalPlan.Threats)
+	{
+		const float Flick = 0.6f + 0.4f * FMath::Abs(FMath::Sin(Time * 9.f + NT * 1.7f));
+		PlaceLine(Pooled(Threats, NT++, LineMesh), TacticalPlan.Icons[k].P, Us, 0.2f, ColHostile, 16.f * Flick * Fade);
+	}
+	HideFrom(Threats, NT);
 	FString Target;
 	float TargetKm = 0.f;
 	if (Battle)
 	{
-		TArray<UAstraBattleSubsystem::FContactView> Cs;
-		Battle->GetContacts(Cs);
-		for (const UAstraBattleSubsystem::FContactView& C : Cs)
-		{
-			const FVector* At = C.bFiringAtUs ? PlotOf.Find(C.ContactId) : nullptr;
-			if (At)
-			{
-				const float Flick = 0.6f + 0.4f * FMath::Abs(FMath::Sin(Time * 9.f + NT * 1.7f));
-				PlaceLine(Pooled(Threats, NT++, LineMesh), *At, Us, 0.2f, ColHostile, 16.f * Flick * Fade);
-			}
-		}
 		const UAstraBattleSubsystem::FFireControl FC = Battle->GetFireControl();
 		Target = FC.Target;
 		TargetKm = FC.TargetRangeKm;
 	}
-	HideFrom(Threats, NT);
 	// how far our guns reach (the numbers the fire control uses): a ring for the railguns, one for the lasers
 	int32 NR = 0;
 	UAstraBattleSubsystem::FWeaponRanges Ours;
@@ -1127,7 +1240,19 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 	HideTextFrom(ReachLabels, NR);
 	// our target under fire control: a line from the Aquila with its distance at the middle, whether our guns reach it, and
 	// whether its guns reach us (once the sensors have classified it): red when we are inside them
-	const FVector* TargetAt = Target.IsEmpty() ? nullptr : PlotOf.Find(Target);
+	const FVector* TargetAt = nullptr;
+	if (!Target.IsEmpty())
+	{
+		for (const AstraHoloPlan::FIcon& Ic : TacticalPlan.Icons)
+		{
+			const FAstraHoloBlip& B = Blips[Ic.Blip];
+			if (!B.bBearingOnly && B.Contact == Target)
+			{
+				TargetAt = &Ic.P;
+				break;
+			}
+		}
+	}
 	if (TargetAt)
 	{
 		const UAstraBattleSubsystem::FWeaponRanges Theirs = Battle ? Battle->GetWeaponRanges(Target) : UAstraBattleSubsystem::FWeaponRanges();
@@ -1163,8 +1288,8 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 	HideFrom(Stems, NI);
 	HideFrom(Vectors, NI);
 	HideTextFrom(Labels, NL);
-	HideFrom(Leaders, NI);
-	HideFrom(Dots, ND);
+	HideFrom(Leaders, NLead);
+	HideFrom(Dots, 0);
 	HideFrom(Blasts, NB);
 	HideFrom(Strobes, NS);
 }

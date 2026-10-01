@@ -3,6 +3,7 @@
 #include "AstraBattleSubsystem.h"
 #include "AstraHullName.h"
 #include "AstraWarFX.h"
+#include "AstraWarDraw.h"
 #include "Misc/Crc.h"
 #include "EngineUtils.h"
 #include "Components/DecalComponent.h"
@@ -19,6 +20,10 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Sound/SoundBase.h"
 #include "HAL/PlatformTime.h"
+
+DECLARE_CYCLE_STAT(TEXT("Battle tick"), STAT_AstraBattle, STATGROUP_Astra);
+DECLARE_CYCLE_STAT(TEXT("War draw"), STAT_AstraWarDraw, STATGROUP_Astra);
+DECLARE_CYCLE_STAT(TEXT("War FX"), STAT_AstraWarFx, STATGROUP_Astra);
 
 namespace
 {
@@ -134,6 +139,7 @@ int32 UAstraBattleSubsystem::AddShip(const FString& Contact, const FString& Name
 	S.Mode = Speed > 1.f ? EAstraShipMode::Cruise : EAstraShipMode::Idle;
 	Ships.Add(S);
 	IdIndex.Add(S.Id, Ships.Num() - 1);
+	++PlotStamp;
 	InitShipModel(Ships.Last());     // a warship gets its class's sections, plates, shield sectors and mounts (AstraWarDamage.cpp)
 	return Ships.Num() - 1;
 }
@@ -151,6 +157,8 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	WarFX = NewObject<UAstraWarFX>(this);   // the war's visual effects (before any ship is drawn: SpawnVisual asks whether they draw the shields and the drives)
 	WarFX->Init(this);
+	WarDraw = NewObject<UAstraWarDraw>(this);   // the craft and the lamps as instances (SpawnVisual asks it to claim a ship)
+	WarDraw->Init(this);
 
 	// the Aquila first (index 0): the player's ship, heading 045 mark 10 like the helm
 	const int32 P = AddShip(TEXT("AQUILA"), TEXT("ASN Aquila"), TEXT("Aquila-class carrier cruiser"), TEXT(""), EAstraSide::Astra,
@@ -223,6 +231,10 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 {
+	if (WarDraw && WarDraw->Claim(S))
+	{
+		return;                           // a craft the war draws as an instance of its kind of hull (AstraWarDraw.cpp): no actor, no components, no ticks
+	}
 	if (!FApp::CanEverRender())
 	{
 		return;                           // headless (the war bench, -nullrhi): the battle runs without its pictures
@@ -243,6 +255,7 @@ void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 	C->SetCastShadow(false);          // km-scale shadows are invisible and cost VSM pages
 	C->bAffectDynamicIndirectLighting = false;
 	C->SetLightingChannels(true, true, false);   // outside the hull: the planet's light reaches it too
+	if (!S.bDrawLamps)                  // (the war draws a ship's lamps itself: instances of its glow, no component and no tick)
 	{
 		UAstraNavLights* NL = NewObject<UAstraNavLights>(S.Actor);
 		NL->SetupAttachment(S.Actor->GetRootComponent());
@@ -349,12 +362,20 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	{
 		SyncVisuals();   // the plot stays drawn behind the menu
 		TickWrecks(0.f);
+		if (WarDraw)
+		{
+			SCOPE_CYCLE_COUNTER(STAT_AstraWarDraw);
+			WarDraw->Tick(DeltaTime);
+		}
 		if (WarFX)
 		{
+			SCOPE_CYCLE_COUNTER(STAT_AstraWarFx);
 			WarFX->Tick(DeltaTime);
 		}
 		return;
 	}
+	SCOPE_CYCLE_COUNTER(STAT_AstraBattle);
+	const double PerfT0 = FPlatformTime::Seconds();
 	const float Dt = FMath::Min(DeltaTime, 0.1f) * GBattleTimeScale;
 	struct FTickTimer
 	{
@@ -474,6 +495,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		}
 	}
 	ProcessWarCommands();                                   // the bench's scenarios and spawns (AstraWarScenario.cpp)
+	TickScenarioWaves();                                    // the reinforcements of a scenario file arrive when their time comes
 	// the war's minds: what each side holds on its sensors, who is near whom, what the groups want
 	if ((CompactT -= Dt) <= 0.f)
 	{
@@ -561,12 +583,82 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		DecoysSeduced = 0;
 		LastDecoyReport = Time;
 	}
+	const double PerfT1 = FPlatformTime::Seconds();
 	SyncVisuals();
+	const double PerfT2 = FPlatformTime::Seconds();
+	if (WarDraw)
+	{
+		SCOPE_CYCLE_COUNTER(STAT_AstraWarDraw);
+		WarDraw->Tick(DeltaTime);                  // the craft's hulls and every ship's lamps, as instances (AstraWarDraw.cpp)
+	}
+	const double PerfT3 = FPlatformTime::Seconds();
 	if (WarFX)
 	{
+		SCOPE_CYCLE_COUNTER(STAT_AstraWarFx);
 		WarFX->Tick(DeltaTime);                    // the war's effects: shots, particles, shields, drives (AstraWarFX.cpp)
 	}
 	EndPhase(5);
+	++PlotStamp;                                   // the plot has moved: the shared lists (Contacts, HoloBlips) are made again for whoever reads them next
+	const double PerfT4 = FPlatformTime::Seconds();
+	PerfWin.Sim += (PerfT1 - PerfT0) * 1000.0;
+	PerfWin.Sync += (PerfT2 - PerfT1) * 1000.0;
+	PerfWin.Draw += (PerfT3 - PerfT2) * 1000.0;
+	PerfWin.Fx += (PerfT4 - PerfT3) * 1000.0;
+	PerfWin.Total += (PerfT4 - PerfT0) * 1000.0;
+	PerfWin.TotalMax = FMath::Max(PerfWin.TotalMax, (PerfT4 - PerfT0) * 1000.0);
+	++PerfWin.Frames;
+}
+
+FString UAstraBattleSubsystem::PerfReport(bool bReset)
+{
+	const FPerfWindow W = PerfWin;
+	if (bReset)
+	{
+		PerfWin = FPerfWindow();
+	}
+	const double N = FMath::Max(1, W.Frames);
+	return FString::Printf(TEXT("battle tick over %d frames: %.3f ms avg (max %.2f) = simulation %.3f + moving the hulls %.3f + instanced drawing %.3f + effects %.3f"), W.Frames,
+	                       W.Total / N, W.TotalMax, W.Sim / N, W.Sync / N, W.Draw / N, W.Fx / N);
+}
+
+void UAstraBattleSubsystem::StartCampaign()
+{
+	bStarted = true;
+	if (WarDraw)
+	{
+		WarDraw->Prewarm();                        // the craft's kinds of hull ready before the first wing launches
+	}
+}
+
+void UAstraBattleSubsystem::SetLensHint(bool bActive, double WithinKm, int32 ExemptId)
+{
+	if (WarDraw)
+	{
+		WarDraw->SetLensHint(bActive, WithinKm, ExemptId);
+	}
+}
+
+void UAstraBattleSubsystem::GetNearLensComponents(TArray<UPrimitiveComponent*>& Out) const
+{
+	if (WarDraw)
+	{
+		WarDraw->GetNearLensComponents(Out);
+	}
+}
+
+FString UAstraBattleSubsystem::DrawStats() const
+{
+	FString S;
+	if (WarDraw)
+	{
+		WarDraw->Stats(S);
+	}
+	return S;
+}
+
+TSharedRef<FJsonObject> UAstraBattleSubsystem::DrawStatsJson() const
+{
+	return WarDraw ? WarDraw->StatsJson() : MakeShared<FJsonObject>();
 }
 
 float UAstraBattleSubsystem::PlayerSignatureKm() const
@@ -1698,9 +1790,10 @@ UAstraBattleSubsystem::FFireControl UAstraBattleSubsystem::GetFireControl() cons
 	return F;
 }
 
-void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
+void UAstraBattleSubsystem::BuildHoloBlips(TArray<FAstraHoloBlip>& Out, FPlotCounts& Counts) const
 {
 	Out.Reset();
+	Counts = FPlotCounts();
 	if (Ships.Num() == 0)
 	{
 		return;
@@ -1711,8 +1804,22 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 	{
 		return Vel.IsNearlyZero() ? FVector::ZeroVector : (ToWorld(Pos + Vel) - ToWorld(Pos)).GetSafeNormal();
 	};
-	for (const FAstraBattleShip& S : Ships)
+	// a flight group's airborne aircraft and the first of them (it carries the group's label): found in one pass over the ships, not once for each of the aircraft
+	TArray<int32, TInlineAllocator<16>> SquadCount, SquadLead;
+	SquadCount.SetNumZeroed(Squadrons.Num());
+	SquadLead.Init(-1, Squadrons.Num());
+	for (int32 i = 0; i < Ships.Num(); ++i)
 	{
+		const FAstraBattleShip& S = Ships[i];
+		if (S.bAlive && S.bCraft && Squadrons.IsValidIndex(S.Squadron))
+		{
+			SquadLead[S.Squadron] = SquadLead[S.Squadron] < 0 ? i : SquadLead[S.Squadron];
+			++SquadCount[S.Squadron];
+		}
+	}
+	for (int32 Si = 0; Si < Ships.Num(); ++Si)
+	{
+		const FAstraBattleShip& S = Ships[Si];
 		if (!S.bAlive)
 		{
 			continue;
@@ -1722,6 +1829,8 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 			continue;
 		}
 		FAstraHoloBlip B;
+		B.Id = S.Id;
+		B.bFiringAtUs = S.Side == EAstraSide::Mandate && !S.bHoldFire && !S.bDisabled && (S.TargetId == P.Id || S.FireTarget == P.Id);
 		B.Kind = 0;
 		B.bBearingOnly = S.bFog && S.Track == 1;
 		B.bJamming = S.bJamming;
@@ -1763,15 +1872,32 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		if (S.bCraft && Squadrons.IsValidIndex(S.Squadron))
 		{
 			B.bCraft = true;
+			B.Squadron = S.Squadron;
 			B.Size = S.CraftKind == 2 ? 0.2f : 0.3f;
-			const FAstraSquadron& Q = Squadrons[S.Squadron];
-			// the first airborne aircraft of a group carries the group's label
-			const FAstraBattleShip* Lead = Ships.FindByPredicate([&S](const FAstraBattleShip& X) { return X.bAlive && X.bCraft && X.Squadron == S.Squadron; });
-			B.bNoLabel = Lead != &S;
-			B.Name = FString::Printf(TEXT("%s x%d"), *Q.Name.ToUpper(), AirborneCount(S.Squadron));
-			B.Contact = Q.Mission.ToUpper();
+			// the first airborne aircraft of a group carries the group's label (only it has a name and a mission to show)
+			B.bNoLabel = SquadLead[S.Squadron] != Si;
+			if (!B.bNoLabel)
+			{
+				const FAstraSquadron& Q = Squadrons[S.Squadron];
+				B.Name = FString::Printf(TEXT("%s x%d"), *Q.Name.ToUpper(), SquadCount[S.Squadron]);
+				B.Contact = Q.Mission.ToUpper();
+			}
 		}
-		Out.Add(B);
+		if (!S.bPlayer)
+		{
+			const bool bHostileNow = B.bHostile && !B.bRetreating;
+			if (B.bCraft)
+			{
+				Counts.HostileCraft += bHostileNow ? 1 : 0;
+				Counts.FriendlyCraft += B.Side == EAstraSide::Astra ? 1 : 0;
+			}
+			else
+			{
+				Counts.HostileShips += bHostileNow ? 1 : 0;
+				Counts.FriendlyShips += B.Side == EAstraSide::Astra ? 1 : 0;
+			}
+		}
+		Out.Add(MoveTemp(B));
 	}
 	for (const FAstraProjectile& Pr : Projectiles)
 	{
@@ -1783,10 +1909,11 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		B.Kind = 1;
 		B.Rel = ToWorld(Pr.Pos) - Origin;
 		B.VelDir = Dir(Pr.Pos, Pr.Vel);
-		const FAstraBattleShip* Owner = Ships.FindByPredicate([&Pr](const FAstraBattleShip& S) { return S.Id == Pr.Owner; });
+		const FAstraBattleShip* Owner = FindById(Pr.Owner);
 		B.Side = Owner ? Owner->Side : EAstraSide::Neutral;
 		B.bHostile = Owner && Owner->bHostile;
-		Out.Add(B);
+		++Counts.Missiles;
+		Out.Add(MoveTemp(B));
 	}
 	for (const FAstraFlash& F : Flashes)
 	{
@@ -3876,7 +4003,7 @@ void UAstraBattleSubsystem::TickWrecks(float Dt)
 		W.Pos += W.Vel * Dt;
 		W.Att = FQuat(W.SpinAxis, FMath::DegreesToRadians(W.SpinDeg * Dt)) * W.Att;
 		// (a hulk with no actor, headless, stays as the obstacle it is; the far ones go: from the Aquila, or from the origin in a bench)
-		const FVector Ref = bSandbox ? FVector::ZeroVector : Ships[0].Pos;
+		const FVector Ref = (bSandbox && !Ships[0].bAlive) ? FVector::ZeroVector : Ships[0].Pos;
 		if ((!W.Actor && W.Radius <= 0.f) || (W.Life > 0.f && W.Age > W.Life) || FVector::Dist(W.Pos, Ref) > 250 * OneKm)
 		{
 			if (W.Actor) { W.Actor->Destroy(); }
@@ -4868,6 +4995,7 @@ void UAstraBattleSubsystem::ClearSystem()
 	}
 	Ships.SetNum(1);
 	RebuildIdIndex();
+	++PlotStamp;
 	Groups.Reset();
 	GroupEvents.Reset();                          // (what happened to the old system's groups is not news here)
 	Flights.Reset();
@@ -4887,6 +5015,10 @@ void UAstraBattleSubsystem::ClearSystem()
 	if (WarFX)
 	{
 		WarFX->ClearAll();                            // its shots, sparks, shells, pieces and scars are of the old system
+	}
+	if (WarDraw)
+	{
+		WarDraw->ClearAll();                          // the craft and the lamps of the old system
 	}
 	for (FAstraFlash& F : Flashes)
 	{

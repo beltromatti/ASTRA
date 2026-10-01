@@ -3,6 +3,7 @@
 real time. For the lead and the war module's support agents (in their own worktree, with their own build).
 
   tools/war.py run [--seconds 900] [--jump 170] [--exec "astra.battle.spawn styx 12 30"] [--scenario name] [--out Saved/War/run.json]
+                   [--aquila | --aquila-opts "at=-34,0,0;speed=0"] [--holo-at 60,260]   the Aquila in the scenario (where, how); the holo table's plan (docs/SCALA.md)
   tools/war.py report Saved/War/run.json      the story of the battle: arrivals, kills, damage, withdrawals, the outcome, the books
   tools/war.py ship Saved/War/run.json T-21   one ship through the battle (position, hull, shields, mode, target)
   tools/war.py ab --a "..." --b "..." --seeds 6 [--scenario name] [--jobs 3]
@@ -62,6 +63,13 @@ def build_args(a: argparse.Namespace, out: Path) -> list[str]:
         args.append(f'-at={a.at}')
     if getattr(a, "views", False):
         args.append("-views")                              # each frame also carries what the two minds are given of their groups
+    if getattr(a, "aquila", False):
+        args.append("-aquila")                             # the Aquila stays in the scenario (at the origin, with the ASTRA side)
+    if getattr(a, "aquila_opts", ""):
+        args.append(f"-aquila_opts={a.aquila_opts}")       # where she is and how she goes: at=-34,0,0;speed=0;heading=0 (astra.war.scenario <name> aquila ...)
+    if getattr(a, "holo_at", ""):
+        args.append(f"-holo_at={a.holo_at}")               # the holo table's plan at those battle times (docs/SCALA.md)
+        args.append(f"-holo_out={ROOT / 'Saved' / 'War' / 'holo'}")
     return args
 
 
@@ -574,6 +582,9 @@ def main() -> None:
         p.add_argument("--scenario", default="")
         p.add_argument("--at", default="", help='commands at battle times: "200=astra.cmd ...|300=..."')
         p.add_argument("--views", action="store_true", help="record the side views (your_groups, enemy_groups, group_events) in every frame")
+        p.add_argument("--aquila", action="store_true", help="keep the Aquila in the scenario (at the origin, with the ASTRA side): the game's scale test from the bridge")
+        p.add_argument("--aquila-opts", default="", help='the Aquila in the scenario, where and how ("at=-34,0,0;speed=0;heading=0": km, m/s, degrees; implies --aquila)')
+        p.add_argument("--holo-at", default="", help='the holo table\'s plan at these battle times ("60,120"): Saved/War/holo_<t>.json, drawn by tools/art/holo_plan_preview.py')
 
     p = sub.add_parser("run")
     common(p, 900, -1)

@@ -371,7 +371,7 @@ void AAstraViewscreen::Direct(float Dt)
 	{
 		return;
 	}
-	const TArray<FContact>& Cs = Contacts;
+	const TArray<FContact>& Cs = Plot();
 	const FString Engaged = St->ActionTarget();
 	// what happened since the last look: ships destroyed (not merely lost from the plot), heavy hits
 	FString HitId, HitName;
@@ -651,7 +651,7 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 	switch (Shot)
 	{
 	case EShot::Contact:
-		if (const FContact* C = FindC(Contacts, ShotId))
+		if (const FContact* C = FindC(Plot(), ShotId))
 		{
 			FVector Corners[8];
 			if (C->Track >= 2 && HullCorners(*C, Corners))
@@ -683,7 +683,7 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 		FVector Sum = FVector::ZeroVector;
 		for (const FString& Id : GroupIds)
 		{
-			if (const FContact* C = FindC(Contacts, Id))
+			if (const FContact* C = FindC(Plot(), Id))
 			{
 				Pts.Add(B->WorldOf(C->Pos));
 				Sum += Pts.Last().GetSafeNormal();
@@ -738,9 +738,10 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 	Capture->FOVAngle = Fov;
 	// the drive plumes are sized to be seen with the naked eye from the bridge: through a zoom they would be suns
 	Capture->HiddenActors.Reset();
+	Capture->HiddenComponents.Reset();
 	if (Fov < 25.f)
 	{
-		for (const FContact& C : Contacts)
+		for (const FContact& C : Plot())
 		{
 			if (C.Flare)
 			{
@@ -749,16 +750,36 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 		}
 	}
 	// zoomed far out on a target, our own fighters crossing close in front of the lens would fill the frame as huge blurred
-	// shapes: the screen is a composite of the sensors, and leaves them out (never the ship it is showing)
+	// shapes: the screen is a composite of the sensors, and leaves them out (never the ship it is showing). Craft that are actors are
+	// hidden one by one; the instanced ones (AstraWarDraw.cpp) are drawn, while this is on, in a set of components the camera leaves out
+	bool bLens = false;
+	double LensKm = 0.0;
+	int32 LensExempt = -1;
 	if (Fov < 12.f)
 	{
-		const FContact* Shown = ShotId.IsEmpty() ? nullptr : FindC(Contacts, ShotId);
+		const FContact* Shown = ShotId.IsEmpty() ? nullptr : FindC(Plot(), ShotId);
 		const double Far = Shown && Shown->RangeKm > 0.0 ? Shown->RangeKm : 0.0;
-		for (const FContact& C : Contacts)
+		bLens = Far > 0.0;
+		LensKm = 0.5 * Far;
+		LensExempt = Shown ? Shown->Id : -1;
+		for (const FContact& C : Plot())
 		{
 			if (C.bCraft && C.Side == EAstraSide::Astra && C.Actor && &C != Shown && Far > 0.0 && C.RangeKm > 0.0 && C.RangeKm < 0.5 * Far)
 			{
 				Capture->HiddenActors.Add(const_cast<AStaticMeshActor*>(C.Actor));
+			}
+		}
+	}
+	if (UAstraBattleSubsystem* BM = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+	{
+		BM->SetLensHint(bLens, LensKm, LensExempt);
+		if (bLens)
+		{
+			TArray<UPrimitiveComponent*> Near;
+			BM->GetNearLensComponents(Near);
+			for (UPrimitiveComponent* Comp : Near)
+			{
+				Capture->HiddenComponents.Add(Comp);
 			}
 		}
 	}
@@ -787,7 +808,7 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 	++Frame;
 	if (const UAstraBattleSubsystem* B = W->GetSubsystem<UAstraBattleSubsystem>())
 	{
-		B->GetContacts(Contacts);
+		PlotRef = &B->Contacts();
 	}
 	if (Frame % 8 == 0)
 	{
@@ -804,6 +825,10 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 	}
 	if (Fade <= 0.001f)
 	{
+		if (UAstraBattleSubsystem* BM = W->GetSubsystem<UAstraBattleSubsystem>())
+		{
+			BM->SetLensHint(false, 0.0, -1);   // (no camera, no lens to keep craft away from)
+		}
 		return;                           // off: nothing drawn, nothing captured
 	}
 	Aim(DeltaSeconds);
@@ -867,12 +892,13 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	const float PxName = 30.f * S, PxData = 20.f * S;    // read from the Captain's chair, 9 m away
 	const FString Engaged = St ? St->ActionTarget() : FString();
 	const FVector2D Ctr(Width * 0.5f, Height * 0.5f);
-	int32 Labelled = 0, Arrows = 0;
+	int32 Labelled = 0, Arrows = 0, CraftMarks = 0;
+	const bool bCrowd = Plot().Num() > 48;           // a fleet battle: the craft get small crosses instead of boxes
 	TMap<EAstraSide, TPair<FVector2D, int32>> CraftGroups;
 	struct FLabelReq { const FContact* C; FBox2D Box; FLinearColor Col; int32 Order; };
 	TArray<FLabelReq> Pending;
 	TArray<FVector2D> ArrowTags;
-	for (const FContact& C : Contacts)
+	for (const FContact& C : Plot())
 	{
 		const FVector World = B->WorldOf(C.Pos);
 		const FLinearColor Col = C.ContactId == Engaged ? ColAlarm : SideColor(C);
@@ -920,6 +946,21 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 				D.Line(FVector2D(P.X, y), FVector2D(P.X, y + 8.f * S), Col, 1.2f);
 			}
 			D.Text(P.X + 8.f * S, P.Y - 70.f * S, FString::Printf(TEXT("%s  BRG %03.0f  NO RANGE%s"), *C.ContactId, C.BearingDeg, C.bJamming ? TEXT("  JAMMING") : TEXT("")), true, PxData, Col);
+			continue;
+		}
+		if (C.bCraft && bCrowd)
+		{
+			// a crowd of craft (a fleet battle: two hundred contacts): each is a small cross, not the box of a ship (eight canvas lines each, every refresh, were
+			// the overlay's cost); the nearest ninety-six are marked, the rest are in their wing's count
+			TPair<FVector2D, int32>& G = CraftGroups.FindOrAdd(C.Side);
+			G.Key += P;
+			G.Value++;
+			if (CraftMarks++ < 96)
+			{
+				const float r = 3.5f * S;
+				D.Line(FVector2D(P.X - r, P.Y), FVector2D(P.X + r, P.Y), Dimmed(Col, 0.85f), 1.2f);
+				D.Line(FVector2D(P.X, P.Y - r), FVector2D(P.X, P.Y + r), Dimmed(Col, 0.85f), 1.2f);
+			}
 			continue;
 		}
 		// the box: the hull's corners as the camera sees them (a small square when too far to tell)
@@ -984,11 +1025,27 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		}
 		return true;
 	};
+	int32 FullLabels = 0;
 	for (const FLabelReq& L : Pending)
 	{
 		const FContact& C = *L.C;
 		const FBox2D& R = L.Box;
 		const FLinearColor& Col = L.Col;
+		if (FullLabels >= 12)
+		{
+			// past a dozen (the target, who fires on us, the nearest), a name block is a lot of text and measuring and little news: the id alone, if there is room
+			Taken.Add(R);
+			const float Iw = D.Width(C.ContactId, true, PxData);
+			const FVector2D At(R.Max.X + 4.f * S, R.Min.Y);
+			const FBox2D Q(At, At + FVector2D(Iw, PxData * 1.1f));
+			if (Free(Q))
+			{
+				Taken.Add(Q);
+				D.Text(At.X, At.Y, C.ContactId, true, PxData, Dimmed(Col, 0.85f));
+			}
+			continue;
+		}
+		++FullLabels;
 		const FString Name = C.Label.ToUpper();
 		FString Kind = C.Class;
 		Kind.RemoveFromStart(TEXT("Kharon Mandate "));
@@ -1101,7 +1158,7 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		FString Who = Voice.ToUpper();
 		if (Who.IsEmpty())
 		{
-			if (const FContact* PC = FindC(Contacts, Party))
+			if (const FContact* PC = FindC(Plot(), Party))
 			{
 				FString Head, Cmdr;
 				Who = PC->Class.Split(TEXT("flagship of "), &Head, &Cmdr) ? Cmdr.Replace(TEXT(")"), TEXT("")).ToUpper() : PC->Label.ToUpper();
@@ -1160,12 +1217,12 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	else
 	{
 		int32 Hostile = 0, Friendly = 0;
-		for (const FContact& C : Contacts)
+		for (const FContact& C : Plot())
 		{
 			Hostile += C.Side == EAstraSide::Mandate && !C.bCraft;
 			Friendly += C.Side == EAstraSide::Astra && !C.bCraft;
 		}
-		D.Text(16.f * S, By, FString::Printf(TEXT("PLOT  %d HOSTILE  ·  %d FRIENDLY  ·  %d CONTACTS"), Hostile, Friendly, Contacts.Num()), true, PxData, ColDim);
+		D.Text(16.f * S, By, FString::Printf(TEXT("PLOT  %d HOSTILE  ·  %d FRIENDLY  ·  %d CONTACTS"), Hostile, Friendly, Plot().Num()), true, PxData, ColDim);
 	}
 	if (Ship)
 	{

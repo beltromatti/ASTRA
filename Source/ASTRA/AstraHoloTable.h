@@ -6,8 +6,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "AstraHoloPlan.h"
 #include "AstraHoloTable.generated.h"
 
+namespace AstraFx { struct FLayer; }
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UStaticMesh;
@@ -103,6 +105,25 @@ private:
 
 	/** A pooled component on the plot (or on another frame of the table: the ship plot stands upright, untilted). */
 	UStaticMeshComponent* Pooled(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index, UStaticMesh* Mesh, USceneComponent* Parent = nullptr);
+	/** The same, but the caller decides whether it is shown (a thing shown and hidden within a frame makes its render state again, twice). */
+	UStaticMeshComponent* PooledQuiet(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index, UStaticMesh* Mesh);
+
+	// what the tactical plot puts up (AstraHoloPlan.h, docs/SCALA.md): the plan of the frame, what carries from one frame to the next, and the dots
+	// that stand for the craft and the missiles (one instanced component of the war's glow, a colour and a strength for each)
+	AstraHoloPlan::FPlan TacticalPlan;
+	AstraHoloPlan::FState PlanState;
+	float TacticalDt = 0.f;
+	/** Which text component carries which label (by the label's key): a label keeps its component from frame to frame, and its words are changed at most four times a
+	 *  second (a range that ticks every frame is unreadable, and every change of a text makes its render proxy again). */
+	struct FLabelSlot
+	{
+		int32 Key = MIN_int32;
+		double TextAt = -1.0e9;
+		FString Text;
+	};
+	TArray<FLabelSlot> LabelSlots;
+	TSharedPtr<AstraFx::FLayer> DotLayer;
+	static constexpr int32 DotCapacity = 700;
 	UTextRenderComponent* PooledText(TArray<TObjectPtr<UTextRenderComponent>>& Pool, int32 Index, USceneComponent* Parent = nullptr);
 	static void HideFrom(TArray<TObjectPtr<UStaticMeshComponent>>& Pool, int32 Index);
 	static void HideTextFrom(TArray<TObjectPtr<UTextRenderComponent>>& Pool, int32 Index);
