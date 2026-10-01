@@ -483,6 +483,17 @@ _reg("crawlway", name="Maintenance Crawlway Hub", kind="crawlway", dept="enginee
 
 
 
+# ---- Deck 1: the Captain's ready room (hand-placed between the two corridors of the bridge complex, ship_deck1.py; clear height 2.9, as the corridors' roofs are 3.2) ----------
+_reg("ready_room", name="Ready Room", kind="ready_room", dept="command", L=12.0, D=4.2, h=2.9, plate="ready_room",
+     doors=[door("near", 5.0, 1.4, 2.2)], systems=["power_bus", "comms"],
+     spots=[spot("officer", "sit", 3.50, 1.75, 180, "command"), spot("officer", "sit", 3.50, 2.75, 180, "command"),
+            spot("officer", "sit", 7.60, 3.45, -90, "command"), spot("officer", "sit", 9.00, 3.45, -90, "command"), spot("officer", "sit", 6.95, 2.45, 0, "command"),
+            spot("officer", "stand", 9.10, 1.60, 0, "command"), spot("officer", "stand", 10.45, 0.85, 90, "command"), spot("officer", "stand", 10.45, 3.15, -90, "command"),
+            spot("officer", "stand", 4.85, 3.20, 90, "command")],
+     lights=[light(2.3, 2.0, 2.75, 2400, 3300, (3.0, 1.2), 650), light(5.4, 2.0, 2.75, 2000, 3400, (2.0, 1.2), 600), light(8.2, 2.0, 2.75, 2400, 3300, (3.0, 1.4), 650),
+             light(10.45, 2.0, 2.75, 2000, 5600, (2.0, 2.0), 600)])
+
+
 def prefab(key: str) -> dict:
     return PREFABS[key]
 

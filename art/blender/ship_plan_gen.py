@@ -65,9 +65,6 @@ def existing(B: Builder) -> None:
     q = ex["quarters"]
     add("quarters", "Captain's Quarters", 1, 1, "A", "quarters", [q["box"][0], q["box"][1], q["box"][2], q["box"][3]], (q["box"][4], q["box"][5]),
         q["entrance"], "command", ["power_bus", "life_support"], [], data="aquila_quarters.json")
-    B.comp("ready_room", 1, "ready_room", "Ready Room", [-20.2, -2.0, -9.0, 2.0], (0.0, 3.0), section="A", dept="command", status="planned",
-           systems=["power_bus"], stations=[], prefab=None, note="the Captain's ready room: the block between the two corridors of Deck 1 (canon, docs/BIBBIA.md "
-           "§6); its door will be cut in the port corridor's inner wall (SM_COR panel) when Deck 1 is finished", plane=1)
     # ---- Deck 3 label / Deck 4 plane: Crew Berthing
     e = ex["berths"]
     aw = [{"id": f"berths.{a['station']}", "role": "crew", "kind": "sit", "pos": [rnd(e["box"][2] - 0.3 + a["seat"][0]), rnd(a["seat"][1]), rnd(-46.0)],
@@ -216,7 +213,7 @@ def existing_graph(B: Builder, decks: dict) -> None:
 
 
 def deck1_graph(B: Builder) -> None:
-    """The bridge complex: bridge, its two corridors, the lift housing, the Captain's quarters, the ready room (planned)."""
+    """The bridge complex: bridge, its two corridors, the lift housing, the Captain's quarters, the ready room (ship_deck1.py)."""
     bridge = B.comps["bridge"]
     B.node("bridge.hub", 1, 0.0, 0.0, 0.0, "room", "bridge")
     for st in bridge["stations"]:
@@ -232,7 +229,8 @@ def deck1_graph(B: Builder) -> None:
         B.node(f"{cid}.n0", 1, -10.0, d["pos"][1], 0.0, "corridor", cid)
         B.node(f"{cid}.n1", 1, -18.0, d["pos"][1], 0.0, "corridor", cid)
         B.link("bridge.hub", f"{cid}.n0", "door", door=did, width=d["width"])
-        B.link(f"{cid}.n0", f"{cid}.n1", "walk", width=3.2)
+        if cid != "corridor_1a_port":                              # the port corridor's is split at the ready room's door (ship_deck1.py)
+            B.link(f"{cid}.n0", f"{cid}.n1", "walk", width=3.2)
     B.node("lift.bridge", 1, -18.6, -3.9, 0.2, "lift", "lift_housing_bridge")
     B.link("corridor_1a_port.n1", "lift.bridge", "walk", width=3.2)
     # the lift housing at the port corridor's end
@@ -247,13 +245,8 @@ def deck1_graph(B: Builder) -> None:
     B.node("quarters.hub", 1, qd["world_origin"][0] - 4.3, qd["world_origin"][1], 0.0, "room", "quarters")
     B.link("corridor_1a_starboard.n1", "quarters.in", "door", door="quarters_door", width=qd["door"]["width"])
     B.link("quarters.in", "quarters.hub", "walk", width=2.0)
-    B.node("ready_room.in", 1, -14.6, -1.5, 0.0, "door_in", "ready_room")
-    B.node("ready_room.hub", 1, -14.6, 0.0, 0.0, "room", "ready_room")
-    B.door("ready_room_door", 1, (-14.6, -2.3, 0.0), 90.0, 1.6, 2.4, "corridor_1a_port", "ready_room", kind="sliding", planned=True)
-    B.comps["ready_room"]["doors"].append("ready_room_door")
-    B.comps["corridor_1a_port"]["doors"].append("ready_room_door")
-    B.link("corridor_1a_port.n0", "ready_room.in", "door", door="ready_room_door", width=1.6)
-    B.link("ready_room.in", "ready_room.hub", "walk", width=1.5)
+    import ship_deck1 as D1
+    D1.build(B)                                                    # the ready room, its door and its joint with the port corridor
 
 
 def lift_network(B: Builder) -> dict:

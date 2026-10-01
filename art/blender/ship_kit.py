@@ -71,13 +71,15 @@ ROOMS = {
     "point_defense": ("ship_rooms_command", "point_defense"), "barbette": ("ship_rooms_command", "barbette"),
     "staterooms": ("ship_rooms_quarters", "staterooms"), "wardroom": ("ship_rooms_quarters", "wardroom"), "gym": ("ship_rooms_quarters", "gym"),
     "tank": ("ship_rooms_keel", "tank"), "reaction_mass": ("ship_rooms_keel", "reaction_mass"), "crawlway": ("ship_rooms_keel", "crawlway"),
+    "ready_room": ("ship_rooms_bridge", "ready_room"),
 }
 EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHIP_StairTowerBottom": ("ship_rooms_hub", "stair_tower_bottom"),
          "SM_SHIP_LadderTrunk": ("ship_rooms_hub", "ladder_trunk"), "SM_SHIP_StairTower53": ("ship_rooms_hub", "stair_tower_deep"),
-         "SM_SHIP_StairTowerCap": ("ship_rooms_hub", "stair_tower_cap")}
+         "SM_SHIP_StairTowerCap": ("ship_rooms_hub", "stair_tower_cap"), "SM_SHIP_BridgeCorridorDoor": ("ship_rooms_bridge", "corridor_door")}
 
 # the material slots the Unreal side knows (shared bridge v3 instances + the ship's new ones)
-KNOWN_SLOTS = set(BL.SHARED_SLOTS) | set(SL.NEW_SLOTS) | {SL.LABEL}
+OLD_KIT_SLOTS = {A.MAT_PANEL, A.MAT_STRUCTURE, A.MAT_FLOOR, A.MAT_GRATE, A.MAT_TRIM, A.MAT_LIGHT, A.MAT_ACCENT, A.MAT_GUIDE, A.MAT_GLASS, A.MAT_RUBBER}   # the bridge corridors' (kit_corridor.py)
+KNOWN_SLOTS = set(BL.SHARED_SLOTS) | set(SL.NEW_SLOTS) | {SL.LABEL} | OLD_KIT_SLOTS
 TRANSLUCENT_SLOTS = {BL.GLASS}
 
 

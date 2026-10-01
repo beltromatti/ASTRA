@@ -74,6 +74,8 @@ ROOM_VIEWS = {
     "reaction_mass": {"door": ((18.0, 0.9, 1.65), (20.0, 12.0, 1.4), 88), "spheres": ((18.0, 4.0, 1.7), (6.0, 9.0, 1.8), 84), "right": ((22.0, 4.0, 1.7), (33.0, 9.0, 1.8), 84),
                       "back": ((38.0, 2.0, 1.7), (10.0, 10.0, 1.4), 92)},
     "crawlway": {"door": ((6.0, 0.9, 1.6), (9.0, 12.0, 1.3), 86), "manifold": ((4.0, 3.0, 1.6), (11.0, 10.0, 1.4), 80), "back": ((14.0, 2.0, 1.6), (4.0, 12.0, 1.2), 92)},
+    "ready_room": {"door": ((5.0, 1.0, 1.65), (5.0, 3.9, 1.35), 84), "desk": ((10.0, 3.2, 1.7), (1.0, 1.6, 1.2), 70), "window": ((6.0, 0.9, 1.65), (0.3, 2.0, 1.5), 82),
+                   "lounge": ((5.6, 0.7, 1.7), (9.2, 3.2, 0.9), 78), "table": ((6.5, 3.0, 1.7), (11.4, 1.8, 1.2), 74), "back": ((11.5, 3.5, 1.7), (3.0, 1.0, 1.1), 92)},
     "firing_range": {"door": ((10.0, 0.9, 1.65), (22.0, 9.0, 1.4), 84), "booths": ((2.6, 8.55, 1.65), (30.0, 8.55, 1.5), 62), "gallery": ((2.0, 1.4, 1.6), (26.0, 2.0, 1.4), 86),
                      "down": ((8.0, 9.5, 1.6), (39.0, 9.5, 1.6), 60), "trap": ((26.0, 9.5, 1.7), (39.7, 9.5, 1.6), 62), "back": ((38.0, 14.0, 1.7), (8.0, 4.0, 1.3), 84)},
 }
@@ -375,6 +377,67 @@ def modules(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     return done
 
 
+def bridge(args: dict, plan, reg: dict, objs: dict) -> list[str]:
+    """Deck 1: the bridge's port corridor as its builder (tools/ue_scripts/build_bridge_v3.py) lays it out with the old corridor kit (kit_corridor.py: three 4 m modules, the window
+    one in the middle, panels on the walls), with the module that has the ready room's door in place of the window module, the name plate and the ready room."""
+    import kit_corridor as KC
+    out = args["preview"]
+    done = []
+    yc, x_end = -3.9, -8.8
+    for name, (eye, tgt, fov, cut) in {
+        "d1_door": ((-10.9, -4.6, 1.65), (-15.8, -2.3, 1.35), 66, None),
+        "d1_corridor": ((-9.2, -3.7, 1.65), (-20.3, -3.9, 1.5), 84, None),
+        "d1_room_door": ((-15.8, -0.3, 1.65), (-15.8, -2.4, 1.3), 74, None),
+        "d1_cut": (None, None, 0, (-23.0, -6.0, -7.0, 6.0)),
+    }.items():
+        _remove_instances()
+        SP.setup(1280, 720, args["samples"] if cut is None else max(8, args["samples"] // 2), exposure=0.0, world=WORLD)
+        shell, win = KC.shell("PV_Shell"), KC.shell("PV_ShellWindow", window=True)
+        glass = KC.window_glass("PV_Glass")
+        low, up, short = KC.panel_plain("PV_Low", 1.06), KC.panel_plain("PV_Up", 1.10), KC.panel_plain("PV_Short", 0.62)
+        cap = KC.end_cap("PV_Cap")
+        mods = [x_end - 12.0, x_end - 8.0, x_end - 4.0]
+        for i, xm in enumerate(mods):
+            if i == 1:
+                door = objs.get("SM_SHIP_BridgeCorridorDoor")
+                SP.instance(door if door is not None else win, (xm, yc, 0.0), 0.0)
+                SP.instance(glass, (xm, yc, 0.0), 0.0)
+            else:
+                SP.instance(shell, (xm, yc, 0.0), 0.0)
+            for bi, (b0, b1) in enumerate(KC.BAYS):
+                if not (i == 1 and bi == 0):                                      # the door's bay has no panels
+                    SP.instance(low, (xm + b1, yc + 1.6, 0.22), 180.0)
+                    SP.instance(up, (xm + b1, yc + 1.6, 1.32), 180.0)
+                if i == 1:
+                    SP.instance(short, (xm + b0, yc - 1.6, 0.22), 0.0)
+                else:
+                    SP.instance(low, (xm + b0, yc - 1.6, 0.22), 0.0)
+                    SP.instance(up, (xm + b0, yc - 1.6, 1.32), 0.0)
+            SP.rect_light(f"CorrPort_Light{i}", (xm + 2.0, yc, 2.9), (3.4, 0.14), 90.0, (1.0, 0.9, 0.75))
+        SP.instance(cap, (mods[0], yc, 0.0), 180.0)
+        for p in plan["placements"].get("1", []):
+            o = objs.get(p["mesh"])
+            if o is not None and p["mesh"] != "SM_SHIP_BridgeCorridorDoor":
+                SP.instance(o, p["pos"], p["yaw"], p["label"])
+        for o in objs.values():
+            o.hide_render = True
+        rr = next(c for c in plan["compartments"] if c["id"] == "ready_room")
+        for l in rr.get("lights", []):
+            sx, sy = l["size"]
+            SP.rect_light(l["id"], l["pos"], (max(0.2, sx), max(0.2, sy)), l["lumens"] * 0.045, _kelvin(l.get("temperature", 4500)), False)
+        if cut is None:
+            cam = SP.look_camera(name, eye, tgt, fov)
+        else:
+            SP.flat_light(1.0)
+            x0, x1, y0, y1 = cut
+            cam = SP.plan_camera(name, x0, x1, y0, y1, 2.7)
+            cam.location = ((x0 + x1) / 2, -(y0 + y1) / 2, 2.7)
+        path = os.path.join(out, f"{name}.jpg")
+        SP.render(cam, path)
+        done.append(path)
+    return done
+
+
 def run(args: dict, plan, reg: dict, objs: dict) -> None:
     os.makedirs(args["preview"], exist_ok=True)
     KEEP.clear()
@@ -385,6 +448,8 @@ def run(args: dict, plan, reg: dict, objs: dict) -> None:
             done += rooms(args, plan, reg, objs)
         elif v == "modules":
             done += modules(args, plan, reg, objs)
+        elif v == "d1" and plan:
+            done += bridge(args, plan, reg, objs)
         elif v == "d4" and plan:
             done += deck(args, plan, reg, objs, 4)
         elif v == "d6" and plan:

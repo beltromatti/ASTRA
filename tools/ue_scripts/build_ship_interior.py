@@ -17,6 +17,9 @@ Set globals before running to change the defaults:
   REMOVE_LIFT_LEAVES = True   open the entrances of the existing rooms that a built deck now runs up to: destroy the static lift leaves that close their alcoves
                               (folders "Mess/Lift", "Berths/Lift" on Deck 4, "Medbay/Lift" on Deck 6) and put a sliding door (AAstraDoor) in the opening; only once
                               AstraHangar's landings point to the new lift banks (docs/NAVE.md, "Lift"), because the lift's own doors go with the leaves
+  OPEN_READY_ROOM = True      the Captain's ready room (Deck 1) opens on the bridge's port corridor: the window module the bridge builder placed there (label "CorrPort_Window") and
+                              the two panels of its first inner-wall bay ("CorrPort1_0_*_R") are destroyed in L_Bridge; the deck's map holds SM_SHIP_BridgeCorridorDoor in their place.
+                              Run this script after build_bridge_v3.py (which would place them again)
   SAVE_LEVEL = True
   ROOT, LEVEL, DECK_DIR       the checkout, the persistent level and the folder of the decks' sub-levels (the tests of the support agents point them at a copy)
 
@@ -65,6 +68,7 @@ REBUILD_KIT = globals().get("REBUILD_KIT", "changed")
 CHUNK_M = float(globals().get("CHUNK_M", 160.0))
 LOCK_STAIRS = globals().get("LOCK_STAIRS", True)
 REMOVE_LIFT_LEAVES = globals().get("REMOVE_LIFT_LEAVES", True)
+OPEN_READY_ROOM = globals().get("OPEN_READY_ROOM", True)
 SAVE_LEVEL = globals().get("SAVE_LEVEL", True)
 
 eal = unreal.EditorAssetLibrary
@@ -391,6 +395,22 @@ def open_existing_entrances():
     log.append(f"existing entrances opened: {opened}")
 
 
+def open_ready_room_wall():
+    """The ready room's door is cut in the inner wall of the bridge's port corridor, whose modules the bridge builder (build_bridge_v3.py) placed as actors of L_Bridge: the
+    window module and the two wall panels of its first bay (the door's) are removed; the deck's map has the module with the opening (SM_SHIP_BridgeCorridorDoor, ship_rooms_bridge.py)."""
+    door = next((d for d in PLAN_DATA["doors"] if d["id"] == "ready_room_door"), None)
+    if door is None or door.get("planned") or 1 not in DECKS:
+        log.append("ready room: no door in the plan or Deck 1 not built here: the corridor is left as it is")
+        return
+    gone = []
+    for a in eas.get_all_level_actors():
+        label = a.get_actor_label()
+        if label == "CorrPort_Window" or (label.startswith("CorrPort1_0_") and label.endswith("_R")):
+            gone.append(label)
+            eas.destroy_actor(a)
+    log.append(f"ready room: {len(gone)} actors of the port corridor removed {sorted(gone)}" + ("" if gone else " (already open, or the corridor was built differently)"))
+
+
 # ------------------------------------------------------------------------------------------------------------------------ run
 if not eal.does_asset_exist(LEVEL):
     raise RuntimeError(f"{LEVEL} missing: build the bridge level first (build_bridge.py)")
@@ -409,6 +429,8 @@ cleared = clear_deck_folders(world, DECKS)
 log.append(f"{cleared} old actors of the decks {DECKS} removed from {LEVEL}")
 if REMOVE_LIFT_LEAVES:
     open_existing_entrances()
+if OPEN_READY_ROOM:
+    open_ready_room_wall()
 if 4 in DECKS:
     # the lift's Deck 4 stop is now the Mess Concourse's lift bank (the Mess Hall is reached from the concourse, not from its old alcove): the hangar's lift
     # sends the Captain there
