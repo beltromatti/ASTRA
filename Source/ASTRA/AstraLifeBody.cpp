@@ -391,6 +391,7 @@ bool AAstraLifeBody::TickLift(float Dt, const FAstraLifePerson& P)
 		}
 		SetMode(EMode::Lift, P);
 		bRideWalk = false;
+		Offset = FVector2D(GetActorLocation().X - A.X, GetActorLocation().Y - A.Y);      // (where they stand in the lobby, as a step off the waiting place: they settle onto it, no jump)
 	}
 	else if (!L || !Lifts || P.Phase != FAstraLifePerson::EPhase::Walking || R.Done() || R.Seg != RideSeg || !FVector(R.Pts[R.Seg]).Equals(RideA, 1.f))
 	{
@@ -411,6 +412,22 @@ bool AAstraLifeBody::TickLift(float Dt, const FAstraLifePerson& P)
 	if (bRideWalk)
 	{
 		Body->SetPlayRate(FMath::Clamp(Speed / CVarWalkNatural.GetValueOnGameThread(), 0.f, 1.5f));
+	}
+	if (Step == FAstraLiftRider::EStep::Wait)
+	{
+		// at the landing, waiting: the Captain walking up to the doors gives them a step to make way (nobody is walked through), and they come back when the way is clear
+		FVector2D Push = FVector2D::ZeroVector;
+		if (const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0); Pawn && Pawn->IsA<ACharacter>())
+		{
+			const FVector2D Rel(RideA.X - Pawn->GetActorLocation().X, RideA.Y - Pawn->GetActorLocation().Y);
+			const float D = Rel.Size();
+			if (D < 100.f && FMath::Abs(RideA.Z - Pawn->GetActorLocation().Z) < 170.f)
+			{
+				Push = (D > 1.f ? Rel / D : FVector2D(1.f, 0.f)) * (100.f - D);
+			}
+		}
+		Offset = FMath::Vector2DInterpTo(Offset, Push.GetClampedToMaxSize(60.f), Dt, 7.f);
+		SetActorLocation(FVector(RideA.X + Offset.X, RideA.Y + Offset.Y, GetActorLocation().Z), false, nullptr, ETeleportType::None);
 	}
 	Turn = FMath::FixedTurn(Turn, Rider.FacingYaw(), 360.f * Dt);
 	SetActorRotation(FRotator(0.f, ActorYawFor(Turn), 0.f));
