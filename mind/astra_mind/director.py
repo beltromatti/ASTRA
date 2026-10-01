@@ -36,6 +36,9 @@ COMMANDER_VOICES = ["stuart_bell", "michael", "juergen", "lola", "anna", "paul",
 # the voices for the allied captains the story invents (not used by the bridge, the admiral or the Mandate's fixed captains)
 ALLY_VOICES = {"f": ["cosette", "fantine", "azelma", "eponine", "anna"], "m": ["michael", "juergen", "marius", "stuart_bell", "paul"]}
 
+MANDATE_CLASSES = ("acheron", "styx", "lethe", "cruiser", "frigate")
+ASTRA_CLASSES = ("praetorian", "vigilant", "battleship", "destroyer")
+
 # where the war stands when a campaign begins (the director rewrites them at every beat): what each side is gathering
 OPENING_THREADS = (
     "The Kharon Mandate's Interdiction Fleet is gathering beyond the Janus Gate for the assault on Aurelia — carrier groups with their "
@@ -120,7 +123,9 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
               "and carries decoys, a styx carries decoys); reinforcements: ASTRA ships, each with its `captain`; "
               "decisive: one Mandate group (the main fleet goes in `groups`)"},
     "groups": {"type": "array", "items": GROUP, "description": "raid, reinforcements, decisive: the force in battle groups — for anything bigger "
-               "than one group (up to 40 ships in all, 10 a group); the first group's leader commands the whole force. `ships` stays for one group"},
+               "than one group (up to 40 ships in all, 10 a group); the first group's leader commands the whole force. `ships` stays for one group. "
+               "A Mandate force (acheron, styx, lethe) is a `raid` (or the `decisive`), the 7th Fleet's (praetorian, vigilant) is `reinforcements`: "
+               "the ships' classes say whose a group is"},
     "attackers": {"type": "array", "items": SHIP, "description": "distress: the Mandate raiders (styx or lethe)"},
     "ship": {"type": "object", "properties": {"name": {"type": "string"}, "class": {"type": "string"}},
              "description": "distress: the ship calling for help (a Free Guilds freighter)"},
@@ -700,7 +705,8 @@ class Director:
 
     def _register_groups(self, ids: list[str], groups: list[dict[str, Any]], kind: str, force_cmd: dict[str, Any], why: str) -> None:
         """A force in battle groups: the game gave the ids in the groups' order (each group's leader first). A Mandate group's leader gets the
-        commander the story wrote for it (the first group's, if only the force has one); every ASTRA ship gets its captain."""
+        commander the story wrote for it (the first group's, if only the force has one); every ASTRA ship gets its captain. Whose a group
+        is comes from its ships, as in the game (a Styx line is the Mandate's whatever the beat was called)."""
         at = 0
         for g, grp in enumerate(groups):
             if not isinstance(grp, dict):
@@ -710,7 +716,9 @@ class Director:
             at += len(ships)
             if not gids:
                 break
-            if kind == "reinforcements":
+            lead = str((ships[0] if ships else {}).get("class", "")).lower()
+            mandate = any(k in lead for k in MANDATE_CLASSES) or (not any(k in lead for k in ASTRA_CLASSES) and kind == "raid")
+            if not mandate:
                 self._register_captains(gids, ships)
                 continue
             cmd = grp.get("commander") or (force_cmd if g == 0 else {})

@@ -4583,8 +4583,20 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 	// and to her right, from the beat's arrival point), with its leader first, its carriers' wings and its own objective; the
 	// Mandate's come through dark under the fog of war, the 7th Fleet's are on the plot at once. The groups' commanders think
 	// for them (war_minds.py: one seat per group).
-	const bool bRaid = Type == TEXT("raid");
-	const EAstraSide Side = bRaid ? EAstraSide::Mandate : EAstraSide::Astra;
+	// whose a group is comes from its ships, not from the beat's word for it: an Acheron, a Styx, a Lethe are the Mandate's, a
+	// Praetorian or a Vigilant the 7th Fleet's (a world fact; a "reinforcements" beat that brought a Styx line once turned it into
+	// five ASTRA destroyers with Mandate names)
+	const auto IsMandateClass = [](FString C)
+	{
+		C = C.ToLower();
+		return C.Contains(TEXT("acheron")) || C.Contains(TEXT("styx")) || C.Contains(TEXT("lethe")) || C.Contains(TEXT("cruiser")) || C.Contains(TEXT("frigate"));
+	};
+	const auto IsAstraClass = [](FString C)
+	{
+		C = C.ToLower();
+		return C.Contains(TEXT("praetorian")) || C.Contains(TEXT("vigilant")) || C.Contains(TEXT("battleship")) || C.Contains(TEXT("destroyer"));
+	};
+	bool bAnyRaid = false;
 	const int32 PlayerId = Ships[0].Id;                  // copies: spawning may reallocate Ships
 	const FVector PlayerPos = Ships[0].Pos;
 	const FVector Fwd = (PlayerPos - Centre).GetSafeNormal2D().IsNearlyZero() ? FVector::ForwardVector : (PlayerPos - Centre).GetSafeNormal2D();
@@ -4593,10 +4605,21 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 	int32 NextIdx = 0;
 	int32 Total = 0;
 	int32 FirstLeader = INDEX_NONE;
-	TArray<FString> Listing;
+	TArray<FString> Listing, FriendlyListing;
 	for (int32 g = 0; g < Force.Num(); ++g)
 	{
 		const TSharedPtr<FJsonObject>& G = Force[g];
+		const TArray<TSharedPtr<FJsonValue>>* GShips = nullptr;
+		G->TryGetArrayField(TEXT("ships"), GShips);
+		// the group's side: its leader's class (else the beat's word)
+		FString LeadClass;
+		if (GShips && GShips->Num() && (*GShips)[0]->Type == EJson::Object)
+		{
+			(*GShips)[0]->AsObject()->TryGetStringField(TEXT("class"), LeadClass);
+		}
+		const bool bRaid = IsMandateClass(LeadClass) ? true : (IsAstraClass(LeadClass) ? false : Type == TEXT("raid"));
+		const EAstraSide Side = bRaid ? EAstraSide::Mandate : EAstraSide::Astra;
+		bAnyRaid |= bRaid;
 		FString GName = FString::Printf(TEXT("%s group %d"), bRaid ? TEXT("Mandate") : TEXT("7th Fleet"), g + 1), Formation = bRaid ? TEXT("wedge") : TEXT("line"), GoesFor;
 		G->TryGetStringField(TEXT("name"), GName);
 		G->TryGetStringField(TEXT("formation"), Formation);
@@ -4608,8 +4631,6 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 		{
 			GC += Fwd * FMath::Clamp((*Off)[0]->AsNumber(), -40.0, 40.0) * OneKm + Right * FMath::Clamp((*Off)[1]->AsNumber(), -40.0, 40.0) * OneKm;
 		}
-		const TArray<TSharedPtr<FJsonValue>>* GShips = nullptr;
-		G->TryGetArrayField(TEXT("ships"), GShips);
 		const int32 NShips = GShips ? FMath::Min(GShips->Num(), MaxBeatGroupShips) : 0;
 		const double Sp = (bRaid ? 1.6 : 1.8) * OneKm;
 		TArray<int32> Made;
@@ -4624,6 +4645,12 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 			Spec->TryGetStringField(TEXT("class"), Class);
 			Spec->TryGetStringField(TEXT("name"), Name);
 			Class = Class.ToLower();
+			if (bRaid ? IsAstraClass(Class) : IsMandateClass(Class))
+			{
+				const FString Id = Ids.IsValidIndex(NextIdx) ? Ids[NextIdx++] : FString();   // (its id is spent: the ids follow the ships)
+				UE_LOG(LogASTRA, Warning, TEXT("[Battle] a %s in a %s group left out (%s)"), *Class, bRaid ? TEXT("Mandate") : TEXT("7th Fleet"), *Id);
+				continue;
+			}
 			if (!bRaid && !Class.Contains(TEXT("praetorian")))
 			{
 				Class = TEXT("vigilant");                       // the 7th Fleet sends what it has: battleships and destroyers
@@ -4744,8 +4771,12 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 			}
 		}
 		Listing.Add(FString::Printf(TEXT("%s: %d ships"), *GName, Made.Num()));
+		if (!bRaid)
+		{
+			FriendlyListing.Add(Listing.Last());
+		}
 	}
-	if (bRaid)
+	if (bAnyRaid)
 	{
 		bEngagementActive = true;
 		bScenarioOver = false;
@@ -4760,15 +4791,15 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 			TransmissionAt = Time + 14.f;
 		}
 	}
-	else
+	if (FriendlyListing.Num())
 	{
 		Report(FString::Printf(TEXT("sensors: friendly contacts at %.0f km, bearing %03.0f — the 7th Fleet: %s"), (Centre - PlayerPos).Size() / OneKm, Bearing,
-		                       *FString::Join(Listing, TEXT("; "))));
+		                       *FString::Join(FriendlyListing, TEXT("; "))));
 		bool bGranted = false;
 		Beat->TryGetBoolField(TEXT("granted"), bGranted);
 		if (!bGranted && !bEngagementActive)
 		{
-			Report(FString::Printf(TEXT("director: beat complete — reinforcements arrived (%s)"), *FString::Join(Listing, TEXT("; "))), false);
+			Report(FString::Printf(TEXT("director: beat complete — reinforcements arrived (%s)"), *FString::Join(FriendlyListing, TEXT("; "))), false);
 		}
 	}
 }

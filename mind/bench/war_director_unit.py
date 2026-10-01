@@ -278,6 +278,17 @@ class DirectorTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.d.decisive)
         self.assertEqual([(c, p["name"]) for c, p in self.registered], [("T-41", "Archon Teodor Vale")])
 
+    async def test_a_styx_line_called_reinforcements_is_still_the_mandates(self) -> None:
+        self.ids_reply(2)
+        self.model.script = [("start_beat", {"type": "reinforcements", "why": "a Styx line comes to press the Aquila", "crew_mood": "tense",
+                                             "groups": [{"name": "Styx Line Kade", "goes_for": "escorts",
+                                                         "ships": [{"class": "styx", "name": "Acheron's Wake"}, {"class": "styx", "name": "Lethe's Mouth"}],
+                                                         "commander": {"name": "Ferryman Iva Kade", "rank": "Ferryman", "bio": "x", "orders": "y"}}]}),
+                             ("transmit", {"text": "Il Gate sta ciclando."})]
+        await self.d._next_beat("it", QUIET)
+        self.assertEqual([(c, p["name"]) for c, p in self.registered], [("T-41", "Ferryman Iva Kade")])   # a Mandate commander, not two ASTRA captains
+        self.assertNotIn("T-41", self.minds.allies)
+
     async def test_a_new_campaign_begins_with_the_war_gathering(self) -> None:
         self.d.reset()
         self.assertTrue(any("Interdiction Fleet" in t for t in self.d.threads))
