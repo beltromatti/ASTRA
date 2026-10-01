@@ -194,8 +194,8 @@ def lift_tool(lift: Any) -> dict[str, Any]:
     ids = list(lift.ids)
     listing = "; ".join(s.text for s in lift.stops)
     return _fn("lift_go", f"Lift: the ship's computer takes the car the Captain is in ({lift.name}) to one of its stops: the car really moves (the doors close, it runs to the stop, "
-                          "the doors open there); the Captain stays aboard. Call it when he asks to go somewhere and the stop is on this car's list; the result says when the car "
-                          "gets there. Never for a place this car does not serve.", {
+                          "the doors open there); the Captain stays aboard. Call it when he asks to go somewhere and the stop is on this car's list, in the same reply as the computer's "
+                          "one short line (speak); the result says when the car gets there. Never for a stop this car does not have, and never for the nearest stop instead.", {
         "destination": {"type": "string", "enum": ids, "description": f"the stop to take him to: {listing}"}}, ["destination"])
 LOOKUPS = {"crew_locate"}            # tools that only read: what they find goes back to the officer, who then tells the Captain
 

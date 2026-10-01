@@ -114,7 +114,8 @@ class ContextTest(unittest.TestCase):
 
     def test_the_room_tells_the_model_what_to_do(self) -> None:
         note = context_model.describe(parse_context(IN_CAR, {}))
-        for want in ("Turbolift 1", "lift_go", "`computer`", "Main Engineering", "d7 = DECK 7, Engineering & Power", "any language", "never read an id aloud"):
+        for want in ("Turbolift 1", "lift_go", "`computer`", "Main Engineering", "d7 = DECK 7, Engineering & Power", "any language", "never read an id aloud",
+                     "from the highest to the lowest"):
             self.assertIn(want, note)
         self.assertNotIn("Turbolift", context_model.describe(parse_context(IN_CORRIDOR, {})))
 
@@ -123,6 +124,7 @@ class ContextTest(unittest.TestCase):
                "stops": [{"id": "sec_a", "label": "SECTION A", "places": []}, {"id": "sec_h", "label": "SECTION H", "places": ["Aft Stores"]}]}
         lift = parse_context({**IN_CAR, "lift": row}, {}).lift
         self.assertIn("shuttle car on the Spine line", context_model.describe_lift(lift))
+        self.assertIn("in the order the line runs", context_model.describe_lift(lift))
         self.assertEqual(lift_tool(lift)["function"]["parameters"]["properties"]["destination"]["enum"], ["sec_a", "sec_h"])
 
 

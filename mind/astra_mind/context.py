@@ -269,10 +269,13 @@ def describe_lift(lift: Lift) -> str:
     return (f"The Captain is inside {lift.name}, a {'shuttle car on the Spine line' if shuttle else lift.kind + ' car'}" + (f", {where}" if where else "") + ". "
             "The ship's computer runs every lift and shuttle and takes the Captain where he says, as a real ship's computer would: a stop named in any way "
             "(a number, a deck's name, a place on it, a section, \"the bridge\", \"Main Engineering\", \"down\", \"one up\", \"where the wounded are\"), "
-            "in any language. When he asks for it, CALL `lift_go` with the stop that fits (it moves the car for real) and then the computer — speaker `computer`, "
-            "never an officer — confirms in ONE very short line in the Captain's language that names where it goes (never read an id aloud). If what he asked "
-            "fits no stop of this car, call nothing: the computer says so in one short line and names what this car serves. The officers stay out of the lift: "
-            "they answer only what is meant for them. The stops of this car (id = label, deck name, notable places): " + "; ".join(s.text for s in lift.stops) + ".")
+            "in any language. When he asks for it, in ONE reply CALL `lift_go` with the stop that fits (it moves the car for real) AND speak as the computer (speaker "
+            "`computer`, never an officer): ONE very short line in the Captain's language that names where it goes the way people say it in HIS language (the deck by "
+            "its number and its place, in his words, never the panel's capital letters; never read an id aloud). If what he asked is not a stop of this car (a deck or a "
+            "place that is not on its list: the nearest stop is NOT a substitute), call NO lift tool: the computer says so in one short line and names what this car "
+            "serves. The officers stay out of the lift: "
+            "they answer only what is meant for them. The stops of this car, listed " + ("in the order the line runs, the first stop first" if shuttle else "from the highest to the lowest")
+            + " (id = label, deck name, notable places): " + "; ".join(s.text for s in lift.stops) + ".")
 
 
 def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
