@@ -180,7 +180,8 @@ namespace AstraBoard
 		Reload,
 		Spawn,       // Unit came into the fight
 		Order,       // a squad's task changed
-		Outcome
+		Outcome,
+		Cut          // the Mandate cut through a sealed bulkhead: Target is the door (the damage map's index), Start where it is
 	};
 	struct FBoardEvent
 	{
@@ -241,6 +242,10 @@ public:
 	int32 AddUnit(AstraBoard::ESide Side, AstraBoard::ERole Role, const FString& Name, const FVector& Pos, int32 SquadId);
 	int32 AddSquad(AstraBoard::ESide Side, const FString& Name);
 	/** The Captain joins the fight as a man the game moves. */
+	/** A unit that is not in the fight yet: it joins where it stands Seconds from now (a marine roused from his bunk who has to dress and arm). */
+	void DelayUnit(int32 UnitId, float Seconds);
+	/** A squad by its name ("Watch 1", "Reaction 2", "Ferry Guard Alpha"), exactly as the fight names it (INDEX_NONE when there is none). */
+	int32 FindSquad(const FString& Name) const;
 	int32 AddCaptain(const FVector& Pos);
 	void SetCaptain(const FVector& Pos, float Yaw, bool bLow, float Speed, bool bDown);
 	int32 CaptainId() const { return CaptainUnit; }

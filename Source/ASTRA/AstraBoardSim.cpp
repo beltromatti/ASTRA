@@ -229,6 +229,28 @@ int32 FAstraBoardSim::AddUnit(ESide Side, ERole Role, const FString& Name, const
 	return Spawn(Side, Role, Name, Pos, SquadId).Id;
 }
 
+void FAstraBoardSim::DelayUnit(int32 UnitId, float Seconds)
+{
+	if (!People.IsValidIndex(UnitId))
+	{
+		return;
+	}
+	People[UnitId].Act = EAct::Waiting;
+	Pending.Add({UnitId, (float)(Clock + Seconds)});
+}
+
+int32 FAstraBoardSim::FindSquad(const FString& Name) const
+{
+	for (const FSquad& S : Teams)
+	{
+		if (S.Name.Equals(Name, ESearchCase::IgnoreCase))
+		{
+			return S.Id;
+		}
+	}
+	return INDEX_NONE;
+}
+
 int32 FAstraBoardSim::AddCaptain(const FVector& Pos)
 {
 	FUnit& U = Spawn(ESide::Aquila, ERole::Captain, TEXT("the Captain"), Pos, INDEX_NONE);
@@ -420,7 +442,7 @@ void FAstraBoardSim::StepDoors()
 				CutT[d] = 0.f;
 				Doors.Sealed[d] = false;
 				const int32 Pi = Map->PortalOfDoor(d);
-				Emit(EEvent::Order, INDEX_NONE, INDEX_NONE, Pi != INDEX_NONE ? Map->GetPortals()[Pi].Pos : FVector::ZeroVector, FVector::ZeroVector, 0.f, false,
+				Emit(EEvent::Cut, INDEX_NONE, d, Pi != INDEX_NONE ? Map->GetPortals()[Pi].Pos : FVector::ZeroVector, FVector::ZeroVector, 0.f, false,
 				     FString::Printf(TEXT("the Mandate cut through the bulkhead at %s"), Pi != INDEX_NONE ? *Map->Describe(Map->GetPortals()[Pi].A) : TEXT("?")));
 			}
 		}

@@ -664,10 +664,10 @@ void FAstraBoardSim::StepAmbush()
 			Pass.Wings.Add({People[S.Leader].Pos, Men, (float)Clock + S.MusterT});
 		}
 		// as many marines as there are boarders (the ones still to come in count)
-		int32 Hostile = Pending.Num();
+		int32 Hostile = 0;
 		for (const FUnit& U : People)
 		{
-			Hostile += (U.Side == ESide::Mandate && U.Able() && !U.bExternal) ? 1 : 0;
+			Hostile += (U.Side == ESide::Mandate && (U.Able() || U.Act == EAct::Waiting) && !U.bExternal) ? 1 : 0;       // the ones still to come in count
 		}
 		Pass.Need = FMath::Max(6, FMath::CeilToInt(Hostile * 0.8f));
 		// the openings with corners along the Mandate's way, and when the boarders get to each (the bulkheads they must cut count)
@@ -675,7 +675,10 @@ void FAstraBoardSim::StepAmbush()
 		FVector Prev = Mis.BreachPos;
 		for (const FPending& P : Pending)
 		{
-			FirstIn = FMath::Min(FirstIn, P.At);
+			if (People[P.Unit].Side == ESide::Mandate)
+			{
+				FirstIn = FMath::Min(FirstIn, P.At);
+			}
 		}
 		if (FirstIn > 1.0e8f)
 		{
