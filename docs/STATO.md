@@ -86,7 +86,7 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
     (anche via radio dal Ponte 4): i «failed» erano solo `-nosound`.
   - L'«anello scuro» di VFX era il Janus Gate dietro la fila di campioni: gli effetti sono a posto.
   - Aiutanti: **MENTE-GUERRA** e **NAVE-2** ripresi dopo il limite di sessione; **DISTRUZIONE** avviato (brief aggiornato con la
-    spirale dei danni interni, il tampone e il metro `tools/survive.sh`). In costruzione l'app aggiornata (`tools/pacchetto.sh`).
+    spirale dei danni interni, il tampone e il metro `tools/survive.sh`). **App aggiornata** in `~/Applications/ASTRA.app` (Development, 1/10 12:52, provata: parte, plancia, effetti di guerra, VITA, MetalFX).
 - **Aiutanti al lavoro** (brief in `docs/brief/`): **MENTE-GUERRA** (ammiragli, comandanti, alleati che parlano, l'XO con
   `group_order`, la mente nel giro del banco, poi il regista v2), **VFX** (armi, scudi, esplosioni, rotture coi pezzi v3, danni sugli
   scafi, motori), **NAVE-2** (tutti i ponti: stanze nuove, istanze, luci come dati, un sotto-livello per ponte). Poi DISTRUZIONE,
