@@ -61,12 +61,12 @@ struct FCase
 	const char* Label;
 };
 
-static void RunCase(id<MTLDevice> Dev, id<MTLCommandQueue> Q, id<MTLLibrary> Lib, const FCase& C, int Frames)
+static void RunCase(id<MTLDevice> Dev, id<MTLCommandQueue> Q, id<MTLLibrary> Lib, const FCase& C, int Frames, MTLPixelFormat ColorFormat = MTLPixelFormatRGBA16Float)
 {
 	id<MTLFXTemporalScaler> S = MakeScaler(Dev, C.ExtentW, C.ExtentH, C.OutW, C.OutH, true, C.bDynamic,
-		MTLPixelFormatRGBA16Float, MTLPixelFormatDepth32Float, MTLPixelFormatRG16Float, MTLPixelFormatRGBA16Float, C.bAutoExposure);
+		ColorFormat, MTLPixelFormatDepth32Float, MTLPixelFormatRG16Float, MTLPixelFormatRGBA16Float, C.bAutoExposure);
 	if (!S) { printf("%-44s : scaler creation failed\n", C.Label); return; }
-	id<MTLTexture> Color = MakeTex2D(Dev, MTLPixelFormatRGBA16Float, C.ExtentW, C.ExtentH, MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
+	id<MTLTexture> Color = MakeTex2D(Dev, ColorFormat, C.ExtentW, C.ExtentH, MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
 	id<MTLTexture> Depth = MakeTex2D(Dev, MTLPixelFormatDepth32Float, C.ExtentW, C.ExtentH, MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget);
 	id<MTLTexture> Motion = MakeTex2D(Dev, MTLPixelFormatRG16Float, C.ExtentW, C.ExtentH, MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite);
 	id<MTLTexture> Out = MakeTex2D(Dev, MTLPixelFormatRGBA16Float, C.OutW, C.OutH, MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget);
@@ -149,8 +149,8 @@ static void RunCase(id<MTLDevice> Dev, id<MTLCommandQueue> Q, id<MTLLibrary> Lib
 		});
 		InCb.Add(Ms / Inner);
 	}
-	printf("%-44s : in one CB min %.3f med %.3f ms | back-to-back CBs min %.3f med %.3f | single CB gpu min %.3f | encode cpu %.0f us\n",
-		C.Label, InCb.Percentile(0.0), InCb.Median(), RoundMs.Percentile(0.0), RoundMs.Median(), GpuMs.Percentile(0.0), EncodeUs.Median());
+	printf("%-44s %-10s: in one CB min %.3f med %.3f ms | back-to-back CBs min %.3f med %.3f | single CB gpu min %.3f | encode cpu %.0f us\n",
+		C.Label, ColorFormat == MTLPixelFormatRG11B10Float ? "[R11G11B10F]" : (ColorFormat == MTLPixelFormatRGB10A2Unorm ? "[RGB10A2]" : "[RGBA16F]"), InCb.Percentile(0.0), InCb.Median(), RoundMs.Percentile(0.0), RoundMs.Median(), GpuMs.Percentile(0.0), EncodeUs.Median());
 }
 
 int main(int argc, char** argv)
@@ -181,6 +181,17 @@ int main(int argc, char** argv)
 			{ 1712, 1112, 1197, 775, 1710, 1107, true, false, "dyn: extent 1712x1112, content 1197x775" },
 			{ 1120, 630, 1120, 630, 1600, 900, false, true, "1120x630 -> 1600x900 with auto exposure" },
 		};
+		if (argc > 2 && strcmp(argv[2], "compare") == 0)
+		{
+			// Does the scene color format change the cost? Interleaved A/B on the game's cases (the machine's state drifts: compare neighbours only).
+			for (int Pass = 0; Pass < 2; ++Pass)
+				for (int Index : { 0, 1, 4, 10 })
+				{
+					RunCase(Dev, Q, Lib, Cases[Index], Frames, MTLPixelFormatRGBA16Float);
+					RunCase(Dev, Q, Lib, Cases[Index], Frames, MTLPixelFormatRG11B10Float);
+				}
+			return 0;
+		}
 		for (auto& C : Cases) RunCase(Dev, Q, Lib, C, Frames);
 	}
 	return 0;
