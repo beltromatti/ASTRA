@@ -82,6 +82,7 @@ class Scene:
     order: tuple[str, str, set[str], str | None] | None = None        # (by, squadron, mission types, target): the order that must reach the console
     max_lines: int = 2
     note: str = ""
+    memories: dict[str, list[str]] = field(default_factory=dict)       # what the people remember (from earlier in the campaign)
 
 
 def SQ(**squads: str) -> dict[str, Any]:
@@ -124,6 +125,12 @@ SCENES = [
           note="the Chief knows the rearm time from the board"),
     Scene("captain_to_helm", captain="Timoniere, rotta zero-nove-zero, mezza forza.", open_net=True, expect="quiet", note="words for the bridge on an open flight net"),
     Scene("captain_to_price", captain="Price, lancia Bravo sull'Acheron.", open_net=True, expect="quiet", note="Price is the bridge's: the net stays out"),
+    Scene("captain_launch_rearming", captain="CAG, lancia Bravo sull'Acheron.", open_net=True, who={"cag", "bravo_lead"}, max_lines=2,
+          state=SQ(bravo="on deck, rearming: ready in 45 s (7 Hammers)"), note="the console refuses (rearming): they say when it will be ready, and do not claim a launch"),
+    Scene("memory_promise", events=["flight: alpha squadron has lost 2 Falcons to enemy fire, 4 left — Lieutenant Tove Kimura (call sign Echo) killed; Ensign Jin Park (call sign Boots) killed"],
+          state=SQ(alpha="airborne: 4 Falcons airborne, mission strike on T-21; 4 lost"), who={"alpha_lead", "cag"}, max_lines=2,
+          memories={"alpha_lead": ["The Captain promised Pilgrim that Alpha would never again fly a strike through a point-defence belt without Bravo's cover."]},
+          note="a loss in the very situation a promise was about: it may show, never recited"),
     Scene("captain_unknown_target", captain="Alpha Lead, attacca il T-77.", open_net=True, who={"alpha_lead"}, max_lines=2, note="no such contact: the order is refused or not given; he says so"),
     Scene("captain_to_wrong_squadron", captain="Alpha Lead, manda Bravo ad attaccare l'Acheron.", open_net=True, max_lines=3,
           note="a leader does not order the other squadron: he says whose it is, or the CAG does it"),
@@ -146,12 +153,16 @@ SCENES = [
 class Game:
     """The flight console as the game answers it: a mission needs a live contact on the plot (UAstraBattleSubsystem::LaunchSquadron)."""
 
-    def __init__(self) -> None:
+    def __init__(self, state: dict[str, Any] | None = None) -> None:
         self.commands: list[dict[str, Any]] = []
+        self.state = state or {}
 
     async def execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
         self.commands.append({"name": name, "args": args, "by": by})
         p = args.get("params") or {}
+        board = str((self.state.get("squadrons") or {}).get(p.get("squadron", ""), ""))
+        if args.get("mode") not in ("recall", "hold") and "rearming" in board and "airborne" not in board.split("rearming")[0]:
+            return {"ok": False, "detail": f"{p.get('squadron')} squadron is rearming on the flight deck, " + board.split("rearming:", 1)[-1].split("(")[0].strip()}
         if args.get("mode") in ("strike", "escort", "ew") and p.get("target") not in PLOT:
             return {"ok": False, "detail": f"mission {args['mode']} needs a live contact (got '{p.get('target', '')}')"}
         if args.get("mode") == "escort" and p.get("target") in ("T-21", "T-22", "T-23"):
@@ -166,7 +177,7 @@ def words(s: str) -> int:
 async def run_scene(sc: Scene, llm: Spy, debug: bool) -> tuple[list[str], dict[str, Any]]:
     clock = Clock()
     lines: list[tuple[float, str, str, dict[str, Any]]] = []
-    game = Game()
+    game = Game(ship_state(**sc.state))
     t0 = time.perf_counter()
 
     async def say(key: str, text: str, lang: str, tone: str, **kw: Any) -> None:
@@ -178,6 +189,9 @@ async def run_scene(sc: Scene, llm: Spy, debug: bool) -> tuple[list[str], dict[s
         f.on_event(WING)
         f._events.clear()
     f.net_open = sc.open_net
+    for key, mems in sc.memories.items():
+        for m in mems:
+            f._remember({"speaker": key, "kind": "promise", "memory": m})
     for who, text in sc.net:
         f._note(who, text)
         clock.t += 4.0
@@ -311,29 +325,42 @@ async def main_async(a: argparse.Namespace) -> int:
     llm = Spy(OpenRouter())
     models.LEDGER.cap = None
     todo = [s for s in SCENES if not a.only or s.name in a.only]
-    total, bad = 0.0, 0
+    total, bad, runs = 0.0, 0, 0
     lat: list[float] = []
+    rates: list[tuple[str, int, int]] = []
     for sc in todo:
         if total >= a.cap:
             print(f"the cap of {a.cap:.3f} $ is reached: stopping")
             break
-        before = len(llm.done)
-        out, d = await run_scene(sc, llm, a.debug)
-        comps = llm.done[before:]
-        c = sum(x.cost for x in comps)
-        total += c
-        lat.append(d["pulse"].get("latency", 0.0))
-        bad += 1 if d["problems"] else 0
-        first = d["lines"][0][0] if d["lines"] else d["pulse"].get("latency", 0.0)
-        print(f"\n=== {sc.name} ({sc.lang}) — {sc.note}\n    {'OK ' if not d['problems'] else 'BAD'} {'; '.join(d['problems'])}  first line {first:.1f}s, "
-              f"{sum(x.prompt_tokens for x in comps)} in / {sum(x.completion_tokens for x in comps)} out, {c * 1000:.2f} m$")
-        for line in out:
-            print("    " + line)
-        if a.debug:
-            for x in comps:
-                print(f"        [{x.provider}] content={x.content[:160]!r} calls={[(t.name, t.arguments_raw[:400]) for t in x.tool_calls]} error={x.error[:120]!r}")
+        passed, shown_bad, cost_sc = 0, False, 0.0
+        for rep in range(a.repeat):
+            before = len(llm.done)
+            out, d = await run_scene(sc, llm, a.debug)
+            comps = llm.done[before:]
+            c = sum(x.cost for x in comps)
+            total += c
+            cost_sc += c
+            runs += 1
+            lat.append(d["pulse"].get("latency", 0.0))
+            ok = not d["problems"]
+            passed += 1 if ok else 0
+            bad += 0 if ok else 1
+            first = d["lines"][0][0] if d["lines"] else d["pulse"].get("latency", 0.0)
+            if rep == 0 or (not ok and not shown_bad):
+                shown_bad = shown_bad or not ok
+                print(f"\n=== {sc.name} ({sc.lang}){f' [run {rep + 1}]' if a.repeat > 1 else ''} — {sc.note}\n    {'OK ' if ok else 'BAD'} {'; '.join(d['problems'])}  first line {first:.1f}s, "
+                      f"{sum(x.prompt_tokens for x in comps)} in / {sum(x.completion_tokens for x in comps)} out, {c * 1000:.2f} m$")
+                for line in out:
+                    print("    " + line)
+                if a.debug:
+                    for x in comps:
+                        print(f"        [{x.provider}] content={x.content[:160]!r} calls={[(t.name, t.arguments_raw[:400]) for t in x.tool_calls]} error={x.error[:120]!r}")
+        rates.append((sc.name, passed, a.repeat))
+        if a.repeat > 1:
+            print(f"    -> {sc.name}: {passed}/{a.repeat} as expected, {cost_sc / a.repeat * 1000:.2f} m$ a pulse")
     if lat:
-        print(f"\n--- {len(todo) - bad}/{len(todo)} as expected, pulse latency median {statistics.median(lat):.1f}s (max {max(lat):.1f}s), spent {total:.5f} $")
+        print(f"\n--- {runs - bad}/{runs} runs as expected ({', '.join(f'{n} {p}/{r}' for n, p, r in rates if p < r) or 'every scene every time'}), "
+              f"pulse latency median {statistics.median(lat):.1f}s (max {max(lat):.1f}s), spent {total:.5f} $")
     if a.battle:
         await battle(llm, a.cap, total)
         print(f"\n--- total spent {models.LEDGER.total:.5f} $ ({models.LEDGER.summary()})")
@@ -348,6 +375,7 @@ def main() -> int:
     ap.add_argument("--cap", type=float, default=0.08, help="stop after spending this many dollars")
     ap.add_argument("--battle", action="store_true", help="also run the compressed battle (the cost an hour)")
     ap.add_argument("--debug", action="store_true", help="print what the model returned")
+    ap.add_argument("--repeat", type=int, default=1, help="run every scene this many times (the model is not deterministic): the rate of runs as expected is printed")
     return asyncio.run(main_async(ap.parse_args()))
 
 

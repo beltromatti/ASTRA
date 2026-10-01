@@ -160,6 +160,12 @@ class Classification(unittest.TestCase):
             self.assertIsNotNone(k, text)
             self.assertEqual((k.name, k.take), (kind, True), text)
 
+    def test_what_must_be_called_aloud(self) -> None:
+        called = {fm.classify(t).name for t in (LOSS, TORPEDO, RECOVERED, "flight: bravo squadron rearmed, 7 Hammers ready on the flight deck") if fm.classify(t).call}
+        self.assertEqual(called, {"losses", "torpedoes", "recovered", "rearmed"})
+        for t in (AIRBORNE, SPLASH, WING, "flight: search and rescue at the wreck of the Brightwater: lifeboats found, 41 survivors picked up"):
+            self.assertFalse(fm.classify(t).call, t)
+
     def test_what_belongs_to_price_and_the_xo_stays_with_them(self) -> None:
         for text in ("flight: launching Alpha on combat air patrol over the Aquila", "flight: the sky is quiet: recalling Alpha to rearm",
                      "flight: Falcon recon has identified T-21: Acheron-class cruiser, Cocytus",
@@ -381,12 +387,59 @@ class Pulses(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Alpha Lead: Due Falcon a terra", self.f._recall())                 # what was said is the net's log from then on
         self.assertIn("(news): flight: alpha squadron has lost 2 Falcons", self.f._recall())
 
+    async def test_a_pulse_does_not_inherit_the_callers_voice_flags(self) -> None:
+        """`feed` is called from the Captain's own turn (`captain_to_net`): the voice stage's per-task flags (an answer being given) must not follow into the pulse."""
+        import contextvars
+        flag = contextvars.ContextVar("flag", default="clean")
+        seen: list[str] = []
+
+        async def say(key: str, text: str, lang: str, tone: str, **kw: Any) -> None:
+            seen.append(flag.get())
+        self.f.say = say
+        self.bed.llm.say(("say", {"speaker": "alpha_lead", "text": "Due a terra.", "tone": "grim"}))
+        flag.set("the Captain's turn")
+        self.f.on_event(LOSS)
+        self.f.feed(self.st)
+        self.bed.at(fm.SETTLE_S + 0.5)
+        self.f.feed(self.st)
+        await self.bed.settle()
+        self.assertEqual(seen, ["clean"])
+
     async def test_silence_is_an_answer(self) -> None:
-        self.bed.llm.say(("stay_quiet", {"reason": "the rearm needs no voice"}))
-        await self.news("flight: bravo squadron rearmed, 7 Hammers ready on the flight deck")
+        self.bed.llm.say(("stay_quiet", {"reason": "the launch needs no voice"}))
+        await self.news(AIRBORNE)
         self.assertEqual(self.bed.lines, [])
         self.assertEqual(self.f.stats["silent"], 1)
-        self.assertIn("stayed quiet: the rearm needs no voice", self.f._recall())
+        self.assertIn("stayed quiet: the launch needs no voice", self.f._recall())
+
+    async def test_news_that_is_called_aloud_leaves_no_way_to_stay_quiet(self) -> None:
+        """A loss, a torpedo run, a recovery, a rearm, a wingman down: the look that holds one has no tool for silence (tool design, not a filter on the words); the
+        other looks keep it."""
+        def tools(i: int) -> set[str]:
+            return {t["function"]["name"] for t in self.bed.llm.requests[i]["tools"]}
+        self.bed.llm.say(("say", {"speaker": "alpha_lead", "text": "Due Falcon a terra.", "tone": "grim"}))
+        await self.news(LOSS)
+        self.assertEqual(tools(0), {"say", "mission", "remember"})
+        user = self.bed.llm.requests[0]["messages"][-1]["content"]
+        self.assertIn("holds news that is called aloud", user)
+        self.assertNotIn("call `stay_quiet`", user)
+        for k, text in enumerate((TORPEDO, RECOVERED, "flight: bravo squadron rearmed, 7 Hammers ready on the flight deck"), start=1):
+            self.bed.at(fm.MIN_GAP_S)
+            await self.news(text)
+            self.assertEqual(tools(k), {"say", "mission", "remember"}, text)
+        self.bed.at(fm.MIN_GAP_S)
+        await self.news(AIRBORNE)                                                         # a launch may go without a voice
+        self.assertEqual(tools(4), {"say", "mission", "remember", "stay_quiet"})
+        self.assertNotIn("holds news that is called aloud", self.bed.llm.requests[4]["messages"][-1]["content"])
+        self.assertIn("call `stay_quiet`", self.bed.llm.requests[4]["messages"][-1]["content"])
+
+    async def test_a_wingman_down_is_called_and_the_wings_other_news_is_not(self) -> None:
+        self.f.on_event(WING)
+        self.bed.llm.say(("say", {"speaker": "alpha_3", "text": "Eagle 2 è a terra, la capsula è fuori.", "tone": "urgent"}))
+        await self.news("flight: Eagle 2 is down — the pilot ejected, search and rescue is on the way")
+        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[0]["tools"]}, {"say", "mission", "remember"})
+        await self.news("flight: Eagle 3 engaged a Harpy at 2.4 km", wait_s=fm.WING_GAP_S + 0.1)
+        self.assertIn("stay_quiet", {t["function"]["name"] for t in self.bed.llm.requests[1]["tools"]})
 
     async def test_an_invented_tone_and_a_speaker_outside_the_cast_are_harmless(self) -> None:
         self.bed.llm.say(("say", {"speaker": "alpha_lead", "text": "Ricevuto.", "tone": "bubbly"}), ("say", {"speaker": "price", "text": "No.", "tone": "calm"}),
@@ -405,8 +458,21 @@ class Pulses(unittest.IsolatedAsyncioTestCase):
         self.bed.llm.replies = [[], [("say", {"speaker": "alpha_lead", "text": "Due Falcon a terra.", "tone": "grim"})]]
         await self.news(LOSS)
         self.assertEqual(len(self.bed.llm.requests), 2)
-        self.assertIn("was not said or done", self.bed.llm.requests[1]["messages"][-1]["content"])
+        again = self.bed.llm.requests[1]
+        self.assertIn("was not said or done", again["messages"][-1]["content"])
+        self.assertNotIn("stay_quiet", again["messages"][-1]["content"])                  # (news that is called aloud: no way out through silence)
+        self.assertNotIn("stay_quiet", {t["function"]["name"] for t in again["tools"]})
         self.assertEqual([l["text"] for l in self.bed.lines], ["Due Falcon a terra."])
+
+    async def test_the_model_that_writes_about_news_that_may_go_unsaid_may_still_stay_quiet(self) -> None:
+        self.bed.llm.content = "Alpha is on patrol."
+        self.bed.llm.replies = [[], [("stay_quiet", {"reason": "a launch"})]]
+        await self.news(AIRBORNE)
+        self.assertEqual(len(self.bed.llm.requests), 2)
+        again = self.bed.llm.requests[1]
+        self.assertIn("call stay_quiet", again["messages"][-1]["content"])
+        self.assertIn("stay_quiet", {t["function"]["name"] for t in again["tools"]})
+        self.assertEqual(self.bed.lines, [])
 
     async def test_a_model_with_nothing_to_write_or_call_is_silence_not_a_second_call(self) -> None:
         self.bed.llm.replies = [[]]
@@ -568,8 +634,9 @@ class Pulses(unittest.IsolatedAsyncioTestCase):
         second = self.bed.llm.requests[1]["messages"]
         self.assertTrue(any(m.get("role") == "tool" and "needs a live contact" in m["content"] for m in second))
         self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[1]["tools"]}, {"say", "mission", "stay_quiet"})
-        self.assertEqual(self.bed.lines[-1]["text"], "Capitano, il T-77 non è sul piano: scorto il Vigilant?")
+        self.assertEqual([l["text"] for l in self.bed.lines], ["Capitano, il T-77 non è sul piano: scorto il Vigilant?"])    # the line composed before the answer ("Scorto il T-77") is never said
         self.assertEqual(self.f.pulses[-1]["failed"], 1)
+        self.assertEqual(self.f.pulses[-1]["held"], 1)
 
     async def test_the_console_that_does_not_answer_is_a_failed_order_not_a_hang(self) -> None:
         async def hang(name: str, args: dict[str, Any], by: str) -> dict[str, Any]:

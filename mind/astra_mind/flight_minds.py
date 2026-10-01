@@ -30,6 +30,7 @@ Persistence: what the people remember (`remember`) is kept in Saved/Campaign/fli
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import re
@@ -128,6 +129,7 @@ class Kind:
     name: str
     take: bool                  # the net voices it, so the crew's report turn does not get it (Price coordinates, he does not echo)
     wing: bool = False          # it concerns Eagle's wing: the net answers fast, and only while a wing exists
+    call: bool = False          # it must be called by someone (a loss, a torpedo run, the deck's milestones): in a look that holds one, the net has no way to stay quiet
 
 
 # These are the game's event templates (AstraBattleSubsystem.cpp, AstraWarCraft.cpp); anything else goes to the crew as it always did. A new template is
@@ -136,10 +138,10 @@ class Kind:
 # `flight: ... recon has identified ...` (what a recon flight finds is the plot's news: Sensors tells it; the net reads it in its log).
 _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k) for p, k in (
     (r"^flight: (?:alpha|bravo|drones) squadron airborne", Kind("airborne", True)),
-    (r"^flight: (?:alpha|bravo|drones) squadron has lost", Kind("losses", True)),
-    (r"^flight: (?:alpha|bravo|drones) squadron torpedo run", Kind("torpedoes", True)),
-    (r"^flight: (?:alpha|bravo|drones) squadron recovered", Kind("recovered", True)),
-    (r"^flight: (?:alpha|bravo|drones) squadron rearmed", Kind("rearmed", True)),
+    (r"^flight: (?:alpha|bravo|drones) squadron has lost", Kind("losses", True, call=True)),
+    (r"^flight: (?:alpha|bravo|drones) squadron torpedo run", Kind("torpedoes", True, call=True)),
+    (r"^flight: (?:alpha|bravo|drones) squadron recovered", Kind("recovered", True, call=True)),
+    (r"^flight: (?:alpha|bravo|drones) squadron rearmed", Kind("rearmed", True, call=True)),
     (r"^flight: search and rescue", Kind("rescue", True)),
     (r"^tactical: \d+ harp(?:y|ies) splashed", Kind("splash", True)),
     (r"^flight: eagle(?:'s wing| [2-9])", Kind("wing", True, wing=True)),
@@ -208,6 +210,7 @@ STAY_QUIET = _fn("stay_quiet", "Nothing here needs a voice or an order: the net 
                              "Say in a few words why (it goes in the log).", {"reason": {"type": "string"}}, ["reason"])
 
 TOOLS = [SAY, MISSION, REMEMBER, STAY_QUIET]
+TOOLS_MUST = [SAY, MISSION, REMEMBER]               # a look that holds news that must be called (Kind.call): there is no tool for silence in it
 
 
 # ------------------------------------------------------------------------------------------------ the prompt
@@ -234,7 +237,8 @@ THE CAST (the id before each name is the `speaker` of `say`)
 {cast}
 
 WHEN YOU SPEAK
-- Only when something happens to you or to your people, or when the Captain speaks to you. Silence is normal and most news needs no voice: then call stay_quiet.
+- Only when something happens to you or to your people, or when the Captain speaks to you. Silence is normal and routine news needs no voice: then call stay_quiet. But a
+  loss, a kill and a torpedo run are never left to the boards: they are always called, once, by the one they belong to.
 - One voice for one piece of news, the person it concerns. A squadron's losses and kills are its leader's: the leader of the fighters calls the Harpies that were splashed in
   a few words ("Splash three, one left"), and nobody else on the bridge reports that news, so a kill the net has not called yet is called now; a torpedo run is the bomber
   leader's; the deck's milestones are the Chief of the Deck's, each called once in a few words with the number the Captain can use: a squadron launched (how many, on what),
@@ -304,11 +308,14 @@ _RADIO = {
            '"Deck: Alpha is aboard, six of eight. Rearm in sixty." · "Alpha Lead: splash three, two left."',
            '"Understood, Captain." alone · "Alpha Squadron has suffered the loss of two aircraft during the engagement." · repeating the Captain\'s own order back to him · the same news twice · '
            'ending every call with the same tail ("four Falcons holding the patrol")'),
-    "es": ('"Alpha Lead: dos Falcon abajo, Rook y Jinx. Alpha mantiene la patrulla, seis en el aire." · "Bravo Lead: seis torpedos en el agua sobre el Acheron, los camiones vuelven."',
+    "es": ('"Alpha Lead: dos Falcon abajo, Rook y Jinx. Alpha mantiene la patrulla, seis en el aire." · "Bravo Lead: seis torpedos en el agua sobre el Acheron, los camiones vuelven." · '
+           '"Deck: Alpha a bordo, seis de ocho. Rearme en sesenta segundos."',
            '"Entendido, Capitán." solo · un parte largo y formal · repetir al Capitán su propia orden'),
-    "fr": ('"Alpha Lead : deux Falcon perdus, Rook et Jinx. Alpha tient la patrouille, six en l\'air." · "Bravo Lead : six torpilles à l\'eau sur l\'Acheron, les camions rentrent."',
+    "fr": ('"Alpha Lead : deux Falcon perdus, Rook et Jinx. Alpha tient la patrouille, six en l\'air." · "Bravo Lead : six torpilles à l\'eau sur l\'Acheron, les camions rentrent." · '
+           '"Deck : Alpha à bord, six sur huit. Réarmement en soixante secondes."',
            '"Compris, Capitaine." seul · un compte rendu long et formel · répéter au Capitaine son propre ordre'),
-    "de": ('"Alpha Lead: zwei Falcon runter, Rook und Jinx. Alpha hält die Patrouille, sechs oben." · "Bravo Lead: sechs Torpedos im Wasser auf die Acheron, die Laster kommen heim."',
+    "de": ('"Alpha Lead: zwei Falcon runter, Rook und Jinx. Alpha hält die Patrouille, sechs oben." · "Bravo Lead: sechs Torpedos im Wasser auf die Acheron, die Laster kommen heim." · '
+           '"Deck: Alpha an Bord, sechs von acht. Aufmunitionieren in sechzig Sekunden."',
            '"Verstanden, Kapitän." allein · eine lange, förmliche Meldung · dem Kapitän seinen eigenen Befehl wiederholen'),
 }
 
@@ -326,6 +333,7 @@ class Ev:
     kind: str
     take: bool = True
     wing: bool = False
+    call: bool = False
 
 
 @dataclass
@@ -516,7 +524,7 @@ class FlightMinds:
             self._note("(on the boards)", t)
             return False                                    # Eagle's news with no wing to hear it: Price and the XO have it
         take = k.take and (not k.wing or self.wing)
-        self._events.append(Ev(self.clock(), t, k.name, take, k.wing))
+        self._events.append(Ev(self.clock(), t, k.name, take, k.wing, call=take and (k.call or (k.name == "wing" and "is down" in t.lower()))))
         if take:
             self.stats["taken"] += 1
         self._events = self._events[-16:]
@@ -580,7 +588,9 @@ class FlightMinds:
         inbox, self._inbox = self._inbox, []
         self._last = now
         self._answering = bool(inbox)
-        self._task = asyncio.ensure_future(self._pulse(events, inbox, why, state))
+        # a pulse starts with an empty context: the voice stage's per-task flags (a Captain's turn being answered, a report turn) belong to whoever called `feed`, which may be
+        # the Captain's own turn, and must not make the news of a later pulse an "answer"
+        self._task = asyncio.get_running_loop().create_task(self._pulse(events, inbox, why, state), context=contextvars.Context())
 
     def preempt(self) -> int:
         """The Captain speaks (to anyone): a pulse on news that is still under way is dropped; what it had not said is read again at the next look. A pulse that
@@ -631,7 +641,7 @@ class FlightMinds:
             if self.trace is not None:
                 rec["system"], rec["user"] = self.system, user
             try:
-                await asyncio.wait_for(self._run(user, rec, inbox, state, lang), timeout=PULSE_TIMEOUT_S)
+                await asyncio.wait_for(self._run(user, rec, inbox, state, lang, must=any(e.call for e in events)), timeout=PULSE_TIMEOUT_S)
                 done = True
             except asyncio.TimeoutError:
                 rec["error"] = "timeout"
@@ -751,13 +761,16 @@ class FlightMinds:
             parts.append("THE CAPTAIN SAYS (over the net)\n" + "\n".join(
                 f" - {max(0, now - m.t):.0f} s ago{', relayed by Comms, who opened the net for him' if m.src == 'hail' else ''}: \"{m.text}\"" for m in inbox))
         lang_name = LANG_NAMES.get(lang, lang)
+        must = any(e.call for e in events)
         parts.append(f"You are looking now because: {'; '.join(why)}.\nThe Captain's language is {lang_name}: everything said aloud is in {lang_name} (names in English); the Captain "
                      f"is \"{CAPTAIN_WORD.get(lang, 'Captain')}\".\nWhat a good radio line sounds like: {good}\nWhat it is not: {bad}\n"
-                     "Decide: speak with `say`, order with `mission`, keep a memory with `remember`, or call `stay_quiet`.")
+                     + ("This look holds news that is called aloud (a loss, a torpedo run, a recovery, a rearm, a wingman down): the one it happened to, or the one who saw it, says it in a few words "
+                        "(the boards do not say it for them: the Captain hears a voice, not a board). Decide who and what: `say`, with `mission` if an order goes with it, `remember` if it is worth keeping."
+                        if must else "Decide: speak with `say`, order with `mission`, keep a memory with `remember`, or call `stay_quiet`."))
         return "\n\n".join(parts)
 
     # -- the model call and the tools
-    async def _run(self, user: str, rec: dict[str, Any], inbox: list[Message], state: dict[str, Any], lang: str) -> None:
+    async def _run(self, user: str, rec: dict[str, Any], inbox: list[Message], state: dict[str, Any], lang: str, must: bool = False) -> None:
         by_captain = bool(inbox)
         present = set(self.present(state))
         results: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
@@ -770,6 +783,13 @@ class FlightMinds:
                 rec["first_call"] = round(time.perf_counter() - t_start, 2)
             rec["tools"].append(call.name + (f":{a.get('speaker')}" if call.name == "say" else f":{a.get('squadron')}/{a.get('type')}" if call.name == "mission" else ""))
             if call.name == "say":
+                if pending:
+                    # an order is under way (the console answers in a fraction of a second): the line is voiced once the order is known to have gone through. A line
+                    # composed before the answer says it is done; if the console refused, it is not said, and the one who gave the order answers again with the reason
+                    await asyncio.wait([t for _, _, t in pending], timeout=1.5)
+                    if any(t.done() and not t.cancelled() and not (t.result() or {}).get("ok") for _, _, t in pending):
+                        rec["held"] = rec.get("held", 0) + 1
+                        return
                 await self._say(a, lang, by_captain, present, rec)
             elif call.name == "mission":
                 pending.append(("mission", a, asyncio.ensure_future(self._mission(a, by_captain, state))))
@@ -779,7 +799,8 @@ class FlightMinds:
                 self._note("(the net)", f"stayed quiet: {str(a.get('reason', ''))[:120]}")
 
         msgs = [{"role": "system", "content": self.system}, {"role": "user", "content": user}]
-        comp = await models.chat(self.llm, ROLE, messages=msgs, tools=TOOLS, tool_choice="auto", on_tool_call=on_call)
+        tools = TOOLS_MUST if must else TOOLS
+        comp = await models.chat(self.llm, ROLE, messages=msgs, tools=tools, tool_choice="auto", on_tool_call=on_call)
         self._count(rec, comp)
         new = await self._collect(pending)
         results += new
@@ -790,7 +811,7 @@ class FlightMinds:
         if not rec["tools"] and comp.content.strip():
             # it wrote and called nothing: what it wrote is nobody's radio line and no order; it is asked once for its answer in the tools (§1bis: no guessing from the text)
             before = len(pending)
-            await asyncio.wait_for(self._reask(msgs, comp.content.strip(), on_call, rec), timeout=ROUND2_TIMEOUT_S)
+            await asyncio.wait_for(self._reask(msgs, comp.content.strip(), on_call, rec, tools), timeout=ROUND2_TIMEOUT_S)
             new = await self._collect(pending[before:])
             results += new
             self._account(rec, new)
@@ -809,10 +830,11 @@ class FlightMinds:
                 out.append((name, a, {"ok": False, "detail": "no response from the flight console"}))
         return out
 
-    async def _reask(self, msgs: list[dict[str, Any]], draft: str, on_call: Any, rec: dict[str, Any]) -> None:
+    async def _reask(self, msgs: list[dict[str, Any]], draft: str, on_call: Any, rec: dict[str, Any], tools: list[dict[str, Any]]) -> None:
         follow = list(msgs) + [{"role": "assistant", "content": draft},
-                               {"role": "user", "content": "[What you wrote was not said or done. If the net has something to say or do, do it now with the tools; if not, call stay_quiet.]"}]
-        comp = await models.chat(self.llm, ROLE, messages=follow, tools=TOOLS, tool_choice="auto", on_tool_call=on_call, max_tokens=240)
+                               {"role": "user", "content": "[What you wrote was not said or done. If the net has something to say or do, do it now with the tools"
+                                                           + ("." if STAY_QUIET not in tools else "; if not, call stay_quiet.") + "]"}]
+        comp = await models.chat(self.llm, ROLE, messages=follow, tools=tools, tool_choice="auto", on_tool_call=on_call, max_tokens=240)
         self._count(rec, comp)
         rec["asked_again"] = True
 

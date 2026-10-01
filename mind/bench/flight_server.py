@@ -27,7 +27,7 @@ models.LEDGER.write_file = False
 
 
 class Model(BaseModel):
-    """The stations' scripted model, plus the flight net's: its calls carry `stay_quiet`, and a script answers them."""
+    """The stations' scripted model, plus the flight net's: its calls carry `say` and `mission` (and `stay_quiet`, except in a look that holds news to be called), and a script answers them."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -44,7 +44,7 @@ class Model(BaseModel):
             out = Completion(model=model, provider="fake", cost=0.0001)
             out.content = json.dumps({"to_party": self.router_part[1]})
             return out
-        if "stay_quiet" not in names:
+        if not {"say", "mission"} <= names:
             return await super().chat(model=model, messages=messages, tools=tools, tool_choice=tool_choice, on_tool_call=on_tool_call, **kw)
         self.flight_calls.append({"model": model, "tools": names, "system": str(messages[0].get("content", "")), "user": str(messages[-1].get("content", ""))})
         out = Completion(model=model, provider="fake", cost=0.0004)
