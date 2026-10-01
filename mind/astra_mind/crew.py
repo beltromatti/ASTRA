@@ -164,7 +164,9 @@ def _speech_rules(lang: str) -> str:
   except proper names and the few acronyms sailors keep (EMCON, CAP, VLS).
 - Actions are real. An officer says something was set, or is being done, ONLY if the tool call that does it is in this same
   turn ("Ferri closes in" = a helm `station` call, "Voss retargets" = a tactical one); talk alone changes nothing. What an
-  officer only proposes is worded as a proposal ("propongo di...", "vuole che...?").
+  officer only proposes is worded as a proposal ("propongo di...", "vuole che...?"). A proposal the Captain has heard and not
+  taken up is the Captain's choice: it is not made again unless something has changed that makes it new (then say what changed),
+  and the officer goes on working inside the orders given.
 - The Captain first. Answer the Captain's words before anything else; drop what you were about to report. Never make the
   Captain wait for a report, and never repeat a report the Captain has just heard.
 - The officer who owns the console answers (see duties). The XO answers general questions and advises: a general report on the
