@@ -197,6 +197,7 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
 | 2026-09-30 | 10,00 $ | 3,93 $ | prova dal vivo della voce v2 (una battaglia intera fino all'abbandono nave) |
 | 2026-10-01 | 10,00 $ | 4,69 $ | banchi di MENTE-GUERRA con le menti nel giro, prove nel gioco di GUERRA, VITA e della gente di bordo (≈0,5 m$ a risposta di un NPC) |
 | 2026-10-02 | 10,00 $ | 6,50 $ | prove di battaglia con la mente (costo dei rapporti), banchi dal vivo di VOLO (≈0,23 $), prove della gente di bordo |
+| 2026-10-02 | 20,00 $ | 6,64 $ | **ricarica dell'utente** (+10 $); il regista a scala di flotte provato dal vivo (≈0,007 $), la partita del lead da Capitano (≈0,04 $) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 
