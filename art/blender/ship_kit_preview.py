@@ -74,6 +74,12 @@ ROOM_VIEWS = {
     "reaction_mass": {"door": ((18.0, 0.9, 1.65), (20.0, 12.0, 1.4), 88), "spheres": ((18.0, 4.0, 1.7), (6.0, 9.0, 1.8), 84), "right": ((22.0, 4.0, 1.7), (33.0, 9.0, 1.8), 84),
                       "back": ((38.0, 2.0, 1.7), (10.0, 10.0, 1.4), 92)},
     "crawlway": {"door": ((6.0, 0.9, 1.6), (9.0, 12.0, 1.3), 86), "manifold": ((4.0, 3.0, 1.6), (11.0, 10.0, 1.4), 80), "back": ((14.0, 2.0, 1.6), (4.0, 12.0, 1.2), 92)},
+    "lift_bank": {"door": ((6.0, 0.9, 1.65), (5.2, 12.0, 1.4), 80), "lifts": ((7.2, 4.0, 1.65), (3.2, 9.0, 1.4), 84), "far": ((5.6, 15.0, 1.65), (5.2, 2.0, 1.4), 76),
+                  "corner_a": ((7.4, 1.2, 1.7), (4.0, 9.0, 1.3), 84), "corner_b": ((7.4, 15.0, 1.7), (4.0, 7.0, 1.3), 84)},
+    "lift_bank_o": {"door": ((6.0, 0.9, 1.65), (5.2, 12.0, 1.4), 80), "lifts": ((7.2, 4.0, 1.65), (3.2, 9.0, 1.4), 84), "far": ((5.6, 15.0, 1.65), (5.2, 2.0, 1.4), 76),
+                    "corner_a": ((7.4, 1.2, 1.7), (4.0, 9.0, 1.3), 84), "corner_b": ((7.4, 15.0, 1.7), (4.0, 7.0, 1.3), 84)},
+    "lift_bank_b": {"door": ((3.2, 0.8, 1.65), (4.0, 5.0, 1.4), 80), "lifts": ((1.0, 3.0, 1.65), (8.0, 3.2, 1.4), 80), "corner_a": ((1.0, 0.8, 1.7), (6.0, 4.5, 1.3), 84),
+                    "corner_b": ((6.8, 5.4, 1.7), (1.5, 1.5, 1.3), 84)},
     "shuttle_stop": {"door": ((10.0, 1.0, 1.65), (12.0, 8.0, 1.3), 86), "platform": ((2.0, 1.2, 1.7), (22.0, 6.0, 1.3), 84), "track": ((12.0, 4.4, 1.6), (12.0, 9.0, 1.0), 88),
                      "tunnel": ((22.0, 3.0, 1.7), (0.3, 8.0, 1.5), 66), "back": ((22.0, 14.0, 1.8), (4.0, 3.0, 1.2), 90)},
     "ready_room": {"door": ((5.0, 1.0, 1.65), (5.0, 3.9, 1.35), 84), "desk": ((10.0, 3.2, 1.7), (1.0, 1.6, 1.2), 70), "window": ((6.0, 0.9, 1.65), (0.3, 2.0, 1.5), 82),
@@ -573,6 +579,43 @@ def car(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     return done
 
 
+def signs(args: dict, plan, reg: dict, objs: dict) -> list[str]:
+    """The wayfinding in place: a row of Spine modules with blade signs hung back to back (and a frame plate on a bulkhead), and a lift lobby with its directory over the bench."""
+    blades = [n for n in objs if n.startswith("SM_SHIP_Way_")]
+    if not blades or "SM_SHIP_P_Straight_A" not in objs or "SM_SHIP_LiftBank" not in objs:
+        return []
+    SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
+    for k in range(-5, 5):
+        SP.instance(objs["SM_SHIP_P_Straight_A"], (4.0 * k, 0.0, 0.0), 0, f"inst_mod{k}")
+    z = 3.4
+    for k, (nm, sx) in enumerate(((blades[0], 1), (blades[min(1, len(blades) - 1)], -1))):
+        SP.instance(objs[nm], (2.0 + sx * 0.03, 0.0, z), 0.0 if sx > 0 else 180.0, f"inst_blade{k}")
+    if blades[2:]:
+        SP.instance(objs[blades[2]], (-14.0, 0.0, z), 180.0, "inst_blade_b")
+    SP.instance(objs["SM_SHIP_LiftBank"], (30.0, 0.0, 0.0), 0, "inst_lobby")
+    dirs = [n for n in objs if n.startswith("SM_SHIP_Directory_")]
+    frames = [n for n in objs if n.startswith("SM_SHIP_Frame_")]
+    if dirs:
+        SP.instance(objs[dirs[0]], (30.0 + 7.75, 8.0, 0.0), 180.0, "inst_dir")
+    if frames:
+        SP.instance(objs[frames[0]], (30.0 + 7.75, 8.0, 1.0), 180.0, "inst_frame")
+    for o in objs.values():
+        o.hide_render = True
+    SP.flat_light(1.2)
+    for xz in (-16.0, -8.0, 0.0, 8.0):
+        SP.light_at(f"corr{xz}", (xz, 0.0, 3.0), energy=900.0, color=(0.9, 0.95, 1.0), size=0.5)
+    SP.light_at("lobby", (33.0, 8.0, 3.2), energy=1200.0, color=(0.95, 0.95, 1.0), size=0.5)
+    done = []
+    views = {"signs_far": ((-18.0, 0.0, 1.65), (2.0, 0.0, 2.4), 70), "signs_near": ((-4.0, 0.4, 1.65), (2.0, 0.0, 2.4), 60),
+             "signs_back": ((10.0, -0.3, 1.65), (2.0, 0.0, 2.4), 60), "lobby_dir": ((33.5, 14.0, 1.65), (37.75, 8.0, 1.8), 70)}
+    for name, (eye, tgt, fov) in views.items():
+        cam = SP.look_camera(name, eye, tgt, fov)
+        path = os.path.join(args["preview"], f"{name}.jpg")
+        SP.render(cam, path)
+        done.append(path)
+    return done
+
+
 def run(args: dict, plan, reg: dict, objs: dict) -> None:
     os.makedirs(args["preview"], exist_ok=True)
     KEEP.clear()
@@ -587,6 +630,8 @@ def run(args: dict, plan, reg: dict, objs: dict) -> None:
             done += modules3(args, plan, reg, objs)
         elif v == "car":
             done += car(args, plan, reg, objs)
+        elif v == "signs":
+            done += signs(args, plan, reg, objs)
         elif v == "d1" and plan:
             done += bridge(args, plan, reg, objs)
         elif v == "d4" and plan:

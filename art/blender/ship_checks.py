@@ -106,6 +106,16 @@ def _check_vertical(plan: dict, comps: dict, nodes: dict, edges: list, seen: dic
                     problems.append(f"lift {v['id']}: the landing door of deck {l['deck']} is {math.hypot(l['door'][0] - sh['x'], l['door'][1] - sh['y']):.1f} m from the shaft's axis")
                 if abs(l["z"] - P.deck_z(l["deck"])[0]) > 0.01:
                     problems.append(f"lift {v['id']}: the landing of deck {l['deck']} is at z {l['z']}, the deck's floor is {P.deck_z(l['deck'])[0]}")
+                # the waiting place (ASCENSORI: FindRide matches a rider's route ends against it, 90 cm): the landing's node, in the lobby 1.5 m in front of the door, reachable on foot
+                nd = nodes.get(l.get("node"))
+                if nd is None or seen.get(l.get("node")) != main:
+                    problems.append(f"lift {v['id']}: the landing node {l.get('node')} of deck {l['deck']} is not a reachable graph node")
+                else:
+                    yaw = math.radians(l["yaw"])
+                    wait = (l["door"][0] - 1.5 * math.cos(yaw), l["door"][1] - 1.5 * math.sin(yaw), l["z"])
+                    off = math.dist(nd["p"][:2], wait[:2])
+                    if off > 0.9 or abs(nd["p"][2] - wait[2]) > 0.9:
+                        problems.append(f"lift {v['id']}: the landing node of deck {l['deck']} is {off:.2f} m from the waiting place in front of the door (90 cm at most)")
         elif v["kind"] == "trunk":
             n_trunks += 1
             for a, b in zip(ds, ds[1:]):

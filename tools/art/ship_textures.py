@@ -176,7 +176,7 @@ def draw_arrow(kind: str, s: int = 128) -> Image.Image:
     m = s * 0.16
     pts = [(m, c - s * 0.13), (s * 0.55, c - s * 0.13), (s * 0.55, c - s * 0.30), (s - m, c), (s * 0.55, c + s * 0.30),
            (s * 0.55, c + s * 0.13), (m, c + s * 0.13)]
-    ang = {"fwd": 0, "stbd": 90, "aft": 180, "port": 270, "up": 270, "down": 90}[kind]
+    ang = {"fwd": 0, "stbd": 90, "aft": 180, "port": 270, "up": 270, "down": 90, "right": 0, "left": 180, "ahead": 270}[kind]     # (right, left, ahead: what a blade sign says, seen by the one who reads it)
     a = math.radians(ang)
     rot = [(c + (x - c) * math.cos(a) - (y - c) * math.sin(a), c + (x - c) * math.sin(a) + (y - c) * math.cos(a)) for x, y in pts]
     d.polygon(rot, fill=(*ICE, 255))
@@ -232,6 +232,17 @@ def draw_pictogram(kind: str, s: int = 128) -> Image.Image:
     elif kind == "med":
         d.rectangle((s * 0.42, m, s * 0.58, s - m), fill=fg)
         d.rectangle((m, s * 0.42, s - m, s * 0.58), fill=fg)
+    elif kind == "engine":                                                  # a cog
+        c = s / 2
+        for k in range(8):
+            a = math.radians(k * 45)
+            d.line((c + math.cos(a) * s * 0.26, c + math.sin(a) * s * 0.26, c + math.cos(a) * s * 0.40, c + math.sin(a) * s * 0.40), fill=fg, width=int(s * 0.12))
+        d.ellipse((s * 0.22, s * 0.22, s * 0.78, s * 0.78), outline=fg, width=int(s * 0.09))
+        d.ellipse((s * 0.41, s * 0.41, s * 0.59, s * 0.59), fill=fg)
+    elif kind == "flight":                                                  # a craft seen from above
+        d.polygon([(s * 0.5, m), (s * 0.58, s * 0.40), (s - m, s * 0.66), (s - m, s * 0.74), (s * 0.58, s * 0.64), (s * 0.55, s * 0.80), (s * 0.66, s * 0.88),
+                   (s * 0.66, s * 0.92), (s * 0.5, s * 0.88), (s * 0.34, s * 0.92), (s * 0.34, s * 0.88), (s * 0.45, s * 0.80), (s * 0.42, s * 0.64), (m, s * 0.74),
+                   (m, s * 0.66), (s * 0.42, s * 0.40)], fill=fg)
     elif kind == "muster":
         for (cx, cy) in ((0.5, 0.28), (0.3, 0.62), (0.7, 0.62)):
             d.ellipse((s * (cx - 0.1), s * (cy - 0.1), s * (cx + 0.1), s * (cy + 0.1)), fill=fg)
@@ -433,9 +444,9 @@ def build() -> None:
     for key, (title, sub, dept) in ROOMS.items():
         w, h = (768, 96) if key in _OLD_ROOMS or key.startswith("stairs_") else (512, 64)
         add(f"room_{key}", B3.plate(w, h, title, sub, DEPT[dept]), title)
-    for k in ("fwd", "aft", "port", "stbd", "up", "down"):
+    for k in ("fwd", "aft", "port", "stbd", "up", "down", "right", "left", "ahead"):
         add(f"arrow_{k}", draw_arrow(k))
-    for k in ("stairs", "lift", "ladder", "heads", "galley", "obs", "shuttle", "med", "muster", "pods", "bridge", "brig"):
+    for k in ("stairs", "lift", "ladder", "heads", "galley", "obs", "shuttle", "med", "muster", "pods", "bridge", "brig", "engine", "flight"):
         add(f"pict_{k}", draw_pictogram(k))
     for k in ("news", "menu", "lab", "dir", "sched", "map", "star", "tac", "ship", "data", "wave"):
         add(f"scr_{k}", screen_face(k))

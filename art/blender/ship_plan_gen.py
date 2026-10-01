@@ -284,6 +284,7 @@ def build_plan(only_decks: tuple | None = None) -> dict:
     import ship_design as DS
     import ship_vertical as V
     import ship_design_shuttle as SH
+    import ship_wayfinding as WF
     decks = DS.build_all(B, only_decks)
     d4_open_ends(B, decks[4]) if 4 in decks else None
     deck1_graph(B)
@@ -297,6 +298,8 @@ def build_plan(only_decks: tuple | None = None) -> dict:
     plan["doors"] = list(B.doors.values())
     plan["vertical"] = vertical
     plan["transit"] = [SH.plan(B, decks)]
+    wf = WF.plan(B, decks)                                      # the blade signs, frame plates and directories (they read the finished walk graph)
+    B.notes.append(f"wayfinding: {wf['faces']} blade faces on {wf['blades']} hangers, {wf['frame_plates']} frame plates, {wf['directories']} directories; distinct blades per deck {wf['codes']}")
     plan["graph"] = {"nodes": list(B.nodes.values()), "edges": B.edges}
     plan["systems"] = systems_table(B)
     plan["placements"] = {str(d): v for d, v in B.placements.items() if v}

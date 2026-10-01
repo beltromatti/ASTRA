@@ -135,6 +135,12 @@ def registry(needed: set[str]) -> dict[str, tuple]:
                 reg[m] = ("sign", int(body[:-1]), body[-1])
         elif m.startswith("SM_SHIP_Plate_"):
             reg[m] = ("plate", m[len("SM_SHIP_Plate_"):])
+        elif m.startswith("SM_SHIP_Way_"):                                           # SM_SHIP_Way_liftA_podsL: a blade sign (rows of destination and direction)
+            reg[m] = ("way", m[len("SM_SHIP_Way_"):])
+        elif m.startswith("SM_SHIP_Frame_"):                                         # SM_SHIP_Frame_134: the frame number
+            reg[m] = ("frame", int(m[len("SM_SHIP_Frame_"):]))
+        elif m.startswith("SM_SHIP_Directory_"):                                     # SM_SHIP_Directory_4: the deck's directory screen
+            reg[m] = ("directory", int(m[len("SM_SHIP_Directory_"):]))
         elif m[len("SM_SHIP_"):].startswith(("S_Stub", "P_Stub")):                   # SM_SHIP_S_Stub150: a plain 1.50 m stretch of the Spine
             reg[m] = ("stub", m[len("SM_SHIP_")], int(m[len("SM_SHIP_S_Stub"):]) / 100.0)
     return reg
@@ -158,6 +164,9 @@ def build_mesh(name: str, item: tuple):
     if kind == "plate":
         import ship_signs as SS
         return SS.plate(name, item[1])
+    if kind in ("way", "frame", "directory"):
+        import ship_signs as SS
+        return {"way": SS.way, "frame": SS.frame_plate, "directory": SS.directory}[kind](name, item[1])
     raise ValueError(item)
 
 
