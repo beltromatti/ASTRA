@@ -103,7 +103,7 @@ Prova (banco, scenario `riders`, attori di prova guidati dallo stesso rider, in 
 
 Banco senza grafica: `tools/lift.py run` (comando `UnrealEditor-Cmd -run=AstraLiftSim -unattended -nullrhi -nosound -nopause`): **40 prove su 40**: piano (anche il percorso di una persona su una vettura: `FindRide`), moto (esatto ai due capi, nessuna rottura di continuità), cervello (chiamata, chiamata dove la vettura sta, il giro, la fermata aggiunta in crociera e quella chiesta troppo tardi, le porte che aspettano il ponte, quelle che non si chiudono su qualcuno), ora di punta, un personaggio che viaggia Ponte 1 → 9 e 9 → 5, le porte che aspettano il Capitano, i tasti (E al pannello chiama la vettura, E dentro apre l'elenco, S sposta il segno, E va, Esc chiude: quello che il controller chiama, in un mondo che ticka), la voce, lo streaming, la navetta, i passeggeri, il costo. **Costo: 12 vetture ferme = 0,28 µs a fotogramma di media (limite 50 µs); 12 vetture in moto insieme = 0,19 ms a fotogramma** (tutte e dodici, che non succede mai).
 
-Costo AI delle prove dal vivo della voce: circa 0,05 $ in tutto (0,0477 $ le prime nove scene e la taratura del prompt, 0,0018 $ le scene con il passeggero) (una trentina di scene brevi, la maggior parte per tarare il prompt; la scena a regime costa 0,0002–0,0008 $, e un ordine di ascensore è una sola chiamata).
+Costo AI delle prove dal vivo della voce: 0,052 $ in tutto (0,0477 $ le prime nove scene e la taratura del prompt, 0,0045 $ le scene con il passeggero in due giri: il primo ha trovato il difetto del §6) (una trentina di scene brevi, la maggior parte per tarare il prompt; la scena a regime costa 0,0002–0,0008 $, e un ordine di ascensore è una sola chiamata).
 
 ## 12. Limiti noti
 
