@@ -55,6 +55,16 @@ ROLES: dict[str, Role] = {r.name: r for r in (
          note="who is the Captain talking to (only the cases the rules cannot settle)"),
     Role("chatter", "openai/gpt-oss-120b", ("crusoe",), (("effort", "low"),), max_tokens=700, temperature=0.7,
          first_token_s=6.0, fallback="crew", note="quiet moments and low-stakes talk (bench/stations_models.py: 5x cheaper, faster, same checks)"),
+    Role("admiral", DEEPSEEK, _DS, max_tokens=380, temperature=0.4, first_token_s=5.0,
+         note="the Mandate's admiral (and the bench's ASTRA fleet commander): group orders, missiles, fighters and electronic war every 60-120 s or on "
+              "strong events (war_minds.py); the prompt is long and stable, the picture short"),
+    Role("commander", DEEPSEEK, _DS, max_tokens=320, temperature=0.5, first_token_s=5.0,
+         note="a group commander of the Mandate or an allied captain of ASTRA: orders for one group, and an allied captain's few words on the fleet net "
+              "(war_minds.py)"),
+    Role("talk", DEEPSEEK, _DS, max_tokens=350, temperature=0.6, first_token_s=4.0,
+         note="a Mandate commander on the open channel with the Captain (enemy.py): the same person as the admiral who commands, a few sentences"),
+    Role("director", DEEPSEEK, _DS, max_tokens=900, temperature=0.8, first_token_s=8.0,
+         note="the war director's beats and Rourke on the fleet net (director.py)"),
     Role("npc", DEEPSEEK, _DS, max_tokens=320, temperature=0.8, first_token_s=3.0, fallback="chatter",
          note="the ship's ordinary people when the Captain talks to them (npc.py): one or two lines in character, or a pass; one call per Captain "
               "utterance with someone in earshot (bench/npc_live.py: 16/16 as expected, first line 0.4 s, 0.4 m$ a call; gpt-oss-120b@crusoe 15/16, 0.7 s, 0.12 m$)"),
