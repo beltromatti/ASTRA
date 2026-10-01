@@ -96,7 +96,7 @@ def mandate_persona(first: list[str]):
     return lookup
 
 
-def build_llm(model: str, latency: float, live_budget: float | None):
+def build_llm(model: str, latency: float, live_budget: float | None, range_km: float = 3.2):
     models.LEDGER.write_file = model == "live"
     if model == "live":
         from astra_mind.openrouter import OpenRouter
@@ -104,7 +104,7 @@ def build_llm(model: str, latency: float, live_budget: float | None):
         return OpenRouter()
     sys.path.insert(0, str(ROOT / "mind"))
     from bench import war_mock
-    return war_mock.MockLLM(war_mock.close_policy() if model == "close" else war_mock.null_policy, latency=latency)
+    return war_mock.MockLLM(war_mock.close_policy(range_km) if model == "close" else war_mock.null_policy, latency=latency)
 
 
 async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, Any]:
@@ -129,7 +129,7 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
     proc = await asyncio.create_subprocess_exec(*args, stdout=logf, stderr=subprocess.STDOUT, cwd=str(ROOT))
     link = Link()
     sides = ("mandate", "astra") if a.minds == "both" else (() if a.minds == "none" else (a.minds,))
-    llm = build_llm(a.model, a.latency, a.budget)
+    llm = build_llm(a.model, a.latency, a.budget, a.range)
     lines: list[dict[str, Any]] = []
     pulses: list[dict[str, Any]] = []
     clock = {"t": 0.0}
@@ -139,7 +139,7 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
         lines.append({"t": round(clock["t"], 1), "speaker": speaker, "text": text, "tone": tone, **{k: v for k, v in kw.items() if k in ("urgent", "answer", "topic")}})
 
     minds = war_minds.WarMinds(llm, say, link.execute, clock=lambda: clock["t"], mandate_persona=mandate_persona(first), sides=sides,
-                               astra_admiral=a.astra_admiral and not a.opening, trace=pulses.append)
+                               astra_admiral=a.astra_admiral and not a.opening, ops=not a.no_ops, trace=pulses.append)
     k, t0, decided_at = 0, time.time(), None
     final_counts: dict[str, Any] = {}
     try:
@@ -240,8 +240,10 @@ def main() -> None:
     ap.add_argument("--every", type=float, default=10.0)
     ap.add_argument("--minds", choices=("mandate", "astra", "both", "none"), default="mandate")
     ap.add_argument("--astra-admiral", action="store_true", help="ASTRA's mind is an admiral over all its groups (the Captain's fleet command), as the Mandate's is")
+    ap.add_argument("--no-ops", action="store_true", help="the Mandate admiral has group orders only (no missiles, fighters, electronic war): the fair fight against ASTRA's mind")
     ap.add_argument("--model", choices=("null", "close", "live"), default="close")
     ap.add_argument("--latency", type=float, default=0.3, help="scripted models: seconds each call takes")
+    ap.add_argument("--range", type=float, default=3.2, help="the scripted `close` model: the range (km) it orders the group to hold")
     ap.add_argument("--budget", type=float, default=0.3, help="live: stop spending at this many dollars (all the log holds plus this run)")
     ap.add_argument("--dt", type=float, default=0.5, help="battle seconds between exchanges")
     ap.add_argument("--speed", type=float, default=1.0, help="pace of the battle while a mind thinks (1 = the game's)")

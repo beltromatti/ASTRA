@@ -180,6 +180,7 @@ class Mind:
                             transmit=self._say_external, intel=self.style.mandate_line, note=self.director.note)
         self.enemy.war = self.war
         self.director.war_minds = self.war
+        self.director.negotiate = self._negotiate
         self.agent.say = self._crew_say
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
@@ -238,6 +239,16 @@ class Mind:
         if ship is None:
             return {"ok": True, "detail": "(no game)"}
         return await ship.execute(name, args, by, direct=True)
+
+    async def _negotiate(self, contact: str, terms: str) -> bool:
+        """The director has a Mandate commander call the Aquila to talk: the channel opens from his side and he says his piece (the same path as an
+        arrival or a succession: `transmission:`, then the commander's mind answers the situation). False: that ship is not a hostile contact."""
+        st = (self.game.state if (self.game and self.game.state) else None) or {}
+        if not any(str(c.get("id", "")).upper() == contact and str(c.get("status", "")).startswith("hostile") for c in st.get("contacts", []) or []):
+            return False
+        self.last_activity = time.monotonic()
+        await self.turns.put((f"\x00event:transmission: {contact} — you call the Aquila's captain to talk. Why: {terms}", self.lang))
+        return True
 
     async def _fleet_request(self, args: dict[str, Any], by: str) -> dict[str, Any] | None:
         """Comms relays the Captain's request to the allied ships: their captains judge it (war_minds.py). None: nobody there has a mind to judge it,
@@ -578,6 +589,11 @@ class Mind:
                 continue
             quiet = time.monotonic() - self.director.last_event_t
             hostile = any(str(c.get("status", "")).startswith("hostile") for c in st.get("contacts", []) or [])
+            if hostile and not self.director.decisive and self.director.battle_due():
+                # a long fight is looked in on: the war may bring reinforcements for either side, a call to talk, news — or nothing
+                log.info("the director looks in on a fight that has lasted %.0f s", time.monotonic() - (self.director.fight_since or 0.0))
+                asyncio.create_task(self.director.battle_pulse(self.lang, self._battle_state()))
+                continue
             gate = str(st.get("janus_gate", ""))
             if hostile or st.get("alert") == "red" or quiet < 420 or "under way" in gate or "lane" in gate:
                 continue
@@ -903,6 +919,7 @@ class Mind:
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
+                    self.director.observe(self.game.state)           # (the story's pulse: how long the Captain has fought and had peace)
                     self.war.feed(self.game.state)                   # the commanders look at the battle (they start the pulses that are due)
                     self.game.state["_fleet_board"] = self.war.fleet_board(self.game.state)   # the XO's board of our groups and their captains
                     for p_ in ((self.game.state.get("medbay") or {}).get("patients") or []):

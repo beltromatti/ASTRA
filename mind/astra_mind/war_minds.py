@@ -373,9 +373,11 @@ def view_digest(view: dict[str, Any]) -> tuple:
 
 # ------------------------------------------------------------------------------------------------ the prompts
 DOCTRINE = """How a fleet fights (what your officers and your own years have taught you)
-- Guns: railguns reach 8-10 km and do most of the killing; lasers reach 4 km; missiles reach far but one at a time they are shot down by point
-  defence, so they work in a salvo (all ships at once) against a target with few point-defence channels. Fighters and bombers are shot at by
-  point defence and by the enemy's own fighters.
+- Guns: railguns reach 8-10 km and do most of the killing; lasers reach 4 km. Missiles reach far but one at a time they are shot down by point
+  defence: by default each group already holds its cells until enough are ready to saturate the target's point defence, then fires them all
+  together, timed to land at once, and that is the fleet's strongest punch. `salvo` forces every cell out now; `conserve` keeps them back, and
+  only a reason justifies it (a long fight ahead and a magazine running dry, not a feeling). Fighters and bombers are shot at by point defence
+  and by the enemy's own fighters.
 - The groups run on reflexes all the time: they pick targets (concentrating fire), hold a range of about 4 km, pull their battered ships behind
   the line, and break off when they are clearly losing. The reflexes are decent. YOUR orders override them: while an order stands the group does
   not break off by itself, so withdrawing when it is lost is YOUR decision, and so is releasing it (`auto`) when the order has served.
@@ -403,11 +405,15 @@ deception (jam once found, decoys while their radar is not on you), your crews' 
 pointless, a withdrawal that saves your crews is not dishonour (`decide` withdraw). Know your ships' strengths (railguns 8-10 km against their
 lasers at 4 km: a battered group is a kill if you close) and the information war: the ASTRA can shoot only what they track.
 
-You command through `group_order` (any of your groups, or "all") for the battle and `fleet_ops` for missiles, fighters and electronic war;
-`decide` for the whole fight. Your group commanders are the leaders of the other groups: they think about their own group inside your intent,
-and `report` to you. Your orders carry a `reason`: your subordinates read it as your intent.
-Each time you are called you read the picture and either give orders or call `no_change`. A word is spoken only on the open channel (below);
-orders and datalink are silent."""
+{commands}
+Your group commanders are the leaders of the other groups: they think about their own group inside your intent, and `report` to you. Your orders
+carry a `reason`: your subordinates read it as your intent.
+Each time you are called you read the picture, think (at most four short sentences: what it means, what you will do, why), and then act with the
+tools: orders, or `no_change`. Always end with a tool call. A word is spoken only on the open channel (below); orders and datalink are silent."""
+
+COMMANDS_OPS = ("You command through `group_order` (any of your groups, or \"all\") for the battle and `fleet_ops` for missiles, fighters and electronic "
+               "war; `decide` for the whole fight.")
+COMMANDS_PLAIN = "You command through `group_order` (any of your groups, or \"all\")."
 
 MANDATE_COMMANDER = """You are {name}, {rank} of the Kharon Mandate, aboard {ship}, leader of {group} in {where}. {bio}
 {mission}
@@ -417,7 +423,8 @@ MANDATE_COMMANDER = """You are {name}, {rank} of the Kharon Mandate, aboard {shi
 {admiral_name} commands the strike group; you command {group} only (`group_order` for it, by name) and you act inside the admiral's intent (below).
 You think when something concerns your group: a loss, your morale breaking, your order run out, a new enemy near, a word from the admiral. If you
 cannot do what the admiral wants, or you see what they do not, `report` it (urgent only if they must decide now). Otherwise act for your group
-or call `no_change`. A report is two sentences at most. Your orders carry a `reason`."""
+or call `no_change`. A report is two sentences at most. Your orders carry a `reason`. Think briefly (at most four short sentences), then act with
+the tools; always end with a tool call."""
 
 ASTRA_COMMANDER = """You are {name} of the ASTRA Navy, commanding {ship}. {bio}
 You command {group}: {ships}. You are an officer of the 7th Fleet defending {where}, and you fight beside the ASN Aquila, the first of her class,
@@ -442,20 +449,24 @@ The chain of command and the Captain's words
   line, and say what you do instead. When the one who gives the order is not the senior officer present, weigh it against the senior officer's
   intent and the situation, and you may decline and say why.
 - When he speaks to the whole fleet, the senior allied captain answers for it; the others add a word only if their answer is different.
-- Words that were plainly for someone else (the admiral at Fleet, another ship) are not yours: do nothing."""
+- Words that were plainly for someone else (the admiral at Fleet, another ship) are not yours: do nothing.
+
+Think briefly (at most four short sentences: what the picture and the words mean, what you do, whether to speak), then act with the tools; always
+end with a tool call (`no_change` when there is nothing to do)."""
 
 ASTRA_BENCH_ADMIRAL = """You are {name} of the ASTRA Navy, commanding the ASTRA forces in this action. {bio}
 
 {doctrine}
 
-You command through `group_order` (any of your groups, or "all"). Each time you are called you read the picture and either give orders or call
-`no_change`. Orders carry a `reason`."""
+You command through `group_order` (any of your groups, or "all"). Each time you are called you read the picture, think (at most four short
+sentences), and then act with the tools: orders, or `no_change`. Always end with a tool call. Orders carry a `reason`."""
 
 
 def system_prompt(seat: "Seat", cmd: "Commander", where: str, mission: str, chain: str = "", admiral_name: str = "", ships: str = "", voices: str = "",
-                  channel_open: bool = False) -> str:
+                  channel_open: bool = False, ops: bool = True) -> str:
     if seat.kind == "admiral" and seat.side == "mandate":
-        s = MANDATE_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, where=where, bio=cmd.bio, mission=mission, doctrine=DOCTRINE)
+        s = MANDATE_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, where=where, bio=cmd.bio, mission=mission, doctrine=DOCTRINE,
+                                   commands=COMMANDS_OPS if ops else COMMANDS_PLAIN)
         if channel_open:
             s += ("\n\nA channel with the ASTRA captain is OPEN: they hear what you `transmit`. Silence is the usual: speak only when the picture "
                   "changed what you would say to them (a demand, a warning, an answer); one to three short sentences, formal military radio, cold "
@@ -559,7 +570,7 @@ class WarMinds:
                  clock: Callable[[], float] = time.monotonic, mandate_persona: Callable[[str], dict[str, Any] | None] = lambda c: None,
                  channel: Callable[[str], bool] = lambda c: False, register_voice: Callable[[str, str, str], None] | None = None,
                  transmit: SayFn | None = None, intel: Callable[[], str] = lambda: "", sides: tuple[str, ...] = ("mandate", "astra"), astra_admiral: bool = False,
-                 where: Callable[[dict[str, Any]], str] | None = None, note: Callable[[str], None] | None = None,
+                 ops: bool = True, where: Callable[[dict[str, Any]], str] | None = None, note: Callable[[str], None] | None = None,
                  trace: Callable[[dict[str, Any]], None] | None = None) -> None:
         self.llm = llm
         self.say = say
@@ -573,6 +584,7 @@ class WarMinds:
         self.register_voice = register_voice or (lambda key, name, voice: None)
         self.sides = sides
         self.astra_admiral = astra_admiral              # the bench: ASTRA has an admiral seat (the Captain's fleet command), as the Mandate does
+        self.ops = ops                                  # the Mandate admiral also has missiles, fighters and electronic war (the bench's fair fights: off)
         self.where = where or (lambda st: _place(st))
         self.note_story = note or (lambda text: None)    # the campaign log of the story (director.note)
         self.trace = trace                               # the bench keeps every pulse with its prompts
@@ -956,7 +968,7 @@ class WarMinds:
             chain = self.chain_facts(view, state)
         channel_open = side == "mandate" and self.channel(cmd.contact)
         system = system_prompt(seat, cmd, where, mission, chain=chain, admiral_name=(admiral.commander.name if admiral and admiral.commander else ""),
-                               ships=ships, voices=voices, channel_open=channel_open)
+                               ships=ships, voices=voices, channel_open=channel_open, ops=self.ops)
         pic = picture(side, seat.kind, seat.group, view, state)
         intent = ""
         if seat.kind == "admiral" and side == "mandate":
@@ -979,7 +991,7 @@ class WarMinds:
                 "Decide: give your orders with the tools, or call no_change.")
         tools: list[dict[str, Any]] = []
         if seat.kind == "admiral":
-            tools = [group_order_tool("admiral")] + ([FLEET_OPS, DECIDE] if side == "mandate" else []) + [NO_CHANGE]
+            tools = [group_order_tool("admiral")] + ([FLEET_OPS, DECIDE] if side == "mandate" and self.ops else []) + [NO_CHANGE]
             if channel_open:
                 tools.append(TRANSMIT)
         elif side == "mandate":
@@ -1061,6 +1073,8 @@ class WarMinds:
         comp = await models.chat(self.llm, seat.role, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], tools=tools,
                                  tool_choice="auto", on_tool_call=on_call)
         self._count(rec, comp)
+        if self.trace is not None:
+            rec["content"], rec["finish"] = comp.content[:1500], comp.finish_reason
         for name, a, task in pending:
             try:
                 res = await asyncio.wait_for(task, timeout=4.0)
