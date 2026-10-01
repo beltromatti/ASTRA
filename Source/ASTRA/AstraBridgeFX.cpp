@@ -160,6 +160,10 @@ void AAstraBridgeFX::RandomBurst(float Strength)
 
 void AAstraBridgeFX::Burst(const FVector& At, const FVector& Dir, float Strength)
 {
+	if (!Flash)
+	{
+		return;                       // not playing yet: the pool and the flash are made in BeginPlay
+	}
 	const int32 N = FMath::RoundToInt(FMath::Lerp(18.f, 55.f, FMath::Clamp(Strength, 0.f, 1.f)));
 	// the deck under the burst (the bridge has a lower well): the sparks bounce there
 	float Floor = At.Z - 400.f;

@@ -352,12 +352,6 @@ class Mind:
         except Exception:  # noqa: BLE001
             log.warning("the game did not acknowledge the log entry")
 
-    async def _crew_say(self, speaker: str, text: str, lang: str, tone: str) -> None:
-        """The crew's lines: voiced, and heard by the memory keeper (an officer remembers what passed with the Captain)."""
-        if speaker in CREW:
-            self.memory.hear(speaker, text)
-        await self.voice.say(speaker, text, lang, tone)
-
     def _register_voice(self, key: str, name: str, voice: str) -> None:
         """A voice of the story (the board, whoever finds the pod, a captor): a name on the channel and a voice."""
         EXTERNAL_SPEAKERS[key] = (name, voice)
@@ -794,7 +788,10 @@ class Mind:
 
     # ---------------------------------------------------------------------------------------------- the Captain's words
     async def _crew_say(self, speaker: str, text: str, lang: str, tone: str) -> int:
-        """A line of the crew's: when its turn comes after a wait (or after being cut off), its officer thinks it again first."""
+        """A line of the crew's: heard by the memory keeper (an officer remembers what passed with the Captain); when its turn comes
+        after a wait (or after being cut off), its officer thinks it again first."""
+        if speaker in CREW:
+            self.memory.hear(speaker, text)
         if speaker == "flight":
             self.flight.heard("Price (Flight Control)", text)       # (the flight net hears the controller: its people do not say again what he said)
 
