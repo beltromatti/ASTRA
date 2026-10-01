@@ -60,8 +60,10 @@ def existing(B: Builder) -> None:
     for side, y in (("port", -3.9), ("starboard", 3.9)):
         add(f"corridor_1a_{side}", f"Corridor 1-A ({side})", 1, 1, "A", "corridor", [-20.8, y - 1.6, -8.5, y + 1.6], (0.0, 3.0), None, "command",
             ["power_bus", "life_support"], [], data="aquila_bridge.json")
-    add("lift_housing_bridge", "Bridge lift housing", 1, 1, "A", "lift", [-25.8, -8.2, -21.0, -1.0], (0.0, 3.2), None, "command", ["lift"], [],
-        data="aquila_quarters.json")
+    add("lift_housing_bridge", "Bridge lift housing", 1, 1, "A", "lift", [-22.8, -8.2, -21.0, -1.0], (0.0, 3.2), None, "command", ["lift"], [],
+        data="aquila_quarters.json",
+        note="the housing behind the port corridor's end: since NAVE-3 its first 1.8 m (x -22.8 .. -21.0) are the vestibule of the two command turbolifts, whose shafts (x -25.8 .. -22.8) "
+             "stand in the rest of it (ship_vertical.BRIDGE_SHAFTS); the corridor's end cap (the old lift's door) is to be removed by the lift engine")
     q = ex["quarters"]
     add("quarters", "Captain's Quarters", 1, 1, "A", "quarters", [q["box"][0], q["box"][1], q["box"][2], q["box"][3]], (q["box"][4], q["box"][5]),
         q["entrance"], "command", ["power_bus", "life_support"], [], data="aquila_quarters.json")
@@ -231,9 +233,10 @@ def deck1_graph(B: Builder) -> None:
         B.link("bridge.hub", f"{cid}.n0", "door", door=did, width=d["width"])
         if cid != "corridor_1a_port":                              # the port corridor's is split at the ready room's door (ship_deck1.py)
             B.link(f"{cid}.n0", f"{cid}.n1", "walk", width=3.2)
-    B.node("lift.bridge", 1, -18.6, -3.9, 0.2, "lift", "lift_housing_bridge")
-    B.link("corridor_1a_port.n1", "lift.bridge", "walk", width=3.2)
-    # the lift housing at the port corridor's end
+    # the housing at the port corridor's end: its first 1.8 m are the vestibule of the two command turbolifts (x -22.8 .. -21.0): a hub joined to the corridor's aft node, to which
+    # the landings of the lifts join (ship_vertical.bridge_lifts); the corridor's end cap (the old lift's door) is the lift engine's to remove
+    B.node("lift_housing_bridge.hub", 1, -21.9, -4.6, 0.0, "room", "lift_housing_bridge")
+    B.link("corridor_1a_port.n1", "lift_housing_bridge.hub", "walk", width=3.2)
     B.comps["lift_housing_bridge"]["doors"].append("bridge_door_port")
     q = B.comps["quarters"]
     qd = P._j("aquila_quarters.json")
@@ -249,68 +252,11 @@ def deck1_graph(B: Builder) -> None:
     D1.build(B)                                                    # the ready room, its door and its joint with the port corridor
 
 
-def lift_network(B: Builder) -> dict:
-    """The turbolift: every landing a node, a virtual core node joining them (a ride: fade, hum, the other deck)."""
-    landings = []
-    B.node("lift.core", 0, 0.0, 0.0, -30.0, "lift_core", None)
-    names = {"bridge": ("corridor_1a_port", 1, (-18.6, -3.9, 0.2)), "flight_deck": ("flight_deck", 9, None), "engineering": ("engineering", 7, None),
-             "medbay": ("medbay", 6, None), "mess": ("mess", 4, None), "berths": ("berths", 4, None)}
-    B.link("lift.bridge", "lift.core", "lift", cost=10.0)
-    landings.append({"deck": 1, "room": "corridor_1a_port", "pos": [-18.6, -3.9, 0.2], "node": "lift.bridge", "existing": True})
-    for lid in ("berths", "mess", "medbay", "engineering", "flight_deck"):
-        n = B.nodes[f"{lid}.in"]
-        B.node(f"lift.{lid}", n["deck"], n["p"][0], n["p"][1], n["p"][2], "lift", lid)
-        B.link(f"lift.{lid}", f"{lid}.in", "walk", width=1.0)
-        B.link(f"lift.{lid}", "lift.core", "lift", cost=10.0)
-        landings.append({"deck": B.comps[lid]["deck"], "plane": n["deck"], "room": lid, "pos": n["p"], "node": f"lift.{lid}", "existing": True})
-    # the planned landing on Deck 4: in the concourse, at the lift bank on its aft wall
-    B.node("lift.d4_concourse", 4, -119.1, 9.0, -46.0, "lift", "d4_concourse")
-    B.link("lift.d4_concourse", "d4_concourse.hub", "walk", width=2.0)
-    B.link("lift.d4_concourse", "lift.core", "lift", cost=10.0)
-    landings.append({"deck": 4, "plane": 4, "room": "d4_concourse", "pos": [-119.1, 9.0, -46.0], "node": "lift.d4_concourse", "existing": False,
-                     "note": "the lift bank of the concourse (its doors are part of SM_SHIP_Concourse): set AstraHangar MessLanding to this point once "
-                             "the Mess's own lift leaves are removed"})
-    return {"id": "lift_main", "kind": "turbolift", "name": "Turbolift", "decks": [1, 3, 4, 6, 7, 9], "landings": landings,
-            "ride": {"fade_s": 0.4, "note": "a teleport between landings (AstraHangar::RideLift); not a shaft"}}
-
-
-def stair_columns(B: Builder, decks: dict) -> list:
-    """One vertical link per stair column: the tower compartment of every deck that has it, joined by stairs to the decks above and below
-    (Deck 4's are the modelled ones: two switchback flights per deck, 4 m rise; Deck 2 to Deck 3 climbs 5.3 m through the armour deck)."""
-    import ship_deck4 as D4
-    out = []
-    for (tx, side) in D4.STAIR_COLUMNS:
-        col = {"id": f"stair_{int(abs(tx))}{'n' if tx < 0 else 'p'}", "kind": "stair", "x_min": tx, "side": side, "nodes": {}, "towers": {}, "decks": []}
-        prev = None
-        for n in range(2, 13):
-            cid = D4.tower_id(n, tx)
-            if cid not in B.comps:
-                prev = None
-                continue
-            c = B.comps[cid]
-            b = c["bounds"]
-            cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
-            z = c["z"][0]
-            nid = f"{cid}.stair"
-            B.node(nid, n, cx, cy, z, "stair", cid)
-            B.link(f"{cid}.hub", nid, "walk", width=1.5)
-            if prev is not None:
-                pdeck, pnid, pz = prev
-                B.link(pnid, nid, "stair", cost=14.0 if abs(pz - z) < 4.5 else 24.0)
-            prev = (n, nid, z)
-            col["nodes"][str(n)] = nid
-            col["towers"][str(n)] = cid
-            col["decks"].append(n)
-            col["pos"] = [rnd(cx), rnd(cy)]
-        out.append(col)
-    return out
-
-
 def d4_open_ends(B: Builder, d4: Deck) -> None:
-    """The Spine's open ends: aft into the concourse (through the blast door of the Section A/B boundary), forward into the bow observation deck."""
-    ps = d4.passages["SPF"]
-    B.link("d4.SPF.000", "d4_concourse.hub", "door", door=d4._blast(ps, 0, -104.0), width=2.0, blast=True)
-    B.link(f"d4.SPF.{ps.n - 1:03d}", "d4_bow_obs.hub", "walk", width=3.1)
+    """The Spine's open ends on Deck 4: aft into the concourse (through the blast door of the Section A/B boundary), forward into the bow observation deck."""
+    ps = next(p for p in d4.passages.values() if p.pid.startswith("SP") and abs(p.a0 + 104.0) < 1e-6)
+    B.link(f"d4.{ps.pid}.000", "d4_concourse.hub", "door", door=d4._blast(ps, 0, -104.0), width=2.0, blast=True)
+    B.link(f"d4.{ps.pid}.{ps.n - 1:03d}", "d4_bow_obs.hub", "walk", width=3.1)
 
 
 def systems_table(B: Builder) -> dict:
@@ -348,32 +294,23 @@ def spine_shuttle(B: Builder) -> dict:
                     "moving car and no 'shuttle' edge in the graph yet"}
 
 
-def build_plan(only_decks: bool = False) -> dict:
+def build_plan(only_decks: tuple | None = None) -> dict:
     B = Builder()
     existing(B)
-    import ship_deck4 as D4
-    import ship_decks as DK
-    d4 = D4.build(B)
-    d4.emit()
-    d4.finish_doors()
-    d4_open_ends(B, d4)
-    decks = {4: d4}
-    for n in (2, 3, 5, 6, 7, 8, 9, 10, 11, 12):
-        dk = DK.plan_deck(B, n, D4.STAIR_COLUMNS, coarse=n not in BUILT_DECKS)
-        dk.emit()
-        dk.finish_doors()
-        decks[n] = dk
+    import ship_design as DS
+    import ship_vertical as V
+    decks = DS.build_all(B, only_decks)
+    d4_open_ends(B, decks[4]) if 4 in decks else None
     deck1_graph(B)
     existing_graph(B, decks)
-    stairs = stair_columns(B, decks)
-    lift = lift_network(B)
-    plan = {"id": "ASN_Aquila_Plan", "version": 1, "generator": "art/blender/ship_plan_gen.py", "frame": FRAME}
+    vertical = V.bridge_lifts(B, decks) + V.lifts(B, decks) + V.stairs(B, decks) + V.trunks(B, decks)
+    plan = {"id": "ASN_Aquila_Plan", "version": 2, "generator": "art/blender/ship_plan_gen.py", "frame": FRAME}
     plan["decks"] = [deck_record(d) for d in range(1, 13)]
     for c in B.comps.values():                                  # a door that two builders both added once
         c["doors"] = list(dict.fromkeys(c.get("doors", [])))
     plan["compartments"] = list(B.comps.values())
     plan["doors"] = list(B.doors.values())
-    plan["vertical"] = [lift] + stairs
+    plan["vertical"] = vertical
     plan["transit"] = [spine_shuttle(B)]
     plan["graph"] = {"nodes": list(B.nodes.values()), "edges": B.edges}
     plan["systems"] = systems_table(B)

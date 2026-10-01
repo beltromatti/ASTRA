@@ -12,7 +12,7 @@ yaw in degrees (0 faces +x, 90 faces +y: into the room), and `dept` of the unifo
 """
 from __future__ import annotations
 
-from ship_catalog import DOOR_H, DOOR_W
+from ship_catalog import DOOR_H, DOOR_W, GATE_H, GATE_W
 
 # ---------------------------------------------------------------------------------------------------------------- helpers
 
@@ -505,9 +505,45 @@ _reg("ready_room", name="Ready Room", kind="ready_room", dept="command", L=12.0,
              light(10.45, 2.0, 2.75, 440, 5600, (2.0, 2.0), 600)])
 
 
+# ================================================================================================================ NAVE-3: the vertical network
+# A lift bank is a lobby 8 m long and as deep as its lane: the two turbolift shafts (3.2 m of wall each, ship_catalog.LIFT_OUT) stand along the lobby's local x = 0 wall (the
+# aft wall on the starboard side of a corridor, the forward one on the port side: the prefab turns with its lane), the lobby is in front of them (4.8 m), a gate on the corridor
+# side and, in an inner lane, another on the passage across (the bank is also a cross link). On a deck where the shafts do not stop, the same footprint is the lift's service room.
+LIFT_SHAFTS_Y = (5.8, 10.2)         # the two shafts' middle on the lobby's depth axis (y from the corridor wall): 3.2 m shafts side by side with 1.2 m between them
+LIFT_LOBBY = (3.2, 0.0, 8.0, 16.0)  # the lobby is what lies in front of the shafts (local x 3.2 .. 8): the compartment's bounds; the shafts' strip x 0 .. 3.2 is theirs
+_reg("lift_bank", name="Turbolift Lobby", kind="lobby", dept="neutral", L=8.0, D=16.0, h=3.7, plate="lift_bank", lobby=LIFT_LOBBY,
+     doors=[door("near", 6.0, GATE_W, GATE_H), door("far", 6.0, GATE_W, GATE_H)], systems=["power_bus", "life_support", "lift"],
+     spots=[spot("crew", "stand", 5.8, 3.0, 90, "neutral"), spot("crew", "stand", 6.4, 12.8, -90, "neutral"), spot("crew", "sit", 7.4, 8.0, 180, "neutral")],
+     lights=[light(5.9, 4.0, 3.55, 2600, 4200, (3.2, 1.2), 900), light(5.9, 12.0, 3.55, 2600, 4200, (3.2, 1.2), 900)])
+_reg("lift_bank_o", name="Turbolift Lobby", kind="lobby", dept="neutral", L=8.0, D=16.0, h=3.7, plate="lift_bank", lobby=LIFT_LOBBY,
+     doors=[door("near", 6.0, GATE_W, GATE_H)], systems=["power_bus", "life_support", "lift"],
+     spots=[spot("crew", "stand", 5.8, 3.0, 90, "neutral"), spot("crew", "sit", 7.4, 8.0, 180, "neutral")],
+     lights=[light(5.9, 4.0, 3.55, 2600, 4200, (3.2, 1.2), 900), light(5.9, 12.0, 3.55, 2600, 4200, (3.2, 1.2), 900)])
+_reg("lift_pass", name="Turbolift Service Room", kind="machinery", dept="engineering", L=8.0, D=16.0, h=3.4, plate="lift_service", lobby=LIFT_LOBBY,
+     doors=[door("near", 6.0)], systems=["power_bus", "lift"],
+     spots=[spot("lift_technician", "work", 5.6, 3.2, 90, "engineering"), spot("lift_technician", "work", 5.6, 12.4, -90, "engineering")],
+     lights=[light(5.9, 8.0, 3.3, 3000, 4800, (3.0, 9.0), 800)])
+PREFABS["lift_pass_o"] = dict(PREFABS["lift_pass"], key="lift_pass_o", mesh=PREFABS["lift_pass"]["mesh"])          # the same room in an outer lane (its mesh is the one of the inner lane)
+# the bridge bank's lobby on the decks below the bridge: 8 m along the Spine's port wall, 6.2 deep (the two command shafts stand aft of it, x -25.8 .. -22.8, under the bridge's lift
+# housing; ship_vertical.py). A special room (hand-placed: its edge is off the 4 m grid).
+_reg("lift_bank_b", name="Command Turbolift Lobby", kind="lobby", dept="command", L=8.0, D=6.2, h=3.7, plate="lift_bank_b",
+     doors=[door("near", 3.2, GATE_W, GATE_H)], systems=["power_bus", "life_support", "lift"], special=True,
+     spots=[spot("crew", "stand", 2.4, 2.8, 90, "command"), spot("crew", "stand", 5.6, 4.6, -90, "command")],
+     lights=[light(4.0, 3.1, 3.55, 2600, 4200, (4.0, 2.4), 900)])
+# the damage-control station (8 x 8: a locker, a hose reel, the suits and the shoring, a plot of the section) at the nodes: behind the stair towers, by the lift banks
+_reg("dc_station", name="Damage-Control Station", kind="damage_control", dept="engineering", L=8.0, D=8.0, h=3.4, plate="dc",
+     doors=[door("near", 2.0)], systems=["damage_control", "supply"],
+     spots=[spot("dc_technician", "stand", 5.0, 2.4, 90, "engineering"), spot("dc_technician", "work", 5.8, 6.2, -90, "engineering"),
+            spot("dc_technician", "stand", 1.8, 5.4, 0, "engineering")],
+     lights=[light(4.0, 4.0, 3.3, 3200, 5000, (4.0, 1.0), 800)])
+
+
 def prefab(key: str) -> dict:
     return PREFABS[key]
 
 
 def door_world_offsets(key: str) -> list[float]:
     return [d["x"] for d in PREFABS[key]["doors"] if d["wall"] == "near"]
+
+
+import ship_spec3  # noqa: E402,F401  (NAVE-3: the rooms the redesign adds register themselves here)
