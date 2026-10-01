@@ -44,7 +44,10 @@ def _shaft_record(sid: str, kind: str, name: str, x: float, y: float, w: float, 
 
 def _shaft_comp(B: Builder, sid: str, name: str, x: float, y: float, out: float, decks: list) -> str:
     cid = f"shaft_{sid}"
-    z0, z1 = deck_z(max(decks)), deck_z(min(decks)) + P.DECKS[min(decks)]["clear"] + P.STRUCT
+    top = min(decks)
+    z0, z1 = deck_z(max(decks)), deck_z(top) + P.DECKS[top]["clear"] + P.STRUCT
+    if top >= 2:
+        z1 = min(z1, deck_z(top - 1) - 0.05)                       # (a shaft ends at the floor of the deck above its top stop, not inside that deck's volume)
     B.comp(cid, min(decks), "lift", f"{name} shaft", [x - out / 2, y - out / 2, x + out / 2, y + out / 2], (z0, z1), section=P.section_of(min(decks) if min(decks) > 1 else 2, x),
            dept="neutral", status="built", systems=["lift"], stations=[], spans_decks=list(decks), shaft=sid)
     return cid

@@ -484,13 +484,16 @@ _reg("crawlway", name="Maintenance Crawlway Hub", kind="crawlway", dept="enginee
 
 
 # ---- Deck 5: the Spine shuttle's stops (one per section, pinned by ship_decks.PINNED; the car stands at the platform, ship_rooms_transit.py) -------------------------------------
-_reg("shuttle_stop", name="Spine Shuttle Stop", kind="transit", dept="neutral", L=24.0, D=12.0, h=3.7, plate="shuttle_stop",
-     doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
+# NAVE-3: the stop is a hall of the starboard outer lane (24 x 16): the platform along the passage's wall (6.4 m: the car's three doors open on it), the track bed in the middle (the line's axis,
+# y 8.0 = world y 30), the service ledge behind it. The car is not part of the hall: it comes and stops (ASCENSORI). `mouths` = (aft, forward): where the tunnel enters; a terminal has one.
+_reg("shuttle_stop", name="Spine Shuttle Stop", kind="transit", dept="neutral", L=24.0, D=16.0, h=3.7, plate="shuttle_stop",
+     doors=[door("near", 10.0), door("near", 18.0)], systems=["power_bus", "life_support", "transit"], mouths=(True, True),
      spots=[spot("crew", "stand", 6.4, 4.7, 90), spot("crew", "stand", 8.6, 4.2, 90), spot("crew", "stand", 15.4, 4.2, 90), spot("crew", "stand", 17.6, 4.7, 90),
-            spot("crew", "sit", 4.9, 2.5, 90), spot("crew", "sit", 6.1, 2.5, 90), spot("crew", "sit", 17.9, 2.5, 90), spot("crew", "sit", 19.1, 2.5, 90),
-            spot("crew", "sit", 8.5, 8.68, -90, "services", 0.16), spot("crew", "sit", 15.5, 8.68, -90, "services", 0.16)],
+            spot("crew", "sit", 4.9, 2.5, 90), spot("crew", "sit", 6.1, 2.5, 90), spot("crew", "sit", 17.9, 2.5, 90), spot("crew", "sit", 19.1, 2.5, 90)],
      lights=[light(6.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900), light(12.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900), light(18.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900),
-             light(12.0, 7.6, 2.4, 1400, 5600, (10.0, 1.0), 450), light(12.0, 10.6, 3.5, 2500, 5000, (14.0, 1.5), 800)])
+             light(12.0, 8.0, 2.4, 1400, 5600, (10.0, 1.0), 450), light(12.0, 13.0, 3.5, 2500, 5000, (14.0, 1.5), 800)])
+PREFABS["shuttle_stop_bow"] = dict(PREFABS["shuttle_stop"], key="shuttle_stop_bow", name="Spine Shuttle Stop (Bow Terminal)", mesh="SM_SHIP_ShuttleStopBow", mouths=(True, False))
+PREFABS["shuttle_stop_stern"] = dict(PREFABS["shuttle_stop"], key="shuttle_stop_stern", name="Spine Shuttle Stop (Stern Terminal)", mesh="SM_SHIP_ShuttleStopStern", mouths=(False, True))
 
 
 # ---- Deck 1: the Captain's ready room (hand-placed between the two corridors of the bridge complex, ship_deck1.py; clear height 2.9, as the corridors' roofs are 3.2) ----------

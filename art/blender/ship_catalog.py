@@ -71,7 +71,7 @@ CORRIDOR_SPECS = {
 TONE_FAMILY = ["Straight_A", "Straight_B", "Straight_C", "Door_L_A", "Door_L_B", "Door_R_A", "Door_R_B", "Door_LR", "Gate_L",
                "Gate_R", "Gate_LR", "Bulkhead", "T_L", "T_R", "X", "End"]
 # the shuttle tunnel has a short family: straight cells (two variants), a cell with a maintenance hatch on a side, and the closed end of the line (the depot's wall)
-TUNNEL_FAMILY = ["Straight_A", "Straight_B", "Door_L_A", "Door_R_A", "End"]
+TUNNEL_FAMILY = ["Straight_A", "Straight_B", "Door_L_A", "Door_R_A", "Bulkhead", "End"]
 # a trunk module (NAVE-3): the 4 x 4 cell of a Jefferies arm that holds the vertical shaft and its ladder (K tone); three variants: a deck in the middle of the
 # column (open above and below), the top of the column (a roof) and the bottom (a floor)
 TRUNK_SUFFIXES = ["Trunk", "TrunkTop", "TrunkBottom"]

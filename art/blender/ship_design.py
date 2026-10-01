@@ -29,8 +29,9 @@ GRID0 = DK.GRID0
 # ======================================================================================================================== the structure
 # The Jefferies columns: a K crawlway (the arm) leaves each side passage's outer wall at these x (the middle of its 4 m slot) on every deck; its first module is the trunk cell,
 # a vertical ladder shaft 1.2 m square that runs from the top deck of the column to the keel. Eight columns, one a section or so, on both sides: sixteen trunks on a deck.
-JCOLS = [10.0, -50.0, -142.0, -206.0, -274.0, -342.0, -406.0, -474.0]
+JCOLS = [10.0, -50.0, -158.0, -206.0, -274.0, -342.0, -406.0, -474.0]
 ARM_REACH = 16.0                      # the arm's length where the hull allows it (the outer lane's depth); shorter on the decks whose hull is narrow
+SHUTTLE_DECK, SHUTTLE_Y = 5, 30.0     # the Spine Shuttle's tunnel runs along the middle of Deck 5's starboard outer lane: the arms there are only their trunk cell (ship_design_shuttle.py)
 
 # The turbolift banks: two shafts side by side, 8 m x 16 m, in the lane of the passage `pid` ("SP" = the Spine's pieces, "SBP"/"PP" = a side passage's outer lane), at x_fwd (the
 # forward edge). Both shafts of a bank serve the same decks. A bank is a lobby (and a cross link) where it stops and the lift's service room where it passes.
@@ -41,11 +42,24 @@ BANKS = [
     dict(id="e", name="Engineering", x=-308.0, pid="SP", side=-1, decks=range(2, 13), why="Main Engineering's entrance, the life-support plants, the stores and the workshops below"),
     dict(id="g", name="Aft", x=-404.0, pid="SP", side=-1, decks=range(2, 13), why="the aft crew spaces, the stern machinery and the keel"),
     dict(id="h", name="Stern", x=-444.0, pid="SP", side=-1, decks=range(4, 13), why="the engine rooms and the radiators' pumps"),
-    dict(id="m1", name="Mess starboard", x=-148.0, pid="SBP", side=+1, decks=range(4, 13), why="the Mess Hall's flank and the Berthing: the outer lane, because the Mess hides the Spine here"),
-    dict(id="m2", name="Mess port", x=-148.0, pid="PP", side=-1, decks=range(4, 13), why="the same on the port side"),
+    dict(id="m1", name="Mess starboard", x=-160.0, pid="SBP", side=+1, decks=range(6, 13), why="the Mess Hall's flank, from the medical deck down: the outer lane, because the Mess hides the Spine here (Deck 5's starboard outer lane is the Spine Shuttle's tunnel, so this bank does not go up through it)"),
+    dict(id="m2", name="Mess port", x=-160.0, pid="PP", side=-1, decks=range(4, 13), why="the same on the port side"),
 ]
 # The stair towers: 8 x 8 m off the Spine (x of the aft edge, side), a column through every deck; an 8 x 8 damage-control station stands behind each, on the passage
 STAIRS = [(28.0, +1), (-92.0, -1), (-216.0, +1), (-292.0, +1), (-408.0, +1), (-472.0, +1)]
+
+# The hull galleries (V tone, 2.1 m wide): where a Jefferies arm reaches the band between the outer lane and the hull (Decks 5-12: y 38 to 48), a service corridor runs along the hull for
+# 36 m, closed at both ends; on its outboard side stand the rooms the hull is for — the lifepod bays, the EVA airlocks, the suit lockers. {deck: {J column: (sides, rooms from the bow)}}
+GALLERY_Y = 40.0
+GALLERY_N, GALLERY_J = 9, 4          # modules; the junction (the arm's) is the fifth
+GALLERIES = {
+    5: {2: ((-1,), "pod_bay pod_bay pod_bay airlock"), 3: ((-1,), "pod_bay pod_bay pod_bay airlock"), 5: ((-1,), "pod_bay pod_bay pod_bay airlock"), 6: ((-1,), "pod_bay pod_bay pod_bay airlock")},
+    6: {1: ((+1, -1), "pod_bay pod_bay airlock pod_bay"), 2: ((+1, -1), "pod_bay pod_bay pod_bay airlock"), 3: ((+1, -1), "pod_bay pod_bay airlock pod_bay"),
+        5: ((+1, -1), "pod_bay pod_bay pod_bay airlock"), 6: ((+1, -1), "pod_bay pod_bay airlock pod_bay")},
+    7: {2: ((+1, -1), "suit_locker airlock suit_locker airlock"), 4: ((+1, -1), "suit_locker airlock suit_locker airlock"), 6: ((+1, -1), "suit_locker airlock suit_locker airlock")},
+    9: {2: ((+1, -1), "suit_locker airlock suit_locker airlock"), 4: ((+1, -1), "suit_locker airlock suit_locker airlock"), 6: ((+1, -1), "suit_locker airlock suit_locker airlock")},
+    11: {1: ((+1, -1), "suit_locker airlock suit_locker airlock"), 3: ((+1, -1), "suit_locker airlock suit_locker airlock"), 5: ((+1, -1), "suit_locker airlock suit_locker airlock")},
+}
 
 LOG: dict = {"banks": {}, "stairs": {}, "arms": {}, "decks": {}}
 
@@ -163,12 +177,59 @@ def apply_structure(D: Deck, towers: bool = True, banks: bool = True, arms: bool
                     log["skipped"].append(f"arm J{k + 1}{'S' if side > 0 else 'P'} (no passage)")
                     continue
                 top = trunk_variant(deck, k)
+                gal = GALLERIES.get(deck, {}).get(k)
+                gid = f"G{'S' if side > 0 else 'P'}{k + 1}" if gal and side in gal[0] and n >= 4 else None
+                opt = {"trunk": top, "name": f"Jefferies Tube J-{k + 1}{'S' if side > 0 else 'P'}", "col": k, "end": "open" if gid else "wall"}
+                if gid:
+                    opt["gallery"] = (gid, GALLERY_J)
                 try:
-                    D.anchor(ps.pid, side, xc + 2.0, ("arm", n, "K", {"trunk": top, "name": f"Jefferies Tube J-{k + 1}{'S' if side > 0 else 'P'}", "col": k, "end": "wall"}))
+                    D.anchor(ps.pid, side, xc + 2.0, ("arm", n, "K", opt))
                 except DesignError as e:                          # (a bulkhead's slot at this x on this deck: the column starts one deck lower)
                     log["skipped"].append(f"arm J{k + 1}{'S' if side > 0 else 'P'}: {e}")
                     continue
                 log["arms"].append((k, side, n))
+                if gid:
+                    try:
+                        opt["gallery"] = (gid, gallery(D, gid, k, side, xc, gal[1]))
+                    except (DesignError, ValueError) as e:
+                        log["skipped"].append(f"gallery {gid}: {e}")
+                        opt["end"] = "wall"                         # (no gallery: the arm ends in its wall)
+                        opt.pop("gallery", None)
+
+
+def gallery(D: Deck, gid: str, k: int, side: int, xc: float, rooms: str) -> int:
+    """A hull gallery at the end of a Jefferies arm: a V passage along x at y = +-40, up to nine modules centred on the arm's x (the junction), closed at both ends; the rooms stand on
+    its outboard side, from the bow, 8 m each (one that does not fit — the hull — is left out). A section's bulkhead may cross the gallery, but not at its junction or at an end: the
+    gallery is then a module or two shorter. The arm's last module opens on the junction (ship_layout.Deck.finish_doors). Returns the junction's module index."""
+    y = side * GALLERY_Y
+    err = None
+    for (da, db) in ((18.0, 18.0), (14.0, 18.0), (18.0, 14.0), (14.0, 14.0), (10.0, 14.0), (14.0, 10.0), (10.0, 10.0)):
+        x0, x1 = xc - da, xc + db
+        ji = int(round((xc - 2.0 - x0) / MOD))
+        ps = D.passage(gid, "V", "x", y, x0, x1, f"Hull Gallery J-{k + 1}{'S' if side > 0 else 'P'}")
+        ps.side(ji, "L" if side > 0 else "R", "branch")                   # the arm comes from the inboard side
+        ps.mark(0, end="aft")
+        ps.mark(ps.n - 1, end="fwd")
+        D.section_bulkheads([gid])
+        if any(ps.ev.get(i, {}).get("bulk") for i in (0, ji, ps.n - 1)):
+            err = f"deck {D.deck}: the gallery at x {xc} meets a section's bulkhead at its junction or its end"
+            del D.passages[gid]
+            continue
+        D.rects.append((x0, min(y - SLOT_HW, y + SLOT_HW), x1, max(y - SLOT_HW, y + SLOT_HW), f"a hull gallery {gid}"))
+        D._occ_add(gid, xc, "L" if side > 0 else "R", "branch")
+        keys = rooms.split()
+        door = 6.0 if side > 0 else 2.0                               # a room's door is 2 m from its aft end on the starboard side (yaw 0), 2 m from its forward end on the port side
+        x = x1 if all(abs((x1 - 8.0 * j) - door - xc) > 1e-6 for j in range(len(keys))) else x1 - 4.0          # (no door on the junction's module)
+        bounds = [b for (_, b, _) in P.sections(D.deck)] + [P.sections(D.deck)[-1][1]]
+        for key in keys:
+            for b in bounds:                                          # a room lies in one section: one that would straddle a boundary goes aft of its bulkhead's module
+                if x - 8.0 < b < x:
+                    x = b - MOD
+            if x - 8.0 >= x0 - 1e-6:
+                D._place_item(gid, side, x, (key,), "gallery")
+            x -= 8.0
+        return ji
+    raise DesignError(err or f"deck {D.deck}: no gallery at x {xc}")
 
 
 _ARMS: dict = {}
@@ -188,6 +249,8 @@ def arm_n(deck: int, xc: float, side: int) -> int:
         if DK.hits([xc - 2.0, y0, xc + 2.0, y1], obs) or hw < max(abs(y0), abs(y1)) + 0.01:
             break
         n = k
+    if deck == SHUTTLE_DECK and side > 0:
+        n = min(n, 1)
     _ARMS[key] = n
     return n
 

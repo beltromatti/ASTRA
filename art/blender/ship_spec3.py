@@ -125,6 +125,10 @@ _reg("pod_bay", name="Lifepod Bay", kind="lifepod", dept="neutral", L=8.0, D=4.0
      doors=[door("near", 2.0, 1.2, 2.2)], systems=["life_support", "power_bus", "escape"],
      spots=[spot("crew", "stand", 5.0, 2.0, 90)],
      lights=[light(4.0, 2.0, 2.6, 1200, 3200, (4.0, 0.6), 500)])
+_reg("suit_locker", name="EVA Suit Lockers", kind="storage", dept="engineering", L=8.0, D=4.0, h=2.7, plate="suits",
+     doors=[door("near", 2.0, 1.2, 2.2)], systems=["life_support", "supply"],
+     spots=[spot("eva_technician", "stand", 5.0, 2.0, 90, "engineering")],
+     lights=[light(4.0, 2.0, 2.6, 1400, 4200, (4.0, 0.6), 500)])
 
 
 # ---- small rooms: the 8 m and 12 m fillers of a lane and the half-depth rooms of the passage side (NAVE-3: right-sized rooms, not 16 m halls for a cupboard) ------------------------------

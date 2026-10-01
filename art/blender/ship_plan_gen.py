@@ -278,27 +278,12 @@ def systems_table(B: Builder) -> dict:
     return {k: {"name": names.get(k, k), "compartments": v} for k, v in sorted(hosts.items())}
 
 
-def spine_shuttle(B: Builder) -> dict:
-    """The Spine's internal shuttle (docs/BIBBIA.md §6: "the central corridor along the ship with the internal shuttle"): on Deck 5 (Science & Transport) a line parallel to the Spine
-    with a stop in every section but F. The stops are built: a platform hall off the Spine (the prefab `shuttle_stop`, pinned at a fixed place of the section, ship_decks.PINNED) with a car
-    standing at its platform. The line itself is not modelled: there is no moving car and no `shuttle` edge in the graph (a route-finder that wants to ride it needs both)."""
-    d = 5
-    env = P.envelope(d)
-    stops = []
-    for c in sorted((c for c in B.comps.values() if c.get("prefab") == "shuttle_stop" and c["deck"] == d), key=lambda c: -c["bounds"][0]):
-        stops.append({"section": c["section"], "x": rnd((c["bounds"][0] + c["bounds"][2]) / 2), "room": c["id"], "node": f"{c['id']}.hub"})
-    return {"id": "spine_shuttle", "kind": "shuttle", "name": "Spine Shuttle", "deck": d, "y": 0.0, "z": P.deck_z(d)[0],
-            "x_fwd": env["x_fwd"], "x_aft": env["x_aft"], "stops": stops, "status": "stops built",
-            "note": "a line parallel to Deck 5's Spine with a platform hall in every section but F (the Spine's pieces between the halls of the decks above and below are 24 to 304 m "
-                    "long: the line passes under the halls, and Section F's only free 20 m of Spine are too short for a stop); each stop has a car standing at its platform; no "
-                    "moving car and no 'shuttle' edge in the graph yet"}
-
-
 def build_plan(only_decks: tuple | None = None) -> dict:
     B = Builder()
     existing(B)
     import ship_design as DS
     import ship_vertical as V
+    import ship_design_shuttle as SH
     decks = DS.build_all(B, only_decks)
     d4_open_ends(B, decks[4]) if 4 in decks else None
     deck1_graph(B)
@@ -311,7 +296,7 @@ def build_plan(only_decks: tuple | None = None) -> dict:
     plan["compartments"] = list(B.comps.values())
     plan["doors"] = list(B.doors.values())
     plan["vertical"] = vertical
-    plan["transit"] = [spine_shuttle(B)]
+    plan["transit"] = [SH.plan(B, decks)]
     plan["graph"] = {"nodes": list(B.nodes.values()), "edges": B.edges}
     plan["systems"] = systems_table(B)
     plan["placements"] = {str(d): v for d, v in B.placements.items() if v}

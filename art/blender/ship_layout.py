@@ -146,7 +146,8 @@ class Passage:
             return "Bulkhead"
         L, R = e.get("L", "wall"), e.get("R", "wall")
         v = "A" if i % 2 == 0 else "B"
-        table = {("wall", "wall"): "Straight_" + "ABC"[i % 3], ("door", "wall"): f"Door_L_{v}", ("wall", "door"): f"Door_R_{v}",
+        straight = "Straight_" + ("AB"[i % 2] if self.tone == "T" else "ABC"[i % 3])                  # (the tunnel has two straight cells, the corridors three)
+        table = {("wall", "wall"): straight, ("door", "wall"): f"Door_L_{v}", ("wall", "door"): f"Door_R_{v}",
                  ("door", "door"): "Door_LR", ("gate", "wall"): "Gate_L", ("wall", "gate"): "Gate_R", ("gate", "gate"): "Gate_LR",
                  ("branch", "wall"): "T_L", ("wall", "branch"): "T_R", ("branch", "branch"): "X"}
         if (L, R) not in table:
@@ -494,7 +495,7 @@ class Deck:
                         self.lane_log.setdefault((pid, side), []).append((x, run[1], "gap"))
                     break
         if pending:
-            left = [f"{it[0]} ({self.item_len(it)} m)" for it in pending if it[0] != "gap" and not (len(it) > 1 and isinstance(it[-1], dict) and it[-1].get("optional"))]
+            left = [f"{it[0]} ({self.item_len(it)} m)" for it in pending if it[0] != "gap" and not pool and not (len(it) > 1 and isinstance(it[-1], dict) and it[-1].get("optional"))]
             if left:
                 raise DesignError(f"deck {self.deck} lane {pid}{side:+d} section {letter}: the schedule does not fit: {left} left over (runs {[(round(a, 1), round(b, 1)) for a, b in runs]})")
 
@@ -525,6 +526,7 @@ class Deck:
                     continue
                 if self._place_item(pid, side, x, (fillers[j],), lane):
                     self.fill_count[fillers[j]] = self.fill_count.get(fillers[j], 0) + 1
+                    self.rooms[-1]["filler"] = True                       # (the programme report counts the rooms nobody asked for apart)
                     x -= L
                     ok = True
                     break
@@ -563,6 +565,7 @@ class Deck:
         """A door / gate between the special room `r` and passage `pid` at x = xw; the room lies on `room_side` of the passage."""
         ps = self.passages[pid]
         self._room_door(r, r["cid"], {"wall": wall, "w": w, "h": h, "id": did}, xw, ps.pos + room_side * SLOT_HW, pid, room_side)
+        self._occ_add(pid, xw, "R" if room_side > 0 else "L", "gate" if w > 2.0 else "door")           # (the lanes' rooms leave the opposite wall of this module alone)
 
     def section_bulkheads(self, pids=None) -> None:
         """A bulkhead on every passage along x at every section boundary it spans (the module aft of the boundary)."""
@@ -603,7 +606,7 @@ class Deck:
                 out.append((r["pid"], xw, r["side"], kind))
             elif d["wall"] == "far":
                 yf = r["y_near"] + r["side"] * spec["D"]
-                other = next((p for p in self.passages.values() if p.along == "x" and abs(abs(yf - p.pos) - SLOT_HW) < 1e-6), None)
+                other = next((p for p in self.passages.values() if p.along == "x" and p.tone != "V" and abs(abs(yf - p.pos) - SLOT_HW) < 1e-6), None)       # (a far door opens on a main passage, never on a hull gallery)
                 if other is not None:
                     out.append((other.pid, xw, -r["side"], kind))
         return out
@@ -761,7 +764,7 @@ class Deck:
                 self._room_door(r, cid, d, xw, r["y_near"], r["pid"], r["side"])
             elif d["wall"] == "far":
                 yf = r["y_near"] + r["side"] * D
-                other = next((p for p in self.passages.values() if p.along == "x" and abs(abs(yf - p.pos) - SLOT_HW) < 1e-6), None)
+                other = next((p for p in self.passages.values() if p.along == "x" and p.tone != "V" and abs(abs(yf - p.pos) - SLOT_HW) < 1e-6), None)       # (a far door opens on a main passage, never on a hull gallery)
                 if other is not None:
                     self._room_door(r, cid, d, xw, yf, other.pid, -r["side"])
 
@@ -818,7 +821,7 @@ class Deck:
             ap.mark(t_idx, trunk=opt["trunk"])
         if opt.get("end", "wall") == "wall":
             ap.mark(n - 1 if side > 0 else 0, end="fwd" if side > 0 else "aft")
-        ap.arm_of = dict(parent=ps.pid, i=i, side=side, y_wall=ya, trunk_idx=t_idx if opt.get("trunk") else None, hatch=f"{self.tag}_hatch_{aid}")
+        ap.arm_of = dict(parent=ps.pid, i=i, side=side, y_wall=ya, trunk_idx=t_idx if opt.get("trunk") else None, hatch=f"{self.tag}_hatch_{aid}", gallery=opt.get("gallery"))
         self.passages[aid] = ap
         self.B.door(ap.arm_of["hatch"], self.deck, (xc, ya - side * WALL_T / 2, self.z0), 90.0, DOOR_W, DOOR_H, None, None, kind="door", wall="arm", passage=ps.pid,
                     side=side, hatch=True)
@@ -903,7 +906,14 @@ class Deck:
                     pos, yaw = (ps.pos, a + MOD, self.z0), -90.0
             mesh = module_mesh(ps.tone, suffix)
             B.place(self.deck, mesh, pos, yaw, f"{folder}/{ps.pid}", f"{prefix}.{i:03d}", "module", passage=ps.pid, index=i, suffix=suffix)
-            if ps.tone == "T":                                    # the shuttle's tunnel is not walked: its nodes and its `shuttle` edges are the plan's (ship_plan_gen.spine_shuttle)
+            if ps.tone == "T":                                    # the shuttle's tunnel is not walked: its nodes and its `shuttle` edges are the plan's (ship_design_shuttle.plan)
+                if suffix == "Bulkhead" and not e.get("bulk_aft"):         # the tunnel's blast gate at a section's frame (the car passes through it; no graph node: the record is for the damage model)
+                    rec = B.doors[self._blast(ps, i, e["bulk_x"])]
+                    rec["a"], rec["b"] = seg_ids[i], seg_ids[min(i + 1, ps.n - 1)]
+                    rec["width"], rec["height"] = rnd(2 * TONE_DIMS["T"][0]), TONE_DIMS["T"][1]
+                    for c_ in (rec["a"], rec["b"]):
+                        if rec["id"] not in B.comps[c_]["doors"]:
+                            B.comps[c_]["doors"].append(rec["id"])
                 continue
             nid = f"{prefix}.{i:03d}"
             B.node(nid, self.deck, cx, cy, self.z0, "trunk" if ps.arm_of and i == ps.arm_of["trunk_idx"] else "corridor", seg_ids[i], passage=ps.pid)
@@ -1039,6 +1049,10 @@ class Deck:
             for c_ in (parent_seg, arm_seg):
                 if c_ in B.comps and rec["id"] not in B.comps[c_]["doors"]:
                     B.comps[c_]["doors"].append(rec["id"])
+            if ar.get("gallery"):                                   # the arm's far end opens on the junction of its hull gallery (a cell of the same slot: no door)
+                gid, gi = ar["gallery"]
+                far = ps.n - 1 if ar["side"] > 0 else 0
+                B.link(f"{self.tag}.{ps.pid}.{far:03d}", f"{self.tag}.{gid}.{gi:03d}", "walk", width=TONE_WALK_W["K"])
 
     def _room_graph(self, r: dict) -> None:
         """A hub node in the middle of the room joined to the door nodes, and every station of the room joined to the hub."""
