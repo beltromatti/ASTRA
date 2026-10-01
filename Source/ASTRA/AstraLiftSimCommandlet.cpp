@@ -1509,6 +1509,32 @@ namespace
 		}
 		LiftCheck(TEXT("plan: the lifts of the test plan"), Net.Problems.Num() == 0 && Shafts == 3 && Shuttles == 1 && Stops == 9 + 9 + 9 + 7 && Bad == 0,
 		      FString::Printf(TEXT("%d shafts, %d shuttle line, %d stops; %d problems %s"), Shafts, Shuttles, Stops, Net.Problems.Num(), Net.Problems.Num() ? *Net.Problems[0] : TEXT("")));
+		// a person's route is on a lift when its two ends are the waiting places of two stops of a line (what the life simulation's bodies ask: FindRide)
+		{
+			const int32 Tl = Net.FindLine(TEXT("tl_a")), Tl2 = Net.FindLine(TEXT("tl_a2")), Sh = Net.FindLine(TEXT("spine_shuttle"));
+			int32 Line = INDEX_NONE, From = INDEX_NONE, To = INDEX_NONE;
+			bool bShaft = false, bPair = false, bShuttle = false, bNot = true;
+			if (Tl != INDEX_NONE && Net.Lines[Tl].Stops.Num() > 5)
+			{
+				bShaft = Net.FindRide(Net.Lines[Tl].Stops[1].WaitCm(), Net.Lines[Tl].Stops[5].WaitCm(), Line, From, To) && Line == Tl && From == 1 && To == 5;
+			}
+			if (Tl2 != INDEX_NONE && Net.Lines[Tl2].Stops.Num() > 3)
+			{
+				bPair = Net.FindRide(Net.Lines[Tl2].Stops[3].WaitCm() + FVector(30.f, 20.f, 0.f), Net.Lines[Tl2].Stops[0].WaitCm(), Line, From, To) && Line == Tl2 && From == 3 && To == 0;
+			}
+			if (Sh != INDEX_NONE && Net.Lines[Sh].Stops.Num() > 3)
+			{
+				bShuttle = Net.FindRide(Net.Lines[Sh].Stops[0].WaitCm(), Net.Lines[Sh].Stops[3].WaitCm(), Line, From, To) && Line == Sh && From == 0 && To == 3;
+			}
+			if (Tl != INDEX_NONE)
+			{
+				// a corridor walk that only passes by a landing, and a hop of a few centimetres on the same deck: neither is a ride
+				bNot = !Net.FindRide(Net.Lines[Tl].Stops[1].WaitCm() + FVector(400.f, 0.f, 0.f), Net.Lines[Tl].Stops[5].WaitCm(), Line, From, To)
+				    && !Net.FindRide(Net.Lines[Tl].Stops[1].WaitCm(), Net.Lines[Tl].Stops[1].WaitCm() + FVector(0.f, 0.f, 3.f), Line, From, To);
+			}
+			LiftCheck(TEXT("plan: a route on a lift is found"), bShaft && bPair && bShuttle && bNot,
+			      FString::Printf(TEXT("a shaft's ride %d, the pair's (a step off the node) %d, the shuttle's %d, a walk that only passes by is not one %d"), bShaft, bPair, bShuttle, bNot));
+		}
 		// a plan that breaks the contract is told so: a door off its shaft's wall, a car that does not fit, a stop twice
 		const FString Bad1 = TEXT("{\"version\":2,\"vertical\":[{\"id\":\"bad\",\"kind\":\"turbolift\",\"shaft\":{\"x\":0,\"y\":0,\"w\":2.8,\"d\":2.8,\"z\":[-10,0]},\"car\":{\"w\":3.0,\"d\":2.4,\"h\":2.6},"
 		                         "\"landings\":[{\"deck\":1,\"z\":0,\"door\":[0,3.5,0],\"yaw\":90},{\"deck\":2,\"z\":-4,\"door\":[0,1.4,-4],\"yaw\":90},{\"deck\":2,\"z\":-8,\"door\":[0,1.4,-8],\"yaw\":90}]}]}");
