@@ -112,6 +112,12 @@ ti porta fuori in tempo il comando passa all'XO.
 - In **mensa** ascolti i tavoli e puoi parlare con chi vuoi; in **infermeria** con la dottoressa e con i feriti.
 
 ## La guerra e la storia
+È una guerra di flotte. Nell'apertura un contatto freddo si sveglia, poi arriva il gruppo d'attacco dell'Archon Solm; qualche minuto dopo
+il **Janus Gate si attiva** e ne esce l'avanguardia della flotta d'interdizione del Mandato (una portaerei con caccia e bombardieri, una linea
+di cacciatorpediniere, un cuneo di fregate), mentre da New Ravenna arriva il **gruppo di battaglia Constance** in vostro aiuto. Lo schermo
+principale stacca sulle forze che arrivano (INCOMING / ARRIVING); il tavolo raggruppa le navi che volano insieme. Da lì la guerra cresce con la
+sua logica: sonde e incursioni, forze intere, l'assalto; la 7th Fleet risponde con i suoi gruppi.
+
 Le altre navi pensano: l'**ammiraglio del Mandato** (nell'apertura l'Archon Varek Solm sull'Acheron) comanda i suoi gruppi con la
 nebbia di guerra, e se cade il comando passa al più anziano; i **capitani alleati** (Castellan sulla Praetorian, gli altri che
 arrivano) comandano il loro gruppo e ti parlano sulla rete della flotta, valutano le tue richieste secondo la catena di comando e
