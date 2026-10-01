@@ -850,6 +850,16 @@ bool UAstraTransporterSubsystem::ResolveSubjects(const FAstraXportOrder& O, TArr
 					{
 						continue;
 					}
+					// not the ones in a pattern-shielded room (the armory, a magazine), nor on a post with an actor of its own
+					const int32 Ci = L->Sim().CompOf(i);
+					if (L->Sim().GetMap().Comps.IsValidIndex(Ci) && (T.InhibitKinds.Contains(L->Sim().GetMap().Comps[Ci].Kind) || T.InhibitIds.Contains(L->Sim().GetMap().Comps[Ci].Id)))
+					{
+						continue;
+					}
+					if (Pe.Place != INDEX_NONE && L->Sim().GetMap().Places.IsValidIndex(Pe.Place) && L->Sim().GetMap().Places[Pe.Place].External != NAME_None)
+					{
+						continue;
+					}
 					const double Pen = Pe.Act == EAstraLifeAct::Sleep ? 1.0e9 : 0.0;      // the awake first
 					Pool.Add({i, FVector::Dist(Pe.Pos, RoomOriginCm) + Pen});
 				}
@@ -1141,7 +1151,7 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 	                         (S && !S->SurfaceSiteName().IsEmpty() && Q.Contains(S->SurfaceSiteName().ToLower()));
 	if (bGroundWord)
 	{
-		if (!S || !S->HasSurface())
+		if (!S || !(S->HasSurface() || bTestSurface))
 		{
 			OutErr = TEXT("there is no ground to beam to: the system's main world has no surface (a gas giant) or none is charted");
 			return false;
@@ -1166,21 +1176,34 @@ bool UAstraTransporterSubsystem::ResolveEnd(const FString& Text, bool bDest, con
 		{
 			const int32 Want = XpContactNumber(Q);
 			const UAstraBattleSubsystem::FContactView* Best = nullptr;
+			TArray<FString> Same;
 			for (const UAstraBattleSubsystem::FContactView& C : B->Contacts())
 			{
-				if (Want != INDEX_NONE && XpIdNumber(C.ContactId) == Want)
+				if (Want != INDEX_NONE)
 				{
-					Best = &C;
-					break;
+					if (XpIdNumber(C.ContactId) == Want)
+					{
+						Best = &C;
+						break;
+					}
+					continue;
 				}
-				const FString Label = XpNorm(C.Label);
-				if (Want == INDEX_NONE && Q.Len() >= 4 && (Label.Contains(Q) || Q.Contains(XpNorm(C.Label.Left(FMath::Max(0, C.Label.Find(TEXT(" ("))))))))
+				// by name: the whole words of what was said are the whole words of her name ("vigilant", "asn vigilant"), never a part of one
+				const int32 Paren = C.Label.Find(TEXT(" ("));
+				const FString Name = XpNorm(Paren == INDEX_NONE ? C.Label : C.Label.Left(Paren));
+				if (Q.Len() >= 4 && !Name.IsEmpty() && ((TEXT(" ") + Name + TEXT(" ")).Contains(TEXT(" ") + Q + TEXT(" "))))
 				{
+					Same.Add(FString::Printf(TEXT("%s (%s)"), *C.ContactId, *C.Label.Left(Paren == INDEX_NONE ? C.Label.Len() : Paren)));
 					if (!Best || C.RangeKm < Best->RangeKm)
 					{
 						Best = &C;
 					}
 				}
+			}
+			if (Same.Num() > 1)
+			{
+				OutErr = FString::Printf(TEXT("\"%s\" could be %s: say the contact id"), *Text, *FString::Join(Same, TEXT(", ")));
+				return false;
 			}
 			if (Best && Best->bCraft)
 			{
@@ -1470,12 +1493,23 @@ bool UAstraTransporterSubsystem::MakeRequest(const FAstraXportOrder& O, FAstraXp
 	{
 		TArray<int32> Taken;
 		int32 Cursor = To.bEmergencyPad ? T.Pads + 1 + To.Pad : To.Pad;
+		// one person to a pad the order names, and somebody stands on it: the order is not moved to another pad behind its back, it is refused (`occupied`) and the Chief says so
+		const int32 Named = To.bEmergencyPad ? T.Pads + 1 + To.Pad : To.Pad;
+		bool bNamedBusy = false;
+		if (N == 1 && To.bPadOccupied && OutJob.Subs[0].S.Kind != ESubject::Cargo && Pads.IsValidIndex(Named))
+		{
+			bNamedBusy = FVector::DistSquared2D(OutJob.Subs[0].FromCm, Pads[Named].PosCm) >= FMath::Square(Pads[Named].RadiusCm + 25.f);   // (not the subject's own pad)
+		}
 		for (FAstraXportSubject& Sub : OutJob.Subs)
 		{
 			int32 Use = INDEX_NONE;
 			if (Sub.S.Kind == ESubject::Cargo)
 			{
 				Use = T.Pads;                                            // the cargo pad
+			}
+			else if (bNamedBusy)
+			{
+				Use = Named;
 			}
 			else if (To.bEmergencyPad)
 			{
@@ -1518,6 +1552,7 @@ bool UAstraTransporterSubsystem::MakeRequest(const FAstraXportOrder& O, FAstraXp
 			Sub.ToYaw = Pads[Use].YawDeg;
 		}
 		(void)Cursor;
+		To.bPadOccupied = bNamedBusy;
 		To.Label = N == 1 ? Pads[Taken[0]].Id == FName(TEXT("cargo")) ? FString(TEXT("the cargo pad")) : (Pads[Taken[0]].bEmergency ? FString::Printf(TEXT("emergency pad %d"), Pads[Taken[0]].Index + 1) : FString::Printf(TEXT("pad %d"), Taken[0] + 1))
 		             : FString::Printf(TEXT("the pads (%s)"), *To.Label);
 		To.Pad = To.bEmergencyPad ? Pads[Taken[0]].Index : Taken[0];

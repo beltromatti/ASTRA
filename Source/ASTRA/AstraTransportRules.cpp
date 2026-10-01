@@ -378,10 +378,11 @@ namespace AstraXport
 			{
 				Cost(FMath::Lerp(T.GateApproachQ * 0.8f, 1.f, Sat((Env.GateKm - T.GateFieldKm) / 35.f)), FString::Printf(TEXT("the Janus Gate's field (%s off)"), *Km(Env.GateKm)));
 			}
+			// the long-range lock rides on the sensor net and the ship's thermal margin; a transport inside the hull uses the pads' own sensors
+			Cost(0.7f + 0.3f * Sat(Env.SensorsPower), FString::Printf(TEXT("the sensors' power (%s)"), *Pct(Env.SensorsPower)));
+			Cost(0.8f + 0.2f * Sat(Env.HeatFactor), TEXT("the heat"));
 		}
 		Cost(0.55f + 0.45f * Sat(R.Power), FString::Printf(TEXT("the room's power (%s)"), *Pct(R.Power)));
-		Cost(0.7f + 0.3f * Sat(Env.SensorsPower), FString::Printf(TEXT("the sensors' power (%s)"), *Pct(Env.SensorsPower)));
-		Cost(0.8f + 0.2f * Sat(Env.HeatFactor), TEXT("the heat"));
 		return Sat(Q);
 	}
 

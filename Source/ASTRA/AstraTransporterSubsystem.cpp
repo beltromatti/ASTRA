@@ -794,6 +794,10 @@ void UAstraTransporterSubsystem::EvaluateJob(FAstraXportJob& J)
 	}
 	J.bCondOk = bOk;
 	J.TargetQ = V.Quality;
+	if (J.Phase == EAstraXportPhase::Warmup || J.Phase == EAstraXportPhase::Demat)
+	{
+		J.MinQ = FMath::Min(J.MinQ, V.Quality);                 // what the conditions allowed at the worst, while the pattern was being taken: it decides how the arrival goes
+	}
 	J.Notes = V.Notes;
 	J.RangeKm = V.RangeKm;
 	J.Jam = V.Jam;
@@ -839,7 +843,7 @@ void UAstraTransporterSubsystem::TickLocking(FAstraXportJob& J, float Dt)
 		}
 		if (J.bHold)
 		{
-			News(J, FString::Printf(TEXT("%s: lock held on %s, quality %s: waiting for the word to energize"), *J.Tag, *Who(J), *Pct(J.Lock.Quality)), true);
+			News(J, FString::Printf(TEXT("%s: lock held on %s, quality %s: waiting for the word to energize"), *J.Tag, *Who(J), *Pct(J.TargetQ)), true);
 		}
 	}
 	if (!J.bHold)
@@ -875,7 +879,7 @@ void UAstraTransporterSubsystem::BeginCycle(FAstraXportJob& J)
 	J.Phase = EAstraXportPhase::Warmup;
 	J.T = 0.f;
 	J.Cycle = 0.f;
-	J.MinQ = J.Lock.Quality;
+	J.MinQ = V.Quality;
 	J.BufferS = 0.f;
 	J.EvalT = 0.f;
 	if (J.bEmergency)
@@ -916,10 +920,6 @@ void UAstraTransporterSubsystem::TickCycle(FAstraXportJob& J, float Dt)
 		const FTuning& Tj = TuningFor(J);
 		J.Lock.Tick(Tj, Dt, J.bCondOk ? J.TargetQ : 0.f, J.bCondOk ? 1.f : 0.f);
 		J.Quality = J.Lock.Quality;
-		if (J.Phase < EAstraXportPhase::Buffer)
-		{
-			J.MinQ = FMath::Min(J.MinQ, J.Lock.Quality);
-		}
 		if (J.Lock.State == FLock::EState::Lost)
 		{
 			OnLockLost(J);
@@ -1156,7 +1156,7 @@ void UAstraTransporterSubsystem::Depart(FAstraXportJob& J)
 	}
 	if (J.Arrival.Kind == EArrival::Delayed)
 	{
-		News(J, FString::Printf(TEXT("%s: %s are held in the buffer for about %.0f s: the far lock is unsteady (quality %s); the pattern is safe"), *J.Tag, *Who(J), J.Arrival.DelayS, *Pct(J.MinQ)), true);
+		News(J, FString::Printf(TEXT("%s: %s %s held in the buffer for about %.0f s: the lock is unsteady (quality %s); the pattern is safe"), *J.Tag, *Who(J), J.Subs.Num() == 1 ? TEXT("is") : TEXT("are"), J.Arrival.DelayS, *Pct(J.MinQ)), true);
 	}
 }
 
@@ -1371,7 +1371,7 @@ void UAstraTransporterSubsystem::Complete(FAstraXportJob& J)
 		Finish(J, EAstraXportPhase::Aborted, FString::Printf(TEXT("the pattern was called back from the buffer and set down on the pad it left (%s)"), *Who(J)));
 		return;
 	}
-	Told.Add(FString::Printf(TEXT("%s are at %s"), *Who(J), *J.ToText));
+	Told.Add(FString::Printf(TEXT("%s %s at %s"), *Who(J), J.Subs.Num() == 1 ? TEXT("is") : TEXT("are"), *J.ToText));
 	switch (J.Arrival.Kind)
 	{
 	case EArrival::Delayed:

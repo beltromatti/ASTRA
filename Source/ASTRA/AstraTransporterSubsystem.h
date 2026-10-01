@@ -237,6 +237,8 @@ public:
 	bool TestCaptainOnGround() const { return bTestPlanetside; }
 	/** Everything that is in the beam or waiting is dropped and the people are put back: a new campaign, the tests. */
 	void Reset();
+	/** A headless world has no planet actors, so no ground to stand on: the tests say there is one (the transport itself only needs the world's name and its landing site). */
+	void SetTestSurface(bool bOn) { bTestSurface = bOn; }
 
 	/** What the console would answer to a plain request right now (the chief's pre-flight; the card's `options` are made of these). OutWhy: why it could not even be read. */
 	AstraXport::FVerdict Preflight(const FAstraXportOrder& O, FString& OutWhy) const;
@@ -281,6 +283,7 @@ private:
 	// the tests' Captain
 	bool bTestCaptain = false;
 	bool bTestPlanetside = false;
+	bool bTestSurface = false;
 	FVector TestFeetCm = FVector::ZeroVector;
 
 	// the shield window: what Tactical was doing before, to put back

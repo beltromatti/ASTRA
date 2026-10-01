@@ -1,6 +1,7 @@
 #include "AstraTransportCommandlet.h"
 
 #include "ASTRA.h"
+#include "AstraTransportBench.h"
 #include "AstraTransportRules.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -496,11 +497,34 @@ namespace
 			E.Main.Power = 0.08f;
 			V = Evaluate(T, E, Inside);
 			XCheck(TEXT("room: no power: no beam"), !V.bOk && V.HasBlocker(TEXT("room")), Line(V));
+			// inside the hull the pads' own sensors do the lock: the sensor net and the ship's heat matter only to a beam that leaves it
+			{
+				FEnv Hot = BaseEnv();
+				Hot.SensorsPower = 0.f;
+				Hot.HeatFactor = 0.55f;
+				const FVerdict Vin = Evaluate(T, Hot, Inside);
+				FHull Far = MakeShip(TEXT("T-02"), TEXT("ASN Vigilant"), EAllegiance::Allied, FVector(20000, 0, 0), FRotator(0, 180, 0));
+				Hot.Own.bShieldsUp = false;
+				const FVerdict Vout = Evaluate(T, Hot, Req(PadEnd(0), ShipEnd(Far), {Person(TEXT("Sato"))}));
+				XCheck(TEXT("room: inside the hull a dead sensor net and a hot ship cost the lock nothing; outside they do"), Vin.bOk && Near(Vin.Quality, 1.f, 0.01f) && Vout.Quality < 0.7f, FString::Printf(TEXT("inside %.0f%%, to a ship %.0f%%"), 100.f * Vin.Quality, 100.f * Vout.Quality));
+			}
 			E.Main.Power = 1.f;
 			E.Main.Wreck = 0.95f;
 			V = Evaluate(T, E, Inside);
 			XCheck(TEXT("room: wrecked: no beam"), !V.bOk && V.HasBlocker(TEXT("room")), Line(V));
 			E.Main.Wreck = 0.f;
+			// a post that cannot be left, and a target that has left the plot
+			{
+				FRequest Posted = Inside;
+				Posted.Subjects[0].Barred = TEXT("Lieutenant Sato is on station at the helm post: it cannot be left by the beam");
+				const FVerdict Vp = Evaluate(T, BaseEnv(), Posted);
+				FHull Gone = MakeShip(TEXT("T-02"), TEXT("ASN Vigilant"), EAllegiance::Allied, FVector(20000, 0, 0), FRotator(0, 180, 0));
+				Gone.bPresent = false;
+				FEnv Eg = BaseEnv();
+				Eg.Own.bShieldsUp = false;
+				const FVerdict Vg = Evaluate(T, Eg, Req(PadEnd(0), ShipEnd(Gone), {Person(TEXT("Sato"))}));
+				XCheck(TEXT("subject: a post that cannot be left is refused; so is a ship that has left the plot"), !Vp.bOk && Vp.HasBlocker(TEXT("subject")) && !Vg.bOk && Vg.HasBlocker(TEXT("target")), FString::Printf(TEXT("%s | %s"), *Blockers(Vp), *Blockers(Vg)));
+			}
 			E.Main.Fire = 0.5f;
 			V = Evaluate(T, E, Inside);
 			XCheck(TEXT("room: on fire: the operators are out"), !V.bOk && V.HasBlocker(TEXT("room")), Line(V));
@@ -612,6 +636,11 @@ namespace
 	}
 }
 
+void AstraXportBenchCheck(const TCHAR* Name, bool bPass, const FString& Detail)
+{
+	XCheck(Name, bPass, Detail);
+}
+
 UAstraTransportCommandlet::UAstraTransportCommandlet()
 {
 	IsClient = false;
@@ -641,6 +670,10 @@ int32 UAstraTransportCommandlet::Main(const FString& Params)
 	if (bAll || Scenario == TEXT("rules"))
 	{
 		RulesBench(T);
+	}
+	if (bAll || Scenario == TEXT("world"))
+	{
+		AstraXportRunWorldBench(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Transport/fixtures")));
 	}
 
 	int32 Failed = 0;
