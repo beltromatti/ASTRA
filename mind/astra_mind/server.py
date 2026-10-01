@@ -178,6 +178,7 @@ class Mind:
         self.war = WarMinds(self.llm, self._ally_say, self._war_execute, lang=lambda: self.lang, mandate_persona=COMMANDERS.get,
                             channel=lambda c: self.enemy.open and self.enemy.contact == c, register_voice=self._register_voice,
                             transmit=self._say_external, intel=self.style.mandate_line, note=self.director.note)
+        self.war.disabled = os.environ.get("ASTRA_WAR_MINDS", "1") == "0"        # (ASTRA_WAR_MINDS=0: the groups fight on their reflexes, as before)
         self.enemy.war = self.war
         self.director.war_minds = self.war
         self.director.negotiate = self._negotiate

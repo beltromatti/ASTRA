@@ -340,6 +340,20 @@ class ToolsTests(Fixture):
         self.assertTrue(any("FAILED" in str(m.get("content")) for m in second if m.get("role") == "tool"))
         self.assertIn("again:group_order:attack", self.minds.pulses[0]["tools"])
 
+    async def test_a_model_that_ends_without_a_tool_call_is_asked_once_more_and_not_a_third_time(self) -> None:
+        await self.start(ScriptPolicy([], [("group_order", {"group": "Vanguard", "order": "attack", "target": "A-01", "reason": "kill the cruiser"})], loop=False))
+        await asyncio.sleep(0.01)
+        self.assertEqual([c[1]["order"] for c in self.cmds], ["attack"])
+        self.assertEqual(len(self.llm.calls), 2)
+        self.assertIn("without a tool call", self.llm.calls[1]["user"])
+        self.assertTrue(self.minds.pulses[0]["asked_again"])
+
+    async def test_a_model_that_says_nothing_twice_leaves_the_group_to_its_reflexes(self) -> None:
+        await self.start(ScriptPolicy([]))
+        await asyncio.sleep(0.01)
+        self.assertEqual(len(self.llm.calls), 2)
+        self.assertEqual(self.cmds, [])
+
     async def test_what_was_ordered_is_remembered_at_the_next_look(self) -> None:
         await self.start(ScriptPolicy([("group_order", {"group": "Vanguard", "order": "attack", "target": "A-01", "reason": "kill the cruiser first"})],
                                       [("no_change", {"reason": "it stands"})]))
@@ -491,7 +505,8 @@ class AstraTests(Fixture):
         st = astra_state([self.picket(), g2], ENEMIES(), contacts=[])
         self.llm.latency = 0.02                                                            # (both think at the same time: the word arrives while the other is reading)
         self.llm.policy = lambda mind, view, state, tools: (
-            [("say", {"to": "ally_t43", "text": "Resolute, Praetorian: take our starboard quarter.", "tone": "calm"})] if mind.seat.group == "7th Fleet picket" else [])
+            [("say", {"to": "ally_t43", "text": "Resolute, Praetorian: take our starboard quarter.", "tone": "calm"})] if mind.seat.group == "7th Fleet picket"
+            else [("no_change", {"reason": "holding"})])
         await self.feed(st)
         await self.feed(st, 9)
         seats = {c["seat"] for c in self.llm.calls}

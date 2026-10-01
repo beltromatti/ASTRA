@@ -19,6 +19,7 @@ import asyncio
 import importlib.util
 import json
 import logging
+import os
 import statistics
 import subprocess
 import sys
@@ -32,7 +33,7 @@ sys.path.insert(0, str(ROOT / "mind"))
 from astra_mind import models, war_minds  # noqa: E402
 from astra_mind.enemy import COMMANDERS  # noqa: E402
 
-ENGINE = Path("/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd")
+ENGINE = Path(os.environ.get("ASTRA_UE_CMD", "/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd"))   # (Windows: ASTRA_UE_CMD=...\\UnrealEditor-Cmd.exe)
 # main's pace of the war (the lead, 1/10: every hull, plate and shield half as tough again): this branch's code has the older base values, so the bench
 # sets them (docs/GUERRA.md §8). `--tune ""` for the branch's own.
 TUNE = "astra.war.tune shield_scale 1.5;astra.war.tune armour_scale 1.5;astra.war.tune struct_scale 1.8"

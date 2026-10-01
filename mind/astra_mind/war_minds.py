@@ -68,16 +68,16 @@ FORMATIONS = ("line", "wedge", "column", "screen")
 # (ASTRA names are of the Core Worlds' mixed peoples; the captains of the opening are fixed, any other ship gets one from the pool or from the
 # director's beat. The voices are Pocket TTS catalogue voices not used by the bridge crew, the admiral or the Mandate's captains.)
 ALLIES: dict[str, dict[str, Any]] = {
-    "T-01": dict(key="castellan", name="Captain Rhea Castellan", rank="Captain", ship="the battleship ASN Praetorian, the 7th Fleet's flagship at Aurelia",
+    "T-01": dict(key="castellan", name="Captain Rhea Castellan", rank="Captain", ship="the battleship ASN Praetorian",
                  voice="estelle", gender="f", precedence=1,
                  mission="Fleet's orders for the Aurelia picket: hold the approach to New Ravenna and the Janus Gate with the Aquila as the heart of the line; the "
                          "picket fights where the carrier can support it and keeps her covered; the Aquila's captain commands the picket in action.",
-                 bio="Twenty-six years in the fleet, the last three as the Praetorian's captain. Formal, patient and unsentimental: she has buried "
+                 bio="Twenty-six years in the fleet, the last three as the captain of the Praetorian, the 7th Fleet's flagship at Aurelia. Formal, patient and unsentimental: she has buried "
                      "crews before and wastes no ship. She trusts Vice Admiral Rourke and serves the Aquila's captain with the loyalty the service "
                      "demands and the honest opinion nobody asked for. She speaks in plain complete sentences and never raises her voice."),
-    "T-02": dict(key="okoro", name="Commander Daniel Okoro", rank="Commander", ship="the destroyer ASN Vigilant, in the Praetorian's picket",
+    "T-02": dict(key="okoro", name="Commander Daniel Okoro", rank="Commander", ship="the destroyer ASN Vigilant",
                  voice="paul", gender="m", precedence=2,
-                 bio="Thirty-four, the youngest destroyer captain of the 7th Fleet; Castellan taught him. Quick, confident, a little reckless, "
+                 bio="Thirty-four, the youngest destroyer captain of the 7th Fleet, in the Praetorian's picket; Castellan taught him. Quick, confident, a little reckless, "
                      "he wants the Aquila's captain to notice his ship. Talks fast and jokes under fire, but never about the crew."),
 }
 ALLY_POOL: list[dict[str, Any]] = [
@@ -383,9 +383,13 @@ DOCTRINE = """How a fleet fights (what your officers and your own years have tau
 - The groups run on reflexes all the time: they pick targets (concentrating fire), hold a range of about 4 km, pull their battered ships behind
   the line, and break off when they are clearly losing. The reflexes are decent. YOUR orders override them: while an order stands the group does
   not break off by itself, so withdrawing when it is lost is YOUR decision, and so is releasing it (`auto`) when the order has served.
-- Range is the main lever between equals. A line that holds at the maximum railgun range leaves half its wedge out of the fight; the side that
-  closes to 2.5-4 km brings every gun to bear and usually wins, at a price in damage to the closing ships. Against a heavier enemy, closing under
-  its lasers is costly; against a lighter or already battered one it is the kill. A group shut out by range loses to one that closes.
+- Range is the main lever between equals, and the right range depends on the size of the formation. The enemy's lasers reach 4 km, its railguns 8-10 km;
+  the rear of a deep formation (a wedge of six ships is 4-5 km deep) is that much further from the enemy than its front. A SMALL group (up to three or
+  four ships) does best holding just outside laser reach, 4.5-5 km: only railguns and missiles are exchanged and every railgun bears; closing inside
+  4 km adds the enemy's lasers for no gain, and beyond about 5.5 km the advantage is gone again. A DEEPER formation (six ships or more, or two groups
+  fighting side by side) cannot keep its rear in railgun reach and still stay out of laser reach: it does better closing to 2.5-3 km, everything
+  firing, the groups covering each other. These are the measured sweet spots between equal forces. Against a clearly heavier enemy stand off; against
+  a battered one close and kill it.
 - Concentrate fire: shots spread over several ships lose one or two ships in six against a line that focuses. Name the target that matters most
   and can be killed (a capital ship whose shield face is down or whose hull is going, a ship about to fall); do not chase a distant destroyer
   with a cruiser still unhurt.
@@ -913,21 +917,22 @@ class WarMinds:
         CURRENT.set(mind)
         CURRENT_VIEW.set((view, state))
         try:
-            system, user, tools = self._compose(mind, view, state, new_events, new_enemy, inbox, why)
-            if self.trace is not None:
-                rec["system"], rec["user"] = system, user
-            await asyncio.wait_for(self._run(mind, system, user, tools, rec, inbox, view), timeout=PULSE_TIMEOUT_S)
-        except asyncio.TimeoutError:
-            rec["error"] = "timeout"
-            log.warning("%s (%s): no decision in %.0f s: the group holds on its reflexes", cmd.name, seat.id, PULSE_TIMEOUT_S)
-        except asyncio.CancelledError:
-            rec["error"] = "cancelled"
-            raise
-        except Exception as exc:  # noqa: BLE001
-            rec["error"] = f"{type(exc).__name__}: {exc}"[:120]
-            log.exception("%s (%s): the pulse failed", cmd.name, seat.id)
-            if rec["error"] and rec["error"] != "cancelled":
-                await self._fallback(inbox)
+            try:
+                system, user, tools = self._compose(mind, view, state, new_events, new_enemy, inbox, why)
+                if self.trace is not None:
+                    rec["system"], rec["user"] = system, user
+                await asyncio.wait_for(self._run(mind, system, user, tools, rec, inbox, view), timeout=PULSE_TIMEOUT_S)
+            except asyncio.TimeoutError:
+                rec["error"] = "timeout"
+                log.warning("%s (%s): no decision in time: the group holds on its reflexes", cmd.name, seat.id)
+            except asyncio.CancelledError:
+                rec["error"] = "cancelled"
+                raise
+            except Exception as exc:  # noqa: BLE001
+                rec["error"] = f"{type(exc).__name__}: {exc}"[:120]
+                log.exception("%s (%s): the pulse failed", cmd.name, seat.id)
+            if rec["error"] and not rec["tools"]:
+                await self._fallback(inbox)                      # (a request from the Captain must not be lost to a model that failed or stalled before it answered)
         finally:
             rec["latency"] = round(time.perf_counter() - t0, 2)
             s = mind.stats
@@ -1099,9 +1104,36 @@ class WarMinds:
         if comp.error and not rec["tools"]:
             rec["error"] = comp.error[:100]
             return
+        if not rec["tools"]:
+            # it wrote and called nothing (or was cut off while thinking aloud): what it wrote is not an order and is not said; it is asked once for its
+            # decision, in the tools (docs/ARCHITETTURA.md §1bis: no guessing from the text)
+            await asyncio.wait_for(self._reask(mind, system, user, tools, rec, comp, on_call), timeout=ROUND2_TIMEOUT_S)
+            results = await self._settle(pending)
+            self._account(mind, rec, results)
         failed = [(n, a, r) for n, a, r in results if not r.get("ok")]
         if failed:
             await asyncio.wait_for(self._round2(mind, system, user, tools, rec, comp, results, failed, by_captain), timeout=ROUND2_TIMEOUT_S)
+
+    async def _reask(self, mind: Mind, system: str, user: str, tools: list[dict[str, Any]], rec: dict[str, Any], first: Completion, on_call: Any) -> None:
+        msgs: list[dict[str, Any]] = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        if first.content.strip():
+            msgs.append({"role": "assistant", "content": first.content.strip()})
+        msgs.append({"role": "user", "content": "[You ended without a tool call, so nothing was done or said. Decide now, briefly, with the tools: your orders, "
+                                                "your words, or no_change.]"})
+        comp = await models.chat(self.llm, mind.seat.role, messages=msgs, tools=tools, tool_choice="auto", on_tool_call=on_call, max_tokens=300)
+        self._count(rec, comp)
+        rec["asked_again"] = True
+
+    @staticmethod
+    async def _settle(pending: list[tuple[str, dict[str, Any], asyncio.Task]]) -> list[tuple[str, dict[str, Any], dict[str, Any]]]:
+        """The results of the tool calls started so far that have not been collected (the pulse's second try)."""
+        out = []
+        for name, a, task in pending:
+            try:
+                out.append((name, a, await asyncio.wait_for(asyncio.shield(task), timeout=4.0)))
+            except asyncio.TimeoutError:
+                out.append((name, a, {"ok": False, "detail": "no response from the fleet's datalink"}))
+        return out
 
     async def _round2(self, mind: Mind, system: str, user: str, tools: list[dict[str, Any]], rec: dict[str, Any], first: Completion,
                       results: list[tuple[str, dict[str, Any], dict[str, Any]]], failed: list[tuple[str, dict[str, Any], dict[str, Any]]],

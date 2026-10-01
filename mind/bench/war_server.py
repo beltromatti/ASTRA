@@ -136,7 +136,7 @@ class WarServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([(m["args"]["by"], m["args"]["side"], m["by"]) for m in orders], [("commander", "astra", "commander")])
         line = next(m for m in self.game.sent if m.get("type") == "line")
         self.assertEqual(line["speaker"], "castellan")
-        self.assertEqual(line["name"], "Captain Rhea Castellan (the battleship ASN Praetorian, the 7th Fleet's flagship at Aurelia)")
+        self.assertEqual(line["name"], "Captain Rhea Castellan (the battleship ASN Praetorian)")
         self.assertTrue(line["channel"])                                               # a radio voice, not an officer of the bridge
         self.assertIn("over the radio, Captain Rhea Castellan", " ".join(self.mind.game.events))
 
