@@ -648,6 +648,11 @@ void UAstraShipSubsystem::SetPlanetFill(const FString& T)
 	else { PlanetFill = FLinearColor(0.42f, 0.6f, 1.f); PlanetFillGain = 1.f; }
 }
 
+float UAstraShipSubsystem::GetStarLux() const
+{
+	return Sun && Sun->GetLightComponent() ? Sun->GetLightComponent()->Intensity : 1200.f;
+}
+
 FString UAstraShipSubsystem::LightInfo() const
 {
 	auto One = [](const TCHAR* Name, const ADirectionalLight* L) -> FString

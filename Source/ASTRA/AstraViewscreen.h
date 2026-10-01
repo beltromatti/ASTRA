@@ -57,6 +57,7 @@ private:
 	UPROPERTY() TObjectPtr<UTextureRenderTarget2D> Feed;
 	UPROPERTY() TObjectPtr<UCanvasRenderTarget2D> Overlay;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> Mid;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> FillMid;   // the sensor fill on the capture (M_ASTRA_ViewscreenFill)
 	UPROPERTY() TObjectPtr<UFont> Mono;
 	UPROPERTY() TObjectPtr<UFont> Title;
 

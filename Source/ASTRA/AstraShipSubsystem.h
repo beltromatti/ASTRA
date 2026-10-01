@@ -173,6 +173,8 @@ public:
 	/** The fill on the hulls comes from where the main viewscreen looks (its camera's direction, world). */
 	void AimSpaceFill(const FVector& LookDir, float DeltaTime);
 	FString LightInfo() const;
+	/** The star's light on the hulls (lux): what the viewscreen's sensor fill is measured against. */
+	float GetStarLux() const;
 	/** The comms channel open now ("" when none): the other party's contact id. */
 	const FString& GetChannelParty() const { return ChannelParty; }
 	/** The Captain's standing orders in force ("tactical: weapons free on hostiles inside 10 km"), from the crew's mind. */

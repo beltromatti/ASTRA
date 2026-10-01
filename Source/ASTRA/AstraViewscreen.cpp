@@ -33,6 +33,8 @@ DECLARE_CYCLE_STAT(TEXT("Viewscreen"), STAT_AstraViewscreen, STATGROUP_Astra);
 namespace
 {
 	TAutoConsoleVariable<int32> CVarViewscreenHz(TEXT("astra.viewscreen.hz"), 30, TEXT("Main viewscreen: optical feed and overlay refreshes per second (0 = frozen)"));
+	TAutoConsoleVariable<float> CVarViewscreenFill(TEXT("astra.viewscreen.fill"), 0.35f,
+		TEXT("Main viewscreen: the sensors' fill from the camera's side, as a fraction of the star's light (a ship against the star is not a black cut-out; 0 = off)"));
 	FAutoConsoleCommandWithWorldAndArgs CmdViewscreenDump(TEXT("astra.viewscreen.dump"),
 		TEXT("Testing: astra.viewscreen.dump [path.png] (the main viewscreen's image at full resolution, feed under overlay)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
@@ -270,6 +272,12 @@ void AAstraViewscreen::BeginPlay()
 	PP.MotionBlurAmount = 0.f;
 	PP.bOverride_AmbientOcclusionIntensity = true;
 	PP.AmbientOcclusionIntensity = 0.f;
+	// the sensor fill (M_ASTRA_ViewscreenFill): the hull lit from the camera's side as well as by the star, on this image only
+	if (UMaterialInterface* FillMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/UI/Materials/M_ASTRA_ViewscreenFill.M_ASTRA_ViewscreenFill")))
+	{
+		FillMid = UMaterialInstanceDynamic::Create(FillMat, this);
+		PP.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, FillMid));
+	}
 	Capture->PostProcessBlendWeight = 1.f;
 	// what a sensor feed of ships in sunlight does not need, at 30 Hz next to the bridge's own frame: no shadow maps (the
 	// ships cast none), no screen-space or distance-field effects, no fog
@@ -885,6 +893,11 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 	if (bWatched && bDue)
 	{
 		LastCaptureAt = Now;
+		if (FillMid)
+		{
+			const UAstraShipSubsystem* Lit = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+			FillMid->SetScalarParameterValue(TEXT("Fill"), FMath::Max(0.f, CVarViewscreenFill.GetValueOnGameThread()) * (Lit ? Lit->GetStarLux() : 1200.f) / PI);
+		}
 		Capture->CaptureScene();
 		if (Overlay)
 		{
