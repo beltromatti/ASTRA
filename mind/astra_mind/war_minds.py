@@ -9,8 +9,9 @@ system), `say` (an allied captain's words to the Aquila on the fleet net), `repo
 decides for them or filters what they say (docs/ARCHITETTURA.md §1bis): the code carries facts, keeps the clock, and runs the tools.
 
 Two velocities (docs/GUERRA.md §2): the groups run on their reflexes all the time; a mind thinks every 60-120 s or when something strong
-happens to its group (a loss, a morale that breaks, an order that ran out, a new enemy, a word from the Captain), never twice at once for the
-same person, and when it is slow or silent the groups simply hold on their reflexes.
+happens to its group (a loss, a morale that breaks, an order that ran out, a new enemy, a word from the Captain, and for an allied captain the
+Aquila drawing away or losing her protection fast), never twice at once for the same person, and when it is slow or silent the groups simply
+hold on their reflexes.
 
 Who thinks (a seat each, one model call per pulse):
   - the Mandate's ADMIRAL: the senior commander alive (the game passes the command: `commands_the_strike_group`); gives `group_order`
