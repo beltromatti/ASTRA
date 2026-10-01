@@ -30,9 +30,9 @@ _PLACE_WORDS = (                                 # (text found in the ship state
 @dataclass
 class Channel:
     """A radio or video channel the Captain has open with someone outside the room."""
-    party: str = ""                     # contact id ("T-23"), "fleet", a port controller...
+    party: str = ""                     # contact id ("T-23"), "fleet", "flight" (the flight net), a port controller...
     name: str = ""                      # what the Captain would call them: "Ferryman Irina Vael (the Cocytus)"
-    kind: str = "enemy"                 # enemy | fleet | ally | port
+    kind: str = "enemy"                 # enemy | fleet | flight | ally | port
     open: bool = True
     muted: bool = False                 # the Captain's voice does not go out
     heard_s: float | None = None        # seconds since the party last spoke to the Captain (None: not in this exchange)
@@ -141,10 +141,12 @@ def earshot_from_state(place: str, state: dict[str, Any] | None) -> tuple[str, .
 
 
 def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any = None, names: dict[str, str] | None = None,
-          exchange: Exchange | None = None) -> Context:
+          exchange: Exchange | None = None, flight_net: bool = False) -> Context:
     """The context of one utterance. `raw`: the game's `context` (None or {} on a build that does not send it):
         {place: slug, place_name, pawn, in_earshot: [ids], facing: id|null, channel: {party, open, muted}|null};
-    `enemy`: the mind's enemy agent (open, contact) — the channel the mind itself keeps; `names`: party id -> display name."""
+    `enemy`: the mind's enemy agent (open, contact) — the channel the mind itself keeps; `names`: party id -> display name;
+    `flight_net`: the mind's flight net is live (the Captain opened it, flies a Falcon, stands on the flight deck, or was just called on it): it is the channel when
+    no other is open."""
     ex = exchange or Exchange()
     if raw:
         ch = raw.get("channel") if isinstance(raw.get("channel"), dict) else None
@@ -155,6 +157,8 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
                               open=bool(ch.get("open", True)), muted=bool(ch.get("muted", False)) or _comms_muted(state),
                               heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), last_words=ex.last_words(party),
                               screen=bool(ch.get("screen", False)) or _on_screen(state, party))
+        if channel is None and flight_net:
+            channel = _flight_channel(names, ex, state)
         slug = str(raw.get("place") or "bridge")
         place = PLACE_SLUGS.get(slug, slug)
         listed = known_speakers(raw.get("in_earshot")) if raw.get("in_earshot") is not None else earshot_from_state(place, state)
@@ -168,8 +172,16 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
         channel = Channel(party=party, name=(names or {}).get(party, party), kind="enemy", open=True, muted=_comms_muted(state),
                           heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), last_words=ex.last_words(party),
                           screen=_on_screen(state, party))
+    if channel is None and flight_net:
+        channel = _flight_channel(names, ex, state)
     return Context(place=place, in_earshot=earshot_from_state(place, state), facing=None, channel=channel,
                    pawn="falcon" if place == "falcon" else "seated", source="inferred", asleep=asleep)
+
+
+def _flight_channel(names: dict[str, str] | None, ex: Exchange, state: dict[str, Any] | None) -> Channel:
+    """The flight net as a channel (the mind keeps it: the game's own `channel` has no flight party)."""
+    return Channel(party="flight", name=(names or {}).get("flight", "the flight net"), kind="flight", open=True, muted=_comms_muted(state),
+                   heard_s=ex.ago(ex._heard, "flight"), said_s=ex.ago(ex._said, "flight"), last_words=ex.last_words("flight"))
 
 
 def _comms_muted(state: dict[str, Any] | None) -> bool:
@@ -190,6 +202,8 @@ def _kind(party: str, state: dict[str, Any] | None = None) -> str:
     p = party.lower()
     if p in ("fleet", "admiral", "rourke"):
         return "fleet"
+    if p in ("flight", "flight_net", "cag"):
+        return "flight"
     if p.startswith("port") or p in ("field", "control"):
         return "port"
     for c in (state or {}).get("contacts", []) or []:
@@ -213,6 +227,10 @@ def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
         who = ch.name or ch.party
         if ch.muted:
             parts.append(f"A channel with {who} is open but MUTED: nothing the Captain says reaches them.")
+        elif ch.kind == "flight":
+            parts.append(f"The flight net is live ({who}; the bridge hears it, and so do you): what the Captain says TO a pilot, a squadron, the CAG or the Chief of the Deck goes "
+                         "out on it (Martin lets it through) and they answer for themselves, and carry out the orders for their squadrons. Whatever is for them is theirs: you "
+                         "hear every word and say nothing about it — Price too, unless the words are for him or for Flight Control. What is meant for the bridge is yours.")
         else:
             parts.append(f"A channel with {who} is open: what the Captain says TO them goes out on it (Martin lets it through), "
                          f"and you hear every word as well. Words said to {who} are for {who} to answer, not for you: act and "

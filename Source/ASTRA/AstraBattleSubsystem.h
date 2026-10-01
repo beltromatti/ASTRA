@@ -185,6 +185,12 @@ struct FAstraBattleShip
 	float SensorKm = 45.f;               // reach of its own sensors at full health
 	float LaserDamage = 18.f, LaserCd = 5.f, LaserRange = 4000.f;
 	EAstraFate DeathHow = EAstraFate::Alive;
+	// the Captain's wing and its radio (AstraWarCraft.cpp, docs/VOLO.md): a craft that flies his wing has a name on the flight net, and what happens to it is told
+	FString Radio;                       // "Eagle 2" (empty: an ordinary craft, told only in its squadron's reports)
+	int32 LastHitBy = -1;                // the craft or ship whose blow struck it last: a kill is credited to them
+	int32 RadioHullStep = 0;             // how far its hull has been called on the radio (0 sound, 1 under 70 %, 2 under 35 %)
+	int32 RadioTarget = -1;              // the bandit it last called as engaged
+	float RadioT = -100.f;               // when it last called an engagement
 };
 
 UENUM()
@@ -254,6 +260,7 @@ struct FAstraSquadron
 	int32 LostSinceReport = 0;
 	TArray<FString> LostCrew;             // who was flying the aircraft lost since the last report
 	float LastLossReport = -100.f;
+	float EngagedAt = -100.f;              // when one of its flights last met the enemy (told as `flight: alpha squadron engaged ...`, at most once in 45 s)
 	bool bAirborneReported = false;
 	int32 Launched = 0;      // aircraft launched in this sortie
 	int32 TorpedoesAway = 0; // released since the last report (one spoken report per torpedo run)
@@ -809,6 +816,16 @@ private:
 	void FireCraft(FAstraBattleShip& S, float Dt);
 	void LandCraft(FAstraBattleShip& S, FAstraBattleShip& Carrier, FAstraSquadron& Q);
 	int32 AirborneCount(int32 Squadron) const;
+	// --- the Captain's wing (AstraWarCraft.cpp, docs/VOLO.md): when he leaves the catapult in a Falcon, two more of Alpha's Falcons follow from the tubes and fly his
+	// wing as Eagle 2 and Eagle 3 (an escort flight that he leads); what happens to them is told as `flight: Eagle 2 ...` for the flight net's people to speak
+	int32 WingToLaunch = 0;              // Falcons still to come off the deck
+	int32 WingLaunched = 0;
+	float WingLaunchT = 0.f;
+	int32 WingFlightId = -1;
+	void StartEagleWing();
+	void TickEagleWing(float Dt);
+	void EndEagleWing();
+	void WingNotes(FAstraBattleShip& S);
 	/** A Mandate cruiser's strike wing (Harpy fighters) that launches after Delay seconds against the Aquila. */
 	void AddEnemyWing(int32 CarrierIdx, int32 Count, float Delay);
 	bool bMandateStandDown() const;   // the Mandate leader agreed to terms: their fighters break off
