@@ -22,6 +22,8 @@
 #include "HAL/PlatformTime.h"
 
 DECLARE_CYCLE_STAT(TEXT("Battle tick"), STAT_AstraBattle, STATGROUP_Astra);
+DECLARE_CYCLE_STAT(TEXT("War draw"), STAT_AstraWarDraw, STATGROUP_Astra);
+DECLARE_CYCLE_STAT(TEXT("War FX"), STAT_AstraWarFx, STATGROUP_Astra);
 
 namespace
 {
@@ -362,10 +364,12 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		TickWrecks(0.f);
 		if (WarDraw)
 		{
+			SCOPE_CYCLE_COUNTER(STAT_AstraWarDraw);
 			WarDraw->Tick(DeltaTime);
 		}
 		if (WarFX)
 		{
+			SCOPE_CYCLE_COUNTER(STAT_AstraWarFx);
 			WarFX->Tick(DeltaTime);
 		}
 		return;
@@ -584,11 +588,13 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	const double PerfT2 = FPlatformTime::Seconds();
 	if (WarDraw)
 	{
+		SCOPE_CYCLE_COUNTER(STAT_AstraWarDraw);
 		WarDraw->Tick(DeltaTime);                  // the craft's hulls and every ship's lamps, as instances (AstraWarDraw.cpp)
 	}
 	const double PerfT3 = FPlatformTime::Seconds();
 	if (WarFX)
 	{
+		SCOPE_CYCLE_COUNTER(STAT_AstraWarFx);
 		WarFX->Tick(DeltaTime);                    // the war's effects: shots, particles, shields, drives (AstraWarFX.cpp)
 	}
 	EndPhase(5);

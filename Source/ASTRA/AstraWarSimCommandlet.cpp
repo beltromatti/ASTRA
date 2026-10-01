@@ -173,14 +173,13 @@ namespace
 {
 	/** The tactical plot's plan for the battle as it stands (AstraHoloPlan.h), as the Captain in the chair would see it, written for tools/art/holo_plan_preview.py to draw:
 	 *  the readability of the holo table at two hundred contacts is checked on pictures, offline. */
-	void DumpHoloPlan(UAstraBattleSubsystem* B, float Heading, const FString& Path, AstraHoloPlan::FState& State)
+	/** The table's geometry as the Captain in the chair sees it, with the range the table would settle on for these blips (its ladder of ranges). */
+	AstraHoloPlan::FParams HoloParamsFor(const TArray<FAstraHoloBlip>& Blips, float Heading, float& OutTilt)
 	{
 		using namespace AstraHoloPlan;
 		FParams Par;
-		float Tilt = 0.f;
-		Par.ViewerLocal = ViewerInPlotFrame(FVector(-430.f, 0.f, 100.f), Par.PlotRadius, Par.PlaneHeight, 32.f, Tilt);   // (the Captain's chair)
+		Par.ViewerLocal = ViewerInPlotFrame(FVector(-430.f, 0.f, 100.f), Par.PlotRadius, Par.PlaneHeight, 32.f, OutTilt);   // (the Captain's chair)
 		Par.HeadingDeg = Heading;
-		const TArray<FAstraHoloBlip>& Blips = B->HoloBlips();
 		static const float Ladder[] = {5.f, 10.f, 15.f, 20.f, 30.f, 40.f, 60.f, 80.f, 120.f, 160.f};
 		float Far = 4.f;
 		for (const FAstraHoloBlip& Bl : Blips)
@@ -199,6 +198,15 @@ namespace
 				break;
 			}
 		}
+		return Par;
+	}
+
+	void DumpHoloPlan(UAstraBattleSubsystem* B, float Heading, const FString& Path, AstraHoloPlan::FState& State)
+	{
+		using namespace AstraHoloPlan;
+		const TArray<FAstraHoloBlip>& Blips = B->HoloBlips();
+		float Tilt = 0.f;
+		const FParams Par = HoloParamsFor(Blips, Heading, Tilt);
 		FPlan Plan;
 		Make(Blips, Par, State, Plan);
 		FVector Right, Up;
@@ -455,6 +463,23 @@ namespace
 				PlotJson->SetNumberField(TEXT("blips"), NBlips);
 				PlotJson->SetNumberField(TEXT("contacts_build_ms"), FMath::RoundToDouble(Ms[0] / Rounds * 1000.0) / 1000.0);
 				PlotJson->SetNumberField(TEXT("blips_build_ms"), FMath::RoundToDouble(Ms[1] / Rounds * 1000.0) / 1000.0);
+				// and what the holo table's plan costs to decide (which ships are named, which are a tagged group, where each label goes): the table makes it at most 30 times a second
+				{
+					const TArray<FAstraHoloBlip>& Blips = B->HoloBlips();
+					float Tilt = 0.f;
+					const AstraHoloPlan::FParams Par = HoloParamsFor(Blips, Ship->GetHeadingDeg(), Tilt);
+					AstraHoloPlan::FState State;                                   // (warm: the second plan on knows who was together and where the labels sat, as the table's does)
+					AstraHoloPlan::FPlan Plan;
+					AstraHoloPlan::Make(Blips, Par, State, Plan);
+					const double P0 = FPlatformTime::Seconds();
+					for (int32 k = 0; k < Rounds; ++k)
+					{
+						AstraHoloPlan::Make(Blips, Par, State, Plan);
+					}
+					PlotJson->SetNumberField(TEXT("plan_ms"), FMath::RoundToDouble((FPlatformTime::Seconds() - P0) * 1000.0 / Rounds * 1000.0) / 1000.0);
+					PlotJson->SetNumberField(TEXT("plan_labels"), Plan.Labels.Num());
+					PlotJson->SetNumberField(TEXT("plan_groups"), Plan.Clusters.Num());
+				}
 			}
 			while (NextHolo < HoloAt.Num() && B->GetBattleTime() >= HoloAt[NextHolo])
 			{

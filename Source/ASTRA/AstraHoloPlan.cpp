@@ -191,7 +191,7 @@ namespace AstraHoloPlan
 			FVector2D BestOff = FVector2D::ZeroVector;
 			int32 BestSlot = 0;
 			bool bFound = false;
-			const int32 Rings = A.bMust ? 3 : 2;
+			const int32 Rings = A.bMust ? 5 : 2;           // (a label that must be shown goes out as far as it takes to find room: in a heap of ships that is a few rings)
 			// the eight places round its thing, on a ring a label's height further out each time: slot = ring * 8 + which
 			const auto PlaceOf = [&A](int32 Slot) -> FVector2D
 			{
