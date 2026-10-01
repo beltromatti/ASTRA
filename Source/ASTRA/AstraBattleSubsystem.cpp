@@ -135,6 +135,7 @@ int32 UAstraBattleSubsystem::AddShip(const FString& Contact, const FString& Name
 	S.Mode = Speed > 1.f ? EAstraShipMode::Cruise : EAstraShipMode::Idle;
 	Ships.Add(S);
 	IdIndex.Add(S.Id, Ships.Num() - 1);
+	++PlotStamp;
 	InitShipModel(Ships.Last());     // a warship gets its class's sections, plates, shield sectors and mounts (AstraWarDamage.cpp)
 	return Ships.Num() - 1;
 }
@@ -583,6 +584,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		WarFX->Tick(DeltaTime);                    // the war's effects: shots, particles, shields, drives (AstraWarFX.cpp)
 	}
 	EndPhase(5);
+	++PlotStamp;                                   // the plot has moved: the shared lists (Contacts, HoloBlips) are made again for whoever reads them next
 }
 
 void UAstraBattleSubsystem::StartCampaign()
@@ -1754,9 +1756,10 @@ UAstraBattleSubsystem::FFireControl UAstraBattleSubsystem::GetFireControl() cons
 	return F;
 }
 
-void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
+void UAstraBattleSubsystem::BuildHoloBlips(TArray<FAstraHoloBlip>& Out, FPlotCounts& Counts) const
 {
 	Out.Reset();
+	Counts = FPlotCounts();
 	if (Ships.Num() == 0)
 	{
 		return;
@@ -1767,8 +1770,22 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 	{
 		return Vel.IsNearlyZero() ? FVector::ZeroVector : (ToWorld(Pos + Vel) - ToWorld(Pos)).GetSafeNormal();
 	};
-	for (const FAstraBattleShip& S : Ships)
+	// a flight group's airborne aircraft and the first of them (it carries the group's label): found in one pass over the ships, not once for each of the aircraft
+	TArray<int32, TInlineAllocator<16>> SquadCount, SquadLead;
+	SquadCount.SetNumZeroed(Squadrons.Num());
+	SquadLead.Init(-1, Squadrons.Num());
+	for (int32 i = 0; i < Ships.Num(); ++i)
 	{
+		const FAstraBattleShip& S = Ships[i];
+		if (S.bAlive && S.bCraft && Squadrons.IsValidIndex(S.Squadron))
+		{
+			SquadLead[S.Squadron] = SquadLead[S.Squadron] < 0 ? i : SquadLead[S.Squadron];
+			++SquadCount[S.Squadron];
+		}
+	}
+	for (int32 Si = 0; Si < Ships.Num(); ++Si)
+	{
+		const FAstraBattleShip& S = Ships[Si];
 		if (!S.bAlive)
 		{
 			continue;
@@ -1778,6 +1795,8 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 			continue;
 		}
 		FAstraHoloBlip B;
+		B.Id = S.Id;
+		B.bFiringAtUs = S.Side == EAstraSide::Mandate && !S.bHoldFire && !S.bDisabled && (S.TargetId == P.Id || S.FireTarget == P.Id);
 		B.Kind = 0;
 		B.bBearingOnly = S.bFog && S.Track == 1;
 		B.bJamming = S.bJamming;
@@ -1819,15 +1838,32 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		if (S.bCraft && Squadrons.IsValidIndex(S.Squadron))
 		{
 			B.bCraft = true;
+			B.Squadron = S.Squadron;
 			B.Size = S.CraftKind == 2 ? 0.2f : 0.3f;
-			const FAstraSquadron& Q = Squadrons[S.Squadron];
-			// the first airborne aircraft of a group carries the group's label
-			const FAstraBattleShip* Lead = Ships.FindByPredicate([&S](const FAstraBattleShip& X) { return X.bAlive && X.bCraft && X.Squadron == S.Squadron; });
-			B.bNoLabel = Lead != &S;
-			B.Name = FString::Printf(TEXT("%s x%d"), *Q.Name.ToUpper(), AirborneCount(S.Squadron));
-			B.Contact = Q.Mission.ToUpper();
+			// the first airborne aircraft of a group carries the group's label (only it has a name and a mission to show)
+			B.bNoLabel = SquadLead[S.Squadron] != Si;
+			if (!B.bNoLabel)
+			{
+				const FAstraSquadron& Q = Squadrons[S.Squadron];
+				B.Name = FString::Printf(TEXT("%s x%d"), *Q.Name.ToUpper(), SquadCount[S.Squadron]);
+				B.Contact = Q.Mission.ToUpper();
+			}
 		}
-		Out.Add(B);
+		if (!S.bPlayer)
+		{
+			const bool bHostileNow = B.bHostile && !B.bRetreating;
+			if (B.bCraft)
+			{
+				Counts.HostileCraft += bHostileNow ? 1 : 0;
+				Counts.FriendlyCraft += B.Side == EAstraSide::Astra ? 1 : 0;
+			}
+			else
+			{
+				Counts.HostileShips += bHostileNow ? 1 : 0;
+				Counts.FriendlyShips += B.Side == EAstraSide::Astra ? 1 : 0;
+			}
+		}
+		Out.Add(MoveTemp(B));
 	}
 	for (const FAstraProjectile& Pr : Projectiles)
 	{
@@ -1839,10 +1875,11 @@ void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
 		B.Kind = 1;
 		B.Rel = ToWorld(Pr.Pos) - Origin;
 		B.VelDir = Dir(Pr.Pos, Pr.Vel);
-		const FAstraBattleShip* Owner = Ships.FindByPredicate([&Pr](const FAstraBattleShip& S) { return S.Id == Pr.Owner; });
+		const FAstraBattleShip* Owner = FindById(Pr.Owner);
 		B.Side = Owner ? Owner->Side : EAstraSide::Neutral;
 		B.bHostile = Owner && Owner->bHostile;
-		Out.Add(B);
+		++Counts.Missiles;
+		Out.Add(MoveTemp(B));
 	}
 	for (const FAstraFlash& F : Flashes)
 	{
@@ -4924,6 +4961,7 @@ void UAstraBattleSubsystem::ClearSystem()
 	}
 	Ships.SetNum(1);
 	RebuildIdIndex();
+	++PlotStamp;
 	Groups.Reset();
 	GroupEvents.Reset();                          // (what happened to the old system's groups is not news here)
 	Flights.Reset();

@@ -36,7 +36,7 @@ namespace
 
 	/** An instanced component for the war's drawing, set up like the effects' layers (no shadow, no collision, no culling by distance: it holds hundreds of things
 	 *  over tens of kilometres). */
-	UInstancedStaticMeshComponent* MakeComp(AActor* Host, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 NumData)
+	UInstancedStaticMeshComponent* MakeComp(AActor* Host, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 NumData, bool bMotionVectors)
 	{
 		UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(Host, Name);
 		C->SetupAttachment(Host->GetRootComponent());
@@ -59,6 +59,10 @@ namespace
 		C->SetReceivesDecals(false);
 		C->SetLightingChannels(true, true, false);      // outside the hull: the star's light and the planet's, like the ships
 		C->SetNumCustomDataFloats(NumData);
+		if (bMotionVectors)
+		{
+			C->SetHasPerInstancePrevTransforms(true);   // a hull that moves is given where it was, so that the temporal upscaler sees its motion (the engine has no way to know)
+		}
 		TArray<FTransform> Init;
 		Init.Init(HiddenXf(), Capacity);
 		C->AddInstances(Init, false, false, false);
@@ -115,7 +119,7 @@ void UAstraWarDraw::Init(UAstraBattleSubsystem* InOwner)
 	Host->Tags.Add(TEXT("ASTRA.Sky"));                  // the main viewscreen's camera shows what is out there: tagged like the sky
 	Lamps.Init(CapLamps);
 	Lamps.NumData = AstraFx::Stride;
-	if (UInstancedStaticMeshComponent* C = MakeComp(Host, TEXT("DrawLamps"), SphereMesh, MatGlow, CapLamps, AstraFx::Stride))
+	if (UInstancedStaticMeshComponent* C = MakeComp(Host, TEXT("DrawLamps"), SphereMesh, MatGlow, CapLamps, AstraFx::Stride, false))
 	{
 		C->SetTranslucentSortPriority(4);
 		Lamps.Comp = C;
@@ -171,11 +175,12 @@ FPage* UAstraWarDraw::MakePage(int32 KindIdx, int32 SetIdx)
 	FKind& Kd = Kinds[KindIdx];
 	FPage& P = Kd.Sets[SetIdx].Pages.AddDefaulted_GetRef();
 	P.Xf.Init(HiddenXf(), PageSize);
+	P.PrevXf.Init(HiddenXf(), PageSize);
 	P.Owner.Init(-1, PageSize);
 	if (bLive && Kd.StaticMesh && Host)
 	{
 		const FString Name = FString::Printf(TEXT("Draw_%s_%d_%d"), *Kd.Mesh, SetIdx, Kd.Sets[SetIdx].Pages.Num());
-		P.Comp = MakeComp(Host, *Name, Kd.StaticMesh, nullptr, PageSize, 0);
+		P.Comp = MakeComp(Host, *Name, Kd.StaticMesh, nullptr, PageSize, 0, true);
 	}
 	return &P;
 }
@@ -257,6 +262,7 @@ void UAstraWarDraw::Release(const FRef& R)
 	FPage& P = St.Pages[R.Slot / PageSize];
 	const int32 L = R.Slot % PageSize;
 	P.Xf[L] = HiddenXf();
+	P.PrevXf[L] = HiddenXf();
 	P.Owner[L] = -1;
 	--P.Live;
 	--St.Live;
@@ -278,6 +284,7 @@ void UAstraWarDraw::StageHull(FAstraBattleShip& S, double Dist2)
 		Where.Remove(S.Id);
 		R = nullptr;
 	}
+	const bool bFresh = R == nullptr;
 	if (!R)
 	{
 		FRef N;
@@ -286,7 +293,10 @@ void UAstraWarDraw::StageHull(FAstraBattleShip& S, double Dist2)
 	}
 	R->Frame = Frame;
 	FPage& P = Kinds[R->Kind].Sets[R->Set].Pages[R->Slot / PageSize];
-	P.Xf[R->Slot % PageSize] = FTransform(F.ToWorldRot(S.Att), F.ToWorld(S.Pos), FVector::OneVector);
+	const int32 L = R->Slot % PageSize;
+	const FTransform Now(F.ToWorldRot(S.Att), F.ToWorld(S.Pos), FVector::OneVector);
+	P.PrevXf[L] = bFresh ? Now : P.Xf[L];                 // (a craft that has just appeared has no past: it is not smeared across the sky from where its slot was last)
+	P.Xf[L] = Now;
 	++Hulls;
 	NearNow += SetIdx;
 }
@@ -371,7 +381,7 @@ void UAstraWarDraw::Flush()
 				{
 					if (P.High > 0)
 					{
-						C->BatchUpdateInstancesTransforms(0, MakeArrayView(P.Xf.GetData(), P.High), false, false, false);
+						C->BatchUpdateInstancesTransforms(0, P.Xf, P.PrevXf, false, false, false);   // (the page whole: the two lists must match in length)
 					}
 				}
 				P.bWritten = P.Live > 0;
@@ -398,6 +408,10 @@ void UAstraWarDraw::HideAll()
 			for (FPage& P : St.Pages)
 			{
 				for (FTransform& X : P.Xf)
+				{
+					X = HiddenXf();
+				}
+				for (FTransform& X : P.PrevXf)
 				{
 					X = HiddenXf();
 				}

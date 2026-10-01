@@ -41,6 +41,7 @@ namespace AstraDraw
 	{
 		TWeakObjectPtr<UInstancedStaticMeshComponent> Comp;     // (empty on the bench: staged and counted, not drawn)
 		TArray<FTransform> Xf;                                  // PageSize
+		TArray<FTransform> PrevXf;                              // where each was a frame ago: the upscaler's motion vectors for a hull that moves 14 m a frame
 		TArray<int32> Owner;                                    // the ship id in each slot (-1 free)
 		int32 High = 0;                                         // 1 + the highest slot in use: what is written
 		int32 Live = 0;

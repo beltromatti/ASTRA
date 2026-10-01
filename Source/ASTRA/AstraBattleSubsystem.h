@@ -317,6 +317,9 @@ struct FAstraHoloBlip
 	bool bTargeted = false;                 // our fire control is on it
 	bool bCraft = false;                    // fighter / bomber / drone
 	bool bNoLabel = false;                  // only a flight group's leader is labelled
+	bool bFiringAtUs = false;               // its guns or its commander's orders are on the Aquila
+	int32 Id = -1;                          // the ship's id (the battle's; the plot's own tags and groupings are made from these)
+	int32 Squadron = -1;                    // a craft's flight group (index in the battle's squadrons)
 	float Size = 1.f;                       // 1 capital, ~0.7 escort, ~0.55 small
 	float Fade = 1.f;
 	float RangeKm = 0.f;
@@ -549,8 +552,24 @@ public:
 		const AStaticMeshActor* Actor = nullptr;   // what the optical sensors see of it (firm tracks only)
 		AStaticMeshActor* Flare = nullptr;         // its drive plume, sized to be seen from the bridge (not through a zoom)
 	};
-	/** Every contact on the Aquila's plot (not the Aquila herself), nearest first. */
+	/** Every contact on the Aquila's plot (not the Aquila herself), nearest first: a copy of the shared list below, for a caller that keeps or changes its own. */
 	void GetContacts(TArray<FContactView>& Out) const;
+	/** The plot as the Aquila knows it, built once for each step of the battle and shared by everyone who reads it within that step (a dozen readers a frame: the stations'
+	 *  executors, the screens, the holo table, the main viewscreen, the HUDs; with two hundred contacts each used to make its own list). The references hold until the
+	 *  battle's next tick: never keep one. (AstraBattleQueries.cpp, AstraBattleSubsystem.cpp) */
+	const TArray<FContactView>& Contacts() const;
+	/** What the tactical plot draws (ships, craft, missiles, blasts), shared in the same way. */
+	const TArray<FAstraHoloBlip>& HoloBlips() const;
+	/** What the plot holds, counted when its lists are made: the screens' headlines (ships by side, craft by side, missiles in flight). */
+	struct FPlotCounts
+	{
+		int32 HostileShips = 0, FriendlyShips = 0, HostileCraft = 0, FriendlyCraft = 0, Missiles = 0;
+	};
+	const FPlotCounts& PlotCounts() const;
+	/** What the shared lists cost (astra.war.stat): builds and reads since the start, and the time the builds took. */
+	FString PlotStats() const;
+	/** The shared lists are made again for the next reader (the bench uses it to time a build; the end of every battle tick does it already). */
+	void InvalidatePlot() { ++PlotStamp; }
 	/** The physical state of one warship as the Aquila can know it (AstraWarDamage.cpp), for the visuals and the crew.
 	 *  Detail 0: nothing known (returns false) · 1: what the eye sees (gutted, burning, venting, breaking up, disabled) ·
 	 *  2: + structure by section, armour plates, shield sectors (a firm, classified track) · 3: everything, systems and
@@ -706,6 +725,16 @@ private:
 	FVector BridgeOffset = FVector(172.0, 0.0, 62.0);
 
 	float Time = 0.f;
+	// the shared plot (AstraBattleQueries.cpp): the lists are rebuilt when the stamp moves (the end of each tick, a ship added, a system cleared)
+	uint32 PlotStamp = 1;
+	mutable TArray<FContactView> ContactsCache;
+	mutable TArray<FAstraHoloBlip> BlipsCache;
+	mutable FPlotCounts CountsCache;
+	mutable uint32 ContactsBuiltAt = 0, BlipsBuiltAt = 0;
+	mutable int32 ContactBuilds = 0, ContactReads = 0, BlipBuilds = 0, BlipReads = 0;
+	mutable double ContactMs = 0.0, BlipMs = 0.0;
+	void BuildContacts(TArray<FContactView>& Out) const;
+	void BuildHoloBlips(TArray<FAstraHoloBlip>& Out, FPlotCounts& Counts) const;
 	bool bPlayerTracked = true;
 	bool bPlayerEverTracked = false;   // since hostiles appeared: "lost" needs a track first
 	float PlayerTrackT = 0.f;

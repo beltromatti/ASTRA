@@ -183,6 +183,9 @@ namespace
 		FParse::Value(*Params, TEXT("at="), At, false);            // "200=astra.cmd ...|300=...": commands at battle times (a mind's orders, scripted)
 		FParse::Value(*Params, TEXT("scenario="), Scenario);
 		const bool bViews = FParse::Param(*Params, TEXT("views"));
+		float PlotAt = 120.f;                                      // when the cost of making the plot's lists is timed (-plot_at=<battle seconds>)
+		FParse::Value(*Params, TEXT("plot_at="), PlotAt);
+		TSharedPtr<FJsonObject> PlotJson;
 		FMindLink Mind;                                            // the minds in the loop (-mind=<dir>)
 		FParse::Value(*Params, TEXT("mind="), Mind.Dir, false);
 		FParse::Value(*Params, TEXT("mind_dt="), Mind.Dt);
@@ -275,6 +278,31 @@ namespace
 					break;
 				}
 			}
+			if (!PlotJson.IsValid() && B->GetBattleTime() >= PlotAt)
+			{
+				// what the plot's lists cost to make, at the height of the fight: every reader that did not share them (the stations' executors, the screens, the holo
+				// table, the viewscreen: a dozen a frame) made its own, so this is the price of each; the battle makes them once for each step now (docs/SCALA.md)
+				const int32 Rounds = 300;
+				double Ms[2] = {0.0, 0.0};
+				int32 NContacts = 0, NBlips = 0;
+				for (int32 k = 0; k < Rounds; ++k)
+				{
+					B->InvalidatePlot();
+					const double A0 = FPlatformTime::Seconds();
+					NContacts = B->Contacts().Num();
+					const double A1 = FPlatformTime::Seconds();
+					NBlips = B->HoloBlips().Num();
+					const double A2 = FPlatformTime::Seconds();
+					Ms[0] += (A1 - A0) * 1000.0;
+					Ms[1] += (A2 - A1) * 1000.0;
+				}
+				PlotJson = MakeShared<FJsonObject>();
+				PlotJson->SetNumberField(TEXT("at_s"), B->GetBattleTime());
+				PlotJson->SetNumberField(TEXT("contacts"), NContacts);
+				PlotJson->SetNumberField(TEXT("blips"), NBlips);
+				PlotJson->SetNumberField(TEXT("contacts_build_ms"), FMath::RoundToDouble(Ms[0] / Rounds * 1000.0) / 1000.0);
+				PlotJson->SetNumberField(TEXT("blips_build_ms"), FMath::RoundToDouble(Ms[1] / Rounds * 1000.0) / 1000.0);
+			}
 			const float T0 = B->GetBattleTime();
 			const double W0 = FPlatformTime::Seconds();
 			World->Tick(LEVELTICK_All, Step);
@@ -336,6 +364,10 @@ namespace
 			Stats->SetObjectField(TEXT("world_tick"), WJ);
 		}
 		Stats->SetObjectField(TEXT("draw"), B->DrawStatsJson());      // the craft and lamps staged as instances: what it costs, what it would have been as actors (docs/SCALA.md)
+		if (PlotJson.IsValid())
+		{
+			Stats->SetObjectField(TEXT("plot"), PlotJson.ToSharedRef());
+		}
 		Root->SetObjectField(TEXT("stats"), Stats);
 		FString Json;
 		const TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Json);
