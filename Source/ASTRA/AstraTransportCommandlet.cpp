@@ -1,6 +1,8 @@
 #include "AstraTransportCommandlet.h"
 
 #include "ASTRA.h"
+#include "Engine/StaticMesh.h"
+#include "StaticMeshResources.h"
 #include "AstraTransportBench.h"
 #include "AstraTransportRules.h"
 #include "Dom/JsonObject.h"
@@ -674,6 +676,37 @@ int32 UAstraTransportCommandlet::Main(const FString& Params)
 	if (bAll || Scenario == TEXT("world"))
 	{
 		AstraXportRunWorldBench(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Transport/fixtures")));
+	}
+	if (Scenario == TEXT("shapes"))
+	{
+		// what the effects assume of the engine's basic shapes (AstraTransportFx.cpp, AstraTransportConsole.cpp): the plane is 100 x 100 cm in XY with its normal up, the cylinder
+		// is 100 cm tall and 100 cm across, centred; read from the mesh's own vertices (a commandlet keeps the CPU copy)
+		for (const TCHAR* Name : {TEXT("Plane"), TEXT("Cylinder"), TEXT("Sphere"), TEXT("Cube")})
+		{
+			UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Engine/BasicShapes/%s.%s"), Name, Name));
+			if (!M || !M->GetRenderData() || M->GetRenderData()->LODResources.Num() == 0)
+			{
+				XCheck(*FString::Printf(TEXT("shapes: %s"), Name), false, TEXT("not loaded or no render data"));
+				continue;
+			}
+			const FStaticMeshLODResources& L = M->GetRenderData()->LODResources[0];
+			const FPositionVertexBuffer& Pos = L.VertexBuffers.PositionVertexBuffer;
+			const int32 N = (int32)Pos.GetNumVertices();
+			if (N == 0 || !L.VertexBuffers.StaticMeshVertexBuffer.GetAllowCPUAccess())
+			{
+				XCheck(*FString::Printf(TEXT("shapes: %s"), Name), false, FString::Printf(TEXT("%d vertices, no CPU copy of them"), N));
+				continue;
+			}
+			FBox Box(ForceInit);
+			FVector NormalSum = FVector::ZeroVector;
+			for (int32 i = 0; i < N; ++i)
+			{
+				Box += FVector(Pos.VertexPosition(i));
+				NormalSum += FVector(L.VertexBuffers.StaticMeshVertexBuffer.VertexTangentZ(i));
+			}
+			XCheck(*FString::Printf(TEXT("shapes: %s"), Name), true, FString::Printf(TEXT("%d vertices, box min (%.1f, %.1f, %.1f) max (%.1f, %.1f, %.1f), mean normal (%.2f, %.2f, %.2f)"), N,
+			       Box.Min.X, Box.Min.Y, Box.Min.Z, Box.Max.X, Box.Max.Y, Box.Max.Z, NormalSum.X / N, NormalSum.Y / N, NormalSum.Z / N));
+		}
 	}
 
 	int32 Failed = 0;
