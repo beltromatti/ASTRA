@@ -23,15 +23,15 @@ DECLARE_CYCLE_STAT(TEXT("Boarding"), STAT_AstraBoarding, STATGROUP_Astra);
 
 namespace
 {
-	constexpr float CaptainArmor = 0.8f;        // the share of a round that goes through the Captain's vest
-	constexpr float BodyReachCm = 6500.f;       // soldiers nearer than this (on the Captain's deck) get a body
-	constexpr float BodyKeepCm = 8200.f;
-	constexpr int32 MaxBodies = 22;
-	constexpr float CleanUpS = 75.f;            // how long the fallen lie after the fight
+	constexpr float BdCaptainArmor = 0.8f;        // the share of a round that goes through the Captain's vest
+	constexpr float BdBodyReachCm = 6500.f;       // soldiers nearer than this (on the Captain's deck) get a body
+	constexpr float BdBodyKeepCm = 8200.f;
+	constexpr int32 BdMaxBodies = 22;
+	constexpr float BdCleanUpS = 75.f;            // how long the fallen lie after the fight
 
-	TAutoConsoleVariable<int32> CVarFriendlyFire(TEXT("astra.board.friendlyfire"), 0, TEXT("1: the Captain's rounds wound the marines too"));
+	TAutoConsoleVariable<int32> BdCVarFriendlyFire(TEXT("astra.board.friendlyfire"), 0, TEXT("1: the Captain's rounds wound the marines too"));
 
-	TSharedPtr<FJsonObject> Args1(const TCHAR* K, const FString& V)
+	TSharedPtr<FJsonObject> BdArgs1(const TCHAR* K, const FString& V)
 	{
 		TSharedPtr<FJsonObject> A = MakeShared<FJsonObject>();
 		A->SetStringField(K, V);
@@ -468,7 +468,7 @@ bool UAstraBoardSubsystem::StartBoarding(const FSpec& Spec, FString& OutDetail)
 		if (S->GetAlert() != EAstraAlert::Red)
 		{
 			FString D;
-			S->ApplyCommand(TEXT("set_alert"), Args1(TEXT("level"), TEXT("red")), D);
+			S->ApplyCommand(TEXT("set_alert"), BdArgs1(TEXT("level"), TEXT("red")), D);
 			bRaisedAlert = true;
 		}
 		else
@@ -534,7 +534,7 @@ void UAstraBoardSubsystem::Finish(const TCHAR* Why)
 	if (S && bRaisedAlert && S->GetAlert() == EAstraAlert::Red)
 	{
 		FString D;
-		S->ApplyCommand(TEXT("set_alert"), Args1(TEXT("level"), PriorAlert == (int32)EAstraAlert::Green ? TEXT("green") : TEXT("yellow")), D);
+		S->ApplyCommand(TEXT("set_alert"), BdArgs1(TEXT("level"), PriorAlert == (int32)EAstraAlert::Green ? TEXT("green") : TEXT("yellow")), D);
 	}
 	bRaisedAlert = false;
 	if (Breach && Breach->IsOpen())
@@ -621,7 +621,7 @@ void UAstraBoardSubsystem::OnCaptainHit(const FBoardEvent& E)
 	{
 		return;
 	}
-	const float Real = E.Dmg * CaptainArmor;
+	const float Real = E.Dmg * BdCaptainArmor;
 	CapHp -= Real;
 	CapHurtAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 	CapHurtAmount = Real;
@@ -741,7 +741,7 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 			}
 		}
 		ManageBodies(Dt);
-		if (AfterEnd > CleanUpS)
+		if (AfterEnd > BdCleanUpS)
 		{
 			ClearBodies();
 			Phase = EPhase::Idle;
@@ -792,14 +792,14 @@ void UAstraBoardSubsystem::SyncLife()
 
 AAstraCombatant* UAstraBoardSubsystem::TakeBody(int32 Side)
 {
-	for (AAstraCombatant* B : Pool[Side])
+	for (AAstraCombatant* B : PoolOf(Side))
 	{
 		if (B && !B->InUse())
 		{
 			return B;
 		}
 	}
-	if (Pool[Side].Num() >= 30 || !GetWorld())
+	if (PoolOf(Side).Num() >= 30 || !GetWorld())
 	{
 		return nullptr;
 	}
@@ -808,7 +808,7 @@ AAstraCombatant* UAstraBoardSubsystem::TakeBody(int32 Side)
 	AAstraCombatant* B = GetWorld()->SpawnActor<AAstraCombatant>(FVector(0.0, 0.0, -1.0e6), FRotator::ZeroRotator, P);
 	if (B)
 	{
-		Pool[Side].Add(B);
+		PoolOf(Side).Add(B);
 	}
 	return B;
 }
@@ -858,7 +858,7 @@ void UAstraBoardSubsystem::ManageBodies(float Dt)
 		}
 		const float D = (float)FVector::Dist2D(U.Pos, Eye);
 		const bool bHas = BodyOf.Contains(U.Id);
-		if (D > (bHas ? BodyKeepCm : BodyReachCm) || ((U.Act == EAct::Dead || U.Act == EAct::Down) && D > 3800.f && !bHas))
+		if (D > (bHas ? BdBodyKeepCm : BdBodyReachCm) || ((U.Act == EAct::Dead || U.Act == EAct::Down) && D > 3800.f && !bHas))
 		{
 			continue;
 		}
@@ -866,7 +866,7 @@ void UAstraBoardSubsystem::ManageBodies(float Dt)
 	}
 	Cand.Sort([](const FCand& A, const FCand& B) { return A.Score < B.Score; });
 	TSet<int32> Want;
-	for (int32 i = 0; i < Cand.Num() && i < MaxBodies; ++i)
+	for (int32 i = 0; i < Cand.Num() && i < BdMaxBodies; ++i)
 	{
 		Want.Add(Cand[i].U);
 	}
@@ -936,7 +936,7 @@ bool UAstraBoardSubsystem::PlayerHit(AAstraCombatant* Who, float Damage, bool bH
 	{
 		return false;
 	}
-	if (U->Side == ESide::Aquila && CVarFriendlyFire.GetValueOnGameThread() == 0)
+	if (U->Side == ESide::Aquila && BdCVarFriendlyFire.GetValueOnGameThread() == 0)
 	{
 		return false;
 	}

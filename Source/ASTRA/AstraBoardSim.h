@@ -264,6 +264,8 @@ public:
 
 	/** The Captain's hand: a round of his hit this unit (Dmg points, at a place on the body). */
 	void HitUnit(int32 UnitId, float Dmg, bool bHead, const FString& By = FString());
+	/** The Captain fired: the boarders who are near and have a way to the sound know where it came from, roughly. */
+	void CaptainFired();
 	/** An outside hand wounds, kills or heals (a rescue, the Medbay): a unit that is down is taken out of the fight alive. */
 	void CarryOut(int32 UnitId);
 

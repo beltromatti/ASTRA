@@ -24,10 +24,10 @@ using namespace AstraBoard;
 
 namespace
 {
-	constexpr float FxReachCm = 9500.f;          // what the Captain can see and hear of a fight: beyond this nothing is drawn
-	const FLinearColor MarineTracer(1.f, 0.82f, 0.42f);
-	const FLinearColor MandateTracer(1.f, 0.16f, 0.1f);
-	TAutoConsoleVariable<int32> CVarTakeoverFatal(TEXT("astra.board.takeover_fatal"), 1, TEXT("1: when the boarders hold Main Engineering the reactor's containment fails (the abandon-ship chain); 0: the fight just ends"));
+	constexpr float BdFxReachCm = 9500.f;          // what the Captain can see and hear of a fight: beyond this nothing is drawn
+	const FLinearColor BdMarineTracer(1.f, 0.82f, 0.42f);
+	const FLinearColor BdMandateTracer(1.f, 0.16f, 0.1f);
+	TAutoConsoleVariable<int32> BdCVarTakeoverFatal(TEXT("astra.board.takeover_fatal"), 1, TEXT("1: when the boarders hold Main Engineering the reactor's containment fails (the abandon-ship chain); 0: the fight just ends"));
 }
 
 void UAstraBoardSubsystem::Tell(const FString& Text, bool bReport)
@@ -188,14 +188,14 @@ void UAstraBoardSubsystem::OnShot(const FBoardEvent& E)
 		return;
 	}
 	const FVector Eye = Cam->GetCameraLocation();
-	if (FVector::Dist(Shooter->Pos, Eye) > FxReachCm || FMath::Abs(Shooter->Pos.Z - Eye.Z) > 800.f)
+	if (FVector::Dist(Shooter->Pos, Eye) > BdFxReachCm || FMath::Abs(Shooter->Pos.Z - Eye.Z) > 800.f)
 	{
 		return;                                       // out of sight and out of hearing
 	}
 	AAstraCombatant* B = BodyOf.FindRef(E.Unit);
 	const FVector Muzzle = B ? B->MuzzleAt() : E.Start;
 	const FVector Dir = (E.End - Muzzle).GetSafeNormal();
-	X->Tracer(Muzzle, E.End, Shooter->Side == ESide::Mandate ? MandateTracer : MarineTracer);
+	X->Tracer(Muzzle, E.End, Shooter->Side == ESide::Mandate ? BdMandateTracer : BdMarineTracer);
 	X->MuzzleFlash(Muzzle, Dir, B ? 1.f : 0.7f);
 	X->Whiz(Muzzle, E.End);
 	if (B)
@@ -246,7 +246,7 @@ void UAstraBoardSubsystem::OnHit(const FBoardEvent& E)
 	if (UAstraCombatFx* X = FxSub())
 	{
 		const APlayerCameraManager* Cam = GetWorld() ? UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0) : nullptr;
-		if (Cam && FVector::Dist(E.End, Cam->GetCameraLocation()) < FxReachCm)
+		if (Cam && FVector::Dist(E.End, Cam->GetCameraLocation()) < BdFxReachCm)
 		{
 			const FVector N = Shooter ? (Shooter->Pos - E.End).GetSafeNormal() : FVector::UpVector;
 			X->Impact(E.End, N, UAstraCombatFx::ESurface::Flesh);
@@ -297,7 +297,7 @@ void UAstraBoardSubsystem::OnOutcome()
 		break;
 	case EOutcome::MandateTakes:
 		bToldTakeover = true;
-		if (CVarTakeoverFatal.GetValueOnGameThread() != 0)
+		if (BdCVarTakeoverFatal.GetValueOnGameThread() != 0)
 		{
 			Tell(FString::Printf(TEXT("the boarders hold Main Engineering and are working on the reactor: its containment will fail in about half a minute. %s"), *Tally), true);
 			TakeoverFuse = 28.f;

@@ -985,6 +985,14 @@ void FAstraBoardSim::HitUnit(int32 UnitId, float Dmg, bool bHead, const FString&
 	}
 }
 
+void FAstraBoardSim::CaptainFired()
+{
+	if (People.IsValidIndex(CaptainUnit))
+	{
+		Hear(People[CaptainUnit]);
+	}
+}
+
 void FAstraBoardSim::CarryOut(int32 UnitId)
 {
 	if (People.IsValidIndex(UnitId) && People[UnitId].Act == EAct::Down)

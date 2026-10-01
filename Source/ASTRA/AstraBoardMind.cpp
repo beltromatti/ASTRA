@@ -20,9 +20,9 @@ using namespace AstraBoard;
 
 namespace
 {
-	TAutoConsoleVariable<int32> CVarBoardDebug(TEXT("astra.board.debug"), 0, TEXT("Draws the boarding fight in the world: 1 the soldiers, 2 also their squads' places, the Mandate's route and the marines' ambush opening"));
+	TAutoConsoleVariable<int32> BdCVarBoardDebug(TEXT("astra.board.debug"), 0, TEXT("Draws the boarding fight in the world: 1 the soldiers, 2 also their squads' places, the Mandate's route and the marines' ambush opening"));
 
-	FString Str(const TSharedPtr<FJsonObject>& A, const TCHAR* K)
+	FString BdStr(const TSharedPtr<FJsonObject>& A, const TCHAR* K)
 	{
 		FString V;
 		if (A.IsValid())
@@ -31,7 +31,7 @@ namespace
 		}
 		return V;
 	}
-	double Num(const TSharedPtr<FJsonObject>& A, const TCHAR* K, double Def = 0.0)
+	double BdNum(const TSharedPtr<FJsonObject>& A, const TCHAR* K, double Def = 0.0)
 	{
 		double V = Def;
 		if (A.IsValid())
@@ -279,7 +279,7 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 {
 	if (Name == TEXT("boarding"))
 	{
-		const FString Action = Str(Args, TEXT("action")).ToLower();
+		const FString Action = BdStr(Args, TEXT("action")).ToLower();
 		if (Action == TEXT("end") || Action == TEXT("stop") || Action == TEXT("cancel"))
 		{
 			if (Phase != EPhase::Active)
@@ -292,17 +292,17 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 			return true;
 		}
 		FSpec Spec;
-		Spec.Breach = Str(Args, TEXT("breach"));
-		Spec.Skiffs = FMath::Clamp((int32)Num(Args, TEXT("skiffs"), 1.0), 1, 4);
-		Spec.Boarders = (int32)Num(Args, TEXT("boarders"), 0.0);
-		Spec.Source = Str(Args, TEXT("source"));
+		Spec.Breach = BdStr(Args, TEXT("breach"));
+		Spec.Skiffs = FMath::Clamp((int32)BdNum(Args, TEXT("skiffs"), 1.0), 1, 4);
+		Spec.Boarders = (int32)BdNum(Args, TEXT("boarders"), 0.0);
+		Spec.Source = BdStr(Args, TEXT("source"));
 		bool bLock = true;
 		if (Args.IsValid())
 		{
 			Args->TryGetBoolField(TEXT("lockdown"), bLock);
 		}
 		Spec.bLockdown = bLock;
-		Spec.WarnS = (float)Num(Args, TEXT("warn_s"), 45.0);
+		Spec.WarnS = (float)BdNum(Args, TEXT("warn_s"), 45.0);
 		return StartBoarding(Spec, OutDetail);
 	}
 	if (Phase != EPhase::Active)
@@ -331,7 +331,7 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 				}
 			}
 		}
-		else if (Str(Args, TEXT("scope")) == TEXT("breach_section") || Str(Args, TEXT("doors")).IsEmpty())
+		else if (BdStr(Args, TEXT("scope")) == TEXT("breach_section") || BdStr(Args, TEXT("doors")).IsEmpty())
 		{
 			// every pressure bulkhead of the breach's deck round it
 			const int32 Deck = Map->GetComps()[Fight.Mission().Breach].Deck;
@@ -349,11 +349,11 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 	}
 	if (Name == TEXT("marine_order"))
 	{
-		const FString Who = Str(Args, TEXT("squad"));
-		const FString Task = Str(Args, TEXT("task")).ToLower();
-		const FString PlaceId = Str(Args, TEXT("place"));
-		const FString Note = Str(Args, TEXT("note"));
-		const float Radius = (float)Num(Args, TEXT("radius_m"), 8.0) * 100.f;
+		const FString Who = BdStr(Args, TEXT("squad"));
+		const FString Task = BdStr(Args, TEXT("task")).ToLower();
+		const FString PlaceId = BdStr(Args, TEXT("place"));
+		const FString Note = BdStr(Args, TEXT("note"));
+		const float Radius = (float)BdNum(Args, TEXT("radius_m"), 8.0) * 100.f;
 		TArray<int32> Targets;
 		const FString WhoL = Who.ToLower();
 		for (const FSquad& S : Fight.Squads())
@@ -432,7 +432,7 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 void UAstraBoardSubsystem::DrawDebug() const
 {
 #if ENABLE_DRAW_DEBUG
-	const int32 Level = CVarBoardDebug.GetValueOnGameThread();
+	const int32 Level = BdCVarBoardDebug.GetValueOnGameThread();
 	UWorld* W = GetWorld();
 	if (!W || Level <= 0 || (Phase != EPhase::Active && Phase != EPhase::Over) || !Map.IsValid())
 	{
@@ -486,12 +486,12 @@ void UAstraBoardSubsystem::DrawDebug() const
 
 namespace
 {
-	UAstraBoardSubsystem* Board(UWorld* W) { return W ? W->GetSubsystem<UAstraBoardSubsystem>() : nullptr; }
+	UAstraBoardSubsystem* BdBoard(UWorld* W) { return W ? W->GetSubsystem<UAstraBoardSubsystem>() : nullptr; }
 
-	FAutoConsoleCommandWithWorldAndArgs CmdStart(TEXT("astra.board.start"), TEXT("Testing: a boarding. astra.board.start [skiffs 1..4] [the plan's id of the compartment the boarders cut into]"),
+	FAutoConsoleCommandWithWorldAndArgs BdCmdStart(TEXT("astra.board.start"), TEXT("Testing: a boarding. astra.board.start [skiffs 1..4] [the plan's id of the compartment the boarders cut into]"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
-			UAstraBoardSubsystem* B = Board(W);
+			UAstraBoardSubsystem* B = BdBoard(W);
 			if (!B)
 			{
 				return;
@@ -505,22 +505,22 @@ namespace
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("started") : TEXT("not started"), *D);
 			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 6.f, bOk ? FColor::Green : FColor::Red, D); }
 		}));
-	FAutoConsoleCommandWithWorld CmdEnd(TEXT("astra.board.end"), TEXT("Testing: calls the boarding off (bulkheads open, marines back to duty)"),
-		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraBoardSubsystem* B = Board(W)) { B->EndBoarding(TEXT("console")); } }));
-	FAutoConsoleCommandWithWorld CmdInfo(TEXT("astra.board.info"), TEXT("The boarding fight in numbers"),
+	FAutoConsoleCommandWithWorld BdCmdEnd(TEXT("astra.board.end"), TEXT("Testing: calls the boarding off (bulkheads open, marines back to duty)"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraBoardSubsystem* B = BdBoard(W)) { B->EndBoarding(TEXT("console")); } }));
+	FAutoConsoleCommandWithWorld BdCmdInfo(TEXT("astra.board.info"), TEXT("The boarding fight in numbers"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
 		{
-			if (UAstraBoardSubsystem* B = Board(W))
+			if (UAstraBoardSubsystem* B = BdBoard(W))
 			{
 				const FString T = B->InfoText();
 				UE_LOG(LogASTRA, Log, TEXT("[Board] %s"), *T);
 				if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 8.f, FColor::Cyan, T); }
 			}
 		}));
-	FAutoConsoleCommandWithWorldAndArgs CmdCommand(TEXT("astra.board.cmd"), TEXT("Testing: one of the boarding commands by its JSON: astra.board.cmd marine_order {\"squad\":\"all\",\"task\":\"hold\",\"place\":\"engineering\"}"),
+	FAutoConsoleCommandWithWorldAndArgs BdCmdCommand(TEXT("astra.board.cmd"), TEXT("Testing: one of the boarding commands by its JSON: astra.board.cmd marine_order {\"squad\":\"all\",\"task\":\"hold\",\"place\":\"engineering\"}"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
-			UAstraBoardSubsystem* B = Board(W);
+			UAstraBoardSubsystem* B = BdBoard(W);
 			if (!B || A.Num() < 1)
 			{
 				return;
@@ -538,10 +538,10 @@ namespace
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("ok") : TEXT("refused"), *D);
 			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 6.f, bOk ? FColor::Green : FColor::Red, D); }
 		}));
-	FAutoConsoleCommandWithWorld CmdPicture(TEXT("astra.board.picture"), TEXT("Writes the marines' picture of the fight (the mind's context) to the log"),
+	FAutoConsoleCommandWithWorld BdCmdPicture(TEXT("astra.board.picture"), TEXT("Writes the marines' picture of the fight (the mind's context) to the log"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
 		{
-			if (UAstraBoardSubsystem* B = Board(W))
+			if (UAstraBoardSubsystem* B = BdBoard(W))
 			{
 				FString Out;
 				const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Wr = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);

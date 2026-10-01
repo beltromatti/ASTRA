@@ -64,6 +64,8 @@ public:
 	/** A round of the Captain's struck a soldier (Damage: what it does after the range, Head: it hit the head). The soldier's wound; false when it did not count (a marine of
 	 *  ours, or nobody is fighting). From: where it was fired (the way he falls). */
 	bool PlayerHit(AAstraCombatant* Who, float Damage, bool bHead, const FVector& From);
+	/** The Captain fired a round: the boarders near him hear it (where from, roughly). */
+	void NoteCaptainShot() { if (Phase == EPhase::Active) { Fight.CaptainFired(); } }
 	/** The Captain's strength, 0..1 (1 whole), whether he is down, and how long ago and from where he was last hit (the weapon's screen reads these). */
 	float CaptainStrength() const { return FMath::Clamp(CapHp / 100.f, 0.f, 1.f); }
 	bool IsCaptainDown() const { return bCapDown; }
@@ -137,7 +139,9 @@ private:
 	int32 CaptainSquad = INDEX_NONE;
 
 	// --- the bodies
-	UPROPERTY() TArray<TObjectPtr<AAstraCombatant>> Pool[2];     // by side: 0 the marines', 1 the Mandate's
+	UPROPERTY() TArray<TObjectPtr<AAstraCombatant>> PoolMarines;  // the bodies of the marines (a pool: they come and go as the Captain moves)
+	UPROPERTY() TArray<TObjectPtr<AAstraCombatant>> PoolMandate;  // and of the Mandate's boarders
+	TArray<TObjectPtr<AAstraCombatant>>& PoolOf(int32 Side) { return Side == 0 ? PoolMarines : PoolMandate; }
 	TMap<int32, TObjectPtr<AAstraCombatant>> BodyOf;              // unit -> body
 	UPROPERTY() TArray<TObjectPtr<UObject>> Warm;
 	UPROPERTY() TObjectPtr<AAstraBoardBreach> Breach;

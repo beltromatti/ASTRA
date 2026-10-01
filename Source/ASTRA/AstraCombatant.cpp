@@ -12,19 +12,19 @@
 
 namespace
 {
-	const TCHAR* const AnimRoot = TEXT("/Game/Characters/Mannequins/Anims/");
+	const TCHAR* const CbAnimRoot = TEXT("/Game/Characters/Mannequins/Anims/");
 	// the eight ways of a walk or a jog, by the angle of the move against the way he faces (0 ahead, clockwise): 45 degrees each
-	const TCHAR* const WayNames[8] = {TEXT("Fwd"), TEXT("Fwd_Right"), TEXT("Right"), TEXT("Bwd_Right"), TEXT("Bwd"), TEXT("Bwd_Left"), TEXT("Left"), TEXT("Fwd_Left")};
-	constexpr float JogFromCmS = 235.f;          // faster than this he jogs, slower he walks
-	constexpr float WalkRefCmS = 150.f;          // what the mannequin's cycles were made for
-	constexpr float JogRefCmS = 340.f;
-	constexpr float MinDwellS = 0.28f;           // an animation stays this long before another (a squad's moves are stop and go)
+	const TCHAR* const CbWayNames[8] = {TEXT("Fwd"), TEXT("Fwd_Right"), TEXT("Right"), TEXT("Bwd_Right"), TEXT("Bwd"), TEXT("Bwd_Left"), TEXT("Left"), TEXT("Fwd_Left")};
+	constexpr float CbJogFromCmS = 235.f;          // faster than this he jogs, slower he walks
+	constexpr float CbWalkRefCmS = 150.f;          // what the mannequin's cycles were made for
+	constexpr float CbJogRefCmS = 340.f;
+	constexpr float CbMinDwellS = 0.28f;           // an animation stays this long before another (a squad's moves are stop and go)
 
-	UAnimSequence* Anim(const FString& Sub)
+	UAnimSequence* CbAnim(const FString& Sub)
 	{
-		return LoadObject<UAnimSequence>(nullptr, *FString::Printf(TEXT("%s%s"), AnimRoot, *Sub));
+		return LoadObject<UAnimSequence>(nullptr, *FString::Printf(TEXT("%s%s"), CbAnimRoot, *Sub));
 	}
-	FString AnimPath(const TCHAR* Dir, const FString& Name)
+	FString CbAnimPath(const TCHAR* Dir, const FString& Name)
 	{
 		return FString::Printf(TEXT("%s/%s.%s"), Dir, *Name, *Name);
 	}
@@ -64,19 +64,19 @@ void AAstraCombatant::PreloadAssets(TArray<TObjectPtr<UObject>>& OutKeep)
 	Paths.Add(TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
 	Paths.Add(TEXT("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple"));
 	Paths.Add(AstraWeapons::Get(EAstraWeapon::Rifle).MeshPath);
-	Paths.Add(FString(AnimRoot) + TEXT("Rifle/MF_Rifle_Idle_ADS.MF_Rifle_Idle_ADS"));
-	Paths.Add(FString(AnimRoot) + TEXT("Rifle/MM_Rifle_Reload.MM_Rifle_Reload"));
+	Paths.Add(FString(CbAnimRoot) + TEXT("Rifle/MF_Rifle_Idle_ADS.MF_Rifle_Idle_ADS"));
+	Paths.Add(FString(CbAnimRoot) + TEXT("Rifle/MM_Rifle_Reload.MM_Rifle_Reload"));
 	for (const TCHAR* Gait : {TEXT("Walk"), TEXT("Jog")})
 	{
 		for (const int32 Way : {0, 2, 4, 6})
 		{
-			const FString N = FString::Printf(TEXT("MF_Rifle_%s_%s"), Gait, WayNames[Way]);
-			Paths.Add(FString::Printf(TEXT("%sRifle/%s/%s.%s"), AnimRoot, Gait, *N, *N));
+			const FString N = FString::Printf(TEXT("MF_Rifle_%s_%s"), Gait, CbWayNames[Way]);
+			Paths.Add(FString::Printf(TEXT("%sRifle/%s/%s.%s"), CbAnimRoot, Gait, *N, *N));
 		}
 	}
 	for (const TCHAR* D : {TEXT("MM_Death_Front_01"), TEXT("MM_Death_Back_01")})
 	{
-		Paths.Add(FString::Printf(TEXT("%sDeath/%s.%s"), AnimRoot, D, D));
+		Paths.Add(FString::Printf(TEXT("%sDeath/%s.%s"), CbAnimRoot, D, D));
 	}
 	for (const FString& P : Paths)
 	{
@@ -264,7 +264,7 @@ void AAstraCombatant::SetPose(EPose P, int32 Sub, float Rate)
 		return;
 	}
 	const bool bUrgent = P == EPose::Fallen || P == EPose::Reload || Pose == EPose::None || Pose == EPose::Reload;
-	if (!bUrgent && PoseT < MinDwellS)
+	if (!bUrgent && PoseT < CbMinDwellS)
 	{
 		return;
 	}
@@ -273,25 +273,25 @@ void AAstraCombatant::SetPose(EPose P, int32 Sub, float Rate)
 	switch (P)
 	{
 	case EPose::Idle:
-		Seq = Anim(TEXT("Rifle/MF_Rifle_Idle_ADS.MF_Rifle_Idle_ADS"));
+		Seq = CbAnim(TEXT("Rifle/MF_Rifle_Idle_ADS.MF_Rifle_Idle_ADS"));
 		break;
 	case EPose::Walk:
 	case EPose::Jog:
 	{
 		const bool bJog = P == EPose::Jog;
-		const FString N = FString::Printf(TEXT("MF_Rifle_%s_%s"), bJog ? TEXT("Jog") : TEXT("Walk"), WayNames[FMath::Clamp(Sub, 0, 7)]);
-		Seq = LoadObject<UAnimSequence>(nullptr, *AnimPath(*FString::Printf(TEXT("%sRifle/%s"), AnimRoot, bJog ? TEXT("Jog") : TEXT("Walk")), N));
+		const FString N = FString::Printf(TEXT("MF_Rifle_%s_%s"), bJog ? TEXT("Jog") : TEXT("Walk"), CbWayNames[FMath::Clamp(Sub, 0, 7)]);
+		Seq = LoadObject<UAnimSequence>(nullptr, *CbAnimPath(*FString::Printf(TEXT("%sRifle/%s"), CbAnimRoot, bJog ? TEXT("Jog") : TEXT("Walk")), N));
 		break;
 	}
 	case EPose::Reload:
-		Seq = Anim(TEXT("Rifle/MM_Rifle_Reload.MM_Rifle_Reload"));
+		Seq = CbAnim(TEXT("Rifle/MM_Rifle_Reload.MM_Rifle_Reload"));
 		bLoop = false;
 		break;
 	case EPose::Fallen:
 	{
 		static const TCHAR* const Falls[] = {TEXT("MM_Death_Front_01"), TEXT("MM_Death_Front_02"), TEXT("MM_Death_Front_03"), TEXT("MM_Death_Back_01"), TEXT("MM_Death_Left_01"), TEXT("MM_Death_Right_01")};
 		int32 Pick = Sub >= 0 ? Sub : FMath::RandHelper(3);
-		Seq = LoadObject<UAnimSequence>(nullptr, *AnimPath(*FString::Printf(TEXT("%sDeath"), AnimRoot), Falls[FMath::Clamp(Pick, 0, 5)]));
+		Seq = LoadObject<UAnimSequence>(nullptr, *CbAnimPath(*FString::Printf(TEXT("%sDeath"), CbAnimRoot), Falls[FMath::Clamp(Pick, 0, 5)]));
 		bLoop = false;
 		break;
 	}
@@ -364,8 +364,8 @@ void AAstraCombatant::Drive(const AstraBoard::FUnit& U, float Dt)
 			Rel += 360.f;
 		}
 		const int32 Way = ((int32)FMath::RoundToInt(Rel / 45.f)) % 8;
-		const bool bJog = Speed > JogFromCmS;
-		SetPose(bJog ? EPose::Jog : EPose::Walk, Way, FMath::Clamp(Speed / (bJog ? JogRefCmS : WalkRefCmS), 0.6f, 1.5f));
+		const bool bJog = Speed > CbJogFromCmS;
+		SetPose(bJog ? EPose::Jog : EPose::Walk, Way, FMath::Clamp(Speed / (bJog ? CbJogRefCmS : CbWalkRefCmS), 0.6f, 1.5f));
 	}
 	else
 	{
