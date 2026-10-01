@@ -63,6 +63,22 @@ class Link:
         self.waiting: dict[str, asyncio.Future] = {}
         self.orders: list[dict[str, Any]] = []         # every command with its result (the bench's evidence)
         self.t = 0.0
+        self.state: dict[str, Any] = {}                # the last state the minds were given (for the context of an order: bench/war_quality.py)
+
+    def context(self, args: dict[str, Any]) -> dict[str, Any]:
+        """What the ordered group's side knew of it when the order was given (strength against the enemy near it, morale, the order in force): the
+        bench judges an order against that, not against how the battle ended."""
+        view = (self.state.get("_mandate") if args.get("side") == "mandate" else self.state.get("_astra_groups")) or {}
+        name = str(args.get("group", "")).lower()
+        g = next((x for x in view.get("your_groups") or [] if str(x.get("name", "")).lower() == name), None)
+        out: dict[str, Any] = {}
+        if g is not None:
+            out.update(strength=g.get("your_strength"), enemy_near=g.get("enemy_strength_near"), morale=g.get("morale"), in_force=g.get("order_in_force"),
+                       state=g.get("state"))
+        target = args.get("target")
+        if target:
+            out["target_on_plot"] = any(str(sh.get("id")) == str(target) for e in view.get("enemy_groups") or [] for sh in e.get("ships") or [])
+        return out
 
     async def execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
         self.n += 1
@@ -71,6 +87,8 @@ class Link:
         self.waiting[cid] = fut
         self.out.append({"id": cid, "name": name, "args": args, "by": by})
         rec = {"t": round(self.t, 1), "name": name, "args": args, "by": by}
+        if name == "group_order":
+            rec["ctx"] = self.context(args)
         self.orders.append(rec)
         try:
             res = await asyncio.wait_for(fut, timeout=30.0)
@@ -158,6 +176,7 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
                 continue
             path.unlink()
             clock["t"] = link.t = float(data["t"])
+            link.state = data["state"]
             link.resolve(data.get("results") or [])
             final_counts = data.get("counts", {})
             while script and script[0][0] <= clock["t"]:

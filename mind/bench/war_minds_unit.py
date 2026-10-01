@@ -630,5 +630,30 @@ class RenderTests(unittest.TestCase):
         self.assertNotEqual(war_minds.view_digest(a), war_minds.view_digest(c))
 
 
+class QualityTests(unittest.TestCase):
+    """The bench's reader of order quality (bench/war_quality.py): counts from the facts recorded with each order."""
+
+    def test_it_counts_refusals_repeats_withdrawals_and_flip_flops_from_the_records(self) -> None:
+        from bench import war_quality
+
+        def order(t: float, g: str, what: str, ok: bool = True, target: str | None = None, **ctx: Any) -> dict[str, Any]:
+            return {"t": t, "name": "group_order", "args": {"side": "mandate", "group": g, "order": what, **({"target": target} if target else {})}, "ok": ok,
+                    "ctx": ctx}
+        d = {"orders": [order(10, "Vanguard", "attack", target="A-01", target_on_plot=True),
+                        order(20, "Vanguard", "attack", ok=False, target="A-77", target_on_plot=False),
+                        order(60, "Vanguard", "attack", ok=False, target="A-77", target_on_plot=False),      # the same impossible order again within 3 minutes
+                        order(90, "Vanguard", "withdraw", strength=2.0, enemy_near=4.0, morale=0.3),         # the weaker and its morale going: sensible
+                        order(95, "Vanguard", "regroup"),                                                      # replaced within 20 s: a flip-flop
+                        order(200, "Lancers", "withdraw", strength=5.0, enemy_near=2.0, morale=0.8),         # the stronger and holding: doubtful
+                        {"t": 5, "name": "mandate_tactics", "args": {}, "ok": True}],
+             "result": {"minds": {"pulses": 8, "errors": 0, "cost": 0.008, "cost_per_hour": 0.05, "latency_median": 1.2, "latency_p90": 2.0,
+                                  "by_seat": {"mandate/admiral": {"no_change": 4}}}}}
+        r = war_quality.analyse(d)
+        self.assertEqual((r["orders"], r["accepted"], r["refused"], r["repeated"], r["off_plot"]), (6, 4, 2, 1, 2))
+        self.assertEqual(r["withdrawals"], {"sensible": 1, "doubtful": 1, "neutral": 0, "unknown": 0})
+        self.assertEqual(r["flips"], 1)
+        self.assertAlmostEqual(r["no_change_share"], 0.5)
+
+
 if __name__ == "__main__":
     unittest.main()
