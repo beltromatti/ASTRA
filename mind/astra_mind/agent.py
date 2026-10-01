@@ -456,7 +456,8 @@ class BridgeAgent:
 
 
 EVENT_ASK = ("The Captain should hear this: the responsible officer reports it now, in one short line with speak (in the "
-             "Captain's language), unless it merely repeats what was reported in the last few seconds, or it is news that has "
+             "Captain's language), unless the Captain has already heard it from anyone on the bridge and nothing has changed since "
+             "(a victory, a retreat, a distance said once is said; the same picture again is noise), or it is news that has "
              "grown old while the bridge was busy ([happened N s ago]) and no longer matters as it stands — then say nothing, or "
              "say what it means now. When several things happened at once (they are joined by |), the officers report the one or "
              "two that matter most to the Captain right now, the most dangerous first, one short line each: the rest stays on "

@@ -43,10 +43,15 @@ def _game_pid() -> int | None:
 
 
 def _rss_gb(pid: int | None) -> float | None:
+    """The game's physical footprint (what Activity Monitor calls Memory): `ps` rss leaves out the compressed pages and most of what Metal holds,
+    and read 0.5 GB for a game of 8 GB."""
     if pid is None:
         return None
-    out = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
-    return round(int(out) / 1048576.0, 2) if out.isdigit() else None
+    out = subprocess.run(["top", "-l", "1", "-pid", str(pid), "-stats", "mem"], capture_output=True, text=True).stdout.strip().splitlines()
+    m = re.match(r"([\d.]+)([KMG])", out[-1].strip()) if out else None
+    if not m:
+        return None
+    return round(float(m.group(1)) / {"K": 1048576.0, "M": 1024.0, "G": 1.0}[m.group(2)], 2)
 
 
 def _perf() -> dict[str, float]:
