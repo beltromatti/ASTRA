@@ -16,8 +16,8 @@ si chiudono dietro l'aria che se ne va. **Chi muore o si fa male era davvero lì
 le squadre di controllo danni (le squadre di VITA) **camminano fin lì e lavorano sul posto**, i feriti vanno in Medbay,
 **il Capitano può morire** (la catena c'è già: il XO prende il comando, l'abbandono nave, l'inchiesta).
 
-Le cifre, dal banco (sei semi, il gruppo d'attacco che concentra il fuoco sull'Aquila per dieci minuti: §6): **268 colpi, 116 arrivano
-dentro, 34 fori, 66 fuochi, in media 1 morto e 9 feriti** (nove colpi su dieci cadono in stanze vuote: macchine, serbatoi, depositi),
+Le cifre, dal banco (sei semi, il gruppo d'attacco che concentra il fuoco sull'Aquila per dieci minuti: §6): **272 colpi, 117 arrivano
+dentro, 36 fori, 64 fuochi, in media 1 morto e 6 feriti** (nove colpi su dieci cadono in stanze vuote: macchine, serbatoi, depositi),
 **lo scafo non scende mai sotto il 16 %** e l'abbandono non scatta mai in dieci minuti (il «tampone» vecchio faceva abbandonare in 2 semi su 6 dopo
 ~290 s), **nessuna spirale**: i danni crescono in proporzione ai colpi veri, le squadre li rimettono in piedi e quello che resta è
 poco. Un colpo costa nel modello microsecondi; il modello intero in media 0,1 ms per ogni 0,1 s di gioco, picchi di 0,4 ms (§7).
@@ -172,7 +172,7 @@ corrispondenza per posizione con `FAstraDamageMap::DoorNear`); il portello si ri
 | `astra.damage.fx` (1), `.fx.reach` (35 m), `.fx.glow`, `.fx.smoke`, `.fx.volume`, `.fx.fires/.hazes/.vents/.sparks` | gli effetti: acceso, portata, luminosità di fiamme e campi, spessore del fumo, volume, quanti per tipo |
 | `astra.lamps.*` | il pool di lampade di NAVE-2 |
 
-Comandi: `astra.damage.info` (stato del modello, costo, uno per compartimento in gioco), `astra.damage.strike [here|id o nome] [energia 40] [kinetic|energy|explosive] [nohole]`
+Comandi: `astra.damage.info` (stato del modello, costo, la potenza che resta alle sei assegnazioni, il Capitano e gli incidenti aperti uno per riga), `astra.damage.strike [here|id o nome] [energia 40] [kinetic|energy|explosive] [nohole]`
 (un colpo in un compartimento, «here» è quello del Capitano), `astra.damage.reset`, `astra.damage.fx.info`, `astra.lamps.info`; `stat Interior`, `stat Astra` (Damage FX, Lamp pool).
 Se le fiamme o il campo sono troppo forti o troppo deboli nel gioco, `astra.damage.fx.glow`; se il fumo è nero o invisibile, `astra.damage.fx.smoke` (le intensità sono state scelte
 senza vederle: la scala degli emissivi dell'interno è la stessa del tavolo olografico).
@@ -206,19 +206,19 @@ Il metro del brief, misurato con sei semi (`tools/damage.py batch --seeds 6 --sc
 
 | | media | minimo – massimo |
 |---|---|---|
-| colpi / arrivati dentro | 270 / 117 | 212–322 / 80–168 |
-| fori / fuochi | 34 / 66 | 14–56 / 11–149 |
-| scafo dopo 10 min | 43 % | 17–72 % |
+| colpi / arrivati dentro | 272 / 117 | 212–322 / 80–168 |
+| fori / fuochi | 36 / 64 | 15–55 / 11–150 |
+| scafo dopo 10 min | 42 % | 17–72 % |
 | scafo ≤ 50 % | 4 semi su 6, dopo 170–200 s dall'arrivo | |
-| scafo ≤ 20 % | 1 seme su 6, dopo 224 s | |
+| scafo ≤ 20 % | 1 seme su 6, dopo 226 s | |
 | scafo ≤ 5 % / abbandono nave | mai | |
-| morti / feriti (totali) | 1 / 9 (5 semi su 6); 185 / 104 nel seme in cui una sezione è stata sventrata dalla guerra | 0–2 / 7–13 |
-| stanze in gioco al massimo / incidenti al massimo | 500 / 28 (la sezione sventrata ne mette 1800) | |
+| morti / feriti (totali) | 1 / 6 (5 semi su 6); 188 / 103 nel seme in cui una sezione è stata sventrata dalla guerra | 0–3 / 3–9 |
+| stanze in gioco al massimo / incidenti al massimo | 480 / 28 (la sezione sventrata ne mette 1800) | |
 | persone nelle stanze attraversate da un colpo | 12 colpi su 117 attraversano una stanza con qualcuno (di media 12 persone) | |
 
 Vincoli del brief: **nessuna spirale** (gli incidenti sono al tetto di 28 ma si chiudono man mano che le squadre arrivano: a battaglia finita non ne restano); **la sopravvivenza non scende**
 (oltre 10 minuti in tutti i semi, contro i ~290 s dopo l'arrivo dei semi peggiori del vecchio «tampone»); **chi muore o è ferito era là** (il banco lo verifica a ogni colpo) e **il numero è credibile**
-(1–2 morti e 7–13 feriti per battaglia, mai decine per colpo; solo una sezione sventrata ne porta via 185). `astra.damage.casualties 3` porta i morti a 1,8: la scala
+(0–3 morti e 3–9 feriti per battaglia, mai decine per colpo; solo una sezione sventrata ne porta via 188). `astra.damage.casualties 3` porta i morti a 1,8: la scala
 delle vittime dipende da dove stanno le persone più che dal coefficiente.
 
 **Cosa deve rifare il lead nel gioco**: `tools/survive.sh` (la stessa prova, nel gioco vero, senza mente: `incidents` ogni 15 s); camminare durante la battaglia fino a un fuoco e a un foro (§8:

@@ -240,6 +240,10 @@ namespace
 			const bool bHole = !(A.Num() > 3 && A[3].StartsWith(TEXT("no")));
 			FAstraImpactResult R;
 			I.Strike(Comp, Energy, Type, I.GetMap().Comps[Comp].Box.GetCenter(), bHole, R);
+			if (UAstraDamageFx* Fx = World->GetSubsystem<UAstraDamageFx>())
+			{
+				Fx->OnBlow(R, Energy);                       // the boom and the sparks too, as for a real blow
+			}
 			UE_LOG(LogASTRA, Display, TEXT("[Damage] a blow of %.0f into %s: %s%s"), Energy, *I.GetMap().Describe(Comp), R.Lines.Num() ? *FString::Join(R.Lines, TEXT("; ")) : TEXT("nothing came of it"),
 			       R.Killed + R.Wounded ? *FString::Printf(TEXT(" — %d killed, %d wounded"), R.Killed, R.Wounded) : TEXT(""));
 		}));
