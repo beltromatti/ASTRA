@@ -649,6 +649,11 @@ Prima, a scafo zero, la nave veniva «distrutta» senza conseguenze. Ora perdere
 13. **L'app**: `tools/pacchetto.sh shipping` costruisce e installa `~/Applications/ASTRA.app` (la build di rilascio; senza argomento: Development, con la console); aprila come qualsiasi app (la prima volta la mente impiega circa un minuto a caricare le voci). Esc apre il menu, Cmd+Q chiude.
 
 ## Note operative
+- **Prove di durata** (`tools/soak.py run N --jump 170`, poi `report`): niente `tools/ricompila.sh` mentre girano (chiude gioco e mente). I banchi
+  degli aiutanti che vanno in crash lasciano un `CrashReportClient` al 100 % di CPU: `pkill -f CrashReportClient` prima di misurare (soak lo fa da sé).
+  Con gli aiutanti che compilano l'orologio di gioco scorre più lento del reale (fotogrammi lunghi tagliati): i tempi assoluti valgono a macchina scarica.
+- **L'app impacchettata**: provarla senza `-ResX/-ResY` (la risoluzione resta salvata nelle impostazioni dell'utente in
+  `~/Library/Application Support/Epic/ASTRA/Saved/Config/Mac/GameUserSettings.ini`).
 - **Campagna di sviluppo**: la partita creata dalle prove (2026-09-29) è stata spostata in `Saved/Campaign_prove_2026-09-29` (l'ultima prova l'aveva lasciata con l'Aquila al 2 %): alla prossima apertura il gioco propone una campagna nuova. Per riprenderla basta rinominare la cartella in `Saved/Campaign`.
 - Se UnrealBuildTool va in crash con «Segmentation fault» in `libUbaHost` (l'acceleratore di compilazione), basta rilanciare `tools/ricompila.sh`.
 - **Prestazioni (2026-09-29, 1710x1107 come l'app sull'Air, risoluzione dinamica al 50%)**: plancia **15,1 ms** di mediana (p95 16,7; GPU 14,8), battaglia decisiva GPU 14,9 ms — prima 19,4 ms. Limite: la GPU (render thread e worker aspettano la GPU dentro la visibilità, dove tornano le query di occlusione: `stat dumpframe` lo mostra). Cosa ha contato:
