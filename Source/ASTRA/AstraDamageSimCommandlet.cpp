@@ -3,6 +3,13 @@
 #include "ASTRA.h"
 #include "AstraDamageMap.h"
 #include "AstraDamageModel.h"
+#include "AstraBattleSubsystem.h"
+#include "AstraLifeSubsystem.h"
+#include "AstraShipPlan.h"
+#include "AstraShipSubsystem.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "Tickable.h"
 #include "AstraWarTypes.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -70,7 +77,7 @@ namespace
 		{
 			Map = MakeShared<FAstraDamageMap>();
 			FString Err;
-			if (!Map->Load(Err))
+			if (!Map->Load(Err, true))
 			{
 				UE_LOG(LogASTRA, Error, TEXT("[Damage] %s"), *Err);
 				return false;
@@ -124,6 +131,87 @@ namespace
 			}
 		}
 		float Air(int32 C) const { const FAstraDmgState* S = Model.Find(C); return S ? S->Air : 1.f; }
+	};
+
+	/** The whole ship in a headless world: the ship, the plan, the life of the 560, the battle: what the people and survival benches run in. */
+	struct FDmWorld
+	{
+		UWorld* World = nullptr;
+		UAstraShipSubsystem* Ship = nullptr;
+		UAstraLifeSubsystem* Life = nullptr;
+		UAstraShipPlan* Plan = nullptr;
+		UAstraBattleSubsystem* Battle = nullptr;
+		double GameT = 0.0;
+		TArray<FString> Reports;
+
+		bool Make()
+		{
+			World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("AstraDamageSim"));
+			FWorldContext& Ctx = GEngine->CreateNewWorldContext(EWorldType::Game);
+			Ctx.SetCurrentWorld(World);
+			World->InitializeActorsForPlay(FURL());
+			World->BeginPlay();
+			Ship = World->GetSubsystem<UAstraShipSubsystem>();
+			Life = World->GetSubsystem<UAstraLifeSubsystem>();
+			Plan = World->GetSubsystem<UAstraShipPlan>();
+			Battle = World->GetSubsystem<UAstraBattleSubsystem>();
+			if (!Ship || !Life || !Plan || !Battle)
+			{
+				UE_LOG(LogASTRA, Error, TEXT("[Damage] the ship, its plan, the life or the battle are not in the world"));
+				return false;
+			}
+			Ship->OnShipEvent.AddLambda([this](const FString& Text, bool bReport)
+			{
+				if (Reports.Num() < 4000)
+				{
+					Reports.Add(FString::Printf(TEXT("%.1f%s %s"), GameT, bReport ? TEXT(" R") : TEXT(""), *Text));
+				}
+			});
+			// the plan and the tables load on a worker: give them a moment
+			const double Wall0 = FPlatformTime::Seconds();
+			for (int32 i = 0; i < 4000 && !(Life->IsRunning() && Ship->GetInterior().IsReady()) && FPlatformTime::Seconds() - Wall0 < 60.0; ++i)
+			{
+				Tick(0.05f);
+				FPlatformProcess::Sleep(0.005f);
+			}
+			GameT = 0.0;
+			return Life->IsRunning() && Ship->GetInterior().IsReady();
+		}
+		void Tick(float Dt)
+		{
+			const double Before = Life->IsRunning() ? Life->Sim().GameSeconds() : -1.0;
+			World->Tick(LEVELTICK_All, Dt);
+			const double After = Life->IsRunning() ? Life->Sim().GameSeconds() : -1.0;
+			if (FMath::IsNearlyEqual(Before, After))
+			{
+				FTickableGameObject::TickObjects(World, LEVELTICK_All, false, Dt);       // the world tick did not reach the tickable subsystems
+			}
+			GameT += Dt;
+		}
+		void Run(float Seconds, float Dt = 0.1f)
+		{
+			for (float t = 0.f; t < Seconds; t += Dt)
+			{
+				Tick(Dt);
+			}
+		}
+		void Command(const TCHAR* Name, std::initializer_list<TPair<const TCHAR*, FString>> Strs, std::initializer_list<TPair<const TCHAR*, double>> Nums = {})
+		{
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			for (const auto& P : Strs) { O->SetStringField(P.Key, P.Value); }
+			for (const auto& N : Nums) { O->SetNumberField(N.Key, N.Value); }
+			FString Detail;
+			Ship->ApplyCommand(Name, O, Detail);
+		}
+		void Destroy()
+		{
+			if (World)
+			{
+				GEngine->DestroyWorldContext(World);
+				World->DestroyWorld(false);
+				World = nullptr;
+			}
+		}
 	};
 
 	/** A hit as the war model would give it: a point on the hull's box, a direction, the energy that got through. */
@@ -492,6 +580,265 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 			Dark.Run(150.f);
 			DmCheck(TEXT("without power it goes up"), Dark.Model.Books().Explosions >= 1, FString::Printf(TEXT("a blow of 70 (power %.2f left in it): %d explosion(s), %d wrecked compartments"), Dark.Model.Find(Mag) ? Dark.Model.Find(Mag)->Power : 1.f, Dark.Model.Books().Explosions, Dark.Model.NumWrecked()));
 		}
+	}
+
+	// ======================================================================================================== the people
+	if (bAll || Scenario == TEXT("people"))
+	{
+		FDmWorld W;
+		if (!W.Make())
+		{
+			return 1;
+		}
+		FAstraLifeSim& Sim = W.Life->Sim();
+		const FAstraLifeMap& LMap = Sim.GetMap();
+		W.Command(TEXT("set_alert"), {{TEXT("level"), TEXT("red")}});
+		W.Run(240.f, 0.25f);                                   // general quarters: everyone to their battle stations
+		// the busiest rooms: who is in them now
+		TArray<TPair<int32, int32>> Busy;
+		for (int32 c = 0; c < LMap.Comps.Num(); ++c)
+		{
+			TArray<int32> There;
+			Sim.PeopleInComp(c, There);
+			if (There.Num() >= 4 && !LMap.Comps[c].bCorridor)
+			{
+				Busy.Add({There.Num(), c});
+			}
+		}
+		Busy.Sort([](const TPair<int32, int32>& A, const TPair<int32, int32>& B) { return A.Key > B.Key; });
+		DmCheck(TEXT("people are at their stations"), Busy.Num() >= 5, FString::Printf(TEXT("%d rooms hold four or more of them (the busiest: %s, %d)"), Busy.Num(), Busy.Num() ? *LMap.Comps[Busy[0].Value].Name : TEXT("-"), Busy.Num() ? Busy[0].Key : 0));
+		const FAstraCrewRoster& Roster = W.Ship->GetRoster();
+		DmSet(TEXT("astra.damage.fields=0"));
+		int32 Hurt = 0, Outside = 0, TotalKilled = 0, TotalWounded = 0, TotalPresent = 0;
+		TArray<FString> Notes;
+		for (int32 k = 0; k < FMath::Min(3, Busy.Num()); ++k)
+		{
+			const int32 LC = Busy[k].Value;
+			const int32 MC = W.Ship->GetInterior().GetMap().CompByName.FindRef(LMap.Comps[LC].Id, INDEX_NONE);
+			if (MC == INDEX_NONE)
+			{
+				continue;
+			}
+			TArray<int32> There;
+			Sim.PeopleInComp(LC, There);
+			TSet<int32> Present;
+			for (const int32 P : There) { Present.Add(Sim.Person(P).Roster); }
+			int32 Fit0 = 0;
+			for (const FAstraCrewman& P : Roster.Get()) { Fit0 += P.Status == 0 ? 1 : 0; }
+			FAstraImpactResult Res;
+			W.Ship->GetInterior().Strike(MC, 60.f, 0, W.Ship->GetInterior().GetMap().Comps[MC].Box.GetCenter(), true, Res);
+			int32 Fit1 = 0;
+			for (const FAstraCrewman& P : Roster.Get()) { Fit1 += P.Status == 0 ? 1 : 0; }
+			TotalPresent += Present.Num();
+			TotalKilled += Res.Killed;
+			TotalWounded += Res.Wounded;
+			Hurt += Fit0 - Fit1;
+			Notes.Add(FString::Printf(TEXT("%s: %d there, a blow of 60 hurt %d (%d killed, %d wounded)"), *LMap.Comps[LC].Name, Present.Num(), Fit0 - Fit1, Res.Killed, Res.Wounded));
+			// who the report names must have been in the room
+			for (const FString& Who : Res.People)
+			{
+				bool bFound = false;
+				for (const int32 R : Present)
+				{
+					bFound |= Who.Contains(Roster.Get()[R].Last);
+				}
+				Outside += bFound ? 0 : 1;
+			}
+		}
+		DmCheck(TEXT("a blow hurts who stood there"), Outside == 0 && TotalPresent > 0, FString::Printf(TEXT("%s; %d people named who were not in the room"), *FString::Join(Notes, TEXT("; ")), Outside));
+		DmCheck(TEXT("not a massacre"), Hurt <= TotalPresent * 6 / 10 + 1, FString::Printf(TEXT("%d hurt of %d who were in the three rooms struck (%d killed, %d wounded)"), Hurt, TotalPresent, TotalKilled, TotalWounded));
+		// the rooms are open to space (no field): who gets out, who is carried out, who is lost, in the next three minutes
+		const int32 Killed0 = Roster.NumKilled();
+		W.Run(180.f, 0.25f);
+		const FAstraDamageModel::FBooks& B = W.Ship->GetInterior().Books();
+		DmCheck(TEXT("the open rooms empty their people"), B.Escaped + B.Rescued + B.Killed > 0, FString::Printf(TEXT("in 180 s: %d got out in time, %d were carried out alive, %d died in vacuum (killed so far %d, wounded %d)"), B.Escaped, B.Rescued, Roster.NumKilled() - Killed0, Roster.NumKilled(), Roster.NumWounded()));
+		DmSet(TEXT("astra.damage.fields=1"));
+		// the wounded walk to the Medbay
+		W.Run(240.f, 0.25f);
+		int32 Wounded = 0, InMedbay = 0;
+		for (int32 i = 0; i < Sim.NumPeople(); ++i)
+		{
+			const FAstraLifePerson& P = Sim.Person(i);
+			if (P.Status == 1)
+			{
+				++Wounded;
+				InMedbay += (P.Act == EAstraLifeAct::Patient && P.Phase == FAstraLifePerson::EPhase::Settled) ? 1 : 0;
+			}
+		}
+		DmCheck(TEXT("the wounded reach the Medbay"), Wounded > 0 && InMedbay * 10 >= Wounded * 8, FString::Printf(TEXT("%d of the %d wounded are in the Medbay 4 game minutes after"), InMedbay, Wounded));
+		// a section the war has gutted takes who lived in it, and only them
+		{
+			int32 InStern = 0, Elsewhere = 0;
+			TSet<int32> SternRoster;
+			for (int32 i = 0; i < Sim.NumPeople(); ++i)
+			{
+				const FAstraLifePerson& P = Sim.Person(i);
+				if (P.Status == 0 && P.Act != EAstraLifeAct::Patient)
+				{
+					const bool bStern = P.Pos.X < -27700.f && Sim.CompOf(i) != INDEX_NONE && LMap.Comps[Sim.CompOf(i)].Deck >= 2;
+					InStern += bStern ? 1 : 0;
+					Elsewhere += bStern ? 0 : 1;
+					if (bStern) { SternRoster.Add(P.Roster); }
+				}
+			}
+			const int32 K0 = Roster.NumKilled(), Fit0 = Elsewhere;
+			FAstraImpactResult R;
+			W.Ship->GetInterior().GutSection(-1.0e7f, -27700.f, TEXT("stern"), R);
+			int32 StillFitElsewhere = 0;
+			for (const FAstraCrewman& P : Roster.Get()) { StillFitElsewhere += P.Status == 0 ? 1 : 0; }
+			int32 FitStern = 0;
+			for (const int32 Ro : SternRoster) { FitStern += Roster.Get()[Ro].Status == 0 ? 1 : 0; }
+			DmCheck(TEXT("a gutted section takes its people"), InStern > 20 && R.Killed >= InStern * 4 / 10 && R.Killed + R.Wounded >= InStern * 6 / 10 && FitStern <= InStern * 5 / 10, FString::Printf(TEXT("%d people were in the stern section: %d killed, %d wounded, %d left fit there; killed in all %d -> %d"), InStern, R.Killed, R.Wounded, FitStern, K0, Roster.NumKilled()));
+			(void)Fit0; (void)StillFitElsewhere;
+		}
+		W.Destroy();
+	}
+
+	// ======================================================================================================== the Captain
+	if (bAll || Scenario == TEXT("captain"))
+	{
+		DmSet(TEXT("astra.damage.fields=0"));
+		for (int32 Rescue = 0; Rescue < 2; ++Rescue)
+		{
+			FDmWorld W;
+			if (!W.Make())
+			{
+				return 1;
+			}
+			W.Command(TEXT("set_alert"), {{TEXT("level"), TEXT("red")}});
+			const int32 MC = W.Ship->GetInterior().GetMap().CompByName.FindRef(FName(TEXT("d4_games_D1")), INDEX_NONE);
+			const FAstraDmgComp& Room = W.Ship->GetInterior().GetMap().Comps[MC];
+			const FVector Feet = Room.Box.GetCenter();
+			W.Ship->SetTestCaptain(true, FVector(Room.Box.Min.X + 150.f, Room.Box.Min.Y + 150.f, Room.Box.Min.Z + 90.f));       // at the far end of the room from where the blow comes in
+			W.Run(2.f);
+			FAstraImpactResult Res;
+			W.Ship->GetInterior().Strike(MC, 40.f, 0, Feet, true, Res);
+			const float Hole = W.Ship->GetInterior().Find(MC) ? W.Ship->GetInterior().Find(MC)->Hole : 0.f;
+			float Impaired = -1.f, Down = -1.f, Dead = -1.f, Woke = -1.f;
+			bool bDispatched = false;
+			for (float t = 0.f; t < 400.f && Dead < 0.f && Woke < 0.f; t += 0.25f)
+			{
+				W.Tick(0.25f);
+				const FAstraDmgCaptain& C = W.Ship->GetCaptainHealth();
+				if (Impaired < 0.f && C.State != FAstraDmgCaptain::EState::Well) { Impaired = t; }
+				if (Down < 0.f && C.State == FAstraDmgCaptain::EState::Down) { Down = t; }
+				if (Dead < 0.f && C.State == FAstraDmgCaptain::EState::Dead) { Dead = t; }
+				if (Down >= 0.f && W.Ship->GetCaptainFate() == 0 && C.State == FAstraDmgCaptain::EState::Well) { Woke = t; }
+				if (Rescue == 1 && !bDispatched && t >= 3.f)
+				{
+					bDispatched = true;                         // ops sends a team at once (the incident is on the board a second after the blow)
+					for (const FAstraDamage& D : W.Ship->GetDamage())
+					{
+						if (D.Kind == TEXT("hull breach"))
+						{
+							W.Command(TEXT("dispatch_damage_control"), {{TEXT("section"), FString(1, &D.Section)}, {TEXT("priority"), TEXT("critical")}}, {{TEXT("deck"), (double)D.Deck}, {TEXT("id"), (double)D.Id}});
+							break;
+						}
+					}
+				}
+			}
+			if (Rescue == 0)
+			{
+				DmCheck(TEXT("the Captain faints in thin air"), Impaired > 0.f && Down > Impaired && Down < 90.f, FString::Printf(TEXT("a breach of %.1f m2 into a %.0f m3 room: the sight closes in after %.0f s, the Captain is down after %.0f s"), Hole, Room.VolumeM3, Impaired, Down));
+				DmCheck(TEXT("and dies if nobody comes"), Dead > Down + 40.f && Dead < 400.f, FString::Printf(TEXT("dead after %.0f s (%.0f s after falling): %s"), Dead, Dead - Down, *W.Ship->GetInterior().Captain().Why));
+			}
+			else
+			{
+				DmCheck(TEXT("a team carries the Captain out"), Down > 0.f && Woke > Down, FString::Printf(TEXT("down after %.0f s; a team sent at once; awake again after %.0f s (dead: %s)"), Down, Woke, Dead >= 0.f ? TEXT("YES") : TEXT("no")));
+			}
+			W.Destroy();
+		}
+		DmSet(TEXT("astra.damage.fields=1"));
+	}
+
+	// ======================================================================================================== the Aquila under the strike group's fire
+	if (bAll || Scenario == TEXT("survive"))
+	{
+		float Seconds = 600.f;
+		FParse::Value(*Params, TEXT("seconds="), Seconds);
+		FDmWorld W;
+		if (!W.Make())
+		{
+			return 1;
+		}
+		GEngine->Exec(W.World, TEXT("astra.battle.time 170"));
+		W.Battle->StartCampaign();
+		W.Command(TEXT("set_alert"), {{TEXT("level"), TEXT("red")}});
+		struct FRow { float T, Hull, Shield, Heat, PShield, PWeapon; int32 Incidents, Active, Wrecked, Fields, Sealed, Killed, Wounded; };
+		TArray<FRow> Rows;
+		float T50 = -1.f, T20 = -1.f, T5 = -1.f, TLost = -1.f;
+		bool bTactics = false;
+		const double BattleWall0 = FPlatformTime::Seconds();
+		const float Step = 0.1f;
+		double CostSum = 0.0, CostMax = 0.0;
+		int64 CostN = 0;
+		for (float t = 0.f; t < Seconds + 15.f; t += Step)
+		{
+			const float BT = W.Battle->GetBattleTime();
+			if (!bTactics && BT >= 185.f)
+			{
+				bTactics = true;
+				W.Command(TEXT("mandate_tactics"), {{TEXT("focus"), TEXT("AQUILA")}, {TEXT("stance"), TEXT("flank")}, {TEXT("missiles"), TEXT("salvo")}, {TEXT("ew"), TEXT("jam")}});
+			}
+			const double C0 = FPlatformTime::Seconds();
+			W.Tick(Step);
+			const double C1 = (FPlatformTime::Seconds() - C0) * 1000.0;
+			CostSum += C1;
+			CostMax = FMath::Max(CostMax, C1);
+			++CostN;
+			const float Hull = W.Battle->PlayerHullFraction();
+			if (T50 < 0.f && Hull <= 0.5f) { T50 = BT - 180.f; }
+			if (T20 < 0.f && Hull <= 0.2f) { T20 = BT - 180.f; }
+			if (T5 < 0.f && Hull <= 0.05f) { T5 = BT - 180.f; }
+			if (TLost < 0.f && W.Ship->IsAbandoning()) { TLost = BT - 180.f; }
+			if (FMath::Fmod(BT, 10.f) < Step * 0.5f && (Rows.Num() == 0 || BT - Rows.Last().T >= 9.9f))
+			{
+				const FAstraDamageModel& I = W.Ship->GetInterior();
+				Rows.Add({BT, Hull, W.Battle->PlayerShieldFraction(), W.Ship->GetHeatPct(), W.Ship->PowerFactor(TEXT("shields")), W.Ship->PowerFactor(TEXT("weapons")), W.Ship->GetDamage().Num(),
+				          I.States().Num(), I.NumWrecked(), I.Power().Fields, I.SealedDoors().Num(), W.Ship->GetRoster().NumKilled(), W.Ship->GetRoster().NumWounded()});
+			}
+			if (BT - 180.f > Seconds || W.Ship->IsShipLost())
+			{
+				break;
+			}
+		}
+		const FAstraDamageModel& I = W.Ship->GetInterior();
+		const FAstraDamageModel::FBooks& B = I.Books();
+		for (const FRow& R : Rows)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[Damage] t=%5.0f hull %3.0f%% shields %3.0f%% heat %3.0f%% | power shields %.2f weapons %.2f | incidents %2d, %3d compartments in play (%d gutted), %d fields, %d bulkheads shut | killed %d wounded %d"),
+			       R.T, 100.f * R.Hull, 100.f * R.Shield, R.Heat, R.PShield, R.PWeapon, R.Incidents, R.Active, R.Wrecked, R.Fields, R.Sealed, R.Killed, R.Wounded);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Damage] survival after the group's arrival (t=180): hull <= 50%% at %.0f s, <= 20%% at %.0f s, <= 5%% at %.0f s, abandon ship at %.0f s (-1: not reached)"), T50, T20, T5, TLost);
+		UE_LOG(LogASTRA, Display, TEXT("[Damage] books: %d blows (%d reached the interior, %.0f energy of %.0f), %d holes, %d fires, %d conduits, %d gutted, %d fields failed, %d bulkheads sealed, %d explosions, %d suppressions; %d killed, %d wounded, %d got out, %d carried out; structure burnt %.0f; most compartments in play %d, most incidents %d"),
+		       B.Hits, B.HitsInside, B.EnergyInside, B.Energy, B.Holes, B.Fires, B.Conduits, B.Wrecks, B.FieldsFailed, B.DoorsSealed, B.Explosions, B.Suppressions, B.Killed, B.Wounded, B.Escaped, B.Rescued, B.StructureBurnt, B.MaxActive, B.MaxIncidents);
+		UE_LOG(LogASTRA, Display, TEXT("[Damage] people: %d of the %d blows that reached the interior crossed a room with someone in it; %d people were in the rooms they crossed"), B.OccupiedBlows, B.HitsInside, B.PeopleNear);
+		UE_LOG(LogASTRA, Display, TEXT("[Damage] cost: the whole world tick %.3f ms on average, %.1f ms at worst (%lld ticks, %.0f s of battle in %.0f s)"), CostN ? CostSum / CostN : 0.0, CostMax, CostN, W.Battle->GetBattleTime() - 170.f, FPlatformTime::Seconds() - BattleWall0);
+		TSharedRef<FJsonObject> Sv = MakeShared<FJsonObject>();
+		Sv->SetNumberField(TEXT("t_hull_50"), T50);
+		Sv->SetNumberField(TEXT("t_hull_20"), T20);
+		Sv->SetNumberField(TEXT("t_hull_5"), T5);
+		Sv->SetNumberField(TEXT("t_abandon"), TLost);
+		Sv->SetNumberField(TEXT("hits"), B.Hits);
+		Sv->SetNumberField(TEXT("hits_inside"), B.HitsInside);
+		Sv->SetNumberField(TEXT("holes"), B.Holes);
+		Sv->SetNumberField(TEXT("fires"), B.Fires);
+		Sv->SetNumberField(TEXT("killed"), W.Ship->GetRoster().NumKilled());
+		Sv->SetNumberField(TEXT("wounded_now"), W.Ship->GetRoster().NumWounded());
+		Sv->SetNumberField(TEXT("max_active"), B.MaxActive);
+		Sv->SetNumberField(TEXT("max_incidents"), B.MaxIncidents);
+		Sv->SetNumberField(TEXT("hull_end"), 100.0 * W.Battle->PlayerHullFraction());
+		Sv->SetNumberField(TEXT("occupied_blows"), B.OccupiedBlows);
+		Sv->SetNumberField(TEXT("people_near"), B.PeopleNear);
+		Sv->SetNumberField(TEXT("wounded_total"), B.Wounded);
+		Sv->SetNumberField(TEXT("killed_total"), B.Killed);
+		Sv->SetNumberField(TEXT("tick_ms"), CostN ? CostSum / CostN : 0.0);
+		DmRecord->SetObjectField(TEXT("survive"), Sv);
+		TArray<TSharedPtr<FJsonValue>> Ev;
+		for (const FString& R : W.Reports) { Ev.Add(MakeShared<FJsonValueString>(R)); }
+		DmRecord->SetArrayField(TEXT("reports"), Ev);
+		DmCheck(TEXT("the Aquila lasts"), T5 < 0.f || T5 >= 270.f, FString::Printf(TEXT("under the group's focused fire: half the hull at %.0f s, a fifth at %.0f s, a twentieth at %.0f s after its arrival"), T50, T20, T5));
+		W.Destroy();
 	}
 
 	int32 NumFailed = 0;

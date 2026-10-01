@@ -25,6 +25,7 @@ struct FAstraDmgPerson
 	int32 Roster = INDEX_NONE;
 	FVector PosCm = FVector::ZeroVector;
 	bool bSuited = false;         // in a damage-control party (suited for vacuum and smoke)
+	bool bAtPost = false;         // at their duty or battle station (they hold it a few seconds longer than a person off duty)
 };
 
 enum class EAstraDmgHarm : uint8 { Decompression, Fire, Smoke, Blast, Electric };
@@ -79,6 +80,7 @@ struct FAstraDmgState
 	float Wreck = 0.f;            // 0..1: the room's fabric and what it holds; at 1 it is gutted
 	// the doors
 	bool bLocked = false;         // locked down: its doors hold the air, the smoke and the fire in
+	bool bGutted = false;         // lost with its section of the hull: no air, no power, no repair (the war's: a section whose structure is gone)
 	float TeamT = 0.f;            // a damage-control team is working here (seconds since it last was)
 	float TeamFire = 0.f;         // how hard the team on the fire sprays (the rate the fire dies at)
 	// the people in it
@@ -142,6 +144,9 @@ public:
 	bool Trace(const FAstraHullHit& Hit, FVector& OutEntryCm, TArray<int32>& OutComps, float* OutEnergy = nullptr) const;
 	/** A compartment takes damage directly (the tests, the war's catastrophes): an energy as a hit's, spent there. */
 	void Strike(int32 Comp, float Energy, uint8 Type, const FVector& AtCm, bool bHole, FAstraImpactResult& Out);
+	/** A lengthwise section of the hull is gutted (the war's: its structure is at zero): what lived in the compartments along it, between two points on the
+	 *  ship's axis (plan cm), is lost: the air, the power, most of the people (the bridge's island, above the hull, is not part of it). */
+	void GutSection(float XMinCm, float XMaxCm, const FString& Name, FAstraImpactResult& Out);
 	/** The conduits of a compartment burn out (the reactor's heat past what the coolant holds): Loss of its power, and a scorch for whoever is at the panels. */
 	void Overload(int32 Comp, float Loss, FAstraImpactResult& Out);
 
@@ -185,6 +190,7 @@ public:
 		int32 Killed = 0, Wounded = 0, Rescued = 0, Escaped = 0;
 		double Energy = 0.0, EnergyInside = 0.0, StructureBurnt = 0.0;
 		int32 MaxActive = 0, MaxIncidents = 0;
+		int32 OccupiedBlows = 0, PeopleNear = 0;      // blows that crossed a room with someone in it, and how many were in the rooms they crossed
 	};
 	const FBooks& Books() const { return Stats; }
 	FString InfoText() const;
@@ -204,6 +210,7 @@ private:
 	TMap<int32, FAstraDmgState> Active;
 	TSet<int32> Sealed;                        // door indices
 	TMap<int32, float> DoorTimer;              // shut blast doors: how long the section beside them has been whole
+	TMap<int32, float> SpreadTold;             // when a fire spreading into a stretch of the ship was last told
 	TMap<int32, float> SectionTimer;           // sections losing their air: how long (deck * 256 + section)
 	FAstraDmgPower PowerNow;
 	FAstraDmgCaptain Cap;
@@ -215,6 +222,7 @@ private:
 	mutable TArray<int32> HeatRooms;
 	float Acc = 0.f, PeopleT = 0.f, SyncT = 0.f, SystemsT = 0.f, Clock = 0.f;
 	bool bDoorsChanged = false;
+	bool bImpactOccupied = false;
 	float DoorsChangedAt = -100.f;
 
 	FAstraDmgState& Get(int32 Comp);
@@ -228,7 +236,7 @@ private:
 	void RecomputePower();
 	float Openness(const FAstraDmgLink& L, const FAstraDmgState& A, const FAstraDmgState* B) const;
 	void Deposit(int32 Comp, float Energy, uint8 Type, const FVector& AtCm, const FVector& Dir, bool bFirst, FAstraImpactResult& Out);
-	void BlastPeople(int32 Comp, float Energy, const FVector& From, const FVector& To, FAstraImpactResult& Out);
+	void BlastPeople(int32 Comp, float Energy, uint8 Type, const FVector& From, const FVector& To, FAstraImpactResult& Out);
 	bool SkinEntry(const FAstraHullHit& Hit, FVector& OutAt, FVector& OutDir) const;
 	void Harm(int32 Roster, bool bKill, EAstraDmgHarm Cause, FAstraImpactResult* Out, const FAstraDmgComp& Where);
 	FString Say(int32 Comp) const;

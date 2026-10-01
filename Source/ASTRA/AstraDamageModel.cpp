@@ -13,7 +13,7 @@ namespace
 	// (astra.damage.<name> <value>) without a build.
 	float GDmHole = 1.f;        // the size of the holes a blow punches
 	float GDmFire = 1.f;        // how readily a blow starts a fire
-	float GDmCasualty = 1.f;    // how many a blow's blast hurts
+	float GDmCasualty = 1.5f;    // how many a blow's blast hurts
 	float GDmFields = 1.f;           // 1: containment fields on the holes; 0: none (the air tests)
 	float GDmVent = 60.f;            // m/s: the speed the air leaves a hole at (the real, choked flow is twice this: the game's time is kinder)
 	float GDmMix = 25.f;             // m/s: the speed it moves through an open way between two compartments
@@ -54,6 +54,10 @@ namespace
 	float DmTypeFire(uint8 Type) { return Type == 1 ? 1.3f : (Type == 2 ? 1.2f : 0.35f); }       // 0 kinetic, 1 energy, 2 explosive
 	float DmTypeHole(uint8 Type) { return Type == 1 ? 0.35f : (Type == 2 ? 1.5f : 1.0f); }
 	float DmTypeBlast(uint8 Type) { return Type == 1 ? 0.5f : (Type == 2 ? 1.4f : 1.0f); }
+	/** How much of a room a blow, a fire or a fault can take at once: a hangar is not set alight, nor cut off from its power, by one slug; a closet is. */
+	float DmSize(float VolumeM3) { return FMath::Clamp(FMath::Sqrt(1500.f / FMath::Max(VolumeM3, 1.f)), 0.12f, 1.3f); }
+	float DmKillRadius(uint8 Type) { return Type == 1 ? 1.8f : (Type == 2 ? 3.4f : 2.4f); }     // m: how far from the path of a blow it kills (kinetic, energy, explosive)
+	float DmHurtRadius(uint8 Type) { return Type == 1 ? 3.5f : (Type == 2 ? 7.0f : 5.0f); }
 	FString DmSystemsOf(const FAstraDamageMap& Map, int32 Comp);
 }
 
@@ -69,10 +73,18 @@ void FAstraDamageModel::Init(TSharedRef<const FAstraDamageMap> InMap, FAstraDmgH
 
 void FAstraDamageModel::Reset()
 {
+	if (Hooks.SealDoor && Map.IsValid())
+	{
+		for (const int32 D : Sealed)
+		{
+			Hooks.SealDoor(Map->Doors[D].Id, false);            // the bulkheads open again
+		}
+	}
 	Active.Reset();
 	Sealed.Reset();
 	DoorTimer.Reset();
 	SectionTimer.Reset();
+	SpreadTold.Reset();
 	PowerNow = FAstraDmgPower();
 	Cap = FAstraDmgCaptain();
 	Stats = FBooks();
@@ -335,6 +347,7 @@ bool FAstraDamageModel::Trace(const FAstraHullHit& H, FVector& OutEntryCm, TArra
 void FAstraDamageModel::Impact(const FAstraHullHit& H, FAstraImpactResult& Out)
 {
 	ON_SCOPE_EXIT { Flush(); };
+	bImpactOccupied = false;
 	++Stats.Hits;
 	Stats.Energy += H.Felt;
 	if (!Map.IsValid() || H.Felt < 3.f)
@@ -403,7 +416,7 @@ void FAstraDamageModel::Impact(const FAstraHullHit& H, FAstraImpactResult& Out)
 		const FDmCell& C = Cells[i];
 		Out.Comps.Add(C.Comp);
 		Deposit(C.Comp, C.Energy, H.Type, C.In, D, i == 0, Out);
-		BlastPeople(C.Comp, C.Energy * DmTypeBlast(H.Type), C.In, C.Out, Out);
+		BlastPeople(C.Comp, C.Energy * DmTypeBlast(H.Type), H.Type, C.In, C.Out, Out);
 	}
 	// a warhead that goes off inside throws its shock through the doors of the first room too
 	if (H.Type == 2)
@@ -419,7 +432,7 @@ void FAstraDamageModel::Impact(const FAstraHullHit& H, FAstraImpactResult& Out)
 			if (Splash >= 3.f)
 			{
 				Deposit(L.To, Splash * 0.6f, H.Type, L.AtCm, D, false, Out);
-				BlastPeople(L.To, Splash, C0.In, L.AtCm, Out);
+				BlastPeople(L.To, Splash, H.Type, C0.In, L.AtCm, Out);
 				Out.Comps.AddUnique(L.To);
 			}
 		}
@@ -441,7 +454,64 @@ void FAstraDamageModel::Strike(int32 Comp, float Energy, uint8 Type, const FVect
 	Out.EntryCm = AtCm;
 	Out.Comps.AddUnique(Comp);
 	Deposit(Comp, Energy, Type, AtCm, FVector::ForwardVector, bHole, Out);
-	BlastPeople(Comp, Energy * DmTypeBlast(Type), AtCm, AtCm, Out);
+	BlastPeople(Comp, Energy * DmTypeBlast(Type), Type, AtCm, AtCm, Out);
+}
+
+void FAstraDamageModel::GutSection(float XMinCm, float XMaxCm, const FString& Name, FAstraImpactResult& Out)
+{
+	if (!Map.IsValid())
+	{
+		return;
+	}
+	ON_SCOPE_EXIT { Flush(); };
+	int32 Rooms = 0;
+	for (int32 i = 0; i < Map->Comps.Num(); ++i)
+	{
+		const FAstraDmgComp& C = Map->Comps[i];
+		const float X = C.Box.GetCenter().X;
+		if (C.Deck < 2 || X < XMinCm || X > XMaxCm)
+		{
+			continue;
+		}
+		FAstraDmgState& S = Get(i);
+		if (S.bGutted)
+		{
+			continue;
+		}
+		++Rooms;
+		S.bGutted = true;
+		S.Wreck = 1.f;
+		S.Power = 0.f;
+		S.Air = FMath::Min(S.Air, 0.02f);
+		S.Hole = 0.f;
+		S.Fire = 0.f;
+		S.bLocked = false;
+		if (Cap.Comp == i && Cap.State != FAstraDmgCaptain::EState::Dead)
+		{
+			Cap.Trauma += 60.f;                                         // the section goes round the Captain: unconscious at best
+			Cap.Cause = TEXT("the section gutted");
+		}
+		TArray<FAstraDmgPerson> There;
+		if (Hooks.PeopleIn)
+		{
+			Hooks.PeopleIn(C, There);
+		}
+		for (const FAstraDmgPerson& Pr : There)
+		{
+			// most of whoever was in it is lost; some were in the part that held, or got out through a door before the deck gave way
+			const float U = Rng.FRand();
+			if (U < 0.5f)
+			{
+				Harm(Pr.Roster, true, EAstraDmgHarm::Blast, &Out, C);
+			}
+			else if (U < 0.75f)
+			{
+				Harm(Pr.Roster, false, EAstraDmgHarm::Blast, &Out, C);
+			}
+		}
+	}
+	++Stats.Wrecks;
+	Report(FString::Printf(TEXT("damage report: the %s section of the hull is gutted — %d compartments lost with it, no air and no power there, %d killed and %d wounded"), *Name, Rooms, Out.Killed, Out.Wounded), true);
 }
 
 void FAstraDamageModel::Overload(int32 Comp, float Loss, FAstraImpactResult& Out)
@@ -462,7 +532,7 @@ void FAstraDamageModel::Overload(int32 Comp, float Loss, FAstraImpactResult& Out
 		Out.Lines.AddUnique(FString::Printf(TEXT("power lost in %s"), *Say(Comp)));
 	}
 	Out.Comps.AddUnique(Comp);
-	BlastPeople(Comp, 9.f, C.Box.GetCenter(), C.Box.GetCenter(), Out);
+	BlastPeople(Comp, 9.f, 1, C.Box.GetCenter(), C.Box.GetCenter(), Out);
 }
 
 FString FAstraDamageModel::SystemsText(int32 Comp) const
@@ -555,7 +625,8 @@ void FAstraDamageModel::Deposit(int32 Comp, float Energy, uint8 Type, const FVec
 	}
 	// --- fire: what burns in the room, lit by what the blow is
 	const float O2 = FMath::Clamp((S.Air - 0.2f) / 0.5f, 0.f, 1.f);
-	const float Ignite = FMath::Clamp(Energy / 40.f * DmTypeFire(Type) * P.Ignite * GDmFire, 0.f, 0.9f) * O2;
+	const float Size = DmSize(C.VolumeM3);
+	const float Ignite = FMath::Clamp(Energy / 40.f * DmTypeFire(Type) * P.Ignite * GDmFire * Size, 0.f, 0.9f) * O2;
 	if (Ignite > 0.02f)
 	{
 		const bool bWas = S.Fire >= DmFireMin;
@@ -569,7 +640,7 @@ void FAstraDamageModel::Deposit(int32 Comp, float Energy, uint8 Type, const FVec
 		}
 	}
 	// --- power: the conduits of the room, and of the rooms the corridor feeds
-	const float Lost = FMath::Clamp(Energy / 45.f * P.Conduit, 0.f, 1.f);
+	const float Lost = FMath::Clamp(Energy / 45.f * P.Conduit * Size, 0.f, 1.f);
 	if (Lost > 0.04f)
 	{
 		const bool bWas = S.Power < DmPowerMin;
@@ -618,7 +689,7 @@ void FAstraDamageModel::Deposit(int32 Comp, float Energy, uint8 Type, const FVec
 	}
 }
 
-void FAstraDamageModel::BlastPeople(int32 Comp, float Energy, const FVector& From, const FVector& To, FAstraImpactResult& Out)
+void FAstraDamageModel::BlastPeople(int32 Comp, float Energy, uint8 Type, const FVector& From, const FVector& To, FAstraImpactResult& Out)
 {
 	if (Energy < 3.f)
 	{
@@ -629,17 +700,27 @@ void FAstraDamageModel::BlastPeople(int32 Comp, float Energy, const FVector& Fro
 	{
 		TArray<FAstraDmgPerson> There;
 		Hooks.PeopleIn(C, There);
+		Stats.PeopleNear += There.Num();
+		if (There.Num() && !bImpactOccupied)
+		{
+			bImpactOccupied = true;
+			++Stats.OccupiedBlows;
+		}
 		for (const FAstraDmgPerson& Pr : There)
 		{
 			const float R = DmDistToSegment(Pr.PosCm, From, To) / 100.f;          // metres from the path of the blow
-			const float Kill = FMath::Clamp(Energy / 28.f * FMath::Exp(-R / 3.2f), 0.f, 0.9f) * GDmCasualty;
-			const float Hurt = FMath::Clamp(Energy / 14.f * FMath::Exp(-R / 6.f), 0.f, 1.f) * GDmCasualty;
+			// two zones round the path of the blow, the deadly one inside the hurtful one; each grows with the square root of the energy (the spall of a bigger
+			// blow flies further) and the odds fall away linearly to its edge: a small blow hurts only who is next to it, a big one a few dozen metres of crowd
+			const float Reach = FMath::Sqrt(FMath::Clamp(Energy / 20.f, 0.25f, 4.f));
+			const float Force = FMath::Clamp(Energy / 15.f, 0.f, 1.f);
+			const float Kill = 0.7f * Force * FMath::Clamp(1.f - R / (DmKillRadius(Type) * Reach), 0.f, 1.f) * GDmCasualty;
+			const float Hurt = 0.6f * Force * FMath::Clamp(1.f - R / (DmHurtRadius(Type) * Reach), 0.f, 1.f) * GDmCasualty;
 			const float U = Rng.FRand();
 			if (U < Kill)
 			{
 				Harm(Pr.Roster, true, EAstraDmgHarm::Blast, &Out, C);
 			}
-			else if (U < Kill + (1.f - Kill) * Hurt * 0.6f)
+			else if (U < Kill + (1.f - Kill) * Hurt)
 			{
 				Harm(Pr.Roster, false, EAstraDmgHarm::Blast, &Out, C);
 			}
@@ -649,7 +730,9 @@ void FAstraDamageModel::BlastPeople(int32 Comp, float Energy, const FVector& Fro
 	if (Cap.Comp == Comp && GDmCaptain > 0.5f && Cap.State != FAstraDmgCaptain::EState::Dead)
 	{
 		const float R = DmDistToSegment(CapPos, From, To) / 100.f;
-		Cap.Trauma += 13.f * FMath::Clamp(Energy / 28.f * FMath::Exp(-R / 3.2f), 0.f, 1.f) + 3.f * FMath::Clamp(Energy / 40.f * FMath::Exp(-R / 8.f), 0.f, 1.f);
+		const float Reach = FMath::Sqrt(FMath::Clamp(Energy / 20.f, 0.25f, 4.f));
+		const float Force = FMath::Clamp(Energy / 15.f, 0.f, 1.f);
+		Cap.Trauma += 14.f * Force * FMath::Clamp(1.f - R / (DmKillRadius(Type) * Reach), 0.f, 1.f) + 5.f * Force * FMath::Clamp(1.f - R / (DmHurtRadius(Type) * Reach), 0.f, 1.f);
 		if (Cap.Cause.IsEmpty())
 		{
 			Cap.Cause = TEXT("a blast");
@@ -807,7 +890,7 @@ void FAstraDamageModel::StepFields(float Dt)
 	for (auto& KV : Active)
 	{
 		FAstraDmgState& S = KV.Value;
-		if (S.Hole >= 0.01f)
+		if (S.Hole >= 0.01f && !S.bGutted)
 		{
 			Want.Add({S.Hole, KV.Key});
 		}
@@ -926,6 +1009,11 @@ void FAstraDamageModel::StepAir(float Dt)
 	for (const int32 K : Keys)
 	{
 		FAstraDmgState& S = Active[K];
+		if (S.bGutted)
+		{
+			S.Air = FMath::Min(S.Air, 0.02f);                             // a gutted section has no air (and takes none: the pressure bulkheads hold it off)
+			continue;
+		}
 		const float Leak = DmLeak(S);
 		if (Leak > 0.f)
 		{
@@ -997,10 +1085,14 @@ void FAstraDamageModel::StepFire(float Dt)
 		const FAstraDmgComp& C = Map->Comps[K];
 		const FAstraDmgProfile& P = Map->ProfileOf(K);
 		const float O2 = FMath::Clamp((S.Air - 0.2f) / 0.5f, 0.f, 1.f);
+		if (S.bGutted)
+		{
+			continue;
+		}
 		if (S.Fire > 0.001f)
 		{
 			const bool bFuel = S.Fuel > 0.02f;
-			const float Grow = 0.10f * P.Ignite * O2 * (bFuel ? 1.f : 0.f);
+			const float Grow = 0.10f * P.Ignite * O2 * (bFuel ? 1.f : 0.f) * FMath::Sqrt(DmSize(C.VolumeM3));
 			const float Decay = (1.f - O2) * 0.35f + (bFuel ? 0.f : 0.08f) + (S.Suppress > 0.f ? 0.30f : 0.f) + (S.TeamT > 0.f ? S.TeamFire : 0.f);
 			S.Fire = FMath::Clamp(S.Fire + (Grow * (S.Fire + 0.015f) * (1.f - S.Fire) - Decay * S.Fire) * Dt, 0.f, 1.f);
 			S.Fuel = FMath::Max(0.f, S.Fuel - S.Fire * Dt / P.Fuel);
@@ -1060,8 +1152,8 @@ void FAstraDamageModel::StepFire(float Dt)
 			}
 		}
 		// smoke and heat: made by the fire, let out by a hole, diffusing through the open ways
-		S.Smoke = FMath::Clamp(S.Smoke + (0.35f * S.Fire - (0.012f + (S.Hole > 0.005f ? 0.25f * DmLeak(S) : 0.f)) * S.Smoke) * Dt, 0.f, 1.f);
-		S.Heat = FMath::Clamp(S.Heat + (0.9f * S.Fire - S.Heat) * (0.04f + 0.08f * (1.f - S.Air)) * Dt, 0.f, 1.f);
+		S.Smoke = FMath::Clamp(S.Smoke + (0.35f * S.Fire * DmSize(C.VolumeM3) - (0.012f + (S.Hole > 0.005f ? 0.25f * DmLeak(S) : 0.f)) * S.Smoke) * Dt, 0.f, 1.f);
+		S.Heat = FMath::Clamp(S.Heat + (0.9f * S.Fire * DmSize(C.VolumeM3) - S.Heat) * (0.04f + 0.08f * (1.f - S.Air)) * Dt, 0.f, 1.f);
 	}
 	for (const int32 K : Blasts)
 	{
@@ -1070,7 +1162,7 @@ void FAstraDamageModel::StepFire(float Dt)
 		Report(FString::Printf(TEXT("damage report: the magazine at %s has gone up"), *Say(K)), true);
 		FAstraImpactResult R;
 		Deposit(K, 300.f, 2, C.Box.GetCenter(), FVector::ForwardVector, false, R);          // the room is gutted, and everyone in it
-		BlastPeople(K, 90.f, C.Box.GetCenter(), C.Box.GetCenter(), R);
+		BlastPeople(K, 90.f, 2, C.Box.GetCenter(), C.Box.GetCenter(), R);
 		if (FAstraDmgState* Gone = Active.Find(K))
 		{
 			Gone->Fire = 0.f;                                                                // what there was to burn is burnt
@@ -1082,7 +1174,7 @@ void FAstraDamageModel::StepFire(float Dt)
 			if (L.Kind != FAstraDmgLink::EKind::Blast)
 			{
 				Deposit(L.To, 22.f, 2, L.AtCm, FVector::ForwardVector, false, R);
-				BlastPeople(L.To, 24.f, C.Box.GetCenter(), L.AtCm, R);
+				BlastPeople(L.To, 24.f, 2, C.Box.GetCenter(), L.AtCm, R);
 			}
 		}
 		if (Hooks.StructureBurn)
@@ -1103,7 +1195,14 @@ void FAstraDamageModel::StepFire(float Dt)
 			if (!bWas && B.Fire >= DmFireMin)
 			{
 				++Stats.Fires;
-				Report(FString::Printf(TEXT("damage report: the fire has spread to %s"), *Say(Sd.Key)), true);
+				// told once for a stretch of corridor (a fire running along it is one report), room by room for the rooms
+				const FAstraDmgComp& CB = Map->Comps[Sd.Key];
+				float& Told = SpreadTold.FindOrAdd(CB.Deck * 512 + (int32)CB.Section * 2 + (CB.bCorridor ? 1 : 0), -100.f);
+				if (Clock - Told > (CB.bCorridor ? 30.f : 4.f))
+				{
+					Told = Clock;
+					Report(FString::Printf(TEXT("damage report: the fire has spread to %s"), *Say(Sd.Key)), true);
+				}
 			}
 		}
 	}
@@ -1267,13 +1366,13 @@ void FAstraDamageModel::StepPeople(float Dt)
 				{
 					FAstraDmgExposure E;
 					// how long they need to be out: a start, then the way to the nearest door at a run
-					E.EscapeS = 1.5f + 2.5f * Rng.FRand() + ExitDistanceM(K, P.PosCm) / 3.0f;
+					E.EscapeS = 1.5f + 2.5f * Rng.FRand() + ExitDistanceM(K, P.PosCm) / 3.0f + (P.bAtPost ? 3.f + 9.f * Rng.FRand() : 0.f);
 					S->People.Add(P.Roster, E);
 				}
 			}
 		}
 		const float Hyp = FMath::Clamp((0.55f - S->Air) / 0.55f, 0.f, 1.f);
-		const float Burn = FMath::Max(0.f, S->Fire - 0.2f) * 1.2f + FMath::Max(0.f, S->Heat - 0.5f);
+		const float Burn = FMath::Max(0.f, S->Fire * DmSize(C.VolumeM3) - 0.2f) * 1.2f + FMath::Max(0.f, S->Heat - 0.5f);
 		const float Smk = FMath::Max(0.f, S->Smoke - 0.5f) * 0.7f;
 		TArray<int32, TInlineAllocator<8>> Done;
 		int32 Killed = 0, Wounded = 0, Rescued = 0;
@@ -1338,6 +1437,19 @@ void FAstraDamageModel::StepPeople(float Dt)
 		{
 			S->People.Remove(R);
 		}
+		// a damage-control party at work is suited against the air and the smoke; the fire, the blasts and the failing bulkheads still find some of them
+		for (const FAstraDmgPerson& P : There)
+		{
+			if (P.bSuited)
+			{
+				const float Risk = (S->Fire * DmSize(C.VolumeM3) > 0.5f ? 0.004f * S->Fire : 0.f) + (S->Air < 0.2f ? 0.0008f : 0.f);
+				if (Risk > 0.f && Rng.FRand() < Risk * Dt * GDmCasualty)
+				{
+					Harm(P.Roster, Rng.FRand() < 0.15f, EAstraDmgHarm::Fire, nullptr, C);
+					++Wounded;
+				}
+			}
+		}
 		if (!bDanger)
 		{
 			for (auto It = S->People.CreateIterator(); It; ++It)
@@ -1380,7 +1492,7 @@ void FAstraDamageModel::TickCaptain(float Dt, int32 Comp, const FVector& PosCm)
 	if (S && GDmCaptain > 0.5f)
 	{
 		Hyp = FMath::Clamp((0.55f - S->Air) / 0.55f, 0.f, 1.f);
-		Burn = FMath::Max(0.f, S->Fire - 0.2f) * 1.2f + FMath::Max(0.f, S->Heat - 0.5f);
+		Burn = FMath::Max(0.f, S->Fire * DmSize(Map->Comps[Comp].VolumeM3) - 0.2f) * 1.2f + FMath::Max(0.f, S->Heat - 0.5f);
 		Smk = FMath::Max(0.f, S->Smoke - 0.5f) * 0.7f;
 	}
 	Cap.Hypoxia = Hyp > 0.f ? Cap.Hypoxia + Hyp * Dt : FMath::Max(0.f, Cap.Hypoxia - 0.6f * Dt);
@@ -1568,6 +1680,10 @@ void FAstraDamageModel::SyncIncidents(TArray<FAstraDamage>& Incidents)
 	for (const auto& KV : Active)
 	{
 		const FAstraDmgState& S = KV.Value;
+		if (S.bGutted)
+		{
+			continue;
+		}
 		if (S.BreachId == 0 && S.Hole >= DmHoleMin)
 		{
 			Need.Add({SeverityOf(S, 0) + 0.2f, KV.Key, 0});

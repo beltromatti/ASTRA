@@ -97,8 +97,8 @@ public:
 	/** The ship's volume in the plan's frame (cm): where the decks lie. */
 	FBox Hull = FBox(ForceInit);
 
-	/** Reads the plan. False (and a reason) when it is missing or does not parse. Safe on a worker thread. */
-	bool Load(FString& OutError);
+	/** Reads the plan (the staged copy first, the repository's when bRepoFirst is false and there is none: the bench passes true). False (and a reason) when it is missing or does not parse. Safe on a worker thread. */
+	bool Load(FString& OutError, bool bRepoFirst = false);
 
 	/** The smallest compartment containing a point (world cm), within Slack cm of its walls; INDEX_NONE outside every one. */
 	int32 CompartmentAt(const FVector& Cm, float SlackCm = 0.f) const;

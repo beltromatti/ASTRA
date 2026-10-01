@@ -51,6 +51,7 @@
 #include "Sound/SoundBase.h"
 
 DECLARE_CYCLE_STAT(TEXT("Ship"), STAT_AstraShip, STATGROUP_Astra);
+DECLARE_CYCLE_STAT(TEXT("Interior"), STAT_AstraInterior, STATGROUP_Astra);
 
 namespace
 {
@@ -167,6 +168,86 @@ namespace
 			for (int32 i = 0; Ship && i < N; ++i)
 			{
 				Ship->OnHullHit(Dmg, 0.f, FMath::VRand());
+			}
+		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdDamageInfo(TEXT("astra.damage.info"),
+		TEXT("DISTRUZIONE: the damage inside the hull: what is in play, the incidents, the books, what the model costs"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			const UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			if (!Ship)
+			{
+				return;
+			}
+			const FAstraDamageModel& I = Ship->GetInterior();
+			float Avg = 0.f, Max = 0.f;
+			Ship->InteriorCost(Avg, Max);
+			UE_LOG(LogASTRA, Display, TEXT("[Damage] %s | cost %.3f ms a tick (worst %.2f)"), I.IsReady() ? *I.InfoText() : TEXT("the damage model is not up (the plan is still loading or missing)"), Avg, Max);
+			if (I.IsReady())
+			{
+				UE_LOG(LogASTRA, Display, TEXT("[Damage] power the ship's distribution still carries: shields %.2f weapons %.2f engines %.2f sensors %.2f life support %.2f flight deck %.2f"),
+				       I.Power().Factor[0], I.Power().Factor[1], I.Power().Factor[2], I.Power().Factor[3], I.Power().Factor[4], I.Power().Factor[5]);
+				const FAstraDmgCaptain& C = I.Captain();
+				UE_LOG(LogASTRA, Display, TEXT("[Damage] the Captain: %s, peril %.2f (hypoxia %.1f, burn %.1f, smoke %.1f, trauma %.1f)"),
+				       C.State == FAstraDmgCaptain::EState::Well ? TEXT("well") : (C.State == FAstraDmgCaptain::EState::Impaired ? TEXT("impaired") : (C.State == FAstraDmgCaptain::EState::Down ? TEXT("down") : TEXT("dead"))),
+				       C.Peril, C.Hypoxia, C.Burn, C.Smoke, C.Trauma);
+				for (const FAstraDamage& D : Ship->GetDamage())
+				{
+					UE_LOG(LogASTRA, Display, TEXT("[Damage]    #%d %s: %s (%s) severity %.2f%s"), D.Id, *D.Where(), *D.Kind, *D.Note, D.Severity, D.Team >= 0 ? *FString::Printf(TEXT(", team %d"), D.Team + 1) : TEXT(""));
+				}
+			}
+		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdDamageStrike(TEXT("astra.damage.strike"),
+		TEXT("Testing: astra.damage.strike [here | a compartment's id or part of its name] [energy 40] [kinetic|energy|explosive] [nohole]: a blow into a compartment ('here': the one the Captain is in)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			if (!Ship || !Ship->GetInterior().IsReady())
+			{
+				UE_LOG(LogASTRA, Warning, TEXT("[Damage] the damage model is not up"));
+				return;
+			}
+			FAstraDamageModel& I = Ship->GetInterior();
+			const FString Where = A.Num() ? A[0] : FString(TEXT("here"));
+			int32 Comp = INDEX_NONE;
+			if (Where.Equals(TEXT("here"), ESearchCase::IgnoreCase))
+			{
+				if (const APawn* P = UGameplayStatics::GetPlayerPawn(World, 0))
+				{
+					Comp = Ship->InteriorCompOf(P->GetActorLocation());
+				}
+			}
+			else if (const int32* Id = I.GetMap().CompByName.Find(FName(*Where)))
+			{
+				Comp = *Id;
+			}
+			else
+			{
+				for (int32 i = 0; i < I.GetMap().Comps.Num() && Comp == INDEX_NONE; ++i)
+				{
+					Comp = I.GetMap().Comps[i].Name.Contains(Where, ESearchCase::IgnoreCase) && !I.GetMap().Comps[i].bCorridor ? i : INDEX_NONE;
+				}
+			}
+			if (Comp == INDEX_NONE)
+			{
+				UE_LOG(LogASTRA, Warning, TEXT("[Damage] no such compartment (a compartment id such as d4_galley_B1, part of a name such as Galley, or here)"));
+				return;
+			}
+			const float Energy = A.Num() > 1 ? FCString::Atof(*A[1]) : 40.f;
+			const FString T = A.Num() > 2 ? A[2].ToLower() : FString(TEXT("kinetic"));
+			const uint8 Type = T.StartsWith(TEXT("en")) ? 1 : (T.StartsWith(TEXT("ex")) ? 2 : 0);
+			const bool bHole = !(A.Num() > 3 && A[3].StartsWith(TEXT("no")));
+			FAstraImpactResult R;
+			I.Strike(Comp, Energy, Type, I.GetMap().Comps[Comp].Box.GetCenter(), bHole, R);
+			UE_LOG(LogASTRA, Display, TEXT("[Damage] a blow of %.0f into %s: %s%s"), Energy, *I.GetMap().Describe(Comp), R.Lines.Num() ? *FString::Join(R.Lines, TEXT("; ")) : TEXT("nothing came of it"),
+			       R.Killed + R.Wounded ? *FString::Printf(TEXT(" — %d killed, %d wounded"), R.Killed, R.Wounded) : TEXT(""));
+		}));
+	FAutoConsoleCommandWithWorld CmdDamageReset(TEXT("astra.damage.reset"), TEXT("Testing: everything the damage model has in play is made whole at once (the bulkheads open, the incidents go)"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+		{
+			if (UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr)
+			{
+				Ship->ResetInterior();
 			}
 		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdHeat(TEXT("astra.heat"),
@@ -3206,6 +3287,7 @@ void UAstraShipSubsystem::TickInterior(float DeltaTime)
 					X.Roster = Pr.Roster;
 					X.PosCm = Pr.Pos;
 					X.bSuited = Pr.Party != INDEX_NONE;       // a damage-control party at work wears suits
+					X.bAtPost = Pr.Act == EAstraLifeAct::Battle || Pr.Act == EAstraLifeAct::Duty;
 					Out.Add(X);
 				}
 			};
@@ -3253,9 +3335,48 @@ void UAstraShipSubsystem::TickInterior(float DeltaTime)
 	{
 		return;
 	}
-	Interior.Tick(DeltaTime, Damage);
+	{
+		SCOPE_CYCLE_COUNTER(STAT_AstraInterior);
+		const double T0 = FPlatformTime::Seconds();
+		Interior.Tick(DeltaTime, Damage);
+		const float Ms = (float)((FPlatformTime::Seconds() - T0) * 1000.0);
+		InteriorMsAvg = InteriorMsAvg * 0.98f + Ms * 0.02f;
+		InteriorMsMax = FMath::Max(InteriorMsMax * 0.9995f, Ms);
+	}
 	FlushHitReport(false);
+	// a section of the hull the war has gutted takes what lived in it (the war's structure is the war's; the rooms and the people are ours)
+	if ((GutT -= DeltaTime) <= 0.f)
+	{
+		GutT = 1.f;
+		const UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+		UAstraBattleSubsystem::FDamageView V;
+		if (Battle && Battle->GetDamageView(TEXT("AQUILA"), V))
+		{
+			static const TCHAR* Names[3] = {TEXT("bow"), TEXT("mid"), TEXT("stern")};
+			const float Bow = (float)((V.CutBowX - ShipHullToPlanX) * 100.0), Stern = (float)((V.CutSternX - ShipHullToPlanX) * 100.0);
+			for (int32 Sec = 0; Sec < 3; ++Sec)
+			{
+				if (V.bGutted[Sec] && !(GutDone & (1 << Sec)))
+				{
+					GutDone |= 1 << Sec;
+					FAstraImpactResult R;
+					Interior.GutSection(Sec == 0 ? Bow : (Sec == 1 ? Stern : -1.0e7f), Sec == 0 ? 1.0e7f : (Sec == 1 ? Bow : Stern), Names[Sec], R);
+				}
+				else if (!V.bGutted[Sec])
+				{
+					GutDone &= ~(1 << Sec);            // patched up in the war's books (the rooms stay lost until the yards)
+				}
+			}
+		}
+	}
 	TickCaptainFate(DeltaTime);
+}
+
+void UAstraShipSubsystem::ResetInterior()
+{
+	Interior.Reset();
+	Damage.RemoveAll([](const FAstraDamage& D) { return D.Comp != INDEX_NONE; });
+	HitReport = FHitReport();
 }
 
 void UAstraShipSubsystem::TickCaptainFate(float DeltaTime)
@@ -3282,9 +3403,10 @@ void UAstraShipSubsystem::TickCaptainFate(float DeltaTime)
 	const float Dt = 0.25f + FMath::Max(0.f, -CaptainProbeT);
 	CaptainProbeT = 0.25f;
 	// a Captain who is not walking the ship (in a Falcon, on a planet, in a pod) is out of its compartments' reach
-	const bool bAboard = Walker && !Cast<AAstraFighterPawn>(Pawn) && !bPlanetside && !bAbandon;
-	const int32 Comp = bAboard ? InteriorCompOf(Pawn->GetActorLocation()) : INDEX_NONE;
-	Interior.TickCaptain(Dt, Comp, bAboard ? Pawn->GetActorLocation() : FVector::ZeroVector);
+	const bool bAboard = bTestCaptain || (Walker && !Cast<AAstraFighterPawn>(Pawn) && !bPlanetside && !bAbandon);
+	const FVector Feet = bTestCaptain ? TestCaptainCm : (bAboard ? Pawn->GetActorLocation() : FVector::ZeroVector);
+	const int32 Comp = bAboard ? InteriorCompOf(Feet) : INDEX_NONE;
+	Interior.TickCaptain(Dt, Comp, Feet);
 	const FAstraDmgCaptain& Cap = Interior.Captain();
 	const FAstraDmgState* Here = Comp != INDEX_NONE ? Interior.Find(Comp) : nullptr;
 	const FString Place = Comp != INDEX_NONE ? Interior.GetMap().Describe(Comp) : FString(TEXT("somewhere aboard"));

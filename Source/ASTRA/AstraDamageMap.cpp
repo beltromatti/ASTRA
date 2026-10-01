@@ -103,11 +103,17 @@ namespace
 		return FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Out) && Out.IsValid();
 	}
 
-	FString DmFindPlan()
+	FString DmFindPlan(bool bRepoFirst)
 	{
-		// staged with the game (Content/ASTRA/Data, always packaged as a loose file), else the repository's copy
+		// staged with the game (Content/ASTRA/Data, always packaged as a loose file), else the repository's copy (the one the plan generator writes: the
+		// bench reads it first, the staged copy is only as new as the last time the lead staged it)
+		const FString Repo = FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/aquila_plan.json"));
 		const FString A = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("ASTRA/Data/aquila_plan.json"));
-		return FPaths::FileExists(A) ? A : FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/aquila_plan.json"));
+		if (bRepoFirst && FPaths::FileExists(Repo))
+		{
+			return Repo;
+		}
+		return FPaths::FileExists(A) ? A : Repo;
 	}
 
 	FVector DmMetres(const TArray<TSharedPtr<FJsonValue>>* A)
@@ -148,11 +154,11 @@ float FAstraDmgDeck::HalfWidthAt(float X) const
 	return 0.f;
 }
 
-bool FAstraDamageMap::Load(FString& OutError)
+bool FAstraDamageMap::Load(FString& OutError, bool bRepoFirst)
 {
 	const double T0 = FPlatformTime::Seconds();
 	TSharedPtr<FJsonObject> Plan;
-	if (!DmReadJson(DmFindPlan(), Plan))
+	if (!DmReadJson(DmFindPlan(bRepoFirst), Plan))
 	{
 		OutError = TEXT("no ship's plan (aquila_plan.json)");
 		return false;

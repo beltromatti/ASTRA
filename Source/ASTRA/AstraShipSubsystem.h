@@ -207,8 +207,17 @@ public:
 	/** The damage model: the state of every compartment that is not as it was built, the incidents, the people hurt (docs/DISTRUZIONE.md). */
 	const FAstraDamageModel& GetInterior() const { return Interior; }
 	FAstraDamageModel& GetInterior() { return Interior; }
+	/** The damage model's compartment a point (world cm) is in, or INDEX_NONE. */
+	int32 InteriorCompOf(const FVector& Cm) const;
+	/** Everything the damage model has in play is made whole at once (the console's test, a new command): the incidents it owns go, the bulkheads open. */
+	void ResetInterior();
+	/** What the damage model costs: milliseconds a tick, on average and at worst (the console's info). */
+	void InteriorCost(float& OutAvgMs, float& OutMaxMs) const { OutAvgMs = InteriorMsAvg; OutMaxMs = InteriorMsMax; }
 	/** The Captain's state under the air and the fire (the screens' vignette, the harness). */
 	const FAstraDmgCaptain& GetCaptainHealth() const { return Interior.Captain(); }
+	/** The tests' own Captain (no pawn needed): where the feet are while it is on; the air, the smoke and the fire work on them as on the real one. */
+	void SetTestCaptain(bool bOn, const FVector& PosCm) { bTestCaptain = bOn; TestCaptainCm = PosCm; }
+	int32 GetCaptainFate() const { return CaptainFate; }
 	/** A plan door's actor (the sliding door in the level), found by where it stands; null when the level has none there (its deck is not loaded). */
 	class AAstraDoor* DoorActorOf(FName DoorId);
 	/** The campaign save: the system the Aquila is in, the crew's losses. */
@@ -282,6 +291,9 @@ private:
 	TFuture<TSharedPtr<FAstraDamageMap>> InteriorFuture;
 	bool bInteriorLoading = false;
 	float CaptainProbeT = 0.f;
+	float GutT = 0.f;                 // the war's gutted sections are looked at once a second
+	float InteriorMsAvg = 0.f, InteriorMsMax = 0.f;
+	int32 GutDone = 0;                // the sections whose people and rooms are already lost (bit by section: bow, mid, stern)
 	float ThermalStress = 0.f;        // overheated conduits: a failure when it reaches 1
 	int32 ThermalSeq = 0;
 	float RadiatorStress = 0.f;       // blows on the radiator wings: one is torn when it reaches 1
@@ -292,6 +304,8 @@ private:
 	double DoorsMappedAt = -100.0;
 	// the Captain's fate under the hazards: down, carried to the Medbay, or dead
 	int32 CaptainFate = 0;            // 0 well, 1 down, 2 dead
+	bool bTestCaptain = false;
+	FVector TestCaptainCm = FVector::ZeroVector;
 	float CaptainFateT = 0.f;
 	bool bCaptainFadeSet = false;
 	void StartInterior();
@@ -299,7 +313,6 @@ private:
 	void TickCaptainFate(float DeltaTime);
 	void FlushHitReport(bool bForce);
 	void RadiatorHit(const FAstraHullHit& Hit);
-	int32 InteriorCompOf(const FVector& Cm) const;
 	FAstraCrewRoster Roster;          // the 560 aboard, by name: the crew's cost
 	// heat
 	float HeatPct = 12.f;
