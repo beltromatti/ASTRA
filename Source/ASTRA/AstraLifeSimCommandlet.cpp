@@ -11,6 +11,7 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Engine/Engine.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
@@ -226,10 +227,22 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 		TArray<FVector> PrevPos;
 		PrevPos.Init(FVector::ZeroVector, N);
 		float WorstSpread = 0.f;
+		double ThoughtSec = 0.0;
+		int64 Thoughts = 0;
+		int32 Looked = 0, Wrong = 0;
+		TMap<FString, int32> WrongWhy;
+		const bool bAssets = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple")) != nullptr;
 		double BodiesMsSum = 0.0, BodiesMsMax = 0.0;
 		int64 BodyTicks = 0;
 		const float StepW = FMath::Min(Step, 0.0333f);
 		FVector Feet = Legs[0].From;
+		// The game begins on the bridge, where nobody walks: the pool is warmed there, a body at a time, before the Captain takes a lift.
+		for (float Warm = 0.f; Warm < 7.f; Warm += StepW)
+		{
+			Life->SetTestCaptain(FVector(8000.f, 0.f, 0.f), FVector(8000.f, 0.f, 160.f), FVector::ForwardVector);
+			TickWorld(StepW);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Life] walk: %d bodies in the pool before anyone walks"), Life->PoolView().Num());
 		for (const FLeg& Leg : Legs)
 		{
 			TArray<FVector> Route;
@@ -263,10 +276,15 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 				const FVector Look = Seg + 1 < Route.Num() ? (Route[Seg + 1] - Route[Seg]).GetSafeNormal() : FVector::ForwardVector;
 				Life->SetTestCaptain(Feet, Feet + FVector(0, 0, 160), Look);
 				TickWorld(StepW);
+				// (a headless world does not tick its actors: the bodies think when the test says; what a thought costs is measured here)
+				const double TT0 = FPlatformTime::Seconds();
+				int64 ThoughtsBefore = 0, ThoughtsAfter = 0;
 				for (int32 i = 0; i < N; ++i)
 				{
-					if (AAstraLifeBody* Bd = Life->BodyOfPerson(i)) { Bd->TickForTest(StepW); }       // (a headless world does not tick its actors: the bodies think when the test says)
+					if (AAstraLifeBody* Bd = Life->BodyOfPerson(i)) { ThoughtsBefore += Bd->TicksRun(); Bd->TickForTest(StepW); ThoughtsAfter += Bd->TicksRun(); }
 				}
+				ThoughtSec += FPlatformTime::Seconds() - TT0;
+				Thoughts += ThoughtsAfter - ThoughtsBefore;
 				Elapsed += StepW;
 				SinceJump += StepW;
 				WalkClock += StepW;
@@ -310,8 +328,18 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 				for (const TWeakObjectPtr<const AActor>& W : AstraDoors::Walkers()) { DoorWalkers += W.IsValid() ? 1 : 0; }
 				DoorMax = FMath::Max(DoorMax, DoorWalkers);
 				BodiesMsSum += Life->GetCost().BodiesMs;
-				BodiesMsMax = FMath::Max(BodiesMsMax, Life->GetCost().BodiesMsMax);
+				BodiesMsMax = FMath::Max(BodiesMsMax, Life->GetCost().BodiesMs);
 				++BodyTicks;
+			}
+			// what the bodies are made of (needs the mannequins' content: without it the check is skipped)
+			for (int32 i = 0; i < N; ++i)
+			{
+				if (const AAstraLifeBody* B = Life->BodyOfPerson(i))
+				{
+					FString Why;
+					++Looked;
+					if (!B->LooksRight(Why)) { ++Wrong; ++WrongWhy.FindOrAdd(Why); }
+				}
 			}
 			UE_LOG(LogASTRA, Display, TEXT("[Life] walk %s: %d bodies at the end (most %d), %d made on the way"), *Leg.Name, BodiesHere, MaxHere, SpawnsHere);
 		}
@@ -339,6 +367,22 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 		      FString::Printf(TEXT("%d bodies made, %d released, %d at a jump, %d out of a lift, %d out of a room not built; %d made within 40 m and in front of the Captain (nearest %.0f m)"),
 		                      TotalSpawns, TotalDrops, Settling, Lifts, Doors, Pops, Nearest < 1.0e8f ? Nearest : 0.f));
 		Check(TEXT("the bodies think"), TickBodies > 0 && TickRateSum / TickBodies > 1.5, FString::Printf(TEXT("%.1f thoughts a second on average for the %d bodies alive for more than 20 s (nobody sees them here: every tenth or half second)"), TickBodies ? TickRateSum / TickBodies : 0.0, TickBodies));
+		{
+			// what one body's thought costs (its walk, its pose, its place), and so what a full pool seen at every frame would cost
+			const double UsPerThought = Thoughts ? ThoughtSec * 1.0e6 / (double)Thoughts : 0.0;
+			Check(TEXT("a body's thought is cheap"), Thoughts > 0 && UsPerThought * Map.Vis.MaxBodies < 500.0,
+			      FString::Printf(TEXT("%.1f microseconds a thought (%lld thoughts): all %d bodies seen at every frame would cost %.2f ms"), UsPerThought, Thoughts, Map.Vis.MaxBodies, UsPerThought * Map.Vis.MaxBodies / 1000.0));
+		}
+		if (bAssets)
+		{
+			FString Reasons;
+			for (const TPair<FString, int32>& KV : WrongWhy) { Reasons += FString::Printf(TEXT(" [%d %s]"), KV.Value, *KV.Key); }
+			Check(TEXT("the bodies are made right"), Looked > 0 && Wrong == 0, FString::Printf(TEXT("%d bodies looked at the end of the legs, %d wrong%s"), Looked, Wrong, *Reasons));
+		}
+		else
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[Life] SKIP the bodies are made right: the mannequins' content (Content/Characters) is not here"));
+		}
 		Check(TEXT("a body is where its person is"), WorstSpread < 200.f, FString::Printf(TEXT("the widest a walking body strayed from the route: %.0f cm"), WorstSpread));
 		Check(TEXT("the doors know the walkers"), DoorMax <= Cap, FString::Printf(TEXT("%d walkers on the doors' list at most"), DoorMax));
 		Check(TEXT("the bodies' manager is cheap"), BodiesMsSum / FMath::Max<int64>(1, BodyTicks) < 0.3,

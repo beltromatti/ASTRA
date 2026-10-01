@@ -35,8 +35,17 @@ public:
 	int64 TicksRun() const { return Ticks; }
 	/** Out on its feet, walking a route (not in a lift, not at its post): the pose where it must be where its person is. */
 	bool IsWalking() const { return Mode == EMode::Walk; }
+	/** The tests: is the body what its mode says it is (a mesh and a cycle on its feet; the seated pose's mesh at a table or in a bunk; nothing
+	 *  showing in a lift or a tower)? OutWhy says what is wrong. */
+	bool LooksRight(FString& OutWhy) const;
 	/** A headless world does not tick its actors the way a game does: the tests drive the bodies themselves. */
 	void TickForTest(float Dt) { Tick(Dt); }
+
+	/** The assets every body needs (the two mannequins, the cycles, the uniforms), loaded now and given back to be kept: the first body to be
+	 *  made would otherwise pay for them in the middle of a frame. */
+	static void PreloadAssets(TArray<TObjectPtr<UObject>>& OutKeep);
+	/** The sex of the mesh it wears (a body of the same sex as the next person is the cheaper one to give them). */
+	bool IsFemaleBody() const { return bFemaleBody; }
 
 	/** Seen by the camera lately (their own mesh or their seated pose). */
 	bool SeenRecently(float Within = 0.5f) const;

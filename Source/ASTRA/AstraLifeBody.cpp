@@ -52,6 +52,58 @@ void AAstraLifeBody::Place(const FVector& At, float FacingYaw)
 	SetActorLocationAndRotation(At, FRotator(0.f, ActorYawFor(FacingYaw), 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 }
 
+void AAstraLifeBody::PreloadAssets(TArray<TObjectPtr<UObject>>& OutKeep)
+{
+	static const TCHAR* Paths[] = {
+		TEXT("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple"),
+		TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"),
+		TEXT("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle.MM_Idle"),
+		TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Walk/MF_Unarmed_Walk_Fwd.MF_Unarmed_Walk_Fwd"),
+		TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Jog/MF_Unarmed_Jog_Fwd.MF_Unarmed_Jog_Fwd"),
+		TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Uniform.MI_Crew_Uniform"),
+		TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_Command.MI_Crew_Dept_Command"),
+		TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_Engineering.MI_Crew_Dept_Engineering"),
+		TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_Flight.MI_Crew_Dept_Flight"),
+		TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_Medical.MI_Crew_Dept_Medical"),
+		TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_Science.MI_Crew_Dept_Science"),
+		TEXT("/Game/ASTRA/Crew/Materials/MI_Crew_Dept_Security.MI_Crew_Dept_Security")};
+	for (const TCHAR* Path : Paths)
+	{
+		if (UObject* O = StaticLoadObject(UObject::StaticClass(), nullptr, Path))
+		{
+			OutKeep.Add(O);
+		}
+	}
+}
+
+bool AAstraLifeBody::LooksRight(FString& OutWhy) const
+{
+	switch (Mode)
+	{
+	case EMode::Walk:
+	case EMode::Stand:
+		if (IsHidden())                        { OutWhy = TEXT("on its feet but hidden"); return false; }
+		if (!Body->GetSkeletalMeshAsset())     { OutWhy = TEXT("on its feet with no mesh"); return false; }
+		if (!Body->IsVisible())                { OutWhy = TEXT("on its feet but its mesh is not visible"); return false; }
+		if (!Body->IsPlaying())                { OutWhy = TEXT("on its feet with no animation"); return false; }
+		if (Seated->IsVisible())               { OutWhy = TEXT("on its feet with the seated mesh showing"); return false; }
+		return true;
+	case EMode::Sit:
+	case EMode::Lie:
+		if (IsHidden())                        { OutWhy = TEXT("seated or lying but hidden"); return false; }
+		if (!Seated->GetSkinnedAsset())        { OutWhy = TEXT("seated or lying with no mesh"); return false; }
+		if (!Seated->IsVisible())              { OutWhy = TEXT("seated or lying but the pose's mesh is not visible"); return false; }
+		if (Body->IsVisible())                 { OutWhy = TEXT("seated or lying with the standing mesh showing"); return false; }
+		return true;
+	case EMode::Shaft:
+		if (!IsHidden())                       { OutWhy = TEXT("in a lift or a tower but showing"); return false; }
+		return true;
+	default:
+		OutWhy = TEXT("bound but not set");
+		return false;
+	}
+}
+
 void AAstraLifeBody::Shadows(bool bOn)
 {
 	if (bOn != bShadows)

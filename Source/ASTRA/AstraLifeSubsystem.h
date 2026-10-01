@@ -116,6 +116,8 @@ private:
 	// --- bodies
 	UPROPERTY() TArray<TObjectPtr<AAstraLifeBody>> Pool;
 	TMap<int32, int32> BodyOf;              // person -> pool index
+	UPROPERTY() TArray<TObjectPtr<UObject>> Warm;     // the assets every body needs, loaded once at the start and kept
+	bool bWarmed = false;
 	FVector LastCaptain = FVector::ZeroVector;
 	FVector EyeCm = FVector::ZeroVector;
 	FVector LookDir = FVector::ForwardVector;
@@ -124,7 +126,7 @@ private:
 	void ManageBodies();
 	void PrewarmPool(float DeltaTime);
 	bool CanAppearUnseen(const FVector& Where) const;
-	AAstraLifeBody* TakeBody();
+	AAstraLifeBody* TakeBody(bool bFemale);
 	void ReleaseBody(int32 Person);
 
 	void TryStart();

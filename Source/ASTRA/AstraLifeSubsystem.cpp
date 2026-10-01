@@ -232,6 +232,12 @@ void UAstraLifeSubsystem::PrewarmPool(float DeltaTime)
 		return;
 	}
 	PrewarmT = 0.12f;
+	if (!bWarmed)
+	{
+		bWarmed = true;
+		AAstraLifeBody::PreloadAssets(Warm);                 // (most are in memory already: the bridge's officers wear the same)
+		return;
+	}
 	FActorSpawnParameters P;
 	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	P.ObjectFlags |= RF_Transient;
@@ -482,14 +488,24 @@ void UAstraLifeSubsystem::ReleaseAllBodies()
 	NumActiveBodies = 0;
 }
 
-AAstraLifeBody* UAstraLifeSubsystem::TakeBody()
+AAstraLifeBody* UAstraLifeSubsystem::TakeBody(bool bFemale)
 {
+	// a free body that already wears the right mannequin first (changing a mesh is the costly part of becoming someone)
+	AAstraLifeBody* Any = nullptr;
 	for (const TObjectPtr<AAstraLifeBody>& B : Pool)
 	{
 		if (B && !B->InUse())
 		{
-			return B;
+			if (B->IsFemaleBody() == bFemale)
+			{
+				return B;
+			}
+			Any = Any ? Any : B.Get();
 		}
+	}
+	if (Any)
+	{
+		return Any;
 	}
 	if (Pool.Num() >= MapPtr->Vis.MaxBodies + 4 || !GetWorld())
 	{
@@ -670,7 +686,7 @@ void UAstraLifeSubsystem::ManageBodies()
 		{
 			break;
 		}
-		AAstraLifeBody* B = TakeBody();
+		AAstraLifeBody* B = TakeBody(Life.Person(C.P).bFemale);
 		if (!B)
 		{
 			break;
