@@ -140,6 +140,7 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
 
     minds = war_minds.WarMinds(llm, say, link.execute, clock=lambda: clock["t"], mandate_persona=mandate_persona(first), sides=sides,
                                astra_admiral=a.astra_admiral and not a.opening, ops=not a.no_ops, trace=pulses.append)
+    script = parse_captain(a.captain)                                    # the scripted Captain: what he says to the fleet and when
     k, t0, decided_at = 0, time.time(), None
     final_counts: dict[str, Any] = {}
     try:
@@ -158,6 +159,8 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
             clock["t"] = link.t = float(data["t"])
             link.resolve(data.get("results") or [])
             final_counts = data.get("counts", {})
+            while script and script[0][0] <= clock["t"]:
+                await captain_acts(minds, link, script.pop(0))
             minds.feed(data["state"])
             await asyncio.sleep(0)
             busy = any(m.busy for m in minds.minds.values())
@@ -196,6 +199,40 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
     result["minds"] = minds.summary()
     (WAR / f"{tag}_{seed}.mind.json").write_text(json.dumps({"result": result, "pulses": pulses, "orders": link.orders, "lines": lines}, indent=1, default=str))
     return result
+
+
+def parse_captain(text: str) -> list[tuple[float, str, list[str]]]:
+    """`--captain "200:fleet:Praetorian, concentrate on the Acheron;260:request:T-01:cover_us;300:order:7th Fleet picket:attack:T-21:3.5"`: the Captain's words
+    to the fleet net, a request through comms, a direct order through the XO — at battle times."""
+    out = []
+    for item in [x for x in text.split(";") if x.strip()]:
+        t, kind, *rest = item.strip().split(":")
+        out.append((float(t), kind, rest))
+    return sorted(out, key=lambda x: x[0])
+
+
+async def captain_acts(minds: war_minds.WarMinds, link: Link, item: tuple[float, str, list[str]]) -> None:
+    _, kind, rest = item
+    if kind == "fleet":
+        minds.captain_to_fleet(":".join(rest), "en")
+    elif kind == "ship":
+        minds.captain_to_fleet(":".join(rest[1:]), "en", to=rest[0])
+    elif kind == "request":
+        minds.captain_request({"ship": rest[0], "request": rest[1], "target": rest[2] if len(rest) > 2 else ""}, "en")
+    elif kind == "order":
+        args = {"group": rest[0], "order": rest[1], "side": "astra", "by": "captain"}
+        if len(rest) > 2 and rest[2]:
+            args["target"] = rest[2]
+        if len(rest) > 3 and rest[3]:
+            args["range_km"] = float(rest[3])
+        asyncio.ensure_future(_direct_order(minds, link, args))
+    minds.kick()
+
+
+async def _direct_order(minds: war_minds.WarMinds, link: Link, args: dict[str, Any]) -> None:
+    res = await link.execute("group_order", args, "captain")
+    if res.get("ok"):
+        minds.captain_ordered(args["group"], res["detail"])
 
 
 def parse_seeds(text: str) -> list[int]:
@@ -248,6 +285,7 @@ def main() -> None:
     ap.add_argument("--dt", type=float, default=0.5, help="battle seconds between exchanges")
     ap.add_argument("--speed", type=float, default=1.0, help="pace of the battle while a mind thinks (1 = the game's)")
     ap.add_argument("--wall-limit", type=float, default=3600.0)
+    ap.add_argument("--captain", default="", help='the scripted Captain: "200:fleet:words;260:request:T-01:cover_us;300:order:group:attack:T-21:3.5"')
     ap.add_argument("--exec", default="")
     ap.add_argument("--tune", default=TUNE, help="the war's tuning constants (default: main's pace of the war)")
     ap.add_argument("--tag", default="")

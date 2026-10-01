@@ -449,6 +449,21 @@ class AstraTests(Fixture):
 
     async def test_a_request_nobody_can_judge_is_not_taken(self) -> None:
         self.assertIsNone(self.minds.captain_request({"ship": "T-09", "request": "stand_off"}))
+        self.assertEqual(self.minds.deliver("astra", "", Message(0.0, "captain", "x")), [])               # (an empty address is nobody's)
+
+    async def test_a_ship_may_be_named_by_its_name_or_its_captains(self) -> None:
+        await self.feed(self.state())
+        for to in ("Praetorian", "ASN Vigilant", "castellan", "Okoro", "T-02"):
+            self.assertEqual(len(self.minds.deliver("astra", to, Message(0.0, "captain", "x"))), 1, to)
+        self.assertEqual(len(self.minds.deliver("astra", "Meridian", Message(0.0, "captain", "x"))), 0)
+
+    async def test_a_group_that_is_gone_has_no_commander_to_wake(self) -> None:
+        g2 = group("Resolute", 4, [member("T-43", "vigilant")], leader="T-43")
+        await self.feed(astra_state([self.picket(), g2], ENEMIES(), contacts=[]))
+        self.assertIn("astra/group/Resolute", self.minds.minds)
+        await self.feed(astra_state([self.picket()], ENEMIES(), contacts=[]), 1)
+        self.assertNotIn("astra/group/Resolute", self.minds.minds)
+        self.assertFalse(self.minds.can_answer("T-43"))
 
     async def test_when_the_commander_cannot_answer_the_request_goes_to_the_ships_the_old_way(self) -> None:
         async def broken(**kw: Any):

@@ -19,7 +19,7 @@ from unittest import mock
 from astra_mind import models, war_minds
 from astra_mind.local_ship import LocalShip
 from bench.stations_server import FakeGame, FakeTTS, Model as BaseModel
-from bench.war_minds_unit import ENEMIES, astra_state, group, mandate_state, member
+from bench.war_minds_unit import ENEMIES, astra_state, foe, group, mandate_state, member
 from bench.war_mock import MockLLM, ScriptPolicy, null_policy
 
 models.LEDGER.write_file = False
@@ -58,16 +58,24 @@ def picket(**kw: Any) -> dict[str, Any]:
 
 
 def battle_state(order: str = "auto", enemies: list | None = None, events: list | None = None, mandate: bool = True) -> dict[str, Any]:
-    """What the game's snapshot carries in a fight on the Aquila's picket: the crew's state plus both sides' group views."""
+    """What the game's snapshot carries in a fight on the Aquila's picket: the crew's state plus both sides' group views, all of one battle (the
+    Praetorian and the Vigilant with the Aquila, the Acheron and two Styx closing from 240)."""
     st = json.loads(json.dumps(LocalShip(stations=True, fight=True).snapshot()))
-    foes = enemies if enemies is not None else ENEMIES()
-    st.update(astra_state([picket(order=order) if order != "auto" else picket()], foes, events, speed_mps=0, heading_deg=45))
-    st.pop("contacts_ignored", None)
+    foes = enemies if enemies is not None else [foe("group of T-21", [{"id": "T-21", "class": "acheron", "hull_pct": 90, "shields_pct": 86},
+                                                                       {"id": "T-22", "class": "styx", "hull_pct": 100, "shields_pct": 100},
+                                                                       {"id": "T-23", "class": "styx", "hull_pct": 100, "shields_pct": 100}], 24.0)]
+    contacts = [{"id": "T-01", "name": "ASN Praetorian", "class": "praetorian", "status": "friendly", "range_km": 4.5, "bearing_deg": 25, "hull_pct": 100},
+                {"id": "T-02", "name": "ASN Vigilant", "class": "vigilant", "status": "friendly", "range_km": 3.0, "bearing_deg": 70, "hull_pct": 100},
+                {"id": "T-21", "name": "Acheron", "class": "acheron", "status": "hostile", "range_km": 24.0, "bearing_deg": 240, "hull_pct": 90, "shields_pct": 86},
+                {"id": "T-22", "name": "Styx", "class": "styx", "status": "hostile", "range_km": 26.0, "bearing_deg": 238, "hull_pct": 100, "shields_pct": 100},
+                {"id": "T-23", "name": "Cocytus", "class": "styx", "status": "hostile", "range_km": 27.0, "bearing_deg": 242, "hull_pct": 100, "shields_pct": 100}]
+    st.update(astra_state([picket(order=order) if order != "auto" else picket()], foes, events, speed_mps=0, heading_deg=45, contacts=contacts))
     if mandate:
         strike = group("Strike Group Varek Solm", 2, [member("T-21", "acheron", missiles=32), member("T-22"), member("T-23")], leader="T-21")
         st.update(mandate_state([strike], [{"label": "group of T-01", "ships": [{"id": "T-01", "class": "praetorian", "hull_pct": 100, "shields_pct": 100},
+                                                                               {"id": "T-02", "class": "vigilant", "hull_pct": 100, "shields_pct": 100},
                                                                                {"id": "AQUILA", "class": "aquila"}], "range_km": 24.0,
-                                                  "nearest_ship_km": 22.0, "bearing_deg": 250}], boss="T-21"))
+                                                  "nearest_ship_km": 22.0, "bearing_deg": 60}], boss="T-21"))
     return st
 
 

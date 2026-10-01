@@ -140,7 +140,9 @@ def group_order_tool(who: str) -> dict[str, Any]:
                                                     "friendly group's name. Without one, attack presses on the group's own choice"},
         "range_km": {"type": "number", "description": "the distance (1.5-12 km) at which the group holds its target: the main lever of a fight "
                                                        "between equals (see the doctrine). Leave out to keep the group's own choice"},
-        "for_s": {"type": "number", "description": "how many seconds the order stands (then back to auto); leave out for until you change it"},
+        "for_s": {"type": "number", "description": "seconds the order stands, then the group is back on its own judgement (which may break off when it is "
+                                                   "losing). Usually leave it out: the order stands until you change it. Give a time only when you want "
+                                                   "the group handed back at that moment"},
         "formation": {"type": "string", "enum": list(FORMATIONS), "description": "optional: the group's formation"},
         "reason": {"type": "string", "description": "one sentence: why, and what you expect (it is your log, and what your subordinates read as intent)"}},
         ["group", "order", "reason"])
@@ -450,6 +452,9 @@ The chain of command and the Captain's words
   intent and the situation, and you may decline and say why.
 - When he speaks to the whole fleet, the senior allied captain answers for it; the others add a word only if their answer is different.
 - Words that were plainly for someone else (the admiral at Fleet, another ship) are not yours: do nothing.
+- What you say is true to what you do. An order is real only if you give it with `group_order` in this same turn: if you tell the Captain you are closing,
+  covering or concentrating on something, either your group already is (the picture shows it: its order in force, `its fire on`, where it holds) or you
+  order it now. Never claim what the picture does not show.
 
 Think briefly (at most four short sentences: what the picture and the words mean, what you do, whether to speak), then act with the tools; always
 end with a tool call (`no_change` when there is nothing to do)."""
@@ -542,6 +547,7 @@ class Mind:
     intent: str = ""                                    # the last `reason` of the admiral (a subordinate's orders)
     known_enemy: set[str] = field(default_factory=set)
     new_enemy: list[str] = field(default_factory=list)
+    period: float = 0.0                                 # how long until the next look on the clock (drawn after each look)
     takeover: str = ""                                  # a new commander took the seat (a succession): they look at once
     aquila_km: float | None = None                      # (ASTRA group) how far from the Aquila it was at the last look
     why_extra: list[str] = field(default_factory=list)  # facts that woke it besides the events (the Aquila drawing away), told at the next look
@@ -636,15 +642,11 @@ class WarMinds:
         fixed = ALLIES.get(contact)
         if fixed is not None:
             return self.register_ally(contact, fixed)
-        if self.astra_admiral and not self.allies and contact.startswith("A-"):
-            pass
-        if self.pool_used < 10_000:
-            p = dict(ALLY_POOL[self.pool_used % len(ALLY_POOL)])
-            self.pool_used += 1
-            p["ship"] = f"the {cls or 'warship'} {contact}"
-            p["key"] = "ally_" + re.sub(r"\W", "", contact.lower())
-            return self.register_ally(contact, p)
-        raise RuntimeError("unreachable")
+        p = dict(ALLY_POOL[self.pool_used % len(ALLY_POOL)])         # a ship the story has not named a captain for: one from the pool
+        self.pool_used += 1
+        p["ship"] = f"the {cls or 'warship'} {contact}"
+        p["key"] = "ally_" + re.sub(r"\W", "", contact.lower())
+        return self.register_ally(contact, p)
 
     # ------------------------------------------------------------------------------------------------ the log (a side's memory of orders, words and news)
     def journal(self, side: str, who: str, text: str) -> None:
@@ -686,10 +688,15 @@ class WarMinds:
     def _feed_side(self, side: str, view: dict[str, Any], state: dict[str, Any], now: float) -> None:
         groups = [g for g in view.get("your_groups") or [] if g.get("members") or g.get("ships")]
         events = [e for e in view.get("group_events") or [] if isinstance(e, dict)]
-        for e in events:
-            e.setdefault("t", now - float(e.get("ago_s", 0.0) or 0.0))
         active = self._active(side, view, state, events)
         seats = self._seats(side, view, groups, state)
+        if side == "astra":
+            for g in groups:                                       # (every ship of ours has a captain from the first look: a request can name any of them)
+                for m in g.get("members") or []:
+                    self.persona_of("astra", str(m.get("id")), str(m.get("class", "")))
+        here = {seat.id for seat, _ in seats}
+        for gone in [k for k, m in self.minds.items() if m.seat.side == side and k not in here and not m.busy]:
+            del self.minds[gone]                                   # (a group that is no more has no commander to wake)
         # the people who command now (a succession passes a seat to the next commander; the memory is the side's)
         for seat, leader in seats:
             mind = self._seat_mind(seat)
@@ -814,7 +821,9 @@ class WarMinds:
         commander (events only)."""
         if mind.seat.kind == "group" and mind.seat.side == "mandate":
             return None
-        return PERIODIC_S[mind.seat.role] * random.uniform(0.85, 1.25)
+        if mind.period <= 0.0:
+            mind.period = PERIODIC_S[mind.seat.role] * random.uniform(0.85, 1.25)       # (drawn once per look: between 60 and 120 s)
+        return mind.period
 
     def _end_fight(self, mind: Mind) -> None:
         mind.engaged_since = None
@@ -830,19 +839,23 @@ class WarMinds:
     # ------------------------------------------------------------------------------------------------ words reaching the commanders
     def deliver(self, side: str, to: str, msg: Message) -> list[Mind]:
         """A message for the commander(s) of `to`: a commander's key or a ship's contact id, or "all" (every ASTRA group commander)."""
-        out = []
+        out: list[Mind] = []
+        want = (to or "").strip().lower()
+        if not want:
+            return out
+        v = self._view(side, self.state) or {}
         for m in self.minds.values():
             c = m.commander
             if m.seat.side != side or c is None:
                 continue
-            hit = to == "all" or to in (c.key, c.contact) or (m.seat.kind == "group" and to.lower() in m.seat.group.lower())
-            members = []
+            hit = want == "all" or want in (c.key.lower(), c.contact.lower()) or (m.seat.kind == "group" and want in m.seat.group.lower())
             if not hit:
-                v = self._view(side, self.state) or {}
                 for g in v.get("your_groups") or []:
-                    if g.get("name") == m.seat.group:
-                        members = [str(x.get("id")) for x in g.get("members") or []]
-                hit = to in members
+                    if m.seat.kind == "admiral" or g.get("name") == m.seat.group:
+                        for x in g.get("members") or []:
+                            cap = self.allies.get(str(x.get("id")))
+                            names = [str(x.get("id")).lower()] + ([cap.key.lower(), cap.ship.lower(), cap.name.lower()] if cap else [])
+                            hit = hit or any(want == n or (len(want) > 3 and want in n) for n in names)
             if hit:
                 m.inbox.append(msg)
                 out.append(m)
@@ -891,6 +904,7 @@ class WarMinds:
         new_enemy, mind.new_enemy = mind.new_enemy, []
         mind.last_think = now
         mind.thinks += 1
+        mind.period = 0.0
         mind.digest = view_digest(view)
         if seat.side == "astra" and seat.kind == "group":
             mind.aquila_km = aquila_km(view, state, seat.group)
@@ -1223,7 +1237,9 @@ class WarMinds:
         self.journal("astra", speaker.name + (f" to {to}" if to != "aquila" else ""), text[:200])
         if to not in ("aquila", "fleet", ""):
             self.deliver("astra", to, Message(self.clock(), speaker.key, text, urgent=True))
-        await self.say(speaker.key, text, lang, str(a.get("tone", "calm")), urgent=urgent, answer=answer, topic=f"ally:{mind.seat.id}")
+        # (no topic: the voice stage lets two sentences of one captain join in one breath, and two captains of a group speak both; a line that waited
+        # too long is thought again by whoever was to say it, see `rethink`)
+        await self.say(speaker.key, text, lang, str(a.get("tone", "calm")), urgent=urgent, answer=answer)
         return True
 
     # ------------------------------------------------------------------------------------------------ a line that waited

@@ -15,6 +15,9 @@ real time. For the lead and the war module's support agents (in their own worktr
                                               a symmetric scenario, against the control where both sides have it (astra.war.tune <name>_a)
   tools/war.py groups Saved/War/run.json     the battle groups through a record (state, order, focus, guide, axis, ships)
   tools/war.py views Saved/War/run.json      what the minds are given of the groups (record made with run --views), its size and the events
+  tools/war.py mind --scenario sym_small --seeds 1-8 --minds mandate --model live --budget 0.1
+                                              the minds in the loop (docs/GUERRA.md §8): the battle stops every half second of battle time, hands the
+                                              minds what the game hands them and runs the commands they give; see mind/bench/war_arena.py (all its options)
   tools/war.py duel --shooter acheron --target praetorian --range 5
                                               static shooters against a passive dummy from each face: the damage model on a bench
   tools/war.py embed                          after a change in data/war/classes.json: rewrite the table compiled into the game
@@ -452,6 +455,24 @@ def cmd_duel(a: argparse.Namespace) -> None:
               f" {fates['destroyed']:>10}/{fates['disabled']}/{fates['alive']}      {100 * sh / allv:3.0f}% / {100 * pl / allv:3.0f}% / {100 * st / allv:3.0f}%")
 
 
+def mind_python() -> str:
+    """The Python of the mind's environment (mind/.venv): in this checkout, or in the main checkout when this is a worktree (the venv lives there)."""
+    here = ROOT / "mind" / ".venv" / "bin" / "python"
+    if here.exists():
+        return str(here)
+    for parent in ROOT.parents:                       # .../ASTRA/.claude/worktrees/<name>: the main checkout is the one with a mind/.venv above
+        cand = parent / "mind" / ".venv" / "bin" / "python"
+        if cand.exists():
+            return str(cand)
+    return sys.executable
+
+
+def cmd_mind(a: argparse.Namespace) -> None:
+    """The minds in the loop: mind/bench/war_arena.py in the mind's own environment (it launches the commandlet itself, at most two at once)."""
+    rc = subprocess.call([mind_python(), "-m", "bench.war_arena", *a.rest], cwd=str(ROOT / "mind"))
+    sys.exit(rc)
+
+
 def cmd_embed(a: argparse.Namespace) -> None:
     """data/war/classes.json -> Source/ASTRA/AstraWarClassesData.inl (the table compiled in: the game runs without the file)."""
     src = ROOT / "data" / "war" / "classes.json"
@@ -595,6 +616,9 @@ def main() -> None:
     p.add_argument("--seeds", type=int, default=6)
     p.add_argument("--jobs", type=int, default=2)
     p.set_defaults(fn=cmd_duel)
+    p = sub.add_parser("mind", help="the minds in the loop: a battle in which the commanders' minds read what the game gives them and give orders (all options: mind/bench/war_arena.py --help)")
+    p.add_argument("rest", nargs=argparse.REMAINDER)
+    p.set_defaults(fn=cmd_mind)
     p = sub.add_parser("embed", help="write the ship class table compiled into the game from data/war/classes.json")
     p.set_defaults(fn=cmd_embed)
     p = sub.add_parser("report")
