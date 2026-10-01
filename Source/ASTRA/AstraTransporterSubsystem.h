@@ -130,6 +130,8 @@ struct FAstraXportAway
 	bool bFemale = false;
 	bool bCargo = false;
 	float MassKg = 90.f;
+	FString System;                            // the star system the Aquila was in when they were sent away
+	bool bStranded = false;                    // the Aquila has left that system (a Janus transit): out of any beam's reach
 	FVector GroundCm = FVector::ZeroVector;    // on a world: where they stand
 	float GroundYaw = 0.f;
 	TWeakObjectPtr<AActor> Body;               // the figure or the crate standing on the ground while the Captain is there

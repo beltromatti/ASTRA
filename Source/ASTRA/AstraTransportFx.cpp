@@ -53,7 +53,7 @@ namespace
 // ================================================================================================ the layers
 namespace AstraXportFx
 {
-	void FLayer::Init(int32 InCapacity)
+	void FXLayer::Init(int32 InCapacity)
 	{
 		Capacity = InCapacity;
 		Xf.SetNumUninitialized(Capacity);
@@ -61,23 +61,23 @@ namespace AstraXportFx
 		{
 			T = XHiddenXf();
 		}
-		Data.SetNumZeroed(Capacity * Stride);
+		Data.SetNumZeroed(Capacity * XStride);
 		Count = Prev = 0;
 	}
 
-	float* FLayer::Next(FTransform*& OutXf)
+	float* FXLayer::Next(FTransform*& OutXf)
 	{
 		if (Count >= Capacity)
 		{
 			return nullptr;
 		}
 		OutXf = &Xf[Count];
-		float* D = &Data[Count * Stride];
+		float* D = &Data[Count * XStride];
 		++Count;
 		return D;
 	}
 
-	void FLayer::Flush()
+	void FXLayer::Flush()
 	{
 		if (UInstancedStaticMeshComponent* C = Comp.Get())
 		{
@@ -89,7 +89,7 @@ namespace AstraXportFx
 					Xf[i] = XHiddenXf();             // what was drawn last frame and is gone now
 				}
 				C->BatchUpdateInstancesTransforms(0, MakeArrayView(Xf.GetData(), N), false, false, false);
-				C->SetCustomData(0, N - 1, MakeArrayView(Data.GetData(), N * Stride), false);
+				C->SetCustomData(0, N - 1, MakeArrayView(Data.GetData(), N * XStride), false);
 			}
 		}
 		Prev = Count;
@@ -178,7 +178,7 @@ void UAstraTransportFx::Init(UWorld* InWorld)
 {
 	World = InWorld;
 	bReady = World != nullptr && FApp::CanEverRender();
-	Pool.SetNum(CapSparkles);
+	Pool.SetNum(XCapSparkles);
 }
 
 void UAstraTransportFx::Shutdown()
@@ -210,9 +210,9 @@ void UAstraTransportFx::Shutdown()
 		Host->Destroy();
 		Host = nullptr;
 	}
-	SparkleL = FLayer();
-	ColumnL = FLayer();
-	RingL = FLayer();
+	SparkleL = FXLayer();
+	ColumnL = FXLayer();
+	RingL = FXLayer();
 	Light = nullptr;
 	bLayers = false;
 	bReady = false;
@@ -267,7 +267,7 @@ bool UAstraTransportFx::EnsureLayers()
 	Host->SetRootComponent(Root);
 	Root->SetMobility(EComponentMobility::Movable);
 	Root->RegisterComponent();
-	auto Make = [this, Root](FLayer& L, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 Sort)
+	auto Make = [this, Root](FXLayer& L, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 Sort)
 	{
 		L.Init(Capacity);
 		if (!Mesh || !Mat)
@@ -291,16 +291,16 @@ bool UAstraTransportFx::EnsureLayers()
 		C->bUseAsOccluder = false;
 		C->SetReceivesDecals(false);
 		C->SetTranslucentSortPriority(Sort);
-		C->SetNumCustomDataFloats(Stride);
+		C->SetNumCustomDataFloats(XStride);
 		TArray<FTransform> Init;
 		Init.Init(XHiddenXf(), Capacity);
 		C->AddInstances(Init, false, false, false);
 		C->RegisterComponent();
 		L.Comp = C;
 	};
-	Make(RingL, TEXT("XportRings"), PlaneMesh, RingMat, CapRings, -1);
-	Make(ColumnL, TEXT("XportColumns"), CylinderMesh, ColumnMat, CapColumns, 1);
-	Make(SparkleL, TEXT("XportSparkles"), SphereMesh, SparkleMat, CapSparkles, 2);
+	Make(RingL, TEXT("XportRings"), PlaneMesh, RingMat, XCapRings, -1);
+	Make(ColumnL, TEXT("XportColumns"), CylinderMesh, ColumnMat, XCapColumns, 1);
+	Make(SparkleL, TEXT("XportSparkles"), SphereMesh, SparkleMat, XCapSparkles, 2);
 	// one soft warm light that follows the columns (no shadows: the room's own lamps do the rest)
 	Light = NewObject<UPointLightComponent>(Host, TEXT("XportLight"));
 	Light->SetupAttachment(Root);
@@ -314,7 +314,7 @@ bool UAstraTransportFx::EnsureLayers()
 	Light->SetVisibility(false);
 	Light->RegisterComponent();
 	bLayers = true;
-	UE_LOG(LogASTRA, Log, TEXT("[XportFx] effects ready (sparkles %d, columns %d, rings %d; materials: %s%s%s%s)"), CapSparkles, CapColumns, CapRings, SparkleMat ? TEXT("sparkle ") : TEXT(""),
+	UE_LOG(LogASTRA, Log, TEXT("[XportFx] effects ready (sparkles %d, columns %d, rings %d; materials: %s%s%s%s)"), XCapSparkles, XCapColumns, XCapRings, SparkleMat ? TEXT("sparkle ") : TEXT(""),
 	       ColumnMat ? TEXT("column ") : TEXT(""), RingMat ? TEXT("ring ") : TEXT(""), GhostMat ? TEXT("ghost") : TEXT(""));
 	return true;
 }
@@ -528,19 +528,19 @@ void UAstraTransportFx::Emit(FColumn& C, float Prog, float Dt)
 			Vel = FVector(Rng.FRandRange(-12.f, 12.f), Rng.FRandRange(-12.f, 12.f), Rng.FRandRange(55.f, 150.f));
 		}
 		SpawnSparkle(At, Vel, Life, Rng.FRandRange(1.4f, 3.6f), Col, Rng.FRandRange(3.5f, 7.f));
-		FSparkle& S = Pool[(NextSparkle + CapSparkles - 1) % CapSparkles];
+		FSparkle& S = Pool[(NextSparkle + XCapSparkles - 1) % XCapSparkles];
 		S.Swirl = FVector(C.Feet.X, C.Feet.Y, Rng.FRandRange(-2.6f, 2.6f));
 	}
 }
 
 void UAstraTransportFx::SpawnSparkle(const FVector& At, const FVector& Vel, float Life, float Size, const FLinearColor& Col, float Inten)
 {
-	if (Pool.Num() != CapSparkles)
+	if (Pool.Num() != XCapSparkles)
 	{
-		Pool.SetNum(CapSparkles);
+		Pool.SetNum(XCapSparkles);
 	}
 	FSparkle& S = Pool[NextSparkle];
-	NextSparkle = (NextSparkle + 1) % CapSparkles;
+	NextSparkle = (NextSparkle + 1) % XCapSparkles;
 	S.Pos = At;
 	S.Vel = Vel;
 	S.Swirl = FVector::ZeroVector;
@@ -647,7 +647,7 @@ void UAstraTransportFx::StepSparkles(float Dt)
 // ================================================================================================ pads, the emitter, the light
 void UAstraTransportFx::SetPadLook(int32 PadIndex, const FVector& PosCm, float RadiusCm, EAstraPadLook Look)
 {
-	if (PadIndex < 0 || PadIndex >= CapRings)
+	if (PadIndex < 0 || PadIndex >= XCapRings)
 	{
 		return;
 	}

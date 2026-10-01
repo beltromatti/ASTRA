@@ -23,20 +23,20 @@ using namespace AstraXport;
 
 namespace
 {
-	TSharedPtr<FJsonValue> JStr(const FString& S) { return MakeShared<FJsonValueString>(S); }
-	TArray<TSharedPtr<FJsonValue>> JStrs(const TArray<FString>& In)
+	TSharedPtr<FJsonValue> XpJStr(const FString& S) { return MakeShared<FJsonValueString>(S); }
+	TArray<TSharedPtr<FJsonValue>> XpJStrs(const TArray<FString>& In)
 	{
 		TArray<TSharedPtr<FJsonValue>> Out;
 		for (const FString& S : In)
 		{
-			Out.Add(JStr(S));
+			Out.Add(XpJStr(S));
 		}
 		return Out;
 	}
-	double Round1(double X) { return FMath::RoundToDouble(X * 10.0) / 10.0; }
-	double Pc(float F) { return FMath::RoundToDouble(F * 100.0); }
+	double XpRound1(double X) { return FMath::RoundToDouble(X * 10.0) / 10.0; }
+	double XpPc(float F) { return FMath::RoundToDouble(F * 100.0); }
 
-	const TCHAR* RoomStateOf(const FRoomState& R, const FTuning& T)
+	const TCHAR* XpRoomStateOf(const FRoomState& R, const FTuning& T)
 	{
 		if (!R.bExists || R.bGutted || R.Wreck >= 0.9f)
 		{
@@ -91,7 +91,7 @@ void UAstraTransporterSubsystem::BuildOptions(TArray<FAstraXportOption>& Out, in
 		O.bUnknown = V.Unknown.Num() > 0;
 		O.RangeKm = V.RangeKm;
 		O.LockS = V.LockS;
-		O.QualityPct = (float)Pc(V.Quality);
+		O.QualityPct = (float)XpPc(V.Quality);
 		O.OwnFace = V.OwnFace;
 		O.TheirFace = V.TheirFace;
 		for (const FBlocker& B : V.Blockers)
@@ -170,7 +170,7 @@ void UAstraTransporterSubsystem::GetView(FAstraXportView& V) const
 	}
 	FEnv E;
 	BuildEnv(E);
-	V.RoomState = RoomStateOf(E.Main, T);
+	V.RoomState = XpRoomStateOf(E.Main, T);
 	V.RoomPower = E.Main.Power;
 	V.RoomWreck = E.Main.Wreck;
 	V.ReachKm = ReachKm(T, E, false);
@@ -218,14 +218,14 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 	// the room and the power behind it
 	{
 		TSharedRef<FJsonObject> R = MakeShared<FJsonObject>();
-		R->SetStringField(TEXT("state"), RoomStateOf(E.Main, T));
-		R->SetNumberField(TEXT("power_pct"), Pc(E.Main.Power));
-		R->SetNumberField(TEXT("wreck_pct"), Pc(E.Main.Wreck));
+		R->SetStringField(TEXT("state"), XpRoomStateOf(E.Main, T));
+		R->SetNumberField(TEXT("power_pct"), XpPc(E.Main.Power));
+		R->SetNumberField(TEXT("wreck_pct"), XpPc(E.Main.Wreck));
 		R->SetNumberField(TEXT("reach_km"), FMath::RoundToDouble(ReachKm(T, E, false)));
-		R->SetNumberField(TEXT("cycle_s"), Round1(CycleSeconds(T, E.Main)));
+		R->SetNumberField(TEXT("cycle_s"), XpRound1(CycleSeconds(T, E.Main)));
 		R->SetNumberField(TEXT("energy_mw_for_one"), EnergyFor(T, 1));
 		R->SetNumberField(TEXT("pads"), T.Pads);
-		R->SetStringField(TEXT("emergency_pads"), FString::Printf(TEXT("%s, reach %.0f km"), RoomStateOf(E.Emergency, T), ReachKm(T, E, true)));
+		R->SetStringField(TEXT("emergency_pads"), FString::Printf(TEXT("%s, reach %.0f km"), XpRoomStateOf(E.Emergency, T), ReachKm(T, E, true)));
 		R->SetStringField(TEXT("reactor"), E.bReactorOn ? TEXT("on") : TEXT("down"));
 		O->SetObjectField(TEXT("room"), R);
 	}
@@ -239,7 +239,7 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 				On.Add(FString::Printf(TEXT("%s: %s"), P.bCargo ? TEXT("cargo pad") : (P.bEmergency ? *FString::Printf(TEXT("med%d"), P.Index + 1) : *FString::Printf(TEXT("pad %d"), P.Index + 1)), *P.Occupant));
 			}
 		}
-		O->SetArrayField(TEXT("on_pads"), JStrs(On));
+		O->SetArrayField(TEXT("on_pads"), XpJStrs(On));
 	}
 	// the Aquila as the beam sees her
 	{
@@ -249,17 +249,17 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 		static const TCHAR* Names[NumFaces] = {TEXT("bow"), TEXT("stern"), TEXT("port"), TEXT("starboard"), TEXT("dorsal"), TEXT("ventral")};
 		for (int32 f = 0; f < NumFaces; ++f)
 		{
-			F->SetNumberField(Names[f], Pc(E.Own.Frac[f]));
+			F->SetNumberField(Names[f], XpPc(E.Own.Frac[f]));
 		}
 		S->SetObjectField(TEXT("face_charge_pct"), F);
-		S->SetNumberField(TEXT("accel_mps2"), Round1(E.AccelMps2));
-		S->SetNumberField(TEXT("turn_deg_s"), Round1(E.TurnDegS));
+		S->SetNumberField(TEXT("accel_mps2"), XpRound1(E.AccelMps2));
+		S->SetNumberField(TEXT("turn_deg_s"), XpRound1(E.TurnDegS));
 		if (E.GateKm >= 0.f)
 		{
 			S->SetNumberField(TEXT("gate_km"), FMath::RoundToDouble(E.GateKm));
 		}
 		S->SetBoolField(TEXT("in_gate_lane"), E.bGateLane);
-		S->SetNumberField(TEXT("sensors_power_pct"), Pc(E.SensorsPower));
+		S->SetNumberField(TEXT("sensors_power_pct"), XpPc(E.SensorsPower));
 		O->SetObjectField(TEXT("aquila"), S);
 	}
 	// the transports
@@ -299,25 +299,25 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 				}
 				if (Eta >= 0.f)
 				{
-					JO->SetNumberField(TEXT("eta_s"), Round1(Eta));
+					JO->SetNumberField(TEXT("eta_s"), XpRound1(Eta));
 				}
-				JO->SetNumberField(TEXT("lock_built_pct"), Pc(J.Lock.Progress));
-				JO->SetNumberField(TEXT("lock_quality_pct"), Pc(J.Lock.Quality));
+				JO->SetNumberField(TEXT("lock_built_pct"), XpPc(J.Lock.Progress));
+				JO->SetNumberField(TEXT("lock_quality_pct"), XpPc(J.Lock.Quality));
 				JO->SetStringField(TEXT("lock"), FLock::Name(J.Lock.State));
 				JO->SetBoolField(TEXT("waiting_for_the_word"), J.bHold && J.Phase == EAstraXportPhase::Locked);
 				JO->SetBoolField(TEXT("shield_window"), J.bWindow);
 				if (J.Phase == EAstraXportPhase::Buffer)
 				{
-					JO->SetNumberField(TEXT("buffered_s"), Round1(J.BufferS));
+					JO->SetNumberField(TEXT("buffered_s"), XpRound1(J.BufferS));
 					JO->SetNumberField(TEXT("buffer_limit_s"), T.BufferHoldS);
 				}
 				if (J.Blockers.Num())
 				{
-					JO->SetArrayField(TEXT("in_the_way"), JStrs(J.Blockers));
+					JO->SetArrayField(TEXT("in_the_way"), XpJStrs(J.Blockers));
 				}
 				if (J.Notes.Num())
 				{
-					JO->SetArrayField(TEXT("costs_the_lock"), JStrs(J.Notes));
+					JO->SetArrayField(TEXT("costs_the_lock"), XpJStrs(J.Notes));
 				}
 			}
 			else
@@ -341,6 +341,10 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 			AO->SetStringField(TEXT("who"), A.bCargo ? A.Label : (A.Person != INDEX_NONE ? FString::Printf(TEXT("%s (%s)"), *A.Label, *A.Id) : A.Label));
 			AO->SetStringField(TEXT("where"), A.WhereText);
 			AO->SetNumberField(TEXT("since_s"), FMath::RoundToDouble(Now - A.Since));
+			if (A.bStranded)
+			{
+				AO->SetBoolField(TEXT("out_of_reach"), true);
+			}
 			Away.Add(MakeShared<FJsonValueObject>(AO));
 		}
 		O->SetArrayField(TEXT("away"), Away);
@@ -362,12 +366,12 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 			}
 			if (X.bOk || X.LockS > 0.f)
 			{
-				XO->SetNumberField(TEXT("lock_s"), Round1(X.LockS));
+				XO->SetNumberField(TEXT("lock_s"), XpRound1(X.LockS));
 				XO->SetNumberField(TEXT("lock_quality_pct"), X.QualityPct);
 			}
 			if (X.Why.Num())
 			{
-				XO->SetArrayField(TEXT("in_the_way"), JStrs(X.Why));
+				XO->SetArrayField(TEXT("in_the_way"), XpJStrs(X.Why));
 			}
 			if (!X.Fix.IsEmpty() && !X.bOk)
 			{
@@ -375,7 +379,7 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 			}
 			if (X.Notes.Num())
 			{
-				XO->SetArrayField(TEXT("costs_the_lock"), JStrs(X.Notes));
+				XO->SetArrayField(TEXT("costs_the_lock"), XpJStrs(X.Notes));
 			}
 			Arr.Add(MakeShared<FJsonValueObject>(XO));
 		}
@@ -406,7 +410,7 @@ TSharedRef<FJsonObject> UAstraTransporterSubsystem::SnapshotJson() const
 					}
 				}
 			}
-			O->SetArrayField(TEXT("in_the_room"), JStrs(Names));
+			O->SetArrayField(TEXT("in_the_room"), XpJStrs(Names));
 		}
 	}
 	return O;
@@ -507,7 +511,7 @@ namespace
 		UE_LOG(LogASTRA, Display, TEXT("%s"), *S);
 	}
 
-	FAutoConsoleCommandWithWorldAndArgs CmdInfo(TEXT("astra.xport.info"), TEXT("TELETRASPORTO: the Transporter Room's state, its transports and who is away"),
+	FAutoConsoleCommandWithWorldAndArgs XpCmdInfo(TEXT("astra.xport.info"), TEXT("TELETRASPORTO: the Transporter Room's state, its transports and who is away"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			if (UAstraTransporterSubsystem* X = Xp(W))
@@ -516,7 +520,7 @@ namespace
 			}
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdCard(TEXT("astra.xport.card"), TEXT("TELETRASPORTO: the card the Chief reads (ship_state.transporter), as JSON"),
+	FAutoConsoleCommandWithWorldAndArgs XpCmdCard(TEXT("astra.xport.card"), TEXT("TELETRASPORTO: the card the Chief reads (ship_state.transporter), as JSON"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			if (UAstraTransporterSubsystem* X = Xp(W))
@@ -528,7 +532,7 @@ namespace
 			}
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdSend(TEXT("astra.xport.send"),
+	FAutoConsoleCommandWithWorldAndArgs XpCmdSend(TEXT("astra.xport.send"),
 		TEXT("TELETRASPORTO: astra.xport.send <who> <to> [from=<place>] [hold] [window] [hazard] [weak]   who: captain | npc17 | \"Lieutenant Sato\" | \"marines 4\" | \"cargo 300 kg supplies\" (several: separate with ;)   to: \"pad 2\" | surface | T-02 | \"Main Engineering\" | med1"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
@@ -559,11 +563,11 @@ namespace
 				}
 				else if (A[i] == TEXT("hazard"))
 				{
-					Over.Add(JStr(TEXT("hazard")));
+					Over.Add(XpJStr(TEXT("hazard")));
 				}
 				else if (A[i] == TEXT("weak"))
 				{
-					Over.Add(JStr(TEXT("weak_lock")));
+					Over.Add(XpJStr(TEXT("weak_lock")));
 				}
 			}
 			if (Over.Num())
@@ -575,7 +579,7 @@ namespace
 			XpLog(FString::Printf(TEXT("[Transport] %s: %s"), bOk ? TEXT("ok") : TEXT("NO"), *Detail));
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdEnergize(TEXT("astra.xport.energize"), TEXT("TELETRASPORTO: astra.xport.energize [X3]: the word for a lock that is held"),
+	FAutoConsoleCommandWithWorldAndArgs XpCmdEnergize(TEXT("astra.xport.energize"), TEXT("TELETRASPORTO: astra.xport.energize [X3]: the word for a lock that is held"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			if (UAstraTransporterSubsystem* X = Xp(W))
@@ -586,7 +590,7 @@ namespace
 			}
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdAbort(TEXT("astra.xport.abort"), TEXT("TELETRASPORTO: astra.xport.abort [X3]: cancel a transport (mid-cycle the pattern is recomposed, in the buffer it is called back)"),
+	FAutoConsoleCommandWithWorldAndArgs XpCmdAbort(TEXT("astra.xport.abort"), TEXT("TELETRASPORTO: astra.xport.abort [X3]: cancel a transport (mid-cycle the pattern is recomposed, in the buffer it is called back)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			if (UAstraTransporterSubsystem* X = Xp(W))
@@ -597,7 +601,7 @@ namespace
 			}
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdReset(TEXT("astra.xport.reset"), TEXT("TELETRASPORTO: everything in the beam is dropped, the people are put back, the shields come back"),
+	FAutoConsoleCommandWithWorldAndArgs XpCmdReset(TEXT("astra.xport.reset"), TEXT("TELETRASPORTO: everything in the beam is dropped, the people are put back, the shields come back"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			if (UAstraTransporterSubsystem* X = Xp(W))
@@ -607,7 +611,7 @@ namespace
 			}
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdRoom(TEXT("astra.xport.room"), TEXT("TELETRASPORTO: the Captain on foot in the Transporter Room, in front of the dais, facing it (for trying it out)"),
+	FAutoConsoleCommandWithWorldAndArgs XpCmdRoom(TEXT("astra.xport.room"), TEXT("TELETRASPORTO: the Captain on foot in the Transporter Room, in front of the dais, facing it (for trying it out)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			UAstraTransporterSubsystem* X = Xp(W);
@@ -637,7 +641,7 @@ namespace
 			XpLog(FString::Printf(TEXT("[Transport] the Captain is in the Transporter Room (%.0f, %.0f, %.0f)"), Stand.X, Stand.Y, Stand.Z));
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdDump(TEXT("astra.xport.dump"), TEXT("TELETRASPORTO: the wall screen drawn into Saved/Transport/screen.png (needs a renderer)"),
+	FAutoConsoleCommandWithWorldAndArgs XpCmdDump(TEXT("astra.xport.dump"), TEXT("TELETRASPORTO: the wall screen drawn into Saved/Transport/screen.png (needs a renderer)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			UAstraTransporterSubsystem* X = Xp(W);

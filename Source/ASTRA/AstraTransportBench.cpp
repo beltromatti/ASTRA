@@ -247,7 +247,7 @@ namespace
 		}
 	};
 
-	FString Phases(const TSet<uint8>& Seen)
+	FString XPhases(const TSet<uint8>& Seen)
 	{
 		FString Out;
 		for (uint8 P = 0; P <= (uint8)EAstraXportPhase::Lost; ++P)
@@ -346,7 +346,7 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 			const bool bDone = J && J->Phase == EAstraXportPhase::Done;
 			AstraXportBenchCheck(TEXT("cycle: a lock, a warm-up, a dematerialization, a rematerialization, a settling, done"), bDone && Seen.Contains((uint8)EAstraXportPhase::Locking) && Seen.Contains((uint8)EAstraXportPhase::Warmup) &&
 			                     Seen.Contains((uint8)EAstraXportPhase::Demat) && Seen.Contains((uint8)EAstraXportPhase::Remat) && Seen.Contains((uint8)EAstraXportPhase::Settle),
-			                     FString::Printf(TEXT("%s; took %.1f s; %s"), *Phases(Seen), W.T - Start, J ? *J->Outcome : TEXT("(no job)")));
+			                     FString::Printf(TEXT("%s; took %.1f s; %s"), *XPhases(Seen), W.T - Start, J ? *J->Outcome : TEXT("(no job)")));
 			AstraXportBenchCheck(TEXT("cycle: he stays where he stood while he dematerializes and appears in Main Engineering after the pattern has left"),
 			                     bStillDuringDemat && MovedAt > 4.0 && W.RoomAt(X->TestCaptainCm()).Contains(TEXT("engineering")),
 			                     FString::Printf(TEXT("moved at %.1f s into the order, now in %s (%.0f, %.0f, %.0f)"), MovedAt, *W.RoomAt(X->TestCaptainCm()), X->TestCaptainCm().X, X->TestCaptainCm().Y, X->TestCaptainCm().Z));
@@ -391,7 +391,7 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 				bThere = FVector::Dist2D(P1.Pos, X->GetPads()[2].PosCm) < 120.0;
 				AstraXportBenchCheck(TEXT("people: an engineer is beamed from her post to pad 3 and VITA puts her there"), bThere && !P1.bTransit && !P1.bAway,
 				                     FString::Printf(TEXT("from (%.0f, %.0f, %.0f) to (%.0f, %.0f, %.0f); pad 3 is at (%.0f, %.0f); in transit at some point: %d; %s"), From.X, From.Y, From.Z, P1.Pos.X, P1.Pos.Y, P1.Pos.Z,
-				                                     X->GetPads()[2].PosCm.X, X->GetPads()[2].PosCm.Y, bTransitSeen ? 1 : 0, *Phases(Seen)));
+				                                     X->GetPads()[2].PosCm.X, X->GetPads()[2].PosCm.Y, bTransitSeen ? 1 : 0, *XPhases(Seen)));
 			}
 			else
 			{
@@ -472,7 +472,7 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 			const FVector Site = W.Ship->SurfaceSite();
 			AstraXportBenchCheck(TEXT("ground: he stands on the ground by the landing field, the ship knows he is down there and the card says he is away"),
 			                     J && J->Phase == EAstraXportPhase::Done && X->TestCaptainOnGround() && FVector::Dist2D(X->TestCaptainCm(), Site) < 900.0 && X->GetAway().Num() == 1 && X->GetAway()[0].Id == TEXT("captain"),
-			                     FString::Printf(TEXT("%s; feet (%.0f, %.0f, %.0f), the field is at (%.0f, %.0f, %.0f); %s"), *Phases(Seen), X->TestCaptainCm().X, X->TestCaptainCm().Y, X->TestCaptainCm().Z, Site.X, Site.Y, Site.Z, J ? *J->Outcome.Left(120) : TEXT("?")));
+			                     FString::Printf(TEXT("%s; feet (%.0f, %.0f, %.0f), the field is at (%.0f, %.0f, %.0f); %s"), *XPhases(Seen), X->TestCaptainCm().X, X->TestCaptainCm().Y, X->TestCaptainCm().Z, Site.X, Site.Y, Site.Z, J ? *J->Outcome.Left(120) : TEXT("?")));
 			W.Save(Fixtures, TEXT("card_captain_down.json"));
 			// he calls for the pads from the ground
 			// pad 3 is where the engineer was set down a minute ago and she is still standing there: the order is refused for that, not moved to another pad
@@ -566,7 +566,7 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 				}
 				W.Run(3.f);
 				const FAstraXportJob* J = W.Job(Tag);
-				AstraXportBenchCheck(TEXT("shields: they were down for the cycle and are up again after it"), bUpBefore && bDown && W.Ship->AreShieldsUp(), FString::Printf(TEXT("%s; %s"), *Phases(Seen), J ? *J->Outcome.Left(120) : TEXT("?")));
+				AstraXportBenchCheck(TEXT("shields: they were down for the cycle and are up again after it"), bUpBefore && bDown && W.Ship->AreShieldsUp(), FString::Printf(TEXT("%s; %s"), *XPhases(Seen), J ? *J->Outcome.Left(120) : TEXT("?")));
 				AstraXportBenchCheck(TEXT("away: the party is off the ship, on the card, and the locator says so"), J && J->Phase == EAstraXportPhase::Done && W.Xp->GetAway().Num() == 4,
 				                     FString::Printf(TEXT("%d away: %s"), W.Xp->GetAway().Num(), W.Xp->GetAway().Num() ? *W.Xp->GetAway()[0].WhereText : TEXT("")));
 				W.Save(Fixtures, TEXT("card_away.json"));

@@ -27,11 +27,11 @@ using namespace AstraXport;
 
 namespace
 {
-	constexpr int32 MaxQueue = 4;                 // transports waiting behind the one in the beam, per system
-	constexpr float HoldArrivalGameS = 240.f;     // someone beamed to a room stays where they were set down this long (the ship's clock) before they go back to their day
-	constexpr float WindowSafetyS = 40.f;         // a shield window that nobody closed ends by itself this long after the cycle
+	constexpr int32 XpMaxQueue = 4;                 // transports waiting behind the one in the beam, per system
+	constexpr float XpHoldArrivalGameS = 240.f;     // someone beamed to a room stays where they were set down this long (the ship's clock) before they go back to their day
+	constexpr float XpWindowSafetyS = 40.f;         // a shield window that nobody closed ends by itself this long after the cycle
 
-	FString ArgStr(const TSharedPtr<FJsonObject>& A, const TCHAR* Key)
+	FString XpArgStr(const TSharedPtr<FJsonObject>& A, const TCHAR* Key)
 	{
 		FString S;
 		if (A->TryGetStringField(Key, S))
@@ -46,7 +46,7 @@ namespace
 		return FString();
 	}
 
-	bool ArgBool(const TSharedPtr<FJsonObject>& A, const TCHAR* Key)
+	bool XpArgBool(const TSharedPtr<FJsonObject>& A, const TCHAR* Key)
 	{
 		bool B = false;
 		if (A->TryGetBoolField(Key, B))
@@ -63,7 +63,7 @@ namespace
 	}
 
 	/** A list: a JSON array of strings, or one string holding several separated by semicolons, commas or bars. */
-	TArray<FString> ArgList(const TSharedPtr<FJsonObject>& A, const TCHAR* Key)
+	TArray<FString> XpArgList(const TSharedPtr<FJsonObject>& A, const TCHAR* Key)
 	{
 		TArray<FString> Out;
 		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
@@ -101,7 +101,7 @@ namespace
 		return Out;
 	}
 
-	FString Pct(float F) { return FString::Printf(TEXT("%.0f%%"), F * 100.f); }
+	FString XpPct(float F) { return FString::Printf(TEXT("%.0f%%"), F * 100.f); }
 }
 
 const TCHAR* AstraXportPhaseName(EAstraXportPhase P)
@@ -394,23 +394,23 @@ bool UAstraTransporterSubsystem::ApplyCommand(const FString& Name, const TShared
 	if (Name.Equals(TEXT("transport"), ESearchCase::IgnoreCase))
 	{
 		FAstraXportOrder O;
-		O.Who = ArgList(A, TEXT("who"));
-		O.To = ArgStr(A, TEXT("to"));
-		O.From = ArgStr(A, TEXT("from"));
-		O.By = ArgStr(A, TEXT("by"));
-		O.bHold = ArgStr(A, TEXT("energize")).Equals(TEXT("hold"), ESearchCase::IgnoreCase) || ArgBool(A, TEXT("hold"));
-		O.bWindow = ArgBool(A, TEXT("shield_window")) || ArgBool(A, TEXT("window"));
-		O.Override = ArgList(A, TEXT("override"));
+		O.Who = XpArgList(A, TEXT("who"));
+		O.To = XpArgStr(A, TEXT("to"));
+		O.From = XpArgStr(A, TEXT("from"));
+		O.By = XpArgStr(A, TEXT("by"));
+		O.bHold = XpArgStr(A, TEXT("energize")).Equals(TEXT("hold"), ESearchCase::IgnoreCase) || XpArgBool(A, TEXT("hold"));
+		O.bWindow = XpArgBool(A, TEXT("shield_window")) || XpArgBool(A, TEXT("window"));
+		O.Override = XpArgList(A, TEXT("override"));
 		return Order(O, OutDetail);
 	}
-	const FString Tag = ArgStr(A, TEXT("id")).IsEmpty() ? ArgStr(A, TEXT("tag")) : ArgStr(A, TEXT("id"));
+	const FString Tag = XpArgStr(A, TEXT("id")).IsEmpty() ? XpArgStr(A, TEXT("tag")) : XpArgStr(A, TEXT("id"));
 	if (Name.Equals(TEXT("transport_energize"), ESearchCase::IgnoreCase))
 	{
 		return Energize(Tag, OutDetail);
 	}
 	if (Name.Equals(TEXT("transport_abort"), ESearchCase::IgnoreCase))
 	{
-		return Abort(Tag, ArgStr(A, TEXT("why")), OutDetail);
+		return Abort(Tag, XpArgStr(A, TEXT("why")), OutDetail);
 	}
 	OutDetail = FString::Printf(TEXT("the Transporter Room does not know %s"), *Name);
 	return false;
@@ -507,7 +507,7 @@ bool UAstraTransporterSubsystem::Order(const FAstraXportOrder& O, FString& OutDe
 	{
 		Waiting += AstraXportLive(Other.Phase) && Other.bEmergency == J.bEmergency ? 1 : 0;
 	}
-	if (Waiting > MaxQueue)
+	if (Waiting > XpMaxQueue)
 	{
 		OutDetail = FString::Printf(TEXT("refused: the console holds %d transports already: let some finish"), Waiting);
 		return false;
@@ -565,7 +565,7 @@ bool UAstraTransporterSubsystem::Order(const FAstraXportOrder& O, FString& OutDe
 	}
 	TArray<FString> Told;
 	Told.Add(FString::Printf(TEXT("%s accepted: %s from %s to %s"), *J.Tag, *Who(J), *J.FromText, *J.ToText));
-	Told.Add(FString::Printf(TEXT("lock in about %.1f s at %s, then a %.1f s cycle, %.0f MW%s"), V.LockS, *Pct(V.Quality), V.CycleS, V.EnergyMW,
+	Told.Add(FString::Printf(TEXT("lock in about %.1f s at %s, then a %.1f s cycle, %.0f MW%s"), V.LockS, *XpPct(V.Quality), V.CycleS, V.EnergyMW,
 	                         J.Req.From.Kind == EEndKind::Ship || J.Req.To.Kind == EEndKind::Ship || J.Req.From.Kind == EEndKind::Surface || J.Req.To.Kind == EEndKind::Surface
 	                             ? *FString::Printf(TEXT(" over %.0f km"), V.RangeKm) : TEXT("")));
 	if (V.bNeedsOwnWindow)
@@ -629,7 +629,7 @@ bool UAstraTransporterSubsystem::Energize(const FString& Tag, FString& OutDetail
 	}
 	J->bHold = false;
 	OutDetail = J->Phase == EAstraXportPhase::Locked ? FString::Printf(TEXT("%s: energizing"), *J->Tag)
-	                                                  : FString::Printf(TEXT("%s: the beam goes the moment the lock holds (%s of the lock built)"), *J->Tag, *Pct(J->Lock.Progress));
+	                                                  : FString::Printf(TEXT("%s: the beam goes the moment the lock holds (%s of the lock built)"), *J->Tag, *XpPct(J->Lock.Progress));
 	return true;
 }
 
@@ -826,7 +826,7 @@ void UAstraTransporterSubsystem::TickLocking(FAstraXportJob& J, float Dt)
 	}
 	if (J.T > T.LockMaxS + 10.f && !J.Lock.IsLocked())
 	{
-		Finish(J, EAstraXportPhase::Failed, FString::Printf(TEXT("no lock after %.0f s (%s of it built, quality %s): the beam gave up; nobody left their place"), J.T, *Pct(J.Lock.Progress), *Pct(J.Lock.Quality)));
+		Finish(J, EAstraXportPhase::Failed, FString::Printf(TEXT("no lock after %.0f s (%s of it built, quality %s): the beam gave up; nobody left their place"), J.T, *XpPct(J.Lock.Progress), *XpPct(J.Lock.Quality)));
 		return;
 	}
 	if (!J.Lock.IsLocked())
@@ -843,7 +843,7 @@ void UAstraTransporterSubsystem::TickLocking(FAstraXportJob& J, float Dt)
 		}
 		if (J.bHold)
 		{
-			News(J, FString::Printf(TEXT("%s: lock held on %s, quality %s: waiting for the word to energize"), *J.Tag, *Who(J), *Pct(J.TargetQ)), true);
+			News(J, FString::Printf(TEXT("%s: lock held on %s, quality %s: waiting for the word to energize"), *J.Tag, *Who(J), *XpPct(J.TargetQ)), true);
 		}
 	}
 	if (!J.bHold)
@@ -1156,7 +1156,7 @@ void UAstraTransporterSubsystem::Depart(FAstraXportJob& J)
 	}
 	if (J.Arrival.Kind == EArrival::Delayed)
 	{
-		News(J, FString::Printf(TEXT("%s: %s %s held in the buffer for about %.0f s: the lock is unsteady (quality %s); the pattern is safe"), *J.Tag, *Who(J), J.Subs.Num() == 1 ? TEXT("is") : TEXT("are"), J.Arrival.DelayS, *Pct(J.MinQ)), true);
+		News(J, FString::Printf(TEXT("%s: %s %s held in the buffer for about %.0f s: the lock is unsteady (quality %s); the pattern is safe"), *J.Tag, *Who(J), J.Subs.Num() == 1 ? TEXT("is") : TEXT("are"), J.Arrival.DelayS, *XpPct(J.MinQ)), true);
 	}
 }
 
@@ -1182,7 +1182,7 @@ void UAstraTransporterSubsystem::Scattered(FAstraXportJob& J)
 		}
 	}
 	Finish(J, bCargoLost ? EAstraXportPhase::Lost : EAstraXportPhase::Failed,
-	       FString::Printf(TEXT("the pattern did not hold at the far end (a lock of %s taken on the Captain's word): %s"), *Pct(J.MinQ),
+	       FString::Printf(TEXT("the pattern did not hold at the far end (a lock of %s taken on the Captain's word): %s"), *XpPct(J.MinQ),
 	                       bCargoLost ? TEXT("people were recomposed on the pads they left, the cargo is lost") : TEXT("they were recomposed on the pads they left, shaken but whole")));
 }
 
@@ -1384,7 +1384,7 @@ void UAstraTransporterSubsystem::Complete(FAstraXportJob& J)
 		Told.Add(TEXT("a clean arrival"));
 		break;
 	}
-	Told.Add(FString::Printf(TEXT("lock quality %s at worst, %.1f s cycle"), *Pct(J.MinQ), J.CycleS));
+	Told.Add(FString::Printf(TEXT("lock quality %s at worst, %.1f s cycle"), *XpPct(J.MinQ), J.CycleS));
 	Finish(J, EAstraXportPhase::Done, FString::Join(Told, TEXT(", ")));
 }
 
@@ -1462,7 +1462,7 @@ void UAstraTransporterSubsystem::OpenWindow(FAstraXportJob& J)
 		return;
 	}
 	J.bWindow = true;
-	WindowEndsAt = Now + J.CycleS + WindowSafetyS;
+	WindowEndsAt = Now + J.CycleS + XpWindowSafetyS;
 	if (bWindowHeld)
 	{
 		WindowOwner = J.Serial;
@@ -1480,7 +1480,7 @@ void UAstraTransporterSubsystem::OpenWindow(FAstraXportJob& J)
 		A->SetStringField(TEXT("station"), TEXT("tactical"));
 		A->SetStringField(TEXT("aspect"), TEXT("shields"));
 		A->SetStringField(TEXT("mode"), TEXT("shields_off"));
-		A->SetStringField(TEXT("until"), FString::Printf(TEXT("time:%.0f"), J.CycleS + WindowSafetyS));
+		A->SetStringField(TEXT("until"), FString::Printf(TEXT("time:%.0f"), J.CycleS + XpWindowSafetyS));
 		A->SetStringField(TEXT("note"), TEXT("transporter shield window"));
 		FString Detail;
 		if (St->SetMode(A, TEXT("officer"), Detail))
@@ -1567,7 +1567,7 @@ void UAstraTransporterSubsystem::PlaceSubject(FAstraXportJob& J, FAstraXportSubj
 	case ESubject::Person:
 		if (UAstraLifeSubsystem* L = Life(); L && L->IsRunning() && S.Person != INDEX_NONE)
 		{
-			L->Sim().PlaceTransported(S.Person, Spot, Yaw, HoldArrivalGameS);
+			L->Sim().PlaceTransported(S.Person, Spot, Yaw, XpHoldArrivalGameS);
 			L->ForceBody(S.Person, 25.f);
 		}
 		break;
@@ -1601,6 +1601,10 @@ void UAstraTransporterSubsystem::SetSubjectAway(FAstraXportJob& J, FAstraXportSu
 	A.bFemale = S.bFemale;
 	A.bCargo = S.S.Kind == ESubject::Cargo;
 	A.MassKg = S.S.MassKg;
+	if (const UAstraShipSubsystem* Sh = Ship(); Sh && A.System.IsEmpty())
+	{
+		A.System = Sh->GetSystemName();
+	}
 	if (!(J.bReturning && S.bAway))
 	{
 		A.GroundCm = Spot;
@@ -1796,6 +1800,24 @@ void UAstraTransporterSubsystem::SetPadLooks()
 void UAstraTransporterSubsystem::SyncAway(float Dt)
 {
 	(void)Dt;
+	// the Aquila went through a Gate with people still away: they are where they were, a system behind, and no beam reaches them
+	if (const UAstraShipSubsystem* Sh = Ship())
+	{
+		const FString Here = Sh->GetSystemName();
+		for (FAstraXportAway& A : AwayList)
+		{
+			if (!A.bStranded && !A.System.IsEmpty() && !A.System.Equals(Here, ESearchCase::IgnoreCase) && A.Id != TEXT("captain"))
+			{
+				A.bStranded = true;
+				A.WhereText = FString::Printf(TEXT("left behind in the %s system (%s)"), *A.System, *A.WhereText);
+				if (UAstraLifeSubsystem* L = Life(); L && L->IsRunning() && A.Person != INDEX_NONE)
+				{
+					L->Sim().SetAway(A.Person, A.WhereText);
+				}
+				Say(FString::Printf(TEXT("%s %s: the Aquila has left the %s system and no beam reaches that far"), *A.Label, *A.WhereText, *A.System), true);
+			}
+		}
+	}
 	// the Captain who was beamed down and is back aboard by another way (the console's test command, the shuttle) is not away any more
 	if (AwayHere(TEXT("captain")))
 	{

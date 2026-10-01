@@ -32,11 +32,11 @@ enum class EAstraPadLook : uint8 { Idle, Selected, Locking, Locked, Energizing, 
 
 namespace AstraXportFx
 {
-	constexpr int32 Stride = 8;                 // floats of per-instance custom data: 0-2 colour, 3 intensity, 4 progress or age, 5 direction or mode, 6 fade, 7 seed
-	constexpr int32 CapSparkles = 420, CapColumns = 12, CapRings = 12;
+	constexpr int32 XStride = 8;                 // floats of per-instance custom data: 0-2 colour, 3 intensity, 4 progress or age, 5 direction or mode, 6 fade, 7 seed
+	constexpr int32 XCapSparkles = 420, XCapColumns = 12, XCapRings = 12;
 
 	/** One layer of instances: staged each frame, written once. */
-	struct FLayer
+	struct FXLayer
 	{
 		TWeakObjectPtr<UInstancedStaticMeshComponent> Comp;
 		int32 Capacity = 0, Count = 0, Prev = 0;
@@ -146,7 +146,7 @@ private:
 	UPROPERTY() TMap<FName, TObjectPtr<USoundBase>> Sounds;
 	UPROPERTY() TMap<int32, TObjectPtr<UAudioComponent>> Loops;
 	UPROPERTY() TObjectPtr<USoundAttenuation> Attenuation;
-	AstraXportFx::FLayer SparkleL, ColumnL, RingL;
+	AstraXportFx::FXLayer SparkleL, ColumnL, RingL;
 	TArray<FColumn> Cols;
 	TArray<FSparkle> Pool;
 	TArray<FPadFx> PadList;

@@ -679,6 +679,10 @@ bool UAstraTransporterSubsystem::ResolveSubjects(const FAstraXportOrder& O, TArr
 				if (A.Person == Person)
 				{
 					Sub.AwayWhere = A.Where;
+					if (A.bStranded)
+					{
+						Sub.S.Barred = FString::Printf(TEXT("%s was left behind in the %s system: out of any beam's reach"), *Sub.S.Label, *A.System);
+					}
 				}
 			}
 			if (Sub.AwayWhere.IsEmpty())
