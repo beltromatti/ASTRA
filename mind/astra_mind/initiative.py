@@ -269,7 +269,7 @@ def watch_ask(lang: str) -> str:
 def watch_system(lang: str, state: dict[str, Any], standing: str, style: str, orders: str) -> str:
     roster = "\n".join(f"- {o.id}: {o.title} — {DUTIES_V2.get(o.id, o.duties)}. {o.personality}." for o in CREW.values() if o.id in DUTIES_V2)
     trimmed = {k: v for k, v in state.items() if not k.startswith("_") and k not in ("stations", "sim_time_s", "contacts", "bearing_convention",
-                                                                                    "known_systems", "casualties", "medbay", "mess")}
+                                                                                    "known_systems", "casualties", "medbay", "mess", "transporter")}   # (the Chief's console is hers)
     return _WATCH_SYSTEM.format(
         lang_name=LANG_NAMES.get(lang, lang), captain=CAPTAIN_WORD.get(lang, "Captain"), table=station_model.describe(station_model.available_from_state(state)),
         roster=roster, standing=standing or "- none", style=style or "- unknown yet", orders=orders or "- none yet",

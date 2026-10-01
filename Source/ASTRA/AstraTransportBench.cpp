@@ -585,6 +585,33 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 				AstraXportBenchCheck(TEXT("away: the away team is called back to the pads and nobody is left out there"), bBack && W.Job(TagB) && W.Job(TagB)->Phase == EAstraXportPhase::Done && W.Xp->GetAway().Num() == 0,
 				                     FString::Printf(TEXT("%s | away now %d | %s"), *DB.Left(100), W.Xp->GetAway().Num(), W.Job(TagB) ? *W.Job(TagB)->Outcome.Left(100) : TEXT("?")));
 			}
+			// the Mandate's cruisers jam the Aquila's radar (their commander's order): a beam on a ship that does is no use at its range, and the card says so; an ally on the far side is not touched
+			{
+				TSharedPtr<FJsonObject> Ew = MakeShared<FJsonObject>();
+				Ew->SetStringField(TEXT("focus"), TEXT("AQUILA"));
+				Ew->SetStringField(TEXT("ew"), TEXT("jam"));
+				FString Det;
+				W.Ship->ApplyCommand(TEXT("mandate_tactics"), Ew, Det);
+				W.Run(3.f);
+				bool bJamSeen = false;
+				for (const UAstraBattleSubsystem::FContactView& C : W.Battle->Contacts())
+				{
+					bJamSeen |= C.bJamming && C.Side == EAstraSide::Mandate;
+				}
+				FString DJ;
+				const bool bJ = W.Send({TEXT("marines 4")}, HostileId, DJ, {TEXT("window")});
+				// (the sandbox's Mandate ships may be running cold and not jam at all: the check says so in its detail and holds only for a jammer that is on the plot)
+				AstraXportBenchCheck(TEXT("jam: a Mandate cruiser that jams cannot be a beam's target at fifteen kilometres"), !bJamSeen || (!bJ && DJ.Contains(TEXT("[jam]"))),
+				                     FString::Printf(TEXT("%s; %s"), bJamSeen ? TEXT("a jammer is on the plot") : TEXT("no jammer on the plot (the rules bench covers the strobe)"), *DJ.Left(240)));
+				FString DA2;
+				const bool bA2 = W.Send({TEXT("marines 4")}, AllyId, DA2, {TEXT("window")});
+				AstraXportBenchCheck(TEXT("jam: an ally on the other side of the Aquila is not touched by it"), bA2 || !DA2.Contains(TEXT("[jam]")), DA2.Left(160));
+				if (bA2)
+				{
+					W.Xp->Abort(FString(), TEXT("bench"), Det);
+					W.Run(1.f);
+				}
+			}
 			// a Mandate ship whose shields are gone (a hull that came up with none): the console asks only for ours, and with a window the party goes across
 			GEngine->Exec(W.World, TEXT("astra.war.tune shield_scale 0"));
 			GEngine->Exec(W.World, TEXT("astra.war.spawn acheron mandate 12 0 0 180 static passive id=Z-01 name=Shieldless"));
@@ -606,6 +633,60 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 			                     W.Xp->GetAway()[0].WhereText.Contains(TEXT("Shieldless")) && W.Ship->AreShieldsUp(), FString::Printf(TEXT("%s | %s"), *DZW.Left(100), JZ ? *JZ->Outcome.Left(120) : TEXT("?")));
 			W.Save(Fixtures, TEXT("card_boarding.json"));
 		}
+	}
+
+	// ======================================================================================================== the ship's own motion
+	{
+		X->Reset();
+		W.Run(1.f);
+		GEngine->Exec(W.World, TEXT("astra.war.tune shield_scale 1.5"));
+		GEngine->Exec(W.World, TEXT("astra.war.scenario sym_two aquila at=0,0,0"));
+		W.Battle->StartCampaign();
+		W.Run(3.f);
+		FString AllyId;
+		for (const UAstraBattleSubsystem::FContactView& C : W.Battle->Contacts())
+		{
+			if (!C.bCraft && C.Side == EAstraSide::Astra && AllyId.IsEmpty())
+			{
+				AllyId = C.ContactId;
+			}
+		}
+		const TSharedPtr<FJsonObject> Course = MakeShared<FJsonObject>();
+		Course->SetNumberField(TEXT("heading_deg"), 150.0);
+		Course->SetNumberField(TEXT("mark_deg"), 0.0);
+		FString Det;
+		W.Ship->ApplyCommand(TEXT("set_course"), Course, Det);
+		const TSharedPtr<FJsonObject> Throttle = MakeShared<FJsonObject>();
+		Throttle->SetNumberField(TEXT("percent"), 100.0);
+		W.Ship->ApplyCommand(TEXT("set_throttle"), Throttle, Det);
+		float Peak = 0.f, PeakAccel = 0.f;
+		FString DM;
+		bool bBlocked = false;
+		for (int32 i = 0; i < 160 && !bBlocked; ++i)
+		{
+			W.Tick(0.1f);
+			const FString Card = W.CardText();
+			float T = 0.f, A = 0.f;
+			int32 K = Card.Find(TEXT("\"turn_deg_s\":"));
+			if (K != INDEX_NONE)
+			{
+				T = FCString::Atof(*Card.Mid(K + 14));
+			}
+			K = Card.Find(TEXT("\"accel_mps2\":"));
+			if (K != INDEX_NONE)
+			{
+				A = FCString::Atof(*Card.Mid(K + 14));
+			}
+			Peak = FMath::Max(Peak, T);
+			PeakAccel = FMath::Max(PeakAccel, A);
+			if (!AllyId.IsEmpty() && (T >= 2.f || A >= 9.f) && !bBlocked)
+			{
+				W.Send({TEXT("marines 2")}, AllyId, DM, {TEXT("window")});
+				bBlocked = DM.Contains(TEXT("[motion]"));
+			}
+		}
+		AstraXportBenchCheck(TEXT("motion: the card shows the Aquila's turn and burn while she manoeuvres"), Peak > 0.2f || PeakAccel > 0.5f, FString::Printf(TEXT("peak turn %.2f deg/s, peak burn %.2f m/s2"), Peak, PeakAccel));
+		AstraXportBenchCheck(TEXT("motion: a hard turn or burn forbids the beam (when the ship is that hard at it)"), bBlocked || (Peak < 2.f && PeakAccel < 9.f), DM.Left(200));
 	}
 
 	// ======================================================================================================== the damaged room
