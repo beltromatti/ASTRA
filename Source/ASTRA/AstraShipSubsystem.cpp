@@ -1655,16 +1655,16 @@ FString UAstraShipSubsystem::CaptainAboard() const
 	// anywhere else aboard: the compartment of the ship's plan (the bridge is one of them)
 	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P); Comp && Comp->Kind != TEXT("bridge"))
 	{
-		FString DeckName;
+		FString PlanDeck;
 		if (const UAstraShipPlan* Plan = GetWorld()->GetSubsystem<UAstraShipPlan>())
 		{
 			for (const FAstraPlanDeck& D : Plan->GetDecks())
 			{
-				if (D.Id == Comp->Deck) { DeckName = D.Name; }
+				if (D.Id == Comp->Deck) { PlanDeck = D.Name; }
 			}
 		}
 		return FString::Printf(TEXT("in the %s (Deck %d%s, section %s), away from the bridge: the XO has the conn; the bridge officers speak "
-		                            "by intercom"), *PlanRoomName(*Comp), Comp->Deck, DeckName.IsEmpty() ? TEXT("") : *(TEXT(" · ") + DeckName),
+		                            "by intercom"), *PlanRoomName(*Comp), Comp->Deck, PlanDeck.IsEmpty() ? TEXT("") : *(TEXT(" · ") + PlanDeck),
 		                       *Comp->Section);
 	}
 	if (P && P->GetActorLocation().Z < -3000.f)

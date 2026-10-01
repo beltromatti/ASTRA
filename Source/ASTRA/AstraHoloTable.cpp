@@ -19,6 +19,21 @@ DECLARE_CYCLE_STAT(TEXT("Holo table"), STAT_AstraHolo, STATGROUP_Astra);
 
 namespace
 {
+	// a label's text, colour and size, set only when they change: each of UTextRenderComponent's setters makes its render proxy again (new
+	// vertex buffers on the render thread, 3 ms a frame with the table's dozens of labels set every frame)
+	void HoloSetText(UTextRenderComponent* T, const FString& S)
+	{
+		if (!T->Text.ToString().Equals(S, ESearchCase::CaseSensitive)) { T->SetText(FText::FromString(S)); }
+	}
+	void HoloSetColor(UTextRenderComponent* T, const FColor& C)
+	{
+		if (T->TextRenderColor != C) { T->SetTextRenderColor(C); }
+	}
+	void HoloSetSize(UTextRenderComponent* T, float Size)
+	{
+		if (!FMath::IsNearlyEqual(T->WorldSize, Size)) { T->SetWorldSize(Size); }
+	}
+
 	const FLinearColor ColAstra(0.22f, 0.72f, 1.f);
 	const FLinearColor ColAquila(0.62f, 0.95f, 1.f);
 	const FLinearColor ColHostile(1.f, 0.2f, 0.08f);
@@ -127,8 +142,8 @@ void AAstraHoloTable::BeginPlay()
 		UStaticMeshComponent* R = Pooled(Rings, i, RingMesh);
 		SetColor(R, ColAstra, i == 0 ? 20.f : 10.f);
 		UTextRenderComponent* T = PooledText(RingLabels, i);
-		T->SetWorldSize(4.2f);
-		T->SetTextRenderColor(FColor(120, 200, 255));
+		HoloSetSize(T, 4.2f);
+		HoloSetColor(T, FColor(120, 200, 255));
 	}
 }
 
@@ -150,8 +165,11 @@ UStaticMeshComponent* AAstraHoloTable::Pooled(TArray<TObjectPtr<UStaticMeshCompo
 	UStaticMeshComponent* C = Pool[Index];
 	if (C->GetStaticMesh() != Mesh)
 	{
-		C->SetStaticMesh(Mesh);
-		C->CreateDynamicMaterialInstance(0, HoloMat);
+		C->SetStaticMesh(Mesh);                          // (the slot keeps its own material instance: no new one each time)
+		if (!Cast<UMaterialInstanceDynamic>(C->GetMaterial(0)))
+		{
+			C->CreateDynamicMaterialInstance(0, HoloMat);
+		}
 	}
 	C->SetVisibility(true);
 	return C;
@@ -169,7 +187,7 @@ UTextRenderComponent* AAstraHoloTable::PooledText(TArray<TObjectPtr<UTextRenderC
 		T->SetTextMaterial(TextMID ? static_cast<UMaterialInterface*>(TextMID) : TextMat.Get());
 		T->SetHorizontalAlignment(EHTA_Center);
 		T->SetVerticalAlignment(EVRTA_TextBottom);
-		T->SetWorldSize(3.f);
+		HoloSetSize(T, 3.f);
 		Pool.Add(T);
 	}
 	Pool[Index]->SetVisibility(true);
@@ -338,9 +356,9 @@ void AAstraHoloTable::TickBearings(const UAstraBattleSubsystem* Battle, const FV
 		{
 			UTextRenderComponent* T = PooledText(TickLabels, Deg / 30);
 			T->SetRelativeLocation(C + Dir * (R + Len + 4.5f) + FVector(0.f, 0.f, -1.5f));
-			T->SetText(FText::FromString(FString::Printf(TEXT("%03d"), Deg)));
-			T->SetWorldSize(4.0f);
-			T->SetTextRenderColor(FColor(120, 200, 255, 255));
+			HoloSetText(T, FString::Printf(TEXT("%03d"), Deg));
+			HoloSetSize(T, 4.0f);
+			HoloSetColor(T, FColor(120, 200, 255, 255));
 			FaceViewer(T, ViewerLocal);
 		}
 	}
@@ -432,9 +450,9 @@ void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, fl
 		FString Sub = OwnerTag(S.Owner);
 		if (bHere) { Sub = TEXT("ASN AQUILA  ·  ") + Sub; }
 		if (S.Name == Dest) { Sub += TEXT("  ·  TRANSIT"); }
-		T->SetText(FText::FromString(S.Name.ToUpper() + TEXT("<br>") + Sub));
-		T->SetTextRenderColor((Col * FMath::Max(0.25f, Fade)).ToFColor(true));
-		T->SetWorldSize(bHere ? 5.6f : 4.6f);
+		HoloSetText(T, S.Name.ToUpper() + TEXT("<br>") + Sub);
+		HoloSetColor(T, (Col * FMath::Max(0.25f, Fade)).ToFColor(true));
+		HoloSetSize(T, bHere ? 5.6f : 4.6f);
 		T->SetRelativeLocation(P + FVector(0, 0, 3.2f));
 		FaceViewer(T, ViewerLocal);
 	}
@@ -487,9 +505,9 @@ bool AAstraHoloTable::TickScannedShip(float DeltaTime, const FVector& ViewerLoca
 	auto Text = [&](const FString& T, const FVector& P, const FLinearColor& Col, float Size)
 	{
 		UTextRenderComponent* L = PooledText(ShipLabels, NT++, ShipFrame);
-		L->SetText(FText::FromString(T));
-		L->SetTextRenderColor((Col * FMath::Max(0.25f, Fade)).ToFColor(true));
-		L->SetWorldSize(Size);
+		HoloSetText(L, T);
+		HoloSetColor(L, (Col * FMath::Max(0.25f, Fade)).ToFColor(true));
+		HoloSetSize(L, Size);
 		L->SetRelativeLocation(P);
 		FaceViewer(L, ViewerLocal);
 	};
@@ -711,9 +729,9 @@ void AAstraHoloTable::TickShip(float DeltaTime, const FVector& ViewerLocal, floa
 		}
 		Placed.Add(At);
 		UTextRenderComponent* T = PooledText(ShipLabels, NT++, ShipFrame);
-		T->SetText(FText::FromString(Text));
-		T->SetTextRenderColor((Col * FMath::Max(0.25f, Fade)).ToFColor(true));
-		T->SetWorldSize(Size);
+		HoloSetText(T, Text);
+		HoloSetColor(T, (Col * FMath::Max(0.25f, Fade)).ToFColor(true));
+		HoloSetSize(T, Size);
 		T->SetRelativeLocation(At);
 		FaceViewer(T, ViewerLocal);
 	};
@@ -861,7 +879,7 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		T->SetVisibility(R <= PlotRadius * 1.01f);
 		const float A = FMath::DegreesToRadians(-38.f);
 		T->SetRelativeLocation(FVector(R * FMath::Cos(A), R * FMath::Sin(A), PlaneHeight + 0.8f));
-		T->SetText(FText::FromString(RangeText(Km)));
+		HoloSetText(T, RangeText(Km));
 		FaceViewer(T, ViewerLocal);
 	}
 
@@ -942,9 +960,9 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			if (B.bHoldFire) { Sub += TEXT("  HOLDING FIRE"); }
 			else if (B.bRetreating) { Sub += TEXT("  WITHDRAWING"); }
 			if (B.bTargeted) { Sub += TEXT("  [TARGET]"); }
-			T->SetText(FText::FromString(Sub.IsEmpty() ? Title : Title + TEXT("<br>") + Sub));
-			T->SetTextRenderColor(Col.ToFColor(true));
-			T->SetWorldSize(B.bPlayer ? 6.0f : 5.4f);   // (WS below)
+			HoloSetText(T, Sub.IsEmpty() ? Title : Title + TEXT("<br>") + Sub);
+			HoloSetColor(T, Col.ToFColor(true));
+			HoloSetSize(T, B.bPlayer ? 6.0f : 5.4f);   // (WS below)
 			// declutter in the viewer's picture plane: a label that would cover another climbs just above it
 			const float WS = B.bPlayer ? 6.0f : 5.4f;
 			const float W = FMath::Max(Title.Len(), Sub.Len()) * WS * 0.52f;
@@ -1041,9 +1059,9 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			UTextRenderComponent* T = PooledText(ReachLabels, NR);
 			const float A = FMath::DegreesToRadians(38.f + 9.f * NR);
 			T->SetRelativeLocation(FVector(R * FMath::Cos(A), R * FMath::Sin(A), PlaneHeight + 0.8f));
-			T->SetText(FText::FromString(FString::Printf(TEXT("%s %s"), W.Value, *RangeText(W.Key))));
-			T->SetWorldSize(3.6f);
-			T->SetTextRenderColor((Col * FMath::Max(0.3f, Fade)).ToFColor(true));
+			HoloSetText(T, FString::Printf(TEXT("%s %s"), W.Value, *RangeText(W.Key)));
+			HoloSetSize(T, 3.6f);
+			HoloSetColor(T, (Col * FMath::Max(0.3f, Fade)).ToFColor(true));
 			FaceViewer(T, ViewerLocal);
 			++NR;
 		}
@@ -1068,9 +1086,9 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 			}
 			UTextRenderComponent* T = PooledText(TargetLabel, 0);
 			T->SetRelativeLocation((Us + *TargetAt) * 0.5f + FVector(0.f, 0.f, 1.5f));
-			T->SetText(FText::FromString(RangeText(TargetKm) + TEXT(" · ") + Reach));
-			T->SetWorldSize(4.4f);
-			T->SetTextRenderColor((bInTheirs ? ColHostile : ColAquila).ToFColor(true));
+			HoloSetText(T, RangeText(TargetKm) + TEXT(" · ") + Reach);
+			HoloSetSize(T, 4.4f);
+			HoloSetColor(T, (bInTheirs ? ColHostile : ColAquila).ToFColor(true));
 			FaceViewer(T, ViewerLocal);
 		}
 		else
