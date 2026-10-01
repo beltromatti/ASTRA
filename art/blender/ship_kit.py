@@ -71,7 +71,7 @@ ROOMS = {
     "point_defense": ("ship_rooms_command", "point_defense"), "barbette": ("ship_rooms_command", "barbette"),
     "staterooms": ("ship_rooms_quarters", "staterooms"), "wardroom": ("ship_rooms_quarters", "wardroom"), "gym": ("ship_rooms_quarters", "gym"),
     "tank": ("ship_rooms_keel", "tank"), "reaction_mass": ("ship_rooms_keel", "reaction_mass"), "crawlway": ("ship_rooms_keel", "crawlway"),
-    "ready_room": ("ship_rooms_bridge", "ready_room"),
+    "ready_room": ("ship_rooms_bridge", "ready_room"), "shuttle_stop": ("ship_rooms_transit", "shuttle_stop"),
 }
 EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHIP_StairTowerBottom": ("ship_rooms_hub", "stair_tower_bottom"),
          "SM_SHIP_LadderTrunk": ("ship_rooms_hub", "ladder_trunk"), "SM_SHIP_StairTower53": ("ship_rooms_hub", "stair_tower_deep"),

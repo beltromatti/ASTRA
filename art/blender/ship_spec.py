@@ -483,6 +483,16 @@ _reg("crawlway", name="Maintenance Crawlway Hub", kind="crawlway", dept="enginee
 
 
 
+# ---- Deck 5: the Spine shuttle's stops (one per section, pinned by ship_decks.PINNED; the car stands at the platform, ship_rooms_transit.py) -------------------------------------
+_reg("shuttle_stop", name="Spine Shuttle Stop", kind="transit", dept="neutral", L=24.0, D=12.0, h=3.7, plate="shuttle_stop",
+     doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
+     spots=[spot("crew", "stand", 6.4, 4.7, 90), spot("crew", "stand", 8.6, 4.2, 90), spot("crew", "stand", 15.4, 4.2, 90), spot("crew", "stand", 17.6, 4.7, 90),
+            spot("crew", "sit", 4.9, 2.5, 90), spot("crew", "sit", 6.1, 2.5, 90), spot("crew", "sit", 17.9, 2.5, 90), spot("crew", "sit", 19.1, 2.5, 90),
+            spot("crew", "sit", 8.5, 8.68, -90, "services", 0.16), spot("crew", "sit", 15.5, 8.68, -90, "services", 0.16)],
+     lights=[light(6.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900), light(12.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900), light(18.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900),
+             light(12.0, 7.6, 2.4, 1400, 5600, (10.0, 1.0), 450), light(12.0, 10.6, 3.5, 2500, 5000, (14.0, 1.5), 800)])
+
+
 # ---- Deck 1: the Captain's ready room (hand-placed between the two corridors of the bridge complex, ship_deck1.py; clear height 2.9, as the corridors' roofs are 3.2) ----------
 _reg("ready_room", name="Ready Room", kind="ready_room", dept="command", L=12.0, D=4.2, h=2.9, plate="ready_room",
      doors=[door("near", 5.0, 1.4, 2.2)], systems=["power_bus", "comms"],

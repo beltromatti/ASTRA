@@ -1,9 +1,12 @@
-"""ASN Aquila interior kit: the craft that stand inside the ship's rooms (NAVE-2) — the Kestrel assault shuttle of the Deck 8 bay.
+"""ASN Aquila interior kit: the craft that stand inside the ship's rooms (NAVE-2) — the Kestrel assault shuttle of the Deck 8 bay and the car of the Spine shuttle at its stops (Deck 5).
 
 The Kestrel is the Marines' boarding craft (docs/BIBBIA.md §3 Boarding, §6 Deck 8): twelve fanti sit on two benches in its troop bay, it latches on to a hull with a
 plasma breaching collar and opens a way through with it. It is built here as a prop in its own frame (origin on the floor under the middle of the craft, nose towards
 +x, y to starboard, z up), parked on four legs with the troop ramp down, so a Captain can walk up the ramp and see the bay. 11.7 m with the ramp, 7.6 m over the wing
-tips, 3.1 m to the top of the masts: it fits the 3.7 m bay with room to spare for the gantry. Same conventions as ship_furniture*.py."""
+tips, 3.1 m to the top of the masts: it fits the 3.7 m bay with room to spare for the gantry. Same conventions as ship_furniture*.py.
+
+The Spine shuttle's car (`spine_car`) is the ship's own tram: 14 m, ivory with a blue band, three doors on the platform side, benches inside; it stands at the platform of a stop with its
+doors open (ship_rooms_transit.py)."""
 from __future__ import annotations
 
 import math
@@ -250,3 +253,100 @@ def kestrel(b: SParts, collar: int = 1, number: str = "eq_k1") -> None:
             cx, cy = 0.92 * math.cos(a), 0.92 * math.sin(a)
             b.body.box((cx - 0.1, cy - 0.1, 0.0), (cx + 0.1, cy + 0.1, 0.34), STRUCT)
             b.emit.lamp_box((cx - 0.03, cy - 0.03, 0.34), (cx + 0.03, cy + 0.03, 0.36), "amber", LAMP_DIM)
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------------- the Spine shuttle's car
+CAR_L, CAR_W = 14.0, 2.8                 # the car: length and width
+CAR_FLOOR = 0.16                         # its floor over the platform's (one low step)
+CAR_ROOF = 2.45                          # the underside of its roof; the crown is at 2.9
+CAR_DOORS = (-3.5, 0.0, 3.5)             # the door openings' centres along the car, on its -y side (the platform side)
+CAR_DOOR_W, CAR_DOOR_H = 1.3, 2.1
+
+
+def spine_car(b: SParts) -> None:
+    """The Spine shuttle's car at its stop: x along the car (nose +x), y across with the platform on the -y side, origin on the floor under the middle of the car, which stands
+    on a 3 cm skirt. An ivory body with a blue band under the window band, a roof with shoulders, a dark windscreen and lamps at either end, three 1.3 m doors on the platform
+    side standing open, inside a grey floor, long benches along both sides between the doors, poles at the doors and two overhead rails, strip lights in the ceiling."""
+    hw, t = CAR_W / 2, 0.07
+    x0, x1 = -CAR_L / 2, CAR_L / 2
+    gaps = [(xc - CAR_DOOR_W / 2, xc + CAR_DOOR_W / 2) for xc in CAR_DOORS]
+    segs_platform = []                                                             # the solid stretches of the platform-side wall between the door openings
+    a = x0
+    for (g0, g1) in gaps:
+        segs_platform.append((a, g0))
+        a = g1
+    segs_platform.append((a, x1))
+    # floor, skirt
+    b.body.box((x0, -hw, 0.03), (x1, hw, CAR_FLOOR), STRUCT)
+    b.soft.box((x0 + t, -hw + t, CAR_FLOOR), (x1 - t, hw - t, CAR_FLOOR + 0.008), FABRIC_GREY)
+    for (g0, g1) in gaps:
+        b.fine.box((g0, -hw - 0.012, CAR_FLOOR - 0.03), (g1, -hw + t, CAR_FLOOR + 0.012), TRIM)             # the door sills
+    # the walls: a lower panel with the blue band, the window band between pillars, an upper panel
+    def wall(sy: int, xa: float, xb: float) -> None:
+        ya, yb = (sy * hw, sy * (hw - t))
+        lo, hi = (min(ya, yb), max(ya, yb))
+        b.body.box((xa, lo, 0.03), (xb, hi, 0.95), IVORY)
+        b.body.box((xa, lo, 1.90), (xb, hi, CAR_ROOF), IVORY)
+        out = sy * (hw + 0.004)
+        b.soft.box((xa, min(sy * hw, out), 0.58), (xb, max(sy * hw, out), 0.76), FABRIC_NAVY)
+        n = max(1, int(round((xb - xa) / 1.5)))
+        pw = (xb - xa) / n
+        for k in range(n + 1):                                                    # pillars
+            xp = xa + k * pw
+            b.body.box((max(xa, xp - 0.05), lo, 0.95), (min(xb, xp + 0.05), hi, 1.90), IVORY)
+        for k in range(n):                                                        # panes, set into the pillars
+            b.soft.box((xa + k * pw + 0.05, sy * (hw - t * 0.7) - 0.006, 0.97), (xa + (k + 1) * pw - 0.05, sy * (hw - t * 0.7) + 0.006, 1.88), DGLASS)
+        b.fine.box((xa, lo, 0.95), (xb, hi, 0.97), TRIM)                          # sill and head of the window band
+        b.fine.box((xa, lo, 1.88), (xb, hi, 1.90), TRIM)
+
+    wall(+1, x0, x1)
+    for (xa, xb) in segs_platform:
+        if xb - xa > 0.2:
+            wall(-1, xa, xb)
+    for (g0, g1) in gaps:                                                         # over the openings: a header with a green lamp, the jambs' trim
+        b.body.box((g0, -hw, CAR_DOOR_H + CAR_FLOOR), (g1, -hw + t, CAR_ROOF), IVORY)
+        b.body.box((g0, -hw, 0.03), (g1, -hw + t, CAR_FLOOR), STRUCT)
+        for xj in (g0 - 0.045, g1):
+            b.fine.box((xj, -hw - 0.012, CAR_FLOOR), (xj + 0.045, -hw + t + 0.012, CAR_DOOR_H + CAR_FLOOR + 0.06), TRIM)
+        b.fine.box((g0 - 0.045, -hw - 0.012, CAR_DOOR_H + CAR_FLOOR), (g1 + 0.045, -hw + t + 0.012, CAR_DOOR_H + CAR_FLOOR + 0.06), TRIM)
+        b.emit.lamp_box(((g0 + g1) / 2 - 0.15, -hw - 0.016, CAR_DOOR_H + CAR_FLOOR + 0.12), ((g0 + g1) / 2 + 0.15, -hw - 0.004, CAR_DOOR_H + CAR_FLOOR + 0.17), "green", LAMP_DIM)
+        b.soft.box((g0, -hw - 0.004, 0.58), (g1, -hw, 0.76), FABRIC_NAVY)       # (the band runs under the openings' sills, above the skirt)
+    # the roof: a profile with shoulders along the whole car
+    b.body.extrude_x([(-hw, CAR_ROOF), (hw, CAR_ROOF), (hw - 0.12, 2.75), (0.8, 2.90), (-0.8, 2.90), (-hw + 0.12, 2.75)], x0, x1, IVORY)
+    b.fine.box((x0, -hw, CAR_ROOF - 0.02), (x1, hw, CAR_ROOF), TRIM)
+    for sy in (-1, 1):
+        b.emit.lamp_box((x0 + 0.6, sy * 0.50 - 0.11, CAR_ROOF - 0.026), (x1 - 0.6, sy * 0.50 + 0.11, CAR_ROOF - 0.02), "white_cool", LAMP)
+    # the ends: a bulkhead with the windscreen, the lamps and a destination board
+    for sx in (-1, 1):
+        xe = sx * CAR_L / 2
+        lo, hi = (min(xe, xe - sx * t), max(xe, xe - sx * t))
+        b.body.box((lo, -hw, 0.03), (hi, hw, CAR_ROOF), IVORY)
+        face = sx * 0.004
+        b.body.box((min(xe, xe + face), -0.95, 1.00), (max(xe, xe + face), 0.95, 2.30), TRIM)
+        b.soft.box((min(xe, xe + sx * 0.006), -0.90, 1.05), (max(xe, xe + sx * 0.006), 0.90, 2.25), DGLASS)
+        for sy in (-1, 1):
+            b.emit.lamp_box((min(xe, xe + sx * 0.012), sy * 1.08 - 0.1, 0.52), (max(xe, xe + sx * 0.012), sy * 1.08 + 0.1, 0.70), "white" if sx > 0 else "red", LAMP)
+        b.soft.box((min(xe, xe + sx * 0.003), -hw, 0.58), (max(xe, xe + sx * 0.003), hw, 0.76), FABRIC_NAVY)
+        b.emit.label_fit((xe + sx * 0.008, 0.0, 0.88), 0.9, "room_shuttle_stop", (sx, 0, 0), up=(0, 0, 1))
+    # inside: the benches (a base, a cushion, a back under the windows), the poles and the overhead rails
+    def bench(sy: int, xa: float, xb: float) -> None:
+        y_wall = sy * (hw - t)
+        ya, yb = sorted((y_wall, y_wall - sy * 0.46))
+        b.body.box((xa, ya, CAR_FLOOR), (xb, yb, CAR_FLOOR + 0.27), COMPOSITE)
+        b.soft.box((xa, ya, CAR_FLOOR + 0.27), (xb, yb, CAR_FLOOR + 0.33), FABRIC_NAVY)
+        yb2 = y_wall - sy * 0.09
+        b.soft.box((xa, min(y_wall, yb2), CAR_FLOOR + 0.33), (xb, max(y_wall, yb2), CAR_FLOOR + 0.78), FABRIC_NAVY)
+        for k in range(1, int((xb - xa) / 0.7)):
+            xv = xa + k * (xb - xa) / int((xb - xa) / 0.7)
+            b.fine.box((xv - 0.004, ya, CAR_FLOOR + 0.33), (xv + 0.004, yb, CAR_FLOOR + 0.335), RUBBER)
+
+    bench(+1, x0 + 0.9, x1 - 0.9)
+    for (xa, xb) in segs_platform:
+        if xb - xa > 1.2:
+            bench(-1, xa + (0.6 if xa > x0 else 0.9), xb - (0.6 if xb < x1 else 0.9))
+    for xc in CAR_DOORS:
+        b.fine.cyl((xc, -0.55, CAR_FLOOR), (xc, -0.55, CAR_ROOF - 0.02), 0.022, TRIM, seg=8)
+    for sy in (-1, 1):
+        b.fine.cyl((x0 + 0.9, sy * 0.55, 2.18), (x1 - 0.9, sy * 0.55, 2.18), 0.016, TRIM, seg=8)
+        for xc in (-5.5, -2.0, 2.0, 5.5):
+            b.fine.box((xc - 0.015, sy * 0.55 - 0.015, 2.18), (xc + 0.015, sy * 0.55 + 0.015, CAR_ROOF), TRIM)
