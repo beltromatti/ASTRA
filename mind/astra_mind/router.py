@@ -61,6 +61,10 @@ def _situation(ctx: Context) -> str:
     out = []
     if ch and ch.kind == "fleet":
         out.append("This channel reaches the admiral and the allied ships: an order or a request put to any of them is for the channel.")
+    if ch and ch.kind == "flight":
+        out.append("This channel is the flight net: the CAG, the squadron leaders (Alpha Lead, Bravo Lead), their wingmen and the Chief of the Deck. A call, an order, a question "
+                   "or a request the Captain puts to a pilot, a squadron, the CAG or the deck chief is for the channel, whatever the call sign or the post it uses. Price is Flight "
+                   "Control on the bridge, one of our own crew: words to him stay on the bridge.")
     if ch and ch.talking:
         said = f': "{ch.last_words}"' if ch.last_words else ""
         out.append(f"{ch.name or ch.party} spoke to the Captain {ch.heard_s:.0f} seconds ago{said} — a short reply may well be for them.")

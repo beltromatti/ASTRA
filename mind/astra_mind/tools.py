@@ -97,8 +97,9 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "state": {"type": "string", "enum": ["extended", "retracted"]}}, ["state"]),
     _fn("vent_heat", "Engineering: emergency coolant dump — sheds a third of the heat at once (three charges aboard); "
                      "the plume gives the ship away to every sensor for half a minute.", {}, []),
-    _fn("hail", "Communications: open a channel to a contact (or 'fleet' for the 7th Fleet net).", {
-        "contact_id": {"type": "string"},
+    _fn("hail", "Communications: open a channel to a contact (or 'fleet' for the 7th Fleet net, or 'flight' for the flight net: the CAG, the squadron leaders and their "
+                "wingmen, the Chief of the Deck; what the Captain says to them then goes out on it and they answer for themselves).", {
+        "contact_id": {"type": "string", "description": "a contact id, 'fleet' or 'flight'"},
         "intent": {"type": "string", "enum": ["identify", "warn", "demand_surrender", "request_support", "negotiate", "report"]},
         "message": {"type": "string", "description": "What we transmit, in English (the Interpreter translates)"}},
         ["contact_id", "intent", "message"]),

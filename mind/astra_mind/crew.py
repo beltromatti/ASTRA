@@ -75,7 +75,8 @@ CREW: dict[str, Officer] = {o.id: o for o in (
             "keeps count of every life she could not save", "lola", "f"),
     Officer("flight", "Jonah Price", "Lieutenant", "Flight Control",
             "flight deck, launches and recoveries of Alpha Squadron (Falcon fighters), Bravo Squadron (Hammer "
-            "fighter-bombers) and Wasp drones, liaison with the CAG, Lt. Cmdr. Ada 'Hex' Kovac",
+            "fighter-bombers) and Wasp drones, liaison with the CAG, Lt. Cmdr. Ada 'Hex' Kovac; the flight net's own people (the CAG, "
+            "the squadron leaders and their wingmen, the Chief of the Deck) speak for themselves: Price coordinates and does not echo them",
             "upbeat, protective of the pilots, fast talker on the net", "javert", "m"),
 )}
 
@@ -97,7 +98,8 @@ DUTIES_V2 = {
                "identifies contacts, unmasks decoys, calls new bearings",
     "engineering": "power profiles and distribution, the ship's heat, the reactor; the bridge's liaison to Chief Okonkwo and Main "
                    "Engineering",
-    "flight": "the flight groups' missions, launches and recoveries (Alpha, Bravo, the Wasp drones)",
+    "flight": "the flight groups' missions, launches and recoveries (Alpha, Bravo, the Wasp drones): the flight console, the Captain's questions to Flight "
+              "Control, the controller's calls to the Captain's Falcon; not the flight net's own voices (see the flight net rule)",
 }
 
 CAPTAIN_WORD = {"it": "Capitano", "en": "Captain", "es": "Capitán", "fr": "Capitaine", "de": "Kapitän", "pt": "Capitão",
@@ -273,6 +275,14 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
   Captain is the senior officer present (the board says): use it when the Captain orders a group outright ("Praetorian, that is an order:
   ..."), or when no time is left for an answer; the group obeys at once. The allied captains also speak up on their own over the fleet
   net (a warning, a request, a loss): everyone on the bridge hears them.
+- The flight net: the CAG (Lt. Cmdr. Ada "Hex" Kovac), the leaders of Alpha and Bravo and their wingmen, and the Chief of the Deck are people with their own voices and
+  they are NOT yours: they report what happens to their squadrons and the deck (a launch, losses, kills, a torpedo run, a recovery) over the radio, the bridge hears
+  them like any radio voice (the recent events show it: "over the radio, Alpha Lead (...): ..."), and they answer when the Captain speaks to them on the net. Price does
+  not repeat what they said: he runs the flight console (missions, launches, recalls), answers what the Captain asks of Flight Control and calls the picture to the
+  Captain's Falcon. To talk to them the Captain has Comms open the net (`hail` with contact `flight`; it is always open when the Captain is in a Falcon or on the flight
+  deck, and for a moment after somebody on it called him): while it is open, words said to a pilot, the CAG or the deck chief are theirs to answer and carry out, and
+  nobody on the bridge answers for them. With the net closed, if the Captain speaks to one of them Martin says so and offers to open it; Price may carry a plain order for a
+  squadron himself (`station` flight).
 - Heat (`thermal` in the state) is the ship's other limit: the reactor, railgun volleys, lasers, shields soaking hits and engines
   at full all heat her. Above 70% the weapons and shields slow down, above 90% conduits fail and people in Main Engineering get
   burned. Engineering manages it: radiators out (they shed heat fast but betray the ship and can be shot away), a coolant vent
