@@ -15,6 +15,12 @@ from ship_rooms import Style, WF, WS, build_shell, ceiling_panels, place
 from ship_rooms_service import cart
 
 
+def clinic_style(accent: str = "medical_dim", cove: str = "medical") -> Style:
+    """The medical rooms' shell (NAVE-3): not a 2020 hospital — ivory walls over a dark deck floor, a brushed rail at 1.2 m, a rib of water-green light every 4 m on the end walls and a cove
+    of the same light (the medical colour of docs/STILE.md, #2EC4B6)."""
+    return Style(floor=DECK, floor_mode="plates", wall_lo=IVORY, wall_hi=IVORY, wain_h=1.2, ceil=IVORY, accent=accent, cove=cove, ribs=True, rib_mat=TRIM, skirt=STRUCT)
+
+
 def _dims(key: str):
     s = SPEC.PREFABS[key]
     return s, s["L"], s["D"], s["h"]
@@ -85,7 +91,7 @@ def surgery(name: str = "SM_SHIP_Surgery"):
     """16 x 16: two operating tables under surgical lamps, anaesthesia machines at the heads, instrument tables, scrub sinks by the door, cabinets and screens."""
     spec, L, D, H = _dims("surgery")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=TILE, floor_mode="covering", wall_lo=TILE, wall_hi=IVORY, wain_h=2.0, ceil=IVORY, accent="medical_dim", cove="white_cool", ribs=False, skirt=STEEL)
+    st = clinic_style()
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
@@ -121,7 +127,7 @@ def quarantine(name: str = "SM_SHIP_Quarantine"):
     """24 x 16: an air-lock zone by the door, a nurse station, and six isolation cells along the far wall (glass fronts, a bed, a monitor each)."""
     spec, L, D, H = _dims("quarantine")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=TILE, floor_mode="covering", wall_lo=TILE, wall_hi=IVORY, wain_h=2.0, ceil=IVORY, accent="medical_dim", cove="white_cool", ribs=False, skirt=STEEL)
+    st = clinic_style()
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
@@ -167,7 +173,7 @@ def pharmacy(name: str = "SM_SHIP_Pharmacy"):
     """12 x 16: a counter across the room with a screen above, shelves of medicines behind it on three walls, refrigerators, a desk."""
     spec, L, D, H = _dims("pharmacy")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=TILE, floor_mode="covering", wall_lo=TILE, wall_hi=IVORY, wain_h=1.2, ceil=IVORY, accent="medical_dim", cove="white_cool", ribs=False, skirt=STEEL)
+    st = clinic_style()
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF

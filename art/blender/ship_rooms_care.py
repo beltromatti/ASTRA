@@ -12,7 +12,7 @@ from bridge3_lib import frame
 from ship_lib import (BEDDING, COMPOSITE, CRATE_GREY, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL,
                       STRUCT, TILE, TRIM, WOOD, SParts)
 from ship_rooms import Style, WF, WS, build_shell, ceiling_panels, luminaire_strips, place, wall_label
-from ship_rooms_med import surgical_lamp
+from ship_rooms_med import clinic_style, surgical_lamp
 from ship_rooms_service import cart
 
 
@@ -21,8 +21,7 @@ def _dims(key: str):
     return s, s["L"], s["D"], s["h"]
 
 
-def _clinic_style(accent: str = "medical_dim", cove: str = "white_cool") -> Style:
-    return Style(floor=TILE, floor_mode="covering", wall_lo=TILE, wall_hi=IVORY, wain_h=2.0, ceil=IVORY, accent=accent, cove=cove, ribs=False, skirt=STEEL)
+_clinic_style = clinic_style                                                      # (the medical rooms' shell: ship_rooms_med.py)
 
 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------- dental clinic
