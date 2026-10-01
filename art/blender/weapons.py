@@ -1,6 +1,6 @@
 """ABBORDAGGI: the Aquila's small arms, prepared for Unreal from free third-party models (Blender 5.2, headless).
 
-    blender -b --factory-startup -P art/blender/weapons.py [-- --only AR181|M27S] [-- --preview]
+    blender -b --factory-startup -P art/blender/weapons.py [-- --only AR181|M27S] [--preview] [--smooth off|face]
 
 Sources (art/_downloads/weapons/, not in git; licences in docs/LICENZE.md):
   - ar181_frostoise.glb     "Frostoise AR-181"      Sketchfab, CC BY 4.0 (the service rifle)
@@ -124,6 +124,9 @@ def transform_all(objs, m: Matrix) -> None:
         o.data.update()
 
 
+SMOOTH = "OFF"          # the FBX's smoothing: "OFF" the mesh's own normals, "FACE" smoothing groups (--smooth face, if the weapon looks faceted in Unreal)
+
+
 def export_fbx(obj, path: str) -> None:
     """The project's export (astra_bpy.export_fbx: metres in, centimetres out, the handedness flipped, Blender +Y becomes Unreal -Y) with the mesh's own
     normals kept (the models carry smooth normals that their normal maps were baked for), not rebuilt from smoothing groups."""
@@ -137,7 +140,7 @@ def export_fbx(obj, path: str) -> None:
     tri.keep_custom_normals = True
     bpy.ops.export_scene.fbx(
         filepath=path, use_selection=True, apply_unit_scale=True, apply_scale_options="FBX_SCALE_UNITS",
-        axis_forward="-Z", axis_up="Y", mesh_smooth_type="OFF", use_tspace=True,
+        axis_forward="-Z", axis_up="Y", mesh_smooth_type=SMOOTH, use_tspace=True,
         use_mesh_modifiers=True, add_leaf_bones=False, bake_anim=False, path_mode="STRIP")
     obj.modifiers.remove(tri)
 
@@ -386,6 +389,9 @@ def main() -> None:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     only = argv[argv.index("--only") + 1] if "--only" in argv else None
     preview = "--preview" in argv
+    global SMOOTH
+    if "--smooth" in argv:
+        SMOOTH = argv[argv.index("--smooth") + 1].upper()
     info = {}
     for name, cfg in WEAPONS.items():
         if only and name != only:
