@@ -91,7 +91,17 @@
       "quarantine": "medical officer",
       "tank": "engineering watch officer",
       "gym": "training officer",
-      "library": "education officer"
+      "library": "education officer",
+      "dental": "dental officer",
+      "counselling": "chaplain",
+      "morgue": "medical officer",
+      "security": "master-at-arms",
+      "brig": "master-at-arms",
+      "computer": "systems officer",
+      "simulator": "simulator officer",
+      "shop": "supply officer",
+      "airlock": "damage-control officer",
+      "lifepod": "damage-control officer"
     },
     "by_room": {
       "offices": "staff clerk",
@@ -128,7 +138,19 @@
       "cabins": "off duty",
       "tank": "tank tender",
       "gym": "physical-training instructor",
-      "library": "librarian"
+      "library": "librarian",
+      "dental": "dental technician",
+      "counselling": "counsellor",
+      "morgue": "mortuary technician",
+      "security": "military policeman",
+      "brig": "brig sentry",
+      "computer": "core technician",
+      "simulator": "simulator operator",
+      "shop": "storekeeper",
+      "airlock": "airlock technician",
+      "lifepod": "lifepod inspector",
+      "chapel": "chapel steward",
+      "observation": "off duty"
     }
   },
   "departments": {
@@ -216,6 +238,10 @@
         {
           "kinds": ["cic"],
           "weight": 1.5
+        },
+        {
+          "kinds": ["computer"],
+          "weight": 1.5
         }
       ],
       "battle": [
@@ -243,6 +269,14 @@
         {
           "kinds": ["crawlway"],
           "weight": 1
+        },
+        {
+          "kinds": ["airlock"],
+          "weight": 0.5
+        },
+        {
+          "kinds": ["lifepod"],
+          "weight": 0.5
         }
       ],
       "battle": [
@@ -285,6 +319,10 @@
         {
           "kinds": ["gym"],
           "weight": 0.5
+        },
+        {
+          "kinds": ["shop"],
+          "weight": 1
         }
       ],
       "battle": [
@@ -343,6 +381,10 @@
         {
           "kinds": ["hangar"],
           "weight": 3
+        },
+        {
+          "kinds": ["simulator"],
+          "weight": 1.5
         }
       ],
       "battle": [
@@ -373,6 +415,18 @@
         {
           "kinds": ["quarantine"],
           "weight": 1.5
+        },
+        {
+          "kinds": ["dental"],
+          "weight": 1.5
+        },
+        {
+          "kinds": ["counselling"],
+          "weight": 1
+        },
+        {
+          "kinds": ["morgue"],
+          "weight": 0.3
         }
       ],
       "battle": [
@@ -524,6 +578,14 @@
           "kinds": ["hangar"],
           "dept": "security",
           "weight": 2
+        },
+        {
+          "kinds": ["brig"],
+          "weight": 2
+        },
+        {
+          "kinds": ["security"],
+          "weight": 2
         }
       ],
       "battle": [
@@ -550,6 +612,10 @@
       },
       {
         "kinds": ["cabins"],
+        "deck": [2]
+      },
+      {
+        "kinds": ["cabins"],
         "deck": [6]
       }
     ],
@@ -559,7 +625,8 @@
       },
       {
         "kinds": ["cabins"],
-        "deck": [6]
+        "dept": "services",
+        "deck": [4, 6, 9, 11]
       },
       {
         "kinds": ["cabins"],
@@ -611,6 +678,18 @@
         "kinds": ["concourse"],
         "taste": [0.0, 0.5],
         "label": "on the Mess Concourse"
+      },
+      {
+        "id": "shop",
+        "kinds": ["shop"],
+        "taste": [0.0, 0.5],
+        "label": "in the ship's store"
+      },
+      {
+        "id": "simulator",
+        "kinds": ["simulator"],
+        "taste": [0.0, 0.3],
+        "label": "in the simulator bay"
       },
       {
         "id": "cabin",

@@ -350,3 +350,11 @@ def spine_car(b: SParts) -> None:
         b.fine.cyl((x0 + 0.9, sy * 0.55, 2.18), (x1 - 0.9, sy * 0.55, 2.18), 0.016, TRIM, seg=8)
         for xc in (-5.5, -2.0, 2.0, 5.5):
             b.fine.box((xc - 0.015, sy * 0.55 - 0.015, 2.18), (xc + 0.015, sy * 0.55 + 0.015, CAR_ROOF), TRIM)
+
+
+def spine_car_mesh(name: str = "SM_SHIP_SpineCar"):
+    """The shuttle's car on its own (the mesh the line's engine runs along the track, plan transit[].car.mesh = "SpineCar"): x along the car (nose +x), the doors on the -y side (the platform
+    side of every stop), origin on the floor under its middle; the skirt stands 3 cm above the rails' foot."""
+    b = SParts(bevel=0.005, fine_bevel=0.003)
+    spine_car(b)
+    return b.build(name)

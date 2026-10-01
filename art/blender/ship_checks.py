@@ -16,6 +16,10 @@ import ship_plan as P  # noqa: E402
 from ship_catalog import MOD, SLOT_HW  # noqa: E402
 
 TOL = 0.05
+LIFT_KINDS = ("turbolift", "bridge", "service", "cargo")        # the contract's `kind` of a vertical[] record that is a lift (docs/brief/NAVE-3.md)
+CREW = 560
+SLEEP_QUOTA = int(math.ceil(CREW * 1.10))                       # every one of the crew has a berth, and a tenth over for the guests, the wounded and a relief
+POD_SEATS = 20                                                  # a lifepod bay holds two pods of ten
 
 
 def _sorted_pairs(boxes: list[tuple[str, list[float]]]):
@@ -27,6 +31,162 @@ def _sorted_pairs(boxes: list[tuple[str, list[float]]]):
         for c, b in active:
             yield (c, b), (cid, bx)
         active.append((cid, bx))
+
+
+EXISTING_RACKS = 84                                             # the Berths hall's racks (aquila_berths.json), a deck-4 existing room whose stations the plan does not list
+# the programme of the redesign (docs/NAVE.md §3): the rooms a ship like this must have, by prefab, and how many at least
+REQUIRED = {"dentist": 1, "morgue": 1, "counselling": 1, "pharmacy": 1, "surgery": 2, "quarantine": 1, "brig": 1, "security_office": 1, "armory": 1, "kit_room": 1, "barracks": 4,
+            "computer_core": 2, "aux_reactor": 1, "air_plant": 2, "water_plant": 2, "waste_plant": 1, "dc_central": 3, "power_control": 1, "switchgear": 1, "capacitors": 1,
+            "chapel": 1, "barber": 1, "bar": 1, "library": 1, "gym": 2, "sim_bay": 1, "observation": 1, "shop": 1, "wardroom": 1, "galley": 1, "transporter": 1,
+            "airlock": 6, "pod_bay": 20, "suit_locker": 4, "shuttle_stop": 6, "berthing": 10}
+REACH_P90 = 100.0                                               # a warning: more than this many metres of corridor to the nearest lift lobby for one corridor point in ten
+REACH_P90_KEEL = 110.0                                          # (the keel's bow end is tanks and crawlways: nobody lives there)
+
+
+def _check_programme(plan: dict, comps: dict, problems: list, warnings: list, stats: dict) -> None:
+    """The programme of the redesign: the rooms that must exist (REQUIRED), the berths (every one of the crew and a tenth over), the lifepod seats, the two computer cores far apart."""
+    built = [c for c in comps.values() if c.get("status") == "built" and c.get("prefab")]
+    count: dict[str, int] = defaultdict(int)
+    for c in built:
+        count[c["prefab"]] += 1
+    for key, n in REQUIRED.items():
+        if count.get(key, 0) < n:
+            problems.append(f"programme: {count.get(key, 0)} {key} in the plan, at least {n} wanted")
+    sleep = sum(1 for c in comps.values() for s in c.get("stations", []) if s.get("kind") == "sleep") + EXISTING_RACKS
+    stats["sleeping_places"] = sleep
+    if sleep < SLEEP_QUOTA:
+        problems.append(f"programme: {sleep} berths for a crew of {CREW} (and a tenth over: {SLEEP_QUOTA})")
+    seats = count.get("pod_bay", 0) * POD_SEATS
+    stats["lifepod_seats"] = seats
+    if seats < CREW:
+        problems.append(f"programme: {seats} lifepod seats for a crew of {CREW}")
+    cores = [c for c in built if c["prefab"] == "computer_core"]
+    if len(cores) >= 2:
+        cx = [(c["bounds"][0] + c["bounds"][2]) / 2 for c in cores]
+        if max(cx) - min(cx) < 250.0 or len({c["deck"] for c in cores}) < 2:
+            problems.append(f"programme: the two computer cores are {max(cx) - min(cx):.0f} m apart on decks {sorted({c['deck'] for c in cores})}: a hit that takes one must not take both")
+    stats["programme"] = {k: count[k] for k in sorted(count)}
+
+
+def _check_vertical(plan: dict, comps: dict, nodes: dict, edges: list, seen: dict, main: int, problems: list, warnings: list, stats: dict) -> None:
+    """The vertical network (the vertical[] / transit[] v2 contract with ASCENSORI): lifts that stop where they say, shafts and lobbies where the records put them, stairs and Jefferies
+    trunks without a missing deck, the shuttle's halls joined by `shuttle` edges and a tunnel under its whole path."""
+    ride = defaultdict(int)
+    ladders = {(e["a"], e["b"]) for e in edges if e["kind"] == "stair" and e.get("ladder")}
+    ladders |= {(b, a) for (a, b) in ladders}
+    for e in edges:
+        if e["kind"] == "lift" and e.get("shaft"):
+            ride[e["shaft"]] += 1
+    n_lifts = n_trunks = n_stairs = 0
+    ids = set()
+    for v in plan.get("vertical", []):
+        if v["id"] in ids:
+            problems.append(f"vertical {v['id']}: the id is used twice")
+        ids.add(v["id"])
+        ds = sorted(v["decks"])
+        if ds != list(range(ds[0], ds[-1] + 1)):
+            problems.append(f"{v['kind']} {v['id']}: the decks {ds} are not a continuous run (a column that skips a deck cannot be climbed)")
+        if v["kind"] in LIFT_KINDS:
+            n_lifts += 1
+            n = len(ds)
+            if n < 2:
+                problems.append(f"lift {v['id']}: it serves one deck")
+            if {l["deck"] for l in v["landings"]} != set(ds):
+                problems.append(f"lift {v['id']}: the landings are not its decks {ds}")
+            if ride.get(v["id"], 0) != n * (n - 1) // 2:
+                problems.append(f"lift {v['id']}: {ride.get(v['id'], 0)} ride arcs, {n * (n - 1) // 2} wanted")
+            sh = v["shaft"]
+            if abs((sh["z"][1] - sh["z"][0]) - (P.deck_z(ds[0])[0] - P.deck_z(ds[-1])[0])) > 6.0:
+                problems.append(f"lift {v['id']}: the shaft's z range {sh['z']} does not fit the decks {ds}")
+            for l in v["landings"]:
+                lobby = comps.get(l["lobby"])
+                if lobby is None or lobby["deck"] != l["deck"]:
+                    problems.append(f"lift {v['id']}: the lobby {l['lobby']} of deck {l['deck']} is missing")
+                    continue
+                if not (abs(l["door"][0] - sh["x"]) <= sh["w"] / 2 + 1.0 and abs(l["door"][1] - sh["y"]) <= sh["d"] / 2 + 1.0):
+                    problems.append(f"lift {v['id']}: the landing door of deck {l['deck']} is {math.hypot(l['door'][0] - sh['x'], l['door'][1] - sh['y']):.1f} m from the shaft's axis")
+                if abs(l["z"] - P.deck_z(l["deck"])[0]) > 0.01:
+                    problems.append(f"lift {v['id']}: the landing of deck {l['deck']} is at z {l['z']}, the deck's floor is {P.deck_z(l['deck'])[0]}")
+                # the waiting place (ASCENSORI: FindRide matches a rider's route ends against it, 90 cm): the landing's node, in the lobby 1.5 m in front of the door, reachable on foot
+                nd = nodes.get(l.get("node"))
+                if nd is None or seen.get(l.get("node")) != main:
+                    problems.append(f"lift {v['id']}: the landing node {l.get('node')} of deck {l['deck']} is not a reachable graph node")
+                else:
+                    yaw = math.radians(l["yaw"])
+                    wait = (l["door"][0] - 1.5 * math.cos(yaw), l["door"][1] - 1.5 * math.sin(yaw), l["z"])
+                    off = math.dist(nd["p"][:2], wait[:2])
+                    if off > 0.9 or abs(nd["p"][2] - wait[2]) > 0.9:
+                        problems.append(f"lift {v['id']}: the landing node of deck {l['deck']} is {off:.2f} m from the waiting place in front of the door (90 cm at most)")
+        elif v["kind"] == "trunk":
+            n_trunks += 1
+            for a, b in zip(ds, ds[1:]):
+                if (v["nodes"][str(a)], v["nodes"][str(b)]) not in ladders:
+                    problems.append(f"trunk {v['id']}: no ladder between decks {a} and {b}")
+        elif v["kind"] == "stair":
+            n_stairs += 1
+    stats["lifts"], stats["trunks"], stats["stair_columns"] = n_lifts, n_trunks, n_stairs
+    # the shuttle
+    shuttle_edges = {(e["a"], e["b"]) for e in edges if e["kind"] == "shuttle"}
+    for t in plan.get("transit", []):
+        stops = t.get("stops", [])
+        if len(stops) < 3:
+            problems.append(f"transit {t['id']}: {len(stops)} stops")
+        for s in stops:
+            if s["room"] not in comps or s["node"] not in nodes or seen.get(s["node"]) != main:
+                problems.append(f"transit {t['id']}: the stop {s['id']} has no room or no reachable node")
+        for a, b in zip(stops, stops[1:]):
+            if (a["node"], b["node"]) not in shuttle_edges and (b["node"], a["node"]) not in shuttle_edges:
+                problems.append(f"transit {t['id']}: no `shuttle` edge between the stops {a['id']} and {b['id']}")
+        halls = [c for c in comps.values() if c["deck"] == t["deck"] and c["kind"] in ("tunnel", "transit")]
+        path = t["path"]
+        for p0, p1 in zip(path, path[1:]):
+            n = max(1, int(math.dist(p0[:2], p1[:2]) // 4.0))
+            for i in range(n + 1):
+                x = p0[0] + (p1[0] - p0[0]) * i / n
+                y = p0[1] + (p1[1] - p0[1]) * i / n
+                if not any(c["bounds"][0] - 0.01 <= x <= c["bounds"][2] + 0.01 and c["bounds"][1] - 0.01 <= y <= c["bounds"][3] + 0.01 for c in halls):
+                    problems.append(f"transit {t['id']}: the path at ({x:.1f}, {y:.1f}) is in no tunnel or stop hall")
+                    break
+            else:
+                continue
+            break
+        stats["shuttle_stops"] = len(stops)
+
+
+def _check_reach(nodes: dict, edges: list, problems: list, warnings: list, stats: dict) -> None:
+    """The walk from the corridors of a deck to the nearest turbolift lobby (docs/NAVE.md §4: from anywhere a lift within 60-80 m): median, p90, max per deck, in stats; a warning when
+    the p90 is over REACH_P90, a problem when a deck of the body has no lift at all."""
+    import heapq
+    adj: dict[str, list] = defaultdict(list)
+    for e in edges:
+        if e["kind"] in ("walk", "door") and nodes[e["a"]]["deck"] == nodes[e["b"]]["deck"]:
+            adj[e["a"]].append((e["b"], e["len"]))
+            adj[e["b"]].append((e["a"], e["len"]))
+    out = {}
+    for deck in range(2, 13):
+        src = [nid for nid, n in nodes.items() if n["deck"] == deck and n["kind"] == "lift"]
+        if not src:
+            problems.append(f"deck {deck}: no turbolift lobby")
+            continue
+        dist = {s: 0.0 for s in src}
+        pq = [(0.0, s) for s in src]
+        while pq:
+            d, u = heapq.heappop(pq)
+            if d > dist.get(u, 1e18):
+                continue
+            for v, w in adj[u]:
+                if d + w < dist.get(v, 1e18):
+                    dist[v] = d + w
+                    heapq.heappush(pq, (d + w, v))
+        cor = sorted(dist.get(nid, 1e9) for nid, n in nodes.items() if n["deck"] == deck and n["kind"] == "corridor" and n.get("passage", "")[:2] in ("SP", "SB", "PO"))
+        if not cor:
+            continue
+        q = lambda f: cor[min(len(cor) - 1, int(f * len(cor)))]
+        out[deck] = {"median": round(q(0.5), 1), "p90": round(q(0.9), 1), "max": round(cor[-1], 1)}
+        lim = REACH_P90_KEEL if deck == 12 else REACH_P90
+        if q(0.9) > lim:
+            warnings.append(f"deck {deck}: one corridor point in ten is more than {lim:.0f} m of walk from a turbolift lobby (p90 {q(0.9):.0f} m)")
+    stats["lift_walk_m"] = out
 
 
 def check(plan: dict, verbose: bool = True) -> dict:
@@ -149,14 +309,14 @@ def check(plan: dict, verbose: bool = True) -> dict:
                 break
     reach = {n["comp"] for nid, n in nodes.items() if n.get("comp") and seen[nid] == main}
     for c in comps.values():
-        if c["id"] not in reach:
+        if c["id"] not in reach and c["kind"] != "tunnel":                   # (the shuttle's tunnel is not walked: the car runs in it, `shuttle` edges join the halls)
             problems.append(f"graph: compartment {c['id']} ({c['kind']}, deck {c['deck']}) has no node in the network")
     for v in plan.get("vertical", []):
         if v["kind"] == "stair":
             for deck, nid in v["nodes"].items():
                 if nid not in nodes or seen[nid] != main:
                     problems.append(f"stairs {v['id']}: the landing of deck {deck} is not reachable")
-        if v["kind"] == "turbolift":
+        if v["kind"] in LIFT_KINDS:
             for l in v["landings"]:
                 if l["node"] not in nodes or seen[l["node"]] != main:
                     problems.append(f"lift landing {l['node']} is not reachable")
@@ -204,6 +364,9 @@ def check(plan: dict, verbose: bool = True) -> dict:
     for n in plan.get("notes", []):
         if " cannot stand at " in n:
             problems.append("programme: " + n)
+    _check_programme(plan, comps, problems, warnings, stats)
+    _check_vertical(plan, comps, nodes, edges, seen, main, problems, warnings, stats)
+    _check_reach(nodes, edges, problems, warnings, stats)
     stats["compartments"] = len(comps)
     stats["doors"] = len(doors)
     stats["nodes"] = len(nodes)

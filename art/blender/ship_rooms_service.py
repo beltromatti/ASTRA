@@ -227,11 +227,6 @@ def store_dry(name: str = "SM_SHIP_StoreDry"):
     return store_room("store_dry", name, False)
 
 
-def store_dry_d10(name: str = "SM_SHIP_StoreDryD10"):
-    """The dry stores with the door at x 10 (where the layout needs it): same room, the storekeeper's corner and the racks follow the door."""
-    return store_room("store_dry_d10", name, False)
-
-
 def store_cold(name: str = "SM_SHIP_StoreCold"):
     return store_room("store_cold", name, True)
 
