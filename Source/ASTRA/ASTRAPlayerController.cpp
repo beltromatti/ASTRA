@@ -341,6 +341,12 @@ void AASTRAPlayerController::SetSeated(bool bSit)
 		C->SetActorLocation(CaptainSeat + FVector(-85.f, 0.f, C->GetDefaultHalfHeight() + 2.f), false, nullptr, ETeleportType::TeleportPhysics);
 		C->SetActorEnableCollision(true);
 		C->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+		if (!bWalkHintShown)
+		{
+			// the first time on foot: the keys for walking (the card at the start spoke of the chair)
+			bWalkHintShown = true;
+			ShowNotice(TEXT("WASD  walk  ·  Shift  run  ·  C  crouch (hold: lie down)  ·  Space  jump  ·  E  doors, lifts, use  ·  F1  all the controls"), 25.f);
+		}
 	}
 	bSeated = bSit;
 }

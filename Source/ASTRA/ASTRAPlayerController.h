@@ -78,6 +78,8 @@ protected:
 	bool bStartSeated = true;
 
 	bool bSeated = false;
+
+	bool bWalkHintShown = false;      // the walking keys were shown the first time the Captain left the chair
 	FTimerHandle SeatTimer;
 	void ToggleSeat();
 	void OpenMenu();
