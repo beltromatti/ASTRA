@@ -55,8 +55,8 @@ CAPTAIN = {"type": "object", "description": "ASTRA ships only: the person who co
            "required": ["name", "rank", "bio", "gender"]}
 SHIP = {"type": "object", "properties": {
     "class": {"type": "string", "enum": ["acheron", "styx", "lethe", "vigilant", "praetorian"]},
-    "name": {"type": "string", "description": "The ship's name, in English (Mandate ships: rivers and places of the "
-                                              "underworld or of the Outer Worlds; ASTRA ships: virtues, eagles, old navy names)"},
+    "name": {"type": "string", "description": "The ship's name ONLY, one or two words, in English, no class and no quotes (Mandate ships: rivers and "
+                                              "places of the underworld or of the Outer Worlds; ASTRA ships: virtues, eagles, old navy names)"},
     "captain": CAPTAIN},
     "required": ["class", "name"]}
 COMMANDER = {"type": "object", "properties": {
@@ -162,7 +162,8 @@ How you decide
 - Rhythm from the Captain: a rested Captain with a sound ship gets harder problems and a cleverer enemy; one who has been pushed hard (long under
   pressure, hull low, ships or people lost, magazines thin) gets room to breathe — a calm, a resupply, news, a human moment — before the next blow.
   Alternate. Do not escalate at every beat and do not leave the Captain idle for long: a war that goes quiet has a reason, and a quiet that lasts
-  becomes a question the next beat answers.
+  becomes a question the next beat answers. A Captain who has had several quiet minutes and a sound ship gets the next problem now (a raid, a call,
+  news that bites, a place to search); never two calm beats in a row.
 - Balance by the war's logic, never by numbers: if the Captain is crushing the Mandate, the Mandate answers like an army (a second wave through the gate,
   another approach, a trap built on what it learned of the Captain, a commander who calls to talk); if the Captain is losing, the 7th Fleet answers like
   a fleet (reinforcements, a tender, orders), and the enemy may press or pause. BOTH sides reinforce: a raid is the Mandate's way, `reinforcements` the
@@ -230,8 +231,10 @@ The pulse
 Live state of the Aquila and the battlefield
 {state}"""
 
-BATTLE_ASK = ("A FIGHT IS IN PROGRESS (about {minutes:.0f} minutes old): you are looking in on it, not stopping it. Add only what this war would really "
-              "bring with a delay everyone can see coming — reinforcements for either side (an ASTRA squadron from the 7th Fleet, or a Mandate second "
+BATTLE_ASK = ("A FIGHT IS IN PROGRESS (about {minutes:.0f} minutes old): you are looking in on it, not stopping it. The fight under way IS the story: most "
+              "looks end with `none`. Add something only when the war's logic really calls for it (the side that is behind has a relief that was on its "
+              "way, a Mandate commander has a reason to talk), at most once or twice in a fight, and never as a rescue. What this war would really "
+              "bring comes with a delay everyone can see coming — reinforcements for either side (an ASTRA squadron from the 7th Fleet, or a Mandate second "
               "wave through the gate: `delay_s` 120-420), one of the Mandate's commanders on the plot calling the Aquila to talk (`negotiation`), news "
               "from elsewhere (`war_news`) — or nothing: `start_beat` with type `none` and why the war simply runs on. Never change the strength of ships "
               "already in the fight. Nothing else (no transit, no investigation, no resupply) while the guns are firing.")

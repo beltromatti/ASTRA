@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from . import models
-from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
+from .crew import LANG_NAMES, WORLD
 from .openrouter import Completion, OpenRouter, ToolCall
 
 log = logging.getLogger("astra.war_minds")

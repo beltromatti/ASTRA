@@ -19,7 +19,7 @@ from unittest import mock
 from astra_mind import models, war_minds
 from astra_mind.local_ship import LocalShip
 from bench.stations_server import FakeGame, FakeTTS, Model as BaseModel
-from bench.war_minds_unit import ENEMIES, astra_state, foe, group, mandate_state, member
+from bench.war_minds_unit import astra_state, foe, group, mandate_state, member
 from bench.war_mock import MockLLM, ScriptPolicy, null_policy
 
 models.LEDGER.write_file = False
@@ -204,6 +204,26 @@ class WarServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("admiral", [s for s, _ in self.game.lines()])
         self.assertEqual(len(self.model.rourke_calls), 1)                                # (he was asked: he judged it was not for him)
         self.assertIn("Castellan", self.model.rourke_calls[0] + self.mind.director._allies_line())
+
+    async def test_the_mandate_commander_who_talks_is_the_one_who_commands_and_shares_his_memory(self) -> None:
+        self.model.war.policy = ScriptPolicy([("group_order", {"group": "Strike Group Varek Solm", "order": "attack", "target": "T-01", "range_km": 4.5,
+                                                               "reason": "hold them at four and a half kilometres"})])
+        await self.state(battle_state())
+        self.at(10)
+        await self.state(battle_state(), 0.2)                                             # the admiral ordered (and wrote it in the common log)
+        self.mind.enemy.open_channel("T-21")
+        self.model.enemy_says = "Capitano, resa o morte."
+        ctx = {"place": "bridge", "channel": {"party": "T-21", "open": True, "muted": False}}
+        self.model.router_says = {"arrendetevi": "party"}
+        self.model.crew = []
+        await self.game.push(type="player_text", text="arrendetevi o sarete distrutti", context=ctx)
+        await asyncio.sleep(0.8)
+        enemy = [c for c in self.model.calls if c["kind"] == "enemy"][-1]
+        self.assertIn("Your log of this fight", enemy["system"])
+        self.assertIn("ordered Strike Group Varek Solm: attack on T-01 at 4.5 km", enemy["system"])      # what he decided, he remembers when he speaks
+        self.assertIn("YOUR GROUPS", enemy["system"])                                      # the same picture the commander reads
+        self.assertIn(("solm", "Capitano, resa o morte."), self.game.lines())
+        self.assertIn("said to the Captain over the channel: Capitano, resa o morte.", self.mind.war.recall("mandate"))      # and what he said, the commander remembers
 
     async def test_hello_forgets_the_last_fight(self) -> None:
         self.model.war.policy = ScriptPolicy([("no_change", {"reason": "x"})])

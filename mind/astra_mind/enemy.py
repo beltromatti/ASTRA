@@ -15,7 +15,7 @@ import time
 from typing import Any, Awaitable, Callable
 
 from . import models
-from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
+from .crew import CAPTAIN_WORD, LANG_NAMES
 from .openrouter import OpenRouter, ToolCall
 from .war_minds import picture
 

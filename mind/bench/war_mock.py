@@ -51,7 +51,7 @@ def _enemy_ships(view: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def close_policy(range_km: float = 3.2) -> Policy:
+def close_policy(range_km: float = 3.2, formation: str = "") -> Policy:
     def policy(mind: Any, view: dict[str, Any], state: dict[str, Any], tools: list[str]) -> Reply:
         foes = _enemy_ships(view)
         if not foes:
@@ -77,8 +77,11 @@ def close_policy(range_km: float = 3.2) -> Policy:
             cur = g.get("order_target") or g.get("focus_fire_on")
             if g.get("order_in_force") == "attack" and cur in ids and g.get("order_by") in ("admiral", "commander", "captain"):
                 continue
-            calls.append(("group_order", {"group": g["name"], "order": "attack", "target": best["id"], "range_km": range_km,
-                                          "reason": f"concentrate on {best['id']} ({best.get('class')}) and close to {range_km} km"}))
+            order = {"group": g["name"], "order": "attack", "target": best["id"], "range_km": range_km,
+                     "reason": f"concentrate on {best['id']} ({best.get('class')}) and hold {range_km} km"}
+            if formation and g.get("formation") != formation:
+                order["formation"] = formation
+            calls.append(("group_order", order))
         return calls or [("no_change", {"reason": "the orders that stand serve"})]
     return policy
 

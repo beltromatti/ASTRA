@@ -10,7 +10,6 @@ fallback, succession, and the figures (cost, latency)."""
 from __future__ import annotations
 
 import asyncio
-import json
 import unittest
 from typing import Any
 from unittest import mock
