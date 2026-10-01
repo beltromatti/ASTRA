@@ -202,17 +202,27 @@ void FAstraCrewRoster::Leave(int32 Index)
 	++Rev;
 }
 
-FString FAstraCrewRoster::Casualties(int32 Deck, int32 W, int32 K, FRandomStream& R, const FString& Cause)
+FString FAstraCrewRoster::Casualties(int32 Deck, int32 W, int32 K, FRandomStream& R, const FString& Cause, const TArray<int32>* Present)
 {
 	TArray<FString> Dead, Injured;
 	auto Pick = [&](int32 Want, uint8 NewStatus, TArray<FString>& Out)
 	{
 		for (int32 n = 0; n < Want; ++n)
 		{
-			for (int32 Dist = 0; Dist < 12; ++Dist)   // that deck first, then the nearest ones
+			for (int32 Dist = -1; Dist < 12; ++Dist)   // who was there, then that deck, then the nearest ones
 			{
 				TArray<int32> Cand;
-				for (int32 i = 0; i < People.Num(); ++i)
+				if (Dist < 0)
+				{
+					for (const int32 i : Present ? *Present : TArray<int32>())
+					{
+						if (People.IsValidIndex(i) && People[i].Status == 0)
+						{
+							Cand.Add(i);
+						}
+					}
+				}
+				else for (int32 i = 0; i < People.Num(); ++i)
 				{
 					const FAstraCrewman& P = People[i];
 					if (P.Status == 0 && P.Dept != TEXT("Air Group pilots") && FMath::Abs(P.Deck - Deck) == Dist)

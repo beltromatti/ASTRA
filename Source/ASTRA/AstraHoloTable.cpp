@@ -289,11 +289,11 @@ void AAstraHoloTable::Tick(float DeltaTime)
 
 void AAstraHoloTable::HideTactical()
 {
-	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders, &Strobes, &Ticks, &Threats, &TargetLine})
+	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&Rings, &Icons, &Stems, &Vectors, &Dots, &Blasts, &Leaders, &Strobes, &Ticks, &Threats, &TargetLine, &ReachRings})
 	{
 		HideFrom(*Pool, 0);
 	}
-	for (TArray<TObjectPtr<UTextRenderComponent>>* Pool : {&Labels, &RingLabels, &TickLabels, &TargetLabel})
+	for (TArray<TObjectPtr<UTextRenderComponent>>* Pool : {&Labels, &RingLabels, &TickLabels, &TargetLabel, &ReachLabels})
 	{
 		HideTextFrom(*Pool, 0);
 	}
@@ -823,19 +823,59 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		TargetKm = FC.TargetRangeKm;
 	}
 	HideFrom(Threats, NT);
-	// our target under fire control: a line from the Aquila with its distance at the middle
+	// how far our guns reach (the numbers the fire control uses): a ring for the railguns, one for the lasers
+	int32 NR = 0;
+	UAstraBattleSubsystem::FWeaponRanges Ours;
+	if (Battle)
+	{
+		Ours = Battle->GetWeaponRanges();
+		const TPair<float, const TCHAR*> Reach[] = {{Ours.RailKm, TEXT("RAIL")}, {Ours.LaserKm, TEXT("LASER")}};
+		for (const TPair<float, const TCHAR*>& W : Reach)
+		{
+			const float R = W.Key > 0.f ? PlotRadiusOf(W.Key) : 0.f;
+			if (R <= 1.f || R > PlotRadius * 1.01f)
+			{
+				continue;
+			}
+			const bool bRail = FCString::Strcmp(W.Value, TEXT("RAIL")) == 0;
+			const FLinearColor Col = bRail ? ColAstra * 0.8f : ColHolding;
+			UStaticMeshComponent* Ring = Pooled(ReachRings, NR, RingMesh);
+			Ring->SetRelativeLocation(FVector(0, 0, PlaneHeight + 0.2f));
+			Ring->SetRelativeScale3D(FVector(R / 100.f, R / 100.f, 1.f));
+			SetColor(Ring, Col, 7.f * Fade);
+			UTextRenderComponent* T = PooledText(ReachLabels, NR);
+			const float A = FMath::DegreesToRadians(38.f + 9.f * NR);
+			T->SetRelativeLocation(FVector(R * FMath::Cos(A), R * FMath::Sin(A), PlaneHeight + 0.8f));
+			T->SetText(FText::FromString(FString::Printf(TEXT("%s %s"), W.Value, *RangeText(W.Key))));
+			T->SetWorldSize(3.6f);
+			T->SetTextRenderColor((Col * FMath::Max(0.3f, Fade)).ToFColor(true));
+			FaceViewer(T, ViewerLocal);
+			++NR;
+		}
+	}
+	HideFrom(ReachRings, NR);
+	HideTextFrom(ReachLabels, NR);
+	// our target under fire control: a line from the Aquila with its distance at the middle, whether our guns reach it, and
+	// whether its guns reach us (once the sensors have classified it): red when we are inside them
 	const FVector* TargetAt = Target.IsEmpty() ? nullptr : PlotOf.Find(Target);
 	if (TargetAt)
 	{
+		const UAstraBattleSubsystem::FWeaponRanges Theirs = Battle ? Battle->GetWeaponRanges(Target) : UAstraBattleSubsystem::FWeaponRanges();
+		const bool bInTheirs = TargetKm > 0.f && TargetKm <= FMath::Max(Theirs.RailKm, Theirs.LaserKm);
 		UStaticMeshComponent* L = Pooled(TargetLine, 0, LineMesh);
-		PlaceLine(L, Us, *TargetAt, 0.3f, ColAquila, 22.f * Fade);
+		PlaceLine(L, Us, *TargetAt, 0.3f, bInTheirs ? ColHostile : ColAquila, 22.f * Fade);
 		if (TargetKm > 0.f)
 		{
+			FString Reach = TargetKm <= Ours.LaserKm ? TEXT("RAILS AND LASERS") : (TargetKm <= Ours.RailKm ? TEXT("IN RAIL RANGE") : TEXT("OUT OF OUR GUNS"));
+			if (bInTheirs)
+			{
+				Reach += TEXT("<br>WE ARE IN ITS GUNS");
+			}
 			UTextRenderComponent* T = PooledText(TargetLabel, 0);
 			T->SetRelativeLocation((Us + *TargetAt) * 0.5f + FVector(0.f, 0.f, 1.5f));
-			T->SetText(FText::FromString(RangeText(TargetKm)));
+			T->SetText(FText::FromString(RangeText(TargetKm) + TEXT(" · ") + Reach));
 			T->SetWorldSize(4.4f);
-			T->SetTextRenderColor(ColAquila.ToFColor(true));
+			T->SetTextRenderColor((bInTheirs ? ColHostile : ColAquila).ToFColor(true));
 			FaceViewer(T, ViewerLocal);
 		}
 		else

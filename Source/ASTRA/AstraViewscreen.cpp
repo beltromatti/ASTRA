@@ -324,6 +324,10 @@ FString AAstraViewscreen::Describe() const
 void AAstraViewscreen::Cut(EShot NewShot, const FString& Id, const FString& Name, const FString& Why, int32 Pri, double Hold)
 {
 	const bool bSame = NewShot == Shot && Id == ShotId;
+	if ((NewShot == EShot::Ship) != (Shot == EShot::Ship))
+	{
+		NextShowListAt = 0.0;   // the Aquila's own hull enters or leaves the camera's world now, not half a second later
+	}
 	Shot = NewShot;
 	ShotId = Id;
 	ShotName = Name;
@@ -963,12 +967,21 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		const FString Cls = Kind.IsEmpty() ? FString::Printf(TEXT("%s  UNCLASSIFIED"), *C.ContactId) : FString::Printf(TEXT("%s  %s"), *C.ContactId, *Kind);
 		const FString Kin = FString::Printf(TEXT("%.1f km   %.0f m/s"), C.RangeKm, C.Vel.Size());
 		const float Bw = 110.f * S;
-		const float BlockW = FMath::Max3(D.Width(Name, false, PxName), D.Width(Cls, true, PxData), FMath::Max(D.Width(Kin, true, PxData), Bw));
 		FString Tags;
 		if (C.ContactId == Engaged) { Tags += TEXT("ENGAGED   "); }
 		if (C.bFiringAtUs) { Tags += TEXT("FIRING ON US   "); }
 		if (C.bFleeing) { Tags += TEXT("RUNNING   "); }
-		if (C.bJamming) { Tags += TEXT("JAMMING"); }
+		if (C.bJamming) { Tags += TEXT("JAMMING   "); }
+		if (const UAstraBattleSubsystem* RB = C.Side == EAstraSide::Mandate && C.RangeKm > 0.0 ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+		{
+			// the guns' reach, as fire control knows it (theirs only once the sensors have classified them)
+			const UAstraBattleSubsystem::FWeaponRanges Theirs = RB->GetWeaponRanges(C.ContactId);
+			if (C.RangeKm <= FMath::Max(Theirs.RailKm, Theirs.LaserKm)) { Tags += TEXT("IN ITS GUNS   "); }
+			if (C.ContactId == Engaged) { Tags += C.RangeKm <= RB->GetWeaponRanges().RailKm ? TEXT("IN OUR RAILS") : TEXT("OUT OF RANGE"); }
+		}
+		Tags.TrimEndInline();
+		const float BlockW = FMath::Max3(D.Width(Name, false, PxName), D.Width(Cls, true, PxData),
+		                                 FMath::Max3(D.Width(Kin, true, PxData), Bw, Tags.IsEmpty() ? 0.f : D.Width(Tags, true, PxData)));
 		const float BlockH = PxName * 1.08f + PxData * 2.7f + (C.HullFrac >= 0.f ? 16.f * S : 0.f) + (Tags.IsEmpty() ? 0.f : PxData * 1.1f);
 		const float Gap = 10.f * S;
 		// beside the box, below, above; and for a ship that fills the frame, inside its own box (over the hull)
@@ -1218,9 +1231,10 @@ void AAstraViewscreen::RebuildShowList()
 			continue;
 		}
 		bool bSpace = A->ActorHasTag(SkyTag) || A->GetActorLocation().SizeSquared() > FMath::Square(60000.0);   // beyond 600 m: out there
-		if (!bSpace)
+		if (!bSpace && Shot == EShot::Ship)
 		{
-			// the Aquila's own hull (its frame is 183 m from the bridge): seen from outside in the damage view
+			// the Aquila's own hull (its frame is 183 m from the bridge), only for the view of her from outside: the sensors
+			// do not see their own ship, and her radiators and masts would hang in front of a target as huge blurred planes
 			if (const AStaticMeshActor* SMA = Cast<AStaticMeshActor>(A))
 			{
 				const UStaticMeshComponent* C = SMA->GetStaticMeshComponent();

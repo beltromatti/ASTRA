@@ -69,6 +69,9 @@ private:
 	// who is firing on us (a line from the shooter to the Aquila), and the line to the target under fire control
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Threats;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> TargetLine;
+	// how far the Aquila's guns reach: the railguns' and the lasers' rings
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ReachRings;
+	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> ReachLabels;
 	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> TargetLabel;
 	// the sector plot (the war map): systems, gate links, names
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorNodes;

@@ -1,6 +1,7 @@
 // ASTRA — ship simulation.
 
 #include "AstraShipSubsystem.h"
+#include "AstraLifeSubsystem.h"
 #include "AstraHarness.h"
 #include "AstraStations.h"
 #include "AstraViewscreen.h"
@@ -1723,6 +1724,14 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 		}
 	}
 	C->SetArrayField(TEXT("in_earshot"), Ear);
+	if (Cam && Pawn != TEXT("falcon") && Pawn != TEXT("pod"))
+	{
+		// the people around the Captain, as VITA knows them (who they are, what they are doing): for the mind of the person spoken to
+		if (const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>())
+		{
+			C->SetArrayField(TEXT("people"), Life->ListenersJson(Cam->GetCameraLocation(), Cam->GetCameraRotation().Vector(), 6));
+		}
+	}
 	if (Facing.IsEmpty()) { C->SetField(TEXT("facing"), MakeShared<FJsonValueNull>()); }
 	else { C->SetStringField(TEXT("facing"), Facing); }
 	if (ChannelParty.IsEmpty())
@@ -2173,7 +2182,10 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		const FString Priority = Str(TEXT("priority")).ToLower();
 		const float Speed = Priority == TEXT("critical") ? 0.8f : (Priority == TEXT("low") ? 1.2f : 1.f);
 		D->Team = Team;
-		D->Travel = D->Travel0 = (6.f + FMath::Abs(D->Deck - 6) * 1.5f) * Speed;
+		// the walk the team really has, on the ship's plan (VITA), else the old estimate
+		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
+		const float Eta = Life ? Life->RepairEtaSeconds(D->Deck, D->Section, D->Id) : 0.f;
+		D->Travel = D->Travel0 = (Eta > 0.f ? Eta : (6.f + FMath::Abs(D->Deck - 6) * 1.5f)) * Speed;
 		D->Work = (D->Kind == TEXT("fire") ? 30.f : (D->Kind == TEXT("hull breach") ? 40.f : 25.f)) * Speed;
 		int32 Busy = 0;
 		for (const FAstraDamage& X : Damage) { Busy += X.Team >= 0 ? 1 : 0; }
@@ -2525,6 +2537,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	float Sum = 0.f;
 	for (const auto& KV : PowerPct) { Sum += KV.Value; }
 	S->SetStringField(TEXT("power_budget"), FString::Printf(TEXT("%.0f%% of %.0f%% allocated (six systems at 100%% = 600%%)"), Sum, PowerBudget));
+	if (const UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; Life && Life->IsRunning())
+	{
+		S->SetObjectField(TEXT("life"), Life->SnapshotJson());   // the ship's clock, who does what, the teams, the people near the Captain
+	}
 	return S;
 }
 
@@ -2604,7 +2620,9 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 	// helm: coordinated turn at a capital-ship rate, pitch at half of it
 	if (bTurning)
 	{
-		const float Rate = 1.5f * DeltaTime;
+		// the engines are at her stern: damaged, they turn her more slowly (GUERRA: PlayerEngineFactor, 1 = sound)
+		const UAstraBattleSubsystem* HelmBattle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+		const float Rate = 1.5f * DeltaTime * FMath::Max(0.3f, HelmBattle ? HelmBattle->PlayerEngineFactor() : 1.f);
 		const float DH = DeltaDeg(HeadingDeg, TargetHeadingDeg);
 		const float DM = TargetMarkDeg - MarkDeg;
 		HeadingDeg = WrapDeg(HeadingDeg + FMath::Clamp(DH, -Rate, Rate));
@@ -2623,7 +2641,9 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 	}
 	// drive: speed follows the throttle (max 480 m/s at nominal engine power: a carrier cruiser, a little faster than
 	// Mandate destroyers at cruise; engine power scales it)
-	SpeedMps = FMath::FInterpTo(SpeedMps, ThrottlePct * 4.8f * (0.6f + 0.4f * PowerFactor(TEXT("engines"))) * (HeatPct > 90.f ? 0.85f : 1.f),
+	const UAstraBattleSubsystem* DriveBattle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	const float EngineHealth = DriveBattle ? DriveBattle->PlayerEngineFactor() : 1.f;   // her engines as the war has left them
+	SpeedMps = FMath::FInterpTo(SpeedMps, ThrottlePct * 4.8f * (0.6f + 0.4f * PowerFactor(TEXT("engines"))) * (HeatPct > 90.f ? 0.85f : 1.f) * EngineHealth,
 	                            DeltaTime, 0.2f);
 	TickDamage(DeltaTime);
 	UpdateAlertVisuals(DeltaTime);
@@ -2937,6 +2957,11 @@ void UAstraShipSubsystem::TickDamage(float DeltaTime)
 				continue;
 			}
 			D.Progress += DeltaTime / D.Work;
+			if (Battle)
+			{
+				// a team at work on the spot also mends what the war broke there: engines, sensors, mounts (GUERRA)
+				Battle->RepairPlayerSystems(0.006f * DeltaTime);
+			}
 			if (D.Progress >= 1.f)
 			{
 				const FString Done = D.Kind == TEXT("fire") ? TEXT("is out") : (D.Kind == TEXT("hull breach") ? TEXT("is sealed")
@@ -3025,7 +3050,10 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 		if (D.Kind == TEXT("hull breach")) { W = Roll2 < 0.4f ? FMath::RandRange(1, 3) : 0; K = Roll2 < 0.1f ? 1 : 0; }
 		else if (D.Kind == TEXT("fire")) { W = Roll2 < 0.35f ? FMath::RandRange(1, 2) : 0; }
 		else { W = Roll2 < 0.1f ? 1 : 0; }
-		const FString Names = (W || K) ? Roster.Casualties(D.Deck, W, K, CasualtyRng, D.Kind) : FString();
+		// who was really in that section when it was hit (VITA), else the deck's people
+		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
+		const TArray<int32> There = (W || K) && Life ? Life->RosterIn(D.Deck, D.Section) : TArray<int32>();
+		const FString Names = (W || K) ? Roster.Casualties(D.Deck, W, K, CasualtyRng, D.Kind, &There) : FString();
 		if (!Names.IsEmpty())
 		{
 			Where += TEXT(" — casualties: ") + Names;
