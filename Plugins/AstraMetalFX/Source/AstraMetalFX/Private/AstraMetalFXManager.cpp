@@ -384,7 +384,7 @@ bool FAstraMetalFXManager::TickDynamicResolution(float DeltaTime)
 		{
 			// With the priority the variable has now: a higher one (the console) is not overridden by raising it, a lower one is not
 			// locked out of later changes.
-			Headroom->SetWithCurrentPriority(Target);
+			Headroom->Set(Target, ECVF_SetByCode);   // (SetWithCurrentPriority is refused on a constructor-set variable: nothing was ever written)
 			WrittenHeadroomPercent = Headroom->GetFloat();
 			if (!bCompensating)
 			{
@@ -414,7 +414,7 @@ void FAstraMetalFXManager::ReleaseDynamicResolution()
 	{
 		if (FMath::Abs(Headroom->GetFloat() - WrittenHeadroomPercent) <= 0.01f)   // still ours: give it back
 		{
-			Headroom->SetWithCurrentPriority(BaseHeadroomPercent);
+			Headroom->Set(BaseHeadroomPercent, ECVF_SetByCode);
 			UE_LOG(LogAstraMetalFX, Log, TEXT("MetalFX is not upscaling any more: r.DynamicRes.TargetedGPUHeadRoomPercentage back to %.1f"), BaseHeadroomPercent);
 		}
 	}

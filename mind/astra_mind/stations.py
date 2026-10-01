@@ -105,9 +105,10 @@ def _build() -> dict[str, Station]:
         m("helm", "course", "intercept", "close on a contact and hold the standoff range, broadside inside it; the course follows the target",
           (_target(), P("standoff_km", NUM, "range to hold: railguns reach 10 km, lasers 4 km", lo=0.5, hi=40, default=6), _speed()),
           "target_lost", "engaged"),
-        m("helm", "course", "keep_on_bow", "keep the bow on the target (attitude only, speed unchanged): the Captain sees it through the window; "
-          "with target `action` the bow follows the fight from one target to the next by itself, and waits when there is none",
-          (_action_target(),), "target_lost"),
+        m("helm", "course", "keep_on_bow", "keep the bow on the target: the Captain sees it through the window; with target `action` the bow "
+          "follows the fight from one target to the next by itself, and waits when there is none. It turns the ship; her speed stays "
+          "as it is unless speed_pct is given in the same order (pointing at an enemy at cruise speed closes on it)",
+          (_action_target(), _speed()), "target_lost"),
         m("helm", "course", "follow", "shadow a ship at a distance and on a side of it",
           (_target(), P("distance_km", NUM, "distance to keep", lo=0.3, hi=40, default=2),
            P("side", STR, "which side of the ship to keep", enum=("astern", "port", "starboard", "above", "below"), default="astern")),
@@ -186,9 +187,11 @@ def _build() -> dict[str, Station]:
         m("ops", "viewscreen", "viewscreen_off", "screen off: the true window", (), "order", native="off"),
         m("ops", "holo", "holo_tactical", "the holo table shows the battle around the Aquila", (), "order", native="tactical"),
         m("ops", "holo", "holo_sector", "the holo table shows the sector map", (), "order", native="sector"),
-        m("ops", "holo", "holo_ship", "the holo table shows the Aquila herself: a cutaway deck by deck, sections A-H, the damage where "
-          "it is (fires, breaches, damaged conduits), the damage-control teams on their way or at work, where the Captain is", (), "order",
-          native="ship"),
+        m("ops", "holo", "holo_ship", "the holo table shows a ship close up. Without a target: the Aquila herself, a cutaway deck by deck "
+          "(sections A-H, the damage where it is, the damage-control teams, where the Captain is). With a target: a ship the sensors hold "
+          "a firm track on — her bow, mid and stern sections and what is left of them, her six shield faces, what burns or breaks (her "
+          "systems and guns too for our own ships, by datalink)",
+          (_target(required=False, desc="optional: a contact id (T-21) to show that ship; empty for the Aquila"),), "order", native="ship"),
         m("ops", "datapad", "datapad_push", "put a page on the Captain's datapad (Tab shows it)",
           (P("page", STR, "overview | contact (a dossier: give focus) | damage | fleet | orders", required=True, enum=DATAPAD_PAGES),
            P("focus", STR, "a contact id, for the page 'contact'")), "order", native="push"),

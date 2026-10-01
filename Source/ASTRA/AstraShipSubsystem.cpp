@@ -1,6 +1,7 @@
 // ASTRA — ship simulation.
 
 #include "AstraShipSubsystem.h"
+#include "AstraLifeSubsystem.h"
 #include "AstraHarness.h"
 #include "AstraStations.h"
 #include "AstraViewscreen.h"
@@ -11,6 +12,7 @@
 #include "AstraHangar.h"
 #include "AstraPatient.h"
 #include "AstraQuarters.h"
+#include "AstraShipPlan.h"
 #include "GameFramework/Character.h"
 #include "AstraCrewMember.h"
 #include "AstraLifepod.h"
@@ -50,6 +52,7 @@ DECLARE_CYCLE_STAT(TEXT("Ship"), STAT_AstraShip, STATGROUP_Astra);
 
 namespace
 {
+	TAutoConsoleVariable<float> CVarSpaceFill(TEXT("astra.light.fill"), 0.f, TEXT("The cool fill on hulls from the main viewscreen camera's side, as a share of the star's light (outside the hull only)"));
 	const FName TagSky(TEXT("ASTRA.Sky"));
 	const FName TagSun(TEXT("ASTRA.Sun"));
 	const FName TagShipLight(TEXT("ASTRA.ShipLight"));
@@ -64,8 +67,35 @@ namespace
 		}
 	}
 
+	/** Where a pawn is in the ship's plan (the decks of the whole Aquila, docs/NAVE.md): its compartment, or null off the plan (a
+	 *  Falcon, a planet, a level without the plan). */
+	const FAstraPlanCompartment* PlanCompartmentOf(const UWorld* World, const APawn* P)
+	{
+		const UAstraShipPlan* Plan = World && P ? World->GetSubsystem<UAstraShipPlan>() : nullptr;
+		return Plan ? Plan->CompartmentAt(P->GetActorLocation()) : nullptr;
+	}
+
+	/** A compartment's own name without the section the plan writes into a corridor's ("Port Passage · Section C" -> "Port Passage"). */
+	FString PlanRoomName(const FAstraPlanCompartment& Comp)
+	{
+		FString Name = Comp.Name;
+		const int32 Cut = Name.Find(TEXT(" · Section"));
+		return Cut != INDEX_NONE ? Name.Left(Cut) : Name;
+	}
+
 	float WrapDeg(float D) { return FMath::Fmod(FMath::Fmod(D, 360.f) + 360.f, 360.f); }
 	float DeltaDeg(float From, float To) { return FMath::FindDeltaAngleDegrees(From, To); }
+
+	FAutoConsoleCommandWithWorldAndArgs CmdLightInfo(TEXT("astra.light.info"),
+		TEXT("Testing: the star's light, the planet's and the fill on the hulls (direction, intensity, channels)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			const UAstraShipSubsystem* Ship = World ? World->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+			if (Ship)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("%s"), *Ship->LightInfo());
+			}
+		}));
 
 	// testing: any ship command as the crew (or the director) would send it; single quotes stand for double quotes
 	FAutoConsoleCommandWithWorldAndArgs CmdPlanet(TEXT("astra.planet"),
@@ -403,6 +433,23 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 			D->SetIntensity(0.f);
 		}
 	}
+	// the night side of a hull is not a hole: a faint cool fill from the side of the main viewscreen's camera (AimSpaceFill), outside the
+	// hull only (channel 1), without shadows — what a film's camera does. Without it a backlit cruiser on the screen is a black cut-out
+	SpaceFill = InWorld.SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator::ZeroRotator, SP);
+	if (SpaceFill)
+	{
+		if (UDirectionalLightComponent* D = Cast<UDirectionalLightComponent>(SpaceFill->GetLightComponent()))
+		{
+			D->SetMobility(EComponentMobility::Movable);
+			D->SetCastShadows(false);
+			D->SetLightingChannels(false, true, false);
+			D->SetAtmosphereSunLight(false);
+			D->SetSpecularScale(0.15f);
+			D->SetLightSourceAngle(40.f);
+			D->SetLightColor(FLinearColor(0.62f, 0.74f, 1.f));
+			D->SetIntensity(0.f);
+		}
+	}
 	// the Aquila's own hull (and any ship or station placed in the level) is outside: channel 1 as well
 	int32 Exterior = 0;
 	for (TActorIterator<AStaticMeshActor> It(&InWorld); It; ++It)
@@ -509,6 +556,38 @@ void UAstraShipSubsystem::SetPlanetFill(const FString& T)
 	else if (T == TEXT("gas_giant")) { PlanetFill = FLinearColor(1.f, 0.84f, 0.62f); PlanetFillGain = 1.4f; }
 	else if (T == TEXT("barren")) { PlanetFill = FLinearColor(0.76f, 0.73f, 0.7f); PlanetFillGain = 0.8f; }
 	else { PlanetFill = FLinearColor(0.42f, 0.6f, 1.f); PlanetFillGain = 1.f; }
+}
+
+FString UAstraShipSubsystem::LightInfo() const
+{
+	auto One = [](const TCHAR* Name, const ADirectionalLight* L) -> FString
+	{
+		if (!L || !L->GetLightComponent())
+		{
+			return FString::Printf(TEXT("%s: none"), Name);
+		}
+		const ULightComponent* C = L->GetLightComponent();
+		return FString::Printf(TEXT("%s: dir %s intensity %.2f visible %d mobility %d channels %d%d%d"), Name, *L->GetActorForwardVector().ToCompactString(),
+		                       C->Intensity, C->IsVisible() ? 1 : 0, (int32)C->Mobility, C->LightingChannels.bChannel0, C->LightingChannels.bChannel1,
+		                       C->LightingChannels.bChannel2);
+	};
+	return One(TEXT("star"), Sun) + TEXT(" | ") + One(TEXT("planet"), PlanetLight) + TEXT(" | ") + One(TEXT("fill"), SpaceFill);
+}
+
+void UAstraShipSubsystem::AimSpaceFill(const FVector& LookDir, float DeltaTime)
+{
+	// the fill comes from where the main viewscreen's camera looks from (a little above it, for shape), turning in about a second when
+	// the screen cuts to another subject: what the Captain studies on it shows its face, whatever side the star lights
+	if (!SpaceFill || LookDir.IsNearlyZero())
+	{
+		return;
+	}
+	const FVector Want = (LookDir.GetSafeNormal() - FVector(0.f, 0.f, 0.35f)).GetSafeNormal();
+	const FQuat Now = FQuat::Slerp(SpaceFill->GetActorQuat(), Want.ToOrientationQuat(), FMath::Clamp(DeltaTime * 2.5f, 0.f, 1.f));
+	if (Now.AngularDistance(SpaceFill->GetActorQuat()) > FMath::DegreesToRadians(0.25f))
+	{
+		SpaceFill->SetActorRotation(Now);
+	}
 }
 
 void UAstraShipSubsystem::UpdatePlanetLight(const FVector& SunNow, const FVector Axes[3])
@@ -796,12 +875,16 @@ float UAstraShipSubsystem::HeatFactor() const
 	return FMath::Lerp(0.8f, 0.55f, FMath::Clamp((H - 0.9f) / 0.1f, 0.f, 1.f));
 }
 
-void UAstraShipSubsystem::RadiatorHit()
+void UAstraShipSubsystem::RadiatorHit(float HullDamage)
 {
-	if (!bRadiatorsOut || RadiatorHealth < 0.3f || FMath::FRand() > 0.3f)
+	// a wing is torn by a blow in proportion to its force, and the next one goes no sooner than 20 s after (a hit lands near the wreck
+	// of the last one): before, every hit had a 30 % chance and all three wings went in fifteen seconds of a focused attack
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (!bRadiatorsOut || RadiatorHealth < 0.3f || Now - LastRadiatorTear < 20.0 || FMath::FRand() > 0.3f * FMath::Clamp(HullDamage / 80.f, 0.1f, 1.f))
 	{
 		return;
 	}
+	LastRadiatorTear = Now;
 	// a wing torn: an incident damage control can repair (each repair gives back a quarter of the radiators)
 	FAstraDamage D;
 	D.Id = NextDamageId++;
@@ -904,7 +987,7 @@ void UAstraShipSubsystem::TickHeat(float DeltaTime)
 	{
 		if ((HeatHarmT -= DeltaTime) <= 0.f)
 		{
-			HeatHarmT = FMath::FRandRange(10.f, 16.f);
+			HeatHarmT = FMath::FRandRange(18.f, 26.f);
 			static const TCHAR* Sys[] = {TEXT("shields"), TEXT("weapons"), TEXT("engines"), TEXT("sensors")};
 			FAstraDamage D;
 			D.Id = NextDamageId++;
@@ -1634,6 +1717,21 @@ FString UAstraShipSubsystem::CaptainAboard() const
 			            "officers speak by intercom");
 		}
 	}
+	// anywhere else aboard: the compartment of the ship's plan (the bridge is one of them)
+	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P); Comp && Comp->Kind != TEXT("bridge"))
+	{
+		FString PlanDeck;
+		if (const UAstraShipPlan* Plan = GetWorld()->GetSubsystem<UAstraShipPlan>())
+		{
+			for (const FAstraPlanDeck& D : Plan->GetDecks())
+			{
+				if (D.Id == Comp->Deck) { PlanDeck = D.Name; }
+			}
+		}
+		return FString::Printf(TEXT("in the %s (Deck %d%s, section %s), away from the bridge: the XO has the conn; the bridge officers speak "
+		                            "by intercom"), *PlanRoomName(*Comp), Comp->Deck, PlanDeck.IsEmpty() ? TEXT("") : *(TEXT(" · ") + PlanDeck),
+		                       *Comp->Section);
+	}
 	if (P && P->GetActorLocation().Z < -3000.f)
 	{
 		return TEXT("on the flight deck (Deck 9), away from the bridge: the XO has the conn; the Captain speaks by intercom");
@@ -1664,6 +1762,15 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	{
 		if (It->IsPawnInside(P)) { return TEXT("DECK 1 · CAPTAIN'S QUARTERS"); }
 	}
+	// anywhere else aboard: the compartment of the ship's plan, as the signs say it ("DECK 4 · MESS CONCOURSE · SECTION B")
+	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P))
+	{
+		if (Comp->Kind == TEXT("bridge"))
+		{
+			return TEXT("BRIDGE");
+		}
+		return FString::Printf(TEXT("DECK %d · %s · SECTION %s"), Comp->Deck, *PlanRoomName(*Comp).ToUpper(), *Comp->Section);
+	}
 	if (P && P->GetActorLocation().Z < -3000.f)
 	{
 		return TEXT("DECK 9 · FLIGHT DECK");
@@ -1683,10 +1790,19 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 	TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
 	const FString Where = CaptainPlace();
 	FString Place = Where.Contains(TEXT("·")) ? Where.RightChop(Where.Find(TEXT("·")) + 1).TrimStartAndEnd() : Where;
-	Place = Place.ToLower().Replace(TEXT("'"), TEXT("")).Replace(TEXT(" "), TEXT("_"));   // "bridge", "captains_quarters", "flight_deck"…
-	C->SetStringField(TEXT("place"), Place);
+	if (Place.Contains(TEXT("·")))
+	{
+		Place = Place.Left(Place.Find(TEXT("·"))).TrimStartAndEnd();       // "MESS CONCOURSE · SECTION B": the room
+	}
+	Place = Place.ToLower().Replace(TEXT("'"), TEXT("")).Replace(TEXT("("), TEXT("")).Replace(TEXT(")"), TEXT("")).Replace(TEXT(" "), TEXT("_"));
+	C->SetStringField(TEXT("place"), Place);                                // "bridge", "captains_quarters", "flight_deck", "mess_concourse"…
 	C->SetStringField(TEXT("place_name"), Where);
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P))
+	{
+		C->SetNumberField(TEXT("deck"), Comp->Deck);                      // where a fire, a breach, a team is, against where the Captain is
+		C->SetStringField(TEXT("section"), Comp->Section);
+	}
 	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0);
 	FString Pawn = TEXT("on_foot");
 	if (CaptainPod.IsValid()) { Pawn = TEXT("pod"); }
@@ -1723,6 +1839,14 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 		}
 	}
 	C->SetArrayField(TEXT("in_earshot"), Ear);
+	if (Cam && Pawn != TEXT("falcon") && Pawn != TEXT("pod"))
+	{
+		// the people around the Captain, as VITA knows them (who they are, what they are doing): for the mind of the person spoken to
+		if (const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>())
+		{
+			C->SetArrayField(TEXT("people"), Life->ListenersJson(Cam->GetCameraLocation(), Cam->GetCameraRotation().Vector(), 6));
+		}
+	}
 	if (Facing.IsEmpty()) { C->SetField(TEXT("facing"), MakeShared<FJsonValueNull>()); }
 	else { C->SetStringField(TEXT("facing"), Facing); }
 	if (ChannelParty.IsEmpty())
@@ -1852,10 +1976,48 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 			OutDetail = TEXT("no sector data from the fleet yet");
 			return false;
 		}
+		// a scanned ship instead of the Aquila: what the sensors know of her (a firm track; more once she is classified)
+		FString Scan = M == TEXT("ship") ? Str(TEXT("target")).TrimStartAndEnd() : FString();
+		if (Scan.Equals(TEXT("AQUILA"), ESearchCase::IgnoreCase) || Scan.Equals(TEXT("self"), ESearchCase::IgnoreCase))
+		{
+			Scan.Empty();
+		}
+		if (!Scan.IsEmpty())
+		{
+			const UAstraBattleSubsystem* B = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+			UAstraBattleSubsystem::FDamageView View;
+			if (!B || !B->GetDamageView(Scan.ToUpper(), View))
+			{
+				OutDetail = FString::Printf(TEXT("the sensors hold no firm track on %s: nothing to put on the holo table"), *Scan);
+				return false;
+			}
+			Scan = View.ContactId;
+		}
 		HoloMode = M;
-		OutDetail = M == TEXT("sector") ? TEXT("holo table: the sector map (the March, who holds what, the gate links)")
+		HoloShipId = Scan;
+		OutDetail = M == TEXT("sector") ? FString(TEXT("holo table: the sector map (the March, who holds what, the gate links)"))
+		          : M == TEXT("ship") && !Scan.IsEmpty() ? FString::Printf(TEXT("holo table: %s as the sensors see her — sections, shield faces, what burns"), *Scan)
 		          : M == TEXT("ship")   ? FString::Printf(TEXT("holo table: the Aquila, deck by deck — %s"), *DamageSummary())
 		                                : FString(TEXT("holo table: tactical plot"));
+		return true;
+	}
+	if (Name == TEXT("crew_locate"))
+	{
+		// the personnel file and the internal locator (VITA): who someone is, where they are, what they are doing
+		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
+		if (!Life || !Life->IsRunning())
+		{
+			OutDetail = TEXT("the internal locator is not answering");
+			return false;
+		}
+		const FString Who = Str(TEXT("who")).TrimStartAndEnd();
+		OutDetail = Life->LocatorText(Who, 4);
+		if (OutDetail.IsEmpty())
+		{
+			OutDetail = FString::Printf(TEXT("nobody aboard matches \"%s\" in the personnel file (try a surname, a rank and a name, or a job)"), *Who);
+			return false;
+		}
+		OutDetail = TEXT("the personnel file and the internal locator say (other crew members, not the officer who looked): ") + OutDetail;
 		return true;
 	}
 	if (Name == TEXT("visit"))
@@ -2173,7 +2335,10 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		const FString Priority = Str(TEXT("priority")).ToLower();
 		const float Speed = Priority == TEXT("critical") ? 0.8f : (Priority == TEXT("low") ? 1.2f : 1.f);
 		D->Team = Team;
-		D->Travel = D->Travel0 = (6.f + FMath::Abs(D->Deck - 6) * 1.5f) * Speed;
+		// the walk the team really has, on the ship's plan (VITA), else the old estimate
+		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
+		const float Eta = Life ? Life->RepairEtaSeconds(D->Deck, D->Section, D->Id) : 0.f;
+		D->Travel = D->Travel0 = (Eta > 0.f ? Eta : (6.f + FMath::Abs(D->Deck - 6) * 1.5f)) * Speed;
 		D->Work = (D->Kind == TEXT("fire") ? 30.f : (D->Kind == TEXT("hull breach") ? 40.f : 25.f)) * Speed;
 		int32 Busy = 0;
 		for (const FAstraDamage& X : Damage) { Busy += X.Team >= 0 ? 1 : 0; }
@@ -2525,6 +2690,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	float Sum = 0.f;
 	for (const auto& KV : PowerPct) { Sum += KV.Value; }
 	S->SetStringField(TEXT("power_budget"), FString::Printf(TEXT("%.0f%% of %.0f%% allocated (six systems at 100%% = 600%%)"), Sum, PowerBudget));
+	if (const UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; Life && Life->IsRunning())
+	{
+		S->SetObjectField(TEXT("life"), Life->SnapshotJson());   // the ship's clock, who does what, the teams, the people near the Captain
+	}
 	return S;
 }
 
@@ -2604,7 +2773,9 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 	// helm: coordinated turn at a capital-ship rate, pitch at half of it
 	if (bTurning)
 	{
-		const float Rate = 1.5f * DeltaTime;
+		// the engines are at her stern: damaged, they turn her more slowly (GUERRA: PlayerEngineFactor, 1 = sound)
+		const UAstraBattleSubsystem* HelmBattle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+		const float Rate = 1.5f * DeltaTime * FMath::Max(0.3f, HelmBattle ? HelmBattle->PlayerEngineFactor() : 1.f);
 		const float DH = DeltaDeg(HeadingDeg, TargetHeadingDeg);
 		const float DM = TargetMarkDeg - MarkDeg;
 		HeadingDeg = WrapDeg(HeadingDeg + FMath::Clamp(DH, -Rate, Rate));
@@ -2623,7 +2794,9 @@ void UAstraShipSubsystem::Tick(float DeltaTime)
 	}
 	// drive: speed follows the throttle (max 480 m/s at nominal engine power: a carrier cruiser, a little faster than
 	// Mandate destroyers at cruise; engine power scales it)
-	SpeedMps = FMath::FInterpTo(SpeedMps, ThrottlePct * 4.8f * (0.6f + 0.4f * PowerFactor(TEXT("engines"))) * (HeatPct > 90.f ? 0.85f : 1.f),
+	const UAstraBattleSubsystem* DriveBattle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	const float EngineHealth = DriveBattle ? DriveBattle->PlayerEngineFactor() : 1.f;   // her engines as the war has left them
+	SpeedMps = FMath::FInterpTo(SpeedMps, ThrottlePct * 4.8f * (0.6f + 0.4f * PowerFactor(TEXT("engines"))) * (HeatPct > 90.f ? 0.85f : 1.f) * EngineHealth,
 	                            DeltaTime, 0.2f);
 	TickDamage(DeltaTime);
 	UpdateAlertVisuals(DeltaTime);
@@ -2658,10 +2831,19 @@ void UAstraShipSubsystem::UpdateAttitudeVisuals()
 		// the star's light follows in quarter-degree steps: any turn of a directional light throws its whole shadow cache
 		// away (every virtual shadow page drawn again, each frame of a turn), and a quarter of a degree moves a shadow on
 		// the bridge floor by a centimetre
+		// (the level's star is Stationary: it keeps the light the bridge and the ships were lit with, and a turn of it is refused with a log
+		// line a frame — so it is not asked to. Made Movable it does follow the attitude, but a backlit cruiser is then black on the main
+		// viewscreen, and a fill on lighting channel 1 cannot help: Nanite meshes ignore lighting channels, UE 5.8 NaniteShading.cpp)
 		const FVector Want = (-Delta.UnrotateVector(SunDir0)).GetSafeNormal();
-		if (FVector::DotProduct(Want, Sun->GetActorForwardVector()) < FMath::Cos(FMath::DegreesToRadians(0.25f)))
+		if (Sun->GetRootComponent() && Sun->GetRootComponent()->Mobility == EComponentMobility::Movable &&
+		    FVector::DotProduct(Want, Sun->GetActorForwardVector()) < FMath::Cos(FMath::DegreesToRadians(0.25f)))
 		{
 			Sun->SetActorRotation(Want.Rotation());
+		}
+		if (SpaceFill && SpaceFill->GetLightComponent())
+		{
+			const float SunLux = Sun->GetLightComponent() ? Sun->GetLightComponent()->Intensity : 1200.f;
+			SpaceFill->GetLightComponent()->SetIntensity(SunLux * FMath::Max(0.f, CVarSpaceFill.GetValueOnGameThread()));
 		}
 	}
 }
@@ -2721,6 +2903,10 @@ void UAstraShipSubsystem::SetPlanetside(bool bOn)
 	if (PlanetLight && PlanetLight->GetLightComponent())
 	{
 		PlanetLight->GetLightComponent()->SetVisibility(!bOn);
+	}
+	if (SpaceFill && SpaceFill->GetLightComponent())
+	{
+		SpaceFill->GetLightComponent()->SetVisibility(!bOn);
 	}
 	if (Sun)
 	{
@@ -2892,12 +3078,15 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 float UAstraShipSubsystem::PowerFactor(const FString& System) const
 {
 	const float* P = PowerPct.Find(System);
-	float F = (P ? *P : 100.f) / 100.f;
+	const float F = (P ? *P : 100.f) / 100.f;
+	// each failed conduit takes a fifth of what it carried, but the power finds other routes: never less than 55 % of what is allocated
+	// (multiplied, three conduits on the shields were half the shields, and a long battle a death spiral)
+	int32 N = 0;
 	for (const FAstraDamage& D : Damage)
 	{
-		F *= D.System == System ? 0.8f : 1.f;
+		N += D.System == System ? 1 : 0;
 	}
-	return F;
+	return F * FMath::Max(0.55f, 1.f - 0.15f * N);
 }
 
 int32 UAstraShipSubsystem::FreeDamageTeam() const
@@ -2937,6 +3126,11 @@ void UAstraShipSubsystem::TickDamage(float DeltaTime)
 				continue;
 			}
 			D.Progress += DeltaTime / D.Work;
+			if (Battle)
+			{
+				// a team at work on the spot also mends what the war broke there: engines, sensors, mounts (GUERRA)
+				Battle->RepairPlayerSystems(0.006f * DeltaTime);
+			}
 			if (D.Progress >= 1.f)
 			{
 				const FString Done = D.Kind == TEXT("fire") ? TEXT("is out") : (D.Kind == TEXT("hull breach") ? TEXT("is sealed")
@@ -3000,11 +3194,12 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 	}
 	if (HullDamage > 5.f)
 	{
-		RadiatorHit();
+		RadiatorHit(HullDamage);
 	}
 	// a blow that gets through does harm inside in proportion to its force: a graze may only buckle plating (the hull's own
-	// damage), a heavy hit almost always starts something (until DISTRUZIONE puts it where the hit really landed)
-	if (HullDamage > 8.f && FMath::FRand() < FMath::Clamp(HullDamage / 45.f, 0.2f, 1.f))
+	// damage), a heavy hit often starts something (until DISTRUZIONE puts it where the hit really landed). Calibrated on the war's
+	// volumes of fire: before GUERRA hits came a few a minute, now dozens, and nearly every one started a fire, a breach or a conduit
+	if (HullDamage > 8.f && FMath::FRand() < FMath::Clamp(HullDamage / 100.f, 0.1f, 0.7f))
 	{
 		// where did it land? a compartment (decks 1-12, sections A-H) and what it does there
 		FAstraDamage D;
@@ -3025,7 +3220,10 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 		if (D.Kind == TEXT("hull breach")) { W = Roll2 < 0.4f ? FMath::RandRange(1, 3) : 0; K = Roll2 < 0.1f ? 1 : 0; }
 		else if (D.Kind == TEXT("fire")) { W = Roll2 < 0.35f ? FMath::RandRange(1, 2) : 0; }
 		else { W = Roll2 < 0.1f ? 1 : 0; }
-		const FString Names = (W || K) ? Roster.Casualties(D.Deck, W, K, CasualtyRng, D.Kind) : FString();
+		// who was really in that section when it was hit (VITA), else the deck's people
+		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
+		const TArray<int32> There = (W || K) && Life ? Life->RosterIn(D.Deck, D.Section) : TArray<int32>();
+		const FString Names = (W || K) ? Roster.Casualties(D.Deck, W, K, CasualtyRng, D.Kind, &There) : FString();
 		if (!Names.IsEmpty())
 		{
 			Where += TEXT(" — casualties: ") + Names;

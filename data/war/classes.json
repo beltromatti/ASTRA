@@ -4,7 +4,7 @@
     {
       "key": "aquila", "mesh": "", "label": "Aquila-class carrier cruiser",
       "radius": 407, "tier": 3, "hull_m": {"x": [-407, 392], "width": 140, "height": 92}, "cuts_x_m": [236, -105],
-      "hull": 3000, "shield": 1100, "shield_regen": 4,
+      "hull": 4200, "shield": 1500, "shield_regen": 6,
       "accel": 15, "turn_deg": 3, "cruise": 288, "sensor_km": 55,
       "sections": [0.26, 0.42, 0.32], "armour": 0.64,
       "facing_armour": [0.20, 0.16, 0.19, 0.19, 0.13, 0.13],
@@ -12,7 +12,7 @@
       "rail": {"slugs": 4, "damage": 55, "cd": 7, "range": 10000},
       "missiles": {"count": 96, "cd": 14, "range": 25000},
       "laser": {"damage": 18, "cd": 5, "range": 4000},
-      "pd": {"channels": 4, "range": 2000},
+      "pd": {"channels": 6, "range": 2000},
       "systems": {"engines": 2, "sensors": 0, "hangar": 0, "bridge": 1, "reactor": 2},
       "range_km": [6, 9],
       "mounts": [

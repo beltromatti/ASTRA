@@ -477,7 +477,11 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			Wave = BeginChannelLine(Id, Rate);
 			V.Comp = ChannelAudio;
 		}
-		if (!Wave)
+		if (!Wave && !(GameWorld() && GameWorld()->GetAudioDeviceRaw()))
+		{
+			SendVoiceStatus(Id, TEXT("silent"), TEXT("no audio device (-nosound): the subtitle only"));   // a test run: nothing could play
+		}
+		else if (!Wave)
 		{
 			SendVoiceStatus(Id, TEXT("failed"), bInPerson ? TEXT("the officer's voice did not start (Play)") : TEXT("the radio did not start (no audio component or Play)"));
 		}

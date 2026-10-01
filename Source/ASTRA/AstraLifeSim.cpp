@@ -312,6 +312,32 @@ void FAstraLifeSim::Init(TSharedRef<const FAstraLifeMap> InMap, const FAstraCrew
 		}
 	}
 	AssignPosts();
+	// the job in words fits the rank: an officer in a department of ratings leads its division (a lieutenant in the stores is the supply
+	// officer, never a "storekeeper"; an ensign at a galley station is the mess officer, not a cook); a rating among the staff officers is
+	// their clerk or yeoman.
+	for (int32 i = 0; i < People.Num(); ++i)
+	{
+		FAstraLifePerson& P = People[i];
+		const FString& Rank = R[i].Rank;
+		const bool bOfficerRank = Rank == TEXT("Ensign") || Rank.StartsWith(TEXT("Lieutenant")) || Rank == TEXT("Commander");
+		const bool bOfficerDept = P.Class == EAstraLifeClass::Officer;
+		if (P.Class == EAstraLifeClass::Marine || bOfficerRank == bOfficerDept || !Map->Places.IsValidIndex(P.Duty))
+		{
+			continue;
+		}
+		const int32 Room = Map->Places[P.Duty].Comp;
+		const FName Kind = Map->Comps.IsValidIndex(Room) ? Map->Comps[Room].Kind : NAME_None;
+		if (bOfficerRank)
+		{
+			const FString* J = Map->OfficerJobByRoom.Find(Kind);
+			P.Job = J ? *J : FString::Printf(TEXT("%s division officer"), *R[i].Dept);
+		}
+		else
+		{
+			const FString* J = Map->JobByRoom.Find(Kind);
+			P.Job = J && !J->Contains(TEXT("officer")) ? *J : FString(TEXT("yeoman"));
+		}
+	}
 	AssignHomes();
 	AssignBattle();
 	// friends: colleagues of their department (two of their own watch), the people they see most

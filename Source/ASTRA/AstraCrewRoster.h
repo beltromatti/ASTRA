@@ -36,8 +36,9 @@ public:
 
 	/** People caught in a hit on a deck: W wounded, K killed (from that deck, else the nearest ones); Cause is what hit
 	 *  the compartment ("hull breach", "fire", "conduit damage") and shapes the injuries. Returns
-	 *  "Petty Officer Amara Diallo (engineering) killed; Crewman Jonas Berg wounded" (empty if nobody). */
-	FString Casualties(int32 Deck, int32 W, int32 K, FRandomStream& R, const FString& Cause = FString());
+	 *  "Petty Officer Amara Diallo (engineering) killed; Crewman Jonas Berg wounded" (empty if nobody). Present: who is
+	 *  physically in that compartment now (VITA's RosterIn), taken first; the deck's people after them. */
+	FString Casualties(int32 Deck, int32 W, int32 K, FRandomStream& R, const FString& Cause = FString(), const TArray<int32>* Present = nullptr);
 
 	/** A manned aircraft was shot down: its pilot is killed or ejects and is recovered wounded. Returns the report. */
 	FString AircrewLost(FRandomStream& R);

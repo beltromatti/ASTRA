@@ -54,6 +54,9 @@ UAstraNavLights::UAstraNavLights()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickInterval = 0.f;
+	// it ticks only once it has a lamp (AddLamp): a station's module, a hull without lights in the data have nothing to blink, and
+	// 1300 such components ticking for nothing cost the game thread a millisecond
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void UAstraNavLights::Setup(const FString& MeshName, bool bMandate, bool bNoTopStrobe)
@@ -123,6 +126,7 @@ void UAstraNavLights::AddLamp(const FVector& Local, const FLinearColor& Color, f
 	M->SetVectorParameterValue(TEXT("Color"), Color);
 	M->SetScalarParameterValue(TEXT("Intensity"), InPattern == 0 ? Intensity : 0.f);
 	Lamps.Add(C);
+	SetComponentTickEnabled(true);
 	Mids.Add(M);
 	Size.Add(SizeM);
 	Glow.Add(Intensity);

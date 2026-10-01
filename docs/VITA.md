@@ -115,8 +115,10 @@ di bordo; la mente le gioca nella lingua del Capitano.
 
 `mind/astra_mind/npc.py`. Il gioco manda con le parole del Capitano `context.people`: chi è a portata d'orecchio (corpo, muri
 e porte compresi), con identità, mestiere, turno, cosa sta facendo e dove, memoria, amici, distanza e se il Capitano li guarda
-(`UAstraLifeSubsystem::ListenersJson`). Il server prende al più 3 persone (quella guardata, poi le più vicine, entro 4,5 m)
-e fa **una sola chiamata** al modello con: la scena, ogni persona con ciò che *uno del suo reparto* potrebbe sapere della
+(`UAstraLifeSubsystem::ListenersJson`, al più 6). Il server le prende **tutte** (quella guardata prima, poi le più vicine):
+l'udito l'ha già deciso il gioco (16 m, muri, porte), e se le parole erano per una di loro lo giudica il modello, non una
+distanza nel codice — un marinaio chiamato per nome a 14 m risponde (fino al 2026-10-01 un filtro a 4,5 m lo escludeva e
+rispondeva l'XO inventando). Poi **una sola chiamata** al modello con: la scena, ogni persona con ciò che *uno del suo reparto* potrebbe sapere della
 nave (un cuoco il menù e le notizie della flotta; un ingegnere il reattore e le tavole dei danni; un tecnico dei sensori il
 quadro dei contatti; nessuno il piano del nemico) e ciò che si sono detti col Capitano le volte scorse (4 scambi per persona,
 salvati in `mind/.cache/npc_talk.json`, azzerati a una campagna nuova).
@@ -227,4 +229,21 @@ persona, cosa fa e ricorda), `astra.life.hour`, `astra.life.scale`; variabili `a
 - Gli attori `AstraWalker` del livello (se restano) possono raddoppiare i corpi della stessa persona nel Mess.
 - Il giorno di bordo e la memoria non sono ancora nel salvataggio della campagna (l'orologio riparte da `start_hour`).
 - La mente delle persone non conosce le altre persone del salone se non sono nella stessa conversazione (una sola
-  chiamata per frase del Capitano, con al più 3 persone).
+  chiamata per frase del Capitano, con al più 6 persone).
+
+## 8. L'anagrafe e il localizzatore (`crew_locate`)
+
+Gli ufficiali conoscono la plancia e i capi reparto, non i 560 a bordo. Per chiunque altro hanno lo strumento di un vero
+ufficiale: **`crew_locate(who)`** (mente: `tools.py`; gioco: `ApplyCommand` → `UAstraLifeSubsystem::LocatorText`). Cerca
+nell'anagrafe per cognome, nome, grado, nominativo radio o mestiere (in inglese: "cook", "Lieutenant Sato"), i nomi prima
+delle descrizioni, chi è in servizio prima, il più vicino prima; risponde in frasi in terza persona: chi è, dov'è adesso
+(ponte · sezione · locale), cosa fa, la distanza solo se è sul ponte del Capitano, oppure ferito in Medbay o caduto. Il
+giro di rilettura (`agent._follow_up`) fa riferire all'ufficiale ciò che l'anagrafe dice, sempre, anche se aveva già
+detto "un momento". Prova: «Ponte, chi è il cuoco di turno e dov'è?» → l'XO: il Crewman Tiago Sirin, turno Gold, nella
+cucina principale (sezione B, 43 m), gli altri due cuochi fuori servizio e dove sono.
+
+Il ruolino (`AstraCrewRoster.cpp`): 468 cognomi (al più due persone con lo stesso), mai quelli del cast principale (Serra,
+Ferri, Tanaka, Voss, Martin, Nair, Mensah, Okonkwo, Lindqvist, Price, Kovac, Wren, Rourke); 76 nominativi radio, uno per
+pilota. Il mestiere segue il grado (`AstraLifeSim::Init`, dati `jobs.officer_by_room` in `aquila_life.json`): un ufficiale in
+un reparto di graduati guida la sua divisione (un tenente nei magazzini è il *supply officer*, un guardiamarina in cucina il
+*mess officer*), un graduato tra gli ufficiali di stato maggiore è *staff clerk* o *yeoman*.

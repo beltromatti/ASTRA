@@ -161,6 +161,7 @@ public:
 	TMap<FString, FAstraLifeDept> Depts;         // by the roster's department name
 	TArray<FAstraLifeLeisure> Leisure;
 	TMap<FName, FString> JobByRoom;
+	TMap<FName, FString> OfficerJobByRoom;      // an officer's job by the room of their post (a division officer, not a rating)
 	TArray<FAstraLifeSelector> HomeMarine, HomeOfficer, HomeRating;
 	TArray<FName> MealKinds;
 	FString Menu;
