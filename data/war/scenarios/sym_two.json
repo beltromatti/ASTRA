@@ -1,0 +1,10 @@
+{
+  "_doc": "Symmetric: two groups a side (a cruiser and two destroyers each, the second 8 km behind and 6 km to the side), facing across 30 km; the Mandate side is the ASTRA side turned half a circle about the origin. It tests the fleet level: which group takes which enemy, and mutual support.",
+  "mirror": true,
+  "astra": [
+    {"name": "Vanguard", "formation": "wedge", "at_km": [-15, -3, 0], "heading": 0, "spacing_km": 1.6,
+     "ships": [{"class": "acheron", "n": 1}, {"class": "styx", "n": 2}]},
+    {"name": "Second Line", "formation": "wedge", "at_km": [-22, 4, 0], "heading": 0, "spacing_km": 1.6,
+     "ships": [{"class": "acheron", "n": 1}, {"class": "styx", "n": 2}]}
+  ]
+}

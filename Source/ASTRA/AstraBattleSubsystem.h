@@ -7,6 +7,9 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Dom/JsonObject.h"
+#include "AstraWarStats.h"
+#include "AstraWarTypes.h"
+#include "AstraWarAI.h"
 #include "AstraBattleSubsystem.generated.h"
 
 class AStaticMeshActor;
@@ -32,6 +35,12 @@ enum class EAstraShipMode : uint8
 	Evade,      // breaking off
 	Dead
 };
+
+/** Which side an AI thinks for: the index of the side in the books (0 ASTRA, 1 Mandate); -1 for the rest. */
+inline int32 AstraSideIdx(EAstraSide S)
+{
+	return S == EAstraSide::Astra ? 0 : (S == EAstraSide::Mandate ? 1 : -1);
+}
 
 USTRUCT()
 struct FAstraBattleShip
@@ -114,6 +123,9 @@ struct FAstraBattleShip
 	bool bSalvo = false;                 // empty the cells at the next chance (all together: saturate point defence)
 	bool bConserve = false;              // fire missiles sparingly
 
+	// what the plot's contact list says of it, kept while the state that decides it is the same (a list of hundreds is read every frame)
+	mutable FString CvLabel, CvClass;
+	mutable uint8 CvKey = 255;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> ShieldBubble = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> DriveFlare = nullptr;   // engine plume, kept visible at long range
@@ -122,6 +134,46 @@ struct FAstraBattleShip
 	FVector ShieldFacing = FVector::ZeroVector;   // reinforced sector in the ship's frame (zero = balanced)
 	float ShieldPower = 1.f;                       // power factor (the player's allocation and damage)
 	float WeaponPower = 1.f;
+	// --- the physical model of a warship (AstraWarDamage.cpp): its class, shield sectors, armour plates, structure by
+	// section, subsystems and weapon mounts with their fields of fire. Hull and Shield above stay the sums (what the rest of
+	// the game reads); craft and decoys have no model (Dmg.bModel false) and keep the lumps.
+	FName ClassKey;
+	AstraWar::FHullBox Box;              // the hull as a shot strikes it (a box from the class's true measures); empty: a sphere of Radius
+	uint8 SizeTier = 0;                  // how big it counts (3 capital ship, 2 cruiser, 1 destroyer, 0 smaller): what depends on class size
+	FAstraShipDamage Dmg;
+	TArray<FAstraMount> Mounts;
+	bool bDisabled = false;              // no power: dead in the water, drifting, a derelict (boardable in F5)
+	bool bHoldStation = false;           // bench: kept exactly where it is (a target dummy)
+	bool bFixedAtt = false;              // bench: and pointed where it is
+	// --- the AI's state (AstraWarShipAI.cpp, AstraWarGroups.cpp, AstraWarCraft.cpp, AstraWarKnowledge.cpp)
+	int32 GroupId = -1;                  // its battle group (warships)
+	int32 FlightId = -1;                 // its flight (craft)
+	EAstraTask Task = EAstraTask::Formation;
+	FVector TaskPos = FVector::ZeroVector;     // where its group wants it: a slot, a flank point
+	FVector TaskVel = FVector::ZeroVector;     // and what that point is doing (feed-forward)
+	bool bTaskSet = false;
+	float ThinkAcc = 0.f;                // time since it last thought
+	FVector Steer = FVector::ZeroVector;       // the velocity it wants (system frame)
+	FVector FaceWant = FVector::ZeroVector;    // the heading it wants (unit; zero: along its velocity)
+	float RetargetT = 0.f;
+	float SeenT[2] = {-1.0e9f, -1.0e9f};       // when each side last held it on its sensors (0 ASTRA, 1 Mandate)
+	FVector SeenPos[2] = {FVector::ZeroVector, FVector::ZeroVector};
+	FVector SeenVel[2] = {FVector::ZeroVector, FVector::ZeroVector};
+	float DeadT = 0.f;                   // craft: seconds since it left the plot (it is cleared from the array after a while)
+	bool bHoldMissiles = false;          // its group keeps the cells for a saturating salvo
+	float SalvoAt = -1.f;                // launch the salvo at this battle time (timed by the group)
+	float CombatValue = 1.f;             // what it is worth in a fight (from its class)
+	// craft flight (AstraWarCraft.cpp)
+	float Speed = 0.f;                   // along its heading
+	uint8 CraftState = 0;                // 0 fighting/flying the mission, 1 breaking (a defensive turn), 2 extending, 3 run in, 4 egress
+	float StateT = 0.f;
+	FVector BreakDir = FVector::ZeroVector;
+	int32 CraftTarget = -1;              // the ship or craft it is going for now
+	int32 CraftSlot = 0;                 // its place in the flight (0 the leader)
+	float GunHeat = 0.f;                 // guns: seconds until it may fire again
+	float SensorKm = 45.f;               // reach of its own sensors at full health
+	float LaserDamage = 18.f, LaserCd = 5.f, LaserRange = 4000.f;
+	EAstraFate DeathHow = EAstraFate::Alive;
 };
 
 UENUM()
@@ -146,6 +198,8 @@ struct FAstraProjectile
 	float MaxSpeed = 1600.f;             // guided weapons: missiles 1600 m/s, torpedoes 900 m/s
 	bool bTorpedo = false;
 	bool bDead = false;
+	EAstraHitKind HitKind = EAstraHitKind::Missile;   // what it does on impact (the damage type follows)
+	int8 OwnerSide = -1;                 // the side that fired it (0 ASTRA, 1 Mandate)
 	bool bDecoyChecked = false;          // a missile coming at the Aquila meets her decoys once, on its terminal run
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Trail = nullptr;   // guided weapons: the exhaust streak behind
@@ -196,6 +250,7 @@ struct FAstraSquadron
 	EAstraSide Side = EAstraSide::Astra;   // Mandate wings fly from their cruisers
 	int32 CarrierId = -1;                  // the ship they launch from and land on
 	int32 Rockets = 0;                     // per aircraft (Mandate strike fighters)
+	bool bAuto = false;                    // its craft pick their own targets (the Mandate's wings, a bench scenario's): no crew to task it
 };
 
 /** The Captain at the stick of a Falcon: what the pilot does this frame (the fighter pawn fills it). */
@@ -290,6 +345,7 @@ struct FAstraWreck
 	float Life = -1.f;                    // debris fade away; hulks stay (-1)
 	float Age = 0.f;
 	float Scale = 1.f;
+	float Radius = 0.f;                   // a hulk (Life -1) is an obstacle of this size for the ships that steer round it
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
 };
 
@@ -418,9 +474,18 @@ public:
 	bool ContactGeometry(const FString& ContactId, double& OutBearing, double& OutMark, double& OutRangeKm) const;
 	void SetPlayerShields(bool bUp) { if (Ships.Num()) { Ships[0].bShieldsUp = bUp; } }
 	/** Structure damage from inside (fires): hull points, no shields. */
-	void PlayerInternalDamage(float Hull) { if (Ships.Num()) { Ships[0].Hull = FMath::Max(1.f, Ships[0].Hull - Hull); } }
+	void PlayerInternalDamage(float Hull) { if (Ships.Num()) { AddHullDelta(Ships[0], -Hull); } }
 
 	float PlayerHullFraction() const { return Ships.Num() ? Ships[0].Hull / Ships[0].HullMax : 1.f; }
+	/** Weapon reach as the plot may show it (km; 0 = none or unknown). */
+	struct FWeaponRanges
+	{
+		float RailKm = 0.f, LaserKm = 0.f, MissileKm = 0.f, PointDefenseKm = 0.f;
+	};
+	/** Empty id: the Aquila's own weapons. A contact id: that ship's reach as the Aquila knows it: its class's weapons once
+	 *  it is classified (fog of war), all zeros before. The numbers are the ones the fire code uses (the class table, or
+	 *  what a scenario set on the ship). (AstraBattleQueries.cpp) */
+	FWeaponRanges GetWeaponRanges(const FString& ContactId = FString()) const;
 	/** The Aquila's fire control at a glance (bridge screens). */
 	struct FFireControl
 	{
@@ -463,6 +528,58 @@ public:
 	};
 	/** Every contact on the Aquila's plot (not the Aquila herself), nearest first. */
 	void GetContacts(TArray<FContactView>& Out) const;
+	/** The physical state of one warship as the Aquila can know it (AstraWarDamage.cpp), for the visuals and the crew.
+	 *  Detail 0: nothing known (returns false) · 1: what the eye sees (gutted, burning, venting, breaking up, disabled) ·
+	 *  2: + structure by section, armour plates, shield sectors (a firm, classified track) · 3: everything, systems and
+	 *  mounts too (our own side, by datalink). Facings: bow, stern, port, starboard, dorsal, ventral. Sections: bow, mid,
+	 *  stern. Systems: engines, sensors, hangar, bridge, reactor, point defence. */
+	struct FDamageView
+	{
+		struct FMountView
+		{
+			EAstraMountKind Kind = EAstraMountKind::Rail;
+			FVector Dir = FVector::ForwardVector;   // ship frame
+			float ArcDeg = 0.f;                     // half-angle of its field of fire
+			uint8 Section = 0;
+			float Health = 1.f;
+			bool bReady = false;
+		};
+		int32 Id = -1;
+		FString ContactId;
+		int32 Detail = 0;
+		EAstraSide Side = EAstraSide::Neutral;
+		FVector Pos = FVector::ZeroVector;          // system frame
+		FQuat Att = FQuat::Identity;
+		float ShieldFrac[6] = {}, ShieldValue[6] = {}, ShieldCap[6] = {}, ShieldFlash[6] = {};
+		float StructureFrac[3] = {};
+		float PlateFrac[3][6] = {};
+		bool bGutted[3] = {}, bBurning[3] = {}, bBreached[3] = {};
+		float Sys[6] = {1, 1, 1, 1, 1, 1};
+		TArray<FMountView> Mounts;
+		bool bDisabled = false, bBreakingUp = false, bReactorCritical = false;
+		uint8 BreakSection = 0;
+		FVector BreakAxis = FVector::ZeroVector;    // the ship's long axis: the break is a plane across it (system frame)
+		FVector BreakPoint = FVector::ZeroVector;   // where the plane crosses it (the class's true cut of the section that lets go)
+		float CutBowX = 0.f, CutSternX = 0.f;       // the two cut planes of the break-up pieces (m along the axis, from the ship's origin)
+		FVector LastHitLocal = FVector::ZeroVector; // unit vector, ship frame, out of the ship: where the last blow struck
+		float LastHitAge = 1e9f;
+		int32 LastHitFacing = 0;
+	};
+	bool GetDamageView(const FString& ContactId, FDamageView& Out) const;
+	bool GetDamageViewById(int32 ShipId, FDamageView& Out) const;
+	/** Deaths since the last call (a reactor breach, a breakup with its section and axis, a ship left disabled): for the
+	 *  effects and the splitting of the mesh. */
+	void ConsumeDeathEvents(TArray<FAstraDeathEvent>& Out);
+	/** The Aquila's engines as the helm should feel them (0 = dead, 1 = sound), her damage control's help to the systems. */
+	float PlayerEngineFactor() const;
+	void RepairPlayerSystems(float Amount);
+	/** Where a path (P0 to P1, system frame) first meets a ship's hull: the point it strikes. The hull is a box of the mesh's own measures
+	 *  (a sphere of Radius for what has none). */
+	bool HullSweep(const FAstraBattleShip& T, const FVector& P0, const FVector& P1, FVector& OutEntry) const;
+	/** Where a beam from From, aimed at a random point of the target's side, enters its hull. */
+	FVector HullRandomEntry(const FVector& From, const FAstraBattleShip& T) const;
+	/** The x (along the ship's axis, from its origin) of the cut where the section that lets go breaks away. */
+	float BreakX(const FAstraBattleShip& S, int32 Section) const;
 	/** The Aquila in the system frame. */
 	FVector PlayerPos() const { return Ships.Num() ? Ships[0].Pos : FVector::ZeroVector; }
 	FVector PlayerVel() const { return Ships.Num() ? Ships[0].Vel : FVector::ZeroVector; }
@@ -471,6 +588,9 @@ public:
 	float GetBattleTime() const { return Time; }
 	/** The truth, for tests and tuning (never for the crew): every ship with its side, state, orders and damage. */
 	TSharedRef<FJsonObject> DebugState() const;
+	/** The war bench's counters (damage by type and facing, losses by cause, focus of fire, cost per tick). */
+	TSharedRef<FJsonObject> WarStatsJson() const { return Stats.ToJson(); }
+	const FAstraWarStats& GetWarStats() const { return Stats; }
 	/** A ship of the battle with this contact id is dead (destroyed, not merely lost from the plot). */
 	bool WasDestroyed(const FString& ContactId) const;
 	/** Missiles flying at the Aquila now (system frame). */
@@ -504,6 +624,7 @@ public:
 	float ConsumeShake(float DeltaTime);
 
 private:
+	FAstraWarStats Stats;
 	bool bFrozen = false;   // Freeze(): the story has left this fight behind
 	UPROPERTY() TArray<FAstraBattleShip> Ships;
 	UPROPERTY() TArray<FAstraProjectile> Projectiles;
@@ -619,6 +740,14 @@ private:
 	void TickWeapons(FAstraBattleShip& S, float Dt);
 	void TickSquadrons(float Dt);
 	void TickCraft(FAstraBattleShip& S, float Dt);
+	// --- the craft's minds (AstraWarCraft.cpp)
+	void AssignFlight(FAstraBattleShip& C, int32 Squadron);
+	FAstraFlight* FindFlight(int32 Id);
+	FVector CraftAvoidance(const FAstraBattleShip& S) const;
+	FVector EnvelopeWall(const FAstraBattleShip& S, const FVector& Steer) const;
+	void ThinkCraft(FAstraBattleShip& S, float DtT);
+	void FireCraft(FAstraBattleShip& S, float Dt);
+	void LandCraft(FAstraBattleShip& S, FAstraBattleShip& Carrier, FAstraSquadron& Q);
 	int32 AirborneCount(int32 Squadron) const;
 	/** A Mandate cruiser's strike wing (Harpy fighters) that launches after Delay seconds against the Aquila. */
 	void AddEnemyWing(int32 CarrierIdx, int32 Count, float Delay);
@@ -636,8 +765,106 @@ private:
 	void FireRail(FAstraBattleShip& From, FAstraBattleShip& To, float Spread);
 	void FireMissile(FAstraBattleShip& From, FAstraBattleShip& To);
 	void FireLaser(FAstraBattleShip& From, FAstraBattleShip& To);
-	void ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos);
-	void Destroy(FAstraBattleShip& S);
+	/** A blow lands: FromDir is the direction of travel, HitPos where it strikes the hull; Kind says what it is (and so how
+	 *  shields and armour take it); SourceId is the ship that fired (-1: none). */
+	void ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId);
+	void Destroy(FAstraBattleShip& S, EAstraHitKind Cause = EAstraHitKind::Internal, EAstraFate How = EAstraFate::Destroyed, uint8 Section = 0);
+
+	// --- the hierarchy and the minds (AstraWarKnowledge.cpp, AstraWarShipAI.cpp, AstraWarGroups.cpp, AstraWarCraft.cpp)
+	TArray<FAstraBattleGroup> Groups;
+	TArray<FAstraFlight> Flights;
+	int32 NextGroupId = 1, NextFlightId = 1;
+	FAstraWarGrid Grid;
+	TArray<int32> CapIdx;               // this tick: the alive warships (indices in Ships)
+	TArray<int32> CraftBySide[2];       // this tick: the alive craft of each side (a search over a long reach goes down this list, not the grid)
+	bool bStandDownCache = false;       // this tick: the Mandate leader has agreed to terms (bMandateStandDown, asked by every craft)
+	TArray<int32> HulkIdx;              // and the hulks that are obstacles (indices in Wrecks)
+	TMap<int32, int32> IdIndex;         // ship id -> index in Ships
+	float KnowledgeT = 0.f, GroupAssignT = 0.f, CompactT = 0.f;
+	void RebuildIdIndex();
+	void CompactShips();
+	void BuildGrid();
+	float SignatureOf(const FAstraBattleShip& T) const;
+	double SensorReachM(const FAstraBattleShip& O) const;
+	void TickKnowledge();
+	/** Does this side hold that ship on its sensors now (or a moment ago); where it believes it is. */
+	bool Knows(int32 SideIdx, const FAstraBattleShip& T) const;
+	FVector KnownPos(int32 SideIdx, const FAstraBattleShip& T) const;
+	double ShipDps(const FAstraBattleShip& S, double RangeM) const;
+	float Readiness(const FAstraBattleShip& S) const;
+	bool CanEngage(const FAstraBattleShip& S, const FAstraBattleShip& O) const;
+	FAstraBattleGroup* FindGroup(int32 Id);
+	const FAstraBattleGroup* FindGroup(int32 Id) const { return const_cast<UAstraBattleSubsystem*>(this)->FindGroup(Id); }
+	// the commanders' tools (AstraWarOrders.cpp)
+	TArray<FAstraGroupEvent> GroupEvents;
+	int32 NextGroupEventSerial = 1;
+	void NoteGroupEvent(int32 SideIdx, const FString& Text);
+	void SetGroupState(FAstraBattleGroup& G, EAstraGroupState New, const FString& Why);
+	void NoteGroupLoss(const FAstraBattleShip& S, const TCHAR* How);
+	FAstraBattleGroup* ResolveGroup(const FString& Key, int32 SideIdx, FString* OutWhy = nullptr);
+	FString DescribeGroupOrder(const FAstraBattleGroup& G, const FAstraBattleShip* Target, const FAstraBattleGroup* Other) const;
+	/** Is this enemy ship on the side's plot now (its ships' sensors; for ASTRA also the Aquila's own plot), and where. */
+	bool OnPlot(int32 SideIdx, const FAstraBattleShip& X, FVector& OutPos) const;
+	FAstraBattleShip* ChooseTarget(FAstraBattleShip& S, FAstraBattleGroup* G);
+	FVector ChooseFacing(const FAstraBattleShip& S, const FVector& ToTarget, double Dist) const;
+	FVector AvoidanceVel(const FAstraBattleShip& S) const;
+	void TickShipAI(FAstraBattleShip& S, float Dt);
+	void ThinkShip(FAstraBattleShip& S, float DtT);
+	void ThinkWithdraw(FAstraBattleShip& S, FAstraBattleGroup* G);
+	void TickPointDefence(FAstraBattleShip& S);
+	int32 NewGroup(EAstraSide Side, const FString& Name, EAstraFormation Formation);
+	void JoinGroup(FAstraBattleShip& S, int32 GroupId);
+	int32 NoteGroupSpawn(EAstraSide Side, const FString& Name, const FString& Formation, const TArray<int32>& ShipIdx, int32 ProtecteeId);
+	void AssignGroups();
+	void TickGroups(float Dt);
+	void ThinkGroup(FAstraBattleGroup& G, float DtT);
+public:
+	/** The minds' orders on a battle group (docs/GUERRA.md, the menu): auto | attack | attack_group | pin | flank_left |
+	 *  flank_right | screen | withdraw | regroup | reinforce | hold. */
+	bool SetGroupOrder(int32 GroupId, const FString& Order, const FString& ShipContact, int32 OtherGroup, float Duration, const FString& By, FString& OutDetail);
+	/** The battle groups as the bench reads them (state, order, formation, focus, range, strengths). */
+	TSharedRef<FJsonObject> GroupsJson() const;
+	/** The `group_order` command of the minds: {side, group, order, target, for_s, by, formation}. The detail says, in plain
+	 *  English, what the group will do. Only the callers a side allows may order its groups (docs/GUERRA.md). */
+	bool GroupOrderCommand(const TSharedPtr<FJsonObject>& Args, FString& OutDetail);
+	/** One side's groups as its mind may read them, the fog of war applied: { your_groups, enemy_groups, group_events }.
+	 *  Side 0 is the snapshot's `_astra_groups`, side 1 is merged into `_mandate`. */
+	TSharedRef<FJsonObject> SideGroupsJson(int32 SideIdx) const;
+private:
+
+	// --- bench scenarios (AstraWarScenario.cpp)
+	bool bSandbox = false;              // no Aquila, no script: a scenario of the bench is running
+	void ProcessWarCommands();
+	void SandboxReset();
+	int32 SpawnByKey(FName Key, EAstraSide Side, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);
+	/** A flight group aboard a carrier (kind 0 fighter, 1 bomber, 2 drone), launching after Delay seconds; its index. */
+	int32 AddWing(int32 CarrierIdx, int32 Kind, int32 Count, const FString& Mission, float Delay);
+	bool LoadScenario(const FString& Name, FString& OutDetail);
+
+	// --- the physical model (AstraWarDamage.cpp)
+	void InitShipModel(FAstraBattleShip& S);
+	/** (Re)build a ship's sections, plates and shield sectors for a hull and a shield total (full health). */
+	void BuildDurability(FAstraBattleShip& S, float Hull, float Shield);
+	void SyncTotals(FAstraBattleShip& S) const;
+	void SetShieldFocus(FAstraBattleShip& S, int32 Facing, float K);
+	float EngineFactor(const FAstraBattleShip& S) const;
+	float PowerFactorOf(const FAstraBattleShip& S) const;
+	float SensorFactor(const FAstraBattleShip& S) const;
+	float HangarFactor(const FAstraBattleShip& S) const;
+	void AddHullDelta(FAstraBattleShip& S, float Delta);
+	void SetHullFraction(FAstraBattleShip& S, float Frac);
+	void ApplyHitLump(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId);
+	void ApplyHitModel(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId);
+	float StructureDamage(FAstraBattleShip& S, int32 Sec, float Amount, EAstraDamageType Type, const FVector& N, int32 F);
+	void DamageInside(FAstraBattleShip& S, int32 Sec, float Taken, float SystemMul, const FVector& N, int32 F);
+	void OnSectionGutted(FAstraBattleShip& S, int32 Sec);
+	void DisableShip(FAstraBattleShip& S, const TCHAR* Why);
+	void KillModelShip(FAstraBattleShip& S, EAstraFate How, EAstraHitKind Cause, int32 Section);
+	void TickShields(FAstraBattleShip& S, float Dt);
+	void TickDamageState(FAstraBattleShip& S, float Dt);
+	int32 BearingBarrels(const FAstraBattleShip& S, EAstraMountKind Kind, const FVector& AimDir) const;
+	void FireMounts(FAstraBattleShip& S, FAstraBattleShip& T, double Dist);
+	TArray<FAstraDeathEvent> DeathEvents;
 	void BreakCeasefire(const FAstraBattleShip& Victim);
 	/** The Mandate commander's ship is gone (destroyed or jumped out): the next captain in line takes over and calls. */
 	void OnCommanderLost(const FAstraBattleShip& Old, const TCHAR* How);

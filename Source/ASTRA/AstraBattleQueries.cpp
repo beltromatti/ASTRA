@@ -2,6 +2,7 @@
 // of war applied (a bearing-only contact has no range, no speed, no damage state).
 
 #include "AstraBattleSubsystem.h"
+#include "AstraWarClasses.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 
@@ -29,20 +30,32 @@ void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 		V.Side = S.bGhost ? EAstraSide::Mandate : (V.bUnknown ? EAstraSide::Neutral : S.Side);
 		V.Track = S.Track;
 		V.bCraft = S.bCraft;
-		V.bDerelict = S.bDerelict;
-		V.bCapital = !S.bCraft && !S.bDerelict && V.Side != EAstraSide::Neutral;
+		V.bDerelict = S.bDerelict || S.bDisabled;      // a ship without power is a hulk: no threat, no target
+		if (S.bDisabled && V.Side == EAstraSide::Mandate)
+		{
+			V.Side = EAstraSide::Neutral;
+		}
+		V.bCapital = !S.bCraft && !V.bDerelict && V.Side != EAstraSide::Neutral;
 		V.bFleeing = S.bFleeing;
 		V.bJamming = S.bJamming;
-		V.bFiringAtUs = S.Side == EAstraSide::Mandate && !S.bHoldFire && (S.TargetId == P.Id || S.FireTarget == P.Id);
+		V.bFiringAtUs = S.Side == EAstraSide::Mandate && !S.bHoldFire && !S.bDisabled && (S.TargetId == P.Id || S.FireTarget == P.Id);
 		V.RadiusM = S.Radius;
 		const bool bFirm = S.Track >= 2;
-		V.Class = !bUnknown ? S.Class : FString();
-		FString Head, Short;
-		if (!V.Class.Split(TEXT(", "), &Head, &Short))
+		// the class and the label change only when what is known of it does (a list of hundreds is read every frame: the strings are kept)
+		const uint8 Key = (bUnknown ? 1 : 0) | (S.bIdentified ? 2 : 0);
+		if (S.CvKey != Key)
 		{
-			Short = V.Class;             // "Kharon Mandate cruiser, Acheron class" -> "Acheron class"
+			S.CvKey = Key;
+			S.CvClass = !bUnknown ? S.Class : FString();
+			FString Head, Short;
+			if (!S.CvClass.Split(TEXT(", "), &Head, &Short))
+			{
+				Short = S.CvClass;       // "Kharon Mandate cruiser, Acheron class" -> "Acheron class"
+			}
+			S.CvLabel = S.bIdentified ? S.Name : (!S.CvClass.IsEmpty() ? FString::Printf(TEXT("%s (%s)"), *S.ContactId, *Short) : S.ContactId);
 		}
-		V.Label = S.bIdentified ? S.Name : (!V.Class.IsEmpty() ? FString::Printf(TEXT("%s (%s)"), *S.ContactId, *Short) : S.ContactId);
+		V.Class = S.CvClass;
+		V.Label = S.CvLabel;
 		V.BearingDeg = BearingDeg(P.Pos, S.Pos);
 		V.MarkDeg = MarkDeg(P.Pos, S.Pos);
 		if (bFirm)
@@ -67,6 +80,32 @@ void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
 		const double Ra = A.RangeKm < 0.0 ? 1e9 : A.RangeKm, Rb = B.RangeKm < 0.0 ? 1e9 : B.RangeKm;
 		return Ra < Rb;
 	});
+}
+
+UAstraBattleSubsystem::FWeaponRanges UAstraBattleSubsystem::GetWeaponRanges(const FString& ContactId) const
+{
+	FWeaponRanges R;
+	if (Ships.Num() == 0)
+	{
+		return R;
+	}
+	const FAstraBattleShip* S = ContactId.IsEmpty() ? &Ships[0] : FindByContact(ContactId);
+	if (!S || !S->bAlive)
+	{
+		return R;
+	}
+	// what the Aquila can know: her own side by datalink; the others once their class is known (classified, or identified)
+	const bool bKnown = S->bPlayer || S->Side == EAstraSide::Astra || (S->bFog ? S->bClassified : S->bIdentified);
+	if (!bKnown || S->bCraft || S->bGhost || S->bDerelict)
+	{
+		return R;
+	}
+	const AstraWar::FShipClass* C = S->ClassKey.IsNone() ? nullptr : AstraWar::FindClass(S->ClassKey);
+	R.RailKm = S->RailDamage > 0.f ? S->RailRange / 1000.f : 0.f;
+	R.LaserKm = (S->Dmg.bModel ? S->LaserDamage > 0.f : true) ? S->LaserRange / 1000.f : 0.f;
+	R.MissileKm = ((C && C->Missiles > 0) || S->Missiles > 0) ? S->MissileRange / 1000.f : 0.f;
+	R.PointDefenseKm = S->PDChannels > 0 ? S->PDRange / 1000.f : 0.f;
+	return R;
 }
 
 bool UAstraBattleSubsystem::WasDestroyed(const FString& ContactId) const
@@ -113,6 +152,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 		J->SetStringField(TEXT("side"), S.Side == EAstraSide::Astra ? TEXT("astra") : (S.Side == EAstraSide::Mandate ? TEXT("mandate") : TEXT("neutral")));
 		J->SetBoolField(TEXT("craft"), S.bCraft);
 		J->SetBoolField(TEXT("alive"), S.bAlive);
+		J->SetStringField(TEXT("fate"), S.bAlive ? (S.bDisabled ? TEXT("disabled") : TEXT("alive")) : ((S.Mode == EAstraShipMode::Dead && !(S.bPlayer && bSandbox)) ? TEXT("destroyed") : TEXT("gone")));   // gone: left the theatre, or a craft that landed
 		if (!S.bAlive)
 		{
 			Arr.Add(MakeShared<FJsonValueObject>(J));
@@ -138,9 +178,22 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 		else
 		{
 			J->SetNumberField(TEXT("missiles"), S.Missiles);
+			if (S.Dmg.bModel)
+			{
+				// the physical state: shield sectors (bow, stern, port, starboard, dorsal, ventral) and structure by section
+				// (bow, mid, stern) in percent, and the systems (engines, sensors, hangar, bridge, reactor, point defence)
+				TArray<TSharedPtr<FJsonValue>> Sh, St, Sy;
+				for (int32 f = 0; f < 6; ++f) { Sh.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(100.0 * S.Dmg.Sector[f] / FMath::Max(1.f, S.Dmg.SectorMax[f])))); }
+				for (int32 k = 0; k < 3; ++k) { St.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(100.0 * S.Dmg.Structure[k] / FMath::Max(1.f, S.Dmg.StructureMax[k])))); }
+				for (int32 k = 0; k < 6; ++k) { Sy.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(100.0 * S.Dmg.Sys[k]))); }
+				J->SetArrayField(TEXT("shields"), Sh);
+				J->SetArrayField(TEXT("sections"), St);
+				J->SetArrayField(TEXT("systems"), Sy);
+			}
 		}
 		Arr.Add(MakeShared<FJsonValueObject>(J));
 	}
 	O->SetArrayField(TEXT("ships"), Arr);
+	O->SetArrayField(TEXT("groups"), GroupsJson()->GetArrayField(TEXT("groups")));
 	return O;
 }

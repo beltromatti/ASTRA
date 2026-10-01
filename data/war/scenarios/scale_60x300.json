@@ -1,0 +1,270 @@
+{
+ "_doc": "Twice the scale bench: thirty warships and a hundred and fifty craft a side (sixty capital ships and three hundred fighters, bombers and drones in all), the second half of each fleet 30 km to the side of the first; the Mandate side is the ASTRA side turned half a circle. To see how much headroom the simulation has over the 1 ms target.",
+ "mirror": true,
+ "astra": [
+  {
+   "name": "Battle line",
+   "formation": "line",
+   "at_km": [
+    -18,
+    0,
+    0
+   ],
+   "heading": 0,
+   "spacing_km": 1.8,
+   "ships": [
+    {
+     "class": "praetorian",
+     "n": 1
+    },
+    {
+     "class": "styx",
+     "n": 4
+    }
+   ]
+  },
+  {
+   "name": "Frigate wedge",
+   "formation": "wedge",
+   "at_km": [
+    -20,
+    12,
+    0
+   ],
+   "heading": 0,
+   "spacing_km": 1.4,
+   "ships": [
+    {
+     "class": "lethe",
+     "n": 5
+    }
+   ]
+  },
+  {
+   "name": "Carrier group",
+   "formation": "column",
+   "at_km": [
+    -26,
+    -6,
+    0
+   ],
+   "heading": 0,
+   "spacing_km": 2.0,
+   "ships": [
+    {
+     "class": "acheron",
+     "n": 3,
+     "name": "Carrier"
+    }
+   ],
+   "wings": [
+    {
+     "carrier": 0,
+     "kind": "fighter",
+     "n": 16,
+     "mission": "cap",
+     "delay": 5
+    },
+    {
+     "carrier": 0,
+     "kind": "bomber",
+     "n": 5,
+     "mission": "strike",
+     "delay": 30
+    },
+    {
+     "carrier": 1,
+     "kind": "fighter",
+     "n": 16,
+     "mission": "cap",
+     "delay": 8
+    },
+    {
+     "carrier": 1,
+     "kind": "bomber",
+     "n": 5,
+     "mission": "strike",
+     "delay": 40
+    },
+    {
+     "carrier": 1,
+     "kind": "drone",
+     "n": 4,
+     "mission": "cap",
+     "delay": 12
+    },
+    {
+     "carrier": 2,
+     "kind": "fighter",
+     "n": 16,
+     "mission": "cap",
+     "delay": 11
+    },
+    {
+     "carrier": 2,
+     "kind": "bomber",
+     "n": 5,
+     "mission": "strike",
+     "delay": 50
+    },
+    {
+     "carrier": 2,
+     "kind": "drone",
+     "n": 7,
+     "mission": "cap",
+     "delay": 15
+    }
+   ]
+  },
+  {
+   "name": "Carrier screen",
+   "formation": "screen",
+   "at_km": [
+    -24,
+    -6,
+    0
+   ],
+   "heading": 0,
+   "spacing_km": 1.5,
+   "protects": "Carrier group",
+   "ships": [
+    {
+     "class": "styx",
+     "n": 2
+    }
+   ]
+  },
+  {
+   "name": "Battle line II",
+   "formation": "line",
+   "at_km": [
+    -18,
+    30,
+    0
+   ],
+   "heading": 0,
+   "spacing_km": 1.8,
+   "ships": [
+    {
+     "class": "praetorian",
+     "n": 1
+    },
+    {
+     "class": "styx",
+     "n": 4
+    }
+   ]
+  },
+  {
+   "name": "Frigate wedge II",
+   "formation": "wedge",
+   "at_km": [
+    -20,
+    42,
+    0
+   ],
+   "heading": 0,
+   "spacing_km": 1.4,
+   "ships": [
+    {
+     "class": "lethe",
+     "n": 5
+    }
+   ]
+  },
+  {
+   "name": "Carrier group II",
+   "formation": "column",
+   "at_km": [
+    -26,
+    24,
+    0
+   ],
+   "heading": 0,
+   "spacing_km": 2.0,
+   "ships": [
+    {
+     "class": "acheron",
+     "n": 3,
+     "name": "Carrier"
+    }
+   ],
+   "wings": [
+    {
+     "carrier": 0,
+     "kind": "fighter",
+     "n": 16,
+     "mission": "cap",
+     "delay": 5
+    },
+    {
+     "carrier": 0,
+     "kind": "bomber",
+     "n": 5,
+     "mission": "strike",
+     "delay": 30
+    },
+    {
+     "carrier": 1,
+     "kind": "fighter",
+     "n": 16,
+     "mission": "cap",
+     "delay": 8
+    },
+    {
+     "carrier": 1,
+     "kind": "bomber",
+     "n": 5,
+     "mission": "strike",
+     "delay": 40
+    },
+    {
+     "carrier": 1,
+     "kind": "drone",
+     "n": 4,
+     "mission": "cap",
+     "delay": 12
+    },
+    {
+     "carrier": 2,
+     "kind": "fighter",
+     "n": 16,
+     "mission": "cap",
+     "delay": 11
+    },
+    {
+     "carrier": 2,
+     "kind": "bomber",
+     "n": 5,
+     "mission": "strike",
+     "delay": 50
+    },
+    {
+     "carrier": 2,
+     "kind": "drone",
+     "n": 7,
+     "mission": "cap",
+     "delay": 15
+    }
+   ]
+  },
+  {
+   "name": "Carrier screen II",
+   "formation": "screen",
+   "at_km": [
+    -24,
+    24,
+    0
+   ],
+   "heading": 0,
+   "spacing_km": 1.5,
+   "protects": "Carrier group II",
+   "ships": [
+    {
+     "class": "styx",
+     "n": 2
+    }
+   ]
+  }
+ ]
+}

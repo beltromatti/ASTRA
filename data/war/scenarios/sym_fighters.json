@@ -1,0 +1,9 @@
+{
+  "_doc": "Dogfight bench: two motionless carriers 9 km apart, each launching twelve fighters on combat patrol with intercept orders; no torpedoes, no other ships. Fair fight: the losses on the two sides should be even over seeds (the tail of the distribution shows who has the better tactics).",
+  "mirror": true,
+  "astra": [
+    {"name": "Deck", "formation": "line", "at_km": [-4.5, 0, 0], "heading": 0, "spacing_km": 1.0,
+     "ships": [{"class": "vigilant", "n": 1, "name": "Deck", "hold": true}],
+     "wings": [{"carrier": 0, "kind": "fighter", "n": 12, "mission": "intercept", "delay": 3}]}
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "_doc": "Unequal: two cruisers and four destroyers of ASTRA against one cruiser and two destroyers of the Mandate, 30 km apart. It measures what superiority is worth to the stronger side's tactics (flanking, focus) and how the weaker side breaks off. To read a behaviour, switch it off for one side (astra.war.tune <name>_a 0 / <name>_m 0).",
+  "astra": [
+    {"name": "Vanguard", "formation": "wedge", "at_km": [-15, 0, 0], "heading": 0, "spacing_km": 1.6,
+     "ships": [{"class": "acheron", "n": 2}, {"class": "styx", "n": 4}]}
+  ],
+  "mandate": [
+    {"name": "Interdiction Squadron", "formation": "wedge", "at_km": [15, 0, 0], "heading": 180, "spacing_km": 1.6,
+     "ships": [{"class": "acheron", "n": 1}, {"class": "styx", "n": 2}]}
+  ]
+}

@@ -2219,6 +2219,10 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	{
 		return Battle ? Battle->EnemyTactics(Args, OutDetail) : false;
 	}
+	if (Name == TEXT("group_order"))
+	{
+		return Battle ? Battle->GroupOrderCommand(Args, OutDetail) : false;   // docs/GUERRA.md: {side, group, order, target, for_s, by}
+	}
 	if (Name == TEXT("enemy_order"))
 	{
 		return Battle ? Battle->EnemyOrder(Str(TEXT("order")), Str(TEXT("reason")), Str(TEXT("commander")), OutDetail) : false;
@@ -2396,6 +2400,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 		S->SetArrayField(TEXT("contacts"), Battle->ContactsJson());
 		S->SetStringField(TEXT("enemy_small_craft"), Battle->EnemyCraftSummary());
 		S->SetObjectField(TEXT("_mandate"), Battle->MandateViewJson());   // for the enemy minds only
+		S->SetObjectField(TEXT("_astra_groups"), Battle->SideGroupsJson(0));   // the ASTRA groups, for the allied commanders (docs/GUERRA.md)
 		// where the Captain is: in a Falcon the XO has the conn and the Captain speaks by radio
 		const FString Flying = Battle->PilotSummary();
 		S->SetStringField(TEXT("captain"), !Flying.IsEmpty() ? Flying : CaptainAboard());

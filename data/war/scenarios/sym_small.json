@@ -1,0 +1,8 @@
+{
+  "_doc": "Symmetric: one cruiser and two destroyers a side, facing across 28 km; the Mandate side is the ASTRA side turned half a circle about the origin. Neither side has the better position: the result over seeds should be even.",
+  "mirror": true,
+  "astra": [
+    {"name": "Vanguard", "formation": "wedge", "at_km": [-14, 0, 0], "heading": 0, "spacing_km": 1.6,
+     "ships": [{"class": "acheron", "n": 1}, {"class": "styx", "n": 2}]}
+  ]
+}
