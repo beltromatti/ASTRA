@@ -669,3 +669,427 @@ di punto. Scenario dei soli caccia (48 semi): nessuna nave affondata, 0,2 ± 0,7
 - La poppa debole dell'Aquila e la forza dell'apertura (pari, senza il Capitano) sono valori di `data/war/classes.json`.
 - Il costo dei velivoli è la prima voce se si vuole il doppio: la separazione fra velivoli e la ricerca dei bersagli si possono rendere
   più radi per i lontani dall'Aquila (F2.3).
+
+
+## 8. Le menti di guerra (MENTE-GUERRA: F2.2 lato mente e F2.5)
+
+*Scritto a fine lavoro del modulo MENTE-GUERRA (1/10/2026): cosa c'è, come si prova, cosa misura il banco con la mente nel giro. I nomi nel
+gioco sono in inglese; il documento in italiano. Il contratto con cui le menti agiscono è il §6; i principi sono in
+[ARCHITETTURA.md](ARCHITETTURA.md) §1bis (nessun filtro sulle parole o sulle decisioni dei modelli: prompt, contesto vero, strumenti veri).*
+
+### 8.1 In breve
+
+Il codice di GUERRA è il **corpo** della flotta (formazioni, tiro, evasione, difesa di punto, riflessi). Qui c'è il **giudizio**. Una mente
+è una chiamata a un modello (un *giro*, `pulse`) con tre cose: **cosa può sapere quella persona** (i suoi gruppi per intero, il nemico come lo
+vedono i sensori della sua parte, gli eventi dei suoi gruppi, il registro di ciò che ha deciso, detto e sentito), **gli strumenti del suo
+grado** e un prompt con il suo carattere e la dottrina. Niente regole di codice sulle decisioni o sulle parole.
+
+| chi pensa | cosa vede | cosa può fare |
+|---|---|---|
+| **Ammiraglio del Mandato** (il comandante più anziano vivo: l'Archon Varek Solm sull'Acheron; il gioco passa il comando con `commands_the_strike_group`) | tutti i suoi gruppi, i nemici in nebbia di guerra, guerra elettronica, caccia, la sua intelligence sul Capitano | `group_order` (by `admiral`, un gruppo o `all`), `fleet_ops` (= `mandate_tactics`: missili, caccia, guerra elettronica), `decide` (= `enemy_order`: ritirata dal sistema), `transmit` (solo con un canale aperto) |
+| **Comandante di un gruppo del Mandato** (il capo di ogni altro gruppo) | il suo gruppo per intero, gli altri in una riga, l'intento dell'ammiraglio | `group_order` per il suo gruppo (by `commander`), `report` all'ammiraglio |
+| **Capitano alleato ASTRA** (il capo di ogni gruppo ASTRA: la Praetorian per il picchetto; chi arriva col regista) | i suoi gruppi, i nemici come li tiene la flotta (`_astra_groups`), l'Aquila e i vicini, la catena di comando, le parole del Capitano | `group_order` (by `commander`), `weapons_posture`, `say` (parla con l'Aquila sulla rete della flotta), `no_change` |
+| **Il Capitano** (tramite l'XO) | la tabella della flotta nel prompt dell'equipaggio | `group_order` (by `captain`) solo se è il più anziano presente; `fleet_request` = una *richiesta* che il capitano alleato giudica |
+
+Una chiamata dà voce a più capitani: i capitani delle altre navi di un gruppo (il comandante del Vigilant nel picchetto) parlano con la propria voce
+nella stessa chiamata (`say` con `speaker`); non danno ordini al gruppo.
+
+### 8.2 I file
+
+| file | cosa contiene |
+|---|---|
+| `mind/astra_mind/war_minds.py` (nuovo) | `WarMinds`: i seggi, la cadenza, il quadro per parte, gli strumenti, la memoria comune, la catena di comando, i capitani alleati, le misure |
+| `mind/astra_mind/enemy.py` | la persona sul canale aperto (`EnemyAgent`, `COMMANDERS`, `CHAIN`): ora legge lo stesso quadro e lo stesso registro dell'ammiraglio (è la stessa persona); via `plan_tactics` |
+| `mind/astra_mind/director.py` | il regista v2 e Rourke (§8.7) |
+| `mind/astra_mind/server.py` | l'aggancio (§8.9) |
+| `mind/astra_mind/crew.py`, `tools.py` | lo strumento dell'XO (`group_order`), `fleet_request` come richiesta, la tabella della flotta nel prompt |
+| `mind/astra_mind/models.py` | ruoli `admiral`, `commander`, `talk`, `director` (il registro dei costi li conta) |
+| `mind/bench/war_arena.py`, `war_mock.py`, `war_show.py`, `war_quality.py`, `war_judge.py`, `war_crew_live.py`, `war_director_live.py`, `war_scenes_live.py` | la mente nel giro, i modelli finti, il lettore dei record, la qualità degli ordini, il giudice delle parole, le prove dal vivo (equipaggio, regista, due scene: l'Aquila sotto il fuoco e la formazione) |
+| `mind/bench/war_minds_unit.py`, `war_server.py`, `war_director_unit.py` | le prove offline (71, con le 106 di prima: 177) |
+| `Source/ASTRA/AstraWarSimCommandlet.*` | il commandlet con `-mind=<cartella>` |
+| `tools/war.py mind ...` | un solo ingresso per l'arena |
+
+### 8.3 Chi pensa: i seggi e la catena di comando
+
+Un **seggio** è una posizione di comando (`mandate/admiral`, `mandate/group/<nome>`, `astra/group/<nome>`); la persona che lo tiene è il
+capitano della **nave capo** del gruppo (`leader` nella vista) e cambia quando il gioco cambia il capo: chi subentra guarda subito il quadro
+con le parole «avete appena preso il comando da...» e legge il registro di chi c'era prima (la memoria è del lato, non della persona). Un gruppo
+che non c'è più perde il suo seggio.
+
+**Catena di comando ASTRA** (fatti, non verdetti: cosa significano per un ordine lo giudica il capitano). Ogni capitano ha un grado
+(`RANK_ORDER`) e una precedenza; il Capitano dell'Aquila è, per nomina della Flotta, al comando tattico del picchetto di Aurelia
+(precedenza 0), quindi il più anziano presente **a meno che** non sia presente un ufficiale di grado superiore (un contrammiraglio che arriva
+con una forza, inventato dal regista). La catena è nel prompt di ogni capitano alleato e nella tabella della flotta dell'XO. Il capitano alleato
+**obbedisce** al più anziano presente (può aggiungere una protesta o un'idea migliore; rifiuta solo ciò che non si può fare o che getterebbe la
+nave per niente, dicendo perché e cosa fa invece); se chi comanda non è il più anziano presente, pesa la richiesta e può rifiutare. L'XO può
+dare `group_order` (ordine diretto del Capitano) solo se il Capitano è il più anziano presente: altrimenti lo strumento risponde che si chiede
+al più anziano sulla rete della flotta.
+
+**Rourke** (`director.py`) resta il comando di flotta da lontano: risponde a ciò che è per il comando (il Capitano lo chiama, chiede aiuto),
+tace se le parole erano per un capitano (la rete è condivisa: lo sa dal prompt), e può concedere rinforzi o rifornimenti (`grant`).
+
+### 8.4 Cadenza e costo
+
+Una mente pensa ogni **60–120 s** (periodo estratto una volta per sguardo: 80 s × 0,85–1,25 l'ammiraglio, 100 s × 0,85–1,25 un capitano
+alleato), e solo se il quadro è cambiato (impronta: ordini, stati, scafi a gradini del 20 %, distanze a gradini di 4 km), oppure **sugli
+eventi**: i `group_events` nuovi (la lettura aspetta 3 s che la raffica finisca, al più 8 s; minimo 20 s fra due giri per l'ammiraglio, 25 s per
+un capitano), un nemico mai visto sul piano, l'Aquila che si allontana di 4 km dal gruppo dall'ultimo sguardo (l'avviso successivo ne vuole il
+doppio, poi il quadruplo, fino a 8 volte; riparte quando l'Aquila torna fra le sue navi; che si avvicini è sempre una notizia), l'Aquila che
+perde protezione in fretta (scudi giù di 30 punti o scafo di 8 dall'ultimo sguardo), un messaggio per lui. Il primo sguardo viene 8 s dopo
+l'inizio del combattimento. I comandanti di gruppo del Mandato non hanno orologio: pensano solo per eventi del loro gruppo. **Mai due volte
+insieme per la stessa persona**; un giro che non finisce in 28 s lascia il gruppo ai suoi riflessi. Una parola del Capitano sulla rete della
+flotta, o una richiesta dell'XO, sveglia subito i capitani interessati (anche senza combattimento).
+
+Un giro è **una chiamata** (più una correzione se un ordine è stato rifiutato: legge perché e lo corregge una volta; più una richiesta se il
+modello ha chiuso senza alcuno strumento: «hai finito senza chiamare nulla: decidi ora», senza leggere ciò che aveva scritto). Il prompt di
+sistema è lungo e stabile (carattere, dottrina), il quadro corto: la cache dei fornitori lo sconta (da 1,3 a 0,35 m$ la chiamata). Il modello
+pensa ad alta voce in poche frasi e poi chiama gli strumenti (`no_change` se non c'è nulla da cambiare: una scelta, non un silenzio). Se un
+giro fallisce o scade prima che il capitano abbia risposto a una richiesta del Capitano, la richiesta va alle navi come prima: non si perde.
+
+### 8.5 Cosa legge e cosa può fare
+
+Il quadro è testo compatto (circa 0,6–1,5 KB, 400–900 token): i gruppi propri con membri, scafo, scudi (le facce solo se una è sotto il 90 %),
+missili, stato; i gruppi nemici come li tiene la parte; per il Mandato anche i caccia, le esche, l'ufficiale di guerra elettronica e le navi
+ASTRA *sul suo piano* (la nebbia di guerra vale anche per lui); per un capitano alleato l'Aquila (scafo, scudi, velocità, rotta, cosa fa il
+timone, e che scafo e scudi aveva al suo ultimo sguardo), le navi amiche attorno a lei, **le navi nemiche più vicine a lei con la distanza e
+quali sono dentro la portata dei laser**, e i contatti con la sola direzione (qualunque può essere un'esca). Sotto: gli eventi nuovi dei suoi
+gruppi, i messaggi per lui, il suo **registro** (ordini con la ragione e l'esito, parole dette e sentite sulla rete, passaggi di comando),
+e per un subordinato l'intento dell'ammiraglio (la `reason` dell'ultimo ordine). Gli strumenti sono quelli della tabella del §8.1; il
+codice li esegue come comandi del gioco (`group_order` con `side` e `by` aggiunti, la `reason` tolta) e rifiuta solo ciò che il grado non
+permette (un comandante ordina il suo gruppo, non un altro).
+
+### 8.6 Il Capitano e la sua flotta
+
+- **Richiesta** (l'ufficiale alle comunicazioni, `fleet_request`): non va più alle navi ma al capitano alleato, come parole (`The Captain
+  asks...`); lui giudica, ordina il suo gruppo e risponde per radio (un'assenso, o il perché non può). Se la nave nominata non ha un capitano
+  con una mente, o se il modello non risponde, la richiesta va alle navi come prima (`fleet_request` del gioco): non si perde mai.
+- **Ordine diretto** (l'XO, `group_order`, by `captain`): vale subito, solo se il Capitano è il più anziano presente; il capitano è
+  avvisato (lo legge nel registro e nel quadro: `order in force ... by captain`) e non lo disfa se non per forza maggiore.
+- **Parole del Capitano sulla rete** (canale `fleet`, o a una nave): il router decide cosa esce; i capitani alleati lo sentono tutti e ognuno
+  giudica se era per lui (il più anziano risponde per la flotta; Rourke tace se erano per una nave). Le risposte escono come voci radio
+  (priorità «risposta»: passano avanti ai rapporti).
+- **I capitani parlano da soli** (pochi messaggi, brevi, utili: lo dice il prompt, nessun filtro): un avviso che il Capitano può aver perso,
+  una richiesta, ciò che stanno facendo e lo riguarda (l'Aquila si è allontanata dal picchetto e lo dicono), una perdita. Gli alleati si
+  parlano fra loro con `say` a un altro capitano (che si sveglia, e il Capitano sente). Una riga rimasta troppo in coda la ripensa chi
+  doveva dirla (`rethink`). Il prompt chiede la riga più corta: il nominativo e solo ciò che per il Capitano è **nuovo** (non il suo ordine, la
+  formazione tenuta, la distanza, né ciò che ha già detto).
+- **L'Aquila sotto il fuoco** (dalla prima battaglia vera col gioco: il gruppo d'attacco chiude a 2–3 km e senza il Capitano la uccide in circa 4,5
+  minuti, e la Praetorian non si concentra sugli attaccanti): il capitano alleato si sveglia quando gli scudi o lo scafo dell'Aquila calano in fretta
+  (30 punti di scudo o 8 di scafo dall'ultimo sguardo: `AQUILA_SHIELD_DROP`, `AQUILA_HULL_DROP`, al più ogni 25 s), il quadro gli dice cos'erano al
+  suo ultimo sguardo e quali navi nemiche le sono più vicine (e quali dentro la portata dei laser), e il prompt gli dice di agire subito senza
+  aspettare la parola del Capitano — sparare su chi la colpisce o farle schermo — e di dirlo in una riga. Provato dal vivo su una scena (§8.10).
+  La leva del Capitano è l'XO: «picchetto, attacca l'Acheron a 3 km» è un `group_order` diretto (§8.1).
+
+### 8.7 Il regista v2 (F2.5)
+
+`director.py`, senza atti: via `act`, `act_beats`, `ACTS`; resta il capitolo (`arc`) che si chiude con la battaglia decisiva, che il regista
+sceglie quando la guerra ha radunato le due parti, non per un contatore. Legge il **polso**, fatti e non verdetti, calcolati dal codice
+dallo stato (`Director.observe` a ogni stato, `pulse_facts`): la **tensione** (minuti di combattimento e di pace negli ultimi 20, il
+combattimento in corso e quanti combattimenti di fila dall'ultima vera pace di 3 minuti), la **stanchezza del Capitano** (minuti di sessione,
+da quanto è sotto pressione, scafo, scudi, missili, calore, perdite, incidenti aperti, gli ultimi beat con quanto tempo fa), l'**equilibrio**
+(forze sul piano per classe, chi tiene cosa nella March con le minacce); più il registro della campagna, il tavolo e i **fili aperti** (`threads`:
+ciò che ogni parte sta facendo o radunando, le promesse, i misteri; li riscrive a ogni beat e li salva con la storia).
+
+Cosa può fare: i beat di prima (`raid`, `distress`, `reinforcements`, `resupply`, `calm`, `transit`, `investigate`, `decisive`, `war_news`) più
+**`none`** (la guerra corre, con la ragione) e **`negotiation`** (un comandante del Mandato già sul piano chiama l'Aquila: `caller`, `terms`;
+il server apre il canale dal suo lato col percorso di `transmission:` e la sua mente dice la sua parte; nessun numero cambia). I **rinforzi**
+sono di **entrambe** le parti: `reinforcements` è la 7th Fleet (ogni nave con un `captain` inventato: nome, grado, bio, sesso → una voce e una
+mente, `WarMinds.register_ally`), `raid` è la seconda ondata del Mandato (con il suo `commander`); in una battaglia in corso arrivano con un
+ritardo di 2–7 minuti (visibili sui sensori), mai come un salvataggio. **Mai numeri truccati**: nessun beat cambia le navi già nella
+battaglia; durante un combattimento il codice lascia passare solo `reinforcements`, `raid`, `negotiation`, `none` (le regole del mondo, non
+un filtro sulle parole: un transito in mezzo ai cannoni non esiste). Uno sguardo alle **battaglie lunghe**: dopo 150 s di combattimento e
+poi ogni 4 minuti (`battle_due`, `battle_pulse`), a bassa spesa, il regista può aggiungere ciò che la guerra porterebbe, o niente.
+
+### 8.8 Il banco con la mente nel giro (`mind/bench/war_arena.py`, `tools/war.py mind`)
+
+```
+tools/war.py mind --scenario sym_small --seeds 1-8 --minds mandate --no-ops --model live --budget 0.1
+tools/war.py mind --opening --jump 160 --seconds 450 --minds astra --model live --captain "200:fleet:Praetorian, concentrate on the Acheron;260:request:T-02:cover_us"
+tools/war.py mind --scenario sym_small --seeds 1-8 --minds mandate --no-ops --model close --range 4.5     # il comandante a copione (nessuna spesa)
+cd mind && .venv/bin/python -m bench.war_show <tag> <seed> [--content] [--prompts]      # i giri, gli ordini e le parole di un record
+cd mind && .venv/bin/python -m bench.war_quality <tag> [--seeds 1-8]                     # la qualità degli ordini di un gruppo di battaglie
+cd mind && .venv/bin/python -m bench.war_judge <tag> <seed>                              # un modello giudica le parole dei capitani alleati
+cd mind && .venv/bin/python -m bench.war_scenes_live                                     # due scene col modello vero: l'Aquila sotto il fuoco, la formazione
+```
+
+I riflessi contro i riflessi (il termine di paragone) si fanno con `tools/war.py batch --scenario sym_small --seeds 24 --exec "astra.war.tune
+shield_scale 1.5;astra.war.tune armour_scale 1.5;astra.war.tune struct_scale 1.8"`.
+
+Il commandlet con `-mind=<cartella> [-mind_dt=0.5] [-mind_speed=1]` si ferma ogni `mind_dt` secondi di battaglia, scrive `s_<k>.json` (le
+viste `_mandate` e `_astra_groups`, i contatti dell'Aquila, i conteggi, gli eventi e i risultati dei comandi del giro prima) e aspetta
+`r_<k>.json` (i comandi dati dalle menti, eseguiti con `ApplyCommand`, e se qualcuna sta ancora pensando). **Finché una mente pensa il mondo
+corre a tempo reale** (non aspetta un modello che ci mette secondi, come nel gioco); altrimenti corre al massimo. L'arena è il «gioco»: usa le
+stesse funzioni Python (`WarMinds.feed`, gli stessi prompt e strumenti), con il tempo di battaglia come orologio. `--model close` è un
+comandante a copione (attacca la nave più preziosa e malconcia a una distanza fissa): stima cosa può fare l'interfaccia degli ordini, a
+costo zero; `--model live` è il modello vero (`--budget` ferma la spesa). `--no-ops` toglie all'ammiraglio del Mandato missili, caccia e
+guerra elettronica (lo scontro equo contro le menti ASTRA, che non li hanno). `--captain` è un Capitano a copione (parole sulla rete,
+richieste, ordini diretti, a tempi di battaglia). `--range` e `--formation` dicono al comandante a copione che distanza e che formazione
+ordinare, `--reissue` che ripeta l'ordine a ogni sguardo, `--formation-doctrine` accende la formazione nella dottrina dei modelli veri (§8.10). Lo
+scenario base è con la durezza di main (`astra.war.tune shield_scale 1.5;
+armour_scale 1.5; struct_scale 1.8`, default dell'arena: `--tune ""` per quella del ramo).
+
+### 8.9 L'aggancio al server (`mind/astra_mind/server.py`)
+
+Tutte le modifiche a `server.py` (nient'altro è toccato fuori dai file del modulo, a parte `crew.py` e `tools.py` per l'XO):
+
+- `GameShip(send, intercept=...)` e `execute(name, args, by, direct=False)`: dei comandi della plancia due passano prima dalla mente,
+  `fleet_request` (la richiesta dell'ufficiale comunicazioni va al capitano alleato come parole: `Mind._fleet_request`) e `group_order`
+  (l'ordine diretto dell'XO, solo se il Capitano è il più anziano: `Mind._captain_group_order`). Le menti dei comandanti usano `direct=True`
+  (`Mind._war_execute`): vanno dritte alle navi.
+- `Mind.__init__`: crea `WarMinds` (`self.war`) con `_ally_say` (la voce radio dei capitani alleati), il canale aperto, l'intelligence sul
+  Capitano e `director.note`; `ASTRA_WAR_MINDS=0` le spegne (i gruppi combattono sui riflessi, come prima), `ASTRA_WAR_FORMATION=1` accende la formazione nella dottrina; `enemy.war`, `director.war_minds` e
+  `director.negotiate` (`_negotiate`: il regista fa chiamare l'Aquila da un comandante del Mandato).
+- Stato della nave (`ship_state`): `Mind._war_look(state)` = `director.observe(state)` (il polso della storia), `war.feed(state)` (le menti
+  guardano la battaglia e avviano i giri dovuti), `_fleet_board` nello stato (la tabella della flotta per l'XO, che `crew.bridge_now` porta con
+  l'ultimo messaggio del turno). Un difetto in questa lettura è contenuto (registrato, mai propagato): non taglia l'equipaggio dalla nave.
+- Via `enemy_tactics` (il vecchio ciclo del Mandato ogni 40 s): lo sostituisce l'ammiraglio.
+- `story_watch`: lo sguardo del regista alle battaglie lunghe (`battle_due`/`battle_pulse`).
+- Parole del Capitano: `_to_party` e `hail` verso `fleet` o una nave alleata passano a `war.captain_to_fleet` e `war.kick()`;
+  `_can_answer` conta anche i capitani alleati.
+- `war.reset()` a ogni nuova sessione e a ogni ripresa della campagna; `EXTERNAL_SPEAKERS` conosce i capitani del picchetto (gli altri si
+  registrano quando arrivano).
+
+### 8.10 Misure (1/10/2026; durezza di main: scudi 1,5, corazze 1,5, strutture 1,8; `deepseek/deepseek-v4.1-flash`, provider together/modal)
+
+**Come si legge.** «Vantaggio» = navi sopravvissute a fine battaglia (ritirate comprese) della parte considerata meno quelle dell'altra, su
+semi uguali; «± » è l'errore standard. «Mente / riflessi / pari» sono i semi vinti dalla parte con la mente, dall'altra, e i pari. Il termine
+di paragone giusto è **la stessa parte coi soli riflessi** (stessa durezza, stessi semi, stessa durata), non lo zero: nei banchi con la
+durezza di main la parte creata per seconda è in vantaggio anche senza menti.
+
+**I riflessi contro i riflessi con la durezza di main** (`tools/war.py batch ... --exec "astra.war.tune shield_scale 1.5;..."`):
+
+| scenario | semi | ASTRA / Mandato / pari | vantaggio di ASTRA |
+|---|---|---|---|
+| sym_small (ASTRA creata per prima) | 24 | 6 / 16 / 2 | **−0,58 ± 0,21** |
+| sym_small, 1200 s invece di 600 | 24 | 6 / 16 / 2 | −0,67 ± 0,23 |
+| sym_small_rev (Mandato creato per primo) | 24 | 13 / 6 / 5 | **+0,33 ± 0,18** |
+| sym_small coi valori del ramo (durezza di prima) | 24 | 13 / 11 / 0 | +0,00 ± 0,32 |
+| sym_two | 16 | 3 / 6 / 7 | −0,31 ± 0,23 |
+| sym_medium | 16 | 9 / 5 / 2 | +0,31 ± 0,49 |
+
+**Trovato per strada, da guardare** (non è di questo modulo): con la durezza 1,5/1,5/1,8 **il vantaggio segue l'ordine di creazione** — nel
+sym_small la parte creata per seconda vince di circa mezza nave su tre (il segno si rovescia con `sym_small_rev`), mentre con la durezza di
+prima i due lati erano pari (§7.2). Nel gioco le navi di ASTRA nascono prima del Mandato: se il difetto è nel mondo (l'ordine in cui le navi
+sono servite in un tick: scudi, danni) il Mandato parte con mezza nave di vantaggio. Le misure qui sotto ne tengono conto (si confronta sempre
+con la stessa parte senza mente).
+
+**Il margine dell'interfaccia** (comandante a copione, costo zero, 8 semi, 600 s, sul lato del Mandato: «attacca la nave più preziosa e
+malconcia a una distanza fissa e tienila finché serve»; mostra cosa può dare lo strumento degli ordini, non cosa dà un modello):
+
+| scenario | distanza ordinata | mente / riflessi / pari | vantaggio della mente | contro i riflessi (Δ) |
+|---|---|---|---|---|
+| sym_small | 3,2 km | 2 / 3 / 3 | −0,25 ± 0,46 | −0,83 |
+| | 4,2 km | 5 / 2 / 1 | +0,12 ± 0,45 | −0,46 |
+| | **4,5 km** | **7 / 0 / 1** | **+0,88 ± 0,12** | **+0,30** |
+| | 4,8 km | 5 / 1 / 2 | +0,38 ± 0,35 | −0,20 |
+| | 5,5 km | 4 / 4 / 0 | 0,00 ± 0,35 | −0,58 |
+| sym_small, lo stesso ordine ripetuto a ogni sguardo | 4,5 km | 7 / 0 / 1 | +0,88 ± 0,12 | +0,30 (ripetere non costa nulla) |
+| sym_medium | 3,2 km | 6 / 2 / 0 | +0,50 ± 0,43 | +0,81 |
+| | 4,5 km | 3 / 3 / 2 | −0,25 ± 0,52 | +0,06 |
+| sym_two | 3,2 km | 6 / 1 / 1 | +1,00 ± 0,47 | +0,69 |
+| | 4,5 km | 0 / 7 / 1 | −2,25 ± 0,39 | **−2,56** |
+| asym_3to2, sulla parte più debole | 3,2 km | 0 / 6 / 0 | −4,33 ± 0,19 | (il numero vince) |
+
+Lo stesso comandante a copione **sul lato di ASTRA** (la parte creata per prima: coi riflessi sta −0,58 ± 0,21), sym_small, 16 semi: il picco è lo
+stesso (4,5 km) e il guadagno sui riflessi è maggiore.
+
+| distanza ordinata | mente / riflessi / pari | vantaggio della mente | contro i riflessi (Δ) |
+|---|---|---|---|
+| 3,2 km | 6 / 7 / 3 | −0,12 ± 0,33 | +0,46 |
+| 4,2 km | 8 / 7 / 1 | −0,12 ± 0,30 | +0,46 |
+| **4,5 km** | **12 / 3 / 1** | **+0,44 ± 0,26** | **+1,02** |
+| 4,8 km | 8 / 7 / 1 | −0,31 ± 0,35 | +0,27 |
+
+Il modello vero dalla parte di ASTRA (+1,14 ± 0,28, sotto) arriva dove arriva il comandante a copione col suo numero migliore (+1,02 ± 0,33).
+
+La **distanza è la leva**, e dipende da quante navi combattono insieme: un gruppo piccolo ha un picco netto a 4,5 km (appena oltre i 4 km dei
+laser: solo rotaie e missili; 4,2 e 4,8 ne cedono quasi tutto), due gruppi o sei navi vogliono 3,2 (a 4,5 la coda di una formazione profonda non
+raggiunge il bersaglio e si perde più di due navi). Le tre costanti di `war_minds.py` (`LASER_KM`, `SMALL_GROUP_KM`, `DEEP_GROUP_KM`) vengono da
+qui: **se cambiano le armi o la durezza, rifare lo scorrimento** (`tools/war.py mind --scenario sym_small --seeds 1-8 --minds mandate --no-ops
+--model close --range 4.2`, e così via) e aggiornarle; il testo della dottrina le segue.
+
+**La formazione è la seconda leva** (stesso comandante a copione sul lato del Mandato, 8 semi, la formazione `line` ordinata insieme all'attacco; i
+riflessi tengono il cuneo):
+
+| scenario | formazione e distanza | mente / riflessi / pari | vantaggio della mente | contro i riflessi (Δ) |
+|---|---|---|---|---|
+| sym_small | cuneo, 4,5 km | 7 / 0 / 1 | +0,88 ± 0,12 | +0,30 |
+| | **linea, 3,2 km** | **8 / 0 / 0** | **+1,50 ± 0,18** | **+0,92** |
+| | linea, 4,0 km | 5 / 2 / 1 | +0,25 ± 0,39 | −0,33 |
+| | linea, 4,5 km | 0 / 8 / 0 | −1,38 ± 0,17 | −1,96 |
+| | colonna, 4,5 km | 0 / 8 / 0 | −2,25 ± 0,15 | −2,83 |
+| sym_two | cuneo, 3,2 km | 6 / 1 / 1 | +1,00 ± 0,47 | +0,69 |
+| | **linea, 2,8 km** | 8 / 0 / 0 | **+2,50 ± 0,35** | **+2,19** |
+| | linea, 3,2 km | 8 / 0 / 0 | +2,12 ± 0,28 | +1,81 |
+| | linea, 3,6 km | 7 / 0 / 1 | +2,00 ± 0,31 | +1,69 |
+| | linea, 4,5 km | 2 / 5 / 1 | −1,00 ± 0,53 | −1,31 |
+| sym_medium | cuneo, 3,2 km | 6 / 2 / 0 | +0,50 ± 0,43 | +0,81 |
+| | linea, 2,8 km | 8 / 0 / 0 | +2,38 ± 0,25 | +2,69 |
+| | **linea, 3,2 km** | 8 / 0 / 0 | **+2,38 ± 0,17** | **+2,69** |
+| | linea, 3,8 km | 8 / 0 / 0 | +1,75 ± 0,23 | +2,06 |
+| | linea, 4,5 km | 8 / 0 / 0 | +1,88 ± 0,21 | +2,19 |
+| sym_small, lato ASTRA (16 semi) | cuneo, 4,5 km | 12 / 3 / 1 | +0,44 ± 0,26 | +1,02 |
+| | linea, 4,5 km | 3 / 10 / 3 | −0,75 ± 0,27 | −0,17 |
+
+Una **linea di fronte che chiude a circa 3 km** è l'ordine più forte che il banco abbia trovato fra pari (circa una nave su tre, e da due a due e
+mezza su sei): tutte le navi stanno alla stessa distanza dal nemico e tutte le armi battono, mentre il cuneo dei riflessi ne tiene metà fuori dal
+tiro. Tenuta a 4,5 km la stessa linea perde (con tre navi o con due gruppi), e la colonna è la peggiore forma per combattere (le navi dietro non
+sparano mai). **Il prezzo è il ritmo**: se entrambe le parti ordinano la linea a 3,2 km (comandante a copione da tutte e due, 16 semi sym_small) il
+bilancio resta pari (ASTRA 4 / Mandato 2 / pari 10: +0,12 ± 0,26) ma il combattimento è quasi il doppio più sanguinoso: dopo 600 s sopravvivono 2,0
+navi su 6 (coi riflessi 3,9; col cuneo a 4,5 km da tutte e due 3,1), e 3,75 su 12 nei due gruppi (coi riflessi 7,2). Per questo la dottrina con la
+formazione è un **interruttore spento** (`WarMinds.formation_doctrine`, `ASTRA_WAR_FORMATION=1`, `--formation-doctrine`): il lead decide, giocando,
+se vuole battaglie così. Col modello vero e l'interruttore acceso (sym_small, mente sul Mandato) 6 semi su 6 (§ sotto): 11 ordini d'attacco su 12 sono
+«linea a 3,2 km».
+
+**Il modello vero** (stessi semi e durezza; `--no-ops`: l'ammiraglio del Mandato ha solo gli ordini di gruppo, come le menti ASTRA; la mente di
+ASTRA nei banchi simmetrici è un «ammiraglio del banco» sopra tutti i suoi gruppi (`--astra-admiral`: le navi dei semi non hanno capitani con un
+nome), con la stessa dottrina; i capitani alleati veri, Castellan e Okoro, si provano nell'apertura):
+
+| prova | semi | mente / riflessi / pari | vantaggio della mente | stessa parte coi riflessi | contro i riflessi (Δ) | spesa |
+|---|---|---|---|---|---|---|
+| sym_small, mente su ASTRA (creata per prima) | 16 | **11 / 2 / 3** | **+0,56 ± 0,18** | −0,58 ± 0,21 | **+1,14 ± 0,28** | 0,054 $ |
+| sym_small, mente sul Mandato (creato per secondo) | 16 | 11 / 3 / 2 | +0,50 ± 0,25 | +0,58 ± 0,21 | −0,08 ± 0,33 | 0,059 $ |
+| sym_small, menti su entrambe (ASTRA − Mandato) | 12 | 6 / 5 / 1 | +0,08 ± 0,34 | −0,58 ± 0,21 | +0,66 ± 0,40 | 0,088 $ |
+| sym_two, ammiraglio + comandante del 2° gruppo (Mandato) | 8 | 4 / 1 / 3 | +0,88 ± 0,41 | +0,31 ± 0,23 | +0,57 ± 0,47 | 0,097 $ |
+| sym_two, con «conta le navi che combattono insieme» | 8 (6 validi) | 4 / 3 / 1 | +0,50 ± 0,47 | +0,31 ± 0,23 | +0,19 ± 0,52 | 0,080 $ |
+| sym_medium, 6 navi in un gruppo (Mandato) | 8 | 5 / 3 / 0 | +0,62 ± 0,58 | −0,31 ± 0,49 | +0,93 ± 0,76 | 0,045 $ |
+| sym_small, mente sul Mandato, **con la formazione in dottrina** (`ASTRA_WAR_FORMATION=1`) | 6 | **6 / 0 / 0** | **+1,67 ± 0,19** | +0,58 ± 0,21 | **+1,09 ± 0,28** | 0,022 $ |
+| *prima della taratura (dottrina «chiudi e finisci», 4,5–5 km)*: mente su ASTRA | 8 | 5 / 2 / 1 | +0,38 ± 0,30 | −0,58 | +0,96 | 0,026 $ |
+| *idem*, mente sul Mandato | 8 | 3 / 4 / 1 | −0,25 ± 0,49 | +0,58 | −0,83 | 0,034 $ |
+| *idem*, menti su entrambe (ASTRA − Mandato) | 8 | 2 / 2 / 4 | −0,12 ± 0,33 | −0,58 | +0,46 ± 0,39 | 0,060 $ |
+
+Lettura onesta. **La mente dà una parte vera ma modesta**: dalla parte di ASTRA (quella in svantaggio nel banco) porta i semi vinti da 6 su
+24 a 11 su 16 e mezza nave in più su tre di quanto i riflessi non lasciassero (+1,1 ± 0,3: 4σ); dalla parte del Mandato nel sym_small (già
+avanti di 0,6 senza mente) conserva il vantaggio senza accrescerlo; nei due gruppi e nelle sei navi i guadagni vanno nel verso giusto ma entro
+l'errore (+0,6 ± 0,5; +0,9 ± 0,8). Con menti dalle due parti **nessuna parte vince sempre** (6 / 5 / 1 e prima 2 / 2 / 4). Gli ordini della
+prima dottrina costavano mezza nave dal lato del Mandato: la taratura della distanza (e il «non chiudere su un pari») ha cambiato il segno.
+Il banco misura il giudizio **di battaglia fra pari senza Capitano né guerra elettronica**, contro riflessi decenti, con 3 navi per parte:
+non risolve differenze di un decimo di nave e non vede le cose per cui la mente c'è davvero (nebbia di guerra, esche, missili, il Capitano
+che parla, la successione). Il paragone vero lo darà il gioco.
+
+**Qualità degli ordini** (`bench.war_quality`, dai fatti registrati: nessuna lettura delle parole del modello):
+
+| prova | ordini | accettati / rifiutati | rifiuto ripetuto | ritirate sensate / dubbie | ordini rovesciati in 20 s | `no_change` |
+|---|---|---|---|---|---|---|
+| sym_small Mandato (16 semi) | 53 | 52 / 1 | 0 | 3 / 0 | 0 | 61 % |
+| sym_small ASTRA (16 semi) | 41 | 41 / 0 | 0 | 3 / 2 | 1 | 65 % |
+| sym_small menti su entrambe (12 semi) | 82 | 81 / 1 | 0 | 11 / 0 | 3 | 50 % |
+| sym_two (8 semi, ammiraglio + comandante) | 110 | 107 / 3 | 0 | 4 / 0 (+4 non valutabili) | 17 | 27 % |
+
+5 rifiuti su 286 ordini: quattro volte un bersaglio morto un attimo prima («'A-01' is not a hostile warship on your plot»: il modello corregge
+una volta nello stesso giro, tre volte con successo; la quarta nominò il gruppo del bersaglio morto e riuscì al giro dopo) e una volta un
+ordine senza il campo `order`. Mai lo stesso ordine impossibile due volte; ritirate quando il gruppo era il più debole o il morale cedeva
+(«dubbie» = si è ritirato un gruppo più forte con il morale intatto: 2 casi su 16 semi, tutti di una stessa mente ASTRA). Nei due gruppi 17
+ordini su 110 sono ordini di un comandante che completa o rimpiazza quello dell'ammiraglio nei 20 s successivi (spesso lo stesso ordine con la
+distanza che l'altro non aveva dato): è il prezzo di due menti sullo stesso piano. Metà dei giri finisce con `no_change` ragionato («l'ordine
+in vigore serve»): una scelta, non un silenzio.
+
+**Costo e latenza** (giri veri, tutti i giri senza errore delle prove sopra; il prompt di sistema, lungo e stabile, sta nella cache del fornitore):
+
+| chi pensa | giri | per giro | all'ora di battaglia | giro intero: mediana / p90 / max | primo strumento (mediana) | token in / out per giro |
+|---|---|---|---|---|---|---|
+| un ammiraglio (m1, m2: una parte con la mente) | 261 | 0,42–0,45 m$ | **0,02 $** | 0,8–1,1 / 2,0–2,5 / 3,5–13,2 s | 0,7–1,0 s | 2,6–2,8 k / 150–180 |
+| due ammiragli (uno per parte) | 206 | 0,43 m$ | 0,046 $ | 0,8 / 2,0 / 9,6 s | 0,7 s | 2,7 k / 170 |
+| ammiraglio + comandante del secondo gruppo | 197 | 0,81–0,82 m$ | 0,064–0,073 $ | 2,0 / 3,0 / 5,6 s | 1,2–1,3 s | 3,6 k / 320 |
+| un gruppo di sei navi | 84 | 0,53 m$ | 0,029 $ | 1,5 / 2,5 / 4,1 s | 1,2 s | 3,1 k / 205 |
+| il capitano alleato dell'apertura (con un Capitano a copione) | 31 | 0,73 m$ | 0,054 $ | 2,4 / 3,0 / 4,0 s | 1,5 s | 4,6 k / 290 |
+| apertura, entrambe le parti (ammiraglio, comandante, capitano alleato) | 106 | 0,70–0,90 m$ | 0,09–0,17 $ | 1,1–1,5 / 2,5 / 4,1 s | 0,9 s | 4,1–4,5 k / 250–330 |
+
+Tutte le menti di guerra di una battaglia costano **da 0,02 a 0,17 $ l'ora** (l'obiettivo era 1 $ l'ora per tutte, equipaggio compreso: con
+l'equipaggio a 0,76 $ l'ora misurati dal lead nel gioco vero dopo la divisione del prompt, la somma sta fra 0,78 e 0,93 $ l'ora). Alle chiamate
+dell'equipaggio le menti di guerra aggiungono solo la tabella della flotta dell'XO (120 token col picchetto, 300 nella battaglia più grande, nell'ultimo
+messaggio: da 1 a 3 % di una chiamata); le loro righe radio non fanno parlare l'equipaggio (sono eventi del contesto, non turni). Il caso peggiore possibile (quattro comandanti di gruppo del Mandato e due capitani ASTRA, tutti
+svegliati al ritmo minimo consentito, 25 s, per un'ora intera, a 0,8 m$ a giro, più l'ammiraglio ogni 20 s) è di circa 0,8 $ l'ora: il ritmo
+minimo è un limite, non quel che succede (nelle prove un giro ogni 45–80 s per mente). Nessun giro è scaduto (28 s) in nessuna prova (tranne i giri del tetto di spesa, scartati); il
+peggiore ha impiegato 13 s (un fornitore lento: il client ritenta una volta sul secondo, mai in parallelo, per un primo token oltre i 5 s).
+
+**L'apertura, i capitani alleati e un Capitano a copione** (`--opening --jump 160`, l'Aquila sui riflessi: parole sulla rete della flotta a 175 s,
+una richiesta alla Vigilant a 235 s, una domanda a 300 s, un ordine diretto a 385 s, un'esortazione a 450 s):
+
+- **La capitana alleata** (Castellan, con Okoro che parla per la Vigilant) ordina il picchetto al primo contatto (`screen` sull'Aquila a 4,5 km o
+  `attack` sul Lethe) e lo dice in una riga («Praetorian and Vigilant in screen on you, holding four point five. One contact, the Lethe, closing
+  from two hundred»); risponde alle parole del Capitano in 1–3 s con i numeri veri (scudi e missili di entrambe le navi: «Shields full, twelve
+  missiles in the cells. Vigilant full, six»); la richiesta indirizzata alla Vigilant la prende di solito Okoro con la sua voce («Already between
+  you and them, four point five, holding»); un ordine diretto del Capitano su un bersaglio già morto viene rifiutato dal gioco e lo si vede nel
+  registro; quando l'ordine diretto è valido lo esegue anche se avrebbe scelto altro e lo dice in una riga («On the Acheron at four point five,
+  closing now. The three Styx are breaking off»); la regola «dissentire non è rifiutare» è nata da una prova in cui un ordine diretto era stato
+  disfatto un secondo dopo.
+- **Il dato del lead dell'1/10** (con i soli riflessi gli alleati restano in formazione mentre l'Aquila avanza e non la seguono né la avvisano):
+  qui l'Aquila sui riflessi si allontana (7, 12, 18, 24 km in 90 s) e la capitana lo dice a ogni salto («You have drawn to 7 km and my screen is
+  no longer between you and the Acheron group: closing back onto your engaged side. If you mean to open the range, say so and I will conform»),
+  ricompone l'arco (`screen` di nuovo) e, a 24 km, passa a impegnare il gruppo nemico («my screen is a formality at that gap»); a scafo zero offre
+  il soccorso e chiede un faro. Ripeteva l'avviso troppo spesso (4 in 90 s): ora la soglia raddoppia a ogni avviso (fino a 8 volte) e riparte
+  quando l'Aquila torna fra le sue navi (prove nel banco unitario).
+- **Giudice** (`bench.war_judge`, `openai/gpt-oss-120b`, un'altra famiglia dei capitani che sono DeepSeek; punteggi da 1 a 5 e «avrebbe taciuto»;
+  rumoroso: lo stesso testo può prendere voti diversi, serve a scoprire difetti, non a classificare), righe delle prove:
+  prima serie (3 semi, 24 righe) utilità 3,2, brevità 3,3, verità 3,9, carattere 4,6, tempestività 3,9, «avrebbe taciuto» 2 su 24;
+  dopo le correzioni dei prompt (2 semi validi, 19 righe) **utilità 4,1, brevità 3,3, verità 4,6, carattere 4,7, tempestività 4,5**, «avrebbe
+  taciuto» 1 su 19 (una riga sull'Aquila a scafo zero, artefatto del banco). Righe al minuto: 0,7–1,7 con un Capitano che parla cinque volte in
+  otto minuti e un'Aquila che scappa (da un terzo alla metà sono risposte a lui). La brevità resta il punto debole (due o tre frasi: «a bit wordy for radio»).
+- **L'ammiraglio del Mandato nell'apertura**: il primo sguardo (8 s dopo l'inizio, 168 s) cade **prima** che il gruppo d'attacco arrivi (170 s)
+  e vede solo il Lethe (forza 0,3 contro 2,8, morale 0,09): a quel punto l'ammiraglio è Hale. Nelle prime prove (3 semi) ordinò il ritiro del
+  Lethe e `decide: withdraw` («il combattimento è perso prima di cominciare»), e in un seme su tre chi subentrò (Solm) tenne il ritiro: il gruppo
+  d'attacco se ne andò senza combattere. Dopo i prompt («il primo sguardo è un quadro parziale», «chi subentra giudica da capo», `decide` è la
+  decisione di un ammiraglio battuto) due semi validi su quattro (gli altri due sono stati troncati dal tetto di spesa): in uno Hale tiene il
+  Lethe a 4,5 km «per vedere cosa è davvero il nemico: non lo butterò via al primo sguardo»; nell'altro ordina ancora il ritiro (il gioco risponde
+  «own ship only (1 ship)»: tocca la sola fregata); in entrambi Solm, subentrato, combatte («Hale ordered a withdrawal on a picture of one broken
+  frigate: I judge afresh on mine») e, dove serve, annulla il ritiro a 250 s (`continue_attack`). **È una trappola vera dell'apertura**: chi la
+  rivede nel gioco guardi il registro dell'ammiraglio nei primi 180 s.
+- **L'Aquila sotto il fuoco** (`bench.war_scenes_live`, scena a copione col modello vero, 0,23 m$; il banco non può farlo da sé perché la sua Aquila
+  regge, e la richiesta del lead dopo la prima battaglia vera era proprio questa): l'Aquila passa da 100 %/100 % a 61 %/8 % in 35 s, T-21 a 2,4 km e
+  T-22 a 3,1 km da lei, il picchetto a 6 km. La capitana si sveglia per «the Aquila is losing her shields or hull fast», ordina `attack` su T-21 a 3,2 km
+  («Aquila's shields are down and her hull is falling to T-21 and T-22 at knife range: close on the Acheron») e dice, con tono urgente: «Aquila,
+  Praetorian: closing on the Acheron and the Styx on your bow, engaging at 3 km. We are coming between you and them.» Con la formazione in dottrina
+  (un'altra scena) l'ammiraglio del Mandato al primo sguardo di tre navi contro tre ordina `attack` su A-01 a 3,2 km in formazione `line`.
+
+### 8.11 Limiti, e cosa chiede al resto
+
+- **Il giudizio vero si prova nel gioco.** Il banco misura battaglie fra pari, 3–6 navi per parte, senza Capitano né il resto dello spazio, contro
+  riflessi decenti; i margini sono di mezza nave e non risolvono differenze di un decimo. Quello per cui le menti ci sono (nebbia di guerra, esche,
+  missili, il Capitano che parla, la successione, le parole degli alleati) si vede giocando, con la voce. Il banco non ha lo strato della nave (calore,
+  condotti): la sua Aquila regge più di quella vera, quindi «l'Aquila sotto il fuoco» si prova solo in una scena a copione (§8.10).
+- **Le costanti della dottrina sono fisica del momento** (§8.10): portata dei laser, distanze di 4,5 e 3,2 km. Se cambiano armi o durezza, rifare lo
+  scorrimento col banco. Il testo dice «le rotaie a 8–10 km, i laser a 4»: viene da `data/war/classes.json`.
+- **La formazione è una leva che il modello usa bene e che cambia il ritmo** (§8.10): con la linea a 3,2 km da entrambe le parti si perde il doppio
+  delle navi nello stesso tempo. È spenta di default; la decisione è del lead, che sa che ritmo vuole.
+- **La durezza di main ha reso il banco di simmetria dipendente dall'ordine di creazione** (§8.10): da guardare nel mondo di GUERRA (non è di questo
+  modulo). Finché non è chiarito, ogni confronto va fatto con la stessa parte senza mente.
+- **Gli eventi di gruppo sono testo**: la mente di un comandante di gruppo del Mandato si sveglia sugli eventi il cui testo comincia col nome del
+  gruppo (`group_events[].text`); se il C++ cambia il formato la mente smette di svegliarsi per quel gruppo (l'ammiraglio non dipende da questo).
+- **Due menti sullo stesso piano si rimpiazzano gli ordini** (ammiraglio e comandante di gruppo: 17 ordini su 110 nei due gruppi, spesso lo stesso
+  ordine con la distanza che l'altro non aveva dato). Non ha fatto danni nelle misure; se nel gioco disturba, il prompt del comandante può dire che
+  un ordine in vigore dell'ammiraglio non si rimpiazza ma si completa o si riferisce.
+- **Il giudice delle parole è un modello** (di un'altra famiglia, rumoroso, un campione di 43 righe): scopre difetti, non classifica. Nei banchi
+  l'Aquila è sui riflessi e a scafo zero «si allontana»: le righe su un'Aquila morta sono un artefatto del banco, non dei capitani.
+- **Brevità**: le parole dei capitani alleati erano di due o tre frasi (il giudice: «a bit wordy for radio»); la regola «solo ciò che è nuovo per
+  il Capitano» le accorcia (una prova dal vivo: righe di una o due frasi, il nominativo e la notizia), ma la voce lunga si sente.
+- **La tabella della flotta nel prompt dell'equipaggio**: quella dell'XO (120 token con il picchetto, 300 nella battaglia più grande) viaggia con
+  l'ultimo messaggio del turno (`crew.bridge_now`) e mai nel prompt di sistema: la cache del fornitore copre il resto, come ha voluto il lead.
+- **Due prove di `bench.npc_server` falliscono anche su main** (`test_nobody_near_nobody_asked`, `test_the_officers_are_told_the_captain_is_among_the_crew`):
+  il testo di `npc.py` è cambiato (il gioco decide chi sente il Capitano) e la prova no. Non sono di questo modulo.
+- **Niente prova nel gioco vero**, con la voce, il Capitano che comanda l'Aquila e gli errori della rete: è il passo del lead.
+
+### 8.12 Integrazione (passi esatti)
+
+1. **Unire il ramo** `worktree-agent-adfe3daf93e51bd02`: contiene già due unioni di main (la seconda con la divisione del prompt dell'equipaggio
+   di aa68778: la tabella della flotta è in `bridge_now`). Se main è andato avanti, conflitti possibili solo in `crew.py` e `tools.py` (si tengono
+   entrambi i lati: la `crew_locate` e i `LOOKUPS` di main, il `"group_order"` dell'XO nostro); `director.py` è riscritto (prendere il ramo);
+   `docs/GUERRA.md` riceve solo questo §8.
+2. **Nessuna modifica al C++ del gioco**: cambia solo il commandlet del banco (`Source/ASTRA/AstraWarSimCommandlet.*`, `-mind=<cartella>`, e ora
+   anche gli scudi dell'Aquila nello stato). Per usare il banco: ricompilare l'editor (`Build.sh`, già provato sull'unione) e `tools/war.py mind ...`.
+3. **Variabili** (`.env` o ambiente): `ASTRA_WAR_MINDS=0` spegne le menti (i gruppi tornano ai riflessi, la richiesta del Capitano alle navi come
+   prima); `ASTRA_WAR_FORMATION=1` accende la formazione nella dottrina (§8.10); `ASTRA_MODEL_ADMIRAL`, `ASTRA_MODEL_COMMANDER`, `ASTRA_MODEL_TALK`,
+   `ASTRA_MODEL_DIRECTOR` (`modello@fornitore1,fornitore2`) cambiano il modello di un ruolo; `ASTRA_UE_CMD` dà il percorso dell'`UnrealEditor-Cmd` al
+   banco (Windows).
+4. **Manopole** in `war_minds.py`: `PERIODIC_S`, `MIN_GAP_S`, `FIRST_PULSE_S`, `SEPARATION_KM`, `AQUILA_HULL_DROP`, `AQUILA_SHIELD_DROP`, `SETTLE_S`,
+   `QUIET_END_S`, `PULSE_TIMEOUT_S`, e le costanti fisiche della dottrina (`LASER_KM`, `SMALL_GROUP_KM`, `DEEP_GROUP_KM`, `LINE_KM`); in `director.py`:
+   `BATTLE_PULSE_FIRST_S`, `BATTLE_PULSE_EVERY_S`, `CALM_AFTER_S`, `IN_BATTLE_BEATS`.
+5. **Cosa guardare nel gioco**: il registro del server (`astra.war_minds`) ha una riga per giro (chi, durata, costo, motivi, strumenti), e
+   `war.summary()` i totali; nei primi 180 s dell'apertura il registro dell'ammiraglio del Mandato (§8.10); le voci radio dei capitani alleati con il
+   loro nome (Castellan, Okoro) e quelle dell'ammiraglio solo a canale aperto; l'Aquila sotto il fuoco (la capitana che chiude sugli attaccanti e lo
+   dice); l'XO che dà `group_order` («XO, il picchetto attacchi l'Acheron a 4,5 km»); una richiesta alle comunicazioni («cover us» alla Vigilant) che
+   torna come risposta del capitano; Rourke che tace se le parole erano per una nave.
+6. **Prove offline**: `cd mind && .venv/bin/python -m unittest bench.stations_unit bench.stations_server bench.npc_unit bench.npc_server
+   bench.voice_units bench.war_minds_unit bench.war_server bench.war_director_unit` (181 prove, nessuna rete; due di `npc_server` falliscono anche su
+   main). Dal vivo (pochi decimi di centesimo l'una): `python -m bench.war_crew_live`, `python -m bench.war_director_live`,
+   `python -m bench.war_scenes_live`.

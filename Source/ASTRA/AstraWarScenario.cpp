@@ -8,7 +8,8 @@
 //                                              passive: a target dummy that does not fight)
 //   astra.war.wing <carrier id> <fighter|bomber|drone> <n> <mission> [target id]
 //                                              a flight group aboard a carrier (it launches at once)
-//   astra.war.scenario <name>                  data/war/scenarios/<name>.json (implies the sandbox)
+//   astra.war.scenario <name> [aquila]         data/war/scenarios/<name>.json (implies the sandbox); "aquila" (or "aquila": true in the
+//                                              file) keeps the Aquila in it, at the origin with the ASTRA side: the lead's scale test from the bridge
 //
 // The scenario file: {"mirror": true, "astra": [group...], "mandate": [group...]}; a group: {"name", "formation": line|wedge|
 // column, "at_km": [x,y,z], "heading": deg, "spacing_km", "ships": [{"class", "n", "name"}], "wings": [{"carrier": index in
@@ -121,7 +122,7 @@ void UAstraBattleSubsystem::ProcessWarCommands()
 		else if (Cmd == TEXT("scenario") && A.Num() >= 2)
 		{
 			FString Detail;
-			const bool bOk = LoadScenario(A[1], Detail);
+			const bool bOk = LoadScenario(A[1], Detail, A.Num() >= 3 && A[2].Equals(TEXT("aquila"), ESearchCase::IgnoreCase));
 			UE_LOG(LogASTRA, Display, TEXT("[WarSim] scenario %s: %s%s"), *A[1], bOk ? TEXT("") : TEXT("FAILED — "), *Detail);
 		}
 		else if (Cmd == TEXT("spawn") && A.Num() >= 6)
@@ -192,14 +193,17 @@ void UAstraBattleSubsystem::ProcessWarCommands()
 	}
 }
 
-void UAstraBattleSubsystem::SandboxReset()
+void UAstraBattleSubsystem::SandboxReset(bool bKeepAquila)
 {
 	ClearSystem();
 	Ships.Reserve(512);
 	FAstraBattleShip& P = Ships[0];
-	P.bAlive = false;                       // the Aquila is not in it: the bench's forces are the two sides' own
-	P.Mode = EAstraShipMode::Dead;
-	P.Pos = FVector(0.0, 0.0, -1.0e9);      // far away: nothing measures against her
+	if (!bKeepAquila)
+	{
+		P.bAlive = false;                   // the Aquila is not in it: the bench's forces are the two sides' own
+		P.Mode = EAstraShipMode::Dead;
+		P.Pos = FVector(0.0, 0.0, -1.0e9);  // far away: nothing measures against her
+	}
 	Squadrons.Reset();
 	bSandbox = true;
 	bStarted = true;
@@ -209,7 +213,7 @@ void UAstraBattleSubsystem::SandboxReset()
 	bScenarioOver = false;
 	bPlayerTracked = true;
 	NextContact = 1;
-	UE_LOG(LogASTRA, Display, TEXT("[WarSim] sandbox: the plot is empty"));
+	UE_LOG(LogASTRA, Display, TEXT("[WarSim] sandbox: the plot is empty%s"), bKeepAquila ? TEXT(" but for the Aquila") : TEXT(""));
 }
 
 int32 UAstraBattleSubsystem::SpawnByKey(FName Key, EAstraSide Side, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg)
@@ -256,7 +260,7 @@ int32 UAstraBattleSubsystem::AddWing(int32 CarrierIdx, int32 Kind, int32 Count, 
 	return Squadrons.Num() - 1;
 }
 
-bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail)
+bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail, bool bWithAquila)
 {
 	FString Text;
 	const FString Path = FPaths::Combine(FPaths::ProjectDir(), TEXT("data/war/scenarios"), Name + TEXT(".json"));
@@ -271,7 +275,8 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 		OutDetail = TEXT("it does not parse");
 		return false;
 	}
-	SandboxReset();
+	Root->TryGetBoolField(TEXT("aquila"), bWithAquila);
+	SandboxReset(bWithAquila);
 	bool bMirror = false;
 	Root->TryGetBoolField(TEXT("mirror"), bMirror);
 	FString First;
