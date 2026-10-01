@@ -97,6 +97,7 @@ private:
 	float CheckT = 0.f;
 	float LiftCooldown = 0.f;
 	float LiftT = -1.f;          // a ride in progress (fade, move, fade)
+	float LiftWaitS = 0.f;          // how long the car has waited in the dark for the destination's deck to load
 	TWeakObjectPtr<APawn> Rider;
 	FVector RideTo;
 
