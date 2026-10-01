@@ -6,6 +6,9 @@
 //
 // The lights of the older rooms (bridge, Mess Hall, Medbay, Engineering, Flight Deck) are actors of the persistent level and keep their own rules
 // (AstraZoneLights.*, AstraHangar.*).
+//
+// The damage inside the ship (DISTRUZIONE, docs/DISTRUZIONE.md) reaches the lamps here: a compartment that lost its power burns only the emergency strips (red,
+// dim), one with a faulty supply or a blow a moment ago flickers, one on fire is orange, one open to space is red, one full of smoke is dimmer, a lost one is dark.
 
 #pragma once
 
@@ -63,6 +66,14 @@ private:
 		float Level = 0.f;           // 0..1: the fade
 		float Target = 0.f;
 		float Applied = -1.f;        // the intensity last set (to skip a set that changes nothing)
+		// what the damage inside the ship leaves of the lamp (read from the interior model at each pass: UAstraShipSubsystem::GetInterior().LightOf)
+		int32 ModelComp = INDEX_NONE;                       // the damage model's compartment the lamp is in
+		float Mains = 1.f, Strips = 0.f, Flicker = 0.f;     // the room's power share, the emergency strips' share, how unsteady
+		float Unsteady = 1.f;                               // the flicker's factor of this instant
+		float Mix = 0.f;
+		FLinearColor Tint = FLinearColor::White;
+		float AppliedMix = -1.f;
+		FLinearColor AppliedTint = FLinearColor::White;
 	};
 	UPROPERTY() TObjectPtr<AActor> PoolActor;
 	TArray<FSlot> Slots;
@@ -71,6 +82,7 @@ private:
 	float LightLevel = 1.f;          // the ship's light level and the red alert's tint, read from the ship's material collection
 	float AlertBlend = 0.f;
 	float AppliedAlert = -1.f;
+	float FlickT = 0.f;              // the flicker is drawn at about 12 Hz, not every frame
 	bool bTest = false;
 	FVector TestEye = FVector::ZeroVector, TestFeet = FVector::ZeroVector;
 
@@ -79,4 +91,5 @@ private:
 	void Assign(FSlot& S, int32 Lamp);
 	void Apply(FSlot& S, bool bTint);
 	void ReadShipState();
+	void ReadDamage(FSlot& S, const class UAstraShipSubsystem* Ship) const;
 };

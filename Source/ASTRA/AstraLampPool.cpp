@@ -4,7 +4,9 @@
 
 #include "ASTRA.h"
 #include "Algo/Count.h"
+#include "AstraDamageModel.h"
 #include "AstraShipPlan.h"
+#include "AstraShipSubsystem.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/RectLightComponent.h"
@@ -247,6 +249,36 @@ void UAstraLampPool::Assign(FSlot& S, int32 LampIndex)
 	S.Level = 0.f;
 	S.Target = 1.f;
 	S.Applied = -1.f;
+	// the damage model's compartment under the lamp (looked up once, when the lamp is taken up)
+	S.ModelComp = INDEX_NONE;
+	if (const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	{
+		if (Ship->GetInterior().IsReady() && Plan->GetCompartments().IsValidIndex(Lamp.Comp))
+		{
+			S.ModelComp = Ship->GetInterior().GetMap().CompByName.FindRef(FName(*Plan->GetCompartments()[Lamp.Comp].Id), INDEX_NONE);
+		}
+		ReadDamage(S, Ship);
+	}
+	S.Unsteady = 1.f;
+	S.AppliedMix = -1.f;
+}
+
+void UAstraLampPool::ReadDamage(FSlot& S, const UAstraShipSubsystem* Ship) const
+{
+	if (!Ship || S.ModelComp == INDEX_NONE || !Ship->GetInterior().IsReady())
+	{
+		S.Mains = 1.f;
+		S.Strips = 0.f;
+		S.Flicker = 0.f;
+		S.Mix = 0.f;
+		return;
+	}
+	const FAstraDmgLight D = Ship->GetInterior().LightOf(S.ModelComp);
+	S.Mains = D.Mains;
+	S.Strips = D.Strips;
+	S.Flicker = D.Flicker;
+	S.Mix = D.Mix;
+	S.Tint = D.Tint;
 }
 
 void UAstraLampPool::Apply(FSlot& S, bool bTint)
@@ -268,10 +300,14 @@ void UAstraLampPool::Apply(FSlot& S, bool bTint)
 		return;
 	}
 	const FAstraPlanLamp& Lamp = Plan->GetLamps()[S.Lamp];
-	const float I = Lamp.Lumens * CVarLampGain.GetValueOnGameThread() * S.Level * LightLevel;
-	if (S.Applied < 0.f || bTint)
+	// the mains follow the ship's light level (the alert's dimming, the rails' sag) and the room's power; the emergency strips are on their own batteries
+	const float I = Lamp.Lumens * CVarLampGain.GetValueOnGameThread() * S.Level * (S.Mains * LightLevel + S.Strips) * S.Unsteady;
+	if (S.Applied < 0.f || bTint || FMath::Abs(S.Mix - S.AppliedMix) > 0.01f || (S.Mix > 0.f && !S.Tint.Equals(S.AppliedTint, 0.02f)))
 	{
-		L->SetLightColor(FMath::Lerp(FLinearColor::White, FLinearColor(1.f, 0.55f, 0.5f), AlertBlend * 0.35f));
+		const FLinearColor Base = FMath::Lerp(FLinearColor::White, FLinearColor(1.f, 0.55f, 0.5f), AlertBlend * 0.35f);
+		L->SetLightColor(S.Mix > 0.f ? FMath::Lerp(Base, S.Tint, S.Mix) : Base);
+		S.AppliedMix = S.Mix;
+		S.AppliedTint = S.Tint;
 	}
 	if (S.Applied < 0.f || FMath::Abs(I - S.Applied) > 1.f)
 	{
@@ -332,8 +368,13 @@ void UAstraLampPool::Reselect()
 	}
 	const bool bTint = FMath::Abs(AlertBlend - AppliedAlert) > 0.005f;     // the ship's level or alert may have changed
 	AppliedAlert = AlertBlend;
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
 	for (FSlot& S : Slots)
 	{
+		if (S.Lamp != INDEX_NONE)
+		{
+			ReadDamage(S, Ship);
+		}
 		Apply(S, bTint);
 	}
 }
@@ -357,11 +398,27 @@ void UAstraLampPool::Tick(float DeltaTime)
 void UAstraLampPool::Advance(float Seconds)
 {
 	const float Rate = 1.f / FMath::Max(0.02f, CVarLampFade.GetValueOnGameThread());
+	FlickT += Seconds;
+	const bool bFlicker = FlickT >= 0.08f;
+	if (bFlicker)
+	{
+		FlickT = 0.f;
+	}
 	for (FSlot& S : Slots)
 	{
 		if (S.Lamp == INDEX_NONE)
 		{
 			continue;
+		}
+		if (bFlicker)
+		{
+			// a failing supply, a blow a moment ago, a fire: now and then the lamp drops out for a moment, never quite to nothing
+			const float Was = S.Unsteady;
+			S.Unsteady = S.Flicker > 0.f && FMath::FRand() < S.Flicker * 0.55f ? FMath::Lerp(0.05f, 0.55f, FMath::FRand()) : 1.f;
+			if (S.Unsteady != Was)
+			{
+				Apply(S, false);
+			}
 		}
 		if (S.Level != S.Target)
 		{
@@ -411,7 +468,12 @@ FString UAstraLampPool::Describe() const
 		{
 			const FAstraPlanLamp& L = Plan->GetLamps()[S.Lamp];
 			const FAstraPlanCompartment& C = Plan->GetCompartments()[L.Comp];
-			Out += FString::Printf(TEXT("  %-28s %.0f lm  level %.2f -> %.0f\n"), *C.Id, L.Lumens, S.Level, S.Target);
+			Out += FString::Printf(TEXT("  %-28s %.0f lm  level %.2f -> %.0f"), *C.Id, L.Lumens, S.Level, S.Target);
+			if (S.Mains < 0.999f || S.Strips > 0.f || S.Flicker > 0.f)
+			{
+				Out += FString::Printf(TEXT("   damaged: mains %.2f, strips %.2f, flicker %.2f"), S.Mains, S.Strips, S.Flicker);
+			}
+			Out += TEXT("\n");
 		}
 	}
 	return Out;

@@ -3168,12 +3168,41 @@ void UAstraShipSubsystem::UpdateAlertVisuals(float DeltaTime)
 		UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), ShipMPC, TEXT("AlertPulse"), AlertBlend);
 		UKismetMaterialLibrary::SetScalarParameterValue(GetWorld(), ShipMPC, TEXT("LightLevel"), LightLevel);
 	}
+	// the damage inside the ship reaches the older rooms' lights by the compartment each stands in (the lamp pool does the same for the decks')
+	if (!bShipLightCompsKnown && Interior.IsReady())
+	{
+		bShipLightCompsKnown = true;
+		ShipLightComp.Reset();
+		for (const ALight* L : ShipLights)
+		{
+			ShipLightComp.Add(L ? InteriorCompOf(L->GetActorLocation()) : INDEX_NONE);
+		}
+		ShipLightUnsteady.Init(1.f, ShipLights.Num());
+	}
+	ShipLightFlickT += DeltaTime;
+	const bool bShipFlicker = ShipLightFlickT >= 0.08f;
+	if (bShipFlicker)
+	{
+		ShipLightFlickT = 0.f;
+	}
 	for (int32 i = 0; i < ShipLights.Num(); ++i)
 	{
 		if (ULightComponent* LC = ShipLights[i] ? ShipLights[i]->GetLightComponent() : nullptr)
 		{
-			LC->SetIntensity(ShipLightBase[i] * LightLevel);
-			LC->SetLightColor(FMath::Lerp(ShipLightColorBase[i], FLinearColor(1.f, 0.55f, 0.5f), AlertBlend * 0.35f));
+			float Share = LightLevel;
+			FLinearColor Color = FMath::Lerp(ShipLightColorBase[i], FLinearColor(1.f, 0.55f, 0.5f), AlertBlend * 0.35f);
+			if (bShipLightCompsKnown && ShipLightComp.IsValidIndex(i) && ShipLightComp[i] != INDEX_NONE && Interior.Find(ShipLightComp[i]))
+			{
+				const FAstraDmgLight D = Interior.LightOf(ShipLightComp[i]);
+				if (bShipFlicker)
+				{
+					ShipLightUnsteady[i] = D.Flicker > 0.f && FMath::FRand() < D.Flicker * 0.55f ? FMath::Lerp(0.05f, 0.55f, FMath::FRand()) : 1.f;
+				}
+				Share = (D.Mains * LightLevel + D.Strips) * ShipLightUnsteady[i];
+				Color = D.Mix > 0.f ? FMath::Lerp(Color, D.Tint, D.Mix) : Color;
+			}
+			LC->SetIntensity(ShipLightBase[i] * Share);
+			LC->SetLightColor(Color);
 		}
 	}
 }

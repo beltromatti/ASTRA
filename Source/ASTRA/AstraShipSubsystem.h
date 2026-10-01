@@ -424,6 +424,10 @@ private:
 	UPROPERTY() TArray<TObjectPtr<ALight>> ShipLights;
 	TArray<float> ShipLightBase;
 	TArray<FLinearColor> ShipLightColorBase;
+	TArray<int32> ShipLightComp;        // the interior model's compartment each of the older rooms' lights is in (INDEX_NONE: none), found once the model is up
+	TArray<float> ShipLightUnsteady;    // the flicker's factor of each, drawn at about 12 Hz
+	float ShipLightFlickT = 0.f;
+	bool bShipLightCompsKnown = false;
 	FVector SkyAxis0[3];
 	FVector SunDir0 = FVector::ForwardVector;
 	float Heading0 = 45.f, Mark0 = 0.f;

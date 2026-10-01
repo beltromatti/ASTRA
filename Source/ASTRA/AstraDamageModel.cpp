@@ -151,6 +151,47 @@ float FAstraDamageModel::Emergency(int32 Comp) const
 	return FMath::Clamp(FMath::Max(FMath::Max3((1.f - S->Power) * 1.0f, (1.f - S->Air) * 1.2f, S->Fire * 1.f), S->Smoke * 0.7f, S->Wreck * 0.8f), 0.f, 1.f);
 }
 
+FAstraDmgLight FAstraDamageModel::LightOf(int32 Comp) const
+{
+	FAstraDmgLight L;
+	const FAstraDmgState* S = Active.Find(Comp);
+	if (!S)
+	{
+		return L;
+	}
+	if (S->bGutted || S->Wreck >= 1.f)
+	{
+		L.Mains = 0.f;                                  // lost: not even the strips
+		return L;
+	}
+	// the mains give way between three quarters and an eighth of the room's power; the emergency strips (red, a seventh of the light) come up as they go
+	const float Mains = FMath::SmoothStep(0.12f, 0.75f, S->Power);
+	L.Mains = Mains * (1.f - 0.5f * S->Smoke);
+	L.Strips = 0.14f * (1.f - Mains) * (1.f - S->Wreck);
+	L.Tint = FLinearColor(1.f, 0.07f, 0.03f);
+	L.Mix = FMath::Clamp((1.f - Mains) * 0.95f, 0.f, 1.f);
+	// a decompression is announced in red too, and a fire lights the room orange
+	if (S->Hole > 0.02f && S->Air < 0.92f)
+	{
+		L.Mix = FMath::Max(L.Mix, 0.55f);
+	}
+	if (S->Fire > 0.08f)
+	{
+		const float FireMix = FMath::Clamp(S->Fire * 0.7f, 0.f, 0.6f);
+		if (FireMix > L.Mix)
+		{
+			L.Tint = FLinearColor(1.f, 0.42f, 0.1f);
+			L.Mix = FireMix;
+		}
+	}
+	// unsteady: a supply that is failing (not one that is gone), a blow a moment ago, a fire in the room
+	float Flick = S->Power > 0.14f && S->Power < 0.9f ? FMath::Clamp((1.f - S->Power) * 1.6f, 0.f, 1.f) : 0.f;
+	Flick = FMath::Max(Flick, FMath::Clamp(1.f - S->HitAge / 2.5f, 0.f, 1.f) * 0.8f);
+	Flick = FMath::Max(Flick, FMath::Clamp(S->Fire * 1.2f, 0.f, 0.7f));
+	L.Flicker = Flick;
+	return L;
+}
+
 int32 FAstraDamageModel::NumWrecked() const
 {
 	int32 N = 0;
@@ -595,6 +636,7 @@ void FAstraDamageModel::Deposit(int32 Comp, float Energy, uint8 Type, const FVec
 	FAstraDmgState& S = Get(Comp);
 	TArray<int32, TInlineAllocator<6>> Feeds;       // the rooms a corridor's bus feeds (done last: bringing a room into play may move the states)
 	S.Age = 0.f;
+	S.HitAge = 0.f;
 	// --- the hole: where the blow came in, if the room was where it came in and it had the strength to punch the plating
 	if (bFirst && Energy >= 4.f)
 	{
@@ -870,6 +912,7 @@ void FAstraDamageModel::Step(float Dt)
 	{
 		FAstraDmgState& S = KV.Value;
 		S.TeamT = FMath::Max(0.f, S.TeamT - Dt);
+		S.HitAge += Dt;
 		S.Age = S.Calm() ? S.Age + Dt : 0.f;
 		if (S.Age > 3.f)
 		{

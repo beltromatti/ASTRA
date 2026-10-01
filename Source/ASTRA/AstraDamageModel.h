@@ -87,7 +87,8 @@ struct FAstraDmgState
 	TMap<int32, FAstraDmgExposure> People;
 	// the incidents that stand for it in the ship's list (0: none)
 	int32 BreachId = 0, FireId = 0, ConduitId = 0;
-	float Age = 0.f;              // since anything last happened in it
+	float Age = 0.f;              // how long it has been calm (0 while anything is going on in it)
+	float HitAge = 99.f;          // since a blow last landed in it (the lights flicker for a moment)
 
 	bool Calm() const
 	{
@@ -119,6 +120,18 @@ struct FAstraDmgCaptain
 	int32 Comp = INDEX_NONE;
 	FString Cause;                 // what is doing it
 	FString Why;                   // how they ended (for the record)
+};
+
+/** What a compartment's lamps do under its damage (the lamp pool's and the older rooms' lights follow it). The light that burns is
+ *  Lamp * (Mains * the ship's light level + Strips): the mains follow the room's power, the emergency strips are on their own batteries. */
+struct FAstraDmgLight
+{
+	float Mains = 1.f;            // 0..1: the share of the lamps' light the room's power still gives (0 in a lost room)
+	float Strips = 0.f;           // 0..1: the emergency strips' share (red, dim), which come up as the mains give way
+	float Flicker = 0.f;          // 0..1: how unsteady the light is (a faulty supply, a blow a moment ago, a fire)
+	FLinearColor Tint = FLinearColor::White;
+	float Mix = 0.f;              // 0..1: how far toward Tint (the emergency red, the fire's orange)
+	bool Calm() const { return Mains > 0.995f && Strips <= 0.f && Flicker <= 0.f && Mix <= 0.f; }
 };
 
 /** How much of each power allocation the ship's distribution still carries (0..1), and what the fields cost. */
@@ -202,6 +215,8 @@ public:
 	float ExitDistanceM(int32 Comp, const FVector& PosCm) const;
 	/** Whether a compartment is in a state fit for the crew's eyes (the effects, the lights): 0 calm .. 1 grave. */
 	float Emergency(int32 Comp) const;
+	/** What the lamps of a compartment do under its damage (a compartment the model does not hold burns as built). */
+	FAstraDmgLight LightOf(int32 Comp) const;
 
 private:
 	TSharedPtr<const FAstraDamageMap> Map;
