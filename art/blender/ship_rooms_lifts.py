@@ -69,19 +69,21 @@ def _shafts(b: SParts, ys: tuple, h: float) -> None:
         fb.box((0.0, a, 0.0), (X0, c, h), STRUCT)
 
 
-def _tubes(b: SParts, x0: float, ys: tuple, h: float, roof_t: float | None = None, back_inset: float = 0.0) -> None:
+def _tubes(b: SParts, x0: float, ys: tuple, h: float, roof_t: float | None = None, back_inset: float = 0.0, y_lim: float | None = None, z0: float = -0.3) -> None:
     """The two command shafts' tubes (3.0 m outside, 2.6 inside, walls of 0.2 m) behind the shell's aft wall, which is their front wall: sides and back, from the floor structure up to the roof
     (open at the top and the bottom: the shaft goes on through the decks) or, with `roof_t`, to a closed roof of that thickness; no slab inside a tube. `x0`: where the tubes start (the shell's
-    aft face); `back_inset`: how far the back wall stops short of 3.0 m (so as not to share a plane with the block outside)."""
+    aft face); `back_inset`: how far the tubes stop short of 3.0 m, `y_lim` the outermost y they reach and `z0` where they start (so as to stay inside the block outside)."""
     fb = b.body
     hi = 1.5
     top = h + (0.3 if roof_t is None else roof_t)
+    xe = x0 + 2.8 - back_inset
     for y0 in ys:
-        fb.box((x0, y0 - hi, -0.3), (x0 + 2.8, y0 - 1.3, top), STRUCT)
-        fb.box((x0, y0 + 1.3, -0.3), (x0 + 2.8, y0 + hi, top), STRUCT)
-        fb.box((x0 + 2.6, y0 - hi, -0.3), (x0 + 2.8 - back_inset, y0 + hi, top), STRUCT)
+        ya, yb = y0 - hi, y0 + hi if y_lim is None else min(y0 + hi, y_lim)
+        fb.box((x0, ya, z0), (xe, y0 - 1.3, top), STRUCT)
+        fb.box((x0, y0 + 1.3, z0), (xe, yb, top), STRUCT)
+        fb.box((x0 + 2.6, ya, z0), (xe, yb, top), STRUCT)
         if roof_t is not None:
-            fb.box((x0, y0 - hi, h), (x0 + 2.8 - back_inset, y0 + hi, top), STRUCT)
+            fb.box((x0, ya, h), (xe, yb, top), STRUCT)
 
 
 def _bank(name: str, key: str):
@@ -157,8 +159,8 @@ def lift_bank_b(name: str = "SM_SHIP_LiftBankB"):
 def lift_housing_bridge(name: str = "SM_SHIP_LiftHousingBridge"):
     """2 x 6.96 x 2.9: the housing of the two command lifts on Deck 1, in the block behind the port corridor's end (placed at yaw 180: x runs aft from the corridor's mouth, y to port): the fore
     wall (x 0 .. 0.2, where the corridor's end cap stood) has the corridor's 3.2 m mouth, the aft wall (x 2.0 .. 2.2) the two lifts' doors with their frames and call panels, and behind it the
-    shafts' tubes (x 2.2 .. 5.0) go up to a closed roof; a bench and a plant in the vestibule, blue light. Low (the block outside leaves 3.15 m) and 2 cm inside it, so as not to share a plane
-    with the faces of `SM_SHIP_ASTRA_AquilaBridgeBlock`. The plan's landing doors are on the lobby face of the aft wall (x 2.0, the world's x -22.8)."""
+    shafts' tubes (x 2.2 .. 5.0) go up to a closed roof; a bench and a plant in the vestibule, blue light. Low (the block outside leaves 3.15 m up and 0.05 m down at its sides) and 2 cm inside it, so as not to share a
+    plane with the faces of `SM_SHIP_ASTRA_AquilaBridgeBlock`. The plan's landing doors are on the lobby face of the aft wall (x 2.0, the world's x -22.8)."""
     spec = SPEC.PREFABS["lift_housing_bridge"]
     L, D, H = spec["L"], spec["D"], spec["h"]
     oy = HOUSING_ORIGIN[1]
@@ -168,8 +170,8 @@ def lift_housing_bridge(name: str = "SM_SHIP_LiftHousingBridge"):
     b = SParts(bevel=0.005, fine_bevel=0.003)
     st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.2, ceil=COMPOSITE, accent="command_dim", cove="white_cool", strip="white_cool", rib_mat=TRIM, skirt=STRUCT)
     doors = [{"wall": "left", "x": portal, "w": 3.2, "h": PORTAL_H}] + [{"wall": "right", "x": D - y, "w": LIFT_DOOR_W, "h": LIFT_DOOR_H} for y in ys]
-    build_shell(b, dict(spec, L=lw), st, doors=doors, bare=(), ceil_t=0.22)
-    _tubes(b, lw, ys, H, roof_t=0.22, back_inset=0.03)
+    build_shell(b, dict(spec, L=lw), st, doors=doors, bare=(), ceil_t=0.22, floor_t=0.05)
+    _tubes(b, lw, ys, H, roof_t=0.22, back_inset=0.03, y_lim=D, z0=-0.05)
     for y in ys:
         _frame_door(b, "right", lw, D, D - y, "command_dim", compact=True)
     place(b, 1.1, 0.30, 90, F.bench, 1.4, 0.45, 0.46, FABRIC_NAVY)

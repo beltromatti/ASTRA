@@ -136,16 +136,16 @@ def wall_finish(b: SParts, name: str, L: float, D: float, H: float, st: Style, d
 
 
 def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far_door: bool = True, windows_far: list | None = None,
-                seed: int = 1, skip: tuple = (), bare: tuple = ("near",), ceil_t: float = 0.30) -> None:
+                seed: int = 1, skip: tuple = (), bare: tuple = ("near",), ceil_t: float = 0.30, floor_t: float = 0.30) -> None:
     """Floor, ceiling and the four walls of a room. `skip`: walls not built here (the caller builds them: window walls); `bare`: walls that
-    belong to a corridor (a finish layer only, no structure of their own); `ceil_t`: the ceiling structure's thickness (a room under a roof that leaves no more than that)."""
+    belong to a corridor (a finish layer only, no structure of their own); `ceil_t`, `floor_t`: the ceiling's and the floor's structure thickness (a room inside a shell that leaves no more than that)."""
     L, D, H = spec["L"], spec["D"], spec["h"]
     doors = doors if doors is not None else spec["doors"]
     b._doors = doors                                                  # (dress_wall keeps clear of them)
     fb, fine, em = b.body, b.fine, b.emit
     rng = random.Random(seed)
     # floor: structure and covering
-    fb.box((0.0, 0.0, -0.30), (L, D, -0.012), STRUCT)
+    fb.box((0.0, 0.0, -floor_t), (L, D, -0.012), STRUCT)
     if st.floor_mode == "plates":
         rows = int(D // 1.0)
         for j in range(rows):
