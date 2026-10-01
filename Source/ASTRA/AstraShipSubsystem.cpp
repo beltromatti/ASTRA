@@ -1013,7 +1013,7 @@ void UAstraShipSubsystem::TickHeat(float DeltaTime)
 	}
 	// what the ship makes by herself: the reactor (by the power drawn), the drive (by the throttle and the engines' power);
 	// the battle adds the rest (weapons fired, hits soaked, shields recharging: AddHeat)
-	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (ThrottlePct / 100.f) * PowerFactor(TEXT("engines")) + (bBattleShort ? 0.3f : 0.f);
+	const float Gen = 0.16f * (Sum / 600.f) + 0.2f * (FMath::Abs(ThrottlePct) / 100.f) * PowerFactor(TEXT("engines")) + (bBattleShort ? 0.3f : 0.f);
 	// what she sheds: the hull's own glow, plus the radiators, more the hotter she is (retracted: a cruise settles near 15 %,
 	// a typical fight near 70 %, a long heavy one beyond 100 %; extended they shed 2.6 times as much, torn ones less)
 	const float B = bRadiatorsOut ? 0.5f + (1.3f - 0.5f) * RadiatorHealth : 0.5f;

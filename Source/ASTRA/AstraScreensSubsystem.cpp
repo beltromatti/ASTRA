@@ -883,7 +883,8 @@ void UAstraScreensSubsystem::DrawHelm(UCanvas* C, int32 W, int32 H, const FStrin
 	P.Panel(20, 350, W * 0.5f - 10, H - 20, TEXT("Drive"));
 	const float Spd = Ship->GetSpeedMps();
 	P.Bar(36, 396, W * 0.5f - 62, 16, Spd / 576.f, TEXT("Speed"), FString::Printf(TEXT("%.0f M/S"), Spd), CYAN);
-	P.Bar(36, 460, W * 0.5f - 62, 16, Ship->GetThrottlePct() / 100.f, TEXT("Throttle"), FString::Printf(TEXT("%.0f %%"), Ship->GetThrottlePct()), CYAN);
+	P.Bar(36, 460, W * 0.5f - 62, 16, FMath::Abs(Ship->GetThrottlePct()) / 100.f, Ship->GetThrottlePct() < 0.f ? TEXT("Retro-thrust") : TEXT("Throttle"),
+	      FString::Printf(TEXT("%.0f %%"), FMath::Abs(Ship->GetThrottlePct())), CYAN);
 	P.Bar(36, 524, W * 0.5f - 62, 16, Ship->PowerFactor(TEXT("engines")) / 1.5f, TEXT("Engine power"), FString::Printf(TEXT("%.0f %%"), 100.f * Ship->PowerFactor(TEXT("engines"))), CYAN);
 	P.Panel(W * 0.5f + 10, 350, W - 20, H - 20, TEXT("Manoeuvre"));
 	const float MX = W * 0.5f + 28;

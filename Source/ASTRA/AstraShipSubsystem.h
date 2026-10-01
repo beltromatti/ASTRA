@@ -150,7 +150,9 @@ public:
 	FString GetHoloShipId() const { return HoloShipId; }
 	/** Autopilot (the Janus approach): the helm steers to a heading without the usual turn reports. */
 	void SteerTo(float Heading, float Mark);
-	void SetThrottle(float Pct) { ThrottlePct = FMath::Clamp(Pct, 0.f, 100.f); }
+	void SetThrottle(float Pct) { ThrottlePct = FMath::Clamp(Pct, -ReverseThrottlePct, 100.f); }
+	/** Retro-thrust: the drive can back the ship off at up to this much of her full speed (a console holding a range uses it). */
+	static constexpr float ReverseThrottlePct = 30.f;
 	void SetSpeedMps(float V) { SpeedMps = V; }
 	/** The Janus lane has the ship: attitude and speed come from the gate's field until the transit. */
 	void SetLaneControl(bool bOn) { bLaneControl = bOn; bAutoHelm = false; }

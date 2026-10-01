@@ -1100,7 +1100,8 @@ void UAstraStationsSubsystem::TickHelm()
 	};
 	auto SpeedFor = [&](double Mps)
 	{
-		Sh->SetThrottle((float)FMath::Clamp(Mps / 4.8, 0.0, 100.0));
+		// (below zero the drive backs her off: retro-thrust, up to UAstraShipSubsystem::ReverseThrottlePct)
+		Sh->SetThrottle((float)FMath::Clamp(Mps / 4.8, -(double)UAstraShipSubsystem::ReverseThrottlePct, 100.0));
 	};
 	if (M == TEXT("hold"))
 	{
@@ -1134,7 +1135,8 @@ void UAstraStationsSubsystem::TickHelm()
 		if (Hold > 0.0)
 		{
 			// the console holds the range: closes no faster than she can still stop in (the drive answers in ~5 s), matches
-			// the target's run once there, and stops if the target closes inside it (what then is the helm's call)
+			// the target's run once there, and backs off on retro-thrust if the target closes inside it (a third of her speed:
+			// one that comes on faster still gets in, and then it is the helm's call)
 			const FVector Los = (T->Pos - P).GetSafeNormal();
 			const double Away = FVector::DotProduct(T->Vel, Los);
 			const double Err = FVector::Dist(P, T->Pos) - Hold;

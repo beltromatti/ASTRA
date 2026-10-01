@@ -671,7 +671,7 @@ float UAstraBattleSubsystem::PlayerSignatureKm() const
 	}
 	const FString E = Ship->GetEmcon();
 	float Km = E == TEXT("silent") ? 12.f : (E == TEXT("full") ? 60.f : 30.f);
-	Km *= 0.55f + 0.45f * Ship->GetThrottlePct() / 100.f;                                  // the drive's plume
+	Km *= 0.55f + 0.45f * FMath::Max(0.f, Ship->GetThrottlePct()) / 100.f;                 // the drive's plume (backing off, it idles)
 	Km *= 1.f + Ship->SignatureBoost() + 0.4f * FMath::Max(0.f, Ship->GetHeatPct() - 50.f) / 50.f;   // hot panels, a vent, a hot hull
 	return Km;
 }

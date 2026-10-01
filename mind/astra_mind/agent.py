@@ -266,7 +266,9 @@ class BridgeAgent:
         cut = f" They had said only «{cut_after}» when the Captain spoke over them." if cut_after else ""
         ask = (f"[Before speaking] {waited_s:.0f} seconds ago {who} was about to tell the Captain: «{text}».{cut} The ship has moved on "
                "since (the state above is now). If it still matters to the Captain, they say it now as it stands — updated, short, "
-               "in character — with speak. If it no longer matters, they say nothing: do not call speak.")
+               "in character — with speak. If it no longer matters, they say nothing: do not call speak. A line that answers an order "
+               "of the Captain's (what was done about it, what the other ship or console said) always still matters: the Captain is "
+               "waiting for it — say it, updated if things changed, and add only what is new and pressing.")
         msgs = [self._system(lang, state)] + self._last_turns(4) + [{"role": "user", "content": self._now(state) + "\n\n" + ask}]
         said: list[str] = []
 
@@ -454,7 +456,9 @@ EVENT_ASK = ("The Captain should hear this: the responsible officer reports it n
              "say what it means now. When several things happened at once (they are joined by |), the officers report the one or "
              "two that matter most to the Captain right now, the most dangerous first, one short line each: the rest stays on "
              "the boards and the datapad, where the Captain can ask for it; in a battle the Captain hears many voices, and a "
-             "report that changes nothing the Captain must decide is better left unsaid. Within "
+             "report that changes nothing the Captain must decide is better left unsaid. Ranges, shield percentages and countdowns "
+             "that move every few seconds are on the screens: say them when they cross a line that matters (into or out of our guns, "
+             "shields failing, a section gone), never as a running commentary of the same target. Within "
              "their own authority an officer may also act at once: with live consoles, set a mode on their own console when their "
              "delegation is auto and it keeps the Captain's intent alive; on an older build, damage control, shield facing, point "
              "defense and the radiators. To act, CALL the tool in this same turn, then say what was done — saying it without the "
