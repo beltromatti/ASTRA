@@ -13,6 +13,7 @@ plume as an instance of an engine sphere or cylinder, one component per material
   M_WAR_Smoke    translucent  the same with a flipbook of smoke (T_WAR_Smoke)
   M_WAR_Plume    additive   a cylinder narrowing to a tip: a drive's exhaust
   M_WAR_Shield   additive, two-sided   a ship's shield shell (an ellipsoid): hexagons lit round each blow; MID parameters per ship
+  M_WAR_Debris   lit, opaque   chunks of metal (a cube): its side's colour and an ember glow while hot, per instance
   M_WAR_DamageDecal + Instances/MI_WAR_Damage_<Burn|Hole|Torn|Impact|Strafe|Melt|Gouge|Blast>   deferred decals from the damage atlas
 Textures: T_WAR_Fire, T_WAR_Smoke (art/_cache/fx, from tools/art/war_fx_textures.py).
 The per-instance custom data every instanced material reads is in AstraWarFX.h (AstraFx::Fill): 0-2 colour, 3 intensity, 4 age, 5-6 parameters,
@@ -355,6 +356,22 @@ def build_shield():
     finish(m)
 
 
+def build_debris():
+    """Chunks of metal thrown off a hull: lit by the star, the colour of its side and an ember glow while it is hot, both per instance."""
+    m = fresh("M_WAR_Debris", unreal.BlendMode.BLEND_OPAQUE, unlit=False)
+    col = cd3(m, 0, -700, 0)
+    heat = cd(m, 3, -700, 200)
+    ember = E(m, unreal.MaterialExpressionConstant3Vector, -700, 120, constant=unreal.LinearColor(1.0, 0.38, 0.10, 1))
+    em = E(m, unreal.MaterialExpressionMultiply, -400, 150)
+    link(ember, "", em, "A")
+    link(heat, "", em, "B")
+    mel.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(const(m, 0.5, -400, 280), "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.connect_material_property(const(m, 0.45, -400, 340), "", unreal.MaterialProperty.MP_METALLIC)
+    mel.connect_material_property(em, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(m)
+
+
 def build_decal():
     """The damage decal: the atlas T_ShipDamage_A/N (ARTE-NAVI), the cell chosen by AtlasRect (x, y, w, h). The older M_ASTRA_DamageDecal connects the
     parameter's RGB pin and then masks its alpha, which a float3 does not have; this one takes the RGBA pin."""
@@ -451,6 +468,7 @@ attempt("M_WAR_Tube", build_tube)
 attempt("M_WAR_Glow", build_glow)
 attempt("M_WAR_Plume", build_plume)
 attempt("M_WAR_Shield", build_shield)
+attempt("M_WAR_Debris", build_debris)
 if fire_tex:
     attempt("M_WAR_Fire", build_fire, fire_tex)
 if smoke_tex:

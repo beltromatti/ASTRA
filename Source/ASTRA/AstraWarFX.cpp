@@ -128,6 +128,7 @@ bool UAstraWarFX::LoadAssets()
 	MatSmoke = Mat(TEXT("M_WAR_Smoke"));
 	MatPlume = Mat(TEXT("M_WAR_Plume"));
 	MatShield = Mat(TEXT("M_WAR_Shield"));
+	MatDebris = Mat(TEXT("M_WAR_Debris"));
 	static const TCHAR* const Dmg[8] = {TEXT("Burn"), TEXT("Hole"), TEXT("Torn"), TEXT("Impact"), TEXT("Strafe"), TEXT("Melt"), TEXT("Gouge"), TEXT("Blast")};
 	DamageMats.Reset();
 	for (const TCHAR* N : Dmg)
@@ -145,14 +146,14 @@ bool UAstraWarFX::LoadAssets()
 	return bOk;
 }
 
-void UAstraWarFX::MakeLayer(FLayer& L, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 SortPriority, bool bLit)
+void UAstraWarFX::MakeLayer(FLayer& L, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 SortPriority, bool bLit, int32 NumData)
 {
 	L.Init(Capacity);
 	if (!Host || !Mesh || !Mat)
 	{
 		return;
 	}
-	L.NumData = bLit ? 0 : Stride;
+	L.NumData = NumData;
 	UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(Host, Name);
 	C->SetupAttachment(Host->GetRootComponent());
 	C->SetMobility(EComponentMobility::Movable);
@@ -174,7 +175,7 @@ void UAstraWarFX::MakeLayer(FLayer& L, const TCHAR* Name, UStaticMesh* Mesh, UMa
 	{
 		C->SetLightingChannels(true, true, false);   // outside the hull: the star's light and the planet's, like the ships
 	}
-	C->SetNumCustomDataFloats(bLit ? 0 : Stride);
+	C->SetNumCustomDataFloats(NumData);
 	TArray<FTransform> Init;
 	Init.Init(HiddenXf(), Capacity);
 	C->AddInstances(Init, false, false, false);
@@ -195,7 +196,7 @@ void UAstraWarFX::Init(UAstraBattleSubsystem* InOwner)
 	Sparks.Reserve(CapSparks);
 	Beams.Reserve(CapBeams);
 	Debris.Reserve(CapDebrisSim);
-	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisA, &DebrisM})
+	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisL})
 	{
 		L->Init(0);
 	}
@@ -206,7 +207,7 @@ void UAstraWarFX::Init(UAstraBattleSubsystem* InOwner)
 		if (bSim)
 		{
 			Darts.Init(CapDarts); Tubes.Init(CapTubes); Glows.Init(CapGlows); Fires.Init(CapFires); Smokes.Init(CapSmokes);
-			Plumes.Init(CapPlumes); DebrisA.Init(CapDebris); DebrisM.Init(CapDebris);
+			Plumes.Init(CapPlumes); DebrisL.Init(CapDebris);
 		}
 		return;
 	}
@@ -227,16 +228,15 @@ void UAstraWarFX::Init(UAstraBattleSubsystem* InOwner)
 	Root->SetMobility(EComponentMobility::Movable);
 	Root->RegisterComponent();
 	Host->Tags.Add(TEXT("ASTRA.Sky"));              // the main viewscreen's camera shows what is out there: tagged like the sky
-	UMaterialInterface* HullA = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/Instances/MI_HULL_A_Plate.MI_HULL_A_Plate"));
-	UMaterialInterface* HullM = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/Instances/MI_HULL_M_Frame.MI_HULL_M_Frame"));
-	MakeLayer(Smokes, TEXT("FxSmoke"), SphereMesh, MatSmoke, CapSmokes, -2, false);
-	MakeLayer(Fires, TEXT("FxFire"), SphereMesh, MatFire, CapFires, 0, false);
-	MakeLayer(Plumes, TEXT("FxPlume"), CylinderMesh, MatPlume, CapPlumes, 1, false);
-	MakeLayer(Tubes, TEXT("FxTube"), CylinderMesh, MatTube, CapTubes, 2, false);
-	MakeLayer(Darts, TEXT("FxDart"), SphereMesh, MatDart, CapDarts, 3, false);
-	MakeLayer(Glows, TEXT("FxGlow"), SphereMesh, MatGlow, CapGlows, 4, false);
-	MakeLayer(DebrisA, TEXT("FxDebrisA"), CubeMesh, HullA ? HullA : MatGlow.Get(), CapDebris, 0, true);
-	MakeLayer(DebrisM, TEXT("FxDebrisM"), CubeMesh, HullM ? HullM : MatGlow.Get(), CapDebris, 0, true);
+	MakeLayer(Smokes, TEXT("FxSmoke"), SphereMesh, MatSmoke, CapSmokes, -2, false, Stride);
+	MakeLayer(Fires, TEXT("FxFire"), SphereMesh, MatFire, CapFires, 0, false, Stride);
+	MakeLayer(Plumes, TEXT("FxPlume"), CylinderMesh, MatPlume, CapPlumes, 1, false, Stride);
+	MakeLayer(Tubes, TEXT("FxTube"), CylinderMesh, MatTube, CapTubes, 2, false, Stride);
+	MakeLayer(Darts, TEXT("FxDart"), SphereMesh, MatDart, CapDarts, 3, false, Stride);
+	MakeLayer(Glows, TEXT("FxGlow"), SphereMesh, MatGlow, CapGlows, 4, false, Stride);
+	// chunks of metal: lit, with their colour and glow per instance (M_WAR_Debris), or in the engine's plain material until that exists
+	UMaterialInterface* DebrisMat = MatDebris ? MatDebris.Get() : LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	MakeLayer(DebrisL, TEXT("FxDebris"), CubeMesh, DebrisMat, CapDebris, 0, true, MatDebris ? Stride : 0);
 	// the flash lights: exterior only (lighting channel 1: the hulls are on it, the bridge's interior is not)
 	for (int32 i = 0; i < MaxLights; ++i)
 	{
@@ -254,8 +254,8 @@ void UAstraWarFX::Init(UAstraBattleSubsystem* InOwner)
 		Lights.Add(L);
 	}
 	bLive = true;
-	UE_LOG(LogASTRA, Log, TEXT("[WarFX] effects ready: darts %d, tubes %d, glows %d, fire %d, smoke %d, plumes %d, debris %d x2, lights %d"),
-	       CapDarts, CapTubes, CapGlows, CapFires, CapSmokes, CapPlumes, CapDebris, MaxLights);
+	UE_LOG(LogASTRA, Log, TEXT("[WarFX] effects ready: darts %d, tubes %d, glows %d, fire %d, smoke %d, plumes %d, debris %d, lights %d (debris material: %s)"),
+	       CapDarts, CapTubes, CapGlows, CapFires, CapSmokes, CapPlumes, CapDebris, MaxLights, MatDebris ? TEXT("M_WAR_Debris") : TEXT("engine default"));
 }
 
 bool UAstraWarFX::IsActive() const
@@ -276,6 +276,7 @@ void UAstraWarFX::ClearAll()
 	Debris.Reset();
 	Tracks.Reset();
 	FreeTracks.Reset();
+	Ghosts.Reset();
 	FlashLights.Reset();
 	Timed.Reset();
 	for (FScar& S : Scars)
@@ -302,10 +303,23 @@ void UAstraWarFX::ClearAll()
 		}
 	}
 	ShipFx.Reset();
-	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisA, &DebrisM})
+	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisL})
 	{
 		L->Begin();
 	}
+}
+
+float UAstraWarFX::Room(uint8 Layer) const
+{
+	const int32 Cap = Layer == LFire ? CapFires : (Layer == LSmoke ? CapSmokes : CapGlows);
+	const float Used = (float)PuffLive[FMath::Min<int32>(Layer, 3)] / (float)Cap;
+	return FMath::Clamp((1.f - Used) / 0.35f, 0.f, 1.f);
+}
+
+float UAstraWarFX::RoomSparks() const
+{
+	const float Used = FMath::Max((float)Sparks.Num() / (float)CapSparks, (float)Darts.Prev / (float)CapDarts);
+	return FMath::Clamp((1.f - Used) / 0.4f, 0.f, 1.f);
 }
 
 AstraFx::FShipFx& UAstraWarFX::ShipOf(int32 Id)
@@ -368,7 +382,7 @@ AstraFx::FSpark* UAstraWarFX::AddSpark(const FVector& Pos, const FVector& Vel, f
 void UAstraWarFX::SparkBurst(const FVector& Pos, const FVector& Dir, float Spread, int32 N, float SpeedLo, float SpeedHi, float LifeLo, float LifeHi,
                              float Len, const FLinearColor& Col, float Inten, const FVector& BaseVel)
 {
-	const float K = FMath::Clamp(Density, 0.2f, 2.f);
+	const float K = FMath::Clamp(Density, 0.2f, 2.f) * FMath::Max(0.12f, RoomSparks());
 	N = FMath::Max(1, FMath::RoundToInt(N * K));
 	for (int32 i = 0; i < N; ++i)
 	{
@@ -416,15 +430,15 @@ void UAstraWarFX::AddDebris(const FVector& Pos, const FVector& Vel, float SizeM,
 void UAstraWarFX::BeginFrame()
 {
 	const FAstraBattleShip& A = Owner->Ships[0];
-	F.Origin = A.Pos;
+	F.Origin = Owner->bSandbox ? FVector::ZeroVector : A.Pos;      // (a bench scenario parks the Aquila far away: what is measured is round the origin)
 	F.Att = A.Att;
 	F.InvAtt = A.Att.Inverse();
-	F.Vel = A.Vel;
+	F.Vel = Owner->bSandbox ? FVector::ZeroVector : A.Vel;
 	F.Bridge = Owner->BridgeOffset;
 	Intensity = FMath::Clamp(CVarIntensity.GetValueOnGameThread(), 0.1f, 6.f);
 	Density = FMath::Clamp(CVarDensity.GetValueOnGameThread(), 0.2f, 2.f);
 	LightScale = FMath::Clamp(CVarLights.GetValueOnGameThread(), 0.f, 4.f);
-	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisA, &DebrisM})
+	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisL})
 	{
 		L->Begin();
 	}
@@ -432,7 +446,7 @@ void UAstraWarFX::BeginFrame()
 
 void UAstraWarFX::EndFrame()
 {
-	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisA, &DebrisM})
+	for (FLayer* L : {&Darts, &Tubes, &Glows, &Fires, &Smokes, &Plumes, &DebrisL})
 	{
 		L->Flush();
 	}
@@ -488,11 +502,11 @@ void UAstraWarFX::Tick(float InDt)
 
 void UAstraWarFX::Stats(FString& Out) const
 {
-	Out = FString::Printf(TEXT("%s | %.3f ms/frame (max %.2f) over %d frames | instances now/peak: darts %d/%d tubes %d/%d glows %d/%d fire %d/%d smoke %d/%d plumes %d/%d debris %d+%d | "
+	Out = FString::Printf(TEXT("%s | %.3f ms/frame (max %.2f) over %d frames | instances now/peak: darts %d/%d tubes %d/%d glows %d/%d fire %d/%d smoke %d/%d plumes %d/%d debris %d | "
 	                           "dropped (full): darts %d tubes %d glows %d fire %d smoke %d | puffs %d sparks %d beams %d tracks %d pieces %d scars %d lights %d"),
 	                      bLive ? TEXT("drawing") : (bSim ? TEXT("bench (not drawn)") : TEXT("off")), TickCount ? TickMs / TickCount : 0.0, TickMsMax, TickCount,
 	                      Darts.Prev, Darts.Peak, Tubes.Prev, Tubes.Peak, Glows.Prev, Glows.Peak, Fires.Prev, Fires.Peak, Smokes.Prev, Smokes.Peak,
-	                      Plumes.Prev, Plumes.Peak, DebrisA.Prev, DebrisM.Prev, Darts.Dropped, Tubes.Dropped, Glows.Dropped, Fires.Dropped, Smokes.Dropped,
+	                      Plumes.Prev, Plumes.Peak, DebrisL.Prev, Darts.Dropped, Tubes.Dropped, Glows.Dropped, Fires.Dropped, Smokes.Dropped,
 	                      Puffs.Num(), Sparks.Num(), Beams.Num(), Tracks.Num() - FreeTracks.Num(), Pieces.Num(), Scars.Num(), FlashLights.Num());
 }
 
@@ -582,6 +596,9 @@ void UAstraWarFX::DrawShots()
 		T.Frame = Frame;
 		T.Age += Dt;
 		const bool bAstra = Pr.OwnerSide == 0;
+		// what it is is read each frame: a torpedo and a rocket are missiles made over after they leave the gun
+		T.Style = Pr.Kind == EAstraProjKind::Rail ? 0 : (Pr.bTorpedo ? 2 : (Pr.HitKind == EAstraHitKind::Rocket ? 3 : 1));
+		T.Col = ShotColor(bAstra, Pr.HitKind);
 		const float Fade = T.Age < T.OffsetTau ? 1.f - Ease(T.Age / T.OffsetTau) : 0.f;
 		const FVector Head = Pr.Pos + T.Offset * Fade;
 		// the way it moves in the Aquila's frame, with the muzzle's correction in it
@@ -595,6 +612,7 @@ void UAstraWarFX::DrawShots()
 		{
 			continue;
 		}
+		T.Last = Head;
 		const FVector DirW = F.DirToWorld(Vrel / Speed);
 		const FVector HeadW = F.ToWorld(Head);
 		const double Dist = FVector::Dist(HeadW, Eye) / 100.0;
@@ -618,7 +636,7 @@ void UAstraWarFX::DrawShots()
 			FTransform* X;
 			if (float* D = Glows.Next(X))
 			{
-				const float R = (T.Style == 2 ? 11.f : 7.f) * (0.8f + 0.2f * FMath::Sin(T.Age * 40.f));
+				const float R = (T.Style == 2 ? 11.f : 7.f) * GlowK * (0.8f + 0.2f * FMath::Sin(T.Age * 40.f));
 				*X = FTransform(FQuat::Identity, HeadW, FVector(R * 2.f));
 				Fill(D, T.Style == 2 ? FLinearColor(1.f, 1.f, 1.f) : FLinearColor(1.f, 0.85f, 0.6f), 260.f * Intensity * Hot, 0.f, 0.f, 0.f, 0.f, R * 2.f, 0.f);
 			}
@@ -643,14 +661,16 @@ void UAstraWarFX::DrawShots()
 			const double L = FVector::Dist(A, B);
 			if (L > 20.0)
 			{
+				// a bead: an ellipsoid a little longer than its stretch of the path, so that it melts into its neighbours; older, wider, dimmer
 				FTransform* X;
-				if (float* D = Tubes.Next(X))
+				if (float* D = Darts.Next(X))
 				{
-					const float Age01 = (float)(i + 1) / (float)FTrack::TrailPts;
-					const float Width = (T.Style == 2 ? 3.6f : 2.2f) * (1.f + 2.2f * Age01);
+					const float AgeTail = (float)(i + 1) / (float)FTrack::TrailPts, AgeHead = (float)i / (float)FTrack::TrailPts;
+					const float Width = (T.Style == 2 ? 3.6f : 2.2f) * (1.f + 2.2f * AgeTail);
 					const FVector Dir = (A - B) / L;
-					*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, (float)L / 100.f));
-					Fill(D, T.Col, 90.f * Intensity * Hot, Age01, 2.f, (float)(L / 100.0), (float)(Pr.FxSlot & 255) / 255.f, Width, (float)(L / 100.0));
+					const float Len = (float)(L / 100.0) * 1.7f;
+					*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, Len));
+					Fill(D, T.Col, 65.f * Intensity * Hot, AgeTail, 2.f, AgeHead, (float)(Pr.FxSlot & 255) / 255.f, Width, Len);
 				}
 			}
 			Newer = Older;
@@ -662,8 +682,55 @@ void UAstraWarFX::DrawShots()
 		FTrack& T = Tracks[i];
 		if (T.Frame >= 0 && T.Frame != Frame)
 		{
+			if (T.Style >= 1 && T.HistN >= 2 && Ghosts.Num() < 120)
+			{
+				FGhost& G = Ghosts.AddDefaulted_GetRef();
+				G.Pts[0] = T.Last;
+				G.N = FMath::Min(T.HistN + 1, (int32)FTrack::TrailPts + 1);
+				for (int32 k = 1; k < G.N; ++k)
+				{
+					G.Pts[k] = T.Hist[k - 1];
+				}
+				G.Style = T.Style;
+				G.Col = T.Col;
+				G.Seed = (uint8)(i & 255);
+				G.Life = 1.0f + 0.5f * (T.Style == 2);
+			}
 			T.Frame = -2;
 			FreeTracks.Add(i);
+		}
+	}
+	// the trails the ended shots left: the same beads, ageing together
+	for (int32 g = Ghosts.Num() - 1; g >= 0; --g)
+	{
+		FGhost& G = Ghosts[g];
+		G.Age += Dt;
+		if (G.Age >= G.Life)
+		{
+			Ghosts.RemoveAtSwap(g, EAllowShrinking::No);
+			continue;
+		}
+		const float Shift = G.Age / G.Life;
+		const float Hot = G.Style == 2 ? 1.5f : (G.Style == 3 ? 0.7f : 1.f);
+		for (int32 k = 0; k + 1 < G.N; ++k)
+		{
+			const FVector A = F.ToWorld(G.Pts[k]), B = F.ToWorld(G.Pts[k + 1]);
+			const double L = FVector::Dist(A, B);
+			FTransform* X;
+			if (L < 20.0)
+			{
+				continue;
+			}
+			if (float* D = Darts.Next(X))
+			{
+				const float AgeTail = FMath::Min(1.f, (float)(k + 1) / (float)FTrack::TrailPts + Shift);
+				const float AgeHead = FMath::Min(1.f, (float)k / (float)FTrack::TrailPts + Shift);
+				const float Width = (G.Style == 2 ? 3.6f : 2.2f) * (1.f + 2.2f * AgeTail);
+				const FVector Dir = (A - B) / L;
+				const float Len = (float)(L / 100.0) * 1.7f;
+				*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, Dir), (A + B) * 0.5, FVector(Width, Width, Len));
+				Fill(D, G.Col, 65.f * Intensity * Hot, AgeTail, 2.f, AgeHead, (float)G.Seed / 255.f, Width, Len);
+			}
 		}
 	}
 }
@@ -675,7 +742,7 @@ void UAstraWarFX::OnBeam(EAstraFxShot Kind, const FVector& A, const FVector& B, 
 	{
 		return;
 	}
-	if (FVector::DistSquared(B, Owner->Ships[0].Pos) > FMath::Square(160000.0) && FVector::DistSquared(A, Owner->Ships[0].Pos) > FMath::Square(160000.0))
+	if (FVector::DistSquared(B, F.Origin) > FMath::Square(160000.0) && FVector::DistSquared(A, F.Origin) > FMath::Square(160000.0))
 	{
 		return;
 	}
@@ -784,7 +851,7 @@ void UAstraWarFX::DrawBeams()
 				}
 				if (float* D = Glows.Next(X))
 				{
-					const float R = Bm.Width * (e == 0 ? 3.4f : 2.2f) * (0.85f + 0.3f * FMath::Frac(Bm.Seed * 13.f + Clock * 31.f));
+					const float R = Bm.Width * GlowK * (e == 0 ? 3.4f : 2.2f) * (0.85f + 0.3f * FMath::Frac(Bm.Seed * 13.f + Clock * 31.f));
 					*X = FTransform(FQuat::Identity, e == 0 ? BW : AW, FVector(R * 2.f));
 					Fill(D, e == 0 ? Mix(Bm.Col, FLinearColor::White, 0.45f) : Bm.Col, (e == 0 ? 300.f : 160.f) * Intensity * Fade, K, 0.f, 0.f, Bm.Seed, R * 2.f, 0.f);
 				}
@@ -820,6 +887,7 @@ void UAstraWarFX::DrawBeams()
 // ------------------------------------------------------------------------------------------------------------------ particles
 void UAstraWarFX::DrawPuffs()
 {
+	int32 Live[4] = {0, 0, 0, 0};
 	for (int32 i = Puffs.Num() - 1; i >= 0; --i)
 	{
 		FPuff& P = Puffs[i];
@@ -833,6 +901,7 @@ void UAstraWarFX::DrawPuffs()
 		{
 			continue;                              // not born yet
 		}
+		++Live[FMath::Min<int32>(P.Layer, 3)];
 		if (P.Drag > 0.f)
 		{
 			P.Vel *= FMath::Max(0.f, 1.f - P.Drag * Dt);
@@ -842,6 +911,10 @@ void UAstraWarFX::DrawPuffs()
 		FTransform* X;
 		float* D = nullptr;
 		float R = FMath::Lerp(P.R0, P.R1, Out(K));
+		if (P.Layer == LGlow)
+		{
+			R *= GlowK;                        // (the soft falloff of a glow reaches about 0.6 of its sphere: the sphere is drawn larger)
+		}
 		switch (P.Layer)
 		{
 		case LFire:
@@ -868,12 +941,17 @@ void UAstraWarFX::DrawPuffs()
 			Fill(D, P.Col, P.Inten, K, P.Seed, P.P1, P.Seed, R * 2.f, P.P2);
 			break;
 		case LShock:
-			Fill(D, P.Col, P.Inten * Intensity, K, 2.f, P.P2, P.Seed, R * 2.f, 0.f);
+			Fill(D, P.Col, P.Inten * Intensity, K, 3.f, P.P2, P.Seed, R * 2.f, 0.f);
 			break;
 		default:
 			Fill(D, P.Col, P.Inten * Intensity, K, P.P1, P.P2, P.Seed, R * 2.f, 0.f);
 			break;
 		}
+	}
+	Live[LGlow] += Live[LShock];             // (the blast waves are drawn with the glows)
+	for (int32 k = 0; k < 4; ++k)
+	{
+		PuffLive[k] = Live[k];
 	}
 }
 
@@ -936,14 +1014,13 @@ void UAstraWarFX::DrawDebris()
 				AddSpark(D.Pos, D.Vel * 0.6f, 0.5f, 8.f, 0.7f, FLinearColor(1.f, 0.6f, 0.2f), 140.f, 0.5f);
 			}
 		}
-		FLayer& L = D.bAstra ? DebrisA : DebrisM;
 		FTransform* X;
-		if (float* Dat = L.Next(X))
+		if (float* Dat = DebrisL.Next(X))
 		{
-			(void)Dat;
-			// shrinks away in its last second
+			// shrinks away in its last second; the metal of its side, glowing a little while it is hot
 			const float S = FMath::Min(1.f, (D.Life - D.Age) * 1.5f);
 			*X = FTransform(F.ToWorldRot(D.Att), F.ToWorld(D.Pos), D.Size * S);
+			Fill(Dat, D.bAstra ? FLinearColor(0.5f, 0.49f, 0.46f) : FLinearColor(0.07f, 0.062f, 0.055f), D.Glow > 0.f ? 55.f * FMath::Min(1.f, D.Glow) : 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f);
 		}
 	}
 }

@@ -170,7 +170,7 @@ FVector UAstraWarFX::MuzzleOf(const FAstraBattleShip& S, EAstraMountKind Kind, c
 			Tmax = FMath::Min(Tmax, ((D > 0.0 ? H[a] : -H[a]) - O[a]) / D);
 		}
 	}
-	const FVector Local = O + LocalAim * FMath::Max(0.0, Tmax) + FVector(Mid, 0.f, 0.f);
+	const FVector Local = O + LocalAim * FMath::Clamp(Tmax, 0.0, 2.0 * (double)S.Radius) + FVector(Mid, 0.f, 0.f);
 	return S.Pos + S.Att.RotateVector(Local);
 }
 
@@ -408,7 +408,7 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 		}
 		if (bBurn)
 		{
-			Fx.Emit[sec] += Dt * ((D.Burn[sec] > 0.f ? 2.4f : 0.f) + (bGut ? 4.5f : 0.f)) * FMath::Sqrt(SizeK) * K;
+			Fx.Emit[sec] += Dt * ((D.Burn[sec] > 0.f ? 2.4f : 0.f) + (bGut ? 4.5f : 0.f)) * FMath::Sqrt(SizeK) * K * Room(LFire);
 			while (Fx.Emit[sec] >= 1.f)
 			{
 				Fx.Emit[sec] -= 1.f;
@@ -432,7 +432,7 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 		}
 		if (bVent)
 		{
-			Fx.EmitVent[sec] += Dt * 14.f * K;
+			Fx.EmitVent[sec] += Dt * 14.f * K * Room(LGlow);
 			while (Fx.EmitVent[sec] >= 1.f)
 			{
 				Fx.EmitVent[sec] -= 1.f;
@@ -758,7 +758,7 @@ void UAstraWarFX::TickPieces()
 				continue;
 			}
 			const float Area = FMath::Clamp(Cf.HalfY * Cf.HalfZ / 400.f, 0.5f, 6.f);
-			P.Emit += Dt * (1.2f + 4.f * Area * FMath::Pow(P.Heat, 0.6f)) * K;
+			P.Emit += Dt * (0.8f + 3.f * Area * FMath::Pow(P.Heat, 0.6f)) * K * FMath::Min(Room(LFire), Room(LSmoke) * 1.5f);
 			int32 Spawned = 0;
 			while (P.Emit >= 1.f && Spawned < 6)
 			{
@@ -936,11 +936,19 @@ void UAstraWarFX::DrawDrives()
 		{
 			continue;
 		}
-		const FShipFx* Fx = ShipFx.Find(S.Id);
+		FShipFx* Fx = ShipFx.Find(S.Id);
 		const float Thrust = Fx ? Fx->Thrust : 0.15f;
 		const bool bDead = S.bDisabled || (S.Dmg.bModel && Owner->EngineFactor(S) <= 0.01f);
-		const FAstraBattleShip& Sr = S;
-		const FShipTable* T = FindTable(FxMeshOf(Sr));
+		const FShipTable* T = nullptr;
+		if (Fx)
+		{
+			if (!Fx->bTableKnown)
+			{
+				Fx->Table = FindTable(FxMeshOf(S));            // (once: a string search a frame for every craft would be waste)
+				Fx->bTableKnown = true;
+			}
+			T = Fx->Table;
+		}
 		const bool bAstra = S.Side == EAstraSide::Astra;
 		const FLinearColor Core = bAstra ? FLinearColor(0.78f, 0.9f, 1.f) : FLinearColor(1.f, 0.62f, 0.3f);
 		if (S.bCraft)
@@ -954,7 +962,7 @@ void UAstraWarFX::DrawDrives()
 			FTransform* X;
 			if (float* D = Glows.Next(X))
 			{
-				const float R = FMath::Max(S.Radius * 0.25f, 1.1f);
+				const float R = FMath::Max(S.Radius * 0.25f, 1.1f) * GlowK;
 				*X = FTransform(FQuat::Identity, F.ToWorld(Back), FVector(R * 2.f));
 				Fill(D, Core, 110.f * Intensity * (0.35f + 0.65f * Thrust), 0.f, 0.f, 0.f, (float)(S.Id & 255) / 255.f, R * 2.f, 0.f);
 			}
@@ -983,11 +991,11 @@ void UAstraWarFX::DrawDrives()
 			{
 				const FVector LipW = F.ToWorld(Lip);
 				*X = FTransform(FQuat::FindBetweenNormals(FVector::ZAxisVector, DirW), LipW + DirW * (Len * 50.0), FVector(Width, Width, Len));
-				Fill(D, Core, 150.f * Intensity * Fl, Clock, bAstra ? 0.f : 1.f, Sput, (float)(S.Id & 255) / 255.f, Width, Len);
+				Fill(D, Core, 70.f * Intensity * Fl, Clock, bAstra ? 0.f : 1.f, Sput, (float)(S.Id & 255) / 255.f, Width, Len);
 			}
 			if (float* D = Glows.Next(X))
 			{
-				const float R = Bl.R * (1.5f + 1.5f * Thrust);
+				const float R = Bl.R * GlowK * (1.5f + 1.5f * Thrust);
 				*X = FTransform(FQuat::Identity, F.ToWorld(Lip), FVector(R * 2.f));
 				Fill(D, Core, 210.f * Intensity * Fl, 0.f, 0.f, 0.f, (float)(S.Id & 255) / 255.f, R * 2.f, 0.f);
 			}

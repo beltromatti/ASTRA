@@ -21,7 +21,7 @@ namespace
 // ------------------------------------------------------------------------------------------------------------------ flashes
 void UAstraWarFX::OnFlash(EAstraFxFlash Kind, const FVector& Pos, float Size, float Life, const FLinearColor& Col, float Inten, const FVector& Vel, float Delay)
 {
-	if (!IsActive() || FVector::DistSquared(Pos, Owner->Ships[0].Pos) > FMath::Square(170000.0))
+	if (!IsActive() || FVector::DistSquared(Pos, F.Origin) > FMath::Square(170000.0))
 	{
 		return;
 	}
@@ -66,7 +66,11 @@ void UAstraWarFX::OnFlash(EAstraFxFlash Kind, const FVector& Pos, float Size, fl
 // ------------------------------------------------------------------------------------------------------------------ explosions
 void UAstraWarFX::Smoke(const FVector& Pos, const FVector& Vel, float Radius, float Life, float Dark, float Delay)
 {
-	if (FPuff* P = AddPuff(Pos, Vel * 0.8f + FMath::VRand() * Radius * 0.12f, Life, Radius * 0.5f, Radius * 1.5f, FLinearColor(0.16f, 0.15f, 0.14f), 38.f, LSmoke, Delay))
+	if (FMath::FRand() > Room(LSmoke))
+	{
+		return;                              // the smoke is thick enough already
+	}
+	if (FPuff* P = AddPuff(Pos, Vel * 0.8f + FMath::VRand() * Radius * 0.12f, Life, Radius * 0.5f, Radius * 1.5f, FLinearColor(0.5f, 0.48f, 0.46f), 70.f, LSmoke, Delay))
 	{
 		P->P1 = Dark;
 		P->P2 = 0.4f;                       // an ember glow inside it, fading
@@ -94,7 +98,7 @@ void UAstraWarFX::Explosion(const FVector& Pos, const FVector& Vel, float Radius
 		F0->P1 = 1.f;
 	}
 	// the fireball: billows of fire from the flipbook, a little apart, living a second or two
-	const int32 Billows = FMath::Clamp(FMath::RoundToInt((1.f + 1.6f * P) * K), 1, 5);
+	const int32 Billows = FMath::Clamp(FMath::RoundToInt((1.f + 1.6f * P) * K * FMath::Max(0.4f, Room(LFire))), 1, 5);
 	for (int32 i = 0; i < Billows; ++i)
 	{
 		const FVector Off = FMath::VRand() * R * 0.22f * (float)i;
@@ -108,7 +112,7 @@ void UAstraWarFX::Explosion(const FVector& Pos, const FVector& Vel, float Radius
 	AddPuff(Pos, Vel, 1.0f + 0.5f * P, R, 2.0f * R, FLinearColor(1.f, 0.5f, 0.18f), 22.f, LGlow, Delay);
 	SparkBurst(Pos, FVector::UpVector, 3.f, 12 + (int32)(34 * P), 30.f, 90.f + 70.f * P, 0.7f, 2.0f, 9.f + 5.f * P, FxMetal, 260.f, Vel);
 	// smoke, and the blast wave of a big one
-	const int32 Puffs_ = FMath::Max(1, FMath::RoundToInt((1.f + 2.5f * P) * K));
+	const int32 Puffs_ = FMath::Max(1, FMath::RoundToInt((1.f + 2.5f * P) * K));          // (each one asks the smoke's room in Smoke())
 	for (int32 i = 0; i < Puffs_; ++i)
 	{
 		Smoke(Pos + FMath::VRand() * R * 0.35f, Vel + FMath::VRand() * 8.f, R * FMath::FRandRange(0.7f, 1.2f), FMath::FRandRange(4.f, 7.5f), 0.85f, Delay + 0.15f + 0.1f * i);
@@ -215,7 +219,7 @@ void UAstraWarFX::ShieldHit(const FAstraBattleShip& To, const FAstraFxHit& H)
 
 void UAstraWarFX::OnHit(const FAstraBattleShip& To, const FAstraFxHit& H)
 {
-	if (!IsActive() || !Owner || FVector::DistSquared(H.Pos, Owner->Ships[0].Pos) > FMath::Square(170000.0))
+	if (!IsActive() || !Owner || FVector::DistSquared(H.Pos, F.Origin) > FMath::Square(170000.0))
 	{
 		return;
 	}
@@ -310,7 +314,7 @@ void UAstraWarFX::OnHit(const FAstraBattleShip& To, const FAstraFxHit& H)
 // ------------------------------------------------------------------------------------------------------------------ deaths
 void UAstraWarFX::OnCraftDestroyed(const FAstraBattleShip& S)
 {
-	if (!IsActive() || FVector::DistSquared(S.Pos, Owner->Ships[0].Pos) > FMath::Square(170000.0))
+	if (!IsActive() || FVector::DistSquared(S.Pos, F.Origin) > FMath::Square(170000.0))
 	{
 		return;
 	}

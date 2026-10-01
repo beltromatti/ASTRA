@@ -70,9 +70,10 @@ namespace AstraFx
 	constexpr int32 Stride = 12;              // floats of per-instance custom data (colour 0-2, intensity 3, age 4, P1 5, P2 6, seed 7, width 8, length 9)
 
 	/** Capacity of each layer (instances) and of the particle lists: the budget of the effects. */
-	constexpr int32 CapDarts = 1400, CapTubes = 900, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
+	constexpr int32 CapDarts = 1500, CapTubes = 1200, CapGlows = 700, CapFires = 200, CapSmokes = 220, CapPlumes = 220, CapDebris = 140;
 	constexpr int32 CapPuffs = 900, CapSparks = 1800, CapBeams = 360, CapDebrisSim = 240, CapPieces = 36;
 	constexpr int32 MaxLights = 8;
+	constexpr float GlowK = 1.7f;             // a glow's soft falloff reaches ~0.6 of its sphere: spheres are drawn this much larger than the glow they stand for
 
 	/** One layer of instances (one UInstancedStaticMeshComponent, one material): staged each frame, written once. */
 	struct FLayer
@@ -144,11 +145,23 @@ namespace AstraFx
 		float Age = 0.f;
 		FVector Offset = FVector::ZeroVector;  // the muzzle's offset from the true path at birth (m), fading to zero
 		float OffsetTau = 0.25f;
+		FVector Last = FVector::ZeroVector;    // where it was drawn last (its head)
 		FVector Hist[TrailPts];                // where the trail has been (system frame), newest first
 		int32 HistN = 0;
 		float SampleAcc = 0.f;
 		uint8 Style = 0;                       // 0 rail slug, 1 missile, 2 torpedo, 3 rocket
 		FLinearColor Col = FLinearColor::White;
+	};
+
+	/** The trail a shot left when it ended (a hit, a kill by point defence, running out): it hangs there a moment, fading. */
+	struct FGhost
+	{
+		FVector Pts[FTrack::TrailPts + 1];    // newest first (system frame)
+		int32 N = 0;
+		float Age = 0.f, Life = 1.4f;
+		uint8 Style = 1;
+		FLinearColor Col = FLinearColor::White;
+		uint8 Seed = 0;
 	};
 
 	/** One ripple of a shield: where a blow landed on it and how it spreads. */
@@ -187,6 +200,8 @@ namespace AstraFx
 		float BreakBlast = 0.f;                // secondary blasts while the hull is breaking
 		FShield Shield;
 		int32 Scars = 0;
+		const struct FShipTable* Table = nullptr;   // its drive bells and pieces (found once)
+		bool bTableKnown = false;
 		bool bDark = false;                    // its lights have been put out (disabled)
 		float DarkT = 0.f;
 		TWeakObjectPtr<UMaterialInstanceDynamic> LightsMid;   // the windows
@@ -341,6 +356,7 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialInterface> MatSmoke;
 	UPROPERTY() TObjectPtr<UMaterialInterface> MatPlume;
 	UPROPERTY() TObjectPtr<UMaterialInterface> MatShield;
+	UPROPERTY() TObjectPtr<UMaterialInterface> MatDebris;   // lit chunks of metal (M_WAR_Debris; the engine's basic material until it exists)
 	UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> Lights;
 	UPROPERTY() TArray<TObjectPtr<UMaterialInterface>> DamageMats;   // MI_ShipDamage_<Burn|Hole|Torn|Impact|Strafe|Melt|Gouge|Blast>
 
@@ -350,7 +366,7 @@ private:
 	bool bInitDone = false;
 
 	// ---- the layers
-	AstraFx::FLayer Darts, Tubes, Glows, Fires, Smokes, Plumes, DebrisA, DebrisM;
+	AstraFx::FLayer Darts, Tubes, Glows, Fires, Smokes, Plumes, DebrisL;
 
 	// ---- the state
 	TArray<AstraFx::FPuff> Puffs;
@@ -358,6 +374,7 @@ private:
 	TArray<AstraFx::FBeam> Beams;
 	TArray<AstraFx::FTrack> Tracks;
 	TArray<int32> FreeTracks;
+	TArray<AstraFx::FGhost> Ghosts;
 	TMap<int32, AstraFx::FShipFx> ShipFx;
 	TArray<AstraFx::FPiece> Pieces;
 	TArray<AstraFx::FDebris> Debris;
@@ -391,7 +408,7 @@ private:
 
 	// ---- internals (AstraWarFX.cpp)
 	bool LoadAssets();
-	void MakeLayer(AstraFx::FLayer& L, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 SortPriority, bool bLit);
+	void MakeLayer(AstraFx::FLayer& L, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Mat, int32 Capacity, int32 SortPriority, bool bLit, int32 NumData);
 	void BeginFrame();
 	void EndFrame();
 	void DrawShots();
@@ -408,6 +425,12 @@ private:
 	void TickShields();
 	AstraFx::FShipFx& ShipOf(int32 Id);
 	FVector PlayerEye() const;
+
+	// ---- the budget: how much room is left in what the effects draw (1 plenty .. 0 full): what throws particles asks it, so the biggest blast of a
+	// battle does not push the sparks of the rest out and a long fire does not fill the sky with smoke
+	int32 PuffLive[4] = {0, 0, 0, 0};
+	float Room(uint8 Layer) const;
+	float RoomSparks() const;
 
 	// ---- spawning (AstraWarFX.cpp, AstraWarFXEvents.cpp)
 	AstraFx::FPuff* AddPuff(const FVector& Pos, const FVector& Vel, float Life, float R0, float R1, const FLinearColor& Col, float Inten, uint8 Layer, float Delay = 0.f);
