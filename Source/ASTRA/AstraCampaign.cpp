@@ -90,6 +90,7 @@ public:
 			{
 				FirstDo = Do;
 			}
+			Order.Add(TPair<int32, FSimpleDelegate>(Index, Do));
 			Items->AddSlot().AutoHeight().Padding(0, 6)
 			[
 				SAssignNew(Buttons[Index], SButton)
@@ -100,7 +101,7 @@ public:
 					+ SVerticalBox::Slot().AutoHeight()
 					[
 						SNew(STextBlock).Font(TitleFont(30)).Text_Lambda([this, Label, Index]() { return FText::FromString(LabelFor(Label, Index)); })
-						.ColorAndOpacity_Lambda([this, Index]() { return FSlateColor(Buttons[Index].IsValid() && Buttons[Index]->IsHovered() ? MenuAccent : MenuInk); })
+						.ColorAndOpacity_Lambda([this, Index]() { return FSlateColor((Buttons[Index].IsValid() && Buttons[Index]->IsHovered()) || IsSelected(Index) ? MenuAccent : MenuInk); })
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(2, 0, 0, 0)
 					[
@@ -158,17 +159,37 @@ public:
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Key) override
 	{
-		if (Key.GetKey() == EKeys::Enter && FirstDo.IsBound())
+		// the keyboard as well as the mouse: Up/Down (W/S) choose, Enter (Space) takes the item lit
+		const FKey K = Key.GetKey();
+		if ((K == EKeys::Up || K == EKeys::W || K == EKeys::Down || K == EKeys::S) && Order.Num())
 		{
-			Click(FirstDo, 0);   // (SButton::SimulateClick does not exist in Shipping)
+			const int32 Step = (K == EKeys::Up || K == EKeys::W) ? -1 : 1;
+			Selected = Selected < 0 ? (Step > 0 ? 0 : Order.Num() - 1) : (Selected + Step + Order.Num()) % Order.Num();
 			return FReply::Handled();
+		}
+		if (K == EKeys::Enter || K == EKeys::SpaceBar)
+		{
+			if (Order.IsValidIndex(Selected))
+			{
+				Click(Order[Selected].Value, Order[Selected].Key);
+				return FReply::Handled();
+			}
+			if (FirstDo.IsBound())
+			{
+				Click(FirstDo, 0);   // (SButton::SimulateClick does not exist in Shipping)
+				return FReply::Handled();
+			}
 		}
 		return FReply::Unhandled();
 	}
 
 private:
 	TSharedPtr<SButton> Buttons[4];
+	TArray<TPair<int32, FSimpleDelegate>> Order;   // the items as they stand, top to bottom (their index, what they do)
+	int32 Selected = -1;                           // the one lit by the keyboard (none until a key is pressed)
 	FSimpleDelegate FirstDo;     // Enter: the first item (resume, or continue the saved war)
+
+	bool IsSelected(int32 Index) const { return Order.IsValidIndex(Selected) && Order[Selected].Key == Index; }
 	bool bHasSave = false;
 	bool bNeedConfirm = false;   // a saved war is not thrown away with one click
 	bool bConfirmNew = false;
