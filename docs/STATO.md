@@ -2,23 +2,30 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-01 sera · **Traguardo corrente:** Piano v0.4 ([PIANO.md](PIANO.md)): F1 da chiudere, F2 e F4 in parallelo con gli agenti di supporto ([ARCHITETTURA.md](ARCHITETTURA.md)); **principio delle intelligenze** ([ARCHITETTURA §1bis](ARCHITETTURA.md))
+**Ultimo aggiornamento:** 2026-10-02 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
+ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano e rifinisce; **principio delle intelligenze**
+([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
-## Piano v0.4 — dove siamo (aggiornato a ogni passo)
+## Piano v0.5 — dove siamo (aggiornato a ogni passo)
 | Fase | Stato |
 |---|---|
-| **F0** Fondamenta | ✓ controlli in prima persona, banco di prova da terminale, architettura a moduli, agenti di supporto |
-| **F1** La plancia viva | quasi fatta. ✓ Già pronto: **postazioni vere** (modalità persistenti eseguite a 10 Hz); **schermo principale** intelligente (telecamera, zoom, regia, sovrimpressione, scheda del canale); **tavolo olografico** leggibile dalla poltrona (si inclina verso chi guarda; rilevamenti veri, minacce, linea al bersaglio); **datapad** spinto da ops; **finestrone** in realtà aumentata; **HUD del Falcon**; **equipaggio agente** (MENTE-EQUIPAGGIO); **plancia v3**; **menu SETTINGS**; **voce v2 provata dal vivo** (parla anche chi è fuori plancia, sottotitoli giusti, «● LISTENING», il Capitano sempre per primo). ✓ **Principio delle intelligenze** applicato: le parole dell'equipaggio arrivano come le dice (via tagli, riscritture, liste di parole); il router lascia sentire tutto alla stanza e fa decidere a un modello cosa esce su un canale aperto (93–95 % sui 734 casi, 260 ms); la brevità del nemico è nel suo prompt. ✓ Il palco della voce **ripensa** invece di scartare (chi doveva dire una battuta rimasta in coda o interrotta la ridice con lo stato di adesso, la cambia o la lascia cadere). Da fare: la plancia curata nel minimo dettaglio, l'immagine nitida |
-| **F2** La guerra grande | in corso (GUERRA): ✓ F2.1 danni fisici; F2.2 gerarchie a metà (gruppi di battaglia, squadriglie); poi le menti di guerra (lead), la scala, la bellezza, il regista v2 |
+| **F0** Fondamenta | ✓ |
+| **F1** La plancia viva | quasi fatta: postazioni vere, schermo principale intelligente, tavolo olografico, datapad, equipaggio agente, voce v2. Da fare: la plancia al minimo dettaglio, la prova di partite intere |
+| **F2** La guerra grande | ✓ GUERRA (danni fisici, gruppi, squadriglie), ✓ MENTE-GUERRA (ammiragli, comandanti, catena di comando, alleati che parlano, regista v2), ✓ **SCALA** (velivoli e luci a istanze; `scale_30x150` dalla plancia: 60 fps, game thread 3,7 ms invece di 13,8, render 11,8 ms), ✓ VFX, ✓ **VOLO** (la rete di volo: CAG, capi squadriglia, gregari, Chief of the Deck; l'ala di Eagle) |
 | **F3** Persone vere | ferma sull'autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **F4** La nave intera e la distruzione | in corso: ✓ **NAVE unita** (pianta dell'Aquila: 2251 compartimenti, 1034 porte, grafo di 4450 luoghi; kit di 96 modelli; Ponte 4 e Ponte 6 costruiti; `UAstraShipPlan` trova i percorsi in 0,1 ms); Ponti 4 e 6 nel livello e camminati (57 fps nella Spina); **VITA** (la vita di bordo) in corso |
-| **F5** Abbordaggi · **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | da fare |
+| **F4** La nave intera e la distruzione | ✓ NAVE, NAVE-2 (12 ponti in streaming), VITA (560 persone), ✓ **DISTRUZIONE** (modello fisico per compartimento: falle, campi di contenimento, fuoco e fumo, paratie, potenza, feriti e morti dove erano, il Capitano che sviene e muore). **In corso F4.3**: NAVE-3 (la pianta pensata come una nave vera) e ASCENSORI (turboascensori e navetta veri) |
+| **F5** Abbordaggi | **in corso F5.1** (ABBORDAGGI: prima persona, armi, marine, squadra d'abbordaggio del Mandato) |
+| **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | brief di F6 pronto (`docs/brief/TELETRASPORTO.md`); poi FLOTTA-VIVA (gli interni delle altre navi simulati come l'Aquila) |
 
-**Agenti di supporto attivi** (worktree in `.claude/worktrees/`, rami `worktree-*`; il lead prova nel gioco, unisce, rimanda i difetti):
-- **GUERRA** — F2.1 fatto, F2.2 in corso: gruppi di battaglia, squadriglie, e il contratto per le menti (`group_order`, viste per parte, eventi; `GetWeaponRanges()` per tavolo e schermo) (`docs/GUERRA.md`).
-- **METALFX** — un upscaler MetalFX (Apple) al posto di TSR sul Mac: prima la fattibilità (come far girare MetalFX dentro il fotogramma di Unreal senza toccare il motore), poi il plugin con interruttore `r.AstraMetalFX` e TSR come riserva; il lead confronta le immagini a parità di costo.
-- **VITA** — le ~560 persone dell'Aquila sul grafo dei percorsi: turni, lavori veri, pasti, sonno, posti di combattimento, squadre di riparazione che camminano fino ai danni, feriti in infermeria; corpi solo vicino al Capitano (≤ ~40), memoria in codice, un modello piccolo quando il Capitano ci parla.
-- Chiusi: ~~MENTE-EQUIPAGGIO~~, ~~ARTE-PLANCIA~~, ~~VOCE~~, ~~NAVE~~ (unita e importata il 30/9 sera: Ponti 4 e 6 nel livello, `docs/NAVE.md`), ~~ARTE-NAVI~~ (unita il 1/10: 12 navi e velivoli v3 con 21 pezzi di rottura (prua, centro e poppa di 7 navi), materiali a strati con usura, 8 decalcomanie di danno, lo scafo dell'Aquila aperto sotto il blocco per i Ponti 2–3; anteprime in `docs/progressi/navi_v3/`).
+**Aiutanti al lavoro (2/10)** (worktree in `.claude/worktrees/`, rami `worktree-*`; brief in `docs/brief/`): **NAVE-3**, **ASCENSORI**,
+**ABBORDAGGI**. Poi: TELETRASPORTO, FLOTTA-VIVA (dopo i piani delle altre classi di NAVE-3), F5.2 (abbordare le navi nemiche).
+
+**2/10 — unione di SCALA, DISTRUZIONE e VOLO** (compilati insieme, 260 prove della mente verdi): materiali di SCALA e suoni dei danni
+importati nell'editor. Nel gioco: `scale_30x150` con l'Aquila a 60 fps (sopra); un colpo da 80 nel Mess Concourse fa falla, fuoco,
+potenza persa, il fuoco passa alla Mess Hall e alla Spine, ops manda la squadra 4. Corretti: `_crew_say` definito due volte in
+`server.py` (la memoria degli ufficiali non sentiva le loro battute), `AstraBridgeFX::Burst` prima di BeginPlay. **Visto camminando**: un
+solo ascensore finto (sei fermate in punti diversi, uno schermo nero e un salto: ci sono passato senza volerlo), il Concourse grande, buio
+e spoglio, il programma delle stanze a ciclo, l'equipaggio di manichini: da qui NAVE-3 e ASCENSORI.
 
 **Prove d'integrazione del lead (1/10 notte, rami locali `integ-*`, non pubblicati):**
 - **GUERRA** (main + F2.2 parte 3): si unisce senza conflitti e compila; nel gioco la battaglia d'apertura è intensa e credibile
@@ -170,6 +177,7 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
 | 2026-09-30 | 10,00 $ | 3,84 $ | MENTE-EQUIPAGGIO completato (0,40 $ in tutto), prova della mente nel gioco vero |
 | 2026-09-30 | 10,00 $ | 3,93 $ | prova dal vivo della voce v2 (una battaglia intera fino all'abbandono nave) |
 | 2026-10-01 | 10,00 $ | 4,69 $ | banchi di MENTE-GUERRA con le menti nel giro, prove nel gioco di GUERRA, VITA e della gente di bordo (≈0,5 m$ a risposta di un NPC) |
+| 2026-10-02 | 10,00 $ | 6,50 $ | prove di battaglia con la mente (costo dei rapporti), banchi dal vivo di VOLO (≈0,23 $), prove della gente di bordo |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 

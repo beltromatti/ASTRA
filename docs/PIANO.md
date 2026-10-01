@@ -1,7 +1,8 @@
-# ASTRA — Piano v0.4
+# ASTRA — Piano v0.5
 
-*30 settembre 2026, sera · sostituisce la v0.3. Scritto dopo la prima giornata di lavoro con gli agenti di supporto: la voce
-integrata e provata nel gioco, le misure pulite delle prestazioni, e il principio delle intelligenze ribadito dal Capitano.
+*2 ottobre 2026 · aggiorna la v0.4 (30/9). Nuovo: la nave progettata come una nave vera, con ascensori veri e abitata ovunque
+(F4.3), e le altre navi che si comportano come l'Aquila anche quando non si camminano (FLOTTA-VIVA): così diventano giocabili
+abbordaggi e, in futuro, il PvP. Il lead gioca partite intere da Capitano per rifinire l'esperienza.
 Architettura, moduli e contratti: [ARCHITETTURA.md](ARCHITETTURA.md). Stato: [STATO.md](STATO.md).*
 
 > **Lingua del gioco: inglese** (nomi, lore, scritte, interfacce). Gli NPC parlano la lingua del giocatore.
@@ -38,18 +39,17 @@ Il 30/9 sera questo principio è stato applicato:
 - ai messaggi del nemico: la brevità è della persona;
 - al palco della voce (1/10): le battute che hanno aspettato o sono state interrotte le ripensa chi le doveva dire (§4.2).
 
-## 2. Dove siamo (1/10 sera)
+## 2. Dove siamo (2/10)
 
 | Area | Stato |
 |---|---|
 | **Controlli in prima persona**, banco di prova da terminale | fatto |
-| **Plancia viva** (F1) | quasi fatta. Pronti: postazioni vere, schermo principale intelligente, tavolo olografico leggibile dalla poltrona, datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente, plancia v3, menu SETTINGS. La voce v2 è provata dal vivo: parla anche chi è fuori plancia, sottotitoli giusti, il Capitano sempre per primo. Il palco della voce ripensa invece di scartare. Mancano: la plancia curata nel minimo dettaglio, le persone vere (F3), l'immagine nitida (§4.5) |
-| **Guerra grande** (F2) | in corso. Fatti: F2.1 danni fisici (scudi a sei settori, corazza e struttura per sezione, sottosistemi, relitti); F2.2 gruppi di battaglia e squadriglie; **menti di guerra** (MENTE-GUERRA, unita il 1/10: l'ammiraglio del Mandato con la nebbia di guerra, i capitani alleati che comandano il loro gruppo e parlano all'Aquila, l'XO con `group_order`, il regista v2 senza atti; 0,02–0,17 $/ora); **bellezza** (VFX, unita il 1/10: armi, scudi a esagoni, esplosioni, rotture, tutto a istanze). In corso: **SCALA** (velivoli a istanze, livelli di dettaglio: 30 navi e 150 velivoli dalla plancia) e **VOLO** (piloti, CAG e ponte di volo con voce) |
-| **Persone vere** (F3) | ferma: serve la tua autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **La nave intera** (F4.1) | **NAVE-2 unita** (1/10): tutti i dodici ponti costruiti (2270 compartimenti, 1056 porte, 10797 luoghi del grafo, 3167 lampade come dati), ogni ponte un sotto-livello a istanze caricato col Capitano, le lampade accese solo vicino; generazione nell'editor e prova camminando in corso. VITA unita: 560 persone con turni, lavori, pasti, squadre che camminano |
-| **Navi v3** | ARTE-NAVI unita: esterni alla qualità di EVE Online, pezzi di sezione per la rottura, decalcomanie di danno; import nell'editor e prova nel gioco in corso |
-| Distruzione (F4.2) | in corso (DISTRUZIONE) |
-| Abbordaggi e prima persona (F5) · Teletrasporto (F6) · Pianeta (F7) · Rete e Windows (F8) | da fare (la Transporter Room e l'hangar delle navette d'assalto sono già nei ponti) |
+| **Plancia viva** (F1) | quasi fatta: postazioni vere, schermo principale intelligente, tavolo olografico, datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente, plancia v3, voce v2 col palco che ripensa. Mancano: la plancia curata nel minimo dettaglio, le persone vere (F3), partite intere giocate dal lead |
+| **Guerra grande** (F2) | fatta la base: danni fisici, gruppi e squadriglie, menti di guerra (ammiragli, comandanti, alleati, regista v2), bellezza (VFX), **scala** (SCALA: 30 navi e 150 velivoli a 60 fps dalla plancia), **voci del volo** (VOLO). Ora: provarla e rifinirla giocando |
+| **Persone vere** (F3) | ferma: serve l'autorizzazione Epic per i MetaHuman (RICHIESTE) |
+| **La nave intera** (F4) | 12 ponti in streaming (NAVE, NAVE-2), 560 persone (VITA), **danni interni veri** (DISTRUZIONE). In corso **F4.3**: NAVE-3 e ASCENSORI |
+| **Abbordaggi e prima persona** (F5) | in corso F5.1 (ABBORDAGGI) |
+| Teletrasporto (F6) · Pianeta (F7) · Rete e Windows (F8) | brief di F6 pronto; F7 e F8 dopo |
 
 ## 3. Le fasi
 
@@ -58,7 +58,7 @@ Il 30/9 sera questo principio è stato applicato:
 | **F1** La plancia viva | postazioni vere · equipaggio agente con iniziativa · router con la stanza e i canali · voce veloce e pulita · schermo principale, tavolo, datapad integrati e comandati da ops · plancia curata · immagine nitida | in mezz'ora di battaglia vedo sempre l'azione, l'equipaggio pilota la nave con me e senza di me, non si perde una parola, la plancia è bella |
 | **F2** La guerra grande | danni fisici · gerarchie (flotta → gruppo → nave; stormo → squadriglia → caccia) · menti di ammiragli, comandanti e alleati che parlano fra loro e con noi · scala (decine di capitali, centinaia di caccia) · bellezza (armi, motori, scudi, esplosioni, navi che si spezzano) · regista v2 senza atti | una battaglia di flotta dura 30–60 minuti ad alta intensità, la vedo tutta, le mosse contano, la campagna dura giorni |
 | **F3** Persone vere | MetaHuman per tutti (anche marinai, fanti e il Capitano) · animazioni vere · labiale · cervelli di codice con memoria per i PNG, un modello quando ci parli | nessun manichino in vista; chi incontro fa qualcosa e mi risponde |
-| **F4** La nave intera e la distruzione | l'Aquila percorribile da una sola pianta · la vita di bordo (VITA): persone che fanno lavori veri, turni, mense, laboratori · squarci, campi di contenimento, paratie, incendi, decompressione, squadre di riparazione visibili, morti vere · mappa olografica della nave e delle navi scansionate | cammino durante la battaglia e trovo i danni veri dove sono avvenuti; posso morire |
+| **F4** La nave intera e la distruzione | l'Aquila percorribile da una sola pianta · la vita di bordo (VITA): persone che fanno lavori veri, turni, mense, laboratori · squarci, campi di contenimento, paratie, incendi, decompressione, squadre di riparazione visibili, morti vere · mappa olografica della nave e delle navi scansionate · **F4.3: la pianta di una nave vera** (programma ragionato, labirinto di corridoi di servizio e tubi di Jefferies, turboascensori e navetta che si muovono davvero) · **FLOTTA-VIVA**: le altre navi con la loro pianta, il loro equipaggio e lo stesso modello dei danni, simulate senza grafica | cammino durante la battaglia e trovo i danni veri dove sono avvenuti; posso morire; prendo un ascensore vero per qualsiasi ponte; un colpo su una nave nemica uccide gente vera e spegne sistemi veri |
 | **F5** Abbordaggi e prima persona | navette d'assalto nostre e nemiche · fanti con IA di squadra · combattimento in prima persona anche del Capitano · ordini alle formazioni d'attacco e difesa | un abbordaggio ricevuto è una battaglia vera nei corridoi |
 | **F6** Teletrasporto | sala, operatori, comandi; limiti alla Star Trek (portata, scudi, interferenze); per chiunque; animazioni e persone che ragionano sul contesto | trasporto persone e cose con effetti e regole credibili |
 | **F7** Il pianeta (demo) | discesa coerente col resto; prova per il futuro universo di pianeti veri | la discesa è bella e senza stacchi evidenti |
@@ -149,20 +149,14 @@ nello stesso contratto: Parakeet ONNX su CPU, TSR.
 ## 5. Moduli e agenti di supporto
 
 Fino a tre agenti (Sonnet 5.5, sforzo massimo) su moduli indipendenti, ognuno nel suo worktree. Il lead dirige,
-integra, prova nel gioco vero, e li chiude quando il modulo è perfetto.
+integra, prova nel gioco vero, e li chiude quando il modulo è perfetto. Brief in `docs/brief/`.
 
-| Adesso | Poi (appena si libera un posto) |
-|---|---|
-| **GUERRA** (F2.1–F2.2: danni, gruppi, squadriglie; contratto per le menti) | **MENTE-GUERRA** (ammiragli, comandanti, alleati che parlano, regista v2) · **SCALA** (F2.3) |
-| **VITA** (la vita di bordo sul grafo dei percorsi; dopo NAVE, unita il 30/9) | **DISTRUZIONE** (F4.2) · **NAVE-2** (gli altri ponti) |
-| **METALFX** (upscaler; dopo ARTE-NAVI, unita il 1/10) | **VFX** (armi, motori, scudi, esplosioni, rotture: F2.4) |
+| Fatti e uniti | Adesso (2/10) | Poi (appena si libera un posto) |
+|---|---|---|
+| MENTE-EQUIPAGGIO, ARTE-PLANCIA, VOCE, NAVE, NAVE-2, ARTE-NAVI, GUERRA, VITA, METALFX, VFX, MENTE-GUERRA, SCALA, DISTRUZIONE, VOLO | **NAVE-3** (la pianta di una nave vera) · **ASCENSORI** (turboascensori e navetta veri) · **ABBORDAGGI** (F5.1) | **TELETRASPORTO** (F6) · **FLOTTA-VIVA** (gli interni delle altre navi, dai piani di NAVE-3) · F5.2 (abbordare le navi nemiche) · ARTE-INTERNI (l'aspetto dei ponti al livello della plancia) |
 
-Il lead, intanto:
-- l'integrazione di ogni modulo (le navi v3 nel gioco, poi GUERRA e VITA);
-- le prove nel gioco;
-- le prestazioni;
-- la plancia al dettaglio;
-- il collegamento delle menti di guerra al contratto di GUERRA.
+Il lead, intanto: l'integrazione e le prove di ogni modulo; **partite intere giocate da Capitano** (plancia, battaglia, nave) e la
+rifinitura di ciò che trova; le prestazioni; la plancia al dettaglio.
 
 ## 6. Rischi e contromisure
 
