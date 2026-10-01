@@ -34,27 +34,21 @@
 riga, sezioni col colore del danno, incidenti con squadra e progresso, squadre che camminano dal Ponte 6, il Capitano dov'è; ops e la
 mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le navi scansionate (`GetDamageView` di GUERRA).
 
-**Ripresa (1/10 ~02:40, limite d'uso raggiunto):**
-- **METALFX unito in main** (plugin `Plugins/AstraMetalFX`, `r.AstraMetalFX=1`): provato nel gioco vero, 60 fps con risoluzione
-  dinamica al 45–48 % contro 41–43 % del TSR (la compensazione alza `TargetedGPUHeadRoomPercentage` del suo 1,3 ms); a risoluzione
-  fissa il render thread non aspetta. Da fare: guardare il moto (`r.AstraMetalFX.Debug 1|2`), tarare `r.Tonemapper.Sharpen`, togliere
-  il worktree `agent-a90bd4087f2057aa8` (modulo chiuso).
-- **GUERRA ha chiuso** (ramo `worktree-agent-a05c7a46bb8cc857f`, commit finale **7e375cf**, main già unito e compilato nel suo ramo):
-  colpi sulla scatola vera degli scafi v3, rottura sul taglio vero (`CutBowX/CutSternX` negli eventi), apertura su 12 semi da 0/12/0 a
-  1/7/4 (scafo dell'Aquila a fine prova 68 % ± 11), simmetria entro 2σ su 96 semi, 30 navi + 150 velivoli a 0,04–0,09 ms per tick.
-  Da fare alla ripresa: unirlo, poi GUERRA.md §6.8 (menti su `group_order`, effetti da `ConsumeDeathEvents`/`GetDamageView`,
-  `PlayerEngineFactor()` al timone, `RepairPlayerSystems()` dalle squadre, `GetContacts` a cadenza più bassa negli schermi, tarare la
-  poppa dell'Aquila — fragile: 18 s contro due Acheron — e la forza dell'apertura nel gioco vero), togliere il suo worktree, avviare
-  MENTE-GUERRA.
-- **VITA ha chiuso** (ramo `worktree-agent-a8bbccf24c82b87ce`, commit finale **b22d827**, unione con main pulita secondo l'aiutante):
-  560 persone sulla pianta a 0,002 ms per fotogramma, corpi solo vicino al Capitano (al più 40, nessuno appare in vista), squadre con
-  tempi veri sui percorsi (15 s stimati contro 14 reali), la mente delle persone (`npc.py`, DeepSeek V4.1 Flash, 16/16 sul banco
-  dal vivo, ~0,2 m$ a frase). **Mai provata nel gioco vero né in compilazione unity.** Alla ripresa: unirla, compilare (unity),
-  fare VITA.md §7 (contesto `people`, istantanea `life`, `RepairEtaSeconds` per le squadre, `RosterIn` per le vittime,
-  `PlanChanged` sulle porte stagne), provare corpi, voci e costo (`stat Astra`, `astra.life.max_bodies 0`), poi avviare NAVE-2 o
-  DISTRUZIONE al suo posto.
-- **Prossimi moduli, brief pronti** in `docs/brief/`: MENTE-GUERRA (al posto di GUERRA), NAVE-2 (gli altri ponti, a istanze e a
-  livelli), VFX (la guerra bella, nomi per nave, tetto dell'isola), DISTRUZIONE (dopo VITA).
+**1/10 mattina — il nuovo giro:**
+- **GUERRA e VITA unite** (compilazione unity ok, provate nel gioco: 560 persone, 40 corpi attorno al Capitano sul Ponte 4, 60 fps)
+  e collegate: motori danneggiati al timone (velocità e virata), squadre che riparano anche sistemi e affusti, squadre che arrivano
+  col tempo vero dei percorsi, vittime di un colpo tra chi era davvero in quella sezione, persone vicine nel contesto delle parole e
+  vita di bordo nell'istantanea della mente. **METALFX unito** (risoluzione dinamica 45–48 % contro 41–43 % a 60 fps).
+- **Tavolo olografico**: anelli di gittata di rotaie e laser; sulla linea del bersaglio se lo raggiungiamo e se siamo nei suoi cannoni
+  (rossa allora); **`holo ship` con un bersaglio**: la nave scansionata come ologramma della sua mesh, sezioni con la struttura, facce
+  di scudo, ciò che brucia o si rompe, sistemi e affusti per le nostre navi (vista dei danni di GUERRA con la nebbia di guerra).
+- **Schermo principale**: le schede dicono IN ITS GUNS / IN OUR RAILS / OUT OF RANGE; la telecamera non vede più lo scafo dell'Aquila
+  tranne nella vista da fuori. Le «lastre» che restano con lo zoom forte sono gli effetti grezzi dei colpi (anelli d'urto, bolle
+  degli scudi): li rifà VFX.
+- **Aiutanti al lavoro** (brief in `docs/brief/`): **MENTE-GUERRA** (ammiragli, comandanti, alleati che parlano, l'XO con
+  `group_order`, la mente nel giro del banco, poi il regista v2), **VFX** (armi, scudi, esplosioni, rotture coi pezzi v3, danni sugli
+  scafi, motori), **NAVE-2** (tutti i ponti: stanze nuove, istanze, luci come dati, un sotto-livello per ponte). Poi DISTRUZIONE,
+  SCALA, abbordaggi, teletrasporto.
 
 **Banco della guerra senza grafica**: `tools/war.py run|report|ship|ab` (commandlet `AstraWarSim`, ~1000× il tempo reale, deterministico per seme; vedi [GUERRA.md](GUERRA.md)).
 

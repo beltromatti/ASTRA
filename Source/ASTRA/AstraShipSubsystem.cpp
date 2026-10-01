@@ -1861,8 +1861,27 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 			OutDetail = TEXT("no sector data from the fleet yet");
 			return false;
 		}
+		// a scanned ship instead of the Aquila: what the sensors know of her (a firm track; more once she is classified)
+		FString Scan = M == TEXT("ship") ? Str(TEXT("target")).TrimStartAndEnd() : FString();
+		if (Scan.Equals(TEXT("AQUILA"), ESearchCase::IgnoreCase) || Scan.Equals(TEXT("self"), ESearchCase::IgnoreCase))
+		{
+			Scan.Empty();
+		}
+		if (!Scan.IsEmpty())
+		{
+			const UAstraBattleSubsystem* B = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+			UAstraBattleSubsystem::FDamageView View;
+			if (!B || !B->GetDamageView(Scan.ToUpper(), View))
+			{
+				OutDetail = FString::Printf(TEXT("the sensors hold no firm track on %s: nothing to put on the holo table"), *Scan);
+				return false;
+			}
+			Scan = View.ContactId;
+		}
 		HoloMode = M;
-		OutDetail = M == TEXT("sector") ? TEXT("holo table: the sector map (the March, who holds what, the gate links)")
+		HoloShipId = Scan;
+		OutDetail = M == TEXT("sector") ? FString(TEXT("holo table: the sector map (the March, who holds what, the gate links)"))
+		          : M == TEXT("ship") && !Scan.IsEmpty() ? FString::Printf(TEXT("holo table: %s as the sensors see her — sections, shield faces, what burns"), *Scan)
 		          : M == TEXT("ship")   ? FString::Printf(TEXT("holo table: the Aquila, deck by deck — %s"), *DamageSummary())
 		                                : FString(TEXT("holo table: tactical plot"));
 		return true;

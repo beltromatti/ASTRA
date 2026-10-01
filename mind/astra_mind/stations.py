@@ -186,9 +186,11 @@ def _build() -> dict[str, Station]:
         m("ops", "viewscreen", "viewscreen_off", "screen off: the true window", (), "order", native="off"),
         m("ops", "holo", "holo_tactical", "the holo table shows the battle around the Aquila", (), "order", native="tactical"),
         m("ops", "holo", "holo_sector", "the holo table shows the sector map", (), "order", native="sector"),
-        m("ops", "holo", "holo_ship", "the holo table shows the Aquila herself: a cutaway deck by deck, sections A-H, the damage where "
-          "it is (fires, breaches, damaged conduits), the damage-control teams on their way or at work, where the Captain is", (), "order",
-          native="ship"),
+        m("ops", "holo", "holo_ship", "the holo table shows a ship close up. Without a target: the Aquila herself, a cutaway deck by deck "
+          "(sections A-H, the damage where it is, the damage-control teams, where the Captain is). With a target: a ship the sensors hold "
+          "a firm track on — her bow, mid and stern sections and what is left of them, her six shield faces, what burns or breaks (her "
+          "systems and guns too for our own ships, by datalink)",
+          (_target(required=False, desc="optional: a contact id (T-21) to show that ship; empty for the Aquila"),), "order", native="ship"),
         m("ops", "datapad", "datapad_push", "put a page on the Captain's datapad (Tab shows it)",
           (P("page", STR, "overview | contact (a dossier: give focus) | damage | fleet | orders", required=True, enum=DATAPAD_PAGES),
            P("focus", STR, "a contact id, for the page 'contact'")), "order", native="push"),

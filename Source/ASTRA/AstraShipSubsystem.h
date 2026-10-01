@@ -161,6 +161,8 @@ public:
 	const FAstraSectorSystem* FindSector(const FString& Name) const;
 	/** What the holo table shows: "tactical" (the battle around the Aquila) or "sector" (the war map). */
 	FString GetHoloMode() const { return HoloMode; }
+	/** The ship the holo table shows in "ship" mode: empty for the Aquila herself, else a contact id (a scanned ship). */
+	FString GetHoloShipId() const { return HoloShipId; }
 	/** Autopilot (the Janus approach): the helm steers to a heading without the usual turn reports. */
 	void SteerTo(float Heading, float Mark);
 	void SetThrottle(float Pct) { ThrottlePct = FMath::Clamp(Pct, 0.f, 100.f); }
@@ -266,6 +268,7 @@ private:
 	TMap<FString, FAstraSystemLook> Systems;   // charted systems
 	TArray<FAstraSectorSystem> Sector;         // the sector at war (empty until the mind sends it)
 	FString HoloMode = TEXT("tactical");
+	FString HoloShipId;
 	FAstraSystemLook MakeLook(const FString& Name, const FString& Star, const FString& Planet, const FString& PlanetName) const;
 	bool bLaneControl = false;                 // the Janus lane drives the ship
 	bool bAutoHelm = false;                    // the gate approach autopilot steers (no turn reports)

@@ -114,9 +114,11 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         ["ship", "request"]),
     _fn("holo_display", "Science & Sensors: what the holo table in the middle of the bridge shows — the tactical plot "
                         "(the battle around the Aquila), the sector map (the systems of the March, who holds them, "
-                        "the gate links, where the Aquila is) or the ship (the Aquila in cutaway, deck by deck: the damage "
-                        "where it is and the damage-control teams).", {
-        "mode": {"type": "string", "enum": ["tactical", "sector", "ship"]}}, ["mode"]),
+                        "the gate links, where the Aquila is) or a ship close up (the Aquila in cutaway, deck by deck: the "
+                        "damage where it is and the damage-control teams; or, with a target, a scanned ship's sections and "
+                        "shield faces).", {
+        "mode": {"type": "string", "enum": ["tactical", "sector", "ship"]},
+        "target": {"type": "string", "description": "ship mode only, optional: the contact id of a scanned ship (T-21)"}}, ["mode"]),
     _fn("abandon_ship", "ABANDON SHIP: the evacuation of the Aquila to the lifepods; Engineering overloads the reactor so the "
                         "enemy cannot take her, and she is lost in about two minutes. Only on the Captain's explicit order to "
                         "abandon ship (never proposed as done, never on initiative).", {}, []),

@@ -745,6 +745,20 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 			}
 		}
 	}
+	// zoomed far out on a target, our own fighters crossing close in front of the lens would fill the frame as huge blurred
+	// shapes: the screen is a composite of the sensors, and leaves them out (never the ship it is showing)
+	if (Fov < 12.f)
+	{
+		const FContact* Shown = ShotId.IsEmpty() ? nullptr : FindC(Contacts, ShotId);
+		const double Far = Shown && Shown->RangeKm > 0.0 ? Shown->RangeKm : 0.0;
+		for (const FContact& C : Contacts)
+		{
+			if (C.bCraft && C.Side == EAstraSide::Astra && C.Actor && &C != Shown && Far > 0.0 && C.RangeKm > 0.0 && C.RangeKm < 0.5 * Far)
+			{
+				Capture->HiddenActors.Add(const_cast<AStaticMeshActor*>(C.Actor));
+			}
+		}
+	}
 }
 
 bool AAstraViewscreen::Project(const FVector& World, int32 W, int32 H, FVector2D& Out) const

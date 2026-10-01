@@ -10,6 +10,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "ASTRA.h"
@@ -445,16 +446,210 @@ void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, fl
 
 void AAstraHoloTable::HideShip()
 {
+	if (ScanHull)
+	{
+		ScanHull->SetVisibility(false);
+	}
 	HideFrom(ShipSlabs, 0);
 	HideFrom(ShipMarks, 0);
 	HideFrom(ShipDots, 0);
 	HideTextFrom(ShipLabels, 0);
 }
 
+bool AAstraHoloTable::TickScannedShip(float DeltaTime, const FVector& ViewerLocal, float Fade, const FString& Id)
+{
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	UAstraBattleSubsystem::FDamageView V;
+	if (!Battle || !Battle->GetDamageView(Id, V))
+	{
+		return false;
+	}
+	TArray<UAstraBattleSubsystem::FContactView> Cs;
+	Battle->GetContacts(Cs);
+	const UAstraBattleSubsystem::FContactView* C = Cs.FindByPredicate([&Id](const UAstraBattleSubsystem::FContactView& X) { return X.ContactId == Id; });
+	// a diagram of her, side on to the viewer and the bow to their right, like the Aquila's cutaway: three sections between
+	// the true cuts of her break-up pieces, a hull a fifth as tall as long, her six shield faces round it
+	const float HalfLen = C ? FMath::Max(C->RadiusM, 15.f) : 200.f;
+	const float CutBow = (V.CutBowX != 0.f || V.CutSternX != 0.f) ? FMath::Clamp(V.CutBowX, -0.9f * HalfLen, 0.9f * HalfLen) : HalfLen / 3.f;
+	const float CutStern = (V.CutBowX != 0.f || V.CutSternX != 0.f) ? FMath::Clamp(V.CutSternX, -0.9f * HalfLen, CutBow - 1.f) : -HalfLen / 3.f;
+	const float S = PlotRadius * 1.3f / (2.f * HalfLen);
+	const float H = 2.f * HalfLen * S * 0.2f, Depth = 2.f * HalfLen * S * 0.1f;
+	const float WantYaw = FMath::RadiansToDegrees(FMath::Atan2(ViewerLocal.Y, ViewerLocal.X)) - 90.f;
+	ShipYaw = ShipBlend < 0.05f ? WantYaw : ShipYaw + FMath::Clamp(FMath::FindDeltaAngleDegrees(ShipYaw, WantYaw), -60.f * DeltaTime, 60.f * DeltaTime);
+	const FVector Fwd = FRotator(0.f, ShipYaw, 0.f).Vector();
+	const FVector Stbd = FVector::CrossProduct(FVector::UpVector, Fwd);
+	const FVector Centre(0.f, 0.f, PlaneHeight + 22.f);
+	auto At = [&](float Xm, float Yrel, float Zrel) { return Centre + Fwd * (Xm * S) + Stbd * (Yrel * Depth * 0.5f) + FVector(0.f, 0.f, Zrel * H * 0.5f); };
+	const float Pulse = 0.5f + 0.5f * FMath::Sin(Time * 6.f);
+	const bool bHostile = V.Side == EAstraSide::Mandate;
+	const FLinearColor Base = V.Side == EAstraSide::Astra ? ColAstra : (bHostile ? ColHostile * 0.85f : ColNeutral);
+	int32 NS = 0, NM = 0, ND = 0, NT = 0;
+	auto Text = [&](const FString& T, const FVector& P, const FLinearColor& Col, float Size)
+	{
+		UTextRenderComponent* L = PooledText(ShipLabels, NT++, ShipFrame);
+		L->SetText(FText::FromString(T));
+		L->SetTextRenderColor((Col * FMath::Max(0.25f, Fade)).ToFColor(true));
+		L->SetWorldSize(Size);
+		L->SetRelativeLocation(P);
+		FaceViewer(L, ViewerLocal);
+	};
+	auto Box = [&](const FVector& P, const FVector& SizeCm, const FLinearColor& Col, float Intensity)
+	{
+		UStaticMeshComponent* B = Pooled(ShipSlabs, NS++, CubeMesh, ShipFrame);
+		B->SetRelativeLocationAndRotation(P, FRotator(0.f, ShipYaw, 0.f));
+		B->SetRelativeScale3D(SizeCm / 100.f);
+		SetColor(B, Col, Intensity * Fade);
+	};
+	// her own hull as a hologram: the ship the optical sensors see, scaled to the table and turned side on
+	const UStaticMesh* HullMesh = C && C->Actor && C->Actor->GetStaticMeshComponent() ? C->Actor->GetStaticMeshComponent()->GetStaticMesh() : nullptr;
+	if (HullMesh)
+	{
+		if (!ScanHull)
+		{
+			ScanHull = NewObject<UStaticMeshComponent>(this, TEXT("ScanHull"));
+			ScanHull->SetupAttachment(ShipFrame);
+			ScanHull->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			ScanHull->SetCastShadow(false);
+			ScanHull->SetMobility(EComponentMobility::Movable);
+			ScanHull->RegisterComponent();
+		}
+		if (ScanHull->GetStaticMesh() != HullMesh)
+		{
+			ScanHull->SetStaticMesh(const_cast<UStaticMesh*>(HullMesh));
+			for (int32 i = 0; i < ScanHull->GetNumMaterials(); ++i)
+			{
+				ScanHull->CreateDynamicMaterialInstance(i, HoloMat);     // translucent: drawn from its fallback mesh, a hologram's grain
+			}
+		}
+		const FBox MB = HullMesh->GetBoundingBox();
+		const float MeshLen = FMath::Max(1.0, MB.GetSize().X);
+		const float K = 2.f * HalfLen * S / MeshLen;
+		ScanHull->SetVisibility(true);
+		ScanHull->SetRelativeScale3D(FVector(K));
+		ScanHull->SetRelativeRotation(FRotator(0.f, ShipYaw, 0.f));
+		ScanHull->SetRelativeLocation(Centre - FRotator(0.f, ShipYaw, 0.f).RotateVector(MB.GetCenter() * K));
+		for (int32 i = 0; i < ScanHull->GetNumMaterials(); ++i)
+		{
+			if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(ScanHull->GetMaterial(i)))
+			{
+				M->SetVectorParameterValue(TEXT("Color"), V.bReactorCritical || V.bBreakingUp ? ColHostile : Base);
+				M->SetScalarParameterValue(TEXT("Intensity"), (V.bReactorCritical || V.bBreakingUp ? 3.f + 4.f * Pulse : 2.2f) * Fade * Brightness);
+			}
+		}
+	}
+	else if (ScanHull)
+	{
+		ScanHull->SetVisibility(false);
+	}
+	// her sections (bow, mid, stern) as bars under the hull: what is left of their structure once the sensors know her
+	// class, and what burns, vents or is gutted there (a flare over the hull where it happens)
+	const float Ends[3][2] = {{CutBow, HalfLen}, {CutStern, CutBow}, {-HalfLen, CutStern}};
+	static const TCHAR* SecName[3] = {TEXT("BOW"), TEXT("MID"), TEXT("STERN")};
+	for (int32 k = 0; k < 3; ++k)
+	{
+		const float X0 = Ends[k][0], X1 = Ends[k][1];
+		FLinearColor Col = V.Detail >= 2 ? (V.StructureFrac[k] > 0.66f ? Base : (V.StructureFrac[k] > 0.33f ? ColHolding : ColHostile)) : ColUnknown;
+		if (V.bGutted[k]) { Col = FLinearColor(0.5f, 0.02f, 0.02f); }
+		const float Frac = V.Detail >= 2 ? FMath::Clamp(V.StructureFrac[k], 0.f, 1.f) : 1.f;
+		const float BarLen = (X1 - X0) * S * 0.94f;
+		const FVector BarAt = At(0.5f * (X0 + X1), 0.f, -1.f) - FVector(0.f, 0.f, 4.f);
+		Box(BarAt, FVector(BarLen, 1.f, 0.9f), Col * 0.35f, 3.f);                                       // the frame of the bar
+		Box(BarAt - Fwd * (BarLen * (1.f - Frac) * 0.5f), FVector(BarLen * Frac, 1.2f, 1.1f), Col, 9.f);   // what is left
+		if (V.bBurning[k] || V.bBreached[k] || V.bGutted[k])
+		{
+			UStaticMeshComponent* F = Pooled(ShipMarks, NM++, SphereMesh, ShipFrame);
+			F->SetRelativeLocation(At(0.5f * (X0 + X1), 0.f, 0.3f));
+			F->SetRelativeScale3D(FVector((3.f + 2.f * Pulse) / 100.f));
+			SetColor(F, V.bBurning[k] ? FLinearColor(1.f, 0.45f, 0.05f) : ColHostile, Fade * (20.f + 30.f * Pulse));
+		}
+		if (V.Detail >= 2)
+		{
+			Text(FString::Printf(TEXT("%s %.0f%%%s"), SecName[k], 100.f * V.StructureFrac[k], V.bGutted[k] ? TEXT(" GUTTED") : (V.bBurning[k] ? TEXT(" BURNING") : (V.bBreached[k] ? TEXT(" BREACHED") : TEXT("")))),
+			     BarAt - FVector(0.f, 0.f, 3.2f), Col, 2.4f);
+		}
+	}
+	// the six shield faces: a plate outside each face, as bright as the face is strong, flashing where it takes a hit
+	if (V.Detail >= 2)
+	{
+		const float Gap = 1.6f;
+		struct FFace { FVector P; FVector Size; };
+		const float Len = 2.f * HalfLen * S;
+		const FFace Faces[6] = {
+			{At(HalfLen, 0.f, 0.f) + Fwd * Gap, FVector(0.5f, Depth + 2.f, H + 2.f)},          // bow
+			{At(-HalfLen, 0.f, 0.f) - Fwd * Gap, FVector(0.5f, Depth + 2.f, H + 2.f)},         // stern
+			{At(0.f, -1.f, 0.f) - Stbd * Gap, FVector(Len, 0.4f, H + 2.f)},                    // port
+			{At(0.f, 1.f, 0.f) + Stbd * Gap, FVector(Len, 0.4f, H + 2.f)},                     // starboard
+			{At(0.f, 0.f, 1.f) + FVector(0.f, 0.f, Gap), FVector(Len, Depth + 2.f, 0.5f)},    // dorsal
+			{At(0.f, 0.f, -1.f) - FVector(0.f, 0.f, Gap), FVector(Len, Depth + 2.f, 0.5f)}};  // ventral
+		const FLinearColor Shield = bHostile ? FLinearColor(1.f, 0.35f, 0.25f) : FLinearColor(0.35f, 0.75f, 1.f);
+		for (int32 f = 0; f < 6; ++f)
+		{
+			// a face down: nothing there; port and starboard face the viewer and would wall the hull in: their strength is in the
+			// line below, and they show only while they flash under a hit
+			if ((V.ShieldFrac[f] <= 0.01f && V.ShieldFlash[f] <= 0.f) || ((f == 2 || f == 3) && V.ShieldFlash[f] <= 0.05f))
+			{
+				continue;
+			}
+			Box(Faces[f].P, Faces[f].Size, Shield, 0.6f + 2.4f * V.ShieldFrac[f] + 30.f * FMath::Clamp(V.ShieldFlash[f], 0.f, 1.f));
+		}
+		Text(FString::Printf(TEXT("SHIELDS  BOW %.0f · STERN %.0f · PORT %.0f · STBD %.0f · DORSAL %.0f · VENTRAL %.0f"),
+		                     100.f * V.ShieldFrac[0], 100.f * V.ShieldFrac[1], 100.f * V.ShieldFrac[2], 100.f * V.ShieldFrac[3], 100.f * V.ShieldFrac[4], 100.f * V.ShieldFrac[5]),
+		     Centre - FVector(0.f, 0.f, H * 0.5f + 13.f), Shield, 2.6f);
+	}
+	// her systems and guns: only our own ships tell us (the datalink)
+	if (V.Detail >= 3)
+	{
+		Text(FString::Printf(TEXT("ENGINES %.0f · SENSORS %.0f · HANGAR %.0f · BRIDGE %.0f · REACTOR %.0f · POINT DEFENCE %.0f"),
+		                     100.f * V.Sys[0], 100.f * V.Sys[1], 100.f * V.Sys[2], 100.f * V.Sys[3], 100.f * V.Sys[4], 100.f * V.Sys[5]),
+		     Centre - FVector(0.f, 0.f, H * 0.5f + 17.f), ColAquila, 2.4f);
+		for (const UAstraBattleSubsystem::FDamageView::FMountView& M : V.Mounts)
+		{
+			UStaticMeshComponent* D = Pooled(ShipDots, ND++, SphereMesh, ShipFrame);
+			D->SetRelativeLocation(At(M.Dir.X * HalfLen * 0.9f, FMath::Clamp(M.Dir.Y * 1.3f, -1.1f, 1.1f), FMath::Clamp(M.Dir.Z * 1.3f, -1.1f, 1.1f)));
+			D->SetRelativeScale3D(FVector(0.8f / 100.f));
+			SetColor(D, M.Health > 0.66f ? FLinearColor(0.3f, 1.f, 0.55f) : (M.Health > 0.2f ? ColHolding : ColHostile), Fade * (M.bReady ? 30.f : 10.f));
+		}
+	}
+	// where the last blow landed, for a moment
+	if (V.LastHitAge < 2.5f && !V.LastHitLocal.IsNearlyZero())
+	{
+		const FVector Dir = V.LastHitLocal.GetSafeNormal();
+		UStaticMeshComponent* Hit = Pooled(ShipMarks, NM++, SphereMesh, ShipFrame);
+		Hit->SetRelativeLocation(At(Dir.X * HalfLen, FMath::Clamp(Dir.Y * 1.4f, -1.2f, 1.2f), FMath::Clamp(Dir.Z * 1.4f, -1.2f, 1.2f)));
+		Hit->SetRelativeScale3D(FVector((2.f + 3.f * V.LastHitAge) / 100.f));
+		SetColor(Hit, FLinearColor(1.f, 0.85f, 0.6f), Fade * 60.f * (1.f - V.LastHitAge / 2.5f));
+	}
+	// who she is, and what the sensors see of her
+	const FString Name = C ? C->Label.ToUpper() : Id;
+	FString Kind = C ? C->Class : FString();
+	Kind.RemoveFromStart(TEXT("Kharon Mandate "));
+	Kind.RemoveFromStart(TEXT("ASTRA "));
+	FString Head = FString::Printf(TEXT("%s · %s%s"), *Id, *Name, Kind.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" · %s"), *Kind.ToUpper()));
+	if (C && C->RangeKm > 0.0)
+	{
+		Head += FString::Printf(TEXT(" · %.1f KM"), C->RangeKm);
+	}
+	FString Sub = V.Detail >= 2 && C ? FString::Printf(TEXT("HULL %.0f%% · SHIELDS %.0f%%"), 100.f * C->HullFrac, 100.f * C->ShieldFrac)
+	                                 : FString(TEXT("CLASS NOT KNOWN: ONLY WHAT BURNS AND BREAKS"));
+	if (V.bReactorCritical) { Sub += TEXT(" · REACTOR CRITICAL"); }
+	if (V.bBreakingUp) { Sub += TEXT(" · BREAKING UP"); }
+	if (V.bDisabled) { Sub += TEXT(" · DISABLED"); }
+	Text(Head + TEXT("<br>") + Sub, Centre + FVector(0.f, 0.f, H * 0.5f + 8.f), V.bReactorCritical || V.bBreakingUp ? ColHostile * (0.6f + 0.4f * Pulse) : Base, 3.4f);
+	HideFrom(ShipSlabs, NS);
+	HideFrom(ShipMarks, NM);
+	HideFrom(ShipDots, ND);
+	HideTextFrom(ShipLabels, NT);
+	return true;
+}
+
 void AAstraHoloTable::TickShip(float DeltaTime, const FVector& ViewerLocal, float Fade)
 {
 	const UAstraShipPlan* Plan = GetWorld()->GetSubsystem<UAstraShipPlan>();
 	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	if (!Ship->GetHoloShipId().IsEmpty() && TickScannedShip(DeltaTime, ViewerLocal, Fade, Ship->GetHoloShipId()))
+	{
+		return;                                // a scanned ship (else, her track lost: back to the Aquila)
+	}
 	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 	const TArray<FAstraPlanDeck>& Decks = Plan->GetDecks();
 	// a cutaway, as in a ship's manual: the whole ship across the disc, seen from the side, her decks one row each (5 cm

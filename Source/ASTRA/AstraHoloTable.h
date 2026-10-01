@@ -84,6 +84,7 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ShipMarks;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ShipDots;
 	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> ShipLabels;
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> ScanHull;   // a scanned ship's own hull, as a hologram
 
 	UPROPERTY() TObjectPtr<UStaticMesh> ShipMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> CubeMesh;
@@ -123,5 +124,8 @@ private:
 	void PlaceLine(UStaticMeshComponent* L, const FVector& A, const FVector& B, float Thickness, const FLinearColor& Color, float Intensity);
 	void HideSector();
 	void TickShip(float DeltaTime, const FVector& ViewerLocal, float Fade);
+	/** A scanned ship on the table (holo ship with a target): her sections, her shield faces, what burns, what the sensors
+	 *  know of her (GUERRA's damage view, with the fog of war). False when the sensors hold no firm track on her. */
+	bool TickScannedShip(float DeltaTime, const FVector& ViewerLocal, float Fade, const FString& Id);
 	void HideShip();
 };
