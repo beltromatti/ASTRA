@@ -76,8 +76,11 @@ class Link:
             out.update(strength=g.get("your_strength"), enemy_near=g.get("enemy_strength_near"), morale=g.get("morale"), in_force=g.get("order_in_force"),
                        state=g.get("state"))
         target = args.get("target")
-        if target:
-            out["target_on_plot"] = any(str(sh.get("id")) == str(target) for e in view.get("enemy_groups") or [] for sh in e.get("ships") or [])
+        if target and str(target).upper() != "AQUILA" and args.get("order") not in ("screen", "reinforce"):
+            want = str(target).strip().lower()
+            groups = view.get("enemy_groups") or []
+            out["target_on_plot"] = (any(str(sh.get("id")).lower() == want for e in groups for sh in e.get("ships") or [])
+                                     or any(str(e.get("label", "")).lower() == want for e in groups))       # (a ship's id, or an enemy group's label)
         return out
 
     async def execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
@@ -105,7 +108,8 @@ class Link:
 
 
 def mandate_persona(first: list[str]):
-    """The bench's Mandate captains: the first ship the admiral's seat sees is Archon Solm's, the others generic."""
+    """The bench's Mandate captains in the symmetric scenarios (their ships have no names of the story): the first ship the admiral's seat sees is
+    Archon Solm's, the others generic. The opening has the real ones (`COMMANDERS`: Solm on the Acheron, Hale on the Lethe...)."""
     def lookup(contact: str) -> dict[str, Any] | None:
         if not first:
             first.append(contact)
@@ -157,7 +161,7 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
     async def say(speaker: str, text: str, lang: str, tone: str, **kw: Any) -> None:
         lines.append({"t": round(clock["t"], 1), "speaker": speaker, "text": text, "tone": tone, **{k: v for k, v in kw.items() if k in ("urgent", "answer", "topic")}})
 
-    minds = war_minds.WarMinds(llm, say, link.execute, clock=lambda: clock["t"], mandate_persona=mandate_persona(first), sides=sides,
+    minds = war_minds.WarMinds(llm, say, link.execute, clock=lambda: clock["t"], mandate_persona=COMMANDERS.get if a.opening else mandate_persona(first), sides=sides,
                                astra_admiral=a.astra_admiral and not a.opening, ops=not a.no_ops, trace=pulses.append)
     script = parse_captain(a.captain)                                    # the scripted Captain: what he says to the fleet and when
     k, t0, decided_at = 0, time.time(), None

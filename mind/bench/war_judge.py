@@ -48,7 +48,7 @@ Reply with JSON only: {"useful": n, "brief": n, "true": n, "character": n, "time
 async def judge(llm: OpenRouter, ctx: str, speaker: str, line: str, tone: str) -> dict[str, Any]:
     comp = await models.chat(llm, JUDGE_ROLE, messages=[{"role": "system", "content": SYSTEM},
                                                          {"role": "user", "content": f"{ctx}\n\nTHE LINE (spoken by {speaker}, tone {tone}):\n\"{line}\""}],
-                             max_tokens=220, temperature=0.0)
+                             max_tokens=900, temperature=0.0)
     m = re.search(r"\{.*\}", comp.content or "", re.S)
     try:
         return json.loads(m.group(0)) if m else {}
