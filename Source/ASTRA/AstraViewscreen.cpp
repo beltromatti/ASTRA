@@ -39,7 +39,9 @@ namespace
 		{
 			for (TActorIterator<AAstraViewscreen> It(World); It; ++It)
 			{
-				const FString Path = A.Num() ? A[0] : FPaths::ProjectSavedDir() / TEXT("Play/viewscreen.png");
+				// a relative path is the project's (the process's working directory is the engine's binaries: a relative dump landed there)
+				const FString Path = !A.Num() ? FPaths::ProjectSavedDir() / TEXT("Play/viewscreen.png")
+				                   : FPaths::IsRelative(A[0]) ? FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / A[0]) : A[0];
 				UE_LOG(LogASTRA, Display, TEXT("[Viewscreen] dump %s: %s"), *Path, It->Dump(Path) ? TEXT("ok") : TEXT("failed"));
 			}
 		}));

@@ -38,17 +38,18 @@ Il 30/9 sera questo principio è stato applicato:
 - ai messaggi del nemico: la brevità è della persona;
 - al palco della voce (1/10): le battute che hanno aspettato o sono state interrotte le ripensa chi le doveva dire (§4.2).
 
-## 2. Dove siamo (1/10)
+## 2. Dove siamo (1/10 sera)
 
 | Area | Stato |
 |---|---|
 | **Controlli in prima persona**, banco di prova da terminale | fatto |
 | **Plancia viva** (F1) | quasi fatta. Pronti: postazioni vere, schermo principale intelligente, tavolo olografico leggibile dalla poltrona, datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente, plancia v3, menu SETTINGS. La voce v2 è provata dal vivo: parla anche chi è fuori plancia, sottotitoli giusti, il Capitano sempre per primo. Il palco della voce ripensa invece di scartare. Mancano: la plancia curata nel minimo dettaglio, le persone vere (F3), l'immagine nitida (§4.5) |
-| **Guerra grande** (F2) | in corso (GUERRA). Fatto F2.1: danni fisici, scudi a sei settori, corazza e struttura per sezione, sottosistemi, relitti. F2.2 a metà: gruppi di battaglia, squadriglie di caccia. Da fare: menti di ammiragli e comandanti, scala, bellezza, regista v2 |
+| **Guerra grande** (F2) | in corso. Fatti: F2.1 danni fisici (scudi a sei settori, corazza e struttura per sezione, sottosistemi, relitti); F2.2 gruppi di battaglia e squadriglie; **menti di guerra** (MENTE-GUERRA, unita il 1/10: l'ammiraglio del Mandato con la nebbia di guerra, i capitani alleati che comandano il loro gruppo e parlano all'Aquila, l'XO con `group_order`, il regista v2 senza atti; 0,02–0,17 $/ora); **bellezza** (VFX, unita il 1/10: armi, scudi a esagoni, esplosioni, rotture, tutto a istanze). In corso: **SCALA** (velivoli a istanze, livelli di dettaglio: 30 navi e 150 velivoli dalla plancia) e **VOLO** (piloti, CAG e ponte di volo con voce) |
 | **Persone vere** (F3) | ferma: serve la tua autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **La nave intera** (F4.1) | NAVE unita: il DNA dell'Aquila (12 ponti, 2251 compartimenti, 1034 porte, grafo di 4450 luoghi), il kit di 96 modelli; il Ponte 4 (la Spina, la mensa, gli alloggi) e il Ponte 6 (Medical) sono nel livello e si camminano a 57 fps. Il gioco legge la pianta e trova i percorsi (`UAstraShipPlan`, 0,1 ms). In corso: VITA (la vita di bordo); da fare: gli altri ponti |
+| **La nave intera** (F4.1) | **NAVE-2 unita** (1/10): tutti i dodici ponti costruiti (2270 compartimenti, 1056 porte, 10797 luoghi del grafo, 3167 lampade come dati), ogni ponte un sotto-livello a istanze caricato col Capitano, le lampade accese solo vicino; generazione nell'editor e prova camminando in corso. VITA unita: 560 persone con turni, lavori, pasti, squadre che camminano |
 | **Navi v3** | ARTE-NAVI unita: esterni alla qualità di EVE Online, pezzi di sezione per la rottura, decalcomanie di danno; import nell'editor e prova nel gioco in corso |
-| Distruzione (F4.2) · Abbordaggi e prima persona (F5) · Teletrasporto (F6) · Pianeta (F7) · Rete e Windows (F8) | da fare |
+| Distruzione (F4.2) | in corso (DISTRUZIONE) |
+| Abbordaggi e prima persona (F5) · Teletrasporto (F6) · Pianeta (F7) · Rete e Windows (F8) | da fare (la Transporter Room e l'hangar delle navette d'assalto sono già nei ponti) |
 
 ## 3. Le fasi
 

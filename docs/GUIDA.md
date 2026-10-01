@@ -44,9 +44,21 @@ falle, arancio gli incendi, giallo le condotte), le squadre di riparazione che c
 Lo stesso spaccato sta sulla pagina **DAMAGE** del datapad (Tab), insieme all'elenco degli incidenti e alle perdite.
 
 ## La nave
-Oltre alla plancia si camminano due ponti interi dell'Aquila: il **Ponte 4** (Crew Services: la **Spina**, il corridoio
-che va da prua a poppa, la mensa con gli ascensori, gli alloggi dell'equipaggio e le stanze dei servizi) e il **Ponte 6**
-(Medical, con l'infermeria). Le porte si aprono da sole; gli ascensori collegano i ponti. Gli altri ponti arrivano via via.
+L'Aquila si cammina tutta, **dodici ponti**: il Ponte 1 (la plancia, i corridoi, lo **Studio del Capitano** con la porta sul
+corridoio di babordo, la tua cabina), il 2 (il **CIC**, la sala riunioni, gli uffici, le comunicazioni), il 3 (gli alloggi degli
+ufficiali, la sala ufficiali, la palestra), il 4 (Crew Services: la **Spina** da prua a poppa, la mensa, gli alloggi dell'equipaggio,
+la biblioteca, l'osservatorio di prua), il 5 (la **Transporter Room**, l'astrometria, i laboratori, le fermate della navetta della
+Spina), il 6 (l'infermeria), il 7 (sala macchine e centrali di potenza), l'8 (marine: armeria, poligono, caserma, l'**hangar delle
+navette d'assalto** con i Kestrel), il 9 (il ponte di volo e la sala operativa), il 10 e l'11 (stive, santabarbara, officine) e il 12
+(serbatoi e cunicoli, 1,7 m: testa bassa). Le porte si aprono da sole. L'**ascensore** (E davanti alle porte, poi il numero della
+fermata) va in plancia, al Berthing, alla mensa, all'infermeria, in sala macchine e al ponte di volo; le **scale** delle torri uniscono
+tutti i ponti. Ogni ponte si carica quando ti avvicini (l'ascensore aspetta al buio che il tuo sia pronto).
+
+A bordo vivono **560 persone** con i loro turni (Red 0–8, Gold 8–16, Blue 16–24), il loro lavoro, i pasti, il sonno, i posti di
+combattimento; le squadre di riparazione camminano davvero fino ai danni. **Puoi parlare con chiunque**: chi è vicino e ti sente
+risponde per sé, con quello che sa del suo mestiere e della nave e con quello che ricorda (anche di te), chiamandolo per nome anche da
+lontano. Se cerchi qualcuno chiedi agli ufficiali: «chi è il cuoco di turno e dov'è?», «dov'è il tenente Sato?» — consultano
+l'anagrafe e il localizzatore di bordo.
 
 ## Le impostazioni (Esc → SETTINGS)
 | Voce | Cosa cambia |
@@ -86,10 +98,12 @@ plancia resta all'XO, che ti tiene informato via radio.
   ti fanno domande, ti portano **notizie da casa**. In cabina qualcuno può bussare.
 - In **mensa** ascolti i tavoli e puoi parlare con chi vuoi; in **infermeria** con la dottoressa e con i feriti.
 
-## La storia
-Un regista decide i passi della guerra (incursioni, richieste d'aiuto, indagini, rinforzi, transiti nei Janus Gate)
-in tre atti, fino a una **battaglia decisiva** che chiude l'arco; poi la guerra continua. Se perdi l'Aquila ci sono le
-capsule di salvataggio, un'inchiesta e un nuovo comando.
+## La guerra e la storia
+Le altre navi pensano: l'**ammiraglio del Mandato** (nell'apertura l'Archon Varek Solm sull'Acheron) comanda i suoi gruppi con la
+nebbia di guerra, e se cade il comando passa al più anziano; i **capitani alleati** (Castellan sulla Praetorian, gli altri che
+arrivano) comandano il loro gruppo e ti parlano sulla rete della flotta, valutano le tue richieste secondo la catena di comando e
+accorrono se l'Aquila è sotto il fuoco. Un **regista** invisibile, senza atti fissi, crea le situazioni dai fatti (rinforzi per tutte e
+due le parti, trattative, notizie). Se perdi l'Aquila ci sono le capsule di salvataggio, un'inchiesta e un nuovo comando.
 
 ## Giocare (l'app)
 Apri **`~/Applications/ASTRA.app`** (Spotlight: «ASTRA», oppure Finder → Vai → Inizio → Applicazioni). Parte a schermo

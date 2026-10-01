@@ -500,8 +500,9 @@ _reg("ready_room", name="Ready Room", kind="ready_room", dept="command", L=12.0,
             spot("officer", "sit", 7.60, 3.45, -90, "command"), spot("officer", "sit", 9.00, 3.45, -90, "command"), spot("officer", "sit", 6.95, 2.45, 0, "command"),
             spot("officer", "stand", 9.10, 1.60, 0, "command"), spot("officer", "stand", 10.45, 0.85, 90, "command"), spot("officer", "stand", 10.45, 3.15, -90, "command"),
             spot("officer", "stand", 4.85, 3.20, 90, "command")],
-     lights=[light(2.3, 2.0, 2.75, 2400, 3300, (3.0, 1.2), 650), light(5.4, 2.0, 2.75, 2000, 3400, (2.0, 1.2), 600), light(8.2, 2.0, 2.75, 2400, 3300, (3.0, 1.4), 650),
-             light(10.45, 2.0, 2.75, 2000, 5600, (2.0, 2.0), 600)])
+     # ~42 lm per square metre like the CIC and the offices (it had 196: five times the ship's rooms, an orange glare)
+     lights=[light(2.3, 2.0, 2.75, 520, 3300, (3.0, 1.2), 650), light(5.4, 2.0, 2.75, 440, 3400, (2.0, 1.2), 600), light(8.2, 2.0, 2.75, 520, 3300, (3.0, 1.4), 650),
+             light(10.45, 2.0, 2.75, 440, 5600, (2.0, 2.0), 600)])
 
 
 def prefab(key: str) -> dict:

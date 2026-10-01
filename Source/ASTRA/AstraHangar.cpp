@@ -1,6 +1,7 @@
 // ASTRA — the flight deck.
 
 #include "AstraHangar.h"
+#include "AstraDeckStreaming.h"
 
 #include "AstraShipSubsystem.h"
 
@@ -244,6 +245,11 @@ bool AAstraHangar::RideLift(APawn* Pawn, int32 ToLanding)
 	RideToLanding = ToLanding;
 	Rider = Pawn;
 	LiftT = 0.f;
+	LiftWaitS = 0.f;
+	if (UAstraDeckStreaming* DS = GetWorld()->GetSubsystem<UAstraDeckStreaming>())
+	{
+		DS->RequestAt(RideTo, 30.f);          // the destination's deck starts loading as the car leaves
+	}
 	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
 	{
 		Cam->StartCameraFade(0.f, 1.f, 0.4f, FLinearColor::Black, false, true);
@@ -278,6 +284,11 @@ bool AAstraHangar::TryUseLift(APawn* Pawn)
 	}
 	Rider = Pawn;
 	LiftT = 0.f;
+	LiftWaitS = 0.f;
+	if (UAstraDeckStreaming* DS = GetWorld()->GetSubsystem<UAstraDeckStreaming>())
+	{
+		DS->RequestAt(RideTo, 30.f);
+	}
 	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
 	{
 		Cam->StartCameraFade(0.f, 1.f, 0.4f, FLinearColor::Black, false, true);
@@ -348,6 +359,23 @@ void AAstraHangar::Tick(float DeltaTime)
 	{
 		const float Before = LiftT;
 		LiftT += DeltaTime;
+		// the car does not open on a deck that is not there yet: in the dark it waits for the destination's sub-level (the decks stream,
+		// docs/NAVE.md §7bis), six seconds at most, then the deck is made ready at once
+		if (Before < 0.9f && LiftT >= 0.9f && Rider.IsValid())
+		{
+			if (UAstraDeckStreaming* DS = GetWorld()->GetSubsystem<UAstraDeckStreaming>(); DS && !DS->IsReadyAt(RideTo))
+			{
+				LiftWaitS += DeltaTime;
+				if (LiftWaitS < 6.f)
+				{
+					LiftT = 0.89f;
+				}
+				else
+				{
+					DS->ForceReadyAt(RideTo);
+				}
+			}
+		}
 		if (Before < 0.9f && LiftT >= 0.9f && Rider.IsValid())
 		{
 			float Half = 96.f;
@@ -358,8 +386,10 @@ void AAstraHangar::Tick(float DeltaTime)
 			Rider->SetActorLocation(RideTo + FVector(0, 0, Half), false, nullptr, ETeleportType::TeleportPhysics);
 			if (AController* Ctl = Rider->GetController())
 			{
-				// out of the car facing into the deck: aft into Main Engineering and the Medbay, forward on the others
-				Ctl->SetControlRotation(FRotator(0.f, RideToLanding >= 2 ? 180.f : (RideToLanding == 1 ? GetActorRotation().Yaw : 0.f), 0.f));
+				// out of the car facing into the deck: aft into Main Engineering and the Medbay, forward on the others (the Mess and the
+				// Berthing come out of the Deck 4 lift banks, whose doors are on the aft wall: forward too)
+				const bool bAft = RideToLanding == 2 || RideToLanding == 3;
+				Ctl->SetControlRotation(FRotator(0.f, bAft ? 180.f : (RideToLanding == 1 ? GetActorRotation().Yaw : 0.f), 0.f));
 			}
 			SetZoneLights(IsPawnInHangar(Rider.Get()));
 			if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
