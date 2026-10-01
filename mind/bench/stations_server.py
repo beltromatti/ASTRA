@@ -40,7 +40,7 @@ class Model:
         out = Completion(model=model, provider="fake", cost=0.0005)
         kind = "router" if not names else "enemy" if "transmit" in names else "crew"
         self.calls.append({"kind": kind, "model": model, "user": user[:160], "tools": names, "watch": "WATCH CHECK" in user,
-                           "system": str(messages[0].get("content", ""))})
+                           "system": str(messages[0].get("content", "")), "prompt": " ".join(str(m.get("content", "")) for m in messages)})
         script: list[tuple[str, dict[str, Any]]] = []
         if kind == "router":                                       # the comms officer's call: the words that go out, as JSON
             verdict = next((v for k, v in self.router_says.items() if k in user), "crew")
@@ -244,7 +244,7 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         ctx = {"place": "mess_hall", "place_name": "DECK 4 · MESS HALL", "pawn": "on_foot", "in_earshot": ["mess1", "mess_cook", "deck1", "sleeper3"],
                "facing": "mess_cook", "channel": None}
         await self.say("cosa c'è da mangiare?", ctx, wait=0.6)
-        room = [c for c in self.model.calls if c["kind"] == "crew"][0]["system"]
+        room = [c for c in self.model.calls if c["kind"] == "crew"][0]["prompt"]
         self.assertIn("not on the bridge (mess)", room)
         self.assertIn("looking at mess_cook", room)
 

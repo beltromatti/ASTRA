@@ -317,13 +317,14 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(turn.actions[0][2]["ok"])
         self.assertIn("intercepting", c.ship.snapshot().get("helm", ""))
         # and the prompt it was given has no console board
-        self.assertNotIn("Consoles now", c.llm.requests[0]["messages"][0]["content"])
+        self.assertNotIn("Consoles now", " ".join(str(m.get("content", "")) for m in c.llm.requests[0]["messages"]))
 
     async def test_the_prompt_carries_the_board_and_the_room(self) -> None:
         c = Crew(Script([speak("Sì.", "xo")]))
         ctx = Context(place="mess", facing="mess3", channel=Channel(party="T-23", name="Ferryman Vael", muted=True))
         await c.agent.handle("come va", "it", ctx=ctx)
-        sysmsg = c.llm.requests[0]["messages"][0]["content"]
+        sysmsg = " ".join(str(m.get("content", "")) for m in c.llm.requests[0]["messages"])     # (the board and the room come in the last message)
+        self.assertNotIn("Consoles now", c.llm.requests[0]["messages"][0]["content"])           # ... not in the system prompt the cache covers
         self.assertIn("Consoles now", sysmsg)
         self.assertIn("[engagement] return_fire", sysmsg)
         self.assertIn("MUTED", sysmsg)
