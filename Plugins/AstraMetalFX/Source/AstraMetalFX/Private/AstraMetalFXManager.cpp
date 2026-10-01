@@ -8,6 +8,7 @@
 #include "HAL/PlatformTime.h"
 #include "RHI.h"
 #include "RenderingThread.h"
+#include "SceneTexturesConfig.h"
 #include "SceneViewExtension.h"
 
 DEFINE_LOG_CATEGORY(LogAstraMetalFX);
@@ -55,8 +56,8 @@ static FAutoConsoleCommandWithOutputDevice GAstraMetalFXStatusCommand(
 			Status.bActive ? TEXT("ACTIVE") : TEXT("not active (TSR)"),
 			Status.bSupported ? TEXT("yes") : TEXT("no"), Status.bEnabled ? TEXT("on") : TEXT("off"),
 			Status.Reason.IsEmpty() ? TEXT("") : TEXT(" | why not: "), *Status.Reason);
-		Ar.Logf(TEXT("MetalFX: output %dx%d, GPU %.3f ms last, %.3f ms average over %llu frames, %llu errors"),
-			Status.OutputSize.X, Status.OutputSize.Y, Status.LastGpuMs, Status.AverageGpuMs, Status.FramesUpscaled, Status.Errors);
+		Ar.Logf(TEXT("MetalFX: output %dx%d, scene color %s, GPU %.3f ms last, %.3f ms average over %llu frames, %llu fallback frames, %llu errors"),
+			Status.OutputSize.X, Status.OutputSize.Y, *Status.ColorFormat, Status.LastGpuMs, Status.AverageGpuMs, Status.FramesUpscaled, Status.FallbackFrames, Status.Errors);
 	}));
 
 FAstraMetalFXManager& FAstraMetalFXManager::Get()
@@ -104,8 +105,10 @@ void FAstraMetalFXManager::Startup()
 	}
 
 	bSupported = true;
+	WantedColorFormat.store(PredictColorFormat());
 	ViewExtension = FSceneViewExtensions::NewExtension<FAstraMetalFXViewExtension>();
-	UE_LOG(LogAstraMetalFX, Log, TEXT("MetalFX upscaler ready: r.AstraMetalFX is %s"), IsEnabledByCVar() ? TEXT("on") : TEXT("off"));
+	UE_LOG(LogAstraMetalFX, Log, TEXT("MetalFX upscaler ready: r.AstraMetalFX is %s, scene color expected in %s"), IsEnabledByCVar() ? TEXT("on") : TEXT("off"),
+		*AstraMetalFX::ColorFormatName(WantedColorFormat.load()));
 
 	// The very first MetalFX scaler of a machine compiles its pipelines for seconds (later ones take a fraction of a second):
 	// start now, off the game thread, for the usual window size. The game view keeps TSR until the real size is ready.
@@ -121,7 +124,7 @@ void FAstraMetalFXManager::Startup()
 		}
 		if (bStartBuild)
 		{
-			StartBuild(FIntPoint(1600, 900));
+			StartBuild(FIntPoint(1600, 900), WantedColorFormat.load());
 		}
 	}
 #else
@@ -156,7 +159,8 @@ void FAstraMetalFXManager::Shutdown()
 #endif
 	{
 		FScopeLock ScopeLock(&Lock);
-		Current.Reset();
+		Contexts.Reset();
+		LastUsed.Reset();
 	}
 #if PLATFORM_MAC
 	AstraMetalFX::ReleaseSharedResources();
@@ -189,15 +193,20 @@ FAstraMetalFXManager::FContextPtr FAstraMetalFXManager::AcquireContext(FIntPoint
 		return nullptr;
 	}
 
+	const uint32 ColorFormat = WantedColorFormat.load();
 	FContextPtr Result;
 	bool bStartBuild = false;
 	{
 		FScopeLock ScopeLock(&Lock);
-		if (Current.IsValid() && Current->GetOutputSize() == OutputSize)
+		for (const FContextPtr& Candidate : Contexts)
 		{
-			Result = Current;
+			if (Candidate->GetOutputSize() == OutputSize && Candidate->GetColorFormat() == ColorFormat)
+			{
+				Result = Candidate;
+				break;
+			}
 		}
-		else if (!bBuilding)
+		if (!Result.IsValid() && !bBuilding)
 		{
 			bBuilding = bStartBuild = true;
 		}
@@ -210,28 +219,62 @@ FAstraMetalFXManager::FContextPtr FAstraMetalFXManager::AcquireContext(FIntPoint
 	}
 	if (bStartBuild)
 	{
-		StartBuild(OutputSize);
+		StartBuild(OutputSize, ColorFormat);
 	}
 	return Result;
 }
 
-void FAstraMetalFXManager::StartBuild(FIntPoint OutputSize)
+void FAstraMetalFXManager::NoteColorFormat(uint32 ColorFormat)
+{
+	if (WantedColorFormat.load() == ColorFormat)
+	{
+		return;
+	}
+	if (!AstraMetalFX::SupportsColorFormat(ColorFormat))
+	{
+		DisableForSession(FString::Printf(TEXT("the scene color reaching the upscaler is %s, which MetalFX does not take"), *AstraMetalFX::ColorFormatName(ColorFormat)));
+		return;
+	}
+	const uint32 Previous = WantedColorFormat.exchange(ColorFormat);
+	if (Previous != ColorFormat)
+	{
+		UE_LOG(LogAstraMetalFX, Log, TEXT("the scene color reaching the upscaler is %s, not %s: the game view switches to a scaler built for it (TSR until it is ready)"),
+			*AstraMetalFX::ColorFormatName(ColorFormat), *AstraMetalFX::ColorFormatName(Previous));
+	}
+}
+
+uint32 FAstraMetalFXManager::PredictColorFormat() const
+{
+	// The scene color format the engine allocates (r.SceneColorFormat, set by sg.EffectsQuality: R11G11B10F on the lower levels, RGBA16F
+	// on Epic). It is what reaches the upscaler unless a post-process pass (depth of field...) writes another; the render thread
+	// corrects the guess with NoteColorFormat.
+	EPixelFormat SceneColorFormat = PF_FloatRGBA;
+	ETextureCreateFlags SceneColorFlags = TexCreate_None;
+	GetSceneColorFormatAndCreateFlags(ERHIFeatureLevel::SM5, /*bRequiresAlphaChannel=*/false, TexCreate_None, /*NumSamples=*/1, /*bMemorylessMSAA=*/false, SceneColorFormat, SceneColorFlags);
+	const uint32 Predicted = GPixelFormats[SceneColorFormat].PlatformFormat;
+	return AstraMetalFX::SupportsColorFormat(Predicted) ? Predicted : AstraMetalFX::DefaultColorFormat();
+}
+
+void FAstraMetalFXManager::StartBuild(FIntPoint OutputSize, uint32 ColorFormat)
 {
 	BuildsInFlight.fetch_add(1);
-	UE_LOG(LogAstraMetalFX, Log, TEXT("building the MetalFX scaler for an output of %dx%d (the game view uses TSR until it is ready)"), OutputSize.X, OutputSize.Y);
+	UE_LOG(LogAstraMetalFX, Log, TEXT("building the MetalFX scaler for an output of %dx%d, scene color %s (the game view uses TSR until it is ready)"),
+		OutputSize.X, OutputSize.Y, *AstraMetalFX::ColorFormatName(ColorFormat));
 
-	Async(EAsyncExecution::ThreadPool, [this, OutputSize]()
+	Async(EAsyncExecution::ThreadPool, [this, OutputSize, ColorFormat]()
 	{
 		FString Error;
 		const double Start = FPlatformTime::Seconds();
-		FContextPtr Built = AstraMetalFX::CreateScalerContext(OutputSize, Error);
+		FContextPtr Built = AstraMetalFX::CreateScalerContext(OutputSize, ColorFormat, Error);
 		const double Seconds = FPlatformTime::Seconds() - Start;
 		{
 			FScopeLock ScopeLock(&Lock);
 			bBuilding = false;
 			if (Built.IsValid() && !bDisabled.load())
 			{
-				Current = Built;
+				// A new output size makes the scalers of the old one useless; the other color formats of this size stay.
+				Contexts.RemoveAll([OutputSize](const FContextPtr& Old) { return Old->GetOutputSize() != OutputSize; });
+				Contexts.Add(Built);
 			}
 		}
 		if (Built.IsValid())
@@ -280,6 +323,7 @@ void FAstraMetalFXManager::PublishFrame(const FContextPtr& Context)
 	{
 		FScopeLock ScopeLock(&Lock);
 		LastActiveTime = Now;
+		LastUsed = Context;
 		if (Interval > 0.0f && Now - LastLogTime >= Interval)
 		{
 			LastLogTime = Now;
@@ -300,7 +344,8 @@ FAstraMetalFXStatus FAstraMetalFXManager::GetStatus() const
 	Status.bEnabled = CVarAstraMetalFX.GetValueOnAnyThread() != 0;
 
 	FScopeLock ScopeLock(&Lock);
-	Status.bActive = Current.IsValid() && (FPlatformTime::Seconds() - LastActiveTime) < 0.5;
+	const FContextPtr Shown = LastUsed.IsValid() ? LastUsed : (Contexts.Num() > 0 ? Contexts[0] : FContextPtr());
+	Status.bActive = LastUsed.IsValid() && (FPlatformTime::Seconds() - LastActiveTime) < 0.5;
 	if (!bSupported)
 	{
 		Status.Reason = UnsupportedReason;
@@ -321,7 +366,7 @@ FAstraMetalFXStatus FAstraMetalFXManager::GetStatus() const
 		{
 			Status.Reason = TEXT("r.AstraMetalFX is 0");
 		}
-		else if (!Current.IsValid())
+		else if (Contexts.Num() == 0)
 		{
 			Status.Reason = bBuilding ? TEXT("the scaler is being built") : TEXT("the game's main view has not been rendered yet");
 		}
@@ -330,13 +375,15 @@ FAstraMetalFXStatus FAstraMetalFXManager::GetStatus() const
 			Status.Reason = TEXT("the game's main view did not use it in the last frames (TSR)");
 		}
 	}
-	if (Current.IsValid())
+	if (Shown.IsValid())
 	{
-		const AstraMetalFX::FGpuTimings Timings = Current->GetTimings();
-		Status.OutputSize = Current->GetOutputSize();
+		const AstraMetalFX::FGpuTimings Timings = Shown->GetTimings();
+		Status.OutputSize = Shown->GetOutputSize();
+		Status.ColorFormat = AstraMetalFX::ColorFormatName(Shown->GetColorFormat());
 		Status.LastGpuMs = Timings.LastMs;
 		Status.AverageGpuMs = Timings.AverageMs;
 		Status.FramesUpscaled = Timings.Frames;
+		Status.FallbackFrames = Timings.Fallbacks;
 		Status.Errors = Timings.Errors;
 	}
 	return Status;

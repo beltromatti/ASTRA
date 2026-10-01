@@ -21,9 +21,11 @@ struct FAstraMetalFXStatus
 	bool bActive = false;       // the last frame of the game view was upscaled by MetalFX (otherwise TSR)
 	FString Reason;             // why MetalFX is not running, when it is not
 	FIntPoint OutputSize = FIntPoint::ZeroValue;
+	FString ColorFormat;  // the scene color format the running scaler was built for (R11G11B10F or RGBA16F depending on the quality level)
 	float LastGpuMs = 0.0f;     // GPU time of the last MetalFX command buffer: motion kernel, exposure and the scaler
 	float AverageGpuMs = 0.0f;
 	uint64 FramesUpscaled = 0;
+	uint64 FallbackFrames = 0;   // frames that got a bilinear stretch instead of MetalFX (a format change in flight, a failure)
 	uint64 Errors = 0;
 };
 

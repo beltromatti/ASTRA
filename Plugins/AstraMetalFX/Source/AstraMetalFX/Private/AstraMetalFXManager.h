@@ -1,6 +1,6 @@
-// Copyright ASTRA. The plugin's state: cvars, the scaler context (built on a worker thread, swapped in when ready), the
-// fallback latch, the cost counters. One instance, owned by the module, used by the view extension (game thread) and the
-// upscaler (render thread).
+// Copyright ASTRA. The plugin's state: cvars, the scaler contexts (one per output size and scene color format, built on a
+// worker thread, swapped in when ready), the fallback latch, the cost counters. One instance, owned by the module, used by
+// the view extension (game thread) and the upscaler (render thread).
 
 #pragma once
 
@@ -45,10 +45,18 @@ public:
 	void DisableForSession(const FString& Reason);
 
 	/**
-	 * Game thread, when a game view wants MetalFX: the scaler for this output size if it is ready, else null (TSR this
-	 * frame) and a worker thread builds it. Building takes hundreds of milliseconds, seconds the very first time.
+	 * Game thread, when a game view wants MetalFX: the scaler for this output size and for the scene color format the engine
+	 * hands to upscalers (guessed from the engine's own setting at start, then what the render thread saw last) if it is ready,
+	 * else null (TSR this frame) and a worker thread builds it. Building takes hundreds of milliseconds, seconds the very first time.
 	 */
 	FContextPtr AcquireContext(FIntPoint OutputSize);
+
+	/**
+	 * Render thread: the scene color reaching the upscaler is in this format (an MTLPixelFormat). When it is not the one the scaler
+	 * was built for the next game frames switch to (and build, once) a scaler for it; the frames already in the pipeline get the
+	 * bilinear fallback.
+	 */
+	void NoteColorFormat(uint32 ColorFormat);
 
 	/**
 	 * Game thread: the game's main view is rendered without MetalFX this frame (TSR or no temporal upscaling). The MetalFX history,
@@ -69,7 +77,8 @@ public:
 	FAstraMetalFXStatus GetStatus() const;
 
 private:
-	void StartBuild(FIntPoint OutputSize);
+	void StartBuild(FIntPoint OutputSize, uint32 ColorFormat);
+	uint32 PredictColorFormat() const;
 
 	bool bStarted = false;
 	bool bSupported = false;
@@ -81,9 +90,11 @@ private:
 	std::atomic<double> LastDeclineTime{ 0.0 };
 	bool bUpscalingNow = false;   // game thread: what the game view did last frame, to log the switches between MetalFX and TSR
 	std::atomic<int32> BuildsInFlight{ 0 };
+	std::atomic<uint32> WantedColorFormat{ 0 };   // MTLPixelFormat of the scene color the scalers are wanted for
 
 	mutable FCriticalSection Lock;   // guards everything below
-	FContextPtr Current;
+	TArray<FContextPtr> Contexts;   // the scalers built for the current output size, one per scene color format seen
+	FContextPtr LastUsed;          // the one the last upscaled frame used (status and timings)
 	bool bBuilding = false;
 	FString DisabledReason;
 	bool bActiveLastFrame = false;

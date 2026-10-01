@@ -32,7 +32,7 @@ namespace Core
 	/** One frame of work. Textures may be null where noted; all of them are retained until the command buffer has completed. */
 	struct FFrameInput
 	{
-		id<MTLTexture> Color = nil;       // RGBA16F; the rendered rectangle starts at (ViewMinX, ViewMinY)
+		id<MTLTexture> Color = nil;       // in the format the scaler was built for; the rendered rectangle starts at (ViewMinX, ViewMinY)
 		id<MTLTexture> Depth = nil;       // Depth32Float_Stencil8, reversed Z
 		id<MTLTexture> Velocity = nil;    // Unreal's encoded velocity; null: camera motion only
 		id<MTLTexture> Eye = nil;         // eye adaptation, 1x1, exposure in x; null: neutral exposure
@@ -58,6 +58,7 @@ namespace Core
 		float AverageMs = 0.0f;
 		uint64_t Frames = 0;
 		uint64_t Errors = 0;
+		uint64_t Fallbacks = 0;   // frames that got the bilinear fallback instead of MetalFX
 	};
 
 	/**
@@ -67,12 +68,15 @@ namespace Core
 	 */
 	void ClearTexture(id<MTLCommandQueue> Queue, id<MTLTexture> Texture, std::shared_ptr<void> KeepAlive = nullptr);
 
-	/** A MetalFX temporal scaler for one output size with its private textures and kernels. Creating it is slow: a worker thread. */
+	/** The scene color formats MetalFX takes as input and the plugin builds a scaler for (Unreal's depends on sg.EffectsQuality). */
+	bool SupportsColorFormat(MTLPixelFormat Format);
+
+	/** A MetalFX temporal scaler for one output size and one color format, with its private textures and kernels. Creating it is slow: a worker thread. */
 	class FScaler : public std::enable_shared_from_this<FScaler>
 	{
 	public:
 		/** Null (and a reason) when MetalFX or the kernels cannot be built. Slow: hundreds of milliseconds, seconds the first time. */
-		static std::shared_ptr<FScaler> Create(id<MTLDevice> Device, int OutputW, int OutputH, std::string& OutError);
+		static std::shared_ptr<FScaler> Create(id<MTLDevice> Device, int OutputW, int OutputH, MTLPixelFormat ColorFormat, std::string& OutError);
 
 		/** Empty when the device supports MetalFX temporal scaling, else why not. Cheap. */
 		static std::string QueryUnsupportedReason(id<MTLDevice> Device);
@@ -81,11 +85,15 @@ namespace Core
 
 		int OutputW() const { return OutputW_; }
 		int OutputH() const { return OutputH_; }
+		MTLPixelFormat ColorFormat() const { return ColorFormat_; }   // the format of the scene color it processes
 		float MinScale() const { return MinScale_; }   // smallest and largest output / rendered size the scaler accepts
 		float MaxScale() const { return MaxScale_; }
 
-		/** Empty when the frame's textures fit what the scaler and its ordering trick need, else the first problem. Cheap. */
+		/** Empty when the frame's textures fit what the scaler and its ordering trick need, else every problem found. Cheap. */
 		std::string Validate(const FFrameInput& Frame) const;
+
+		/** Whether a frame, whatever its scene color format, can at least get the bilinear fallback (Color and Output of a usable shape). */
+		std::string ValidateForFallback(const FFrameInput& Frame) const;
 
 		/**
 		 * Encodes the frame into a new command buffer of Queue and commits it. Fast (tens of microseconds). The scaler's state
@@ -93,6 +101,14 @@ namespace Core
 		 * The frame (and so its textures) stays alive until the GPU has completed the command buffer.
 		 */
 		void Encode(id<MTLCommandQueue> Queue, const std::shared_ptr<const FFrameInput>& Frame);
+
+		/**
+		 * The fallback: stretches the rendered rectangle of Frame.Color to Frame.Output bilinearly, without MetalFX and without history.
+		 * For a frame the scaler cannot process (another color format than it was built for, a failed scaler, a frame the host had
+		 * committed to before it knew): a soft image instead of black or uninitialised memory. Works on a failed scaler too.
+		 * Same threading rules as Encode; the frame's KeepAlive is released when the GPU is done.
+		 */
+		void EncodeFallback(id<MTLCommandQueue> Queue, const std::shared_ptr<const FFrameInput>& Frame);
 
 		bool Failed() const { return bFailed_.load(); }
 		std::string FailureReason() const;
@@ -113,6 +129,7 @@ namespace Core
 		FScaler& operator=(const FScaler&) = delete;
 
 		int OutputW_ = 0, OutputH_ = 0;
+		MTLPixelFormat ColorFormat_ = MTLPixelFormatRGBA16Float;
 		float MinScale_ = 1.0f, MaxScale_ = 3.0f;
 		uint32_t Id_ = 0;
 
@@ -120,6 +137,7 @@ namespace Core
 		id<MTLComputePipelineState> MotionPipeline_ = nil;
 		id<MTLComputePipelineState> ExposurePipeline_ = nil;
 		id<MTLComputePipelineState> DebugPipeline_ = nil;
+		id<MTLComputePipelineState> UpscalePipeline_ = nil;   // the fallback
 		id<MTLTexture> MotionTexture_ = nil;     // what the scaler reads as motion vectors, as big as the color texture it goes with
 		id<MTLTexture> ExposureTexture_ = nil;   // 1x1 R16F
 		id<MTLTexture> DummyVelocity_ = nil;     // bound when there is no velocity texture
@@ -132,6 +150,7 @@ namespace Core
 		std::string FailureReason_;
 		FTimings Timings_;
 		bool bWarnedScale_ = false;
+		bool bLoggedFirstFrame_ = false;   // Encode's thread only: the first frame's formats go to the log once
 	};
 }
 }

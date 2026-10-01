@@ -119,12 +119,23 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 	// that jumped this far has nothing in common with its history.
 	bReset = bReset || IsLargeCameraMovement(View.ViewMatrices, PreviousMatrices);
 
+	// The scaler is built for one scene color format; the engine's depends on the quality level (R11G11B10F or RGBA16F) and on the
+	// passes before the upscaler. A frame in another format cannot use it: it gets the bilinear fallback, and the manager learns
+	// the format so that the next frames use (and build, once) the right scaler.
+	const uint32 SceneColorFormat = GPixelFormats[Inputs.SceneColor.Texture->Desc.Format].PlatformFormat;
+	const bool bColorFormatMismatch = SceneColorFormat != Context->GetColorFormat();
+	if (bColorFormatMismatch)
+	{
+		Manager.NoteColorFormat(SceneColorFormat);
+	}
+
 	AstraMetalFX::FFrame Frame;
 	Frame.ViewRect = InputRect;
 	Frame.OutputSize = OutputSize;
 	Frame.Jitter = Inputs.TemporalJitterPixels;
 	Frame.PreExposure = Inputs.PreExposure;
 	Frame.bReset = bReset;
+	Frame.bFallback = bColorFormatMismatch;
 	Frame.DebugView = Manager.GetDebugView();
 	Frame.FrameNumber = View.Family ? View.Family->FrameNumber : 0;
 	const FMatrix44f ClipToPrevClip = ComputeClipToPrevClip(View.ViewMatrices, PreviousMatrices);
@@ -148,7 +159,8 @@ FAstraMetalFXUpscaler::FOutputs FAstraMetalFXUpscaler::AddPasses(FRDGBuilder& Gr
 	// (1) hand everything recorded so far to Metal and (2) enqueue our submission right behind it, the same sequence
 	// the Metal RHI itself uses for the present and Epic's NNE plugin uses to run an external library in the middle of a frame.
 	GraphBuilder.AddPass(
-		RDG_EVENT_NAME("AstraMetalFX %dx%d -> %dx%d%s", InputRect.Width(), InputRect.Height(), OutputSize.X, OutputSize.Y, bReset ? TEXT(" (reset)") : TEXT("")),
+		RDG_EVENT_NAME("AstraMetalFX %dx%d -> %dx%d%s", InputRect.Width(), InputRect.Height(), OutputSize.X, OutputSize.Y,
+			bColorFormatMismatch ? TEXT(" (fallback: other scene color format)") : (bReset ? TEXT(" (reset)") : TEXT(""))),
 		PassParameters,
 		ERDGPassFlags::Compute | ERDGPassFlags::NeverCull,
 		[Context = Context, Frame, SceneColor, SceneDepth, SceneVelocity, EyeAdaptation, OutputTexture](FRHICommandListImmediate& RHICmdList) mutable

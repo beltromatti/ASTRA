@@ -34,6 +34,8 @@ kernel void poison(texture2d<half, access::read_write> C [[texture(0)]], constan
 	half v = k == 0 ? half(NAN) : (k == 1 ? half(INFINITY) : (k == 2 ? half(-INFINITY) : half(-5.0)));
 	C.write(half4(v, v, v, 1.0h), p);
 }
+kernel void copy_color(texture2d<half, access::read> Src [[texture(0)]], texture2d<half, access::write> Dst [[texture(1)]], constant uint2& Off [[buffer(0)]], uint2 gid [[thread_position_in_grid]])
+{ if (gid.x < Src.get_width() && gid.y < Src.get_height()) Dst.write(Src.read(gid), gid + Off); }
 kernel void clear_velocity(texture2d<float, access::write> Out [[texture(0)]], uint2 gid [[thread_position_in_grid]])
 { if (gid.x < Out.get_width() && gid.y < Out.get_height()) Out.write(float4(0.0), gid); }
 )MSL";
@@ -69,7 +71,7 @@ struct FRig
 {
 	id<MTLDevice> Dev; id<MTLCommandQueue> Q;
 	FHeap Heap;
-	id<MTLComputePipelineState> PsoRender, PsoFillEye, PsoClearVel, PsoPoison;
+	id<MTLComputePipelineState> PsoRender, PsoFillEye, PsoClearVel, PsoPoison, PsoCopyColor;
 	id<MTLRenderPipelineState> RPS; id<MTLDepthStencilState> DSS;
 	double HalfFov = 45.0 * M_PI / 180.0; float MinZ = 5.0f;
 
@@ -78,7 +80,7 @@ struct FRig
 		Dev = MTLCreateSystemDefaultDevice(); Q = [Dev newCommandQueue];
 		Heap.Init(Dev, 768ull * 1024 * 1024);
 		id<MTLLibrary> Lib = MakeLib(Dev, kSrcScene), DLib = MakeLib(Dev, kSrcDepthFill);
-		PsoRender = MakePSO(Dev, Lib, "e2e_render"); PsoFillEye = MakePSO(Dev, DLib, "fill_eye"); PsoClearVel = MakePSO(Dev, DLib, "clear_velocity"); PsoPoison = MakePSO(Dev, DLib, "poison");
+		PsoRender = MakePSO(Dev, Lib, "e2e_render"); PsoFillEye = MakePSO(Dev, DLib, "fill_eye"); PsoClearVel = MakePSO(Dev, DLib, "clear_velocity"); PsoPoison = MakePSO(Dev, DLib, "poison"); PsoCopyColor = MakePSO(Dev, DLib, "copy_color");
 		MTLRenderPipelineDescriptor* RPD = [MTLRenderPipelineDescriptor new];
 		RPD.vertexFunction = [DLib newFunctionWithName:@"fs_vs"]; RPD.fragmentFunction = [DLib newFunctionWithName:@"fs_depth"];
 		RPD.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8; RPD.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
@@ -96,12 +98,12 @@ struct FTextures
 	id<MTLTexture> SmallColor, SmallDepth;   // the content-sized render targets of the scene kernel
 };
 
-static FTextures MakeTextures(FRig& R, int ExtW, int ExtH, int OutW, int OutH, int ContentMaxW, int ContentMaxH)
+static FTextures MakeTextures(FRig& R, int ExtW, int ExtH, int OutW, int OutH, int ContentMaxW, int ContentMaxH, MTLPixelFormat ColorFormat = MTLPixelFormatRGBA16Float)
 {
 	FTextures T{};
 	T.ExtW = ExtW; T.ExtH = ExtH; T.OutW = OutW; T.OutH = OutH;
 	const MTLTextureUsage RW = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
-	T.Color = R.Heap.Alloc(MTLPixelFormatRGBA16Float, ExtW, ExtH, RW | MTLTextureUsageRenderTarget);
+	T.Color = R.Heap.Alloc(ColorFormat, ExtW, ExtH, RW | MTLTextureUsageRenderTarget);
 	T.Depth = R.Heap.Alloc(MTLPixelFormatDepth32Float_Stencil8, ExtW, ExtH, MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget);
 	T.DepthR32 = R.Heap.Alloc(MTLPixelFormatR32Float, ExtW, ExtH, RW);
 	T.Velocity = R.Heap.Alloc(MTLPixelFormatRGBA16Unorm, ExtW, ExtH, RW | MTLTextureUsageRenderTarget);
@@ -137,8 +139,14 @@ static void RenderInputs(FRig& R, FTextures& T, int F, int CW, int CH, int MinX,
 		[E endEncoding];
 	}
 	{
+		id<MTLComputeCommandEncoder> E = [CB computeCommandEncoder];
+		simd_uint2 Off = { (unsigned)MinX, (unsigned)MinY };
+		[E setComputePipelineState:R.PsoCopyColor]; [E setTexture:T.SmallColor atIndex:0]; [E setTexture:T.Color atIndex:1]; [E setBytes:&Off length:8 atIndex:0];
+		Dispatch2D(E, R.PsoCopyColor, CW, CH);
+		[E endEncoding];
+	}
+	{
 		id<MTLBlitCommandEncoder> B = [CB blitCommandEncoder];
-		[B copyFromTexture:T.SmallColor sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(CW, CH, 1) toTexture:T.Color destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(MinX, MinY, 0)];
 		[B copyFromTexture:T.SmallDepth sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(CW, CH, 1) toTexture:T.DepthR32 destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(MinX, MinY, 0)];
 		[B endEncoding];
 	}
@@ -202,7 +210,7 @@ int main(int argc, char** argv)
 			// the completion handlers update them, frames committed without waiting. No crash, no error, everything completes.
 			int N = argc > 2 ? atoi(argv[2]) : 5000;
 			std::string E2;
-			std::shared_ptr<FScaler> Sk = FScaler::Create(R.Dev, OutW, OutH, E2);
+			std::shared_ptr<FScaler> Sk = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGBA16Float, E2);
 			FTextures T = MakeTextures(R, 1024, 600, OutW, OutH, 960, 540);
 			std::atomic<bool> bStop{ false };
 			std::atomic<uint64_t> Polls{ 0 };
@@ -232,7 +240,7 @@ int main(int argc, char** argv)
 		printf("create\n");
 		std::string Err;
 		double T0 = NowMs();
-		std::shared_ptr<FScaler> S = FScaler::Create(R.Dev, OutW, OutH, Err);
+		std::shared_ptr<FScaler> S = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGBA16Float, Err);
 		printf("  created in %.0f ms\n", NowMs() - T0);
 		Check(S != nullptr && Err.empty(), "scaler created");
 		if (!S) return 2;
@@ -315,7 +323,7 @@ int main(int argc, char** argv)
 			// A few frames have NaN, +-Inf and negative texels in a block of the colour (a material that divided by zero): what
 			// does MetalFX leave in its output, and how long does it take to recover?
 			FTextures T = MakeTextures(R, 1024, 600, OutW, OutH, CW0, CH0);
-			std::shared_ptr<FScaler> Sp = FScaler::Create(R.Dev, OutW, OutH, Err);
+			std::shared_ptr<FScaler> Sp = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGBA16Float, Err);
 			auto CountBad = [&](int& NonFinite, double& MaxAbs) {
 				id<MTLTexture> Sh = MakeTex2D(R.Dev, MTLPixelFormatRGBA16Float, OutW, OutH, MTLTextureUsageShaderRead, MTLStorageModeShared);
 				RunCB(R.Q, ^(id<MTLCommandBuffer> CB) { id<MTLBlitCommandEncoder> B = [CB blitCommandEncoder]; [B copyFromTexture:T.Output toTexture:Sh]; [B endEncoding]; });
@@ -368,7 +376,7 @@ int main(int argc, char** argv)
 
 		printf("out of range rectangles are clamped, not passed to MetalFX\n");
 		{
-			std::shared_ptr<FScaler> S2 = FScaler::Create(R.Dev, OutW, OutH, Err);
+			std::shared_ptr<FScaler> S2 = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGBA16Float, Err);
 			FTextures T = MakeTextures(R, 1024, 600, OutW, OutH, 1024, 600);
 			float C2P[16]; RenderInputs(R, T, 0, 1024, 600, 0, 0, 0, 0, C2P);
 			WaitAll(R);
@@ -382,7 +390,7 @@ int main(int argc, char** argv)
 
 		printf("failure\n");
 		{
-			std::shared_ptr<FScaler> S3 = FScaler::Create(R.Dev, OutW, OutH, Err);
+			std::shared_ptr<FScaler> S3 = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGBA16Float, Err);
 			FTextures T = MakeTextures(R, 600, 340, OutW, OutH, 600, 340);
 			float C2P[16]; RenderInputs(R, T, 0, 528, 297, 0, 0, 0, 0, C2P); WaitAll(R);
 			S3->Fail("test failure");
@@ -392,7 +400,7 @@ int main(int argc, char** argv)
 			Check(S3->Timings().Frames == 0, "a failed scaler encodes nothing");
 			// What the host does instead for such a frame: a black output, never uninitialised memory.
 			{
-				std::shared_ptr<FScaler> S4 = FScaler::Create(R.Dev, OutW, OutH, Err);
+				std::shared_ptr<FScaler> S4 = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGBA16Float, Err);
 				S4->Encode(R.Q, MakeFrame(T, 528, 297, 0, 0, 0, 0, C2P, true, false, false));
 				WaitAll(R);
 				std::vector<float> Before = Luma(R, T.Output, OutW, OutH);
@@ -405,9 +413,58 @@ int main(int argc, char** argv)
 			}
 		}
 
+		printf("the scene color formats: R11G11B10F (Unreal's sg.EffectsQuality 0-2), RGB10A2, the fallback, every problem at once\n");
+		{
+			std::string E3;
+			std::shared_ptr<FScaler> S11 = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRG11B10Float, E3);
+			Check(S11 != nullptr && S11->ColorFormat() == MTLPixelFormatRG11B10Float, "a scaler built for R11G11B10F");
+			FTextures T11 = MakeTextures(R, 1024, 600, OutW, OutH, CW0, CH0, MTLPixelFormatRG11B10Float);
+			double P11 = RunScene("R11G11B10F scene color, textures bigger than the content", T11, S11, [&](int, int& W, int& H) { W = CW0; H = CH0; }, 0, 0, true, true);
+			Check(P11 > PTight - 1.0, "R11G11B10F converges almost as well as RGBA16F (within 1 dB)");
+			FTextures T11o = MakeTextures(R, 1024, 600, OutW, OutH, CW0, CH0, MTLPixelFormatRG11B10Float);
+			double P11o = RunScene("R11G11B10F, content at (24, 16) (the copy path)", T11o, S11, [&](int, int& W, int& H) { W = CW0; H = CH0; }, 24, 16, true, false);
+			Check(fabs(P11o - P11) < 0.4, "R11G11B10F: the copy path gives the same image");
+			Check(S11->Timings().Errors == 0 && !S11->Failed(), "the R11G11B10F scaler had no error");
+
+			std::shared_ptr<FScaler> S10 = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGB10A2Unorm, E3);
+			Check(S10 != nullptr, "a scaler built for RGB10A2");
+			FTextures T10 = MakeTextures(R, 1024, 600, OutW, OutH, CW0, CH0, MTLPixelFormatRGB10A2Unorm);
+			double P10 = RunScene("RGB10A2 scene color (values above 1 are clipped by the format)", T10, S10, [&](int, int& W, int& H) { W = CW0; H = CH0; }, 0, 0, true, true);
+			Check(P10 > 15.0 && S10->Timings().Errors == 0, "RGB10A2 runs without error and still reconstructs the scene");
+
+			std::string E4;
+			std::shared_ptr<FScaler> S8 = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGBA8Unorm, E4);
+			Check(S8 == nullptr && E4.find("not one MetalFX takes") != std::string::npos, "a color format MetalFX does not take is refused when the scaler is built");
+
+			// An RGBA16F scaler given an R11G11B10F frame (the format changed after the host chose the scaler): refused with every
+			// reason, but the frame can still get the bilinear fallback
+			auto Mismatch = std::make_shared<FFrameInput>(*MakeFrame(T11, CW0, CH0, 0, 0, 0, 0, std::vector<float>(16, 0.0f).data(), false, true, true));
+			std::string Why = S->Validate(*Mismatch);
+			Check(Why.find("R11G11B10F") != std::string::npos && Why.find("RGBA16F") != std::string::npos, "an R11G11B10F frame on an RGBA16F scaler is refused, naming both formats");
+			Check(S->ValidateForFallback(*Mismatch).empty(), "...but the fallback accepts it");
+			// the Metal textures of T11 hold the last frame rendered above
+			uint64_t Fallbacks0 = S->Timings().Fallbacks;
+			S->EncodeFallback(R.Q, Mismatch);
+			WaitAll(R);
+			double PFall = Psnr(Luma(R, T11.Output, OutW, OutH), GT, OutW, OutH);
+			printf("  the bilinear fallback of that frame                          PSNR %.2f dB\n", PFall);
+			Check(PFall > 12.0, "the fallback output is a recognisable image, not black or garbage (> 12 dB)");
+			Check(S->Timings().Fallbacks == Fallbacks0 + 1, "the fallback frame was counted");
+			Check(FScaler::CommandBuffersInFlight() == 0, "nothing left in flight");
+
+			// several problems in one frame are all reported
+			auto Many = std::make_shared<FFrameInput>(*MakeFrame(T11, CW0, CH0, 0, 0, 0, 0, std::vector<float>(16, 0.0f).data(), false, true, true));
+			Many->Depth = R.Heap.Alloc(MTLPixelFormatDepth32Float, 1024, 600, MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget);
+			Many->Output = R.Heap.Alloc(MTLPixelFormatRGBA16Float, OutW + 8, OutH, MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget);
+			std::string All = S->Validate(*Many);
+			printf("  all the problems of a bad frame: %s\n", All.c_str());
+			Check(All.find("scene color format") != std::string::npos && All.find("scene depth format") != std::string::npos && All.find("output texture") != std::string::npos,
+				"one message names the color, depth and output problems together");
+		}
+
 		printf("the host's keep-alive object stays alive until the GPU has completed the frame\n");
 		{
-			std::shared_ptr<FScaler> S5 = FScaler::Create(R.Dev, OutW, OutH, Err);
+			std::shared_ptr<FScaler> S5 = FScaler::Create(R.Dev, OutW, OutH, MTLPixelFormatRGBA16Float, Err);
 			FTextures T = MakeTextures(R, 600, 340, OutW, OutH, 600, 340);
 			float C2P[16]; RenderInputs(R, T, 0, 528, 297, 0, 0, 0, 0, C2P); WaitAll(R);
 			std::mutex Mx;

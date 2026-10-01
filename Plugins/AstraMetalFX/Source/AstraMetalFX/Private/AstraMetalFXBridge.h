@@ -20,10 +20,18 @@ namespace AstraMetalFX
 	/** Why MetalFX cannot run on this machine, or an empty string when it can. Needs the Metal RHI to be up. */
 	FString QueryUnsupportedReason();
 
+	/**
+	 * Scene color formats are MTLPixelFormat values (a uint32 here, this header has no Metal). The ones the scaler is built for:
+	 * RGBA16F (r.SceneColorFormat 4, sg.EffectsQuality 3), R11G11B10F (3, the lower levels) and RGB10A2 (1).
+	 */
+	bool SupportsColorFormat(uint32 ColorFormat);
+	uint32 DefaultColorFormat();
+	FString ColorFormatName(uint32 ColorFormat);
+
 	/** One frame of work for the upscaler, all plain data. The textures are the RHI's; the bridge retains their native handles. */
 	struct FFrame
 	{
-		FRHITexture* SceneColor = nullptr;      // RGBA16F, the rendered rectangle starts at ViewRect.Min
+		FRHITexture* SceneColor = nullptr;      // the rendered rectangle starts at ViewRect.Min
 		FRHITexture* SceneDepth = nullptr;      // depth / stencil, reversed Z
 		FRHITexture* SceneVelocity = nullptr;   // Unreal's encoded velocity (may be null or a dummy)
 		FRHITexture* EyeAdaptation = nullptr;   // 1x1, the exposure of the tonemapper in x (may be null)
@@ -34,6 +42,7 @@ namespace AstraMetalFX
 		float PreExposure = 1.0f;
 		float ClipToPrevClip[16] = {};              // Unreal's matrix, row-major, copied verbatim
 		bool bReset = false;                        // history invalid: camera cut, first frame, ...
+		bool bFallback = false;                     // the scene color is not in the scaler's format: bilinear stretch instead of MetalFX
 		EDebugView DebugView = EDebugView::Off;
 		uint64 FrameNumber = 0;
 	};
@@ -45,6 +54,7 @@ namespace AstraMetalFX
 		float AverageMs = 0.0f;
 		uint64 Frames = 0;
 		uint64 Errors = 0;
+		uint64 Fallbacks = 0;   // frames that got the bilinear fallback
 	};
 
 	/**
@@ -62,6 +72,9 @@ namespace AstraMetalFX
 		~FScalerContext();
 
 		FIntPoint GetOutputSize() const { return OutputSize; }
+
+		/** The scene color format (MTLPixelFormat) this scaler was built for: a frame in another one cannot use it. */
+		uint32 GetColorFormat() const { return ColorFormat; }
 
 		/** Smallest and largest (rendered size / output size) the scaler accepts: what dynamic resolution may use. */
 		float GetMinInputFraction() const { return MinInputFraction; }
@@ -81,18 +94,19 @@ namespace AstraMetalFX
 		FGpuTimings GetTimings() const;
 
 	private:
-		friend TSharedPtr<FScalerContext, ESPMode::ThreadSafe> CreateScalerContext(FIntPoint OutputSize, FString& OutError);
-		explicit FScalerContext(FIntPoint InOutputSize);
+		friend TSharedPtr<FScalerContext, ESPMode::ThreadSafe> CreateScalerContext(FIntPoint OutputSize, uint32 ColorFormat, FString& OutError);
+		FScalerContext(FIntPoint InOutputSize, uint32 InColorFormat);
 
 		FIntPoint OutputSize;
+		uint32 ColorFormat;
 		float MinInputFraction = 1.0f;
 		float MaxInputFraction = 1.0f;
 
 		TSharedPtr<FImpl, ESPMode::ThreadSafe> Impl;   // shared with the Metal completion handlers, which may outlive the context
 	};
 
-	/** Creates the scaler for an output size. Slow, worker thread. Returns null (and a reason) on failure. */
-	TSharedPtr<FScalerContext, ESPMode::ThreadSafe> CreateScalerContext(FIntPoint OutputSize, FString& OutError);
+	/** Creates the scaler for an output size and a scene color format. Slow, worker thread. Returns null (and a reason) on failure. */
+	TSharedPtr<FScalerContext, ESPMode::ThreadSafe> CreateScalerContext(FIntPoint OutputSize, uint32 ColorFormat, FString& OutError);
 
 	/** Shutdown: returns once the Metal submission thread has run every callback handed to it before this call. */
 	void DrainSubmissionQueue();

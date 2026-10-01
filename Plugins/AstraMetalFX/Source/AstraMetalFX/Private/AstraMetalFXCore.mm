@@ -34,8 +34,8 @@ namespace Core
 		constexpr uint32_t kFlagIgnoreVelocity = 1u;
 		constexpr uint32_t kFlagEyeAdaptation = 4u;
 
-		// Formats the scaler is built for: Unreal's scene color, scene depth and the plugin's own motion texture.
-		constexpr MTLPixelFormat kColorFormat = MTLPixelFormatRGBA16Float;
+		// Formats the scaler is built for: Unreal's scene depth, the plugin's own motion texture and output. The scene color's
+		// format varies (see SupportsColorFormat) and is a parameter of the scaler.
 		constexpr MTLPixelFormat kDepthFormat = MTLPixelFormatDepth32Float_Stencil8;
 		constexpr MTLPixelFormat kMotionFormat = MTLPixelFormatRG16Float;
 		constexpr MTLPixelFormat kOutputFormat = MTLPixelFormatRGBA16Float;
@@ -56,6 +56,26 @@ namespace Core
 		std::string Str(NSString* Text)
 		{
 			return Text ? std::string([Text UTF8String]) : std::string();
+		}
+
+		const char* FormatName(MTLPixelFormat Format)
+		{
+			switch (Format)
+			{
+			case MTLPixelFormatRGBA16Float: return "RGBA16F";
+			case MTLPixelFormatRG11B10Float: return "R11G11B10F";
+			case MTLPixelFormatRGB10A2Unorm: return "RGB10A2";
+			case MTLPixelFormatRGBA8Unorm: return "RGBA8";
+			case MTLPixelFormatBGRA8Unorm: return "BGRA8";
+			case MTLPixelFormatRGBA32Float: return "RGBA32F";
+			case MTLPixelFormatRG16Float: return "RG16F";
+			case MTLPixelFormatRG16Unorm: return "RG16";
+			case MTLPixelFormatRGBA16Unorm: return "RGBA16";
+			case MTLPixelFormatDepth32Float_Stencil8: return "D32F_S8";
+			case MTLPixelFormatDepth24Unorm_Stencil8: return "D24_S8";
+			case MTLPixelFormatDepth32Float: return "D32F";
+			default: return "another format";
+			}
 		}
 
 		// The compiled kernels, once per process (a few tens of milliseconds).
@@ -113,6 +133,13 @@ namespace Core
 		}
 	}
 
+	bool SupportsColorFormat(MTLPixelFormat Format)
+	{
+		// What MetalFX accepts as the color of a temporal scaler (tools/metalfx_probe probe_formats, probe_core): Unreal's scene
+		// color is RGBA16F (r.SceneColorFormat 4, sg.EffectsQuality 3), R11G11B10F (3, the lower levels) or RGB10A2 (1).
+		return Format == MTLPixelFormatRGBA16Float || Format == MTLPixelFormatRG11B10Float || Format == MTLPixelFormatRGB10A2Unorm;
+	}
+
 	void SetLogger(std::function<void(ELogLevel, const std::string&)> Logger)
 	{
 		GLogger = std::move(Logger);
@@ -167,7 +194,7 @@ namespace Core
 
 	FScaler::~FScaler() = default;
 
-	std::shared_ptr<FScaler> FScaler::Create(id<MTLDevice> Device, int OutputW, int OutputH, std::string& OutError)
+	std::shared_ptr<FScaler> FScaler::Create(id<MTLDevice> Device, int OutputW, int OutputH, MTLPixelFormat ColorFormat, std::string& OutError)
 	{
 		@autoreleasepool
 		{
@@ -181,11 +208,17 @@ namespace Core
 				OutError = "the output is too small";
 				return nullptr;
 			}
+			if (!SupportsColorFormat(ColorFormat))
+			{
+				OutError = Format("the scene color format (MTLPixelFormat %d) is not one MetalFX takes", (int)ColorFormat);
+				return nullptr;
+			}
 
 			std::shared_ptr<FScaler> Self(new FScaler());
 			Self->Id_ = GNextId.fetch_add(1);
 			Self->OutputW_ = OutputW;
 			Self->OutputH_ = OutputH;
+			Self->ColorFormat_ = ColorFormat;
 
 			if (@available(macOS 14.0, *))
 			{
@@ -202,7 +235,7 @@ namespace Core
 			// textures at the upper bound of the dynamic resolution, bigger than the rendered rectangle and than the output;
 			// MetalFX only looks at the rectangle (tools/metalfx_probe/probe_quality.mm "layout": the same image).
 			MTLFXTemporalScalerDescriptor* Desc = [MTLFXTemporalScalerDescriptor new];
-			Desc.colorTextureFormat = kColorFormat;
+			Desc.colorTextureFormat = ColorFormat;
 			Desc.depthTextureFormat = kDepthFormat;
 			Desc.motionTextureFormat = kMotionFormat;
 			Desc.outputTextureFormat = kOutputFormat;
@@ -233,7 +266,8 @@ namespace Core
 			Self->MotionPipeline_ = MakePipeline(Device, Library, @"astra_motion", OutError);
 			Self->ExposurePipeline_ = MakePipeline(Device, Library, @"astra_exposure", OutError);
 			Self->DebugPipeline_ = MakePipeline(Device, Library, @"astra_debug", OutError);
-			if (!Self->MotionPipeline_ || !Self->ExposurePipeline_ || !Self->DebugPipeline_)
+			Self->UpscalePipeline_ = MakePipeline(Device, Library, @"astra_upscale", OutError);
+			if (!Self->MotionPipeline_ || !Self->ExposurePipeline_ || !Self->DebugPipeline_ || !Self->UpscalePipeline_)
 			{
 				return nullptr;
 			}
@@ -252,8 +286,8 @@ namespace Core
 				return nullptr;
 			}
 
-			Log(ELogLevel::Log, Format("MetalFX scaler %u ready: output %dx%d, rendered size from %.0f%% to %.0f%% of it, device %s",
-				Self->Id_, OutputW, OutputH, 100.0f / Self->MaxScale_, 100.0f / Self->MinScale_, Str(Device.name).c_str()));
+			Log(ELogLevel::Log, Format("MetalFX scaler %u ready: output %dx%d, scene color %s, rendered size from %.0f%% to %.0f%% of it, device %s",
+				Self->Id_, OutputW, OutputH, FormatName(ColorFormat), 100.0f / Self->MaxScale_, 100.0f / Self->MinScale_, Str(Device.name).c_str()));
 			return Self;
 		}
 	}
@@ -296,50 +330,151 @@ namespace Core
 		GLibrary = nil;
 	}
 
+	namespace
+	{
+		void AddProblem(std::string& Problems, const std::string& Problem)
+		{
+			Problems += Problems.empty() ? Problem : "; " + Problem;
+		}
+	}
+
+	std::string FScaler::ValidateForFallback(const FFrameInput& Frame) const
+	{
+		if (!Frame.Color || !Frame.Output)
+		{
+			return "a texture of the frame has no native Metal resource";
+		}
+		std::string Problems;
+		if (Frame.Color.textureType != MTLTextureType2D || Frame.Color.sampleCount != 1)
+		{
+			AddProblem(Problems, "the scene color is not a plain 2D single-sample texture");
+		}
+		if ((Frame.Output.usage & MTLTextureUsageShaderWrite) == 0 || (int)Frame.Output.width != OutputW_ || (int)Frame.Output.height != OutputH_)
+		{
+			AddProblem(Problems, Format("the output texture is %dx%d with usage %lu, the scaler was built for %dx%d and needs shader write",
+				(int)Frame.Output.width, (int)Frame.Output.height, (unsigned long)Frame.Output.usage, OutputW_, OutputH_));
+		}
+		if (Frame.ViewW < 1 || Frame.ViewH < 1 || Frame.ViewMinX + Frame.ViewW > Frame.Color.width || Frame.ViewMinY + Frame.ViewH > Frame.Color.height)
+		{
+			AddProblem(Problems, Format("the rendered rectangle (%u,%u) %ux%u does not fit the scene color (%lux%lu)", Frame.ViewMinX, Frame.ViewMinY,
+				Frame.ViewW, Frame.ViewH, (unsigned long)Frame.Color.width, (unsigned long)Frame.Color.height));
+		}
+		return Problems;
+	}
+
 	std::string FScaler::Validate(const FFrameInput& Frame) const
 	{
 		if (!Frame.Color || !Frame.Depth || !Frame.Output)
 		{
 			return "a texture of the frame has no native Metal resource";
 		}
+		// Every problem at once: a run in the real game is expensive, one message should say all that is wrong.
+		std::string Problems;
 		auto Tracked = [](id<MTLTexture> Texture) { return !Texture || Texture.hazardTrackingMode != MTLHazardTrackingModeUntracked; };
 		if (!Tracked(Frame.Color) || !Tracked(Frame.Depth) || !Tracked(Frame.Velocity) || !Tracked(Frame.Eye) || !Tracked(Frame.Output))
 		{
 			// The separate command buffer relies on Metal's hazard tracking to be ordered against Unreal's: without it we would race.
-			return "the frame's textures are not hazard tracked: the MetalFX command buffer cannot be ordered against the renderer's";
+			AddProblem(Problems, "the frame's textures are not hazard tracked: the MetalFX command buffer cannot be ordered against the renderer's");
 		}
 		if (Frame.Color.textureType != MTLTextureType2D || Frame.Depth.textureType != MTLTextureType2D || Frame.Color.sampleCount != 1)
 		{
-			return "the scene textures are not plain 2D single-sample textures";
+			AddProblem(Problems, "the scene textures are not plain 2D single-sample textures");
 		}
-		if (Frame.Color.pixelFormat != kColorFormat)
+		if (Frame.Color.pixelFormat != ColorFormat_)
 		{
-			return Format("the scene color format (MTLPixelFormat %d) is not RGBA16F", (int)Frame.Color.pixelFormat);
+			AddProblem(Problems, Format("the scene color format is %s (MTLPixelFormat %d), the scaler was built for %s", FormatName(Frame.Color.pixelFormat),
+				(int)Frame.Color.pixelFormat, FormatName(ColorFormat_)));
 		}
 		if (Frame.Depth.pixelFormat != kDepthFormat)
 		{
-			return Format("the scene depth format (MTLPixelFormat %d) is not Depth32Float_Stencil8", (int)Frame.Depth.pixelFormat);
+			AddProblem(Problems, Format("the scene depth format is %s (MTLPixelFormat %d), not Depth32Float_Stencil8", FormatName(Frame.Depth.pixelFormat), (int)Frame.Depth.pixelFormat));
 		}
 		if (Frame.Output.pixelFormat != kOutputFormat || (int)Frame.Output.width != OutputW_ || (int)Frame.Output.height != OutputH_)
 		{
-			return Format("the output texture is %dx%d (format %d), the scaler was built for %dx%d RGBA16F",
-				(int)Frame.Output.width, (int)Frame.Output.height, (int)Frame.Output.pixelFormat, OutputW_, OutputH_);
+			AddProblem(Problems, Format("the output texture is %dx%d (%s), the scaler was built for %dx%d RGBA16F",
+				(int)Frame.Output.width, (int)Frame.Output.height, FormatName(Frame.Output.pixelFormat), OutputW_, OutputH_));
 		}
 		const MTLTextureUsage NeedOutput = Scaler_.outputTextureUsage;
 		if ((Frame.Output.usage & NeedOutput) != NeedOutput)
 		{
-			return Format("the output texture usage %lu lacks what MetalFX needs (%lu)", (unsigned long)Frame.Output.usage, (unsigned long)NeedOutput);
+			AddProblem(Problems, Format("the output texture usage %lu lacks what MetalFX needs (%lu)", (unsigned long)Frame.Output.usage, (unsigned long)NeedOutput));
 		}
-		if ((Frame.Color.usage & Scaler_.colorTextureUsage) != Scaler_.colorTextureUsage || (Frame.Depth.usage & Scaler_.depthTextureUsage) != Scaler_.depthTextureUsage)
+		if ((Frame.Color.usage & Scaler_.colorTextureUsage) != Scaler_.colorTextureUsage)
 		{
-			return "the scene color or depth texture lacks the usage MetalFX needs";
+			AddProblem(Problems, Format("the scene color usage %lu lacks what MetalFX needs (%lu)", (unsigned long)Frame.Color.usage, (unsigned long)Scaler_.colorTextureUsage));
+		}
+		if ((Frame.Depth.usage & Scaler_.depthTextureUsage) != Scaler_.depthTextureUsage)
+		{
+			AddProblem(Problems, Format("the scene depth usage %lu lacks what MetalFX needs (%lu)", (unsigned long)Frame.Depth.usage, (unsigned long)Scaler_.depthTextureUsage));
 		}
 		if (Frame.ViewW < 1 || Frame.ViewH < 1 || Frame.ViewMinX + Frame.ViewW > Frame.Color.width || Frame.ViewMinY + Frame.ViewH > Frame.Color.height
 			|| Frame.ViewMinX + Frame.ViewW > Frame.Depth.width || Frame.ViewMinY + Frame.ViewH > Frame.Depth.height)
 		{
-			return Format("the rendered rectangle (%u,%u) %ux%u does not fit the scene textures", Frame.ViewMinX, Frame.ViewMinY, Frame.ViewW, Frame.ViewH);
+			AddProblem(Problems, Format("the rendered rectangle (%u,%u) %ux%u does not fit the scene textures (color %lux%lu, depth %lux%lu)", Frame.ViewMinX, Frame.ViewMinY,
+				Frame.ViewW, Frame.ViewH, (unsigned long)Frame.Color.width, (unsigned long)Frame.Color.height, (unsigned long)Frame.Depth.width, (unsigned long)Frame.Depth.height));
 		}
-		return std::string();
+		return Problems;
+	}
+
+	void FScaler::EncodeFallback(id<MTLCommandQueue> Queue, const std::shared_ptr<const FFrameInput>& FramePtr)
+	{
+		@autoreleasepool
+		{
+			const FFrameInput& Frame = *FramePtr;
+			const std::string Problems = ValidateForFallback(Frame);
+			if (!Problems.empty())
+			{
+				// Nothing to stretch: black at least, when the output can be cleared at all.
+				static std::atomic<int> Reports{ 0 };
+				if (Reports.fetch_add(1) < 4)
+				{
+					Log(ELogLevel::Warning, Format("MetalFX scaler %u cannot even stretch a frame: %s", Id_, Problems.c_str()));
+				}
+				ClearTexture(Queue, Frame.Output, Frame.KeepAlive);
+				return;
+			}
+
+			const uint32_t ViewW = std::min<uint32_t>(Frame.ViewW, (uint32_t)Frame.Color.width - Frame.ViewMinX);
+			const uint32_t ViewH = std::min<uint32_t>(Frame.ViewH, (uint32_t)Frame.Color.height - Frame.ViewMinY);
+			FAstraParams Params;
+			std::memset(&Params, 0, sizeof(Params));
+			Params.ViewRectMin[0] = Frame.ViewMinX;
+			Params.ViewRectMin[1] = Frame.ViewMinY;
+			Params.ViewSize[0] = ViewW;
+			Params.ViewSize[1] = ViewH;
+
+			id<MTLCommandBuffer> CommandBuffer = [Queue commandBuffer];
+			CommandBuffer.label = @"AstraMetalFX fallback";
+			id<MTLComputeCommandEncoder> Encoder = [CommandBuffer computeCommandEncoder];
+			Encoder.label = @"AstraMetalFX fallback upscale";
+			[Encoder setComputePipelineState:UpscalePipeline_];
+			[Encoder setTexture:Frame.Color atIndex:0];
+			[Encoder setTexture:Frame.Output atIndex:1];
+			[Encoder setBytes:&Params length:sizeof(Params) atIndex:0];
+			[Encoder dispatchThreads:MTLSizeMake((NSUInteger)OutputW_, (NSUInteger)OutputH_, 1) threadsPerThreadgroup:MTLSizeMake(16, 16, 1)];
+			[Encoder endEncoding];
+
+			GInFlight.fetch_add(1);
+			std::shared_ptr<FScaler> Keep = shared_from_this();
+			std::shared_ptr<const FFrameInput> KeepFrame = FramePtr;   // the block owns the retained textures until the GPU is done with them
+			[CommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> Done)
+			{
+				{
+					std::lock_guard<std::mutex> Lock(Keep->Mutex_);
+					if (Done.status == MTLCommandBufferStatusError)
+					{
+						++Keep->Timings_.Errors;
+					}
+					else
+					{
+						++Keep->Timings_.Fallbacks;
+					}
+				}
+				(void)KeepFrame;
+				GInFlight.fetch_sub(1);
+			}];
+			[CommandBuffer commit];
+		}
 	}
 
 	void FScaler::Encode(id<MTLCommandQueue> Queue, const std::shared_ptr<const FFrameInput>& FramePtr)
@@ -365,6 +500,16 @@ namespace Core
 					Frame.ViewW, Frame.ViewH, OutputW_, OutputH_, ContentW, ContentH));
 			}
 
+			if (!bLoggedFirstFrame_)
+			{
+				bLoggedFirstFrame_ = true;
+				Log(ELogLevel::Log, Format("MetalFX scaler %u first frame: scene color %s %lux%lu, depth %s %lux%lu, velocity %s, output %s %lux%lu, rendered %ux%u at (%u,%u)",
+					Id_, FormatName(Frame.Color.pixelFormat), (unsigned long)Frame.Color.width, (unsigned long)Frame.Color.height,
+					FormatName(Frame.Depth.pixelFormat), (unsigned long)Frame.Depth.width, (unsigned long)Frame.Depth.height,
+					Frame.Velocity ? FormatName(Frame.Velocity.pixelFormat) : "none", FormatName(Frame.Output.pixelFormat),
+					(unsigned long)Frame.Output.width, (unsigned long)Frame.Output.height, Frame.ViewW, Frame.ViewH, Frame.ViewMinX, Frame.ViewMinY));
+			}
+
 			// MetalFX wants the rendered rectangle at the corner of its input textures: when the host's does not start there (a
 			// letterboxed view) color and depth are copied to textures of our own first.
 			id<MTLTexture> ColorInput = Frame.Color;
@@ -374,7 +519,7 @@ namespace Core
 			{
 				if (!ColorCopy_ || !DepthCopy_)
 				{
-					ColorCopy_ = MakeTexture(Frame.Color.device, kColorFormat, (NSUInteger)OutputW_, (NSUInteger)OutputH_, MTLTextureUsageShaderRead, @"AstraMetalFX color copy");
+					ColorCopy_ = MakeTexture(Frame.Color.device, ColorFormat_, (NSUInteger)OutputW_, (NSUInteger)OutputH_, MTLTextureUsageShaderRead, @"AstraMetalFX color copy");
 					DepthCopy_ = MakeTexture(Frame.Color.device, kDepthFormat, (NSUInteger)OutputW_, (NSUInteger)OutputH_, Scaler_.depthTextureUsage, @"AstraMetalFX depth copy");
 					if (!ColorCopy_ || !DepthCopy_)
 					{

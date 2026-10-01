@@ -9,6 +9,9 @@
 //  astra_exposure  MetalFX wants the exposure as a 1x1 R16Float texture: the tonemapper's global exposure, from the eye
 //                  adaptation texture Unreal gives to third party upscalers (x = the exposure applied after the upscale).
 //  astra_debug     Optional visualisations written into the output (r.AstraMetalFX.Debug): motion vectors, static/dynamic.
+//  astra_upscale   The fallback: a bilinear stretch of the rendered rectangle to the output, no history. What a frame gets when
+//                  MetalFX cannot process it (the scene color is not in the format the scaler was built for, the scaler failed):
+//                  never black, never uninitialised memory.
 //
 // The parameter block is mirrored by FAstraMotionParams in AstraMetalFXBridge.mm: change both together.
 
@@ -92,6 +95,21 @@ kernel void astra_exposure(
 	float E = (P.Flags & 4u) != 0u ? EyeTex.read(uint2(0, 0)).x : P.ExposureFallback;
 	if (!(E > 0.0)) E = 1.0;
 	ExposureOut.write(half4(half(clamp(E, 1e-4, 6e4)), 0.0h, 0.0h, 0.0h), uint2(0, 0));
+}
+
+// The fallback upscale (see the header): any float-readable color format, bilinear, the rendered rectangle to the whole output.
+kernel void astra_upscale(
+	texture2d<float, access::sample> ColorTex [[texture(0)]],
+	texture2d<half, access::write> Out [[texture(1)]],
+	constant AstraParams& P [[buffer(0)]],
+	uint2 gid [[thread_position_in_grid]])
+{
+	if (gid.x >= Out.get_width() || gid.y >= Out.get_height()) return;
+	constexpr sampler Bilinear(coord::normalized, address::clamp_to_edge, filter::linear);
+	float2 UV = (float2(gid) + 0.5) / float2(Out.get_width(), Out.get_height());
+	float2 Source = float2(P.ViewRectMin) + UV * float2(P.ViewSize);
+	float3 Color = ColorTex.sample(Bilinear, Source / float2(ColorTex.get_width(), ColorTex.get_height())).rgb;
+	Out.write(half4(half3(clamp(Color, 0.0, 60000.0)), 1.0h), gid);
 }
 
 // Writes a visualisation into the upscaler's output instead of the upscaled image.

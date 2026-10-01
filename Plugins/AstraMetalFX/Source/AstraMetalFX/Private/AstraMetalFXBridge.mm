@@ -79,6 +79,27 @@ namespace AstraMetalFX
 		}
 	}
 
+	bool SupportsColorFormat(uint32 ColorFormat)
+	{
+		return Core::SupportsColorFormat((MTLPixelFormat)ColorFormat);
+	}
+
+	uint32 DefaultColorFormat()
+	{
+		return (uint32)MTLPixelFormatRGBA16Float;
+	}
+
+	FString ColorFormatName(uint32 ColorFormat)
+	{
+		switch ((MTLPixelFormat)ColorFormat)
+		{
+		case MTLPixelFormatRGBA16Float: return TEXT("RGBA16F");
+		case MTLPixelFormatRG11B10Float: return TEXT("R11G11B10F");
+		case MTLPixelFormatRGB10A2Unorm: return TEXT("RGB10A2");
+		default: return FString::Printf(TEXT("MTLPixelFormat %u"), ColorFormat);
+		}
+	}
+
 	FString QueryUnsupportedReason()
 	{
 		@autoreleasepool
@@ -92,8 +113,9 @@ namespace AstraMetalFX
 		}
 	}
 
-	FScalerContext::FScalerContext(FIntPoint InOutputSize)
+	FScalerContext::FScalerContext(FIntPoint InOutputSize, uint32 InColorFormat)
 		: OutputSize(InOutputSize)
+		, ColorFormat(InColorFormat)
 	{
 	}
 
@@ -119,11 +141,12 @@ namespace AstraMetalFX
 			Result.AverageMs = Timings.AverageMs;
 			Result.Frames = Timings.Frames;
 			Result.Errors = Timings.Errors;
+			Result.Fallbacks = Timings.Fallbacks;
 		}
 		return Result;
 	}
 
-	TSharedPtr<FScalerContext, ESPMode::ThreadSafe> CreateScalerContext(FIntPoint OutputSize, FString& OutError)
+	TSharedPtr<FScalerContext, ESPMode::ThreadSafe> CreateScalerContext(FIntPoint OutputSize, uint32 ColorFormat, FString& OutError)
 	{
 		@autoreleasepool
 		{
@@ -135,14 +158,14 @@ namespace AstraMetalFX
 			}
 
 			std::string Error;
-			std::shared_ptr<Core::FScaler> Scaler = Core::FScaler::Create(GetDevice(), OutputSize.X, OutputSize.Y, Error);
+			std::shared_ptr<Core::FScaler> Scaler = Core::FScaler::Create(GetDevice(), OutputSize.X, OutputSize.Y, (MTLPixelFormat)ColorFormat, Error);
 			if (!Scaler)
 			{
 				OutError = ToFString(Error);
 				return nullptr;
 			}
 
-			TSharedPtr<FScalerContext, ESPMode::ThreadSafe> Context = MakeShareable(new FScalerContext(OutputSize));
+			TSharedPtr<FScalerContext, ESPMode::ThreadSafe> Context = MakeShareable(new FScalerContext(OutputSize, ColorFormat));
 			Context->Impl = MakeShared<FScalerContext::FImpl, ESPMode::ThreadSafe>();
 			Context->Impl->Scaler = Scaler;
 			Context->MinInputFraction = 1.0f / Scaler->MaxScale();
@@ -171,22 +194,32 @@ namespace AstraMetalFX
 			Keep->Textures[3] = Frame.EyeAdaptation;
 			Keep->Textures[4] = Frame.Output;
 
-			// A scaler that cannot run still owes the renderer a valid image this frame (frames already in the pipeline were
-			// set up before the failure was noticed): black, until the game view is switched to TSR.
-			auto ClearInstead = [this, &Frame, &Native, Keep]()
+			// A frame the scaler cannot process (another scene color format than it was built for, a scaler that failed, frames already in
+			// the pipeline when that was noticed) still owes the renderer a valid image: the core's bilinear stretch of the rendered
+			// rectangle, black if even that is impossible. The host switches the game view to TSR soon after.
+			auto FallbackInstead = [this, &Frame, &Native, Keep]()
 			{
-				id<MTLTexture> Output = Native(Frame.Output);
-				if (Output)
+				std::shared_ptr<Core::FFrameInput> Stretch = std::make_shared<Core::FFrameInput>();
+				Stretch->Color = Native(Frame.SceneColor);
+				Stretch->Output = Native(Frame.Output);
+				Stretch->ViewMinX = (uint32_t)FMath::Max(Frame.ViewRect.Min.X, 0);
+				Stretch->ViewMinY = (uint32_t)FMath::Max(Frame.ViewRect.Min.Y, 0);
+				Stretch->ViewW = (uint32_t)FMath::Max(Frame.ViewRect.Width(), 0);
+				Stretch->ViewH = (uint32_t)FMath::Max(Frame.ViewRect.Height(), 0);
+				Stretch->KeepAlive = Keep;
+				if (Stretch->Output)
 				{
-					GetIMetalDynamicRHI()->RHIRunOnQueue([Output, Keep](MTL::CommandQueue* Queue)
+					std::shared_ptr<Core::FScaler> Scaler = Impl->Scaler;
+					std::shared_ptr<const Core::FFrameInput> ConstStretch = Stretch;
+					GetIMetalDynamicRHI()->RHIRunOnQueue([Scaler, ConstStretch](MTL::CommandQueue* Queue)
 					{
-						Core::ClearTexture((__bridge id<MTLCommandQueue>)Queue, Output, Keep);
+						Scaler->EncodeFallback((__bridge id<MTLCommandQueue>)Queue, ConstStretch);
 					}, /*bWaitForSubmission=*/false);
 				}
 			};
-			if (Impl->Scaler->Failed())
+			if (Frame.bFallback || Impl->Scaler->Failed())
 			{
-				ClearInstead();
+				FallbackInstead();
 				return;
 			}
 
@@ -212,7 +245,7 @@ namespace AstraMetalFX
 			if (!Problem.empty())
 			{
 				Impl->Scaler->Fail(Problem);
-				ClearInstead();
+				FallbackInstead();
 				return;
 			}
 
