@@ -123,6 +123,7 @@ private:
 	FVector LookDir = FVector::ForwardVector;
 	bool bCaptainSeen = false;
 	float JumpGraceS = 0.f;           // after a jump (a lift, a fade) the picture is still coming back: bodies are made in view, in a few frames
+	int32 MaxBodiesNow() const;
 	void ManageBodies();
 	void PrewarmPool(float DeltaTime);
 	bool CanAppearUnseen(const FVector& Where) const;

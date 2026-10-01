@@ -168,8 +168,9 @@ più; l'intera nave costa meno di 0,3 ms; lo stesso seme dà lo stesso giorno. `
 nessuno appare davanti al Capitano, i corpi pensano e stanno dov'è la persona, la lista delle porte è corta, il gestore è leggero.
 
 Comandi nel gioco: `astra.life.info` (orologio, chi fa cosa, corpi, costo), `astra.life.who <numero | parte del nome>` (una
-persona, cosa fa e ricorda), `astra.life.hour`, `astra.life.scale`; variabili `astra.life.walk_natural` / `jog_natural` (velocità
-dei cicli di camminata: se i piedi pattinano), `astra.life.lane_cm`, `astra.life.shadow_m`.
+persona, cosa fa e ricorda), `astra.life.hour`, `astra.life.scale`; variabili `astra.life.max_bodies` (-1: il numero del file; 0: nessun corpo, gira solo la simulazione: per vedere cosa costano),
+`astra.life.walk_natural` / `jog_natural` (velocità dei cicli di camminata: se i piedi pattinano), `astra.life.lane_cm`,
+`astra.life.shadow_m`.
 
 ## 7. Integrazione (cosa deve fare il lead)
 

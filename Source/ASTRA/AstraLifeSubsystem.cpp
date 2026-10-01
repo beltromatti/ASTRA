@@ -26,6 +26,9 @@ namespace
 
 	UAstraLifeSubsystem* LifeOf(UWorld* W) { return W ? W->GetSubsystem<UAstraLifeSubsystem>() : nullptr; }
 
+	TAutoConsoleVariable<int32> CVarMaxBodies(TEXT("astra.life.max_bodies"), -1,
+		TEXT("VITA: the most bodies at once (-1: the life file's number; 0: none, only the simulation runs): to see what the bodies cost"));
+
 	FAutoConsoleCommandWithWorld CmdInfo(TEXT("astra.life.info"), TEXT("VITA: the clock, who is doing what, the bodies, what the simulation costs"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
 		{
@@ -219,11 +222,17 @@ void UAstraLifeSubsystem::Tick(float DeltaTime)
 	SET_DWORD_STAT(STAT_AstraLifeBodyCount, NumActiveBodies);
 }
 
+int32 UAstraLifeSubsystem::MaxBodiesNow() const
+{
+	const int32 Override = CVarMaxBodies.GetValueOnGameThread();
+	return MapPtr.IsValid() ? (Override >= 0 ? FMath::Min(Override, 200) : MapPtr->Vis.MaxBodies) : 0;
+}
+
 void UAstraLifeSubsystem::PrewarmPool(float DeltaTime)
 {
 	// The pool is made one body at a time, a few times a second, while the Captain is still on the bridge: nobody sees a body being spawned,
 	// no frame carries more than one, and a lift's arrival finds them ready. A frame that is already long (a level streaming, a hitch) waits.
-	if (!MapPtr.IsValid() || (!FApp::CanEverRender() && !bTestCaptain) || Pool.Num() >= MapPtr->Vis.MaxBodies || !GetWorld())
+	if (!MapPtr.IsValid() || (!FApp::CanEverRender() && !bTestCaptain) || Pool.Num() >= MaxBodiesNow() || !GetWorld())
 	{
 		return;
 	}
@@ -507,7 +516,7 @@ AAstraLifeBody* UAstraLifeSubsystem::TakeBody(bool bFemale)
 	{
 		return Any;
 	}
-	if (Pool.Num() >= MapPtr->Vis.MaxBodies + 4 || !GetWorld())
+	if (Pool.Num() >= MaxBodiesNow() + 4 || !GetWorld())
 	{
 		return nullptr;
 	}
@@ -557,6 +566,11 @@ void UAstraLifeSubsystem::ManageBodies()
 	SCOPE_CYCLE_COUNTER(STAT_AstraLifeBodies);
 	if ((!FApp::CanEverRender() && !bTestCaptain) || !MapPtr.IsValid())
 	{
+		return;
+	}
+	if (MaxBodiesNow() <= 0)
+	{
+		ReleaseAllBodies();                              // astra.life.max_bodies 0: the simulation alone
 		return;
 	}
 	FVector Feet = TestFeet;
@@ -634,7 +648,7 @@ void UAstraLifeSubsystem::ManageBodies()
 	int32 Traced = 0;
 	for (const FCand& C : Cand)
 	{
-		if (Want.Num() >= Map.Vis.MaxBodies)
+		if (Want.Num() >= MaxBodiesNow())
 		{
 			break;
 		}
