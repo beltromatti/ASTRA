@@ -130,6 +130,7 @@ class Kind:
     take: bool                  # the net voices it, so the crew's report turn does not get it (Price coordinates, he does not echo)
     wing: bool = False          # it concerns Eagle's wing: the net answers fast, and only while a wing exists
     call: bool = False          # it must be called by someone (a loss, a torpedo run, the deck's milestones): in a look that holds one, the net has no way to stay quiet
+                                # (a wingman down, and the Harpies splashed when no wing could have called them, are decided by `_called_aloud`)
 
 
 # These are the game's event templates (AstraBattleSubsystem.cpp, AstraWarCraft.cpp); anything else goes to the crew as it always did. A new template is
@@ -240,7 +241,7 @@ WHEN YOU SPEAK
 - Only when something happens to you or to your people, or when the Captain speaks to you. Silence is normal and routine news needs no voice: then call stay_quiet. But a
   loss, a kill and a torpedo run are never left to the boards: they are always called, once, by the one they belong to.
 - One voice for one piece of news, the person it concerns. A squadron's losses and kills are its leader's: the leader of the fighters calls the Harpies that were splashed in
-  a few words ("Splash three, one left"), and nobody else on the bridge reports that news, so a kill the net has not called yet is called now; a torpedo run is the bomber
+  a few words ("Splash [n], [n] left": the numbers are the news's), and nobody else on the bridge reports that news, so a kill the net has not called yet is called now; a torpedo run is the bomber
   leader's; the deck's milestones are the Chief of the Deck's, each called once in a few words with the number the Captain can use: a squadron launched (how many, on what),
   recovered (how many aboard, the rearm time), ready again (his cue to launch it again); the boards show them, but nobody reads boards in a fight: the Chief's voice is how the
   Captain knows the deck has turned. The CAG does not take a leader's news from him: she speaks when it is
@@ -298,25 +299,26 @@ said. Most calls keep nothing. What is kept comes back to you below, in "What th
 Each time you are called you read the net and the boards and answer ONLY with tool calls, no other text: `say` for the voices, `mission` and `remember` when they are called
 for, `stay_quiet` when the net stays quiet."""
 
-# what a radio line sounds like in the Captain's language, and what it must not be (the model imitates what it sees)
+# what a radio line sounds like in the Captain's language, and what it must not be (the model imitates what it sees: no fact in an example that could be copied; what is in
+# [brackets] is filled from the news and the boards, and no example ends with a tail the others could share)
 _RADIO = {
-    "it": ('"Alpha Lead: due Falcon a terra, Rook e Jinx. Alpha tiene la pattuglia, sei in volo." · "Bravo Lead: sei siluri in acqua sull\'Acheron, i camion rientrano." · '
-           '"Deck: Alpha a bordo, sei su otto. Riarmo in sessanta secondi." · "Alpha Lead: tre abbattuti, ne restano due."',
+    "it": ('"Alpha Lead: due Falcon a terra, [call sign] e [call sign]. [n] in volo." · "Bravo Lead: [n] siluri in acqua sul [target], i camion rientrano." · '
+           '"Deck: Alpha a bordo, [n] su [n]. Riarmo in [n] secondi." · "Alpha Lead: [n] abbattuti, ne restano [n]."',
            '"Ricevuto, Capitano." da solo · "La squadriglia Alpha ha subito la perdita di due velivoli nel corso dell\'ingaggio." · ripetere al Capitano il suo stesso ordine · la stessa notizia due volte · '
-           'chiudere ogni chiamata con la stessa coda ("quattro Falcon tengono la pattuglia")'),
-    "en": ('"Alpha Lead: two Falcons down, Rook and Jinx. Alpha holds the patrol, six up." · "Bravo Lead: six fish away on the Acheron, the trucks are coming home." · '
-           '"Deck: Alpha is aboard, six of eight. Rearm in sixty." · "Alpha Lead: splash three, two left."',
+           'chiudere ogni chiamata con la stessa coda ("Alpha tiene la pattuglia") · un nome, un numero o un bersaglio che le notizie e le lavagne non danno'),
+    "en": ('"Alpha Lead: two Falcons down, [call sign] and [call sign]. [n] up." · "Bravo Lead: [n] fish away on the [target], the trucks are coming home." · '
+           '"Deck: Alpha is aboard, [n] of [n]. Rearm in [n]." · "Alpha Lead: splash [n], [n] left."',
            '"Understood, Captain." alone · "Alpha Squadron has suffered the loss of two aircraft during the engagement." · repeating the Captain\'s own order back to him · the same news twice · '
-           'ending every call with the same tail ("four Falcons holding the patrol")'),
-    "es": ('"Alpha Lead: dos Falcon abajo, Rook y Jinx. Alpha mantiene la patrulla, seis en el aire." · "Bravo Lead: seis torpedos en el agua sobre el Acheron, los camiones vuelven." · '
-           '"Deck: Alpha a bordo, seis de ocho. Rearme en sesenta segundos."',
-           '"Entendido, Capitán." solo · un parte largo y formal · repetir al Capitán su propia orden'),
-    "fr": ('"Alpha Lead : deux Falcon perdus, Rook et Jinx. Alpha tient la patrouille, six en l\'air." · "Bravo Lead : six torpilles à l\'eau sur l\'Acheron, les camions rentrent." · '
-           '"Deck : Alpha à bord, six sur huit. Réarmement en soixante secondes."',
-           '"Compris, Capitaine." seul · un compte rendu long et formel · répéter au Capitaine son propre ordre'),
-    "de": ('"Alpha Lead: zwei Falcon runter, Rook und Jinx. Alpha hält die Patrouille, sechs oben." · "Bravo Lead: sechs Torpedos im Wasser auf die Acheron, die Laster kommen heim." · '
-           '"Deck: Alpha an Bord, sechs von acht. Aufmunitionieren in sechzig Sekunden."',
-           '"Verstanden, Kapitän." allein · eine lange, förmliche Meldung · dem Kapitän seinen eigenen Befehl wiederholen'),
+           'ending every call with the same tail ("Alpha holds the patrol") · a name, a number or a target that the news and the boards do not give'),
+    "es": ('"Alpha Lead: dos Falcon abajo, [call sign] y [call sign]. [n] en el aire." · "Bravo Lead: [n] torpedos en el agua sobre el [target], los camiones vuelven." · '
+           '"Deck: Alpha a bordo, [n] de [n]. Rearme en [n] segundos."',
+           '"Entendido, Capitán." solo · un parte largo y formal · repetir al Capitán su propia orden · cerrar cada llamada con la misma cola · un nombre o un número que no dan las noticias'),
+    "fr": ('"Alpha Lead : deux Falcon perdus, [call sign] et [call sign]. [n] en l\'air." · "Bravo Lead : [n] torpilles à l\'eau sur le [target], les camions rentrent." · '
+           '"Deck : Alpha à bord, [n] sur [n]. Réarmement en [n] secondes."',
+           '"Compris, Capitaine." seul · un compte rendu long et formel · répéter au Capitaine son propre ordre · finir chaque appel par la même queue · un nom ou un chiffre que les nouvelles ne donnent pas'),
+    "de": ('"Alpha Lead: zwei Falcon runter, [call sign] und [call sign]. [n] oben." · "Bravo Lead: [n] Torpedos im Wasser auf die [target], die Laster kommen heim." · '
+           '"Deck: Alpha an Bord, [n] von [n]. Aufmunitionieren in [n] Sekunden."',
+           '"Verstanden, Kapitän." allein · eine lange, förmliche Meldung · dem Kapitän seinen eigenen Befehl wiederholen · jeden Ruf mit demselben Schwanz beenden · ein Name oder eine Zahl, die die Nachrichten nicht geben'),
 }
 
 
@@ -354,6 +356,11 @@ def _pct(v: Any) -> str:
         return f"{min(100.0, float(v)):.0f}%"
     except (TypeError, ValueError):
         return "?"
+
+
+def _order_text(a: dict[str, Any], r: dict[str, Any]) -> str:
+    """An order and what the console answered, for the one who gave it to read."""
+    return f"mission({json.dumps({k: v for k, v in a.items() if k != 'reason'}, ensure_ascii=False)}) {'ok' if r.get('ok') else 'FAILED'}: {r.get('detail', '')}"
 
 
 class FlightMinds:
@@ -524,11 +531,20 @@ class FlightMinds:
             self._note("(on the boards)", t)
             return False                                    # Eagle's news with no wing to hear it: Price and the XO have it
         take = k.take and (not k.wing or self.wing)
-        self._events.append(Ev(self.clock(), t, k.name, take, k.wing, call=take and (k.call or (k.name == "wing" and "is down" in t.lower()))))
+        self._events.append(Ev(self.clock(), t, k.name, take, k.wing, call=take and self._called_aloud(k, t)))
         if take:
             self.stats["taken"] += 1
         self._events = self._events[-16:]
         return take
+
+    def _called_aloud(self, k: Kind, text: str) -> bool:
+        """Is this news called by a voice (the look that holds it has no way to stay quiet)? The squadron news the table marks; the wing checking in and a wingman who is
+        down; the Harpies splashed when nobody on a wing could have called them already (on the bridge the news arrives once, and only the net voices it: with a wing, the
+        wingman's own "splash one" may have said it, and the net may stay quiet)."""
+        if k.call:
+            return True
+        low = text.lower()
+        return (k.name == "wing" and ("is down" in low or "joined" in low)) or (k.name == "splash" and not self.wing)
 
     def _wing_event(self, text: str) -> None:
         """`flight: Eagle's wing joined ...` forms the wing; the radio names of its two pilots become Eagle 2 and Eagle 3. `flight: Eagle 3 is down ...` takes that pilot
@@ -627,7 +643,7 @@ class FlightMinds:
     async def _pulse(self, events: list[Ev], inbox: list[Message], why: list[str], state: dict[str, Any]) -> None:
         t0 = time.perf_counter()
         rec: dict[str, Any] = {"t": round(self.clock() - self.t0, 1), "why": why, "tools": [], "lines": 0, "ok": 0, "failed": 0, "cost": 0.0, "latency": 0.0,
-                               "first_call": None, "tokens_in": 0, "tokens_out": 0, "cached": 0, "error": "", "events": len(events), "captain": bool(inbox)}
+                               "first_call": None, "tokens_in": 0, "tokens_out": 0, "cached": 0, "error": "", "events": len(events), "captain": bool(inbox), "quiet": False}
         done = False
         me = asyncio.current_task()
         ending = any(e.kind == "eagle" and any(s in e.text.lower() for s in _EAGLE_END) for e in events)     # the Captain's Falcon is gone: the wing is over after this look
@@ -763,8 +779,9 @@ class FlightMinds:
         lang_name = LANG_NAMES.get(lang, lang)
         must = any(e.call for e in events)
         parts.append(f"You are looking now because: {'; '.join(why)}.\nThe Captain's language is {lang_name}: everything said aloud is in {lang_name} (names in English); the Captain "
-                     f"is \"{CAPTAIN_WORD.get(lang, 'Captain')}\".\nWhat a good radio line sounds like: {good}\nWhat it is not: {bad}\n"
-                     + ("This look holds news that is called aloud (a loss, a torpedo run, a recovery, a rearm, a wingman down): the one it happened to, or the one who saw it, says it in a few words "
+                     f"is \"{CAPTAIN_WORD.get(lang, 'Captain')}\".\nWhat a good radio line sounds like (what is in [brackets] comes from the news and the boards here; nothing else "
+                     f"in these examples is a fact): {good}\nWhat it is not: {bad}\n"
+                     + ("This look holds news that is called aloud (a loss, a kill, a torpedo run, a recovery, a rearm, a wingman down): the one it happened to, or the one who saw it, says it in a few words "
                         "(the boards do not say it for them: the Captain hears a voice, not a board). Decide who and what: `say`, with `mission` if an order goes with it, `remember` if it is worth keeping."
                         if must else "Decide: speak with `say`, order with `mission`, keep a memory with `remember`, or call `stay_quiet`."))
         return "\n\n".join(parts)
@@ -796,6 +813,7 @@ class FlightMinds:
             elif call.name == "remember":
                 self._remember(a)
             elif call.name == "stay_quiet":
+                rec["quiet"] = True
                 self._note("(the net)", f"stayed quiet: {str(a.get('reason', ''))[:120]}")
 
         msgs = [{"role": "system", "content": self.system}, {"role": "user", "content": user}]
@@ -817,7 +835,11 @@ class FlightMinds:
             self._account(rec, new)
         failed = [(n, a, r) for n, a, r in results if not r.get("ok")]
         if failed:
-            await asyncio.wait_for(self._round2(msgs, results, failed, rec, by_captain, state, lang), timeout=ROUND2_TIMEOUT_S)
+            results += await asyncio.wait_for(self._round2(msgs, results, failed, rec, by_captain, state, lang), timeout=ROUND2_TIMEOUT_S)
+        if by_captain and not rec["lines"] and not rec["quiet"]:
+            # the Captain spoke to the net and nobody answered him (an order given and not a word said, a correction and not a word said, or nothing at all): the net answers
+            # a man who calls it; only a deliberate silence (his words were not for the net) leaves him unanswered
+            await asyncio.wait_for(self._answer(msgs, results, rec, state, lang), timeout=ROUND2_TIMEOUT_S)
 
     @staticmethod
     async def _collect(pending: list[tuple[str, dict[str, Any], asyncio.Task]]) -> list[tuple[str, dict[str, Any], dict[str, Any]]]:
@@ -839,16 +861,32 @@ class FlightMinds:
         rec["asked_again"] = True
 
     async def _round2(self, msgs: list[dict[str, Any]], results: list[tuple[str, dict[str, Any], dict[str, Any]]],
-                      failed: list[tuple[str, dict[str, Any], dict[str, Any]]], rec: dict[str, Any], by_captain: bool, state: dict[str, Any], lang: str) -> None:
-        """An order was refused (a contact that is not on the plot, a squadron that is rearming, an authority): the one who gave it reads why and answers once: a line to the
-        Captain, and a corrected order if there is a way."""
-        notes = "\n".join(f"- mission({json.dumps({k: v for k, v in a.items() if k != 'reason'}, ensure_ascii=False)}) {'ok' if r.get('ok') else 'FAILED'}: {r.get('detail', '')}"
-                          for n, a, r in results)
+                      failed: list[tuple[str, dict[str, Any], dict[str, Any]]], rec: dict[str, Any], by_captain: bool, state: dict[str, Any],
+                      lang: str) -> list[tuple[str, dict[str, Any], dict[str, Any]]]:
+        """An order was refused (a contact that is not on the plot, a squadron that is rearming, an authority): the one who gave it reads why and answers once: a line to
+        the Captain, and a corrected order if there is a way. Returns the corrected orders' results."""
+        notes = "\n".join(f"- {_order_text(a, r)}" for n, a, r in results)
         calls = [{"id": f"m{i}", "type": "function", "function": {"name": n, "arguments": json.dumps(a, ensure_ascii=False)}} for i, (n, a, _) in enumerate(results)]
         follow = list(msgs) + [{"role": "assistant", "content": None, "tool_calls": calls}]
         follow += [{"role": "tool", "tool_call_id": f"m{i}", "content": ("ok: " if r.get("ok") else "FAILED: ") + str(r.get("detail", ""))} for i, (_, _, r) in enumerate(results)]
-        follow.append({"role": "user", "content": f"[The order did not go through (above).\n{notes}\nThe one who gave it tells the Captain in one line what happened and what they suggest, "
-                                                  "with say; if there is a way to do what was meant, correct the order with mission; otherwise call stay_quiet.]"})
+        follow.append({"role": "user", "content": f"[The order did not go through (above).\n{notes}\nThe one who gave it tells the Captain in one line what happened and what they "
+                                                  "suggest, with say, and if there is a way to do what was meant, corrects the order with mission in the same turn; otherwise "
+                                                  "call stay_quiet.]"})
+        return await self._follow_up(follow, rec, by_captain, state, lang)
+
+    async def _answer(self, msgs: list[dict[str, Any]], results: list[tuple[str, dict[str, Any], dict[str, Any]]], rec: dict[str, Any], state: dict[str, Any],
+                      lang: str) -> list[tuple[str, dict[str, Any], dict[str, Any]]]:
+        """The Captain spoke to the net and has heard no voice (an order carried out without a word, a correction without a word, an empty answer): the one he spoke to
+        answers him now, knowing what the console did."""
+        done = ("What has been done so far:\n" + "\n".join(f"- {_order_text(a, r)}" for n, a, r in results) + "\n") if results else ""
+        follow = list(msgs) + [{"role": "user", "content": f"[The Captain spoke to the net and has not heard a voice answer him. {done}The person he spoke to (or whose squadron the order is "
+                                                           "for) answers him now, in one line, with say: what they are doing, or what they know. If his words were not for the net at "
+                                                           "all, call stay_quiet.]"}]
+        return await self._follow_up(follow, rec, True, state, lang)
+
+    async def _follow_up(self, follow: list[dict[str, Any]], rec: dict[str, Any], by_captain: bool, state: dict[str, Any],
+                         lang: str) -> list[tuple[str, dict[str, Any], dict[str, Any]]]:
+        """One more turn, with the voice, the order and silence at hand: its lines are said (the Captain's answers), its orders sent, its results returned."""
         present = set(self.present(state))
         again: list[tuple[str, dict[str, Any], asyncio.Task]] = []
 
@@ -859,10 +897,14 @@ class FlightMinds:
                 await self._say(a, lang, by_captain, present, rec)
             elif call.name == "mission":
                 again.append(("mission", a, asyncio.ensure_future(self._mission(a, by_captain, state))))
+            elif call.name == "stay_quiet":
+                rec["quiet"] = True
 
         comp = await models.chat(self.llm, ROLE, messages=follow, tools=[SAY, MISSION, STAY_QUIET], tool_choice="auto", on_tool_call=on_call, max_tokens=240)
         self._count(rec, comp)
-        self._account(rec, await self._collect(again), second=True)
+        new = await self._collect(again)
+        self._account(rec, new, second=True)
+        return new
 
     @staticmethod
     def _count(rec: dict[str, Any], comp: Completion) -> None:

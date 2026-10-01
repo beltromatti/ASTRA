@@ -433,6 +433,17 @@ class Pulses(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("holds news that is called aloud", self.bed.llm.requests[4]["messages"][-1]["content"])
         self.assertIn("call `stay_quiet`", self.bed.llm.requests[4]["messages"][-1]["content"])
 
+    async def test_the_kills_are_called_on_the_bridge_and_left_to_the_wingman_with_a_wing(self) -> None:
+        self.bed.llm.say(("say", {"speaker": "alpha_lead", "text": "Splash tre, ne resta uno.", "tone": "focused"}))
+        await self.news(SPLASH)
+        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[0]["tools"]}, {"say", "mission", "remember"})        # nobody else could have called them
+        self.bed.at(fm.MIN_GAP_S)
+        await self.news(WING)                                                              # the wing checks in (called aloud: they say they are there)
+        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[1]["tools"]}, {"say", "mission", "remember"})
+        self.bed.at(fm.MIN_GAP_S)
+        await self.news(SPLASH)                                                            # in a cockpit the wingman's own "splash one" may have said it already
+        self.assertIn("stay_quiet", {t["function"]["name"] for t in self.bed.llm.requests[2]["tools"]})
+
     async def test_a_wingman_down_is_called_and_the_wings_other_news_is_not(self) -> None:
         self.f.on_event(WING)
         self.bed.llm.say(("say", {"speaker": "alpha_3", "text": "Eagle 2 è a terra, la capsula è fuori.", "tone": "urgent"}))
@@ -637,6 +648,60 @@ class Pulses(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([l["text"] for l in self.bed.lines], ["Capitano, il T-77 non è sul piano: scorto il Vigilant?"])    # the line composed before the answer ("Scorto il T-77") is never said
         self.assertEqual(self.f.pulses[-1]["failed"], 1)
         self.assertEqual(self.f.pulses[-1]["held"], 1)
+
+    async def test_a_captain_who_gave_an_order_and_heard_nothing_is_answered(self) -> None:
+        """The order went through and nobody said a word: he spoke to the net, the net answers (once more asked, with what the console said)."""
+        self.bed.llm.replies = [[("mission", {"by": "bravo_lead", "squadron": "bravo", "type": "strike", "target": "T-21"})],
+                                [("say", {"speaker": "bravo_lead", "text": "Bravo va sull'Acheron, Capitano.", "tone": "focused"})]]
+        self.f.captain_to_net("Bravo Lead, attacca l'Acheron", "it")
+        self.f.feed(self.st)
+        await self.bed.settle()
+        self.assertEqual(len(self.bed.llm.requests), 2)
+        second = self.bed.llm.requests[1]
+        self.assertIn("has not heard a voice answer him", second["messages"][-1]["content"])
+        self.assertIn("What has been done so far", second["messages"][-1]["content"])
+        self.assertIn('"squadron": "bravo", "type": "strike"', second["messages"][-1]["content"])           # what the console did, in the one who gave it
+        self.assertIn(" ok: ", second["messages"][-1]["content"])
+        self.assertEqual({t["function"]["name"] for t in second["tools"]}, {"say", "mission", "stay_quiet"})
+        self.assertEqual([(l["speaker"], l["answer"]) for l in self.bed.lines], [("bravo_lead", True)])
+        self.assertEqual(len(self.bed.commands), 1)                                        # (the order is not given twice)
+
+    async def test_a_refused_order_corrected_without_a_word_still_gets_its_answer(self) -> None:
+        self.bed.llm.replies = [[("mission", {"by": "alpha_lead", "squadron": "bravo", "type": "strike", "target": "T-21"})],           # (not his squadron: refused)
+                                [("mission", {"by": "cag", "squadron": "bravo", "type": "strike", "target": "T-21"})],                  # the correction, and no word
+                                [("say", {"speaker": "cag", "text": "Bravo in attacco sull'Acheron, Capitano.", "tone": "focused"})]]
+        self.f.captain_to_net("Bravo, attacco sull'Acheron", "it")
+        self.f.feed(self.st)
+        await self.bed.settle()
+        self.assertEqual(len(self.bed.llm.requests), 3)
+        last = self.bed.llm.requests[2]["messages"][-1]["content"]
+        self.assertIn("cannot order bravo", last)
+        self.assertIn(" ok: ", last)
+        self.assertEqual([(l["speaker"], l["answer"]) for l in self.bed.lines], [("cag", True)])
+        self.assertEqual([(c[1]["aspect"], c[1]["mode"]) for c in self.bed.commands], [("bravo", "strike")])
+
+    async def test_a_captain_the_net_chose_not_to_answer_is_not_asked_about_again(self) -> None:
+        self.bed.llm.say(("stay_quiet", {"reason": "his words are for Price"}))
+        self.f.captain_to_net("Timoniere, rotta zero-nove-zero", "it")
+        self.f.feed(self.st)
+        await self.bed.settle()
+        self.assertEqual(len(self.bed.llm.requests), 1)
+        self.assertEqual(self.bed.lines, [])
+
+    async def test_a_model_that_says_nothing_to_the_captain_is_asked_once_more(self) -> None:
+        self.bed.llm.replies = [[], [("say", {"speaker": "cag", "text": "CAG in ascolto, Capitano.", "tone": "calm"})]]
+        self.f.captain_to_net("CAG, mi senti?", "it")
+        self.f.feed(self.st)
+        await self.bed.settle()
+        self.assertEqual(len(self.bed.llm.requests), 2)
+        self.assertEqual([l["speaker"] for l in self.bed.lines], ["cag"])
+        self.assertNotIn("tool", [m.get("role") for m in self.bed.llm.requests[1]["messages"]])      # (nothing was called: nothing to show of it)
+        self.bed.llm.replies = [[]]
+        self.bed.at(1.0)
+        self.f.captain_to_net("CAG?", "it")
+        self.f.feed(self.st)
+        await self.bed.settle()
+        self.assertEqual(len(self.bed.llm.requests), 4)                                      # asked once more, not forever
 
     async def test_the_console_that_does_not_answer_is_a_failed_order_not_a_hang(self) -> None:
         async def hang(name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
