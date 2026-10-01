@@ -96,8 +96,10 @@ public:
 	const FAstraDamageMap& Source() const { return *Src; }
 	int32 NumDoors() const { return Src->Doors.Num(); }
 
-	/** The compartment a point (cm) is in (a few cm of slack at the walls), or INDEX_NONE. */
-	int32 CompAt(const FVector& P, float SlackCm = 30.f) const { return Src->CompartmentAt(P, SlackCm); }
+	/** The compartment a point (cm) is in (a few cm of slack at the walls), or INDEX_NONE. A man's feet are on the floor, which is also the ceiling of the
+	 *  deck below (the decks' pitch is the height of a deck): the point is lifted 60 cm off the floor first (an eye or a chest is lifted too, harmlessly) and the
+	 *  slack is kept small so that it never reaches into the deck below. */
+	int32 CompAt(const FVector& P, float SlackCm = 25.f) const { return Src->CompartmentAt(P + FVector(0.0, 0.0, 60.0), FMath::Min(SlackCm, 30.f)); }
 
 	/** Whether a soldier's eye at A sees a point B (cm): the ray stays in the compartments and crosses faces only where they are open. Doors
 	 *  count as they are in Doors (null: every door open). Stairs, lifts and different decks never see each other. */

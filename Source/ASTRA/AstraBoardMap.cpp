@@ -387,12 +387,19 @@ static bool BoardAStar(const FAstraBoardMap& Map, const FVector& From, const FVe
 		OutLen = (float)FVector::Dist(From, To);
 		return true;
 	}
-	TArray<FBoardNode> Nodes;
-	Nodes.Reserve(256);
-	TArray<int32> Open;                                    // heap of node indices by F
-	TMap<int64, float> Best;                               // (portal, into) -> best G
-	auto Key = [](int32 Portal, int32 Into) { return ((int64)Portal << 32) | (uint32)Into; };
-	auto Less = [&Nodes](int32 A, int32 B) { return Nodes[A].F < Nodes[B].F; };
+	// the search's buffers are kept between searches (a fight asks for a great many routes)
+	thread_local TArray<FBoardNode> Nodes;
+	thread_local TArray<int32> Open;                       // heap of node indices by F
+	thread_local TArray<float> Best;                       // by (portal, side it brings into): the best G so far
+	Nodes.Reset();
+	Open.Reset();
+	Best.SetNumUninitialized(Portals.Num() * 2, EAllowShrinking::No);
+	for (float& B : Best)
+	{
+		B = TNumericLimits<float>::Max();
+	}
+	auto Key = [&Portals](int32 Portal, int32 Into) { return Portal * 2 + (Portals[Portal].B == Into ? 1 : 0); };
+	auto Less = [](int32 A, int32 B) { return Nodes[A].F < Nodes[B].F; };
 	auto Cost = [&](const FBoardPortal& P, int32 Pi) -> float
 	{
 		float C = P.ExtraCost;
@@ -441,12 +448,12 @@ static bool BoardAStar(const FAstraBoardMap& Map, const FVector& From, const FVe
 		}
 		const int32 Into = P.Other(Cs);
 		const float G = (float)FVector::Dist(From, P.PosIn(Cs)) + Extra + Cost(P, Pi);
-		const int64 K = Key(Pi, Into);
-		if (Best.Contains(K) && Best[K] <= G)
+		const int32 K = Key(Pi, Into);
+		if (Best[K] <= G)
 		{
 			continue;
 		}
-		Best.Add(K, G);
+		Best[K] = G;
 		Push(Pi, Into, G, P.PosIn(Into), INDEX_NONE);
 	}
 	int32 GoalNode = INDEX_NONE;
@@ -487,13 +494,12 @@ static bool BoardAStar(const FAstraBoardMap& Map, const FVector& From, const FVe
 			}
 			const int32 Into = P.Other(Node.Into);
 			const float G = Node.G + (float)FVector::Dist(Arrive, P.PosIn(Node.Into)) + Extra + Cost(P, Pi);
-			const int64 K = Key(Pi, Into);
-			const float* Old = Best.Find(K);
-			if (Old && *Old <= G)
+			const int32 K = Key(Pi, Into);
+			if (Best[K] <= G)
 			{
 				continue;
 			}
-			Best.Add(K, G);
+			Best[K] = G;
 			Push(Pi, Into, G, P.PosIn(Into), Cur);
 		}
 	}

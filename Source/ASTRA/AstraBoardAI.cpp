@@ -144,7 +144,10 @@ void FAstraBoardSim::StepSquad(FSquad& S, float Dt)
 	if (S.PlanT >= 0.5f)
 	{
 		S.PlanT = 0.f;
-		Plan(S);
+		if (!S.bStand)
+		{
+			Plan(S);
+		}
 	}
 }
 
@@ -329,6 +332,7 @@ bool FAstraBoardSim::FlankFor(FSquad& S, const FVector& Enemy)
 	Plain.Doors = &Doors;
 	Around.Doors = &Doors;
 	Around.PortalPenalty = &Pen;
+	Plain.bThroughSealed = Around.bThroughSealed = S.Side == ESide::Mandate;       // the Mandate cut through another bulkhead to get round
 	int32 Got = 0;
 	for (const int32 M : Cand)
 	{
@@ -336,7 +340,7 @@ bool FAstraBoardSim::FlankFor(FSquad& S, const FVector& Enemy)
 		TArray<FVector> Pts;
 		TArray<int32> Direct, Round;
 		float Metres = 0.f;
-		if (!Map->Route(U.Pos, Enemy, Pts, Around, &Metres) || Metres > 120.f)
+		if (!Map->Route(U.Pos, Enemy, Pts, Around, &Metres) || Metres > 220.f)
 		{
 			continue;
 		}
@@ -360,6 +364,7 @@ bool FAstraBoardSim::FlankFor(FSquad& S, const FVector& Enemy)
 		U.PathI = 1;
 		U.Dest = Enemy;
 		U.Speed = Tuning.JogCmS;
+		U.Cruise = Tuning.JogCmS;
 		U.Act = EAct::Move;
 		U.Target = INDEX_NONE;
 		S.Flankers[Got++] = M;
@@ -415,6 +420,10 @@ void FAstraBoardSim::PlanMandate(FSquad& S)
 		Emit(EEvent::Retreat, S.Leader, INDEX_NONE, People[S.Leader].Pos, People[S.Leader].Pos, 0.f, false, S.Name);
 	}
 	FUnit& L = People[S.Leader];
+	if (S.Task != ETask::Advance)
+	{
+		S.StallT = 0.f;
+	}
 	switch (S.Task)
 	{
 	case ETask::Withdraw:
@@ -446,6 +455,27 @@ void FAstraBoardSim::PlanMandate(FSquad& S)
 			S.TaskT = 0.f;
 			Emit(EEvent::Order, S.Leader, INDEX_NONE, L.Pos, L.Pos, 0.f, false, FString::Printf(TEXT("%s: at the objective, holding"), *S.Name));
 			break;
+		}
+		// the way in: not getting any nearer with the enemy about for long enough, the squad presses the attack (a boarding party that sits at a door loses the ship it came to take)
+		{
+			const float Dist = (float)FVector::Dist2D(L.Pos, S.TargetPos);
+			if (Dist < S.BestDist - 400.f)
+			{
+				S.BestDist = Dist;
+				S.StallT = 0.f;
+			}
+			else if (S.ContactT < 20.f)
+			{
+				S.StallT += 0.5f;
+			}
+			if (S.StallT >= Tuning.PushS)
+			{
+				S.Task = ETask::Assault;
+				S.TaskT = 0.f;
+				S.StallT = 0.f;
+				Emit(EEvent::Order, S.Leader, INDEX_NONE, L.Pos, L.Pos, 0.f, false, FString::Printf(TEXT("%s: pressing the attack"), *S.Name));
+				break;
+			}
 		}
 		if (!S.bContact)
 		{
@@ -551,39 +581,160 @@ void FAstraBoardSim::PlanMandate(FSquad& S)
 
 // ================================================================================================================== the marines
 
-int32 FAstraBoardSim::AmbushPortal() const
+bool FAstraBoardSim::AmbushWins(const FAmbushPass::FStop& Stop, float Margin, int32& InOutRoutes) const
 {
-	TArray<FVector> Route;
-	if (!PlannedRoute(Route) || Route.Num() < 3)
+	const FBoardPortal& P = Map->GetPortals()[Stop.Portal];
+	// the time by which Need marines can be at the opening, from the arrivals of each squad (the time its men are there, how many they are)
+	const auto TimeOfForce = [this](TArray<TPair<float, int32>, TInlineAllocator<12>>& Arrivals) -> float
 	{
-		return INDEX_NONE;
-	}
-	// along the Mandate's way, 45 to 80 m in, the first opening with corners to fight from, not in the objective's own compartment
-	float Walked = 0.f;
-	int32 Best = INDEX_NONE;
-	for (int32 i = 1; i < Route.Num(); ++i)
-	{
-		Walked += (float)FVector::Dist(Route[i - 1], Route[i]);
-		if (Walked < 4500.f)
+		Arrivals.Sort([](const TPair<float, int32>& A, const TPair<float, int32>& B) { return A.Key < B.Key; });
+		int32 Men = 0;
+		for (const TPair<float, int32>& A : Arrivals)
 		{
-			continue;
-		}
-		const int32 Comp = Map->CompAt(Route[i], 80.f);
-		if (Comp == INDEX_NONE || Comp == Mis.Objective)
-		{
-			continue;
-		}
-		const int32 P = Map->NearestPortal(Comp, Route[i]);
-		if (P != INDEX_NONE && FVector::Dist2D(Map->GetPortals()[P].Pos, Route[i]) < 400.f && (Map->GetComps()[Map->GetPortals()[P].A].Slots.Num() || Map->GetComps()[Map->GetPortals()[P].B].Slots.Num()))
-		{
-			Best = P;
-			if (Walked > 8000.f)
+			Men += A.Value;
+			if (Men >= AmbPass.Need)
 			{
-				break;
+				return A.Key;
+			}
+		}
+		return 1.0e9f;
+	};
+	// the straight line first: a place the marines could not reach in time even if they flew is not worth a search
+	TArray<TPair<float, int32>, TInlineAllocator<12>> Arrivals;
+	for (const FAmbushPass::FWing& W : AmbPass.Wings)
+	{
+		Arrivals.Emplace(W.Ready + (float)FVector::Dist(W.From, P.Pos) / Tuning.JogCmS, W.Men);
+	}
+	if (Stop.Theirs - TimeOfForce(Arrivals) < Margin)
+	{
+		return false;
+	}
+	Arrivals.Reset();
+	for (const FAmbushPass::FWing& W : AmbPass.Wings)
+	{
+		TArray<FVector> Pts;
+		float Metres = 0.f;
+		FBoardRouteOptions Mine;
+		Mine.Doors = &Doors;
+		++InOutRoutes;
+		if (Map->Route(W.From, P.Pos, Pts, Mine, &Metres))
+		{
+			Arrivals.Emplace(W.Ready + Metres * 100.f / Tuning.JogCmS, W.Men);
+		}
+	}
+	return Stop.Theirs - TimeOfForce(Arrivals) >= Margin;
+}
+
+void FAstraBoardSim::StepAmbush()
+{
+	if (!Cmd.bActive || Mis.Breach == INDEX_NONE || Mis.Objective == INDEX_NONE)
+	{
+		return;
+	}
+	FAmbushPass& Pass = AmbPass;
+	if (!Pass.bRunning)
+	{
+		if (Clock - AmbushAge < 3.0)
+		{
+			return;
+		}
+		TArray<int32> Ps;
+		FBoardRouteOptions Opt;
+		Opt.Doors = &Doors;
+		Opt.bThroughSealed = true;
+		AmbushAge = Clock;
+		if (!Map->RoutePortals(Mis.BreachPos, Map->CentreOf(Mis.Objective), Ps, Opt))
+		{
+			AmbushIdx = INDEX_NONE;
+			return;
+		}
+		// the marines by squad: where each leader is, how many men it brings, when it can move (the reaction team after it has armed)
+		Pass.Wings.Reset();
+		for (const FSquad& S : Teams)
+		{
+			if (S.Side != ESide::Aquila || S.bOrdered || S.Leader == INDEX_NONE || !People[S.Leader].Able())
+			{
+				continue;
+			}
+			int32 Men = 0;
+			for (const int32 M : S.Members)
+			{
+				Men += People[M].Able() ? 1 : 0;
+			}
+			Pass.Wings.Add({People[S.Leader].Pos, Men, (float)Clock + S.MusterT});
+		}
+		// as many marines as there are boarders (the ones still to come in count)
+		int32 Hostile = Pending.Num();
+		for (const FUnit& U : People)
+		{
+			Hostile += (U.Side == ESide::Mandate && U.Able() && !U.bExternal) ? 1 : 0;
+		}
+		Pass.Need = FMath::Max(6, FMath::CeilToInt(Hostile * 0.8f));
+		// the openings with corners along the Mandate's way, and when the boarders get to each (the bulkheads they must cut count)
+		float Walked = 0.f, Cut = 0.f, FirstIn = 1.0e9f;
+		FVector Prev = Mis.BreachPos;
+		for (const FPending& P : Pending)
+		{
+			FirstIn = FMath::Min(FirstIn, P.At);
+		}
+		if (FirstIn > 1.0e8f)
+		{
+			FirstIn = (float)Clock;
+		}
+		Pass.Stops.Reset();
+		for (const int32 Pi : Ps)
+		{
+			const FBoardPortal& P = Map->GetPortals()[Pi];
+			Walked += (float)FVector::Dist(Prev, P.Pos);
+			Prev = P.Pos;
+			if (P.bDoor() && Doors.IsSealed(P.Door))
+			{
+				Cut += Tuning.CutS;
+			}
+			if ((Map->GetComps()[P.A].Slots.Num() > 0 || Map->GetComps()[P.B].Slots.Num() > 0) && !P.bVertical())
+			{
+				Pass.Stops.Add({Pi, FirstIn + Walked / Tuning.JogCmS + Cut});
+			}
+		}
+		Pass.Cursor = 0;
+		Pass.bKeepChecked = false;
+		Pass.bRunning = true;
+	}
+	// a slice of the search
+	int32 Routes = 0;
+	const int32 Budget = 12;
+	if (!Pass.bKeepChecked)
+	{
+		Pass.bKeepChecked = true;
+		for (const FAmbushPass::FStop& Stop : Pass.Stops)
+		{
+			if (Stop.Portal == AmbushIdx && AmbushWins(Stop, 0.f, Routes))
+			{
+				Pass.bRunning = false;                     // the place they are going to still wins the race: no change of mind
+				AmbushAge = Clock;
+				return;
 			}
 		}
 	}
-	return Best;
+	while (Pass.Cursor < Pass.Stops.Num())
+	{
+		if (AmbushWins(Pass.Stops[Pass.Cursor], 8.f, Routes))
+		{
+			AmbushIdx = Pass.Stops[Pass.Cursor].Portal;    // the first opening they can reach in force ahead of the boarders
+			Pass.bRunning = false;
+			AmbushAge = Clock;
+			return;
+		}
+		++Pass.Cursor;
+		if (Routes >= Budget && Pass.Cursor < Pass.Stops.Num())
+		{
+			return;                                        // the rest in the next slice
+		}
+	}
+	// none wins the race: the way into the objective, the last opening on it
+	AmbushIdx = Pass.Stops.Num() ? Pass.Stops.Last().Portal : INDEX_NONE;
+	Pass.bRunning = false;
+	AmbushAge = Clock;
 }
 
 bool FAstraBoardSim::PlannedRoute(TArray<FVector>& Out) const
@@ -623,39 +774,58 @@ void FAstraBoardSim::PlanMarines(FSquad& S)
 	ETask Task = S.Task;
 	FVector At = S.TargetPos;
 	float Radius = S.Radius > 0.f ? S.Radius : 700.f;
-	// no order: the squad meets what is coming. Those on watch take the corners of the way in; the reaction team goes at the contact.
+	// no order: from the alarm the marines go to the opening that wins the race against the boarders (AmbushPortal) and take its corners: the watch at once, the
+	// reaction team when it has armed; a squad that runs into the boarders on the way goes in only when it has them two to one
 	if (!S.bOrdered)
 	{
-		TArray<FSeen> Seen;
-		Intel(ESide::Aquila, Seen);
-		if (Seen.IsEmpty() && Mis.Outcome == EOutcome::Running && Pending.IsEmpty() && Stats.Spawned[1] == 0)
+		if (!Cmd.bActive)
 		{
 			return;                                        // nothing has come yet
 		}
 		const int32 Amb = AmbushPortal();
-		if (S.bQuickReaction)
+		const FVector Home = Amb != INDEX_NONE ? Map->GetPortals()[Amb].Pos : Map->CentreOf(Mis.Objective);
+		TArray<FSeen> Seen;
+			Intel(ESide::Aquila, Seen);
+		float Nearest = 1.0e9f;
+		FVector Enemy = Home;
+		for (const FSeen& X : Seen)
 		{
-			// the nearest known enemy, else the ambush
-			float Best = 1.0e9f;
-			FVector Enemy = Amb != INDEX_NONE ? Map->GetPortals()[Amb].Pos : Mis.BreachPos;
+			const float D = (float)FVector::Dist(L.Pos, X.Pos);
+			if (D < Nearest)
+			{
+				Nearest = D;
+				Enemy = X.Pos;
+			}
+		}
+		int32 Theirs = 0, Ours = 0;
+		if (Nearest < 2200.f)
+		{
 			for (const FSeen& X : Seen)
 			{
-				const float D = (float)FVector::Dist(L.Pos, X.Pos);
-				if (D < Best) { Best = D; Enemy = X.Pos; }
+				Theirs += FVector::Dist(X.Pos, Enemy) < 2200.f ? 1 : 0;
 			}
-			Task = Best < 1.0e8f ? ETask::Advance : ETask::Hold;
-			At = Enemy;
-			if (Task == ETask::Advance && Best < 1500.f)
+			for (const FUnit& U : People)
 			{
-				Task = ETask::Assault;
+				Ours += (U.Side == ESide::Aquila && U.Able() && !U.bExternal && FVector::Dist(U.Pos, L.Pos) < 3000.f) ? 1 : 0;
 			}
+		}
+		if (Nearest < 2200.f && Theirs > 0 && Ours >= 2 * Theirs && Strength(S) >= 0.6f)
+		{
+			Task = ETask::Assault;
+			At = Enemy;
+		}
+		else if (FVector::Dist2D(L.Pos, Home) > 900.f)
+		{
+			Task = ETask::Advance;
+			At = Home;
 		}
 		else
 		{
 			Task = ETask::Hold;
-			At = Amb != INDEX_NONE ? Map->GetPortals()[Amb].Pos : (Seen.Num() ? Seen[0].Pos : Map->CentreOf(Mis.Objective));
+			At = Home;
 		}
 		Radius = 800.f;
+		S.TargetPos = At;
 	}
 	switch (Task)
 	{
@@ -727,12 +897,12 @@ void FAstraBoardSim::PlanMarines(FSquad& S)
 	}
 	case ETask::Hold:
 	{
-		HoldAround(S, At, Radius);
+			HoldAround(S, At, Radius);
 		break;
 	}
 	case ETask::Assault:
 	{
-		for (const int32 M : Able)
+			for (const int32 M : Able)
 		{
 			FUnit& U = People[M];
 			U.Slot = INDEX_NONE;
@@ -746,7 +916,7 @@ void FAstraBoardSim::PlanMarines(FSquad& S)
 	case ETask::Advance:
 	case ETask::FallBack:
 	{
-		if (!S.bContact || Task == ETask::FallBack)
+			if (!S.bContact || Task == ETask::FallBack)
 		{
 			if (FVector::Dist2D(L.Pos, At) < 500.f)
 			{
@@ -801,4 +971,28 @@ void FAstraBoardSim::PlanMarines(FSquad& S)
 		break;
 	}
 	S.Task = S.bOrdered ? S.Task : Task;
+}
+
+// ================================================================================================================== the marines' command
+
+void FAstraBoardSim::StepMarineCommand(float Dt)
+{
+	CmdT += Dt;
+	if (CmdT < 1.0f)
+	{
+		return;
+	}
+	CmdT = 0.f;
+	if (Cmd.bActive)
+	{
+		return;
+	}
+	// the alarm: boarders are coming (the breach is known, or the sensors see them)
+	if (Stats.Spawned[1] == 0 && Mis.Breach == INDEX_NONE)
+	{
+		return;
+	}
+	Cmd.bActive = true;
+	Cmd.AlarmT = (float)Clock;
+	Emit(EEvent::Order, INDEX_NONE, INDEX_NONE, Mis.BreachPos, Mis.BreachPos, 0.f, false, TEXT("alarm: boarders — the marines go"));
 }

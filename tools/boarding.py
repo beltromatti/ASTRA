@@ -8,8 +8,9 @@
                                        team: who holds, at what cost, how long); checks the invariants and prints the verdict
   tools/boarding.py report Saved/Boarding/run.json   the record of a run
 
-`run` needs the editor target built for this checkout (Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex) and uses -nullrhi: it never opens
-a window or touches the GPU, so it can run while the game or the editor is open. It uses no mind and spends nothing (no AI calls).
+`run` needs the editor target built for this checkout (Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex) and uses -nullrhi -unattended -nopause: it
+never opens a window or touches the GPU, so it can run while the game or the editor is open (if the engine crashes, its crash reporter is closed by the script).
+It uses no mind and spends nothing (no AI calls).
 """
 from __future__ import annotations
 
@@ -32,9 +33,13 @@ def cmd_run(a: argparse.Namespace) -> int:
     out = (ROOT / a.out).resolve()
     log = OUT / "last_run.log"
     args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraBoardSim", f"-scenario={a.scenario}", f"-seed={a.seed}", f"-seeds={a.seeds}", f"-boarders={a.boarders}",
-            f"-out={out}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
+            f"-out={out}", "-nullrhi", "-unattended", "-nopause", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
     if a.set:
         args.append(f"-set={a.set}")
+    if a.trace:
+        args.append("-trace")
+    if a.setup >= 0:
+        args.append(f"-setup={a.setup}")
     t0 = time.time()
     with open(log, "w") as f:
         p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
@@ -44,6 +49,8 @@ def cmd_run(a: argparse.Namespace) -> int:
             p.kill()
             p.wait()
             print(f"   the boarding bench did not finish in {a.timeout} s: killed (log {log})")
+    # a crashed engine leaves its crash reporter running (a window spinning at 100% of a core): the ones of this run's process are closed here
+    subprocess.run(["pkill", "-f", f"CrashReportClient.*pid-{p.pid}"], check=False)
     lines = [l for l in log.read_text(errors="replace").splitlines() if "[Board]" in l]
     for l in lines[-200:]:
         print(l[l.find("[Board]"):])
@@ -66,6 +73,8 @@ def main() -> int:
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")
     r.add_argument("--set", default="", help='tuning, "MandateSkill=0.8,HoldS=60,bFlank=0"')
+    r.add_argument("--setup", type=int, default=-1, help="board: run only this setup (0..5)")
+    r.add_argument("--trace", action="store_true", help="print the fights' events and a line a squad every five seconds (use with --seeds 1)")
     r.add_argument("--out", default="Saved/Boarding/run.json")
     r.add_argument("--timeout", type=int, default=1500)
     r.set_defaults(fn=cmd_run)

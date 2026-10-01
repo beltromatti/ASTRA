@@ -78,6 +78,10 @@ void FAstraBoardSim::Init(TSharedRef<const FAstraBoardMap> InMap, int32 Seed)
 	OpenNow.Reset();
 	Doors.Init(Map->NumDoors());
 	CutT.Init(0.f, Map->NumDoors());
+	Cmd = FMarineCommand();
+	AmbushIdx = INDEX_NONE;
+	AmbushAge = -1.0e9;
+	AmbPass = FAmbushPass();
 	Mis = FMission();
 	Stats = FBook();
 	Clock = 0.0;
@@ -119,6 +123,7 @@ FUnit& FAstraBoardSim::Spawn(ESide Side, ERole Role, const FString& Name, const 
 	U.Armor = Side == ESide::Aquila ? Tuning.MarineArmor : Tuning.MandateArmor;
 	U.Act = EAct::Idle;
 	U.Time0 = (float)Clock;
+	U.PercT = Rng.FRandRange(0.f, 0.25f);
 	People.Add(U);
 	FUnit& R = People.Last();
 	ArmUnit(R);
@@ -312,8 +317,19 @@ void FAstraBoardSim::Step(float Dt)
 			Pending.RemoveAt(i);
 		}
 	}
+	double T0 = FPlatformTime::Seconds();
+	const auto Lap = [this, &T0](int32 Part)
+	{
+		const double T1 = FPlatformTime::Seconds();
+		const double Ms = (T1 - T0) * 1000.0;
+		Stats.Ms[Part] += Ms;
+		Stats.MsWorst[Part] = FMath::Max(Stats.MsWorst[Part], Ms);
+		T0 = T1;
+	};
 	StepDoors();
 	StepSensors(Dt);
+	StepMarineCommand(Dt);
+	StepAmbush();
 	for (FUnit& U : People)
 	{
 		if (!U.bExternal && (U.Act != EAct::Dead && U.Act != EAct::Gone && U.Act != EAct::Waiting))
@@ -327,13 +343,21 @@ void FAstraBoardSim::Step(float Dt)
 				}
 				continue;
 			}
-			Perceive(U, Dt);
+			U.PercT += Dt;
+			if (U.PercT >= 0.25f)
+			{
+				const float Since = U.PercT;
+				U.PercT = 0.f;
+				Perceive(U, Since);
+			}
 		}
 	}
+	Lap(0);
 	for (FSquad& S : Teams)
 	{
 		StepSquad(S, Dt);
 	}
+	Lap(1);
 	for (FUnit& U : People)
 	{
 		if (!U.bExternal && U.Act != EAct::Dead && U.Act != EAct::Gone && U.Act != EAct::Waiting && U.Act != EAct::Down)
@@ -342,6 +366,7 @@ void FAstraBoardSim::Step(float Dt)
 		}
 	}
 	StepMission(Dt);
+	Lap(2);
 }
 
 void FAstraBoardSim::StepDoors()
@@ -732,7 +757,7 @@ float FAstraBoardSim::HitChance(const FUnit& Shooter, const FUnit& Target, float
 	{
 		P *= Tuning.MoveFactor;
 	}
-	P *= 1.f - 0.55f * Shooter.Suppression;
+	P *= 1.f - 0.45f * Shooter.Suppression;
 	if (Shooter.Hp < 45.f)
 	{
 		P *= 0.8f;
@@ -849,7 +874,7 @@ void FAstraBoardSim::Damage(FUnit& T, float Dmg, bool bHead, int32 ByUnit, const
 	const float Real = Dmg * T.Armor;
 	T.Hp -= Real;
 	++T.HitsTaken;
-	T.Suppression = FMath::Min(1.f, T.Suppression + 0.22f);
+	T.Suppression = FMath::Min(1.f, T.Suppression + 0.12f);
 	Emit(EEvent::Hit, T.Id, ByUnit, At, At, Real, true, By);
 	if (Stats.FirstBloodT < 0.0)
 	{
@@ -875,7 +900,7 @@ void FAstraBoardSim::Damage(FUnit& T, float Dmg, bool bHead, int32 ByUnit, const
 		T.Speed = 0.f;
 		T.Target = INDEX_NONE;
 		T.BurstLeft = 0;
-		++Stats.Down[(int32)T.Side];
+		++Stats.Down[(int32)T.Side];                      // (Down is who is down now: a man who bleeds out moves to Killed)
 		if (Teams.IsValidIndex(T.Squad))
 		{
 			++Teams[T.Squad].Lost;
@@ -902,6 +927,10 @@ void FAstraBoardSim::Kill(FUnit& U, int32 ByUnit, const FString& By)
 	U.Speed = 0.f;
 	U.BurstLeft = 0;
 	++Stats.Killed[(int32)U.Side];
+	if (bWasDown)
+	{
+		Stats.Down[(int32)U.Side] = FMath::Max(0, Stats.Down[(int32)U.Side] - 1);      // he was counted down: now he is counted dead
+	}
 	if (!bWasDown && Teams.IsValidIndex(U.Squad))
 	{
 		++Teams[U.Squad].Lost;
@@ -939,6 +968,8 @@ void FAstraBoardSim::CarryOut(int32 UnitId)
 	if (People.IsValidIndex(UnitId) && People[UnitId].Act == EAct::Down)
 	{
 		People[UnitId].Act = EAct::Gone;
+		Stats.Down[(int32)People[UnitId].Side] = FMath::Max(0, Stats.Down[(int32)People[UnitId].Side] - 1);
+		++Stats.Carried[(int32)People[UnitId].Side];
 		++Stats.Rescues;
 	}
 }
@@ -961,13 +992,49 @@ void FAstraBoardSim::Fight(FUnit& U, float Dt)
 			U.Speed = 0.f;
 			if (U.Slot != INDEX_NONE)
 			{
-				// at his corner, waiting for the enemy to show
+				// at his corner, waiting for the enemy to show; a man who knows the enemy is near (what he has is stale) steps out to look from time to time
 				const FBoardSlot& S = Map->GetSlots()[U.Slot];
-				if (FVector::Dist2D(U.Pos, S.Pos) > 40.f)
+				bool bSuspect = false;
+				for (const FSeen& X : U.Seen)
 				{
-					GoTo(U, S.Pos, Tuning.CoverCmS);
+					bSuspect |= X.AgeS < 12.f && People.IsValidIndex(X.Unit) && People[X.Unit].Able();
 				}
-				U.Act = EAct::Cover;
+				if (bSuspect && Tuning.bCover && U.Suppression < 0.6f)
+				{
+					U.CycleT -= Dt;
+					if (U.bAtPeek)
+					{
+						U.Act = EAct::Peek;
+						if (U.CycleT <= 0.f)
+						{
+							U.bAtPeek = false;
+							U.CycleT = Rng.FRandRange(2.5f, 6.f);
+							GoTo(U, S.Pos, Tuning.CoverCmS);
+						}
+					}
+					else if (FVector::Dist2D(U.Pos, S.Pos) > 40.f)
+					{
+						GoTo(U, S.Pos, Tuning.CoverCmS);
+					}
+					else
+					{
+						U.Act = EAct::Cover;
+						if (U.CycleT <= 0.f)
+						{
+							U.bAtPeek = true;
+							U.CycleT = Tuning.PeekS * 1.5f;
+							GoTo(U, S.Peek, Tuning.CoverCmS);
+						}
+					}
+				}
+				else
+				{
+					if (FVector::Dist2D(U.Pos, S.Pos) > 40.f)
+					{
+						GoTo(U, S.Pos, Tuning.CoverCmS);
+					}
+					U.Act = EAct::Cover;
+				}
 			}
 			else
 			{
@@ -986,11 +1053,12 @@ void FAstraBoardSim::Fight(FUnit& U, float Dt)
 	const FUnit& T = People[U.Target];
 	const float Dist = (float)FVector::Dist(U.Pos, T.Pos);
 	Face(U, T.Pos, Dt);
+	const bool bStand = Teams.IsValidIndex(U.Squad) && Teams[U.Squad].bStand;
 	// dry: reload where he is hidden, or get hidden first
 	if (U.Rounds <= 0 && U.Reserve > 0)
 	{
 		const bool bHidden = U.Slot != INDEX_NONE && FVector::Dist2D(U.Pos, Map->GetSlots()[U.Slot].Pos) < 40.f;
-		if (bHidden || Dist > 1800.f || !TakeCover(U, T.Pos))
+		if (bStand || bHidden || Dist > 1800.f || !TakeCover(U, T.Pos))
 		{
 			U.Act = EAct::Reload;
 			U.ReloadT = U.Weapon.ReloadS;
@@ -1001,7 +1069,7 @@ void FAstraBoardSim::Fight(FUnit& U, float Dt)
 	}
 	// frightened men keep their heads down
 	const bool bPinned = U.Suppression > 0.75f && U.Role != ERole::Leader;
-	if (U.Slot == INDEX_NONE && Dist > 500.f && U.Speed < 1.f)
+	if (U.Slot == INDEX_NONE && Dist > 500.f && U.Speed < 1.f && !bStand)
 	{
 		// in the open and not too close: find a corner first
 		TakeCover(U, T.Pos);
@@ -1185,6 +1253,7 @@ void FAstraBoardSim::GoTo(FUnit& U, const FVector& To, float Speed, bool bThroug
 	U.PathI = 1;
 	U.Dest = To;
 	U.Speed = Speed;
+	U.Cruise = Speed;
 	if (U.Act != EAct::Reload && U.Act != EAct::Down)
 	{
 		U.Act = EAct::Move;
@@ -1198,7 +1267,8 @@ void FAstraBoardSim::Move(FUnit& U, float Dt)
 		U.Speed = 0.f;
 		return;
 	}
-	float Left = U.Speed * Dt * (U.Hp < 30.f ? 0.7f : 1.f);
+	U.Speed = U.Cruise;
+	float Left = U.Cruise * Dt * (U.Hp < 30.f ? 0.7f : 1.f);
 	U.bLow = false;
 	while (Left > 0.f && U.PathI < U.Path.Num())
 	{

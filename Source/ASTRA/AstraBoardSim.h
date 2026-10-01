@@ -58,7 +58,7 @@ namespace AstraBoard
 		float HideMinS = 0.45f, HideMaxS = 1.25f;               // behind the corner between two looks
 		float PeekS = 0.85f;                                    // a look's length at most (a burst ends it)
 		float JogCmS = 330.f, WalkCmS = 175.f, CoverCmS = 210.f;
-		float SuppressDecay = 0.30f, SuppressPerRound = 0.055f, SuppressMiss = 130.f;   // a round within this many cm of a man frightens him
+		float SuppressDecay = 0.30f, SuppressPerRound = 0.035f, SuppressMiss = 130.f;   // a round within this many cm of a man frightens him
 		float CoverFactor = 0.55f;                              // a hit chance behind a corner's edge, against one in the open
 		float MoveFactor = 0.62f;                               // a man in motion against one who stands
 		float RangeFullCm = 450.f, RangeFarCm = 2000.f, RangeMaxCm = 3800.f;
@@ -68,6 +68,7 @@ namespace AstraBoard
 		float HearCm = 2600.f;                                  // a shot is heard this far (through the open ways)
 		float SensorDelayS = 2.0f;                              // the ship's internal sensors: how stale the marines' picture of the corridors is
 		float CutS = 22.f;                                      // how long the Mandate need to cut through a sealed bulkhead
+		float PushS = 40.f;                                     // how long the Mandate sit in contact without getting nearer before they press the attack
 		bool bFlank = true;                                     // squads go round (the bench turns it off to see what it is worth)
 		bool bCover = true;                                     // men look for corners (the bench turns it off for the duels in the open)
 	};
@@ -96,7 +97,8 @@ namespace AstraBoard
 		float Hp = 100.f;
 		float Armor = 1.f;               // the share of a hit that goes through
 		float Skill = 0.8f;
-		float Speed = 0.f;               // cm/s now
+		float Speed = 0.f;               // cm/s now (0 while he waits at a shut bulkhead or stands to shoot)
+		float Cruise = 0.f;              // the pace of the way he is on (he goes at it again when nothing holds him)
 		bool bSprint = false;
 		bool bLow = false;               // crouched or prone (a harder target)
 		EAct Act = EAct::Idle;
@@ -115,6 +117,7 @@ namespace AstraBoard
 		float Suppression = 0.f;         // 0..1
 		float Morale = 1.f;
 		TArray<FSeen, TInlineAllocator<8>> Seen;
+		float PercT = 0.f;               // since he last looked about (a man looks four times a second, each at his own beat)
 		// moving and fighting
 		TArray<FVector> Path;
 		int32 PathI = 0;
@@ -153,11 +156,14 @@ namespace AstraBoard
 		FVector FlankAt = FVector::ZeroVector;
 		TArray<FVector> Trail;           // where the leader has been (the column follows it)
 		float FlankT = 0.f;
+		float BestDist = 1.0e9f;         // the Mandate's way in: the nearest the leader has got to the objective (cm)
+		float StallT = 0.f;              // how long the squad has been in contact without getting any nearer (they press the attack after PushS)
 		bool bQuickReaction = false;     // the reaction team: arms itself before it goes
 		float MusterT = 0.f;
 		float StartStrength = 0.f;
 		int32 Lost = 0;
 		bool bOrdered = false;           // an order of the Captain's or the marines' commander's stands (the squad does not re-plan its place)
+		bool bStand = false;             // stand fast where they are and shoot (no corners, no moves: the bench's duels)
 		FString Note;                    // what it was last told or decided, for the reports
 	};
 
@@ -204,11 +210,13 @@ namespace AstraBoard
 	struct FBook
 	{
 		int32 Shots = 0, Hits = 0, Misses = 0;
-		int32 Killed[2] = {0, 0}, Down[2] = {0, 0}, Exited[2] = {0, 0}, Spawned[2] = {0, 0};
+		int32 Killed[2] = {0, 0}, Down[2] = {0, 0}, Exited[2] = {0, 0}, Spawned[2] = {0, 0}, Carried[2] = {0, 0};   // Down: who is down now
 		int32 Contacts = 0, Flanks = 0, Retreats = 0, Reloads = 0, Suppressed = 0, Rescues = 0;
 		double FirstContactT = -1.0, FirstBloodT = -1.0, EndT = -1.0;
 		int32 CaptainHits = 0;
 		float MarineRoundsFired = 0.f;
+		// the cost, in milliseconds, of the step's parts (what each took in total and in its worst step): sensing, the squads' plans, the men's moves and shots
+		double Ms[3] = {0.0, 0.0, 0.0}, MsWorst[3] = {0.0, 0.0, 0.0};
 	};
 }
 
@@ -279,8 +287,18 @@ public:
 	FString WhereIs(const FUnit& U) const { return Map->Describe(U.Comp); }
 	/** The route a squad of the Mandate takes from its breach to its objective (cm), for the displays and the chokepoints. */
 	bool PlannedRoute(TArray<FVector>& Out) const;
-	/** A fighting position for the marines that covers the way the Mandate comes: the place the commander would hold (for the default response). */
-	int32 AmbushPortal() const;
+	/** Where the marines should meet the boarders: the first opening along the Mandate's way, counting from the breach, where as many marines as there are boarders
+	 *  can be with time to spare before the boarders arrive (the sealed bulkheads they must cut count), else the way into the objective. INDEX_NONE until there is a breach
+	 *  and the first search has finished (a search takes a second or two: it goes on in slices of the step). */
+	int32 AmbushPortal() const { return AmbushIdx; }
+	/** The marines' default response, when nobody has given an order: from the alarm they go (the watch at once, the reaction team after it has armed) to the
+	 *  opening that wins the race against the boarders and take its corners (AmbushPortal). */
+	struct FMarineCommand
+	{
+		bool bActive = false;                // the alarm has sounded
+		float AlarmT = 0.f;                  // when
+	};
+	const FMarineCommand& MarineCommand() const { return Cmd; }
 	/** The line of sight between two points as the fight sees it (the doors as they are). */
 	bool Sees(const FVector& EyeA, const FVector& EyeB) const { return Map->Visible(EyeA, EyeB, &Doors); }
 	/** The game may override sight for the Captain's own fights with a real trace (a locker is cover too). */
@@ -309,6 +327,26 @@ private:
 	struct FPending { int32 Unit; float At; };
 	TArray<FPending> Pending;
 	float DoorT = 0.f;
+	int32 AmbushIdx = INDEX_NONE;
+	FMarineCommand Cmd;
+	float CmdT = 0.f;
+	void StepMarineCommand(float Dt);
+	double AmbushAge = -1.0e9;
+	/** The search for the ambush opening, done in slices of a few routes a step (a long search in one go would be a hitch in the game). */
+	struct FAmbushPass
+	{
+		struct FWing { FVector From = FVector::ZeroVector; int32 Men = 0; float Ready = 0.f; };
+		struct FStop { int32 Portal = INDEX_NONE; float Theirs = 0.f; };
+		bool bRunning = false;
+		bool bKeepChecked = false;
+		TArray<FWing> Wings;
+		TArray<FStop> Stops;
+		int32 Need = 6;
+		int32 Cursor = 0;
+	};
+	FAmbushPass AmbPass;
+	void StepAmbush();
+	bool AmbushWins(const FAmbushPass::FStop& Stop, float Margin, int32& InOutRoutes) const;
 
 	// --- the step
 	void Step(float Dt);
