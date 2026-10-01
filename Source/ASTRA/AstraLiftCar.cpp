@@ -18,20 +18,20 @@ DECLARE_CYCLE_STAT(TEXT("Car tick"), STAT_AstraLiftCar, STATGROUP_AstraLifts);
 
 namespace
 {
-	UStaticMesh* LiftKitMesh(const FString& Name)
-	{
-		return LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Kit/Lift/%s.%s"), *Name, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
-	}
-
 	USoundBase* LiftSound(const TCHAR* Name)
 	{
 		return LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Audio/%s.%s"), Name, Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
 	}
+}
 
-	UStaticMesh* LiftCube()
-	{
-		return LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/LiftCube.LiftCube"), nullptr, LOAD_NoWarn | LOAD_Quiet);
-	}
+UStaticMesh* AstraLiftKit::Mesh(const FString& Name)
+{
+	return LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Kit/Lift/%s.%s"), *Name, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
+}
+
+UStaticMesh* AstraLiftKit::Cube()
+{
+	return LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"), nullptr, LOAD_NoWarn | LOAD_Quiet);
 }
 
 // ================================================================================================================================ spec
@@ -189,8 +189,8 @@ void AAstraLiftCar::BuildShell()
 	}
 	Pier(Cursor, OW * 0.5f);
 	// the leaves: a pair for each opening (the visible leaf and its collision move together)
-	UStaticMesh* LeafKit = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_CarLeaf_%s"), *S.Suffix));
-	UStaticMesh* CubeMesh = LiftCube();
+	UStaticMesh* LeafKit = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_CarLeaf_%s"), *S.Suffix));
+	UStaticMesh* CubeMesh = AstraLiftKit::Cube();
 	for (int32 I = 0; I < Ops.Num(); ++I)
 	{
 		for (int32 Side = 0; Side < 2; ++Side)
@@ -225,17 +225,17 @@ void AAstraLiftCar::BuildLooks()
 	const FAstraLiftSpec& S = CarSpec;
 	const float Z0 = Data.CarFloor;
 	const FString Suf = S.Suffix;
-	UStaticMesh* Cabin = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_Car_%s"), *Suf));
+	UStaticMesh* Cabin = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_Car_%s"), *Suf));
 	if (Cabin)
 	{
 		Hull = AddMesh(TEXT("Hull"), Cabin, FVector(0.f, 0.f, Z0), FVector::OneVector);
-		if (UStaticMesh* G = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_CarGlass_%s"), *Suf)))
+		if (UStaticMesh* G = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_CarGlass_%s"), *Suf)))
 		{
 			Glass = AddMesh(TEXT("Glass"), G, FVector(0.f, 0.f, Z0), FVector::OneVector);
 			Glass->SetCastShadow(false);
 		}
 	}
-	else if (UStaticMesh* C = LiftCube())
+	else if (UStaticMesh* C = AstraLiftKit::Cube())
 	{
 		// the kit is not imported: the shell's boxes as they are, so the car is something to ride
 		auto Plain = [&](UBoxComponent* B)
@@ -253,7 +253,7 @@ void AAstraLiftCar::BuildLooks()
 	// the screen: the kit's quad (1 m square, facing +X, u to the viewer's right, v up) scaled to the screen's size and turned to face into the car; the
 	// lift subsystem paints it. Without the kit, the engine's plane stands in for it (its picture may come out turned: the kit is the one that is right)
 	const FVector ScreenAt = S.ScreenCenter + FVector(0.f, 0.f, Z0);
-	if (UStaticMesh* Quad = LiftKitMesh(TEXT("SM_LIFT_Screen")))
+	if (UStaticMesh* Quad = AstraLiftKit::Mesh(TEXT("SM_LIFT_Screen")))
 	{
 		Screen = AddMesh(TEXT("Screen"), Quad, ScreenAt, FVector(1.0, S.ScreenSize.X / 100.0, S.ScreenSize.Y / 100.0));
 		Screen->SetRelativeRotation(FRotator(0.f, S.ScreenYaw, 0.f));

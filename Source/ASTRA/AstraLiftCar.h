@@ -29,6 +29,14 @@ class UStaticMesh;
 class UStaticMeshComponent;
 class AAstraLiftLanding;
 
+namespace AstraLiftKit
+{
+	/** A mesh of the lift kit (/Game/ASTRA/Kit/Lift/<name>), or null when it is not imported yet (the cars then stand in plain boxes). */
+	ASTRA_API UStaticMesh* Mesh(const FString& Name);
+	/** The engine's cube: the stand-in for a kit mesh that is not there. */
+	ASTRA_API UStaticMesh* Cube();
+}
+
 /** The measures a car and its landings share (the kit's meshes are built to the same numbers: art/blender/ship_lift.py). */
 struct ASTRA_API FAstraLiftSpec
 {

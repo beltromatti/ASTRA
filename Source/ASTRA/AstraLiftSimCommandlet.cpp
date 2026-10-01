@@ -19,6 +19,9 @@
 #include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Policies/CondensedJsonPrintPolicy.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 #include "Tickable.h"
 
 bool GAstraLiftTrace = false;
@@ -1001,6 +1004,14 @@ namespace
 					}
 				}
 			}
+		}
+		if (Ctx.IsValid())
+		{
+			// the context as the mind reads it (the row mind/bench/lift_unit.py holds as its sample)
+			FString Text;
+			const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Text);
+			FJsonSerializer::Serialize(Ctx.ToSharedRef(), Writer);
+			UE_LOG(LogASTRA, Display, TEXT("[Lift]   context.lift: %s"), *Text);
 		}
 		LiftCheck(TEXT("voice: the context says where the car goes"), bOutside && Ctx.IsValid() && NStops == L.Stops.Num() && bPlaces && Ctx->GetStringField(TEXT("car")) == TEXT("tl_a"),
 		      FString::Printf(TEXT("outside a car: refused (%s); inside: %d stops, deck 7 lists Main Engineering %d"), *Refusal.Left(60), NStops, bPlaces));

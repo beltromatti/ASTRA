@@ -10,16 +10,6 @@
 
 namespace
 {
-	UStaticMesh* LiftKitMesh(const FString& Name)
-	{
-		return LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Kit/Lift/%s.%s"), *Name, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
-	}
-
-	UStaticMesh* LiftCube()
-	{
-		return LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/LiftCube.LiftCube"), nullptr, LOAD_NoWarn | LOAD_Quiet);
-	}
-
 	// the shaft's segments (the kit's meshes are built to these heights)
 	constexpr float LiftSegH = 400.f;            // a plain segment
 	constexpr float LiftDoorSegH = 320.f;        // a segment with a landing's opening in it: from this far under the floor
@@ -63,8 +53,8 @@ void AAstraLiftLanding::Setup(const FAstraLiftLine& InLine, int32 InStop, const 
 	if (bDoors)
 	{
 		// the doors: a pair of leaves just outside the shaft's front plane (X 0.5 to 6.5 cm: three and a half centimetres from the car's sill), closed over the opening and sliding apart into the frame's piers
-		UStaticMesh* LeafKit = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_LandingLeaf_%s"), *Spec.Suffix));
-		UStaticMesh* CubeMesh = LiftCube();
+		UStaticMesh* LeafKit = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_LandingLeaf_%s"), *Spec.Suffix));
+		UStaticMesh* CubeMesh = AstraLiftKit::Cube();
 		for (int32 Side = 0; Side < 2; ++Side)
 		{
 			const float HalfW = Op.Width * 0.25f + 1.f;
@@ -93,11 +83,11 @@ void AAstraLiftLanding::Setup(const FAstraLiftLine& InLine, int32 InStop, const 
 
 void AAstraLiftLanding::BuildLooks()
 {
-	if (UStaticMesh* F = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_Landing_%s"), *Spec.Suffix)))
+	if (UStaticMesh* F = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_Landing_%s"), *Spec.Suffix)))
 	{
 		Frame = LiftMakeMesh(this, GetRootComponent(), TEXT("Frame"), F, FVector::ZeroVector, FVector::OneVector);
 	}
-	else if (UStaticMesh* C = LiftCube(); C && bDoors)
+	else if (UStaticMesh* C = AstraLiftKit::Cube(); C && bDoors)
 	{
 		// the kit is not imported: a plain frame round the opening so that the landing is a place
 		const FAstraLiftSpec::FOpening& Op = Spec.Openings[0];
@@ -106,25 +96,25 @@ void AAstraLiftLanding::BuildLooks()
 		LiftMakeMesh(this, GetRootComponent(), TEXT("Head"), C, FVector(4.f, 0.f, Op.Height + 6.f), FVector(0.1f, Op.Width / 100.f + 0.24f, 0.12f));
 	}
 	// the call panel's lamp: lit while a car is on its way
-	UStaticMesh* LampMesh = LiftKitMesh(TEXT("SM_LIFT_CallLamp"));
+	UStaticMesh* LampMesh = AstraLiftKit::Mesh(TEXT("SM_LIFT_CallLamp"));
 	if (!LampMesh)
 	{
-		LampMesh = LiftCube();
+		LampMesh = AstraLiftKit::Cube();
 	}
 	if (LampMesh)
 	{
-		Lamp = LiftMakeMesh(this, GetRootComponent(), TEXT("CallLamp"), LampMesh, PanelLocal + FVector(2.f, 0.f, 6.f), LiftKitMesh(TEXT("SM_LIFT_CallLamp")) ? FVector::OneVector : FVector(0.02f, 0.06f, 0.06f));
+		Lamp = LiftMakeMesh(this, GetRootComponent(), TEXT("CallLamp"), LampMesh, PanelLocal + FVector(2.f, 0.f, 6.f), AstraLiftKit::Mesh(TEXT("SM_LIFT_CallLamp")) ? FVector::OneVector : FVector(0.02f, 0.06f, 0.06f));
 		Lamp->SetVisibility(false);
 		Lamp->SetCastShadow(false);
 	}
 	if (!bDoors)
 	{
 		// the shuttle's call post: a slim pillar on the platform with the lamp on it (the car has its own doors; the platform has none)
-		if (UStaticMesh* Post = LiftKitMesh(TEXT("SM_LIFT_CallPost")))
+		if (UStaticMesh* Post = AstraLiftKit::Mesh(TEXT("SM_LIFT_CallPost")))
 		{
 			Frame = LiftMakeMesh(this, GetRootComponent(), TEXT("Post"), Post, FVector(PanelLocal.X, PanelLocal.Y, 0.f), FVector::OneVector);
 		}
-		else if (UStaticMesh* C = LiftCube())
+		else if (UStaticMesh* C = AstraLiftKit::Cube())
 		{
 			LiftMakeMesh(this, GetRootComponent(), TEXT("Post"), C, FVector(PanelLocal.X, PanelLocal.Y, 60.f), FVector(0.12f, 0.12f, 1.2f));
 		}
@@ -194,8 +184,8 @@ AAstraLiftShaft::AAstraLiftShaft()
 void AAstraLiftShaft::Setup(const FAstraLiftLine& L, const FAstraLiftSpec& S)
 {
 	const FString Suf = S.Suffix;
-	UStaticMesh* PlainMesh = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_Shaft_%s"), *Suf));
-	UStaticMesh* DoorMesh = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_ShaftDoor_%s"), *Suf));
+	UStaticMesh* PlainMesh = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_Shaft_%s"), *Suf));
+	UStaticMesh* DoorMesh = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_ShaftDoor_%s"), *Suf));
 	if (!PlainMesh || !DoorMesh || L.bShuttle)
 	{
 		return;                                // the kit is not imported (or this is the shuttle's line: its tunnel is the ship's): no shaft to show
