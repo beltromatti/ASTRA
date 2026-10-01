@@ -98,6 +98,9 @@ struct FAstraLifePerson
 	int32 PartySlot = 0;
 	bool bBody = false;              // a body is moving them (the abstract step leaves their feet to it)
 	bool bHurry = false;
+	bool bTransit = false;           // TELETRASPORTO: the transporter has them in its buffer: not aboard, not simulated, nothing can hurt them
+	bool bAway = false;              // TELETRASPORTO: off the ship (on a world, on another ship) until the transporter brings them back
+	FString AwayText;                // where, in words ("on the surface of New Ravenna, at Port Aurelius Field")
 	TArray<FAstraLifeMemory> Mem;
 };
 
@@ -209,6 +212,17 @@ public:
 	/** Something happened in or near a room: all who were within RadiusCm of it remember. */
 	void RememberNear(int32 CompIdx, float RadiusCm, uint8 Weight, const FString& Text, int32 Except = INDEX_NONE);
 	FString MemoryLine(const FAstraLifeMemory& M) const;
+
+	// ------------------------------------------------------------------------------------------------ the transporter (TELETRASPORTO, docs/TELETRASPORTO.md)
+	/** The transporter has the person in its buffer (or lets them go): they are not on the ship, no step moves them, no hazard reaches them, nobody finds them aboard. */
+	void SetTransit(int32 Person, bool bOn);
+	/** The pattern is set down aboard: the person stands at Where (world cm, feet) facing Yaw, stays there HoldGameS seconds of the ship's clock (the reason they were sent: a chat, a repair)
+	 *  and then goes on with their day from there (the way to their post is made again). */
+	void PlaceTransported(int32 Person, const FVector& Where, float YawDeg, float HoldGameS = 1.5f);
+	/** The person is off the ship (a world, another ship) until the transporter brings them back: Text says where. */
+	void SetAway(int32 Person, const FString& Text);
+	bool IsOffShip(int32 Person) const { return People.IsValidIndex(Person) && (People[Person].bTransit || People[Person].bAway); }
+	FString AwayText(int32 Person) const { return People.IsValidIndex(Person) ? People[Person].AwayText : FString(); }
 
 	/** The routes that failed (for the tests): who, from where to where. */
 	const TArray<FString>& FailLog() const { return Fails; }

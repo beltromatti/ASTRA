@@ -416,6 +416,10 @@ FString UAstraLifeSubsystem::LocatorText(const FString& Words, int32 Max) const
 		{
 			Line += FString::Printf(TEXT(" lies wounded in the Medbay (Deck 6): %s, %s."), *R.Injury, R.ConditionName());
 		}
+		else if (Life.IsOffShip(Hits[k].Person))
+		{
+			Line += FString::Printf(TEXT(" is not aboard: %s."), *Life.Doing(Hits[k].Person));       // (TELETRASPORTO: beamed away, or in the buffer)
+		}
 		else
 		{
 			// how far from the Captain only on the Captain's own deck (forty metres through two decks is no distance anyone walks)
@@ -569,6 +573,18 @@ AAstraLifeBody* UAstraLifeSubsystem::BodyOfRoster(int32 RosterIdx) const
 	return I && Pool.IsValidIndex(*I) ? Pool[*I].Get() : nullptr;
 }
 
+void UAstraLifeSubsystem::ForceBody(int32 Person, float Seconds)
+{
+	// TELETRASPORTO: someone the transporter has just set down is seen arriving: their body is made at once, even in plain view
+	ForcedBodies.Add(Person, GetWorld() ? GetWorld()->GetTimeSeconds() + Seconds : (double)Seconds);
+}
+
+bool UAstraLifeSubsystem::IsBodyForced(int32 Person) const
+{
+	const double* Until = ForcedBodies.Find(Person);
+	return Until && GetWorld() && GetWorld()->GetTimeSeconds() < *Until;
+}
+
 void UAstraLifeSubsystem::ReleaseBody(int32 Person)
 {
 	if (const int32* I = BodyOf.Find(Person))
@@ -708,9 +724,9 @@ void UAstraLifeSubsystem::ManageBodies()
 	for (int32 i = 0; i < Life.NumPeople(); ++i)
 	{
 		const FAstraLifePerson& P = Life.Person(i);
-		if (P.Status != 0 || P.Act == EAstraLifeAct::Dead)
+		if (P.Status != 0 || P.Act == EAstraLifeAct::Dead || P.bTransit || P.bAway)
 		{
-			continue;
+			continue;                                    // (the dead; the ones the transporter holds or has sent away: no body for them aboard)
 		}
 		const bool bSettled = P.Phase == FAstraLifePerson::EPhase::Settled;
 		if (bSettled && (P.Act == EAstraLifeAct::Patient || (P.Place != INDEX_NONE && Map.Places[P.Place].External != NAME_None)))
@@ -756,7 +772,7 @@ void UAstraLifeSubsystem::ManageBodies()
 		{
 			continue;
 		}
-		if (!bJump && !BodyOf.Contains(C.P))
+		if (!bJump && !BodyOf.Contains(C.P) && !IsBodyForced(C.P))
 		{
 			// (a few traces a call: the rest wait for the next)
 			if (Traced >= 12 || !CanAppearUnseen(P.Pos))
@@ -773,7 +789,7 @@ void UAstraLifeSubsystem::ManageBodies()
 	for (const auto& KV : BodyOf)
 	{
 		const AAstraLifeBody* B = Pool.IsValidIndex(KV.Value) ? Pool[KV.Value].Get() : nullptr;
-		if (!B || Life.Person(KV.Key).Status != 0)
+		if (!B || Life.Person(KV.Key).Status != 0 || Life.Person(KV.Key).bTransit || Life.Person(KV.Key).bAway)
 		{
 			Drop.Add(KV.Key);
 		}
