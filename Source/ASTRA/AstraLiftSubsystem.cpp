@@ -26,11 +26,11 @@ DECLARE_DWORD_COUNTER_STAT(TEXT("Lines"), STAT_AstraLiftsLines, STATGROUP_AstraL
 
 namespace
 {
-	TAutoConsoleVariable<FString> CVarPlan(TEXT("astra.lifts.plan"), TEXT(""),
+	TAutoConsoleVariable<FString> LiftCVarPlan(TEXT("astra.lifts.plan"), TEXT(""),
 		TEXT("The plan the lifts are read from (a path; empty: the ship's own, staged with the game or in data/ship). A test plan: data/ship/test/lifts_fixture.json"));
-	TAutoConsoleVariable<int32> CVarEnabled(TEXT("astra.lifts"), 1, TEXT("0: no lifts are built (a world that needs none)"));
+	TAutoConsoleVariable<int32> LiftCVarEnabled(TEXT("astra.lifts"), 1, TEXT("0: no lifts are built (a world that needs none)"));
 
-	int32 ParkingStop(const FAstraLiftLine& L)
+	int32 LiftParkingStop(const FAstraLiftLine& L)
 	{
 		// the main landing: the bridge's deck, else Crew Services (the Mess and the berths), else the middle of the line
 		int32 I = L.FindStopByDeck(1);
@@ -52,11 +52,11 @@ void UAstraLiftSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	TitleFont = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"), nullptr, LOAD_NoWarn | LOAD_Quiet);
 	MonoFont = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"), nullptr, LOAD_NoWarn | LOAD_Quiet);
-	if (IsRunningCommandlet() || CVarEnabled.GetValueOnGameThread() == 0 || State != EState::Idle)
+	if (IsRunningCommandlet() || LiftCVarEnabled.GetValueOnGameThread() == 0 || State != EState::Idle)
 	{
 		return;                       // a bench builds its own lifts (LoadNetwork, BuildNow)
 	}
-	FString Path = CVarPlan.GetValueOnGameThread();
+	FString Path = LiftCVarPlan.GetValueOnGameThread();
 	if (Path.IsEmpty())
 	{
 		Path = FAstraLiftNetwork::DefaultPlanFile();
@@ -182,7 +182,7 @@ void UAstraLiftSubsystem::BuildLine(int32 Line)
 		return;
 	}
 	R.Car->bQuiet = bBench;
-	R.Car->Setup(this, Line, L, ParkingStop(L));
+	R.Car->Setup(this, Line, L, LiftParkingStop(L));
 	SlotOwner[Line].Init(INDEX_NONE, R.Car->NumSlots());
 	TArray<AAstraLiftLanding*> Landings;
 	for (int32 S = 0; S < L.Stops.Num(); ++S)
@@ -590,6 +590,23 @@ bool UAstraLiftSubsystem::IsNearPanel(const FVector& Feet) const
 		}
 	}
 	return false;
+}
+
+bool UAstraLiftSubsystem::RideFeet(FVector& OutFeetCm) const
+{
+	if (InLine == INDEX_NONE || !Run.IsValidIndex(InLine) || !Run[InLine].Car)
+	{
+		return false;
+	}
+	const FAstraLiftBrain& B = Run[InLine].Car->Brain;
+	const int32 Stop = B.State() == FAstraLiftBrain::EState::Moving ? B.LegTarget() : (B.State() == FAstraLiftBrain::EState::Hold ? B.AtLanding() : INDEX_NONE);
+	if (!Net.Lines[InLine].Stops.IsValidIndex(Stop))
+	{
+		return false;
+	}
+	const FAstraLiftStop& S = Net.Lines[InLine].Stops[Stop];
+	OutFeetCm = S.DoorCm + S.Out * 150.f;
+	return true;
 }
 
 bool UAstraLiftSubsystem::Use(APawn* Pawn, FString& OutNotice)

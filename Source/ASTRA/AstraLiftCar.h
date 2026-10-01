@@ -126,6 +126,7 @@ private:
 	void UpdateHum();
 	void Thump(float Volume);
 	bool bNearNow = false;
+	double LastMoveAt = -1.0e9;
 	friend class UAstraLiftSubsystem;
 };
 

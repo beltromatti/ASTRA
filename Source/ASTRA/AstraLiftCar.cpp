@@ -18,19 +18,19 @@ DECLARE_CYCLE_STAT(TEXT("Car tick"), STAT_AstraLiftCar, STATGROUP_AstraLifts);
 
 namespace
 {
-	UStaticMesh* KitMesh(const FString& Name)
+	UStaticMesh* LiftKitMesh(const FString& Name)
 	{
 		return LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Kit/Lift/%s.%s"), *Name, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
 	}
 
-	USoundBase* Sound(const TCHAR* Name)
+	USoundBase* LiftSound(const TCHAR* Name)
 	{
 		return LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Audio/%s.%s"), Name, Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
 	}
 
-	UStaticMesh* Cube()
+	UStaticMesh* LiftCube()
 	{
-		return LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		return LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/LiftCube.LiftCube"), nullptr, LOAD_NoWarn | LOAD_Quiet);
 	}
 }
 
@@ -189,8 +189,8 @@ void AAstraLiftCar::BuildShell()
 	}
 	Pier(Cursor, OW * 0.5f);
 	// the leaves: a pair for each opening (the visible leaf and its collision move together)
-	UStaticMesh* LeafKit = KitMesh(FString::Printf(TEXT("SM_LIFT_CarLeaf_%s"), *S.Suffix));
-	UStaticMesh* CubeMesh = Cube();
+	UStaticMesh* LeafKit = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_CarLeaf_%s"), *S.Suffix));
+	UStaticMesh* CubeMesh = LiftCube();
 	for (int32 I = 0; I < Ops.Num(); ++I)
 	{
 		for (int32 Side = 0; Side < 2; ++Side)
@@ -225,17 +225,17 @@ void AAstraLiftCar::BuildLooks()
 	const FAstraLiftSpec& S = CarSpec;
 	const float Z0 = Data.CarFloor;
 	const FString Suf = S.Suffix;
-	UStaticMesh* Cabin = KitMesh(FString::Printf(TEXT("SM_LIFT_Car_%s"), *Suf));
+	UStaticMesh* Cabin = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_Car_%s"), *Suf));
 	if (Cabin)
 	{
 		Hull = AddMesh(TEXT("Hull"), Cabin, FVector(0.f, 0.f, Z0), FVector::OneVector);
-		if (UStaticMesh* G = KitMesh(FString::Printf(TEXT("SM_LIFT_CarGlass_%s"), *Suf)))
+		if (UStaticMesh* G = LiftKitMesh(FString::Printf(TEXT("SM_LIFT_CarGlass_%s"), *Suf)))
 		{
 			Glass = AddMesh(TEXT("Glass"), G, FVector(0.f, 0.f, Z0), FVector::OneVector);
 			Glass->SetCastShadow(false);
 		}
 	}
-	else if (UStaticMesh* C = Cube())
+	else if (UStaticMesh* C = LiftCube())
 	{
 		// the kit is not imported: the shell's boxes as they are, so the car is something to ride
 		auto Plain = [&](UBoxComponent* B)
@@ -253,7 +253,7 @@ void AAstraLiftCar::BuildLooks()
 	// the screen: the kit's quad (1 m square, facing +X, u to the viewer's right, v up) scaled to the screen's size and turned to face into the car; the
 	// lift subsystem paints it. Without the kit, the engine's plane stands in for it (its picture may come out turned: the kit is the one that is right)
 	const FVector ScreenAt = S.ScreenCenter + FVector(0.f, 0.f, Z0);
-	if (UStaticMesh* Quad = KitMesh(TEXT("SM_LIFT_Screen")))
+	if (UStaticMesh* Quad = LiftKitMesh(TEXT("SM_LIFT_Screen")))
 	{
 		Screen = AddMesh(TEXT("Screen"), Quad, ScreenAt, FVector(1.0, S.ScreenSize.X / 100.0, S.ScreenSize.Y / 100.0));
 		Screen->SetRelativeRotation(FRotator(0.f, S.ScreenYaw, 0.f));
@@ -281,11 +281,11 @@ void AAstraLiftCar::BuildLooks()
 	Lamp->SetVisibility(false);
 	Lamp->RegisterComponent();
 	// the sounds
-	SndThump = Sound(TEXT("SW_Lift_Thump"));
-	SndChime = Sound(TEXT("SW_Lift_Chime"));
-	SndDoor = Sound(TEXT("SW_Door_Open"));
-	SndDoorShut = Sound(TEXT("SW_Door_Close"));
-	if (USoundBase* HumSound = Sound(TEXT("SW_Lift_Hum")))
+	SndThump = LiftSound(TEXT("SW_Lift_Thump"));
+	SndChime = LiftSound(TEXT("SW_Lift_Chime"));
+	SndDoor = LiftSound(TEXT("SW_Door_Open"));
+	SndDoorShut = LiftSound(TEXT("SW_Door_Close"));
+	if (USoundBase* HumSound = LiftSound(TEXT("SW_Lift_Hum")))
 	{
 		Hum = NewObject<UAudioComponent>(this, TEXT("Hum"));
 		Hum->SetupAttachment(GetRootComponent());
@@ -418,8 +418,13 @@ void AAstraLiftCar::Thump(float Volume)
 void AAstraLiftCar::ApplyBrain(float Dt)
 {
 	const FVector P = Data.Path.At(Brain.S());
-	if (!P.Equals(LastLocation, 0.005f))
+	// a car that nobody is near (the Captain far from it, the car between landings) moves its body a few times a second: its time is the brain's and exact, and
+	// the body is where it should be as soon as it stops or anyone comes near; twelve cars on the move at once cost the frame a third of what they do at full rate
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	const bool bCoarse = !bNearNow && Brain.AtLanding() == INDEX_NONE && Now - LastMoveAt < 0.25;
+	if (!bCoarse && !P.Equals(LastLocation, 0.005f))
 	{
+		LastMoveAt = Now;
 		// carried: the Captain's feet and the crew's bodies move with it (their movement reads this component as their base)
 		SetActorLocation(P, false, nullptr, ETeleportType::None);
 		LastLocation = P;

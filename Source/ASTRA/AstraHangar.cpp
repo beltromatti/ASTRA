@@ -1,7 +1,6 @@
 // ASTRA — the flight deck.
 
 #include "AstraHangar.h"
-#include "AstraDeckStreaming.h"
 
 #include "AstraShipSubsystem.h"
 
@@ -45,7 +44,6 @@ void AAstraHangar::BeginPlay()
 {
 	Super::BeginPlay();
 	CatapultSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Catapult.SW_Catapult"));
-	LiftSound = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Door_Close.SW_Door_Close"));
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (It->ActorHasTag(ZoneTag))
@@ -143,52 +141,6 @@ void AAstraHangar::SetZoneLights(bool bOn)
 	}
 }
 
-FVector AAstraHangar::LandingWorld(int32 Index) const
-{
-	switch (Index)
-	{
-	case 0: return BridgeLanding;
-	case 1: return GetActorTransform().TransformPosition(HangarLanding);
-	case 2: return EngineeringLanding;
-	case 3: return MedbayLanding;
-	case 4: return MessLanding;
-	case 5: return BerthLanding;
-	default: return FVector::ZeroVector;
-	}
-}
-
-int32 AAstraHangar::NumLandings() const
-{
-	int32 N = 0;
-	for (int32 i = 0; i < MaxLandings; ++i)
-	{
-		N += HasLanding(i) ? 1 : 0;
-	}
-	return N;
-}
-
-int32 AAstraHangar::LiftLandingNear(const APawn* Pawn) const
-{
-	if (!Pawn || LiftT >= 0.f || LiftCooldown > 0.f)
-	{
-		return -1;
-	}
-	const FVector P = Pawn->GetActorLocation();
-	for (int32 i = 0; i < MaxLandings; ++i)
-	{
-		if (!HasLanding(i))
-		{
-			continue;
-		}
-		const FVector L = LandingWorld(i);
-		if (FVector::Dist2D(P, L) < 320.f && FMath::Abs(P.Z - L.Z) < 400.f)
-		{
-			return i;
-		}
-	}
-	return -1;
-}
-
 bool AAstraHangar::IsPawnInEngineering(const APawn* Pawn) const
 {
 	// only the Captain on foot is in a room (a Falcon crossing the hull, a lifepod: never)
@@ -234,76 +186,10 @@ bool AAstraHangar::IsPawnInBerths(const APawn* Pawn) const
 	return D.X < 400.f && D.X > -2500.f && FMath::Abs(D.Y) < 450.f && D.Z > -300.f && D.Z < 600.f;
 }
 
-bool AAstraHangar::RideLift(APawn* Pawn, int32 ToLanding)
-{
-	const int32 From = LiftLandingNear(Pawn);
-	if (From < 0 || !HasLanding(ToLanding) || ToLanding == From)
-	{
-		return false;
-	}
-	RideTo = LandingWorld(ToLanding);
-	RideToLanding = ToLanding;
-	Rider = Pawn;
-	LiftT = 0.f;
-	LiftWaitS = 0.f;
-	if (UAstraDeckStreaming* DS = GetWorld()->GetSubsystem<UAstraDeckStreaming>())
-	{
-		DS->RequestAt(RideTo, 30.f);          // the destination's deck starts loading as the car leaves
-	}
-	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
-	{
-		Cam->StartCameraFade(0.f, 1.f, 0.4f, FLinearColor::Black, false, true);
-	}
-	if (LiftSound)
-	{
-		UGameplayStatics::PlaySound2D(this, LiftSound, 0.8f);
-	}
-	return true;
-}
-
-bool AAstraHangar::TryUseLift(APawn* Pawn)
-{
-	if (!Pawn || LiftT >= 0.f || LiftCooldown > 0.f)
-	{
-		return false;
-	}
-	const FVector P = Pawn->GetActorLocation();
-	const FVector Down = GetActorTransform().TransformPosition(HangarLanding);
-	const FVector Up = BridgeLanding;
-	if (FVector::Dist2D(P, Up) < 320.f && FMath::Abs(P.Z - Up.Z) < 400.f)
-	{
-		RideTo = Down;
-	}
-	else if (FVector::Dist2D(P, Down) < 320.f && FMath::Abs(P.Z - Down.Z) < 400.f)
-	{
-		RideTo = Up;
-	}
-	else
-	{
-		return false;
-	}
-	Rider = Pawn;
-	LiftT = 0.f;
-	LiftWaitS = 0.f;
-	if (UAstraDeckStreaming* DS = GetWorld()->GetSubsystem<UAstraDeckStreaming>())
-	{
-		DS->RequestAt(RideTo, 30.f);
-	}
-	if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
-	{
-		Cam->StartCameraFade(0.f, 1.f, 0.4f, FLinearColor::Black, false, true);
-	}
-	if (LiftSound)
-	{
-		UGameplayStatics::PlaySound2D(this, LiftSound, 0.8f);
-	}
-	return true;
-}
-
 bool AAstraHangar::TryBoard(APawn* Pawn)
 {
 	TArray<FParked>* Alpha = Parked.Find(TEXT("alpha"));
-	if (!Pawn || !Alpha || LiftT >= 0.f)
+	if (!Pawn || !Alpha)
 	{
 		return false;
 	}
@@ -353,61 +239,7 @@ void AAstraHangar::Tick(float DeltaTime)
 {
 	SCOPE_CYCLE_COUNTER(STAT_AstraHangar);
 	Super::Tick(DeltaTime);
-	LiftCooldown = FMath::Max(0.f, LiftCooldown - DeltaTime);
-	// the lift ride: fade out, the car moves (a moment of dark and the hum), fade in on the other deck
-	if (LiftT >= 0.f)
-	{
-		const float Before = LiftT;
-		LiftT += DeltaTime;
-		// the car does not open on a deck that is not there yet: in the dark it waits for the destination's sub-level (the decks stream,
-		// docs/NAVE.md §7bis), six seconds at most, then the deck is made ready at once
-		if (Before < 0.9f && LiftT >= 0.9f && Rider.IsValid())
-		{
-			if (UAstraDeckStreaming* DS = GetWorld()->GetSubsystem<UAstraDeckStreaming>(); DS && !DS->IsReadyAt(RideTo))
-			{
-				LiftWaitS += DeltaTime;
-				if (LiftWaitS < 6.f)
-				{
-					LiftT = 0.89f;
-				}
-				else
-				{
-					DS->ForceReadyAt(RideTo);
-				}
-			}
-		}
-		if (Before < 0.9f && LiftT >= 0.9f && Rider.IsValid())
-		{
-			float Half = 96.f;
-			if (const ACharacter* C = Cast<ACharacter>(Rider.Get()))
-			{
-				Half = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-			}
-			Rider->SetActorLocation(RideTo + FVector(0, 0, Half), false, nullptr, ETeleportType::TeleportPhysics);
-			if (AController* Ctl = Rider->GetController())
-			{
-				// out of the car facing into the deck: aft into Main Engineering and the Medbay, forward on the others (the Mess and the
-				// Berthing come out of the Deck 4 lift banks, whose doors are on the aft wall: forward too)
-				const bool bAft = RideToLanding == 2 || RideToLanding == 3;
-				Ctl->SetControlRotation(FRotator(0.f, bAft ? 180.f : (RideToLanding == 1 ? GetActorRotation().Yaw : 0.f), 0.f));
-			}
-			SetZoneLights(IsPawnInHangar(Rider.Get()));
-			if (APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0))
-			{
-				Cam->StartCameraFade(1.f, 0.f, 0.7f, FLinearColor::Black, false, false);
-			}
-			if (LiftSound)
-			{
-				UGameplayStatics::PlaySound2D(this, LiftSound, 0.6f, 1.08f);
-			}
-		}
-		if (LiftT > 1.8f)
-		{
-			LiftT = -1.f;
-			LiftCooldown = 1.0f;
-		}
-	}
-		if ((CheckT -= DeltaTime) <= 0.f)
+	if ((CheckT -= DeltaTime) <= 0.f)
 	{
 		CheckT = 0.25f;
 		SetZoneLights(IsPawnInHangar(UGameplayStatics::GetPlayerPawn(this, 0)));

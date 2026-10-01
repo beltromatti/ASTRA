@@ -22,7 +22,7 @@ void FAstraLiftPath::Build(const TArray<FVector>& InPts)
 namespace
 {
 	/** The segment an arc length falls in (the last one past the end). */
-	int32 SegmentAt(const TArray<float>& Cum, float S)
+	int32 LiftSegmentAt(const TArray<float>& Cum, float S)
 	{
 		int32 I = 0;
 		while (I + 2 < Cum.Num() && S > Cum[I + 1])
@@ -44,7 +44,7 @@ FVector FAstraLiftPath::At(float S) const
 		return Pts[0];
 	}
 	S = FMath::Clamp(S, 0.f, Length);
-	const int32 I = SegmentAt(Cum, S);
+	const int32 I = LiftSegmentAt(Cum, S);
 	const float Len = Cum[I + 1] - Cum[I];
 	return Len > KINDA_SMALL_NUMBER ? FMath::Lerp(Pts[I], Pts[I + 1], (S - Cum[I]) / Len) : Pts[I];
 }
@@ -55,7 +55,7 @@ FVector FAstraLiftPath::Tangent(float S) const
 	{
 		return FVector::UpVector;
 	}
-	const int32 I = SegmentAt(Cum, FMath::Clamp(S, 0.f, Length));
+	const int32 I = LiftSegmentAt(Cum, FMath::Clamp(S, 0.f, Length));
 	return (Pts[I + 1] - Pts[I]).GetSafeNormal();
 }
 
@@ -112,15 +112,15 @@ FAstraLiftProfile FAstraLiftProfile::Make(float Dist, float Vmax, float Accel)
 
 namespace
 {
-	float RampPos(float X)          // the area under a smoothstep, X in 0..1 (times Vc Ta)
+	float LiftRampPos(float X)          // the area under a smoothstep, X in 0..1 (times Vc Ta)
 	{
 		return X * X * X - 0.5f * X * X * X * X;
 	}
-	float RampVel(float X)          // the smoothstep (times Vc)
+	float LiftRampVel(float X)          // the smoothstep (times Vc)
 	{
 		return X * X * (3.f - 2.f * X);
 	}
-	float RampAcc(float X)          // its slope (times Vc / Ta)
+	float LiftRampAcc(float X)          // its slope (times Vc / Ta)
 	{
 		return 6.f * X * (1.f - X);
 	}
@@ -135,13 +135,13 @@ float FAstraLiftProfile::Pos(float t) const
 	t = FMath::Clamp(t, 0.f, T);
 	if (t < Ta)
 	{
-		return Vc * Ta * RampPos(t / Ta);
+		return Vc * Ta * LiftRampPos(t / Ta);
 	}
 	if (t < Ta + Tc)
 	{
 		return 0.5f * Vc * Ta + Vc * (t - Ta);
 	}
-	return D - Vc * Ta * RampPos((T - t) / Ta);
+	return D - Vc * Ta * LiftRampPos((T - t) / Ta);
 }
 
 float FAstraLiftProfile::Vel(float t) const
@@ -152,13 +152,13 @@ float FAstraLiftProfile::Vel(float t) const
 	}
 	if (t < Ta)
 	{
-		return Vc * RampVel(t / Ta);
+		return Vc * LiftRampVel(t / Ta);
 	}
 	if (t < Ta + Tc)
 	{
 		return Vc;
 	}
-	return Vc * RampVel((T - t) / Ta);
+	return Vc * LiftRampVel((T - t) / Ta);
 }
 
 float FAstraLiftProfile::Acc(float t) const
@@ -169,13 +169,13 @@ float FAstraLiftProfile::Acc(float t) const
 	}
 	if (t < Ta)
 	{
-		return Vc / Ta * RampAcc(t / Ta);
+		return Vc / Ta * LiftRampAcc(t / Ta);
 	}
 	if (t < Ta + Tc)
 	{
 		return 0.f;
 	}
-	return -Vc / Ta * RampAcc((T - t) / Ta);
+	return -Vc / Ta * LiftRampAcc((T - t) / Ta);
 }
 
 bool FAstraLiftProfile::Retarget(float t, float NewD, float Guard)

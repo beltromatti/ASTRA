@@ -12,9 +12,9 @@
 
 namespace
 {
-	using FObj = TSharedPtr<FJsonObject>;
+	using FLiftObj = TSharedPtr<FJsonObject>;
 
-	double NumOf(const FObj& O, const TCHAR* K, double Def = 0.0)
+	double LiftNumOf(const FLiftObj& O, const TCHAR* K, double Def = 0.0)
 	{
 		double V = Def;
 		if (O.IsValid())
@@ -24,7 +24,7 @@ namespace
 		return V;
 	}
 
-	FString StrOf(const FObj& O, const TCHAR* K, const FString& Def = FString())
+	FString LiftStrOf(const FLiftObj& O, const TCHAR* K, const FString& Def = FString())
 	{
 		FString V = Def;
 		if (O.IsValid())
@@ -35,7 +35,7 @@ namespace
 	}
 
 	/** A point in the plan's metres as world cm; false when the field is not three numbers. */
-	bool Vec3Of(const FObj& O, const TCHAR* K, FVector& Out)
+	bool LiftVec3Of(const FLiftObj& O, const TCHAR* K, FVector& Out)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
 		if (!O.IsValid() || !O->TryGetArrayField(K, A) || A->Num() < 3)
@@ -46,14 +46,14 @@ namespace
 		return true;
 	}
 
-	FObj ObjOf(const FObj& O, const TCHAR* K)
+	FLiftObj LiftObjOf(const FLiftObj& O, const TCHAR* K)
 	{
-		const FObj* Sub = nullptr;
-		return O.IsValid() && O->TryGetObjectField(K, Sub) ? *Sub : FObj();
+		const FLiftObj* Sub = nullptr;
+		return O.IsValid() && O->TryGetObjectField(K, Sub) ? *Sub : FLiftObj();
 	}
 
 	/** A room of the plan, as far as the car's screen cares: where it is and how notable. */
-	struct FRoom
+	struct FLiftRoom
 	{
 		int32 Plane = 0;
 		FString Kind, Name, Id;
@@ -65,7 +65,7 @@ namespace
 
 	/** How notable a kind of room is (below 40: an anonymous room that is not worth a name on a screen). The rooms a Captain goes to first: the halls the
 	 *  ship had before (the existing ones), the stations that run her, where people sleep, eat and heal. */
-	int32 NotableWeight(const FString& Kind)
+	int32 LiftNotableWeight(const FString& Kind)
 	{
 		static const TMap<FString, int32> W = {
 			{TEXT("bridge"), 100}, {TEXT("medbay"), 95}, {TEXT("engineering"), 95}, {TEXT("hangar"), 95}, {TEXT("mess"), 90}, {TEXT("cic"), 90},
@@ -78,7 +78,7 @@ namespace
 		return V ? *V : 0;
 	}
 
-	EAstraLiftKind KindOf(const FString& K)
+	EAstraLiftKind LiftKindOf(const FString& K)
 	{
 		if (K == TEXT("bridge")) { return EAstraLiftKind::Bridge; }
 		if (K == TEXT("service")) { return EAstraLiftKind::Service; }
@@ -87,29 +87,29 @@ namespace
 		return EAstraLiftKind::Turbolift;
 	}
 
-	struct FSection { FString Id; float X0 = 0.f, X1 = 0.f; };
+	struct FLiftSection { FString Id; float X0 = 0.f, X1 = 0.f; };
 
-	struct FContext
+	struct FLiftContext
 	{
 		TMap<int32, FString> DeckName;
-		TMap<int32, TArray<FSection>> Sections;
-		TArray<FRoom> Rooms;
+		TMap<int32, TArray<FLiftSection>> Sections;
+		TArray<FLiftRoom> Rooms;
 		TMap<FString, FVector> NodePos;       // only the nodes the lifts name
 		TSet<FString> WantedNodes;
 	};
 
 	/** The notable rooms of a deck, the halls first, then by how notable and how near (cm from a point); at most Max different names. */
-	void PlacesFor(const FContext& Ctx, int32 Plane, const FVector2D& Near, float X0, float X1, int32 Max, TArray<FString>& Out)
+	void LiftPlacesFor(const FLiftContext& Ctx, int32 Plane, const FVector2D& Near, float X0, float X1, int32 Max, TArray<FString>& Out)
 	{
-		TArray<const FRoom*> C;
-		for (const FRoom& R : Ctx.Rooms)
+		TArray<const FLiftRoom*> C;
+		for (const FLiftRoom& R : Ctx.Rooms)
 		{
 			if (R.Plane == Plane && R.Weight >= 40 && (X1 <= X0 || (R.Mid.X >= X0 && R.Mid.X <= X1)))
 			{
 				C.Add(&R);
 			}
 		}
-		C.Sort([&Near](const FRoom& A, const FRoom& B)
+		C.Sort([&Near](const FLiftRoom& A, const FLiftRoom& B)
 		{
 			if (A.bExisting != B.bExisting)
 			{
@@ -121,7 +121,7 @@ namespace
 			}
 			return FVector2D::DistSquared(A.Mid, Near) < FVector2D::DistSquared(B.Mid, Near);
 		});
-		for (const FRoom* R : C)
+		for (const FLiftRoom* R : C)
 		{
 			if (Out.Num() >= Max)
 			{
@@ -134,21 +134,21 @@ namespace
 		}
 	}
 
-	void ParseShaft(const FObj& V, FContext& Ctx, FAstraLiftNetwork& Net)
+	void LiftParseShaft(const FLiftObj& V, FLiftContext& Ctx, FAstraLiftNetwork& Net)
 	{
-		const FObj Shaft = ObjOf(V, TEXT("shaft"));
+		const FLiftObj Shaft = LiftObjOf(V, TEXT("shaft"));
 		if (!Shaft.IsValid())
 		{
 			return;                                     // the stairs, the older lift (a teleport between rooms): not a shaft
 		}
 		FAstraLiftLine L;
-		L.Id = StrOf(V, TEXT("id"));
-		L.Name = StrOf(V, TEXT("name"), L.Id);
-		L.Kind = KindOf(StrOf(V, TEXT("kind"), TEXT("turbolift")));
+		L.Id = LiftStrOf(V, TEXT("id"));
+		L.Name = LiftStrOf(V, TEXT("name"), L.Id);
+		L.Kind = LiftKindOf(LiftStrOf(V, TEXT("kind"), TEXT("turbolift")));
 		const FString Who = FString::Printf(TEXT("lift %s"), *L.Id);
-		L.ShaftCm = FVector(NumOf(Shaft, TEXT("x")) * 100.0, NumOf(Shaft, TEXT("y")) * 100.0, 0.0);
-		L.ShaftW = (float)NumOf(Shaft, TEXT("w"), 2.8) * 100.f;
-		L.ShaftD = (float)NumOf(Shaft, TEXT("d"), 2.8) * 100.f;
+		L.ShaftCm = FVector(LiftNumOf(Shaft, TEXT("x")) * 100.0, LiftNumOf(Shaft, TEXT("y")) * 100.0, 0.0);
+		L.ShaftW = (float)LiftNumOf(Shaft, TEXT("w"), 2.8) * 100.f;
+		L.ShaftD = (float)LiftNumOf(Shaft, TEXT("d"), 2.8) * 100.f;
 		const TArray<TSharedPtr<FJsonValue>>* Z = nullptr;
 		float ShaftZ0 = 0.f, ShaftZ1 = 0.f;
 		if (Shaft->TryGetArrayField(TEXT("z"), Z) && Z->Num() >= 2)
@@ -156,15 +156,15 @@ namespace
 			ShaftZ0 = (float)(*Z)[0]->AsNumber() * 100.f;
 			ShaftZ1 = (float)(*Z)[1]->AsNumber() * 100.f;
 		}
-		const FObj Car = ObjOf(V, TEXT("car"));
+		const FLiftObj Car = LiftObjOf(V, TEXT("car"));
 		const bool bBig = L.Kind == EAstraLiftKind::Cargo;
-		L.CarW = (float)NumOf(Car, TEXT("w"), bBig ? 3.4 : 2.4) * 100.f;
-		L.CarD = (float)NumOf(Car, TEXT("d"), bBig ? 3.0 : 2.4) * 100.f;
-		L.CarH = (float)NumOf(Car, TEXT("h"), bBig ? 3.2 : 2.6) * 100.f;
-		L.CarFloor = (float)NumOf(Car, TEXT("floor"), 0.0) * 100.f;
+		L.CarW = (float)LiftNumOf(Car, TEXT("w"), bBig ? 3.4 : 2.4) * 100.f;
+		L.CarD = (float)LiftNumOf(Car, TEXT("d"), bBig ? 3.0 : 2.4) * 100.f;
+		L.CarH = (float)LiftNumOf(Car, TEXT("h"), bBig ? 3.2 : 2.6) * 100.f;
+		L.CarFloor = (float)LiftNumOf(Car, TEXT("floor"), 0.0) * 100.f;
 		const bool bSlow = L.Kind == EAstraLiftKind::Service || bBig;
-		L.SpeedCmS = (float)NumOf(V, TEXT("speed"), bBig ? 3.0 : bSlow ? 5.0 : 8.0) * 100.f;
-		L.AccelCmS2 = (float)NumOf(V, TEXT("accel"), bBig ? 1.0 : bSlow ? 1.5 : 2.5) * 100.f;
+		L.SpeedCmS = (float)LiftNumOf(V, TEXT("speed"), bBig ? 3.0 : bSlow ? 5.0 : 8.0) * 100.f;
+		L.AccelCmS2 = (float)LiftNumOf(V, TEXT("accel"), bBig ? 1.0 : bSlow ? 1.5 : 2.5) * 100.f;
 		if (L.CarW > L.ShaftW - 8.f || L.CarD > L.ShaftD - 8.f)
 		{
 			Net.Problems.Add(FString::Printf(TEXT("%s: the car (%.2f x %.2f m) does not fit the shaft (%.2f x %.2f m)"), *Who, L.CarW / 100, L.CarD / 100, L.ShaftW / 100, L.ShaftD / 100));
@@ -178,23 +178,23 @@ namespace
 		}
 		for (const TSharedPtr<FJsonValue>& LV : *Landings)
 		{
-			const FObj O = LV->AsObject();
+			const FLiftObj O = LV->AsObject();
 			FVector Door;
-			if (!O.IsValid() || !Vec3Of(O, TEXT("door"), Door))
+			if (!O.IsValid() || !LiftVec3Of(O, TEXT("door"), Door))
 			{
 				Net.Problems.Add(FString::Printf(TEXT("%s: a landing without a door position"), *Who));
 				continue;
 			}
 			FAstraLiftStop S;
-			S.Deck = (int32)NumOf(O, TEXT("deck"));
+			S.Deck = (int32)LiftNumOf(O, TEXT("deck"));
 			S.Id = FString::Printf(TEXT("d%d"), S.Deck);
 			S.Label = FString::Printf(TEXT("DECK %d"), S.Deck);
 			S.DeckName = Ctx.DeckName.FindRef(S.Deck);
-			S.FloorZ = (float)NumOf(O, TEXT("z"), Door.Z / 100.0) * 100.f;
+			S.FloorZ = (float)LiftNumOf(O, TEXT("z"), Door.Z / 100.0) * 100.f;
 			S.DoorCm = FVector(Door.X, Door.Y, S.FloorZ);
-			S.DoorYaw = (float)NumOf(O, TEXT("yaw"));
-			S.Lobby = StrOf(O, TEXT("lobby"));
-			S.NodeId = StrOf(O, TEXT("node"));
+			S.DoorYaw = (float)LiftNumOf(O, TEXT("yaw"));
+			S.Lobby = LiftStrOf(O, TEXT("lobby"));
+			S.NodeId = LiftStrOf(O, TEXT("node"));
 			// which wall of the shaft the door is in: a door turned 0 or 180 is in a wall across x (its passage runs along x), 90 or 270 along y; the sign
 			// is where it lies from the shaft's middle
 			const bool bAlongX = FMath::Abs(FMath::Cos(FMath::DegreesToRadians(S.DoorYaw))) > 0.5f;
@@ -246,7 +246,7 @@ namespace
 		Net.Lines.Add(MoveTemp(L));
 	}
 
-	void ParseTransit(const FObj& V, FContext& Ctx, FAstraLiftNetwork& Net)
+	void LiftParseTransit(const FLiftObj& V, FLiftContext& Ctx, FAstraLiftNetwork& Net)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* PathPts = nullptr;
 		if (!V.IsValid() || !V->TryGetArrayField(TEXT("path"), PathPts) || PathPts->Num() < 2)
@@ -256,8 +256,8 @@ namespace
 		FAstraLiftLine L;
 		L.bShuttle = true;
 		L.Kind = EAstraLiftKind::Shuttle;
-		L.Id = StrOf(V, TEXT("id"), TEXT("shuttle"));
-		L.Name = StrOf(V, TEXT("name"), TEXT("Spine Shuttle"));
+		L.Id = LiftStrOf(V, TEXT("id"), TEXT("shuttle"));
+		L.Name = LiftStrOf(V, TEXT("name"), TEXT("Spine Shuttle"));
 		const FString Who = FString::Printf(TEXT("line %s"), *L.Id);
 		TArray<FVector> Pts;
 		for (const TSharedPtr<FJsonValue>& PV : *PathPts)
@@ -275,15 +275,15 @@ namespace
 			return;
 		}
 		// the car's own frame has its door side on +x: its width runs along the doors (here the whole length of the car, along the line), its depth across
-		const FObj Car = ObjOf(V, TEXT("car"));
-		L.CarLength = (float)NumOf(Car, TEXT("length"), 14.0) * 100.f;
+		const FLiftObj Car = LiftObjOf(V, TEXT("car"));
+		L.CarLength = (float)LiftNumOf(Car, TEXT("length"), 14.0) * 100.f;
 		L.CarW = L.CarLength;
-		L.CarD = (float)NumOf(Car, TEXT("w"), 2.8) * 100.f;
-		L.CarH = (float)NumOf(Car, TEXT("h"), 2.9) * 100.f;
-		L.CarFloor = (float)NumOf(Car, TEXT("floor"), 0.16) * 100.f;
-		L.SpeedCmS = (float)NumOf(V, TEXT("speed"), 16.0) * 100.f;
-		L.AccelCmS2 = (float)NumOf(V, TEXT("accel"), 2.2) * 100.f;
-		const int32 DeckId = (int32)NumOf(V, TEXT("deck"), 5.0);
+		L.CarD = (float)LiftNumOf(Car, TEXT("w"), 2.8) * 100.f;
+		L.CarH = (float)LiftNumOf(Car, TEXT("h"), 2.9) * 100.f;
+		L.CarFloor = (float)LiftNumOf(Car, TEXT("floor"), 0.16) * 100.f;
+		L.SpeedCmS = (float)LiftNumOf(V, TEXT("speed"), 16.0) * 100.f;
+		L.AccelCmS2 = (float)LiftNumOf(V, TEXT("accel"), 2.2) * 100.f;
+		const int32 DeckId = (int32)LiftNumOf(V, TEXT("deck"), 5.0);
 		const TArray<TSharedPtr<FJsonValue>>* Stops = nullptr;
 		if (!V->TryGetArrayField(TEXT("stops"), Stops))
 		{
@@ -292,16 +292,16 @@ namespace
 		}
 		for (const TSharedPtr<FJsonValue>& SV : *Stops)
 		{
-			const FObj O = SV->AsObject();
+			const FLiftObj O = SV->AsObject();
 			FVector Door;
-			if (!O.IsValid() || !Vec3Of(O, TEXT("door"), Door))
+			if (!O.IsValid() || !LiftVec3Of(O, TEXT("door"), Door))
 			{
 				Net.Problems.Add(FString::Printf(TEXT("%s: a stop without a door position"), *Who));
 				continue;
 			}
 			FAstraLiftStop S;
 			S.Deck = DeckId;
-			S.Section = StrOf(O, TEXT("section"));
+			S.Section = LiftStrOf(O, TEXT("section"));
 			S.Id = S.Section.IsEmpty() ? FString::Printf(TEXT("s%d"), L.Stops.Num() + 1) : FString::Printf(TEXT("sec_%s"), *S.Section.ToLower());
 			S.Label = S.Section.IsEmpty() ? FString::Printf(TEXT("STOP %d"), L.Stops.Num() + 1) : FString::Printf(TEXT("SECTION %s"), *S.Section.ToUpper());
 			S.DeckName = Ctx.DeckName.FindRef(DeckId);
@@ -309,7 +309,7 @@ namespace
 			const FVector OnPath = L.Path.At(S.S);
 			S.DoorCm = Door;
 			S.FloorZ = OnPath.Z;
-			S.DoorYaw = (float)NumOf(O, TEXT("yaw"));
+			S.DoorYaw = (float)LiftNumOf(O, TEXT("yaw"));
 			// the platform side: from the line to the door; a door on the line itself is across it, on the side the yaw says
 			FVector Side = FVector(Door.X - OnPath.X, Door.Y - OnPath.Y, 0.0);
 			if (Side.SizeSquared() < 20.0 * 20.0)
@@ -318,8 +318,8 @@ namespace
 				Side = FVector(-FMath::Sin(Y), FMath::Cos(Y), 0.f);
 			}
 			S.Out = Side.GetSafeNormal();
-			S.Lobby = StrOf(O, TEXT("room"));
-			S.NodeId = StrOf(O, TEXT("node"));
+			S.Lobby = LiftStrOf(O, TEXT("room"));
+			S.NodeId = LiftStrOf(O, TEXT("node"));
 			if (!S.NodeId.IsEmpty())
 			{
 				Ctx.WantedNodes.Add(S.NodeId);
@@ -445,33 +445,33 @@ bool FAstraLiftNetwork::Load(const FString& Path)
 	{
 		return false;
 	}
-	FObj Root;
+	FLiftObj Root;
 	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
 	{
 		Problems.Add(FString::Printf(TEXT("%s does not parse"), *Path));
 		return false;
 	}
 	Text.Empty();
-	FContext Ctx;
+	FLiftContext Ctx;
 	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
 	if (Root->TryGetArrayField(TEXT("decks"), List))
 	{
 		for (const TSharedPtr<FJsonValue>& V : *List)
 		{
-			const FObj O = V->AsObject();
-			const int32 Id = (int32)NumOf(O, TEXT("id"));
-			Ctx.DeckName.Add(Id, StrOf(O, TEXT("name")));
+			const FLiftObj O = V->AsObject();
+			const int32 Id = (int32)LiftNumOf(O, TEXT("id"));
+			Ctx.DeckName.Add(Id, LiftStrOf(O, TEXT("name")));
 			const TArray<TSharedPtr<FJsonValue>>* Secs = nullptr;
 			if (O.IsValid() && O->TryGetArrayField(TEXT("sections"), Secs))
 			{
 				for (const TSharedPtr<FJsonValue>& SV : *Secs)
 				{
-					const FObj SO = SV->AsObject();
+					const FLiftObj SO = SV->AsObject();
 					const TArray<TSharedPtr<FJsonValue>>* X = nullptr;
 					if (SO.IsValid() && SO->TryGetArrayField(TEXT("x"), X) && X->Num() >= 2)
 					{
-						FSection S;
-						S.Id = StrOf(SO, TEXT("id"));
+						FLiftSection S;
+						S.Id = LiftStrOf(SO, TEXT("id"));
 						S.X0 = (float)FMath::Min((*X)[0]->AsNumber(), (*X)[1]->AsNumber()) * 100.f;
 						S.X1 = (float)FMath::Max((*X)[0]->AsNumber(), (*X)[1]->AsNumber()) * 100.f;
 						Ctx.Sections.FindOrAdd(Id).Add(S);
@@ -484,23 +484,23 @@ bool FAstraLiftNetwork::Load(const FString& Path)
 	{
 		for (const TSharedPtr<FJsonValue>& V : *List)
 		{
-			const FObj O = V->AsObject();
+			const FLiftObj O = V->AsObject();
 			const TArray<TSharedPtr<FJsonValue>>* B = nullptr;
 			if (!O.IsValid() || !O->TryGetArrayField(TEXT("bounds"), B) || B->Num() < 4)
 			{
 				continue;
 			}
-			FRoom R;
-			R.Kind = StrOf(O, TEXT("kind"));
-			R.Weight = NotableWeight(R.Kind);
+			FLiftRoom R;
+			R.Kind = LiftStrOf(O, TEXT("kind"));
+			R.Weight = LiftNotableWeight(R.Kind);
 			if (R.Weight == 0)
 			{
 				continue;
 			}
-			R.Id = StrOf(O, TEXT("id"));
-			R.Name = StrOf(O, TEXT("name"));
-			R.Plane = (int32)NumOf(O, TEXT("plane"), NumOf(O, TEXT("deck")));
-			R.bExisting = StrOf(O, TEXT("status")) == TEXT("existing");
+			R.Id = LiftStrOf(O, TEXT("id"));
+			R.Name = LiftStrOf(O, TEXT("name"));
+			R.Plane = (int32)LiftNumOf(O, TEXT("plane"), LiftNumOf(O, TEXT("deck")));
+			R.bExisting = LiftStrOf(O, TEXT("status")) == TEXT("existing");
 			R.X0 = (float)FMath::Min((*B)[0]->AsNumber(), (*B)[2]->AsNumber()) * 100.f;
 			R.X1 = (float)FMath::Max((*B)[0]->AsNumber(), (*B)[2]->AsNumber()) * 100.f;
 			R.Mid = FVector2D((R.X0 + R.X1) * 0.5, ((*B)[1]->AsNumber() + (*B)[3]->AsNumber()) * 50.0);
@@ -511,27 +511,27 @@ bool FAstraLiftNetwork::Load(const FString& Path)
 	{
 		for (const TSharedPtr<FJsonValue>& V : *List)
 		{
-			ParseShaft(V->AsObject(), Ctx, *this);
+			LiftParseShaft(V->AsObject(), Ctx, *this);
 		}
 	}
 	if (Root->TryGetArrayField(TEXT("transit"), List))
 	{
 		for (const TSharedPtr<FJsonValue>& V : *List)
 		{
-			ParseTransit(V->AsObject(), Ctx, *this);
+			LiftParseTransit(V->AsObject(), Ctx, *this);
 		}
 	}
 	// the graph nodes the lifts name: where the crew waits for a car
-	const FObj Graph = ObjOf(Root, TEXT("graph"));
+	const FLiftObj Graph = LiftObjOf(Root, TEXT("graph"));
 	if (Graph.IsValid() && Ctx.WantedNodes.Num() && Graph->TryGetArrayField(TEXT("nodes"), List))
 	{
 		for (const TSharedPtr<FJsonValue>& V : *List)
 		{
-			const FObj O = V->AsObject();
+			const FLiftObj O = V->AsObject();
 			FVector P;
-			if (O.IsValid() && Ctx.WantedNodes.Contains(StrOf(O, TEXT("id"))) && Vec3Of(O, TEXT("p"), P))
+			if (O.IsValid() && Ctx.WantedNodes.Contains(LiftStrOf(O, TEXT("id"))) && LiftVec3Of(O, TEXT("p"), P))
 			{
-				Ctx.NodePos.Add(StrOf(O, TEXT("id")), P);
+				Ctx.NodePos.Add(LiftStrOf(O, TEXT("id")), P);
 			}
 		}
 	}
@@ -552,7 +552,7 @@ bool FAstraLiftNetwork::Load(const FString& Path)
 			if (L.bShuttle)
 			{
 				float X0 = 0.f, X1 = 0.f;
-				for (const FSection& Sec : Ctx.Sections.FindRef(S.Deck))
+				for (const FLiftSection& Sec : Ctx.Sections.FindRef(S.Deck))
 				{
 					if (Sec.Id.Equals(S.Section, ESearchCase::IgnoreCase))
 					{
@@ -560,11 +560,11 @@ bool FAstraLiftNetwork::Load(const FString& Path)
 						X1 = Sec.X1;
 					}
 				}
-				PlacesFor(Ctx, S.Deck, FVector2D(S.DoorCm.X, S.DoorCm.Y), X0, X1, 4, S.Places);
+				LiftPlacesFor(Ctx, S.Deck, FVector2D(S.DoorCm.X, S.DoorCm.Y), X0, X1, 4, S.Places);
 			}
 			else
 			{
-				PlacesFor(Ctx, S.Deck, FVector2D(S.DoorCm.X, S.DoorCm.Y), 0.f, 0.f, 5, S.Places);
+				LiftPlacesFor(Ctx, S.Deck, FVector2D(S.DoorCm.X, S.DoorCm.Y), 0.f, 0.f, 5, S.Places);
 			}
 		}
 	}

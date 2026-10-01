@@ -83,17 +83,13 @@ protected:
 	void OpenMenu();
 	/** The Captain climbs into a Falcon of Alpha on the flight deck: the cockpit on the port catapult. */
 	void BoardFalcon(class AAstraHangar* Hangar, APawn* Walker);
-	/** The lift's panel: which deck (1 the bridge, 2 Main Engineering, 3 the flight deck). */
-	void ShowLiftMenu(class AAstraHangar* Hangar, int32 From);
-	void CloseLiftMenu();
-	void ChooseDeck(int32 Number);
-	TSharedPtr<class SWidget> LiftMenu;
-	TWeakObjectPtr<class AAstraHangar> LiftHangar;
+	/** The lifts (docs/ASCENSORI.md): E at a panel or inside a car goes to UAstraLiftSubsystem::Use; the list on the car's screen holds the walking still. */
+	bool bLiftListHeld = false;
 	/** F1: the controls card (shown for a while at the start of a campaign as a hint). */
 	void ToggleHelp();
 	UFUNCTION(Exec) void AstraHelp() { ToggleHelp(); }
-	/** Console: pick a deck on the open lift panel (1 bridge, 2 engineering, 3 flight deck). */
-	UFUNCTION(Exec) void AstraDeck(int32 N) { if (LiftMenu.IsValid()) { ChooseDeck(N); } }
+	/** Console: the lift the Captain is in goes to a deck (what the voice does). */
+	UFUNCTION(Exec) void AstraDeck(int32 N);
 	void ShowHelp(bool bShow);
 	/** Tab: the Captain's datapad, raised in the left hand anywhere aboard (the ship at a glance), or lowered. */
 	void TogglePad();

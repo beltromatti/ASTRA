@@ -103,6 +103,9 @@ public:
 	bool CallAt(int32 Line, int32 Stop, FString& OutNotice);
 	/** A landing's panel within reach of a place on the floor (for the controller's rule that the lift is what E means here). */
 	bool IsNearPanel(const FVector& Feet) const;
+	/** While the Captain rides (the car moves, or waits with its doors shut for the deck), the lobby he is going to: where the deck streaming should look instead of at
+	 *  each deck he passes (a ride down the ship would load every one of them in turn). False when he is not riding. */
+	bool RideFeet(FVector& OutFeetCm) const;
 
 	// --------------------------------------------------------------------------------------------------------------------------- for the screen
 	struct FRow { int32 Stop = INDEX_NONE; FString Label, Name, Places; bool bHere = false; };

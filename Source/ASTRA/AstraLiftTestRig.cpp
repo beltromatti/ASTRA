@@ -13,7 +13,7 @@
 namespace
 {
 	/** A box of the arena in an actor's frame: collision always, a plain cube to see it when asked. */
-	void Slab(AActor* Owner, const FName& Name, const FVector& Centre, const FRotator& Rot, const FVector& HalfExtent, bool bVisible, UStaticMesh* Cube)
+	void LiftSlab(AActor* Owner, const FName& Name, const FVector& Centre, const FRotator& Rot, const FVector& HalfExtent, bool bVisible, UStaticMesh* Cube)
 	{
 		UBoxComponent* B = NewObject<UBoxComponent>(Owner, Name);
 		B->SetupAttachment(Owner->GetRootComponent());
@@ -53,11 +53,11 @@ void AstraLiftArena::Build(AActor* Owner, const FAstraLiftNetwork& Net, bool bVi
 			{
 				const FAstraLiftStop& St = L.Stops[S];
 				const FVector Centre = St.DoorCm + St.Out * 300.f - FVector(0.f, 0.f, 20.f);
-				Slab(Owner, *FString::Printf(TEXT("Platform_%s_%d"), *L.Id, S), Centre, Yaw, FVector(300.f, 900.f, 20.f), bVisible, Cube);
+				LiftSlab(Owner, *FString::Printf(TEXT("Platform_%s_%d"), *L.Id, S), Centre, Yaw, FVector(300.f, 900.f, 20.f), bVisible, Cube);
 				++N;
 			}
 			const FVector Mid = (L.Path.At(0.f) + L.Path.At(L.Path.Length)) * 0.5f;
-			Slab(Owner, *FString::Printf(TEXT("Track_%s"), *L.Id), Mid - FVector(0.f, 0.f, 40.f), Yaw, FVector(FMath::Abs(L.Path.Length) * 0.5f + 800.f, 200.f, 20.f), bVisible, Cube);
+			LiftSlab(Owner, *FString::Printf(TEXT("Track_%s"), *L.Id), Mid - FVector(0.f, 0.f, 40.f), Yaw, FVector(FMath::Abs(L.Path.Length) * 0.5f + 800.f, 200.f, 20.f), bVisible, Cube);
 			continue;
 		}
 		const FAstraLiftSpec Spec = FAstraLiftSpec::Make(L);
@@ -67,12 +67,12 @@ void AstraLiftArena::Build(AActor* Owner, const FAstraLiftNetwork& Net, bool bVi
 		const float Bottom = L.ZBottom - 150.f, Top = L.ZTop + 600.f;
 		const float HW = L.ShaftW * 0.5f + 10.f, HD = L.ShaftD * 0.5f;
 		// the shaft: the back and the two sides, the whole way
-		Slab(Owner, *FString::Printf(TEXT("ShaftBack_%s"), *L.Id), World(FVector(-HD - 10.f, 0.f, (Top + Bottom) * 0.5f)), Yaw, FVector(10.f, HW + 10.f, (Top - Bottom) * 0.5f), bVisible, Cube);
+		LiftSlab(Owner, *FString::Printf(TEXT("ShaftBack_%s"), *L.Id), World(FVector(-HD - 10.f, 0.f, (Top + Bottom) * 0.5f)), Yaw, FVector(10.f, HW + 10.f, (Top - Bottom) * 0.5f), bVisible, Cube);
 		for (const float Side : {-1.f, 1.f})
 		{
-			Slab(Owner, *FString::Printf(TEXT("ShaftSide_%s_%d"), *L.Id, Side > 0.f), World(FVector(0.f, Side * (HW + 10.f), (Top + Bottom) * 0.5f)), Yaw, FVector(HD, 10.f, (Top - Bottom) * 0.5f), bVisible, Cube);
+			LiftSlab(Owner, *FString::Printf(TEXT("ShaftSide_%s_%d"), *L.Id, Side > 0.f), World(FVector(0.f, Side * (HW + 10.f), (Top + Bottom) * 0.5f)), Yaw, FVector(HD, 10.f, (Top - Bottom) * 0.5f), bVisible, Cube);
 		}
-		Slab(Owner, *FString::Printf(TEXT("ShaftPit_%s"), *L.Id), World(FVector(0.f, 0.f, Bottom - 10.f)), Yaw, FVector(HD, HW, 10.f), bVisible, Cube);
+		LiftSlab(Owner, *FString::Printf(TEXT("ShaftPit_%s"), *L.Id), World(FVector(0.f, 0.f, Bottom - 10.f)), Yaw, FVector(HD, HW, 10.f), bVisible, Cube);
 		// the front wall (on the +X side): solid except at the doors: the piers either side of each opening, the wall between landings
 		const float OpW = Spec.Openings[0].Width, OpH = Spec.Openings[0].Height;
 		const float Pier = HW - OpW * 0.5f;
@@ -82,7 +82,7 @@ void AstraLiftArena::Build(AActor* Owner, const FAstraLiftNetwork& Net, bool bVi
 			const float StopZ = S < L.Stops.Num() ? L.Stops[S].FloorZ : Top;
 			if (StopZ - Z > 1.f)
 			{
-				Slab(Owner, *FString::Printf(TEXT("FrontWall_%s_%d"), *L.Id, S), World(FVector(HD + 10.f, 0.f, (Z + StopZ) * 0.5f)), Yaw, FVector(10.f, HW, (StopZ - Z) * 0.5f), bVisible, Cube);
+				LiftSlab(Owner, *FString::Printf(TEXT("FrontWall_%s_%d"), *L.Id, S), World(FVector(HD + 10.f, 0.f, (Z + StopZ) * 0.5f)), Yaw, FVector(10.f, HW, (StopZ - Z) * 0.5f), bVisible, Cube);
 			}
 			if (S < L.Stops.Num())
 			{
@@ -90,11 +90,11 @@ void AstraLiftArena::Build(AActor* Owner, const FAstraLiftNetwork& Net, bool bVi
 				const float Z0 = St.FloorZ;
 				for (const float Side : {-1.f, 1.f})
 				{
-					Slab(Owner, *FString::Printf(TEXT("Pier_%s_%d_%d"), *L.Id, S, Side > 0.f), World(FVector(HD + 10.f, Side * (OpW * 0.5f + Pier * 0.5f), Z0 + OpH * 0.5f)), Yaw,
+					LiftSlab(Owner, *FString::Printf(TEXT("Pier_%s_%d_%d"), *L.Id, S, Side > 0.f), World(FVector(HD + 10.f, Side * (OpW * 0.5f + Pier * 0.5f), Z0 + OpH * 0.5f)), Yaw,
 					     FVector(10.f, Pier * 0.5f, OpH * 0.5f), bVisible, Cube);
 				}
 				// the lobby: a floor in front of the doors, and a wall either side so that nobody walks round to the back of the shaft
-				Slab(Owner, *FString::Printf(TEXT("Lobby_%s_%d"), *L.Id, S), World(FVector(HD + 20.f + 350.f, 0.f, Z0 - 20.f)), Yaw, FVector(350.f, 450.f, 20.f), bVisible, Cube);
+				LiftSlab(Owner, *FString::Printf(TEXT("Lobby_%s_%d"), *L.Id, S), World(FVector(HD + 20.f + 350.f, 0.f, Z0 - 20.f)), Yaw, FVector(350.f, 450.f, 20.f), bVisible, Cube);
 				Z = Z0 + OpH;
 				++N;
 			}

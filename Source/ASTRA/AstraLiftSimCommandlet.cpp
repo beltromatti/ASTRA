@@ -25,20 +25,20 @@ bool GAstraLiftTrace = false;
 
 namespace
 {
-	struct FCheck
+	struct FLiftCheck
 	{
 		FString Name;
 		bool bPass = true;
 	};
-	TArray<FCheck> Checks;
+	TArray<FLiftCheck> LiftChecks;
 
-	void Check(const TCHAR* Name, bool bPass, const FString& Detail)
+	void LiftCheck(const TCHAR* Name, bool bPass, const FString& Detail)
 	{
-		Checks.Add({Name, bPass});
+		LiftChecks.Add({Name, bPass});
 		UE_LOG(LogASTRA, Display, TEXT("[Lift] %s %-40s %s"), bPass ? TEXT("PASS") : TEXT("FAIL"), Name, *Detail);
 	}
 
-	double Percentile(TArray<double> V, double P)
+	double LiftPercentile(TArray<double> V, double P)
 	{
 		if (V.Num() == 0)
 		{
@@ -48,7 +48,7 @@ namespace
 		return V[FMath::Clamp((int32)(P * (V.Num() - 1) + 0.5), 0, V.Num() - 1)];
 	}
 
-	double Mean(const TArray<double>& V)
+	double LiftMean(const TArray<double>& V)
 	{
 		double S = 0.0;
 		for (const double X : V)
@@ -73,7 +73,7 @@ UAstraLiftSimCommandlet::UAstraLiftSimCommandlet()
 namespace
 {
 	/** A brain on its own clock, with the invariants a lift must never break checked at every step. */
-	struct FSim
+	struct FLiftSim
 	{
 		FAstraLiftBrain B;
 		TArray<float> LandingS;
@@ -185,7 +185,7 @@ namespace
 	};
 
 	/** The landings of a line of the test plan, as the brain is given them. */
-	TArray<float> StopsOf(const FAstraLiftLine& L)
+	TArray<float> LiftStopsOf(const FAstraLiftLine& L)
 	{
 		TArray<float> S;
 		for (const FAstraLiftStop& Stop : L.Stops)
@@ -195,7 +195,7 @@ namespace
 		return S;
 	}
 
-	FString ArrivalText(const TArray<int32>& A)
+	FString LiftArrivalText(const TArray<int32>& A)
 	{
 		FString T;
 		for (const int32 I : A)
@@ -205,7 +205,7 @@ namespace
 		return T;
 	}
 
-	void TestMotion()
+	void LiftTestMotion()
 	{
 		const float Vmax = 800.f, A = 250.f;
 		const float Metres[] = {4.f, 8.f, 16.f, 36.7f, 66.f, 78.f};
@@ -233,7 +233,7 @@ namespace
 			Bad += FMath::Abs(P.Pos(P.T) - M * 100.f) > 0.01f ? 1 : 0;
 			Bad += FMath::Abs(P.Pos(0.f)) > 0.001f || P.Vel(0.f) != 0.f || P.Vel(P.T) != 0.f || FMath::Abs(P.Acc(0.001f)) > 1.f ? 1 : 0;
 		}
-		Check(TEXT("motion: a smooth move, exact at both ends"), Bad == 0, FString::Printf(TEXT("%d breaks over 6 moves; %s; jerk at most %.1f m/s3"), Bad, *Times, WorstJerk / 100.f));
+		LiftCheck(TEXT("motion: a smooth move, exact at both ends"), Bad == 0, FString::Printf(TEXT("%d breaks over 6 moves; %s; jerk at most %.1f m/s3"), Bad, *Times, WorstJerk / 100.f));
 		// a stop asked for on the way: only while cruising, and only if the braking can still begin; the car does not notice
 		FAstraLiftProfile P = FAstraLiftProfile::Make(6600.f, Vmax, A);
 		const float T0 = P.Ta + 0.3f;
@@ -244,12 +244,12 @@ namespace
 		const bool bLate = !Q.Retarget(Q.Ta + 2.f, 5000.f, 0.4f);                // the braking would have had to begin already
 		FAstraLiftProfile R = FAstraLiftProfile::Make(6600.f, Vmax, A);
 		const bool bRamp = !R.Retarget(1.0f, 5000.f, 0.4f);                       // still accelerating: no
-		Check(TEXT("motion: a stop on the way, in the cruise"), bOk && bSame && bLate && bRamp, FString::Printf(TEXT("accepted %d, position kept %d, refused when late %d and when accelerating %d"), bOk, bSame, bLate, bRamp));
+		LiftCheck(TEXT("motion: a stop on the way, in the cruise"), bOk && bSame && bLate && bRamp, FString::Printf(TEXT("accepted %d, position kept %d, refused when late %d and when accelerating %d"), bOk, bSame, bLate, bRamp));
 	}
 
-	void TestBrain(const FAstraLiftLine& L)
+	void LiftTestBrain(const FAstraLiftLine& L)
 	{
-		const TArray<float> S = StopsOf(L);
+		const TArray<float> S = LiftStopsOf(L);
 		const int32 N = S.Num();
 		const int32 Top = N - 1;      // the highest landing (Deck 1)
 		FAstraLiftBrain::FConfig Cfg;
@@ -259,7 +259,7 @@ namespace
 
 		// a call from a landing: the car goes, stops, opens, waits, closes
 		{
-			FSim Sim;
+			FLiftSim Sim;
 			Sim.Cfg = Cfg;
 			Sim.Init(S, Top);
 			const int32 Want = 5;
@@ -267,22 +267,22 @@ namespace
 			const double Took = Sim.RunQuiet(120.f);
 			const float Leg = FAstraLiftProfile::Make(S[Top] - S[Want], Cfg.VmaxCmS, Cfg.AccelCmS2).T;
 			const double Expect = Leg + 2.0 * Cfg.DoorS + Cfg.DwellS;
-			Check(TEXT("brain: a call from a landing"), Sim.Violations == 0 && Sim.B.AtLanding() == Want && Sim.Count(ET::Arrive) == 1 && Sim.Count(ET::DoorsOpen) == 1 && Sim.Count(ET::DoorsClosed) == 1 &&
+			LiftCheck(TEXT("brain: a call from a landing"), Sim.Violations == 0 && Sim.B.AtLanding() == Want && Sim.Count(ET::Arrive) == 1 && Sim.Count(ET::DoorsOpen) == 1 && Sim.Count(ET::DoorsClosed) == 1 &&
 			      FMath::Abs(Took - Expect) < 0.3, FString::Printf(TEXT("arrives %d, %.1f s for a leg of %.1f s and the doors (%.1f expected), %d violations %s"), Sim.B.AtLanding(), Took, Leg, Expect, Sim.Violations, *Sim.First));
 		}
 		// a call at the landing the car is parked at: the doors open, the car does not move
 		{
-			FSim Sim;
+			FLiftSim Sim;
 			Sim.Cfg = Cfg;
 			Sim.Init(S, 3);
 			Sim.B.HallCall(3, 0);
 			Sim.RunQuiet(30.f);
-			Check(TEXT("brain: a call where the car stands"), Sim.Violations == 0 && Sim.Count(ET::Depart) == 0 && Sim.Count(ET::DoorsOpen) == 1 && Sim.Count(ET::DoorsClosed) == 1,
+			LiftCheck(TEXT("brain: a call where the car stands"), Sim.Violations == 0 && Sim.Count(ET::Depart) == 0 && Sim.Count(ET::DoorsOpen) == 1 && Sim.Count(ET::DoorsClosed) == 1,
 			      FString::Printf(TEXT("%d departures, %d openings"), Sim.Count(ET::Depart), Sim.Count(ET::DoorsOpen)));
 		}
 		// the sweep: a car call to the bottom, a down call and an up call between: the down call is answered on the way down, the up call on the way back
 		{
-			FSim Sim;
+			FLiftSim Sim;
 			Sim.Cfg = Cfg;
 			Sim.Init(S, Top);
 			Sim.B.CarCall(0);
@@ -291,11 +291,11 @@ namespace
 			Sim.RunQuiet(400.f);
 			const TArray<int32> A = Sim.Arrivals();
 			const bool bOrder = A.Num() == 3 && A[0] == 4 && A[1] == 0 && A[2] == 6;
-			Check(TEXT("brain: the sweep (stops for its own way first)"), Sim.Violations == 0 && bOrder && Sim.B.Quiet(), FString::Printf(TEXT("stops in order: %s (4 0 6 expected), %d violations %s"), *ArrivalText(A), Sim.Violations, *Sim.First));
+			LiftCheck(TEXT("brain: the sweep (stops for its own way first)"), Sim.Violations == 0 && bOrder && Sim.B.Quiet(), FString::Printf(TEXT("stops in order: %s (4 0 6 expected), %d violations %s"), *LiftArrivalText(A), Sim.Violations, *Sim.First));
 		}
 		// a stop asked for in the cruise is added when the braking can still begin, and left for the way back when not
 		{
-			FSim Sim;
+			FLiftSim Sim;
 			Sim.Cfg = Cfg;
 			Sim.Init(S, Top);
 			Sim.B.CarCall(0);
@@ -305,10 +305,10 @@ namespace
 			Sim.B.CarCall(2);
 			Sim.RunQuiet(400.f);
 			const TArray<int32> A = Sim.Arrivals();
-			Check(TEXT("brain: a stop added in the cruise"), Sim.Violations == 0 && Sim.Count(ET::Retarget) == 1 && A.Num() == 2 && A[0] == 2 && A[1] == 0, FString::Printf(TEXT("%d retargets, stops %s (2 0 expected), %d violations %s"), Sim.Count(ET::Retarget), *ArrivalText(A), Sim.Violations, *Sim.First));
+			LiftCheck(TEXT("brain: a stop added in the cruise"), Sim.Violations == 0 && Sim.Count(ET::Retarget) == 1 && A.Num() == 2 && A[0] == 2 && A[1] == 0, FString::Printf(TEXT("%d retargets, stops %s (2 0 expected), %d violations %s"), Sim.Count(ET::Retarget), *LiftArrivalText(A), Sim.Violations, *Sim.First));
 		}
 		{
-			FSim Sim;
+			FLiftSim Sim;
 			Sim.Cfg = Cfg;
 			Sim.Init(S, Top);
 			Sim.B.CarCall(0);
@@ -318,11 +318,11 @@ namespace
 			Sim.B.CarCall(2);
 			Sim.RunQuiet(400.f);
 			const TArray<int32> A = Sim.Arrivals();
-			Check(TEXT("brain: a stop asked too late waits"), Sim.Violations == 0 && Sim.Count(ET::Retarget) == 0 && A.Num() == 2 && A[0] == 0 && A[1] == 2, FString::Printf(TEXT("%d retargets, stops %s (0 2 expected), %d violations %s"), Sim.Count(ET::Retarget), *ArrivalText(A), Sim.Violations, *Sim.First));
+			LiftCheck(TEXT("brain: a stop asked too late waits"), Sim.Violations == 0 && Sim.Count(ET::Retarget) == 0 && A.Num() == 2 && A[0] == 0 && A[1] == 2, FString::Printf(TEXT("%d retargets, stops %s (0 2 expected), %d violations %s"), Sim.Count(ET::Retarget), *LiftArrivalText(A), Sim.Violations, *Sim.First));
 		}
 		// the doors wait for a deck that is not there: shut at the landing, open when it is; made ready by force when it never comes
 		{
-			FSim Sim;
+			FLiftSim Sim;
 			Sim.Cfg = Cfg;
 			double ReadyAt = 1.0e9;
 			int32 Forced = 0;
@@ -339,9 +339,9 @@ namespace
 				Arrived = E.Value.Type == ET::Arrive ? E.Key : Arrived;
 				Opened = E.Value.Type == ET::DoorsOpening ? E.Key : Opened;
 			}
-			Check(TEXT("brain: the doors wait for the deck"), Sim.Violations == 0 && Sim.Count(ET::Held) == 1 && Forced == 0 && Opened >= ReadyAt - 0.1 && Opened - ReadyAt < 0.3,
+			LiftCheck(TEXT("brain: the doors wait for the deck"), Sim.Violations == 0 && Sim.Count(ET::Held) == 1 && Forced == 0 && Opened >= ReadyAt - 0.1 && Opened - ReadyAt < 0.3,
 			      FString::Printf(TEXT("arrived %.1f s, deck ready %.1f s, doors opened %.1f s, forced %d"), Arrived, ReadyAt, Opened, Forced));
-			FSim Never;
+			FLiftSim Never;
 			Never.Cfg = Cfg;
 			int32 Forced2 = 0;
 			FAstraLiftBrain::FHooks H2;
@@ -356,12 +356,12 @@ namespace
 				Arr = E.Value.Type == ET::Arrive ? E.Key : Arr;
 				Op = E.Value.Type == ET::DoorsOpening ? E.Key : Op;
 			}
-			Check(TEXT("brain: the deck that never comes is forced"), Never.Violations == 0 && Forced2 == 1 && Never.Count(ET::Forced) == 1 && FMath::Abs((Op - Arr) - Cfg.HeldForceS) < 0.2,
+			LiftCheck(TEXT("brain: the deck that never comes is forced"), Never.Violations == 0 && Forced2 == 1 && Never.Count(ET::Forced) == 1 && FMath::Abs((Op - Arr) - Cfg.HeldForceS) < 0.2,
 			      FString::Printf(TEXT("forced %d time(s), the doors opened %.1f s after the car stopped (%.1f s wait)"), Forced2, Op - Arr, Cfg.HeldForceS));
 		}
 		// the doors never close on someone, and wait for them
 		{
-			FSim Sim;
+			FLiftSim Sim;
 			Sim.Cfg = Cfg;
 			bool bBusy = false;
 			FAstraLiftBrain::FHooks H;
@@ -384,13 +384,13 @@ namespace
 			const bool bReopen = Sim.Count(ET::DoorsReopen) >= 1;
 			bBusy = false;
 			Sim.RunQuiet(60.f);
-			Check(TEXT("brain: the doors never close on someone"), Sim.Violations == 0 && bStillOpen && bReopen && Sim.B.Quiet(), FString::Printf(TEXT("held open %d, went back when someone stepped in %d, then closed %d"), bStillOpen, bReopen, Sim.B.Quiet()));
+			LiftCheck(TEXT("brain: the doors never close on someone"), Sim.Violations == 0 && bStillOpen && bReopen && Sim.B.Quiet(), FString::Printf(TEXT("held open %d, went back when someone stepped in %d, then closed %d"), bStillOpen, bReopen, Sim.B.Quiet()));
 		}
 	}
 
 	// ============================================================================================================================ the rush hour
 
-	struct FRider
+	struct FLiftRider
 	{
 		int32 Id = 0;
 		double Born = 0.0;
@@ -399,7 +399,7 @@ namespace
 		double CalledAt = 0.0, BoardedAt = 0.0, DoneAt = 0.0, BusyUntil = 0.0;
 	};
 
-	struct FRushResult
+	struct FLiftRushResult
 	{
 		TArray<double> Waits, Rides, Totals;
 		double Last = 0.0;
@@ -410,19 +410,19 @@ namespace
 
 	/** People who use the lifts as the crew does: they call from the landing for the way they go, wait, get in when the car is open and going their way, choose
 	 *  their stop, get out where it opens. The cars are the brain alone, on a clock; a person in a doorway holds the doors for a second or two. */
-	FRushResult RushHour(const FAstraLiftLine& L, int32 NumCars, int32 NumRiders, int32 Seed, double Spread)
+	FLiftRushResult LiftRushHour(const FAstraLiftLine& L, int32 NumCars, int32 NumRiders, int32 Seed, double Spread)
 	{
 		FRandomStream R(Seed);
-		const TArray<float> S = StopsOf(L);
+		const TArray<float> S = LiftStopsOf(L);
 		const int32 N = S.Num();
 		FAstraLiftBrain::FConfig Cfg;
 		Cfg.VmaxCmS = L.SpeedCmS;
 		Cfg.AccelCmS2 = L.AccelCmS2;
-		TArray<FRider> Riders;
+		TArray<FLiftRider> Riders;
 		// the morning: most come from the top (the bridge's deck) and the middle (Crew Services), going anywhere
 		for (int32 I = 0; I < NumRiders; ++I)
 		{
-			FRider Rd;
+			FLiftRider Rd;
 			Rd.Id = I;
 			Rd.Born = R.FRand() * Spread;
 			const float P = R.FRand();
@@ -430,7 +430,7 @@ namespace
 			do { Rd.To = R.RandRange(0, N - 1); } while (Rd.To == Rd.From);
 			Riders.Add(Rd);
 		}
-		Riders.Sort([](const FRider& A, const FRider& B) { return A.Born < B.Born; });
+		Riders.Sort([](const FLiftRider& A, const FLiftRider& B) { return A.Born < B.Born; });
 		struct FCarSim
 		{
 			FAstraLiftBrain B;
@@ -441,16 +441,16 @@ namespace
 		TArray<FCarSim> Cars;
 		Cars.SetNum(NumCars);
 		double T = 0.0;
-		FRushResult Out;
+		FLiftRushResult Out;
 		const int32 Capacity = 8;
 		for (int32 C = 0; C < NumCars; ++C)
 		{
 			FAstraLiftBrain::FHooks H;
 			H.DoorwayBusy = [&Riders, &T, C](int32 Landing)
 			{
-				for (const FRider& Rd : Riders)
+				for (const FLiftRider& Rd : Riders)
 				{
-					if (Rd.Car == C && Rd.BusyUntil > T && (Rd.St == FRider::ESt::Boarding || Rd.St == FRider::ESt::Alighting))
+					if (Rd.Car == C && Rd.BusyUntil > T && (Rd.St == FLiftRider::ESt::Boarding || Rd.St == FLiftRider::ESt::Alighting))
 					{
 						return true;
 					}
@@ -461,10 +461,10 @@ namespace
 			Cars[C].B.Init(S, C % 2 ? 0 : N - 1, Cfg, H);
 		}
 		const float Dt = 0.05f;
-		using ES = FRider::ESt;
+		using ES = FLiftRider::ESt;
 		while (T < 1500.0 && Out.Done < NumRiders)
 		{
-			for (FRider& Rd : Riders)
+			for (FLiftRider& Rd : Riders)
 			{
 				if (Rd.St == ES::Coming && Rd.Born <= T)
 				{
@@ -513,7 +513,7 @@ namespace
 				}
 				// people: out where the car opens at their stop, in when it opens at theirs and goes their way (and has room)
 				const bool bOpen = B.State() == EState::Open || (B.State() == EState::Opening && B.DoorOpen() > 0.6f);
-				for (FRider& Rd : Riders)
+				for (FLiftRider& Rd : Riders)
 				{
 					if (Rd.Car != C)
 					{
@@ -576,7 +576,7 @@ namespace
 				Out.First += FString::Printf(TEXT(" [car %d: state %d at %d heading %d doors %.2f aboard %d any %d]"), C, (int32)B.State(), B.AtLanding(), B.Heading(), B.DoorOpen(), Cars[C].Aboard.Num(), B.AnyRequest());
 			}
 			int32 Shown = 0;
-			for (const FRider& Rd : Riders)
+			for (const FLiftRider& Rd : Riders)
 			{
 				if (Rd.St != ES::Done && Shown++ < 4)
 				{
@@ -587,16 +587,16 @@ namespace
 		return Out;
 	}
 
-	void TestRush(const FAstraLiftLine& L, int32 Riders, int32 Seed)
+	void LiftTestRush(const FAstraLiftLine& L, int32 Riders, int32 Seed)
 	{
 		for (const int32 Cars : {1, 2})
 		{
-			const FRushResult R = RushHour(L, Cars, Riders, Seed, 90.0);
-			const double Worst = Percentile(R.Waits, 1.0);
-			Check(Cars == 1 ? TEXT("rush: 20 riders, one shaft") : TEXT("rush: 20 riders, a bank of two shafts"),
+			const FLiftRushResult R = LiftRushHour(L, Cars, Riders, Seed, 90.0);
+			const double Worst = LiftPercentile(R.Waits, 1.0);
+			LiftCheck(Cars == 1 ? TEXT("rush: 20 riders, one shaft") : TEXT("rush: 20 riders, a bank of two shafts"),
 			      R.Done == Riders && R.Violations == 0 && R.MaxIdleWithCalls < 1.0 && Worst < (Cars == 1 ? 180.0 : 130.0),
 			      FString::Printf(TEXT("%d of %d delivered in %.0f s; wait avg %.1f, median %.1f, p95 %.1f, worst %.1f s; ride avg %.1f s; %d stops; idle with calls at most %.2f s; %d violations %s"),
-			                      R.Done, Riders, R.Last, Mean(R.Waits), Percentile(R.Waits, 0.5), Percentile(R.Waits, 0.95), Worst, Mean(R.Rides), R.Stops, R.MaxIdleWithCalls, R.Violations, *R.First));
+			                      R.Done, Riders, R.Last, LiftMean(R.Waits), LiftPercentile(R.Waits, 0.5), LiftPercentile(R.Waits, 0.95), Worst, LiftMean(R.Rides), R.Stops, R.MaxIdleWithCalls, R.Violations, *R.First));
 		}
 	}
 }
@@ -607,7 +607,7 @@ namespace
 {
 	/** One headless world for every scenario that needs one (a world made and destroyed again for each of them leaves the garbage collector with the debris of the
 	 *  last: what a scenario builds in it is taken out again when it is done). */
-	struct FWorldBench
+	struct FLiftWorldBench
 	{
 		UWorld* World = nullptr;
 		UAstraLiftSubsystem* Lifts = nullptr;
@@ -731,14 +731,14 @@ namespace
 		}
 	};
 
-	FWorldBench& Bench()
+	FLiftWorldBench& LiftBench()
 	{
-		static FWorldBench B;
+		static FLiftWorldBench B;
 		return B;
 	}
 
 	/** What a ride is checked for, frame by frame. */
-	struct FRideLog
+	struct FLiftRideLog
 	{
 		float MaxDevCm = 0.f;
 		int32 FallFrames = 0, UnbasedFrames = 0, DoorBreaks = 0, Frames = 0;
@@ -747,7 +747,7 @@ namespace
 		FVector Rel0 = FVector::ZeroVector;
 	};
 
-	ACharacter* SpawnCaptain(FWorldBench& W, const FVector& FeetAt, const FRotator& Facing)
+	ACharacter* LiftSpawnCaptain(FLiftWorldBench& W, const FVector& FeetAt, const FRotator& Facing)
 	{
 		FActorSpawnParameters P;
 		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -769,7 +769,7 @@ namespace
 	}
 
 	/** The car's door and its landing's, checked every frame: open only with the car stopped at that landing, and no other landing's open. */
-	void CheckDoors(FWorldBench& W, int32 Line, FRideLog& Log)
+	void LiftCheckDoors(FLiftWorldBench& W, int32 Line, FLiftRideLog& Log)
 	{
 		const AAstraLiftCar* Car = W.Lifts->CarOf(Line);
 		const FAstraLiftLine& L = W.Lifts->Network().Lines[Line];
@@ -802,7 +802,7 @@ namespace
 	}
 
 	/** One frame of a ride's record: where the Captain is in the car, whether he is standing on it. */
-	void RecordRide(FWorldBench& W, int32 Line, ACharacter* C, FRideLog& Log)
+	void LiftRecordRide(FLiftWorldBench& W, int32 Line, ACharacter* C, FLiftRideLog& Log)
 	{
 		const AAstraLiftCar* Car = W.Lifts->CarOf(Line);
 		const FVector Rel = Car->ToLocal(C->GetActorLocation());
@@ -817,12 +817,12 @@ namespace
 		Log.UnbasedFrames += C->GetMovementBase() != Car->FloorComponent() ? 1 : 0;
 		Log.MaxSpeed = FMath::Max(Log.MaxSpeed, (float)FMath::Abs(Car->Brain.V()));
 		++Log.Frames;
-		CheckDoors(W, Line, Log);
+		LiftCheckDoors(W, Line, Log);
 	}
 
 	/** Walks the Captain on a line (a unit vector on the floor) for up to Seconds, until Stop() says so. */
 	template <typename F>
-	bool Walk(FWorldBench& W, ACharacter* C, const FVector& Dir, float Seconds, F Stop, float Dt = 1.f / 60.f)
+	bool LiftWalk(FLiftWorldBench& W, ACharacter* C, const FVector& Dir, float Seconds, F Stop, float Dt = 1.f / 60.f)
 	{
 		for (float T = 0.f; T < Seconds; T += Dt)
 		{
@@ -836,21 +836,21 @@ namespace
 		return Stop();
 	}
 
-	void TestWorld(const FAstraLiftNetwork& Net, bool bAll, const FString& Which)
+	void LiftTestWorld(const FAstraLiftNetwork& Net, bool bAll, const FString& Which)
 	{
-		FWorldBench& W = Bench();
+		FLiftWorldBench& W = LiftBench();
 		if (!W.Create())
 		{
-			Check(TEXT("world: the lifts' subsystem"), false, TEXT("the world has no UAstraLiftSubsystem"));
+			LiftCheck(TEXT("world: the lifts' subsystem"), false, TEXT("the world has no UAstraLiftSubsystem"));
 			return;
 		}
 		W.Build(Net);
-		Check(TEXT("world: the lifts are built"), W.Lifts->IsBuilt() && W.Lifts->NumLines() == Net.Lines.Num(),
+		LiftCheck(TEXT("world: the lifts are built"), W.Lifts->IsBuilt() && W.Lifts->NumLines() == Net.Lines.Num(),
 		      FString::Printf(TEXT("%d lines (%s)"), W.Lifts->NumLines(), *W.Lifts->Describe().Left(120).Replace(TEXT("\n"), TEXT(" | "))));
 		const int32 Tl = Net.FindLine(TEXT("tl_a"));
 		if (Tl == INDEX_NONE)
 		{
-			Check(TEXT("world: the test plan's turbolift"), false, TEXT("no line tl_a in the plan"));
+			LiftCheck(TEXT("world: the test plan's turbolift"), false, TEXT("no line tl_a in the plan"));
 			W.Destroy();
 			return;
 		}
@@ -859,10 +859,10 @@ namespace
 		const int32 Deck1 = L.FindStopByDeck(1), Deck9 = L.FindStopByDeck(9), Deck5 = L.FindStopByDeck(5);
 		const FAstraLiftStop& S1 = L.Stops[Deck1];
 		// the Captain on the lobby of Deck 1, two metres from the doors
-		ACharacter* C = SpawnCaptain(W, S1.DoorCm + S1.Out * 220.f, FRotator(0.f, L.FrontYaw + 180.f, 0.f));
+		ACharacter* C = LiftSpawnCaptain(W, S1.DoorCm + S1.Out * 220.f, FRotator(0.f, L.FrontYaw + 180.f, 0.f));
 		W.Run(0.8f);
 		const UCharacterMovementComponent* M = C->GetCharacterMovement();
-		Check(TEXT("world: the Captain stands on the lobby"), M->MovementMode == MOVE_Walking && FMath::Abs(C->GetActorLocation().Z - 96.f - S1.FloorZ) < 4.f,
+		LiftCheck(TEXT("world: the Captain stands on the lobby"), M->MovementMode == MOVE_Walking && FMath::Abs(C->GetActorLocation().Z - 96.f - S1.FloorZ) < 4.f,
 		      FString::Printf(TEXT("movement mode %d, feet %.1f cm over the floor (a headless world with physics queries?)"), (int32)M->MovementMode, C->GetActorLocation().Z - 96.f - S1.FloorZ));
 		if (M->MovementMode != MOVE_Walking)
 		{
@@ -875,15 +875,15 @@ namespace
 		FString Notice;
 		const bool bCalled = W.Lifts->CallAt(Tl, Deck1, Notice);
 		const bool bOpened = [&]() { for (float T = 0.f; T < 8.f; T += 1.f / 60.f) { W.Step(1.f / 60.f); if (Car->Brain.State() == FAstraLiftBrain::EState::Open) { return true; } } return false; }();
-		Check(TEXT("world: a call opens the doors where the car is"), bCalled && bOpened && Car->Brain.DoorOpen() >= 1.f, FString::Printf(TEXT("%s; doors %.2f"), *Notice, Car->Brain.DoorOpen()));
+		LiftCheck(TEXT("world: a call opens the doors where the car is"), bCalled && bOpened && Car->Brain.DoorOpen() >= 1.f, FString::Printf(TEXT("%s; doors %.2f"), *Notice, Car->Brain.DoorOpen()));
 
 		// ---- in
-		const bool bIn = Walk(W, C, -S1.Out, 5.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
+		const bool bIn = LiftWalk(W, C, -S1.Out, 5.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
 		W.Run(0.5f);
-		Check(TEXT("world: the Captain walks into the car"), bIn && C->GetMovementBase() == Car->FloorComponent(), FString::Printf(TEXT("inside %d, based on the car's floor %d"), bIn, C->GetMovementBase() == Car->FloorComponent()));
+		LiftCheck(TEXT("world: the Captain walks into the car"), bIn && C->GetMovementBase() == Car->FloorComponent(), FString::Printf(TEXT("inside %d, based on the car's floor %d"), bIn, C->GetMovementBase() == Car->FloorComponent()));
 
 		// ---- the ride, Deck 1 to Deck 9 (66 m down)
-		FRideLog Log;
+		FLiftRideLog Log;
 		Log.Rel0 = Car->ToLocal(C->GetActorLocation());
 		W.Run(0.4f);                               // (the subsystem notices he is in a car at its slow rate)
 		FString Detail;
@@ -894,7 +894,7 @@ namespace
 		for (float T = 0.f; T < 60.f; T += 1.f / 60.f)
 		{
 			W.Step(1.f / 60.f);
-			RecordRide(W, Tl, C, Log);
+			LiftRecordRide(W, Tl, C, Log);
 			if (Car->Brain.AtLanding() == Deck9 && Car->Brain.DoorOpen() >= 1.f)
 			{
 				bArrived = true;
@@ -904,26 +904,26 @@ namespace
 		Travel = (float)(W.World->GetTimeSeconds() - T0);
 		const FVector Rel1 = Car->ToLocal(C->GetActorLocation());
 		const float EndDev = (float)(Rel1 - Log.Rel0).Size();
-		Check(TEXT("world: Deck 1 to Deck 9: arrives with the car"), bGo && bArrived && EndDev < 2.f && FMath::Abs(Car->GetActorLocation().Z - L.Stops[Deck9].FloorZ) < 0.1f,
+		LiftCheck(TEXT("world: Deck 1 to Deck 9: arrives with the car"), bGo && bArrived && EndDev < 2.f && FMath::Abs(Car->GetActorLocation().Z - L.Stops[Deck9].FloorZ) < 0.1f,
 		      FString::Printf(TEXT("%s; %.1f s; %.1f cm from where he stood in the car (2 allowed), the car %.2f cm from the landing; peak %.1f m/s"), *Detail, Travel, EndDev,
 		                      Car->GetActorLocation().Z - L.Stops[Deck9].FloorZ, Log.MaxSpeed / 100.f));
-		Check(TEXT("world: never falls, never off the car's floor"), Log.FallFrames == 0 && Log.UnbasedFrames == 0 && Log.MaxDevCm < 2.f,
+		LiftCheck(TEXT("world: never falls, never off the car's floor"), Log.FallFrames == 0 && Log.UnbasedFrames == 0 && Log.MaxDevCm < 2.f,
 		      FString::Printf(TEXT("%d frames: %d falling, %d not on the car's floor, he drifted at most %.2f cm in the car"), Log.Frames, Log.FallFrames, Log.UnbasedFrames, Log.MaxDevCm));
-		Check(TEXT("world: doors only at the landing, only with the car stopped"), Log.DoorBreaks == 0, FString::Printf(TEXT("%d frames broke it %s"), Log.DoorBreaks, *Log.First));
+		LiftCheck(TEXT("world: doors only at the landing, only with the car stopped"), Log.DoorBreaks == 0, FString::Printf(TEXT("%d frames broke it %s"), Log.DoorBreaks, *Log.First));
 
 		// ---- out onto Deck 9's lobby
 		const FAstraLiftStop& S9 = L.Stops[Deck9];
-		const bool bOut = Walk(W, C, S9.Out, 5.f, [&]() { return FVector::DotProduct(C->GetActorLocation() - S9.DoorCm, S9.Out) > 160.f; });
+		const bool bOut = LiftWalk(W, C, S9.Out, 5.f, [&]() { return FVector::DotProduct(C->GetActorLocation() - S9.DoorCm, S9.Out) > 160.f; });
 		W.Run(0.4f);
-		Check(TEXT("world: out onto the lobby of Deck 9"), bOut && C->GetCharacterMovement()->MovementMode == MOVE_Walking && FMath::Abs(FeetZ() - S9.FloorZ) < 4.f && C->GetMovementBase() != Car->FloorComponent(),
+		LiftCheck(TEXT("world: out onto the lobby of Deck 9"), bOut && C->GetCharacterMovement()->MovementMode == MOVE_Walking && FMath::Abs(FeetZ() - S9.FloorZ) < 4.f && C->GetMovementBase() != Car->FloorComponent(),
 		      FString::Printf(TEXT("out %d, feet %.2f cm from the floor, mode %d"), bOut, FeetZ() - S9.FloorZ, (int32)C->GetCharacterMovement()->MovementMode));
 
 		// ---- the way back, up to Deck 5 (16 m), at thirty frames a second (a hitch is no reason to fall)
-		FRideLog Up;
+		FLiftRideLog Up;
 		W.Lifts->CallAt(Tl, Deck9, Notice);
-		Walk(W, C, FVector::ZeroVector, 15.f, [&]() { return Car->Brain.AtLanding() == Deck9 && Car->Brain.DoorOpen() >= 1.f; }, 1.f / 30.f);
-		const bool bBack = Walk(W, C, -S9.Out, 5.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); }, 1.f / 30.f);
-		Walk(W, C, FVector::ZeroVector, 0.6f, []() { return false; }, 1.f / 30.f);
+		LiftWalk(W, C, FVector::ZeroVector, 15.f, [&]() { return Car->Brain.AtLanding() == Deck9 && Car->Brain.DoorOpen() >= 1.f; }, 1.f / 30.f);
+		const bool bBack = LiftWalk(W, C, -S9.Out, 5.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); }, 1.f / 30.f);
+		LiftWalk(W, C, FVector::ZeroVector, 0.6f, []() { return false; }, 1.f / 30.f);
 		Up.Rel0 = Car->ToLocal(C->GetActorLocation());
 		FString D2;
 		const bool bGo2 = W.Lifts->GoToDeck(5, D2);
@@ -931,7 +931,7 @@ namespace
 		for (float T = 0.f; T < 40.f; T += 1.f / 30.f)
 		{
 			W.Step(1.f / 30.f);
-			RecordRide(W, Tl, C, Up);
+			LiftRecordRide(W, Tl, C, Up);
 			if (Car->Brain.AtLanding() == Deck5 && Car->Brain.DoorOpen() >= 1.f)
 			{
 				bArr2 = true;
@@ -939,27 +939,27 @@ namespace
 			}
 		}
 		const float EndDev2 = (float)(Car->ToLocal(C->GetActorLocation()) - Up.Rel0).Size();
-		Check(TEXT("world: Deck 9 up to Deck 5, at 30 fps"), bBack && bGo2 && bArr2 && EndDev2 < 2.f && Up.FallFrames == 0 && Up.UnbasedFrames == 0 && Up.DoorBreaks == 0,
+		LiftCheck(TEXT("world: Deck 9 up to Deck 5, at 30 fps"), bBack && bGo2 && bArr2 && EndDev2 < 2.f && Up.FallFrames == 0 && Up.UnbasedFrames == 0 && Up.DoorBreaks == 0,
 		      FString::Printf(TEXT("%s; %.2f cm at the end, drift at most %.2f cm, %d falling, %d off the floor, %d door breaks"), *D2, EndDev2, Up.MaxDevCm, Up.FallFrames, Up.UnbasedFrames, Up.DoorBreaks));
 
 		if (bAll || Which == TEXT("doors"))
 		{
 			// ---- the doors do not close on the Captain: he stands in the doorway of Deck 5 while the dwell runs out
 			const FAstraLiftStop& S5 = L.Stops[Deck5];
-			const bool bOutAgain = Walk(W, C, S5.Out, 5.f, [&]() { return FVector::DotProduct(C->GetActorLocation() - S5.DoorCm, S5.Out) > 10.f; }, 1.f / 60.f);
-			Walk(W, C, FVector::ZeroVector, 0.3f, []() { return false; });
+			const bool bOutAgain = LiftWalk(W, C, S5.Out, 5.f, [&]() { return FVector::DotProduct(C->GetActorLocation() - S5.DoorCm, S5.Out) > 10.f; }, 1.f / 60.f);
+			LiftWalk(W, C, FVector::ZeroVector, 0.3f, []() { return false; });
 			// he stands on the threshold (in the doorway) for twice the dwell
 			W.Run(Car->Brain.Config().DwellS * 2.f + 2.f);
 			const bool bHeld = Car->Brain.State() == FAstraLiftBrain::EState::Open && Car->Brain.DoorOpen() >= 1.f;
-			Walk(W, C, S5.Out, 3.f, [&]() { return FVector::DotProduct(C->GetActorLocation() - S5.DoorCm, S5.Out) > 200.f; });
+			LiftWalk(W, C, S5.Out, 3.f, [&]() { return FVector::DotProduct(C->GetActorLocation() - S5.DoorCm, S5.Out) > 200.f; });
 			const bool bClosed = [&]() { for (float T = 0.f; T < 12.f; T += 1.f / 60.f) { W.Step(1.f / 60.f); if (Car->Brain.State() == FAstraLiftBrain::EState::Idle && Car->Brain.DoorOpen() <= 0.f) { return true; } } return false; }();
-			Check(TEXT("world: the doors wait for the Captain in the doorway"), bOutAgain && bHeld && bClosed, FString::Printf(TEXT("held open while he stood there %d, closed after he stepped away %d"), bHeld, bClosed));
+			LiftCheck(TEXT("world: the doors wait for the Captain in the doorway"), bOutAgain && bHeld && bClosed, FString::Printf(TEXT("held open while he stood there %d, closed after he stepped away %d"), bHeld, bClosed));
 		}
 	}
 
-	void TestVoice(const FAstraLiftNetwork& Net)
+	void LiftTestVoice(const FAstraLiftNetwork& Net)
 	{
-		FWorldBench& W = Bench();
+		FLiftWorldBench& W = LiftBench();
 		if (!W.Create())
 		{
 			return;
@@ -975,12 +975,12 @@ namespace
 		// outside a car the lifts take no orders
 		const bool bOutside = !W.Lifts->GoByVoice(Args, Detail);
 		const FString Refusal = Detail;
-		ACharacter* C = SpawnCaptain(W, S1.DoorCm - S1.Out * 100.f + FVector(0.f, 0.f, 0.f), FRotator(0.f, L.FrontYaw + 180.f, 0.f));
+		ACharacter* C = LiftSpawnCaptain(W, S1.DoorCm - S1.Out * 100.f + FVector(0.f, 0.f, 0.f), FRotator(0.f, L.FrontYaw + 180.f, 0.f));
 		FString Notice;
 		W.Run(0.5f);
 		W.Lifts->CallAt(Tl, L.FindStopByDeck(1), Notice);
 		W.Run(2.5f);
-		Walk(W, C, -S1.Out, 4.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
+		LiftWalk(W, C, -S1.Out, 4.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
 		W.Run(1.f);
 		const TSharedPtr<FJsonObject> Ctx = W.Lifts->ContextJson();
 		const TArray<TSharedPtr<FJsonValue>>* Stops = nullptr;
@@ -1002,7 +1002,7 @@ namespace
 				}
 			}
 		}
-		Check(TEXT("voice: the context says where the car goes"), bOutside && Ctx.IsValid() && NStops == L.Stops.Num() && bPlaces && Ctx->GetStringField(TEXT("car")) == TEXT("tl_a"),
+		LiftCheck(TEXT("voice: the context says where the car goes"), bOutside && Ctx.IsValid() && NStops == L.Stops.Num() && bPlaces && Ctx->GetStringField(TEXT("car")) == TEXT("tl_a"),
 		      FString::Printf(TEXT("outside a car: refused (%s); inside: %d stops, deck 7 lists Main Engineering %d"), *Refusal.Left(60), NStops, bPlaces));
 		const bool bGo = W.Lifts->GoByVoice(Args, Detail);
 		const FString Said = Detail;
@@ -1027,14 +1027,14 @@ namespace
 		ByDeck->SetNumberField(TEXT("deck"), 3);
 		FString DeckDetail;
 		const bool bDeck = W.Lifts->GoByVoice(ByDeck, DeckDetail);
-		Check(TEXT("voice: lift_go takes the car to a stop"), bGo && bThere && bBad && bDeck && BadDetail.Contains(TEXT("d9")),
+		LiftCheck(TEXT("voice: lift_go takes the car to a stop"), bGo && bThere && bBad && bDeck && BadDetail.Contains(TEXT("d9")),
 		      FString::Printf(TEXT("%s; there in %.1f s; the wrong stop: %s"), *Said, W.World->GetTimeSeconds() - T0, *BadDetail.Left(80)));
 		W.Destroy();
 	}
 
-	void TestStreaming(const FAstraLiftNetwork& Net)
+	void LiftTestStreaming(const FAstraLiftNetwork& Net)
 	{
-		FWorldBench& W = Bench();
+		FLiftWorldBench& W = LiftBench();
 		if (!W.Create())
 		{
 			return;
@@ -1045,12 +1045,12 @@ namespace
 		AAstraLiftCar* Car = W.Lifts->CarOf(Tl);
 		const int32 D1 = L.FindStopByDeck(1), D7 = L.FindStopByDeck(7);
 		const FAstraLiftStop& S1 = L.Stops[D1];
-		ACharacter* C = SpawnCaptain(W, S1.DoorCm + S1.Out * 220.f, FRotator(0.f, L.FrontYaw + 180.f, 0.f));
+		ACharacter* C = LiftSpawnCaptain(W, S1.DoorCm + S1.Out * 220.f, FRotator(0.f, L.FrontYaw + 180.f, 0.f));
 		W.Run(0.6f);
 		FString Notice;
 		W.Lifts->CallAt(Tl, D1, Notice);
 		W.Run(2.5f);
-		Walk(W, C, -S1.Out, 4.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
+		LiftWalk(W, C, -S1.Out, 4.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
 		W.Run(1.f);
 		double ReadyAt = 1.0e9;
 		int32 Wanted = 0, Forced = 0;
@@ -1077,7 +1077,7 @@ namespace
 				break;
 			}
 		}
-		Check(TEXT("stream: the car waits for the deck, doors shut"), Wanted >= 1 && bHeldShut && Forced == 0 && OpenedAt >= ReadyAt - 0.1 && OpenedAt - ReadyAt < 0.5,
+		LiftCheck(TEXT("stream: the car waits for the deck, doors shut"), Wanted >= 1 && bHeldShut && Forced == 0 && OpenedAt >= ReadyAt - 0.1 && OpenedAt - ReadyAt < 0.5,
 		      FString::Printf(TEXT("the deck was asked for %d time(s) at departure; held with the doors shut %d; the deck ready at %.1f s, the doors opened at %.1f s; forced %d"), Wanted, bHeldShut, ReadyAt - T0, OpenedAt - T0, Forced));
 		// and one that never comes is made ready, once, after the wait
 		W.Run(Car->Brain.Config().DwellS + 4.f);
@@ -1101,20 +1101,20 @@ namespace
 				break;
 			}
 		}
-		Check(TEXT("stream: a deck that never comes is forced, last"), Forced == 1 && Opened2 > Stopped && FMath::Abs((Opened2 - Stopped) - Car->Brain.Config().HeldForceS) < 0.3,
+		LiftCheck(TEXT("stream: a deck that never comes is forced, last"), Forced == 1 && Opened2 > Stopped && FMath::Abs((Opened2 - Stopped) - Car->Brain.Config().HeldForceS) < 0.3,
 		      FString::Printf(TEXT("forced %d time(s), the doors opened %.1f s after the car stopped"), Forced, Opened2 - Stopped));
 		W.Destroy();
 	}
 
-	void TestShuttle(const FAstraLiftNetwork& Net)
+	void LiftTestShuttle(const FAstraLiftNetwork& Net)
 	{
 		const int32 Sh = Net.FindLine(TEXT("spine_shuttle"));
 		if (Sh == INDEX_NONE)
 		{
-			Check(TEXT("shuttle: the line is in the plan"), false, TEXT("no spine_shuttle in the plan"));
+			LiftCheck(TEXT("shuttle: the line is in the plan"), false, TEXT("no spine_shuttle in the plan"));
 			return;
 		}
-		FWorldBench& W = Bench();
+		FLiftWorldBench& W = LiftBench();
 		if (!W.Create())
 		{
 			return;
@@ -1125,14 +1125,14 @@ namespace
 		// the stops A (forward) and C: the car comes to A, the Captain gets in by the middle door and rides to C
 		const int32 A = L.FindStopById(TEXT("sec_a")), Cc = L.FindStopById(TEXT("sec_c"));
 		const FAstraLiftStop& SA = L.Stops[A];
-		ACharacter* C = SpawnCaptain(W, FVector(SA.DoorCm.X, SA.DoorCm.Y, SA.FloorZ) + SA.Out * 200.f, FRotator(0.f, L.FrontYaw + 180.f, 0.f));
+		ACharacter* C = LiftSpawnCaptain(W, FVector(SA.DoorCm.X, SA.DoorCm.Y, SA.FloorZ) + SA.Out * 200.f, FRotator(0.f, L.FrontYaw + 180.f, 0.f));
 		W.Run(0.8f);
 		FString Notice;
 		W.Lifts->CallAt(Sh, A, Notice);
-		const bool bCome = Walk(W, C, FVector::ZeroVector, 80.f, [&]() { return Car->Brain.AtLanding() == A && Car->Brain.DoorOpen() >= 1.f; });
-		const bool bIn = Walk(W, C, -SA.Out, 6.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
+		const bool bCome = LiftWalk(W, C, FVector::ZeroVector, 80.f, [&]() { return Car->Brain.AtLanding() == A && Car->Brain.DoorOpen() >= 1.f; });
+		const bool bIn = LiftWalk(W, C, -SA.Out, 6.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
 		W.Run(0.6f);
-		FRideLog Log;
+		FLiftRideLog Log;
 		Log.Rel0 = Car->ToLocal(C->GetActorLocation());
 		W.Lifts->Tick(0.3f);
 		// the shuttle's own list: the Captain chooses from inside (the console twin of the voice)
@@ -1146,7 +1146,7 @@ namespace
 		for (float T = 0.f; T < 120.f; T += 1.f / 60.f)
 		{
 			W.Step(1.f / 60.f);
-			RecordRide(W, Sh, C, Log);
+			LiftRecordRide(W, Sh, C, Log);
 			if (Car->Brain.AtLanding() == Cc && Car->Brain.DoorOpen() >= 1.f)
 			{
 				bArr = true;
@@ -1154,14 +1154,14 @@ namespace
 			}
 		}
 		const float EndDev = (float)(Car->ToLocal(C->GetActorLocation()) - Log.Rel0).Size();
-		Check(TEXT("shuttle: Section A to Section C, 208 m, aboard"), bCome && bIn && bGo && bArr && EndDev < 2.f && Log.FallFrames == 0 && Log.UnbasedFrames == 0 && Log.DoorBreaks == 0,
+		LiftCheck(TEXT("shuttle: Section A to Section C, 208 m, aboard"), bCome && bIn && bGo && bArr && EndDev < 2.f && Log.FallFrames == 0 && Log.UnbasedFrames == 0 && Log.DoorBreaks == 0,
 		      FString::Printf(TEXT("%s; %.1f s; peak %.1f m/s; %.2f cm from his place at the end, drift %.2f cm, %d falling, %d off the floor, %d door breaks %s"), *Detail, W.World->GetTimeSeconds() - T0,
 		                      Log.MaxSpeed / 100.f, EndDev, Log.MaxDevCm, Log.FallFrames, Log.UnbasedFrames, Log.DoorBreaks, *Log.First));
 		W.Destroy();
 	}
 
 	/** Twelve cars standing at their landings: what the lifts cost a frame (the subsystem's own tick, 5 Hz slow part included), then the same with all twelve on the move. */
-	void TestPerf(const FAstraLiftNetwork& Net)
+	void LiftTestPerf(const FAstraLiftNetwork& Net)
 	{
 		FAstraLiftNetwork Big;
 		Big.Source = Net.Source;
@@ -1179,7 +1179,7 @@ namespace
 			for (FAstraLiftStop& S : L.Stops) { S.DoorCm += Shift; S.NodeCm += Shift; }
 			Big.Lines.Add(L);
 		}
-		FWorldBench& W = Bench();
+		FLiftWorldBench& W = LiftBench();
 		if (!W.Create())
 		{
 			return;
@@ -1198,7 +1198,7 @@ namespace
 			MaxUs = FMath::Max(MaxUs, W.Lifts->TickMicros());
 		}
 		const double BaseWorldMs = W.WorldMsSum / FMath::Max<int64>(1, W.Frames);
-		Check(TEXT("perf: 12 cars standing"), SumUs / Frames <= 50.0, FString::Printf(TEXT("%.2f us a frame on average, %.1f us the worst frame of %d (the limit is 50 us); the whole world tick %.3f ms"), SumUs / Frames, MaxUs, Frames, BaseWorldMs));
+		LiftCheck(TEXT("perf: 12 cars standing"), SumUs / Frames <= 50.0, FString::Printf(TEXT("%.2f us a frame on average, %.1f us the worst frame of %d (the limit is 50 us); the whole world tick %.3f ms"), SumUs / Frames, MaxUs, Frames, BaseWorldMs));
 		// all twelve called at once: the cost of cars in motion
 		for (int32 I = 0; I < 12; ++I)
 		{
@@ -1224,12 +1224,12 @@ namespace
 			MovingFrames += bAny ? 1 : 0;
 		}
 		const double MovingWorldMs = W.WorldMsSum / FMath::Max<int64>(1, W.Frames);
-		Check(TEXT("perf: 12 cars on the move (reported)"), true, FString::Printf(TEXT("the whole world tick %.3f ms with cars moving in %d of 1800 frames (%.3f ms before): the cars cost about %.3f ms a frame while they move; the subsystem alone %.1f us"),
+		LiftCheck(TEXT("perf: 12 cars on the move (reported)"), true, FString::Printf(TEXT("the whole world tick %.3f ms with cars moving in %d of 1800 frames (%.3f ms before): the cars cost about %.3f ms a frame while they move; the subsystem alone %.1f us"),
 		                                                MovingWorldMs, MovingFrames, BaseWorldMs, FMath::Max(0.0, MovingWorldMs - BaseWorldMs), SumUs / 1800.0));
 		W.Destroy();
 	}
 
-	void TestPlan(const FAstraLiftNetwork& Net)
+	void LiftTestPlan(const FAstraLiftNetwork& Net)
 	{
 		int32 Stops = 0, Shafts = 0, Shuttles = 0, Bad = 0;
 		for (const FAstraLiftLine& L : Net.Lines)
@@ -1244,7 +1244,7 @@ namespace
 				Bad += S.bNode ? 0 : 1;
 			}
 		}
-		Check(TEXT("plan: the lifts of the test plan"), Net.Problems.Num() == 0 && Shafts == 3 && Shuttles == 1 && Stops == 9 + 9 + 9 + 7 && Bad == 0,
+		LiftCheck(TEXT("plan: the lifts of the test plan"), Net.Problems.Num() == 0 && Shafts == 3 && Shuttles == 1 && Stops == 9 + 9 + 9 + 7 && Bad == 0,
 		      FString::Printf(TEXT("%d shafts, %d shuttle line, %d stops; %d problems %s"), Shafts, Shuttles, Stops, Net.Problems.Num(), Net.Problems.Num() ? *Net.Problems[0] : TEXT("")));
 		// a plan that breaks the contract is told so: a door off its shaft's wall, a car that does not fit, a stop twice
 		const FString Bad1 = TEXT("{\"version\":2,\"vertical\":[{\"id\":\"bad\",\"kind\":\"turbolift\",\"shaft\":{\"x\":0,\"y\":0,\"w\":2.8,\"d\":2.8,\"z\":[-10,0]},\"car\":{\"w\":3.0,\"d\":2.4,\"h\":2.6},"
@@ -1260,7 +1260,7 @@ namespace
 			bDoor |= P.Contains(TEXT("from the shaft's middle"));
 			bTwice |= P.Contains(TEXT("listed twice"));
 		}
-		Check(TEXT("plan: a plan that breaks the contract is told so"), bCar && bDoor && bTwice, FString::Printf(TEXT("car too big %d, door off the wall %d, deck twice %d (%d problems)"), bCar, bDoor, bTwice, N2.Problems.Num()));
+		LiftCheck(TEXT("plan: a plan that breaks the contract is told so"), bCar && bDoor && bTwice, FString::Printf(TEXT("car too big %d, door off the wall %d, deck twice %d (%d problems)"), bCar, bDoor, bTwice, N2.Problems.Num()));
 	}
 }
 
@@ -1278,7 +1278,7 @@ int32 UAstraLiftSimCommandlet::Main(const FString& Params)
 	}
 	GAstraLiftTrace = FParse::Param(*Params, TEXT("trace"));
 	const bool bAll = Scenario == TEXT("all");
-	Checks.Reset();
+	LiftChecks.Reset();
 	FAstraLiftNetwork Net;
 	if (!Net.Load(PlanFile))
 	{
@@ -1289,46 +1289,46 @@ int32 UAstraLiftSimCommandlet::Main(const FString& Params)
 	const int32 Tl = Net.FindLine(TEXT("tl_a"));
 	if (bAll || Scenario == TEXT("plan"))
 	{
-		TestPlan(Net);
+		LiftTestPlan(Net);
 	}
 	if (bAll || Scenario == TEXT("motion"))
 	{
-		TestMotion();
+		LiftTestMotion();
 	}
 	if (Tl != INDEX_NONE && (bAll || Scenario == TEXT("brain")))
 	{
-		TestBrain(Net.Lines[Tl]);
+		LiftTestBrain(Net.Lines[Tl]);
 	}
 	if (Tl != INDEX_NONE && (bAll || Scenario == TEXT("rush")))
 	{
-		TestRush(Net.Lines[Tl], Riders, Seed);
+		LiftTestRush(Net.Lines[Tl], Riders, Seed);
 	}
 	if (bAll || Scenario == TEXT("ride") || Scenario == TEXT("doors"))
 	{
-		TestWorld(Net, bAll, Scenario);
+		LiftTestWorld(Net, bAll, Scenario);
 	}
 	if (bAll || Scenario == TEXT("voice"))
 	{
-		TestVoice(Net);
+		LiftTestVoice(Net);
 	}
 	if (bAll || Scenario == TEXT("stream"))
 	{
-		TestStreaming(Net);
+		LiftTestStreaming(Net);
 	}
 	if (bAll || Scenario == TEXT("shuttle"))
 	{
-		TestShuttle(Net);
+		LiftTestShuttle(Net);
 	}
 	if (bAll || Scenario == TEXT("perf"))
 	{
-		TestPerf(Net);
+		LiftTestPerf(Net);
 	}
-	Bench().Shutdown();
+	LiftBench().Shutdown();
 	int32 Failed = 0;
-	for (const FCheck& C : Checks)
+	for (const FLiftCheck& C : LiftChecks)
 	{
 		Failed += C.bPass ? 0 : 1;
 	}
-	UE_LOG(LogASTRA, Display, TEXT("[Lift] %d checks, %d failed"), Checks.Num(), Failed);
+	UE_LOG(LogASTRA, Display, TEXT("[Lift] %d checks, %d failed"), LiftChecks.Num(), Failed);
 	return Failed ? 1 : 0;
 }

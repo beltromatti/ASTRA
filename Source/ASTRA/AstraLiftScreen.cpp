@@ -14,27 +14,27 @@
 
 namespace
 {
-	FLinearColor RGB(uint8 R, uint8 G, uint8 B, float A = 1.f)
+	FLinearColor LiftRgb(uint8 R, uint8 G, uint8 B, float A = 1.f)
 	{
 		FLinearColor C(FColor(R, G, B));
 		C.A = A;
 		return C;
 	}
 
-	const FLinearColor BG = RGB(4, 9, 18);
-	const FLinearColor PANEL = RGB(10, 22, 40);
-	const FLinearColor LINE = RGB(70, 140, 210);
-	const FLinearColor DIM = RGB(40, 80, 125);
-	const FLinearColor TEXTC = RGB(205, 228, 255);
-	const FLinearColor CYAN = RGB(111, 195, 255);
-	const FLinearColor AMBER = RGB(255, 179, 71);
-	const FLinearColor GREEN = RGB(80, 220, 150);
-	const FLinearColor HEADER = RGB(6, 14, 28);
-	const FLinearColor COMMAND = RGB(62, 123, 250);
+	const FLinearColor LiftBg = LiftRgb(4, 9, 18);
+	const FLinearColor LiftPanel = LiftRgb(10, 22, 40);
+	const FLinearColor LiftLine = LiftRgb(70, 140, 210);
+	const FLinearColor LiftDim = LiftRgb(40, 80, 125);
+	const FLinearColor LiftTextc = LiftRgb(205, 228, 255);
+	const FLinearColor LiftCyan = LiftRgb(111, 195, 255);
+	const FLinearColor LiftAmber = LiftRgb(255, 179, 71);
+	const FLinearColor LiftGreen = LiftRgb(80, 220, 150);
+	const FLinearColor LiftHeader = LiftRgb(6, 14, 28);
+	const FLinearColor LiftCommand = LiftRgb(62, 123, 250);
 
 	/** The canvas as the bridge's screens use it: fills, then lines, then texts, each in one batch (the canvas starts a new batch each time the kind of item
 	 *  changes). */
-	struct FPaint
+	struct FLiftPaint
 	{
 		UCanvas* C = nullptr;
 		UFont* Title = nullptr;
@@ -43,7 +43,7 @@ namespace
 		TArray<FCanvasLineItem> Lines;
 		TArray<FCanvasTextItem> Texts;
 
-		~FPaint()
+		~FLiftPaint()
 		{
 			for (FCanvasTileItem& T : Tiles) { C->DrawItem(T); }
 			for (FCanvasLineItem& L : Lines) { C->DrawItem(L); }
@@ -107,7 +107,7 @@ void UAstraLiftSubsystem::EnsureScreen(int32 Line)
 	S->Owner = this;
 	S->Line = Line;
 	S->Target = UCanvasRenderTarget2D::CreateCanvasRenderTarget2D(this, UCanvasRenderTarget2D::StaticClass(), 1024, 640);
-	S->Target->ClearColor = BG;
+	S->Target->ClearColor = LiftBg;
 	S->Target->OnCanvasRenderTargetUpdate.AddDynamic(S, &UAstraLiftScreen::Draw);
 	Run[Line].Screen = S;
 	Run[Line].Car->SetScreenTexture(S->Target);
@@ -185,7 +185,7 @@ int32 UAstraLiftSubsystem::ShownStop(int32 Line) const
 
 FString UAstraLiftSubsystem::StatusLine(int32 Line, FLinearColor& OutColor) const
 {
-	OutColor = CYAN;
+	OutColor = LiftCyan;
 	if (!Run.IsValidIndex(Line) || !Run[Line].Car || !Net.Lines.IsValidIndex(Line))
 	{
 		return FString();
@@ -198,16 +198,16 @@ FString UAstraLiftSubsystem::StatusLine(int32 Line, FLinearColor& OutColor) cons
 	{
 	case EState::Moving:
 	{
-		OutColor = AMBER;
+		OutColor = LiftAmber;
 		const int32 Dir = B.LegTarget() != INDEX_NONE && L.Stops[B.LegTarget()].S > B.S() ? 1 : -1;
 		return FString::Printf(TEXT("%s  ·  %s"), L.bShuttle ? (Dir > 0 ? TEXT("AFT") : TEXT("FORWARD")) : (Dir > 0 ? TEXT("UP") : TEXT("DOWN")), *Name(B.LegTarget()));
 	}
 	case EState::Hold:
-		OutColor = AMBER;
+		OutColor = LiftAmber;
 		return FString::Printf(TEXT("%s  ·  ARRIVING"), *Name(B.AtLanding()));
 	case EState::Opening:
 	case EState::Open:
-		OutColor = GREEN;
+		OutColor = LiftGreen;
 		return FString::Printf(TEXT("%s  ·  DOORS OPEN"), *Name(B.AtLanding()));
 	case EState::Closing:
 		return FString::Printf(TEXT("%s  ·  DOORS CLOSING"), *Name(B.AtLanding()));
@@ -227,17 +227,17 @@ void UAstraLiftSubsystem::PaintScreen(int32 Line, UCanvas* Canvas, int32 W, int3
 	const FAstraLiftLine& L = Net.Lines[Line];
 	const AAstraLiftCar* Car = Run[Line].Car;
 	const FAstraLiftBrain& B = Car->Brain;
-	FPaint P;
+	FLiftPaint P;
 	P.C = Canvas;
 	P.Title = TitleFont;
 	P.Mono = MonoFont;
-	const FLinearColor Accent = L.Kind == EAstraLiftKind::Bridge ? COMMAND : (L.Kind == EAstraLiftKind::Service || L.Kind == EAstraLiftKind::Cargo) ? AMBER : CYAN;
-	P.Rect(0, 0, W, H, BG);
+	const FLinearColor Accent = L.Kind == EAstraLiftKind::Bridge ? LiftCommand : (L.Kind == EAstraLiftKind::Service || L.Kind == EAstraLiftKind::Cargo) ? LiftAmber : LiftCyan;
+	P.Rect(0, 0, W, H, LiftBg);
 	// the header: the lift's name, and what it is doing
-	P.Rect(0, 0, W, 70, HEADER);
+	P.Rect(0, 0, W, 70, LiftHeader);
 	P.Rect(0, 0, 10, 70, Accent);
 	P.Line(0, 70, W, 70, Accent, 2.f);
-	P.Text(28, 12, L.Name.ToUpper(), false, 38, TEXTC);
+	P.Text(28, 12, L.Name.ToUpper(), false, 38, LiftTextc);
 	FLinearColor StatusColor;
 	P.Text(W - 24, 24, StatusLine(Line, StatusColor), true, 22, StatusColor, 2, true);
 
@@ -256,28 +256,28 @@ void UAstraLiftSubsystem::PaintScreen(int32 Line, UCanvas* Canvas, int32 W, int3
 			const bool bSel = I == MenuSel;
 			if (bSel)
 			{
-				P.Rect(30, Y, W - 60, RowH - 5, RGB(40, 28, 8));
-				P.Frame(30, Y, W - 60, RowH - 5, AMBER, 2.f);
+				P.Rect(30, Y, W - 60, RowH - 5, LiftRgb(40, 28, 8));
+				P.Frame(30, Y, W - 60, RowH - 5, LiftAmber, 2.f);
 			}
 			else
 			{
-				P.Rect(30, Y, W - 60, RowH - 5, PANEL);
-				P.Frame(30, Y, W - 60, RowH - 5, DIM);
+				P.Rect(30, Y, W - 60, RowH - 5, LiftPanel);
+				P.Frame(30, Y, W - 60, RowH - 5, LiftDim);
 			}
-			const FLinearColor Ink = R.bHere ? DIM : (bSel ? AMBER : TEXTC);
+			const FLinearColor Ink = R.bHere ? LiftDim : (bSel ? LiftAmber : LiftTextc);
 			P.Text(80, Y + (RowH - 5) * 0.5f - 18, R.Label, false, 38, Ink, 1, true);
 			P.Text(130, Y + (RowH - 5) * 0.5f - 15, R.Name, false, FMath::Min(30.f, RowH * 0.6f), Ink);
 			if (!R.Places.IsEmpty() && RowH > 36.f)
 			{
-				P.Text(W - 50, Y + (RowH - 5) * 0.5f - 9, R.bHere ? FString(TEXT("YOU ARE HERE")) : R.Places, true, 15, R.bHere ? CYAN : (bSel ? AMBER : RGB(120, 160, 205)), 2);
+				P.Text(W - 50, Y + (RowH - 5) * 0.5f - 9, R.bHere ? FString(TEXT("YOU ARE HERE")) : R.Places, true, 15, R.bHere ? LiftCyan : (bSel ? LiftAmber : LiftRgb(120, 160, 205)), 2);
 			}
 			else if (R.bHere)
 			{
-				P.Text(W - 50, Y + (RowH - 5) * 0.5f - 9, TEXT("HERE"), true, 15, CYAN, 2);
+				P.Text(W - 50, Y + (RowH - 5) * 0.5f - 9, TEXT("HERE"), true, 15, LiftCyan, 2);
 			}
 		}
-		P.Rect(0, H - 56, W, 56, HEADER);
-		P.Text(28, H - 40, TEXT("W / S  OR THE MOUSE  ·  E  GO  ·  ESC  CLOSE"), true, 18, RGB(120, 160, 205));
+		P.Rect(0, H - 56, W, 56, LiftHeader);
+		P.Text(28, H - 40, TEXT("W / S  OR THE MOUSE  ·  E  GO  ·  ESC  CLOSE"), true, 18, LiftRgb(120, 160, 205));
 		return;
 	}
 
@@ -285,25 +285,25 @@ void UAstraLiftSubsystem::PaintScreen(int32 Line, UCanvas* Canvas, int32 W, int3
 	const int32 Shown = ShownStop(Line);
 	const FAstraLiftStop& S = L.Stops.IsValidIndex(Shown) ? L.Stops[Shown] : L.Stops[0];
 	const FString Figure = L.bShuttle ? S.Section.ToUpper() : FString::FromInt(S.Deck);
-	P.Text(330, 120, Figure, false, 330, TEXTC, 1, true);
-	P.Text(330, 470, L.bShuttle ? FString::Printf(TEXT("SECTION %s"), *S.Section.ToUpper()) : S.DeckName.ToUpper(), false, 38, CYAN, 1);
+	P.Text(330, 120, Figure, false, 330, LiftTextc, 1, true);
+	P.Text(330, 470, L.bShuttle ? FString::Printf(TEXT("SECTION %s"), *S.Section.ToUpper()) : S.DeckName.ToUpper(), false, 38, LiftCyan, 1);
 	if (!S.Places.IsEmpty())
 	{
-		P.Text(330, 520, S.Places[0], true, 17, RGB(120, 160, 205), 1);
+		P.Text(330, 520, S.Places[0], true, 17, LiftRgb(120, 160, 205), 1);
 	}
 	// the ladder: the stops evenly spaced (the highest first), the car's place between them from how far it has got
 	const float LX = 760.f, LTop = 110.f, LBottom = 540.f;
 	const int32 N = Rows.Num();
 	const float Step = N > 1 ? (LBottom - LTop) / (N - 1) : 0.f;
-	P.Line(LX, LTop, LX, LBottom, DIM, 3.f);
+	P.Line(LX, LTop, LX, LBottom, LiftDim, 3.f);
 	const int32 Target = B.LegTarget();
 	for (int32 I = 0; I < N; ++I)
 	{
 		const float Y = LTop + I * Step;
 		const bool bHere = Rows[I].Stop == B.AtLanding();
 		const bool bTarget = Rows[I].Stop == Target;
-		P.Line(LX - 12, Y, LX + 12, Y, bTarget ? AMBER : (bHere ? CYAN : DIM), bTarget || bHere ? 4.f : 2.f);
-		P.Text(LX + 28, Y - 11, Rows[I].Label, false, 22, bTarget ? AMBER : (bHere ? CYAN : RGB(90, 130, 175)));
+		P.Line(LX - 12, Y, LX + 12, Y, bTarget ? LiftAmber : (bHere ? LiftCyan : LiftDim), bTarget || bHere ? 4.f : 2.f);
+		P.Text(LX + 28, Y - 11, Rows[I].Label, false, 22, bTarget ? LiftAmber : (bHere ? LiftCyan : LiftRgb(90, 130, 175)));
 	}
 	// the marker: between the stop it left and the one ahead (the display is ordered the other way round for a shaft: row 0 is the highest)
 	{
@@ -324,10 +324,10 @@ void UAstraLiftSubsystem::PaintScreen(int32 Line, UCanvas* Canvas, int32 W, int3
 			RowPos = FMath::Lerp((float)StopToRow(Line, Lo), (float)StopToRow(Line, Hi), F);
 		}
 		const float MY = LTop + RowPos * Step;
-		const FLinearColor MarkCol = B.State() == FAstraLiftBrain::EState::Moving ? AMBER : CYAN;
+		const FLinearColor MarkCol = B.State() == FAstraLiftBrain::EState::Moving ? LiftAmber : LiftCyan;
 		P.Rect(LX - 20, MY - 7, 40, 14, MarkCol);
 		P.Frame(LX - 24, MY - 11, 48, 22, MarkCol, 2.f);
 	}
-	P.Rect(0, H - 56, W, 56, HEADER);
-	P.Text(28, H - 40, B.State() == FAstraLiftBrain::EState::Moving ? FString(TEXT("IN TRANSIT")) : FString(TEXT("E  CHOOSE  ·  OR SAY WHERE TO")), true, 18, RGB(120, 160, 205));
+	P.Rect(0, H - 56, W, 56, LiftHeader);
+	P.Text(28, H - 40, B.State() == FAstraLiftBrain::EState::Moving ? FString(TEXT("IN TRANSIT")) : FString(TEXT("E  CHOOSE  ·  OR SAY WHERE TO")), true, 18, LiftRgb(120, 160, 205));
 }
