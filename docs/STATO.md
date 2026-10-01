@@ -36,6 +36,15 @@ alleati (1–2 m$ a decisione), ~0,3 $/ora in tutto, 60 fps con gli aiutanti fer
 schermo principale stacca sulle forze che arrivano (INCOMING / ARRIVING). Il brief CAMPAGNA resta per ciò che manca: la guerra lontana
 dall'Aquila (fronti, battaglie risolte dalla simulazione), la struttura lunga della campagna.
 
+**2/10 sera — prove di durata della guerra di flotte** (`tools/soak.py`, mente accesa, nessun Capitano, gli aiutanti che compilano):
+la prima (12 min) costava **1,63 $/ora** (l'equipaggio 1,00: la storia si accorciava a ogni turno e la cache copriva solo il prompt di
+sistema, ~10k token nuovi a turno) e ha trovato un «reinforcements» del regista con una linea di Styx (diventata alleata) e il Gate che
+cicla detto con 5 minuti di ritardo (le notizie di routine aspettavano una plancia mai silenziosa). Corretti: la storia cresce fino al
+doppio e poi si accorcia, la parte di un gruppo viene dalle sue navi, le notizie di routine aspettano al più 15 s e le forze nuove sono
+avvisi di pericolo, i comandanti di gruppo aspettano di più quando sono tanti. La seconda (16 min): **0,77 $/ora** (equipaggio 0,35,
+comandanti 0,13, guardia 0,13, ammiragli 0,09, volo 0,04, regista 0,04), 0 errori, memoria stabile; due battaglie vinte, poi tregua e
+rifornimento dal regista.
+
 **2/10 — il lead gioca da Capitano (l'apertura con la mente, ~10 minuti, ~0,04 $) e rifinisce ciò che trova:**
 - **Funziona bene**: il XO accoglie e fa il punto in italiano; un ordine con due destinatari («Timoniere… Tattico…») è eseguito da entrambi
   in 1–1,5 s con le loro conferme; Tanaka mette un contatto sullo schermo principale e la pagina dell'Acheron sul datapad in 1 s; l'Archon
