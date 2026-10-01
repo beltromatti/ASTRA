@@ -137,6 +137,8 @@ class Passage:
     def suffix(self, i: int) -> str:
         e = self.ev.get(i, {})
         if e.get("trunk"):                                                    # a Jefferies trunk cell (K tone): the vertical shaft in the arm's first module
+            if e.get("end"):                                                  # (a one-module arm: the cell is also the arm's end)
+                return e["trunk"] + ("EndFwd" if e["end"] == "fwd" else "EndAft")
             return e["trunk"]                                                 # Trunk | TrunkTop | TrunkBottom
         if e.get("end"):
             if "L" in e or "R" in e:

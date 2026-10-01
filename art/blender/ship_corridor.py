@@ -284,6 +284,62 @@ def blast_frame(b: SParts, tn: dict) -> None:
 
 
 # -------------------------------------------------------------------------------------------------------------- the keel's crawlways
+ALCOVE = (1.45, 2.55)                                       # a trunk cell's ladder niche: its extent along x (the niche is 1.1 m deep, from the walkway's side wall to the slot's edge)
+
+
+def slab(fb, z0: float, z1: float, hole=None) -> None:
+    """The floor or the roof structure of a 4 x 4 cell, with the ladder shaft's hole through it when `hole` = (x0, x1) (the niche: y from the walkway's wall to the slot's edge)."""
+    if hole is None:
+        fb.box((-OV, -SLOT_HW, z0), (MOD + OV, SLOT_HW, z1), STRUCT)
+        return
+    a, c = hole
+    y0 = CRAWL_HW
+    fb.box((-OV, -SLOT_HW, z0), (MOD + OV, y0, z1), STRUCT)
+    fb.box((-OV, y0, z0), (a, SLOT_HW, z1), STRUCT)
+    fb.box((c, y0, z0), (MOD + OV, SLOT_HW, z1), STRUCT)
+
+
+def trunk_alcove(b: SParts, tw: float, kh: float, variant: str, tn: dict) -> None:
+    """The inside of a Jefferies trunk's niche (wall-local frame of the starboard wall: s along the cell, t from the walkway's wall face (0) into the wall, to 1.1): two ladder rails on the
+    back wall with rungs every 0.3 m that run up through the roof and down through the floor, a safety cage of hoops over the deck, a lamp, the labels; the top of the column has its roof
+    closed with a hatch plate, the bottom its floor closed and a toe plate."""
+    fb, fine, em = b.body, b.fine, b.emit
+    a, c = ALCOVE
+    sc = (a + c) / 2
+    tb = tw - 0.06                                                   # the back wall's face
+    fb.box((a - 0.02, tb, 0.0), (c + 0.02, tw, kh), STRUCT)         # the niche's back wall (the slot's edge)
+    fb.box((a - 0.02, tb, kh), (c + 0.02, tw, kh + 1.2), STRUCT)    # ... and the shaft's, up through the roof's thickness
+    fb.box((a - 0.02, tb, -FLOOR_T), (c + 0.02, tw, 0.0), STRUCT)   # ... and down through the floor's
+    for sx in (sc - 0.22, sc + 0.22):                                # the rails
+        fine.box((sx - 0.02, tb - 0.1, -0.30 if variant != "TrunkBottom" else 0.0), (sx + 0.02, tb - 0.06, kh + 1.2 if variant != "TrunkTop" else kh), TRIM)
+    z_lo = 0.0 if variant == "TrunkBottom" else -0.28
+    z_hi = kh if variant == "TrunkTop" else kh + 1.15
+    z = z_lo + 0.15
+    while z < z_hi:
+        fine.cyl((sc - 0.22, tb - 0.08, z), (sc + 0.22, tb - 0.08, z), 0.014, STRUCT, seg=6)
+        z += 0.30
+    for zc in (2.15, 3.0, 3.85):                                     # the safety cage
+        if variant == "TrunkTop" and zc > kh - 0.2:
+            continue
+        if zc > z_hi:
+            continue
+        fine.box((a + 0.06, tb - 0.55, zc - 0.015), (c - 0.06, tb - 0.52, zc + 0.015), TRIM)
+        fine.box((a + 0.06, tb - 0.55, zc - 0.015), (a + 0.09, tb - 0.10, zc + 0.015), TRIM)
+        fine.box((c - 0.09, tb - 0.55, zc - 0.015), (c - 0.06, tb - 0.10, zc + 0.015), TRIM)
+    fb.box((a, 0.0, 0.0), (c, 0.015, 0.012), TRIM)                   # the sill between the walkway and the niche
+    if variant == "TrunkBottom":                                     # the bottom of the column: a toe plate over the last rung
+        fine.box((a + 0.02, 0.0, 0.012), (c - 0.02, 0.05, 0.14), TRIM)
+    else:                                                            # the floor opening: a kerb and a yellow edge
+        fine.box((a, 0.03, 0.0), (c, 0.06, 0.07), TRIM)
+        fb.label((sc, 0.0, 0.0125), c - a, 0.10, (0, 0, 1), "hazard_h", up=(0, 1, 0))
+    em.lamp_box((sc - 0.15, 0.2, kh - 0.04), (sc + 0.15, 0.5, kh - 0.03), tn["strip"], LAMP_DIM)
+    fb.label((sc, 0.0, 1.9), 0.5, 0.125, (0, -1, 0), "tag_13")
+    if variant == "TrunkTop":
+        fb.box((a, 0.0, kh - 0.05), (c, tw, kh), COMPOSITE)
+        fb.label((sc, tb - 0.02, kh - 0.3), 0.5, 0.125, (0, -1, 0), "small_06")
+
+
+# --------------------------------------------------------------------------------------------------------------- the build of a crawlway cell
 def _crawl_matrix(side: int) -> Matrix:
     m = Matrix.Identity(4)
     m[1][1] = float(side)
@@ -291,11 +347,24 @@ def _crawl_matrix(side: int) -> Matrix:
     return m
 
 
+def parse_trunk(suffix: str):
+    """A trunk module's name: Trunk | TrunkTop | TrunkBottom, with EndFwd / EndAft when the arm ends in this cell (a one-module arm): (variant, end) or None."""
+    for base in ("TrunkBottom", "TrunkTop", "Trunk"):
+        if suffix.startswith(base):
+            tail = suffix[len(base):]
+            return base, (tail if tail in ("EndFwd", "EndAft") else None)
+    return None
+
+
 def build_crawl_module(name: str, suffix: str) -> "bpy.types.Object":
     """A module of the keel's crawlways (tone K, Deck 12): the same names, 4 x 4 m cell and openings as the corridor modules, but a 1.7 m wide and 2.5 m high tunnel in the middle
     of the slot: 1.15 m thick walls with pipe bundles in three rows, a cable tray and a hull frame every 2 m; a roof 1.2 m thick with a pipe run and a dim lamp strip; a grating floor
     with low amber guide lights. A room's hatch (1.6 x 2.4) or a side crawlway (1.7 wide) is a short tunnel through the wall."""
-    left, right, aft, fwd = CORRIDOR_SPECS[suffix.split("#")[0]]
+    trunk = parse_trunk(suffix)
+    if trunk:                                                     # a Jefferies trunk cell: a straight cell with the ladder shaft in an alcove of its starboard wall (local +y)
+        left, right, aft, fwd = "wall", "alcove", "closed" if trunk[1] == "EndAft" else "open", "closed" if trunk[1] == "EndFwd" else "open"
+    else:
+        left, right, aft, fwd = CORRIDOR_SPECS[suffix.split("#")[0]]
     tn = TONES["K"]
     seed = sum(ord(c) for c in name) * 7 + 13
     rng = random.Random(seed)
@@ -303,8 +372,10 @@ def build_crawl_module(name: str, suffix: str) -> "bpy.types.Object":
     fb, fine, em, soft = b.body, b.fine, b.emit, b.soft
     kw, kh = CRAWL_HW, CRAWL_H
     tw = SLOT_HW - kw
+    hole_floor = bool(trunk) and trunk[0] in ("Trunk", "TrunkTop")        # the shaft passes through the floor (not at the bottom of the column) and the roof (not at the top)
+    hole_roof = bool(trunk) and trunk[0] in ("Trunk", "TrunkBottom")
     # floor: structure, plates over the clear width, guide lights, a chevron
-    fb.box((-OV, -SLOT_HW, -FLOOR_T), (MOD + OV, SLOT_HW, -0.012), STRUCT)
+    slab(fb, -FLOOR_T, -0.012, ALCOVE if hole_floor else None)
     for j in range(2):
         for (a, c) in ((0.0, 2.0), (2.0, 4.0)) if j == 0 else ((0.0, 1.0), (1.0, 3.0), (3.0, 4.0)):
             faces = fb.box((a - (OV if a == 0.0 else 0.0) + 0.008, -kw + j * kw + 0.008, -0.012), (c + (OV if c == MOD else 0.0) - 0.008, -kw + (j + 1) * kw - 0.008, 0.0), DECK)
@@ -314,7 +385,7 @@ def build_crawl_module(name: str, suffix: str) -> "bpy.types.Object":
     SL.lamp_strip(em, (1.8, -0.2, 0.002), (2.2, 0.0, 0.002), 0.03, 0.004, tn["accent"], LAMP_DIM)
     SL.lamp_strip(em, (1.8, 0.2, 0.002), (2.2, 0.0, 0.002), 0.03, 0.004, tn["accent"], LAMP_DIM)
     # roof: a thick slab, pipe runs, a cable tray and the dim strip along the middle
-    fb.box((-OV, -SLOT_HW, kh), (MOD + OV, SLOT_HW, kh + 1.2), STRUCT)
+    slab(fb, kh, kh + 1.2, ALCOVE if hole_roof else None)
     for k, (y, r, mat) in enumerate(((-0.52, 0.07, CRATE_BLUE), (-0.34, 0.05, TRIM), (0.5, 0.09, STEEL), (0.28, 0.045, CRATE_ORANGE))):
         soft.cyl((-OV, y, kh - r - 0.02), (MOD + OV, y, kh - r - 0.02), r, mat, seg=8)
     for s in (0.5, 2.5):
@@ -324,7 +395,7 @@ def build_crawl_module(name: str, suffix: str) -> "bpy.types.Object":
     ribs = (0.0, 2.0)
     for side, kind in ((-1, left), (1, right)):
         with b.at(_crawl_matrix(side)):
-            op = {"door": (2.0 - DOOR_W / 2, 2.0 + DOOR_W / 2, DOOR_H), "gate": (0.8, 3.2, kh), "branch": (2.0 - kw, 2.0 + kw, kh)}.get(kind)
+            op = {"door": (2.0 - DOOR_W / 2, 2.0 + DOOR_W / 2, DOOR_H), "gate": (0.8, 3.2, kh), "branch": (2.0 - kw, 2.0 + kw, kh), "alcove": (ALCOVE[0], ALCOVE[1], kh)}.get(kind)
             if op is None:
                 fb.box((-OV, 0.0, 0.0), (MOD + OV, tw, kh), STRUCT)
             else:
@@ -359,6 +430,8 @@ def build_crawl_module(name: str, suffix: str) -> "bpy.types.Object":
                 fine.box((a, 0.0, 0.0), (c, tw, 0.012), TRIM)
                 em.lamp_box((c + 0.06, -0.12, 1.55), (c + 0.1, -0.08, 1.62), "green", LAMP_DIM)
                 em.lamp_box((a - 0.02, 0.01, 2.3), (c + 0.02, 0.012 + 0.01, 2.34), "amber", LAMP_DIM)
+            elif op is not None and kind == "alcove":                                                                       # the ladder shaft's niche
+                trunk_alcove(b, tw, kh, trunk[0], tn)
             elif op is not None and kind == "branch":                                                                       # the mouth of a side crawlway
                 a, c, oh = op
                 fine.box((a - 0.05, 0.0, 0.0), (a, tw, kh), TRIM)
@@ -366,6 +439,12 @@ def build_crawl_module(name: str, suffix: str) -> "bpy.types.Object":
                 em.lamp_box((a - 0.006, -0.01, 0.3), (a, 0.0, kh - 0.4), tn["accent"], LAMP_DIM)
                 em.lamp_box((c, -0.01, 0.3), (c + 0.006, 0.0, kh - 0.4), tn["accent"], LAMP_DIM)
     # the ends
+    if aft == "closed":                                                                                              # (a one-module arm on the port side: its far end is the aft one)
+        fb.box((-OV, -kw - 0.02, 0.0), (0.42, kw + 0.02, kh), STRUCT)
+        fine.box((0.42, -0.62, 0.02), (0.47, 0.62, 0.3), TRIM)
+        fine.box((0.42, -0.62, 0.3), (0.47, 0.62, kh - 0.2), COMPOSITE)
+        em.lamp_box((0.47, -0.44, 1.8), (0.48, -0.40, 1.9), "amber", LAMP)
+        em.label((0.49, 0.0, 2.1), 0.8, 0.2, (1, 0, 0), "tag_08")
     if fwd == "closed":
         fb.box((MOD - 0.42, -kw - 0.02, 0.0), (MOD + OV, kw + 0.02, kh), STRUCT)
         fine.box((MOD - 0.47, -0.62, 0.02), (MOD - 0.42, 0.62, 0.3), TRIM)
@@ -433,6 +512,9 @@ def build_stub(name: str, tone: str, length: float) -> "bpy.types.Object":
 def build_module(name: str, tone: str, suffix: str) -> "bpy.types.Object":
     if tone == "K":
         return build_crawl_module(name, suffix)
+    if tone in ("V", "T"):                                                       # the service corridors and the shuttle's tunnel (NAVE-3: ship_corridor2.py)
+        import ship_corridor2 as SC2
+        return SC2.build_service_module(name, suffix) if tone == "V" else SC2.build_tunnel_module(name, suffix)
     left, right, aft, fwd = CORRIDOR_SPECS[suffix.split("#")[0]]
     tn = TONES[tone]
     plan_id = "A"
