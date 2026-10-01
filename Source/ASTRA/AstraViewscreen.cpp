@@ -417,6 +417,18 @@ void AAstraViewscreen::Direct(float Dt)
 			Deaths.Add({KV.Key, KV.Value.Value, KV.Value.Key, Now});
 		}
 	}
+	// warships that are new on the plot (not at the first look: everything is new then)
+	if (LastSeen.Num() && Now > 8.0)
+	{
+		for (const FContact& C : Cs)
+		{
+			if (C.Track >= 2 && !C.bCraft && C.bCapital && !LastSeen.Contains(C.ContactId) && !Arrivals.ContainsByPredicate([&C](const FArrival& A) { return A.Id == C.ContactId; }))
+			{
+				Arrivals.Add({C.ContactId, C.Side == EAstraSide::Mandate, Now});
+			}
+		}
+	}
+	Arrivals.RemoveAll([this](const FArrival& A) { return Now - A.At > 45.0; });
 	LastSeen = MoveTemp(Seen);
 	Deaths.RemoveAll([this](const FDeath& D) { return Now - D.At > 4.0; });
 
@@ -541,6 +553,27 @@ void AAstraViewscreen::Direct(float Dt)
 	else if (!HitId.IsEmpty())
 	{
 		Best = {EShot::Contact, HitId, HitName, TEXT("HEAVY HIT"), 5, 4.0, FVector::ZeroVector, {}};
+	}
+	else if (Arrivals.Num() >= 2 && Now - ArrivalShotAt[Arrivals[0].bHostile ? 1 : 0] > 30.0)
+	{
+		// a force arriving (the vanguard out of the gate, a relief): the screen shows it coming, then the fight goes on; the sensors
+		// find a dark force a pair at a time, and the next look at it waits half a minute (it shows what was found meanwhile)
+		const bool bHostile = Arrivals[0].bHostile;
+		TArray<FString> Wave;
+		for (const FArrival& A : Arrivals)
+		{
+			if (A.bHostile == bHostile && FindC(Cs, A.Id) && Wave.Num() < 8)
+			{
+				Wave.Add(A.Id);
+			}
+		}
+		if (Wave.Num() >= 2)
+		{
+			ArrivalShotAt[bHostile ? 1 : 0] = Now;
+			const FString Name = FString::Printf(TEXT("%d %s"), Wave.Num(), bHostile ? TEXT("hostiles") : TEXT("ASTRA warships"));
+			Best = {EShot::Group, FString(), Name, bHostile ? TEXT("INCOMING") : TEXT("ARRIVING"), 5, 6.0, FVector::ZeroVector, MoveTemp(Wave)};
+			Arrivals.RemoveAll([bHostile](const FArrival& A) { return A.bHostile == bHostile; });
+		}
 	}
 	else if (const FContact* E = FindC(Cs, Engaged))
 	{

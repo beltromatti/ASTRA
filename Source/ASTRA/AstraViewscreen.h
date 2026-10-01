@@ -93,6 +93,9 @@ private:
 	TMap<FString, float> RecentDamage; // hull lost in the last seconds (decays)
 	struct FDeath { FString Id; FString Name; FVector Pos; double At; };
 	TArray<FDeath> Deaths;             // destroyed since the last look, waiting for their moment on screen
+	struct FArrival { FString Id; bool bHostile; double At; };
+	TArray<FArrival> Arrivals;         // warships newly on the plot (a force through the gate, a relief): the screen goes to them once
+	double ArrivalShotAt[2] = {-100.0, -100.0};   // the last arrival shot, ASTRA and hostile (a force found two ships at a time is one story)
 	/** The plot, as the battle shares it (one list for each step of the battle: UAstraBattleSubsystem::Contacts); read, never kept past the frame. */
 	const TArray<UAstraBattleSubsystem::FContactView>* PlotRef = nullptr;
 	const TArray<UAstraBattleSubsystem::FContactView>& Plot() const
