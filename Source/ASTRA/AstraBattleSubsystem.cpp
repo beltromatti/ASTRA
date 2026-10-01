@@ -4278,11 +4278,23 @@ bool UAstraBattleSubsystem::StartBeat(const TSharedPtr<FJsonObject>& Beat, FStri
 	{
 		N += List->Num();
 	}
+	if (Beat->TryGetArrayField(TEXT("groups"), List))
+	{
+		// a force in battle groups (a fleet-scale beat): the ids follow the groups' ships in order, each group's leader first
+		for (const TSharedPtr<FJsonValue>& GV : *List)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* GShips = nullptr;
+			if (GV->Type == EJson::Object && GV->AsObject()->TryGetArrayField(TEXT("ships"), GShips))
+			{
+				N += FMath::Min(GShips->Num(), MaxBeatGroupShips);
+			}
+		}
+	}
 	if (Type == TEXT("distress"))
 	{
 		++N;   // the ship calling for help comes first
 	}
-	N = FMath::Clamp(N, 1, 8);
+	N = FMath::Clamp(N, 1, MaxBeatShips);
 	TArray<TSharedPtr<FJsonValue>> IdValues;
 	for (int32 i = 0; i < N; ++i)
 	{
@@ -4335,6 +4347,12 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 		return Out;
 	};
 	FString Listing;
+	const TArray<TSharedPtr<FJsonObject>> GroupSpecs = ShipSpecs(TEXT("groups"));
+	if ((Type == TEXT("raid") || Type == TEXT("reinforcements")) && GroupSpecs.Num())
+	{
+		ArriveGroups(Beat, Type, GroupSpecs, Centre, Bearing, Ids);
+		return;
+	}
 	if (Type == TEXT("raid") || Type == TEXT("reinforcements"))
 	{
 		const TArray<TSharedPtr<FJsonObject>> Specs = ShipSpecs(TEXT("ships"));
@@ -4485,6 +4503,203 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 		                       VClass.Contains(TEXT("Guild")) ? *VClass : *(TEXT("Free Guilds ") + VClass), *VName, *VId, Range, Bearing,
 		                       Attackers.IsEmpty() ? TEXT("unknown attackers") : *Attackers));
 		(void)LeaderIdx;
+	}
+}
+
+void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, const FString& Type, const TArray<TSharedPtr<FJsonObject>>& Force,
+                                         const FVector& Centre, double Bearing, const TArray<FString>& Ids)
+{
+	// A fleet-scale beat: each battle group comes in its own formation around its own point (offset_km: ahead towards the Aquila,
+	// and to her right, from the beat's arrival point), with its leader first, its carriers' wings and its own objective; the
+	// Mandate's come through dark under the fog of war, the 7th Fleet's are on the plot at once. The groups' commanders think
+	// for them (war_minds.py: one seat per group).
+	const bool bRaid = Type == TEXT("raid");
+	const EAstraSide Side = bRaid ? EAstraSide::Mandate : EAstraSide::Astra;
+	const int32 PlayerId = Ships[0].Id;                  // copies: spawning may reallocate Ships
+	const FVector PlayerPos = Ships[0].Pos;
+	const FVector Fwd = (PlayerPos - Centre).GetSafeNormal2D().IsNearlyZero() ? FVector::ForwardVector : (PlayerPos - Centre).GetSafeNormal2D();
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Fwd).GetSafeNormal();
+	const float Facing = (float)FMath::Fmod(Bearing + 180.0, 360.0);
+	int32 NextIdx = 0;
+	int32 Total = 0;
+	int32 FirstLeader = INDEX_NONE;
+	TArray<FString> Listing;
+	for (int32 g = 0; g < Force.Num(); ++g)
+	{
+		const TSharedPtr<FJsonObject>& G = Force[g];
+		FString GName = FString::Printf(TEXT("%s group %d"), bRaid ? TEXT("Mandate") : TEXT("7th Fleet"), g + 1), Formation = bRaid ? TEXT("wedge") : TEXT("line"), GoesFor;
+		G->TryGetStringField(TEXT("name"), GName);
+		G->TryGetStringField(TEXT("formation"), Formation);
+		G->TryGetStringField(TEXT("goes_for"), GoesFor);
+		GoesFor = GoesFor.ToLower();
+		FVector GC = Centre;
+		const TArray<TSharedPtr<FJsonValue>>* Off = nullptr;
+		if (G->TryGetArrayField(TEXT("offset_km"), Off) && Off->Num() >= 2)
+		{
+			GC += Fwd * FMath::Clamp((*Off)[0]->AsNumber(), -40.0, 40.0) * OneKm + Right * FMath::Clamp((*Off)[1]->AsNumber(), -40.0, 40.0) * OneKm;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* GShips = nullptr;
+		G->TryGetArrayField(TEXT("ships"), GShips);
+		const int32 NShips = GShips ? FMath::Min(GShips->Num(), MaxBeatGroupShips) : 0;
+		const double Sp = (bRaid ? 1.6 : 1.8) * OneKm;
+		TArray<int32> Made;
+		for (int32 k = 0; k < NShips && Total < MaxBeatShips; ++k)
+		{
+			const TSharedPtr<FJsonObject> Spec = (*GShips)[k]->Type == EJson::Object ? (*GShips)[k]->AsObject() : nullptr;
+			if (!Spec.IsValid())
+			{
+				continue;
+			}
+			FString Class, Name;
+			Spec->TryGetStringField(TEXT("class"), Class);
+			Spec->TryGetStringField(TEXT("name"), Name);
+			Class = Class.ToLower();
+			if (!bRaid && !Class.Contains(TEXT("praetorian")))
+			{
+				Class = TEXT("vigilant");                       // the 7th Fleet sends what it has: battleships and destroyers
+			}
+			else if (bRaid && !(Class.Contains(TEXT("acheron")) || Class.Contains(TEXT("styx")) || Class.Contains(TEXT("lethe"))))
+			{
+				Class = TEXT("styx");
+			}
+			// the formation's slots, the leader at the point: line abreast, a wedge, a column (a screen spreads abreast ahead of its group)
+			FVector Slot = GC;
+			if (Formation == TEXT("column"))
+			{
+				Slot -= Fwd * (Sp * k);
+			}
+			else if (Formation == TEXT("wedge"))
+			{
+				const int32 Rank = (k + 1) / 2;
+				Slot += Right * ((k % 2 ? 1.0 : -1.0) * Rank * Sp) - Fwd * (Sp * 0.8 * Rank);
+			}
+			else
+			{
+				Slot += Right * ((k - (NShips - 1) * 0.5) * Sp);
+			}
+			Slot.Z += FMath::FRandRange(-0.4f, 0.4f) * OneKm;
+			const FString Id = Ids.IsValidIndex(NextIdx) ? Ids[NextIdx++] : FString::Printf(TEXT("T-%d"), NextContact++);
+			const int32 I = SpawnClass(Class, Id, Name.IsEmpty() ? Id : Name, Slot, Facing);
+			FAstraBattleShip& S = Ships[I];
+			if (bRaid)
+			{
+				S.bFog = true;
+				S.bDark = true;
+				S.Track = 0;
+				S.bClassified = false;
+				S.bIdentified = false;
+				S.Decoys = S.SizeTier >= 2 ? 4 : (S.SizeTier >= 1 ? 2 : 0);
+			}
+			else
+			{
+				S.Mode = EAstraShipMode::Cruise;
+			}
+			Made.Add(I);
+			++Total;
+		}
+		if (Made.Num() == 0)
+		{
+			continue;
+		}
+		// what the group goes for: the Aquila, her consorts, the Janus Gate, or a contact on the plot
+		TArray<int32> Prey;
+		for (const FAstraBattleShip& O : Ships)
+		{
+			if (O.bAlive && !O.bPlayer && !O.bCraft && !O.bDerelict && O.Side == EAstraSide::Astra)
+			{
+				Prey.Add(O.Id);
+			}
+		}
+		int32 TargetId = PlayerId;
+		FVector Objective = PlayerPos;
+		if (GoesFor == TEXT("escorts") && Prey.Num())
+		{
+			TargetId = Prey[FMath::RandRange(0, Prey.Num() - 1)];
+		}
+		else if (GoesFor == TEXT("gate") && Landmarks.IsValidIndex(GateLandmark))
+		{
+			Objective = Landmarks[GateLandmark].Pos;
+		}
+		else if (const FAstraBattleShip* T = GoesFor.IsEmpty() || GoesFor == TEXT("aquila") ? nullptr : FindByContact(GoesFor.ToUpper()))
+		{
+			TargetId = T->Id;
+			Objective = T->Pos;
+		}
+		for (const int32 I : Made)
+		{
+			if (bRaid)
+			{
+				Ships[I].TargetId = TargetId;
+			}
+		}
+		const int32 Gid = NoteGroupSpawn(Side, GName, Formation, Made, INDEX_NONE);
+		if (FAstraBattleGroup* NG = FindGroup(Gid))
+		{
+			NG->Objective = bRaid || GoesFor.Len() ? Objective : PlayerPos;
+			NG->bHasObjective = true;
+		}
+		Ships[Made[0]].bLeader = true;
+		if (FirstLeader == INDEX_NONE)
+		{
+			FirstLeader = Made[0];
+		}
+		// the carriers' wings: Harpies (and Talon bombers) off an Acheron, Falcons and Hammers off a Praetorian
+		const TArray<TSharedPtr<FJsonValue>>* Ws = nullptr;
+		if (G->TryGetArrayField(TEXT("wings"), Ws))
+		{
+			for (const TSharedPtr<FJsonValue>& WV : *Ws)
+			{
+				const TSharedPtr<FJsonObject> WO = WV->Type == EJson::Object ? WV->AsObject() : nullptr;
+				if (!WO.IsValid())
+				{
+					continue;
+				}
+				double CarrierK = 0.0, NCraft = 8.0;
+				FString KindS = TEXT("fighter"), Mission = bRaid ? TEXT("strike") : TEXT("cap");
+				WO->TryGetNumberField(TEXT("carrier"), CarrierK);
+				WO->TryGetNumberField(TEXT("n"), NCraft);
+				WO->TryGetStringField(TEXT("kind"), KindS);
+				WO->TryGetStringField(TEXT("mission"), Mission);
+				const int32 C = Made.IsValidIndex((int32)CarrierK) ? Made[(int32)CarrierK] : Made[0];
+				if (Ships[C].SizeTier < 2)
+				{
+					continue;                                    // only a carrier launches: an Acheron or a Praetorian
+				}
+				const int32 Kind = KindS.StartsWith(TEXT("b")) ? 1 : (KindS.StartsWith(TEXT("d")) ? 2 : 0);
+				const int32 Q = AddWing(C, Kind, FMath::Clamp((int32)NCraft, 2, 16), Mission.ToLower(), FMath::FRandRange(20.f, 45.f));
+				if (bRaid && Squadrons.IsValidIndex(Q) && Mission.ToLower() == TEXT("strike"))
+				{
+					Squadrons[Q].TargetId = TargetId;
+				}
+			}
+		}
+		Listing.Add(FString::Printf(TEXT("%s: %d ships"), *GName, Made.Num()));
+	}
+	if (bRaid)
+	{
+		bEngagementActive = true;
+		bScenarioOver = false;
+		bSurrenderAccepted = false;
+		UE_LOG(LogASTRA, Log, TEXT("[Battle] a Mandate force in, dark: %d ships in %d groups at %.0f km, bearing %03.0f — %s"), Total, Force.Num(),
+		       (Centre - PlayerPos).Size() / OneKm, Bearing, *FString::Join(Listing, TEXT("; ")));
+		bool bHail = true;
+		Beat->TryGetBoolField(TEXT("hail"), bHail);
+		if (bHail && FirstLeader != INDEX_NONE)
+		{
+			TransmissionText = FString::Printf(TEXT("%s — the commander of the Mandate force, aboard the %s, hails the Aquila"), *Ships[FirstLeader].ContactId, *Ships[FirstLeader].Name);
+			TransmissionAt = Time + 14.f;
+		}
+	}
+	else
+	{
+		Report(FString::Printf(TEXT("sensors: friendly contacts at %.0f km, bearing %03.0f — the 7th Fleet: %s"), (Centre - PlayerPos).Size() / OneKm, Bearing,
+		                       *FString::Join(Listing, TEXT("; "))));
+		bool bGranted = false;
+		Beat->TryGetBoolField(TEXT("granted"), bGranted);
+		if (!bGranted && !bEngagementActive)
+		{
+			Report(FString::Printf(TEXT("director: beat complete — reinforcements arrived (%s)"), *FString::Join(Listing, TEXT("; "))), false);
+		}
 	}
 }
 

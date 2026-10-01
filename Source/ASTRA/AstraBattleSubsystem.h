@@ -721,6 +721,11 @@ private:
 	void ClearSystem();
 	void DoTransit(const TSharedPtr<FJsonObject>& Beat);
 	void ArriveBeat(const TSharedPtr<FJsonObject>& Beat);
+	/** A fleet-scale beat (`groups`): each battle group in its formation at its own point, with its wings and its objective. */
+	void ArriveGroups(const TSharedPtr<FJsonObject>& Beat, const FString& Type, const TArray<TSharedPtr<FJsonObject>>& Force, const FVector& Centre,
+	                  double Bearing, const TArray<FString>& Ids);
+	static constexpr int32 MaxBeatShips = 40;        // the ships one beat may bring (SCALA: 30 capital ships and 150 craft hold 60 fps)
+	static constexpr int32 MaxBeatGroupShips = 10;   // the ships of one of its battle groups
 	int32 SpawnClass(const FString& Class, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);
 	/** A Mandate ship puts decoy emitters out: drones that fly to false bearings faking a warship's drive. */
 	int32 LaunchGhosts(int32 OwnerIdx, int32 N);
