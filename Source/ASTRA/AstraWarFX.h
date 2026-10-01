@@ -321,6 +321,8 @@ public:
 
 	// ---- the console (AstraWarFXTest.cpp)
 	void Stats(FString& Out) const;
+	/** Runs what astra.fx.* asked for since the last frame. */
+	void RunTests();
 
 private:
 	friend class UAstraBattleSubsystem;

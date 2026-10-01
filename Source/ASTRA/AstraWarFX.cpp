@@ -458,6 +458,7 @@ void UAstraWarFX::Tick(float InDt)
 	Clock += Dt;
 	++Frame;
 	BeginFrame();
+	RunTests();                            // what astra.fx.* asked for (AstraWarFXTest.cpp)
 	TickTimed();
 	TickShips();
 	TickPieces();
