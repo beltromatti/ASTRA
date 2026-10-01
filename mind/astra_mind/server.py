@@ -33,7 +33,7 @@ from .crew import CREW
 from .enemy import COMMANDERS, EnemyAgent
 from .style import StyleKeeper
 from . import router as router_mod
-from .context import Exchange, parse as parse_context
+from .context import Exchange, parse as parse_context, parse_lift
 from .initiative import Watch, chatter_system, recent_orders, watch_ask, watch_system
 from .director import ADMIRAL, Director
 from .env import CACHE
@@ -117,6 +117,7 @@ from .memory import MemoryKeeper  # noqa: E402
 from .npc import Npcs  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
+EXTERNAL_SPEAKERS["computer"] = ("Ship's computer", "estelle")          # the lifts' voice (a car the Captain is in: tools.lift_tool)
 
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402
@@ -866,6 +867,10 @@ class Mind:
             gate = asyncio.get_running_loop().create_future()
             world = {"state": st, "war": self.director.war.crew_view(), "mood": self.director.mood, "clock": (st.get("life") or {}).get("clock")}
             where = "at " + str((raw_ctx or {}).get("place_name") or (raw_ctx or {}).get("place") or "somewhere aboard")
+            if lift := parse_lift((raw_ctx or {}).get("lift")):
+                # in a lift car with them: the ship's computer runs the lift, so what asks for a ride is its to answer (tools.lift_tool), never a rider's
+                where += (f", inside {lift.name}, a lift car: the ship's computer takes him wherever he asks, a deck, a place or a section, \"down\", \"one up\", in any language, so "
+                          "words that ask for a ride are for the computer and the people aboard say nothing to them (unless he speaks to one of them)")
             asyncio.create_task(self.npcs.hear(text, lang, people, world, gate, where))
             if str((raw_ctx or {}).get("facing", "")).startswith("npc"):
                 faced = next((p.name for p in people if p.id == raw_ctx["facing"]), "a crew member")

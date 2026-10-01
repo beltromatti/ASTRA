@@ -1,6 +1,7 @@
 // ASTRA — the flight deck (Deck 9): its lights come on while the Captain is down there, the parked flight groups follow
 // the simulation (a launch: the craft taxis to its catapult and is thrown down the tube; a landing: it is back in its
-// bay), and the lift joins it to the bridge's corridor.
+// bay). The old rooms' lights (Main Engineering, the Medbay, the Mess Hall, Crew Berthing) follow the Captain here too. The lifts are no longer
+// this actor's: the real ones are AstraLiftSubsystem's (docs/ASCENSORI.md).
 
 #pragma once
 
@@ -22,43 +23,35 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
-	/** The lift's two landings: on the bridge deck (world, cm) and here (relative to this actor, cm). */
+	/** Where the old lift's two landings were (the bridge's corridor, the flight deck's alcove): kept so that the saved level and tools/ue_scripts/build_hangar.py
+	 *  still read and write them; nothing uses them now. */
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector BridgeLanding = FVector(-1860.f, -390.f, 20.f);
 
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector HangarLanding = FVector(250.f, 0.f, 20.f);
 
-	/** Main Engineering's landing (world, cm; zero = no such stop). */
+	/** Main Engineering's old lift alcove (world, cm; zero = none): the room's volume is measured from it (its lights, the Captain's visit), and the ship's tests put him there. */
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector EngineeringLanding = FVector::ZeroVector;
 
-	/** The Medbay's landing (world, cm; zero = no such stop). */
+	/** The Medbay's (the same). */
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector MedbayLanding = FVector::ZeroVector;
 
-	/** The Mess Hall's landing (world, cm; zero = no such stop). */
+	/** The Mess Hall's (the same). */
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector MessLanding = FVector::ZeroVector;
 
-	/** Crew Berthing's landing (Deck 4, Section C; world, cm; zero = no such stop). */
+	/** Crew Berthing's (Deck 4, Section C; the same). */
 	UPROPERTY(EditAnywhere, Category = "Hangar")
 	FVector BerthLanding = FVector::ZeroVector;
 
-	/** The lift network: which landing the pawn stands at (0 the bridge, 1 the flight deck, 2 Main Engineering, 3 the
-	 *  Medbay, 4 the Mess Hall, 5 Crew Berthing, -1 none), and the ride to another (fade, the car's hum, the other deck). */
-	static constexpr int32 MaxLandings = 6;
-	int32 LiftLandingNear(const APawn* Pawn) const;
-	bool RideLift(APawn* Pawn, int32 ToLanding);
-	bool HasLanding(int32 Index) const { return Index >= 0 && Index < MaxLandings && !LandingWorld(Index).IsNearlyZero(); }
-	int32 NumLandings() const;
 	bool IsPawnInEngineering(const APawn* Pawn) const;
 	bool IsPawnInMedbay(const APawn* Pawn) const;
 	bool IsPawnInMess(const APawn* Pawn) const;
 	bool IsPawnInBerths(const APawn* Pawn) const;
 
-	/** The lift call: the Captain is near a landing and presses E. Returns false when no landing is near. */
-	bool TryUseLift(APawn* Pawn);
 	/** E beside one of Alpha's Falcons on deck: the Captain takes it (the next in line for the catapult disappears from
 	 *  its bay while the screen is dark). False when no Falcon is near or none is free. */
 	bool TryBoard(APawn* Pawn);
@@ -89,17 +82,9 @@ private:
 	bool bBerthLightsOn = true;
 	bool bEngLightsOn = true;
 	bool bMedLightsOn = true;
-	int32 RideToLanding = -1;
-	FVector LandingWorld(int32 Index) const;
 	UPROPERTY() TObjectPtr<USoundBase> CatapultSound;
-	UPROPERTY() TObjectPtr<USoundBase> LiftSound;
 	bool bLightsOn = true;
 	float CheckT = 0.f;
-	float LiftCooldown = 0.f;
-	float LiftT = -1.f;          // a ride in progress (fade, move, fade)
-	float LiftWaitS = 0.f;          // how long the car has waited in the dark for the destination's deck to load
-	TWeakObjectPtr<APawn> Rider;
-	FVector RideTo;
 
 	void SetZoneLights(bool bOn);
 	void SyncSquadrons();
