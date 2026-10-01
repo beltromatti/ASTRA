@@ -30,5 +30,7 @@ Offline il banco delle regole e le prove della mente con un modello finto; il le
 verso il pianeta, uno negato dagli scudi in battaglia).
 
 ## Coordinamento
-Nei limiti del modulo: niente abbordaggi (F5, dopo DISTRUZIONE) se non come interfaccia (trasportare una squadra sarà la stessa
-regola). Gli altri moduli in corso: DISTRUZIONE (danni interni), SCALA (disegno della guerra), VOLO (piloti nella mente).
+Nei limiti del modulo: niente abbordaggi se non come interfaccia (trasportare una squadra sarà la stessa regola: ABBORDAGGI, in corso, fa
+il combattimento a bordo). In main: DISTRUZIONE (danni interni: la sala e l'energia possono essere danneggiate davvero, `AstraDamageModel`),
+VOLO, SCALA, MENTE-GUERRA. Accanto: NAVE-3 (la pianta: se la Transporter Room cambia posto o forma, lo dice il piano), ASCENSORI, CAMPAGNA
+(se attivo). Non toccare i loro file; ciò che serve, chiedilo al lead.
