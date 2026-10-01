@@ -53,6 +53,8 @@ PERIODIC_S = {"admiral": 80.0, "commander": 100.0}      # a mind with a fight on
 MIN_GAP_S = {"admiral": 20.0, "commander": 25.0}        # and never more often than this on events alone
 FIRST_PULSE_S = 8.0                                     # the first look at a fight that has just begun
 SEPARATION_KM = 4.0                                     # an allied group wakes when the Aquila has moved this far from it since its last look
+AQUILA_HULL_DROP = 8.0                                  # ... or has lost this many points of hull since its last look,
+AQUILA_SHIELD_DROP = 30.0                               # ... or of shield strength (her protection going fast is the Fleet's business at once)
 SETTLE_S = 3.0                                          # a burst of events is read together: wait for it to end (at most MAX_SETTLE_S)
 MAX_SETTLE_S = 8.0
 QUIET_END_S = 75.0                                      # a fight with nothing happening for this long is over
@@ -64,6 +66,7 @@ ROUND2_TIMEOUT_S = 12.0
 LASER_KM = 4.0
 SMALL_GROUP_KM = 4.5                                    # up to three or four ships: just beyond laser reach (the edge peaks sharply here: 4.2 and 4.8 give most of it up)
 DEEP_GROUP_KM = 3.2                                     # six ships or more, or two groups side by side: close, everything firing
+LINE_KM = 3.2                                           # a line abreast (any size): the range the bench found best for it (2.8-3.6 within the error)
 LOG_LINES = 16                                          # what a commander remembers of the last orders, words and news
 LOG_KEEP = 80
 
@@ -313,17 +316,40 @@ def mandate_extras(view: dict[str, Any]) -> tuple[str, dict[str, dict[str, Any]]
     return "\n".join(lines), ew_by_id
 
 
-def render_astra_extras(state: dict[str, Any]) -> str:
-    """What an allied captain reads of the Aquila and of the ships about, from the fleet datalink: the carrier's state, the friendly ships'
-    positions about her, the contacts that are only a bearing."""
+Levels = tuple[float | None, float | None, float]          # (hull %, shield strength %, when): what the Aquila was at a captain's look
+
+
+def aquila_levels(state: dict[str, Any]) -> tuple[float | None, float | None]:
+    """The Aquila's hull and shield strength (percent) as the fleet datalink gives them, or None where the state has none."""
+    def num(v: Any) -> float | None:
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    return num(state.get("hull_pct")), num((state.get("shields") or {}).get("strength_pct"))
+
+
+def aquila_hurt(state: dict[str, Any], seen: Levels | None) -> bool:
+    """Her protection has gone down fast since the captain's last look (hull or shield strength, by the thresholds)."""
+    if seen is None:
+        return False
+    hull, shield = aquila_levels(state)
+    return (hull is not None and seen[0] is not None and seen[0] - hull >= AQUILA_HULL_DROP) \
+        or (shield is not None and seen[1] is not None and seen[1] - shield >= AQUILA_SHIELD_DROP)
+
+
+def render_astra_extras(state: dict[str, Any], seen: Levels | None = None, now: float = 0.0) -> str:
+    """What an allied captain reads of the Aquila and of the ships about, from the fleet datalink: the carrier's state (and what it was at the
+    captain's last look, `seen`), the friendly ships' positions about her, the hostile ones nearest to her, the contacts that are only a bearing."""
     out = []
     bits = []
+    hull, shield = aquila_levels(state)
+    then = (f" ({seen[0]:.0f}% at your last look, {max(0.0, now - seen[2]):.0f} s ago)"
+            if seen is not None and seen[0] is not None and hull is not None and abs(seen[0] - hull) >= 2 else "")
     for k, label in (("hull_pct", "hull"), ("alert", "alert")):
         if state.get(k) is not None:
-            bits.append(f"{label} {state[k]}{'%' if k == 'hull_pct' else ''}")
+            bits.append(f"{label} {state[k]}{'%' + then if k == 'hull_pct' else ''}")
     sh = (state.get("shields") or {}).get("strength_pct")
     if sh is not None:
-        bits.append(f"shields {sh}%")
+        then_s = f" ({seen[1]:.0f}% then)" if seen is not None and seen[1] is not None and shield is not None and abs(seen[1] - shield) >= 5 else ""
+        bits.append(f"shields {sh}%{then_s}")
     for k, label, unit in (("speed_mps", "speed", " m/s"), ("heading_deg", "heading", "°")):
         if state.get(k) is not None:
             bits.append(f"{label} {state[k]}{unit}")
@@ -333,7 +359,7 @@ def render_astra_extras(state: dict[str, Any]) -> str:
         bits.append(f"her target {state['target']}")
     if bits:
         out.append(" The ASN Aquila (the Captain's ship): " + ", ".join(bits))
-    friends, bearings = [], []
+    friends, bearings, hostile = [], [], []
     for c in state.get("contacts") or []:
         st = str(c.get("status", ""))
         if st == "friendly":
@@ -341,14 +367,22 @@ def render_astra_extras(state: dict[str, Any]) -> str:
                            f"bearing {c.get('bearing_deg', '?')}°, hull {_pct(c.get('hull_pct'))}")
         elif st.startswith(("bearing only", "JAMMING")):
             bearings.append(f"{c.get('id')} bearing {c.get('bearing_deg', '?')}°" + (" (jamming)" if st.startswith("JAMMING") else ""))
+        elif st.startswith("hostile") and isinstance(c.get("range_km"), (int, float)):
+            hostile.append(c)
     if friends:
         out.append(" Friendly ships about the Aquila: " + "; ".join(friends))
+    if hostile:
+        hostile.sort(key=lambda c: float(c["range_km"]))
+        near = [f"{c.get('id')} {str(c.get('class') or c.get('name') or '').split(' (')[0]} {_km(c.get('range_km'))} (hull {_pct(c.get('hull_pct'))})" for c in hostile[:4]]
+        inside = [str(c.get("id")) for c in hostile if float(c["range_km"]) <= LASER_KM]
+        out.append(" Hostile ships nearest the Aquila: " + "; ".join(near)
+                   + (f" — inside laser reach ({LASER_KM:g} km) of her: {', '.join(inside)}" if inside else ""))
     if bearings:
         out.append(" Contacts with a bearing and no range (any may be a decoy): " + "; ".join(bearings))
     return "\n".join(out)
 
 
-def picture(side: str, kind: str, group: str, view: dict[str, Any], state: dict[str, Any]) -> str:
+def picture(side: str, kind: str, group: str, view: dict[str, Any], state: dict[str, Any], seen: Levels | None = None, now: float = 0.0) -> str:
     """What a commander reads of the battle: their groups (the admiral's: all in full; a group commander's: their own in full), the enemy as their
     sensors hold it, and what their seat needs besides (the Mandate admiral's fleet operations; an allied captain's Aquila and neighbours)."""
     only = None if kind == "admiral" else group
@@ -357,7 +391,7 @@ def picture(side: str, kind: str, group: str, view: dict[str, Any], state: dict[
         text = (f"YOUR GROUPS\n{render_groups(view, only=only, ew_by_id=ew)}\nENEMY GROUPS (ASTRA, as your sensors hold them)\n{render_enemy(view)}")
         return text + (f"\nYOUR FLEET OPERATIONS\n{extra}" if kind == "admiral" else "")
     text = f"YOUR GROUPS\n{render_groups(view, only=only)}\nENEMY GROUPS (as the fleet's sensors hold them)\n{render_enemy(view)}"
-    ex = render_astra_extras(state)
+    ex = render_astra_extras(state, seen, now)
     return text + (f"\nTHE AQUILA AND THE SHIPS ABOUT\n{ex}" if ex else "")
 
 
@@ -382,7 +416,7 @@ def view_digest(view: dict[str, Any]) -> tuple:
 
 
 # ------------------------------------------------------------------------------------------------ the prompts
-DOCTRINE = f"""How a fleet fights (what your officers and your own years have taught you)
+_DOCTRINE_HEAD = """How a fleet fights (what your officers and your own years have taught you)
 - Guns: railguns reach 8-10 km and do most of the killing; lasers reach 4 km. Missiles reach far but one at a time they are shot down by point
   defence: by default each group already holds its cells until enough are ready to saturate the target's point defence, then fires them all
   together, timed to land at once, and that is the fleet's strongest punch. `salvo` forces every cell out now; `conserve` keeps them back, and
@@ -391,7 +425,12 @@ DOCTRINE = f"""How a fleet fights (what your officers and your own years have ta
 - The groups run on reflexes all the time: they pick targets (concentrating fire), hold a range of about 4 km, pull their battered ships behind
   the line, and break off when they are clearly losing. The reflexes are decent. YOUR orders override them: while an order stands the group does
   not break off by itself, so withdrawing when it is lost is YOUR decision, and so is releasing it (`auto`) when the order has served.
-- Range is the main lever between equals, and the right range depends on how many ships fight together. The enemy's lasers reach {LASER_KM:g} km, its
+"""
+
+# The range paragraph, in two versions. The standard one is what the live runs validated (docs/GUERRA.md §8.10). The other adds the formation lever the
+# bench measured afterwards, with the scripted commander only (a line abreast closing to about 3 km beats the reflexes' wedge by about one ship of three and
+# two to two and a half of six): it is a switch (`WarMinds.formation_doctrine`, ASTRA_WAR_FORMATION=1) until the lead has seen the minds use it in the game.
+_RANGE_WEDGE = f"""- Range is the main lever between equals, and the right range depends on how many ships fight together. The enemy's lasers reach {LASER_KM:g} km, its
   railguns 8-10 km. The reflexes hold about 4 km: right at the lasers' edge, where every laser of both sides is in play. A SMALL force (up to three or
   four ships fighting together) does best at {SMALL_GROUP_KM:g} km, just beyond laser reach: only railguns and missiles are exchanged and every railgun
   bears. Inside 4.2 km the leading ships drift into laser reach and the enemy's lasers join in for no gain, and beyond 5 km the advantage fades; closing
@@ -401,7 +440,24 @@ DOCTRINE = f"""How a fleet fights (what your officers and your own years have ta
   reach (a wedge of six ships is 4-5 km deep): it does better closing to about {DEEP_GROUP_KM:g} km, everything firing, the groups covering each other.
   These are the measured sweet spots between equal forces; the odds move them: against a clearly heavier enemy stand off, against a clearly beaten one
   (most of its ships under a third of their hull) close and finish it.
-- Concentrate fire: shots spread over several ships lose one or two ships in six against a line that focuses. Name the target that matters most
+"""
+
+_RANGE_LINE = f"""- Range and formation are the levers between equals. The enemy's lasers reach {LASER_KM:g} km, its railguns 8-10 km. The reflexes hold about 4 km in a
+  WEDGE (a deep vee: its rear sits several km behind its tip): at the lasers' edge, where every laser of both sides is in play and only the front of the
+  wedge fires at its best. Measured between equal forces, against that wedge:
+  . a LINE ABREAST (`formation` line: every ship at the same distance from the enemy, so every gun bears together) closing to about {LINE_KM:g} km was the
+    strongest order there is: about one ship of three better than the reflexes, two to two and a half of six with two groups or six ships together. It is a
+    knife fight, the lasers and railguns of both sides all firing: it pays between equals and against a weaker or battered enemy, not against a clearly
+    heavier one. Held at 4.5 km a line loses, with three ships or two groups.
+  . the plain wedge does best at {SMALL_GROUP_KM:g} km with a small force (up to three or four ships): just beyond laser reach only railguns and missiles are
+    exchanged; inside 4.2 km its leading ships drift into laser reach, beyond 5 km the advantage fades. With two groups or six ships together the wedge
+    loses ships at that range (its rear cannot reach).
+  . a column is the worst shape to fight in (the ships behind never fire): it is for transit.
+  Count the ships that fight together, not the groups. Against a clearly heavier enemy stand off; against a clearly beaten one (most of its ships under a
+  third of their hull) close and finish it. Closing in on an equal enemy with the wedge to "finish" a target costs ships.
+"""
+
+_DOCTRINE_TAIL = """- Concentrate fire: shots spread over several ships lose one or two ships in six against a line that focuses. Name the target that matters most
   and can be killed (a capital ship whose shield face is down or whose hull is going, a ship about to fall); do not chase a distant destroyer
   with a cruiser still unhurt.
 - A flank sends one or two agile ships to the enemy's beam; the whole enemy line then fires on them. It pays with clear superiority, or as bait;
@@ -414,6 +470,15 @@ DOCTRINE = f"""How a fleet fights (what your officers and your own years have ta
 - The first look at a fight is a partial picture: the rest of your fleet may still be arriving, and the enemy shows only what the sensors have found.
   Do not judge a battle by its first picture, and do not leave a fight that has not been fought. When you take command from someone, what he decided
   was his, made on his picture: you judge afresh on yours."""
+
+
+def doctrine(formation: bool = False) -> str:
+    """The doctrine every commander is given (the same for all, both sides): with `formation` the range paragraph is the one that also teaches the
+    formation lever (the switch above)."""
+    return _DOCTRINE_HEAD + (_RANGE_LINE if formation else _RANGE_WEDGE) + _DOCTRINE_TAIL
+
+
+DOCTRINE = doctrine()
 
 MANDATE_ADMIRAL = """You are {name}, {rank} of the Kharon Mandate, aboard {ship}, commanding the Mandate's forces in {where}. {bio}
 {mission}
@@ -463,6 +528,11 @@ loss. Most of the time you say nothing and act. Never narrate the picture back t
 then only what is NEW to him, in one or two short sentences: do not restate his own order, your standing stance or the range you hold unless he
 asked, and do not repeat what you told him last time. {voices}
 
+The Aquila is the Fleet's carrier and the Captain's ship. When she is under focused fire (the picture shows her shields or hull falling fast since your
+last look, and enemy ships close to her, inside laser reach), your group acts at once, without waiting for his word: it fires on the ships that are hurting
+her (the nearest to her, the most dangerous) or screens her, whichever puts more between her and them, and you tell him in a line what you are doing. If
+she is far from you, say so and close with her.
+
 The chain of command and the Captain's words
 - {chain}
 - The Captain's requests reach you as words ("From the Captain, over the fleet net: ..."), or as an order he gave your group directly (the picture
@@ -491,9 +561,9 @@ sentences), and then act with the tools: orders, or `no_change`. Always end with
 
 
 def system_prompt(seat: "Seat", cmd: "Commander", where: str, mission: str, chain: str = "", admiral_name: str = "", ships: str = "", voices: str = "",
-                  channel_open: bool = False, ops: bool = True) -> str:
+                  channel_open: bool = False, ops: bool = True, formation: bool = False) -> str:
     if seat.kind == "admiral" and seat.side == "mandate":
-        s = MANDATE_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, where=where, bio=cmd.bio, mission=mission, doctrine=DOCTRINE,
+        s = MANDATE_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, where=where, bio=cmd.bio, mission=mission, doctrine=doctrine(formation),
                                    commands=COMMANDS_OPS if ops else COMMANDS_PLAIN)
         if channel_open:
             s += ("\n\nA channel with the ASTRA captain is OPEN: they hear what you `transmit`. Silence is the usual: speak only when the picture "
@@ -501,12 +571,12 @@ def system_prompt(seat: "Seat", cmd: "Commander", where: str, mission: str, chai
                   "dignity, true to the battle below (what you say must match what your ships are really doing).")
         return s
     if seat.kind == "admiral":
-        return ASTRA_BENCH_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, doctrine=DOCTRINE)
+        return ASTRA_BENCH_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, doctrine=doctrine(formation))
     if seat.side == "mandate":
-        return MANDATE_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, mission=mission, doctrine=DOCTRINE, where=where,
+        return MANDATE_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, mission=mission, doctrine=doctrine(formation), where=where,
                                         group=seat.group, admiral_name=admiral_name or "the admiral")
     return ASTRA_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, group=seat.group, ships=ships, where=where, mission=mission,
-                                  world=WORLD, doctrine=DOCTRINE, chain=chain, voices=voices)
+                                  world=WORLD, doctrine=doctrine(formation), chain=chain, voices=voices)
 
 
 # ------------------------------------------------------------------------------------------------ the people and the seats
@@ -574,6 +644,7 @@ class Mind:
     takeover: str = ""                                  # a new commander took the seat (a succession): they look at once
     aquila_km: float | None = None                      # (ASTRA group) how far from the Aquila it was at the last look
     drawn_away: int = 0                                 # how many looks in a row the Aquila's drawing away has called (each needs twice the distance of the last)
+    aquila_seen: tuple[float | None, float | None, float] | None = None    # (ASTRA group) the Aquila's hull and shield strength at its last look, and when
     why_extra: list[str] = field(default_factory=list)  # facts that woke it besides the events (the Aquila drawing away), told at the next look
     stats: dict[str, float] = field(default_factory=lambda: {"pulses": 0, "cost": 0.0, "latency": 0.0, "first_call": 0.0, "orders": 0, "failed": 0,
                                                               "tokens_in": 0, "tokens_out": 0, "errors": 0, "no_change": 0, "lines": 0})
@@ -627,6 +698,7 @@ class WarMinds:
         self.admiral_contact: dict[str, str] = {}        # side -> the contact id of the commander in charge (to see a succession)
         self.t0 = self.clock()
         self.disabled = False
+        self.formation_doctrine = False                  # the doctrine also teaches the formation lever (a switch: ASTRA_WAR_FORMATION=1, see `_RANGE_LINE`)
 
     # ------------------------------------------------------------------------------------------------ people
     def reset(self) -> None:
@@ -823,6 +895,8 @@ class WarMinds:
                     if mind.new_enemy:
                         why.append("new enemy on the plot: " + ", ".join(mind.new_enemy[:6]))
             if not why and seat.side == "astra" and seat.kind == "group" and gap >= MIN_GAP_S[seat.role]:
+                if aquila_hurt(state, mind.aquila_seen):
+                    why.append("the Aquila is losing her shields or hull fast")
                 cur = aquila_km(view, state, seat.group)
                 if cur is not None and mind.aquila_km is not None:
                     # drawing away again and again is news less and less often (the threshold doubles each time, up to 8x); she coming back is always news
@@ -1013,8 +1087,10 @@ class WarMinds:
             chain = self.chain_facts(view, state)
         channel_open = side == "mandate" and self.channel(cmd.contact)
         system = system_prompt(seat, cmd, where, mission, chain=chain, admiral_name=(admiral.commander.name if admiral and admiral.commander else ""),
-                               ships=ships, voices=voices, channel_open=channel_open, ops=self.ops)
-        pic = picture(side, seat.kind, seat.group, view, state)
+                               ships=ships, voices=voices, channel_open=channel_open, ops=self.ops, formation=self.formation_doctrine)
+        pic = picture(side, seat.kind, seat.group, view, state, mind.aquila_seen, self.clock())
+        if side == "astra" and seat.kind == "group":
+            mind.aquila_seen = (*aquila_levels(state), self.clock())                    # (what the next look compares with)
         intent = ""
         if seat.kind == "admiral" and side == "mandate":
             style = self.intel()
@@ -1315,7 +1391,7 @@ class WarMinds:
         cut = f" They had said only «{cut_after}» when the Captain spoke over them." if cut_after else ""
         ask = (f"{waited_s:.0f} seconds ago you were about to tell the Captain, over the fleet net: «{text}».{cut} The battle has moved on (the picture below is "
                f"now). If it still matters to him, say it now as it stands — updated, short — with say. If not, say nothing: call no_change.")
-        system = system_prompt(mind.seat, cmd, self.where(self.state), cmd.mission, chain=self.chain_facts(view, self.state))
+        system = system_prompt(mind.seat, cmd, self.where(self.state), cmd.mission, chain=self.chain_facts(view, self.state), formation=self.formation_doctrine)
         user = (f"{render_groups(view, only=mind.seat.group)}\nENEMY\n{render_enemy(view)}\n{render_astra_extras(self.state)}\n\n{ask}")
         said: list[str] = []
         CURRENT.set(mind)

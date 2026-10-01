@@ -163,6 +163,7 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
 
     minds = war_minds.WarMinds(llm, say, link.execute, clock=lambda: clock["t"], mandate_persona=COMMANDERS.get if a.opening else mandate_persona(first), sides=sides,
                                astra_admiral=a.astra_admiral and not a.opening, ops=not a.no_ops, trace=pulses.append)
+    minds.formation_doctrine = a.formation_doctrine
     script = parse_captain(a.captain)                                    # the scripted Captain: what he says to the fleet and when
     k, t0, decided_at = 0, time.time(), None
     final_counts: dict[str, Any] = {}
@@ -306,6 +307,7 @@ def main() -> None:
     ap.add_argument("--latency", type=float, default=0.3, help="scripted models: seconds each call takes")
     ap.add_argument("--range", type=float, default=3.2, help="the scripted `close` model: the range (km) it orders the group to hold")
     ap.add_argument("--reissue", action="store_true", help="the scripted `close` model: give the order again at every look, even when it still stands")
+    ap.add_argument("--formation-doctrine", action="store_true", help="the live minds' doctrine also teaches the formation lever (a line abreast closing to ~3 km)")
     ap.add_argument("--formation", default="", help="the scripted `close` model: a formation to order (line, wedge, column, screen)")
     ap.add_argument("--budget", type=float, default=0.3, help="live: stop spending at this many dollars (all the log holds plus this run)")
     ap.add_argument("--dt", type=float, default=0.5, help="battle seconds between exchanges")

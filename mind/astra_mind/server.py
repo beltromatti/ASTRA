@@ -181,6 +181,7 @@ class Mind:
                             channel=lambda c: self.enemy.open and self.enemy.contact == c, register_voice=self._register_voice,
                             transmit=self._say_external, intel=self.style.mandate_line, note=self.director.note)
         self.war.disabled = os.environ.get("ASTRA_WAR_MINDS", "1") == "0"        # (ASTRA_WAR_MINDS=0: the groups fight on their reflexes, as before)
+        self.war.formation_doctrine = os.environ.get("ASTRA_WAR_FORMATION", "0") == "1"   # (ASTRA_WAR_FORMATION=1: the doctrine also teaches the formation lever)
         self.enemy.war = self.war
         self.director.war_minds = self.war
         self.director.negotiate = self._negotiate

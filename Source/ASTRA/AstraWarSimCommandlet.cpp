@@ -94,6 +94,9 @@ namespace
 		State->SetObjectField(TEXT("_astra_groups"), B->SideGroupsJson(0));
 		State->SetArrayField(TEXT("contacts"), B->ContactsJson());
 		State->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(100.f * B->PlayerHullFraction()));
+		TSharedRef<FJsonObject> Shields = MakeShared<FJsonObject>();               // (the same field the game's snapshot has: the allied captains watch her protection)
+		Shields->SetNumberField(TEXT("strength_pct"), FMath::RoundToInt(100.f * B->PlayerShieldFraction()));
+		State->SetObjectField(TEXT("shields"), Shields);
 		State->SetNumberField(TEXT("sim_time_s"), B->GetBattleTime());
 		Root->SetObjectField(TEXT("state"), State);
 		Root->SetObjectField(TEXT("counts"), FleetCounts(B->DebugState()));

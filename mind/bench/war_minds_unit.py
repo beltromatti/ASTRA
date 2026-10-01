@@ -280,6 +280,15 @@ class ToolsTests(Fixture):
         await self.feed(st)
         await self.feed(st, 9)
 
+    async def test_the_formation_doctrine_switch_reaches_every_seats_system_prompt(self) -> None:
+        self.llm.policy = null_policy
+        self.minds.formation_doctrine = True
+        await self.start(null_policy)
+        self.assertIn("LINE ABREAST", self.llm.calls[0]["system"])
+        self.minds.formation_doctrine = False
+        await self.feed(mandate_state([VANGUARD(order="attack")], ENEMIES()), 90)
+        self.assertNotIn("LINE ABREAST", self.llm.calls[-1]["system"])
+
     async def test_the_admiral_orders_through_group_order_with_side_and_by_and_without_the_reason(self) -> None:
         await self.start(ScriptPolicy([("group_order", {"group": "all", "order": "attack", "target": "A-01", "range_km": 3.0, "for_s": 90,
                                                          "reason": "close on the Acheron"})]))
@@ -406,12 +415,42 @@ class AstraTests(Fixture):
                            contacts=[{"id": "T-01", "name": "ASN Praetorian", "status": "friendly", "range_km": 4.5, "bearing_deg": 25, "hull_pct": 100},
                                      {"id": "T-31", "status": "bearing only (passive)", "bearing_deg": 335}], speed_mps=288, heading_deg=45)
 
-    def aquila_at(self, km: float) -> dict[str, Any]:
-        """The picket's ships `km` from the Aquila (the fleet datalink's contact ranges)."""
+    def aquila_at(self, km: float, hull: float = 100.0, shield: float = 100.0, hostile: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """The picket's ships `km` from the Aquila (the fleet datalink's contact ranges), the Aquila's hull and shield strength, the hostile contacts."""
         return astra_state([self.picket()], ENEMIES(), None,
                            contacts=[{"id": "T-01", "name": "ASN Praetorian", "status": "friendly", "range_km": km, "bearing_deg": 25, "hull_pct": 100},
-                                     {"id": "T-02", "name": "ASN Vigilant", "status": "friendly", "range_km": km, "bearing_deg": 30, "hull_pct": 100}],
-                           speed_mps=288, heading_deg=45)
+                                     {"id": "T-02", "name": "ASN Vigilant", "status": "friendly", "range_km": km, "bearing_deg": 30, "hull_pct": 100}] + (hostile or []),
+                           speed_mps=288, heading_deg=45, hull_pct=hull, shields={"strength_pct": shield})
+
+    async def test_the_aquila_losing_hull_or_shields_fast_wakes_the_captain_who_sees_what_she_was_and_who_is_near_her(self) -> None:
+        self.llm.policy = null_policy
+        near = [{"id": "T-21", "name": "Acheron", "class": "acheron", "status": "hostile", "range_km": 2.4, "hull_pct": 90},
+                {"id": "T-22", "name": "Styx", "class": "styx", "status": "hostile", "range_km": 3.3, "hull_pct": 100},
+                {"id": "T-23", "name": "Styx", "class": "styx", "status": "hostile", "range_km": 9.0, "hull_pct": 100}]
+        await self.feed(self.aquila_at(2.5, 100, 100, near))
+        await self.feed(self.aquila_at(2.5, 100, 100, near), 9)                           # first look
+        n = len(self.llm.calls)
+        await self.feed(self.aquila_at(2.5, 97, 90, near), 30)                            # a little: nothing
+        self.assertEqual(len(self.llm.calls), n)
+        await self.feed(self.aquila_at(2.5, 88, 82, near), 5)                             # 12 points of hull since the look: she wakes
+        self.assertEqual(len(self.llm.calls), n + 1)
+        self.assertIn("losing her shields or hull fast", self.minds.pulses[-1]["why"][0])
+        user = self.llm.calls[-1]["user"]
+        self.assertIn("hull 88% (100% at your last look", user)
+        self.assertIn("shields 82% (100% then)", user)
+        self.assertIn("Hostile ships nearest the Aquila: T-21 acheron 2.4 km (hull 90%); T-22 styx 3.3 km (hull 100%); T-23 styx 9.0 km", user)
+        self.assertIn("inside laser reach (4 km) of her: T-21, T-22", user)
+        await self.feed(self.aquila_at(2.5, 86, 80, near), 30)                            # the next look compares with this one: 2 points, nothing
+        self.assertEqual(len(self.llm.calls), n + 1)
+        await self.feed(self.aquila_at(2.5, 86, 45, near), 5)                             # 35 points of shield: wakes
+        self.assertEqual(len(self.llm.calls), n + 2)
+
+    async def test_the_captain_is_told_in_her_prompt_what_to_do_when_the_aquila_is_under_fire(self) -> None:
+        self.llm.policy = null_policy
+        await self.feed(self.aquila_at(2.5))
+        await self.feed(self.aquila_at(2.5), 9)
+        self.assertIn("The Aquila is the Fleet's carrier", self.llm.calls[0]["system"])
+        self.assertIn("without waiting for his word", self.llm.calls[0]["system"])
 
     async def test_the_aquila_drawing_away_wakes_the_captain_less_and_less_often_and_coming_back_is_always_news(self) -> None:
         self.llm.policy = null_policy
@@ -652,6 +691,17 @@ class RenderTests(unittest.TestCase):
         self.assertIn("AQUILA: LOST", text)
         self.assertIn("6 still aboard", text)
         self.assertEqual(ew["M-01"]["decoys_aboard"], 4)
+
+    def test_the_doctrine_quotes_the_measured_ranges_and_teaches_the_formation_lever_only_when_switched_on(self) -> None:
+        plain, line = war_minds.doctrine(), war_minds.doctrine(True)
+        self.assertIn(f"does best at {war_minds.SMALL_GROUP_KM:g} km", plain)
+        self.assertNotIn("LINE ABREAST", plain)
+        self.assertIn("LINE ABREAST", line)
+        self.assertIn(f"closing to about {war_minds.LINE_KM:g} km", line)
+        for text in (plain, line):
+            self.assertIn("The first look at a fight is a partial picture", text)         # the rest of the doctrine is the same
+            self.assertIn("Concentrate fire", text)
+        self.assertEqual(war_minds.DOCTRINE, plain)
 
     def test_ranks_order_the_navy(self) -> None:
         self.assertLess(war_minds.rank_index("Rear Admiral"), war_minds.rank_index("Captain"))
