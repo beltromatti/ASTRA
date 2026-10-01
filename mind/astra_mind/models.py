@@ -68,6 +68,9 @@ ROLES: dict[str, Role] = {r.name: r for r in (
     Role("npc", DEEPSEEK, _DS, max_tokens=320, temperature=0.8, first_token_s=3.0, fallback="chatter",
          note="the ship's ordinary people when the Captain talks to them (npc.py): one or two lines in character, or a pass; one call per Captain "
               "utterance with someone in earshot (bench/npc_live.py: 16/16 as expected, first line 0.4 s, 0.4 m$ a call; gpt-oss-120b@crusoe 15/16, 0.7 s, 0.12 m$)"),
+    Role("transporter", DEEPSEEK, _DS, max_tokens=320, temperature=0.6, first_token_s=3.5, fallback="chatter",
+         note="the Transporter Room's Chief (transporter.py): one call per order relayed from the bridge, per Captain utterance with her in earshot and per burst of the "
+              "room's news; she acts with the console's tools (transport, energize, abort, locate) and speaks; a second short call only to read a refusal"),
     Role("flight", DEEPSEEK, _DS, max_tokens=340, temperature=0.6, first_token_s=4.0, fallback="chatter",
          note="the flight net (flight_minds.py): the CAG, the squadron leaders, their wingmen and the Chief of the Deck; a few radio lines on strong events "
               "and when the Captain calls them, a squadron's mission when he orders it; ONE call voices the whole cast; the prompt is long and stable, the "

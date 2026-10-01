@@ -7,6 +7,7 @@ from typing import Any
 
 from . import stations as station_model
 from .crew import CREW
+from .transporter import TO_HELP, WHO_HELP
 
 
 def _fn(name: str, desc: str, props: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -142,6 +143,25 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "contact_id": {"type": "string", "description": "Contact id, or empty string for a full sweep"}}, ["contact_id"]),
 ]
 
+# the Transporter Room (docs/TELETRASPORTO.md): Operations or the XO hand the Captain's order to the Chief, who is a person of her own (transporter.py); the mind takes the call
+# (server.py: the `transporter` hook), it never goes to the game as a command of the bridge's
+TRANSPORTER = _fn("transporter", "Operations or the XO: hand the Captain's order to the Transporter Room (Deck 5), where Chief Petty Officer Rhea Ostrander runs the lattice "
+                                 "transport. She checks it against the beam's rules, carries it out or tells the Captain why not, and answers for herself in her own voice: you only "
+                                 "relay, in the Captain's own terms, and do not promise or narrate the result. beam: who goes where; energize: the Captain's word for a lock she is "
+                                 "holding; abort: cancel what is in the beam; ask: a question for her (what can reach the Vigilant, who is away, why not). Only on the Captain's "
+                                 "order, never on your own initiative.", {
+    "action": {"type": "string", "enum": ["beam", "energize", "abort", "ask"]},
+    "who": {"type": "array", "items": {"type": "string"}, "description": WHO_HELP},
+    "to": {"type": "string", "description": TO_HELP},
+    "from": {"type": "string", "description": "leave out when they are where they stand; 'surface' or a contact id to bring them back from there"},
+    "energize": {"type": "string", "enum": ["auto", "hold"], "description": "hold: the lock waits for the Captain's word (then `energize`); leave out for auto"},
+    "shield_window": {"type": "boolean", "description": "our shields held down for the cycle: only when the Captain says so (or has said it is all right) with enemies about"},
+    "override": {"type": "array", "items": {"type": "string", "enum": ["hazard", "weak_lock"]},
+                 "description": "the Captain's OWN word to take a risk (land them in a compartment with fire, smoke or no air; beam on a lock under 55%): never on an officer's say-so"},
+    "id": {"type": "string", "description": "the transport's id (X3) for energize or abort; leave out for the one waiting or under way"},
+    "question": {"type": "string", "description": "ask only: what the Captain wants to know, in his words"}}, ["action"])
+SHIP_TOOLS.append(TRANSPORTER)
+
 DEPARTMENTS = ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"]
 # what a standing order lets each department do by itself when an event calls for it
 DEPT_TOOLS = {"tactical": {"set_target", "fire_weapons", "cease_fire", "set_shields", "set_point_defense", "launch_decoys"},
@@ -217,7 +237,7 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "dispatch_damage_control": "ops", "hail": "comms", "set_emcon": "sensors", "active_scan": "sensors",
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
-          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops"}
+          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "transporter": "ops"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
@@ -240,7 +260,15 @@ def has_groups(state: dict[str, Any] | None) -> bool:
 
 
 def tools_for(state: dict[str, Any] | None) -> ToolSet:
-    """The tools that fit the game build (`stations` in its state or not)."""
+    """The tools that fit the game build (`stations` in its state or not; the Transporter Room's relay only when the build has the room)."""
+    ts = _tools_for(state)
+    if (state or {}).get("transporter"):
+        return ts
+    tools = [t for t in ts.tools if t["function"]["name"] != "transporter"]
+    return ToolSet(tools, {t["function"]["name"] for t in tools}, ts.available)
+
+
+def _tools_for(state: dict[str, Any] | None) -> ToolSet:
     avail = station_model.available_from_state(state)
     if avail is None:
         return ToolSet(list(ALL_TOOLS), {t["function"]["name"] for t in ALL_TOOLS}, None)

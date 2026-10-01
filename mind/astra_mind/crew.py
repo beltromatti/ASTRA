@@ -318,6 +318,18 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
 - ABANDON SHIP is the Captain's order alone (`abandon_ship`); when the ship is not doomed (hull above a quarter, the reactor
   holding), the XO questions it once, and carries it out if the Captain repeats it."""
 
+_RULE_TRANSPORTER = """- The Transporter Room (Deck 5, `transporter` in the ship state) is run by Chief Petty Officer Rhea Ostrander: a person with her own voice and her own mind, NOT yours. She
+  checks every transport against the beam's rules and the room's state, carries it out or tells the Captain why not, and answers for herself over the intercom (face to
+  face when the Captain is in her room, and then it is hers to answer, not yours). The bridge's part is the `transporter` tool: when the Captain orders anyone or anything
+  carried — himself, the away team, a squad of marines, a crate, a person he names — to a pad, a room of the ship, an allied ship in range or the surface of the world below,
+  or asks what can be reached, Operations (Tanaka) or the XO (Serra) hands it to her in the Captain's own terms (who, where to, from where if they are not where they
+  stand) and says ONE short line in the Captain's language, what was handed over ("Chief, the Captain to the surface"): never what she will find, never her answer —
+  the Chief gives it, and the officers do not repeat it. Plain words for who and where: the Captain's names, "the Captain" for him, a room by its name, a ship by its
+  contact id. Every transport is the Captain's order: no officer beams anyone on their own initiative. The Captain's own word is what lowers our shields for a cycle
+  (`shield_window`) with enemies about and what accepts a risk (`override`: a landing in fire or smoke, a weak lock): pass them only when he said so himself, and
+  never put them in on a hunch — the Chief asks him once if she doubts. The bridge learns the room's state from the one line in the ship state and from what the
+  Chief says. Before a Janus transit with people away from the ship (the line says who, and where) the XO reminds the Captain: the beam does not reach across the Gate."""
+
 _RULE_ASLEEP = """- When the Captain rests in their quarters (`captain` says asleep) the XO has the conn and decides alone what can wait; if
   something wakes the Captain (the recent events say the XO woke them), the XO is the one who calls them — one short, human line
   ("Captain, sorry to wake you: …") — before the others report."""
@@ -379,6 +391,8 @@ def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str
         blocks.append(_RULE_MESS)
     if ship_state.get("visitor") or "quarters" in cap:
         blocks.append(_RULE_VISITOR)
+    if ship_state.get("transporter"):
+        blocks.append(_RULE_TRANSPORTER)
     if ship_state.get("abandon"):
         blocks.append(_RULE_ABANDON)
     return f"""You are the bridge crew of the ASN Aquila. The player is the ship's Captain.
@@ -444,8 +458,11 @@ def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: st
     battle cost twice as much)."""
     events = "\n".join(f"- {e}" for e in recent_events[-8:]) or "- (none)"
     board = station_model.board(ship_state, {k: v.title for k, v in CREW.items()})
-    state_json = json.dumps({k: v for k, v in ship_state.items() if not k.startswith("_") and (k not in ("stations", "sim_time_s") or not board)},
-                            separators=(",", ":"), ensure_ascii=False)
+    view = {k: v for k, v in ship_state.items() if not k.startswith("_") and (k not in ("stations", "sim_time_s") or not board)}
+    if isinstance(view.get("transporter"), dict):
+        from .transporter import brief           # (the Chief reads her whole console; the bridge needs only to know the room is there, what is under way and who is away)
+        view["transporter"] = brief(view["transporter"])
+    state_json = json.dumps(view, separators=(",", ":"), ensure_ascii=False)
     room = f"The room: {hearing}\n" if hearing else ""
     fleet = str(ship_state.get("_fleet_board") or "")           # the allied groups and their captains (the war minds' fleet board, set by the server)
     return (f"[The bridge now]\nRecent events\n{events}\n"

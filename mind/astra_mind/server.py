@@ -115,8 +115,22 @@ from .loss import Aftermath  # noqa: E402
 from .finale import Finale  # noqa: E402
 from .memory import MemoryKeeper  # noqa: E402
 from .npc import Npcs  # noqa: E402
+from .transporter import DISPLAY as XFER_DISPLAY, SPEAKER as XFER_SPEAKER, TITLE as XFER_TITLE, VOICE as XFER_VOICE, TransporterRoom  # noqa: E402
 EXTERNAL_SPEAKERS[PORT_CONTROL["key"]] = (f'{PORT_CONTROL["name"]} ({PORT_CONTROL["place"]})', PORT_CONTROL["voice"])
 EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
+EXTERNAL_SPEAKERS[XFER_SPEAKER] = (XFER_DISPLAY, XFER_VOICE)         # the Transporter Room's Chief (transporter.py)
+
+
+def _both(a: "asyncio.Future[bool]", b: "asyncio.Future[bool]") -> "asyncio.Future[bool]":
+    """One verdict out of two listeners' (npc.py, transporter.py): True (nobody answered, the words were for the bridge) only when both say so."""
+    out: asyncio.Future = asyncio.get_running_loop().create_future()
+
+    def check(_f) -> None:  # noqa: ANN001
+        if not out.done() and a.done() and b.done():
+            out.set_result(bool(a.result()) and bool(b.result()))
+    a.add_done_callback(check)
+    b.add_done_callback(check)
+    return out
 
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402
@@ -193,6 +207,10 @@ class Mind:
                                   standing=lambda: {o["department"] for o in self.agent.standing}, path=self._flight_path)
         self.flight.disabled = os.environ.get("ASTRA_FLIGHT_MINDS", "1") == "0"           # (ASTRA_FLIGHT_MINDS=0: Price reports the flight events, as before)
         self.flight.on_unanswered = self._flight_unanswered
+        # the Transporter Room's Chief (transporter.py): a person with her own mind who reads the room's console and carries out the orders the bridge relays and the Captain gives
+        self.xfer = TransporterRoom(self.llm, self._xfer_say, self._xfer_execute, state=lambda: (self.game.state if self.game else None) or {}, lang=lambda: self.lang,
+                                    relay=self._xfer_relay)
+        self.xfer.disabled = os.environ.get("ASTRA_TRANSPORTER_MIND", "1") == "0"        # (ASTRA_TRANSPORTER_MIND=0: the bridge's orders go to the console as typed, nobody answers)
         self.enemy.war = self.war
         self.director.war_minds = self.war
         self.director.negotiate = self._negotiate
@@ -273,6 +291,32 @@ class Mind:
         if ship is None:
             return {"ok": True, "detail": "(no game)"}
         return await ship.execute(name, args, by, direct=True)
+
+    async def _xfer_say(self, speaker: str, text: str, lang: str, tone: str, *, priority_urgent: bool = False, answer: bool = False) -> None:
+        """The Transporter Room's Chief speaks: in her room the Captain hears her face to face, elsewhere over the intercom (the game decides); the bridge's crew reads
+        what she said in its events, so that nobody repeats it. A line that waited is thought again by her first."""
+        if self.game is not None:
+            self.game.events.append(f"over the intercom, {XFER_TITLE} (Transporter Room): {text}")
+
+        async def rethink(t: str, waited: float, cut_after: str) -> str | None:
+            return await self.xfer.rethink(speaker, t, waited, cut_after, lang)
+        await self.voice.say(speaker, text, lang, tone, priority=Prio.URGENT if priority_urgent else None, answer=True if answer else None, rethink=rethink)
+
+    async def _xfer_execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
+        """The Chief's console to the game: the transports and the personnel locator, straight to the ship (never through the hooks the bridge's own tools go through)."""
+        ship = self.game if (self.game and self.game.state) else None
+        if ship is None:
+            return {"ok": False, "detail": "the ship does not answer"}
+        return await ship.execute(name, args, by, direct=True)
+
+    async def _xfer_order(self, args: dict[str, Any], by: str) -> dict[str, Any]:
+        """The bridge's `transporter` tool: the order is handed to the Chief at once; she answers the Captain herself."""
+        return await self.xfer.order(args, by)
+
+    async def _xfer_relay(self, text: str) -> None:
+        """The console carried an order out by itself (the Chief did not answer): the bridge is told."""
+        self.last_activity = time.monotonic()
+        await self.turns.put(("\x00event:" + text, self.lang))
 
     def _flight_path(self) -> str:
         return os.path.join(os.path.dirname(self.director.war.save_path), "flight.json")
@@ -815,7 +859,7 @@ class Mind:
     def _captain_speaks(self) -> None:
         """The Captain has priority over everything: whatever the crew was doing (a report, a watch check, a chat) stops now,
         and the reports still waiting to be voiced are dropped."""
-        n = self.agent.preempt() + self.npcs.preempt() + self.flight.preempt()
+        n = self.agent.preempt() + self.npcs.preempt() + self.flight.preempt() + self.xfer.preempt()
         drop = getattr(self.voice, "drop_low_priority", None)        # (the voice module's side: it may give the Captain more than this)
         dropped = drop() if callable(drop) else 0
         hook = getattr(self.voice, "captain_speaks", None)           # the hook for cutting the line being spoken, if the voice has one
@@ -870,6 +914,16 @@ class Mind:
             if str((raw_ctx or {}).get("facing", "")).startswith("npc"):
                 faced = next((p.name for p in people if p.id == raw_ctx["facing"]), "a crew member")
                 raw_ctx = {**raw_ctx, "facing": faced}
+        # the Chief of the Transporter Room, when she is within earshot: a person with her own mind, the words for her are hers to answer (the bridge's turn waits for her verdict too)
+        self.xfer.captain_said(text, lang)
+        if not self.xfer.disabled and self.xfer.in_earshot(raw_ctx):
+            gate_x = asyncio.get_running_loop().create_future()
+            place_x = str((raw_ctx or {}).get("place") or "")
+            where_x = "in the Transporter Room" if "transporter" in place_x else "at " + str((raw_ctx or {}).get("place_name") or place_x or "somewhere aboard")
+            asyncio.create_task(self.xfer.hear(text, lang, gate_x, where_x))
+            gate = gate_x if gate is None else _both(gate, gate_x)
+            if self.xfer.facing(raw_ctx):
+                raw_ctx = {**(raw_ctx or {}), "facing": XFER_TITLE}
         ctx = parse_context(raw_ctx, st, self.enemy, self._party_names(), self.exchange,
                             flight_net=self.flight.net_live(st, self.exchange.ago(self.exchange._heard, FLIGHT_PARTY)))
         self.memory.hear("Captain", text)
@@ -962,7 +1016,8 @@ class Mind:
         self.clients.add(ws)
         self.voice.muted = False
         self.game = GameShip(lambda m: ws.send(json.dumps(m, ensure_ascii=False)),
-                             intercept={"fleet_request": self._fleet_request, "group_order": self._captain_group_order, "hail": self._hail_flight})
+                             intercept={"fleet_request": self._fleet_request, "group_order": self._captain_group_order, "hail": self._hail_flight,
+                                        "transporter": self._xfer_order})
         await ws.send(json.dumps({"type": "status", "crew": {k: v.title for k, v in CREW.items()}, "rate": self.tts.sample_rate,
                                   "voice": 2}))       # voice protocol 2: docs/protocollo_voce.md (cancel, hold_s, floor, line_dropped)
         log.info("game connected")
@@ -983,6 +1038,7 @@ class Mind:
                     self.enemy.reset()
                     self.war.reset()
                     self.flight.reset()
+                    self.xfer.reset()
                     self.port.reset()
                     await self.voice.clear("new_session")     # what the last session had not said yet is not said in this one
                     self.watch.reset()
@@ -1026,6 +1082,7 @@ class Mind:
                         self.style.reset()
                         self.npcs.reset()
                         self.flight.new_campaign()
+                        self.xfer.new_campaign()
                         log.info("new campaign")
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
@@ -1079,6 +1136,10 @@ class Mind:
                             taken = self.flight.on_event(text)     # the flight net's people tell their own news (Price coordinates: he does not echo them)
                         except Exception:  # noqa: BLE001
                             log.exception("the flight net could not take an event")
+                        try:
+                            taken = self.xfer.on_event(text) or taken      # the Transporter Room's own news: the Chief tells it herself, the bridge does not echo it
+                        except Exception:  # noqa: BLE001
+                            log.exception("the Transporter Room could not take an event")
                     if msg.get("report") and not self.aftermath.muted and not taken:
                         self.last_activity = time.monotonic()
                         await self.turns.put(("\x00event:" + text, self.lang))

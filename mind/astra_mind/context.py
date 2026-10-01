@@ -101,11 +101,11 @@ class Exchange:
 
 def known_speakers(ids: Any) -> tuple[str, ...]:
     """The ids the game lists as within earshot, reduced to the ones the crew's mind knows: an officer, the doctor, the chief, a
-    patient's bed, a place at a table in the Mess (the game also lists extras: "deck1", "sleeper3"...)."""
+    patient's bed, a place at a table in the Mess, the Transporter Room's Chief (the game also lists extras: "deck1", "sleeper3"...)."""
     out = []
     for x in ids or []:
         x = str(x)
-        if x in CREW or x == "mess_cook" or re.fullmatch(r"(patient|mess)\d+", x):
+        if x in CREW or x in ("mess_cook", "xfer_chief") or re.fullmatch(r"(patient|mess)\d+", x):
             out.append(x)
     return tuple(out)
 

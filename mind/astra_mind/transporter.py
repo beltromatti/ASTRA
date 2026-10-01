@@ -20,7 +20,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -54,12 +53,38 @@ LOG_LINES = 12
 TALK_KEEP = 8                # what the Captain and she said last, kept between conversations
 JOURNAL = CACHE / "xfer_journal.json"
 
-_URGENT = re.compile(r"\b(lost|lose|aborted|abort|buffer|scatter|offline|wrecked|hit|failed|blocked|interlock|in danger|degraded)\b", re.I)
+URGENT_MARK = "URGENT:"     # the world marks the news that is danger (a lock lost with someone in the beam, a pattern lost): `transporter: URGENT: ...`
 
 
 def is_news(text: str) -> bool:
     """A game event that is the Transporter Room's (the subsystem's own words: `transporter: ...`)."""
     return (text or "").lstrip().lower().startswith("transporter:")
+
+
+def split_news(text: str) -> tuple[str, bool]:
+    """The words of the room's news and whether the world marked them as danger (the game says it; the code does not guess it from the words)."""
+    body = (text or "").split(":", 1)[1].strip() if ":" in (text or "") else (text or "").strip()
+    if body.upper().startswith(URGENT_MARK):
+        return body[len(URGENT_MARK):].strip(), True
+    return body, False
+
+
+def brief(card: dict[str, Any] | None) -> str:
+    """The room in one line for the bridge's telemetry: the Chief reads her whole console, Operations and the XO need to know whether the room can take an order, what is under way and
+    who is away from the ship."""
+    if not isinstance(card, dict) or not card:
+        return "the Transporter Room does not answer"
+    room = card.get("room") or {}
+    parts = [f"room {room.get('state', '?')} ({room.get('power_pct', '?')}% power, reach {room.get('reach_km', '?')} km)"]
+    jobs = [j for j in (card.get("transports") or []) if j.get("state") not in ("done", "failed", "aborted", "lost")]
+    if jobs:
+        parts.append("under way: " + "; ".join(f"{j.get('id')} {j.get('who')} to {j.get('to')} ({j.get('state')})" for j in jobs[:3]))
+    away = card.get("away") or []
+    if away:
+        parts.append("away from the ship: " + "; ".join(f"{a.get('who')} {a.get('where')}" for a in away[:4]) + (f" and {len(away) - 4} more" if len(away) > 4 else ""))
+    if card.get("last"):
+        parts.append(f"last: {str(card['last'])[:140]}")
+    return "; ".join(parts)
 
 
 # ------------------------------------------------------------------------------------------------ tools
@@ -307,9 +332,9 @@ class TransporterRoom:
         if self.disabled or not is_news(text):
             return False
         now = self.clock()
-        body = text.split(":", 1)[1].strip()
+        body, urgent = split_news(text)
         self.log.append((now, "(room)", body[:300]))
-        self._events.append(Ev(now, body, bool(_URGENT.search(body))))
+        self._events.append(Ev(now, body, urgent))
         self.kick()
         return True
 
