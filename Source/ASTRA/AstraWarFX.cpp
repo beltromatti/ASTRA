@@ -464,10 +464,11 @@ void UAstraWarFX::AddDebris(const FVector& Pos, const FVector& Vel, float SizeM,
 void UAstraWarFX::BeginFrame()
 {
 	const FAstraBattleShip& A = Owner->Ships[0];
-	F.Origin = Owner->bSandbox ? FVector::ZeroVector : A.Pos;      // (a bench scenario parks the Aquila far away: what is measured is round the origin)
+	const bool bParked = Owner->bSandbox && !A.bAlive;              // (a bench scenario parks the Aquila far away: what is measured is round the origin; one that keeps her
+	F.Origin = bParked ? FVector::ZeroVector : A.Pos;               //  — astra.war.scenario <name> aquila — is drawn round her, as the game does)
 	F.Att = A.Att;
 	F.InvAtt = A.Att.Inverse();
-	F.Vel = Owner->bSandbox ? FVector::ZeroVector : A.Vel;
+	F.Vel = bParked ? FVector::ZeroVector : A.Vel;
 	F.Bridge = Owner->BridgeOffset;
 	Intensity = FMath::Clamp(CVarIntensity.GetValueOnGameThread(), 0.1f, 6.f);
 	Density = FMath::Clamp(CVarDensity.GetValueOnGameThread(), 0.2f, 2.f);

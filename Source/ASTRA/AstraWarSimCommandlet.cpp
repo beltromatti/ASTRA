@@ -225,7 +225,8 @@ namespace
 		// the variant's commands first (console variables, spawns, station modes), before the first tick
 		if (!Scenario.IsEmpty())
 		{
-			GEngine->Exec(World, *FString::Printf(TEXT("astra.war.scenario %s"), *Scenario));   // data/war/scenarios/<name>.json
+			// data/war/scenarios/<name>.json; -aquila keeps the Aquila in it (at the origin, with the ASTRA side), as the game's scale test from the bridge does
+			GEngine->Exec(World, *FString::Printf(TEXT("astra.war.scenario %s%s"), *Scenario, FParse::Param(*Params, TEXT("aquila")) ? TEXT(" aquila") : TEXT("")));
 		}
 		TArray<FString> Cmds;
 		Exec.ParseIntoArray(Cmds, TEXT(";"));
@@ -334,6 +335,7 @@ namespace
 			WJ->SetNumberField(TEXT("ms_max"), FMath::RoundToDouble(WorldMs.Last() * 1000.0) / 1000.0);
 			Stats->SetObjectField(TEXT("world_tick"), WJ);
 		}
+		Stats->SetObjectField(TEXT("draw"), B->DrawStatsJson());      // the craft and lamps staged as instances: what it costs, what it would have been as actors (docs/SCALA.md)
 		Root->SetObjectField(TEXT("stats"), Stats);
 		FString Json;
 		const TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Json);

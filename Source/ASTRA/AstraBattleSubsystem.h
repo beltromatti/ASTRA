@@ -18,6 +18,8 @@ class UPointLightComponent;
 class UStaticMesh;
 class USoundBase;
 class UAstraWarFX;
+class UAstraWarDraw;
+class UPrimitiveComponent;
 struct FAstraWarFXTest;
 enum class EAstraFxFlash : uint8;
 enum class EAstraFxShot : uint8;
@@ -131,6 +133,11 @@ struct FAstraBattleShip
 	mutable FString CvLabel, CvClass;
 	mutable uint8 CvKey = 255;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> Actor = nullptr;
+	// how the war draws it (AstraWarDraw.cpp): a craft with DrawKind >= 0 is an instance of that kind of hull and has no actor; bDrawLamps: its running lights
+	// are instances of the lamp set LampSet (and it has no running-light component)
+	int16 DrawKind = -1;
+	int16 LampSet = -1;
+	bool bDrawLamps = false;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> ShieldBubble = nullptr;
 	UPROPERTY() TObjectPtr<AStaticMeshActor> DriveFlare = nullptr;   // engine plume, kept visible at long range
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> ShieldMID = nullptr;
@@ -368,6 +375,7 @@ class ASTRA_API UAstraBattleSubsystem : public UTickableWorldSubsystem
 	GENERATED_BODY()
 
 	friend class UAstraWarFX;            // the war's visual effects read the battle's state (AstraWarFX*.cpp)
+	friend class UAstraWarDraw;          // and so does the instanced drawing of its craft and lamps (AstraWarDraw.cpp)
 	friend struct FAstraWarFXTest;       // and the console that tries them (astra.fx.*)
 
 public:
@@ -440,6 +448,13 @@ public:
 	void AquilaBlasts(const FVector& HullCentreW, const FVector& HullExtentW);
 	/** After the loss, when the story moves on (hours, days): the fight stops where it was, no more reports. */
 	void Freeze() { bFrozen = true; }
+	/** The main viewscreen tells the drawing that its camera is zoomed far out on a target: our own craft nearer than WithinKm to the Aquila would cross its lens
+	 *  as huge blurred shapes, so they are drawn in a set the camera is told to leave out (ExemptId, the craft it is showing, is not). */
+	void SetLensHint(bool bActive, double WithinKm, int32 ExemptId);
+	void GetNearLensComponents(TArray<UPrimitiveComponent*>& Out) const;
+	/** What the instanced drawing of the craft and the lamps holds and costs (astra.war.stat), as text and as JSON for the bench's record. */
+	FString DrawStats() const;
+	TSharedRef<FJsonObject> DrawStatsJson() const;
 	/** Battle scars: a burn (and, for a heavy hit, a breach) painted where a hit landed on a hull; hot at first, cooling. */
 	struct FAstraScar
 	{
@@ -614,7 +629,7 @@ public:
 	bool IsScenarioOver() const { return bScenarioOver; }
 
 	/** The campaign: nothing moves until the Captain chooses (new campaign, or continue a saved one). */
-	void StartCampaign() { bStarted = true; }
+	void StartCampaign();
 	bool IsStarted() const { return bStarted; }
 	/** What a save keeps of the battle side: the Aquila's hull and magazines, her flight groups. */
 	TSharedRef<FJsonObject> SaveJson() const;
@@ -885,6 +900,8 @@ private:
 	 *  once its materials are in the project (tools/ue_scripts/make_war_fx.py); until then the older drawing below stands. */
 	UPROPERTY() TObjectPtr<UAstraWarFX> WarFX;
 	bool FxOn() const;
+	/** The craft and the lamps as instances (AstraWarDraw.cpp): a craft it claims at SpawnVisual has no actor, and no ship it draws the lamps of has a running-light component. */
+	UPROPERTY() TObjectPtr<UAstraWarDraw> WarDraw;
 	void Explode(FAstraBattleShip& S);    // secondary blasts, shockwave, debris, and the hulk left behind
 	void TickWrecks(float Dt);
 	/** Our own guns and launchers, felt through the hull (rate-limited per sound). */

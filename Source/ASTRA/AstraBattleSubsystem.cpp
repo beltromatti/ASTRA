@@ -3,6 +3,7 @@
 #include "AstraBattleSubsystem.h"
 #include "AstraHullName.h"
 #include "AstraWarFX.h"
+#include "AstraWarDraw.h"
 #include "Misc/Crc.h"
 #include "EngineUtils.h"
 #include "Components/DecalComponent.h"
@@ -151,6 +152,8 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	WarFX = NewObject<UAstraWarFX>(this);   // the war's visual effects (before any ship is drawn: SpawnVisual asks whether they draw the shields and the drives)
 	WarFX->Init(this);
+	WarDraw = NewObject<UAstraWarDraw>(this);   // the craft and the lamps as instances (SpawnVisual asks it to claim a ship)
+	WarDraw->Init(this);
 
 	// the Aquila first (index 0): the player's ship, heading 045 mark 10 like the helm
 	const int32 P = AddShip(TEXT("AQUILA"), TEXT("ASN Aquila"), TEXT("Aquila-class carrier cruiser"), TEXT(""), EAstraSide::Astra,
@@ -223,6 +226,10 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 {
+	if (WarDraw && WarDraw->Claim(S))
+	{
+		return;                           // a craft the war draws as an instance of its kind of hull (AstraWarDraw.cpp): no actor, no components, no ticks
+	}
 	if (!FApp::CanEverRender())
 	{
 		return;                           // headless (the war bench, -nullrhi): the battle runs without its pictures
@@ -243,6 +250,7 @@ void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 	C->SetCastShadow(false);          // km-scale shadows are invisible and cost VSM pages
 	C->bAffectDynamicIndirectLighting = false;
 	C->SetLightingChannels(true, true, false);   // outside the hull: the planet's light reaches it too
+	if (!S.bDrawLamps)                  // (the war draws a ship's lamps itself: instances of its glow, no component and no tick)
 	{
 		UAstraNavLights* NL = NewObject<UAstraNavLights>(S.Actor);
 		NL->SetupAttachment(S.Actor->GetRootComponent());
@@ -349,6 +357,10 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	{
 		SyncVisuals();   // the plot stays drawn behind the menu
 		TickWrecks(0.f);
+		if (WarDraw)
+		{
+			WarDraw->Tick(DeltaTime);
+		}
 		if (WarFX)
 		{
 			WarFX->Tick(DeltaTime);
@@ -562,11 +574,55 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		LastDecoyReport = Time;
 	}
 	SyncVisuals();
+	if (WarDraw)
+	{
+		WarDraw->Tick(DeltaTime);                  // the craft's hulls and every ship's lamps, as instances (AstraWarDraw.cpp)
+	}
 	if (WarFX)
 	{
 		WarFX->Tick(DeltaTime);                    // the war's effects: shots, particles, shields, drives (AstraWarFX.cpp)
 	}
 	EndPhase(5);
+}
+
+void UAstraBattleSubsystem::StartCampaign()
+{
+	bStarted = true;
+	if (WarDraw)
+	{
+		WarDraw->Prewarm();                        // the craft's kinds of hull ready before the first wing launches
+	}
+}
+
+void UAstraBattleSubsystem::SetLensHint(bool bActive, double WithinKm, int32 ExemptId)
+{
+	if (WarDraw)
+	{
+		WarDraw->SetLensHint(bActive, WithinKm, ExemptId);
+	}
+}
+
+void UAstraBattleSubsystem::GetNearLensComponents(TArray<UPrimitiveComponent*>& Out) const
+{
+	if (WarDraw)
+	{
+		WarDraw->GetNearLensComponents(Out);
+	}
+}
+
+FString UAstraBattleSubsystem::DrawStats() const
+{
+	FString S;
+	if (WarDraw)
+	{
+		WarDraw->Stats(S);
+	}
+	return S;
+}
+
+TSharedRef<FJsonObject> UAstraBattleSubsystem::DrawStatsJson() const
+{
+	return WarDraw ? WarDraw->StatsJson() : MakeShared<FJsonObject>();
 }
 
 float UAstraBattleSubsystem::PlayerSignatureKm() const
@@ -3876,7 +3932,7 @@ void UAstraBattleSubsystem::TickWrecks(float Dt)
 		W.Pos += W.Vel * Dt;
 		W.Att = FQuat(W.SpinAxis, FMath::DegreesToRadians(W.SpinDeg * Dt)) * W.Att;
 		// (a hulk with no actor, headless, stays as the obstacle it is; the far ones go: from the Aquila, or from the origin in a bench)
-		const FVector Ref = bSandbox ? FVector::ZeroVector : Ships[0].Pos;
+		const FVector Ref = (bSandbox && !Ships[0].bAlive) ? FVector::ZeroVector : Ships[0].Pos;
 		if ((!W.Actor && W.Radius <= 0.f) || (W.Life > 0.f && W.Age > W.Life) || FVector::Dist(W.Pos, Ref) > 250 * OneKm)
 		{
 			if (W.Actor) { W.Actor->Destroy(); }
@@ -4887,6 +4943,10 @@ void UAstraBattleSubsystem::ClearSystem()
 	if (WarFX)
 	{
 		WarFX->ClearAll();                            // its shots, sparks, shells, pieces and scars are of the old system
+	}
+	if (WarDraw)
+	{
+		WarDraw->ClearAll();                          // the craft and the lamps of the old system
 	}
 	for (FAstraFlash& F : Flashes)
 	{

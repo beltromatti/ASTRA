@@ -18,6 +18,7 @@
 
 #include "AstraBattleSubsystem.h"
 #include "AstraWarClasses.h"
+#include "AstraWarDraw.h"
 #include "ASTRA.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -207,6 +208,10 @@ void UAstraBattleSubsystem::SandboxReset(bool bKeepAquila)
 	Squadrons.Reset();
 	bSandbox = true;
 	bStarted = true;
+	if (WarDraw)
+	{
+		WarDraw->Prewarm();                 // the craft's kinds of hull ready before the first wing launches
+	}
 	bBriefed = true;
 	StageDone = 3;
 	bEngagementActive = false;
