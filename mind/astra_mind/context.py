@@ -141,12 +141,13 @@ def earshot_from_state(place: str, state: dict[str, Any] | None) -> tuple[str, .
 
 
 def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any = None, names: dict[str, str] | None = None,
-          exchange: Exchange | None = None, flight_net: bool = False) -> Context:
+          exchange: Exchange | None = None, flight_net: bool = False, marine_net: bool = False) -> Context:
     """The context of one utterance. `raw`: the game's `context` (None or {} on a build that does not send it):
         {place: slug, place_name, pawn, in_earshot: [ids], facing: id|null, channel: {party, open, muted}|null};
     `enemy`: the mind's enemy agent (open, contact) — the channel the mind itself keeps; `names`: party id -> display name;
     `flight_net`: the mind's flight net is live (the Captain opened it, flies a Falcon, stands on the flight deck, or was just called on it): it is the channel when
-    no other is open."""
+    no other is open; `marine_net`: the marine net is live (boarders are aboard, or the fight has just ended: marines.py): the channel when no other is open, the flight net's
+    included (the fight is where the Captain's words are most likely for the marines)."""
     ex = exchange or Exchange()
     if raw:
         ch = raw.get("channel") if isinstance(raw.get("channel"), dict) else None
@@ -157,8 +158,8 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
                               open=bool(ch.get("open", True)), muted=bool(ch.get("muted", False)) or _comms_muted(state),
                               heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), last_words=ex.last_words(party),
                               screen=bool(ch.get("screen", False)) or _on_screen(state, party))
-        if channel is None and flight_net:
-            channel = _flight_channel(names, ex, state)
+        if channel is None and (marine_net or flight_net):
+            channel = _marines_channel(names, ex, state) if marine_net else _flight_channel(names, ex, state)
         slug = str(raw.get("place") or "bridge")
         place = PLACE_SLUGS.get(slug, slug)
         listed = known_speakers(raw.get("in_earshot")) if raw.get("in_earshot") is not None else earshot_from_state(place, state)
@@ -172,8 +173,8 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
         channel = Channel(party=party, name=(names or {}).get(party, party), kind="enemy", open=True, muted=_comms_muted(state),
                           heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), last_words=ex.last_words(party),
                           screen=_on_screen(state, party))
-    if channel is None and flight_net:
-        channel = _flight_channel(names, ex, state)
+    if channel is None and (marine_net or flight_net):
+        channel = _marines_channel(names, ex, state) if marine_net else _flight_channel(names, ex, state)
     return Context(place=place, in_earshot=earshot_from_state(place, state), facing=None, channel=channel,
                    pawn="falcon" if place == "falcon" else "seated", source="inferred", asleep=asleep)
 
@@ -182,6 +183,12 @@ def _flight_channel(names: dict[str, str] | None, ex: Exchange, state: dict[str,
     """The flight net as a channel (the mind keeps it: the game's own `channel` has no flight party)."""
     return Channel(party="flight", name=(names or {}).get("flight", "the flight net"), kind="flight", open=True, muted=_comms_muted(state),
                    heard_s=ex.ago(ex._heard, "flight"), said_s=ex.ago(ex._said, "flight"), last_words=ex.last_words("flight"))
+
+
+def _marines_channel(names: dict[str, str] | None, ex: Exchange, state: dict[str, Any] | None) -> Channel:
+    """The marine net as a channel (the mind keeps it, like the flight net's: the game's own `channel` has no marine party)."""
+    return Channel(party="marines", name=(names or {}).get("marines", "the marine net"), kind="marines", open=True, muted=_comms_muted(state),
+                   heard_s=ex.ago(ex._heard, "marines"), said_s=ex.ago(ex._said, "marines"), last_words=ex.last_words("marines"))
 
 
 def _comms_muted(state: dict[str, Any] | None) -> bool:
@@ -204,6 +211,8 @@ def _kind(party: str, state: dict[str, Any] | None = None) -> str:
         return "fleet"
     if p in ("flight", "flight_net", "cag"):
         return "flight"
+    if p in ("marines", "marine", "marine_net", "marine_ops", "security", "reyes"):
+        return "marines"
     if p.startswith("port") or p in ("field", "control"):
         return "port"
     for c in (state or {}).get("contacts", []) or []:
@@ -231,6 +240,11 @@ def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
             parts.append(f"The flight net is live ({who}; the bridge hears it, and so do you): what the Captain says TO a pilot, a squadron, the CAG or the Chief of the Deck goes "
                          "out on it (Martin lets it through) and they answer for themselves, and carry out the orders for their squadrons. Whatever is for them is theirs: you "
                          "hear every word and say nothing about it — Price too, unless the words are for him or for Flight Control. What is meant for the bridge is yours.")
+        elif ch.kind == "marines":
+            parts.append(f"The marine net is live ({who}; the bridge hears it, and so do you): what the Captain says TO Major Reyes, the marines, a squad or its sergeant, or about "
+                         "the boarders, the bulkheads and the fight inside the hull, goes out on it (Martin lets it through) and they answer for themselves, and carry out the "
+                         "orders for their squads and the doors. Whatever is for them is theirs: you hear every word and say nothing about it — Tactical and the XO included, unless "
+                         "the words are for them. What is meant for the bridge (the ship, the guns, the helm) is yours.")
         else:
             parts.append(f"A channel with {who} is open: what the Captain says TO them goes out on it (Martin lets it through), "
                          f"and you hear every word as well. Words said to {who} are for {who} to answer, not for you: act and "
