@@ -17,10 +17,11 @@ Con 30 navi capitali e 150 velivoli attorno all'Aquila il gioco teneva 57–58 f
 14,8 ms (misura del lead dalla plancia: WorldTickMisc 3,95, EndOfFrameUpdates 3,42, Tickables 2,53, TickActors 1,53; render:
 RenderOther 3,9, UpdatePrimitiveTransform 1,27, attesa della visibilità 1,65; GPU 12,8 ms a risoluzione dinamica ~47 %). La simulazione non
 c'entra (0,04–0,09 ms a tick: GUERRA §7.5): il costo era nel **disegno e nelle domande che ognuno fa a ogni fotogramma**. Ogni velivolo era un
-attore con la sua mesh, un componente per le luci di navigazione che tickava, un componente e un materiale dinamico per ogni lampada
-(712 componenti per i 148 velivoli di picco, più quelli delle navi); il tavolo olografico faceva per ogni contatto, velivoli compresi, un
-disegno di icona, stelo, vettore, linea guida e un testo; una dozzina di lettori (schermi, tavolo, schermo principale, HUD della finestra, Falcon)
-rifaceva ciascuno la sua lista dei contatti.
+attore con la sua mesh, un componente per le luci di navigazione che tickava, un componente e un materiale dinamico per ogni lampada (con i
+148 velivoli di picco, le 30 navi e le loro luci: 148 attori e 712 componenti che il modulo ora non crea più); il tavolo olografico faceva per ogni
+contatto, velivoli compresi, tre componenti (icona, stelo, vettore) e, per le navi e i capi-volo, una linea guida e un testo (circa 640 componenti
+e 70 testi con 30 navi e 150 velivoli); una dozzina di lettori (schermi, tavolo, schermo principale, HUD della finestra, Falcon) rifaceva ciascuno la
+sua lista dei contatti.
 
 Il principio è quello degli effetti di VFX: **il costo deve crescere con ciò che si vede, non con ciò che c'è**. Un componente istanziato per
 tipo di scafo, un solo livello di lampade, una lista condivisa per fotogramma, e un tavolo che decide che cosa mostrare prima di toccare un
@@ -76,8 +77,9 @@ non avrà il componente delle luci (`bDrawLamps`). Una volta per fotogramma, dop
   (`HiddenComponents`, da `GetNearLensComponents`): un velivolo passa da un insieme all'altro una volta, quando attraversa la soglia. Il
   velivolo mostrato (`LensExempt`) non è mai nascosto.
 - **Prezzo**: `Tick` costa in media 0,004 ms sul banco con 148 velivoli e 186–232 lampade (massimo 0,016 ms); con 296 velivoli e 430 lampade 0,009 ms
-  (massimo 0,023). Sostituisce 148 attori e 712 componenti (296 e 1424 nel doppio): i numeri "di prima" sono contati dal modulo stesso con la
-  stessa regola della vecchia strada (`stats.draw.actors_it_replaces_peak`, `components_it_replaces_peak`).
+  (massimo 0,023). Sostituisce 148 attori e 712 componenti (296 e 1424 nel doppio: i componenti di mesh dei velivoli, e per ogni nave, velivoli e navi
+  capitali, il componente delle luci e uno per lampada): i numeri "di prima" sono contati dal modulo stesso con la stessa regola della vecchia strada
+  (`stats.draw.actors_it_replaces_peak`, `components_it_replaces_peak`).
 
 ### 3.1 Le luci
 
@@ -242,8 +244,9 @@ Banco, seme 1, `-nullrhi`, un Mac condiviso con altri lavori (i tempi variano da
 | disegno a istanze, 30 + 148 (media / max) | — | 0,004 / 0,016 ms |
 | tick della battaglia, 60 + 296 (media / p95 / max) | | 0,32 / 0,79 / 0,97 ms (disegno 0,009 / 0,023 ms) |
 | tick della battaglia, battaglia di flotta, 71 navi + 137 velivoli al picco | | 0,19 / 0,27 / 0,35 ms |
-| attori e componenti dei velivoli e delle luci, 30 + 148 | 148 attori, 712 componenti (più le luci delle navi) | 4 pagine + 1 livello di luci (5 componenti) |
-| attori e componenti, 60 + 296 | 296 attori, 1424 componenti | 5 pagine + 1 livello |
+| attori e componenti dei velivoli e delle luci (navi comprese), 30 + 148 | 148 attori, 712 componenti | 1 attore (il contenitore) con 6 componenti: 4 pagine, 1 livello di luci, la radice |
+| attori e componenti, 60 + 296 | 296 attori, 1424 componenti | 1 attore con 7 componenti (5 pagine) |
+| componenti del tavolo olografico (30 navi + 150 velivoli, stima dal conto del codice) | circa 640 componenti e 70 testi | circa 135 componenti (3 per nave, linee guida e minacce, 1 istanziato per i punti) e al più 16 testi |
 | lista dei contatti, 143 contatti | 0,015–0,05 ms × circa 12 lettori a fotogramma | una volta per passo, per riferimento |
 | piano del tavolo, 150 contatti | (le etichette: un testo riscritto per contatto, a ogni fotogramma) | 0,01–0,02 ms, al più 30 volte al secondo, 16 etichette |
 | sovrapposizioni delle etichette del tavolo | non misurate | 0 su 8 piani (battaglia di flotta e scala) |
