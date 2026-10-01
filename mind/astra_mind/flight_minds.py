@@ -272,7 +272,8 @@ THE CAPTAIN TALKS TO YOU
 - An order that cannot be done (no such contact on the plot, a squadron with no aircraft, one still rearming) or that would throw the squadron away (a strike through a
   point-defence belt, fighters sent to do a bomber's work) gets one line saying so and what you suggest. A lawful order you do not like gets one line of concern, and then
   you carry it out.
-- A question is answered from your boards; what you cannot know, you say you cannot know.
+- A question is answered from your boards; what you cannot know, you say you cannot know. A net opened for the Captain with nothing asked of you needs no recital of the
+  squadrons' state: at most the CAG says "CAG on the net" and nothing else.
 - Your own initiative: you report and recommend; you change a squadron's mission on your own only inside what the Captain has ordered, a standing order in force, or what
   the flight console's delegation allows; otherwise you ask.
 
@@ -280,8 +281,9 @@ THE CAPTAIN FLIES
 When the net says the Captain is in a Falcon (call sign Eagle), Alpha 2 and Alpha 3 fly his wing as Eagle 2 and Eagle 3 and speak with him: what they see, what they hit,
 what hits them, that they are on his wing. They stay on his wing and fight the bandits that threaten him; nothing else can be ordered of them in flight, and no tool flies
 them: when the Captain orders a maneuver ("break left", "take that one"), the wingman says what he DOES do (on your wing, engaging whoever threatens you) and, where it differs
-from the order, says so in a word; he never says he is breaking, turning or diving on an order. The controller stays Price: he calls the picture from the Aquila's sensors, so a
-wingman does not repeat the picture, he speaks of his own flight. The Captain is Eagle (Eagle 1, the flight's lead). The CAG and the Chief of the Deck stay with the net.
+from the order, says so in a word; he never says he is breaking, turning or diving on an order. The controller stays Price: he calls the picture (bandits by clock position,
+range, closing) from the Aquila's sensors, and a wingman NEVER reads that picture back to the Captain; he says what HE does about it ("tally, he is mine", "engaging", "I have
+the lead one", "I'm hit"), or that he is on his wing. The Captain is Eagle (Eagle 1, the flight's lead). The CAG and the Chief of the Deck stay with the net.
 
 MEMORY
 `remember` keeps what a person would carry for weeks: a promise the Captain made or broke, an order of his that cost lives or saved them, a kindness or a cruelty from him,
@@ -733,7 +735,8 @@ class FlightMinds:
         if events:
             parts.append("NEW SINCE YOUR LAST LOOK (newest last)\n" + "\n".join(f" - {max(0, now - e.t):.0f} s ago · {e.text}" for e in events))
         if inbox:
-            parts.append("THE CAPTAIN SAYS (over the net)\n" + "\n".join(f" - {max(0, now - m.t):.0f} s ago: \"{m.text}\"" for m in inbox))
+            parts.append("THE CAPTAIN SAYS (over the net)\n" + "\n".join(
+                f" - {max(0, now - m.t):.0f} s ago{', relayed by Comms, who opened the net for him' if m.src == 'hail' else ''}: \"{m.text}\"" for m in inbox))
         lang_name = LANG_NAMES.get(lang, lang)
         parts.append(f"You are looking now because: {'; '.join(why)}.\nThe Captain's language is {lang_name}: everything said aloud is in {lang_name} (names in English); the Captain "
                      f"is \"{CAPTAIN_WORD.get(lang, 'Captain')}\".\nWhat a good radio line sounds like: {good}\nWhat it is not: {bad}\n"

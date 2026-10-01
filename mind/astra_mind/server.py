@@ -873,15 +873,33 @@ class Mind:
         ctx = parse_context(raw_ctx, st, self.enemy, self._party_names(), self.exchange,
                             flight_net=self.flight.net_live(st, self.exchange.ago(self.exchange._heard, FLIGHT_PARTY)))
         self.memory.hear("Captain", text)
-        turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx, note=self.npcs.note_for_crew(people), gate=gate))
         r = router_mod.Route()
         party_task = None
         ch = ctx.channel
-        if ch and ch.live and self._can_answer(ch.party):
+        note = self.npcs.note_for_crew(people)
+        if ch and ch.live and ch.kind == "flight" and self._can_answer(ch.party):
+            # the flight net: comms decides first (a fraction of a second), and the officers are told what went out on it, so that nobody on the bridge says it again
+            # (Price does not relay a pilot's order, Comms does not narrate it): the rest of the Captain's words, for the bridge, is theirs as ever
             r = await router_mod.for_party(self.llm, text, ctx)
-            log.info("channel open with %s: out on it (%s, %.0f ms): %r", ch.party, r.how, r.ms, r.external[:80])
+            log.info("flight net live: out on it (%s, %.0f ms): %r", r.how, r.ms, r.external[:80])
             if r.external:
-                party_task = asyncio.create_task(self._to_party(r.party, r.external, lang))
+                await self._to_party(r.party, r.external, lang)
+                if " ".join(r.external.split()) == " ".join(text.split()):
+                    # every word of it went out on the net, verbatim: there is nothing left for the bridge, and the crew's turn (a model call to say nothing) is not needed
+                    # (the officers see the order in the flight console and hear the pilots' answer on the radio, in their events)
+                    log.info("the Captain's words went out on the flight net whole: no turn for the bridge")
+                    return
+                note = (note + " " if note else "") + (f"The Captain's words «{r.external}» went out on the flight net: the pilots, the CAG and the deck chief answer them and carry out "
+                                                       "the orders in them. That part is theirs: say and do nothing about it — no acknowledgement, no relay, no \"the CAG answers\" "
+                                                       "(Price and Comms included). If the Captain also said something meant for the bridge, that is yours; otherwise stay silent.")
+            turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx, note=note, gate=gate))
+        else:
+            turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx, note=note, gate=gate))
+            if ch and ch.live and self._can_answer(ch.party):
+                r = await router_mod.for_party(self.llm, text, ctx)
+                log.info("channel open with %s: out on it (%s, %.0f ms): %r", ch.party, r.how, r.ms, r.external[:80])
+                if r.external:
+                    party_task = asyncio.create_task(self._to_party(r.party, r.external, lang))
         t = await turn_task
         if party_task is not None:
             await party_task

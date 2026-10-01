@@ -281,8 +281,9 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
   not repeat what they said: he runs the flight console (missions, launches, recalls), answers what the Captain asks of Flight Control and calls the picture to the
   Captain's Falcon. To talk to them the Captain has Comms open the net (`hail` with contact `flight`; it is always open when the Captain is in a Falcon or on the flight
   deck, and for a moment after somebody on it called him): while it is open, words said to a pilot, the CAG or the deck chief are theirs to answer and carry out, and
-  nobody on the bridge answers for them. With the net closed, if the Captain speaks to one of them Martin says so and offers to open it; Price may carry a plain order for a
-  squadron himself (`station` flight).
+  nobody on the bridge answers for them or echoes them (the room's note says when the words went out on the net). With the net closed, when the Captain speaks to one of them
+  Martin opens it at once (`hail` flight, with the Captain's words as the message) and says only that it is open: the words are then the net's, and nobody else says
+  anything about them, Price included. For a plain order to a squadron with no person named, Price carries it himself (`station` flight).
 - Heat (`thermal` in the state) is the ship's other limit: the reactor, railgun volleys, lasers, shields soaking hits and engines
   at full all heat her. Above 70% the weapons and shields slow down, above 90% conduits fail and people in Main Engineering get
   burned. Engineering manages it: radiators out (they shed heat fast but betray the ship and can be shot away), a coolant vent

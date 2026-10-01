@@ -34,9 +34,16 @@ class Model(BaseModel):
         self.flight: list[list[tuple[str, dict[str, Any]]]] = [[("stay_quiet", {"reason": "x"})]]
         self.flight_calls: list[dict[str, Any]] = []
         self.flight_error = ""
+        self.router_part: tuple[str, str] | None = None          # (a phrase in the words, the part of them that goes out): comms lets out only that
 
     async def chat(self, *, model, messages, tools=None, tool_choice="auto", on_tool_call=None, **kw):
         names = {t["function"]["name"] for t in (tools or [])}
+        if not names and self.router_part and self.router_part[0] in str(messages[-1].get("content", "")):
+            self.calls.append({"kind": "router", "model": model, "user": str(messages[-1].get("content", ""))[:160], "tools": names, "watch": False,
+                               "system": str(messages[0].get("content", "")), "prompt": " ".join(str(m.get("content", "")) for m in messages)})
+            out = Completion(model=model, provider="fake", cost=0.0001)
+            out.content = json.dumps({"to_party": self.router_part[1]})
+            return out
         if "stay_quiet" not in names:
             return await super().chat(model=model, messages=messages, tools=tools, tool_choice=tool_choice, on_tool_call=on_tool_call, **kw)
         self.flight_calls.append({"model": model, "tools": names, "system": str(messages[0].get("content", "")), "user": str(messages[-1].get("content", ""))})
@@ -164,21 +171,43 @@ class FlightServerTest(unittest.IsolatedAsyncioTestCase):
         reply = next(m for m in self.game.sent if m.get("type") == "line" and m["speaker"] == "alpha_lead")
         self.assertTrue(reply["answer"])                                              # an answer to the Captain: first on the stage
 
-    async def test_with_the_net_open_the_router_decides_and_the_crew_hears_all(self) -> None:
+    async def test_words_that_went_out_on_the_net_whole_need_no_turn_for_the_bridge(self) -> None:
         self.mind.flight.open_net()
         self.model.router_says = {"Alpha Lead": "party", "Helm": "crew"}
-        self.model.crew = []
+        self.model.crew = [("speak", {"speaker": "flight", "text": "Non dovrei parlare.", "tone": "calm"})]
         self.model.flight = [[("mission", {"by": "alpha_lead", "squadron": "alpha", "type": "cap", "reason": "back on patrol"}),
                               ("say", {"speaker": "alpha_lead", "text": "Alpha torna in pattuglia.", "tone": "calm"})]]
         await self.state()
         await self.game.push(type="player_text", text="Alpha Lead, torna in pattuglia attorno all'Aquila")
         await asyncio.sleep(0.9)
-        self.assertEqual(len([c for c in self.model.calls if c["kind"] == "router"]), 1)
-        self.assertEqual(len(self.crew_calls()), 1)                                    # the room hears it, and judges it is not theirs
-        self.assertIn("The flight net is live", self.crew_calls()[0]["prompt"])
+        self.assertEqual(len([c for c in self.model.calls if c["kind"] == "router"]), 1)      # comms decided first (a call of a fraction of a second)
+        self.assertEqual(self.crew_calls(), [])                                                # every word went out: nothing is left for the bridge, no model call to say nothing
         self.assertIn(("alpha_lead", "Alpha torna in pattuglia."), self.game.lines())
+        self.assertNotIn(("flight", "Non dovrei parlare."), self.game.lines())
         self.assertEqual([m["args"]["mode"] for m in self.game.commands if m["name"] == "station"], ["cap"])
-        # words for the bridge stay on the bridge
+        self.assertEqual(self.mind.flight.stats["captain"], 1)
+
+    async def test_what_is_left_for_the_bridge_is_told_what_went_out(self) -> None:
+        self.mind.flight.open_net()
+        words = "Alpha Lead, torna in pattuglia; timoniere, prua sull'Acheron"
+        self.model.router_part = ("Alpha Lead, torna in pattuglia", "Alpha Lead, torna in pattuglia")
+        self.model.crew = [("station", {"station": "helm", "mode": "keep_on_bow", "params": {"target": "T-21"}}),
+                           ("speak", {"speaker": "helm", "text": "Prua sull'Acheron.", "tone": "focused"})]
+        self.model.flight = [[("say", {"speaker": "alpha_lead", "text": "Alpha torna in pattuglia.", "tone": "calm"})]]
+        await self.state()
+        await self.game.push(type="player_text", text=words)
+        await asyncio.sleep(0.9)
+        self.assertEqual(len(self.crew_calls()), 1)                                    # the helm's part is the bridge's
+        prompt = self.crew_calls()[0]["prompt"]
+        self.assertIn("The flight net is live", prompt)
+        self.assertIn("«Alpha Lead, torna in pattuglia» went out on the flight net", prompt)        # the officers are told what went out, so nobody says it again
+        self.assertIn(("helm", "Prua sull'Acheron."), self.game.lines())
+        self.assertIn(("alpha_lead", "Alpha torna in pattuglia."), self.game.lines())
+
+    async def test_words_for_the_bridge_stay_on_the_bridge_with_the_net_open(self) -> None:
+        self.mind.flight.open_net()
+        self.model.router_says = {"Helm": "crew"}
+        await self.state()
         self.game.commands.clear()
         self.model.flight_calls.clear()
         self.model.crew = [("station", {"station": "helm", "mode": "keep_on_bow", "params": {"target": "T-21"}}),
@@ -187,6 +216,7 @@ class FlightServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.8)
         self.assertEqual(self.model.flight_calls, [])
         self.assertIn(("helm", "Prua sull'Acheron."), self.game.lines())
+        self.assertNotIn("went out on the flight net", self.crew_calls()[-1]["prompt"])      # nothing went out: the crew is told nothing
 
     async def test_with_the_net_closed_the_captains_words_stay_with_the_crew(self) -> None:
         self.model.crew = [("speak", {"speaker": "flight", "text": "Alpha è in pattuglia, Capitano.", "tone": "calm"})]
