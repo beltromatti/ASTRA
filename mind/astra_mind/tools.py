@@ -103,8 +103,10 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         "message": {"type": "string", "description": "What we transmit, in English (the Interpreter translates)"}},
         ["contact_id", "intent", "message"]),
     _fn("end_transmission", "Communications: close the open channel (e.g. with an enemy commander).", {}, []),
-    _fn("fleet_request", "Communications: pass the Captain's request to the friendly warships in company (the 7th "
-                         "Fleet ships on the plot) by fleet datalink; they acknowledge and act at once.", {
+    _fn("fleet_request", "Communications: pass the Captain's REQUEST to the captains of the friendly warships in company (the 7th "
+                         "Fleet ships on the plot) over the fleet net. They are people: the captain judges it by the chain of command and "
+                         "answers over the radio (an acknowledgement, or the reason it cannot be done) and gives the order to his group "
+                         "himself. For a direct order from the Captain as the senior officer, the XO's group_order is the tool.", {
         "ship": {"type": "string", "description": "contact id of one friendly warship (e.g. T-01) or 'all'"},
         "request": {"type": "string", "enum": ["focus_fire", "engage_freely", "cover_us", "close_in", "stand_off", "hold_fire"],
                     "description": "focus_fire: concentrate on the target; engage_freely: pick their own targets; "
@@ -114,9 +116,11 @@ SHIP_TOOLS: list[dict[str, Any]] = [
         ["ship", "request"]),
     _fn("holo_display", "Science & Sensors: what the holo table in the middle of the bridge shows — the tactical plot "
                         "(the battle around the Aquila), the sector map (the systems of the March, who holds them, "
-                        "the gate links, where the Aquila is) or the ship (the Aquila in cutaway, deck by deck: the damage "
-                        "where it is and the damage-control teams).", {
-        "mode": {"type": "string", "enum": ["tactical", "sector", "ship"]}}, ["mode"]),
+                        "the gate links, where the Aquila is) or a ship close up (the Aquila in cutaway, deck by deck: the "
+                        "damage where it is and the damage-control teams; or, with a target, a scanned ship's sections and "
+                        "shield faces).", {
+        "mode": {"type": "string", "enum": ["tactical", "sector", "ship"]},
+        "target": {"type": "string", "description": "ship mode only, optional: the contact id of a scanned ship (T-21)"}}, ["mode"]),
     _fn("abandon_ship", "ABANDON SHIP: the evacuation of the Aquila to the lifepods; Engineering overloads the reactor so the "
                         "enemy cannot take her, and she is lost in about two minutes. Only on the Captain's explicit order to "
                         "abandon ship (never proposed as done, never on initiative).", {}, []),
@@ -138,7 +142,7 @@ DEPT_TOOLS = {"tactical": {"set_target", "fire_weapons", "cease_fire", "set_shie
               "flight": {"launch_squadron", "recall_squadron"},
               "sensors": {"active_scan", "set_emcon", "holo_display"},
               "comms": {"hail", "fleet_request"},
-              "xo": {"set_alert"}}
+              "xo": {"set_alert", "group_order"}}
 
 # handled by the mind (not a ship command): the Captain's orders that last
 STANDING = _fn("standing_order", "Record (or cancel) a STANDING ORDER: an order of the Captain's meant to last, which a "
@@ -151,8 +155,27 @@ STANDING = _fn("standing_order", "Record (or cancel) a STANDING ORDER: an order 
                                                "limits (what, when, against what, what never)"}},
     ["action", "department", "order"])
 
+# The XO's direct order to one of our battle groups (docs/GUERRA.md §6.2): only on a game that reports its groups (`_astra_groups`), and the mind
+# lets it through only when the Captain is the senior officer present (war_minds.WarMinds.captain_is_senior). A REQUEST to an allied captain is
+# `fleet_request`; an ORDER is this.
+GROUP_ORDER = _fn("group_order", "XO: the Captain's DIRECT ORDER to one of our battle groups (the groups and their captains are in the fleet board "
+                                "of your prompt): it takes effect at once and stands until changed or `for_s` runs out; the answer says what the "
+                                "group will do or why it cannot. Only while the Captain is the senior officer present, and only when the Captain "
+                                "orders it (a plain request to an allied captain is Communications' fleet_request, and he judges it). "
+                                "attack: every ship that can reach `target` fires on it and the group closes to `range_km`; pin: hold the enemy "
+                                "at long range; flank_left/flank_right; screen: ring `target` (a friendly ship, AQUILA); withdraw: break off in "
+                                "order; regroup; reinforce: go to the group `target`; hold; auto: back to the group's own judgement.", {
+    "group": {"type": "string", "description": "the group's name as the fleet board lists it (or the id of one of its ships)"},
+    "order": {"type": "string", "enum": ["auto", "attack", "pin", "flank_left", "flank_right", "screen", "withdraw", "regroup", "reinforce", "hold"]},
+    "target": {"type": "string", "description": "attack/pin/flank: an enemy contact id on the plot or \"group of <id>\"; screen: the ship to protect; "
+                                                "reinforce: the group's name"},
+    "range_km": {"type": "number", "description": "the distance (1.5-12 km) to hold from the target; leave out for the group's own choice"},
+    "for_s": {"type": "number", "description": "seconds the order stands (then auto); leave out for until changed"},
+    "formation": {"type": "string", "enum": ["line", "wedge", "column", "screen"]}},
+    ["group", "order"])
+
 ALL_TOOLS = [SPEAK, STANDING] + SHIP_TOOLS
-SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS}
+SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS} | {"group_order"}
 
 
 # ================================================================================================ the stations (v2)
@@ -184,7 +207,7 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "dispatch_damage_control": "ops", "hail": "comms", "set_emcon": "sensors", "active_scan": "sensors",
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
-          "dismiss_visitor": "captain", "abandon_ship": "xo"}
+          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
@@ -200,6 +223,12 @@ class ToolSet:
         return self.available is not None
 
 
+def has_groups(state: dict[str, Any] | None) -> bool:
+    """The game reports our battle groups (`_astra_groups` in its state): the XO can give them orders."""
+    g = (state or {}).get("_astra_groups")
+    return isinstance(g, dict) and bool(g.get("your_groups"))
+
+
 def tools_for(state: dict[str, Any] | None) -> ToolSet:
     """The tools that fit the game build (`stations` in its state or not)."""
     avail = station_model.available_from_state(state)
@@ -209,6 +238,8 @@ def tools_for(state: dict[str, Any] | None) -> ToolSet:
     for s in avail:
         hidden |= SUPERSEDED.get(s, set())
     tools: list[dict[str, Any]] = [SPEAK, STANDING, station_model.tool_schema(avail)]
+    if has_groups(state):
+        tools.append(GROUP_ORDER)
     for t in SHIP_TOOLS:
         name = t["function"]["name"]
         if name in hidden:

@@ -52,6 +52,7 @@ CURRENT_VIEW: contextvars.ContextVar[tuple[dict[str, Any], dict[str, Any]] | Non
 PERIODIC_S = {"admiral": 80.0, "commander": 100.0}      # a mind with a fight on thinks about it this often (between 60 and 120 s, by how much moved)
 MIN_GAP_S = {"admiral": 20.0, "commander": 25.0}        # and never more often than this on events alone
 FIRST_PULSE_S = 8.0                                     # the first look at a fight that has just begun
+SEPARATION_KM = 4.0                                     # an allied group wakes when the Aquila has moved this far from it since its last look
 SETTLE_S = 3.0                                          # a burst of events is read together: wait for it to end (at most MAX_SETTLE_S)
 MAX_SETTLE_S = 8.0
 QUIET_END_S = 75.0                                      # a fight with nothing happening for this long is over
@@ -329,6 +330,26 @@ def render_astra_extras(state: dict[str, Any]) -> str:
     return "\n".join(out)
 
 
+def picture(side: str, kind: str, group: str, view: dict[str, Any], state: dict[str, Any]) -> str:
+    """What a commander reads of the battle: their groups (the admiral's: all in full; a group commander's: their own in full), the enemy as their
+    sensors hold it, and what their seat needs besides (the Mandate admiral's fleet operations; an allied captain's Aquila and neighbours)."""
+    only = None if kind == "admiral" else group
+    if side == "mandate":
+        extra, ew = mandate_extras(view)
+        text = (f"YOUR GROUPS\n{render_groups(view, only=only, ew_by_id=ew)}\nENEMY GROUPS (ASTRA, as your sensors hold them)\n{render_enemy(view)}")
+        return text + (f"\nYOUR FLEET OPERATIONS\n{extra}" if kind == "admiral" else "")
+    text = f"YOUR GROUPS\n{render_groups(view, only=only)}\nENEMY GROUPS (as the fleet's sensors hold them)\n{render_enemy(view)}"
+    ex = render_astra_extras(state)
+    return text + (f"\nTHE AQUILA AND THE SHIPS ABOUT\n{ex}" if ex else "")
+
+
+def aquila_km(view: dict[str, Any], state: dict[str, Any], group: str) -> float | None:
+    """How far a group's ships are from the Aquila (the mean of the contacts' range from her: the fleet datalink), or None when it is not known."""
+    ids = {str(m.get("id")) for g in view.get("your_groups") or [] if g.get("name") == group for m in g.get("members") or []}
+    rng = [float(c["range_km"]) for c in state.get("contacts") or [] if str(c.get("id")) in ids and isinstance(c.get("range_km"), (int, float))]
+    return sum(rng) / len(rng) if rng else None
+
+
 def view_digest(view: dict[str, Any]) -> tuple:
     """What a pulse would be about: if it has not changed since the last look and nothing happened, there is nothing to think about."""
     def b(v: Any, n: float) -> int:
@@ -502,6 +523,8 @@ class Mind:
     intent: str = ""                                    # the last `reason` of the admiral (a subordinate's orders)
     known_enemy: set[str] = field(default_factory=set)
     new_enemy: list[str] = field(default_factory=list)
+    aquila_km: float | None = None                      # (ASTRA group) how far from the Aquila it was at the last look
+    why_extra: list[str] = field(default_factory=list)  # facts that woke it besides the events (the Aquila drawing away), told at the next look
     stats: dict[str, float] = field(default_factory=lambda: {"pulses": 0, "cost": 0.0, "latency": 0.0, "first_call": 0.0, "orders": 0, "failed": 0,
                                                               "tokens_in": 0, "tokens_out": 0, "errors": 0, "no_change": 0, "lines": 0})
 
@@ -526,13 +549,14 @@ class WarMinds:
     def __init__(self, llm: OpenRouter, say: SayFn, execute: ExecFn, *, lang: Callable[[], str] = lambda: "en",
                  clock: Callable[[], float] = time.monotonic, mandate_persona: Callable[[str], dict[str, Any] | None] = lambda c: None,
                  channel: Callable[[str], bool] = lambda c: False, register_voice: Callable[[str, str, str], None] | None = None,
-                 transmit: SayFn | None = None, sides: tuple[str, ...] = ("mandate", "astra"), astra_admiral: bool = False,
+                 transmit: SayFn | None = None, intel: Callable[[], str] = lambda: "", sides: tuple[str, ...] = ("mandate", "astra"), astra_admiral: bool = False,
                  where: Callable[[dict[str, Any]], str] | None = None, note: Callable[[str], None] | None = None,
                  trace: Callable[[dict[str, Any]], None] | None = None) -> None:
         self.llm = llm
         self.say = say
         self.transmit = transmit or say
         self.execute = execute
+        self.intel = intel                               # what Mandate intelligence knows of how the Aquila's captain fights (style.py)
         self.lang = lang
         self.clock = clock
         self.mandate_persona = mandate_persona
@@ -742,6 +766,11 @@ class WarMinds:
                         why.append("news for your group" if seat.kind == "group" else "news of the fleet")
                     if mind.new_enemy:
                         why.append("new enemy on the plot: " + ", ".join(mind.new_enemy[:6]))
+            if not why and seat.side == "astra" and seat.kind == "group" and gap >= MIN_GAP_S[seat.role]:
+                cur = aquila_km(view, state, seat.group)
+                if cur is not None and mind.aquila_km is not None and abs(cur - mind.aquila_km) >= SEPARATION_KM:
+                    why.append(f"the Aquila has {'drawn away from' if cur > mind.aquila_km else 'closed on'} your group")
+                    mind.why_extra.append(f"The Aquila is now {cur:.0f} km from your ships (it was {mind.aquila_km:.0f} km at your last look).")
             if not why and mind.inbox and gap >= MIN_GAP_S[seat.role] / 2:
                 why.append("a word for you (below)")
             period = self._periodic(mind)
@@ -838,6 +867,8 @@ class WarMinds:
         mind.last_think = now
         mind.thinks += 1
         mind.digest = view_digest(view)
+        if seat.side == "astra" and seat.kind == "group":
+            mind.aquila_km = aquila_km(view, state, seat.group)
         rec: dict[str, Any] = {"t": round(now - self.t0, 1), "seat": seat.id, "who": cmd.name, "why": why, "tools": [], "ok": 0, "failed": 0, "lines": 0,
                                "cost": 0.0, "latency": 0.0, "first_call": None, "tokens_in": 0, "tokens_out": 0, "error": ""}
         CURRENT.set(mind)
@@ -913,27 +944,24 @@ class WarMinds:
         channel_open = side == "mandate" and self.channel(cmd.contact)
         system = system_prompt(seat, cmd, where, mission, chain=chain, admiral_name=(admiral.commander.name if admiral and admiral.commander else ""),
                                ships=ships, voices=voices, channel_open=channel_open)
-        # the picture
-        if side == "mandate":
-            extra, ew = mandate_extras(view)
-            groups_txt = render_groups(view, only=None if seat.kind == "admiral" else seat.group, ew_by_id=ew)
-            picture = f"YOUR GROUPS\n{groups_txt}\nENEMY GROUPS (ASTRA, as your sensors hold them)\n{render_enemy(view)}"
-            if seat.kind == "admiral":
-                picture += f"\nYOUR FLEET OPERATIONS\n{extra}"
-        else:
-            picture = f"YOUR GROUPS\n{render_groups(view, only=None if seat.kind == 'admiral' else seat.group)}\nENEMY GROUPS (as the fleet's sensors hold them)\n{render_enemy(view)}"
-            ex = render_astra_extras(state)
-            if ex:
-                picture += f"\nTHE AQUILA AND THE SHIPS ABOUT\n{ex}"
+        pic = picture(side, seat.kind, seat.group, view, state)
         intent = ""
+        if seat.kind == "admiral" and side == "mandate":
+            style = self.intel()
+            if style:
+                intent = ("\nWhat Mandate intelligence has learned of the Aquila's captain from earlier fights (use it: lay the trap their habits walk "
+                          f"into): {style}")
         if seat.kind == "group" and side == "mandate" and admiral is not None:
             intent = (f"\nThe admiral's last intent: {admiral.intent}" if admiral.intent else "\nThe admiral has not given orders yet.")
+        if mind.why_extra:
+            intent += "\n" + "\n".join(mind.why_extra)
+            mind.why_extra = []
         msgs = ""
         if inbox:
             msgs = "\nMESSAGES FOR YOU\n" + "\n".join(f" {max(0, self.clock() - m.t):.0f} s ago · {self._src(m)}: {m.text}" for m in inbox)
         enemy_note = f"\nNew enemy ships on your plot since your last look: {', '.join(new_enemy)}" if new_enemy else ""
         user = (f"WHAT YOU HAVE DECIDED AND SAID, AND WHAT YOU HEARD (your log, newest last)\n{self.recall(side)}\n\n"
-                f"{picture}\nEVENTS SINCE YOUR LAST LOOK (newest last)\n{render_events(new_events)}{enemy_note}{intent}{msgs}\n\n"
+                f"{pic}\nEVENTS SINCE YOUR LAST LOOK (newest last)\n{render_events(new_events)}{enemy_note}{intent}{msgs}\n\n"
                 f"You are looking now because: {'; '.join(why)}. The Captain's language is {LANG_NAMES.get(lang, lang)} (what you say aloud is in it).\n"
                 "Decide: give your orders with the tools, or call no_change.")
         tools: list[dict[str, Any]] = []
@@ -1224,6 +1252,35 @@ class WarMinds:
 
     def is_admiral(self, contact: str) -> bool:
         return self.admiral_contact.get("mandate") == contact
+
+    def can_answer(self, party: str) -> bool:
+        """A channel to this ASTRA ship (or its captain's key) reaches a commander with a mind."""
+        v = self._view("astra", self.state) or {}
+        for m in self.minds.values():
+            if m.seat.side != "astra" or m.commander is None:
+                continue
+            if party in (m.commander.key, m.commander.contact):
+                return True
+            for g in v.get("your_groups") or []:
+                if g.get("name") == m.seat.group and party in [str(x.get("id")) for x in g.get("members") or []]:
+                    return True
+        return False
+
+    def allies_line(self) -> str:
+        """The allied captains on the fleet net now (for whoever else is on it: Fleet command)."""
+        v = self._view("astra", self.state) or {}
+        caps = []
+        for g in v.get("your_groups") or []:
+            for m in g.get("members") or []:
+                c = self.allies.get(str(m.get("id")))
+                if c and c.name not in caps:
+                    caps.append(c.name)
+        return ", ".join(caps) or "the captains of the ships in company"
+
+    def kick(self) -> None:
+        """Look at the state again now (a word for a commander has just been delivered: no need to wait for the next state)."""
+        if self.state:
+            self.feed(self.state)
 
     def fleet_board(self, state: dict[str, Any] | None = None) -> str:
         """The ASTRA groups as the XO and the comms officer see them (the fleet datalink), for the crew's prompt: who commands each, what it is doing,

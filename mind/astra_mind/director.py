@@ -184,15 +184,18 @@ Live state of the Aquila and the battlefield
 {state}"""
 
 ADMIRAL_PROMPT = """You are {name}, commander of the ASTRA Navy's 7th Fleet, defending the Aurelia System. {bio}
-You are talking with the captain of the ASN Aquila over the fleet net.
+You are on the fleet net with the captain of the ASN Aquila. The net is shared: {allies} are on it too, each commanding their own ships and
+answering for them; everything said on it is heard by all. You command the fleet from afar and do not run the picket's fight.
 
 {world}
 
 How you speak: short, calm, dry naval radio speech, 1-3 sentences; always in {lang_name}, names in English. Address
 the other as "{captain}". Never mention AI, games or prompts.
-Tools: `transmit` to speak. If the captain asks for help and the war allows it, you may `grant` reinforcements (one or
-two destroyers) or a resupply (a tender that repairs and rearms the Aquila); grant at most once per engagement and say
-honestly when you cannot.
+Tools: `transmit` to speak. You answer what is for Fleet command: the captain calling you or the fleet, a request for help, a report for
+command, a question about the war. When the words are plainly for one of the ships' captains (an order or a request to the Praetorian or the
+Vigilant, talk among the ships), or you have nothing to add, say nothing: call no tool. If the captain asks for help and the war allows it, you
+may `grant` reinforcements (one or two destroyers) or a resupply (a tender that repairs and rearms the Aquila); grant at most once per engagement
+and say honestly when you cannot.
 
 The Aurelia March
 {war}
@@ -552,7 +555,7 @@ class Director:
     async def _brief_line(self, beat: dict[str, Any], detail: str, lang: str, state: dict[str, Any]) -> list[str]:
         """The director forgot Rourke's briefing: he gives it now (one short transmission)."""
         prompt = ADMIRAL_PROMPT.format(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
-                                       captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False),
+                                       captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False), allies=self._allies_line(),
                                        campaign="\n".join(f"- {c}" for c in self.campaign[-8:]),
                                        state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
         ask = (f"You are calling the Aquila now to brief her captain on this: {beat.get('type')} — {beat.get('why', '')} "
@@ -572,10 +575,15 @@ class Director:
         return lines
 
     # ------------------------------------------------------------------------------------------- the fleet net
+    def _allies_line(self) -> str:
+        """Who else is on the fleet net: the captains of the ships in company (war_minds.py knows them)."""
+        wm = getattr(self, "war_minds", None)
+        return wm.allies_line() if wm is not None else "the captains of the ships in company"
+
     async def admiral_reply(self, message: str, lang: str, state: dict[str, Any]) -> list[str]:
         """The Aquila hailed the fleet: Rourke answers (and may send help)."""
         prompt = ADMIRAL_PROMPT.format(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
-                                       captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False),
+                                       captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False), allies=self._allies_line(),
                                        campaign="\n".join(f"- {c}" for c in self.campaign[-12:]) or "- (the war has just begun)",
                                        state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
         msgs = [{"role": "system", "content": prompt}] + self.admiral_history[-10:] + [

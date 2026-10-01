@@ -84,7 +84,10 @@ DUTIES_V2 = {
     "xo": "second in command: coordinates the departments, advises the Captain, answers what no console owns, sets how far "
           "each officer may act alone (delegation) when the Captain says so, has the conn when the Captain is away",
     "helm": "the ship's course, speed and pursuit: intercept, follow, keep the bow on the action, broadside, orbit, evade, "
-            "retreat, formation, the Janus transit",
+            "retreat, formation, the Janus transit. A bow pointed at the enemy at cruise speed closes on them: the helm minds the "
+            "range as well as the heading — when bringing the bow onto a ship or a group, also set the speed that holds the range "
+            "the fight wants (the Captain's word; railguns reach 10 km, lasers 4 km) and say so in the read-back, and never carry "
+            "the Aquila alone into an enemy group or far ahead of the fleet without the Captain's word for it",
     "ops": "the MAIN VIEWSCREEN (what it shows, the zoom), the HOLO TABLE, pages on the Captain's DATAPAD, and damage control "
            "(the four repair teams)",
     "tactical": "weapons and targets (engage, weapons free, hold fire), shields, point defence, missile doctrine, decoys",
@@ -260,9 +263,14 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
   relays to him and the Captain can call him), over the intercom — face to face only when the Captain is in Main Engineering.
 - Dr. Lindqvist (`doctor`) runs the Medbay (Deck 6): she speaks when the wounded are at stake (casualties, someone dying or
   recovering) or when called, over the intercom — face to face only when the Captain is in the Medbay.
-- The friendly warships in company (the 7th Fleet ships on the plot) take the Captain's requests by fleet datalink through
-  Communications (`fleet_request`: focus fire, cover us, close in, stand off, hold fire, engage freely); "Praetorian,
-  concentrate on the Acheron" is such a request. Comms relays it and reports their acknowledgement.
+- The friendly warships in company (the 7th Fleet ships on the plot) are commanded by captains with minds of their own (the fleet
+  board below names them and their groups). The Captain's REQUESTS to them go through Communications (`fleet_request`: focus fire,
+  cover us, close in, stand off, hold fire, engage freely; "Praetorian, concentrate on the Acheron" is one): Comms relays it, and the
+  allied captain answers over the radio himself — an acknowledgement, or the reason he cannot — and gives his own group the order, so
+  Comms does not speak for him and does not promise the result. A DIRECT ORDER to a group (`group_order`, the XO's) exists only while the
+  Captain is the senior officer present (the board says): use it when the Captain orders a group outright ("Praetorian, that is an order:
+  ..."), or when no time is left for an answer; the group obeys at once. The allied captains also speak up on their own over the fleet
+  net (a warning, a request, a loss): everyone on the bridge hears them.
 - Heat (`thermal` in the state) is the ship's other limit: the reactor, railgun volleys, lasers, shields soaking hits and engines
   at full all heat her. Above 70% the weapons and shields slow down, above 90% conduits fail and people in Main Engineering get
   burned. Engineering manages it: radiators out (they shed heat fast but betray the ship and can be shot away), a coolant vent
@@ -359,6 +367,7 @@ def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str
     if ship_state.get("abandon"):
         blocks.append(_RULE_ABANDON)
     board = station_model.board(ship_state, {k: v.title for k, v in CREW.items()})
+    fleet = str(ship_state.get("_fleet_board") or "")           # the allied groups and their captains (the war minds' fleet board, set by the server)
     state_json = json.dumps({k: v for k, v in ship_state.items() if not k.startswith("_") and (k not in ("stations", "sim_time_s") or not board)},
                             separators=(",", ":"), ensure_ascii=False)
     room = f"\nThe room: {hearing}\n" if hearing else ""
@@ -416,6 +425,6 @@ an unasked question, loyalty under fire; never announce it)
 
 Recent events
 {events}
-{("Consoles now (who runs what, since when, how it is going)" + chr(10) + board + chr(10)) if board else ""}{room}
+{("Consoles now (who runs what, since when, how it is going)" + chr(10) + board + chr(10)) if board else ""}{("The fleet: our battle groups and their captains, from the fleet datalink" + chr(10) + fleet + chr(10)) if fleet else ""}{room}
 Current ship state (live telemetry, JSON)
 {state_json}"""
