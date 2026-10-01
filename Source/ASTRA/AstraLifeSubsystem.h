@@ -84,6 +84,8 @@ public:
 
 	/** Drops every body now (a level change, the tests). */
 	void ReleaseAllBodies();
+	/** ABBORDAGGI: a person a fight has taken over (a marine): their body, if they have one, goes back to the pool (the fight makes its own). */
+	void ReleaseBodyOf(int32 Person) { ReleaseBody(Person); }
 
 	// ------------------------------------------------------------------------------------------------ measured
 	struct FCost
