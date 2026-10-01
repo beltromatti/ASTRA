@@ -179,8 +179,10 @@ class WarServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("direct order", self.mind.war.recall("astra"))
         crew = [c for c in self.model.calls if c["kind"] == "crew"][0]
         self.assertIn("group_order", crew["tools"])
-        self.assertIn("The fleet: our battle groups", crew["system"])
-        self.assertIn("Captain Rhea Castellan", crew["system"])
+        self.assertIn("The fleet: our battle groups", crew["prompt"])                       # the board changes with every state: it rides with the turn's last message...
+        self.assertIn("Captain Rhea Castellan", crew["prompt"])
+        self.assertNotIn("The fleet: our battle groups", crew["system"])                    # ...and never in the system prompt (the provider's cache covers that)
+        self.assertNotIn("Captain Rhea Castellan", crew["system"])
 
     async def test_the_xo_may_not_order_the_groups_of_a_flag_officer(self) -> None:
         await self.state(battle_state(mandate=False))
