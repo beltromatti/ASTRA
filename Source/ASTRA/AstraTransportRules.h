@@ -122,6 +122,7 @@ namespace AstraXport
 		bool bAway = false;                   // already off the ship
 		bool bDead = false;
 		bool bInPattern = false;              // already in a transport (a second order for the same person)
+		FString Barred;                       // a plain reason this one cannot be carried at all (a post that cannot be left): empty = free to go
 	};
 
 	/** One end of a transport. */
@@ -172,7 +173,7 @@ namespace AstraXport
 	// ------------------------------------------------------------------------------------------------ the verdict
 	struct ASTRA_API FBlocker
 	{
-		FName Code;                           // shields_own, shields_theirs, range, jam, motion, gate, room, hazard, inhibit, occupied, mass, pads, subject, power
+		FName Code;                           // shields_own, shields_theirs, range, jam, motion, gate, room, hazard, inhibit, occupied, mass, pads, subject, power, target, quality
 		FString Why;                          // one plain English sentence, with the numbers
 		FString Fix;                          // what would clear it
 		bool bHard = true;                    // nothing the Captain's word can change (the laws of the beam)

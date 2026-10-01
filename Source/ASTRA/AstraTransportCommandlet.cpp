@@ -644,7 +644,7 @@ int32 UAstraTransportCommandlet::Main(const FString& Params)
 	}
 
 	int32 Failed = 0;
-	TArray<TSharedPtr<FJsonValue>> Rows;
+	TArray<TSharedPtr<FJsonValue>> CheckRows;
 	for (const FXCheck& C : XChecks)
 	{
 		Failed += C.bPass ? 0 : 1;
@@ -652,9 +652,9 @@ int32 UAstraTransportCommandlet::Main(const FString& Params)
 		R->SetStringField(TEXT("name"), C.Name);
 		R->SetBoolField(TEXT("pass"), C.bPass);
 		R->SetStringField(TEXT("detail"), C.Detail);
-		Rows.Add(MakeShared<FJsonValueObject>(R));
+		CheckRows.Add(MakeShared<FJsonValueObject>(R));
 	}
-	XRecord->SetArrayField(TEXT("checks"), Rows);
+	XRecord->SetArrayField(TEXT("checks"), CheckRows);
 	XRecord->SetStringField(TEXT("verdict"), Failed == 0 ? TEXT("PASS") : TEXT("FAIL"));
 	XRecord->SetNumberField(TEXT("wall_s"), FPlatformTime::Seconds() - Wall0);
 	FString Text;

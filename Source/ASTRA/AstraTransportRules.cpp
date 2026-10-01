@@ -588,6 +588,10 @@ namespace AstraXport
 			{
 				Block(TEXT("subject"), FString::Printf(TEXT("%s is dead"), *S.Label), TEXT(""), true, false);
 			}
+			else if (!S.Barred.IsEmpty())
+			{
+				Block(TEXT("subject"), S.Barred, TEXT("someone else, or the post relieved first"), true, false);
+			}
 			else if (!S.bFound)
 			{
 				Block(TEXT("subject"), FString::Printf(TEXT("no pattern to lock on %s: not where the file says, or no signal"), *S.Label), TEXT("ask the locator for where they are"), true, false);
@@ -635,6 +639,10 @@ namespace AstraXport
 		{
 			const FEnd& Far = Req.To.Aboard() ? Req.From : Req.To;
 			FVector FarPoint = Env.Own.Centre;
+			if (Far.Kind == EEndKind::Ship && !Far.Ship.bPresent)
+			{
+				Block(TEXT("target"), FString::Printf(TEXT("%s is not on the plot any more: nothing to lock on"), *Far.Label), TEXT("another place"), true, false);
+			}
 			if (Far.Kind == EEndKind::Ship && Far.Ship.bPresent)
 			{
 				FarPoint = Far.Ship.Centre;
@@ -743,7 +751,7 @@ namespace AstraXport
 		// ---- what the lock can be
 		V.Quality = LockTarget(T, Env, Req, V, &V.Notes);
 		V.LockS = LockSeconds(T, Env, Req, V.RangeKm, V.Jam);
-		if (V.Quality < T.AcquireQ && !V.HasBlocker(TEXT("jam")) && !V.HasBlocker(TEXT("range")) && !V.HasBlocker(TEXT("motion")) && !V.HasBlocker(TEXT("gate")) && !V.HasBlocker(TEXT("room")))
+		if (V.Quality < T.AcquireQ && !V.HasBlocker(TEXT("jam")) && !V.HasBlocker(TEXT("range")) && !V.HasBlocker(TEXT("motion")) && !V.HasBlocker(TEXT("gate")) && !V.HasBlocker(TEXT("room")) && !V.HasBlocker(TEXT("target")))
 		{
 			Block(TEXT("quality"), FString::Printf(TEXT("the lock would top out at %s and a beam needs %s"), *Pct(V.Quality), *Pct(T.AcquireQ)), TEXT("remove what costs the lock: see the notes"), false, true);
 		}
