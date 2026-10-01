@@ -81909,7 +81909,7 @@
     {
      "type": "rect",
      "pos": [-18.5, -0.1, 2.75],
-     "lumens": 2400,
+     "lumens": 520,
      "temperature": 3300,
      "size": [3.0, 1.2],
      "radius": 650,
@@ -81919,7 +81919,7 @@
     {
      "type": "rect",
      "pos": [-15.4, -0.1, 2.75],
-     "lumens": 2000,
+     "lumens": 440,
      "temperature": 3400,
      "size": [2.0, 1.2],
      "radius": 600,
@@ -81929,7 +81929,7 @@
     {
      "type": "rect",
      "pos": [-12.6, -0.1, 2.75],
-     "lumens": 2400,
+     "lumens": 520,
      "temperature": 3300,
      "size": [3.0, 1.4],
      "radius": 650,
@@ -81939,7 +81939,7 @@
     {
      "type": "rect",
      "pos": [-10.35, -0.1, 2.75],
-     "lumens": 2000,
+     "lumens": 440,
      "temperature": 5600,
      "size": [2.0, 2.0],
      "radius": 600,
