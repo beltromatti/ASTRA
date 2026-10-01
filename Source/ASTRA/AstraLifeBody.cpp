@@ -319,8 +319,20 @@ void AAstraLifeBody::TickStand(float Dt, const FAstraLifePerson& P)
 	// at their post: slip into place, face the way the plan says, and turn to the Captain while speaking to them
 	FVector At = GetActorLocation();
 	const FVector Goal = P.Target;
-	At = FMath::VInterpConstantTo(At, Goal, Dt, 130.f);
-	Offset = FMath::Vector2DInterpTo(Offset, FVector2D::ZeroVector, Dt, 5.f);
+	// the Captain walking into someone who stands: they give way a step (nobody is walked through) and come back when the way is clear
+	FVector2D Push = FVector2D::ZeroVector;
+	if (const APawn* Pawn = UGameplayStatics::GetPlayerPawn(this, 0); Pawn && Pawn->IsA<ACharacter>())
+	{
+		const FVector PawnAt = Pawn->GetActorLocation();
+		const FVector2D Rel(Goal.X - PawnAt.X, Goal.Y - PawnAt.Y);
+		const float D = Rel.Size();
+		if (D < 100.f && FMath::Abs(Goal.Z - PawnAt.Z) < 170.f)
+		{
+			Push = (D > 1.f ? Rel / D : FVector2D(1.f, 0.f)) * (100.f - D);
+		}
+	}
+	Offset = FMath::Vector2DInterpTo(Offset, Push.GetClampedToMaxSize(60.f), Dt, 7.f);
+	At = FMath::VInterpConstantTo(At, FVector(Goal.X + Offset.X, Goal.Y + Offset.Y, Goal.Z), Dt, 130.f);
 	SinceSpoke = IsSpeaking() ? 0.f : SinceSpoke + Dt;
 	FaceBlend = FMath::FInterpTo(FaceBlend, SinceSpoke < 2.5f ? 1.f : 0.f, Dt, 2.5f);
 	float Want = P.TargetYaw;
@@ -420,7 +432,16 @@ void AAstraLifeBody::Tick(float DeltaSeconds)
 	default:
 		break;
 	}
-	// how often to think next: every frame while anyone could see them, rarely when nobody can; a pose that breathes is the crew member's own
-	// (its base class would leave a half-second heartbeat behind, which a walk must not inherit)
-	SetActorTickInterval(SeenRecently(0.4f) || IsSpeaking() ? 0.f : (Mode == EMode::Sit || Mode == EMode::Lie ? 0.5f : 0.1f));
+	// How often to think next: every frame while anyone could see them, rarely when nobody can. The seated pose is the crew member's own
+	// (its base class would leave a half-second heartbeat behind, which a walk must not inherit) and is the dearest of them (a pose of ~80
+	// bones rebuilt): within eight metres every frame, farther the breathing and the head are too small to tell apart at a lower rate.
+	const bool bWatched = SeenRecently(0.4f) || IsSpeaking();
+	if (Mode == EMode::Sit || Mode == EMode::Lie)
+	{
+		SetActorTickInterval(IsSpeaking() ? 0.f : !bWatched ? 0.5f : Dist < 800.f ? 0.f : Dist < 2000.f ? 0.07f : 0.15f);
+	}
+	else
+	{
+		SetActorTickInterval(bWatched ? 0.f : 0.1f);
+	}
 }
