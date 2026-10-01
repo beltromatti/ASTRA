@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -26,7 +27,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data" / "ship"
-ENGINE = Path("/Users/Shared/Epic Games/UE_5.8/Engine/Binaries/Mac/UnrealEditor-Cmd")
+# the engine's command-line editor (the headless bench never opens a window): UE_ROOT overrides the usual install folder
+_UE = Path(os.environ["UE_ROOT"]) if os.environ.get("UE_ROOT") else Path("/Users/Shared/Epic Games/UE_5.8" if sys.platform == "darwin" else "C:/Program Files/Epic Games/UE_5.8")
+ENGINE = _UE / ("Engine/Binaries/Mac/UnrealEditor-Cmd" if sys.platform == "darwin" else "Engine/Binaries/Win64/UnrealEditor-Cmd.exe")
 
 # the roster's departments and their sizes (Source/ASTRA/AstraCrewRoster.cpp)
 ROSTER = {"command staff": 14, "communications": 10, "sensors": 12, "damage control": 40, "stewards and galley": 28, "flight deck": 96,
