@@ -180,7 +180,7 @@ l'intervallo raddoppia) tiene anche un abbordaggio lunghissimo sotto 0,25 $ l'or
 | `Source/ASTRA/AstraBoardSimCommandlet.h/.cpp`, `tools/boarding.py` | il banco senza grafica (§9) |
 | `art/blender/weapons.py`, `tools/ue_scripts/import_weapons.py`, `tools/art/weapon_sounds.py` | le armi: modelli, texture, materiali, mesh con le prese, suoni |
 | `mind/astra_mind/marines.py` | la rete dei marine |
-| `mind/bench/marines_unit.py` (71 prove), `marines_server.py` (19), `marines_live.py` (29 scene + un abbordaggio) | prove offline e dal vivo |
+| `mind/bench/marines_unit.py` (71 prove), `marines_server.py` (19), `marines_live.py` (29 scene + un abbordaggio), `marines_router.py` (30 frasi) | prove offline e dal vivo |
 | `docs/licenze.csv` | AR-181 e M27S (CC-BY: attribuzione) |
 
 **Ganci in file di altri** (piccoli e nominati, ABBORDAGGI): `ASTRACharacter.*` (il componente `Fps`, i legami dei tasti, il passo e il giro con l'arma),
@@ -206,6 +206,10 @@ le persone possono sapere e nessuno che non possono, la lingua nel messaggio); l
 ordini (l'autorità, `marine_order` e `lockdown` come li prende il gioco, un rifiuto che torna a chi l'ha dato, una riga dopo un ordine rifiutato non viene detta); un modello che
 fallisce o si blocca passa le parole del Capitano all'XO; il canale (il router, la nota all'equipaggio, la cabina di un Falcon tiene la rete di volo); la memoria. L'intera suite offline
 della mente (con ASCENSORI di main e la rete dei marine, uniti in una copia di prova): **378 prove verdi**.
+
+**Il router sul canale dei marine** (`python -m bench.marines_router`, 0,002 $): 30 frasi in cinque lingue (ordini a una squadra, al Maggiore, alle paratie, domande, parole per il timoniere,
+l'XO, il tattico, Comms, frasi miste): **30 su 30** (mediana 263 ms); la prima versione ne sbagliava una («Reaction Two, assault corridor 5-C» restava in plancia) finché la situazione del
+router non ha detto come si chiamano le squadre.
 
 **Dal vivo** (`python -m bench.marines_live [--battle] [--only NOME] [--repeat N] [--temp T]`): 29 scene contro il modello vero, il gioco finto che risponde come il C++, e un abbordaggio
 compresso. Ultimo giro completo: 27 su 28 come previsto (la 28ª, «con me», un errore di squadra poi corretto con i nomi detti), tutti i controlli di macchina; le righe sono da
