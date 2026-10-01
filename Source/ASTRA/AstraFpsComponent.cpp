@@ -142,7 +142,7 @@ bool UAstraFpsComponent::Locked() const
 	{
 		return true;                                  // not the player's (or not possessed): nothing in the hands
 	}
-	if (PC->IsSeated() || PC->IsPadUp() || PC->IsLiftMenuOpen())
+	if (PC->IsSeated() || PC->IsPadUp() || PC->IsMoveInputIgnored())       // (the lift's list on a car's screen holds the walking still: the clicks and the number keys are its own)
 	{
 		return true;
 	}
