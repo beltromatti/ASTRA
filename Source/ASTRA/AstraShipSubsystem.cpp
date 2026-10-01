@@ -1,6 +1,7 @@
 // ASTRA — ship simulation.
 
 #include "AstraShipSubsystem.h"
+#include "AstraLiftSubsystem.h"
 #include "AstraLifeSubsystem.h"
 #include "AstraHarness.h"
 #include "AstraStations.h"
@@ -1915,6 +1916,14 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 		Ch->SetBoolField(TEXT("muted"), false);
 		C->SetObjectField(TEXT("channel"), Ch);
 	}
+	// in a lift car: which, where it is, the stops it serves (the ship's computer takes the ride, docs/ASCENSORI.md)
+	if (const UAstraLiftSubsystem* L = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
+	{
+		if (const TSharedPtr<FJsonObject> J = L->ContextJson(); J.IsValid())
+		{
+			C->SetObjectField(TEXT("lift"), J);
+		}
+	}
 	return C;
 }
 
@@ -1966,6 +1975,12 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 			FJsonSerializer::Serialize(Args.ToSharedRef(), W);
 		}
 		FAstraTimeline::Record(TEXT("cmd"), FString::Printf(TEXT("%s %s"), *Name, *ArgsText.Left(300)));
+	}
+	// the ship's computer rides the Captain's lift car where he asked to go (docs/ASCENSORI.md)
+	if (Name == TEXT("lift_go"))
+	{
+		UAstraLiftSubsystem* L = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr;
+		return L ? L->GoByVoice(Args, OutDetail) : false;
 	}
 	// the bridge stations' persistent modes (docs/ARCHITETTURA.md §4)
 	if (Name == TEXT("station"))
