@@ -406,6 +406,42 @@ class AstraTests(Fixture):
                            contacts=[{"id": "T-01", "name": "ASN Praetorian", "status": "friendly", "range_km": 4.5, "bearing_deg": 25, "hull_pct": 100},
                                      {"id": "T-31", "status": "bearing only (passive)", "bearing_deg": 335}], speed_mps=288, heading_deg=45)
 
+    def aquila_at(self, km: float) -> dict[str, Any]:
+        """The picket's ships `km` from the Aquila (the fleet datalink's contact ranges)."""
+        return astra_state([self.picket()], ENEMIES(), None,
+                           contacts=[{"id": "T-01", "name": "ASN Praetorian", "status": "friendly", "range_km": km, "bearing_deg": 25, "hull_pct": 100},
+                                     {"id": "T-02", "name": "ASN Vigilant", "status": "friendly", "range_km": km, "bearing_deg": 30, "hull_pct": 100}],
+                           speed_mps=288, heading_deg=45)
+
+    async def test_the_aquila_drawing_away_wakes_the_captain_less_and_less_often_and_coming_back_is_always_news(self) -> None:
+        self.llm.policy = null_policy
+        await self.feed(self.aquila_at(2.5))
+        await self.feed(self.aquila_at(2.5), 9)                                           # first look
+        n = len(self.llm.calls)
+        await self.feed(self.aquila_at(2.8), 30)                                          # a small move: nothing
+        self.assertEqual(len(self.llm.calls), n)
+        await self.feed(self.aquila_at(7.0), 5)                                           # 4 km and more away: she wakes
+        self.assertEqual(len(self.llm.calls), n + 1)
+        self.assertIn("drawn away from", self.minds.pulses[-1]["why"][0])
+        self.assertIn("now 7 km", self.llm.calls[-1]["user"])
+        await self.feed(self.aquila_at(12.0), 40)                                         # 5 km further: not enough now (it takes 8)
+        self.assertEqual(len(self.llm.calls), n + 1)
+        await self.feed(self.aquila_at(16.0), 5)                                          # 9 km from the last look: enough
+        self.assertEqual(len(self.llm.calls), n + 2)
+        await self.feed(self.aquila_at(6.0), 40)                                          # 10 km closer: always news
+        self.assertEqual(len(self.llm.calls), n + 3)
+        self.assertIn("closed on", self.minds.pulses[-1]["why"][0])
+
+    async def test_a_picket_that_has_her_back_among_them_is_woken_at_the_first_distance_again(self) -> None:
+        self.llm.policy = null_policy
+        await self.feed(self.aquila_at(2.5))
+        await self.feed(self.aquila_at(2.5), 9)
+        await self.feed(self.aquila_at(7.0), 30)                                          # drawn away (threshold doubles)
+        await self.feed(self.aquila_at(2.5), 40)                                          # back among them: reset
+        n = len(self.llm.calls)
+        await self.feed(self.aquila_at(7.0), 40)                                          # drawn away by 4.5 km again: enough at the first distance
+        self.assertEqual(len(self.llm.calls), n + 1)
+
     async def test_the_picket_has_a_commander_with_a_voice_and_the_chain_of_command(self) -> None:
         self.llm.policy = ScriptPolicy([("say", {"to": "aquila", "text": "Aquila, Praetorian: contact bearing zero-seven-zero, closing.", "tone": "focused"}),
                                         ("group_order", {"group": "7th Fleet picket", "order": "screen", "target": "AQUILA", "reason": "cover the carrier"})])

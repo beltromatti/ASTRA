@@ -571,6 +571,7 @@ class Mind:
     period: float = 0.0                                 # how long until the next look on the clock (drawn after each look)
     takeover: str = ""                                  # a new commander took the seat (a succession): they look at once
     aquila_km: float | None = None                      # (ASTRA group) how far from the Aquila it was at the last look
+    drawn_away: int = 0                                 # how many looks in a row the Aquila's drawing away has called (each needs twice the distance of the last)
     why_extra: list[str] = field(default_factory=list)  # facts that woke it besides the events (the Aquila drawing away), told at the next look
     stats: dict[str, float] = field(default_factory=lambda: {"pulses": 0, "cost": 0.0, "latency": 0.0, "first_call": 0.0, "orders": 0, "failed": 0,
                                                               "tokens_in": 0, "tokens_out": 0, "errors": 0, "no_change": 0, "lines": 0})
@@ -821,9 +822,13 @@ class WarMinds:
                         why.append("new enemy on the plot: " + ", ".join(mind.new_enemy[:6]))
             if not why and seat.side == "astra" and seat.kind == "group" and gap >= MIN_GAP_S[seat.role]:
                 cur = aquila_km(view, state, seat.group)
-                if cur is not None and mind.aquila_km is not None and abs(cur - mind.aquila_km) >= SEPARATION_KM:
-                    why.append(f"the Aquila has {'drawn away from' if cur > mind.aquila_km else 'closed on'} your group")
-                    mind.why_extra.append(f"The Aquila is now {cur:.0f} km from your ships (it was {mind.aquila_km:.0f} km at your last look).")
+                if cur is not None and mind.aquila_km is not None:
+                    # drawing away again and again is news less and less often (the threshold doubles each time, up to 8x); she coming back is always news
+                    need = SEPARATION_KM * (2 ** mind.drawn_away) if cur > mind.aquila_km else SEPARATION_KM
+                    if abs(cur - mind.aquila_km) >= need:
+                        why.append(f"the Aquila has {'drawn away from' if cur > mind.aquila_km else 'closed on'} your group")
+                        mind.why_extra.append(f"The Aquila is now {cur:.0f} km from your ships (it was {mind.aquila_km:.0f} km at your last look).")
+                        mind.drawn_away = min(mind.drawn_away + 1, 3) if cur > mind.aquila_km else mind.drawn_away
             if not why and mind.inbox and gap >= MIN_GAP_S[seat.role] / 2:
                 why.append("a word for you (below)")
             period = self._periodic(mind)
@@ -929,6 +934,8 @@ class WarMinds:
         mind.digest = view_digest(view)
         if seat.side == "astra" and seat.kind == "group":
             mind.aquila_km = aquila_km(view, state, seat.group)
+            if mind.aquila_km is not None and mind.aquila_km < SEPARATION_KM:
+                mind.drawn_away = 0                                                     # she is back among them: the next time she leaves is news again
         rec: dict[str, Any] = {"t": round(now - self.t0, 1), "seat": seat.id, "who": cmd.name, "why": why, "tools": [], "ok": 0, "failed": 0, "lines": 0,
                                "cost": 0.0, "latency": 0.0, "first_call": None, "tokens_in": 0, "tokens_out": 0, "error": ""}
         CURRENT.set(mind)
