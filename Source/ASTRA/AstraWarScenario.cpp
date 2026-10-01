@@ -233,7 +233,7 @@ void UAstraBattleSubsystem::SandboxReset(bool bKeepAquila)
 		WarDraw->Prewarm();                 // the craft's kinds of hull ready before the first wing launches
 	}
 	bBriefed = true;
-	StageDone = 3;
+	StageDone = OpeningOver;
 	bEngagementActive = false;
 	bScenarioOver = false;
 	bPlayerTracked = true;

@@ -45,6 +45,17 @@ _TERMS: list[tuple[str, tuple[str, ...], bool]] = [
     ("Charon", (), False),
     ("Persephone", ("persefone", "perséfone", "persefoon", "persefon"), True),
     ("Brightwater", ("bright water", "brightwoter", "braitwater"), True),
+    # the Interdiction Fleet's vanguard and the relief of the opening's third stage
+    ("Nyx", ("nix", "nics", "niks", "nyks", "nisse"), False),
+    ("Tartarus", ("tartaro", "tártaro", "tartarus", "tartare", "tartaros"), True),
+    ("Hypnos", ("ipnos", "hipnos", "ipno", "hypnos"), True),
+    ("Thanatos", ("tanatos", "thanato", "thanatos", "tanato"), True),
+    ("Erinys", ("erinni", "erinys", "erinie", "erinis"), True),
+    ("Moros", (), False),
+    ("Keres", ("cheres", "kere", "keres"), False),
+    ("Constance", ("constanza", "constans", "konstanz"), True),          # (not "costanza": an Italian word the Captain may say)
+    ("Steadfast", ("stedfast", "stead fast", "stedfest"), True),
+    ("Kestrel", ("kestrel",), False),
     ("Tenacity", (), False),
     # places and organisations
     ("Aurelia", ("aurelia", "aurelja"), False),

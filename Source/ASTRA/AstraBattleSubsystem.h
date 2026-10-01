@@ -774,7 +774,13 @@ private:
 	int32 InboundSinceReport = 0;       // missiles launched at us since the last spoken report
 	float LastInboundReport = -100.f;
 	int32 NextId = 1;
-	int32 StageDone = 0;
+	int32 StageDone = 0;                // the opening's script: 1 the frigate wakes, 2 the strike group, 3 the gate cycles (the vanguard and the relief on their way)
+	static constexpr int32 OpeningOver = 9;
+	float StageTwoAt = -1.f;            // when the strike group came (the vanguard follows it)
+	float VanguardAfterS = 330.f;       // how long after the strike group the Interdiction Fleet's vanguard comes through the gate
+	TArray<TPair<float, FString>> TransmissionNotes;   // reports that come at their time (Fleet's word on a relief under way)
+	/** The opening grows into a fleet battle: the Interdiction Fleet's vanguard through the gate, the 7th Fleet's relief from New Ravenna. */
+	void ScheduleOpeningForce(const TCHAR* Which, float At);
 	bool bScenarioOver = false;
 	float TransmissionAt = -1.f;
 	bool bSurrenderAccepted = false;    // the Mandate accepted the Aquila's surrender

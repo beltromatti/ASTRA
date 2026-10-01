@@ -1072,6 +1072,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	if (StageDone == 1 && Time > 170.f)
 	{
 		StageDone = 2;
+		StageTwoAt = Time;
 		const FVector C = Ships[0].Pos + Polar(25 * OneKm, 70, 4);
 		const int32 A = AddShip(TEXT("T-21"), TEXT("Acheron"), TEXT("Kharon Mandate cruiser (flagship of Archon Varek Solm)"),
 		                        TEXT("SM_SHIP_MANDATE_Acheron"), EAstraSide::Mandate, C, 70.f, 500.f, 240.f, 3600.f, 1500.f);
@@ -1121,6 +1122,27 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		bEngagementActive = true;
 		Report(TEXT("sensors: four new contacts at 25 km, bearing 070 — Kharon Mandate strike group: cruiser Acheron (T-21) "
 		            "and three Styx-class destroyers (T-22 Styx, T-23 Cocytus, T-24 Phlegethon), closing at 450 m/s; the 7th Fleet is moving to engage"));
+	}
+	// stage 3: the strike group was the Interdiction Fleet's probe; its vanguard comes through the Janus Gate, and the 7th Fleet's relief
+	// from New Ravenna follows it — the opening grows into a fleet battle. Not after a surrender or under a truce (the war's director
+	// takes the story from there)
+	if (StageDone == 2 && StageTwoAt >= 0.f && Time > StageTwoAt + VanguardAfterS && !bSurrenderAccepted && TruceSince < 0.f && Landmarks.IsValidIndex(GateLandmark))
+	{
+		StageDone = 3;
+		Report(TEXT("sensors: the Janus Gate is cycling — a transit wake with many drives behind it: a Mandate force is coming through; Keeper "
+		            "Station confirms an unscheduled transit"));
+		ScheduleOpeningForce(TEXT("vanguard"), Time + 50.f);
+		ScheduleOpeningForce(TEXT("relief"), Time + 50.f + 170.f);
+		TransmissionNotes.Add(TPair<float, FString>(Time + 62.f, TEXT("comms: Fleet to the Aquila — Battle Group Constance (the battleship ASN Constance and "
+		                                                         "three destroyers) is under way from New Ravenna to the Gate, three minutes out")));
+	}
+	for (int32 i = TransmissionNotes.Num() - 1; i >= 0; --i)
+	{
+		if (Time >= TransmissionNotes[i].Key)
+		{
+			Report(TransmissionNotes[i].Value);
+			TransmissionNotes.RemoveAt(i);
+		}
 	}
 	// a Mandate captain opens a channel to the Aquila (arrival, succession after the flagship's loss, a broken ceasefire)
 	if (TransmissionAt > 0.f && Time >= TransmissionAt)
@@ -4328,7 +4350,16 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 	int32 NextIdx = 0;
 	auto TakeId = [&]() { return Ids.IsValidIndex(NextIdx) ? Ids[NextIdx++] : FString::Printf(TEXT("T-%d"), NextContact++); };
 	const int32 PlayerId = Ships[0].Id;                  // copies: spawning may reallocate Ships
-	const FVector Centre = Ships[0].Pos + Polar(Range * OneKm, Bearing, FMath::FRandRange(-3.f, 5.f));
+	FVector Centre = Ships[0].Pos + Polar(Range * OneKm, Bearing, FMath::FRandRange(-3.f, 5.f));
+	const TArray<TSharedPtr<FJsonValue>>* AtM = nullptr;
+	if (Beat->TryGetArrayField(TEXT("at_m"), AtM) && AtM->Num() >= 3)
+	{
+		// a fixed place (the Janus Gate's mouth): the bearing is where it lies from the Aquila now
+		Centre = FVector((*AtM)[0]->AsNumber(), (*AtM)[1]->AsNumber(), (*AtM)[2]->AsNumber());
+		const FVector To = Centre - Ships[0].Pos;
+		Bearing = FMath::Fmod(FMath::RadiansToDegrees(FMath::Atan2(To.Y, To.X)) + 360.0, 360.0);
+		Range = To.Size() / OneKm;
+	}
 	const float Facing = (float)FMath::Fmod(Bearing + 180.0, 360.0);   // they come towards us
 	auto ShipSpecs = [&Beat](const TCHAR* Field) -> TArray<TSharedPtr<FJsonObject>>
 	{
@@ -4504,6 +4535,45 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 		                       Attackers.IsEmpty() ? TEXT("unknown attackers") : *Attackers));
 		(void)LeaderIdx;
 	}
+}
+
+void UAstraBattleSubsystem::ScheduleOpeningForce(const TCHAR* Which, float At)
+{
+	// the forces of the opening's third stage, with the contact ids their commanders' minds know them by (mind/astra_mind/enemy.py COMMANDERS,
+	// war_minds.py ALLIES): the vanguard is T-31..T-38, the relief T-03..T-06
+	const bool bVanguard = FCString::Strcmp(Which, TEXT("vanguard")) == 0;
+	const TCHAR* Json = bVanguard
+		? TEXT(R"({"type":"raid","hail":false,"groups":[
+			{"name":"Interdiction Vanguard","formation":"column","goes_for":"aquila","offset_km":[0,0],
+			 "ships":[{"class":"acheron","name":"Nyx"},{"class":"styx","name":"Asphodel"}],
+			 "wings":[{"carrier":0,"kind":"fighter","n":8,"mission":"strike"},{"carrier":0,"kind":"bomber","n":4,"mission":"strike"}]},
+			{"name":"Styx Line Dorn","formation":"line","goes_for":"escorts","offset_km":[1.5,-6],
+			 "ships":[{"class":"styx","name":"Tartarus"},{"class":"styx","name":"Hypnos"},{"class":"styx","name":"Thanatos"},{"class":"styx","name":"Erinys"}]},
+			{"name":"Raider Wedge Morrow","formation":"wedge","goes_for":"escorts","offset_km":[2,7],
+			 "ships":[{"class":"lethe","name":"Moros"},{"class":"lethe","name":"Keres"}]}]})")
+		: TEXT(R"({"type":"reinforcements","granted":true,"groups":[
+			{"name":"Battle Group Constance","formation":"line",
+			 "ships":[{"class":"praetorian","name":"ASN Constance"},{"class":"vigilant","name":"ASN Steadfast"},{"class":"vigilant","name":"ASN Valour"},
+			          {"class":"vigilant","name":"ASN Kestrel"}],
+			 "wings":[{"carrier":0,"kind":"fighter","n":8,"mission":"cap"}]}]})");
+	TSharedPtr<FJsonObject> Beat;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Beat) || !Beat.IsValid() || !Landmarks.IsValidIndex(GateLandmark))
+	{
+		return;
+	}
+	TArray<TSharedPtr<FJsonValue>> IdValues;
+	for (const int32 n : bVanguard ? TArray<int32>({31, 32, 33, 34, 35, 36, 37, 38}) : TArray<int32>({3, 4, 5, 6}))
+	{
+		IdValues.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("T-%02d"), n)));
+	}
+	Beat->SetArrayField(TEXT("_ids"), IdValues);
+	// the vanguard comes out of the gate's mouth on the Aquila's side; the relief from the other quarter, where New Ravenna lies
+	const FVector Gate = Landmarks[GateLandmark].Pos;
+	const FVector Us = Ships[0].Pos;
+	const FVector ToUs = (Us - Gate).GetSafeNormal();
+	const FVector Where = bVanguard ? Gate + ToUs * 4.0 * OneKm : Us + ToUs * 22.0 * OneKm;
+	Beat->SetArrayField(TEXT("at_m"), {MakeShared<FJsonValueNumber>(Where.X), MakeShared<FJsonValueNumber>(Where.Y), MakeShared<FJsonValueNumber>(Where.Z)});
+	PendingBeats.Add(TPair<float, TSharedPtr<FJsonObject>>(At, Beat));
 }
 
 void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, const FString& Type, const TArray<TSharedPtr<FJsonObject>>& Force,
@@ -4907,7 +4977,7 @@ void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 		return;
 	}
 	ClearSystem();
-	StageDone = 3;
+	StageDone = OpeningOver;
 	bBriefed = true;
 	FAstraBattleShip& P = Ships[0];
 	P.Pos = FVector::ZeroVector;
@@ -5270,11 +5340,12 @@ void UAstraBattleSubsystem::ClearSystem()
 		List->Reset();
 	}
 	PendingBeats.Reset();
+	TransmissionNotes.Reset();
 	TransmissionAt = -1.f;
 	bEngagementActive = false;
 	bScenarioOver = false;
 	bSurrenderAccepted = false;
-	StageDone = 3;
+	StageDone = OpeningOver;
 }
 
 void UAstraBattleSubsystem::DoTransit(const TSharedPtr<FJsonObject>& Beat)

@@ -41,8 +41,19 @@ COMMANDERS = {
     "T-11": dict(key="hale", name="Warden Tomas Hale", ship="the frigate Lethe, a raider sent ahead of the strike group",
                  voice="jean", bio="A young, ambitious officer eager to prove himself to Archon Solm; reckless, proud.",
                  rank="Warden (junior commander)"),
+    # the Interdiction Fleet's vanguard, through the Janus Gate after the strike group (the opening's third stage, AstraBattleSubsystem)
+    "T-31": dict(key="thale", name="Warden Sabine Thale", ship="the carrier-cruiser Nyx, leading the Interdiction Vanguard", voice="lola",
+                 bio="A carrier officer who grew up on ration lines during the Silence; precise, unhurried, a believer in air power "
+                     "and in hitting once, hard, where it matters. She serves Archon Solm and finishes what he starts.",
+                 rank="Warden (group commander)"),
+    "T-33": dict(key="dorn", name="Ferryman Ilse Dorn", ship="the destroyer Tartarus, leading the Styx line", voice="vera",
+                 bio="Forty years in destroyers, iron discipline, few words; she keeps her line straight under fire and thinks "
+                     "the Core's officers fight for medals.", rank="Ferryman (line leader)"),
+    "T-37": dict(key="morrow", name="Ferryman Cael Morrow", ship="the frigate Moros, leading the raider wedge", voice="rafael",
+                 bio="Young, fast and vain about it; he loves a flank and a knife in the back of a slow ship, and wants Archon "
+                     "Solm to see him do it.", rank="Ferryman (raider leader)"),
 }
-CHAIN = ["T-21", "T-22", "T-23", "T-24", "T-11"]      # who commands the Mandate forces when the one above is gone (same as the game)
+CHAIN = ["T-21", "T-31", "T-22", "T-33", "T-23", "T-24", "T-37", "T-11"]   # who commands the Mandate forces when the one above is gone (same as the game)
 
 
 def _fn(name, desc, props, required):

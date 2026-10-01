@@ -89,6 +89,13 @@ ALLIES: dict[str, dict[str, Any]] = {
                  voice="paul", gender="m", precedence=2,
                  bio="Thirty-four, the youngest destroyer captain of the 7th Fleet, in the Praetorian's picket; Castellan taught him. Quick, confident, a little reckless, "
                      "he wants the Aquila's captain to notice his ship. Talks fast and jokes under fire, but never about the crew."),
+    # the relief of the opening's third stage (AstraBattleSubsystem::ScheduleOpeningForce): the battle group from New Ravenna
+    "T-03": dict(key="aldana", name="Captain Ines Aldana", rank="Captain", ship="the battleship ASN Constance, leading Battle Group Constance",
+                 voice="azelma", gender="f", precedence=3,
+                 mission="Fleet's orders: reinforce the Aurelia picket at the Janus Gate and hold it with the Aquila; the Aquila's captain commands "
+                         "the picket in action.",
+                 bio="Forty-eight, a battleship captain who came up through damage control; steady, warm with her crew, merciless with "
+                     "sloppiness. She arrives when she says she will and expects the same of everyone."),
 }
 ALLY_POOL: list[dict[str, Any]] = [
     dict(name="Captain Imre Dalca", rank="Captain", voice="michael", gender="m",
