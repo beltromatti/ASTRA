@@ -17,11 +17,11 @@ import bridge3_lib as L  # noqa: E402
 from bridge3_lib import FB, Rx, Ry, Rz, T, lerp  # noqa: E402
 
 
-def key(fine: FB, em: FB, x: float, y: float, cell: str = "cyan", size: float = 0.024, h: float = 0.009, shell: str = L.IVORY) -> None:
-    """A square keycap on a dark bezel with a lit face."""
-    fine.box((x - size / 2 - 0.003, y - size / 2 - 0.003, -0.002), (x + size / 2 + 0.003, y + size / 2 + 0.003, 0.003), L.STRUCT)
+def key(fine: FB, em: FB, x: float, y: float, cell: str = "cyan", size: float = 0.024, h: float = 0.009, shell: str = L.RUBBER) -> None:
+    """A square backlit key: a dark cap in a thin brushed bezel, its face a lit legend pane."""
+    fine.box((x - size / 2 - 0.0025, y - size / 2 - 0.0025, -0.002), (x + size / 2 + 0.0025, y + size / 2 + 0.0025, 0.0025), L.TRIM)
     fine.box((x - size / 2, y - size / 2, 0.0), (x + size / 2, y + size / 2, h), shell)
-    em.lamp_box((x - size / 2 + 0.004, y - size / 2 + 0.004, h), (x + size / 2 - 0.004, y + size / 2 - 0.004, h + 0.0015), cell, L.LAMP_DIM)
+    em.lamp_box((x - size / 2 + 0.0035, y - size / 2 + 0.0035, h), (x + size / 2 - 0.0035, y + size / 2 - 0.0035, h + 0.0015), cell, L.LAMP_DIM)
 
 
 def key_grid(fine: FB, em: FB, x0: float, y0: float, rows: int, cols: int, pitch: float, rng: random.Random,

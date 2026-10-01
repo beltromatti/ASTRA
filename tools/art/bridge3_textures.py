@@ -9,7 +9,9 @@ reproducible with this script):
 
 The packing follows tools/art/pack_textures.py (BC sRGB, N DirectX, ORM = AO/roughness/metal): its pack_set() is reused.
 
-Run: uv run --with pillow --with numpy python tools/art/bridge3_textures.py [--no-download]
+  art/_cache/bridge3/T_BRG3_Decor.png + decor.json    ARTE-PLANCIA-2: static display pages and soft glows (tools/art/bridge3_decor.py)
+
+Run: uv run --with pillow --with numpy python tools/art/bridge3_textures.py [--no-download | --atlas-only]
 """
 from __future__ import annotations
 
@@ -151,6 +153,27 @@ SMALL = ["1A-03", "1A-04", "1A-05", "1A-06", "1A-07", "1A-08", "PWR", "DATA", "C
 DECK_LEGENDS = [("deck_bridge", "DECK 1 · SECTION A · BRIDGE", "ASN AQUILA · CVC-01"), ("deck_dais", "COMMAND DAIS", "AUTHORIZED PERSONNEL"),
                 ("deck_step", "MIND THE STEP", "WELL DECK · -0.6 M"), ("deck_well", "TACTICAL WELL", "HOLOGRAPHIC PLOT")]
 
+# ---- ARTE-PLANCIA-2: tiles APPENDED after the old ones (the old rects keep their pixel positions; the atlas is 2048 x 4096 now)
+TAGS2 = ["OXYGEN MASKS · RACK 3", "EMERGENCY LIGHTING", "SURVIVAL KITS", "HULL BREACH KIT", "COMM RELAY 1", "SENSOR ARRAY CONTROL", "FIRE SUPPRESSION",
+         "PRESSURE DOOR 1A-01", "LIFEPOD ACCESS", "SECURE STORAGE", "LOG ARCHIVE · CVC-01", "HIGH VOLTAGE 480 V", "HYDRAULICS · LOOP 1", "NAV COMPUTER",
+         "SPARE PARTS · CONSOLES", "PORTABLE O2 · 8 UNITS", "EMERGENCY BEACON", "COMPARTMENT SEAL", "STATION READY", "CHECK BEFORE USE", "KEEP CLEAR",
+         "STANDBY POWER", "TRANSPORT CASE", "BRIDGE ACCESS", "CAUTION · HOT SURFACE", "DO NOT OBSTRUCT", "FLIGHT SUIT LOCKER", "SIGNAL FLARES"]
+SMALL2 = ["1A-09", "1A-10", "1A-11", "1A-12", "A1", "A2", "B1", "B2", "L1", "L2", "R1", "R2", "ON", "OFF", "AUTO", "MAN",
+          "ARM", "SAFE", "RDY", "TEST", "RESET", "MUTE", "SYNC", "ALT"]
+# corridor / door plates (1024 x 128): (cell, title, sub, accent, arrow)  arrow: -1 left, 1 right, 0 none
+PLATES2 = [("sign_port_corridor", "PORT CORRIDOR · DECK 1-A", "ASN AQUILA · CVC-01", "command", 0),
+           ("sign_stbd_corridor", "STARBOARD CORRIDOR · DECK 1-A", "ASN AQUILA · CVC-01", "command", 0),
+           ("sign_quarters", "CAPTAIN'S QUARTERS", "AUTHORIZED PERSONNEL", "command", 0),
+           ("sign_ready_room", "READY ROOM", "COMMAND STAFF", "command", 0),
+           ("sign_turbolift", "TURBOLIFT", "DECKS 1-12", "science", 0),
+           ("sign_lifepods", "LIFEPODS 1-A", "8 PODS · STAND CLEAR", "security", 0),
+           ("sign_bridge", "BRIDGE", "AUTHORIZED PERSONNEL ONLY", "command", 0),
+           ("sign_to_bridge", "BRIDGE", "DECK 1 · SECTION A", "command", 1),
+           ("sign_to_lift", "TURBOLIFTS · LIFEPODS", "DECKS 2-12", "science", -1),
+           ("sign_to_quarters", "CAPTAIN'S QUARTERS · READY ROOM", "STARBOARD", "command", 1),
+           ("sign_emergency", "EMERGENCY EXIT · LIFEPODS", "FOLLOW THE GREEN LIGHTS", "security", 0),
+           ("sign_deck1", "DECK 1 · COMMAND", "SECTION A · BRIDGE COMPLEX", "command", 0)]
+
 
 def plate(w: int, h: int, title: str, sub: str, accent) -> Image.Image:
     img = Image.new("RGBA", (w, h), (*PLATE, 255))
@@ -176,6 +199,69 @@ def tag(w: int, h: int, text: str, warn: bool = False) -> Image.Image:
         f = font(TITLE, size)
     d.text((w / 2, h * 0.52), text, font=f, fill=(*fg, 255), anchor="mm")
     return img
+
+
+def plate_arrow(w: int, h: int, title: str, sub: str, accent, arrow: int) -> Image.Image:
+    """A plate with a drawn arrow (the font has no arrows): arrow -1 on the left, 1 on the right, 0 none."""
+    if not arrow:
+        return plate(w, h, title, sub, accent)
+    img = Image.new("RGBA", (w, h), (*PLATE, 255))
+    d = ImageDraw.Draw(img)
+    d.rectangle((0, 0, w - 1, h - 1), outline=(46, 54, 66, 255), width=3)
+    d.rectangle((0, 0, int(h * 0.09), h), fill=(*accent, 255))
+    ah = h * 0.7
+    tip = 14 if arrow < 0 else w - 14
+    tail = tip + ah * 1.05 if arrow < 0 else tip - ah * 1.05
+    sgn = -1 if arrow < 0 else 1
+    cy = h * 0.5
+    neck = tip - sgn * ah * 0.5
+    d.polygon([(tail, cy - ah * 0.13), (neck, cy - ah * 0.13), (neck, cy - ah * 0.34), (tip, cy), (neck, cy + ah * 0.34), (neck, cy + ah * 0.13), (tail, cy + ah * 0.13)],
+              fill=(*ICE, 255))
+    x_text = int(h * 0.3) if arrow > 0 else int(h * 0.3) + int(ah * 1.3)
+    d.text((x_text, h * 0.42), title, font=font(TITLE, int(h * 0.56)), fill=(*ICE, 255), anchor="lm")
+    d.text((w - int(h * 0.18) - (int(ah * 1.4) if arrow > 0 else 0), h * 0.82), sub, font=font(MONO, int(h * 0.15)), fill=(*DIM, 255), anchor="rm")
+    return img
+
+
+def emblem(size: int = 384) -> Image.Image:
+    """The ASTRA Navy emblem as a lit inlay: a double ring with the motto round it, an eight-pointed compass star (long points N/E/S/W)
+    (the proportions of art/blender/ship3_text.astra_emblem and tools/art/signage.py)."""
+    S2 = 3
+    big = Image.new("RGBA", (size * S2, size * S2), (*PLATE, 255))
+    d = ImageDraw.Draw(big)
+    c = size * S2 / 2
+    r = size * S2 / 2 * 0.96
+    for ri, ro in ((0.90 * r, 0.97 * r), (0.58 * r, 0.63 * r)):
+        d.ellipse((c - ro, c - ro, c + ro, c + ro), outline=(*ICE, 255), width=int(ro - ri))
+    pts = []
+    for k in range(16):
+        rad = {0: 0.72 * r, 2: 0.40 * r}.get(k % 4, 0.11 * r)
+        a = 2 * math.pi * k / 16
+        pts.append((c + rad * math.sin(a), c - rad * math.cos(a)))
+    d.polygon(pts, fill=(*ICE, 255))
+    d.ellipse((c - 0.065 * r, c - 0.065 * r, c + 0.065 * r, c + 0.065 * r), fill=(*PLATE, 255))
+
+    def ring_text(text: str, mid_deg: float, rad: float, fsize: int, bottom: bool) -> None:
+        f = font(TITLE, fsize * S2)
+        total = sum(d.textlength(ch, font=f) for ch in text) + 6 * S2 * (len(text) - 1)
+        ang_total = total / rad
+        a = math.radians(mid_deg) - (ang_total / 2 if not bottom else -ang_total / 2)
+        for ch in text:
+            wch = d.textlength(ch, font=f)
+            half = (wch / 2 + 3 * S2) / rad
+            a_c = a + (half if not bottom else -half)
+            tile = Image.new("RGBA", (int(wch + 20 * S2), int(fsize * S2 * 1.6)), (0, 0, 0, 0))
+            ImageDraw.Draw(tile).text((tile.width / 2, tile.height / 2), ch, font=f, fill=(*ICE, 255), anchor="mm")
+            rot = -math.degrees(a_c) + (180 if bottom else 0)
+            tile = tile.rotate(rot, resample=Image.BICUBIC, expand=True)
+            x = c + rad * math.sin(a_c) - tile.width / 2
+            y = c - rad * math.cos(a_c) - tile.height / 2
+            big.alpha_composite(tile, (int(x), int(y)))
+            a += (2 * half) if not bottom else -(2 * half)
+
+    ring_text("ASTRA NAVY", 0, 0.765 * r, 30, False)
+    ring_text("CONCORD · LAW · LIGHT", 180, 0.765 * r, 24, True)
+    return big.resize((size, size), Image.LANCZOS)
 
 
 def stripes(w: int, h: int, step: int = 36) -> Image.Image:
@@ -230,16 +316,18 @@ def icon(kind: str, s: int = 128) -> Image.Image:
     return img
 
 
-def atlas(size: int = 2048) -> None:
-    img = Image.new("RGBA", (size, size), (*PLATE, 255))
+def atlas(W: int = 2048, H: int = 4096) -> None:
+    img = Image.new("RGBA", (W, H), (*PLATE, 255))
     rects: dict[str, tuple[int, int, int, int]] = {}
     cx = cy = row_h = 0
 
     def put(name: str, tile: Image.Image) -> None:
         nonlocal cx, cy, row_h
         w, h = tile.size
-        if cx + w > size:
+        if cx + w > W:
             cx, cy, row_h = 0, cy + row_h, 0
+        if cy + h > H:
+            raise RuntimeError(f"the label atlas is full at {name}")
         img.paste(tile, (cx, cy))
         rects[name] = (cx, cy, w, h)
         cx += w
@@ -257,18 +345,35 @@ def atlas(size: int = 2048) -> None:
         put(f"small_{i:02d}", tag(256, 64, t, warn=(t in ("CAUTION", "STOP"))))
     for k in ("hv", "fire", "exit", "aid", "eva", "rad", "no_step"):
         put(f"icon_{k}", icon(k))
+    # ---- appended (ARTE-PLANCIA-2)
+    for i, t in enumerate(TAGS2):
+        put(f"tag_{len(TAGS) + i:02d}", tag(512, 128, t, warn=(t.startswith("CAUTION") or t in ("KEEP CLEAR", "DO NOT OBSTRUCT"))))
+    for i, t in enumerate(SMALL2):
+        put(f"small_{len(SMALL) + i:02d}", tag(256, 64, t, warn=(t in ("ARM", "TEST"))))
+    for cell, title, sub, dept, arrow in PLATES2:
+        put(cell, plate_arrow(1024, 128, title, sub, DEPT[dept], arrow))
+    put("emblem", emblem(384))
     img.convert("RGB").save(os.path.join(OUT_B3, "T_BRG3_Labels.png"), optimize=True)
-    uv = {k: [x / size, 1.0 - (y + h) / size, (x + w) / size, 1.0 - y / size] for k, (x, y, w, h) in rects.items()}
+    uv = {k: [x / W, 1.0 - (y + h) / H, (x + w) / W, 1.0 - y / H] for k, (x, y, w, h) in rects.items()}
+    tags = {f"tag_{i:02d}": t for i, t in enumerate(TAGS + TAGS2)}
+    small = {f"small_{i:02d}": t for i, t in enumerate(SMALL + SMALL2)}
+    for cell, title, _sub, _dept, _arrow in PLATES2:
+        tags[cell] = title
     with open(os.path.join(OUT_B3, "labels.json"), "w", encoding="utf-8") as fh:
-        json.dump({"size": [size, size], "rects": uv, "px": {k: list(v) for k, v in rects.items()},
-                   "tags": {f"tag_{i:02d}": t for i, t in enumerate(TAGS)}, "small": {f"small_{i:02d}": t for i, t in enumerate(SMALL)}},
-                  fh, indent=1)
-    print(f"  label atlas: {len(rects)} tiles, {cy + row_h}/{size} px used")
+        json.dump({"size": [W, H], "rects": uv, "px": {k: list(v) for k, v in rects.items()}, "tags": tags, "small": small}, fh, indent=1)
+    print(f"  label atlas: {len(rects)} tiles, {cy + row_h}/{H} px used")
 
 
 def main() -> None:
     os.makedirs(OUT_TEX, exist_ok=True)
     os.makedirs(OUT_B3, exist_ok=True)
+    if "--atlas-only" in sys.argv:                  # the lamp palette, the label atlas and the decor atlas (no downloads, no PBR sets)
+        import bridge3_decor as DC  # noqa: E402
+        palette()
+        atlas()
+        DC.atlas()
+        print("OUT", OUT_B3)
+        return
     if "--no-download" not in sys.argv:
         for acg in SETS.values():
             download(acg)
@@ -278,6 +383,8 @@ def main() -> None:
     deck_grain()
     palette()
     atlas()
+    import bridge3_decor as DC  # noqa: E402
+    DC.atlas()
     print("OUT", OUT_TEX, OUT_B3)
 
 

@@ -165,6 +165,7 @@ def palette_lamp(name: str, strength: float) -> bpy.types.Material:
     em = mt.node("ShaderNodeEmission", 300, 0)
     em.inputs["Strength"].default_value = strength
     t = mt.image(path, interp="Closest", x=-300, y=0)
+    t.image.alpha_mode = "CHANNEL_PACKED"          # the alpha is the alert weight: it must not darken the colour (weight 0 = black otherwise)
     mt.link(t, "Color", em, "Color")
     mt.link(em, "Emission", mt.out, "Surface")
     return mt.m
@@ -237,6 +238,20 @@ def label_mat(name: str, strength: float = 1.6) -> bpy.types.Material:
     return mt.m
 
 
+def decor_mat(name: str, strength: float = 1.8) -> bpy.types.Material:
+    """The decor atlas (static display pages, soft glows): dark glass that emits the page (the instance is a M_ASTRA_Screen)."""
+    mt = Mat(name)
+    path = find([L.CACHE], "T_BRG3_Decor.png")
+    bsdf = mt.node("ShaderNodeBsdfPrincipled", 500, 0)
+    bsdf.inputs["Base Color"].default_value = (0.01, 0.012, 0.015, 1)
+    bsdf.inputs["Roughness"].default_value = 0.30
+    bsdf.inputs["Emission Strength"].default_value = strength
+    t = mt.image(path, x=-300, y=0)
+    mt.link(t, "Color", bsdf, "Emission Color")
+    mt.link(bsdf, "BSDF", mt.out, "Surface")
+    return mt.m
+
+
 def make_materials(screen_pages: dict[str, dict]) -> None:
     """Configure every material of the scene by name (Unreal instance names / SCREEN_ slots)."""
     ivory = srgb_to_linear("#E6E1D6")
@@ -253,6 +268,8 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     palette_lamp(L.LAMP_DIM, 2.4)
     palette_lamp(L.LAMP_HOT, 22.0)
     label_mat(L.LABEL, 1.4)
+    decor_mat(L.DECOR, float(os.environ.get("BRG3_DECOR", "1.8")))
+    pbr(L.BRASS, srgb_to_linear("#B89A4E"), "Brushed", 1.0, (0.24, 0.42), 1.0, 0.0, 0.15, 0.5)
     glass(L.GLASS)
     for slot, info in screen_pages.items():
         surf = info.get("surface")

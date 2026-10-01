@@ -42,6 +42,7 @@ import astra_bpy as A  # noqa: E402
 import bridge3_lib as L  # noqa: E402
 import bridge3_preview as PV  # noqa: E402
 import bridge3_shell as SH  # noqa: E402
+import bridge3_floor as FL  # noqa: E402
 import bridge3_walls as WL  # noqa: E402
 import bridge3_ceiling as CE  # noqa: E402
 import bridge3_checks as CK  # noqa: E402
@@ -69,7 +70,7 @@ def load_data() -> dict:
 def parse_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out = {"out_dir": os.path.join(ROOT, "art", "export", "bridge_v3"), "only": None, "export": True, "preview": None,
-           "views": None, "samples": 48, "save_blend": None, "studio": False, "check_screens": False}
+           "views": None, "samples": 48, "save_blend": None, "studio": False, "check_screens": False, "extra_views": {}}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -86,6 +87,15 @@ def parse_args() -> dict:
             i += 1
         elif a == "--samples":
             out["samples"] = int(argv[i + 1])
+            i += 1
+        elif a == "--view":                          # --view name:x,y,z,yaw,pitch,fov  (an extra camera, layout coordinates)
+            nm, vals = argv[i + 1].split(":")
+            v = [float(q) for q in vals.split(",")]
+            if len(v) == 7:                          # name:x,y,z,tx,ty,tz,fov  (looking at the point t)
+                dx, dy, dz = v[3] - v[0], v[4] - v[1], v[5] - v[2]
+                v = [v[0], v[1], v[2], math.degrees(math.atan2(dy, dx)), math.degrees(math.atan2(dz, math.hypot(dx, dy))), v[6]]
+            out["extra_views"][nm] = ((v[0], v[1], v[2]), v[3], v[4], v[5])
+            out["views"] = (out["views"] or []) + [nm]
             i += 1
         elif a == "--studio":
             out["studio"] = True
@@ -125,7 +135,7 @@ def builders(c: SH.Ctx) -> list[tuple[str, object]]:
 
     st = {x["id"]: x for x in c.D["stations"]}
     out = [
-        ("SM_BRG3_Deck", lambda n: SH.build_deck(c, n)),
+        ("SM_BRG3_Deck", lambda n: FL.build_deck(c, n)),
         ("SM_BRG3_WallPort", lambda n: _info(n, WL.build_side_wall(c, -1, n, c.D["stations"]))),
         ("SM_BRG3_WallStarboard", lambda n: _info(n, WL.build_side_wall(c, 1, n, c.D["stations"]))),
         ("SM_BRG3_WallBack", lambda n: FR.build_back_wall(c, n)),
@@ -243,6 +253,7 @@ def main() -> None:
     D = load_data()
     c = SH.Ctx(D)
     L.load_label_atlas()
+    L.load_decor_atlas()
     A.reset_scene()
     t0 = time.time()
     objs: dict[str, bpy.types.Object] = {}
@@ -411,6 +422,7 @@ VIEWS = {
 
 
 def preview_scene(D, c, objs, args, views) -> None:
+    VIEWS.update(args.get("extra_views", {}))
     assemble(D, objs)
     PV.set_world((0.0, 0.0, 0.0), 0.0)
     PV.sky_dome(yaw_deg=float(os.environ.get("BRG3_SKYYAW", "0")))

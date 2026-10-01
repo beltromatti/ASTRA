@@ -76,7 +76,8 @@ def fan_body(b: Parts, F: Fan, dept: str, station: str, spine: bool = True) -> N
         th1 = th0 + (2 * a) / 7.0 - 2.4
         if th0 < -a + 1.0 or th1 > a - 1.0:
             continue
-        sweep(fb, [(1.0, zs(1.0) - 0.004), (r1 + 0.006, zs(r1) + 0.024), (r1 + 0.006, zs(r1) + 0.036), (1.0, zs(1.0) + 0.008)], th0, th1, L.IVORY, 6)
+        sweep(fb, [(1.0, zs(1.0) - 0.004), (r1 + 0.006, zs(r1) + 0.024), (r1 + 0.006, zs(r1) + 0.036), (1.0, zs(1.0) + 0.008)], th0, th1,
+              L.IVORY if k0 % 2 == 0 else L.COMPOSITE, 6)
     # the glass work surface (the whole fan is dark glass between the lip and the spine)
     sweep(fb, [(r0 + 0.012, zs(r0 + 0.012) - 0.002), (1.06, zs(1.06) - 0.002), (1.06, zs(1.06) + 0.0015), (r0 + 0.012, zs(r0 + 0.012) + 0.0015)],
           -a + 1.0, a - 1.0, L.DGLASS, 26)
@@ -94,11 +95,12 @@ def fan_body(b: Parts, F: Fan, dept: str, station: str, spine: bool = True) -> N
         with b.at(Rz(th)):
             pk = [(0.50, 0.68), (0.50, F.z0 + 0.03), (0.80, zs(0.80) + 0.075), (1.05, zs(1.05) + 0.095), (r1, zs(r1) + 0.06), (r1, 0.06), (0.70, 0.06)]
             fb.extrude_y(pk, -0.026, 0.026, L.COMPOSITE)
-            # ivory rim along the top edge (a thin strip, a little proud of the plate)
+            # ivory rim along the top edge (a thin strip, a little proud of the plate) with a brass line on it
             for (xa, za), (xb, zb) in zip(pk[1:5], pk[2:6]):
                 ang = math.degrees(math.atan2(zb - za, xb - xa))
                 ln = math.hypot(xb - xa, zb - za)
                 fb.cbox(((xa + xb) / 2, 0.0, (za + zb) / 2 - 0.012), (ln, 0.056, 0.026), L.IVORY, Ry(-ang))
+                em.cbox(((xa + xb) / 2, 0.0, (za + zb) / 2 + 0.0015), (ln, 0.010, 0.004), L.BRASS, Ry(-ang))
                 em.lamp_cbox(((xa + xb) / 2, 0.0, (za + zb) / 2 - 0.028), (ln, 0.06, 0.005), dept, L.LAMP, Ry(-ang))
             # a recessed vent panel on the outer face (towards the outside of the console) and bolts
             for side in (-1, 1):
@@ -108,6 +110,12 @@ def fan_body(b: Parts, F: Fan, dept: str, station: str, spine: bool = True) -> N
                 for xx in (0.83, 1.13):
                     for zz in (0.30, 0.66):
                         fb.cyl((xx, side * 0.026, zz), (xx, side * 0.034, zz), 0.008, L.TRIM, seg=8)
+    # brass: a thin line along the lip's edge and along the foot of the spine; the silkscreen of the glass; the status ticker on the spine's front
+    sweep(em, [(r0 - 0.004, F.z0 - 0.034), (r0 + 0.001, F.z0 - 0.034), (r0 + 0.001, F.z0 - 0.026), (r0 - 0.004, F.z0 - 0.026)], -a + 3, a - 3, L.BRASS, 22)
+    if spine:
+        sweep(em, [(1.058, zs(1.058) + 0.003), (1.064, zs(1.064) + 0.003), (1.064, zs(1.064) + 0.007), (1.058, zs(1.058) + 0.007)], -a + 2, a - 2, L.BRASS, 26)
+        em.decor_polar(F, "fan_" + dept, 0.52, 1.06, -(a - 1.5), a - 1.5, lift=0.0026, seg=26, tile_a=58.0, tile_r=(0.50, 1.08))
+        em.decor_strip((1.0688, zs(1.06) + 0.0251), (1.0912, zs(1.06) + 0.0852), -27.0, 27.0, "ticker", seg=18, lift_out=0.002)
     # lamps: under the lip (light on the knees), along the lip, under the base
     em.lamp_arc([(0.545, 0.0), (0.60, 0.0), (0.60, 0.006), (0.545, 0.006)], 0, 0, 0, -a + 4, a - 4, dim, L.LAMP_DIM, seg=22, z0=0.658)
     em.lamp_arc([(r0 - 0.003, 0.0), (r0 + 0.002, 0.0), (r0 + 0.002, 0.008), (r0 - 0.003, 0.008)], 0, 0, 0, -a + 3, a - 3, dept, L.LAMP, seg=26,
@@ -120,6 +128,12 @@ def fan_body(b: Parts, F: Fan, dept: str, station: str, spine: bool = True) -> N
             vent_back(fb, -0.24, 0.24, 0.28, 0.62, 6)
             fb.label((0.012, 0.0, 0.83 if abs(th) < 1 else 0.79), 0.5 if abs(th) < 1 else 0.3, 0.0625 if abs(th) < 1 else 0.05, (1, 0, 0),
                      PLATE[station] if abs(th) < 1 else "small_00")
+    for th in (-24.0, 24.0):                                       # brass grab handles on the back, where the Captain's hand falls
+        c, s = math.cos(math.radians(th)), math.sin(math.radians(th))
+        with em.at(T((r1 + 0.03) * c, (r1 + 0.03) * s, 0) @ Rz(th)):
+            em.cyl((0.062, -0.11, 0.70), (0.062, 0.11, 0.70), 0.0105, L.BRASS, seg=8)
+            for yy in (-0.10, 0.10):
+                em.cyl((0.0, yy, 0.70), (0.062, yy, 0.70), 0.0075, L.BRASS, seg=6)
     for th in (-17.0, 17.0):
         c, s = math.cos(math.radians(th)), math.sin(math.radians(th))
         with fb.at(T((r1 + 0.03) * c, (r1 + 0.03) * s, 0) @ Rz(th)):
@@ -149,18 +163,21 @@ def hover_mounts(b: Parts, F: Fan, kind: str, dept: str) -> None:
     for n, (r, th, zc, w, asp, mount) in HO.PANELS.get(kind, {}).items():
         if mount == "puck":
             x, y, z = F.pos(r, th)
-            fb.cyl((x, y, z), (x, y, z + 0.026), 0.038, L.IVORY, seg=20, r2=0.030)
-            fb.cyl((x, y, z + 0.026), (x, y, z + 0.032), 0.032, L.STRUCT, seg=20)
-            em.lamp_cyl((x, y, z + 0.0315), (x, y, z + 0.0335), 0.021, dept, L.LAMP, seg=20)
-            em.lamp_arc([(0.038, 0.0), (0.041, 0.0), (0.041, 0.004), (0.038, 0.004)], x, y, 0.0, 0, 360, dept + "_dim", L.LAMP_DIM, seg=24,
-                        z0=z + 0.004, loop=True)
-        else:                                                    # mast: two slim posts holding a panel over the console
-            top = zc - w / asp / 2 - 0.05
-            for sd in (-1, 1):
-                x, y, z = F.pos(1.24, sd * 17.0, 0.12)
-                fb.cyl((x, y, z), (x + 0.03, y * 1.02, top), 0.02, L.IVORY, seg=12, r2=0.015)
-                fb.cyl((x + 0.03, y * 1.02, top), (x + 0.045, y * 1.02, top + 0.06), 0.028, L.STRUCT, seg=12)
-                em.lamp_cyl((x + 0.045, y * 1.02, top + 0.058), (x + 0.045, y * 1.02, top + 0.064), 0.018, dept, L.LAMP, seg=12)
+            fb.cyl((x, y, z - 0.004), (x, y, z + 0.016), 0.060, L.STRUCT, seg=28, r2=0.052)                        # the emitter pad
+            em.cyl((x, y, z + 0.0158), (x, y, z + 0.0185), 0.056, L.BRASS, seg=28)                                  # brass collar
+            fb.cyl((x, y, z + 0.0165), (x, y, z + 0.0245), 0.040, L.DGLASS, seg=24, r2=0.034)                      # the lens
+            em.lamp_cyl((x, y, z + 0.0243), (x, y, z + 0.0256), 0.022, dept, L.LAMP, seg=20)
+            em.lamp_arc([(0.046, 0.0), (0.050, 0.0), (0.050, 0.0035), (0.046, 0.0035)], x, y, 0.0, 0, 360, dept + "_dim", L.LAMP_DIM, seg=28,
+                        z0=z + 0.0185, loop=True)
+            em.decor((x, y, z + 0.0034), 0.46, 0.22, (0, 0, 1), "glow_" + dept, up=(math.cos(math.radians(th)), math.sin(math.radians(th)), 0))     # the light pool
+        else:                                                    # a projector turret on the spine: the panel floats above it, the beams show where it comes from
+            x, y, z = F.pos(1.18, 0.0)
+            zb = z + 0.122
+            fb.cyl((x, y, zb - 0.02), (x, y, zb + 0.052), 0.046, L.STRUCT, seg=28, r2=0.034)
+            em.cyl((x, y, zb + 0.0505), (x, y, zb + 0.0535), 0.038, L.BRASS, seg=28)
+            fb.cyl((x, y, zb + 0.052), (x, y, zb + 0.076), 0.027, L.DGLASS, seg=24, r2=0.021)
+            em.lamp_cyl((x, y, zb + 0.0755), (x, y, zb + 0.0775), 0.0145, dept, L.LAMP, seg=16)
+            em.lamp_arc([(0.040, 0.0), (0.0445, 0.0), (0.0445, 0.0035), (0.040, 0.0035)], x, y, 0.0, 0, 360, dept + "_dim", L.LAMP_DIM, seg=28, z0=zb + 0.0, loop=True)
 
 
 # ------------------------------------------------------------------------------------------------------ console types
