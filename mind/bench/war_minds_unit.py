@@ -116,6 +116,16 @@ ENEMIES = lambda: [foe("group of A-01", [{"id": "A-01", "class": "acheron", "hul
 class CadenceTests(Fixture):
     sides = ("mandate",)
 
+    async def test_many_group_commanders_each_wait_longer_on_events(self) -> None:
+        wm = self.minds
+        from astra_mind.war_minds import Mind, Seat, MIN_GAP_S
+        for k in range(6):
+            m = wm.minds[f"mandate/group/G{k}"] = Mind(Seat("group", "mandate", f"G{k}"))
+            m.engaged_since = 1.0
+        self.assertAlmostEqual(wm._min_gap(Seat("group", "mandate", "G0")), MIN_GAP_S["commander"] * 2.0)   # six engaged: twice the wait
+        self.assertEqual(wm._min_gap(Seat("admiral", "mandate")), MIN_GAP_S["admiral"])                     # the admiral's does not change
+        self.assertEqual(wm._min_gap(Seat("group", "astra", "Picket")), MIN_GAP_S["commander"])              # nor the other side's
+
     async def test_nothing_happens_without_a_fight(self) -> None:
         for _ in range(5):
             await self.feed(mandate_state([VANGUARD()], []), 20)

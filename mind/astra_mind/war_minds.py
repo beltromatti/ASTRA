@@ -853,6 +853,16 @@ class WarMinds:
             out.append((Seat("group", side, str(g.get("name"))), str(g.get("leader") or (g.get("members") or [{}])[0].get("id", ""))))
         return out
 
+    def _min_gap(self, seat: Seat) -> float:
+        """How long a mind waits between looks on events alone. A war of fleets has many group commanders: past three engaged on a
+        side, each waits proportionally longer, so the side's thinking (and its cost) stays about what three groups spend — the
+        admiral's cadence does not change, nor a word that cannot wait."""
+        base = MIN_GAP_S[seat.role]
+        if seat.role != COMMANDER_ROLE:
+            return base
+        engaged = sum(1 for m in self.minds.values() if m.seat.role == COMMANDER_ROLE and m.seat.side == seat.side and m.engaged_since is not None)
+        return base * max(1.0, engaged / 3.0)
+
     def _feed_mind(self, mind: Mind, view: dict[str, Any], state: dict[str, Any], events: list[dict[str, Any]], active: bool, now: float) -> None:
         seat = mind.seat
         if active:
@@ -876,6 +886,7 @@ class WarMinds:
         if mind.busy or mind.commander is None:
             return
         gap = now - mind.last_think
+        min_gap = self._min_gap(seat)
         why: list[str] = []
         urgent = [m for m in mind.inbox if m.urgent or m.src == "captain"]
         if mind.takeover and mind.engaged_since is not None:
@@ -897,12 +908,12 @@ class WarMinds:
                     mind.trigger_n = max(mind.trigger_n, top)
                     mind.last_trigger = now
                 settled = now - mind.last_trigger >= SETTLE_S or now - mind.pending_since >= MAX_SETTLE_S
-                if settled and gap >= MIN_GAP_S[seat.role]:
+                if settled and gap >= min_gap:
                     if mine:
                         why.append("news for your group" if seat.kind == "group" else "news of the fleet")
                     if mind.new_enemy:
                         why.append("new enemy on the plot: " + ", ".join(mind.new_enemy[:6]))
-            if not why and seat.side == "astra" and seat.kind == "group" and gap >= MIN_GAP_S[seat.role]:
+            if not why and seat.side == "astra" and seat.kind == "group" and gap >= min_gap:
                 if aquila_hurt(state, mind.aquila_seen):
                     why.append("the Aquila is losing her shields or hull fast")
                 cur = aquila_km(view, state, seat.group)
@@ -913,7 +924,7 @@ class WarMinds:
                         why.append(f"the Aquila has {'drawn away from' if cur > mind.aquila_km else 'closed on'} your group")
                         mind.why_extra.append(f"The Aquila is now {cur:.0f} km from your ships (it was {mind.aquila_km:.0f} km at your last look).")
                         mind.drawn_away = min(mind.drawn_away + 1, 3) if cur > mind.aquila_km else mind.drawn_away
-            if not why and mind.inbox and gap >= MIN_GAP_S[seat.role] / 2:
+            if not why and mind.inbox and gap >= min_gap / 2:
                 why.append("a word for you (below)")
             period = self._periodic(mind)
             if not why and period and gap >= period:
