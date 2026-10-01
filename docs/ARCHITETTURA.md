@@ -120,7 +120,7 @@ Conseguenze sul codice che c'è (da fare, vedi [PIANO.md](PIANO.md)):
 | **BANCO** | banco di prova per giocare da terminale, misure | `AstraHarness.*`, `tools/play.py`, `tools/perf/*` | lead |
 | **MENTE-EQUIPAGGIO** | agenti di plancia, strumenti delle postazioni, iniziativa, router e acustica, collaborazione fra ufficiali | `mind/astra_mind/{agent,crew,tools,router}.py`, la loro colla in `server.py` | unito il 30/9; ora lead |
 | **VOCE** | riconoscimento, sintesi, turni di parola, sottotitoli (lato mente e lato gioco: `AstraVoiceWave.*`) | `mind/astra_mind/{speech,stt,tts,audio_in,voice_casting}.py`, `docs/protocollo_voce.md` | unito il 30/9; ora lead |
-| **MENTE-GUERRA** | regista, comandanti nemici e alleati, gerarchie di flotta | `mind/astra_mind/{director,enemy,war,finale,loss}.py` | poi |
+| **MENTE-GUERRA** | ammiraglio e comandanti del Mandato, capitani alleati che parlano, l'XO con `group_order`, regista v2 | `mind/astra_mind/{war_minds,director,enemy,war}.py`, banco `tools/war.py mind` (GUERRA.md §8) | unita 1/10 |
 | **ARTE-PLANCIA** | la plancia v3 (geometria, materiali, console, poltrone), da Blender | `art/blender/bridge*.py`, `tools/ue_scripts/build_bridge*.py` | unito il 30/9 |
 | **ARTE-NAVI / VFX** | navi v3 con pezzi di rottura e decalcomanie di danno (ARTE-NAVI, unita il 1/10); armi, motori, scudi, esplosioni, rotture nel gioco (VFX: poi, sul contratto di GUERRA `ConsumeDeathEvents` / `GetDamageView`) | `art/blender/shipgen3.py`, `art/blender/ship3_*.py`, `tools/ue_scripts/*ship*v3*`, `make_fx_*.py` | ARTE-NAVI unita; VFX poi |
 | **UMANI** | personaggi realistici, animazioni, labiale, IA dei PNG | `Source/ASTRA/AstraCrew*`, `tools/ue_scripts/make_crew_*` | poi |
