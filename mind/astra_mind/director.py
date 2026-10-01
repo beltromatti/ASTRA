@@ -36,6 +36,14 @@ COMMANDER_VOICES = ["stuart_bell", "michael", "juergen", "lola", "anna", "paul",
 # the voices for the allied captains the story invents (not used by the bridge, the admiral or the Mandate's fixed captains)
 ALLY_VOICES = {"f": ["cosette", "fantine", "azelma", "eponine", "anna"], "m": ["michael", "juergen", "marius", "stuart_bell", "paul"]}
 
+# where the war stands when a campaign begins (the director rewrites them at every beat): what each side is gathering
+OPENING_THREADS = (
+    "The Kharon Mandate's Interdiction Fleet is gathering beyond the Janus Gate for the assault on Aurelia — carrier groups with their "
+    "wings, a Styx line, raider wedges; Archon Varek Solm's strike group is its vanguard, sent to test the picket",
+    "The 7th Fleet's main body holds New Ravenna under Vice Admiral Rourke; the Aquila's picket guards the Gate and Keeper Station, the "
+    "first to meet whatever comes through",
+)
+
 # the beats that may reach a fight under way (what a war really brings, announced by a delay): everything else waits for the lull
 IN_BATTLE_BEATS = ("reinforcements", "raid", "negotiation", "none")
 BATTLE_PULSE_FIRST_S = 150.0          # a fight this old is looked in on once...
@@ -65,6 +73,28 @@ COMMANDER = {"type": "object", "properties": {
     "orders": {"type": "string", "description": "their mission here, as the Mandate gave it to them (one sentence)"}},
     "required": ["name", "rank", "bio", "orders"]}
 
+WING = {"type": "object", "properties": {
+    "carrier": {"type": "integer", "description": "which of the group's ships launches it (its index in the group's `ships`, 0 = the first): an "
+                                                 "acheron (Mandate) or a praetorian (ASTRA)"},
+    "kind": {"type": "string", "enum": ["fighter", "bomber", "drone"]},
+    "n": {"type": "integer", "description": "how many craft (4-16)"},
+    "mission": {"type": "string", "enum": ["strike", "cap", "escort"], "description": "strike: at what the group goes for; cap: over its own group"}},
+    "required": ["carrier", "kind", "n"]}
+GROUP = {"type": "object", "properties": {
+    "name": {"type": "string", "description": "the battle group's name as its own side calls it (Mandate: Third Carrier Group, Styx Line Kade; ASTRA: "
+                                              "Battle Group Resolute, Destroyer Squadron 9)"},
+    "formation": {"type": "string", "enum": ["wedge", "line", "column", "screen"]},
+    "ships": {"type": "array", "items": SHIP, "description": "2-10 ships, the leader first (Mandate: acheron carrier-cruisers, styx destroyers, lethe "
+                                                             "frigates; ASTRA: praetorian battleships, vigilant destroyers, each with its `captain`)"},
+    "wings": {"type": "array", "items": WING, "description": "the craft its carriers launch"},
+    "commander": {**COMMANDER, "description": "a Mandate group: the person who leads it, aboard its first ship (a mind and a voice of their own)"},
+    "offset_km": {"type": "array", "items": {"type": "number"}, "description": "[towards the Aquila, to her right] in km from the beat's arrival "
+                                                                              "point: place the groups the way that side would (a screen ahead of "
+                                                                              "its carriers, a pincer on both flanks, a second line behind)"},
+    "goes_for": {"type": "string", "description": "a Mandate group: aquila, escorts (her consorts), gate (the Janus Gate), or a contact id on the plot; "
+                                                  "an ASTRA group: leave it out (it joins the fleet)"}},
+    "required": ["name", "ships"]}
+
 POI = {"type": "object", "properties": {
     "kind": {"type": "string", "enum": ["listening_post", "derelict_warship", "derelict_freighter"]},
     "name": {"type": "string", "description": "e.g. Thule Watch, the freighter Silver Kestrel, ASN Resolve"}}, "required": ["kind", "name"]}
@@ -72,7 +102,7 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit", "investigate", "decisive", "negotiation", "none"],
              "description": "none: the war simply runs on (say why in `why`); negotiation: a Mandate commander already on the plot calls the Aquila "
                             "to talk (`caller`, `terms`)"},
-    "allies": {"type": "array", "items": SHIP, "description": "decisive: the ASTRA ships that join the Aquila for it (1-3), each with its `captain`"},
+    "allies": {"type": "array", "items": SHIP, "description": "decisive: the ASTRA ships that join the Aquila for it (2-8), each with its `captain`"},
     "poi": {**POI, "description": "investigate: the place to search (on the plot at once, dark and tumbling)"},
     "findings": {"type": "array", "items": {"type": "string"}, "description": "investigate: what the crew learns there, in "
                  "order — 1) the active scan, 2) a flight group reaches it or the Aquila closes in, 3) alongside. Concrete "
@@ -88,7 +118,9 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
                                                   "reinforcements 15-30; what the player asks for, if they ask)"},
     "ships": {"type": "array", "items": SHIP, "description": "raid: the Mandate ships (first = leader; an acheron jams our radar "
               "and carries decoys, a styx carries decoys); reinforcements: ASTRA ships, each with its `captain`; "
-              "decisive: the Mandate's main fleet (4-8 ships, the leader first, an acheron among them)"},
+              "decisive: one Mandate group (the main fleet goes in `groups`)"},
+    "groups": {"type": "array", "items": GROUP, "description": "raid, reinforcements, decisive: the force in battle groups — for anything bigger "
+               "than one group (up to 40 ships in all, 10 a group); the first group's leader commands the whole force. `ships` stays for one group"},
     "attackers": {"type": "array", "items": SHIP, "description": "distress: the Mandate raiders (styx or lethe)"},
     "ship": {"type": "object", "properties": {"name": {"type": "string"}, "class": {"type": "string"}},
              "description": "distress: the ship calling for help (a Free Guilds freighter)"},
@@ -178,10 +210,17 @@ Rules
   enemy's call speaks for itself). The fog of war holds for him too: of a raid (it comes dark) the fleet knows at most what a distant picket glimpsed —
   roughly from where, perhaps how many, that it is the Mandate — never the ranges, classes, names or tricks it will use; the Aquila's own sensors must
   find them (he may tell her to keep her eyes open, never what she will see).
-- Sizes: a raid is 1-4 Mandate ships sized to what the Aquila and her escorts can fight; distress calls are Free Guilds freighters hunted by 1-2
-  raiders; reinforcements are 1-2 ASTRA destroyers (vigilant), rarely a battleship; decisive: the Mandate's main fleet in `ships` (4-8, an acheron
-  leading) against the Aquila and the `allies` that join her (1-3 ASTRA ships), where the Aquila is. It MUST include `commander`.
-- A raid or distress MUST include `commander` for its leader: invent a person (English name, rank, a bio with a reason to fight and a way of speaking).
+- Sizes: this is a war of fleets, and the simulation holds one (dozens of warships and a hundred-odd craft in one battle). Size each beat to what
+  the war would send there, not to what the Aquila alone could fight: she fights inside her fleet, and the Captain wins by where he takes her and
+  what he asks of the others. A raid may be one group (2-6 ships) probing, hunting or striking, or a real force in `groups` (a carrier group
+  with its screen and its wings, a destroyer line, raiders on a flank: 10-30 ships). The 7th Fleet answers in kind: `reinforcements` as groups (a
+  battleship leading destroyers, a whole battle group when the war calls for it), every ship with its `captain`. Decisive: the Mandate's main
+  fleet in `groups` (20-40 ships, its carriers launching their wings, an acheron leading) against the 7th Fleet gathered for it (`allies`, or a
+  reinforcements beat before it). Distress calls stay small (a freighter hunted by 1-2 raiders). The war escalates by its own logic: probes and
+  raids before forces, forces before the assault; a battle the Mandate is losing draws its next group through the gate, one the 7th Fleet is
+  losing draws its relief — and each arrives where its side would send it, at a distance the sensors see it coming.
+- A raid or distress MUST include `commander` for its leader, and in `groups` every Mandate group has its own `commander`: invent people (English
+  names, ranks, bios with a reason to fight and a way of speaking; a force has a hierarchy: the leader of the first group commands it).
   Recurring characters are welcome when the story justifies it. Every ASTRA ship that arrives (`reinforcements`, `allies`) gets a `captain`: a person
   with a name, a rank, a bio and a voice of their own (the fleet net will hear them).
 - Never reuse the name of a ship that is still on the plot (see contacts) for a new ship.
@@ -290,7 +329,7 @@ class Director:
         self.last_event_t = time.monotonic()   # the last time the story moved (a director event or a beat)
         self.mood = ""                          # how the bridge crew feels (the director's latest word on it)
         self.bonds: dict[str, str] = {}          # officer id -> how they stand with the Captain (the director keeps it)
-        self.threads: list[str] = []             # the war's open threads: what each side is doing or gathering, promises, mysteries (the director keeps it)
+        self.threads: list[str] = list(OPENING_THREADS)   # the war's open threads: what each side is doing or gathering, promises, mysteries (the director keeps it)
         self.arc = 1                             # the chapters of the war: each ends in a decisive battle (no acts: the war's logic says when)
         self.decisive = False                    # the decisive battle is being fought
         self.finale = None                       # the arc's ending (finale.Finale, set by the server)
@@ -318,7 +357,7 @@ class Director:
         self.campaign.clear()
         self.mood = ""
         self.bonds = {}
-        self.threads = []
+        self.threads = list(OPENING_THREADS)
         self.standing.clear()
         self.memories.clear()
         self.style.clear()
@@ -637,10 +676,12 @@ class Director:
             self.note(f"(a planned {beat.get('type')} could not happen: {res.get('detail')})")
             return
         self.note(f"beat: {beat.get('type')} — {beat.get('why', '')} ({res.get('detail', '')})")
-        # the leader of a raid or of the raiders gets a mind and a voice
+        # the leader of a raid or of the raiders gets a mind and a voice (in a force of groups, each group's leader)
         cmd = beat.get("commander") or {}
         ids = _ids(res.get("detail", ""))
-        if ids and cmd.get("name") and beat.get("type") in ("raid", "distress", "investigate") and (beat.get("type") != "investigate" or len(ids) > 1):
+        if ids and beat.get("groups") and kind in ("raid", "reinforcements"):
+            self._register_groups(ids, beat.get("groups") or [], kind, cmd, beat.get("why", ""))
+        elif ids and cmd.get("name") and beat.get("type") in ("raid", "distress", "investigate") and (beat.get("type") != "investigate" or len(ids) > 1):
             first = (beat.get("ships") or beat.get("attackers") or beat.get("ambush") or [{}])[0]
             leader_id = ids[1] if beat.get("type") in ("distress", "investigate") and len(ids) > 1 else ids[0]
             self.register(leader_id, {"name": cmd["name"], "rank": cmd.get("rank", "Ferryman (ship captain)"),
@@ -649,13 +690,39 @@ class Director:
                                       "mission": cmd.get("orders") or beat.get("why", "")})
             self.voice_i += 1
             self.note(f"{cmd['name']} ({cmd.get('rank', '')}) leads it, aboard {first.get('name', '?')} ({leader_id})")
-        if kind == "reinforcements":
+        if kind == "reinforcements" and not beat.get("groups"):
             self._register_captains(ids, beat.get("ships") or [])
         if not speech and beat.get("type") in ("transit", "raid", "distress", "reinforcements", "investigate"):
             speech = await self._brief_line(beat, res.get("detail", ""), lang, state)
         for line in speech[:2]:
             await self.say("admiral", line, lang, "measured")
             self.note(f"Rourke to the Aquila: {line}")
+
+    def _register_groups(self, ids: list[str], groups: list[dict[str, Any]], kind: str, force_cmd: dict[str, Any], why: str) -> None:
+        """A force in battle groups: the game gave the ids in the groups' order (each group's leader first). A Mandate group's leader gets the
+        commander the story wrote for it (the first group's, if only the force has one); every ASTRA ship gets its captain."""
+        at = 0
+        for g, grp in enumerate(groups):
+            if not isinstance(grp, dict):
+                continue
+            ships = [sh for sh in (grp.get("ships") or []) if isinstance(sh, dict)][:10]
+            gids = ids[at:at + len(ships)]
+            at += len(ships)
+            if not gids:
+                break
+            if kind == "reinforcements":
+                self._register_captains(gids, ships)
+                continue
+            cmd = grp.get("commander") or (force_cmd if g == 0 else {})
+            if not isinstance(cmd, dict) or not cmd.get("name"):
+                continue                                       # (no commander written: the war minds draw one when the group thinks)
+            first = ships[0] if ships else {}
+            self.register(gids[0], {"name": cmd["name"], "rank": cmd.get("rank", "Ferryman (ship captain)"), "bio": cmd.get("bio", ""),
+                                    "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),
+                                    "voice": COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
+                                    "mission": cmd.get("orders") or why})
+            self.voice_i += 1
+            self.note(f"{cmd['name']} ({cmd.get('rank', '')}) leads {grp.get('name', 'a group')}, aboard {first.get('name', '?')} ({gids[0]})")
 
     def _register_captains(self, ids: list[str], ships: list[dict[str, Any]]) -> None:
         """The ASTRA ships that arrive have captains the story invented: from now on each has a mind and a voice (war_minds.py)."""
@@ -688,18 +755,22 @@ class Director:
         on_plot = {str(c.get("name") or "").lower() for c in (state or {}).get("contacts", []) or []}
         allies = [a for a in (beat.get("allies") or []) if not any(str(a.get("name", "")).lower() in n for n in on_plot if n)]
         if allies:
-            res = await self.command("director_beat", {"beat": {"type": "reinforcements", "ships": allies[:3], "granted": True,
+            res = await self.command("director_beat", {"beat": {"type": "reinforcements", "ships": allies[:8], "granted": True,
                                                                  "bearing_deg": (float(beat.get("bearing_deg", 90)) + 180) % 360,
                                                                  "range_km": 12, "why": "the fleet gathers for the decisive battle"}})
             log.info("decisive: allies -> %s", res)
             if res.get("ok"):
-                self._register_captains(_ids(res.get("detail", "")), allies[:3])
+                self._register_captains(_ids(res.get("detail", "")), allies[:8])
         raid = {k: v for k, v in beat.items() if k not in ("why", "commander", "allies")}
         try:
             rng = float(beat.get("range_km", 40))
         except (TypeError, ValueError):
             rng = 40.0
-        raid.update(type="raid", ships=(beat.get("ships") or [])[:8], hail=True, range_km=min(max(rng, 25.0), 50.0))
+        if beat.get("groups"):
+            raid.update(type="raid", hail=True, range_km=min(max(rng, 25.0), 60.0))
+            raid.pop("ships", None)
+        else:
+            raid.update(type="raid", ships=(beat.get("ships") or [])[:8], hail=True, range_km=min(max(rng, 25.0), 50.0))
         res = await self.command("director_beat", {"beat": raid})
         log.info("director %.2fs: DECISIVE %s -> %s", time.perf_counter() - t0, json.dumps(beat, ensure_ascii=False)[:400], res)
         if not res.get("ok"):
@@ -709,7 +780,9 @@ class Director:
         self.note(f"THE DECISIVE BATTLE of chapter {self.arc}: {beat.get('why', '')} ({res.get('detail', '')})")
         cmd = beat.get("commander") or {}
         ids = _ids(res.get("detail", ""))
-        if ids and cmd.get("name"):
+        if ids and beat.get("groups"):
+            self._register_groups(ids, beat.get("groups") or [], "raid", cmd, beat.get("why", ""))
+        elif ids and cmd.get("name"):
             first = (beat.get("ships") or [{}])[0]
             self.register(ids[0], {"name": cmd["name"], "rank": cmd.get("rank", "Archon"), "bio": cmd.get("bio", ""),
                                    "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),

@@ -226,6 +226,62 @@ class DirectorTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.minds.allies["T-41"].name, "Captain Aiko Brandt")
         self.assertEqual(self.registered[0][1]["name"], "Archon Teodor Vale")
 
+    def ids_reply(self, n: int) -> None:
+        """The game's answer to the next beats: n contact ids in the groups' order (T-41 ...)."""
+        async def command(name: str, args: dict[str, Any]) -> dict[str, Any]:
+            self.commands.append((name, args))
+            ids = ", ".join(f"T-{41 + i}" for i in range(n))
+            return {"ok": True, "detail": f"{args.get('beat', {}).get('type', 'beat')} scheduled in 120 s; contact ids {ids}; the first is the group's leader"}
+        self.d.command = command
+
+    async def test_a_mandate_force_in_groups_gives_each_group_its_commander(self) -> None:
+        self.ids_reply(5)
+        grp = lambda name, ships, who: {"name": name, "formation": "wedge", "ships": [{"class": c, "name": n} for c, n in ships],
+                                         "commander": {"name": who, "rank": "Ferryman", "bio": "x", "orders": "y"}}
+        self.model.script = [("start_beat", {"type": "raid", "why": "the Interdiction Fleet's first wave", "crew_mood": "tense", "delay_s": 200,
+                                             "range_km": 45, "bearing_deg": 60,
+                                             "groups": [grp("Third Carrier Group", [("acheron", "Nyx"), ("acheron", "Erebus")], "Archon Mira Kade"),
+                                                        grp("Styx Line Dorn", [("styx", "Asphodel"), ("styx", "Tartarus"), ("styx", "Hypnos")], "Warden Ilse Dorn")]}),
+                             ("transmit", {"text": "Una forza del Mandato attraversa il portale."})]
+        await self.d._next_beat("it", QUIET)
+        beat = self.commands[0][1]["beat"]
+        self.assertEqual([g["name"] for g in beat["groups"]], ["Third Carrier Group", "Styx Line Dorn"])
+        self.assertNotIn("commander", beat)                                  # (the people are the mind's; the game gets the ships)
+        self.assertEqual([(c, p["name"]) for c, p in self.registered], [("T-41", "Archon Mira Kade"), ("T-43", "Warden Ilse Dorn")])
+        self.assertEqual(self.registered[1][1]["ship"], "the styx Asphodel")
+
+    async def test_reinforcements_in_groups_register_every_captain(self) -> None:
+        self.ids_reply(3)
+        cap = lambda n, g: {"name": n, "rank": "Captain", "bio": "x", "gender": g}
+        self.model.script = [("start_beat", {"type": "reinforcements", "why": "the 7th Fleet answers in strength", "crew_mood": "hopeful", "delay_s": 180,
+                                             "groups": [{"name": "Battle Group Resolute", "ships": [
+                                                            {"class": "praetorian", "name": "ASN Resolute", "captain": cap("Captain Mara Lind", "f")},
+                                                            {"class": "vigilant", "name": "ASN Valour", "captain": cap("Commander Tom Reyes", "m")}],
+                                                         "wings": [{"carrier": 0, "kind": "fighter", "n": 8, "mission": "cap"}]},
+                                                        {"name": "Destroyer Squadron 9", "ships": [
+                                                            {"class": "vigilant", "name": "ASN Kestrel", "captain": cap("Commander Ana Silva", "f")}]}]}),
+                             ("transmit", {"text": "Arriva il gruppo della Resolute."})]
+        await self.d._next_beat("it", QUIET)
+        self.assertEqual([self.minds.allies[i].name for i in ("T-41", "T-42", "T-43")], ["Captain Mara Lind", "Commander Tom Reyes", "Commander Ana Silva"])
+
+    async def test_the_decisive_battle_in_groups_is_a_force_not_eight_ships(self) -> None:
+        self.ids_reply(4)
+        self.model.script = [("start_beat", {"type": "decisive", "why": "the assault on Aurelia", "crew_mood": "grim", "bearing_deg": 60, "range_km": 50,
+                                             "groups": [{"name": "Interdiction Fleet", "ships": [{"class": "acheron", "name": "Kharon"}, {"class": "acheron", "name": "Styx Regnant"}],
+                                                         "commander": {"name": "Archon Teodor Vale", "rank": "Archon", "bio": "Old.", "orders": "take the gate"}},
+                                                        {"name": "Raider Screen", "ships": [{"class": "lethe", "name": "Moros"}, {"class": "lethe", "name": "Keres"}]}]}),
+                             ("transmit", {"text": "È l'assalto."})]
+        await self.d._next_beat("it", QUIET)
+        raid = [a["beat"] for n, a in self.commands if a["beat"]["type"] == "raid"][0]
+        self.assertEqual(len(raid["groups"]), 2)
+        self.assertNotIn("ships", raid)
+        self.assertTrue(self.d.decisive)
+        self.assertEqual([(c, p["name"]) for c, p in self.registered], [("T-41", "Archon Teodor Vale")])
+
+    async def test_a_new_campaign_begins_with_the_war_gathering(self) -> None:
+        self.d.reset()
+        self.assertTrue(any("Interdiction Fleet" in t for t in self.d.threads))
+
     async def test_a_chapter_ends_with_the_decisive_battle_and_the_war_goes_on(self) -> None:
         self.assertEqual(self.d.arc, 1)
 
