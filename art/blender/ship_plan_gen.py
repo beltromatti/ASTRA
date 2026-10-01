@@ -106,7 +106,7 @@ def existing(B: Builder) -> None:
         note="floor z -72.8 (the launch tubes open into the bow mouths); the volume 20 m tall crosses the planes of Decks 6-11 at x 60..218, |y| < 29")
 
 
-BUILT_DECKS = (4, 5, 6, 7, 8)    # the decks with meshes: Deck 4 by hand (ship_deck4.py), the others from their programme (ship_decks.plan_deck(coarse=False))
+BUILT_DECKS = (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)    # the decks with meshes: Deck 4 by hand (ship_deck4.py), the others from their programme (ship_decks.plan_deck(coarse=False))
 
 PROGRAMME = {   # docs/BIBBIA.md §6: the twelve decks
     1: "Bridge, Captain's quarters, ready room, command corridors",

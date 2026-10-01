@@ -63,9 +63,18 @@ ROOMS = {
     "shuttle_bay": ("ship_rooms_security", "shuttle_bay"), "barracks": ("ship_rooms_security", "barracks"), "kit_room": ("ship_rooms_security", "kit_room"),
     "firing_range": ("ship_rooms_security", "firing_range"),
     "switchgear": ("ship_rooms_engineering", "switchgear"), "capacitors": ("ship_rooms_engineering", "capacitors"),
+    "flight_ops": ("ship_rooms_flight", "flight_ops"), "pilot_ready": ("ship_rooms_flight", "pilot_ready"), "aircraft_shop": ("ship_rooms_flight", "aircraft_shop"),
+    "magazine": ("ship_rooms_flight", "magazine"), "cargo_hold": ("ship_rooms_flight", "cargo_hold"),
+    "fab_shop": ("ship_rooms_workshops", "fab_shop"), "repair_bay": ("ship_rooms_workshops", "repair_bay"),
+    "cic": ("ship_rooms_command", "cic"), "briefing": ("ship_rooms_command", "briefing"), "comms_center": ("ship_rooms_command", "comms_center"),
+    "offices": ("ship_rooms_command", "offices"), "records": ("ship_rooms_command", "records"), "vls_magazine": ("ship_rooms_command", "vls_magazine"),
+    "point_defense": ("ship_rooms_command", "point_defense"), "barbette": ("ship_rooms_command", "barbette"),
+    "staterooms": ("ship_rooms_quarters", "staterooms"), "wardroom": ("ship_rooms_quarters", "wardroom"), "gym": ("ship_rooms_quarters", "gym"),
+    "tank": ("ship_rooms_keel", "tank"), "reaction_mass": ("ship_rooms_keel", "reaction_mass"), "crawlway": ("ship_rooms_keel", "crawlway"),
 }
 EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHIP_StairTowerBottom": ("ship_rooms_hub", "stair_tower_bottom"),
-         "SM_SHIP_LadderTrunk": ("ship_rooms_hub", "ladder_trunk")}
+         "SM_SHIP_LadderTrunk": ("ship_rooms_hub", "ladder_trunk"), "SM_SHIP_StairTower53": ("ship_rooms_hub", "stair_tower_deep"),
+         "SM_SHIP_StairTowerCap": ("ship_rooms_hub", "stair_tower_cap")}
 
 # the material slots the Unreal side knows (shared bridge v3 instances + the ship's new ones)
 KNOWN_SLOTS = set(BL.SHARED_SLOTS) | set(SL.NEW_SLOTS) | {SL.LABEL}
@@ -265,6 +274,8 @@ class RouteChecker:
         for e in plan["graph"]["edges"]:
             na, nb = nodes.get(e["a"]), nodes.get(e["b"])
             if na is None or nb is None or e["kind"] not in ("walk", "door"):
+                continue
+            if abs(na["p"][2] - nb["p"][2]) > 1.5:                              # a way between two levels (the Flight Deck's door is 6.8 m below the corridor: VITA rides it like a lift)
                 continue
             if e.get("door") and doors.get(e["door"], {}).get("planned"):       # the door of a room not modelled yet: a plain wall, locked
                 blank += 1

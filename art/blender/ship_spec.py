@@ -363,6 +363,126 @@ _reg("capacitors", name="Capacitor Hall", kind="power", dept="engineering", L=24
      lights=[light(11.2, 8.4, 3.6, 3800, 3800, (2.0, 12.0), 1000), light(6.0, 8.4, 3.6, 3000, 4200, (6.0, 8.0), 900), light(18.0, 8.4, 3.6, 3000, 4200, (6.0, 8.0), 900)])
 
 
+# ---- Deck 9: flight operations, the pilots' room, the aircraft workshop, the magazine, the cargo hold ---------------------------------------------------
+_reg("flight_ops", name="Flight Operations", kind="flight_ops", dept="flight", L=24.0, D=16.0, h=3.6, plate="flight_ops",
+     doors=[door("near", 10.0)], systems=["comms", "power_bus", "data_trunk"],
+     spots=[spot("flight_officer", "sit", x, 9.15, 90, "flight") for x in (4.5, 8.0, 16.0, 19.5)] + [spot("flight_officer", "sit", x, 4.75, 90, "flight") for x in (3.8, 7.4, 16.6, 20.2)]
+           + [spot("air_boss", "stand", 10.6, 11.2, 90, "flight"), spot("cag", "stand", 13.4, 11.2, 90, "flight")],
+     lights=[light(12.0, 7.0, 3.5, 4500, 5600, (14.0, 8.0), 1100), light(12.0, 12.8, 3.5, 3500, 6000, (8.0, 4.0), 900), light(12.0, 14.8, 3.4, 2500, 6500, (18.0, 1.0), 900)])
+_reg("pilot_ready", name="Pilots' Ready Room", kind="flight_ops", dept="flight", L=24.0, D=16.0, h=3.6, plate="pilot_ready",
+     doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
+     spots=[spot("pilot", "sit", x, y, 90, "flight") for y in (5.2, 7.2, 9.2) for x in (4.0, 7.4, 16.6, 20.0)]
+           + [spot("pilot", "sit", 23.1, 10.0, 180, "flight"), spot("pilot", "sit", 23.1, 13.8, 180, "flight"), spot("briefing_officer", "stand", 12.0, 15.0, -90, "flight")],
+     lights=[light(12.0, 8.0, 3.5, 3600, 4000, (16.0, 10.0), 1000), light(12.0, 13.0, 3.5, 2500, 5600, (8.0, 3.0), 900)])
+_reg("aircraft_shop", name="Aircraft Workshop", kind="workshop", dept="flight", L=28.0, D=16.0, h=3.7, plate="aircraft_shop",
+     doors=[door("near", 10.0)], systems=["power_bus", "compressed_air", "damage_control"],
+     spots=[spot("aircraft_technician", "work", 1.9, 3.0, 180, "flight"), spot("aircraft_technician", "work", 1.9, 6.2, 180, "flight"),
+            spot("aircraft_technician", "work", 19.5, 7.3, 90, "flight"), spot("aircraft_technician", "work", 19.5, 9.8, -90, "flight"),
+            spot("aircraft_technician", "work", 6.6, 10.3, 90, "flight"), spot("aircraft_technician", "work", 11.0, 6.6, 180, "flight")],
+     lights=[light(8.0, 8.0, 3.7, 6500, 5200, (10.0, 10.0), 1100), light(20.0, 8.5, 3.7, 7000, 5200, (10.0, 8.0), 1200), light(14.0, 14.5, 3.7, 4500, 5000, (20.0, 1.0), 1000)])
+_reg("magazine", name="Munitions Magazine", kind="magazine", dept="security", L=24.0, D=16.0, h=3.6, plate="magazine",
+     doors=[door("near", 10.0)], systems=["ordnance", "power_bus"],
+     spots=[spot("loader", "work", 6.0, 12.5, 90, "security"), spot("loader", "work", 15.0, 12.5, 90, "security"), spot("loader", "work", 21.0, 12.5, 90, "security"),
+            spot("loader", "work", 12.0, 4.2, 90, "security")],
+     lights=[light(8.0, 8.0, 3.5, 5000, 5000, (14.0, 1.0), 1000), light(18.0, 8.0, 3.5, 4500, 5000, (8.0, 1.0), 1000)])
+_reg("cargo_hold", name="Cargo Hold", kind="storage", dept="flight", L=32.0, D=16.0, h=3.7, plate="cargo",
+     doors=[door("near", 10.0)], systems=["supply"],
+     spots=[spot("handler", "work", 5.0, 5.7, 90, "flight"), spot("handler", "work", 23.0, 5.7, 90, "flight"), spot("handler", "work", 9.0, 5.7, 90, "flight"),
+            spot("handler", "work", 16.0, 11.0, 0, "flight")],
+     lights=[light(8.0, 8.0, 3.6, 5200, 4800, (12.0, 6.0), 1100), light(24.0, 8.0, 3.6, 5200, 4800, (12.0, 6.0), 1100), light(16.0, 4.0, 3.6, 4200, 4800, (8.0, 2.0), 900)])
+
+
+# ---- Deck 11: fabrication and repair ----------------------------------------------------------------------------------------------------------------------
+_reg("fab_shop", name="Fabrication Shop", kind="fabrication", dept="engineering", L=28.0, D=16.0, h=3.7, plate="fab",
+     doors=[door("near", 10.0)], systems=["power_bus", "compressed_air", "data_trunk"],
+     spots=[spot("fabricator", "work", x, 12.4, 90, "engineering") for x in (3.6, 6.4, 9.2)]
+           + [spot("fabricator", "work", 17.0, 10.0, 90, "engineering"), spot("fabricator", "work", 24.0, 13.2, 90, "engineering"),
+              spot("machinist", "work", 25.6, 4.0, 180, "engineering"), spot("machinist", "work", 25.6, 6.4, 180, "engineering"),
+              spot("quality_inspector", "work", 22.0, 3.7, -90, "engineering")],
+     lights=[light(8.0, 8.0, 3.8, 6000, 5400, (12.0, 10.0), 1100), light(20.0, 8.0, 3.8, 6000, 5400, (12.0, 10.0), 1100), light(14.0, 14.5, 3.8, 3500, 5000, (22.0, 1.0), 900)])
+_reg("repair_bay", name="Repair Bay", kind="workshop", dept="engineering", L=32.0, D=16.0, h=3.7, plate="repair",
+     doors=[door("near", 10.0)], systems=["damage_control", "power_bus"],
+     spots=[spot("dc_technician", "work", 15.0, 6.5, -90, "engineering"), spot("dc_technician", "work", 29.3, 11.4, 0, "engineering"),
+            spot("dc_technician", "work", 29.3, 8.0, 0, "engineering"), spot("dc_technician", "stand", 17.7, 12.8, 90, "engineering"),
+            spot("dc_technician", "stand", 1.8, 6.0, 180, "engineering")],
+     lights=[light(8.0, 8.0, 3.6, 5200, 5000, (12.0, 8.0), 1000), light(24.0, 8.0, 3.6, 5200, 5000, (12.0, 8.0), 1000), light(16.0, 13.5, 3.6, 3500, 4800, (20.0, 1.0), 900)])
+
+
+# ---- Deck 2: the command deck (clear height 3.6: the VLS hall and the barbette are the lower part of tall installations) -------------------------------------
+_reg("cic", name="Combat Information Centre", kind="cic", dept="command", L=32.0, D=16.0, h=3.6, plate="cic",
+     doors=[door("near", 14.0)], systems=["sensors", "tactical", "data_trunk", "power_bus"],
+     spots=[spot(r, "sit", x, y, 90, "command") for (x, r) in zip((3.6, 7.0, 10.4, 21.6, 25.0, 28.4), ("tactical_officer", "sensor_operator", "plotter") * 2) for y in (7.95, 4.15)]
+           + [spot("combat_officer", "stand", 13.0, 11.2, 90, "command"), spot("damage_control_officer", "stand", 19.0, 11.2, 90, "command")],
+     lights=[light(8.0, 7.0, 3.5, 5000, 6000, (10.0, 8.0), 1100), light(24.0, 7.0, 3.5, 5000, 6000, (10.0, 8.0), 1100), light(16.0, 12.4, 3.5, 4500, 6500, (4.0, 4.0), 1000),
+             light(16.0, 14.8, 3.4, 3000, 6500, (24.0, 1.0), 900)])
+_reg("briefing", name="Briefing Room", kind="briefing", dept="command", L=16.0, D=16.0, h=3.6, plate="briefing",
+     doors=[door("near", 6.0)], systems=["power_bus"],
+     spots=[spot("officer", "sit", 8.0 - 2.4 + k * 0.96, 7.1, 90, "command") for k in range(6)] + [spot("officer", "sit", 8.0 - 2.4 + k * 0.96, 9.7, -90, "command") for k in range(6)]
+           + [spot("officer", "sit", 4.3, 8.4, 0, "command"), spot("officer", "sit", 11.7, 8.4, 180, "command")],
+     lights=[light(8.0, 8.4, 3.5, 4200, 3600, (8.0, 3.0), 1000), light(8.0, 14.0, 3.5, 2500, 5600, (12.0, 1.0), 800)])
+_reg("comms_center", name="Communications Centre", kind="comms", dept="command", L=24.0, D=16.0, h=3.6, plate="comms",
+     doors=[door("near", 10.0)], systems=["comms", "data_trunk", "power_bus"],
+     spots=[spot("comms_operator", "sit", x, y - 1.25, 90, "command") for y in (11.2, 8.0, 4.8) for x in (4.0, 7.4, 16.6, 20.0)],
+     lights=[light(12.0, 7.0, 3.5, 5200, 6000, (16.0, 8.0), 1000), light(12.0, 14.6, 3.4, 3000, 6500, (18.0, 1.0), 900)])
+_reg("offices", name="Department Offices", kind="offices", dept="command", L=16.0, D=16.0, h=3.4, plate="offices",
+     doors=[door("near", 6.0)], systems=["power_bus", "data_trunk"],
+     spots=[spot("clerk", "sit", 2.4, 4.6, 0, "command"), spot("officer", "sit", 2.4, 10.6, 0, "command"), spot("clerk", "sit", 13.6, 4.6, 180, "command"),
+            spot("officer", "sit", 13.6, 10.6, 180, "command")],
+     lights=[light(8.0, 8.0, 3.3, 4500, 4200, (12.0, 10.0), 1000)])
+_reg("records", name="Records & Archive", kind="offices", dept="command", L=12.0, D=16.0, h=3.4, plate="records",
+     doors=[door("near", 6.0)], systems=["data_trunk"],
+     spots=[spot("archivist", "work", 2.55, 9.6, 90, "command"), spot("archivist", "work", 5.25, 9.6, 90, "command"), spot("archivist", "sit", 10.2, 1.5, 90, "command")],
+     lights=[light(6.0, 8.0, 3.3, 3600, 4200, (8.0, 12.0), 900)])
+_reg("vls_magazine", name="VLS Magazine", kind="magazine", dept="security", L=24.0, D=16.0, h=3.6, plate="vls",
+     doors=[door("near", 10.0)], systems=["weapons", "ordnance", "power_bus"],
+     spots=[spot("loader", "work", 12.0, 10.8, 90, "security"), spot("loader", "work", 12.0, 5.0, 90, "security"), spot("loader", "sit", 21.6, 1.7, 90, "security")],
+     lights=[light(8.0, 8.0, 3.5, 4500, 5000, (10.0, 10.0), 1000), light(18.0, 8.0, 3.5, 4500, 5000, (10.0, 10.0), 1000)])
+_reg("point_defense", name="Point-Defence Control", kind="weapons_control", dept="security", L=16.0, D=16.0, h=3.6, plate="pdc",
+     doors=[door("near", 6.0)], systems=["weapons", "sensors", "power_bus"],
+     spots=[spot("gunner", "sit", x, 9.95, 90, "security") for x in (3.2, 6.4, 9.6, 12.8)] + [spot("gunnery_chief", "sit", 8.0, 4.95, 90, "security")],
+     lights=[light(8.0, 8.0, 3.5, 4500, 6000, (12.0, 10.0), 1000)])
+_reg("barbette", name="Turret Barbette", kind="weapons", dept="security", L=24.0, D=16.0, h=3.6, plate="barbette",
+     doors=[door("near", 10.0)], systems=["weapons", "power_bus", "ordnance"],
+     spots=[spot("gunner", "work", 21.8, 8.4, 180, "security"), spot("gunner", "work", 12.2, 5.4, 0, "security"), spot("gunner", "work", 5.8, 6.6, 90, "security"),
+            spot("gunner", "sit", 10.5, 1.5, 90, "security")],
+     lights=[light(6.0, 8.0, 3.5, 4000, 5000, (8.0, 10.0), 1000), light(17.0, 8.4, 3.5, 4500, 5000, (6.0, 6.0), 1000)])
+
+
+# ---- Deck 3: the officers' deck (clear height 3.4) -----------------------------------------------------------------------------------------------------------
+STATEROOM_Y = (0.61, 4.61, 8.61, 12.61)                                    # the beds' middle across a side's four staterooms (ship_rooms_quarters.STATEROOM_BED_Y)
+
+_reg("staterooms", name="Officers' Staterooms", kind="cabins", dept="services", L=20.0, D=16.0, h=3.2, plate="staterooms",
+     doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
+     spots=[spot("officer", "sleep", 1.39, y, 180, "services") for y in STATEROOM_Y] + [spot("officer", "sleep", 18.61, y, 0, "services") for y in STATEROOM_Y],
+     lights=[light(10.0, 8.0, 3.1, 2500, 3400, (14.0, 0.6))] + [light(xc, yc, 3.0, 900, 3400, (1.4, 1.4), 480) for xc in (2.6, 17.4) for yc in (2.0, 6.0, 10.0, 14.0)])
+_reg("wardroom", name="Officers' Wardroom", kind="wardroom", dept="command", L=24.0, D=16.0, h=3.6, plate="wardroom",
+     doors=[door("near", 10.0)], systems=["power_bus"],
+     spots=[spot("officer", "eat", 6.4 - 1.65 + k * 1.1, y - 0.95, 90, "command") for y in (4.4, 10.8) for k in range(4)]
+           + [spot("officer", "eat", 6.4 - 1.65 + k * 1.1, y + 0.95, -90, "command") for y in (4.4, 10.8) for k in range(4)]
+           + [spot("officer", "sit", 14.9, 4.6, 0, "command"), spot("officer", "sit", 14.9, 11.4, 0, "command"), spot("steward", "work", 21.4, 8.0, 0, "services")],
+     lights=[light(7.0, 7.5, 3.5, 3600, 3400, (12.0, 12.0), 1000), light(17.0, 8.0, 3.5, 3000, 3200, (10.0, 12.0), 1000)])
+_reg("gym", name="Gymnasium", kind="gym", dept="services", L=24.0, D=16.0, h=3.7, plate="gym",
+     doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
+     spots=[spot("crew", "work", x, 14.4, 90, "services", 0.235) for x in (3.0, 5.4, 7.8, 10.2, 12.6)] + [spot("crew", "work", 7.6, 7.0, 0, "services"), spot("crew", "work", 21.52, 7.71, 180, "services")],
+     lights=[light(12.0, 8.0, 3.6, 5000, 5200, (16.0, 8.0), 1100)])
+
+
+# ---- Deck 12: the keel (clear height 3.4) ---------------------------------------------------------------------------------------------------------------------
+_reg("tank", name="Fuel & Coolant Tank", kind="tank", dept="neutral", L=32.0, D=16.0, h=3.4, plate="tank",
+     doors=[door("near", 14.0)], systems=["coolant", "fuel"],
+     spots=[spot("machinist", "work", 17.9, 5.0, 180, "engineering"), spot("machinist", "work", 14.1, 11.0, 0, "engineering"), spot("machinist", "stand", 13.0, 8.0, 0, "engineering")],
+     lights=[light(7.0, 8.0, 3.3, 3500, 4200, (11.0, 3.0), 900), light(25.0, 8.0, 3.3, 3500, 4200, (11.0, 3.0), 900), light(16.0, 8.0, 3.3, 4200, 4500, (5.0, 12.0), 900)])
+_reg("reaction_mass", name="Reaction-Mass Tank", kind="tank", dept="neutral", L=40.0, D=16.0, h=3.4, plate="mass",
+     doors=[door("near", 18.0)], systems=["reaction_mass"],
+     spots=[spot("machinist", "work", 21.5, 5.0, 180, "engineering"), spot("machinist", "work", 18.5, 12.5, 0, "engineering"), spot("machinist", "sit", 22.0, 1.5, 90, "engineering")],
+     lights=[light(9.0, 8.5, 3.3, 4000, 4800, (10.0, 6.0), 1000), light(31.0, 8.5, 3.3, 4000, 4800, (10.0, 6.0), 1000), light(20.0, 8.0, 3.3, 3500, 4800, (10.0, 8.0), 900)])
+_reg("crawlway", name="Maintenance Crawlway Hub", kind="crawlway", dept="engineering", L=16.0, D=16.0, h=3.0, plate="crawl",
+     doors=[door("near", 6.0)], systems=["power_bus", "data_trunk", "coolant"],
+     spots=[spot("dc_technician", "sit", 4.0, 15.3, -90, "engineering"), spot("dc_technician", "work", 11.0, 8.0, 90, "engineering")],
+     lights=[light(8.0, 8.0, 2.9, 3200, 3000, (10.0, 10.0), 800)])
+
+
+
 def prefab(key: str) -> dict:
     return PREFABS[key]
 

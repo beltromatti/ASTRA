@@ -406,7 +406,7 @@ def aquarium(b: SParts, w: float = 3.2, d: float = 0.8, h: float = 2.1, seed: in
     for sy in (-hw, hw - 0.06):
         b.body.box((-d / 2, sy, 0.68), (d / 2, sy + 0.06, h - 0.16), TRIM)
     b.emit.lamp_box((-d / 2 + 0.04, -hw + 0.06, 0.74), (d / 2 - 0.1, hw - 0.06, h - 0.2), water, LAMP_DIM)                # the water
-    b.fine.box((d / 2 - 0.1, -hw + 0.06, 0.68), (d / 2 - 0.08, hw - 0.06, h - 0.16), DGLASS if False else TRIM)             # the front frame line
+    b.fine.box((d / 2 - 0.1, -hw + 0.06, 0.68), (d / 2 - 0.08, hw - 0.06, h - 0.16), TRIM)             # the front frame line
     for k in range(int(w / 0.5)):
         y = -hw + 0.3 + k * 0.5 + rng.uniform(-0.1, 0.1)
         hh = rng.uniform(0.5, 1.3)

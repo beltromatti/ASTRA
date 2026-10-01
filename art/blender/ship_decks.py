@@ -24,8 +24,10 @@ PROGRAMME = {
         "A": ["cic", "briefing", "comms_center", "offices"], "B": ["offices", "records", "point_defense", "briefing", "offices"],
         "C": ["vls_magazine", "sensor_room", "offices", "comms_center"], "D": ["vls_magazine", "point_defense", "sensor_room", "offices"],
         "E": ["barbette", "point_defense", "offices"], "F": ["barbette", "offices", "sensor_room"], "G": ["sensor_room", "offices", "machinery"]},
-    3: {"default": ["staterooms", "staterooms", "offices", "gym"], "A": ["wardroom", "gym", "staterooms"], "B": ["staterooms", "staterooms", "offices"],
-        "C": ["staterooms", "gym", "staterooms"], "H": ["machinery", "staterooms"]},
+    3: {"default": ["staterooms", "staterooms", "offices", "gym", "staterooms", "records"], "A": ["wardroom", "gym", "staterooms", "offices"],
+        "B": ["staterooms", "staterooms", "offices", "staterooms", "wardroom"], "C": ["staterooms", "gym", "staterooms", "records", "offices"],
+        "D": ["staterooms", "staterooms", "offices", "gym"], "E": ["staterooms", "offices", "staterooms", "staterooms"], "F": ["staterooms", "staterooms", "gym", "offices"],
+        "G": ["staterooms", "offices", "staterooms"], "H": ["machinery", "staterooms"]},
     5: {"default": ["lab", "sensor_archive", "lab_bio", "sensor_room"], "A": ["lab_bio", "lab", "sensor_room", "hydro", "lab_phys"],
         "B": ["lab", "sensor_archive", "lab_astro", "lab_bio"], "C": ["lab_phys", "lab", "lab_bio", "sensor_room", "lab"],
         "D": ["lab_astro", "hydro", "lab", "sensor_archive"], "E": ["radiator_pumps", "machinery", "dc_locker", "machinery_b"],
@@ -44,11 +46,21 @@ PROGRAMME = {
     8: {"default": ["store_dry", "hold", "machinery", "dc_locker", "workshop"], "B": ["barracks", "kit_room", "barracks", "lounge", "heads", "armory"],
         "C": ["armory", "barracks", "laundry", "barracks", "kit_room", "heads", "store_dry"], "D": ["barracks", "hold", "barracks", "store_dry", "laundry", "dc_locker"],
         "F": ["workshop", "machinery", "dc_locker", "hold"], "G": ["hold", "store_dry", "machinery"], "H": ["machinery", "dc_locker"]},
-    9: {"default": ["cargo_hold", "machinery", "cargo_hold"], "A": [], "B": [], "C": ["flight_ops", "aircraft_shop", "magazine"],
-        "D": ["aircraft_shop", "flight_ops", "magazine"], "E": ["magazine", "cargo_hold", "flight_ops"], "H": ["machinery", "dc_locker"]},
-    10: {"default": ["cargo_hold", "magazine", "hold", "cargo_hold"], "A": ["cargo_hold", "hold", "magazine"], "H": ["machinery", "hold"]},
-    11: {"default": ["workshop", "fab_shop", "repair_bay", "dc_locker"], "A": ["repair_bay", "dc_locker", "workshop"], "H": ["machinery", "dc_locker"]},
-    12: {"default": ["tank", "reaction_mass", "crawlway", "tank"], "A": ["tank", "crawlway"], "H": ["crawlway", "tank"]},
+    9: {"default": ["cargo_hold", "machinery", "cargo_hold", "dc_locker", "store_dry"], "A": [], "B": [],
+        "C": ["flight_ops", "pilot_ready", "aircraft_shop", "magazine", "flight_ops", "pilot_ready"], "D": ["aircraft_shop", "magazine", "pilot_ready", "cargo_hold", "flight_ops", "dc_locker"],
+        "E": ["magazine", "cargo_hold", "aircraft_shop", "store_dry", "machinery"], "F": ["cargo_hold", "hold", "magazine", "dc_locker"],
+        "G": ["cargo_hold", "store_dry", "machinery", "hold"], "H": ["machinery", "dc_locker"]},
+    10: {"default": ["cargo_hold", "magazine", "hold", "store_dry", "cargo_hold", "store_cold", "dc_locker"], "A": ["cargo_hold", "hold", "magazine"],
+         "B": ["magazine", "magazine", "cargo_hold", "hold", "store_dry"], "C": ["cargo_hold", "hold", "store_cold", "store_dry", "magazine", "dc_locker"],
+         "D": ["magazine", "cargo_hold", "hold", "store_cold", "dc_locker"], "E": ["cargo_hold", "store_dry", "hold", "magazine", "machinery"],
+         "F": ["hold", "cargo_hold", "store_cold", "dc_locker"], "G": ["cargo_hold", "hold", "store_dry", "machinery"], "H": ["machinery", "hold", "dc_locker"]},
+    11: {"default": ["workshop", "fab_shop", "repair_bay", "dc_locker", "machinery", "hold"], "A": ["repair_bay", "dc_locker", "workshop"],
+         "B": ["fab_shop", "workshop", "dc_locker", "fab_shop", "repair_bay"], "C": ["repair_bay", "dc_locker", "workshop", "fab_shop", "machinery_b"],
+         "D": ["workshop", "repair_bay", "fab_shop", "hold"], "E": ["fab_shop", "machinery", "dc_locker", "workshop"], "F": ["repair_bay", "workshop", "dc_locker", "machinery"],
+         "G": ["hold", "store_dry", "machinery", "dc_locker"], "H": ["machinery", "dc_locker"]},
+    12: {"default": ["tank", "reaction_mass", "crawlway", "tank", "dc_locker"], "A": ["tank", "crawlway", "tank"], "B": ["reaction_mass", "tank", "crawlway", "tank"],
+         "C": ["tank", "tank", "crawlway", "reaction_mass"], "D": ["reaction_mass", "crawlway", "tank", "dc_locker"], "E": ["tank", "crawlway", "tank", "tank"],
+         "F": ["tank", "reaction_mass", "crawlway", "tank"], "G": ["tank", "crawlway", "dc_locker", "tank"], "H": ["crawlway", "tank", "dc_locker"]},
 }
 
 
@@ -219,9 +231,11 @@ def plan_deck(B: Builder, deck: int, towers: list | None = None, coarse: bool = 
     spine = free_pieces(deck, SP_Y, env, obs, xh, xl)
     if not coarse:
         spine = reach_rooms(deck, SP_Y, spine)
-    sp = [D.passage(f"SP{i}", "S", "x", SP_Y, a0, a1, "Spine") for i, (a0, a1) in enumerate(spine)]
-    sbp = [D.passage(f"SB{i}", "P", "x", SBP_Y, a0, a1, "Starboard Passage") for i, (a0, a1) in enumerate(free_pieces(deck, SBP_Y, env, obs, xh, xl))]
-    pp = [D.passage(f"PO{i}", "P", "x", PP_Y, a0, a1, "Port Passage") for i, (a0, a1) in enumerate(free_pieces(deck, PP_Y, env, obs, xh, xl))]
+    keel = deck == 12 and not coarse                                            # the keel's passages are maintenance crawlways (tone K)
+    sp = [D.passage(f"SP{i}", "K" if keel else "S", "x", SP_Y, a0, a1, "Keel Crawlway" if keel else "Spine") for i, (a0, a1) in enumerate(spine)]
+    sbp = [D.passage(f"SB{i}", "K" if keel else "P", "x", SBP_Y, a0, a1, "Starboard Crawlway" if keel else "Starboard Passage")
+           for i, (a0, a1) in enumerate(free_pieces(deck, SBP_Y, env, obs, xh, xl))]
+    pp = [D.passage(f"PO{i}", "K" if keel else "P", "x", PP_Y, a0, a1, "Port Crawlway" if keel else "Port Passage") for i, (a0, a1) in enumerate(free_pieces(deck, PP_Y, env, obs, xh, xl))]
     placed: list = []
     used: set = set()
     for (tx, tside) in (towers or []):
