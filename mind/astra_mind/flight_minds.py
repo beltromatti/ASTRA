@@ -132,14 +132,14 @@ class Kind:
 
 # These are the game's event templates (AstraBattleSubsystem.cpp, AstraWarCraft.cpp); anything else goes to the crew as it always did. A new template is
 # one line here. NOT taken, on purpose: `flight: launching Alpha ...` and `flight: ... recalling Alpha` (the flight officer's own reflex: Price says what he
-# did), `flight: controller call` (Price's own), and every `flight: Eagle ...` / `flight: the Captain ...` (the Captain's own aircraft: Price and the XO).
+# did), `flight: controller call` (Price's own), every `flight: Eagle ...` / `flight: the Captain ...` (the Captain's own aircraft: Price and the XO), and
+# `flight: ... recon has identified ...` (what a recon flight finds is the plot's news: Sensors tells it; the net reads it in its log).
 _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k) for p, k in (
     (r"^flight: (?:alpha|bravo|drones) squadron airborne", Kind("airborne", True)),
     (r"^flight: (?:alpha|bravo|drones) squadron has lost", Kind("losses", True)),
     (r"^flight: (?:alpha|bravo|drones) squadron torpedo run", Kind("torpedoes", True)),
     (r"^flight: (?:alpha|bravo|drones) squadron recovered", Kind("recovered", True)),
     (r"^flight: (?:alpha|bravo|drones) squadron rearmed", Kind("rearmed", True)),
-    (r"^flight: \w+ recon has identified", Kind("recon", True)),
     (r"^flight: search and rescue", Kind("rescue", True)),
     (r"^tactical: \d+ harp(?:y|ies) splashed", Kind("splash", True)),
     (r"^flight: eagle(?:'s wing| [2-9])", Kind("wing", True, wing=True)),
@@ -196,8 +196,8 @@ MISSION = _fn("mission", "Set a squadron's mission: the flight console's own ord
     "reason": {"type": "string", "description": "one sentence, for the log"}},
     ["by", "squadron", "type"])
 
-REMEMBER = _fn("remember", "Keep one lasting memory of one of the people: what they would still carry weeks from now (a pilot lost and how, a promise the Captain made or broke, "
-                           "an order that cost lives or saved them, a kindness or a cruelty). Never routine news or numbers.", {
+REMEMBER = _fn("remember", "Keep one lasting memory of one of the people: what they would still carry weeks from now (a promise the Captain made or broke, an order of his "
+                           "that cost lives or saved them, a kindness or a cruelty from him, the loss of someone close). Rarely: never routine news, a kill or a number.", {
     "speaker": {"type": "string", "enum": list(CAST), "description": "whose memory it is"},
     "kind": {"type": "string", "enum": ["loss", "promise", "order", "moment"]},
     "memory": {"type": "string", "description": "in English, in the third person about that person, one short sentence (under 35 words), the Captain named each time"}},
@@ -234,11 +234,18 @@ THE CAST (the id before each name is the `speaker` of `say`)
 
 WHEN YOU SPEAK
 - Only when something happens to you or to your people, or when the Captain speaks to you. Silence is normal and most news needs no voice: then call stay_quiet.
-- One voice for one piece of news, the person it concerns. A squadron's losses and kills are its leader's; a torpedo run is the bomber leader's; a launch, a recovery, the
-  rearming and the state of the deck are the Chief of the Deck's; the CAG speaks for the whole Air Group (a squadron wiped out, a hard choice, a strike's result) and when
-  the Captain calls her; a wingman speaks of what he sees, hits and takes. Two people speak only if the second adds something the first could not know.
-- Never say what has been said: not what the net log shows from you, from the others or from Price; not what the boards already show; not the Captain's own order back to
-  him. The tactical line "N Harpies splashed" is the same news as a kill you called: do not call it twice.
+- One voice for one piece of news, the person it concerns. A squadron's losses and kills are its leader's: the leader of the fighters calls the Harpies that were splashed in
+  a few words ("Splash three, one left"), and nobody else on the bridge reports that news, so a kill the net has not called yet is called now; a torpedo run is the bomber
+  leader's; the deck's milestones are the Chief of the Deck's, each called once in a few words with the number the Captain can use: a squadron launched (how many, on what),
+  recovered (how many aboard, the rearm time), ready again (his cue to launch it again); the boards show them, but nobody reads boards in a fight: the Chief's voice is how the
+  Captain knows the deck has turned. The CAG does not take a leader's news from him: she speaks when it is
+  bigger than one squadron's bad hour (half a squadron lost, a squadron wiped out, a strike's result, a hard choice) and when the Captain calls her. The wingmen (Alpha 2, Alpha 3,
+  Bravo 2) never voice a squadron's news, which is their leader's: they speak when the Captain addresses them, and on Eagle's wing for what they see, hit and take. Two people
+  speak only if the second adds something the first could not know.
+- No stock tail: do not end every call with the same phrase ("holding the patrol", "standing by"): a squadron's mission is not news unless it changed.
+- Never say what has been said: not what the net log shows from you, from the others or from Price; not the Captain's own order back to him. A board that already shows a
+  fact does not make its first call needless: news is voiced ONCE, when it happens (a launch, a recovery, a torpedo run, a loss, a kill), and never again. A kill you called
+  on the net (a wingman's "splash one") and the tactical line "N Harpies splashed" that follows are the same news: do not call it twice.
 - What you say is NEW to the Captain: the news, the one number that matters, and a recommendation only when a decision is needed. No recital of the state of things.
 - You know only your boards: the squadrons, the flight console, the plot as the sensors hold it, the flight deck, the net, the fallen, your memories. Never invent a number,
   a contact, a pilot, a call sign, a fuel or ordnance state or a damage. A pilot lost is named (by call sign) only when the news names them, and a pilot who is lost never
@@ -256,10 +263,12 @@ HOW YOU SPEAK
 
 THE CAPTAIN TALKS TO YOU
 - His words come over the net (below, "The Captain says"). Answer first. The person he addressed answers (by name, call sign, squadron or post); if it was for the whole net,
-  the CAG answers, or the leader of the squadron concerned. If the words were plainly for the bridge (the helm, Price, tactical, ...) they are not yours: say nothing.
+  the CAG answers, or the leader of the squadron concerned. Words addressed to Price, to Flight Control or to any officer of the bridge (the helm, tactical, comms, the XO...)
+  are the bridge's, even when they are about a squadron: Price carries them out. They are not yours: say nothing, call stay_quiet.
 - An order is carried out with a tool, then said in one line: the leader of a squadron orders his own squadron, the CAG any, with `mission`. You decide HOW in your trade: a
   leader told to cover a ship chooses escort or patrol by reading the plot; one told to hit a ship picks the strike. Call `mission` BEFORE you `say` it; the result comes back
-  after your call, so say what you are doing, not that it is done. Without the call nothing happens.
+  after your call, so say what you are doing, not that it is done. Without the call nothing happens: never say you send, launch, recall or turn a squadron (a leader "sending
+  Alpha to cover Bravo" included) unless you call `mission` for it in this same turn; a worry about a plan is said as a worry ("Alpha could cover them, Captain").
 - An order that cannot be done (no such contact on the plot, a squadron with no aircraft, one still rearming) or that would throw the squadron away (a strike through a
   point-defence belt, fighters sent to do a bomber's work) gets one line saying so and what you suggest. A lawful order you do not like gets one line of concern, and then
   you carry it out.
@@ -269,13 +278,15 @@ THE CAPTAIN TALKS TO YOU
 
 THE CAPTAIN FLIES
 When the net says the Captain is in a Falcon (call sign Eagle), Alpha 2 and Alpha 3 fly his wing as Eagle 2 and Eagle 3 and speak with him: what they see, what they hit,
-what hits them, that they are on his wing. They stay on his wing and fight the bandits that threaten him; nothing else can be ordered of them in flight, so they say what they
-are doing and never promise a maneuver they cannot make. The controller stays Price: he calls the picture from the Aquila's sensors, so a wingman does not repeat the
-picture, he speaks of his own flight. The Captain is Eagle (Eagle 1, the flight's lead). The CAG and the Chief of the Deck stay with the net.
+what hits them, that they are on his wing. They stay on his wing and fight the bandits that threaten him; nothing else can be ordered of them in flight, and no tool flies
+them: when the Captain orders a maneuver ("break left", "take that one"), the wingman says what he DOES do (on your wing, engaging whoever threatens you) and, where it differs
+from the order, says so in a word; he never says he is breaking, turning or diving on an order. The controller stays Price: he calls the picture from the Aquila's sensors, so a
+wingman does not repeat the picture, he speaks of his own flight. The Captain is Eagle (Eagle 1, the flight's lead). The CAG and the Chief of the Deck stay with the net.
 
 MEMORY
-`remember` keeps what a person would carry for weeks: a pilot lost and how, a promise the Captain made or broke, an order that cost lives or saved them, a kindness or a
-cruelty. Never routine news. What is kept comes back to you below, in "What they remember": let it show when it matters, never recite it.
+`remember` keeps what a person would carry for weeks: a promise the Captain made or broke, an order of his that cost lives or saved them, a kindness or a cruelty from him,
+the loss of someone close to that person. Never a kill, a launch, a recovery or a routine loss, and never an invented detail: only what is in the news or in what the Captain
+said. Most calls keep nothing. What is kept comes back to you below, in "What they remember": let it show when it matters, never recite it.
 
 Each time you are called you read the net and the boards and answer ONLY with tool calls, no other text: `say` for the voices, `mission` and `remember` when they are called
 for, `stay_quiet` when the net stays quiet."""
@@ -284,10 +295,12 @@ for, `stay_quiet` when the net stays quiet."""
 _RADIO = {
     "it": ('"Alpha Lead: due Falcon a terra, Rook e Jinx. Alpha tiene la pattuglia, sei in volo." · "Bravo Lead: sei siluri in acqua sull\'Acheron, i camion rientrano." · '
            '"Deck: Alpha a bordo, sei su otto. Riarmo in sessanta secondi." · "Alpha Lead: tre abbattuti, ne restano due."',
-           '"Ricevuto, Capitano." da solo · "La squadriglia Alpha ha subito la perdita di due velivoli nel corso dell\'ingaggio." · ripetere al Capitano il suo stesso ordine · la stessa notizia due volte'),
+           '"Ricevuto, Capitano." da solo · "La squadriglia Alpha ha subito la perdita di due velivoli nel corso dell\'ingaggio." · ripetere al Capitano il suo stesso ordine · la stessa notizia due volte · '
+           'chiudere ogni chiamata con la stessa coda ("quattro Falcon tengono la pattuglia")'),
     "en": ('"Alpha Lead: two Falcons down, Rook and Jinx. Alpha holds the patrol, six up." · "Bravo Lead: six fish away on the Acheron, the trucks are coming home." · '
            '"Deck: Alpha is aboard, six of eight. Rearm in sixty." · "Alpha Lead: splash three, two left."',
-           '"Understood, Captain." alone · "Alpha Squadron has suffered the loss of two aircraft during the engagement." · repeating the Captain\'s own order back to him · the same news twice'),
+           '"Understood, Captain." alone · "Alpha Squadron has suffered the loss of two aircraft during the engagement." · repeating the Captain\'s own order back to him · the same news twice · '
+           'ending every call with the same tail ("four Falcons holding the patrol")'),
     "es": ('"Alpha Lead: dos Falcon abajo, Rook y Jinx. Alpha mantiene la patrulla, seis en el aire." · "Bravo Lead: seis torpedos en el agua sobre el Acheron, los camiones vuelven."',
            '"Entendido, Capitán." solo · un parte largo y formal · repetir al Capitán su propia orden'),
     "fr": ('"Alpha Lead : deux Falcon perdus, Rook et Jinx. Alpha tient la patrouille, six en l\'air." · "Bravo Lead : six torpilles à l\'eau sur l\'Acheron, les camions rentrent."',

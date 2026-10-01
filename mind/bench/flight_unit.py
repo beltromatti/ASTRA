@@ -46,7 +46,7 @@ def ship_state(**over: Any) -> dict[str, Any]:
     return st
 
 
-LOSS = ("flight: alpha squadron has lost 2 Falcons to enemy fire, 4 left — Lieutenant Anil Rao (call sign Wick) killed; Ensign Jin Park (call sign Moth) ejected, "
+LOSS = ("flight: alpha squadron has lost 2 Falcons to enemy fire, 6 left — Lieutenant Anil Rao (call sign Wick) killed; Ensign Jin Park (call sign Moth) ejected, "
         "recovered wounded by search and rescue")
 AIRBORNE = "flight: alpha squadron airborne, 8 Falcons on CAP"
 TORPEDO = "flight: bravo squadron torpedo run on T-21: 5 torpedoes away, bombers returning"
@@ -155,7 +155,6 @@ class Classification(unittest.TestCase):
     def test_the_squadron_news_is_the_nets(self) -> None:
         for text, kind in ((AIRBORNE, "airborne"), (LOSS, "losses"), (TORPEDO, "torpedoes"), (RECOVERED, "recovered"), (SPLASH, "splash"),
                            ("flight: bravo squadron rearmed, 7 Hammers ready on the flight deck", "rearmed"),
-                           ("flight: Falcon recon has identified T-21: Acheron-class cruiser, Cocytus", "recon"),
                            ("flight: search and rescue at the wreck of the Brightwater: lifeboats found, 41 survivors picked up", "rescue")):
             k = fm.classify(text)
             self.assertIsNotNone(k, text)
@@ -163,6 +162,7 @@ class Classification(unittest.TestCase):
 
     def test_what_belongs_to_price_and_the_xo_stays_with_them(self) -> None:
         for text in ("flight: launching Alpha on combat air patrol over the Aquila", "flight: the sky is quiet: recalling Alpha to rearm",
+                     "flight: Falcon recon has identified T-21: Acheron-class cruiser, Cocytus",
                      "flight: controller call — the Captain is flying a Falcon", "flight: the Captain is off the catapult in a Falcon of Alpha, callsign Eagle — the XO has the conn",
                      "flight: Eagle has landed on New Ravenna, near Port Aurelius", "tactical: three missiles incoming", "sensors: Nair has a new contact",
                      "damage report: we've been hit — hull breach at deck 6 section B; shields 70%, hull 85%"):
