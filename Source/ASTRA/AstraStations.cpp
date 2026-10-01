@@ -502,13 +502,22 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 			{
 				return false;
 			}
+			// keep_on_bow turns the ship, not her speed: with speed_pct the helm sets the throttle in the same order (the bow on
+			// a group at cruise speed closes on it; holding a range is the helm's call, with this one console)
+			FString SpeedNote;
+			if (M == TEXT("keep_on_bow") && A.Params.IsValid() && A.Params->HasField(TEXT("speed_pct")))
+			{
+				Sh->SetThrottle(FMath::Clamp((float)Num(A.Params, TEXT("speed_pct"), Sh->GetThrottlePct()), 0.f, 100.f));
+				SpeedNote = FString::Printf(TEXT(", throttle %.0f%%"), Sh->GetThrottlePct());
+			}
 			const FContact* C = FindContact(Cs, Target);
 			if (!C)
 			{
+				Detail += SpeedNote;
 				return true;              // "the action" and no fight on yet: NeedTarget has said so
 			}
-			Detail = FString::Printf(TEXT("%s %s%s"), *M.Replace(TEXT("_"), TEXT(" ")), *C->Label,
-			                         C->RangeKm >= 0.0 ? *FString::Printf(TEXT(", %.1f km"), C->RangeKm) : TEXT(", range unknown"));
+			Detail = FString::Printf(TEXT("%s %s%s%s"), *M.Replace(TEXT("_"), TEXT(" ")), *C->Label,
+			                         C->RangeKm >= 0.0 ? *FString::Printf(TEXT(", %.1f km"), C->RangeKm) : TEXT(", range unknown"), *SpeedNote);
 			return true;
 		}
 		if (M == TEXT("evade"))

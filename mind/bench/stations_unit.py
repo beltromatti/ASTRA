@@ -672,7 +672,7 @@ class WireTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(S.to_wire(cmd)["params"]["target"], "action")
         text = S.tool_description()
         self.assertIn("`action`", text)
-        self.assertIn("keep_on_bow(target=id|action)", text)
+        self.assertIn("keep_on_bow(target=id|action, speed_pct?)", text)
         self.assertIn("800%", S.MODE_INDEX["reactor_battle_short"].summary)
 
     def test_what_the_game_would_refuse_is_refused_the_same_way(self) -> None:
