@@ -45,7 +45,14 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
   Da fare alla ripresa: unirlo, poi GUERRA.md §6.8 (menti su `group_order`, effetti da `ConsumeDeathEvents`/`GetDamageView`,
   `PlayerEngineFactor()` al timone, `RepairPlayerSystems()` dalle squadre, `GetContacts` a cadenza più bassa negli schermi, tarare la
   poppa dell'Aquila — fragile: 18 s contro due Acheron — e la forza dell'apertura nel gioco vero), togliere il suo worktree, avviare
-  MENTE-GUERRA. **VITA** sta finendo: unirla e fare VITA.md §7.
+  MENTE-GUERRA.
+- **VITA ha chiuso** (ramo `worktree-agent-a8bbccf24c82b87ce`, commit finale **b22d827**, unione con main pulita secondo l'aiutante):
+  560 persone sulla pianta a 0,002 ms per fotogramma, corpi solo vicino al Capitano (al più 40, nessuno appare in vista), squadre con
+  tempi veri sui percorsi (15 s stimati contro 14 reali), la mente delle persone (`npc.py`, DeepSeek V4.1 Flash, 16/16 sul banco
+  dal vivo, ~0,2 m$ a frase). **Mai provata nel gioco vero né in compilazione unity.** Alla ripresa: unirla, compilare (unity),
+  fare VITA.md §7 (contesto `people`, istantanea `life`, `RepairEtaSeconds` per le squadre, `RosterIn` per le vittime,
+  `PlanChanged` sulle porte stagne), provare corpi, voci e costo (`stat Astra`, `astra.life.max_bodies 0`), poi avviare NAVE-2 o
+  DISTRUZIONE al suo posto.
 - **Prossimi moduli, brief pronti** in `docs/brief/`: MENTE-GUERRA (al posto di GUERRA), NAVE-2 (gli altri ponti, a istanze e a
   livelli), VFX (la guerra bella, nomi per nave, tetto dell'isola), DISTRUZIONE (dopo VITA).
 
