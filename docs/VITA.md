@@ -209,8 +209,12 @@ persona, cosa fa e ricorda), `astra.life.hour`, `astra.life.scale`; variabili `a
 6. **I posti del livello** (Mess, Berthing, Medbay): `Life->Sim().WhoIsAt(<station id>)` dice chi dovrebbe stare in un posto
    di un attore esistente (`mess1`..., `sleeperK`, `patientN`).
 7. **Porte stagne**: quando se ne sigilla una, `Life->Sim().PlanChanged()` rifà i percorsi in corso.
-8. **Compilazione unity**: `TagSky` è dichiarato in `AstraViewscreen.cpp:1192` e in `AstraShipSubsystem.cpp:53` (spazio
-   anonimo): nello stesso blocco unity non compila. Rinominare uno dei due.
+8. **Compilazione unity**: i file di VITA danno ai loro aiutanti nomi propri (`Life...`: `Metres` e `Num` di `AstraShipPlan` e
+   `AstraStations` avevano la stessa firma nello spazio anonimo) e nessun nome dei miei file coincide con uno degli altri
+   (controllato a mano); `TagSky` è già risolto in main (`SkyTag`). I miei build di prova sono con `-DisableUnity`: una
+   compilazione unity del modulo intero non è stata provata.
+9. **`AstraDoor.cpp`**: la modifica di main alla stessa funzione (la porta a riposo guarda quattro volte al secondo) è ripetuta
+   parola per parola sul ramo, con i camminatori del registro nel conto: l'unione è pulita (`git merge-tree`).
 
 ## 8. Limiti noti
 
