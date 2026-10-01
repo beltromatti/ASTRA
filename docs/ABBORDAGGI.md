@@ -115,9 +115,8 @@ sintetizzati (`tools/art/weapon_sounds.py`: colpo, scatto a vuoto, ricariche, im
   da arma da fuoco della tabella di VITA, di gravità 0-2). I loro corpi del gioco tornano al pool, VITA li restituisce alla loro giornata (`Commandeer`).
 - **Il Capitano**: una forza 0-100; ogni colpo ne toglie la parte che passa il giubbotto (×0,8); il **trauma** che il modello del danno già conosce (`CaptainWounded`: tunnel e
   svenimento sullo schermo, la causa nel registro); 25 s senza colpi e recupera lentamente. A zero è **a terra** (non muore subito): sanguina per 85-135 s; la catena della
-  nave lo porta via quando è sicuro (le **due squadre più vicine vanno da lui da sole**, per riflesso del drill, e restano intorno a lui finché non è portato via o in piedi: il banco
-misura 10 marine entro 8 m dopo 50 s, e `rescue_captain` ne manda altre) o lo perde (`CaptainDied`: «bled out from gunshot
-  wounds»). Se il nemico lo vede a meno di 32 m la catena non può portarlo via (`CaptainContested`). Salvato, si sveglia in Medbay al 35%.
+  nave lo porta via quando è sicuro (le **due squadre più vicine vanno da lui da sole**, per riflesso del drill, e restano intorno a lui finché non è portato via o in piedi: il
+  banco misura 10 marine entro 8 m dopo 50 s, e `rescue_captain` ne manda altre) o lo perde (`CaptainDied`: «bled out from gunshot wounds»). Se il nemico lo vede a meno di 32 m la catena non può portarlo via (`CaptainContested`). Salvato, si sveglia in Medbay al 35%.
 - **La fine**: se muore, tutto ciò che c'è già prende il sopravvento (l'XO al comando, l'abbandono nave, l'inchiesta, «THE CAPTAIN IS LOST»).
 
 ## 6. L'evento
@@ -228,8 +227,8 @@ a faccia a faccia con il sergente 7 su 8 (l'ottavo: «teniamo qui» senza l'ordi
 - **Le armi si importano a mano** (§11): senza gli asset il codice ripiega su barre (il gioco funziona, ma le armi sono parallelepipedi) e i suoni sono muti.
 - La presa dell'Ingegneria (`astra.board.takeover_fatal 1`, predefinito) fa cedere il reattore dopo circa 30 s: la fine della nave nel modo che la nave già conosce.
 - Il quadro dei marine non conosce i civili: le paratie chiuse tagliano fuori chi c'è dietro (anche i nostri); la mente lo sa, il gioco non porta in salvo nessuno.
-- **L'ordine di un capo è tracciato sul momento**: un marine non ha ancora un modo di dire «non ho munizioni» o «sono tagliato fuori» se non attraverso il quadro (le tacche, il
-  contatto); i capisquadra parlano di ciò che il quadro mostra.
+- I capisquadra parlano di ciò che il quadro mostra (squadre, contatto, perdite, luoghi, paratie): le munizioni e il morale degli uomini non sono nel quadro, e le urla di battaglia
+  (un «contatto!» di un marine qualunque, un «ricarico!») non ci sono: solo le battute dei capisquadra e del Maggiore, a impulsi.
 - Il modello a volte nomina la squadra sbagliata quando il Capitano ne dice il numero a parole («Reaction Due»). Il quadro ora lo mostra come lo dice il Capitano («Reaction 2 (said
   "Reaction due")»: da 3 errori su 6 a 0 su 12 nelle ripetizioni), ma l'errore resta possibile: il Capitano lo sente («Reaction Uno: all'attacco») e può correggere.
 
