@@ -137,7 +137,9 @@ metrico** (tre piani mescolati alla potenza 8: nessuna deformazione ai poli), co
   e qualche scintilla sul guscio. Lo **stress** del settore (1 − quanto ne resta) fa tremolare le celle e crepitare i bordi.
 - **Il crollo** (`bSectorFell`): l'intera faccia si accende e lampeggia per 1,4 s, con un lampo bianco-azzurro, un getto di
   scintille e una luce.
-- Il guscio esiste e si vede **solo mentre qualcosa ondeggia**: poi è nascosto, dopo 30 s di quiete è distrutto.
+- Il guscio di una nave capitale è creato **appena la nave è abbastanza vicina da contare** (entro 150 km) e sta lì invisibile (è il componente a non
+  essere visibile, mai l'attore: lo schermo principale rifà la lista degli attori che mostra ogni mezzo secondo e lascia fuori gli attori nascosti,
+  quindi un guscio creato al primo colpo gli mancherebbe per metà dell'ondulazione). Si vede **solo mentre qualcosa ondeggia**; sparisce con la nave.
 - Colore: ASTRA azzurro (0,28/0,60/1,00), Mandate ambra (1,00/0,50/0,14).
 - Le navi senza modello di danni (i caccia): un lampo bluastro.
 
@@ -168,8 +170,11 @@ e, mentre lo scafo si spezza (`bBreakingUp`), esplosioni dentro lo scafo sempre 
 Il contratto della simulazione è `FAstraDeathEvent` (come è morta, sezione, asse e punto di rottura, `CutBowX/CutSternX`, velocità di
 separazione). Il modulo lo riceve **direttamente da `Destroy()`** (non consuma la coda `ConsumeDeathEvents`, che resta com'è).
 
-- **Rottura (`Breakup`)**: nello stesso frame lo scafo intero si nasconde e al suo posto compaiono i **tre pezzi** v3
-  (`SM_SHIP_<Faction>_<Name>_Sec<Bow|Mid|Stern>`), alla stessa posizione e assetto: *l'immagine non cambia* nell'istante della rottura. I
+- **Rottura (`Breakup`)**: nello stesso frame lo scafo intero sparisce all'occhio della plancia e al suo posto compaiono i **tre pezzi** v3
+  (`SM_SHIP_<Faction>_<Name>_Sec<Bow|Mid|Stern>`), alla stessa posizione e assetto: *l'immagine non cambia* nell'istante della rottura. (Lo
+  schermo principale, che conosce gli attori nuovi solo al giro successivo della sua lista, ogni 0,5 s, per 0,75 s continua a vedere lo scafo
+  intero, portato avanti da qui sulla sua rotta: lo scafo è "visibile solo nelle catture" e i pezzi "nascosti nelle catture"; poi i ruoli si
+  pareggiano e lo scafo viene distrutto. Niente salti sul bersaglio nello schermo.) I
   pezzi si separano con la quantità di moto giusta (il gruppo che si stacca contro il resto, in proporzione alle lunghezze), ruotano
   piano attorno al loro baricentro, e **le facce di taglio** (`MI_HULL_<f>_Cut`) partono roventi (`Heat` 1 → 0 in ~60 s) e
   alimentano fuochi, scintille e fumo finché sono calde; le finestre si spengono con un balbettio in 2,5 s. Un lampo e una fontana di
@@ -325,3 +330,6 @@ i dardi, i fasci e i pennacchi, i fogli del fuoco e del fumo.
   decal non può funzionare così. Il modulo usa il suo `M_WAR_DamageDecal`; il vecchio si può togliere.
 - La bolla dello scudo (`ShieldBubble`) e il bagliore del motore (`DriveFlare`) non vengono più creati quando gli effetti sono accesi:
   `C.Flare` dello schermo principale è già null-safe.
+- Opzionale, in `AstraViewscreen`: oggi `RebuildShowList()` gira ogni 0,5 s e gli attori nuovi mancano allo schermo fino al giro successivo; il modulo
+  lo aggira (gusci creati in anticipo, scafo intero portato avanti per 0,75 s dopo una rottura). Se la funzione fosse pubblica e fosse chiamabile
+  da `UAstraWarFX` subito dopo aver creato i tre pezzi, il giro di attesa non servirebbe più.

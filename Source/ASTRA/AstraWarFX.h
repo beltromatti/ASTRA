@@ -183,7 +183,6 @@ namespace AstraFx
 		TArray<FRipple, TInlineAllocator<6>> Ripples;
 		FVector CollapseDir = FVector::ForwardVector;   // shield frame: the sector that fell
 		float CollapseAge = -1.f;               // seconds since it fell (-1: none)
-		float Idle = 0.f;                       // seconds since anything rippled
 		bool bShown = false;
 		FVector Axes = FVector(100.f);          // the shell's semi-axes (m) as last set
 	};
@@ -232,6 +231,13 @@ namespace AstraFx
 		float Radius = 50.f;
 		bool bAstra = false;
 		bool bReactor = false;                 // thrown out by a reactor breach: burns harder, and is charred
+		// The main viewscreen takes the list of what it shows twice a second, so the pieces (new actors) would be missing from it for up to half a
+		// second after the break. The bridge's eye sees the pieces from the first frame; the viewscreen goes on seeing the whole hull (driven here, on
+		// its old path) until Hold runs out, and then the pieces too, and the hull goes.
+		float Hold = 0.f;                      // seconds the viewscreen still sees the whole hull
+		TWeakObjectPtr<AActor> HullActor;      // the whole hull (on one of the three pieces)
+		FVector HullOrigin = FVector::ZeroVector, HullVel = FVector::ZeroVector;
+		FQuat HullAtt = FQuat::Identity;
 	};
 
 	/** A chunk of debris (a cube with the faction's hull material). */
@@ -265,14 +271,6 @@ namespace AstraFx
 		TWeakObjectPtr<UMaterialInstanceDynamic> Mid;
 		TWeakObjectPtr<AActor> On;
 		float Heat = 1.f, Shown = 1.f;
-	};
-
-	/** Something to do a moment from now (a hull hidden once the flash has covered it, an actor destroyed). */
-	struct FTimed
-	{
-		float T = 0.f;
-		uint8 What = 0;                        // 0 hide the actor, 1 destroy the actor
-		TWeakObjectPtr<AActor> Actor;
 	};
 
 	enum ELayer : uint8 { LGlow = 0, LFire = 1, LSmoke = 2, LShock = 3 };
@@ -381,7 +379,6 @@ private:
 	TArray<AstraFx::FDebris> Debris;
 	TArray<AstraFx::FFlashLight> FlashLights;
 	TArray<AstraFx::FScar> Scars;
-	TArray<AstraFx::FTimed> Timed;
 	int32 Frame = 0;
 	float Clock = 0.f;            // the effects' own time (real seconds)
 	float StatClock = 0.f;
@@ -422,7 +419,6 @@ private:
 	void TickShips();
 	void TickPieces();
 	void TickScars();
-	void TickTimed();
 	void TickShields();
 	AstraFx::FShipFx& ShipOf(int32 Id);
 	FVector PlayerEye() const;

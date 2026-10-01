@@ -284,7 +284,6 @@ void UAstraWarFX::ClearAll()
 	FreeTracks.Reset();
 	Ghosts.Reset();
 	FlashLights.Reset();
-	Timed.Reset();
 	for (FScar& S : Scars)
 	{
 		if (UDecalComponent* D = S.Decal.Get())
@@ -298,6 +297,10 @@ void UAstraWarFX::ClearAll()
 		if (AStaticMeshActor* A = P.Actor.Get())
 		{
 			A->Destroy();
+		}
+		if (AActor* H = P.HullActor.Get())
+		{
+			H->Destroy();
 		}
 	}
 	Pieces.Reset();
@@ -504,7 +507,6 @@ void UAstraWarFX::Tick(float InDt)
 	++Frame;
 	BeginFrame();
 	RunTests();                            // what astra.fx.* asked for (AstraWarFXTest.cpp)
-	TickTimed();
 	TickShips();
 	TickPieces();
 	DrawShots();
@@ -1112,30 +1114,5 @@ void UAstraWarFX::TickLights()
 		C->SetLightColor(L.Col);
 		C->SetIntensity(Cur);
 		C->SetAttenuationRadius(L.Radius * 100.f);
-	}
-}
-
-void UAstraWarFX::TickTimed()
-{
-	for (int32 i = Timed.Num() - 1; i >= 0; --i)
-	{
-		FTimed& T = Timed[i];
-		T.T -= Dt;
-		if (T.T > 0.f)
-		{
-			continue;
-		}
-		if (AActor* A = T.Actor.Get())
-		{
-			if (T.What == 0)
-			{
-				A->SetActorHiddenInGame(true);
-			}
-			else
-			{
-				A->Destroy();
-			}
-		}
-		Timed.RemoveAtSwap(i, EAllowShrinking::No);
 	}
 }

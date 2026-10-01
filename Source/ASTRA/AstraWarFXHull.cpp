@@ -585,10 +585,15 @@ bool UAstraWarFX::MakePieces(FAstraBattleShip& S, const FAstraDeathEvent& E, AAc
 			{
 				A->Destroy();
 			}
+			if (AActor* H = Pieces[0].HullActor.Get())
+			{
+				H->Destroy();
+			}
 			Pieces.RemoveAt(0);
 		}
 	}
 	const TCHAR Fac = S.Side == EAstraSide::Mandate ? TEXT('M') : (S.Side == EAstraSide::Astra ? TEXT('A') : TEXT('G'));
+	int32 Leader = INDEX_NONE;                 // the piece that holds the whole hull for the viewscreen
 	for (int32 i = 0; i < 3; ++i)
 	{
 		FPiece P;
@@ -639,6 +644,11 @@ bool UAstraWarFX::MakePieces(FAstraBattleShip& S, const FAstraDeathEvent& E, AAc
 			A->SetActorLocationAndRotation(F.ToWorld(S.Pos), F.ToWorldRot(S.Att));
 			A->Tags.Add(TEXT("ASTRA.Sky"));
 			P.Actor = A;
+			if (Hull)
+			{
+				C->SetHiddenInSceneCapture(true);          // (the viewscreen has not got this actor yet: it goes on with the whole hull, see FPiece::Hold)
+				P.Hold = 0.75f;
+			}
 			// the burnt faces start hot and cool; the windows go out
 			const int32 CutSlot = C->GetMaterialIndex(*FString::Printf(TEXT("MI_HULL_%c_Cut"), Fac));
 			if (CutSlot != INDEX_NONE)
@@ -674,7 +684,11 @@ bool UAstraWarFX::MakePieces(FAstraBattleShip& S, const FAstraDeathEvent& E, AAc
 				}
 			}
 		}
-		Pieces.Add(P);
+		const int32 Added = Pieces.Add(P);
+		if (Leader == INDEX_NONE)
+		{
+			Leader = Added;
+		}
 		// the war's own list keeps each piece as the obstacle it is for the ships that steer round it
 		FAstraWreck W;
 		W.Pos = P.Pivot;
@@ -683,15 +697,24 @@ bool UAstraWarFX::MakePieces(FAstraBattleShip& S, const FAstraDeathEvent& E, AAc
 		W.Radius = P.Radius;
 		Owner->Wrecks.Add(W);
 	}
-	// the whole ship leaves: the pieces already stand where it was
-	if (Hull)
+	if (bLive && Leader == INDEX_NONE)
 	{
-		Hull->SetActorHiddenInGame(true);
-		FTimed Tm;
-		Tm.T = 0.6f;
-		Tm.What = 1;
-		Tm.Actor = Hull;
-		Timed.Add(Tm);
+		return false;                          // no piece could be made: the old explosion (the hull is untouched)
+	}
+	// the whole ship leaves the bridge's eye in this frame (the pieces already stand where it was); the viewscreen sees it a moment longer
+	if (Hull && bLive)
+	{
+		TInlineComponentArray<UPrimitiveComponent*> Prims;
+		Hull->GetComponents(Prims);
+		for (UPrimitiveComponent* C : Prims)
+		{
+			C->SetVisibleInSceneCaptureOnly(true);
+		}
+		FPiece& L = Pieces[Leader];
+		L.HullActor = Hull;
+		L.HullOrigin = S.Pos;
+		L.HullVel = S.Vel;
+		L.HullAtt = S.Att;
 	}
 	return true;
 }
@@ -713,10 +736,36 @@ void UAstraWarFX::TickPieces()
 			{
 				A->Destroy();
 			}
+			if (AActor* H = P.HullActor.Get())
+			{
+				H->Destroy();
+			}
 			Pieces.RemoveAtSwap(i, EAllowShrinking::No);
 			continue;
 		}
 		P.Age += Dt;
+		if (P.Hold > 0.f)
+		{
+			// the viewscreen still shows the whole hull, on the path it had; when the time is up the pieces are shown to it too and the hull goes
+			P.Hold -= Dt;
+			if (P.Hold <= 0.f)
+			{
+				if (AStaticMeshActor* A = P.Actor.Get())
+				{
+					A->GetStaticMeshComponent()->SetHiddenInSceneCapture(false);
+				}
+				if (AActor* H = P.HullActor.Get())
+				{
+					H->Destroy();
+				}
+				P.HullActor.Reset();
+			}
+			else if (AActor* H = P.HullActor.Get())
+			{
+				P.HullOrigin += P.HullVel * Dt;
+				H->SetActorLocationAndRotation(F.ToWorld(P.HullOrigin), F.ToWorldRot(P.HullAtt));
+			}
+		}
 		P.Pivot += P.Vel * Dt;
 		P.Att = FQuat(P.SpinAxis, P.SpinRate * Dt) * P.Att;
 		P.Att.Normalize();
@@ -810,6 +859,7 @@ void UAstraWarFX::TickPieces()
 void UAstraWarFX::TickShields()
 {
 	UWorld* World = Owner->GetWorld();
+	int32 Made = 0;                            // shells made this frame (one is enough: a battle's start has thirty ships)
 	for (auto It = ShipFx.CreateIterator(); It; ++It)
 	{
 		FShipFx& Fx = It.Value();
@@ -831,7 +881,6 @@ void UAstraWarFX::TickShields()
 			}
 		}
 		const bool bActive = Sh.Ripples.Num() > 0 || Sh.CollapseAge >= 0.f;
-		Sh.Idle = bActive ? 0.f : Sh.Idle + Dt;
 		const FAstraBattleShip* S = Owner->FindById(It.Key());
 		if (!S || !S->bAlive)
 		{
@@ -854,23 +903,15 @@ void UAstraWarFX::TickShields()
 			continue;
 		}
 		AStaticMeshActor* A = Sh.Actor.Get();
-		if (!bActive)
-		{
-			if (A && Sh.bShown)
-			{
-				A->SetActorHiddenInGame(true);
-				Sh.bShown = false;
-			}
-			if (A && Sh.Idle > 30.f)
-			{
-				A->Destroy();                       // an idle shell is not kept for ever
-				Sh.Actor = nullptr;
-				Sh.Mid = nullptr;
-			}
-			continue;
-		}
 		if (!A)
 		{
+			// A warship's shell is made as soon as the ship is near enough to matter, and stands there unseen (its component is not visible): the main
+			// viewscreen takes the list of the actors it shows twice a second, so a shell made at the first blow would miss half a second of its ripple.
+			if (!S->Dmg.bModel || S->bCraft || Made >= 1 || FVector::DistSquared(S->Pos, F.Origin) > FMath::Square(150000.0))
+			{
+				continue;
+			}
+			++Made;
 			FActorSpawnParameters P;
 			P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			A = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, P);
@@ -886,10 +927,20 @@ void UAstraWarFX::TickShields()
 			C->bAffectDynamicIndirectLighting = false;
 			C->SetReceivesDecals(false);
 			C->SetTranslucentSortPriority(-1);
+			C->SetVisibility(false);
 			A->Tags.Add(TEXT("ASTRA.Sky"));
 			Sh.Mid = C->CreateAndSetMaterialInstanceDynamicFromMaterial(0, MatShield);
 			Sh.Actor = A;
 			Sh.bShown = false;
+		}
+		if (!bActive)
+		{
+			if (Sh.bShown)
+			{
+				A->GetStaticMeshComponent()->SetVisibility(false);       // (the actor itself is never hidden: the viewscreen leaves out the hidden)
+				Sh.bShown = false;
+			}
+			continue;
 		}
 		const FVector Axes = ShieldAxes(*S);
 		const FVector Centre = S->Pos + S->Att.RotateVector(FVector(S->Box.Valid() ? S->Box.Mid : 0.f, 0.f, 0.f));
@@ -897,7 +948,7 @@ void UAstraWarFX::TickShields()
 		A->SetActorScale3D(Axes * 2.f);
 		if (!Sh.bShown)
 		{
-			A->SetActorHiddenInGame(false);
+			A->GetStaticMeshComponent()->SetVisibility(true);
 			Sh.bShown = true;
 		}
 		if (UMaterialInstanceDynamic* M = Sh.Mid.Get())

@@ -185,7 +185,6 @@ void UAstraWarFX::ShieldHit(const FAstraBattleShip& To, const FAstraFxHit& H)
 		Sh.Ripples.RemoveAt(0);
 	}
 	Sh.Ripples.Add(R);
-	Sh.Idle = 0.f;
 	// the flash on the shell, and a few sparks thrown off it
 	if (FPuff* G = AddPuff(P, To.Vel, 0.26f, 0.25f * R.Radius, 0.7f * R.Radius, Mix(Col, FxWhite, 0.4f), 110.f * R.Strength, LGlow))
 	{
