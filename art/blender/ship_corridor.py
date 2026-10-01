@@ -24,7 +24,7 @@ from mathutils import Matrix
 import ship_lib as SL
 import ship_walls as SW
 from bridge3_lib import Rz
-from ship_catalog import (BLAST_H, BLAST_W, CLEAR_H, CORRIDOR_SPECS, CRAWL_H, CRAWL_HW, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONES, WALL_T)
+from ship_catalog import (BLAST_H, BLAST_W, CLEAR_H, CORRIDOR_SPECS, CRAWL_H, CRAWL_HW, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONES, TRUNK_NICHE, WALL_T)
 from ship_lib import (COMPOSITE, CRATE_BLUE, CRATE_ORANGE, DECK, IVORY, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, SParts)
 
 H = CLEAR_H
@@ -284,7 +284,7 @@ def blast_frame(b: SParts, tn: dict) -> None:
 
 
 # -------------------------------------------------------------------------------------------------------------- the keel's crawlways
-ALCOVE = (1.45, 2.55)                                       # a trunk cell's ladder niche: its extent along x (the niche is 1.1 m deep, from the walkway's side wall to the slot's edge)
+ALCOVE = TRUNK_NICHE                                        # a trunk cell's ladder niche: its extent along x (the niche is 1.1 m deep, from the walkway's side wall to the slot's edge)
 
 
 def slab(fb, z0: float, z1: float, hole=None) -> None:
