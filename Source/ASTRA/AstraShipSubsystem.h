@@ -126,7 +126,7 @@ public:
 	/** The radiators shed heat and glow: extended or the vent's plume make the Aquila easier to find (enemy detection). */
 	float SignatureBoost() const { return (bRadiatorsOut ? 0.35f : 0.f) + (VentPlumeT > 0.f ? 1.f : 0.f); }
 	/** A hit on the flanks while the radiators are out may tear one of them. */
-	void RadiatorHit();
+	void RadiatorHit(float HullDamage);
 	const TMap<FString, float>& GetPowerPct() const { return PowerPct; }
 	const TArray<FAstraDamage>& GetDamage() const { return Damage; }
 	const TArray<FString>& GetRecentEvents() const { return RecentEvents; }
@@ -161,6 +161,8 @@ public:
 	const FAstraSectorSystem* FindSector(const FString& Name) const;
 	/** What the holo table shows: "tactical" (the battle around the Aquila) or "sector" (the war map). */
 	FString GetHoloMode() const { return HoloMode; }
+	/** The ship the holo table shows in "ship" mode: empty for the Aquila herself, else a contact id (a scanned ship). */
+	FString GetHoloShipId() const { return HoloShipId; }
 	/** Autopilot (the Janus approach): the helm steers to a heading without the usual turn reports. */
 	void SteerTo(float Heading, float Mark);
 	void SetThrottle(float Pct) { ThrottlePct = FMath::Clamp(Pct, 0.f, 100.f); }
@@ -183,6 +185,9 @@ public:
 	TSharedRef<FJsonObject> CaptainContext() const;
 	/** What the main viewscreen shows now ("off (the bare window)" when it is off). */
 	FString GetViewscreenDescription() const;
+	/** The fill on the hulls comes from where the main viewscreen looks (its camera's direction, world). */
+	void AimSpaceFill(const FVector& LookDir, float DeltaTime);
+	FString LightInfo() const;
 	/** The comms channel open now ("" when none): the other party's contact id. */
 	const FString& GetChannelParty() const { return ChannelParty; }
 	/** The Captain's standing orders in force ("tactical: weapons free on hostiles inside 10 km"), from the crew's mind. */
@@ -266,6 +271,7 @@ private:
 	TMap<FString, FAstraSystemLook> Systems;   // charted systems
 	TArray<FAstraSectorSystem> Sector;         // the sector at war (empty until the mind sends it)
 	FString HoloMode = TEXT("tactical");
+	FString HoloShipId;
 	FAstraSystemLook MakeLook(const FString& Name, const FString& Star, const FString& Planet, const FString& PlanetName) const;
 	bool bLaneControl = false;                 // the Janus lane drives the ship
 	bool bAutoHelm = false;                    // the gate approach autopilot steers (no turn reports)
@@ -343,7 +349,8 @@ private:
 	bool bBattleShort = false;        // the reactor's safety limits overridden: more power, more heat, a risk to the core
 	float HullPct = 100.f;
 	double LastHitReport = -100.0;
-	double LastBridgeBurst = -100.0;   // the last console or fixture that shorted out on the bridge (game time)
+	double LastBridgeBurst = -100.0;
+	double LastRadiatorTear = -100.0;   // the last radiator wing torn by a hit (game time)   // the last console or fixture that shorted out on the bridge (game time)
 	float FlickerTime = 0.f;
 	float RailDraw = 0.f;              // 1 at a railgun volley, fading: the lights sag
 	FString HullNumber = TEXT("CVC-01");
@@ -370,6 +377,7 @@ private:
 	// the star's light thrown back by the planet (earthshine): a soft fill from the planet on everything outside the
 	// hull (lighting channel 1: it casts no shadow, so it must never reach inside)
 	UPROPERTY() TObjectPtr<ADirectionalLight> PlanetLight;
+	UPROPERTY() TObjectPtr<ADirectionalLight> SpaceFill;      // the faint cool fill on the night side of hulls (channel 1)
 	// New Ravenna's surface zone (tag ASTRA.Planet.NewRavenna) and what it replaces while the Captain is down there
 	UPROPERTY() TArray<TObjectPtr<AActor>> PlanetActors;
 	UPROPERTY() TObjectPtr<AActor> SpaceSkyActor;

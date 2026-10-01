@@ -32,6 +32,9 @@ AAstraLifeBody::AAstraLifeBody()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
+	// a body in the pool is nobody: its meshes do not tick either (forty parked bodies were eighty ticks a frame for nothing)
+	Body->PrimaryComponentTick.bStartWithTickEnabled = false;
+	Seated->PrimaryComponentTick.bStartWithTickEnabled = false;
 	SetActorHiddenInGame(true);
 }
 
@@ -144,6 +147,8 @@ void AAstraLifeBody::Bind(UAstraLifeSubsystem* InOwner, int32 InPerson)
 	Ticks = 0;
 	bFresh = true;
 	InOwner->Sim().SetBodied(InPerson, true);
+	Body->SetComponentTickEnabled(true);
+	Seated->SetComponentTickEnabled(true);
 	SetActorTickEnabled(true);
 	SetActorTickInterval(0.f);
 	// the first pose, from where the person is now
@@ -173,6 +178,8 @@ void AAstraLifeBody::Unbind()
 	Body->Stop();
 	Body->SetVisibility(false);
 	Seated->SetVisibility(false);
+	Body->SetComponentTickEnabled(false);
+	Seated->SetComponentTickEnabled(false);
 }
 
 void AAstraLifeBody::SetMode(EMode M, const FAstraLifePerson& P)

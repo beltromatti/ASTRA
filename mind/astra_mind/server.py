@@ -119,6 +119,8 @@ EXTERNAL_SPEAKERS["director"] = ("The Director (game master)", "paul")
 import re as _re  # noqa: E402
 # events whose report is a warning of danger: the crew says them before any routine talk (voice priority URGENT)
 _URGENT_EVENT = _re.compile(r"missiles? inbound|rockets? inbound|hull integrity critical|containment failing|abandon ship|breach", _re.I)
+URGENT_GATHER_S = 0.6          # what comes with a warning of danger joins it (a hit: its breach, fire and wounded arrive together)
+URGENT_WAIT_S = 3.0            # ... and it waits for the line being said to end, this long at most
 # events that are not news but a request to speak (the flight controller calls, the after-action report, the fleet net's news, a visitor
 # at the door): they are reported whenever the bridge is quiet, however long that took
 _NOT_PERISHABLE = _re.compile(r"^(flight: controller call|bridge: after-action|comms: fleet net news)|has come to the Captain's quarters in person", _re.I)
@@ -623,18 +625,28 @@ class Mind:
                     # let the bridge fall quiet first (reports must not pile up behind the voices; a warning of danger waits for
                     # nobody), then coalesce: everything that happened meanwhile becomes one report turn; the Captain's words
                     # are never merged or delayed behind events
-                    while not _URGENT_EVENT.search(text) and (self.voice.busy_s() > 1.2 or self.voice.held) and self.turns.empty():
-                        await asyncio.sleep(0.2)
+                    # (a warning of danger does not wait for the queue: only a moment for what came with it — a hit brings its breach,
+                    # its fire and its wounded in the same instant — and for the line being said to end, URGENT_WAIT_S at most; one
+                    # report turn for each of them was a flood of a dozen voices a minute in a big battle)
                     events = [text[len("\x00event:"):]]
                     when = [rest[1] if len(rest) > 1 else None]           # (the time each one arrived: see _TurnQueue)
                     pending = []
-                    while not self.turns.empty():
-                        nxt = self.turns.get_nowait()
-                        if nxt[0].startswith("\x00event:"):
-                            events.append(nxt[0][len("\x00event:"):])
-                            when.append(nxt[3] if len(nxt) > 3 else None)
-                        else:
-                            pending.append(nxt)
+                    urgent = bool(_URGENT_EVENT.search(text))
+                    t_in = asyncio.get_running_loop().time()
+                    while True:
+                        while not self.turns.empty():
+                            nxt = self.turns.get_nowait()
+                            if nxt[0].startswith("\x00event:"):
+                                events.append(nxt[0][len("\x00event:"):])
+                                when.append(nxt[3] if len(nxt) > 3 else None)
+                                urgent = urgent or bool(_URGENT_EVENT.search(nxt[0]))
+                            else:
+                                pending.append(nxt)
+                        waited = asyncio.get_running_loop().time() - t_in
+                        if pending or (not urgent and self.voice.busy_s() <= 1.2 and not self.voice.held) or \
+                                (urgent and waited >= URGENT_GATHER_S and (self.voice.speaking_s() < 0.8 or waited >= URGENT_WAIT_S)):
+                            break
+                        await asyncio.sleep(0.1)
                     for p in pending:
                         await self.turns.put(p)
                     if pending:

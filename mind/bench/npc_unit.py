@@ -111,10 +111,12 @@ class ParseAndPick(unittest.TestCase):
         self.assertEqual(npc.parse_people(None, {}), [])
 
     def test_who_the_words_could_be_for(self) -> None:
+        # everyone the game says can hear (it did the hearing: distance, walls, doors): the one looked at first, then the nearest. A
+        # crewman fourteen metres away still hears his name called: whether the words were for him is the model's to judge, not a distance's
         ps = npc.parse_people({"people": [SENSOR, STEWARD, ENGINEER, FAR]}, {})
         chosen = npc.pick(ps)
-        self.assertEqual([p.id for p in chosen], ["npc17", "npc301"])        # the one looked at first, then the near; the far and the not-so-near not
-        self.assertEqual(npc.pick(npc.parse_people({"people": [FAR]}, {})), [])
+        self.assertEqual([p.id for p in chosen], ["npc17", "npc301", "npc90", "npc5"])
+        self.assertEqual([p.id for p in npc.pick(npc.parse_people({"people": [FAR]}, {}))], ["npc5"])
         many = npc.parse_people({"people": [dict(STEWARD, id=f"npc{i}", dist_m=1.0 + i * 0.3) for i in range(9)]}, {})
         self.assertEqual(len(npc.pick(many)), npc.MAX_LISTENERS)
 

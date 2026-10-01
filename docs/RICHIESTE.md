@@ -5,7 +5,7 @@ Qui scrivo solo ciò che **non posso fare io** (per regole di sicurezza: creare 
 ## Aperte
 
 ### 2026-09-30 — Credito OpenRouter (quando ti fa comodo)
-Restano 5,97 $ su 10 (1/10, verificato sul conto). Con la guerra grande (molte più menti) e le mie prove di gioco il consumo salirà: l'obiettivo è
+Restano 5,31 $ su 10 (1/10 pomeriggio, verificato sul conto). Con la guerra grande (molte più menti) e le mie prove di gioco il consumo salirà: l'obiettivo è
 restare sotto 1 $ per ora di battaglia, ma per lo sviluppo delle prossime settimane conviene una ricarica di 10–20 $.
 Niente fretta: sotto i 3 $ residui te lo riscrivo qui e riduco le prove che costano.
 

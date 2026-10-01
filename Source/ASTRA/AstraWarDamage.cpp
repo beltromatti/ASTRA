@@ -15,6 +15,7 @@
 
 #include "AstraBattleSubsystem.h"
 #include "AstraWarClasses.h"
+#include "AstraWarFX.h"
 #include "ASTRA.h"
 #include "AstraShipSubsystem.h"
 #include "Engine/World.h"
@@ -208,7 +209,10 @@ void UAstraBattleSubsystem::BuildDurability(FAstraBattleShip& S, float Hull, flo
 		S.Shield = S.ShieldMax = Shield;
 		return;
 	}
-	static AstraWar::FTuneVar KShield(TEXT("shield_scale"), 1.f), KArmour(TEXT("armour_scale"), 1.f), KStruct(TEXT("struct_scale"), 1.2f);
+	// the pace of the war (the lead, 1/10, from the game: a carrier cruiser caught alone by four warships went from 99 % to 19 % in
+	// 100 s, no time left to answer): every hull, plate and shield half as tough again as GUERRA's bench tuning; uniform, so the
+	// balance between the classes and the bench's symmetry hold, and a mistake still costs dearly but leaves minutes to answer it
+	static AstraWar::FTuneVar KShield(TEXT("shield_scale"), 1.5f), KArmour(TEXT("armour_scale"), 1.5f), KStruct(TEXT("struct_scale"), 1.8f);
 	FAstraShipDamage& D = S.Dmg;
 	D = FAstraShipDamage();
 	D.bModel = true;
@@ -541,17 +545,39 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 	}
 	// --- what it looks like
 	const float Felt = StructTook + 0.25f * PlateTook;            // what the hull feels of it (the crew's incidents, the scars, the shudder)
-	AddFlash(HitPos, Felt > 10.f ? 45.f : 25.f, 0.8f, ShieldTook > 0.f && Rem < Damage * 0.5f ? FLinearColor(0.6f, 0.8f, 1.f) : FLinearColor(1.f, 0.6f, 0.3f), 80.f);
-	if (Felt > 8.f)
+	if (FxOn())
 	{
-		AddScar(To, HitPos, Felt);             // the plating remembers it
+		FAstraFxHit H;                                              // the war's effects: the shield's ripple, the flash and sparks, the scar
+		H.Pos = HitPos;
+		H.Dir = FromDir.GetSafeNormal();
+		H.Kind = Kind;
+		H.Damage = Damage;
+		H.ShieldTook = ShieldTook;
+		H.Through = Damage - ShieldTook;
+		H.Felt = Felt;
+		H.Facing = F;
+		H.Section = Sec;
+		H.LocalOut = N;
+		H.SectorFrac = D.SectorMax[F] > 0.f ? D.Sector[F] / D.SectorMax[F] : 0.f;
+		H.bSectorFell = ShieldTook > 0.f && D.Sector[F] <= 0.f;
+		WarFX->OnHit(To, H);
+	}
+	else
+	{
+		AddFlash(HitPos, Felt > 10.f ? 45.f : 25.f, 0.8f, ShieldTook > 0.f && Rem < Damage * 0.5f ? FLinearColor(0.6f, 0.8f, 1.f) : FLinearColor(1.f, 0.6f, 0.3f), 80.f);
+		if (Felt > 8.f)
+		{
+			AddScar(To, HitPos, Felt);             // the plating remembers it
+		}
 	}
 	if (To.bPlayer)
 	{
 		Shake = FMath::Min(1.f, Shake + (Felt > 20.f ? 0.8f : 0.35f));
 		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 		{
-			Ship->AddHeat(ShieldTook * 0.012f * (Type == EAstraDamageType::Energy ? 1.5f : 1.f));   // what the shields stop becomes heat in the emitters
+			// what the shields stop becomes heat in the emitters (half what it was before GUERRA: with the war's volumes of fire a focused
+			// attack took the Aquila from 26 to 95 % in thirty seconds, and the heat, not the enemy, killed her)
+			Ship->AddHeat(ShieldTook * 0.006f * (Type == EAstraDamageType::Energy ? 1.5f : 1.f));
 			Ship->OnHullHit(Felt, ShieldTook, FromDir);
 		}
 		if (USoundBase* Snd = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Impact.SW_Impact")))
@@ -771,6 +797,10 @@ void UAstraBattleSubsystem::DisableShip(FAstraBattleShip& S, const TCHAR* Why)
 	const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
 	S.bDisabled = true;
 	S.DeathHow = EAstraFate::Disabled;
+	if (FxOn())
+	{
+		WarFX->OnShipDisabled(S);                 // the lights go out, a last discharge of sparks (AstraWarFX.cpp)
+	}
 	if (!S.bCraft && !S.bGhost)
 	{
 		NoteGroupLoss(S, *FString::Printf(TEXT("disabled, %s"), Why));
@@ -892,7 +922,7 @@ void UAstraBattleSubsystem::TickShields(FAstraBattleShip& S, float Dt)
 	{
 		if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 		{
-			Ship->AddHeat((S.Shield - SumBefore) * 0.06f / D.ShieldScale);   // the emitters recharging run hot
+			Ship->AddHeat((S.Shield - SumBefore) * 0.03f / D.ShieldScale);   // the emitters recharging run hot (halved with the above)
 		}
 	}
 }

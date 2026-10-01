@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-01 notte · **Traguardo corrente:** Piano v0.4 ([PIANO.md](PIANO.md)): F1 da chiudere, F2 e F4 in parallelo con gli agenti di supporto ([ARCHITETTURA.md](ARCHITETTURA.md)); **principio delle intelligenze** ([ARCHITETTURA §1bis](ARCHITETTURA.md))
+**Ultimo aggiornamento:** 2026-10-01 pomeriggio · **Traguardo corrente:** Piano v0.4 ([PIANO.md](PIANO.md)): F1 da chiudere, F2 e F4 in parallelo con gli agenti di supporto ([ARCHITETTURA.md](ARCHITETTURA.md)); **principio delle intelligenze** ([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
 ## Piano v0.4 — dove siamo (aggiornato a ogni passo)
 | Fase | Stato |
@@ -34,27 +34,53 @@
 riga, sezioni col colore del danno, incidenti con squadra e progresso, squadre che camminano dal Ponte 6, il Capitano dov'è; ops e la
 mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le navi scansionate (`GetDamageView` di GUERRA).
 
-**Ripresa (1/10 ~02:40, limite d'uso raggiunto):**
-- **METALFX unito in main** (plugin `Plugins/AstraMetalFX`, `r.AstraMetalFX=1`): provato nel gioco vero, 60 fps con risoluzione
-  dinamica al 45–48 % contro 41–43 % del TSR (la compensazione alza `TargetedGPUHeadRoomPercentage` del suo 1,3 ms); a risoluzione
-  fissa il render thread non aspetta. Da fare: guardare il moto (`r.AstraMetalFX.Debug 1|2`), tarare `r.Tonemapper.Sharpen`, togliere
-  il worktree `agent-a90bd4087f2057aa8` (modulo chiuso).
-- **GUERRA ha chiuso** (ramo `worktree-agent-a05c7a46bb8cc857f`, commit finale **7e375cf**, main già unito e compilato nel suo ramo):
-  colpi sulla scatola vera degli scafi v3, rottura sul taglio vero (`CutBowX/CutSternX` negli eventi), apertura su 12 semi da 0/12/0 a
-  1/7/4 (scafo dell'Aquila a fine prova 68 % ± 11), simmetria entro 2σ su 96 semi, 30 navi + 150 velivoli a 0,04–0,09 ms per tick.
-  Da fare alla ripresa: unirlo, poi GUERRA.md §6.8 (menti su `group_order`, effetti da `ConsumeDeathEvents`/`GetDamageView`,
-  `PlayerEngineFactor()` al timone, `RepairPlayerSystems()` dalle squadre, `GetContacts` a cadenza più bassa negli schermi, tarare la
-  poppa dell'Aquila — fragile: 18 s contro due Acheron — e la forza dell'apertura nel gioco vero), togliere il suo worktree, avviare
-  MENTE-GUERRA.
-- **VITA ha chiuso** (ramo `worktree-agent-a8bbccf24c82b87ce`, commit finale **b22d827**, unione con main pulita secondo l'aiutante):
-  560 persone sulla pianta a 0,002 ms per fotogramma, corpi solo vicino al Capitano (al più 40, nessuno appare in vista), squadre con
-  tempi veri sui percorsi (15 s stimati contro 14 reali), la mente delle persone (`npc.py`, DeepSeek V4.1 Flash, 16/16 sul banco
-  dal vivo, ~0,2 m$ a frase). **Mai provata nel gioco vero né in compilazione unity.** Alla ripresa: unirla, compilare (unity),
-  fare VITA.md §7 (contesto `people`, istantanea `life`, `RepairEtaSeconds` per le squadre, `RosterIn` per le vittime,
-  `PlanChanged` sulle porte stagne), provare corpi, voci e costo (`stat Astra`, `astra.life.max_bodies 0`), poi avviare NAVE-2 o
-  DISTRUZIONE al suo posto.
-- **Prossimi moduli, brief pronti** in `docs/brief/`: MENTE-GUERRA (al posto di GUERRA), NAVE-2 (gli altri ponti, a istanze e a
-  livelli), VFX (la guerra bella, nomi per nave, tetto dell'isola), DISTRUZIONE (dopo VITA).
+**1/10 mattina — il nuovo giro:**
+- **GUERRA e VITA unite** (compilazione unity ok, provate nel gioco: 560 persone, 40 corpi attorno al Capitano sul Ponte 4, 60 fps)
+  e collegate: motori danneggiati al timone (velocità e virata), squadre che riparano anche sistemi e affusti, squadre che arrivano
+  col tempo vero dei percorsi, vittime di un colpo tra chi era davvero in quella sezione, persone vicine nel contesto delle parole e
+  vita di bordo nell'istantanea della mente. **METALFX unito** (risoluzione dinamica 45–48 % contro 41–43 % a 60 fps).
+- **Tavolo olografico**: anelli di gittata di rotaie e laser; sulla linea del bersaglio se lo raggiungiamo e se siamo nei suoi cannoni
+  (rossa allora); **`holo ship` con un bersaglio**: la nave scansionata come ologramma della sua mesh, sezioni con la struttura, facce
+  di scudo, ciò che brucia o si rompe, sistemi e affusti per le nostre navi (vista dei danni di GUERRA con la nebbia di guerra).
+- **Schermo principale**: le schede dicono IN ITS GUNS / IN OUR RAILS / OUT OF RANGE; la telecamera non vede più lo scafo dell'Aquila
+  tranne nella vista da fuori. Le «lastre» che restano con lo zoom forte sono gli effetti grezzi dei colpi (anelli d'urto, bolle
+  degli scudi): li rifà VFX.
+- **La gente di bordo parla davvero** (provato nel gioco con la mente, Mess Concourse del Ponte 4): chiamato per nome a 14 m, un
+  tenente del ponte di volo risponde lui (prima un filtro di 4,5 m nel codice lo escludeva e rispondeva l'XO inventando); un ordine
+  «Ponte, qui il Capitano…» detto guardando un marinaio resta del ponte. Gli ufficiali hanno l'**anagrafe e il localizzatore**
+  (`crew_locate`): «chi è il cuoco di turno e dov'è?» → il Crewman Tiago Sirin, nella cucina principale a 43 m, gli altri due
+  cuochi fuori servizio. Ruolino rifatto: 468 cognomi (mai più sette Kowalski, mai i cognomi del cast), un nominativo per pilota,
+  il mestiere segue il grado (niente tenenti magazzinieri). Il posto del Capitano viene dalla pianta («DECK 4 · MESS CONCOURSE ·
+  SECTION B», con ponte e sezione nel contesto; prima diceva «flight deck» su tutti i ponti bassi). Con `-nosound` le voci
+  risultano «silent», non più «failed». Dettagli in [VITA.md §8](VITA.md).
+- **1/10 pomeriggio** (limite d'uso raggiunto a metà giro; tutto compilato, provato e pubblicato):
+  - **Prestazioni in battaglia**: da 51 a 58–60 fps mediani (etichette del tavolo che rifacevano il proxy a ogni fotogramma,
+    1339 luci di navigazione senza lampade che tickavano, corpi di VITA parcheggiati, niente log AI); render thread da 22,6 a 11–16 ms.
+    Tolti due spam del log a ogni fotogramma (sole Stationary ruotato; MetalFX che non riusciva a scrivere `TargetedGPUHeadRoomPercentage`:
+    ora la risoluzione dinamica tiene davvero conto di MetalFX, +7 punti di margine).
+  - **Ritmo dei rapporti** (prima battaglia con la mente dopo GUERRA: 0,26 $ in 7 minuti, battute in coda fino a 61 s): gli avvisi
+    urgenti raccolgono per 0,6 s ciò che arriva con loro e aspettano la fine della battuta in corso; una battuta ripensata alla volta;
+    il prompt chiede le una o due cose che contano. **Da riprovare dal vivo** (costo e coda).
+  - **VFX unito** (armi, scudi a esagoni, esplosioni a strati, rotture coi pezzi v3, tutto a istanze; materiali `M_WAR_*` creati
+    nell'editor, `[WarFX] effects ready`). Fuoco, fumo, traccianti, bagliori e scarichi visti nel gioco e buoni. **Difetto da
+    rimandare all'aiutante VFX**: l'onda d'urto (`astra.fx.swatch`, quinta colonna in alto) è un anello scuro a segmenti invece che
+    luminoso (`Saved/Play/fx_ring.png`).
+  - **Equilibrio**: con tutto il gruppo d'attacco su di lei a 2–3 km (postura «flank») l'Aquila moriva in ~3,5 minuti anche senza
+    mente: lo strato dei danni interni (scritto prima di GUERRA) era una spirale (calore 26→95 % in 30 s, tre radiatori in 15 s,
+    condotti che si moltiplicavano). Tampone in attesa di DISTRUZIONE: calore degli scudi dimezzato, radiatori uno ogni 20 s e in
+    proporzione al colpo, incidenti meno frequenti, condotti additivi con minimo 55 %; Aquila più robusta (scafo 4200, scudi 1500,
+    ricarica 6, difesa di punto 6 canali). Senza Capitano regge ~4,5 minuti a bruciapelo contro quattro navi: il resto è tattica
+    (Praetorian che concentra il fuoco: le menti alleate di MENTE-GUERRA) e scelte del Capitano. Nota: il banco `tools/war.py` non ha
+    lo strato della nave, e un `mandate_tactics` dato prima dell'arrivo del gruppo (t<180) non ha effetto.
+  - **Schermo principale**: la cattura è registrata come vista per lo streaming delle texture (a ×30 gli scafi erano a blocchi).
+    Scoperta: **Nanite ignora i canali di luce** (`NaniteShading.cpp`: `bUsesLightingChannels = false // TODO`): le luci solo sul
+    canale 1 (la luce del pianeta, il riempimento `astra.light.fill`, ora a 0) non toccano le navi. Il sole resta fisso rispetto alla
+    nave (resa validata); farlo ruotare con l'assetto rende nere le navi in controluce sullo schermo: serve un'altra via (esposizione
+    propria della cattura, o il riempimento sul canale 0 con l'interno schermato).
+- **Aiutanti al lavoro** (brief in `docs/brief/`): **MENTE-GUERRA** (ammiragli, comandanti, alleati che parlano, l'XO con
+  `group_order`, la mente nel giro del banco, poi il regista v2), **VFX** (armi, scudi, esplosioni, rotture coi pezzi v3, danni sugli
+  scafi, motori), **NAVE-2** (tutti i ponti: stanze nuove, istanze, luci come dati, un sotto-livello per ponte). Poi DISTRUZIONE,
+  SCALA, abbordaggi, teletrasporto.
 
 **Banco della guerra senza grafica**: `tools/war.py run|report|ship|ab` (commandlet `AstraWarSim`, ~1000× il tempo reale, deterministico per seme; vedi [GUERRA.md](GUERRA.md)).
 
@@ -120,6 +146,7 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
 | 2026-09-30 | 10,00 $ | 3,56 $ | agenti di supporto: prove del router su più modelli (MENTE-EQUIPAGGIO ≈0,22 $ in 1192 chiamate) |
 | 2026-09-30 | 10,00 $ | 3,84 $ | MENTE-EQUIPAGGIO completato (0,40 $ in tutto), prova della mente nel gioco vero |
 | 2026-09-30 | 10,00 $ | 3,93 $ | prova dal vivo della voce v2 (una battaglia intera fino all'abbandono nave) |
+| 2026-10-01 | 10,00 $ | 4,69 $ | banchi di MENTE-GUERRA con le menti nel giro, prove nel gioco di GUERRA, VITA e della gente di bordo (≈0,5 m$ a risposta di un NPC) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 

@@ -121,6 +121,14 @@ SHIP_TOOLS: list[dict[str, Any]] = [
                         "shield faces).", {
         "mode": {"type": "string", "enum": ["tactical", "sector", "ship"]},
         "target": {"type": "string", "description": "ship mode only, optional: the contact id of a scanned ship (T-21)"}}, ["mode"]),
+    _fn("crew_locate", "The personnel file and the internal locator (any officer, at any console): who someone aboard is and where "
+                       "they are right now — rank, department, job and watch, the deck, section and room they are in and what they are "
+                       "doing, or that they lie wounded in the Medbay or fell. Ask by a name (\"Kowalski\", \"Lieutenant Sato\", a "
+                       "pilot's call sign) or a job (\"the cook\", \"a flight-deck officer\"). Call it on its own, before speaking: what "
+                       "it finds comes back to you, and you tell the Captain that and nothing more. Of the 560 aboard you know the "
+                       "bridge and the heads of department; anyone else you look up before saying anything about them.", {
+        "who": {"type": "string", "description": "a surname, a rank and name, a call sign or a job, in English (the file is kept in "
+                                                 "English: \"cook\", \"Lieutenant Sato\")"}}, ["who"]),
     _fn("abandon_ship", "ABANDON SHIP: the evacuation of the Aquila to the lifepods; Engineering overloads the reactor so the "
                         "enemy cannot take her, and she is lost in about two minutes. Only on the Captain's explicit order to "
                         "abandon ship (never proposed as done, never on initiative).", {}, []),
@@ -176,6 +184,7 @@ GROUP_ORDER = _fn("group_order", "XO: the Captain's DIRECT ORDER to one of our b
 
 ALL_TOOLS = [SPEAK, STANDING] + SHIP_TOOLS
 SHIP_TOOL_NAMES = {t["function"]["name"] for t in SHIP_TOOLS} | {"group_order"}
+LOOKUPS = {"crew_locate"}            # tools that only read: what they find goes back to the officer, who then tells the Captain
 
 
 # ================================================================================================ the stations (v2)
@@ -207,7 +216,7 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "dispatch_damage_control": "ops", "hail": "comms", "set_emcon": "sensors", "active_scan": "sensors",
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
-          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo"}
+          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 

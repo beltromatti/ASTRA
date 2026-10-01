@@ -2,6 +2,7 @@
 
 #include "AstraBattleSubsystem.h"
 #include "AstraHullName.h"
+#include "AstraWarFX.h"
 #include "Misc/Crc.h"
 #include "EngineUtils.h"
 #include "Components/DecalComponent.h"
@@ -148,6 +149,8 @@ void UAstraBattleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	RingMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Holo/SM_HOLO_Ring.SM_HOLO_Ring"));
 	BlastMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Blast.M_FX_Blast"));
 	CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	WarFX = NewObject<UAstraWarFX>(this);   // the war's visual effects (before any ship is drawn: SpawnVisual asks whether they draw the shields and the drives)
+	WarFX->Init(this);
 
 	// the Aquila first (index 0): the player's ship, heading 045 mark 10 like the helm
 	const int32 P = AddShip(TEXT("AQUILA"), TEXT("ASN Aquila"), TEXT("Aquila-class carrier cruiser"), TEXT(""), EAstraSide::Astra,
@@ -254,7 +257,7 @@ void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 		UAstraHullName::Paint(S.Actor, S.Name, FString::Printf(TEXT("%s-%02d"), bBattleship ? TEXT("BB") : TEXT("DD"),
 		                                                      bBattleship ? 2 + H % 9 : 10 + H % 80));
 	}
-	if (SphereMesh && ShellMat && !S.bCraft)
+	if (SphereMesh && ShellMat && !S.bCraft && !FxOn())
 	{
 		S.ShieldBubble = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, P);
 		S.ShieldBubble->SetMobility(EComponentMobility::Movable);
@@ -270,7 +273,7 @@ void UAstraBattleSubsystem::SpawnVisual(FAstraBattleShip& S)
 		S.ShieldBubble->SetActorScale3D(FVector(R * 1.25f, R * 0.45f, R * 0.4f));
 		S.ShieldBubble->SetActorHiddenInGame(true);
 	}
-	if (SphereMesh && GlowMat)
+	if (SphereMesh && GlowMat && !FxOn())
 	{
 		S.DriveFlare = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator, P);
 		S.DriveFlare->SetMobility(EComponentMobility::Movable);
@@ -346,6 +349,10 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	{
 		SyncVisuals();   // the plot stays drawn behind the menu
 		TickWrecks(0.f);
+		if (WarFX)
+		{
+			WarFX->Tick(DeltaTime);
+		}
 		return;
 	}
 	const float Dt = FMath::Min(DeltaTime, 0.1f) * GBattleTimeScale;
@@ -555,6 +562,10 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		LastDecoyReport = Time;
 	}
 	SyncVisuals();
+	if (WarFX)
+	{
+		WarFX->Tick(DeltaTime);                    // the war's effects: shots, particles, shields, drives (AstraWarFX.cpp)
+	}
 	EndPhase(5);
 }
 
@@ -1448,7 +1459,7 @@ void UAstraBattleSubsystem::FireRail(FAstraBattleShip& From, FAstraBattleShip& T
 	Pr.Target = To.Id;
 	Pr.Damage = From.RailDamage;
 	Pr.Life = Tof + 1.5f;
-	if (UWorld* World = GetWorld(); World && CylinderMesh && GlowMat && FApp::CanEverRender())
+	if (UWorld* World = GetWorld(); World && CylinderMesh && GlowMat && FApp::CanEverRender() && !FxOn())
 	{
 		FActorSpawnParameters P;
 		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -1462,6 +1473,10 @@ void UAstraBattleSubsystem::FireRail(FAstraBattleShip& From, FAstraBattleShip& T
 		M->SetVectorParameterValue(TEXT("Color"), From.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.5f, 0.25f) : RailColor);
 		M->SetScalarParameterValue(TEXT("Intensity"), 400.f);
 		Pr.Actor->SetActorScale3D(FVector(2.5f, 2.5f, 120.f));   // a 120 m streak, 2.5 m thick: readable at km range
+	}
+	if (FxOn())
+	{
+		Pr.FxSlot = WarFX->OnProjectile(From, To, Pr);     // drawn by the effects, from the gun's muzzle
 	}
 	Projectiles.Add(Pr);
 }
@@ -1482,7 +1497,7 @@ void UAstraBattleSubsystem::FireMissile(FAstraBattleShip& From, FAstraBattleShip
 	{
 		++Stats.MissilesFired[From.Side == EAstraSide::Astra ? 0 : 1];
 	}
-	if (UWorld* World = GetWorld(); World && SphereMesh && GlowMat && FApp::CanEverRender())
+	if (UWorld* World = GetWorld(); World && SphereMesh && GlowMat && FApp::CanEverRender() && !FxOn())
 	{
 		FActorSpawnParameters P;
 		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -1509,6 +1524,10 @@ void UAstraBattleSubsystem::FireMissile(FAstraBattleShip& From, FAstraBattleShip
 			TM->SetScalarParameterValue(TEXT("Intensity"), 35.f);
 		}
 	}
+	if (FxOn())
+	{
+		Pr.FxSlot = WarFX->OnProjectile(From, To, Pr);
+	}
 	Projectiles.Add(Pr);
 }
 
@@ -1517,7 +1536,7 @@ void UAstraBattleSubsystem::FireLaser(FAstraBattleShip& From, FAstraBattleShip& 
 	// the beam strikes the hull where it enters it, at a random point of the side it comes from
 	const FVector Dir = (To.Pos - From.Pos).GetSafeNormal();
 	const FVector Hit = HullRandomEntry(From.Pos, To);
-	AddBeam(From.Pos, Hit, 0.35f, From.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.35f, 0.15f) : FLinearColor(0.5f, 0.8f, 1.f));
+	AddBeam(From.Pos, Hit, 0.35f, From.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.35f, 0.15f) : FLinearColor(0.5f, 0.8f, 1.f), EAstraFxShot::Laser, From.Id, To.Id);
 	ApplyHit(To, Dir, From.LaserDamage > 0.f ? From.LaserDamage : 18.f, Hit, EAstraHitKind::Laser, From.Id);
 }
 
@@ -2483,10 +2502,27 @@ void UAstraBattleSubsystem::ApplyHitLump(FAstraBattleShip& To, const FVector& Fr
 		}
 	}
 	To.Hull -= ToHull;
-	AddFlash(HitPos, ToHull > 10.f ? 45.f : 25.f, 0.8f, To.ShieldFlash > 0.f ? FLinearColor(0.6f, 0.8f, 1.f) : FLinearColor(1.f, 0.6f, 0.3f), 80.f);
-	if (ToHull > 8.f && !To.bCraft)
+	if (FxOn())
 	{
-		AddScar(To, HitPos, ToHull);             // the plating remembers it
+		FAstraFxHit H;                                    // a craft or a ship with no class: one shield, one hull
+		H.Pos = HitPos;
+		H.Dir = FromDir.GetSafeNormal();
+		H.Kind = Kind;
+		H.Damage = Damage;
+		H.ShieldTook = ShieldTook;
+		H.Through = ToHull;
+		H.Felt = To.bCraft ? 0.f : ToHull;
+		H.LocalOut = To.Att.UnrotateVector((HitPos - To.Pos).GetSafeNormal());
+		H.Facing = AstraFacingOf(H.LocalOut);
+		WarFX->OnHit(To, H);
+	}
+	else
+	{
+		AddFlash(HitPos, ToHull > 10.f ? 45.f : 25.f, 0.8f, To.ShieldFlash > 0.f ? FLinearColor(0.6f, 0.8f, 1.f) : FLinearColor(1.f, 0.6f, 0.3f), 80.f);
+		if (ToHull > 8.f && !To.bCraft)
+		{
+			AddScar(To, HitPos, ToHull);             // the plating remembers it
+		}
 	}
 	if (To.bPlayer)
 	{
@@ -2528,6 +2564,11 @@ void UAstraBattleSubsystem::AquilaBlasts(const FVector& HullCentreW, const FVect
 	{
 		const FVector W(HullCentreW.X + FMath::FRandRange(-0.95f, 0.9f) * HullExtentW.X, HullCentreW.Y + FMath::FRandRange(-0.75f, 0.75f) * HullExtentW.Y,
 		                HullCentreW.Z + FMath::FRandRange(-0.4f, 0.8f) * HullExtentW.Z);
+		if (FxOn())
+		{
+			WarFX->OnFlash(EAstraFxFlash::Blast, FromWorld(W), FMath::FRandRange(60.f, 160.f), 1.4f, FLinearColor(1.f, 0.55f, 0.18f), 320.f, P.Vel, FMath::FRandRange(0.f, 3.6f));
+			continue;
+		}
 		AddFlash(FromWorld(W), FMath::FRandRange(60.f, 160.f), FMath::FRandRange(0.9f, 1.8f), FLinearColor(1.f, FMath::FRandRange(0.4f, 0.7f), 0.18f), 320.f);
 		Flashes.Last().Age = -FMath::FRandRange(0.f, 3.6f);
 	}
@@ -2560,6 +2601,12 @@ void UAstraBattleSubsystem::AquilaBreach(const FVector& ReactorW)
 	// the reactor, aft: a ship's death centred on it (the flash of the core letting go, the fireball, the shockwave ring,
 	// blasts along her axis, the debris); her own actor is the level's hull, which the ship subsystem darkens. Pos is
 	// the frame's origin: moved to the reactor for the explosion only, and put back
+	if (FxOn())
+	{
+		WarFX->OnAquilaBreach(FromWorld(ReactorW), 240.f, P.Vel);              // the war's effects: the flash, the ball of fire, the wave, the debris
+		UE_LOG(LogASTRA, Log, TEXT("[Battle] the Aquila's reactor breached"));
+		return;
+	}
 	const FVector Centre = P.Pos;
 	const float R0 = P.Radius;
 	P.Pos = FromWorld(ReactorW);
@@ -2601,14 +2648,12 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 		NoteGroupLoss(S, How == EAstraFate::ReactorBreach ? TEXT("the reactor went") : (How == EAstraFate::Breakup ? TEXT("the hull broke apart") : TEXT("destroyed")));
 	}
 	const float Blast = How == EAstraFate::ReactorBreach ? 1.8f : 1.f;    // a reactor going takes the whole ship in a bigger ball of fire
-	AddFlash(S.Pos, S.Radius * 1.4f * Blast, 2.6f, FLinearColor(1.f, 0.5f, 0.2f), 160.f);    // fireball: the gas cloud expands and thins
-	AddFlash(S.Pos, S.Radius * 0.9f * Blast, 1.1f, FLinearColor(1.f, 0.92f, 0.75f), 600.f);  // the flash of the reactor letting go
-	if (!S.bCraft)
+	// the war's effects draw the death (the hull's pieces, the fireball, the wave); where they cannot, the older explosion does
+	const bool bEvent = !S.bCraft && !S.bGhost && !S.bPlayer;
+	FAstraDeathEvent E;                          // for the visuals: how it went, where it broke
+	if (bEvent)
 	{
-		Explode(S);   // takes over the ship's actor as the hulk
-		if (!S.bGhost && !S.bPlayer)
 		{
-			FAstraDeathEvent E;                  // for the visuals: how it went, where it broke
 			E.Time = Time;
 			E.ShipId = S.Id;
 			E.ContactId = S.ContactId;
@@ -2629,11 +2674,36 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 				E.BreakPoint = S.Pos + E.BreakAxis * BreakX(S, Section);                // on the true cut of the section that lets go
 				E.BreakSpeed = FMath::FRandRange(8.f, 25.f);
 			}
-			DeathEvents.Add(E);
-			if (DeathEvents.Num() > 64)
-			{
-				DeathEvents.RemoveAt(0);
-			}
+		}
+	}
+	bool bFxDone = false;
+	if (FxOn())
+	{
+		if (S.bCraft)
+		{
+			WarFX->OnCraftDestroyed(S);
+			bFxDone = true;
+		}
+		else if (bEvent)
+		{
+			bFxDone = WarFX->OnShipDestroyed(S, E);
+		}
+	}
+	if (!bFxDone)
+	{
+		AddFlash(S.Pos, S.Radius * 1.4f * Blast, 2.6f, FLinearColor(1.f, 0.5f, 0.2f), 160.f, EAstraFxFlash::Blast);   // fireball: the gas cloud expands and thins
+		AddFlash(S.Pos, S.Radius * 0.9f * Blast, 1.1f, FLinearColor(1.f, 0.92f, 0.75f), 600.f);                       // the flash of the reactor letting go
+		if (!S.bCraft)
+		{
+			Explode(S);   // takes over the ship's actor as the hulk
+		}
+	}
+	if (bEvent)
+	{
+		DeathEvents.Add(E);
+		if (DeathEvents.Num() > 64)
+		{
+			DeathEvents.RemoveAt(0);
 		}
 	}
 	if (S.Actor) { S.Actor->Destroy(); S.Actor = nullptr; }
@@ -2905,6 +2975,12 @@ bool UAstraBattleSubsystem::LaunchDecoys(FString& OutDetail)
 	for (int32 i = 0; i < 10; ++i)
 	{
 		const FVector Out = (P.Att.GetRightVector() * (i % 2 ? 1.f : -1.f) + FMath::VRand() * 0.6f).GetSafeNormal();
+		if (FxOn())
+		{
+			WarFX->OnFlash(EAstraFxFlash::Decoy, P.Pos + Out * P.Radius * 1.1f, FMath::FRandRange(6.f, 14.f), 18.f, FLinearColor(1.f, 0.8f, 0.55f), 400.f,
+			               P.Vel + Out * FMath::FRandRange(25.f, 60.f), FMath::FRandRange(0.f, 1.2f));
+			continue;
+		}
 		AddFlash(P.Pos + Out * P.Radius * 1.1f, FMath::FRandRange(6.f, 14.f), 18.f, FLinearColor(1.f, 0.8f, 0.55f), 400.f);
 		Flashes.Last().Vel = P.Vel + Out * FMath::FRandRange(25.f, 60.f);
 		Flashes.Last().Age = -FMath::FRandRange(0.f, 1.2f);
@@ -2914,8 +2990,23 @@ bool UAstraBattleSubsystem::LaunchDecoys(FString& OutDetail)
 	return true;
 }
 
+bool UAstraBattleSubsystem::FxOn() const
+{
+	return WarFX && WarFX->IsActive();
+}
+
 void UAstraBattleSubsystem::AddFlash(const FVector& Pos, float Size, float Life, const FLinearColor& Color, float Intensity)
 {
+	AddFlash(Pos, Size, Life, Color, Intensity, EAstraFxFlash::Spark);
+}
+
+void UAstraBattleSubsystem::AddFlash(const FVector& Pos, float Size, float Life, const FLinearColor& Color, float Intensity, EAstraFxFlash Kind)
+{
+	if (FxOn())
+	{
+		WarFX->OnFlash(Kind, Pos, Size, Life, Color, Intensity);
+		return;
+	}
 	FAstraFlash F;
 	F.Pos = Pos;
 	F.Size = Size;
@@ -2942,6 +3033,16 @@ void UAstraBattleSubsystem::AddFlash(const FVector& Pos, float Size, float Life,
 
 void UAstraBattleSubsystem::AddBeam(const FVector& A, const FVector& B, float Life, const FLinearColor& Color)
 {
+	AddBeam(A, B, Life, Color, EAstraFxShot::Cannon);
+}
+
+void UAstraBattleSubsystem::AddBeam(const FVector& A, const FVector& B, float Life, const FLinearColor& Color, EAstraFxShot Kind, int32 FromId, int32 ToId)
+{
+	if (FxOn())
+	{
+		WarFX->OnBeam(Kind, A, B, Life, Color, FromId, ToId);
+		return;
+	}
 	FAstraFlash F;
 	F.Pos = A;
 	F.BeamTo = B;
@@ -4783,6 +4884,10 @@ void UAstraBattleSubsystem::ClearSystem()
 		if (Pr.Trail) { Pr.Trail->Destroy(); }
 	}
 	Projectiles.Reset();
+	if (WarFX)
+	{
+		WarFX->ClearAll();                            // its shots, sparks, shells, pieces and scars are of the old system
+	}
 	for (FAstraFlash& F : Flashes)
 	{
 		if (F.Actor) { F.Actor->Destroy(); }
@@ -5196,7 +5301,7 @@ void UAstraBattleSubsystem::TickPiloted(FAstraBattleShip& S, float Dt)
 		}
 		for (int32 k = 0; k < 6; ++k)
 		{
-			AddFlash(S.Pos - S.Att.GetForwardVector() * (8.0 + 6.0 * k) + FMath::VRand() * 6.0, 4.f, 1.6f, FLinearColor(1.f, 0.75f, 0.4f), 90.f);
+			AddFlash(S.Pos - S.Att.GetForwardVector() * (8.0 + 6.0 * k) + FMath::VRand() * 6.0, 4.f, 1.6f, FLinearColor(1.f, 0.75f, 0.4f), 90.f, EAstraFxFlash::Decoy);
 		}
 		HullSound(TEXT("SW_PD_Burst"), 0.35f, 0.1f);
 		UE_LOG(LogASTRA, Log, TEXT("[Battle] Eagle decoys: %d seekers spoofed, %d decoys left"), Spoofed, PilotDecoys);
@@ -5252,7 +5357,7 @@ void UAstraBattleSubsystem::FirePilotGuns(FAstraBattleShip& S)
 			Hit = &O;
 		}
 	}
-	AddBeam(Muzzle, Muzzle + Dir * HitT, 0.05f, FLinearColor(0.55f, 0.85f, 1.f));
+	AddBeam(Muzzle, Muzzle + Dir * HitT, 0.05f, FLinearColor(0.55f, 0.85f, 1.f), EAstraFxShot::Cannon, -1, Hit ? Hit->Id : -1);
 	HullSound(TEXT("SW_PD_Burst"), 0.22f, 0.09f);
 	if (Hit)
 	{
