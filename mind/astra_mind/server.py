@@ -272,6 +272,16 @@ class Mind:
             self.war.captain_ordered(str(args.get("group", "")), str(res.get("detail", "")))
         return res
 
+    def _war_look(self, state: dict[str, Any]) -> None:
+        """The war minds read the new ship state: the story's pulse, the commanders' look (they start the pulses that are due), the XO's board of the
+        groups. A defect in them must never cut the crew off from the ship."""
+        try:
+            self.director.observe(state)
+            self.war.feed(state)
+            state["_fleet_board"] = self.war.fleet_board(state)
+        except Exception:  # noqa: BLE001
+            log.exception("the war minds could not read the ship state")
+
     def record_log(self, entry: str) -> None:
         """A captain's log entry: kept in Saved/Campaign/captains_log.md, noted for the director, acknowledged."""
         path = os.path.join(os.path.dirname(self.director.war.save_path), "captains_log.md")
@@ -920,9 +930,7 @@ class Mind:
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
-                    self.director.observe(self.game.state)           # (the story's pulse: how long the Captain has fought and had peace)
-                    self.war.feed(self.game.state)                   # the commanders look at the battle (they start the pulses that are due)
-                    self.game.state["_fleet_board"] = self.war.fleet_board(self.game.state)   # the XO's board of our groups and their captains
+                    self._war_look(self.game.state)
                     for p_ in ((self.game.state.get("medbay") or {}).get("patients") or []):
                         EXTERNAL_SPEAKERS[p_["speaker"]] = (p_.get("name", p_["speaker"]), patient_voice(p_))
                     mess_ = self.game.state.get("mess") or {}

@@ -225,6 +225,14 @@ class WarServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn(("solm", "Capitano, resa o morte."), self.game.lines())
         self.assertIn("said to the Captain over the channel: Capitano, resa o morte.", self.mind.war.recall("mandate"))      # and what he said, the commander remembers
 
+    async def test_a_defect_in_the_war_minds_never_cuts_the_crew_off_from_the_ship(self) -> None:
+        with mock.patch.object(self.mind.war, "feed", side_effect=RuntimeError("a bug in the war minds")):
+            await self.state(battle_state())
+            self.assertEqual(self.mind.game.state.get("alert"), "red")                      # the state still arrived
+        await self.state(battle_state(), 0.1)                                              # and the connection is still being served
+        self.assertIn("_fleet_board", self.mind.game.state)
+        self.assertFalse(self.tasks[0].done())
+
     async def test_hello_forgets_the_last_fight(self) -> None:
         self.model.war.policy = ScriptPolicy([("no_change", {"reason": "x"})])
         await self.state(battle_state())
