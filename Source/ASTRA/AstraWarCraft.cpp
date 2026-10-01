@@ -94,6 +94,144 @@ FAstraFlight* UAstraBattleSubsystem::FindFlight(int32 Id)
 	return Id < 0 ? nullptr : Flights.FindByPredicate([Id](const FAstraFlight& F) { return F.Id == Id; });
 }
 
+// ---------------------------------------------------------------------------------------------- the Captain's wing (docs/VOLO.md)
+// When the Captain leaves the catapult in a Falcon, two more Falcons of Alpha follow him off the deck and fly his wing as Eagle 2 and Eagle 3: an escort flight that he
+// leads (the escort mission on his Falcon: the craft keep his finger-four slot and fight the bandits near him, go home when hurt, and when he is gone). What happens to
+// them is told as `flight: Eagle 2 ...` events, which the flight net's people speak (mind/astra_mind/flight_minds.py): they join, engage, splash a Harpy, are hit, go down.
+void UAstraBattleSubsystem::StartEagleWing()
+{
+	const int32 Qi = Squadrons.IndexOfByPredicate([](const FAstraSquadron& Q) { return Q.Side == EAstraSide::Astra && Q.Name == TEXT("alpha"); });
+	if (Qi == INDEX_NONE || PilotedId < 0)
+	{
+		return;
+	}
+	const FAstraSquadron& Q = Squadrons[Qi];
+	WingToLaunch = FMath::Clamp(Q.OnDeck - Q.ToLaunch, 0, 2);       // two, if the deck has them (the Captain's own Falcon is already out of OnDeck)
+	WingLaunched = 0;
+	WingLaunchT = 3.f;                                              // the first a few seconds behind him, the second from the other tube
+	WingFlightId = -1;
+}
+
+void UAstraBattleSubsystem::EndEagleWing()
+{
+	WingToLaunch = 0;
+	WingFlightId = -1;
+	for (FAstraBattleShip& S : Ships)
+	{
+		if (!S.Radio.IsEmpty())
+		{
+			S.Radio.Reset();                                        // (no longer anybody's wing: their escort target is gone, so they come home by themselves)
+		}
+	}
+}
+
+void UAstraBattleSubsystem::TickEagleWing(float Dt)
+{
+	if (WingToLaunch <= 0)
+	{
+		return;
+	}
+	const FAstraBattleShip* Eagle = PilotedId >= 0 ? FindById(PilotedId) : nullptr;
+	if (!Eagle || !Eagle->bAlive)
+	{
+		WingToLaunch = 0;
+		return;
+	}
+	if ((WingLaunchT -= Dt) > 0.f)
+	{
+		return;
+	}
+	const int32 Qi = Squadrons.IndexOfByPredicate([](const FAstraSquadron& Q) { return Q.Side == EAstraSide::Astra && Q.Name == TEXT("alpha"); });
+	const FAstraBattleShip* Carrier = Qi != INDEX_NONE ? FindById(Squadrons[Qi].CarrierId) : nullptr;
+	if (!Carrier || !Carrier->bAlive || Squadrons[Qi].OnDeck <= 0 || HangarFactor(*Carrier) <= 0.f)
+	{
+		WingToLaunch = 0;                                           // no Falcon left on the deck, or no deck to launch from: the Captain flies with what there is
+		return;
+	}
+	FAstraSquadron& Q = Squadrons[Qi];
+	--WingToLaunch;
+	WingLaunchT = 1.5f;
+	--Q.OnDeck;
+	const int32 Number = 2 + WingLaunched;                          // Eagle 2, Eagle 3
+	++WingLaunched;
+	const bool bLast = WingToLaunch == 0;
+	const FVector CarrierPos = Carrier->Pos, CarrierVel = Carrier->Vel;   // copies: AddShip may reallocate Ships
+	const FQuat CarrierAtt = Carrier->Att;
+	const FString Callsign = Q.CallSign, Mesh = Q.Mesh;
+	const EAstraSide Side = Q.Side;
+	// the tubes are in the hull frame as the squadrons' launches have them (x 398 m, y +-14.9 m, z -4.3 m); the Captain left by the port one, the wing by starboard first
+	const FVector Pos = CarrierPos + CarrierAtt.RotateVector(FVector(398.0, (WingLaunched % 2) ? 14.9 : -14.9, -4.3));
+	const int32 I = AddShip(FString::Printf(TEXT("EAGLE-W%d"), Number), FString::Printf(TEXT("Eagle %d"), Number),
+	                        FString::Printf(TEXT("ASTRA fighter (%s)"), *Callsign), Mesh, Side, Pos, CarrierAtt.Rotator().Yaw, 200.f, 10.f, 60.f, 20.f);
+	FAstraBattleShip& C = Ships[I];
+	C.bCraft = true;
+	C.Squadron = Qi;
+	C.CraftKind = 0;
+	C.Mission = TEXT("escort");
+	C.MissionTarget = PilotedId;                                    // the escort mission on the Captain's Falcon: his slot, the bandits near him, home when he is gone
+	C.Torpedoes = 0;
+	C.RailDamage = 0.f;
+	C.Missiles = 0;
+	C.PDRange = 0.f;
+	C.PDChannels = 0;
+	C.bShieldsUp = C.Shield > 0.f;
+	C.Vel = CarrierVel + CarrierAtt.RotateVector(FVector(120.0, (WingLaunched % 2) ? 80.0 : -80.0, -40.0));
+	C.CruiseSpeed = 850.f;
+	C.MaxAccel = 200.f;
+	C.MaxTurnDeg = 100.f;
+	C.Speed = C.Vel.Size();
+	C.OrbitPhase = FMath::FRand() * 2.f * PI;
+	C.Mode = EAstraShipMode::Cruise;
+	C.bHostile = false;
+	C.ThinkAcc = FMath::FRand() * 0.1f;
+	C.Radio = FString::Printf(TEXT("Eagle %d"), Number);
+	// the flight: the Captain leads it (his Falcon is the first member), the wingmen take the slots behind him; PhaseT far in the past keeps AssignFlight from adding a
+	// later sortie's Falcon to it
+	FAstraFlight* F = FindFlight(WingFlightId);
+	if (!F)
+	{
+		FAstraFlight NF;
+		NF.Id = NextFlightId++;
+		NF.Squadron = Qi;
+		NF.Side = Side;
+		NF.PhaseT = Time - 100.f;
+		NF.NextThink = Time;
+		NF.Members.Add(PilotedId);
+		NF.LeaderId = PilotedId;
+		Flights.Add(NF);
+		F = &Flights.Last();
+		WingFlightId = F->Id;
+	}
+	F->Members.Add(C.Id);
+	C.FlightId = F->Id;
+	C.CraftSlot = F->Members.Num() - 1;
+	SpawnVisual(C);
+	HullSound(TEXT("SW_Catapult"), 0.75f, 0.9f);
+	if (bLast)
+	{
+		Report(WingLaunched >= 2 ? TEXT("flight: Eagle's wing joined — Eagle 2 and Eagle 3, two Falcons of Alpha, are on the Captain's wing")
+		                         : TEXT("flight: Eagle's wing joined — Eagle 2, a Falcon of Alpha, is on the Captain's wing"));
+	}
+}
+
+/** What a craft of the Captain's wing tells on the radio about itself: a bandit it engages (one call a target, ten seconds apart) and its hull as it goes (under 70 % and 35 %). */
+void UAstraBattleSubsystem::WingNotes(FAstraBattleShip& S)
+{
+	const int32 Step = S.Hull < 0.35f * S.HullMax ? 2 : (S.Hull < 0.7f * S.HullMax ? 1 : 0);
+	if (Step > S.RadioHullStep)
+	{
+		S.RadioHullStep = Step;
+		Report(FString::Printf(TEXT("flight: %s is hit — hull %d%%"), *S.Radio, FMath::RoundToInt(100.f * S.Hull / FMath::Max(1.f, S.HullMax))));
+	}
+	const FAstraBattleShip* B = S.CraftTarget >= 0 ? FindById(S.CraftTarget) : nullptr;
+	if (B && B->bAlive && B->bCraft && B->Side != S.Side && S.CraftTarget != S.RadioTarget && Time - S.RadioT > 10.f)
+	{
+		S.RadioTarget = S.CraftTarget;
+		S.RadioT = Time;
+		Report(FString::Printf(TEXT("flight: %s engaged a Harpy at %.1f km"), *S.Radio, FVector::Dist(S.Pos, B->Pos) / WarKm));
+	}
+}
+
 // ---------------------------------------------------------------------------------------------- the steering fields
 namespace
 {
@@ -330,6 +468,10 @@ void UAstraBattleSubsystem::LandCraft(FAstraBattleShip& S, FAstraBattleShip& Car
 
 void UAstraBattleSubsystem::ThinkCraft(FAstraBattleShip& S, float DtT)
 {
+	if (!S.Radio.IsEmpty())
+	{
+		WingNotes(S);                                                 // (the Captain's wing tells its own news: a bandit engaged, a hit taken)
+	}
 	FAstraSquadron& Q = Squadrons[S.Squadron];
 	const int32 Me = AstraSideIdx(S.Side);
 	FAstraBattleShip* Home = FindById(Q.CarrierId);

@@ -608,6 +608,22 @@ class Pulses(unittest.IsolatedAsyncioTestCase):
         self.f.feed(ship_state(captain="on the bridge"))
         self.assertFalse(self.f.wing)
 
+    async def test_a_wingman_shot_down_is_off_the_net_until_the_flight_is_over(self) -> None:
+        self.f.on_event(WING)
+        self.assertTrue(self.f.on_event("flight: Eagle 2 is down — the pilot ejected, search and rescue is on the way"))
+        self.assertNotIn("alpha_2", self.f.present(self.st))
+        self.assertIn("alpha_3", self.f.present(self.st))
+        self.assertIn("shot down on Eagle's wing", self.f._board(self.st))
+        self.assertIn("Eagle 2", self.f._board(self.st))
+        self.bed.llm.say(("say", {"speaker": "alpha_2", "text": "Sono ancora qui.", "tone": "calm"}), ("say", {"speaker": "alpha_3", "text": "Eagle 2 è giù, vedo il paracadute.", "tone": "urgent"}))
+        self.f.feed(self.st)
+        self.bed.at(fm.SETTLE_S + 0.5)
+        self.f.feed(self.st)
+        await self.bed.settle()
+        self.assertEqual([l["speaker"] for l in self.bed.lines], ["alpha_3"])               # the one who ejected does not speak
+        self.f._wing_off()
+        self.assertIn("alpha_2", self.f.present(self.st))
+
     async def test_eagles_news_wakes_the_wing_and_stays_with_price(self) -> None:
         self.bed.llm.say(("say", {"speaker": "alpha_2", "text": "Eagle è a terra! Vedo un paracadute!", "tone": "urgent", "urgent": True}))
         self.st = ship_state(captain="the Captain ejected from a destroyed Falcon; the pod is being recovered")

@@ -148,6 +148,7 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
     (r"^(?:damage report|damage control): .*\bdeck 9\b", Kind("deck", False)),
 ))
 _EAGLE_END = ("is down", "recovered", "left the plot", "escape pod", "flew into", "has landed")      # the Captain's Falcon is gone (or out of the fight): no more wing
+_WING_DOWN = re.compile(r"^flight: eagle ([2-9]) is down", re.I)
 _OBSERVED = re.compile(r"^(?:flight: (?!controller call)|tactical: \d+ harp)", re.I)       # what goes in the net's log even when it does not wake it
 
 
@@ -373,6 +374,7 @@ class FlightMinds:
         self.state: dict[str, Any] = {}
         self.net_open = False                              # the Captain opened the net (Comms: `hail flight`)
         self.wing = False                                  # two Falcons fly Eagle's wing
+        self._wing_down: set[str] = set()                  # the wing's pilots shot down in this flight (ejected: off the net until it is over)
         self.memories: dict[str, list[dict[str, str]]] = {}
         self.pulses: list[dict[str, Any]] = []
         self.t0 = clock()
@@ -408,7 +410,7 @@ class FlightMinds:
         """Who is on the net: everyone, but a squadron with no aircraft left has lost its pilots (the game's own line says so)."""
         sq = ((state if state is not None else self.state) or {}).get("squadrons") or {}
         gone = {name for name in ("alpha", "bravo") if "no aircraft left" in str(sq.get(name, ""))}
-        return [k for k, p in CAST.items() if not (p.squadron and p.squadron in gone)]
+        return [k for k, p in CAST.items() if not (p.squadron and p.squadron in gone) and k not in self._wing_down]
 
     def can_answer(self) -> bool:
         return not self.disabled
@@ -521,9 +523,15 @@ class FlightMinds:
         return take
 
     def _wing_event(self, text: str) -> None:
-        """`flight: Eagle's wing joined ...` forms the wing; the radio names of its two pilots become Eagle 2 and Eagle 3."""
+        """`flight: Eagle's wing joined ...` forms the wing; the radio names of its two pilots become Eagle 2 and Eagle 3. `flight: Eagle 3 is down ...` takes that pilot
+        off the net for the rest of the flight (they ejected: search and rescue has them)."""
         if "joined" in text.lower() or "on the captain's wing" in text.lower():
             self._wing_on()
+        m = _WING_DOWN.match(text)
+        if m:
+            key = {"2": "alpha_2", "3": "alpha_3"}.get(m.group(1))
+            if key:
+                self._wing_down.add(key)
 
     def _wing_on(self) -> None:
         if self.wing:
@@ -533,6 +541,7 @@ class FlightMinds:
             self._set_radio(CAST[k], CAST[k].wing or CAST[k].radio)
 
     def _wing_off(self) -> None:
+        self._wing_down.clear()
         if not self.wing:
             return
         self.wing = False
@@ -698,7 +707,11 @@ class FlightMinds:
             lines.append(" the Medbay's count and the fallen: " + cas[:360])
         if self.wing:
             lines.append(f" Eagle's wing is up: {self.radio('alpha_2')} ({CAST['alpha_2'].callsign}) and {self.radio('alpha_3')} ({CAST['alpha_3'].callsign}) fly the Captain's wing")
-        gone = [self.radio(k) for k in CAST if k not in self.present(state)]
+        here = self.present(state)
+        down = [self.radio(k) for k in CAST if k in self._wing_down]
+        if down:
+            lines.append(f" shot down on Eagle's wing (the pilot ejected, search and rescue has them), off the net: {', '.join(down)}")
+        gone = [self.radio(k) for k in CAST if k not in here and k not in self._wing_down]
         if gone:
             lines.append(f" lost with their squadron, not on the net: {', '.join(gone)}")
         return "\n".join(lines)

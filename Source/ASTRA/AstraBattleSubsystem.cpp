@@ -501,6 +501,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	TickPOIs(Dt);
 	TickScenario(Dt);
 	TickSquadrons(Dt);
+	TickEagleWing(Dt);
 	EndPhase(2);
 	for (FAstraBattleShip& S : Ships)
 	{
@@ -2468,6 +2469,7 @@ void UAstraBattleSubsystem::ApplyHitLump(FAstraBattleShip& To, const FVector& Fr
 	{
 		return;
 	}
+	To.LastHitBy = SourceId;                              // (a kill is credited to whoever struck last: the Captain's wing calls its own)
 	float ToHull = Damage;
 	float ShieldTook = 0.f;
 	if (To.bShieldsUp && To.Shield > 0.f)
@@ -2717,9 +2719,19 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 			--Squadrons[S.Squadron].Total;
 		}
 		Report(TEXT("flight: Eagle is down — the Captain's Falcon was destroyed, the Captain ejected; a Wasp is going out for the pod"), true);
+		EndEagleWing();                                                       // (his wing has lost its leader: it comes home)
 	}
 	else if (S.bCraft)
 	{
+		if (S.Side == EAstraSide::Mandate && !S.bGhost)
+		{
+			// a Harpy splashed by one of the Captain's wing: that wingman calls it (the squadron's own count is told as before)
+			const FAstraBattleShip* Killer = S.LastHitBy >= 0 ? FindById(S.LastHitBy) : nullptr;
+			if (Killer && Killer->bCraft && Killer->Side == EAstraSide::Astra && !Killer->Radio.IsEmpty())
+			{
+				Report(FString::Printf(TEXT("flight: %s splashed a Harpy"), *Killer->Radio));
+			}
+		}
 		if (Squadrons.IsValidIndex(S.Squadron))
 		{
 			FAstraSquadron& Q = Squadrons[S.Squadron];
@@ -2728,7 +2740,14 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 			// a manned aircraft of ours: somebody was flying it
 			if (Q.Side == EAstraSide::Astra && Q.Kind != 2)
 			{
-				if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+				if (!S.Radio.IsEmpty())
+				{
+					// one of the Captain's wing (the flight net's own people, not the roster's): told now by its radio name, not in the squadron's report twelve
+					// seconds later; the pilot ejects and search and rescue picks them up (the aircraft is a real loss: Total went down above)
+					--Q.LostSinceReport;
+					Report(FString::Printf(TEXT("flight: %s is down — the pilot ejected, search and rescue is on the way"), *S.Radio));
+				}
+				else if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
 				{
 					const FString Who = Ship->AircrewLost();
 					if (!Who.IsEmpty())
@@ -4871,6 +4890,8 @@ void UAstraBattleSubsystem::ClearSystem()
 	Groups.Reset();
 	GroupEvents.Reset();                          // (what happened to the old system's groups is not news here)
 	Flights.Reset();
+	WingToLaunch = 0;                             // (and the Captain's wing is gone with them)
+	WingFlightId = -1;
 	POIs.Reset();
 	Squadrons.RemoveAll([](const FAstraSquadron& Q) { return Q.Side != EAstraSide::Astra; });
 	for (FAstraSquadron& Q : Squadrons)
@@ -5096,6 +5117,10 @@ bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos,
 	const FString WorldN = ShipW ? ShipW->SurfaceWorldName() : FString(TEXT("the world below"));
 	Report(bFromPlanet ? FString::Printf(TEXT("flight: Eagle is back in orbit from %s, climbing to rejoin the Aquila"), *WorldN)
 	                   : TEXT("flight: the Captain is off the catapult in a Falcon of Alpha, callsign Eagle — the XO has the conn"), true);
+	if (!bFromPlanet)
+	{
+		StartEagleWing();                      // two more Falcons of Alpha follow him off the deck: his wing
+	}
 	return true;
 }
 
@@ -5112,6 +5137,7 @@ void UAstraBattleSubsystem::FalconLostPlanetside()
 
 void UAstraBattleSubsystem::LeavePiloted()
 {
+	EndEagleWing();
 	if (FAstraBattleShip* S = FindById(PilotedId))
 	{
 		S->bAlive = false;
@@ -5127,6 +5153,7 @@ void UAstraBattleSubsystem::LeavePiloted()
 
 void UAstraBattleSubsystem::EndPiloted(bool bLanded)
 {
+	EndEagleWing();
 	if (FAstraBattleShip* S = FindById(PilotedId))
 	{
 		S->bAlive = false;
