@@ -1053,6 +1053,8 @@ struct FAstraLiftConsole
 		if (UAstraLiftSubsystem* S = Get(W))
 		{
 			UE_LOG(LogASTRA, Log, TEXT("[Lift]\n%s"), *S->Describe());
+			UE_LOG(LogASTRA, Log, TEXT("[Lift] a ride between two decks takes %.1f s on average, the call and the doors included: the number for `speed.lift_s` of the life plan (the abstract ride of the people nobody sees)"),
+			       S->AverageRideSeconds());
 		}
 	}
 
