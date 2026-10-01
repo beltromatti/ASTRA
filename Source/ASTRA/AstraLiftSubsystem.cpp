@@ -192,6 +192,7 @@ void UAstraLiftSubsystem::BuildLine(int32 Line)
 		{
 			Landing->bQuiet = bBench;
 			Landing->Setup(L, S, Spec);
+			Landing->SetSigns(L.Stops[S].Label, L.Stops[S].Deck);
 		}
 		R.Landings.Add(Landing);
 		Landings.Add(Landing);

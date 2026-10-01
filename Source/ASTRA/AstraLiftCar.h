@@ -28,6 +28,8 @@ class UTexture;
 class UStaticMesh;
 class UStaticMeshComponent;
 class AAstraLiftLanding;
+class UMaterialInstanceDynamic;
+class UTextRenderComponent;
 
 namespace AstraLiftKit
 {
@@ -50,6 +52,11 @@ struct ASTRA_API FAstraLiftSpec
 	float DoorLeaf = 6.f;                      // the leaves' thickness
 	float WallT = 14.f, FloorT = 30.f, CeilT = 14.f;
 	FString Suffix;                            // which kit meshes: "tl", "sv", "cg", "sh"
+	/** The kit's meshes are modelled to the nominal measures of their kind (art/blender/ship_lift.py, KIT); a plan with other measures gets them scaled: the car's meshes by
+	 *  Hull (X the depth, Y the width, Z the height), the doors' leaves and the landing's frame by Opening (Y the width, Z the height), the shaft's lining by Shaft (X, Y). */
+	FVector Hull = FVector::OneVector;
+	FVector2D Opening = FVector2D(1.0, 1.0);
+	FVector2D Shaft = FVector2D(1.0, 1.0);
 
 	static FAstraLiftSpec Make(const FAstraLiftLine& Line);
 	/** The distance from the landing's door plane back to the car's front face (the sill gap). */
@@ -148,6 +155,8 @@ public:
 	AAstraLiftLanding();
 
 	void Setup(const FAstraLiftLine& InLine, int32 InStop, const FAstraLiftSpec& InSpec);
+	/** What the landing says: the deck sign over its doors, and the number on the shaft's back wall that the car's window shows as it passes. */
+	void SetSigns(const FString& Label, int32 Deck);
 	/** The doors' travel, 0 shut .. 1 open (the car at this landing drives it). */
 	void SetOpen(float Alpha);
 	float GetOpen() const { return OpenNow; }
@@ -179,6 +188,10 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> LeafMesh;
 	UPROPERTY() TArray<TObjectPtr<UBoxComponent>> LeafBox;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Lamp;
+	UPROPERTY() TObjectPtr<UTextRenderComponent> SignText;
+	UPROPERTY() TObjectPtr<UTextRenderComponent> ShaftText;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> SignMat;
+	float ShaftBackCm = 280.f;                  // how far the shaft's back wall is behind the doors' plane
 	void BuildLooks();
 };
 

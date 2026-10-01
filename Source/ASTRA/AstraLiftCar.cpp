@@ -36,6 +36,32 @@ UStaticMesh* AstraLiftKit::Cube()
 
 // ================================================================================================================================ spec
 
+namespace
+{
+	/** The measures the kit's meshes of each kind were modelled to (cm): art/blender/ship_lift.py's KIT and SHUTTLE, the same numbers. */
+	struct FLiftNominal
+	{
+		float CarW, CarD, CarH, OpW, OpH, ShaftW, ShaftD;
+	};
+
+	FLiftNominal LiftNominal(const FString& Suffix)
+	{
+		if (Suffix == TEXT("sv"))
+		{
+			return {280.f, 240.f, 280.f, 138.f, 230.f, 320.f, 280.f};
+		}
+		if (Suffix == TEXT("cg"))
+		{
+			return {340.f, 300.f, 320.f, 168.f, 260.f, 380.f, 340.f};
+		}
+		if (Suffix == TEXT("sh"))
+		{
+			return {1400.f, 280.f, 290.f, 130.f, 210.f, 1.f, 1.f};
+		}
+		return {240.f, 240.f, 260.f, 118.f, 220.f, 280.f, 280.f};
+	}
+}
+
 FAstraLiftSpec FAstraLiftSpec::Make(const FAstraLiftLine& L)
 {
 	FAstraLiftSpec S;
@@ -72,6 +98,11 @@ FAstraLiftSpec FAstraLiftSpec::Make(const FAstraLiftLine& L)
 		S.ScreenCenter = FVector(S.D * 0.5f - 70.f, -S.W * 0.5f + 3.f, 150.f);
 		S.ScreenYaw = 90.f;
 	}
+	// the kit's meshes are built to the nominal measures of their kind: a plan that asks for others has them stretched to fit
+	const FLiftNominal N = LiftNominal(S.Suffix);
+	S.Hull = FVector(L.CarD / N.CarD, L.CarW / N.CarW, S.H / N.CarH);
+	S.Opening = FVector2D(S.Openings[0].Width / N.OpW, S.Openings[0].Height / N.OpH);
+	S.Shaft = L.bShuttle ? FVector2D(1.0, 1.0) : FVector2D(L.ShaftD / N.ShaftD, L.ShaftW / N.ShaftW);
 	return S;
 }
 
@@ -197,7 +228,7 @@ void AAstraLiftCar::BuildShell()
 		{
 			const float HalfW = Ops[I].Width * 0.25f + 1.f;
 			UStaticMeshComponent* M = AddMesh(*FString::Printf(TEXT("Leaf%d_%d"), I, Side), LeafKit ? LeafKit : CubeMesh, FVector::ZeroVector,
-			                                  LeafKit ? FVector(1.f, Side ? 1.f : -1.f, 1.f) : FVector(S.DoorLeaf / 100.f, HalfW * 2.f / 100.f, Ops[I].Height / 100.f));
+			                                  LeafKit ? FVector(1.f, (Side ? 1.f : -1.f) * S.Opening.X, S.Opening.Y) : FVector(S.DoorLeaf / 100.f, HalfW * 2.f / 100.f, Ops[I].Height / 100.f));
 			M->SetCastShadow(false);
 			LeafMesh.Add(M);
 			// (the collision is its own box on the car, moved with the leaf: a child of the leaf would inherit the leaf's scale)
@@ -228,10 +259,10 @@ void AAstraLiftCar::BuildLooks()
 	UStaticMesh* Cabin = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_Car_%s"), *Suf));
 	if (Cabin)
 	{
-		Hull = AddMesh(TEXT("Hull"), Cabin, FVector(0.f, 0.f, Z0), FVector::OneVector);
+		Hull = AddMesh(TEXT("Hull"), Cabin, FVector(0.f, 0.f, Z0), S.Hull);
 		if (UStaticMesh* G = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_CarGlass_%s"), *Suf)))
 		{
-			Glass = AddMesh(TEXT("Glass"), G, FVector(0.f, 0.f, Z0), FVector::OneVector);
+			Glass = AddMesh(TEXT("Glass"), G, FVector(0.f, 0.f, Z0), S.Hull);
 			Glass->SetCastShadow(false);
 		}
 	}

@@ -6,7 +6,10 @@
 #include "Components/BoxComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Misc/App.h"
 
 namespace
 {
@@ -47,6 +50,7 @@ void AAstraLiftLanding::Setup(const FAstraLiftLine& InLine, int32 InStop, const 
 	const FAstraLiftStop& S = InLine.Stops[InStop];
 	OutDir = S.Out;
 	bDoors = !InLine.bShuttle;
+	ShaftBackCm = InLine.ShaftD;
 	SetActorLocationAndRotation(S.DoorCm, FRotator(0.f, InLine.FrontYaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 	const FAstraLiftSpec::FOpening& Op = Spec.Openings[0];
 	PanelLocal = bDoors ? FVector(6.f, -(Op.Width * 0.5f + 45.f), 110.f) : FVector(130.f, -175.f, 110.f);
@@ -58,7 +62,7 @@ void AAstraLiftLanding::Setup(const FAstraLiftLine& InLine, int32 InStop, const 
 		for (int32 Side = 0; Side < 2; ++Side)
 		{
 			const float HalfW = Op.Width * 0.25f + 1.f;
-			const FVector Scale = LeafKit ? FVector(1.f, Side ? 1.f : -1.f, 1.f) : FVector(Spec.DoorLeaf / 100.f, HalfW * 2.f / 100.f, Op.Height / 100.f);
+			const FVector Scale = LeafKit ? FVector(1.f, (Side ? 1.f : -1.f) * Spec.Opening.X, Spec.Opening.Y) : FVector(Spec.DoorLeaf / 100.f, HalfW * 2.f / 100.f, Op.Height / 100.f);
 			if (LeafKit || CubeMesh)
 			{
 				LeafMesh.Add(LiftMakeMesh(this, GetRootComponent(), *FString::Printf(TEXT("Leaf%d"), Side), LeafKit ? LeafKit : CubeMesh, FVector::ZeroVector, Scale));
@@ -85,7 +89,7 @@ void AAstraLiftLanding::BuildLooks()
 {
 	if (UStaticMesh* F = AstraLiftKit::Mesh(FString::Printf(TEXT("SM_LIFT_Landing_%s"), *Spec.Suffix)))
 	{
-		Frame = LiftMakeMesh(this, GetRootComponent(), TEXT("Frame"), F, FVector::ZeroVector, FVector::OneVector);
+		Frame = LiftMakeMesh(this, GetRootComponent(), TEXT("Frame"), F, FVector::ZeroVector, FVector(1.f, Spec.Opening.X, Spec.Opening.Y));
 	}
 	else if (UStaticMesh* C = AstraLiftKit::Cube(); C && bDoors)
 	{
@@ -118,6 +122,53 @@ void AAstraLiftLanding::BuildLooks()
 		{
 			LiftMakeMesh(this, GetRootComponent(), TEXT("Post"), C, FVector(PanelLocal.X, PanelLocal.Y, 60.f), FVector(0.12f, 0.12f, 1.2f));
 		}
+	}
+}
+
+void AAstraLiftLanding::SetSigns(const FString& Label, int32 Deck)
+{
+	if (!bDoors || !FApp::CanEverRender())
+	{
+		return;                                // (the shuttle's platform has no doors to put a sign over, and a bench has no eyes)
+	}
+	UMaterialInterface* TextMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_HoloText.M_ASTRA_HoloText"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (TextMaterial && !SignMat)
+	{
+		SignMat = UMaterialInstanceDynamic::Create(TextMaterial, this);
+		if (SignMat)
+		{
+			SignMat->SetScalarParameterValue(TEXT("Intensity"), 6.f);
+		}
+	}
+	auto Make = [this](const TCHAR* Name, const FString& Text, const FVector& At, float Size, const FColor& Colour)
+	{
+		UTextRenderComponent* T = NewObject<UTextRenderComponent>(this, Name);
+		T->SetupAttachment(GetRootComponent());
+		T->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		T->SetCastShadow(false);
+		if (SignMat)
+		{
+			T->SetTextMaterial(SignMat);
+		}
+		T->SetHorizontalAlignment(EHTA_Center);
+		T->SetVerticalAlignment(EVRTA_TextCenter);
+		T->SetWorldSize(Size);
+		T->SetTextRenderColor(Colour);
+		T->SetText(FText::FromString(Text));
+		T->SetRelativeLocation(At);
+		T->RegisterComponent();
+		return T;
+	};
+	const FAstraLiftSpec::FOpening& Op = Spec.Openings[0];
+	if (!SignText && !Label.IsEmpty())
+	{
+		// over the doors, on the sign's plate of the frame (0.6 cm proud of it); the kit's frame is built for the nominal opening, scaled with it
+		SignText = Make(TEXT("SignText"), Label, FVector(8.3f, 0.f, Op.Height + 21.f * Spec.Opening.Y), 9.f, FColor(190, 225, 255));
+	}
+	if (!ShaftText && Deck > 0)
+	{
+		// on the back wall of the shaft, at the height of the car's window when the car stands here: the number the Captain sees go by
+		ShaftText = Make(TEXT("ShaftText"), FString::FromInt(Deck), FVector(-ShaftBackCm + 6.f, 0.f, 150.f), 46.f, FColor(110, 195, 255));
 	}
 }
 
@@ -217,7 +268,7 @@ void AAstraLiftShaft::Setup(const FAstraLiftLine& L, const FAstraLiftSpec& S)
 		while (To - Z > 1.f)
 		{
 			const float H = FMath::Min(LiftSegH, To - Z);
-			Seg->AddInstance(FTransform(Yaw, XY + FVector(0.f, 0.f, Z), FVector(1.f, 1.f, H / LiftSegH)));
+			Seg->AddInstance(FTransform(Yaw, XY + FVector(0.f, 0.f, Z), FVector(S.Shaft.X, S.Shaft.Y, H / LiftSegH)));
 			Z += H;
 			++Segments;
 		}
@@ -226,7 +277,7 @@ void AAstraLiftShaft::Setup(const FAstraLiftLine& L, const FAstraLiftSpec& S)
 	{
 		const float Start = Stop.FloorZ - LiftDoorSegDown;
 		Fill(Start);
-		Door->AddInstance(FTransform(Yaw, XY + FVector(0.f, 0.f, Start)));
+		Door->AddInstance(FTransform(Yaw, XY + FVector(0.f, 0.f, Start), FVector(S.Shaft.X, S.Shaft.Y, 1.f)));
 		Z = Start + LiftDoorSegH;
 		++Segments;
 	}
