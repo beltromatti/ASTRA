@@ -53,6 +53,9 @@ public:
 	void CycleWeapon(float Direction);
 	void QuickSwitch();
 	void ToggleHolster();
+	void SelectRifle() { SelectWeapon(EAstraWeapon::Rifle); }
+	void SelectPistol() { SelectWeapon(EAstraWeapon::Pistol); }
+	void WheelInput(const struct FInputActionValue& Value);
 
 	// ------------------------------------------------------------------------------------------------ what the weapon costs the Captain (the character asks)
 	/** His pace with the weapon in his hands, against empty ones (1 when none is drawn). */
@@ -133,6 +136,7 @@ private:
 	bool bShown = false;
 	FRotator LastControl = FRotator::ZeroRotator;
 	float BaseFov = 90.f;
+	bool bFovTaken = false;                      // the camera's field of view is ours (through the sights): to be given back
 
 	// --- the helpers
 	AASTRACharacter* Owner() const;
@@ -156,6 +160,7 @@ private:
 	void PlayArms(UAnimSequence* A, bool bLoop, float Rate = 1.f);
 	void TickArms(float Dt);
 	void ShowArms(bool bOn);
+	void RestoreFov();
 	void TickHud(float Dt);
 	void RemoveHud();
 	FVector MuzzleGuess(const FVector& Eye, const FRotator& View) const;

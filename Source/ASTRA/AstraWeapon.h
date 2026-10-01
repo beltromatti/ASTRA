@@ -64,6 +64,10 @@ struct FAstraWeaponDef
 	const TCHAR* AnimEquip = TEXT("");
 	const TCHAR* AnimReload = TEXT("");
 	const TCHAR* AnimDry = TEXT("");
+	// the right hand's socket (HandGrip_R) in the ready pose, in the mannequin's mesh space (cm; the pose's axes as unit vectors): where the first-person arms put the weapon.
+	// Read from the animation by a headless probe; the arms are placed against the camera from these (UAstraFpsComponent::DressArms).
+	FVector PoseGripLoc = FVector::ZeroVector;
+	FVector PoseGripX = FVector(1.0, 0.0, 0.0), PoseGripY = FVector(0.0, 1.0, 0.0), PoseGripZ = FVector(0.0, 0.0, 1.0);
 	float EquipAnimS = 1.6f;               // their lengths, which the handling's times are fitted to
 	float ReloadAnimS = 2.2f;
 	float DryAnimS = 0.8f;

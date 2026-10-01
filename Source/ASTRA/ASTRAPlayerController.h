@@ -32,6 +32,9 @@ public:
 	void StandUp() { if (bSeated) { SetSeated(false); } }
 	/** A short notice at the bottom right of the screen (the start hint, "OPS › DATAPAD: DAMAGE REPORT"). */
 	void ShowNotice(const FString& Text, float Seconds);
+	// --- ABBORDAGGI: what the weapons ask of the controller (UAstraFpsComponent): the datapad is raised, the lift's panel is open
+	bool IsPadUp() const { return bPadUp; }
+	bool IsLiftMenuOpen() const { return LiftMenu.IsValid(); }
 
 protected:
 

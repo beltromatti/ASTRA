@@ -38,6 +38,14 @@ void UAstraInputSet::Build()
 	Jump = NewAction(this, TEXT("IA_ASTRA_Jump"), EInputActionValueType::Boolean);
 	Sprint = NewAction(this, TEXT("IA_ASTRA_Sprint"), EInputActionValueType::Boolean);
 	Crouch = NewAction(this, TEXT("IA_ASTRA_Crouch"), EInputActionValueType::Boolean);
+	Fire = NewAction(this, TEXT("IA_ASTRA_Fire"), EInputActionValueType::Boolean);
+	Aim = NewAction(this, TEXT("IA_ASTRA_Aim"), EInputActionValueType::Boolean);
+	Reload = NewAction(this, TEXT("IA_ASTRA_Reload"), EInputActionValueType::Boolean);
+	Weapon1 = NewAction(this, TEXT("IA_ASTRA_Weapon1"), EInputActionValueType::Boolean);
+	Weapon2 = NewAction(this, TEXT("IA_ASTRA_Weapon2"), EInputActionValueType::Boolean);
+	QuickSwitch = NewAction(this, TEXT("IA_ASTRA_QuickSwitch"), EInputActionValueType::Boolean);
+	Holster = NewAction(this, TEXT("IA_ASTRA_Holster"), EInputActionValueType::Boolean);
+	WeaponWheel = NewAction(this, TEXT("IA_ASTRA_WeaponWheel"), EInputActionValueType::Axis1D);
 
 	OnFoot = NewObject<UInputMappingContext>(this, TEXT("IMC_ASTRA_OnFoot"));
 
@@ -85,4 +93,19 @@ void UAstraInputSet::Build()
 	OnFoot->MapKey(Sprint, EKeys::Gamepad_LeftThumbstick);
 	OnFoot->MapKey(Crouch, EKeys::C);
 	OnFoot->MapKey(Crouch, EKeys::Gamepad_FaceButton_Right);
+
+	// the weapons: the left button fires, the right looks through the sights, R reloads, 1 and 2 the rifle and the sidearm, Q the last one, H puts it away, the wheel changes
+	OnFoot->MapKey(Fire, EKeys::LeftMouseButton);
+	OnFoot->MapKey(Fire, EKeys::Gamepad_RightTriggerAxis);
+	OnFoot->MapKey(Aim, EKeys::RightMouseButton);
+	OnFoot->MapKey(Aim, EKeys::Gamepad_LeftTriggerAxis);
+	OnFoot->MapKey(Reload, EKeys::R);
+	OnFoot->MapKey(Reload, EKeys::Gamepad_FaceButton_Left);
+	OnFoot->MapKey(Weapon1, EKeys::One);
+	OnFoot->MapKey(Weapon2, EKeys::Two);
+	OnFoot->MapKey(QuickSwitch, EKeys::Q);
+	OnFoot->MapKey(QuickSwitch, EKeys::Gamepad_FaceButton_Top);
+	OnFoot->MapKey(Holster, EKeys::H);
+	OnFoot->MapKey(Holster, EKeys::Gamepad_DPad_Down);
+	OnFoot->MapKey(WeaponWheel, EKeys::MouseWheelAxis);
 }

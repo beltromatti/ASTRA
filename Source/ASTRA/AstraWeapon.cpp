@@ -2,7 +2,7 @@
 
 namespace
 {
-	FAstraWeaponDef MakeRifle()
+	FAstraWeaponDef WpnMakeRifle()
 	{
 		FAstraWeaponDef W;
 		W.Id = EAstraWeapon::Rifle;
@@ -47,6 +47,11 @@ namespace
 		W.AnimEquip = TEXT("/Game/Characters/Mannequins/Anims/Rifle/MM_Rifle_Equip.MM_Rifle_Equip");
 		W.AnimReload = TEXT("/Game/Characters/Mannequins/Anims/Rifle/MM_Rifle_Reload.MM_Rifle_Reload");
 		W.AnimDry = TEXT("/Game/Characters/Mannequins/Anims/Rifle/MM_Rifle_DryFire.MM_Rifle_DryFire");
+		// the pose of MF_Rifle_Idle_ADS at its first frame (the probe's numbers)
+		W.PoseGripLoc = FVector(-14.3, 15.4, 138.7);
+		W.PoseGripX = FVector(0.94, 0.19, -0.27).GetSafeNormal();
+		W.PoseGripY = FVector(-0.14, 0.97, 0.21).GetSafeNormal();
+		W.PoseGripZ = FVector(0.30, -0.16, 0.94).GetSafeNormal();
 		W.EquipAnimS = 1.67f;
 		W.ReloadAnimS = 2.2f;
 		W.DryAnimS = 0.8f;
@@ -57,7 +62,7 @@ namespace
 		return W;
 	}
 
-	FAstraWeaponDef MakePistol()
+	FAstraWeaponDef WpnMakePistol()
 	{
 		FAstraWeaponDef W;
 		W.Id = EAstraWeapon::Pistol;
@@ -101,6 +106,11 @@ namespace
 		W.AnimEquip = TEXT("/Game/Characters/Mannequins/Anims/Pistol/MM_Pistol_Equip.MM_Pistol_Equip");
 		W.AnimReload = TEXT("/Game/Characters/Mannequins/Anims/Pistol/MM_Pistol_Reload.MM_Pistol_Reload");
 		W.AnimDry = TEXT("/Game/Characters/Mannequins/Anims/Pistol/MM_Pistol_DryFire.MM_Pistol_DryFire");
+		// MF_Pistol_Idle_ADS, first frame
+		W.PoseGripLoc = FVector(-11.2, 42.1, 147.4);
+		W.PoseGripX = FVector(1.0, 0.06, -0.01).GetSafeNormal();
+		W.PoseGripY = FVector(-0.06, 0.99, 0.14).GetSafeNormal();
+		W.PoseGripZ = FVector(0.02, -0.14, 0.99).GetSafeNormal();
 		W.EquipAnimS = 1.4f;
 		W.ReloadAnimS = 2.0f;
 		W.DryAnimS = 0.8f;
@@ -129,8 +139,8 @@ namespace AstraWeapons
 {
 	const FAstraWeaponDef& Get(EAstraWeapon Id)
 	{
-		static const FAstraWeaponDef Rifle = MakeRifle();
-		static const FAstraWeaponDef Pistol = MakePistol();
+		static const FAstraWeaponDef Rifle = WpnMakeRifle();
+		static const FAstraWeaponDef Pistol = WpnMakePistol();
 		static const FAstraWeaponDef None;
 		return Id == EAstraWeapon::Rifle ? Rifle : (Id == EAstraWeapon::Pistol ? Pistol : None);
 	}

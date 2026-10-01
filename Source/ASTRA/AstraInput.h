@@ -32,5 +32,15 @@ public:
 	/** Tap: crouch or stand up; hold: lie down (the character times it). */
 	UPROPERTY() TObjectPtr<UInputAction> Crouch;
 
+	// --- ABBORDAGGI: the weapons (UAstraFpsComponent): fire, aim through the sights, reload, the two weapons, the last one, holster, the wheel
+	UPROPERTY() TObjectPtr<UInputAction> Fire;
+	UPROPERTY() TObjectPtr<UInputAction> Aim;
+	UPROPERTY() TObjectPtr<UInputAction> Reload;
+	UPROPERTY() TObjectPtr<UInputAction> Weapon1;
+	UPROPERTY() TObjectPtr<UInputAction> Weapon2;
+	UPROPERTY() TObjectPtr<UInputAction> QuickSwitch;
+	UPROPERTY() TObjectPtr<UInputAction> Holster;
+	UPROPERTY() TObjectPtr<UInputAction> WeaponWheel;     // Axis1D: the mouse wheel
+
 	UPROPERTY() TObjectPtr<UInputMappingContext> OnFoot;
 };
