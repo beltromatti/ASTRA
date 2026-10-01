@@ -153,7 +153,7 @@ def roster_names() -> tuple[set[str], set[str]]:
 
 class Classification(unittest.TestCase):
     def test_the_squadron_news_is_the_nets(self) -> None:
-        for text, kind in ((AIRBORNE, "airborne"), (LOSS, "losses"), (TORPEDO, "torpedoes"), (RECOVERED, "recovered"), (SPLASH, "splash"),
+        for text, kind in ((AIRBORNE, "airborne"), ("flight: alpha squadron engaged a Harpy at 6.2 km", "engaged"), (LOSS, "losses"), (TORPEDO, "torpedoes"), (RECOVERED, "recovered"), (SPLASH, "splash"),
                            ("flight: bravo squadron rearmed, 7 Hammers ready on the flight deck", "rearmed"),
                            ("flight: search and rescue at the wreck of the Brightwater: lifeboats found, 41 survivors picked up", "rescue")):
             k = fm.classify(text)

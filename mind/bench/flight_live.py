@@ -96,6 +96,9 @@ HARPIES1 = {"enemy_small_craft": "1 Harpy strike fighters airborne (rockets and 
 SCENES = [
     Scene("loss_alpha", events=[LOSS], who={"alpha_lead", "cag"}, note="a leader tells his losses, by call sign"),
     Scene("airborne_alpha", events=[AIRBORNE], state=SQ(alpha="airborne: 8 Falcons airborne, mission cap"), expect="either", max_lines=1, note="a launch: the Chief's, or nothing"),
+    Scene("engaged_alpha", events=["flight: alpha squadron engaged a Harpy at 6.2 km"], state={**SQ(alpha="airborne: 8 Falcons airborne, mission cap"),
+                                                                                             "enemy_small_craft": "4 Harpy strike fighters airborne (rockets and guns), the nearest 6.2 km from us"},
+          expect="either", who={"alpha_lead", "cag"}, max_lines=1, note="the first contact: the fighters' leader may call it in two words, or not"),
     Scene("torpedo_bravo", events=[TORPEDO], state=SQ(bravo="returning: 7 Hammers airborne, mission recall"), who={"bravo_lead", "cag"}, max_lines=1, note="the bomber leader's"),
     Scene("recovered_alpha", events=[RECOVERED], state=SQ(alpha="on deck, rearming: ready in 60 s (6 Falcons); 2 lost"), who={"deck_chief", "alpha_lead"}, max_lines=1,
           note="the Chief's: aboard, the rearm"),

@@ -139,6 +139,7 @@ class Kind:
 # `flight: ... recon has identified ...` (what a recon flight finds is the plot's news: Sensors tells it; the net reads it in its log).
 _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k) for p, k in (
     (r"^flight: (?:alpha|bravo|drones) squadron airborne", Kind("airborne", True)),
+    (r"^flight: (?:alpha|drones) squadron engaged", Kind("engaged", True)),
     (r"^flight: (?:alpha|bravo|drones) squadron has lost", Kind("losses", True, call=True)),
     (r"^flight: (?:alpha|bravo|drones) squadron torpedo run", Kind("torpedoes", True, call=True)),
     (r"^flight: (?:alpha|bravo|drones) squadron recovered", Kind("recovered", True, call=True)),
@@ -241,7 +242,8 @@ WHEN YOU SPEAK
 - Only when something happens to you or to your people, or when the Captain speaks to you. Silence is normal and routine news needs no voice: then call stay_quiet. But a
   loss, a kill and a torpedo run are never left to the boards: they are always called, once, by the one they belong to.
 - One voice for one piece of news, the person it concerns. A squadron's losses and kills are its leader's: the leader of the fighters calls the Harpies that were splashed in
-  a few words ("Splash [n], [n] left": the numbers are the news's), and nobody else on the bridge reports that news, so a kill the net has not called yet is called now; a torpedo run is the bomber
+  a few words ("Splash [n], [n] left": the numbers are the news's), and nobody else on the bridge reports that news, so a kill the net has not called yet is called now; his first
+  contact with the enemy is his to call too, in two or three words, if the kills are not already on their way; a torpedo run is the bomber
   leader's; the deck's milestones are the Chief of the Deck's, each called once in a few words with the number the Captain can use: a squadron launched (how many, on what),
   recovered (how many aboard, the rearm time), ready again (his cue to launch it again); the boards show them, but nobody reads boards in a fight: the Chief's voice is how the
   Captain knows the deck has turned. The CAG does not take a leader's news from him: she speaks when it is

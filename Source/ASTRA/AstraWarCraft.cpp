@@ -687,6 +687,12 @@ void UAstraBattleSubsystem::ThinkCraft(FAstraBattleShip& S, float DtT)
 				if (F && bLeader && Bandit)
 				{
 					F->Bandit = Bandit->Id;
+					if (S.Side == EAstraSide::Astra && !S.bPiloted && S.CraftKind == 0 && Time - Q.EngagedAt > 45.f)
+					{
+						// the leader of one of our fighter flights meets the enemy: told once a minute at most for the squadron (its leader on the flight net calls it)
+						Q.EngagedAt = Time;
+						Report(FString::Printf(TEXT("flight: %s squadron engaged a Harpy at %.1f km"), *Q.Name, FVector::Dist(S.Pos, Bandit->Pos) / WarKm));
+					}
 				}
 			}
 		}

@@ -253,6 +253,7 @@ struct FAstraSquadron
 	int32 LostSinceReport = 0;
 	TArray<FString> LostCrew;             // who was flying the aircraft lost since the last report
 	float LastLossReport = -100.f;
+	float EngagedAt = -100.f;              // when one of its flights last met the enemy (told as `flight: alpha squadron engaged ...`, at most once in 45 s)
 	bool bAirborneReported = false;
 	int32 Launched = 0;      // aircraft launched in this sortie
 	int32 TorpedoesAway = 0; // released since the last report (one spoken report per torpedo run)
