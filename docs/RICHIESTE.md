@@ -5,7 +5,7 @@ Qui scrivo solo ciò che **non posso fare io** (per regole di sicurezza: creare 
 ## Aperte
 
 ### 2026-09-30 — Credito OpenRouter (quando ti fa comodo)
-Restano 5,31 $ su 10 (1/10 pomeriggio, verificato sul conto). Con la guerra grande (molte più menti) e le mie prove di gioco il consumo salirà: l'obiettivo è
+Restano 3,75 $ su 10 (1/10 sera, verificato sul conto): oggi le menti di guerra, i loro banchi e le prove di battaglia con la mente hanno speso circa 1,6 $. Una partita costa ora meno di 1 $ l'ora (equipaggio 0,76 + menti di guerra 0,02–0,17), ma lo sviluppo dei prossimi moduli (VOLO, le prove nel gioco) consuma: **una ricarica di 10–20 $ è consigliata presto**. Con la guerra grande (molte più menti) e le mie prove di gioco il consumo salirà: l'obiettivo è
 restare sotto 1 $ per ora di battaglia, ma per lo sviluppo delle prossime settimane conviene una ricarica di 10–20 $.
 Niente fretta: sotto i 3 $ residui te lo riscrivo qui e riduco le prove che costano.
 
