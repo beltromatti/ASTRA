@@ -36,6 +36,15 @@ alleati (1–2 m$ a decisione), ~0,3 $/ora in tutto, 60 fps con gli aiutanti fer
 schermo principale stacca sulle forze che arrivano (INCOMING / ARRIVING). Il brief CAMPAGNA resta per ciò che manca: la guerra lontana
 dall'Aquila (fronti, battaglie risolte dalla simulazione), la struttura lunga della campagna.
 
+**2/10 notte — ASCENSORI unito** ([ASCENSORI.md](ASCENSORI.md)): turboascensori e navetta della Spine veri (vetture cinematiche che
+portano il Capitano e la gente di VITA, porte accoppiate, pannelli, l'elenco dei ponti sullo schermo della vettura, la voce «ponte sette»
+al computer di bordo con lo strumento `lift_go`). Kit di 27 mesh, suoni, campo di prova `L_LiftTest`; agganci nella nave (contesto `lift`,
+comando `lift_go`), la voce del computer pulita, lo streaming che guarda dove va la corsa. Provato nel campo di prova: chiamata, elenco,
+corsa di tre ponti in 7 s a 8 m/s. **Il vecchio ascensore finto non c'è più e la pianta di oggi non ha pozzi: finché non arriva quella di
+NAVE-3 il gioco non ha ascensori** (le prove si fanno con il campo di prova o con `astra.lifts.plan data/ship/test/lifts_fixture.json`).
+Da fare con NAVE-3: `speed.lift_s` = 16,5 nei dati di VITA. Aiutanti ora: NAVE-3 e ABBORDAGGI (ripresi dopo il limite di sessione),
+TELETRASPORTO (avviato).
+
 **2/10 sera — prove di durata della guerra di flotte** (`tools/soak.py`, mente accesa, nessun Capitano, gli aiutanti che compilano):
 la prima (12 min) costava **1,63 $/ora** (l'equipaggio 1,00: la storia si accorciava a ogni turno e la cache copriva solo il prompt di
 sistema, ~10k token nuovi a turno) e ha trovato un «reinforcements» del regista con una linea di Styx (diventata alleata) e il Gate che
