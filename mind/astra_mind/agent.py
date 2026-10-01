@@ -20,7 +20,7 @@ from . import models
 from . import stations as station_model
 from .crew import CREW, system_prompt
 from .openrouter import Completion, OpenRouter, ToolCall
-from .tools import DEPT_TOOLS, SHIP_TOOL_NAMES, SPEAK, initiative_names, owner_of, tools_for
+from .tools import DEPT_TOOLS, LOOKUPS, SHIP_TOOL_NAMES, SPEAK, initiative_names, owner_of, tools_for
 
 log = logging.getLogger("astra.agent")
 
@@ -197,9 +197,10 @@ class BridgeAgent:
             results = await self._collect(pending, turn)
             main_lines = len(turn.lines)
             failures = [a for a in turn.actions if not a[2].get("ok", False)]
+            looked_up = any(n in LOOKUPS for n, _, _ in turn.actions)
             if not turn.cancelled:
-                if turn.actions and not turn.lines and not comp.error:
-                    await self._follow_up(turn, msgs, lang, readback=True)      # orders carried out in silence: read them back
+                if turn.actions and not comp.error and (not turn.lines or looked_up):
+                    await self._follow_up(turn, msgs, lang, readback=True)      # orders carried out in silence, or a file read: say what
                 elif failures:
                     await self._follow_up(turn, msgs, lang, readback=False)
             self._record(user, comp.tool_calls, results, turn, main_lines)
@@ -395,7 +396,12 @@ class BridgeAgent:
     async def _follow_up(self, turn: Turn, msgs, lang: str, readback: bool) -> None:
         notes = "\n".join(f"- {n}({json.dumps(a, ensure_ascii=False)}) {'ok' if r.get('ok') else 'FAILED'}: {r.get('detail', '')}"
                           for n, a, r in turn.actions if readback or not r.get("ok", False))
-        ask = ("The officers who acted now say to the Captain, one short line each and in speaking order, WHAT was done, with the "
+        lookup = readback and any(n in LOOKUPS for n, _, _ in turn.actions)
+        ask = ("The officer who looked it up now reports to the Captain what the personnel file and the locator say about the people "
+               "asked for: a report ABOUT them, in the third person (they are other members of the crew, not the officer speaking), "
+               "who they are, where they are and what they are doing, in one or two short lines; nothing the file does not say. Then, "
+               "one short line each, any other officer who acted says what was done." if lookup else
+               "The officers who acted now say to the Captain, one short line each and in speaking order, WHAT was done, with the "
                "exact values (never a bare 'aye'); for anything that FAILED, why, and an alternative." if readback else
                "The responsible officer now tells the Captain briefly what failed and why, and proposes an alternative "
                "if there is one.")

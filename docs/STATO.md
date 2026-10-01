@@ -45,6 +45,14 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
 - **Schermo principale**: le schede dicono IN ITS GUNS / IN OUR RAILS / OUT OF RANGE; la telecamera non vede più lo scafo dell'Aquila
   tranne nella vista da fuori. Le «lastre» che restano con lo zoom forte sono gli effetti grezzi dei colpi (anelli d'urto, bolle
   degli scudi): li rifà VFX.
+- **La gente di bordo parla davvero** (provato nel gioco con la mente, Mess Concourse del Ponte 4): chiamato per nome a 14 m, un
+  tenente del ponte di volo risponde lui (prima un filtro di 4,5 m nel codice lo escludeva e rispondeva l'XO inventando); un ordine
+  «Ponte, qui il Capitano…» detto guardando un marinaio resta del ponte. Gli ufficiali hanno l'**anagrafe e il localizzatore**
+  (`crew_locate`): «chi è il cuoco di turno e dov'è?» → il Crewman Tiago Sirin, nella cucina principale a 43 m, gli altri due
+  cuochi fuori servizio. Ruolino rifatto: 468 cognomi (mai più sette Kowalski, mai i cognomi del cast), un nominativo per pilota,
+  il mestiere segue il grado (niente tenenti magazzinieri). Il posto del Capitano viene dalla pianta («DECK 4 · MESS CONCOURSE ·
+  SECTION B», con ponte e sezione nel contesto; prima diceva «flight deck» su tutti i ponti bassi). Con `-nosound` le voci
+  risultano «silent», non più «failed». Dettagli in [VITA.md §8](VITA.md).
 - **Aiutanti al lavoro** (brief in `docs/brief/`): **MENTE-GUERRA** (ammiragli, comandanti, alleati che parlano, l'XO con
   `group_order`, la mente nel giro del banco, poi il regista v2), **VFX** (armi, scudi, esplosioni, rotture coi pezzi v3, danni sugli
   scafi, motori), **NAVE-2** (tutti i ponti: stanze nuove, istanze, luci come dati, un sotto-livello per ponte). Poi DISTRUZIONE,
@@ -114,6 +122,7 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
 | 2026-09-30 | 10,00 $ | 3,56 $ | agenti di supporto: prove del router su più modelli (MENTE-EQUIPAGGIO ≈0,22 $ in 1192 chiamate) |
 | 2026-09-30 | 10,00 $ | 3,84 $ | MENTE-EQUIPAGGIO completato (0,40 $ in tutto), prova della mente nel gioco vero |
 | 2026-09-30 | 10,00 $ | 3,93 $ | prova dal vivo della voce v2 (una battaglia intera fino all'abbandono nave) |
+| 2026-10-01 | 10,00 $ | 4,69 $ | banchi di MENTE-GUERRA con le menti nel giro, prove nel gioco di GUERRA, VITA e della gente di bordo (≈0,5 m$ a risposta di un NPC) |
 
 Regola: sotto i 3 $ residui aggiungo una voce in RICHIESTE.md e riduco le spese AI non essenziali (benchmark, immagini).
 

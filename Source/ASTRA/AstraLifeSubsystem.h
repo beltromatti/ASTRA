@@ -54,6 +54,11 @@ public:
 	/** One person as the mind sees them (identity, what they do now, what they remember). */
 	TSharedRef<FJsonObject> PersonJson(int32 Person) const;
 
+	/** The personnel file and the internal locator, as an officer at a console reads them: the people aboard whose name, rank, job or
+	 *  department match the words ("Kowalski", "Lieutenant Sato", "the cook", "a pilot called Ghost"), best first, at most Max — who they
+	 *  are, where they are now and what they are doing, or that they are wounded in the Medbay or fell. Empty: nobody matches. */
+	FString LocatorText(const FString& Words, int32 Max = 4) const;
+
 	/** What a damage-control party needs to get to an incident in a deck and section, in seconds: the number the ship should give as "on scene
 	 *  in" when it dispatches a team (the repair then begins when the party is there). 0 when life is not running. */
 	float RepairEtaSeconds(int32 InDeck, TCHAR InSection, int32 IncidentId) const { return IsRunning() ? Life.RepairEtaSeconds(InDeck, InSection, IncidentId) : 0.f; }

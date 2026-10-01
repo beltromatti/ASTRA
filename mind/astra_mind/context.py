@@ -23,7 +23,8 @@ PLACE_SLUGS = {"bridge": "bridge", "corridors": "corridor", "captains_quarters":
 
 _PLACE_WORDS = (                                 # (text found in the ship state's `captain`, place)
     ("main engineering", "engineering"), ("mess hall", "mess"), ("crew berthing", "berthing"), ("medbay", "medbay"),
-    ("flying a falcon", "falcon"), ("captain's quarters", "quarters"), ("flight deck", "flight_deck"), ("on the bridge", "bridge"))
+    ("flying a falcon", "falcon"), ("captain's quarters", "quarters"), ("flight deck", "flight_deck"), ("away from the bridge", "aboard"),
+    ("on the bridge", "bridge"))
 
 
 @dataclass

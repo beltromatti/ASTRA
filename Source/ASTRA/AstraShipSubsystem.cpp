@@ -12,6 +12,7 @@
 #include "AstraHangar.h"
 #include "AstraPatient.h"
 #include "AstraQuarters.h"
+#include "AstraShipPlan.h"
 #include "GameFramework/Character.h"
 #include "AstraCrewMember.h"
 #include "AstraLifepod.h"
@@ -63,6 +64,22 @@ namespace
 		case EAstraAlert::Red: return TEXT("red");
 		default: return TEXT("green");
 		}
+	}
+
+	/** Where a pawn is in the ship's plan (the decks of the whole Aquila, docs/NAVE.md): its compartment, or null off the plan (a
+	 *  Falcon, a planet, a level without the plan). */
+	const FAstraPlanCompartment* PlanCompartmentOf(const UWorld* World, const APawn* P)
+	{
+		const UAstraShipPlan* Plan = World && P ? World->GetSubsystem<UAstraShipPlan>() : nullptr;
+		return Plan ? Plan->CompartmentAt(P->GetActorLocation()) : nullptr;
+	}
+
+	/** A compartment's own name without the section the plan writes into a corridor's ("Port Passage · Section C" -> "Port Passage"). */
+	FString PlanRoomName(const FAstraPlanCompartment& Comp)
+	{
+		FString Name = Comp.Name;
+		const int32 Cut = Name.Find(TEXT(" · Section"));
+		return Cut != INDEX_NONE ? Name.Left(Cut) : Name;
 	}
 
 	float WrapDeg(float D) { return FMath::Fmod(FMath::Fmod(D, 360.f) + 360.f, 360.f); }
@@ -1635,6 +1652,21 @@ FString UAstraShipSubsystem::CaptainAboard() const
 			            "officers speak by intercom");
 		}
 	}
+	// anywhere else aboard: the compartment of the ship's plan (the bridge is one of them)
+	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P); Comp && Comp->Kind != TEXT("bridge"))
+	{
+		FString DeckName;
+		if (const UAstraShipPlan* Plan = GetWorld()->GetSubsystem<UAstraShipPlan>())
+		{
+			for (const FAstraPlanDeck& D : Plan->GetDecks())
+			{
+				if (D.Id == Comp->Deck) { DeckName = D.Name; }
+			}
+		}
+		return FString::Printf(TEXT("in the %s (Deck %d%s, section %s), away from the bridge: the XO has the conn; the bridge officers speak "
+		                            "by intercom"), *PlanRoomName(*Comp), Comp->Deck, DeckName.IsEmpty() ? TEXT("") : *(TEXT(" · ") + DeckName),
+		                       *Comp->Section);
+	}
 	if (P && P->GetActorLocation().Z < -3000.f)
 	{
 		return TEXT("on the flight deck (Deck 9), away from the bridge: the XO has the conn; the Captain speaks by intercom");
@@ -1665,6 +1697,15 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	{
 		if (It->IsPawnInside(P)) { return TEXT("DECK 1 · CAPTAIN'S QUARTERS"); }
 	}
+	// anywhere else aboard: the compartment of the ship's plan, as the signs say it ("DECK 4 · MESS CONCOURSE · SECTION B")
+	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P))
+	{
+		if (Comp->Kind == TEXT("bridge"))
+		{
+			return TEXT("BRIDGE");
+		}
+		return FString::Printf(TEXT("DECK %d · %s · SECTION %s"), Comp->Deck, *PlanRoomName(*Comp).ToUpper(), *Comp->Section);
+	}
 	if (P && P->GetActorLocation().Z < -3000.f)
 	{
 		return TEXT("DECK 9 · FLIGHT DECK");
@@ -1684,10 +1725,19 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 	TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
 	const FString Where = CaptainPlace();
 	FString Place = Where.Contains(TEXT("·")) ? Where.RightChop(Where.Find(TEXT("·")) + 1).TrimStartAndEnd() : Where;
-	Place = Place.ToLower().Replace(TEXT("'"), TEXT("")).Replace(TEXT(" "), TEXT("_"));   // "bridge", "captains_quarters", "flight_deck"…
-	C->SetStringField(TEXT("place"), Place);
+	if (Place.Contains(TEXT("·")))
+	{
+		Place = Place.Left(Place.Find(TEXT("·"))).TrimStartAndEnd();       // "MESS CONCOURSE · SECTION B": the room
+	}
+	Place = Place.ToLower().Replace(TEXT("'"), TEXT("")).Replace(TEXT("("), TEXT("")).Replace(TEXT(")"), TEXT("")).Replace(TEXT(" "), TEXT("_"));
+	C->SetStringField(TEXT("place"), Place);                                // "bridge", "captains_quarters", "flight_deck", "mess_concourse"…
 	C->SetStringField(TEXT("place_name"), Where);
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P))
+	{
+		C->SetNumberField(TEXT("deck"), Comp->Deck);                      // where a fire, a breach, a team is, against where the Captain is
+		C->SetStringField(TEXT("section"), Comp->Section);
+	}
 	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0);
 	FString Pawn = TEXT("on_foot");
 	if (CaptainPod.IsValid()) { Pawn = TEXT("pod"); }
@@ -1884,6 +1934,25 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		          : M == TEXT("ship") && !Scan.IsEmpty() ? FString::Printf(TEXT("holo table: %s as the sensors see her — sections, shield faces, what burns"), *Scan)
 		          : M == TEXT("ship")   ? FString::Printf(TEXT("holo table: the Aquila, deck by deck — %s"), *DamageSummary())
 		                                : FString(TEXT("holo table: tactical plot"));
+		return true;
+	}
+	if (Name == TEXT("crew_locate"))
+	{
+		// the personnel file and the internal locator (VITA): who someone is, where they are, what they are doing
+		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
+		if (!Life || !Life->IsRunning())
+		{
+			OutDetail = TEXT("the internal locator is not answering");
+			return false;
+		}
+		const FString Who = Str(TEXT("who")).TrimStartAndEnd();
+		OutDetail = Life->LocatorText(Who, 4);
+		if (OutDetail.IsEmpty())
+		{
+			OutDetail = FString::Printf(TEXT("nobody aboard matches \"%s\" in the personnel file (try a surname, a rank and a name, or a job)"), *Who);
+			return false;
+		}
+		OutDetail = TEXT("the personnel file and the internal locator say (other crew members, not the officer who looked): ") + OutDetail;
 		return true;
 	}
 	if (Name == TEXT("visit"))

@@ -34,8 +34,7 @@ log = logging.getLogger("astra.npc")
 
 ROLE = "npc"
 WAIT_S = 4.0                 # a crew member who has not answered by now says nothing: the bridge takes the Captain's words
-NEAR_M = 4.5                 # near enough that the Captain's words are plausibly meant for them, in a corridor or a room
-MAX_LISTENERS = 3            # people in the prompt: the one the Captain looks at, then the nearest
+MAX_LISTENERS = 6            # people in the prompt: everyone the game says can hear (it sends six at most), the one looked at first
 MAX_LINES = 3
 MEMORY_EXCHANGES = 4         # what the Captain and each person said last, kept
 SAY = {"type": "function", "function": {
@@ -94,11 +93,11 @@ def parse_people(raw_ctx: dict[str, Any] | None, state: dict[str, Any] | None) -
 
 
 def pick(people: list[Listener], n: int = MAX_LISTENERS) -> list[Listener]:
-    """The people the Captain's words could plausibly be for: who the Captain looks at, then whoever is close. (Geometry, not words:
-    whether the words were meant for them is the model's to judge.)"""
-    cand = [p for p in people if p.facing or p.dist_m <= NEAR_M]
-    cand.sort(key=lambda p: (not p.facing, p.dist_m))
-    return cand[:n]
+    """The people the Captain's words could be for: everyone the game says can hear them (the game did the hearing: the distance, a
+    wall, a closed door), the one the Captain looks at first, then the nearest. Whether the words were meant for one of them (a name
+    called across the room, a look, a question to whoever is at hand) is the model's to judge from where each of them is, not a
+    distance's in the code: a crewman called by name at ten metres answers."""
+    return sorted(people, key=lambda p: (not p.facing, p.dist_m))[:n]
 
 
 # ------------------------------------------------------------------------------------------------ what each department could know
@@ -188,7 +187,8 @@ How they speak
   No lists, no markdown, no stage directions, no emojis; never a word about being an AI, a game or a prompt.
 - They know only what their block says: what they are doing, what they remember, and what someone of their department could know of
   the ship. Everything else they do not know, and say so the way a person does ("nobody tells us that, {captain}", "you would have to
-  ask the bridge", a hedged rumour); they never invent a battle, a casualty, a number or a place the block does not give.
+  ask the bridge", a hedged rumour); they never invent a battle, a casualty, a number, a place or a person's name the block does not
+  give (who is on duty in another department, who cooks today: they do not know, and say so).
 - They can only talk. If the Captain orders something a word cannot do (go somewhere, fix something, change the ship) they say what
   they would do or who they would tell ("I will tell my chief at once"): never that it is done.
 
@@ -196,8 +196,9 @@ Whom the Captain speaks to
 The words may be for one of them, for several, for someone else (an officer, the bridge, the whole ship, the Captain thinking aloud) or
 for nobody. Judge as a person would: someone who is asked something, called by name or looked at while the Captain speaks to them,
 answers; another who listens may add a word if it is natural. When the Captain names or titles somebody who is not listed ("Number
-One", the helm, the chief, the ship's computer, a fighter on the radio) or speaks to the ship at large or to themselves, the words are
-not for the people listed, however well they know the subject: being able to answer is not being asked. When the words are not for any
+One", the helm, the chief, the ship's computer, a fighter on the radio), calls the bridge ("Bridge, this is the Captain"), or speaks to
+the ship at large or to themselves, the words are not for the people listed, however well they know the subject and even when the
+Captain happens to be looking at one of them: the Captain is talking over the intercom, and being able to answer is not being asked. When the words are not for any
 of them, call `pass` and nothing else. Otherwise answer with `say`, one call per line, in the order they speak; at most
 {max_lines} lines in all."""
 
@@ -268,8 +269,8 @@ class Npcs:
         if not people:
             return ""
         names = ", ".join(f"{p.name} ({p.job or p.dept})" for p in people)
-        return (f"The Captain is face to face with crew members who can hear and answer for themselves: {names}. Unless the words are plainly for "
-                "the bridge (an order, a question for an officer), they are for them: say nothing.")
+        return (f"The Captain is among crew members who can hear and answer for themselves: {names}. Unless the words are plainly for the "
+                "bridge (an order, a question for an officer), they are for them: say nothing.")
 
     def preempt(self) -> int:
         """The Captain speaks again: whoever was about to answer the last words says nothing."""

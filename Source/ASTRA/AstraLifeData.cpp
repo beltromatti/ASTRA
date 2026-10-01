@@ -527,6 +527,13 @@ void FAstraLifeMap::LoadLife(const TSharedPtr<FJsonObject>& Life)
 				JobByRoom.Add(FName(*KV.Key), KV.Value->AsString());
 			}
 		}
+		if (const TSharedPtr<FJsonObject>* Off = nullptr; (*Jobs)->TryGetObjectField(TEXT("officer_by_room"), Off))
+		{
+			for (const auto& KV : (*Off)->Values)
+			{
+				OfficerJobByRoom.Add(FName(*KV.Key), KV.Value->AsString());
+			}
+		}
 	}
 	if (const TSharedPtr<FJsonObject>* Ds = nullptr; Life->TryGetObjectField(TEXT("departments"), Ds))
 	{

@@ -335,6 +335,104 @@ TSharedRef<FJsonObject> UAstraLifeSubsystem::PersonJson(int32 Person) const
 	return O;
 }
 
+FString UAstraLifeSubsystem::LocatorText(const FString& Words, int32 Max) const
+{
+	const UAstraShipSubsystem* S = Ship.Get();
+	if (!IsRunning() || !S)
+	{
+		return FString();
+	}
+	// the words as the file is searched: a name, a call sign, a rank, a job, a department (the little words of a sentence weigh nothing)
+	static const TSet<FString> Little = {TEXT("the"), TEXT("and"), TEXT("our"), TEXT("who"), TEXT("where"), TEXT("is"), TEXT("of"), TEXT("on"),
+	                                     TEXT("called"), TEXT("named"), TEXT("ship"), TEXT("aboard"), TEXT("duty"), TEXT("now"), TEXT("any"), TEXT("one")};
+	FString Clean;
+	for (const TCHAR Ch : Words.ToLower())
+	{
+		Clean.AppendChar(FChar::IsAlpha(Ch) || Ch == TEXT('-') || Ch == TEXT('\'') ? Ch : TEXT(' '));
+	}
+	TArray<FString> Toks;
+	Clean.ParseIntoArrayWS(Toks);
+	Toks.RemoveAll([](const FString& T) { return T.Len() < 3 || Little.Contains(T); });
+	if (Toks.IsEmpty())
+	{
+		return FString();
+	}
+	struct FHit { int32 Score; bool bName; int32 Person; float Dist; };
+	TArray<FHit> Hits;
+	const TArray<FAstraCrewman>& Roster = S->GetRoster().Get();
+	for (int32 i = 0; i < Life.NumPeople(); ++i)
+	{
+		const FAstraLifePerson& P = Life.Person(i);
+		const FAstraCrewman& R = Roster[P.Roster];
+		FString Last = R.Last.ToLower(), Call;
+		if (const int32 Cut = Last.Find(TEXT(" (call sign ")); Cut != INDEX_NONE)
+		{
+			Call = Last.Mid(Cut + 12).LeftChop(1);
+			Last = Last.Left(Cut);
+		}
+		const FString First = R.First.ToLower(), RankL = R.Rank.ToLower(), JobL = P.Job.ToLower(), DeptL = R.Dept.ToLower();
+		int32 Score = 0;
+		bool bName = false;
+		for (const FString& T : Toks)
+		{
+			if (T == Last || T == Call) { Score += 6; bName = true; }
+			else if (T == First) { Score += 5; bName = true; }
+			else if (T.Len() >= 4 && (Last.StartsWith(T) || First.StartsWith(T))) { Score += 2; bName = true; }
+			else if (T.Len() >= 4 && JobL.Contains(T)) { Score += 3; }
+			else if (RankL.Contains(T)) { Score += 1; }
+			else if (T.Len() >= 4 && DeptL.Contains(T)) { Score += 1; }
+		}
+		if (Score >= 3)
+		{
+			Hits.Add({Score, bName, i, FVector::Dist(P.Pos, EyeCm)});
+		}
+	}
+	if (Hits.IsEmpty())
+	{
+		return FString();
+	}
+	// a name asked for is a name found: the people the words only describe (a job, a rank) come after them; on duty before off, the nearer first
+	Hits.Sort([this](const FHit& A, const FHit& B)
+	{
+		if (A.Score != B.Score) { return A.Score > B.Score; }
+		const bool DutyA = Life.Person(A.Person).Act == EAstraLifeAct::Duty, DutyB = Life.Person(B.Person).Act == EAstraLifeAct::Duty;
+		return DutyA != DutyB ? DutyA : A.Dist < B.Dist;
+	});
+	const int32 Best = Hits[0].Score;
+	const bool bByName = Hits[0].bName;
+	Hits.RemoveAll([Best, bByName](const FHit& H) { return H.Score < Best - 2 || (bByName && !H.bName); });
+	// in the third person, a sentence each: what the file says of them (the officer who looked tells the Captain)
+	TArray<FString> Lines;
+	for (int32 k = 0; k < FMath::Min(Max, Hits.Num()); ++k)
+	{
+		const FAstraLifePerson& P = Life.Person(Hits[k].Person);
+		const FAstraCrewman& R = Roster[P.Roster];
+		FString Line = FString::Printf(TEXT("%s (%s, %s, %s watch)"), *R.Name(), *P.Job, *R.Dept, Life.WatchName(P.Watch));
+		if (R.Status == 2)
+		{
+			Line += TEXT(" was killed in action.");
+		}
+		else if (R.Status == 1)
+		{
+			Line += FString::Printf(TEXT(" lies wounded in the Medbay (Deck 6): %s, %s."), *R.Injury, R.ConditionName());
+		}
+		else
+		{
+			// how far from the Captain only on the Captain's own deck (forty metres through two decks is no distance anyone walks)
+			const int32 Comp = Life.CompOf(Hits[k].Person);
+			const bool bSameDeck = Life.GetMap().Comps.IsValidIndex(Comp) && Plan.IsValid() && Life.GetMap().Comps[Comp].Deck == Plan->DeckAt(EyeCm);
+			Line += FString::Printf(TEXT(" is now in %s, %s%s"), *Life.Where(Hits[k].Person), *Life.Doing(Hits[k].Person),
+			                        bSameDeck ? *FString::Printf(TEXT("; on the Captain's deck, %.0f m away."), Hits[k].Dist / 100.f) : TEXT("."));
+		}
+		Lines.Add(Line);
+	}
+	if (Hits.Num() > Max)
+	{
+		Lines.Add(FString::Printf(TEXT("%d more match the words."), Hits.Num() - Max));
+	}
+	return FString::Join(Lines, TEXT(" "));
+}
+
 TArray<TSharedPtr<FJsonValue>> UAstraLifeSubsystem::ListenersJson(const FVector& Eye, const FVector& Look, int32 Max) const
 {
 	struct FHeard { float Score; float Dist; float Angle; const AAstraLifeBody* B; };

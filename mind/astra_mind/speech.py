@@ -334,7 +334,8 @@ class Voice:
     def game_status(self, msg: dict) -> None:
         """The game reports what became of a line it was given: `voice_status{line,state,detail}`, state one of started,
         stalled (the audio ran dry while the line was still being said), failed (it could not play the line at all: the
-        subtitle was shown and nobody spoke), finished. Logged and counted; a failure is a warning."""
+        subtitle was shown and nobody spoke), silent (a game without an audio device, a test run: the subtitle only), finished.
+        Logged and counted; a failure is a warning."""
         state = str(msg.get("state", ""))
         self.stats[f"game_{state}"] += 1
         text = f"the game says line {msg.get('line')} is {state}" + (f" ({msg.get('detail')})" if msg.get("detail") else "")

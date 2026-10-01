@@ -75,6 +75,22 @@ SCENARIOS: list[dict[str, Any]] = [
          expect="answer", who="npc17", must=r"", forbid=r""),
     dict(name="morale", text="Com'è il morale dei marines?", lang="it", where="at the armoury", people=[MARINE],
          expect="answer", who="npc455", must=r"", forbid=r""),
+    # a name called across a busy concourse: the one named answers, ten metres away and not looked at (the game says he can hear)
+    dict(name="name_far", text="Kowalski, com'è il rancio oggi?", lang="it", where="in the Mess Concourse (Deck 4, section B)",
+         people=[_at(SENSOR, dist_m=2.5, facing=False, angle_deg=60), _at(ENGINEER, dist_m=3.4, facing=False, angle_deg=80),
+                 _at(STEWARD, dist_m=9.5, facing=False, angle_deg=40, doing="on the way to a meal", place="Deck 4 · Section B · Mess Concourse")],
+         expect="answer", who="npc301", must=r"", forbid=r""),
+    # the Captain looks at a crewman while calling the bridge on the intercom: the words are the bridge's all the same
+    dict(name="bridge_facing", text="Ponte, qui il Capitano: chi è il cuoco di turno adesso, e dov'è?", lang="it",
+         where="in the Mess Concourse (Deck 4, section B)",
+         people=[_at(SENSOR, dist_m=4.0, facing=True, angle_deg=8), _at(MARINE, dist_m=9.0, facing=False, angle_deg=70)],
+         expect="silence", who=None, must=r"", forbid=r""),
+    # the same crowd, and words for the bridge over the intercom: nobody of them answers
+    dict(name="crowd_bridge", text="Ponte, qui il Capitano: allarme giallo, e mandatemi il rapporto dei danni.", lang="it",
+         where="in the Mess Concourse (Deck 4, section B)",
+         people=[_at(SENSOR, dist_m=2.5, facing=False, angle_deg=60), _at(ENGINEER, dist_m=3.4, facing=False, angle_deg=80),
+                 _at(STEWARD, dist_m=9.5, facing=False, angle_deg=40), _at(MARINE, dist_m=12.0, facing=False, angle_deg=120)],
+         expect="silence", who=None, must=r"", forbid=r""),
 ]
 
 

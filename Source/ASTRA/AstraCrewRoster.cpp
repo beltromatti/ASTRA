@@ -19,19 +19,65 @@ namespace
 		TEXT("Dario"), TEXT("Nia"), TEXT("Hugo"), TEXT("Sana"), TEXT("Emil"), TEXT("Olga"), TEXT("Ibrahim"), TEXT("Clara"),
 		TEXT("Rustam"), TEXT("Tove"), TEXT("Ade"), TEXT("Beatriz"), TEXT("Ren"), TEXT("Halima"), TEXT("Stefan"), TEXT("Maya")};
 	const TCHAR* LastNames[] = {
-		TEXT("Diallo"), TEXT("Berg"), TEXT("Tanaka"), TEXT("Kowalski"), TEXT("Rahman"), TEXT("Alvarez"), TEXT("Lindgren"), TEXT("Mensah"),
-		TEXT("Moretti"), TEXT("Iyer"), TEXT("Sandberg"), TEXT("Fuentes"), TEXT("Haddad"), TEXT("Sato"), TEXT("Karimi"), TEXT("Nystrom"),
-		TEXT("Petrova"), TEXT("Okafor"), TEXT("Ricci"), TEXT("Patel"), TEXT("Halvorsen"), TEXT("Aziz"), TEXT("Navarro"), TEXT("Eriksen"),
-		TEXT("Dlamini"), TEXT("Nakamura"), TEXT("Ortega"), TEXT("Volkov"), TEXT("Schreiber"), TEXT("Costa"), TEXT("Kimura"), TEXT("Bello"),
-		TEXT("Serrano"), TEXT("Orlov"), TEXT("Sharma"), TEXT("Holm"), TEXT("El-Amin"), TEXT("Ferreira"), TEXT("Lund"), TEXT("Boateng"),
-		TEXT("Romano"), TEXT("Mehta"), TEXT("Strand"), TEXT("Castillo"), TEXT("Hosseini"), TEXT("Watanabe"), TEXT("Nwosu"), TEXT("Novak"),
-		TEXT("Reyes"), TEXT("Dahl"), TEXT("Farahani"), TEXT("Adeyemi"), TEXT("Marchetti"), TEXT("Zhang"), TEXT("Obi"), TEXT("Keller"),
-		TEXT("Kahale"), TEXT("Nasser"), TEXT("Solberg"), TEXT("Medina"), TEXT("Ishikawa"), TEXT("Yilmaz"), TEXT("Barros"), TEXT("Voigt"),
-		TEXT("Mokoena"), TEXT("Lopes"), TEXT("Hayashi"), TEXT("Qureshi"), TEXT("Ivanova"), TEXT("Brandt"), TEXT("Owusu"), TEXT("Conti"),
-		TEXT("Wallin"), TEXT("Carter"), TEXT("Delgado"), TEXT("Sokolov"), TEXT("Park"), TEXT("Demir"), TEXT("Silva"), TEXT("Markovic"),
-		TEXT("Vitale"), TEXT("Achebe"), TEXT("Laurent"), TEXT("Chaudhry"), TEXT("Engel"), TEXT("Kuznetsova"), TEXT("Suleiman"), TEXT("Moreau"),
-		TEXT("Aliyev"), TEXT("Sjoberg"), TEXT("Adebayo"), TEXT("Rocha"), TEXT("Fujita"), TEXT("Abdi"), TEXT("Hartmann"), TEXT("Quinn"),
-		TEXT("O'Rourke"), TEXT("Kaur"), TEXT("Mbeki"), TEXT("Bianchi"), TEXT("Vasquez"), TEXT("Jensen"), TEXT("Takahashi"), TEXT("Nkemelu")};
+		TEXT("Diallo"), TEXT("Berg"), TEXT("Kowalski"), TEXT("Rahman"), TEXT("Alvarez"), TEXT("Lindgren"), TEXT("Moretti"), TEXT("Iyer"),
+		TEXT("Sandberg"), TEXT("Fuentes"), TEXT("Haddad"), TEXT("Sato"), TEXT("Karimi"), TEXT("Nystrom"), TEXT("Petrova"), TEXT("Okafor"),
+		TEXT("Ricci"), TEXT("Patel"), TEXT("Halvorsen"), TEXT("Aziz"), TEXT("Navarro"), TEXT("Eriksen"), TEXT("Dlamini"), TEXT("Nakamura"),
+		TEXT("Ortega"), TEXT("Volkov"), TEXT("Schreiber"), TEXT("Costa"), TEXT("Kimura"), TEXT("Bello"), TEXT("Serrano"), TEXT("Orlov"),
+		TEXT("Sharma"), TEXT("Holm"), TEXT("El-Amin"), TEXT("Ferreira"), TEXT("Lund"), TEXT("Boateng"), TEXT("Romano"), TEXT("Mehta"),
+		TEXT("Strand"), TEXT("Castillo"), TEXT("Hosseini"), TEXT("Watanabe"), TEXT("Nwosu"), TEXT("Novak"), TEXT("Reyes"), TEXT("Dahl"),
+		TEXT("Farahani"), TEXT("Adeyemi"), TEXT("Marchetti"), TEXT("Zhang"), TEXT("Obi"), TEXT("Keller"), TEXT("Kahale"), TEXT("Nasser"),
+		TEXT("Solberg"), TEXT("Medina"), TEXT("Ishikawa"), TEXT("Yilmaz"), TEXT("Barros"), TEXT("Voigt"), TEXT("Mokoena"), TEXT("Lopes"),
+		TEXT("Hayashi"), TEXT("Qureshi"), TEXT("Ivanova"), TEXT("Brandt"), TEXT("Owusu"), TEXT("Conti"), TEXT("Wallin"), TEXT("Carter"),
+		TEXT("Delgado"), TEXT("Sokolov"), TEXT("Park"), TEXT("Demir"), TEXT("Silva"), TEXT("Markovic"), TEXT("Vitale"), TEXT("Achebe"),
+		TEXT("Laurent"), TEXT("Chaudhry"), TEXT("Engel"), TEXT("Kuznetsova"), TEXT("Suleiman"), TEXT("Moreau"), TEXT("Aliyev"), TEXT("Sjoberg"),
+		TEXT("Adebayo"), TEXT("Rocha"), TEXT("Fujita"), TEXT("Abdi"), TEXT("Hartmann"), TEXT("Quinn"), TEXT("Kaur"), TEXT("Mbeki"),
+		TEXT("Bianchi"), TEXT("Vasquez"), TEXT("Jensen"), TEXT("Takahashi"), TEXT("Nkemelu"), TEXT("Abara"), TEXT("Abiodun"), TEXT("Acosta"),
+		TEXT("Adamczyk"), TEXT("Adomaitis"), TEXT("Agarwal"), TEXT("Aguilar"), TEXT("Ahmadi"), TEXT("Akande"), TEXT("Akinola"), TEXT("Akhtar"),
+		TEXT("Albrecht"), TEXT("Alexiou"), TEXT("Almeida"), TEXT("Amadi"), TEXT("Amundsen"), TEXT("Andersen"), TEXT("Antonelli"), TEXT("Appiah"),
+		TEXT("Arslan"), TEXT("Asante"), TEXT("Ashkenazi"), TEXT("Atkinson"), TEXT("Avila"), TEXT("Ayodele"), TEXT("Azevedo"), TEXT("Babic"),
+		TEXT("Bakker"), TEXT("Balogun"), TEXT("Banda"), TEXT("Baptiste"), TEXT("Barak"), TEXT("Baranov"), TEXT("Bauer"), TEXT("Becker"),
+		TEXT("Bergstrom"), TEXT("Bhatt"), TEXT("Blanco"), TEXT("Bondarenko"), TEXT("Bonnet"), TEXT("Borg"), TEXT("Bose"), TEXT("Botha"),
+		TEXT("Bradley"), TEXT("Brennan"), TEXT("Bui"), TEXT("Bulut"), TEXT("Caldwell"), TEXT("Calloway"), TEXT("Camara"), TEXT("Campos"),
+		TEXT("Cardenas"), TEXT("Carvalho"), TEXT("Castro"), TEXT("Celik"), TEXT("Chakraborty"), TEXT("Chan"), TEXT("Chavez"), TEXT("Chen"),
+		TEXT("Cho"), TEXT("Chowdhury"), TEXT("Cisse"), TEXT("Coelho"), TEXT("Coleman"), TEXT("Colombo"), TEXT("Cruz"), TEXT("Cyrus"),
+		TEXT("Dabrowski"), TEXT("Dang"), TEXT("Danjuma"), TEXT("DaSilva"), TEXT("Daoud"), TEXT("Das"), TEXT("Davies"), TEXT("Dekker"),
+		TEXT("Desai"), TEXT("Diaz"), TEXT("Dimitrov"), TEXT("Dinh"), TEXT("Doherty"), TEXT("Domingo"), TEXT("Dossou"), TEXT("Dubois"),
+		TEXT("Dumont"), TEXT("Duran"), TEXT("Duvall"), TEXT("Ebrahimi"), TEXT("Eklund"), TEXT("Ekwueme"), TEXT("Eliasson"), TEXT("Esposito"),
+		TEXT("Estrada"), TEXT("Eze"), TEXT("Fagerlund"), TEXT("Falk"), TEXT("Fallon"), TEXT("Farouk"), TEXT("Fedorov"), TEXT("Fernandes"),
+		TEXT("Figueroa"), TEXT("Fischer"), TEXT("Flores"), TEXT("Fontaine"), TEXT("Forde"), TEXT("Fraser"), TEXT("Fujimoto"), TEXT("Gallo"),
+		TEXT("Gamboa"), TEXT("Garcia"), TEXT("Garza"), TEXT("Gashi"), TEXT("Gauthier"), TEXT("Ghosh"), TEXT("Gill"), TEXT("Gomez"),
+		TEXT("Gonzaga"), TEXT("Goto"), TEXT("Grabowski"), TEXT("Greco"), TEXT("Gruber"), TEXT("Guerrero"), TEXT("Gunawardena"), TEXT("Gupta"),
+		TEXT("Gustafsson"), TEXT("Guzman"), TEXT("Hagen"), TEXT("Hakimi"), TEXT("Halloran"), TEXT("Hamid"), TEXT("Hansen"), TEXT("Hara"),
+		TEXT("Hashemi"), TEXT("Haugen"), TEXT("Hedlund"), TEXT("Hernandez"), TEXT("Herrera"), TEXT("Hoang"), TEXT("Hoffmann"), TEXT("Horvat"),
+		TEXT("Hossain"), TEXT("Huang"), TEXT("Hussein"), TEXT("Ibarra"), TEXT("Idowu"), TEXT("Ikeda"), TEXT("Inoue"), TEXT("Iqbal"),
+		TEXT("Ivanov"), TEXT("Jablonski"), TEXT("Jaramillo"), TEXT("Jovanovic"), TEXT("Juarez"), TEXT("Kaminski"), TEXT("Kang"), TEXT("Kapoor"),
+		TEXT("Karlsson"), TEXT("Katz"), TEXT("Kawasaki"), TEXT("Kaya"), TEXT("Keita"), TEXT("Khalil"), TEXT("Khan"), TEXT("Kiplagat"),
+		TEXT("Kirby"), TEXT("Klein"), TEXT("Koch"), TEXT("Kokkinos"), TEXT("Kolar"), TEXT("Kone"), TEXT("Kozak"), TEXT("Krause"),
+		TEXT("Kristiansen"), TEXT("Kumar"), TEXT("Kurtz"), TEXT("Kwon"), TEXT("Lachance"), TEXT("Lam"), TEXT("Lambert"), TEXT("Landry"),
+		TEXT("Larsen"), TEXT("Lazarov"), TEXT("Lee"), TEXT("Lehmann"), TEXT("Leone"), TEXT("Levy"), TEXT("Li"), TEXT("Lima"),
+		TEXT("Lin"), TEXT("Liu"), TEXT("Lombardi"), TEXT("Lozano"), TEXT("Lucero"), TEXT("Lungu"), TEXT("Luna"), TEXT("Lysenko"),
+		TEXT("Machado"), TEXT("Madsen"), TEXT("Magnusson"), TEXT("Mahlangu"), TEXT("Maier"), TEXT("Malik"), TEXT("Mancini"), TEXT("Mansour"),
+		TEXT("Marin"), TEXT("Marino"), TEXT("Marquez"), TEXT("Matsuda"), TEXT("Mazur"), TEXT("Mbatha"), TEXT("Mendes"), TEXT("Mendoza"),
+		TEXT("Meyer"), TEXT("Mikkelsen"), TEXT("Miller"), TEXT("Mishra"), TEXT("Miyazaki"), TEXT("Mohammadi"), TEXT("Molina"), TEXT("Monroe"),
+		TEXT("Montoya"), TEXT("Mori"), TEXT("Morris"), TEXT("Moyo"), TEXT("Mukherjee"), TEXT("Muller"), TEXT("Murray"), TEXT("Musa"),
+		TEXT("Mwangi"), TEXT("Nagy"), TEXT("Nakashima"), TEXT("Ndiaye"), TEXT("Ndlovu"), TEXT("Neumann"), TEXT("Nguyen"), TEXT("Nielsen"),
+		TEXT("Njoroge"), TEXT("Nkosi"), TEXT("Noor"), TEXT("Nordin"), TEXT("Nowak"), TEXT("Nunez"), TEXT("Obradovic"), TEXT("Ochoa"),
+		TEXT("Odhiambo"), TEXT("Ogunleye"), TEXT("Oh"), TEXT("Okeke"), TEXT("Olsen"), TEXT("Omondi"), TEXT("Onyango"), TEXT("Osei"),
+		TEXT("Ospina"), TEXT("Otieno"), TEXT("Ozturk"), TEXT("Pacheco"), TEXT("Padilla"), TEXT("Pal"), TEXT("Pandey"), TEXT("Papadopoulos"),
+		TEXT("Pavlov"), TEXT("Pereira"), TEXT("Perez"), TEXT("Persson"), TEXT("Petersen"), TEXT("Pham"), TEXT("Pillai"), TEXT("Pinto"),
+		TEXT("Popescu"), TEXT("Popov"), TEXT("Prasad"), TEXT("Quintero"), TEXT("Rad"), TEXT("Ramirez"), TEXT("Ramos"), TEXT("Rana"),
+		TEXT("Rao"), TEXT("Rasmussen"), TEXT("Reddy"), TEXT("Rinaldi"), TEXT("Rios"), TEXT("Rivera"), TEXT("Robles"), TEXT("Rodrigues"),
+		TEXT("Rojas"), TEXT("Rossi"), TEXT("Rousseau"), TEXT("Ruiz"), TEXT("Saari"), TEXT("Sadeghi"), TEXT("Saito"), TEXT("Salazar"),
+		TEXT("Salo"), TEXT("Sanchez"), TEXT("Santos"), TEXT("Sarkar"), TEXT("Sasaki"), TEXT("Schmidt"), TEXT("Schulz"), TEXT("Sesay"),
+		TEXT("Shah"), TEXT("Shapiro"), TEXT("Shin"), TEXT("Sidibe"), TEXT("Singh"), TEXT("Sirin"), TEXT("Smirnov"), TEXT("Soares"),
+		TEXT("Song"), TEXT("Sorensen"), TEXT("Soto"), TEXT("Stein"), TEXT("Stojanovic"), TEXT("Sun"), TEXT("Sundberg"), TEXT("Suzuki"),
+		TEXT("Svensson"), TEXT("Szabo"), TEXT("Tadesse"), TEXT("Tahir"), TEXT("Tamura"), TEXT("Tan"), TEXT("Tavares"), TEXT("Teixeira"),
+		TEXT("Thapa"), TEXT("Thorsen"), TEXT("Toivonen"), TEXT("Torres"), TEXT("Tran"), TEXT("Traore"), TEXT("Trivedi"), TEXT("Tsai"),
+		TEXT("Turner"), TEXT("Ueda"), TEXT("Uddin"), TEXT("Ulloa"), TEXT("Uzun"), TEXT("Valdez"), TEXT("Varga"), TEXT("Vargas"),
+		TEXT("Vasilyev"), TEXT("Vega"), TEXT("Verma"), TEXT("Vidal"), TEXT("Vieira"), TEXT("Vu"), TEXT("Wagner"), TEXT("Walsh"),
+		TEXT("Wang"), TEXT("Weber"), TEXT("Wiik"), TEXT("Wojcik"), TEXT("Wu"), TEXT("Xu"), TEXT("Yadav"), TEXT("Yamada"),
+		TEXT("Yamamoto"), TEXT("Yang"), TEXT("Yeo"), TEXT("Yoon"), TEXT("Yusuf"), TEXT("Zaman"), TEXT("Zamora"), TEXT("Zapata"),
+		TEXT("Zeller"), TEXT("Zhou"), TEXT("Zielinski"), TEXT("Zubiri")};
 	// where they come from: mostly the March and the old Core; a few crossed over from the Outer Worlds
 	const TCHAR* Homes[] = {
 		TEXT("New Ravenna"), TEXT("New Ravenna"), TEXT("New Ravenna"), TEXT("New Ravenna"), TEXT("New Ravenna"),
@@ -41,7 +87,13 @@ namespace
 		TEXT("Rook"), TEXT("Vesper"), TEXT("Saint"), TEXT("Jinx"), TEXT("Halo"), TEXT("Moth"), TEXT("Tempest"), TEXT("Kestrel"),
 		TEXT("Dagger"), TEXT("Lucky"), TEXT("Echo"), TEXT("Wick"), TEXT("Brick"), TEXT("Nova"), TEXT("Sparrow"), TEXT("Ghost"),
 		TEXT("Ace"), TEXT("Rattle"), TEXT("Comet"), TEXT("Ember"), TEXT("Pike"), TEXT("Dusty"), TEXT("Viper"), TEXT("Boots"),
-		TEXT("Fable"), TEXT("Anvil"), TEXT("Quill"), TEXT("Rogue"), TEXT("Stitch"), TEXT("Banshee"), TEXT("Flint"), TEXT("Juno")};
+		TEXT("Fable"), TEXT("Anvil"), TEXT("Quill"), TEXT("Rogue"), TEXT("Stitch"), TEXT("Banshee"), TEXT("Flint"), TEXT("Juno"),
+		TEXT("Raven"), TEXT("Torch"), TEXT("Mako"), TEXT("Sable"), TEXT("Gremlin"), TEXT("Bishop"), TEXT("Cinder"), TEXT("Talon"),
+		TEXT("Harrier"), TEXT("Blaze"), TEXT("Frost"), TEXT("Ranger"), TEXT("Wraith"), TEXT("Specter"), TEXT("Cobra"), TEXT("Sling"),
+		TEXT("Tango"), TEXT("Shrike"), TEXT("Merlin"), TEXT("Puck"), TEXT("Zero"), TEXT("Bandit"), TEXT("Scout"), TEXT("Kite"),
+		TEXT("Onyx"), TEXT("Rocket"), TEXT("Patch"), TEXT("Hammer"), TEXT("Sierra"), TEXT("Lynx"), TEXT("Atlas"), TEXT("Bolt"),
+		TEXT("Gambit"), TEXT("Nomad"), TEXT("Ripley"), TEXT("Ozone"), TEXT("Pepper"), TEXT("Skipper"), TEXT("Dart"), TEXT("Rascal"),
+		TEXT("Hawk"), TEXT("Thorn"), TEXT("Maverick"), TEXT("Raptor")};
 
 	struct FDept { const TCHAR* Name; int32 Count; int32 DeckLo; int32 DeckHi; int32 Kind; };   // 0 navy, 1 pilots, 2 marines
 	const FDept Depts[] = {
@@ -113,6 +165,7 @@ void FAstraCrewRoster::Generate(int32 Seed)
 	++Rev;
 	FRandomStream R(Seed);
 	TSet<FString> Used;
+	TMap<FString, int32> Surnames;      // a surname at most twice aboard: a name shared by chance, never a clan
 	int32 Call = 0;
 	for (const FDept& D : Depts)
 	{
@@ -120,16 +173,17 @@ void FAstraCrewRoster::Generate(int32 Seed)
 		{
 			FAstraCrewman P;
 			int32 FirstIdx = 0;
-			for (int32 Try = 0; Try < 20; ++Try)
+			for (int32 Try = 0; Try < 40; ++Try)
 			{
 				FirstIdx = R.RandHelper(UE_ARRAY_COUNT(FirstNames));
 				P.First = FirstNames[FirstIdx];
 				P.Last = LastNames[R.RandHelper(UE_ARRAY_COUNT(LastNames))];
-				if (!Used.Contains(P.First + P.Last))
+				if (!Used.Contains(P.First + P.Last) && Surnames.FindRef(P.Last) < 2)
 				{
 					break;
 				}
 			}
+			++Surnames.FindOrAdd(P.Last);
 			// the first names alternate women's and men's (from "Min-jun", index 76, men's first)
 			P.bFemale = (FirstIdx < 76) == (FirstIdx % 2 == 0);
 			Used.Add(P.First + P.Last);
