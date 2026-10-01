@@ -15,7 +15,9 @@ if pgrep -f "UnrealEditor.app/Contents/MacOS/UnrealEditor" >/dev/null; then echo
 rm -rf "$OUT/Mac"          # (only our own build output: a previous app must not be picked up instead of this one)
 "$UE/Engine/Build/BatchFiles/RunUAT.sh" BuildCookRun -project="$PWD/ASTRA.uproject" -platform=Mac -clientconfig=$CONFIG \
   -build -cook -stage -pak -iostore -package -archive -archivedirectory="$OUT" -nop4 -utf8output -unattended -NoCodeSign \
-  -ubtargs="-WaitMutex" > "$LOG" 2>&1     # (-WaitMutex: a support agent's build in its worktree holds UBT's mutex; without it UAT fails at once, "SDK not found")
+  -nocompileeditor -ubtargs="-WaitMutex" > "$LOG" 2>&1
+  # (-WaitMutex: a support agent's build in its worktree holds UBT's mutex; without it UAT fails at once, "SDK not found".
+  #  -nocompileeditor: UAT's own editor build ignores -ubtargs and fails the same way; the editor is built first with tools/ricompila.sh)
 if ! grep -q "BUILD SUCCESSFUL" "$LOG"; then echo "PACCHETTO FALLITO (log: $LOG)"; grep -E "Error|error:" "$LOG" | head -20; exit 1; fi
 APP=$(find "$OUT" -maxdepth 3 -name "*.app" -type d | head -1)
 [[ -z "$APP" ]] && { echo "app non trovata in $OUT"; exit 1; }

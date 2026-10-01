@@ -27,6 +27,25 @@ potenza persa, il fuoco passa alla Mess Hall e alla Spine, ops manda la squadra 
 solo ascensore finto (sei fermate in punti diversi, uno schermo nero e un salto: ci sono passato senza volerlo), il Concourse grande, buio
 e spoglio, il programma delle stanze a ciclo, l'equipaggio di manichini: da qui NAVE-3 e ASCENSORI.
 
+**2/10 — il lead gioca da Capitano (l'apertura con la mente, ~10 minuti, ~0,04 $) e rifinisce ciò che trova:**
+- **Funziona bene**: il XO accoglie e fa il punto in italiano; un ordine con due destinatari («Timoniere… Tattico…») è eseguito da entrambi
+  in 1–1,5 s con le loro conferme; Tanaka mette un contatto sullo schermo principale e la pagina dell'Acheron sul datapad in 1 s; l'Archon
+  apre il canale, minaccia, risponde al Capitano (con Martin che riapre il canale chiuso); la rete di volo (VOLO) apre il canale, passa
+  l'ordine ad Alpha e Alpha Lead risponde.
+- **Corretto**: (1) il timone a tutta forza con la prua sul bersaglio attraversava il gruppo nemico e si ritrovava a 30 km: ora
+  `keep_on_bow` accetta `standoff_km` e la console tiene la distanza da sola (provato: chiude a 480 m/s, frena da 10 km, si ferma a 6–8 km);
+  (2) lo schermo principale in AUTO prendeva il «quadro del gruppo» a x1 (FOV 75°) quando i nemici erano tutt'attorno: ora solo se il gruppo
+  sta in un'inquadratura leggibile; le frecce ai bordi non scrivono sopra le barre; (3) i nomi in realtà aumentata del finestrone si
+  scrivevano uno sopra l'altro e sopra lo schermo principale e il tavolo: ora cercano posto e si tengono lontani da entrambi; il tavolo
+  misura il suo carattere per disporre le etichette; (4) il nemico sullo schermo principale era una sagoma nera (il sole sta davanti alla
+  prua): il **riempimento dei sensori** (`M_ASTRA_ViewscreenFill`, post-processo della sola cattura, `astra.viewscreen.fill` 0,35)
+  illumina lo scafo inquadrato dal lato della telecamera (luminosità media dell'inquadratura da 12 a 19); (5) il XO diceva «Comandante» e
+  dava del tu: gli ufficiali danno del Lei al Capitano.
+- **Da fare**: la guerra della campagna è piccola (il regista dimensiona le incursioni a 1–4 navi): brief **CAMPAGNA** pronto per il
+  prossimo posto libero. La qualità dell'immagine dello schermo principale a zoom forte (640×267) è da rivedere.
+- `tools/pacchetto.sh`: `-nocompileeditor` (la compilazione dell'editor dentro UAT ignorava `-WaitMutex` e falliva con un aiutante che
+  compilava); l'editor si compila prima con `tools/ricompila.sh`.
+
 **Prove d'integrazione del lead (1/10 notte, rami locali `integ-*`, non pubblicati):**
 - **GUERRA** (main + F2.2 parte 3): si unisce senza conflitti e compila; nel gioco la battaglia d'apertura è intensa e credibile
   (riflessi, caccia, missili, esche, danni, calore al 97 %, scafo 88 % in 2,5 minuti senza mente), 59,7 fps a macchina scarica. Difetti
