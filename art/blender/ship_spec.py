@@ -161,7 +161,7 @@ _reg("pharmacy", name="Pharmacy", kind="pharmacy", dept="medical", L=12.0, D=16.
 _reg("concourse", name="Mess Concourse", kind="concourse", dept="services", L=17.7, D=36.0, h=3.7, plate="concourse", doors=[],
      systems=["power_bus", "life_support"], special=True,
      spots=[spot("crew", "stand", 4.0, 11.5, 180), spot("crew", "sit", 6.75, 17.0, 0), spot("crew", "sit", 6.75, 19.0, 0), spot("crew", "sit", 11.25, 17.0, 180),
-            spot("crew", "sit", 11.25, 19.0, 180), spot("crew", "sit", 7.0, 1.15, 90), spot("crew", "sit", 8.4, 34.85, -90), spot("crew", "stand", 3.4, 27.0, 0)],
+            spot("crew", "sit", 11.25, 19.0, 180), spot("crew", "sit", 7.0, 0.75, 90), spot("crew", "sit", 8.4, 35.25, -90), spot("crew", "stand", 3.4, 27.0, 0)],
      lights=[light(9.0, 18.0, 3.6, 9000, 4200, (10.0, 2.0), 1400), light(9.0, 8.0, 3.6, 5000, 3600, (6.0, 2.0), 1100),
              light(9.0, 28.0, 3.6, 5000, 3600, (6.0, 2.0), 1100)])
 _reg("berth_lobby", name="Berthing Lobby", kind="concourse", dept="services", L=14.6, D=36.0, h=3.6, plate=None, doors=[],
@@ -226,7 +226,7 @@ _plan("cargo_hold", "Cargo Hold", "storage", "flight", 32.0, 16.0, 3.7, ["supply
 # that the plans of the decks do not move; doors on a module centre (x = 2 mod 4); `dz` is the height above the floor of a place on a platform.
 _reg("transporter", name="Transporter Room", kind="transporter", dept="science", L=24.0, D=16.0, h=3.7, plate="transporter",
      doors=[door("near", 10.0)], systems=["transporter", "power_bus", "data_trunk", "coolant"],
-     spots=[spot("transporter_chief", "sit", 22.6, 3.0, 0, "science"), spot("transport_operator", "sit", 8.4, 7.0, 0, "science"),
+     spots=[spot("transporter_chief", "sit", 22.4, 3.0, 0, "science"), spot("transport_operator", "sit", 8.4, 7.0, 0, "science"),
             spot("transport_operator", "sit", 8.4, 10.2, 0, "science"), spot("engineer", "work", 7.4, 13.4, 90, "engineering"),
             spot("technician", "work", 4.6, 10.8, 90, "science"), spot("technician", "stand", 3.2, 5.2, 90, "science"),
             spot("visitor", "stand", 19.0, 8.6, 180, "science", 0.312), spot("visitor", "stand", 15.0, 8.6, 0, "science", 0.312)],
@@ -276,17 +276,17 @@ _reg("lab_phys", name="Physics Lab", kind="lab", dept="science", L=24.0, D=16.0,
 _reg("radiator_pumps", name="Radiator Manifold", kind="machinery", dept="engineering", L=24.0, D=16.0, h=3.7, plate="pumps",
      doors=[door("near", 10.0)], systems=["coolant", "radiators", "power_bus"],
      spots=[spot("machinist", "work", 5.6, 9.4, 0, "engineering"), spot("machinist", "work", 10.0, 9.4, 0, "engineering"), spot("pump_tender", "work", 14.4, 9.4, 0, "engineering"),
-            spot("coolant_tender", "work", 19.0, 7.2, 0, "engineering"), spot("machinist", "sit", 7.4, 1.1, 90, "engineering"), spot("engineer", "stand", 15.6, 2.4, 90, "engineering")],
+            spot("coolant_tender", "work", 19.0, 7.2, 0, "engineering"), spot("machinist", "work", 6.4, 2.05, -90, "engineering"), spot("engineer", "stand", 15.6, 2.4, 90, "engineering")],
      lights=[light(8.0, 8.0, 3.6, 5000, 4500, (12.0, 1.0), 1000), light(18.0, 8.0, 3.6, 5000, 4500, (10.0, 1.0), 1000)])
 _reg("machinery", name="Machinery Space", kind="machinery", dept="engineering", L=24.0, D=16.0, h=3.7, plate="machinery",
      doors=[door("near", 10.0)], systems=["power_bus", "coolant", "compressed_air", "life_support", "potable_water"],
      spots=[spot("machinist", "work", 3.4, 12.6, 90, "engineering"), spot("machinist", "work", 7.4, 12.6, 90, "engineering"), spot("machinist", "work", 11.4, 12.6, 90, "engineering"),
-            spot("water_tender", "work", 18.6, 10.4, 0, "engineering"), spot("machinist", "sit", 14.0, 1.0, 270, "engineering"), spot("machinist", "work", 7.0, 6.1, 90, "engineering")],
+            spot("water_tender", "work", 18.6, 10.4, 0, "engineering"), spot("machinist", "sit", 14.0, 2.85, 270, "engineering"), spot("machinist", "work", 7.0, 6.1, 90, "engineering")],
      lights=[light(8.0, 8.0, 3.6, 5000, 4500, (12.0, 1.0), 1000), light(18.0, 8.0, 3.6, 4500, 4500, (8.0, 1.0), 1000)])
 _reg("machinery_b", name="Compressor Room", kind="machinery", dept="engineering", L=24.0, D=16.0, h=3.7, plate="machinery",
      doors=[door("near", 10.0)], systems=["power_bus", "compressed_air"],
      spots=[spot("machinist", "work", 4.0, 7.2, 90, "engineering"), spot("machinist", "work", 8.4, 7.2, 90, "engineering"), spot("machinist", "work", 15.8, 9.0, 0, "engineering"),
-            spot("machinist", "sit", 12.0, 3.0, 270, "engineering"), spot("engineer", "stand", 20.0, 6.5, 180, "engineering")],
+            spot("machinist", "sit", 12.0, 2.85, 270, "engineering"), spot("engineer", "stand", 20.0, 6.5, 180, "engineering")],
      lights=[light(8.0, 8.0, 3.6, 5000, 4500, (12.0, 1.0), 1000), light(18.0, 8.0, 3.6, 4500, 4500, (8.0, 1.0), 1000)])
 _reg("power_control", name="Power Control", kind="power", dept="engineering", L=24.0, D=16.0, h=3.6, plate="power",
      doors=[door("near", 10.0)], systems=["power_bus", "reactor", "data_trunk"],
@@ -470,7 +470,7 @@ _reg("crawlway", name="Maintenance Crawlway Hub", kind="crawlway", dept="enginee
 _reg("shuttle_stop", name="Spine Shuttle Stop", kind="transit", dept="neutral", L=24.0, D=16.0, h=3.7, plate="shuttle_stop",
      doors=[door("near", 10.0), door("near", 18.0)], systems=["power_bus", "life_support", "transit"], mouths=(True, True),
      spots=[spot("crew", "stand", 6.4, 4.7, 90), spot("crew", "stand", 8.6, 4.2, 90), spot("crew", "stand", 15.4, 4.2, 90), spot("crew", "stand", 17.6, 4.7, 90),
-            spot("crew", "sit", 4.9, 2.5, 90), spot("crew", "sit", 6.1, 2.5, 90), spot("crew", "sit", 17.9, 2.5, 90), spot("crew", "sit", 19.1, 2.5, 90)],
+            spot("crew", "sit", 3.9, 4.65, 90), spot("crew", "sit", 4.9, 4.65, 90), spot("crew", "sit", 13.5, 4.65, 90), spot("crew", "sit", 14.5, 4.65, 90)],
      lights=[light(6.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900), light(12.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900), light(18.0, 3.2, 3.55, 3500, 5600, (8.0, 2.0), 900),
              light(12.0, 8.0, 2.4, 1400, 5600, (10.0, 1.0), 450), light(12.0, 13.0, 3.5, 2500, 5000, (14.0, 1.5), 800)])
 PREFABS["shuttle_stop_bow"] = dict(PREFABS["shuttle_stop"], key="shuttle_stop_bow", name="Spine Shuttle Stop (Bow Terminal)", mesh="SM_SHIP_ShuttleStopBow", mouths=(True, False))

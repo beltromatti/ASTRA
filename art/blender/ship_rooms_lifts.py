@@ -118,7 +118,10 @@ def lift_bank_b(name: str = "SM_SHIP_LiftBankB"):
     fb = b.body
     for y0 in ys:                                                                                          # the shafts: a 3.0 m tube behind the aft wall
         hi = 1.5
-        fb.box((L, y0 - hi, -0.3), (L + 0.2, y0 + hi, H + 0.3), STRUCT)
+        w_, h_ = LIFT_DOOR_W, LIFT_DOOR_H
+        fb.box((L, y0 - hi, -0.3), (L + 0.2, y0 - w_ / 2, H + 0.3), STRUCT)                                # the shaft's front wall, open at the door
+        fb.box((L, y0 + w_ / 2, -0.3), (L + 0.2, y0 + hi, H + 0.3), STRUCT)
+        fb.box((L, y0 - w_ / 2, h_, ), (L + 0.2, y0 + w_ / 2, H + 0.3), STRUCT)
         fb.box((L + 0.2, y0 - hi, -0.3), (L + 3.0, y0 - 1.3, H + 0.3), STRUCT)
         fb.box((L + 0.2, y0 + 1.3, -0.3), (L + 3.0, y0 + hi, H + 0.3), STRUCT)
         fb.box((L + 2.8, y0 - hi, -0.3), (L + 3.0, y0 + hi, H + 0.3), STRUCT)

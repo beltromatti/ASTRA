@@ -45,8 +45,8 @@ def air_plant(name: str = "SM_SHIP_AirPlant"):
     for x in (20.4, 22.4):
         place(b, x, 11.6, 0, H.tank_v, 0.9, 2.9, STEEL, "science", "eq_oxygen")
     H.pipe_bundle(b, (20.4, 11.6, 0.5), (22.4, 11.6, 0.5), 2, 0.06, 0.03, (0, 1, 0), None, 2.0)
-    place(b, 21.6, 3.0, 180, H.work_console, 2.4, "engineering", 2, None, False, True)
-    place(b, 22.8, 3.0, 180, H.chair_op, FABRIC_RUST)
+    place(b, 23.2, 3.0, 180, H.work_console, 2.4, "engineering", 2, None, False, True)                       # the console against the right wall, the operator's chair in front of it
+    place(b, 22.35, 3.0, 0, H.chair_op, FABRIC_RUST)
     pipe_rack(b, 12.0, 1.8, 7.0, 2.3, 4, 5)
     place(b, xl + 0.35, 9.0, 0, F.locker_row, 3, 0.45, 1.95, 0.5, COMPOSITE)
     dress_wall(b, "near", L, D, H_, 12.0, 23.5, 5, accent="engineering", accent_dim="engineering_dim", kinds=("plain", "vent", "panelboard", "safety"))
@@ -78,8 +78,8 @@ def water_plant(name: str = "SM_SHIP_WaterPlant"):
         place(b, x, yf - 0.58, -90, valve_wheel, 0.17, CRATE_BLUE)
     place(b, 15.0, 3.6, 90, G.workbench, 3.0, 0.8, 0.95, False)
     place(b, 15.0, 2.6, -90, F.stool, 0.19, 0.62)
-    place(b, 21.6, 3.0, 180, H.work_console, 2.4, "engineering", 2, None, False, True)
-    place(b, 22.8, 3.0, 180, H.chair_op, FABRIC_RUST)
+    place(b, 23.2, 3.0, 180, H.work_console, 2.4, "engineering", 2, None, False, True)
+    place(b, 22.35, 3.0, 0, H.chair_op, FABRIC_RUST)
     pipe_rack(b, 12.0, 1.8, 8.0, 2.3, 3, 9)
     dress_wall(b, "near", L, D, H_, 12.0, 23.5, 3, accent="ice", accent_dim="ice_dim", kinds=("plain", "vent", "panelboard", "hydrant"))
     wall_label(b, 3.0, WF + 0.02, 2.5, (0, 1, 0), "eq_potable", 0.8)
@@ -110,8 +110,8 @@ def waste_plant(name: str = "SM_SHIP_WastePlant"):
         place(b, x, 3.4, 0, F.barrel, 0.3, 0.9, (CRATE_BLUE, CRATE_OLIVE, CRATE_ORANGE, CRATE_GREY)[k])
     place(b, 17.0, 4.2, 90, G.workbench, 3.0, 0.8, 0.95, False)
     place(b, 17.0, 3.2, -90, F.stool, 0.19, 0.62)
-    place(b, 21.6, 3.0, 180, H.work_console, 2.0, "engineering", 2, None, False, True)
-    place(b, 22.8, 3.0, 180, H.chair_op, FABRIC_RUST)
+    place(b, 23.2, 3.0, 180, H.work_console, 2.0, "engineering", 2, None, False, True)
+    place(b, 22.35, 3.0, 0, H.chair_op, FABRIC_RUST)
     place(b, xl + 0.35, 6.0, 0, F.locker_row, 3, 0.45, 1.95, 0.5, COMPOSITE)
     dress_wall(b, "near", L, D, H_, 14.0, 23.5, 6, accent="green", accent_dim="green_dim", kinds=("plain", "vent", "safety", "conduits"))
     ceiling_services(b, L, D, H_, [(5.0, "duct"), (11.0, "pipes")], 1.0, 23.0, 8)
@@ -134,8 +134,8 @@ def computer_core(name: str = "SM_SHIP_ComputerCore"):
         place(b, x1, 11.58, yaw1, H.rack_row, 9, 0.62, 0.95, 2.2, "cyan", int(x1) + 3)
     place(b, 20.6, 7.4, 0, H.data_core, 0.55, 2.5, "cyan")
     place(b, 20.6, 10.6, 0, H.data_core, 0.55, 2.5, "ice")
-    place(b, xr - 0.3, 3.4, 180, H.work_console, 2.8, "science", 2, None, False, True)
-    place(b, xr - 1.2, 3.4, 180, H.chair_op, FABRIC_GREY)
+    place(b, xr - 0.5, 3.4, 180, H.work_console, 2.8, "science", 2, None, False, True)
+    place(b, xr - 1.55, 3.4, 0, H.chair_op, FABRIC_GREY)
     place(b, xl + 0.02, 12.0, 0, F.wall_screen, 2.4, 1.3, "scr_data", z=1.5)
     for y in (4.2, 8.0):
         b.body.cyl((xl + 0.2, y, 0.0), (xl + 0.2, y, 1.3), 0.12, PAINT_RED, seg=12)         # fire-suppression bottles
@@ -164,8 +164,8 @@ def aux_reactor(name: str = "SM_SHIP_AuxReactor"):
         place(b, x + 2.4, 5.0, 90, H.pump_set, 1.6, "engineering")
     for k in range(5):
         place(b, xl + 0.4, 3.2 + k * 1.0, 0, H.hv_cabinet, 0.9, 0.7, 2.2, 1)
-    place(b, xr - 0.3, 3.0, 180, H.work_console, 3.0, "engineering", 2, None, False, True)
-    place(b, xr - 1.2, 3.0, 180, H.chair_op, FABRIC_RUST)
+    place(b, xr - 0.5, 3.0, 180, H.work_console, 3.0, "engineering", 2, None, False, True)
+    place(b, xr - 1.55, 3.0, 0, H.chair_op, FABRIC_RUST)
     pipe_rack(b, 16.0, 1.6, 4.6, 2.3, 4, 13)
     dress_wall(b, "near", L, D, H_, 16.0, 31.5, 4, accent="amber", accent_dim="amber_dim", kinds=("plain", "vent", "panelboard", "safety"))
     wall_label(b, 6.0, WF + 0.02, 2.6, (0, 1, 0), "eq_hv2", 0.9)
@@ -186,7 +186,7 @@ def dc_central(name: str = "SM_SHIP_DcCentral"):
     place(b, 12.0, 7.4, 0, F.table, 4.0, 1.8, 0.86, STEEL, TRIM, False)
     b.emit.label((12.0, 7.4, 0.865), 3.9, 1.7, (0, 0, 1), "scr_ship", up=(0, 1, 0))
     H.lamp_ring(b.emit, 12.0, 7.4, H_ - 0.12, 2.6, 0.1, 0.01, "red_dim", LAMP_DIM, 36)
-    for (x, y, yaw) in ((9.0, 7.4, 0), (15.0, 7.4, 180), (12.0, 9.4, -90)):
+    for (x, y, yaw) in ((9.4, 7.4, 0), (14.6, 7.4, 180), (12.0, 8.95, -90)):
         place(b, x, y, yaw, H.chair_op, FABRIC_GREY)
     for k in range(3):
         place(b, xl + 0.5, 4.4 + k * 3.4, 0, H.work_console, 2.6, "engineering", 2, None, False, True)

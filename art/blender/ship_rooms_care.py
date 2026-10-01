@@ -38,8 +38,12 @@ def dentist(name: str = "SM_SHIP_Dentist"):
         place(b, xc, 9.4, 90, N.dental_chair)
         place(b, xc + 1.15, 9.4, 0, N.dental_unit)
         place(b, xc, 7.5, 90, F.stool, 0.19, 0.62)
-    b.body.box((5.9, 6.9, 0.0), (6.1, 12.4, H), COMPOSITE)                                  # a screen between the two bays
-    b.fine.box((5.9, 6.9, 1.2), (6.1, 12.4, 2.3), DGLASS)
+    b.body.box((5.9, 6.9, 0.0), (6.1, 12.4, 1.95), IVORY)                                   # a privacy screen between the two bays: a light partition, 1.95 m, with three windows in it
+    b.fine.box((5.88, 6.9, 1.95), (6.12, 12.4, 2.0), TRIM)
+    for k in range(3):
+        y0 = 7.3 + k * 1.7
+        b.fine.box((5.88, y0 - 0.04, 1.14), (6.12, y0 + 1.24, 1.66), TRIM)
+        b.fine.box((5.87, y0, 1.18), (6.13, y0 + 1.2, 1.62), DGLASS)
     for k in range(3):                                                                     # waiting chairs, a table with magazines
         place(b, xl + 0.4, 1.4 + k * 0.7, 0, F.chair, FABRIC_NAVY)
     place(b, xl + 1.6, 2.1, 0, F.low_table, 0.5, 1.4, 0.42, WOOD)
@@ -126,7 +130,7 @@ def brig(name: str = "SM_SHIP_Brig"):
         place(b, xc, yf - 0.05, -90, N.brig_cell, 3.2, 3.5, 3.2, "red" if k in (1, 3) else "green")
     b.emit.label((9.2, yf - 3.45, 0.006), 17.0, 0.16, (0, 0, 1), "hazard_h", up=(0, 1, 0))
     place(b, 20.3, 8.6, 180, N.counter_desk, 3.4, 0.9, 1.1)
-    place(b, 21.9, 8.6, 180, F.chair, FABRIC_GREY)
+    place(b, 21.45, 8.6, 180, F.chair, FABRIC_GREY)
     place(b, xr - 0.02, 3.4, 180, G.weapon_rack, 2.0, 4, 1.9, 2)
     place(b, 1.2, 3.0, 0, F.bench, 2.0, 0.42, 0.46, FABRIC_GREY)
     place(b, xr - 0.02, 12.6, 180, F.wall_screen, 1.8, 1.0, "scr_ship", z=1.8)

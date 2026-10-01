@@ -342,6 +342,12 @@ class RouteChecker:
                     hit = tree.find_nearest(inv @ Vector((x, -y, z + h)), r)
                     if hit[0] is not None:
                         return f"{h} m: geometry {hit[3]:.2f} m away"
+                if kind in ("sit", "eat"):                                  # something to sit on: the first surface under the hips is a seat (30-80 cm above the floor: chairs, benches, bar stools, bunks)
+                    seat = tree.ray_cast(inv @ Vector((x, -y, z + 0.9)), Vector((0.0, 0.0, -1.0)), 0.95)
+                    if seat[0] is None:
+                        return "no floor under it"
+                    h = 0.9 - seat[3]
+                    return None if 0.30 <= h <= 0.80 else f"nothing to sit on (the first surface under the hips is {h:.2f} m above the floor)"
                 ray = tree.ray_cast(inv @ Vector((x, -y, z + 0.5)), Vector((0.0, 0.0, -1.0)), 0.7)
                 return "no floor under it" if ray[0] is None else None
 

@@ -116,6 +116,54 @@ def room_views(key: str, spec: dict, names: list[str] | None) -> dict:
     return views
 
 
+SPOT_COLORS = {"stand": (0.1, 1.0, 0.25), "work": (1.0, 0.85, 0.0), "sit": (0.25, 0.55, 1.0), "eat": (1.0, 0.45, 0.0), "sleep": (1.0, 0.25, 0.85)}
+
+
+def _spot_material(kind: str):
+    name = f"spot_{kind}"
+    m = bpy.data.materials.get(name)
+    if m:
+        return m
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out, em = nt.nodes.new("ShaderNodeOutputMaterial"), nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (*SPOT_COLORS.get(kind, (1.0, 0.0, 0.0)), 1.0)
+    em.inputs["Strength"].default_value = 4.0
+    nt.links.new(em.outputs[0], out.inputs[0])
+    return m
+
+
+def spot_markers(spec: dict) -> None:
+    """The room's spots (people: green stand, yellow work, blue sit, orange eat, pink sleep) as discs with a facing arrow, for the plan view: a seat with no chair under it,
+    a sitter facing the wall or a worker inside a console shows at once."""
+    import bmesh
+    from mathutils import Matrix as M
+    by_kind: dict = {}
+    for s in spec.get("spots", []):
+        by_kind.setdefault(s["kind"], []).append(s)
+    for kind, lst in by_kind.items():
+        bm = bmesh.new()
+        for s in lst:
+            z = s.get("dz", 0.0) + (0.5 if kind in ("sit", "eat") else 0.9 if kind == "sleep" else 1.1)
+            bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=0.17, radius2=0.17, depth=0.06, matrix=M.Translation((s["x"], s["y"], z)))
+            yaw = math.radians(s["yaw"])
+            c, sn = math.cos(yaw), math.sin(yaw)
+            arrow = M.Translation((s["x"] + 0.34 * c, s["y"] + 0.34 * sn, z)) @ M.Rotation(yaw, 4, "Z") @ M.Diagonal((0.34, 0.045, 0.03, 1.0))
+            bmesh.ops.create_cube(bm, size=2.0, matrix=arrow)
+            tip = M.Translation((s["x"] + 0.7 * c, s["y"] + 0.7 * sn, z)) @ M.Rotation(yaw, 4, "Z") @ M.Diagonal((0.1, 0.1, 0.05, 1.0))
+            bmesh.ops.create_cube(bm, size=2.0, matrix=tip)
+        for v in bm.verts:
+            v.co.y = -v.co.y
+        me = bpy.data.meshes.new(f"spots_{kind}")
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(_spot_material(kind))
+        o = bpy.data.objects.new(f"spots_{kind}", me)
+        bpy.context.scene.collection.objects.link(o)
+
+
 def render_room(key: str, obj, out: str, samples: int, names: list[str] | None = None, plan_view: bool = True) -> list[str]:
     spec = SPEC.PREFABS[key]
     L, D, H = spec["L"], spec["D"], spec["h"]
@@ -131,6 +179,7 @@ def render_room(key: str, obj, out: str, samples: int, names: list[str] | None =
         done.append(path)
     if plan_view:
         SP.flat_light(0.5)
+        spot_markers(spec)
         cam = SP.plan_camera("plan", 0, L, 0, D, H * 0.72)
         cam.location = (L / 2, -D / 2, H * 0.72)
         path = os.path.join(out, f"room_{key}_plan.jpg")
@@ -500,6 +549,30 @@ def bridge(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     return done
 
 
+def car(args: dict, plan, reg: dict, objs: dict) -> list[str]:
+    """The Spine shuttle's car stopped in a stop hall: from the platform, from the track and from above."""
+    if "SM_SHIP_SpineCar" not in objs or "SM_SHIP_ShuttleStop" not in objs:
+        return []
+    key = "shuttle_stop"
+    spec = SPEC.PREFABS[key]
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
+    SP.instance(objs["SM_SHIP_ShuttleStop"], (0, 0, 0), 0, "inst_stop")
+    SP.instance(objs["SM_SHIP_SpineCar"], (L / 2, 8.0, 0.0), 0, "inst_car")
+    for o in objs.values():
+        o.hide_render = True
+    SP.spec_lights(spec, gain=1.5)
+    done = []
+    views = {"car_platform": ((5.0, 1.4, 1.65), (L / 2, 8.0, 1.2), 80), "car_side": ((L / 2, 1.0, 1.5), (L / 2, 8.0, 1.3), 70),
+             "car_nose": ((3.0, 7.6, 1.5), (L / 2 + 5, 8.0, 1.5), 66), "car_back": ((L / 2 - 4, 14.5, 1.6), (L / 2, 4.0, 1.0), 84)}
+    for name, (eye, tgt, fov) in views.items():
+        cam = SP.look_camera(name, eye, tgt, fov)
+        path = os.path.join(args["preview"], f"{name}.jpg")
+        SP.render(cam, path)
+        done.append(path)
+    return done
+
+
 def run(args: dict, plan, reg: dict, objs: dict) -> None:
     os.makedirs(args["preview"], exist_ok=True)
     KEEP.clear()
@@ -512,6 +585,8 @@ def run(args: dict, plan, reg: dict, objs: dict) -> None:
             done += modules(args, plan, reg, objs)
         elif v == "modules3":
             done += modules3(args, plan, reg, objs)
+        elif v == "car":
+            done += car(args, plan, reg, objs)
         elif v == "d1" and plan:
             done += bridge(args, plan, reg, objs)
         elif v == "d4" and plan:

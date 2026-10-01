@@ -272,7 +272,7 @@ def machinery(name: str = "SM_SHIP_Machinery"):
     place(b, xl + 0.35, 10.0, 0, F.locker_row, 4, 0.45, 1.95, 0.5, COMPOSITE)
     place(b, 14.0, 2.0, 90, F.desk, 1.6, 0.7, 0.8, STEEL, False)
     place(b, 14.0, 2.0, 90, F.monitor, 0.5, 0.3, "scr_ship", False, z=0.8)
-    place(b, 14.0, 1.0, -90, H.chair_op, FABRIC_RUST)
+    place(b, 14.0, 2.9, -90, H.chair_op, FABRIC_RUST)                                   # the screen faces +y: the machinist sits on that side
     dress_wall(b, "near", L, D, H_, 12.0, 23.5, 7, accent="engineering", accent_dim="engineering_dim", kinds=("plain", "vent", "panelboard", "safety"))
     ceiling_services(b, L, D, H_, [(4.0, "duct"), (8.6, "pipes")], 1.0, 23.0, 9)
     ceiling_panels(b, L, D, H_, 4, 3, "white_warm", 1.6, 1.2, 0.6, LAMP_HOT)

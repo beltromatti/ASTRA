@@ -93,10 +93,11 @@ def suit_locker(name: str = "SM_SHIP_SuitLocker"):
     place(b, 5.0, yf - 0.08, -90, H7.eva_rack, 3)
     place(b, 6.6, 1.2, 0, F.bench, 2.0, 0.42, 0.46, FABRIC_GREY)
     place(b, xr - 0.2, 1.4, 180, F.locker_row, 2, 0.45, 1.95, 0.4, COMPOSITE)
-    place(b, 3.2, 0.9, 90, F.shelf, 1.8, 0.3, 1.0, 2, STEEL, False, 3, False)
-    for k in range(4):
-        b.soft.sphere((1.0 + k * 0.55, 0.9, 1.05), 0.14, IVORY, seg=10, rings=6)
-        b.soft.box((1.0 + k * 0.55 + 0.08, 0.84, 1.0), (1.0 + k * 0.55 + 0.17, 0.96, 1.1), DGLASS)
+    place(b, 4.0, 0.42, 90, F.shelf, 1.8, 0.3, 1.0, 2, STEEL, False, 3, False)                    # a shelf by the door's neighbour wall, the helmets on top of it (visor to the room)
+    for k in range(3):
+        hx = 3.4 + k * 0.6
+        b.soft.sphere((hx, 0.42, 1.15), 0.14, IVORY, seg=10, rings=6)
+        b.soft.box((hx - 0.09, 0.50, 1.10), (hx + 0.09, 0.59, 1.20), DGLASS)
     b.emit.label((2.0, WF + 0.002, 2.2), 0.7, 0.175, (0, 1, 0), "eq_suit")
     ceiling_panels(b, L, D, H, 2, 1, "white_warm", 1.2, 1.4, 0.6, LAMP_HOT)
     return b.build(name)

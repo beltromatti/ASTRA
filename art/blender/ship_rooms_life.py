@@ -161,8 +161,8 @@ def sim_bay(name: str = "SM_SHIP_SimBay"):
         xa = 1.4 + k * 4.4
         b.fine.box((xa, yf - 0.12, 0.7), (xa + 4.0, yf - 0.1, 3.0), DGLASS)
         b.emit.label((xa + 2.0, yf - 0.125, 1.85), 3.9, 2.2, (0, -1, 0), ("scr_star", "scr_tac", "scr_map", "scr_star")[k])
-    place(b, 21.0, 4.0, 180, H3.work_console, 3.0, "flight", 3, None, True, True)
-    place(b, 22.2, 4.0, 180, H3.chair_op, FABRIC_NAVY)
+    place(b, 23.2, 4.0, 180, H3.work_console, 3.0, "flight", 3, None, True, True)
+    place(b, 22.35, 4.0, 0, H3.chair_op, FABRIC_NAVY)
     place(b, xl + 0.3, 3.2, 0, F.locker_row, 6, 0.5, 1.95, 0.5, COMPOSITE)
     place(b, 20.0, 10.0, 0, F.table, 2.0, 1.0, 0.74, LAMINATE, TRIM, False)
     for (dx, dy, yaw) in ((-1.1, 0.0, 0), (1.1, 0.0, 180), (0.0, -0.7, 90)):
@@ -283,8 +283,8 @@ def drone_bay(name: str = "SM_SHIP_DroneBay"):
         place(b, 3.0 + 4.0 * k, yf - 0.35, -90, F.shelf, 3.0, 0.5, 2.1, 5, STEEL, True, 15 + k, True)
     place(b, 28.5, yf - 0.4, -90, G.tool_wall, 3.0, 1.4, 4)
     place(b, 27.0, 11.6, 0, G.workbench, 2.4, 0.8, 0.95, True)
-    place(b, 28.0, 2.4, 180, H3.work_console, 3.0, "flight", 2, None, False, True)
-    place(b, 29.2, 2.4, 180, H3.chair_op, FABRIC_NAVY)
+    place(b, 31.2, 2.4, 180, H3.work_console, 3.0, "flight", 2, None, False, True)
+    place(b, 30.25, 2.4, 0, H3.chair_op, FABRIC_NAVY)
     dress_wall(b, "near", L, D, H, 14.0, 31.5, 4, accent="amber", accent_dim="amber_dim", kinds=("plain", "vent", "panelboard", "safety"))
     ceiling_panels(b, L, D, H, 5, 3, "white_cool", 1.6, 1.2, 0.6, LAMP_HOT)
     return b.build(name)
