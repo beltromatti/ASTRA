@@ -9,7 +9,7 @@ from __future__ import annotations
 import ship_craft as CR
 import ship_furniture as F
 import ship_spec as SPEC
-from ship_lib import (COMPOSITE, DECK, DGLASS, FABRIC_NAVY, IVORY, LAMP, LAMP_DIM, RUBBER, STEEL, STRUCT, TRIM, SParts)
+from ship_lib import (COMPOSITE, DECK, DGLASS, FABRIC_NAVY, LAMP_DIM, RUBBER, STEEL, STRUCT, TRIM, SParts)
 from ship_rooms import (Style, WF, WS, build_shell, ceiling_services, dress_wall, luminaire_strips, place, wall_label)
 
 TRACK_Y0, TRACK_Y1 = 6.10, 9.30                  # the track bed across the hall (the platform ends at 6.1)

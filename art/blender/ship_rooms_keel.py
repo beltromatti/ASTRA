@@ -3,17 +3,14 @@ tunnels meet. The tunnels themselves are the modules of tone K (ship_corridor.bu
 from __future__ import annotations
 
 import math
-import random
 
 import ship_furniture as F
-import ship_furniture2 as G
 import ship_furniture3 as H
-import ship_furniture6 as K6
 import ship_spec as SPEC
 import ship_walls as W
-from bridge3_lib import Rx, Ry, Rz, T, frame
-from ship_lib import (COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_RUST, IVORY, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER,
-                      STEEL, STRUCT, TRIM, SParts, lamp_strip)
+from bridge3_lib import Ry, T
+from ship_lib import (COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_RUST, LAMP_DIM, LAMP_HOT, RUBBER, STEEL, STRUCT, TRIM, SParts,
+                      lamp_strip)
 from ship_rooms import (Style, WF, WS, build_shell, ceiling_panels, ceiling_services, dress_wall, place)
 from ship_rooms_hub import on_wall
 from ship_rooms_engineering import pipe_rack, valve_wheel, valve_wheel_flat

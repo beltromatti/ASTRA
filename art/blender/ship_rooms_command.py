@@ -4,20 +4,18 @@ ship_rooms.py / ship_spec.py."""
 from __future__ import annotations
 
 import math
-import random
 
 import ship_furniture as F
 import ship_furniture2 as G
 import ship_furniture3 as H
-import ship_furniture4 as K
 import ship_furniture6 as K6
 import ship_furniture8 as K8
 import ship_spec as SPEC
 import ship_walls as W
-from bridge3_lib import Rx, Ry, Rz, T, frame
-from ship_lib import (BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY,
-                      LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, LEAF, PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, WOOD, SParts, lamp_strip)
-from ship_rooms import (Style, WF, WS, build_shell, ceiling_panels, ceiling_services, dress_wall, luminaire_strips, place, wall_label, wall_matrix)
+from bridge3_lib import T
+from ship_lib import (BEDDING, COMPOSITE, CRATE_GREY, CRATE_ORANGE, DECK, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, LAMINATE, LAMP_DIM, LAMP_HOT, RUBBER,
+                      STEEL, STRUCT, TRIM, WOOD, SParts)
+from ship_rooms import (Style, WF, WS, build_shell, ceiling_panels, ceiling_services, dress_wall, place)
 from ship_rooms_hub import on_wall
 
 

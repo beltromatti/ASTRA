@@ -8,13 +8,9 @@ from __future__ import annotations
 import math
 import random
 
-from mathutils import Vector
 
-import ship_furniture as F
-import ship_furniture2 as G
-from bridge3_lib import Rx, Ry, Rz, T, frame
-from ship_lib import (BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE,
-                      LAMP, LAMP_DIM, LAMP_HOT, LEAF, PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, WOOD, SParts, lamp_strip)
+from ship_lib import (BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_SAND, IVORY, LAMINATE, LAMP, LAMP_DIM,
+                      PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, WOOD, SParts)
 
 
 # ---------------------------------------------------------------------------------------------------------------------- offices and meetings

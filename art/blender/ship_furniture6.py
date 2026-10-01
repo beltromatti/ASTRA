@@ -5,15 +5,12 @@ ship_furniture.py .. ship_furniture5.py; same conventions: every function builds
 from __future__ import annotations
 
 import math
-import random
 
 from mathutils import Vector
 
-import ship_furniture as F
-import ship_furniture2 as G
-from bridge3_lib import Rx, Ry, Rz, T, frame
-from ship_lib import (BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE,
-                      LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, SParts, lamp_strip)
+from bridge3_lib import T
+from ship_lib import (COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DGLASS, FABRIC_GREY, IVORY, LAMP, LAMP_DIM, PAINT_RED, RUBBER, STEEL, STRUCT,
+                      TRIM, SParts)
 
 
 def _ellipse_ring(x: float, ry: float, rz: float, zc: float, n: int = 16):

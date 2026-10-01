@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import math
 
-from bridge3_lib import Rx, Ry, Rz, T, frame
-from ship_lib import (COMPOSITE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, IVORY, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL,
-                      STRUCT, TRIM, SParts, lamp_strip)
+from bridge3_lib import Rx, frame
+from ship_lib import (COMPOSITE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, IVORY, LAMP, LAMP_DIM, PAINT_RED, RUBBER, STRUCT, TRIM,
+                      SParts, lamp_strip)
 
 BELLY = 0.62                         # the fuselage's underside over the floor
 FLOOR = 0.70                         # the troop bay's floor (the ramp's hinge)

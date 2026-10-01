@@ -4,7 +4,6 @@ builds one piece in ITS OWN frame (origin on the floor, +x the piece's front, +y
 cloth, rubber and thin details, emit = lamps and labels); rooms place it with ship_rooms.place()."""
 from __future__ import annotations
 
-import math
 import random
 
 import ship_furniture2 as G
