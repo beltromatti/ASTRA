@@ -96,10 +96,15 @@ senza toccare le regole. Niente degli effetti è necessario alle regole: un asse
 
 ## 6. I banchi e i risultati
 
-- `tools/transport.py run --scenario all` (senza finestra, `-nullrhi`, ~25 s): **67 prove delle regole** (le facce a entrambe le estremità, la portata, il disturbo lungo la linea, la
-  manovra, il Gate, lo stato della sala, l'aggancio, gli arrivi) e **33 del mondo** in un mondo senza grafica con la pianta vera, i 560 di VITA, il modello dei danni e la
+- `tools/transport.py run --scenario all` (senza finestra, `-nullrhi`, ~15-25 s): **67 prove delle regole** (le facce a entrambe le estremità, la portata, il disturbo lungo la linea, la
+  manovra, il Gate, lo stato della sala, l'aggancio, gli arrivi) e **37 del mondo** in un mondo senza grafica con la pianta vera, i 560 di VITA, il modello dei danni e la
   battaglia: ordini dentro la nave, il ciclo con le sue fasi, la coda, l'aggancio tenuto fino alla parola, l'annullo a metà, la finestra scudi (giù per il ciclo, su dopo), una
-  squadra su una nave alleata e il richiamo, un abbordaggio su una nave senza scudi, la discesa sul pianeta e il ritorno, un carico, la stanza senza energia. **100/100.**
+  squadra su una nave alleata e il richiamo, un abbordaggio su una nave senza scudi, la discesa sul pianeta e il ritorno, un carico, la manovra dell'Aquila (la scheda mostra virata e
+  spinta, una spinta forte nega il fascio con `[motion]`), i disturbatori (la prova si fa solo se in plancia ce n'è uno: le regole coprono la strobo), la stanza senza energia.
+  **104/104.** (Il processo del commandlet esce con codice 1 perché nella copia di lavoro i `.uasset` sono ancora puntatori LFS e il motore conta i loro errori di caricamento: il
+  verdetto è la riga `VERDICT: PASS`, e `tools/transport.py` lo legge da lì.)
+- `tools/transport.py run --scenario shapes`: sonda sulle forme base del motore, lette dai vertici (il piano è 100 × 100 cm in XY con la normale in su, cilindro, sfera e cubo ±50 cm):
+  conferma le ipotesi dello schermo a parete e delle colonne di luce.
 - `mind/bench/transporter_unit.py` (modello finto, anche sulle carte vere scritte dal gioco): **34 prove**.
 - `mind/bench/transporter_live.py` (modello vero): 8 scene, **~0,002 $ a giro**; costo totale dei miei giri: ~0,010 $.
 - `tools/art/transporter_fx_check.py`: i 5 shader compilano con il DXC del motore e lo script dei materiali è controllato contro lo stub dell'editor (nessun editor).
