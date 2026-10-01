@@ -25,6 +25,10 @@ Hard rules
   tools/pacchetto.sh or tools/perf/*: the machine has one editor and one GPU and the lead uses them. You may compile C++ in
   your worktree only if your spec says so (Build.sh with -WaitMutex). You may run Blender headless, Python, uv, unit tests,
   and offline simulations. If a git-lfs file is a pointer in your worktree and you need it, run `git lfs pull` there.
+- Memory is shared (16 GB for the lead's editor and game plus up to three helpers): at most 2 UnrealEditor-Cmd
+  commandlets running at once from your worktree (queue the rest); C++ builds are capped at 4 parallel actions for
+  everyone by ~/Library/Application Support/Unreal Engine/UnrealBuildTool/BuildConfiguration.xml (never change it);
+  compile only when you need to, batching your edits.
 - Secrets live only in .env (repo root of the MAIN checkout: /Users/beltromatti/Desktop/ASTRA/.env). Never print, log or
   commit key values. AI spend goes through OpenRouter with a small credit: any test that calls an LLM must be short and you
   must report its cost; prefer offline/mocked tests.

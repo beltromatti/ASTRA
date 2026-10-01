@@ -122,10 +122,11 @@ Conseguenze sul codice che c'è (da fare, vedi [PIANO.md](PIANO.md)):
 | **VOCE** | riconoscimento, sintesi, turni di parola, sottotitoli (lato mente e lato gioco: `AstraVoiceWave.*`) | `mind/astra_mind/{speech,stt,tts,audio_in,voice_casting}.py`, `docs/protocollo_voce.md` | unito il 30/9; ora lead |
 | **MENTE-GUERRA** | regista, comandanti nemici e alleati, gerarchie di flotta | `mind/astra_mind/{director,enemy,war,finale,loss}.py` | poi |
 | **ARTE-PLANCIA** | la plancia v3 (geometria, materiali, console, poltrone), da Blender | `art/blender/bridge*.py`, `tools/ue_scripts/build_bridge*.py` | unito il 30/9 |
-| **ARTE-NAVI / VFX** | navi v3 con pezzi di rottura (ARTE-NAVI, agente, in corso); armi, motori, scudi, esplosioni (VFX: poi) | `art/blender/shipgen3.py`, `art/blender/ship3_*.py`, `tools/ue_scripts/*ship*v3*`, `make_fx_*.py` | ARTE-NAVI (agente) |
+| **ARTE-NAVI / VFX** | navi v3 con pezzi di rottura e decalcomanie di danno (ARTE-NAVI, unita il 1/10); armi, motori, scudi, esplosioni, rotture nel gioco (VFX: poi, sul contratto di GUERRA `ConsumeDeathEvents` / `GetDamageView`) | `art/blender/shipgen3.py`, `art/blender/ship3_*.py`, `tools/ue_scripts/*ship*v3*`, `make_fx_*.py` | ARTE-NAVI unita; VFX poi |
 | **UMANI** | personaggi realistici, animazioni, labiale, IA dei PNG | `Source/ASTRA/AstraCrew*`, `tools/ue_scripts/make_crew_*` | poi |
-| **NAVE-INTERA** | la pianta dell'Aquila (compartimenti, porte, grafo dei percorsi), il kit dei corridoi e delle stanze, i ponti | `data/ship/aquila_plan.json`, `art/blender/ship_*`, `tools/ue_scripts/build_ship_interior.py`; lato gioco `AstraShipPlan.*` (lead) | NAVE (agente, F4.1) |
-| **PRESTAZIONI** | impostazioni di resa, risoluzione, upscaling, profili, menu SETTINGS | `Config/*`, `AstraSettings.*`, eventuale plugin MetalFX | lead |
+| **NAVE-INTERA** | la pianta dell'Aquila (compartimenti, porte, grafo dei percorsi), il kit dei corridoi e delle stanze, i ponti | `data/ship/aquila_plan.json`, `art/blender/ship_*`, `tools/ue_scripts/build_ship_interior.py`; lato gioco `AstraShipPlan.*` (lead) | NAVE unita il 30/9 (Ponti 4 e 6); gli altri ponti: NAVE-2, poi |
+| **VITA** | le ~560 persone dell'Aquila sul grafo dei percorsi: turni, lavori, pasti, sonno, posti di combattimento, squadre di riparazione, feriti; corpi vicino al Capitano; memoria in codice, un modello quando il Capitano ci parla | `AstraLife*.*`, `data/ship/aquila_life.json`, `tools/life.py` | VITA (agente, in corso) |
+| **PRESTAZIONI** | impostazioni di resa, risoluzione, upscaling, profili, menu SETTINGS | `Config/*`, `AstraSettings.*`, plugin MetalFX (METALFX, agente, in corso) | lead + METALFX |
 
 Il lead possiede l'integrazione (collegare i moduli, `ApplyCommand`, il protocollo) e **tutte le prove nel gioco vero**:
 sulla macchina c'è un solo editor e una sola GPU.
@@ -220,6 +221,11 @@ davvero ambiguo sceglie la lettura più naturale e lo dice in poche parole, oppu
 - **Solo il lead avvia l'editor, il gioco, le misure e il pacchetto** (una GPU, un editor). Gli agenti provano offline:
   test unitari, simulazioni scritte, Blender senza interfaccia con rendering di anteprima, la mente contro la nave locale
   (`mind/astra_mind/local_ship.py`) con messaggi finti.
+- **La memoria è una sola (16 GB)**: al massimo 2 commandlet contemporanei per agente (una simulazione della guerra
+  grande arriva a 1,5 GB); le compilazioni UE sono limitate a 4 processi per tutti
+  (`~/Library/Application Support/Unreal Engine/UnrealBuildTool/BuildConfiguration.xml`, `MaxParallelActions`: un
+  clang su un modulo UE prende 0,6–1,4 GB). Il 1/10 quattro simulazioni più una compilazione a 10 processi hanno
+  portato lo swap a 9 GB e fermato l'editor del lead.
 - I contratti (questo documento, `docs/protocollo_voce.md`, lo schema di `ApplyCommand`) cambiano solo con il lead.
 - I file condivisi (`server.py`, `ASTRA.Build.cs`, `Config/*`) si toccano il meno possibile e ogni modifica va
   elencata nel rapporto finale.

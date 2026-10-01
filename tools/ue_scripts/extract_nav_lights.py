@@ -29,7 +29,9 @@ for path in eal.list_assets("/Game/ASTRA/Ships", recursive=False):
     x0, x1 = min(xs), max(xs)
     L = x1 - x0
     mid = [p for p in pts if abs(p[0] - (x0 + x1) / 2) < 0.3 * L] or pts
-    centre = [p for p in pts if abs(p[1]) < 0.12 * (max(q[1] for q in pts) - min(q[1] for q in pts)) + 1] or pts
+    ys = [p[1] for p in pts]
+    half_band = 0.12 * (max(ys) - min(ys)) + 1          # (once: inside the comprehension it made this quadratic)
+    centre = [p for p in pts if abs(p[1]) < half_band] or pts
     port = min(mid, key=lambda p: p[1])
     star = max(mid, key=lambda p: p[1])
     top = max(pts, key=lambda p: p[2])

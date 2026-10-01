@@ -45,6 +45,7 @@ struct FAstraDamage
 	FString System;             // conduit damage: the system that loses power through it
 	int32 Team = -1;            // damage-control team on it (0..3), -1 = unattended
 	float Travel = 0.f;         // s until the team is on scene
+	float Travel0 = 0.f;        // s the walk took from the teams' station (Deck 6) when it was sent: the holo table moves it
 	float Work = 30.f;          // s of work on scene
 	float Progress = 0.f;       // 0..1
 	float SpreadT = 25.f;       // fires: next chance to spread / burn the structure
@@ -342,6 +343,7 @@ private:
 	bool bBattleShort = false;        // the reactor's safety limits overridden: more power, more heat, a risk to the core
 	float HullPct = 100.f;
 	double LastHitReport = -100.0;
+	double LastBridgeBurst = -100.0;   // the last console or fixture that shorted out on the bridge (game time)
 	float FlickerTime = 0.f;
 	float RailDraw = 0.f;              // 1 at a railgun volley, fading: the lights sag
 	FString HullNumber = TEXT("CVC-01");

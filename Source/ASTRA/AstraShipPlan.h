@@ -36,6 +36,19 @@ struct FAstraPlanCompartment
 	FBox Box = FBox(ForceInit);          // world cm
 };
 
+/** A deck: its floor, its sections along the ship and how wide it is where (the hull's envelope less the wall). */
+struct FAstraPlanDeck
+{
+	int32 Id = 0;
+	FString Name;
+	float FloorZ = 0.f;                  // world cm
+	struct FSection { FString Id; float X0 = 0.f, X1 = 0.f; };   // world cm, aft to fore
+	TArray<FSection> Sections;
+	TArray<FVector2D> HalfWidth;         // (x, half width), world cm, from the bow aft
+	/** The deck's half width at x (cm; 0 outside its envelope). */
+	float HalfWidthAt(float X) const;
+};
+
 struct FAstraPlanDoor
 {
 	FString Id, Kind;
@@ -70,6 +83,10 @@ public:
 	/** A door shut by damage control (a breach beyond it) or opened again. */
 	void SetDoorSealed(const FString& DoorId, bool bSealed);
 
+	/** The decks, from the bridge (1) down to the keel (12); empty without the plan. */
+	const TArray<FAstraPlanDeck>& GetDecks() const { EnsureLoaded(); return Decks; }
+	/** The deck a point is on (world cm: the deck whose floor is the highest under it, within a deck's height), or 0. */
+	int32 DeckAt(const FVector& Cm) const;
 	int32 NumNodes() const { return Nodes.Num(); }
 	int32 NumEdges() const { return Edges.Num(); }
 	const FAstraPlanNode* Node(int32 I) const { return Nodes.IsValidIndex(I) ? &Nodes[I] : nullptr; }
@@ -81,6 +98,7 @@ private:
 	mutable TArray<TArray<int32>> Adjacent;      // node -> its edges
 	mutable TArray<FAstraPlanCompartment> Comps;
 	mutable TArray<FAstraPlanDoor> Doors;
+	mutable TArray<FAstraPlanDeck> Decks;
 	mutable TMap<FString, int32> DoorIndex;
 
 	bool Load() const;

@@ -419,6 +419,27 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 			{
 				RadiatorGlow = C->CreateDynamicMaterialInstance(Slot);   // her radiators glow with her heat (TickHeat)
 			}
+			if (M->GetName() == TEXT("SM_SHIP_ASTRA_Aquila"))
+			{
+				// her own hull is the only one seen from a few metres (through the bridge's windows): the wear map, drawn for
+				// hulls seen from hundreds of metres, would lay scratches like cracks and soot streaks a metre wide there.
+				// Four times finer, and quieter scratches and streaks, on her paint only.
+				for (const TCHAR* Part : {TEXT("MI_HULL_A_Plate"), TEXT("MI_HULL_A_Frame"), TEXT("MI_HULL_A_Livery"), TEXT("MI_HULL_A_Trim"), TEXT("MI_HULL_A_Marking")})
+				{
+					const int32 S = C->GetMaterialIndex(Part);
+					if (S == INDEX_NONE)
+					{
+						continue;
+					}
+					if (UMaterialInstanceDynamic* Mid = C->CreateDynamicMaterialInstance(S))
+					{
+						Mid->SetScalarParameterValue(TEXT("WearScale"), 2.0f);
+						Mid->SetScalarParameterValue(TEXT("ScratchAmount"), 0.12f);
+						Mid->SetScalarParameterValue(TEXT("StreakAmount"), 0.05f);
+						Mid->SetScalarParameterValue(TEXT("DirtBlotch"), 0.12f);
+					}
+				}
+			}
 			if (!It->FindComponentByClass<UAstraNavLights>())
 			{
 				// her running lights (no strobe over the bridge: the Captain looks out of it)
@@ -1589,7 +1610,7 @@ FString UAstraShipSubsystem::CaptainAboard() const
 			}
 			if (It->IsPawnInBerths(P))
 			{
-				return TEXT("in Crew Berthing (Deck 3), in the dim aisle between the racks where the Red watch sleeps (two ratings "
+				return TEXT("in Crew Berthing (Deck 4), in the dim aisle between the racks where the Red watch sleeps (two ratings "
 				            "who cannot sleep sit at the table aft); the XO has the conn and the bridge officers speak by intercom, softly");
 			}
 			if (It->IsPawnInMedbay(P))
@@ -1635,7 +1656,7 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	{
 		if (It->IsPawnInEngineering(P)) { return TEXT("DECK 7 · MAIN ENGINEERING"); }
 		if (It->IsPawnInMess(P)) { return TEXT("DECK 4 · MESS HALL"); }
-		if (It->IsPawnInBerths(P)) { return TEXT("DECK 3 · CREW BERTHING"); }
+		if (It->IsPawnInBerths(P)) { return TEXT("DECK 4 · CREW BERTHING"); }
 		if (It->IsPawnInMedbay(P)) { return TEXT("DECK 6 · MEDBAY"); }
 		if (It->IsPawnInHangar(P)) { return TEXT("DECK 9 · FLIGHT DECK"); }
 	}
@@ -1821,9 +1842,9 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	if (Name == TEXT("holo_display"))
 	{
 		const FString M = Str(TEXT("mode")).ToLower();
-		if (M != TEXT("tactical") && M != TEXT("sector"))
+		if (M != TEXT("tactical") && M != TEXT("sector") && M != TEXT("ship"))
 		{
-			OutDetail = TEXT("the holo table shows either the tactical plot or the sector map");
+			OutDetail = TEXT("the holo table shows the tactical plot, the sector map or the ship (her decks, the damage and the damage-control teams)");
 			return false;
 		}
 		if (M == TEXT("sector") && Sector.Num() == 0)
@@ -1833,7 +1854,8 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		}
 		HoloMode = M;
 		OutDetail = M == TEXT("sector") ? TEXT("holo table: the sector map (the March, who holds what, the gate links)")
-		                                : TEXT("holo table: tactical plot");
+		          : M == TEXT("ship")   ? FString::Printf(TEXT("holo table: the Aquila, deck by deck — %s"), *DamageSummary())
+		                                : FString(TEXT("holo table: tactical plot"));
 		return true;
 	}
 	if (Name == TEXT("visit"))
@@ -2151,7 +2173,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		const FString Priority = Str(TEXT("priority")).ToLower();
 		const float Speed = Priority == TEXT("critical") ? 0.8f : (Priority == TEXT("low") ? 1.2f : 1.f);
 		D->Team = Team;
-		D->Travel = (6.f + FMath::Abs(D->Deck - 6) * 1.5f) * Speed;
+		D->Travel = D->Travel0 = (6.f + FMath::Abs(D->Deck - 6) * 1.5f) * Speed;
 		D->Work = (D->Kind == TEXT("fire") ? 30.f : (D->Kind == TEXT("hull breach") ? 40.f : 25.f)) * Speed;
 		int32 Busy = 0;
 		for (const FAstraDamage& X : Damage) { Busy += X.Team >= 0 ? 1 : 0; }
@@ -2959,24 +2981,30 @@ void UAstraShipSubsystem::OnHullHit(float HullDamage, float ShieldDamage, const 
 {
 	FlickerTime = 0.6f;
 	FString Where;
-	if (HullDamage > 8.f && BridgeFX)
+	const double HitAt = GetWorld()->GetTimeSeconds();
+	// the shock runs through the frame: a fixture or a console on the bridge shorts out. A breaker that has just tripped holds
+	// for a while: at most one every 8 s, a heavy blow after 2 s (with the war's physical damage the hits come many a minute)
+	if (HullDamage > 8.f && BridgeFX && HitAt - LastBridgeBurst > (HullDamage > 35.f ? 2.0 : 8.0))
 	{
-		// the shock runs through the frame: a fixture or a console on the bridge shorts out
 		const float Strength = FMath::Clamp(HullDamage / 60.f, 0.2f, 1.f);
 		if (FMath::FRand() < 0.35f + 0.5f * Strength)
 		{
 			BridgeFX->RandomBurst(Strength);
+			LastBridgeBurst = HitAt;
 		}
 		if (HullDamage > 35.f)
 		{
 			BridgeFX->RandomBurst(Strength * 0.7f);
+			LastBridgeBurst = HitAt;
 		}
 	}
 	if (HullDamage > 5.f)
 	{
 		RadiatorHit();
 	}
-	if (HullDamage > 8.f)
+	// a blow that gets through does harm inside in proportion to its force: a graze may only buckle plating (the hull's own
+	// damage), a heavy hit almost always starts something (until DISTRUZIONE puts it where the hit really landed)
+	if (HullDamage > 8.f && FMath::FRand() < FMath::Clamp(HullDamage / 45.f, 0.2f, 1.f))
 	{
 		// where did it land? a compartment (decks 1-12, sections A-H) and what it does there
 		FAstraDamage D;

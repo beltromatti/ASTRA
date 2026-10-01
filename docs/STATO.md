@@ -11,7 +11,7 @@
 | **F1** La plancia viva | quasi fatta. ✓ Già pronto: **postazioni vere** (modalità persistenti eseguite a 10 Hz); **schermo principale** intelligente (telecamera, zoom, regia, sovrimpressione, scheda del canale); **tavolo olografico** leggibile dalla poltrona (si inclina verso chi guarda; rilevamenti veri, minacce, linea al bersaglio); **datapad** spinto da ops; **finestrone** in realtà aumentata; **HUD del Falcon**; **equipaggio agente** (MENTE-EQUIPAGGIO); **plancia v3**; **menu SETTINGS**; **voce v2 provata dal vivo** (parla anche chi è fuori plancia, sottotitoli giusti, «● LISTENING», il Capitano sempre per primo). ✓ **Principio delle intelligenze** applicato: le parole dell'equipaggio arrivano come le dice (via tagli, riscritture, liste di parole); il router lascia sentire tutto alla stanza e fa decidere a un modello cosa esce su un canale aperto (93–95 % sui 734 casi, 260 ms); la brevità del nemico è nel suo prompt. ✓ Il palco della voce **ripensa** invece di scartare (chi doveva dire una battuta rimasta in coda o interrotta la ridice con lo stato di adesso, la cambia o la lascia cadere). Da fare: la plancia curata nel minimo dettaglio, l'immagine nitida |
 | **F2** La guerra grande | in corso (GUERRA): ✓ F2.1 danni fisici; F2.2 gerarchie a metà (gruppi di battaglia, squadriglie); poi le menti di guerra (lead), la scala, la bellezza, il regista v2 |
 | **F3** Persone vere | ferma sull'autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **F4** La nave intera e la distruzione | in corso: ✓ **NAVE unita** (pianta dell'Aquila: 2251 compartimenti, 1034 porte, grafo di 4450 luoghi; kit di 96 modelli; Ponte 4 e Ponte 6 costruiti; `UAstraShipPlan` trova i percorsi in 0,1 ms); import nel livello in corso; **VITA** (la vita di bordo) avviata |
+| **F4** La nave intera e la distruzione | in corso: ✓ **NAVE unita** (pianta dell'Aquila: 2251 compartimenti, 1034 porte, grafo di 4450 luoghi; kit di 96 modelli; Ponte 4 e Ponte 6 costruiti; `UAstraShipPlan` trova i percorsi in 0,1 ms); Ponti 4 e 6 nel livello e camminati (57 fps nella Spina); **VITA** (la vita di bordo) in corso |
 | **F5** Abbordaggi · **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | da fare |
 
 **Agenti di supporto attivi** (worktree in `.claude/worktrees/`, rami `worktree-*`; il lead prova nel gioco, unisce, rimanda i difetti):
@@ -20,9 +20,58 @@
 - **VITA** — le ~560 persone dell'Aquila sul grafo dei percorsi: turni, lavori veri, pasti, sonno, posti di combattimento, squadre di riparazione che camminano fino ai danni, feriti in infermeria; corpi solo vicino al Capitano (≤ ~40), memoria in codice, un modello piccolo quando il Capitano ci parla.
 - Chiusi: ~~MENTE-EQUIPAGGIO~~, ~~ARTE-PLANCIA~~, ~~VOCE~~, ~~NAVE~~ (unita e importata il 30/9 sera: Ponti 4 e 6 nel livello, `docs/NAVE.md`), ~~ARTE-NAVI~~ (unita il 1/10: 12 navi e velivoli v3 con 21 pezzi di rottura (prua, centro e poppa di 7 navi), materiali a strati con usura, 8 decalcomanie di danno, lo scafo dell'Aquila aperto sotto il blocco per i Ponti 2–3; anteprime in `docs/progressi/navi_v3/`).
 
+**Prove d'integrazione del lead (1/10 notte, rami locali `integ-*`, non pubblicati):**
+- **GUERRA** (main + F2.2 parte 3): si unisce senza conflitti e compila; nel gioco la battaglia d'apertura è intensa e credibile
+  (riflessi, caccia, missili, esche, danni, calore al 97 %, scafo 88 % in 2,5 minuti senza mente), 59,7 fps a macchina scarica. Difetti
+  trovati e corretti su main: scintille delle console a ogni colpo (4 in 15 s) e incendi interni a ogni colpo (sei ponti in 30 s).
+  Da fare all'unione: `PlayerEngineFactor()` al timone, `RepairPlayerSystems()` dalle squadre, `GetWeaponRanges()` su tavolo e schermo.
+- **METALFX**: al primo giro il plugin si spegneva (il colore che arriva all'upscaler nel gioco vero è R11G11B10F, voleva RGBA16F);
+  corretto dall'aiutante in un'ora. Al secondo giro **funziona**: 1,3 ms di MetalFX, a pari risoluzione (50 %) ~1 ms meno del TSR e
+  immagine alla pari; con la risoluzione dinamica si assesta al **54 %** contro il 40–42 % del TSR (+70 % di pixel). Da sistemare
+  prima dell'unione: la risoluzione dinamica non vede il suo 1,3 ms (56–57 fps) e il render thread sale a ~19 ms; poi la prova del moto.
+
+**Fatto dal lead il 1/10 notte:** la **mappa olografica della nave** (`holo ship`): lo spaccato dell'Aquila sul tavolo, ponte per
+riga, sezioni col colore del danno, incidenti con squadra e progresso, squadre che camminano dal Ponte 6, il Capitano dov'è; ops e la
+mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le navi scansionate (`GetDamageView` di GUERRA).
+
+**Ripresa (1/10 ~02:40, limite d'uso raggiunto):**
+- **METALFX unito in main** (plugin `Plugins/AstraMetalFX`, `r.AstraMetalFX=1`): provato nel gioco vero, 60 fps con risoluzione
+  dinamica al 45–48 % contro 41–43 % del TSR (la compensazione alza `TargetedGPUHeadRoomPercentage` del suo 1,3 ms); a risoluzione
+  fissa il render thread non aspetta. Da fare: guardare il moto (`r.AstraMetalFX.Debug 1|2`), tarare `r.Tonemapper.Sharpen`, togliere
+  il worktree `agent-a90bd4087f2057aa8` (modulo chiuso).
+- **GUERRA** e **VITA** stanno finendo (rapporti in arrivo): unirli e fare i passi d'integrazione di GUERRA.md §6.8 (motori al timone,
+  riparazioni, gittate su tavolo e schermo, `holo ship` delle navi scansionate) e di VITA.md §7.
+- **Prossimi moduli, brief pronti** in `docs/brief/`: MENTE-GUERRA (al posto di GUERRA), NAVE-2 (gli altri ponti, a istanze e a
+  livelli), VFX (la guerra bella, nomi per nave, tetto dell'isola), DISTRUZIONE (dopo VITA).
+
 **Banco della guerra senza grafica**: `tools/war.py run|report|ship|ab` (commandlet `AstraWarSim`, ~1000× il tempo reale, deterministico per seme; vedi [GUERRA.md](GUERRA.md)).
 
 **Strumenti di prova del lead** (gioco con `tools/play.py launch --nomind`; `tools/play.py tp X Y YAW PITCH` per le foto): `astra.battle.time 170` (arriva il gruppo d'attacco), `astra.cmd station {...}`, `astra.viewscreen.dump` (l'immagine dello schermo principale a piena risoluzione), `astra.screens.dump <Pagina>` (una console su PNG), `/state` con `context`.
+
+## Navi v3 nel gioco (1/10 notte)
+- **Importate** (12 navi e velivoli + 21 pezzi di rottura, `import_ships_v3.py`: 0 problemi), luci di navigazione rilette dalle mesh nuove
+  (`extract_nav_lights.py`: era quadratico, 20 minuti bloccati → pochi secondi).
+- **Il materiale `M_ASTRA_HullV3` non aveva mai compilato** (campionatore della mappa d'usura «Masks» su una texture BC7): nel gioco le
+  navi v3 avevano il materiale di ripiego del motore (griglia grigia, marrone sotto il sole arancione, a scacchi). Corretto; in più
+  usura e variazione macro ora vengono da una proiezione nello spazio della nave (le UV0 sono ancorate per triangolo: a scala
+  frazionaria facevano scacchi diagonali). `patch_ship_materials_localuv.py` corregge in posto (ricostruire da zero un materiale in
+  uso manda in crash l'editor: `make_ship_materials_v3.py` ora si ferma con un messaggio invece di cancellare).
+- **Nel gioco**: la prua dell'Aquila vista dalla plancia è bellissima (piastre di toni diversi, torrette, sensori); Praetorian e
+  Mandato leggibili sullo schermo principale fino allo zoom ×230. **Da sistemare** (con il modulo VFX o un passaggio sulle navi):
+  graffi e strisce della mappa d'usura troppo grossi sulle superfici viste da pochi metri (sotto i finestroni); la superficie liscia
+  lasciata dal generatore attorno alla plancia (senza dettagli); nomi e numeri per nave (oggi Praetorian e Vigilant hanno nome e
+  numero nella geometria, sbagliati per le gemelle; l'Aquila ha ancora la decalcomania v2 del nome, forse a vuoto sul fianco più stretto).
+- **Prestazioni** in battaglia dalla poltrona, aiutanti in pausa: 59,9 fps, game 8,2 ms, render 8,0 ms, GPU 14,4 ms con la risoluzione
+  dinamica al 41 % (prima 50–55 %): il materiale v3 è pesante (382 istruzioni) e la cattura dello schermo principale disegna la nave
+  inquadrata a tutto schermo. Con gli aiutanti al lavoro (2 simulazioni + 1 compilazione) il render thread sale a 30 ms (40 fps):
+  le misure si fanno sempre con i loro processi sospesi (`kill -STOP`/`-CONT`).
+- **Schermo principale nitido** (1/10 notte): la cattura della telecamera aveva l'antialiasing temporale spento (default delle
+  catture 2D in UE: ripiego su FXAA) e le navi v3 erano «a puntini»; ora ha il suo TSR (storia propria) e rende a 640x267 con
+  mipmap, le scritte a 1280x534: la Praetorian a x6–x10 si legge come in un film. Costo a 20 Hz con uno scafo a tutto schermo
+  ~1,5–2 ms (una cattura rende sempre al 100 % del suo bersaglio, senza risoluzione dinamica). Prima: 1280x534 senza AA, ~3 ms.
+- Ripartizione GPU al 70 % in battaglia (CSV `csvprofile` con `r.GPUCsvStatsEnabled 1`): ombre 2,1 + proiezione 0,7, luci locali
+  3,1 (clustered 1,6 + deferred 1,5), Nanite 2,7, traslucidi 1,3, GI di Lumen 1,3 + scena 0,9, post 0,75. Prove A/B: raggi delle
+  luci di plancia a 0,7 → −0,6 ms, ombre dei due faretti → −0,5 ms (comandi `astra.lights.radius|shadows`, non ancora applicati).
 
 ## Prestazioni (misure pulite 30/9 sera: macchina scarica, finestra 1600×900, plancia v3 in battaglia, prove A/B alternate)
 - **Costo GPU**: ~27 ms al 100 %, ~17,5 al 70 %, ~12,6 al 50 %, ~12 al 40 %: un costo fisso di ~9–10 ms (ombre ~1,6, GI Lumen ~1,1,

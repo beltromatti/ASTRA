@@ -36,6 +36,13 @@ Mentre tieni premuto **V** in basso compare «● LISTENING». Il Capitano parla
 parlando si interrompe, e ciò che voleva dire lo ripensa con la situazione di quel momento (magari non serve più).
 Gli ufficiali fuori plancia li senti attraverso la stanza o all'interfono; i sottotitoli seguono la voce.
 
+## Il tavolo olografico e il datapad
+Il tavolo al centro della plancia ha tre viste, che chiedi a Tanaka (operazioni): la **battaglia** attorno all'Aquila
+(«Tanaka, la tattica sul tavolo»), la **mappa del settore** (i sistemi della March, chi li tiene, i portali) e la **nave**
+(«mostrami la nave sul tavolo»): lo spaccato dell'Aquila ponte per ponte, con le sezioni danneggiate che pulsano (rosso le
+falle, arancio gli incendi, giallo le condotte), le squadre di riparazione che camminano verso i danni e il punto dove sei tu.
+Lo stesso spaccato sta sulla pagina **DAMAGE** del datapad (Tab), insieme all'elenco degli incidenti e alle perdite.
+
 ## La nave
 Oltre alla plancia si camminano due ponti interi dell'Aquila: il **Ponte 4** (Crew Services: la **Spina**, il corridoio
 che va da prua a poppa, la mensa con gli ascensori, gli alloggi dell'equipaggio e le stanze dei servizi) e il **Ponte 6**

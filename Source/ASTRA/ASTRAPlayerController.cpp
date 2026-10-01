@@ -516,7 +516,7 @@ namespace
 	// Medbay (3), 4 Main Engineering (2), 5 the flight deck (1)
 	constexpr int32 NumDecks = 6;
 	const int32 DeckLanding[NumDecks + 1] = {-1, 0, 5, 4, 3, 2, 1};
-	const TCHAR* DeckName[NumDecks + 1] = {TEXT(""), TEXT("BRIDGE  ·  DECK 1"), TEXT("CREW BERTHING  ·  DECK 3"), TEXT("MESS HALL  ·  DECK 4"),
+	const TCHAR* DeckName[NumDecks + 1] = {TEXT(""), TEXT("BRIDGE  ·  DECK 1"), TEXT("CREW BERTHING  ·  DECK 4 C"), TEXT("MESS HALL  ·  DECK 4 B"),
 	                                       TEXT("MEDBAY  ·  DECK 6"), TEXT("MAIN ENGINEERING  ·  DECK 7"), TEXT("FLIGHT DECK  ·  DECK 9")};
 }
 

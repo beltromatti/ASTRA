@@ -130,11 +130,10 @@ def custom(mat, code, inputs, x, y, out=unreal.CustomMaterialOutputType.CMOT_FLO
 def fresh(name):
     path = f"{MAT}/{name}"
     if eal.does_asset_exist(path):
-        m = eal.load_asset(path)
-        mel.delete_all_material_expressions(m)
-        for e in mel.get_material_expressions(m):
-            mel.delete_material_expression(m, e)
-        return m
+        # deleting the expressions of a master that is loaded and in use (the level's ships) asserts in UE 5.8 (!IsRooted) and
+        # takes the editor down: rebuild from scratch only with the masters deleted (editor closed), or patch in place
+        # (tools/ue_scripts/patch_ship_materials_localuv.py is the model)
+        raise RuntimeError(f"{path} exists: delete the v3 masters with the editor closed to rebuild them, or patch them in place")
     return tools.create_asset(name, MAT, unreal.Material, unreal.MaterialFactoryNew())
 
 
@@ -153,6 +152,25 @@ def uvset(m, index, x, y):
     return E(m, unreal.MaterialExpressionTextureCoordinate, x, y, coordinate_index=index)
 
 
+def local_box_uv(m, x, y):
+    """A box projection in the ship's own space, in UV0's units (metres / 8), continuous over the whole hull. UV0 is anchored
+    per triangle on an 8 m lattice (whole-unit jumps between triangles, invisible to the detail textures that tile at integer
+    scales): anything sampled at a fractional scale of it — the wear map, the macro variation — would jump at every diagonal.
+    The section pieces share the ship's frame, so a broken piece keeps its wear where it was."""
+    lp = E(m, unreal.MaterialExpressionLocalPosition, x - 400, y)
+    nw = E(m, unreal.MaterialExpressionVertexNormalWS, x - 600, y + 100)
+    nl = E(m, unreal.MaterialExpressionTransform, x - 400, y + 100)
+    nl.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_WORLD)
+    nl.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
+    link(nw, "", nl, "")
+    code = """
+float3 n = abs(N);
+float2 q = (n.x >= n.y && n.x >= n.z) ? P.yz : ((n.y >= n.z) ? P.xz : P.xy);
+return q / 800.0;
+"""
+    return custom(m, code, [("P", (lp, "")), ("N", (nl, ""))], x - 200, y, out=unreal.CustomMaterialOutputType.CMOT_FLOAT2)
+
+
 # =========================================================================================================== M_ASTRA_HullV3
 def build_hull():
     m = fresh("M_ASTRA_HullV3")
@@ -160,16 +178,17 @@ def build_hull():
     uv1 = uvset(m, 1, -2600, 300)
     uv2 = uvset(m, 2, -2600, 450)
     uvt = binop(m, unreal.MaterialExpressionMultiply, uv0, "", scalar(m, "UVScale", 4.0, -2600, 120, "UV"), "", -2400, 40)
-    wuv = binop(m, unreal.MaterialExpressionMultiply, uv0, "", scalar(m, "WearScale", 0.5, -2600, 620, "UV"), "", -2400, 560)
+    luv = local_box_uv(m, -2600, 1200)
+    wuv = binop(m, unreal.MaterialExpressionMultiply, luv, "", scalar(m, "WearScale", 0.5, -2600, 620, "UV"), "", -2400, 560)
     bc = texparam(m, "BaseColorMap", tex("T_PanelPaint_BC"), ST.SAMPLERTYPE_COLOR, -2100, -400)
     nm = texparam(m, "NormalMap", tex("T_PanelPaint_N"), ST.SAMPLERTYPE_NORMAL, -2100, 300)
     orm = texparam(m, "ORMMap", tex("T_PanelPaint_ORM"), ST.SAMPLERTYPE_MASKS, -2100, 0)
     for t in (bc, nm, orm):
         link(uvt, "", t, "UVs")
-    wear = texparam(m, "ShipWear", tex("T_ShipWear_M"), ST.SAMPLERTYPE_MASKS, -2100, 700, "Wear")
+    wear = texparam(m, "ShipWear", tex("T_ShipWear_M"), ST.SAMPLERTYPE_LINEAR_COLOR, -2100, 700, "Wear")
     link(wuv, "", wear, "UVs")
     # the macro variation, shifted per object so two ships never repeat each other
-    muv0 = binop(m, unreal.MaterialExpressionMultiply, uv0, "", scalar(m, "MacroScale", 0.6, -2600, 800, "UV"), "", -2400, 760)
+    muv0 = binop(m, unreal.MaterialExpressionMultiply, luv, "", scalar(m, "MacroScale", 0.6, -2600, 800, "UV"), "", -2400, 760)
     objm = mask(m, E(m, unreal.MaterialExpressionObjectPositionWS, -2600, 920), "", -2450, 920, r=True, g=True)
     objoff = binop(m, unreal.MaterialExpressionMultiply, objm, "", const(m, 0.00173, -2450, 1000), "", -2300, 940)
     muv = binop(m, unreal.MaterialExpressionAdd, muv0, "", objoff, "", -2200, 800)
@@ -292,11 +311,10 @@ return float4(col * Intensity * k, k);
 # ========================================================================================================= M_ASTRA_ShipCut
 def build_cut():
     m = fresh("M_ASTRA_ShipCut")
-    uv0 = uvset(m, 0, -2000, 0)
     uv1 = uvset(m, 1, -2000, 200)
     uv2 = uvset(m, 2, -2000, 300)
-    uvt = binop(m, unreal.MaterialExpressionMultiply, uv0, "", scalar(m, "WearScale", 0.9, -2000, 100, "UV"), "", -1800, 40)
-    wear = texparam(m, "ShipWear", tex("T_ShipWear_M"), ST.SAMPLERTYPE_MASKS, -1600, 0, "Wear")
+    uvt = binop(m, unreal.MaterialExpressionMultiply, local_box_uv(m, -2000, 500), "", scalar(m, "WearScale", 0.9, -2000, 100, "UV"), "", -1800, 40)
+    wear = texparam(m, "ShipWear", tex("T_ShipWear_M"), ST.SAMPLERTYPE_LINEAR_COLOR, -1600, 0, "Wear")
     link(uvt, "", wear, "UVs")
     tint = vector(m, "Tint", (0.085, 0.078, 0.07, 1), -1600, 300, "Burnt")
     ember = vector(m, "EmberColor", (1.0, 0.33, 0.07, 1), -1600, 380, "Burnt")

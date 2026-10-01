@@ -1,0 +1,26 @@
+// Copyright ASTRA. The scene view extension that, every frame, decides whether the game view is upscaled by MetalFX or by
+// the engine's TSR, and installs the upscaler on the view family when it is ours.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "SceneViewExtension.h"
+
+class FAstraMetalFXViewExtension final : public FSceneViewExtensionBase
+{
+public:
+	explicit FAstraMetalFXViewExtension(const FAutoRegister& AutoRegister);
+
+	//~ ISceneViewExtension
+	virtual void SetupViewFamily(FSceneViewFamily& InViewFamily) override {}
+	virtual void SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView) override {}
+	virtual void BeginRenderViewFamily(FSceneViewFamily& InViewFamily) override;
+
+private:
+	/**
+	 * Only the game's own, single, real-time view is a candidate: scene captures, editor viewports, split screen keep TSR.
+	 * Returns null for a candidate, else why not. bOutMainGameView tells whether the family is the game's main view (a view of a
+	 * game world that is no capture): that is the one whose frames TSR renders instead of MetalFX, and the one worth reporting.
+	 */
+	static const TCHAR* GetRejection(const FSceneViewFamily& Family, bool& bOutMainGameView);
+};

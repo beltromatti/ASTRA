@@ -186,7 +186,8 @@ def _build() -> dict[str, Station]:
         m("ops", "viewscreen", "viewscreen_off", "screen off: the true window", (), "order", native="off"),
         m("ops", "holo", "holo_tactical", "the holo table shows the battle around the Aquila", (), "order", native="tactical"),
         m("ops", "holo", "holo_sector", "the holo table shows the sector map", (), "order", native="sector"),
-        m("ops", "holo", "holo_ship", "the holo table shows the tactical plot with one ship marked", (_target(desc="contact id"),), "order",
+        m("ops", "holo", "holo_ship", "the holo table shows the Aquila herself: a cutaway deck by deck, sections A-H, the damage where "
+          "it is (fires, breaches, damaged conduits), the damage-control teams on their way or at work, where the Captain is", (), "order",
           native="ship"),
         m("ops", "datapad", "datapad_push", "put a page on the Captain's datapad (Tab shows it)",
           (P("page", STR, "overview | contact (a dossier: give focus) | damage | fleet | orders", required=True, enum=DATAPAD_PAGES),

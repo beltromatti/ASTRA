@@ -1425,10 +1425,10 @@
    "plane": 4,
    "entrance": {"wall": "fwd", "x": -176.0, "y": 0.0, "w": 3.0, "h": 3.0, "z": -46.0},
    "existing": true,
-   "label_deck": 3,
+   "label_deck": 4,
    "data": "aquila_berths.json",
    "capacity": 84,
-   "note": "its signage says DECK 3; it stands on the Deck 4 plane (z -46, like the Mess): the Deck 3 plane (z -42) is under the hull's inner skin here",
+   "note": "it stands on the Deck 4 plane (z -46, like the Mess), and its signage says so (DECK 4 · SECTION C): the Deck 3 plane (z -42) is under the hull's inner skin here",
    "entrance_door": "berths_entrance"
   },
   {

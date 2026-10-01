@@ -223,7 +223,7 @@
       "lumens": 8000,
       "temperature": 5200,
       "shadows": false,
-      "radius": 1400,
+      "radius": 1120,
       "note": "the dome's eye: soft top light for the dais, tactical and the back of the room"
     },
     {
@@ -246,7 +246,7 @@
       "lumens": 6500,
       "temperature": 5600,
       "shadows": false,
-      "radius": 1200
+      "radius": 960
     },
     {
       "id": "Table_Key",
@@ -258,7 +258,7 @@
       "lumens": 5200,
       "temperature": 6800,
       "shadows": true,
-      "radius": 1200,
+      "radius": 960,
       "note": "from the collector ring: the table, the helm and ops consoles get their shadows here"
     },
     {
@@ -271,7 +271,7 @@
       "lumens": 4200,
       "temperature": 3800,
       "shadows": true,
-      "radius": 1000,
+      "radius": 800,
       "note": "warm key on the captain's chair; one of the two shadowed lights of the bridge"
     },
     {
@@ -284,7 +284,7 @@
       "lumens": 2600,
       "temperature": 3300,
       "shadows": false,
-      "radius": 1400,
+      "radius": 1120,
       "note": "the cornice trough: warm indirect light on the ceiling edge"
     },
     {
@@ -297,7 +297,7 @@
       "lumens": 2600,
       "temperature": 3300,
       "shadows": false,
-      "radius": 1400
+      "radius": 1120
     },
     {
       "id": "Cove_Aft",
@@ -309,7 +309,7 @@
       "lumens": 2400,
       "temperature": 3300,
       "shadows": false,
-      "radius": 1400
+      "radius": 1120
     },
     {
       "id": "Ring_Cove",
@@ -320,7 +320,7 @@
       "lumens": 2200,
       "temperature": 3600,
       "shadows": false,
-      "radius": 1600,
+      "radius": 1280,
       "note": "bounces off the ceiling panels between the ring beams"
     },
     {
@@ -407,7 +407,7 @@
       "lumens": 4500,
       "temperature": 7800,
       "shadows": false,
-      "radius": 1800,
+      "radius": 1440,
       "note": "the image lights the room: tint and gain follow what the screen shows"
     },
     {
@@ -420,7 +420,7 @@
       "lumens": 2300,
       "temperature": 6500,
       "shadows": false,
-      "radius": 1000
+      "radius": 800
     },
     {
       "id": "Helm_Task",
