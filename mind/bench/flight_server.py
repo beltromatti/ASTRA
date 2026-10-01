@@ -89,7 +89,8 @@ class FlightServerTest(unittest.IsolatedAsyncioTestCase):
 
     def later(self, seconds: float) -> None:
         """The net's clock moves (its cadence is in seconds of play: the tests do not wait for them)."""
-        self.mind.flight.clock = lambda t=self.mind.flight.clock() + seconds: t
+        moved = self.mind.flight.clock() + seconds
+        self.mind.flight.clock = lambda: moved
 
     def crew_calls(self) -> list[dict[str, Any]]:
         return [c for c in self.model.calls if c["kind"] == "crew"]

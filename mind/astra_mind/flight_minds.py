@@ -36,7 +36,7 @@ import logging
 import re
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
@@ -774,7 +774,9 @@ class FlightMinds:
         if mem:
             parts.append(f"WHAT THEY REMEMBER\n{mem}")
         if events:
-            parts.append("NEW SINCE YOUR LAST LOOK (newest last)\n" + "\n".join(f" - {max(0, now - e.t):.0f} s ago · {e.text}" for e in events))
+            parts.append("NEW SINCE YOUR LAST LOOK (newest last)\n" + "\n".join(
+                f" - {max(0, now - e.t):.0f} s ago · {e.text}" + ("" if e.take else "  [the bridge's news: its officers have it; say something only if it touches your own people or your own deck]")
+                for e in events))
         if inbox:
             parts.append("THE CAPTAIN SAYS (over the net)\n" + "\n".join(
                 f" - {max(0, now - m.t):.0f} s ago{', relayed by Comms, who opened the net for him' if m.src == 'hail' else ''}: \"{m.text}\"" for m in inbox))
@@ -905,7 +907,7 @@ class FlightMinds:
         comp = await models.chat(self.llm, ROLE, messages=follow, tools=[SAY, MISSION, STAY_QUIET], tool_choice="auto", on_tool_call=on_call, max_tokens=240)
         self._count(rec, comp)
         new = await self._collect(again)
-        self._account(rec, new, second=True)
+        self._account(rec, new)
         return new
 
     @staticmethod
@@ -915,8 +917,8 @@ class FlightMinds:
         rec["tokens_out"] += comp.completion_tokens
         rec["cached"] += comp.cached_tokens
 
-    def _account(self, rec: dict[str, Any], results: list[tuple[str, dict[str, Any], dict[str, Any]]], second: bool = False) -> None:
-        for name, a, res in results:
+    def _account(self, rec: dict[str, Any], results: list[tuple[str, dict[str, Any], dict[str, Any]]]) -> None:
+        for _name, a, res in results:
             ok = bool(res.get("ok"))
             rec["ok" if ok else "failed"] += 1
             who = self.radio(a.get("by", "cag")) if a.get("by") in CAST else "?"

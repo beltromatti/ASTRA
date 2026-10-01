@@ -36,7 +36,7 @@ l'autorità degli ordini e li passa al gioco; non decide cosa dice nessuno. Con 
 | `mind/astra_mind/tools.py` | `hail` conosce `flight` |
 | `mind/astra_mind/server.py` | l'aggancio: voci radio, intercetta `hail`, notizie, turno del Capitano, sessione, `_flight_say/_execute/_unanswered` |
 | `Source/ASTRA/AstraBattleSubsystem.h/.cpp`, `AstraWarCraft.cpp` | **C++ (non compilato)**: l'ala di Eagle e gli eventi nuovi (§7) |
-| `mind/bench/flight_unit.py` (61 prove), `flight_server.py` (17) | offline: modello finto, nessuna rete |
+| `mind/bench/flight_unit.py` (62 prove), `flight_server.py` (17) | offline: modello finto, nessuna rete |
 | `mind/bench/flight_live.py` (32 scene), `flight_crew_live.py` (9) | dal vivo, pochi centesimi (§9) |
 
 ## 3. Il cast
@@ -170,7 +170,7 @@ Tornano al modello sotto «What they remember»: possono affiorare quando conta,
 Comandi (dalla cartella `mind`, con il venv del progetto):
 
 ```
-.venv/bin/python -m unittest bench.flight_unit bench.flight_server            # 61 + 17 prove, senza rete e senza costo
+.venv/bin/python -m unittest bench.flight_unit bench.flight_server            # 62 + 17 prove, senza rete e senza costo
 .venv/bin/python -m bench.flight_live --repeat 3 --cap 0.06                   # le 32 scene dal vivo (circa 0,03 $)
 .venv/bin/python -m bench.flight_live --battle --only none --cap 0.05         # la battaglia compressa: pulsazioni, righe, costo all'ora (circa 0,01 $)
 .venv/bin/python -m bench.flight_crew_live --budget 0.06                      # equipaggio + router + rete insieme, gioco finto (circa 0,006 $)
@@ -183,10 +183,11 @@ La chiave OpenRouter si legge dall'ambiente o dal `.env` del checkout principale
 strumenti senza silenzio per le notizie che si dicono, gli ordini (autorità, delega, rifiuto e correzione, console che non risponde), l'ala (nomi, scioglimento, gregario
 abbattuto), la memoria, il canale (apertura, chiusura, vivo dove sta il Capitano), la risposta garantita al Capitano, e col vero `Mind`: l'equipaggio non riceve ciò che
 la rete dice, Price non ripete, le parole intere alla rete non fanno turno, una rete che fallisce passa le parole a Price e un difetto nella rete non toglie la
-nave all'equipaggio. Suite offline completa del `mind`: 259 prove, tutte verdi.
+nave all'equipaggio. Suite offline completa del `mind` (npc, stazioni, guerra, regista, voce, volo): 260 prove, tutte verdi.
 
-**Dal vivo** (DeepSeek V4.1 Flash via OpenRouter, 31 scene × 3 ripetizioni nell'ultima corsa: 92/93 come atteso; la partenza era 83/96 prima di togliere il silenzio
-alle notizie che si dicono e di garantire la risposta al Capitano):
+**Dal vivo** (DeepSeek V4.1 Flash via OpenRouter, 32 scene × 3 ripetizioni nell'ultima corsa: 96/96 come atteso, con una sola voce nelle scene dove ne serve una;
+la partenza era 83/96 prima di togliere il silenzio alle notizie che si dicono e di garantire la risposta al Capitano; il resto sta nella lettura delle righe, che si
+fa a occhio, mai con un'espressione regolare):
 
 | Cosa | Risultato |
 |---|---|

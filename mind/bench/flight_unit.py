@@ -269,6 +269,17 @@ class Prompts(unittest.TestCase):
             self.assertNotIn("flank the Aquila", user)
             self.assertNotIn("_mandate", user)
 
+    def test_what_is_the_bridges_news_says_so(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bed = Bed(tmp)
+            bed.flight.on_event(LOSS)
+            bed.flight.on_event("damage report: the unattended fire at deck 9 section C has spread to section D")
+            user = bed.flight._compose(ship_state(), bed.flight._events, [], ["news on the net (below)"], "it")
+            fire = next(row for row in user.splitlines() if "unattended fire" in row)
+            loss = next(row for row in user.splitlines() if "lost 2 Falcons" in row)
+            self.assertIn("the bridge's news", fire)                                      # (not the net's to tell: it speaks only if the deck or its people are touched)
+            self.assertNotIn("the bridge's news", loss)
+
     def test_the_captains_words_and_the_language_are_in_the_message(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bed = Bed(tmp)
