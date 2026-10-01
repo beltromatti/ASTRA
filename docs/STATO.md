@@ -13,12 +13,32 @@ ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano 
 | **F1** La plancia viva | quasi fatta: postazioni vere, schermo principale intelligente, tavolo olografico, datapad, equipaggio agente, voce v2. Da fare: la plancia al minimo dettaglio, la prova di partite intere |
 | **F2** La guerra grande | ✓ GUERRA (danni fisici, gruppi, squadriglie), ✓ MENTE-GUERRA (ammiragli, comandanti, catena di comando, alleati che parlano, regista v2), ✓ **SCALA** (velivoli e luci a istanze; `scale_30x150` dalla plancia: 60 fps, game thread 3,7 ms invece di 13,8, render 11,8 ms), ✓ VFX, ✓ **VOLO** (la rete di volo: CAG, capi squadriglia, gregari, Chief of the Deck; l'ala di Eagle) |
 | **F3** Persone vere | ferma sull'autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **F4** La nave intera e la distruzione | ✓ NAVE, NAVE-2 (12 ponti in streaming), VITA (560 persone), ✓ **DISTRUZIONE** (modello fisico per compartimento: falle, campi di contenimento, fuoco e fumo, paratie, potenza, feriti e morti dove erano, il Capitano che sviene e muore). **In corso F4.3**: NAVE-3 (la pianta pensata come una nave vera) e ASCENSORI (turboascensori e navetta veri) |
-| **F5** Abbordaggi | **in corso F5.1** (ABBORDAGGI: prima persona, armi, marine, squadra d'abbordaggio del Mandato) |
-| **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | brief di F6 pronto (`docs/brief/TELETRASPORTO.md`); poi FLOTTA-VIVA (gli interni delle altre navi simulati come l'Aquila) |
+| **F4** La nave intera e la distruzione | ✓ NAVE, NAVE-2 (12 ponti in streaming), VITA (560 persone), ✓ **DISTRUZIONE** (modello fisico per compartimento: falle, campi di contenimento, fuoco e fumo, paratie, potenza, feriti e morti dove erano, il Capitano che sviene e muore), ✓ ASCENSORI. **F4.3 quasi fatta**: la pianta v2 di NAVE-3 è nel gioco (3234 compartimenti, 34 turboascensori e la navetta che funzionano nei ponti veri); mancano l'atrio degli ascensori del Ponte 1, le bocche dei tunnel della navetta e le scale dei tubi di Jefferies (NAVE-3 ci lavora) |
+| **F5** Abbordaggi | **F5.1 unito** (ABBORDAGGI: prima persona, fucile e pistola, marine del ruolino con il Maggiore Reyes e i capisquadra come menti, la squadra del Mandato che cerca l'Ingegneria): da compilare e provare nel gioco |
+| **F6** Teletrasporto · **F7** Pianeta · **F8** Rete e Windows | **F6 in corso** (TELETRASPORTO: regole, banco, Capo della sala); poi FLOTTA-VIVA (gli interni delle altre navi simulati come l'Aquila) |
 
-**Aiutanti al lavoro (2/10)** (worktree in `.claude/worktrees/`, rami `worktree-*`; brief in `docs/brief/`): **NAVE-3**, **ASCENSORI**,
-**ABBORDAGGI**. Poi: TELETRASPORTO, FLOTTA-VIVA (dopo i piani delle altre classi di NAVE-3), F5.2 (abbordare le navi nemiche).
+**Aiutanti al lavoro (2/10 notte)** (worktree in `.claude/worktrees/`, rami `worktree-*`; brief in `docs/brief/`): **NAVE-3** (gli ultimi
+pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo del Falcon, corridoi del Ponte 1 e alloggi del Capitano al
+livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
+abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
+
+**2/10 notte — la pianta di NAVE-3 nel gioco** (il lead): kit esportato (444 mesh, 7,4 M triangoli), i 12 ponti ricostruiti (13 318 istanze,
+1729 porte), 34 pozzi e la navetta caricati senza problemi, 299 pianerottoli. Provato camminando e salendo: le corse fra i ponti vanno (Ponte 7 ↔ 4),
+gli atrii delle banche sono belli (cornice di NAVE-3, ante del motore). **Trovati e corretti nel motore** (41 prove del banco verdi, una nuova):
+scendendo, un fotogramma lungo (un ponte che si carica) faceva passare il soffitto della vettura attraverso la testa del Capitano, che restava sul
+tetto: ora la vettura lo porta con sé a ogni passo; stare mezzo metro dentro la vettura teneva aperte le porte; il pianerottolo colma il muro
+dell'atrio (soglia e imbotte); il posto e il ponte del Capitano dentro un pozzo vengono dalla vettura. **Trovati e mandati a NAVE-3**: il Ponte 1
+non ha l'atrio degli ascensori (il corridoio finisce nella vecchia alcova «LIFT», dietro si vedono le stelle), le fermate della navetta hanno le
+bocche dei tunnel murate (il Capitano viene raschiato via dalla vettura), i tubi di Jefferies servono dei dati per le scale (il Capitano non ci
+cade: si ferma sull'orlo). Memoria del gioco con i ponti nuovi: **8 GB** (limite 9): da tenere d'occhio.
+
+**2/10 notte — una partita da Capitano con la mente** (≈20 minuti): l'apertura, il canale con Solm, gli ordini a timone, tattico e ingegneria
+eseguiti in un secondo, la vittoria, Kade e la ritirata, l'avanguardia dal Gate, Rourke. **Corretti**: Hale (la Lethe da sola davanti al picchetto)
+ritirava «tutta la flotta» dopo mezzo minuto (ora sa di essere gli occhi del gruppo d'attacco che arriva dietro di lui); i cannoni hanno sparato
+44 missili per due minuti e mezzo sull'Acheron ormai relitto, con Solm a bordo, mentre Voss diceva «armi in attesa» (ora l'ingaggio lascia un
+bersaglio senza energia e lo dice, e il fuoco libero non spara sui relitti; finirlo resta possibile con un ordine); Martin diceva «il messaggio è
+passato» dopo ogni frase del Capitano sul canale; gli ufficiali ripetevano ciò che una voce alla radio aveva appena detto e la vittoria tre volte
+in un minuto (prompt: il Capitano ha già sentito).
 
 **2/10 — unione di SCALA, DISTRUZIONE e VOLO** (compilati insieme, 260 prove della mente verdi): materiali di SCALA e suoni dei danni
 importati nell'editor. Nel gioco: `scale_30x150` con l'Aquila a 60 fps (sopra); un colpo da 80 nel Mess Concourse fa falla, fuoco,
