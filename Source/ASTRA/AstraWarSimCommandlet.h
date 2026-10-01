@@ -5,6 +5,9 @@
 //                    [-exec="astra.battle.spawn styx 12 30;astra.cmd station {...}"] [-out=Saved/War/run.json]
 //                    -nullrhi -unattended -nosound
 //
+//   With -mind=<dir> [-mind_dt=1] [-mind_speed=1] the minds are in the loop: every mind_dt battle seconds the battle writes the views
+//   the game gives them (s_<k>.json) and waits for the commands they gave (r_<k>.json); see mind/bench/war_arena.py and docs/GUERRA.md §8.
+//
 // The record: every event and report with its battle time, the truth about every ship every few seconds (positions in km
 // from the Aquila, hull and shields, AI mode, target, stance), the stations' modes, and a summary (who died when).
 

@@ -8,8 +8,11 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "HAL/PlatformTime.h"
+#include "HAL/FileManager.h"
+#include "HAL/PlatformProcess.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "Tickable.h"
@@ -21,6 +24,145 @@ UAstraWarSimCommandlet::UAstraWarSimCommandlet()
 	IsEditor = true;                 // the editor's plugins (MetaHuman capture) assume an editor engine even here
 	LogToConsole = true;
 	ShowErrorCount = true;
+}
+
+namespace
+{
+	/** The minds in the loop (docs/GUERRA.md §8): the battle stops every `Dt` battle seconds, writes what the two sides' minds are given (the
+	 *  same JSON the game's snapshot carries: `_mandate`, `_astra_groups`, the Aquila's contacts) to <dir>/s_<k>.json, and waits for
+	 *  <dir>/r_<k>.json: the commands the minds gave since the last exchange (run here with the game's own `ApplyCommand`; their results
+	 *  come back in the next state) and whether any mind is still thinking. While one is, the battle runs at real time (x`Speed`): the
+	 *  world does not wait for a model that takes seconds to answer, as in the game; otherwise it runs as fast as it can. */
+	struct FMindLink
+	{
+		FString Dir;
+		float Dt = 1.f;
+		float Speed = 1.f;
+		float TimeoutS = 900.f;
+		double NextAt = 0.0;
+		int32 K = 0;
+		bool bThinking = false;
+		bool bStop = false;
+		double PaceWall0 = 0.0;
+		double PaceBattle0 = 0.0;
+		int32 EventsSent = 0;
+		TArray<TSharedPtr<FJsonValue>> Results;                      // the commands run at the last exchange: handed over with the next state
+		bool Active() const { return !Dir.IsEmpty(); }
+	};
+
+	/** Warships and craft still flying, per side (the driver ends a battle that is decided). */
+	TSharedRef<FJsonObject> FleetCounts(const TSharedRef<FJsonObject>& Debug)
+	{
+		int32 Warships[2] = {0, 0}, Craft[2] = {0, 0};
+		for (const TSharedPtr<FJsonValue>& V : Debug->GetArrayField(TEXT("ships")))
+		{
+			const TSharedPtr<FJsonObject> S = V->AsObject();
+			if (!S.IsValid() || !S->GetBoolField(TEXT("alive")))
+			{
+				continue;
+			}
+			const FString Side = S->GetStringField(TEXT("side"));
+			const int32 I = Side == TEXT("astra") ? 0 : (Side == TEXT("mandate") ? 1 : -1);
+			if (I < 0 || S->GetStringField(TEXT("fate")) != TEXT("alive"))
+			{
+				continue;
+			}
+			(S->GetBoolField(TEXT("craft")) ? Craft : Warships)[I] += 1;
+		}
+		TSharedRef<FJsonObject> R = MakeShared<FJsonObject>();
+		for (int32 I = 0; I < 2; ++I)
+		{
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetNumberField(TEXT("warships"), Warships[I]);
+			J->SetNumberField(TEXT("craft"), Craft[I]);
+			R->SetObjectField(I == 0 ? TEXT("astra") : TEXT("mandate"), J);
+		}
+		return R;
+	}
+
+	/** One exchange with the driver: the state out, the commands in. */
+	void MindExchange(FMindLink& L, UAstraBattleSubsystem* B, UAstraShipSubsystem* Ship, const TArray<TSharedPtr<FJsonValue>>& Events)
+	{
+		const double Wall0 = FPlatformTime::Seconds();
+		TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+		Root->SetNumberField(TEXT("k"), L.K);
+		Root->SetNumberField(TEXT("t"), B->GetBattleTime());
+		Root->SetArrayField(TEXT("results"), L.Results);
+		L.Results.Reset();
+		TSharedRef<FJsonObject> State = MakeShared<FJsonObject>();
+		State->SetObjectField(TEXT("_mandate"), B->MandateViewJson());
+		State->SetObjectField(TEXT("_astra_groups"), B->SideGroupsJson(0));
+		State->SetArrayField(TEXT("contacts"), B->ContactsJson());
+		State->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(100.f * B->PlayerHullFraction()));
+		State->SetNumberField(TEXT("sim_time_s"), B->GetBattleTime());
+		Root->SetObjectField(TEXT("state"), State);
+		Root->SetObjectField(TEXT("counts"), FleetCounts(B->DebugState()));
+		TArray<TSharedPtr<FJsonValue>> NewEvents;
+		for (int32 i = L.EventsSent; i < Events.Num(); ++i)
+		{
+			NewEvents.Add(Events[i]);
+		}
+		L.EventsSent = Events.Num();
+		Root->SetArrayField(TEXT("events"), NewEvents);
+		FString Json;
+		const TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Json);
+		FJsonSerializer::Serialize(Root, W);
+		const FString Base = L.Dir / FString::Printf(TEXT("s_%d.json"), L.K);
+		FFileHelper::SaveStringToFile(Json, *(Base + TEXT(".tmp")), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+		IFileManager::Get().Move(*Base, *(Base + TEXT(".tmp")), true);
+		// the commands of the minds come back in r_<k>.json
+		const FString Reply = L.Dir / FString::Printf(TEXT("r_%d.json"), L.K);
+		while (!IFileManager::Get().FileExists(*Reply))
+		{
+			if (FPlatformTime::Seconds() - Wall0 > L.TimeoutS)
+			{
+				UE_LOG(LogASTRA, Warning, TEXT("[WarSim] the mind driver did not answer exchange %d in %.0f s: the battle stops"), L.K, L.TimeoutS);
+				L.bStop = true;
+				return;
+			}
+			FPlatformProcess::Sleep(0.002f);
+		}
+		FString Text;
+		FFileHelper::LoadFileToString(Text, *Reply);
+		IFileManager::Get().Delete(*Reply, false, true, true);
+		TSharedPtr<FJsonObject> R;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), R) || !R.IsValid())
+		{
+			UE_LOG(LogASTRA, Warning, TEXT("[WarSim] exchange %d: the reply does not parse"), L.K);
+			++L.K;
+			return;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Cmds = nullptr;
+		if (R->TryGetArrayField(TEXT("commands"), Cmds))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Cmds)
+			{
+				const TSharedPtr<FJsonObject> C = V->AsObject();
+				if (!C.IsValid())
+				{
+					continue;
+				}
+				const TSharedPtr<FJsonObject>* Args = nullptr;
+				C->TryGetObjectField(TEXT("args"), Args);
+				FString Detail;
+				const bool bOk = Ship->ApplyCommand(C->GetStringField(TEXT("name")), Args ? *Args : MakeShared<FJsonObject>(), Detail);
+				UE_LOG(LogASTRA, Display, TEXT("[WarSim] %7.1f mind command %s %s: %s"), B->GetBattleTime(), *C->GetStringField(TEXT("name")), bOk ? TEXT("ok") : TEXT("FAILED"), *Detail);
+				TSharedRef<FJsonObject> Res = MakeShared<FJsonObject>();
+				Res->SetStringField(TEXT("id"), C->GetStringField(TEXT("id")));
+				Res->SetBoolField(TEXT("ok"), bOk);
+				Res->SetStringField(TEXT("detail"), Detail);
+				L.Results.Add(MakeShared<FJsonValueObject>(Res));
+			}
+		}
+		bool bThink = false, bEnd = false;
+		R->TryGetBoolField(TEXT("thinking"), bThink);
+		R->TryGetBoolField(TEXT("stop"), bEnd);
+		L.bThinking = bThink;
+		L.bStop = bEnd;
+		L.PaceWall0 = FPlatformTime::Seconds();
+		L.PaceBattle0 = B->GetBattleTime();
+		++L.K;
+	}
 }
 
 namespace
@@ -38,6 +180,16 @@ namespace
 		FParse::Value(*Params, TEXT("at="), At, false);            // "200=astra.cmd ...|300=...": commands at battle times (a mind's orders, scripted)
 		FParse::Value(*Params, TEXT("scenario="), Scenario);
 		const bool bViews = FParse::Param(*Params, TEXT("views"));
+		FMindLink Mind;                                            // the minds in the loop (-mind=<dir>)
+		FParse::Value(*Params, TEXT("mind="), Mind.Dir, false);
+		FParse::Value(*Params, TEXT("mind_dt="), Mind.Dt);
+		FParse::Value(*Params, TEXT("mind_speed="), Mind.Speed);
+		FParse::Value(*Params, TEXT("mind_timeout="), Mind.TimeoutS);
+		Mind.Dt = FMath::Clamp(Mind.Dt, 0.2f, 10.f);
+		if (Mind.Active())
+		{
+			IFileManager::Get().MakeDirectory(*Mind.Dir, true);
+		}
 		Step = FMath::Clamp(Step, 0.02f, 0.1f);
 		FMath::RandInit(Seed);           // the same seed, the same battle: comparisons change one thing at a time
 		FMath::SRandInit(Seed);
@@ -103,12 +255,21 @@ namespace
 		const int32 N = FMath::CeilToInt(Seconds / Step);
 		TArray<float> WorldMs;                // what a whole world tick costs (the battle, the stations, the ship: everything that ticks)
 		WorldMs.Reserve(N);
-		for (int32 i = 0; i < N; ++i)
+		for (int32 i = 0; i < N && !Mind.bStop; ++i)
 		{
 			while (NextTimed < Timed.Num() && B->GetBattleTime() >= Timed[NextTimed].Key)
 			{
 				GEngine->Exec(World, *Timed[NextTimed].Value);
 				++NextTimed;
+			}
+			if (Mind.Active() && B->GetBattleTime() >= Mind.NextAt)
+			{
+				MindExchange(Mind, B, Ship, Events);
+				Mind.NextAt = B->GetBattleTime() + Mind.Dt;
+				if (Mind.bStop)
+				{
+					break;
+				}
 			}
 			const float T0 = B->GetBattleTime();
 			const double W0 = FPlatformTime::Seconds();
@@ -117,6 +278,16 @@ namespace
 			{
 				// the world tick did not reach the tickable subsystems: tick them as the engine loop would
 				FTickableGameObject::TickObjects(World, LEVELTICK_All, false, Step);
+			}
+			if (Mind.Active() && Mind.bThinking && Mind.Speed > 0.f)
+			{
+				// a mind is thinking: the world does not wait for it (the pace of the game, or Speed times it)
+				const double WantWall = Mind.PaceWall0 + (B->GetBattleTime() - Mind.PaceBattle0) / Mind.Speed;
+				const double Now = FPlatformTime::Seconds();
+				if (WantWall > Now)
+				{
+					FPlatformProcess::Sleep((float)(WantWall - Now));
+				}
 			}
 			WorldMs.Add((float)((FPlatformTime::Seconds() - W0) * 1000.0));
 			if (B->GetBattleTime() >= NextFrame)
