@@ -1212,6 +1212,71 @@ namespace
 		W.Destroy();
 	}
 
+	// ============================================================================================================================ the Captain's keys
+
+	/** What the controller does with E, W, S and Esc, as the subsystem sees it: E at a landing's panel calls the car; E inside opens the list on the car's screen, W and S move the
+	 *  mark, E chooses it; Esc closes the list. (The key bindings are the controller's; what they call is checked here, in a world that ticks.) */
+	void LiftTestUse(const FAstraLiftNetwork& Net)
+	{
+		FLiftWorldBench& W = LiftBench();
+		if (!W.Create())
+		{
+			LiftCheck(TEXT("use: the lifts' subsystem"), false, TEXT("the world has no UAstraLiftSubsystem"));
+			return;
+		}
+		const int32 Tl = Net.FindLine(TEXT("tl_a"));
+		if (Tl == INDEX_NONE)
+		{
+			LiftCheck(TEXT("use: the test plan's turbolift"), false, TEXT("no line tl_a in the plan"));
+			return;
+		}
+		W.Build(Net);
+		const FAstraLiftLine& L = Net.Lines[Tl];
+		AAstraLiftCar* Car = W.Lifts->CarOf(Tl);
+		const int32 Deck5 = L.FindStopByDeck(5), Deck8 = L.FindStopByDeck(8);
+		const FAstraLiftStop& S5 = L.Stops[Deck5];
+		// ---- E at the panel of Deck 5's landing (the car is at Deck 1): it calls the car
+		const FVector Panel = W.Lifts->LandingOf(Tl, Deck5)->PanelCm();
+		const FVector Feet = FVector(Panel.X, Panel.Y, S5.FloorZ) + S5.Out * 70.f;
+		ACharacter* C = LiftSpawnCaptain(W, Feet, FRotator(0.f, L.FrontYaw + 180.f, 0.f));
+		W.Run(0.8f);
+		const bool bNear = W.Lifts->IsNearPanel(Feet);
+		FString Notice;
+		const bool bCalled = W.Lifts->Use(C, Notice);
+		const bool bCame = LiftWalk(W, C, FVector::ZeroVector, 50.f, [&]() { return Car->Brain.AtLanding() == Deck5 && Car->Brain.DoorOpen() >= 1.f; });
+		LiftCheck(TEXT("use: E at a landing's panel calls the car"), bNear && bCalled && bCame, FString::Printf(TEXT("near the panel %d, E took the call (%s) %d, the car came with its doors open %d"), bNear, *Notice, bCalled, bCame));
+		// ---- inside: E opens the list (the mark on the deck the car is at), S moves it down three decks, E goes there, the list closes
+		// (the panel is beside the opening: along the wall to the middle of the doors first, then in)
+		const FVector InFront = FVector(S5.DoorCm.X, S5.DoorCm.Y, 0.f) + S5.Out * 90.f;
+		LiftWalk(W, C, (FVector(InFront.X, InFront.Y, 0.f) - FVector(C->GetActorLocation().X, C->GetActorLocation().Y, 0.f)).GetSafeNormal(), 6.f,
+		         [&]() { return FVector::Dist2D(C->GetActorLocation(), InFront) < 25.f; });
+		const bool bIn = LiftWalk(W, C, -S5.Out, 6.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
+		W.Run(0.6f);
+		const int32 Rows = L.Stops.Num();
+		const int32 RowOf5 = Rows - 1 - Deck5, RowOf8 = Rows - 1 - Deck8;                       // a shaft's list runs from its highest deck down
+		const bool bOpened = W.Lifts->Use(C, Notice) && W.Lifts->IsMenuOpen() && W.Lifts->PlayerLine() == Tl;
+		const int32 Sel0 = W.Lifts->MenuSelected();
+		W.Lifts->MenuMove(RowOf8 - RowOf5);
+		const int32 Sel1 = W.Lifts->MenuSelected();
+		TArray<UAstraLiftSubsystem::FRow> List;
+		W.Lifts->MenuRows(Tl, List);
+		const bool bRows = List.Num() == Rows && List.IsValidIndex(Sel1) && List[Sel1].Stop == Deck8 && List[Sel0].bHere && List[0].Label == TEXT("1") && !List[Sel1].Places.IsEmpty();
+		const bool bWent = W.Lifts->Use(C, Notice) && !W.Lifts->IsMenuOpen();
+		const bool bArrived = LiftWalk(W, C, FVector::ZeroVector, 40.f, [&]() { return Car->Brain.AtLanding() == Deck8 && Car->Brain.DoorOpen() >= 1.f; });
+		LiftCheck(TEXT("use: E inside opens the list, S moves the mark, E goes"), bIn && bOpened && Sel0 == RowOf5 && Sel1 == RowOf8 && bRows && bWent && bArrived,
+		      FString::Printf(TEXT("in %d, opened %d, the mark on row %d (the car's deck %d) then %d (Deck 8 %d), the rows read right %d (%d of them), E went and the list closed %d, there %d"), bIn, bOpened,
+		                      Sel0, RowOf5, Sel1, RowOf8, bRows, List.Num(), bWent, bArrived));
+		// ---- Esc closes the list without going anywhere, and the mark wraps round the ends
+		W.Lifts->Use(C, Notice);
+		W.Lifts->MenuMove(-100);
+		const int32 Wrapped = W.Lifts->MenuSelected();
+		W.Lifts->MenuClose();
+		W.Run(0.4f);
+		LiftCheck(TEXT("use: Esc closes the list and nothing moves"), !W.Lifts->IsMenuOpen() && Wrapped >= 0 && Wrapped < Rows && Car->Brain.AtLanding() == Deck8,
+		      FString::Printf(TEXT("closed %d, the mark stayed on a row (%d) %d, the car stayed at Deck 8 %d"), !W.Lifts->IsMenuOpen(), Wrapped, Wrapped >= 0 && Wrapped < Rows, Car->Brain.AtLanding() == Deck8));
+		W.Destroy();
+	}
+
 	void LiftTestVoice(const FAstraLiftNetwork& Net)
 	{
 		FLiftWorldBench& W = LiftBench();
@@ -1599,6 +1664,10 @@ int32 UAstraLiftSimCommandlet::Main(const FString& Params)
 	if (bAll || Scenario == TEXT("riders"))
 	{
 		LiftTestRiders(Net, Riders, Seed);
+	}
+	if (bAll || Scenario == TEXT("use"))
+	{
+		LiftTestUse(Net);
 	}
 	if (bAll || Scenario == TEXT("voice"))
 	{
