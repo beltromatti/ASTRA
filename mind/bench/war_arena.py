@@ -115,7 +115,7 @@ def mandate_persona(first: list[str]):
     return lookup
 
 
-def build_llm(model: str, latency: float, live_budget: float | None, range_km: float = 3.2, formation: str = ""):
+def build_llm(model: str, latency: float, live_budget: float | None, range_km: float = 3.2, formation: str = "", reissue: bool = False):
     models.LEDGER.write_file = model == "live"
     if model == "live":
         from astra_mind.openrouter import OpenRouter
@@ -123,7 +123,7 @@ def build_llm(model: str, latency: float, live_budget: float | None, range_km: f
         return OpenRouter()
     sys.path.insert(0, str(ROOT / "mind"))
     from bench import war_mock
-    return war_mock.MockLLM(war_mock.close_policy(range_km, formation) if model == "close" else war_mock.null_policy, latency=latency)
+    return war_mock.MockLLM(war_mock.close_policy(range_km, formation, reissue) if model == "close" else war_mock.null_policy, latency=latency)
 
 
 async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, Any]:
@@ -148,7 +148,7 @@ async def run_battle(a: argparse.Namespace, seed: int, tag: str) -> dict[str, An
     proc = await asyncio.create_subprocess_exec(*args, stdout=logf, stderr=subprocess.STDOUT, cwd=str(ROOT))
     link = Link()
     sides = ("mandate", "astra") if a.minds == "both" else (() if a.minds == "none" else (a.minds,))
-    llm = build_llm(a.model, a.latency, a.budget, a.range, a.formation)
+    llm = build_llm(a.model, a.latency, a.budget, a.range, a.formation, a.reissue)
     lines: list[dict[str, Any]] = []
     pulses: list[dict[str, Any]] = []
     clock = {"t": 0.0}
@@ -301,6 +301,7 @@ def main() -> None:
     ap.add_argument("--model", choices=("null", "close", "live"), default="close")
     ap.add_argument("--latency", type=float, default=0.3, help="scripted models: seconds each call takes")
     ap.add_argument("--range", type=float, default=3.2, help="the scripted `close` model: the range (km) it orders the group to hold")
+    ap.add_argument("--reissue", action="store_true", help="the scripted `close` model: give the order again at every look, even when it still stands")
     ap.add_argument("--formation", default="", help="the scripted `close` model: a formation to order (line, wedge, column, screen)")
     ap.add_argument("--budget", type=float, default=0.3, help="live: stop spending at this many dollars (all the log holds plus this run)")
     ap.add_argument("--dt", type=float, default=0.5, help="battle seconds between exchanges")

@@ -26,6 +26,7 @@ from astra_mind import models  # noqa: E402
 from astra_mind.openrouter import OpenRouter  # noqa: E402
 
 WAR = ROOT / "Saved" / "War"
+JUDGE_ROLE = "chatter"            # a model of another family than the captains' (they run on DeepSeek): a judge that is the same model flatters it
 
 SYSTEM = """You judge the radio talk of a ship's captain in a military space-war game (the ASTRA Navy against the Kharon Mandate). You are given what the captain
 was looking at when they spoke — their persona, their log, the picture of the battle, the words that had reached them — and ONE line they said over the
@@ -45,7 +46,7 @@ Reply with JSON only: {"useful": n, "brief": n, "true": n, "character": n, "time
 
 
 async def judge(llm: OpenRouter, ctx: str, speaker: str, line: str, tone: str) -> dict[str, Any]:
-    comp = await models.chat(llm, "commander", messages=[{"role": "system", "content": SYSTEM},
+    comp = await models.chat(llm, JUDGE_ROLE, messages=[{"role": "system", "content": SYSTEM},
                                                          {"role": "user", "content": f"{ctx}\n\nTHE LINE (spoken by {speaker}, tone {tone}):\n\"{line}\""}],
                              max_tokens=220, temperature=0.0)
     m = re.search(r"\{.*\}", comp.content or "", re.S)

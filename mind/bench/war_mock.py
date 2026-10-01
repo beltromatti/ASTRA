@@ -51,7 +51,9 @@ def _enemy_ships(view: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def close_policy(range_km: float = 3.2, formation: str = "") -> Policy:
+def close_policy(range_km: float = 3.2, formation: str = "", reissue: bool = False) -> Policy:
+    """`reissue`: the commander gives its order again at every look even when the one in force still serves (an order that is only repeated: the
+    bench asks what that costs a group)."""
     def policy(mind: Any, view: dict[str, Any], state: dict[str, Any], tools: list[str]) -> Reply:
         foes = _enemy_ships(view)
         if not foes:
@@ -75,7 +77,7 @@ def close_policy(range_km: float = 3.2, formation: str = "") -> Policy:
             if g.get("order_in_force") == "withdraw":
                 continue
             cur = g.get("order_target") or g.get("focus_fire_on")
-            if g.get("order_in_force") == "attack" and cur in ids and g.get("order_by") in ("admiral", "commander", "captain"):
+            if not reissue and g.get("order_in_force") == "attack" and cur in ids and g.get("order_by") in ("admiral", "commander", "captain"):
                 continue
             order = {"group": g["name"], "order": "attack", "target": best["id"], "range_km": range_km,
                      "reason": f"concentrate on {best['id']} ({best.get('class')}) and hold {range_km} km"}

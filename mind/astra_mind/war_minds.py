@@ -58,6 +58,12 @@ MAX_SETTLE_S = 8.0
 QUIET_END_S = 75.0                                      # a fight with nothing happening for this long is over
 PULSE_TIMEOUT_S = 28.0                                  # a model that has not finished by now is left to its reflexes
 ROUND2_TIMEOUT_S = 12.0
+# The physics the doctrine quotes (data/war/classes.json and the damage tuning) and the ranges the bench measured as the best between equal forces
+# (docs/GUERRA.md §8.10: `tools/war.py mind ... --model close --range X`, sym_small / sym_medium / sym_two). When the weapons or the tuning move, re-run
+# the sweep and change these: the doctrine text follows.
+LASER_KM = 4.0
+SMALL_GROUP_KM = 4.5                                    # up to three or four ships: just beyond laser reach (the edge peaks sharply here: 4.2 and 4.8 give most of it up)
+DEEP_GROUP_KM = 3.2                                     # six ships or more, or two groups side by side: close, everything firing
 LOG_LINES = 16                                          # what a commander remembers of the last orders, words and news
 LOG_KEEP = 80
 
@@ -374,7 +380,7 @@ def view_digest(view: dict[str, Any]) -> tuple:
 
 
 # ------------------------------------------------------------------------------------------------ the prompts
-DOCTRINE = """How a fleet fights (what your officers and your own years have taught you)
+DOCTRINE = f"""How a fleet fights (what your officers and your own years have taught you)
 - Guns: railguns reach 8-10 km and do most of the killing; lasers reach 4 km. Missiles reach far but one at a time they are shot down by point
   defence: by default each group already holds its cells until enough are ready to saturate the target's point defence, then fires them all
   together, timed to land at once, and that is the fleet's strongest punch. `salvo` forces every cell out now; `conserve` keeps them back, and
@@ -383,13 +389,15 @@ DOCTRINE = """How a fleet fights (what your officers and your own years have tau
 - The groups run on reflexes all the time: they pick targets (concentrating fire), hold a range of about 4 km, pull their battered ships behind
   the line, and break off when they are clearly losing. The reflexes are decent. YOUR orders override them: while an order stands the group does
   not break off by itself, so withdrawing when it is lost is YOUR decision, and so is releasing it (`auto`) when the order has served.
-- Range is the main lever between equals, and the right range depends on the size of the formation. The enemy's lasers reach 4 km, its railguns 8-10 km;
-  the rear of a deep formation (a wedge of six ships is 4-5 km deep) is that much further from the enemy than its front. A SMALL group (up to three or
-  four ships) does best holding just outside laser reach, 4.5-5 km: only railguns and missiles are exchanged and every railgun bears; closing inside
-  4 km adds the enemy's lasers for no gain, and beyond about 5.5 km the advantage is gone again. A DEEPER formation (six ships or more, or two groups
-  fighting side by side) cannot keep its rear in railgun reach and still stay out of laser reach: it does better closing to 2.5-3 km, everything
-  firing, the groups covering each other. These are the measured sweet spots between equal forces. Against a clearly heavier enemy stand off; against
-  a battered one close and kill it.
+- Range is the main lever between equals, and the right range depends on the size of the formation. The enemy's lasers reach {LASER_KM:g} km, its
+  railguns 8-10 km. The reflexes hold about 4 km: right at the lasers' edge, where every laser of both sides is in play. A SMALL group (up to three
+  or four ships) does best at {SMALL_GROUP_KM:g} km, just beyond laser reach: only railguns and missiles are exchanged and every railgun bears. Inside
+  4.2 km the leading ships drift into laser reach and the enemy's lasers join in for no gain, and beyond 5 km the advantage fades; closing to 3 km
+  with a small group gave the whole edge up. So the first order of a small group's fight is to take it out to {SMALL_GROUP_KM:g} km and keep it there,
+  and closing in on an equal enemy to "finish" a target costs ships. A DEEPER formation (six ships or more) or two groups fighting side by side cannot keep its rear in railgun reach and still stay
+  out of laser reach (a wedge of six ships is 4-5 km deep): it does better closing to about {DEEP_GROUP_KM:g} km, everything firing, the groups covering
+  each other. These are the measured sweet spots between equal forces; the odds move them: against a clearly heavier enemy stand off, against a
+  clearly beaten one (most of its ships under a third of their hull) close and finish it.
 - Concentrate fire: shots spread over several ships lose one or two ships in six against a line that focuses. Name the target that matters most
   and can be killed (a capital ship whose shield face is down or whose hull is going, a ship about to fall); do not chase a distant destroyer
   with a cruiser still unhurt.
