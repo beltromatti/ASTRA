@@ -177,6 +177,18 @@ class Answering(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(g.result())                                           # the words were for the bridge
         self.assertEqual(self.voice.lines, [])
 
+    async def test_passing_is_an_answer_too_and_it_says_for_whom(self) -> None:
+        # the models are better at choosing a tool than at choosing none: "not for us" is a call of its own
+        self.llm.script = [("pass", {"for_whom": "the helm"})]
+        g = self.gate()
+        with self.assertLogs("astra.npc", level="INFO") as cap:
+            spoke = await self.npcs.hear("Timoniere, rotta zero-nove-zero", "it", self.people, self.world, g)
+        self.assertEqual(spoke, [])
+        self.assertTrue(g.result())                                           # the words were for the bridge: its gate opens at once
+        self.assertEqual(self.voice.lines, [])
+        self.assertTrue(any("not for them: the helm" in l for l in cap.output))
+        self.assertEqual(dict(self.npcs.talk), {})                            # and nothing is remembered as said
+
     async def test_a_line_for_someone_not_listed_is_never_said(self) -> None:
         self.llm.script = [("say", {"speaker": "npc90", "text": "Sono io, Capitano.", "tone": "calm"}),
                            ("say", {"speaker": "xo", "text": "Capitano?", "tone": "calm"}),
@@ -223,9 +235,12 @@ class Answering(unittest.IsolatedAsyncioTestCase):
         system, user = req["messages"][0]["content"], req["messages"][1]["content"]
         self.assertIn("Italian", system)
         self.assertIn('"Capitano"', system)
-        self.assertEqual([t["function"]["name"] for t in req["tools"]], ["say"])
+        self.assertEqual([t["function"]["name"] for t in req["tools"]], ["say", "pass"])
         self.assertIn("come va il lavoro?", user)
         self.assertIn("`npc17`", user)
+        for officer in ("Commander Elena Serra", "Lieutenant Marco Ferri", "Chief Engineer"):
+            self.assertIn(officer, system)                                    # the named officers answer for themselves: not these people
+        self.assertIn("call `pass`", system)
         self.assertIn("Petty Officer Amara Diallo", user)
         self.assertIn("machinist", user)                                      # what they do
         self.assertIn("ship time 09:12", user)                                # what they remember
@@ -265,6 +280,7 @@ class TheRole(unittest.TestCase):
         self.assertEqual(r.max_price, models.CEILING)
         self.assertLessEqual(r.max_tokens, 400)
         self.assertEqual(r.fallback, "chatter")
+        self.assertEqual(r.model, models.DEEPSEEK)                            # bench/npc_live.py: the faster of the two that judge well
 
     def test_it_can_be_swapped_without_touching_code(self) -> None:
         import os

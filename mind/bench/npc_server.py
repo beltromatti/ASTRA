@@ -36,7 +36,7 @@ class Model(BaseModel):
 
     async def chat(self, *, model, messages, tools=None, tool_choice="auto", on_tool_call=None, **kw):
         names = {t["function"]["name"] for t in (tools or [])}
-        if names == {"say"}:
+        if names == {"say", "pass"}:
             self.calls.append({"kind": "npc", "model": model, "user": str(messages[-1].get("content", ""))[:400], "tools": names, "watch": False,
                                "system": str(messages[0].get("content", ""))})
             out = Completion(model=model, provider="fake", cost=0.0002)

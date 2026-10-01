@@ -55,9 +55,9 @@ ROLES: dict[str, Role] = {r.name: r for r in (
          note="who is the Captain talking to (only the cases the rules cannot settle)"),
     Role("chatter", "openai/gpt-oss-120b", ("crusoe",), (("effort", "low"),), max_tokens=700, temperature=0.7,
          first_token_s=6.0, fallback="crew", note="quiet moments and low-stakes talk (bench/stations_models.py: 5x cheaper, faster, same checks)"),
-    Role("npc", "openai/gpt-oss-120b", ("crusoe",), (("effort", "low"),), max_tokens=320, temperature=0.8,
-         first_token_s=4.0, fallback="chatter", note="the ship's ordinary people when the Captain talks to them (npc.py): one or two lines in character, "
-                                                     "or silence; one call per Captain utterance with someone in earshot"),
+    Role("npc", DEEPSEEK, _DS, max_tokens=320, temperature=0.8, first_token_s=3.0, fallback="chatter",
+         note="the ship's ordinary people when the Captain talks to them (npc.py): one or two lines in character, or a pass; one call per Captain "
+              "utterance with someone in earshot (bench/npc_live.py: 16/16 as expected, first line 0.4 s, 0.4 m$ a call; gpt-oss-120b@crusoe 15/16, 0.7 s, 0.12 m$)"),
 )}
 
 

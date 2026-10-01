@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from . import models
-from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
+from .crew import CAPTAIN_WORD, CREW, LANG_NAMES, WORLD
 from .env import CACHE
 from .medbay import patient_voice
 from .openrouter import OpenRouter, ToolCall
@@ -46,6 +46,13 @@ SAY = {"type": "function", "function": {
         "text": {"type": "string", "description": "what they say, in the Captain's language, usually one or two short sentences"},
         "tone": {"type": "string", "enum": ["calm", "warm", "cheerful", "tired", "tense", "wary", "somber", "brisk"]}},
         "required": ["speaker", "text"]}}}
+
+PASS = {"type": "function", "function": {
+    "name": "pass", "description": "The Captain's words were not for any of the people listed: they are for an officer, the ship's computer, a "
+                                   "radio contact, the whole ship, or the Captain is thinking aloud. Nobody answers. Call it alone, instead of `say`.",
+    "parameters": {"type": "object", "properties": {
+        "for_whom": {"type": "string", "description": "who the words were for, in a few words (the helm, the computer, nobody...)"}},
+        "required": ["for_whom"]}}}
 
 SpeakFn = Callable[..., Awaitable[Any]]
 
@@ -159,9 +166,12 @@ def knowledge(dept: str, state: dict[str, Any] | None, world: dict[str, Any] | N
 
 
 # ------------------------------------------------------------------------------------------------ the prompt
+OFFICERS = "; ".join(f"{o.title} ({o.role})" for o in CREW.values())
+
 PROMPT = """You play ordinary people of the ASN Aquila's company (ratings, petty officers, technicians, pilots, marines: people with
 a job, friends and a home) when the Captain speaks to them face to face: in a corridor, at a workstation, in the Mess, in a cabin.
-You are not the bridge crew: those are other people, who answer on their own.
+You are not the ship's named officers, who answer on their own, each at their place: {officers}. Nor are you the ship's computer
+or the radio to other ships and fighters.
 
 {world}
 
@@ -183,10 +193,12 @@ How they speak
   they would do or who they would tell ("I will tell my chief at once"): never that it is done.
 
 Whom the Captain speaks to
-The words may be for one of them, for several, for someone else (the bridge, the whole ship, the Captain thinking aloud) or for nobody.
-Judge as a person would: someone who is asked something, called by name or looked at while the Captain speaks to them, answers;
-another who listens may add a word if it is natural; a rating who hears an order for the helm does not answer it. When the words are
-not for any of them, say nothing: call no tool at all. Answer with `say`, one call per line, in the order they speak; at most
+The words may be for one of them, for several, for someone else (an officer, the bridge, the whole ship, the Captain thinking aloud) or
+for nobody. Judge as a person would: someone who is asked something, called by name or looked at while the Captain speaks to them,
+answers; another who listens may add a word if it is natural. When the Captain names or titles somebody who is not listed ("Number
+One", the helm, the chief, the ship's computer, a fighter on the radio) or speaks to the ship at large or to themselves, the words are
+not for the people listed, however well they know the subject: being able to answer is not being asked. When the words are not for any
+of them, call `pass` and nothing else. Otherwise answer with `say`, one call per line, in the order they speak; at most
 {max_lines} lines in all."""
 
 USER = """The Captain is {where}; they say, in {lang_name}: "{text}"{facing}
@@ -194,7 +206,7 @@ USER = """The Captain is {where}; they say, in {lang_name}: "{text}"{facing}
 The people within earshot (use their id as `speaker`):
 {people}
 
-Answer as they would, or say nothing if the words were not for them."""
+First decide whose words these were. If they were for one of these people, answer as they would with `say`; if not, call `pass`."""
 
 
 def _block(i: int, p: Listener, know: list[str], talk: list[tuple[str, str, str]]) -> str:
@@ -298,13 +310,17 @@ class Npcs:
         state = world.get("state") or {}
         blocks = [_block(i + 1, p, knowledge(p.dept, state, world), list(self.talk.get(p.id, ()))) for i, p in enumerate(people)]
         facing = next((p for p in people if p.facing), None)
-        system = PROMPT.format(world=WORLD, lang_name=LANG_NAMES.get(lang, lang), captain=CAPTAIN_WORD.get(lang, "Captain"), max_lines=MAX_LINES)
+        system = PROMPT.format(world=WORLD, officers=OFFICERS, lang_name=LANG_NAMES.get(lang, lang), captain=CAPTAIN_WORD.get(lang, "Captain"), max_lines=MAX_LINES)
         user = USER.format(where=where, lang_name=LANG_NAMES.get(lang, lang), text=text.replace('"', "'"),
                            facing=f" The Captain is looking at {facing.name}." if facing else "", people="\n\n".join(blocks))
         spoke: list[tuple[str, str]] = []
+        passed: list[str] = []
 
         async def on_call(call: ToolCall) -> None:
             a = call.arguments() or {}
+            if call.name == "pass":
+                passed.append(str(a.get("for_whom", "")))
+                return
             who, line = str(a.get("speaker", "")), str(a.get("text", "")).strip()
             if call.name != "say" or who not in ids or len(line) < 2 or len(spoke) >= MAX_LINES:
                 return
@@ -314,14 +330,14 @@ class Npcs:
             await self.say(who, line, lang, str(a.get("tone", "calm")), answer=True)
 
         t0 = time.perf_counter()
-        comp = await models.chat(self.llm, ROLE, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], tools=[SAY],
+        comp = await models.chat(self.llm, ROLE, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], tools=[SAY, PASS],
                                  tool_choice="auto", on_tool_call=on_call)
         self.calls += 1
         self.spent += comp.cost
         if comp.error and not spoke:
             log.warning("crew answer failed: %s", comp.error[:120])
         log.info("crew answer %.2fs (%d in earshot, cost $%.5f): %s", time.perf_counter() - t0, len(people), comp.cost,
-                 " | ".join(f"{w}: {t}" for w, t in spoke) or "(nobody answered)")
+                 " | ".join(f"{w}: {t}" for w, t in spoke) or (f"(not for them: {passed[0] or 'someone else'})" if passed else "(nobody answered)"))
         if spoke:
             label = world.get("clock") or time.strftime("%H:%M")
             for who, line in spoke:
