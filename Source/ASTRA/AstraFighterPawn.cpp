@@ -825,8 +825,7 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	// the datalink: every contact on the Aquila's plot, as the Aquila knows it, seen from this cockpit
 	if (const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>())
 	{
-		TArray<UAstraBattleSubsystem::FContactView> Cs;
-		Battle->GetContacts(Cs);
+		const TArray<UAstraBattleSubsystem::FContactView>& Cs = Battle->Contacts();
 		const FVector Fwd = Camera->GetForwardVector();
 		int32 Named = 0;
 		for (const UAstraBattleSubsystem::FContactView& Ct : Cs)

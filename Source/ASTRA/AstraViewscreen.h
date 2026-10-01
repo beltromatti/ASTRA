@@ -92,7 +92,13 @@ private:
 	TMap<FString, float> RecentDamage; // hull lost in the last seconds (decays)
 	struct FDeath { FString Id; FString Name; FVector Pos; double At; };
 	TArray<FDeath> Deaths;             // destroyed since the last look, waiting for their moment on screen
-	TArray<UAstraBattleSubsystem::FContactView> Contacts;   // the plot, refreshed every frame
+	/** The plot, as the battle shares it (one list for each step of the battle: UAstraBattleSubsystem::Contacts); read, never kept past the frame. */
+	const TArray<UAstraBattleSubsystem::FContactView>* PlotRef = nullptr;
+	const TArray<UAstraBattleSubsystem::FContactView>& Plot() const
+	{
+		static const TArray<UAstraBattleSubsystem::FContactView> None;
+		return PlotRef ? *PlotRef : None;
+	}
 	bool bPushIn = false;              // the next aim starts a little wide and pushes in (a cut)
 	double LastCaptureAt = -1.0;       // the last refresh of the feed and the overlay
 	double NextShowListAt = 0.0;       // when the list of what the camera may see is rebuilt

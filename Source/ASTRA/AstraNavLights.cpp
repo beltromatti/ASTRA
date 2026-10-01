@@ -59,8 +59,9 @@ UAstraNavLights::UAstraNavLights()
 	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
-void UAstraNavLights::Setup(const FString& MeshName, bool bMandate, bool bNoTopStrobe)
+void UAstraNavLights::LampsFor(const FString& MeshName, bool bMandate, bool bNoTopStrobe, TArray<FAstraNavLamp>& Out)
 {
+	Out.Reset();
 	const TSharedPtr<FJsonObject>& Data = NavData();
 	const TSharedPtr<FJsonObject>* ShipP = nullptr;
 	if (!Data.IsValid() || !Data->TryGetObjectField(MeshName, ShipP))
@@ -70,37 +71,73 @@ void UAstraNavLights::Setup(const FString& MeshName, bool bMandate, bool bNoTopS
 	const TSharedPtr<FJsonObject>& Ship = *ShipP;
 	const float Length = float(Ship->GetNumberField(TEXT("length_m")));
 	const bool bSmall = Length < 40.f;                               // a fighter or a drone
-	const float Out = bSmall ? 15.f : 60.f;                           // cm clear of the plating
+	const float Clear = bSmall ? 15.f : 60.f;                         // cm clear of the plating
 	const float Lamp = bSmall ? 0.6f : FMath::Clamp(Length * 0.004f, 1.2f, 3.5f);   // m
+	const auto Add = [&Out](const FVector& Local, const FLinearColor& Color, float SizeM, float Glow, uint8 Pattern)
+	{
+		FAstraNavLamp& L = Out.AddDefaulted_GetRef();
+		L.Local = Local;
+		L.Color = Color;
+		L.SizeM = SizeM;
+		L.Glow = Glow;
+		L.Pattern = Pattern;
+	};
 	FVector P;
 	if (bMandate)
 	{
 		// the Mandate runs dark: one slow red pulse on the highest point
 		if (Point(Ship, TEXT("top"), P))
 		{
-			AddLamp(P + FVector(0, 0, Out), FLinearColor(1.f, 0.08f, 0.03f), Lamp * 1.2f, 420.f, 2);
+			Add(P + FVector(0, 0, Clear), FLinearColor(1.f, 0.08f, 0.03f), Lamp * 1.2f, 420.f, 2);
 		}
 		return;
 	}
 	if (Point(Ship, TEXT("port"), P))
 	{
-		AddLamp(P - FVector(0, Out, 0), FLinearColor(1.f, 0.06f, 0.04f), Lamp, 160.f, 0);
+		Add(P - FVector(0, Clear, 0), FLinearColor(1.f, 0.06f, 0.04f), Lamp, 160.f, 0);
 	}
 	if (Point(Ship, TEXT("starboard"), P))
 	{
-		AddLamp(P + FVector(0, Out, 0), FLinearColor(0.1f, 1.f, 0.35f), Lamp, 160.f, 0);
+		Add(P + FVector(0, Clear, 0), FLinearColor(0.1f, 1.f, 0.35f), Lamp, 160.f, 0);
 	}
 	if (!bSmall && Point(Ship, TEXT("stern"), P))
 	{
-		AddLamp(P - FVector(Out, 0, 0), FLinearColor(1.f, 0.95f, 0.85f), Lamp, 120.f, 0);
+		Add(P - FVector(Clear, 0, 0), FLinearColor(1.f, 0.95f, 0.85f), Lamp, 120.f, 0);
 	}
 	if (!bNoTopStrobe && Point(Ship, TEXT("top"), P))
 	{
-		AddLamp(P + FVector(0, 0, Out), FLinearColor(1.f, 1.f, 1.f), Lamp * 1.1f, 900.f, 1);
+		Add(P + FVector(0, 0, Clear), FLinearColor(1.f, 1.f, 1.f), Lamp * 1.1f, 900.f, 1);
 	}
 	if (!bSmall && Point(Ship, TEXT("belly"), P))
 	{
-		AddLamp(P - FVector(0, 0, Out), FLinearColor(1.f, 0.1f, 0.05f), Lamp, 500.f, 2);
+		Add(P - FVector(0, 0, Clear), FLinearColor(1.f, 0.1f, 0.05f), Lamp, 500.f, 2);
+	}
+}
+
+float UAstraNavLights::PatternOn(uint8 Pattern, float T, float Phase)
+{
+	if (Pattern == 0)
+	{
+		return 1.f;
+	}
+	if (Pattern == 1)
+	{
+		// the white strobe: two quick flashes every second and a half
+		const float Tt = FMath::Fmod(T + Phase, 1.5f);
+		return (Tt < 0.07f || (Tt > 0.2f && Tt < 0.27f)) ? 1.f : 0.f;
+	}
+	// the red pulse: a soft beat every two seconds and a bit
+	const float Tt = FMath::Fmod(T + Phase, 2.2f);
+	return Tt < 0.5f ? FMath::Sin(Tt / 0.5f * PI) : 0.f;
+}
+
+void UAstraNavLights::Setup(const FString& MeshName, bool bMandate, bool bNoTopStrobe)
+{
+	TArray<FAstraNavLamp> Set;
+	LampsFor(MeshName, bMandate, bNoTopStrobe, Set);
+	for (const FAstraNavLamp& L : Set)
+	{
+		AddLamp(L.Local, L.Color, L.SizeM, L.Glow, L.Pattern);
 	}
 }
 
@@ -154,19 +191,6 @@ void UAstraNavLights::TickComponent(float DeltaTime, ELevelTick TickType, FActor
 		{
 			continue;
 		}
-		float On = 0.f;
-		if (Pattern[i] == 1)
-		{
-			// the white strobe: two quick flashes every second and a half
-			const float Tt = FMath::Fmod(T + Phase[i], 1.5f);
-			On = (Tt < 0.07f || (Tt > 0.2f && Tt < 0.27f)) ? 1.f : 0.f;
-		}
-		else
-		{
-			// the red pulse: a soft beat every two seconds and a bit
-			const float Tt = FMath::Fmod(T + Phase[i], 2.2f);
-			On = Tt < 0.5f ? FMath::Sin(Tt / 0.5f * PI) : 0.f;
-		}
-		Mids[i]->SetScalarParameterValue(TEXT("Intensity"), Glow[i] * On);
+		Mids[i]->SetScalarParameterValue(TEXT("Intensity"), Glow[i] * PatternOn(Pattern[i], T, Phase[i]));
 	}
 }

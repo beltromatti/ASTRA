@@ -5,8 +5,59 @@
 #include "AstraWarClasses.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
+#include "HAL/PlatformTime.h"
+
+const TArray<UAstraBattleSubsystem::FContactView>& UAstraBattleSubsystem::Contacts() const
+{
+	++ContactReads;
+	if (ContactsBuiltAt != PlotStamp)
+	{
+		const double T0 = FPlatformTime::Seconds();
+		ContactsBuiltAt = PlotStamp;
+		BuildContacts(ContactsCache);
+		++ContactBuilds;
+		ContactMs += (FPlatformTime::Seconds() - T0) * 1000.0;
+	}
+	return ContactsCache;
+}
 
 void UAstraBattleSubsystem::GetContacts(TArray<FContactView>& Out) const
+{
+	Out = Contacts();
+}
+
+const TArray<FAstraHoloBlip>& UAstraBattleSubsystem::HoloBlips() const
+{
+	++BlipReads;
+	if (BlipsBuiltAt != PlotStamp)
+	{
+		const double T0 = FPlatformTime::Seconds();
+		BlipsBuiltAt = PlotStamp;
+		BuildHoloBlips(BlipsCache, CountsCache);
+		++BlipBuilds;
+		BlipMs += (FPlatformTime::Seconds() - T0) * 1000.0;
+	}
+	return BlipsCache;
+}
+
+void UAstraBattleSubsystem::GetHoloBlips(TArray<FAstraHoloBlip>& Out) const
+{
+	Out = HoloBlips();
+}
+
+const UAstraBattleSubsystem::FPlotCounts& UAstraBattleSubsystem::PlotCounts() const
+{
+	HoloBlips();                                   // (counted with the blips)
+	return CountsCache;
+}
+
+FString UAstraBattleSubsystem::PlotStats() const
+{
+	return FString::Printf(TEXT("contacts: %d reads, %d builds (%.3f ms each), plot blips: %d reads, %d builds (%.3f ms each)"), ContactReads, ContactBuilds,
+	                       ContactBuilds ? ContactMs / ContactBuilds : 0.0, BlipReads, BlipBuilds, BlipBuilds ? BlipMs / BlipBuilds : 0.0);
+}
+
+void UAstraBattleSubsystem::BuildContacts(TArray<FContactView>& Out) const
 {
 	Out.Reset();
 	if (Ships.Num() == 0)

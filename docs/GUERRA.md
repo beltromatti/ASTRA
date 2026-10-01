@@ -69,14 +69,14 @@ caccia, flotta, trattativa), i nemici sono furbi in gruppo, e l'esito dipende da
   ritirate riuscite, caccia persi contro la difesa di punto).
 
 ### F2.3 Scala e ritmo (modulo GUERRA-SCALA)
-*Stato (30/9): la parte di simulazione (classi e scenari dai dati, griglia, scala 30 navi + 150 velivoli) è fatta dal modulo GUERRA (§5, §7.5); il disegno a istanze resta.*
+*Stato (1/10): la parte di simulazione (classi e scenari dai dati, griglia, scala 30 navi + 150 velivoli) è fatta dal modulo GUERRA (§5, §7.5); il disegno a istanze (velivoli e luci), le domande per fotogramma condivise, il tavolo olografico con 50+ contatti e gli scenari grandi giocabili (battaglia di flotta con rinforzi) sono del modulo SCALA: [SCALA.md](SCALA.md). Scritto, compilato e provato sul banco; da misurare nel gioco.*
 - **Scenari dai dati** (`data/war/*.json`): classi di navi (massa, spinta, virata, scudi per faccia, corazza per
   sezione, armamento con archi e cadenze, stive di caccia), flotte, posizioni, obiettivi. Battaglie fino a ~30 navi
   capitali e ~150 caccia/droni; campagna di più battaglie.
 - **Simulazione a livelli di dettaglio**: ciò che è lontano dall'Aquila si aggiorna meno spesso; griglia spaziale per le
-  domande di vicinanza (difesa di punto, evitamento, bersagli); proiettili in array compatti.
+  domande di vicinanza (difesa di punto, evitamento, bersagli); proiettili in array compatti. *(La griglia e gli array compatti ci sono; i livelli per distanza non servono: 0,1–0,3 ms a tick con 30 + 150 e col doppio, SCALA §5.)*
 - **Disegno a istanze**: caccia e proiettili come istanze (ISM/HISM), niente attore per ogni oggetto; luci e particelle con
-  un budget.
+  un budget. *(Fatto: proiettili e particelle da VFX, velivoli e luci di navigazione da SCALA, [SCALA.md](SCALA.md) §3.)*
 - **Obiettivo di prestazioni**: 1 ms di simulazione per frame con 30 navi e 150 caccia (misurato col banco); la grafica
   ha il suo gate in [ricerca/11](ricerca/11-efficienza-grafica.md).
 
@@ -300,7 +300,7 @@ Il commandlet gira con `-nullrhi` (mai la grafica), deterministico per seme (`-s
 (`-seeds=N`). **Scenari** (`data/war/scenarios/*.json`; `"mirror": true` = la parte del Mandato è quella ASTRA ruotata di
 mezzo giro attorno all'origine): `sym_small` (1 Acheron + 2 Styx a parte), `sym_small_rev` (come sopra con il Mandato creato per
 primo), `sym_medium` (2 + 4), `sym_two` (due gruppi da 3), `sym_air` (incrociatori portaerei con caccia e bombardieri),
-`sym_fighters` (soli caccia), `asym_3to2`, `asym_2to1`, `scale_30x150` (15 navi e 75 velivoli a parte).
+`sym_fighters` (soli caccia), `asym_3to2`, `asym_2to1`, `scale_30x150` (15 navi e 75 velivoli a parte), `scale_60x300` (il doppio), `fleet_battle` (una battaglia di flotta di campagna: 37 navi e un centinaio di velivoli all'inizio, sette ondate di rinforzi, fino a 71 navi e 137 velivoli insieme). Un file può avere anche `"waves"` (rinforzi: `{"at_s", "side", "group"}`, annunciati nella riga degli eventi di gruppo) e `"aquila"` (l'Aquila nella battaglia: `{"at_km", "heading", "speed", "wings"}`); nel gioco `astra.war.scenario <nome> aquila [hold|speed=|heading=|at=x,y,z]` (SCALA §9).
 
 **Variabili di taratura** (`astra.war.tune <nome> <valore>`, dal banco con `--exec`; valori di default):
 
@@ -627,7 +627,7 @@ velivolo a ogni tick: ora una volta per tick), la conoscenza (le portate dei sen
 contatti dell'Aquila (`GetContacts`, letta da molti schermi a ogni frame: classe ed etichetta restano in memoria finché non cambia ciò che si sa). Prima: 60 + 300
 seme 1 aveva media 0,94 ms, p95 3,4, max 6,8; 30 + 150 seme 2 media 0,13, p95 0,57, max 1,7. In `perf.phases` del record il
 tempo di ogni tick è diviso in conoscenza, gruppi, squadriglie, navi, velivoli, proiettili. Il lavoro di scala vero (livelli di dettaglio per ciò che è lontano
-dall'Aquila, disegno a istanze) è F2.3: da lì in poi la voce da guardare è quella dei velivoli.
+dall'Aquila, disegno a istanze) è F2.3 e non riguarda la simulazione: il disegno a istanze, le liste condivise e il tavolo sono in [SCALA.md](SCALA.md), dove si misura anche il costo di un tick con la battaglia di flotta (71 navi e 137 velivoli insieme: 0,19 ms di media, 0,27 al 95°); la simulazione non ha bisogno di livelli di dettaglio.
 
 ### 7.6 I velivoli
 
@@ -668,7 +668,7 @@ di punto. Scenario dei soli caccia (48 semi): nessuna nave affondata, 0,2 ± 0,7
   riflessi e gli strumenti. Quando le menti sono cablate (§6.8) va rifatto il bilanciamento dell'apertura con loro e col Capitano.
 - La poppa debole dell'Aquila e la forza dell'apertura (pari, senza il Capitano) sono valori di `data/war/classes.json`.
 - Il costo dei velivoli è la prima voce se si vuole il doppio: la separazione fra velivoli e la ricerca dei bersagli si possono rendere
-  più radi per i lontani dall'Aquila (F2.3).
+  più radi per i lontani dall'Aquila (F2.3: misurato, oggi non serve, [SCALA.md](SCALA.md) §5).
 
 
 ## 8. Le menti di guerra (MENTE-GUERRA: F2.2 lato mente e F2.5)

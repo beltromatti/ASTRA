@@ -549,13 +549,9 @@ void UAstraScreensSubsystem::DrawMaster(UCanvas* C, int32 W, int32 H)
 	int32 Hostiles = 0, Friends = 0;
 	if (Battle)
 	{
-		TArray<FAstraHoloBlip> Blips;
-		Battle->GetHoloBlips(Blips);
-		for (const FAstraHoloBlip& B : Blips)
-		{
-			Hostiles += (B.Kind == 0 && B.bHostile && !B.bRetreating) ? 1 : 0;
-			Friends += (B.Kind == 0 && !B.bPlayer && !B.bCraft && B.Side == EAstraSide::Astra) ? 1 : 0;
-		}
+		const UAstraBattleSubsystem::FPlotCounts& Pc = Battle->PlotCounts();      // (counted once for each step of the battle, with the plot's lists)
+		Hostiles = Pc.HostileShips + Pc.HostileCraft;
+		Friends = Pc.FriendlyShips;
 	}
 	P.Text(RX, 766, FString::Printf(TEXT("CONTACTS  %d HOSTILE  ·  %d FRIENDLY"), Hostiles, Friends), true, 18, Hostiles ? RED : TEXTC);
 	const TArray<FString>& Ev = Ship->GetRecentEvents();
@@ -633,11 +629,8 @@ void UAstraScreensSubsystem::DrawPadOverview(UCanvas* C, int32 W, int32 H)
 	P.Bar(MX + 2 * (BW + 20), 128, BW, 16, FMath::Clamp(He, 0.f, 1.f), TEXT("Heat"), FString::Printf(TEXT("%.0f %%"), 100.f * He),
 	      He > 0.9f ? RED : (He > 0.7f ? AMBER : CYAN));
 	// contacts, as the sensors know them: the nearest first, bearings (no range) after
-	TArray<FAstraHoloBlip> Blips;
-	if (Battle)
-	{
-		Battle->GetHoloBlips(Blips);
-	}
+	static const TArray<FAstraHoloBlip> NoBlips;
+	const TArray<FAstraHoloBlip>& Blips = Battle ? Battle->HoloBlips() : NoBlips;
 	int32 Hostiles = 0, Friends = 0;
 	TArray<const FAstraHoloBlip*> Ships;
 	for (const FAstraHoloBlip& B : Blips)
@@ -770,13 +763,8 @@ void UAstraScreensSubsystem::DrawTactical(UCanvas* C, int32 W, int32 H)
 	P.Rect(0, 0, W, H, BG);
 	const UAstraBattleSubsystem::FFireControl F = Battle->GetFireControl();
 	const float Sh = Battle->PlayerShieldFraction();
-	int32 Hostiles = 0;
-	TArray<FAstraHoloBlip> Blips;
-	Battle->GetHoloBlips(Blips);
-	for (const FAstraHoloBlip& B : Blips)
-	{
-		Hostiles += (B.Kind == 0 && B.bHostile && !B.bRetreating) ? 1 : 0;
-	}
+	const UAstraBattleSubsystem::FPlotCounts& Pc = Battle->PlotCounts();
+	const int32 Hostiles = Pc.HostileShips + Pc.HostileCraft;
 	struct FCell { FString K, V, S; FLinearColor Col; };
 	TArray<FCell> Cells;
 	if (F.RailVolleys > 0 && !F.Target.IsEmpty())
@@ -973,8 +961,7 @@ void UAstraScreensSubsystem::DrawSensors(UCanvas* C, int32 W, int32 H, const FSt
 	}
 	FPaint P{C, TitleFont, MonoFont, Time};
 	P.Rect(0, 0, W, H, BG);
-	TArray<FAstraHoloBlip> Blips;
-	Battle->GetHoloBlips(Blips);
+	const TArray<FAstraHoloBlip>& Blips = Battle->HoloBlips();
 	if (Slot == TEXT("B"))
 	{
 		// relative plot (bow up), logarithmic range like the holo table
@@ -1023,15 +1010,24 @@ void UAstraScreensSubsystem::DrawSensors(UCanvas* C, int32 W, int32 H, const FSt
 	P.Text(790, 56, TEXT("BRG"), true, 15, DIM, 2);
 	P.Text(W - 24, 56, TEXT("STATUS"), true, 15, DIM, 2);
 	int32 Row = 0;
-	Blips.Sort([](const FAstraHoloBlip& A, const FAstraHoloBlip& B)
+	TArray<const FAstraHoloBlip*> Nearest;            // the warships, the nearest first (the shared list is not ours to reorder)
+	for (const FAstraHoloBlip& B : Blips)
+	{
+		if (B.Kind == 0 && !B.bPlayer && !B.bCraft)
+		{
+			Nearest.Add(&B);
+		}
+	}
+	Nearest.Sort([](const FAstraHoloBlip& A, const FAstraHoloBlip& B)
 	{
 		return (A.bBearingOnly ? 1.0e6f : A.RangeKm) < (B.bBearingOnly ? 1.0e6f : B.RangeKm);   // bearings (no range) last
 	});
-	for (const FAstraHoloBlip& B : Blips)
+	for (const FAstraHoloBlip* Bp : Nearest)
 	{
-		if (B.Kind != 0 || B.bPlayer || B.bCraft || Row >= 11)
+		const FAstraHoloBlip& B = *Bp;
+		if (Row >= 11)
 		{
-			continue;
+			break;
 		}
 		const float Y = 84.f + Row * 48.f;
 		const FLinearColor Col = B.bUnknown ? DIM : (B.Side == EAstraSide::Astra ? CYAN : (B.bHostile ? (B.bHoldFire ? AMBER : RED) : YELLOW));
@@ -1438,8 +1434,7 @@ void UAstraScreensSubsystem::DrawPadContact(UCanvas* C, int32 W, int32 H)
 	P.Rect(0, 0, W, H, BG);
 	PadHeader(P, W, Ship->GetHullNumber(), Time, TEXT("CONTACT DOSSIER"), RED);
 	const float MX = 46.f, RX = W - 46.f;
-	TArray<UAstraBattleSubsystem::FContactView> Cs;
-	Battle->GetContacts(Cs);
+	const TArray<UAstraBattleSubsystem::FContactView>& Cs = Battle->Contacts();
 	// the pushed contact, else what the fight is about, else the nearest warship
 	FString Id = PadFocus.IsEmpty() && St ? St->ActionTarget() : PadFocus;
 	const UAstraBattleSubsystem::FContactView* Ct = Cs.FindByPredicate([&Id](const UAstraBattleSubsystem::FContactView& X)
@@ -1680,8 +1675,7 @@ void UAstraScreensSubsystem::DrawPadFleet(UCanvas* C, int32 W, int32 H)
 	P.Rect(0, 0, W, H, BG);
 	PadHeader(P, W, Ship->GetHullNumber(), Time, TEXT("THE FLEET"), CYAN);
 	const float MX = 46.f, RX = W - 46.f;
-	TArray<UAstraBattleSubsystem::FContactView> Cs;
-	Battle->GetContacts(Cs);
+	const TArray<UAstraBattleSubsystem::FContactView>& Cs = Battle->Contacts();
 	P.Text(MX, 60, TEXT("7TH FLEET · SHIPS IN COMPANY"), false, 18, CYAN);
 	float Y = 90.f;
 	int32 Hostile = 0, HostileCraft = 0, OurCraft = 0;
@@ -1882,8 +1876,7 @@ void UAstraScreensSubsystem::DrawFlight(UCanvas* C, int32 W, int32 H, const FStr
 	FPaint P{C, TitleFont, MonoFont, Time};
 	P.Rect(0, 0, W, H, BG);
 	P.Header(W, Slot == TEXT("A") ? TEXT("Flight Operations · Air Group") : TEXT("Flight Operations · In Flight"), TEXT("CAG · DECK 9"), AMBER);
-	TArray<UAstraBattleSubsystem::FContactView> Cs;
-	Battle->GetContacts(Cs);
+	const TArray<UAstraBattleSubsystem::FContactView>& Cs = Battle->Contacts();
 	int32 Ours = 0, Theirs = 0;
 	for (const UAstraBattleSubsystem::FContactView& Ct : Cs)
 	{
