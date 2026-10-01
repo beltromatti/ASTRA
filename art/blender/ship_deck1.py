@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import ship_plan as P
 import ship_spec as SP
+from ship_catalog import HOUSING_ORIGIN
 from ship_layout import Builder, rnd
 
-ORIGIN = (-20.8, -2.1)               # the room's corner: the corridors' aft end (their modules start at -20.8) and the outer face of the port corridor's inner wall; the forward end
+HOUSING_YAW = 180.0                  # the housing's mesh is placed turned about: its x runs aft from the corridor's mouth, its y to port
+ORIGIN = (-20.8, -2.1)              # the room's corner: the corridors' aft end (their modules start at -20.8) and the outer face of the port corridor's inner wall; the forward end
                                      # (x -8.8) is the outer face of the bridge's back wall and the starboard corridor's face is at y +2.1
 CORRIDOR_Y = -3.9                    # the port corridor's centre line
 WALL_MID_Y = -2.2                    # the middle of that corridor's inner wall (0.2 m thick: -2.3 .. -2.1), where the door's leaves run
@@ -64,3 +66,33 @@ def build(B: Builder) -> None:
     for st in stations:
         B.node(st["id"], 1, st["pos"][0], st["pos"][1], st["pos"][2], "station", "ready_room", role=st["role"], act=st["kind"], yaw=st["yaw"])
         B.link("ready_room.hub", st["id"], "walk", width=1.0)
+    build_housing(B)
+
+
+def build_housing(B: Builder) -> None:
+    """The housing of the two command lifts (the compartment `lift_housing_bridge`, registered by ship_plan_gen.existing): the mesh that gives it walls, a floor, a roof and the shafts' tubes (the
+    old block outside it, `SM_SHIP_ASTRA_AquilaBridgeBlock`, is a closed shell with nothing inside), the spots and the light of its prefab, and the spots' nodes. It stays an `existing` compartment
+    (its data file is the quarters'): no programme, no plate. The corridor's end cap, the old lift's leaves and sign and the old floor under the shafts are removed by build_ship_interior.py."""
+    spec = SP.PREFABS["lift_housing_bridge"]
+    o3 = (HOUSING_ORIGIN[0], HOUSING_ORIGIN[1], 0.0)
+    comp = B.comps["lift_housing_bridge"]
+    stations, lights = [], []
+    for i, s in enumerate(spec["spots"]):
+        w = P.place_local(o3, HOUSING_YAW, s["x"], s["y"])
+        stations.append({"id": f"lift_housing_bridge.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(s.get("dz", 0.0))],
+                         "yaw": rnd((s["yaw"] + HOUSING_YAW) % 360.0, 1), "dept": s["dept"]})
+    for i, l in enumerate(spec["lights"]):
+        w = P.place_local(o3, HOUSING_YAW, l["pos"][0], l["pos"][1], l["pos"][2])
+        ld = dict(l)
+        ld["pos"] = [rnd(w[0]), rnd(w[1]), rnd(w[2])]
+        ld["id"] = f"lift_housing_bridge.l{i}"
+        lights.append(ld)
+    comp["stations"] = stations
+    comp["lights"] = lights
+    comp["mesh"] = spec["mesh"]
+    comp["pos"] = [rnd(o3[0]), rnd(o3[1]), 0.0]
+    comp["yaw"] = HOUSING_YAW
+    B.place(1, spec["mesh"], o3, HOUSING_YAW, "Interior/Deck01/Rooms", "d1_lift_housing", "room", comp="lift_housing_bridge")
+    for st in stations:
+        B.node(st["id"], 1, st["pos"][0], st["pos"][1], st["pos"][2], "station", "lift_housing_bridge", role=st["role"], act=st["kind"], yaw=st["yaw"])
+        B.link("lift_housing_bridge.hub", st["id"], "walk", width=1.0)

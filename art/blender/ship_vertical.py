@@ -11,7 +11,7 @@ import math
 import ship_design as DS
 import ship_plan as P
 import ship_spec as SP
-from ship_catalog import CRAWL_HW, MOD, SLOT_HW, STAIR_RISE, TRUNK_CLIMB_GAP, TRUNK_NICHE, TRUNK_RAIL_GAP, TRUNK_RUNG_PITCH, TRUNK_RUNG_T, TRUNK_RUNG_Z0
+from ship_catalog import BRIDGE_SHAFT_X, BRIDGE_SHAFT_Y, CRAWL_HW, MOD, SLOT_HW, STAIR_RISE, TRUNK_CLIMB_GAP, TRUNK_NICHE, TRUNK_RAIL_GAP, TRUNK_RUNG_PITCH, TRUNK_RUNG_T, TRUNK_RUNG_Z0
 from ship_layout import Builder, rnd
 
 LIFT_SPEED, LIFT_ACCEL = 6.0, 2.0          # m/s and m/s²: the contract's numbers (ASCENSORI tunes them)
@@ -19,7 +19,8 @@ DOOR_TIME = 4.0                            # the wait for the doors, in the arc'
 LAND = (1.5, 1.7)                          # the landing node: 1.5 m from the shaft's face; the deck's door record is on that face
 # the bridge bank (the two command shafts under the bridge's lift housing; they run from Deck 1 to the keel): inner 2.6 m, outer 3.0 m (walls 0.2 m), at x -25.8 .. -22.8; the landing doors
 # are on the lobby face of the front wall, x -22.8 (as every bank's: the plan's door point is where the lift engine's fascia mounts)
-BRIDGE_SHAFTS = [dict(id="tl_b1", name="Bridge Turbolift 1", decks=list(range(1, 13)), x=-24.3, y=-6.7), dict(id="tl_b2", name="Bridge Turbolift 2", decks=list(range(1, 10)), x=-24.3, y=-3.7)]
+BRIDGE_SHAFTS = [dict(id="tl_b1", name="Bridge Turbolift 1", decks=list(range(1, 13)), x=BRIDGE_SHAFT_X, y=BRIDGE_SHAFT_Y[0]),
+                 dict(id="tl_b2", name="Bridge Turbolift 2", decks=list(range(1, 10)), x=BRIDGE_SHAFT_X, y=BRIDGE_SHAFT_Y[1])]
 BRIDGE_IN, BRIDGE_OUT = 2.6, 3.0
 BRIDGE_LOBBY = [-22.8, -8.2, -14.8, -2.0]  # the lobby on the decks below (Deck 1's is the housing's vestibule, x -22.8 .. -21.0, y -8.2 .. -1.0)
 

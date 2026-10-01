@@ -136,9 +136,9 @@ def wall_finish(b: SParts, name: str, L: float, D: float, H: float, st: Style, d
 
 
 def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far_door: bool = True, windows_far: list | None = None,
-                seed: int = 1, skip: tuple = (), bare: tuple = ("near",)) -> None:
+                seed: int = 1, skip: tuple = (), bare: tuple = ("near",), ceil_t: float = 0.30) -> None:
     """Floor, ceiling and the four walls of a room. `skip`: walls not built here (the caller builds them: window walls); `bare`: walls that
-    belong to a corridor (a finish layer only, no structure of their own)."""
+    belong to a corridor (a finish layer only, no structure of their own); `ceil_t`: the ceiling structure's thickness (a room under a roof that leaves no more than that)."""
     L, D, H = spec["L"], spec["D"], spec["h"]
     doors = doors if doors is not None else spec["doors"]
     b._doors = doors                                                  # (dress_wall keeps clear of them)
@@ -164,7 +164,7 @@ def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far
             if k * step < L and st.seams:
                 fine.box((k * step - 0.01, 0.0, 0.0), (k * step + 0.01, D, 0.003), st.trim)
     # ceiling: structure and finish
-    fb.box((0.0, 0.0, H), (L, D, H + 0.30), STRUCT)
+    fb.box((0.0, 0.0, H), (L, D, H + ceil_t), STRUCT)
     fb.box((WS + WF, FIN + WF, H - 0.05), (L - WS - WF, D - WS - WF, H), st.ceil)
     # walls
     for name in ("left", "right", "far", "near"):

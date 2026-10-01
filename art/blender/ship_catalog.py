@@ -93,6 +93,12 @@ def module_mesh(tone: str, suffix: str) -> str:
 LIFT_IN = 2.8                  # a shaft's clear width and depth
 LIFT_OUT = 3.2                 # ... with its walls
 LIFT_DOOR_W, LIFT_DOOR_H = 1.6, 2.4    # the landing opening in the lobby's wall (the lift's own frame and leaves go in it: AstraLift*, brief ASCENSORI)
+# the bridge's lift housing on Deck 1: the block behind the port corridor's end (x -25.8 .. -21.0, y -8.2 .. -1.0: its outside is art/blender/quarters.py's `SM_SHIP_ASTRA_AquilaBridgeBlock`, a
+# closed shell with a chamfered section: vertical faces up to z 3.15, the roof at 3.5) holds the vestibule of the two command shafts and the shafts' tubes (ship_rooms_lifts.lift_housing_bridge)
+BRIDGE_SHAFT_X = -24.3             # the two command shafts' middle along x (3.0 m outside, 2.6 m inside)
+BRIDGE_SHAFT_Y = (-6.7, -3.7)      # ... and their middle along y
+HOUSING_ORIGIN = (-20.8, -1.22)    # where the housing's mesh is placed (yaw 180: its x runs aft, its y to port): the corridor's end, and 2 cm inside the block's starboard face
+HOUSING_D = 6.96                   # its width (to 2 cm inside the block's port face, y -8.2)
 TRUNK_IN = 1.2                 # a Jefferies trunk's clear width and depth (a ladder shaft)
 TRUNK_NICHE = (1.45, 2.55)     # the trunk cell's ladder niche: its extent along the cell (m from the cell's aft end); the niche is 1.1 m deep, in the cell's aft wall (world -x: the cell is placed at yaw 90)
 TRUNK_RUNG_T = 1.01            # the rungs' axis: this far into the niche from the walkway's wall face (the walkway's half width, CRAWL_HW, is where the niche starts)

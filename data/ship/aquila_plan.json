@@ -1367,11 +1367,29 @@
    "doors": ["bridge_door_port", "d1_tl_b1_door", "d1_tl_b2_door"],
    "dept": "command",
    "systems": ["lift"],
-   "stations": [],
+   "stations": [
+    {"id": "lift_housing_bridge.s0", "role": "crew", "kind": "stand", "pos": [-21.7, -5.22, 0.0], "yaw": 180.0, "dept": "command"},
+    {"id": "lift_housing_bridge.s1", "role": "crew", "kind": "stand", "pos": [-21.7, -2.22, 0.0], "yaw": 180.0, "dept": "command"}
+   ],
    "plane": 1,
    "existing": true,
    "data": "aquila_quarters.json",
-   "note": "the housing behind the port corridor's end: since NAVE-3 its first 1.8 m (x -22.8 .. -21.0) are the vestibule of the two command turbolifts, whose shafts (x -25.8 .. -22.8) stand in the rest of it (ship_vertical.BRIDGE_SHAFTS); the corridor's end cap (the old lift's door) is to be removed by the lift engine"
+   "note": "the housing behind the port corridor's end: since NAVE-3 its first 1.8 m (x -22.8 .. -21.0) are the vestibule of the two command turbolifts, whose shafts (x -25.8 .. -22.8) stand in the rest of it (ship_vertical.BRIDGE_SHAFTS); its walls, floor, roof and the shafts' tubes are the mesh SM_SHIP_LiftHousingBridge (ship_deck1.py); the corridor's end cap, the old lift's leaves and sign and the old floor under the shafts are removed by build_ship_interior.py",
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-21.9, -4.72, 2.85],
+     "lumens": 600,
+     "temperature": 4200,
+     "size": [1.2, 4.0],
+     "radius": 700,
+     "shadows": false,
+     "id": "lift_housing_bridge.l0"
+    }
+   ],
+   "mesh": "SM_SHIP_LiftHousingBridge",
+   "pos": [-20.8, -1.22, 0.0],
+   "yaw": 180.0
   },
   {
    "id": "quarters",
@@ -195133,6 +195151,26 @@
     "act": "stand",
     "yaw": 90.0
    },
+   {
+    "id": "lift_housing_bridge.s0",
+    "deck": 1,
+    "p": [-21.7, -5.22, 0.0],
+    "kind": "station",
+    "comp": "lift_housing_bridge",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 180.0
+   },
+   {
+    "id": "lift_housing_bridge.s1",
+    "deck": 1,
+    "p": [-21.7, -2.22, 0.0],
+    "kind": "station",
+    "comp": "lift_housing_bridge",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 180.0
+   },
    {"id": "mess.in", "deck": 4, "p": [-124.6, 0.0, -46.0], "kind": "door_in", "comp": "mess"},
    {"id": "mess.hub", "deck": 4, "p": [-141.0, 0.0, -46.3], "kind": "room", "comp": "mess"},
    {"id": "mess.mess1", "deck": 4, "p": [-137.8, -3.88, -46.0], "kind": "station", "comp": "mess", "role": "crew", "act": "eat", "yaw": 90.0},
@@ -209134,6 +209172,8 @@
    {"a": "ready_room.hub", "b": "ready_room.s6", "len": 4.6, "kind": "walk", "w": 1.0},
    {"a": "ready_room.hub", "b": "ready_room.s7", "len": 4.6, "kind": "walk", "w": 1.0},
    {"a": "ready_room.hub", "b": "ready_room.s8", "len": 1.66, "kind": "walk", "w": 1.0},
+   {"a": "lift_housing_bridge.hub", "b": "lift_housing_bridge.s0", "len": 0.65, "kind": "walk", "w": 1.0},
+   {"a": "lift_housing_bridge.hub", "b": "lift_housing_bridge.s1", "len": 2.39, "kind": "walk", "w": 1.0},
    {"a": "mess.in", "b": "mess.hub", "len": 16.4, "kind": "walk", "w": 2.0},
    {"a": "mess.hub", "b": "mess.mess1", "len": 5.04, "kind": "walk", "w": 1.0},
    {"a": "mess.hub", "b": "mess.mess2", "len": 4.46, "kind": "walk", "w": 1.0},
@@ -211717,6 +211757,15 @@
     "folder": "Interior/Deck01/Plates",
     "label": "d1_plate_ready_room",
     "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_LiftHousingBridge",
+    "pos": [-20.8, -1.22, 0.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck01/Rooms",
+    "label": "d1_lift_housing",
+    "cls": "room",
+    "comp": "lift_housing_bridge"
    }
   ],
   "2": [

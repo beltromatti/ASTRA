@@ -83,6 +83,7 @@ ROOMS = {
     "sim_bay": ("ship_rooms_life", "sim_bay"), "berthing": ("ship_rooms_life", "berthing"), "suites": ("ship_rooms_life", "suites"), "single_cabins": ("ship_rooms_life", "single_cabins"),
     "drone_bay": ("ship_rooms_life", "drone_bay"),
     "lift_bank": ("ship_rooms_lifts", "lift_bank"), "lift_bank_o": ("ship_rooms_lifts", "lift_bank_o"), "lift_bank_b": ("ship_rooms_lifts", "lift_bank_b"),
+    "lift_housing_bridge": ("ship_rooms_lifts", "lift_housing_bridge"),
     "shuttle_stop_bow": ("ship_rooms_transit", "shuttle_stop_bow"), "shuttle_stop_stern": ("ship_rooms_transit", "shuttle_stop_stern"),
 }
 EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHIP_StairTowerBottom": ("ship_rooms_hub", "stair_tower_bottom"),
@@ -219,7 +220,7 @@ def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
             xlo = -0.45                                                   # the reveal between the lobby and the Berthing
         else:
             xlo = -tol
-        xhi = L + (3.2 if item[1] == "lift_bank_b" else 0.0)                          # (the command lobby's shafts stand behind its aft wall)
+        xhi = L + {"lift_bank_b": 3.2, "lift_housing_bridge": 3.0}.get(item[1], 0.0)   # (the command lobby's and the housing's shafts stand behind their aft walls)
         if lo[0] < xlo or hi[0] > xhi + tol or lo[1] < -0.25 - tol or hi[1] > D + 0.25 + tol:
             problems.append(f"{name}: bounds {lo} .. {hi} leave the footprint 0..{L} x 0..{D}")
         if hi[2] > 4.0 + tol and item[1] not in ("stair_tower",):

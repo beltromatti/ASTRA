@@ -12,7 +12,7 @@ yaw in degrees (0 faces +x, 90 faces +y: into the room), and `dept` of the unifo
 """
 from __future__ import annotations
 
-from ship_catalog import DOOR_H, DOOR_W, GATE_H, GATE_W
+from ship_catalog import DOOR_H, DOOR_W, GATE_H, GATE_W, HOUSING_D
 
 # ---------------------------------------------------------------------------------------------------------------- helpers
 
@@ -517,6 +517,13 @@ _reg("lift_bank_b", name="Command Turbolift Lobby", kind="lobby", dept="command"
      doors=[door("near", 3.2, GATE_W, GATE_H)], systems=["power_bus", "life_support", "lift"], special=True,
      spots=[spot("crew", "stand", 2.4, 2.8, 90, "command"), spot("crew", "stand", 5.6, 4.6, -90, "command")],
      lights=[light(4.0, 3.1, 3.55, 2600, 4200, (4.0, 2.4), 900)])
+# the bridge lift's housing on Deck 1 (hand-placed behind the port corridor's end, ship_deck1.py; its mesh is placed at yaw 180, so its x runs aft from the corridor's mouth and its y to port): the
+# vestibule of the two command shafts (1.7 m clear in front of their doors, 6.7 m wide) with the corridor's 3.2 m mouth in its fore wall (the `left` wall, x 0) and the shafts' tubes behind its aft
+# wall (the `right` wall: x L .. L + 3.0 is theirs); the roof is low (the block outside leaves 3.15 m: clear height 2.9, as the ready room's)
+_reg("lift_housing_bridge", name="Bridge Lift Housing", kind="lift", dept="command", L=2.0, D=HOUSING_D, h=2.9, plate=None,
+     doors=[door("left", 2.68, 3.2, 2.5)], systems=["power_bus", "life_support", "lift"], special=True,
+     spots=[spot("crew", "stand", 0.9, 4.0, 0, "command"), spot("crew", "stand", 0.9, 1.0, 0, "command")],
+     lights=[light(1.1, 3.5, 2.85, 600, 4200, (1.2, 4.0), 700)])
 # the damage-control station (8 x 8: a locker, a hose reel, the suits and the shoring, a plot of the section) at the nodes: behind the stair towers, by the lift banks
 _reg("dc_station", name="Damage-Control Station", kind="damage_control", dept="engineering", L=8.0, D=8.0, h=3.4, plate="dc",
      doors=[door("near", 2.0)], systems=["damage_control", "supply"],
