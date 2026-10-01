@@ -570,6 +570,8 @@ public:
 	FString PlotStats() const;
 	/** The shared lists are made again for the next reader (the bench uses it to time a build; the end of every battle tick does it already). */
 	void InvalidatePlot() { ++PlotStamp; }
+	/** What a battle tick costs the game thread, since the last report (astra.war.perf): the simulation, moving the hulls, the instanced drawing, the effects. */
+	FString PerfReport(bool bReset);
 	/** The physical state of one warship as the Aquila can know it (AstraWarDamage.cpp), for the visuals and the crew.
 	 *  Detail 0: nothing known (returns false) · 1: what the eye sees (gutted, burning, venting, breaking up, disabled) ·
 	 *  2: + structure by section, armour plates, shield sectors (a firm, classified track) · 3: everything, systems and
@@ -733,6 +735,12 @@ private:
 	mutable uint32 ContactsBuiltAt = 0, BlipsBuiltAt = 0;
 	mutable int32 ContactBuilds = 0, ContactReads = 0, BlipBuilds = 0, BlipReads = 0;
 	mutable double ContactMs = 0.0, BlipMs = 0.0;
+	struct FPerfWindow
+	{
+		double Sim = 0.0, Sync = 0.0, Draw = 0.0, Fx = 0.0, Total = 0.0, TotalMax = 0.0;
+		int32 Frames = 0;
+	};
+	FPerfWindow PerfWin;
 	void BuildContacts(TArray<FContactView>& Out) const;
 	void BuildHoloBlips(TArray<FAstraHoloBlip>& Out, FPlotCounts& Counts) const;
 	bool bPlayerTracked = true;
@@ -891,7 +899,22 @@ private:
 	int32 SpawnByKey(FName Key, EAstraSide Side, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);
 	/** A flight group aboard a carrier (kind 0 fighter, 1 bomber, 2 drone), launching after Delay seconds; its index. */
 	int32 AddWing(int32 CarrierIdx, int32 Kind, int32 Count, const FString& Mission, float Delay);
-	bool LoadScenario(const FString& Name, FString& OutDetail, bool bWithAquila = false);
+	bool LoadScenario(const FString& Name, FString& OutDetail, bool bWithAquila = false, const TArray<FString>& Options = TArray<FString>());
+	/** One group of a scenario file made (its ships in formation, its wings, a battle group for them): at the start, or as a wave. Its group id (INDEX_NONE: no ships). */
+	int32 SpawnScenarioGroup(const TSharedPtr<FJsonObject>& G, EAstraSide Side, int32 SideIdx, bool bRotated, int32& Spawned, int32& Wings, FString& OutName, FString& OutProtects);
+	/** The "wings" of a group (or of the Aquila): each is a flight group aboard the ship of Made that its "carrier" index names. How many were made. */
+	int32 AddScenarioWings(const TArray<TSharedPtr<FJsonValue>>& List, const TArray<int32>& Made);
+	/** A wave of a scenario file (reinforcements: "waves", in a file of data/war/scenarios): a group that arrives when its time comes. */
+	struct FScenarioWave
+	{
+		float At = 0.f;
+		TSharedPtr<FJsonObject> Group;
+		EAstraSide Side = EAstraSide::Astra;
+		bool bDone = false;
+	};
+	TArray<FScenarioWave> ScenarioWaves;
+	int32 ScenarioCounter[2] = {1, 1};         // the next contact number of each side's scenario ships
+	void TickScenarioWaves();
 
 	// --- the physical model (AstraWarDamage.cpp)
 	void InitShipModel(FAstraBattleShip& S);

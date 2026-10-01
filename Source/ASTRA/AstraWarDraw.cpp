@@ -457,9 +457,9 @@ void UAstraWarDraw::ClearAll()
 // ------------------------------------------------------------------------------------------------------------------ a frame
 void UAstraWarDraw::Tick(float InDt)
 {
-	if (!IsActive() || !Owner || Owner->Ships.Num() == 0)
+	if (!(bLive || bSim) || !Owner || Owner->Ships.Num() == 0)
 	{
-		return;
+		return;                                             // (astra.war.draw 0 only stops new claims: what is already in the sky goes on being moved)
 	}
 	const double T0 = FPlatformTime::Seconds();
 	Dt = FMath::Clamp(InDt, 0.f, 0.1f);

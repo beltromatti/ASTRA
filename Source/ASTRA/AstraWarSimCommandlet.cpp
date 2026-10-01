@@ -375,8 +375,14 @@ namespace
 		// the variant's commands first (console variables, spawns, station modes), before the first tick
 		if (!Scenario.IsEmpty())
 		{
-			// data/war/scenarios/<name>.json; -aquila keeps the Aquila in it (at the origin, with the ASTRA side), as the game's scale test from the bridge does
-			GEngine->Exec(World, *FString::Printf(TEXT("astra.war.scenario %s%s"), *Scenario, FParse::Param(*Params, TEXT("aquila")) ? TEXT(" aquila") : TEXT("")));
+			// data/war/scenarios/<name>.json; -aquila keeps the Aquila in it (at the origin, with the ASTRA side), as the game's scale test from the bridge does;
+			// -aquila_opts=at=-34,0,0;speed=0;heading=0 are the options of the console command after "aquila" (';' for a space)
+			FString AquilaOpts;
+			FParse::Value(*Params, TEXT("aquila_opts="), AquilaOpts, false);
+			AquilaOpts.ReplaceInline(TEXT(";"), TEXT(" "));
+			const bool bAquila = FParse::Param(*Params, TEXT("aquila")) || !AquilaOpts.IsEmpty();
+			GEngine->Exec(World, *FString::Printf(TEXT("astra.war.scenario %s%s%s"), *Scenario, bAquila ? TEXT(" aquila") : TEXT(""),
+			                                      AquilaOpts.IsEmpty() ? TEXT("") : *(FString(TEXT(" ")) + AquilaOpts)));
 		}
 		TArray<FString> Cmds;
 		Exec.ParseIntoArray(Cmds, TEXT(";"));

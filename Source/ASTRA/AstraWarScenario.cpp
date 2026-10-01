@@ -8,16 +8,22 @@
 //                                              passive: a target dummy that does not fight)
 //   astra.war.wing <carrier id> <fighter|bomber|drone> <n> <mission> [target id]
 //                                              a flight group aboard a carrier (it launches at once)
-//   astra.war.scenario <name> [aquila]         data/war/scenarios/<name>.json (implies the sandbox); "aquila" (or "aquila": true in the
-//                                              file) keeps the Aquila in it, at the origin with the ASTRA side: the lead's scale test from the bridge
+//   astra.war.scenario <name> [aquila] [hold|speed=<m/s>|heading=<deg>|at=<x_km>,<y_km>,<z_km>]
+//                                              data/war/scenarios/<name>.json (implies the sandbox); "aquila" (or "aquila": true in the
+//                                              file) keeps the Aquila in it, with the ASTRA side, held at rest where the file puts her (the origin
+//                                              unless it says "aquila": {"at_km": [x,y,z], "heading": deg, "speed": m/s}, or the command does:
+//                                              at=), bow to +x: the lead's scale test from the bridge, the same every time
 //
-// The scenario file: {"mirror": true, "astra": [group...], "mandate": [group...]}; a group: {"name", "formation": line|wedge|
-// column, "at_km": [x,y,z], "heading": deg, "spacing_km", "ships": [{"class", "n", "name"}], "wings": [{"carrier": index in
-// the group's ships, "kind", "n", "mission", "delay"}]}. mirror: the Mandate side is the ASTRA side turned 180 degrees about
-// the origin (the same forces, the same geometry: neither side has the better position).
+// The scenario file: {"mirror": true, "aquila": {...}, "astra": [group...], "mandate": [group...], "waves": [wave...]}; a group: {"name",
+// "formation": line|wedge|column, "at_km": [x,y,z], "heading": deg, "spacing_km", "ships": [{"class", "n", "name"}], "wings": [{"carrier":
+// index in the group's ships, "kind", "n", "mission", "delay"}]}. mirror: the Mandate side is the ASTRA side turned 180 degrees about
+// the origin (the same forces, the same geometry: neither side has the better position). A wave is reinforcements that arrive in the
+// battle: {"at_s": battle seconds, "side": "astra"|"mandate", "group": {a group}} (announced on the group-events line). "aquila": the
+// Aquila is in the battle: {"at_km": [x,y,z], "heading": deg, "speed": m/s, "wings": [{"kind", "n", "mission", "delay"}]} (her own air group).
 
 #include "AstraBattleSubsystem.h"
 #include "AstraWarClasses.h"
+#include "AstraShipSubsystem.h"
 #include "AstraWarDraw.h"
 #include "ASTRA.h"
 #include "Dom/JsonObject.h"
@@ -123,7 +129,20 @@ void UAstraBattleSubsystem::ProcessWarCommands()
 		else if (Cmd == TEXT("scenario") && A.Num() >= 2)
 		{
 			FString Detail;
-			const bool bOk = LoadScenario(A[1], Detail, A.Num() >= 3 && A[2].Equals(TEXT("aquila"), ESearchCase::IgnoreCase));
+			TArray<FString> Options;                                 // with "aquila": hold, speed=<m/s>, heading=<deg>, at=<x_km>,<y_km>,<z_km>
+			bool bAquila = false;
+			for (int32 i = 2; i < A.Num(); ++i)
+			{
+				if (A[i].Equals(TEXT("aquila"), ESearchCase::IgnoreCase))
+				{
+					bAquila = true;
+				}
+				else
+				{
+					Options.Add(A[i]);
+				}
+			}
+			const bool bOk = LoadScenario(A[1], Detail, bAquila, Options);
 			UE_LOG(LogASTRA, Display, TEXT("[WarSim] scenario %s: %s%s"), *A[1], bOk ? TEXT("") : TEXT("FAILED — "), *Detail);
 		}
 		else if (Cmd == TEXT("spawn") && A.Num() >= 6)
@@ -197,6 +216,7 @@ void UAstraBattleSubsystem::ProcessWarCommands()
 void UAstraBattleSubsystem::SandboxReset(bool bKeepAquila)
 {
 	ClearSystem();
+	ScenarioWaves.Reset();
 	Ships.Reserve(512);
 	FAstraBattleShip& P = Ships[0];
 	if (!bKeepAquila)
@@ -265,7 +285,133 @@ int32 UAstraBattleSubsystem::AddWing(int32 CarrierIdx, int32 Kind, int32 Count, 
 	return Squadrons.Num() - 1;
 }
 
-bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail, bool bWithAquila)
+
+int32 UAstraBattleSubsystem::SpawnScenarioGroup(const TSharedPtr<FJsonObject>& G, EAstraSide Side, int32 SideIdx, bool bRotated, int32& Spawned, int32& Wings,
+                                                FString& OutName, FString& OutProtects)
+{
+	FString GName = TEXT("Group"), Formation = TEXT("line"), Protects;
+	G->TryGetStringField(TEXT("name"), GName);
+	G->TryGetStringField(TEXT("formation"), Formation);
+	G->TryGetStringField(TEXT("protects"), Protects);
+	const TArray<TSharedPtr<FJsonValue>>* Obj = nullptr;
+	G->TryGetArrayField(TEXT("objective_km"), Obj);
+	const TArray<TSharedPtr<FJsonValue>>* At = nullptr;
+	G->TryGetArrayField(TEXT("at_km"), At);
+	FVector Origin = VecKm(At);
+	double Heading = 0.0, Spacing = 1.5;
+	G->TryGetNumberField(TEXT("heading"), Heading);
+	G->TryGetNumberField(TEXT("spacing_km"), Spacing);
+	if (bRotated)
+	{
+		Origin = FVector(-Origin.X, -Origin.Y, Origin.Z);
+		Heading += 180.0;
+	}
+	// the ships of the group, in order
+	struct FPlan { FName Key; FString Name; bool bHold; };
+	TArray<FPlan> Plan;
+	const TArray<TSharedPtr<FJsonValue>>* Ships_ = nullptr;
+	if (G->TryGetArrayField(TEXT("ships"), Ships_))
+	{
+		for (const TSharedPtr<FJsonValue>& SV : *Ships_)
+		{
+			const TSharedPtr<FJsonObject> SO = SV->AsObject();
+			FString Class, SName;
+			double N = 1.0;
+			if (!SO.IsValid() || !SO->TryGetStringField(TEXT("class"), Class))
+			{
+				continue;
+			}
+			SO->TryGetNumberField(TEXT("n"), N);
+			SO->TryGetStringField(TEXT("name"), SName);
+			bool bHold = false;
+			SO->TryGetBoolField(TEXT("hold"), bHold);
+			for (int32 k = 0; k < (int32)N; ++k)
+			{
+				Plan.Add({FName(*Class.ToLower()), SName.IsEmpty() ? FString() : (N > 1.0 ? FString::Printf(TEXT("%s %d"), *SName, k + 1) : SName), bHold});
+			}
+		}
+	}
+	const FVector Fwd = FRotator(0.0, Heading, 0.0).RotateVector(FVector::ForwardVector);
+	const FVector Right = FRotator(0.0, Heading, 0.0).RotateVector(FVector::RightVector);
+	FVector Objective = Obj ? VecKm(Obj) : FVector::ZeroVector;
+	if (bRotated && Obj)
+	{
+		Objective = FVector(-Objective.X, -Objective.Y, Objective.Z);
+	}
+	TArray<int32> Made;
+	for (int32 k = 0; k < Plan.Num(); ++k)
+	{
+		// slots: line abreast, a wedge (the first ship at the point), or a column
+		FVector Slot = Origin;
+		const double Sp = Spacing * 1000.0;
+		if (Formation == TEXT("column"))
+		{
+			Slot += Fwd * (-Sp * k);
+		}
+		else if (Formation == TEXT("wedge"))
+		{
+			const int32 Rank = (k + 1) / 2;
+			Slot += Right * ((k % 2 ? 1.0 : -1.0) * Rank * Sp) + Fwd * (-Sp * 0.8 * Rank);
+		}
+		else
+		{
+			Slot += Right * ((k - (Plan.Num() - 1) * 0.5) * Sp);
+		}
+		const FString Id = FString::Printf(TEXT("%s-%02d"), Side == EAstraSide::Astra ? TEXT("A") : TEXT("M"), ScenarioCounter[SideIdx]++);
+		const int32 I = SpawnByKey(Plan[k].Key, Side, Id, Plan[k].Name.IsEmpty() ? FString::Printf(TEXT("%s %s"), *Plan[k].Key.ToString(), *Id) : Plan[k].Name, Slot, (float)Heading);
+		if (I != INDEX_NONE)
+		{
+			Ships[I].bHoldStation = Plan[k].bHold;
+			Made.Add(I);
+			++Spawned;
+		}
+	}
+	const int32 Gid = NoteGroupSpawn(Side, bRotated ? GName + TEXT(" (mirror)") : GName, Formation, Made, INDEX_NONE);
+	if (FAstraBattleGroup* NG = FindGroup(Gid))
+	{
+		NG->Objective = Objective;                       // where it goes when it sees nothing (the origin unless the file says)
+		NG->bHasObjective = true;
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Ws = nullptr;
+	if (G->TryGetArrayField(TEXT("wings"), Ws))
+	{
+		Wings += AddScenarioWings(*Ws, Made);
+	}
+	OutName = GName;
+	OutProtects = Protects;
+	return Gid;
+}
+
+int32 UAstraBattleSubsystem::AddScenarioWings(const TArray<TSharedPtr<FJsonValue>>& List, const TArray<int32>& Made)
+{
+	int32 Added = 0;
+	for (const TSharedPtr<FJsonValue>& WV : List)
+	{
+		const TSharedPtr<FJsonObject> WO = WV->AsObject();
+		if (!WO.IsValid())
+		{
+			continue;
+		}
+		double CarrierK = 0.0, N = 8.0, Delay = 20.0;
+		FString KindS = TEXT("fighter"), Mission = TEXT("cap");
+		WO->TryGetNumberField(TEXT("carrier"), CarrierK);
+		WO->TryGetNumberField(TEXT("n"), N);
+		WO->TryGetNumberField(TEXT("delay"), Delay);
+		WO->TryGetStringField(TEXT("kind"), KindS);
+		WO->TryGetStringField(TEXT("mission"), Mission);
+		if (Made.IsValidIndex((int32)CarrierK))
+		{
+			const int32 Kind = KindS.StartsWith(TEXT("b")) ? 1 : (KindS.StartsWith(TEXT("d")) ? 2 : 0);
+			if (AddWing(Made[(int32)CarrierK], Kind, (int32)N, Mission.ToLower(), (float)Delay) != INDEX_NONE)
+			{
+				++Added;
+			}
+		}
+	}
+	return Added;
+}
+
+bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail, bool bWithAquila, const TArray<FString>& Options)
 {
 	FString Text;
 	const FString Path = FPaths::Combine(FPaths::ProjectDir(), TEXT("data/war/scenarios"), Name + TEXT(".json"));
@@ -280,14 +426,21 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 		OutDetail = TEXT("it does not parse");
 		return false;
 	}
+	// "aquila": true (or an object: where she is, which way she points, how fast she goes) keeps the Aquila in it
+	const TSharedPtr<FJsonObject>* AquilaObj = nullptr;
 	Root->TryGetBoolField(TEXT("aquila"), bWithAquila);
+	if (Root->TryGetObjectField(TEXT("aquila"), AquilaObj))
+	{
+		bWithAquila = true;
+	}
 	SandboxReset(bWithAquila);
+	ScenarioCounter[0] = ScenarioCounter[1] = 1;
+	ScenarioWaves.Reset();
 	bool bMirror = false;
 	Root->TryGetBoolField(TEXT("mirror"), bMirror);
 	FString First;
 	Root->TryGetStringField(TEXT("first"), First);          // which side is spawned first (the order of the ships in the arrays): "mandate" swaps it
 	int32 Spawned = 0, Wings = 0;
-	int32 Counter[2] = {1, 1};
 	TMap<FString, int32> GroupByName[2];              // to resolve "protects" once every group exists
 	TArray<TTuple<int32, int32, FString>> Protect;    // group id, side, the name of the group it screens
 	const bool bMandateFirst = First.Equals(TEXT("mandate"), ESearchCase::IgnoreCase);
@@ -315,119 +468,14 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 			{
 				continue;
 			}
-			FString GName = TEXT("Group"), Formation = TEXT("line"), Protects;
-			G->TryGetStringField(TEXT("name"), GName);
-			G->TryGetStringField(TEXT("formation"), Formation);
-			G->TryGetStringField(TEXT("protects"), Protects);
-			const TArray<TSharedPtr<FJsonValue>>* Obj = nullptr;
-			G->TryGetArrayField(TEXT("objective_km"), Obj);
-			const TArray<TSharedPtr<FJsonValue>>* At = nullptr;
-			G->TryGetArrayField(TEXT("at_km"), At);
-			FVector Origin = VecKm(At);
-			double Heading = 0.0, Spacing = 1.5;
-			G->TryGetNumberField(TEXT("heading"), Heading);
-			G->TryGetNumberField(TEXT("spacing_km"), Spacing);
-			if (bRotated)
+			FString GName, Protects;
+			const int32 Gid = SpawnScenarioGroup(G, Side, SideIdx, bRotated, Spawned, Wings, GName, Protects);
+			if (FindGroup(Gid))
 			{
-				Origin = FVector(-Origin.X, -Origin.Y, Origin.Z);
-				Heading += 180.0;
-			}
-			// the ships of the group, in order
-			struct FPlan { FName Key; FString Name; bool bHold; };
-			TArray<FPlan> Plan;
-			const TArray<TSharedPtr<FJsonValue>>* Ships_ = nullptr;
-			if (G->TryGetArrayField(TEXT("ships"), Ships_))
-			{
-				for (const TSharedPtr<FJsonValue>& SV : *Ships_)
-				{
-					const TSharedPtr<FJsonObject> SO = SV->AsObject();
-					FString Class, SName;
-					double N = 1.0;
-					if (!SO.IsValid() || !SO->TryGetStringField(TEXT("class"), Class))
-					{
-						continue;
-					}
-					SO->TryGetNumberField(TEXT("n"), N);
-					SO->TryGetStringField(TEXT("name"), SName);
-					bool bHold = false;
-					SO->TryGetBoolField(TEXT("hold"), bHold);
-					for (int32 k = 0; k < (int32)N; ++k)
-					{
-						Plan.Add({FName(*Class.ToLower()), SName.IsEmpty() ? FString() : (N > 1.0 ? FString::Printf(TEXT("%s %d"), *SName, k + 1) : SName), bHold});
-					}
-				}
-			}
-			const FVector Fwd = FRotator(0.0, Heading, 0.0).RotateVector(FVector::ForwardVector);
-			const FVector Right = FRotator(0.0, Heading, 0.0).RotateVector(FVector::RightVector);
-			FVector Objective = Obj ? VecKm(Obj) : FVector::ZeroVector;
-			if (bRotated && Obj)
-			{
-				Objective = FVector(-Objective.X, -Objective.Y, Objective.Z);
-			}
-			TArray<int32> Made;
-			for (int32 k = 0; k < Plan.Num(); ++k)
-			{
-				// slots: line abreast, a wedge (the first ship at the point), or a column
-				FVector Slot = Origin;
-				const double Sp = Spacing * 1000.0;
-				if (Formation == TEXT("column"))
-				{
-					Slot += Fwd * (-Sp * k);
-				}
-				else if (Formation == TEXT("wedge"))
-				{
-					const int32 Rank = (k + 1) / 2;
-					Slot += Right * ((k % 2 ? 1.0 : -1.0) * Rank * Sp) + Fwd * (-Sp * 0.8 * Rank);
-				}
-				else
-				{
-					Slot += Right * ((k - (Plan.Num() - 1) * 0.5) * Sp);
-				}
-				const FString Id = FString::Printf(TEXT("%s-%02d"), Side == EAstraSide::Astra ? TEXT("A") : TEXT("M"), Counter[SideIdx]++);
-				const int32 I = SpawnByKey(Plan[k].Key, Side, Id, Plan[k].Name.IsEmpty() ? FString::Printf(TEXT("%s %s"), *Plan[k].Key.ToString(), *Id) : Plan[k].Name, Slot, (float)Heading);
-				if (I != INDEX_NONE)
-				{
-					Ships[I].bHoldStation = Plan[k].bHold;
-					Made.Add(I);
-					++Spawned;
-				}
-			}
-			const int32 Gid = NoteGroupSpawn(Side, bRotated ? GName + TEXT(" (mirror)") : GName, Formation, Made, INDEX_NONE);
-			if (FAstraBattleGroup* NG = FindGroup(Gid))
-			{
-				NG->Objective = Objective;                       // where it goes when it sees nothing (the origin unless the file says)
-				NG->bHasObjective = true;
 				GroupByName[SideIdx].Add(GName, Gid);
 				if (!Protects.IsEmpty())
 				{
 					Protect.Add(MakeTuple(Gid, SideIdx, Protects));
-				}
-			}
-			const TArray<TSharedPtr<FJsonValue>>* Ws = nullptr;
-			if (G->TryGetArrayField(TEXT("wings"), Ws))
-			{
-				for (const TSharedPtr<FJsonValue>& WV : *Ws)
-				{
-					const TSharedPtr<FJsonObject> WO = WV->AsObject();
-					if (!WO.IsValid())
-					{
-						continue;
-					}
-					double CarrierK = 0.0, N = 8.0, Delay = 20.0;
-					FString KindS = TEXT("fighter"), Mission = TEXT("cap");
-					WO->TryGetNumberField(TEXT("carrier"), CarrierK);
-					WO->TryGetNumberField(TEXT("n"), N);
-					WO->TryGetNumberField(TEXT("delay"), Delay);
-					WO->TryGetStringField(TEXT("kind"), KindS);
-					WO->TryGetStringField(TEXT("mission"), Mission);
-					if (Made.IsValidIndex((int32)CarrierK))
-					{
-						const int32 Kind = KindS.StartsWith(TEXT("b")) ? 1 : (KindS.StartsWith(TEXT("d")) ? 2 : 0);
-						if (AddWing(Made[(int32)CarrierK], Kind, (int32)N, Mission.ToLower(), (float)Delay) != INDEX_NONE)
-						{
-							++Wings;
-						}
-					}
 				}
 			}
 		}
@@ -442,6 +490,129 @@ bool UAstraBattleSubsystem::LoadScenario(const FString& Name, FString& OutDetail
 			G->Formation = EAstraFormation::Screen;
 		}
 	}
-	OutDetail = FString::Printf(TEXT("%d ships, %d flight groups"), Spawned, Wings);
+	// "waves": groups that arrive later (reinforcements: {"at_s": 120, "side": "astra"|"mandate", "group": {the same as a group of the sides}}), as a fleet battle of a campaign has them
+	int32 NumWaves = 0;
+	const TArray<TSharedPtr<FJsonValue>>* WaveList = nullptr;
+	if (Root->TryGetArrayField(TEXT("waves"), WaveList))
+	{
+		for (const TSharedPtr<FJsonValue>& WV : *WaveList)
+		{
+			const TSharedPtr<FJsonObject> WO = WV->AsObject();
+			if (!WO.IsValid())
+			{
+				continue;
+			}
+			FScenarioWave W;
+			double At = 0.0;
+			FString SideS = TEXT("astra");
+			WO->TryGetNumberField(TEXT("at_s"), At);
+			WO->TryGetStringField(TEXT("side"), SideS);
+			W.At = (float)At;
+			W.Side = SideOf(SideS);
+			const TSharedPtr<FJsonObject>* GObj = nullptr;
+			W.Group = WO->TryGetObjectField(TEXT("group"), GObj) ? *GObj : WO;
+			if (AstraSideIdx(W.Side) >= 0)
+			{
+				ScenarioWaves.Add(W);
+				++NumWaves;
+			}
+		}
+	}
+	// the Aquila: at the origin with the ASTRA side unless the file or the command says otherwise, held where she is (the helm at rest) so that a test is the same every time;
+	// speed=<m/s> and heading=<deg> on the command line (or in the file) set her going
+	if (bWithAquila && Ships.Num())
+	{
+		FVector At = FVector::ZeroVector;
+		double Heading = 0.0, Speed = 0.0;
+		if (AquilaObj)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* AtKm = nullptr;
+			if ((*AquilaObj)->TryGetArrayField(TEXT("at_km"), AtKm))
+			{
+				At = VecKm(AtKm);
+			}
+			(*AquilaObj)->TryGetNumberField(TEXT("heading"), Heading);
+			(*AquilaObj)->TryGetNumberField(TEXT("speed"), Speed);
+			// her own air group: wings aboard the Aquila herself (they leave through her bow tubes, as they do in the game)
+			const TArray<TSharedPtr<FJsonValue>>* AirGroup = nullptr;
+			if ((*AquilaObj)->TryGetArrayField(TEXT("wings"), AirGroup))
+			{
+				const TArray<int32> Herself = {0};
+				Wings += AddScenarioWings(*AirGroup, Herself);
+			}
+		}
+		for (const FString& O : Options)
+		{
+			if (O.StartsWith(TEXT("speed="))) { Speed = FCString::Atod(*O.Mid(6)); }
+			else if (O.StartsWith(TEXT("heading="))) { Heading = FCString::Atod(*O.Mid(8)); }
+			else if (O.Equals(TEXT("hold"), ESearchCase::IgnoreCase)) { Speed = 0.0; }
+			else if (O.StartsWith(TEXT("at=")))
+			{
+				TArray<FString> Km;                                 // at=<x_km>,<y_km>,<z_km>
+				O.Mid(3).ParseIntoArray(Km, TEXT(","));
+				if (Km.Num() >= 2)
+				{
+					At = FVector(FCString::Atod(*Km[0]), FCString::Atod(*Km[1]), Km.Num() >= 3 ? FCString::Atod(*Km[2]) : 0.0) * 1000.0;
+				}
+			}
+		}
+		Ships[0].Pos = At;
+		Ships[0].Att = FRotator(0.0, Heading, 0.0).Quaternion();
+		Ships[0].Vel = Ships[0].Att.GetForwardVector() * Speed;
+		if (UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr)
+		{
+			Ship->DriveExternally((float)Heading, 0.f, (float)Speed);
+			Ship->SetThrottle(Speed > 1.0 ? (float)(Speed / 4.8) : 0.f);          // (her speed follows the throttle: at rest she stays so)
+		}
+	}
+	OutDetail = FString::Printf(TEXT("%d ships, %d flight groups%s%s"), Spawned, Wings, NumWaves ? *FString::Printf(TEXT(", %d waves to come"), NumWaves) : TEXT(""),
+	                            bWithAquila ? TEXT(", the Aquila in it") : TEXT(""));
 	return true;
+}
+
+void UAstraBattleSubsystem::TickScenarioWaves()
+{
+	for (FScenarioWave& W : ScenarioWaves)
+	{
+		if (W.bDone || Time < W.At)
+		{
+			continue;
+		}
+		W.bDone = true;
+		const int32 SideIdx = AstraSideIdx(W.Side);
+		int32 Spawned = 0, Wings = 0;
+		FString GName, Protects;
+		const int32 Gid = SpawnScenarioGroup(W.Group, W.Side, SideIdx, false, Spawned, Wings, GName, Protects);
+		const FAstraBattleGroup* G = FindGroup(Gid);
+		if (!G)
+		{
+			continue;
+		}
+		if (!Protects.IsEmpty())
+		{
+			// the group it screens is one of this side's that is already in the battle
+			for (const FAstraBattleGroup& O : Groups)
+			{
+				if (O.Side == W.Side && O.Id != Gid && O.Name.Equals(Protects, ESearchCase::IgnoreCase) && O.LeaderId >= 0)
+				{
+					if (FAstraBattleGroup* M = FindGroup(Gid))
+					{
+						M->ProtecteeId = O.LeaderId;
+						M->Formation = EAstraFormation::Screen;
+					}
+					break;
+				}
+			}
+		}
+		TArray<FString> Ids;
+		for (const int32 Id : G->Members)
+		{
+			if (const FAstraBattleShip* S = FindById(Id))
+			{
+				Ids.Add(FString::Printf(TEXT("%s (%s)"), *S->ContactId, *S->ClassKey.ToString()));
+			}
+		}
+		NoteGroupEvent(SideIdx, FString::Printf(TEXT("%s: reinforcements arriving: %s"), *GName, *FString::Join(Ids, TEXT(", "))));
+		UE_LOG(LogASTRA, Display, TEXT("[WarSim] %.0f s: wave %s (%s): %d ships, %d flight groups"), Time, *GName, SideIdx == 0 ? TEXT("ASTRA") : TEXT("Mandate"), Spawned, Wings);
+	}
 }

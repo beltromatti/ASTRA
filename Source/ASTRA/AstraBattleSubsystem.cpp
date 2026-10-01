@@ -21,6 +21,8 @@
 #include "Sound/SoundBase.h"
 #include "HAL/PlatformTime.h"
 
+DECLARE_CYCLE_STAT(TEXT("Battle tick"), STAT_AstraBattle, STATGROUP_Astra);
+
 namespace
 {
 	const double OneKm = 1000.0;
@@ -368,6 +370,8 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		}
 		return;
 	}
+	SCOPE_CYCLE_COUNTER(STAT_AstraBattle);
+	const double PerfT0 = FPlatformTime::Seconds();
 	const float Dt = FMath::Min(DeltaTime, 0.1f) * GBattleTimeScale;
 	struct FTickTimer
 	{
@@ -487,6 +491,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		}
 	}
 	ProcessWarCommands();                                   // the bench's scenarios and spawns (AstraWarScenario.cpp)
+	TickScenarioWaves();                                    // the reinforcements of a scenario file arrive when their time comes
 	// the war's minds: what each side holds on its sensors, who is near whom, what the groups want
 	if ((CompactT -= Dt) <= 0.f)
 	{
@@ -574,17 +579,40 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 		DecoysSeduced = 0;
 		LastDecoyReport = Time;
 	}
+	const double PerfT1 = FPlatformTime::Seconds();
 	SyncVisuals();
+	const double PerfT2 = FPlatformTime::Seconds();
 	if (WarDraw)
 	{
 		WarDraw->Tick(DeltaTime);                  // the craft's hulls and every ship's lamps, as instances (AstraWarDraw.cpp)
 	}
+	const double PerfT3 = FPlatformTime::Seconds();
 	if (WarFX)
 	{
 		WarFX->Tick(DeltaTime);                    // the war's effects: shots, particles, shields, drives (AstraWarFX.cpp)
 	}
 	EndPhase(5);
 	++PlotStamp;                                   // the plot has moved: the shared lists (Contacts, HoloBlips) are made again for whoever reads them next
+	const double PerfT4 = FPlatformTime::Seconds();
+	PerfWin.Sim += (PerfT1 - PerfT0) * 1000.0;
+	PerfWin.Sync += (PerfT2 - PerfT1) * 1000.0;
+	PerfWin.Draw += (PerfT3 - PerfT2) * 1000.0;
+	PerfWin.Fx += (PerfT4 - PerfT3) * 1000.0;
+	PerfWin.Total += (PerfT4 - PerfT0) * 1000.0;
+	PerfWin.TotalMax = FMath::Max(PerfWin.TotalMax, (PerfT4 - PerfT0) * 1000.0);
+	++PerfWin.Frames;
+}
+
+FString UAstraBattleSubsystem::PerfReport(bool bReset)
+{
+	const FPerfWindow W = PerfWin;
+	if (bReset)
+	{
+		PerfWin = FPerfWindow();
+	}
+	const double N = FMath::Max(1, W.Frames);
+	return FString::Printf(TEXT("battle tick over %d frames: %.3f ms avg (max %.2f) = simulation %.3f + moving the hulls %.3f + instanced drawing %.3f + effects %.3f"), W.Frames,
+	                       W.Total / N, W.TotalMax, W.Sim / N, W.Sync / N, W.Draw / N, W.Fx / N);
 }
 
 void UAstraBattleSubsystem::StartCampaign()
