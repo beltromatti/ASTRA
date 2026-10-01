@@ -20,6 +20,8 @@ import ship_spec as SP
 from ship_catalog import BLAST_H, BLAST_W, CLEAR_H, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONE_DIMS, TONE_WALK_W, WALL_T, module_mesh
 
 SEG_MODULES = 4                 # a corridor compartment (and its zone light) is 4 modules = 16 m long
+MID_LINK_SECTION = 84.0         # a section longer than this (aft of the first 4 m, the bulkhead) gets a second cross link near its middle
+FILL_LONG_RUN = 40.0            # a free stretch of at least this length (what the schedule left) takes two filler cells, a shorter one takes one
 
 
 def rnd(v: float, n: int = 3) -> float:
@@ -357,8 +359,8 @@ class Deck:
                  x_min=x_fwd - spec["L"], x_max=x_fwd, y_near=self.wall_plane(pid, side), opt=item[1] if len(item) > 1 else {})
         return self.room_openings(r)
 
-    def _place_item(self, pid: str, side: int, x_fwd: float, item: tuple, lane: str, strict: bool = False) -> bool:
-        """Put an item in the lane at x_fwd (the packer's step). With strict a clash raises; otherwise it returns False and puts nothing."""
+    def _item_problem(self, pid: str, side: int, x_fwd: float, item: tuple) -> str | None:
+        """Why this item cannot stand in the lane at x_fwd (an opening that clashes with the other side of the corridor, another room's floor, the hull), or None."""
         bad = self._occ_conflict(self._openings_of(pid, side, x_fwd, item))
         if not bad and item[0] not in ("gap", "link", "arm"):
             rc = self._room_rect(pid, side, item[0], x_fwd)
@@ -370,6 +372,11 @@ class Deck:
                 hw = min(P.half_width_at(self.env, rc[0]) or 0.0, P.half_width_at(self.env, rc[2]) or 0.0, P.half_width_at(self.env, (rc[0] + rc[2]) / 2) or 0.0)
                 if far > hw + 1e-6:
                     bad = f"the hull is {hw:.1f} m wide here, the room wants {far:.1f}"
+        return bad
+
+    def _place_item(self, pid: str, side: int, x_fwd: float, item: tuple, lane: str, strict: bool = False) -> bool:
+        """Put an item in the lane at x_fwd (the packer's step). With strict a clash raises; otherwise it returns False and puts nothing."""
+        bad = self._item_problem(pid, side, x_fwd, item)
         if bad:
             if strict:
                 raise DesignError(f"deck {self.deck} lane {pid}{side:+d}: {item[0]} at {x_fwd - self.item_len(item)}..{x_fwd}: {bad}")
@@ -403,6 +410,7 @@ class Deck:
         fills = fill if isinstance(fill, dict) else {"*": fill or []}
         anchors = sorted(self.anchors.get((pid, side), []), key=lambda a: -a["x1"])
         used_secs = [(l, xmin, xmax) for (l, xmin, xmax) in secs if min(xmax, hi_lane) - max(xmin, ps.a0) >= 4.0 - 1e-6]
+        own_boundary = any(k_ > 0 and ps.a0 + 2 * MOD <= xmax_ <= hi_lane + 1e-6 for k_, (l_, xmin_, xmax_) in enumerate(secs))     # a section's boundary (so its bulkhead and cross link) lies on this piece
         if flat is not None:
             sched = {used_secs[0][0]: flat} if used_secs else {}
         for k, (letter, xmin, xmax) in enumerate(secs):
@@ -415,7 +423,7 @@ class Deck:
                 obstacles.append((hi - MOD, hi))
                 if links and link_to:
                     placed_link = False
-                    for off in (MOD, 2 * MOD, 3 * MOD):
+                    for off in (MOD, 2 * MOD, 3 * MOD, 4 * MOD, 5 * MOD, 6 * MOD):
                         xl = hi - off
                         if xl - MOD < lo - 1e-6 or any(min(o1, xl) - max(o0, xl - MOD) > 1e-6 for (o0, o1) in obstacles):
                             continue
@@ -426,6 +434,31 @@ class Deck:
                             obstacles.append((xl - MOD, xl))
                             placed_link = True
                             break
+            elif links and link_to and abs(hi - hi_lane) < 1e-6 and xmax - hi > MOD - 1e-6 and not own_boundary:
+                # the lane starts inside the section (a piece of the Spine between two halls): a cross link near its forward end, so that the passage beside it is not cut off from it
+                for off in (MOD, 2 * MOD, 3 * MOD, 4 * MOD, 5 * MOD, 6 * MOD):
+                    xl = hi - off
+                    if xl - MOD < lo - 1e-6 or any(min(o1, xl) - max(o0, xl - MOD) > 1e-6 for (o0, o1) in obstacles):
+                        continue
+                    pa, pb = self.passages[pid], self.passages[link_to]
+                    if pb.a0 > xl - MOD + 1e-6 or pb.a1 < xl - 1e-6:
+                        continue
+                    if self._place_item(pid, side, xl, ("link", link_to, "P"), lane):
+                        obstacles.append((xl - MOD, xl))
+                        break
+            # a long section gets a second cross link near its middle (a rider of the outer lane is never more than ~50 m from a way to the Spine and its lifts)
+            if links and link_to and hi - lo > MID_LINK_SECTION:
+                x_mid = lo + round((hi - lo) / 2.0 / MOD) * MOD
+                for d_ in (0, MOD, -MOD, 2 * MOD, -2 * MOD, 3 * MOD, -3 * MOD, 4 * MOD, -4 * MOD):
+                    xl = x_mid + d_
+                    if xl - MOD < lo + MOD - 1e-6 or xl > hi - 4 * MOD + 1e-6 or any(min(o1, xl) - max(o0, xl - MOD) > 1e-6 for (o0, o1) in obstacles):
+                        continue
+                    pa, pb = self.passages[pid], self.passages[link_to]
+                    if pb.a0 > xl - MOD + 1e-6 or pb.a1 < xl - 1e-6:
+                        continue
+                    if self._place_item(pid, side, xl, ("link", link_to, "P"), lane):
+                        obstacles.append((xl - MOD, xl))
+                        break
             obstacles.sort(key=lambda o: -o[1])
             runs: list[list[float]] = []                 # [forward edge, aft edge] of the free stretches, forward first
             cur = hi
@@ -480,12 +513,18 @@ class Deck:
                             placed = True
                             break
                     if not placed:
-                        # nothing of the next four fits here: a 4 m gap (a chase) may clear a door against a branch; otherwise the rest of the run is filled / left
-                        fits = [j for j in look if self.item_len(pending[j]) <= room - MOD + 1e-6]
-                        if fits and room - MOD >= min(self.item_len(pending[j]) for j in fits) - 1e-6 and self._shift_ok(pid, side, x - MOD, [pending[j] for j in fits]):
-                            self.lane_log.setdefault((pid, side), []).append((x, x - MOD, "gap"))
-                            x -= MOD
-                            placed = True
+                        # nothing of the next four fits here: a gap of one to three modules (a chase) may clear a door against a branch, a longer one (the hull is too narrow here)
+                        # carries the run to where a room fits; otherwise the rest of the run is filled / left
+                        cands = [j for j in look if pending[j][0] != "gap"]
+                        hull = bool(cands) and all("the hull is" in (self._item_problem(pid, side, x, pending[j]) or "") for j in cands)
+                        kmax = int((room - min([self.item_len(pending[j]) for j in cands] + [1e9])) / MOD + 1e-6) if cands else 0
+                        for kk in range(1, (kmax if hull else min(3, kmax)) + 1):
+                            xs = x - kk * MOD
+                            if any(self.item_len(pending[j]) <= xs - run[1] + 1e-6 and self._item_problem(pid, side, xs, pending[j]) is None for j in cands):
+                                self.lane_log.setdefault((pid, side), []).append((x, xs, "gap"))
+                                x = xs
+                                placed = True
+                                break
                 if not placed:
                     # the remainder of this run: fillers
                     fl = self._fill_run(pid, side, x, run[1], fillers, lane, rot)
@@ -513,7 +552,8 @@ class Deck:
         laid just before, then the least used on this deck, then the larger."""
         x = x_hi
         guard = 0
-        while x - x_lo >= 4.0 - 1e-6 and fillers and guard < 40:
+        cap = 1 if x_hi - x_lo < FILL_LONG_RUN else 2          # a leftover stretch gets a cell or two, not a row of them: the rest of it is a void (a reserve volume, a chase, a cofferdam: nothing to build)
+        while x - x_lo >= 4.0 - 1e-6 and fillers and guard < cap:
             guard += 1
             room = x - x_lo
             last = self.last.get((pid, side))

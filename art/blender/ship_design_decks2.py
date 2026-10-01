@@ -18,7 +18,7 @@ def deck8(D) -> None:
     FILL = ["store_s", "locker_s", "tech_s"]
     # ---- the Spine's forward piece (SP1): from the bow end to the Engineering hall
     lane(D, fwd.pid, +1, {"B": "tech_s locker_s:Marine_Lockers", "C": "barracks:Marine_Barracks_1 barracks:Marine_Barracks_2 barracks:Marine_Barracks_3",
-                          "D": "records:Security_Records security_office brig offices:Interrogation_Suite armory:Security_Armory",
+                          "D": "records:Security_Records security_office brig armory:Security_Armory offices:Interrogation_Suite?",
                           "E": "workshop:Machine_Shop workshop:Welding_Shop?", "F": "tech_s"}, FILL)
     lane(D, fwd.pid, -1, {"B": "armory:Marine_Armory kit_room:Boarding_Kit_Room", "C": "barracks:Marine_Barracks_4 lounge:Marine_Lounge store_s",
                           "D": "briefing:Security_Briefing_Room workshop:Armourer's_Shop store_dry:Evidence_Store",
@@ -27,7 +27,7 @@ def deck8(D) -> None:
     lane(D, aft.pid, +1, {"G": "machinery_b:Core_Cooling_Plant tech_s", "H": "computer_core:Computer_Core_B records tech_s"}, FILL)
     lane(D, aft.pid, -1, {"G": "air_plant:Atmosphere_Plant_Aft", "H": "dc_central:Damage-Control_Central_Aft switchgear:Aft_Switchgear"}, FILL)
     # ---- the outer lanes
-    lane(D, "PO0", -1, {"B": "shuttle_bay:Assault-Shuttle_Bay", "C": "firing_range:Marine_Firing_Range heads", "D": "magazine:Small-Arms_Magazine store_dry:Ordnance_Stores workshop:Weapons_Workshop kit_room:Marine_Kit_Store",
+    lane(D, "PO0", -1, {"B": "shuttle_bay:Assault-Shuttle_Bay", "C": "heads laundry?", "D": "firing_range:Marine_Firing_Range magazine:Small-Arms_Magazine workshop:Weapons_Workshop? kit_room:Marine_Kit_Store?",
                         "E": "pool hold store_dry workshop?", "F": "pool machinery hold", "G": "pool machinery_b hold", "H": "pool machinery radiator_pumps"}, FILL)
     lane(D, "SB0", +1, {"B": "magazine:Boarding_Munitions store_s", "C": "gym:Marine_Gym laundry heads", "D": "lab:Forensics_Lab offices:Military_Police_Office store_dry:Evidence_Lockers",
                         "E": "pool hold store_dry workshop?", "F": "pool machinery hold", "G": "pool machinery_b hold", "H": "pool machinery radiator_pumps"}, FILL)
@@ -42,16 +42,16 @@ def deck9(D) -> None:
     s = sp[0]
     FILL = ["store_s", "locker_s", "tech_s"]
     lane(D, s.pid, +1, {"C": "tech_s flight_ops:Flight_Operations pilot_ready:Squadron_Ready_Room store_s",
-                        "D": "cabins:Pilots'_Quarters_1 cabins:Pilots'_Quarters_2 cabins:Pilots'_Quarters_3 heads",
-                        "E": "lounge:Pilots'_Lounge berthing:Flight_Crew_Berthing heads laundry", "F": "store_dry:Aircraft_Parts_Store hold aircraft_shop:Component_Shop?",
-                        "G": "cargo_hold:Cargo_Hold_1 cargo_hold:Cargo_Hold_2 records:Cargo_Office", "H": "hold:General_Stores_Aft cargo_hold?"}, FILL)
+                        "D": "cabins:Pilots'_Quarters_1 cabins:Pilots'_Quarters_2 heads",
+                        "E": "lounge:Pilots'_Lounge berthing:Flight_Crew_Berthing heads laundry?", "F": "store_dry:Aircraft_Parts_Store hold? aircraft_shop:Component_Shop?",
+                        "G": "cargo_hold:Cargo_Hold_1 cargo_hold:Cargo_Hold_2? records:Cargo_Office?", "H": "hold:General_Stores_Aft cargo_hold?"}, FILL)
     lane(D, s.pid, -1, {"C": "pilot_ready:Squadron_Ready_Room_2 briefing:Flight_Briefing_Room aircraft_shop:Avionics_Shop",
-                        "D": "cabins:Pilots'_Quarters_4 cabins:Pilots'_Quarters_5 cabins:Pilots'_Quarters_6 laundry?", "E": "berthing:Flight_Crew_Berthing_2 berthing:Flight_Crew_Berthing_3 quiet?",
-                        "F": "hold store_dry:Aircraft_Spares aircraft_shop:Airframe_Shop?", "G": "cargo_hold:Cargo_Hold_3 cargo_hold:Cargo_Hold_4 store_cold:Cold_Stores?",
+                        "D": "cabins:Pilots'_Quarters_3 cabins:Pilots'_Quarters_4 laundry?", "E": "berthing:Flight_Crew_Berthing_2 berthing:Flight_Crew_Berthing_3 quiet?",
+                        "F": "hold store_dry:Aircraft_Spares aircraft_shop:Airframe_Shop?", "G": "cargo_hold:Cargo_Hold_3 cargo_hold:Cargo_Hold_4? store_cold:Cold_Stores?",
                         "H": "pool hold cargo_hold store_dry"}, FILL)
-    lane(D, "PO0", -1, {"C": "magazine:Aircraft_Ordnance_Magazine hold", "D": "pool heads laundry store_dry", "E": "pool heads laundry lounge", "F": "pool hold store_dry cargo_hold",
+    lane(D, "PO0", -1, {"C": "magazine:Aircraft_Ordnance_Magazine hold", "D": "cabins:Pilots'_Quarters_6 heads laundry?", "E": "pool heads laundry lounge", "F": "pool hold store_dry cargo_hold",
                         "G": "pool cargo_hold hold store_cold", "H": "pool hold store_dry cargo_hold"}, FILL)
-    lane(D, "SB0", +1, {"C": "drone_bay:Drone_Bay aircraft_shop:Flight-Deck_Shop", "D": "pool heads laundry store_dry", "E": "pool heads laundry gym", "F": "pool hold store_dry cargo_hold",
+    lane(D, "SB0", +1, {"C": "drone_bay:Drone_Bay aircraft_shop:Flight-Deck_Shop?", "D": "cabins:Pilots'_Quarters_5 heads laundry?", "E": "pool heads laundry gym", "F": "pool hold store_dry cargo_hold",
                         "G": "pool cargo_hold hold store_cold", "H": "pool hold store_dry cargo_hold"}, FILL)
 
 
@@ -61,10 +61,10 @@ def deck10(D) -> None:
     ammunition route; the cargo holds forward and aft, the cold stores, the dry stores; the freight lift's lobby (the Engineering bank, x -308) in the middle of the holds."""
     s = pieces(D)[0]
     FILL = ["store_s", "locker_s", "tech_s"]
-    lane(D, s.pid, +1, {"B": "tech_s cargo_hold:Cargo_Hold_5", "C": "magazine:Munitions_Magazine_1 magazine:Munitions_Magazine_2 magazine:Munitions_Magazine_3",
-                        "D": "magazine:Munitions_Magazine_4 magazine:Munitions_Magazine_5 hold", "E": "magazine:Munitions_Magazine_6 store_dry:Ordnance_Stores hold",
-                        "F": "cargo_hold:Cargo_Hold_6 hold store_dry?", "G": "cargo_hold:Cargo_Hold_7? hold", "H": "hold store_dry?"}, FILL)
-    lane(D, s.pid, -1, {"B": "store_cold:Cold_Stores_1 hold", "C": "magazine:Munitions_Magazine_7 magazine:Munitions_Magazine_8", "D": "magazine:Munitions_Magazine_9 store_dry:Ordnance_Stores_2 hold",
+    lane(D, s.pid, +1, {"B": "tech_s cargo_hold:Cargo_Hold_5", "C": "magazine:Munitions_Magazine_1 magazine:Munitions_Magazine_2 magazine:Munitions_Magazine_3?",
+                        "D": "magazine:Munitions_Magazine_4 magazine:Munitions_Magazine_5 hold?", "E": "magazine:Munitions_Magazine_6 store_dry:Ordnance_Stores hold",
+                        "F": "cargo_hold:Cargo_Hold_6 hold? store_dry?", "G": "cargo_hold:Cargo_Hold_7? hold", "H": "hold store_dry?"}, FILL)
+    lane(D, s.pid, -1, {"B": "store_cold:Cold_Stores_1 hold", "C": "magazine:Munitions_Magazine_7 magazine:Munitions_Magazine_8?", "D": "magazine:Munitions_Magazine_9 store_dry:Ordnance_Stores_2 hold",
                         "E": "store_cold:Cold_Stores_2 hold store_dry", "F": "cargo_hold:Cargo_Hold_8 hold", "G": "hold", "H": "store_cold:Cold_Stores_3 hold?"}, FILL)
     lane(D, "PO0", -1, {"B": "pool cargo_hold hold", "C": "pool magazine hold", "D": "pool magazine store_dry hold", "E": "pool store_cold hold store_dry", "F": "pool cargo_hold hold store_dry",
                         "G": "pool cargo_hold hold", "H": "pool hold store_dry store_cold"}, FILL)
@@ -78,9 +78,9 @@ def deck11(D) -> None:
     shops; the second damage-control central (the first is on Deck 7, the third aft on Deck 8). D-E: the stores of spares; F-H: the stern's workshops and the crew that works them."""
     s = pieces(D)[0]
     FILL = ["store_s", "locker_s", "tech_s"]
-    lane(D, s.pid, +1, {"B": "fab_shop:Fabrication_Shop_1 repair_bay:Repair_Bay_1?", "C": "fab_shop:Fabrication_Shop_2 workshop:Machine_Shop dc_central:Damage-Control_Central_Fore",
-                        "D": "workshop:Electronics_Shop hold:Spares_Store heads laundry", "E": "berthing:Fabricators'_Berthing store_dry:Spares_Store", "F": "workshop:Foundry_Shop hold", "G": "hold store_dry?", "H": "hold"}, FILL)
-    lane(D, s.pid, -1, {"B": "repair_bay:Repair_Bay_2 fab_shop:Fabrication_Shop_3", "C": "workshop:Welding_Shop workshop:Composites_Shop", "D": "hold:Spares_Store store_dry heads laundry",
+    lane(D, s.pid, +1, {"B": "fab_shop:Fabrication_Shop_1 repair_bay:Repair_Bay_1?", "C": "dc_central:Damage-Control_Central_Fore fab_shop:Fabrication_Shop_2 workshop:Machine_Shop?",
+                        "D": "workshop:Electronics_Shop hold:Spares_Store heads laundry", "E": "berthing:Fabricators'_Berthing store_dry:Spares_Store", "F": "workshop:Foundry_Shop hold?", "G": "hold store_dry?", "H": "hold"}, FILL)
+    lane(D, s.pid, -1, {"B": "repair_bay:Repair_Bay_2 fab_shop:Fabrication_Shop_3", "C": "workshop:Welding_Shop workshop:Composites_Shop?", "D": "hold:Spares_Store store_dry heads laundry",
                         "E": "heads laundry store_dry", "F": "workshop:Optics_Shop hold", "G": "hold store_dry?", "H": "hold"}, FILL)
     lane(D, "PO0", -1, {"B": "pool fab_shop workshop", "C": "pool repair_bay workshop hold", "D": "pool hold store_dry", "E": "pool hold store_dry machinery", "F": "pool machinery hold",
                         "G": "pool hold machinery_b", "H": "pool hold machinery"}, FILL)

@@ -95,14 +95,14 @@ def deck3(D) -> None:
     sp = pieces(D)
     fwd, aft = sp[0], sp[1]
     FILL = ["store_s", "locker_s", "tech_s"]
-    lane(D, fwd.pid, +1, {"A": "wardroom lounge:Officers'_Lounge library:Officers'_Library gym", "B": "heads offices:Executive_Officer's_Office store_s"}, FILL)
-    lane(D, fwd.pid, -1, {"A": "staterooms staterooms staterooms quiet:Officers'_Quiet_Room", "B": "offices:Personnel_Office staterooms"}, FILL)
+    lane(D, fwd.pid, +1, {"A": "wardroom lounge:Officers'_Lounge library:Officers'_Library", "B": "heads gym:Officers'_Gym offices:Executive_Officer's_Office?"}, FILL)
+    lane(D, fwd.pid, -1, {"A": "staterooms staterooms quiet:Officers'_Quiet_Room", "B": "offices:Personnel_Office staterooms"}, FILL)
     lane(D, aft.pid, +1, {"C": "staterooms heads", "D": "offices:Department_Heads'_Offices laundry", "E": "staterooms offices:Supply_Office", "F": "heads briefing:Training_Classroom_1",
                           "G": "briefing:Training_Classroom_2 records:Training_Records?"}, FILL)
     lane(D, aft.pid, -1, {"C": "staterooms heads", "D": "briefing:Training_Classroom_3 records offices:Chaplain's_Office", "E": "staterooms offices:Engineering_Staff_Office", "F": "laundry quiet",
                           "G": "heads offices:Flight_Staff_Office"}, FILL)
-    lane(D, "SB0", +1, {"D": "single_cabins heads_s?", "F": "single_cabins laundry_s?"})
-    lane(D, "PO0", -1, {"D": "single_cabins heads_s?", "F": "single_cabins laundry_s?"})
+    lane(D, "SB0", +1, {"D": "single_cabins", "F": "single_cabins"})
+    lane(D, "PO0", -1, {"D": "single_cabins", "F": "single_cabins"})
 
 
 # ===================================================================================================================================================== Deck 4
@@ -140,8 +140,8 @@ def deck4(D) -> None:
     D.anchor("PO0", +1, -124.0, ("galley_pass",))
     D.anchor("PO0", -1, -128.0, ("galley",))                  # the Main Galley, across the Port Passage from its pass (its door 10 m in: clear of the Concourse's gates)
     # ---- A: the high street. Starboard: learning and quiet at the bow, then the shops, the bar and the lounge towards the Concourse. Port: the garden, the games, the simulators.
-    lane(D, fwd.pid, +1, {"A": "library:Main_Library chapel store_s shop barber bar lounge games:Card_Room store_s offices:Crew_Services_Office"})
-    lane(D, fwd.pid, -1, {"A": "hydro:Forward_Garden games sim_bay library:Technical_Library store_s gym quiet heads store_s quiet"})
+    lane(D, fwd.pid, +1, {"A": "library:Main_Library chapel store_s shop barber bar lounge games:Card_Room? store_s offices:Crew_Services_Office?"})
+    lane(D, fwd.pid, -1, {"A": "hydro:Forward_Garden games sim_bay library:Technical_Library store_s gym quiet heads store_s? quiet?"})
     # ---- C-E, the Spine's middle piece (aft of the Berthing): heads and laundry at the Berthing's door, the lounge, the games rooms and the bar further aft
     lane(D, mid.pid, +1, {"C": "heads laundry store_s", "D": "games games"}, FILL)
     lane(D, mid.pid, -1, {"C": "lounge:Berthing_Lounge heads", "D": "bar sim_bay"}, FILL)
@@ -149,10 +149,10 @@ def deck4(D) -> None:
     lane(D, aft.pid, +1, {"F": "store_s berthing store_s", "G": "heads laundry", "H": "games:Engineers'_Games_Room"}, FILL)
     lane(D, aft.pid, -1, {"F": "heads laundry", "G": "lounge:Engineers'_Lounge", "H": "berthing"}, FILL)
     # ---- the outer lanes (16 m rooms along the hull)
-    lane(D, "SB0", +1, {"A": "store_s observation lounge store_s hydro games", "B": "lounge:Concourse_Cafe store_s", "C": "berthing berthing", "D": "laundry heads", "E": "berthing",
+    lane(D, "SB0", +1, {"A": "store_s observation lounge store_s hydro games?", "B": "lounge:Concourse_Cafe store_s", "C": "berthing berthing", "D": "laundry heads", "E": "berthing",
                         "F": "laundry heads", "G": "lounge:Engineers'_Reading_Room?"}, FILL)
-    lane(D, "PO0", -1, {"A": "store_s observation bar library quiet", "B": "store_s?", "C": "store_dry store_cold", "D": "heads laundry", "E": "berthing",
-                        "F": "heads laundry", "G": "games:Engineers'_Card_Room?"}, FILL)
+    lane(D, "PO0", -1, {"A": "store_s observation bar library quiet", "B": "store_s?", "C": "store_dry store_cold", "D": "heads laundry",
+                        "F": "heads berthing laundry?", "G": "games:Engineers'_Card_Room?"}, FILL)
 
 
 # ===================================================================================================================================================== Deck 5
@@ -165,12 +165,12 @@ def deck5(D) -> None:
     sp = pieces(D)
     fwd, p2, p3, aft = sp[0], sp[1], sp[2], sp[3]
     FILL = ["store_s", "tech_s", "locker_s"]
-    lane(D, fwd.pid, +1, {"A": "sensor_room:Forward_Sensor_Array lab_phys lab lab_bio sensor_archive", "B": "transporter lab_astro lab_bio records:Science_Records",
+    lane(D, fwd.pid, +1, {"A": "sensor_room:Forward_Sensor_Array lab_phys sensor_archive lab lab_bio?", "B": "transporter lab_astro lab_bio? records:Science_Records?",
                           "C": "records computer_core:Computer_Core_A store_s"}, FILL)
     lane(D, fwd.pid, -1, {"A": "sensor_room:Sensor_Array_2 lab_bio:Exobiology_Lab lab:Chemistry_Lab lab_phys:Materials_Lab sensor_room", "B": "lab:Analysis_Lab sensor_room lab_phys store_s",
                           "C": "sensor_room lab"}, FILL)
-    lane(D, p2.pid, +1, {"D": "records"}, FILL)
-    lane(D, p2.pid, -1, {"D": "sensor_archive"}, FILL)
+    lane(D, p2.pid, +1, {"D": "records?"}, FILL)
+    lane(D, p2.pid, -1, {"D": "sensor_archive?"}, FILL)
     lane(D, p3.pid, +1, {"E": "radiator_pumps tech_s"}, FILL)
     lane(D, p3.pid, -1, {"E": "machinery tech_s"}, FILL)
     lane(D, aft.pid, +1, {"F": "tech_s", "G": "pool water_plant", "H": "pool radiator_pumps machinery_b"}, FILL)
@@ -188,17 +188,17 @@ def deck6(D) -> None:
     sp = pieces(D)
     fwd, p3, aft = sp[0], sp[1], sp[2]
     FILL = ["store_s", "tech_s", "locker_s"]
-    lane(D, fwd.pid, +1, {"A": "store_s tech_s", "B": "gym:Rehabilitation_Gym hydro:Medicinal_Garden lab:Medical_Research records store_s cabins:Medical_Staff_Quarters heads laundry",
+    lane(D, fwd.pid, +1, {"A": "store_s tech_s", "B": "gym:Rehabilitation_Gym hydro:Medicinal_Garden lab:Medical_Research records store_s cabins:Medical_Staff_Quarters heads laundry?",
                           "C": "surgery surgery:Surgery_2 pharmacy dentist records:Medical_Records"}, FILL)
     lane(D, fwd.pid, -1, {"A": "store_s", "B": "store_cold:Medical_Cold_Store offices:Medical_Administration lab:Pathology_Lab heads",
-                          "C": "quarantine:Isolation_Ward morgue lab:Medical_Laboratory counselling:Counselling_&_Chaplaincy"}, FILL)
+                          "C": "quarantine:Isolation_Ward morgue lab:Medical_Laboratory? counselling:Counselling_&_Chaplaincy"}, FILL)
     lane(D, p3.pid, +1, {"C": "store_s", "D": "store_dry:Medical_Supplies"}, FILL)
     lane(D, p3.pid, -1, {"C": "lab:Blood_&_Tissue_Lab", "D": "store_s heads"}, FILL)
     lane(D, aft.pid, +1, {"E": "berthing", "F": "berthing", "G": "heads", "H": "gym:Engineers'_Gym"}, FILL)
     lane(D, aft.pid, -1, {"E": "berthing", "F": "heads laundry", "G": "lounge:Engineers'_Lounge", "H": "berthing"}, FILL)
-    lane(D, "PO0", -1, {"B": "hydro store_cold", "C": "pool lab store_dry heads", "D": "cabins:Petty_Officers'_Quarters_2 laundry", "E": "library:Engineers'_Library hydro:Aft_Garden",
+    lane(D, "PO0", -1, {"B": "hydro store_cold", "C": "pool lab store_dry heads", "D": "cabins:Petty_Officers'_Quarters_2 laundry", "E": "library:Engineers'_Library hydro:Aft_Garden?",
                         "F": "pool heads laundry store_dry", "G": "pool lounge:Petty_Officers'_Mess heads", "H": "pool store_s heads"}, FILL)
-    lane(D, "SB0", +1, {"B": "pool lab hydro store_cold", "C": "pool lab store_cold records", "D": "cabins:Petty_Officers'_Quarters_1 heads", "E": "lounge:Engineers'_Mess gym",
+    lane(D, "SB0", +1, {"B": "pool lab hydro store_cold", "C": "pool lab store_cold records", "D": "cabins:Petty_Officers'_Quarters_1 heads", "E": "lounge:Engineers'_Mess gym?",
                         "F": "pool heads laundry store_dry", "G": "pool heads laundry", "H": "pool store_s"}, FILL)
 
 
@@ -211,16 +211,16 @@ def deck7(D) -> None:
     sp = pieces(D)
     fwd, p3, aft = sp[0], sp[1], sp[2]
     FILL = ["tech_s", "store_s", "locker_s"]
-    lane(D, fwd.pid, +1, {"B": "dc_central:Damage-Control_Central workshop:Engineering_Workshop machinery_b:Compressor_Room heads", "C": "air_plant water_plant waste_plant machinery:Auxiliary_Machinery?",
+    lane(D, fwd.pid, +1, {"B": "dc_central:Damage-Control_Central workshop:Engineering_Workshop machinery_b:Compressor_Room heads", "C": "air_plant:Atmosphere_Plant_1 water_plant:Water_Reclamation_Plant_1 machinery:Auxiliary_Machinery?",
                           "D": "tech_s"}, FILL)
-    lane(D, fwd.pid, -1, {"B": "lounge:Engineers'_Mess offices:Engineering_Office workshop:Electrical_Shop", "C": "machinery:HVAC_Plant air_plant water_plant"}, FILL)
+    lane(D, fwd.pid, -1, {"B": "lounge:Engineers'_Mess offices:Engineering_Office workshop:Electrical_Shop", "C": "air_plant:Atmosphere_Plant_2 water_plant:Water_Reclamation_Plant_2 machinery:HVAC_Plant?"}, FILL)
     lane(D, p3.pid, +1, {"E": "power_control:Main_Power_Control"}, FILL)
     lane(D, p3.pid, -1, {"E": "aux_reactor:Auxiliary_Power_Plant"}, FILL)
     lane(D, aft.pid, +1, {"G": "pool machinery_b radiator_pumps", "H": "pool machinery radiator_pumps"}, FILL)
     lane(D, aft.pid, -1, {"G": "pool machinery", "H": "pool machinery_b power_control:Engine_Control"}, FILL)
     lane(D, "PO0", -1, {"B": "pool machinery machinery_b store_dry", "C": "pool machinery_b hold", "D": "pool machinery_b", "E": "pool capacitors switchgear", "F": "pool machinery capacitors",
                         "G": "pool radiator_pumps machinery_b", "H": "pool machinery radiator_pumps"}, FILL)
-    lane(D, "SB0", +1, {"B": "pool machinery machinery_b hold", "C": "pool machinery_b store_dry", "D": "pool machinery", "E": "pool switchgear power_control", "F": "pool machinery_b capacitors",
+    lane(D, "SB0", +1, {"B": "pool machinery machinery_b hold", "C": "waste_plant:Waste_Processing_Plant machinery_b? store_dry?", "D": "pool machinery", "E": "pool switchgear power_control", "F": "pool machinery_b capacitors",
                         "G": "pool radiator_pumps machinery", "H": "pool machinery_b radiator_pumps"}, FILL)
 
 

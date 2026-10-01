@@ -136,13 +136,6 @@ _reg("store_s", name="Section Stores", kind="storage", dept="flight", L=8.0, D=1
      doors=[door("near", 2.0)], systems=["supply"],
      spots=[spot("storekeeper", "work", 5.0, 3.0, 90, "flight")],
      lights=[light(4.0, 5.0, 3.3, 3200, 4600, (6.0, 0.8), 800), light(4.0, 12.0, 3.3, 3200, 4600, (6.0, 0.8), 800)])
-_reg("heads_s", name="Heads · Showers", kind="heads", dept="services", L=12.0, D=8.0, h=3.4, plate="heads",
-     doors=[door("near", 6.0)], systems=["potable_water", "waste"],
-     spots=[], lights=[light(6.0, 4.0, 3.3, 3600, 5000, (6.0, 4.0), 700)])
-_reg("laundry_s", name="Laundry", kind="laundry", dept="services", L=12.0, D=8.0, h=3.4, plate="laundry",
-     doors=[door("near", 6.0)], systems=["potable_water", "power_bus"],
-     spots=[spot("laundry_hand", "work", 4.0, 4.0, 90, "services")],
-     lights=[light(6.0, 4.0, 3.3, 3600, 4800, (6.0, 4.0), 700)])
 _reg("locker_s", name="Crew Lockers", kind="storage", dept="services", L=8.0, D=16.0, h=3.4, plate="lockers",
      doors=[door("near", 2.0)], systems=["supply"],
      spots=[spot("crew", "stand", 4.0, 3.0, 90), spot("crew", "stand", 6.0, 8.0, 180)],

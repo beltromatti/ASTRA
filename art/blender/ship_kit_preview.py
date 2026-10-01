@@ -93,7 +93,7 @@ BEST = {"galley": ["corner_b"], "galley_pass": ["corner_a"], "store_dry": ["door
         "observation": ["corner_a"], "bow_obs": ["corner"], "concourse": ["spine", "lift"], "berth_lobby": ["back"], "stair_tower": ["hall", "well"],
         "lab": ["corner_a"], "workshop": ["corner_a"], "armory": ["corner_b"], "cabins": ["far"], "surgery": ["corner_a"], "quarantine": ["corner_b"],
         "pharmacy": ["corner_a"]}
-SKIP_BEST = {"observation_d14", "store_dry_d10"}
+SKIP_BEST: set = set()
 
 
 def room_views(key: str, spec: dict, names: list[str] | None) -> dict:

@@ -44,7 +44,19 @@ BANKS = [
     dict(id="h", name="Stern", x=-444.0, pid="SP", side=-1, decks=range(4, 13), why="the engine rooms and the radiators' pumps"),
     dict(id="m1", name="Mess starboard", x=-160.0, pid="SBP", side=+1, decks=range(6, 13), why="the Mess Hall's flank, from the medical deck down: the outer lane, because the Mess hides the Spine here (Deck 5's starboard outer lane is the Spine Shuttle's tunnel, so this bank does not go up through it)"),
     dict(id="m2", name="Mess port", x=-160.0, pid="PP", side=-1, decks=range(4, 13), why="the same on the port side"),
+    # the side lifts of the lanes beyond the side passages (NAVE-3 §4: from anywhere a lift within ~80 m of walk): amidships, by the Medbay, by Main Engineering, at the stern. The starboard ones
+    # start at Deck 6 (Deck 5's starboard outer lane is the Spine Shuttle's tunnel), the stern ones at Deck 5 on the port side and Deck 6 on the starboard (the hull of Deck 4 is too narrow there)
+    dict(id="n1", name="Amidships starboard", x=-16.0, pid="SBP", side=+1, decks=range(6, 13), why="the middle of the ship, a main passage's width from the bridge lifts"),
+    dict(id="n2", name="Amidships port", x=-16.0, pid="PP", side=-1, decks=range(4, 13), why="the same on the port side"),
+    dict(id="k1", name="Medical starboard", x=-240.0, pid="SBP", side=+1, decks=range(6, 13), why="the Medbay and the Berthing's aft end: the stretch between the Berthing bank and the Engineering bank is the longest"),
+    dict(id="k2", name="Medical port", x=-240.0, pid="PP", side=-1, decks=range(4, 13), why="the same on the port side"),
+    dict(id="r1", name="Reactor starboard", x=-364.0, pid="SBP", side=+1, decks=range(6, 13), why="the flank of Main Engineering's hall: the engineers' shortest way to the decks above and below"),
+    dict(id="r2", name="Reactor port", x=-364.0, pid="PP", side=-1, decks=range(4, 13), why="the same on the port side"),
+    dict(id="s1", name="Stern starboard", x=-500.0, pid="SBP", side=+1, decks=range(6, 13), why="the stern: the radiators' pumps and the engine controls"),
+    dict(id="s2", name="Stern port", x=-500.0, pid="PP", side=-1, decks=range(5, 13), why="the same on the port side"),
 ]
+# what a shaft is for (the contract's `kind`): the Engineering and Flight banks have a service lift, the Flight bank a freight lift for the aircraft's ordnance and the stores
+BANK_ROLES = {"e": ("turbolift", "service"), "f": ("service", "cargo")}
 # The stair towers: 8 x 8 m off the Spine (x of the aft edge, side), a column through every deck; an 8 x 8 damage-control station stands behind each, on the passage
 STAIRS = [(28.0, +1), (-92.0, -1), (-216.0, +1), (-292.0, +1), (-408.0, +1), (-472.0, +1)]
 
@@ -148,7 +160,7 @@ def apply_structure(D: Deck, towers: bool = True, banks: bool = True, arms: bool
         for bk in BANKS:
             if deck not in bk["decks"]:
                 continue
-            stop = True                                       # both shafts stop on every deck of their range (a lift of the bridge's kind would not: NAVE-3 §4)
+            # (both shafts of a bank stop on every deck of its range)
             x1 = bk["x"]
             if bk["pid"] == "SP":
                 ps = piece_at(D, "SP", x1 - 8.0, x1)
@@ -162,8 +174,8 @@ def apply_structure(D: Deck, towers: bool = True, banks: bool = True, arms: bool
             if ps is None or DK.hits(rect, obs) or hw < max(abs(rect[1]), abs(rect[3])) + 0.5:
                 log["skipped"].append(f"bank {bk['id']}")
                 continue
-            key = ("lift_bank" if inner else "lift_bank_o") if stop else ("lift_pass" if inner else "lift_pass_o")
-            D.anchor(ps.pid, bk["side"], x1, (key, {"id": bank_id(deck, bk["id"]), "bank": bk["id"], "name": f"{bk['name']} Turbolift Lobby" if stop else f"{bk['name']} Lift Service Room"}))
+            key = "lift_bank" if inner else "lift_bank_o"
+            D.anchor(ps.pid, bk["side"], x1, (key, {"id": bank_id(deck, bk["id"]), "bank": bk["id"], "name": f"{bk['name']} Turbolift Lobby"}))
             log["banks"][bk["id"]] = dict(pid=ps.pid, side=bk["side"], x1=x1, key=key)
     if arms:
         for k, xc in enumerate(JCOLS):

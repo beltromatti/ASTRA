@@ -157,19 +157,6 @@ _reg("pharmacy", name="Pharmacy", kind="pharmacy", dept="medical", L=12.0, D=16.
      lights=[light(6.0, 8.0, 3.3, 4200, 5600, (6.0, 8.0))])
 
 
-def _variant(base: str, suffix: str, door_x: float) -> None:
-    """The same room with its near door moved to `door_x` (the layout puts some doors on another module of the corridor): another mesh."""
-    import copy
-    spec = copy.deepcopy(PREFABS[base])
-    spec["key"] = f"{base}_{suffix}"
-    spec["mesh"] = PREFABS[base]["mesh"] + suffix.upper()
-    spec["doors"] = [door("near", door_x)] + [d for d in spec["doors"] if d["wall"] != "near"]
-    spec["variant_of"] = base
-    PREFABS[spec["key"]] = spec
-
-
-_variant("observation", "d14", 14.0)
-_variant("store_dry", "d10", 10.0)
 # ---- specials (their own frames: see ship_rooms.py): concourse, stair tower, bow observation ---------------------------------
 _reg("concourse", name="Mess Concourse", kind="concourse", dept="services", L=17.7, D=36.0, h=3.7, plate="concourse", doors=[],
      systems=["power_bus", "life_support"], special=True,
@@ -217,7 +204,6 @@ _plan("transporter", "Transporter Room", "transporter", "science", 24.0, 16.0, 3
       ("transporter_chief", "operator"), 2, 10.0, lm=4500, temp=6500)
 _plan("sensor_archive", "Sensor Archive", "archive", "science", 16.0, 16.0, 3.4, ["sensors", "data_trunk"], ("archivist",), 2, 6.0)
 _plan("radiator_pumps", "Radiator Manifold", "machinery", "engineering", 24.0, 16.0, 3.7, ["coolant", "radiators", "power_bus"], ("machinist",), 3, 10.0)
-_plan("dc_locker", "Damage Control Locker", "damage_control", "engineering", 12.0, 16.0, 3.4, ["damage_control", "supply"], ("dc_tech",), 4, 6.0)
 _plan("power_control", "Power Control", "power", "engineering", 24.0, 16.0, 3.6, ["power_bus", "reactor", "data_trunk"], ("power_tech",), 4, 10.0)
 _plan("machinery", "Machinery Space", "machinery", "engineering", 24.0, 16.0, 3.7, ["power_bus", "coolant", "compressed_air"], ("machinist",), 2, 10.0)
 _plan("barracks", "Marine Barracks", "cabins", "security", 24.0, 16.0, 3.4, ["power_bus", "life_support"], ("marine",), 8, 10.0, "sleep", 2500, 3600)
@@ -302,11 +288,6 @@ _reg("machinery_b", name="Compressor Room", kind="machinery", dept="engineering"
      spots=[spot("machinist", "work", 4.0, 7.2, 90, "engineering"), spot("machinist", "work", 8.4, 7.2, 90, "engineering"), spot("machinist", "work", 15.8, 9.0, 0, "engineering"),
             spot("machinist", "sit", 12.0, 3.0, 270, "engineering"), spot("engineer", "stand", 20.0, 6.5, 180, "engineering")],
      lights=[light(8.0, 8.0, 3.6, 5000, 4500, (12.0, 1.0), 1000), light(18.0, 8.0, 3.6, 4500, 4500, (8.0, 1.0), 1000)])
-_reg("dc_locker", name="Damage Control Locker", kind="damage_control", dept="engineering", L=12.0, D=16.0, h=3.4, plate="dc",
-     doors=[door("near", 6.0)], systems=["damage_control", "supply"],
-     spots=[spot("dc_technician", "stand", 4.4, 13.2, 90, "engineering"), spot("dc_technician", "work", 6.0, 6.2, 270, "engineering"),
-            spot("dc_technician", "stand", 2.0, 8.0, 180, "engineering"), spot("dc_technician", "stand", 10.2, 8.0, 0, "engineering")],
-     lights=[light(6.0, 5.0, 3.3, 4200, 5000, (6.0, 1.0), 900), light(6.0, 11.0, 3.3, 4200, 5000, (6.0, 1.0), 900)])
 _reg("power_control", name="Power Control", kind="power", dept="engineering", L=24.0, D=16.0, h=3.6, plate="power",
      doors=[door("near", 10.0)], systems=["power_bus", "reactor", "data_trunk"],
      spots=[spot("power_technician", "sit", 3.6, 7.35, 90, "engineering"), spot("power_technician", "sit", 8.0, 7.35, 90, "engineering"),
@@ -522,11 +503,6 @@ _reg("lift_bank_o", name="Turbolift Lobby", kind="lobby", dept="neutral", L=8.0,
      doors=[door("near", 6.0, GATE_W, GATE_H)], systems=["power_bus", "life_support", "lift"],
      spots=[spot("crew", "stand", 5.8, 3.0, 90, "neutral"), spot("crew", "sit", 7.4, 8.0, 180, "neutral")],
      lights=[light(5.9, 4.0, 3.55, 2600, 4200, (3.2, 1.2), 900), light(5.9, 12.0, 3.55, 2600, 4200, (3.2, 1.2), 900)])
-_reg("lift_pass", name="Turbolift Service Room", kind="machinery", dept="engineering", L=8.0, D=16.0, h=3.4, plate="lift_service", lobby=LIFT_LOBBY,
-     doors=[door("near", 6.0)], systems=["power_bus", "lift"],
-     spots=[spot("lift_technician", "work", 5.6, 3.2, 90, "engineering"), spot("lift_technician", "work", 5.6, 12.4, -90, "engineering")],
-     lights=[light(5.9, 8.0, 3.3, 3000, 4800, (3.0, 9.0), 800)])
-PREFABS["lift_pass_o"] = dict(PREFABS["lift_pass"], key="lift_pass_o", mesh=PREFABS["lift_pass"]["mesh"])          # the same room in an outer lane (its mesh is the one of the inner lane)
 # the bridge bank's lobby on the decks below the bridge: 8 m along the Spine's port wall, 6.2 deep (the two command shafts stand aft of it, x -25.8 .. -22.8, under the bridge's lift
 # housing; ship_vertical.py). A special room (hand-placed: its edge is off the 4 m grid).
 _reg("lift_bank_b", name="Command Turbolift Lobby", kind="lobby", dept="command", L=8.0, D=6.2, h=3.7, plate="lift_bank_b",

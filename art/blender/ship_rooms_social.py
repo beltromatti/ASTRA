@@ -256,6 +256,3 @@ def bow_obs(name: str = "SM_SHIP_BowObs"):
     return b.build(name)
 
 
-def observation_d14(name: str = "SM_SHIP_ObservationD14"):
-    """The observation deck with the door at x 14 (where the layout needs it)."""
-    return observation(name, "observation_d14")

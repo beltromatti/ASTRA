@@ -87,6 +87,7 @@ def lifts(B: Builder, decks: dict) -> list:
         for k, dy in enumerate(SP.LIFT_SHAFTS_Y):
             n_name += 1
             sid = f"tl_{bk['id']}{k + 1}"
+            role = DS.BANK_ROLES.get(bk["id"], ("turbolift", "turbolift"))[k]
             lan = []
             geo = {}
             for d in served:
@@ -108,7 +109,7 @@ def lifts(B: Builder, decks: dict) -> list:
                 land_x = g["ox"] + side * 4.7
                 lan.append(_landing(B, sid, shaft_cid, g["lobby"], d, (g["fx"], g["sy"]), yaw_into, (land_x, g["sy"]), deck_z(d), f"{g['lobby']}.hub"))
             _ride_arcs(B, sid, served)
-            out.append(_shaft_record(sid, "turbolift", f"Turbolift {n_name}", sx, sy, 2.8, 2.8, served, lan))
+            out.append(_shaft_record(sid, role, f"Turbolift {n_name}" if role == "turbolift" else f"{'Service' if role == 'service' else 'Freight'} Lift {n_name}", sx, sy, 2.8, 2.8, served, lan))
     return out
 
 
