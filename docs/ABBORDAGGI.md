@@ -224,7 +224,8 @@ a faccia a faccia con il sergente 7 su 8 (l'ottavo: «teniamo qui» senza l'ordi
 - **L'abbordaggio parte da un comando o dalla console**: il collegamento con la guerra (una navetta nemica che aggancia dopo la battaglia) non c'è; la mente può dare
   `boarding` con `_director_command("boarding", {...})` (richiesta al lead, §12).
 - **Reyes non ha corpo**: comanda dalla sala operativa; i capisquadra parlano via radio (anche quando sono nella stessa stanza: la voce non cambia).
-- **Le armi si importano a mano** (§11): senza gli asset il codice ripiega su barre (il gioco funziona, ma le armi sono parallelepipedi) e i suoni sono muti.
+- **Gli asset delle armi sono finiti e nel ramo** (§11: `Content/ASTRA/Weapons`, nove suoni `SW_*`, via LFS); se mancassero il codice ripiega su barre (il gioco funziona, le armi sono
+  parallelepipedi) e i suoni sono muti. Le armi non sono mai state viste nel gioco: la levigatura delle mesh e il peso dei materiali si giudicano solo lì.
 - La presa dell'Ingegneria (`astra.board.takeover_fatal 1`, predefinito) fa cedere il reattore dopo circa 30 s: la fine della nave nel modo che la nave già conosce.
 - Il quadro dei marine non conosce i civili: le paratie chiuse tagliano fuori chi c'è dietro (anche i nostri); la mente lo sa, il gioco non porta in salvo nessuno.
 - I capisquadra parlano di ciò che il quadro mostra (squadre, contatto, perdite, luoghi, paratie): le munizioni e il morale degli uomini non sono nel quadro, e le urla di battaglia
@@ -237,12 +238,15 @@ a faccia a faccia con il sergente 7 su 8 (l'ottavo: «teniamo qui» senza l'ordi
 1. **Unione**: il ramo `worktree-agent-a744b27da57aae0d4` si unisce a main senza conflitti (provato con `git merge-tree` il 2/10 contro il main di quel giorno). Dopo l'unione compilare
    (`Engine/Build/BatchFiles/Mac/Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex`): i simboli condivisi che uso (`SealBulkhead`, `HarmPerson`, `CaptainWounded`,
    `Commandeer`...) sono miei e arrivano con il ramo; ho controllato che main non abbia rimosso né rinominato niente di ciò che chiamo.
-2. **Asset** (una volta, con l'editor chiuso per Blender e aperto per l'import):
-   - `blender -b --factory-startup -P art/blender/weapons.py` (legge `art/_downloads/weapons/`, scrive `art/export/weapons/`), poi nell'editor
-     `tools/ue.py pyfile tools/ue_scripts/import_weapons.py` (texture, materiale `M_Weapon`, istanze `MI_AR181_*`/`MI_M27S_*`, mesh `SM_AR181`, `SM_AR181_Mag`, `SM_M27S` con le prese);
-   - `uv run --with numpy --with soundfile --with scipy python tools/art/weapon_sounds.py` (scrive `art/_cache/audio/SW_*.wav`: nove suoni), poi
-     `tools/ue.py py "ONLY=['SW_Rifle_Shot','SW_Pistol_Shot','SW_Gun_Dry','SW_Rifle_Reload','SW_Pistol_Reload','SW_Gun_Draw','SW_Bullet_Impact','SW_Bullet_Whiz','SW_Body_Hit']; exec(open('tools/ue_scripts/import_audio.py').read())"`;
-   - gli altri suoni che il codice cerca (`SW_Blast_Inside`, `SW_Sparks`) sono già nel progetto; se mancano il gioco resta muto per quel suono, senza errori.
+2. **Asset**: già fatti e nel ramo (LFS): `Content/ASTRA/Weapons` (16 texture, `M_Weapon` e 5 istanze, `SM_AR181`, `SM_AR181_Mag`, `SM_M27S` con le prese) e nove suoni
+   `Content/ASTRA/Audio/SW_*` (`Rifle_Shot`, `Pistol_Shot`, `Gun_Dry`, `Rifle_Reload`, `Pistol_Reload`, `Gun_Draw`, `Bullet_Impact`, `Bullet_Whiz`, `Body_Hit`). Non c'è nulla da
+   importare: il primo avvio compila gli shader di `M_Weapon`. Per **rigenerarli** (es. levigatura delle mesh: `--smooth face`) servono i file grezzi, che non stanno in git
+   (`art/_downloads/weapons/`: `ar181_frostoise.glb`, `m27s_tuuttipingu.glb`, 119 MB con l'AR-727 non usato; si copiano dal mio worktree
+   `/Users/beltromatti/Desktop/ASTRA/.claude/worktrees/agent-a744b27da57aae0d4/art/_downloads/weapons/` finché esiste, o si riscaricano da Sketchfab con le stesse licenze):
+   - `blender -b --factory-startup -P art/blender/weapons.py` (scrive `art/export/weapons/`), poi nell'editor `tools/ue.py pyfile tools/ue_scripts/import_weapons.py`;
+   - `uv run --with numpy --with soundfile --with scipy python tools/art/weapon_sounds.py` (scrive `art/_cache/audio/SW_*.wav`), poi
+     `tools/ue.py py "ONLY=['SW_Rifle_Shot','SW_Pistol_Shot','SW_Gun_Dry','SW_Rifle_Reload','SW_Pistol_Reload','SW_Gun_Draw','SW_Bullet_Impact','SW_Bullet_Whiz','SW_Body_Hit']; exec(open('tools/ue_scripts/import_audio.py').read())"`.
+   Gli altri suoni che il codice cerca (`SW_Blast_Inside`, `SW_Sparks`) sono già nel progetto.
 3. **Provare** (§2): `astra.armory.here` + E; poi `astra.weapons.give` per sparare ovunque; `astra.board.start` in un corridoio; `astra.board.debug 2`; parlare con Reyes.
    Se le braccia o il mirino sono fuori posto: `astra.fps.hip_*`, `astra.fps.ads_*` (i numeri finiti vanno in `AstraFpsComponent.cpp`, in cima).
 4. **La mente**: `cd mind && .venv/bin/python -m unittest bench.marines_unit bench.marines_server` (90 prove); dal vivo `python -m bench.marines_live` (0,02 $).
