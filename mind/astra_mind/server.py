@@ -951,7 +951,12 @@ class Mind:
             if chk is not None:
                 self.watch.ran(chk, bool(t.lines or t.actions))
             return t
-        return await self.agent.handle_event(" | ".join(events), self.lang, ask=ask)
+        # a bridge already talking over itself (a fleet battle: queued lines waited 75-175 s) is told so: what the officers
+        # add is theirs to judge — docs/ARCHITETTURA.md §1bis
+        busy = self.voice.busy_s()
+        note = (f" [the bridge is busy: about {busy:.0f} s of speech is still waiting to be said — only what the Captain must hear now, "
+                "in one short line, or nothing]") if busy > 12.0 else ""
+        return await self.agent.handle_event(" | ".join(events) + note, self.lang, ask=ask)
 
     async def handle_client(self, ws) -> None:  # noqa: ANN001
         self.clients.add(ws)
