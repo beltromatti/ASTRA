@@ -1721,11 +1721,13 @@ void UAstraScreensSubsystem::DrawPadDamage(UCanvas* C, int32 W, int32 H)
 		const FAstraDamage& D = *Sorted[i];
 		const float Y = ListTop + i * 27.f;
 		const FLinearColor KC = D.Kind.Contains(TEXT("breach")) ? RED : (D.Kind.Contains(TEXT("fire")) ? AMBER : YELLOW);
-		P.Text(MX, Y, FString::Printf(TEXT("D%-2d %c  %s"), D.Deck, D.Section, *D.Place.ToUpper().Left(22)), true, 17, TEXTC);
-		P.Text(MX + 280, Y, (D.Kind.Replace(TEXT("hull breach"), TEXT("breach")).Replace(TEXT(" damage"), TEXT("")) + (D.System.IsEmpty() ? FString() : FString::Printf(TEXT(" (%s)"), *D.System))).ToUpper().Left(30), true, 17, KC);
-		if (!D.Note.IsEmpty())
+		P.Text(MX, Y, FString::Printf(TEXT("D%-2d %c  %s"), D.Deck, D.Section, *D.Place.ToUpper().Left(18)), true, 17, TEXTC);
+		P.Text(MX + 270, Y, KindShort(D.Kind), true, 17, KC);
+		// how it stands: the field on the hole and the air that is left, the fire and the smoke, the power a conduit's room has and what runs through it
+		const FString Detail = (D.System.IsEmpty() ? FString() : D.System + TEXT(" · ")) + D.Note;
+		if (!Detail.IsEmpty())
 		{
-			P.Text(MX + 590, Y + 3, D.Note.ToUpper().Left(24), true, 12, DIM);
+			P.Text(MX + 385, Y + 3, Detail.ToUpper().Left(40), true, 13, DIM);
 		}
 		const FString Team = D.Team < 0 ? FString(TEXT("UNATTENDED")) : (D.Travel > 0.f ? FString::Printf(TEXT("TEAM %d  EN ROUTE %.0f S"), D.Team + 1, D.Travel)
 		                                                                              : FString::Printf(TEXT("TEAM %d  %.0f %%"), D.Team + 1, 100.f * D.Progress));

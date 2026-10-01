@@ -199,11 +199,13 @@ void FAstraFxPlanner::Plan(const FAstraDamageModel& Model, const FVector& Eye, c
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------ the subsystem
+bool GAstraDamageFxInBench = false;
+
 bool UAstraDamageFx::ShouldCreateSubsystem(UObject* Outer) const
 {
 	const UWorld* World = Cast<UWorld>(Outer);
-	// (a headless bench has no scene to put effects in)
-	return World && (World->WorldType == EWorldType::Game || World->WorldType == EWorldType::PIE) && FApp::CanEverRender();
+	// (a headless bench has no scene to put effects in, unless it asks for them to test the code that makes them)
+	return World && (World->WorldType == EWorldType::Game || World->WorldType == EWorldType::PIE) && (FApp::CanEverRender() || GAstraDamageFxInBench);
 }
 
 void UAstraDamageFx::OnWorldBeginPlay(UWorld& InWorld)
@@ -959,7 +961,7 @@ void UAstraDamageFx::SparkShower(const FAstraFxPlan::FSpark& S, float Strength)
 {
 	UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
 	AAstraBridgeFX* Sparks = Ship ? Ship->GetBridgeFX() : nullptr;
-	if (!Sparks)
+	if (!Sparks || !Sparks->HasActorBegunPlay())          // (its flash and its parts are made when it begins play)
 	{
 		return;
 	}
@@ -1020,7 +1022,7 @@ void UAstraDamageFx::OnBlow(const FAstraImpactResult& R, float Energy)
 		}
 	}
 	// a shower of sparks from the place, if it is in sight of him
-	if (BestD < 1800.f && Ship && Ship->GetBridgeFX())
+	if (BestD < 1800.f && Ship && Ship->GetBridgeFX() && Ship->GetBridgeFX()->HasActorBegunPlay())
 	{
 		Ship->GetBridgeFX()->Burst(BestAt + FVector(0.f, 0.f, 120.f), FVector(FMath::FRandRange(-1.f, 1.f), FMath::FRandRange(-1.f, 1.f), 0.3f).GetSafeNormal(), FMath::Clamp(Energy / 50.f, 0.3f, 1.f));
 	}
@@ -1090,6 +1092,28 @@ void UAstraDamageFx::DressDoor(AAstraDoor* Door, bool bSealed)
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------ what is shown
+void UAstraDamageFx::SetTestAssets(UStaticMesh* Sphere, UStaticMesh* Line, UMaterialInterface* Material)
+{
+	SphereMesh = Sphere;
+	LineMesh = Line;
+	BlastMat = SmokeMat = GlowMat = ScarMat = TextMat = Material;
+	SignMid = TextMat ? UMaterialInstanceDynamic::Create(TextMat, this) : nullptr;
+}
+
+UAstraDamageFx::FStats UAstraDamageFx::GetStats() const
+{
+	FStats S;
+	for (const FInst& I : Insts)
+	{
+		(I.Kind == EPart::Flame ? S.Flames : (I.Kind == EPart::Smoke ? S.Smoke : (I.Kind == EPart::Mist ? S.Mist : S.Fields)))++;
+	}
+	S.Streaks = Streaks.Num();
+	for (const FLightSlot& L : Lights) { S.Lights += L.Level > 0.01f ? 1 : 0; }
+	for (const FScar& C : Scars) { S.Scars += C.Level > 0.01f ? 1 : 0; }
+	for (const TPair<uint32, FSign>& KV : Signs) { S.Signs += KV.Value.bOn ? 1 : 0; }
+	return S;
+}
+
 int32 UAstraDamageFx::NumParts() const
 {
 	int32 N = Insts.Num() + Streaks.Num();

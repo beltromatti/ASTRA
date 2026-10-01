@@ -1714,8 +1714,8 @@ void FAstraDamageModel::SyncIncidents(TArray<FAstraDamage>& Incidents)
 		}
 		if (Kind == 0)
 		{
-			const TCHAR* F = S->Field == FAstraDmgState::EField::Holding ? TEXT("containment field holding") : (S->Field == FAstraDmgState::EField::Forming ? TEXT("containment field forming")
-			                 : (S->Field == FAstraDmgState::EField::Failed ? TEXT("containment field failed") : TEXT("no field")));
+			const TCHAR* F = S->Field == FAstraDmgState::EField::Holding ? TEXT("field holding") : (S->Field == FAstraDmgState::EField::Forming ? TEXT("field forming")
+			                 : (S->Field == FAstraDmgState::EField::Failed ? TEXT("field failed") : TEXT("no field")));
 			D.Note = FString::Printf(TEXT("%s, air %.0f %%, hole %.1f m2"), F, 100.f * S->Air, S->Hole);
 		}
 		else if (Kind == 1)

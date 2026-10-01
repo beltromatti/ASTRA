@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """DISTRUZIONE, the damage inside the ASN Aquila (Source/ASTRA/AstraDamage*.cpp, docs/DISTRUZIONE.md): the headless bench.
 
-  tools/damage.py run [--scenario all|trace|air|fire|people|captain|survive] [--seed 1] [--seconds 600] [--set "astra.damage.hole=1.2,..."]
+  tools/damage.py run [--scenario all|trace|air|fire|people|captain|fx|fxlive|survive] [--seed 1] [--seconds 600] [--set "astra.damage.hole=1.2,..."]
                                        the commandlet AstraDamageSim: hits scripted on the real plan and the real damage model (where blows go,
                                        the air that leaves and stops at the pressure bulkheads, fires that spread and burn out, teams that
-                                       arrive, the people of VITA hurt where they stood, the Captain in a compartment that empties) and the whole
+                                       arrive, the people of VITA hurt where they stood, the Captain in a compartment that empties, the effects and the
+                                       lights that follow it, the doors of decks that load late) and the whole
                                        Aquila under the strike group's fire; checks the invariants and prints the verdict
   tools/damage.py batch --seeds 8 [--scenario survive] [--set ...] [--tag t]
                                        N seeds of one scenario (two processes at a time): one line each and the mean
@@ -124,7 +125,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | trace | air | fire | people | captain | survive")
+    r.add_argument("--scenario", default="all", help="all | trace | air | fire | people | captain | fx | fxlive | survive")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seconds", type=float, default=600.0, help="survive: battle seconds after the strike group's arrival")
     r.add_argument("--set", default="", help='console variables, "astra.damage.hole=1.2,astra.damage.fire=0.8"')

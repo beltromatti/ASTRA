@@ -9,6 +9,9 @@
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
 #include "Engine/Engine.h"
+#include "Materials/Material.h"
+#include "Engine/StaticMesh.h"
+#include "AstraDoor.h"
 #include "Engine/World.h"
 #include "Tickable.h"
 #include "AstraWarTypes.h"
@@ -866,6 +869,104 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 			}
 			DmCheck(TEXT("doors are found by where they stand"), Hit == Tried && Tried > 100 && Map.DoorNear(FVector(1.0e7f, 0.f, 0.f), 40.f) == INDEX_NONE, FString::Printf(TEXT("%d of %d doors found from 15 cm off; none far away"), Hit, Tried));
 		}
+	}
+
+	// ======================================================================================================== the effects, made and moved in a world (with the engine's own meshes and material)
+	if (bAll || Scenario == TEXT("fxlive"))
+	{
+		DmSet(TEXT("astra.damage.fields=0"));
+		GAstraDamageFxInBench = true;
+		FDmWorld W;
+		const bool bMade = W.Make();
+		GAstraDamageFxInBench = false;
+		if (!bMade)
+		{
+			return 1;
+		}
+		UAstraDamageFx* Fx = W.World->GetSubsystem<UAstraDamageFx>();
+		DmCheck(TEXT("the effects are in the world"), Fx != nullptr, Fx ? TEXT("yes") : TEXT("the subsystem was not made"));
+		if (Fx)
+		{
+			Fx->SetTestAssets(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")), LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")), UMaterial::GetDefaultMaterial(MD_Surface));
+			FAstraDamageModel& In = W.Ship->GetInterior();
+			const FAstraDamageMap& Map = In.GetMap();
+			const int32 Room = Map.CompByName.FindRef(FName(TEXT("d4_games_D2")), INDEX_NONE), Next = Map.CompByName.FindRef(FName(TEXT("d4_games_D1")), INDEX_NONE);
+			const FVector Eye = Map.Comps[Room].Box.GetCenter() + FVector(0.f, 0.f, 100.f);
+			Fx->SetTestEye(Eye);
+			FAstraImpactResult Res;
+			In.Strike(Room, 70.f, 2, Map.Comps[Room].Box.GetCenter(), true, Res);
+			In.Strike(Next, 30.f, 1, Map.Comps[Next].Box.GetCenter(), false, Res);
+			Fx->OnBlow(Res, 70.f);
+			// a deck on fire: every room near him that is built is struck by a warhead (more hazards than the effects can show)
+			int32 Struck = 0;
+			for (int32 i = 0; i < Map.Comps.Num() && Struck < 12; ++i)
+			{
+				const FAstraDmgComp& Cm = Map.Comps[i];
+				if (i != Room && i != Next && Cm.Deck == 4 && Cm.Status != 0 && !Cm.bCorridor && Cm.Box.ComputeSquaredDistanceToPoint(Eye) < FMath::Square(3000.0))
+				{
+					FAstraImpactResult R1;
+					In.Strike(i, 60.f, 2, Cm.Box.GetCenter(), true, R1);
+					++Struck;
+				}
+			}
+			W.Run(10.f, 0.05f);
+			UAstraDamageFx::FStats A = Fx->GetStats();
+			UE_LOG(LogASTRA, Display, TEXT("[Damage] effects after 10 s (%d rooms struck besides the first two): %s"), Struck, *Fx->Describe());
+			DmCheck(TEXT("a burning deck gets its effects"), A.Flames >= 3 && A.Smoke >= 3 && A.Fields + A.Streaks >= 1 && A.Lights >= 1 && A.Scars >= 1, FString::Printf(TEXT("%d flames, %d smoke, %d fields, %d streaks, %d lights, %d scars; %d parts"), A.Flames, A.Smoke, A.Fields, A.Streaks, A.Lights, A.Scars, Fx->NumParts()));
+			DmCheck(TEXT("and no more than its budget"), A.Flames <= 12 && A.Smoke + A.Mist <= 20 && A.Fields <= 4 && A.Streaks <= 40 && A.Lights <= 2 && A.Scars <= 3 && A.Flames <= 9, FString::Printf(TEXT("%d flames (3 fires, 3 each at most), %d smoke, %d mist, %d fields, %d streaks, %d lights, %d scars"), A.Flames, A.Smoke, A.Mist, A.Fields, A.Streaks, A.Lights, A.Scars));
+			const float Ms = Fx->GetCostMs();
+			DmCheck(TEXT("it costs little"), Ms < 0.6f, FString::Printf(TEXT("%.3f ms a frame on average in the game thread with %d parts on (the world is ticked at 20 Hz here, so a frame of the game has half this)"), Ms, Fx->NumParts()));
+			// a collection of garbage in the middle of it (a part someone forgot to keep alive would show now), then on
+			CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+			W.Run(3.f, 0.05f);
+			A = Fx->GetStats();
+			DmCheck(TEXT("it goes on after a collection of garbage"), A.Flames + A.Smoke + A.Streaks > 0, FString::Printf(TEXT("3 s later: %d flames, %d smoke, %d streaks; %d parts"), A.Flames, A.Smoke, A.Streaks, Fx->NumParts()));
+			W.Run(20.f, 0.05f);
+			Fx->SetTestEye(Eye + FVector(8000.f, 0.f, 0.f));
+			W.Run(6.f, 0.05f);
+			DmCheck(TEXT("it lets go when the Captain is far"), Fx->NumParts() == 0, FString::Printf(TEXT("the Captain 80 m away: %d parts still on"), Fx->NumParts()));
+			// the pressure bulkheads and the doors of decks that load late
+			W.Ship->ResetInterior();
+			Fx->SetTestEye(Eye);
+			const int32 Tract = Map.CompByName.FindRef(FName(TEXT("d4_spm_D3")), INDEX_NONE);
+			FAstraImpactResult R2;
+			In.Strike(Tract, 55.f, 0, Map.Comps[Tract].Box.GetCenter(), true, R2);
+			W.Run(15.f, 0.05f);
+			TArray<int32> Sealed = In.SealedDoors().Array();
+			DmCheck(TEXT("a breached corridor seals its section"), Sealed.Num() >= 2, FString::Printf(TEXT("%d pressure bulkheads shut"), Sealed.Num()));
+			if (Sealed.Num() >= 2)
+			{
+				// a deck streams in after the seal: its doors begin play now (one at a sealed bulkhead, one at a door that is not)
+				FActorSpawnParameters SP;
+				SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				AAstraDoor* Late = W.World->SpawnActor<AAstraDoor>(Map.Doors[Sealed[0]].PosCm, FRotator(0.f, Map.Doors[Sealed[0]].Yaw, 0.f), SP);
+				int32 Plain = INDEX_NONE;
+				for (int32 i = 0; i < Map.Doors.Num() && Plain == INDEX_NONE; ++i) { Plain = !Map.Doors[i].bBlast && Map.Doors[i].Deck == 4 ? i : INDEX_NONE; }
+				AAstraDoor* Ordinary = W.World->SpawnActor<AAstraDoor>(Map.Doors[Plain].PosCm, FRotator::ZeroRotator, SP);
+				for (AAstraDoor* D : {Late, Ordinary})
+				{
+					if (D && !D->HasActorBegunPlay())
+					{
+						D->DispatchBeginPlay();                    // (the bench's world does not begin play for what is spawned in it: the streamed-in deck's doors do)
+					}
+				}
+				W.Run(1.f, 0.05f);
+				UE_LOG(LogASTRA, Display, TEXT("[Damage] doors: late %s (begun play %d, at %s), loaded %d, plan door %d at %s, near %d, sealed contains %d"), Late ? *Late->GetName() : TEXT("null"), Late ? (int32)Late->HasActorBegunPlay() : -1,
+				       Late ? *Late->GetActorLocation().ToString() : TEXT("-"), AstraDoors::Loaded().Num(), Sealed[0], *Map.Doors[Sealed[0]].PosCm.ToString(), Late ? Map.DoorNear(Late->GetActorLocation(), 40.f) : -2, (int32)In.SealedDoors().Contains(Sealed[0]));
+				DmCheck(TEXT("a door loaded after the seal is shut"), Late && Late->bLocked && Ordinary && !Ordinary->bLocked && W.Ship->DoorActorOf(Map.Doors[Sealed[0]].Id) == Late,
+				        FString::Printf(TEXT("the sealed bulkhead's door: %s; an ordinary door: %s; found by where it stands: %s; signs on: %d"), Late && Late->bLocked ? TEXT("shut") : TEXT("OPEN"), Ordinary && !Ordinary->bLocked ? TEXT("free") : TEXT("LOCKED"),
+				                        W.Ship->DoorActorOf(Map.Doors[Sealed[0]].Id) == Late ? TEXT("yes") : TEXT("NO"), Fx->GetStats().Signs));
+				const bool bSigned = Fx->GetStats().Signs >= 1;
+				W.Ship->ResetInterior();
+				W.Run(1.f, 0.05f);
+				DmCheck(TEXT("and opens again with the bulkhead"), Late && !Late->bLocked && Fx->GetStats().Signs == 0 && bSigned, FString::Printf(TEXT("after the bulkheads open: the door is %s, signs on %d (it wore one: %s)"), Late && Late->bLocked ? TEXT("STILL SHUT") : TEXT("free"), Fx->GetStats().Signs, bSigned ? TEXT("yes") : TEXT("NO")));
+				In.Strike(Tract, 55.f, 0, Map.Comps[Tract].Box.GetCenter(), true, R2);
+				W.Run(15.f, 0.05f);
+				DmCheck(TEXT("it shuts again when the section is sealed again"), Late && Late->bLocked && Fx->GetStats().Signs >= 1, FString::Printf(TEXT("the door is %s, signs on %d"), Late && Late->bLocked ? TEXT("shut") : TEXT("OPEN"), Fx->GetStats().Signs));
+			}
+		}
+		W.Destroy();
+		DmSet(TEXT("astra.damage.fields=1"));
 	}
 
 	// ======================================================================================================== the Aquila under the strike group's fire

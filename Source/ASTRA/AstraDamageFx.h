@@ -78,6 +78,9 @@ public:
 	static void HoleWall(const FBox& Room, const FVector& HoleAt, FVector& OutPoint, FVector& OutNormal);
 };
 
+/** The bench makes its world with this set: the effects subsystem is made though nothing renders there (SetTestAssets then gives it parts to make). */
+extern ASTRA_API bool GAstraDamageFxInBench;
+
 UCLASS()
 class ASTRA_API UAstraDamageFx : public UTickableWorldSubsystem
 {
@@ -104,6 +107,12 @@ public:
 
 	/** The tests' Captain: where the eye is (no pawn, no camera needed). */
 	void SetTestEye(const FVector& Eye) { bTest = true; TestEye = Eye; }
+	/** The bench's world has no content: the parts are made of the meshes and the material it gives (engine defaults) so that the code that makes and moves them runs. */
+	void SetTestAssets(UStaticMesh* Sphere, UStaticMesh* Line, UMaterialInterface* Material);
+	struct FStats { int32 Flames = 0, Smoke = 0, Mist = 0, Fields = 0, Streaks = 0, Lights = 0, Scars = 0, Signs = 0; };
+	FStats GetStats() const;
+	/** The game thread's time in this subsystem, averaged (ms). */
+	float GetCostMs() const { return (float)MsAvg; }
 
 private:
 	enum class EPart : uint8 { Flame, Smoke, Mist, Field, Num };
