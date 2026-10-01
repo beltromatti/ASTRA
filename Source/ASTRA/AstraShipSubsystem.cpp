@@ -9,6 +9,7 @@
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraBridgeFX.h"
+#include "AstraDamageFx.h"
 #include "AstraDoor.h"
 #include "AstraHangar.h"
 #include "AstraPatient.h"
@@ -344,6 +345,7 @@ void UAstraShipSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	CollectSceneRefs(InWorld);
 	UpdateAttitudeVisuals();
 	StartInterior();
+	DoorPlacedHandle = AstraDoors::OnPlaced().AddUObject(this, &UAstraShipSubsystem::OnDoorPlaced);
 	// the bridge at rest: reactor hum through the deck, air handling, far electronics (a seamless loop)
 	if (USoundBase* Amb = LoadObject<USoundBase>(nullptr, TEXT("/Game/ASTRA/Audio/SW_Bridge_Ambience.SW_Bridge_Ambience")))
 	{
@@ -3265,28 +3267,63 @@ AAstraDoor* UAstraShipSubsystem::DoorActorOf(FName DoorId)
 			return A->Get();
 		}
 	}
-	// the doors of the plan, by where they stand (the level's actors are labelled with the plan's ids, but a packaged game has no labels); looked for
-	// again no oftener than every half minute (a deck that is not loaded has none)
-	const double Now = GetWorld()->GetTimeSeconds();
-	if (bDoorsMapped && Now - DoorsMappedAt < 30.0)
+	// the doors of the plan, by where they stand (the level's actors are labelled with the plan's ids, but a packaged game has no labels): among the door
+	// actors that are in the world now (a deck that is not loaded has none)
+	const int32* Di = Interior.GetMap().DoorByName.Find(DoorId);
+	if (!Di)
 	{
 		return nullptr;
 	}
-	bDoorsMapped = true;
-	DoorsMappedAt = Now;
-	for (TActorIterator<AAstraDoor> It(GetWorld()); It; ++It)
+	const FVector& At = Interior.GetMap().Doors[*Di].PosCm;
+	for (const TWeakObjectPtr<AAstraDoor>& W : AstraDoors::Loaded())
 	{
-		for (const FAstraDmgDoor& D : Interior.GetMap().Doors)
+		AAstraDoor* D = W.Get();
+		if (D && FVector::DistSquared(At, D->GetActorLocation()) < 40.0 * 40.0)
 		{
-			if (FVector::DistSquared(D.PosCm, It->GetActorLocation()) < 40.0 * 40.0)
-			{
-				DoorActors.FindOrAdd(D.Id) = *It;
-				break;
-			}
+			DoorActors.FindOrAdd(DoorId) = D;
+			return D;
 		}
 	}
-	const TWeakObjectPtr<AAstraDoor>* A = DoorActors.Find(DoorId);
-	return A ? A->Get() : nullptr;
+	return nullptr;
+}
+
+AAstraBridgeFX* UAstraShipSubsystem::GetBridgeFX() const
+{
+	return BridgeFX;
+}
+
+void UAstraShipSubsystem::Deinitialize()
+{
+	AstraDoors::OnPlaced().Remove(DoorPlacedHandle);
+	Super::Deinitialize();
+}
+
+void UAstraShipSubsystem::OnDoorPlaced(AAstraDoor* Door)
+{
+	// a deck has streamed in: a door of it that stands where a pressure bulkhead is sealed shuts (the seal was made while the deck was not there to shut)
+	if (!Door || !Interior.IsReady())
+	{
+		return;
+	}
+	const int32 Di = Interior.GetMap().DoorNear(Door->GetActorLocation(), 40.f);
+	if (Di == INDEX_NONE)
+	{
+		return;
+	}
+	DoorActors.FindOrAdd(Interior.GetMap().Doors[Di].Id) = Door;
+	if (Interior.SealedDoors().Contains(Di))
+	{
+		ApplyDoorSeal(Di, Door, true);
+	}
+}
+
+void UAstraShipSubsystem::ApplyDoorSeal(int32 DoorIndex, AAstraDoor* Door, bool bSealed)
+{
+	Door->bLocked = bSealed;                                   // shut, and it stays shut
+	if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr)
+	{
+		Fx->DressDoor(Door, bSealed);
+	}
 }
 
 void UAstraShipSubsystem::TickInterior(float DeltaTime)
@@ -3336,9 +3373,14 @@ void UAstraShipSubsystem::TickInterior(float DeltaTime)
 				{
 					Plan->SetDoorSealed(Id.ToString(), bSealed);
 				}
+				const int32 Di = Interior.GetMap().DoorByName.FindRef(Id, INDEX_NONE);
 				if (AAstraDoor* A = DoorActorOf(Id))
 				{
-					A->bLocked = bSealed;                      // shut, and it stays shut
+					ApplyDoorSeal(Di, A, bSealed);
+				}
+				if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr; Fx && Di != INDEX_NONE)
+				{
+					Fx->OnBulkhead(Interior.GetMap().Doors[Di].PosCm, bSealed);
 				}
 			};
 			H.PlanChanged = [this]()
@@ -3445,10 +3487,13 @@ void UAstraShipSubsystem::TickCaptainFate(float DeltaTime)
 		if (Cam)
 		{
 			// the air going, the smoke, the pain: the edges of the sight close in (and sound goes thin) as they get worse
-			const float Fade = Cap.State == FAstraDmgCaptain::EState::Well ? 0.f : FMath::Clamp((Cap.Peril - 0.3f) / 0.7f, 0.f, 0.9f) * 0.8f;
+			const float PerilFade = Cap.State == FAstraDmgCaptain::EState::Well ? 0.f : FMath::Clamp((Cap.Peril - 0.3f) / 0.7f, 0.f, 0.9f) * 0.8f;
+			// thick smoke closes the room in grey-brown before it hurts him (the puffs seen from the inside are not drawn: the eye is in them)
+			const float SmokeFade = Here ? FMath::Clamp(Here->Smoke - 0.2f, 0.f, 1.f) * 0.6f : 0.f;
+			const float Fade = FMath::Max(PerilFade, SmokeFade);
 			if (Fade > 0.01f || bCaptainFadeSet)
 			{
-				Cam->SetManualCameraFade(Fade, FLinearColor::Black, true);
+				Cam->SetManualCameraFade(Fade, PerilFade >= SmokeFade ? FLinearColor::Black : FLinearColor(0.07f, 0.06f, 0.05f), PerilFade >= SmokeFade);
 				bCaptainFadeSet = Fade > 0.01f;
 			}
 		}
@@ -3664,6 +3709,10 @@ void UAstraShipSubsystem::OnHullHit(const FAstraHullHit& Hit)
 	if (Interior.IsReady())
 	{
 		Interior.Impact(Hit, Res);
+		if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr)
+		{
+			Fx->OnBlow(Res, Hit.Felt);
+		}
 	}
 	// the shock runs through the frame: a fixture or a console on the bridge shorts out, the more the harder the blow and the nearer the bridge. A breaker
 	// that has just tripped holds for a while: at most one every 8 s, a heavy shock after 2 s

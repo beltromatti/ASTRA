@@ -89,6 +89,8 @@ struct FAstraDmgState
 	int32 BreachId = 0, FireId = 0, ConduitId = 0;
 	float Age = 0.f;              // how long it has been calm (0 while anything is going on in it)
 	float HitAge = 99.f;          // since a blow last landed in it (the lights flicker for a moment)
+	FVector BlowAt = FVector::ZeroVector;   // where the last blow landed in it (cm): the sparks fly from there
+	FVector FireAt = FVector::ZeroVector;   // where the fire began (cm): the blow that lit it, or the opening it came in by; zero when it has not burned
 
 	bool Calm() const
 	{
@@ -102,11 +104,22 @@ struct FAstraImpactResult
 {
 	FVector EntryCm = FVector::ZeroVector;     // where it came in (the plan's frame, cm)
 	TArray<int32> Comps;                       // the compartments it spent itself in, the first where it came in
+	TArray<FVector> AtCm;                      // where it touched each of them (parallel to Comps: the effects go there)
 	float Energy = 0.f;                        // what reached the first
 	TArray<FString> Lines;                     // what happened, in the report's words
 	int32 Killed = 0, Wounded = 0;
 	TArray<FString> People;                    // who (the roster's words)
 	bool bBreach = false, bFire = false, bPower = false, bWreck = false;
+	/** A compartment the blow reached, and where (the first time only). */
+	void Touch(int32 Comp, const FVector& At)
+	{
+		const int32 I = Comps.AddUnique(Comp);
+		if (AtCm.Num() <= I)
+		{
+			AtCm.SetNumZeroed(I + 1);
+			AtCm[I] = At;
+		}
+	}
 };
 
 /** The Captain, as the model sees them: where they stand and what the air, the smoke and the fire have done to them. */

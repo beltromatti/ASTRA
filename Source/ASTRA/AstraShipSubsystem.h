@@ -79,6 +79,7 @@ class ASTRA_API UAstraShipSubsystem : public UTickableWorldSubsystem
 
 public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
+	virtual void Deinitialize() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { RETURN_QUICK_DECLARE_CYCLE_STAT(UAstraShipSubsystem, STATGROUP_Tickables); }
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
@@ -220,6 +221,8 @@ public:
 	int32 GetCaptainFate() const { return CaptainFate; }
 	/** A plan door's actor (the sliding door in the level), found by where it stands; null when the level has none there (its deck is not loaded). */
 	class AAstraDoor* DoorActorOf(FName DoorId);
+	/** The bridge's spark effects (the damage effects throw their showers through it too). */
+	class AAstraBridgeFX* GetBridgeFX() const;
 	/** The campaign save: the system the Aquila is in, the crew's losses. */
 	TSharedRef<FJsonObject> SaveJson() const;
 	void ResumeFrom(const TSharedPtr<FJsonObject>& Save);
@@ -300,8 +303,9 @@ private:
 	struct FHitReport { TArray<FString> Lines; TArray<FString> People; int32 Hits = 0; double Since = -100.0; };
 	FHitReport HitReport;             // what the last blows did, told in one report
 	TMap<FName, TWeakObjectPtr<class AAstraDoor>> DoorActors;
-	bool bDoorsMapped = false;
-	double DoorsMappedAt = -100.0;
+	FDelegateHandle DoorPlacedHandle;
+	void OnDoorPlaced(class AAstraDoor* Door);
+	void ApplyDoorSeal(int32 DoorIndex, class AAstraDoor* Door, bool bSealed);
 	// the Captain's fate under the hazards: down, carried to the Medbay, or dead
 	int32 CaptainFate = 0;            // 0 well, 1 down, 2 dead
 	bool bTestCaptain = false;

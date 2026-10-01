@@ -2,6 +2,7 @@
 
 #include "ASTRA.h"
 #include "AstraDamageMap.h"
+#include "AstraDamageFx.h"
 #include "AstraDamageModel.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraLifeSubsystem.h"
@@ -749,6 +750,122 @@ int32 UAstraDamageSimCommandlet::Main(const FString& Params)
 			W.Destroy();
 		}
 		DmSet(TEXT("astra.damage.fields=1"));
+	}
+
+	// ======================================================================================================== what the Captain sees and the lights
+	if (bAll || Scenario == TEXT("fx"))
+	{
+		FDmRig Rig;
+		if (!Rig.Make(Seed))
+		{
+			return 1;
+		}
+		const FAstraDamageMap& Map = *Rig.Map;
+		FAstraFxBudget Budget;
+		FAstraFxPlan Plan;
+		// a room with a hole and a fire (a warhead): what the effects ask for with the Captain in it, far from it, and with its deck not in the world
+		const int32 C = Rig.Comp(TEXT("d4_games_D2"));
+		FAstraImpactResult Res;
+		Rig.Model.Strike(C, 70.f, 2, Map.Comps[C].Box.GetCenter(), true, Res);
+		Rig.Run(3.f);
+		const FBox Box = Map.Comps[C].Box;
+		const FVector InRoom = Box.GetCenter() + FVector(0.f, 0.f, 100.f);
+		FAstraFxPlanner::Plan(Rig.Model, InRoom, Budget, nullptr, Plan);
+		const FAstraDmgState* St = Rig.Model.Find(C);
+		const bool bVentFound = Plan.Vents.Num() >= 1 && Plan.Vents[0].Comp == C;
+		const float WallGap = bVentFound ? (float)FMath::Sqrt(Box.ComputeSquaredDistanceToPoint(Plan.Vents[0].At)) : 1.0e9f;
+		const float Outward = bVentFound ? (float)FVector::DotProduct(Plan.Vents[0].Normal, (Plan.Vents[0].At - Box.GetCenter()).GetSafeNormal()) : -1.f;
+		DmCheck(TEXT("the effects find the hole"), bVentFound && WallGap < 1.f && Outward > 0.2f && FMath::Abs(Plan.Vents[0].Normal.Size() - 1.0) < 1e-3,
+		        FString::Printf(TEXT("%s: hole %.2f m2, on the wall (%.1f cm off it), normal out of the room (dot %.2f), field %d; fire %.2f -> %d fires in the plan, %d hazes"), *Map.Comps[C].Name,
+		                        St ? St->Hole : 0.f, WallGap, Outward, bVentFound ? (int32)Plan.Vents[0].Field : -1, St ? St->Fire : 0.f, Plan.Fires.Num(), Plan.Hazes.Num()));
+		DmCheck(TEXT("a fire gets flames"), St && St->Fire >= 0.05f ? Plan.Fires.Num() == 1 && Plan.Fires[0].Comp == C : true, FString::Printf(TEXT("fire %.2f in the room: %d fire sites"), St ? St->Fire : 0.f, Plan.Fires.Num()));
+		FAstraFxPlan Far;
+		FAstraFxPlanner::Plan(Rig.Model, InRoom + FVector(6000.f, 0.f, 0.f), Budget, nullptr, Far);
+		FAstraFxPlan Unloaded;
+		FAstraFxPlanner::Plan(Rig.Model, InRoom, Budget, [](const FVector&) { return false; }, Unloaded);
+		DmCheck(TEXT("nothing out of reach or unloaded"), Far.Total() == 0 && Unloaded.Total() == 0, FString::Printf(TEXT("the Captain 60 m off: %d effects; his deck not in the world: %d"), Far.Total(), Unloaded.Total()));
+		bool bInside = true, bSame = true;
+		FAstraFxPlan::FFire Fire;
+		Fire.Comp = C;
+		Fire.Level = 0.9f;
+		Fire.Box = Box;
+		Fire.Anchor = Box.GetCenter();
+		for (int32 k = 0; k < 3; ++k)
+		{
+			const FVector P = FAstraFxPlanner::FlameSpot(Fire, k, 3);
+			bInside &= Box.IsInsideOrOn(P + FVector(0.f, 0.f, 20.f));
+			bSame &= P.Equals(FAstraFxPlanner::FlameSpot(Fire, k, 3), 0.01f);
+		}
+		DmCheck(TEXT("flames stand in the room, the same each time"), bInside && bSame, FString::Printf(TEXT("three flames at a fire of 0.9: inside %s, repeatable %s"), bInside ? TEXT("yes") : TEXT("NO"), bSame ? TEXT("yes") : TEXT("NO")));
+		// a deck full of fire: the budget holds and the nearest come first
+		{
+			FDmRig Many;
+			if (!Many.Make(Seed))
+			{
+				return 1;
+			}
+			TArray<int32> Rooms;
+			for (int32 i = 0; i < Many.Map->Comps.Num() && Rooms.Num() < 16; ++i)
+			{
+				const FAstraDmgComp& Cm = Many.Map->Comps[i];
+				if (Cm.Deck == 4 && Cm.Status != 0 && !Cm.bCorridor && Cm.VolumeM3 < 400.f)
+				{
+					Rooms.Add(i);
+				}
+			}
+			for (const int32 R : Rooms)
+			{
+				FAstraImpactResult R2;
+				Many.Model.Strike(R, 60.f, 2, Many.Map->Comps[R].Box.GetCenter(), true, R2);
+			}
+			Many.Run(4.f);
+			FAstraFxBudget Wide;
+			Wide.ReachCm = 100000.f;
+			FAstraFxPlan Big;
+			const double T0 = FPlatformTime::Seconds();
+			for (int32 i = 0; i < 400; ++i)
+			{
+				FAstraFxPlanner::Plan(Many.Model, Many.Map->Comps[Rooms[0]].Box.GetCenter(), Wide, nullptr, Big);
+			}
+			const double PlanMs = (FPlatformTime::Seconds() - T0) * 1000.0 / 400.0;
+			bool bSorted = true;
+			for (int32 i = 1; i < Big.Fires.Num(); ++i) { bSorted &= Big.Fires[i - 1].Dist <= Big.Fires[i].Dist; }
+			for (int32 i = 1; i < Big.Vents.Num(); ++i) { bSorted &= Big.Vents[i - 1].Dist <= Big.Vents[i].Dist; }
+			DmCheck(TEXT("the budget holds"), Big.Fires.Num() <= Wide.Fires && Big.Vents.Num() <= Wide.Vents && Big.Hazes.Num() <= Wide.Hazes + Wide.Mists && Big.Sparks.Num() <= Wide.Sparks && bSorted && Big.Vents.Num() == Wide.Vents,
+			        FString::Printf(TEXT("%d rooms struck (%d hazards in the model): %d fires (of %d), %d holes (of %d), %d hazes (of %d), %d spark rooms (of %d), nearest first %s; a plan costs %.4f ms"), Rooms.Num(), Many.Model.NumHazards(),
+			                        Big.Fires.Num(), Wide.Fires, Big.Vents.Num(), Wide.Vents, Big.Hazes.Num(), Wide.Hazes, Big.Sparks.Num(), Wide.Sparks, bSorted ? TEXT("yes") : TEXT("NO"), PlanMs));
+			DmCheck(TEXT("planning is cheap"), PlanMs < 0.25, FString::Printf(TEXT("%.4f ms for a plan over %d states (it runs four times a second)"), PlanMs, Many.Model.States().Num()));
+		}
+		// the lights: a room that lost its power burns the red strips, a lost room is dark, a calm one burns as built
+		{
+			FDmRig L;
+			if (!L.Make(Seed))
+			{
+				return 1;
+			}
+			const int32 Dark = L.Comp(TEXT("d4_games_D2")), Half = L.Comp(TEXT("d4_games_D1")), Lost = L.Comp(TEXT("d4_store_dry_C1")), Calm = L.Comp(TEXT("d4_spm_D3"));
+			FAstraImpactResult R3;
+			L.Model.Overload(Dark, 0.95f, R3);
+			L.Model.Overload(Half, 0.4f, R3);
+			L.Model.Strike(Lost, 600.f, 0, L.Map->Comps[Lost].Box.GetCenter(), false, R3);
+			const FAstraDmgLight NoPower = L.Model.LightOf(Dark), Failing = L.Model.LightOf(Half), Gone = L.Model.LightOf(Lost), Whole = L.Model.LightOf(Calm);
+			const FAstraDmgState* LS = L.Model.Find(Lost);
+			DmCheck(TEXT("the lights follow the damage"), NoPower.Mains < 0.05f && NoPower.Strips > 0.1f && NoPower.Mix > 0.8f && NoPower.Flicker <= 0.f && Failing.Mains > 0.2f && Failing.Mains < 1.f && Failing.Flicker > 0.3f
+			        && Whole.Calm() && (LS && LS->Wreck >= 1.f ? Gone.Mains <= 0.f && Gone.Strips <= 0.f : true),
+			        FString::Printf(TEXT("no power: mains %.2f, strips %.2f, red %.2f, steady (flicker %.2f); a failing supply (60 %%): mains %.2f, flicker %.2f; a lost room (wreck %.2f): mains %.2f strips %.2f; an untouched one calm: %s"),
+			                        NoPower.Mains, NoPower.Strips, NoPower.Mix, NoPower.Flicker, Failing.Mains, Failing.Flicker, LS ? LS->Wreck : 0.f, Gone.Mains, Gone.Strips, Whole.Calm() ? TEXT("yes") : TEXT("NO")));
+		}
+		// the plan's doors by where they stand (how a door actor of the level is matched to its door)
+		{
+			int32 Hit = 0, Tried = 0;
+			for (int32 i = 0; i < Map.Doors.Num(); i += FMath::Max(1, Map.Doors.Num() / 300))
+			{
+				++Tried;
+				const int32 D = Map.DoorNear(Map.Doors[i].PosCm + FVector(12.f, -9.f, 5.f), 40.f);
+				Hit += D != INDEX_NONE && FVector::Dist(Map.Doors[D].PosCm, Map.Doors[i].PosCm + FVector(12.f, -9.f, 5.f)) <= FVector::Dist(Map.Doors[i].PosCm, Map.Doors[i].PosCm + FVector(12.f, -9.f, 5.f)) + 0.01 ? 1 : 0;
+			}
+			DmCheck(TEXT("doors are found by where they stand"), Hit == Tried && Tried > 100 && Map.DoorNear(FVector(1.0e7f, 0.f, 0.f), 40.f) == INDEX_NONE, FString::Printf(TEXT("%d of %d doors found from 15 cm off; none far away"), Hit, Tried));
+		}
 	}
 
 	// ======================================================================================================== the Aquila under the strike group's fire

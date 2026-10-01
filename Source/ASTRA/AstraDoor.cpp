@@ -17,6 +17,7 @@ DECLARE_CYCLE_STAT(TEXT("Doors"), STAT_AstraDoors, STATGROUP_Astra);
 namespace
 {
 	TArray<TWeakObjectPtr<const AActor>> GDoorWalkers;
+	TArray<TWeakObjectPtr<AAstraDoor>> GDoorsLoaded;
 }
 
 void AstraDoors::AddWalker(const AActor* Walker)
@@ -38,6 +39,17 @@ void AstraDoors::RemoveWalker(const AActor* Walker)
 const TArray<TWeakObjectPtr<const AActor>>& AstraDoors::Walkers()
 {
 	return GDoorWalkers;
+}
+
+const TArray<TWeakObjectPtr<AAstraDoor>>& AstraDoors::Loaded()
+{
+	return GDoorsLoaded;
+}
+
+AstraDoors::FPlaced& AstraDoors::OnPlaced()
+{
+	static FPlaced Delegate;
+	return Delegate;
 }
 
 AAstraDoor::AAstraDoor()
@@ -64,6 +76,15 @@ void AAstraDoor::BeginPlay()
 {
 	Super::BeginPlay();
 	Place();
+	GDoorsLoaded.RemoveAllSwap([](const TWeakObjectPtr<AAstraDoor>& W) { return !W.IsValid(); });
+	GDoorsLoaded.AddUnique(this);
+	AstraDoors::OnPlaced().Broadcast(this);
+}
+
+void AAstraDoor::EndPlay(const EEndPlayReason::Type Reason)
+{
+	GDoorsLoaded.RemoveSwap(this);
+	Super::EndPlay(Reason);
 }
 
 void AAstraDoor::Place()

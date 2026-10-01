@@ -110,6 +110,8 @@ public:
 	float KeelCm() const { return KeelFloorCm; }
 	/** A short place name for a report: "deck 4 section B (Main Galley)". */
 	FString Describe(int32 Comp) const;
+	/** The plan's door standing within RadiusCm of a point (world cm): the nearest, or INDEX_NONE (how a door actor of the level is matched to its door). */
+	int32 DoorNear(const FVector& Cm, float RadiusCm) const;
 	const FAstraDmgProfile& ProfileOf(int32 Comp) const { return Profiles[Comps[Comp].Profile]; }
 	const TCHAR* CategoryName(EAstraDmgCategory C) const;
 
@@ -117,6 +119,9 @@ private:
 	static constexpr float CellCm = 1000.f;
 	int32 GridX0 = 0, GridY0 = 0, GridNX = 0, GridNY = 0;
 	TArray<TArray<int32>> Grid;
+	TMap<int64, TArray<int32>> DoorGrid;           // the doors by 2 m cell
+	static constexpr float DoorCellCm = 200.f;
+	static int64 DoorCell(int32 X, int32 Y, int32 Z) { return ((int64)(X + 4096) << 40) | ((int64)(Y + 4096) << 20) | (int64)(Z + 4096); }
 	float TopCm = 0.f, KeelFloorCm = 0.f;
 	void BuildGrid();
 };

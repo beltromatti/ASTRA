@@ -455,7 +455,7 @@ void FAstraDamageModel::Impact(const FAstraHullHit& H, FAstraImpactResult& Out)
 	for (int32 i = 0; i < Cells.Num(); ++i)
 	{
 		const FDmCell& C = Cells[i];
-		Out.Comps.Add(C.Comp);
+		Out.Touch(C.Comp, C.In);
 		Deposit(C.Comp, C.Energy, H.Type, C.In, D, i == 0, Out);
 		BlastPeople(C.Comp, C.Energy * DmTypeBlast(H.Type), H.Type, C.In, C.Out, Out);
 	}
@@ -474,7 +474,7 @@ void FAstraDamageModel::Impact(const FAstraHullHit& H, FAstraImpactResult& Out)
 			{
 				Deposit(L.To, Splash * 0.6f, H.Type, L.AtCm, D, false, Out);
 				BlastPeople(L.To, Splash, H.Type, C0.In, L.AtCm, Out);
-				Out.Comps.AddUnique(L.To);
+				Out.Touch(L.To, L.AtCm);
 			}
 		}
 	}
@@ -493,7 +493,7 @@ void FAstraDamageModel::Strike(int32 Comp, float Energy, uint8 Type, const FVect
 	Stats.EnergyInside += Energy;
 	Out.Energy = Energy;
 	Out.EntryCm = AtCm;
-	Out.Comps.AddUnique(Comp);
+	Out.Touch(Comp, AtCm);
 	Deposit(Comp, Energy, Type, AtCm, FVector::ForwardVector, bHole, Out);
 	BlastPeople(Comp, Energy * DmTypeBlast(Type), Type, AtCm, AtCm, Out);
 }
@@ -572,7 +572,7 @@ void FAstraDamageModel::Overload(int32 Comp, float Loss, FAstraImpactResult& Out
 		Out.bPower = true;
 		Out.Lines.AddUnique(FString::Printf(TEXT("power lost in %s"), *Say(Comp)));
 	}
-	Out.Comps.AddUnique(Comp);
+	Out.Touch(Comp, C.Box.GetCenter());
 	BlastPeople(Comp, 9.f, 1, C.Box.GetCenter(), C.Box.GetCenter(), Out);
 }
 
@@ -637,6 +637,7 @@ void FAstraDamageModel::Deposit(int32 Comp, float Energy, uint8 Type, const FVec
 	TArray<int32, TInlineAllocator<6>> Feeds;       // the rooms a corridor's bus feeds (done last: bringing a room into play may move the states)
 	S.Age = 0.f;
 	S.HitAge = 0.f;
+	S.BlowAt = AtCm;
 	// --- the hole: where the blow came in, if the room was where it came in and it had the strength to punch the plating
 	if (bFirst && Energy >= 4.f)
 	{
@@ -672,6 +673,10 @@ void FAstraDamageModel::Deposit(int32 Comp, float Energy, uint8 Type, const FVec
 	if (Ignite > 0.02f)
 	{
 		const bool bWas = S.Fire >= DmFireMin;
+		if (!bWas)
+		{
+			S.FireAt = AtCm;
+		}
 		S.Fire = FMath::Clamp(S.Fire + Ignite * (1.f - S.Fire), 0.f, 1.f);
 		S.Smoke = FMath::Clamp(S.Smoke + 0.3f * Ignite, 0.f, 1.f);
 		if (S.Fire >= DmFireMin && !bWas)
@@ -1119,7 +1124,8 @@ void FAstraDamageModel::StepFire(float Dt)
 {
 	TArray<int32, TInlineAllocator<64>> Keys;
 	Active.GetKeys(Keys);
-	TArray<TPair<int32, float>, TInlineAllocator<16>> Seeds;       // fire that crosses to a neighbour: comp, strength
+	struct FSeed { int32 Comp; float Amount; FVector At; };
+	TArray<FSeed, TInlineAllocator<16>> Seeds;                     // fire that crosses to a neighbour: where to, how much, by which opening
 	TArray<int32, TInlineAllocator<4>> Blasts;                     // magazines that go up this step
 	float Burn = 0.f;
 	for (const int32 K : Keys)
@@ -1166,7 +1172,7 @@ void FAstraDamageModel::StepFire(float Dt)
 					const float Rate = S.Fire * O * 0.07f * PB.Ignite * GDmFire * ((B ? B->Fuel : 1.f) > 0.1f ? 1.f : 0.f);
 					if (Rate * Dt > 0.0004f)
 					{
-						Seeds.Add({L.To, Rate * Dt});
+						Seeds.Add({L.To, Rate * Dt, L.AtCm});
 					}
 				}
 			}
@@ -1227,24 +1233,28 @@ void FAstraDamageModel::StepFire(float Dt)
 		}
 	}
 	// the seeds: what crosses lights the next room (where it finds fuel and air)
-	for (const TPair<int32, float>& Sd : Seeds)
+	for (const FSeed& Sd : Seeds)
 	{
-		FAstraDmgState& B = Get(Sd.Key);
+		FAstraDmgState& B = Get(Sd.Comp);
 		const float O2 = FMath::Clamp((B.Air - 0.2f) / 0.5f, 0.f, 1.f);
 		if (O2 > 0.f && B.Wreck < 1.f)
 		{
 			const bool bWas = B.Fire >= DmFireMin;
-			B.Fire = FMath::Clamp(B.Fire + Sd.Value * O2 * (1.f - B.Fire) + 0.002f, 0.f, 1.f);
+			if (B.Fire < 0.02f)
+			{
+				B.FireAt = Sd.At;                                // the fire comes in by the opening it crossed
+			}
+			B.Fire = FMath::Clamp(B.Fire + Sd.Amount * O2 * (1.f - B.Fire) + 0.002f, 0.f, 1.f);
 			if (!bWas && B.Fire >= DmFireMin)
 			{
 				++Stats.Fires;
 				// told once for a stretch of corridor (a fire running along it is one report), room by room for the rooms
-				const FAstraDmgComp& CB = Map->Comps[Sd.Key];
+				const FAstraDmgComp& CB = Map->Comps[Sd.Comp];
 				float& Told = SpreadTold.FindOrAdd(CB.Deck * 512 + (int32)CB.Section * 2 + (CB.bCorridor ? 1 : 0), -100.f);
 				if (Clock - Told > (CB.bCorridor ? 30.f : 4.f))
 				{
 					Told = Clock;
-					Report(FString::Printf(TEXT("damage report: the fire has spread to %s"), *Say(Sd.Key)), true);
+					Report(FString::Printf(TEXT("damage report: the fire has spread to %s"), *Say(Sd.Comp)), true);
 				}
 			}
 		}

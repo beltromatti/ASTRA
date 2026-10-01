@@ -455,6 +455,43 @@ void FAstraDamageMap::BuildGrid()
 			}
 		}
 	}
+	DoorGrid.Reset();
+	for (int32 i = 0; i < Doors.Num(); ++i)
+	{
+		const FVector& P = Doors[i].PosCm;
+		DoorGrid.FindOrAdd(DoorCell(FMath::FloorToInt(P.X / DoorCellCm), FMath::FloorToInt(P.Y / DoorCellCm), FMath::FloorToInt(P.Z / DoorCellCm))).Add(i);
+	}
+}
+
+int32 FAstraDamageMap::DoorNear(const FVector& Cm, float RadiusCm) const
+{
+	const int32 X0 = FMath::FloorToInt((Cm.X - RadiusCm) / DoorCellCm), X1 = FMath::FloorToInt((Cm.X + RadiusCm) / DoorCellCm);
+	const int32 Y0 = FMath::FloorToInt((Cm.Y - RadiusCm) / DoorCellCm), Y1 = FMath::FloorToInt((Cm.Y + RadiusCm) / DoorCellCm);
+	const int32 Z0 = FMath::FloorToInt((Cm.Z - RadiusCm) / DoorCellCm), Z1 = FMath::FloorToInt((Cm.Z + RadiusCm) / DoorCellCm);
+	int32 Best = INDEX_NONE;
+	double BestD = (double)RadiusCm * RadiusCm;
+	for (int32 x = X0; x <= X1; ++x)
+	{
+		for (int32 y = Y0; y <= Y1; ++y)
+		{
+			for (int32 z = Z0; z <= Z1; ++z)
+			{
+				if (const TArray<int32>* Cell = DoorGrid.Find(DoorCell(x, y, z)))
+				{
+					for (const int32 D : *Cell)
+					{
+						const double Dist = FVector::DistSquared(Doors[D].PosCm, Cm);
+						if (Dist <= BestD)
+						{
+							BestD = Dist;
+							Best = D;
+						}
+					}
+				}
+			}
+		}
+	}
+	return Best;
 }
 
 int32 FAstraDamageMap::CompartmentAt(const FVector& Cm, float SlackCm) const
