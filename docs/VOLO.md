@@ -205,7 +205,8 @@ aggiunge la sintesi vocale (non misurata qui).
 **Costo**: una pulsazione costa 0,15–0,5 m$ (circa 5.000 token in ingresso, l'80% in cache, circa 100 in uscita). Battaglia compressa (23 notizie in 700 s di gioco): 20
 pulsazioni, 18 righe, 3 silenzi, 0,0094 $ → **0,049 $ per ora di quella battaglia**; il caso peggiore a un'ora di fuoco continuo con una pulsazione ogni 14 s è circa
 0,12 $/ora, sotto il tetto di 0,15; oltre 0,18 $/ora il regolatore raddoppia la distanza. Una frase del Capitano tutta per la rete costa il router (0,03 m$) e una pulsazione
-(0,2–0,5 m$) e risparmia il turno dell'equipaggio (0,5–1 m$). **Sviluppo del modulo: circa 0,20 $** (tetto 0,3).
+(0,2–0,5 m$) e risparmia il turno dell'equipaggio (0,5–1 m$). **Sviluppo del modulo: circa 0,23 $** (tetto 0,3). Con l'equipaggio (0,76 $/ora) e le menti di guerra (0,02-0,17 $/ora) il totale tipico resta sotto 1 $/ora; nel caso peggiore
+di tutti insieme è vicino a 1 $/ora, e il regolatore di spesa della rete di volo raddoppia la distanza tra le pulsazioni quando spende troppo.
 
 ## 10. Limiti noti
 
