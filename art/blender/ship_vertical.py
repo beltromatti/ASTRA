@@ -11,14 +11,16 @@ import math
 import ship_design as DS
 import ship_plan as P
 import ship_spec as SP
-from ship_catalog import MOD, SLOT_HW
+from ship_catalog import BRIDGE_SHAFT_X, BRIDGE_SHAFT_Y, CRAWL_HW, MOD, SLOT_HW, STAIR_RISE, TRUNK_CLIMB_GAP, TRUNK_NICHE, TRUNK_RAIL_GAP, TRUNK_RUNG_PITCH, TRUNK_RUNG_T, TRUNK_RUNG_Z0
 from ship_layout import Builder, rnd
 
 LIFT_SPEED, LIFT_ACCEL = 6.0, 2.0          # m/s and m/s²: the contract's numbers (ASCENSORI tunes them)
 DOOR_TIME = 4.0                            # the wait for the doors, in the arc's cost
 LAND = (1.5, 1.7)                          # the landing node: 1.5 m from the shaft's face; the deck's door record is on that face
-# the bridge bank (the two command shafts under the bridge's lift housing; they run from Deck 1 to the keel): inner 2.6 m, outer 3.0 m, at x -25.8 .. -22.8
-BRIDGE_SHAFTS = [dict(id="tl_b1", name="Bridge Turbolift 1", decks=list(range(1, 13)), x=-24.3, y=-6.7), dict(id="tl_b2", name="Bridge Turbolift 2", decks=list(range(1, 10)), x=-24.3, y=-3.7)]
+# the bridge bank (the two command shafts under the bridge's lift housing; they run from Deck 1 to the keel): inner 2.6 m, outer 3.0 m (walls 0.2 m), at x -25.8 .. -22.8; the landing doors
+# are on the lobby face of the front wall, x -22.8 (as every bank's: the plan's door point is where the lift engine's fascia mounts)
+BRIDGE_SHAFTS = [dict(id="tl_b1", name="Bridge Turbolift 1", decks=list(range(1, 13)), x=BRIDGE_SHAFT_X, y=BRIDGE_SHAFT_Y[0]),
+                 dict(id="tl_b2", name="Bridge Turbolift 2", decks=list(range(1, 10)), x=BRIDGE_SHAFT_X, y=BRIDGE_SHAFT_Y[1])]
 BRIDGE_IN, BRIDGE_OUT = 2.6, 3.0
 BRIDGE_LOBBY = [-22.8, -8.2, -14.8, -2.0]  # the lobby on the decks below (Deck 1's is the housing's vestibule, x -22.8 .. -21.0, y -8.2 .. -1.0)
 
@@ -126,7 +128,7 @@ def bridge_lifts(B: Builder, decks: dict) -> list:
                 lobby, hub = "lift_housing_bridge", "lift_housing_bridge.hub"
             else:
                 lobby, hub = f"d{d}_lift_b", f"d{d}_lift_b.hub"
-            lan.append(_landing(B, sid, cid, lobby, d, (x + BRIDGE_IN / 2, y), 180.0, (x + BRIDGE_IN / 2 + 1.5, y), z, hub))
+            lan.append(_landing(B, sid, cid, lobby, d, (x + BRIDGE_OUT / 2, y), 180.0, (x + BRIDGE_OUT / 2 + 1.5, y), z, hub))      # (the door point on the LOBBY face of the shaft's wall, like every bank's)
         _ride_arcs(B, sid, sh["decks"])
         out.append(_shaft_record(sid, "bridge", sh["name"], x, y, BRIDGE_IN, BRIDGE_IN, sh["decks"], lan))
     return out
@@ -192,5 +194,26 @@ def trunks(B: Builder, decks: dict) -> list:
                 e["len"] = rnd(e["len"] * 1.6, 2)
             n0 = B.nodes[nodes[ds[0]]]
             out.append({"id": sid, "kind": "trunk", "name": f"Jefferies Tube J-{k + 1}{'S' if side > 0 else 'P'}", "x": n0["p"][0], "y": n0["p"][1], "shaft": {"x": n0["p"][0], "y": n0["p"][1], "w": 1.2, "d": 1.2,
-                        "z": [rnd(deck_z(ds[-1])), rnd(deck_z(ds[0]) + 3.4)]}, "decks": ds, "nodes": {str(d): nodes[d] for d in ds}, "trunks": {str(d): comps[d] for d in ds}})
+                        "z": [rnd(deck_z(ds[-1])), rnd(deck_z(ds[0]) + 3.4)]}, "decks": ds, "nodes": {str(d): nodes[d] for d in ds}, "trunks": {str(d): comps[d] for d in ds},
+                        **_climb(B, ds, nodes)})
     return out
+
+
+def _climb(B: Builder, ds: list, nodes: dict) -> dict:
+    """What a climber needs (the lead's engine makes the ladders climbable): per deck the place of the body in front of the rungs (`ladder`), the way it faces (`facing`: the yaw towards the
+    rungs), the walkway point to step off to (`step`), the niche's opening in the floor (`hole`: x0, y0, x1, y1, where a walker would fall down the column) and which end of the column is
+    closed on that deck. A trunk cell is the arm's first module, placed at yaw 90: its ladder niche is in the cell's aft wall (world -x), 1.1 m deep from the walkway's wall face (the
+    walkway is CRAWL_HW either side of the arm's axis), the rungs' axis 1.01 m in; the cell's middle is the niche's middle along the arm."""
+    top, bottom = ds[0], ds[-1]
+    lan = []
+    for d in ds:
+        x, y, _z = B.nodes[nodes[d]]["p"]
+        t = TRUNK_RUNG_T - TRUNK_CLIMB_GAP
+        a, c = TRUNK_NICHE
+        lan.append({"deck": d, "z": rnd(deck_z(d)), "node": nodes[d], "ladder": {"x": rnd(x - CRAWL_HW - t), "y": rnd(y)}, "facing": 180.0, "step": [rnd(x), rnd(y)],
+                    "hole": [rnd(x - CRAWL_HW - 1.1), rnd(y - 2.0 + a), rnd(x - CRAWL_HW), rnd(y - 2.0 + c)],
+                    "closed": "hatch" if d == top else "toe_plate" if d == bottom else None})
+    return {"landings": lan, "ends": {"top": {"deck": top, "closed": "hatch"}, "bottom": {"deck": bottom, "closed": "toe_plate"}},
+            "rungs": {"pitch": rnd(TRUNK_RUNG_PITCH, 4), "per_deck": round(STAIR_RISE / TRUNK_RUNG_PITCH), "rail_gap": TRUNK_RAIL_GAP, "z0": TRUNK_RUNG_Z0,
+                      "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor "
+                              "has the hole `hole`) except at its two ends"}}

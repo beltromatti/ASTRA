@@ -9,6 +9,7 @@ import random
 
 import ship_furniture as F
 import ship_furniture2 as G
+import ship_furniture9 as N
 import ship_spec as SPEC
 import ship_walls as W
 from bridge3_lib import Rx, Rz, T, frame
@@ -101,67 +102,157 @@ def extinguisher_free(b: SParts) -> None:
 
 
 # ------------------------------------------------------------------------------------------------------------------ concourse
+def _panel(b: SParts, x0: float, x1: float, y0: float, y1: float, z: float, cell: str = "white_warm", mat: str = LAMP_HOT) -> None:
+    """A luminous ceiling panel kept cheap (a hall has dozens of them): a soft-shaded frame and the lamp face, no bevels."""
+    b.soft.box((x0 - 0.03, y0 - 0.03, z - 0.045), (x1 + 0.03, y1 + 0.03, z - 0.02), TRIM)
+    b.emit.lamp_box((x0, y0, z - 0.056), (x1, y1, z - 0.046), cell, mat)
+
+
+def _lamella(b: SParts, x0: float, sx: int, y0: float, y1: float, z0: float, z1: float, glow: str = "warm_dim") -> None:
+    """A wall of vertical wooden slats standing off a wall (the wall's finished face at x0; sx = +1 for a wall that faces +x, -1 for one that faces -x) with a warm glow behind them: the
+    hero wall of a hall that is meant to feel like a street, not a corridor."""
+    xa, xb = x0, x0 + sx * 0.012
+    b.emit.lamp_box((min(xa, xb), y0, z0), (max(xa, xb), y1, z1), glow, LAMP_DIM)
+    pitch, slat, depth = 0.16, 0.09, 0.07
+    for k in range(int((y1 - y0) / pitch)):
+        ya = y0 + k * pitch + (pitch - slat) / 2
+        xs = x0 + sx * 0.012
+        xe = xs + sx * depth
+        b.soft.box((min(xs, xe), ya, z0), (max(xs, xe), ya + slat, z1), WOOD)                          # (soft: no bevels: a wall has a hundred slats)
+    for z in (z0 - 0.04, z1):
+        xe = x0 + sx * 0.09
+        b.body.box((min(x0, xe), y0 - 0.03, z), (max(x0, xe), y1 + 0.03, z + 0.04), TRIM)
+
+
+def _canopy(b: SParts, x0: float, x1: float, y0: float, y1: float, z: float, cell: str = "white_warm") -> None:
+    """A dropped ceiling over a part of the hall — a brushed rim, a dark soffit, a field of warm light panels under it — on four slender posts: it lowers the scale where people sit
+    and gives the zone an edge."""
+    b.body.box((x0, y0, z), (x1, y1, z + 0.12), COMPOSITE)
+    for (xa, xb, ya, yb) in ((x0, x1, y0, y0 + 0.05), (x0, x1, y1 - 0.05, y1), (x0, x0 + 0.05, y0, y1), (x1 - 0.05, x1, y0, y1)):
+        b.body.box((xa, ya, z - 0.05), (xb, yb, z + 0.12), TRIM)
+    nx, ny = max(1, int((x1 - x0) // 1.5)), max(1, int((y1 - y0) // 1.5))
+    for i in range(nx):
+        for j in range(ny):
+            cx0 = x0 + 0.25 + i * (x1 - x0 - 0.5) / nx + 0.08
+            cx1 = x0 + 0.25 + (i + 1) * (x1 - x0 - 0.5) / nx - 0.08
+            cy0 = y0 + 0.25 + j * (y1 - y0 - 0.5) / ny + 0.08
+            cy1 = y0 + 0.25 + (j + 1) * (y1 - y0 - 0.5) / ny - 0.08
+            _panel(b, cx0, cx1, cy0, cy1, z - 0.04, cell, LAMP_HOT)
+    for (px, py) in ((x0 + 0.12, y0 + 0.12), (x1 - 0.12, y0 + 0.12), (x0 + 0.12, y1 - 0.12), (x1 - 0.12, y1 - 0.12)):
+        b.body.cyl((px, py, 0.0), (px, py, z), 0.045, TRIM, seg=10)
+        b.fine.cyl((px, py, 0.0), (px, py, 0.1), 0.08, STRUCT, seg=12)
+        b.emit.lamp_cyl((px, py, 0.9), (px, py, 0.95), 0.052, "warm_dim", LAMP_DIM, seg=12)
+
+
+def _tree(b: SParts, x: float, y: float, h: float = 3.1) -> None:
+    """A small tree for the garden island: a trunk, a few round crowns of leaves."""
+    b.body.cyl((x, y, 0.45), (x, y, h * 0.62), 0.11, WOOD, seg=10)
+    for (dx, dy, dz, r) in ((0.0, 0.0, h * 0.78, 0.95), (0.55, 0.2, h * 0.6, 0.62), (-0.5, -0.3, h * 0.62, 0.66), (0.1, -0.6, h * 0.55, 0.5), (-0.2, 0.55, h * 0.58, 0.55)):
+        b.soft.sphere((x + dx, y + dy, dz), r, LEAF, seg=14, rings=8)
+
+
 def concourse(name: str = "SM_SHIP_Concourse"):
-    """17.7 x 36 x 3.7. x = 0 is the Mess Hall's forward face (aft wall), x = L the Spine's opening (forward wall); y 0 (port) .. 36 (starboard):
-    the near and far walls are the walls of the side passages (their gates at x 3.7 and 11.7)."""
+    """17.7 x 36 x 3.7. x = 0 is the Mess Hall's forward face (aft wall), x = L the Spine's opening (forward wall); y 0 (port) .. 36 (starboard): the near and far walls are the walls of the
+    side passages (their gates at x 3.7 and 11.7). The crew's street: a garden island with a tree under a round ceiling light in the middle, between the Mess Hall's portal and the Spine; on
+    either side of it, in the blocks between the gates' lanes, a café (counter, back bar, stools, tables, carpet) and the ship's store (a counter, shelves, racks), each under its own dropped
+    ceiling of warm light on four posts; the aft wall (the portal's) clad in lit wooden slats, the forward wall's big screens as windows on the stars; light walls and ceiling over a dark floor,
+    a field of luminous panels, floor guide lines; the directory stele by the Mess Hall's portal."""
     spec, L, D, H = _dims("concourse")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.05, ceil=COMPOSITE, accent="warm_dim", cove="white_warm",
-               rib_mat=TRIM, skirt=STRUCT)
+    st = Style(floor=DECK, floor_mode="plates", wall_lo=WOOD, wall_hi=IVORY, wain_h=1.05, ceil=IVORY, accent="warm_dim", cove="white_warm", rib_mat=TRIM, skirt=STRUCT)
     doors = [{"wall": "left", "x": 18.0, "w": 3.4, "h": 3.3}, {"wall": "right", "x": 18.0, "w": 4.0, "h": 3.4}]
     for gx in (3.7, 11.7):
         doors.append({"wall": "near", "x": gx, "w": 3.2, "h": 3.0})
         doors.append({"wall": "far", "x": gx, "w": 3.2, "h": 3.0})
     build_shell(b, spec, st, doors=doors, bare=("near", "far"), far_door=True)
     xa, xf = WS + WF, L - WS - WF                       # the finished faces of the aft and forward walls
-    # the Mess Hall's portal on the aft wall, the lift bank beside it
+    # ---- the aft wall: the Mess Hall's portal between two walls of lit slats, the directory by it
     place(b, xa, 18.0, 0, portal, 3.4, 3.3, 3.7, "room_mess", 1.9)
-    for yc in (25.6, 28.4):
-        place(b, xa, yc, 0, lift_door)
-    b.body.box((xa, 24.5, 3.1), (xa + 0.12, 29.5, 3.7), COMPOSITE)
-    b.body.box((xa, 24.5, 3.1), (xa + 0.14, 29.5, 3.15), TRIM)
-    b.emit.label((xa + 0.125, 26.2, 3.4), 1.5, 0.3, (1, 0, 0), "room_lift")
-    b.emit.label((xa + 0.125, 28.8, 3.4), 0.42, 0.42, (1, 0, 0), "pict_lift")
-    lamp_strip(b.emit, (0.6, 24.5, 0.006), (3.4, 24.5, 0.006), 0.05, 0.004, "amber_dim", LAMP_DIM)
-    lamp_strip(b.emit, (0.6, 29.5, 0.006), (3.4, 29.5, 0.006), 0.05, 0.004, "amber_dim", LAMP_DIM)
-    lamp_strip(b.emit, (3.4, 24.5, 0.006), (3.4, 29.5, 0.006), 0.05, 0.004, "amber_dim", LAMP_DIM)
-    # the directory, the planter island with its ring light, benches around it
-    place(b, 2.7, 11.5, 0, stele, 1.3, 0.5, 2.4, "room_directory")
-    place(b, 9.0, 18.0, 0, F.planter, 4.4, 2.2, 0.55, 5, 3, True)
+    _lamella(b, xa, +1, 2.2, 15.6, 0.3, 3.4)
+    _lamella(b, xa, +1, 20.4, 33.8, 0.3, 3.4)
+    place(b, xa + 0.5, 14.6, 0, F.bench, 1.8, 0.45, 0.46, FABRIC_NAVY)
+    place(b, xa + 0.5, 21.4, 0, F.bench, 1.8, 0.45, 0.46, FABRIC_NAVY)
+    place(b, 2.6, 12.0, 0, stele, 1.3, 0.5, 2.4, "room_directory")
+    # ---- the garden island under its ring of light, benches round its ends
+    b.body.cyl((9.0, 18.0, 0.0), (9.0, 18.0, 0.5), 2.0, STRUCT, seg=40)
+    b.fine.cyl((9.0, 18.0, 0.5), (9.0, 18.0, 0.54), 2.0, TRIM, seg=40)
+    b.soft.cyl((9.0, 18.0, 0.5), (9.0, 18.0, 0.57), 1.9, SOIL, seg=40)
+    _tree(b, 9.0, 18.0)
+    for (px, py) in ((7.6, 17.0), (10.4, 19.0), (8.0, 19.4), (10.0, 16.6), (9.0, 19.8), (9.0, 16.2)):
+        b.soft.sphere((px, py, 0.72), 0.2, LEAF, seg=10, rings=6)
     place(b, 6.75, 18.0, 0, F.bench, 3.6, 0.5, 0.46, FABRIC_GREY)
     place(b, 11.25, 18.0, 0, F.bench, 3.6, 0.5, 0.46, FABRIC_GREY)
     _ring(b.emit, 9.0, 18.0, H - 0.075, 3.3, "white_warm", 64, 0.07, LAMP)
     _ring(b.emit, 9.0, 18.0, H - 0.075, 2.5, "warm_dim", 48, 0.04, LAMP_DIM)
     b.body.cyl((9.0, 18.0, H - 0.05), (9.0, 18.0, H - 0.075), 3.4, TRIM, seg=64)
     _ring(b.emit, 9.0, 18.0, 0.004, 3.7, "guide_warm", 64, 0.04, LAMP_DIM)
-    # floor guide lines: along the gates, to the Mess portal and the Spine
-    for x in (3.7, 11.7):
-        for (y0, y1) in ((0.6, 9.5), (26.5, D - 0.6)) if x == 3.7 else ((0.6, 14.4), (21.6, D - 0.6)):
-            lamp_strip(b.emit, (x, y0, 0.006), (x, y1, 0.006), 0.04, 0.004, "guide", LAMP_DIM)
-    lamp_strip(b.emit, (0.5, 18.0, 0.006), (5.0, 18.0, 0.006), 0.04, 0.004, "guide", LAMP_DIM)
-    lamp_strip(b.emit, (13.0, 18.0, 0.006), (L - 0.4, 18.0, 0.006), 0.04, 0.004, "guide", LAMP_DIM)
-    # the side walls between the gates: benches with screens above, plants at the corners
-    for (y, yaw) in ((0.7, 90), (D - 0.7, -90)):
-        place(b, 7.7, y, yaw, F.bench, 3.8, 0.5, 0.46, FABRIC_NAVY)
-        place(b, 7.7, 0.08 if y < 1 else D - 0.08, yaw, F.wall_screen, 2.6, 1.4, "scr_map" if y < 1 else "scr_news", z=1.75)
-    for (x, y) in ((1.2, 1.4), (1.2, D - 1.4), (L - 1.2, 1.4), (L - 1.2, D - 1.4)):
-        place(b, x, y, 0, F.planter, 1.2, 0.7, 0.5, 3, int(x * 3 + y), True)
-    # the forward wall around the Spine's opening: section plate and pictograms, screens
-    place(b, xf, 11.6, 180, F.wall_screen, 2.4, 1.3, "scr_sched", z=1.8)
-    place(b, xf, 24.4, 180, F.wall_screen, 2.4, 1.3, "scr_lab", z=1.8)
+    # ---- the café (north of the island): a canopy, a carpet, the counter on the east side with its back bar, stools along it, tables with chairs
+    cx0, cx1, cy0, cy1 = 5.4, 10.0, 2.4, 12.6
+    place(b, 7.7, 7.5, 0, G.rug, 4.2, 9.6, FABRIC_RUST, FABRIC_SAND)
+    _canopy(b, cx0, cx1, cy0, cy1, 2.95)
+    place(b, 8.7, 7.5, 180, G.bar_counter, 6.0, 0.7, 1.08)
+    place(b, 9.9, 7.5, 180, G.back_bar, 5.2, 2.1, 0.34, 7)
+    place(b, 9.5, 5.2, 180, G.coffee_machine)
+    for k in range(4):
+        place(b, 7.95, 5.0 + k * 1.35, 0, G.bar_stool, 0.72, FABRIC_RUST)
+    for (ty, tyaw) in ((3.9, 0), (11.2, 0)):
+        place(b, 6.4, ty, 0, F.table, 1.0, 0.8, 0.74, WOOD, TRIM, True)
+        for (dx, dy, yaw) in ((-0.8, 0.0, 0), (0.8, 0.0, 180)):
+            place(b, 6.4 + dx, ty + dy, yaw, F.chair, FABRIC_RUST)
+    place(b, 6.4, 7.5, 0, F.low_table, 0.9, 0.6, 0.42, WOOD)
+    place(b, 5.7, 7.5, 0, F.sofa, 2.0, FABRIC_RUST)
+    b.emit.label((cx0 + 0.02, 7.5, 2.7), 2.2, 0.3, (1, 0, 0), "room_canteen")                          # the café's sign on the canopy's west face
+    place(b, 9.95, 2.65, 180, F.wall_screen, 0.9, 0.5, "scr_menu", z=1.2)
+    # ---- the ship's store (south of the island)
+    sx0, sx1, sy0, sy1 = 5.4, 10.0, 23.4, 33.6
+    place(b, 7.7, 28.5, 0, G.rug, 4.2, 9.6, FABRIC_NAVY, FABRIC_SAND)
+    _canopy(b, sx0, sx1, sy0, sy1, 2.95)
+    place(b, 9.9, 28.5, 180, N.cell_wall_rack, 7.0, 0.45, 2.1, 71)                                     # the stock on the east side, and the till counter facing it across the aisle
+    place(b, 8.2, 26.2, 180, F.counter, 2.2, 0.65, 1.0, LAMINATE, COMPOSITE, True, False)
+    place(b, 8.2, 26.2, 180, F.monitor, 0.4, 0.25, "scr_menu", False, z=1.0)
+    place(b, 7.8, 29.8, 90, N.cell_wall_rack, 2.6, 0.5, 1.5, 72)                                       # a gondola with the day's goods, and a rail of clothing
+    b.body.cyl((6.2, 31.0, 1.65), (6.2, 33.2, 1.65), 0.02, STEEL, seg=8)
+    for k in range(5):
+        b.soft.box((6.18, 31.1 + k * 0.4, 0.8), (6.22, 31.3 + k * 0.4, 1.65), (FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, FABRIC_GREY, FABRIC_NAVY)[k])
+    b.emit.label((sx0 + 0.02, 28.5, 2.7), 2.0, 0.3, (1, 0, 0), "eq_till")
+    place(b, 7.0, 23.9, 90, F.wall_screen, 0.9, 0.5, "scr_news", z=1.2)
+    # ---- the forward wall around the Spine's opening: screens as windows on the stars, the section plate, the pictograms
+    place(b, xf, 8.8, 180, F.wall_screen, 6.0, 2.2, "scr_star", z=0.7)
+    place(b, xf, 27.2, 180, F.wall_screen, 6.0, 2.2, "scr_star", z=0.7)
+    place(b, xf, 3.4, 180, F.wall_screen, 2.2, 1.3, "scr_sched", z=1.4)
+    place(b, xf, 32.6, 180, F.wall_screen, 2.2, 1.3, "scr_news", z=1.4)
     b.emit.label_fit((xf - 0.002, 14.6, 2.9), 0.9, "sec_4B", (-1, 0, 0))
     b.emit.label_fit((xf - 0.002, 21.4, 2.9), 0.7, "pict_obs", (-1, 0, 0))
     b.emit.label_fit((xf - 0.002, 14.6, 1.7), 0.5, "arrow_fwd", (-1, 0, 0))
-    ceiling_panels(b, L, D, H, 3, 6, "white_warm", 1.6, 0.9, 0.5, LAMP_HOT)
+    place(b, xf - 0.4, 15.2, 180, F.bench, 1.6, 0.45, 0.46, FABRIC_GREY)
+    place(b, xf - 0.4, 20.8, 180, F.bench, 1.6, 0.45, 0.46, FABRIC_GREY)
+    # ---- floor guide lines along the gates and the axis, benches and screens on the side walls between the gates, plants in the corners
+    for x in (3.7, 11.7):
+        for (y0, y1) in ((0.6, 2.2), (33.8, D - 0.6)) if x == 3.7 else ((0.6, 2.2), (33.8, D - 0.6)):
+            lamp_strip(b.emit, (x, y0, 0.006), (x, y1, 0.006), 0.04, 0.004, "guide", LAMP_DIM)
+    lamp_strip(b.emit, (0.5, 18.0, 0.006), (5.0, 18.0, 0.006), 0.04, 0.004, "guide", LAMP_DIM)
+    lamp_strip(b.emit, (13.0, 18.0, 0.006), (L - 0.4, 18.0, 0.006), 0.04, 0.004, "guide", LAMP_DIM)
+    for (y, yaw) in ((0.7, 90), (D - 0.7, -90)):
+        place(b, 7.7, y, yaw, F.bench, 3.8, 0.5, 0.46, FABRIC_NAVY)
+        place(b, 7.7, 0.08 if y < 1 else D - 0.08, yaw, F.wall_screen, 2.6, 1.4, "scr_map" if y < 1 else "scr_news", z=1.75)
+    for (x, y) in ((1.2, 1.4), (1.2, D - 1.4), (L - 1.2, 1.4), (L - 1.2, D - 1.4), (4.5, 14.2), (13.2, 14.2), (4.5, 21.8), (13.2, 21.8)):
+        place(b, x, y, 0, F.planter, 1.2, 0.7, 0.5, 3, int(x * 3 + y), True)
+    for i in range(4):                                                                                  # the field of ceiling light: four rows of nine panels
+        for j in range(9):
+            cx = 1.4 + (i + 0.5) * (L - 2.8) / 4
+            cy = 1.4 + (j + 0.5) * (D - 2.8) / 9
+            _panel(b, cx - 0.5, cx + 0.5, cy - 0.25, cy + 0.25, H - 0.05)
     return b.build(name)
 
 
 # ------------------------------------------------------------------------------------------------------------ berthing lobby
 def berth_lobby(name: str = "SM_SHIP_BerthLobby"):
-    """14.6 x 36 x 3.6. x = 0 is the aft wall the Berthing's entrance (y 18, 3 m wide) opens through, 0.4 m ahead of the Berthing's face."""
+    """14.6 x 36 x 3.6. x = 0 is the aft wall the Berthing's entrance (y 18, 3 m wide) opens through, 0.4 m ahead of the Berthing's face. The crew's living room: the entrance between two
+    walls of lit slats, a runner of carpet from it to the notice screen on the forward wall, pendant rings over the runner, and two lounge corners (a sofa, armchairs, a low table, a rug,
+    a standard lamp) each under its own dropped ceiling of warm light; a drinks point at the gate, lockers and plants, benches on the side walls."""
     spec, L, D, H = _dims("berth_lobby")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=FABRIC_GREY, floor_mode="covering", seams=False, wall_lo=WOOD, wall_hi=COMPOSITE, wain_h=1.05, ceil=IVORY, accent="warm_dim", cove="white_warm",
+    st = Style(floor=FABRIC_GREY, floor_mode="covering", seams=False, wall_lo=WOOD, wall_hi=IVORY, wain_h=1.05, ceil=IVORY, accent="warm_dim", cove="white_warm",
                rib_mat=TRIM, skirt=WOOD)
     doors = [{"wall": "left", "x": 18.0, "w": 3.2, "h": 3.1}]
     for gx in (5.3, 9.3):
@@ -177,7 +268,15 @@ def berth_lobby(name: str = "SM_SHIP_BerthLobby"):
     b.body.box((-0.4, 16.36, 0.0), (0.0, 16.4, 3.1), TRIM)
     b.body.box((-0.4, 19.6, 0.0), (0.0, 19.64, 3.1), TRIM)
     b.body.box((-0.4, 16.36, 3.1), (0.0, 19.64, 3.16), TRIM)
-    # two sitting groups by the forward wall, a rug, low tables, plants
+    # the aft wall between its two doors' sides: lit slats; a runner of carpet from the entrance to the forward wall, rings of light over it
+    _lamella(b, xa, +1, 2.0, 15.4, 0.3, 3.3)
+    _lamella(b, xa, +1, 20.6, 34.0, 0.3, 3.3)
+    place(b, 7.4, 18.0, 0, G.rug, 11.6, 2.8, FABRIC_RUST, FABRIC_SAND)
+    for x in (3.4, 7.4, 11.4):
+        b.fine.cyl((x, 18.0, H - 0.05), (x, 18.0, H - 0.5), 0.012, TRIM, seg=6)
+        _ring(b.emit, x, 18.0, H - 0.5, 0.75, "white_warm", 40, 0.05, LAMP)
+        _ring(b.emit, x, 18.0, H - 0.5, 0.5, "warm_dim", 32, 0.03, LAMP_DIM)
+    # two lounge corners by the forward wall, a rug, a low table, a standard lamp, plants, each under a dropped ceiling
     for k, yc in enumerate((8.0, 28.0)):
         place(b, 10.6, yc, 0, G.rug, 4.4, 6.0, FABRIC_NAVY, FABRIC_SAND)
         place(b, 10.6, yc, 0, F.low_table, 0.7, 1.4, 0.4, WOOD)
@@ -185,6 +284,8 @@ def berth_lobby(name: str = "SM_SHIP_BerthLobby"):
         place(b, 8.7, yc - 1.4, 0, F.armchair, FABRIC_SAND)
         place(b, 8.7, yc + 1.4, 0, F.armchair, FABRIC_SAND)
         place(b, 13.5, yc + (2.6 if k == 0 else -2.6), 0, F.potted_plant, 1.3, k + 1)
+        place(b, 8.9, yc + (3.0 if k == 0 else -3.0), 0, F.lamp_standard, 1.6, "white_warm")
+        _canopy(b, 7.0, 13.9, yc - 3.5, yc + 3.5, 2.95)
     place(b, xf, 18.0, 180, F.wall_screen, 3.6, 1.9, "scr_sched", z=1.95)
     b.emit.label_fit((xf - 0.002, 18.0, 3.05), 1.5, "eq_notice", (-1, 0, 0))
     place(b, xf - 0.3, 14.0, 180, F.locker_row, 4, 0.5, 1.95, 0.5, COMPOSITE)
@@ -193,7 +294,11 @@ def berth_lobby(name: str = "SM_SHIP_BerthLobby"):
     place(b, 2.6, 0.7, 90, G.coffee_machine, z=0.0)
     for (y, yaw) in ((0.7, 90), (D - 0.7, -90)):
         place(b, 7.3, y, yaw, F.bench, 2.6, 0.5, 0.46, FABRIC_NAVY)
-    ceiling_panels(b, L, D, H, 3, 6, "white_warm", 1.5, 0.8, 0.5, LAMP)
+    for i in range(3):
+        for j in range(8):
+            cx = 1.5 + (i + 0.5) * (L - 3.0) / 3
+            cy = 1.5 + (j + 0.5) * (D - 3.0) / 8
+            _panel(b, cx - 0.5, cx + 0.5, cy - 0.25, cy + 0.25, H - 0.05)
     return b.build(name)
 
 

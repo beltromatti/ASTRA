@@ -86,7 +86,7 @@ _reg("chapel", name="Chapel", kind="chapel", dept="services", L=16.0, D=16.0, h=
      spots=[spot("crew", "sit", 4.0, 5.75, 90), spot("crew", "sit", 4.8, 5.75, 90), spot("crew", "sit", 5.6, 5.75, 90), spot("crew", "sit", 4.4, 8.75, 90), spot("crew", "sit", 5.2, 8.75, 90),
             spot("crew", "sit", 10.4, 5.75, 90), spot("crew", "sit", 11.2, 5.75, 90), spot("crew", "sit", 12.0, 5.75, 90), spot("crew", "sit", 11.6, 8.75, 90),
             spot("chaplain", "stand", 8.0, 12.9, -90, "medical")],
-     lights=[light(8.0, 8.0, 3.6, 1800, 2700, (6.0, 6.0), 900), light(8.0, 14.0, 3.6, 2200, 3000, (6.0, 1.0), 800)])
+     lights=[light(8.0, 8.0, 3.6, 2600, 2700, (6.0, 6.0), 900), light(8.0, 14.0, 3.6, 2600, 3000, (6.0, 1.0), 800), light(8.0, 3.0, 3.6, 1400, 2800, (8.0, 1.0), 700)])
 _reg("shop", name="Ship's Store", kind="shop", dept="services", L=16.0, D=16.0, h=3.4, plate="shop",
      doors=[door("near", 6.0)], systems=["power_bus", "supply"],
      spots=[spot("storekeeper", "sit", 12.95, 3.6, 180, "services"), spot("crew", "stand", 7.0, 9.1, -90), spot("crew", "stand", 7.0, 6.9, 90), spot("crew", "stand", 9.0, 9.4, 180)],
@@ -100,15 +100,17 @@ _reg("sim_bay", name="Simulator Bay", kind="simulator", dept="flight", L=24.0, D
 _reg("berthing", name="Crew Berthing Bay", kind="cabins", dept="services", L=24.0, D=16.0, h=3.4, plate="berthing_bay",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
      spots=[spot("sleeper", "sleep", 2.0 + 3.0 * k, 3.0 + 3.2 * j, 90 if j % 2 == 0 else -90, "services") for k in range(7) for j in range(4)],
-     lights=[light(8.0, 8.0, 3.2, 1800, 3000, (10.0, 0.6), 700), light(18.0, 8.0, 3.2, 1800, 3000, (8.0, 0.6), 700)])
+     lights=[light(6.0, 4.0, 3.2, 1500, 3000, (10.0, 0.6), 600), light(18.0, 4.0, 3.2, 1500, 3000, (8.0, 0.6), 600), light(6.0, 12.0, 3.2, 1500, 3000, (10.0, 0.6), 600),
+             light(18.0, 12.0, 3.2, 1500, 3000, (8.0, 0.6), 600)])
 _reg("suites", name="Senior Officers' Quarters", kind="cabins", dept="command", L=24.0, D=12.0, h=3.2, plate="suites",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
      spots=[spot("officer", "sleep", 2.6 + 6.0 * k, 9.0, 90, "command") for k in range(4)] + [spot("officer", "sit", 3.4 + 6.0 * k, 5.0, 90, "command") for k in range(4)],
-     lights=[light(6.0, 6.0, 3.1, 1600, 3200, (4.0, 3.0), 700), light(18.0, 6.0, 3.1, 1600, 3200, (4.0, 3.0), 700)])
+     lights=[light(3.0, 6.0, 3.1, 1100, 3200, (4.0, 3.0), 500), light(9.0, 6.0, 3.1, 1100, 3200, (4.0, 3.0), 500), light(15.0, 6.0, 3.1, 1100, 3200, (4.0, 3.0), 500),
+             light(21.0, 6.0, 3.1, 1100, 3200, (4.0, 3.0), 500), light(12.0, 1.4, 3.1, 900, 3600, (20.0, 0.6), 500)])
 _reg("single_cabins", name="Officers' Cabins", kind="cabins", dept="services", L=24.0, D=4.0, h=3.2, plate="cabins_row",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
      spots=[spot("officer", "sleep", 2.0 + 4.0 * k, 2.4, 90, "services") for k in range(6)],
-     lights=[light(12.0, 2.0, 3.1, 1500, 3200, (20.0, 0.6), 600)])
+     lights=[light(4.0, 2.0, 3.1, 1000, 3200, (6.0, 0.6), 500), light(12.0, 2.0, 3.1, 1000, 3200, (6.0, 0.6), 500), light(20.0, 2.0, 3.1, 1000, 3200, (6.0, 0.6), 500)])
 
 # ---- flight (Deck 9) -------------------------------------------------------------------------------------------------------------------------------------------------------------
 _reg("drone_bay", name="Drone Bay", kind="hangar", dept="flight", L=32.0, D=16.0, h=3.7, plate="drone_bay",

@@ -12,7 +12,7 @@ yaw in degrees (0 faces +x, 90 faces +y: into the room), and `dept` of the unifo
 """
 from __future__ import annotations
 
-from ship_catalog import DOOR_H, DOOR_W, GATE_H, GATE_W
+from ship_catalog import DOOR_H, DOOR_W, GATE_H, GATE_W, HOUSING_D
 
 # ---------------------------------------------------------------------------------------------------------------- helpers
 
@@ -161,15 +161,23 @@ _reg("pharmacy", name="Pharmacy", kind="pharmacy", dept="medical", L=12.0, D=16.
 _reg("concourse", name="Mess Concourse", kind="concourse", dept="services", L=17.7, D=36.0, h=3.7, plate="concourse", doors=[],
      systems=["power_bus", "life_support"], special=True,
      spots=[spot("crew", "stand", 4.0, 11.5, 180), spot("crew", "sit", 6.75, 17.0, 0), spot("crew", "sit", 6.75, 19.0, 0), spot("crew", "sit", 11.25, 17.0, 180),
-            spot("crew", "sit", 11.25, 19.0, 180), spot("crew", "sit", 7.0, 0.75, 90), spot("crew", "sit", 8.4, 35.25, -90), spot("crew", "stand", 3.4, 27.0, 0)],
-     lights=[light(9.0, 18.0, 3.6, 9000, 4200, (10.0, 2.0), 1400), light(9.0, 8.0, 3.6, 5000, 3600, (6.0, 2.0), 1100),
-             light(9.0, 28.0, 3.6, 5000, 3600, (6.0, 2.0), 1100)])
+            spot("crew", "sit", 11.25, 19.0, 180), spot("crew", "sit", 7.0, 0.75, 90), spot("crew", "sit", 8.4, 35.25, -90), spot("crew", "stand", 3.4, 27.0, 0),
+            # the café (north): the stools along the counter, the chairs at the two tables, the sofa, the barista behind the bar
+            spot("crew", "sit", 7.95, 5.0, 0), spot("crew", "sit", 7.95, 6.35, 0), spot("crew", "sit", 7.95, 7.7, 0), spot("crew", "sit", 7.95, 9.05, 0),
+            spot("crew", "sit", 5.65, 3.9, 0), spot("crew", "sit", 7.15, 3.9, 180), spot("crew", "sit", 5.65, 11.2, 0), spot("crew", "sit", 7.15, 11.2, 180),
+            spot("crew", "sit", 5.75, 6.9, 0), spot("crew", "sit", 5.75, 8.1, 0), spot("barista", "work", 9.4, 7.5, 180, "services"),
+            # the ship's store (south): the cashier behind the counter, shoppers at the shelves
+            spot("storekeeper", "work", 8.95, 26.2, 180, "services"), spot("crew", "stand", 7.0, 26.2, 0), spot("crew", "stand", 7.8, 28.6, 90), spot("crew", "stand", 6.4, 29.0, 0)],
+     lights=[light(9.0, 18.0, 3.6, 9000, 4200, (10.0, 2.0), 1400), light(7.7, 7.5, 2.85, 4500, 3000, (4.0, 8.0), 700), light(7.7, 28.5, 2.85, 4500, 3200, (4.0, 8.0), 700),
+             light(3.0, 18.0, 3.6, 3500, 3200, (3.0, 8.0), 900), light(15.0, 18.0, 3.6, 3500, 3800, (3.0, 8.0), 900), light(9.0, 2.0, 3.6, 2500, 3600, (8.0, 2.0), 800),
+             light(9.0, 34.0, 3.6, 2500, 3600, (8.0, 2.0), 800)])
 _reg("berth_lobby", name="Berthing Lobby", kind="concourse", dept="services", L=14.6, D=36.0, h=3.6, plate=None, doors=[],
      systems=["power_bus", "life_support"], special=True,
      spots=[spot("crew", "sit", 12.4, 7.2, 180), spot("crew", "sit", 12.4, 8.8, 180), spot("crew", "sit", 8.7, 6.6, 0), spot("crew", "sit", 12.4, 27.2, 180),
             spot("crew", "sit", 12.4, 28.8, 180), spot("crew", "sit", 8.7, 29.4, 0)],
-     lights=[light(7.3, 18.0, 3.5, 4500, 3600, (8.0, 3.0), 1200), light(7.3, 8.0, 3.5, 2500, 3200, (5.0, 2.0), 900),
-             light(7.3, 28.0, 3.5, 2500, 3200, (5.0, 2.0), 900)])
+     lights=[light(7.3, 18.0, 3.5, 4500, 3600, (8.0, 3.0), 1200), light(10.4, 8.0, 2.85, 4000, 3000, (6.0, 6.0), 700), light(10.4, 28.0, 2.85, 4000, 3000, (6.0, 6.0), 700),
+             light(3.5, 18.0, 3.4, 2500, 3200, (3.0, 3.0), 800), light(11.5, 18.0, 3.4, 2500, 3200, (3.0, 3.0), 800), light(7.3, 3.0, 3.4, 1800, 3600, (6.0, 2.0), 700),
+             light(7.3, 33.0, 3.4, 1800, 3600, (6.0, 2.0), 700)])
 _reg("stair_tower", name="Stair Tower", kind="stairs", dept="neutral", L=8.0, D=8.0, h=3.4, plate="stairs", doors=[door("near", 2.0)],
      systems=["power_bus"], special=True, spots=[], lights=[light(4.0, 4.0, 3.3, 3000, 4500, (3.0, 3.0), 800)])
 _reg("bow_obs", name="Bow Observation", kind="observation", dept="command", L=20.0, D=32.0, h=3.7, plate="bow_obs", doors=[],
@@ -509,6 +517,13 @@ _reg("lift_bank_b", name="Command Turbolift Lobby", kind="lobby", dept="command"
      doors=[door("near", 3.2, GATE_W, GATE_H)], systems=["power_bus", "life_support", "lift"], special=True,
      spots=[spot("crew", "stand", 2.4, 2.8, 90, "command"), spot("crew", "stand", 5.6, 4.6, -90, "command")],
      lights=[light(4.0, 3.1, 3.55, 2600, 4200, (4.0, 2.4), 900)])
+# the bridge lift's housing on Deck 1 (hand-placed behind the port corridor's end, ship_deck1.py; its mesh is placed at yaw 180, so its x runs aft from the corridor's mouth and its y to port): the
+# vestibule of the two command shafts (1.7 m clear in front of their doors, 6.7 m wide) with the corridor's 3.2 m mouth in its fore wall (the `left` wall, x 0) and the shafts' tubes behind its aft
+# wall (the `right` wall: x L .. L + 3.0 is theirs); the roof is low (the block outside leaves 3.15 m: clear height 2.9, as the ready room's)
+_reg("lift_housing_bridge", name="Bridge Lift Housing", kind="lift", dept="command", L=2.0, D=HOUSING_D, h=2.9, plate=None,
+     doors=[door("left", 2.68, 3.2, 2.5)], systems=["power_bus", "life_support", "lift"], special=True,
+     spots=[spot("crew", "stand", 0.9, 4.0, 0, "command"), spot("crew", "stand", 0.9, 1.0, 0, "command")],
+     lights=[light(1.1, 3.5, 2.85, 600, 4200, (1.2, 4.0), 700)])
 # the damage-control station (8 x 8: a locker, a hose reel, the suits and the shoring, a plot of the section) at the nodes: behind the stair towers, by the lift banks
 _reg("dc_station", name="Damage-Control Station", kind="damage_control", dept="engineering", L=8.0, D=8.0, h=3.4, plate="dc",
      doors=[door("near", 2.0)], systems=["damage_control", "supply"],

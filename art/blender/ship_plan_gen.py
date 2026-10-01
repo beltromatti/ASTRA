@@ -63,7 +63,8 @@ def existing(B: Builder) -> None:
     add("lift_housing_bridge", "Bridge lift housing", 1, 1, "A", "lift", [-22.8, -8.2, -21.0, -1.0], (0.0, 3.2), None, "command", ["lift"], [],
         data="aquila_quarters.json",
         note="the housing behind the port corridor's end: since NAVE-3 its first 1.8 m (x -22.8 .. -21.0) are the vestibule of the two command turbolifts, whose shafts (x -25.8 .. -22.8) "
-             "stand in the rest of it (ship_vertical.BRIDGE_SHAFTS); the corridor's end cap (the old lift's door) is to be removed by the lift engine")
+             "stand in the rest of it (ship_vertical.BRIDGE_SHAFTS); its walls, floor, roof and the shafts' tubes are the mesh SM_SHIP_LiftHousingBridge (ship_deck1.py); the corridor's end cap, "
+             "the old lift's leaves and sign and the old floor under the shafts are removed by build_ship_interior.py")
     q = ex["quarters"]
     add("quarters", "Captain's Quarters", 1, 1, "A", "quarters", [q["box"][0], q["box"][1], q["box"][2], q["box"][3]], (q["box"][4], q["box"][5]),
         q["entrance"], "command", ["power_bus", "life_support"], [], data="aquila_quarters.json")

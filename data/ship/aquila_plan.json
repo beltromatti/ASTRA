@@ -1367,11 +1367,29 @@
    "doors": ["bridge_door_port", "d1_tl_b1_door", "d1_tl_b2_door"],
    "dept": "command",
    "systems": ["lift"],
-   "stations": [],
+   "stations": [
+    {"id": "lift_housing_bridge.s0", "role": "crew", "kind": "stand", "pos": [-21.7, -5.22, 0.0], "yaw": 180.0, "dept": "command"},
+    {"id": "lift_housing_bridge.s1", "role": "crew", "kind": "stand", "pos": [-21.7, -2.22, 0.0], "yaw": 180.0, "dept": "command"}
+   ],
    "plane": 1,
    "existing": true,
    "data": "aquila_quarters.json",
-   "note": "the housing behind the port corridor's end: since NAVE-3 its first 1.8 m (x -22.8 .. -21.0) are the vestibule of the two command turbolifts, whose shafts (x -25.8 .. -22.8) stand in the rest of it (ship_vertical.BRIDGE_SHAFTS); the corridor's end cap (the old lift's door) is to be removed by the lift engine"
+   "note": "the housing behind the port corridor's end: since NAVE-3 its first 1.8 m (x -22.8 .. -21.0) are the vestibule of the two command turbolifts, whose shafts (x -25.8 .. -22.8) stand in the rest of it (ship_vertical.BRIDGE_SHAFTS); its walls, floor, roof and the shafts' tubes are the mesh SM_SHIP_LiftHousingBridge (ship_deck1.py); the corridor's end cap, the old lift's leaves and sign and the old floor under the shafts are removed by build_ship_interior.py",
+   "lights": [
+    {
+     "type": "rect",
+     "pos": [-21.9, -4.72, 2.85],
+     "lumens": 600,
+     "temperature": 4200,
+     "size": [1.2, 4.0],
+     "radius": 700,
+     "shadows": false,
+     "id": "lift_housing_bridge.l0"
+    }
+   ],
+   "mesh": "SM_SHIP_LiftHousingBridge",
+   "pos": [-20.8, -1.22, 0.0],
+   "yaw": 180.0
   },
   {
    "id": "quarters",
@@ -1639,23 +1657,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [30.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [33.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A1.l0"
     },
     {
      "type": "rect",
-     "pos": [18.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [27.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [21.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [15.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A1.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [24.0, -3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A1.l4"
     }
    ],
    "plate": "suites",
@@ -1726,23 +1774,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [10.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [7.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A2.l0"
     },
     {
      "type": "rect",
-     "pos": [22.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [13.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [19.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [25.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A2.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [16.0, 3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A2.l4"
     }
    ],
    "plate": "suites",
@@ -1779,23 +1857,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [6.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [9.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A3.l0"
     },
     {
      "type": "rect",
-     "pos": [-6.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [3.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A3.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-3.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A3.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-9.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A3.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [0.0, -3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A3.l4"
     }
    ],
    "plate": "suites",
@@ -1832,23 +1940,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-14.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-17.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A4.l0"
     },
     {
      "type": "rect",
-     "pos": [-2.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-11.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A4.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-5.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A4.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [1.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A4.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [-8.0, 3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A4.l4"
     }
    ],
    "plate": "suites",
@@ -1885,23 +2023,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-38.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-41.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A5.l0"
     },
     {
      "type": "rect",
-     "pos": [-26.0, 8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-35.0, 8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A5.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-29.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A5.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-23.0, 8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A5.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [-32.0, 3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A5.l4"
     }
    ],
    "plate": "suites",
@@ -1938,23 +2106,53 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-34.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-31.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A6.l0"
     },
     {
      "type": "rect",
-     "pos": [-46.0, -8.0, -33.6],
-     "lumens": 1600,
+     "pos": [-37.0, -8.0, -33.6],
+     "lumens": 1100,
      "temperature": 3200,
      "size": [4.0, 3.0],
-     "radius": 700,
+     "radius": 500,
      "shadows": false,
      "id": "d2_suites_A6.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-43.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A6.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-49.0, -8.0, -33.6],
+     "lumens": 1100,
+     "temperature": 3200,
+     "size": [4.0, 3.0],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A6.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [-40.0, -3.4, -33.6],
+     "lumens": 900,
+     "temperature": 3600,
+     "size": [20.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_suites_A6.l4"
     }
    ],
    "plate": "suites",
@@ -2343,13 +2541,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-136.0, -24.0, -33.6],
-     "lumens": 1500,
+     "pos": [-128.0, -24.0, -33.6],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d2_single_cabins_C1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-136.0, -24.0, -33.6],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_single_cabins_C1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-144.0, -24.0, -33.6],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_single_cabins_C1.l2"
     }
    ],
    "plate": "cabins_row",
@@ -2384,13 +2602,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-136.0, 24.0, -33.6],
-     "lumens": 1500,
+     "pos": [-144.0, 24.0, -33.6],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d2_single_cabins_C2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-136.0, 24.0, -33.6],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_single_cabins_C2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-128.0, 24.0, -33.6],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d2_single_cabins_C2.l2"
     }
    ],
    "plate": "cabins_row",
@@ -9483,13 +9721,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-288.0, -24.0, -38.9],
-     "lumens": 1500,
+     "pos": [-280.0, -24.0, -38.9],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d3_single_cabins_D1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-288.0, -24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_D1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-296.0, -24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_D1.l2"
     }
    ],
    "plate": "cabins_row",
@@ -9524,13 +9782,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-288.0, 24.0, -38.9],
-     "lumens": 1500,
+     "pos": [-296.0, 24.0, -38.9],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d3_single_cabins_D2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-288.0, 24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_D2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-280.0, 24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_D2.l2"
     }
    ],
    "plate": "cabins_row",
@@ -10495,13 +10773,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-420.0, -24.0, -38.9],
-     "lumens": 1500,
+     "pos": [-412.0, -24.0, -38.9],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d3_single_cabins_F1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-420.0, -24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_F1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-428.0, -24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_F1.l2"
     }
    ],
    "plate": "cabins_row",
@@ -10536,13 +10834,33 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-420.0, 24.0, -38.9],
-     "lumens": 1500,
+     "pos": [-428.0, 24.0, -38.9],
+     "lumens": 1000,
      "temperature": 3200,
-     "size": [20.0, 0.6],
-     "radius": 600,
+     "size": [6.0, 0.6],
+     "radius": 500,
      "shadows": false,
      "id": "d3_single_cabins_F2.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-420.0, 24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_F2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-412.0, 24.0, -38.9],
+     "lumens": 1000,
+     "temperature": 3200,
+     "size": [6.0, 0.6],
+     "radius": 500,
+     "shadows": false,
+     "id": "d3_single_cabins_F2.l2"
     }
    ],
    "plate": "cabins_row",
@@ -14842,7 +15160,22 @@
     {"id": "d4_concourse.s4", "role": "crew", "kind": "sit", "pos": [-110.45, 1.0, -46.0], "yaw": 180.0, "dept": "services"},
     {"id": "d4_concourse.s5", "role": "crew", "kind": "sit", "pos": [-114.7, -17.25, -46.0], "yaw": 90.0, "dept": "services"},
     {"id": "d4_concourse.s6", "role": "crew", "kind": "sit", "pos": [-113.3, 17.25, -46.0], "yaw": 270.0, "dept": "services"},
-    {"id": "d4_concourse.s7", "role": "crew", "kind": "stand", "pos": [-118.3, 9.0, -46.0], "yaw": 0.0, "dept": "services"}
+    {"id": "d4_concourse.s7", "role": "crew", "kind": "stand", "pos": [-118.3, 9.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s8", "role": "crew", "kind": "sit", "pos": [-113.75, -13.0, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s9", "role": "crew", "kind": "sit", "pos": [-113.75, -11.65, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s10", "role": "crew", "kind": "sit", "pos": [-113.75, -10.3, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s11", "role": "crew", "kind": "sit", "pos": [-113.75, -8.95, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s12", "role": "crew", "kind": "sit", "pos": [-116.05, -14.1, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s13", "role": "crew", "kind": "sit", "pos": [-114.55, -14.1, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_concourse.s14", "role": "crew", "kind": "sit", "pos": [-116.05, -6.8, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s15", "role": "crew", "kind": "sit", "pos": [-114.55, -6.8, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_concourse.s16", "role": "crew", "kind": "sit", "pos": [-115.95, -11.1, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s17", "role": "crew", "kind": "sit", "pos": [-115.95, -9.9, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s18", "role": "barista", "kind": "work", "pos": [-112.3, -10.5, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_concourse.s19", "role": "storekeeper", "kind": "work", "pos": [-112.75, 8.2, -46.0], "yaw": 180.0, "dept": "services"},
+    {"id": "d4_concourse.s20", "role": "crew", "kind": "stand", "pos": [-114.7, 8.2, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_concourse.s21", "role": "crew", "kind": "stand", "pos": [-113.9, 10.6, -46.0], "yaw": 90.0, "dept": "services"},
+    {"id": "d4_concourse.s22", "role": "crew", "kind": "stand", "pos": [-115.3, 11.0, -46.0], "yaw": 0.0, "dept": "services"}
    ],
    "lights": [
     {
@@ -14857,23 +15190,63 @@
     },
     {
      "type": "rect",
-     "pos": [-112.7, -10.0, -42.4],
-     "lumens": 5000,
-     "temperature": 3600,
-     "size": [6.0, 2.0],
-     "radius": 1100,
+     "pos": [-114.0, -10.5, -43.15],
+     "lumens": 4500,
+     "temperature": 3000,
+     "size": [4.0, 8.0],
+     "radius": 700,
      "shadows": false,
      "id": "d4_concourse.l1"
     },
     {
      "type": "rect",
-     "pos": [-112.7, 10.0, -42.4],
-     "lumens": 5000,
-     "temperature": 3600,
-     "size": [6.0, 2.0],
-     "radius": 1100,
+     "pos": [-114.0, 10.5, -43.15],
+     "lumens": 4500,
+     "temperature": 3200,
+     "size": [4.0, 8.0],
+     "radius": 700,
      "shadows": false,
      "id": "d4_concourse.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-118.7, 0.0, -42.4],
+     "lumens": 3500,
+     "temperature": 3200,
+     "size": [3.0, 8.0],
+     "radius": 900,
+     "shadows": false,
+     "id": "d4_concourse.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [-106.7, 0.0, -42.4],
+     "lumens": 3500,
+     "temperature": 3800,
+     "size": [3.0, 8.0],
+     "radius": 900,
+     "shadows": false,
+     "id": "d4_concourse.l4"
+    },
+    {
+     "type": "rect",
+     "pos": [-112.7, -16.0, -42.4],
+     "lumens": 2500,
+     "temperature": 3600,
+     "size": [8.0, 2.0],
+     "radius": 800,
+     "shadows": false,
+     "id": "d4_concourse.l5"
+    },
+    {
+     "type": "rect",
+     "pos": [-112.7, 16.0, -42.4],
+     "lumens": 2500,
+     "temperature": 3600,
+     "size": [8.0, 2.0],
+     "radius": 800,
+     "shadows": false,
+     "id": "d4_concourse.l6"
     }
    ],
    "plate": "concourse",
@@ -14917,23 +15290,63 @@
     },
     {
      "type": "rect",
-     "pos": [-168.0, -10.0, -42.5],
-     "lumens": 2500,
-     "temperature": 3200,
-     "size": [5.0, 2.0],
-     "radius": 900,
+     "pos": [-164.9, -10.0, -43.15],
+     "lumens": 4000,
+     "temperature": 3000,
+     "size": [6.0, 6.0],
+     "radius": 700,
      "shadows": false,
      "id": "d4_berth_lobby.l1"
     },
     {
      "type": "rect",
-     "pos": [-168.0, 10.0, -42.5],
-     "lumens": 2500,
-     "temperature": 3200,
-     "size": [5.0, 2.0],
-     "radius": 900,
+     "pos": [-164.9, 10.0, -43.15],
+     "lumens": 4000,
+     "temperature": 3000,
+     "size": [6.0, 6.0],
+     "radius": 700,
      "shadows": false,
      "id": "d4_berth_lobby.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-171.8, 0.0, -42.6],
+     "lumens": 2500,
+     "temperature": 3200,
+     "size": [3.0, 3.0],
+     "radius": 800,
+     "shadows": false,
+     "id": "d4_berth_lobby.l3"
+    },
+    {
+     "type": "rect",
+     "pos": [-163.8, 0.0, -42.6],
+     "lumens": 2500,
+     "temperature": 3200,
+     "size": [3.0, 3.0],
+     "radius": 800,
+     "shadows": false,
+     "id": "d4_berth_lobby.l4"
+    },
+    {
+     "type": "rect",
+     "pos": [-168.0, -15.0, -42.6],
+     "lumens": 1800,
+     "temperature": 3600,
+     "size": [6.0, 2.0],
+     "radius": 700,
+     "shadows": false,
+     "id": "d4_berth_lobby.l5"
+    },
+    {
+     "type": "rect",
+     "pos": [-168.0, 15.0, -42.6],
+     "lumens": 1800,
+     "temperature": 3600,
+     "size": [6.0, 2.0],
+     "radius": 700,
+     "shadows": false,
+     "id": "d4_berth_lobby.l6"
     }
    ],
    "lane": "special",
@@ -15355,7 +15768,7 @@
     {
      "type": "rect",
      "pos": [20.0, 10.0, -42.4],
-     "lumens": 1800,
+     "lumens": 2600,
      "temperature": 2700,
      "size": [6.0, 6.0],
      "radius": 900,
@@ -15365,12 +15778,22 @@
     {
      "type": "rect",
      "pos": [20.0, 16.0, -42.4],
-     "lumens": 2200,
+     "lumens": 2600,
      "temperature": 3000,
      "size": [6.0, 1.0],
      "radius": 800,
      "shadows": false,
      "id": "d4_chapel_A1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [20.0, 5.0, -42.4],
+     "lumens": 1400,
+     "temperature": 2800,
+     "size": [8.0, 1.0],
+     "radius": 700,
+     "shadows": false,
+     "id": "d4_chapel_A1.l2"
     }
    ],
    "plate": "chapel_nave",
@@ -17168,23 +17591,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-180.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-182.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_C1.l0"
     },
     {
      "type": "rect",
-     "pos": [-170.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-170.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_C1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-182.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_C1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-170.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_C1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -17507,23 +17950,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-224.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-226.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_C2.l0"
     },
     {
      "type": "rect",
-     "pos": [-214.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-214.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_C2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-226.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_C2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-214.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_C2.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -18771,23 +19234,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-360.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-362.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_E1.l0"
     },
     {
      "type": "rect",
-     "pos": [-350.0, 30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-350.0, 26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_E1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-362.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_E1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-350.0, 34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_E1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -19297,23 +19780,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-416.0, -30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-414.0, -26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_F1.l0"
     },
     {
      "type": "rect",
-     "pos": [-426.0, -30.0, -42.8],
-     "lumens": 1800,
+     "pos": [-426.0, -26.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_F1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-414.0, -34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_F1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-426.0, -34.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_F1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -19404,23 +19907,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-424.0, 10.0, -42.8],
-     "lumens": 1800,
+     "pos": [-426.0, 6.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_F2.l0"
     },
     {
      "type": "rect",
-     "pos": [-414.0, 10.0, -42.8],
-     "lumens": 1800,
+     "pos": [-414.0, 6.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_F2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-426.0, 14.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_F2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-414.0, 14.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_F2.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -20170,23 +20693,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-500.0, -10.0, -42.8],
-     "lumens": 1800,
+     "pos": [-498.0, -6.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_H1.l0"
     },
     {
      "type": "rect",
-     "pos": [-510.0, -10.0, -42.8],
-     "lumens": 1800,
+     "pos": [-510.0, -6.0, -42.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d4_berthing_H1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-498.0, -14.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_H1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-510.0, -14.0, -42.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d4_berthing_H1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -41399,23 +41942,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-384.0, -10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-382.0, -6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_E1.l0"
     },
     {
      "type": "rect",
-     "pos": [-394.0, -10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-394.0, -6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_E1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-382.0, -14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_E1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-394.0, -14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_E1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -41472,23 +42035,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-392.0, 10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-394.0, 6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_E2.l0"
     },
     {
      "type": "rect",
-     "pos": [-382.0, 10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-382.0, 6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_E2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-394.0, 14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_E2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-382.0, 14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_E2.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -42193,23 +42776,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-436.0, 10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-438.0, 6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_F1.l0"
     },
     {
      "type": "rect",
-     "pos": [-426.0, 10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-426.0, 6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_F1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-438.0, 14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_F1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-426.0, 14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_F1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -42930,23 +43533,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-508.0, -10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-506.0, -6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_H1.l0"
     },
     {
      "type": "rect",
-     "pos": [-518.0, -10.0, -50.8],
-     "lumens": 1800,
+     "pos": [-518.0, -6.0, -50.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d6_berthing_H1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-506.0, -14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_H1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-518.0, -14.0, -50.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d6_berthing_H1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -71578,23 +72201,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-136.0, -10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-134.0, -6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E1.l0"
     },
     {
      "type": "rect",
-     "pos": [-146.0, -10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-146.0, -6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-134.0, -14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-146.0, -14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -72487,23 +73130,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-184.0, -10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-182.0, -6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E2.l0"
     },
     {
      "type": "rect",
-     "pos": [-194.0, -10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-194.0, -6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E2.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-182.0, -14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E2.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-194.0, -14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E2.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -72560,23 +73223,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-192.0, 10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-194.0, 6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E3.l0"
     },
     {
      "type": "rect",
-     "pos": [-182.0, 10.0, -62.8],
-     "lumens": 1800,
+     "pos": [-182.0, 6.0, -62.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d9_berthing_E3.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-194.0, 14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E3.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-182.0, 14.0, -62.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d9_berthing_E3.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -94634,23 +95317,43 @@
    "lights": [
     {
      "type": "rect",
-     "pos": [-244.0, 10.0, -70.8],
-     "lumens": 1800,
+     "pos": [-246.0, 6.0, -70.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [10.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d11_berthing_E1.l0"
     },
     {
      "type": "rect",
-     "pos": [-234.0, 10.0, -70.8],
-     "lumens": 1800,
+     "pos": [-234.0, 6.0, -70.8],
+     "lumens": 1500,
      "temperature": 3000,
      "size": [8.0, 0.6],
-     "radius": 700,
+     "radius": 600,
      "shadows": false,
      "id": "d11_berthing_E1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-246.0, 14.0, -70.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [10.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d11_berthing_E1.l2"
+    },
+    {
+     "type": "rect",
+     "pos": [-234.0, 14.0, -70.8],
+     "lumens": 1500,
+     "temperature": 3000,
+     "size": [8.0, 0.6],
+     "radius": 600,
+     "shadows": false,
+     "id": "d11_berthing_E1.l3"
     }
    ],
    "plate": "berthing_bay",
@@ -140935,7 +141638,7 @@
   {
    "id": "d1_tl_b1_door",
    "deck": 1,
-   "pos": [-23.0, -6.7, 0.0],
+   "pos": [-22.8, -6.7, 0.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -140948,7 +141651,7 @@
   {
    "id": "d2_tl_b1_door",
    "deck": 2,
-   "pos": [-23.0, -6.7, -36.7],
+   "pos": [-22.8, -6.7, -36.7],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -140961,7 +141664,7 @@
   {
    "id": "d3_tl_b1_door",
    "deck": 3,
-   "pos": [-23.0, -6.7, -42.0],
+   "pos": [-22.8, -6.7, -42.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -140974,7 +141677,7 @@
   {
    "id": "d4_tl_b1_door",
    "deck": 4,
-   "pos": [-23.0, -6.7, -46.0],
+   "pos": [-22.8, -6.7, -46.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -140987,7 +141690,7 @@
   {
    "id": "d5_tl_b1_door",
    "deck": 5,
-   "pos": [-23.0, -6.7, -50.0],
+   "pos": [-22.8, -6.7, -50.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141000,7 +141703,7 @@
   {
    "id": "d6_tl_b1_door",
    "deck": 6,
-   "pos": [-23.0, -6.7, -54.0],
+   "pos": [-22.8, -6.7, -54.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141013,7 +141716,7 @@
   {
    "id": "d7_tl_b1_door",
    "deck": 7,
-   "pos": [-23.0, -6.7, -58.0],
+   "pos": [-22.8, -6.7, -58.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141026,7 +141729,7 @@
   {
    "id": "d8_tl_b1_door",
    "deck": 8,
-   "pos": [-23.0, -6.7, -62.0],
+   "pos": [-22.8, -6.7, -62.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141039,7 +141742,7 @@
   {
    "id": "d9_tl_b1_door",
    "deck": 9,
-   "pos": [-23.0, -6.7, -66.0],
+   "pos": [-22.8, -6.7, -66.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141052,7 +141755,7 @@
   {
    "id": "d10_tl_b1_door",
    "deck": 10,
-   "pos": [-23.0, -6.7, -70.0],
+   "pos": [-22.8, -6.7, -70.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141065,7 +141768,7 @@
   {
    "id": "d11_tl_b1_door",
    "deck": 11,
-   "pos": [-23.0, -6.7, -74.0],
+   "pos": [-22.8, -6.7, -74.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141078,7 +141781,7 @@
   {
    "id": "d12_tl_b1_door",
    "deck": 12,
-   "pos": [-23.0, -6.7, -78.0],
+   "pos": [-22.8, -6.7, -78.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141091,7 +141794,7 @@
   {
    "id": "d1_tl_b2_door",
    "deck": 1,
-   "pos": [-23.0, -3.7, 0.0],
+   "pos": [-22.8, -3.7, 0.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141104,7 +141807,7 @@
   {
    "id": "d2_tl_b2_door",
    "deck": 2,
-   "pos": [-23.0, -3.7, -36.7],
+   "pos": [-22.8, -3.7, -36.7],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141117,7 +141820,7 @@
   {
    "id": "d3_tl_b2_door",
    "deck": 3,
-   "pos": [-23.0, -3.7, -42.0],
+   "pos": [-22.8, -3.7, -42.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141130,7 +141833,7 @@
   {
    "id": "d4_tl_b2_door",
    "deck": 4,
-   "pos": [-23.0, -3.7, -46.0],
+   "pos": [-22.8, -3.7, -46.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141143,7 +141846,7 @@
   {
    "id": "d5_tl_b2_door",
    "deck": 5,
-   "pos": [-23.0, -3.7, -50.0],
+   "pos": [-22.8, -3.7, -50.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141156,7 +141859,7 @@
   {
    "id": "d6_tl_b2_door",
    "deck": 6,
-   "pos": [-23.0, -3.7, -54.0],
+   "pos": [-22.8, -3.7, -54.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141169,7 +141872,7 @@
   {
    "id": "d7_tl_b2_door",
    "deck": 7,
-   "pos": [-23.0, -3.7, -58.0],
+   "pos": [-22.8, -3.7, -58.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141182,7 +141885,7 @@
   {
    "id": "d8_tl_b2_door",
    "deck": 8,
-   "pos": [-23.0, -3.7, -62.0],
+   "pos": [-22.8, -3.7, -62.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -141195,7 +141898,7 @@
   {
    "id": "d9_tl_b2_door",
    "deck": 9,
-   "pos": [-23.0, -3.7, -66.0],
+   "pos": [-22.8, -3.7, -66.0],
    "yaw": 0.0,
    "width": 1.6,
    "height": 2.4,
@@ -144724,18 +145427,18 @@
    "shaft": {"x": -24.3, "y": -6.7, "w": 2.6, "d": 2.6, "z": [-78.0, 0.0]},
    "car": {"w": 2.4, "d": 2.4, "h": 2.6},
    "landings": [
-    {"deck": 1, "z": 0.0, "door": [-23.0, -6.7, 0.0], "yaw": 180.0, "lobby": "lift_housing_bridge", "node": "lift.tl_b1.1.land"},
-    {"deck": 2, "z": -36.7, "door": [-23.0, -6.7, -36.7], "yaw": 180.0, "lobby": "d2_lift_b", "node": "lift.tl_b1.2.land"},
-    {"deck": 3, "z": -42.0, "door": [-23.0, -6.7, -42.0], "yaw": 180.0, "lobby": "d3_lift_b", "node": "lift.tl_b1.3.land"},
-    {"deck": 4, "z": -46.0, "door": [-23.0, -6.7, -46.0], "yaw": 180.0, "lobby": "d4_lift_b", "node": "lift.tl_b1.4.land"},
-    {"deck": 5, "z": -50.0, "door": [-23.0, -6.7, -50.0], "yaw": 180.0, "lobby": "d5_lift_b", "node": "lift.tl_b1.5.land"},
-    {"deck": 6, "z": -54.0, "door": [-23.0, -6.7, -54.0], "yaw": 180.0, "lobby": "d6_lift_b", "node": "lift.tl_b1.6.land"},
-    {"deck": 7, "z": -58.0, "door": [-23.0, -6.7, -58.0], "yaw": 180.0, "lobby": "d7_lift_b", "node": "lift.tl_b1.7.land"},
-    {"deck": 8, "z": -62.0, "door": [-23.0, -6.7, -62.0], "yaw": 180.0, "lobby": "d8_lift_b", "node": "lift.tl_b1.8.land"},
-    {"deck": 9, "z": -66.0, "door": [-23.0, -6.7, -66.0], "yaw": 180.0, "lobby": "d9_lift_b", "node": "lift.tl_b1.9.land"},
-    {"deck": 10, "z": -70.0, "door": [-23.0, -6.7, -70.0], "yaw": 180.0, "lobby": "d10_lift_b", "node": "lift.tl_b1.10.land"},
-    {"deck": 11, "z": -74.0, "door": [-23.0, -6.7, -74.0], "yaw": 180.0, "lobby": "d11_lift_b", "node": "lift.tl_b1.11.land"},
-    {"deck": 12, "z": -78.0, "door": [-23.0, -6.7, -78.0], "yaw": 180.0, "lobby": "d12_lift_b", "node": "lift.tl_b1.12.land"}
+    {"deck": 1, "z": 0.0, "door": [-22.8, -6.7, 0.0], "yaw": 180.0, "lobby": "lift_housing_bridge", "node": "lift.tl_b1.1.land"},
+    {"deck": 2, "z": -36.7, "door": [-22.8, -6.7, -36.7], "yaw": 180.0, "lobby": "d2_lift_b", "node": "lift.tl_b1.2.land"},
+    {"deck": 3, "z": -42.0, "door": [-22.8, -6.7, -42.0], "yaw": 180.0, "lobby": "d3_lift_b", "node": "lift.tl_b1.3.land"},
+    {"deck": 4, "z": -46.0, "door": [-22.8, -6.7, -46.0], "yaw": 180.0, "lobby": "d4_lift_b", "node": "lift.tl_b1.4.land"},
+    {"deck": 5, "z": -50.0, "door": [-22.8, -6.7, -50.0], "yaw": 180.0, "lobby": "d5_lift_b", "node": "lift.tl_b1.5.land"},
+    {"deck": 6, "z": -54.0, "door": [-22.8, -6.7, -54.0], "yaw": 180.0, "lobby": "d6_lift_b", "node": "lift.tl_b1.6.land"},
+    {"deck": 7, "z": -58.0, "door": [-22.8, -6.7, -58.0], "yaw": 180.0, "lobby": "d7_lift_b", "node": "lift.tl_b1.7.land"},
+    {"deck": 8, "z": -62.0, "door": [-22.8, -6.7, -62.0], "yaw": 180.0, "lobby": "d8_lift_b", "node": "lift.tl_b1.8.land"},
+    {"deck": 9, "z": -66.0, "door": [-22.8, -6.7, -66.0], "yaw": 180.0, "lobby": "d9_lift_b", "node": "lift.tl_b1.9.land"},
+    {"deck": 10, "z": -70.0, "door": [-22.8, -6.7, -70.0], "yaw": 180.0, "lobby": "d10_lift_b", "node": "lift.tl_b1.10.land"},
+    {"deck": 11, "z": -74.0, "door": [-22.8, -6.7, -74.0], "yaw": 180.0, "lobby": "d11_lift_b", "node": "lift.tl_b1.11.land"},
+    {"deck": 12, "z": -78.0, "door": [-22.8, -6.7, -78.0], "yaw": 180.0, "lobby": "d12_lift_b", "node": "lift.tl_b1.12.land"}
    ],
    "speed": 6.0,
    "accel": 2.0,
@@ -144748,15 +145451,15 @@
    "shaft": {"x": -24.3, "y": -3.7, "w": 2.6, "d": 2.6, "z": [-66.0, 0.0]},
    "car": {"w": 2.4, "d": 2.4, "h": 2.6},
    "landings": [
-    {"deck": 1, "z": 0.0, "door": [-23.0, -3.7, 0.0], "yaw": 180.0, "lobby": "lift_housing_bridge", "node": "lift.tl_b2.1.land"},
-    {"deck": 2, "z": -36.7, "door": [-23.0, -3.7, -36.7], "yaw": 180.0, "lobby": "d2_lift_b", "node": "lift.tl_b2.2.land"},
-    {"deck": 3, "z": -42.0, "door": [-23.0, -3.7, -42.0], "yaw": 180.0, "lobby": "d3_lift_b", "node": "lift.tl_b2.3.land"},
-    {"deck": 4, "z": -46.0, "door": [-23.0, -3.7, -46.0], "yaw": 180.0, "lobby": "d4_lift_b", "node": "lift.tl_b2.4.land"},
-    {"deck": 5, "z": -50.0, "door": [-23.0, -3.7, -50.0], "yaw": 180.0, "lobby": "d5_lift_b", "node": "lift.tl_b2.5.land"},
-    {"deck": 6, "z": -54.0, "door": [-23.0, -3.7, -54.0], "yaw": 180.0, "lobby": "d6_lift_b", "node": "lift.tl_b2.6.land"},
-    {"deck": 7, "z": -58.0, "door": [-23.0, -3.7, -58.0], "yaw": 180.0, "lobby": "d7_lift_b", "node": "lift.tl_b2.7.land"},
-    {"deck": 8, "z": -62.0, "door": [-23.0, -3.7, -62.0], "yaw": 180.0, "lobby": "d8_lift_b", "node": "lift.tl_b2.8.land"},
-    {"deck": 9, "z": -66.0, "door": [-23.0, -3.7, -66.0], "yaw": 180.0, "lobby": "d9_lift_b", "node": "lift.tl_b2.9.land"}
+    {"deck": 1, "z": 0.0, "door": [-22.8, -3.7, 0.0], "yaw": 180.0, "lobby": "lift_housing_bridge", "node": "lift.tl_b2.1.land"},
+    {"deck": 2, "z": -36.7, "door": [-22.8, -3.7, -36.7], "yaw": 180.0, "lobby": "d2_lift_b", "node": "lift.tl_b2.2.land"},
+    {"deck": 3, "z": -42.0, "door": [-22.8, -3.7, -42.0], "yaw": 180.0, "lobby": "d3_lift_b", "node": "lift.tl_b2.3.land"},
+    {"deck": 4, "z": -46.0, "door": [-22.8, -3.7, -46.0], "yaw": 180.0, "lobby": "d4_lift_b", "node": "lift.tl_b2.4.land"},
+    {"deck": 5, "z": -50.0, "door": [-22.8, -3.7, -50.0], "yaw": 180.0, "lobby": "d5_lift_b", "node": "lift.tl_b2.5.land"},
+    {"deck": 6, "z": -54.0, "door": [-22.8, -3.7, -54.0], "yaw": 180.0, "lobby": "d6_lift_b", "node": "lift.tl_b2.6.land"},
+    {"deck": 7, "z": -58.0, "door": [-22.8, -3.7, -58.0], "yaw": 180.0, "lobby": "d7_lift_b", "node": "lift.tl_b2.7.land"},
+    {"deck": 8, "z": -62.0, "door": [-22.8, -3.7, -62.0], "yaw": 180.0, "lobby": "d8_lift_b", "node": "lift.tl_b2.8.land"},
+    {"deck": 9, "z": -66.0, "door": [-22.8, -3.7, -66.0], "yaw": 180.0, "lobby": "d9_lift_b", "node": "lift.tl_b2.9.land"}
    ],
    "speed": 6.0,
    "accel": 2.0,
@@ -145651,6 +146354,116 @@
     "10": "d10_sb0j10p_BT",
     "11": "d11_sb0j10p_BT",
     "12": "d12_sb0j10p_BT"
+   },
+   "landings": [
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": "hatch"
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.SB0J10p.000",
+     "ladder": {"x": 8.49, "y": 24.0},
+     "facing": 180.0,
+     "step": [10.0, 24.0],
+     "hole": [8.05, 23.45, 9.15, 24.55],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 3, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145684,6 +146497,116 @@
     "10": "d10_po0j10p_BT",
     "11": "d11_po0j10p_BT",
     "12": "d12_po0j10p_BT"
+   },
+   "landings": [
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.PO0J10p.000",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": "hatch"
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.PO0J10p.003",
+     "ladder": {"x": 8.49, "y": -24.0},
+     "facing": 180.0,
+     "step": [10.0, -24.0],
+     "hole": [8.05, -24.55, 9.15, -23.45],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 3, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145717,6 +146640,116 @@
     "10": "d10_sb0j50n_CT",
     "11": "d11_sb0j50n_CT",
     "12": "d12_sb0j50n_CT"
+   },
+   "landings": [
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": "hatch"
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.SB0J50n.000",
+     "ladder": {"x": -51.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-50.0, 24.0],
+     "hole": [-51.95, 23.45, -50.85, 24.55],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 3, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145750,6 +146783,116 @@
     "10": "d10_po0j50n_CT",
     "11": "d11_po0j50n_CT",
     "12": "d12_po0j50n_CT"
+   },
+   "landings": [
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.PO0J50n.000",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": "hatch"
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.PO0J50n.003",
+     "ladder": {"x": -51.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-50.0, -24.0],
+     "hole": [-51.95, -24.55, -50.85, -23.45],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 3, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145785,6 +146928,126 @@
     "10": "d10_sb0j158n_DT",
     "11": "d11_sb0j158n_DT",
     "12": "d12_sb0j158n_DT"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.SB0J158n.000",
+     "ladder": {"x": -159.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-158.0, 24.0],
+     "hole": [-159.95, 23.45, -158.85, 24.55],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145820,6 +147083,126 @@
     "10": "d10_po0j158n_DT",
     "11": "d11_po0j158n_DT",
     "12": "d12_po0j158n_DT"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.PO0J158n.000",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.PO0J158n.000",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.PO0J158n.003",
+     "ladder": {"x": -159.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-158.0, -24.0],
+     "hole": [-159.95, -24.55, -158.85, -23.45],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145855,6 +147238,126 @@
     "10": "d10_sb0j206n_DT",
     "11": "d11_sb0j206n_DT",
     "12": "d12_sb0j206n_DT"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.SB0J206n.000",
+     "ladder": {"x": -207.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-206.0, 24.0],
+     "hole": [-207.95, 23.45, -206.85, 24.55],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145890,6 +147393,126 @@
     "10": "d10_po0j206n_DT",
     "11": "d11_po0j206n_DT",
     "12": "d12_po0j206n_DT"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.PO0J206n.000",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.PO0J206n.000",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.PO0J206n.003",
+     "ladder": {"x": -207.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-206.0, -24.0],
+     "hole": [-207.95, -24.55, -206.85, -23.45],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145925,6 +147548,126 @@
     "10": "d10_sb0j274n_ET",
     "11": "d11_sb0j274n_ET",
     "12": "d12_sb0j274n_ET"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.SB0J274n.000",
+     "ladder": {"x": -275.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-274.0, 24.0],
+     "hole": [-275.95, 23.45, -274.85, 24.55],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145960,6 +147703,126 @@
     "10": "d10_po0j274n_ET",
     "11": "d11_po0j274n_ET",
     "12": "d12_po0j274n_ET"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.PO0J274n.000",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.PO0J274n.000",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.PO0J274n.003",
+     "ladder": {"x": -275.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-274.0, -24.0],
+     "hole": [-275.95, -24.55, -274.85, -23.45],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -145995,6 +147858,126 @@
     "10": "d10_sb0j342n_FT",
     "11": "d11_sb0j342n_FT",
     "12": "d12_sb0j342n_FT"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.SB0J342n.000",
+     "ladder": {"x": -343.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-342.0, 24.0],
+     "hole": [-343.95, 23.45, -342.85, 24.55],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -146030,6 +148013,126 @@
     "10": "d10_po0j342n_FT",
     "11": "d11_po0j342n_FT",
     "12": "d12_po0j342n_FT"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.PO0J342n.000",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.PO0J342n.000",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.PO0J342n.003",
+     "ladder": {"x": -343.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-342.0, -24.0],
+     "hole": [-343.95, -24.55, -342.85, -23.45],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -146065,6 +148168,126 @@
     "10": "d10_sb0j406n_FT",
     "11": "d11_sb0j406n_FT",
     "12": "d12_sb0j406n_FT"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.SB0J406n.000",
+     "ladder": {"x": -407.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-406.0, 24.0],
+     "hole": [-407.95, 23.45, -406.85, 24.55],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -146100,6 +148323,126 @@
     "10": "d10_po0j406n_FT",
     "11": "d11_po0j406n_FT",
     "12": "d12_po0j406n_FT"
+   },
+   "landings": [
+    {
+     "deck": 2,
+     "z": -36.7,
+     "node": "d2.PO0J406n.000",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": "hatch"
+    },
+    {
+     "deck": 3,
+     "z": -42.0,
+     "node": "d3.PO0J406n.000",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.PO0J406n.003",
+     "ladder": {"x": -407.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-406.0, -24.0],
+     "hole": [-407.95, -24.55, -406.85, -23.45],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 2, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -146131,6 +148474,106 @@
     "10": "d10_sb0j474n_GT",
     "11": "d11_sb0j474n_GT",
     "12": "d12_sb0j474n_GT"
+   },
+   "landings": [
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": "hatch"
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.SB0J474n.000",
+     "ladder": {"x": -475.51, "y": 24.0},
+     "facing": 180.0,
+     "step": [-474.0, 24.0],
+     "hole": [-475.95, 23.45, -474.85, 24.55],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 4, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   },
   {
@@ -146162,6 +148605,106 @@
     "10": "d10_po0j474n_GT",
     "11": "d11_po0j474n_GT",
     "12": "d12_po0j474n_GT"
+   },
+   "landings": [
+    {
+     "deck": 4,
+     "z": -46.0,
+     "node": "d4.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": "hatch"
+    },
+    {
+     "deck": 5,
+     "z": -50.0,
+     "node": "d5.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 6,
+     "z": -54.0,
+     "node": "d6.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 7,
+     "z": -58.0,
+     "node": "d7.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 8,
+     "z": -62.0,
+     "node": "d8.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 9,
+     "z": -66.0,
+     "node": "d9.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 10,
+     "z": -70.0,
+     "node": "d10.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 11,
+     "z": -74.0,
+     "node": "d11.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": null
+    },
+    {
+     "deck": 12,
+     "z": -78.0,
+     "node": "d12.PO0J474n.003",
+     "ladder": {"x": -475.51, "y": -24.0},
+     "facing": 180.0,
+     "step": [-474.0, -24.0],
+     "hole": [-475.95, -24.55, -474.85, -23.45],
+     "closed": "toe_plate"
+    }
+   ],
+   "ends": {"top": {"deck": 4, "closed": "hatch"}, "bottom": {"deck": 12, "closed": "toe_plate"}},
+   "rungs": {
+    "pitch": 0.2857,
+    "per_deck": 14,
+    "rail_gap": 0.44,
+    "z0": -0.13,
+    "note": "rung k of a deck is at the deck's floor z + z0 + k * pitch, 14 to a deck: the same pattern on every deck, so the ladder is unbroken from deck to deck; the column is open (the floor has the hole `hole`) except at its two ends"
    }
   }
  ],
@@ -153712,6 +156255,156 @@
     "id": "d4_concourse.s7",
     "deck": 4,
     "p": [-118.3, 9.0, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s8",
+    "deck": 4,
+    "p": [-113.75, -13.0, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s9",
+    "deck": 4,
+    "p": [-113.75, -11.65, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s10",
+    "deck": 4,
+    "p": [-113.75, -10.3, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s11",
+    "deck": 4,
+    "p": [-113.75, -8.95, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s12",
+    "deck": 4,
+    "p": [-116.05, -14.1, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s13",
+    "deck": 4,
+    "p": [-114.55, -14.1, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_concourse.s14",
+    "deck": 4,
+    "p": [-116.05, -6.8, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s15",
+    "deck": 4,
+    "p": [-114.55, -6.8, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_concourse.s16",
+    "deck": 4,
+    "p": [-115.95, -11.1, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s17",
+    "deck": 4,
+    "p": [-115.95, -9.9, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "sit",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s18",
+    "deck": 4,
+    "p": [-112.3, -10.5, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "barista",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_concourse.s19",
+    "deck": 4,
+    "p": [-112.75, 8.2, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "storekeeper",
+    "act": "work",
+    "yaw": 180.0
+   },
+   {
+    "id": "d4_concourse.s20",
+    "deck": 4,
+    "p": [-114.7, 8.2, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 0.0
+   },
+   {
+    "id": "d4_concourse.s21",
+    "deck": 4,
+    "p": [-113.9, 10.6, -46.0],
+    "kind": "station",
+    "comp": "d4_concourse",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 90.0
+   },
+   {
+    "id": "d4_concourse.s22",
+    "deck": 4,
+    "p": [-115.3, 11.0, -46.0],
     "kind": "station",
     "comp": "d4_concourse",
     "role": "crew",
@@ -192458,6 +195151,26 @@
     "act": "stand",
     "yaw": 90.0
    },
+   {
+    "id": "lift_housing_bridge.s0",
+    "deck": 1,
+    "p": [-21.7, -5.22, 0.0],
+    "kind": "station",
+    "comp": "lift_housing_bridge",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 180.0
+   },
+   {
+    "id": "lift_housing_bridge.s1",
+    "deck": 1,
+    "p": [-21.7, -2.22, 0.0],
+    "kind": "station",
+    "comp": "lift_housing_bridge",
+    "role": "crew",
+    "act": "stand",
+    "yaw": 180.0
+   },
    {"id": "mess.in", "deck": 4, "p": [-124.6, 0.0, -46.0], "kind": "door_in", "comp": "mess"},
    {"id": "mess.hub", "deck": 4, "p": [-141.0, 0.0, -46.3], "kind": "room", "comp": "mess"},
    {"id": "mess.mess1", "deck": 4, "p": [-137.8, -3.88, -46.0], "kind": "station", "comp": "mess", "role": "crew", "act": "eat", "yaw": 90.0},
@@ -192558,48 +195271,48 @@
    {"id": "flight_deck.hub", "deck": 9, "p": [138.75, 0.0, -73.4], "kind": "room", "comp": "flight_deck"},
    {"id": "engineering_lobby.hub", "deck": 7, "p": [-328.75, 0.0, -58.0], "kind": "corridor", "comp": "engineering_lobby"},
    {"id": "flight_deck_lobby.hub", "deck": 9, "p": [57.75, 0.0, -66.0], "kind": "corridor", "comp": "flight_deck_lobby"},
-   {"id": "lift.tl_b1.1.land", "deck": 1, "p": [-21.5, -6.7, 0.0], "kind": "lift", "comp": "lift_housing_bridge"},
-   {"id": "lift.tl_b1.1.car", "deck": 1, "p": [-24.4, -6.7, 0.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.2.land", "deck": 2, "p": [-21.5, -6.7, -36.7], "kind": "lift", "comp": "d2_lift_b"},
-   {"id": "lift.tl_b1.2.car", "deck": 2, "p": [-24.4, -6.7, -36.7], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.3.land", "deck": 3, "p": [-21.5, -6.7, -42.0], "kind": "lift", "comp": "d3_lift_b"},
-   {"id": "lift.tl_b1.3.car", "deck": 3, "p": [-24.4, -6.7, -42.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.4.land", "deck": 4, "p": [-21.5, -6.7, -46.0], "kind": "lift", "comp": "d4_lift_b"},
-   {"id": "lift.tl_b1.4.car", "deck": 4, "p": [-24.4, -6.7, -46.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.5.land", "deck": 5, "p": [-21.5, -6.7, -50.0], "kind": "lift", "comp": "d5_lift_b"},
-   {"id": "lift.tl_b1.5.car", "deck": 5, "p": [-24.4, -6.7, -50.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.6.land", "deck": 6, "p": [-21.5, -6.7, -54.0], "kind": "lift", "comp": "d6_lift_b"},
-   {"id": "lift.tl_b1.6.car", "deck": 6, "p": [-24.4, -6.7, -54.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.7.land", "deck": 7, "p": [-21.5, -6.7, -58.0], "kind": "lift", "comp": "d7_lift_b"},
-   {"id": "lift.tl_b1.7.car", "deck": 7, "p": [-24.4, -6.7, -58.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.8.land", "deck": 8, "p": [-21.5, -6.7, -62.0], "kind": "lift", "comp": "d8_lift_b"},
-   {"id": "lift.tl_b1.8.car", "deck": 8, "p": [-24.4, -6.7, -62.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.9.land", "deck": 9, "p": [-21.5, -6.7, -66.0], "kind": "lift", "comp": "d9_lift_b"},
-   {"id": "lift.tl_b1.9.car", "deck": 9, "p": [-24.4, -6.7, -66.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.10.land", "deck": 10, "p": [-21.5, -6.7, -70.0], "kind": "lift", "comp": "d10_lift_b"},
-   {"id": "lift.tl_b1.10.car", "deck": 10, "p": [-24.4, -6.7, -70.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.11.land", "deck": 11, "p": [-21.5, -6.7, -74.0], "kind": "lift", "comp": "d11_lift_b"},
-   {"id": "lift.tl_b1.11.car", "deck": 11, "p": [-24.4, -6.7, -74.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b1.12.land", "deck": 12, "p": [-21.5, -6.7, -78.0], "kind": "lift", "comp": "d12_lift_b"},
-   {"id": "lift.tl_b1.12.car", "deck": 12, "p": [-24.4, -6.7, -78.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
-   {"id": "lift.tl_b2.1.land", "deck": 1, "p": [-21.5, -3.7, 0.0], "kind": "lift", "comp": "lift_housing_bridge"},
-   {"id": "lift.tl_b2.1.car", "deck": 1, "p": [-24.4, -3.7, 0.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
-   {"id": "lift.tl_b2.2.land", "deck": 2, "p": [-21.5, -3.7, -36.7], "kind": "lift", "comp": "d2_lift_b"},
-   {"id": "lift.tl_b2.2.car", "deck": 2, "p": [-24.4, -3.7, -36.7], "kind": "lift_car", "comp": "shaft_tl_b2"},
-   {"id": "lift.tl_b2.3.land", "deck": 3, "p": [-21.5, -3.7, -42.0], "kind": "lift", "comp": "d3_lift_b"},
-   {"id": "lift.tl_b2.3.car", "deck": 3, "p": [-24.4, -3.7, -42.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
-   {"id": "lift.tl_b2.4.land", "deck": 4, "p": [-21.5, -3.7, -46.0], "kind": "lift", "comp": "d4_lift_b"},
-   {"id": "lift.tl_b2.4.car", "deck": 4, "p": [-24.4, -3.7, -46.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
-   {"id": "lift.tl_b2.5.land", "deck": 5, "p": [-21.5, -3.7, -50.0], "kind": "lift", "comp": "d5_lift_b"},
-   {"id": "lift.tl_b2.5.car", "deck": 5, "p": [-24.4, -3.7, -50.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
-   {"id": "lift.tl_b2.6.land", "deck": 6, "p": [-21.5, -3.7, -54.0], "kind": "lift", "comp": "d6_lift_b"},
-   {"id": "lift.tl_b2.6.car", "deck": 6, "p": [-24.4, -3.7, -54.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
-   {"id": "lift.tl_b2.7.land", "deck": 7, "p": [-21.5, -3.7, -58.0], "kind": "lift", "comp": "d7_lift_b"},
-   {"id": "lift.tl_b2.7.car", "deck": 7, "p": [-24.4, -3.7, -58.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
-   {"id": "lift.tl_b2.8.land", "deck": 8, "p": [-21.5, -3.7, -62.0], "kind": "lift", "comp": "d8_lift_b"},
-   {"id": "lift.tl_b2.8.car", "deck": 8, "p": [-24.4, -3.7, -62.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
-   {"id": "lift.tl_b2.9.land", "deck": 9, "p": [-21.5, -3.7, -66.0], "kind": "lift", "comp": "d9_lift_b"},
-   {"id": "lift.tl_b2.9.car", "deck": 9, "p": [-24.4, -3.7, -66.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b1.1.land", "deck": 1, "p": [-21.3, -6.7, 0.0], "kind": "lift", "comp": "lift_housing_bridge"},
+   {"id": "lift.tl_b1.1.car", "deck": 1, "p": [-24.2, -6.7, 0.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.2.land", "deck": 2, "p": [-21.3, -6.7, -36.7], "kind": "lift", "comp": "d2_lift_b"},
+   {"id": "lift.tl_b1.2.car", "deck": 2, "p": [-24.2, -6.7, -36.7], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.3.land", "deck": 3, "p": [-21.3, -6.7, -42.0], "kind": "lift", "comp": "d3_lift_b"},
+   {"id": "lift.tl_b1.3.car", "deck": 3, "p": [-24.2, -6.7, -42.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.4.land", "deck": 4, "p": [-21.3, -6.7, -46.0], "kind": "lift", "comp": "d4_lift_b"},
+   {"id": "lift.tl_b1.4.car", "deck": 4, "p": [-24.2, -6.7, -46.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.5.land", "deck": 5, "p": [-21.3, -6.7, -50.0], "kind": "lift", "comp": "d5_lift_b"},
+   {"id": "lift.tl_b1.5.car", "deck": 5, "p": [-24.2, -6.7, -50.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.6.land", "deck": 6, "p": [-21.3, -6.7, -54.0], "kind": "lift", "comp": "d6_lift_b"},
+   {"id": "lift.tl_b1.6.car", "deck": 6, "p": [-24.2, -6.7, -54.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.7.land", "deck": 7, "p": [-21.3, -6.7, -58.0], "kind": "lift", "comp": "d7_lift_b"},
+   {"id": "lift.tl_b1.7.car", "deck": 7, "p": [-24.2, -6.7, -58.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.8.land", "deck": 8, "p": [-21.3, -6.7, -62.0], "kind": "lift", "comp": "d8_lift_b"},
+   {"id": "lift.tl_b1.8.car", "deck": 8, "p": [-24.2, -6.7, -62.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.9.land", "deck": 9, "p": [-21.3, -6.7, -66.0], "kind": "lift", "comp": "d9_lift_b"},
+   {"id": "lift.tl_b1.9.car", "deck": 9, "p": [-24.2, -6.7, -66.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.10.land", "deck": 10, "p": [-21.3, -6.7, -70.0], "kind": "lift", "comp": "d10_lift_b"},
+   {"id": "lift.tl_b1.10.car", "deck": 10, "p": [-24.2, -6.7, -70.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.11.land", "deck": 11, "p": [-21.3, -6.7, -74.0], "kind": "lift", "comp": "d11_lift_b"},
+   {"id": "lift.tl_b1.11.car", "deck": 11, "p": [-24.2, -6.7, -74.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b1.12.land", "deck": 12, "p": [-21.3, -6.7, -78.0], "kind": "lift", "comp": "d12_lift_b"},
+   {"id": "lift.tl_b1.12.car", "deck": 12, "p": [-24.2, -6.7, -78.0], "kind": "lift_car", "comp": "shaft_tl_b1"},
+   {"id": "lift.tl_b2.1.land", "deck": 1, "p": [-21.3, -3.7, 0.0], "kind": "lift", "comp": "lift_housing_bridge"},
+   {"id": "lift.tl_b2.1.car", "deck": 1, "p": [-24.2, -3.7, 0.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b2.2.land", "deck": 2, "p": [-21.3, -3.7, -36.7], "kind": "lift", "comp": "d2_lift_b"},
+   {"id": "lift.tl_b2.2.car", "deck": 2, "p": [-24.2, -3.7, -36.7], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b2.3.land", "deck": 3, "p": [-21.3, -3.7, -42.0], "kind": "lift", "comp": "d3_lift_b"},
+   {"id": "lift.tl_b2.3.car", "deck": 3, "p": [-24.2, -3.7, -42.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b2.4.land", "deck": 4, "p": [-21.3, -3.7, -46.0], "kind": "lift", "comp": "d4_lift_b"},
+   {"id": "lift.tl_b2.4.car", "deck": 4, "p": [-24.2, -3.7, -46.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b2.5.land", "deck": 5, "p": [-21.3, -3.7, -50.0], "kind": "lift", "comp": "d5_lift_b"},
+   {"id": "lift.tl_b2.5.car", "deck": 5, "p": [-24.2, -3.7, -50.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b2.6.land", "deck": 6, "p": [-21.3, -3.7, -54.0], "kind": "lift", "comp": "d6_lift_b"},
+   {"id": "lift.tl_b2.6.car", "deck": 6, "p": [-24.2, -3.7, -54.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b2.7.land", "deck": 7, "p": [-21.3, -3.7, -58.0], "kind": "lift", "comp": "d7_lift_b"},
+   {"id": "lift.tl_b2.7.car", "deck": 7, "p": [-24.2, -3.7, -58.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b2.8.land", "deck": 8, "p": [-21.3, -3.7, -62.0], "kind": "lift", "comp": "d8_lift_b"},
+   {"id": "lift.tl_b2.8.car", "deck": 8, "p": [-24.2, -3.7, -62.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
+   {"id": "lift.tl_b2.9.land", "deck": 9, "p": [-21.3, -3.7, -66.0], "kind": "lift", "comp": "d9_lift_b"},
+   {"id": "lift.tl_b2.9.car", "deck": 9, "p": [-24.2, -3.7, -66.0], "kind": "lift_car", "comp": "shaft_tl_b2"},
    {"id": "lift.tl_f1.4.land", "deck": 4, "p": [48.7, 7.8, -46.0], "kind": "lift", "comp": "d4_lift_f"},
    {"id": "lift.tl_f1.4.car", "deck": 4, "p": [45.8, 7.8, -46.0], "kind": "lift_car", "comp": "shaft_tl_f1"},
    {"id": "lift.tl_f1.5.land", "deck": 5, "p": [48.7, 7.8, -50.0], "kind": "lift", "comp": "d5_lift_f"},
@@ -195588,6 +198301,21 @@
    {"a": "d4_concourse.hub", "b": "d4_concourse.s5", "len": 17.35, "kind": "walk", "w": 1.0},
    {"a": "d4_concourse.hub", "b": "d4_concourse.s6", "len": 17.26, "kind": "walk", "w": 1.0},
    {"a": "d4_concourse.hub", "b": "d4_concourse.s7", "len": 10.52, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s8", "len": 13.03, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s9", "len": 11.68, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s10", "len": 10.34, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s11", "len": 9.0, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s12", "len": 14.46, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s13", "len": 14.2, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s14", "len": 7.52, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s15", "len": 7.01, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s16", "len": 11.52, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s17", "len": 10.37, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s18", "len": 10.51, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s19", "len": 8.2, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s20", "len": 8.41, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s21", "len": 10.65, "kind": "walk", "w": 1.0},
+   {"a": "d4_concourse.hub", "b": "d4_concourse.s22", "len": 11.27, "kind": "walk", "w": 1.0},
    {"a": "d4.SB0.089", "b": "d4_berth_lobby.in0", "len": 3.2, "kind": "door", "door": "d4_gate_lobby_sbp_166", "w": 3.2},
    {"a": "d4.PO0.089", "b": "d4_berth_lobby.in1", "len": 3.2, "kind": "door", "door": "d4_gate_lobby_pp_166", "w": 3.2},
    {"a": "d4.SB0.088", "b": "d4_berth_lobby.in2", "len": 3.2, "kind": "door", "door": "d4_gate_lobby_sbp_170", "w": 3.2},
@@ -206444,6 +209172,8 @@
    {"a": "ready_room.hub", "b": "ready_room.s6", "len": 4.6, "kind": "walk", "w": 1.0},
    {"a": "ready_room.hub", "b": "ready_room.s7", "len": 4.6, "kind": "walk", "w": 1.0},
    {"a": "ready_room.hub", "b": "ready_room.s8", "len": 1.66, "kind": "walk", "w": 1.0},
+   {"a": "lift_housing_bridge.hub", "b": "lift_housing_bridge.s0", "len": 0.65, "kind": "walk", "w": 1.0},
+   {"a": "lift_housing_bridge.hub", "b": "lift_housing_bridge.s1", "len": 2.39, "kind": "walk", "w": 1.0},
    {"a": "mess.in", "b": "mess.hub", "len": 16.4, "kind": "walk", "w": 2.0},
    {"a": "mess.hub", "b": "mess.mess1", "len": 5.04, "kind": "walk", "w": 1.0},
    {"a": "mess.hub", "b": "mess.mess2", "len": 4.46, "kind": "walk", "w": 1.0},
@@ -206491,29 +209221,29 @@
    {"a": "d9.SP0.144", "b": "flight_deck_lobby.hub", "len": 3.75, "kind": "walk", "w": 3.1},
    {"a": "flight_deck_lobby.hub", "b": "flight_deck.in", "len": 8.29, "kind": "door", "door": "flight_deck_entrance", "w": 3.0},
    {"a": "lift.tl_b1.1.land", "b": "lift.tl_b1.1.car", "len": 2.9, "kind": "door", "door": "d1_tl_b1_door", "w": 1.6},
-   {"a": "lift_housing_bridge.hub", "b": "lift.tl_b1.1.land", "len": 2.14, "kind": "walk", "w": 2.0},
+   {"a": "lift_housing_bridge.hub", "b": "lift.tl_b1.1.land", "len": 2.18, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.2.land", "b": "lift.tl_b1.2.car", "len": 2.9, "kind": "door", "door": "d2_tl_b1_door", "w": 1.6},
-   {"a": "d2_lift_b.hub", "b": "lift.tl_b1.2.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d2_lift_b.hub", "b": "lift.tl_b1.2.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.3.land", "b": "lift.tl_b1.3.car", "len": 2.9, "kind": "door", "door": "d3_tl_b1_door", "w": 1.6},
-   {"a": "d3_lift_b.hub", "b": "lift.tl_b1.3.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d3_lift_b.hub", "b": "lift.tl_b1.3.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.4.land", "b": "lift.tl_b1.4.car", "len": 2.9, "kind": "door", "door": "d4_tl_b1_door", "w": 1.6},
-   {"a": "d4_lift_b.hub", "b": "lift.tl_b1.4.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d4_lift_b.hub", "b": "lift.tl_b1.4.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.5.land", "b": "lift.tl_b1.5.car", "len": 2.9, "kind": "door", "door": "d5_tl_b1_door", "w": 1.6},
-   {"a": "d5_lift_b.hub", "b": "lift.tl_b1.5.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d5_lift_b.hub", "b": "lift.tl_b1.5.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.6.land", "b": "lift.tl_b1.6.car", "len": 2.9, "kind": "door", "door": "d6_tl_b1_door", "w": 1.6},
-   {"a": "d6_lift_b.hub", "b": "lift.tl_b1.6.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d6_lift_b.hub", "b": "lift.tl_b1.6.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.7.land", "b": "lift.tl_b1.7.car", "len": 2.9, "kind": "door", "door": "d7_tl_b1_door", "w": 1.6},
-   {"a": "d7_lift_b.hub", "b": "lift.tl_b1.7.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d7_lift_b.hub", "b": "lift.tl_b1.7.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.8.land", "b": "lift.tl_b1.8.car", "len": 2.9, "kind": "door", "door": "d8_tl_b1_door", "w": 1.6},
-   {"a": "d8_lift_b.hub", "b": "lift.tl_b1.8.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d8_lift_b.hub", "b": "lift.tl_b1.8.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.9.land", "b": "lift.tl_b1.9.car", "len": 2.9, "kind": "door", "door": "d9_tl_b1_door", "w": 1.6},
-   {"a": "d9_lift_b.hub", "b": "lift.tl_b1.9.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d9_lift_b.hub", "b": "lift.tl_b1.9.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.10.land", "b": "lift.tl_b1.10.car", "len": 2.9, "kind": "door", "door": "d10_tl_b1_door", "w": 1.6},
-   {"a": "d10_lift_b.hub", "b": "lift.tl_b1.10.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d10_lift_b.hub", "b": "lift.tl_b1.10.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.11.land", "b": "lift.tl_b1.11.car", "len": 2.9, "kind": "door", "door": "d11_tl_b1_door", "w": 1.6},
-   {"a": "d11_lift_b.hub", "b": "lift.tl_b1.11.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d11_lift_b.hub", "b": "lift.tl_b1.11.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.12.land", "b": "lift.tl_b1.12.car", "len": 2.9, "kind": "door", "door": "d12_tl_b1_door", "w": 1.6},
-   {"a": "d12_lift_b.hub", "b": "lift.tl_b1.12.land", "len": 3.14, "kind": "walk", "w": 2.0},
+   {"a": "d12_lift_b.hub", "b": "lift.tl_b1.12.land", "len": 2.97, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b1.1.car", "b": "lift.tl_b1.2.car", "len": 36.7, "kind": "lift", "cost": 13.1, "shaft": "tl_b1"},
    {"a": "lift.tl_b1.1.car", "b": "lift.tl_b1.3.car", "len": 42.0, "kind": "lift", "cost": 14.0, "shaft": "tl_b1"},
    {"a": "lift.tl_b1.1.car", "b": "lift.tl_b1.4.car", "len": 46.0, "kind": "lift", "cost": 14.7, "shaft": "tl_b1"},
@@ -206581,23 +209311,23 @@
    {"a": "lift.tl_b1.10.car", "b": "lift.tl_b1.12.car", "len": 8.0, "kind": "lift", "cost": 8.0, "shaft": "tl_b1"},
    {"a": "lift.tl_b1.11.car", "b": "lift.tl_b1.12.car", "len": 4.0, "kind": "lift", "cost": 6.8, "shaft": "tl_b1"},
    {"a": "lift.tl_b2.1.land", "b": "lift.tl_b2.1.car", "len": 2.9, "kind": "door", "door": "d1_tl_b2_door", "w": 1.6},
-   {"a": "lift_housing_bridge.hub", "b": "lift.tl_b2.1.land", "len": 0.98, "kind": "walk", "w": 2.0},
+   {"a": "lift_housing_bridge.hub", "b": "lift.tl_b2.1.land", "len": 1.08, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.2.land", "b": "lift.tl_b2.2.car", "len": 2.9, "kind": "door", "door": "d2_tl_b2_door", "w": 1.6},
-   {"a": "d2_lift_b.hub", "b": "lift.tl_b2.2.land", "len": 3.04, "kind": "walk", "w": 2.0},
+   {"a": "d2_lift_b.hub", "b": "lift.tl_b2.2.land", "len": 2.87, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.3.land", "b": "lift.tl_b2.3.car", "len": 2.9, "kind": "door", "door": "d3_tl_b2_door", "w": 1.6},
-   {"a": "d3_lift_b.hub", "b": "lift.tl_b2.3.land", "len": 3.04, "kind": "walk", "w": 2.0},
+   {"a": "d3_lift_b.hub", "b": "lift.tl_b2.3.land", "len": 2.87, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.4.land", "b": "lift.tl_b2.4.car", "len": 2.9, "kind": "door", "door": "d4_tl_b2_door", "w": 1.6},
-   {"a": "d4_lift_b.hub", "b": "lift.tl_b2.4.land", "len": 3.04, "kind": "walk", "w": 2.0},
+   {"a": "d4_lift_b.hub", "b": "lift.tl_b2.4.land", "len": 2.87, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.5.land", "b": "lift.tl_b2.5.car", "len": 2.9, "kind": "door", "door": "d5_tl_b2_door", "w": 1.6},
-   {"a": "d5_lift_b.hub", "b": "lift.tl_b2.5.land", "len": 3.04, "kind": "walk", "w": 2.0},
+   {"a": "d5_lift_b.hub", "b": "lift.tl_b2.5.land", "len": 2.87, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.6.land", "b": "lift.tl_b2.6.car", "len": 2.9, "kind": "door", "door": "d6_tl_b2_door", "w": 1.6},
-   {"a": "d6_lift_b.hub", "b": "lift.tl_b2.6.land", "len": 3.04, "kind": "walk", "w": 2.0},
+   {"a": "d6_lift_b.hub", "b": "lift.tl_b2.6.land", "len": 2.87, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.7.land", "b": "lift.tl_b2.7.car", "len": 2.9, "kind": "door", "door": "d7_tl_b2_door", "w": 1.6},
-   {"a": "d7_lift_b.hub", "b": "lift.tl_b2.7.land", "len": 3.04, "kind": "walk", "w": 2.0},
+   {"a": "d7_lift_b.hub", "b": "lift.tl_b2.7.land", "len": 2.87, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.8.land", "b": "lift.tl_b2.8.car", "len": 2.9, "kind": "door", "door": "d8_tl_b2_door", "w": 1.6},
-   {"a": "d8_lift_b.hub", "b": "lift.tl_b2.8.land", "len": 3.04, "kind": "walk", "w": 2.0},
+   {"a": "d8_lift_b.hub", "b": "lift.tl_b2.8.land", "len": 2.87, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.9.land", "b": "lift.tl_b2.9.car", "len": 2.9, "kind": "door", "door": "d9_tl_b2_door", "w": 1.6},
-   {"a": "d9_lift_b.hub", "b": "lift.tl_b2.9.land", "len": 3.04, "kind": "walk", "w": 2.0},
+   {"a": "d9_lift_b.hub", "b": "lift.tl_b2.9.land", "len": 2.87, "kind": "walk", "w": 2.0},
    {"a": "lift.tl_b2.1.car", "b": "lift.tl_b2.2.car", "len": 36.7, "kind": "lift", "cost": 13.1, "shaft": "tl_b2"},
    {"a": "lift.tl_b2.1.car", "b": "lift.tl_b2.3.car", "len": 42.0, "kind": "lift", "cost": 14.0, "shaft": "tl_b2"},
    {"a": "lift.tl_b2.1.car", "b": "lift.tl_b2.4.car", "len": 46.0, "kind": "lift", "cost": 14.7, "shaft": "tl_b2"},
@@ -209027,6 +211757,15 @@
     "folder": "Interior/Deck01/Plates",
     "label": "d1_plate_ready_room",
     "cls": "plate"
+   },
+   {
+    "mesh": "SM_SHIP_LiftHousingBridge",
+    "pos": [-20.8, -1.22, 0.0],
+    "yaw": 180.0,
+    "folder": "Interior/Deck01/Rooms",
+    "label": "d1_lift_housing",
+    "cls": "room",
+    "comp": "lift_housing_bridge"
    }
   ],
   "2": [
@@ -310152,7 +312891,7 @@
     "cls": "sign"
    },
    {
-    "mesh": "SM_SHIP_WayRow_medA",
+    "mesh": "SM_SHIP_WayRow_medR",
     "pos": [-21.97, 20.0, -67.34],
     "yaw": 0.0,
     "folder": "Interior/Deck10/Way",
@@ -311320,7 +314059,7 @@
     "cls": "sign"
    },
    {
-    "mesh": "SM_SHIP_WayBlade_3",
+    "mesh": "SM_SHIP_WayBlade_2",
     "pos": [-30.0, -11.97, -66.6],
     "yaw": 90.0,
     "folder": "Interior/Deck10/Way",
@@ -311344,15 +314083,7 @@
     "cls": "sign"
    },
    {
-    "mesh": "SM_SHIP_WayRow_medA",
-    "pos": [-30.0, -11.97, -67.64],
-    "yaw": 90.0,
-    "folder": "Interior/Deck10/Way",
-    "label": "d10_way_sp0po030n_001_p_r2",
-    "cls": "sign"
-   },
-   {
-    "mesh": "SM_SHIP_WayBlade_3",
+    "mesh": "SM_SHIP_WayBlade_2",
     "pos": [-30.0, -12.03, -66.6],
     "yaw": -90.0,
     "folder": "Interior/Deck10/Way",
@@ -311365,6 +314096,14 @@
     "yaw": -90.0,
     "folder": "Interior/Deck10/Way",
     "label": "d10_way_sp0po030n_001_n_r0",
+    "cls": "sign"
+   },
+   {
+    "mesh": "SM_SHIP_WayRow_medA",
+    "pos": [-30.0, -12.03, -67.34],
+    "yaw": -90.0,
+    "folder": "Interior/Deck10/Way",
+    "label": "d10_way_sp0po030n_001_n_r1",
     "cls": "sign"
    },
    {
@@ -322990,7 +325729,7 @@
     "cls": "sign"
    },
    {
-    "mesh": "SM_SHIP_WayRow_medA",
+    "mesh": "SM_SHIP_WayRow_medR",
     "pos": [-21.97, 20.0, -71.34],
     "yaw": 0.0,
     "folder": "Interior/Deck11/Way",
@@ -324142,7 +326881,7 @@
     "cls": "sign"
    },
    {
-    "mesh": "SM_SHIP_WayBlade_3",
+    "mesh": "SM_SHIP_WayBlade_2",
     "pos": [-30.0, -11.97, -70.6],
     "yaw": 90.0,
     "folder": "Interior/Deck11/Way",
@@ -324166,15 +326905,7 @@
     "cls": "sign"
    },
    {
-    "mesh": "SM_SHIP_WayRow_medA",
-    "pos": [-30.0, -11.97, -71.64],
-    "yaw": 90.0,
-    "folder": "Interior/Deck11/Way",
-    "label": "d11_way_sp0po030n_001_p_r2",
-    "cls": "sign"
-   },
-   {
-    "mesh": "SM_SHIP_WayBlade_3",
+    "mesh": "SM_SHIP_WayBlade_2",
     "pos": [-30.0, -12.03, -70.6],
     "yaw": -90.0,
     "folder": "Interior/Deck11/Way",
@@ -324187,6 +326918,14 @@
     "yaw": -90.0,
     "folder": "Interior/Deck11/Way",
     "label": "d11_way_sp0po030n_001_n_r0",
+    "cls": "sign"
+   },
+   {
+    "mesh": "SM_SHIP_WayRow_medA",
+    "pos": [-30.0, -12.03, -71.34],
+    "yaw": -90.0,
+    "folder": "Interior/Deck11/Way",
+    "label": "d11_way_sp0po030n_001_n_r1",
     "cls": "sign"
    },
    {
@@ -335384,7 +338123,7 @@
     "cls": "sign"
    },
    {
-    "mesh": "SM_SHIP_WayBlade_3",
+    "mesh": "SM_SHIP_WayBlade_2",
     "pos": [-30.0, -11.97, -74.6],
     "yaw": 90.0,
     "folder": "Interior/Deck12/Way",
@@ -335408,15 +338147,7 @@
     "cls": "sign"
    },
    {
-    "mesh": "SM_SHIP_WayRow_medA",
-    "pos": [-30.0, -11.97, -75.64],
-    "yaw": 90.0,
-    "folder": "Interior/Deck12/Way",
-    "label": "d12_way_sp0po030n_001_p_r2",
-    "cls": "sign"
-   },
-   {
-    "mesh": "SM_SHIP_WayBlade_3",
+    "mesh": "SM_SHIP_WayBlade_2",
     "pos": [-30.0, -12.03, -74.6],
     "yaw": -90.0,
     "folder": "Interior/Deck12/Way",
@@ -335429,6 +338160,14 @@
     "yaw": -90.0,
     "folder": "Interior/Deck12/Way",
     "label": "d12_way_sp0po030n_001_n_r0",
+    "cls": "sign"
+   },
+   {
+    "mesh": "SM_SHIP_WayRow_medA",
+    "pos": [-30.0, -12.03, -75.34],
+    "yaw": -90.0,
+    "folder": "Interior/Deck12/Way",
+    "label": "d12_way_sp0po030n_001_n_r1",
     "cls": "sign"
    },
    {
@@ -336090,6 +338829,6 @@
   ]
  },
  "notes": [
-  "wayfinding: 967 blade faces on 508 hangers, 505 frame plates, 135 directories; distinct blades per deck {2: 33, 3: 32, 4: 35, 5: 58, 6: 40, 7: 43, 8: 44, 9: 42, 10: 38, 11: 34, 12: 11}"
+  "wayfinding: 967 blade faces on 508 hangers, 505 frame plates, 135 directories; distinct blades per deck {2: 33, 3: 32, 4: 35, 5: 58, 6: 40, 7: 43, 8: 44, 9: 42, 10: 39, 11: 35, 12: 11}"
  ]
 }
