@@ -24,6 +24,7 @@ from ship_rooms import Style, WF, WS, build_shell, place
 
 
 WALL_HI = FABRIC_SAND               # the upper walls (the wainscot is wood)
+HULL_PLATE = "MI_HULL_A_Plate"      # the hull's plating (an instance of the project: the fairings under the bridge's corridors have it)
 
 
 def _dims(key: str):
@@ -378,6 +379,8 @@ def ready_room(name: str = "SM_SHIP_ReadyRoom"):
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
+    # under the floor, down into the island's top, a fairing of the hull's plating between the two that the bridge's builder put under the corridors (quarters.py): the room does not float
+    b.body.box((0.0, 0.05, -1.85), (L, D - 0.05, -0.30), HULL_PLATE)
     # the stern wall: viewport, sideboard and what stands on it
     starfield(b, xl, 2.0, 2.7, 1.0, 1.62)
     place(b, xl + 0.225, 2.0, 0, credenza, 2.7, 0.45, 0.78, 4)

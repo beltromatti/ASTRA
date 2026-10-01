@@ -79,7 +79,8 @@ EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHI
          "SM_SHIP_StairTowerCap": ("ship_rooms_hub", "stair_tower_cap"), "SM_SHIP_BridgeCorridorDoor": ("ship_rooms_bridge", "corridor_door")}
 
 # the material slots the Unreal side knows (shared bridge v3 instances + the ship's new ones)
-OLD_KIT_SLOTS = {A.MAT_PANEL, A.MAT_STRUCTURE, A.MAT_FLOOR, A.MAT_GRATE, A.MAT_TRIM, A.MAT_LIGHT, A.MAT_ACCENT, A.MAT_GUIDE, A.MAT_GLASS, A.MAT_RUBBER}   # the bridge corridors' (kit_corridor.py)
+OLD_KIT_SLOTS = {A.MAT_PANEL, A.MAT_STRUCTURE, A.MAT_FLOOR, A.MAT_GRATE, A.MAT_TRIM, A.MAT_LIGHT, A.MAT_ACCENT, A.MAT_GUIDE, A.MAT_GLASS, A.MAT_RUBBER,    # the bridge corridors' (kit_corridor.py)
+                 "MI_HULL_A_Plate"}                                                                                                                                  # and the hull's plating (the ready room's fairing)
 KNOWN_SLOTS = set(BL.SHARED_SLOTS) | set(SL.NEW_SLOTS) | {SL.LABEL} | OLD_KIT_SLOTS
 TRANSLUCENT_SLOTS = {BL.GLASS}
 
