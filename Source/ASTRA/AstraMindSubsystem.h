@@ -53,6 +53,10 @@ private:
 	UPROPERTY() TObjectPtr<class UAudioComponent> ChannelAudio;
 	UPROPERTY() TObjectPtr<class UAstraVoiceWave> ChannelWave;
 	class UAstraVoiceWave* BeginChannelLine(int32 LineId, int32 Rate);
+	/** The ship's computer (the lift cars: docs/ASCENSORI.md) speaks clean, all round, not over a radio band. */
+	UPROPERTY() TObjectPtr<class UAudioComponent> ComputerAudio;
+	UPROPERTY() TObjectPtr<class UAstraVoiceWave> ComputerWave;
+	class UAstraVoiceWave* BeginComputerLine(int32 LineId, int32 Rate);
 
 	/** A line being heard (voice protocol 2, docs/protocollo_voce.md): where its audio goes and how much of it has been
 	 *  played, so the game can tell the mind that a voice started, stalled, failed or finished. */
