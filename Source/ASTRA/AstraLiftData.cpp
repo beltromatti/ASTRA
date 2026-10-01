@@ -249,6 +249,53 @@ namespace
 		Net.Lines.Add(MoveTemp(L));
 	}
 
+	void LiftParseLadder(const FLiftObj& V, FAstraLiftNetwork& Net)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Landings = nullptr;
+		if (!V.IsValid() || LiftStrOf(V, TEXT("kind")) != TEXT("trunk") || !V->TryGetArrayField(TEXT("landings"), Landings))
+		{
+			return;                                     // (a plan before the ladders' data: the trunks are only shafts on the map)
+		}
+		FAstraLadder L;
+		L.Id = LiftStrOf(V, TEXT("id"));
+		L.Name = LiftStrOf(V, TEXT("name"), L.Id);
+		for (const TSharedPtr<FJsonValue>& LV : *Landings)
+		{
+			const FLiftObj O = LV->AsObject();
+			const FLiftObj Ladder = LiftObjOf(O, TEXT("ladder"));
+			const TArray<TSharedPtr<FJsonValue>>* Step = nullptr;
+			const TArray<TSharedPtr<FJsonValue>>* Hole = nullptr;
+			if (!O.IsValid() || !Ladder.IsValid() || !O->TryGetArrayField(TEXT("step"), Step) || Step->Num() < 2 || !O->TryGetArrayField(TEXT("hole"), Hole) || Hole->Num() < 4)
+			{
+				Net.Problems.Add(FString::Printf(TEXT("ladder %s: a landing without its ladder, step or hole"), *L.Id));
+				continue;
+			}
+			FAstraLadderStop S;
+			S.Deck = (int32)LiftNumOf(O, TEXT("deck"));
+			S.FloorZ = (float)LiftNumOf(O, TEXT("z")) * 100.f;
+			S.Step = FVector2D((*Step)[0]->AsNumber() * 100.0, (*Step)[1]->AsNumber() * 100.0);
+			const FVector2D A((*Hole)[0]->AsNumber() * 100.0, (*Hole)[1]->AsNumber() * 100.0), B((*Hole)[2]->AsNumber() * 100.0, (*Hole)[3]->AsNumber() * 100.0);
+			S.Hole = FBox2D(FVector2D(FMath::Min(A.X, B.X), FMath::Min(A.Y, B.Y)), FVector2D(FMath::Max(A.X, B.X), FMath::Max(A.Y, B.Y)));
+			const FString Closed = LiftStrOf(O, TEXT("closed"));
+			S.bTop = Closed == TEXT("hatch");
+			S.bBottom = Closed == TEXT("toe_plate");
+			if (L.Stops.Num() == 0)
+			{
+				L.Spot = FVector2D(LiftNumOf(Ladder, TEXT("x")) * 100.0, LiftNumOf(Ladder, TEXT("y")) * 100.0);
+				L.FacingYaw = (float)LiftNumOf(O, TEXT("facing"));
+			}
+			L.Stops.Add(S);
+		}
+		if (L.Stops.Num() < 2)
+		{
+			return;
+		}
+		L.Stops.Sort([](const FAstraLadderStop& A, const FAstraLadderStop& B) { return A.FloorZ < B.FloorZ; });
+		L.Stops[0].bBottom = true;                      // (the column ends there whatever the record says: nothing below to climb to)
+		L.Stops.Last().bTop = true;
+		Net.Ladders.Add(MoveTemp(L));
+	}
+
 	void LiftParseTransit(const FLiftObj& V, FLiftContext& Ctx, FAstraLiftNetwork& Net)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* PathPts = nullptr;
@@ -440,6 +487,7 @@ bool FAstraLiftNetwork::FindRide(const FVector& A, const FVector& B, int32& OutL
 bool FAstraLiftNetwork::Load(const FString& Path)
 {
 	Lines.Reset();
+	Ladders.Reset();
 	Problems.Reset();
 	Notes.Reset();
 	Source = Path;
@@ -515,6 +563,7 @@ bool FAstraLiftNetwork::Load(const FString& Path)
 		for (const TSharedPtr<FJsonValue>& V : *List)
 		{
 			LiftParseShaft(V->AsObject(), Ctx, *this);
+			LiftParseLadder(V->AsObject(), *this);
 		}
 	}
 	if (Root->TryGetArrayField(TEXT("transit"), List))

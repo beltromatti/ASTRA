@@ -32,6 +32,8 @@ non ha l'atrio degli ascensori (il corridoio finisce nella vecchia alcova «LIFT
 bocche dei tunnel murate (il Capitano viene raschiato via dalla vettura), i tubi di Jefferies servono dei dati per le scale (il Capitano non ci
 cade: si ferma sull'orlo). Memoria del gioco con i ponti nuovi: **8 GB** (limite 9): da tenere d'occhio.
 
+**2/10 notte — da riprendere qui:** unito il ramo finale di NAVE-3 (atrio dei turboascensori del Ponte 1, bocche dei tunnel della navetta aperte, dati delle scale di Jefferies) e ABBORDAGGI (compila); kit della nave riesportato. **Il prossimo passo è `tools/ue.py pyfile /Users/beltromatti/Desktop/ASTRA/tools/ue_scripts/build_ship_interior.py` nell'editor** (leggere le righe «bridge lift housing»), poi provare nel gioco: ascensore dalla plancia, navetta da A a D, le scale di Jefferies (nuovo `AstraLadderSubsystem`: E vicino alla nicchia o spingere verso i pioli, W/S, E per scendere; `astra.ladders.info`), le armi e un abbordaggio (`astra.weapons.give`, `astra.board.start 1`). Prova di durata con il Capitano che gioca: **0,87 $/ora** (sotto 1), 55 fps di mediana in battaglia, il thread di render arriva a 54 ms nei picchi. Credito: 7,84 $ spesi su 20. Aiutanti al lavoro: TELETRASPORTO, ARTE-PLANCIA-2, CAMPAGNA.
+
 **2/10 notte — una partita da Capitano con la mente** (≈20 minuti): l'apertura, il canale con Solm, gli ordini a timone, tattico e ingegneria
 eseguiti in un secondo, la vittoria, Kade e la ritirata, l'avanguardia dal Gate, Rourke. **Corretti**: Hale (la Lethe da sola davanti al picchetto)
 ritirava «tutta la flotta» dopo mezzo minuto (ora sa di essere gli occhi del gruppo d'attacco che arriva dietro di lui); i cannoni hanno sparato

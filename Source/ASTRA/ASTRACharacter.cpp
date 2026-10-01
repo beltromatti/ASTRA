@@ -11,6 +11,7 @@
 #include "ASTRAPlayerController.h"
 #include "AstraInput.h"
 #include "AstraFpsComponent.h"
+#include "AstraLadderSubsystem.h"
 #include "Engine/World.h"
 #include "ASTRA.h"
 
@@ -136,6 +137,11 @@ void AASTRACharacter::MoveInput(const FInputActionValue& Value)
 			}
 			return;
 		}
+	}
+	// on a Jefferies ladder: W and S climb and go down (AstraLadderSubsystem places him while he climbs)
+	if (UAstraLadderSubsystem* Ladder = GetWorld() ? GetWorld()->GetSubsystem<UAstraLadderSubsystem>() : nullptr; Ladder && Ladder->ClimbInput(this, MovementVector))
+	{
+		return;
 	}
 	DoMove(MovementVector.X, MovementVector.Y);
 }
