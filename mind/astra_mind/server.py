@@ -122,11 +122,11 @@ EXTERNAL_SPEAKERS["computer"] = ("Ship's computer", "estelle")          # the li
 # the player talking to the story itself (game master mode): "Regista, ...", "Director, ...", "Narratore, ..."
 import re as _re  # noqa: E402
 # events whose report is a warning of danger: the crew says them before any routine talk (voice priority URGENT)
-_URGENT_EVENT = _re.compile(r"inbound|torpedo|hull integrity critical|containment failing|abandon ship|breach|new contacts|is cycling|"
-                           r"coming through|the Mandate has found us", _re.I)
+_URGENT_EVENT = _re.compile(r"missiles? inbound|rockets? inbound|torpedoes away|hull integrity critical|containment failing|abandon ship|"
+                           r"breach|new contacts|is cycling|coming through", _re.I)
 URGENT_GATHER_S = 0.6          # what comes with a warning of danger joins it (a hit: its breach, fire and wounded arrive together)
 URGENT_WAIT_S = 3.0            # ... and it waits for the line being said to end, this long at most
-ROUTINE_WAIT_S = 15.0          # routine news waits for a quiet bridge this long at most: in a fleet battle the bridge is never quiet,
+ROUTINE_WAIT_S = 25.0          # routine news waits for a quiet bridge this long at most: in a fleet battle the bridge is never quiet,
                                # and news held back for minutes (the gate cycling, told five minutes late) is worse than a busy floor
 # events that are not news but a request to speak (the flight controller calls, the after-action report, the fleet net's news, a visitor
 # at the door): they are reported whenever the bridge is quiet, however long that took
