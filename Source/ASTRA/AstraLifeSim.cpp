@@ -1157,12 +1157,42 @@ void FAstraLifeSim::SetBodied(int32 Idx, bool bBody)
 	}
 }
 
+void FAstraLifeSim::Commandeer(int32 Idx, bool bOn, const FVector& Pos)
+{
+	if (!People.IsValidIndex(Idx))
+	{
+		return;
+	}
+	FAstraLifePerson& P = People[Idx];
+	if (bOn)
+	{
+		if (!P.bCommandeered)
+		{
+			Release(P, Idx);
+			P.Route.Clear();
+			P.Phase = FAstraLifePerson::EPhase::Settled;
+			P.bBody = false;
+			P.Act = EAstraLifeAct::Battle;
+			P.bCommandeered = true;
+		}
+		P.Pos = Pos;
+		return;
+	}
+	if (P.bCommandeered)
+	{
+		P.bCommandeered = false;
+		P.Pos = Pos;
+		P.Episode = -1;                                  // they choose again from where they stand
+		P.LastStep = GameT;
+	}
+}
+
 void FAstraLifeSim::StepPerson(int32 Idx)
 {
 	FAstraLifePerson& P = People[Idx];
 	const float Dt = (float)FMath::Clamp(GameT - P.LastStep, 0.0, 900.0);
 	P.LastStep = GameT;
-	if (P.Status == 2)
+	if (P.Status == 2 || P.bCommandeered)
 	{
 		return;
 	}
@@ -1783,6 +1813,10 @@ int32 FAstraLifeSim::WhoIsAt(FName ExternalStation) const
 FString FAstraLifeSim::Doing(int32 Person) const
 {
 	const FAstraLifePerson& P = People[Person];
+	if (P.bCommandeered)
+	{
+		return FString::Printf(TEXT("fighting the boarders with their squad (%s)"), *Map->Describe(CompOf(Person)));
+	}
 	const bool bWalk = P.Phase != FAstraLifePerson::EPhase::Settled;
 	const FString Here = Map->Describe(P.Place != INDEX_NONE ? Map->Places[P.Place].Comp : CompOf(Person));
 	switch (P.Act)

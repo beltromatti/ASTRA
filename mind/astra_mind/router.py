@@ -65,6 +65,11 @@ def _situation(ctx: Context) -> str:
         out.append("This channel is the flight net: the CAG, the squadron leaders (Alpha Lead, Bravo Lead), their wingmen and the Chief of the Deck. A call, an order, a question "
                    "or a request the Captain puts to a pilot, a squadron, the CAG or the deck chief is for the channel, whatever the call sign or the post it uses. Price is Flight "
                    "Control on the bridge, one of our own crew: words to him stay on the bridge.")
+    if ch and ch.kind == "marines":
+        out.append("This channel is the marine net while boarders are aboard: Major Reyes (Security & Marines, on Deck 8) and the squad leaders in the fight (the squads are named "
+                   "Reaction, Watch and Reserve with a number, in the Captain's language: \"Reaction Two\", \"Reaction Due\", \"Watch 3\"; their sergeants). A call, an order, a question or a request the Captain puts to the marines, a squad or its sergeant, the Major, or about the boarders, the "
+                   "bulkheads and doors, the lockdown or the fight inside the hull is for the channel, whatever the name or the post it uses. The bridge's officers (the XO, "
+                   "Tactical, the helm...) are our own crew on the bridge: words to them, and orders about the ship, the guns and the fleet, stay on the bridge.")
     if ch and ch.talking:
         said = f': "{ch.last_words}"' if ch.last_words else ""
         out.append(f"{ch.name or ch.party} spoke to the Captain {ch.heard_s:.0f} seconds ago{said} — a short reply may well be for them.")

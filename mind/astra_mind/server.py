@@ -42,7 +42,8 @@ from .openrouter import OpenRouter, credits
 from .stt import Recognizer
 from .voice_lang import resolve_language
 from .speech import REPORT_LATE_S, Prio, Voice
-from .flight_minds import CAST as FLIGHT_CAST, PARTY as FLIGHT_PARTY, PARTY_ALIASES as FLIGHT_ALIASES, FlightMinds
+from .flight_minds import CAST as FLIGHT_CAST, PARTY as FLIGHT_PARTY, PARTY_ALIASES as FLIGHT_ALIASES, FlightMinds, flying as _flying
+from .marines import PARTY as MARINES_PARTY, MarineMinds
 from .war_minds import ALLIES, WarMinds
 from .tts import TTSEngine
 from .voice_qos import boost_thread
@@ -142,6 +143,11 @@ def speaker_identity(speaker: str) -> tuple[str, str, bool]:
     return name, voice, False
 
 
+# the nets of people that are a channel of the Captain's (kind -> what the log says, who answers, an example of what nobody on the bridge says, who "nobody" is)
+_NETS = {"flight": ("flight net", "the pilots, the CAG and the deck chief", "the CAG answers", "Price and Comms"),
+         "marines": ("marine net", "Major Reyes and the squad leaders", "Reyes answers", "Tactical, the XO and Comms")}
+
+
 class _TurnQueue(asyncio.Queue):
     """The turns waiting for the crew. An event that goes in is stamped with the time it arrived (loop time, a fourth item): a report of it is
     worth saying only while it is news, and the wait for a quiet bridge must not make old news of it unnoticed."""
@@ -194,6 +200,10 @@ class Mind:
                                   standing=lambda: {o["department"] for o in self.agent.standing}, path=self._flight_path)
         self.flight.disabled = os.environ.get("ASTRA_FLIGHT_MINDS", "1") == "0"           # (ASTRA_FLIGHT_MINDS=0: Price reports the flight events, as before)
         self.flight.on_unanswered = self._flight_unanswered
+        # the marine net: Major Reyes and the squad leaders, while boarders are aboard (marines.py)
+        self.marines = MarineMinds(self.llm, self._marines_say, self._marines_execute, lang=lambda: self.lang, register_voice=self._register_voice, path=self._marines_path)
+        self.marines.disabled = os.environ.get("ASTRA_MARINE_MINDS", "1") == "0"          # (ASTRA_MARINE_MINDS=0: the marines fight on their drill, the bridge reports)
+        self.marines.on_unanswered = self._marines_unanswered
         self.enemy.war = self.war
         self.director.war_minds = self.war
         self.director.negotiate = self._negotiate
@@ -284,6 +294,34 @@ class Mind:
         await self.turns.put((f"\x00event:flight: the Captain called the flight net and nobody there answered: \"{' '.join(words)[:240]}\" — Price answers him now, "
                               "from Flight Control", self.lang))
 
+    async def _marines_say(self, speaker: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False) -> None:
+        """Someone on the marine net speaks (marines.py): the bridge hears it like any radio voice, the crew reads it in its next events, whoever answers the Captain goes first;
+        a line that waited too long is thought again by whoever was to say it (`rethink`)."""
+        if self.game is not None:
+            who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
+            self.game.events.append(f"over the radio, {who}: {text}")
+        self.exchange.heard(MARINES_PARTY, text)
+
+        async def rethink(t: str, waited: float, cut_after: str) -> str | None:
+            return await self.marines.rethink(speaker, t, waited, cut_after, lang)
+        await self.voice.say(speaker, text, lang, tone, priority=Prio.URGENT if urgent else None, answer=True if answer else None, rethink=rethink)
+
+    async def _marines_execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
+        """The marines' orders and the bulkheads (`marine_order`, `lockdown`): straight to the game (never through the hooks the Captain's own commands go through)."""
+        ship = self.game if (self.game and self.game.state) else None
+        if ship is None:
+            return {"ok": True, "detail": "(no game)"}
+        return await ship.execute(name, args, by, direct=True)
+
+    def _marines_path(self) -> str:
+        return os.path.join(os.path.dirname(self.director.war.save_path), "marines.json")
+
+    async def _marines_unanswered(self, words: list[str]) -> None:
+        """The marine net could not answer the Captain (the model failed or stalled): the XO takes his words, so that they are never lost."""
+        self.last_activity = time.monotonic()
+        await self.turns.put((f"\x00event:marines: the Captain called the marine net and nobody there answered: \"{' '.join(words)[:240]}\" — the XO answers him now, from the bridge",
+                              self.lang))
+
     async def _hail_flight(self, args: dict[str, Any], by: str) -> dict[str, Any] | None:
         """Comms opens the flight net (`hail` flight): the mind keeps this channel (the game's `hail` knows contacts and the fleet). None: not for the net."""
         if str(args.get("contact_id", "")).strip().lower() not in FLIGHT_ALIASES or self.flight.disabled:
@@ -334,6 +372,10 @@ class Mind:
             self.flight.feed(state)                       # (the flight net looks at the state, and starts the pulse that is due)
         except Exception:  # noqa: BLE001
             log.exception("the flight net could not read the ship state")
+        try:
+            self.marines.feed(state)                      # (so does the marine net: the fight's picture, and the pulse that is due)
+        except Exception:  # noqa: BLE001
+            log.exception("the marine net could not read the ship state")
 
     def record_log(self, entry: str) -> None:
         """A captain's log entry: kept in Saved/Campaign/captains_log.md, noted for the director, acknowledged."""
@@ -798,6 +840,8 @@ class Mind:
             self.memory.hear(speaker, text)
         if speaker == "flight":
             self.flight.heard("Price (Flight Control)", text)       # (the flight net hears the controller: its people do not say again what he said)
+        if speaker in CREW:
+            self.marines.heard(f"the bridge: {CREW[speaker].title} ({CREW[speaker].role})", text)     # (and the marines hear the bridge in a boarding)
 
         async def rethink(t: str, waited: float, cut_after: str) -> str | None:
             return await self.agent.rethink(speaker, t, waited, cut_after, lang)
@@ -811,12 +855,13 @@ class Mind:
                   if str(c.get("status", "")).startswith("friendly") and c.get("name")]
         names["fleet"] = f'{ADMIRAL["name"]} and the 7th Fleet' + (f' ({", ".join(allies)})' if allies else "")
         names[FLIGHT_PARTY] = self.flight.net_name()
+        names[MARINES_PARTY] = self.marines.net_name()
         return names
 
     def _captain_speaks(self) -> None:
         """The Captain has priority over everything: whatever the crew was doing (a report, a watch check, a chat) stops now,
         and the reports still waiting to be voiced are dropped."""
-        n = self.agent.preempt() + self.npcs.preempt() + self.flight.preempt()
+        n = self.agent.preempt() + self.npcs.preempt() + self.flight.preempt() + self.marines.preempt()
         drop = getattr(self.voice, "drop_low_priority", None)        # (the voice module's side: it may give the Captain more than this)
         dropped = drop() if callable(drop) else 0
         hook = getattr(self.voice, "captain_speaks", None)           # the hook for cutting the line being spoken, if the voice has one
@@ -828,7 +873,7 @@ class Mind:
     def _can_answer(self, party: str) -> bool:
         """Someone answers on this channel: the admiral (and the allied captains on the fleet net), an allied captain with a mind, or a Mandate captain
         with a mind who is still alive."""
-        return party == "fleet" or (party == FLIGHT_PARTY and self.flight.can_answer()) or self.war.can_answer(party) \
+        return party == "fleet" or (party == FLIGHT_PARTY and self.flight.can_answer()) or (party == MARINES_PARTY and self.marines.can_answer()) or self.war.can_answer(party) \
             or (party in COMMANDERS and party not in self.enemy.dead)
 
     async def _to_party(self, party: str, words: str, lang: str) -> None:
@@ -837,6 +882,9 @@ class Mind:
         self.exchange.said(party)
         if party == FLIGHT_PARTY:
             self.flight.captain_to_net(words, lang)                # (the CAG, the leaders, the wingmen, the Chief: whoever it was for answers)
+            return
+        if party == MARINES_PARTY:
+            self.marines.captain_to_net(words, lang)               # (the Major, the squad leaders: whoever it was for answers)
             return
         if party == "fleet":
             self.war.captain_to_fleet(words, lang)
@@ -876,27 +924,29 @@ class Mind:
                 faced = next((p.name for p in people if p.id == raw_ctx["facing"]), "a crew member")
                 raw_ctx = {**raw_ctx, "facing": faced}
         ctx = parse_context(raw_ctx, st, self.enemy, self._party_names(), self.exchange,
-                            flight_net=self.flight.net_live(st, self.exchange.ago(self.exchange._heard, FLIGHT_PARTY)))
+                            flight_net=self.flight.net_live(st, self.exchange.ago(self.exchange._heard, FLIGHT_PARTY)),
+                            marine_net=self.marines.net_live(st, self.exchange.ago(self.exchange._heard, MARINES_PARTY)) and not _flying(st))
         self.memory.hear("Captain", text)
         r = router_mod.Route()
         party_task = None
         ch = ctx.channel
         note = self.npcs.note_for_crew(people)
-        if ch and ch.live and ch.kind == "flight" and self._can_answer(ch.party):
-            # the flight net: comms decides first (a fraction of a second), and the officers are told what went out on it, so that nobody on the bridge says it again
-            # (Price does not relay a pilot's order, Comms does not narrate it): the rest of the Captain's words, for the bridge, is theirs as ever
+        if ch and ch.live and ch.kind in _NETS and self._can_answer(ch.party):
+            # a net of people (the flight net, the marine net): comms decides first (a fraction of a second), and the officers are told what went out on it, so that nobody on the
+            # bridge says it again (Price does not relay a pilot's order, Comms does not narrate it): the rest of the Captain's words, for the bridge, is theirs as ever
+            label, who, example, included = _NETS[ch.kind]
             r = await router_mod.for_party(self.llm, text, ctx)
-            log.info("flight net live: out on it (%s, %.0f ms): %r", r.how, r.ms, r.external[:80])
+            log.info("%s live: out on it (%s, %.0f ms): %r", label, r.how, r.ms, r.external[:80])
             if r.external:
                 await self._to_party(r.party, r.external, lang)
                 if " ".join(r.external.split()) == " ".join(text.split()):
                     # every word of it went out on the net, verbatim: there is nothing left for the bridge, and the crew's turn (a model call to say nothing) is not needed
-                    # (the officers see the order in the flight console and hear the pilots' answer on the radio, in their events)
-                    log.info("the Captain's words went out on the flight net whole: no turn for the bridge")
+                    # (the officers see the order in the console and hear the answer on the radio, in their events)
+                    log.info("the Captain's words went out on the %s whole: no turn for the bridge", label)
                     return
-                note = (note + " " if note else "") + (f"The Captain's words «{r.external}» went out on the flight net: the pilots, the CAG and the deck chief answer them and carry out "
-                                                       "the orders in them. That part is theirs: say and do nothing about it — no acknowledgement, no relay, no \"the CAG answers\" "
-                                                       "(Price and Comms included). If the Captain also said something meant for the bridge, that is yours; otherwise stay silent.")
+                note = (note + " " if note else "") + (f"The Captain's words «{r.external}» went out on the {label}: {who} answer them and carry out "
+                                                       "the orders in them. That part is theirs: say and do nothing about it — no acknowledgement, no relay, "
+                                                       f"no \"{example}\" ({included} included). If the Captain also said something meant for the bridge, that is yours; otherwise stay silent.")
             turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx, note=note, gate=gate))
         else:
             turn_task = asyncio.create_task(self.agent.handle(text, lang, ctx, note=note, gate=gate))
@@ -988,6 +1038,7 @@ class Mind:
                     self.enemy.reset()
                     self.war.reset()
                     self.flight.reset()
+                    self.marines.reset()
                     self.port.reset()
                     await self.voice.clear("new_session")     # what the last session had not said yet is not said in this one
                     self.watch.reset()
@@ -1003,6 +1054,7 @@ class Mind:
                         log.info("campaign continued (war map %s): %s, %d story notes", "loaded" if ok else "missing",
                                  self.director.war.current, len(self.director.campaign))
                         self.flight.load()                # (what the flight net's people remember of the Captain and of the fight so far)
+                        self.marines.load()               # (and the Major's, and the squad leaders')
                         # the war resumes: the director decides what the Aquila meets now (after the XO's welcome)
                         if new_command:
                             # after the loss: a new ship, weeks later; the crew's memory of the pod and the hearing is
@@ -1013,6 +1065,7 @@ class Mind:
                             self.enemy.reset()
                             self.war.reset()
                             self.flight.reset()
+                            self.marines.reset()
                             resume = (f"director: campaign resumed — the Captain takes command of the new Aquila at New Ravenna "
                                       f"({new_command}); weeks have passed and the March moved on: tell what changed with "
                                       f"war_news, then the first beat for the new ship")
@@ -1031,6 +1084,7 @@ class Mind:
                         self.style.reset()
                         self.npcs.reset()
                         self.flight.new_campaign()
+                        self.marines.new_campaign()
                         log.info("new campaign")
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
@@ -1084,6 +1138,10 @@ class Mind:
                             taken = self.flight.on_event(text)     # the flight net's people tell their own news (Price coordinates: he does not echo them)
                         except Exception:  # noqa: BLE001
                             log.exception("the flight net could not take an event")
+                        try:
+                            taken = self.marines.on_event(text) or taken     # so do the marines (a boarding's own news is theirs; the bridge reports the ship's)
+                        except Exception:  # noqa: BLE001
+                            log.exception("the marine net could not take an event")
                     if msg.get("report") and not self.aftermath.muted and not taken:
                         self.last_activity = time.monotonic()
                         await self.turns.put(("\x00event:" + text, self.lang))

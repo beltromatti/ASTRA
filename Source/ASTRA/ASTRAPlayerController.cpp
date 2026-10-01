@@ -12,6 +12,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Font.h"
+#include "AstraArmory.h"
 #include "AstraCampaign.h"
 #include "AstraFighterPawn.h"
 #include "AstraHangar.h"
@@ -255,6 +256,17 @@ void AASTRAPlayerController::ToggleSeat()
 	{
 		F->ClimbOut();
 		return;
+	}
+	// ABBORDAGGI: the armory's rack: take the weapons, or put them back
+	if (APawn* Me = GetPawn())
+	{
+		for (TActorIterator<AAstraArmoryRack> It(GetWorld()); It; ++It)
+		{
+			if (It->TryUse(Me))
+			{
+				return;
+			}
+		}
 	}
 	// a lifepod's hatch: sealed, or (abandoning ship) the way off her
 	if (APawn* Me = GetPawn())
@@ -557,6 +569,14 @@ namespace
 		TEXT("  or say it: \"Deck seven\", \"Main Engineering\"; the car really moves, and the crew rides it too\n")
 		TEXT("  the Captain's quarters: the door at the end of the starboard corridor;\n")
 		TEXT("  E beside the bunk to rest (the XO wakes you if anything happens)\n")
+		TEXT("\n")
+		TEXT("ARMED (the armory, Deck 8: E at the rack takes the rifle and the sidearm)\n")
+		TEXT("  left mouse      fire (the rifle holds fire: the sidearm one round a click)\n")
+		TEXT("  right mouse     look through the sights (slower turn, steadier aim)\n")
+		TEXT("  R               reload              1 / 2    rifle / sidearm        Q   the last weapon\n")
+		TEXT("  H               holster             wheel    change weapon          the weapon is lowered when you run\n")
+		TEXT("  C, hold C       crouch / lie down: the cone of your rounds closes, you are a smaller target\n")
+		TEXT("  gamepad         right trigger fire · left trigger sights · X reload · Y last weapon · D-pad down holster\n")
 		TEXT("\n")
 		TEXT("ON THE FLIGHT DECK\n")
 		TEXT("  E               beside a Falcon of Alpha: climb in\n")

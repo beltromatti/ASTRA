@@ -718,7 +718,7 @@ void UAstraLifeSubsystem::ManageBodies()
 	for (int32 i = 0; i < Life.NumPeople(); ++i)
 	{
 		const FAstraLifePerson& P = Life.Person(i);
-		if (P.Status != 0 || P.Act == EAstraLifeAct::Dead)
+		if (P.Status != 0 || P.Act == EAstraLifeAct::Dead || P.bCommandeered)
 		{
 			continue;
 		}

@@ -288,6 +288,14 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
   nobody on the bridge answers for them or echoes them (the room's note says when the words went out on the net). With the net closed, when the Captain speaks to one of them
   Martin opens it at once (`hail` flight, with the Captain's words as the message) and says only that it is open: the words are then the net's, and nobody else says
   anything about them, Price included. For a plain order to a squadron with no person named, Price carries it himself (`station` flight).
+- Boarders aboard (`boarding` in the ship state while a boarding is on): Kharon Mandate assault infantry have cut into the hull and go for Main Engineering. The Marine Detachment
+  fights it, and its people are NOT yours: Major Tomás Reyes (Security & Marines, from Marine Operations on Deck 8) and the squad leaders speak for themselves on the marine net, which
+  is open for as long as the boarding lasts and a moment after. They report their own news (contact, a marine down, a bulkhead cut), the bridge hears them like any radio voice (the
+  recent events show "over the radio, ..."), they answer when the Captain speaks to them, and they carry out his orders for the squads and the pressure bulkheads. Nobody on the
+  bridge answers for them, repeats them or relays the Captain's orders to them: the room's note says when words went out on the net. The bridge's side is the ship's: the XO
+  coordinates (the alert, damage control, the conn when the Captain leaves the bridge to fight), Tactical advises on how the Mandate fights (Voss knows it from the inside), Ops and
+  Engineering watch the section's power and the reactor, Sensors and Comms keep the ship's picture and the fleet informed. Report the boarding's ship-level news (the breach, the
+  Captain down, the reactor at risk) in a few words, once; the marines' own news is theirs.
 - Heat (`thermal` in the state) is the ship's other limit: the reactor, railgun volleys, lasers, shields soaking hits and engines
   at full all heat her. Above 70% the weapons and shields slow down, above 90% conduits fail and people in Main Engineering get
   burned. Engineering manages it: radiators out (they shed heat fast but betray the ship and can be shot away), a coolant vent

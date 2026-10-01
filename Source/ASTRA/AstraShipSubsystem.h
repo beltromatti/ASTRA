@@ -220,6 +220,12 @@ public:
 	void InteriorCost(float& OutAvgMs, float& OutMaxMs) const { OutAvgMs = InteriorMsAvg; OutMaxMs = InteriorMsMax; }
 	/** The Captain's state under the air and the fire (the screens' vignette, the harness). */
 	const FAstraDmgCaptain& GetCaptainHealth() const { return Interior.Captain(); }
+	/** ABBORDAGGI (docs/ABBORDAGGI.md): what a fight inside the ship asks of the ship. A person of the roster is wounded or killed by gunfire (Cause "gunfire": the roster's
+	 *  table of wounds): the roster's own words about them (empty when they were hurt already); the wounded go to the Medbay, the fallen are named. */
+	FString HarmPerson(int32 RosterIdx, bool bKill, const FString& Cause);
+	/** ABBORDAGGI: a pressure bulkhead of the plan is shut, or opened, by the fight (a lockdown against boarders; the boarders cutting through): the plan's door, the door
+	 *  actor of the level (when its deck is in) and the people's routes follow, as when the damage model seals one. */
+	void SealBulkhead(FName DoorId, bool bSealed);
 	/** The tests' own Captain (no pawn needed): where the feet are while it is on; the air, the smoke and the fire work on them as on the real one. */
 	void SetTestCaptain(bool bOn, const FVector& PosCm) { bTestCaptain = bOn; TestCaptainCm = PosCm; }
 	int32 GetCaptainFate() const { return CaptainFate; }
@@ -308,8 +314,10 @@ private:
 	FHitReport HitReport;             // what the last blows did, told in one report
 	TMap<FName, TWeakObjectPtr<class AAstraDoor>> DoorActors;
 	FDelegateHandle DoorPlacedHandle;
+	TSet<int32> ExternalSeals;          // ABBORDAGGI: doors the fight has sealed (the damage model does not know them): they shut again when their deck streams in
 	TMap<int32, bool> DoorLockMemory;   // plan door -> whether its actor was locked by the level before a bulkhead sealed it (a sealed one is shut; it goes back as it was)
 	void OnDoorPlaced(class AAstraDoor* Door);
+	void ShutBulkhead(FName Id, bool bSealed);   // the plan's door, its actor, the effects and the people's routes (the damage model's seal and the fight's)
 	void ApplyDoorSeal(int32 DoorIndex, class AAstraDoor* Door, bool bSealed);
 	// the Captain's fate under the hazards: down, carried to the Medbay, or dead
 	int32 CaptainFate = 0;            // 0 well, 1 down, 2 dead

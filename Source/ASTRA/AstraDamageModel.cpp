@@ -1597,6 +1597,19 @@ void FAstraDamageModel::TickCaptain(float Dt, int32 Comp, const FVector& PosCm)
 	}
 }
 
+void FAstraDamageModel::CaptainWounded(float Trauma, const FString& Cause)
+{
+	if (Cap.State == FAstraDmgCaptain::EState::Dead || Trauma <= 0.f)
+	{
+		return;
+	}
+	Cap.Trauma = FMath::Max(Cap.Trauma, Trauma);
+	if (Cap.Cause.IsEmpty() || Trauma >= 1.f)
+	{
+		Cap.Cause = Cause;
+	}
+}
+
 void FAstraDamageModel::CaptainRescued()
 {
 	const int32 Comp = Cap.Comp;

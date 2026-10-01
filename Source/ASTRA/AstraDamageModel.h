@@ -133,6 +133,7 @@ struct FAstraDmgCaptain
 	int32 Comp = INDEX_NONE;
 	FString Cause;                 // what is doing it
 	FString Why;                   // how they ended (for the record)
+	bool bContested = false;       // ABBORDAGGI: armed enemies are on them: nobody can carry them out until it is clear
 };
 
 /** What a compartment's lamps do under its damage (the lamp pool's and the older rooms' lights follow it). The light that burns is
@@ -188,6 +189,11 @@ public:
 	/** The Captain stands in Comp (INDEX_NONE: outside the plan, a Falcon, a planet): the air and the fire work on them. */
 	void TickCaptain(float Dt, int32 Comp, const FVector& PosCm);
 	const FAstraDmgCaptain& Captain() const { return Cap; }
+	/** ABBORDAGGI: a wound from a weapon (the fight inside the ship keeps the Captain's strength; this is its mark on the model): the trauma is at least this much
+	 *  (12 puts them down), and the cause shown for it is Cause. */
+	void CaptainWounded(float Trauma, const FString& Cause);
+	/** ABBORDAGGI: armed enemies are on the Captain (or not): while they are, the ship's chain does not carry a fallen Captain out. */
+	void CaptainContested(bool bOn) { Cap.bContested = bOn; }
 	/** The Captain was taken out of harm's way (the rescue's end): the doses are cleared. */
 	void CaptainRescued();
 	void CaptainDied(const FString& Why) { Cap.State = FAstraDmgCaptain::EState::Dead; Cap.Why = Why; }
