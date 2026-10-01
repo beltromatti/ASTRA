@@ -1772,19 +1772,29 @@ FString UAstraShipSubsystem::CaptainAboard() const
 			            "officers speak by intercom");
 		}
 	}
+	// in a lift: the car and where it is (a shaft runs through many decks)
+	const UAstraLiftSubsystem* Lifts = GetWorld()->GetSubsystem<UAstraLiftSubsystem>();
+	const FVector Feet = P ? P->GetActorLocation() - FVector(0.f, 0.f, Cast<ACharacter>(P) ? Cast<ACharacter>(P)->GetDefaultHalfHeight() : 90.f) : FVector::ZeroVector;
+	FString LiftPlace;
+	int32 LiftDeck = 0;
+	if (Lifts && P && Lifts->CaptainPlace(Feet, LiftPlace, LiftDeck))
+	{
+		return FString::Printf(TEXT("in a lift car (%s), away from the bridge: the XO has the conn; the bridge officers speak by intercom"), *LiftPlace);
+	}
 	// anywhere else aboard: the compartment of the ship's plan (the bridge is one of them)
 	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P); Comp && Comp->Kind != TEXT("bridge"))
 	{
+		const int32 Deck = Comp->Kind == TEXT("lift") && Lifts ? FMath::Max(Lifts->DeckNearZ(Feet.Z), 1) : Comp->Deck;
 		FString PlanDeck;
 		if (const UAstraShipPlan* Plan = GetWorld()->GetSubsystem<UAstraShipPlan>())
 		{
 			for (const FAstraPlanDeck& D : Plan->GetDecks())
 			{
-				if (D.Id == Comp->Deck) { PlanDeck = D.Name; }
+				if (D.Id == Deck) { PlanDeck = D.Name; }
 			}
 		}
 		return FString::Printf(TEXT("in the %s (Deck %d%s, section %s), away from the bridge: the XO has the conn; the bridge officers speak "
-		                            "by intercom"), *PlanRoomName(*Comp), Comp->Deck, PlanDeck.IsEmpty() ? TEXT("") : *(TEXT(" · ") + PlanDeck),
+		                            "by intercom"), *PlanRoomName(*Comp), Deck, PlanDeck.IsEmpty() ? TEXT("") : *(TEXT(" · ") + PlanDeck),
 		                       *Comp->Section);
 	}
 	if (P && P->GetActorLocation().Z < -3000.f)
@@ -1817,6 +1827,15 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	{
 		if (It->IsPawnInside(P)) { return TEXT("DECK 1 · CAPTAIN'S QUARTERS"); }
 	}
+	// in a lift: the car and the deck it is at, or where it is going ("DECK 7 · SERVICE LIFT 1"); a shaft runs through many decks, so its compartment cannot say which
+	const UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr;
+	const FVector Feet = P ? P->GetActorLocation() - FVector(0.f, 0.f, Cast<ACharacter>(P) ? Cast<ACharacter>(P)->GetDefaultHalfHeight() : 90.f) : FVector::ZeroVector;
+	FString InLift;
+	int32 LiftDeck = 0;
+	if (Lifts && P && Lifts->CaptainPlace(Feet, InLift, LiftDeck))
+	{
+		return InLift;
+	}
 	// anywhere else aboard: the compartment of the ship's plan, as the signs say it ("DECK 4 · MESS CONCOURSE · SECTION B")
 	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P))
 	{
@@ -1824,7 +1843,8 @@ FString UAstraShipSubsystem::CaptainPlace() const
 		{
 			return TEXT("BRIDGE");
 		}
-		return FString::Printf(TEXT("DECK %d · %s · SECTION %s"), Comp->Deck, *PlanRoomName(*Comp).ToUpper(), *Comp->Section);
+		const int32 Deck = Comp->Kind == TEXT("lift") && Lifts ? FMath::Max(Lifts->DeckNearZ(Feet.Z), 1) : Comp->Deck;
+		return FString::Printf(TEXT("DECK %d · %s · SECTION %s"), Deck, *PlanRoomName(*Comp).ToUpper(), *Comp->Section);
 	}
 	if (P && P->GetActorLocation().Z < -3000.f)
 	{
@@ -1855,7 +1875,16 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P))
 	{
-		C->SetNumberField(TEXT("deck"), Comp->Deck);                      // where a fire, a breach, a team is, against where the Captain is
+		// where a fire, a breach, a team is, against where the Captain is (in a lift's shaft, the deck of his car or of the floor at his feet)
+		const UAstraLiftSubsystem* Lifts = GetWorld()->GetSubsystem<UAstraLiftSubsystem>();
+		const FVector Feet = P ? P->GetActorLocation() - FVector(0.f, 0.f, Cast<ACharacter>(P) ? Cast<ACharacter>(P)->GetDefaultHalfHeight() : 90.f) : FVector::ZeroVector;
+		FString Unused;
+		int32 Deck = Comp->Deck;
+		if (Lifts && !Lifts->CaptainPlace(Feet, Unused, Deck) && Comp->Kind == TEXT("lift"))
+		{
+			Deck = FMath::Max(Lifts->DeckNearZ(Feet.Z), 1);
+		}
+		C->SetNumberField(TEXT("deck"), Deck);
 		C->SetStringField(TEXT("section"), Comp->Section);
 	}
 	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0);

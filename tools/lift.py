@@ -117,7 +117,7 @@ def check_plan(plan: dict) -> tuple[list[str], list[str]]:
     n_shafts = 0
     for v in plan.get("vertical", []):
         sh = v.get("shaft")
-        if not sh:
+        if not sh or v.get("kind") == "trunk":         # the stairs and the Jefferies trunks (ladders) are not lifts
             continue
         n_shafts += 1
         who = f"lift {v['id']}"
@@ -137,8 +137,9 @@ def check_plan(plan: dict) -> tuple[list[str], list[str]]:
             along_x = abs(math.cos(math.radians(yaw))) > 0.5
             delta = (door[0] - sh["x"]) if along_x else (door[1] - sh["y"])
             outs.add(("x" if along_x else "y", delta < 0))
-            if abs(abs(delta) - d / 2) > 0.15:
-                problems.append(f"{who}, deck {ld['deck']}: the door is {abs(delta):.2f} m from the shaft's middle, its wall is {d / 2:.2f} m")
+            wall = abs(delta) - d / 2                    # the door's plane: the shaft's inside face, or out of it through the lobby's wall (up to 0.6 m)
+            if wall < -0.15 or wall > 0.6:
+                problems.append(f"{who}, deck {ld['deck']}: the door is {abs(delta):.2f} m from the shaft's middle, its inside face is {d / 2:.2f} m")
             if not sh["z"][0] - 0.05 <= ld["z"] <= sh["z"][1] + 0.05:
                 problems.append(f"{who}, deck {ld['deck']}: the landing (z {ld['z']}) is outside the shaft {sh['z']}")
             if ld.get("node") and ld["node"] not in nodes:

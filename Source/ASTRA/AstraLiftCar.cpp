@@ -9,6 +9,9 @@
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "HAL/IConsoleManager.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -18,6 +21,9 @@ DECLARE_CYCLE_STAT(TEXT("Car tick"), STAT_AstraLiftCar, STATGROUP_AstraLifts);
 
 namespace
 {
+	TAutoConsoleVariable<int32> CVarLiftCarry(TEXT("astra.lifts.carry"), 1,
+		TEXT("1: a car takes the Captain standing in it along by its own step, in the same frame (0: only his movement follows the floor, a frame late: the bench's A/B)"));
+
 	USoundBase* LiftSound(const TCHAR* Name)
 	{
 		return LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Audio/%s.%s"), Name, Name), nullptr, LOAD_NoWarn | LOAD_Quiet);
@@ -457,8 +463,10 @@ void AAstraLiftCar::ApplyBrain(float Dt)
 	{
 		LastMoveAt = Now;
 		// carried: the Captain's feet and the crew's bodies move with it (their movement reads this component as their base)
+		const FVector Step = P - LastLocation;
 		SetActorLocation(P, false, nullptr, ETeleportType::None);
 		LastLocation = P;
+		CarryCaptain(Step);
 	}
 	const FVector Vel = Data.Path.Tangent(Brain.S()) * Brain.V();
 	if (Floor && !Floor->ComponentVelocity.Equals(Vel, 0.5f))
@@ -489,6 +497,22 @@ void AAstraLiftCar::ApplyBrain(float Dt)
 		LastDoor = Door;
 		LastLandingOpen = At != INDEX_NONE ? At : LastLandingOpen;
 	}
+}
+
+void AAstraLiftCar::CarryCaptain(const FVector& Step)
+{
+	// his own movement follows a moving floor a frame late and by a sweep: in a long frame (a deck's level streaming in as the car goes by) the ceiling of a car going down
+	// came through his head and he was pushed out on top of it, left on the roof while the car went on. So the car takes him along by its own step, at once, and his movement
+	// is told the floor is where it is now (it does not move him a second time)
+	ACharacter* C = CVarLiftCarry.GetValueOnGameThread() ? UGameplayStatics::GetPlayerCharacter(this, 0) : nullptr;
+	UCharacterMovementComponent* M = C ? C->GetCharacterMovement() : nullptr;
+	const UPrimitiveComponent* Base = C ? Cast<UPrimitiveComponent>(C->GetMovementBaseObject()) : nullptr;
+	if (!M || !Base || Base->GetOwner() != this || M->MovementMode != MOVE_Walking || Step.SizeSquared() > FMath::Square(300.f))
+	{
+		return;                                         // not standing in this car (or a jump of the car's body that is no ride: a teleport)
+	}
+	C->SetActorLocation(C->GetActorLocation() + Step, false, nullptr, ETeleportType::None);
+	M->SaveBaseLocation();
 }
 
 void AAstraLiftCar::DrainEvents()

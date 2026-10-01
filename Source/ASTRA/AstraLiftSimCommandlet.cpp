@@ -959,6 +959,40 @@ namespace
 			const bool bClosed = [&]() { for (float T = 0.f; T < 12.f; T += 1.f / 60.f) { W.Step(1.f / 60.f); if (Car->Brain.State() == FAstraLiftBrain::EState::Idle && Car->Brain.DoorOpen() <= 0.f) { return true; } } return false; }();
 			LiftCheck(TEXT("world: the doors wait for the Captain in the doorway"), bOutAgain && bHeld && bClosed, FString::Printf(TEXT("held open while he stood there %d, closed after he stepped away %d"), bHeld, bClosed));
 		}
+
+		// ---- a ride down with long frames (a deck's level streaming in as the car goes by): the car's ceiling must not come through his head (it did: he was left on the
+		// car's roof while it went on), he goes down with the floor however long the frame
+		{
+			const FAstraLiftStop& S5b = L.Stops[Deck5];
+			if (!Car->Contains(C->GetActorLocation(), 40.f))
+			{
+				W.Lifts->CallAt(Tl, Deck5, Notice);
+				LiftWalk(W, C, FVector::ZeroVector, 15.f, [&]() { return Car->Brain.AtLanding() == Deck5 && Car->Brain.DoorOpen() >= 1.f; });
+				LiftWalk(W, C, -S5b.Out, 6.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
+			}
+			LiftWalk(W, C, FVector::ZeroVector, 0.6f, []() { return false; });
+			FLiftRideLog Down;
+			Down.Rel0 = Car->ToLocal(C->GetActorLocation());
+			FString D3;
+			const bool bGo3 = W.Lifts->GoToDeck(9, D3);
+			bool bArr3 = false;
+			int32 Frame = 0;
+			for (float T = 0.f; T < 60.f;)
+			{
+				const float Dt = ++Frame % 20 == 0 ? 0.35f : 1.f / 60.f;   // a third of a second every twentieth frame
+				W.Step(Dt);
+				T += Dt;
+				LiftRecordRide(W, Tl, C, Down);
+				if (Car->Brain.AtLanding() == Deck9 && Car->Brain.DoorOpen() >= 1.f)
+				{
+					bArr3 = true;
+					break;
+				}
+			}
+			const float EndDev3 = (float)(Car->ToLocal(C->GetActorLocation()) - Down.Rel0).Size();
+			LiftCheck(TEXT("world: Deck 5 down to Deck 9 with long frames"), bGo3 && bArr3 && EndDev3 < 2.f && Down.FallFrames == 0 && Down.UnbasedFrames == 0,
+			      FString::Printf(TEXT("%s; %.2f cm at the end, drift at most %.2f cm, %d falling, %d off the floor"), *D3, EndDev3, Down.MaxDevCm, Down.FallFrames, Down.UnbasedFrames));
+		}
 	}
 
 	// ============================================================================================================================ the crew's riders

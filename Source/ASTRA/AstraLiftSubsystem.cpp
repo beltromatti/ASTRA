@@ -611,6 +611,53 @@ bool UAstraLiftSubsystem::RideFeet(FVector& OutFeetCm) const
 	return true;
 }
 
+int32 UAstraLiftSubsystem::DeckNearZ(float Z) const
+{
+	int32 Best = 0;
+	float BestD = TNumericLimits<float>::Max();
+	for (const FAstraLiftLine& L : Net.Lines)
+	{
+		if (L.bShuttle)
+		{
+			continue;
+		}
+		for (const FAstraLiftStop& S : L.Stops)
+		{
+			const float D = FMath::Abs(S.FloorZ - Z);
+			if (D < BestD)
+			{
+				BestD = D;
+				Best = S.Deck;
+			}
+		}
+	}
+	return Best;
+}
+
+bool UAstraLiftSubsystem::CaptainPlace(const FVector& FeetCm, FString& OutName, int32& OutDeck) const
+{
+	if (InLine == INDEX_NONE || !Net.Lines.IsValidIndex(InLine) || !Run.IsValidIndex(InLine) || !Run[InLine].Car)
+	{
+		return false;
+	}
+	const FAstraLiftLine& L = Net.Lines[InLine];
+	const FAstraLiftBrain& B = Run[InLine].Car->Brain;
+	const FString Name = L.Name.ToUpper();
+	if (B.State() == FAstraLiftBrain::EState::Moving && L.Stops.IsValidIndex(B.LegTarget()))
+	{
+		const FAstraLiftStop& To = L.Stops[B.LegTarget()];
+		OutDeck = L.bShuttle ? To.Deck : DeckNearZ(FeetCm.Z);
+		OutName = L.bShuttle ? FString::Printf(TEXT("%s · BOUND FOR %s"), *Name, *To.Label)
+		                     : FString::Printf(TEXT("%s · GOING %s TO %s"), *Name, To.FloorZ < FeetCm.Z ? TEXT("DOWN") : TEXT("UP"), *To.Label);
+		return true;
+	}
+	const int32 Here = Run[InLine].Car->CurrentStop();
+	OutDeck = L.Stops.IsValidIndex(Here) ? L.Stops[Here].Deck : DeckNearZ(FeetCm.Z);
+	OutName = L.bShuttle && L.Stops.IsValidIndex(Here) ? FString::Printf(TEXT("DECK %d · %s · %s"), OutDeck, *Name, *L.Stops[Here].Label)
+	                                                  : FString::Printf(TEXT("DECK %d · %s"), OutDeck, *Name);
+	return true;
+}
+
 bool UAstraLiftSubsystem::Use(APawn* Pawn, FString& OutNotice)
 {
 	if (!bBuilt || !Pawn)

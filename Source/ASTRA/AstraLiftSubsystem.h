@@ -106,6 +106,12 @@ public:
 	/** While the Captain rides (the car moves, or waits with its doors shut for the deck), the lobby he is going to: where the deck streaming should look instead of at
 	 *  each deck he passes (a ride down the ship would load every one of them in turn). False when he is not riding. */
 	bool RideFeet(FVector& OutFeetCm) const;
+	/** Where the Captain is when a lift has him (in a car, or in a shaft's doorway): "DECK 7 · SERVICE LIFT 1", "SERVICE LIFT 1 · GOING DOWN TO DECK 7", and the deck he is
+	 *  at (the car's landing, or the floor nearest his feet). False when no lift has him: the plan's compartment says where he is. A shaft runs through many decks, so its
+	 *  compartment alone cannot say which. */
+	bool CaptainPlace(const FVector& FeetCm, FString& OutName, int32& OutDeck) const;
+	/** The deck whose floor is nearest a height (world cm), from the landings of every line; 0 when there are none. */
+	int32 DeckNearZ(float Z) const;
 
 	// --------------------------------------------------------------------------------------------------------------------------- for the screen
 	struct FRow { int32 Stop = INDEX_NONE; FString Label, Name, Places; bool bHere = false; };

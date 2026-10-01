@@ -137,9 +137,9 @@ namespace
 	void LiftParseShaft(const FLiftObj& V, FLiftContext& Ctx, FAstraLiftNetwork& Net)
 	{
 		const FLiftObj Shaft = LiftObjOf(V, TEXT("shaft"));
-		if (!Shaft.IsValid())
+		if (!Shaft.IsValid() || LiftStrOf(V, TEXT("kind")) == TEXT("trunk"))
 		{
-			return;                                     // the stairs, the older lift (a teleport between rooms): not a shaft
+			return;                                     // the stairs, the older lift (a teleport between rooms), the Jefferies trunks (ladders): not a lift's shaft
 		}
 		FAstraLiftLine L;
 		L.Id = LiftStrOf(V, TEXT("id"));
@@ -200,10 +200,13 @@ namespace
 			const bool bAlongX = FMath::Abs(FMath::Cos(FMath::DegreesToRadians(S.DoorYaw))) > 0.5f;
 			const float Delta = bAlongX ? (float)(Door.X - L.ShaftCm.X) : (float)(Door.Y - L.ShaftCm.Y);
 			S.Out = bAlongX ? FVector(Delta < 0.f ? -1.f : 1.f, 0.f, 0.f) : FVector(0.f, Delta < 0.f ? -1.f : 1.f, 0.f);
-			if (FMath::Abs(FMath::Abs(Delta) - L.ShaftD * 0.5f) > 15.f)
+			// the door's plane is the shaft's inside face or, through a lobby's wall, up to 60 cm out of it (the landing then bridges the wall: a threshold and a reveal)
+			const float Wall = FMath::Abs(Delta) - L.ShaftD * 0.5f;
+			if (Wall < -15.f || Wall > 60.f)
 			{
-				Net.Problems.Add(FString::Printf(TEXT("%s, deck %d: the door is %.2f m from the shaft's middle; its wall is %.2f m"), *Who, S.Deck, FMath::Abs(Delta) / 100.f, L.ShaftD / 200.f));
+				Net.Problems.Add(FString::Printf(TEXT("%s, deck %d: the door is %.2f m from the shaft's middle; its inside face is %.2f m"), *Who, S.Deck, FMath::Abs(Delta) / 100.f, L.ShaftD / 200.f));
 			}
+			S.WallCm = FMath::Clamp(Wall, 0.f, 60.f);
 			if (L.Stops.Num() && !S.Out.Equals(L.Stops[0].Out, 0.01f))
 			{
 				Net.Problems.Add(FString::Printf(TEXT("%s, deck %d: its door is on another side of the shaft than the others (a car has its door on one side): left out"), *Who, S.Deck));

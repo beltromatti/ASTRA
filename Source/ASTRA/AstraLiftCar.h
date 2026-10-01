@@ -137,6 +137,8 @@ private:
 	void BuildLooks();
 	void ApplyDoors(float Open);
 	void ApplyBrain(float Dt);
+	/** The Captain standing in this car goes with it by the car's own step, in the same frame. */
+	void CarryCaptain(const FVector& Step);
 	void DrainEvents();
 	void UpdateHum();
 	void Thump(float Volume);
@@ -192,7 +194,10 @@ private:
 	UPROPERTY() TObjectPtr<UTextRenderComponent> ShaftText;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> SignMat;
 	float ShaftBackCm = 280.f;                  // how far the shaft's back wall is behind the doors' plane
+	float WallCm = 0.f;                         // the lobby's wall between the shaft's inside face and the doors' plane (the reveal bridges it)
 	void BuildLooks();
+	/** Through a lobby's wall: a threshold the feet cross from the car's sill to the landing's, and the jambs and head that line the wall's opening. */
+	void BuildReveal();
 };
 
 /** A shaft's walls: instances of the kit's segment up its whole height (one component, as many instances as it has segments). */

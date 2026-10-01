@@ -4,17 +4,19 @@
 cd "$(dirname "$0")/.."
 PY=/opt/homebrew/bin/python3.13
 EDITOR_BIN="UnrealEditor.app/Contents/MacOS/UnrealEditor"
+# the editor (or a game the harness started): not the commandlets the helpers run from the same binary (-run=...), which do not hold this checkout's module
+editor_up() { pgrep -fl "$EDITOR_BIN" | grep -v -- "-run=" | grep -q .; }
 # a game started by the playtest harness runs the same binary: close it first
 pgrep -f "astra_harness_port" >/dev/null && $PY tools/play.py quit >/dev/null 2>&1
-if pgrep -f "$EDITOR_BIN" >/dev/null; then
+if editor_up; then
   $PY tools/ue.py pie stop >/dev/null 2>&1
   $PY tools/ue.py py "import unreal
 unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
 unreal.SystemLibrary.quit_editor()" >/dev/null 2>&1
 fi
 pkill -f astra-mind
-for i in {1..120}; do pgrep -f "$EDITOR_BIN" >/dev/null || break; sleep 2; done
-if pgrep -f "$EDITOR_BIN" >/dev/null; then echo "l'editor non si chiude"; exit 1; fi
+for i in {1..120}; do editor_up || break; sleep 2; done
+if editor_up; then echo "l'editor non si chiude"; exit 1; fi
 LOG=Saved/Logs/build_last.log
 mkdir -p Saved/Logs
 "/Users/Shared/Epic Games/UE_5.8/Engine/Build/BatchFiles/Mac/Build.sh" ASTRAEditor Mac Development -Project="$PWD/ASTRA.uproject" -WaitMutex > "$LOG" 2>&1

@@ -26,6 +26,7 @@ struct FAstraLiftStop
 	FVector DoorCm = FVector::ZeroVector;     // the middle of the opening, on the floor (world cm)
 	float DoorYaw = 0.f;                      // the plan's yaw of the door (90: a door in a wall that runs along x)
 	FVector Out = FVector::ForwardVector;     // the horizontal unit vector from the car into the lobby
+	float WallCm = 0.f;                       // how far the door's plane stands out of the shaft's inside face: the lobby's wall the landing bridges (0: a door in the face)
 	float S = 0.f;                            // cm along the path where the car stands for this stop
 	float FloorZ = 0.f;                       // the floor of the lobby
 	FString Lobby, NodeId;                    // the plan's compartment and graph node

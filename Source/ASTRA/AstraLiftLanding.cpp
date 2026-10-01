@@ -50,7 +50,8 @@ void AAstraLiftLanding::Setup(const FAstraLiftLine& InLine, int32 InStop, const 
 	const FAstraLiftStop& S = InLine.Stops[InStop];
 	OutDir = S.Out;
 	bDoors = !InLine.bShuttle;
-	ShaftBackCm = InLine.ShaftD;
+	WallCm = bDoors ? S.WallCm : 0.f;
+	ShaftBackCm = InLine.ShaftD + WallCm;
 	SetActorLocationAndRotation(S.DoorCm, FRotator(0.f, InLine.FrontYaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 	const FAstraLiftSpec::FOpening& Op = Spec.Openings[0];
 	PanelLocal = bDoors ? FVector(6.f, -(Op.Width * 0.5f + 45.f), 110.f) : FVector(130.f, -175.f, 110.f);
@@ -82,7 +83,43 @@ void AAstraLiftLanding::Setup(const FAstraLiftLine& InLine, int32 InStop, const 
 		}
 	}
 	BuildLooks();
+	BuildReveal();
 	SetOpen(0.f);
+}
+
+void AAstraLiftLanding::BuildReveal()
+{
+	if (WallCm < 2.f)
+	{
+		return;                                         // a door in the shaft's own face: the car's sill meets the landing's
+	}
+	UStaticMesh* C = AstraLiftKit::Cube();
+	if (!C)
+	{
+		return;
+	}
+	static UMaterialInterface* Trim = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/Instances/MI_ASTRA_Trim.MI_ASTRA_Trim"));
+	const FAstraLiftSpec::FOpening& Op = Spec.Openings[0];
+	const float Back = WallCm + 3.f;                    // from the car's sill (three centimetres inside the shaft's face) to the doors' plane
+	const float HalfW = Op.Width * 0.5f;
+	auto Piece = [&](const TCHAR* Name, const FVector& Mid, const FVector& Size, bool bWalk)
+	{
+		UStaticMeshComponent* M = LiftMakeMesh(this, GetRootComponent(), Name, C, Mid, Size / 100.f);
+		if (Trim)
+		{
+			M->SetMaterial(0, Trim);
+		}
+		if (bWalk)
+		{
+			// the feet cross it: it blocks like a floor (the gap under it runs down the shaft)
+			M->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			M->SetCollisionResponseToAllChannels(ECR_Block);
+		}
+	};
+	Piece(TEXT("Threshold"), FVector(-Back * 0.5f, 0.f, -1.4f), FVector(Back, Op.Width + 10.f, 2.4f), true);     // two millimetres under the floors it meets (no flicker)
+	Piece(TEXT("RevealL"), FVector(-Back * 0.5f + 1.5f, -(HalfW + 4.f), Op.Height * 0.5f), FVector(Back - 3.f, 8.f, Op.Height), false);
+	Piece(TEXT("RevealR"), FVector(-Back * 0.5f + 1.5f, HalfW + 4.f, Op.Height * 0.5f), FVector(Back - 3.f, 8.f, Op.Height), false);
+	Piece(TEXT("RevealHead"), FVector(-Back * 0.5f + 1.5f, 0.f, Op.Height + 4.f), FVector(Back - 3.f, Op.Width + 16.f, 8.f), false);
 }
 
 void AAstraLiftLanding::BuildLooks()
@@ -214,7 +251,9 @@ bool AAstraLiftLanding::InDoorway(const FVector& World, float Margin) const
 {
 	const FVector L = GetActorTransform().InverseTransformPosition(World);
 	const FAstraLiftSpec::FOpening& Op = Spec.Openings[0];
-	return FMath::Abs(L.Y) < Op.Width * 0.5f + Margin && L.X > -60.f && L.X < 80.f && L.Z > -20.f && L.Z < Op.Height;
+	// across the doors' two planes (the car's, behind the lobby's wall, and the landing's) and a body's width either side: someone standing well inside the car, or waiting in the
+	// lobby, does not hold the doors (half a metre into a car held them for good)
+	return FMath::Abs(L.Y) < Op.Width * 0.5f + Margin && L.X > -(WallCm + 52.f) && L.X < 80.f && L.Z > -20.f && L.Z < Op.Height;
 }
 
 bool AAstraLiftLanding::Reaches(const FVector& Feet, float RangeCm) const
