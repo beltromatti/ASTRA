@@ -65,7 +65,7 @@ _reg("galley_pass", name="Galley Pass", kind="galley", dept="services", L=24.0, 
      spots=[spot("steward", "work", 8.0, 2.0, 90), spot("steward", "work", 14.0, 2.0, 90)],
      lights=[light(12.0, 2.0, 3.3, 3500, 4800, (14.0, 0.5))])
 _reg("lounge", name="Crew Lounge", kind="lounge", dept="services", L=24.0, D=16.0, h=3.6, plate="lounge",
-     doors=[door("near", 10.0), door("far", 14.0)], systems=["power_bus", "entertainment"],
+     doors=[door("near", 10.0)], systems=["power_bus", "entertainment"],
      spots=[spot("crew", "sit", 4.0, 4.0, 45), spot("crew", "sit", 4.0, 6.6, -45), spot("crew", "sit", 7.7, 4.6, 180), spot("crew", "sit", 7.7, 6.0, 180),
             spot("crew", "sit", 4.0, 11.4, 45), spot("crew", "sit", 4.0, 14.0, -45), spot("crew", "sit", 7.7, 12.0, 180), spot("crew", "sit", 7.7, 13.4, 180),
             spot("crew", "eat", 15.4, 4.3, 90), spot("crew", "eat", 15.4, 6.5, -90), spot("crew", "eat", 19.6, 4.3, 90), spot("crew", "eat", 20.7, 5.4, 180)]
@@ -73,7 +73,7 @@ _reg("lounge", name="Crew Lounge", kind="lounge", dept="services", L=24.0, D=16.
      lights=[light(6.0, 8.0, 3.5, 5200, 3200, (8.0, 8.0)), light(18.0, 5.0, 3.5, 4200, 3400, (8.0, 3.0)),
              light(18.0, 12.0, 3.5, 4200, 3400, (8.0, 3.0))])
 _reg("games", name="Games Room", kind="lounge", dept="services", L=24.0, D=16.0, h=3.6, plate="games",
-     doors=[door("near", 10.0), door("far", 14.0)], systems=["power_bus", "entertainment"],
+     doors=[door("near", 10.0)], systems=["power_bus", "entertainment"],
      spots=[spot("crew", "sit", 5.0, 5.0, 0), spot("crew", "sit", 7.0, 5.0, 180), spot("crew", "sit", 5.0, 11.0, 0), spot("crew", "sit", 7.0, 11.0, 180),
             spot("crew", "sit", 12.0, 4.0, 0), spot("crew", "sit", 14.0, 4.0, 180), spot("crew", "stand", 17.5, 14.1, 90),
             spot("crew", "stand", 19.5, 14.1, 90), spot("crew", "stand", 15.0, 8.0, 0), spot("crew", "stand", 19.0, 8.0, 180)],

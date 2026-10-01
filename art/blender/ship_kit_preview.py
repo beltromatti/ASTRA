@@ -74,10 +74,14 @@ ROOM_VIEWS = {
     "reaction_mass": {"door": ((18.0, 0.9, 1.65), (20.0, 12.0, 1.4), 88), "spheres": ((18.0, 4.0, 1.7), (6.0, 9.0, 1.8), 84), "right": ((22.0, 4.0, 1.7), (33.0, 9.0, 1.8), 84),
                       "back": ((38.0, 2.0, 1.7), (10.0, 10.0, 1.4), 92)},
     "crawlway": {"door": ((6.0, 0.9, 1.6), (9.0, 12.0, 1.3), 86), "manifold": ((4.0, 3.0, 1.6), (11.0, 10.0, 1.4), 80), "back": ((14.0, 2.0, 1.6), (4.0, 12.0, 1.2), 92)},
-    "shuttle_stop": {"door": ((10.0, 1.0, 1.65), (12.0, 8.0, 1.3), 86), "platform": ((2.0, 1.2, 1.7), (22.0, 6.0, 1.3), 84), "car": ((8.0, 4.8, 1.7), (13.0, 8.2, 1.3), 80),
-                     "inside": ((12.0, 6.6, 1.65), (12.0, 8.9, 1.2), 86), "tunnel": ((22.0, 3.0, 1.7), (0.3, 7.6, 1.5), 66), "back": ((22.0, 11.0, 1.8), (4.0, 3.0, 1.2), 90)},
+    "shuttle_stop": {"door": ((10.0, 1.0, 1.65), (12.0, 8.0, 1.3), 86), "platform": ((2.0, 1.2, 1.7), (22.0, 6.0, 1.3), 84), "track": ((12.0, 4.4, 1.6), (12.0, 9.0, 1.0), 88),
+                     "tunnel": ((22.0, 3.0, 1.7), (0.3, 8.0, 1.5), 66), "back": ((22.0, 14.0, 1.8), (4.0, 3.0, 1.2), 90)},
     "ready_room": {"door": ((5.0, 1.0, 1.65), (5.0, 3.9, 1.35), 84), "desk": ((10.0, 3.2, 1.7), (1.0, 1.6, 1.2), 70), "window": ((6.0, 0.9, 1.65), (0.3, 2.0, 1.5), 82),
                    "lounge": ((5.6, 0.7, 1.7), (9.2, 3.2, 0.9), 78), "table": ((6.5, 3.0, 1.7), (11.4, 1.8, 1.2), 74), "back": ((11.5, 3.5, 1.7), (3.0, 1.0, 1.1), 92)},
+    # NAVE-3: the hull's small rooms (4 m deep: the standard views would stare at a wall)
+    "airlock": {"ante": ((3.6, 0.6, 1.6), (0.6, 3.2, 1.3), 96), "chamber": ((4.3, 0.5, 1.6), (7.8, 3.6, 1.3), 96), "hatch": ((5.9, 0.6, 1.5), (5.9, 4.0, 1.2), 84)},
+    "pod_bay": {"bay": ((0.5, 0.5, 1.6), (6.0, 2.5, 1.2), 100), "pods": ((4.7, 0.5, 1.6), (4.9, 3.5, 1.1), 86), "door": ((2.0, 0.4, 1.6), (4.5, 2.6, 1.0), 96)},
+    "suit_locker": {"racks": ((1.0, 0.5, 1.6), (4.0, 3.6, 1.3), 100), "bench": ((0.6, 3.4, 1.6), (6.6, 1.0, 0.9), 96)},
     "firing_range": {"door": ((10.0, 0.9, 1.65), (22.0, 9.0, 1.4), 84), "booths": ((2.6, 8.55, 1.65), (30.0, 8.55, 1.5), 62), "gallery": ((2.0, 1.4, 1.6), (26.0, 2.0, 1.4), 86),
                      "down": ((8.0, 9.5, 1.6), (39.0, 9.5, 1.6), 60), "trap": ((26.0, 9.5, 1.7), (39.7, 9.5, 1.6), 62), "back": ((38.0, 14.0, 1.7), (8.0, 4.0, 1.3), 84)},
 }
@@ -379,6 +383,62 @@ def modules(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     return done
 
 
+def modules3(args: dict, plan, reg: dict, objs: dict) -> list[str]:
+    """NAVE-3: the service corridor (tone V) with a hatch, a branch, a bulkhead and its end; the shuttle's tunnel (tone T) with its blast gate and the buffers; a Jefferies arm (tone K) with
+    the three trunk cells stacked as three decks of a column (the top, a through cell, the bottom)."""
+    out = args["preview"]
+    _remove_instances()
+    SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
+
+    def M(tone, suf):
+        return objs.get(CAT.module_mesh(tone, suf))
+    serv = ["Straight_A", "Door_R_A", "Straight_B", "Door_L_B", "Straight_C", "T_L", "Straight_A", "Bulkhead", "Straight_B", "End"]
+    for i, suf in enumerate(serv):
+        if M("V", suf) is not None:
+            SP.instance(M("V", suf), (4.0 * i, -40.0, 0.0), 0.0)
+    tun = ["Straight_A", "Straight_B", "Straight_A", "Bulkhead", "Straight_B", "Straight_A", "End"]
+    for i, suf in enumerate(tun):
+        if M("T", suf) is not None:
+            SP.instance(M("T", suf), (4.0 * i, 30.0, 0.0), 0.0)
+    # an arm along +y from (60, 0): its first cell is the trunk, stacked over three decks
+    for k, suf in enumerate(("TrunkTopEndFwd", "TrunkEndFwd", "TrunkBottomEndFwd")):
+        if M("K", suf) is not None:
+            SP.instance(M("K", suf), (60.0, 0.0, -4.0 * k), 90.0)
+    for k in range(3):
+        if M("K", "Straight_A") is not None:
+            SP.instance(M("K", "Straight_A"), (60.0, 4.0 + 4.0 * k, 0.0), 90.0)
+    for o in objs.values():
+        o.hide_render = True
+    for i in range(len(serv)):
+        SP.rect_light(f"V{i}", (4.0 * i + 2.0, -40.0, 2.62), (3.4, 0.25), 70, (1.0, 0.82, 0.58))
+    for i in range(len(tun)):
+        SP.rect_light(f"T{i}", (4.0 * i + 2.0, 30.0, 3.2), (3.4, 0.4), 160, (0.85, 0.93, 1.0))
+        SP.rect_light(f"T{i}b", (4.0 * i + 2.0, 30.0, 3.2), (3.4, 0.4), 60, (0.8, 0.9, 1.0))
+    for k in range(3):
+        SP.rect_light(f"K{k}", (60.0, 2.0 + 4.0 * k, 2.3), (0.4, 3.4), 40, (1.0, 0.9, 0.7))
+        SP.rect_light(f"KT{k}", (60.0, 0.0, 2.3 - 4.0 * k), (3.0, 3.0), 45, (1.0, 0.9, 0.7))
+    SP.rect_light("fill", (26.0, 0.0, 6.0), (60.0, 90.0), 60.0, (1.0, 0.96, 0.9), direction=(0, 0, 1))
+    done = []
+    for name, (eye, tgt, fov) in {
+        "v_a": ((-1.5, -40.2, 1.5), (30.0, -40.0, 1.3), 80),
+        "v_door": ((6.0, -40.0, 1.5), (10.0, -39.0, 1.3), 80),
+        "v_junction": ((14.0, -40.0, 1.5), (22.0, -42.2, 1.3), 84),
+        "v_bulkhead": ((20.0, -40.2, 1.5), (31.0, -40.0, 1.4), 70),
+        "t_a": ((-1.5, 30.3, 1.6), (24.0, 30.0, 1.4), 82),
+        "t_gate": ((8.0, 30.0, 1.6), (13.0, 30.0, 1.5), 78),
+        "t_end": ((18.0, 30.0, 1.6), (27.0, 30.0, 1.0), 78),
+        "trunk_in": ((60.7, 2.0, 1.4), (58.2, 2.0, 1.5), 74),
+        "trunk_up": ((60.5, 2.0, 0.5), (58.6, 2.0, 3.6), 78),
+        "trunk_down": ((60.3, 2.0, -3.3), (58.6, 2.0, -7.0), 78),
+        "trunk_mid": ((60.7, 2.0, -2.6), (58.2, 2.0, -2.5), 74),
+    }.items():
+        cam = SP.look_camera(name, eye, tgt, fov)
+        path = os.path.join(out, f"modules3_{name}.jpg")
+        SP.render(cam, path)
+        done.append(path)
+    return done
+
+
 def bridge(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     """Deck 1: the bridge's port corridor as its builder (tools/ue_scripts/build_bridge_v3.py) lays it out with the old corridor kit (kit_corridor.py: three 4 m modules, the window
     one in the middle, panels on the walls), with the module that has the ready room's door in place of the window module, the name plate and the ready room."""
@@ -450,6 +510,8 @@ def run(args: dict, plan, reg: dict, objs: dict) -> None:
             done += rooms(args, plan, reg, objs)
         elif v == "modules":
             done += modules(args, plan, reg, objs)
+        elif v == "modules3":
+            done += modules3(args, plan, reg, objs)
         elif v == "d1" and plan:
             done += bridge(args, plan, reg, objs)
         elif v == "d4" and plan:

@@ -75,7 +75,7 @@ _reg("barber", name="Barber & Tailor", kind="shop", dept="services", L=12.0, D=1
             spot("crew", "sit", 8.4, 10.2, -90, "services"), spot("tailor", "work", 10.4, 3.4, 180, "services")],
      lights=[light(6.0, 5.0, 3.3, 3600, 3600, (8.0, 3.0), 800), light(6.0, 12.0, 3.3, 3600, 3600, (8.0, 3.0), 800)])
 _reg("bar", name="Crew Bar", kind="lounge", dept="services", L=24.0, D=16.0, h=3.6, plate="bar",
-     doors=[door("near", 10.0), door("far", 14.0)], systems=["power_bus", "entertainment", "potable_water"],
+     doors=[door("near", 10.0)], systems=["power_bus", "entertainment", "potable_water"],
      spots=[spot("bartender", "work", 18.0, 13.2, -90, "services"), spot("crew", "sit", 16.4, 11.6, 90, "services"), spot("crew", "sit", 18.0, 11.6, 90, "services"),
             spot("crew", "sit", 19.6, 11.6, 90, "services"), spot("crew", "sit", 4.0, 5.0, 45, "services"), spot("crew", "sit", 4.0, 7.6, -45, "services"),
             spot("crew", "eat", 8.4, 4.6, 90, "services"), spot("crew", "eat", 8.4, 6.2, -90, "services"), spot("crew", "stand", 12.0, 9.0, 180, "services")],
@@ -118,17 +118,17 @@ _reg("drone_bay", name="Drone Bay", kind="hangar", dept="flight", L=32.0, D=16.0
 
 # ---- the hull's galleries (decks 5-12: service corridors 2.7 m high; the rooms are 8 x 4 m on their outboard side) ----------------------------------------------------------------
 _reg("airlock", name="EVA Airlock", kind="airlock", dept="engineering", L=8.0, D=4.0, h=2.7, plate="airlock",
-     doors=[door("near", 2.0, 1.2, 2.2)], systems=["life_support", "power_bus"],
-     spots=[spot("eva_technician", "stand", 5.0, 2.0, 90, "engineering")],
-     lights=[light(4.0, 2.0, 2.6, 1400, 4500, (4.0, 0.6), 500)])
+     doors=[door("near", 2.0)], systems=["life_support", "power_bus"],
+     spots=[spot("eva_technician", "stand", 2.2, 2.2, 0, "engineering")],
+     lights=[light(2.0, 2.0, 2.6, 1400, 4500, (3.0, 1.4), 500), light(5.9, 2.0, 2.6, 1400, 5200, (2.0, 1.0), 500)])
 _reg("pod_bay", name="Lifepod Bay", kind="lifepod", dept="neutral", L=8.0, D=4.0, h=2.7, plate="lifepods",
-     doors=[door("near", 2.0, 1.2, 2.2)], systems=["life_support", "power_bus", "escape"],
-     spots=[spot("crew", "stand", 5.0, 2.0, 90)],
-     lights=[light(4.0, 2.0, 2.6, 1200, 3200, (4.0, 0.6), 500)])
+     doors=[door("near", 2.0)], systems=["life_support", "power_bus", "escape"],
+     spots=[spot("crew", "stand", 1.5, 1.3, 90)],
+     lights=[light(4.0, 1.4, 2.6, 1200, 3200, (6.0, 0.4), 500), light(4.0, 2.6, 2.6, 1200, 3200, (6.0, 0.4), 500)])
 _reg("suit_locker", name="EVA Suit Lockers", kind="storage", dept="engineering", L=8.0, D=4.0, h=2.7, plate="suits",
-     doors=[door("near", 2.0, 1.2, 2.2)], systems=["life_support", "supply"],
-     spots=[spot("eva_technician", "stand", 5.0, 2.0, 90, "engineering")],
-     lights=[light(4.0, 2.0, 2.6, 1400, 4200, (4.0, 0.6), 500)])
+     doors=[door("near", 2.0)], systems=["life_support", "supply"],
+     spots=[spot("eva_technician", "stand", 4.0, 1.7, 90, "engineering")],
+     lights=[light(2.0, 2.0, 2.6, 1400, 4200, (2.0, 1.4), 500), light(6.0, 2.0, 2.6, 1400, 4200, (2.0, 1.4), 500)])
 
 
 # ---- small rooms: the 8 m and 12 m fillers of a lane and the half-depth rooms of the passage side (NAVE-3: right-sized rooms, not 16 m halls for a cupboard) ------------------------------

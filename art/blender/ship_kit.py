@@ -72,10 +72,23 @@ ROOMS = {
     "staterooms": ("ship_rooms_quarters", "staterooms"), "wardroom": ("ship_rooms_quarters", "wardroom"), "gym": ("ship_rooms_quarters", "gym"),
     "tank": ("ship_rooms_keel", "tank"), "reaction_mass": ("ship_rooms_keel", "reaction_mass"), "crawlway": ("ship_rooms_keel", "crawlway"),
     "ready_room": ("ship_rooms_bridge", "ready_room"), "shuttle_stop": ("ship_rooms_transit", "shuttle_stop"),
+    # NAVE-3
+    "airlock": ("ship_rooms_hull", "airlock"), "pod_bay": ("ship_rooms_hull", "pod_bay"), "suit_locker": ("ship_rooms_hull", "suit_locker"), "dc_station": ("ship_rooms_hull", "dc_station"),
+    "store_s": ("ship_rooms_hull", "store_s"), "locker_s": ("ship_rooms_hull", "locker_s"), "tech_s": ("ship_rooms_hull", "tech_s"),
+    "dentist": ("ship_rooms_care", "dentist"), "morgue": ("ship_rooms_care", "morgue"), "counselling": ("ship_rooms_care", "counselling"), "brig": ("ship_rooms_care", "brig"),
+    "security_office": ("ship_rooms_care", "security_office"),
+    "air_plant": ("ship_rooms_plants", "air_plant"), "water_plant": ("ship_rooms_plants", "water_plant"), "waste_plant": ("ship_rooms_plants", "waste_plant"),
+    "computer_core": ("ship_rooms_plants", "computer_core"), "aux_reactor": ("ship_rooms_plants", "aux_reactor"), "dc_central": ("ship_rooms_plants", "dc_central"),
+    "barber": ("ship_rooms_life", "barber"), "bar": ("ship_rooms_life", "bar"), "chapel": ("ship_rooms_life", "chapel"), "shop": ("ship_rooms_life", "shop"),
+    "sim_bay": ("ship_rooms_life", "sim_bay"), "berthing": ("ship_rooms_life", "berthing"), "suites": ("ship_rooms_life", "suites"), "single_cabins": ("ship_rooms_life", "single_cabins"),
+    "drone_bay": ("ship_rooms_life", "drone_bay"),
+    "lift_bank": ("ship_rooms_lifts", "lift_bank"), "lift_bank_o": ("ship_rooms_lifts", "lift_bank_o"), "lift_bank_b": ("ship_rooms_lifts", "lift_bank_b"),
+    "shuttle_stop_bow": ("ship_rooms_transit", "shuttle_stop_bow"), "shuttle_stop_stern": ("ship_rooms_transit", "shuttle_stop_stern"),
 }
 EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHIP_StairTowerBottom": ("ship_rooms_hub", "stair_tower_bottom"),
          "SM_SHIP_LadderTrunk": ("ship_rooms_hub", "ladder_trunk"), "SM_SHIP_StairTower53": ("ship_rooms_hub", "stair_tower_deep"),
-         "SM_SHIP_StairTowerCap": ("ship_rooms_hub", "stair_tower_cap"), "SM_SHIP_BridgeCorridorDoor": ("ship_rooms_bridge", "corridor_door")}
+         "SM_SHIP_StairTowerCap": ("ship_rooms_hub", "stair_tower_cap"), "SM_SHIP_BridgeCorridorDoor": ("ship_rooms_bridge", "corridor_door"),
+         "SM_SHIP_SpineCar": ("ship_craft", "spine_car_mesh")}
 
 # the material slots the Unreal side knows (shared bridge v3 instances + the ship's new ones)
 OLD_KIT_SLOTS = {A.MAT_PANEL, A.MAT_STRUCTURE, A.MAT_FLOOR, A.MAT_GRATE, A.MAT_TRIM, A.MAT_LIGHT, A.MAT_ACCENT, A.MAT_GUIDE, A.MAT_GLASS, A.MAT_RUBBER,    # the bridge corridors' (kit_corridor.py)
@@ -109,7 +122,7 @@ def needed_meshes(plan) -> set[str]:
 def registry(needed: set[str]) -> dict[str, tuple]:
     reg: dict[str, tuple] = {}
     for tone in CAT.TONES:
-        for suf in CAT.TONE_FAMILY:
+        for suf in CAT.tone_family(tone):
             reg[CAT.module_mesh(tone, suf)] = ("module", tone, suf)
     for key, (mod, fn) in ROOMS.items():
         reg[SPEC.PREFABS[key]["mesh"]] = ("room", key, mod, fn)
@@ -195,7 +208,8 @@ def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
             xlo = -0.45                                                   # the reveal between the lobby and the Berthing
         else:
             xlo = -tol
-        if lo[0] < xlo or hi[0] > L + tol or lo[1] < -0.25 - tol or hi[1] > D + 0.25 + tol:
+        xhi = L + (3.2 if item[1] == "lift_bank_b" else 0.0)                          # (the command lobby's shafts stand behind its aft wall)
+        if lo[0] < xlo or hi[0] > xhi + tol or lo[1] < -0.25 - tol or hi[1] > D + 0.25 + tol:
             problems.append(f"{name}: bounds {lo} .. {hi} leave the footprint 0..{L} x 0..{D}")
         if hi[2] > 4.0 + tol and item[1] not in ("stair_tower",):
             problems.append(f"{name}: top at {hi[2]:.2f} m is above the deck pitch (4.0)")

@@ -47,6 +47,7 @@ NEW_SLOTS = [LABEL, LAMINATE, STEEL, FABRIC_NAVY, FABRIC_RUST, FABRIC_GREY, FABR
 # ------------------------------------------------------------------------------------------------------------ the atlas
 LABELS: dict[str, tuple[float, float, float, float]] = {}
 LABEL_TEXT: dict[str, str] = {}
+ATLAS_PX = [4096.0, 4096.0]              # the atlas's size in pixels (labels.json says: it is taller than wide since NAVE-3)
 
 
 def find_cache(name: str) -> str | None:
@@ -69,6 +70,7 @@ def load_labels() -> dict:
         LABELS[k] = tuple(v)
     for k, t in data.get("text", {}).items():
         LABEL_TEXT.setdefault(t, k)
+    ATLAS_PX[:] = [float(v) for v in data.get("size", [4096, 4096])]
     return LABELS
 
 
@@ -87,7 +89,7 @@ class SFB(FB):
         """A label of width w with the tile's own aspect ratio."""
         cell = LABEL_TEXT.get(cell, cell)
         u0, v0, u1, v1 = LABELS[cell]
-        aspect = ((u1 - u0) * 4096.0) / ((v1 - v0) * 4096.0)
+        aspect = ((u1 - u0) * ATLAS_PX[0]) / ((v1 - v0) * ATLAS_PX[1])
         return self.label(center, w, w / aspect, facing, cell, up=up)
 
 

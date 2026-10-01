@@ -1,7 +1,7 @@
 """Textures of the ship's interior kit (NAVE): the label atlas of the corridors and rooms. Output in art/_cache/ship/
 (gitignored, reproducible with this script):
 
-  art/_cache/ship/T_SHIP_Labels.png + labels.json   label atlas (4096 x 4096): every tile of the bridge v3 atlas (same names,
+  art/_cache/ship/T_SHIP_Labels.png + labels.json   label atlas (4096 x 6144): every tile of the bridge v3 atlas (same names,
         so the bridge wall builders can be reused as they are), the section signs "DECK n · SECTION X" (n 1-12, X A-H), the
         section codes "4C-07" of Deck 4, the room name plates over the doors, pictograms (stairs, lift, ladder, heads, galley,
         arrows) and a few static screen faces (news, menu, a lab plot, a ship's directory)
@@ -26,7 +26,7 @@ sys.path.insert(0, HERE)
 import bridge3_textures as B3  # noqa: E402   (fonts, plate/tag/stripes/icon drawing, the bridge's tile lists)
 
 OUT = os.path.join(ROOT, "art", "_cache", "ship")
-ATLAS = 4096
+ATLAS_W, ATLAS_H = 4096, 6144          # (taller than wide since NAVE-3: the plates of the new rooms, the wayfinding tiles and the decks' directories)
 
 TITLE, MONO = B3.TITLE, B3.MONO
 ICE, DIM, PLATE_BG = B3.ICE, B3.DIM, B3.PLATE
@@ -96,6 +96,22 @@ ROOMS.update({
     # Deck 1
     "ready_room": ("CAPTAIN'S READY ROOM", "PRIVATE · COMMAND", "command"),
 })
+# NAVE-3: the plates of the rooms the redesign adds (512 x 64, like NAVE-2's)
+ROOMS.update({
+    "lift_bank": ("TURBOLIFTS", "DECKS 2-12", "command"), "lift_bank_b": ("COMMAND TURBOLIFTS", "BRIDGE · DECKS 1-12", "command"),
+    "dentist": ("DENTAL CLINIC", "APPOINTMENTS · STERILE", "medical"), "morgue": ("MORGUE", "COLD CHAMBER · AUTHORIZED ONLY", "medical"),
+    "counselling": ("COUNSELLING", "CHAPLAINCY · WELFARE", "medical"), "brig": ("BRIG", "SECURITY · RESTRICTED", "security"),
+    "security": ("SECURITY OFFICE", "MASTER-AT-ARMS", "security"), "air_plant": ("ATMOSPHERE PLANT", "OXYGEN · CO2 SCRUBBERS", "engineering"),
+    "water_plant": ("WATER RECLAMATION", "POTABLE · GREY WATER", "engineering"), "waste_plant": ("WASTE PROCESSING", "RECYCLING · NO ENTRY", "engineering"),
+    "computer_core": ("COMPUTER CORE", "AUTHORIZED PERSONNEL ONLY", "science"), "aux_reactor": ("AUXILIARY POWER", "STANDBY REACTOR", "engineering"),
+    "dc_central": ("DAMAGE CONTROL CENTRAL", "TEAMS 1-4 · SHIP STATUS", "engineering"), "barber": ("BARBER & TAILOR", "OPEN 0900-1900", "services"),
+    "bar": ("CREW BAR", "OFF-DUTY ONLY", "services"), "chapel_nave": ("CHAPEL", "ALL FAITHS · SILENCE", "services"),
+    "sim_bay": ("SIMULATOR BAY", "FLIGHT TRAINING", "flight"), "berthing_bay": ("CREW BERTHING", "QUIET · WATCH ROTATION", "services"),
+    "suites": ("SENIOR OFFICERS", "QUARTERS · PRIVATE", "command"), "cabins_row": ("OFFICERS' CABINS", "QUIET HOURS", "services"),
+    "drone_bay": ("DRONE BAY", "RECON · ESCORT", "flight"), "airlock": ("EVA AIRLOCK", "CHECK SEALS · TWO-PERSON RULE", "engineering"),
+    "lifepods": ("LIFEPODS", "ABANDON SHIP STATIONS", "neutral"), "suits": ("EVA SUIT LOCKERS", "SIGN OUT · INSPECT", "engineering"),
+    "stores_section": ("SECTION STORES", "SUPPLY", "flight"), "lockers": ("CREW LOCKERS", "PERSONAL KIT", "services"), "tech": ("TECHNICAL SPACE", "AUTHORIZED PERSONNEL", "engineering"),
+})
 for _d in range(2, 13):                 # the plate over a stair tower's door says where the flights go from this deck
     ROOMS[f"stairs_{_d}"] = ("STAIRS", f"UP DECK {_d - 1} · DOWN DECK {_d + 1}" if _d < 12 else "UP DECK 11", "neutral")
 
@@ -117,6 +133,42 @@ NAVE2_TAGS = {
 }
 
 
+# NAVE-3: tags of the new rooms and of the Jefferies tubes (256 x 64: small tiles keep the atlas inside its size)
+NAVE3_TAGS = {
+    "eq_ladder": "LADDER · ONE AT A TIME", "eq_trunk": "JEFFERIES TUBE", "eq_trunk_top": "TOP OF TRUNK", "eq_trunk_bottom": "BOTTOM OF TRUNK",
+    "eq_oxygen": "OXYGEN · NO OIL OR GREASE", "eq_scrub": "CO2 SCRUBBER", "eq_potable": "POTABLE WATER · TREATED", "eq_grey": "GREY WATER", "eq_waste": "WASTE STREAM",
+    "eq_core": "CORE RACK · LIVE", "eq_cool": "COOLANT LOOP", "eq_plot": "DAMAGE PLOT", "eq_drone": "DRONE · CHARGING", "eq_pod": "ESCAPE POD · ARMED", "eq_suit": "EVA SUIT · INSPECT",
+    "eq_cycle": "AIRLOCK · CYCLE", "eq_dental": "DENTAL · STERILE", "eq_cold": "COLD CHAMBER · -4 C", "eq_cell": "CELL", "eq_bar": "LAST ORDERS 2300", "eq_sim": "SIMULATION ACTIVE",
+    "eq_silence": "SILENCE", "eq_standby": "STANDBY · DO NOT SWITCH OFF", "eq_hv2": "HIGH VOLTAGE · AUX BUS", "eq_stock": "STOCK · COUNT", "eq_kit2": "PERSONAL KIT",
+    "eq_pharm": "PHARMACY · SIGN OUT", "eq_inmate": "PRISONER · NO CONTACT", "eq_evidence": "EVIDENCE · LOG IT", "eq_arms": "ARMS RACK · CLEAR WEAPONS", "eq_launch2": "LAUNCH RAIL · KEEP CLEAR",
+    "eq_lift": "TURBOLIFT · CALL", "eq_muster": "MUSTER STATION", "eq_dcs": "DAMAGE CONTROL STATION", "eq_shower": "SHOWERS · 3 MINUTES", "eq_bunk": "BUNK · WATCH ROTATION",
+    "eq_clippers": "BARBER", "eq_till": "SHIP'S STORE", "eq_menu2": "TODAY'S SPECIALS", "eq_news2": "FLEET NET",
+}
+# the wayfinding (docs/NAVE.md §5): destinations on the blade signs (384 x 64), the frame numbers' digits
+DESTS = {"lift": "TURBOLIFTS", "stairs": "STAIRS", "med": "MEDBAY", "pods": "LIFEPODS", "bridge": "BRIDGE", "mess": "MESS HALL", "engineering": "ENGINEERING", "flight": "FLIGHT DECK",
+         "shuttle": "SPINE SHUTTLE", "brig": "BRIG"}
+
+# the decks' directories (screens in the lobbies): (section, room), the main places of every deck
+DIRECTORY = {
+    2: [("A", "SENIOR OFFICERS' QUARTERS"), ("B", "COMBAT INFORMATION CENTRE"), ("B", "COMMUNICATIONS CENTRE"), ("C", "OPERATIONS · INTELLIGENCE"), ("D-G", "FIRE CONTROL · TURRETS"),
+        ("D-G", "VLS MAGAZINES"), ("H", "AUXILIARY CONTROL")],
+    3: [("A", "OFFICERS' WARDROOM"), ("A", "LOUNGE · LIBRARY"), ("B", "GYMNASIUM"), ("B", "EXECUTIVE OFFICER"), ("C-G", "OFFICERS' STATEROOMS"), ("D-G", "OFFICES · CLASSROOMS")],
+    4: [("A", "BOW OBSERVATION"), ("A", "LIBRARY · CHAPEL · SHOPS"), ("A", "BAR · LOUNGE · GAMES"), ("B", "MESS CONCOURSE · MESS HALL"), ("B", "GALLEY"), ("C", "CREW BERTHING"),
+        ("D", "SIMULATORS · GAMES"), ("E-H", "BERTHING · HEADS · LAUNDRY")],
+    5: [("A-C", "LABORATORIES · SENSORS"), ("B", "TRANSPORTER ROOM"), ("B", "ASTROMETRICS"), ("C", "COMPUTER CORE A"), ("D-H", "LIFE SUPPORT · PUMPS"), ("A-H", "SPINE SHUTTLE · 8 STOPS")],
+    6: [("B", "REHABILITATION · GARDEN"), ("C", "MEDBAY"), ("C", "SURGERY · PHARMACY · DENTAL"), ("C", "ISOLATION WARD · MORGUE"), ("C", "COUNSELLING"), ("D-H", "ENGINEERS' QUARTERS")],
+    7: [("B", "DAMAGE CONTROL CENTRAL"), ("B", "ENGINEERING WORKSHOP"), ("C", "ATMOSPHERE · WATER · WASTE"), ("E", "MAIN POWER CONTROL"), ("E", "AUXILIARY POWER"), ("F", "MAIN ENGINEERING"),
+        ("G-H", "ENGINE CONTROLS")],
+    8: [("B", "ASSAULT-SHUTTLE BAY"), ("B", "MARINE ARMORY"), ("C", "MARINE BARRACKS"), ("D", "BRIG · SECURITY OFFICE"), ("D", "FIRING RANGE"), ("E-F", "WORKSHOPS"), ("H", "COMPUTER CORE B")],
+    9: [("A-B", "FLIGHT DECK"), ("C", "FLIGHT OPERATIONS"), ("C", "READY ROOMS · SHOPS"), ("D-E", "PILOTS' QUARTERS"), ("F-H", "CARGO HOLDS · STORES")],
+    10: [("B-H", "CARGO HOLDS"), ("C-E", "MUNITIONS MAGAZINES"), ("B-H", "COLD STORES · DRY STORES")],
+    11: [("B-C", "FABRICATION · REPAIR BAYS"), ("C", "DAMAGE CONTROL CENTRAL"), ("D-H", "WORKSHOPS · SPARES")],
+    12: [("A-H", "KEEL: FUEL · COOLANT · REACTION MASS"), ("A-H", "CRAWLWAYS ONLY")],
+}
+DECK_NAME = {2: "CIC & COMMUNICATIONS", 3: "CREW COUNTRY", 4: "CREW SERVICES", 5: "SCIENCE & TRANSPORT", 6: "MEDICAL", 7: "ENGINEERING & POWER", 8: "SECURITY & MARINES", 9: "FLIGHT OPERATIONS",
+             10: "CARGO & MAGAZINES", 11: "FABRICATION & REPAIR", 12: "KEEL"}
+
+
 def draw_arrow(kind: str, s: int = 128) -> Image.Image:
     img = Image.new("RGBA", (s, s), (20, 20, 22, 255))
     d = ImageDraw.Draw(img)
@@ -124,7 +176,7 @@ def draw_arrow(kind: str, s: int = 128) -> Image.Image:
     m = s * 0.16
     pts = [(m, c - s * 0.13), (s * 0.55, c - s * 0.13), (s * 0.55, c - s * 0.30), (s - m, c), (s * 0.55, c + s * 0.30),
            (s * 0.55, c + s * 0.13), (m, c + s * 0.13)]
-    ang = {"fwd": 0, "stbd": 90, "aft": 180, "port": 270}[kind]
+    ang = {"fwd": 0, "stbd": 90, "aft": 180, "port": 270, "up": 270, "down": 90}[kind]
     a = math.radians(ang)
     rot = [(c + (x - c) * math.cos(a) - (y - c) * math.sin(a), c + (x - c) * math.sin(a) + (y - c) * math.cos(a)) for x, y in pts]
     d.polygon(rot, fill=(*ICE, 255))
@@ -177,7 +229,61 @@ def draw_pictogram(kind: str, s: int = 128) -> Image.Image:
         d.line((m, s * 0.75, s - m, s * 0.75), fill=fg, width=int(s * 0.05))
         for k in range(3):
             d.rectangle((s * (0.26 + 0.18 * k), s * 0.40, s * (0.36 + 0.18 * k), s * 0.5), fill=fg)
+    elif kind == "med":
+        d.rectangle((s * 0.42, m, s * 0.58, s - m), fill=fg)
+        d.rectangle((m, s * 0.42, s - m, s * 0.58), fill=fg)
+    elif kind == "muster":
+        for (cx, cy) in ((0.5, 0.28), (0.3, 0.62), (0.7, 0.62)):
+            d.ellipse((s * (cx - 0.1), s * (cy - 0.1), s * (cx + 0.1), s * (cy + 0.1)), fill=fg)
+            d.rectangle((s * (cx - 0.09), s * (cy + 0.12), s * (cx + 0.09), s * (cy + 0.22)), fill=fg)
+        d.rectangle((m, s * 0.9, s - m, s * 0.94), fill=fg)
+    elif kind == "pods":
+        d.ellipse((s * 0.28, s * 0.14, s * 0.72, s * 0.86), outline=fg, width=int(s * 0.05))
+        d.polygon([(s * 0.5, s * 0.16), (s * 0.4, s * 0.34), (s * 0.6, s * 0.34)], fill=fg)
+        d.line((s * 0.5, s * 0.4, s * 0.5, s * 0.78), fill=fg, width=int(s * 0.05))
+    elif kind == "bridge":
+        d.polygon([(m, s * 0.7), (s * 0.5, s * 0.22), (s - m, s * 0.7)], outline=fg, width=int(s * 0.05))
+        d.line((m, s * 0.8, s - m, s * 0.8), fill=fg, width=int(s * 0.05))
+        d.ellipse((s * 0.44, s * 0.46, s * 0.56, s * 0.58), fill=fg)
+    elif kind == "brig":
+        for k in range(4):
+            d.rectangle((s * (0.24 + 0.15 * k), m, s * (0.28 + 0.15 * k), s - m), fill=fg)
+        d.rectangle((m, s * 0.2, s - m, s * 0.26), fill=fg)
+        d.rectangle((m, s * 0.74, s - m, s * 0.8), fill=fg)
     d.rectangle((0, 0, s - 1, s - 1), outline=(46, 54, 66, 255), width=3)
+    return img
+
+
+def draw_digit(ch: str, w: int = 64, h: int = 96) -> Image.Image:
+    img = Image.new("RGBA", (w, h), (20, 20, 22, 255))
+    d = ImageDraw.Draw(img)
+    d.text((w / 2, h / 2), ch, font=B3.font(TITLE, int(h * 0.8)), fill=(*ICE, 255), anchor="mm")
+    return img
+
+
+def draw_dest(text: str, w: int = 384, h: int = 64) -> Image.Image:
+    img = Image.new("RGBA", (w, h), (20, 20, 22, 255))
+    d = ImageDraw.Draw(img)
+    d.text((14, h / 2), text, font=B3.font(TITLE, int(h * 0.62)), fill=(*ICE, 255), anchor="lm")
+    d.rectangle((0, 0, w - 1, h - 1), outline=(46, 54, 66, 255), width=2)
+    return img
+
+
+def draw_directory(deck: int, w: int = 512, h: int = 288) -> Image.Image:
+    """A deck's directory (the screen in the lifts' lobbies): the deck's name and its main places by section."""
+    img = Image.new("RGBA", (w, h), (8, 11, 15, 255))
+    d = ImageDraw.Draw(img)
+    f_title, f_mono = B3.font(TITLE, 30), B3.font(MONO, 15)
+    d.rectangle((0, 0, w - 1, h - 1), outline=(46, 70, 100, 255), width=3)
+    d.rectangle((0, 0, w, 44), fill=(14, 22, 32, 255))
+    d.text((16, 22), f"DECK {deck} · {DECK_NAME[deck]}", font=f_title, fill=(*ICE, 255), anchor="lm")
+    col = DEPT[DECK_TAG[deck]]
+    for k, (sec, room) in enumerate(DIRECTORY[deck][:9]):
+        y = 62 + k * 24
+        d.rectangle((16, y - 8, 22, y + 8), fill=(*col, 255))
+        d.text((36, y), sec, font=f_mono, fill=(*DIM, 255), anchor="lm")
+        d.text((92, y), room, font=f_mono, fill=(*ICE, 255), anchor="lm")
+    d.text((16, h - 18), "YOU ARE HERE · FOLLOW THE BLADE SIGNS", font=B3.font(MONO, 12), fill=(*DIM, 255), anchor="lm")
     return img
 
 
@@ -309,6 +415,15 @@ def build() -> None:
         add(k, B3.tag(512, 128, t), t)
     for k, t in NAVE2_TAGS.items():
         add(k, B3.tag(256, 64, t), t)
+    for k, t in NAVE3_TAGS.items():
+        add(k, B3.tag(256, 64, t), t)
+    for ch in "0123456789":                                          # the frame numbers' digits, "FR" and the blade signs' destinations
+        add(f"dg_{ch}", draw_digit(ch))
+    add("dg_fr", draw_digit("FR", 96, 96))
+    for k, t in DESTS.items():
+        add(f"dest_{k}", draw_dest(t), t)
+    for d in sorted(DIRECTORY):
+        add(f"scr_dir_{d}", draw_directory(d))
     for d in range(1, 13):
         for x in SECTIONS:
             add(f"sec_{d}{x}", B3.plate(512, 64, f"DECK {d} · SECTION {x}", "", DEPT[DECK_TAG[d]]),
@@ -318,37 +433,37 @@ def build() -> None:
     for key, (title, sub, dept) in ROOMS.items():
         w, h = (768, 96) if key in _OLD_ROOMS or key.startswith("stairs_") else (512, 64)
         add(f"room_{key}", B3.plate(w, h, title, sub, DEPT[dept]), title)
-    for k in ("fwd", "aft", "port", "stbd"):
+    for k in ("fwd", "aft", "port", "stbd", "up", "down"):
         add(f"arrow_{k}", draw_arrow(k))
-    for k in ("stairs", "lift", "ladder", "heads", "galley", "obs", "shuttle"):
+    for k in ("stairs", "lift", "ladder", "heads", "galley", "obs", "shuttle", "med", "muster", "pods", "bridge", "brig"):
         add(f"pict_{k}", draw_pictogram(k))
     for k in ("news", "menu", "lab", "dir", "sched", "map", "star", "tac", "ship", "data", "wave"):
         add(f"scr_{k}", screen_face(k))
 
     # shelf packing, tallest first
     order = sorted(range(len(tiles)), key=lambda i: (-tiles[i][1].size[1], -tiles[i][1].size[0]))
-    img = Image.new("RGBA", (ATLAS, ATLAS), (*PLATE_BG, 255))
+    img = Image.new("RGBA", (ATLAS_W, ATLAS_H), (*PLATE_BG, 255))
     rects: dict[str, tuple[int, int, int, int]] = {}
     x = y = row_h = 0
     for i in order:
         name, tile, _t = tiles[i]
         w, h = tile.size
-        if x + w > ATLAS:
+        if x + w > ATLAS_W:
             x, y, row_h = 0, y + row_h, 0
-        if y + h > ATLAS:
-            raise RuntimeError("the label atlas is full: raise ATLAS or shrink the tiles")
+        if y + h > ATLAS_H:
+            raise RuntimeError("the label atlas is full: raise ATLAS_H or shrink the tiles")
         img.paste(tile, (x, y))
         rects[name] = (x, y, w, h)
         x += w
         row_h = max(row_h, h)
     used = y + row_h
     img.convert("RGB").save(os.path.join(OUT, "T_SHIP_Labels.png"), optimize=True)
-    uv = {k: [px / ATLAS, 1.0 - (py + h) / ATLAS, (px + w) / ATLAS, 1.0 - py / ATLAS] for k, (px, py, w, h) in rects.items()}
+    uv = {k: [px / ATLAS_W, 1.0 - (py + h) / ATLAS_H, (px + w) / ATLAS_W, 1.0 - py / ATLAS_H] for k, (px, py, w, h) in rects.items()}
     text = {name: t for name, _img, t in tiles if t}
     with open(os.path.join(OUT, "labels.json"), "w", encoding="utf-8") as fh:
-        json.dump({"size": [ATLAS, ATLAS], "rects": uv, "px": {k: list(v) for k, v in rects.items()}, "text": text,
+        json.dump({"size": [ATLAS_W, ATLAS_H], "rects": uv, "px": {k: list(v) for k, v in rects.items()}, "text": text,
                    "rooms": {k: f"room_{k}" for k in ROOMS}}, fh, indent=1)
-    print(f"  ship label atlas: {len(rects)} tiles, {used}/{ATLAS} px used -> {OUT}")
+    print(f"  ship label atlas: {len(rects)} tiles, {used}/{ATLAS_H} rows used of {ATLAS_W} x {ATLAS_H} px -> {OUT}")
 
 
 if __name__ == "__main__":
