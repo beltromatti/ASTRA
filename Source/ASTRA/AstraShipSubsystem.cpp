@@ -2,6 +2,7 @@
 
 #include "AstraShipSubsystem.h"
 #include "AstraLifeSubsystem.h"
+#include "AstraBoardSubsystem.h"
 #include "AstraHarness.h"
 #include "AstraStations.h"
 #include "AstraViewscreen.h"
@@ -1973,6 +1974,17 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		}
 		return St ? St->SetMode(Args, By.IsEmpty() ? TEXT("officer") : By, OutDetail) : false;
 	}
+	// ABBORDAGGI: a boarding and the marines' orders are the board subsystem's
+	if (Name == TEXT("boarding") || Name == TEXT("marine_order") || Name == TEXT("lockdown"))
+	{
+		UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr;
+		if (!Board)
+		{
+			OutDetail = TEXT("the ship's marines are not available");
+			return false;
+		}
+		return Board->HandleCommand(Name, Args, OutDetail);
+	}
 	if (!Args.IsValid())
 	{
 		OutDetail = TEXT("invalid arguments");
@@ -2802,6 +2814,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	{
 		S->SetObjectField(TEXT("life"), Life->SnapshotJson());   // the ship's clock, who does what, the teams, the people near the Captain
 	}
+	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && Board->IsActive())
+	{
+		S->SetObjectField(TEXT("boarding"), Board->Snapshot());  // ABBORDAGGI: boarders aboard: the fight as the bridge knows it
+	}
 	return S;
 }
 
@@ -3315,7 +3331,7 @@ void UAstraShipSubsystem::OnDoorPlaced(AAstraDoor* Door)
 		return;
 	}
 	DoorActors.FindOrAdd(Interior.GetMap().Doors[Di].Id) = Door;
-	if (Interior.SealedDoors().Contains(Di))
+	if (Interior.SealedDoors().Contains(Di) || ExternalSeals.Contains(Di))
 	{
 		ApplyDoorSeal(Di, Door, true);
 	}
@@ -3348,6 +3364,64 @@ void UAstraShipSubsystem::ApplyDoorSeal(int32 DoorIndex, AAstraDoor* Door, bool 
 	{
 		Fx->DressDoor(Door, bSealed);
 	}
+}
+
+void UAstraShipSubsystem::ShutBulkhead(FName Id, bool bSealed)
+{
+	if (UAstraShipPlan* Plan = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipPlan>() : nullptr)
+	{
+		Plan->SetDoorSealed(Id.ToString(), bSealed);
+	}
+	const int32 Di = Interior.IsReady() ? Interior.GetMap().DoorByName.FindRef(Id, INDEX_NONE) : INDEX_NONE;
+	if (AAstraDoor* A = DoorActorOf(Id))
+	{
+		ApplyDoorSeal(Di, A, bSealed);
+	}
+	if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr; Fx && Di != INDEX_NONE)
+	{
+		Fx->OnBulkhead(Interior.GetMap().Doors[Di].PosCm, bSealed);
+	}
+}
+
+void UAstraShipSubsystem::SealBulkhead(FName DoorId, bool bSealed)
+{
+	// the fight's seals (ABBORDAGGI): the door of the plan and its actor, the people's routes; remembered for a deck that streams in later
+	if (Interior.IsReady())
+	{
+		const int32 Di = Interior.GetMap().DoorByName.FindRef(DoorId, INDEX_NONE);
+		if (Di != INDEX_NONE)
+		{
+			if (bSealed)
+			{
+				ExternalSeals.Add(Di);
+			}
+			else
+			{
+				ExternalSeals.Remove(Di);
+			}
+		}
+	}
+	ShutBulkhead(DoorId, bSealed);
+	if (UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; Life && Life->IsRunning())
+	{
+		Life->Sim().PlanChanged();                       // the routes being walked may cross a door that has shut (the damage model tells VITA itself)
+	}
+}
+
+FString UAstraShipSubsystem::HarmPerson(int32 RosterIdx, bool bKill, const FString& Cause)
+{
+	const TArray<FAstraCrewman>& P = Roster.Get();
+	if (!P.IsValidIndex(RosterIdx) || P[RosterIdx].Status != 0)
+	{
+		return FString();                                // hurt or fallen already
+	}
+	const TArray<int32> Single = {RosterIdx};
+	const FString Words = Roster.Casualties(P[RosterIdx].Deck, bKill ? 0 : 1, bKill ? 1 : 0, CasualtyRng, Cause, &Single);
+	if (!Words.IsEmpty())
+	{
+		Event(FString::Printf(TEXT("casualties: %s"), *Words), false);
+	}
+	return Words;
 }
 
 void UAstraShipSubsystem::TickInterior(float DeltaTime)
@@ -3391,22 +3465,7 @@ void UAstraShipSubsystem::TickInterior(float DeltaTime)
 				const TArray<int32> Single = {Who};
 				return Roster.Casualties(P[Who].Deck, bKill ? 0 : 1, bKill ? 1 : 0, CasualtyRng, ShipHarmCause(Cause), &Single);
 			};
-			H.SealDoor = [this](FName Id, bool bSealed)
-			{
-				if (UAstraShipPlan* Plan = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipPlan>() : nullptr)
-				{
-					Plan->SetDoorSealed(Id.ToString(), bSealed);
-				}
-				const int32 Di = Interior.GetMap().DoorByName.FindRef(Id, INDEX_NONE);
-				if (AAstraDoor* A = DoorActorOf(Id))
-				{
-					ApplyDoorSeal(Di, A, bSealed);
-				}
-				if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr; Fx && Di != INDEX_NONE)
-				{
-					Fx->OnBulkhead(Interior.GetMap().Doors[Di].PosCm, bSealed);
-				}
-			};
+			H.SealDoor = [this](FName Id, bool bSealed) { ShutBulkhead(Id, bSealed); };
 			H.PlanChanged = [this]()
 			{
 				if (UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; Life && Life->IsRunning())
@@ -3555,7 +3614,7 @@ void UAstraShipSubsystem::TickCaptainFate(float DeltaTime)
 		}
 		// carried out once the compartment is fit again or a team has reached it
 		const bool bFit = !Here || (Here->Air > 0.6f && Here->Fire < 0.2f && Here->Smoke < 0.5f && Here->Heat < 0.45f);
-		if (CaptainFateT > 6.f && (bFit || (Here && Here->TeamT > 0.f)))
+		if (CaptainFateT > 6.f && !Cap.bContested && (bFit || (Here && Here->TeamT > 0.f)))
 		{
 			Interior.CaptainRescued();
 			CaptainFate = 0;
