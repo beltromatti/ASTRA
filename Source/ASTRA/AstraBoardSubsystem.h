@@ -20,6 +20,7 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "AstraBoardSubsystem.generated.h"
 
+class AAstraArmoryRack;
 class AAstraBoardBreach;
 class AAstraCombatant;
 class UAstraCombatFx;
@@ -155,6 +156,13 @@ private:
 	bool bWarmed = false;
 
 	void TryFinishLoading();
+	// --- the armory's rack: made while the Captain is near the armory, unless the level has placed its own
+	void EnsureRack(float Dt);
+	UPROPERTY() TObjectPtr<AAstraArmoryRack> Rack;
+	bool bOwnRack = false;
+	float RackT = 0.f;
+	int32 ArmoryComp = INDEX_NONE;
+	FVector ArmoryAt = FVector::ZeroVector;
 	// --- the beginning
 	bool PickBreach(const FString& Id, int32& OutComp, FVector& OutAt, FString& OutWhy) const;
 	void MobiliseMarines();

@@ -18,10 +18,10 @@ DECLARE_CYCLE_STAT(TEXT("CombatFx"), STAT_AstraCombatFx, STATGROUP_Astra);
 
 namespace
 {
-	constexpr int32 FxMaxParts = 160;              // tracers and sparks together
-	constexpr int32 FxNumFlashes = 6;
-	constexpr float FxSparkGravity = 980.f;
-	constexpr float FxWhizRadiusCm = 130.f;
+	constexpr int32 CfxMaxParts = 160;              // tracers and sparks together
+	constexpr int32 CfxNumFlashes = 6;
+	constexpr float CfxSparkGravity = 980.f;
+	constexpr float CfxWhizRadiusCm = 130.f;
 }
 
 bool UAstraCombatFx::ShouldCreateSubsystem(UObject* Outer) const
@@ -45,7 +45,7 @@ void UAstraCombatFx::OnWorldBeginPlay(UWorld& InWorld)
 	Root->RegisterComponent();
 	LineMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Holo/SM_HOLO_Line.SM_HOLO_Line"));
 	GlowMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Glow.M_FX_Glow"));
-	for (int32 i = 0; i < FxNumFlashes; ++i)
+	for (int32 i = 0; i < CfxNumFlashes; ++i)
 	{
 		UPointLightComponent* L = NewObject<UPointLightComponent>(Host);
 		L->SetupAttachment(Root);
@@ -91,7 +91,7 @@ int32 UAstraCombatFx::TakeSlot()
 	{
 		return FreeSlots.Pop();
 	}
-	if (!Host || Pool.Num() >= FxMaxParts || !LineMesh || !GlowMat)
+	if (!Host || Pool.Num() >= CfxMaxParts || !LineMesh || !GlowMat)
 	{
 		return INDEX_NONE;
 	}
@@ -274,7 +274,7 @@ void UAstraCombatFx::Whiz(const FVector& Muzzle, const FVector& End)
 	{
 		return;
 	}
-	if (FMath::PointDistToSegment(Eye, Muzzle, End) < FxWhizRadiusCm && FVector::Dist(Eye, Muzzle) > 250.0)
+	if (FMath::PointDistToSegment(Eye, Muzzle, End) < CfxWhizRadiusCm && FVector::Dist(Eye, Muzzle) > 250.0)
 	{
 		LastWhizAt = Now;
 		PlaySoundAt(TEXT("/Game/ASTRA/Audio/SW_Bullet_Whiz.SW_Bullet_Whiz"), Eye + (End - Muzzle).GetSafeNormal() * 40.f, 0.8f, FMath::FRandRange(0.85f, 1.2f));
@@ -324,7 +324,7 @@ void UAstraCombatFx::Tick(float DeltaTime)
 			Sparks.RemoveAtSwap(i);
 			continue;
 		}
-		S.Vel.Z -= FxSparkGravity * Dt * (S.bDrop ? 0.8f : 1.f);
+		S.Vel.Z -= CfxSparkGravity * Dt * (S.bDrop ? 0.8f : 1.f);
 		S.Vel *= 1.f - 1.4f * Dt;
 		S.Pos += S.Vel * Dt;
 		const float T = S.Age / S.Life;

@@ -10,6 +10,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "GameFramework/Pawn.h"
+#include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInterface.h"
 
 namespace
@@ -158,4 +160,23 @@ void AAstraArmoryRack::Tick(float DeltaSeconds)
 		}
 	}
 	F->Prompt(F->HasKit() ? TEXT("E   PUT THE WEAPONS BACK") : TEXT("E   TAKE THE RIFLE AND THE SIDEARM"), 0.25f);
+}
+
+namespace
+{
+	FAutoConsoleCommandWithWorld ArmoryCmdHere(TEXT("astra.armory.here"), TEXT("Testing: a weapon rack on the deck in front of the Captain (E takes the weapons)"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
+		{
+			const APawn* Me = W ? UGameplayStatics::GetPlayerPawn(W, 0) : nullptr;
+			if (!Me)
+			{
+				return;
+			}
+			const FVector Fwd = FRotator(0.f, Me->GetControlRotation().Yaw, 0.f).Vector();
+			FVector At = Me->GetActorLocation() + Fwd * 130.f;
+			At.Z -= Me->GetSimpleCollisionHalfHeight();
+			FActorSpawnParameters Sp;
+			Sp.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			W->SpawnActor<AAstraArmoryRack>(At, FRotator(0.f, Me->GetControlRotation().Yaw + 180.f, 0.f), Sp);
+		}));
 }
