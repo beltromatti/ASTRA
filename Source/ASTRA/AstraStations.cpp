@@ -1257,6 +1257,7 @@ void UAstraStationsSubsystem::TickTactical()
 	const UAstraBattleSubsystem::FFireControl FC = B->GetFireControl();
 	// --- who to shoot
 	FString Want;
+	FString Disabled;                                  // a target of the order that has gone dead in space: no power, no longer a threat
 	if (Eng.Mode == TEXT("engage"))
 	{
 		const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
@@ -1270,7 +1271,7 @@ void UAstraStationsSubsystem::TickTactical()
 					// every hostile warship: stay on the one we fight while it is inside missile range, else the best one in
 					// reach — whoever is firing on us first, then the nearest (the plot is nearest first) — never a chase
 					const FContact* Cur = EngagedId.IsEmpty() ? nullptr : FindContact(Cs, EngagedId);
-					if (Cur && Cur->Side == EAstraSide::Mandate && Cur->RangeKm >= 0.0 && Cur->RangeKm < 25.0)
+					if (Cur && Cur->Side == EAstraSide::Mandate && !Cur->bDerelict && Cur->RangeKm >= 0.0 && Cur->RangeKm < 25.0)
 					{
 						Want = Cur->ContactId;
 						break;
@@ -1278,7 +1279,7 @@ void UAstraStationsSubsystem::TickTactical()
 					const FContact* Best = nullptr;
 					for (const FContact& C : Cs)
 					{
-						if (C.Side != EAstraSide::Mandate || C.bCraft || C.Track < 2)
+						if (C.Side != EAstraSide::Mandate || C.bCraft || C.Track < 2 || C.bDerelict)
 						{
 							continue;
 						}
@@ -1295,6 +1296,11 @@ void UAstraStationsSubsystem::TickTactical()
 					continue;
 				}
 				const FContact* C = FindContact(Cs, Resolve(Id));
+				if (C && C->Side != EAstraSide::Astra && C->bDerelict)
+				{
+					Disabled = C->Label;           // a hulk is out of the fight: the guns leave it (the Captain can still have it finished: fire_weapons)
+					continue;
+				}
 				if (C && C->Side != EAstraSide::Astra)
 				{
 					Want = C->ContactId;
@@ -1317,7 +1323,8 @@ void UAstraStationsSubsystem::TickTactical()
 		}
 		if (Want.IsEmpty())
 		{
-			Expire(TEXT("tactical"), TEXT("engagement"), TEXT("return_fire"), TEXT("the targets are down or gone"));
+			Expire(TEXT("tactical"), TEXT("engagement"), TEXT("return_fire"), Disabled.IsEmpty() ? FString(TEXT("the targets are down or gone"))
+			       : FString::Printf(TEXT("%s is disabled: no power, drifting, no longer a threat"), *Disabled));
 			EngagedId.Empty();
 			return;
 		}
@@ -1328,9 +1335,9 @@ void UAstraStationsSubsystem::TickTactical()
 		double Best = -1e9;
 		for (const FContact& C : Cs)
 		{
-			if (C.Side != EAstraSide::Mandate || C.Track < 2 || C.RangeKm > Range)
+			if (C.Side != EAstraSide::Mandate || C.Track < 2 || C.RangeKm > Range || C.bDerelict)
 			{
-				continue;
+				continue;                    // (a hulk with no power is no threat: weapons free does not mean firing on the dead)
 			}
 			if (Eng.Mode == TEXT("return_fire") && !C.bFiringAtUs)
 			{
