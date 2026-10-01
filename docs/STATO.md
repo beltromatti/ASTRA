@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-01 pomeriggio · **Traguardo corrente:** Piano v0.4 ([PIANO.md](PIANO.md)): F1 da chiudere, F2 e F4 in parallelo con gli agenti di supporto ([ARCHITETTURA.md](ARCHITETTURA.md)); **principio delle intelligenze** ([ARCHITETTURA §1bis](ARCHITETTURA.md))
+**Ultimo aggiornamento:** 2026-10-01 sera · **Traguardo corrente:** Piano v0.4 ([PIANO.md](PIANO.md)): F1 da chiudere, F2 e F4 in parallelo con gli agenti di supporto ([ARCHITETTURA.md](ARCHITETTURA.md)); **principio delle intelligenze** ([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
 ## Piano v0.4 — dove siamo (aggiornato a ogni passo)
 | Fase | Stato |
@@ -77,6 +77,16 @@ mente la conoscono (prima `holo ship` ricadeva sul piano tattico). Prossimo: le 
     canale 1 (la luce del pianeta, il riempimento `astra.light.fill`, ora a 0) non toccano le navi. Il sole resta fisso rispetto alla
     nave (resa validata); farlo ruotare con l'assetto rende nere le navi in controluce sullo schermo: serve un'altra via (esposizione
     propria della cattura, o il riempimento sul canale 0 con l'interno schermato).
+- **1/10 sera** — ripreso dopo il limite d'uso:
+  - **Costo della plancia in battaglia**: con la raccolta degli eventi e il prompt diviso (ciò che cambia a ogni turno nell'ultimo
+    messaggio, `crew.bridge_now`: la cache copre prompt di sistema e storia, 40 → 57 %) una battaglia di 7,5 minuti con un Capitano
+    sensato costa **0,76 $/ora** per l'equipaggio (era 2,25 $/ora a inizio giornata). Le proposte non raccolte non si ripetono.
+  - **Battaglia di prova con la mente** (formazione con la Praetorian, fuoco concentrato): il Mandato abbatte prima il Vigilant,
+    poi stringe l'Aquila a 2 km; il nostro fuoco concentrato riduce l'Acheron a relitto. Le voci con l'audio vero partono tutte
+    (anche via radio dal Ponte 4): i «failed» erano solo `-nosound`.
+  - L'«anello scuro» di VFX era il Janus Gate dietro la fila di campioni: gli effetti sono a posto.
+  - Aiutanti: **MENTE-GUERRA** e **NAVE-2** ripresi dopo il limite di sessione; **DISTRUZIONE** avviato (brief aggiornato con la
+    spirale dei danni interni, il tampone e il metro `tools/survive.sh`). **App aggiornata** in `~/Applications/ASTRA.app` (Development, 1/10 12:52, provata: parte, plancia, effetti di guerra, VITA, MetalFX).
 - **Aiutanti al lavoro** (brief in `docs/brief/`): **MENTE-GUERRA** (ammiragli, comandanti, alleati che parlano, l'XO con
   `group_order`, la mente nel giro del banco, poi il regista v2), **VFX** (armi, scudi, esplosioni, rotture coi pezzi v3, danni sugli
   scafi, motori), **NAVE-2** (tutti i ponti: stanze nuove, istanze, luci come dati, un sotto-livello per ponte). Poi DISTRUZIONE,

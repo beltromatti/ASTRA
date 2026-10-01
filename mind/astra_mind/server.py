@@ -41,7 +41,8 @@ from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
 from .stt import Recognizer
 from .voice_lang import resolve_language
-from .speech import REPORT_LATE_S, Voice
+from .speech import REPORT_LATE_S, Prio, Voice
+from .war_minds import ALLIES, WarMinds
 from .tts import TTSEngine
 from .voice_qos import boost_thread
 
@@ -61,12 +62,15 @@ def detect_lang(text: str, default: str = "en") -> str:
 class GameShip:
     """ShipLink backed by the game: commands go to Unreal, which answers with the authoritative result."""
 
-    def __init__(self, send) -> None:  # noqa: ANN001
+    def __init__(self, send, intercept: dict[str, Any] | None = None) -> None:  # noqa: ANN001
         self._send = send
         self.state: dict[str, Any] = {}
         self.events: list[str] = []
         self._waiting: dict[str, asyncio.Future] = {}
         self._n = 0
+        # commands the mind takes first: a request to an allied captain is judged by him (war_minds.py), an order to a group is checked against
+        # the chain of command. A hook answers with a result, or None to let the command go to the game as it is.
+        self.intercept = intercept or {}
 
     def snapshot(self) -> dict[str, Any]:
         return self.state
@@ -74,7 +78,12 @@ class GameShip:
     def recent_events(self) -> list[str]:
         return self.events[-8:]
 
-    async def execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
+    async def execute(self, name: str, args: dict[str, Any], by: str, direct: bool = False) -> dict[str, Any]:
+        hook = None if direct else self.intercept.get(name)
+        if hook is not None:
+            res = await hook(args, by)
+            if res is not None:
+                return res
         self._n += 1
         cid = f"c{self._n}"
         fut = asyncio.get_running_loop().create_future()
@@ -93,6 +102,8 @@ class GameShip:
 
 EXTERNAL_SPEAKERS = {c["key"]: (f'{c["name"]} ({c["ship"]})', c["voice"]) for c in COMMANDERS.values()}
 EXTERNAL_SPEAKERS[ADMIRAL["key"]] = (f'{ADMIRAL["name"]} ({ADMIRAL["ship"]})', ADMIRAL["voice"])
+for _a in ALLIES.values():                        # the captains of the picket (war_minds.py): the ones the director adds are registered as they come
+    EXTERNAL_SPEAKERS[_a["key"]] = (f'{_a["name"]} ({_a["ship"]})', _a["voice"])
 from .port import PORT as PORT_CONTROL, FieldControl, for_field, stimulus_for, world_of  # noqa: E402
 from .medbay import patient_voice  # noqa: E402
 from .mess import MessTalk  # noqa: E402
@@ -165,6 +176,15 @@ class Mind:
         self.agent.home = self.director.home_lines
         self.director.captain_style = self.style.xo_line
         self.enemy.intel = self.style.mandate_line
+        # the minds that command the war: the Mandate's admiral and group commanders, the allied captains (war_minds.py)
+        self.war = WarMinds(self.llm, self._ally_say, self._war_execute, lang=lambda: self.lang, mandate_persona=COMMANDERS.get,
+                            channel=lambda c: self.enemy.open and self.enemy.contact == c, register_voice=self._register_voice,
+                            transmit=self._say_external, intel=self.style.mandate_line, note=self.director.note)
+        self.war.disabled = os.environ.get("ASTRA_WAR_MINDS", "1") == "0"        # (ASTRA_WAR_MINDS=0: the groups fight on their reflexes, as before)
+        self.war.formation_doctrine = os.environ.get("ASTRA_WAR_FORMATION", "0") == "1"   # (ASTRA_WAR_FORMATION=1: the doctrine also teaches the formation lever)
+        self.enemy.war = self.war
+        self.director.war_minds = self.war
+        self.director.negotiate = self._negotiate
         self.agent.say = self._crew_say
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
@@ -201,6 +221,69 @@ class Mind:
         elif speaker == ADMIRAL["key"]:
             self.exchange.heard("fleet", text)
         await self.voice.say(speaker, text, lang, tone)
+
+    async def _ally_say(self, speaker: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False,
+                        topic: str | None = None) -> None:
+        """An allied captain speaks on the fleet net (war_minds.py): the bridge hears it like any radio voice, the other captains read it in their
+        next look. `answer`: it answers what the Captain said (it goes first); a line that waited is thought again by whoever was to say it."""
+        if self.game is not None:
+            who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
+            self.game.events.append(f"over the radio, {who}: {text}")
+        self.exchange.heard("fleet", text)
+
+        async def rethink(t: str, waited: float, cut_after: str) -> str | None:
+            return await self.war.rethink(speaker, t, waited, cut_after, lang)
+        await self.voice.say(speaker, text, lang, tone, priority=Prio.URGENT if urgent else None, answer=True if answer else None, topic=topic,
+                             rethink=rethink)
+
+    async def _war_execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
+        """The commanders' orders to the game (group orders, fleet operations, decisions): straight to the ships, never through the hooks the
+        Captain's own commands go through."""
+        ship = self.game if (self.game and self.game.state) else None
+        if ship is None:
+            return {"ok": True, "detail": "(no game)"}
+        return await ship.execute(name, args, by, direct=True)
+
+    async def _negotiate(self, contact: str, terms: str) -> bool:
+        """The director has a Mandate commander call the Aquila to talk: the channel opens from his side and he says his piece (the same path as an
+        arrival or a succession: `transmission:`, then the commander's mind answers the situation). False: that ship is not a hostile contact."""
+        st = (self.game.state if (self.game and self.game.state) else None) or {}
+        if not any(str(c.get("id", "")).upper() == contact and str(c.get("status", "")).startswith("hostile") for c in st.get("contacts", []) or []):
+            return False
+        self.last_activity = time.monotonic()
+        await self.turns.put((f"\x00event:transmission: {contact} — you call the Aquila's captain to talk. Why: {terms}", self.lang))
+        return True
+
+    async def _fleet_request(self, args: dict[str, Any], by: str) -> dict[str, Any] | None:
+        """Comms relays the Captain's request to the allied ships: their captains judge it (war_minds.py). None: nobody there has a mind to judge it,
+        and the request goes to the ships the old way."""
+        res = self.war.captain_request(args, self.lang)
+        if res is not None:
+            self.war.kick()                                   # (the captain reads it now, not at the next state)
+        return res
+
+    async def _captain_group_order(self, args: dict[str, Any], by: str) -> dict[str, Any]:
+        """The XO gives one of our groups the Captain's direct order: only while the Captain is the senior officer present. The group's captain is told."""
+        if not self.war.captain_is_senior():
+            return {"ok": False, "detail": "the Captain is not the senior officer present: the senior officer commands the groups, ask him over the fleet net "
+                                           "(fleet_request)"}
+        cap = str(((self.game.state if self.game else None) or {}).get("captain", "on the bridge"))
+        order = {k: v for k, v in args.items() if v not in (None, "")}
+        order.update(side="astra", by="xo" if ("XO has the conn" in cap or cap.startswith("asleep")) else "captain")
+        res = await self._war_execute("group_order", order, order["by"])
+        if res.get("ok"):
+            self.war.captain_ordered(str(args.get("group", "")), str(res.get("detail", "")))
+        return res
+
+    def _war_look(self, state: dict[str, Any]) -> None:
+        """The war minds read the new ship state: the story's pulse, the commanders' look (they start the pulses that are due), the XO's board of the
+        groups. A defect in them must never cut the crew off from the ship."""
+        try:
+            self.director.observe(state)
+            self.war.feed(state)
+            state["_fleet_board"] = self.war.fleet_board(state)
+        except Exception:  # noqa: BLE001
+            log.exception("the war minds could not read the ship state")
 
     def record_log(self, entry: str) -> None:
         """A captain's log entry: kept in Saved/Campaign/captains_log.md, noted for the director, acknowledged."""
@@ -453,40 +536,6 @@ class Mind:
             except Exception:  # noqa: BLE001
                 log.exception("could not send the standing orders")
 
-    async def enemy_tactics(self) -> None:
-        """The Mandate fights with its head: while its strike group is attacking, its senior commander reads the battle
-        every ~40 s and commands the ships by datalink (focus of fire, stance, missile salvos, fighters). The Aquila's
-        sensors see what the ships do, and the bridge reacts."""
-        from .enemy import plan_tactics
-        first_seen = 0.0
-        last = 0.0
-        while True:
-            await asyncio.sleep(4)
-            st = self.game.state if (self.game and self.game.state) else None
-            if not st or not self.clients:
-                continue
-            view = st.get("_mandate") if isinstance(st.get("_mandate"), dict) else {}
-            fighting = [s_ for s_ in view.get("your_ships", []) if s_.get("state") == "attacking"]
-            if not fighting:
-                if first_seen:
-                    # the fight is over: the next one starts from a clean slate of orders
-                    self.enemy.last_orders = "none yet: each ship fights the nearest enemy at standard range"
-                    self.enemy.last_focus = ""
-                first_seen = 0.0
-                continue
-            now = time.monotonic()
-            if not first_seen:
-                first_seen = now
-            if now - first_seen < 20 or now - last < 40:
-                continue
-            last = now
-            try:
-                orders = await plan_tactics(self.enemy, self._battle_state(), note=self.director.note)
-                if orders:
-                    log.info("Mandate tactics: %s", orders)
-            except Exception:  # noqa: BLE001
-                log.exception("enemy tactics failed")
-
     async def tactical_watch(self) -> None:
         """In a fight the crew watches the big picture for the Captain: when something important is going wrong
         (weapons assigned out of reach while the helm chases another contact, a friendly ship dying, shields failing,
@@ -554,6 +603,11 @@ class Mind:
                 continue
             quiet = time.monotonic() - self.director.last_event_t
             hostile = any(str(c.get("status", "")).startswith("hostile") for c in st.get("contacts", []) or [])
+            if hostile and not self.director.decisive and self.director.battle_due():
+                # a long fight is looked in on: the war may bring reinforcements for either side, a call to talk, news — or nothing
+                log.info("the director looks in on a fight that has lasted %.0f s", time.monotonic() - (self.director.fight_since or 0.0))
+                asyncio.create_task(self.director.battle_pulse(self.lang, self._battle_state()))
+                continue
             gate = str(st.get("janus_gate", ""))
             if hostile or st.get("alert") == "red" or quiet < 420 or "under way" in gate or "lane" in gate:
                 continue
@@ -721,14 +775,22 @@ class Mind:
             log.info("the Captain speaks: %d turn(s) cut off, %d unspoken line(s) dropped", n, dropped)
 
     def _can_answer(self, party: str) -> bool:
-        """Someone answers on this channel: the admiral, or a Mandate captain with a mind who is still alive."""
-        return party == "fleet" or (party in COMMANDERS and party not in self.enemy.dead)
+        """Someone answers on this channel: the admiral (and the allied captains on the fleet net), an allied captain with a mind, or a Mandate captain
+        with a mind who is still alive."""
+        return party == "fleet" or self.war.can_answer(party) or (party in COMMANDERS and party not in self.enemy.dead)
 
     async def _to_party(self, party: str, words: str, lang: str) -> None:
-        """What the Captain said TO the party on the channel goes out: the enemy commander answers, or the admiral."""
+        """What the Captain said TO the party on the channel goes out: the enemy commander answers, the admiral, or the allied captains (each judges
+        whether the words were for them)."""
         self.exchange.said(party)
         if party == "fleet":
+            self.war.captain_to_fleet(words, lang)
+            self.war.kick()
             await self.director.admiral_reply(words, lang, self._battle_state())
+            return
+        if self.war.can_answer(party):
+            self.war.captain_to_fleet(words, lang, to=party)
+            self.war.kick()
             return
         if (not self.enemy.open or self.enemy.contact != party) and not self.enemy.open_channel(party):
             log.info("words for %s, but nobody answers on that channel: %s", party, words[:80])
@@ -776,7 +838,12 @@ class Mind:
             if name == "end_transmission":
                 self.enemy.open = False
             if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() == "fleet":
+                self.war.captain_to_fleet(str(args_.get("message", "")), lang)
+                self.war.kick()
                 await self.director.admiral_reply(str(args_.get("message", "")), lang, self._battle_state())
+            elif name == "hail" and res.get("ok") and self.war.can_answer(str(args_.get("contact_id", "")).upper()):
+                self.war.captain_to_fleet(str(args_.get("message", "")), lang, to=str(args_.get("contact_id", "")).upper())
+                self.war.kick()
             # (open_channel knows who has a commander to answer: a contact not yet classified, a decoy, a
             # friendly ship never do)
             if name == "hail" and res.get("ok") and str(args_.get("contact_id", "")).lower() != "fleet" \
@@ -811,7 +878,8 @@ class Mind:
     async def handle_client(self, ws) -> None:  # noqa: ANN001
         self.clients.add(ws)
         self.voice.muted = False
-        self.game = GameShip(lambda m: ws.send(json.dumps(m, ensure_ascii=False)))
+        self.game = GameShip(lambda m: ws.send(json.dumps(m, ensure_ascii=False)),
+                             intercept={"fleet_request": self._fleet_request, "group_order": self._captain_group_order})
         await ws.send(json.dumps({"type": "status", "crew": {k: v.title for k, v in CREW.items()}, "rate": self.tts.sample_rate,
                                   "voice": 2}))       # voice protocol 2: docs/protocollo_voce.md (cancel, hold_s, floor, line_dropped)
         log.info("game connected")
@@ -830,6 +898,7 @@ class Mind:
                     # a new game session: the crew starts a fresh conversation (the ship state is new too)
                     self.agent.history.clear()
                     self.enemy.reset()
+                    self.war.reset()
                     self.port.reset()
                     await self.voice.clear("new_session")     # what the last session had not said yet is not said in this one
                     self.watch.reset()
@@ -852,6 +921,7 @@ class Mind:
                             self.aftermath.reset()
                             self.agent.history.clear()
                             self.enemy.reset()
+                            self.war.reset()
                             resume = (f"director: campaign resumed — the Captain takes command of the new Aquila at New Ravenna "
                                       f"({new_command}); weeks have passed and the March moved on: tell what changed with "
                                       f"war_news, then the first beat for the new ship")
@@ -873,6 +943,7 @@ class Mind:
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
                     self.game.state = msg.get("state", {})
+                    self._war_look(self.game.state)
                     for p_ in ((self.game.state.get("medbay") or {}).get("patients") or []):
                         EXTERNAL_SPEAKERS[p_["speaker"]] = (p_.get("name", p_["speaker"]), patient_voice(p_))
                     mess_ = self.game.state.get("mess") or {}
@@ -994,7 +1065,6 @@ class Mind:
         asyncio.create_task(self.story_watch())
         asyncio.create_task(self.mess_talk())
         asyncio.create_task(self.tactical_watch())
-        asyncio.create_task(self.enemy_tactics())
         asyncio.create_task(self.standing_sync())
         asyncio.create_task(self.idle_exit())
         asyncio.create_task(self.flight_controller())

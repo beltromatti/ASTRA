@@ -1,11 +1,15 @@
 """The war director and the voice of the fleet.
 
-The director reads the campaign so far after every engagement (and after every quiet stretch) and decides what happens
-next as a concrete beat the simulation can play (raid, distress call, reinforcements, resupply, calm), inventing the new
-enemy commanders it needs (they get a mind and a voice on the channel). Vice Admiral Adrian Rourke, commander of the
-7th Fleet, delivers the orders over the fleet net and answers when the Aquila calls; he can grant reinforcements or a
-resupply when the war allows it. The simulation stays the truth: every beat goes through the game and its result comes
-back before anyone talks about it."""
+An invisible showrunner. It reads the campaign so far after every engagement (and after every quiet stretch, and now and then in the middle of a
+long fight) and decides what the war brings next as a concrete beat the simulation can play: a raid, a distress call, reinforcements for either side,
+a resupply, a calm, a commander of the Mandate calling to talk, a transit, a place to investigate, news from elsewhere in the March, the decisive
+battle — or nothing, when the war should simply run. There are no acts and no quotas: what it reads is a PULSE of facts (the tension of the recent
+fights, how tired the Captain must be, the balance of the war), the campaign log, the war's open threads and the map; the war's own logic and the
+Captain's choices make the story. It never rigs a fight: no beat changes the strength of ships already fighting; what may reach a battle under way is
+what a war really brings and everybody can see coming (a relief on its way, a call to talk, news). It invents the new commanders it needs (the enemy's
+and the allies': they get a mind and a voice). Vice Admiral Adrian Rourke, commander of the 7th Fleet, delivers the orders over the fleet net and answers
+when the Aquila calls; he can grant reinforcements or a resupply when the war allows it. The simulation stays the truth: every beat goes through the
+game and its result comes back before anyone talks about it."""
 from __future__ import annotations
 
 import asyncio
@@ -14,21 +18,29 @@ import logging
 import os
 import re as _re
 import time
+from collections import deque
 from typing import Any, Awaitable, Callable
 
+from . import models
 from .crew import CAPTAIN_WORD, LANG_NAMES, WORLD
 from .openrouter import OpenRouter, ToolCall
 from .war import OWNERS, WarMap
 
 log = logging.getLogger("astra.director")
 
-MODEL = "deepseek/deepseek-v4.1-flash"
-PROVIDERS = ["together", "modal"]
 ADMIRAL = dict(key="admiral", name="Vice Admiral Adrian Rourke", ship="7th Fleet command", voice="george",
                bio="Commander of the 7th Fleet. Sixty-one, a veteran of the last Gate campaigns before the Silence ended; "
                    "calm, dry, fiercely protective of his captains, allergic to heroics that waste ships. He trusts the "
                    "Aquila's captain and says so rarely.")
 COMMANDER_VOICES = ["stuart_bell", "michael", "juergen", "lola", "anna", "paul", "marius"]
+# the voices for the allied captains the story invents (not used by the bridge, the admiral or the Mandate's fixed captains)
+ALLY_VOICES = {"f": ["cosette", "fantine", "azelma", "eponine", "anna"], "m": ["michael", "juergen", "marius", "stuart_bell", "paul"]}
+
+# the beats that may reach a fight under way (what a war really brings, announced by a delay): everything else waits for the lull
+IN_BATTLE_BEATS = ("reinforcements", "raid", "negotiation", "none")
+BATTLE_PULSE_FIRST_S = 150.0          # a fight this old is looked in on once...
+BATTLE_PULSE_EVERY_S = 240.0          # ...and then every so often while it lasts
+CALM_AFTER_S = 180.0                  # this much peace ends a run of engagements (the Captain has had a breath)
 
 
 def _fn(name, desc, props, required):
@@ -36,10 +48,16 @@ def _fn(name, desc, props, required):
         "type": "object", "properties": props, "required": required}}}
 
 
+CAPTAIN = {"type": "object", "description": "ASTRA ships only: the person who commands this ship (invented): a name that fits the Core Worlds' mixed "
+                                            "peoples, a rank, two sentences on who they are and how they talk",
+           "properties": {"name": {"type": "string"}, "rank": {"type": "string", "description": "Captain, Commander, Lieutenant Commander"},
+                          "bio": {"type": "string"}, "gender": {"type": "string", "enum": ["f", "m"]}},
+           "required": ["name", "rank", "bio", "gender"]}
 SHIP = {"type": "object", "properties": {
     "class": {"type": "string", "enum": ["acheron", "styx", "lethe", "vigilant", "praetorian"]},
-    "name": {"type": "string", "description": "The ship's name, in English (Mandate ships: rivers and places of the "
-                                              "underworld or of the Outer Worlds; ASTRA ships: virtues, eagles, old navy names)"}},
+    "name": {"type": "string", "description": "The ship's name ONLY, one or two words, in English, no class and no quotes (Mandate ships: rivers and "
+                                              "places of the underworld or of the Outer Worlds; ASTRA ships: virtues, eagles, old navy names)"},
+    "captain": CAPTAIN},
     "required": ["class", "name"]}
 COMMANDER = {"type": "object", "properties": {
     "name": {"type": "string"}, "rank": {"type": "string", "description": "e.g. Ferryman (ship captain), Warden, Archon"},
@@ -51,10 +69,10 @@ POI = {"type": "object", "properties": {
     "kind": {"type": "string", "enum": ["listening_post", "derelict_warship", "derelict_freighter"]},
     "name": {"type": "string", "description": "e.g. Thule Watch, the freighter Silver Kestrel, ASN Resolve"}}, "required": ["kind", "name"]}
 BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulation.", {
-    "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit", "investigate", "decisive"]},
-    "act": {"type": "integer", "minimum": 1, "maximum": 3, "description": "the act of the arc this beat belongs to: the current "
-            "one, or the next when this beat is the story's turning point into it"},
-    "allies": {"type": "array", "items": SHIP, "description": "decisive: the ASTRA ships that join the Aquila for it (1-3)"},
+    "type": {"type": "string", "enum": ["raid", "distress", "reinforcements", "resupply", "calm", "transit", "investigate", "decisive", "negotiation", "none"],
+             "description": "none: the war simply runs on (say why in `why`); negotiation: a Mandate commander already on the plot calls the Aquila "
+                            "to talk (`caller`, `terms`)"},
+    "allies": {"type": "array", "items": SHIP, "description": "decisive: the ASTRA ships that join the Aquila for it (1-3), each with its `captain`"},
     "poi": {**POI, "description": "investigate: the place to search (on the plot at once, dark and tumbling)"},
     "findings": {"type": "array", "items": {"type": "string"}, "description": "investigate: what the crew learns there, in "
                  "order — 1) the active scan, 2) a flight group reaches it or the Aquila closes in, 3) alongside. Concrete "
@@ -62,24 +80,32 @@ BEAT_TOOL = _fn("start_beat", "The next beat of the war, played by the simulatio
     "ambush": {"type": "array", "items": SHIP, "description": "investigate (optional): Mandate ships lying cold near it, "
                "waking when the Aquila comes within ambush_km"},
     "ambush_km": {"type": "number", "description": "investigate: how close the Aquila must come before the ambush springs"},
-    "delay_s": {"type": "number", "description": "seconds before it happens (raids and distress: 60-300; calm: 90-240)"},
+    "delay_s": {"type": "number", "description": "seconds before it happens (raids and distress: 60-300; calm: 90-240; reinforcements in a fight "
+                                                 "under way: 120-420)"},
     "bearing_deg": {"type": "number", "description": "true bearing from the Aquila where they appear (0-359)"},
     "range_km": {"type": "number", "description": "distance from the Aquila (raid 25-60: from further out the sensor game has "
                                                   "time to play — they come dark, a bearing, decoys, jamming; distress 25-45; "
                                                   "reinforcements 15-30; what the player asks for, if they ask)"},
     "ships": {"type": "array", "items": SHIP, "description": "raid: the Mandate ships (first = leader; an acheron jams our radar "
-              "and carries decoys, a styx carries decoys); reinforcements: ASTRA ships; "
+              "and carries decoys, a styx carries decoys); reinforcements: ASTRA ships, each with its `captain`; "
               "decisive: the Mandate's main fleet (4-8 ships, the leader first, an acheron among them)"},
     "attackers": {"type": "array", "items": SHIP, "description": "distress: the Mandate raiders (styx or lethe)"},
     "ship": {"type": "object", "properties": {"name": {"type": "string"}, "class": {"type": "string"}},
              "description": "distress: the ship calling for help (a Free Guilds freighter)"},
     "hail": {"type": "boolean", "description": "raid: whether the leader opens a channel to the Aquila on arrival"},
     "commander": COMMANDER,
+    "caller": {"type": "string", "description": "negotiation: the contact id (T-21) of the Mandate commander on the plot who calls; he must be there"},
+    "terms": {"type": "string", "description": "negotiation: what he calls about, in English, one or two sentences — terms to surrender, a ceasefire to "
+                                               "recover the dead, a corridor, a prisoner, a warning, a price — as he would put it; the Captain may "
+                                               "accept, refuse or bargain, and the commander answers by what was said"},
     "hull_pct": {"type": "number", "description": "resupply: hull integrity restored up to this percent"},
     "missiles": {"type": "integer", "description": "resupply: missiles brought aboard"},
     "duration_s": {"type": "number", "description": "resupply: how long it takes (60-300)"},
     "system_name": {"type": "string", "description": "transit: the system Fleet sends the Aquila to — one the gate here reaches"},
     "why": {"type": "string", "description": "the story reason, one sentence (for the campaign log)"},
+    "threads": {"type": "array", "items": {"type": "string"}, "description": "the open threads of the war after this beat — what each side is "
+                "doing or gathering, a promise made, a mystery open, a grudge — up to five short lines in English; they replace the previous "
+                "list (keep the ones still alive); you read them again next time"},
     "officers": {"type": "object", "additionalProperties": {"type": "string"},
                  "description": "only for officers whose bond with the Captain changed because of what happened (keys: "
                  "xo Serra she, helm Ferri he, ops Tanaka she, tactical Voss she, comms Martin he, sensors Nair she, "
@@ -117,44 +143,66 @@ TRANSMIT = _fn("transmit", "Vice Admiral Rourke speaks to the Aquila over the fl
     "text": {"type": "string", "description": "what he says, in the Captain's language, names in English; 1-3 sentences"}},
     ["text"])
 
-DIRECTOR_PROMPT = """You are the director of a war story that the player lives as the Captain of the ASN Aquila. Decide
-the next beat of the war now, like a great showrunner: consequences follow from what happened, tension rises and falls,
-and the player's choices matter (spared enemies may come back, negotiated terms may hold or be broken, losses hurt).
+DIRECTOR_PROMPT = """You are the director of a war story that the player lives as the Captain of the ASN Aquila: an invisible showrunner who lets the
+war run by its own logic and gives the Captain situations worth deciding. Nobody knows you are there. Decide what the war brings next, now.
 
 {world}
 
+What you read
+- The PULSE (below) gives you facts, not verdicts: the tension of the recent fights, how tired the Captain must be (time under pressure, losses, the
+  ship's state) and the balance of the war (the forces on the plot, who holds what). Judge them as a great showrunner would. The campaign log is the war
+  so far; the open threads are what each side is doing or gathering and the promises still alive.
+
+How you decide
+- There is no fixed structure: no acts, no scheduled twists, no quota of battles. The war has a logic — the Mandate wants the Gates and learns how this
+  Captain fights; the 7th Fleet defends and answers — and the story is what that logic and the Captain's choices make of it. Consequences follow from
+  what happened; spared enemies may come back; negotiated terms may hold or be broken; losses hurt. The decisive battle (`decisive`) comes when the war
+  has gathered both sides for it (the Mandate's assault on Aurelia, or the 7th Fleet's strike at Erebus Anchorage...), not when a counter says so;
+  its outcome closes a chapter of the war and the war goes on.
+- Rhythm from the Captain: a rested Captain with a sound ship gets harder problems and a cleverer enemy; one who has been pushed hard (long under
+  pressure, hull low, ships or people lost, magazines thin) gets room to breathe — a calm, a resupply, news, a human moment — before the next blow.
+  Alternate. Do not escalate at every beat and do not leave the Captain idle for long: a war that goes quiet has a reason, and a quiet that lasts
+  becomes a question the next beat answers. A Captain who has had several quiet minutes and a sound ship gets the next problem now (a raid, a call,
+  news that bites, a place to search); never two calm beats in a row.
+- Balance by the war's logic, never by numbers: if the Captain is crushing the Mandate, the Mandate answers like an army (a second wave through the gate,
+  another approach, a trap built on what it learned of the Captain, a commander who calls to talk); if the Captain is losing, the 7th Fleet answers like
+  a fleet (reinforcements, a tender, orders), and the enemy may press or pause. BOTH sides reinforce: a raid is the Mandate's way, `reinforcements` the
+  7th Fleet's.
+- NEVER rig a fight in progress: no beat changes the strength of ships already in it, no miracle rescue, no sudden handicap. What may reach a battle under
+  way is what a war really brings, with a delay everybody can see coming on the sensors: reinforcements that were on the way, a commander calling to talk,
+  news from elsewhere.
+
 Rules
-- Call `start_beat` exactly once, `war_news` at most once, and ALWAYS `transmit` once: Vice Admiral Adrian Rourke
-  (7th Fleet commander) briefs the Aquila in {lang_name} about what is coming or what to do now — in character,
-  concrete, without game terms. The fog of war holds for him too: of a raid (it comes dark) the fleet knows at most
-  what a distant picket glimpsed — roughly from where, perhaps how many, that it is the Mandate — never the ranges,
-  classes, names or tricks it will use; the Aquila's own sensors must find them (he may tell her to keep her eyes open,
-  never what she will see).
-- Pacing: after a hard fight (hull below 50% or ships lost) prefer resupply or calm; escalate step by step; a raid is
-  1-4 Mandate ships sized to what the Aquila and her escorts can fight; distress calls are Free Guilds freighters hunted
-  by 1-2 raiders; reinforcements are 1-2 ASTRA destroyers (vigilant), rarely a battleship.
-- decisive: the battle this arc was building to (Act III only, once the forces are gathered): the Mandate's main
-  fleet in `ships` (4-8, an acheron leading) against the Aquila and the `allies` that join her (1-3 ASTRA ships), where
-  the Aquila is and where the arc says it must be fought (the Mandate's assault on Aurelia, or the 7th Fleet's strike
-  at Erebus Anchorage...). It MUST include `commander`. Its outcome ends the arc.
-- A raid or distress MUST include `commander` for its leader: invent a person (English name, rank, a bio with a reason
-  to fight and a way of speaking). Recurring characters are welcome when the story justifies it.
+- Call `start_beat` exactly once, `war_news` at most once. `transmit` once — Vice Admiral Adrian Rourke (7th Fleet commander) briefs the Aquila in
+  {lang_name} about what is coming or what to do now — in character, concrete, without game terms — unless the beat is `none` or `negotiation` (the
+  enemy's call speaks for itself). The fog of war holds for him too: of a raid (it comes dark) the fleet knows at most what a distant picket glimpsed —
+  roughly from where, perhaps how many, that it is the Mandate — never the ranges, classes, names or tricks it will use; the Aquila's own sensors must
+  find them (he may tell her to keep her eyes open, never what she will see).
+- Sizes: a raid is 1-4 Mandate ships sized to what the Aquila and her escorts can fight; distress calls are Free Guilds freighters hunted by 1-2
+  raiders; reinforcements are 1-2 ASTRA destroyers (vigilant), rarely a battleship; decisive: the Mandate's main fleet in `ships` (4-8, an acheron
+  leading) against the Aquila and the `allies` that join her (1-3 ASTRA ships), where the Aquila is. It MUST include `commander`.
+- A raid or distress MUST include `commander` for its leader: invent a person (English name, rank, a bio with a reason to fight and a way of speaking).
+  Recurring characters are welcome when the story justifies it. Every ASTRA ship that arrives (`reinforcements`, `allies`) gets a `captain`: a person
+  with a name, a rank, a bio and a voice of their own (the fleet net will hear them).
 - Never reuse the name of a ship that is still on the plot (see contacts) for a new ship.
-- transit: Fleet orders the Aquila through the Janus Gate to another system of the March (Keeper Station tunes the
-  gate; the Captain decides when to go, and the war goes on wherever the Aquila is). Only a system the gate here
-  reaches (see the map). The right beat when the story moves elsewhere: the enemy regroups beyond the gate, another
-  front needs her, a system calls for help. Not right after arriving. The Captain may also take the ship through the
-  gate on their own: the log says so, and the story follows them.
-- Raids, distress calls and reinforcements happen where the Aquila is, and must make sense there (who holds the
-  system, who could reach it through its gates).
-- investigate: a place to search where the Aquila is — a silent station, a drifting warship, a dead freighter. Its
-  findings are the story: what happened there, who did it, a clue that leads on (logs, survivors, a Mandate code, a
-  course). An ambush lying cold around it is possible, not mandatory. A raid or distress there must include `commander`;
-  for an ambush, give `commander` for its first ship.
-- The war is bigger than the Aquila: `war_news` moves it elsewhere (systems fall or are retaken, fronts shift) as a
-  consequence of what happened and of the enemy's plans. Mandate ships never appear deep in ASTRA space without a
-  reason (a gate they hold, a breakthrough reported first).
+- negotiation: a Mandate commander on the plot (a hostile ship in the contacts, the `caller`) calls the Aquila: surrender terms to a Captain who is
+  losing, a ceasefire to recover the dead, a corridor, a prisoner, a warning, a price. It fits a commander who has reason to talk (his group is hurt, or
+  winning and wishing to spare lives, or the Captain did something that earned it). It does not change a single number: what is said on the channel
+  decides what follows.
+- transit: Fleet orders the Aquila through the Janus Gate to another system of the March (Keeper Station tunes the gate; the Captain decides when to
+  go, and the war goes on wherever the Aquila is). Only a system the gate here reaches (see the map). The right beat when the story moves elsewhere:
+  the enemy regroups beyond the gate, another front needs her, a system calls for help. Not right after arriving. The Captain may also take the ship
+  through the gate on their own: the log says so, and the story follows them.
+- Raids, distress calls and reinforcements happen where the Aquila is, and must make sense there (who holds the system, who could reach it through its
+  gates).
+- investigate: a place to search where the Aquila is — a silent station, a drifting warship, a dead freighter. Its findings are the story: what happened
+  there, who did it, a clue that leads on (logs, survivors, a Mandate code, a course). An ambush lying cold around it is possible, not mandatory. A raid
+  or distress there must include `commander`; for an ambush, give `commander` for its first ship.
+- The war is bigger than the Aquila: `war_news` moves it elsewhere (systems fall or are retaken, fronts shift) as a consequence of what happened and of
+  the enemy's plans. Mandate ships never appear deep in ASTRA space without a reason (a gate they hold, a breakthrough reported first).
 - If the Captain has not acted on Fleet's orders for a long while, Rourke may press them, or the war may come to them.
+- `threads`: keep the war's open threads (what each side is doing or gathering, promises, mysteries, grudges): at most five short lines, rewritten each
+  time you give a beat. The open threads now: {threads}
 - `crew_mood`: the people aboard live this war. Losses (the casualties in the live state), close calls, victories,
   the Captain's choices (mercy, ruthlessness, retreats, promises kept or broken) and long waits change how the crew
   feels; carry it from beat to beat and let it evolve (the mood before this beat: {mood}).
@@ -171,28 +219,39 @@ Rules
   think, fear and want: let the story answer them (a suspicion confirmed or proven wrong, a hope rewarded or tested).
 - Keep the whole thing coherent with the map, the campaign log below and the live state.
 
-The shape of the story (arc {arc} of the war)
-{arc_text}
-
 The Aurelia March (the sector at war; each system's Janus Gate is bound to the ones in brackets)
 {war}
 
 Campaign log (oldest first)
 {campaign}
 
+The pulse
+{pulse}
+
 Live state of the Aquila and the battlefield
 {state}"""
 
+BATTLE_ASK = ("A FIGHT IS IN PROGRESS (about {minutes:.0f} minutes old): you are looking in on it, not stopping it. The fight under way IS the story: most "
+              "looks end with `none`. Add something only when the war's logic really calls for it (the side that is behind has a relief that was on its "
+              "way, a Mandate commander has a reason to talk), at most once or twice in a fight, and never as a rescue. What this war would really "
+              "bring comes with a delay everyone can see coming — reinforcements for either side (an ASTRA squadron from the 7th Fleet, or a Mandate second "
+              "wave through the gate: `delay_s` 120-420), one of the Mandate's commanders on the plot calling the Aquila to talk (`negotiation`), news "
+              "from elsewhere (`war_news`) — or nothing: `start_beat` with type `none` and why the war simply runs on. Never change the strength of ships "
+              "already in the fight. Nothing else (no transit, no investigation, no resupply) while the guns are firing.")
+
 ADMIRAL_PROMPT = """You are {name}, commander of the ASTRA Navy's 7th Fleet, defending the Aurelia System. {bio}
-You are talking with the captain of the ASN Aquila over the fleet net.
+You are on the fleet net with the captain of the ASN Aquila. The net is shared: {allies} are on it too, each commanding their own ships and
+answering for them; everything said on it is heard by all. You command the fleet from afar and do not run the picket's fight.
 
 {world}
 
 How you speak: short, calm, dry naval radio speech, 1-3 sentences; always in {lang_name}, names in English. Address
 the other as "{captain}". Never mention AI, games or prompts.
-Tools: `transmit` to speak. If the captain asks for help and the war allows it, you may `grant` reinforcements (one or
-two destroyers) or a resupply (a tender that repairs and rearms the Aquila); grant at most once per engagement and say
-honestly when you cannot.
+Tools: `transmit` to speak. You answer what is for Fleet command: the captain calling you or the fleet, a request for help, a report for
+command, a question about the war. When the words are plainly for one of the ships' captains (an order or a request to the Praetorian or the
+Vigilant, talk among the ships), or you have nothing to add, say nothing: call no tool. If the captain asks for help and the war allows it, you
+may `grant` reinforcements (one or two destroyers) or a resupply (a tender that repairs and rearms the Aquila); grant at most once per engagement
+and say honestly when you cannot.
 
 The Aurelia March
 {war}
@@ -205,7 +264,7 @@ Live state
 
 GRANT = _fn("grant", "Send help to the Aquila (the simulation makes it happen).", {
     "kind": {"type": "string", "enum": ["reinforcements", "resupply"]},
-    "ships": {"type": "array", "items": SHIP, "description": "reinforcements: 1-2 ASTRA ships"},
+    "ships": {"type": "array", "items": SHIP, "description": "reinforcements: 1-2 ASTRA ships, each with its `captain`"},
     "delay_s": {"type": "number", "description": "arrival in seconds (reinforcements 90-300)"}}, ["kind"])
 
 
@@ -220,17 +279,19 @@ class Director:
         self.say = say                  # (speaker, text, lang, tone)
         self.command = command          # (name, args) -> result from the game
         self.register = register        # (contact_id, persona) -> the enemy minds learn a new commander
+        self.war_minds: Any = None       # the war minds (war_minds.py): the allied captains the story invents are registered with them
+        self.negotiate: Callable[[str, str], Awaitable[bool]] | None = None   # (contact_id, terms) -> the Mandate commander calls the Aquila (the server)
         self.campaign: list[str] = []
         self.busy = False
         self.granted = False
         self.voice_i = 0
+        self.ally_voice_i = {"f": 0, "m": 0}
         self.admiral_history: list[dict[str, Any]] = []
         self.last_event_t = time.monotonic()   # the last time the story moved (a director event or a beat)
         self.mood = ""                          # how the bridge crew feels (the director's latest word on it)
         self.bonds: dict[str, str] = {}          # officer id -> how they stand with the Captain (the director keeps it)
-        self.arc = 1                             # the arcs of the war: three acts each, ending in a decisive battle
-        self.act = 1
-        self.act_beats = 0
+        self.threads: list[str] = []             # the war's open threads: what each side is doing or gathering, promises, mysteries (the director keeps it)
+        self.arc = 1                             # the chapters of the war: each ends in a decisive battle (no acts: the war's logic says when)
         self.decisive = False                    # the decisive battle is being fought
         self.finale = None                       # the arc's ending (finale.Finale, set by the server)
         self.blocked = lambda: False             # the story waits (the ship being abandoned, the aftermath): set by the server
@@ -239,6 +300,16 @@ class Director:
         self.style: dict[str, Any] = {}          # how the Captain commands: the XO's read, the Mandate's (style.py)
         self.home: list[dict[str, Any]] = []     # the officers' own lives: news from home (told to the Captain or not yet)
         self.captain_style = lambda: ""          # the XO's read, for the story (set by the server)
+        # what the pulse is made of (tension, fatigue, balance): the time the Captain has spent fighting and at peace, as the ship states say
+        self.clock = time.monotonic
+        self.t0 = self.clock()
+        self._last_obs = self.clock()
+        self._fight_log: deque[tuple[float, float, bool]] = deque()   # (time, seconds covered, hostile ships on the plot)
+        self.fight_since: float | None = None    # the current fight began (None: peace)
+        self.peace_since: float | None = self.t0
+        self.in_a_row = 0                        # engagements since the last real peace
+        self.last_pulse_t = self.t0              # the last time the story was looked at (a beat, a stall, a look in on a fight)
+        self.beat_log: deque[tuple[float, str, str]] = deque(maxlen=8)    # (time, type, why) of the latest beats
 
     def reset(self) -> None:
         """A new campaign: the war begins again at Aurelia."""
@@ -247,15 +318,18 @@ class Director:
         self.campaign.clear()
         self.mood = ""
         self.bonds = {}
+        self.threads = []
         self.standing.clear()
         self.memories.clear()
         self.style.clear()
         self.home.clear()
-        self.arc, self.act, self.act_beats, self.decisive = 1, 1, 0, False
+        self.arc, self.decisive = 1, False
         self.busy = False
         self.granted = False
         self.admiral_history.clear()
         self.last_event_t = time.monotonic()
+        self.beat_log.clear()
+        self.in_a_row = 0
         self.save()
 
     def load(self, note: str = "") -> bool:
@@ -268,6 +342,7 @@ class Director:
             self.voice_i = int(d.get("voice_i", 0))
             self.mood = str(d.get("mood", ""))
             self.bonds = {str(k): str(v) for k, v in (d.get("bonds") or {}).items()}
+            self.threads = [str(t) for t in (d.get("threads") or []) if str(t).strip()][:5]
             self.standing[:] = [o for o in (d.get("standing") or []) if isinstance(o, dict) and o.get("department") and o.get("order")]
             self.memories.clear()
             self.memories.update({str(k): [m for m in v if isinstance(m, dict) and m.get("memory")]
@@ -275,8 +350,7 @@ class Director:
             self.style.clear()
             self.style.update(d.get("style") or {})
             self.home[:] = [h for h in (d.get("home") or []) if isinstance(h, dict) and h.get("officer") and h.get("news")][-12:]
-            self.arc, self.act = int(d.get("arc", 1)), int(d.get("act", 1))
-            self.act_beats, self.decisive = int(d.get("act_beats", 0)), bool(d.get("decisive", False))
+            self.arc, self.decisive = int(d.get("arc", 1)), bool(d.get("decisive", False))     # (older saves also had acts: they are gone)
         except (OSError, ValueError):
             self.campaign.clear()
             self.mood = ""
@@ -296,29 +370,12 @@ class Director:
             os.makedirs(os.path.dirname(self._story_path()), exist_ok=True)
             tmp = self._story_path() + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds,
-                           "standing": self.standing, "arc": self.arc, "act": self.act, "act_beats": self.act_beats,
-                           "decisive": self.decisive, "memories": self.memories, "style": self.style, "home": self.home}, f,
-                          ensure_ascii=False, indent=1)
+                json.dump({"campaign": self.campaign, "voice_i": self.voice_i, "mood": self.mood, "bonds": self.bonds, "threads": self.threads,
+                           "standing": self.standing, "arc": self.arc, "decisive": self.decisive, "memories": self.memories,
+                           "style": self.style, "home": self.home}, f, ensure_ascii=False, indent=1)
             os.replace(tmp, self._story_path())
         except OSError:
             log.exception("could not save the story")
-
-    ACTS = {1: "Act I — the storm gathers: the Mandate tests the March (raids, a silence to investigate, a distress call); "
-               "the enemy's plan shows itself piece by piece; the Captain earns the crew. About 4-6 beats, then a turning "
-               "point opens Act II (a system falls, a plan is uncovered, a blow lands).",
-            2: "Act II — the March burns: the offensive in the open; systems change hands on the fleet net; the Aquila goes "
-               "where she is needed (gates), meets again the commanders she spared or wronged; losses and choices pile up. "
-               "About 6-10 beats, then a turning point opens Act III.",
-            3: "Act III — the gate: both sides gather for the decisive battle (the Mandate's assault on Aurelia, or the 7th "
-               "Fleet's strike at Erebus Anchorage: whichever the war map and the Captain's choices make right). Two or three "
-               "beats of gathering (reinforcements, resupply, a last intelligence), then the `decisive` beat. Its outcome "
-               "ends the arc."}
-
-    def arc_text(self) -> str:
-        return (f"{self.ACTS[1]}\n{self.ACTS[2]}\n{self.ACTS[3]}\nNOW: Act {self.act}, {self.act_beats} beat(s) into it"
-                + (" — the decisive battle is being fought" if self.decisive else "")
-                + (f". (This is arc {self.arc}: the war went on after the earlier arcs, see the campaign log.)" if self.arc > 1 else "."))
 
     def note(self, text: str) -> None:
         self.campaign.append(text)
@@ -336,6 +393,86 @@ class Director:
         """Where each officer stands with the Captain (for the crew and the director)."""
         from .crew import CREW
         return [f"{CREW[k].name} ({k}): {v}" for k, v in self.bonds.items() if k in CREW]
+
+    # ------------------------------------------------------------------------------------------------ the pulse (tension, fatigue, balance)
+    def observe(self, state: dict[str, Any]) -> None:
+        """The ship's state, about once a second: how long the Captain has fought and how long he has had peace (facts for the pulse; nothing is
+        decided here)."""
+        now = self.clock()
+        dt = min(5.0, max(0.0, now - self._last_obs))
+        self._last_obs = now
+        fighting = any(str(c.get("status", "")).startswith("hostile") and "retreating" not in str(c.get("status", ""))
+                       for c in (state or {}).get("contacts", []) or [])
+        self._fight_log.append((now, dt, fighting))
+        while self._fight_log and now - self._fight_log[0][0] > 1500.0:
+            self._fight_log.popleft()
+        if fighting and self.fight_since is None:
+            peace = now - self.peace_since if self.peace_since is not None else CALM_AFTER_S
+            self.in_a_row = 1 if peace >= CALM_AFTER_S else self.in_a_row + 1
+            self.fight_since, self.peace_since = now, None
+        elif not fighting and self.fight_since is not None:
+            self.fight_since, self.peace_since = None, now
+
+    def _window(self, seconds: float) -> tuple[float, float]:
+        """(seconds with hostile ships on the plot, seconds without) in the last `seconds`."""
+        now = self.clock()
+        fight = sum(dt for t, dt, f in self._fight_log if f and now - t <= seconds)
+        peace = sum(dt for t, dt, f in self._fight_log if not f and now - t <= seconds)
+        return fight, peace
+
+    def battle_due(self) -> bool:
+        """A long fight is looked in on (the server asks every few seconds)."""
+        now = self.clock()
+        return (not self.busy and self.fight_since is not None and now - self.fight_since >= BATTLE_PULSE_FIRST_S
+                and now - self.last_pulse_t >= BATTLE_PULSE_EVERY_S)
+
+    def pulse_facts(self, state: dict[str, Any]) -> str:
+        """What the director reads of the tension, the Captain's fatigue and the balance of the war: facts, never verdicts."""
+        now = self.clock()
+        fight, peace = self._window(1200.0)
+        seen = fight + peace
+        lines = []
+        if self.fight_since is not None:
+            lines.append(f"- A fight is in progress now: {(now - self.fight_since) / 60:.0f} min old (engagement number {self.in_a_row} since the Captain last had "
+                         f"{CALM_AFTER_S / 60:.0f} min of peace).")
+        else:
+            lines.append(f"- No hostile ship is on the plot: peace for {((now - self.peace_since) / 60 if self.peace_since is not None else 0):.0f} min.")
+        if seen > 60:
+            lines.append(f"- Tension: in the last {seen / 60:.0f} min the Captain spent {fight / 60:.0f} min with hostile ships on the plot and {peace / 60:.0f} min in peace.")
+        lines.append(f"- The Captain: {(now - self.t0) / 60:.0f} min into this session; {self.in_a_row} engagement(s) since the last real peace.")
+        if self.beat_log:
+            lines.append("- The latest beats (oldest first): " + "; ".join(f"{b[1]} {max(0, now - b[0]) / 60:.0f} min ago ({b[2][:70]})" for b in self.beat_log))
+        ship = [f"hull {state.get('hull_pct')}%"] if state.get("hull_pct") is not None else []
+        sh = (state.get("shields") or {}).get("strength_pct")
+        if sh is not None:
+            ship.append(f"shields {sh}%")
+        wp = (state.get("weapons") or {}).get("missiles")
+        if wp:
+            ship.append(f"missiles: {wp}")
+        th = state.get("thermal") or {}
+        if th.get("heat_pct") is not None:
+            ship.append(f"heat {th['heat_pct']}%")
+        if state.get("casualties"):
+            ship.append(f"casualties: {str(state['casualties'])[:140]}")
+        if state.get("damage"):
+            ship.append(f"{len(state['damage'])} open damage incident(s)")
+        if ship:
+            lines.append("- The ship now: " + ", ".join(ship) + ".")
+        contacts = state.get("contacts", []) or []
+        friends = [c for c in contacts if str(c.get("status", "")) == "friendly"]
+        foes = [c for c in contacts if str(c.get("status", "")).startswith("hostile")]
+
+        def kinds(cs: list[dict[str, Any]]) -> str:
+            n: dict[str, int] = {}
+            for c in cs:
+                n[str(c.get("class") or "unknown")] = n.get(str(c.get("class") or "unknown"), 0) + 1
+            return ", ".join(f"{v} {k}" for k, v in n.items()) or "none"
+        lines.append(f"- Forces on the plot: ASTRA with the Aquila: {len(friends)} warship(s) ({kinds(friends)}); hostile: {len(foes)} ({kinds(foes)}).")
+        held: dict[str, list[str]] = {}
+        for k, s in self.war.systems.items():
+            held.setdefault(s["owner"], []).append(f"{k}{'!' * int(s['threat'])}")
+        lines.append("- The war's balance: " + "; ".join(f"{o}: {', '.join(v)}" for o, v in held.items()) + " (each ! is a degree of threat).")
+        return "\n".join(lines)
 
     # ------------------------------------------------------------------------------------------------ the beats
     async def on_event(self, text: str, lang: str, state: dict[str, Any]) -> None:
@@ -366,6 +503,18 @@ class Director:
         finally:
             self.busy = False
 
+    async def battle_pulse(self, lang: str, state: dict[str, Any]) -> None:
+        """A long fight is looked in on: the war may bring something (reinforcements for either side, a commander calling to talk, news) or nothing."""
+        if self.busy or self.blocked():
+            return
+        self.busy = True
+        try:
+            await self._next_beat(lang, state, in_battle=True)
+        except Exception:  # noqa: BLE001
+            log.exception("the director's look at the fight failed")
+        finally:
+            self.busy = False
+
     async def gm_request(self, text: str, lang: str, state: dict[str, Any]) -> None:
         """The player speaks to the director directly (game master mode): what they would like to happen next."""
         if self.busy:
@@ -381,14 +530,16 @@ class Director:
         finally:
             self.busy = False
 
-    async def _next_beat(self, lang: str, state: dict[str, Any], request: str = "") -> None:
+    async def _next_beat(self, lang: str, state: dict[str, Any], request: str = "", in_battle: bool = False) -> None:
         t0 = time.perf_counter()
+        self.last_pulse_t = self.clock()
         prompt = DIRECTOR_PROMPT.format(world=WORLD, lang_name=LANG_NAMES.get(lang, lang), war=self.war.brief(),
-                                        arc=self.arc, arc_text=self.arc_text(),
                                         mood=self.mood or "not yet set: the patrol has just begun",
                                         bonds="; ".join(self.bonds_lines()) or "(nothing yet: a new ship, a new crew, a new captain)",
+                                        threads="; ".join(self.threads) or "(none yet)",
                                         captain_style=self.captain_style() or "(no fights yet)",
                                         campaign="\n".join(f"- {c}" for c in self.campaign) or "- (the war has just begun)",
+                                        pulse=self.pulse_facts(state),
                                         state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
         beat: dict[str, Any] = {}
         speech: list[str] = []
@@ -409,6 +560,8 @@ class Director:
 
         ask = "Decide the next beat now."
         tools = [BEAT_TOOL, WAR_NEWS, TRANSMIT]
+        if in_battle:
+            ask = BATTLE_ASK.format(minutes=((self.clock() - self.fight_since) / 60) if self.fight_since is not None else 0.0)
         if request:
             # game master mode: the player's wish, made to fit the world
             ask = (f"The player — the Captain, speaking to you, the director, out of character — asks: \"{request}\". The "
@@ -419,11 +572,8 @@ class Director:
                    f"in {LANG_NAMES.get(lang, lang)}, as a game master would (what you are setting up, without spoiling "
                    "surprises); then the beat.")
             tools = tools + [NARRATE]
-        comp = await self.llm.chat(model=MODEL, messages=[{"role": "system", "content": prompt},
-                                                          {"role": "user", "content": ask}],
-                                   tools=tools, tool_choice="auto", providers=PROVIDERS,
-                                   reasoning={"enabled": False}, max_tokens=1300 if request else 900, temperature=0.8, on_tool_call=on_call,
-                                   allow_fallbacks=True)
+        comp = await models.chat(self.llm, "director", messages=[{"role": "system", "content": prompt}, {"role": "user", "content": ask}],
+                                 tools=tools, tool_choice="auto", on_tool_call=on_call, max_tokens=1300 if request else 900)
         for n in news:   # the war elsewhere moves first: the beat may follow from it
             changed = self.war.update(n.get("system", ""), n.get("owner"), n.get("threat"), n["text"])
             self.war.add_news(n["text"])
@@ -454,18 +604,25 @@ class Director:
             self.mood = mood[:400]
             log.info("crew mood: %s", self.mood)
             self.save()
-        try:
-            act = int(beat.pop("act", self.act) or self.act)
-        except (TypeError, ValueError):
-            act = self.act
-        if act > self.act and act <= 3:
-            self.act, self.act_beats = act, 0
-            self.note(f"ACT {'I' * act if act < 3 else 'III'} of arc {self.arc} begins: {beat.get('why', '')}")
-            log.info("act %d begins", act)
-        self.act_beats += 1
-        if beat.get("type") == "decisive":
+        threads = beat.pop("threads", None)
+        if isinstance(threads, list):
+            self.threads = [str(t).strip()[:160] for t in threads if str(t).strip()][:5]
+            log.info("war threads: %s", self.threads)
+            self.save()
+        kind = str(beat.get("type", ""))
+        self.beat_log.append((self.clock(), kind, str(beat.get("why", ""))))
+        if in_battle and kind not in IN_BATTLE_BEATS:
+            self.note(f"(a {kind} was not played: the guns are firing)")
+            log.info("director: a %s during a fight is not played", kind)
+            return
+        if kind == "none":
+            self.note(f"the war ran on: {beat.get('why', '')}")
+            return
+        if kind == "negotiation":
+            return await self._negotiation(beat)
+        if kind == "decisive":
             return await self._decisive(beat, lang, state, t0)
-        if beat.get("type") == "transit":
+        if kind == "transit":
             dest = self.war.find(beat.get("system_name", ""))
             if not dest or not self.war.linked(self.war.current, dest):
                 self.note(f"(a transit to {beat.get('system_name')} was impossible: the gate in {self.war.current} "
@@ -492,14 +649,42 @@ class Director:
                                       "mission": cmd.get("orders") or beat.get("why", "")})
             self.voice_i += 1
             self.note(f"{cmd['name']} ({cmd.get('rank', '')}) leads it, aboard {first.get('name', '?')} ({leader_id})")
+        if kind == "reinforcements":
+            self._register_captains(ids, beat.get("ships") or [])
         if not speech and beat.get("type") in ("transit", "raid", "distress", "reinforcements", "investigate"):
             speech = await self._brief_line(beat, res.get("detail", ""), lang, state)
         for line in speech[:2]:
             await self.say("admiral", line, lang, "measured")
             self.note(f"Rourke to the Aquila: {line}")
 
+    def _register_captains(self, ids: list[str], ships: list[dict[str, Any]]) -> None:
+        """The ASTRA ships that arrive have captains the story invented: from now on each has a mind and a voice (war_minds.py)."""
+        if self.war_minds is None:
+            return
+        for cid, ship in zip(ids, ships):
+            cap = ship.get("captain") if isinstance(ship, dict) else None
+            if not isinstance(cap, dict) or not cap.get("name"):
+                continue                                           # (no captain given: the war minds draw one from their pool when the ship is in a group)
+            g = "f" if str(cap.get("gender", "m")).lower().startswith("f") else "m"
+            voices = ALLY_VOICES[g]
+            voice = voices[self.ally_voice_i[g] % len(voices)]
+            self.ally_voice_i[g] += 1
+            self.war_minds.register_ally(cid, {"name": cap["name"], "rank": cap.get("rank", "Captain"), "bio": cap.get("bio", ""), "gender": g, "voice": voice,
+                                               "ship": f"the {ship.get('class', 'warship')} ASN {str(ship.get('name', '')).replace('ASN ', '')}".strip(),
+                                               "precedence": 5})
+            self.note(f"{cap['name']} ({cap.get('rank', '')}) commands the ASN {str(ship.get('name', '?')).replace('ASN ', '')} ({cid})")
+
+    async def _negotiation(self, beat: dict[str, Any]) -> None:
+        """A Mandate commander on the plot calls the Aquila to talk: the channel opens from his side and he says his piece (the server, the commander's mind)."""
+        caller, terms = str(beat.get("caller") or "").upper(), str(beat.get("terms") or beat.get("why") or "").strip()
+        if self.negotiate is None or not caller or not terms:
+            self.note("(a negotiation could not begin: no caller or no terms)")
+            return
+        ok = await self.negotiate(caller, terms)
+        self.note(f"negotiation: {caller} calls the Aquila — {terms}" if ok else f"(a negotiation could not begin: {caller} is not there to call)")
+
     async def _decisive(self, beat: dict[str, Any], lang: str, state: dict[str, Any], t0: float) -> None:
-        """The battle the arc was building to: the allies join the Aquila, then the Mandate's main fleet comes."""
+        """The battle the war was building to: the allies join the Aquila, then the Mandate's main fleet comes."""
         on_plot = {str(c.get("name") or "").lower() for c in (state or {}).get("contacts", []) or []}
         allies = [a for a in (beat.get("allies") or []) if not any(str(a.get("name", "")).lower() in n for n in on_plot if n)]
         if allies:
@@ -507,6 +692,8 @@ class Director:
                                                                  "bearing_deg": (float(beat.get("bearing_deg", 90)) + 180) % 360,
                                                                  "range_km": 12, "why": "the fleet gathers for the decisive battle"}})
             log.info("decisive: allies -> %s", res)
+            if res.get("ok"):
+                self._register_captains(_ids(res.get("detail", "")), allies[:3])
         raid = {k: v for k, v in beat.items() if k not in ("why", "commander", "allies")}
         try:
             rng = float(beat.get("range_km", 40))
@@ -519,7 +706,7 @@ class Director:
             self.note(f"(the decisive battle could not begin: {res.get('detail')})")
             return
         self.decisive = True
-        self.note(f"THE DECISIVE BATTLE of arc {self.arc}: {beat.get('why', '')} ({res.get('detail', '')})")
+        self.note(f"THE DECISIVE BATTLE of chapter {self.arc}: {beat.get('why', '')} ({res.get('detail', '')})")
         cmd = beat.get("commander") or {}
         ids = _ids(res.get("detail", ""))
         if ids and cmd.get("name"):
@@ -535,24 +722,24 @@ class Director:
             self.note(f"Rourke to the Aquila: {line}")
 
     async def _end_arc(self, result: str, lang: str, state: dict[str, Any]) -> None:
-        """The decisive battle is over: the arc's ending is told, then a new arc begins."""
+        """The decisive battle is over: the chapter's ending is told, then the war goes on into a new one."""
         self.busy = True
         try:
             await asyncio.sleep(16.0)                   # the bridge reports the outcome first
             await self.finale.run(self, result.split(":", 1)[-1].strip(), lang)
-            self.arc, self.act, self.act_beats = self.arc + 1, 1, 0
+            self.arc += 1
             self.save()
             await asyncio.sleep(20.0)
             await self._next_beat(lang, state)
         except Exception:  # noqa: BLE001
-            log.exception("the arc's ending failed")
+            log.exception("the chapter's ending failed")
         finally:
             self.busy = False
 
     async def _brief_line(self, beat: dict[str, Any], detail: str, lang: str, state: dict[str, Any]) -> list[str]:
         """The director forgot Rourke's briefing: he gives it now (one short transmission)."""
         prompt = ADMIRAL_PROMPT.format(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
-                                       captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False),
+                                       captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False), allies=self._allies_line(),
                                        campaign="\n".join(f"- {c}" for c in self.campaign[-8:]),
                                        state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
         ask = (f"You are calling the Aquila now to brief her captain on this: {beat.get('type')} — {beat.get('why', '')} "
@@ -564,18 +751,26 @@ class Director:
             if call.name == "transmit" and len((a.get("text") or "").strip()) >= 4 and not lines:
                 lines.append(a["text"].strip())
 
-        comp = await self.llm.chat(model=MODEL, messages=[{"role": "system", "content": prompt}, {"role": "user", "content": ask}],
-                                   tools=[TRANSMIT], tool_choice="auto", providers=PROVIDERS, reasoning={"enabled": False},
-                                   max_tokens=300, temperature=0.6, on_tool_call=on_call, allow_fallbacks=True)
-        if not lines and comp.content.strip() and not comp.error:
-            lines.append(comp.content.strip())
+        msgs = [{"role": "system", "content": prompt}, {"role": "user", "content": ask}]
+        comp = await models.chat(self.llm, "director", messages=msgs, tools=[TRANSMIT], tool_choice="auto", on_tool_call=on_call, max_tokens=300,
+                                 temperature=0.6)
+        if not lines and comp.content.strip() and not comp.error and not comp.tool_calls:
+            # he wrote the briefing instead of transmitting it: what he wrote is not said (only `transmit` is speech); he is asked once more
+            await models.chat(self.llm, "director", messages=msgs + [{"role": "assistant", "content": comp.content.strip()},
+                                                                      {"role": "user", "content": "[What you wrote was not transmitted. Transmit the briefing now, with `transmit`.]"}],
+                              tools=[TRANSMIT], tool_choice="auto", on_tool_call=on_call, max_tokens=300, temperature=0.6)
         return lines
 
     # ------------------------------------------------------------------------------------------- the fleet net
+    def _allies_line(self) -> str:
+        """Who else is on the fleet net: the captains of the ships in company (war_minds.py knows them)."""
+        wm = self.war_minds
+        return wm.allies_line() if wm is not None else "the captains of the ships in company"
+
     async def admiral_reply(self, message: str, lang: str, state: dict[str, Any]) -> list[str]:
-        """The Aquila hailed the fleet: Rourke answers (and may send help)."""
+        """The Aquila spoke on the fleet net: Rourke answers what is for Fleet command (and may send help); words for a ship's captain are theirs."""
         prompt = ADMIRAL_PROMPT.format(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
-                                       captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False),
+                                       captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False), allies=self._allies_line(),
                                        campaign="\n".join(f"- {c}" for c in self.campaign[-12:]) or "- (the war has just begun)",
                                        state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
         msgs = [{"role": "system", "content": prompt}] + self.admiral_history[-10:] + [
@@ -591,21 +786,20 @@ class Director:
                 self.granted = True
                 kind = a.get("kind", "resupply")
                 beat = {"type": kind, "delay_s": a.get("delay_s", 150), "granted": True}
+                ships: list[dict[str, Any]] = []
                 if kind == "reinforcements":
-                    ships = a.get("ships") or [{"class": "vigilant", "name": "ASN Resolute"}]
-                    beat.update(ships=ships[:2], bearing_deg=(state.get("heading_deg", 0) + 180) % 360, range_km=20)
+                    ships = (a.get("ships") or [{"class": "vigilant", "name": "ASN Resolute"}])[:2]
+                    beat.update(ships=ships, bearing_deg=(state.get("heading_deg", 0) + 180) % 360, range_km=20)
                 else:
                     beat.update(hull_pct=85, missiles=24, duration_s=150)
                 res = await self.command("director_beat", {"beat": beat})
                 self.note(f"Rourke granted {kind}: {res.get('detail', '')}")
                 log.info("admiral grants %s -> %s", kind, res)
+                if res.get("ok") and ships:
+                    self._register_captains(_ids(res.get("detail", "")), ships)
 
-        comp = await self.llm.chat(model=MODEL, messages=msgs, tools=[TRANSMIT, GRANT], tool_choice="auto", providers=PROVIDERS,
-                                   reasoning={"enabled": False}, max_tokens=400, temperature=0.6, on_tool_call=on_call,
-                                   allow_fallbacks=True)
-        if not lines and comp.content.strip() and not comp.error:
-            lines.append(comp.content.strip())
-            await self.say("admiral", lines[0], lang, "measured")
+        await models.chat(self.llm, "director", messages=msgs, tools=[TRANSMIT, GRANT], tool_choice="auto", on_tool_call=on_call, max_tokens=400,
+                          temperature=0.6)
         self.admiral_history += [{"role": "user", "content": f"[The Aquila on the fleet net]: {message}"},
                                  {"role": "assistant", "content": " ".join(lines) or "(no answer)"}]
         for line in lines:

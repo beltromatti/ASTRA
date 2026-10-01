@@ -28,8 +28,13 @@ BLAST_W, BLAST_H = 2.0, 2.5    # the section blast door (2.0 wide: its two leave
 HATCH_W, HATCH_H = 1.0, 2.0    # a cabin door
 
 # palette cells of the corridor accents (tone -> (ribs/guide, ceiling strip))
+# tone K = the keel's crawlways (Deck 12): a 1.7 m wide, 2.5 m high maintenance tunnel in the same 4 x 4 m slot (the walls are 1.15 m thick: pipes, frames; the hatch of a room is a
+# short tunnel through them)
+CRAWL_HW, CRAWL_H = 0.85, 2.5
+TONE_DIMS = {"S": (1.55, 3.4), "P": (1.55, 3.4), "K": (CRAWL_HW, CRAWL_H)}                    # tone -> (half of the clear width, clear height)
 TONES = {"S": {"accent": "command", "accent_dim": "command_dim", "strip": "white_cool"},        # the spine
-         "P": {"accent": "engineering", "accent_dim": "engineering_dim", "strip": "white_warm"}}   # the passages
+         "P": {"accent": "engineering", "accent_dim": "engineering_dim", "strip": "white_warm"},   # the passages
+         "K": {"accent": "engineering", "accent_dim": "engineering_dim", "strip": "white_warm"}}   # the keel's crawlways
 
 # ------------------------------------------------------------------------------------------------ corridor modules
 # name suffix -> (left wall, right wall, aft end, fwd end); left = port (-y) when facing forward (+x), right = starboard.

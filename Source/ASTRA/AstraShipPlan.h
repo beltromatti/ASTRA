@@ -34,6 +34,34 @@ struct FAstraPlanCompartment
 	FString Id, Name, Kind, Section;
 	int32 Deck = 0;
 	FBox Box = FBox(ForceInit);          // world cm
+	int32 Plane = 0;                     // the deck whose floor plane it stands on (an existing room's signage may say another deck)
+	FName Passage;                       // a corridor's run (SPF, SBP, PP ... or a cross link's own): sections of one run are one straight view
+	bool bBuilt = false;                 // modelled in the level: status "built" or "existing"
+	bool bExisting = false;              // one of the rooms the level already held (bridge, Mess Hall, Berthing, Medbay, Engineering, Flight Deck ...)
+	int32 FirstLamp = 0, NumLamps = 0;   // its lamps: a slice of UAstraShipPlan::GetLamps() (only the built ones have any)
+};
+
+/** A lamp of a built compartment: the plan's lights[]. The level has none of them as actors: the lamp pool (AstraLampPool.*) makes a handful
+ *  of real lights out of the ones near the Captain. */
+struct FAstraPlanLamp
+{
+	FVector Pos = FVector::ZeroVector;           // world cm
+	FVector2D SizeCm = FVector2D(100.0, 30.0);   // the lit rectangle: along X, along Y
+	float Lumens = 0.f;                          // as rated in the plan (for a dim ship: the pool applies its gain)
+	float TempK = 5000.f;
+	float RadiusCm = 1000.f;
+	int32 Comp = INDEX_NONE;
+	bool bRect = true;                           // else a point
+	bool bShadows = false;
+};
+
+/** Where the Captain can walk to from a compartment: along a corridor into the next section (open all the way), or through a room's doorway (a door he
+ *  sees through only when it opens for him, a few metres from it: the lamp pool lights a room behind a door only when he is near the door). */
+struct FAstraPlanLink
+{
+	int32 Comp = INDEX_NONE;
+	bool bDoor = false;                  // through a door (not a corridor, not an open blast door)
+	FVector DoorCm = FVector::ZeroVector;   // the door's place (world cm) when bDoor
 };
 
 /** A deck: its floor, its sections along the ship and how wide it is where (the hull's envelope less the wall). */
@@ -92,6 +120,19 @@ public:
 	int32 NumEdges() const { return Edges.Num(); }
 	const FAstraPlanNode* Node(int32 I) const { return Nodes.IsValidIndex(I) ? &Nodes[I] : nullptr; }
 
+	// ---- for the lamp pool and the deck streaming (docs/NAVE.md §7bis)
+	const TArray<FAstraPlanCompartment>& GetCompartments() const { EnsureLoaded(); return Comps; }
+	const TArray<FAstraPlanLamp>& GetLamps() const { EnsureLoaded(); return Lamps; }
+	/** The index in GetCompartments() of the smallest compartment containing a point (world cm), or INDEX_NONE. */
+	int32 CompartmentIndexAt(const FVector& Cm) const;
+	/** The compartments next to a compartment by an open way: a corridor into the next section (cost 0) or a room's doorway (a few metres of cost). */
+	const TArray<FAstraPlanLink>& CompLinks(int32 Comp) const;
+	/** The decks a deck is joined to by a stair column (the flights between two towers): where the Captain can walk to from it. */
+	TArray<int32> StairNeighbours(int32 Deck) const;
+	/** The deck a point belongs to as far as loading goes: the floor plane of an existing room it stands in (the Flight Deck's volume crosses six
+	 *  decks), else DeckAt. */
+	int32 DeckOfPoint(const FVector& Cm) const;
+
 private:
 	mutable bool bTried = false;
 	mutable TArray<FAstraPlanNode> Nodes;
@@ -101,6 +142,9 @@ private:
 	mutable TArray<FAstraPlanDoor> Doors;
 	mutable TArray<FAstraPlanDeck> Decks;
 	mutable TMap<FString, int32> DoorIndex;
+	mutable TArray<FAstraPlanLamp> Lamps;
+	mutable TArray<TArray<FAstraPlanLink>> Links;   // compartment -> its open neighbours
+	mutable TArray<TPair<int32, int32>> StairLinks; // deck pairs joined by a stair edge
 
 	bool Load() const;
 	float EdgeCost(const FAstraPlanEdge& E, bool bKeys, bool bThroughSealed = false) const;   // metres of walking it is worth; < 0: impassable

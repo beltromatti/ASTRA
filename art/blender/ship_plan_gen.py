@@ -65,9 +65,6 @@ def existing(B: Builder) -> None:
     q = ex["quarters"]
     add("quarters", "Captain's Quarters", 1, 1, "A", "quarters", [q["box"][0], q["box"][1], q["box"][2], q["box"][3]], (q["box"][4], q["box"][5]),
         q["entrance"], "command", ["power_bus", "life_support"], [], data="aquila_quarters.json")
-    B.comp("ready_room", 1, "ready_room", "Ready Room", [-20.2, -2.0, -9.0, 2.0], (0.0, 3.0), section="A", dept="command", status="planned",
-           systems=["power_bus"], stations=[], prefab=None, note="the Captain's ready room: the block between the two corridors of Deck 1 (canon, docs/BIBBIA.md "
-           "§6); its door will be cut in the port corridor's inner wall (SM_COR panel) when Deck 1 is finished", plane=1)
     # ---- Deck 3 label / Deck 4 plane: Crew Berthing
     e = ex["berths"]
     aw = [{"id": f"berths.{a['station']}", "role": "crew", "kind": "sit", "pos": [rnd(e["box"][2] - 0.3 + a["seat"][0]), rnd(a["seat"][1]), rnd(-46.0)],
@@ -106,7 +103,7 @@ def existing(B: Builder) -> None:
         note="floor z -72.8 (the launch tubes open into the bow mouths); the volume 20 m tall crosses the planes of Decks 6-11 at x 60..218, |y| < 29")
 
 
-BUILT_DECKS = (4, 6)    # the decks with meshes: Deck 4 by hand (ship_deck4.py), the others from their programme (ship_decks.plan_deck(coarse=False))
+BUILT_DECKS = (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)    # the decks with meshes: Deck 4 by hand (ship_deck4.py), the others from their programme (ship_decks.plan_deck(coarse=False))
 
 PROGRAMME = {   # docs/BIBBIA.md §6: the twelve decks
     1: "Bridge, Captain's quarters, ready room, command corridors",
@@ -205,6 +202,9 @@ def existing_graph(B: Builder, decks: dict) -> None:
                dept=rec["dept"], systems=["power_bus", "life_support"], note="the corridor's end and the room's door meet here: the passage's last bay, "
                "finished with the room's deck")
         B.node(f"{lid}.hub", deck, (lo + hi) / 2, 0.0, seg["z"][0], "corridor", lid)
+        if seg["status"] == "built" and abs(hi - lo) < 3.95:                       # a built deck: a stub of corridor fills the gap (its length is the gap's)
+            B.place(deck, f"SM_SHIP_{seg.get('tone', 'S')}_Stub{int(round(abs(hi - lo) * 100))}", (min(lo, hi), 0.0, seg["z"][0]), 0.0,
+                    f"Interior/Deck{deck:02d}/Corridors/Stubs", f"d{deck}_{cid}_stub", "module", passage=seg.get("passage"), suffix="Stub")
         B.link(best["id"], f"{lid}.hub", "walk", width=3.1)
         B.link(f"{lid}.hub", f"{cid}.in", "door", door=door["id"], width=door["width"])
         door["b"] = lid
@@ -213,7 +213,7 @@ def existing_graph(B: Builder, decks: dict) -> None:
 
 
 def deck1_graph(B: Builder) -> None:
-    """The bridge complex: bridge, its two corridors, the lift housing, the Captain's quarters, the ready room (planned)."""
+    """The bridge complex: bridge, its two corridors, the lift housing, the Captain's quarters, the ready room (ship_deck1.py)."""
     bridge = B.comps["bridge"]
     B.node("bridge.hub", 1, 0.0, 0.0, 0.0, "room", "bridge")
     for st in bridge["stations"]:
@@ -229,7 +229,8 @@ def deck1_graph(B: Builder) -> None:
         B.node(f"{cid}.n0", 1, -10.0, d["pos"][1], 0.0, "corridor", cid)
         B.node(f"{cid}.n1", 1, -18.0, d["pos"][1], 0.0, "corridor", cid)
         B.link("bridge.hub", f"{cid}.n0", "door", door=did, width=d["width"])
-        B.link(f"{cid}.n0", f"{cid}.n1", "walk", width=3.2)
+        if cid != "corridor_1a_port":                              # the port corridor's is split at the ready room's door (ship_deck1.py)
+            B.link(f"{cid}.n0", f"{cid}.n1", "walk", width=3.2)
     B.node("lift.bridge", 1, -18.6, -3.9, 0.2, "lift", "lift_housing_bridge")
     B.link("corridor_1a_port.n1", "lift.bridge", "walk", width=3.2)
     # the lift housing at the port corridor's end
@@ -244,13 +245,8 @@ def deck1_graph(B: Builder) -> None:
     B.node("quarters.hub", 1, qd["world_origin"][0] - 4.3, qd["world_origin"][1], 0.0, "room", "quarters")
     B.link("corridor_1a_starboard.n1", "quarters.in", "door", door="quarters_door", width=qd["door"]["width"])
     B.link("quarters.in", "quarters.hub", "walk", width=2.0)
-    B.node("ready_room.in", 1, -14.6, -1.5, 0.0, "door_in", "ready_room")
-    B.node("ready_room.hub", 1, -14.6, 0.0, 0.0, "room", "ready_room")
-    B.door("ready_room_door", 1, (-14.6, -2.3, 0.0), 90.0, 1.6, 2.4, "corridor_1a_port", "ready_room", kind="sliding", planned=True)
-    B.comps["ready_room"]["doors"].append("ready_room_door")
-    B.comps["corridor_1a_port"]["doors"].append("ready_room_door")
-    B.link("corridor_1a_port.n0", "ready_room.in", "door", door="ready_room_door", width=1.6)
-    B.link("ready_room.in", "ready_room.hub", "walk", width=1.5)
+    import ship_deck1 as D1
+    D1.build(B)                                                    # the ready room, its door and its joint with the port corridor
 
 
 def lift_network(B: Builder) -> dict:
@@ -336,16 +332,20 @@ def systems_table(B: Builder) -> dict:
     return {k: {"name": names.get(k, k), "compartments": v} for k, v in sorted(hosts.items())}
 
 
-def spine_shuttle() -> dict:
-    """The Spine's internal shuttle (docs/BIBBIA.md §6: "the central corridor along the ship with the internal shuttle"): reserved on Deck 5
-    (Science & Transport), a car on the centre line of the Spine from the forward end of the deck to the stern with a stop in every section.
-    Planned only: the plan's Deck 5 is a coarse deck; the car and its rails are not built."""
+def spine_shuttle(B: Builder) -> dict:
+    """The Spine's internal shuttle (docs/BIBBIA.md §6: "the central corridor along the ship with the internal shuttle"): on Deck 5 (Science & Transport) a line parallel to the Spine
+    with a stop in every section but F. The stops are built: a platform hall off the Spine (the prefab `shuttle_stop`, pinned at a fixed place of the section, ship_decks.PINNED) with a car
+    standing at its platform. The line itself is not modelled: there is no moving car and no `shuttle` edge in the graph (a route-finder that wants to ride it needs both)."""
     d = 5
     env = P.envelope(d)
-    stops = [{"section": letter, "x": rnd((x0 + x1) / 2)} for (letter, x0, x1) in P.sections(d)]
+    stops = []
+    for c in sorted((c for c in B.comps.values() if c.get("prefab") == "shuttle_stop" and c["deck"] == d), key=lambda c: -c["bounds"][0]):
+        stops.append({"section": c["section"], "x": rnd((c["bounds"][0] + c["bounds"][2]) / 2), "room": c["id"], "node": f"{c['id']}.hub"})
     return {"id": "spine_shuttle", "kind": "shuttle", "name": "Spine Shuttle", "deck": d, "y": 0.0, "z": P.deck_z(d)[0],
-            "x_fwd": env["x_fwd"], "x_aft": env["x_aft"], "stops": stops, "status": "planned",
-            "note": "a car on the centre line of Deck 5's Spine; the crew boards it at a section stop (route-finder: a 'shuttle' edge between stops, not modelled yet)"}
+            "x_fwd": env["x_fwd"], "x_aft": env["x_aft"], "stops": stops, "status": "stops built",
+            "note": "a line parallel to Deck 5's Spine with a platform hall in every section but F (the Spine's pieces between the halls of the decks above and below are 24 to 304 m "
+                    "long: the line passes under the halls, and Section F's only free 20 m of Spine are too short for a stop); each stop has a car standing at its platform; no "
+                    "moving car and no 'shuttle' edge in the graph yet"}
 
 
 def build_plan(only_decks: bool = False) -> dict:
@@ -374,7 +374,7 @@ def build_plan(only_decks: bool = False) -> dict:
     plan["compartments"] = list(B.comps.values())
     plan["doors"] = list(B.doors.values())
     plan["vertical"] = [lift] + stairs
-    plan["transit"] = [spine_shuttle()]
+    plan["transit"] = [spine_shuttle(B)]
     plan["graph"] = {"nodes": list(B.nodes.values()), "edges": B.edges}
     plan["systems"] = systems_table(B)
     plan["placements"] = {str(d): v for d, v in B.placements.items() if v}

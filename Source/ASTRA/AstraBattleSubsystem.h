@@ -843,11 +843,11 @@ private:
 	// --- bench scenarios (AstraWarScenario.cpp)
 	bool bSandbox = false;              // no Aquila, no script: a scenario of the bench is running
 	void ProcessWarCommands();
-	void SandboxReset();
+	void SandboxReset(bool bKeepAquila = false);
 	int32 SpawnByKey(FName Key, EAstraSide Side, const FString& Contact, const FString& Name, const FVector& Pos, float HeadingDeg);
 	/** A flight group aboard a carrier (kind 0 fighter, 1 bomber, 2 drone), launching after Delay seconds; its index. */
 	int32 AddWing(int32 CarrierIdx, int32 Kind, int32 Count, const FString& Mission, float Delay);
-	bool LoadScenario(const FString& Name, FString& OutDetail);
+	bool LoadScenario(const FString& Name, FString& OutDetail, bool bWithAquila = false);
 
 	// --- the physical model (AstraWarDamage.cpp)
 	void InitShipModel(FAstraBattleShip& S);
