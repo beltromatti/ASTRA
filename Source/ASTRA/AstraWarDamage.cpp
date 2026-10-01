@@ -15,6 +15,7 @@
 
 #include "AstraBattleSubsystem.h"
 #include "AstraWarClasses.h"
+#include "AstraWarFX.h"
 #include "ASTRA.h"
 #include "AstraShipSubsystem.h"
 #include "Engine/World.h"
@@ -544,10 +545,30 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 	}
 	// --- what it looks like
 	const float Felt = StructTook + 0.25f * PlateTook;            // what the hull feels of it (the crew's incidents, the scars, the shudder)
-	AddFlash(HitPos, Felt > 10.f ? 45.f : 25.f, 0.8f, ShieldTook > 0.f && Rem < Damage * 0.5f ? FLinearColor(0.6f, 0.8f, 1.f) : FLinearColor(1.f, 0.6f, 0.3f), 80.f);
-	if (Felt > 8.f)
+	if (FxOn())
 	{
-		AddScar(To, HitPos, Felt);             // the plating remembers it
+		FAstraFxHit H;                                              // the war's effects: the shield's ripple, the flash and sparks, the scar
+		H.Pos = HitPos;
+		H.Dir = FromDir.GetSafeNormal();
+		H.Kind = Kind;
+		H.Damage = Damage;
+		H.ShieldTook = ShieldTook;
+		H.Through = Damage - ShieldTook;
+		H.Felt = Felt;
+		H.Facing = F;
+		H.Section = Sec;
+		H.LocalOut = N;
+		H.SectorFrac = D.SectorMax[F] > 0.f ? D.Sector[F] / D.SectorMax[F] : 0.f;
+		H.bSectorFell = ShieldTook > 0.f && D.Sector[F] <= 0.f;
+		WarFX->OnHit(To, H);
+	}
+	else
+	{
+		AddFlash(HitPos, Felt > 10.f ? 45.f : 25.f, 0.8f, ShieldTook > 0.f && Rem < Damage * 0.5f ? FLinearColor(0.6f, 0.8f, 1.f) : FLinearColor(1.f, 0.6f, 0.3f), 80.f);
+		if (Felt > 8.f)
+		{
+			AddScar(To, HitPos, Felt);             // the plating remembers it
+		}
 	}
 	if (To.bPlayer)
 	{
@@ -774,6 +795,10 @@ void UAstraBattleSubsystem::DisableShip(FAstraBattleShip& S, const TCHAR* Why)
 	const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
 	S.bDisabled = true;
 	S.DeathHow = EAstraFate::Disabled;
+	if (FxOn())
+	{
+		WarFX->OnShipDisabled(S);                 // the lights go out, a last discharge of sparks (AstraWarFX.cpp)
+	}
 	if (!S.bCraft && !S.bGhost)
 	{
 		NoteGroupLoss(S, *FString::Printf(TEXT("disabled, %s"), Why));

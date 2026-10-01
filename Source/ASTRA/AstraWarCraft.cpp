@@ -11,6 +11,7 @@
 //   return       a craft that is hurt, or empty, goes home; a hangar that cannot take it leaves it circling.
 
 #include "AstraBattleSubsystem.h"
+#include "AstraWarFX.h"
 #include "AstraWarClasses.h"
 #include "AstraWarAI.h"
 #include "ASTRA.h"
@@ -731,7 +732,7 @@ void UAstraBattleSubsystem::FireCraft(FAstraBattleShip& S, float Dt)
 				{
 					S.GunHeat = 0.25f;
 					const float Pk = (float)(0.55 * FMath::Pow(1.0 - D / 950.0, 0.8) * FMath::Clamp((C2 - 0.985) / 0.014, 0.0, 1.0) + 0.05);
-					AddBeam(S.Pos, S.Pos + LeadDir * FMath::Min(D, 950.0), 0.06f, S.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.55f, 0.3f) : FLinearColor(0.6f, 0.85f, 1.f));
+					AddBeam(S.Pos, S.Pos + LeadDir * FMath::Min(D, 950.0), 0.06f, S.Side == EAstraSide::Mandate ? FLinearColor(1.f, 0.55f, 0.3f) : FLinearColor(0.6f, 0.85f, 1.f), EAstraFxShot::Cannon);
 					if (FMath::FRand() < Pk)
 					{
 						ApplyHit(*B, Dir, B->bPiloted ? 7.f : 22.f, B->Pos, EAstraHitKind::Cannon, S.Id);
@@ -780,7 +781,7 @@ void UAstraBattleSubsystem::FireCraft(FAstraBattleShip& S, float Dt)
 					S.GunHeat = 0.5f;
 					FVector Strike = B->Pos - Dir * B->Radius;
 					HullSweep(*B, S.Pos, B->Pos + Dir * (double)B->Radius, Strike);       // (where its burst enters the hull)
-					AddBeam(S.Pos, Strike, 0.08f, FLinearColor(0.6f, 0.85f, 1.f));
+					AddBeam(S.Pos, Strike, 0.08f, FLinearColor(0.6f, 0.85f, 1.f), EAstraFxShot::Cannon);
 					ApplyHit(*B, Dir, S.CraftKind == 2 ? 1.f : 3.f, Strike, EAstraHitKind::Cannon, S.Id);
 				}
 			}
@@ -808,7 +809,7 @@ void UAstraBattleSubsystem::FireCraft(FAstraBattleShip& S, float Dt)
 		if (Best)
 		{
 			S.GunHeat = 0.4f;
-			AddBeam(S.Pos, Best->Pos, 0.08f, FLinearColor(0.6f, 0.85f, 1.f));
+			AddBeam(S.Pos, Best->Pos, 0.08f, FLinearColor(0.6f, 0.85f, 1.f), EAstraFxShot::Cannon);
 			if (FMath::FRand() < (S.CraftKind == 0 ? 0.35f : 0.15f))
 			{
 				Best->bDead = true;
@@ -816,7 +817,7 @@ void UAstraBattleSubsystem::FireCraft(FAstraBattleShip& S, float Dt)
 				{
 					++Stats.MissilesShot[Best->OwnerSide];
 				}
-				AddFlash(Best->Pos, 20.f, 0.5f, FLinearColor(1.f, 0.7f, 0.35f), 50.f);
+				AddFlash(Best->Pos, 20.f, 0.5f, FLinearColor(1.f, 0.7f, 0.35f), 50.f, EAstraFxFlash::Flak);
 			}
 		}
 	}
