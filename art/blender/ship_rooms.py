@@ -16,7 +16,7 @@ import ship_lib as SL
 import ship_furniture as F
 from bridge3_lib import Rz, T, frame
 from ship_catalog import CLEAR_H, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW
-from ship_lib import (COMPOSITE, DECK, DGLASS, GLASS, IVORY, LAMP, LAMP_DIM, LAMP_HOT, RUBBER, STRUCT, TRIM, SParts, SFB)
+from ship_lib import (COMPOSITE, DECK, DGLASS, GLASS, IVORY, LAMP, LAMP_DIM, LAMP_HOT, RUBBER, STEEL, STRUCT, TRIM, SParts, SFB)
 
 WS = 0.20               # structure thickness of a room's own walls
 WF = 0.05               # finish layer
@@ -141,6 +141,7 @@ def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far
     belong to a corridor (a finish layer only, no structure of their own)."""
     L, D, H = spec["L"], spec["D"], spec["h"]
     doors = doors if doors is not None else spec["doors"]
+    b._doors = doors                                                  # (dress_wall keeps clear of them)
     fb, fine, em = b.body, b.fine, b.emit
     rng = random.Random(seed)
     # floor: structure and covering
@@ -275,3 +276,57 @@ def window_wall(b: SParts, wall: str, L: float, D: float, H: float, st: Style, b
                 x += w
         fb.box((0.0, -WF - 0.06, H - 0.06), (sl, 0.0, H), st.trim)                                     # cornice
     return spans
+
+
+# ------------------------------------------------------------------------------------------------------------ NAVE-2: wall and ceiling dressing
+DEFAULT_BAYS = ("plain", "vent", "panelboard", "conduits", "screen", "safety", "hatch", "plain")
+
+
+def dress_wall(b: SParts, wall: str, L: float, D: float, H: float, s0: float, s1: float, seed: int = 1, kinds=None, accent: str = "cyan",
+               accent_dim: str = "cool_dim", bay: float = 2.0, ribs: bool = True, skip=()) -> None:
+    """Layered bays of the corridor's language (panels in brushed frames, vents, breaker panels, conduit bundles, screens, hatches, extinguishers) on a stretch of a
+    room wall (`wall`: near, far, left, right) with a rib every bay: the walls of a working room are never flat. s0..s1 are ROOM coordinates along the wall (x for the near
+    and far walls, y for the left and right ones); a bay that would cover a door of the room (build_shell records them) is left out. `skip`: bay indexes to leave."""
+    import ship_walls as W
+    rng = random.Random(seed * 131 + len(wall))
+    kinds = kinds or DEFAULT_BAYS
+    lo, hi = min(s0, s1), max(s0, s1)
+    # to the wall's own s axis (see wall_matrix): near runs along -x from x = L, right along -y from y = D
+    a0, a1 = (L - hi, L - lo) if wall == "near" else (D - hi, D - lo) if wall == "right" else (lo, hi)
+    n = max(1, int(round((a1 - a0) / bay)))
+    w = (a1 - a0) / n
+    doors = [d for d in getattr(b, "_doors", []) if d["wall"] == wall]
+    spans = [(sa - 0.5, sc + 0.5) for (sa, sc, _h) in door_spans(wall, doors, L, D)]
+    with b.at(wall_matrix(wall, L, D) @ T(0.0, -WF, 0.0)):
+        for k in range(n):
+            a, c = a0 + k * w, a0 + (k + 1) * w
+            clear = not any(a < sc and c > sa for (sa, sc) in spans)
+            if k not in skip and clear:
+                W.bay(b.soft, kinds[(k + seed) % len(kinds)], a + 0.16, c - 0.16, H, rng, accent, accent_dim)
+            if ribs and not any(sa - 0.3 < a < sc + 0.3 for (sa, sc) in spans):
+                W.rib(b.soft, a, 0.0, H - 0.06, accent_dim)
+        if ribs and not any(sa - 0.3 < a1 < sc + 0.3 for (sa, sc) in spans):
+            W.rib(b.soft, a1, 0.0, H - 0.06, accent_dim)
+
+
+def ceiling_services(b: SParts, L: float, D: float, H: float, runs, x0: float = 1.0, x1: float | None = None, seed: int = 1) -> None:
+    """The service run under the ceiling of a working room: `runs` = [(y, kind)] along the room's x, kind duct | pipes | tray. They hang 0.3-0.5 m below the
+    ceiling between the rows of light panels, on brackets every 2 m."""
+    import ship_furniture3 as H3
+    rng = random.Random(seed)
+    x1 = L - 1.0 if x1 is None else x1
+    for y, kind in runs:
+        if kind == "duct":
+            H3.duct_run(b, (x0, y, H - 0.42), (x1, y, H - 0.42), 0.55, 0.36, STEEL if rng.random() < 0.5 else IVORY, 1.4)
+        elif kind == "pipes":
+            H3.pipe_bundle(b, (x0, y, H - 0.30), (x1, y, H - 0.30), 3, 0.05, 0.03, (0, 1, 0), None, 1.8)
+        elif kind == "tray":
+            b.body.box((x0, y - 0.25, H - 0.26), (x1, y + 0.25, H - 0.22), STRUCT)
+            b.body.box((x0, y - 0.25, H - 0.22), (x1, y - 0.22, H - 0.10), STRUCT)
+            b.body.box((x0, y + 0.22, H - 0.22), (x1, y + 0.25, H - 0.10), STRUCT)
+            for k in range(4):
+                b.fine.cyl((x0, y - 0.15 + k * 0.1, H - 0.19), (x1, y - 0.15 + k * 0.1, H - 0.19), 0.016, RUBBER, seg=6)
+        x = x0 + 0.8
+        while x < x1 - 0.3:
+            b.fine.box((x - 0.02, y - 0.3, H - 0.46), (x + 0.02, y + 0.3, H - 0.02), TRIM)
+            x += 2.0

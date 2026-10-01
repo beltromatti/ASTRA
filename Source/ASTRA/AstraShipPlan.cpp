@@ -171,8 +171,51 @@ bool UAstraShipPlan::Load() const
 			O->TryGetStringField(TEXT("kind"), C.Kind);
 			O->TryGetStringField(TEXT("section"), C.Section);
 			C.Deck = (int32)O->GetNumberField(TEXT("deck"));
+			double PlaneNum = 0.0;
+			C.Plane = O->TryGetNumberField(TEXT("plane"), PlaneNum) ? (int32)PlaneNum : C.Deck;
+			FString PassageId;
+			if (O->TryGetStringField(TEXT("passage"), PassageId))
+			{
+				C.Passage = FName(*PassageId);
+			}
+			FString Status;
+			O->TryGetStringField(TEXT("status"), Status);
+			C.bExisting = Status == TEXT("existing");
+			C.bBuilt = C.bExisting || Status == TEXT("built");
 			C.Box = FBox(FVector((*B)[0]->AsNumber(), (*B)[1]->AsNumber(), (*Z)[0]->AsNumber()) * 100.0,
 			             FVector((*B)[2]->AsNumber(), (*B)[3]->AsNumber(), (*Z)[1]->AsNumber()) * 100.0);
+			// the lamps of a modelled compartment (the existing rooms light themselves with their own actors)
+			C.FirstLamp = Lamps.Num();
+			const TArray<TSharedPtr<FJsonValue>>* LampList = nullptr;
+			if (Status == TEXT("built") && O->TryGetArrayField(TEXT("lights"), LampList))
+			{
+				for (const TSharedPtr<FJsonValue>& LV : *LampList)
+				{
+					const TSharedPtr<FJsonObject> LO = LV->AsObject();
+					const TArray<TSharedPtr<FJsonValue>>* LP = nullptr;
+					if (!LO.IsValid() || !LO->TryGetArrayField(TEXT("pos"), LP) || LP->Num() < 3)
+					{
+						continue;
+					}
+					FAstraPlanLamp L;
+					L.Pos = Metres(LP);
+					L.Comp = Comps.Num();
+					FString Type;
+					L.bRect = !LO->TryGetStringField(TEXT("type"), Type) || Type == TEXT("rect");
+					const TArray<TSharedPtr<FJsonValue>>* LS = nullptr;
+					if (LO->TryGetArrayField(TEXT("size"), LS) && LS->Num() >= 2)
+					{
+						L.SizeCm = FVector2D((*LS)[0]->AsNumber() * 100.0, (*LS)[1]->AsNumber() * 100.0);
+					}
+					double Num = 0.0;
+					L.Lumens = LO->TryGetNumberField(TEXT("lumens"), Num) ? (float)Num : 0.f;
+					L.TempK = LO->TryGetNumberField(TEXT("temperature"), Num) ? (float)Num : 5000.f;
+					L.RadiusCm = LO->TryGetNumberField(TEXT("radius"), Num) ? (float)Num : 1000.f;
+					LO->TryGetBoolField(TEXT("shadows"), L.bShadows);
+					Lamps.Add(L);
+				}
+			}
+			C.NumLamps = Lamps.Num() - C.FirstLamp;
 			CompIndex.Add(C.Id, Comps.Add(C));
 		}
 	}
@@ -261,7 +304,106 @@ bool UAstraShipPlan::Load() const
 			Adjacent[E.B].Add(I);
 		}
 	}
+	// who borders whom: the compartments an edge of the graph joins (a corridor into the next 16 m, a room's doorway, a section's blast door), and the
+	// decks a stair edge joins
+	Links.SetNum(Comps.Num());
+	for (const FAstraPlanEdge& E : Edges)
+	{
+		const FAstraPlanNode& NA = Nodes[E.A];
+		const FAstraPlanNode& NB = Nodes[E.B];
+		if (E.Kind == FAstraPlanEdge::EKind::Stair)
+		{
+			if (NA.Deck != NB.Deck)
+			{
+				StairLinks.AddUnique(TPair<int32, int32>(FMath::Min(NA.Deck, NB.Deck), FMath::Max(NA.Deck, NB.Deck)));
+			}
+			continue;
+		}
+		if (E.Kind == FAstraPlanEdge::EKind::Lift || NA.Comp == NB.Comp || NA.Comp == INDEX_NONE || NB.Comp == INDEX_NONE)
+		{
+			continue;
+		}
+		// a doorway into a room hides what lies behind it until it opens; a blast door stands open
+		const bool bDoor = E.Kind == FAstraPlanEdge::EKind::Door && !E.bBlast;
+		const FVector At = Doors.IsValidIndex(E.Door) ? Doors[E.Door].Pos : (NA.Pos + NB.Pos) * 0.5;
+		auto Add = [this, bDoor, &At](int32 From, int32 To)
+		{
+			for (const FAstraPlanLink& L : Links[From])
+			{
+				if (L.Comp == To && L.bDoor == bDoor && (!bDoor || FVector::DistSquared(L.DoorCm, At) < 100.0))
+				{
+					return;
+				}
+			}
+			Links[From].Add({To, bDoor, bDoor ? At : FVector::ZeroVector});
+		};
+		Add(NA.Comp, NB.Comp);
+		Add(NB.Comp, NA.Comp);
+	}
 	return Nodes.Num() > 0;
+}
+
+const TArray<FAstraPlanLink>& UAstraShipPlan::CompLinks(int32 Comp) const
+{
+	static const TArray<FAstraPlanLink> None;
+	EnsureLoaded();
+	return Links.IsValidIndex(Comp) ? Links[Comp] : None;
+}
+
+TArray<int32> UAstraShipPlan::StairNeighbours(int32 Deck) const
+{
+	EnsureLoaded();
+	TArray<int32> Out;
+	for (const TPair<int32, int32>& P : StairLinks)
+	{
+		if (P.Key == Deck)
+		{
+			Out.AddUnique(P.Value);
+		}
+		else if (P.Value == Deck)
+		{
+			Out.AddUnique(P.Key);
+		}
+	}
+	return Out;
+}
+
+int32 UAstraShipPlan::CompartmentIndexAt(const FVector& Cm) const
+{
+	if (!EnsureLoaded())
+	{
+		return INDEX_NONE;
+	}
+	// the smallest compartment containing the point (a room inside a larger space wins over the space)
+	int32 Best = INDEX_NONE;
+	double BestVolume = TNumericLimits<double>::Max();
+	for (int32 i = 0; i < Comps.Num(); ++i)
+	{
+		if (Comps[i].Box.IsInsideOrOn(Cm))
+		{
+			const double V = Comps[i].Box.GetVolume();
+			if (V < BestVolume)
+			{
+				BestVolume = V;
+				Best = i;
+			}
+		}
+	}
+	return Best;
+}
+
+int32 UAstraShipPlan::DeckOfPoint(const FVector& Cm) const
+{
+	if (EnsureLoaded())
+	{
+		const int32 I = CompartmentIndexAt(Cm);
+		// a room stands on a plane of its own (Crew Berthing's door says Deck 3 and its floor is Deck 4's; the Flight Deck's hall reaches Deck 11)
+		if (I != INDEX_NONE && Comps[I].Plane > 0)
+		{
+			return Comps[I].Plane;
+		}
+	}
+	return DeckAt(Cm);
 }
 
 float UAstraShipPlan::EdgeCost(const FAstraPlanEdge& E, bool bKeys) const

@@ -17,7 +17,7 @@ import math
 
 import ship_plan as P
 import ship_spec as SP
-from ship_catalog import BLAST_H, BLAST_W, CLEAR_H, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, WALL_T, module_mesh
+from ship_catalog import BLAST_H, BLAST_W, CLEAR_H, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONE_DIMS, WALL_T, module_mesh
 
 SEG_MODULES = 4                 # a corridor compartment (and its zone light) is 4 modules = 16 m long
 
@@ -151,6 +151,11 @@ class Passage:
         return (a, self.pos) if self.along == "x" else (self.pos, a)
 
 
+# the stair towers' variants by deck: the top of the column (Deck 2: the hall, the well and the roof), the 5.3 m climb of Deck 3 to Deck 2 (the armour deck lies between), the
+# bottom of the column (Deck 12: the well has a floor)
+TOWER_MESH = {2: "SM_SHIP_StairTowerCap", 3: "SM_SHIP_StairTower53", 12: "SM_SHIP_StairTowerBottom"}
+
+
 class Deck:
     """The layout of one built deck. Declare passages, lanes and specials, then call `emit()`."""
 
@@ -204,7 +209,7 @@ class Deck:
         stations = []
         for i, s in enumerate(spec["spots"]):
             w = P.place_local(o3, yaw, s["x"], s["y"])
-            stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0)],
+            stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0 + s.get("dz", 0.0))],
                              "yaw": rnd((s["yaw"] + yaw) % 360.0, 1), "dept": s["dept"]})
         lights = []
         for i, l in enumerate(spec["lights"]):
@@ -372,7 +377,7 @@ class Deck:
         stations = []
         for i, s in enumerate(spec["spots"]):
             w = self.local(r, s["x"], s["y"])
-            stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0)],
+            stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0 + s.get("dz", 0.0))],
                              "yaw": rnd((s["yaw"] + r["yaw"]) % 360.0, 1), "dept": s["dept"]})
         lights = []
         for i, l in enumerate(spec["lights"]):
@@ -394,7 +399,8 @@ class Deck:
                      lane=r["lane"], size=[L, D, spec["h"]], crew_slots=slots)
         r["cid"], r["bounds"] = cid, bounds
         if built:
-            B.place(self.deck, spec["mesh"], (r["origin"][0], r["origin"][1], self.z0), r["yaw"],
+            mesh = TOWER_MESH.get(self.deck, spec["mesh"]) if key == "stair_tower" else spec["mesh"]
+            B.place(self.deck, mesh, (r["origin"][0], r["origin"][1], self.z0), r["yaw"],
                     f"Interior/Deck{self.deck:02d}/Rooms/{rec['section']}", cid, "room", comp=cid)
         for d in spec["doors"]:
             dx = r["opt"].get("door_x", d["x"]) if d["wall"] == "near" else r["opt"].get("far_door_x", d["x"])
@@ -416,6 +422,10 @@ class Deck:
         if not blank:
             ps.side(i, "R" if room_side > 0 else "L", kind)
         did = d.get("id") or (f"{self.tag}_door_{cid[len(self.tag) + 1:]}" + ("_far" if d["wall"] == "far" else ""))
+        if not d.get("id"):                                                  # a room with two doors on one wall (the shuttle bay's): the second is `_2`, the third `_3`
+            base, n = did, 2
+            while did in self.B.doors:
+                did, n = f"{base}_{n}", n + 1
         pos = (xw, y_wall - room_side * WALL_T / 2, self.z0)
         r.setdefault("doors", []).append(dict(id=did, pos=pos, w=d["w"], h=d["h"], pid=pid, i=i, side=room_side, kind=kind, wall=d["wall"], xw=xw,
                                                y_wall=y_wall))
@@ -478,10 +488,11 @@ class Deck:
             along_len = (hi - lo + 1) * MOD
             size = [along_len - 0.6, 0.6] if ps.along == "x" else [0.6, along_len - 0.6]
             temp = 5600.0 if ps.tone == "S" else 3900.0
+            clear = TONE_DIMS[ps.tone][1]
             extra = {} if self.coarse else dict(
                 systems=["power_bus", "life_support", "data_trunk"] if ps.tone == "S" else ["power_bus", "life_support"],
-                lights=[{"id": f"{cid}.l0", "type": "rect", "pos": [rnd(xc), rnd(yc), rnd(self.z0 + 3.28)], "lumens": 3400, "temperature": temp,
-                         "size": size, "radius": 1000.0, "shadows": False}])
+                lights=[{"id": f"{cid}.l0", "type": "rect", "pos": [rnd(xc), rnd(yc), rnd(self.z0 + clear - 0.12)], "lumens": 3400 if ps.tone != "K" else 1500, "temperature": temp,
+                         "size": size if ps.tone != "K" else [size[0], 0.3] if ps.along == "x" else [0.3, size[1]], "radius": 1000.0 if ps.tone != "K" else 600.0, "shadows": False}])
             B.comp(cid, self.deck, "corridor", f"{lname} · Section {sec}", bounds, section=sec, status="planned" if self.coarse else "built",
                    passage=ps.pid, modules=[lo, hi], tone=ps.tone, **extra)
             for i in idxs:
@@ -574,6 +585,8 @@ class Deck:
         return did
 
     def _signs(self, ps: Passage, i: int, bx: float) -> None:
+        if ps.tone == "K":                                                          # a crawlway has no room for a hanging sign: the section is on the plates of the rooms
+            return
         secs = P.sections(self.deck)
         fwd = next((l for (l, x0, x1) in secs if abs(x0 - bx) < 1e-6), None)     # the section whose aft edge is bx
         aft = next((l for (l, x0, x1) in secs if abs(x1 - bx) < 1e-6), None)     # the section that starts at bx and runs aft
@@ -604,14 +617,18 @@ class Deck:
                 if seg in B.comps and rec["id"] not in B.comps[seg]["doors"]:
                     B.comps[seg]["doors"].append(rec["id"])
                 if not self.coarse and d["wall"] == "near" and r["spec"].get("plate"):        # the plate over the door, on the corridor face
-                    y = ps.pos + d["side"] * (HW - 0.06)
+                    hw_c, clear_c = TONE_DIMS[ps.tone]
+                    y = ps.pos + d["side"] * (hw_c - 0.06)
                     z = self.z0 + (2.72 if d["kind"] == "door" else 3.05)
+                    xp = d["xw"]
+                    if ps.tone == "K":                                          # a crawlway has no height over its hatches: the plate hangs beside the hatch, on the wall
+                        z, xp = self.z0 + 1.75, d["xw"] + (1.2 if ps.along == "x" else 0.0)
                     yaw = -90.0 if d["side"] > 0 else 90.0
                     plate = r["spec"]["plate"]
                     if plate == "stairs":                                   # the plate says where the flights go from this deck
                         plate = f"stairs_{self.deck}"
-                    B.place(self.deck, f"SM_SHIP_Plate_{plate}", (d["xw"], y, z), yaw, f"Interior/Deck{self.deck:02d}/Plates",
-                            f"{self.tag}_plate_{r['cid'][len(self.tag) + 1:]}", "plate")
+                    B.place(self.deck, f"SM_SHIP_Plate_{plate}", (xp, y, z), yaw, f"Interior/Deck{self.deck:02d}/Plates",
+                            f"{self.tag}_plate_{r['cid'][len(self.tag) + 1:]}" + (f"_{k + 1}" if k else ""), "plate")
                 nid = f"{r['cid']}.in{k}"                                 # a node just inside the room, behind the door
                 B.node(nid, self.deck, d["xw"], d["y_wall"] + d["side"] * 1.2, self.z0, "door_in", r["cid"])
                 B.link(mod_node, nid, "door", door=d["id"], width=d["w"])
@@ -629,5 +646,5 @@ class Deck:
         for nid in r["door_nodes"]:
             B.link(nid, hub, "walk", width=1.5)
         for st in rec["stations"]:
-            B.node(st["id"], self.deck, st["pos"][0], st["pos"][1], self.z0, "station", cid, role=st["role"], act=st["kind"], yaw=st["yaw"])
+            B.node(st["id"], self.deck, st["pos"][0], st["pos"][1], st["pos"][2], "station", cid, role=st["role"], act=st["kind"], yaw=st["yaw"])
             B.link(hub, st["id"], "walk", width=1.0)

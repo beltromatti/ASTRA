@@ -195,6 +195,15 @@ def check(plan: dict, verbose: bool = True) -> dict:
                           if c["deck"] != d)
             if not allc and inside and not spanned:
                 warnings.append(f"deck {d} section {letter}: no compartment")
+    # ---- 8. the programme: every room of the kit stands somewhere, and what the generator could not place is a problem, not a note -------------------------
+    import ship_spec as SP
+    placed_keys = {c.get("prefab") for c in comps.values() if c.get("status") == "built" and c.get("prefab")}
+    for key, spec in SP.PREFABS.items():
+        if spec.get("mesh") and key not in placed_keys:
+            problems.append(f"programme: the room {key} of the kit stands nowhere in the plan (its programme or its fixed place does not fit)")
+    for n in plan.get("notes", []):
+        if " cannot stand at " in n:
+            problems.append("programme: " + n)
     stats["compartments"] = len(comps)
     stats["doors"] = len(doors)
     stats["nodes"] = len(nodes)

@@ -8,6 +8,7 @@ they reach. Deck 1 is the bridge complex and is registered by ship_plan_gen.exis
 """
 from __future__ import annotations
 
+import math
 import random
 
 import ship_plan as P
@@ -23,34 +24,59 @@ PROGRAMME = {
         "A": ["cic", "briefing", "comms_center", "offices"], "B": ["offices", "records", "point_defense", "briefing", "offices"],
         "C": ["vls_magazine", "sensor_room", "offices", "comms_center"], "D": ["vls_magazine", "point_defense", "sensor_room", "offices"],
         "E": ["barbette", "point_defense", "offices"], "F": ["barbette", "offices", "sensor_room"], "G": ["sensor_room", "offices", "machinery"]},
-    3: {"default": ["staterooms", "staterooms", "offices", "gym"], "A": ["wardroom", "gym", "staterooms"], "B": ["staterooms", "staterooms", "offices"],
-        "C": ["staterooms", "gym", "staterooms"], "H": ["machinery", "staterooms"]},
-    5: {"default": ["lab", "sensor_archive", "lab", "sensor_room"], "A": ["lab", "sensor_archive", "sensor_room"],
-        "B": ["transporter", "lab", "lab", "sensor_archive"], "C": ["lab", "transporter", "sensor_room", "lab"], "D": ["lab", "hydro", "lab", "sensor_archive"],
-        "E": ["radiator_pumps", "machinery", "lab"], "F": ["radiator_pumps", "machinery", "sensor_room"], "G": ["radiator_pumps", "machinery"],
-        "H": ["machinery", "dc_locker"]},
+    3: {"default": ["staterooms", "staterooms", "offices", "gym", "staterooms", "records"], "A": ["wardroom", "gym", "staterooms", "offices"],
+        "B": ["staterooms", "staterooms", "offices", "staterooms", "wardroom"], "C": ["staterooms", "gym", "staterooms", "records", "offices"],
+        "D": ["staterooms", "staterooms", "offices", "gym"], "E": ["staterooms", "offices", "staterooms", "staterooms"], "F": ["staterooms", "staterooms", "gym", "offices"],
+        "G": ["staterooms", "offices", "staterooms"], "H": ["machinery", "staterooms"]},
+    5: {"default": ["lab", "sensor_archive", "lab_bio", "sensor_room"], "A": ["lab_bio", "lab", "sensor_room", "hydro", "lab_phys"],
+        "B": ["lab", "sensor_archive", "lab_astro", "lab_bio"], "C": ["lab_phys", "lab", "lab_bio", "sensor_room", "lab"],
+        "D": ["lab_astro", "hydro", "lab", "sensor_archive"], "E": ["radiator_pumps", "machinery", "dc_locker", "machinery_b"],
+        "F": ["radiator_pumps", "machinery_b", "sensor_room", "dc_locker"], "G": ["machinery", "radiator_pumps", "dc_locker"],
+        "H": ["machinery_b", "dc_locker", "machinery"]},
     6: {"default": ["store_cold", "laundry", "heads", "store_dry", "cabins", "quiet", "library", "hydro", "lab"],
         "A": ["store_dry", "store_cold", "laundry", "heads", "hold"], "B": ["cabins", "store_dry", "lab", "heads", "laundry", "store_cold", "quiet", "library"],
         "C": ["store_cold", "cabins", "lab", "dc_locker", "store_dry", "heads"], "D": ["cabins", "store_dry", "laundry", "heads", "hydro"],
         "E": ["hydro", "store_cold", "heads", "lab"], "F": ["cabins", "library", "quiet", "laundry"], "G": ["store_dry", "laundry", "heads", "quiet"],
         "H": ["machinery", "dc_locker"]},
-    7: {"default": ["power_control", "machinery", "dc_locker", "machinery"], "A": ["power_control", "machinery"], "B": ["power_control", "machinery", "dc_locker"],
-        "E": ["radiator_pumps", "machinery"], "F": ["power_control", "machinery", "dc_locker"], "G": ["radiator_pumps", "machinery", "power_control"],
-        "H": ["machinery", "dc_locker", "machinery"]},
-    8: {"default": ["barracks", "barracks", "dc_locker", "machinery"], "A": ["shuttle_bay", "barracks"], "B": ["barracks", "firing_range", "armory"],
-        "C": ["armory", "barracks", "firing_range"], "D": ["barracks", "armory", "barracks"], "H": ["machinery", "dc_locker"]},
-    9: {"default": ["cargo_hold", "machinery", "cargo_hold"], "A": [], "B": [], "C": ["flight_ops", "aircraft_shop", "magazine"],
-        "D": ["aircraft_shop", "flight_ops", "magazine"], "E": ["magazine", "cargo_hold", "flight_ops"], "H": ["machinery", "dc_locker"]},
-    10: {"default": ["cargo_hold", "magazine", "hold", "cargo_hold"], "A": ["cargo_hold", "hold", "magazine"], "H": ["machinery", "hold"]},
-    11: {"default": ["workshop", "fab_shop", "repair_bay", "dc_locker"], "A": ["repair_bay", "dc_locker", "workshop"], "H": ["machinery", "dc_locker"]},
-    12: {"default": ["tank", "reaction_mass", "crawlway", "tank"], "A": ["tank", "crawlway"], "H": ["crawlway", "tank"]},
+    7: {"default": ["machinery", "dc_locker", "machinery_b", "power_control"], "A": ["machinery", "dc_locker"],
+        "B": ["power_control", "switchgear", "machinery", "dc_locker", "capacitors", "machinery_b"], "C": ["switchgear", "capacitors", "power_control", "machinery", "radiator_pumps"],
+        "D": ["power_control", "machinery_b", "dc_locker", "capacitors"], "E": ["radiator_pumps", "machinery", "switchgear", "dc_locker"],
+        "F": ["power_control", "capacitors", "machinery_b", "dc_locker", "machinery"], "G": ["radiator_pumps", "machinery", "power_control", "switchgear"],
+        "H": ["machinery", "dc_locker", "machinery_b"]},
+    8: {"default": ["store_dry", "hold", "machinery", "dc_locker", "workshop"], "B": ["barracks", "kit_room", "barracks", "lounge", "heads", "armory"],
+        "C": ["armory", "barracks", "laundry", "barracks", "kit_room", "heads", "store_dry"], "D": ["barracks", "hold", "barracks", "store_dry", "laundry", "dc_locker"],
+        "F": ["workshop", "machinery", "dc_locker", "hold"], "G": ["hold", "store_dry", "machinery"], "H": ["machinery", "dc_locker"]},
+    9: {"default": ["cargo_hold", "machinery", "cargo_hold", "dc_locker", "store_dry"], "A": [], "B": [],
+        "C": ["flight_ops", "pilot_ready", "aircraft_shop", "magazine", "flight_ops", "pilot_ready"], "D": ["aircraft_shop", "magazine", "pilot_ready", "cargo_hold", "flight_ops", "dc_locker"],
+        "E": ["magazine", "cargo_hold", "aircraft_shop", "store_dry", "machinery"], "F": ["cargo_hold", "hold", "magazine", "dc_locker"],
+        "G": ["cargo_hold", "store_dry", "machinery", "hold"], "H": ["machinery", "dc_locker"]},
+    10: {"default": ["cargo_hold", "magazine", "hold", "store_dry", "cargo_hold", "store_cold", "dc_locker"], "A": ["cargo_hold", "hold", "magazine"],
+         "B": ["magazine", "magazine", "cargo_hold", "hold", "store_dry"], "C": ["cargo_hold", "hold", "store_cold", "store_dry", "magazine", "dc_locker"],
+         "D": ["magazine", "cargo_hold", "hold", "store_cold", "dc_locker"], "E": ["cargo_hold", "store_dry", "hold", "magazine", "machinery"],
+         "F": ["hold", "cargo_hold", "store_cold", "dc_locker"], "G": ["cargo_hold", "hold", "store_dry", "machinery"], "H": ["machinery", "hold", "dc_locker"]},
+    11: {"default": ["workshop", "fab_shop", "repair_bay", "dc_locker", "machinery", "hold"], "A": ["repair_bay", "dc_locker", "workshop"],
+         "B": ["fab_shop", "workshop", "dc_locker", "fab_shop", "repair_bay"], "C": ["repair_bay", "dc_locker", "workshop", "fab_shop", "machinery_b"],
+         "D": ["workshop", "repair_bay", "fab_shop", "hold"], "E": ["fab_shop", "machinery", "dc_locker", "workshop"], "F": ["repair_bay", "workshop", "dc_locker", "machinery"],
+         "G": ["hold", "store_dry", "machinery", "dc_locker"], "H": ["machinery", "dc_locker"]},
+    12: {"default": ["tank", "reaction_mass", "crawlway", "tank", "dc_locker"], "A": ["tank", "crawlway", "tank"], "B": ["reaction_mass", "tank", "crawlway", "tank"],
+         "C": ["tank", "tank", "crawlway", "reaction_mass"], "D": ["reaction_mass", "crawlway", "tank", "dc_locker"], "E": ["tank", "crawlway", "tank", "tank"],
+         "F": ["tank", "reaction_mass", "crawlway", "tank"], "G": ["tank", "crawlway", "dc_locker", "tank"], "H": ["crawlway", "tank", "dc_locker"]},
 }
 
 
-UNIQUE = {6: {"surgery", "quarantine", "pharmacy"}}      # rooms that stand once on their deck
+UNIQUE = {2: {"cic"}, 5: {"transporter", "lab_astro"}, 6: {"surgery", "quarantine", "pharmacy"}, 8: {"shuttle_bay", "firing_range"}}      # rooms that stand once on their deck
 # rooms placed first, at a fixed place: (key, side of the Spine, x of the room's forward edge). Deck 6: the medical rooms next to the Medbay's entrance,
 # on the starboard side of the Spine (the Medbay's own door is at x -232)
-PINNED = {6: [("pharmacy", +1, -216.0), ("surgery", +1, -200.0), ("quarantine", +1, -176.0)]}
+# Deck 5 also has the Spine shuttle's stops, one per section on the Spine's pieces between the halls of the decks above and below (A 88..112, B -24..0, C -108..-84, D -228..-204,
+# E -304..-280, G -440..-416, H -504..-480). Section F has none: the 20 m of its Spine that the Main Engineering hall's keep-out leaves are shorter than a stop, and a room may not
+# straddle a section's bulkhead. A stop never takes the whole starboard lane of a piece of Spine (the cross link to the Starboard Passage lives there).
+# Deck 2: the CIC, in the first section where the block is wide enough for a 16 m room (the block is only 16.4 m to a side forward of x -60: Section A has the Spine and nothing else), on the
+# starboard side behind the section's first cross link
+PINNED = {2: [("cic", +1, -68.0)],
+          5: [("transporter", +1, 4.0), ("shuttle_stop", +1, 112.0), ("shuttle_stop", -1, 0.0), ("shuttle_stop", +1, -84.0), ("shuttle_stop", -1, -204.0),
+              ("shuttle_stop", -1, -280.0), ("shuttle_stop", +1, -416.0), ("shuttle_stop", -1, -480.0)],
+          8: [("shuttle_bay", -1, 52.0), ("firing_range", -1, 16.0)],      # (the bay on the port side: the bow stair tower (x 44..52) stands on the starboard side of that stretch)
+          6: [("pharmacy", +1, -216.0), ("surgery", +1, -200.0), ("quarantine", +1, -176.0)]}
 
 
 def obstacles(deck: int) -> list[list[float]]:
@@ -100,10 +126,9 @@ def reach_rooms(deck: int, y_c: float, pieces: list, reach: float = 8.0) -> list
             continue
         for p in out:
             if e["wall"] == "fwd" and 0.0 <= p[0] - bx[2] <= reach:              # the piece lies forward of the room: its aft end meets the forward wall
-                a = GRID0 + MOD * int((bx[2] - GRID0) // MOD)
-                p[0] = a if a <= bx[2] + 1e-6 else a - MOD
-            elif e["wall"] == "aft" and 0.0 <= bx[0] - p[1] <= reach:            # the piece lies aft of the room: its forward end meets the aft wall
-                p[1] = GRID0 + MOD * (int((bx[0] - GRID0) // MOD) + 1)
+                p[0] = GRID0 + MOD * math.ceil((bx[2] - 0.4 - GRID0) / MOD - 1e-9)       # (the first grid line that is not more than 0.4 m inside the wall: a wall that is off
+            elif e["wall"] == "aft" and 0.0 <= bx[0] - p[1] <= reach:            #  the 4 m grid leaves a gap of less than 4 m that the plan fills with a lobby)
+                p[1] = GRID0 + MOD * math.floor((bx[0] + 0.4 - GRID0) / MOD + 1e-9)
     return [tuple(p) for p in out]
 
 
@@ -213,9 +238,11 @@ def plan_deck(B: Builder, deck: int, towers: list | None = None, coarse: bool = 
     spine = free_pieces(deck, SP_Y, env, obs, xh, xl)
     if not coarse:
         spine = reach_rooms(deck, SP_Y, spine)
-    sp = [D.passage(f"SP{i}", "S", "x", SP_Y, a0, a1, "Spine") for i, (a0, a1) in enumerate(spine)]
-    sbp = [D.passage(f"SB{i}", "P", "x", SBP_Y, a0, a1, "Starboard Passage") for i, (a0, a1) in enumerate(free_pieces(deck, SBP_Y, env, obs, xh, xl))]
-    pp = [D.passage(f"PO{i}", "P", "x", PP_Y, a0, a1, "Port Passage") for i, (a0, a1) in enumerate(free_pieces(deck, PP_Y, env, obs, xh, xl))]
+    keel = deck == 12 and not coarse                                            # the keel's passages are maintenance crawlways (tone K)
+    sp = [D.passage(f"SP{i}", "K" if keel else "S", "x", SP_Y, a0, a1, "Keel Crawlway" if keel else "Spine") for i, (a0, a1) in enumerate(spine)]
+    sbp = [D.passage(f"SB{i}", "K" if keel else "P", "x", SBP_Y, a0, a1, "Starboard Crawlway" if keel else "Starboard Passage")
+           for i, (a0, a1) in enumerate(free_pieces(deck, SBP_Y, env, obs, xh, xl))]
+    pp = [D.passage(f"PO{i}", "K" if keel else "P", "x", PP_Y, a0, a1, "Port Crawlway" if keel else "Port Passage") for i, (a0, a1) in enumerate(free_pieces(deck, PP_Y, env, obs, xh, xl))]
     placed: list = []
     used: set = set()
     for (tx, tside) in (towers or []):
@@ -244,10 +271,12 @@ def plan_deck(B: Builder, deck: int, towers: list | None = None, coarse: bool = 
         for side, partners in ((+1, sbp), (-1, pp)):
             partner = next((p for p in partners if p.a0 <= ps.a0 + 2 and p.a1 >= ps.a1 - 2), None) or (partners[0] if partners else None)
             partner = partner if partner and partner.a0 <= ps.a1 and partner.a1 >= ps.a0 else None
-            snap = list(placed)
+            snap, snap_used = list(placed), set(used)
             items = fill_lane(deck, ps, side, env, obs, partner, placed, used=used)
             if partner is not None and not any(it[0] == "link" for it in items) and side > 0:
                 placed[:] = snap
+                used.clear()                                                    # the rooms of the discarded try are free again (a unique room must not be lost with it)
+                used.update(snap_used)
                 items = fill_lane(deck, ps, side, env, obs, partner, placed, force=True, used=used)
             D.lane(ps.pid, side, ps.a1, items, "I_s" if side > 0 else "I_p")
     # outer lanes off the side passages, only where the hull is wide enough for 16 m rooms
