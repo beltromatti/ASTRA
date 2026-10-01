@@ -16,6 +16,7 @@
 #include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "Tickable.h"
@@ -230,6 +231,9 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 		double ThoughtSec = 0.0;
 		int64 Thoughts = 0;
 		int32 Looked = 0, Wrong = 0;
+		int32 HeardRows = 0, BadRows = 0;
+		FString BadWhy;
+		FVector LastLook = FVector::ForwardVector;
 		TMap<FString, int32> WrongWhy;
 		const bool bAssets = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple")) != nullptr;
 		double BodiesMsSum = 0.0, BodiesMsMax = 0.0;
@@ -274,6 +278,7 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 					Dwell -= StepW;
 				}
 				const FVector Look = Seg + 1 < Route.Num() ? (Route[Seg + 1] - Route[Seg]).GetSafeNormal() : FVector::ForwardVector;
+				LastLook = Look;
 				Life->SetTestCaptain(Feet, Feet + FVector(0, 0, 160), Look);
 				TickWorld(StepW);
 				// (a headless world does not tick its actors: the bodies think when the test says; what a thought costs is measured here)
@@ -331,6 +336,31 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 				BodiesMsMax = FMath::Max(BodiesMsMax, Life->GetCost().BodiesMs);
 				++BodyTicks;
 			}
+			// what the minds are told of the people within earshot (the context that goes with the Captain's words): every row has what
+			// mind/astra_mind/npc.py reads
+			for (const TSharedPtr<FJsonValue>& V : Life->ListenersJson(Feet + FVector(0, 0, 160), LastLook, 6))
+			{
+				const TSharedPtr<FJsonObject>& O = V->AsObject();
+				++HeardRows;
+				if (HeardRows == 1)
+				{
+					FString Sample;
+					TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Sample);
+					FJsonSerializer::Serialize(O.ToSharedRef(), Writer);
+					UE_LOG(LogASTRA, Display, TEXT("[Life] a row of context.people, as the mind gets it: %s"), *Sample);
+				}
+				FString Missing;
+				for (const TCHAR* K : {TEXT("id"), TEXT("name"), TEXT("rank"), TEXT("gender"), TEXT("dept"), TEXT("job"), TEXT("watch"), TEXT("doing"), TEXT("place"), TEXT("dist_m"), TEXT("facing"), TEXT("memory"), TEXT("friends")})
+				{
+					if (!O->HasField(K)) { Missing += FString(K) + TEXT(" "); }
+				}
+				FString Id;
+				O->TryGetStringField(TEXT("id"), Id);
+				FString Name;
+				O->TryGetStringField(TEXT("name"), Name);
+				if (!Id.StartsWith(TEXT("npc")) || Name.IsEmpty()) { Missing += TEXT("(id or name) "); }
+				if (!Missing.IsEmpty()) { ++BadRows; BadWhy = Missing; }
+			}
 			// what the bodies are made of (needs the mannequins' content: without it the check is skipped)
 			for (int32 i = 0; i < N; ++i)
 			{
@@ -373,6 +403,8 @@ int32 UAstraLifeSimCommandlet::Main(const FString& Params)
 			Check(TEXT("a body's thought is cheap"), Thoughts > 0 && UsPerThought * Map.Vis.MaxBodies < 500.0,
 			      FString::Printf(TEXT("%.1f microseconds a thought (%lld thoughts): all %d bodies seen at every frame would cost %.2f ms"), UsPerThought, Thoughts, Map.Vis.MaxBodies, UsPerThought * Map.Vis.MaxBodies / 1000.0));
 		}
+		Check(TEXT("the minds are told who is near"), HeardRows > 0 && BadRows == 0,
+		      FString::Printf(TEXT("%d rows of people within earshot over the legs, %d without what the mind reads%s"), HeardRows, BadRows, BadWhy.IsEmpty() ? TEXT("") : *(FString(TEXT(" (missing: ")) + BadWhy + TEXT(")"))));
 		if (bAssets)
 		{
 			FString Reasons;
