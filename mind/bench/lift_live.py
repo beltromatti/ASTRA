@@ -39,6 +39,15 @@ def at(stop: str, **kw: Any) -> dict[str, Any]:
     return {**IN_CAR, "lift": {**LIFT, "at": stop, **kw}}
 
 
+# someone riding the car with the Captain, facing him (a body of the life simulation: what ListenersJson sends); the Captain's words to the ship's computer must not be taken for his
+RIDER = {"id": "npc412", "name": "Crewman Elias Brandt", "rank": "Crewman", "gender": "m", "dept": "logistics", "home": "Earth", "job": "supply clerk", "watch": "Gold",
+         "doing": "riding Turbolift 1 to Deck 4", "place": "Turbolift 1", "dist_m": 0.9, "angle_deg": 5, "facing": True, "memory": [], "friends": []}
+
+
+def with_rider(stop: str) -> dict[str, Any]:
+    return {**at(stop), "people": [RIDER], "in_earshot": [RIDER["id"]], "facing": RIDER["id"]}
+
+
 # name, the Captain's words, language, the context, the stop expected (None: no call), who must speak ("computer", or an officer, or None), a pattern the line must hold (any language)
 SCENES: list[tuple[str, str, str, dict[str, Any], str | None, str | None, str]] = [
     ("deck_number", "Deck seven.", "en", at("d1"), "d7", "computer", r""),
@@ -50,6 +59,10 @@ SCENES: list[tuple[str, str, str, dict[str, Any], str | None, str | None, str]] 
     ("not_served", "Take me to Deck twelve.", "en", at("d1"), None, "computer", r"(?i)twelve|12|not|nine|serve"),
     ("for_the_xo", "Number One, status?", "en", at("d4"), None, None, r""),
     ("shuttle", "Section C, please.", "en", {**IN_CAR, "lift": SHUTTLE}, "sec_c", "computer", r""),
+    # with someone aboard who faces him: the words for the computer are still the computer's, and the words for the rider are the rider's
+    ("rider_deck", "Deck seven.", "en", with_rider("d1"), "d7", "computer", r""),
+    ("rider_place_it", "Portami in sala macchine.", "it", with_rider("d1"), "d7", "computer", r""),
+    ("rider_chat", "Da quanto sei a bordo, marinaio?", "it", with_rider("d1"), None, "npc412", r""),
 ]
 
 
@@ -133,10 +146,12 @@ async def main_async(a: argparse.Namespace) -> int:
                 problems.append(f"the order was not the computer's: {gone}")
             if want_speaker == "computer" and not any(s == "computer" for s, _ in lines):
                 problems.append("the ship's computer did not answer")
-            if want_speaker is None and any(s == "computer" for s, _ in lines):
+            if want_speaker not in ("computer",) and any(s == "computer" for s, _ in lines):
                 problems.append("the computer answered words that were for an officer")
             if want_speaker == "computer" and any(s != "computer" for s, _ in lines):
-                problems.append(f"an officer spoke in the lift: {[s for s, _ in lines if s != 'computer']}")
+                problems.append(f"an officer or a rider spoke in the lift: {[s for s, _ in lines if s != 'computer']}")
+            if want_speaker not in (None, "computer") and not any(s == want_speaker for s, _ in lines):
+                problems.append(f"{want_speaker} did not answer")
             if not lines:
                 problems.append("nobody answered")
             if must and lines and not any(re.search(must, t) for _, t in lines):
