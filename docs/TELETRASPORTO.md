@@ -91,8 +91,11 @@ o convergono (rimaterializzazione), e il **fantasma del corpo**: il corpo vero (
 mangia dai piedi in su (o la forma), seguendo la posa viva. Gli **anelli delle pedane** dicono lo stato (spenta, occupata, aggancio in corso a segmenti che girano, agganciata, in
 ciclo, guasta a sfarfallio); il **ronzio** gira finché un ciclo dura. Per il **Capitano** (che non ha un corpo visibile) lo schermo: celle di luce che si accendono a caso, scintille,
 un velo bianco-oro che lo copre alla partenza e lo lascia piano alla ricomposizione; i controlli sono bloccati. Suoni (originali, sintetizzati): carica, smaterializzazione,
-rimaterializzazione, chirp d'aggancio, guasto, ronzio. `astra.xport.gain` scala tutto (l'esposizione dell'interno può volere più o meno luce), `astra.xport.fx 0` spegne gli effetti
-senza toccare le regole. Niente degli effetti è necessario alle regole: un asset mancante si salta con una riga nel log.
+rimaterializzazione, chirp d'aggancio, guasto, ronzio. `astra.xport.gain` scala la luce di tutti gli effetti (l'esposizione dell'interno può volerne più o meno; i suoni no),
+`astra.xport.fx 0` spegne gli effetti e i suoni anche nel mezzo di un trasporto (colonne, fantasmi, luce, velo del Capitano spariscono, i corpi tornano visibili) senza toccare le
+regole. Niente degli effetti è necessario alle regole: un asset mancante si salta con una riga nel log.
+Lo **schermo a parete** mette il quadro sul piano del motore leggendo la posizione locale (u = 0,5 − x/100, v = 0,5 − y/100: gli assi del motore sono mancini, e visto dal lato della
+normale con la y in su il piano ha la x verso la SINISTRA di chi guarda).
 
 ## 6. I banchi e i risultati
 

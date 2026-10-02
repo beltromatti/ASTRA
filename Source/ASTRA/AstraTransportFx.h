@@ -161,9 +161,12 @@ private:
 	float ViewAge = 0.f, ViewSeconds = 3.6f, ViewDir = 1.f, ViewHold = 0.f, ViewShown = 0.f, ShownWash = 0.f, ShownCells = 0.f;
 	bool bViewRemat = false, bViewActive = false, bViewEnding = false;
 	float EmitterWritten = -1.f;
-	bool bPadsDirty = true, bWasBusy = false;
+	bool bPadsDirty = true, bWasBusy = false, bSilenced = false;
 
 	void LoadAssets();
+	void DropOverlay();
+	/** astra.xport.fx 0 in the middle of a transport: everything on show goes (columns, ghosts, sparkles, rings, light, the Captain's screen), once. */
+	void ClearAllShown();
 	bool EnsureLayers();
 	void StepColumns(float Dt);
 	void StepSparkles(float Dt);

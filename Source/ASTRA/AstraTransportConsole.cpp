@@ -158,8 +158,9 @@ AAstraTransportConsole::AAstraTransportConsole()
 void AAstraTransportConsole::Place(const FVector& CentreCm, float YawDeg, const FVector2D& SizeCm)
 {
 	Size = SizeCm;
-	// the engine's Plane is 100 x 100 cm lying in XY, facing +Z: stand it up with its face along the way the screen faces (the yaw), its local y up and so its local x to the
-	// viewer's right (M_XPORT_Screen lays the picture by that local position, whatever the plane's own texture mapping is); a centimetre off the wall's panel
+	// the engine's Plane is 100 x 100 cm lying in XY, facing +Z: stand it up with its face along the way the screen faces (the yaw) and its local y up; its local x then runs to the
+	// viewer's LEFT (the axes are left-handed: x cross y is z), which M_XPORT_Screen knows (it lays the picture by that local position, u = 0.5 - x/100, v = 0.5 - y/100, whatever
+	// the plane's own texture mapping is); a centimetre off the wall's panel
 	const FVector Face = FRotator(0.f, YawDeg, 0.f).Vector();
 	SetActorLocationAndRotation(CentreCm + Face * 1.0, FRotationMatrix::MakeFromZY(Face, FVector::UpVector).ToQuat());
 	SetActorScale3D(FVector(SizeCm.X / 100.0, SizeCm.Y / 100.0, 1.0));

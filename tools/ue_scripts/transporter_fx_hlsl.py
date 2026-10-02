@@ -9,10 +9,12 @@ Inputs of each snippet are the names its Custom node gets; every snippet returns
 """
 
 # ------------------------------------------------------------------------------------------------------------------------------ wall screen
-# The picture on the room's wall display: the engine's plane is 100 x 100 cm, centred, with local x to the viewer's right and local y up (the game stands it so): the
-# texture coordinates come from the local position, not from the plane's own mapping. Returns a float2.
+# The picture on the room's wall display: the engine's plane is 100 x 100 cm, centred, normal +z; the game stands it with its face to the viewer and its local y up
+# (AAstraTransportConsole::Place). The engine's axes are left-handed, so a plane seen from its normal side with y up has its local x running to the viewer's LEFT (x cross y
+# is z): the picture's u runs the other way, 0.5 - x/100, or the text would read backwards. v: the top of the picture is v = 0, at the plane's local y = +50.
+# The texture coordinates come from the local position, not from the plane's own mapping. Returns a float2.
 SCREEN_UV = """
-return float2(LP.x * 0.01 + 0.5, 0.5 - LP.y * 0.01);
+return float2(0.5 - LP.x * 0.01, 0.5 - LP.y * 0.01);
 """
 
 # ------------------------------------------------------------------------------------------------------------------------------ sparkle

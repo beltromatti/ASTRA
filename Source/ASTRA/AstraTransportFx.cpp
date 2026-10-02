@@ -196,15 +196,7 @@ void UAstraTransportFx::Shutdown()
 		}
 	}
 	Loops.Reset();
-	if (Overlay.IsValid())
-	{
-		if (UGameViewportClient* VC = GEngine ? GEngine->GameViewport : nullptr)
-		{
-			VC->RemoveViewportWidgetContent(Overlay.ToSharedRef());
-		}
-		Overlay.Reset();
-		bOverlayOn = false;
-	}
+	DropOverlay();
 	if (Host)
 	{
 		Host->Destroy();
@@ -216,6 +208,62 @@ void UAstraTransportFx::Shutdown()
 	Light = nullptr;
 	bLayers = false;
 	bReady = false;
+}
+
+void UAstraTransportFx::DropOverlay()
+{
+	if (Overlay.IsValid())
+	{
+		if (UGameViewportClient* VC = GEngine ? GEngine->GameViewport : nullptr)
+		{
+			VC->RemoveViewportWidgetContent(Overlay.ToSharedRef());
+		}
+		Overlay.Reset();
+	}
+	bOverlayOn = false;
+	bViewActive = false;
+	bViewEnding = false;
+	ViewShown = 0.f;
+}
+
+void UAstraTransportFx::ClearAllShown()
+{
+	for (FColumn& C : Cols)
+	{
+		DropColumn(C);
+	}
+	Cols.Reset();
+	for (FSparkle& S : Pool)
+	{
+		S.bLive = false;
+	}
+	NumLive = 0;
+	if (bLayers)
+	{
+		RingL.Begin();
+		ColumnL.Begin();
+		SparkleL.Begin();
+		RingL.Flush();
+		ColumnL.Flush();
+		SparkleL.Flush();
+		if (Light)
+		{
+			Light->SetIntensity(0.f);
+			Light->SetVisibility(false);
+		}
+	}
+	for (TPair<int32, TObjectPtr<UAudioComponent>>& L : Loops)
+	{
+		if (L.Value)
+		{
+			L.Value->Stop();
+		}
+	}
+	Loops.Reset();
+	bWasBusy = false;
+	bPadsDirty = true;
+	EmitterShown = 0.f;
+	DropOverlay();
 }
 
 void UAstraTransportFx::LoadAssets()
@@ -810,6 +858,10 @@ void UAstraTransportFx::WriteInstances()
 // ================================================================================================ the Captain's screen
 void UAstraTransportFx::BeginCaptainView(bool bRematerialize, float Seconds)
 {
+	if (!bReady || CVarXFx.GetValueOnGameThread() == 0)
+	{
+		return;                                              // (nothing is drawn: nothing is left waiting to be drawn when the effects come back)
+	}
 	bViewActive = true;
 	bViewEnding = false;
 	bViewRemat = bRematerialize;
@@ -836,6 +888,10 @@ void UAstraTransportFx::EndCaptainView()
 
 void UAstraTransportFx::HoldCaptainView(float Level01)
 {
+	if (!bReady || CVarXFx.GetValueOnGameThread() == 0)
+	{
+		return;
+	}
 	ViewHold = FMath::Clamp(Level01, 0.f, 1.f);
 	if (ViewHold > 0.f)
 	{
@@ -979,7 +1035,7 @@ int32 UAstraTransportFx::StartLoop(const TCHAR* Id, const FVector& AtCm, float V
 		{
 			PlaySound(TEXT("Lock"), AtCm, 0.f, 1.f);              // (makes the attenuation; a silent call)
 		}
-		if (UAudioComponent* A = UGameplayStatics::SpawnSoundAtLocation(World, S, AtCm, FRotator::ZeroRotator, Volume, 1.f, 0.f, Attenuation, nullptr, false))
+		if (UAudioComponent* A = UGameplayStatics::SpawnSoundAtLocation(World, S, AtCm, FRotator::ZeroRotator, Volume, 1.f, 0.f, Attenuation, nullptr, true))   // (it goes when it has faded out)
 		{
 			Loops.Add(Handle, A);
 		}
@@ -1009,19 +1065,14 @@ void UAstraTransportFx::Tick(float Dt, const FVector& CaptainEyeCm)
 	}
 	if (CVarXFx.GetValueOnGameThread() == 0)
 	{
-		if (Cols.Num() || bViewActive)
+		if (!bSilenced)
 		{
-			for (FColumn& C : Cols)
-			{
-				DropColumn(C);
-			}
-			Cols.Reset();
-			bViewActive = false;
-			bViewEnding = true;
-			ViewShown = 0.f;
+			bSilenced = true;
+			ClearAllShown();                                     // (a transport in the middle of its cycle: no column, no ghost, no white screen is left behind)
 		}
 		return;
 	}
+	bSilenced = false;
 	Clock += Dt;
 	StepColumns(Dt);
 	StepSparkles(Dt);

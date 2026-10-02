@@ -623,7 +623,7 @@ namespace
 				XpLog(TEXT("[Transport] the room is not known (no plan) or there is no Captain"));
 				return;
 			}
-			const FVector Stand = X->LocalToWorldCm(FVector(10.5, 8.6, 0.0));
+			const FVector Stand = X->LocalToWorldCm(FVector(12.4, 8.6, 0.0));       // (the control console is at x = 10, the dais begins at 13.7: the free floor between them, the Chief behind the console, the wall screen beyond the dais)
 			if (UAstraDeckStreaming* DS = W->GetSubsystem<UAstraDeckStreaming>())
 			{
 				DS->RequestAt(Stand, 60.f);
