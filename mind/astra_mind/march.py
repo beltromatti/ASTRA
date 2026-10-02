@@ -23,20 +23,18 @@ events; everything they do goes through `order`, `split`, `merge`, `set_build`, 
 Aquila is, losses read back from it) is march_glue.py."""
 from __future__ import annotations
 
-import copy
 import json
 import logging
 import math
 import os
 import random
-import time
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from . import march_battle as mb
 from .march_data import (ASTRA_PEOPLE, ASTRA_SHIPS, CAPITALS, CARRIERS, CLASSES, HQ, MANDATE_PEOPLE, MANDATE_SHIPS, ORBAT, PACE, SYSTEMS, YARD_DEFAULT)
-from .war import LINKS, WarMap
+from .war import WarMap
 
 log = logging.getLogger("astra.march")
 
@@ -667,6 +665,15 @@ class March:
                 tgt = dest
         if kind in ("assault", "blockade", "raid") and self.neutral(dest):
             return False, f"{dest} is neutral ground (the Free Guilds keep it: no side may fight there)"
+        if f.status == "real":
+            # a fleet the real simulation is playing (it is with the Aquila): the map does not move it. The order is on its record as its high command's intent, which its
+            # commanders on the spot read (field_brief), and the Captain with them on the ASTRA side; what they do with it is theirs
+            f.order = Order(kind, tgt, stance, dark, by, reason, self.t, None if until_s is None else self.t + float(until_s), position if position in ("gate", "world") else "")
+            self.dirty = True
+            who = ("the Captain, who commands there, and its captains" if side == "astra" else "its commanders on the spot")
+            return True, (f"{f.id} {f.name} is with the Aquila, played ship by ship in {f.where}: it does not move on the map. Your order is on its record as your intent; "
+                          f"{who} read it and decide what to do with it (tell the Captain if it cannot wait)" if side == "astra" else
+                          f"{f.id} {f.name} is in the fighting at {f.where}, played ship by ship: it does not move on the map. Your order is on its record as your intent; {who} read it and decide")
         p = self.path(start, dest, side) if dest else []
         if p is None:
             why = " (Veyra's Gates are closed to warships: the Free Guilds keep them so unless they grant passage)" if self.neutral("Veyra") and self.path(start, dest) is not None else ""
@@ -844,7 +851,6 @@ class March:
             self._order_reached(f)
         side = f.side
         watchers = [s for s in SIDES if s != side and self.detects(s, f) > 0]
-        n = f.n
         txt = {side: f"{f.name} has come through the Gate into {dest}." if not f.route else f"{f.name} passed through {dest}."}
         for s in watchers:
             lvl = self.detects(s, f)
@@ -1166,6 +1172,30 @@ class March:
         self.dirty = True
         for s in SIDES:
             self.tracks[s] = {k: v for k, v in self.tracks[s].items() if k in self.fleets}
+
+    def cut_battle(self, system: str) -> None:
+        """The Aquila has come to a system where the map was fighting a battle: the real simulation takes it over. The fleets go on as they stand (what the battle has done
+        to them so far is in their hulls and their losses, and counts in the scores and the people's will as it would have at the end), and the glue sends their ships to
+        the game."""
+        b = self.battles.pop(system, None)
+        if b is None:
+            return
+        for s in SIDES:
+            for fid in list(b.fleets[s]):
+                f = self.fleets.get(fid)
+                if f is None or fid in b.settled:
+                    continue
+                if self._settle(b, f, self._units_of(b, fid)):
+                    f.status = "ready"
+                    f.route = []
+        for s in SIDES:
+            self.score[s]["lost_points"] += b.lost_points[s]
+            self.score[s]["ships_lost"] += b.lost_ships[s]
+            self.score[other(s)]["killed_points"] += b.lost_points[s]
+            self.score[other(s)]["ships_killed"] += b.lost_ships[s]
+            self.will[s] = max(0.0, self.will[s] - 0.0040 * b.lost_points[s])
+            self.will[other(s)] = min(1.0, self.will[other(s)] + 0.0015 * b.lost_points[s])
+        self.dirty = True
 
     def _retreat(self, f: Fleet, from_system: str) -> None:
         """A fleet that broke off falls back to the nearest depot of its side away from the enemy (or where it came from)."""
@@ -1734,7 +1764,7 @@ class March:
             out.append("BATTLES UNDER WAY")
             out.extend(fights)
         if side == "astra":
-            out.append(f"THE AQUILA: " + (f"in the Gate's lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + (f" (since {fmt_s(self.t - self.aquila['since'])})" if self.aquila["since"] else ""))
+            out.append("THE AQUILA: " + (f"in the Gate's lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + (f" (since {fmt_s(self.t - self.aquila['since'])})" if self.aquila["since"] else ""))
         else:
             if self.aquila_seen[0]:
                 out.append(f"THE AQUILA (the ASTRA carrier cruiser, the Captain's ship): last seen at {self.aquila_seen[0]}, {fmt_s(self.t - self.aquila_seen[1])} ago.")
@@ -1808,7 +1838,7 @@ class March:
             out.append(f"A truce is in force for {fmt_s(max(0.0, self.truce['until'] - self.t))}.")
         for s in SIDES:
             out.append(f"{SIDE_WORD[s]} high command's plan: " + (self.plans[s] or "(none written yet)"))
-        out.append(f"The Aquila: " + (f"in the lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + ".")
+        out.append("The Aquila: " + (f"in the lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + ".")
         for s in SIDES:
             out.append(f"{SIDE_WORD[s].upper()} FLEETS")
             for f in sorted(self.side_fleets(s), key=lambda x: x.id):

@@ -257,6 +257,8 @@ class MarchGlue:
         if not rs or m.aquila["lane"]:
             return
         now = self.clock()
+        if rs in m.battles:
+            m.cut_battle(rs)                                    # (a battle the map was fighting where she has come: the game takes it over, with the fleets as they stand)
         for f in list(m.fleets.values()):
             if f.status in ("real", "scripted", "engaged") or f.id in self.sending:
                 continue
@@ -363,7 +365,6 @@ class MarchGlue:
 
     def beat_groups(self, f: Fleet, chunk: list[list[int]], first: bool) -> tuple[list[dict[str, Any]], list[int]]:
         """The beat's groups for these groups of the fleet, and the fleet's ship index of each ship in the order the game will number them."""
-        m = self.m
         order: list[int] = []
         groups: list[dict[str, Any]] = []
         names = f.groups if f.groups and len(f.groups) == len(chunk) else None

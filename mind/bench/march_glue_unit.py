@@ -11,7 +11,6 @@ set the Gate (and are tried again while an engagement refuses them); the bridge 
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import tempfile
 import unittest
@@ -19,7 +18,7 @@ from typing import Any
 
 from astra_mind import march_glue as mg
 from astra_mind import models
-from astra_mind.march import SIDES, STRAGGLERS, Fleet, Order, Ship
+from astra_mind.march import STRAGGLERS, Fleet, Order
 from astra_mind.march_data import CLASSES
 from astra_mind.strategy import StrategicMinds
 from bench.march_mock import StrategyMock
@@ -413,6 +412,21 @@ class PlaceTest(Fixture):
         self.world.lane = ""                                                              # (the status no longer says she is in a lane, and no event came)
         await self.step(int(mg.LANE_TIMEOUT_S) + 5)
         self.assertEqual((self.m.aquila["where"], self.m.aquila["lane"], self.m.real_system), ("Cassia", "", "Cassia"))
+
+    async def test_a_battle_the_map_was_fighting_where_the_aquila_comes_goes_to_the_game(self) -> None:
+        a = put(self.m, "astra", "Cassia", [("vigilant", 4)], name="Defenders")
+        b = put(self.m, "mandate", "Cassia", [("styx", 4)], name="Attackers", order=Order("assault", "Cassia", "bold", False, "default", "", 0.0))
+        self.m.run(150.0)
+        self.assertIn("Cassia", self.m.battles)                                          # (the map fights it)
+        self.m.aquila_arrived("Cassia")
+        self.m.war.current = "Cassia"
+        await self.step(mg.PRESENT_DELAY_S + 20)
+        self.assertNotIn("Cassia", self.m.battles)
+        self.assertEqual((a.status, b.status), ("real", "real"))                            # (both sides' fleets are in the game, as they stand)
+        beat_ships = sum(len(g["ships"]) for beat in self.world.beats for g in beat["groups"])
+        self.assertEqual(beat_ships, a.n + b.n)
+        hulls = [sp.get("hull_pct", 100) for beat in self.world.beats for g in beat["groups"] for sp in g["ships"]]
+        self.assertTrue(any(h < 100 for h in hulls))                                       # (what the battle had done to them is in the beat)
 
     async def test_the_march_follows_the_war_map_when_the_story_says_the_aquila_arrived(self) -> None:
         self.m.war.arrived("Meridian")

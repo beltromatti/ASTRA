@@ -19,8 +19,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "mind"))
 
-from astra_mind import models, strategy  # noqa: E402
-from astra_mind.march import SIDES, March, fmt_s, other  # noqa: E402
+from astra_mind import models  # noqa: E402
+from astra_mind.march import SIDES, March, fmt_s  # noqa: E402
 from astra_mind.march_auto import AutoAdmiral  # noqa: E402
 from astra_mind.strategy import StrategicMinds  # noqa: E402
 from astra_mind.war import WarMap  # noqa: E402

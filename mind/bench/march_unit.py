@@ -15,7 +15,6 @@ from astra_mind import march as mr
 from astra_mind import march_auto as ma
 from astra_mind import march_battle as mb
 from astra_mind.march import Fleet, Order, SIDES, Ship
-from astra_mind.march_data import CLASSES, SYSTEMS
 from astra_mind.war import WarMap
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,7 +75,7 @@ class BattleModelTest(unittest.TestCase):
         gone = dead = 0
         for _ in range(60):
             ua, ub = mb.units(0, [("praetorian", 1), ("vigilant", 3)], stance="cautious", fid="a"), mb.units(1, [("acheron", 3), ("styx", 6)], fid="b")
-            e = mb.fight(ua, ub, rng)
+            mb.fight(ua, ub, rng)
             gone += sum(1 for u in ua if u.alive and u.gone)
             dead += sum(1 for u in ua if not u.alive)
         self.assertGreater(gone, 0)                                       # some got away
@@ -251,7 +250,7 @@ class FogTest(unittest.TestCase):
         enemy = put(m, "mandate", "Cassia", [("styx", 9)])
         m.sys["Cassia"].post["astra"] = False
         m.war.systems["Cassia"]["owner"] = "silent"
-        a = put(m, "astra", "Aurelia", [("vigilant", 2)])
+        put(m, "astra", "Aurelia", [("vigilant", 2)])
         m.run(30.0)
         tr = m.tracks["astra"].get(enemy.id)
         self.assertIsNotNone(tr)                                           # Aurelia's post hears the drives next door: a contact
@@ -278,7 +277,7 @@ class BattleWorldTest(unittest.TestCase):
         clear(m)
         m.war.systems["Thule"]["owner"] = "silent"
         a = put(m, "astra", "Thule", [("vigilant", 6)], order=Order("assault", "Thule", "steady", False, "default", "", 0.0))
-        b = put(m, "mandate", "Thule", [("styx", 3)], order=Order("assault", "Thule", "bold", False, "default", "", 0.0))
+        put(m, "mandate", "Thule", [("styx", 3)], order=Order("assault", "Thule", "bold", False, "default", "", 0.0))
         m.run(900.0)
         self.assertEqual(m.battles, {})
         self.assertGreater(m.score["mandate"]["ships_lost"], 0)
@@ -295,7 +294,7 @@ class BattleWorldTest(unittest.TestCase):
         m = world()
         clear(m)
         put(m, "astra", "Aurelia", [("praetorian", 2), ("vigilant", 6)], order=Order("defend", "Aurelia", "steady", False, "default", "", 0.0))
-        scout = put(m, "mandate", "Aurelia", [("lethe", 1)], order=Order("recon", "Aurelia", "cautious", False, "default", "", 0.0), dark=True)
+        put(m, "mandate", "Aurelia", [("lethe", 1)], order=Order("recon", "Aurelia", "cautious", False, "default", "", 0.0), dark=True)
         m.run(1200.0)
         self.assertLessEqual(sum(1 for e in m.events if e.kind == "battle_start"), 2)
 
@@ -304,7 +303,7 @@ class BattleWorldTest(unittest.TestCase):
         clear(m)
         picket = put(m, "astra", "Aurelia", [("vigilant", 2)], order=Order("defend", "Aurelia", "steady", False, "default", "", 0.0, None, "gate"), zone="gate")
         world_f = put(m, "astra", "Aurelia", [("praetorian", 2)], order=Order("defend", "Aurelia", "steady", False, "default", "", 0.0, None, "world"), zone="world")
-        raid = put(m, "mandate", "Aurelia", [("styx", 4)], order=Order("assault", "Aurelia", "bold", False, "default", "", 0.0))
+        put(m, "mandate", "Aurelia", [("styx", 4)], order=Order("assault", "Aurelia", "bold", False, "default", "", 0.0))
         m.run(20.0)
         self.assertIn("Aurelia", m.battles)
         in_battle = {fid for s in SIDES for fid in m.battles["Aurelia"].fleets[s]}
@@ -585,6 +584,25 @@ class HighCommandToolsTest(unittest.TestCase):
         self.assertEqual(f.id, "F-A1")
         self.assertIsNone(m.find_fleet("mandate", "F-A1 7th Fleet Main Body"))               # (never a fleet of the other side)
 
+    def test_an_order_to_a_fleet_the_game_plays_is_an_intent_on_its_record_not_a_move(self) -> None:
+        m = world()
+        clear(m)
+        f = put(m, "astra", "Aurelia", [("vigilant", 3)], name="With the Aquila")
+        m.real_adopt(f, "Aurelia")
+        ok, detail = m.order("astra", f.id, "move", "Cassia", by="admiral", reason="the yards need it")
+        self.assertTrue(ok)
+        self.assertIn("with the Aquila", detail)
+        self.assertIn("the Captain", detail)
+        self.assertEqual((f.status, f.where, f.route), ("real", "Aurelia", []))              # (nothing moved: the game has it)
+        self.assertEqual((f.order.kind, f.order.target, f.order.by), ("move", "Cassia", "admiral"))
+        self.assertIn("Fleet orders for With the Aquila: move Cassia", m.field_brief("astra", "Aurelia"))
+        m.run(600.0)
+        self.assertEqual((f.status, f.where), ("real", "Aurelia"))
+        foe = put(m, "mandate", "Aurelia", [("styx", 2)], name="Foe in the game")
+        m.real_adopt(foe, "Aurelia")
+        ok, detail = m.order("mandate", foe.id, "withdraw", "Thule", by="admiral")
+        self.assertTrue(ok and "on the spot" in detail)
+
     def test_the_real_simulation_scores_what_it_loses_like_a_battle_of_the_map(self) -> None:
         m = world()
         clear(m)
@@ -609,7 +627,7 @@ class ReflexTest(unittest.TestCase):
         m = world()
         clear(m)
         helper = put(m, "astra", "Meridian", [("praetorian", 1), ("vigilant", 4)], order=Order("hold", "Meridian", "steady", False, "default", "", 0.0))
-        enemy = put(m, "mandate", "Cassia", [("styx", 4)], order=Order("hold", "Cassia", "steady", False, "default", "", 0.0))
+        put(m, "mandate", "Cassia", [("styx", 4)], order=Order("hold", "Cassia", "steady", False, "default", "", 0.0))
         m.sys["Cassia"].fort_hp = 0.0
         m.run(30.0)
         auto = ma.AutoAdmiral(m, "astra", "full")
@@ -619,7 +637,7 @@ class ReflexTest(unittest.TestCase):
     def test_the_capitals_spare_ships_go_into_the_field_and_its_guard_stays(self) -> None:
         m = world()
         clear(m)
-        home = put(m, "astra", "Concordia", [("praetorian", 3), ("vigilant", 8)], name="Home Fleet", zone="world")
+        put(m, "astra", "Concordia", [("praetorian", 3), ("vigilant", 8)], name="Home Fleet", zone="world")
         auto = ma.AutoAdmiral(m, "astra", "full")
         auto.think()
         names = [f.name for f in m.side_fleets("astra")]

@@ -188,7 +188,9 @@ RULES = """The war you command (what you can know and do)
 - Battles away from the Aquila follow the war's own rules, the same for both sides: numbers, classes, hulls and wings decide; strength tells like a square (twice the ships is far
   more than twice the strength: concentration wins, dispersal loses ships); defences and the defender's own ground count; the beaten side breaks off if it can, and the slow and the
   late do not always get away; there is luck. Ships that are lost stay lost; hulls heal at a depot, slowly. A fleet out of supply must fall back.
-- Where the Aquila is, the fighting is played ship by ship with her Captain in it: the fleets that come to her system fight there, and what they lose there is lost. {aquila}
+- Where the Aquila is, the fighting is played ship by ship with her Captain in it: any fleet that comes to her system (through its Gate, or standing there when she arrives) is played there
+  as the ships it really has, and what it loses there is lost. While she is there such a fleet does not move on the map: your orders to it are your intent, which its commanders on the
+  spot read (and on ASTRA's side the Captain, who is the senior officer there); when she leaves, the fleets she leaves are the map's again, where they stand. {aquila}
 - Your people's will to fight is in your picture: losses and lost worlds wear it down, victories and a safe homeland hold it up. A war ends when a capital falls, when a people's
   will is gone, or when both sides' governments agree a peace. You want a war you can win or end well, not one you only survive."""
 

@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import math
 import random
-from dataclasses import asdict, dataclass, fields, replace
+from dataclasses import dataclass, fields, replace
 from pathlib import Path
 from typing import Any
 
@@ -222,7 +222,8 @@ class Engagement:
                     if u.fighting and not u.fixed and u.hull_frac < p.flee_hull:
                         u.flee_t = 0.0
                         self.events.append((self.t, "broke off", u))
-        self._morale(dt)
+        if self.t >= self.approach_s:
+            self._morale(dt)                                              # (a fleet decides to break off once the shooting has begun: not on the strength of the numbers alone)
         # it is decided when one side has nothing left on the field: no ship fighting and none still running (the ones that run stay targets until they are out)
         pa, pb = self.alive(0), self.alive(1)
         if not pa or not pb:
