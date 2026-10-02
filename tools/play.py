@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Play ASTRA like a person, from the terminal — the client of the playtest harness (Source/ASTRA/AstraHarness.*).
 
-  tools/play.py launch [--map /Game/ASTRA/Maps/L_Bridge] [--res 1600x900] [--continue] [--nomind] [--sound] [--args "..."]
+  tools/play.py launch [--map /Game/ASTRA/Maps/L_Bridge] [--res 1600x900] [--continue] [--nomind] [--sound] [--args "..."] [--app ~/Applications/ASTRA.app]
   tools/play.py state                     where the Captain is, posture, view, fps, menu, game clock
   tools/play.py perf [SECONDS] [--label]  median frame timings: fps, game thread, render thread, GPU, dynamic resolution
   tools/play.py ship [key ...]            the ship snapshot the crew sees (optionally only some keys)
@@ -103,9 +103,20 @@ def cmd_launch(a: argparse.Namespace) -> None:
         time.sleep(0.5)
     PLAY_DIR.mkdir(parents=True, exist_ok=True)
     w, h = a.res.split("x")
-    args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), a.map, "-game", "-windowed", f"-ResX={w}", f"-ResY={h}",
-            "-astra_harness", f"-astra_harness_port={PORT}", "-unattended", "-NoVerifyGC",
-            "-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
+    if a.app:
+        # the packaged app as the player gets it (full screen on the Mac's own display, Retina, its own settings): a Development build has the
+        # harness. No -ResX/-ResY here: the engine would keep them in the player's own GameUserSettings.ini
+        app = Path(a.app).expanduser()
+        exe = next(iter(sorted((app / "Contents" / "MacOS").glob("*"))), None) if app.suffix == ".app" else app
+        if exe is None or not exe.exists():
+            print(f"no app at {app}")
+            sys.exit(1)
+        args = [str(exe), "-astra_harness", f"-astra_harness_port={PORT}", "-unattended",
+                "-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
+    else:
+        args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), a.map, "-game", "-windowed", f"-ResX={w}", f"-ResY={h}",
+                "-astra_harness", f"-astra_harness_port={PORT}", "-unattended", "-NoVerifyGC",
+                "-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
     if a.nomind:
         args.append("-astra_nomind")
     if not a.sound:
@@ -266,6 +277,7 @@ def main() -> None:
     p.add_argument("--continue", dest="cont", action="store_true")
     p.add_argument("--nomind", action="store_true")
     p.add_argument("--sound", action="store_true")
+    p.add_argument("--app", default=None, help="the packaged app (Packaged/Mac/ASTRA.app or ~/Applications/ASTRA.app) instead of the editor binary")
     p.add_argument("--args", default="")
     p.set_defaults(fn=cmd_launch)
     sub.add_parser("state").set_defaults(fn=cmd_state)
