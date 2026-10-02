@@ -224,6 +224,23 @@ def glass(name: str, tint=(0.02, 0.03, 0.035), alpha: float = 0.10) -> bpy.types
     return mt.m
 
 
+def grate_mat(name: str) -> bpy.types.Material:
+    """The walkway grate (a masked material in Unreal): dark steel with a square perforation (a checker drives the alpha)."""
+    mt = Mat(name)
+    bsdf = mt.node("ShaderNodeBsdfPrincipled", 500, 0)
+    bsdf.inputs["Base Color"].default_value = (0.05, 0.055, 0.06, 1)
+    bsdf.inputs["Metallic"].default_value = 0.8
+    bsdf.inputs["Roughness"].default_value = 0.45
+    uv = mt.node("ShaderNodeTexCoord", -600, 0)
+    ck = mt.node("ShaderNodeTexChecker", -300, 0)
+    ck.inputs["Scale"].default_value = 36.0
+    mt.link(uv, "UV", ck, "Vector")
+    mt.link(ck, "Fac", bsdf, "Alpha")
+    mt.link(bsdf, "BSDF", mt.out, "Surface")
+    mt.m.surface_render_method = "DITHERED"
+    return mt.m
+
+
 def label_mat(name: str, strength: float = 1.6) -> bpy.types.Material:
     mt = Mat(name)
     path = find([L.CACHE], "T_BRG3_Labels.png")
@@ -270,7 +287,7 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     label_mat(L.LABEL, 1.4)
     decor_mat(L.DECOR, float(os.environ.get("BRG3_DECOR", "1.8")))
     pbr(L.BRASS, srgb_to_linear("#B89A4E"), "Brushed", 1.0, (0.24, 0.42), 1.0, 0.0, 0.15, 0.5)
-    pbr("MI_BRG3_Navy", srgb_to_linear("#1F3A6B"), "PanelPaint", 1.0, (0.28, 0.45), 0.0, 0.0, 0.3, 0.3)         # navy paint: livery stripes and flight-deck markings
+    pbr("MI_BRG3_Navy", srgb_to_linear("#16294F"), "PanelPaint", 1.0, (0.28, 0.45), 0.0, 0.0, 0.3, 0.3)         # navy paint: the wainscot of the command deck
     # the Falcon's own hull instances (ship3_palette.PAINT["A"]): the nose and wings of the cockpit mesh are the hull seen from inside
     pbr("MI_HULL_A_Plate", srgb_to_linear("#D6D2C7"), "PanelPaint", 1.0, (0.30, 0.55), 0.0, 0.0, 0.25, 0.3)
     pbr("MI_HULL_A_Frame", srgb_to_linear("#4A4F55"), "Gunmetal", 1.0, (0.28, 0.55), 0.35, 0.0, 0.5, 0.5)
@@ -279,6 +296,7 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     pbr("MI_SHIP_Soil", (0.035, 0.022, 0.014), "Linen", 4.0, (0.7, 0.9), 0.0, 0.0, 0.5, 0.8)
     pbr("MI_SHIP_CrateBlue", (0.045, 0.09, 0.20), "PanelPaint", 1.0, (0.5, 0.7), 0.0, 0.0, 0.25, 0.3)
     glass(L.GLASS)
+    grate_mat("MI_ASTRA_Grate")
     for slot, info in screen_pages.items():
         surf = info.get("surface")
         if slot in bpy.data.materials:

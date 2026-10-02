@@ -322,8 +322,8 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     pbr("MI_BRG3_Leather", "LeatherBlack", (0.05, 0.055, 0.075), 2.0, (0.30, 0.50), 0.0, 0.9, 0.7, macro=0.06)
     # brushed brass: the warm line of the command deck (a thin accent, never a big surface): metal, a hint of the brushed grain
     pbr("MI_BRG3_Brass", "Brushed", srgb_to_linear("#B89A4E"), 1.0, (0.24, 0.42), 0.0, 0.15, 0.5, macro=0.03, scratch=0.04, bias=1.0)
-    # navy paint (the ASTRA Navy livery): stripes and markings on the Falcons and the flight deck; a satin paint, not a metal
-    pbr("MI_BRG3_Navy", "PanelPaint", srgb_to_linear("#1F3A6B"), 1.0, (0.28, 0.45), 0.0, 0.3, 0.3)
+    # navy paint (the ASTRA Navy blue, a shade darker than the hulls' livery): the wainscot of the command deck's corridors; a satin paint, not a metal
+    pbr("MI_BRG3_Navy", "PanelPaint", srgb_to_linear("#16294F"), 1.0, (0.28, 0.45), 0.0, 0.3, 0.3)
     pal = tex("T_BRG3_Lamps")
     make_mi(MI_DST, "MI_BRG3_Lamps", lamps, {"Intensity": 20.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_LampsDim", lamps, {"Intensity": 6.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
