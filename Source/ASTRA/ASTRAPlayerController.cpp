@@ -12,9 +12,12 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Font.h"
+#include "AstraArmory.h"
 #include "AstraCampaign.h"
 #include "AstraFighterPawn.h"
 #include "AstraHangar.h"
+#include "AstraLadderSubsystem.h"
+#include "AstraLiftSubsystem.h"
 #include "AstraLifepod.h"
 #include "AstraQuarters.h"
 #include "AstraShipSubsystem.h"
@@ -136,13 +139,50 @@ void AASTRAPlayerController::SetupInputComponent()
 		};
 		Wheel(EKeys::MouseScrollDown, 1);
 		Wheel(EKeys::MouseScrollUp, -1);
-		// the lift's panel (only while it is open)
-		auto Deck = [this](const FKey& K, int32 N)
+		// the lift's list on the car's screen (only while it is open): W / S and the arrows move the mark, Enter, Space and the left mouse button choose, a number
+		// goes to that deck, the wheel scrolls it (the keys also mean other things, which is why they act only when the list is open)
+		auto LiftKey = [this](const FKey& K, TFunction<void(UAstraLiftSubsystem*)> Do)
 		{
 			FInputKeyBinding B(FInputChord(K), IE_Pressed);
 			B.bConsumeInput = false;
-			B.KeyDelegate.GetDelegateForManualSet().BindLambda([this, N]() { if (LiftMenu.IsValid()) { ChooseDeck(N); } });
+			B.KeyDelegate.GetDelegateForManualSet().BindLambda([this, Do]()
+			{
+				UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr;
+				if (Lifts && Lifts->IsMenuOpen())
+				{
+					Do(Lifts);
+				}
+			});
 			InputComponent->KeyBindings.Add(B);
+		};
+		auto Choose = [this](UAstraLiftSubsystem* Lifts)
+		{
+			FString Notice;
+			Lifts->MenuChoose(Notice);
+			if (!Notice.IsEmpty())
+			{
+				ShowNotice(Notice, 3.5f);
+			}
+		};
+		LiftKey(EKeys::W, [](UAstraLiftSubsystem* L) { L->MenuMove(-1); });
+		LiftKey(EKeys::Up, [](UAstraLiftSubsystem* L) { L->MenuMove(-1); });
+		LiftKey(EKeys::MouseScrollUp, [](UAstraLiftSubsystem* L) { L->MenuMove(-1); });
+		LiftKey(EKeys::S, [](UAstraLiftSubsystem* L) { L->MenuMove(1); });
+		LiftKey(EKeys::Down, [](UAstraLiftSubsystem* L) { L->MenuMove(1); });
+		LiftKey(EKeys::MouseScrollDown, [](UAstraLiftSubsystem* L) { L->MenuMove(1); });
+		LiftKey(EKeys::Enter, Choose);
+		LiftKey(EKeys::SpaceBar, Choose);
+		LiftKey(EKeys::LeftMouseButton, Choose);
+		auto Deck = [this, &LiftKey](const FKey& K, int32 N)
+		{
+			LiftKey(K, [this, N](UAstraLiftSubsystem* L)
+			{
+				FString Detail;
+				if (L->GoToDeck(N, Detail))
+				{
+					ShowNotice(Detail, 3.5f);
+				}
+			});
 		};
 		Deck(EKeys::One, 1);
 		Deck(EKeys::Two, 2);
@@ -150,6 +190,9 @@ void AASTRAPlayerController::SetupInputComponent()
 		Deck(EKeys::Four, 4);
 		Deck(EKeys::Five, 5);
 		Deck(EKeys::Six, 6);
+		Deck(EKeys::Seven, 7);
+		Deck(EKeys::Eight, 8);
+		Deck(EKeys::Nine, 9);
 	}
 
 	// only add IMCs for local player controllers
@@ -215,6 +258,17 @@ void AASTRAPlayerController::ToggleSeat()
 		F->ClimbOut();
 		return;
 	}
+	// ABBORDAGGI: the armory's rack: take the weapons, or put them back
+	if (APawn* Me = GetPawn())
+	{
+		for (TActorIterator<AAstraArmoryRack> It(GetWorld()); It; ++It)
+		{
+			if (It->TryUse(Me))
+			{
+				return;
+			}
+		}
+	}
 	// a lifepod's hatch: sealed, or (abandoning ship) the way off her
 	if (APawn* Me = GetPawn())
 	{
@@ -230,11 +284,8 @@ void AASTRAPlayerController::ToggleSeat()
 				}
 				// sealed: a word on it, unless the lift is right here (pod 1-A is beside the bridge's lift doors: the lift is what the
 				// Captain came for, and E always answered "sealed")
-				bool bLiftHere = false;
-				for (TActorIterator<AAstraHangar> H(GetWorld()); H && !bLiftHere; ++H)
-				{
-					bLiftHere = H->LiftLandingNear(Me) >= 0;
-				}
+				const UAstraLiftSubsystem* LiftsHere = GetWorld()->GetSubsystem<UAstraLiftSubsystem>();
+				const bool bLiftHere = LiftsHere && LiftsHere->IsNearPanel(Me->GetActorLocation() - FVector(0.f, 0.f, Me->IsA<ACharacter>() ? Cast<ACharacter>(Me)->GetDefaultHalfHeight() : 90.f));
 				if (!bLiftHere)
 				{
 					Subtitle(-1 - It->PodName.Len(), TEXT("notice"), FString::Printf(TEXT("LIFEPOD %s"), *It->PodName),
@@ -268,29 +319,40 @@ void AASTRAPlayerController::ToggleSeat()
 			}
 		}
 	}
-	// the lift to the flight deck (or back up) when standing at one of its landings; a Falcon of Alpha on the deck
+	// a Jefferies trunk's ladder (docs/NAVE.md §8): by a niche E takes it, on it E steps off at a deck
 	if (APawn* Me = GetPawn())
 	{
-		if (LiftMenu.IsValid())
+		if (UAstraLadderSubsystem* Ladders = GetWorld() ? GetWorld()->GetSubsystem<UAstraLadderSubsystem>() : nullptr)
 		{
-			CloseLiftMenu();   // E again: never mind
-			return;
-		}
-		for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
-		{
-			const int32 From = It->LiftLandingNear(Me);
-			if (From >= 0)
+			FString Notice;
+			if (Ladders->Use(Me, Notice))
 			{
-				if (It->NumLandings() > 2)
+				if (!Notice.IsEmpty())
 				{
-					ShowLiftMenu(*It, From);
-				}
-				else
-				{
-					It->RideLift(Me, From == 0 ? 1 : 0);
+					ShowNotice(Notice, 3.f);
 				}
 				return;
 			}
+		}
+	}
+	// the lift (docs/ASCENSORI.md): at a landing's panel E calls the car; inside, it opens the list of decks on the car's screen, and chooses the one that is marked
+	if (APawn* Me = GetPawn())
+	{
+		if (UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
+		{
+			FString Notice;
+			if (Lifts->Use(Me, Notice))
+			{
+				if (!Notice.IsEmpty())
+				{
+					ShowNotice(Notice, 3.5f);
+				}
+				return;
+			}
+		}
+		// a Falcon of Alpha on the flight deck
+		for (TActorIterator<AAstraHangar> It(GetWorld()); It; ++It)
+		{
 			if (It->TryBoard(Me))
 			{
 				BoardFalcon(*It, Me);
@@ -366,6 +428,16 @@ void AASTRAPlayerController::AstraBoardFalcon()
 			SetSeated(false);
 		}
 		BoardFalcon(*It, Me);
+	}
+}
+
+void AASTRAPlayerController::AstraDeck(int32 N)
+{
+	if (UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
+	{
+		FString Detail;
+		Lifts->GoToDeck(N, Detail);
+		ShowNotice(Detail, 3.5f);
 	}
 }
 
@@ -508,10 +580,20 @@ namespace
 		TEXT("  Space           jump (low down: stand)  C              crouch · hold C: lie down\n")
 		TEXT("  Esc             pause · save · menu\n")
 		TEXT("\n")
-		TEXT("THE LIFT (at the end of the port corridor)\n")
-		TEXT("  E, then 1-6     Bridge · Crew Berthing · Mess Hall · Medbay · Main Engineering · Flight Deck\n")
+		TEXT("THE LIFTS (a panel beside each door; the car's own screen inside)\n")
+		TEXT("  E at the panel   call the car          E inside   the list of decks and places on the screen\n")
+		TEXT("  W / S, mouse     move the mark         E, click   go            1-9   that deck            Esc   close\n")
+		TEXT("  or say it: \"Deck seven\", \"Main Engineering\"; the car really moves, and the crew rides it too\n")
 		TEXT("  the Captain's quarters: the door at the end of the starboard corridor;\n")
 		TEXT("  E beside the bunk to rest (the XO wakes you if anything happens)\n")
+		TEXT("\n")
+		TEXT("ARMED (the armory, Deck 8: E at the rack takes the rifle and the sidearm)\n")
+		TEXT("  left mouse      fire (the rifle holds fire: the sidearm one round a click)\n")
+		TEXT("  right mouse     look through the sights (slower turn, steadier aim)\n")
+		TEXT("  R               reload              1 / 2    rifle / sidearm        Q   the last weapon\n")
+		TEXT("  H               holster             wheel    change weapon          the weapon is lowered when you run\n")
+		TEXT("  C, hold C       crouch / lie down: the cone of your rounds closes, you are a smaller target\n")
+		TEXT("  gamepad         right trigger fire · left trigger sights · X reload · Y last weapon · D-pad down holster\n")
 		TEXT("\n")
 		TEXT("ON THE FLIGHT DECK\n")
 		TEXT("  E               beside a Falcon of Alpha: climb in\n")
@@ -529,80 +611,6 @@ namespace
 		TEXT("                  RB boost · LB decoys · Y recover/land · X descend\n")
 		TEXT("\n")
 		TEXT("F1  this card");
-}
-
-namespace
-{
-	// the lift's decks, top to bottom, by the number on its panel: 1 the bridge (landing 0), 2 the Mess Hall (4), 3 the
-	// Medbay (3), 4 Main Engineering (2), 5 the flight deck (1)
-	constexpr int32 NumDecks = 6;
-	const int32 DeckLanding[NumDecks + 1] = {-1, 0, 5, 4, 3, 2, 1};
-	const TCHAR* DeckName[NumDecks + 1] = {TEXT(""), TEXT("BRIDGE  ·  DECK 1"), TEXT("CREW BERTHING  ·  DECK 4 C"), TEXT("MESS HALL  ·  DECK 4 B"),
-	                                       TEXT("MEDBAY  ·  DECK 6"), TEXT("MAIN ENGINEERING  ·  DECK 7"), TEXT("FLIGHT DECK  ·  DECK 9")};
-}
-
-void AASTRAPlayerController::ShowLiftMenu(AAstraHangar* Hangar, int32 From)
-{
-	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
-	if (!VC || !Hangar)
-	{
-		return;
-	}
-	CloseLiftMenu();
-	LiftHangar = Hangar;
-	UFont* Mono = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Mono.F_ASTRA_Mono"));
-	const FSlateFontInfo Font = Mono ? FSlateFontInfo(Mono, 18) : FCoreStyle::GetDefaultFontStyle("Mono", 18);
-	const FSlateFontInfo Small = Mono ? FSlateFontInfo(Mono, 12) : FCoreStyle::GetDefaultFontStyle("Mono", 12);
-	TSharedRef<SVerticalBox> List = SNew(SVerticalBox)
-		+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 12)
-		[
-			SNew(STextBlock).Font(Small).ColorAndOpacity(FLinearColor(0.55f, 0.75f, 1.f)).Text(FText::FromString(TEXT("LIFT  ·  ASN AQUILA")))
-		];
-	for (int32 N = 1; N <= NumDecks; ++N)
-	{
-		if (!Hangar->HasLanding(DeckLanding[N]))
-		{
-			continue;
-		}
-		const bool bHere = DeckLanding[N] == From;
-		List->AddSlot().AutoHeight().Padding(0, 4)
-		[
-			SNew(STextBlock).Font(Font).ColorAndOpacity(bHere ? FLinearColor(0.5f, 0.55f, 0.6f, 0.7f) : FLinearColor(0.88f, 0.92f, 0.97f))
-			.Text(FText::FromString(FString::Printf(TEXT("%d   %s%s"), N, DeckName[N], bHere ? TEXT("   (here)") : TEXT(""))))
-		];
-	}
-	List->AddSlot().AutoHeight().Padding(0, 12, 0, 0)
-	[
-		SNew(STextBlock).Font(Small).ColorAndOpacity(FLinearColor(0.6f, 0.65f, 0.7f)).Text(FText::FromString(TEXT("press a number  ·  E to stay")))
-	];
-	LiftMenu = SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)
-	[
-		SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush")).BorderBackgroundColor(FLinearColor(0.004f, 0.006f, 0.01f, 0.88f))
-		.Padding(FMargin(36, 26))
-		[
-			List
-		]
-	];
-	VC->AddViewportWidgetContent(LiftMenu.ToSharedRef(), 45);
-}
-
-void AASTRAPlayerController::CloseLiftMenu()
-{
-	if (LiftMenu.IsValid() && GetWorld() && GetWorld()->GetGameViewport())
-	{
-		GetWorld()->GetGameViewport()->RemoveViewportWidgetContent(LiftMenu.ToSharedRef());
-	}
-	LiftMenu.Reset();
-}
-
-void AASTRAPlayerController::ChooseDeck(int32 Number)
-{
-	AAstraHangar* H = LiftHangar.Get();
-	CloseLiftMenu();
-	if (H && GetPawn() && Number >= 1 && Number <= NumDecks)
-	{
-		H->RideLift(GetPawn(), DeckLanding[Number]);
-	}
 }
 
 void AASTRAPlayerController::EnsureStoryWidget()
@@ -679,6 +687,7 @@ static FLinearColor SpeakerColor(const FString& S)
 	if (S == TEXT("sensors") || S == TEXT("doctor")) { return FLinearColor(0.3f, 0.85f, 0.8f); }
 	if (S == TEXT("admiral") || S.StartsWith(TEXT("board"))) { return FLinearColor(1.f, 0.85f, 0.45f); }
 	if (S == TEXT("director")) { return FLinearColor(0.75f, 0.6f, 1.f); }
+	if (S == TEXT("computer")) { return FLinearColor(0.45f, 0.85f, 1.f); }                 // the ship's computer (the lifts answer by it)
 	if (S.StartsWith(TEXT("mess")) || S.StartsWith(TEXT("patient"))) { return FLinearColor(0.75f, 0.78f, 0.82f); }
 	if (S == TEXT("finder") || S.Contains(TEXT("field")) || S.Contains(TEXT("port"))) { return FLinearColor(0.5f, 0.9f, 0.5f); }
 	return FLinearColor(1.f, 0.45f, 0.35f);                   // the Mandate, a captor: anyone else on the channel
@@ -859,6 +868,15 @@ void AASTRAPlayerController::PlayerTick(float DeltaTime)
 			WindowHud = MakeShared<FAstraWindowHud>();
 		}
 		WindowHud->Tick(this, DeltaTime);
+		if (const UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
+		{
+			const bool bList = Lifts->IsMenuOpen();
+			if (bList != bLiftListHeld)
+			{
+				bLiftListHeld = bList;
+				SetIgnoreMoveInput(bList);              // (a counter: the chair's own hold is not undone)
+			}
+		}
 	}
 	if (!StoryWidget.IsValid())
 	{
@@ -918,7 +936,7 @@ void AASTRAPlayerController::AstraTypeTest(const FString& Text)
 void AASTRAPlayerController::OpenOrderLine()
 {
 	UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr;
-	if (!VC || OrderLine.IsValid() || LiftMenu.IsValid())
+	if (!VC || OrderLine.IsValid())
 	{
 		return;
 	}
@@ -1050,6 +1068,14 @@ void AASTRAPlayerController::ShowHelp(bool bShow)
 
 void AASTRAPlayerController::OpenMenu()
 {
+	if (UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
+	{
+		if (Lifts->IsMenuOpen())
+		{
+			Lifts->MenuClose();                         // Esc closes the car's list; the pause menu is for when there is none
+			return;
+		}
+	}
 	if (UAstraCampaignSubsystem* C = GetWorld() ? GetWorld()->GetSubsystem<UAstraCampaignSubsystem>() : nullptr)
 	{
 		if (C->IsStarted() && !C->IsMenuOpen())

@@ -1,6 +1,7 @@
 // ASTRA — deck streaming.
 
 #include "AstraDeckStreaming.h"
+#include "AstraLiftSubsystem.h"
 
 #include "ASTRA.h"
 #include "AstraShipPlan.h"
@@ -98,6 +99,15 @@ bool UAstraDeckStreaming::CaptainPosition(FVector& OutFeet) const
 	{
 		OutFeet = TestFeet;
 		return true;
+	}
+	// riding a lift car, the Captain is where the car is going: its decks load ahead of him, and the ones it passes are left alone
+	// (docs/ASCENSORI.md)
+	if (const UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
+	{
+		if (Lifts->RideFeet(OutFeet))
+		{
+			return true;
+		}
 	}
 	// only the Captain on foot is aboard in a deck: a Falcon in the void, a lifepod, the bridge's chair outside the plan: nothing to stream
 	const ACharacter* C = Cast<ACharacter>(UGameplayStatics::GetPlayerPawn(this, 0));

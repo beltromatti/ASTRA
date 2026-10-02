@@ -170,7 +170,7 @@ class BridgeAgent:
         turn = Turn(text=text, lang=lang, kind="captain")
         t0 = time.perf_counter()
         state = self.ship.snapshot()
-        ts = tools_for(state)
+        ts = tools_for(state, ctx)                                   # (inside a lift car: the ship's computer has `lift_go`)
         pending: list[tuple[ToolCall, asyncio.Task]] = []
         fired: list[ToolCall] = []
         on_call = self._on_call(turn, lang, t0, pending, ts, state, fired, captain=True, gate=gate)
@@ -209,9 +209,9 @@ class BridgeAgent:
             looked_up = any(n in LOOKUPS for n, _, _ in turn.actions)
             if not turn.cancelled:
                 if turn.actions and not comp.error and (not turn.lines or looked_up):
-                    await self._follow_up(turn, msgs, lang, readback=True)      # orders carried out in silence, or a file read: say what
+                    await self._follow_up(turn, msgs, lang, readback=True, ts=ts)      # orders carried out in silence, or a file read: say what
                 elif failures:
-                    await self._follow_up(turn, msgs, lang, readback=False)
+                    await self._follow_up(turn, msgs, lang, readback=False, ts=ts)
             self._record(user, comp.tool_calls, results, turn, main_lines)
             turn.t_end = time.perf_counter() - t0
             self.spent += turn.cost
@@ -328,7 +328,9 @@ class BridgeAgent:
             if call.name == "speak":
                 speaker = args.get("speaker", "xo")
                 st_ = self.ship.snapshot()
-                if speaker not in CREW and speaker not in _patients(st_) and speaker not in _diners(st_):
+                if speaker == "computer" and ts.lift:
+                    pass                                            # the ship's computer, in a lift car
+                elif speaker not in CREW and speaker not in _patients(st_) and speaker not in _diners(st_):
                     speaker = "doctor" if str(speaker).startswith("patient") else "xo"   # (a voice must belong to someone aboard)
                 line = (args.get("text") or "").strip()
                 if not line:
@@ -405,7 +407,7 @@ class BridgeAgent:
                                max_tokens=200)
         turn.cost += comp.cost
 
-    async def _follow_up(self, turn: Turn, msgs, lang: str, readback: bool) -> None:
+    async def _follow_up(self, turn: Turn, msgs, lang: str, readback: bool, ts: Any = None) -> None:
         notes = "\n".join(f"- {n}({json.dumps(a, ensure_ascii=False)}) {'ok' if r.get('ok') else 'FAILED'}: {r.get('detail', '')}"
                           for n, a, r in turn.actions if readback or not r.get("ok", False))
         lookup = readback and any(n in LOOKUPS for n, _, _ in turn.actions)
@@ -423,7 +425,7 @@ class BridgeAgent:
         t0 = time.perf_counter()
         state = self.ship.snapshot()
         comp = await self._llm(turn, "crew", follow, [SPEAK],
-                               self._on_call(turn, lang, t0, [], tools_for(state), state, [], captain=True), max_tokens=260)
+                               self._on_call(turn, lang, t0, [], ts or tools_for(state), state, [], captain=True), max_tokens=260)   # (the turn's own tools: in a lift car the computer may speak)
         turn.cost += comp.cost
 
     def _record(self, user: str, calls: list[ToolCall], results: dict[int, dict[str, Any]], turn: Turn, main_lines: int) -> None:
@@ -454,14 +456,17 @@ class BridgeAgent:
 
 
 EVENT_ASK = ("The Captain should hear this: the responsible officer reports it now, in one short line with speak (in the "
-             "Captain's language), unless it merely repeats what was reported in the last few seconds, or it is news that has "
+             "Captain's language), unless the Captain has already heard it from anyone on the bridge and nothing has changed since "
+             "(a victory, a retreat, a distance said once is said; the same picture again is noise), or it is news that has "
              "grown old while the bridge was busy ([happened N s ago]) and no longer matters as it stands — then say nothing, or "
              "say what it means now. When several things happened at once (they are joined by |), the officers report the one or "
              "two that matter most to the Captain right now, the most dangerous first, one short line each: the rest stays on "
              "the boards and the datapad, where the Captain can ask for it; in a battle the Captain hears many voices, and a "
              "report that changes nothing the Captain must decide is better left unsaid. Ranges, shield percentages and countdowns "
              "that move every few seconds are on the screens: say them when they cross a line that matters (into or out of our guns, "
-             "shields failing, a section gone), never as a running commentary of the same target. Within "
+             "shields failing, a section gone), never as a running commentary of the same target. A voice over the radio (an enemy "
+             "commander, an allied captain, a pilot) was heard by the Captain himself: nobody repeats or sums up what it said; an "
+             "officer speaks after it only to add what the bridge knows and it did not say. Within "
              "their own authority an officer may also act at once: with live consoles, set a mode on their own console when their "
              "delegation is auto and it keeps the Captain's intent alive; on an older build, damage control, shield facing, point "
              "defense and the radiators. To act, CALL the tool in this same turn, then say what was done — saying it without the "

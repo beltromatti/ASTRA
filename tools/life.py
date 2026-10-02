@@ -107,6 +107,11 @@ def cmd_check(_: argparse.Namespace) -> int:
         need = sum(ROSTER[d] for d, s in life["departments"].items() if s["class"] == cls)
         print(f"home {cls:8} bunks {n:4d} for {need:3d} people (shared by up to two watches: {2 * n})" + ("  NOT ENOUGH" if 2 * n < need else ""))
         bad += 1 if 2 * n < need else 0
+    sleepers = [c for c in comps if c["kind"] not in ("medbay", "quarantine") and any(s["kind"] == "sleep" for s in c.get("stations", []))]       # (the sick-bay beds are not homes)
+    reach = lambda c: any(_match(c, sel) for cls, sels in life["homes"].items() if cls != "note" for sel in sels)      # noqa: E731
+    lost = sum(sum(1 for s in c["stations"] if s["kind"] == "sleep") for c in sleepers if not reach(c))
+    print(f"sleeping places: {sum(sum(1 for s in c['stations'] if s['kind'] == 'sleep') for c in sleepers)} in {len(sleepers)} rooms; {lost} that no home selector reaches" + ("  UNUSED BUNKS" if lost else ""))
+    bad += 1 if lost else 0
     for lz in life["leisure"]["kinds"]:
         n = sum(1 for c in comps if c["kind"] in lz["kinds"] and not _walled(c, doors))
         print(f"leisure {lz['id']:12} {n:3d} rooms" + ("" if n or lz["kinds"] == ["__home"] else "  NONE"))

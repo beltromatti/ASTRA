@@ -274,12 +274,39 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 	X->SetTestSurface(true);
 	AstraXportBenchCheck(TEXT("world: the room is found on the plan"), X->IsReady() && X->GetPads().Num() == 9,
 	                     FString::Printf(TEXT("%d pads (six, the cargo pad, two emergency)"), X->GetPads().Num()));
-	// the pads stand where the plan's own visitor stations stand (d5_transporter_B1.s6 and .s7 are on pads 1 and 4, by design)
+	// the pads stand where the plan's own visitor stations stand (d5_transporter_B1.s6 and .s7 are on pads 1 and 4, by design, wherever NAVE-3 puts the room: the stations of the
+	// room that stand a pad's height above its floor are the plan's word for where the pads are)
 	{
 		const TArray<FAstraXportPad>& P = X->GetPads();
-		const FVector P1(-100.0, 1060.0, -4968.8), P4(-500.0, 1060.0, -4968.8);
-		AstraXportBenchCheck(TEXT("world: the pads stand where the kit puts them"), P.Num() >= 4 && P[0].PosCm.Equals(P1, 3.0) && P[3].PosCm.Equals(P4, 3.0),
-		                     FString::Printf(TEXT("pad 1 at (%.0f, %.0f, %.1f) cm, pad 4 at (%.0f, %.0f, %.1f)"), P[0].PosCm.X, P[0].PosCm.Y, P[0].PosCm.Z, P[3].PosCm.X, P[3].PosCm.Y, P[3].PosCm.Z));
+		FVector Origin;
+		float Yaw;
+		TArray<FVector> OnPads;
+		const FAstraLifeMap& Map = W.Life->Sim().GetMap();
+		if (X->RoomFrame(Origin, Yaw))
+		{
+			if (const int32* Ci = Map.CompByName.Find(FName(*X->RoomId())))
+			{
+				for (const int32 Pl : Map.Comps[*Ci].Places)
+				{
+					const FAstraLifePlace& Place = Map.Places[Pl];
+					if (Place.Kind == EAstraPlaceKind::Stand && FMath::Abs(Place.Pos.Z - (Origin.Z + 31.2)) < 3.0)
+					{
+						OnPads.Add(Place.Pos);
+					}
+				}
+			}
+		}
+		int32 Matched = 0;
+		for (const FVector& At : OnPads)
+		{
+			for (int32 i = 0; i < 6 && i < P.Num(); ++i)
+			{
+				Matched += FVector::DistXY(At, P[i].PosCm) < 3.0 ? 1 : 0;
+			}
+		}
+		AstraXportBenchCheck(TEXT("world: the pads stand where the kit puts them"), P.Num() >= 4 && !OnPads.IsEmpty() && Matched == OnPads.Num(),
+		                     FString::Printf(TEXT("%d of the plan's %d stands on the dais are on one of the six pads; pad 1 at (%.0f, %.0f, %.1f) cm, pad 4 at (%.0f, %.0f, %.1f)"), Matched, OnPads.Num(), P[0].PosCm.X, P[0].PosCm.Y, P[0].PosCm.Z,
+		                                      P[3].PosCm.X, P[3].PosCm.Y, P[3].PosCm.Z));
 	}
 
 	// ======================================================================================================== the Captain, the people, the ship

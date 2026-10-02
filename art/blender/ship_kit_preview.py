@@ -19,8 +19,9 @@ WORLD = (0.05, 0.052, 0.058)
 
 # custom viewpoints (room frame: eye, target, fov) for the specials and the vertical pieces
 ROOM_VIEWS = {
-    "concourse": {"spine": ((17.0, 18.0, 1.7), (0.0, 24.0, 1.5), 84), "mess": ((1.0, 10.0, 1.7), (17.7, 22.0, 1.5), 80),
-                  "lift": ((9.0, 20.0, 1.7), (0.0, 27.0, 1.6), 62)},
+    "concourse": {"spine": ((17.0, 18.0, 1.7), (0.0, 24.0, 1.5), 84), "mess": ((1.0, 10.0, 1.7), (17.7, 22.0, 1.5), 80), "axis": ((16.5, 18.0, 1.7), (0.5, 18.0, 1.8), 80),
+                  "cafe": ((8.5, 15.0, 1.7), (7.8, 6.0, 1.4), 78), "store": ((8.5, 21.0, 1.7), (7.8, 30.0, 1.4), 78), "gate": ((3.7, 1.2, 1.7), (9.0, 18.0, 1.5), 80),
+                  "wall": ((6.0, 18.0, 1.7), (17.7, 9.0, 1.6), 72), "garden": ((14.0, 8.0, 1.7), (9.0, 18.0, 1.8), 70)},
     "berth_lobby": {"entrance": ((13.5, 18.0, 1.7), (0.0, 18.0, 1.6), 84), "back": ((1.0, 6.0, 1.7), (14.6, 24.0, 1.6), 84)},
     "bow_obs": {"aft": ((1.0, 16.0, 1.7), (20.0, 16.0, 1.5), 84), "window": ((6.0, 4.0, 1.7), (20.0, 20.0, 1.5), 84),
                 "corner": ((1.0, 1.0, 1.7), (12.0, 22.0, 1.3), 84)},
@@ -74,10 +75,22 @@ ROOM_VIEWS = {
     "reaction_mass": {"door": ((18.0, 0.9, 1.65), (20.0, 12.0, 1.4), 88), "spheres": ((18.0, 4.0, 1.7), (6.0, 9.0, 1.8), 84), "right": ((22.0, 4.0, 1.7), (33.0, 9.0, 1.8), 84),
                       "back": ((38.0, 2.0, 1.7), (10.0, 10.0, 1.4), 92)},
     "crawlway": {"door": ((6.0, 0.9, 1.6), (9.0, 12.0, 1.3), 86), "manifold": ((4.0, 3.0, 1.6), (11.0, 10.0, 1.4), 80), "back": ((14.0, 2.0, 1.6), (4.0, 12.0, 1.2), 92)},
-    "shuttle_stop": {"door": ((10.0, 1.0, 1.65), (12.0, 8.0, 1.3), 86), "platform": ((2.0, 1.2, 1.7), (22.0, 6.0, 1.3), 84), "car": ((8.0, 4.8, 1.7), (13.0, 8.2, 1.3), 80),
-                     "inside": ((12.0, 6.6, 1.65), (12.0, 8.9, 1.2), 86), "tunnel": ((22.0, 3.0, 1.7), (0.3, 7.6, 1.5), 66), "back": ((22.0, 11.0, 1.8), (4.0, 3.0, 1.2), 90)},
+    "lift_bank": {"door": ((6.0, 0.9, 1.65), (5.2, 12.0, 1.4), 80), "lifts": ((7.2, 4.0, 1.65), (3.2, 9.0, 1.4), 84), "far": ((5.6, 15.0, 1.65), (5.2, 2.0, 1.4), 76),
+                  "corner_a": ((7.4, 1.2, 1.7), (4.0, 9.0, 1.3), 84), "corner_b": ((7.4, 15.0, 1.7), (4.0, 7.0, 1.3), 84)},
+    "lift_bank_o": {"door": ((6.0, 0.9, 1.65), (5.2, 12.0, 1.4), 80), "lifts": ((7.2, 4.0, 1.65), (3.2, 9.0, 1.4), 84), "far": ((5.6, 15.0, 1.65), (5.2, 2.0, 1.4), 76),
+                    "corner_a": ((7.4, 1.2, 1.7), (4.0, 9.0, 1.3), 84), "corner_b": ((7.4, 15.0, 1.7), (4.0, 7.0, 1.3), 84)},
+    "lift_bank_b": {"door": ((3.2, 0.8, 1.65), (4.0, 5.0, 1.4), 80), "lifts": ((1.0, 3.0, 1.65), (8.0, 3.2, 1.4), 80), "corner_a": ((1.0, 0.8, 1.7), (6.0, 4.5, 1.3), 84),
+                    "corner_b": ((6.8, 5.4, 1.7), (1.5, 1.5, 1.3), 84)},
+    "lift_housing_bridge": {"door": ((0.6, 2.7, 1.65), (2.0, 4.0, 1.4), 84), "lifts": ((0.6, 0.5, 1.65), (2.0, 4.2, 1.4), 84), "back": ((1.6, 4.0, 1.65), (0.2, 2.7, 1.4), 86),
+                            "corner_a": ((0.5, 6.4, 1.7), (1.9, 1.5, 1.3), 90), "corner_b": ((1.7, 0.4, 1.7), (1.0, 6.0, 1.3), 90)},
+    "shuttle_stop": {"door": ((10.0, 1.0, 1.65), (12.0, 8.0, 1.3), 86), "platform": ((2.0, 1.2, 1.7), (22.0, 6.0, 1.3), 84), "track": ((12.0, 4.4, 1.6), (12.0, 9.0, 1.0), 88),
+                     "tunnel": ((22.0, 3.0, 1.7), (0.3, 8.0, 1.5), 66), "back": ((22.0, 14.0, 1.8), (4.0, 3.0, 1.2), 90)},
     "ready_room": {"door": ((5.0, 1.0, 1.65), (5.0, 3.9, 1.35), 84), "desk": ((10.0, 3.2, 1.7), (1.0, 1.6, 1.2), 70), "window": ((6.0, 0.9, 1.65), (0.3, 2.0, 1.5), 82),
                    "lounge": ((5.6, 0.7, 1.7), (9.2, 3.2, 0.9), 78), "table": ((6.5, 3.0, 1.7), (11.4, 1.8, 1.2), 74), "back": ((11.5, 3.5, 1.7), (3.0, 1.0, 1.1), 92)},
+    # NAVE-3: the hull's small rooms (4 m deep: the standard views would stare at a wall)
+    "airlock": {"ante": ((3.6, 0.6, 1.6), (0.6, 3.2, 1.3), 96), "chamber": ((4.3, 0.5, 1.6), (7.8, 3.6, 1.3), 96), "hatch": ((5.9, 0.6, 1.5), (5.9, 4.0, 1.2), 84)},
+    "pod_bay": {"bay": ((0.5, 0.5, 1.6), (6.0, 2.5, 1.2), 100), "pods": ((4.7, 0.5, 1.6), (4.9, 3.5, 1.1), 86), "door": ((2.0, 0.4, 1.6), (4.5, 2.6, 1.0), 96)},
+    "suit_locker": {"racks": ((1.0, 0.5, 1.6), (4.0, 3.6, 1.3), 100), "bench": ((0.6, 3.4, 1.6), (6.6, 1.0, 0.9), 96)},
     "firing_range": {"door": ((10.0, 0.9, 1.65), (22.0, 9.0, 1.4), 84), "booths": ((2.6, 8.55, 1.65), (30.0, 8.55, 1.5), 62), "gallery": ((2.0, 1.4, 1.6), (26.0, 2.0, 1.4), 86),
                      "down": ((8.0, 9.5, 1.6), (39.0, 9.5, 1.6), 60), "trap": ((26.0, 9.5, 1.7), (39.7, 9.5, 1.6), 62), "back": ((38.0, 14.0, 1.7), (8.0, 4.0, 1.3), 84)},
 }
@@ -93,7 +106,7 @@ BEST = {"galley": ["corner_b"], "galley_pass": ["corner_a"], "store_dry": ["door
         "observation": ["corner_a"], "bow_obs": ["corner"], "concourse": ["spine", "lift"], "berth_lobby": ["back"], "stair_tower": ["hall", "well"],
         "lab": ["corner_a"], "workshop": ["corner_a"], "armory": ["corner_b"], "cabins": ["far"], "surgery": ["corner_a"], "quarantine": ["corner_b"],
         "pharmacy": ["corner_a"]}
-SKIP_BEST = {"observation_d14", "store_dry_d10"}
+SKIP_BEST: set = set()
 
 
 def room_views(key: str, spec: dict, names: list[str] | None) -> dict:
@@ -112,6 +125,54 @@ def room_views(key: str, spec: dict, names: list[str] | None) -> dict:
     return views
 
 
+SPOT_COLORS = {"stand": (0.1, 1.0, 0.25), "work": (1.0, 0.85, 0.0), "sit": (0.25, 0.55, 1.0), "eat": (1.0, 0.45, 0.0), "sleep": (1.0, 0.25, 0.85)}
+
+
+def _spot_material(kind: str):
+    name = f"spot_{kind}"
+    m = bpy.data.materials.get(name)
+    if m:
+        return m
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out, em = nt.nodes.new("ShaderNodeOutputMaterial"), nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (*SPOT_COLORS.get(kind, (1.0, 0.0, 0.0)), 1.0)
+    em.inputs["Strength"].default_value = 4.0
+    nt.links.new(em.outputs[0], out.inputs[0])
+    return m
+
+
+def spot_markers(spec: dict) -> None:
+    """The room's spots (people: green stand, yellow work, blue sit, orange eat, pink sleep) as discs with a facing arrow, for the plan view: a seat with no chair under it,
+    a sitter facing the wall or a worker inside a console shows at once."""
+    import bmesh
+    from mathutils import Matrix as M
+    by_kind: dict = {}
+    for s in spec.get("spots", []):
+        by_kind.setdefault(s["kind"], []).append(s)
+    for kind, lst in by_kind.items():
+        bm = bmesh.new()
+        for s in lst:
+            z = s.get("dz", 0.0) + (0.5 if kind in ("sit", "eat") else 0.9 if kind == "sleep" else 1.1)
+            bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=0.17, radius2=0.17, depth=0.06, matrix=M.Translation((s["x"], s["y"], z)))
+            yaw = math.radians(s["yaw"])
+            c, sn = math.cos(yaw), math.sin(yaw)
+            arrow = M.Translation((s["x"] + 0.34 * c, s["y"] + 0.34 * sn, z)) @ M.Rotation(yaw, 4, "Z") @ M.Diagonal((0.34, 0.045, 0.03, 1.0))
+            bmesh.ops.create_cube(bm, size=2.0, matrix=arrow)
+            tip = M.Translation((s["x"] + 0.7 * c, s["y"] + 0.7 * sn, z)) @ M.Rotation(yaw, 4, "Z") @ M.Diagonal((0.1, 0.1, 0.05, 1.0))
+            bmesh.ops.create_cube(bm, size=2.0, matrix=tip)
+        for v in bm.verts:
+            v.co.y = -v.co.y
+        me = bpy.data.meshes.new(f"spots_{kind}")
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(_spot_material(kind))
+        o = bpy.data.objects.new(f"spots_{kind}", me)
+        bpy.context.scene.collection.objects.link(o)
+
+
 def render_room(key: str, obj, out: str, samples: int, names: list[str] | None = None, plan_view: bool = True) -> list[str]:
     spec = SPEC.PREFABS[key]
     L, D, H = spec["L"], spec["D"], spec["h"]
@@ -127,6 +188,7 @@ def render_room(key: str, obj, out: str, samples: int, names: list[str] | None =
         done.append(path)
     if plan_view:
         SP.flat_light(0.5)
+        spot_markers(spec)
         cam = SP.plan_camera("plan", 0, L, 0, D, H * 0.72)
         cam.location = (L / 2, -D / 2, H * 0.72)
         path = os.path.join(out, f"room_{key}_plan.jpg")
@@ -379,6 +441,62 @@ def modules(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     return done
 
 
+def modules3(args: dict, plan, reg: dict, objs: dict) -> list[str]:
+    """NAVE-3: the service corridor (tone V) with a hatch, a branch, a bulkhead and its end; the shuttle's tunnel (tone T) with its blast gate and the buffers; a Jefferies arm (tone K) with
+    the three trunk cells stacked as three decks of a column (the top, a through cell, the bottom)."""
+    out = args["preview"]
+    _remove_instances()
+    SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
+
+    def M(tone, suf):
+        return objs.get(CAT.module_mesh(tone, suf))
+    serv = ["Straight_A", "Door_R_A", "Straight_B", "Door_L_B", "Straight_C", "T_L", "Straight_A", "Bulkhead", "Straight_B", "End"]
+    for i, suf in enumerate(serv):
+        if M("V", suf) is not None:
+            SP.instance(M("V", suf), (4.0 * i, -40.0, 0.0), 0.0)
+    tun = ["Straight_A", "Straight_B", "Straight_A", "Bulkhead", "Straight_B", "Straight_A", "End"]
+    for i, suf in enumerate(tun):
+        if M("T", suf) is not None:
+            SP.instance(M("T", suf), (4.0 * i, 30.0, 0.0), 0.0)
+    # an arm along +y from (60, 0): its first cell is the trunk, stacked over three decks
+    for k, suf in enumerate(("TrunkTopEndFwd", "TrunkEndFwd", "TrunkBottomEndFwd")):
+        if M("K", suf) is not None:
+            SP.instance(M("K", suf), (60.0, 0.0, -4.0 * k), 90.0)
+    for k in range(3):
+        if M("K", "Straight_A") is not None:
+            SP.instance(M("K", "Straight_A"), (60.0, 4.0 + 4.0 * k, 0.0), 90.0)
+    for o in objs.values():
+        o.hide_render = True
+    for i in range(len(serv)):
+        SP.rect_light(f"V{i}", (4.0 * i + 2.0, -40.0, 2.62), (3.4, 0.25), 70, (1.0, 0.82, 0.58))
+    for i in range(len(tun)):
+        SP.rect_light(f"T{i}", (4.0 * i + 2.0, 30.0, 3.2), (3.4, 0.4), 160, (0.85, 0.93, 1.0))
+        SP.rect_light(f"T{i}b", (4.0 * i + 2.0, 30.0, 3.2), (3.4, 0.4), 60, (0.8, 0.9, 1.0))
+    for k in range(3):
+        SP.rect_light(f"K{k}", (60.0, 2.0 + 4.0 * k, 2.3), (0.4, 3.4), 40, (1.0, 0.9, 0.7))
+        SP.rect_light(f"KT{k}", (60.0, 0.0, 2.3 - 4.0 * k), (3.0, 3.0), 45, (1.0, 0.9, 0.7))
+    SP.rect_light("fill", (26.0, 0.0, 6.0), (60.0, 90.0), 60.0, (1.0, 0.96, 0.9), direction=(0, 0, 1))
+    done = []
+    for name, (eye, tgt, fov) in {
+        "v_a": ((-1.5, -40.2, 1.5), (30.0, -40.0, 1.3), 80),
+        "v_door": ((6.0, -40.0, 1.5), (10.0, -39.0, 1.3), 80),
+        "v_junction": ((14.0, -40.0, 1.5), (22.0, -42.2, 1.3), 84),
+        "v_bulkhead": ((20.0, -40.2, 1.5), (31.0, -40.0, 1.4), 70),
+        "t_a": ((-1.5, 30.3, 1.6), (24.0, 30.0, 1.4), 82),
+        "t_gate": ((8.0, 30.0, 1.6), (13.0, 30.0, 1.5), 78),
+        "t_end": ((18.0, 30.0, 1.6), (27.0, 30.0, 1.0), 78),
+        "trunk_in": ((60.7, 2.0, 1.4), (58.2, 2.0, 1.5), 74),
+        "trunk_up": ((60.5, 2.0, 0.5), (58.6, 2.0, 3.6), 78),
+        "trunk_down": ((60.3, 2.0, -3.3), (58.6, 2.0, -7.0), 78),
+        "trunk_mid": ((60.7, 2.0, -2.6), (58.2, 2.0, -2.5), 74),
+    }.items():
+        cam = SP.look_camera(name, eye, tgt, fov)
+        path = os.path.join(out, f"modules3_{name}.jpg")
+        SP.render(cam, path)
+        done.append(path)
+    return done
+
+
 def bridge(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     """Deck 1: the bridge's port corridor as its builder (tools/ue_scripts/build_bridge_v3.py) lays it out with the old corridor kit (kit_corridor.py: three 4 m modules, the window
     one in the middle, panels on the walls), with the module that has the ready room's door in place of the window module, the name plate and the ready room."""
@@ -440,6 +558,76 @@ def bridge(args: dict, plan, reg: dict, objs: dict) -> list[str]:
     return done
 
 
+def car(args: dict, plan, reg: dict, objs: dict) -> list[str]:
+    """The Spine shuttle's car stopped in a stop hall: from the platform, from the track and from above."""
+    if "SM_SHIP_SpineCar" not in objs or "SM_SHIP_ShuttleStop" not in objs:
+        return []
+    key = "shuttle_stop"
+    spec = SPEC.PREFABS[key]
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
+    SP.instance(objs["SM_SHIP_ShuttleStop"], (0, 0, 0), 0, "inst_stop")
+    SP.instance(objs["SM_SHIP_SpineCar"], (L / 2, 8.0, 0.0), 0, "inst_car")
+    for o in objs.values():
+        o.hide_render = True
+    SP.spec_lights(spec, gain=1.5)
+    done = []
+    views = {"car_platform": ((5.0, 1.4, 1.65), (L / 2, 8.0, 1.2), 80), "car_side": ((L / 2, 1.0, 1.5), (L / 2, 8.0, 1.3), 70),
+             "car_nose": ((3.0, 7.6, 1.5), (L / 2 + 5, 8.0, 1.5), 66), "car_back": ((L / 2 - 4, 14.5, 1.6), (L / 2, 4.0, 1.0), 84)}
+    for name, (eye, tgt, fov) in views.items():
+        cam = SP.look_camera(name, eye, tgt, fov)
+        path = os.path.join(args["preview"], f"{name}.jpg")
+        SP.render(cam, path)
+        done.append(path)
+    return done
+
+
+def signs(args: dict, plan, reg: dict, objs: dict) -> list[str]:
+    """The wayfinding in place: a row of Spine modules with blade signs hung back to back (and a frame plate on a bulkhead), and a lift lobby with its directory over the bench."""
+    frames_b = sorted(n for n in objs if n.startswith("SM_SHIP_WayBlade_"))
+    rows_m = sorted(n for n in objs if n.startswith("SM_SHIP_WayRow_"))
+    if not frames_b or not rows_m or "SM_SHIP_P_Straight_A" not in objs or "SM_SHIP_LiftBank" not in objs:
+        return []
+    SP.setup(1280, 720, args["samples"], exposure=0.0, world=WORLD)
+    for k in range(-5, 5):
+        SP.instance(objs["SM_SHIP_P_Straight_A"], (4.0 * k, 0.0, 0.0), 0, f"inst_mod{k}")
+    z = 3.4
+    import ship_catalog as CAT
+
+    def blade(x: float, yaw: float, rows: list, tag: str) -> None:
+        sx = 1.0 if yaw == 0.0 else -1.0
+        px = x + sx * 0.03
+        SP.instance(objs[f"SM_SHIP_WayBlade_{len(rows)}"], (px, 0.0, z), yaw, f"inst_blade_{tag}")
+        for k, r in enumerate(rows):
+            SP.instance(objs[f"SM_SHIP_WayRow_{r}"], (px, 0.0, z - CAT.WAY_HANGER - CAT.WAY_FRAME_PAD - (k + 0.5) * CAT.WAY_ROW_H), yaw, f"inst_row_{tag}{k}")
+    codes = [n[len("SM_SHIP_WayRow_"):] for n in rows_m]
+    blade(2.0, 0.0, codes[:3], "a")
+    blade(2.0, 180.0, codes[3:5] or codes[:2], "b")
+    blade(-14.0, 180.0, codes[:2], "c")
+    SP.instance(objs["SM_SHIP_LiftBank"], (30.0, 0.0, 0.0), 0, "inst_lobby")
+    dirs = [n for n in objs if n.startswith("SM_SHIP_Directory_")]
+    frames = [n for n in objs if n.startswith("SM_SHIP_Frame_")]
+    if dirs:
+        SP.instance(objs[dirs[0]], (30.0 + 7.75, 8.0, 0.0), 180.0, "inst_dir")
+    if frames:
+        SP.instance(objs[frames[0]], (30.0 + 7.75, 8.0, 1.0), 180.0, "inst_frame")
+    for o in objs.values():
+        o.hide_render = True
+    SP.flat_light(1.2)
+    for xz in (-16.0, -8.0, 0.0, 8.0):
+        SP.light_at(f"corr{xz}", (xz, 0.0, 3.0), energy=900.0, color=(0.9, 0.95, 1.0), size=0.5)
+    SP.light_at("lobby", (33.0, 8.0, 3.2), energy=1200.0, color=(0.95, 0.95, 1.0), size=0.5)
+    done = []
+    views = {"signs_far": ((-18.0, 0.0, 1.65), (2.0, 0.0, 2.4), 70), "signs_near": ((-4.0, 0.4, 1.65), (2.0, 0.0, 2.4), 60),
+             "signs_back": ((10.0, -0.3, 1.65), (2.0, 0.0, 2.4), 60), "lobby_dir": ((33.5, 14.0, 1.65), (37.75, 8.0, 1.8), 70)}
+    for name, (eye, tgt, fov) in views.items():
+        cam = SP.look_camera(name, eye, tgt, fov)
+        path = os.path.join(args["preview"], f"{name}.jpg")
+        SP.render(cam, path)
+        done.append(path)
+    return done
+
+
 def run(args: dict, plan, reg: dict, objs: dict) -> None:
     os.makedirs(args["preview"], exist_ok=True)
     KEEP.clear()
@@ -450,6 +638,12 @@ def run(args: dict, plan, reg: dict, objs: dict) -> None:
             done += rooms(args, plan, reg, objs)
         elif v == "modules":
             done += modules(args, plan, reg, objs)
+        elif v == "modules3":
+            done += modules3(args, plan, reg, objs)
+        elif v == "car":
+            done += car(args, plan, reg, objs)
+        elif v == "signs":
+            done += signs(args, plan, reg, objs)
         elif v == "d1" and plan:
             done += bridge(args, plan, reg, objs)
         elif v == "d4" and plan:

@@ -97,6 +97,7 @@ struct FAstraLifePerson
 	int32 Party = INDEX_NONE;        // the incident they are working
 	int32 PartySlot = 0;
 	bool bBody = false;              // a body is moving them (the abstract step leaves their feet to it)
+	bool bCommandeered = false;      // ABBORDAGGI: a fight has them (a marine at the guns): no steps, no routes; they stand where the fight puts them
 	bool bHurry = false;
 	bool bTransit = false;           // TELETRASPORTO: the transporter has them in its buffer: not aboard, not simulated, nothing can hurt them
 	bool bAway = false;              // TELETRASPORTO: off the ship (on a world, on another ship) until the transporter brings them back
@@ -165,6 +166,8 @@ public:
 	void MoveBody(int32 Person, float Dt, float SpeedCmS);
 	/** A body carries the person now (or has let go). */
 	void SetBodied(int32 Person, bool bBody);
+	/** ABBORDAGGI: a fight takes a person over (a marine at the guns) and puts them at Pos; bOn false gives them back (they decide again from where they stand). */
+	void Commandeer(int32 Person, bool bOn, const FVector& Pos);
 	/** The speed this person walks at now (cm/s). */
 	float WalkSpeed(const FAstraLifePerson& P) const;
 

@@ -5,6 +5,7 @@
 #include "ASTRA.h"
 #include "Async/Async.h"
 #include "AstraLifeBody.h"
+#include "AstraLiftSubsystem.h"
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
 #include "Camera/PlayerCameraManager.h"
@@ -701,6 +702,15 @@ void UAstraLifeSubsystem::ManageBodies()
 		Feet = Pawn->GetActorLocation() - FVector(0.f, 0.f, Pawn->GetDefaultHalfHeight());
 	}
 	const FAstraLifeMap& Map = *MapPtr;
+	if (const UAstraLiftSubsystem* Lifts = bTestCaptain || !GetWorld() ? nullptr : GetWorld()->GetSubsystem<UAstraLiftSubsystem>())
+	{
+		// riding a lift (ASCENSORI): the people are made round the lobby he is going to, before the doors open there, and not round each deck he passes on the way
+		FVector Dest;
+		if (Lifts->RideFeet(Dest))
+		{
+			Feet = Dest;
+		}
+	}
 	if (!bCaptainSeen || FVector::Dist(Feet, LastCaptain) > 1500.f)
 	{
 		JumpGraceS = 1.6f;                               // a lift, a fade: nobody may be missing when the picture returns
@@ -724,9 +734,9 @@ void UAstraLifeSubsystem::ManageBodies()
 	for (int32 i = 0; i < Life.NumPeople(); ++i)
 	{
 		const FAstraLifePerson& P = Life.Person(i);
-		if (P.Status != 0 || P.Act == EAstraLifeAct::Dead || P.bTransit || P.bAway)
+		if (P.Status != 0 || P.Act == EAstraLifeAct::Dead || P.bCommandeered || P.bTransit || P.bAway)
 		{
-			continue;                                    // (the dead; the ones the transporter holds or has sent away: no body for them aboard)
+			continue;                                    // (the dead; the ones the marines have taken for a boarding fight; the ones the transporter holds or has sent away: no body for them aboard)
 		}
 		const bool bSettled = P.Phase == FAstraLifePerson::EPhase::Settled;
 		if (bSettled && (P.Act == EAstraLifeAct::Patient || (P.Place != INDEX_NONE && Map.Places[P.Place].External != NAME_None)))

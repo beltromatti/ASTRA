@@ -450,7 +450,8 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			LineTexts.Remove(Id);
 		}
 		AAstraCrewMember* Crew = AAstraCrewMember::FindByStation(GameWorld(), Speaker);
-		if (!Crew)
+		const bool bComputer = Speaker == TEXT("computer");
+		if (!Crew && !bComputer)
 		{
 			// not one of ours: a voice over a channel (the main viewscreen shows who is speaking)
 			ExternalLineId = Id;
@@ -471,6 +472,11 @@ void UAstraMindSubsystem::OnText(const FString& Text)
 			Wave = Crew->BeginLine(Id, Rate);
 			V.Crew = Crew;
 			V.Comp = Crew->GetVoice();
+		}
+		else if (bComputer)
+		{
+			Wave = BeginComputerLine(Id, Rate);
+			V.Comp = ComputerAudio;
 		}
 		else
 		{
@@ -670,6 +676,48 @@ UAstraVoiceWave* UAstraMindSubsystem::BeginChannelLine(int32 LineId, int32 Rate)
 	ChannelAudio->Play();
 	UE_LOG(LogASTRA, Log, TEXT("[Mind] channel voice (line %d)"), LineId);
 	return ChannelAudio->IsPlaying() ? ChannelWave.Get() : nullptr;
+}
+
+UAstraVoiceWave* UAstraMindSubsystem::BeginComputerLine(int32 LineId, int32 Rate)
+{
+	UWorld* World = GameWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+	if (ComputerAudio && (!IsValid(ComputerAudio) || ComputerAudio->GetWorld() != World))
+	{
+		ComputerAudio = nullptr;   // another world
+		ComputerWave = nullptr;
+	}
+	if (ComputerAudio && ComputerWave && ComputerWave->GetRate() == Rate && ComputerAudio->IsPlaying() && ComputerWave->GetAvailableAudioByteCount() > 0)
+	{
+		return ComputerWave;       // the last line still sounding: this one follows it
+	}
+	ComputerWave = NewObject<UAstraVoiceWave>(this);
+	ComputerWave->Setup(Rate);
+	if (!ComputerAudio)
+	{
+		// clean and all round: the car's own voice, not a channel (no band, no viewscreen caller)
+		ComputerAudio = UGameplayStatics::CreateSound2D(World, ComputerWave, 1.f, 1.f, 0.f, nullptr, true, false);
+		if (ComputerAudio)
+		{
+			ComputerAudio->bOverridePriority = true;
+			ComputerAudio->Priority = 4.f;
+		}
+	}
+	else
+	{
+		ComputerAudio->SetSound(ComputerWave);
+	}
+	if (!ComputerAudio)
+	{
+		return nullptr;
+	}
+	ComputerAudio->SetVolumeMultiplier(FAstraSettings::Get().Voices);
+	ComputerAudio->Play();
+	UE_LOG(LogASTRA, Log, TEXT("[Mind] the ship's computer (line %d)"), LineId);
+	return ComputerAudio->IsPlaying() ? ComputerWave.Get() : nullptr;
 }
 
 bool UAstraMindSubsystem::HeardOnRadio(const AAstraCrewMember* Crew)

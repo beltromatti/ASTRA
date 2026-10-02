@@ -17,6 +17,13 @@ guscio, telaio, pareti, soffitto, console, comandi, sedute, tavolo, ologramma), 
 - **I corridoi del Ponte 1** (dalla plancia all'ascensore e agli alloggi) sono ancora quelli beige del primo prototipo: un ufficio.
 - Gli schermi delle console sono veri (li disegna il gioco: `SCREEN_<postazione>_<n>`, coordinate 0–1): restano dove sono e con le loro UV.
 
+## Il confine con NAVE-3 (2/10, deciso dal lead)
+NAVE-3 ha rifatto la pianta (v2) e ora costruisce sul Ponte 1 l'**atrio dei turboascensori della plancia** (`lift_housing_bridge`, x −22,8..−21,0,
+y −8,2..−1,0, e i due pozzi tl_b1/tl_b2 a x −25,8..−22,8): vestibolo, tubi dei pozzi, tetto, e in `build_ship_interior.py` l'apertura del fondo del
+corridoio di babordo (oggi chiuso dalla vecchia alcova «LIFT» con due ante finte). Tutto ciò che sta a poppa di x −20,8 sul Ponte 1 è suo; tuoi
+sono la plancia, i due corridoi `corridor_1a_port`/`_starboard` fino a x −20,8 (il loro fondo resta APERTO verso l'atrio), gli alloggi del Capitano,
+la ready room solo se serve (è un prefab di NAVE-3: chiedi). Gli ascensori sono del motore (AstraLift*: porte, cornici, vetture): non si toccano.
+
 ## Cosa costruire
 1. **La plancia al minimo dettaglio**: pavimento con canali di luce e intarsi, luce d'architettura (gole, bordi, strisce che virano al rosso in
    allarme), console ricche da vicino (comandi fisici, pannelli olografici, maniglie, targhe), pareti composte, piccoli oggetti di chi ci lavora,

@@ -227,6 +227,8 @@ public:
 	// ------------------------------------------------------------------------------------------------ for the world around it
 	/** The room's place in the world (cm): where the dais, the chief's stand and the wall screen are; false before the plan is read. */
 	bool RoomFrame(FVector& OutOriginCm, float& OutYawDeg) const;
+	/** The plan's id of the room (d5_transporter_B1), empty before the plan is read. */
+	const FString& RoomId() const { return RoomCompId; }
 	FVector LocalToWorldCm(const FVector& LocalM) const;
 	FVector ChiefStandCm() const;
 	float ChiefYaw() const;

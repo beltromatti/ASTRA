@@ -1157,14 +1157,44 @@ void FAstraLifeSim::SetBodied(int32 Idx, bool bBody)
 	}
 }
 
+void FAstraLifeSim::Commandeer(int32 Idx, bool bOn, const FVector& Pos)
+{
+	if (!People.IsValidIndex(Idx))
+	{
+		return;
+	}
+	FAstraLifePerson& P = People[Idx];
+	if (bOn)
+	{
+		if (!P.bCommandeered)
+		{
+			Release(P, Idx);
+			P.Route.Clear();
+			P.Phase = FAstraLifePerson::EPhase::Settled;
+			P.bBody = false;
+			P.Act = EAstraLifeAct::Battle;
+			P.bCommandeered = true;
+		}
+		P.Pos = Pos;
+		return;
+	}
+	if (P.bCommandeered)
+	{
+		P.bCommandeered = false;
+		P.Pos = Pos;
+		P.Episode = -1;                                  // they choose again from where they stand
+		P.LastStep = GameT;
+	}
+}
+
 void FAstraLifeSim::StepPerson(int32 Idx)
 {
 	FAstraLifePerson& P = People[Idx];
 	const float Dt = (float)FMath::Clamp(GameT - P.LastStep, 0.0, 900.0);
 	P.LastStep = GameT;
-	if (P.Status == 2 || P.bTransit || P.bAway)
+	if (P.Status == 2 || P.bCommandeered || P.bTransit || P.bAway)
 	{
-		return;                                       // (the dead; the ones the transporter holds or has sent away)
+		return;                                       // (the dead; the ones the marines have taken for a fight; the ones the transporter holds or has sent away)
 	}
 	++Counters.Steps;
 	if (P.Phase == FAstraLifePerson::EPhase::Walking && !P.bBody)
@@ -1849,6 +1879,10 @@ FString FAstraLifeSim::Doing(int32 Person) const
 	if (P.bTransit || P.bAway)
 	{
 		return P.bTransit ? FString(TEXT("in the transporter's buffer")) : (P.AwayText.IsEmpty() ? FString(TEXT("away from the ship")) : P.AwayText);
+	}
+	if (P.bCommandeered)
+	{
+		return FString::Printf(TEXT("fighting the boarders with their squad (%s)"), *Map->Describe(CompOf(Person)));
 	}
 	const bool bWalk = P.Phase != FAstraLifePerson::EPhase::Settled;
 	const FString Here = Map->Describe(P.Place != INDEX_NONE ? Map->Places[P.Place].Comp : CompOf(Person));

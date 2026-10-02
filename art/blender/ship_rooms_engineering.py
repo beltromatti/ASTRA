@@ -1,5 +1,5 @@
 """ASN Aquila interior kit: the engineering rooms of the lower decks (NAVE-2) — the radiator manifold and the pump rooms, the machinery spaces (air and water
-handling, compressors), the damage control locker, power control and the capacitor hall. Frames and sizes: ship_rooms.py / ship_spec.py."""
+handling, compressors), power control and the capacitor hall. Frames and sizes: ship_rooms.py / ship_spec.py."""
 from __future__ import annotations
 
 import math
@@ -272,7 +272,7 @@ def machinery(name: str = "SM_SHIP_Machinery"):
     place(b, xl + 0.35, 10.0, 0, F.locker_row, 4, 0.45, 1.95, 0.5, COMPOSITE)
     place(b, 14.0, 2.0, 90, F.desk, 1.6, 0.7, 0.8, STEEL, False)
     place(b, 14.0, 2.0, 90, F.monitor, 0.5, 0.3, "scr_ship", False, z=0.8)
-    place(b, 14.0, 1.0, -90, H.chair_op, FABRIC_RUST)
+    place(b, 14.0, 2.9, -90, H.chair_op, FABRIC_RUST)                                   # the screen faces +y: the machinist sits on that side
     dress_wall(b, "near", L, D, H_, 12.0, 23.5, 7, accent="engineering", accent_dim="engineering_dim", kinds=("plain", "vent", "panelboard", "safety"))
     ceiling_services(b, L, D, H_, [(4.0, "duct"), (8.6, "pipes")], 1.0, 23.0, 9)
     ceiling_panels(b, L, D, H_, 4, 3, "white_warm", 1.6, 1.2, 0.6, LAMP_HOT)
@@ -312,36 +312,6 @@ def machinery_b(name: str = "SM_SHIP_MachineryB"):
 
 
 # ------------------------------------------------------------------------------------------------------------------ damage control locker
-def dc_locker(name: str = "SM_SHIP_DcLocker"):
-    """12 x 16 x 3.4: a wall of red-doored lockers with hose reels, a rack of breathing apparatus, a workbench with hull-patch plates and shoring props, a status board."""
-    spec, L, D, H_ = _dims("dc_locker")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
-    build_shell(b, spec, _style("red_dim", "white_warm"))
-    yf = D - WS - WF
-    xl, xr = WS + WF, L - WS - WF
-    for k in range(4):                                                                                              # lockers along the far wall, red doors
-        place(b, 1.4 + k * 2.4, yf - 0.3, -90, F.locker_row, 4, 0.5, 2.1, 0.55, PAINT_RED)
-    place(b, xl + 0.02, 7.0, 0, hose_reel, 0.4, PAINT_RED)
-    place(b, xl + 0.02, 9.2, 0, hose_reel, 0.4, PAINT_RED)
-    place(b, xr - 0.02, 8.0, 180, scba_rack, 6, 0.32)
-    place(b, xr - 0.02, 12.0, 180, H.wall_rack_panel, 3.0, 2.0, "scr_ship", "red")
-    place(b, 6.0, 7.5, 90, G.workbench, 3.0, 0.8, 0.95, True)
-    # shoring props against the wall and hull patch plates leaning on it
-    for k, x in enumerate((9.0, 9.5, 10.0, 10.5)):
-        b.body.cyl((x, 3.0, 0.0), (x, 3.0, 2.3), 0.05, CRATE_ORANGE, seg=8)
-        b.fine.cyl((x, 3.0, 2.3), (x, 3.0, 2.38), 0.08, STEEL, seg=8)
-    for k in range(3):
-        b.body.box((2.0 + k * 0.5, 3.0, 0.0), (2.08 + k * 0.5, 3.8, 1.2 + k * 0.1), STEEL)
-        b.fine.box((2.0 + k * 0.5, 3.0, 0.5), (2.09 + k * 0.5, 3.8, 0.56), PAINT_RED)
-    place(b, 9.6, 5.4, 90, F.crate, 0.9, 0.6, 0.5, CRATE_ORANGE, "eq_dc", False)
-    place(b, 9.6, 5.4, 90, F.crate, 0.8, 0.55, 0.4, CRATE_GREY, None, False, z=0.5)
-    on_wall(b, "left", L, D, W.extinguisher, b.body, 3.0, 0.0)
-    on_wall(b, "left", L, D, W.first_aid, b.body, 4.0, 1.4)
-    b.emit.label((6.0, WF + 0.02, 2.7), 1.6, 0.4, (0, 1, 0), "eq_dc")
-    b.emit.label((3.0, 6.0, 0.006), 4.0, 0.2, (0, 0, 1), "hazard_h", up=(0, 1, 0))
-    ceiling_services(b, L, D, H_, [(5.0, "pipes")], 1.0, 11.0, 2)
-    ceiling_panels(b, L, D, H_, 2, 3, "white_warm", 1.4, 1.0, 0.5, LAMP_HOT)
-    return b.build(name)
 
 
 # ------------------------------------------------------------------------------------------------------------------------ power control

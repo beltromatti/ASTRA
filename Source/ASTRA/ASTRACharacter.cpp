@@ -10,6 +10,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ASTRAPlayerController.h"
 #include "AstraInput.h"
+#include "AstraFpsComponent.h"
+#include "AstraLadderSubsystem.h"
 #include "Engine/World.h"
 #include "ASTRA.h"
 
@@ -48,6 +50,9 @@ AASTRACharacter::AASTRACharacter()
 	FirstPersonCameraComponent->bEnableFirstPersonScale = true;
 	FirstPersonCameraComponent->FirstPersonFieldOfView = 70.0f;
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
+
+	// ABBORDAGGI: the weapons in his hands
+	Fps = CreateDefaultSubobject<UAstraFpsComponent>(TEXT("Fps"));
 
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);
@@ -101,6 +106,20 @@ void AASTRACharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	EIC->BindAction(In->Sprint, ETriggerEvent::Completed, this, &AASTRACharacter::SprintEnd);
 	EIC->BindAction(In->Crouch, ETriggerEvent::Started, this, &AASTRACharacter::CrouchPressed);
 	EIC->BindAction(In->Crouch, ETriggerEvent::Completed, this, &AASTRACharacter::CrouchReleased);
+	// ABBORDAGGI: the weapons (UAstraFpsComponent)
+	if (Fps)
+	{
+		EIC->BindAction(In->Fire, ETriggerEvent::Started, Fps, &UAstraFpsComponent::FirePressed);
+		EIC->BindAction(In->Fire, ETriggerEvent::Completed, Fps, &UAstraFpsComponent::FireReleased);
+		EIC->BindAction(In->Aim, ETriggerEvent::Started, Fps, &UAstraFpsComponent::AimPressed);
+		EIC->BindAction(In->Aim, ETriggerEvent::Completed, Fps, &UAstraFpsComponent::AimReleased);
+		EIC->BindAction(In->Reload, ETriggerEvent::Started, Fps, &UAstraFpsComponent::ReloadPressed);
+		EIC->BindAction(In->Weapon1, ETriggerEvent::Started, Fps, &UAstraFpsComponent::SelectRifle);
+		EIC->BindAction(In->Weapon2, ETriggerEvent::Started, Fps, &UAstraFpsComponent::SelectPistol);
+		EIC->BindAction(In->QuickSwitch, ETriggerEvent::Started, Fps, &UAstraFpsComponent::QuickSwitch);
+		EIC->BindAction(In->Holster, ETriggerEvent::Started, Fps, &UAstraFpsComponent::ToggleHolster);
+		EIC->BindAction(In->WeaponWheel, ETriggerEvent::Triggered, Fps, &UAstraFpsComponent::WheelInput);
+	}
 }
 
 
@@ -119,12 +138,19 @@ void AASTRACharacter::MoveInput(const FInputActionValue& Value)
 			return;
 		}
 	}
+	// on a Jefferies ladder: W and S climb and go down (AstraLadderSubsystem places him while he climbs)
+	if (UAstraLadderSubsystem* Ladder = GetWorld() ? GetWorld()->GetSubsystem<UAstraLadderSubsystem>() : nullptr; Ladder && Ladder->ClimbInput(this, MovementVector))
+	{
+		return;
+	}
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
 void AASTRACharacter::LookInput(const FInputActionValue& Value)
 {
-	const FVector2D LookAxisVector = Value.Get<FVector2D>();
+	// ABBORDAGGI: through the sights the turn is slower, as the field of view is narrower
+	const float Scale = Fps ? Fps->LookMultiplier() : 1.f;
+	const FVector2D LookAxisVector = Value.Get<FVector2D>() * Scale;
 	DoAim(LookAxisVector.X, LookAxisVector.Y);
 }
 
@@ -254,7 +280,8 @@ void AASTRACharacter::Tick(float DeltaSeconds)
 	}
 	const float Want = Posture == EAstraPosture::Prone ? ProneSpeed : Posture == EAstraPosture::Crouched ? CrouchSpeed
 	                 : (bSprintHeld && bMovingForward ? SprintSpeed : WalkSpeed);
-	Move->MaxWalkSpeed = FMath::FInterpTo(Move->MaxWalkSpeed, Want, DeltaSeconds, 6.f);
+	// ABBORDAGGI: a weapon in the hands slows him (through the sights, more)
+	Move->MaxWalkSpeed = FMath::FInterpTo(Move->MaxWalkSpeed, Want * (Fps ? Fps->MoveMultiplier() : 1.f), DeltaSeconds, 6.f);
 	const float Target = TargetEyeZ();
 	if (!FMath::IsNearlyEqual(EyeZ, Target, 0.1f))
 	{

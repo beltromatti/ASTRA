@@ -696,8 +696,13 @@ bool UAstraTransporterSubsystem::ResolveSubjects(const FAstraXportOrder& O, TArr
 			Sub.FromYaw = P.TargetYaw;
 			const int32 C = L->Sim().CompOf(Person);
 			Sub.FromComp = L->Sim().GetMap().Comps.IsValidIndex(C) ? L->Sim().GetMap().Comps[C].Id.ToString() : FString();
+			// whoever the marines have taken for a boarding fight is the fight's (ABBORDAGGI: a soldier's body of its own stands where the fight puts it): the pattern would stay behind
+			if (P.bCommandeered)
+			{
+				Sub.S.Barred = FString::Printf(TEXT("%s is in the fight with the boarders, with their squad: the marines have them, and a pattern cannot be lifted out of a fight under way"), *Sub.S.Label);
+			}
 			// whoever holds a post that has an actor of its own (a bridge station, a bed of the ward) cannot be taken from it: the actor would stay behind
-			if (P.Place != INDEX_NONE && L->Sim().GetMap().Places.IsValidIndex(P.Place) && L->Sim().GetMap().Places[P.Place].External != NAME_None)
+			else if (P.Place != INDEX_NONE && L->Sim().GetMap().Places.IsValidIndex(P.Place) && L->Sim().GetMap().Places[P.Place].External != NAME_None)
 			{
 				const FString Post = L->Sim().GetMap().Places[P.Place].External.ToString();
 				Sub.S.Barred = Post.StartsWith(TEXT("patient")) ? FString::Printf(TEXT("%s lies in the Medbay under the doctors' care"), *Sub.S.Label)
@@ -853,7 +858,7 @@ bool UAstraTransporterSubsystem::ResolveSubjects(const FAstraXportOrder& O, TArr
 				for (int32 i = 0; i < L->Sim().NumPeople(); ++i)
 				{
 					const FAstraLifePerson& Pe = L->Sim().Person(i);
-					if (Pe.Status != 0 || Pe.bAway || Pe.bTransit || S->GetRoster().Get()[Pe.Roster].Dept != TEXT("marines") || Seen.Contains(FString::Printf(TEXT("npc%d"), Pe.Roster)))
+					if (Pe.Status != 0 || Pe.bAway || Pe.bTransit || Pe.bCommandeered || S->GetRoster().Get()[Pe.Roster].Dept != TEXT("marines") || Seen.Contains(FString::Printf(TEXT("npc%d"), Pe.Roster)))
 					{
 						continue;
 					}

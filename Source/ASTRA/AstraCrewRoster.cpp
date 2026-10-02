@@ -24,7 +24,7 @@ namespace
 		TEXT("Ricci"), TEXT("Patel"), TEXT("Halvorsen"), TEXT("Aziz"), TEXT("Navarro"), TEXT("Eriksen"), TEXT("Dlamini"), TEXT("Nakamura"),
 		TEXT("Ortega"), TEXT("Volkov"), TEXT("Schreiber"), TEXT("Costa"), TEXT("Kimura"), TEXT("Bello"), TEXT("Serrano"), TEXT("Orlov"),
 		TEXT("Sharma"), TEXT("Holm"), TEXT("El-Amin"), TEXT("Ferreira"), TEXT("Lund"), TEXT("Boateng"), TEXT("Romano"), TEXT("Mehta"),
-		TEXT("Strand"), TEXT("Castillo"), TEXT("Hosseini"), TEXT("Watanabe"), TEXT("Nwosu"), TEXT("Novak"), TEXT("Reyes"), TEXT("Dahl"),
+		TEXT("Strand"), TEXT("Castillo"), TEXT("Hosseini"), TEXT("Watanabe"), TEXT("Nwosu"), TEXT("Novak"), TEXT("Reynoso"), TEXT("Dahl"),    // (not "Reyes": Major Tomás Reyes commands the marines, and the locator must find one)
 		TEXT("Farahani"), TEXT("Adeyemi"), TEXT("Marchetti"), TEXT("Zhang"), TEXT("Obi"), TEXT("Keller"), TEXT("Kahale"), TEXT("Nasser"),
 		TEXT("Solberg"), TEXT("Medina"), TEXT("Ishikawa"), TEXT("Yilmaz"), TEXT("Barros"), TEXT("Voigt"), TEXT("Mokoena"), TEXT("Lopes"),
 		TEXT("Hayashi"), TEXT("Qureshi"), TEXT("Ivanova"), TEXT("Brandt"), TEXT("Owusu"), TEXT("Conti"), TEXT("Wallin"), TEXT("Carter"),
@@ -140,6 +140,15 @@ namespace
 		{TEXT("ejected from a burning cockpit: burns on the neck and a dislocated shoulder"), 1},
 		{TEXT("picked up after an hour adrift: hypothermia and a broken ankle"), 0},
 		{TEXT("ejected at high speed: a fractured pelvis"), 2}};
+	const FRosterInjury InjGunfire[] = {
+		{TEXT("a rifle round through the thigh: a broken femur and heavy blood loss"), 2},
+		{TEXT("a round through the shoulder, the collarbone shattered"), 1},
+		{TEXT("two rounds stopped by the armour plate: cracked ribs and a bruised lung"), 1},
+		{TEXT("a graze along the scalp and a concussion"), 0},
+		{TEXT("a round through the forearm, the bone broken"), 1},
+		{TEXT("a round in the abdomen below the plate: straight to surgery"), 2},
+		{TEXT("fragments of a round that came apart on a bulkhead, in the face and neck"), 1},
+		{TEXT("a through-and-through wound of the calf"), 0}};
 	const FRosterInjury InjOther[] = {
 		{TEXT("shrapnel wounds in the side"), 1},
 		{TEXT("a broken arm and heavy bruising"), 0},
@@ -296,7 +305,7 @@ FString FAstraCrewRoster::Casualties(int32 Deck, int32 W, int32 K, FRandomStream
 					else
 					{
 						const FRosterInjury& J = Cause == TEXT("hull breach") ? RosterPickInjury(InjBreach, R) : Cause == TEXT("fire") ? RosterPickInjury(InjFire, R)
-						                 : Cause == TEXT("conduit damage") ? RosterPickInjury(InjConduit, R) : RosterPickInjury(InjOther, R);
+						                 : Cause == TEXT("conduit damage") ? RosterPickInjury(InjConduit, R) : Cause == TEXT("gunfire") ? RosterPickInjury(InjGunfire, R) : RosterPickInjury(InjOther, R);
 						Admit(i, J.Text, RosterConditionFor(J.Severity, R));
 					}
 					Out.Add(FString::Printf(TEXT("%s (%s, from %s)"), *People[i].Name(), *People[i].Dept, *People[i].Home));

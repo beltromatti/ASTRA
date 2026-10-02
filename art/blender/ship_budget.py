@@ -27,7 +27,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ship_plan as P  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-LIMITS = {"mesh_tris": 150_000, "resident_components": 1500, "resident_doors": 400, "resident_lamps": 12000}
+# resident_doors: NAVE-3's decks have more rooms and more doors than NAVE-2's (96-208 per deck instead of ~100); a door far from the Captain ticks 4 times a second (AstraDoor.cpp), so the
+# ceiling went from 400 to 600 for the three decks the Captain keeps loaded: the lead's walk decides
+LIMITS = {"mesh_tris": 150_000, "resident_components": 1500, "resident_doors": 600, "resident_lamps": 12000}
 
 
 def load_stats(path: str | None) -> dict:
@@ -62,7 +64,7 @@ def deck_budget(plan: dict, deck: int, stats: dict, chunk: float) -> dict:
             comps.add(key)
             sections += max(1, len(st["slots"]))
     lamps = sum(len(c.get("lights", [])) for c in plan["compartments"] if c["deck"] == deck)
-    doors = sum(1 for d in plan["doors"] if d["deck"] == deck and not d.get("existing") and not d.get("planned"))
+    doors = sum(1 for d in plan["doors"] if d["deck"] == deck and not d.get("existing") and not d.get("planned") and not d.get("lift"))   # (a lift's landing door is AstraLift's)
     rooms = sum(1 for c in plan["compartments"] if c["deck"] == deck and c.get("status") == "built" and c.get("prefab"))
     top = sorted(meshes, key=lambda m: -stats[m]["tris"] * meshes[m])[:3]
     return {"deck": deck, "name": next((d["name"] for d in plan["decks"] if d["id"] == deck), ""), "placements": len(pls), "by_class": by_class, "meshes": len(meshes),

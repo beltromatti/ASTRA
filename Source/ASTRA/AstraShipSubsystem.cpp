@@ -1,7 +1,9 @@
 // ASTRA — ship simulation.
 
 #include "AstraShipSubsystem.h"
+#include "AstraLiftSubsystem.h"
 #include "AstraLifeSubsystem.h"
+#include "AstraBoardSubsystem.h"
 #include "AstraHarness.h"
 #include "AstraStations.h"
 #include "AstraTransporterSubsystem.h"
@@ -1772,19 +1774,29 @@ FString UAstraShipSubsystem::CaptainAboard() const
 			            "officers speak by intercom");
 		}
 	}
+	// in a lift: the car and where it is (a shaft runs through many decks)
+	const UAstraLiftSubsystem* Lifts = GetWorld()->GetSubsystem<UAstraLiftSubsystem>();
+	const FVector Feet = P ? P->GetActorLocation() - FVector(0.f, 0.f, Cast<ACharacter>(P) ? Cast<ACharacter>(P)->GetDefaultHalfHeight() : 90.f) : FVector::ZeroVector;
+	FString LiftPlace;
+	int32 LiftDeck = 0;
+	if (Lifts && P && Lifts->CaptainPlace(Feet, LiftPlace, LiftDeck))
+	{
+		return FString::Printf(TEXT("in a lift car (%s), away from the bridge: the XO has the conn; the bridge officers speak by intercom"), *LiftPlace);
+	}
 	// anywhere else aboard: the compartment of the ship's plan (the bridge is one of them)
 	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P); Comp && Comp->Kind != TEXT("bridge"))
 	{
+		const int32 Deck = Comp->Kind == TEXT("lift") && Lifts ? FMath::Max(Lifts->DeckNearZ(Feet.Z), 1) : Comp->Deck;
 		FString PlanDeck;
 		if (const UAstraShipPlan* Plan = GetWorld()->GetSubsystem<UAstraShipPlan>())
 		{
 			for (const FAstraPlanDeck& D : Plan->GetDecks())
 			{
-				if (D.Id == Comp->Deck) { PlanDeck = D.Name; }
+				if (D.Id == Deck) { PlanDeck = D.Name; }
 			}
 		}
 		return FString::Printf(TEXT("in the %s (Deck %d%s, section %s), away from the bridge: the XO has the conn; the bridge officers speak "
-		                            "by intercom"), *PlanRoomName(*Comp), Comp->Deck, PlanDeck.IsEmpty() ? TEXT("") : *(TEXT(" · ") + PlanDeck),
+		                            "by intercom"), *PlanRoomName(*Comp), Deck, PlanDeck.IsEmpty() ? TEXT("") : *(TEXT(" · ") + PlanDeck),
 		                       *Comp->Section);
 	}
 	if (P && P->GetActorLocation().Z < -3000.f)
@@ -1817,6 +1829,15 @@ FString UAstraShipSubsystem::CaptainPlace() const
 	{
 		if (It->IsPawnInside(P)) { return TEXT("DECK 1 · CAPTAIN'S QUARTERS"); }
 	}
+	// in a lift: the car and the deck it is at, or where it is going ("DECK 7 · SERVICE LIFT 1"); a shaft runs through many decks, so its compartment cannot say which
+	const UAstraLiftSubsystem* Lifts = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr;
+	const FVector Feet = P ? P->GetActorLocation() - FVector(0.f, 0.f, Cast<ACharacter>(P) ? Cast<ACharacter>(P)->GetDefaultHalfHeight() : 90.f) : FVector::ZeroVector;
+	FString InLift;
+	int32 LiftDeck = 0;
+	if (Lifts && P && Lifts->CaptainPlace(Feet, InLift, LiftDeck))
+	{
+		return InLift;
+	}
 	// anywhere else aboard: the compartment of the ship's plan, as the signs say it ("DECK 4 · MESS CONCOURSE · SECTION B")
 	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P))
 	{
@@ -1824,7 +1845,8 @@ FString UAstraShipSubsystem::CaptainPlace() const
 		{
 			return TEXT("BRIDGE");
 		}
-		return FString::Printf(TEXT("DECK %d · %s · SECTION %s"), Comp->Deck, *PlanRoomName(*Comp).ToUpper(), *Comp->Section);
+		const int32 Deck = Comp->Kind == TEXT("lift") && Lifts ? FMath::Max(Lifts->DeckNearZ(Feet.Z), 1) : Comp->Deck;
+		return FString::Printf(TEXT("DECK %d · %s · SECTION %s"), Deck, *PlanRoomName(*Comp).ToUpper(), *Comp->Section);
 	}
 	if (P && P->GetActorLocation().Z < -3000.f)
 	{
@@ -1855,7 +1877,16 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (const FAstraPlanCompartment* Comp = PlanCompartmentOf(GetWorld(), P))
 	{
-		C->SetNumberField(TEXT("deck"), Comp->Deck);                      // where a fire, a breach, a team is, against where the Captain is
+		// where a fire, a breach, a team is, against where the Captain is (in a lift's shaft, the deck of his car or of the floor at his feet)
+		const UAstraLiftSubsystem* Lifts = GetWorld()->GetSubsystem<UAstraLiftSubsystem>();
+		const FVector Feet = P ? P->GetActorLocation() - FVector(0.f, 0.f, Cast<ACharacter>(P) ? Cast<ACharacter>(P)->GetDefaultHalfHeight() : 90.f) : FVector::ZeroVector;
+		FString Unused;
+		int32 Deck = Comp->Deck;
+		if (Lifts && !Lifts->CaptainPlace(Feet, Unused, Deck) && Comp->Kind == TEXT("lift"))
+		{
+			Deck = FMath::Max(Lifts->DeckNearZ(Feet.Z), 1);
+		}
+		C->SetNumberField(TEXT("deck"), Deck);
 		C->SetStringField(TEXT("section"), Comp->Section);
 	}
 	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0);
@@ -1916,6 +1947,14 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::CaptainContext() const
 		Ch->SetBoolField(TEXT("muted"), false);
 		C->SetObjectField(TEXT("channel"), Ch);
 	}
+	// in a lift car: which, where it is, the stops it serves (the ship's computer takes the ride, docs/ASCENSORI.md)
+	if (const UAstraLiftSubsystem* L = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr)
+	{
+		if (const TSharedPtr<FJsonObject> J = L->ContextJson(); J.IsValid())
+		{
+			C->SetObjectField(TEXT("lift"), J);
+		}
+	}
 	return C;
 }
 
@@ -1968,6 +2007,12 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		}
 		FAstraTimeline::Record(TEXT("cmd"), FString::Printf(TEXT("%s %s"), *Name, *ArgsText.Left(300)));
 	}
+	// the ship's computer rides the Captain's lift car where he asked to go (docs/ASCENSORI.md)
+	if (Name == TEXT("lift_go"))
+	{
+		UAstraLiftSubsystem* L = GetWorld() ? GetWorld()->GetSubsystem<UAstraLiftSubsystem>() : nullptr;
+		return L ? L->GoByVoice(Args, OutDetail) : false;
+	}
 	// the bridge stations' persistent modes (docs/ARCHITETTURA.md §4)
 	if (Name == TEXT("station"))
 	{
@@ -1978,6 +2023,17 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 			Args->TryGetStringField(TEXT("by"), By);
 		}
 		return St ? St->SetMode(Args, By.IsEmpty() ? TEXT("officer") : By, OutDetail) : false;
+	}
+	// ABBORDAGGI: a boarding and the marines' orders are the board subsystem's
+	if (Name == TEXT("boarding") || Name == TEXT("marine_order") || Name == TEXT("lockdown"))
+	{
+		UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr;
+		if (!Board)
+		{
+			OutDetail = TEXT("the ship's marines are not available");
+			return false;
+		}
+		return Board->HandleCommand(Name, Args, OutDetail);
 	}
 	if (!Args.IsValid())
 	{
@@ -2823,6 +2879,11 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	{
 		S->SetObjectField(TEXT("transporter"), Xport->SnapshotJson());   // TELETRASPORTO: the Transporter Room's console, as the Chief reads it
 	}
+	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && Board->IsActive())
+	{
+		S->SetObjectField(TEXT("boarding"), Board->Snapshot());  // ABBORDAGGI: boarders aboard: the fight as the bridge knows it
+		S->SetObjectField(TEXT("_marines"), Board->MarinesPicture());   // (and as the marines' net reads it: squads, places, bulkheads; the `_` keeps it out of the bridge crew's board)
+	}
 	return S;
 }
 
@@ -3336,7 +3397,7 @@ void UAstraShipSubsystem::OnDoorPlaced(AAstraDoor* Door)
 		return;
 	}
 	DoorActors.FindOrAdd(Interior.GetMap().Doors[Di].Id) = Door;
-	if (Interior.SealedDoors().Contains(Di))
+	if (Interior.SealedDoors().Contains(Di) || ExternalSeals.Contains(Di))
 	{
 		ApplyDoorSeal(Di, Door, true);
 	}
@@ -3369,6 +3430,64 @@ void UAstraShipSubsystem::ApplyDoorSeal(int32 DoorIndex, AAstraDoor* Door, bool 
 	{
 		Fx->DressDoor(Door, bSealed);
 	}
+}
+
+void UAstraShipSubsystem::ShutBulkhead(FName Id, bool bSealed)
+{
+	if (UAstraShipPlan* Plan = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipPlan>() : nullptr)
+	{
+		Plan->SetDoorSealed(Id.ToString(), bSealed);
+	}
+	const int32 Di = Interior.IsReady() ? Interior.GetMap().DoorByName.FindRef(Id, INDEX_NONE) : INDEX_NONE;
+	if (AAstraDoor* A = DoorActorOf(Id))
+	{
+		ApplyDoorSeal(Di, A, bSealed);
+	}
+	if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr; Fx && Di != INDEX_NONE)
+	{
+		Fx->OnBulkhead(Interior.GetMap().Doors[Di].PosCm, bSealed);
+	}
+}
+
+void UAstraShipSubsystem::SealBulkhead(FName DoorId, bool bSealed)
+{
+	// the fight's seals (ABBORDAGGI): the door of the plan and its actor, the people's routes; remembered for a deck that streams in later
+	if (Interior.IsReady())
+	{
+		const int32 Di = Interior.GetMap().DoorByName.FindRef(DoorId, INDEX_NONE);
+		if (Di != INDEX_NONE)
+		{
+			if (bSealed)
+			{
+				ExternalSeals.Add(Di);
+			}
+			else
+			{
+				ExternalSeals.Remove(Di);
+			}
+		}
+	}
+	ShutBulkhead(DoorId, bSealed);
+	if (UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; Life && Life->IsRunning())
+	{
+		Life->Sim().PlanChanged();                       // the routes being walked may cross a door that has shut (the damage model tells VITA itself)
+	}
+}
+
+FString UAstraShipSubsystem::HarmPerson(int32 RosterIdx, bool bKill, const FString& Cause)
+{
+	const TArray<FAstraCrewman>& P = Roster.Get();
+	if (!P.IsValidIndex(RosterIdx) || P[RosterIdx].Status != 0)
+	{
+		return FString();                                // hurt or fallen already
+	}
+	const TArray<int32> Single = {RosterIdx};
+	const FString Words = Roster.Casualties(P[RosterIdx].Deck, bKill ? 0 : 1, bKill ? 1 : 0, CasualtyRng, Cause, &Single);
+	if (!Words.IsEmpty())
+	{
+		Event(FString::Printf(TEXT("casualties: %s"), *Words), false);
+	}
+	return Words;
 }
 
 void UAstraShipSubsystem::TickInterior(float DeltaTime)
@@ -3412,22 +3531,7 @@ void UAstraShipSubsystem::TickInterior(float DeltaTime)
 				const TArray<int32> Single = {Who};
 				return Roster.Casualties(P[Who].Deck, bKill ? 0 : 1, bKill ? 1 : 0, CasualtyRng, ShipHarmCause(Cause), &Single);
 			};
-			H.SealDoor = [this](FName Id, bool bSealed)
-			{
-				if (UAstraShipPlan* Plan = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipPlan>() : nullptr)
-				{
-					Plan->SetDoorSealed(Id.ToString(), bSealed);
-				}
-				const int32 Di = Interior.GetMap().DoorByName.FindRef(Id, INDEX_NONE);
-				if (AAstraDoor* A = DoorActorOf(Id))
-				{
-					ApplyDoorSeal(Di, A, bSealed);
-				}
-				if (UAstraDamageFx* Fx = GetWorld() ? GetWorld()->GetSubsystem<UAstraDamageFx>() : nullptr; Fx && Di != INDEX_NONE)
-				{
-					Fx->OnBulkhead(Interior.GetMap().Doors[Di].PosCm, bSealed);
-				}
-			};
+			H.SealDoor = [this](FName Id, bool bSealed) { ShutBulkhead(Id, bSealed); };
 			H.PlanChanged = [this]()
 			{
 				if (UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; Life && Life->IsRunning())
@@ -3576,7 +3680,7 @@ void UAstraShipSubsystem::TickCaptainFate(float DeltaTime)
 		}
 		// carried out once the compartment is fit again or a team has reached it
 		const bool bFit = !Here || (Here->Air > 0.6f && Here->Fire < 0.2f && Here->Smoke < 0.5f && Here->Heat < 0.45f);
-		if (CaptainFateT > 6.f && (bFit || (Here && Here->TeamT > 0.f)))
+		if (CaptainFateT > 6.f && !Cap.bContested && (bFit || (Here && Here->TeamT > 0.f)))
 		{
 			Interior.CaptainRescued();
 			CaptainFate = 0;

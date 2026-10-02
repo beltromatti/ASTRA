@@ -2,7 +2,7 @@
 utterance (docs/ARCHITETTURA.md §3, `player_text.context`).
 
 The game sends it with every word of the Captain's (`place`, `in_earshot`, `facing`, `channel{party, open, muted}`,
-`pawn`). A build that does not send it yet gets the same picture inferred from what the mind already knows: the ship state
+`pawn`, and `lift` while he is inside a lift car). A build that does not send it yet gets the same picture inferred from what the mind already knows: the ship state
 (`captain`, `medbay`, `mess`, `visitor`, `surface`) and the mind's own channel with the enemy commander. Nothing here decides
 anything: it describes the room, and the router and the crew's prompt use it."""
 from __future__ import annotations
@@ -51,6 +51,39 @@ class Channel:
         return self.heard_s is not None and self.heard_s <= 25.0
 
 
+@dataclass(frozen=True)
+class LiftStop:
+    """A stop of the lift car the Captain is in: its id (what `lift_go` takes), what the panel calls it, the deck's name and the notable places on it."""
+    id: str
+    label: str = ""
+    deck_name: str = ""
+    places: tuple[str, ...] = ()
+
+    @property
+    def text(self) -> str:
+        head = self.label + (f", {self.deck_name}" if self.deck_name else "")
+        return f"{self.id} = {head}" + (f" ({', '.join(self.places)})" if self.places else "")
+
+
+@dataclass(frozen=True)
+class Lift:
+    """The lift car the Captain is inside (the game's `context.lift`): which one, where it stands or goes, and the stops it serves (docs/ASCENSORI.md)."""
+    car: str = ""
+    name: str = ""
+    kind: str = "turbolift"             # turbolift | service | cargo | shuttle
+    at: str = ""                        # the stop it stands at (or has just left)
+    moving: bool = False
+    going_to: str = ""
+    stops: tuple[LiftStop, ...] = ()
+
+    def stop(self, stop_id: str) -> LiftStop | None:
+        return next((s for s in self.stops if s.id == stop_id), None)
+
+    @property
+    def ids(self) -> tuple[str, ...]:
+        return tuple(s.id for s in self.stops)
+
+
 @dataclass
 class Context:
     place: str = "bridge"
@@ -60,6 +93,7 @@ class Context:
     pawn: str = "seated"                # on_foot | seated | falcon | pod
     source: str = "inferred"            # game | inferred
     asleep: bool = False
+    lift: Lift | None = None            # the lift car he is inside, with the stops it serves
 
     @property
     def on_bridge(self) -> bool:
@@ -110,6 +144,21 @@ def known_speakers(ids: Any) -> tuple[str, ...]:
     return tuple(out)
 
 
+def parse_lift(raw: Any) -> Lift | None:
+    """The game's `context.lift` (a car and its stops), or None when the Captain is in no car or the record has no stop to go to."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("stops"), list):
+        return None
+    stops = []
+    for s in raw["stops"]:
+        if isinstance(s, dict) and s.get("id"):
+            stops.append(LiftStop(id=str(s["id"]), label=str(s.get("label") or ""), deck_name=str(s.get("deck_name") or ""),
+                                  places=tuple(str(p) for p in (s.get("places") or []) if p)))
+    if not stops:
+        return None
+    return Lift(car=str(raw.get("car") or ""), name=str(raw.get("name") or raw.get("car") or "the lift"), kind=str(raw.get("kind") or "turbolift"),
+                at=str(raw.get("at") or ""), moving=bool(raw.get("moving")), going_to=str(raw.get("going_to") or ""), stops=tuple(stops))
+
+
 def place_from_state(state: dict[str, Any] | None) -> tuple[str, bool]:
     """(place, asleep) from the ship state's `captain` text (what the game already writes)."""
     st = state or {}
@@ -141,12 +190,13 @@ def earshot_from_state(place: str, state: dict[str, Any] | None) -> tuple[str, .
 
 
 def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any = None, names: dict[str, str] | None = None,
-          exchange: Exchange | None = None, flight_net: bool = False) -> Context:
+          exchange: Exchange | None = None, flight_net: bool = False, marine_net: bool = False) -> Context:
     """The context of one utterance. `raw`: the game's `context` (None or {} on a build that does not send it):
         {place: slug, place_name, pawn, in_earshot: [ids], facing: id|null, channel: {party, open, muted}|null};
     `enemy`: the mind's enemy agent (open, contact) — the channel the mind itself keeps; `names`: party id -> display name;
     `flight_net`: the mind's flight net is live (the Captain opened it, flies a Falcon, stands on the flight deck, or was just called on it): it is the channel when
-    no other is open."""
+    no other is open; `marine_net`: the marine net is live (boarders are aboard, or the fight has just ended: marines.py): the channel when no other is open, the flight net's
+    included (the fight is where the Captain's words are most likely for the marines)."""
     ex = exchange or Exchange()
     if raw:
         ch = raw.get("channel") if isinstance(raw.get("channel"), dict) else None
@@ -157,14 +207,14 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
                               open=bool(ch.get("open", True)), muted=bool(ch.get("muted", False)) or _comms_muted(state),
                               heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), last_words=ex.last_words(party),
                               screen=bool(ch.get("screen", False)) or _on_screen(state, party))
-        if channel is None and flight_net:
-            channel = _flight_channel(names, ex, state)
+        if channel is None and (marine_net or flight_net):
+            channel = _marines_channel(names, ex, state) if marine_net else _flight_channel(names, ex, state)
         slug = str(raw.get("place") or "bridge")
         place = PLACE_SLUGS.get(slug, slug)
         listed = known_speakers(raw.get("in_earshot")) if raw.get("in_earshot") is not None else earshot_from_state(place, state)
         return Context(place=place, in_earshot=listed or (BRIDGE if place == "bridge" else ()),
                        facing=(str(raw["facing"]) if raw.get("facing") else None), channel=channel,
-                       pawn=str(raw.get("pawn") or "seated"), source="game", asleep=place_from_state(state)[1])
+                       pawn=str(raw.get("pawn") or "seated"), source="game", asleep=place_from_state(state)[1], lift=parse_lift(raw.get("lift")))
     place, asleep = place_from_state(state)
     channel = None
     if enemy is not None and getattr(enemy, "open", False):
@@ -172,8 +222,8 @@ def parse(raw: dict[str, Any] | None, state: dict[str, Any] | None, enemy: Any =
         channel = Channel(party=party, name=(names or {}).get(party, party), kind="enemy", open=True, muted=_comms_muted(state),
                           heard_s=ex.ago(ex._heard, party), said_s=ex.ago(ex._said, party), last_words=ex.last_words(party),
                           screen=_on_screen(state, party))
-    if channel is None and flight_net:
-        channel = _flight_channel(names, ex, state)
+    if channel is None and (marine_net or flight_net):
+        channel = _marines_channel(names, ex, state) if marine_net else _flight_channel(names, ex, state)
     return Context(place=place, in_earshot=earshot_from_state(place, state), facing=None, channel=channel,
                    pawn="falcon" if place == "falcon" else "seated", source="inferred", asleep=asleep)
 
@@ -182,6 +232,12 @@ def _flight_channel(names: dict[str, str] | None, ex: Exchange, state: dict[str,
     """The flight net as a channel (the mind keeps it: the game's own `channel` has no flight party)."""
     return Channel(party="flight", name=(names or {}).get("flight", "the flight net"), kind="flight", open=True, muted=_comms_muted(state),
                    heard_s=ex.ago(ex._heard, "flight"), said_s=ex.ago(ex._said, "flight"), last_words=ex.last_words("flight"))
+
+
+def _marines_channel(names: dict[str, str] | None, ex: Exchange, state: dict[str, Any] | None) -> Channel:
+    """The marine net as a channel (the mind keeps it, like the flight net's: the game's own `channel` has no marine party)."""
+    return Channel(party="marines", name=(names or {}).get("marines", "the marine net"), kind="marines", open=True, muted=_comms_muted(state),
+                   heard_s=ex.ago(ex._heard, "marines"), said_s=ex.ago(ex._said, "marines"), last_words=ex.last_words("marines"))
 
 
 def _comms_muted(state: dict[str, Any] | None) -> bool:
@@ -204,6 +260,8 @@ def _kind(party: str, state: dict[str, Any] | None = None) -> str:
         return "fleet"
     if p in ("flight", "flight_net", "cag"):
         return "flight"
+    if p in ("marines", "marine", "marine_net", "marine_ops", "security", "reyes"):
+        return "marines"
     if p.startswith("port") or p in ("field", "control"):
         return "port"
     for c in (state or {}).get("contacts", []) or []:
@@ -212,10 +270,29 @@ def _kind(party: str, state: dict[str, Any] | None = None) -> str:
     return "enemy"
 
 
+def describe_lift(lift: Lift) -> str:
+    """The Captain inside a lift car: what the ship's computer does there and which stops it can take him to."""
+    label = lambda stop_id: (lift.stop(stop_id).label if lift.stop(stop_id) else stop_id) or stop_id          # noqa: E731
+    where = (f"moving towards {label(lift.going_to)}" if lift.moving and lift.going_to else f"standing at {label(lift.at)}" if lift.at else "")
+    shuttle = lift.kind == "shuttle"
+    return (f"The Captain is inside {lift.name}, a {'shuttle car on the Spine line' if shuttle else lift.kind + ' car'}" + (f", {where}" if where else "") + ". "
+            "The ship's computer runs every lift and shuttle and takes the Captain where he says, as a real ship's computer would: a stop named in any way "
+            "(a number, a deck's name, a place on it, a section, \"the bridge\", \"Main Engineering\", \"down\", \"one up\", \"where the wounded are\"), "
+            "in any language. When he asks for it, in ONE reply CALL `lift_go` with the stop that fits (it moves the car for real) AND speak as the computer (speaker "
+            "`computer`, never an officer): ONE very short line in the Captain's language that names where it goes the way people say it in HIS language (the deck by "
+            "its number and its place, in his words, never the panel's capital letters; never read an id aloud). If what he asked is not a stop of this car (a deck or a "
+            "place that is not on its list: the nearest stop is NOT a substitute), call NO lift tool: the computer says so in one short line and names what this car "
+            "serves. The officers stay out of the lift: "
+            "they answer only what is meant for them. The stops of this car, listed " + ("in the order the line runs, the first stop first" if shuttle else "from the highest to the lowest")
+            + " (id = label, deck name, notable places): " + "; ".join(s.text for s in lift.stops) + ".")
+
+
 def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
     """The room, in a sentence or two, for the crew's prompt (empty when it is the ordinary case: the bridge, no channel)."""
     t = titles or {}
     parts = []
+    if ctx.lift:
+        parts.append(describe_lift(ctx.lift))
     if ctx.place != "bridge":
         parts.append(f"The Captain is not on the bridge ({ctx.place.replace('_', ' ')}): the officers hear over the intercom and "
                      "answer when they are called or when it concerns their station.")
@@ -231,8 +308,14 @@ def describe(ctx: Context, titles: dict[str, str] | None = None) -> str:
             parts.append(f"The flight net is live ({who}; the bridge hears it, and so do you): what the Captain says TO a pilot, a squadron, the CAG or the Chief of the Deck goes "
                          "out on it (Martin lets it through) and they answer for themselves, and carry out the orders for their squadrons. Whatever is for them is theirs: you "
                          "hear every word and say nothing about it — Price too, unless the words are for him or for Flight Control. What is meant for the bridge is yours.")
+        elif ch.kind == "marines":
+            parts.append(f"The marine net is live ({who}; the bridge hears it, and so do you): what the Captain says TO Major Reyes, the marines, a squad or its sergeant, or about "
+                         "the boarders, the bulkheads and the fight inside the hull, goes out on it (Martin lets it through) and they answer for themselves, and carry out the "
+                         "orders for their squads and the doors. Whatever is for them is theirs: you hear every word and say nothing about it — Tactical and the XO included, unless "
+                         "the words are for them. What is meant for the bridge (the ship, the guns, the helm) is yours.")
         else:
             parts.append(f"A channel with {who} is open: what the Captain says TO them goes out on it (Martin lets it through), "
                          f"and you hear every word as well. Words said to {who} are for {who} to answer, not for you: act and "
-                         "speak on what is meant for the bridge (Martin may say in a few words that a message went out, if that helps).")
+                         "speak on what is meant for the bridge. The Captain hears the answer himself, so nobody says that the words went out "
+                         "(Martin speaks about the channel only when they could not: cut, jammed, gone silent).")
     return " ".join(parts)

@@ -41,6 +41,10 @@ class AASTRACharacter : public ACharacter
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCameraComponent;
 
+	/** ABBORDAGGI: the weapons in his hands (the rifle and the sidearm of the armory): the arms, the aim, the rounds (AstraFpsComponent.*) */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	class UAstraFpsComponent* Fps;
+
 protected:
 
 	/** Jump Input Action */
@@ -130,5 +134,8 @@ public:
 
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
+
+	/** ABBORDAGGI: the Captain's weapons. */
+	class UAstraFpsComponent* GetFps() const { return Fps; }
 
 };

@@ -42,6 +42,7 @@ import ship_spec as SPEC  # noqa: E402
 ROOT = SL.ROOT
 DEFAULT_OUT = os.path.join(ROOT, "art", "export", "ship")
 TRI_BUDGET = 150_000                       # per mesh (Nanite: the disk and the import time, not the frame time)
+CAR_HALF_W, CAR_Z0, CAR_Z1 = 1.4, 0.16, 3.06   # the Spine car's envelope on the line's axis (ASCENSORI: 2.8 m wide, 2.9 m high, its floor 0.16 m above the track bed; 14 m long)
 
 # prefab key -> (module, function) of the room builders
 ROOMS = {
@@ -51,7 +52,6 @@ ROOMS = {
     "lounge": ("ship_rooms_social", "lounge"), "games": ("ship_rooms_social", "games"), "library": ("ship_rooms_social", "library"),
     "quiet": ("ship_rooms_social", "quiet"), "observation": ("ship_rooms_social", "observation"), "bow_obs": ("ship_rooms_social", "bow_obs"),
     "concourse": ("ship_rooms_hub", "concourse"), "berth_lobby": ("ship_rooms_hub", "berth_lobby"), "stair_tower": ("ship_rooms_hub", "stair_tower"),
-    "observation_d14": ("ship_rooms_social", "observation_d14"), "store_dry_d10": ("ship_rooms_service", "store_dry_d10"),
     "surgery": ("ship_rooms_med", "surgery"), "quarantine": ("ship_rooms_med", "quarantine"), "pharmacy": ("ship_rooms_med", "pharmacy"),
     "lab": ("ship_rooms_work", "lab"), "workshop": ("ship_rooms_work", "workshop"), "armory": ("ship_rooms_work", "armory"),
     "cabins": ("ship_rooms_work", "cabins"),
@@ -60,7 +60,7 @@ ROOMS = {
     "sensor_archive": ("ship_rooms_science2", "sensor_archive"), "sensor_room": ("ship_rooms_science2", "sensor_room"),
     "lab_bio": ("ship_rooms_science2", "lab_bio"), "lab_astro": ("ship_rooms_science2", "lab_astro"), "lab_phys": ("ship_rooms_science2", "lab_phys"),
     "radiator_pumps": ("ship_rooms_engineering", "radiator_pumps"), "machinery": ("ship_rooms_engineering", "machinery"), "machinery_b": ("ship_rooms_engineering", "machinery_b"),
-    "dc_locker": ("ship_rooms_engineering", "dc_locker"), "power_control": ("ship_rooms_engineering", "power_control"),
+    "power_control": ("ship_rooms_engineering", "power_control"),
     "shuttle_bay": ("ship_rooms_security", "shuttle_bay"), "barracks": ("ship_rooms_security", "barracks"), "kit_room": ("ship_rooms_security", "kit_room"),
     "firing_range": ("ship_rooms_security", "firing_range"),
     "switchgear": ("ship_rooms_engineering", "switchgear"), "capacitors": ("ship_rooms_engineering", "capacitors"),
@@ -73,10 +73,24 @@ ROOMS = {
     "staterooms": ("ship_rooms_quarters", "staterooms"), "wardroom": ("ship_rooms_quarters", "wardroom"), "gym": ("ship_rooms_quarters", "gym"),
     "tank": ("ship_rooms_keel", "tank"), "reaction_mass": ("ship_rooms_keel", "reaction_mass"), "crawlway": ("ship_rooms_keel", "crawlway"),
     "ready_room": ("ship_rooms_bridge", "ready_room"), "shuttle_stop": ("ship_rooms_transit", "shuttle_stop"),
+    # NAVE-3
+    "airlock": ("ship_rooms_hull", "airlock"), "pod_bay": ("ship_rooms_hull", "pod_bay"), "suit_locker": ("ship_rooms_hull", "suit_locker"), "dc_station": ("ship_rooms_hull", "dc_station"),
+    "store_s": ("ship_rooms_hull", "store_s"), "locker_s": ("ship_rooms_hull", "locker_s"), "tech_s": ("ship_rooms_hull", "tech_s"),
+    "dentist": ("ship_rooms_care", "dentist"), "morgue": ("ship_rooms_care", "morgue"), "counselling": ("ship_rooms_care", "counselling"), "brig": ("ship_rooms_care", "brig"),
+    "security_office": ("ship_rooms_care", "security_office"),
+    "air_plant": ("ship_rooms_plants", "air_plant"), "water_plant": ("ship_rooms_plants", "water_plant"), "waste_plant": ("ship_rooms_plants", "waste_plant"),
+    "computer_core": ("ship_rooms_plants", "computer_core"), "aux_reactor": ("ship_rooms_plants", "aux_reactor"), "dc_central": ("ship_rooms_plants", "dc_central"),
+    "barber": ("ship_rooms_life", "barber"), "bar": ("ship_rooms_life", "bar"), "chapel": ("ship_rooms_life", "chapel"), "shop": ("ship_rooms_life", "shop"),
+    "sim_bay": ("ship_rooms_life", "sim_bay"), "berthing": ("ship_rooms_life", "berthing"), "suites": ("ship_rooms_life", "suites"), "single_cabins": ("ship_rooms_life", "single_cabins"),
+    "drone_bay": ("ship_rooms_life", "drone_bay"),
+    "lift_bank": ("ship_rooms_lifts", "lift_bank"), "lift_bank_o": ("ship_rooms_lifts", "lift_bank_o"), "lift_bank_b": ("ship_rooms_lifts", "lift_bank_b"),
+    "lift_housing_bridge": ("ship_rooms_lifts", "lift_housing_bridge"),
+    "shuttle_stop_bow": ("ship_rooms_transit", "shuttle_stop_bow"), "shuttle_stop_stern": ("ship_rooms_transit", "shuttle_stop_stern"),
 }
 EXTRA = {"SM_SHIP_StairTowerTop": ("ship_rooms_hub", "stair_tower_top"), "SM_SHIP_StairTowerBottom": ("ship_rooms_hub", "stair_tower_bottom"),
          "SM_SHIP_LadderTrunk": ("ship_rooms_hub", "ladder_trunk"), "SM_SHIP_StairTower53": ("ship_rooms_hub", "stair_tower_deep"),
-         "SM_SHIP_StairTowerCap": ("ship_rooms_hub", "stair_tower_cap"), "SM_SHIP_BridgeCorridorDoor": ("ship_rooms_bridge", "corridor_door")}
+         "SM_SHIP_StairTowerCap": ("ship_rooms_hub", "stair_tower_cap"), "SM_SHIP_BridgeCorridorDoor": ("ship_rooms_bridge", "corridor_door"),
+         "SM_SHIP_SpineCar": ("ship_craft", "spine_car_mesh")}
 
 # the material slots the Unreal side knows (shared bridge v3 instances + the ship's new ones)
 OLD_KIT_SLOTS = {A.MAT_PANEL, A.MAT_STRUCTURE, A.MAT_FLOOR, A.MAT_GRATE, A.MAT_TRIM, A.MAT_LIGHT, A.MAT_ACCENT, A.MAT_GUIDE, A.MAT_GLASS, A.MAT_RUBBER,    # the bridge corridors' (kit_corridor.py)
@@ -110,7 +124,7 @@ def needed_meshes(plan) -> set[str]:
 def registry(needed: set[str]) -> dict[str, tuple]:
     reg: dict[str, tuple] = {}
     for tone in CAT.TONES:
-        for suf in CAT.TONE_FAMILY:
+        for suf in CAT.tone_family(tone):
             reg[CAT.module_mesh(tone, suf)] = ("module", tone, suf)
     for key, (mod, fn) in ROOMS.items():
         reg[SPEC.PREFABS[key]["mesh"]] = ("room", key, mod, fn)
@@ -123,6 +137,14 @@ def registry(needed: set[str]) -> dict[str, tuple]:
                 reg[m] = ("sign", int(body[:-1]), body[-1])
         elif m.startswith("SM_SHIP_Plate_"):
             reg[m] = ("plate", m[len("SM_SHIP_Plate_"):])
+        elif m.startswith("SM_SHIP_WayBlade_"):                                      # SM_SHIP_WayBlade_2: the frame of a blade sign with two rows
+            reg[m] = ("blade", int(m[len("SM_SHIP_WayBlade_"):]))
+        elif m.startswith("SM_SHIP_WayRow_"):                                        # SM_SHIP_WayRow_liftA: a row: the lifts are ahead
+            reg[m] = ("wayrow", m[len("SM_SHIP_WayRow_"):])
+        elif m.startswith("SM_SHIP_Frame_"):                                         # SM_SHIP_Frame_134: the frame number
+            reg[m] = ("frame", int(m[len("SM_SHIP_Frame_"):]))
+        elif m.startswith("SM_SHIP_Directory_"):                                     # SM_SHIP_Directory_4: the deck's directory screen
+            reg[m] = ("directory", int(m[len("SM_SHIP_Directory_"):]))
         elif m[len("SM_SHIP_"):].startswith(("S_Stub", "P_Stub")):                   # SM_SHIP_S_Stub150: a plain 1.50 m stretch of the Spine
             reg[m] = ("stub", m[len("SM_SHIP_")], int(m[len("SM_SHIP_S_Stub"):]) / 100.0)
     return reg
@@ -146,6 +168,9 @@ def build_mesh(name: str, item: tuple):
     if kind == "plate":
         import ship_signs as SS
         return SS.plate(name, item[1])
+    if kind in ("blade", "wayrow", "frame", "directory"):
+        import ship_signs as SS
+        return {"blade": SS.way_blade, "wayrow": SS.way_row_mesh, "frame": SS.frame_plate, "directory": SS.directory}[kind](name, item[1])
     raise ValueError(item)
 
 
@@ -178,6 +203,38 @@ def uv_problems(obj) -> list[str]:
     return out
 
 
+def car_clearance(name: str, item: tuple, obj) -> list[str]:
+    """The tunnel modules (T: the straight cells and the section gate) and the shuttle halls leave the Spine car's envelope clear: the car is moved without sweeping, so what stands in it
+    scrapes the people in it off (and clips its body). A vertex strictly inside the envelope, or a triangle through its faces, is a problem; a terminal's closed end (its wall and the
+    buffers) is left out, the car stops short of it."""
+    if item[0] == "module" and item[1] == "T" and item[2] in ("Straight_A", "Straight_B", "Bulkhead"):
+        axis, x0, x1 = 0.0, -1.0, CAT.MOD + 1.0
+    elif item[0] == "room" and item[1].startswith("shuttle_stop"):
+        spec = SPEC.PREFABS[item[1]]
+        aft, fwd = spec["mouths"]
+        axis, x0, x1 = 8.0, (0.0 if aft else 1.5), spec["L"] - (0.0 if fwd else 1.5)
+    else:
+        return []
+    eps = 0.004
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = obj.evaluated_get(dg)
+    me = ev.to_mesh()
+    try:
+        inside = [tuple(v.co) for v in me.vertices if x0 < v.co.x < x1 and abs(-v.co.y - axis) < CAR_HALF_W - eps and CAR_Z0 + eps < v.co.z < CAR_Z1 - eps]
+        ya, yb = -axis - CAR_HALF_W + eps, -axis + CAR_HALF_W - eps                                    # (Blender's Y is mirrored)
+        za, zb = CAR_Z0 + eps, CAR_Z1 - eps
+        box = [(x0, ya, za), (x1, ya, za), (x1, yb, za), (x0, yb, za), (x0, ya, zb), (x1, ya, zb), (x1, yb, zb), (x0, yb, zb)]
+        quads = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+        crossing = BVHTree.FromObject(obj, dg).overlap(BVHTree.FromPolygons(box, quads))
+        hit = inside[0] if inside else tuple(me.polygons[crossing[0][0]].center) if crossing else None      # (plain tuples: the mesh is freed below)
+        n_cross = len(crossing)
+    finally:
+        ev.to_mesh_clear()
+    if hit is None:
+        return []
+    return [f"{name}: stands in the Spine car's envelope ({len(inside)} vertices inside, {n_cross} triangles through its faces; first near x {hit[0]:.2f}, y {-hit[1]:.2f}, z {hit[2]:.2f})"]
+
+
 def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
     problems = []
     if st["tris"] > TRI_BUDGET:
@@ -196,7 +253,8 @@ def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
             xlo = -0.45                                                   # the reveal between the lobby and the Berthing
         else:
             xlo = -tol
-        if lo[0] < xlo or hi[0] > L + tol or lo[1] < -0.25 - tol or hi[1] > D + 0.25 + tol:
+        xhi = L + {"lift_bank_b": 3.2, "lift_housing_bridge": 3.0}.get(item[1], 0.0)   # (the command lobby's and the housing's shafts stand behind their aft walls)
+        if lo[0] < xlo or hi[0] > xhi + tol or lo[1] < -0.25 - tol or hi[1] > D + 0.25 + tol:
             problems.append(f"{name}: bounds {lo} .. {hi} leave the footprint 0..{L} x 0..{D}")
         if hi[2] > 4.0 + tol and item[1] not in ("stair_tower",):
             problems.append(f"{name}: top at {hi[2]:.2f} m is above the deck pitch (4.0)")
@@ -210,6 +268,7 @@ def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
         lo, hi = bb["min"], bb["max"]
         if lo[0] < -0.14 or hi[0] > CAT.MOD + 0.03 or abs(lo[1]) > CAT.SLOT_HW + 0.03 or hi[1] > CAT.SLOT_HW + 0.03:      # (the frame rib at the aft end reaches 13 cm back)
             problems.append(f"{name}: bounds {lo} .. {hi} leave the 4 x 4 slot")
+    problems += car_clearance(name, item, obj)
     return problems
 
 
@@ -329,6 +388,12 @@ class RouteChecker:
                     hit = tree.find_nearest(inv @ Vector((x, -y, z + h)), r)
                     if hit[0] is not None:
                         return f"{h} m: geometry {hit[3]:.2f} m away"
+                if kind in ("sit", "eat"):                                  # something to sit on: the first surface under the hips is a seat (30-80 cm above the floor: chairs, benches, bar stools, bunks)
+                    seat = tree.ray_cast(inv @ Vector((x, -y, z + 0.9)), Vector((0.0, 0.0, -1.0)), 0.95)
+                    if seat[0] is None:
+                        return "no floor under it"
+                    h = 0.9 - seat[3]
+                    return None if 0.30 <= h <= 0.80 else f"nothing to sit on (the first surface under the hips is {h:.2f} m above the floor)"
                 ray = tree.ray_cast(inv @ Vector((x, -y, z + 0.5)), Vector((0.0, 0.0, -1.0)), 0.7)
                 return "no floor under it" if ray[0] is None else None
 

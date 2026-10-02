@@ -8,6 +8,7 @@
 
 #include "CoreMinimal.h"
 #include "AstraCrewMember.h"
+#include "AstraLiftRider.h"
 #include "AstraLifeBody.generated.h"
 
 class UAnimSequence;
@@ -35,6 +36,9 @@ public:
 	int64 TicksRun() const { return Ticks; }
 	/** Out on its feet, walking a route (not in a lift, not at its post): the pose where it must be where its person is. */
 	bool IsWalking() const { return Mode == EMode::Walk; }
+	/** In a real lift (ASCENSORI): at a landing waiting for the car, walking into it, riding it or walking out. */
+	bool IsRiding() const { return Mode == EMode::Lift; }
+	const FAstraLiftRider& LiftRider() const { return Rider; }
 	/** The tests: is the body what its mode says it is (a mesh and a cycle on its feet; the seated pose's mesh at a table or in a bunk; nothing
 	 *  showing in a lift or a tower)? OutWhy says what is wrong. */
 	bool LooksRight(FString& OutWhy) const;
@@ -54,7 +58,7 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
-	enum class EMode : uint8 { Off, Walk, Stand, Sit, Lie, Shaft };
+	enum class EMode : uint8 { Off, Walk, Stand, Sit, Lie, Shaft, Lift };
 
 	TWeakObjectPtr<UAstraLifeSubsystem> Owner;
 	int32 PersonIdx = INDEX_NONE;
@@ -70,6 +74,10 @@ private:
 	float ShaftT = 0.f;
 	int64 Ticks = 0;
 	bool bFresh = false;              // just bound: the first tick runs at once, whoever sees it
+	FAstraLiftRider Rider;            // the ride on a real lift while the person's route is on one (AstraLiftRider.h); otherwise the abstract ride, hidden
+	int32 RideSeg = INDEX_NONE;       // the route segment the last look for a ride was made at, and where it began
+	FVector RideA = FVector::ZeroVector;
+	bool bRideWalk = false;           // the walk cycle is the one playing (on its feet in the lobby or the doorway), not the idle one
 
 	UPROPERTY() TObjectPtr<UAnimSequence> IdleAnim;
 	UPROPERTY() TObjectPtr<UAnimSequence> WalkAnim;
@@ -80,5 +88,9 @@ private:
 	float ActorYawFor(float FacingYaw) const;
 	void TickWalk(float Dt, const FAstraLifePerson& P);
 	void TickStand(float Dt, const FAstraLifePerson& P);
+	/** The person's route is on a lift (the plan's, which the lift network knows): this body rides it for real. False when it is not, and the body goes on as before. */
+	bool TickLift(float Dt, const FAstraLifePerson& P);
+	/** The ride is over (arrived, or let go): the rider is released and the person is at the far end of the segment. */
+	void EndLift(const FAstraLifePerson& P, bool bPutThere);
 	void Shadows(bool bOn);
 };
