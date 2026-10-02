@@ -333,6 +333,14 @@ def cmd_fit(a: argparse.Namespace) -> None:
     best = total(params)
     print(f"start loss {best:.3f}", flush=True)
     rng = random.Random(a.seed)
+    saved_t = time.time()
+
+    def save(final: bool = False) -> None:
+        """What the search has so far is written as it goes (a long search can be stopped without losing it)."""
+        existing = json.loads(mb.CAL_FILE.read_text()) if mb.CAL_FILE.exists() else {"params": {}}
+        existing["params"].update({f: getattr(params, f) for f in free})
+        existing.update({"loss": best, "experiments": names, "fitted_with": "tools/march_calibrate.py fit"})
+        mb.CAL_FILE.write_text(json.dumps(existing, indent=1))
     for it in range(a.iters):
         step = a.step * (1.0 - 0.75 * it / max(1, a.iters))                     # (the search narrows as it goes)
         picks = rng.sample(free, 2 if rng.random() < 0.3 else 1)
@@ -342,11 +350,10 @@ def cmd_fit(a: argparse.Namespace) -> None:
         if loss < best:
             best, params = loss, trial
             print(f"  it {it:4}  " + "  ".join(f"{n} {getattr(params, n):.4f}" for n in picks) + f"   loss {best:.3f}", flush=True)
-    out = {"params": {f: getattr(params, f) for f in free}, "loss": best, "experiments": names, "runs": a.runs}
-    existing = json.loads(mb.CAL_FILE.read_text()) if mb.CAL_FILE.exists() else {"params": {}}
-    existing["params"].update(out["params"])
-    existing.update({"loss": best, "experiments": names, "fitted_with": "tools/march_calibrate.py fit"})
-    mb.CAL_FILE.write_text(json.dumps(existing, indent=1))
+            if time.time() - saved_t > 60.0:
+                save()
+                saved_t = time.time()
+    save(True)
     print(f"final loss {best:.3f}; written to {mb.CAL_FILE}")
 
 
@@ -373,7 +380,7 @@ def main() -> None:
     p.add_argument("--step", type=float, default=0.18)
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--free", default="k_rail,k_laser,hull_w,shield_w,shield_leak,msl_frac,msl_dmg,pd_per_channel,ow,approach0,approach_per_ship,sigma_battle,sigma_step,"
-                                     "ret_bold,ret_steady,ret_cautious,flee_base_s,flee_turn,flee_exposure,ramp_s,f_dps,b_dps,air_kill,air_pd,"
+                                     "ret_bold,ret_steady,ret_cautious,flee_base_s,flee_turn,flee_exposure,ramp_s,f_dps,b_dps,air_kill,air_pd,focus_group,hold_target,"
                                      "p_praetorian,p_vigilant,p_acheron,p_lethe,h_praetorian,h_vigilant,h_acheron,h_lethe")
     p.set_defaults(fn=cmd_fit)
     p = sub.add_parser("list")

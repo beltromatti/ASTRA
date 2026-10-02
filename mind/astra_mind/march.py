@@ -318,6 +318,8 @@ class March:
         self.aquila: dict[str, Any] = {"where": HQ["astra"], "lane": "", "since": 0.0}  # the player's ship: where she is (the real simulation's system), or in a Gate lane
         self.real_system: str = ""                                                   # the system the real simulation runs (set by the glue): no abstract battle there
         self.real_fight: bool = False                                                # ... and whether a fight is on in it right now
+        self.real_tally: dict[str, dict[str, Any]] = {s: {"lost": 0, "names": [], "points": 0.0} for s in SIDES}   # what the real fight has cost each side since it began
+        self.real_t0: float = 0.0
         self.captain_skill: float = 1.0                                              # the bench's stand-in for how well the Captain fights the fleet he commands
         self.aquila_fleet: str = ""                                                  # (bench) the fleet the Aquila is in: the real game has her in the real simulation
         self.free_classes = False                                                    # (bench) a world where both sides build and field the same classes
@@ -327,6 +329,8 @@ class March:
         self.dirty = True
         self.last_save = 0.0
         self.war.authority = self
+        if self._on_arrival not in self.war.observers:
+            self.war.observers.append(self._on_arrival)                              # (the Aquila arrives in a system: the war map says so, the March follows her)
         self._init_world()
 
     # ------------------------------------------------------------------------------------------- the world at the start
@@ -1500,14 +1504,97 @@ class March:
 
     # ------------------------------------------------------------------------------------------- the Aquila
     def aquila_lane(self, dest: str) -> None:
-        """The Aquila is in a Gate's lane towards `dest`: she is in no system for the war's rules."""
+        """The Aquila is in a Gate's lane towards `dest`: she is in no system for the war's rules, and what the real simulation was playing is the map's again."""
+        if self.aquila["lane"] == dest:
+            return
+        self.release_real()
         self.aquila.update(lane=dest, since=self.t)
-        self.real_system, self.real_fight = "", False
         self.dirty = True
 
     def aquila_arrived(self, system: str) -> None:
+        """The Aquila is through the Gate into `system`: the real simulation is that system's from now on (the fleets there are the glue's to bring in)."""
         self.aquila.update(where=system, lane="", since=self.t)
-        self.war.arrived(system)
+        self.real_system, self.real_fight = system, False
+        self.real_tally = {s: {"lost": 0, "names": [], "points": 0.0} for s in SIDES}
+        self.dirty = True
+
+    def _on_arrival(self, system: str) -> None:
+        if system in self.sys and (self.aquila["where"] != system or self.aquila["lane"]):
+            self.aquila_arrived(system)
+
+    # ------------------------------------------------------------------------------------------- the real simulation's side of the war
+    def real_adopt(self, f: Fleet, system: str) -> None:
+        """A fleet is in the real simulation now (the game brought it in, or the glue sent its ships): the March leaves it alone, and reads what becomes of it."""
+        if f.status == "scripted":
+            self.release_script(f.id, system)
+        f.where, f.status, f.route, f.pending, f.scripted, f.arrived_t = system, "real", [], None, "", self.t
+        self.dirty = True
+
+    def real_hull(self, ship: Ship, frac: float) -> None:
+        ship.hull = max(0.02, min(1.0, float(frac)))
+
+    def real_lost(self, f: Fleet, ship: Ship, how: str = "destroyed") -> None:
+        """A ship of a real fleet is gone from the real simulation: destroyed (it is lost, it counts in the war's scores and wears the people's will, as in a battle of
+        the map) or jumped out of the system (it lives: it goes on as a small fleet that falls back like any that broke off)."""
+        if ship not in f.ships:
+            return
+        s = f.side
+        f.ships.remove(ship)
+        if how == "destroyed":
+            pts = CLASSES[ship.cls]["cost"] or 3.6
+            self.score[s]["lost_points"] += pts
+            self.score[s]["ships_lost"] += 1
+            self.score[other(s)]["killed_points"] += pts
+            self.score[other(s)]["ships_killed"] += 1
+            self.will[s] = max(0.0, self.will[s] - 0.0040 * pts)
+            self.will[other(s)] = min(1.0, self.will[other(s)] + 0.0015 * pts)
+            tally = self.real_tally[s]
+            tally["lost"] += 1
+            tally["points"] += pts
+            tally["names"].append(f"{ship.name} ({ship.cls})")
+            if ship.cls in ("praetorian", "acheron", "aquila"):
+                tally["capital"] = True
+        else:
+            where = f.where or self.real_system
+            mine = [g for g in self.fleets_at(where, s) if g.status == "ready" and g.id != f.id and g.note == f"stragglers of {f.id}" and g.depart_at > self.t]
+            if mine:
+                mine[0].ships.append(ship)
+            else:
+                nf = Fleet(self.new_fleet_id(s), s, f"{f.name} (survivors)", [ship], where, f.supply, max(0.05, f.morale - 0.15), Order("hold", where, "cautious", False, "auto", "", self.t),
+                           commander=dict(f.commander), status="ready", arrived_t=self.t, origin=f.origin, note=f"stragglers of {f.id}")
+                self.fleets[nf.id] = nf
+                self._retreat(nf, where)
+                nf.depart_at = self.t + 20.0                                 # (the others that jump out in the next moments join it)
+        if not f.ships:
+            self._remove_fleet(f)
+        self.dirty = True
+
+    def real_over(self, system: str, result: str = "") -> None:
+        """The real fight is over: the war is told (what each side lost there, who holds the field) and the tally starts again."""
+        tally, self.real_tally = self.real_tally, {s: {"lost": 0, "names": [], "points": 0.0} for s in SIDES}
+        left = {s: sum(f.n for f in self.fleets_at(system, s) if f.status == "real") for s in SIDES}
+        winner = "astra" if left["astra"] and not left["mandate"] else "mandate" if left["mandate"] and not left["astra"] else ""
+        txt = {}
+        for s in SIDES:
+            o = other(s)
+            res = result if (result and s == "astra") else ("we hold the field" if winner == s else "the enemy holds the field" if winner == o else "the fighting is over")
+            names = tally[s]["names"]
+            txt[s] = (f"The battle at {system} is over after {fmt_s(self.t - self.real_t0)}: {res}. We lost {tally[s]['lost']} ships"
+                      + (f" ({', '.join(names[:6])}{'...' if len(names) > 6 else ''})" if names else "") + f"; the enemy lost about {tally[o]['lost']}.")
+        weight = 3 if (tally["astra"].get("capital") or tally["mandate"].get("capital") or tally["astra"]["lost"] + tally["mandate"]["lost"] >= 8 or self.value(system) >= 7) else 2
+        self.say("battle_end", system, txt, SIDES, weight, (), winner=winner, lost={s: tally[s]["lost"] for s in SIDES}, names={s: tally[s]["names"] for s in SIDES})
+        self.real_fight = False
+
+    def release_real(self) -> None:
+        """The Aquila leaves (or the real simulation is gone): the fleets it played are the map's again, where they stand, with the hulls they have."""
+        for f in list(self.fleets.values()):
+            if f.status == "real":
+                f.status = "ready"
+                f.where = f.where or self.real_system
+                f.untouchable_until = self.t
+                if f.order.kind in ("move", "withdraw", "refit") and f.order.target != f.where:
+                    f.pending = None
+        self.real_system, self.real_fight = "", False
         self.dirty = True
 
     # ------------------------------------------------------------------------------------------- the rest of the world's course
@@ -1626,13 +1713,18 @@ class March:
         if not tracks:
             out.append("- (nothing on your plot)")
         bl = [b for b in self.battles.values() if self.sees(side, b.system) >= 1 or any(self.fleets[f].side == side for s in SIDES for f in b.fleets[s] if f in self.fleets)]
-        if bl:
+        fights = []
+        if self.real_fight and self.real_system:
+            fights.append(f"- {self.real_system}: the Aquila's fight, {fmt_s(self.t - self.real_t0)} in, played ship by ship with the Captain; so far we have lost "
+                          f"{self.real_tally[side]['lost']} ships and the enemy about {self.real_tally[other(side)]['lost']}")
+        for b in bl:
+            e = b.eng
+            mine = SIDES.index(side)
+            fights.append(f"- {b.system}: {fmt_s(self.t - b.t0)} in; yours: {sum(1 for u in e.sides[mine] if u.fighting and u.fid != 'fort')} ships fighting, {sum(1 for u in e.sides[mine] if not u.alive and u.fid != 'fort')} lost; "
+                          f"the enemy's: about {sum(1 for u in e.sides[1 - mine] if u.fighting and u.fid != 'fort')} fighting")
+        if fights:
             out.append("BATTLES UNDER WAY")
-            for b in bl:
-                e = b.eng
-                mine = SIDES.index(side)
-                out.append(f"- {b.system}: {fmt_s(self.t - b.t0)} in; yours: {sum(1 for u in e.sides[mine] if u.fighting and u.fid != 'fort')} ships fighting, {sum(1 for u in e.sides[mine] if not u.alive and u.fid != 'fort')} lost; "
-                           f"the enemy's: about {sum(1 for u in e.sides[1 - mine] if u.fighting and u.fid != 'fort')} fighting")
+            out.extend(fights)
         if side == "astra":
             out.append(f"THE AQUILA: " + (f"in the Gate's lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + (f" (since {fmt_s(self.t - self.aquila['since'])})" if self.aquila["since"] else ""))
         else:
@@ -1693,7 +1785,7 @@ class March:
             order += f": \"{o.reason[:90]}\""
         pend = f"; ORDER ON ITS WAY: {f.pending.kind} {f.pending.target} (reaches it in {fmt_s(max(0.0, f.pending_at - self.t))})" if f.pending else ""
         who = f.commander.get("name") or ""
-        battle = "; IN BATTLE" if f.status == "engaged" else ("; besieging" if f.status == "besieging" else "")
+        battle = "; IN BATTLE" if f.status == "engaged" else ("; besieging" if f.status == "besieging" else ("; with the Aquila, in the Captain's hands" if f.status == "real" else ""))
         air = sum(s.fighters + s.bombers + s.drones for s in f.ships)
         return (f"{f.id} {f.name}: {f.composition()}{f' + {air} craft' if air else ''}; hull {int(100 * f.hull)}%, supply {int(100 * f.supply)}%, morale {f.morale:.2f}; {where}{route}; "
                 f"order: {order}{battle}{pend}" + (f"; led by {who}" if who else ""))
@@ -1964,8 +2056,8 @@ class March:
         self.battles.clear()
         self.real_system, self.real_fight = "", False
         for f in self.fleets.values():
-            if f.status == "engaged":
-                f.status = "ready"                                    # (a battle in progress is not kept: the fleets meet again at the next step)
+            if f.status in ("engaged", "real"):
+                f.status = "ready"                                    # (a battle in progress is not kept, nor is the real simulation's: the fleets meet again at the next step)
         self.dirty = True
 
     def reset(self, seed: int | None = None) -> None:

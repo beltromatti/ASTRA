@@ -60,6 +60,7 @@ class Params:
     air_kill: float = 0.010              # craft a fighter kills per second
     air_pd: float = 0.0035               # craft a point-defence channel kills per second
     hold_target: float = 0.6             # a side keeps its target while it scores this much of the best
+    focus_group: float = 7.0             # ships that fire together on one target: a bigger side fights as several groups, each with a target of its own
     defend_bonus: float = 1.10           # the defender's edge at a depot system with a post, in damage
     surprise: float = 1.12               # the edge of a force that arrives unseen, in its first minute
     step_s: float = 5.0
@@ -148,7 +149,7 @@ class Engagement:
         self.approach_s = params.approach0 + params.approach_per_ship * n if approach_s is None else approach_s
         self.luck = [math.exp(rng.gauss(0.0, params.sigma_battle)) for _ in (0, 1)]
         self.defender, self.surprise = defender, surprise
-        self.target: list[Unit | None] = [None, None]
+        self.target: list[list[Unit | None]] = [[], []]                  # side -> the target of each of its fire groups
         self.low_for: dict[str, float] = {}                              # fleet id -> how long its side's strength has been under its stance's line
         self.msl_t = [self.approach_s - 12.0, self.approach_s - 12.0]
         self.events: list[tuple[float, str, Unit]] = []                  # (t, "lost" | "broke off" | "out", unit)
@@ -262,32 +263,44 @@ class Engagement:
         expo = self.p.flee_exposure if u.flee_t >= 0.0 else 1.0
         return u.value * (0.5 + (1.0 - u.frac)) * expo
 
-    def _pick(self, s: int) -> Unit | None:
-        """Side `s` chooses what it fires on: the enemy's most valuable and most battered ship it can still reach, and keeps it while it stays near the best."""
+    def _groups(self, s: int) -> int:
+        """How many fire groups side `s` fights as: a big fleet is several groups (the simulation's battle groups think and aim for themselves), a small one is one."""
+        n = sum(1 for u in self.sides[s] if u.fighting and not u.fixed)
+        return max(1, int(math.ceil(n / max(1.0, self.p.focus_group) - 0.25)))
+
+    def _pick(self, s: int, i: int = 0) -> Unit | None:
+        """Fire group `i` of side `s` chooses what it fires on: the enemy's most valuable and most battered ship it can still reach (the next group takes the next one,
+        so that a fleet's groups do not all spend themselves on the same ship), and keeps it while it stays near the best."""
         foes = [u for u in self.sides[1 - s] if u.alive and not u.gone]
         if not foes:
             return None
-        best = max(foes, key=self._score)
-        cur = self.target[s]
+        ranked = sorted(foes, key=self._score, reverse=True)
+        best = ranked[i % len(ranked)]
+        tg = self.target[s]
+        while len(tg) <= i:
+            tg.append(None)
+        cur = tg[i]
         if cur is not None and cur.alive and not cur.gone and self._score(cur) >= self.p.hold_target * self._score(best):
             return cur
         return best
 
     def _apply(self, victim: int, dmg: tuple[float, float]) -> None:
-        """Damage from the other side lands on side `victim`: direct damage and missile damage, the target chosen as the shooter would."""
+        """Damage from the other side lands on side `victim`: direct damage and missile damage, shared among the shooter's fire groups, each on the target it chose."""
         shooter = 1 - victim
+        k = self._groups(shooter)
         for amount, leak in ((dmg[0], self.p.shield_leak), (dmg[1], self.p.msl_leak)):
-            left = amount
-            guard = 0
-            while left > 1e-6 and guard < 80:
-                guard += 1
-                t = self._pick(shooter)
-                if t is None:
-                    return
-                self.target[shooter] = t
-                left -= self._hit(t, left, leak, shooter)
-                if not t.alive:
-                    self.target[shooter] = None
+            for i in range(k):
+                left = amount / k
+                guard = 0
+                while left > 1e-6 and guard < 80:
+                    guard += 1
+                    t = self._pick(shooter, i)
+                    if t is None:
+                        return
+                    self.target[shooter][i] = t
+                    left -= self._hit(t, left, leak, shooter)
+                    if not t.alive:
+                        self.target[shooter][i] = None
 
     def _hit(self, t: Unit, dmg: float, leak: float, shooter: int) -> float:
         """Raw damage `dmg` on `t`: the shield takes all but `leak` of it until it is down, then the hull. Returns the damage used (a kill wastes some)."""

@@ -145,9 +145,9 @@ ASTRA_PEOPLE: list[dict[str, Any]] = [
 
 # the two strategic commanders: Rourke is the director's (director.ADMIRAL); the Mandate's high command is new
 MANDATE_HIGH_COMMAND: dict[str, Any] = dict(
-    key="ostrander", name="Archon Maren Ostrander", rank="Archon (commander of the Interdiction Fleet)", voice="caro_davy", gender="f",
+    key="skarn", name="Archon Isolde Skarn", rank="Archon (commander of the Interdiction Fleet)", voice="caro_davy", gender="f",
     ship="the Interdiction Fleet's command at Erebus Anchorage",
-    bio="Born on a ration line in the third year of the Silence and an Archon at forty-four; she believes the Gates are the only thing worth the dead and that a "
+    bio="Born on a ration line in the last years of the Silence and an Archon at forty-four; she believes the Gates are the only thing worth the dead and that a "
         "fleet is a finite thing that must be spent only where it takes a Gate. Patient, cold, economical with ships and with words, she wants Aurelia and will "
         "take ten systems slowly rather than lose the fleet in one battle. She respects an enemy who is good and never underestimates one who is lucky.")
 ASTRA_HIGH_COMMAND: dict[str, Any] = dict(
