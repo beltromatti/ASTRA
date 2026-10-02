@@ -638,9 +638,10 @@ class Parts:
         with self.body.at(m), self.fine.at(m), self.soft.at(m), self.emit.at(m):
             yield self
 
-    def build(self, name: str, uv_meter: float = 1.0) -> bpy.types.Object:
-        """Bevel and shade each group, box-project the UVs (1 UV unit = `uv_meter` metres: 1.0 walls, 0.5 consoles, 0.25 seats),
-        join. Faces with their own UVs (lamps, labels, screens) are left alone."""
+    def build(self, name: str, uv_meter: float = 1.0, small_uv_meter: float | None = None) -> bpy.types.Object:
+        """Bevel and shade each group, box-project the UVs (1 UV unit = `uv_meter` metres: 1.0 walls, 0.5 consoles, 0.25 seats; the `fine` and `soft`
+        groups, the small hardware, use `small_uv_meter` when it is given: the materials' grain is then finer on small parts), join. Faces with their own UVs
+        (lamps, labels, screens) are left alone."""
         objs = []
         for tag, fb, bev in (("body", self.body, self.bevel), ("fine", self.fine, self.fine_bevel), ("soft", self.soft, self.soft_bevel),
                              ("emit", self.emit, 0.0)):
@@ -653,7 +654,7 @@ class Parts:
                 A.bevel_and_normals(o, width=bev, segments=self.bevel_segments, angle_deg=self.angle)
             if os.environ.get("BRG3_DEBUG_TRIS"):
                 print(f"    [{name}_{tag}] {n_faces} faces authored -> {tri_count(o)} tris after finishing")
-            A.box_uv(o, texel_m=uv_meter)
+            A.box_uv(o, texel_m=small_uv_meter if (small_uv_meter and tag in ("fine", "soft")) else uv_meter)
             if tag == "soft":                                      # cushions and other organic parts: smooth shading
                 bpy.ops.object.select_all(action="DESELECT")
                 o.select_set(True)

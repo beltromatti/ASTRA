@@ -271,6 +271,10 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     decor_mat(L.DECOR, float(os.environ.get("BRG3_DECOR", "1.8")))
     pbr(L.BRASS, srgb_to_linear("#B89A4E"), "Brushed", 1.0, (0.24, 0.42), 1.0, 0.0, 0.15, 0.5)
     pbr("MI_BRG3_Navy", srgb_to_linear("#1F3A6B"), "PanelPaint", 1.0, (0.28, 0.45), 0.0, 0.0, 0.3, 0.3)         # navy paint: livery stripes and flight-deck markings
+    # the Falcon's own hull instances (ship3_palette.PAINT["A"]): the nose and wings of the cockpit mesh are the hull seen from inside
+    pbr("MI_HULL_A_Plate", srgb_to_linear("#D6D2C7"), "PanelPaint", 1.0, (0.30, 0.55), 0.0, 0.0, 0.25, 0.3)
+    pbr("MI_HULL_A_Frame", srgb_to_linear("#4A4F55"), "Gunmetal", 1.0, (0.28, 0.55), 0.35, 0.0, 0.5, 0.5)
+    pbr("MI_HULL_A_Livery", srgb_to_linear("#1F3A6B"), "PanelPaint", 1.0, (0.28, 0.50), 0.0, 0.0, 0.25, 0.3)
     pbr("MI_SHIP_Leaf", (0.045, 0.20, 0.04), "Linen", 4.0, (0.45, 0.65), 0.0, 0.0, 0.5, 0.6)            # the ship kit's instances that the props share
     pbr("MI_SHIP_Soil", (0.035, 0.022, 0.014), "Linen", 4.0, (0.7, 0.9), 0.0, 0.0, 0.5, 0.8)
     pbr("MI_SHIP_CrateBlue", (0.045, 0.09, 0.20), "PanelPaint", 1.0, (0.5, 0.7), 0.0, 0.0, 0.25, 0.3)
