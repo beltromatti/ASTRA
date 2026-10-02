@@ -18,7 +18,9 @@ namespace
 	constexpr float LadderDownCmS = 160.f;
 	constexpr float LadderAccel = 700.f;        // cm/s²: he starts and stops in a fraction of a second
 	constexpr float LadderSnapS = 0.22f;        // from where he took it to the spot in front of the rungs
-	constexpr float LadderDeckTol = 40.f;       // feet this near a deck's floor: he can step off there
+	constexpr float LadderDeckTol = 150.f;      // feet this near a deck's floor: he can step off there (E brings them level with it)
+	constexpr float LadderSettle = 90.f;        // let go of W/S this near a deck and he settles level with it, ready to step off
+	constexpr float LadderSettleCmS = 70.f;     // cm/s
 }
 
 TStatId UAstraLadderSubsystem::GetStatId() const
@@ -295,6 +297,15 @@ void UAstraLadderSubsystem::Tick(float DeltaTime)
 	Vz = FMath::FInterpConstantTo(Vz, Want, DeltaTime, LadderAccel);
 	const float Lo = L.Stops[0].FloorZ, Hi = L.Stops.Last().FloorZ;
 	float Feet = FeetZ(Cl) + Vz * DeltaTime;
+	if (In == 0.f && FMath::Abs(Vz) < 1.f)
+	{
+		// at rest near a deck: settle level with its floor (a hand on the rung at the hatch's edge)
+		const int32 Near = StopAt(Feet, LadderSettle);
+		if (Near != INDEX_NONE)
+		{
+			Feet = FMath::FInterpConstantTo(Feet, L.Stops[Near].FloorZ, DeltaTime, LadderSettleCmS);
+		}
+	}
 	if (Feet <= Lo || Feet >= Hi)
 	{
 		Feet = FMath::Clamp(Feet, Lo, Hi);
@@ -313,7 +324,7 @@ void UAstraLadderSubsystem::Tick(float DeltaTime)
 		}
 	}
 	// the deck he is level with: its name once, and the way off
-	const int32 At = StopAt(Feet, LadderDeckTol);
+	const int32 At = StopAt(Feet, 60.f);
 	if (At != INDEX_NONE && L.Stops[At].Deck != DeckShown)
 	{
 		DeckShown = L.Stops[At].Deck;
