@@ -458,7 +458,9 @@ def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: st
                             separators=(",", ":"), ensure_ascii=False)
     room = f"The room: {hearing}\n" if hearing else ""
     fleet = str(ship_state.get("_fleet_board") or "")           # the allied groups and their captains (the war minds' fleet board, set by the server)
+    front = str(ship_state.get("_march_board") or "")           # the front as Fleet knows it, beyond the Aquila's sky (the March's board, set by the server)
     return (f"[The bridge now]\nRecent events\n{events}\n"
             + (("Consoles now (who runs what, since when, how it is going)\n" + board + "\n") if board else "")
             + (("The fleet: our battle groups and their captains, from the fleet datalink\n" + fleet + "\n") if fleet else "")
+            + (("The front, as Fleet knows it (what comms and the plot hold of the war beyond this sky; what is not here is not known)\n" + front + "\n") if front else "")
             + room + f"Current ship state (live telemetry, JSON)\n{state_json}\n[end of the bridge now]")

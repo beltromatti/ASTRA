@@ -707,6 +707,7 @@ class WarMinds:
         self.t0 = self.clock()
         self.disabled = False
         self.formation_doctrine = False                  # the doctrine also teaches the formation lever (a switch: ASTRA_WAR_FORMATION=1, see `_RANGE_LINE`)
+        self.strategic: Callable[[str], str] | None = None   # side -> what its high command means and what is on its way to this system (strategy.py: the war of the March)
 
     # ------------------------------------------------------------------------------------------------ people
     def reset(self) -> None:
@@ -1126,6 +1127,10 @@ class WarMinds:
                           f"into): {style}")
         if seat.kind == "group" and side == "mandate" and admiral is not None:
             intent = (f"\nThe admiral's last intent: {admiral.intent}" if admiral.intent else "\nThe admiral has not given orders yet.")
+        high = self.strategic(side) if self.strategic is not None else ""
+        if high:
+            intent += ("\nYOUR HIGH COMMAND, AS YOUR SIDE'S FLEETS KNOW IT (its plan, its orders for the fleets here, what is on its way to this system and what your side's eyes say "
+                       "is coming; the war is bigger than this fight: read what you are fighting for, and what help is on its way)\n" + high)
         if mind.why_extra:
             intent += "\n" + "\n".join(mind.why_extra)
             mind.why_extra = []

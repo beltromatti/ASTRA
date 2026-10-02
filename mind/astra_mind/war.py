@@ -183,10 +183,13 @@ class WarMap:
 
     def game_payload(self) -> dict[str, Any]:
         """What the game needs: looks for the gates, links for routing, the plot for the holo table."""
-        return {"current": self.current, "systems": [
+        out = {"current": self.current, "systems": [
             {"name": k, "star_class": s["star"], "planet_type": s["planet"], "planet_name": s["world"], "owner": s["owner"],
              "threat": s["threat"], "x": s["x"], "y": s["y"], "links": self.links[k], "pop": s.get("pop", 0)}
             for k, s in self.systems.items()], "news": self.news[-5:]}
+        if self.authority is not None:
+            out["march"] = self.authority.holo("astra")             # (the fleets and the battles as ASTRA's high command holds them, with the fog of war)
+        return out
 
     # ---------------------------------------------------------------------------------------------- saving
     def save(self) -> None:

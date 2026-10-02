@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import time
 from typing import Any, Awaitable, Callable
@@ -135,7 +136,7 @@ class MarchGlue:
         m.live_scripts = True                           # (the game brings its own fleets in: the clock of the bench does not)
         m.save_path = m.default_path()
         if new:
-            m.reset()
+            m.reset(random.randrange(1, 10 ** 6))
             if self.minds is not None:
                 self.minds.reset()
         else:

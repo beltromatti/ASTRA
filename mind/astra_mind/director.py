@@ -9,7 +9,12 @@ Captain's choices make the story. It never rigs a fight: no beat changes the str
 what a war really brings and everybody can see coming (a relief on its way, a call to talk, news). It invents the new commanders it needs (the enemy's
 and the allies': they get a mind and a voice). Vice Admiral Adrian Rourke, commander of the 7th Fleet, delivers the orders over the fleet net and answers
 when the Aquila calls; he can grant reinforcements or a resupply when the war allows it. The simulation stays the truth: every beat goes through the
-game and its result comes back before anyone talks about it."""
+game and its result comes back before anyone talks about it.
+
+With the war of the March (march.py, docs/GUERRA.md §10) the director is OMNISCIENT AND ONLY A SHOWRUNNER: the forces are the March's (two high commands order real
+fleets on the map; what arrives where the Aquila is, arrives as the ships it really has), so it invents no ship and changes no strength or owner; it paces the story with
+true things: what a side's intelligence may learn (`reveal`), what the government at home presses its high command to do (`pressure`), news, a breath for the Captain, a
+place to search, a commander who calls to talk. Rourke is a mind of his own then (strategy.py): the director does not script him."""
 from __future__ import annotations
 
 import asyncio
@@ -174,11 +179,100 @@ WAR_NEWS = _fn("war_news", "Something happens elsewhere in the March, and the fl
     "owner": {"type": "string", "enum": list(OWNERS), "description": "who holds it now, if that changed"},
     "threat": {"type": "integer", "minimum": 0, "maximum": 3, "description": "0 quiet, 1 raids, 2 under attack, 3 front line"}},
     ["text", "system"])
+REVEAL = _fn("reveal", "Let a side's intelligence learn something TRUE: where one of the OTHER side's fleets really is now, by some means of the story's (a defector's message, a "
+                       "Guild courier, an intercepted signal). The war needs eyes as much as ships: use it when a side is blind and a decision would be the better for knowing, "
+                       "for either side in turn, never to hand anyone a victory. The fleet must be on the list (the war's truth); nothing is invented.", {
+    "side": {"type": "string", "enum": ["astra", "mandate"], "description": "the side whose intelligence learns it"},
+    "fleet": {"type": "string", "description": "the id of the other side's fleet (F-M4 for a Mandate fleet, F-A1 for an ASTRA one), from the list"},
+    "how": {"type": "string", "description": "how they learn it, a few words in English (a defector from the Cassia Yards; a Guild courier out of Veyra)"}}, ["side", "fleet", "how"])
+PRESSURE = _fn("pressure", "The government at home presses a side's high command for a while: the Senate wants Aurelia held and the Home Fleet kept at Concordia; the Hall of the Ferried "
+                           "wants a result before the harvest; a mutiny rumour, an election. It is a thing the high command reads and answers as it sees fit: it changes no rule "
+                           "and no ship. Use it to move a war that has stalled, or to hold back one that runs too fast for the Captain to breathe, and say it as that government "
+                           "would, with its own motive.", {
+    "side": {"type": "string", "enum": ["astra", "mandate"]},
+    "text": {"type": "string", "description": "what the government demands or fears, one or two sentences in English"},
+    "minutes": {"type": "number", "description": "how long it presses (20-120)"}}, ["side", "text"])
+WAR_NEWS_MARCH = _fn("war_news", "Something the war has really done elsewhere in the March, and the fleet net reports it (the crew hears it): the list below is the war's truth, "
+                                 "say what it says, give it colour, never more than it did. It cannot change who holds a system or how a fleet stands. At most one per beat.", {
+    "text": {"type": "string", "description": "the news as the fleet net says it, in English, one or two sentences"},
+    "system": {"type": "string", "description": "the system concerned (a name from the March)"}}, ["text", "system"])
 NARRATE = _fn("narrate", "Game master mode only: the director answers the player out of character, one short line.", {
     "text": {"type": "string", "description": "in the player's language, one sentence"}}, ["text"])
 TRANSMIT = _fn("transmit", "Vice Admiral Rourke speaks to the Aquila over the fleet net.", {
     "text": {"type": "string", "description": "what he says, in the Captain's language, names in English; 1-3 sentences"}},
     ["text"])
+
+MARCH_BEATS = ["calm", "investigate", "negotiation", "none"]       # the beats that invent no force (the March's director)
+MARCH_BEAT_FIELDS = ("type", "poi", "findings", "bearing_deg", "range_km", "delay_s", "caller", "terms", "why", "threads", "officers", "home", "crew_mood")
+
+
+def _march_beat_tool() -> dict[str, Any]:
+    props = {k: v for k, v in BEAT_TOOL["function"]["parameters"]["properties"].items() if k in MARCH_BEAT_FIELDS}
+    props["type"] = {"type": "string", "enum": MARCH_BEATS, "description": "calm: the Captain has a breath (nothing is forced on him; the war's clock goes on) · investigate: "
+                                                                          "a place to search where the Aquila is (a silent station, a drifting hulk; no ambush) · negotiation: "
+                                                                          "a Mandate commander already on the plot calls the Aquila to talk (`caller`, `terms`) · none: the "
+                                                                          "story needs nothing now (say why in `why`)"}
+    return _fn("start_beat", "The next beat of the story, if it needs one: it invents no force.", props, ["type", "why", "crew_mood"])
+
+
+BEAT_TOOL_MARCH = _march_beat_tool()
+
+DIRECTOR_PROMPT_MARCH = """You are the director of a war story that the player lives as the Captain of the ASN Aquila: an invisible showrunner who lets the war run by its own logic.
+Nobody knows you are there. You see everything: the whole war, both sides, what each commander means to do. Decide what the story does now, which is often nothing.
+
+{world}
+
+How the war runs
+- The war is not yours. Two high commands (Vice Admiral Rourke for ASTRA, an Archon for the Mandate) order real fleets of real ships on the map of the March: they move through
+  the Gates, meet, fight, besiege, are built and repaired, by rules that are the same for both sides. Where the Aquila is, the fighting is played ship by ship with the Captain in
+  it; the fleets that come to her system come as the ships they really have. The Captain wins or loses by where he takes her and what he asks of the others.
+- You never create or change a force: no raid, no reinforcement, no decisive battle, no rescue, no handicap. The fleets in the list below are the only warships in the March; you
+  never change who holds a system or how strong a fleet is. Nothing you do tilts the war for either side, and you never speak for Rourke: he is a person with a mind of his own.
+- What you do is the pace of the story, with TRUE things only. `reveal`: a side's intelligence learns where one of the other side's fleets really is (a defector, a Guild courier,
+  a signal): a blind high command sits still, and a war where nobody can find anybody is a dull one. `pressure`: the government at home presses a side's high command (the
+  Senate wants Aurelia held; the Hall of the Ferried wants a result): a high command that has stalled is moved by it, one that rushes is held. `war_news`: colour for what the
+  war has really done. `start_beat`: `calm` (a breath for the Captain), `investigate` (a place to search where the Aquila is: no ambush), `negotiation` (a Mandate commander on the
+  plot calls the Aquila to talk), or `none`.
+- Rhythm from the Captain: one who has been pushed hard (long under pressure, hull low, ships or people lost, magazines thin) gets room to breathe: you give it by what the world
+  could really do (a government holding its Archon back, a lull, news, a human moment), never by a gift of ships or a rescue; a rested Captain with a sound ship is not protected.
+  Do not leave the war quiet for long without a reason: a quiet that lasts is a question the next move answers. Alternate; never two calms in a row.
+- Balance by the war's logic, never by numbers: both sides are played by minds that read their own pictures; the Mandate learns how this Captain fights (below) and may use it.
+- NEVER rig a fight in progress. In one, you may only `reveal`, `pressure` or let a commander call to talk (`negotiation`), at most once or twice, never as a rescue.
+
+Rules
+- Call `start_beat` exactly once (`none` when the story needs nothing), `war_news` at most once, `reveal` and `pressure` as the story asks (at most two of them in all).
+- A `negotiation` caller must be a hostile ship on the plot (a contact), with a reason to talk (his group is hurt, or winning and wishing to spare lives); it changes no number.
+- `investigate`: where the Aquila is, a silent station, a drifting warship, a dead freighter. Its findings are the story (what happened, who, a clue that leads on).
+- `threads`: keep the war's open threads (what each side is doing or gathering, promises, mysteries, grudges): at most five short lines, rewritten each time you give a beat. The open
+  threads now: {threads}
+- `crew_mood`: the people aboard live this war: losses, close calls, victories, the Captain's choices and long waits change how they feel; carry it from beat to beat (the mood before
+  this beat: {mood}).
+- `officers`: each officer has a bond with the Captain (below). The Captain's choices move it: an order that cost lives, mercy or ruthlessness, trusting an officer's advice or overruling
+  it, visiting the wounded, keeping or breaking a promise. Change a bond only when something happened that would change it, and keep it human and specific. Where each officer stands
+  now: {bonds}
+- How this Captain fights (the XO's read of the fights so far): {captain_style}. Now and then the war may test those habits: an enemy that has learned them and plays on them: never
+  every time, and never unfairly (it is the Mandate's own mind that does it, from what it has learned: you may `pressure` it to be bolder, never tell it how).
+- The Captain's own log entries ("captain's log: ..." in the campaign log) are the player telling you what they think, fear and want: let the story answer them.
+- Keep the whole thing coherent with the map, the campaign log and the live state.
+
+The Aurelia March (the sector at war; each system's Janus Gate is bound to the ones in brackets)
+{war}
+
+THE WAR, AS IT TRULY IS (both sides' fleets and plans, the battles, the wills)
+{march}
+
+Campaign log (oldest first)
+{campaign}
+
+The pulse
+{pulse}
+
+Live state of the Aquila and the battlefield
+{state}"""
+
+BATTLE_ASK_MARCH = ("A FIGHT IS IN PROGRESS (about {minutes:.0f} minutes old): you are looking in on it, not stopping it. The fight IS the story: most looks end with `none`. You may only "
+                    "`reveal`, `pressure` or let a Mandate commander on the plot call to talk (`negotiation`), at most once or twice in a fight, never as a rescue and never changing the "
+                    "strength of ships already in it. Nothing else while the guns are firing.")
 
 DIRECTOR_PROMPT = """You are the director of a war story that the player lives as the Captain of the ASN Aquila: an invisible showrunner who lets the
 war run by its own logic and gives the Captain situations worth deciding. Nobody knows you are there. Decide what the war brings next, now.
@@ -324,6 +418,8 @@ class Director:
         self.command = command          # (name, args) -> result from the game
         self.register = register        # (contact_id, persona) -> the enemy minds learn a new commander
         self.war_minds: Any = None       # the war minds (war_minds.py): the allied captains the story invents are registered with them
+        self.march: Any = None           # the war of the March (march_glue.py), when the war has fleets: the director is its omniscient showrunner, never its hand
+        self.rourke: Callable[[str, str], Awaitable[list[str]]] | None = None   # (words, lang) -> Rourke's lines: with the March he is a mind of his own (strategy.py)
         self.negotiate: Callable[[str, str], Awaitable[bool]] | None = None   # (contact_id, terms) -> the Mandate commander calls the Aquila (the server)
         self.campaign: list[str] = []
         self.busy = False
@@ -577,17 +673,20 @@ class Director:
     async def _next_beat(self, lang: str, state: dict[str, Any], request: str = "", in_battle: bool = False) -> None:
         t0 = time.perf_counter()
         self.last_pulse_t = self.clock()
-        prompt = DIRECTOR_PROMPT.format(world=WORLD, lang_name=LANG_NAMES.get(lang, lang), war=self.war.brief(),
-                                        mood=self.mood or "not yet set: the patrol has just begun",
-                                        bonds="; ".join(self.bonds_lines()) or "(nothing yet: a new ship, a new crew, a new captain)",
-                                        threads="; ".join(self.threads) or "(none yet)",
-                                        captain_style=self.captain_style() or "(no fights yet)",
-                                        campaign="\n".join(f"- {c}" for c in self.campaign) or "- (the war has just begun)",
-                                        pulse=self.pulse_facts(state),
-                                        state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
+        march = self.march is not None
+        fields = dict(world=WORLD, lang_name=LANG_NAMES.get(lang, lang), war=self.war.brief(),
+                      mood=self.mood or "not yet set: the patrol has just begun",
+                      bonds="; ".join(self.bonds_lines()) or "(nothing yet: a new ship, a new crew, a new captain)",
+                      threads="; ".join(self.threads) or "(none yet)",
+                      captain_style=self.captain_style() or "(no fights yet)",
+                      campaign="\n".join(f"- {c}" for c in self.campaign) or "- (the war has just begun)",
+                      pulse=self.pulse_facts(state),
+                      state=json.dumps(_brief(state), ensure_ascii=False, separators=(",", ":")))
+        prompt = DIRECTOR_PROMPT_MARCH.format(march=self.march.m.director_view(), **fields) if march else DIRECTOR_PROMPT.format(**fields)
         beat: dict[str, Any] = {}
         speech: list[str] = []
         news: list[dict[str, Any]] = []
+        told: list[dict[str, Any]] = []                  # (the March) what the director lets a side learn, and what the government presses
 
         narration: list[str] = []
 
@@ -599,13 +698,15 @@ class Director:
                 speech.append(a["text"].strip())
             elif call.name == "war_news" and a.get("text") and not news:
                 news.append(a)
+            elif call.name in ("reveal", "pressure") and march and len(told) < 2:
+                told.append({"tool": call.name, **a})
             elif call.name == "narrate" and (a.get("text") or "").strip() and not narration:
                 narration.append(a["text"].strip())
 
         ask = "Decide the next beat now."
-        tools = [BEAT_TOOL, WAR_NEWS, TRANSMIT]
+        tools = [BEAT_TOOL_MARCH, WAR_NEWS_MARCH, REVEAL, PRESSURE] if march else [BEAT_TOOL, WAR_NEWS, TRANSMIT]
         if in_battle:
-            ask = BATTLE_ASK.format(minutes=((self.clock() - self.fight_since) / 60) if self.fight_since is not None else 0.0)
+            ask = (BATTLE_ASK_MARCH if march else BATTLE_ASK).format(minutes=((self.clock() - self.fight_since) / 60) if self.fight_since is not None else 0.0)
         if request:
             # game master mode: the player's wish, made to fit the world
             ask = (f"The player — the Captain, speaking to you, the director, out of character — asks: \"{request}\". The "
@@ -618,6 +719,16 @@ class Director:
             tools = tools + [NARRATE]
         comp = await models.chat(self.llm, "director", messages=[{"role": "system", "content": prompt}, {"role": "user", "content": ask}],
                                  tools=tools, tool_choice="auto", on_tool_call=on_call, max_tokens=1300 if request else 900)
+        for t in told:   # (the March) true things for the story's pace: a fleet found, the government's pressure
+            if t["tool"] == "reveal":
+                side, fid = str(t.get("side", "")), str(t.get("fleet", ""))
+                ok = side in ("astra", "mandate") and self.march.m.reveal(side, fid, str(t.get("how") or "an agent's report"))
+                self.note(f"the story let {side} intelligence learn where {fid} is: {t.get('how', '')}" if ok else f"(a reveal of {fid} to {side} was impossible)")
+            else:
+                side = str(t.get("side", ""))
+                if side in ("astra", "mandate") and str(t.get("text", "")).strip():
+                    self.march.m.pressure(side, str(t["text"]), min(120.0, max(20.0, float(t.get("minutes") or 60.0))))
+                    self.note(f"{side} government presses its high command: {str(t['text']).strip()[:160]}")
         for n in news:   # the war elsewhere moves first: the beat may follow from it
             changed = self.war.update(n.get("system", ""), n.get("owner"), n.get("threat"), n["text"])
             self.war.add_news(n["text"])
@@ -654,6 +765,9 @@ class Director:
             log.info("war threads: %s", self.threads)
             self.save()
         kind = str(beat.get("type", ""))
+        if march and kind not in MARCH_BEATS:
+            self.note(f"(a {kind} was not played: the war's forces are the March's)")
+            kind = "none"
         self.beat_log.append((self.clock(), kind, str(beat.get("why", ""))))
         if in_battle and kind not in IN_BATTLE_BEATS:
             self.note(f"(a {kind} was not played: the guns are firing)")
@@ -697,7 +811,7 @@ class Director:
             self.note(f"{cmd['name']} ({cmd.get('rank', '')}) leads it, aboard {first.get('name', '?')} ({leader_id})")
         if kind == "reinforcements" and not beat.get("groups"):
             self._register_captains(ids, beat.get("ships") or [])
-        if not speech and beat.get("type") in ("transit", "raid", "distress", "reinforcements", "investigate"):
+        if not speech and beat.get("type") in ("transit", "raid", "distress", "reinforcements", "investigate") and not march:
             speech = await self._brief_line(beat, res.get("detail", ""), lang, state)
         for line in speech[:2]:
             await self.say("admiral", line, lang, "measured")
@@ -727,7 +841,7 @@ class Director:
             first = ships[0] if ships else {}
             self.register(gids[0], {"name": cmd["name"], "rank": cmd.get("rank", "Ferryman (ship captain)"), "bio": cmd.get("bio", ""),
                                     "ship": f"the {first.get('class', 'warship')} {first.get('name', '')}".strip(),
-                                    "voice": COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
+                                    "voice": cmd.get("voice") or COMMANDER_VOICES[self.voice_i % len(COMMANDER_VOICES)],
                                     "mission": cmd.get("orders") or why})
             self.voice_i += 1
             self.note(f"{cmd['name']} ({cmd.get('rank', '')}) leads {grp.get('name', 'a group')}, aboard {first.get('name', '?')} ({gids[0]})")
@@ -742,7 +856,7 @@ class Director:
                 continue                                           # (no captain given: the war minds draw one from their pool when the ship is in a group)
             g = "f" if str(cap.get("gender", "m")).lower().startswith("f") else "m"
             voices = ALLY_VOICES[g]
-            voice = voices[self.ally_voice_i[g] % len(voices)]
+            voice = cap.get("voice") or voices[self.ally_voice_i[g] % len(voices)]
             self.ally_voice_i[g] += 1
             self.war_minds.register_ally(cid, {"name": cap["name"], "rank": cap.get("rank", "Captain"), "bio": cap.get("bio", ""), "gender": g, "voice": voice,
                                                "ship": f"the {ship.get('class', 'warship')} ASN {str(ship.get('name', '')).replace('ASN ', '')}".strip(),
@@ -850,6 +964,11 @@ class Director:
 
     async def admiral_reply(self, message: str, lang: str, state: dict[str, Any]) -> list[str]:
         """The Aquila spoke on the fleet net: Rourke answers what is for Fleet command (and may send help); words for a ship's captain are theirs."""
+        if self.rourke is not None:                                    # (the March: Rourke is a mind with the whole war in front of him: strategy.py)
+            lines = await self.rourke(message, lang)
+            for line in lines:
+                self.note(f"Rourke to the Aquila: {line}")
+            return lines
         prompt = ADMIRAL_PROMPT.format(name=ADMIRAL["name"], bio=ADMIRAL["bio"], world=WORLD, lang_name=LANG_NAMES.get(lang, lang),
                                        captain=CAPTAIN_WORD.get(lang, "Captain"), war=self.war.brief(detail=False), allies=self._allies_line(),
                                        campaign="\n".join(f"- {c}" for c in self.campaign[-12:]) or "- (the war has just begun)",
@@ -879,8 +998,8 @@ class Director:
                 if res.get("ok") and ships:
                     self._register_captains(_ids(res.get("detail", "")), ships)
 
-        await models.chat(self.llm, "director", messages=msgs, tools=[TRANSMIT, GRANT], tool_choice="auto", on_tool_call=on_call, max_tokens=400,
-                          temperature=0.6)
+        await models.chat(self.llm, "director", messages=msgs, tools=[TRANSMIT] if self.march is not None else [TRANSMIT, GRANT], tool_choice="auto", on_tool_call=on_call,
+                          max_tokens=400, temperature=0.6)       # (with the March no help is conjured: Fleet's ships are the March's)
         self.admiral_history += [{"role": "user", "content": f"[The Aquila on the fleet net]: {message}"},
                                  {"role": "assistant", "content": " ".join(lines) or "(no answer)"}]
         for line in lines:

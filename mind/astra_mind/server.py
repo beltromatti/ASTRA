@@ -45,6 +45,9 @@ from .speech import REPORT_LATE_S, Prio, Voice
 from .flight_minds import CAST as FLIGHT_CAST, PARTY as FLIGHT_PARTY, PARTY_ALIASES as FLIGHT_ALIASES, FlightMinds, flying as _flying
 from .marines import PARTY as MARINES_PARTY, MarineMinds
 from .war_minds import ALLIES, WarMinds
+from .march import March
+from .march_glue import MarchGlue
+from .strategy import StrategicMinds
 from .tts import TTSEngine
 from .voice_qos import boost_thread
 
@@ -207,6 +210,11 @@ class Mind:
         self.enemy.war = self.war
         self.director.war_minds = self.war
         self.director.negotiate = self._negotiate
+        # the war of the March (march.py, strategy.py, march_glue.py): the fleets of both sides on the map of the Gates and the high commands that order them, joined to the real
+        # simulation where the Aquila is; built when a campaign begins (ASTRA_MARCH=0: the director plays the war as before; ASTRA_STRATEGY_MINDS=0: the fleets go on on their reflexes)
+        self.march: March | None = None
+        self.strategy: StrategicMinds | None = None
+        self.march_glue: MarchGlue | None = None
         self.agent.say = self._crew_say
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
@@ -257,6 +265,45 @@ class Mind:
             return await self.war.rethink(speaker, t, waited, cut_after, lang)
         await self.voice.say(speaker, text, lang, tone, priority=Prio.URGENT if urgent else None, answer=True if answer else None, topic=topic,
                              rethink=rethink)
+
+    def _start_march(self, new: bool) -> None:
+        """A campaign begins (a new war, or the saved one): the March is the war from now on, with its high commands (Vice Admiral Rourke for ASTRA, the Archon for the Mandate)."""
+        if os.environ.get("ASTRA_MARCH", "1") == "0":
+            return
+        if self.march_glue is None:
+            import random
+            march = March(self.director.war, seed=random.randrange(1, 10 ** 6))
+            strategy = StrategicMinds(self.llm, march, self._rourke_say, lang=lambda: self.lang, intel=self.style.mandate_line, note=self.director.note)
+            strategy.disabled = os.environ.get("ASTRA_STRATEGY_MINDS", "1") == "0"
+            glue = MarchGlue(march, strategy, command=self._director_command, register_groups=self.director._register_groups, announce=self._march_news,
+                             note=self.director.note, send_sector=self._send_sector, lang=lambda: self.lang)
+            self.war.strategic = lambda side: strategy.field_brief(side, march.real_system)
+            self.director.march = glue
+            self.director.rourke = None if strategy.disabled else glue.rourke_reply
+            self.march, self.strategy, self.march_glue = march, strategy, glue
+        self.march_glue.start(new)
+
+    async def _rourke_say(self, speaker: str, text: str, lang: str, tone: str, *, answer: bool = False) -> None:
+        """Vice Admiral Rourke speaks on the fleet net (strategy.py): the bridge hears it like any radio voice; a line that answers the Captain goes first."""
+        if self.game is not None:
+            who = EXTERNAL_SPEAKERS.get(speaker, (speaker, ""))[0]
+            self.game.events.append(f"over the radio, {who}: {text}")
+        self.exchange.heard("fleet", text)
+        await self.voice.say(speaker, text, lang, tone, answer=True if answer else None)
+
+    async def _march_news(self, text: str) -> None:
+        """What the March's war brings to the fleet net: comms relays it to the bridge (march_glue.py chooses what is worth saying)."""
+        self.last_activity = time.monotonic()
+        await self.turns.put(("\x00event:comms: fleet net news — " + text, self.lang))
+
+    async def _war_first(self, then: Any, went_on: bool) -> None:
+        """The Captain comes back to a new ship weeks after the loss: the war went on without her (a few seconds of the March's hours), then the story resumes."""
+        if went_on and self.march_glue is not None:
+            try:
+                await self.march_glue.fast_forward()
+            except Exception:  # noqa: BLE001
+                log.exception("the war could not go on without the Aquila")
+        await then
 
     async def _war_execute(self, name: str, args: dict[str, Any], by: str) -> dict[str, Any]:
         """The commanders' orders to the game (group orders, fleet operations, decisions): straight to the ships, never through the hooks the
@@ -368,6 +415,8 @@ class Mind:
             state["_fleet_board"] = self.war.fleet_board(state)
         except Exception:  # noqa: BLE001
             log.exception("the war minds could not read the ship state")
+        if self.march_glue is not None:
+            self.march_glue.feed(state)                   # (the March: the war beyond the Aquila's sky, joined to the one in it; a defect in it is logged there)
         try:
             self.flight.feed(state)                       # (the flight net looks at the state, and starts the pulse that is due)
         except Exception:  # noqa: BLE001
@@ -1040,6 +1089,8 @@ class Mind:
                     self.flight.reset()
                     self.marines.reset()
                     self.port.reset()
+                    if self.march_glue is not None:
+                        self.march_glue.stop()                # (the war waits for the Captain's choice)
                     await self.voice.clear("new_session")     # what the last session had not said yet is not said in this one
                     self.watch.reset()
                     self.exchange.reset()
@@ -1055,6 +1106,7 @@ class Mind:
                                  self.director.war.current, len(self.director.campaign))
                         self.flight.load()                # (what the flight net's people remember of the Captain and of the fight so far)
                         self.marines.load()               # (and the Major's, and the squad leaders')
+                        self._start_march(False)          # (and the war of the March, where it was)
                         # the war resumes: the director decides what the Aquila meets now (after the XO's welcome)
                         if new_command:
                             # after the loss: a new ship, weeks later; the crew's memory of the pod and the hearing is
@@ -1074,17 +1126,18 @@ class Mind:
                         if new_command and self.director.decisive:
                             # the Aquila was lost in the decisive battle: that battle's outcome ends the arc first
                             self.director.decisive = False
-                            asyncio.create_task(self.director._end_arc(
+                            asyncio.create_task(self._war_first(self.director._end_arc(
                                 f"engagement over — the decisive battle was fought on without the Aquila, lost in it ({new_command})",
-                                self.lang, self._battle_state()))
+                                self.lang, self._battle_state()), True))
                         else:
-                            asyncio.create_task(self.director.on_event(resume, self.lang, self._battle_state()))
+                            asyncio.create_task(self._war_first(self.director.on_event(resume, self.lang, self._battle_state()), bool(new_command)))
                     else:
                         self.director.reset()
                         self.style.reset()
                         self.npcs.reset()
                         self.flight.new_campaign()
                         self.marines.new_campaign()
+                        self._start_march(True)
                         log.info("new campaign")
                     asyncio.create_task(self._send_sector())
                 elif kind == "ship_state":
@@ -1101,6 +1154,8 @@ class Mind:
                     text = msg.get("text", "")
                     self.game.events.append(text)
                     self.watch.note(text)                  # (what may change what the officers should do: the watch's next check)
+                    if self.march_glue is not None and self.march_glue.on_event(text):
+                        self.director.decisive = True      # (the March read what the game says of its ships; a major battle ends a chapter of the story: the finale tells it)
                     if text.startswith("director: the Aquila is lost"):
                         # the story of the loss: who finds the Captain, the board, a new command (mind/astra_mind/loss.py)
                         asyncio.create_task(self.aftermath.on_lost(text, self.lang))
