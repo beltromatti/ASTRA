@@ -210,6 +210,30 @@
       "pos": [-0.15, 2.05],
       "level": "dais",
       "yaw": -10
+    },
+    {
+      "id": "captain_table",
+      "mesh": "SM_BRG3_SideTable",
+      "pos": [0.0, -0.93],
+      "level": "dais",
+      "yaw": 0,
+      "footprint": {"radius": 0.26}
+    },
+    {
+      "id": "planter_port",
+      "mesh": "SM_BRG3_Planter",
+      "pos": [4.4, -7.0],
+      "level": "upper",
+      "yaw": 0,
+      "footprint": {"rect": [-0.3, 0.3, -0.7, 0.7]}
+    },
+    {
+      "id": "planter_starboard",
+      "mesh": "SM_BRG3_Planter",
+      "pos": [4.4, 7.0],
+      "level": "upper",
+      "yaw": 0,
+      "footprint": {"rect": [-0.3, 0.3, -0.7, 0.7]}
     }
   ],
   "light_gain": 1.0,

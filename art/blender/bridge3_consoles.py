@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge3_controls as K  # noqa: E402
 import bridge3_holo as HO  # noqa: E402
+import bridge3_life as LF  # noqa: E402
 import bridge3_lib as L  # noqa: E402
 from bridge3_lib import FB, Parts, Rx, Ry, Rz, T, frame, lerp, polar  # noqa: E402
 
@@ -200,6 +201,9 @@ def build_console(kind: str, name: str, station: dict, rng_seed: int = 5):
     else:
         tactical_body(b, F, dept)
     hover_mounts(b, F, kind, dept)
+    if kind != "tactical":
+        with b.at(Rz(F.a)):
+            LF.personal_shelf(b, kind, dept)
     # ---- controls (surface frames)
     fn = {"helm": helm_controls, "ops": ops_controls, "comms": comms_controls, "sensors": sensors_controls,
           "engineering": engineering_controls, "flight": flight_controls, "tactical": tactical_controls}[kind]

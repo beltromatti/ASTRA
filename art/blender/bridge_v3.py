@@ -49,6 +49,7 @@ import bridge3_checks as CK  # noqa: E402
 import bridge3_frame as FR  # noqa: E402
 import bridge3_consoles as CO  # noqa: E402
 import bridge3_holo as HO  # noqa: E402
+import bridge3_life as LF  # noqa: E402
 import bridge3_seats as SE  # noqa: E402
 import bridge3_table as TB  # noqa: E402
 
@@ -151,6 +152,8 @@ def builders(c: SH.Ctx) -> list[tuple[str, object]]:
         ("SM_BRG3_ChairCrew", lambda n: SE.build_chair_crew(n)),
         ("SM_BRG3_ChairCaptain", lambda n: _info(n, SE.build_chair_command(n, True, ["SCREEN_captain_1", "SCREEN_captain_2"]))),
         ("SM_BRG3_ChairXO", lambda n: _info(n, SE.build_chair_command(n, False, ["SCREEN_xo_1"]))),
+        ("SM_BRG3_SideTable", lambda n: LF.build_side_table(n)),
+        ("SM_BRG3_Planter", lambda n: LF.build_planter(n)),
     ]
     for kind in ("helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"):
         cap = kind.capitalize()

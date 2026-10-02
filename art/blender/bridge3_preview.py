@@ -270,6 +270,9 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     label_mat(L.LABEL, 1.4)
     decor_mat(L.DECOR, float(os.environ.get("BRG3_DECOR", "1.8")))
     pbr(L.BRASS, srgb_to_linear("#B89A4E"), "Brushed", 1.0, (0.24, 0.42), 1.0, 0.0, 0.15, 0.5)
+    pbr("MI_SHIP_Leaf", (0.045, 0.20, 0.04), "Linen", 4.0, (0.45, 0.65), 0.0, 0.0, 0.5, 0.6)            # the ship kit's instances that the props share
+    pbr("MI_SHIP_Soil", (0.035, 0.022, 0.014), "Linen", 4.0, (0.7, 0.9), 0.0, 0.0, 0.5, 0.8)
+    pbr("MI_SHIP_CrateBlue", (0.045, 0.09, 0.20), "PanelPaint", 1.0, (0.5, 0.7), 0.0, 0.0, 0.25, 0.3)
     glass(L.GLASS)
     for slot, info in screen_pages.items():
         surf = info.get("surface")
