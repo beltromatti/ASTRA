@@ -1,4 +1,4 @@
-# ASTRA — Piano v0.5
+# ASTRA — Piano v0.6
 
 *2 ottobre 2026 · aggiorna la v0.4 (30/9). Nuovo: la nave progettata come una nave vera, con ascensori veri e abitata ovunque
 (F4.3), e le altre navi che si comportano come l'Aquila anche quando non si camminano (FLOTTA-VIVA): così diventano giocabili
@@ -39,17 +39,18 @@ Il 30/9 sera questo principio è stato applicato:
 - ai messaggi del nemico: la brevità è della persona;
 - al palco della voce (1/10): le battute che hanno aspettato o sono state interrotte le ripensa chi le doveva dire (§4.2).
 
-## 2. Dove siamo (2/10)
+## 2. Dove siamo (2/10 sera)
 
 | Area | Stato |
 |---|---|
-| **Controlli in prima persona**, banco di prova da terminale | fatto |
-| **Plancia viva** (F1) | quasi fatta: postazioni vere, schermo principale intelligente, tavolo olografico, datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente, plancia v3, voce v2 col palco che ripensa. Mancano: la plancia curata nel minimo dettaglio, le persone vere (F3), partite intere giocate dal lead |
-| **Guerra grande** (F2) | fatta la base: danni fisici, gruppi e squadriglie, menti di guerra (ammiragli, comandanti, alleati, regista v2), bellezza (VFX), **scala** (SCALA: 30 navi e 150 velivoli a 60 fps dalla plancia), **voci del volo** (VOLO). Ora: provarla e rifinirla giocando |
+| **Controlli in prima persona**, banco di prova da terminale | fatto; strumenti del lead: `tools/play.py`, `tools/soak.py` (costo e tempi di un'ora), `tools/perf_ab.py` (A/B di prestazioni), `astra.debug.under/lookat` |
+| **Plancia viva** (F1) | quasi fatta: postazioni vere, schermo principale intelligente, tavolo olografico, datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente, plancia v3, voce v2 col palco che ripensa. **In corso ARTE-PLANCIA-2** (plancia, abitacolo, corridoi del Ponte 1 al livello di un film). Mancano: le persone vere (F3), l'immagine più nitida (prestazioni GPU) |
+| **Guerra grande** (F2) | fatta la battaglia a scala di flotte (gruppi di battaglia fino a 40 navi, comandanti con mente e voce, avanguardia dal Gate, retro-spinta). **In corso CAMPAGNA** (la guerra della March dove l'Aquila non c'è: flotte, Gate, rifornimenti, due menti strategiche). Costo misurato di una partita: **0,87 $/ora** |
 | **Persone vere** (F3) | ferma: serve l'autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **La nave intera** (F4) | 12 ponti in streaming (NAVE, NAVE-2), 560 persone (VITA), **danni interni veri** (DISTRUZIONE). In corso **F4.3**: NAVE-3 e ASCENSORI |
-| **Abbordaggi e prima persona** (F5) | in corso F5.1 (ABBORDAGGI) |
-| Teletrasporto (F6) · Pianeta (F7) · Rete e Windows (F8) | brief di F6 pronto; F7 e F8 dopo |
+| **La nave intera** (F4) | fatta: la pianta di NAVE-3 nel gioco (3234 compartimenti, 34 turboascensori e la navetta che portano davvero il Capitano, tubi di Jefferies scalabili, atrio della plancia), 560 persone (VITA), danni interni veri (DISTRUZIONE). Poi: FLOTTA-VIVA (gli interni delle altre navi) |
+| **Abbordaggi e prima persona** (F5) | F5.1 unito e provato (armi, marine con Reyes, abbordaggio ricevuto); **in corso** le correzioni (braccia) e **F5.2** (abbordare le navi nemiche, navette d'assalto vere, la guerra che decide) |
+| **Teletrasporto** (F6) | fatto e provato: sala, Capo con la sua mente, regole alla Star Trek, effetti |
+| Pianeta (F7) · Rete e Windows (F8) | dopo |
 
 ## 3. Le fasi
 
@@ -151,9 +152,9 @@ nello stesso contratto: Parakeet ONNX su CPU, TSR.
 Fino a tre agenti (Sonnet 5.5, sforzo massimo) su moduli indipendenti, ognuno nel suo worktree. Il lead dirige,
 integra, prova nel gioco vero, e li chiude quando il modulo è perfetto. Brief in `docs/brief/`.
 
-| Fatti e uniti | Adesso (2/10) | Poi (appena si libera un posto) |
+| Fatti e uniti | Adesso (2/10 sera) | Poi (appena si libera un posto) |
 |---|---|---|
-| MENTE-EQUIPAGGIO, ARTE-PLANCIA, VOCE, NAVE, NAVE-2, ARTE-NAVI, GUERRA, VITA, METALFX, VFX, MENTE-GUERRA, SCALA, DISTRUZIONE, VOLO | **NAVE-3** (la pianta di una nave vera) · **ASCENSORI** (turboascensori e navetta veri) · **ABBORDAGGI** (F5.1) | **TELETRASPORTO** (F6) · **FLOTTA-VIVA** (gli interni delle altre navi, dai piani di NAVE-3) · F5.2 (abbordare le navi nemiche) · ARTE-INTERNI (l'aspetto dei ponti al livello della plancia) |
+| MENTE-EQUIPAGGIO, ARTE-PLANCIA, VOCE, NAVE, NAVE-2, ARTE-NAVI, GUERRA, VITA, METALFX, VFX, MENTE-GUERRA, SCALA, DISTRUZIONE, VOLO, **NAVE-3, ASCENSORI, ABBORDAGGI (F5.1), TELETRASPORTO** | **ARTE-PLANCIA-2** · **CAMPAGNA** (lo strato strategico) · **ABBORDAGGI-2** (correzioni e F5.2) | **FLOTTA-VIVA** (con i piani delle altre classi: la fase C di NAVE-3) · ARTE-INTERNI (l'aspetto dei ponti al livello della plancia) · PRESTAZIONI-GPU (il costo fisso della scena in battaglia: traslucidi, mesh a istanze, telecamera dello schermo principale) |
 
 Il lead, intanto: l'integrazione e le prove di ogni modulo; **partite intere giocate da Capitano** (plancia, battaglia, nave) e la
 rifinitura di ciò che trova; le prestazioni; la plancia al dettaglio.
