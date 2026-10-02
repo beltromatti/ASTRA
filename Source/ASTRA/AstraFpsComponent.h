@@ -19,6 +19,8 @@ class UCameraComponent;
 class USkeletalMeshComponent;
 class UStaticMeshComponent;
 class UAnimSequence;
+struct FKey;
+class FOutputDevice;
 
 UCLASS(ClassGroup = (ASTRA))
 class ASTRA_API UAstraFpsComponent : public UActorComponent
@@ -75,6 +77,11 @@ public:
 	int32 ShotsFired() const { return NumShots; }
 	int32 HitsLanded() const { return NumHits; }
 
+	/** The tests (astra.fps.* in the console): a key goes into the player's input as the viewport would send it, so that it takes the road of a real one (the mapping, the action, the
+	 *  binding); and a report of the state, the arms and where the weapon stands in the view. */
+	void SimulateKey(const FKey& Key, bool bDown);
+	void Describe(FOutputDevice& Ar) const;
+
 private:
 	enum class EState : uint8 { Holstered, Drawing, Ready, Reloading, Holstering };
 	struct FAmmo { int32 Mag = 0; int32 Reserve = 0; };
@@ -90,6 +97,7 @@ private:
 	bool bFireHeld = false;
 	bool bTriggerLatched = false;                // a semi-automatic fires once a click
 	bool bAimHeld = false;
+	int32 AimEvents = 0, FireEvents = 0;         // how many times the actions arrived (the console's report: an input that never gets here is not the weapon's fault)
 	bool bSprint = false;
 	bool bLocked = false;                        // seated, in a lift, down: no weapon in the hands
 	float Ads = 0.f;                             // 0 hip .. 1 sights
@@ -123,9 +131,11 @@ private:
 	UPROPERTY() TObjectPtr<UAnimSequence> AnimDry;
 	EAstraWeapon ArmsFor = EAstraWeapon::None;   // the weapon the arms and the gun are made for now
 	bool bCalibrated = false;
-	FQuat HipRot = FQuat::Identity, AdsRot = FQuat::Identity;       // where the arms stand against the camera: hip and sights (cm, relative to the camera)
-	FVector HipLoc = FVector::ZeroVector, AdsLoc = FVector::ZeroVector;
+	FQuat HipRot = FQuat::Identity, AdsRot = FQuat::Identity, LowRot = FQuat::Identity;       // where the arms stand against the camera: hip, sights and lowered (cm, relative to the camera)
+	FVector HipLoc = FVector::ZeroVector, AdsLoc = FVector::ZeroVector, LowLoc = FVector::ZeroVector;
 	FVector SightInMesh = FVector::ZeroVector;
+	float TuneStamp = 0.f;                       // the console's nudges of the places when they were last applied (a change calibrates again)
+	bool bArmsOnly = false;                      // the arms are the arms-only mesh (else the whole mannequin with its head and neck hidden)
 	FVector KickPos = FVector::ZeroVector, KickVel = FVector::ZeroVector;     // the weapon's kick on his shoulder (spring)
 	float KickPitch = 0.f, KickPitchVel = 0.f;
 	FVector2D Sway = FVector2D::ZeroVector;      // the weapon lags behind his turn
@@ -157,6 +167,7 @@ private:
 	void EnsureArms();
 	void DressArms(EAstraWeapon W);
 	void Calibrate(const FAstraWeaponDef& W);
+	void ApplyNudges();
 	void PlayArms(UAnimSequence* A, bool bLoop, float Rate = 1.f);
 	void TickArms(float Dt);
 	void ShowArms(bool bOn);
