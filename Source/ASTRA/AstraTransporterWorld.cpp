@@ -11,6 +11,7 @@
 #include "AstraCrewMember.h"
 #include "AstraDamageModel.h"
 #include "AstraDeckStreaming.h"
+#include "AstraLadderSubsystem.h"
 #include "AstraLifeSubsystem.h"
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
@@ -449,6 +450,13 @@ void UAstraTransporterSubsystem::PlaceCaptain(const FVector& FeetCm, float YawDe
 	if (AASTRAPlayerController* PC = Cast<AASTRAPlayerController>(P->GetController()))
 	{
 		PC->StandUp();                                         // out of the chair: the beam takes him from where he stands
+	}
+	if (UWorld* W = GetWorld())
+	{
+		if (UAstraLadderSubsystem* Ladder = W->GetSubsystem<UAstraLadderSubsystem>())
+		{
+			Ladder->Release(P);                                // (from a Jefferies ladder: it lets go of him first, or it would put him back on the rungs)
+		}
 	}
 	if (AASTRACharacter* A = Cast<AASTRACharacter>(P))
 	{

@@ -561,6 +561,16 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 		if (!AllyId.IsEmpty() && !HostileId.IsEmpty())
 		{
 			W.Save(Fixtures, TEXT("card_battle.json"));
+			{
+				// the card goes to the mind once a second: with a dozen contacts on the plot (each probed twice for the options) and the whole plan of the ship behind it, it costs next to nothing
+				const double T0 = FPlatformTime::Seconds();
+				for (int32 i = 0; i < 50; ++i)
+				{
+					X->SnapshotJson();
+				}
+				const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0 / 50.0;
+				AstraXportBenchCheck(TEXT("cost: the card for the mind (once a second) is built in under 2 ms with the battle's contacts on the plot"), Ms < 2.0, FString::Printf(TEXT("%.3f ms a card"), Ms));
+			}
 			X->SetTestCaptain(true, Pad2);
 			// the ground and the ships, with our shields up: the console says why not, and says what clears it
 			FString DH;
