@@ -4,12 +4,13 @@
 
 Creates:
   textures    T_Carbon_*, T_LeatherBlack_*, T_BRG3_DeckGrain_* (packed PBR sets), T_BRG3_Lamps (palette: RGB colour, A alert
-              weight; nearest, no mips), T_BRG3_Labels (label atlas)
+              weight; nearest, no mips), T_BRG3_Labels (label atlas, 2048 x 4096), T_BRG3_Decor (the decor atlas: static display pages,
+              soft glows, the consoles' silkscreen; 2048 x 4096)
   masters     M_BRG3_Lamps        emissive lamps: colour from the palette by UV cell, alert response like M_ASTRA_Emissive
               M_BRG3_ScreenHolo   additive hover panel: ScreenTexture x Intensity, dim on its back side (BackGain)
               M_BRG3_Viewscreen   translucent image plane of the main viewscreen: ScreenTexture, Intensity, Opacity (0 = off)
   instances   in /Game/ASTRA/Materials/Instances, named exactly like the mesh slots so import_kit's assign_materials_by_slot finds
-              them: MI_BRG3_Composite / Ivory / DeckPlate / DarkGlass / Leather / Lamps / LampsDim / LampsHot / Labels and one
+              them: MI_BRG3_Composite / Ivory / Brass / DeckPlate / DarkGlass / Leather / Lamps / LampsDim / LampsHot / Labels / Decor and one
               SCREEN_<station>_<n> per live screen (a static page until the game binds a live one)
   hover UI    /Game/ASTRA/Kit/Bridge3/HoloUI/MI_UI_<Page>: the translucent twins of the MI_UI_* instances (same object names,
               so UAstraScreensSubsystem, which binds pages by material name, drives them like the opaque ones)
@@ -92,9 +93,10 @@ def import_textures():
     for fn in sets:
         name = fn[:-4]
         set_tex(name, name.rsplit("_", 1)[1])
-    import_files(B3_SRC, ["T_BRG3_Lamps.png", "T_BRG3_Labels.png"], TEX_DST)
+    import_files(B3_SRC, ["T_BRG3_Lamps.png", "T_BRG3_Labels.png", "T_BRG3_Decor.png"], TEX_DST)
     set_tex("T_BRG3_Lamps", "PALETTE")
     set_tex("T_BRG3_Labels", "ATLAS")
+    set_tex("T_BRG3_Decor", "ATLAS")
     log.append("textures imported")
 
 
@@ -300,9 +302,9 @@ def make_mi(folder, name, parent, scalars=None, vectors=None, textures=None, swi
 
 
 def build_instances(hard, lamps, screen, holo, viewscreen):
-    def pbr(name, tset, tint, uvs, rough, metal_map, influence, normal, macro=0.05, scratch=0.05):
+    def pbr(name, tset, tint, uvs, rough, metal_map, influence, normal, macro=0.05, scratch=0.05, bias=0.0):
         make_mi(MI_DST, name, hard,
-                scalars={"UVScale": uvs, "RoughnessMin": rough[0], "RoughnessMax": rough[1], "MetallicFromMap": metal_map, "MetallicBias": 0.0,
+                scalars={"UVScale": uvs, "RoughnessMin": rough[0], "RoughnessMax": rough[1], "MetallicFromMap": metal_map, "MetallicBias": bias,
                          "BaseColorMapInfluence": influence, "NormalStrength": normal, "MacroBrightness": macro, "ScratchRoughness": scratch,
                          "RoughnessVariation": 0.08},
                 vectors={"Tint": tint},
@@ -318,11 +320,15 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     pbr("MI_BRG3_DarkGlass", "PanelPaint", (0.003, 0.004, 0.006), 1.0, (0.30, 0.38), 0.0, 0.0, 0.0, macro=0.0, scratch=0.0)
     # the seats: black leather
     pbr("MI_BRG3_Leather", "LeatherBlack", (0.05, 0.055, 0.075), 2.0, (0.30, 0.50), 0.0, 0.9, 0.7, macro=0.06)
+    # brushed brass: the warm line of the command deck (a thin accent, never a big surface): metal, a hint of the brushed grain
+    pbr("MI_BRG3_Brass", "Brushed", srgb_to_linear("#B89A4E"), 1.0, (0.24, 0.42), 0.0, 0.15, 0.5, macro=0.03, scratch=0.04, bias=1.0)
     pal = tex("T_BRG3_Lamps")
     make_mi(MI_DST, "MI_BRG3_Lamps", lamps, {"Intensity": 20.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_LampsDim", lamps, {"Intensity": 6.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_LampsHot", lamps, {"Intensity": 55.0, "LightDimWeight": 1.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_Labels", screen, {"Intensity": 4.0, "Roughness": 0.4, "FlipU": 0.0, "FlipV": 0.0}, textures={"ScreenTexture": tex("T_BRG3_Labels")})
+    # the decor atlas: static display pages and soft glows, dimmer than the live pages (their Intensity is 22, the hover panels' 10)
+    make_mi(MI_DST, "MI_BRG3_Decor", screen, {"Intensity": 8.0, "Roughness": 0.35, "FlipU": 0.0, "FlipV": 0.0}, textures={"ScreenTexture": tex("T_BRG3_Decor")})
     log.append("shared instances")
 
     # one default instance per live screen: a static page until the game binds a live one; the surface decides the parent
