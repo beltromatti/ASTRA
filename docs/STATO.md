@@ -22,6 +22,28 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**2/10 pomeriggio — DA RIPRENDERE QUI (limite di sessione raggiunto; aiutanti fermati, i loro worktree restano):**
+- **Fatto dal lead:** il harness preme i tasti del mouse dall'input del giocatore (mira e fuoco provabili); **`AstraFallGuard`**: se il Capitano cade
+  più a lungo di ogni salto possibile a bordo (2,4 s) torna dove stava, e il log dice dov'era il buco (da quando ignora la pelle dello scafo un
+  buco lo faceva cadere nello spazio); **`astra.debug.floors <ponte>`** controlla i pavimenti di ogni stanza: nessun buco vero nei 12 ponti
+  (restano da guardare 19 punti del Flight Deck, forse le fessure delle catapulte); **«Said aloud»**: il palco della voce registra ciò che la
+  plancia ha davvero sentito e gli ufficiali lo vedono in ogni turno e nel ripensamento (Voss diceva tre volte in 27 s la stessa ritirata:
+  provato, ora una volta); l'intercetto dice la spinta vera (diceva 60 % a un «avanti tutta»).
+- **Giro della nave** (17 stanze, foto in `docs/progressi/interni_2026-10-02/`): i corridoi di NAVE-3 reggono, le stanze sono un greybox
+  ammobiliato → brief **ARTE-INTERNI** scritto (avviato e fermato subito dal limite: da rilanciare).
+- **ARTE-PLANCIA-2 FINITO** (ramo `worktree-agent-ac64a151337f965c2`, `8d3f0fe`, da unire): plancia, corridoi del Ponte 1, abitacolo del Falcon,
+  alloggi del Capitano; passi d'importazione nell'ordine: `tools/art/bridge3_textures.py` (uv con pillow e numpy) → bridge_v3 in Blender →
+  `make_bridge_v3_materials.py` → `build_bridge.py` → `kit_corridor.py` + `import_kit.py` → il mio `corridor_door` in `ship_rooms_bridge.py`
+  (`return KC.shell(name, window=True, door=(DOOR_X0, DOOR_W, DOOR_H))`) e `ship_kit.py --only BridgeCorridorDoor` → `cockpit.py` +
+  `import_cockpit.py` → `quarters.py` + `build_quarters.py` → riaprire l'atrio del Ponte 1 (`build_ship_interior`); dettagli in `docs/PLANCIA.md` del ramo.
+- **Fermati a metà dal limite** (riprenderli con SendMessage o rilanciarli): ABBORDAGGI (correzioni delle braccia dopo la mia prova: fucile
+  troppo grande, mano sinistra fuori dall'impugnatura, mirino che riempie la vista, due righe di tasti sovrapposte; poi F5.2), CAMPAGNA (lo
+  strato strategico), ARTE-INTERNI. Poi FLOTTA-VIVA.
+- **Visto giocando, da sistemare:** il Capitano che parla alla Praetorian finisce sulla rete della flotta e Martin precisa a sproposito che in
+  linea c'è Rourke (lo strumento `hail` in `mind/astra_mind/tools.py`: spiegare che a una nave alleata si parla col suo contatto);
+  Alpha Lead ripete «Alpha ingaggia». Prima che l'utente provi: rifare il pacchetto (impostazione RETINA compresa).
+- Credito AI: ≈ 8,5 $ spesi su 20 (due brevi partite con la mente oggi; verificare su OpenRouter).
+
 **2/10 notte — la pianta di NAVE-3 nel gioco** (il lead): kit esportato (444 mesh, 7,4 M triangoli), i 12 ponti ricostruiti (13 318 istanze,
 1729 porte), 34 pozzi e la navetta caricati senza problemi, 299 pianerottoli. Provato camminando e salendo: le corse fra i ponti vanno (Ponte 7 ↔ 4),
 gli atrii delle banche sono belli (cornice di NAVE-3, ante del motore). **Trovati e corretti nel motore** (41 prove del banco verdi, una nuova):
