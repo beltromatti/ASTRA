@@ -143,7 +143,7 @@ mostrato subito per chi arriva, il localizzatore sa chi non c'è); **nave** (`As
 scudi in `PowerFactor`); **battaglia** (`AstraBattleSubsystem.*`: `GateDistanceKm()`); **mente** (`models.py` il ruolo `transporter`, `tools.py` lo strumento `transporter` e il filtro
 quando la nave non ha la sala, `crew.py` la regola e la riga della sala in plancia, `context.py` il parlante `xfer_chief`, `server.py` il Capo come quinta rete accanto a PNG, volo
 e marine, `initiative.py` la scheda del Capo fuori dal prompt dell'ispezione); **scale** (`AstraLadderSubsystem.*`: `Release(Pawn)`, il Capitano che sale una scala e viene teletrasportato
-resta libero). L'unione con main (ABBORDAGGI, ascensori, la pianta v2) ha avuto conflitti solo dove le due parti aggiungevano accanto: i marine presi da una lotta (`bCommandeered`) e
+resta libero); **abbordaggi** (`AstraBoardSubsystem.cpp`, una riga: i marine in transito o mandati fuori nave non entrano nelle squadre di un abbordaggio, `LS.IsOffShip(p)`). L'unione con main (ABBORDAGGI, ascensori, la pianta v2) ha avuto conflitti solo dove le due parti aggiungevano accanto: i marine presi da una lotta (`bCommandeered`) e
 le persone in transito o fuori nave non hanno corpo né passi (la condizione ha tutte e tre); la scheda ha insieme `transporter` e `boarding`; il server tiene la rete dei marine e il
 Capo; `tools_for(state, ctx)` tiene il filtro della sala e la vettura dell'ascensore. Chi i marine hanno preso per una lotta non si teletrasporta e non entra nelle squadre (`[subject]`).
 

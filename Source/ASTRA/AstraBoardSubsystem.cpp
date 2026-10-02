@@ -336,6 +336,10 @@ void UAstraBoardSubsystem::MobiliseMarines()
 		{
 			continue;
 		}
+		if (LS.IsOffShip(p))
+		{
+			continue;                                 // TELETRASPORTO: in the transporter's buffer or sent off the ship (a landing party on an allied ship): not aboard, not in this fight
+		}
 		if (!Crew.IsValidIndex(P.Roster) || !Crew[P.Roster].Dept.Equals(TEXT("marines"), ESearchCase::IgnoreCase))
 		{
 			continue;
