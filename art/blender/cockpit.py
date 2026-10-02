@@ -698,9 +698,20 @@ def seat(b: Parts) -> None:
     fb.extrude_y([(-0.72, -0.88), (-0.62, -0.88), (-0.58, -0.80), (-0.505, 0.05), (-0.485, 0.30), (-0.555, 0.32), (-0.68, 0.32), (-0.70, -0.30)], -0.255, 0.255, L.STRUCT)
     pillow(soft, -0.555, -0.495, 0.200, 0.172, -0.78, 0.00, L.LEATHER, c=0.7, rake=0.045)
     pillow(soft, -0.510, -0.448, 0.140, 0.140, 0.04, 0.26, L.LEATHER, c=0.8, rake=0.012)
-    for z_ in (-0.55, -0.30, -0.05):                                                                        # the back cushion's seams
-        xf = -0.495 + 0.045 * (z_ + 0.78) / 0.78
+    xf_of = lambda z_: -0.495 + 0.045 * (z_ + 0.78) / 0.78                                                  # the back cushion's front face at height z_
+    for z_ in (-0.55, -0.30, -0.05):                                                                        # the back cushion's seams, with a line of white stitching either side
+        xf = xf_of(z_)
         fine.box((xf - 0.002, -0.17, z_ - 0.002), (xf + 0.0015, 0.17, z_ + 0.002), L.RUBBER)
+        for dz in (-0.008, 0.008):
+            em.box((xf - 0.001 + 0.045 * dz / 0.78, -0.165, z_ + dz - 0.0005), (xf + 0.0011 + 0.045 * dz / 0.78, 0.165, z_ + dz + 0.0005), PLATE)
+    for yy in (-0.085, 0.085):                                                                              # the long seams, each between two stitched lines
+        for dy in (-0.007, 0.007):
+            em.cyl((xf_of(-0.745) + 0.0004, yy + dy, -0.745), (xf_of(-0.020) + 0.0004, yy + dy, -0.020), 0.0006, PLATE, seg=4, caps=False)
+        fine.cyl((xf_of(-0.745) + 0.0002, yy, -0.745), (xf_of(-0.020) + 0.0002, yy, -0.020), 0.0016, L.RUBBER, seg=4, caps=False)
+    for sd in (-1, 1):                                                                                      # the edge piping of the back cushion
+        em.cyl((xf_of(-0.745) + 0.0004, sd * 0.165, -0.745), (xf_of(-0.020) + 0.0004, sd * 0.150, -0.020), 0.0008, PLATE, seg=4, caps=False)
+    fine.cyl((-0.456, 0.0, 0.150), (-0.4365, 0.0, 0.150), 0.064, L.STRUCT, seg=32)                           # a gunmetal badge riveted on the headrest with the ASTRA roundel
+    emblem(em, (-0.4361, 0.0, 0.150), 0.052, L.IVORY, (1, 0, 0), (0, 0, 1))
     for sd in (-1, 1):
         fb.box((-0.62, sd * 0.262 - 0.014, -0.84), (-0.22, sd * 0.262 + 0.014, -0.62), L.STRUCT)               # side bolsters of the pan
         fb.box((-0.74, sd * 0.285 - 0.016, -1.04), (-0.68, sd * 0.285 + 0.016, 0.34), L.TRIM)                   # the seat rails
