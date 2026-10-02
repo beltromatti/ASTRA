@@ -4678,6 +4678,32 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 			const FString Id = Ids.IsValidIndex(NextIdx) ? Ids[NextIdx++] : FString::Printf(TEXT("T-%d"), NextContact++);
 			const int32 I = SpawnClass(Class, Id, Name.IsEmpty() ? Id : Name, Slot, Facing);
 			FAstraBattleShip& S = Ships[I];
+			// a fleet that fought elsewhere arrives as it is (the March's strategic layer: hull, shields and magazines of each ship, when it says)
+			double HullPct = 100.0, ShieldsPct = 100.0, Missiles = -1.0;
+			if (Spec->TryGetNumberField(TEXT("hull_pct"), HullPct) && HullPct < 99.5)
+			{
+				SetHullFraction(S, (float)FMath::Clamp(HullPct, 5.0, 100.0) / 100.f);
+			}
+			if (Spec->TryGetNumberField(TEXT("shields_pct"), ShieldsPct) && ShieldsPct < 99.5)
+			{
+				const float K = (float)FMath::Clamp(ShieldsPct, 0.0, 100.0) / 100.f;
+				if (S.Dmg.bModel)
+				{
+					for (int32 f = 0; f < AstraWar::NumFacings; ++f)
+					{
+						S.Dmg.Sector[f] = S.Dmg.SectorMax[f] * K;
+					}
+					SyncTotals(S);
+				}
+				else
+				{
+					S.Shield = S.ShieldMax * K;
+				}
+			}
+			if (Spec->TryGetNumberField(TEXT("missiles"), Missiles) && Missiles >= 0.0)
+			{
+				S.Missiles = FMath::Min(S.Missiles, (int32)Missiles);
+			}
 			if (bRaid)
 			{
 				S.bFog = true;
