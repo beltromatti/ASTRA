@@ -317,6 +317,7 @@ def make_cabin_materials() -> None:
     cognac leather, the pillow linen and the navy blanket, red book cloth, the white strips of the cabin's light, the two screens."""
     pbr("MI_QTR_Wood", (1.0, 0.92, 0.86), "WoodDark", 1.2, (0.28, 0.46), 0.0, 0.0, 1.0, 0.6)
     pbr("MI_QTR_Carpet", (0.17, 0.23, 0.44), "Carpet", 2.5, (0.85, 0.96), 0.0, 0.0, 1.0, 0.8)
+    pbr("MI_QTR_Rug", (0.22, 0.045, 0.040), "Carpet", 3.0, (0.85, 0.96), 0.0, 0.0, 1.0, 0.8)
     pbr("MI_QTR_Wall", (0.58, 0.54, 0.48), "PanelPaint", 1.0, (0.5, 0.65), 0.0, 0.0, 0.3, 0.3)
     pbr("MI_QTR_Leather", (0.40, 0.17, 0.075), "LeatherBlack", 2.0, (0.30, 0.50), 0.0, 0.0, 0.9, 0.7, coat=0.12, coat_rough=0.3)
     pbr("MI_MED_Linen", (0.8, 0.82, 0.84), "Cotton", 3.0, (0.72, 0.9), 0.0, 0.0, 0.4, 0.7)

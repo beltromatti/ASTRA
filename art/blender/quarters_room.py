@@ -32,7 +32,7 @@ D = json.load(open(os.path.join(ROOT, "data", "ship", "aquila_quarters.json"), e
 LEN, HW, H = D["length"], D["half_width"], D["height"]
 FIN = 0.05                                   # the finish layer on the structure
 
-WOOD, WALL, CARPET = "MI_QTR_Wood", "MI_QTR_Wall", "MI_QTR_Carpet"
+WOOD, WALL, CARPET, RUG = "MI_QTR_Wood", "MI_QTR_Wall", "MI_QTR_Carpet", "MI_QTR_Rug"
 LEATHER = "MI_QTR_Leather"                   # cognac leather (an instance made by tools/ue_scripts/build_quarters.py)
 LINEN, BLANKET, RED = "MI_MED_Linen", "MI_MED_Blanket", "MI_MED_Red"
 MAP, LOG = "MI_QTR_Map", "MI_QTR_Log"
@@ -279,6 +279,20 @@ def compass_rose(b: Parts, cx: float, cy: float, r: float) -> None:
         l_ = (cx + ca * ln * 0.30 - sa * wd, cy + sa * ln * 0.30 + ca * wd, z)
         r_ = (cx + ca * ln * 0.30 + sa * wd, cy + sa * ln * 0.30 - ca * wd, z)
         em.face([(cx, cy, z), l_, tip, r_], BRASS, (0, 0, 1))
+
+
+def rug(b: Parts, x0: float, x1: float, y0: float, y1: float) -> None:
+    """A wool rug on the carpet: an oxblood field, a navy band and a brass line inside the edge, a cream fringe strip at the two short ends (x0, x1 = its ends along the cabin)."""
+    fine, em = b.fine, b.emit
+    z = 0.0070
+    fine.box((x0, y0, z), (x1, y1, z + 0.0075), RUG)
+    top = z + 0.0075
+    for inset, wd, mat, h in ((0.10, 0.045, CARPET, 0.0007), (0.17, 0.007, BRASS, 0.0010)):
+        xa, xb, ya, yb = x0 + inset, x1 - inset, y0 + inset, y1 - inset
+        for (ax, bx, ay, by) in ((xa, xb, ya, ya + wd), (xa, xb, yb - wd, yb), (xa, xa + wd, ya, yb), (xb - wd, xb, ya, yb)):
+            (em if mat == BRASS else fine).box((ax, ay, top), (bx, by, top + h), mat)
+    for (xa, xb) in ((x0 - 0.04, x0), (x1, x1 + 0.04)):                                                    # the fringe: a cream strip at each short end
+        fine.box((xa, y0 + 0.02, z), (xb, y1 - 0.02, z + 0.0030), WALL)
 
 
 # ============================================================================================================================ upholstery
@@ -840,6 +854,9 @@ def build_room(name: str = "SM_QTR_Room"):
     windows(b)
     ceiling(b)
     compass_rose(b, -3.4, 0.0, 0.85)
+    dk, sf = D["desk"], D["sofa"]
+    rug(b, sf["x1"] - 1.35, sf["x0"] + 0.30, -3.62, -1.28)                                                  # under the sofa, the low table and the armchair
+    rug(b, dk["x"] - 0.40, dk["x"] + 2.00, dk["y"] - 1.45, dk["y"] + 1.15)                                    # under the desk and its visitors' chairs
     for part in (desk, captain_chair, visitor_chairs, sofa, low_table, armchair, bunk, bookcase, galley, sideboard, window_seat, drapes, sector_chart, wall_things, corner_plants):
         part(b)
     return b.build(name, uv_meter=1.2, small_uv_meter=0.3)

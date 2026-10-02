@@ -91,6 +91,7 @@ def hard(name, tint, rough, tex, uv=1.0, normal=0.5, influence=1.0, macro=0.04):
 # a captain's cabin in a warship: dark polished wood, a navy carpet (the grey carpet texture under a deep blue tint), warm pale walls, cognac leather
 hard("MI_QTR_Wood", (1.0, 0.92, 0.86), (0.28, 0.46), "WoodDark", uv=1.2, normal=0.6)
 hard("MI_QTR_Carpet", (0.17, 0.23, 0.44), (0.85, 0.96), "Carpet", uv=2.5, normal=0.8)
+hard("MI_QTR_Rug", (0.22, 0.045, 0.040), (0.85, 0.96), "Carpet", uv=3.0, normal=0.8)             # the wool rugs: the same weave in oxblood
 hard("MI_QTR_Wall", (0.58, 0.54, 0.48), (0.5, 0.65), "PanelPaint", uv=1.0, normal=0.3, influence=0.3)
 hard("MI_QTR_Leather", (0.40, 0.17, 0.075), (0.30, 0.50), "LeatherBlack", uv=2.0, normal=0.7, influence=0.9, macro=0.05)
 # the ship kit's instances that the plants and the globe of the props use (made by build_ship_interior.py; only made here if that has not run yet)
