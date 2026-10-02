@@ -14,6 +14,12 @@ richiede che tu autorizzi una volta il tuo account Epic nell'editor (io non poss
 - Nel frattempo l'equipaggio resta con i manichini seduti in posa procedurale (funziona tutto lo stesso).
 
 
+### 2026-10-02 — Provare l'impostazione RETINA (un minuto, quando giochi)
+Nell'app (~/Applications/ASTRA.app, rifatta oggi) il menu IMPOSTAZIONI ha una riga nuova, **RETINA**: FULL (di serie) ricostruisce
+l'immagine ai pixel veri del tuo display; HALF è come prima (metà dei pixel, raddoppiati dalla finestra: quello che vedevi pixelato).
+Io non posso vedere l'app a schermo intero sul tuo display (gira solo in primo piano): dimmi se con FULL l'immagine è nitida e se il gioco
+resta fluido (le tue impostazioni sono a 30 fps: c'è margine). Se è troppo pesante, HALF o IMAGE su SMOOTH.
+
 ## Chiuse
 - 2026-10-02 — Credito OpenRouter: ricaricato (20 $ in tutto; 13,37 $ residui al 2/10 pomeriggio). Grazie. ✓
 - 2026-09-29 — Finestre di permesso di macOS dopo la prova dell'app dal Desktop: risolte, la compilazione è ripartita. ✓
