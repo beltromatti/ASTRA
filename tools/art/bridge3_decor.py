@@ -821,6 +821,19 @@ def glow_cell(col, w=256, h=128) -> Image.Image:
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB")
 
 
+def halo_cell(col, w=512, h=320, inner=(0.80, 0.77), fall=0.20, peak=0.5) -> Image.Image:
+    """The light a screen spills on the niche round it: 1 (x `peak`) all along the outline of the inner rectangle (half sizes `inner`, as fractions of the
+    tile's half size), falling to nothing over `fall` of the half size, a rounded outline. Inside the rectangle the screen covers it anyway."""
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    u = np.abs((xx + 0.5) / w * 2 - 1)
+    v = np.abs((yy + 0.5) / h * 2 - 1)
+    dx, dy = np.maximum(u - inner[0], 0), np.maximum(v - inner[1], 0)
+    dist = np.sqrt(dx * dx + dy * dy)
+    a = np.clip(1.0 - dist / fall, 0, 1) ** 2.2 * peak
+    arr = np.stack([a * col[0], a * col[1], a * col[2]], -1)
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB")
+
+
 def glow_bar(col, w=256, h=64) -> Image.Image:
     """A soft glowing bar (a fixture's wash): the profile across is a gaussian, the ends fade out."""
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -848,6 +861,7 @@ def atlas(W: int = 2048, H: int = 4096, pad: int = 0) -> None:
                                                        ("white", (225, 235, 255)), ("warm", (255, 190, 120)))]
     tiles += [(f"bar_{k}", glow_bar(c)) for k, c in (("white", (225, 235, 255)), ("warm", (255, 190, 120)), ("cool", (110, 170, 255)))]
     tiles += [(f"fan_{d}", page_fan(d, 11 + i)) for i, d in enumerate(("command", "engineering", "flight", "science", "security"))]
+    tiles += [(f"halo_{d}", halo_cell(c)) for d, c in (("command", (70, 130, 255)), ("engineering", (255, 150, 30)), ("flight", (255, 210, 20)), ("science", (160, 100, 240)))]
     order = sorted(tiles, key=lambda t: (-t[1].size[1], -t[1].size[0]))        # shelf packing, tallest first
     cx = cy = row_h = 0
     for name, tile in order:
