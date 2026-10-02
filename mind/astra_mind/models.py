@@ -72,6 +72,10 @@ ROLES: dict[str, Role] = {r.name: r for r in (
          note="the flight net (flight_minds.py): the CAG, the squadron leaders, their wingmen and the Chief of the Deck; a few radio lines on strong events "
               "and when the Captain calls them, a squadron's mission when he orders it; ONE call voices the whole cast; the prompt is long and stable, the "
               "picture short"),
+    Role("strategy", DEEPSEEK, _DS, max_tokens=700, temperature=0.5, first_token_s=6.0,
+         note="the war's high commands (strategy.py): Vice Admiral Rourke for ASTRA and the Archon of the Interdiction Fleet for the Mandate; fleet orders on the map of the "
+              "March every few minutes or on strong news, and Rourke's answers to the Captain on the fleet net; the prompt is long and stable, the picture short; "
+              "its own role so that the ledger counts the strategic layer apart (the budget is 0.1 $/hour)"),
     Role("marines", DEEPSEEK, _DS, max_tokens=520, temperature=0.6, first_token_s=4.0, fallback="chatter",
          note="the marine net (marines.py), only while boarders are aboard: Major Reyes and the squad leaders; a few radio lines on news and when the Captain calls them, squad "
               "orders and bulkheads when he orders them or the drill is not enough; ONE call voices the whole cast; the prompt is long and stable, the picture short"),

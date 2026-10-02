@@ -123,8 +123,8 @@ class AutoAdmiral:
         for f in v.own:
             if f.status != "ready" or f.pending is not None or f.in_gate or f.tactical_command or not f.where:
                 continue
-            if f.order.by in ("admiral", "captain", "story") and f.order.kind not in ("hold", "refit"):
-                continue
+            if f.order.by in ("admiral", "captain", "story"):
+                continue                                              # (a mind's order stands over the reflexes, battered or not)
             depot_here = SYSTEMS[f.where]["depot"] and m.owner(f.where) == self.side
             if f.hull < 0.5 and f.order.kind != "refit" and not (depot_here and f.order.kind == "hold"):
                 dest = m.nearest_depot(self.side, f.where, avoid=m.hostile_systems(self.side)) or m.nearest_depot(self.side, f.where)

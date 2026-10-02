@@ -231,15 +231,16 @@ class Event:
     weight: int = 1                                              # 0 routine, 1 minor, 2 significant, 3 major
     fleets: tuple[str, ...] = ()
     data: dict[str, Any] = field(default_factory=dict)
+    rn: dict[str, int] = field(default_factory=dict)             # side -> the number under which that side received it (the order it learnt things in: the Gates deliver out of order)
 
     def to_dict(self) -> dict[str, Any]:
         return {"n": self.n, "t": round(self.t, 1), "kind": self.kind, "system": self.system, "text": self.text, "sides": list(self.sides), "weight": self.weight,
-                "fleets": list(self.fleets), "data": self.data}
+                "fleets": list(self.fleets), "data": self.data, "rn": self.rn}
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "Event":
         return Event(int(d["n"]), float(d["t"]), d["kind"], d.get("system", ""), dict(d.get("text") or {}), tuple(d.get("sides") or ()), int(d.get("weight", 1)),
-                     tuple(d.get("fleets") or ()), dict(d.get("data") or {}))
+                     tuple(d.get("fleets") or ()), dict(d.get("data") or {}), {k: int(v) for k, v in (d.get("rn") or {}).items()})
 
 
 @dataclass
@@ -301,6 +302,7 @@ class March:
         self.event_n = 0
         self.inbox: dict[str, deque[tuple[float, Event]]] = {s: deque() for s in SIDES}
         self.log: dict[str, deque[Event]] = {s: deque(maxlen=60) for s in SIDES}
+        self.rcv: dict[str, int] = {s: 0 for s in SIDES}                              # how many events each side has received (the cursor a mind reads its news by)
         self.tracks: dict[str, dict[str, Track]] = {s: {} for s in SIDES}
         self.will: dict[str, float] = dict(self.pace["will_start"])                  # type: ignore[arg-type]
         self.plans: dict[str, str] = {s: "" for s in SIDES}
@@ -308,6 +310,9 @@ class March:
         self.score: dict[str, dict[str, float]] = {s: {"lost_points": 0.0, "killed_points": 0.0, "ships_lost": 0, "ships_killed": 0, "systems_taken": 0, "systems_lost": 0} for s in SIDES}
         self.over: dict[str, Any] = {}                                               # the war's end: {"outcome": ..., "winner": ..., "t": ..., "why": ...}
         self.guilds_open: dict[str, float] = {}                                      # side -> until when Veyra's Gates are open to its warships
+        self.home_orders: dict[str, dict[str, Any]] = {}                             # side -> {"text", "until"}: what the government at home demands (the story's, for both)
+        self.tender_free_at: dict[str, float] = {"astra": 0.0, "mandate": 0.0}       # a side's supply tenders are few: one at a time, and busy for a while
+        self.aquila_task: dict[str, Any] = {}                                        # Fleet's standing order to the Aquila: {"system", "mission", "why", "t"}
         self.truce: dict[str, Any] = {}                                              # an armistice in force: {"until": t, "by": [..]}
         self.proposals: dict[str, dict[str, Any]] = {}                               # side -> a standing proposal for a truce or peace
         self.aquila: dict[str, Any] = {"where": HQ["astra"], "lane": "", "since": 0.0}  # the player's ship: where she is (the real simulation's system), or in a Gate lane
@@ -547,19 +552,26 @@ class March:
             keep: list[tuple[float, Event]] = []
             for when, ev in q:
                 if when <= self.t:
+                    self.rcv[s] += 1
+                    ev.rn[s] = self.rcv[s]
                     self.log[s].append(ev)
                 else:
                     keep.append((when, ev))
             if len(keep) != len(q):
                 self.inbox[s] = deque(keep)
 
-    def news(self, side: str, since_n: int = 0, min_weight: int = 0) -> list[Event]:
-        """What `side` has learnt, oldest first, after the event number `since_n`."""
-        return [e for e in self.log[side] if e.n > since_n and e.weight >= min_weight]
+    def news(self, side: str, since: int = 0, min_weight: int = 0) -> list[Event]:
+        """What `side` has learnt, oldest first, after the receive number `since` (`rcv[side]` at the last look): what reaches a side is read once, in the order it
+        reached it, whatever the order the events happened in."""
+        return [e for e in self.log[side] if e.rn.get(side, 0) > since and e.weight >= min_weight]
 
     # ------------------------------------------------------------------------------------------- the clock
+    def run(self, seconds: float) -> None:
+        """Run the world for `seconds` of war time."""
+        self.advance(self.t + seconds)
+
     def advance(self, to_t: float) -> None:
-        """Run the world up to the time `to_t` in steps."""
+        """Run the world up to the (absolute) time `to_t` in steps."""
         while self.t < to_t - 1e-9:
             self.tick(min(STEP_S, to_t - self.t))
 
@@ -1518,10 +1530,10 @@ class March:
             return sum(CLASSES[c]["worth"] * k for c, k in tr.classes.items()) * (tr.hull if tr.hull else 0.9)
         return tr.n * 1.1 * 0.9
 
-    def view(self, side: str, since_n: int = 0) -> "SideView":
+    def view(self, side: str, since: int = 0) -> "SideView":
         own = [f for f in self.fleets.values() if f.side == side]
         tracks = dict(self.tracks[side])
-        return SideView(self, side, own, tracks, self.news(side, since_n))
+        return SideView(self, side, own, tracks, self.news(side, since))
 
     def known_threat(self, side: str, system: str) -> int:
         """0-3 as `side` would chart it: from the tracks it holds (an enemy fleet seen there lately), its own fleets there and the battle it can see."""
@@ -1569,10 +1581,10 @@ class March:
     def will_word(self, w: float) -> str:
         return "firm" if w >= 0.65 else "steady" if w >= 0.45 else "wavering" if w >= 0.25 else "failing"
 
-    def picture(self, side: str, since_n: int = 0, compact: bool = False) -> str:
+    def picture(self, side: str, since: int = 0, compact: bool = False) -> str:
         """The March as `side`'s high command reads it: its own fleets and yards exactly, the enemy's as its eyes have found them (with their age), the war's
         news since its last look, its plan. The fog of war is the rule: nothing here is a fact the side could not have."""
-        v = self.view(side, since_n)
+        v = self.view(side, since)
         me, foe = SIDE_WORD[side], SIDE_WORD[other(side)]
         out = [f"THE AURELIA MARCH, {self.clock()}. You hold the {me} command. Your will to fight is {self.will[side]:.2f} ({self.will_word(self.will[side])}); "
                f"{foe}'s, by your intelligence, looks {self.will_word(self.will[other(side)] + self.rng_guess(side))}."]
@@ -1586,6 +1598,13 @@ class March:
         mine = self.proposals.get(side)
         if mine and self.t - mine["t"] < 1200.0:
             out.append(f"Your offer of a {mine['kind']} stands ({fmt_s(self.t - mine['t'])} old).")
+        home = self.home_orders.get(side)
+        if home and home["until"] > self.t:
+            out.append(f"ORDERS FROM HOME (the government, for the next {fmt_s(home['until'] - self.t)}): {home['text']}")
+        if side == "astra" and self.aquila_task and self.t - self.aquila_task["t"] < 3600.0:
+            out.append(f"FLEET'S STANDING ORDER TO THE AQUILA ({fmt_s(self.t - self.aquila_task['t'])} ago): to {self.aquila_task['system']}: {self.aquila_task['mission']}")
+        if self.tender_free_at.get(side, 0.0) > self.t:
+            out.append(f"Your supply tender is busy for {fmt_s(self.tender_free_at[side] - self.t)}.")
         out.append("YOUR PLAN: " + (self.plans[side] or "(you have not written one: set_plan)") + (f" (written {fmt_s(self.t - self.plan_t[side])} ago)" if self.plans[side] else ""))
         out.append("SYSTEMS")
         for name in SYSTEM_ORDER:
@@ -1720,6 +1739,45 @@ class March:
                 out.append(f"- {fmt_s(max(0, self.t - e.t))} ago · {e.system + ': ' if e.system else ''}{e.text.get('astra') or e.text.get('mandate')}")
         return "\n".join(out)
 
+    def field_brief(self, side: str, system: str) -> str:
+        """What the commanders in the field (the real simulation's: war_minds.py) read of their high command: its plan, the orders of the fleets in their system, what is
+        on its way to them (their own side's fleets with their time of arrival, and what their side's eyes say of the enemy's), and the war elsewhere. Facts and intent
+        from the side's own picture, no more than its fleets would have been told: what to do with them is the commander's."""
+        v = self.view(side)
+        out = []
+        if self.plans[side]:
+            out.append(f"Your high command's plan ({fmt_s(self.t - self.plan_t[side])} ago): {self.plans[side]}")
+        home = self.home_orders.get(side)
+        if home and home["until"] > self.t:
+            out.append(f"Orders from home: {home['text']}")
+        here = [f for f in v.own if f.where == system and f.status != "scripted"]
+        for f in sorted(here, key=lambda x: x.id):
+            o = f.order
+            out.append(f"Fleet orders for {f.name}: {o.kind}{' ' + o.target if o.target else ''} ({o.stance}" + (f"; by {o.by}" if o.by not in ("default", "auto") else "") + ")"
+                       + (f", reason: {o.reason[:100]}" if o.reason and o.by not in ("default", "auto") else ""))
+        coming = []
+        for f in v.own:
+            if f.where == system or f.status in ("scripted",):
+                continue
+            dest = f.route[-1] if f.route else ""
+            if f.order.kind in ("reinforce", "escort"):
+                tf = self.fleets.get(f.order.target)
+                dest = (tf.where or (tf.route[-1] if tf.route else "")) if tf else dest
+            if dest == system or (f.in_gate and f.route and f.route[0] == system):
+                eta = self.eta(f, system)
+                if eta is not None:
+                    coming.append((eta, f"{f.name} ({f.n} ships: {f.composition()}) is on its way to you: about {fmt_s(eta)}"))
+        for _, text in sorted(coming):
+            out.append(text)
+        for tr in sorted(v.tracks.values(), key=lambda t: -self.track_power(t)):
+            if self.t - tr.seen_t < 900.0 and (tr.moving_to == system or (tr.system == system and not self.sees(side, system))):
+                cls = f" ({composition(tr.classes)})" if tr.classes else ""
+                out.append(f"Your side's eyes: about {tr.n} enemy ships{cls} seen {fmt_s(self.t - tr.seen_t)} ago at {tr.system}" + (f", heading for {tr.moving_to}" if tr.moving_to else ""))
+        elsewhere = [e for e in v.news[-30:] if e.kind in ("system_taken", "siege", "siege_broken", "battle_end", "war_over", "truce", "truce_over") and e.system != system]
+        for e in elsewhere[-3:]:
+            out.append(f"Elsewhere, {fmt_s(max(0, self.t - e.t))} ago: {e.text[side]}")
+        return "\n".join(out)
+
     def board(self, side: str = "astra", max_lines: int = 12) -> str:
         """The short board for the bridge (the XO, comms and ops read it with the fleet board): the front as the Fleet knows it."""
         v = self.view(side)
@@ -1735,16 +1793,111 @@ class March:
                 lines.append(f"- BATTLE at {b.system}, {fmt_s(self.t - b.t0)} in")
         return "\n".join(lines[:max_lines])
 
+    # ------------------------------------------------------------------------------------------- what the minds and the director can do besides giving orders
+    def assess(self, side: str, own_refs: list[str] | str, target: str, runs: int = 28) -> tuple[bool, str]:
+        """The staff's estimate of a meeting: the named fleets of `side` (with what is already theirs at the place) against what the side believes is there — the
+        tracks it holds, with their age, and the defences if the ground is the enemy's. It is the same battle model the war uses, read twice (as many as the contact
+        says, and a third more), so that the answer is as uncertain as the intelligence is. Information: it forbids nothing."""
+        refs = [own_refs] if isinstance(own_refs, str) else list(own_refs)
+        mine = [self.find_fleet(side, r) for r in refs]
+        if not mine or any(f is None for f in mine):
+            return False, "name one or more of your fleets (by id or name)"
+        dest = self.war.find(target) or ""
+        if not dest:
+            return False, f"no system '{target}'"
+        fleets: list[Fleet] = [f for f in mine if f is not None]
+        here_friends = [g for g in self.fleets_at(dest, side) if g not in fleets and g.status not in ("scripted", "real")]
+        tracks = [t for t in self.tracks[side].values() if t.system == dest and self.t - t.seen_t <= 1200.0]
+        ua: list[mb.Unit] = []
+        for f in fleets + here_friends:
+            for sh in f.ships:
+                ua.append(mb.Unit(sh.cls, 0, f.id, sh.name, hull_frac=sh.hull, supply=f.supply, wing=(sh.fighters, sh.bombers, sh.drones), stance="steady", params=self.bp))
+
+        def enemy(scale: float) -> list[mb.Unit]:
+            out: list[mb.Unit] = []
+            for tr in tracks:
+                if tr.classes:
+                    comp = list(tr.classes.items())
+                else:
+                    cls = "styx" if side == "astra" else "vigilant"
+                    comp = [(cls, max(1, tr.n))]
+                for cls, n in comp:
+                    for _ in range(max(0, int(round(n * scale)))):
+                        out.append(mb.Unit(cls, 1, tr.fid, cls, hull_frac=tr.hull or 0.9, params=self.bp))
+            if self.owner(dest) == other(side) and SYSTEMS[dest]["fort"] > 0:
+                out.append(mb.Unit(mb.FORT_CLASS, 1, "fort", "the defences", hull_frac=self.sys[dest].fort_hp, fort=SYSTEMS[dest]["fort"], params=self.bp))
+            return out
+
+        base = enemy(1.0)
+        if not base:
+            return True, (f"You hold no track on {dest}: nothing is known of what stands there. "
+                          + (f"Its defences are the enemy's (fort {SYSTEMS[dest]['fort']:g}). " if self.owner(dest) == other(side) else "")
+                          + "A recon (`recon` order, run dark) is what finds out.")
+        lines = []
+        for label, scale in (("as many as the contact says", 1.0), ("a third more than it says", 1.33)):
+            foe = enemy(scale)
+            r = mb.forecast(ua, foe, runs=runs, seed=int(self.t // 60) + len(dest), params=self.bp)
+            lines.append(f"- if they are {label}: your side holds the field {int(100 * r['win'][0])}% of the time, they do {int(100 * r['win'][1])}%, neither {int(100 * r['draw'])}%; "
+                         f"you lose about {r['lost'][0]:.1f} of your {len(ua)} ships, they lose about {r['lost'][1]:.1f} of {len(foe)}")
+        age = min(self.t - t.seen_t for t in tracks)
+        names = ", ".join(f"{t.fid} (about {t.n} ships, seen {fmt_s(self.t - t.seen_t)} ago, level {t.level})" for t in tracks)
+        extra = f" Your fleets already at {dest} are counted on your side." if here_friends else ""
+        return True, (f"Staff estimate for {', '.join(f.name for f in fleets)} at {dest} against {names}"
+                + (" and its defences" if self.owner(dest) == other(side) and SYSTEMS[dest]["fort"] > 0 else "") + f":{extra}\n" + "\n".join(lines)
+                + f"\n(The contact is {fmt_s(age)} old: they may have moved, or reinforced. Fleets that arrive piecemeal fight piecemeal; this reads them as one battle.)")
+
+    def reveal(self, side: str, fid: str, how: str = "an agent's report") -> bool:
+        """What the director may do for a side's intelligence: let it learn something TRUE — where a fleet of the other side is, as it is now — by some means of the
+        story's (a defector, a Guild courier, an intercepted signal). The fleet is a real one: the fog is lifted on it for a moment, nothing is invented."""
+        f = self.fleets.get(fid)
+        if f is None or f.side == side or f.status == "scripted":
+            return False
+        where = f.where or (f.hop_from if f.in_gate else "")
+        if not where:
+            return False
+        n, cls = self._noisy(side, f, 2)
+        self.tracks[side][f.id] = Track(f.id, where, self.t, 2, n, cls, None, f.route[0] if f.in_gate and f.route else "")
+        what = f"{f.id}: about {n} ships ({composition(cls or {})}) at {where}" + (f", heading for {f.route[0]}" if f.in_gate and f.route else "")
+        self.say("intel", where, {side: f"{how}: {what}."}, (side,), 2, (f.id,))
+        return True
+
+    def pressure(self, side: str, text: str, minutes: float = 60.0) -> None:
+        """What the government at home demands of a side's high command, for a while (the story's: the war's rules do not change)."""
+        self.home_orders[side] = {"text": (text or "").strip()[:300], "until": self.t + minutes * 60.0}
+        self.say("orders_from_home", "", {side: f"Orders from home: {text.strip()[:240]}"}, (side,), 2)
+
+    def use_tender(self, side: str) -> tuple[bool, float]:
+        """A supply tender for the Aquila: there are few, and one is busy for a quarter of an hour after it has been used. (ok, seconds to wait if not)"""
+        wait = self.tender_free_at.get(side, 0.0) - self.t
+        if wait > 0:
+            return False, wait
+        self.tender_free_at[side] = self.t + 900.0
+        return True, 0.0
+
+    def task_aquila(self, system: str, mission: str, why: str = "") -> tuple[bool, str]:
+        """Fleet's order to the Aquila (Rourke's): where she is wanted and what for. It is an order of the service, not a rule of the world: the Captain decides what to
+        do with it, and the war goes on either way."""
+        dest = self.war.find(system) or ""
+        if not dest:
+            return False, f"no system '{system}' in the March"
+        here = self.aquila["where"]
+        if dest != here and self.hops(here, dest, "astra") >= 99:
+            return False, f"no way through the Gates from {here} to {dest}"
+        self.aquila_task = {"system": dest, "mission": (mission or "").strip()[:240], "why": (why or "").strip()[:240], "t": self.t}
+        bits = f"Fleet orders the Aquila to {dest}: {mission.strip()[:200]}"
+        self.say("fleet_orders", dest, {"astra": bits}, ("astra",), 1, ())
+        return True, f"the order to the Aquila stands: {dest}" + (f" ({self.hops(here, dest, 'astra')} Gate{'s' if self.hops(here, dest, 'astra') != 1 else ''} from {here})" if dest != here else " (she is there)")
+
     # ------------------------------------------------------------------------------------------- saving
     def default_path(self) -> str:
         return os.path.join(os.path.dirname(self.war.save_path), "march.json")
 
     def to_dict(self) -> dict[str, Any]:
-        return {"t": round(self.t, 1), "seed": self.seed, "fleets": [f.to_dict() for f in self.fleets.values()], "sys": {k: v.to_dict() for k, v in self.sys.items()},
+        return {"t": round(self.t, 1), "seed": self.seed, "owners": {k: self.owner(k) for k in self.sys}, "fleets": [f.to_dict() for f in self.fleets.values()], "sys": {k: v.to_dict() for k, v in self.sys.items()},
                 "events": [e.to_dict() for e in self.events[-120:]], "event_n": self.event_n, "will": self.will, "plans": self.plans, "plan_t": self.plan_t, "score": self.score,
-                "over": self.over, "guilds_open": self.guilds_open, "truce": self.truce, "proposals": self.proposals, "aquila": self.aquila, "aquila_seen": list(self.aquila_seen), "next_id": self.next_id,
+                "over": self.over, "guilds_open": self.guilds_open, "home_orders": self.home_orders, "tender_free_at": self.tender_free_at, "aquila_task": self.aquila_task, "truce": self.truce, "proposals": self.proposals, "aquila": self.aquila, "aquila_seen": list(self.aquila_seen), "next_id": self.next_id,
                 "used_names": sorted(self.used_names), "tracks": {s: {k: v.to_dict() for k, v in self.tracks[s].items()} for s in SIDES},
-                "log": {s: [e.to_dict() for e in self.log[s]] for s in SIDES}, "inbox": {s: [[round(w, 1), e.n] for w, e in self.inbox[s]] for s in SIDES}}
+                "log": {s: [e.to_dict() for e in self.log[s]] for s in SIDES}, "rcv": self.rcv, "inbox": {s: [[round(w, 1), e.n] for w, e in self.inbox[s]] for s in SIDES}}
 
     def save(self, path: str | None = None) -> None:
         path = path or self.save_path or self.default_path()
@@ -1774,6 +1927,9 @@ class March:
     def _from_dict(self, d: dict[str, Any]) -> None:
         self.t = float(d.get("t", 0.0))
         self.seed = int(d.get("seed", self.seed))
+        for k, o in (d.get("owners") or {}).items():
+            if k in self.war.systems:
+                self.war.systems[k]["owner"] = o                    # (the war's course decides who holds what: the saved war map follows it)
         self.fleets = {x["id"]: Fleet.from_dict(x) for x in d.get("fleets", [])}
         for k, v in (d.get("sys") or {}).items():
             if k in self.sys:
@@ -1793,6 +1949,9 @@ class March:
         self.score = d.get("score") or self.score
         self.over, self.truce, self.proposals = d.get("over") or {}, d.get("truce") or {}, d.get("proposals") or {}
         self.guilds_open = {k: float(v) for k, v in (d.get("guilds_open") or {}).items()}
+        self.home_orders = dict(d.get("home_orders") or {})
+        self.tender_free_at = {s: float((d.get("tender_free_at") or {}).get(s, 0.0)) for s in SIDES}
+        self.aquila_task = dict(d.get("aquila_task") or {})
         self.aquila = d.get("aquila") or self.aquila
         self.aquila_seen = tuple(d.get("aquila_seen") or ("", 0.0))                       # type: ignore[assignment]
         self.next_id = d.get("next_id") or self.next_id
@@ -1800,6 +1959,7 @@ class March:
         self.tracks = {s: {k: Track.from_dict(v) for k, v in (d.get("tracks", {}).get(s) or {}).items()} for s in SIDES}
         by_n = {e.n: e for e in self.events}
         self.log = {s: deque([Event.from_dict(e) for e in d.get("log", {}).get(s, [])], maxlen=60) for s in SIDES}
+        self.rcv = {s: int((d.get("rcv") or {}).get(s, 0)) for s in SIDES}
         self.inbox = {s: deque((float(w), by_n[n]) for w, n in d.get("inbox", {}).get(s, []) if n in by_n) for s in SIDES}
         self.battles.clear()
         self.real_system, self.real_fight = "", False
