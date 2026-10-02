@@ -1,5 +1,6 @@
-"""ASN Aquila bridge v3: the shell (deck, walls, ceiling, window, rails, viewscreen frame, master display).
-All positions come from data/ship/aquila_bridge.json through Ctx; builders return Blender objects, origin = bridge origin."""
+"""ASN Aquila bridge v3: the shared context of the bridge (Ctx: the layout from data/ship/aquila_bridge.json, the walls, the plan
+helpers). The deck lives in bridge3_floor.py, the walls, ceiling, window and rails in their own modules; builders return Blender
+objects, origin = bridge origin."""
 from __future__ import annotations
 
 import math
@@ -7,14 +8,11 @@ import os
 import random
 import sys
 
-import bmesh
-import bpy
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import astra_bpy as A  # noqa: E402
 import bridge3_lib as L  # noqa: E402
-from bridge3_lib import FB, Parts, T, Rz, Ry, Rx, frame, polar, lerp  # noqa: E402
+from bridge3_lib import FB, Rz, polar, lerp  # noqa: E402
 
 
 # --------------------------------------------------------------------------------------------------------------- context

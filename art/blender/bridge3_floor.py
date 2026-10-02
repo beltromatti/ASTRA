@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge3_lib as L  # noqa: E402
 import bridge3_shell as SH  # noqa: E402
-from bridge3_lib import FB, Parts, Rz, T, lerp, polar  # noqa: E402
+from bridge3_lib import FB, Parts, Rz, lerp, polar  # noqa: E402
 
 PLATE_T = 0.012
 
@@ -28,7 +28,6 @@ def ring_poly(cx: float, cy: float, r: float, n: int = 64, a0: float = 0.0, a1: 
 
 def annulus_sector(cx, cy, r0, r1, a0, a1, gap_m: float = 0.0):
     """A convex quad (trapezoid on the chords) between the radii r0, r1 and the angles a0, a1 (degrees), shrunk by gap_m on every side."""
-    da = math.radians(a1 - a0)
     g_r = gap_m
     g_a0 = math.degrees(gap_m / max(r0, 0.5) / 2.0)
     g_a1 = math.degrees(gap_m / max(r1, 0.5) / 2.0)
@@ -120,7 +119,6 @@ def compass_dial(b: Parts, c: SH.Ctx, z: float) -> None:
             fine.text(f"{a:03d}", (px, py, z + 0.0035), 0.06, (0, 0, 1), L.BRASS, up=out, tracking=0.008)
     # chevrons (lit) pointing outwards on the four cardinal points, the bow one in amber
     for a, cell in ((0.0, "amber"), (90.0, "command"), (180.0, "command"), (270.0, "command")):
-        base = polar(tx, ty, r_in + 0.12, a)
         tip = polar(tx, ty, r_in + 0.46, a)
         left = polar(tx, ty, r_in + 0.12, a - 9.0)
         right = polar(tx, ty, r_in + 0.12, a + 9.0)
@@ -135,7 +133,7 @@ def compass_dial(b: Parts, c: SH.Ctx, z: float) -> None:
 def compass_star_inlay(b: Parts, cx, cy, z: float, r: float, rot: float, text: bool, big: bool) -> None:
     """The ASTRA Navy emblem as an inlay: a dark carbon disc, brass double ring, the eight-pointed star in brass with a lit rim, and
     (big) the motto in lettering. rot = the direction of the long 'north' point (degrees from +x towards +y: 0 = forward)."""
-    fb, em, fine = b.body, b.emit, b.fine
+    fb, em = b.body, b.emit
     fb.prism(ring_poly(cx, cy, r * 1.04, 72), z - 0.004, z + 0.004, L.COMPOSITE)
     for ri, ro in ((0.90 * r, 0.97 * r), (0.58 * r, 0.63 * r)):
         brass_arc(fb, cx, cy, (ri + ro) / 2, 0, 360, z + 0.004, ro - ri, 0.006)
@@ -149,7 +147,6 @@ def compass_star_inlay(b: Parts, cx, cy, z: float, r: float, rot: float, text: b
     fb.cyl((cx, cy, z + 0.010), (cx, cy, z + 0.014), 0.065 * r, L.DGLASS, seg=24)
     em.lamp_cyl((cx, cy, z + 0.0142), (cx, cy, z + 0.0155), 0.03 * r, "command", L.LAMP, seg=16)
     if text:
-        h = 0.20 * r / 1.9 * 1.0
         ring_text(em, "ASTRA NAVY", cx, cy, 0.775 * r, rot, z + 0.0045, 0.115 * r, L.LAMP_DIM, "warm_dim", bottom=False, tracking=0.06 * r)
         ring_text(em, "CONCORD · LAW · LIGHT", cx, cy, 0.775 * r, rot + 180.0, z + 0.0045, 0.095 * r, L.LAMP_DIM, "warm_dim", bottom=True, tracking=0.035 * r)
 
@@ -158,7 +155,7 @@ def compass_star_inlay(b: Parts, cx, cy, z: float, r: float, rot: float, text: b
 def build_deck(c: SH.Ctx, name: str = "SM_BRG3_Deck"):
     b = Parts(bevel=0.005, fine_bevel=0.003)
     b.bevel_segments = 1
-    fb, em, fine = b.body, b.emit, b.fine
+    fb, em = b.body, b.emit
     rng = random.Random(3)
     yw = c.side_wall_y(c.WELL_X, 1)
     UP, WL, DS = c.UPPER, c.WELL, c.DAIS

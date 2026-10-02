@@ -14,7 +14,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge3_lib as L  # noqa: E402
-from bridge3_lib import FB, Rx, Ry, Rz, T, lerp  # noqa: E402
+from bridge3_lib import FB, Ry, Rz, T, lerp  # noqa: E402
 
 LEAF = "MI_SHIP_Leaf"
 SOIL = "MI_SHIP_Soil"
