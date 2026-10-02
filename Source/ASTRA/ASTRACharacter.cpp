@@ -13,6 +13,9 @@
 #include "AstraFpsComponent.h"
 #include "AstraLadderSubsystem.h"
 #include "Engine/World.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
+#include "EngineUtils.h"
 #include "ASTRA.h"
 
 namespace
@@ -79,6 +82,16 @@ void AASTRACharacter::BeginPlay()
 	Move->BrakingDecelerationWalking = 2400.f;
 	Move->GroundFriction = 9.f;
 	Move->JumpZVelocity = 380.f;
+	// the ship's outside skin is no wall for a man on foot inside her: the decks run within the hull and the island's blocks, and where a lift's shaft
+	// crosses the skin (the bridge lifts go down from the island into the hull) its surfaces held the Captain while the car went on without him
+	for (TActorIterator<AStaticMeshActor> It(GetWorld()); It; ++It)
+	{
+		const UStaticMeshComponent* SM = It->GetStaticMeshComponent();
+		if (SM && SM->GetStaticMesh() && SM->GetStaticMesh()->GetName().StartsWith(TEXT("SM_SHIP_ASTRA_Aquila")))
+		{
+			GetCapsuleComponent()->IgnoreActorWhenMoving(*It, true);
+		}
+	}
 }
 
 void AASTRACharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
