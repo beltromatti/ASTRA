@@ -54,6 +54,7 @@ class Params:
     flee_base_s: float = 10.0            # a ship that breaks off is under fire this long before it is out of reach, besides the time it takes to turn ...
     flee_turn: float = 0.5               # ... (this share of the time to turn her back on the enemy: 180 degrees at the class's turn rate)
     flee_exposure: float = 0.55          # ... and its ships count this much as targets while they run
+    flee_hull: float = 0.27              # a ship under this share of its hull breaks off by itself (the simulation's own rule: its captain's reflex, a quarter of the plating)
     ramp_s: float = 110.0                # the fire builds up over this long once the fleets are in range (they close and settle at their ranges first)
     f_dps: float = 1.6                   # a fighter's damage per second against ships
     b_dps: float = 7.5                   # a bomber's, as torpedo runs averaged
@@ -216,6 +217,11 @@ class Engagement:
             self.damage_dealt[0] += dmg[0][0] + dmg[0][1]
             self.damage_dealt[1] += dmg[1][0] + dmg[1][1]
             self._air(dt)
+            for s in (0, 1):                                              # a ship too hurt to fight turns away on its own, whatever the fleet does
+                for u in self.sides[s]:
+                    if u.fighting and not u.fixed and u.hull_frac < p.flee_hull:
+                        u.flee_t = 0.0
+                        self.events.append((self.t, "broke off", u))
         self._morale(dt)
         # it is decided when one side has nothing left on the field: no ship fighting and none still running (the ones that run stay targets until they are out)
         pa, pb = self.alive(0), self.alive(1)

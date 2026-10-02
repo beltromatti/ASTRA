@@ -499,6 +499,111 @@ class WarCourseTest(unittest.TestCase):
         self.assertEqual(m.fleets["F-M1"].status, "ready")
 
 
+class HighCommandToolsTest(unittest.TestCase):
+    """What the high commands, the director and the real simulation's join can do to the March besides ordering fleets: the staff's estimate, a fleet found by the story, the
+    government's pressure, the tender, the Aquila's tasking, the picture the field commanders read."""
+
+    def test_the_staff_estimate_is_as_uncertain_as_the_intelligence_and_forbids_nothing(self) -> None:
+        m = world()
+        clear(m)
+        mine = put(m, "astra", "Aurelia", [("praetorian", 1), ("vigilant", 3)], name="Picket")
+        put(m, "mandate", "Thule", [("styx", 5)], name="Foe")
+        ok, text = m.assess("astra", [mine.id], "Thule")
+        self.assertTrue(ok)
+        self.assertIn("You hold no track on Thule", text)                                 # (nothing is known: it says so, and what finds out)
+        self.assertIn("recon", text)
+        m.run(5.0)
+        post = m.sys["Aurelia"].post["astra"]
+        self.assertTrue(post)
+        ok, text = m.assess("astra", [mine.id], "Thule")                                   # (a post next door hears the drives through the Gate)
+        self.assertTrue(ok and "Staff estimate" in text, text)
+        self.assertIn("as many as the contact says", text)
+        self.assertIn("a third more than it says", text)
+        self.assertNotIn("Foe", text)                                                      # (the estimate names what is on the plot, never the truth's own name)
+        self.assertEqual(m.assess("astra", ["F-A99"], "Thule")[0], False)
+        self.assertEqual(m.assess("astra", [mine.id], "Atlantis")[0], False)
+
+    def test_a_fleet_the_story_reveals_is_a_real_one_and_where_it_is(self) -> None:
+        m = world()
+        clear(m)
+        foe = put(m, "mandate", "Erebus", [("acheron", 2), ("styx", 4)], name="Hidden Main Body")
+        self.assertNotIn(foe.id, m.tracks["astra"])
+        self.assertTrue(m.reveal("astra", foe.id, "a defector from the Anchorage"))
+        tr = m.tracks["astra"][foe.id]
+        self.assertEqual((tr.system, tr.level), ("Erebus", 2))
+        self.assertTrue(any(e.kind == "intel" and "a defector from the Anchorage" in e.text["astra"] for e in m.events))
+        self.assertFalse(m.reveal("astra", "F-M99", "nobody"))                             # (no invention: the fleet must be there)
+        mine = put(m, "astra", "Aurelia", [("vigilant", 2)], name="Own")
+        self.assertFalse(m.reveal("astra", mine.id, "it is ours"))                         # (and it is the other side's)
+        self.assertFalse(m.reveal("mandate", foe.id, "ours"))
+
+    def test_the_governments_pressure_is_read_not_obeyed_by_the_code(self) -> None:
+        m = world()
+        clear(m)
+        f = put(m, "mandate", "Erebus", [("styx", 3)], name="Squadron")
+        m.pressure("mandate", "The Hall wants Aurelia before the harvest.", 45)
+        self.assertIn("ORDERS FROM HOME", m.picture("mandate"))
+        self.assertNotIn("ORDERS FROM HOME", m.picture("astra"))
+        m.run(30.0)
+        self.assertEqual(f.order.kind, "hold")                                             # (nothing moved by itself: it is the high command's to answer)
+        m.run(46 * 60.0)
+        self.assertNotIn("ORDERS FROM HOME", m.picture("mandate"))                         # (it runs out)
+
+    def test_the_tender_is_busy_after_it_is_used(self) -> None:
+        m = world()
+        self.assertEqual(m.use_tender("astra"), (True, 0.0))
+        ok, wait = m.use_tender("astra")
+        self.assertFalse(ok)
+        self.assertGreater(wait, 800.0)
+        m.run(901.0)
+        self.assertTrue(m.use_tender("astra")[0])
+
+    def test_the_aquila_is_tasked_to_go_not_to_stay(self) -> None:
+        m = world()
+        ok, detail = m.task_aquila("Aurelia", "hold")
+        self.assertFalse(ok)
+        self.assertIn("tell the Captain", detail)
+        ok, detail = m.task_aquila("Cassia", "relieve the yards", "they are open")
+        self.assertTrue(ok)
+        self.assertEqual(m.aquila_task["system"], "Cassia")
+        self.assertIn("FLEET'S STANDING ORDER TO THE AQUILA", m.picture("astra"))
+        self.assertNotIn("FLEET'S STANDING ORDER TO THE AQUILA", m.picture("mandate"))
+        self.assertFalse(m.task_aquila("Atlantis", "x")[0])
+
+    def test_the_field_commanders_read_their_own_sides_plan_and_orders(self) -> None:
+        m = world()
+        m.set_plan("mandate", "Take the Gate; the main body comes when the picket's strength is known.")
+        text = m.field_brief("mandate", "Aurelia")
+        self.assertIn("Take the Gate", text)
+        self.assertNotIn("ASTRA's", text)
+        self.assertNotIn("Aurelia Picket", text)                                          # (the enemy's own fleets are not in a side's brief)
+
+    def test_a_fleet_may_be_named_the_way_the_picture_writes_it(self) -> None:
+        m = world()
+        f = m.find_fleet("astra", "F-A1 7th Fleet Main Body")
+        self.assertIsNotNone(f)
+        self.assertEqual(f.id, "F-A1")
+        self.assertIsNone(m.find_fleet("mandate", "F-A1 7th Fleet Main Body"))               # (never a fleet of the other side)
+
+    def test_the_real_simulation_scores_what_it_loses_like_a_battle_of_the_map(self) -> None:
+        m = world()
+        clear(m)
+        f = put(m, "mandate", "Aurelia", [("acheron", 1), ("styx", 2)], name="In the game")
+        m.real_adopt(f, "Aurelia")
+        will = m.will["mandate"]
+        m.real_lost(f, f.ships[1], "destroyed")
+        self.assertEqual(f.n, 2)
+        self.assertEqual((m.score["mandate"]["ships_lost"], m.score["astra"]["ships_killed"]), (1, 1))
+        self.assertLess(m.will["mandate"], will)
+        m.real_lost(f, f.ships[0], "destroyed")                                             # (the carrier: a capital ship)
+        m.real_lost(f, f.ships[0], "destroyed")
+        self.assertNotIn(f.id, m.fleets)
+        self.assertTrue(m.real_tally["mandate"].get("capital"))
+        m.real_t0 = m.t - 400
+        self.assertEqual(m.real_over("Aurelia"), 3)                                         # (a capital ship was lost: a major battle)
+        self.assertEqual(m.real_tally["mandate"]["lost"], 0)                                # (the tally starts again)
+
+
 class ReflexTest(unittest.TestCase):
     def test_a_threatened_system_is_answered_by_the_fleets_that_can_reach_it(self) -> None:
         m = world()

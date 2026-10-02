@@ -545,6 +545,21 @@ class SaveTest(Fixture):
             self.assertIn("ordered F-A1: move Aurelia", minds2.recall("astra"))
             self.assertEqual(minds2.seats["astra"].thinks, 3)
 
+    async def test_a_saved_war_keeps_the_games_picket_if_the_aquila_is_at_aurelia_and_clears_the_rest(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            for where, kept in (("Aurelia", True), ("Cassia", False)):
+                m2 = world()
+                m2.war.save_path = os.path.join(d, f"war_{where}.json")
+                m2.war.current = where
+                m2.save_path = os.path.join(d, f"march_{where}.json")
+                m2.fleets["F-A5"].ships[0].cid = "T-77"                                        # (a ship of the map that was in the game's sky when it was saved)
+                m2.save()
+                g2 = mg.MarchGlue(m2, None, command=self.world.command, clock=self.clock)
+                g2.start(False)
+                self.assertEqual("F-A2" in g2.opening, kept)
+                self.assertEqual(m2.real_system, where)
+                self.assertEqual(m2.fleets["F-A5"].ships[0].cid, "")                              # (the game's sky is new: nothing else is there)
+
 
 if __name__ == "__main__":
     unittest.main()

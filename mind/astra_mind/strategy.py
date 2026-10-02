@@ -49,6 +49,7 @@ SETTLE_S = 6.0                  # a burst of news is read together: wait this lo
 MAX_SETTLE_S = 15.0             # ... never longer than this after the first
 NEWS_WEIGHT = 2                 # the news that wakes a mind (the March's weights: 0 routine, 1 minor, 2 significant, 3 major)
 PULSE_TIMEOUT_S = 45.0          # a model that has not finished by now leaves its fleets to their reflexes
+NO_CHANGE_LINE = "looked, no change"
 LOG_LINES = 18                  # what a high command remembers of its last decisions and words
 LOG_KEEP = 90
 FAIL_LIMIT = 3                  # a side whose mind has failed this many pulses in a row is on its reflexes in full until it answers again
@@ -217,8 +218,8 @@ Home Fleet is the Senate's and leaves the capital only when the Senate is persua
 {tools}
 
 How you speak to the Captain (`tell_captain`): radio speech, short, calm and dry, in the Captain's language with names in English; only what is new to him or what he asked: your log
-shows what you have already told him, and you do not tell him twice what has not changed. When his words on the net are plainly for another ship's captain, or you have nothing to
-add, say nothing (`no_change`). Never mention AI, games or prompts."""
+shows what you have already told him, and you do not tell him twice what has not changed. When his words on the net are plainly not for Fleet command (an order to his own helm or
+gunners, words for another ship's captain), or you have nothing to add, say nothing (`no_change`). Never mention AI, games or prompts."""
 
 MANDATE_PERSONA = """You are {name}, {rank}, commanding the Kharon Mandate's Interdiction Fleet, from {ship}, with the Hall of the Ferried's authority to take the Gates of the Aurelia March.
 {bio}
@@ -342,7 +343,12 @@ class StrategicMinds:
         self.first_plans()
 
     def journal(self, side: str, text: str) -> None:
-        self.logs[side].append((self.m.t, text[:300]))
+        """What a high command did goes in its log. A look that changed nothing takes the place of the last such look (a war that stands still would fill the log's eighteen lines
+        with 'no change' and push the orders out of its memory): the log still says when it last looked and what it thought then."""
+        log_ = self.logs[side]
+        if text.startswith(NO_CHANGE_LINE) and log_ and log_[-1][1].startswith(NO_CHANGE_LINE):
+            log_.pop()
+        log_.append((self.m.t, text[:300]))
 
     def recall(self, side: str, n: int = LOG_LINES) -> str:
         now = self.m.t
@@ -544,7 +550,7 @@ class StrategicMinds:
                 rec["tools"].append(("again:" if rnd else "") + call.name + (f":{a.get('order')}" if call.name == "fleet_order" else ""))
                 if call.name == "no_change":
                     seat.stats["no_change"] += 1
-                    self.journal(side, f"looked, no change: {str(a.get('reason', ''))[:160]}")
+                    self.journal(side, f"{NO_CHANGE_LINE}: {str(a.get('reason', ''))[:160]}")
                     res = {"ok": True, "detail": "noted"}
                 else:
                     res = await self._tool(seat, call.name, a, lang, by_captain)

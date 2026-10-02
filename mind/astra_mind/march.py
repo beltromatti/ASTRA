@@ -1958,7 +1958,7 @@ class March:
         n, cls = self._noisy(side, f, 2)
         self.tracks[side][f.id] = Track(f.id, where, self.t, 2, n, cls, None, f.route[0] if f.in_gate and f.route else "")
         what = f"{f.id}: about {n} ships ({composition(cls or {})}) at {where}" + (f", heading for {f.route[0]}" if f.in_gate and f.route else "")
-        self.say("intel", where, {side: f"{how}: {what}."}, (side,), 2, (f.id,))
+        self.say("intel", where, {side: f"Intelligence report, {what}. Source: {how}."}, (side,), 2, (f.id,))      # (the war says what is learnt; the story says only how)
         return True
 
     def pressure(self, side: str, text: str, minutes: float = 60.0) -> None:

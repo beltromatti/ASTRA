@@ -185,6 +185,16 @@ class ReadingTest(Fixture):
         self.assertIn("bring the main body home", self.prompt("astra"))              # (it reads what it said last time)
         self.assertNotIn("bring the main body home", self.prompt("mandate"))
 
+    async def test_a_war_that_stands_still_does_not_push_the_orders_out_of_the_log(self) -> None:
+        self.sm.journal("astra", "ordered F-A1: move Aurelia — home => ok")
+        for i in range(30):
+            self.m.t += 60.0
+            self.sm.journal("astra", f"looked, no change: nothing moved ({i})")
+        text = self.sm.recall("astra")
+        self.assertIn("ordered F-A1: move Aurelia", text)                                  # (the order is still in its memory)
+        self.assertEqual(text.count("looked, no change"), 1)                               # (and the last look is there, with when it was and what it thought)
+        self.assertIn("nothing moved (29)", text)
+
     async def test_the_mandate_reads_what_intelligence_learned_of_the_captain(self) -> None:
         self.sm.intel = lambda: "He holds the Gate and spends missiles early."
         await self.tick(FIRST_PULSE_S + 10)

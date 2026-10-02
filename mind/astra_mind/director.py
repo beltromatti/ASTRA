@@ -184,7 +184,8 @@ REVEAL = _fn("reveal", "Let a side's intelligence learn something TRUE: where on
                        "for either side in turn, never to hand anyone a victory. The fleet must be on the list (the war's truth); nothing is invented.", {
     "side": {"type": "string", "enum": ["astra", "mandate"], "description": "the side whose intelligence learns it"},
     "fleet": {"type": "string", "description": "the id of the other side's fleet (F-M4 for a Mandate fleet, F-A1 for an ASTRA one), from the list"},
-    "how": {"type": "string", "description": "how they learn it, a few words in English (a defector from the Cassia Yards; a Guild courier out of Veyra)"}}, ["side", "fleet", "how"])
+    "how": {"type": "string", "description": "only the CHANNEL, a few words in English (a defector from the Cassia Yards; a Guild courier out of Veyra): the war says what is learnt, "
+                                             "you never say it or add to it"}}, ["side", "fleet", "how"])
 PRESSURE = _fn("pressure", "The government at home presses a side's high command for a while: the Senate wants Aurelia held and the Home Fleet kept at Concordia; the Hall of the Ferried "
                            "wants a result before the harvest; a mutiny rumour, an election. It is a thing the high command reads and answers as it sees fit: it changes no rule "
                            "and no ship. Use it to move a war that has stalled, or to hold back one that runs too fast for the Captain to breathe, and say it as that government "
@@ -229,7 +230,7 @@ How the war runs
 - You never create or change a force: no raid, no reinforcement, no decisive battle, no rescue, no handicap. The fleets in the list below are the only warships in the March; you
   never change who holds a system or how strong a fleet is. Nothing you do tilts the war for either side, and you never speak for Rourke: he is a person with a mind of his own.
 - What you do is the pace of the story, with TRUE things only. `reveal`: a side's intelligence learns where one of the other side's fleets really is (a defector, a Guild courier,
-  a signal): a blind high command sits still, and a war where nobody can find anybody is a dull one. `pressure`: the government at home presses a side's high command (the
+  a signal; you give only the channel, the war says what they learn): a blind high command sits still, and a war where nobody can find anybody is a dull one. `pressure`: the government at home presses a side's high command (the
   Senate wants Aurelia held; the Hall of the Ferried wants a result): a high command that has stalled is moved by it, one that rushes is held. `war_news`: colour for what the
   war has really done. `start_beat`: `calm` (a breath for the Captain), `investigate` (a place to search where the Aquila is: no ambush), `negotiation` (a Mandate commander on the
   plot calls the Aquila to talk), or `none`.

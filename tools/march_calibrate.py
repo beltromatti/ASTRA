@@ -380,7 +380,7 @@ def main() -> None:
     p.add_argument("--step", type=float, default=0.18)
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--free", default="k_rail,k_laser,hull_w,shield_w,shield_leak,msl_frac,msl_dmg,pd_per_channel,ow,approach0,approach_per_ship,sigma_battle,sigma_step,"
-                                     "ret_bold,ret_steady,ret_cautious,flee_base_s,flee_turn,flee_exposure,ramp_s,f_dps,b_dps,air_kill,air_pd,focus_group,hold_target,"
+                                     "ret_bold,ret_steady,ret_cautious,flee_base_s,flee_turn,flee_exposure,ramp_s,f_dps,b_dps,air_kill,air_pd,focus_group,hold_target,flee_hull,"
                                      "p_praetorian,p_vigilant,p_acheron,p_lethe,h_praetorian,h_vigilant,h_acheron,h_lethe")
     p.set_defaults(fn=cmd_fit)
     p = sub.add_parser("list")

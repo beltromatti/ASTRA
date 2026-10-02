@@ -127,7 +127,8 @@ class MarchGlue:
         self._arc_t = -1e9
         self._fight_off_t: float | None = None
         self._transit: dict[str, Any] | None = None
-        self.stats = {"sent": 0, "refused": 0, "lost": 0, "fled": 0, "bulletins": 0, "adopted": 0}
+        self.stats = {"sent": 0, "refused": 0, "lost": 0, "fled": 0, "bulletins": 0, "adopted": 0, "errors": 0}
+        self._err_t = -1e9
         if minds is not None:
             minds.on_aquila_task = self._task_aquila
             minds.on_tender = self._tender
@@ -145,15 +146,16 @@ class MarchGlue:
         else:
             self.load()
         m.aquila_arrived(m.war.current if m.war.current in m.sys else "Aurelia")
-        self.reset_real(keep_opening=new)
+        self.reset_real(keep_opening=True, present_only=not new)       # (the game builds the opening's picket whenever it starts: in a saved war too, if the Aquila is at Aurelia)
         self._over_told = bool(m.over)                  # (a war that ended before is not told again)
         self.active = True
         self._last = None
         self._bul_seen = m.rcv["astra"]
 
-    def reset_real(self, keep_opening: bool = False) -> None:
-        """The game's simulation starts afresh (a new session, a saved campaign): none of the ships the March knew there are there any more, except, in a new war, the
-        ones the opening brings (the order of battle gave them their contact ids: when they show, the fleets are the game's)."""
+    def reset_real(self, keep_opening: bool = False, present_only: bool = False) -> None:
+        """The game's simulation starts afresh (a new session, a saved campaign): none of the ships the March knew there are there any more, except the ones the opening
+        brings (the order of battle gave them their contact ids: when they show, the fleets are the game's): all of them in a new war, only the ones that stand in the Aquila's
+        system in a saved one (the game builds its picket whenever it starts)."""
         self.seen.clear()
         self.fate.clear()
         self.tries.clear()
@@ -164,7 +166,7 @@ class MarchGlue:
         self._fight_off_t = None
         self._transit = None
         for f in self.m.fleets.values():
-            if keep_opening and any(s.cid for s in f.ships) and f.status != "real":
+            if keep_opening and any(s.cid for s in f.ships) and f.status != "real" and (not present_only or (f.where == self.m.real_system and f.status != "scripted")):
                 self.opening.add(f.id)
                 continue
             for s in f.ships:
@@ -204,7 +206,10 @@ class MarchGlue:
             self._holo(now)
             self._save(now)
         except Exception:  # noqa: BLE001
-            log.exception("the March could not follow the game's state")
+            self.stats["errors"] += 1
+            if self.clock() - self._err_t > 60.0:                    # (a defect that comes every second is told once a minute)
+                self._err_t = self.clock()
+                log.exception("the March could not follow the game's state (%d times so far)", self.stats["errors"])
 
     # ------------------------------------------------------------------------------------------------ the Aquila
     def _place(self, state: dict[str, Any]) -> None:
