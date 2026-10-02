@@ -1,19 +1,19 @@
 {
  "params": {
   "p_praetorian": 0.8788,
-  "p_lethe": 0.8111456083371151,
+  "p_lethe": 0.734602218672995,
   "ret_steady": 0.2458,
   "pd_per_channel": 5.1659,
-  "air_pd": 0.0026,
+  "air_pd": 0.0022861102116060266,
   "p_vigilant": 1.0501,
   "approach_per_ship": 0.4567792994454329,
   "k_rail": 0.5177,
   "ow": 0.1746623771696941,
-  "b_dps": 2.343470561499474,
+  "b_dps": 2.043108321903263,
   "k_laser": 0.5182,
-  "flee_base_s": 8.3595,
+  "flee_base_s": 8.01285452171187,
   "air_kill": 0.006637857928341322,
-  "flee_turn": 0.4155367887866231,
+  "flee_turn": 0.39017797682217714,
   "hull_w": 1.8,
   "shield_w": 1.5,
   "shield_leak": 0.09,
@@ -33,9 +33,9 @@
   "h_praetorian": 1.0,
   "h_vigilant": 1.0,
   "h_acheron": 1.0,
-  "h_lethe": 1.2301709831889593
+  "h_lethe": 1.7350233162737247
  },
- "loss": 92.0851647182601,
+ "loss": 86.49701189650342,
  "fitted_with": "tools/march_calibrate.py fit",
  "experiments": [
   "vig3_sty3",

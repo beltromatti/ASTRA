@@ -406,6 +406,14 @@ class PlaceTest(Fixture):
         self.assertEqual(len(self.world.beats), 1)
         self.assertEqual(a.status, "ready")
 
+    async def test_a_lane_that_ended_without_a_word_means_she_arrived(self) -> None:
+        self.world.lane = "Cassia"
+        await self.step(2)
+        self.assertEqual(self.m.aquila["lane"], "Cassia")
+        self.world.lane = ""                                                              # (the status no longer says she is in a lane, and no event came)
+        await self.step(int(mg.LANE_TIMEOUT_S) + 5)
+        self.assertEqual((self.m.aquila["where"], self.m.aquila["lane"], self.m.real_system), ("Cassia", "", "Cassia"))
+
     async def test_the_march_follows_the_war_map_when_the_story_says_the_aquila_arrived(self) -> None:
         self.m.war.arrived("Meridian")
         self.assertEqual((self.m.aquila["where"], self.m.real_system), ("Meridian", "Meridian"))
@@ -458,6 +466,35 @@ class StoryTest(Fixture):
         self.assertEqual(len(self.said), 1)                                              # (the second waits for the fleet net's quiet)
         await self.step(mg.BULLETIN_GAP_S)
         self.assertEqual(len(self.said), 2)
+
+    async def test_while_the_guns_fire_the_bridge_hears_only_what_cannot_wait(self) -> None:
+        await self.arrived("astra", [("vigilant", 2)])
+        await self.arrived("mandate", [("styx", 2)])
+        self.assertTrue(self.m.real_fight)
+        self.said.clear()
+        self.m.say("battle_end", "Thule", "The battle at Thule is over.", ("astra",), 3)
+        await self.step(40)
+        self.assertEqual(self.said, [])                                                  # (it waits for the lull)
+        self.m.say("system_taken", "Cassia", "Cassia has fallen.", ("astra",), 3)
+        await self.step(40)
+        self.assertEqual(len(self.said), 1)                                              # (a fall cannot wait, and takes what waited with it)
+        self.assertIn("The battle at Thule is over", self.said[0])
+        self.assertIn("Cassia has fallen", self.said[0])
+
+    async def arrived(self, side: str, ships: list[tuple[str, int]]) -> Fleet:
+        f = put(self.m, side, "Aurelia", ships, name=f"{side} story")
+        await self.step(mg.PRESENT_DELAY_S + 20)
+        return f
+
+    async def test_the_end_of_the_war_is_told_once(self) -> None:
+        told: list[str] = []
+        self.glue.on_war_over = told.append
+        self.m._end_war("astra", "capital", "the Mandate's capital has fallen")
+        await self.step(3)
+        await self.step(3)
+        self.assertEqual(len(told), 1)
+        self.assertIn("the Mandate's capital has fallen", told[0])
+        self.assertIn("ASTRA has won", told[0])
 
     async def test_the_holo_table_is_drawn_again_every_so_often(self) -> None:
         await self.step(int(mg.HOLO_EVERY_S * 3) + 2)

@@ -460,6 +460,10 @@ class March:
         for f in self.fleets.values():
             if f.side == side and (f.id.lower() == ref.lower() or f.name.lower() == ref.lower()):
                 return f
+        head = ref.split()[0].strip(":,.;()").lower() if ref.split() else ""        # (the picture writes "F-M4 Interdiction Fleet Main Body": the id is the name's first word)
+        for f in self.fleets.values():
+            if f.side == side and f.id.lower() == head:
+                return f
         hits = [f for f in self.fleets.values() if f.side == side and ref.lower() in f.name.lower()]
         return hits[0] if len(hits) == 1 else None
 
@@ -1977,6 +1981,8 @@ class March:
         if not dest:
             return False, f"no system '{system}' in the March"
         here = self.aquila["where"]
+        if dest == here and not self.aquila["lane"]:
+            return False, f"the Aquila is at {dest} already: if you need something of her there, tell the Captain (tell_captain); this order is for sending her somewhere"
         if dest != here and self.hops(here, dest, "astra") >= 99:
             return False, f"no way through the Gates from {here} to {dest}"
         self.aquila_task = {"system": dest, "mission": (mission or "").strip()[:240], "why": (why or "").strip()[:240], "t": self.t}

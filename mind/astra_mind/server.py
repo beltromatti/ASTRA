@@ -278,6 +278,7 @@ class Mind:
             glue = MarchGlue(march, strategy, command=self._director_command, register_groups=self.director._register_groups, announce=self._march_news,
                              note=self.director.note, send_sector=self._send_sector, lang=lambda: self.lang)
             self.war.strategic = lambda side: strategy.field_brief(side, march.real_system)
+            glue.on_war_over = lambda text: asyncio.create_task(self.director._end_arc(text, self.lang, self._battle_state()))
             self.director.march = glue
             self.director.rourke = None if strategy.disabled else glue.rourke_reply
             self.march, self.strategy, self.march_glue = march, strategy, glue

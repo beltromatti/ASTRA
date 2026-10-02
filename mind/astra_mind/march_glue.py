@@ -38,8 +38,9 @@ MAX_REAL_SHIPS = 36             # warships the game plays at once (docs/SCALA.md
 GATE_WAIT_S = 90.0              # ... for this long, and then tries again
 GROUP_SHIPS = 8                 # ships in one battle group when the fleet has none of its own
 MAX_GROUPS = 4                  # battle groups in one beat (the game takes 40 ships, ten a group)
-GRACE_S = 900.0                 # a fleet the game's script was to bring that has not come this long after its time is the map's
+GRACE_S = 1800.0                # a fleet the game's script was to bring that has not come this long after its time is the map's
 RETRIES = 3
+LANE_TIMEOUT_S = 90.0           # a Gate lane lasts well under this: past it, with no lane in the game's Gate status, the Aquila has arrived
 BULLETIN_GAP_S = 25.0           # the fleet net does not report more often than this
 HOLO_EVERY_S = 10.0
 SAVE_EVERY_S = 60.0
@@ -115,7 +116,9 @@ class MarchGlue:
         self.opening: set[str] = set()                  # the fleets the game's opening brings in itself: the map leaves them to it until they show (or the grace is out)
         self.due: dict[str, float] = {}                 # contact id -> when the ship should have shown in the game's views by (a ship that never came is dropped)
         self.ff = False                                 # the war is being run without the Aquila: the game's state does not move it
-        self._pending: list[str] = []                   # bulletins for the bridge, waiting for the fleet net's quiet
+        self.on_war_over: Callable[[str], None] | None = None   # (text): the war has ended (a capital fell, a people's will is gone, an armistice): the story tells its end
+        self._over_told = False
+        self._pending: list[tuple[str, str]] = []       # bulletins for the bridge (kind, text), waiting for the fleet net's quiet
         self._last: float | None = None
         self._bul_seen = 0
         self._bul_t = -1e9
@@ -143,6 +146,7 @@ class MarchGlue:
             self.load()
         m.aquila_arrived(m.war.current if m.war.current in m.sys else "Aurelia")
         self.reset_real(keep_opening=new)
+        self._over_told = bool(m.over)                  # (a war that ended before is not told again)
         self.active = True
         self._last = None
         self._bul_seen = m.rcv["astra"]
@@ -187,6 +191,9 @@ class MarchGlue:
             self._adopt(state)
             if dt > 0.0:
                 m.run(dt)
+            if m.over and not self._over_told:
+                self._over_told = True
+                self._tell_the_end()
             self._bring_in()
             self._read_back(state)
             self._transit_again(now)
@@ -211,6 +218,8 @@ class MarchGlue:
             if dest and self.m.aquila["lane"] != dest:
                 log.info("the Aquila is in the Gate's lane to %s: the real simulation's fleets are the map's again", dest)
                 self.m.aquila_lane(dest)
+        elif self.m.aquila["lane"] and self.m.t - self.m.aquila["since"] > LANE_TIMEOUT_S:
+            self.m.war.arrived(self.m.aquila["lane"])             # (the lane is over and nobody said she arrived: she did)
         elif not self.m.real_system and not self.m.aquila["lane"]:
             self.m.aquila_arrived(self.m.war.current if self.m.war.current in self.m.sys else "Aurelia")
 
@@ -501,6 +510,19 @@ class MarchGlue:
                 return True
         return False
 
+    def _tell_the_end(self) -> None:
+        """The war of the March has ended: the story ends its last chapter with it (the finale is told from what really happened)."""
+        over = self.m.over
+        winner = {"astra": "ASTRA has won", "mandate": "the Mandate has won"}.get(over.get("winner", ""), "an armistice: neither side has won")
+        text = f"engagement over — the war of the Aurelia March is over: {over.get('why', '')} ({over.get('how', '')}; {winner})"
+        log.info("the war is over: %s", over)
+        self.note(f"THE WAR IS OVER: {over.get('why', '')}")
+        if self.on_war_over is not None:
+            try:
+                self.on_war_over(text)
+            except Exception:  # noqa: BLE001
+                log.exception("the end of the war could not be told")
+
     # ------------------------------------------------------------------------------------------------ Fleet's orders to the Aquila
     async def _task_aquila(self, system: str, mission: str) -> dict[str, Any]:
         """Fleet orders the Aquila to a system: Keeper Station tunes the Gate for the first jump of her way (the game takes one Gate at a time)."""
@@ -548,9 +570,11 @@ class MarchGlue:
         self._bul_seen = m.rcv["astra"]
         said = [e for e in news if self._worth_saying(e)]
         if said:
-            self._pending = (self._pending + [e.text["astra"] for e in said])[-4:]
-        if self._pending and now - self._bul_t >= BULLETIN_GAP_S and self.announce is not None:
-            text, self._pending = " / ".join(self._pending), []
+            self._pending = (self._pending + [(e.kind, e.text["astra"]) for e in said])[-4:]
+        # while the guns are firing the bridge hears only what cannot wait: a Gate cycling, a fall, the end of the war; the rest waits for the lull
+        urgent = any(k in ("wake", "system_taken", "war_over", "truce") for k, _ in self._pending)
+        if self._pending and now - self._bul_t >= BULLETIN_GAP_S and self.announce is not None and (urgent or not self.m.real_fight):
+            text, self._pending = " / ".join(t for _, t in self._pending), []
             self._bul_t = now
             self.stats["bulletins"] += 1
             asyncio.ensure_future(self.announce(text))
@@ -619,7 +643,7 @@ class MarchGlue:
                     if n % 3 == 0:
                         a.think()
                 n += 1
-                if n % 20 == 0:
+                if n % 4 == 0:
                     await asyncio.sleep(0)
             self.reset_real()
             m.real_system = m.aquila["where"]

@@ -542,10 +542,12 @@ class ReflexTest(unittest.TestCase):
         on a handful of seeds."""
         from bench import march_sim
         diffs = []
-        for seed in range(1, 9):
+        for seed in range(1, 17):
             row = march_sim.run_war(seed, 6, "none", 1.0, "sym", False)
             diffs.append(row["held"]["astra"] - row["held"]["mandate"])
-        self.assertLess(abs(statistics.mean(diffs)), 1.6)
+        # a side that was favoured would show as a mean far from zero in the units of its own spread (2.6 sigma: a one in a hundred chance for a fair world)
+        spread = statistics.pstdev(diffs) / (len(diffs) ** 0.5)
+        self.assertLess(abs(statistics.mean(diffs)), max(0.5, 2.6 * spread), diffs)
 
 
 if __name__ == "__main__":

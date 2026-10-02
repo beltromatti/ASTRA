@@ -144,11 +144,13 @@ NO_CHANGE = _fn("no_change", "You have read the picture and nothing needs changi
 
 TELL_CAPTAIN = _fn("tell_captain", "Rourke speaks to the Captain of the ASN Aquila over the fleet net: radio speech, one to three short sentences, in the Captain's language (names in "
                                    "English): what the Captain must know that he does not (a force seen, a Gate cycling, what Fleet is doing), an answer to what he said, a "
-                                   "decision. Speak when it helps him, not to fill the net.", {
+                                   "decision. He hears you while he fights: say a thing once and briefly; what your log shows you already told him you do not say again "
+                                   "unless it has changed. Speak when it helps him, not to fill the net.", {
     "text": {"type": "string"}, "tone": {"type": "string", "enum": ["calm", "measured", "dry", "grave", "warm", "urgent"]}}, ["text"])
 
-TASK_AQUILA = _fn("task_aquila", "Fleet's order to the Aquila: where she is wanted and what for. It is an order of the service: the Captain decides what to do with it, and the war goes on "
-                                "either way. Say it to him in `words` (radio speech, his language, one to three sentences); Keeper Station tunes the Gate for her.", {
+TASK_AQUILA = _fn("task_aquila", "Fleet's order to the Aquila to GO somewhere else and what for (not for what she does where she is: for that, tell the Captain). It is an order of the "
+                                "service: the Captain decides what to do with it, and the war goes on either way. Say it to him in `words` (radio speech, his language, one to three "
+                                "sentences); Keeper Station tunes the Gate for her.", {
     "system": {"type": "string", "description": "a system"}, "mission": {"type": "string", "description": "what she is to do there, concretely, one sentence in English"},
     "words": {"type": "string", "description": "what Rourke says to the Captain, in the Captain's language"},
     "why": {"type": "string"}}, ["system", "mission", "words"])
@@ -214,8 +216,9 @@ Home Fleet is the Senate's and leaves the capital only when the Senate is persua
 
 {tools}
 
-How you speak to the Captain (`tell_captain`): radio speech, short, calm and dry, in the Captain's language with names in English; only what is new to him or what he asked. When his
-words on the net are plainly for another ship's captain, or you have nothing to add, say nothing (`no_change`). Never mention AI, games or prompts."""
+How you speak to the Captain (`tell_captain`): radio speech, short, calm and dry, in the Captain's language with names in English; only what is new to him or what he asked: your log
+shows what you have already told him, and you do not tell him twice what has not changed. When his words on the net are plainly for another ship's captain, or you have nothing to
+add, say nothing (`no_change`). Never mention AI, games or prompts."""
 
 MANDATE_PERSONA = """You are {name}, {rank}, commanding the Kharon Mandate's Interdiction Fleet, from {ship}, with the Hall of the Ferried's authority to take the Gates of the Aurelia March.
 {bio}
@@ -550,7 +553,8 @@ class StrategicMinds:
                 rec["ok" if res.get("ok") else "failed"] += 1
                 batch.append((call, a, res))
 
-            comp = await models.chat(self.llm, ROLE, messages=msgs, tools=tools_for(side), tool_choice="auto", on_tool_call=on_call, **({"max_tokens": 360} if rnd else {}))
+            tools = [t for t in tools_for(side) if not (rnd and t["function"]["name"] == "assess")]          # (the second look decides: it does not ask again)
+            comp = await models.chat(self.llm, ROLE, messages=msgs, tools=tools, tool_choice="auto", on_tool_call=on_call, **({"max_tokens": 360} if rnd else {}))
             rec["rounds"] += 1
             self._count(rec, comp)
             if rnd == 0 and self.trace is not None:
