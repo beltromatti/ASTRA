@@ -403,6 +403,24 @@ def dash(b: Parts) -> None:
             a = 2 * math.pi * k / 12
             fine.box((math.cos(a) * 0.0125 - 0.0008, math.sin(a) * 0.0125 - 0.0008, 0.006), (math.cos(a) * 0.0125 + 0.0008, math.sin(a) * 0.0125 + 0.0008, 0.0145), L.STRUCT)
         stencil(em, "DIM", (0.0, 0.034, 0.0002), 0.0058, (0, 0, 1), (1, 0, 0), "ice_dim", tracking=0.004)
+    # ---- the hood's detail: steel frames along its two edges with their screws, a row of six round caution lamps at its rear edge, vent slots either side of the HUD, panel seams
+    for sd in (-1, 1):
+        with b.at(hood_frame(0.825, sd * 0.552)):
+            fine.box((-0.175, -0.016, -0.001), (0.175, 0.016, 0.0030), L.STRUCT)
+            for k in range(6):
+                hex_pad(em, -0.150 + k * 0.060, 0.0, 0.0031, 0.0048, (0, 0, 1), L.TRIM, up=(1, 0, 0))
+        with b.at(hood_frame(0.84, sd * 0.36)):
+            fine.box((-0.16, -0.0012, -0.001), (0.16, 0.0012, 0.0028), L.STRUCT)
+        with b.at(hood_frame(0.80, sd * 0.16)):
+            for k in range(5):
+                fine.box((-0.040 + k * 0.020 - 0.0045, -0.026, -0.001), (-0.040 + k * 0.020 + 0.0045, 0.026, 0.0016), L.DGLASS)
+            em.box((-0.052, -0.030, 0.0), (0.052, -0.0285, 0.0019), L.BRASS)
+            em.box((-0.052, 0.0285, 0.0), (0.052, 0.030, 0.0019), L.BRASS)
+    with b.at(hood_frame(0.662, 0.0)):
+        for k in range(6):
+            yy = -0.125 + k * 0.050
+            fine.cyl((0.0, yy, -0.002), (0.0, yy, 0.005), 0.0105, L.STRUCT, seg=14)
+            em.lamp_cyl((0.0, yy, 0.0045), (0.0, yy, 0.0062), 0.0072, ("amber", "green", "cyan", "amber", "green", "red")[k], L.LAMP_DIM, seg=12)
     # ---- the instrument face: a coaming round it (rails along the sides and the foot with a brass line), ribs between the zones, corner screws
     with b.at(face_frame(0.0, 0.0)):
         fb.box((-0.004, -0.570, -0.002), (0.010, 0.570, 0.020), L.STRUCT)
@@ -803,6 +821,11 @@ def exterior(b: Parts) -> None:
     fb.loft([_ring(*s) for s in NOSE], PLATE, caps=True, closed=True)
     ribbon(fine, [(x, 0.0, ztop(x) + 0.0007, top_half(x) - 0.03) for x in (0.95, 1.4, 2.2, 3.0)], 0.0014, L.RUBBER)
     ribbon(fine, [(x, 0.0, ztop(x) + 0.0010, 0.085) for x in (3.0, 3.6, 4.8, 5.62)], 0.0020, LIVERY)
+    for sd in (-1, 1):                                                                                   # dark service panels either side of the stripe
+        for (xa, xb) in ((3.15, 3.55), (3.85, 4.30), (4.50, 4.85)):
+            ya, yb = 0.115, min(top_half(xa), top_half(xb)) - 0.03
+            if yb - ya > 0.04:
+                ribbon(fine, [(xa, sd * (ya + yb) / 2, ztop(xa) + 0.0008, (yb - ya) / 2), (xb, sd * (ya + yb) / 2, ztop(xb) + 0.0008, (yb - ya) / 2)], 0.0014, FRAME)
     for x in (3.0, 3.6, 4.2, 4.8, 5.3):                                                                 # transverse seams across the top and down the shoulders
         hw = top_half(x)
         fine.box((x - 0.004, -hw, ztop(x) - 0.0005), (x + 0.004, hw, ztop(x) + 0.0015), FRAME)
