@@ -224,6 +224,132 @@ def cmd_cpp(a: argparse.Namespace) -> None:
         RESULTS.write_text(json.dumps(results, indent=1))
 
 
+# ------------------------------------------------------------------------------------------------ the abstract model on the same experiments
+def model_fleet(side: int, ships: list[tuple[str, int]], wings_: list[dict[str, Any]], n_groups: int, params) -> list:
+    """One side of an experiment as the model's units, with the craft the experiment's wings give its carriers (the first group's ship indices, as the scenario)."""
+    from astra_mind import march_battle as mb
+    out = mb.units(side, ships, None, params=params, fid=f"s{side}")
+    chunk = math.ceil(len(out) / n_groups)
+    first = out[:chunk]
+    for w in wings_:
+        idx = int(w.get("carrier", 0))
+        if idx < len(first) and first[idx].cls in ("acheron", "praetorian", "aquila"):
+            u = first[idx]
+            kind = w["kind"]
+            if kind == "fighter":
+                u.f += w["n"]
+            elif kind == "bomber":
+                u.b += w["n"]
+            else:
+                u.d += w["n"]
+    return out
+
+
+def run_model(exp: dict[str, Any], runs: int, params, seed: int = 1) -> list[dict[str, Any]]:
+    """`runs` battles of the model for an experiment, in the record format `pool` reads."""
+    import random
+    from astra_mind import march_battle as mb
+    rng = random.Random(seed)
+    rows = []
+    for _ in range(runs):
+        a = model_fleet(0, exp["astra"], exp["astra_wings"], exp["groups"], params)
+        m = model_fleet(1, exp["mandate"], exp["mandate_wings"], exp["groups"], params)
+        e = mb.fight(a, m, rng, params)
+        row: dict[str, Any] = {"t": e.t, "decided_s": e.t}
+        for side, us in (("astra", a), ("mandate", m)):
+            by: dict[str, dict[str, Any]] = {}
+            for u in us:
+                r = by.setdefault(u.cls, {"n": 0, "destroyed": 0, "gone": 0, "alive": 0, "dark": 0, "hull": []})
+                r["n"] += 1
+                if not u.alive:
+                    r["destroyed"] += 1
+                elif u.gone:
+                    r["gone"] += 1
+                    r["hull"].append(100.0 * u.hull_frac)
+                else:
+                    r["alive"] += 1
+                    r["hull"].append(100.0 * u.hull_frac)
+            row[side] = by
+            launched = sum(w["n"] for w in exp[side + "_wings"])
+            row[side + "_craft"] = {"launched": launched, "lost": launched - sum(u.f + u.b + u.d for u in us if u.alive)}
+        rows.append(row)
+    return rows
+
+
+def compare_line(name: str, cpp: dict[str, Any], mod: dict[str, Any]) -> str:
+    def side(p: dict[str, Any], s: str) -> str:
+        return ", ".join(f"{c[:4]} {x['left_mean']:.1f}" for c, x in p[s].items())
+    return (f"{name:26} edge C++ {cpp['edge_mean']:+5.2f}±{cpp['edge_sd']:.2f} model {mod['edge_mean']:+5.2f}±{mod['edge_sd']:.2f} | "
+            f"A wins C++ {cpp['astra_wins']:.2f} model {mod['astra_wins']:.2f}, M wins {cpp['mandate_wins']:.2f}/{mod['mandate_wins']:.2f} | "
+            f"decided {cpp['decided_mean']:4.0f}/{mod['decided_mean']:4.0f} | A[{side(cpp, 'astra')} / {side(mod, 'astra')}] M[{side(cpp, 'mandate')} / {side(mod, 'mandate')}]")
+
+
+def loss_of(cpp: dict[str, Any], mod: dict[str, Any]) -> float:
+    """How far the model is from the bench on one experiment: ships left per class, the edge, who wins, how long it takes, the craft."""
+    err = 0.0
+    for s in ("astra", "mandate"):
+        for c, x in cpp[s].items():
+            m = mod[s].get(c, {"left_mean": 0.0})
+            err += ((x["left_mean"] - m["left_mean"]) / max(1.0, x["n"]) ** 0.5) ** 2 * 1.0
+    err += ((cpp["edge_mean"] - mod["edge_mean"]) / 1.2) ** 2
+    err += ((cpp["astra_wins"] - mod["astra_wins"]) * 1.6) ** 2 + ((cpp["mandate_wins"] - mod["mandate_wins"]) * 1.6) ** 2
+    err += ((cpp["decided_mean"] - mod["decided_mean"]) / 140.0) ** 2 * 0.6
+    err += ((cpp["edge_sd"] - mod["edge_sd"]) / 1.5) ** 2 * 0.4
+    for s in ("astra", "mandate"):
+        if cpp[s + "_craft_lost"] or mod[s + "_craft_lost"]:
+            err += ((cpp[s + "_craft_lost"] - mod[s + "_craft_lost"]) / 8.0) ** 2 * 0.4
+    return err
+
+
+def cmd_model(a: argparse.Namespace) -> None:
+    sys.path.insert(0, str(ROOT / "mind"))
+    from astra_mind import march_battle as mb
+    params = mb.Params.load()
+    cpp = json.loads(RESULTS.read_text())
+    names = [n for n in (a.only.split(",") if a.only else list(cpp)) if n in cpp]
+    total = 0.0
+    for name in names:
+        mod = pool(run_model(EXPERIMENTS[name], a.runs, params))
+        total += loss_of(cpp[name], mod)
+        print(compare_line(name, cpp[name], mod))
+    print(f"loss {total:.3f} over {len(names)} experiments")
+
+
+def cmd_fit(a: argparse.Namespace) -> None:
+    """A random coordinate search of the model's constants: each round tries a change of one constant (or two) and keeps it if the loss over all the
+    experiments goes down (the same random draws every time, so that a change is judged on the model and not on luck)."""
+    sys.path.insert(0, str(ROOT / "mind"))
+    import random
+    from dataclasses import replace
+    from astra_mind import march_battle as mb
+    cpp = json.loads(RESULTS.read_text())
+    names = [n for n in cpp if n in EXPERIMENTS]
+    free = [n for n in a.free.split(",") if n]
+    params = mb.Params.load()
+
+    def total(p) -> float:
+        return sum(loss_of(cpp[n], pool(run_model(EXPERIMENTS[n], a.runs, p, seed=7))) for n in names)
+
+    best = total(params)
+    print(f"start loss {best:.3f}", flush=True)
+    rng = random.Random(a.seed)
+    for it in range(a.iters):
+        step = a.step * (1.0 - 0.75 * it / max(1, a.iters))                     # (the search narrows as it goes)
+        picks = rng.sample(free, 2 if rng.random() < 0.3 else 1)
+        change = {n: getattr(params, n) * math.exp(rng.gauss(0.0, step)) for n in picks}
+        trial = replace(params, **change)
+        loss = total(trial)
+        if loss < best:
+            best, params = loss, trial
+            print(f"  it {it:4}  " + "  ".join(f"{n} {getattr(params, n):.4f}" for n in picks) + f"   loss {best:.3f}", flush=True)
+    out = {"params": {f: getattr(params, f) for f in free}, "loss": best, "experiments": names, "runs": a.runs}
+    existing = json.loads(mb.CAL_FILE.read_text()) if mb.CAL_FILE.exists() else {"params": {}}
+    existing["params"].update(out["params"])
+    existing.update({"loss": best, "experiments": names, "fitted_with": "tools/march_calibrate.py fit"})
+    mb.CAL_FILE.write_text(json.dumps(existing, indent=1))
+    print(f"final loss {best:.3f}; written to {mb.CAL_FILE}")
+
+
 def cmd_list(_: argparse.Namespace) -> None:
     for name, e in EXPERIMENTS.items():
         print(f"{'*' if name in CORE else ' '} {name:26} ASTRA {e['astra']} {'+wings' if e['astra_wings'] else ''}  vs  Mandate {e['mandate']} {'+wings' if e['mandate_wings'] else ''}  ({e['groups']} groups)")
@@ -237,6 +363,19 @@ def main() -> None:
     p.add_argument("--seeds", type=int, default=24)
     p.add_argument("--seconds", type=float, default=0.0)
     p.set_defaults(fn=cmd_cpp)
+    p = sub.add_parser("model")
+    p.add_argument("--only", default="")
+    p.add_argument("--runs", type=int, default=200)
+    p.set_defaults(fn=cmd_model)
+    p = sub.add_parser("fit")
+    p.add_argument("--iters", type=int, default=300)
+    p.add_argument("--runs", type=int, default=60)
+    p.add_argument("--step", type=float, default=0.18)
+    p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--free", default="k_rail,k_laser,hull_w,shield_w,shield_leak,msl_frac,msl_dmg,pd_per_channel,ow,approach0,approach_per_ship,sigma_battle,sigma_step,"
+                                     "ret_bold,ret_steady,ret_cautious,flee_base_s,flee_turn,flee_exposure,ramp_s,f_dps,b_dps,air_kill,air_pd,"
+                                     "p_praetorian,p_vigilant,p_acheron,p_lethe,h_praetorian,h_vigilant,h_acheron,h_lethe")
+    p.set_defaults(fn=cmd_fit)
     p = sub.add_parser("list")
     p.set_defaults(fn=cmd_list)
     a = ap.parse_args()
