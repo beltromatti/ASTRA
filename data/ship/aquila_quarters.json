@@ -19,5 +19,6 @@
   "galley": {"x0": -0.3, "x1": -0.95, "y0": 1.4, "y1": 4.55},
   "map_screen": {"y0": -3.05, "y1": -0.95, "zc": 1.75},
   "model_pedestal": {"x": -5.6, "y": 4.15},
-  "port_block": {"x0": -21.0, "x1": -25.8, "y0": -8.2, "y1": -1.0, "note": "the housing of the bridge lift, behind the port corridor's end"}
+  "port_block": {"x0": -21.0, "x1": -25.8, "y0": -8.2, "y1": -1.0, "note": "the housing of the bridge lift, behind the port corridor's end",
+                 "mouth": {"y0": -5.5, "y1": -2.3, "z0": 0.0, "z1": 2.5, "note": "the corridor's clear opening, cut out of the block's fore face (x -21.0): the corridor runs into the housing"}}
 }
