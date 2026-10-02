@@ -88,7 +88,8 @@ Dalla radice del progetto:
    delle etichette e dei decori in `art/_cache/bridge3`; `--atlas-only` per rifare solo l'atlante). **Serve a tutti i generatori
    sotto** (leggono `labels.json` e `decor.json`).
 2. `blender -b --factory-startup --python-exit-code 1 -P art/blender/bridge_v3.py -- art/export/bridge_v3`
-3. `tools/ue.py pyfile tools/ue_scripts/make_bridge_v3_materials.py` (anche `MI_BRG3_Navy`, `MI_BRG3_Brass`, `MI_BRG3_Decor`)
+3. `tools/ue.py pyfile tools/ue_scripts/make_bridge_v3_materials.py` (anche `MI_BRG3_Navy`, `MI_BRG3_Brass`, `MI_BRG3_Decor` e, se mancano,
+   `MI_SHIP_Leaf` / `Soil` / `CrateBlue` per le piante delle console)
 4. `tools/ue.py pyfile tools/ue_scripts/build_bridge.py` (importa e piazza la plancia)
 5. Corridoi: `blender … -P art/blender/kit_corridor.py -- art/export/kit_corridor`, poi `tools/ue_scripts/import_kit.py` con i valori
    di serie; poi (ri)esportare `SM_SHIP_BridgeCorridorDoor` da `ship_rooms_bridge.corridor_door`.
