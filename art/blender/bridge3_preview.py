@@ -312,6 +312,22 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
             pbr(m.name, (0.3, 0.3, 0.3))
 
 
+def make_cabin_materials() -> None:
+    """The Captain's quarters' instances (tools/ue_scripts/build_quarters.py) and the medbay's linen, as the preview knows them: dark walnut, a navy carpet, a warm wall paint,
+    cognac leather, the pillow linen and the navy blanket, red book cloth, the white strips of the cabin's light, the two screens."""
+    pbr("MI_QTR_Wood", (1.0, 0.92, 0.86), "WoodDark", 1.2, (0.28, 0.46), 0.0, 0.0, 1.0, 0.6)
+    pbr("MI_QTR_Carpet", (0.17, 0.23, 0.44), "Carpet", 2.5, (0.85, 0.96), 0.0, 0.0, 1.0, 0.8)
+    pbr("MI_QTR_Wall", (0.58, 0.54, 0.48), "PanelPaint", 1.0, (0.5, 0.65), 0.0, 0.0, 0.3, 0.3)
+    pbr("MI_QTR_Leather", (0.40, 0.17, 0.075), "LeatherBlack", 2.0, (0.30, 0.50), 0.0, 0.0, 0.9, 0.7, coat=0.12, coat_rough=0.3)
+    pbr("MI_MED_Linen", (0.8, 0.82, 0.84), "Cotton", 3.0, (0.72, 0.9), 0.0, 0.0, 0.4, 0.7)
+    pbr("MI_MED_Blanket", (0.1, 0.16, 0.27), "Linen", 2.5, (0.8, 0.95), 0.0, 0.0, 0.5, 0.9)
+    pbr("MI_MED_Red", (0.42, 0.03, 0.025), None, 1.0, (0.3, 0.42), 0.0, 0.0, 0.0, 0.2)
+    pbr("MI_ASTRA_Leather", (0.05, 0.055, 0.075), "LeatherBlack", 2.0, (0.3, 0.5), 0.0, 0.0, 0.9, 0.7, coat=0.15, coat_rough=0.25)
+    emissive("MI_ASTRA_Light", (1.0, 0.92, 0.78), 5.0)
+    for slot, page in (("MI_QTR_Map", "Quarters_Map"), ("MI_QTR_Log", "Quarters_Log")):
+        screen_mat(slot, page, strength=2.2)
+
+
 # ------------------------------------------------------------------------------------------------------------- scene
 def clear_scene_lights_and_cameras() -> None:
     for o in list(bpy.context.scene.objects):

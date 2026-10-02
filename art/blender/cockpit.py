@@ -33,6 +33,7 @@ import astra_bpy as A  # noqa: E402
 import bridge3_controls as CT  # noqa: E402
 import bridge3_lib as L  # noqa: E402
 from bridge3_lib import FB, Parts, Rx, Ry, Rz, T, lerp  # noqa: E402
+from bridge3_marks import emblem  # noqa: E402
 
 PLATE, FRAME, LIVERY = "MI_HULL_A_Plate", "MI_HULL_A_Frame", "MI_HULL_A_Livery"
 NAME = "SM_CRAFT_ASTRA_Falcon_Cockpit"
@@ -794,32 +795,6 @@ def hatch(b: Parts, origin, x_axis, n_axis, length: float, width: float, screws:
             xs = -h / 2 + bw / 2 + (h - bw) * k / max(1, screws - 1)
             for ys in (-w / 2 + bw / 2, w / 2 - bw / 2):
                 hex_pad(em, xs, ys, 0.0032, 0.0036, (0, 0, 1), L.TRIM, up=(1, 0, 0))
-
-
-def annulus(fb: FB, c, r0: float, r1: float, mat: str, facing, up, seg: int = 36) -> None:
-    """A flat ring (r0 inside, r1 outside) round `c`, lying on the skin with its face towards `facing`."""
-    f = Vector(facing).normalized()
-    u = Vector(up) - f * Vector(up).dot(f)
-    u = u.normalized()
-    r_ = f.cross(u)
-    for k in range(seg):
-        a0, a1 = 2 * math.pi * k / seg, 2 * math.pi * (k + 1) / seg
-        pts = [tuple(Vector(c) + (r_ * math.cos(a) + u * math.sin(a)) * r) for (a, r) in ((a0, r0), (a1, r0), (a1, r1), (a0, r1))]
-        fb.face(pts, mat, tuple(f))
-
-
-def emblem(fb: FB, c, r: float, mat: str, facing, up) -> None:
-    """The ASTRA Navy roundel painted on the skin: a double ring, a four-point compass star (long N-S, short E-W)."""
-    f = Vector(facing).normalized()
-    u = Vector(up) - f * Vector(up).dot(f)
-    u = u.normalized()
-    r_ = f.cross(u)
-    c = Vector(c)
-    annulus(fb, c, r * 0.90, r, mat, facing, up)
-    annulus(fb, c, r * 0.80, r * 0.84, mat, facing, up)
-    for (ln, wd, d) in ((0.74, 0.085, u), (0.74, 0.085, -u), (0.50, 0.085, r_), (0.50, 0.085, -r_)):
-        side = f.cross(d)
-        fb.face([tuple(c + d * r * 0.10 + side * r * wd), tuple(c + d * r * ln), tuple(c + d * r * 0.10 - side * r * wd), tuple(c - d * r * 0.0)], mat, tuple(f))
 
 
 def exterior(b: Parts) -> None:
