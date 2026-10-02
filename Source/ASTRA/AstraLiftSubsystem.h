@@ -176,6 +176,8 @@ private:
 	FAstraLiftNetwork Net;
 	TFuture<TSharedPtr<FAstraLiftNetwork>> NetFuture;
 	UPROPERTY() TArray<FAstraLiftRuntime> Run;
+	/** Draw only the lifts near the Captain (astra.lifts.cull_m): the rest stay in the world, hidden. */
+	void Cull();
 	bool bBuilt = false;
 	int32 NextToBuild = 0;
 	TArray<int32> BuildOrder;
