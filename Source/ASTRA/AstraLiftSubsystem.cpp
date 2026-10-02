@@ -366,6 +366,23 @@ void UAstraLiftSubsystem::UpdateCaptain()
 			MenuClose();
 		}
 	}
+	// in a car standing at a landing with its doors shut, the Captain walks up to them: they open for him, as a car's doors do for whoever steps to them
+	// (the dwell after an arrival is a few seconds: a man who looked at the car's screen found himself shut in)
+	if (InLine != INDEX_NONE && !Net.Lines[InLine].bShuttle)
+	{
+		AAstraLiftCar* Car = Run[InLine].Car;
+		const int32 Stop = Car->Brain.AtLanding();
+		if (Stop != INDEX_NONE && Car->Brain.State() == FAstraLiftBrain::EState::Idle && Car->Brain.DoorOpen() <= 0.f && Car->Brain.Quiet())
+		{
+			const FVector Local = Car->ToLocal(At);
+			const FVector Push = P->GetLastMovementInputVector();
+			if (Local.X > Car->Spec().D * 0.5f - 75.f && FVector::DotProduct(Push.GetSafeNormal2D(), Car->GetActorForwardVector()) > 0.5f)
+			{
+				FString Unused;
+				CallAt(InLine, Stop, Unused);
+			}
+		}
+	}
 }
 
 // =================================================================================================================================== hooks
