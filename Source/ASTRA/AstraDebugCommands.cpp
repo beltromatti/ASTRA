@@ -4,6 +4,8 @@
 //
 //   astra.debug.under      the ray down from the Captain's feet (2 m)
 //   astra.debug.lookat     the ray from the eye along the view (50 m)
+//   astra.debug.hide_material <part of a material's name>   everything drawn with such a material is hidden ("" shows it again): what a
+//                          material costs, A/B with tools/perf_ab.py ("astra.debug.hide_material" "" MI_ASTRA_Glass)
 
 #include "ASTRA.h"
 #include "Components/PrimitiveComponent.h"
@@ -15,6 +17,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
+#include "UObject/UObjectIterator.h"
 
 namespace
 {
@@ -51,6 +55,51 @@ namespace
 			const FVector Feet = C->GetActorLocation() - FVector(0.f, 0.f, C->GetDefaultHalfHeight() - 20.f);
 			AstraDebugRay(W, Feet, Feet - FVector(0.f, 0.f, 200.f), TEXT("under the Captain"));
 		}));
+
+	// the components a material name hid, to show them again (the last call's)
+	TArray<TWeakObjectPtr<UPrimitiveComponent>> GHiddenByMaterial;
+
+	void AstraHideMaterial(IConsoleVariable* Var)
+	{
+		for (const TWeakObjectPtr<UPrimitiveComponent>& C : GHiddenByMaterial)
+		{
+			if (C.IsValid())
+			{
+				C->SetHiddenInGame(false);
+			}
+		}
+		GHiddenByMaterial.Reset();
+		const FString Part = Var ? Var->GetString() : FString();
+		if (Part.IsEmpty())
+		{
+			return;
+		}
+		int32 N = 0;
+		for (TObjectIterator<UPrimitiveComponent> It; It; ++It)
+		{
+			UPrimitiveComponent* C = *It;
+			if (!C->GetWorld() || !C->GetWorld()->IsGameWorld() || C->bHiddenInGame || !C->IsRegistered())
+			{
+				continue;
+			}
+			for (int32 M = 0; M < C->GetNumMaterials(); ++M)
+			{
+				const UMaterialInterface* Mat = C->GetMaterial(M);
+				if (Mat && (Mat->GetName().Contains(Part) || (Mat->GetMaterial() && Mat->GetMaterial()->GetName().Contains(Part))))
+				{
+					C->SetHiddenInGame(true);
+					GHiddenByMaterial.Add(C);
+					++N;
+					break;
+				}
+			}
+		}
+		UE_LOG(LogASTRA, Log, TEXT("[Debug] %d components drawn with a material named like '%s' are hidden"), N, *Part);
+	}
+
+	TAutoConsoleVariable<FString> CVarHideMaterial(TEXT("astra.debug.hide_material"), TEXT(""),
+		TEXT("Hide everything drawn with a material whose name (or its parent's) contains this text; empty shows it again (for measuring a material's cost)"),
+		FConsoleVariableDelegate::CreateStatic(&AstraHideMaterial));
 
 	FAutoConsoleCommandWithWorld CmdLookAt(TEXT("astra.debug.lookat"), TEXT("What the Captain looks at: the ray from the eye along the view, 50 m"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
