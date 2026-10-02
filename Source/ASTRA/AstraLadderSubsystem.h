@@ -31,6 +31,9 @@ public:
 	/** The walking input while the Captain climbs (Y forward +1 up, back -1 down): the character hands it here instead of walking. False when he is not on a ladder. */
 	bool ClimbInput(const APawn* Pawn, const FVector2D& Axis);
 	bool IsClimbing(const APawn* Pawn) const;
+	/** TELETRASPORTO: the Captain leaves the ladder some other way (the transporter takes him from it): the ladder lets go of him and walking is back, in the same frame as the
+	 *  move (it would put him back on the rungs). False when he was not climbing. */
+	bool Release(const APawn* Pawn);
 	int32 NumLadders() const { return Ladders.Num(); }
 	/** A line for the log and the console: the ladders known, the one in use and where the climber is. */
 	FString Describe() const;
