@@ -45,6 +45,7 @@ STANCES = ("bold", "steady", "cautious")
 ORDERS = ("hold", "move", "defend", "assault", "raid", "blockade", "reinforce", "escort", "withdraw", "recon", "refit")
 SIDE_WORD = {"astra": "ASTRA", "mandate": "Mandate"}
 STEP_S = 5.0
+STRAGGLERS = "stragglers of "                                   # the note of a small fleet made of ships that jumped out of the real simulation's system
 
 
 def other(side: str) -> str:
@@ -1540,6 +1541,7 @@ class March:
             return
         s = f.side
         f.ships.remove(ship)
+        ship.cid = ""                                                       # (it is not in the real simulation any more, whatever became of it)
         if how == "destroyed":
             pts = CLASSES[ship.cls]["cost"] or 3.6
             self.score[s]["lost_points"] += pts
@@ -1556,12 +1558,12 @@ class March:
                 tally["capital"] = True
         else:
             where = f.where or self.real_system
-            mine = [g for g in self.fleets_at(where, s) if g.status == "ready" and g.id != f.id and g.note == f"stragglers of {f.id}" and g.depart_at > self.t]
+            mine = [g for g in self.fleets_at(where, s) if g.note == f"{STRAGGLERS}{f.id}" and g.id != f.id and g.depart_at > self.t]
             if mine:
                 mine[0].ships.append(ship)
             else:
                 nf = Fleet(self.new_fleet_id(s), s, f"{f.name} (survivors)", [ship], where, f.supply, max(0.05, f.morale - 0.15), Order("hold", where, "cautious", False, "auto", "", self.t),
-                           commander=dict(f.commander), status="ready", arrived_t=self.t, origin=f.origin, note=f"stragglers of {f.id}")
+                           commander=dict(f.commander), status="ready", arrived_t=self.t, origin=f.origin, note=f"{STRAGGLERS}{f.id}")
                 self.fleets[nf.id] = nf
                 self._retreat(nf, where)
                 nf.depart_at = self.t + 20.0                                 # (the others that jump out in the next moments join it)
@@ -1569,8 +1571,9 @@ class March:
             self._remove_fleet(f)
         self.dirty = True
 
-    def real_over(self, system: str, result: str = "") -> None:
-        """The real fight is over: the war is told (what each side lost there, who holds the field) and the tally starts again."""
+    def real_over(self, system: str, result: str = "") -> int:
+        """The real fight is over: the war is told (what each side lost there, who holds the field) and the tally starts again. Returns how much it weighs (3: a major
+        battle)."""
         tally, self.real_tally = self.real_tally, {s: {"lost": 0, "names": [], "points": 0.0} for s in SIDES}
         left = {s: sum(f.n for f in self.fleets_at(system, s) if f.status == "real") for s in SIDES}
         winner = "astra" if left["astra"] and not left["mandate"] else "mandate" if left["mandate"] and not left["astra"] else ""
@@ -1584,6 +1587,7 @@ class March:
         weight = 3 if (tally["astra"].get("capital") or tally["mandate"].get("capital") or tally["astra"]["lost"] + tally["mandate"]["lost"] >= 8 or self.value(system) >= 7) else 2
         self.say("battle_end", system, txt, SIDES, weight, (), winner=winner, lost={s: tally[s]["lost"] for s in SIDES}, names={s: tally[s]["names"] for s in SIDES})
         self.real_fight = False
+        return weight
 
     def release_real(self) -> None:
         """The Aquila leaves (or the real simulation is gone): the fleets it played are the map's again, where they stand, with the hulls they have."""
