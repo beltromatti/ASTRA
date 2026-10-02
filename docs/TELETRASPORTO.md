@@ -100,16 +100,22 @@ normale con la y in su il piano ha la x verso la SINISTRA di chi guarda).
 ## 6. I banchi e i risultati
 
 - `tools/transport.py run --scenario all` (senza finestra, `-nullrhi`, ~15-25 s): **67 prove delle regole** (le facce a entrambe le estremità, la portata, il disturbo lungo la linea, la
-  manovra, il Gate, lo stato della sala, l'aggancio, gli arrivi) e **37 del mondo** in un mondo senza grafica con la pianta vera, i 560 di VITA, il modello dei danni e la
+  manovra, il Gate, lo stato della sala, l'aggancio, gli arrivi) e **38 del mondo** in un mondo senza grafica con la pianta vera (la v2 di NAVE-3, 3234 compartimenti), i 560 di VITA, il modello dei danni e la
   battaglia: ordini dentro la nave, il ciclo con le sue fasi, la coda, l'aggancio tenuto fino alla parola, l'annullo a metà, la finestra scudi (giù per il ciclo, su dopo), una
   squadra su una nave alleata e il richiamo, un abbordaggio su una nave senza scudi, la discesa sul pianeta e il ritorno, un carico, la manovra dell'Aquila (la scheda mostra virata e
-  spinta, una spinta forte nega il fascio con `[motion]`), i disturbatori (la prova si fa solo se in plancia ce n'è uno: le regole coprono la strobo), la stanza senza energia.
-  **104/104.** (Il processo del commandlet esce con codice 1 perché nella copia di lavoro i `.uasset` sono ancora puntatori LFS e il motore conta i loro errori di caricamento: il
+  spinta, una spinta forte nega il fascio con `[motion]`), i disturbatori (la prova si fa solo se in plancia ce n'è uno: le regole coprono la strobo), la stanza senza energia, e il
+  costo (il tick sotto il millisecondo; la scheda per la mente, una volta al secondo, 0,08 ms con i contatti di una battaglia). Le pedane si confrontano con le postazioni di
+  pedana della pianta (le due «visitor» di NAVE-3 stanno sulle pedane 1 e 4), non con numeri fissi: la sala è passata da x −20..4 a x 0..24 nella pianta v2 e le pedane l'hanno seguita.
+  **105/105.** (Il processo del commandlet esce con codice 1 perché nella copia di lavoro i `.uasset` sono ancora puntatori LFS e il motore conta i loro errori di caricamento: il
   verdetto è la riga `VERDICT: PASS`, e `tools/transport.py` lo legge da lì.)
 - `tools/transport.py run --scenario shapes`: sonda sulle forme base del motore, lette dai vertici (il piano è 100 × 100 cm in XY con la normale in su, cilindro, sfera e cubo ±50 cm):
   conferma le ipotesi dello schermo a parete e delle colonne di luce.
-- `mind/bench/transporter_unit.py` (modello finto, anche sulle carte vere scritte dal gioco): **34 prove**.
-- `mind/bench/transporter_live.py` (modello vero): 8 scene, **~0,002 $ a giro**; costo totale dei miei giri: ~0,010 $.
+- `mind/bench/transporter_unit.py` (modello finto, anche sulle carte vere scritte dal gioco): **34 prove**. Tutta la mente offline dopo l'unione con main (flight, lift, marines, npc,
+  stations, war, transporter: `python -m unittest bench.flight_server bench.flight_unit bench.lift_server bench.lift_unit bench.marines_server bench.marines_unit bench.npc_server
+  bench.npc_unit bench.stations_server bench.stations_unit bench.transporter_unit bench.war_director_unit bench.war_minds_unit bench.war_server`): **412 prove verdi**.
+- `mind/bench/transporter_live.py` (modello vero, il Capo da sola): 8 scene, **~0,002 $ a giro**. `mind/bench/transporter_crew_live.py` (modello vero, **tutta la catena**: il Capitano
+  parla in plancia, Operations o l'XO passano l'ordine, il Capo lo esegue sulla console o dice perché no; la console risponde dalla carta vera): 6 scene, **~0,006 $ a scena**.
+  Costo totale dei miei giri dal vivo: ~0,044 $.
 - `tools/art/transporter_fx_check.py`: i 5 shader compilano con il DXC del motore e lo script dei materiali è controllato contro lo stub dell'editor (nessun editor).
 - `tools/transport.py check`: la pianta e il kit tornano (13/13).
 
@@ -132,17 +138,25 @@ Comandi: `astra.xport.send <chi> <dove> [from=…] [hold] [window] [hazard] [wea
 
 ## 8. Ganci in file degli altri (da rivedere nel merge)
 
-Un solo commit (i ganci), tutti piccoli e marcati `TELETRASPORTO`: **VITA** (`AstraLifeSim.*`, `AstraLifeSubsystem.*`: persone «in transito» o «fuori nave» non si simulano e non si trovano
-a bordo, un corpo mostrato subito per chi arriva, il localizzatore sa chi non c'è); **nave** (`AstraShipSubsystem.cpp`: il comando `transport*`, la scheda in `ship_state`, i 40 MW del
-ciclo tolti agli scudi in `PowerFactor`); **battaglia** (`AstraBattleSubsystem.*`: `GateDistanceKm()`).
+Tutti piccoli e marcati `TELETRASPORTO`: **VITA** (`AstraLifeSim.*`, `AstraLifeSubsystem.*`: persone «in transito» o «fuori nave» non si simulano e non si trovano a bordo, un corpo
+mostrato subito per chi arriva, il localizzatore sa chi non c'è); **nave** (`AstraShipSubsystem.cpp`: il comando `transport*`, la scheda in `ship_state`, i 40 MW del ciclo tolti agli
+scudi in `PowerFactor`); **battaglia** (`AstraBattleSubsystem.*`: `GateDistanceKm()`); **mente** (`models.py` il ruolo `transporter`, `tools.py` lo strumento `transporter` e il filtro
+quando la nave non ha la sala, `crew.py` la regola e la riga della sala in plancia, `context.py` il parlante `xfer_chief`, `server.py` il Capo come quinta rete accanto a PNG, volo
+e marine, `initiative.py` la scheda del Capo fuori dal prompt dell'ispezione); **scale** (`AstraLadderSubsystem.*`: `Release(Pawn)`, il Capitano che sale una scala e viene teletrasportato
+resta libero). L'unione con main (ABBORDAGGI, ascensori, la pianta v2) ha avuto conflitti solo dove le due parti aggiungevano accanto: i marine presi da una lotta (`bCommandeered`) e
+le persone in transito o fuori nave non hanno corpo né passi (la condizione ha tutte e tre); la scheda ha insieme `transporter` e `boarding`; il server tiene la rete dei marine e il
+Capo; `tools_for(state, ctx)` tiene il filtro della sala e la vettura dell'ascensore. Chi i marine hanno preso per una lotta non si teletrasporta e non entra nelle squadre (`[subject]`).
 
 ## 9. Limiti noti e richieste
 
 - Gli **effetti non si sono potuti vedere** (nessun editor né GPU nel mio lavoro): shader e script sono controllati offline, la geometria e le luminosità no. `astra.xport.gain` e
   le costanti in `AstraTransportFx.cpp` sono la manopola. La riga dello schermo a parete (`AstraTransportConsole.cpp`) è un layout calcolato a mano: verificarlo con `astra.xport.dump`.
-- Il Capo è dietro gli operatori (stand 8,4; 8,6); **richiesta a NAVE-3**: mettere `"station": "xfer_chief"` su una postazione `stand` della stanza se la si vuole altrove (il
-  sottosistema la usa se c'è) — e una postazione per il Capo vero al posto del «transporter_chief» seduto alla scrivania, che resta un anonimo di VITA.
+- Il Capo è dietro gli operatori (stand 8,4; 8,6, cioè fra le due sedie e la console). **Richiesta a NAVE-3 / al lead, la più importante per la sala**: nella pianta v2 la stanza ha
+  ancora la postazione `d5_transporter_B1.s0` (`transporter_chief`, seduta alla scrivania in fondo, a 14 m dalla piattaforma), che VITA riempie con una persona anonima: la sala avrebbe
+  due «capi» e il Capitano che dice «Chief» potrebbe essere sentito da tutte e due (la mente dei PNG e la mia). Mettere `"station": "xfer_chief"` su `s0` (VITA lascia libere le
+  postazioni con un attore proprio, come per i tecnici di plancia) e il Capo è solo lei, in piedi alla console; una postazione `stand` con quel nome la sposta altrove.
 - Chi è fuori nave **non parla** (sulla superficie gli NPC trasportati non hanno un corpo né una mente: serve ABBORDAGGI/VITA); i carichi sono casse a terra, senza fisica.
+- Dove il Capitano sta salendo una scala di Jefferies il fascio lo prende dalla scala (`Release`): dematerializza sui pioli e riappare a destinazione, mai appeso.
 - Il Capitano **non può essere portato su un'altra nave** (nessun interno in libreria) né mentre è in un Falcon; se l'Aquila attraversa un Gate col Capitano a terra, il gioco
   non lo impedisce (richiesta al lead: il transito dovrebbe rifiutare con qualcuno fuori nave, o richiamarlo prima).
 - Una pedana in più, il carico oltre i 2 t, i trasporti fra due navi: fuori dal brief.
