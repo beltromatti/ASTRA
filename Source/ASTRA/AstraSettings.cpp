@@ -23,7 +23,7 @@ namespace
 	const FLinearColor Ink(0.86f, 0.9f, 0.95f);
 	const FLinearColor Dim(0.52f, 0.58f, 0.66f);
 	const FLinearColor Accent(0.42f, 0.78f, 1.f);
-	const TCHAR* Rows[] = {TEXT("GRAPHICS"), TEXT("IMAGE"), TEXT("FRAME RATE"), TEXT("MUSIC"), TEXT("VOICES"), TEXT("SUBTITLES"), TEXT("BACK")};
+	const TCHAR* Rows[] = {TEXT("GRAPHICS"), TEXT("IMAGE"), TEXT("RETINA"), TEXT("FRAME RATE"), TEXT("MUSIC"), TEXT("VOICES"), TEXT("SUBTITLES"), TEXT("BACK")};
 	constexpr int32 NumRows = UE_ARRAY_COUNT(Rows);
 
 	void SetCVar(const TCHAR* Name, float Value)
@@ -45,6 +45,7 @@ FAstraSettings& FAstraSettings::Get()
 		bLoaded = true;
 		GConfig->GetInt(SettingsSection, TEXT("Quality"), S.Quality, GGameUserSettingsIni);
 		GConfig->GetInt(SettingsSection, TEXT("Image"), S.Image, GGameUserSettingsIni);
+		GConfig->GetBool(SettingsSection, TEXT("Retina"), S.bRetina, GGameUserSettingsIni);
 		GConfig->GetInt(SettingsSection, TEXT("FrameRate"), S.FrameRate, GGameUserSettingsIni);
 		GConfig->GetFloat(SettingsSection, TEXT("Music"), S.Music, GGameUserSettingsIni);
 		GConfig->GetFloat(SettingsSection, TEXT("Voices"), S.Voices, GGameUserSettingsIni);
@@ -66,6 +67,7 @@ void FAstraSettings::Save() const
 	}
 	GConfig->SetInt(SettingsSection, TEXT("Quality"), Quality, GGameUserSettingsIni);
 	GConfig->SetInt(SettingsSection, TEXT("Image"), Image, GGameUserSettingsIni);
+	GConfig->SetBool(SettingsSection, TEXT("Retina"), bRetina, GGameUserSettingsIni);
 	GConfig->SetInt(SettingsSection, TEXT("FrameRate"), FrameRate, GGameUserSettingsIni);
 	GConfig->SetFloat(SettingsSection, TEXT("Music"), Music, GGameUserSettingsIni);
 	GConfig->SetFloat(SettingsSection, TEXT("Voices"), Voices, GGameUserSettingsIni);
@@ -76,6 +78,11 @@ void FAstraSettings::Save() const
 float FAstraSettings::FloorOf(int32 InImage)
 {
 	return InImage == 0 ? 70.f : (InImage == 1 ? 55.f : 40.f);
+}
+
+float FAstraSettings::EngineFloor() const
+{
+	return bRetina ? FMath::Max(33.f, FloorOf(Image) * 0.5f) : FloorOf(Image);
 }
 
 void FAstraSettings::Apply() const
@@ -92,9 +99,12 @@ void FAstraSettings::Apply() const
 	}
 	// the dynamic resolution keeps the frame inside its time: at 30 frames a second it has twice the time for each image
 	SetCVar(TEXT("r.DynamicRes.FrameTimeBudget"), 1000.f / (float)FrameRate);
-	SetCVar(TEXT("r.DynamicRes.MinScreenPercentage"), FloorOf(Image));
-	UE_LOG(LogASTRA, Log, TEXT("[Settings] quality %d, image floor %.0f%%, %d fps, music %.0f%%, voices %.0f%%, subtitles %s"), Quality,
-	       FloorOf(Image), FrameRate, Music * 100.f, Voices * 100.f, bSubtitles ? TEXT("on") : TEXT("off"));
+	// the upscaler's output: the display's own pixels, or (0) the engine's default, half of them on a Retina screen, doubled by the window
+	// (the user saw the doubled image as pixelated: a 1710 x 1107 picture spread over a 3420 x 2214 panel)
+	SetCVar(TEXT("r.SecondaryScreenPercentage.GameViewport"), bRetina ? 100.f : 0.f);
+	SetCVar(TEXT("r.DynamicRes.MinScreenPercentage"), EngineFloor());
+	UE_LOG(LogASTRA, Log, TEXT("[Settings] quality %d, image floor %.0f%%, retina output %s, %d fps, music %.0f%%, voices %.0f%%, subtitles %s"), Quality,
+	       EngineFloor(), bRetina ? TEXT("on") : TEXT("off"), FrameRate, Music * 100.f, Voices * 100.f, bSubtitles ? TEXT("on") : TEXT("off"));
 }
 
 // --------------------------------------------------------------------------------------------------- the page
@@ -202,10 +212,11 @@ FString SAstraSettingsPage::ValueOf(int32 Row) const
 		return Q >= 0 && Q <= 3 ? Quality[Q] : TEXT("CUSTOM");
 	}
 	case 1: return Image[S.Image];
-	case 2: return FString::Printf(TEXT("%d"), S.FrameRate);
-	case 3: return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(S.Music * 100.f));
-	case 4: return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(S.Voices * 100.f));
-	case 5: return S.bSubtitles ? TEXT("ON") : TEXT("OFF");
+	case 2: return S.bRetina ? TEXT("FULL") : TEXT("HALF");
+	case 3: return FString::Printf(TEXT("%d"), S.FrameRate);
+	case 4: return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(S.Music * 100.f));
+	case 5: return FString::Printf(TEXT("%d%%"), FMath::RoundToInt(S.Voices * 100.f));
+	case 6: return S.bSubtitles ? TEXT("ON") : TEXT("OFF");
 	default: return FString();
 	}
 }
@@ -219,7 +230,9 @@ FString SAstraSettingsPage::NoteOf(int32 Row) const
 	case 1: return S.Image == 0 ? TEXT("the image never drops below 70% resolution: the sharpest, and in a heavy battle the frame rate may fall")
 	             : S.Image == 1 ? TEXT("never below 55% resolution: sharp, and smooth in most battles")
 	                            : TEXT("down to 40% resolution when the battle is heavy: the frame rate first");
-	case 2: return S.FrameRate == 30 ? TEXT("30 frames a second: twice the time for each image, much sharper and cooler on a fanless Mac")
+	case 2: return S.bRetina ? TEXT("the picture is rebuilt at your display's own pixels: the sharpest on a Retina Mac, a few milliseconds more")
+	                         : TEXT("half the display's pixels, doubled by the window: softer, the frame rate first");
+	case 3: return S.FrameRate == 30 ? TEXT("30 frames a second: twice the time for each image, much sharper and cooler on a fanless Mac")
 	                                 : TEXT("60 frames a second: the smoothest motion; the resolution adapts to keep it");
 	default: return FString();
 	}
@@ -241,10 +254,11 @@ void SAstraSettingsPage::Change(int32 Row, int32 Step)
 		break;
 	}
 	case 1: S.Image = (S.Image + Step + 3) % 3; break;
-	case 2: S.FrameRate = S.FrameRate == 60 ? 30 : 60; break;
-	case 3: S.Music = FMath::Fmod(FMath::RoundToFloat(S.Music * 10.f + Step + 11.f), 11.f) / 10.f; break;
-	case 4: S.Voices = FMath::Fmod(FMath::RoundToFloat(S.Voices * 10.f + Step + 11.f), 11.f) / 10.f; break;
-	case 5: S.bSubtitles = !S.bSubtitles; break;
+	case 2: S.bRetina = !S.bRetina; break;
+	case 3: S.FrameRate = S.FrameRate == 60 ? 30 : 60; break;
+	case 4: S.Music = FMath::Fmod(FMath::RoundToFloat(S.Music * 10.f + Step + 11.f), 11.f) / 10.f; break;
+	case 5: S.Voices = FMath::Fmod(FMath::RoundToFloat(S.Voices * 10.f + Step + 11.f), 11.f) / 10.f; break;
+	case 6: S.bSubtitles = !S.bSubtitles; break;
 	default: OnBack.ExecuteIfBound(); return;
 	}
 	S.Apply();

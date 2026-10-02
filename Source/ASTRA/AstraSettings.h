@@ -9,6 +9,7 @@ struct ASTRA_API FAstraSettings
 {
 	int32 Quality = -1;       // the engine's scalability: 0 low · 1 medium · 2 high · 3 epic; -1 as the engine found it
 	int32 Image = 2;          // how low the dynamic resolution may go: 0 sharp (70 %) · 1 balanced (55 %) · 2 smooth (40 %)
+	bool bRetina = true;      // the image out at the display's own pixels (a Retina Mac: twice the half the engine makes by default), upscaled by MetalFX
 	int32 FrameRate = 60;     // 30 or 60
 	float Music = 1.f;        // 0..1 of the score's own level (it already sits under the dialogue)
 	float Voices = 1.f;       // 0..1 of the voices' level
@@ -20,8 +21,11 @@ struct ASTRA_API FAstraSettings
 	/** Into the engine: scalability, the resolution floor, the frame rate and its time budget (volumes and subtitles are read
 	 *  where they are used). */
 	void Apply() const;
-	/** The dynamic resolution's floor for Image (per cent). */
+	/** The dynamic resolution's floor for Image (per cent), of the half-resolution output. */
 	static float FloorOf(int32 Image);
+	/** The floor the engine is given: with the Retina output the same number of pixels as the half output's floor would be, never under the
+	 *  upscaler's own limit (MetalFX takes 33 % of its output at least). */
+	float EngineFloor() const;
 };
 
 /** The SETTINGS page: one row per setting (click or Enter: the next value; left and right arrows), BACK. */
