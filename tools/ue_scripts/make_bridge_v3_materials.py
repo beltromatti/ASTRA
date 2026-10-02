@@ -11,7 +11,8 @@ Creates:
               M_BRG3_Viewscreen   translucent image plane of the main viewscreen: ScreenTexture, Intensity, Opacity (0 = off)
   instances   in /Game/ASTRA/Materials/Instances, named exactly like the mesh slots so import_kit's assign_materials_by_slot finds
               them: MI_BRG3_Composite / Ivory / Brass / Navy / DeckPlate / DarkGlass / Leather / Lamps / LampsDim / LampsHot / Labels / Decor and one
-              SCREEN_<station>_<n> per live screen (a static page until the game binds a live one)
+              SCREEN_<station>_<n> per live screen (a static page until the game binds a live one); also, only if build_ship_interior.py has not made
+              them yet (same values), the ship kit's MI_SHIP_Leaf / Soil / CrateBlue that the plants and globes on the consoles use
   hover UI    /Game/ASTRA/Kit/Bridge3/HoloUI/MI_UI_<Page>: the translucent twins of the MI_UI_* instances (same object names,
               so UAstraScreensSubsystem, which binds pages by material name, drives them like the opaque ones)
 """
@@ -324,6 +325,11 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     pbr("MI_BRG3_Brass", "Brushed", srgb_to_linear("#B89A4E"), 1.0, (0.24, 0.42), 0.0, 0.15, 0.5, macro=0.03, scratch=0.04, bias=1.0)
     # navy paint (the ASTRA Navy blue, a shade darker than the hulls' livery): the wainscot of the command deck's corridors; a satin paint, not a metal
     pbr("MI_BRG3_Navy", "PanelPaint", srgb_to_linear("#16294F"), 1.0, (0.28, 0.45), 0.0, 0.3, 0.3)
+    # the ship kit's leaf, soil and blue crate (build_ship_interior.py makes them with these values): the consoles' plants and globes use them, so the bridge can be built first
+    for name, tset, tint, uvs, rough, infl, nrm in (("MI_SHIP_Leaf", "Linen", (0.045, 0.20, 0.04), 4.0, (0.45, 0.65), 0.5, 0.6), ("MI_SHIP_Soil", "Linen", (0.035, 0.022, 0.014), 4.0, (0.7, 0.9), 0.5, 0.8),
+                                                     ("MI_SHIP_CrateBlue", "PanelPaint", (0.045, 0.09, 0.20), 1.0, (0.5, 0.7), 0.25, 0.3)):
+        if not eal.does_asset_exist(f"{MI_DST}/{name}") and tex(f"T_{tset}_BC"):
+            pbr(name, tset, tint, uvs, rough, 0.0, infl, nrm)
     pal = tex("T_BRG3_Lamps")
     make_mi(MI_DST, "MI_BRG3_Lamps", lamps, {"Intensity": 20.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_LampsDim", lamps, {"Intensity": 6.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
