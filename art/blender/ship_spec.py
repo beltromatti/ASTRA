@@ -21,11 +21,14 @@ def door(wall: str, x: float, w: float = DOOR_W, h: float = DOOR_H) -> dict:
     return {"wall": wall, "x": x, "w": w, "h": h}
 
 
-def spot(role: str, kind: str, x: float, y: float, yaw: float, dept: str = "services", dz: float = 0.0) -> dict:
-    """`dz`: how far above the room's floor the person stands (a pad on a dais, a gantry): the station's z is the floor's plus this."""
+def spot(role: str, kind: str, x: float, y: float, yaw: float, dept: str = "services", dz: float = 0.0, station: str = "") -> dict:
+    """`dz`: how far above the room's floor the person stands (a pad on a dais, a gantry): the station's z is the floor's plus this. `station`: the place belongs to
+    someone the game gives a body of its own (the transporter's Chief: AstraTransporter), so VITA leaves it to them instead of seating a roster person there."""
     d = {"role": role, "kind": kind, "x": x, "y": y, "yaw": yaw, "dept": dept}
     if dz:
         d["dz"] = dz
+    if station:
+        d["station"] = station
     return d
 
 
@@ -234,7 +237,7 @@ _plan("cargo_hold", "Cargo Hold", "storage", "flight", 32.0, 16.0, 3.7, ["supply
 # that the plans of the decks do not move; doors on a module centre (x = 2 mod 4); `dz` is the height above the floor of a place on a platform.
 _reg("transporter", name="Transporter Room", kind="transporter", dept="science", L=24.0, D=16.0, h=3.7, plate="transporter",
      doors=[door("near", 10.0)], systems=["transporter", "power_bus", "data_trunk", "coolant"],
-     spots=[spot("transporter_chief", "sit", 22.4, 3.0, 0, "science"), spot("transport_operator", "sit", 8.4, 7.0, 0, "science"),
+     spots=[spot("transporter_chief", "sit", 22.4, 3.0, 0, "science", station="xfer_chief"), spot("transport_operator", "sit", 8.4, 7.0, 0, "science"),
             spot("transport_operator", "sit", 8.4, 10.2, 0, "science"), spot("engineer", "work", 7.4, 13.4, 90, "engineering"),
             spot("technician", "work", 4.6, 10.8, 90, "science"), spot("technician", "stand", 3.2, 5.2, 90, "science"),
             spot("visitor", "stand", 19.0, 8.6, 180, "science", 0.312), spot("visitor", "stand", 15.0, 8.6, 0, "science", 0.312)],

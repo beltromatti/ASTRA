@@ -26229,7 +26229,15 @@
    "yaw": 0.0,
    "systems": ["transporter", "power_bus", "data_trunk", "coolant"],
    "stations": [
-    {"id": "d5_transporter_B1.s0", "role": "transporter_chief", "kind": "sit", "pos": [22.4, 5.0, -50.0], "yaw": 0.0, "dept": "science"},
+    {
+     "id": "d5_transporter_B1.s0",
+     "role": "transporter_chief",
+     "kind": "sit",
+     "pos": [22.4, 5.0, -50.0],
+     "yaw": 0.0,
+     "dept": "science",
+     "station": "xfer_chief"
+    },
     {"id": "d5_transporter_B1.s1", "role": "transport_operator", "kind": "sit", "pos": [8.4, 9.0, -50.0], "yaw": 0.0, "dept": "science"},
     {"id": "d5_transporter_B1.s2", "role": "transport_operator", "kind": "sit", "pos": [8.4, 12.2, -50.0], "yaw": 0.0, "dept": "science"},
     {"id": "d5_transporter_B1.s3", "role": "engineer", "kind": "work", "pos": [7.4, 15.4, -50.0], "yaw": 90.0, "dept": "engineering"},
