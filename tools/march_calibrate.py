@@ -315,6 +315,16 @@ def cmd_model(a: argparse.Namespace) -> None:
     print(f"loss {total:.3f} over {len(names)} experiments")
 
 
+def _experiment_loss(args: tuple[str, dict[str, float], int, int]) -> float:
+    """One experiment's loss for a set of constants (a worker of the fit: the experiments are independent, so they run in a few processes at once)."""
+    name, values, runs, seed = args
+    sys.path.insert(0, str(ROOT / "mind"))
+    from astra_mind import march_battle as mb
+    cpp = json.loads(RESULTS.read_text())
+    params = mb.Params(**values)
+    return loss_of(cpp[name], pool(run_model(EXPERIMENTS[name], runs, params, seed=seed)))
+
+
 def cmd_fit(a: argparse.Namespace) -> None:
     """A random coordinate search of the model's constants: each round tries a change of one constant (or two) and keeps it if the loss over all the
     experiments goes down (the same random draws every time, so that a change is judged on the model and not on luck)."""
@@ -327,8 +337,15 @@ def cmd_fit(a: argparse.Namespace) -> None:
     free = [n for n in a.free.split(",") if n]
     params = mb.Params.load()
 
+    from concurrent.futures import ProcessPoolExecutor
+    from dataclasses import asdict
+    workers = ProcessPoolExecutor(max_workers=max(1, a.jobs)) if a.jobs > 1 else None
+
     def total(p) -> float:
-        return sum(loss_of(cpp[n], pool(run_model(EXPERIMENTS[n], a.runs, p, seed=7))) for n in names)
+        if workers is None:
+            return sum(loss_of(cpp[n], pool(run_model(EXPERIMENTS[n], a.runs, p, seed=7))) for n in names)
+        v = asdict(p)
+        return sum(workers.map(_experiment_loss, [(n, v, a.runs, 7) for n in names]))
 
     best = total(params)
     print(f"start loss {best:.3f}", flush=True)
@@ -379,6 +396,7 @@ def main() -> None:
     p.add_argument("--runs", type=int, default=60)
     p.add_argument("--step", type=float, default=0.18)
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--jobs", type=int, default=3, help="processes (the experiments are independent)")
     p.add_argument("--free", default="k_rail,k_laser,hull_w,shield_w,shield_leak,msl_frac,msl_dmg,pd_per_channel,ow,approach0,approach_per_ship,sigma_battle,sigma_step,"
                                      "ret_bold,ret_steady,ret_cautious,flee_base_s,flee_turn,flee_exposure,ramp_s,f_dps,b_dps,air_kill,air_pd,focus_group,hold_target,flee_hull,"
                                      "p_praetorian,p_vigilant,p_acheron,p_lethe,h_praetorian,h_vigilant,h_acheron,h_lethe")

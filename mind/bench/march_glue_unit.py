@@ -414,10 +414,13 @@ class PlaceTest(Fixture):
         self.assertEqual((self.m.aquila["where"], self.m.aquila["lane"], self.m.real_system), ("Cassia", "", "Cassia"))
 
     async def test_a_battle_the_map_was_fighting_where_the_aquila_comes_goes_to_the_game(self) -> None:
-        a = put(self.m, "astra", "Cassia", [("vigilant", 4)], name="Defenders")
-        b = put(self.m, "mandate", "Cassia", [("styx", 4)], name="Attackers", order=Order("assault", "Cassia", "bold", False, "default", "", 0.0))
-        self.m.run(150.0)
+        a = put(self.m, "astra", "Cassia", [("vigilant", 5)], name="Defenders")
+        b = put(self.m, "mandate", "Cassia", [("styx", 5)], name="Attackers", order=Order("assault", "Cassia", "bold", False, "default", "", 0.0))
+        self.m.run(120.0)
         self.assertIn("Cassia", self.m.battles)                                          # (the map fights it)
+        while "Cassia" in self.m.battles and self.m.t < 900.0 and not any(u.hull_frac < 0.9 for side in self.m.battles["Cassia"].eng.sides for u in side):
+            self.m.run(10.0)                                                              # (until it has done something to the hulls)
+        self.assertIn("Cassia", self.m.battles)
         self.m.aquila_arrived("Cassia")
         self.m.war.current = "Cassia"
         await self.step(mg.PRESENT_DELAY_S + 20)

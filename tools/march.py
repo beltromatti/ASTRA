@@ -66,7 +66,7 @@ def main() -> int:
     if cmd == "cal":
         return subprocess.run([python(), str(ROOT / "tools" / "march_calibrate.py"), *rest], cwd=MIND).returncode
     if cmd == "test":
-        return run(["-m", "unittest", "bench.march_unit", "bench.strategy_unit", "bench.march_glue_unit", "bench.march_server", *rest])
+        return run(["-m", "unittest", "bench.march_unit", "bench.strategy_unit", "bench.march_glue_unit", "bench.march_server", "bench.march_soak", *rest])
     print(f"unknown command '{cmd}'\n{__doc__}")
     return 2
 

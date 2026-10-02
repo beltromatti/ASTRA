@@ -673,8 +673,13 @@ class StrategicMinds:
         nothing to add)."""
         seat = self.seats["astra"]
         if seat.busy and seat.task is not None:
+            # a look of his own is under way: the Captain's words come first, the look is dropped (what it had ordered stands; it looks again with the Captain's words in front of it)
+            seat.task.cancel()
             try:
-                await asyncio.wait_for(asyncio.shield(seat.task), timeout=PULSE_TIMEOUT_S)
+                await seat.task
+            except asyncio.CancelledError:
+                if not seat.task.cancelled():
+                    raise
             except Exception:  # noqa: BLE001
                 pass
         lines: list[str] = []

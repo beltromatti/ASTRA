@@ -150,6 +150,18 @@ class CadenceTest(Fixture):
         self.assertIn("Capitano", user)
         self.assertEqual(len(self.looks("mandate")), 0)
 
+    async def test_the_captain_does_not_wait_for_a_look_that_is_under_way(self) -> None:
+        self.llm.latency = 0.3
+        self.run_to(FIRST_PULSE_S + 5)
+        await asyncio.sleep(0.05)
+        self.assertTrue(self.sm.seats["astra"].busy)                                       # (Rourke is in the middle of a look)
+        self.llm.policy = ScriptPolicy([("tell_captain", {"text": "Ti ascolto, Capitano.", "tone": "calm"})], only="astra")
+        self.llm.latency = 0.0
+        lines = await self.sm.rourke_reply("Ammiraglio, mi sente?", "it")
+        self.assertEqual(lines, ["Ti ascolto, Capitano."])
+        self.assertEqual(self.pulses("astra")[0]["error"], "cancelled")                    # (the look that was running was dropped, not waited for)
+        self.assertIn("Ammiraglio, mi sente?", self.prompt("astra"))
+
     async def test_no_two_looks_at_once_for_a_side(self) -> None:
         self.llm.latency = 0.2
         self.run_to(FIRST_PULSE_S + 5)

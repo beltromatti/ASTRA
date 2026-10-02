@@ -1630,6 +1630,8 @@ class March:
                 f.status = "ready"
                 f.where = f.where or self.real_system
                 f.untouchable_until = self.t
+                for ship in f.ships:
+                    ship.cid = ""                                          # (they are not in the real simulation any more: its sky is cleared or is no longer the Aquila's)
                 if f.order.kind in ("move", "withdraw", "refit") and f.order.target != f.where:
                     f.pending = None
         self.real_system, self.real_fight = "", False
@@ -1823,7 +1825,8 @@ class March:
             order += f": \"{o.reason[:90]}\""
         pend = f"; ORDER ON ITS WAY: {f.pending.kind} {f.pending.target} (reaches it in {fmt_s(max(0.0, f.pending_at - self.t))})" if f.pending else ""
         who = f.commander.get("name") or ""
-        battle = "; IN BATTLE" if f.status == "engaged" else ("; besieging" if f.status == "besieging" else ("; with the Aquila, in the Captain's hands" if f.status == "real" else ""))
+        battle = ("; IN BATTLE" if f.status == "engaged" else "; besieging" if f.status == "besieging" else "; with the Aquila, in the Captain's hands" if f.status == "real"
+                  else "; the game's own script is bringing it in: it takes no orders yet" if f.status == "scripted" else "")
         air = sum(s.fighters + s.bombers + s.drones for s in f.ships)
         return (f"{f.id} {f.name}: {f.composition()}{f' + {air} craft' if air else ''}; hull {int(100 * f.hull)}%, supply {int(100 * f.supply)}%, morale {f.morale:.2f}; {where}{route}; "
                 f"order: {order}{battle}{pend}" + (f"; led by {who}" if who else ""))

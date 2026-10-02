@@ -242,7 +242,9 @@ class MarchGlue:
                 continue
             if not any(s.cid and s.cid in here for s in f.ships):
                 if f.status == "scripted" and f.scripted_at and m.t > f.scripted_at + GRACE_S:
-                    m.release_script(f.id)                     # it never came: the map plays it
+                    m.release_script(f.id)                     # it never came: the map plays it (its ships are not in the game: the ids the order of battle gave them are void)
+                    for s in f.ships:
+                        s.cid = ""
                 continue
             if f.status != "scripted" and f.where != rs:
                 continue
@@ -266,6 +268,8 @@ class MarchGlue:
                 if m.t < GRACE_S:
                     continue
                 self.opening.discard(f.id)                      # (the game never brought it: the map sends it)
+                for s in f.ships:
+                    s.cid = ""
             coming = f.in_gate and f.route and f.route[0] == rs and f.arrive_at - m.t <= LEAD_S
             if not (f.where == rs or coming) or f.note.startswith(STRAGGLERS):
                 continue                                         # (the ships that jumped out of her sky are leaving it, not coming in)
