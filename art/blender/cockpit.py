@@ -539,16 +539,16 @@ def throttle(b: Parts) -> None:
     em.lamp_box((0.205, y + 0.0155, 0.0030), (0.345, y + 0.0165, 0.0036), "amber", L.LAMP_DIM)                          # the afterburner range
     for (xx, txt) in ((-0.060, "IDLE"), (0.115, "MIL"), (0.275, "AB")):
         ink(fine, txt, (xx, y - 0.033, 0.0036), 0.0085, tracking=0.005)
-    ink(fine, "THROTTLE", (0.12, y - 0.0385, 0.0036), 0.0050, tracking=0.006)
+    ink(fine, "THROTTLE", (0.12, y + 0.0370, 0.0036), 0.0050, tracking=0.006)
     # the lever: a pivot housing with a brass collar, a shaft leaning forward, the grip
-    fine.cyl((0.02, y, 0.0), (0.02, y, 0.028), 0.030, L.STRUCT, seg=20, r2=0.024)
-    em.cyl((0.02, y, 0.0275), (0.02, y, 0.0300), 0.0305, L.BRASS, seg=20, r2=0.0245)
+    fine.cyl((0.02, y, 0.0), (0.02, y, 0.028), 0.030, L.STRUCT, seg=32, r2=0.024)
+    em.cyl((0.02, y, 0.0275), (0.02, y, 0.0300), 0.0305, L.BRASS, seg=32, r2=0.0245)
     fine.cyl((0.02, y, 0.028), (0.075, y, 0.150), 0.0105, L.TRIM, seg=12)
-    soft.cyl((0.072, y, 0.140), (0.108, y, 0.252), 0.0235, L.RUBBER, seg=16, r2=0.0275)
-    fine.cyl((0.108, y, 0.252), (0.1115, y, 0.263), 0.0285, L.STRUCT, seg=16)
+    soft.cyl((0.072, y, 0.140), (0.108, y, 0.252), 0.0235, L.RUBBER, seg=24, r2=0.0275)
+    fine.cyl((0.108, y, 0.252), (0.1115, y, 0.263), 0.0285, L.DGLASS, seg=24)
     for k in range(3):                                                                         # finger grooves
         zz = 0.165 + k * 0.030
-        fine.cyl((0.072 + (zz - 0.140) * 0.32, y, zz), (0.072 + (zz - 0.140) * 0.32, y, zz + 0.004), 0.0272 + k * 0.0006, L.STRUCT, seg=16)
+        fine.cyl((0.072 + (zz - 0.140) * 0.32, y, zz), (0.072 + (zz - 0.140) * 0.32, y, zz + 0.004), 0.0272 + k * 0.0006, L.STRUCT, seg=24)
     for dy, cell in ((-0.010, "cyan"), (0.010, "amber")):                                       # two buttons on the head
         em.lamp_cyl((0.1115 - 0.012, y + dy, 0.2635), (0.1115 - 0.012, y + dy, 0.2655), 0.0042, cell, L.LAMP_DIM, seg=8)
     for (dx, dy) in ((0.007, 0.0), (-0.007, 0.0), (0.0, 0.007), (0.0, -0.007)):                 # the hat switch
@@ -652,9 +652,9 @@ def stick(b: Parts) -> None:
     fine.cyl((0.404, 0.0, -0.90), (0.372, 0.0, -0.60), 0.0155, L.TRIM, seg=12)
     fine.cyl((0.372, 0.0, -0.60), (0.372, 0.0, -0.58), 0.026, L.STRUCT, seg=16)
     em.cyl((0.372, 0.0, -0.600), (0.372, 0.0, -0.5935), 0.0275, L.BRASS, seg=16)
-    soft.cyl((0.372, 0.0, -0.58), (0.360, 0.0, -0.52), 0.024, L.RUBBER, seg=16, r2=0.031)
-    soft.cyl((0.360, 0.0, -0.52), (0.352, 0.0, -0.455), 0.031, L.RUBBER, seg=16, r2=0.0275)
-    fine.cyl((0.352, 0.0, -0.455), (0.350, 0.0, -0.438), 0.0315, L.STRUCT, seg=16)
+    soft.cyl((0.372, 0.0, -0.58), (0.360, 0.0, -0.52), 0.024, L.RUBBER, seg=28, r2=0.031)
+    soft.cyl((0.360, 0.0, -0.52), (0.352, 0.0, -0.455), 0.031, L.RUBBER, seg=28, r2=0.0275)
+    fine.cyl((0.352, 0.0, -0.455), (0.350, 0.0, -0.438), 0.0315, L.DGLASS, seg=28)
     fine.box((0.372, -0.011, -0.545), (0.404, 0.011, -0.505), L.STRUCT)                          # the trigger (front)
     fine.box((0.366, -0.013, -0.552), (0.380, 0.013, -0.540), L.STRUCT)
     for dy, cell in ((-0.016, "red"), (0.016, "amber")):                                         # two buttons and a hat switch on the head
