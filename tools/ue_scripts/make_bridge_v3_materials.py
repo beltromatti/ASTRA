@@ -10,7 +10,7 @@ Creates:
               M_BRG3_ScreenHolo   additive hover panel: ScreenTexture x Intensity, dim on its back side (BackGain)
               M_BRG3_Viewscreen   translucent image plane of the main viewscreen: ScreenTexture, Intensity, Opacity (0 = off)
   instances   in /Game/ASTRA/Materials/Instances, named exactly like the mesh slots so import_kit's assign_materials_by_slot finds
-              them: MI_BRG3_Composite / Ivory / Brass / DeckPlate / DarkGlass / Leather / Lamps / LampsDim / LampsHot / Labels / Decor and one
+              them: MI_BRG3_Composite / Ivory / Brass / Navy / DeckPlate / DarkGlass / Leather / Lamps / LampsDim / LampsHot / Labels / Decor and one
               SCREEN_<station>_<n> per live screen (a static page until the game binds a live one)
   hover UI    /Game/ASTRA/Kit/Bridge3/HoloUI/MI_UI_<Page>: the translucent twins of the MI_UI_* instances (same object names,
               so UAstraScreensSubsystem, which binds pages by material name, drives them like the opaque ones)
@@ -322,6 +322,8 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     pbr("MI_BRG3_Leather", "LeatherBlack", (0.05, 0.055, 0.075), 2.0, (0.30, 0.50), 0.0, 0.9, 0.7, macro=0.06)
     # brushed brass: the warm line of the command deck (a thin accent, never a big surface): metal, a hint of the brushed grain
     pbr("MI_BRG3_Brass", "Brushed", srgb_to_linear("#B89A4E"), 1.0, (0.24, 0.42), 0.0, 0.15, 0.5, macro=0.03, scratch=0.04, bias=1.0)
+    # navy paint (the ASTRA Navy livery): stripes and markings on the Falcons and the flight deck; a satin paint, not a metal
+    pbr("MI_BRG3_Navy", "PanelPaint", srgb_to_linear("#1F3A6B"), 1.0, (0.28, 0.45), 0.0, 0.3, 0.3)
     pal = tex("T_BRG3_Lamps")
     make_mi(MI_DST, "MI_BRG3_Lamps", lamps, {"Intensity": 20.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_LampsDim", lamps, {"Intensity": 6.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
