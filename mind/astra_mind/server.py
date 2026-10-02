@@ -228,6 +228,7 @@ class Mind:
         self.director.war_minds = self.war
         self.director.negotiate = self._negotiate
         self.agent.say = self._crew_say
+        self.agent.heard = self.voice.heard_since          # what the bridge heard aloud, as it was said (the officers' «Said aloud»)
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
         self.agent.war = lambda: self.director.war.crew_view()
