@@ -91,6 +91,22 @@ bool UAstraLadderSubsystem::IsClimbing(const APawn* Pawn) const
 	return On != INDEX_NONE && Climber.IsValid() && Climber.Get() == Pawn;
 }
 
+bool UAstraLadderSubsystem::Release(const APawn* Pawn)
+{
+	if (!IsClimbing(Pawn))
+	{
+		return false;
+	}
+	if (ACharacter* C = Climber.Get())
+	{
+		C->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
+	UE_LOG(LogASTRA, Log, TEXT("[Ladder] the Captain is taken off %s by the transporter"), *Ladders[On].Id);
+	On = INDEX_NONE;
+	Climber.Reset();
+	return true;
+}
+
 bool UAstraLadderSubsystem::ClimbInput(const APawn* Pawn, const FVector2D& Axis)
 {
 	if (!IsClimbing(Pawn))

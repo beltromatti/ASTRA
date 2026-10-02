@@ -1,0 +1,124 @@
+{
+  "id": "aquila_transport",
+  "version": 1,
+  "note": "The lattice transport of the ASN Aquila (docs/TELETRASPORTO.md, docs/BIBBIA.md §4): every number the rules read (UAstraTransporterSubsystem, AstraTransportRules.*). Metres, seconds, kilometres, megawatts. `room.layout` is in the Transporter Room's own frame (origin on the floor at the corridor-side corner, x along the corridor, y into the room: art/blender/ship_rooms_science.py transporter()); the room's place in the ship comes from the plan (the compartment whose kind is `room.kind`: its `pos` and `yaw`), so a plan that moves the room moves the pads; `tools/transport.py check` compares this layout with the kit and the plan and says what to change here when NAVE changes the room.",
+
+  "limits": {
+    "max_range_km": 30000.0,
+    "emergency_range_km": 400.0,
+    "pads": 6,
+    "emergency_pads": 2,
+    "mass_kg_per_pad": 2000.0,
+    "cargo_kg": 2000.0,
+    "cycle_s": 8.0,
+    "warmup_s": 0.4,
+    "dematerialize_s": 3.6,
+    "rematerialize_s": 3.6,
+    "settle_s": 0.4,
+    "cycle_mw": 40.0,
+    "extra_subject_mw": 6.0,
+    "buffer_hold_s": 90.0,
+    "heat_pct_per_cycle": 0.6
+  },
+
+  "lock": {
+    "aboard_s": 1.5,
+    "ship_s": 3.5,
+    "hostile_extra_s": 2.0,
+    "surface_s": 5.0,
+    "per_1000_km_s": 0.6,
+    "max_s": 30.0,
+    "acquire_quality": 0.55,
+    "hold_quality": 0.40,
+    "lose_quality": 0.25,
+    "lose_grace_s": 0.8,
+    "rise_s": 1.5,
+    "fall_s": 0.4
+  },
+
+  "shield": {
+    "open_below": 0.05,
+    "note": "a face of a hull is open to the beam when shields are down or disabled, or when the sector's charge is at or under this share of its capacity; one open face at each end is enough"
+  },
+
+  "motion": {
+    "accel_warn_mps2": 3.0,
+    "accel_block_mps2": 9.0,
+    "turn_warn_deg_s": 0.8,
+    "turn_block_deg_s": 2.0,
+    "target_turn_warn_deg_s": 3.0,
+    "gate_field_km": 25.0,
+    "gate_approach_quality": 0.5
+  },
+
+  "jam": {
+    "block": 0.6,
+    "warn": 0.25,
+    "sigma_deg": 9.0,
+    "range_ref_km": 60.0,
+    "own_ship_floor": 0.15
+  },
+
+  "ground_jam": {
+    "astra": 0.0,
+    "guilds": 0.05,
+    "contested": 0.3,
+    "mandate": 0.55,
+    "silent": 0.15
+  },
+
+  "surface": {
+    "orbit_km": 1200.0,
+    "landing_offset_m": [4.5, 3.0],
+    "sites": ["field"]
+  },
+
+  "hazard": {
+    "air_min": 0.6,
+    "fire_max": 0.2,
+    "smoke_max": 0.5,
+    "heat_max": 0.45
+  },
+
+  "room_power": {
+    "offline": 0.12,
+    "degraded": 0.6
+  },
+
+  "power": {
+    "shield_load": 0.20,
+    "shield_floor": 0.25
+  },
+
+  "ally": {
+    "engaged_km": 12.0
+  },
+
+  "inhibit_kinds": ["magazine", "armory", "quarantine"],
+  "inhibit_ids": [],
+
+  "failure": {
+    "delay_p": 0.9,
+    "delay_min_s": 2.0,
+    "delay_max_s": 10.0,
+    "offset_p": 0.3,
+    "offset_m": 6.0,
+    "scatter_below": 0.3
+  },
+
+  "room": {
+    "kind": "transporter",
+    "layout": {
+      "dais": {"center": [17.0, 8.6], "pads": 6, "ring_m": 2.0, "first_deg": 0.0, "pad_z_m": 0.312, "pad_r_m": 0.62},
+      "cargo": {"center": [4.6, 13.0], "pad_z_m": 0.2, "pad_r_m": 0.8},
+      "emitter": {"center": [17.0, 8.6, 2.95]},
+      "chief": {"stand": [8.4, 8.6], "yaw": 0.0},
+      "wall_screen": {"center": [23.725, 7.0, 1.395], "size_m": [4.1, 1.85], "yaw": 180.0}
+    }
+  },
+
+  "emergency": [
+    {"id": "med1", "room": "medbay", "pos": [-238.0, -1.8, -54.0], "pad_r_m": 0.6, "note": "the Medbay's emergency pads (BIBBIA §4): two discs in the aisle by the ward's entrance, local x -6.0 y +-1.8 of aquila_medbay.json (origin -232, 0, -54)"},
+    {"id": "med2", "room": "medbay", "pos": [-238.0, 1.8, -54.0], "pad_r_m": 0.6}
+  ]
+}

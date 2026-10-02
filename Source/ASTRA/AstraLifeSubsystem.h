@@ -80,6 +80,8 @@ public:
 
 	/** The body that is this roster person (or null): a pooled actor. */
 	AAstraLifeBody* BodyOfRoster(int32 RosterIdx) const;
+	/** TELETRASPORTO: this person has just been set down by the transporter: their body is made at once, in plain view, for the next few seconds. */
+	void ForceBody(int32 Person, float Seconds = 20.f);
 	int32 NumBodies() const { return NumActiveBodies; }
 
 	/** Drops every body now (a level change, the tests). */
@@ -127,6 +129,8 @@ private:
 	TMap<int32, int32> BodyOf;              // person -> pool index
 	UPROPERTY() TArray<TObjectPtr<UObject>> Warm;     // the assets every body needs, loaded once at the start and kept
 	bool bWarmed = false;
+	TMap<int32, double> ForcedBodies;     // person -> world time until which their body is made in plain view (the transporter's arrivals)
+	bool IsBodyForced(int32 Person) const;
 	FVector LastCaptain = FVector::ZeroVector;
 	FVector EyeCm = FVector::ZeroVector;
 	FVector LookDir = FVector::ForwardVector;

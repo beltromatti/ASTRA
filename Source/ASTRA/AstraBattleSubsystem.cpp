@@ -5170,6 +5170,15 @@ int32 UAstraBattleSubsystem::HostilesFighting(double WithinKm) const
 	return N;
 }
 
+double UAstraBattleSubsystem::GateDistanceKm() const
+{
+	if (!Landmarks.IsValidIndex(GateLandmark) || Ships.Num() == 0)
+	{
+		return -1.0;
+	}
+	return FVector::Dist(Ships[0].Pos, Landmarks[GateLandmark].Pos) / OneKm;
+}
+
 FString UAstraBattleSubsystem::GateStatus() const
 {
 	if (!Landmarks.IsValidIndex(GateLandmark) || Ships.Num() == 0)

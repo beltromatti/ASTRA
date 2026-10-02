@@ -501,6 +501,8 @@ public:
 	bool IsInLane() const { return GateRun == EAstraGateRun::Lane; }
 	/** Where the system's Janus Gate is, Fleet's orders, the transit under way (for the crew and the screens). */
 	FString GateStatus() const;
+	/** How far the Aquila is from the system's Janus Gate (km), or -1 when there is none (TELETRASPORTO: no beam crosses a Gate's field). */
+	double GateDistanceKm() const;
 	/** The system the gate is tuned to: the run under way, else Fleet's orders ("" = none). */
 	FString GetGateDestination() const { return GateRun != EAstraGateRun::None ? GateDest : FleetOrderedDest; }
 	/** Where a live contact is from the Aquila, aimed at its lead point (for the helm's intercept). */
