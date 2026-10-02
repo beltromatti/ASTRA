@@ -603,6 +603,7 @@ def preview(out_dir: str, views: list[str], samples: int) -> None:
         o.hide_viewport = True
     PV.make_materials({})
     PV.set_world((0.0, 0.0, 0.0), 0.0)
+    PV.sky_dome(yaw_deg=60.0)                                                     # the star map outside the window
     PV.configure_render(int(os.environ.get("KC_W", "1600")), int(os.environ.get("KC_H", "900")), samples, exposure=float(os.environ.get("KC_EXPOSURE", "0.4")))
 
     def put(name: str, x: float, y: float, z: float, yaw: float, mirror: bool = False) -> None:
