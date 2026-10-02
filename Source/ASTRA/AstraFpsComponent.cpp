@@ -18,26 +18,42 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
+#include "InputKeyEventArgs.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/OutputDevice.h"
 #include "Kismet/GameplayStatics.h"
 
 DECLARE_CYCLE_STAT(TEXT("Weapons"), STAT_AstraFps, STATGROUP_Astra);
 
 namespace
 {
-	// where the sight of the weapon is against the camera (cm; x ahead, y right, z up), from the hip and through the sights: the numbers to tune in the game
-	float GHipX = 30.f, GHipY = 15.f, GHipZ = -14.f;
-	float GAdsX = 13.f, GAdsY = 0.f, GAdsZ = 0.f;
-	float GLowX = 8.f, GLowY = 14.f, GLowZ = -40.f;                       // lowered (running, putting it away)
+	// the places of the weapon against the camera are the weapon table's (AstraWeapon.cpp: where the rear sight stands, hip, sights, lowered); these nudge them (cm), to tune them
+	// in the game: astra.fps.hip_x 3 moves the hip place 3 cm further ahead (the arms are placed again at once)
+	float GHipX = 0.f, GHipY = 0.f, GHipZ = 0.f;
+	float GAdsX = 0.f, GAdsY = 0.f, GAdsZ = 0.f;
+	float GLowX = 0.f, GLowY = 0.f, GLowZ = 0.f;
 	int32 GArmsOn = 1;
-	FAutoConsoleVariableRef FpsCvHipX(TEXT("astra.fps.hip_x"), GHipX, TEXT("The weapon's sight from the hip, cm ahead of the camera"));
-	FAutoConsoleVariableRef FpsCvHipY(TEXT("astra.fps.hip_y"), GHipY, TEXT("The weapon's sight from the hip, cm to the right of the camera"));
-	FAutoConsoleVariableRef FpsCvHipZ(TEXT("astra.fps.hip_z"), GHipZ, TEXT("The weapon's sight from the hip, cm above the camera (negative: below)"));
-	FAutoConsoleVariableRef FpsCvAdsX(TEXT("astra.fps.ads_x"), GAdsX, TEXT("The weapon's rear sight through the sights, cm ahead of the camera"));
-	FAutoConsoleVariableRef FpsCvAdsY(TEXT("astra.fps.ads_y"), GAdsY, TEXT("The weapon's rear sight through the sights, cm to the right of the camera"));
-	FAutoConsoleVariableRef FpsCvAdsZ(TEXT("astra.fps.ads_z"), GAdsZ, TEXT("The weapon's rear sight through the sights, cm above the camera"));
-	FAutoConsoleVariableRef FpsCvArms(TEXT("astra.fps.arms"), GArmsOn, TEXT("1: the mannequin's arms hold the weapon; 0: the weapon alone (the fallback)"));
+	FAutoConsoleVariableRef FpsCvHipX(TEXT("astra.fps.hip_x"), GHipX, TEXT("Tuning: cm added to the weapon's hip place, ahead of the camera"));
+	FAutoConsoleVariableRef FpsCvHipY(TEXT("astra.fps.hip_y"), GHipY, TEXT("Tuning: cm added to the weapon's hip place, to the right of the camera"));
+	FAutoConsoleVariableRef FpsCvHipZ(TEXT("astra.fps.hip_z"), GHipZ, TEXT("Tuning: cm added to the weapon's hip place, above the camera (negative: below)"));
+	FAutoConsoleVariableRef FpsCvAdsX(TEXT("astra.fps.ads_x"), GAdsX, TEXT("Tuning: cm added to where the rear sight stands through the sights, ahead of the camera"));
+	FAutoConsoleVariableRef FpsCvAdsY(TEXT("astra.fps.ads_y"), GAdsY, TEXT("Tuning: cm added to where the rear sight stands through the sights, to the right"));
+	FAutoConsoleVariableRef FpsCvAdsZ(TEXT("astra.fps.ads_z"), GAdsZ, TEXT("Tuning: cm added to where the rear sight stands through the sights, above the axis"));
+	FAutoConsoleVariableRef FpsCvLowX(TEXT("astra.fps.low_x"), GLowX, TEXT("Tuning: cm added to the lowered weapon's place (running, putting it away), ahead of the camera"));
+	FAutoConsoleVariableRef FpsCvLowY(TEXT("astra.fps.low_y"), GLowY, TEXT("Tuning: cm added to the lowered weapon's place, to the right of the camera"));
+	FAutoConsoleVariableRef FpsCvLowZ(TEXT("astra.fps.low_z"), GLowZ, TEXT("Tuning: cm added to the lowered weapon's place, above the camera (negative: below)"));
+	FAutoConsoleVariableRef FpsCvArms(TEXT("astra.fps.arms"), GArmsOn, TEXT("1: the mannequin's arms hold the weapon (applies when the weapon is next drawn); 0: the weapon alone (the fallback)"));
+
+	// the arms: the mannequin cut down to the lower half of the upper arm, the forearm and the hand (tools/ue_scripts/make_fp_arms.py)
+	const TCHAR* const FpsArmsPath = TEXT("/Game/ASTRA/Weapons/SKM_ASTRA_Arms.SKM_ASTRA_Arms");
+
+	// one number for all the console's nudges: when it changes the arms are placed again
+	float FpsNudgeStamp()
+	{
+		return GHipX + 3.f * GHipY + 7.f * GHipZ + 11.f * GAdsX + 13.f * GAdsY + 17.f * GAdsZ + 19.f * GLowX + 23.f * GLowY + 29.f * GLowZ;
+	}
 
 	constexpr float FpsKeysShownS = 24.f;
 	const TCHAR* const FpsKeysLine = TEXT("LMB fire   RMB aim   R reload   1 rifle   2 sidearm   Q last weapon   H holster   Shift run   C crouch · hold C: prone   F1 all keys");
@@ -160,6 +176,7 @@ bool UAstraFpsComponent::Locked() const
 
 void UAstraFpsComponent::FirePressed()
 {
+	++FireEvents;
 	bFireHeld = true;
 	bTriggerLatched = false;
 	// with nothing in the hands, the button draws the last weapon
@@ -177,12 +194,15 @@ void UAstraFpsComponent::FireReleased()
 
 void UAstraFpsComponent::AimPressed()
 {
+	++AimEvents;
 	bAimHeld = true;
+	UE_LOG(LogASTRA, Log, TEXT("[Fps] aim: pressed (%s, %s)"), bHasKit ? (IsArmed() ? TEXT("weapon in hand") : TEXT("weapon holstered")) : TEXT("no kit"), Locked() ? TEXT("locked: seated, in a lift or down") : TEXT("free"));
 }
 
 void UAstraFpsComponent::AimReleased()
 {
 	bAimHeld = false;
+	UE_LOG(LogASTRA, Log, TEXT("[Fps] aim: released"));
 }
 
 void UAstraFpsComponent::ReloadPressed()
@@ -681,8 +701,14 @@ void UAstraFpsComponent::EnsureArms()
 		P->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::FirstPerson;
 		P->SetCanEverAffectNavigation(false);
 	};
-	// the arms: the same body as the first-person arms of the character (so the colourway matches), on a mesh of their own that plays the mannequin's rifle animations
-	USkeletalMesh* Mesh = C->GetFirstPersonMesh() ? C->GetFirstPersonMesh()->GetSkeletalMeshAsset() : nullptr;
+	// the arms: the mannequin cut down to its arms (the weapon code places them against the camera, where the head and the chest of a whole body would fill the view); when that
+	// asset is not there, the mesh of the character's own first-person arms with the head and neck taken off
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, FpsArmsPath);
+	bArmsOnly = Mesh != nullptr;
+	if (!Mesh)
+	{
+		Mesh = C->GetFirstPersonMesh() ? C->GetFirstPersonMesh()->GetSkeletalMeshAsset() : nullptr;
+	}
 	if (!Mesh)
 	{
 		Mesh = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple"));
@@ -696,6 +722,7 @@ void UAstraFpsComponent::EnsureArms()
 		Arms->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 		Arms->bEnableUpdateRateOptimizations = false;
 		Arms->SetReceivesDecals(false);
+		Arms->SetBoundsScale(4.f);                    // the pose stands far from where the mesh does (the weapon code moves it): never culled
 		Common(Arms);
 		if (C->GetFirstPersonMesh())
 		{
@@ -706,6 +733,10 @@ void UAstraFpsComponent::EnsureArms()
 			}
 		}
 		Arms->RegisterComponent();
+		if (!bArmsOnly)
+		{
+			Arms->HideBoneByName(TEXT("neck_01"), EPhysBodyOp::PBO_None);     // (the head would sit at the camera)
+		}
 		Arms->SetVisibility(false);
 	}
 	Gun = NewObject<UStaticMeshComponent>(C, TEXT("WeaponGun"));
@@ -793,9 +824,10 @@ void UAstraFpsComponent::DressArms(EAstraWeapon W)
 
 void UAstraFpsComponent::Calibrate(const FAstraWeaponDef& W)
 {
-	// Where the arms (or the weapon alone) stand against the camera so that the weapon's sight is at a chosen place and the weapon points where the camera looks. The ready
-	// pose's right-hand socket is known (the probe's numbers in the weapon table): the weapon's own frame (barrel +Y, top +Z, its left +X) in the arms' mesh space is
-	// that socket; the camera's frame is x ahead, y right, z up, so a vector at (barrel, -left, top) of the weapon is at (x, y, z) of the camera.
+	// Where the arms (or the weapon alone) stand against the camera so that the weapon's rear sight is at a chosen place and the weapon is turned as chosen. The ready pose's
+	// right-hand socket is known (the probe's numbers in the weapon table): the weapon's own frame (barrel +Y, top +Z, its left +X) in the arms' mesh space is that socket; the
+	// camera's frame is x ahead, y right, z up, so a vector at (barrel, -left, top) of the weapon is at (x, y, z) of the camera. The places are the weapon table's (hip, sights,
+	// lowered), moved by what the console has added to them.
 	FVector SocketLoc = FVector::ZeroVector;
 	FQuat SocketQ = FQuat::Identity;
 	if (Arms)
@@ -812,10 +844,22 @@ void UAstraFpsComponent::Calibrate(const FAstraWeaponDef& W)
 		OutRot = FQuat(Extra) * Base;
 		OutLoc = Target - OutRot.RotateVector(SightInMesh);
 	};
-	Place(FVector(GHipX, GHipY, GHipZ), FRotator(-1.5f, -2.5f, 0.f), HipLoc, HipRot);
-	Place(FVector(GAdsX, GAdsY, GAdsZ), FRotator::ZeroRotator, AdsLoc, AdsRot);
+	Place(W.HipPlace + FVector(GHipX, GHipY, GHipZ), W.HipTurn, HipLoc, HipRot);
+	Place(W.AdsPlace + FVector(GAdsX, GAdsY, GAdsZ), FRotator::ZeroRotator, AdsLoc, AdsRot);
+	Place(W.LowPlace + FVector(GLowX, GLowY, GLowZ), W.LowTurn, LowLoc, LowRot);
+	TuneStamp = FpsNudgeStamp();
 	bCalibrated = true;
-	UE_LOG(LogASTRA, Log, TEXT("[Fps] %s: the arms' hip place %s, sights %s (%s)"), W.Name, *HipLoc.ToString(), *AdsLoc.ToString(), Arms ? TEXT("on the mannequin's arms") : TEXT("the weapon alone"));
+	UE_LOG(LogASTRA, Log, TEXT("[Fps] %s: the arms' place at the hip %s, through the sights %s, lowered %s (%s)"), W.Name, *HipLoc.ToString(), *AdsLoc.ToString(), *LowLoc.ToString(),
+		Arms ? (bArmsOnly ? TEXT("on the arms-only mesh") : TEXT("on the whole mannequin, head off")) : TEXT("the weapon alone"));
+}
+
+void UAstraFpsComponent::ApplyNudges()
+{
+	// the console's nudges of the places (astra.fps.hip_x ...) take effect at once
+	if (bCalibrated && Cur != EAstraWeapon::None && !FMath::IsNearlyEqual(FpsNudgeStamp(), TuneStamp, 1e-4f))
+	{
+		Calibrate(AstraWeapons::Get(Cur));
+	}
 }
 
 void UAstraFpsComponent::PlayArms(UAnimSequence* A, bool bLoop, float Rate)
@@ -833,6 +877,7 @@ void UAstraFpsComponent::TickArms(float Dt)
 	{
 		return;
 	}
+	ApplyNudges();
 	const FAstraWeaponDef& W = AstraWeapons::Get(Cur);
 	AASTRACharacter* C = Owner();
 	const float Speed = C ? (float)C->GetVelocity().Size2D() : 0.f;
@@ -848,9 +893,7 @@ void UAstraFpsComponent::TickArms(float Dt)
 	FVector L = FMath::Lerp(HipLoc, AdsLoc, A);
 	if (SprintAlpha > 0.001f)
 	{
-		const FQuat LowBase = FQuat(FRotator(-34.f, 26.f, -8.f)) * AdsRot;
-		const FVector LowLoc = FVector(GLowX, GLowY, GLowZ) - LowBase.RotateVector(SightInMesh);
-		Q = FQuat::Slerp(Q, LowBase, SprintAlpha);
+		Q = FQuat::Slerp(Q, LowRot, SprintAlpha);
 		L = FMath::Lerp(L, LowLoc, SprintAlpha);
 	}
 	// walking bobs the weapon, a turn drags it, a shot kicks it
@@ -1064,6 +1107,69 @@ void UAstraFpsComponent::RemoveHud()
 
 // ================================================================================================================== the console
 
+void UAstraFpsComponent::SimulateKey(const FKey& Key, bool bDown)
+{
+	// the key goes into the player's input as the viewport hands one over: through the mapping context, the action and the character's binding, like the mouse's
+	const AASTRACharacter* C = Owner();
+	APlayerController* PC = C ? Cast<APlayerController>(C->GetController()) : nullptr;
+	if (PC)
+	{
+		PC->InputKey(FInputKeyEventArgs::CreateSimulated(Key, bDown ? IE_Pressed : IE_Released, bDown ? 1.f : 0.f));
+	}
+}
+
+void UAstraFpsComponent::Describe(FOutputDevice& Ar) const
+{
+	static const TCHAR* const StateName[] = { TEXT("holstered"), TEXT("drawing"), TEXT("ready"), TEXT("reloading"), TEXT("holstering") };
+	const AASTRACharacter* C = Owner();
+	const AASTRAPlayerController* PC = C ? Cast<AASTRAPlayerController>(C->GetController()) : nullptr;
+	const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+	Ar.Logf(TEXT("kit %s, %s, weapon %s, rounds %d in the magazine and %d spare"), bHasKit ? TEXT("yes") : TEXT("no"), StateName[(int32)State], Cur != EAstraWeapon::None ? AstraWeapons::Get(Cur).Name : TEXT("none"),
+		Cur != EAstraWeapon::None ? AmmoOf(Cur).Mag : 0, Cur != EAstraWeapon::None ? AmmoOf(Cur).Reserve : 0);
+	Ar.Logf(TEXT("aim held %d (the action arrived %d times), through the sights %.2f, trigger held %d (arrived %d times), running %d"), bAimHeld ? 1 : 0, AimEvents, Ads, bFireHeld ? 1 : 0, FireEvents, bSprint ? 1 : 0);
+	Ar.Logf(TEXT("locked %d: seated %d, datapad up %d, movement ignored %d, captain's fate %d"), Locked() ? 1 : 0, PC && PC->IsSeated() ? 1 : 0, PC && PC->IsPadUp() ? 1 : 0, PC && PC->IsMoveInputIgnored() ? 1 : 0, Ship ? Ship->GetCaptainFate() : -1);
+	const UCameraComponent* Cam = Camera();
+	Ar.Logf(TEXT("camera: field of view %.0f, first-person %.0f (scale %.2f)"), Cam ? Cam->FieldOfView : 0.f, Cam ? Cam->FirstPersonFieldOfView : 0.f, Cam ? Cam->FirstPersonScale : 0.f);
+	Ar.Logf(TEXT("arms: %s, shown %d, gun %s"), Arms ? (bArmsOnly ? TEXT("the arms-only mesh") : TEXT("the whole mannequin, head off")) : TEXT("none (the weapon alone)"), bShown ? 1 : 0, Gun && Gun->GetStaticMesh() ? *Gun->GetStaticMesh()->GetName() : TEXT("none"));
+	if (!Cam || !bShown || !Gun || Cur == EAstraWeapon::None)
+	{
+		return;
+	}
+	// where the parts of it stand in the first-person view: the angles from the camera's axis (degrees right and up) and whether the picture holds them (its field is the first-person one)
+	FVector2D VP(1920.f, 1080.f);
+	if (const UGameViewportClient* VC = GetWorld() ? GetWorld()->GetGameViewport() : nullptr)
+	{
+		VC->GetViewportSize(VP);
+	}
+	const float HalfH = FMath::Tan(FMath::DegreesToRadians(Cam->FirstPersonFieldOfView * 0.5f));       // horizontal half-tangent
+	const float HalfV = HalfH * VP.Y / FMath::Max(1.f, VP.X);
+	const FAstraWeaponDef& W = AstraWeapons::Get(Cur);
+	const FTransform CamT = Cam->GetComponentTransform();
+	const auto Where = [&](const TCHAR* Label, const FVector& World)
+	{
+		const FVector L = CamT.InverseTransformPosition(World);
+		if (L.X < 1.f)
+		{
+			Ar.Logf(TEXT("  %-10s behind the camera (%.0f, %.0f, %.0f)"), Label, L.X, L.Y, L.Z);
+			return;
+		}
+		const bool bIn = FMath::Abs(L.Y / L.X) <= HalfH && FMath::Abs(L.Z / L.X) <= HalfV;
+		Ar.Logf(TEXT("  %-10s %5.1f right %5.1f up  at %3.0f cm   %s"), Label, FMath::RadiansToDegrees(FMath::Atan2(L.Y, L.X)), FMath::RadiansToDegrees(FMath::Atan2(L.Z, L.X)), L.X, bIn ? TEXT("IN VIEW") : TEXT("out of view"));
+	};
+	Ar.Logf(TEXT("the view (%.0fx%.0f, first-person field %.0f degrees) holds up to %.1f right and %.1f up:"), VP.X, VP.Y, Cam->FirstPersonFieldOfView, FMath::RadiansToDegrees(FMath::Atan(HalfH)), FMath::RadiansToDegrees(FMath::Atan(HalfV)));
+	const FTransform GunT = Gun->GetComponentTransform();
+	Where(TEXT("rear sight"), GunT.TransformPosition(W.Sight));
+	Where(TEXT("muzzle"), GunT.TransformPosition(W.Muzzle));
+	Where(TEXT("left grip"), GunT.TransformPosition(W.GripL));
+	if (Arms)
+	{
+		Where(TEXT("hand_r"), Arms->GetBoneLocation(TEXT("hand_r"), EBoneSpaces::WorldSpace));
+		Where(TEXT("hand_l"), Arms->GetBoneLocation(TEXT("hand_l"), EBoneSpaces::WorldSpace));
+		Where(TEXT("lowerarm_r"), Arms->GetBoneLocation(TEXT("lowerarm_r"), EBoneSpaces::WorldSpace));
+		Where(TEXT("lowerarm_l"), Arms->GetBoneLocation(TEXT("lowerarm_l"), EBoneSpaces::WorldSpace));
+	}
+}
+
 namespace
 {
 	UAstraFpsComponent* FpsPlayer(UWorld* W)
@@ -1072,8 +1178,115 @@ namespace
 		return P ? P->FindComponentByClass<UAstraFpsComponent>() : nullptr;
 	}
 
+	// "1" or "0" (hold or let go), then "direct" to skip the input system
+	bool FpsParseHold(const TArray<FString>& Args, bool& bDown, bool& bDirect)
+	{
+		bDirect = Args.ContainsByPredicate([](const FString& A) { return A.Equals(TEXT("direct"), ESearchCase::IgnoreCase); });
+		for (const FString& A : Args)
+		{
+			if (A == TEXT("1") || A.Equals(TEXT("on"), ESearchCase::IgnoreCase) || A.Equals(TEXT("down"), ESearchCase::IgnoreCase))
+			{
+				bDown = true;
+				return true;
+			}
+			if (A == TEXT("0") || A.Equals(TEXT("off"), ESearchCase::IgnoreCase) || A.Equals(TEXT("up"), ESearchCase::IgnoreCase))
+			{
+				bDown = false;
+				return true;
+			}
+		}
+		return false;
+	}
+
 	FAutoConsoleCommandWithWorld FpsCmdGive(TEXT("astra.weapons.give"), TEXT("Testing: the Captain takes the rifle and the sidearm from the armory (wherever he is)"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraFpsComponent* F = FpsPlayer(W)) { F->SetKit(true); } }));
 	FAutoConsoleCommandWithWorld FpsCmdStow(TEXT("astra.weapons.stow"), TEXT("Testing: the Captain puts the weapons back"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraFpsComponent* F = FpsPlayer(W)) { F->SetKit(false); } }));
+
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdAim(TEXT("astra.fps.aim"),
+		TEXT("Testing: astra.fps.aim 1 holds the right mouse button down (through the input system, the road of the real one: mapping, action, binding), 0 lets it go; add 'direct' to set the sights without the input system"),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* W, FOutputDevice& Ar)
+		{
+			UAstraFpsComponent* F = FpsPlayer(W);
+			bool bDown = false, bDirect = false;
+			if (!F || !FpsParseHold(Args, bDown, bDirect))
+			{
+				Ar.Logf(TEXT("astra.fps.aim 1|0 [direct]%s"), F ? TEXT("") : TEXT("  (no Captain on foot)"));
+				return;
+			}
+			if (bDirect)
+			{
+				bDown ? F->AimPressed() : F->AimReleased();
+			}
+			else
+			{
+				F->SimulateKey(EKeys::RightMouseButton, bDown);
+			}
+			Ar.Logf(TEXT("aim %s%s: see astra.fps.info next frame (the action counter says whether it arrived)"), bDown ? TEXT("held") : TEXT("let go"), bDirect ? TEXT(", direct") : TEXT(", through the input"));
+		}));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdFire(TEXT("astra.fps.fire"),
+		TEXT("Testing: astra.fps.fire 1 holds the left mouse button down (through the input system), 0 lets it go; add 'direct' to pull the trigger without the input system"),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* W, FOutputDevice& Ar)
+		{
+			UAstraFpsComponent* F = FpsPlayer(W);
+			bool bDown = false, bDirect = false;
+			if (!F || !FpsParseHold(Args, bDown, bDirect))
+			{
+				Ar.Logf(TEXT("astra.fps.fire 1|0 [direct]%s"), F ? TEXT("") : TEXT("  (no Captain on foot)"));
+				return;
+			}
+			if (bDirect)
+			{
+				bDown ? F->FirePressed() : F->FireReleased();
+			}
+			else
+			{
+				F->SimulateKey(EKeys::LeftMouseButton, bDown);
+			}
+			Ar.Logf(TEXT("trigger %s%s"), bDown ? TEXT("held") : TEXT("let go"), bDirect ? TEXT(", direct") : TEXT(", through the input"));
+		}));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdReload(TEXT("astra.fps.reload"), TEXT("Testing: the Captain reloads the weapon in his hands"),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>&, UWorld* W, FOutputDevice& Ar)
+		{
+			if (UAstraFpsComponent* F = FpsPlayer(W))
+			{
+				F->ReloadPressed();
+				Ar.Logf(TEXT("reload"));
+			}
+		}));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdWeapon(TEXT("astra.fps.weapon"), TEXT("Testing: astra.fps.weapon rifle|pistol|holster|switch: draws a weapon, puts it away, or changes to the other"),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* W, FOutputDevice& Ar)
+		{
+			UAstraFpsComponent* F = FpsPlayer(W);
+			if (!F || Args.IsEmpty())
+			{
+				Ar.Logf(TEXT("astra.fps.weapon rifle|pistol|holster|switch"));
+				return;
+			}
+			if (Args[0].Equals(TEXT("holster"), ESearchCase::IgnoreCase))
+			{
+				F->ToggleHolster();
+			}
+			else if (Args[0].Equals(TEXT("switch"), ESearchCase::IgnoreCase))
+			{
+				F->QuickSwitch();
+			}
+			else
+			{
+				F->SelectWeapon(AstraWeapons::FromKey(Args[0]));
+			}
+			Ar.Logf(TEXT("%s"), *F->StatusText());
+		}));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdInfo(TEXT("astra.fps.info"), TEXT("Testing: the weapon's state, the actions that arrived, the arms, and where the weapon and the hands stand in the first-person view"),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda([](const TArray<FString>&, UWorld* W, FOutputDevice& Ar)
+		{
+			if (const UAstraFpsComponent* F = FpsPlayer(W))
+			{
+				F->Describe(Ar);
+			}
+			else
+			{
+				Ar.Logf(TEXT("no Captain on foot"));
+			}
+		}));
 }

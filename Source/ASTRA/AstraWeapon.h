@@ -71,6 +71,14 @@ struct FAstraWeaponDef
 	float EquipAnimS = 1.6f;               // their lengths, which the handling's times are fitted to
 	float ReloadAnimS = 2.2f;
 	float DryAnimS = 0.8f;
+	// where the weapon's rear sight stands against the camera (cm; x ahead, y right, z up) and how the weapon is turned about it (pitch, yaw, roll): at the hip, through the sights
+	// and carried low (running, being put away). Fitted on offline renders of the arms with the weapon as the first-person camera (70 degrees) sees them: the weapon in the lower
+	// part of the view with the left hand and the right forearm in it, the notch of the rear sight at the middle of the screen when aimed (tools/ue_scripts/make_fp_arms.py).
+	FVector HipPlace = FVector(28.0, 6.0, -3.0);
+	FRotator HipTurn = FRotator(0.0, -5.0, 0.0);
+	FVector AdsPlace = FVector(20.0, 0.0, -1.1);
+	FVector LowPlace = FVector(26.0, 12.0, -6.5);
+	FRotator LowTurn = FRotator(-16.0, 15.0, -5.0);
 
 	// --- the sounds (Content/ASTRA/Audio, synthesised by tools/art/weapon_sounds.py)
 	const TCHAR* ShotSound = TEXT("");

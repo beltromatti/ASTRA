@@ -38,7 +38,8 @@ degli ordini e li passa al gioco. Con `ASTRA_MARINE_MINDS=0` la rete dei marine 
 | Il poligono del Ponte 8 | `d8_firing_range_*` nella pianta: il rastrello e un bersaglio qualsiasi (i marine di guardia sono corpi veri) bastano per provare mira, rinculo e ricarica |
 | Un abbordaggio | `astra.board.start [navette 1..4] [id della stanza in cui tagliano]` (il comando `boarding` del gioco: `{skiffs, boarders, breach, source, lockdown, warn_s}`); `astra.board.end` lo chiude; `astra.board.info` ne dà i numeri; `astra.board.debug 1` disegna i soldati, `2` anche i luoghi delle squadre, la via del Mandato e l'imboscata dei marine; `astra.board.picture` scrive nel log il quadro che la mente legge |
 | Ordini ai marine | a voce («Reyes, tieni il corridoio fuori dall'ingegneria», «Reaction Uno, con me», «chiudi le paratie»), o `astra.board.cmd marine_order {"squad":"all","task":"hold","place":"engineering"}` / `astra.board.cmd lockdown {"sealed":true}` |
-| Regolare le braccia | `astra.fps.hip_x/_y/_z`, `astra.fps.ads_x/_y/_z` (dove sta la mira rispetto alla camera, in cm), `astra.fps.arms 0` (solo l'arma, il ripiego) |
+| Provare la mira dal harness | `astra.fps.aim 1` tiene giù il tasto destro **attraverso il sistema d'ingresso** (mappa, azione `IA_ASTRA_Aim`, binding del personaggio: la stessa strada del mouse vero), `astra.fps.aim 0` lo lascia; con `direct` salta il sistema d'ingresso. Così `astra.fps.fire 1/0` (tasto sinistro), `astra.fps.reload`, `astra.fps.weapon rifle\|pistol\|holster\|switch`. `astra.fps.info` dice lo stato, **quante volte l'azione è arrivata** (se resta 0 l'ingresso non arriva: non è colpa dell'arma) e dove stanno nell'inquadratura mirino, bocca, mani e avambracci (angoli e «IN VIEW»); nel log `[Fps] aim: pressed/released` |
+| Regolare le braccia | i posti dell'arma sono nella tabella (`AstraWeapon.cpp`: `HipPlace/HipTurn`, `AdsPlace`, `LowPlace/LowTurn`: dove sta il mirino posteriore rispetto alla camera, in cm); `astra.fps.hip_x/_y/_z`, `ads_x/_y/_z`, `low_x/_y/_z` **aggiungono** cm a quei posti e le braccia si riposizionano subito; `astra.fps.arms 0` (solo l'arma, il ripiego) |
 | Altri | `astra.board.friendlyfire 1` (i colpi del Capitano feriscono anche i marine); `astra.board.takeover_fatal 0` (se il Mandato prende l'Ingegneria il combattimento finisce e basta, senza il collasso del reattore) |
 
 **Senza il gioco** (i banchi, §9): `tools/boarding.py` (la simulazione sulla pianta vera), `mind/bench/marines_unit.py`, `marines_server.py` (modello finto), `marines_live.py` (modello
@@ -98,9 +99,14 @@ Le armi sono modelli gratuiti (CC-BY, registrati in [licenze.csv](licenze.csv)):
 `art/blender/weapons.py` (UV, texture ORM e normale, prese: Muzzle, Sight, SightFront, GripL, MagWell, Eject) e importati da `tools/ue_scripts/import_weapons.py`; i suoni sono
 sintetizzati (`tools/art/weapon_sounds.py`: colpo, scatto a vuoto, ricariche, impugnare, impatto, sibilo, colpo a segno), nessun campione di terzi.
 
-- **Braccia**: la stessa mesh delle braccia del personaggio su un componente a parte, con le animazioni di fucile e pistola del mannequin (Equip, Idle_ADS, Reload, DryFire; la
-  Fire è additiva, il rinculo è procedurale). Il posto dell'arma rispetto alla camera è **calcolato** dalla posa della mano destra misurata con una sonda (i numeri sono in
-  `AstraWeapon.cpp`), in modo che il mirino cada sull'asse della camera: dal fianco, dal mirino e abbassata (corsa, rimessa).
+- **Braccia**: il mannequin **tagliato alle braccia** (`SKM_ASTRA_Arms`, fatto da `tools/ue_scripts/make_fp_arms.py` con Geometry Script: metà inferiore del braccio, avambraccio, mano e
+  dita; stesso scheletro e stessi materiali, quindi le animazioni di fucile e pistola del mannequin lo muovono e le prese `HandGrip_*` sono quelle dello scheletro). Il corpo intero non
+  andava: con la camera sugli occhi e l'arma dove deve stare sullo schermo, testa, spalle e petto riempivano l'inquadratura (la «forma scura curva» sul bordo destro era la testa).
+  Se l'asset manca il gioco ripiega sulla mesh intera con la testa tolta (`neck_01`). Il posto dell'arma rispetto alla camera è **calcolato** dalla posa della mano destra misurata
+  con una sonda (i numeri sono in `AstraWeapon.cpp`), in modo che il mirino posteriore cada dove si vuole: dal fianco (in basso a destra e verso il centro, la mano sinistra e
+  l'avambraccio destro in vista), dal mirino (la tacca sull'asse della camera, la torretta anteriore nella tacca) e abbassata (corsa, rimessa: un angolo dell'arma in basso a destra).
+  I numeri sono tarati su **resa fuori linea** (`Saved/scratch`, non nel repo: la mesh scheletrica e le pose dei file del progetto, scheletrate in numpy e proiettate con il campo di
+  70° della prima persona; la resa della versione vecchia riproduceva lo screenshot del lead, bocca compresa).
 - **Il colpo**: raggio dalla camera con il cono dell'arma (posizione, velocità, salto, apertura del colpo), tracciante breve dal muso, lampo, impatto (metallo, carne), il sibilo
   per chi lo sente passare, il suono; il rinculo alza il mirino e lo fa vagare, l'arma scalcia sulla spalla (molla), poi il mirino ricade in parte.
 - **Lo schermo**: mirino che si apre con il cono, colpi, forza (quando ferito o in un combattimento), rosso ai bordi e archi di provenienza di un colpo ricevuto, la croce
@@ -248,7 +254,7 @@ a faccia a faccia con il sergente 7 su 8 (l'ottavo: «teniamo qui» senza l'ordi
      `tools/ue.py py "ONLY=['SW_Rifle_Shot','SW_Pistol_Shot','SW_Gun_Dry','SW_Rifle_Reload','SW_Pistol_Reload','SW_Gun_Draw','SW_Bullet_Impact','SW_Bullet_Whiz','SW_Body_Hit']; exec(open('tools/ue_scripts/import_audio.py').read())"`.
    Gli altri suoni che il codice cerca (`SW_Blast_Inside`, `SW_Sparks`) sono già nel progetto.
 3. **Provare** (§2): `astra.armory.here` + E; poi `astra.weapons.give` per sparare ovunque; `astra.board.start` in un corridoio; `astra.board.debug 2`; parlare con Reyes.
-   Se le braccia o il mirino sono fuori posto: `astra.fps.hip_*`, `astra.fps.ads_*` (i numeri finiti vanno in `AstraFpsComponent.cpp`, in cima).
+   Se le braccia o il mirino sono fuori posto: `astra.fps.hip_*`, `astra.fps.ads_*`, `astra.fps.low_*` (i numeri finiti vanno nella tabella, `AstraWeapon.cpp`).
 4. **La mente**: `cd mind && .venv/bin/python -m unittest bench.marines_unit bench.marines_server` (90 prove); dal vivo `python -m bench.marines_live` (0,02 $).
 5. **Piante**: la v2 di NAVE-3 ha altri id (`d8_armory_B1` «Marine Armory» e `d8_armory_D1` «Security Armory», nessuna `d7_capacitors_D2`): il gioco sceglie l'armeria per tipo (la prima) e
    la breccia di base con una regola (la stanza più esterna del Ponte 7 nelle sezioni di mezzo); per un'altra: `astra.board.start 1 <id>`.
