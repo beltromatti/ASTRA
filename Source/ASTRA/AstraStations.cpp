@@ -459,6 +459,7 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 			if (bOk && A.Params->HasField(TEXT("speed_pct")))
 			{
 				Sh->SetThrottle((float)Num(A.Params, TEXT("speed_pct"), Sh->GetThrottlePct()));
+				Detail += FString::Printf(TEXT(", throttle %.0f%%"), Sh->GetThrottlePct());   // (the report says the speed too: the helm repeats it back)
 			}
 			return bOk;
 		}
@@ -474,10 +475,13 @@ bool UAstraStationsSubsystem::Enter(const FString& Station, const FString& Aspec
 			}
 			TSharedPtr<FJsonObject> C = Obj({{TEXT("contact_id"), Target}});
 			C->SetNumberField(TEXT("standoff_km"), Num(A.Params, TEXT("standoff_km"), 6.0));
+			// the throttle first: the intercept's report says the speed the ship will run at (it said the old one, 60 %, to a helm told "full ahead")
+			const float WasThrottle = Sh->GetThrottlePct();
+			Sh->SetThrottle((float)Num(A.Params, TEXT("speed_pct"), FMath::Max(WasThrottle, 80.f)));
 			const bool bOk = Command(TEXT("intercept"), C, Detail);
-			if (bOk)
+			if (!bOk)
 			{
-				Sh->SetThrottle((float)Num(A.Params, TEXT("speed_pct"), FMath::Max(Sh->GetThrottlePct(), 80.f)));
+				Sh->SetThrottle(WasThrottle);
 			}
 			return bOk;
 		}
