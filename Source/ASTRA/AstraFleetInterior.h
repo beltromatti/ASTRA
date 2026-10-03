@@ -229,7 +229,8 @@ private:
 	void RefreshFit();
 	int32 ToldCrewBand = 0, ToldCaptain = 0;             // what the war has been told (CollectNews)
 	bool bToldWeapons = false, bToldEngines = false;
-	float ToldMagazineAt = -100.f;
+	bool bToldMagazine = false;
+	float MagazineClearAt = -1.f;                        // since when no magazine has burned (the next fire in one is news again after a while)
 
 	void BuildCrew();
 	int32 AddPerson(int32 Comp, EFleetRole Role);

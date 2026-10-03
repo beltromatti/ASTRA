@@ -388,18 +388,29 @@ void FAstraShipInterior::CollectNews(TArray<FString>& Out)
 	{
 		bToldEngines = false;
 	}
-	// a fire where the ammunition is: the one thing aboard that can take the ship
-	if (Clock - ToldMagazineAt > 40.f)
+	// a fire where the ammunition is: the one thing aboard that can take the ship. Told once each time it takes hold (not while it burns, not for each room): again only after the magazines have been clear a while
+	int32 MagazineOnFire = INDEX_NONE;
+	for (const auto& KV : Model.States())
 	{
-		for (const auto& KV : Model.States())
+		if (KV.Value.Fire >= 0.25f && Plan->Map->Comps[KV.Key].Systems.Contains((uint8)EAstraDmgSystem::Ordnance))
 		{
-			if (KV.Value.Fire >= 0.25f && Plan->Map->Comps[KV.Key].Systems.Contains((uint8)EAstraDmgSystem::Ordnance))
-			{
-				ToldMagazineAt = Clock;
-				Out.Add(FString::Printf(TEXT("%s: fire in a magazine (%s)"), *ShipName, *RoomWord(KV.Key)));
-				break;
-			}
+			MagazineOnFire = KV.Key;
+			break;
 		}
+	}
+	if (MagazineOnFire != INDEX_NONE)
+	{
+		MagazineClearAt = -1.f;
+		if (!bToldMagazine)
+		{
+			bToldMagazine = true;
+			Out.Add(FString::Printf(TEXT("%s: fire in a magazine (%s)"), *ShipName, *RoomWord(MagazineOnFire)));
+		}
+	}
+	else if (bToldMagazine)
+	{
+		MagazineClearAt = MagazineClearAt < 0.f ? Clock : MagazineClearAt;
+		bToldMagazine = Clock - MagazineClearAt < 20.f;
 	}
 }
 
