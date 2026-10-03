@@ -1216,9 +1216,13 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		{
 			if (S.bAlive && S.bHostile && !S.bDisabled)
 			{
-				Fighting += (!S.bFleeing && !S.bHoldFire) ? 1 : 0;
+				// a group its commander told to regroup or hold is pausing in the fight, not leaving it: a strike group that arrived at 85 km and
+				// reformed before closing ended the "engagement" in a victory that never was (3 Oct)
+				const FAstraBattleGroup* SG = S.GroupId >= 0 ? FindGroup(S.GroupId) : nullptr;
+				const bool bOrderedPause = SG && (SG->Order == EAstraGroupOrder::Regroup || SG->Order == EAstraGroupOrder::Hold) && !S.bNegotiated;
+				Fighting += ((!S.bFleeing || bOrderedPause) && !S.bHoldFire) ? 1 : 0;
 				Holding += (S.bHoldFire && !S.bFleeing) ? 1 : 0;
-				Withdrawing += S.bFleeing ? 1 : 0;
+				Withdrawing += (S.bFleeing && !bOrderedPause) ? 1 : 0;
 				AgreedWithdraw += (S.bFleeing && S.bNegotiated) ? 1 : 0;
 			}
 		}
