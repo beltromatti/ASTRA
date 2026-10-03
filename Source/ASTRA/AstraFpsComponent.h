@@ -10,12 +10,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AstraArmsRig.h"
 #include "AstraWeapon.h"
 #include "Components/ActorComponent.h"
 #include "AstraFpsComponent.generated.h"
 
 class AASTRACharacter;
 class UCameraComponent;
+class UPoseableMeshComponent;
 class USkeletalMeshComponent;
 class UStaticMeshComponent;
 class UAnimSequence;
@@ -121,14 +123,17 @@ private:
 	float PromptT = 0.f;
 	TSharedPtr<class SAstraCombatHud> Hud;
 
-	// --- the arms
+	// --- the arms: the mannequin's animation plays on a hidden skeletal mesh (Arms: the weapon rides its right-hand socket); what is seen is a poseable copy of it (Pose) whose
+	// arms are solved to the weapon (AstraArmsRig.h): the shoulders where a body would have them, the left hand on the hand-guard
 	UPROPERTY() TObjectPtr<USkeletalMeshComponent> Arms;
+	UPROPERTY() TObjectPtr<UPoseableMeshComponent> Pose;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Gun;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Mag;
 	UPROPERTY() TObjectPtr<UAnimSequence> AnimIdle;
 	UPROPERTY() TObjectPtr<UAnimSequence> AnimEquip;
 	UPROPERTY() TObjectPtr<UAnimSequence> AnimReload;
 	UPROPERTY() TObjectPtr<UAnimSequence> AnimDry;
+	AstraArms::FBones ArmBones;
 	EAstraWeapon ArmsFor = EAstraWeapon::None;   // the weapon the arms and the gun are made for now
 	bool bCalibrated = false;
 	FQuat HipRot = FQuat::Identity, AdsRot = FQuat::Identity, LowRot = FQuat::Identity;       // where the arms stand against the camera: hip, sights and lowered (cm, relative to the camera)
@@ -136,6 +141,9 @@ private:
 	FVector SightInMesh = FVector::ZeroVector;
 	float TuneStamp = 0.f;                       // the console's nudges of the places when they were last applied (a change calibrates again)
 	bool bArmsOnly = false;                      // the arms are the arms-only mesh (else the whole mannequin with its head and neck hidden)
+	float LeftIk = 0.f;                          // how much the left hand is on the weapon's grip (0: as the animation moves it, 1: on the hand-guard)
+	FQuat MeshQ = FQuat::Identity;               // where the arms stand against the camera this frame (the solve works from it)
+	FVector MeshLoc = FVector::ZeroVector;
 	FVector KickPos = FVector::ZeroVector, KickVel = FVector::ZeroVector;     // the weapon's kick on his shoulder (spring)
 	float KickPitch = 0.f, KickPitchVel = 0.f;
 	FVector2D Sway = FVector2D::ZeroVector;      // the weapon lags behind his turn
@@ -147,6 +155,8 @@ private:
 	FRotator LastControl = FRotator::ZeroRotator;
 	float BaseFov = 90.f;
 	bool bFovTaken = false;                      // the camera's field of view is ours (through the sights): to be given back
+	float BaseFpFov = 70.f;
+	bool bFpFovTaken = false;                    // the camera's first-person field of view is ours (the weapon is in his hands): to be given back
 
 	// --- the helpers
 	AASTRACharacter* Owner() const;
@@ -168,10 +178,13 @@ private:
 	void DressArms(EAstraWeapon W);
 	void Calibrate(const FAstraWeaponDef& W);
 	void ApplyNudges();
+	void SolveArms(const FAstraWeaponDef& W, float Dt);
+	void TickFpFov(float Dt);
 	void PlayArms(UAnimSequence* A, bool bLoop, float Rate = 1.f);
 	void TickArms(float Dt);
 	void ShowArms(bool bOn);
 	void RestoreFov();
+	void RestoreFpFov();
 	void TickHud(float Dt);
 	void RemoveHud();
 	FVector MuzzleGuess(const FVector& Eye, const FRotator& View) const;
