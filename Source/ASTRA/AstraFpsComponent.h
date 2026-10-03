@@ -36,9 +36,15 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	// ------------------------------------------------------------------------------------------------ the kit
-	/** The Captain takes the rifle and the sidearm with all the rounds they carry (the armory); false puts them back. Drawn: the rifle. */
+	/** The Captain takes the rifle and the sidearm with all the rounds they carry (the armory's rack); false puts them back. Drawn: the rifle. */
 	void SetKit(bool bTake);
+	/** Or one weapon: the sidearm of a locker, the rifle the armourer brought. It comes loaded, with its spare magazines; bDraw: it comes up (when his hands are free). False puts it back. */
+	void GiveWeapon(EAstraWeapon W, bool bTake, bool bDraw = true);
+	bool Carries(EAstraWeapon W) const { return W == EAstraWeapon::Rifle ? bHasRifle : (W == EAstraWeapon::Pistol ? bHasPistol : false); }
+	/** He carries something (a rifle, a sidearm, both). */
 	bool HasKit() const { return bHasKit; }
+	/** His hands are free (not seated, in a lift, down): a weapon handed to him can come up. */
+	bool HandsFree() const { return !Locked(); }
 	/** A weapon is in his hands or on its way there (drawing, ready, reloading). */
 	bool IsArmed() const { return State != EState::Holstered && State != EState::Holstering; }
 	EAstraWeapon Current() const { return Cur; }
@@ -92,7 +98,8 @@ private:
 	EAstraWeapon Cur = EAstraWeapon::None;       // the weapon in hand (or being drawn)
 	EAstraWeapon Last = EAstraWeapon::None;      // the one before (the quick switch)
 	EAstraWeapon Next = EAstraWeapon::None;      // the one he is changing to (while the first is put away)
-	bool bHasKit = false;
+	bool bHasKit = false;                        // any weapon at all (bHasRifle || bHasPistol)
+	bool bHasRifle = false, bHasPistol = false;
 	FAmmo Rifle, Pistol;
 	float StateT = 0.f;                          // since the state began
 	float StateLen = 0.f;                        // how long it lasts (the draw, the reload)
@@ -165,6 +172,8 @@ private:
 	FAmmo& AmmoOf(EAstraWeapon W) { return W == EAstraWeapon::Rifle ? Rifle : Pistol; }
 	const FAmmo& AmmoOf(EAstraWeapon W) const { return W == EAstraWeapon::Rifle ? Rifle : Pistol; }
 	bool Locked() const;
+	/** The weapon he reaches for with nothing in his hands: the last one if he carries it, else the rifle, else the sidearm. */
+	EAstraWeapon DefaultWeapon() const;
 	void StartDraw(EAstraWeapon W);
 	void StartHolster(EAstraWeapon Then);
 	void StartReload();

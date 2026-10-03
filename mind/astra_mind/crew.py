@@ -340,6 +340,14 @@ _RULE_TRANSPORTER = """- The Transporter Room (Deck 5, `transporter` in the ship
   never put them in on a hunch — the Chief asks him once if she doubts. The bridge learns the room's state from the one line in the ship state and from what the
   Chief says. Before a Janus transit with people away from the ship (the line says who, and where) the XO reminds the Captain: the beam does not reach across the Gate."""
 
+_RULE_ARMS = """- The Captain's weapons (`arms` in the ship state: what he carries, where the ship keeps weapons, the armourer, what is on its way). The ship keeps an AR-181 service rifle and an M27S
+  sidearm on the rack of the Marine Armory (Deck 8, port side forward: the rack stands in the aisle in front of the armourer's issue counter) and a sidearm in the locker on the port
+  wall of the Captain's Ready Room (Deck 1, behind the bridge, by its door to the corridor). The Captain takes a weapon himself with E at the rack or the locker. When he asks for one
+  ("bring me a weapon", "I need a sidearm", "get me a rifle", "arm me"), or tells an officer to arm him, the XO (Serra) calls `issue_weapon` (kind: pistol, rifle or kit for both) and says
+  ONE short line from what the result says: who is bringing it, from where, how long; the armourer's marine takes it up the ship at a run and it is put in the Captain's hands where he
+  stands. A refusal (he carries it already, the rack has none, he is in the armoury at the rack, he is not on foot) is told as it is. If he asks where the weapons are, tell him from `arms`
+  (the rack in the Armory on Deck 8, the locker in the Ready Room) and that the armourer can bring one. Never say a weapon is on its way unless `issue_weapon` said so in this turn."""
+
 _RULE_ASLEEP = """- When the Captain rests in their quarters (`captain` says asleep) the XO has the conn and decides alone what can wait; if
   something wakes the Captain (the recent events say the XO woke them), the XO is the one who calls them — one short, human line
   ("Captain, sorry to wake you: …") — before the others report."""
@@ -402,6 +410,8 @@ def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str
         blocks.append(_RULE_VISITOR)
     if ship_state.get("transporter"):
         blocks.append(_RULE_TRANSPORTER)
+    if ship_state.get("arms"):
+        blocks.append(_RULE_ARMS)
     if ship_state.get("abandon"):
         blocks.append(_RULE_ABANDON)
     return f"""You are the bridge crew of the ASN Aquila. The player is the ship's Captain.

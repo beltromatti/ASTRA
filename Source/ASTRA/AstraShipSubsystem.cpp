@@ -2043,7 +2043,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		return St ? St->SetMode(Args, By.IsEmpty() ? TEXT("officer") : By, OutDetail) : false;
 	}
 	// ABBORDAGGI: a boarding and the marines' orders are the board subsystem's
-	if (Name == TEXT("boarding") || Name == TEXT("marine_order") || Name == TEXT("lockdown"))
+	if (Name == TEXT("boarding") || Name == TEXT("marine_order") || Name == TEXT("lockdown") || Name == TEXT("issue_weapon"))
 	{
 		UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr;
 		if (!Board)
@@ -2993,6 +2993,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	{
 		S->SetObjectField(TEXT("boarding"), Board->Snapshot());  // ABBORDAGGI: boarders aboard: the fight as the bridge knows it
 		S->SetObjectField(TEXT("_marines"), Board->MarinesPicture());   // (and as the marines' net reads it: squads, places, bulkheads; the `_` keeps it out of the bridge crew's board)
+	}
+	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && Board->IsReady())
+	{
+		S->SetObjectField(TEXT("arms"), Board->ArmsJson());      // ABBORDAGGI: where the Captain's weapons are, what he carries, the armourer's errand (the crew's tool: issue_weapon)
 	}
 	return S;
 }

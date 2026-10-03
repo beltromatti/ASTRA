@@ -162,8 +162,17 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 			}
 			return W;
 		};
-		constexpr int32 NW = UE_ARRAY_COUNT(FpsKeysWeapon), NM = UE_ARRAY_COUNT(FpsKeysMove);
-		const float W1 = ColWidth(FpsKeysWeapon, NW), W2 = ColWidth(FpsKeysMove, NM);
+		FKeyHint WeaponRows[UE_ARRAY_COUNT(FpsKeysWeapon)];
+		int32 NW = 0;
+		for (const FKeyHint& K : FpsKeysWeapon)
+		{
+			if (State.bRifle || FCString::Strcmp(K.What, TEXT("rifle")) != 0)
+			{
+				WeaponRows[NW++] = K;
+			}
+		}
+		constexpr int32 NM = UE_ARRAY_COUNT(FpsKeysMove);
+		const float W1 = ColWidth(WeaponRows, NW), W2 = ColWidth(FpsKeysMove, NM);
 		const float W = 2.f * Pad + W1 + ColGap + W2;
 		const float H = 1.5f * Pad + HeadH + FMath::Max(NW, NM) * RowH;
 		const FVector2D Origin(24.f * U, 24.f * U);
@@ -181,7 +190,7 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 				Text(Col[i].What, FVector2D(X0 + KW + 2.f * CapPad + After, Y + 5.f * U), Cap, FLinearColor(0.7f, 0.78f, 0.88f, 0.95f * A), L + 3);
 			}
 		};
-		DrawColumn(TEXT("WEAPON"), FpsKeysWeapon, NW, Origin.X + Pad);
+		DrawColumn(TEXT("WEAPON"), WeaponRows, NW, Origin.X + Pad);
 		DrawColumn(TEXT("MOVING"), FpsKeysMove, NM, Origin.X + Pad + W1 + ColGap);
 	}
 	return L + 4;

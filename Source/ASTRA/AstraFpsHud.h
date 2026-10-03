@@ -31,6 +31,7 @@ struct FAstraFpsHudState
 	float PromptAlpha = 0.f;
 	float KeysAlpha = 0.f;               // the card of keys (its words are the widget's)
 	bool bLowHint = false;               // "R  RELOAD"
+	bool bRifle = true;                  // he carries the rifle (the card's `1  rifle` is told only then: a locker gives the sidearm alone)
 };
 
 class SAstraCombatHud : public SLeafWidget
