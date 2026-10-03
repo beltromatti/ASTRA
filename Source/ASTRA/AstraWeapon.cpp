@@ -38,7 +38,7 @@ namespace
 		W.MagPath = TEXT("/Game/ASTRA/Weapons/SM_AR181_Mag.SM_AR181_Mag");
 		// art/export/weapons/weapons.json (art/blender/weapons.py)
 		W.Muzzle = FVector(0.f, 68.85f, 11.53f);
-		W.Sight = FVector(0.f, 7.51f, 18.09f);
+		W.Sight = FVector(0.f, 7.51f, 19.24f);                  // (the notch's bottom: 1.15 cm above the sight blade's middle, 18.09 in weapons.json)
 		W.SightFront = FVector(0.f, 45.04f, 17.42f);
 		W.GripL = FVector(0.f, 36.86f, 5.23f);
 		W.MagWell = FVector(0.f, 17.69f, 6.3f);
@@ -47,14 +47,15 @@ namespace
 		W.AnimEquip = TEXT("/Game/Characters/Mannequins/Anims/Rifle/MM_Rifle_Equip.MM_Rifle_Equip");
 		W.AnimReload = TEXT("/Game/Characters/Mannequins/Anims/Rifle/MM_Rifle_Reload.MM_Rifle_Reload");
 		W.AnimDry = TEXT("/Game/Characters/Mannequins/Anims/Rifle/MM_Rifle_DryFire.MM_Rifle_DryFire");
-		// the pose of MF_Rifle_Idle_ADS at its first frame (the probe's numbers)
-		W.PoseGripLoc = FVector(-14.3, 15.4, 138.7);
-		W.PoseGripX = FVector(0.94, 0.19, -0.27).GetSafeNormal();
-		W.PoseGripY = FVector(-0.14, 0.97, 0.21).GetSafeNormal();
-		W.PoseGripZ = FVector(0.30, -0.16, 0.94).GetSafeNormal();
+		// the right-hand socket in MF_Rifle_Idle_ADS at its first frame, as the engine evaluates the animation on the arms' mesh (tools/boarding.py run --scenario fps checks and prints them)
+		W.PoseGripLoc = FVector(-15.87, 14.29, 140.79);
+		W.PoseGripX = FVector(0.9423, 0.1942, -0.2726);
+		W.PoseGripY = FVector(-0.1400, 0.9685, 0.2060);
+		W.PoseGripZ = FVector(0.3040, -0.1559, 0.9398);
 		W.EquipAnimS = 1.67f;
 		W.ReloadAnimS = 2.2f;
 		W.DryAnimS = 0.8f;
+		W.GripLHand = FVector(3.0, 28.0, 3.0);            // under the hand-guard's rear half, a little to its left: the fingers wrap its left side
 		W.ShotSound = TEXT("/Game/ASTRA/Audio/SW_Rifle_Shot.SW_Rifle_Shot");
 		W.DrySound = TEXT("/Game/ASTRA/Audio/SW_Gun_Dry.SW_Gun_Dry");
 		W.ReloadSound = TEXT("/Game/ASTRA/Audio/SW_Rifle_Reload.SW_Rifle_Reload");
@@ -97,7 +98,7 @@ namespace
 		W.MeshPath = TEXT("/Game/ASTRA/Weapons/SM_M27S.SM_M27S");
 		W.MagPath = TEXT("");
 		W.Muzzle = FVector(0.f, 17.69f, 6.16f);
-		W.Sight = FVector(0.f, -1.23f, 8.09f);
+		W.Sight = FVector(0.f, -1.23f, 8.35f);                  // (the front post's tip is 0.26 above the rear blade's middle, 8.09 in weapons.json)
 		W.SightFront = FVector(0.f, 17.24f, 8.09f);
 		W.GripL = FVector(0.f, 4.72f, -4.11f);
 		W.MagWell = FVector(0.f, -1.03f, 3.28f);
@@ -107,18 +108,21 @@ namespace
 		W.AnimReload = TEXT("/Game/Characters/Mannequins/Anims/Pistol/MM_Pistol_Reload.MM_Pistol_Reload");
 		W.AnimDry = TEXT("/Game/Characters/Mannequins/Anims/Pistol/MM_Pistol_DryFire.MM_Pistol_DryFire");
 		// MF_Pistol_Idle_ADS, first frame
-		W.PoseGripLoc = FVector(-11.2, 42.1, 147.4);
-		W.PoseGripX = FVector(1.0, 0.06, -0.01).GetSafeNormal();
-		W.PoseGripY = FVector(-0.06, 0.99, 0.14).GetSafeNormal();
-		W.PoseGripZ = FVector(0.02, -0.14, 0.99).GetSafeNormal();
+		W.PoseGripLoc = FVector(-13.10, 42.27, 149.68);
+		W.PoseGripX = FVector(0.9979, 0.0634, -0.0106);
+		W.PoseGripY = FVector(-0.0612, 0.9877, 0.1438);
+		W.PoseGripZ = FVector(0.0196, -0.1428, 0.9896);
 		W.EquipAnimS = 1.4f;
 		W.ReloadAnimS = 2.0f;
 		W.DryAnimS = 0.8f;
-		W.HipPlace = FVector(30.0, 9.0, -4.0);
-		W.HipTurn = FRotator(0.0, -4.0, 0.0);
-		W.AdsPlace = FVector(24.0, 0.0, -0.3);
-		W.LowPlace = FVector(32.0, 11.0, -12.0);
-		W.LowTurn = FRotator(-20.0, 10.0, -4.0);
+		W.GripLHand = FVector(0.0, 4.72, -4.11);
+		W.ShoulderAdsR = FVector(-22.0, 3.0, -28.0);
+		W.ShoulderAdsL = FVector(2.0, -24.0, -35.0);
+		W.HipPlace = FVector(48.0, 12.0, -6.0);
+		W.HipTurn = FRotator(0.0, -6.0, 0.0);
+		W.AdsPlace = FVector(34.0, 0.0, 0.0);
+		W.LowPlace = FVector(46.0, 20.0, -16.0);
+		W.LowTurn = FRotator(25.0, -20.0, -10.0);
 		W.ShotSound = TEXT("/Game/ASTRA/Audio/SW_Pistol_Shot.SW_Pistol_Shot");
 		W.DrySound = TEXT("/Game/ASTRA/Audio/SW_Gun_Dry.SW_Gun_Dry");
 		W.ReloadSound = TEXT("/Game/ASTRA/Audio/SW_Pistol_Reload.SW_Pistol_Reload");

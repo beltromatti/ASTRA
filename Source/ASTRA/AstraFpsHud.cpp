@@ -1,8 +1,19 @@
 #include "AstraFpsHud.h"
 
 #include "Engine/Font.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
+#include "Rendering/SlateRenderer.h"
 #include "Styling/CoreStyle.h"
+
+namespace
+{
+	/** A key and what it does, for the card that is up when he arms. */
+	struct FKeyHint { const TCHAR* Key; const TCHAR* What; };
+	const FKeyHint FpsKeyRowWeapon[] = {{TEXT("LMB"), TEXT("fire")}, {TEXT("RMB"), TEXT("aim")}, {TEXT("R"), TEXT("reload")}, {TEXT("1"), TEXT("rifle")}, {TEXT("2"), TEXT("sidearm")}, {TEXT("Q"), TEXT("last weapon")}, {TEXT("H"), TEXT("holster")}};
+	const FKeyHint FpsKeyRowMove[] = {{TEXT("W A S D"), TEXT("move")}, {TEXT("Shift"), TEXT("run")}, {TEXT("C"), TEXT("crouch")}, {TEXT("hold C"), TEXT("prone")}, {TEXT("Space"), TEXT("jump")}, {TEXT("E"), TEXT("use")}, {TEXT("F1"), TEXT("all keys")}};
+}
 
 void SAstraCombatHud::Construct(const FArguments&)
 {
@@ -10,6 +21,7 @@ void SAstraCombatHud::Construct(const FArguments&)
 	UFont* Title = LoadObject<UFont>(nullptr, TEXT("/Game/ASTRA/UI/Fonts/F_ASTRA_Title.F_ASTRA_Title"));
 	Small = Mono ? FSlateFontInfo(Mono, 11) : FCoreStyle::GetDefaultFontStyle("Mono", 11);
 	Mid = Title ? FSlateFontInfo(Title, 14) : FCoreStyle::GetDefaultFontStyle("Regular", 14);
+	Cap = Mono ? FSlateFontInfo(Mono, 12) : FCoreStyle::GetDefaultFontStyle("Mono", 12);
 	Big = Title ? FSlateFontInfo(Title, 26) : FCoreStyle::GetDefaultFontStyle("Bold", 26);
 }
 
@@ -134,9 +146,42 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 	{
 		Text(State.Prompt, FVector2D(C.X - 200.f * U, Size.Y * 0.70f), Mid, FLinearColor(0.95f, 0.97f, 1.f, State.PromptAlpha), L + 2);
 	}
-	if (State.KeysAlpha > 0.02f && !State.Keys.IsEmpty())
+	if (State.KeysAlpha > 0.02f)
 	{
-		Text(State.Keys, FVector2D(C.X - 430.f * U, Size.Y - 52.f * U), Small, FLinearColor(0.78f, 0.84f, 0.92f, State.KeysAlpha * 0.9f), L + 2);
+		// the card: two rows of keys on caps, lower middle, above the corner where the controller's walking notice stands (the two never meet)
+		const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+		const float A = State.KeysAlpha;
+		const float RowH = 26.f * U, Pad = 12.f * U, CapPad = 7.f * U, Gap = 18.f * U, After = 6.f * U;
+		const auto RowWidth = [&](const FKeyHint* Row, int32 N)
+		{
+			float W = 0.f;
+			for (int32 i = 0; i < N; ++i)
+			{
+				W += Measure->Measure(FString(Row[i].Key), Cap).X + 2.f * CapPad + After + Measure->Measure(FString(Row[i].What), Cap).X + (i + 1 < N ? Gap : 0.f);
+			}
+			return W;
+		};
+		constexpr int32 NW = UE_ARRAY_COUNT(FpsKeyRowWeapon), NM = UE_ARRAY_COUNT(FpsKeyRowMove);
+		const float W = FMath::Max(RowWidth(FpsKeyRowWeapon, NW), RowWidth(FpsKeyRowMove, NM)) + 2.f * Pad;
+		const float H = 2.f * RowH + 3.f * Pad * 0.75f;
+		const FVector2D Origin(C.X - W * 0.5f, Size.Y - 100.f * U - H);
+		Box(Origin, FVector2D(W, H), FLinearColor(0.004f, 0.006f, 0.01f, 0.62f * A), L + 1);
+		const auto DrawRow = [&](const FKeyHint* Row, int32 N, float Y)
+		{
+			float X = Origin.X + Pad;
+			for (int32 i = 0; i < N; ++i)
+			{
+				const float KW = Measure->Measure(FString(Row[i].Key), Cap).X;
+				Box(FVector2D(X, Y + 1.f * U), FVector2D(KW + 2.f * CapPad, RowH - 2.f * U), FLinearColor(0.46f, 0.52f, 0.6f, 0.9f * A), L + 2);
+				Box(FVector2D(X + 1.f * U, Y + 2.f * U), FVector2D(KW + 2.f * CapPad - 2.f * U, RowH - 4.f * U), FLinearColor(0.1f, 0.125f, 0.16f, 0.96f * A), L + 2);
+				Text(Row[i].Key, FVector2D(X + CapPad, Y + 5.f * U), Cap, FLinearColor(0.96f, 0.98f, 1.f, A), L + 3);
+				X += KW + 2.f * CapPad + After;
+				Text(Row[i].What, FVector2D(X, Y + 5.f * U), Cap, FLinearColor(0.7f, 0.78f, 0.88f, 0.95f * A), L + 3);
+				X += Measure->Measure(FString(Row[i].What), Cap).X + Gap;
+			}
+		};
+		DrawRow(FpsKeyRowWeapon, NW, Origin.Y + Pad * 0.75f);
+		DrawRow(FpsKeyRowMove, NM, Origin.Y + Pad * 0.75f * 2.f + RowH);
 	}
 	return L + 4;
 }

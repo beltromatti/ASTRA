@@ -38,8 +38,8 @@ degli ordini e li passa al gioco. Con `ASTRA_MARINE_MINDS=0` la rete dei marine 
 | Il poligono del Ponte 8 | `d8_firing_range_*` nella pianta: il rastrello e un bersaglio qualsiasi (i marine di guardia sono corpi veri) bastano per provare mira, rinculo e ricarica |
 | Un abbordaggio | `astra.board.start [navette 1..4] [id della stanza in cui tagliano]` (il comando `boarding` del gioco: `{skiffs, boarders, breach, source, lockdown, warn_s}`); `astra.board.end` lo chiude; `astra.board.info` ne dà i numeri; `astra.board.debug 1` disegna i soldati, `2` anche i luoghi delle squadre, la via del Mandato e l'imboscata dei marine; `astra.board.picture` scrive nel log il quadro che la mente legge |
 | Ordini ai marine | a voce («Reyes, tieni il corridoio fuori dall'ingegneria», «Reaction Uno, con me», «chiudi le paratie»), o `astra.board.cmd marine_order {"squad":"all","task":"hold","place":"engineering"}` / `astra.board.cmd lockdown {"sealed":true}` |
-| Provare la mira dal harness | `astra.fps.aim 1` tiene giù il tasto destro **attraverso il sistema d'ingresso** (mappa, azione `IA_ASTRA_Aim`, binding del personaggio: la stessa strada del mouse vero), `astra.fps.aim 0` lo lascia; con `direct` salta il sistema d'ingresso. Così `astra.fps.fire 1/0` (tasto sinistro), `astra.fps.reload`, `astra.fps.weapon rifle\|pistol\|holster\|switch`. `astra.fps.info` dice lo stato, **quante volte l'azione è arrivata** (se resta 0 l'ingresso non arriva: non è colpa dell'arma) e dove stanno nell'inquadratura mirino, bocca, mani e avambracci (angoli e «IN VIEW»); nel log `[Fps] aim: pressed/released` |
-| Regolare le braccia | i posti dell'arma sono nella tabella (`AstraWeapon.cpp`: `HipPlace/HipTurn`, `AdsPlace`, `LowPlace/LowTurn`: dove sta il mirino posteriore rispetto alla camera, in cm); `astra.fps.hip_x/_y/_z`, `ads_x/_y/_z`, `low_x/_y/_z` **aggiungono** cm a quei posti e le braccia si riposizionano subito; `astra.fps.arms 0` (solo l'arma, il ripiego) |
+| Provare la mira dal harness | `astra.fps.aim 1` tiene giù il tasto destro **attraverso il sistema d'ingresso** (mappa, azione `IA_ASTRA_Aim`, binding del personaggio: la stessa strada del mouse vero), `astra.fps.aim 0` lo lascia; con `direct` salta il sistema d'ingresso. Così `astra.fps.fire 1/0` (tasto sinistro), `astra.fps.reload`, `astra.fps.weapon rifle\|pistol\|holster\|switch`. `astra.fps.info` dice lo stato, **quante volte l'azione è arrivata** (se resta 0 l'ingresso non arriva: non è colpa dell'arma) e dove stanno nell'inquadratura mirino, bocca, palmo sinistro voluto, mani, avambracci e spalle (angoli e «IN VIEW»: dal mirino il mirino posteriore deve stare a 0,0 e le spalle devono essere «out of view»), quanto la mano sinistra dista dal palmo voluto e quanto la presa destra dista dalla tabella (0: l'arma sta dove la tabella la mette); nel log `[Fps] aim: pressed/released` |
+| Regolare le braccia | i posti dell'arma e le spalle sono nella tabella (`AstraWeapon.cpp`: `HipPlace/HipTurn`, `AdsPlace`, `LowPlace/LowTurn`, `FpFov`, `GripLHand`, `ShoulderHip*`, `ShoulderAds*`); `astra.fps.hip_x/_y/_z`, `ads_x/_y/_z`, `low_x/_y/_z` **aggiungono** cm ai posti, `astra.fps.shoulder_x/_y/_z` alle spalle e `astra.fps.fp_fov` cambia il campo: le braccia si riposizionano subito; `astra.fps.arms 0` (solo l'arma, il ripiego). **Il banco prova la tabella senza finestra** (§9): `tools/boarding.py run --scenario fps`, e `--fpsset "rifle.hip=76,15.4,-4;rifle.shoulder_l=70,-18,-58"` prova altri numeri prima di toccare la tabella |
 | Altri | `astra.board.friendlyfire 1` (i colpi del Capitano feriscono anche i marine); `astra.board.takeover_fatal 0` (se il Mandato prende l'Ingegneria il combattimento finisce e basta, senza il collasso del reattore) |
 
 **Senza il gioco** (i banchi, §9): `tools/boarding.py` (la simulazione sulla pianta vera), `mind/bench/marines_unit.py`, `marines_server.py` (modello finto), `marines_live.py` (modello
@@ -99,18 +99,33 @@ Le armi sono modelli gratuiti (CC-BY, registrati in [licenze.csv](licenze.csv)):
 `art/blender/weapons.py` (UV, texture ORM e normale, prese: Muzzle, Sight, SightFront, GripL, MagWell, Eject) e importati da `tools/ue_scripts/import_weapons.py`; i suoni sono
 sintetizzati (`tools/art/weapon_sounds.py`: colpo, scatto a vuoto, ricariche, impugnare, impatto, sibilo, colpo a segno), nessun campione di terzi.
 
-- **Braccia**: il mannequin **tagliato alle braccia** (`SKM_ASTRA_Arms`, fatto da `tools/ue_scripts/make_fp_arms.py` con Geometry Script: metà inferiore del braccio, avambraccio, mano e
-  dita; stesso scheletro e stessi materiali, quindi le animazioni di fucile e pistola del mannequin lo muovono e le prese `HandGrip_*` sono quelle dello scheletro). Il corpo intero non
-  andava: con la camera sugli occhi e l'arma dove deve stare sullo schermo, testa, spalle e petto riempivano l'inquadratura (la «forma scura curva» sul bordo destro era la testa).
-  Se l'asset manca il gioco ripiega sulla mesh intera con la testa tolta (`neck_01`). Il posto dell'arma rispetto alla camera è **calcolato** dalla posa della mano destra misurata
-  con una sonda (i numeri sono in `AstraWeapon.cpp`), in modo che il mirino posteriore cada dove si vuole: dal fianco (in basso a destra e verso il centro, la mano sinistra e
-  l'avambraccio destro in vista), dal mirino (la tacca sull'asse della camera, la torretta anteriore nella tacca) e abbassata (corsa, rimessa: un angolo dell'arma in basso a destra).
-  I numeri sono tarati su **resa fuori linea** (`Saved/scratch`, non nel repo: la mesh scheletrica e le pose dei file del progetto, scheletrate in numpy e proiettate con il campo di
-  70° della prima persona; la resa della versione vecchia riproduceva lo screenshot del lead, bocca compresa).
+- **Braccia**: il mannequin **tagliato alle braccia** (`SKM_ASTRA_Arms`, fatto da `tools/ue_scripts/make_fp_arms.py` con Geometry Script: tutto il braccio dalla spalla,
+  avambraccio, mano e dita; stesso scheletro e stessi materiali, quindi le animazioni di fucile e pistola del mannequin lo muovono e le prese `HandGrip_*` sono quelle dello
+  scheletro). Il corpo intero non andava: con la camera sugli occhi e l'arma dove deve stare sullo schermo, testa, spalle e petto riempivano l'inquadratura (la «forma scura
+  curva» sul bordo destro era la testa). La pelle segue **solo le ossa del braccio**: il peso che clavicole e `spine_04` avevano sui vertici vicino alla spalla è dato alle ossa del
+  braccio, perché un braccio spostato lontano dal corpo, con quel peso, si strappava in punte lunghe (il banco lo verifica). Se l'asset manca il gioco ripiega sulla mesh intera con la
+  testa tolta (`neck_01`).
+  - **Come stanno in mano** (`AstraArmsRig.*`, funzioni pure sulle trasformazioni): l'animazione gira su una mesh nascosta (l'arma sta sulla sua presa `HandGrip_R`); quello che si vede è
+    una copia (`UPoseableMeshComponent`) in cui le braccia sono **risolte** ogni fotogramma (IK a due ossa, le ossa mantengono la lunghezza): la mano destra resta dove l'animazione la
+    tiene (impugna il calcio come l'arma lo porta), la sinistra va al punto voluto dell'arma (`GripLHand`: sotto la metà posteriore del paramano; l'animazione la tiene dov'è la presa del
+    fucile Epic, a 6-12 cm da quella del nostro), il gomito si piega da una spalla che sta **sotto il quadro**. Le spalle sono dati della tabella (`ShoulderHip*` dal fianco e abbassata,
+    `ShoulderAds*` dal mirino, in mezzo mentre l'arma sale): con l'arma tenuta lontana dalla camera (non più un terzo dello schermo) le spalle di un corpo non la raggiungerebbero,
+    e un braccio con la spalla nel quadro mostrerebbe il taglio. L'estremità tagliata sporge 7 cm oltre l'articolazione ed è larga 8: il banco esige l'articolazione ad almeno 11 cm fuori dal quadro,
+    anche a 16:10 e sulla via dal fianco al mirino. Il palmo sinistro è dell'arma a meno di 1,5 cm (misurato 0,00) in ogni stato.
+  - **Dove sta l'arma** (tabella): dal fianco il mirino posteriore del fucile a 76 cm, 15 a destra, 4 sotto, con la bocca verso il centro e il campo della prima persona a 90° (il fucile non
+    è più un terzo dello schermo, e la mano destra e l'avambraccio entrano dal basso); dal mirino a 32 cm **sull'asse** (0° e 0°: la tacca è al centro, misurato a 0,000 cm); abbassata
+    (corsa, rimessa) a destra e in basso, la bocca in alto a sinistra, le due mani sull'arma. Il posto è **calcolato** dalla posa della presa destra nell'animazione pronta, con i numeri che
+    il **motore** dà (nella tabella: il banco li confronta a ogni giro): la sonda in Python che li aveva misurati prima dava 1,6-2,3 cm in meno e le braccia stavano fuori posto di
+    quella quantità (il mirino a 4,5° a destra e 2,1° in alto visto dal lead nel gioco). La posa pronta è tenuta ferma al primo fotogramma (il respiro dell'animazione spostava il mirino di 1,6 cm).
+  - **Come si tara**: sul banco, non a occhio: `tools/boarding.py run --scenario fps` (§9) e `--fpsposes FILE` scrive le pose e le braccia risolte dal motore, con cui un renderer in numpy
+    (`Saved/scratch`, fuori dal repo) disegna ciò che vede la camera di prima persona per ogni stato. Con `astra.fps.info` nel gioco si controllano gli stessi numeri.
 - **Il colpo**: raggio dalla camera con il cono dell'arma (posizione, velocità, salto, apertura del colpo), tracciante breve dal muso, lampo, impatto (metallo, carne), il sibilo
   per chi lo sente passare, il suono; il rinculo alza il mirino e lo fa vagare, l'arma scalcia sulla spalla (molla), poi il mirino ricade in parte.
 - **Lo schermo**: mirino che si apre con il cono, colpi, forza (quando ferito o in un combattimento), rosso ai bordi e archi di provenienza di un colpo ricevuto, la croce
-  bianca di un colpo a segno (rossa-bianca alla testa), il suggerimento del tasto a portata («E TAKE THE RIFLE AND THE SIDEARM»), la riga dei tasti per 24 s quando si arma.
+  bianca di un colpo a segno (rossa-bianca alla testa), il suggerimento del tasto a portata («E TAKE THE RIFLE AND THE SIDEARM»), il **cartoncino dei tasti** quando si arma (24 s la prima volta,
+  6 s ai richiami, non più di uno ogni 90 s): due righe di tasti su cappucci, l'arma (LMB fuoco, RMB mira, R ricarica, 1 fucile, 2 pistola, Q l'arma di prima, H in fondina) e il movimento
+  (WASD, Shift corsa, C accucciato, C tenuto sdraiato, Spazio salto, E usa, F1 la scheda); sta in basso al centro, **sopra** l'avviso del cammino del controller (in basso a destra: le due
+  cose si sovrapponevano), così i due non si incontrano.
 - **Il costo**: con l'arma in mano il passo cala (0,9; 0,6 dal mirino), il giro dal mirino segue il campo; da seduto, con il tablet alzato, nella lista di un ascensore, a terra
   o morto l'arma non c'è.
 
@@ -182,7 +197,8 @@ l'intervallo raddoppia) tiene anche un abbordaggio lunghissimo sotto 0,25 $ l'or
 | `Source/ASTRA/AstraBoardSubsystem.h/.cpp`, `AstraBoardEvents.cpp`, `AstraBoardMind.cpp` | l'ospite nel gioco: l'evento, i marine del ruolino, i corpi, le ferite, il Capitano, i rapporti, i comandi (`boarding`, `marine_order`, `lockdown`), il quadro per la mente, la console |
 | `Source/ASTRA/AstraCombatant.h/.cpp`, `AstraCombatFx.h/.cpp` | il corpo di un soldato; tracciati, scintille, lampi, suoni (pool: nulla per colpo, nulla mentre la nave è tranquilla) |
 | `Source/ASTRA/AstraWeapon.h/.cpp`, `AstraFpsComponent.h/.cpp`, `AstraFpsHud.h/.cpp`, `AstraArmory.h/.cpp` | le armi del Capitano, le braccia, lo schermo, il rastrello |
-| `Source/ASTRA/AstraBoardSimCommandlet.h/.cpp`, `tools/boarding.py` | il banco senza grafica (§9) |
+| `Source/ASTRA/AstraArmsRig.h/.cpp`, `tools/ue_scripts/make_fp_arms.py`, `Content/ASTRA/Weapons/SKM_ASTRA_Arms` (LFS) | le braccia: il risolutore a due ossa (funzioni pure), la mesh delle sole braccia con la pelle ripulita |
+| `Source/ASTRA/AstraBoardSimCommandlet.h/.cpp`, `tools/boarding.py` | il banco senza grafica (§9), con lo scenario `fps` per le braccia |
 | `art/blender/weapons.py`, `tools/ue_scripts/import_weapons.py`, `tools/art/weapon_sounds.py` | le armi: modelli, texture, materiali, mesh con le prese, suoni |
 | `mind/astra_mind/marines.py` | la rete dei marine |
 | `mind/bench/marines_unit.py` (71 prove), `marines_server.py` (19), `marines_live.py` (29 scene + un abbordaggio), `marines_router.py` (30 frasi) | prove offline e dal vivo |
@@ -203,6 +219,13 @@ la mappa si costruisce in 141-198 ms, 400 percorsi su 400, i portali sono sulle 
 su 400), la morte per dissanguamento a 85 s, la paratia tagliata dopo 24 s, il combattimento è identico dal seme, un duello alla pari 60/40, una squadra in campo aperto e con gli
 angoli, l'aggiramento, i combattimenti sulla nave (§3), 0,02-0,07 ms a passo. `orders` aggiunge: nessuno esce dalla pianta sotto qualunque ordine, ogni combattimento finisce, «follow»
 raduna, un Capitano a terra è raggiunto dalle due squadre più vicine (10 marine entro 8 m dopo 50 s, 8 combattimenti su 8).
+
+**Il banco delle braccia** (`python3.13 tools/boarding.py run --scenario fps`, 20 s, nessuna pianta e nessuna finestra; `--fpsposes FILE` scrive le pose del motore, `--fpsset "..."` prova altri
+numeri): 24 prove sulla mesh vera, le animazioni vere e la tabella. Le 161 ossa e la **pelle** (nessuna influenza fuori dalle ossa del braccio); la presa destra nella posa pronta contro la
+tabella (meno di 0,2 cm e 0,3°); per ogni arma e stato (fianco, mirino, abbassata): il mirino cade dove la tabella lo mette (0,000 cm), le ossa mantengono le lunghezze, le spalle stanno dove
+si mettono, la mano destra è dove l'animazione la tiene, il palmo sinistro è sul punto voluto (meno di 1,5 cm), dal fianco mirino, bocca, palmo e polso destro sono nell'inquadratura a 16:9 e a
+16:10, dal mirino la tacca è sull'asse (0°, 0°); le spalle sono fuori dal quadro di almeno 11 cm in ogni stato e sulla via dal fianco al mirino (misurato 12,1 cm); l'estrazione, la ricarica
+e lo scatto a vuoto sono risolti in tredici fotogrammi senza rotture. Verdetto **PASS (24 su 24)**; i gomiti dal fianco: sinistro 121° (polso a 48 cm dalla spalla), destro 93° (40 cm).
 
 **La mente offline** (`cd mind && .venv/bin/python -m unittest bench.marines_unit bench.marines_server`, 90 prove, 0 $, 20 s): quali eventi sono della rete e quali restano alla
 plancia, e che **ogni evento che il gioco può dire è riconosciuto dalla tabella** (i testi si leggono dal sorgente C++); che i campi del quadro e gli argomenti dei comandi sono quelli
@@ -225,7 +248,7 @@ a faccia a faccia con il sergente 7 su 8 (l'ottavo: «teniamo qui» senza l'ordi
 ## 10. Limiti noti
 
 - **Non provato nel gioco**: non ho potuto avviare l'editor né il gioco; il C++ compila e il banco lo prova come codice, ma gli aspetti visivi (il posto delle braccia e del mirino
-  rispetto alla camera con il campo di prima persona 70° e la scala 0,6, i mesh delle armi, le animazioni dei soldati, la luce della breccia) e l'integrazione con i livelli veri
+  rispetto alla camera con la scala 0,6 della prima persona (le braccia, 2ª versione: IK, spalle sotto il quadro, campo 90°, pelle ripulita, sono provate dal banco e da rese fuori linea con le pose del motore, non ancora viste nel gioco; la 1ª versione il lead l'ha vista e ne ha dato le misure), i mesh delle armi, le animazioni dei soldati, la luce della breccia) e l'integrazione con i livelli veri
   (corpi sul pavimento, porte, il rastrello nell'armeria) si vedono solo lì. Se le armi appaiono sfaccettate: riesportare con `--smooth face` (Blender non scrive i gruppi di smussatura).
 - **L'abbordaggio parte da un comando o dalla console**: il collegamento con la guerra (una navetta nemica che aggancia dopo la battaglia) non c'è; la mente può dare
   `boarding` con `_director_command("boarding", {...})` (richiesta al lead, §12).
@@ -254,7 +277,9 @@ a faccia a faccia con il sergente 7 su 8 (l'ottavo: «teniamo qui» senza l'ordi
      `tools/ue.py py "ONLY=['SW_Rifle_Shot','SW_Pistol_Shot','SW_Gun_Dry','SW_Rifle_Reload','SW_Pistol_Reload','SW_Gun_Draw','SW_Bullet_Impact','SW_Bullet_Whiz','SW_Body_Hit']; exec(open('tools/ue_scripts/import_audio.py').read())"`.
    Gli altri suoni che il codice cerca (`SW_Blast_Inside`, `SW_Sparks`) sono già nel progetto.
 3. **Provare** (§2): `astra.armory.here` + E; poi `astra.weapons.give` per sparare ovunque; `astra.board.start` in un corridoio; `astra.board.debug 2`; parlare con Reyes.
-   Se le braccia o il mirino sono fuori posto: `astra.fps.hip_*`, `astra.fps.ads_*`, `astra.fps.low_*` (i numeri finiti vanno nella tabella, `AstraWeapon.cpp`).
+   Le braccia: `git lfs pull` (l'asset `SKM_ASTRA_Arms` è stato rifatto), compilare, poi `astra.weapons.give`, `astra.fps.info`, `astra.fps.aim 1` e ancora `astra.fps.info` (il mirino posteriore a 0,0;
+   il palmo sinistro a meno di 2 cm dal punto voluto; le spalle «out of view»). Se le braccia o il mirino sono fuori posto: `astra.fps.hip_*`, `astra.fps.ads_*`, `astra.fps.low_*`, `astra.fps.shoulder_*`
+   (i numeri finiti vanno nella tabella, `AstraWeapon.cpp`).
 4. **La mente**: `cd mind && .venv/bin/python -m unittest bench.marines_unit bench.marines_server` (90 prove); dal vivo `python -m bench.marines_live` (0,02 $).
 5. **Piante**: la v2 di NAVE-3 ha altri id (`d8_armory_B1` «Marine Armory» e `d8_armory_D1` «Security Armory», nessuna `d7_capacitors_D2`): il gioco sceglie l'armeria per tipo (la prima) e
    la breccia di base con una regola (la stanza più esterna del Ponte 7 nelle sezioni di mezzo); per un'altra: `astra.board.start 1 <id>`.
