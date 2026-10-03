@@ -4,6 +4,7 @@
 #include "AstraWarFX.h"
 #include "AstraBattleSubsystem.h"
 #include "ASTRA.h"
+#include "AstraFleetInterior.h"
 #include "Components/DecalComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -397,6 +398,10 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 	const float SizeK = FMath::Clamp(S.Radius / 150.f, 0.5f, 3.2f);
 	const bool bAstra = S.Side == EAstraSide::Astra;
 	const float K = FMath::Clamp(Density, 0.2f, 2.f);
+	if (S.Interior.IsValid())
+	{
+		FleetFxRefresh(S, Fx);                                                  // (a ship with an inside burns and vents where its rooms do)
+	}
 	for (int32 sec = 0; sec < AstraWar::NumSections; ++sec)
 	{
 		const bool bGut = D.GuttedT[sec] >= 0.f;
@@ -412,7 +417,7 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 			while (Fx.Emit[sec] >= 1.f)
 			{
 				Fx.Emit[sec] -= 1.f;
-				const FVector Pt = HullPoint(S, sec, FMath::FRand(), FMath::FRandRange(-1.f, 1.f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.6f, 0.6f), true);
+				const FVector Pt = Fx.InFire[sec].Num() ? FleetFxPoint(S, Fx.InFire[sec]) : HullPoint(S, sec, FMath::FRand(), FMath::FRandRange(-1.f, 1.f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.6f, 0.6f), true);
 				const FVector Out = (Pt - S.Pos).GetSafeNormal();
 				const float R0 = 2.4f * SizeK;
 				if (FPuff* P = AddPuff(Pt, S.Vel + Out * FMath::FRandRange(3.f, 9.f), FMath::FRandRange(0.8f, 1.6f), R0, R0 * FMath::FRandRange(2.2f, 3.4f),
@@ -437,7 +442,7 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 			if (Fx.BlastT[sec] <= 0.f)
 			{
 				Fx.BlastT[sec] = bGut ? FMath::FRandRange(2.5f, 7.f) : FMath::FRandRange(7.f, 16.f);
-				const FVector Pt = HullPoint(S, sec, FMath::FRand(), FMath::FRandRange(-0.8f, 0.8f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.6f, 0.6f), true);
+				const FVector Pt = Fx.InFire[sec].Num() ? FleetFxPoint(S, Fx.InFire[sec]) : HullPoint(S, sec, FMath::FRand(), FMath::FRandRange(-0.8f, 0.8f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.6f, 0.6f), true);
 				Explosion(Pt, S.Vel, FMath::Clamp(S.Radius * FMath::FRandRange(0.035f, 0.07f), 4.f, 40.f), bAstra, bGut ? 0.38f : 0.25f, 0.f);
 			}
 		}
@@ -447,7 +452,7 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 			while (Fx.EmitVent[sec] >= 1.f)
 			{
 				Fx.EmitVent[sec] -= 1.f;
-				const FVector Pt = HullPoint(S, sec, FMath::FRand(), FMath::FRandRange(-1.f, 1.f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.6f, 0.6f), true);
+				const FVector Pt = Fx.InVent[sec].Num() ? FleetFxPoint(S, Fx.InVent[sec]) : HullPoint(S, sec, FMath::FRand(), FMath::FRandRange(-1.f, 1.f), FMath::RandBool() ? 1.f : FMath::FRandRange(-0.6f, 0.6f), true);
 				const FVector Out = (Pt - S.Pos).GetSafeNormal();
 				if (FPuff* P = AddPuff(Pt, S.Vel + (Out + FMath::VRand() * 0.15f) * FMath::FRandRange(55.f, 95.f), FMath::FRandRange(0.5f, 0.95f), 1.2f * FMath::Sqrt(SizeK),
 				                        4.6f * FMath::Sqrt(SizeK), bAstra ? FLinearColor(0.78f, 0.88f, 1.f) : FLinearColor(1.f, 0.9f, 0.78f), 60.f, LGlow))
@@ -468,6 +473,71 @@ void UAstraWarFX::HullEmitters(const FAstraBattleShip& S, FShipFx& Fx)
 			Explosion(Pt, S.Vel, S.Radius * FMath::FRandRange(0.07f, 0.16f), bAstra, 0.5f, 0.f);
 		}
 	}
+}
+
+void UAstraWarFX::FleetFxRefresh(const FAstraBattleShip& S, FShipFx& Fx)
+{
+	Fx.InT -= Dt;
+	if (Fx.InT > 0.f)
+	{
+		return;
+	}
+	Fx.InT = 0.4f;
+	FFleetFxPoints P;
+	S.Interior->FxPoints(P);
+	for (int32 sec = 0; sec < 3; ++sec)
+	{
+		Fx.InFire[sec] = MoveTemp(P.Fire[sec]);
+		Fx.InVent[sec] = MoveTemp(P.Vent[sec]);
+	}
+	// the windows of the rooms that lost their power go dark (the lights' material has one global fraction: a disabled ship's lights are PowerDown's)
+	if (!S.bDisabled && bLive && S.Actor && FMath::Abs(P.Lit - Fx.InLit) > 0.02f)
+	{
+		Fx.InLit = P.Lit;
+		if (!Fx.LightsMid.IsValid())
+		{
+			if (UStaticMeshComponent* C = S.Actor->GetStaticMeshComponent())
+			{
+				const TCHAR Fac = S.Side == EAstraSide::Mandate ? TEXT('M') : (S.Side == EAstraSide::Astra ? TEXT('A') : TEXT('G'));
+				const int32 Slot = C->GetMaterialIndex(*FString::Printf(TEXT("MI_HULL_%c_Lights"), Fac));
+				if (Slot != INDEX_NONE)
+				{
+					Fx.LightsMid = C->CreateDynamicMaterialInstance(Slot);
+				}
+			}
+		}
+		if (UMaterialInstanceDynamic* M = Fx.LightsMid.Get())
+		{
+			M->SetScalarParameterValue(TEXT("LitFraction"), 0.65f * P.Lit);         // (0.65 is the windows fully lit, as PowerDown's)
+		}
+	}
+}
+
+FVector UAstraWarFX::FleetFxPoint(const FAstraBattleShip& S, const TArray<FVector>& Points) const
+{
+	const FVector P = Points[FMath::RandHelper(Points.Num())];                      // the hull's frame (m): the mesh's own, about the ship's position
+	if (!S.Box.Valid())
+	{
+		return S.Pos + S.Att.RotateVector(P);
+	}
+	// it shows on the face of the hull's box it lies nearest (a fire deep in the hull is seen through the plating on the side it is nearest); the ends only for what lies at them
+	const FVector R((P.X - S.Box.Mid) / S.Box.Hx, P.Y / S.Box.Hy, P.Z / S.Box.Hz);
+	const FVector A = R.GetAbs();
+	FVector L = P;
+	if (A.X > 0.85 && A.X >= A.Y && A.X >= A.Z)
+	{
+		L.X = S.Box.Mid + (R.X >= 0.0 ? 1.0 : -1.0) * S.Box.Hx * 0.96;
+	}
+	else if (A.Y > A.Z)
+	{
+		L.Y = (R.Y >= 0.0 ? 1.0 : -1.0) * S.Box.Hy * 0.96;
+	}
+	else
+	{
+		L.Z = (R.Z >= 0.0 ? 1.0 : -1.0) * S.Box.Hz * 0.96;
+	}
+	L += FMath::VRand() * (S.Radius * 0.012f);
+	return S.Pos + S.Att.RotateVector(L);
 }
 
 void UAstraWarFX::PowerDown(const FAstraBattleShip& S, FShipFx& Fx)

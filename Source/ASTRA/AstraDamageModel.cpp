@@ -37,11 +37,10 @@ namespace
 	FAutoConsoleVariableRef DmCVarBurn(TEXT("astra.damage.burn"), GDmBurn, TEXT("DISTRUZIONE: scale of the hull structure the fires eat"));
 	FAutoConsoleVariableRef DmCVarDoctrine(TEXT("astra.damage.auto_seal"), GDmDoctrine, TEXT("DISTRUZIONE: 1 pressure bulkheads and lockdowns close by themselves, 0 they do not"));
 
-	constexpr float DmStep = 0.2f;                 // s: the physics' step
+	constexpr float DmStep = 0.2f;                 // s: the physics' step (the Aquila's: FAstraDamageModel::StepS, which a fleet ship's inside sets longer)
 	constexpr float DmHoleMin = 0.12f;             // m2: a hole big enough to be an incident (the smaller ones are sealed by the plating itself)
 	constexpr float DmFireMin = 0.10f;
 	constexpr float DmPowerMin = 0.85f;
-	constexpr double DmHullToPlan[3] = {172.0, 0.0, 62.0};   // the plan's frame is the hull mesh's, moved: hull = plan + (172, 0, 62) (docs/NAVE.md)
 
 	float DmPow(float X, float E) { return FMath::Pow(FMath::Max(X, 0.f), E); }
 
@@ -243,13 +242,14 @@ FString FAstraDamageModel::InfoText() const
 bool FAstraDamageModel::SkinEntry(const FAstraHullHit& H, FVector& OutAt, FVector& OutDir) const
 {
 	// The hull's box (GUERRA) and the plan do not have the same height: the plan's decks fill the body of the hull from the keel to
-	// the top of Deck 2. A blow's height on the box (-1..1) is carried onto that body; its length and its breadth are the same on
-	// both (the plan is the hull's frame, moved). The blow enters where the plan's envelope is: the plating at that height.
-	const FVector Plan(H.HullM.X - DmHullToPlan[0], H.HullM.Y - DmHullToPlan[1], H.HullM.Z - DmHullToPlan[2]);
+	// the top of its highest body deck (the Aquila's Deck 2). A blow's height on the box (-1..1) is carried onto that body; its length
+	// and its breadth are the same on both (the plan is the hull's frame, moved by the map's origin: the Aquila's is the bridge, a class
+	// plan's is the mesh's own). The blow enters where the plan's envelope is: the plating at that height.
+	const FVector Plan(H.HullM.X - Map->OriginInHullM.X, H.HullM.Y - Map->OriginInHullM.Y, H.HullM.Z - Map->OriginInHullM.Z);
 	const float Tz = FMath::Clamp((H.Box.Z + 1.f) * 0.5f, 0.f, 1.f);
 	const float Bottom = Map->KeelCm() + 40.f, Top = Map->BodyTopCm() - 40.f;
 	const float Z = FMath::Lerp(Bottom, Top, Tz);
-	const int32 Deck = FMath::Max(2, Map->DeckAtZ(Z));
+	const int32 Deck = FMath::Max(Map->FirstBodyDeck, Map->DeckAtZ(Z));
 	const FAstraDmgDeck* D = Map->DeckById(Deck);
 	if (!D)
 	{
@@ -280,14 +280,14 @@ bool FAstraDamageModel::SkinEntry(const FAstraHullHit& H, FVector& OutAt, FVecto
 	}
 	case 4:   // dorsal
 	{
-		const FAstraDmgDeck* Top2 = Map->DeckById(2);
+		const FAstraDmgDeck* Top2 = Map->DeckById(Map->FirstBodyDeck);
 		const float Xc = FMath::Clamp(X, Top2->XAftCm, Top2->XFwdCm);
 		At = FVector(Xc, H.Box.Y * Top2->HalfWidthAt(Xc), Map->BodyTopCm() + 20.f);
 		N = FVector(0.0, 0.0, 1.0);
-		// the bridge's island stands on the top of the hull: a blow on it enters its own deck
+		// the bridge's island (a class's tower or block) stands on the top of the hull: a blow on it enters its own deck
 		for (const FAstraDmgComp& C : Map->Comps)
 		{
-			if (C.Deck == 1 && At.X >= C.Box.Min.X - 300.f && At.X <= C.Box.Max.X + 300.f && At.Y >= C.Box.Min.Y - 300.f && At.Y <= C.Box.Max.Y + 300.f)
+			if (!Map->IsBody(C.Deck) && At.X >= C.Box.Min.X - 300.f && At.X <= C.Box.Max.X + 300.f && At.Y >= C.Box.Min.Y - 300.f && At.Y <= C.Box.Max.Y + 300.f)
 			{
 				At.Z = C.Box.Max.Z + 40.f;
 				break;
@@ -297,7 +297,7 @@ bool FAstraDamageModel::SkinEntry(const FAstraHullHit& H, FVector& OutAt, FVecto
 	}
 	default:  // ventral
 	{
-		const FAstraDmgDeck* Low = Map->DeckById(12);
+		const FAstraDmgDeck* Low = Map->DeckById(Map->LastBodyDeck);
 		const float Xc = FMath::Clamp(X, Low->XAftCm, Low->XFwdCm);
 		At = FVector(Xc, H.Box.Y * Low->HalfWidthAt(Xc), Map->KeelCm() - 20.f);
 		N = FVector(0.0, 0.0, -1.0);
@@ -510,7 +510,7 @@ void FAstraDamageModel::GutSection(float XMinCm, float XMaxCm, const FString& Na
 	{
 		const FAstraDmgComp& C = Map->Comps[i];
 		const float X = C.Box.GetCenter().X;
-		if (C.Deck < 2 || X < XMinCm || X > XMaxCm)
+		if (!Map->IsBody(C.Deck) || X < XMinCm || X > XMaxCm)
 		{
 			continue;
 		}
@@ -819,13 +819,13 @@ void FAstraDamageModel::Tick(float Dt, TArray<FAstraDamage>& Incidents)
 	}
 	Clock += Dt;
 	Acc += Dt;
-	for (int32 Steps = 0; Acc >= DmStep && Steps < 8; ++Steps)
+	for (int32 Steps = 0; Acc >= StepS && Steps < 8; ++Steps)
 	{
-		Step(DmStep);
-		Acc -= DmStep;
-		PeopleT += DmStep;
-		SyncT += DmStep;
-		SystemsT += DmStep;
+		Step(StepS);
+		Acc -= StepS;
+		PeopleT += StepS;
+		SyncT += StepS;
+		SystemsT += StepS;
 	}
 	if (Acc > 2.f)
 	{

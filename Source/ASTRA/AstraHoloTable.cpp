@@ -4,6 +4,7 @@
 
 #include "AstraBattleSubsystem.h"
 #include "AstraDamageModel.h"
+#include "AstraFleetInterior.h"
 #include "AstraShipPlan.h"
 #include "AstraShipSubsystem.h"
 #include "AstraWarDraw.h"
@@ -707,6 +708,49 @@ bool AAstraHoloTable::TickScannedShip(float DeltaTime, const FVector& ViewerLoca
 			D->SetRelativeLocation(At(M.Dir.X * HalfLen * 0.9f, FMath::Clamp(M.Dir.Y * 1.3f, -1.1f, 1.1f), FMath::Clamp(M.Dir.Z * 1.3f, -1.1f, 1.1f)));
 			D->SetRelativeScale3D(FVector(0.8f / 100.f));
 			SetColor(D, M.Health > 0.66f ? FLinearColor(0.3f, 1.f, 0.55f) : (M.Health > 0.2f ? ColHolding : ColHostile), Fade * (M.bReady ? 30.f : 10.f));
+		}
+	}
+	// what the inside of her shows (FLOTTA-VIVA: the ship's own rooms, through the sensors' fog of war): where it burns and where the air streams out, at their places in the hull,
+	// and the people as far as the sensors give them (the life signs of a classified track; her own side's hands, killed and wounded)
+	if (V.Fleet.IsValid())
+	{
+		const FAstraFleetView& Fl = *V.Fleet;
+		auto Place = [&](const FVector& P)
+		{
+			return At((float)P.X, (float)FMath::Clamp((P.Y - Fl.HullCentreM.Y) / FMath::Max(1.0, Fl.HullHalfM.Y), -1.0, 1.0), (float)FMath::Clamp((P.Z - Fl.HullCentreM.Z) / FMath::Max(1.0, Fl.HullHalfM.Z), -1.0, 1.0));
+		};
+		for (int32 i = 0; i < FMath::Min(16, Fl.FireM.Num()); ++i)
+		{
+			UStaticMeshComponent* F = Pooled(ShipMarks, NM++, SphereMesh, ShipFrame);
+			F->SetRelativeLocation(Place(Fl.FireM[i]));
+			F->SetRelativeScale3D(FVector((1.6f + 1.2f * Pulse) / 100.f));
+			SetColor(F, FLinearColor(1.f, 0.45f, 0.05f), Fade * (20.f + 30.f * Pulse));
+		}
+		for (int32 i = 0; i < FMath::Min(12, Fl.BreachM.Num()); ++i)
+		{
+			UStaticMeshComponent* F = Pooled(ShipMarks, NM++, SphereMesh, ShipFrame);
+			F->SetRelativeLocation(Place(Fl.BreachM[i]));
+			F->SetRelativeScale3D(FVector((2.2f + 1.5f * (1.f - Pulse)) / 100.f));
+			SetColor(F, ColBreach, Fade * (24.f + 30.f * (1.f - Pulse)));
+		}
+		FString Line;
+		auto Add = [&Line](const FString& Bit) { Line += (Line.IsEmpty() ? TEXT("") : TEXT(" · ")) + Bit; };
+		if (Fl.Fires) { Add(FString::Printf(TEXT("%d FIRES"), Fl.Fires)); }
+		if (Fl.Breaches) { Add(FString::Printf(TEXT("%d BREACHES"), Fl.Breaches)); }
+		if (V.Detail >= 3)
+		{
+			if (Fl.CrewTotal) { Add(FString::Printf(TEXT("CREW %d FIT · %d WOUNDED · %d KILLED OF %d"), Fl.CrewFit, Fl.CrewWounded, Fl.CrewDead, Fl.CrewTotal)); }
+			if (Fl.bCaptainDead || Fl.bCaptainDown) { Add(FString::Printf(TEXT("CAPTAIN %s"), Fl.bCaptainDead ? TEXT("DEAD") : TEXT("DOWN"))); }
+			if (Fl.Parties) { Add(FString::Printf(TEXT("DAMAGE PARTIES %d/%d"), Fl.PartiesBusy, Fl.Parties)); }
+		}
+		else if (V.Detail >= 2 && Fl.LifeSignsPct >= 0)
+		{
+			Add(FString::Printf(TEXT("LIFE SIGNS ~%d%%"), Fl.LifeSignsPct));
+		}
+		if (Fl.Dark > 0) { Add(FString::Printf(TEXT("%d ROOMS DARK"), Fl.Dark)); }
+		if (!Line.IsEmpty())
+		{
+			Text(Line, Centre - FVector(0.f, 0.f, H * 0.5f + (V.Detail >= 3 ? 21.f : 17.f)), bHostile ? ColHostile : ColAquila, 2.4f);
 		}
 	}
 	// where the last blow landed, for a moment

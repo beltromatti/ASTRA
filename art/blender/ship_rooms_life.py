@@ -2,7 +2,13 @@
 redesign adds (the crew's berthing bays, the senior officers' suites, the officers' single cabins) and the drone bay. Frames and sizes: ship_rooms.py / ship_spec.py / ship_spec3.py."""
 from __future__ import annotations
 
+import ship_cabin as SC
+import ship_furn3 as N3
+import ship_mess as MS
 import ship_furniture as F
+import ship_decor as DC
+import ship_spec3 as SPEC3
+import ship_themes as TH
 import ship_furniture2 as G
 import ship_furniture3 as H3
 import ship_furniture4 as F4
@@ -10,7 +16,7 @@ import ship_furniture8 as K8
 import ship_furniture9 as N
 import ship_spec as SPEC
 from bridge3_lib import T
-from ship_lib import (BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP,
+from ship_lib import (CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, OAK, PLASTER_IVORY, PLASTER_SLATE, WALNUT, WEAVE_SLATE, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP,
                       LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL, STRUCT, TILE, TRIM, WOOD, SParts)
 from ship_rooms import Style, WF, WS, build_shell, ceiling_panels, ceiling_services, dress_wall, luminaire_strips, place, wall_label
 
@@ -92,26 +98,35 @@ def bar(name: str = "SM_SHIP_Bar"):
 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------------- the chapel
 def chapel(name: str = "SM_SHIP_Chapel"):
-    """16 x 16 x 3.7: a nave with five rows of pews either side of a central aisle, an altar (a plain stone table, two candles) at the far end under a lit panel of stars, a few plants,
-    soft light from the cove; for all faiths."""
+    """16 x 16 x 3.7: a nave with five rows of pews either side of a central aisle with a runner on it, an altar of pale stone with two candlesticks and a lectern at the far end under a
+    stained-glass window of the ship's colours between two narrow ones, candelabras at the front, banners, plants; soft warm light from the cove; for all faiths."""
     spec, L, D, H = _dims("chapel")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
+    b = SParts(bevel=0.005, fine_bevel=0.0)
     st = Style(floor=FABRIC_GREY, floor_mode="covering", seams=False, wall_lo=WOOD, wall_hi=COMPOSITE, wain_h=1.4, ceil=COMPOSITE, accent="warm_dim", cove="white_warm", ribs=True, skirt=WOOD)
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
+    b.soft.swatch_box((7.1, 1.2, 0.0), (8.9, yf - 2.6, 0.012), "oxblood")                                       # the runner down the aisle
+    b.soft.swatch_box((7.1, 1.2, 0.0), (7.16, yf - 2.6, 0.014), "mustard")
+    b.soft.swatch_box((8.84, 1.2, 0.0), (8.9, yf - 2.6, 0.014), "mustard")
     for k in range(5):
         for xc in (4.8, 11.2):
-            place(b, xc, 4.2 + k * 1.5, 90, N.pew, 2.6)
-    place(b, 8.0, yf - 1.6, -90, N.altar)
-    b.emit.label((8.0, yf - 0.003, 2.2), 5.0, 2.8, (0, -1, 0), "scr_star")
+            place(b, xc, 4.2 + k * 1.5, 90, N3.pew, 2.6)
+    b.soft.swatch_box((5.0, yf - 2.6, 0.0), (11.0, yf - 0.1, 0.12), "w_walnut")                                    # the chancel: a low platform, the altar and its lectern on it
+    place(b, 8.0, yf - 1.6, -90, N3.altar)
+    place(b, 10.2, yf - 1.2, -110, N3.lectern, z=0.12)
+    for x in (5.6, 10.4):
+        place(b, x, yf - 0.9, 0, N3.candle_stand, 1, z=0.12)
+    place(b, 8.0, yf, -90, N3.mosaic_window, 2.4, 3.0, 3, z=1.75)                                                  # the window and its two companions
+    for x in (5.6, 10.4):
+        place(b, x, yf, -90, N3.mosaic_window, 0.8, 2.4, int(x), z=1.65)
     b.body.box((5.3, yf - 0.1, 0.0), (5.45, yf, 3.6), TRIM)
     b.body.box((10.55, yf - 0.1, 0.0), (10.7, yf, 3.6), TRIM)
-    b.body.box((5.3, yf - 0.1, 3.6), (10.7, yf, 3.7), TRIM)
+    for x in (2.0, 14.0):
+        place(b, x, yf, -90, MS.banner, 0.7, 2.1, z=3.0)
     for (x, y) in ((1.0, 14.6), (15.0, 14.6), (1.0, 1.2)):
         place(b, x, y, 0, F.potted_plant, 1.5, int(x + y))
     wall_label(b, 8.0, WF + 0.02, 2.6, (0, 1, 0), "eq_silence", 0.7)
-    ceiling_panels(b, L, D, H, 2, 3, "white_warm", 2.0, 0.9, 0.5, LAMP_DIM)
     return b.build(name)
 
 
@@ -173,96 +188,62 @@ def sim_bay(name: str = "SM_SHIP_SimBay"):
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- quarters
-BERTH_X = (1.8, 4.6, 7.4, 12.6, 15.4, 18.2, 21.0)           # the bunk columns of a berthing bay (a 4 m aisle in the middle, where the door is)
-BERTH_Y = (4.4, 9.6)
-
-
 def berthing(name: str = "SM_SHIP_BerthingBay"):
-    """24 x 16 x 3.4: a crew berthing bay — fourteen double bunks in two rows either side of a central aisle (twenty-eight sleepers), a locker for each bunk against the far wall, a
-    table and benches at the aisle's end, a notice board; low warm light."""
+    """24 x 16 x 3.4: a crew berthing bay — fourteen double bunks in two rows either side of a central aisle (twenty-eight sleepers: the places are at the bunks, the lower ones at the
+    mattress and the upper ones 0.96 m higher), each bunk with its curtain, reading lamp and net pocket and a locker at its foot against the far wall; at the aisle's end a table with
+    benches and a rug, a notice board and the watch roster on the wall, hooks with jackets by the door, a few plants; the light is low and warm (somebody is always asleep)."""
     spec, L, D, H = _dims("berthing")
     b = SParts(bevel=0.005, fine_bevel=0.0)
-    build_shell(b, spec, _warm_style(FABRIC_GREY, COMPOSITE, "warm_dim"))
+    st = TH.crew(floor=CARPET_SLATE, floor2=CARPET_SAND, wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=WEAVE_SLATE, wall_pattern=("panel", "cloth", "panel"), ceiling="bands",
+                 accent="warm_dim", strip="white_warm", light_cell="white_warm", bands=2, bay=2.0, wain_h=1.0)
+    build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
     blankets = (FABRIC_NAVY, FABRIC_GREY, FABRIC_RUST, FABRIC_SAND)
-    for i, x in enumerate(BERTH_X):
-        for j, y in enumerate(BERTH_Y):
+    for i, x in enumerate(SPEC3.BERTH_X):
+        for j, y in enumerate(SPEC3.BERTH_Y):
             place(b, x, y, 90, G.bunk_bed, 2.05, 0.95, 2, blankets[(i + j) % 4], 3 * i + j)
         place(b, x, yf - 0.3, -90, G.wardrobe, 0.9, 0.55, 2.0)
-    place(b, 10.0, 12.6, 0, F.table, 2.6, 1.0, 0.74, WOOD, TRIM, False)
+    place(b, 9.9, 7.0, 0, DC.rug, 3.0, 5.0, CARPET_SLATE, CARPET_SAND)
+    place(b, 10.0, 12.6, 0, F.table, 2.6, 1.0, 0.74, OAK, TRIM, False)
     for dy in (-0.75, 0.75):
-        place(b, 10.0, 12.6 + dy, 90 if dy < 0 else -90, F.bench, 2.4, 0.4, 0.46, FABRIC_GREY)
-    place(b, 9.9, 7.0, 0, G.rug, 3.0, 5.0, FABRIC_GREY, FABRIC_SAND)
-    b.body.box((xr - 0.05, 6.0, 1.1), (xr, 9.0, 1.9), WOOD)                                    # the notice board
+        place(b, 10.0, 12.6 + dy, 90 if dy < 0 else -90, F.bench, 2.4, 0.4, 0.46, LEATHER_NAVY)
+    for k, (dx, dy) in enumerate(((-0.9, -0.2), (-0.2, 0.25), (0.7, -0.3), (1.1, 0.2))):
+        place(b, 10.0 + dx, 12.6 + dy, 0, DC.mug, (CERAMIC, LAMINATE, LEATHER_NAVY, CERAMIC)[k], z=0.74)
+    place(b, 9.4, 12.5, 12, DC.book_stack, 2, 5, z=0.74)
+    place(b, xr - 0.04, 7.5, 180, DC.notice_board, 2.4, 1.0, 2, z=1.45)
+    place(b, xr - 0.04, 12.0, 180, F.wall_screen, 1.6, 0.9, "scr_sched", z=1.7)
+    place(b, 4.6, WF + 0.05, 90, DC.coat_hooks, 5, 0.2, z=1.7)
+    place(b, 15.4, WF + 0.05, 90, DC.coat_hooks, 5, 0.2, z=1.7)
+    for x in (8.6, 11.4):
+        place(b, x, 1.2, 0, F.potted_plant, 1.2, int(x))
     wall_label(b, 2.0, WF + 0.02, 2.2, (0, 1, 0), "eq_bunk", 0.7)
-    for y in (3.0, 7.0, 11.0, 14.5):
-        for x in (4.5, 10.0, 15.5, 21.0):
-            F.ceiling_light_panel(b, x - 0.4, x + 0.4, y - 0.25, y + 0.25, H - 0.05, "white_warm", LAMP_DIM)
+    for x in (7.0, 13.0):                                                                          # picture rail: the squadron prints
+        place(b, x, yf - 0.02, -90, DC.picture, 1.2, 0.8, int(x), WALNUT, ("squares", "bands")[int(x) % 2], z=1.9)
     return b.build(name)
 
 
 def suites(name: str = "SM_SHIP_Suites"):
-    """24 x 12 x 3.2: four senior officers' suites off a hall that runs the length of the block (the door from the passage is at x 10): each a bedroom-sitting room — a double bed under
-    a viewport screen, a desk, a sofa and a low table on a rug, a wardrobe, a basin with a lit mirror; the hall has plants and a wall screen."""
+    """24 x 12 x 3.2: four senior officers' suites off a hall that runs the length of the block (the door from the passage is at x 10): each a bedroom and a sitting room of 6 x 9 m — a
+    coat cupboard, a sofa, a coffee table and an armchair on a rug, a desk with its screen, a shelf; a double bed under a wide window with its nightstands, a bench, a wardrobe, a basin
+    with its mirror; two lights (ship_cabin.py)."""
     spec, L, D, H = _dims("suites")
     b = SParts(bevel=0.005, fine_bevel=0.0)
     build_shell(b, spec, _warm_style(FABRIC_GREY, WOOD, "warm_dim"))
-    yf = D - WS - WF
-    xl, xr = WS + WF, L - WS - WF
-    yh = 2.6                                                                                  # the hall's far wall (y 0.3 .. 2.6)
-    for k in range(4):
-        xa, xb = 6.0 * k, 6.0 * (k + 1)
-        xc = (xa + xb) / 2
-        if k > 0:                                                                              # the partition between two suites
-            b.body.box((xa - 0.06, yh, 0.0), (xa + 0.06, yf, H), COMPOSITE)
-            b.soft.box((xa - 0.075, yh, 0.0), (xa + 0.075, yf, 1.05), WOOD)
-        # the suite's hatch off the hall, and the hall's wall with it
-        b.body.box((max(xa, xl), yh - 0.06, 0.0), (xc - _DW / 2, yh + 0.06, H), COMPOSITE)
-        b.body.box((xc + _DW / 2, yh - 0.06, 0.0), (min(xb, xr), yh + 0.06, H), COMPOSITE)
-        b.body.box((xc - _DW / 2, yh - 0.06, _DH), (xc + _DW / 2, yh + 0.06, H), COMPOSITE)
-        for yy in (xc - _DW / 2 - 0.04, xc + _DW / 2):
-            b.soft.box((yy, yh - 0.09, 0.0), (yy + 0.04, yh + 0.09, _DH + 0.04), TRIM)
-        b.soft.box((xc - _DW / 2 - 0.04, yh - 0.09, _DH), (xc + _DW / 2 + 0.04, yh + 0.09, _DH + 0.04), TRIM)
-        b.emit.lamp_box((xc + _DW / 2 + 0.06, yh - 0.095, 1.55), (xc + _DW / 2 + 0.12, yh - 0.09, 1.62), "green", LAMP_DIM)
-        place(b, xc, yf - 1.14, -90, K8.officer_bed, 1.4, 2.1, (FABRIC_NAVY, FABRIC_RUST, FABRIC_GREY, FABRIC_SAND)[k])
-        place(b, xc, yf - 0.02, -90, F.wall_screen, 1.5, 0.84, "scr_star", z=1.5)
-        place(b, xa + 0.45, 6.0, 180, F.desk, 1.2, 0.6, 0.75, WOOD, True)
-        place(b, xa + 1.2, 6.0, 180, F.chair, FABRIC_GREY)
-        place(b, xc + 0.6, 4.4, 90, F.sofa, 1.8, FABRIC_NAVY)
-        place(b, xc + 0.6, 5.2, 90, F.low_table, 0.8, 0.5, 0.4, WOOD)
-        place(b, xb - 0.5, 8.4, 180, G.wardrobe, 0.9, 0.55, 2.0)
-        place(b, xa + 0.45, 9.6, 0, G.vanity, 0.9, 0.5)
-        place(b, xc, 6.8, 0, G.rug, 2.8, 2.6, (FABRIC_SAND, FABRIC_GREY, FABRIC_RUST, FABRIC_NAVY)[k], FABRIC_SAND)
-        F.ceiling_light_panel(b, xc - 0.5, xc + 0.5, 6.0, 6.6, H - 0.05, "white_warm", LAMP)
+    SC.suites_block(b, spec)
     for x in (4.0, 14.0, 20.0):
-        place(b, x, 0.9, 0, F.potted_plant, 1.2, int(x))
+        place(b, x, 1.0, 0, F.potted_plant, 1.0, int(x))
     place(b, 12.0, WF + 0.02, 90, F.wall_screen, 1.6, 0.9, "scr_news", z=1.8)
-    for x in (3.0, 9.0, 15.0, 21.0):
-        F.ceiling_light_panel(b, x - 0.4, x + 0.4, 1.2, 1.6, H - 0.05, "white_warm", LAMP)
     return b.build(name)
 
 
 def single_cabins(name: str = "SM_SHIP_SingleCabins"):
-    """24 x 4 x 3.2: a row of six officers' cabins, 4 x 4 m each, a hatch apiece on the passage's side: a bed under a viewport screen, a desk, a wardrobe, a basin; the partitions are
-    wood-faced and the rugs differ."""
+    """24 x 4 x 3.2: a row of six officers' cabins, each 4 x 2.8 m, behind a gallery along the passage's wall with a hatch apiece (ship_cabin.py): a bed along the far wall under a window,
+    a nightstand, a desk with its screen and its lamp, a wardrobe and a basin, a rug and a light of its own; the partitions are plaster and oak and the rugs and blankets differ."""
     spec, L, D, H = _dims("single_cabins")
     b = SParts(bevel=0.005, fine_bevel=0.0)
     build_shell(b, spec, _warm_style(FABRIC_GREY, WOOD, "warm_dim"))
-    yf = D - WS - WF
-    for k in range(6):
-        xa, xc = 4.0 * k, 4.0 * k + 2.0
-        if k > 0:
-            b.body.box((xa - 0.06, WF, 0.0), (xa + 0.06, yf, H), COMPOSITE)
-            b.soft.box((xa - 0.075, WF, 0.0), (xa + 0.075, yf, 1.05), WOOD)
-        place(b, xa + 1.25, 2.4, 0, K8.officer_bed, 0.9, 2.0, (FABRIC_NAVY, FABRIC_RUST, FABRIC_GREY, FABRIC_SAND)[k % 4])
-        place(b, xa + 0.3, 3.0, 0, F.wall_screen, 1.0, 0.56, "scr_star", z=1.5)
-        place(b, xa + 3.6, 1.4, 0, F.desk, 0.9, 0.5, 0.75, WOOD, True)
-        place(b, xa + 2.9, 1.4, 0, F.chair, FABRIC_GREY)
-        place(b, xa + 3.6, 3.3, 180, G.wardrobe, 0.8, 0.5, 2.0)
-        place(b, xa + 2.4, 3.7, -90, G.vanity, 0.7, 0.45)
-        place(b, xa + 2.0, 2.0, 0, G.rug, 1.6, 1.4, (FABRIC_SAND, FABRIC_GREY, FABRIC_RUST, FABRIC_NAVY)[k % 4], FABRIC_SAND)
-        F.ceiling_light_panel(b, xc - 0.4, xc + 0.4, 1.7, 2.3, H - 0.05, "white_warm", LAMP)
+    SC.single_row(b, spec)
     return b.build(name)
 
 

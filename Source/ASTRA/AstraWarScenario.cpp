@@ -54,6 +54,13 @@ namespace
 			C.Append(A);
 			GWarCommands.Add(C);
 		}));
+	FAutoConsoleCommand CmdWarFleet(TEXT("astra.war.fleet"), TEXT("War bench: astra.war.fleet <info|strike|hit|pound> <args> (FLOTTA-VIVA: astra.fleet.*, run in its turn after the spawns before it)"),
+		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A)
+		{
+			TArray<FString> C = {TEXT("fleet")};
+			C.Append(A);
+			GWarCommands.Add(C);
+		}));
 	FAutoConsoleCommand CmdWarScenario(TEXT("astra.war.scenario"), TEXT("War bench: astra.war.scenario <name> (data/war/scenarios/<name>.json)"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& A)
 		{
@@ -190,6 +197,15 @@ void UAstraBattleSubsystem::ProcessWarCommands()
 				Ships[I].Mode = EAstraShipMode::Idle;
 				Ships[I].bHoldStation = true;
 			}
+		}
+		else if (Cmd == TEXT("fleet") && A.Num() >= 2)
+		{
+			TArray<FString> Rest;
+			for (int32 i = 2; i < A.Num(); ++i)
+			{
+				Rest.Add(A[i]);
+			}
+			UE_LOG(LogASTRA, Display, TEXT("[Fleet] %s"), *FleetConsole(A[1], Rest));
 		}
 		else if (Cmd == TEXT("wing") && A.Num() >= 5)
 		{

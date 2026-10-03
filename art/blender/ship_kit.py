@@ -48,7 +48,7 @@ CAR_HALF_W, CAR_Z0, CAR_Z1 = 1.4, 0.16, 3.06   # the Spine car's envelope on the
 ROOMS = {
     "galley": ("ship_rooms_service", "galley"), "galley_pass": ("ship_rooms_service", "galley_pass"),
     "store_dry": ("ship_rooms_service", "store_dry"), "store_cold": ("ship_rooms_service", "store_cold"), "hold": ("ship_rooms_service", "hold"),
-    "heads": ("ship_rooms_service", "heads"), "laundry": ("ship_rooms_service", "laundry"), "hydro": ("ship_rooms_service", "hydro"),
+    "heads": ("ship_rooms_service", "heads"), "laundry": ("ship_rooms_service", "laundry"), "hydro": ("ship_rooms_service", "hydro"), "garden": ("ship_rooms_service", "garden"),
     "lounge": ("ship_rooms_social", "lounge"), "games": ("ship_rooms_social", "games"), "library": ("ship_rooms_social", "library"),
     "quiet": ("ship_rooms_social", "quiet"), "observation": ("ship_rooms_social", "observation"), "bow_obs": ("ship_rooms_social", "bow_obs"),
     "concourse": ("ship_rooms_hub", "concourse"), "berth_lobby": ("ship_rooms_hub", "berth_lobby"), "stair_tower": ("ship_rooms_hub", "stair_tower"),
