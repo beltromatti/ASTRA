@@ -33,7 +33,7 @@ e l'altro, e la fisica gira a passi di 0,5 s (quella dell'Aquila a 0,2 s). Misur
 di battaglia** (0,027 ms di un fotogramma a 60 fps in media), la chiamata peggiore 0,28 ms.
 
 **Le prove** (§7, `tools/fleet.py`): un colpo tracciato dentro una nave nemica, faccia per faccia, con le stanze attraversate e chi c'era; una
-nave pestata sulla prua che **si spezza dove la struttura ha ceduto** (il banco confronta la sezione dove la scafo si rompe con le stanze
+nave pestata sulla prua che **si spezza dove la struttura ha ceduto** (il banco confronta la sezione dove lo scafo si rompe con le stanze
 perse dall'interno: coincidono, 3 semi su 3); battaglie intere con e senza gli interni: **gli esiti non si spostano** (entro il rumore, §7.3)
 e le perdite di persone sono credibili.
 
@@ -230,9 +230,7 @@ poi «the hull broke apart at the bow»; **l'interno ha perso 123 stanze su 123 
 
 ### 7.3 Le battaglie con e senza (esiti, perdite)
 
-`tools/fleet.py ab --scenarios sym_small,sym_medium,sym_two,asym_2to1 --seeds 12`: lo stesso scenario, con `astra.fleet.interior 0` (GUERRA com'era) e `1`. Risultati: vedi la tabella sotto (riempita dal banco; i semi e le deviazioni
-standard sono quelle del banco di GUERRA).
-
+`tools/fleet.py ab --scenarios sym_small,sym_medium,sym_two,asym_2to1 --seeds 12`: lo stesso scenario con `astra.fleet.interior 0` (GUERRA com'era) e con `1`, gli stessi semi.
 12 semi per scenario, 900 s di battaglia, i due lati con le stesse navi (le sim_*) o ASTRA con il doppio (asym_2to1). «Sopravvissuti» sono le navi da guerra rimaste (anche andate via) a fine battaglia; «margine» è
 quelli di ASTRA meno quelli del Mandate, con l'errore standard della media.
 
