@@ -29,6 +29,9 @@ namespace
 	TAutoConsoleVariable<FString> LiftCVarPlan(TEXT("astra.lifts.plan"), TEXT(""),
 		TEXT("The plan the lifts are read from (a path; empty: the ship's own, staged with the game or in data/ship). A test plan: data/ship/test/lifts_fixture.json"));
 	TAutoConsoleVariable<int32> LiftCVarEnabled(TEXT("astra.lifts"), 1, TEXT("0: no lifts are built (a world that needs none)"));
+	TAutoConsoleVariable<float> LiftCVarCull(TEXT("astra.lifts.cull_m"), 0.f,
+		TEXT("Lifts farther than this from the Captain (metres; landings also more than two decks above or below) are not drawn (0 = all drawn, the default: measured ")
+		TEXT("2/10 from the bridge, paused and in battle, hiding them did not lighten the render thread — tools/perf_ab.py — so the switch is only for further tests)"));
 
 	int32 LiftParkingStop(const FAstraLiftLine& L)
 	{
@@ -285,10 +288,47 @@ void UAstraLiftSubsystem::Tick(float DeltaTime)
 	LastTickUs = (FPlatformTime::Seconds() - T0) * 1.0e6;
 }
 
+void UAstraLiftSubsystem::Cull()
+{
+	const APawn* P = Captain();
+	const float CullM = LiftCVarCull.GetValueOnGameThread();
+	const FVector Me = P ? P->GetActorLocation() : FVector::ZeroVector;
+	const float R = CullM * 100.f;
+	auto Show = [](AActor* A, bool bShow)
+	{
+		if (A && A->IsHidden() == bShow)
+		{
+			A->SetActorHiddenInGame(!bShow);
+		}
+	};
+	for (int32 L = 0; L < Run.Num(); ++L)
+	{
+		FAstraLiftRuntime& Rn = Run[L];
+		const bool bAll = CullM <= 0.f || !P;
+		if (Rn.Car)
+		{
+			Show(Rn.Car, bAll || L == InLine || FVector::DistSquared(Rn.Car->GetActorLocation(), Me) < R * R);
+		}
+		if (Rn.Shaft && Net.Lines.IsValidIndex(L))
+		{
+			Show(Rn.Shaft, bAll || FVector::DistSquared2D(Net.Lines[L].ShaftCm, Me) < R * R);
+		}
+		for (AAstraLiftLanding* Landing : Rn.Landings)
+		{
+			if (Landing)
+			{
+				const FVector At = Landing->GetActorLocation();
+				Show(Landing, bAll || (FMath::Abs(At.Z - Me.Z) < 900.f && FVector::DistSquared2D(At, Me) < R * R));
+			}
+		}
+	}
+}
+
 void UAstraLiftSubsystem::Slow(float Dt)
 {
 	SCOPE_CYCLE_COUNTER(STAT_AstraLiftsSlow);
 	UpdateCaptain();
+	Cull();
 	int32 Moving = 0;
 	for (int32 L = 0; L < Run.Num(); ++L)
 	{

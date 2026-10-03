@@ -193,43 +193,66 @@ def cable_runs(fb: FB, s0: float, s1: float, rng: random.Random) -> None:
         s += 1.0
 
 
+def wall_display(fb: FB, em: FB | None, s: float, z: float, w: float, page: str, cell: str = "cool_dim") -> None:
+    """A small static display on a wall panel (a page of the decor atlas): a dark frame with a brass hairline, the picture, a lit edge."""
+    if em is None:
+        return
+    h = w / L.DECOR_ASPECT[page]
+    pad = 0.026
+    t0 = -0.040
+    fb.box((s - w / 2 - pad, t0, z - h / 2 - pad), (s + w / 2 + pad, 0.0, z - h / 2), L.STRUCT)
+    fb.box((s - w / 2 - pad, t0, z + h / 2), (s + w / 2 + pad, 0.0, z + h / 2 + pad), L.STRUCT)
+    fb.box((s - w / 2 - pad, t0, z - h / 2), (s - w / 2, 0.0, z + h / 2), L.STRUCT)
+    fb.box((s + w / 2, t0, z - h / 2), (s + w / 2 + pad, 0.0, z + h / 2), L.STRUCT)
+    em.box((s - w / 2 - pad, t0 - 0.002, z + h / 2 + pad - 0.004), (s + w / 2 + pad, t0, z + h / 2 + pad), L.BRASS)
+    em.decor((s, -0.034, z), w, h, (0, -1, 0), page)
+    for (a0, a1, b0, b1) in ((s - w / 2, s + w / 2, z - h / 2 - 0.003, z - h / 2), (s - w / 2, s + w / 2, z + h / 2, z + h / 2 + 0.003)):
+        em.lamp_box((a0, -0.036, b0), (a1, -0.034, b1), cell, L.LAMP_DIM)
+
+
 # ------------------------------------------------------------------------------------------------------------ bay types
-def bay_module(fb: FB, kind: str, s0: float, s1: float, rng: random.Random, dept: str, tag: int) -> None:
-    """Fill one plain bay (clear width s0..s1) with layered panels and one piece of equipment."""
+def bay_module(fb: FB, kind: str, s0: float, s1: float, rng: random.Random, dept: str, tag: int, em: FB | None = None) -> None:
+    """Fill one plain bay (clear width s0..s1) with layered panels and one piece of equipment (and, with `em`, a static display page)."""
     sc = (s0 + s1) / 2
     if kind == "plain":
         panel(fb, s0, s1, Z_LOW0, Z_LOW1)
         panel(fb, s0, s1, Z_UP0, 2.30)
         panel(fb, s0, s1, 2.34, Z_UP1)
         fb.label((sc, -0.05, 2.05), 0.5, 0.125, (0, -1, 0), "tag_13")
+        wall_display(fb, em, sc, 2.88, 0.9, "schematic")
     elif kind == "vent":
         panel(fb, s0, s1, Z_LOW0, Z_LOW1)
         vent(fb, sc - 0.5, sc + 0.5, 0.5, 0.95, 7)
         panel(fb, s0, s1, Z_UP0, Z_UP1)
-        vent(fb, sc - 0.45, sc + 0.45, 2.55, 3.05, 6, -0.03)
+        vent(fb, sc - 0.45, sc + 0.45, 2.45, 2.85, 5, -0.03)
         fb.label((sc, -0.06, 1.75), 0.5, 0.125, (0, -1, 0), "tag_07")
+        wall_display(fb, em, sc, 3.2, 1.1, "ticker")
     elif kind == "lockers":
         panel(fb, s0, s1, Z_LOW0, Z_LOW1 - 0.05, bolts=False)
         locker_bank(fb, s0 + 0.05, s1 - 0.05, 0.4, 1.06, 2, ["tag_09", "tag_00"], dept)
         panel(fb, s0, s1, Z_UP0, Z_UP1)
         fb.label((sc - 0.35, -0.06, 1.7), 0.18, 0.18, (0, -1, 0), "icon_eva")
         fb.label((sc + 0.25, -0.06, 1.7), 0.18, 0.18, (0, -1, 0), "icon_exit")
+        wall_display(fb, em, sc, 2.55, 0.9, "bars")
     elif kind == "panelboard":
         panel(fb, s0, s1, Z_LOW0, Z_LOW1)
         breaker_panel(fb, s0 + 0.12, s1 - 0.12, 1.36, 2.35, rng, "tag_12")
         panel(fb, s0, s1, 2.42, Z_UP1)
         fb.label((sc, -0.06, 0.75), 0.5, 0.125, (0, -1, 0), "tag_06")
+        wall_display(fb, em, sc, 2.93, 0.95, "matrix")
     elif kind == "conduits":
         panel(fb, s0, s1, Z_LOW0, Z_LOW1)
         conduit_bundle(fb, s0 + 0.35, 0.34, 3.45, 5, 0.04)
         panel(fb, s0, s0 + 0.28, Z_UP0, Z_UP1, raised=False)
         panel(fb, s1 - 0.28, s1, Z_UP0, Z_UP1, raised=False)
+        wall_display(fb, em, s1 - 0.14, 2.6, 0.17, "decks")
         fb.label((s1 - 0.14, -0.06, 1.55), 0.24, 0.06, (0, -1, 0), "small_00")
     elif kind == "hatch":
         panel(fb, s0, s1, Z_LOW0, Z_LOW1)
         hatch(fb, sc, 0.78, 0.62, 0.62, "tag_11", dept)
         panel(fb, s0, s1, Z_UP0, Z_UP1)
-        vent(fb, sc - 0.4, sc + 0.4, 2.05, 2.5, 6, -0.03)
+        vent(fb, sc - 0.4, sc + 0.4, 2.05, 2.4, 5, -0.03)
+        wall_display(fb, em, sc, 2.98, 0.34, "checklist")
     elif kind == "safety":
         panel(fb, s0, s1, Z_LOW0, Z_LOW1)
         extinguisher(fb, sc - 0.4, 0.42)
@@ -237,42 +260,71 @@ def bay_module(fb: FB, kind: str, s0: float, s1: float, rng: random.Random, dept
         fb.label((sc + 0.32, -0.02, 1.08), 0.34, 0.085, (0, -1, 0), "tag_01")
         panel(fb, s0, s1, Z_UP0, Z_UP1)
         fb.label((sc, -0.06, 1.75), 0.5, 0.125, (0, -1, 0), "tag_10")
+        wall_display(fb, em, sc, 2.7, 0.34, "atmo")
     else:
         panel(fb, s0, s1, Z_LOW0, Z_LOW1)
         panel(fb, s0, s1, Z_UP0, Z_UP1)
 
 
 # ----------------------------------------------------------------------------------------------------- station bay (wall)
+def rr_path(s0: float, s1: float, z0: float, z1: float, r: float, n: int = 6):
+    """The outline of a rounded rectangle in the wall plane, counter-clockwise: [(s, z, ns, nz)] with the outward unit normal of each point."""
+    pts = []
+    for (cs, cz), a0, a1 in (((s1 - r, z0 + r), -90.0, 0.0), ((s1 - r, z1 - r), 0.0, 90.0), ((s0 + r, z1 - r), 90.0, 180.0), ((s0 + r, z0 + r), 180.0, 270.0)):
+        for k in range(n + 1):
+            a = math.radians(lerp(a0, a1, k / n))
+            pts.append((cs + r * math.cos(a), cz + r * math.sin(a), math.cos(a), math.sin(a)))
+    return pts
+
+
+def rr_ring(fb: FB, s0: float, s1: float, z0: float, z1: float, r: float, section, mat: str, cell: str | None = None, n: int = 6):
+    """A ring that follows a rounded rectangle: `section` = [(dn, t)], the corners of its cross-section (dn = distance along the outline's outward
+    normal, t = depth in the wall frame). With `cell` it is painted as a lamp (the palette cell)."""
+    path = rr_path(s0, s1, z0, z1, r, n)
+    rings = [[(s + ns * dn, t, z + nz * dn) for (dn, t) in section] for (s, z, ns, nz) in path]
+    faces = fb.loft(rings, mat, caps=False, closed=True, loop=True)
+    if cell:
+        fb._paint(faces, L.cell_uv(cell))
+    return faces
+
+
 def station_bay(b: Parts, wall: SH.Wall, sc: float, station: dict, dept: str, slot: str) -> dict:
-    """A recess in the wall with a large concave live screen, a lit surround, a task light and the station plate.
-    Returns geometry info for the manifest (screen size, arc)."""
+    """A projection niche in the wall: the live screen (concave, edge to edge, no bezel) floats in a dark portal made of three rounded frames that
+    recede into the wall, each with a lit edge, over a back that carries the light the screen spills (the halo). Returns geometry info for the manifest."""
     fb, fine, em = b.body, b.fine, b.emit
     half = 1.50                                   # half width of the opening
     z_lo, z_hi = 0.98, 2.92
-    core_t = 0.30
-    # surround: brushed frame around the opening, a dept-colour lamp line on its inner edge
-    fb.box((sc - half - 0.16, -0.075, z_lo - 0.16), (sc + half + 0.16, 0.0, z_lo), L.TRIM)
-    fb.box((sc - half - 0.16, -0.075, z_hi), (sc + half + 0.16, 0.0, z_hi + 0.16), L.TRIM)
-    fb.box((sc - half - 0.16, -0.075, z_lo), (sc - half, 0.0, z_hi), L.TRIM)
-    fb.box((sc + half, -0.075, z_lo), (sc + half + 0.16, 0.0, z_hi), L.TRIM)
-    fb.box((sc - half - 0.16, -0.098, z_hi + 0.16), (sc + half + 0.16, -0.075, z_hi + 0.19), L.STRUCT)
-    cell = dept
-    em.lamp_box((sc - half + 0.02, -0.004, z_hi - 0.03), (sc + half - 0.02, 0.006, z_hi - 0.014), cell, L.LAMP)
-    em.lamp_box((sc - half + 0.02, -0.004, z_lo + 0.014), (sc + half - 0.02, 0.006, z_lo + 0.03), cell, L.LAMP)
+    cell, dim = dept, dept + "_dim"
+    zc = (z_lo + z_hi) / 2
+    # frame A, proud of the wall: dark gunmetal with a brass line on its face; its inner contour is the rounded opening
+    rr_ring(fb, sc - half + 0.08, sc + half - 0.08, z_lo + 0.08, z_hi - 0.08, 0.24, [(0.0, -0.045), (0.15, -0.045), (0.15, 0.0), (0.0, 0.0)], L.STRUCT)
+    rr_ring(em, sc - half + 0.08, sc + half - 0.08, z_lo + 0.08, z_hi - 0.08, 0.24, [(0.004, -0.047), (0.016, -0.047), (0.016, -0.044), (0.004, -0.044)], L.BRASS)
+    # frames B and C recede (0.10 and 0.20 into the wall), their inner edges are lit, the deeper one brighter
+    rr_ring(fb, sc - half + 0.14, sc + half - 0.14, z_lo + 0.14, z_hi - 0.14, 0.21, [(0.0, 0.10), (0.07, 0.10), (0.07, 0.15), (0.0, 0.15)], L.COMPOSITE)
+    rr_ring(em, sc - half + 0.14, sc + half - 0.14, z_lo + 0.14, z_hi - 0.14, 0.21, [(-0.003, 0.098), (0.0, 0.098), (0.0, 0.152), (-0.003, 0.152)], L.LAMP_DIM, dim)
+    rr_ring(fb, sc - half + 0.20, sc + half - 0.20, z_lo + 0.20, z_hi - 0.20, 0.18, [(0.0, 0.20), (0.06, 0.20), (0.06, 0.26), (0.0, 0.26)], L.STRUCT)
+    rr_ring(em, sc - half + 0.20, sc + half - 0.20, z_lo + 0.20, z_hi - 0.20, 0.18, [(-0.004, 0.198), (0.0, 0.198), (0.0, 0.262), (-0.004, 0.262)], L.LAMP_DIM, cell)
+    # the back of the niche: the halo of the screen (opaque emissive, soft, in the department colour)
+    em.decor((sc, 0.297, zc), 2 * half, z_hi - z_lo, (0, -1, 0), "halo_" + {"command": "command", "science": "science", "engineering": "engineering", "flight": "flight"}.get(dept, "command"),
+             up=(0, 0, 1))
     # the curved screen: R = 3.0, 2.4 m chord, centre recessed 0.27 (the alcove's back is the wall's outer skin)
     R = 3.0
     phi = math.degrees(math.asin(1.2 / R))
     cx, ct = sc, 0.27 - R
     z0s, z1s = 1.18, 2.68
     b.emit.screen_arc(cx, ct, R, 90 - phi, 90 + phi, z0s, z1s, slot, inward=True, seg=28)
-    # bezel round the screen: brushed rails above and below (swept on the same arc), dark stiles at the ends
-    rail = [(-0.02, 0.0), (0.07, 0.0), (0.07, 0.05), (-0.02, 0.05)]
-    fb.arc_sweep(rail, cx, ct, R, 90 - phi - 3.2, 90 + phi + 3.2, L.TRIM, seg=30, z0=z1s)
-    fb.arc_sweep(rail, cx, ct, R, 90 - phi - 3.2, 90 + phi + 3.2, L.TRIM, seg=30, z0=z0s - 0.05)
-    for a in (90 - phi - 1.6, 90 + phi + 1.6):
-        fb.arc_sweep([(-0.02, 0.0), (0.07, 0.0), (0.07, 0.0 + z1s - z0s + 0.1), (-0.02, z1s - z0s + 0.1)], cx, ct, R, a - 1.6, a + 1.6,
-                     L.STRUCT, seg=2, z0=z0s - 0.05)
-    # task light bar above, plate below
+    # no bezel: a lit hairline round the glass, four brackets at the corners, a thin dark lip behind the edge (the glass floats)
+    hair = [(-0.0035, 0.0), (0.0035, 0.0), (0.0035, 0.005), (-0.0035, 0.005)]
+    em.lamp_arc(hair, cx, ct, R, 90 - phi - 0.3, 90 + phi + 0.3, dim, L.LAMP_DIM, seg=30, z0=z1s)
+    em.lamp_arc(hair, cx, ct, R, 90 - phi - 0.3, 90 + phi + 0.3, dim, L.LAMP_DIM, seg=30, z0=z0s - 0.005)
+    for a in (90 - phi, 90 + phi):
+        sgn = -1 if a < 90 else 1
+        em.lamp_arc([(-0.0035, 0.0), (0.0035, 0.0), (0.0035, z1s - z0s), (-0.0035, z1s - z0s)], cx, ct, R, a if sgn > 0 else a - 0.35, (a + 0.35) if sgn > 0 else a, dim,
+                    L.LAMP_DIM, seg=1, z0=z0s)
+    for a in (90 - phi - 0.9, 90 + phi + 0.9):
+        fb.arc_sweep([(-0.05, 0.0), (0.03, 0.0), (0.03, 0.04), (-0.05, 0.04)], cx, ct, R, a - 0.9, a + 0.9, L.STRUCT, seg=2, z0=z0s - 0.045)
+        fb.arc_sweep([(-0.05, 0.0), (0.03, 0.0), (0.03, 0.04), (-0.05, 0.04)], cx, ct, R, a - 0.9, a + 0.9, L.STRUCT, seg=2, z0=z1s + 0.005)
+    # task light bar above, plate above that
     em.lamp_box((sc - 0.9, -0.04, z_hi + 0.19), (sc + 0.9, -0.03, z_hi + 0.205), "white_warm", L.LAMP)
     fb.label((sc, -0.079, z_hi + 0.31), 0.9, 0.1125, (0, -1, 0), {"comms": "st_comms", "sensors": "st_sensors", "engineering": "st_engineering",
                                                                "flight": "st_flight"}[station["id"]])
@@ -336,7 +388,7 @@ def build_side_wall(c: SH.Ctx, side: int, name: str, stations: list[dict]):
             s0, s1 = k * Pe + RIB_W / 2 + 0.03, (k + 1) * Pe - RIB_W / 2 - 0.03
             if k in covered:
                 continue
-            bay_module(fb, pattern.get(k, "plain"), s0, s1, rng, "command", k)
+            bay_module(fb, pattern.get(k, "plain"), s0, s1, rng, "command", k, em=em)
         # ---- the station recesses (screens go to the emissive part)
         for k0, st in bay_first.items():
             sc = (k0 + 1) * Pe

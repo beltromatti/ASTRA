@@ -12,7 +12,6 @@ from __future__ import annotations
 import math
 import random
 
-import astra_bpy as A
 import kit_corridor as KC
 import ship_furniture as F
 import ship_furniture2 as G
@@ -38,123 +37,11 @@ DOOR_X0 = 0.3                        # along the module: the opening is 0.3 .. 1
 
 
 def corridor_door(name: str = "SM_SHIP_BridgeCorridorDoor"):
-    """SM_COR_ShellWindow_4m (the bridge's window module, kit_corridor.py) with a 1.4 x 2.2 m door in the wall opposite the window: the wall is cut, the skirting, the guide
-    lights and the handrail stop at the frame, the frame (trim, sill, two status bars) closes the opening and the accent band above is left to the name plate. Same frame as
-    the kit's module (origin at the aft end of the centre line, Blender's +Y = the window side), same materials (MI_ASTRA_*)."""
-    L, HW, T_, WZ = KC.L, KC.HW, KC.T, KC.WIN_Z
-    x0d, x1d = DOOR_X0, DOOR_X0 + DOOR_W
-    inner = KC.inner_profile()
-    outer = KC.offset_convex(inner, T_)
-    sh = A.Builder()
-    n = len(inner)
-    for i in range(1, n):
-        j = (i + 1) % n
-        quad = [inner[i], outer[i], outer[j], inner[j]]
-        if i == 1:                                                                  # the window (hull side), as the kit's
-            (yi, zi0), (yo, zo0) = inner[1], outer[1]
-            zi1, zo1 = inner[2][1], outer[2][1]
-            xw0, xw1 = KC.WIN_X
-            z0, z1 = WZ
-            sh.prism(quad, 0.0, xw0, A.MAT_STRUCTURE)
-            sh.prism(quad, xw1, L, A.MAT_STRUCTURE)
-            sh.prism([(yi, zi0), (yo, zo0), (yo, z0), (yi, z0)], xw0, xw1, A.MAT_STRUCTURE)
-            sh.prism([(yi, z1), (yo, z1), (yo, zo1), (yi, zi1)], xw0, xw1, A.MAT_STRUCTURE)
-        elif i == 5:                                                                # the inner wall (towards the ready room): the door
-            sh.prism(quad, 0.0, x0d, A.MAT_STRUCTURE)
-            sh.prism(quad, x1d, L, A.MAT_STRUCTURE)
-            (yi, zi_top), (yo, zo_top) = inner[5], outer[5]
-            sh.prism([(yi, zi_top), (yo, zo_top), (yo, DOOR_H), (yi, DOOR_H)], x0d, x1d, A.MAT_STRUCTURE)
-        else:
-            sh.prism(quad, 0.0, L, A.MAT_STRUCTURE)
-    (yl, _), (yr, _) = inner[0], inner[1]
-    (yol, zo), (yor, _) = outer[0], outer[1]
-    sh.prism([(yol, zo), (-KC.TRENCH_HW, zo), (-KC.TRENCH_HW, 0.0), (yl, 0.0)], 0.0, L, A.MAT_STRUCTURE)
-    sh.prism([(KC.TRENCH_HW, zo), (yor, zo), (yr, 0.0), (KC.TRENCH_HW, 0.0)], 0.0, L, A.MAT_STRUCTURE)
-    sh.prism([(-KC.TRENCH_HW, zo), (KC.TRENCH_HW, zo), (KC.TRENCH_HW, -KC.TRENCH_D), (-KC.TRENCH_HW, -KC.TRENCH_D)], 0.0, L, A.MAT_STRUCTURE)
-    obj = sh.to_object(name + "_shell")
-
-    b = A.Builder()
-    for (xa, xb) in ((0.0, 0.1), (L / 2 - 0.1, L / 2 + 0.1), (L - 0.1, L)):         # U ribs
-        KC.u_rib(b, xa, xb)
-    b.box_minmax((L / 2 - 0.1, HW, WZ[0]), (L / 2 + 0.1, HW + T_, WZ[1]), A.MAT_STRUCTURE)   # the mullion of the window
-    for (xa, xb) in ((0.02, 1.98), (2.02, 3.98)):                                   # floor plates either side of the grate over the service trench; the door's sill is trim
-        for s in (1, -1):
-            b.box_minmax((xa, s * (KC.TRENCH_HW + 0.03), 0.0), (xb, s * (HW - 0.05), 0.012), A.MAT_FLOOR)
-        b.box_minmax((xa, -KC.TRENCH_HW + 0.012, -0.008), (xb, KC.TRENCH_HW - 0.012, 0.012), A.MAT_GRATE)
-    for s in (1, -1):
-        b.box_minmax((0.0, s * KC.TRENCH_HW - 0.012, -0.03), (L, s * (KC.TRENCH_HW + 0.03), 0.014), A.MAT_TRIM)
-    pipes = ((-0.30, -0.085, 0.052), (-0.08, -0.105, 0.036), (0.12, -0.11, 0.03))
-    for (y, z, r) in pipes:
-        b.cylinder((0.0, y, z), (L, y, z), r, A.MAT_TRIM, segments=14)
-    for k in range(6):
-        y = 0.30 + 0.028 * (k % 3)
-        z = -0.135 + 0.025 * (k // 3)
-        b.cylinder((0.0, y, z), (L, y, z), 0.012, A.MAT_RUBBER, segments=8)
-    for xb in (0.5, 1.5, 2.5, 3.5):
-        b.box_minmax((xb - 0.02, -0.45, -KC.TRENCH_D), (xb + 0.02, 0.45, -0.14), A.MAT_STRUCTURE)
-        for (y, z, r) in pipes:
-            b.box_minmax((xb - 0.025, y - r - 0.01, -0.145), (xb + 0.025, y + r + 0.01, z - r * 0.4), A.MAT_TRIM)
-    xa, xb_ = x0d - 0.07, x1d + 0.07                                                 # the frame's outer edges: the skirting and its guide lights stop there
-    for s in (1, -1):                                                                # skirting with guide lights
-        runs = ((0.0, L),) if s == 1 else ((0.0, xa), (xb_, L))
-        for (r0, r1) in runs:
-            b.box_minmax((r0, s * (HW - 0.04), 0.0), (r1, s * HW, 0.18), A.MAT_TRIM)
-        for k in range(8):
-            xc = 0.25 + 0.5 * k
-            if s == -1 and xa - 0.05 < xc < xb_ + 0.05:
-                continue
-            b.box_minmax((xc - 0.05, s * (HW - 0.044), 0.075), (xc + 0.05, s * (HW - 0.039), 0.087), A.MAT_GUIDE)
-    for s in (1, -1):                                                                # accent band under the chamfer (not over the door: the plate is there)
-        for (xs0, xs1) in KC.BAYS:
-            if s == -1 and xs0 < x1d and xs1 > x0d:
-                continue
-            b.box_minmax((xs0 - 0.02, s * (HW - 0.012), 2.445), (xs1 + 0.02, s * HW, 2.47), A.MAT_ACCENT)
-            b.box_minmax((xs0 - 0.02, s * (HW - 0.02), 2.43), (xs1 + 0.02, s * HW, 2.445), A.MAT_TRIM)
-    for s in (1, -1):                                                                # pipes and cable trays of the chamfers
-        for (t, off, r) in ((0.28, 0.075, 0.042), (0.58, 0.065, 0.03)):
-            y, z = KC.chamfer_point(s, t, off)
-            b.cylinder((0.0, y, z), (L, y, z), r, A.MAT_TRIM, segments=14)
-            for xb in (0.5, 1.5, 2.5, 3.5):
-                yb, zb = KC.chamfer_point(s, t, off * 0.5)
-                KC.box_rot_x(b, (xb, yb, zb), (0.035, r * 2.4, off), -45.0 * s, A.MAT_STRUCTURE)
-        yt, zt = KC.chamfer_point(s, 0.86, 0.03)
-        KC.box_rot_x(b, (L / 2, yt, zt), (L, 0.2, 0.04), -45.0 * s, A.MAT_STRUCTURE)
-        for k in range(4):
-            yk, zk = KC.chamfer_point(s, 0.80 + 0.04 * k, 0.065)
-            b.cylinder((0.0, yk, zk), (L, yk, zk), 0.011, A.MAT_RUBBER, segments=8)
-    for (xa2, xb2) in ((0.12, 1.88), (2.12, 3.88)):                                  # the ceiling: two panels per bay either side of the light channel
-        for yc in (-0.62, 0.62):
-            b.box(((xa2 + xb2) / 2, yc, KC.H - 0.0075), (xb2 - xa2, 0.95, 0.015), A.MAT_PANEL)
-        b.box(((xa2 + xb2) / 2, 0.0, KC.H - 0.03), (xb2 - xa2, 0.22, 0.06), A.MAT_TRIM)
-        b.box(((xa2 + xb2) / 2, 0.0, KC.H - 0.065), (xb2 - xa2 - 0.04, 0.14, 0.012), A.MAT_LIGHT)
-    y = -(HW - 0.075)                                                                # the handrail of the door's wall starts after the frame (the window wall has none)
-    b.cylinder((xb_ + 0.1, y, 1.02), (L, y, 1.02), 0.021, A.MAT_TRIM, segments=12)
-    for xb in (2.5, 3.5):
-        b.box_minmax((xb - 0.02, -(HW - 0.06), 1.0), (xb + 0.02, -HW, 1.04), A.MAT_TRIM)
-    xw0, xw1 = KC.WIN_X                                                              # the window's frame and the seals round its glass
-    z0, z1 = WZ
-    b.box_minmax((xw0 - 0.06, HW - 0.03, z1), (xw1 + 0.06, HW, z1 + 0.06), A.MAT_TRIM)
-    b.box_minmax((xw0 - 0.06, HW - 0.06, z0 - 0.06), (xw1 + 0.06, HW + 0.04, z0), A.MAT_TRIM)
-    b.box_minmax((xw0 - 0.06, HW - 0.03, z0), (xw0, HW, z1), A.MAT_TRIM)
-    b.box_minmax((xw1, HW - 0.03, z0), (xw1 + 0.06, HW, z1), A.MAT_TRIM)
-    for (a0, a1) in ((xw0, L / 2 - 0.1), (L / 2 + 0.1, xw1)):
-        b.box_minmax((a0, HW + 0.08, z0), (a1, HW + 0.12, z0 + 0.02), A.MAT_RUBBER)
-        b.box_minmax((a0, HW + 0.08, z1 - 0.02), (a1, HW + 0.12, z1), A.MAT_RUBBER)
-    # the door's frame (trim 7 cm wide, 3 cm proud of the finished wall, through the wall's thickness), the sill, the status bars either side
-    yw_in, yw_out = -HW + 0.03, -HW - T_
-    for (xs0, xs1) in ((x0d - 0.07, x0d), (x1d, x1d + 0.07)):
-        b.box_minmax((xs0, yw_out, 0.0), (xs1, yw_in, DOOR_H + 0.07), A.MAT_TRIM)
-    b.box_minmax((x0d - 0.07, yw_out, DOOR_H), (x1d + 0.07, yw_in, DOOR_H + 0.07), A.MAT_TRIM)
-    b.box_minmax((x0d, yw_out, 0.0), (x1d, -HW + 0.02, 0.014), A.MAT_TRIM)
-    for xs in (x0d - 0.11, x1d + 0.07):
-        b.box_minmax((xs, -HW + 0.005, 0.35), (xs + 0.04, -HW + 0.02, 1.9), A.MAT_ACCENT)
-    extra = b.to_object(name + "_extra")
-    A.finish(obj, bevel=0.01)
-    A.finish(extra, bevel=0.006)
-    return A.join([obj, extra], name)
+    """SM_COR_ShellWindow_4m (the bridge's window module, kit_corridor.py) with a 1.4 x 2.2 m door in the wall opposite the window: the kit's own module with the opening cut
+    in (`kit_corridor.shell(..., door=...)`: frame, sill and status bars of the v3 corridor). Same frame and materials as the kit's module."""
+    return KC.shell(name, window=True, door=(DOOR_X0, DOOR_W, DOOR_H))   # the v3 kit cuts the door itself (ARTE-PLANCIA-2)
 
 
-# ----------------------------------------------------------------------------------------------------------------------------------------------------- furniture
 def captain_chair(b: SParts, mat: str = LEATHER) -> None:
     """A high-backed swivel chair facing +x: a five-spoke base on casters, a gas column, a deep seat, a tall back with a headrest and two padded arms."""
     for k in range(5):

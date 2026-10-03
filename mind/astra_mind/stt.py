@@ -100,6 +100,7 @@ class Recognizer:
         self._boot: asyncio.Task | None = None
         self._reaper: asyncio.Task | None = None
         self._up: dict[str, bool | None] = {}                     # True up, False failed, None not tried yet
+        self._waking: dict[str, asyncio.Task] = {}               # a second engine being started in the background for later phrases
         self.stats = {"n": 0, "escalated": 0, "partial_hits": 0, "empty": 0}
 
     @staticmethod
@@ -231,6 +232,17 @@ class Recognizer:
             except asyncio.TimeoutError:
                 return False
             return bool(self._up.get(backend.name))
+        if not wait:
+            # a second opinion is never worth waiting for: the phrase goes with the first engine's words now, and the second engine is
+            # started in the background for the phrases after it (an "Allarme rosso" heard as "Alarmeros" waited 12 s for Whisper to
+            # come up, 2 Oct: an order must feel heard at once)
+            task = self._waking.get(backend.name)
+            if task is None or task.done():
+                self._waking[backend.name] = asyncio.create_task(self._wake(backend))
+            elif getattr(backend, "loaded", False) and await backend.ready():
+                self._up[backend.name] = True          # its server is up before its start call has returned (a model compiled meanwhile)
+                return True
+            return False
         try:
             # the second engine is started by the first phrase that needs it: a phrase does not wait minutes for a model that is
             # still compiling (the first start on a machine): it goes without, and the engine is picked up when it is ready
@@ -242,6 +254,15 @@ class Recognizer:
             log.exception("%s failed to start", backend.name)
             self._up[backend.name] = False
         return bool(self._up[backend.name])
+
+    async def _wake(self, backend: SttBackend) -> None:
+        """Start a second engine without anyone waiting for it (minutes, the first time on a machine: the Neural Engine compiles its model)."""
+        try:
+            self._up[backend.name] = bool(await backend.start())
+            log.info("%s is up in the background, for the phrases it is asked about", backend.name)
+        except Exception:  # noqa: BLE001
+            log.exception("%s failed to start", backend.name)
+            self._up[backend.name] = False
 
     async def _engine(self, backend: SttBackend, pcm: bytes, lang: str | None, use_glossary: bool, wait: bool = True) -> BackendResult | None:
         if not await self._usable(backend, wait):
@@ -272,7 +293,7 @@ class Recognizer:
         # the fast engine is unsure (a language it does not know written as if it were one it does): ask the one that knows every
         # language (not for a draft: what the Captain is still saying is decoded again, whole, when he lets go of the key)
         if res.backend == getattr(prim, "name", "") and unsure(res.conf, res.text) and fall is not None and not escalated and not draft:
-            second = await self._engine(fall, pcm, lang_hint, use_glossary)
+            second = await self._engine(fall, pcm, lang_hint, use_glossary, wait=False)      # (only if it is already up: see _usable)
             if second is not None and second.text:
                 escalated = True
                 res = self._arbitrate(res, second, prior)

@@ -131,6 +131,11 @@ ufficio, monitor comuni, plafoniere). La v3 deve sembrare **il ponte di comando 
 9. **Efficienza**: una manciata di materiali condivisi (trim sheet e decalcomanie), niente texture uniche enormi, geometria
    ricca dove si guarda (console, poltrone) e semplice dove no.
 
+**Seconda passata (2/10, ARTE-PLANCIA-2):** la plancia, i due corridoi del Ponte 1, l'abitacolo del Falcon e gli alloggi del Capitano
+sono stati portati a livello film con queste stesse regole (pavimento a placche polari con l'emblema, soffitto con campi di luce,
+nicchie a portale, atlante dei decori per gli schermi spenti, la vita sulle superfici, ottone e navy). Regole in più, numeri,
+comandi e limiti in [PLANCIA.md](PLANCIA.md); anteprime in [progressi/arte_plancia_2](progressi/arte_plancia_2/).
+
 ## 12. Le navi v3: scafi al livello di EVE Online (1/10)
 Il linguaggio degli scafi dopo ARTE-NAVI (nota completa e anteprime in [progressi/navi_v3](progressi/navi_v3/README.md)):
 1. **Geometria vera a ogni scala**: piastre a strati con smusso e bordo consumato, pannelli per partizione, portelli, sfiati,

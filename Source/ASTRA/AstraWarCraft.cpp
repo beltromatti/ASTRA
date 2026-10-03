@@ -451,7 +451,7 @@ void UAstraBattleSubsystem::LandCraft(FAstraBattleShip& S, FAstraBattleShip& Car
 	}
 	if (Q.Side == EAstraSide::Astra)
 	{
-		++Q.OnDeck;
+		Q.OnDeck = FMath::Min(Q.OnDeck + 1, Q.Total);
 		if (AirborneCount(S.Squadron) == 0)
 		{
 			Q.RearmT = Q.Kind == 1 ? 120.f : 60.f;

@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-02 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
+**Ultimo aggiornamento:** 2026-10-03 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
 ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano e rifinisce; **principio delle intelligenze**
 ([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
@@ -22,6 +22,46 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**3/10 — le partite dell'utente (2/10 sera, app impacchettata) lette come analisi, e corrette (il lead):**
+- **Ordini persi**: una seconda pressione del tasto (anche vuota) annullava il turno che stava eseguendo l'ordine precedente («Timoniere, ritirata» mai
+  arrivato al timone, l'Aquila poi persa): ora la pressione ferma le voci e i rapporti dell'equipaggio, mai l'esecuzione di un ordine del Capitano.
+- **Voce**: una frase incerta («Allarme rosso» sentito «Alarmeros») aspettava 12 s l'avvio di Whisper: ora parte subito e Whisper si accende in
+  sottofondo; il router dei canali lascia finire il suo secondo tentativo (le parole al capitano dello Styx non erano uscite).
+- **In volo**: due schianti contro lo scafo cercando la bocca del tubo a vista → **guida di recupero del ponte** (F entro 8 km, o Flight Control e la rete
+  di volo con `eagle_recover`): fuori dallo scafo, porta davanti alla prua, dentro il tubo; provato, 17 s da 3,7 km. Il localizzatore cercava «captain» e
+  trovava i plane captain (15 minuti di teletrasporti rifiutati): ora trova il Capitano. Il conto dei Falcon sul ponte non supera più il totale.
+- **Una ritirata non è una tregua**: sparare a chi si ritira per ordine non è più «una tregua infranta» (Thale accusava l'Aquila di una tregua mai fatta).
+- I camminatori del ponte di volo non restano più incastrati nella gente di VITA (il log ne scriveva uno al secondo).
+- **ARTE-PLANCIA-2 nel gioco** (unito, importato, Ponte 1 ricostruito, provato a vista): plancia con ottone e luce calda, corridoi blu e avorio, alloggi
+  del Capitano in noce con la galleria di poppa, abitacolo del Falcon nuovo (livrea sabbia come lo scafo).
+- **App rifatta** (~/Applications/ASTRA.app, 2,6 GB, fino al recupero in volo).
+- **Aiutanti**: ABBORDAGGI (correzioni delle braccia, poi F5.2) e CAMPAGNA (con il ritmo della guerra visto nelle partite: un'ondata comparsa già a
+  distanza di coltello ha distrutto l'Aquila in 5 minuti) ripresi; ARTE-INTERNI rilanciato (la sua cartella era stata pulita).
+- Visto nelle partite e ancora da fare: lo scontro vinto in 6 minuti e poi perso in 5 (CAMPAGNA); molte battute tagliate e ricominciate; il nome delle navi
+  storpiato dal riconoscimento (l'equipaggio capisce lo stesso).
+
+**2/10 pomeriggio — DA RIPRENDERE QUI (limite di sessione raggiunto; aiutanti fermati, i loro worktree restano):**
+- **Fatto dal lead:** il harness preme i tasti del mouse dall'input del giocatore (mira e fuoco provabili); **`AstraFallGuard`**: se il Capitano cade
+  più a lungo di ogni salto possibile a bordo (2,4 s) torna dove stava, e il log dice dov'era il buco (da quando ignora la pelle dello scafo un
+  buco lo faceva cadere nello spazio); **`astra.debug.floors <ponte>`** controlla i pavimenti di ogni stanza: nessun buco vero nei 12 ponti
+  (restano da guardare 19 punti del Flight Deck, forse le fessure delle catapulte); **«Said aloud»**: il palco della voce registra ciò che la
+  plancia ha davvero sentito e gli ufficiali lo vedono in ogni turno e nel ripensamento (Voss diceva tre volte in 27 s la stessa ritirata:
+  provato, ora una volta); l'intercetto dice la spinta vera (diceva 60 % a un «avanti tutta»).
+- **Giro della nave** (17 stanze, foto in `docs/progressi/interni_2026-10-02/`): i corridoi di NAVE-3 reggono, le stanze sono un greybox
+  ammobiliato → brief **ARTE-INTERNI** scritto (avviato e fermato subito dal limite: da rilanciare).
+- **ARTE-PLANCIA-2 FINITO** (ramo `worktree-agent-ac64a151337f965c2`, `8d3f0fe`, da unire): plancia, corridoi del Ponte 1, abitacolo del Falcon,
+  alloggi del Capitano; passi d'importazione nell'ordine: `tools/art/bridge3_textures.py` (uv con pillow e numpy) → bridge_v3 in Blender →
+  `make_bridge_v3_materials.py` → `build_bridge.py` → `kit_corridor.py` + `import_kit.py` → il mio `corridor_door` in `ship_rooms_bridge.py`
+  (`return KC.shell(name, window=True, door=(DOOR_X0, DOOR_W, DOOR_H))`) e `ship_kit.py --only BridgeCorridorDoor` → `cockpit.py` +
+  `import_cockpit.py` → `quarters.py` + `build_quarters.py` → riaprire l'atrio del Ponte 1 (`build_ship_interior`); dettagli in `docs/PLANCIA.md` del ramo.
+- **Fermati a metà dal limite** (riprenderli con SendMessage o rilanciarli): ABBORDAGGI (correzioni delle braccia dopo la mia prova: fucile
+  troppo grande, mano sinistra fuori dall'impugnatura, mirino che riempie la vista, due righe di tasti sovrapposte; poi F5.2), CAMPAGNA (lo
+  strato strategico), ARTE-INTERNI. Poi FLOTTA-VIVA.
+- **Visto giocando, da sistemare:** il Capitano che parla alla Praetorian finisce sulla rete della flotta e Martin precisa a sproposito che in
+  linea c'è Rourke (lo strumento `hail` in `mind/astra_mind/tools.py`: spiegare che a una nave alleata si parla col suo contatto);
+  Alpha Lead ripete «Alpha ingaggia». Prima che l'utente provi: rifare il pacchetto (impostazione RETINA compresa).
+- Credito AI: ≈ 8,5 $ spesi su 20 (due brevi partite con la mente oggi; verificare su OpenRouter).
+
 **2/10 notte — la pianta di NAVE-3 nel gioco** (il lead): kit esportato (444 mesh, 7,4 M triangoli), i 12 ponti ricostruiti (13 318 istanze,
 1729 porte), 34 pozzi e la navetta caricati senza problemi, 299 pianerottoli. Provato camminando e salendo: le corse fra i ponti vanno (Ponte 7 ↔ 4),
 gli atrii delle banche sono belli (cornice di NAVE-3, ante del motore). **Trovati e corretti nel motore** (41 prove del banco verdi, una nuova):
@@ -31,6 +71,14 @@ dell'atrio (soglia e imbotte); il posto e il ponte del Capitano dentro un pozzo 
 non ha l'atrio degli ascensori (il corridoio finisce nella vecchia alcova «LIFT», dietro si vedono le stelle), le fermate della navetta hanno le
 bocche dei tunnel murate (il Capitano viene raschiato via dalla vettura), i tubi di Jefferies servono dei dati per le scale (il Capitano non ci
 cade: si ferma sull'orlo). Memoria del gioco con i ponti nuovi: **8 GB** (limite 9): da tenere d'occhio.
+
+**2/10 — integrazione finale e prove nel gioco (il lead):**
+- **NAVE-3 finale nel gioco**: dalla plancia il corridoio di babordo entra nell'atrio dei due turboascensori del comando (il vecchio blocco esterno aveva la faccia chiusa e un piedistallo a −0,3 m che tratteneva il Capitano nel pozzo: ARTE-PLANCIA-2 l'ha aperto; e la pelle esterna dello scafo, dove il pozzo la attraversa, lo tratteneva a −6 m: il Capitano a piedi ora la ignora). **Provato: Ponte 1 → 4 in 12 s con il Capitano a bordo**; in una vettura ferma con le porte chiuse andare verso le porte le riapre.
+- **Scale di Jefferies** (nuovo `AstraLadderSubsystem`): Ponte 4 → 6 sul tubo J-1S, E scende al ponte più vicino entro 1,5 m.
+- **Teletrasporto unito e provato**: sala, Capo Rhea Ostrander con la sua mente («Capo, mandami in sala macchine»: strumento in 0,6 s, arrivo in 10 s), effetti e suoni; il posto del Capo nel piano è suo.
+- **Abbordaggi provati**: `astra.board.start 1`, breccia al Ponte 7 C, allarme rosso, paratie, 80 marine chiamati, «Reyes, tieni il corridoio…» eseguito con tre ordini di squadra in 1,3 s. **Da sistemare (ABBORDAGGI ripreso)**: le braccia in prima persona non si vedono (collocate 1,5 m sotto la camera) e una forma scura taglia il bordo della vista.
+- **Il computer degli ascensori a voce**: «Computer, portami alla sala teletrasporto» → Ponte 5 in 1 s.
+- **Prestazioni in battaglia** (nuovi strumenti: `tools/perf_ab.py`, `astra.debug.under/lookat`, profili CSV): la GPU è il limite (~13,4 ms più MetalFX ~2 non visti dalla risoluzione dinamica; il thread di render aspetta la GPU ~10 ms), i traslucidi costano ~1,9 ms, le mesh a istanze della battaglia ~3,6, la telecamera dello schermo principale ~2,3 ms di thread di render in media; le ombre virtuali restano la scelta giusta (+6,4 ms senza). Memoria del gioco 8 GB.
 
 **2/10 notte — da riprendere qui:** unito il ramo finale di NAVE-3 (atrio dei turboascensori del Ponte 1, bocche dei tunnel della navetta aperte, dati delle scale di Jefferies) e ABBORDAGGI (compila); kit della nave riesportato. **Il prossimo passo è `tools/ue.py pyfile /Users/beltromatti/Desktop/ASTRA/tools/ue_scripts/build_ship_interior.py` nell'editor** (leggere le righe «bridge lift housing»), poi provare nel gioco: ascensore dalla plancia, navetta da A a D, le scale di Jefferies (nuovo `AstraLadderSubsystem`: E vicino alla nicchia o spingere verso i pioli, W/S, E per scendere; `astra.ladders.info`), le armi e un abbordaggio (`astra.weapons.give`, `astra.board.start 1`). Prova di durata con il Capitano che gioca: **0,87 $/ora** (sotto 1), 55 fps di mediana in battaglia, il thread di render arriva a 54 ms nei picchi. Credito: 7,84 $ spesi su 20. Aiutanti al lavoro: TELETRASPORTO, ARTE-PLANCIA-2, CAMPAGNA.
 

@@ -31,6 +31,9 @@ AAstraWalker::AAstraWalker()
 	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -92.f));
 	GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// the people of VITA stand at their posts on the walkers' routes: a walker that met one stayed against it for good, "stuck and failed to move" in the
+	// log every second (2 Oct); a crowd of people brushes past one another
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Ignore);
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;   // unseen: it walks, the pose waits
 	GetMesh()->bEnableUpdateRateOptimizations = true;
 }

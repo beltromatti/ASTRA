@@ -61,18 +61,25 @@ OWNER_WORDS = {"astra": "ASTRA", "mandate": "Kharon Mandate", "guilds": "Free Gu
 class WarMap:
     def __init__(self, save_path: str | None = None) -> None:
         self.save_path = save_path or os.path.join(SAVE_DIR, "war.json")
+        # the March (march.py), when the war has fleets: it alone moves the owners and the threats of the map, by what its fleets do. The story (the director's
+        # war news, a chapter's ending) can still add notes to a system, but not take it or give it: a system changes hands when someone takes it
+        self.authority: Any = None
+        self.observers: list[Any] = []                  # called with the system's name when the Aquila arrives in one (the March follows her)
+        self._dirty = False                             # a threat changed that is not saved yet
+        self.persist = True                             # (the benches play wars that must leave nothing on disk)
         self.reset()
 
     # ------------------------------------------------------------------------------------------------- state
     def reset(self) -> None:
         self.systems: dict[str, dict[str, Any]] = {s["name"]: dict(copy.deepcopy(s), threat=0, notes=[]) for s in SECTOR}
-        self.systems["Thule"]["threat"] = 2
-        self.systems["Aurelia"]["threat"] = 1
+        for name, level in (("Thule", 2), ("Aurelia", 1)):                       # (where the war starts)
+            if name in self.systems:
+                self.systems[name]["threat"] = level
         self.links: dict[str, list[str]] = {s["name"]: [] for s in SECTOR}
         for a, b in LINKS:
             self.links[a].append(b)
             self.links[b].append(a)
-        self.current = "Aurelia"
+        self.current = "Aurelia" if "Aurelia" in self.systems else next(iter(self.systems))
         self.news: list[str] = []
         self.day = 1
 
@@ -91,6 +98,11 @@ class WarMap:
         if k:
             self.current = k
             self.save()
+            for fn in list(self.observers):
+                try:
+                    fn(k)
+                except Exception:  # noqa: BLE001
+                    log.exception("an observer of the Aquila's arrival failed")
 
     def update(self, system: str, owner: str | None = None, threat: int | None = None, note: str | None = None) -> str:
         """The director moves the war. Returns what changed (for the campaign log)."""
@@ -99,6 +111,10 @@ class WarMap:
             return f"(no system {system} in the March)"
         s = self.systems[k]
         changed = []
+        if self.authority is not None and ((owner in OWNERS and owner != s["owner"]) or (threat is not None and int(threat) != s["threat"])):
+            # the war's own course decides who holds a system and how threatened it is (march.py): a telling cannot move it
+            changed.append(f"{k}: held by {OWNER_WORDS[s['owner']]}, {['quiet', 'raids', 'under attack', 'front line'][s['threat']]} (the war decides that, not the telling)")
+            owner, threat = None, None
         if owner in OWNERS and owner != s["owner"]:
             changed.append(f"{k} now {OWNER_WORDS[owner]} (was {OWNER_WORDS[s['owner']]})")
             s["owner"] = owner
@@ -110,6 +126,25 @@ class WarMap:
             changed.append(f"{k}: {note.strip()}")
         self.save()
         return "; ".join(changed) or f"{k} unchanged"
+
+    def set_owner(self, system: str, owner: str, note: str = "") -> str:
+        """The March moves a system's owner (the fleets took it): the only way it changes once the war has fleets."""
+        k = self.find(system)
+        if not k or owner not in OWNERS or owner == self.systems[k]["owner"]:
+            return ""
+        was = self.systems[k]["owner"]
+        self.systems[k]["owner"] = owner
+        if note:
+            self.systems[k]["notes"] = (self.systems[k]["notes"] + [note.strip()])[-3:]
+        self.save()
+        return f"{k} now {OWNER_WORDS[owner]} (was {OWNER_WORDS[was]})"
+
+    def set_threat(self, system: str, threat: int) -> None:
+        """The March charts a system's threat from where its fleets are (0 quiet, 1 raids, 2 under attack, 3 front line)."""
+        k = self.find(system)
+        if k and 0 <= int(threat) <= 3 and int(threat) != self.systems[k]["threat"]:
+            self.systems[k]["threat"] = int(threat)
+            self._dirty = True
 
     def add_news(self, text: str) -> None:
         self.news = (self.news + [text.strip()])[-8:]
@@ -148,13 +183,19 @@ class WarMap:
 
     def game_payload(self) -> dict[str, Any]:
         """What the game needs: looks for the gates, links for routing, the plot for the holo table."""
-        return {"current": self.current, "systems": [
+        out = {"current": self.current, "systems": [
             {"name": k, "star_class": s["star"], "planet_type": s["planet"], "planet_name": s["world"], "owner": s["owner"],
              "threat": s["threat"], "x": s["x"], "y": s["y"], "links": self.links[k], "pop": s.get("pop", 0)}
             for k, s in self.systems.items()], "news": self.news[-5:]}
+        if self.authority is not None:
+            out["march"] = self.authority.holo("astra")             # (the fleets and the battles as ASTRA's high command holds them, with the fog of war)
+        return out
 
     # ---------------------------------------------------------------------------------------------- saving
     def save(self) -> None:
+        self._dirty = False
+        if not self.persist:
+            return
         try:
             os.makedirs(os.path.dirname(self.save_path), exist_ok=True)
             tmp = self.save_path + ".tmp"

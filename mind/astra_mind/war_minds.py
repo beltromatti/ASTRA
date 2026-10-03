@@ -202,14 +202,14 @@ POSTURE = _fn("weapons_posture", "Your group's weapons posture. hold_fire: every
     "reason": {"type": "string"}}, ["posture", "reason"])
 
 
-def say_tool(speakers: list[str]) -> dict[str, Any]:
+def say_tool(speakers: list[str], lang_name: str = "the Captain's language") -> dict[str, Any]:
     return _fn("say", "Say something over the fleet net: the Aquila's Captain, and every allied ship, hear it. Radio speech: one or two short sentences, "
-                      "in the language of the Captain (names in English). Silence is normal: speak when it helps (a warning the Captain may have "
+                      f"in {lang_name} (names in English). Silence is normal: speak when it helps (a warning the Captain may have "
                       "missed, a request you need answered, what you are doing that concerns the Aquila, an answer to what was said to you).", {
         "speaker": {"type": "string", "enum": speakers, "description": "which captain of your group speaks (default: the group's commander)"},
         "to": {"type": "string", "description": "who it is for: \"aquila\" (the Captain), \"fleet\" (everyone), or the id of an allied commander; only an "
                                                 "addressed allied commander is woken by it"},
-        "text": {"type": "string"},
+        "text": {"type": "string", "description": f"what you say aloud, in {lang_name} (the Captain's language: never another one, whatever the log is written in)"},
         "tone": {"type": "string", "enum": ["calm", "focused", "urgent", "tense", "dry", "warm", "grim"]},
         "urgent": {"type": "boolean", "description": "true only for danger now (a loss, a missile salvo, a collapse); it goes before other talk"}},
         ["text", "tone"])
@@ -697,6 +697,7 @@ class WarMinds:
         self.where = where or (lambda st: _place(st))
         self.note_story = note or (lambda text: None)    # the campaign log of the story (director.note)
         self.trace = trace                               # the bench keeps every pulse with its prompts
+        self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []   # the Aquila's speech backlog (speech.Voice.waiting, set by the server)
         self.minds: dict[str, Mind] = {}
         self.allies: dict[str, Commander] = {}           # ASTRA captains by ship contact id
         self.pool_used = 0
@@ -707,6 +708,7 @@ class WarMinds:
         self.t0 = self.clock()
         self.disabled = False
         self.formation_doctrine = False                  # the doctrine also teaches the formation lever (a switch: ASTRA_WAR_FORMATION=1, see `_RANGE_LINE`)
+        self.strategic: Callable[[str], str] | None = None   # side -> what its high command means and what is on its way to this system (strategy.py: the war of the March)
 
     # ------------------------------------------------------------------------------------------------ people
     def reset(self) -> None:
@@ -1126,6 +1128,10 @@ class WarMinds:
                           f"into): {style}")
         if seat.kind == "group" and side == "mandate" and admiral is not None:
             intent = (f"\nThe admiral's last intent: {admiral.intent}" if admiral.intent else "\nThe admiral has not given orders yet.")
+        high = self.strategic(side) if self.strategic is not None else ""
+        if high:
+            intent += ("\nYOUR HIGH COMMAND, AS YOUR SIDE'S FLEETS KNOW IT (its plan, its orders for the fleets here, what is on its way to this system and what your side's eyes say "
+                       "is coming; the war is bigger than this fight: read what you are fighting for, and what help is on its way)\n" + high)
         if mind.why_extra:
             intent += "\n" + "\n".join(mind.why_extra)
             mind.why_extra = []
@@ -1133,8 +1139,12 @@ class WarMinds:
         if inbox:
             msgs = "\nMESSAGES FOR YOU\n" + "\n".join(f" {max(0, self.clock() - m.t):.0f} s ago · {self._src(m)}: {m.text}" for m in inbox)
         enemy_note = f"\nNew enemy ships on your plot since your last look: {', '.join(new_enemy)}" if new_enemy else ""
+        queued = self.waiting() if side == "astra" else []
+        backlog = ("\nWAITING TO BE SAID on the Aquila's speakers (queued behind whoever is speaking there: a word from you to her captain is worth adding only "
+                   "if it matters more to him than these, and nothing here is said again)\n" + "\n".join(f" - {who} ({how}): \"{words}\"" for who, words, how in queued)
+                   if queued else "")
         user = (f"WHAT YOU HAVE DECIDED AND SAID, AND WHAT YOU HEARD (your log, newest last)\n{self.recall(side)}\n\n"
-                f"{pic}\nEVENTS SINCE YOUR LAST LOOK (newest last)\n{render_events(new_events)}{enemy_note}{intent}{msgs}\n\n"
+                f"{pic}\nEVENTS SINCE YOUR LAST LOOK (newest last)\n{render_events(new_events)}{enemy_note}{intent}{msgs}{backlog}\n\n"
                 f"You are looking now because: {'; '.join(why)}. The Captain's language is {LANG_NAMES.get(lang, lang)} (what you say aloud is in it).\n"
                 "Decide: give your orders with the tools, or call no_change.")
         tools: list[dict[str, Any]] = []
@@ -1145,7 +1155,7 @@ class WarMinds:
         elif side == "mandate":
             tools = [group_order_tool("commander"), REPORT, NO_CHANGE]
         else:
-            tools = [group_order_tool("commander"), say_tool(speakers), POSTURE, NO_CHANGE]
+            tools = [group_order_tool("commander"), say_tool(speakers, LANG_NAMES.get(lang, lang)), POSTURE, NO_CHANGE]
         return system, user, tools
 
     @staticmethod
@@ -1429,7 +1439,7 @@ class WarMinds:
                 said.append(str(call.arguments()["text"]).strip())
 
         comp = await models.chat(self.llm, COMMANDER_ROLE, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                                 tools=[say_tool([cmd.key]), NO_CHANGE], tool_choice="auto", on_tool_call=on_call, max_tokens=140)
+                                 tools=[say_tool([cmd.key], LANG_NAMES.get(self.lang(), self.lang())), NO_CHANGE], tool_choice="auto", on_tool_call=on_call, max_tokens=140)
         mind.stats["cost"] += comp.cost
         return " ".join(said) if said else None
 

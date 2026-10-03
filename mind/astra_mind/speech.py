@@ -39,7 +39,7 @@ import enum
 import logging
 import re
 import struct
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable
 
@@ -219,6 +219,19 @@ class Voice:
         self.first_audio: dict[int, float] = {}
         self.enqueued: dict[int, float] = {}
         self.stats: Counter = Counter()
+        # what the room heard aloud, oldest first: (loop time it ended, who said it, the words heard, said to the end). A line thought
+        # again before it was said is here as it was said, one cut off as far as it went: the officers' sense of what the Captain has heard
+        self._heard: deque[tuple[float, str, str, bool]] = deque(maxlen=60)
+
+    def waiting(self, limit: int = 8) -> list[tuple[str, str, str]]:
+        """What is waiting to be said, in the order it would be said: (who, the words, how urgent). The line being said now is not here."""
+        order = sorted((l for l in self._queue if l.state == "queued"), key=lambda l: (l.prio, l.enq, l.id))
+        return [(l.name or self.who(l.speaker)[0], l.text, PRIO_NAMES[l.prio]) for l in order[:limit]]
+
+    def heard_since(self, seconds: float) -> list[tuple[float, str, str, bool]]:
+        """What was said aloud in the last `seconds`, oldest first: (seconds ago, who said it, the words heard, whether it was said to the end)."""
+        now = self._now()
+        return [(now - t, who, text, full) for t, who, text, full in self._heard if now - t <= seconds]
 
     # ------------------------------------------------------------------------------------------ the producer's flags
     @property
@@ -924,6 +937,10 @@ class Voice:
     async def _finish(self, line: Line, reason: str, sent: float) -> None:
         now = self._now()
         line.state = "done" if reason == "done" else "cut"
+        played = 1.0 if reason == "done" else min(1.0, max(0.0, (now - line.t_begin) / max(line.est_s, 0.5)))
+        words = line.text if reason == "done" else line.text[:int(played * len(line.text))].strip()
+        if words and sent > 0.2:
+            self._heard.append((now, line.name or self.who(line.speaker)[0], words, reason == "done"))
         if line.stream is not None:
             line.stream.stop()
         if reason == "cut":

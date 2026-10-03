@@ -91,8 +91,11 @@ def parse(content: str) -> str:
         return ""
 
 
-async def for_party(llm: OpenRouter, text: str, ctx: Context, wait_s: float = 2.5) -> Route:
-    """What of the Captain's words goes out on the open channel (nothing when there is no live channel)."""
+async def for_party(llm: OpenRouter, text: str, ctx: Context, wait_s: float = 4.5) -> Route:
+    """What of the Captain's words goes out on the open channel (nothing when there is no live channel). The wait covers one stalled
+    request and its retry (models.chat: the router's first token is due in 1.2 s, the retry gets twice that): at 2.5 s the retry was always
+    cut off, and the Captain's words to the Styx's captain never left the ship (2 Oct). With no decision at all nothing goes out — the bridge's
+    own orders must never reach the enemy by default."""
     ch = ctx.channel
     if not ch or not ch.live:
         return Route()

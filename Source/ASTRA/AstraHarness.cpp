@@ -372,6 +372,22 @@ void UAstraHarness::SendKey(const FKey& Key, bool bDown)
 	FSlateApplication& App = FSlateApplication::Get();
 	if (Key.IsMouseButton())
 	{
+		// straight to the player's input (the mapping contexts, the bindings), as a click in the game would arrive: Slate routes a button by where the
+		// OS cursor is, and with the cursor off the game window (the lead's own screen) the viewport never saw it — aiming and firing did nothing
+		APlayerController* PC = nullptr;
+		for (const FWorldContext& Ctx : GEngine ? GEngine->GetWorldContexts() : TIndirectArray<FWorldContext>())
+		{
+			if (Ctx.World() && Ctx.World()->IsGameWorld())
+			{
+				PC = Ctx.World()->GetFirstPlayerController();
+				break;
+			}
+		}
+		if (PC)
+		{
+			PC->InputKey(FInputKeyEventArgs::CreateSimulated(Key, bDown ? IE_Pressed : IE_Released, bDown ? 1.f : 0.f));
+			return;
+		}
 		const FPointerEvent E(0, App.GetCursorPos(), App.GetLastCursorPos(), App.GetPressedMouseButtons(), Key, 0.f, App.GetModifierKeys());
 		bDown ? App.ProcessMouseButtonDownEvent(nullptr, E) : App.ProcessMouseButtonUpEvent(E);
 		return;

@@ -560,6 +560,16 @@ void AAstraFighterPawn::Land()
 			Cam->StartCameraFade(0.f, 1.f, 0.8f, FLinearColor::Black, false, true);
 		}
 	}
+	else if (St.bCanRecover)
+	{
+		// farther out: the deck's recovery guidance brings her in (an automatic carrier landing): flying into the tube's mouth by eye ended twice
+		// against the hull (2 Oct)
+		Battle->StartPilotRecovery(TEXT("the Captain"));
+	}
+	else if (St.bRecovering)
+	{
+		Battle->StopPilotRecovery(TEXT("the Captain called it off"));
+	}
 }
 
 void AAstraFighterPawn::Tick(float DeltaTime)
@@ -628,6 +638,10 @@ void AAstraFighterPawn::Tick(float DeltaTime)
 		{
 			Battle->SetPilotInput(In);
 			Battle->GetPilotStatus(St);
+			if (St.bRecovered)
+			{
+				Land();                            // the guidance has her at the mouth, slow: into the tube
+			}
 			if (St.bDown)
 			{
 				// shot down: the canopy blows, black, the pod tumbles; the Wasp brings it home
@@ -939,7 +953,8 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	}
 	const UAstraShipSubsystem* ShipH = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
 	D.HomeText = bAir ? FString::Printf(TEXT("%s %.1f km"), ShipH ? *ShipH->SurfaceSiteName().ToUpper() : TEXT("FIELD"), St.HomeRangeKm)
-	                  : FString::Printf(TEXT("AQUILA %.1f km%s"), St.HomeRangeKm, St.bCanLand ? TEXT("  ·  F: RECOVER") : TEXT(""));
+	                  : FString::Printf(TEXT("AQUILA %.1f km%s"), St.HomeRangeKm, St.bCanLand ? TEXT("  ·  F: RECOVER")
+	                                                                                   : (St.bCanRecover ? TEXT("  ·  F: RECOVERY GUIDANCE") : TEXT("")));
 	if (Project(St.HomeWorld, D.HomePos))
 	{
 		D.bHomeOn = true;
@@ -958,9 +973,17 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	{
 		D.Hint = FString::Printf(TEXT("MISSILE%s INBOUND  ·  C: DECOYS  ·  BREAK AND BOOST"), St.Incoming > 1 ? TEXT("S") : TEXT(""));
 	}
+	else if (St.bRecovering)
+	{
+		D.Hint = TEXT("RECOVERY GUIDANCE  ·  THE DECK IS FLYING YOU IN  ·  PUSH THE STICK OR F: TAKE HER BACK");
+	}
 	else if (St.bCanLand)
 	{
 		D.Hint = TEXT("RECOVERY APPROACH  ·  F: INTO THE TUBE");
+	}
+	else if (St.bCanRecover && St.HullPct < 60.f)
+	{
+		D.Hint = TEXT("F: RECOVERY GUIDANCE  ·  THE DECK FLIES YOU HOME");
 	}
 	else if (St.HullPct < 30.f)
 	{

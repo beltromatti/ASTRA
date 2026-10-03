@@ -34,8 +34,8 @@
     "hurry_cm_s": 300.0,
     "spread": 0.12,
     "stairs_s": 11.0,
-    "lift_s": 9.0,
-    "note": "stairs and lift rides take time, not distance; a lift is a teleport between landings (the ride fades out and in)"
+    "lift_s": 16.0,
+    "note": "stairs and lift rides take time, not distance; lift_s is a real ride between two decks with the call and the doors (astra.lifts.info measures it: 16.0 s on the ship of plan v2), the time the people nobody sees spend in a lift"
   },
   "visibility": {
     "max_bodies": 40,

@@ -146,12 +146,13 @@ def build_back_wall(c: SH.Ctx, name: str = "SM_BRG3_WallBack"):
         # the two end sections: equipment, like the side walls
         sec_l = (0.3 + 0.1, dsc[0] - dw / 2 - 0.44)
         sec_r = (dsc[1] + dw / 2 + 0.44, Lw - 0.4)
-        WL.bay_module(fb, "lockers", sec_l[0], sec_l[1], rng, "command", 1)
-        WL.bay_module(fb, "safety", sec_r[0], sec_r[1], rng, "command", 2)
+        WL.bay_module(fb, "lockers", sec_l[0], sec_l[1], rng, "command", 1, em=em)
+        WL.bay_module(fb, "safety", sec_r[0], sec_r[1], rng, "command", 2, em=em)
         # between the doors: layered panels behind the master display (the display itself is SM_BRG3_MasterDisplay)
         s0, s1 = dsc[0] + dw / 2 + 0.44, dsc[1] - dw / 2 - 0.44
         WL.panel(fb, s0, s1, WL.Z_LOW0, 1.0, bolts=True)
         WL.panel(fb, s0, s1, 3.5, 3.95, bolts=True, raised=False)
+        WL.wall_display(fb, em, (s0 + s1) / 2, 3.80, min(s1 - s0 - 0.3, 4.0), "ticker", "command_dim")
         # above the doors: layered lintel panels with a label, a cable run over everything
         for s in dsc:
             WL.panel(fb, s - 0.95, s + 0.95, dh + 0.26, 3.4, raised=False)
@@ -161,35 +162,36 @@ def build_back_wall(c: SH.Ctx, name: str = "SM_BRG3_WallBack"):
 
 
 def build_master_display(c: SH.Ctx, name: str = "SM_BRG3_MasterDisplay"):
-    """The ship-systems wall display: a brushed frame standing off the wall, the screen, a status shelf. Origin at the wall
-    plane (x = back wall), centred in y, on the floor level; +x into the room."""
+    """The ship-systems wall display: the live glass (a plain rectangle, never covered) standing in two rounded frames that step out of the wall, a
+    lit lip round the glass, a status shelf below. Origin at the wall plane (x = back wall), centred in y, on the floor level; +x into the room."""
     md = c.D["master_display"]
     b = Parts(bevel=0.007, fine_bevel=0.003)
     fb, em = b.body, b.emit
     w, h, z0 = md["width"], md["height"], md["bottom"]
     z1 = z0 + h
     fw = 0.09
-    # frame: four brushed members stepped in two layers
-    fb.box((0.0, -w / 2 - fw, z0 - fw), (0.15, w / 2 + fw, z0), L.TRIM)
-    fb.box((0.0, -w / 2 - fw, z1), (0.15, w / 2 + fw, z1 + 0.06), L.TRIM)
-    fb.box((0.0, -w / 2 - fw, z0), (0.15, -w / 2, z1), L.TRIM)
-    fb.box((0.0, w / 2, z0), (0.15, w / 2 + fw, z1), L.TRIM)
-    fb.box((0.06, -w / 2 - fw - 0.05, z0 - fw - 0.05), (0.17, w / 2 + fw + 0.05, z0 - fw), L.STRUCT)
-    fb.box((0.06, -w / 2 - fw - 0.05, z1 + 0.06), (0.17, w / 2 + fw + 0.05, z1 + 0.11), L.STRUCT)
-    fb.box((0.0, -w / 2, z0), (0.10, w / 2, z1), L.COMPOSITE)                                    # the back plate behind the glass
     b.emit.screen((0.118, 0.0, (z0 + z1) / 2), w, h, "SCREEN_master_1", (1, 0, 0), up=(0, 0, 1))
+    fb.box((0.0, -w / 2, z0), (0.10, w / 2, z1), L.COMPOSITE)                                    # the back plate behind the glass
+    swap = Matrix(((0, 1, 0, 0), (1, 0, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)))                    # (s, t, z) of the wall rings -> (x = t, y = s, z)
+    with fb.at(swap), em.at(swap):
+        m = 0.07                                                                                  # the rounded frame stays outside the glass's corners
+        WL.rr_ring(fb, -w / 2 - m, w / 2 + m, z0 - m, z1 + m, 0.20, [(0.0, 0.0), (0.17, 0.0), (0.17, 0.118), (0.0, 0.118)], L.STRUCT, n=8)
+        WL.rr_ring(em, -w / 2 - m - 0.17 + 0.012, w / 2 + m + 0.17 - 0.012, z0 - m - 0.17 + 0.012, z1 + m + 0.17 - 0.012, 0.37, [(0.0, 0.119), (-0.012, 0.119), (-0.012, 0.123), (0.0, 0.123)],
+                   L.BRASS, n=8)
+        WL.rr_ring(fb, -w / 2 - 0.035, w / 2 + 0.035, z0 - 0.035, z1 + 0.035, 0.17, [(0.0, 0.0), (0.035, 0.0), (0.035, 0.145), (0.0, 0.145)], L.COMPOSITE, n=8)
+        WL.rr_ring(em, -w / 2 - 0.035, w / 2 + 0.035, z0 - 0.035, z1 + 0.035, 0.17, [(-0.004, 0.100), (0.0, 0.100), (0.0, 0.146), (-0.004, 0.146)], L.LAMP, "command", n=8)
     # a thin lit border round the picture, in the command colour
-    em.lamp_box((0.114, -w / 2 - 0.004, z0 - 0.012), (0.126, w / 2 + 0.004, z0), "command", L.LAMP)
-    em.lamp_box((0.114, -w / 2 - 0.004, z1), (0.126, w / 2 + 0.004, z1 + 0.012), "command", L.LAMP)
+    em.lamp_box((0.114, -w / 2 - 0.004, z0 - 0.012), (0.126, w / 2 + 0.004, z0), "command", L.LAMP_DIM)
+    em.lamp_box((0.114, -w / 2 - 0.004, z1), (0.126, w / 2 + 0.004, z1 + 0.012), "command", L.LAMP_DIM)
     # the shelf below: a status strip of small lamps and the ventilation slots
-    fb.box((0.0, -w / 2 - fw, z0 - 0.26), (0.30, w / 2 + fw, z0 - fw - 0.05), L.STRUCT)
-    fb.box((0.0, -w / 2 - fw, z0 - fw - 0.05), (0.32, w / 2 + fw, z0 - fw - 0.03), L.TRIM)
+    fb.box((0.0, -w / 2 - fw, z0 - 0.30), (0.30, w / 2 + fw, z0 - fw - 0.08), L.STRUCT)
+    fb.box((0.0, -w / 2 - fw, z0 - fw - 0.08), (0.32, w / 2 + fw, z0 - fw - 0.06), L.BRASS)
     for k in range(26):
         y = -w / 2 + 0.25 + k * (w - 0.5) / 25
         cell = "green" if k % 7 else "amber"
-        em.lamp_box((0.322, y - 0.02, z0 - fw - 0.13), (0.328, y + 0.02, z0 - fw - 0.09), cell, L.LAMP_DIM)
-    for k in range(10):
-        y = -w / 2 + 0.6 + k * 0.1
+        em.lamp_box((0.322, y - 0.02, z0 - fw - 0.16), (0.328, y + 0.02, z0 - fw - 0.12), cell, L.LAMP_DIM)
+    for k in range(5):                                                                            # slats under the shelf lamps
+        fb.box((0.30, -w / 2 + 0.3, z0 - 0.28 + k * 0.012), (0.325, w / 2 - 0.3, z0 - 0.272 + k * 0.012), L.RUBBER)
     # brackets to the wall
     for y in (-w / 2 - 0.02, -w / 4, 0.0, w / 4, w / 2 + 0.02):
         fb.box((-0.02, y - 0.05, z0 - 0.02), (0.06, y + 0.05, z0 + 0.4), L.STRUCT)
