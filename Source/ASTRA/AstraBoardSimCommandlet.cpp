@@ -1,13 +1,27 @@
 #include "AstraBoardSimCommandlet.h"
 
 #include "ASTRA.h"
+#include "AstraArmsRig.h"
 #include "AstraBoardMap.h"
 #include "AstraBoardSim.h"
 #include "AstraDamageMap.h"
+#include "AstraWeapon.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/AttributesRuntime.h"
+#include "BonePose.h"
+#include "Engine/SkeletalMesh.h"
+#include "Engine/SkeletalMeshSocket.h"
+#if WITH_EDITORONLY_DATA
+#include "Rendering/SkeletalMeshLODModel.h"
+#include "Rendering/SkeletalMeshModel.h"
+#endif
+#include "HAL/IConsoleManager.h"
+#include "ReferenceSkeleton.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
+#include "Misc/MemStack.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
@@ -1053,6 +1067,442 @@ static void BoardScenarioOrders(FRig& Rig, int32 Seed, int32 Seeds)
 	BRecord->SetObjectField(TEXT("orders"), Rec);
 }
 
+
+// ================================================================================================================== the Captain's arms on the weapon
+
+namespace
+{
+	/** The animation's pose at a time on a mesh's skeleton: the local transforms of all its bones (the mannequin's own, as the game plays them). */
+	bool FpsEvalPose(USkeletalMesh* Mesh, UAnimSequence* Anim, double Time, TArray<FTransform>& OutLocal)
+	{
+		FMemMark Mark(FMemStack::Get());	// the compact pose lives on the memory stack
+		const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+		TArray<FBoneIndexType> Required;
+		for (int32 i = 0; i < Ref.GetNum(); ++i)
+		{
+			Required.Add((FBoneIndexType)i);
+		}
+		FBoneContainer Container;
+		Container.InitializeTo(Required, UE::Anim::FCurveFilterSettings(UE::Anim::ECurveFilterMode::DisallowAll), *Mesh);
+		FCompactPose Pose;
+		Pose.SetBoneContainer(&Container);
+		Pose.ResetToRefPose();
+		FBlendedCurve Curve;
+		Curve.InitFrom(Container);
+		UE::Anim::FStackAttributeContainer Attributes;
+		FAnimationPoseData Data(Pose, Curve, Attributes);
+		Anim->GetAnimationPose(Data, FAnimExtractContext(Time, false));
+		OutLocal.SetNum(Ref.GetNum());
+		for (int32 i = 0; i < Ref.GetNum(); ++i)
+		{
+			OutLocal[i] = Pose[FCompactPoseBoneIndex(i)];
+		}
+		return true;
+	}
+
+	/** A socket of the mesh's skeleton in the mesh's space, given the pose (component space). */
+	bool FpsSocket(USkeletalMesh* Mesh, const TArray<FTransform>& CS, const TCHAR* Name, FTransform& Out)
+	{
+		const USkeletalMeshSocket* S = Mesh->FindSocket(FName(Name));
+		if (!S)
+		{
+			return false;
+		}
+		const int32 Bone = Mesh->GetRefSkeleton().FindBoneIndex(S->BoneName);
+		if (Bone == INDEX_NONE)
+		{
+			return false;
+		}
+		Out = S->GetSocketLocalTransform() * CS[Bone];
+		return true;
+	}
+
+	struct FFpsView { double HalfH, HalfV; };
+
+	/** Where a point of the camera's space is in the view: degrees right and up, and whether the picture holds it. */
+	FString FpsWhere(const FVector& C, const FFpsView& V, bool& bIn)
+	{
+		if (C.X < 1.0)
+		{
+			bIn = false;
+			return FString::Printf(TEXT("behind the camera"));
+		}
+		bIn = FMath::Abs(C.Y / C.X) <= V.HalfH && FMath::Abs(C.Z / C.X) <= V.HalfV;
+		return FString::Printf(TEXT("%5.1f right %5.1f up at %3.0f cm %s"), FMath::RadiansToDegrees(FMath::Atan2(C.Y, C.X)), FMath::RadiansToDegrees(FMath::Atan2(C.Z, C.X)), C.X, bIn ? TEXT("in view") : TEXT("out of view"));
+	}
+
+	/** How far (cm) a point of the camera's space stands outside the view volume of a picture (tangents of its half angles); negative inside it, and the near plane counts: the cut end of an arm
+	 *  that is that far outside cannot show. */
+	double FpsOutside(const FVector& P, double TanH, double TanV)
+	{
+		const double Near = 1.0 - P.X;
+		const double Bottom = (-P.Z - P.X * TanV) / FMath::Sqrt(1.0 + TanV * TanV);
+		const double Top = (P.Z - P.X * TanV) / FMath::Sqrt(1.0 + TanV * TanV);
+		const double Side = (FMath::Abs(P.Y) - P.X * TanH) / FMath::Sqrt(1.0 + TanH * TanH);
+		return FMath::Max(FMath::Max(Near, Bottom), FMath::Max(Top, Side));
+	}
+
+	/** One pose of the offline preview's file (Saved/scratch/vm.py): every bone's component-space transform and the hand sockets, as the engine evaluates the animation. */
+	void FpsDumpPose(FString& Out, const FString& Key, double Time, USkeletalMesh* Mesh, const TArray<FTransform>& CS)
+	{
+		const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+		const auto One = [](const FTransform& T)
+		{
+			const FVector L = T.GetLocation(), Sc = T.GetScale3D();
+			const FQuat Q = T.GetRotation();
+			return FString::Printf(TEXT("{\"t\":[%.4f,%.4f,%.4f],\"q\":[%.6f,%.6f,%.6f,%.6f],\"s\":[%.4f,%.4f,%.4f]}"), L.X, L.Y, L.Z, Q.X, Q.Y, Q.Z, Q.W, Sc.X, Sc.Y, Sc.Z);
+		};
+		Out += FString::Printf(TEXT("%s\"%s\":{\"time\":%.3f,\"bones\":{"), Out.IsEmpty() ? TEXT("") : TEXT(",\n"), *Key, Time);
+		for (int32 i = 0; i < Ref.GetNum(); ++i)
+		{
+			Out += FString::Printf(TEXT("%s\"%s\":%s"), i ? TEXT(",") : TEXT(""), *Ref.GetBoneName(i).ToString(), *One(CS[i]));
+		}
+		Out += TEXT("},\"sockets\":{");
+		bool bFirst = true;
+		for (const TCHAR* Name : {TEXT("HandGrip_R"), TEXT("HandGrip_L"), TEXT("weapon_r_muzzle")})
+		{
+			FTransform T;
+			if (FpsSocket(Mesh, CS, Name, T))
+			{
+				Out += FString::Printf(TEXT("%s\"%s\":%s"), bFirst ? TEXT("") : TEXT(","), Name, *One(T));
+				bFirst = false;
+			}
+		}
+		Out += TEXT("}}");
+	}
+
+	/** One state of the offline preview: where the arms' mesh stands against the camera and the six bones as the rig solved them (mesh space). */
+	void FpsDumpState(FString& Out, const FString& Key, const FString& PoseKey, const FVector& Loc, const FQuat& Rot, const AstraArms::FBones& B, const FReferenceSkeleton& Ref, const FTransform* Solved, float Fov)
+	{
+		Out += FString::Printf(TEXT("%s\"%s\":{\"pose\":\"%s\",\"fov\":%.1f,\"loc\":[%.4f,%.4f,%.4f],\"q\":[%.6f,%.6f,%.6f,%.6f],\"solved\":{"), Out.IsEmpty() ? TEXT("") : TEXT(",\n"), *Key, *PoseKey, Fov, Loc.X, Loc.Y, Loc.Z, Rot.X, Rot.Y, Rot.Z, Rot.W);
+		const int32 Index[6] = {B.Upper[0], B.Lower[0], B.Hand[0], B.Upper[1], B.Lower[1], B.Hand[1]};
+		for (int32 i = 0; i < 6; ++i)
+		{
+			const FVector L = Solved[i].GetLocation();
+			const FQuat Q = Solved[i].GetRotation();
+			Out += FString::Printf(TEXT("%s\"%s\":{\"t\":[%.4f,%.4f,%.4f],\"q\":[%.6f,%.6f,%.6f,%.6f],\"s\":[1,1,1]}"), i ? TEXT(",") : TEXT(""), *Ref.GetBoneName(Index[i]).ToString(), L.X, L.Y, L.Z, Q.X, Q.Y, Q.Z, Q.W);
+		}
+		Out += TEXT("}}");
+	}
+
+	/** The tuning of a run, "rifle.hip=84,17,-10;shoulder_l=62,-20,-42": what a place or an anchor would be if it were changed, to try before the table takes it. */
+	TMap<FString, FVector> FpsSetOf(const FString& Set)
+	{
+		TMap<FString, FVector> Out;
+		TArray<FString> Items;
+		Set.ParseIntoArray(Items, TEXT(";"));
+		for (const FString& Item : Items)
+		{
+			FString K, V;
+			if (!Item.Split(TEXT("="), &K, &V))
+			{
+				continue;
+			}
+			TArray<FString> N;
+			V.ParseIntoArray(N, TEXT(","));
+			FVector P(0.0);
+			P.X = N.IsValidIndex(0) ? FCString::Atod(*N[0]) : 0.0;
+			P.Y = N.IsValidIndex(1) ? FCString::Atod(*N[1]) : 0.0;
+			P.Z = N.IsValidIndex(2) ? FCString::Atod(*N[2]) : 0.0;
+			Out.Add(K.TrimStartAndEnd(), P);
+		}
+		return Out;
+	}
+}
+
+static void BoardScenarioFps(const FString& DumpPath, const FString& SetText)
+{
+	FString Dump, StatesOut;
+	const TMap<FString, FVector> Set = FpsSetOf(SetText);
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/ASTRA/Weapons/SKM_ASTRA_Arms.SKM_ASTRA_Arms"));
+	if (!Mesh)
+	{
+		BCheck("fps: the arms asset", false, TEXT("SKM_ASTRA_Arms is not in the project (tools/ue_scripts/make_fp_arms.py makes it from the mannequin)"));
+		return;
+	}
+	const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+	AstraArms::FBones Bones;
+	BCheck("fps: the arm bones", AstraArms::FindBones(Ref, Bones), FString::Printf(TEXT("%d bones, upperarm/lowerarm/hand on both sides"), Ref.GetNum()));
+	if (!Bones.IsValid())
+	{
+		return;
+	}
+#if WITH_EDITORONLY_DATA
+	// the skin of the arms follows the arms' own bones alone (what the chest and the clavicles held would drag the vertices near the shoulder into spikes once the arms are moved away)
+	if (const FSkeletalMeshModel* Model = Mesh->GetImportedModel())
+	{
+		int32 Vertices = 0, Foreign = 0;
+		FString Which;
+		if (Model->LODModels.Num() > 0)
+		{
+			for (const FSkelMeshSection& Sec : Model->LODModels[0].Sections)
+			{
+				for (const FSoftSkinVertex& V : Sec.SoftVertices)
+				{
+					++Vertices;
+					for (int32 k = 0; k < MAX_TOTAL_INFLUENCES; ++k)
+					{
+						if (V.InfluenceWeights[k] > 0 && Sec.BoneMap.IsValidIndex(V.InfluenceBones[k]))
+						{
+							const FString Name = Ref.GetBoneName(Sec.BoneMap[V.InfluenceBones[k]]).ToString();
+							if (!(Name.StartsWith(TEXT("upperarm")) || Name.StartsWith(TEXT("lowerarm")) || Name.StartsWith(TEXT("hand")) || Name.StartsWith(TEXT("index")) || Name.StartsWith(TEXT("middle")) || Name.StartsWith(TEXT("ring")) || Name.StartsWith(TEXT("pinky")) || Name.StartsWith(TEXT("thumb"))))
+							{
+								++Foreign;
+								Which = Name;
+							}
+						}
+					}
+				}
+			}
+		}
+		BCheck("fps: the arms' skin", Vertices > 0 && Foreign == 0, FString::Printf(TEXT("%d vertices, %d influences on bones that are not the arms' (%s): tools/ue_scripts/make_fp_arms.py gives their weight to the arm's own"), Vertices, Foreign, Which.IsEmpty() ? TEXT("none") : *Which));
+	}
+#endif
+	const auto Cvar = [](const TCHAR* Name, float Default)
+	{
+		const IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(Name);
+		return V ? V->GetFloat() : Default;
+	};
+	const FVector ShoulderNudge(Cvar(TEXT("astra.fps.shoulder_x"), 0.f), Cvar(TEXT("astra.fps.shoulder_y"), 0.f), Cvar(TEXT("astra.fps.shoulder_z"), 0.f));
+	for (const EAstraWeapon Id : {EAstraWeapon::Rifle, EAstraWeapon::Pistol})
+	{
+		FAstraWeaponDef W = AstraWeapons::Get(Id);
+		const FString Who = Id == EAstraWeapon::Rifle ? TEXT("rifle") : TEXT("pistol");
+		if (const FVector* P = Set.Find(Who + TEXT(".shoulder_r"))) { W.ShoulderHipR = *P; }
+		if (const FVector* P = Set.Find(Who + TEXT(".shoulder_l"))) { W.ShoulderHipL = *P; }
+		if (const FVector* P = Set.Find(Who + TEXT(".ads_shoulder_r"))) { W.ShoulderAdsR = *P; }
+		if (const FVector* P = Set.Find(Who + TEXT(".ads_shoulder_l"))) { W.ShoulderAdsL = *P; }
+		// the shoulders of a state: the hip's and the lowered's are the table's, the sights' too, and between them as the weapon comes up
+		const auto ShouldersAt = [&](double Ads, FVector& R, FVector& L)
+		{
+			R = FMath::Lerp(W.ShoulderHipR, W.ShoulderAdsR, Ads) + ShoulderNudge;
+			L = FMath::Lerp(W.ShoulderHipL, W.ShoulderAdsL, Ads) + FVector(ShoulderNudge.X, -ShoulderNudge.Y, ShoulderNudge.Z);
+		};
+		FVector ShoulderR, ShoulderL;
+		ShouldersAt(0.0, ShoulderR, ShoulderL);
+		if (const FVector* P = Set.Find(Who + TEXT(".hip"))) { W.HipPlace = *P; }
+		if (const FVector* P = Set.Find(Who + TEXT(".hipturn"))) { W.HipTurn = FRotator(P->X, P->Y, P->Z); }
+		if (const FVector* P = Set.Find(Who + TEXT(".ads"))) { W.AdsPlace = *P; }
+		if (const FVector* P = Set.Find(Who + TEXT(".low"))) { W.LowPlace = *P; }
+		if (const FVector* P = Set.Find(Who + TEXT(".lowturn"))) { W.LowTurn = FRotator(P->X, P->Y, P->Z); }
+		if (const FVector* P = Set.Find(Who + TEXT(".gripl"))) { W.GripLHand = *P; }
+		if (const FVector* P = Set.Find(Who + TEXT(".fov"))) { W.FpFov = P->X; }
+		UAnimSequence* Idle = LoadObject<UAnimSequence>(nullptr, W.AnimIdle);
+		if (!Idle)
+		{
+			BCheck("fps: the animations", false, FString::Printf(TEXT("%s: %s is not in the project"), W.Name, W.AnimIdle));
+			continue;
+		}
+		TArray<FTransform> Local, CS;
+		FpsEvalPose(Mesh, Idle, 0.0, Local);
+		AstraArms::ComponentSpace(Ref, Local, CS);
+		if (!DumpPath.IsEmpty())
+		{
+			FpsDumpPose(Dump, Who + TEXT("_idle@0.00"), 0.0, Mesh, CS);
+		}
+		FTransform SockR, SockL;
+		if (!FpsSocket(Mesh, CS, TEXT("HandGrip_R"), SockR) || !FpsSocket(Mesh, CS, TEXT("HandGrip_L"), SockL))
+		{
+			BCheck("fps: the hand sockets", false, TEXT("HandGrip_R / HandGrip_L are not on the skeleton"));
+			continue;
+		}
+		// the weapon table's measure of the ready pose against the asset's own
+		const FVector TableY = W.PoseGripY.GetSafeNormal();
+		const double LocErr = FVector::Dist(W.PoseGripLoc, SockR.GetLocation());
+		const double AxisErr = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(TableY, SockR.GetRotation().RotateVector(FVector(0, 1, 0))), -1.0, 1.0)));
+		const FMatrix SockM = FRotationMatrix::Make(SockR.GetRotation());
+		BCheck(Id == EAstraWeapon::Rifle ? "fps: the table's pose, rifle" : "fps: the table's pose, pistol", LocErr < 0.2 && AxisErr < 0.3,
+			FString::Printf(TEXT("%s: the right-hand socket in the ready pose is %.2f cm and %.2f deg from the table's numbers (the engine's: loc (%.2f, %.2f, %.2f), X (%.4f, %.4f, %.4f), Y (%.4f, %.4f, %.4f), Z (%.4f, %.4f, %.4f))"), W.Name, LocErr, AxisErr,
+				SockR.GetLocation().X, SockR.GetLocation().Y, SockR.GetLocation().Z, SockM.GetUnitAxis(EAxis::X).X, SockM.GetUnitAxis(EAxis::X).Y, SockM.GetUnitAxis(EAxis::X).Z,
+				SockM.GetUnitAxis(EAxis::Y).X, SockM.GetUnitAxis(EAxis::Y).Y, SockM.GetUnitAxis(EAxis::Y).Z, SockM.GetUnitAxis(EAxis::Z).X, SockM.GetUnitAxis(EAxis::Z).Y, SockM.GetUnitAxis(EAxis::Z).Z));
+		// the weapon's places: hip, sights, lowered
+		struct FState { const TCHAR* Name; FVector Target; FRotator Turn; };
+		const FState States[3] = {{TEXT("hip"), W.HipPlace, W.HipTurn}, {TEXT("sights"), W.AdsPlace, FRotator::ZeroRotator}, {TEXT("lowered"), W.LowPlace, W.LowTurn}};
+		const FVector Wanted0 = SockR.TransformPosition(W.GripLHand);
+		double WorstOutside = 1.0e9;                  // the shoulder joint that stands nearest to the picture, over every state and the way between the hip and the sights
+		FString WorstWhere;
+		for (const FState& St : States)
+		{
+			FVector Loc, SightMesh;
+			FQuat Rot;
+			AstraArms::PlaceWeapon(SockR.GetLocation(), SockR.GetRotation(), W.Sight, St.Target, St.Turn, Loc, Rot, SightMesh);
+			const FVector SightCam = Rot.RotateVector(SightMesh) + Loc;
+			AstraArms::FSetup Setup;
+			ShouldersAt(St.Name[0] == 's' ? 1.0 : 0.0, Setup.Shoulder[AstraArms::Right], Setup.Shoulder[AstraArms::Left]);
+			if (const FVector* P = Set.Find(TEXT("pole_l"))) { Setup.Pole[AstraArms::Left] = *P; }
+			if (const FVector* P = Set.Find(TEXT("pole_r"))) { Setup.Pole[AstraArms::Right] = *P; }
+			Setup.LeftHandDelta = Wanted0 - SockL.GetLocation();
+			FTransform Solved[6];
+			AstraArms::SolveBoth(Bones, CS, Rot, Loc, Setup, Solved);
+			// the lengths of the bones are kept, the shoulders stand where they were put, the right hand is where the animation has it, the left grip is on the weapon's
+			double LenErr = 0.0, ShErr = 0.0;
+			FVector ShCam[2], WristCam[2];
+			double Elbow[2], Reach[2];
+			for (int32 Side = 0; Side < 2; ++Side)
+			{
+				const double L1a = FVector::Dist(CS[Bones.Upper[Side]].GetLocation(), CS[Bones.Lower[Side]].GetLocation());
+				const double L2a = FVector::Dist(CS[Bones.Lower[Side]].GetLocation(), CS[Bones.Hand[Side]].GetLocation());
+				const double L1b = FVector::Dist(Solved[Side * 3].GetLocation(), Solved[Side * 3 + 1].GetLocation());
+				const double L2b = FVector::Dist(Solved[Side * 3 + 1].GetLocation(), Solved[Side * 3 + 2].GetLocation());
+				LenErr = FMath::Max(LenErr, FMath::Max(FMath::Abs(L1a - L1b), FMath::Abs(L2a - L2b)));
+				ShCam[Side] = Rot.RotateVector(Solved[Side * 3].GetLocation()) + Loc;
+				WristCam[Side] = Rot.RotateVector(Solved[Side * 3 + 2].GetLocation()) + Loc;
+				ShErr = FMath::Max(ShErr, FVector::Dist(ShCam[Side], Setup.Shoulder[Side]));
+				Reach[Side] = FVector::Dist(ShCam[Side], WristCam[Side]);
+				Elbow[Side] = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp((L1b * L1b + L2b * L2b - Reach[Side] * Reach[Side]) / (2.0 * L1b * L2b), -1.0, 1.0)));
+			}
+			const double RightErr = FVector::Dist(Solved[5].GetLocation(), CS[Bones.Hand[AstraArms::Right]].GetLocation());
+			if (!DumpPath.IsEmpty())
+			{
+				FpsDumpState(StatesOut, Who + TEXT("|") + St.Name, Who + TEXT("_idle@0.00"), Loc, Rot, Bones, Ref, Solved, W.FpFov);
+			}
+			// the left grip socket follows its hand
+			const FTransform HandAnim = CS[Bones.Hand[AstraArms::Left]];
+			const FVector SockLNow = Solved[2].TransformPosition(HandAnim.InverseTransformPosition(SockL.GetLocation()));
+			const double GripErr = FVector::Dist(SockLNow, Wanted0);
+			const FString Tag = FString::Printf(TEXT("%s %s"), W.Name, St.Name);
+			BCheck(Id == EAstraWeapon::Rifle ? (St.Name[0] == 'h' ? "fps: rifle at the hip" : (St.Name[0] == 's' ? "fps: rifle through the sights" : "fps: rifle lowered"))
+			                                  : (St.Name[0] == 'h' ? "fps: pistol at the hip" : (St.Name[0] == 's' ? "fps: pistol through the sights" : "fps: pistol lowered")),
+				FVector::Dist(SightCam, St.Target) < 0.01 && LenErr < 0.05 && RightErr < 0.01 && ShErr < 0.1 && GripErr < 1.5,
+				FString::Printf(TEXT("%s: the sight is %.3f cm from where it is put, bones keep their lengths to %.3f cm, shoulders %.2f cm off, right wrist %.3f cm off, left palm %.2f cm from the grip"),
+					*Tag, FVector::Dist(SightCam, St.Target), LenErr, ShErr, RightErr, GripErr));
+			BNote(FString::Printf(TEXT("  %-14s elbows: left %3.0f deg (wrist %.0f cm from its shoulder at (%.0f, %.0f, %.0f)), right %3.0f deg (%.0f cm, shoulder at (%.0f, %.0f, %.0f))"), *Tag, Elbow[AstraArms::Left], Reach[AstraArms::Left],
+				ShCam[AstraArms::Left].X, ShCam[AstraArms::Left].Y, ShCam[AstraArms::Left].Z, Elbow[AstraArms::Right], Reach[AstraArms::Right], ShCam[AstraArms::Right].X, ShCam[AstraArms::Right].Y, ShCam[AstraArms::Right].Z));
+			// the cut ends of the arms must not show: a shoulder joint stands outside the picture (the taller 16:10 one) by more than what the mesh reaches beyond it and is across (11 cm)
+			{
+				const double TanH = FMath::Tan(FMath::DegreesToRadians(W.FpFov * 0.5)), TanV = TanH / 1.6;
+				for (int32 Side = 0; Side < 2; ++Side)
+				{
+					const double Out = FpsOutside(ShCam[Side], TanH, TanV);
+					if (Out < WorstOutside)
+					{
+						WorstOutside = Out;
+						WorstWhere = FString::Printf(TEXT("%s, the %s one at (%.0f, %.0f, %.0f)"), St.Name, Side == AstraArms::Left ? TEXT("left") : TEXT("right"), ShCam[Side].X, ShCam[Side].Y, ShCam[Side].Z);
+					}
+				}
+			}
+			// what the picture holds, at 16:9 and at 16:10 (a laptop's own screen), with the first-person field of the weapon
+			for (const double Aspect : {16.0 / 9.0, 16.0 / 10.0})
+			{
+				FFpsView V;
+				V.HalfH = FMath::Tan(FMath::DegreesToRadians(W.FpFov * 0.5f));
+				V.HalfV = V.HalfH / Aspect;
+				bool bSight, bMuz, bGrip, bHandL, bHandR;
+				const FString SightS = FpsWhere(SightCam, V, bSight);
+				const FString MuzS = FpsWhere(Rot.RotateVector(SockR.TransformPosition(W.Muzzle)) + Loc, V, bMuz);
+				const FString GripS = FpsWhere(Rot.RotateVector(SockLNow) + Loc, V, bGrip);
+				const FString HandLS = FpsWhere(Rot.RotateVector(Solved[2].GetLocation()) + Loc, V, bHandL);
+				const FString HandRS = FpsWhere(Rot.RotateVector(Solved[5].GetLocation()) + Loc, V, bHandR);
+				if (Aspect > 1.7)
+				{
+					BNote(FString::Printf(TEXT("  %-14s rear sight %s; muzzle %s; left palm %s; left wrist %s; right wrist %s"), *Tag, *SightS, *MuzS, *GripS, *HandLS, *HandRS));
+				}
+				if (St.Name[0] == 'h')
+				{
+					BCheck(Aspect > 1.7 ? (Id == EAstraWeapon::Rifle ? "fps: rifle hip view 16:9" : "fps: pistol hip view 16:9") : (Id == EAstraWeapon::Rifle ? "fps: rifle hip view 16:10" : "fps: pistol hip view 16:10"),
+						bSight && bMuz && bGrip && bHandR, FString::Printf(TEXT("%s at the hip, %.0f deg first-person field, %s screen: the sight, the muzzle, the left palm and the right wrist are in the picture (%s / %s / %s / %s)"), W.Name,
+							W.FpFov, Aspect > 1.7 ? TEXT("16:9") : TEXT("16:10"), bSight ? TEXT("sight yes") : TEXT("sight NO"), bMuz ? TEXT("muzzle yes") : TEXT("muzzle NO"), bGrip ? TEXT("palm yes") : TEXT("palm NO"), bHandR ? TEXT("wrist yes") : TEXT("wrist NO")));
+				}
+			}
+			if (St.Name[0] == 's')
+			{
+				// the sights: the rear sight's point on the camera's axis
+				BCheck(Id == EAstraWeapon::Rifle ? "fps: rifle sight on the axis" : "fps: pistol sight on the axis", FMath::Abs(SightCam.Y) < 0.01 && FMath::Abs(SightCam.Z) < 0.01 && SightCam.X > 15.0,
+					FString::Printf(TEXT("%s: rear sight at (%.2f, %.2f, %.2f) cm of the camera (0, 0 to the axis when aimed)"), W.Name, SightCam.X, SightCam.Y, SightCam.Z));
+			}
+		}
+		// the way from the hip to the sights: the weapon's place and the shoulders slide together (as the component blends them); a shoulder must not pass through the picture on the way
+		{
+			FVector LocHip, LocAds, SightMesh;
+			FQuat RotHip, RotAds;
+			AstraArms::PlaceWeapon(SockR.GetLocation(), SockR.GetRotation(), W.Sight, W.HipPlace, W.HipTurn, LocHip, RotHip, SightMesh);
+			AstraArms::PlaceWeapon(SockR.GetLocation(), SockR.GetRotation(), W.Sight, W.AdsPlace, FRotator::ZeroRotator, LocAds, RotAds, SightMesh);
+			const double TanH = FMath::Tan(FMath::DegreesToRadians(W.FpFov * 0.5)), TanV = TanH / 1.6;
+			for (int32 k = 1; k < 20; ++k)
+			{
+				const float A = k / 20.f;
+				const FQuat Rot = FQuat::Slerp(RotHip, RotAds, A);
+				const FVector Loc = FMath::Lerp(LocHip, LocAds, (double)A);
+				AstraArms::FSetup Setup;
+				ShouldersAt(A, Setup.Shoulder[AstraArms::Right], Setup.Shoulder[AstraArms::Left]);
+				Setup.LeftHandDelta = Wanted0 - SockL.GetLocation();
+				FTransform Solved[6];
+				AstraArms::SolveBoth(Bones, CS, Rot, Loc, Setup, Solved);
+				for (int32 Side = 0; Side < 2; ++Side)
+				{
+					const FVector Sh = Rot.RotateVector(Solved[Side * 3].GetLocation()) + Loc;
+					const double Out = FpsOutside(Sh, TanH, TanV);
+					if (Out < WorstOutside)
+					{
+						WorstOutside = Out;
+						WorstWhere = FString::Printf(TEXT("%.0f %% of the way to the sights, the %s one at (%.0f, %.0f, %.0f)"), A * 100.f, Side == AstraArms::Left ? TEXT("left") : TEXT("right"), Sh.X, Sh.Y, Sh.Z);
+					}
+				}
+			}
+		}
+		BCheck(Id == EAstraWeapon::Rifle ? "fps: rifle shoulders out of the picture" : "fps: pistol shoulders out of the picture", WorstOutside >= 11.0,
+			FString::Printf(TEXT("%s: the nearest a shoulder joint comes to the picture (16:10, %.0f deg) in any state and on the way to the sights is %.1f cm outside it (at %s; the cut end of an arm reaches 11 cm from the joint)"), W.Name, W.FpFov, WorstOutside, *WorstWhere));
+		// the animations that move the arms: drawing, reloading, the dry fire: the arms solved in every frame, nothing broken
+		const struct { const TCHAR* Path; const TCHAR* Name; const TCHAR* Tag; } Moves[3] = {{W.AnimEquip, TEXT("draw"), TEXT("equip")}, {W.AnimReload, TEXT("reload"), TEXT("reload")}, {W.AnimDry, TEXT("dry fire"), TEXT("dry")}};
+		for (const auto& M : Moves)
+		{
+			UAnimSequence* A = LoadObject<UAnimSequence>(nullptr, M.Path);
+			if (!A)
+			{
+				continue;
+			}
+			int32 Frames = 0, Bad = 0, Short = 0;
+			double Worst = 0.0;
+			FVector Loc;
+			FQuat Rot;
+			FVector SightMesh;
+			AstraArms::PlaceWeapon(SockR.GetLocation(), SockR.GetRotation(), W.Sight, W.HipPlace, W.HipTurn, Loc, Rot, SightMesh);
+			for (int32 k = 0; k <= 12; ++k)
+			{
+				TArray<FTransform> L2, C2;
+				FpsEvalPose(Mesh, A, A->GetPlayLength() * k / 12.0, L2);
+				AstraArms::ComponentSpace(Ref, L2, C2);
+				if (!DumpPath.IsEmpty())
+				{
+					FpsDumpPose(Dump, FString::Printf(TEXT("%s_%s@%.2f"), *Who, M.Tag, A->GetPlayLength() * k / 12.0), A->GetPlayLength() * k / 12.0, Mesh, C2);
+				}
+				AstraArms::FSetup Setup;
+				Setup.Shoulder[AstraArms::Left] = ShoulderL;
+				Setup.Shoulder[AstraArms::Right] = ShoulderR;
+				if (const FVector* P = Set.Find(TEXT("pole_l"))) { Setup.Pole[AstraArms::Left] = *P; }
+				if (const FVector* P = Set.Find(TEXT("pole_r"))) { Setup.Pole[AstraArms::Right] = *P; }
+				FTransform Solved[6];
+				AstraArms::SolveBoth(Bones, C2, Rot, Loc, Setup, Solved);
+				if (!DumpPath.IsEmpty())
+				{
+					const FString PoseKey = FString::Printf(TEXT("%s_%s@%.2f"), *Who, M.Tag, A->GetPlayLength() * k / 12.0);
+					FpsDumpState(StatesOut, Who + TEXT("|") + PoseKey, PoseKey, Loc, Rot, Bones, Ref, Solved, W.FpFov);
+				}
+				++Frames;
+				bool bNan = false;
+				for (const FTransform& T : Solved)
+				{
+					bNan |= T.ContainsNaN() || !T.IsRotationNormalized();
+				}
+				Bad += bNan ? 1 : 0;
+				for (int32 Side = 0; Side < 2; ++Side)
+				{
+					const double Err = FVector::Dist(Solved[Side * 3 + 2].GetLocation(), C2[Bones.Hand[Side]].GetLocation());
+					Worst = FMath::Max(Worst, Err);
+					Short += Err > 1.0 ? 1 : 0;
+				}
+			}
+			BCheck("fps: the arms through the animations", Bad == 0, FString::Printf(TEXT("%s %s: %d frames solved, %d broken, the hands come %d times of %d (worst %.1f cm) short of where the animation has them (the shoulders are fixed: the arms reach what they can)"),
+				W.Name, M.Name, Frames, Bad, Short, Frames * 2, Worst));
+		}
+	}
+	if (!DumpPath.IsEmpty())
+	{
+		FFileHelper::SaveStringToFile(TEXT("{\"poses\":{") + Dump + TEXT("},\n\"states\":{") + StatesOut + TEXT("}}"), *DumpPath);
+		BNote(FString::Printf(TEXT("  the engine's poses written to %s"), *DumpPath));
+	}
+}
+
 // ================================================================================================================== the rules
 
 static void BoardScenarioRules(FRig& Rig, int32 Seed)
@@ -1183,11 +1633,25 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("-seeds="), Seeds);
 	FParse::Value(*Params, TEXT("-boarders="), Boarders);
 	FParse::Value(*Params, TEXT("-out="), OutPath);
-	FParse::Value(*Params, TEXT("-set="), Set);
+	FParse::Value(*Params, TEXT("-set="), Set, false);
 	GTrace = FParse::Param(*Params, TEXT("trace"));
 	FParse::Value(*Params, TEXT("-setup="), GSetup);
 	Scenario = Scenario.ToLower();
 	FRig Rig;
+	if (Scenario == TEXT("fps"))                       // (on request only: the Captain's arms against the mannequin's animations, no plan needed)
+	{
+		FString PosesPath, FpsSet;
+		FParse::Value(*Params, TEXT("-fpsposes="), PosesPath);
+		FParse::Value(*Params, TEXT("-fpsset="), FpsSet, false);
+		BoardScenarioFps(PosesPath, FpsSet);
+		int32 FpsFailed = 0;
+		for (const FBCheck& C : BChecks)
+		{
+			FpsFailed += C.bPass ? 0 : 1;
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Board] VERDICT: %s (%d checks, %d failed)"), FpsFailed ? TEXT("FAIL") : TEXT("PASS"), BChecks.Num(), FpsFailed);
+		return FpsFailed ? 1 : 0;
+	}
 	if (!Rig.Make())
 	{
 		BCheck("plan", false, TEXT("the plan did not load"));
