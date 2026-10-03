@@ -1123,3 +1123,222 @@ dimensionava le incursioni a 1–4 navi e i rinforzi a 1–2 cacciatorpediniere,
 
 Prove nel gioco senza mente: `astra.cmd director_beat {'beat':{'type':'raid','delay_s':5,'range_km':45,'bearing_deg':60,'groups':[...]}}`;
 l'apertura intera in pochi minuti: `astra.battle.time 170`, poi `astra.battle.time 510` (la terza fase parte subito).
+
+## 10. La March: la guerra a scala di campagna (CAMPAGNA F2.6, helper CAMPAGNA, 3/10)
+
+La richiesta dell'utente, alla lettera: la guerra «più grande, di strategia e lunga… come una partita di scacchi blitz, ma con durata di ore»,
+con «macrostrategie e sottostrategie, sottosquadre, tattiche di gruppo reali», «più peso alle decisioni del Capitano», «un regista onnisciente che
+non si vede… senza spostare le sorti in favore di qualcuno». Dalle sue partite del 2/10: la guerra era troppo veloce (il primo gruppo d'attacco battuto in
+sei minuti, un'incursione «già a distanza di coltello», l'Aquila distrutta da otto navi in cinque), i nemici comparivano e morivano senza essere visti.
+
+### 10.1 In breve
+
+- **Due livelli di dettaglio.** Il sistema dove sta l'Aquila è la **simulazione vera** (C++: le menti tattiche, il Capitano, 60 fps). Tutti gli altri
+  sistemi dell'Aurelia March (11 in tutto) sono la **March** (`mind/astra_mind/march.py`): flotte di navi vere (classe, nome, scafo, rifornimenti, stormi, comandante), 11
+  ordini, Gate, nebbia di guerra, cantieri, depositi, assedi, volontà dei popoli; le sue battaglie le risolve un **modello di battaglia taratato sul banco
+  della guerra** (28 esperimenti della simulazione vera). Una flotta che arriva dove sta l'Aquila diventa le navi che ha davvero (`director_beat`) e
+  quello che le accade torna nella flotta (scafi, perdite, fughe, volontà dei popoli): non esistono due guerre.
+- **Due menti strategiche con strumenti veri** (`strategy.py`, ruolo `strategy`, DeepSeek V4.1 Flash): il Vice Admiral Adrian Rourke (ASTRA) e l'Archon
+  Isolde Skarn (il Mandato) leggono ciò che il loro comando può leggere e muovono le flotte (`fleet_order`, `split_fleet`, `merge_fleets`, `set_build`,
+  `set_plan`, `assess`, `parley`; Rourke anche `tell_captain`, `task_aquila`, `send_tender`). Il codice non filtra mai ciò che decidono: solo meccanica.
+- **Il regista è onnisciente e non vede**: vede la guerra com'è (`director_view`), non può creare forze né spostare un sistema raccontandolo; può solo dare il
+  ritmo con fatti veri (`start_beat` calm/investigate/negotiation/none, `war_news`, `reveal`, `pressure`). Le forze sono della March e arrivano al passo della March.
+- **Ritmo.** Le forze arrivano da lontano (la bocca del Gate, ≥ 85 km), a colonna, con l'avviso del Gate e i minuti che servono per raggiungere l'Aquila; chi comanda
+  sa sempre il piano del suo comando e cosa sta arrivando (`field_brief`). Una prima apertura giocata dalla March (opzionale, vedi 10.7) toglie l'ultimo arrivo
+  a distanza di coltello (il gruppo d'attacco a 25 km dopo 170 s).
+- **Costo**: ~0,0017 $ a occhiata (3.200 token in, 180 out); 0,03–0,05 $/ora a regime, 0,062 $/ora nell'apertura più movimentata misurata (18 occhiate in 30
+  minuti, due menti): sotto il tetto di 0,1 $/ora. Con `ASTRA_STRATEGY_MINDS=0` le flotte vanno sui riflessi (costo zero).
+
+### 10.2 I file
+
+| File | Cosa |
+|---|---|
+| `mind/astra_mind/march.py` | la March: mondo, flotte, ordini, Gate, nebbia (tracce), cantieri, assedi, volontà, pace, quadro per le menti (`picture`, `field_brief`), tavolo olografico (`holo`), apertura giocata dalla March (`march_opening`) |
+| `mind/astra_mind/march_battle.py` | il modello di battaglia (Lanchester a gruppi di fuoco, scudi, missili contro difesa puntuale, stormi, ritirate per assetto, fuga per velocità di virata, fortuna); 35 costanti in `march_calibration.json` |
+| `mind/astra_mind/march_data.py` | i dati (nessun numero nel codice): classi, sistemi, ordine di battaglia (5 flotte ASTRA, 8 del Mandato), nomi, persone, `PACE`, `MARCH_OPENING` |
+| `mind/astra_mind/march_auto.py` | i riflessi (`AutoAdmiral`): "safety" (le menti sono in servizio) e "full" (nessuna mente: banco, guerra mentre il Capitano è perso, mente caduta) |
+| `mind/astra_mind/strategy.py` | le due menti: cadenza, quadro, strumenti, diario, `rourke_reply`, costo |
+| `mind/astra_mind/march_glue.py` | la colla con la simulazione vera (10.6) |
+| ganci additivi | `server.py` (`_start_march`, `_rourke_say`, `_march_news`, `_war_first`, `ASTRA_OPENING`), `director.py` (il regista onnisciente), `war_minds.py` (`strategic`: il piano del comando ai comandanti sul campo), `war.py` (il `WarMap` non cambia proprietari/minacce che la March non ha deciso), `crew.py`, `models.py` |
+| banchi | `bench/march_unit.py` (46), `strategy_unit.py` (29), `march_glue_unit.py` (42), `march_server.py` (13), `march_soak.py` (1), `march_pace.py` (2), `march_sim.py`, `march_live.py`, `march_mock.py` |
+| strumenti | `tools/march.py` (`sim`, `live`, `pace`, `cal`, `test`), `tools/march_calibrate.py`, `data/march/cal_cpp.json` |
+
+### 10.3 Le regole del mondo (tutte in `march_data.py`/`PACE`: un designer le cambia senza toccare il codice)
+
+- **Mappa**: Concordia (capitale ASTRA), Meridian, Aurelia, Cassia, Veyra (delle Gilde Libere: chiusa alle navi da guerra, nessuno vi combatte), Thule, Ophir, Erebus,
+  Nemet, Niflheim, Kharon (capitale del Mandato); in ogni sistema due zone, il Gate (Keeper Station e i suoi cannoni) e il mondo (pianeta e cantieri).
+- **Gate**: un salto = 95 s + 4 s a nave (×1,3 se la flotta corre al buio), 25 s per riformarsi all'uscita; l'apertura del Gate si vede 75 s prima dell'arrivo da un
+  posto d'ascolto nel sistema (non se la flotta è al buio). Ordini e notizie viaggiano per i Gate: 8 s + 20 s a salto dal comando (Aurelia per ASTRA, Erebus per il Mandato).
+- **Ordini** (11): `hold`, `move`, `defend`, `assault`, `raid`, `blockade`, `reinforce`, `escort`, `withdraw`, `recon`, `refit`; assetto `bold`/`steady`/`cautious`,
+  posizione `gate`/`world`, `dark`. Una flotta non si divide e non si riunisce in battaglia o in un Gate (`split_fleet`/`merge_fleets`: le sottosquadre).
+- **Nebbia di guerra**: ogni parte legge le proprie flotte esattamente e quelle nemiche per **tracce** (età, stima, livello 1 conteggio / 2 classi / 3 identificata);
+  un posto d'ascolto vede la propria zona e sente i Gate che si aprono; `reveal` del regista dà una traccia vera.
+- **Cantieri e depositi**: ogni sistema fa punti-flotta all'ora (`set_build` sceglie la classe); i depositi riparano (~15 minuti per una nave a metà) e
+  riforniscono solo le flotte di casa. **Assedi**: il tempo cresce col valore del sistema (`siege_s` 420–2400 s); un sistema di nessuno si rivendica in 420 s.
+- **Volontà dei popoli**: ASTRA 0,78, Mandato 0,86 all'inizio, usura ~0,058/ora, −0,004 per punto-flotta perso, +0,0015 per punto distrutto; sotto 0,30 un governo vuole la pace
+  (`parley`). La guerra finisce se cade una capitale, se la volontà di un popolo si spegne, o per armistizio di entrambi.
+- **Cosa non esiste**: la sorte decisa dal regista; un cambio di proprietario o di minaccia che la March non abbia prodotto (`WarMap.update` lo rifiuta).
+
+### 10.4 Il modello di battaglia e la taratura
+
+Fuoco diretto e missili contro difesa puntuale con **gruppi di fuoco** (la concentrazione vince, la dispersione perde navi), scudi che tornano e scafo, stormi (caccia,
+bombardieri, droni), difensore e fortificazioni, ritirata per assetto **solo dopo il contatto**, nave sotto il 27 % di scafo che se ne va, tempo di fuga per velocità di
+virata (una corazzata che volta le spalle tardi non scappa), fortuna per battaglia. 35 costanti libere, trovate con una ricerca a coordinate (`tools/march.py cal fit`)
+contro i **28 esperimenti della simulazione vera** (`data/march/cal_cpp.json`: due flotte a 30 km, 24 battaglie ciascuno, in entrambi gli ordini di creazione).
+
+| Misura (modello contro simulazione vera) | Valore |
+|---|---|
+| perdita della ricerca (60 battaglie a esperimento, seme 7) | 73,5 |
+| perdita su estrazioni nuove (200 battaglie, semi 1–3) | 93–95 (3,4 a esperimento) |
+| stesso vincitore | 22–23 esperimenti su 28 |
+| errore medio sulle navi rimaste al vincitore | 0,8 navi |
+| errore medio sul tempo di decisione | ~130 s (la simulazione vera: 285–900 s, tipico 450–530) |
+
+Limite onesto: la taratura è su scontri di 3–30 navi senza l'Aquila; la ricerca si adatta un poco al suo campione (73,5 → 94 su campioni nuovi). Due prove del modello
+(`test_the_model_matches_the_war_bench`, `test_a_beaten_fleet_breaks_off_and_the_slow_are_caught`) custodiscono ciò che la taratura ottiene.
+
+### 10.5 Le menti strategiche
+
+- **Chi**: Vice Admiral Adrian Rourke (ASTRA, `key admiral`) e Archon Isolde Skarn (Mandato, `key skarn`: «una flotta è una cosa finita da spendere solo dove prende
+  un Gate»). Il quadro (`March.picture(side)`) è ciò che quel comando può sapere: le proprie flotte esatte, le tracce nemiche con la loro età, le notizie arrivate (in
+  ordine di ricezione: i Gate consegnano fuori ordine), il piano e il diario di ciò che ha deciso, la volontà dei popoli; per Rourke anche dove sta l'Aquila, a che
+  distanza dal Gate e che cosa le ha chiesto il Capitano.
+- **Cadenza**: una prima occhiata a 420 s **o appena un Gate si apre verso il cielo dell'Aquila** (o un fatto grave), poi per notizie (peso ≥ 2, dopo 6–15 s perché
+  una raffica si legga insieme, mai più spesso di 75 s) e ogni ~330 s (×0,85–1,25) solo se il quadro è cambiato; le parole del Capitano a Rourke sono immediate
+  (un'occhiata in corso si annulla e ricomincia con le sue parole). Fino a due giri di modello per occhiata (`assess`, un rifiuto, nessuna chiamata).
+- **Strumenti**: ogni risposta dice cosa la flotta farà (rotta, tempo, cosa si sa del posto) o perché non può; `assess` dà la stima dello stato maggiore con le regole
+  della guerra, **non vieta nulla**. Una flotta giocata dal gioco (con l'Aquila) non si muove sulla mappa: l'ordine resta sul suo registro come intento che i suoi comandanti
+  leggono (`field_brief`).
+- **Fallimento**: un modello che non risponde in 45 s o tre volte di fila lascia le flotte ai riflessi "full" (nessuna spesa, la guerra non si ferma).
+- **Il Capitano**: parlare a Rourke (rete di flotta) è una **occhiata** immediata con le sue parole; `task_aquila` è un ordine del servizio ad andare altrove (il Capitano
+  decide, la guerra va avanti comunque); `send_tender` rifornisce l'Aquila (uno ogni quarto d'ora).
+
+### 10.6 La colla con la simulazione vera (`march_glue.py`)
+
+Non giudica nulla: porta fatti nei due sensi.
+
+- **Dove sta l'Aquila**: dallo stato del Gate (nella corsia di un Gate, o arrivata in un sistema) la March sa quale sistema è reale; le flotte che il gioco giocava tornano
+  sulla mappa dove stanno quando lei parte; un arrivo prende le flotte del nuovo sistema.
+- **Dentro**: una flotta della March che arriva al suo sistema (dal Gate, o già presente quando lei arriva) è mandata come le navi che ha davvero, **un beat per gruppo di
+  battaglia**, ogni nave con il suo scafo (`hull_pct`), missili, stormi, capitani/comandanti (da `war_minds.ALLIES` e `enemy.COMMANDERS` per chiave); al più 36 navi di
+  guerra insieme (SCALA), le altre aspettano 90 s nel Gate. Una flotta ASTRA che passa soltanto non si materializza; quella del Mandato sì, sempre.
+- **Fuori**: ogni secondo le viste del gioco (`_astra_groups`, `_mandate`, `contacts`, gli eventi) dicono che ne è delle navi: scafi, perdite (che pesano sul conto e sulla
+  volontà), fughe (navi che escono dal sistema: una flotta di sbandati che si ritira); la battaglia vera finita chiude il capitolo (battaglia maggiore ≥ 8 perdite, capitale
+  persa o valore ≥ 7: ≥ 40 min dalla precedente) e la guerra finita chiude l'arco (`_end_arc`).
+- **L'apertura del gioco**: le flotte che il copione del gioco porta da sé (il picchetto, Lethe, il gruppo d'attacco, l'avanguardia, il soccorso) si **adottano** dagli id dei contatti
+  dell'ordine di battaglia; una che non arriva entro 30 minuti è della mappa.
+- **La guerra senza l'Aquila**: se è persa, `fast_forward` (3 ore di guerra in ~0,6 s, riflessi pieni per entrambe le parti); i bollettini della guerra lontana arrivano sul
+  ponte come notizie della rete di flotta (`comms`), tenuti durante gli scontri tranne i fatti urgenti, al più uno ogni 25 s; il tavolo olografico riceve `sector.march` ogni 10 s.
+
+### 10.7 Il ritmo: arrivi da lontano, e l'apertura giocata dalla March
+
+Cosa è fatto (modulo mente, nel gioco com'è):
+
+- **Mai a distanza di coltello**: ogni forza del Mandato (e ogni flotta amica che non era già lì) entra a **≥ 85 km** dall'Aquila (la bocca del Gate se il Gate è lontano:
+  all'apertura è a 110 km; altrimenti spinta a 85 km e al più 120, il limite del gioco), sul rilevamento del Gate; le flotte già presenti quando lei arriva a 70 km.
+- **A colonna**: le navi passano il Gate una dopo l'altra (4 s a nave): un beat per gruppo di battaglia, ognuno con il ritardo delle navi che lo precedono; una flotta di
+  più gruppi non arriva tutta insieme.
+- **L'avviso del Gate** dice anche i minuti: «una forza di circa 5 navi sta passando fra 75 s; il Gate è a 110 km dall'Aquila, e a 450 m/s servono circa 4 min 04 s dopo per
+  raggiungerla» (avviso sul ponte, quadro di Rourke, tavolo olografico con `eta_s`). Chi comanda sul campo legge cosa sta arrivando e quando (`field_brief`).
+- **Il regista non crea più incursioni**: in modalità March le forze sono solo della March (una incursione è una mossa strategica con costo e tempo di viaggio).
+
+**L'apertura giocata dalla March** (opzionale; `ASTRA_OPENING=script` la spegne; serve una piccola modifica C++, vedi 10.11): una campagna nuova chiede al gioco di spegnere
+il copione dell'apertura (`opening {"script": false}`: niente gruppo d'attacco a 25 km dopo 170 s, avanguardia e soccorso). Se risponde `ok`, le tre flotte sono della guerra:
+il gruppo d'attacco di Solm sta a Thule e **parte alle 150 s** (la prima mossa del Mandato, per orologio), l'avanguardia aspetta a Thule la parola dell'Archon, il gruppo
+Constance a Meridian quella dell'Ammiraglio. Se il gioco non conosce il comando o rifiuta, **non cambia nulla** (il copione resta). L'apertura, nel banco (`bench/march_pace.py`):
+
+| | copione del gioco | giocata dalla March |
+|---|---|---|
+| primo avviso del Gate | nessuno per il gruppo d'attacco (l'avanguardia: a 500 s) | **~200 s** (75 s prima dell'arrivo) |
+| arrivo del gruppo d'attacco | 170 s, a 25 km | ~275 s, a 106 km (bocca del Gate) |
+| primi cannoni (missili a 25 km) | **170 s** | **~455 s** (7,5 minuti) |
+| avviso → primi cannoni | 0 s | **255 s** (4 min 15 s) |
+| soccorso | ~720 s, già deciso | quando Rourke lo manda (al primo sguardo, ~210 s: Constance da Meridian, il grosso da Cassia) |
+
+Il gruppo d'attacco apre il canale all'arrivo (Archon Solm: 14 s dopo il passaggio, con il gruppo ancora a 4 minuti: il Capitano ha l'avvicinamento per parlare).
+La prima occhiata di Rourke non aspetta i 420 s se un Gate si apre verso l'Aquila: dal vivo (10.10) dice, ~10 s dopo l'avviso, «il Gate di Aurelia si apre: circa quattro navi, due
+Acheron e due Styx, fra un minuto, su di lei quattro minuti dopo. Il gruppo Constance viene da Meridian, il grosso da Cassia».
+
+### 10.8 Il regista onnisciente (`director.py`, ganci additivi)
+
+Con la March il regista legge `director_view()` (la guerra com'è, di entrambe le parti) e ha quattro strumenti: `start_beat` (`calm`, `investigate`, `negotiation`, `none`: niente
+incursioni né rinforzi, sono della March), `war_news` (senza proprietario né minaccia: la March decide chi tiene cosa), `reveal` (solo il canale: il testo del rapporto lo scrive la
+March, con i fatti veri), `pressure` (il governo di una parte chiede una cosa per un tempo: dà ritmo senza scegliere un vincitore). Non ha `transmit` né `grant`: Rourke parla
+per mezzo della March (`rourke_reply`). Il regista cura il ritmo della storia (pause, trattative, rivelazioni), **mai la sorte**.
+
+### 10.9 Il Capitano: cosa conta
+
+Nel mondo simmetrico i riflessi danno 45/55 (ASTRA 42, Mandato 52, armistizio 26 su 120 guerre: 44,7 % ± 5,2 dei decisi); nel mondo vero la partita è asimmetrica per
+costruzione (la 7th Fleet e la Home Fleet contro la flotta d'interdizione) e le scelte del Capitano pesano (`march_sim`, 60 guerre da 12 ore, riflessi per entrambe le parti):
+
+| Capitano (stand-in) | ASTRA / Mandato / armistizio | quota ASTRA dei decisi | fine |
+|---|---|---|---|
+| non c'è | 41 / 9 / 10 | 82 % | 4,8 h |
+| fermo (idle) | 25 / 17 / 18 | 60 % | 5,9 h (l'Aquila persa in 53 guerre) |
+| una nave della flotta (fleet) | 38 / 9 / 13 | 81 % | 4,9 h |
+| accorre dove c'è minaccia (defender) | 32 / 11 / 17 | 74 % | 6,0 h |
+| va a colpire ciò che batte (hunter) | 32 / 13 / 15 | 71 % | 5,1 h |
+
+Le guerre durano ore (p10 4,2 h, p90 7,0 h) e nessuna resta aperta oltre le 12.
+
+### 10.10 Il banco e i risultati (3/10; tutto senza motore, senza rete tranne dove indicato)
+
+- **Test** (`tools/march.py test`): 133 della March (46 + 29 + 42 + 13 + 1 + 2) e **460** della suite offline completa (`unittest discover -s bench -p "*_unit.py"`), tutti verdi.
+- **Soak** (`bench/march_soak.py`: la colla contro un gioco finto che combatte, due menti a riflessi, l'Aquila che viaggia, 6 semi × 3 ore): **zero violazioni** (nessuna nave
+  due volte o in due posti, nessuna del gioco ignota alla mappa, nessuna giocata mentre l'Aquila è in una corsia, perdite uguali nei due mondi), zero errori della colla.
+- **Il ritmo** (`bench/march_pace.py`, 6 semi × 3 ore, riflessi: il pavimento; il gioco finto con l'avvicinamento e i danni adattati alle durate del banco):
+
+| | copione | March |
+|---|---|---|
+| primo contatto (3 navi in battaglia) | 170 s | 453 s |
+| avviso prima dei cannoni | nessuno | 255 s |
+| scontri a partita (3 h) | 4 | 4 |
+| navi perse all'ora (entrambe le parti, tutta la guerra) | 4,1 | 4,6 |
+| punti di decisione del Capitano all'ora (Gate verso di lei, arrivi, offerte di pace, assedi, sistemi presi, ordini del governo) | 4,0 | 5,4 |
+| tratti di quiete (> 15 min senza una scelta) all'ora | 0,89 | 0,72 |
+
+  I riflessi soli lasciano tratti quieti lunghi (fino a 2 ore in un seme): è il pavimento. Le menti vere e il regista lo riempiono (qui sotto).
+- **Dal vivo con le menti vere** (`bench.march_pace --live`, 30 minuti di guerra con l'apertura della March nel gioco finto, **0,0312 $**, 18 occhiate, mediana 1,6 s): Rourke alla
+  prima occhiata (210 s) manda Constance e il grosso e avvisa il Capitano con i minuti; Skarn manda l'avanguardia e poi ritira ciò che si trova contro dodici navi; a 1.000 s
+  Rourke dice che a Thule si raduna una forza di dodici navi, a 1.555 s Thule è del Mandato: 9 punti di decisione e 7 comunicazioni di Rourke in 30 minuti. Il costo
+  dell'apertura è il più alto della partita: 0,062 $/ora; a regime 0,03–0,05 $/ora (prove da 1–4 ore).
+- **Taratura e guerre**: vedi 10.4 e 10.9. Simmetria (120 guerre `--world sym`): 44,7 % ± 5,2. Dottrine scambiate (`--swap`): ASTRA 33, Mandato 5, armistizio 22: a decidere
+  la parte è la geografia dell'ordine di battaglia, non la dottrina.
+
+### 10.11 Limiti noti e richieste (fuori dai miei file)
+
+Richieste al C++ (nell'ordine di quanto cambiano la partita):
+
+1. **`dark` per beat/gruppo** (`ArriveBeat` e `ArriveGroups`: oggi un gruppo `raid` entra sempre `bFog` + `bDark`, la firma ×0,33 e si accende a 20 km: un Acheron è un rilevamento a ~20 km, uno
+   Styx a ~15, cioè dentro la portata dei missili (25 km), **qualunque sia la distanza da cui arriva**). Basta `bool bDarkBeat = true; Beat->TryGetBoolField("dark", bDarkBeat); S.bDark = bDarkBeat;` (la
+   March manda `dark` in ogni beat: falso per ciò che non corre al buio). Con la firma intera (`SignatureKmOf`) un Acheron è un rilevamento a ~61 km (2,3 minuti a 450 m/s) e una traccia a ~25 km, uno Styx
+   a ~46 e ~19 km.
+1b. **Keeper Station come sensore** (opzionale, ma è ciò che fa «vedere arrivare» per minuti): in `TickSensors` il Gate (`Landmarks[GateLandmark]`) legge come una nave ASTRA con radar attivo di ~60 km
+   (`Best = Max(Best, Sense(GatePos, 60, false))`, tracce condivise per datalink come già quelle della 7th Fleet): una forza che esce dalla bocca del Gate a 110 km dall'Aquila è una traccia
+   (classificata, poi identificata) per gran parte del suo volo, al buio o no.
+2. **`opening {"script": false}`** (`AstraShipSubsystem::ApplyCommand` → `UAstraBattleSubsystem::SetOpeningScript`): un membro `bOpeningScript = true`; con `false` le fasi 2 e 3 di `TickScenario`
+   (gruppo d'attacco, avanguardia, soccorso, le note di comunicazione) non partono; risponde `ok` solo se il copione non è già cominciato (`StageDone < 2`), altrimenti `ok: false`. La fase 1 (Lethe
+   che si sveglia a 80 s, il picchetto, il mercantile) resta. Senza questo comando l'apertura resta quella del copione (alternativa minima: la fase 2 con `ScheduleOpeningForce` alla bocca del Gate
+   con l'avviso del Gate 75 s prima, come già fa l'avanguardia).
+3. `range_km` oltre 120 (oggi `Clamp(6, 120)`), se il Gate sta più lontano; opzionale: `engagement_active` strutturato nello stato.
+4. Il **tavolo olografico** deve disegnare `sector.march` (flotte con `eta_s`, battaglie, volontà): il dato c'è, il disegno no.
+5. La **durata degli scontri** è una manopola di GUERRA (danni di `classes.json`): nel banco della guerra durano 5–15 minuti (3–6 cacciatorpediniere a parte: 400–530 s), più i
+   3–4 minuti di avvicinamento; se per le ore si vogliono scontri più lunghi si scala il danno, non la March. L'abbordaggio non è collegato alla March.
+
+Limiti miei: l'**apertura giocata dalla March non è provata nel gioco** (solo contro il gioco finto, il server vero con un gioco scritto e le menti vere); il comportamento a lungo
+(ore) delle menti vere è provato solo a riflessi e per 30 minuti dal vivo (il credito per le prove dal vivo si è chiuso a 0,135 $ su 0,15 $); le menti ripetono a volte la stessa
+comunicazione (si tratta nel prompt, mai con un filtro); i riflessi soli lasciano quiete lunghe; MAX 36 navi di guerra insieme nel gioco; un fleet «scriptato» non prende ordini.
+
+### 10.12 Integrazione e prova in gioco
+
+1. `git merge worktree-agent-a64cdaf64f0a8b7c2` su `main` (nessuna dipendenza nuova, nessun asset). Interruttori: `ASTRA_MARCH=0` (il regista fa la guerra come prima), `ASTRA_STRATEGY_MINDS=0`
+   (flotte ai riflessi, nessuna spesa), `ASTRA_OPENING=script` (non chiede l'apertura alla March).
+2. **Senza modifiche al C++**: una campagna nuova parte con il copione (il gioco risponde «unknown command opening» e la March lo lascia fare); da lì la guerra è della March: le menti
+   a cadenza, gli arrivi da lontano e a colonna, i bollettini sul ponte. Nel log (`astra-mind.log`): `the game keeps its opening script`, `the game plays …`, righe `Vice Admiral Adrian Rourke … $0.00xxx
+   (…): fleet_order…`.
+3. **Con le due modifiche (1 e 2 sopra)**: `the game's opening script is off: the March plays F-M1, F-M3, F-A3`; a ~190 s il bollettino del Gate («…fra 75 s; il Gate è a 110 km…»), a ~200–215 s Rourke
+   che parla, a ~260 s il beat `raid` (4 navi, ≥ 85 km), ~14 s dopo la chiamata di Solm, a ~455 s i primi cannoni; il soccorso del Constance/del grosso a ~10 minuti.
+4. Cosa guardare: i tempi sopra; che Rourke non si ripeta troppo (sette comunicazioni in 30 minuti in un'apertura movimentata); che le flotte che arrivano non siano mai a distanza di coltello; che il
+   Capitano abbia sempre qualcosa da decidere (punti di decisione in 10.10); il costo (`tools/march.py live --hours 1 --cap 0.05`, con la chiave).
+5. Comandi: `tools/march.py test` · `tools/march.py sim --seeds 1-60 --hours 12 --captain none,idle,fleet,defender,hunter` · `tools/march.py pace --hours 3 --seeds 1-6` ·
+   `tools/march.py pace --live --hours 0.5 --seeds 1 --cap 0.035` · `tools/march.py cal model`.

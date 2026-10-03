@@ -189,6 +189,22 @@ class MarchServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.mind.march.fleets["F-M1"].status, "ready")
         self.assertEqual(g.summary()["opening"], "march")
 
+    async def test_the_opening_played_by_the_march_sends_the_strike_group_through_the_gate(self) -> None:
+        await self.campaign("new")
+        await self.play(300)
+        raids = [b for b in self.beats() if b["type"] == "raid"]
+        self.assertEqual(len(raids), 1, [b["type"] for b in self.beats()])             # (the strike group, the vanguard waits for the Archon's word)
+        beat = raids[0]
+        self.assertEqual(sorted(sp["name"] for g in beat["groups"] for sp in g["ships"]), ["Acheron", "Cocytus", "Phlegethon", "Styx"])
+        self.assertTrue(beat["hail"])
+        self.assertFalse(beat["dark"])
+        self.assertGreaterEqual(beat["range_km"], 85.0)                                # (from far out: never at knife range)
+        self.assertGreater(beat["delay_s"], 0.0)
+        self.assertEqual(beat["groups"][0]["commander"]["name"], "Archon Varek Solm")
+        from astra_mind.enemy import COMMANDERS
+        lead = self.mind.march.fleets["F-M1"].ships[0].cid
+        self.assertTrue(lead.startswith("T-") and COMMANDERS[lead]["name"] == "Archon Varek Solm")   # (the leader of the new group has his mind and his voice)
+
     async def test_the_opening_switch_keeps_the_games_script_when_asked_to(self) -> None:
         with mock.patch.dict(os.environ, {"ASTRA_OPENING": "script"}):
             await self.campaign("new")
