@@ -394,6 +394,7 @@ class FlightMinds:
         self.standing = standing
         self.path = path
         self.trace = trace
+        self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []   # the speech floor's backlog (speech.Voice.waiting, set by the server)
         self.system = system_prompt()
         self.disabled = False
         self.state: dict[str, Any] = {}
@@ -785,6 +786,11 @@ class FlightMinds:
             parts.append("NEW SINCE YOUR LAST LOOK (newest last)\n" + "\n".join(
                 f" - {max(0, now - e.t):.0f} s ago · {e.text}" + ("" if e.take else "  [the bridge's news: its officers have it; say something only if it touches your own people or your own deck]")
                 for e in events))
+        queued = self.waiting()
+        if queued:
+            # what is queued on the Captain's ears (the bridge's officers, the net, the other ships): a crisis on the net is a few clear calls, not every call
+            parts.append("WAITING TO BE SAID on the Captain's speakers (queued behind whoever is speaking: a new call is worth adding only if it matters more "
+                         "to him than these, and nothing here is said again)\n" + "\n".join(f" - {who} ({how}): \"{words}\"" for who, words, how in queued))
         if inbox:
             parts.append("THE CAPTAIN SAYS (over the net)\n" + "\n".join(
                 f" - {max(0, now - m.t):.0f} s ago{', relayed by Comms, who opened the net for him' if m.src == 'hail' else ''}: \"{m.text}\"" for m in inbox))

@@ -697,6 +697,7 @@ class WarMinds:
         self.where = where or (lambda st: _place(st))
         self.note_story = note or (lambda text: None)    # the campaign log of the story (director.note)
         self.trace = trace                               # the bench keeps every pulse with its prompts
+        self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []   # the Aquila's speech backlog (speech.Voice.waiting, set by the server)
         self.minds: dict[str, Mind] = {}
         self.allies: dict[str, Commander] = {}           # ASTRA captains by ship contact id
         self.pool_used = 0
@@ -1133,8 +1134,12 @@ class WarMinds:
         if inbox:
             msgs = "\nMESSAGES FOR YOU\n" + "\n".join(f" {max(0, self.clock() - m.t):.0f} s ago · {self._src(m)}: {m.text}" for m in inbox)
         enemy_note = f"\nNew enemy ships on your plot since your last look: {', '.join(new_enemy)}" if new_enemy else ""
+        queued = self.waiting() if side == "astra" else []
+        backlog = ("\nWAITING TO BE SAID on the Aquila's speakers (queued behind whoever is speaking there: a word from you to her captain is worth adding only "
+                   "if it matters more to him than these, and nothing here is said again)\n" + "\n".join(f" - {who} ({how}): \"{words}\"" for who, words, how in queued)
+                   if queued else "")
         user = (f"WHAT YOU HAVE DECIDED AND SAID, AND WHAT YOU HEARD (your log, newest last)\n{self.recall(side)}\n\n"
-                f"{pic}\nEVENTS SINCE YOUR LAST LOOK (newest last)\n{render_events(new_events)}{enemy_note}{intent}{msgs}\n\n"
+                f"{pic}\nEVENTS SINCE YOUR LAST LOOK (newest last)\n{render_events(new_events)}{enemy_note}{intent}{msgs}{backlog}\n\n"
                 f"You are looking now because: {'; '.join(why)}. The Captain's language is {LANG_NAMES.get(lang, lang)} (what you say aloud is in it).\n"
                 "Decide: give your orders with the tools, or call no_change.")
         tools: list[dict[str, Any]] = []
