@@ -27,6 +27,10 @@ sys.path.insert(0, HERE)
 
 import ship_class_build as B  # noqa: E402
 import ship_class_specs as S  # noqa: E402
+import ship_class_specs_b as SB  # noqa: E402
+import ship_class_specs_c as SC  # noqa: E402
+
+SPECS = {**S.SPECS, **SB.SPECS, **SC.SPECS}
 
 OUT_DIR = os.path.join(ROOT, "data", "ship", "plans")
 STAGE_DIR = os.path.join(ROOT, "Content", "ASTRA", "Data", "plans")
@@ -46,7 +50,7 @@ def dump(plan: dict, path: str) -> int:
 
 def build_class(key: str, stage: bool = True, check: bool = True) -> dict:
     t0 = time.time()
-    plan = B.Builder(S.SPECS[key]).build()
+    plan = B.Builder(SPECS[key]).build()
     size = dump(plan, os.path.join(OUT_DIR, key + ".json"))
     if stage:
         dump(plan, os.path.join(STAGE_DIR, key + ".json"))
@@ -57,7 +61,7 @@ def build_class(key: str, stage: bool = True, check: bool = True) -> dict:
         print(f"   note: {n}")
     if check:
         import ship_class_checks as C
-        problems = C.check(plan, S.SPECS[key])
+        problems = C.check(plan, SPECS[key])
         for p in problems:
             print(f"   PROBLEM: {p}")
         print(f"   checks: {'0 problems' if not problems else str(len(problems)) + ' problems'}")
@@ -67,7 +71,7 @@ def build_class(key: str, stage: bool = True, check: bool = True) -> dict:
 def report_decks(key: str):
     """The decks a spec makes, before any room is laid: where each one extends, how wide, where its passages run (for writing a spec)."""
     import ship_class_engine as E
-    spec = S.SPECS[key]
+    spec = SPECS[key]
     hull = E.HULL.Hull(key)
     print(f"== {key}: hull x {hull.x_range()[0]:.0f}..{hull.x_range()[1]:.0f}, sections " + " ".join(f"{l}[{xf:.0f}..{xa:.0f}]" for l, xf, xa in spec["sections"]))
     for ds in spec["decks"]:
@@ -87,10 +91,10 @@ def main():
     if "--only" in argv:
         only = argv[argv.index("--only") + 1].split(",")
     if "--decks" in argv:
-        for k in [k for k in S.SPECS if not only or k in only]:
+        for k in [k for k in SPECS if not only or k in only]:
             report_decks(k)
         return
-    keys = [k for k in S.SPECS if not only or k in only]
+    keys = [k for k in SPECS if not only or k in only]
     for k in keys:
         build_class(k, stage="--no-stage" not in argv, check="--no-check" not in argv)
 

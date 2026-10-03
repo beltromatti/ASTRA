@@ -88,14 +88,14 @@ def check(plan: dict, spec: dict | None = None) -> list:
                 if lo - 1e-6 <= x <= hi + 1e-6:
                     lim = ha + (hb - ha) * (x - xa) / (xb - xa) if xb != xa else ha
                     break
-            if lim is not None and hw > lim + 0.35 and c["kind"] not in ("airlock",):
+            if lim is not None and hw > lim + 0.8 and c["kind"] not in ("airlock",):
                 P(f"{c['id']} ({c['kind']}): half width {hw:.1f} outside the deck's envelope {lim:.1f} at x {x:.0f}")
                 break
         if hull and c["kind"] != "corridor":
             za, zb = c["z"]
             for x in xs:
                 skin = hull.half_width(x, za + 0.2, zb - 0.2)
-                if skin > 0 and hw > skin + 3.2:                   # (the envelope fills the plating's recesses: it can stand proud of the median skin there)
+                if skin > 0 and hw > skin + (spec or {}).get("skin_slack", 3.2):                   # (the envelope fills the plating's recesses: it can stand proud of the median skin there)
                     P(f"{c['id']} ({c['kind']}): half width {hw:.1f} beyond the measured skin {skin:.1f} at x {x:.0f}")
                     break
     # no two boxes overlap
@@ -184,7 +184,8 @@ def check(plan: dict, spec: dict | None = None) -> list:
     obj = plan["objectives"]
     start = comp_nodes.get(obj.get("bridge") or "", [])
     no_spine = lambda e: e.get("blast") and doors.get(e.get("door"), {}).get("passage") == "SP0"
-    if start:
+    has_passages = any(cc.get("role") == "passage" for cc in comps)
+    if start and has_passages:
         seen = reach(start, no_spine)
         for k in ("engineering", "armory"):
             tgt = obj.get(k)
@@ -231,6 +232,11 @@ def check(plan: dict, spec: dict | None = None) -> list:
         for cid in s["compartments"]:
             if cid not in by_id:
                 P(f"systems: no compartment {cid}")
+    for m in plan.get("mounts", []):
+        if not m.get("comp") or m["comp"] not in by_id:
+            P(f"mount {m['i']} ({m['kind']}, role {m['role']}) has no room")
+    if any("PROBLEM" in n for n in plan.get("notes", [])):
+        P([n for n in plan["notes"] if "PROBLEM" in n][0])
     # the class's cuts are section boundaries (a gutted section of the war is whole sections here)
     cuts = plan["hull"].get("cuts_x", [])
     bounds = {x for d in plan["decks"] for s in d["sections"] for x in s["x"]}

@@ -85,7 +85,7 @@ LETHE = dict(
         dict(id="dorsal_gun", kind="weapons", name="Dorsal Rail Breech", x=(4.0, 18.0), decks=[2, 3], entry=3, role="gun_dorsal"),
         dict(id="boat_bay", kind="hangar", name="Skiff Bay", x=(14.0, 36.0), decks=[4, 5], entry=5, role="hangar"),
         dict(id="reactor", kind="engineering", name="Reactor Hall", x=(-90.0, -64.0), decks=[3, 4, 5], entry=5, role="engineering"),
-        dict(id="drive", kind="engines", name="Drive Room", x=(-109.0, -97.0), decks=[4, 5], entry=5, role="drives"),
+        dict(id="drive", kind="engines", name="Drive Room", x=(-105.0, -95.0), decks=[5], entry=5, role="drives"),
     ],
     keys=[
         K(1, "IP", -41.0, 8.0, "comms", role="comms"),
@@ -105,6 +105,7 @@ LETHE = dict(
               billets=[dict(role="captain", at="bridge", fx=0.35), dict(role="executive_officer", at="cic"), dict(role="tactical_officer", at="fire_control"),
                        dict(role="chief_engineer", at="engineering"), dict(role="medical_officer", at="medbay"), dict(role="security_chief", at="armory"),
                        dict(role="flight_officer", at="hangar")]),
+    mounts=["gun_bow", "gun_dorsal", "laser_port", "laser_starboard"],
     dc=dict(parties=2, size=4),
 )
 

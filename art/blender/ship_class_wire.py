@@ -106,7 +106,7 @@ class Wiring:
         cross = [c for c in adj if c.get("role") == "cross"]
         if kind == "airlock":
             ves = [v for v in L.vestibules if shared_wall(r, v)]
-            tgts = ves[:1] or pas[:1]
+            tgts = ves[:1] or pas[:1] or spine[:1]
             doors = [self.door_between(r, t, deck=d, extra={"airlock": True}) for t in tgts]
         elif kind == "vestibule":
             doors = [self.door_between(r, t, deck=d) for t in pas[:1]]

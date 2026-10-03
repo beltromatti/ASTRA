@@ -10,6 +10,7 @@ PRESSURE BULKHEADS (door kind `blast`, with `boundary`) across every lane at eac
 """
 from __future__ import annotations
 
+import math
 import os
 import sys
 
@@ -126,7 +127,11 @@ class Deck:
             n = max(1, int(round((xb - xa) / step)))
             self.ex = [xa + (xb - xa) * i / n for i in range(n + 1)]
             raw = [max(0.0, hull.half_width(x, self.z, self.z + self.clear) - wall) for x in self.ex]
-            self.ehw = self._tidy(raw)
+            # smoothed (a recess of the plating is filled), but never more than a couple of metres beyond what the skin measured about there
+            def med(i):
+                s = sorted(raw[max(0, i - 3): i + 4])
+                return s[len(s) // 2]
+            self.ehw = [min(t, med(i) + 2.5) for i, t in enumerate(self._tidy(raw))]
         if self.hw_cap:
             self.ehw = [min(h, self.hw_cap) for h in self.ehw]
         # where there is a body at all: a spine and a room
@@ -184,21 +189,8 @@ class Deck:
         """How far inside the skin a room stops: the strip of the airlocks on a dock deck, else a hand's breadth."""
         return STRIP + WALL if self.strip else 0.3
 
-    def choose_passages(self):
-        """Where the passages run and at which y: the second lane of the walk graph on both flanks, as far as the hull is wide enough for it."""
-        if self.layout != "full":
-            return
-        s = sorted(self.ehw)
-        lo = self.lim_out()
-        if s[int(0.5 * (len(s) - 1))] >= 28.0:
-            yp = clamp(0.5 * s[int(0.6 * (len(s) - 1))], 9.0, 34.0)               # wide: rows on both sides of it
-        else:
-            ref = s[int(0.35 * (len(s) - 1))]
-            yp = ref - lo - PASS_HW                                               # not wide: it hugs the skin and the inner rows take the width
-        yp = round(yp * 2.0) / 2.0
-        if yp < SPINE_HW + WALL + PASS_HW + 2.5 + MIN_DEPTH:
-            return
-        need = yp + PASS_HW + lo
+    def _run(self, need: float):
+        """The longest run of x where the deck is wide enough for a passage whose outer edge is `need` from the axis."""
         best, cur = None, None
         for x, h in zip(self.ex, self.ehw):
             if self.pass_range and not (self.pass_range[0] <= x <= self.pass_range[1]):
@@ -211,8 +203,56 @@ class Deck:
                 cur = None
         if cur and (best is None or cur[1] - cur[0] > best[1] - best[0]):
             best = cur
-        if best and best[1] - best[0] >= 24.0:
-            self.YP, self.pass_x = yp, best
+        return best
+
+    def choose_passages(self):
+        """Where the passages run and at which y: the second lane of the walk graph on both flanks, as wide apart as the hull lets them be while they
+        still run along most of the deck (a ring that stops short is a ring with a break in it)."""
+        if self.layout != "full":
+            return
+        lo = self.lim_out()
+        lo_y = SPINE_HW + WALL + PASS_HW + 2.5 + MIN_DEPTH
+        wide = sorted(self.ehw)[int(0.5 * (len(self.ehw) - 1))] >= 28.0
+        top = max(self.ehw) - lo - PASS_HW
+        if wide:
+            top = min(top, clamp(0.5 * sorted(self.ehw)[int(0.6 * (len(self.ehw) - 1))], 9.0, 34.0))   # wide: rows on both sides of it
+        span = (self.ex[-1] - self.ex[0]) or 1.0
+        pick = None
+        yp = math.floor(top * 2.0) / 2.0
+        while yp >= lo_y - 1e-6:
+            run = self._run(yp + PASS_HW + lo)
+            if run and run[1] - run[0] >= 24.0:
+                frac = (run[1] - run[0]) / span
+                if pick is None or (frac > pick[0] + 0.02 and frac < 0.75) or (pick[0] < 0.75 and frac >= 0.75):
+                    pick = (frac, yp, run)
+                if frac >= 0.75:
+                    break
+            yp -= 0.5
+        if pick:
+            self.YP, self.pass_x = pick[1], pick[2]
+
+    def gaps(self, min_hw: float = SPINE_HW + 0.6, min_len: float = 4.0):
+        """The x intervals where the deck has no body (narrower than a spine): a stretch of truss, a gap between a drum and its arm. The ends are where the
+        envelope crosses the spine's width (interpolated), and a little more."""
+        out = []
+        start = None
+        n = len(self.ex)
+        for i in range(n):
+            x, h = self.ex[i], self.ehw[i]
+            if h < min_hw and start is None:
+                if i > 0:
+                    px, ph = self.ex[i - 1], self.ehw[i - 1]
+                    start = px + (min_hw - ph) / (h - ph) * (x - px) if h != ph else x
+                else:
+                    start = x
+            elif h >= min_hw and start is not None:
+                px, ph = self.ex[i - 1], self.ehw[i - 1]
+                end = px + (min_hw - ph) / (h - ph) * (x - px) if h != ph else x
+                out.append((start, end))
+                start = None
+        if start is not None:
+            out.append((start, self.ex[-1]))
+        return [(a - 0.4, b + 0.4) for a, b in out if b - a >= min_len]
 
     def has_passage(self, x: float) -> bool:
         return bool(self.pass_x) and self.pass_x[0] - 1e-6 <= x <= self.pass_x[1] + 1e-6

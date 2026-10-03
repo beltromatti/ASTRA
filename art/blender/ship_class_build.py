@@ -250,10 +250,11 @@ class Builder(Wiring, Finish):
         secs = self.sec_ranges(d)
         halls = [h for h in self.halls if d.id in h["decks"]]
         hall_cuts = [(h["x0"] - WALL, h["x1"] + WALL) for h in halls]
+        gaps = d.gaps()                                         # where the deck has no body (a freighter's truss between its two blocks): no spine there, no room
         # ---- the spine, a segment to each section, with the halls taken out
         for letter, a, f in secs:
-            for p0, p1 in iv_subtract([(a + 0.2, f - 0.2)], hall_cuts):
-                if p1 - p0 >= 3.0:
+            for p0, p1 in iv_subtract([(a + 0.2, f - 0.2)], hall_cuts + gaps):
+                if p1 - p0 >= 1.0:
                     L.spine.append(self.add_comp(d, "corridor", p0, p1, -SPINE_HW, SPINE_HW, sec=letter, name="Spine", role="spine"))
         # ---- the passages, and a cross corridor at the fore end of every section's run (and at the aft end of the whole run: the ring closes)
         cross_x = []                                           # the x intervals a cross corridor takes (the inner rows stop short of them)
@@ -271,6 +272,9 @@ class Builder(Wiring, Finish):
             cross_x.append((pa_all + 0.2, pa_all + 0.2 + CROSS_W, self.sec_of(pa_all + 1.0)))
             # (a cross corridor does not run through a hall: a passage that ends beside one is joined to the hall's door instead)
             cross_x = [c for c in cross_x if not any(overlap(c[0], c[1], h0, h1) > 0 for h0, h1 in hall_cuts)]
+            # (and only where a passage runs to meet it, and the spine to meet its other end)
+            cross_x = [c for c in cross_x if all(any(p["bounds"][0] - 0.3 <= c[0] and c[1] <= p["bounds"][2] + 0.3 for p in L.passage[sd]) for sd in (1, -1))
+                       and any(sp["bounds"][0] - 0.3 <= 0.5 * (c[0] + c[1]) <= sp["bounds"][2] + 0.3 for sp in L.spine)]
             for cx0, cx1, letter in cross_x:
                 for side in (1, -1):
                     y0, y1 = (SPINE_HW, d.YP - PASS_HW) if side > 0 else (-(d.YP - PASS_HW), -SPINE_HW)
@@ -289,10 +293,17 @@ class Builder(Wiring, Finish):
                 L.halls.append(c)
         # ---- the stair slots, the dock vestibules and airlocks
         slots = {"IP": [], "IS": [], "OP": [], "OS": []}
+        for dk in self.dock_specs:
+            if dk.get("kind", "hatch") != "hatch" or dk["deck"] != d.id:
+                continue
+            self.make_dock_rooms(d, dk, L, slots, hall_cuts + cross_cuts)
         for st in self.stair_specs:
             row = st["row"]
-            x0, x1 = st["x"] - STAIR_SIZE / 2, st["x"] + STAIR_SIZE / 2
-            if not self.stair_fits(d, row, x0, x1, hall_cuts, cross_cuts):
+            for shift in (0.0, 2.0, -2.0, 4.0, -4.0, 6.0, -6.0, 8.0, -8.0, 10.0, -10.0, 12.0, -12.0):
+                x0, x1 = st["x"] + shift - STAIR_SIZE / 2, st["x"] + shift + STAIR_SIZE / 2
+                if self.stair_fits(d, row, x0, x1, hall_cuts, cross_cuts) and not any(overlap(x0, x1, a, b) > 0 for a, b in slots[row]):
+                    break
+            else:
                 continue
             yy = self.row_y(d, row, x0, x1)
             side = ROWS[row][0]
@@ -301,11 +312,18 @@ class Builder(Wiring, Finish):
             c = self.add_comp(d, "stairs", x0, x1, y0, y1, name="Stair Tower", side=side, extra={"_row": row, "_stair": st["id"]})
             L.stairs.append(c)
             slots[row].append((x0 - 0.0, x1 + 0.0))
-        for dk in self.dock_specs:
-            if dk.get("kind", "hatch") != "hatch" or dk["deck"] != d.id:
-                continue
-            self.make_dock_rooms(d, dk, L, slots)
         # ---- the rows: the key rooms, then the fill
+        key_row = {}
+        for ki, k in enumerate(self.keys):
+            if k["deck"] != d.id:
+                continue
+            alt = {"IP": "OP", "IS": "OS", "OP": "IP", "OS": "IS"}[k["row"]]
+            best = None
+            for cand in (k["row"], alt):
+                near = [iv for l, a, f in secs for iv in self.run_ivs(d, cand, a + 0.2, f - 0.2) if iv[1] >= k["x"] - 30.0 and iv[0] <= k["x"] + 30.0]
+                if near and (best is None):
+                    best = cand
+            key_row[ki] = best or k["row"]
         for row in ("IP", "IS", "OP", "OS"):
             side, typ = ROWS[row]
             ivs_by = {}
@@ -317,8 +335,8 @@ class Builder(Wiring, Finish):
                 ivs_by[letter] = iv_subtract(base, cuts)
             # the key rooms of this row first: each in the section its x is in (one that does not sit exactly where it was asked moves to the nearest
             # place in the row, and shrinks to fit)
-            for k in self.keys:
-                if k["deck"] != d.id or k["row"] != row:
+            for ki, k in enumerate(self.keys):
+                if k["deck"] != d.id or key_row.get(ki) != row:
                     continue
                 order = sorted(ivs_by, key=lambda l: abs(self.sec_of(k["x"]) != l) * 1000 + min(abs(k["x"] - iv[0]) if k["x"] < iv[0] else (abs(k["x"] - iv[1]) if k["x"] > iv[1] else 0.0)
                                                                                                   for iv in ivs_by[l]) if ivs_by[l] else 1e9)
@@ -328,7 +346,7 @@ class Builder(Wiring, Finish):
                     host = next(((p0, p1) for p0, p1 in ivs if p0 - 1e-6 <= k["x"] <= p1 + 1e-6), None)
                     if not host and ivs:
                         near = min(ivs, key=lambda iv: min(abs(k["x"] - iv[0]), abs(k["x"] - iv[1])))
-                        host = near if min(abs(k["x"] - near[0]), abs(k["x"] - near[1])) < 14.0 else None
+                        host = near if min(abs(k["x"] - near[0]), abs(k["x"] - near[1])) < 30.0 else None
                     if not host:
                         continue
                     ln = min(k["len"], host[1] - host[0])
@@ -366,13 +384,41 @@ class Builder(Wiring, Finish):
         yy = self.row_y(d, row, x0, x1)
         return bool(yy) and yy[1] - yy[0] >= MIN_DEPTH
 
-    def make_dock_rooms(self, d: Deck, dk: dict, L: Layout, slots: dict):
+    def dock_x(self, d: Deck, dk: dict, avoid, rows) -> float:
+        """The dock's x on this deck: the one asked, or the nearest where its six metres are free of halls and cross corridors, inside one section."""
+        for shift in [0.0] + [s * k for k in range(2, 161, 2) for s in (1.0, -1.0)]:
+            x = dk["x"] + shift
+            x0, x1 = x - 3.0, x + 3.0
+            if x0 < d.xa + 0.5 or x1 > d.xf - 0.5:
+                continue
+            if any(overlap(x0, x1, a, b) > 0 for a, b in avoid):
+                continue
+            if not any(a + 0.2 <= x0 and x1 <= f - 0.2 for _, a, f in self.sec_ranges(d)):
+                continue
+            if d.hw_min(x0, x1) < SPINE_HW + WALL + MIN_DEPTH:
+                continue
+            return x
+        raise ValueError(f"dock {dk['id']} at deck {d.id}: no place near x {dk['x']}")
+
+    def make_dock_rooms(self, d: Deck, dk: dict, L: Layout, slots: dict, avoid=()):
         """The airlock in the strip along the skin at the dock's x and, between it and the passage, the vestibule (a boarding party's gangway); where
         there is hardly a gap the airlock reaches the passage itself."""
         side = dk["side"]
-        x0, x1 = dk["x"] - 3.0, dk["x"] + 3.0
+        dk["x_used"] = self.dock_x(d, dk, avoid, slots)
+        x0, x1 = dk["x_used"] - 3.0, dk["x_used"] + 3.0
         if not d.has_passage(x0) or not d.has_passage(x1):
-            raise ValueError(f"dock {dk['id']} at deck {d.id} x {dk['x']}: no passage there (the airlock needs one)")
+            # no passage here (a narrow ship): the airlock is a slot of the inner row, from the spine's wall out to the skin
+            row = "IS" if side > 0 else "IP"
+            yy = self.row_y(d, row, x0, x1)
+            hw = d.hw_min(x0, x1)
+            if not yy:
+                raise ValueError(f"dock {dk['id']} at deck {d.id} x {dk['x']}: no room for an airlock there")
+            ay0, ay1 = (yy[0], hw - 0.2) if side > 0 else (-(hw - 0.2), -yy[0])
+            c = self.add_comp(d, "airlock", x0, x1, ay0, ay1, name="Boarding Airlock", side=side, extra={"_dock": dk["id"], "_row": row})
+            L.airlocks.append(c)
+            dk["comp"] = c["id"]
+            slots[row].append((x0, x1))
+            return
         hw = d.hw_min(x0, x1)
         row = "OS" if side > 0 else "OP"
         pas_edge = d.YP + PASS_HW + WALL                       # where the passage's wall ends

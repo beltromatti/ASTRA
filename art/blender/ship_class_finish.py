@@ -58,17 +58,25 @@ class Finish:
                 d = self.deck[comp["deck"]]
                 side = dk["side"]
                 zmid = d.z + 1.4
-                skin = self.hull.side_skin(dk["x"], zmid, side)
+                xu = dk.get("x_used", dk["x"])
+                skin = self.hull.side_skin(xu, zmid, side)
                 if skin < 1.0:
-                    skin = d.hw(dk["x"]) + self.wall
+                    skin = d.hw(xu) + self.wall
                 face = "starboard" if side > 0 else "port"
-                out.append({"id": dk["id"], "comp": comp["id"], "face": face, "pos": [r2(dk["x"]), r2(side * skin), r2(zmid)], "normal": [0.0, float(side), 0.0],
+                out.append({"id": dk["id"], "comp": comp["id"], "face": face, "pos": [r2(xu), r2(side * skin), r2(zmid)], "normal": [0.0, float(side), 0.0],
                             "deck": d.id, "kind": "hatch", "width": 2.0, "height": 2.2})
             else:
                 hall = next(h for h in self.halls if h["id"] == dk["hall"])
                 comp = self.by_id[hall["comp"]]
                 face = dk["face"]
                 hb = self.hull.bounds
+                if "pos" in dk:
+                    pos = list(dk["pos"])
+                    normal = {"bow": [1.0, 0.0, 0.0], "stern": [-1.0, 0.0, 0.0], "starboard": [0.0, 1.0, 0.0], "port": [0.0, -1.0, 0.0], "dorsal": [0.0, 0.0, 1.0],
+                              "ventral": [0.0, 0.0, -1.0]}[face]
+                    out.append({"id": dk["id"], "comp": comp["id"], "face": face, "pos": [r2(v) for v in pos], "normal": normal,
+                                "deck": comp["deck"], "kind": dk["kind"], "width": dk.get("width", 8.0), "height": dk.get("height", 5.0)})
+                    continue
                 if face in ("starboard", "port"):
                     side = 1 if face == "starboard" else -1
                     pos, normal = [dk["x"], side * self.hull.side_skin(dk["x"], dk["z"], side), dk["z"]], [0.0, float(side), 0.0]
@@ -204,6 +212,14 @@ class Finish:
             for k in [k for k in c if k.startswith("_")]:
                 del c[k]
         hb = self.hull.bounds
+        # the war's weapon mounts (data/war/classes.json) and the rooms that serve them: a room wrecked or without power takes its mount with it
+        mounts = []
+        cm, roles = cls.get("mounts", []), self.spec.get("mounts", [])
+        if len(cm) != len(roles):
+            self.notes.append(f"PROBLEM mounts: the class has {len(cm)}, the spec names {len(roles)}")
+        for i, (m, role) in enumerate(zip(cm, roles)):
+            comp = next((c for c in self.comps if c.get("role") == role), None)
+            mounts.append({"i": i, "kind": m["kind"], "dir": m["dir"], "section": m.get("section", 1), "role": role, "comp": comp["id"] if comp else None})
         plan = {
             "id": f"{self.key}_plan", "class": self.key, "version": 1, "generator": "art/blender/ship_class_plans.py", "style": self.spec.get("style", "astra"),
             "label": self.spec.get("label", self.key), "frame": FRAME, "origin_in_hull": [0.0, 0.0, 0.0],
@@ -213,7 +229,7 @@ class Finish:
             "compartments": self.comps, "doors": self.doors, "vertical": self.vertical, "transit": [],
             "graph": {"nodes": self.nodes, "edges": self.edges},
             "systems": self.make_systems(), "placements": {},
-            "docks": self.docks, "objectives": self.make_objectives(), "garrison": self.garrison, "crew": self.crew_rec, "damage_control": self.parties,
+            "docks": self.docks, "mounts": mounts, "objectives": self.make_objectives(), "garrison": self.garrison, "crew": self.crew_rec, "damage_control": self.parties,
             "notes": self.notes + list(self.spec.get("notes", [])),
         }
         return plan
