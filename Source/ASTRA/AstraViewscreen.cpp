@@ -1,4 +1,5 @@
 #include "AstraViewscreen.h"
+#include "Engine/Engine.h"
 #include "ASTRA.h"
 #include "AstraShipSubsystem.h"
 #include "AstraMindSubsystem.h"
@@ -910,7 +911,14 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 		RebuildShowList();
 	}
 	// camera and overlay together (the brackets stay on the image), 30 times a second by default
-	const int32 Hz = CVarViewscreenHz.GetValueOnGameThread();
+	// the feed's rate gives way when the frame does not hold its target (3 Oct: in a heavy fleet fight the capture was ~6 ms of the render thread's
+	// 25-31 and 1.7 ms of the GPU): full rate while the game keeps its pace, 20 and then 12 a second when frames run long (the bridge's own frame
+	// first: the screen's picture is what can wait)
+	SmoothDt = SmoothDt <= 0.f ? DeltaSeconds : FMath::Lerp(SmoothDt, DeltaSeconds, 0.05f);
+	const float TargetFps = GEngine && GEngine->GetMaxFPS() > 1.f ? GEngine->GetMaxFPS() : 60.f;
+	const float Fps = 1.f / FMath::Max(SmoothDt, 1e-3f);
+	const int32 HzMax = CVarViewscreenHz.GetValueOnGameThread();
+	const int32 Hz = HzMax <= 0 ? 0 : (Fps >= 0.92f * TargetFps ? HzMax : (Fps >= 0.8f * TargetFps ? FMath::Min(HzMax, 20) : FMath::Min(HzMax, 12)));
 	const bool bDue = Hz > 0 && Now - LastCaptureAt >= 1.0 / Hz - 0.004;
 	if (const int32 Want = CVarViewscreenWidth.GetValueOnGameThread(); Want >= 320 && Want <= 2048 && Want != FeedWidth && Feed)
 	{

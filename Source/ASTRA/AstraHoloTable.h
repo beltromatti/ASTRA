@@ -80,6 +80,10 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorLinks;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> SectorMarks;
 	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> SectorLabels;
+	// the March's fleets and battles on the sector plot (CAMPAGNA): a marker each, its course to the next system, its name, ships and arrival
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> MarchMarks;
+	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> MarchCourses;
+	UPROPERTY() TArray<TObjectPtr<UTextRenderComponent>> MarchLabels;
 
 	// the ship plot: the Aquila deck by deck (the plan), the damage where it is, the damage-control teams, the Captain
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> ShipSlabs;

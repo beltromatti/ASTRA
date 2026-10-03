@@ -1217,9 +1217,13 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		{
 			if (S.bAlive && S.bHostile && !S.bDisabled)
 			{
-				Fighting += (!S.bFleeing && !S.bHoldFire) ? 1 : 0;
+				// a group its commander told to regroup or hold is pausing in the fight, not leaving it: a strike group that arrived at 85 km and
+				// reformed before closing ended the "engagement" in a victory that never was (3 Oct)
+				const FAstraBattleGroup* SG = S.GroupId >= 0 ? FindGroup(S.GroupId) : nullptr;
+				const bool bOrderedPause = SG && (SG->Order == EAstraGroupOrder::Regroup || SG->Order == EAstraGroupOrder::Hold) && !S.bNegotiated;
+				Fighting += ((!S.bFleeing || bOrderedPause) && !S.bHoldFire) ? 1 : 0;
 				Holding += (S.bHoldFire && !S.bFleeing) ? 1 : 0;
-				Withdrawing += S.bFleeing ? 1 : 0;
+				Withdrawing += (S.bFleeing && !bOrderedPause) ? 1 : 0;
 				AgreedWithdraw += (S.bFleeing && S.bNegotiated) ? 1 : 0;
 			}
 		}
@@ -3975,9 +3979,20 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		{
 			Q.bAirborneReported = true;
 			const FAstraBattleShip* Cr = FindById(Q.CarrierId);
-			Report(bOurs ? FString::Printf(TEXT("flight: %s squadron airborne, %d %ss on %s"), *Q.Name, Q.Launched, *Q.CallSign, *Q.Mission.ToUpper())
-			             : FString::Printf(TEXT("sensors: %s has launched strike fighters — %d Harpies inbound on the Aquila"),
-			                               Cr ? *KnownLabel(*Cr) : TEXT("an enemy cruiser"), Q.Launched));
+			const bool bAquilas = Cr && Cr->bPlayer;
+			if (bOurs && !bAquilas)
+			{
+				// another ship's wing (an arriving battle group's): fleet news on the plot, not a report for the Aquila's bridge — each one opened a
+				// report turn with nothing in it for the Captain, and Tactical filled it with the range of her target (3 Oct)
+				Report(FString::Printf(TEXT("flight: the %s's %s are airborne, %d on %s"), Cr ? *Cr->Name : TEXT("fleet"),
+				                       Q.Kind == 1 ? TEXT("bombers") : (Q.Kind == 2 ? TEXT("drones") : TEXT("fighters")), Q.Launched, *Q.Mission.ToLower()), false);
+			}
+			else
+			{
+				Report(bOurs ? FString::Printf(TEXT("flight: %s squadron airborne, %d %ss on %s"), *Q.Name, Q.Launched, *Q.CallSign, *Q.Mission.ToUpper())
+				             : FString::Printf(TEXT("sensors: %s has launched strike fighters — %d Harpies inbound on the Aquila"),
+				                               Cr ? *KnownLabel(*Cr) : TEXT("an enemy cruiser"), Q.Launched));
+			}
 		}
 	}
 }

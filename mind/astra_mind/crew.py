@@ -130,11 +130,11 @@ Everyone wears a neural translator implant, "the Interpreter": people hear each 
 # good and bad acknowledgements in the Captain's language (the model imitates what it sees: show it the register)
 _ACK = {
     "it": ('"Intercetto il Cocytus, tengo sei chilometri." · "Scudi a prua, novanta per cento." · "Fuoco continuo sul Cocytus fino a '
-           'distruzione." · "Già in fuoco libero, Capitano: nessun ordine nuovo da eseguire."',
-           '"Agli ordini, Capitano." · "Ricevuto." · "Sì, signore." · "Eseguo." (alone: they say nothing)'),
+           'distruzione." · "Già in fuoco libero, Capitano: il Cocytus è a sette chilometri, i railgun lo battono."',
+           '"Agli ordini, Capitano." · "Ricevuto." · "Sì, signore." · "Eseguo." (alone: they say nothing) · "Nessun ordine nuovo da eseguire." (a console\'s words, not an officer\'s)'),
     "en": ('"Intercepting the Cocytus, holding six kilometres." · "Shields fore, ninety percent." · "Continuous fire on the Cocytus '
-           'until it falls." · "Already weapons free, Captain: nothing new to set."',
-           '"Aye aye, Captain." · "Understood." · "Yes sir." · "Executing." (alone: they say nothing)'),
+           'until it falls." · "Already weapons free, Captain: the Cocytus is at seven kilometres, the railguns are on her."',
+           '"Aye aye, Captain." · "Understood." · "Yes sir." · "Executing." (alone: they say nothing) · "Nothing new to set." (a console\'s words, not an officer\'s)'),
     "es": ('"Interceptando al Cocytus, manteniendo seis kilómetros." · "Escudos a proa, noventa por ciento." · "Fuego continuo sobre '
            'el Cocytus hasta destruirlo."', '"A sus órdenes, Capitán." · "Recibido." · "Sí, señor." (solos: no dicen nada)'),
     "fr": ('"J\'intercepte le Cocytus, je tiens six kilomètres." · "Boucliers à l\'avant, quatre-vingt-dix pour cent." · "Feu continu '

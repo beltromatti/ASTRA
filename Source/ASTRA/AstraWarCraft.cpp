@@ -461,7 +461,8 @@ void UAstraBattleSubsystem::LandCraft(FAstraBattleShip& S, FAstraBattleShip& Car
 		{
 			Q.RearmT = Q.Kind == 1 ? 120.f : 60.f;
 			Q.Mission = TEXT("recall");
-			Report(FString::Printf(TEXT("flight: %s squadron recovered, %d of %d %ss aboard, rearming (%.0f s)"), *Q.Name, Q.OnDeck, Q.Total, *Q.CallSign, Q.RearmT));
+			Report(FString::Printf(TEXT("flight: %s squadron recovered, %d of %d %ss aboard, rearming (%.0f s)"), *Q.Name, Q.OnDeck, Q.Total, *Q.CallSign, Q.RearmT),
+			       Carrier.bPlayer);                      // (another ship's wing coming home is fleet news, not a report for the Aquila's bridge)
 		}
 	}
 	else
@@ -696,7 +697,9 @@ void UAstraBattleSubsystem::ThinkCraft(FAstraBattleShip& S, float DtT)
 					{
 						// the leader of one of our fighter flights meets the enemy: told once a minute at most for the squadron (its leader on the flight net calls it)
 						Q.EngagedAt = Time;
-						Report(FString::Printf(TEXT("flight: %s squadron engaged a Harpy at %.1f km"), *Q.Name, FVector::Dist(S.Pos, Bandit->Pos) / WarKm));
+						const FAstraBattleShip* QCarrier = FindById(Q.CarrierId);
+						Report(FString::Printf(TEXT("flight: %s squadron engaged a Harpy at %.1f km"), *Q.Name, FVector::Dist(S.Pos, Bandit->Pos) / WarKm),
+						       QCarrier && QCarrier->bPlayer);   // (the Aquila's own squadrons are a report; another carrier's are fleet news)
 					}
 				}
 			}

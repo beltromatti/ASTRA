@@ -1,6 +1,7 @@
 // ASTRA — the Captain at the stick of a Falcon.
 
 #include "AstraFighterPawn.h"
+#include "Components/PointLightComponent.h"
 #include "Fonts/FontMeasure.h"
 
 #include "ASTRA.h"
@@ -349,6 +350,17 @@ AAstraFighterPawn::AAstraFighterPawn()
 	Camera->SetupAttachment(Root);
 	Camera->bUsePawnControlRotation = false;
 	Camera->SetFieldOfView(88.f);
+	// the instruments' own glow on the pilot's side of the cockpit: with the star behind her the seat and the consoles read black (ARTE-PLANCIA-2);
+	// a faint warm fill under the hood, no shadows (a moving shadow-casting light in the pilot's face costs and flickers)
+	CockpitFill = CreateDefaultSubobject<UPointLightComponent>(TEXT("CockpitFill"));
+	CockpitFill->SetupAttachment(Root);
+	CockpitFill->SetRelativeLocation(FVector(55.f, 0.f, -30.f));    // ahead of the eye and below it: the dash's screens
+	CockpitFill->SetIntensityUnits(ELightUnits::Candelas);
+	CockpitFill->SetIntensity(1.6f);
+	CockpitFill->SetAttenuationRadius(160.f);
+	CockpitFill->SetLightColor(FLinearColor(1.f, 0.82f, 0.62f));
+	CockpitFill->SetCastShadows(false);
+	CockpitFill->SetSourceRadius(12.f);
 	AutoPossessPlayer = EAutoReceiveInput::Disabled;
 }
 
