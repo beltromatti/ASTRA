@@ -31,16 +31,22 @@ def srgb_to_linear(h):
     return [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
 
 
-def import_set(name, log):
-    """T_<name>_BC / _N / _ORM from art/_cache/textures when they are not in the project yet (or are newer than the asset's source file: the stamp is the file's size)."""
+def _stamp_file():
+    return unreal.Paths.project_saved_dir() + "Ship/room_textures.json"
+
+
+def import_set(name, log, stamp):
+    """T_<name>_BC / _N / _ORM from art/_cache/textures when they are not in the project yet or the file changed since the last import (the stamp is the file's size, kept in Saved/Ship)."""
     tasks, todo = [], []
     for suffix in ("BC", "N", "ORM"):
         tname = f"T_{name}_{suffix}"
         src = f"{TEX_SRC}/{tname}.png"
         if not os.path.exists(src):
             raise RuntimeError(f"{src} missing: run tools/art/interior_textures.py / tools/art/polyhaven_models.py --all")
-        if eal.does_asset_exist(f"{TEX_DST}/{tname}"):
+        size = os.path.getsize(src)
+        if eal.does_asset_exist(f"{TEX_DST}/{tname}") and stamp.get(tname) == size:
             continue
+        stamp[tname] = size
         t = unreal.AssetImportTask()
         t.filename = src
         t.destination_path = TEX_DST
@@ -77,10 +83,14 @@ def build(log=None):
     hard = eal.load_asset(f"{MAT_DST}/M_ASTRA_Hard")
     if hard is None:
         raise RuntimeError("M_ASTRA_Hard missing: run make_materials.py first")
+    stamp_path = _stamp_file()
+    stamp = json.load(open(stamp_path, encoding="utf-8")) if os.path.exists(stamp_path) else {}
     for sname in sorted({e["set"] for e in table.values()}):
         if sname in ("Brushed", "PanelPaint", "Cotton", "Linen", "WoodDark"):             # the project's own sets (make_materials.py imports them)
             continue
-        import_set(sname, log)
+        import_set(sname, log, stamp)
+    os.makedirs(os.path.dirname(stamp_path), exist_ok=True)
+    json.dump(stamp, open(stamp_path, "w", encoding="utf-8"), indent=0)
     made = []
     for name, e in table.items():
         tint = [c * e.get("k", 1.0) for c in srgb_to_linear(e["tint"])]

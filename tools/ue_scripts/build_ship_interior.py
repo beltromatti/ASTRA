@@ -186,7 +186,9 @@ def build_materials():
         made.append(name)
     make_mi(MI_DIR, "MI_SHIP_Labels", screen, {"Intensity": 4.0, "Roughness": 0.4, "FlipU": 0.0, "FlipV": 0.0}, textures={"ScreenTexture": labels})
     made.append("MI_SHIP_Labels")
+    import importlib
     import ship_room_materials as RM                         # ARTE-INTERNI: the finishes of the rooms (textures + instances from data/ship/room_materials.json)
+    importlib.reload(RM)                                     # the editor keeps modules between runs: take the file as it is now
     made += RM.build(log)
     have = set(made)
     for slot in MANIFEST.get("new_slots", []):
