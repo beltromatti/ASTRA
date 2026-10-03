@@ -44,6 +44,7 @@ ARRIVAL_MAX_KM = 120.0          # ... and no farther than the game's beat takes 
 WORLD_KM = 70.0                 # a fleet that was over the world when she arrived is in the system's far side: this far from her
 GRACE_S = 1800.0                # a fleet the game's script was to bring that has not come this long after its time is the map's
 RETRIES = 3
+ASK_RETRY_S = 3.0               # a game that did not answer the opening question is asked again after this long (twice at most)
 LANE_TIMEOUT_S = 90.0           # a Gate lane lasts well under this: past it, with no lane in the game's Gate status, the Aquila has arrived
 BULLETIN_GAP_S = 25.0           # the fleet net does not report more often than this
 HOLO_EVERY_S = 10.0
@@ -111,7 +112,7 @@ class MarchGlue:
     def __init__(self, march: March, minds: StrategicMinds | None, *, command: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]],
                  register_groups: Callable[[list[str], list[dict[str, Any]], str, dict[str, Any], str], None] | None = None,
                  announce: Callable[[str], Awaitable[None]] | None = None, note: Callable[[str], None] | None = None,
-                 send_sector: Callable[[], Awaitable[None]] | None = None, clock: Callable[[], float] = time.monotonic) -> None:
+                 send_sector: Callable[[], Awaitable[None]] | None = None, clock: Callable[[], float] = time.monotonic, opening: bool = True) -> None:
         self.m = march
         self.minds = minds
         self.command = command                          # (name, args) -> the game's result: `director_beat`
@@ -127,6 +128,9 @@ class MarchGlue:
         self.sending: set[str] = set()
         self.reserve: dict[str, float] = {}             # fleet -> when it may try the Gate again (the game's sky was full)
         self.opening: set[str] = set()                  # the fleets the game's opening brings in itself: the map leaves them to it until they show (or the grace is out)
+        self.march_opening = opening                    # a new campaign asks the game to switch its opening script off (the March plays the opening's fleets: ASTRA_OPENING)
+        self.opening_mode = "script"                    # script: the game's own opening | march: the game has switched it off and the war's fleets play it
+        self._ask = False                               # the question is still to be put to the game
         self.due: dict[str, float] = {}                 # contact id -> when the ship should have shown in the game's views by (a ship that never came is dropped)
         self._acc = 0.0                                 # war time that has passed and the world has not yet been advanced by (a fraction of a step)
         self.ff = False                                 # the war is being run without the Aquila: the game's state does not move it
@@ -153,6 +157,8 @@ class MarchGlue:
         m = self.m
         m.live_scripts = True                           # (the game brings its own fleets in: the clock of the bench does not)
         m.save_path = m.default_path()
+        self._ask = bool(new and self.march_opening)
+        self.opening_mode = "asking" if self._ask else "script"
         if new:
             m.reset(random.randrange(1, 10 ** 6))
             if self.minds is not None:
@@ -202,6 +208,9 @@ class MarchGlue:
         m = self.m
         try:
             self._place(state)
+            if self._ask:
+                self._ask = False
+                asyncio.ensure_future(self._ask_opening())
             self._adopt(state)
             self._acc += dt
             if self._acc >= STEP_S - 1e-6:                      # (the world advances in its own steps, whatever the rate the game's states come at: the battle model's luck is a draw a step)
@@ -302,6 +311,30 @@ class MarchGlue:
             m.real_adopt(f, rs)
             self.sending.add(f.id)
             asyncio.ensure_future(self._send(f, delay, at_gate, bool(coming)))
+
+    async def _ask_opening(self) -> None:
+        """A new campaign: the game is asked to switch its opening script off (the strike group at 25 km after 170 s, the vanguard, the relief), so that the opening's fleets are the war's
+        and come the way the war's fleets come: the Gate's warning, from far out, closing for minutes. A game that does not know the command, or refuses it (the script has begun), keeps
+        its script and nothing changes; no answer is asked again (twice, a few seconds apart)."""
+        res: dict[str, Any] = {}
+        for attempt in range(3):
+            try:
+                res = await self.command("opening", {"script": False})
+            except Exception as e:  # noqa: BLE001
+                res = {"ok": False, "detail": f"no answer ({type(e).__name__})", "lost": True}
+            if res.get("ok") or not res.get("lost"):
+                break
+            await asyncio.sleep(ASK_RETRY_S)
+        if not res.get("ok"):
+            self.opening_mode = "script"
+            log.info("the game keeps its opening script: %s", str(res.get("detail", ""))[:120])
+            return
+        if not self.active:
+            return
+        taken = self.m.march_opening()
+        self.opening.difference_update(taken)
+        self.opening_mode = "march"
+        log.info("the game's opening script is off: the March plays %s", ", ".join(taken) or "no fleet")
 
     def _passing(self, f: Fleet) -> bool:
         """An ASTRA fleet that only passes through her system on its way (its route goes on) is not in the game: it is among friends and nothing is to be played. The
@@ -700,8 +733,8 @@ class MarchGlue:
         return await self.minds.rourke_reply(words, lang)
 
     def summary(self) -> dict[str, Any]:
-        out = {"glue": dict(self.stats), "march": {"t": round(self.m.t), "will": {s: round(self.m.will[s], 2) for s in SIDES}, "score": self.m.score,
-                                                   "over": self.m.over.get("why", "")}}
+        out = {"glue": dict(self.stats), "opening": self.opening_mode,
+               "march": {"t": round(self.m.t), "will": {s: round(self.m.will[s], 2) for s in SIDES}, "score": self.m.score, "over": self.m.over.get("why", "")}}
         if self.minds is not None:
             out["strategy"] = self.minds.summary()
         return out

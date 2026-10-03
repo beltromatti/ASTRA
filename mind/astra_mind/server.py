@@ -231,7 +231,8 @@ class Mind:
         self.director.war_minds = self.war
         self.director.negotiate = self._negotiate
         # the war of the March (march.py, strategy.py, march_glue.py): the fleets of both sides on the map of the Gates and the high commands that order them, joined to the real
-        # simulation where the Aquila is; built when a campaign begins (ASTRA_MARCH=0: the director plays the war as before; ASTRA_STRATEGY_MINDS=0: the fleets go on on their reflexes)
+        # simulation where the Aquila is; built when a campaign begins (ASTRA_MARCH=0: the director plays the war as before; ASTRA_STRATEGY_MINDS=0: the fleets go on on their reflexes;
+        # ASTRA_OPENING=script: the game's own opening script is kept, otherwise a new campaign asks the game to switch it off and the March plays the opening)
         self.march: March | None = None
         self.strategy: StrategicMinds | None = None
         self.march_glue: MarchGlue | None = None
@@ -297,7 +298,7 @@ class Mind:
             strategy = StrategicMinds(self.llm, march, self._rourke_say, lang=lambda: self.lang, intel=self.style.mandate_line, note=self.director.note)
             strategy.disabled = os.environ.get("ASTRA_STRATEGY_MINDS", "1") == "0"
             glue = MarchGlue(march, strategy, command=self._director_command, register_groups=self.director._register_groups, announce=self._march_news,
-                             note=self.director.note, send_sector=self._send_sector)
+                             note=self.director.note, send_sector=self._send_sector, opening=os.environ.get("ASTRA_OPENING", "march") != "script")
             self.war.strategic = lambda side: strategy.field_brief(side, march.real_system)
             glue.on_war_over = lambda text: asyncio.create_task(self.director._end_arc(text, self.lang, self._battle_state()))
             self.director.march = glue

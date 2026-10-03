@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from . import march_battle as mb
-from .march_data import (ASTRA_PEOPLE, ASTRA_SHIPS, CAPITALS, CARRIERS, CLASSES, HQ, MANDATE_PEOPLE, MANDATE_SHIPS, ORBAT, PACE, SYSTEMS, YARD_DEFAULT)
+from .march_data import (ASTRA_PEOPLE, ASTRA_SHIPS, CAPITALS, CARRIERS, CLASSES, HQ, MANDATE_PEOPLE, MANDATE_SHIPS, MARCH_OPENING, ORBAT, PACE, SYSTEMS, YARD_DEFAULT)
 from .war import WarMap
 
 log = logging.getLogger("astra.march")
@@ -320,6 +320,7 @@ class March:
         self.real_tally: dict[str, dict[str, Any]] = {s: {"lost": 0, "names": [], "points": 0.0} for s in SIDES}   # what the real fight has cost each side since it began
         self.real_t0: float = 0.0
         self.aquila_gate_km: float | None = None                                     # how far the Janus Gate is from the Aquila in the real simulation (the glue reads it from the game): the minutes a force needs
+        self.opening_plan: list[dict[str, Any]] = []                                 # the scenario's first moves not yet made (the March-driven opening: `march_opening`)
         self.captain_skill: float = 1.0                                              # the bench's stand-in for how well the Captain fights the fleet he commands
         self.aquila_fleet: str = ""                                                  # (bench) the fleet the Aquila is in: the real game has her in the real simulation
         self.free_classes = False                                                    # (bench) a world where both sides build and field the same classes
@@ -586,6 +587,7 @@ class March:
     def tick(self, dt: float) -> None:
         self.t += dt
         self._script(dt)
+        self._opening(dt)
         self._orders()
         self._movement()
         self._contacts()
@@ -611,6 +613,41 @@ class March:
         for f in list(self.fleets.values()):
             if f.status == "scripted" and f.scripted_at and self.t >= f.scripted_at:
                 self.release_script(f.id)
+
+    def march_opening(self) -> list[str]:
+        """The game has switched its opening script off: the strike group, the vanguard and the relief it was to bring are not coming by it. They are the war's own fleets from now,
+        standing where MARCH_OPENING puts them (the order of battle's contact ids for them are void: the game builds none of these ships), and the Interdiction Fleet's first move is the
+        scenario's own plan, made by the clock (`_opening`). Returns the fleets taken over."""
+        taken: list[str] = []
+        for fid, spec in MARCH_OPENING["fleets"].items():
+            f = self.fleets.get(fid)
+            if f is None or f.status != "scripted":
+                continue
+            for s in f.ships:
+                s.cid = ""
+            f.scripted, f.scripted_at, f.status = "", 0.0, "ready"
+            f.where = f.origin = str(spec.get("where", f.where))
+            f.zone, f.arrived_t, f.hidden_until = "gate", self.t - 600.0, 0.0          # (long since formed up, at the Gate)
+            f.dark = bool(spec.get("dark", f.dark))
+            o = spec.get("order")
+            if o:
+                f.order = Order(o.get("kind", "hold"), o.get("target", f.where), o.get("stance", "steady"), False, str(o.get("by", "default")), o.get("reason", ""), self.t, None, "gate")
+            taken.append(fid)
+        self.opening_plan = [dict(p) for p in MARCH_OPENING["plan"] if p["fleet"] in taken]
+        self.dirty = True
+        return taken
+
+    def _opening(self, dt: float) -> None:
+        """The scenario's first moves (`march_opening`): each is an order of its side's own opening plan, given by the clock at its time; whatever has become of the fleet since,
+        an order that cannot be given is dropped (the war has moved on)."""
+        if not self.opening_plan:
+            return
+        due = [p for p in self.opening_plan if self.t >= float(p.get("at_s", 0.0))]
+        for p in due:
+            self.opening_plan.remove(p)
+            ok, detail = self.order(p["side"], p["fleet"], p["kind"], p.get("target", ""), stance=p.get("stance", ""), dark=bool(p.get("dark", False)), reason=p.get("reason", ""),
+                                    by="story", instant=True)
+            log.info("the opening's move %s %s %s: %s", p["fleet"], p["kind"], p.get("target", ""), detail if ok else "dropped (" + detail + ")")
 
     def release_script(self, fid: str, system: str = "") -> bool:
         """A fleet the game's script brings in has come: from now on it is in the war's rules (a fleet in the Aquila's system is the real simulation's; the
@@ -2043,7 +2080,7 @@ class March:
         return {"t": round(self.t, 1), "seed": self.seed, "owners": {k: self.owner(k) for k in self.sys}, "fleets": [f.to_dict() for f in self.fleets.values()], "sys": {k: v.to_dict() for k, v in self.sys.items()},
                 "events": [e.to_dict() for e in self.events[-120:]], "event_n": self.event_n, "will": self.will, "plans": self.plans, "plan_t": self.plan_t, "score": self.score,
                 "over": self.over, "guilds_open": self.guilds_open, "home_orders": self.home_orders, "tender_free_at": self.tender_free_at, "aquila_task": self.aquila_task, "truce": self.truce, "proposals": self.proposals, "aquila": self.aquila, "aquila_seen": list(self.aquila_seen), "next_id": self.next_id,
-                "used_names": sorted(self.used_names), "tracks": {s: {k: v.to_dict() for k, v in self.tracks[s].items()} for s in SIDES},
+                "used_names": sorted(self.used_names), "opening_plan": self.opening_plan, "tracks": {s: {k: v.to_dict() for k, v in self.tracks[s].items()} for s in SIDES},
                 "log": {s: [e.to_dict() for e in self.log[s]] for s in SIDES}, "rcv": self.rcv, "inbox": {s: [[round(w, 1), e.n] for w, e in self.inbox[s]] for s in SIDES}}
 
     def save(self, path: str | None = None) -> None:
@@ -2103,6 +2140,7 @@ class March:
         self.aquila_seen = tuple(d.get("aquila_seen") or ("", 0.0))                       # type: ignore[assignment]
         self.next_id = d.get("next_id") or self.next_id
         self.used_names = set(d.get("used_names") or [])
+        self.opening_plan = [dict(p) for p in d.get("opening_plan") or []]
         self.tracks = {s: {k: Track.from_dict(v) for k, v in (d.get("tracks", {}).get(s) or {}).items()} for s in SIDES}
         by_n = {e.n: e for e in self.events}
         self.log = {s: deque([Event.from_dict(e) for e in d.get("log", {}).get(s, [])], maxlen=60) for s in SIDES}

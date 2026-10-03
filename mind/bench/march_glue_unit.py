@@ -48,8 +48,15 @@ class FakeWorld:
         self.gate = (87.0, 52.3)
         self.lane = ""
         self.tuned = ""
+        self.asked: list[dict[str, Any]] = []              # the opening questions the game was asked
+        self.script_off: bool | None = False               # what the game answers to "switch the opening script off": True it does, False it does not know the command, None no answer
 
     async def command(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        if name == "opening":
+            self.asked.append(dict(args))
+            if self.script_off is None:
+                raise asyncio.TimeoutError()
+            return {"ok": True, "detail": "the opening's script is off"} if self.script_off else {"ok": False, "detail": "unknown command opening"}
         beat = args["beat"]
         self.beats.append(beat)
         if self.refuse:
@@ -330,6 +337,122 @@ class OpeningTest(Fixture):
         self.m.t = mg.GRACE_S + 500
         await self.step(40)
         self.assertTrue(self.world.beats)                                               # (the picket the game did not bring is sent like any fleet)
+
+
+class MarchOpeningTest(Fixture):
+    """The opening played by the March (the game switches its script off): the strike group through the Gate with the Gate's warning, from far out; the vanguard and the relief the war's."""
+    opening = True
+
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        self.addCleanup(setattr, mg, "ASK_RETRY_S", mg.ASK_RETRY_S)
+        mg.ASK_RETRY_S = 0.0
+        self.glue.reset_real(keep_opening=True)
+        self.glue.opening_mode, self.glue._ask = "asking", True
+        self.world.gate = (200.0, 110.0)                       # (the opening's Gate: 110 km out)
+
+    async def picket(self) -> None:
+        """The game builds the picket and the lethe whenever it starts (script or not)."""
+        self.world.add("T-01", "astra", "praetorian", "ASN Praetorian")
+        self.world.add("T-02", "astra", "vigilant", "ASN Vigilant")
+        self.world.add("T-11", "mandate", "lethe", "Lethe")
+
+    async def test_a_game_that_switches_its_script_off_gives_the_war_the_openings_fleets(self) -> None:
+        self.world.script_off = True
+        await self.picket()
+        await self.step(3)
+        self.assertEqual(self.world.asked, [{"script": False}])
+        self.assertEqual(self.glue.opening_mode, "march")
+        for fid, where in (("F-M1", "Thule"), ("F-M3", "Thule"), ("F-A3", "Meridian")):
+            f = self.m.fleets[fid]
+            self.assertEqual((f.status, f.where, f.scripted), ("ready", where, ""))
+            self.assertFalse(any(s.cid for s in f.ships), fid)                       # (the game builds none of these ships)
+            self.assertNotIn(fid, self.glue.opening)
+        self.assertEqual(self.m.fleets["F-M3"].order.kind, "hold")
+        self.assertEqual(self.m.fleets["F-A3"].order.kind, "hold")
+        self.assertEqual(len(self.m.opening_plan), 1)
+        self.assertEqual(self.fleet("Aurelia Picket").status, "real")                  # (the picket and the lethe are still the game's own)
+        self.assertEqual(self.fleet("Lethe Hale").status, "real")
+        await self.step(2)
+        self.assertEqual(len(self.world.asked), 1)                                     # (it is asked once)
+        self.assertEqual(self.world.beats, [])
+
+    async def test_a_game_that_keeps_its_script_keeps_it(self) -> None:
+        self.world.script_off = False
+        await self.picket()
+        await self.step(3)
+        self.assertEqual(len(self.world.asked), 1)
+        self.assertEqual(self.glue.opening_mode, "script")
+        self.assertEqual(self.m.fleets["F-M1"].status, "scripted")                     # (the game's script brings it, as before)
+        self.assertEqual(self.m.fleets["F-A3"].where, "Aurelia")
+        self.assertEqual(self.m.opening_plan, [])
+        self.assertIn("F-M1", self.glue.opening)
+
+    async def test_a_game_that_does_not_answer_is_asked_again_and_then_leaves_its_script_be(self) -> None:
+        self.world.script_off = None
+        await self.step(3)
+        await asyncio.sleep(0)
+        for _ in range(8):
+            await asyncio.sleep(0)
+        self.assertEqual(len(self.world.asked), 3)
+        self.assertEqual(self.glue.opening_mode, "script")
+        self.assertEqual(self.m.fleets["F-M1"].status, "scripted")
+
+    async def test_a_new_campaign_asks_and_a_saved_war_or_the_scripts_own_switch_does_not(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            self.m.war.save_path = os.path.join(d, "war.json")
+            self.glue.march_opening = False                                             # (ASTRA_OPENING=script)
+            self.glue.start(True)
+            await self.step(3)
+            self.assertEqual((self.world.asked, self.glue.opening_mode), ([], "script"))
+            self.glue.march_opening = True
+            self.glue.start(False)                                                      # (a saved war: the game has resumed it, its opening is over)
+            await self.step(3)
+            self.assertEqual((self.world.asked, self.glue.opening_mode), ([], "script"))
+            self.glue.start(True)                                                       # (a new campaign asks, once, and the answer is the mode)
+            self.assertEqual(self.glue.opening_mode, "asking")
+            await self.step(3)
+            self.assertEqual(len(self.world.asked), 1)
+
+    async def test_the_strike_group_comes_through_the_gate_with_a_warning_and_from_far_out(self) -> None:
+        self.world.script_off = True
+        await self.picket()
+        sent_at = 0.0
+        while self.m.t < 700 and not any(b["type"] == "raid" for b in self.world.beats):
+            await self.step(1)
+        beat = next(b for b in self.world.beats if b["type"] == "raid")
+        sent_at = self.m.t
+        # the scenario's first move was made by the clock, as the Mandate's own plan
+        f1 = self.m.fleets["F-M1"]
+        self.assertEqual(f1.order.by, "story")
+        self.assertEqual((f1.order.kind, f1.order.target, f1.order.dark), ("assault", "Aurelia", False))
+        # the Gate's warning came to ASTRA well before the ships did, with the minutes they need to reach her
+        wake = next(e for e in self.m.events if e.kind == "wake" and e.system == "Aurelia")
+        arrival = sent_at + beat["delay_s"]
+        self.assertGreaterEqual(wake.t, 150.0)
+        self.assertGreater(arrival - wake.t, 60.0)
+        self.assertIn("they need about 4 min 04 s after it to reach her", wake.text["astra"])
+        self.assertTrue(200.0 < arrival < 330.0, arrival)                                 # (the first strike comes in the first minutes, but not at the first)
+        # the ships are the fleet's own, led by the people of the game's own opening
+        names = sorted(sp["name"] for g in beat["groups"] for sp in g["ships"])
+        self.assertEqual(names, ["Acheron", "Cocytus", "Phlegethon", "Styx"])
+        self.assertEqual(beat["groups"][0]["commander"]["name"], "Archon Varek Solm")
+        self.assertFalse(beat["dark"])
+        self.assertGreaterEqual(beat["range_km"], mg.ARRIVAL_MIN_KM)                      # (from far out: never at knife range)
+        self.assertEqual(beat["bearing_deg"], 200.0)
+        # the vanguard waits at Thule and the relief at Meridian: the war's, nobody has told them anything
+        self.assertEqual(self.m.fleets["F-M3"].where, "Thule")
+        self.assertEqual(self.m.fleets["F-A3"].where, "Meridian")
+
+    async def test_the_opening_goes_on_in_a_saved_war(self) -> None:
+        self.world.script_off = True
+        await self.step(3)
+        self.assertEqual(len(self.m.opening_plan), 1)
+        d = self.m.to_dict()
+        m2 = world(2)
+        m2._from_dict(d)
+        self.assertEqual(m2.opening_plan, self.m.opening_plan)
+        self.assertEqual(m2.fleets["F-M1"].where, "Thule")
 
 
 class BackTest(Fixture):

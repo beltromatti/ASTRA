@@ -199,7 +199,7 @@ ORBAT: list[dict[str, Any]] = [
          ships=[("acheron", "Nyx"), ("styx", "Asphodel"), ("styx", "Tartarus"), ("styx", "Hypnos"), ("styx", "Thanatos"), ("styx", "Erinys"), ("lethe", "Moros"),
                 ("lethe", "Keres")], wings=[(0, "fighter", 8), (0, "bomber", 4)],
          contacts=["T-31", "T-32", "T-33", "T-34", "T-35", "T-36", "T-37", "T-38"], commander=dict(key="thale"),
-         groups=[["Interdiction Vanguard", "column", [0, 1]], ["Styx Line Dorn", "line", [2, 3, 4, 5]], ["Raider Wedge Morrow", "wedge", [6, 7]]],
+         groups=[["Interdiction Vanguard", "column", [0, 1], "thale"], ["Styx Line Dorn", "line", [2, 3, 4, 5], "dorn"], ["Raider Wedge Morrow", "wedge", [6, 7], "morrow"]],
          order=dict(kind="assault", target="Aurelia", stance="bold", reason="follow the strike group through the Gate and finish what it begins")),
     dict(id="F-M4", side="mandate", name="Interdiction Fleet Main Body", where="Erebus", supply=1.0, morale=0.85,
          ships=[("acheron", "Erebos"), ("acheron", "Avernus"), ("acheron", "Minos")] + [("styx", n) for n in
@@ -219,6 +219,24 @@ ORBAT: list[dict[str, Any]] = [
          wings=[], order=dict(kind="defend", target="Niflheim", stance="steady", reason="guard the breaking yards", position="world")),
 ]
 PEOPLE_FOR_FLEET = {"F-M4": "Warden Zefir Dacosta"}
+
+# The opening as the March plays it. The game's own script brings three fleets by itself (the strike group at 25 km after 170 s, the vanguard, the relief); when the game switches
+# that script off (the `opening` command with `script: false`, ASTRA_OPENING in docs/GUERRA.md §10) the three are the war's own fleets from the start: they stand where a war would
+# have them, and the Interdiction Fleet opens its campaign the way the script did, but through the Gate: the strike group is sent at the set time (the scenario's first move, made by
+# the clock like the script's was), so the Gate's warning is seen, the group comes from the Gate's mouth far out and closes for minutes, and the Aquila has the time a war gives her.
+# The vanguard waits at Thule for the Archon's word and the relief at Meridian for the Admiral's: what they do next is the war's (the minds', and the Captain's words to Rourke).
+MARCH_OPENING: dict[str, Any] = dict(
+    fleets={
+        "F-M1": dict(where="Thule", dark=False,
+                     order=dict(kind="hold", target="Thule", stance="bold", by="story", reason="the strike group waits at Thule for the hour the Archon has set")),
+        "F-M3": dict(where="Thule", dark=False,
+                     order=dict(kind="hold", target="Thule", stance="steady", reason="the vanguard waits at Thule for the strike group's work and the Archon's word")),
+        "F-A3": dict(where="Meridian",
+                     order=dict(kind="hold", target="Meridian", stance="steady", reason="Battle Group Constance musters at Meridian, one Gate from the Aurelia picket: it comes on the Admiral's word")),
+    },
+    plan=[dict(at_s=150.0, side="mandate", fleet="F-M1", kind="assault", target="Aurelia", stance="bold", dark=False,
+               reason="seize Janus Gate Aurelia and Keeper Station; test the picket")],
+)
 
 # ------------------------------------------------------------------------------------------------ the war's pace (the bench tunes these)
 PACE: dict[str, float] = dict(

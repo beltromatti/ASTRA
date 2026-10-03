@@ -102,6 +102,17 @@ class CadenceTest(Fixture):
         self.assertEqual(len(self.looks("astra")), 1)
         self.assertEqual(len(self.looks("mandate")), 0)                            # (it did not hear of it)
 
+    async def test_a_gate_cycling_towards_the_aquilas_system_brings_the_first_look_forward(self) -> None:
+        self.m.aquila_arrived("Aurelia")
+        await self.tick(100)
+        self.m.say("wake", "Cassia", "The Gate at Cassia is cycling: a force is coming through.", ("astra",), 2)
+        await self.tick(30)
+        self.assertEqual(len(self.looks("astra")), 0)                              # (a force at another system waits for the first look's hour)
+        self.m.say("wake", "Aurelia", "The Gate at Aurelia is cycling: a force is coming through.", ("astra",), 2)
+        await self.tick(30)
+        self.assertEqual(len(self.looks("astra")), 1)                              # (one that comes to the Aquila's sky does not)
+        self.assertEqual(len(self.looks("mandate")), 0)
+
     async def test_the_periodic_look_comes_only_when_the_picture_moved(self) -> None:
         await self.tick(FIRST_PULSE_S + 10)
         n = len(self.looks())

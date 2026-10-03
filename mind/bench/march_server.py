@@ -179,6 +179,24 @@ class MarchServerTest(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.1)
         self.assertFalse(self.mind.march_glue.active)
 
+    async def test_a_new_campaign_asks_the_game_to_switch_its_opening_script_off(self) -> None:
+        await self.campaign("new")
+        await self.play(3)
+        asked = [m["args"] for m in self.game.commands if m["name"] == "opening"]
+        self.assertEqual(asked, [{"script": False}])                                   # (once)
+        g = self.mind.march_glue
+        self.assertEqual(g.opening_mode, "march")                                      # (the game said yes: the opening's fleets are the war's)
+        self.assertEqual(self.mind.march.fleets["F-M1"].status, "ready")
+        self.assertEqual(g.summary()["opening"], "march")
+
+    async def test_the_opening_switch_keeps_the_games_script_when_asked_to(self) -> None:
+        with mock.patch.dict(os.environ, {"ASTRA_OPENING": "script"}):
+            await self.campaign("new")
+        await self.play(3)
+        self.assertEqual([m for m in self.game.commands if m["name"] == "opening"], [])
+        self.assertEqual(self.mind.march_glue.opening_mode, "script")
+        self.assertEqual(self.mind.march.fleets["F-M1"].status, "scripted")
+
     async def test_with_the_march_off_the_war_is_played_as_before(self) -> None:
         with mock.patch.dict(os.environ, {"ASTRA_MARCH": "0"}):
             await self.campaign("new")

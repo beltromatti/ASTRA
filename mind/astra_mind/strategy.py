@@ -44,7 +44,8 @@ CURRENT_VIEW: contextvars.ContextVar[tuple[March, str] | None] = contextvars.Con
 # ------------------------------------------------------------------------------------------------ cadence and budget
 PERIODIC_S = 330.0              # a high command looks at the war on its own clock about this often (x 0.85-1.25), when what it reads has changed
 MIN_GAP_S = 75.0                # and never more often than this on news alone
-FIRST_PULSE_S = 420.0           # the first look: the opening is being fought, the strategic war begins to be decided after it
+FIRST_PULSE_S = 420.0           # the first look: the opening is being fought, the strategic war begins to be decided after it (a Gate cycling towards the Aquila's own system, or a
+                                # major event, does not wait for it)
 SETTLE_S = 6.0                  # a burst of news is read together: wait this long after the last of it ...
 MAX_SETTLE_S = 15.0             # ... never longer than this after the first
 NEWS_WEIGHT = 2                 # the news that wakes a mind (the March's weights: 0 routine, 1 minor, 2 significant, 3 major)
@@ -425,7 +426,7 @@ class StrategicMinds:
         if any(x.urgent for x in seat.inbox):
             return ["a word for you that cannot wait (below)"]
         if seat.thinks == 0:
-            if now >= FIRST_PULSE_S or any(e.weight >= 3 for e in self.m.news(side)):
+            if now >= FIRST_PULSE_S or any(e.weight >= 3 or (e.kind == "wake" and e.system == self.m.real_system) for e in self.m.news(side)):
                 return ["the first look at the war: set your plan and your orders"]
             return []
         gap = now - seat.last_think
