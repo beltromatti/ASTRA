@@ -150,10 +150,12 @@ def pipes(c: Ctx, P0, P1, r, mat: str = "Frame", seg: int = 8, kind: str = "pipe
 
 
 def truss(c: Ctx, A, B, hy: float, hz: float | None = None, bay: float = 16.0, chord: float = 0.9, web: float = 0.45, mat: str = "Frame", up=UP,
-          kind: str = "truss", diag: bool = True, ring: bool = True, skip_ends: bool = False, tone=G.TONE0) -> np.ndarray:
+          kind: str = "truss", diag: bool = True, ring: bool = True, skip_ends: bool = False, tone=G.TONE0, mat_web: str | None = None) -> np.ndarray:
     """A square truss from A to B (any direction): four chords, square rings every `bay` metres and a diagonal on every face of every bay.
-    hy, hz = half widths across (y then z of the beam's own frame). Returns the frame (rows ex, ey, ez) so that things can be hung on it."""
+    hy, hz = half widths across (y then z of the beam's own frame). The chords are `mat`, the rings and diagonals `mat_web` (default the same). Returns the frame (rows
+    ex, ey, ez) so that things can be hung on it."""
     A, B = np.asarray(A, np.float64), np.asarray(B, np.float64)
+    mat_web = mat_web or mat
     hz = hy if hz is None else hz
     d = B - A
     L = float(np.linalg.norm(d))
@@ -172,7 +174,7 @@ def truss(c: Ctx, A, B, hy: float, hz: float | None = None, bay: float = 16.0, c
         p0 = np.concatenate([st[i][None] + off for i in idx]) if len(idx) else np.zeros((0, 3))
         p1 = np.concatenate([st[i][None] + np.roll(off, -1, axis=0) for i in idx]) if len(idx) else np.zeros((0, 3))
         if len(p0):
-            beams(c, p0, p1, web, mat=mat, up=up, kind=kind, tone=tone)
+            beams(c, p0, p1, web, mat=mat_web, up=up, kind=kind, tone=tone)
     if diag:
         a, b = [], []
         for i in range(n):
@@ -182,7 +184,7 @@ def truss(c: Ctx, A, B, hy: float, hz: float | None = None, bay: float = 16.0, c
                     a.append(st[i] + off[k]); b.append(st[i + 1] + off[k2])
                 else:
                     a.append(st[i] + off[k2]); b.append(st[i + 1] + off[k])
-        beams(c, np.array(a), np.array(b), web * 0.9, mat=mat, up=up, kind=kind, tone=tone)
+        beams(c, np.array(a), np.array(b), web * 0.9, mat=mat_web, up=up, kind=kind, tone=tone)
     return fr
 
 
@@ -299,18 +301,46 @@ def nav(c: Ctx, rec: Rec | None, p, normal, colour: float, size: float = 1.4, pa
         rec.lamp(np.asarray(p, np.float64) + G.norm(normal) * 0.9 * size, col, 2.2 * size, glow, pat, phase)
 
 
-def windows_at(c: Ctx, P, N, T, win=(1.5, 0.85), ids=None, lift: float = 0.12, frame_mat: str = "Frame") -> int:
+def windows_at(c: Ctx, P, N, T, win=(1.5, 0.85), ids=None, lift: float = 0.12, frame_mat: str = "Frame", cheap: bool = False) -> int:
     """Lit/dark windows at arbitrary points: P (n,3) on a surface, N its normals, T the reading direction. Each pane carries a random id (the light material turns it
-    on or off and flickers it). Returns the number of panes."""
+    on or off and flickers it). `cheap`: plain frames, 24 triangles a window instead of 56 (the long rows of a ring or a spine). Returns the number of panes."""
     P = np.atleast_2d(P)
     n = len(P)
     if n == 0:
         return 0
     ids = c.rng.random(n) if ids is None else ids
     Fr = G.frames_z(N, T)
-    c.g.boxes(P + np.asarray(N) * 0.05, (win[0] / 2 + 0.16, win[1] / 2 + 0.16, 0.10), c.m(frame_mat), frames=Fr, chamfer=0.03, wear=0.7, kind="window")
+    c.g.boxes(P + np.asarray(N) * 0.05, (win[0] / 2 + 0.16, win[1] / 2 + 0.16, 0.10), c.m(frame_mat), frames=Fr, chamfer=0.0 if cheap else 0.03, wear=0.7, kind="window")
     c.g.boxes(P + np.asarray(N) * (0.05 + lift), (win[0] / 2, win[1] / 2, 0.05), c.m("Lights"), frames=Fr, chamfer=0.0, kind="window", aux=np.asarray(ids))
     return n
+
+
+def zone_windows(c: Ctx, zone, w: float, a0: float, a1: float, pitch: float = 2.6, win=(1.4, 0.75), lift: float = 0.7, runs=(4, 14), gaps=(1.0, 3.0), rows: int = 1,
+                 row_m: float = 2.6, cheap: bool = True) -> int:
+    """Rows of windows along a zone at cross position w, from a0 to a1: panes every `pitch` metres in runs of `runs` panes separated by dark stretches of `gaps` panes,
+    `rows` rows `row_m` apart. Like ship3_kit2.window_band with plain frames (a lit pane and its frame: 24 triangles). `lift`: the height of the surface they stand on."""
+    rng = c.rng
+    dw = row_m / zone.sw(0.5 * (a0 + a1))
+    total = 0
+    for r in range(rows):
+        wr = w + r * dw
+        if wr > 0.97:
+            break
+        xs, a = [], a0 + float(rng.uniform(0.0, 2.0 * pitch))
+        while a < a1 - win[0]:
+            run = int(rng.integers(runs[0], runs[1] + 1))
+            for k in range(run):
+                x = a + k * pitch
+                if x > a1 - win[0]:
+                    break
+                xs.append(x)
+            a += (run + float(rng.uniform(*gaps))) * pitch
+        if not xs:
+            continue
+        xs = np.array(xs)
+        P, N, T = zone.frame(xs, np.full(len(xs), wr))
+        total += windows_at(c, P + N * lift, N, T, win=win, cheap=cheap)
+    return total
 
 
 def window_rows(c: Ctx, A, B, normal, rows: int = 1, pitch: float = 2.4, win=(1.5, 0.85), up=UP, gap_p: float = 0.12, row_pitch: float = 2.6, offset=0.0, lift: float = 0.12,

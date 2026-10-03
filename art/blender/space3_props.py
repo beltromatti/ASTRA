@@ -118,7 +118,7 @@ def rock_geometry(rng: np.random.Generator, radius: float, level: int = 3, kind:
 
 def add_rock(c: Ctx, rock: dict, origin=(0.0, 0.0, 0.0), R=None, scale=1.0, mats=("Rock", "Ore", "Ice"), kind: str = "rock") -> None:
     V = np.asarray(origin) + (rock["V"] * scale) @ (np.eye(3) if R is None else R)
-    names = [c.m(n) for n in mats]
+    names = [n if n.startswith("MI_") else c.m(n) for n in mats]                  # absolute slot names (MI_SPACE_Rock in a Guild mesh) or the mesh's own prefix
     mi = np.array([c.g.mi(n) for n in names], np.int16)
     c.g.add(V, rock["F"], mi[rock["mat"]], rock["a1"], rock["a2"], kind=kind)
 

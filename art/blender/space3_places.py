@@ -23,7 +23,7 @@ from ship3_astra import astra_sec, astra_style, flat_field, mark
 from ship3_kit import Ctx, Xf
 from space3_common import (AMBER, AMBERC, BEACON, CHASER, FLASH2, FLICKER, GREEN, ORANGE, RED, REDPULSE, STEADY, STROBE3, TEAL, UP, WARM, WHITE, Rec, beams, collar,
                            floodlight, frames_x, girder, nav, new_like, pipes, rot_x_deg, rot_y_deg, rot_z_deg, sphere_tank, stamp, tank_cyl, text_on, truss,
-                           window_rows, windows_at)
+                           window_rows, windows_at, zone_windows)
 
 I3 = np.eye(3)
 PRE = "MI_HULL_A_"
@@ -41,6 +41,15 @@ def hull_stations(x0: float, x1: float, n: int, hw: float, hh: float, wp, hp, zo
     return out
 
 
+def big_style(scale: float, p_panels: float = 0.16) -> H.HullStyle:
+    """The Navy's plating for a structure of kilometres: big plates, big panels, few details (what costs triangles is the count, and nobody counts plates at 70 km)."""
+    st = astra_style(scale)
+    return replace(st, scheme=replace(st.scheme, mats=(("Plate", 0.98), ("Frame", 0.02)), tone_sigma=0.08),
+                   panels=replace(st.panels, min_size=(2.9 * scale, 2.1 * scale), max_size=(10.8 * scale, 5.8 * scale), seam=(0.06 * scale, 0.12 * scale), margin=0.2 * scale,
+                                  lifts=(0.025 * scale, 0.05 * scale, 0.08 * scale), chamfer=0.025 * scale, rim=0.06 * scale),
+                   p_panels=p_panels, detail_density=0.05, detail_scale=min(2.0, scale), stencil_height=0.3 * scale)
+
+
 def skipper(boxes):
     """A plate_zone `skip` from rectangles (a0, a1, w0, w1): a plate that touches one is left out (a pier's root, a hatch)."""
     if not boxes:
@@ -56,8 +65,9 @@ def band_plating(c: Ctx, st: H.HullStyle, z, a0: float, a1: float, voids=(), str
     out: list = []
     vs = list(voids)
     sk = skipper(skip_boxes)
+    vb = list(vs)                                                       # the voids of the band itself: the name's field takes its place
     if name:
-        vs.append((name[0] - 2.0, name[1] + 2.0))
+        vb.append((name[0] - 2.0, name[1] + 2.0))
     lower = (0.0, band[0] - 0.035)
     out += LF.plate_zone(g, z, rng, s, PRE, w_lo=lower[0], w_hi=lower[1], voids=vs, skip=sk)
     out += LF.plate_zone(g, z, rng, s, PRE, w_lo=band[1] + 0.035, w_hi=1.0, voids=vs, skip=sk)
@@ -65,12 +75,12 @@ def band_plating(c: Ctx, st: H.HullStyle, z, a0: float, a1: float, voids=(), str
                    wedge=0.0, tone_sigma=0.05)
     gold = replace(s, row_w=(0.5, 0.6), plate_len=(40, 120), mats=(("Trim", 1.0),), levels=(0.58,), level_weights=(1.0,), wedge=0.0, gap_w=(0.02, 0.03), chamfer=0.05, rim=0.1,
                    tone_sigma=0.03)
-    out += LF.plate_zone(g, z, rng, navy, PRE, w_lo=band[0], w_hi=band[1], voids=vs, skip=sk)
-    out += LF.plate_zone(g, z, rng, gold, PRE, w_lo=band[0] - 0.03, w_hi=band[0] - 0.006, voids=vs, skip=sk)
-    out += LF.plate_zone(g, z, rng, gold, PRE, w_lo=band[1] + 0.006, w_hi=band[1] + 0.03, voids=vs, skip=sk)
+    out += LF.plate_zone(g, z, rng, navy, PRE, w_lo=band[0], w_hi=band[1], voids=vb, skip=sk)
+    out += LF.plate_zone(g, z, rng, gold, PRE, w_lo=band[0] - 0.03, w_hi=band[0] - 0.006, voids=vb, skip=sk)
+    out += LF.plate_zone(g, z, rng, gold, PRE, w_lo=band[1] + 0.006, w_hi=band[1] + 0.03, voids=vb, skip=sk)
     if windows:
         pieces = [(a0, a1)]
-        if name or voids:
+        if voids:
             cut = sorted(vs)
             pieces, a = [], a0
             for v0, v1 in cut:
@@ -83,9 +93,9 @@ def band_plating(c: Ctx, st: H.HullStyle, z, a0: float, a1: float, voids=(), str
             if hi - lo < 14.0:
                 continue
             for w in strips:
-                K2.window_band(c, z, w, lo + 3.0, hi - 3.0, rows=1, lift=window_lift)
+                zone_windows(c, z, w, lo + 3.0, hi - 3.0, lift=window_lift)
             for w in upper_rows:
-                K2.window_band(c, z, w, lo + 3.0, hi - 3.0, rows=1, lift=window_lift + 0.2)
+                zone_windows(c, z, w, lo + 3.0, hi - 3.0, lift=window_lift + 0.2)
     if name:
         a_s, a_e, text, th = name
         pl = flat_field(c, z, a_s, a_e, band[0] + 0.01, band[1] - 0.01, "Livery", 0.45)
@@ -111,7 +121,7 @@ def build_keeper_ring(c: Ctx) -> dict:
     Built about its own origin with the turning axis along X: the game turns it about the station's X axis through the hub."""
     g, m, rng = c.g, c.m, c.rng
     rec = Rec()
-    st = astra_style(1.5)
+    st = big_style(2.6, 0.2)
     R, hw, hh = KEEPER_RING_R, KEEPER_RING_HW, KEEPER_RING_HH
     ns = 132
     th = np.linspace(0.0, 2.0 * math.pi, ns + 1)
@@ -128,18 +138,18 @@ def build_keeper_ring(c: Ctx) -> dict:
         z = loft.zone(k)
         z.skin(g, m("Frame"))
         if k in (2, 6):
-            plates += band_plating(c, st, z, 0.0, 2.0 * math.pi * R, strips=(0.10, 0.25), band=(0.42, 0.60), upper_rows=(0.78,), window_lift=0.7)
+            plates += band_plating(c, st, z, 0.0, 2.0 * math.pi * R, strips=(0.14,), band=(0.42, 0.60), upper_rows=(0.80,), window_lift=0.7)
         elif k == 4:
             navy = replace(st.scheme, mats=(("Livery", 0.62), ("Plate", 0.38)), plate_len=(30, 90), row_w=(5.0, 9.0))
             plates += LF.plate_zone(g, z, rng, navy, PRE)
         else:
             plates += LF.plate_zone(g, z, rng, st.scheme, PRE, tone_fn=lambda a, w: -0.06)
-    H.panelize_plates(c, plates, st, p=0.22)
-    H.scatter_details(c, plates, st, density=0.2)
-    H.rivet_plates(c, plates, p=0.15)
+    H.panelize_plates(c, plates, st)
+    H.scatter_details(c, plates, st, density=0.06)
+    H.rivet_plates(c, plates, p=0.08, size=0.1, spacing=(3.5, 6.0), min_size=(8.0, 3.0))
     # a deck of lit windows on the inner face (the ring's floor looks at the hub: seen from the inside of the ring)
     zi = loft.zone(0)
-    K2.window_band(c, zi, 0.5, 0.0, 2.0 * math.pi * R, rows=1, lift=0.6, runs=(6, 22), gap=(6.0, 18.0))
+    zone_windows(c, zi, 0.5, 0.0, 2.0 * math.pi * R, lift=0.6, runs=(6, 22), gaps=(2.0, 6.0))
     # ribs round the ring (frame stations)
     H.ribs(c, loft, [x for x in np.arange(40.0, 2.0 * math.pi * R - 30.0, 98.0)], 2.2, 1.2)
     # spokes: four tubes from a sleeve on the hub to the ring's inner face
@@ -224,11 +234,19 @@ def berth_pier(c: Ctx, rec: Rec, root, tip, hw: float, r: float, roles, max_len:
     root, tip = np.asarray(root, np.float64), np.asarray(tip, np.float64)
     out = G.norm(tip - root)
     L = float(np.linalg.norm(tip - root))
-    truss(c, root + out * 4.0, tip - out * 7.0, hw, bay=max(7.0, hw * 2.0), chord=0.35 + hw * 0.07, web=0.22 + hw * 0.035, kind="pier")
+    truss(c, root + out * 4.0, tip - out * 7.0, hw, bay=max(7.0, hw * 2.0), chord=0.4 + hw * 0.1, web=0.25 + hw * 0.05, kind="pier")
     side = G.norm(np.cross(out, UP))
     fr = G.frame_z(out, (0.0, 0.0, 1.0) if abs(out[2]) < 0.9 else (1.0, 0.0, 0.0))
     g.box(root + out * 6.0, (hw * 3.4, hw * 3.4, 12.0), m("Frame"), frame=fr, chamfer=0.3, kind="pier")             # the root block on the hull
     g.box(root + out * 6.0, (hw * 3.0, hw * 3.0, 12.5), m("Plate"), frame=fr, chamfer=0.25, kind="pier")
+    # a berth cabin on the boom: a plated block with its window deck, where the berth master sits
+    cab = root + out * (L * 0.72)
+    g.box(cab, (hw * 2.6, hw * 2.6, hw * 2.4), m("Plate"), frame=fr, chamfer=0.2, kind="pier")
+    g.box(cab + out * (hw * 1.21), (hw * 2.3, hw * 2.3, 0.3), m("Frame"), frame=fr, chamfer=0.05, kind="pier")
+    fo = frames_x(out)[0]                                                                                    # rows: along the pier, to the side, up
+    for sgn in (-1, 1):
+        g.box(cab + fo[1] * (sgn * hw * 1.31), (hw * 1.6, 0.3, hw * 0.8), m("Lights"), frame=fo, chamfer=0.0, kind="window", aux=0.06)
+    g.box(cab + fo[2] * (hw * 1.21), (hw * 1.6, hw * 1.6, 0.3), m("Lights"), frame=fo, chamfer=0.0, kind="window", aux=0.06)
     for f in np.linspace(0.30, 0.82, floods):
         base = root + out * (L * f)
         for s in (-1, 1):

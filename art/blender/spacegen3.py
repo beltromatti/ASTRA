@@ -61,7 +61,7 @@ PAL.NAVS["R"] = PAL.NAVS["G"]
 def registry() -> dict:
     """name -> spec. Each builder takes (Ctx) and returns a dict: `rec` (space3_common.Rec), `length_m`, and the preview's wishes (see render_views)."""
     reg: dict = {}
-    for modname in ("space3_places", "space3_vessels", "space3_props"):
+    for modname in ("space3_places", "space3_arsenal", "space3_industry", "space3_vessels", "space3_props"):
         try:
             mod = __import__(modname)
         except ImportError as ex:
@@ -235,7 +235,10 @@ def main() -> None:
         os.makedirs(out_dir, exist_ok=True)
     A.reset_scene()
     manifest: dict = {"version": 1, "generator": "art/blender/spacegen3.py", "frame": "Blender frame in the FBX (x forward, z up, y mirrored on import: Unreal +Y is "
-                      "Blender -Y); bounds, lamps, bells, docks, holds and parts below are in the Unreal frame, metres", "meshes": {}}
+                      "Blender -Y); bounds, lamps, bells, docks, holds and parts below are in the Unreal frame, metres", "meshes": {},
+                      # the instances only this module needs (tools/ue_scripts/import_space_v3.py makes them from M_ASTRA_HullV3): the paint of rock, ore and ice
+                      "materials": {ROCK_PRE + p: {"parent": "M_ASTRA_HullV3", "tint": PAL.PAINT["R"][p][0], "bare": PAL.PAINT["R"][p][1], "metallic": PAL.PAINT["R"][p][2],
+                                                   "rough_min": PAL.PAINT["R"][p][3], "rough_max": PAL.PAINT["R"][p][4], "tone": 0.5, "grime": 0.6} for p in ("Rock", "Ore", "Ice")}}
     if os.path.exists(os.path.join(out_dir, "manifest.json")) and args["only"]:       # a partial run keeps the others' entries
         try:
             manifest["meshes"] = json.load(open(os.path.join(out_dir, "manifest.json"), encoding="utf-8")).get("meshes", {})
