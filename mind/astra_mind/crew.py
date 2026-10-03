@@ -390,7 +390,6 @@ def system_prompt(lang: str, ship_state: dict[str, Any], recent_events: list[str
     """The crew's system prompt: what stays the same from one turn to the next. The recent events, the consoles, the room (`hearing`)
     and the telemetry go with each turn's last message (bridge_now); the two parameters stay for the callers."""
     stations_on = station_model.available_from_state(ship_state) is not None
-    story = "\n".join(f"- {c}" for c in (campaign or [])[-10:]) or "- (the patrol has just begun)"
     cap = str(ship_state.get("captain", "on the bridge"))
     blocks = [_RULE_BASE]
     if cap.startswith("asleep"):
@@ -424,6 +423,20 @@ place id, see the rules)
 Other rules
 {chr(10).join(blocks)}
 
+What the crew carries (the war so far, the sector, the mood, the Captain's standing orders, memories, how the Captain commands, the officers'
+lives, where each stands with the Captain) and what changes from moment to moment (the last events, the consoles, the room, the live
+telemetry) come with each turn, in the last message: [What the crew carries] and [The bridge now]."""
+
+
+
+def crew_context(campaign: list[str] | None = None, war: str = "", mood: str = "", bonds: str = "", standing: str = "", memories: str = "",
+                 style: str = "", home: str = "") -> str:
+    """What the crew carries from turn to turn and that changes now and then (a director's note, a mood, a memory, a standing order): the head of a
+    turn's last message, after the conversation. In the system prompt each change made the provider read the whole conversation after it again at
+    full price (the campaign's log changes with every director's note: in a battle the cache broke several times a minute, 2 Oct)."""
+    story = "\n".join(f"- {c}" for c in (campaign or [])[-10:]) or "- (the patrol has just begun)"
+    return f"""[What the crew carries]
+
 The war so far (the crew lived it; remember the Captain's choices and their consequences)
 {story}
 
@@ -456,12 +469,10 @@ may bring it to the Captain in a quiet moment, never in the middle of a fight; t
 Where each officer stands with the Captain (it shows in small ways — warmth or formality, a pause before a read-back,
 an unasked question, loyalty under fire; never announce it)
 {bonds or "- a new ship and a new captain: everyone still taking the measure of them"}
-
-What changes from moment to moment (the last events, the consoles, the room, the live telemetry) comes with each turn, in the
-last message: [The bridge now]."""
+[end of what the crew carries]"""
 
 
-def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: str = "", said_aloud: str = "", waiting: str = "") -> str:
+def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: str = "", said_aloud: str = "", waiting: str = "", context: str = "") -> str:
     """The bridge as it is this moment, for the last message of a crew turn: the recent events, the consoles, the room, the live
     telemetry. Kept out of the system prompt so that the system prompt and the conversation before this turn are the same from one call
     to the next: the provider's prompt cache then covers them (with the telemetry inside the system prompt the cache stopped at it, and a
@@ -478,7 +489,7 @@ def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: st
     front = str(ship_state.get("_march_board") or "")           # the front as Fleet knows it, beyond the Aquila's sky (the March's board, set by the server)
     said = f"Said aloud on the bridge in the last minute (what the Captain has heard, oldest first)\n{said_aloud}\n" if said_aloud else ""
     said += f"Waiting to be said (queued behind whoever is speaking, in the order it will be said)\n{waiting}\n" if waiting else ""
-    return (f"[The bridge now]\nRecent events\n{events}\n" + said
+    return ((context + "\n\n" if context else "") + f"[The bridge now]\nRecent events\n{events}\n" + said
             + (("Consoles now (who runs what, since when, how it is going)\n" + board + "\n") if board else "")
             + (("The fleet: our battle groups and their captains, from the fleet datalink\n" + fleet + "\n") if fleet else "")
             + (("The front, as Fleet knows it (what comms and the plot hold of the war beyond this sky; what is not here is not known)\n" + front + "\n") if front else "")
