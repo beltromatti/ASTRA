@@ -6,6 +6,7 @@ from __future__ import annotations
 import math
 import random
 
+import ship_cabin as SC
 import ship_furniture as F
 import ship_decor as DC
 import ship_plants as PL
@@ -169,7 +170,7 @@ def library(name: str = "SM_SHIP_Library"):
     # the librarian's desk by the door with a terminal
     place(b, 14.4, 3.0, 0, F.desk, 1.6, 0.7, 0.75, WOOD, True)
     place(b, 14.4, 3.0, 0, F.monitor, 0.5, 0.3, "scr_dir", False, z=0.75)
-    place(b, 13.6, 3.0, 0, F.chair, FABRIC_GREY)
+    place(b, 15.4, 4.2, -100, F.chair, FABRIC_GREY)                                                  # the librarian's chair is pushed aside: she stands at the desk (the place at 13.15, 3.0)
     place(b, 10.0, 12.2, 0, F.potted_plant, 1.3, 7)
     ceiling_panels(b, L, D, H, 3, 3, "white_warm", 2.2, 0.5, 0.5, LAMP)
     return b.build(name)
@@ -219,8 +220,10 @@ def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
     st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.05, ceil=COMPOSITE, accent="cool_dim", cove="cool_dim",
                rib_mat=TRIM, skirt=STRUCT)
     build_shell(b, spec, st, skip=("far",))
-    spans = window_wall(b, "far", L, D, H, st, 5)
+    spans = window_wall(b, "far", L, D, H, st, 5, glass=False)
     yf = D - WS - WF
+    for k, (s0, s1) in enumerate(spans):                                   # the windows: the view out, stars and, in the middle bays, the limb of Aurelia
+        place(b, (s0 + s1) / 2, D - WS / 2 + 0.03, -90, SC.sky, s1 - s0, 2.55, 5 + k, 0.3 if k in (1, 2, 3) else 0.0, z=1.85)
     # a cushioned bench under the windows in three lengths, two telescopes in the gaps
     for xc, w in ((4.1, 5.8), (12.0, 6.0), (19.9, 5.8)):
         place(b, xc, yf - 0.4, 90, F.bench, w, 0.6, 0.45, FABRIC_NAVY)
@@ -231,9 +234,12 @@ def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
     for a in (45, 135, 225, 315):
         place(b, 12.0 + 1.55 * math.cos(math.radians(a)), 7.0 + 1.55 * math.sin(math.radians(a)), 0, F.stool, 0.19, 0.46, FABRIC_NAVY)
     for (xa, xb, xt) in ((6.0, 9.2, 7.6), (18.0, 14.8, 16.4)):
+        place(b, xt, 7.0, 0, DC.rug, 4.6, 3.6, CARPET_SLATE, FABRIC_SAND)
         place(b, xa, 7.0, 0 if xa < xb else 180, F.armchair, FABRIC_GREY)
         place(b, xb, 7.0, 180 if xa < xb else 0, F.armchair, FABRIC_GREY)
-        place(b, xt, 7.0, 0, F.low_table, 0.9, 0.6, 0.4, WOOD)
+        place(b, xt, 7.0, 0, DC.coffee_table_set, 0.9, 0.6, 0.4, WALNUT, int(xt))
+        place(b, xt, 8.9, 0, DC.side_table, 0.22, 0.52, WALNUT, True, int(xt))
+        place(b, xt, 5.1, 0, DC.side_table, 0.22, 0.52, WALNUT, True, int(xt) + 1)
     place(b, 0.32, 8.0, 0, F.wall_screen, 3.2, 1.8, "scr_map", z=1.9)
     place(b, L - 0.32, 8.0, 180, F.wall_screen, 3.2, 1.8, "scr_lab", z=1.9)
     place(b, 1.2, 14.0, 0, F.potted_plant, 1.4, 9)

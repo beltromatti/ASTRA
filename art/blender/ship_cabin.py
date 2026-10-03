@@ -77,22 +77,36 @@ def partition(b: SParts, axis: str, pos: float, a0: float, a1: float, H: float, 
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------ the cabin's own pieces
-def sky(b: SParts, w: float, h: float, seed: int = 1) -> None:
+def sky(b: SParts, w: float, h: float, seed: int = 1, planet: float = 0.0, density: float = 16.0) -> None:
     """The view out of a viewport (origin: the middle of its back face, facing +x): a deep blue backdrop with a field of stars — a few big, many small, the small ones denser along a
-    diagonal band (the galaxy's arm) — each a tiny lamp; w x h is the clear size."""
+    diagonal band (the galaxy's arm) — each a tiny lamp; w x h is the clear size. `planet` > 0: the limb of a planet rises from the bottom edge to that fraction of the height at the
+    middle (a disc of deep blue under a bright rim of atmosphere, built of thin columns)."""
     rng = random.Random(seed)
     b.soft.swatch_box((0.0, -w / 2, -h / 2), (0.006, w / 2, h / 2), "navy")
-    for n in range(48):
-        if n < 30:                                            # along the band: y = 0.35 z * (w / h) plus noise
+    n = max(24, int(w * h * density))
+    for k in range(n):
+        if k < n * 0.62:                                      # along the band: y = 0.8 z (w / h) plus noise
             z = rng.uniform(-h / 2 + 0.03, h / 2 - 0.03)
             y = max(-w / 2 + 0.03, min(w / 2 - 0.03, (z / h) * w * 0.8 + rng.gauss(0.0, w * 0.1)))
         else:
             y, z = rng.uniform(-w / 2 + 0.03, w / 2 - 0.03), rng.uniform(-h / 2 + 0.03, h / 2 - 0.03)
         s = rng.choice((0.006, 0.006, 0.008, 0.008, 0.011, 0.016))
         b.emit.lamp_box((0.006, y, z), (0.0075, y + s, z + s), rng.choice(("white_cool", "ice", "white_dim", "cool_dim", "white_warm")), LAMP_DIM)
+    if planet > 0.0:
+        sag = planet * h
+        R = (w * w / 4 + sag * sag) / (2 * sag)
+        cz = -h / 2 + sag - R
+        m = max(28, int(w * 14))
+        for i in range(m):
+            y0, y1 = -w / 2 + w * i / m, -w / 2 + w * (i + 1) / m
+            ym = (y0 + y1) / 2
+            zt = cz + math.sqrt(max(R * R - ym * ym, 0.0))
+            if zt - 0.03 > -h / 2:
+                b.emit.lamp_box((0.0062, y0, -h / 2), (0.0072, y1, zt - 0.02), "command_dim", LAMP_DIM)
+                b.emit.lamp_box((0.0062, y0, zt - 0.025), (0.0074, y1, zt), "cyan_dim", LAMP_DIM)
 
 
-def viewport(b: SParts, w: float = 2.4, h: float = 0.9, cloth: str = FABRIC_SAND, seed: int = 1) -> None:
+def viewport(b: SParts, w: float = 2.4, h: float = 0.9, cloth: str = FABRIC_SAND, seed: int = 1, planet: float = 0.0) -> None:
     """A window onto space on the outer wall (origin: the middle of its back face, facing +x): a walnut frame, the star field in it, an oak sill, a brass rod with two pleated curtains."""
     t = 0.045
     b.body.box((0.0, -w / 2, -h / 2), (0.05, w / 2, -h / 2 + t), WALNUT)
@@ -100,7 +114,7 @@ def viewport(b: SParts, w: float = 2.4, h: float = 0.9, cloth: str = FABRIC_SAND
     b.body.box((0.0, -w / 2, -h / 2 + t), (0.05, -w / 2 + t, h / 2 - t), WALNUT)
     b.body.box((0.0, w / 2 - t, -h / 2 + t), (0.05, w / 2, h / 2 - t), WALNUT)
     with b.at(T(0.01, 0.0, 0.0)):
-        sky(b, w - 2 * t, h - 2 * t, seed)
+        sky(b, w - 2 * t, h - 2 * t, seed, planet)
     b.fine.box((0.0, -w / 2 - 0.05, -h / 2 - 0.045), (0.15, w / 2 + 0.05, -h / 2 - 0.012), OAK)                      # the sill
     zt, zb = h / 2 + 0.16, -h / 2 - 0.2
     b.fine.cyl((0.1, -w / 2 - 0.34, zt), (0.1, w / 2 + 0.34, zt), 0.011, BRASS, seg=8)
@@ -191,7 +205,7 @@ def fit_cabin(b: SParts, side: int, k: int, xo: float, y_lo: float, y_hi: float,
     if officer:                                                     # the bed (the sleeper's place is on it), the nightstand at its head, the viewport over both
         place(b, xo + sgn * 1.14, y_lo + 0.55, yaw, K8.officer_bed, 1.0, 2.1, blanket)
         place(b, xo + sgn * 0.22, y_lo + 1.27, yaw, nightstand, seed)
-        place(b, xo, y_lo + 1.95, yaw, viewport, 2.9, 0.9, cloth, seed, z=1.65)
+        place(b, xo, y_lo + 1.95, yaw, viewport, 2.9, 0.9, cloth, seed, 0.32 if seed % 3 else 0.0, z=1.65)
     else:
         place(b, xo + sgn * 1.09, y_lo + 0.5, yaw, G.bunk_bed, 2.05, 0.95, 2, blanket, seed)
         place(b, xo + sgn * 0.22, y_lo + 1.2, yaw, nightstand, seed)
@@ -373,7 +387,7 @@ def suites_block(b: SParts, spec: dict, seed0: int = 60) -> None:
         place(b, xc, yf - 1.14, -90, K8.officer_bed, 1.4, 2.1, blanket)
         for sx in (-1.0, 1.0):
             place(b, xc + sx, yf - 0.22, -90, nightstand, seed + int(sx))
-        place(b, xc, yf, -90, viewport, 2.6, 0.9, pick(CURTAINS, k), seed, z=1.7)
+        place(b, xc, yf, -90, viewport, 2.6, 0.9, pick(CURTAINS, k), seed, 0.3 if k % 2 == 0 else 0.0, z=1.7)
         place(b, xc, yf - 2.55, -90, F.bench, 1.3, 0.42, 0.45, pick((FABRIC_SAND, FABRIC_GREY, FABRIC_RUST), k))
         place(b, x1 - 0.285, 8.6, 180, G.wardrobe, 0.9, 0.55, 2.0)
         place(b, x0 + 0.27, 9.6, 0, G.vanity, 0.9, 0.5)

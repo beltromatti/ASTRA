@@ -236,7 +236,8 @@ def concourse(name: str = "SM_SHIP_Concourse"):
         place(b, 7.7, y, yaw, F.bench, 3.8, 0.5, 0.46, FABRIC_NAVY)
         place(b, 7.7, 0.08 if y < 1 else D - 0.08, yaw, F.wall_screen, 2.6, 1.4, "scr_map" if y < 1 else "scr_news", z=1.75)
     for (x, y) in ((1.2, 1.4), (1.2, D - 1.4), (L - 1.2, 1.4), (L - 1.2, D - 1.4), (4.5, 14.2), (13.2, 14.2), (4.5, 21.8), (13.2, 21.8)):
-        place(b, x, y, 0, F.planter, 1.2, 0.7, 0.5, 3, int(x * 3 + y), True)
+        corner = x < 2.0 or x > L - 2.0                                                                  # a money tree in the corner planters only: the planters are 14k triangles each with one
+        place(b, x, y, 0, F.planter, 1.2, 0.7, 0.5, 3 if corner else 2, int(x * 3 + y), corner)
     for i in range(4):                                                                                  # the field of ceiling light: four rows of nine panels
         for j in range(9):
             cx = 1.4 + (i + 0.5) * (L - 2.8) / 4

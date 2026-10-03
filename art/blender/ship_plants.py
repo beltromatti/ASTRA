@@ -91,7 +91,7 @@ def planter_bed(b: SParts, w: float = 2.0, d: float = 0.7, h: float = 0.45, seed
     b.fine.box((-d / 2 + 0.05, -w / 2 + 0.05, 0.0), (d / 2 - 0.05, w / 2 - 0.05, 0.07), STRUCT)
     b.fine.box((-d / 2 - 0.006, -w / 2 - 0.006, h - 0.03), (d / 2 + 0.006, w / 2 + 0.006, h - 0.012), TRIM)                      # the rim line
     MK.rbox(b.soft, (-d / 2 + 0.05, -w / 2 + 0.05, h - 0.02), (d / 2 - 0.05, w / 2 - 0.05, h + 0.055), 0.03, SOIL, 2)           # the soil, heaped a little
-    kinds = kinds or ["fern_b", "calathea_b", "fern_c", "anthurium_c", "calathea_c", "fern_b", "calathea_a", "anthurium_b"]
+    kinds = kinds or ["fern_b", "calathea_b", "fern_c", "anthurium_c", "calathea_c", "fern_b", "calathea_c", "fern_c"]
     n = max(2, int(round(w / 0.62 * density)))
     top = h
     for k in range(n):
@@ -264,7 +264,7 @@ def grow_rack(b: SParts, length: float = 4.8, tiers: int = 4, depth: float = 0.6
                 b.soft.swatch_cyl((px, 0.0, z + 0.05), (px, 0.0, z + 0.058), 0.04, "charcoal", seg=10)                                    # the net pot's collar
                 with b.at(T(px, 0.0, z + 0.055)):
                     if kind == "lettuce":
-                        lettuce_head(b, 0.13 + rng.uniform(-0.015, 0.02), 9, seed * 100 + t * 20 + k, 1 if (k + t) % 3 else 0, LETTUCE if (k + t) % 2 else LEAF_GREEN)
+                        lettuce_head(b, 0.13 + rng.uniform(-0.015, 0.02), 6, seed * 100 + t * 20 + k, 1 if (k + t) % 3 else 0, LETTUCE if (k + t) % 2 else LEAF_GREEN)
                     elif kind == "herb":
                         herb_bush(b, 0.22 + rng.uniform(0, 0.08), seed + k)
                     elif kind == "tomato" and k % 2 == 0:

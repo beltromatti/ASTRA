@@ -471,7 +471,7 @@ def garden(name: str = "SM_SHIP_Garden"):
     for (xa, xb, ya, yb, seed) in ((x0 + 0.4, 8.6, y0 + 1.2, 6.0, 1), (11.4, x1 - 0.4, y0 + 1.2, 6.0, 2), (x0 + 0.4, 11.0, 10.0, y1 - 0.5, 3), (13.0, x1 - 0.4, 10.0, y1 - 0.5, 4)):
         w_, d_ = yb - ya, xb - xa
         with b.at(frame((xa + xb) / 2, (ya + yb) / 2, 0.0, 90.0)):
-            PL.planter_bed(b, d_, w_, 0.4, seed, True, 0.7, OAK, kinds=["fern_b", "calathea_b", "fern_c", "anthurium_c", "calathea_c", "calathea_a", "fern_b", "anthurium_b"])
+            PL.planter_bed(b, d_, w_, 0.4, seed, True, 0.55, OAK, kinds=["fern_b", "calathea_b", "fern_c", "anthurium_c", "calathea_c", "fern_b", "calathea_c", "fern_c"])
     # benches along the path, lanterns on posts, a drinking fountain
     for xb in (6.5, 11.8, 17.0):
         place(b, xb, 9.45, -90, F.bench, 2.0, 0.5, 0.46, LEATHER_TAN)
