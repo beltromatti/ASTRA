@@ -25,6 +25,7 @@ AAstraCrewMember::AAstraCrewMember()
 	Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
 	RootComponent = Body;
 	Body->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	Body->SetCollisionObjectType(ECC_PhysicsBody);   // (a person's body: the Captain is held by it, the flight deck's walkers step round it — AstraWalker)
 	// the crew are many and spread over twelve decks: an animation that nobody sees is not computed
 	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 	Body->bEnableUpdateRateOptimizations = true;
