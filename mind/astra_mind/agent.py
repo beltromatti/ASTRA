@@ -18,7 +18,7 @@ from typing import Any, Awaitable, Callable, Protocol
 from . import context as context_model
 from . import models
 from . import stations as station_model
-from .crew import CREW, bridge_now, system_prompt
+from .crew import CREW, bridge_now, crew_context, system_prompt
 from .openrouter import Completion, OpenRouter, ToolCall
 from .tools import DEPT_TOOLS, LOOKUPS, SHIP_TOOL_NAMES, SPEAK, initiative_names, owner_of, tools_for
 
@@ -120,15 +120,18 @@ class BridgeAgent:
         return self.history[starts[-n]:] if len(starts) > n else list(self.history)
 
     def _system(self, lang: str, state: dict[str, Any], ctx: context_model.Context | None = None) -> dict[str, str]:
-        hearing = context_model.describe(ctx, self.titles) if ctx else ""
-        return {"role": "system", "content": system_prompt(lang, state, self.ship.recent_events(), self.campaign(), self.war(),
-                                                          self.mood(), self.bonds(), self.standing_lines(), self.memories(),
-                                                          self.style(), self.home(), hearing)}
+        # only what does not change from turn to turn: the provider caches it and the conversation after it (crew_context goes last)
+        return {"role": "system", "content": system_prompt(lang, state, [])}
+
+    def _context(self) -> str:
+        """What the crew carries (the war, the mood, standing orders, memories, the Captain's ways, the officers' lives and bonds): the head of the
+        last message (crew.crew_context)."""
+        return crew_context(self.campaign(), self.war(), self.mood(), self.bonds(), self.standing_lines(), self.memories(), self.style(), self.home())
 
     def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None) -> str:
         """The bridge this moment (crew.bridge_now), for the head of a turn's last message."""
         hearing = context_model.describe(ctx, self.titles) if ctx else ""
-        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting())
+        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting(), self._context())
 
     def _waiting(self) -> str:
         """The lines queued on the floor behind whoever is speaking: the officers see the backlog (a crisis made fifty urgent lines in four minutes, 2 Oct,
