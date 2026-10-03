@@ -62,6 +62,7 @@ WHITE_GLOSS, CERAMIC = "MI_SHIP_WhiteGloss", "MI_SHIP_CeramicWhite"   # applianc
 TERRACOTTA = "MI_SHIP_Terracotta"
 PAPER = "MI_SHIP_Paper"
 STEM, BARK = "MI_SHIP_Stem", "MI_SHIP_Bark"                     # plants
+GRASS, MOSS, EARTH = "MI_SHIP_Grass", "MI_SHIP_Moss", "MI_SHIP_Earth"   # the ground of the gardens (ambientCG Grass004, Moss002, Ground037)
 LEAF_GREEN, LETTUCE, FRUIT = "MI_SHIP_LeafGreen", "MI_SHIP_Lettuce", "MI_SHIP_Fruit"
 SWATCH = "MI_SHIP_Swatch"                # every small coloured thing (books, crockery, boxes, food, toys): ONE slot, the colour is picked from a 64-colour palette by UV cell
 # palette of T_Swatch_BC (8 x 8 cells, row-major from the top-left); tools/art/interior_textures.SWATCH_COLORS paints the same order

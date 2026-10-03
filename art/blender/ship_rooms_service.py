@@ -12,7 +12,7 @@ import ship_plants as PL
 import ship_themes as TH
 import ship_spec as SPEC
 from bridge3_lib import T, frame
-from ship_lib import (BRASS, CARPET_MOSS, CERAMIC, LEATHER_TAN, OAK, PERF, PLASTER_IVORY, PLASTER_SAGE, TERRAZZO, TILE_FLOOR, TILE_HEX, WEAVE_SAND, WHITE_GLOSS, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DGLASS, DECK, FABRIC_GREY, FABRIC_NAVY, IVORY, LAMINATE,
+from ship_lib import (BRASS, CARPET_MOSS, CERAMIC, GRASS, LEATHER_TAN, MOSS, OAK, PERF, PLASTER_IVORY, PLASTER_SAGE, TERRAZZO, TILE_FLOOR, TILE_HEX, WEAVE_SAND, WHITE_GLOSS, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DGLASS, DECK, FABRIC_GREY, FABRIC_NAVY, IVORY, LAMINATE,
                       LAMP, LAMP_DIM, LAMP_HOT, LEAF, PAINT_RED, RUBBER, SOIL, STEEL, STRUCT, TILE, TRIM, WOOD, SParts)
 from ship_rooms import Style, WF, WS, build_shell, ceiling_panels, luminaire_strips, place, wall_label
 
@@ -425,11 +425,18 @@ def garden(name: str = "SM_SHIP_Garden"):
     dx_ = spec["doors"][0]["x"] - 1.1
     b.body.box((dx_, y0, 0.0), (dx_ + 0.08, 6.2, 0.03), OAK)
     b.body.box((dx_ + 2.12, y0, 0.0), (dx_ + 2.2, 6.2, 0.03), OAK)
-    # the planting beds: four long beds with real plants, a money tree at the end of each
+    # the planting beds: four beds of moss and lawn with mounds, ferns, calatheas, hostas, tufts of grass, flowers and stones, and a money tree in each
     for (xa, xb, ya, yb, seed) in ((x0 + 0.4, 8.6, y0 + 1.2, 6.0, 1), (11.4, x1 - 0.4, y0 + 1.2, 6.0, 2), (x0 + 0.4, 11.0, 10.0, y1 - 0.5, 3), (13.0, x1 - 0.4, 10.0, y1 - 0.5, 4)):
         w_, d_ = yb - ya, xb - xa
         with b.at(frame((xa + xb) / 2, (ya + yb) / 2, 0.0, 90.0)):
-            PL.planter_bed(b, d_, w_, 0.4, seed, True, 0.55, OAK, kinds=["fern_b", "calathea_b", "fern_c", "anthurium_c", "calathea_c", "fern_b", "calathea_c", "fern_c"])
+            PL.garden_bed(b, d_, w_, 0.42, seed, tree="pachira_a" if seed == 3 else "pachira_d", cover=MOSS if seed % 2 else GRASS)
+    # vines hanging from the pergola beams
+    for xb in (4.0, 9.0, 14.0, 19.0):
+        y = y0 + 0.9
+        while y < y1 - 0.8:
+            with b.at(T(xb, y, H - 0.5)):
+                PL.hanging_vine(b, rng.uniform(0.5, 1.4), int(xb * 10 + y * 3))
+            y += rng.uniform(1.1, 2.1)
     # benches along the path, lanterns on posts, a drinking fountain
     for xb in (6.5, 11.8, 17.0):
         place(b, xb, 9.45, -90, F.bench, 2.0, 0.5, 0.46, LEATHER_TAN)
@@ -437,6 +444,7 @@ def garden(name: str = "SM_SHIP_Garden"):
     for (xp, yp) in ((3.0, 7.9), (21.0, 7.9), (12.0, 7.9)):
         place(b, xp, yp, 0, F.lamp_standard, 2.0)
     place(b, x1 - 0.4, 8.0, 180, DC.picture, 1.8, 1.0, 5, OAK, "sun", z=1.9)
-    place(b, 12.0, y1 - 0.1, -90, DC.picture, 2.4, 1.1, 8, OAK, "bands", z=1.9)
+    for k, xw in enumerate((5.0, 12.0, 19.0)):                                                                    # green walls on the far wall
+        place(b, xw, y1 - 0.1, -90, PL.living_wall, 2.8, 2.5, 0.25, 20 + k)
     wall_label(b, 8.0, WF + 0.02, 2.1, (0, 1, 0), "room_hydro", 0.9)
     return b.build(name)

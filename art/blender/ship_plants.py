@@ -5,6 +5,8 @@ Every function builds ONE piece in its own frame (origin on the floor at the mid
   potted(b, kind, pot, ...)      a plant of `kind` in a pot of the ship (a ceramic cylinder or a bowl on a steel foot)
   planter_bed(b, w, d, h, ...)   a long planter (steel box with a soil bed) planted with ferns, calatheas and anthuriums, and a tree at one end if `tall`
   floor_tree(b, ...)             a money tree in a big round tub
+  garden_bed(b, ...)             a planting bed of a garden: a timber frame round a moss or lawn ground with mounds, clumps of ferns, calatheas and anthuriums, hostas, grass, flowers, stones, a tree
+  hanging_vine, living_wall      a strand of trailing leaves for the pergola beams; a green wall of small leaves on a felt panel
   snake_plant, palm, vine, hanging_basket, lettuce_head, tray_*      procedural plants
 """
 from __future__ import annotations
@@ -15,7 +17,7 @@ import random
 import ship_assets as SA
 import ship_mk as MK
 from bridge3_lib import Rz, T
-from ship_lib import (BARK, BRASS, CERAMIC, COMPOSITE, LAMP, LAMP_HOT, LEAF_GREEN, LETTUCE, SOIL, STEEL, STEM, STRUCT, SWATCH, TERRACOTTA, TRIM, WHITE_GLOSS, SParts)
+from ship_lib import (BARK, BRASS, CERAMIC, COMPOSITE, EARTH, LAMP, LAMP_HOT, LEAF_GREEN, LETTUCE, MOSS, OAK, SOIL, STEEL, STEM, STRUCT, SWATCH, TERRACOTTA, TRIM, WHITE_GLOSS, SParts)
 
 PH = "MI_SHIP_PH_"
 # the Poly Haven models used (ship_assets.register: name, glTF id, material map, objects picked, decimation); every one is in docs/licenze.csv
@@ -24,11 +26,11 @@ SA.register("haworthia", "potted_plant_04", {"potted_plant_04": PH + "Haworthia"
 SA.register("ficus", "potted_plant_01", {"potted_plant_01_leaves": PH + "FicusLeaf", "potted_plant_01_pot": PH + "FicusWood"}, pick=["potted_plant_01_leaves", "potted_plant_01_stem"],
             decimate=0.12, two_sided=["potted_plant_01_leaves"])
 SA.register("pachira_d", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
-            pick=["pachira_aquatica_01_bark_d", "pachira_aquatica_01_leaves_d"], decimate=0.35, two_sided=["pachira_aquatica_01_leaves"])
+            pick=["pachira_aquatica_01_bark_d", "pachira_aquatica_01_leaves_d"], decimate=0.27, two_sided=["pachira_aquatica_01_leaves"])
 SA.register("pachira_c", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
             pick=["pachira_aquatica_01_bark_c", "pachira_aquatica_01_leaves_c"], decimate=0.4, two_sided=["pachira_aquatica_01_leaves"])
 SA.register("pachira_a", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
-            pick=["pachira_aquatica_01_bark_a", "pachira_aquatica_01_leaves_a"], decimate=0.4, two_sided=["pachira_aquatica_01_leaves"])
+            pick=["pachira_aquatica_01_bark_a", "pachira_aquatica_01_leaves_a"], decimate=0.3, two_sided=["pachira_aquatica_01_leaves"])
 for k in "bc":
     SA.register(f"fern_{k}", "fern_02", {"fern_02": PH + "Fern"}, pick=[f"fern_02_{k}"], decimate=0.6, two_sided=["fern_02"])
 for k in "abc":
@@ -36,6 +38,11 @@ for k in "abc":
                 two_sided=["calathea_orbifolia_01"])
 for k in "bc":
     SA.register(f"anthurium_{k}", "anthurium_botany_01", {"anthurium_botany_01": PH + "Anthurium"}, pick=[f"anthurium_botany_01_{k}"], decimate=0.45, two_sided=["anthurium_botany_01"])
+# the same scans at a fifth of the triangles for the beds of the gardens, where dozens stand in view at once (seen from two metres and more)
+for k in "bc":
+    SA.register(f"fern_lo_{k}", "fern_02", {"fern_02": PH + "Fern"}, pick=[f"fern_02_{k}"], decimate=0.2, two_sided=["fern_02"])
+SA.register("calathea_lo", "calathea_orbifolia_01", {"calathea_orbifolia_01": PH + "Calathea"}, pick=["calathea_orbifolia_01_b"], decimate=0.28, two_sided=["calathea_orbifolia_01"])
+SA.register("anthurium_lo", "anthurium_botany_01", {"anthurium_botany_01": PH + "Anthurium"}, pick=["anthurium_botany_01_c"], decimate=0.16, two_sided=["anthurium_botany_01"])
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------ pots
@@ -104,6 +111,146 @@ def planter_bed(b: SParts, w: float = 2.0, d: float = 0.7, h: float = 0.45, seed
         SA.add(b.soft, "pachira_c", (0.0, w / 2 - 0.45, h + 0.02), rng.uniform(0, 360), 0.9)
         top = h + SA.get("pachira_c")["size"][2] * 0.9
     return top
+
+
+# ------------------------------------------------------------------------------------------------------------------ the garden
+def grass_tuft(b: SParts, r: float = 0.1, h: float = 0.2, n: int = 9, seed: int = 1, mat: str = LEAF_GREEN) -> None:
+    """A tuft of grass (origin at its base): narrow blades of the atlas' grass tile arching outwards, about 50 triangles."""
+    rng = random.Random(seed)
+    for k in range(n):
+        a = k * 2.399963 + rng.uniform(-0.3, 0.3)
+        rr = rng.uniform(0.0, r * 0.35)
+        lean = rng.uniform(0.2, 0.75)
+        MK.leaf(b.soft, (rr * math.cos(a), rr * math.sin(a), 0.0), (math.cos(a) * lean, math.sin(a) * lean, 1.0), (math.cos(a + 1.57), math.sin(a + 1.57), 0.0),
+                h * rng.uniform(0.6, 1.0), 0.018, mat, tile=2, droop=0.5, fold=0.15, nu=2, nv=1, shape=0.5, seed=k)
+
+
+def leaf_clump(b: SParts, size: float = 0.22, n: int = 7, seed: int = 1, tile: int = 0, mat: str = LEAF_GREEN) -> None:
+    """A rosette of broad leaves lying out from a point (a hosta, a pothos at the foot of a tree; origin at the base): about ten triangles a leaf."""
+    rng = random.Random(seed)
+    for k in range(n):
+        a = k * 2.399963 + rng.uniform(-0.2, 0.2)
+        t = k / max(1, n - 1)
+        pitch = 0.95 - 0.6 * t
+        d = (math.cos(a) * math.cos(pitch), math.sin(a) * math.cos(pitch), math.sin(pitch))
+        MK.leaf(b.soft, (0.0, 0.0, 0.01), d, (0.0, 0.0, 1.0), size * rng.uniform(0.8, 1.15), size * 0.62, mat, tile=tile, droop=0.4, fold=0.2, cup=0.2, nu=3, nv=1, shape=0.85, seed=k + seed)
+
+
+def river_stone(b: SParts, r: float = 0.12, seed: int = 1) -> None:
+    """A smooth stone half sunk in the ground (origin at its middle on the ground): a flattened superellipsoid in a grey, sand or tan of the palette, about 60 triangles."""
+    rng = random.Random(seed)
+    faces = MK.puff(b.soft, (0.0, 0.0, r * 0.28), (r, r * rng.uniform(0.65, 1.0), r * 0.5), SWATCH, e=0.8, nu=10, nv=6, rot=Rz(rng.uniform(0, 180.0)))
+    b.soft.paint(faces, rng.choice(("grey4", "grey5", "grey6", "sand", "tan", "grey3")))
+
+
+def flower_patch(b: SParts, n: int = 7, r: float = 0.22, color: str = "yellow", seed: int = 1) -> None:
+    """A patch of small flowers on stems (origin at its middle on the ground): a six-sided bloom of a palette colour on a hair of a stem, about 28 triangles each."""
+    rng = random.Random(seed)
+    for k in range(n):
+        a = rng.uniform(0.0, 6.2832)
+        d = r * math.sqrt(rng.uniform(0.0, 1.0))
+        x, y, h = d * math.cos(a), d * math.sin(a), rng.uniform(0.07, 0.15)
+        b.soft.swatch_cyl((x, y, h), (x, y, h + 0.012), 0.022 * rng.uniform(0.8, 1.3), color, seg=6)
+        b.soft.swatch_cyl((x, y, 0.0), (x, y, h), 0.0025, "green", seg=3)
+
+
+def hanging_vine(b: SParts, length: float = 0.9, seed: int = 1, leaves: int = 12) -> None:
+    """A trailing plant hanging from a beam (origin at the top of the strand): a drooping stem with a heart-shaped leaf at each node, about 170 triangles."""
+    rng = random.Random(seed)
+    dx, dy = rng.uniform(-0.1, 0.1), rng.uniform(-0.1, 0.1)
+    b.soft.tube([(dx * (k / 6.0) ** 2, dy * (k / 6.0) ** 2, -length * k / 6.0) for k in range(7)], 0.004, STEM, seg=4, caps=False)
+    for j in range(leaves):
+        t = (j + 0.5) / leaves
+        a = rng.uniform(0.0, 6.2832)
+        MK.leaf(b.soft, (dx * t * t, dy * t * t, -length * t), (math.cos(a) * 0.9, math.sin(a) * 0.9, -0.3), (0.0, 0.0, 1.0), 0.11 * (1.25 - 0.55 * t) * rng.uniform(0.8, 1.2),
+                0.085 * (1.25 - 0.55 * t), LEAF_GREEN, tile=0, droop=0.5, fold=0.2, nu=2, nv=1, shape=0.9, seed=j)
+
+
+def living_wall(b: SParts, w: float = 2.8, h: float = 2.5, z0: float = 0.2, seed: int = 1) -> None:
+    """A green wall (origin on the floor at the middle of its base, the leaves facing +x): a dark felt panel in a steel frame with a drip line along the top, on a backing of moss, with overlapping
+    leaves of three kinds over it; about 70 leaves a square metre, two to six triangles each."""
+    rng = random.Random(seed)
+    b.soft.box((-0.08, -w / 2, z0), (-0.02, w / 2, z0 + h), MOSS)
+    for lo, hi in (((-0.09, -w / 2 - 0.03, z0 - 0.03), (0.0, w / 2 + 0.03, z0)), ((-0.09, -w / 2 - 0.03, z0 + h), (0.0, w / 2 + 0.03, z0 + h + 0.03)),
+                   ((-0.09, -w / 2 - 0.03, z0), (0.0, -w / 2, z0 + h)), ((-0.09, w / 2, z0), (0.0, w / 2 + 0.03, z0 + h))):
+        b.fine.box(lo, hi, STEEL)
+    b.fine.cyl((-0.05, -w / 2, z0 + h + 0.07), (-0.05, w / 2, z0 + h + 0.07), 0.012, BRASS, seg=8)
+    for k in range(int(w * h * 70)):
+        y, z = rng.uniform(-w / 2 + 0.06, w / 2 - 0.06), rng.uniform(z0 + 0.06, z0 + h - 0.04)
+        d = (0.22, rng.uniform(-0.55, 0.55), rng.uniform(-0.75, 0.6))
+        MK.leaf(b.soft, (-0.02, y, z), d, (1.0, 0.0, 0.0), rng.uniform(0.13, 0.22), rng.uniform(0.09, 0.14), LEAF_GREEN, tile=rng.choice((0, 0, 1, 3)), droop=0.3, fold=0.25, nu=1 if k % 3 else 2, nv=1,
+                shape=0.9, seed=k)
+
+
+def garden_bed(b: SParts, length: float, width: float, h: float = 0.42, seed: int = 1, tree: str | None = "pachira_d", cover: str = MOSS, density: float = 1.0) -> None:
+    """A planting bed of a garden (centred on the origin, `length` along y, `width` along x, `h` high): an oak frame round a ground of moss or lawn that swells into gentle mounds,
+    clumps of ferns, calatheas and anthuriums (Poly Haven scans), hostas, tufts of grass, patches of flowers, river stones, and a tree on a patch of earth if `tree`."""
+    rng = random.Random(seed)
+    hw, hl, rim = width / 2, length / 2, 0.07
+    for lo, hi in (((-hw, -hl, 0.0), (-hw + rim, hl, h)), ((hw - rim, -hl, 0.0), (hw, hl, h)), ((-hw + rim, -hl, 0.0), (hw - rim, -hl + rim, h)), ((-hw + rim, hl - rim, 0.0), (hw - rim, hl, h))):
+        MK.rbox(b.soft, lo, hi, 0.012, OAK, 1)
+    b.body.box((-hw + rim, -hl + rim, 0.0), (hw - rim, hl - rim, h - 0.1), STRUCT)
+    bumps = [(rng.uniform(-hw * 0.6, hw * 0.6), rng.uniform(-hl * 0.7, hl * 0.7), rng.uniform(0.7, 1.4), rng.uniform(0.07, 0.17)) for _ in range(4)]
+
+    def ground(x: float, y: float) -> float:
+        edge = min(hw - rim - abs(x), hl - rim - abs(y))
+        k = min(1.0, max(0.0, edge / 0.6))
+        k = k * k * (3.0 - 2.0 * k)
+        return h - 0.03 + k * sum(a * math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2.0 * (rad * 0.55) ** 2)) for cx, cy, rad, a in bumps)
+
+    MK.terrain(b.soft, (-hw + rim, -hl + rim), (hw - rim, hl - rim), max(4, round((width - 2 * rim) / 0.45)), max(4, round((length - 2 * rim) / 0.45)), ground, cover)
+    taken: list[tuple[float, float, float]] = []
+
+    def spot(rad: float, margin: float = 0.3, x_pref: float | None = None, y_pref: float | None = None):
+        for _ in range(60):
+            x = x_pref if x_pref is not None else rng.uniform(-hw + rim + margin, hw - rim - margin)
+            y = y_pref if y_pref is not None else rng.uniform(-hl + rim + margin, hl - rim - margin)
+            if all(math.hypot(x - tx, y - ty) > rad + tr for tx, ty, tr in taken):
+                taken.append((x, y, rad))
+                return x, y
+            x_pref = y_pref = None
+        return None
+
+    area = (width - 2 * rim) * (length - 2 * rim)
+    if tree:
+        sy = rng.choice((-1, 1))
+        xy = spot(0.7, 0.8, rng.uniform(-hw * 0.3, hw * 0.3), sy * (hl - 1.0))
+        if xy:
+            x, y = xy
+            z = ground(x, y)
+            b.soft.cyl((x, y, z - 0.02), (x, y, z + 0.012), 0.62, EARTH, seg=20)
+            SA.add(b.soft, tree, (x, y, z), rng.uniform(0, 360), 1.2)
+            for k in range(5):
+                a = k * 1.25 + rng.uniform(0, 0.5)
+                sx, sy_ = x + 0.62 * math.cos(a), y + 0.62 * math.sin(a)
+                with b.at(T(sx, sy_, ground(sx, sy_))):
+                    river_stone(b, rng.uniform(0.07, 0.13), seed * 10 + k)
+    plan = [("fern_lo_b", 0.55, 1.3, 0.95), ("fern_lo_c", 0.5, 1.3, 1.15), ("calathea_lo", 0.3, 0.55, 1.35), ("anthurium_lo", 0.4, 0.5, 1.15)]
+    for kind, rad, per10, sc in plan:
+        for k in range(max(1, round(area / 10.0 * per10 * density))):
+            xy = spot(rad * sc)
+            if xy:
+                SA.add(b.soft, kind, (xy[0], xy[1], ground(*xy) - 0.01), rng.uniform(0, 360), rng.uniform(0.85, 1.15) * sc)
+    for k in range(round(area / 10.0 * 1.8 * density)):
+        xy = spot(0.25)
+        if xy:
+            with b.at(T(xy[0], xy[1], ground(*xy))):
+                leaf_clump(b, rng.uniform(0.18, 0.28), rng.randint(6, 9), seed * 50 + k, tile=rng.choice((0, 1)))
+    for k in range(round(area / 10.0 * 7.0 * density)):
+        x, y = rng.uniform(-hw + rim + 0.12, hw - rim - 0.12), rng.uniform(-hl + rim + 0.12, hl - rim - 0.12)
+        with b.at(T(x, y, ground(x, y) - 0.005)):
+            grass_tuft(b, 0.12, rng.uniform(0.14, 0.3), rng.randint(7, 11), seed * 100 + k)
+    colors = ["yellow", "white", "magenta", "orange", "purple", "rose", "red"]
+    for k in range(round(area / 10.0 * 1.3 * density)):
+        xy = spot(0.25, 0.2)
+        if xy:
+            with b.at(T(xy[0], xy[1], ground(*xy))):
+                flower_patch(b, rng.randint(6, 10), 0.2, colors[(k + seed) % len(colors)], seed * 70 + k)
+    for k in range(round(area / 10.0 * 2.2 * density)):
+        xy = spot(0.12, 0.15)
+        if xy:
+            with b.at(T(xy[0], xy[1], ground(*xy))):
+                river_stone(b, rng.uniform(0.06, 0.14), seed * 90 + k)
 
 
 # ------------------------------------------------------------------------------------------------------------------ procedural plants

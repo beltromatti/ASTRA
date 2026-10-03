@@ -48,6 +48,9 @@ SETS: dict[str, tuple[str, float]] = {
     "FabricWoven": ("Fabric062", 1.0),        # coarse woven upholstery / wall cloth, tinted
     "Swatch": ("", 0.0),                      # (procedural, swatch) the 64-colour palette of every small coloured thing (ship_lib.SWATCH_NAMES, the same order)
     "LeafAtlas": ("", 0.0),                   # (procedural, leaf_atlas) the surface of the leaves of the procedural plants: four kinds in a 2 x 2 atlas
+    "Grass": ("Grass004", 0.0),               # dense short lawn: the planting beds of the gardens
+    "Moss": ("Moss002", 0.0),                 # green moss: mounds and the foot of the trees
+    "Earth": ("Ground037", 0.0),              # damp dark earth: the soil of pots and planters
 }
 
 NEUTRAL_LINEAR = 0.8                          # a neutral map's median in linear light: Tint ~ 1.25 x the albedo wanted

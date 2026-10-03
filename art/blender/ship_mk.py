@@ -7,6 +7,7 @@ that builder, so it composes with `place(...)` and `b.at(frame(...))` like the o
   lathe(fb, profile, c, mat, seg)    a solid turned about the vertical axis through c: profile = [(radius, z) ...] from the bottom up
   leaf(fb, base, d, up, ...)         one leaf blade of real geometry (two-sided, a folded midrib, a droop), with the UVs of a leaf-atlas tile
   rod(fb, p0, p1, r0, r1, mat)       a tapered round rod (legs, stems)
+  terrain(fb, lo, hi, nx, ny, f, mat) a heightfield: a lawn or a moss bed with gentle mounds
   stitch_line(...)                   a thin seam line on a cushion (a dark groove)
 """
 from __future__ import annotations
@@ -216,6 +217,26 @@ def leaf(fb: FB, base, d, up, length: float, width: float, mat: str, tile: int =
                     loop[uv_layer].uv = (uoff + 0.5 * u, voff + 0.5 * v)
                 if side == 0:
                     faces.append(f)
+    return faces
+
+
+def terrain(fb: FB, lo, hi, nx: int, ny: int, height, mat: str):
+    """A heightfield over the rectangle lo..hi (local x, y): nx by ny quads, z = height(x, y); the faces look up (the builder's box projection gives them their UVs). A lawn, a moss bed."""
+    xs = [lo[0] + (hi[0] - lo[0]) * i / nx for i in range(nx + 1)]
+    ys = [lo[1] + (hi[1] - lo[1]) * j / ny for j in range(ny + 1)]
+    vs = [[fb.bm.verts.new(fb.P((x, y, height(x, y)))) for y in ys] for x in xs]
+    idx = fb.mi(mat)
+    flip = fb.frame.determinant() < 0
+    faces = []
+    for i in range(nx):
+        for j in range(ny):
+            quad = [vs[i][j], vs[i + 1][j], vs[i + 1][j + 1], vs[i][j + 1]]
+            try:
+                f = fb.bm.faces.new(list(reversed(quad)) if flip else quad)
+            except ValueError:
+                continue
+            f.material_index = idx
+            faces.append(f)
     return faces
 
 
