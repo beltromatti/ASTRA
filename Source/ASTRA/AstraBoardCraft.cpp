@@ -338,7 +338,22 @@ bool UAstraBattleSubsystem::ShipFacts(int32 Id, FShipFacts& Out) const
 	return true;
 }
 
-bool UAstraBattleSubsystem::CaptureShip(int32 Id, const FString& By, FString& OutDetail)
+void UAstraBattleSubsystem::ListShipFacts(TArray<FShipFacts>& Out) const
+{
+	for (const FAstraBattleShip& S : Ships)
+	{
+		if (S.bAlive && !S.bCraft && !S.bGhost)
+		{
+			FShipFacts F;
+			if (ShipFacts(S.Id, F))
+			{
+				Out.Add(MoveTemp(F));
+			}
+		}
+	}
+}
+
+bool UAstraBattleSubsystem::CaptureShip(int32 Id, const FString& By, FString& OutDetail, int32 ForSide)
 {
 	FAstraBattleShip* S = FindById(Id);
 	if (!S || !S->bAlive || S->bCraft || S->bPlayer)
@@ -346,13 +361,14 @@ bool UAstraBattleSubsystem::CaptureShip(int32 Id, const FString& By, FString& Ou
 		OutDetail = TEXT("there is no such ship to take");
 		return false;
 	}
-	if (S->Side == EAstraSide::Astra)
+	const EAstraSide To = ForSide == 1 ? EAstraSide::Mandate : EAstraSide::Astra;
+	if (S->Side == To)
 	{
-		OutDetail = TEXT("she is ours already");
+		OutDetail = To == EAstraSide::Astra ? TEXT("she is ours already") : TEXT("she is theirs already");
 		return false;
 	}
-	S->Side = EAstraSide::Astra;
-	S->bHostile = false;
+	S->Side = To;
+	S->bHostile = To != EAstraSide::Astra;
 	S->bHoldFire = true;
 	S->bFleeing = false;
 	S->bFog = false;
@@ -363,8 +379,9 @@ bool UAstraBattleSubsystem::CaptureShip(int32 Id, const FString& By, FString& Ou
 	S->TargetId = -1;
 	S->OrderTarget = -1;
 	++PlotStamp;
-	Report(FString::Printf(TEXT("tactical: %s is ours — taken by %s; she has no power and a prize crew aboard"), *S->Name, *By), true);
-	OutDetail = FString::Printf(TEXT("%s is ours"), *S->Name);
+	Report(To == EAstraSide::Astra ? FString::Printf(TEXT("tactical: %s is ours — taken by %s; she has no power and a prize crew aboard"), *S->Name, *By)
+	                               : FString::Printf(TEXT("tactical: %s has been taken by the Mandate (%s); she has no power and a prize crew aboard"), *S->Name, *By), true);
+	OutDetail = FString::Printf(TEXT("%s is %s"), *S->Name, To == EAstraSide::Astra ? TEXT("ours") : TEXT("the Mandate's"));
 	return true;
 }
 

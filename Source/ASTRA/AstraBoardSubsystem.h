@@ -13,7 +13,9 @@
 
 #include "CoreMinimal.h"
 #include "Async/Future.h"
+#include "AstraBoardCraft.h"
 #include "AstraBoardMap.h"
+#include "AstraBoardPlans.h"
 #include "AstraBoardSim.h"
 #include "AstraDamageMap.h"
 #include "Dom/JsonObject.h"
@@ -24,6 +26,7 @@ class AAstraArmoryRack;
 class AAstraBoardBreach;
 class AAstraCombatant;
 class APawn;
+class UAstraBattleSubsystem;
 class UAstraCombatFx;
 class UAstraFpsComponent;
 class UAstraLifeSubsystem;
@@ -43,10 +46,13 @@ public:
 
 	/** The plan is read and the tactical map built (a few hundred milliseconds on a worker after the world begins). */
 	bool IsReady() const { return Phase != EPhase::Loading && Phase != EPhase::Failed; }
-	/** A boarding is on (from the alarm to the end, the cleaning up after it not counted). */
-	bool IsActive() const { return Phase == EPhase::Active; }
+	/** A boarding is on on the Aquila's own decks (from the alarm to the end, the cleaning up after it not counted): the Captain's fight. */
+	bool IsActive() const { return Phase == EPhase::Active && Mode == EMode::Observed; }
+	/** Any boarding is on: on the Aquila's decks, or on another ship (her marines aboard a hulk, a consort taken by the Mandate), where the Captain is not. */
+	bool IsFightOn() const { return Phase == EPhase::Active; }
 	const FAstraBoardSim& Sim() const { return Fight; }
-	const FAstraBoardMap* BoardMap() const { return Map.Get(); }
+	/** The Aquila's own map (the soldiers' map of her plan). */
+	const FAstraBoardMap* BoardMap() const { return AqMap.Get(); }
 
 	/** What a boarding is made of. */
 	struct FSpec
@@ -62,6 +68,32 @@ public:
 	bool StartBoarding(const FSpec& Spec, FString& OutDetail);
 	/** Ends it (the test console, the end of a fight): the bulkheads open, the marines go back to their duty, the bodies are cleared away in a while. */
 	void EndBoarding(const TCHAR* Why);
+
+	// ------------------------------------------------------------------------------------------------ boarding by assault craft (AstraBoardAssault.cpp, docs/brief/ABBORDAGGI-2.md)
+	/** What an order to board is made of when boats fly it: who flies from where at whom (the ships are named as the commands name them: a contact id such as T-30, a name, "aquila"). */
+	struct FAssaultSpec
+	{
+		FString Source;                // the carrier whose boats go (empty: the Aquila's own for an assault on another ship; the Mandate's nearest carrier for an assault on the Aquila)
+		FString Target;                // the ship that is boarded (empty: the Aquila)
+		FString Face;                  // port | starboard | dorsal | ventral | bow | stern | any: the side of the target the boats dock on (empty: the side nearest the carrier)
+		FString Objective;             // bridge | engineering | captain | armory | medbay | brig | comms | hangar, or a compartment's id (empty: engineering for the Aquila, the commander's suite for another ship)
+		FString Breach;                // the plan's id of a hatch (or a compartment on the skin) for the first boat (empty: the side's best)
+		int32 Craft = 0;               // boats (0: as many as the carrier has free, at most two)
+		int32 Boarders = 0;            // men in all (0: the boats' full loads)
+		bool bLockdown = true;         // (the Aquila boarded) the pressure bulkheads round the hatches close
+		bool bCaptain = false;         // the Captain rides in the first boat (his marines')
+		FString By;                    // who ordered it ("Admiral Solm", "the Captain"), for the log
+	};
+	/** Boats leave a carrier for a target and the fight is theirs: the boarders cut in where the boats latch; whoever survives goes home. False, and why, when it cannot be (no boat free, a shield
+	 *  that holds the hatch, no hatch on that face, a boarding already on). The reply is the facts. */
+	bool StartAssault(const FAssaultSpec& Spec, FString& OutDetail);
+	/** The assault under way, as the minds read it (empty object when none): ships, boats and where each is, men, hatches. */
+	TSharedRef<FJsonObject> AssaultJson() const;
+	/** What each side may order, from what is true (the carriers' free boats and, for each enemy ship, what a boat would meet: shield on the face, point defence, fighters): the war minds' context.
+	 *  SideIdx: 0 ASTRA, 1 the Mandate. */
+	TSharedRef<FJsonObject> BoardingOptionsJson(int32 SideIdx) const;
+	/** True while an assault is flying, fighting or coming home (a new order is refused). */
+	bool IsAssaultOn() const { return Assault.bOn; }
 
 	// ------------------------------------------------------------------------------------------------ the Captain
 	/** A round of the Captain's struck a soldier (Damage: what it does after the range, Head: it hit the head). The soldier's wound; false when it did not count (a marine of
@@ -108,11 +140,18 @@ public:
 
 private:
 	enum class EPhase : uint8 { Loading, Failed, Idle, Active, Over };
+	/** Where the fight is: on the Aquila's own decks (bodies, the Captain, her bulkheads), or on another ship (the simulation alone: reports and casualties, the Captain not in it). */
+	enum class EMode : uint8 { Observed, Remote };
 
 	EPhase Phase = EPhase::Loading;
+	EMode Mode = EMode::Observed;
 	TFuture<TSharedPtr<FAstraBoardMap>> MapFuture;
-	TSharedPtr<FAstraDamageMap> Dmg;
+	TSharedPtr<FAstraDamageMap> AqDmg;               // the Aquila's own plan and map (read once; the arms and the marines of her decks use these)
+	TSharedPtr<FAstraBoardMap> AqMap;
+	TSharedPtr<FBoardShipPlan> AqPlan;               // the same with the hatches (her airlocks) and the places a boarding goes for
+	TSharedPtr<FAstraDamageMap> Dmg;                 // the plan and map of the fight that is on (the Aquila's own, or the boarded ship's)
 	TSharedPtr<FAstraBoardMap> Map;
+	TSharedPtr<FBoardShipPlan> ScenePlan;            // (a fight on another ship) her plan
 	FAstraBoardSim Fight;
 	TWeakObjectPtr<UAstraShipSubsystem> Ship;
 	TWeakObjectPtr<UAstraLifeSubsystem> Life;
@@ -159,7 +198,7 @@ private:
 	TArray<TObjectPtr<AAstraCombatant>>& PoolOf(int32 Side) { return Side == 0 ? PoolMarines : PoolMandate; }
 	TMap<int32, TObjectPtr<AAstraCombatant>> BodyOf;              // unit -> body
 	UPROPERTY() TArray<TObjectPtr<UObject>> Warm;
-	UPROPERTY() TObjectPtr<AAstraBoardBreach> Breach;
+	UPROPERTY() TArray<TObjectPtr<AAstraBoardBreach>> Breaches;   // one for each hatch that is cut open
 	float BodyT = 0.f;
 	TArray<double> LastShotSound;                // by unit: when it last made a sound
 	float ThreatT = 0.f;
@@ -170,6 +209,84 @@ private:
 	bool bWarmed = false;
 
 	void TryFinishLoading();
+	// --- boarding by assault craft (AstraBoardAssault.cpp): one assault at a time, flying and fighting, on one scene
+	struct FLeg
+	{
+		int32 Index = 0;                             // its number in the assault: the battle's Leg and the simulation's party
+		int32 CraftId = -1;                          // the battle's id of the boat once it has left
+		FString CraftName;                           // "Skiff 2"
+		FName DockId;                                // the plan's hatch
+		int32 BreachComp = INDEX_NONE;               // the room the hatch opens into (the boarded ship's plan)
+		FVector HatchCm = FVector::ZeroVector;       // the hatch on the skin (the plan's frame, cm)
+		FVector InCm = FVector::ZeroVector;          // inside, on the floor, a step from it
+		FVector Into = FVector::ForwardVector;       // the wall's normal, into the room
+		FVector HullM = FVector::ZeroVector;         // the hatch in the boarded ship's hull frame (m): where the boat goes
+		FVector OutNormal = FVector::ForwardVector;  // out of the hull there
+		int32 Men = 0;
+		TArray<AstraBoard::FArrival> Arrivals;       // who is in the boat
+		enum class EState : uint8 { Ordered, Flying, Latched, Through, Lost, TurnedBack, Home } State = EState::Ordered;
+		int32 Breach = INDEX_NONE;                   // its cut in the Aquila's hull (index into Breaches)
+		FString PlaceText;                           // where it comes out, in words
+		bool bLanded = false;                        // its men have been put into the fight
+		bool bSailing = false;                       // it has left: its men are not in the ship
+		bool bReported = false;
+		bool Resolved() const { return State == EState::Lost || State == EState::Home || (State == EState::TurnedBack && !bSailing); }
+	};
+	struct FAssault
+	{
+		bool bOn = false;
+		int32 Order = 0;
+		AstraBoard::ESide Attacker = AstraBoard::ESide::Mandate;
+		bool bObserved = true;                       // the Aquila's own decks are the scene (else another ship's plan)
+		bool bRoster = false;                        // the attackers are the Aquila's marines of the ship's roster
+		int32 CarrierId = -1, TargetId = -1;
+		FString CarrierName, TargetName, CarrierClass, TargetClassText;
+		FName TargetClass;
+		FString Objective;                           // as ordered
+		FString By;
+		bool bLockdown = true;
+		bool bCaptain = false;
+		TArray<FLeg> Legs;
+		float T = 0.f;                               // seconds since the order
+		float EtaS = 0.f;                            // the first boat's flight, as the battle gave it
+		bool bLaunched = false;                      // the battle has the boats
+		bool bSceneBegun = false;
+		bool bDeparting = false;                     // the fight is over: the boats are told to let go
+		bool bFightSeen = false;                     // a fight was on the scene
+		float DoneT = 0.f;
+		FString PlanKey;
+		TFuture<TSharedPtr<FBoardShipPlan>> PlanFuture;   // the target's plan is being read before the boats go
+		bool bPlanWait = false;
+		FAssaultSpec Spec;
+		FString PlanWhy;
+	};
+	FAssault Assault;
+	int32 NextOrder = 1;
+	float AssaultPollT = 0.f;
+	TArray<FString> AssaultNote;                     // what the order said, for the minds (last few lines)
+	void BuildAquilaPlan();
+	void TickAssault(float Dt);
+	bool LaunchAssault(FString& OutDetail);
+	bool ChooseHatches(const FBoardShipPlan& Plan, const FString& Face, const FString& BreachId, const AstraBoardCraft::FShipFacts& Target, const AstraBoardCraft::FShipFacts& Carrier,
+	                   int32 Count, TArray<int32>& OutDocks, FString& OutWhy) const;
+	void FillLeg(FLeg& L, const FBoardShipPlan& Plan, int32 Dock, const TCHAR* Face) const;
+	void OnCraftEvent(const AstraBoardCraft::FCraftEvent& E);
+	void BeginObservedScene();
+	bool BeginRemoteScene();
+	void LandLeg(FLeg& L);
+	void CloseAssault(const TCHAR* Why);
+	void EndAssaultFight(const TCHAR* Why);
+	void RemoteStep(float Dt);
+	void OnRemoteOutcome();
+	void ReturnMarines(FLeg& L, bool bAlive);
+	void MarkMarinesLost(FLeg& L, const FString& Cause);
+	int32 PickMarines(int32 Total, TArray<TArray<int32>>& OutLegs) const;
+	void OpenBreachAt(FLeg& L);
+	FLeg* LegOf(int32 Index);
+	UAstraBattleSubsystem* Battle() const;
+	FString AssaultText() const;
+	void ResetScene(EMode NewMode);
+	void EnterObserved(const FString& SourceText, int32 BreachComp, const FVector& At, bool bLockdown, float WarnS = 0.f);
 	// --- the weapons: the places the Captain's are kept (the posts, the stock of each), their pictures while he is near, and the armourer's delivery (AstraBoardArms.cpp)
 	struct FArmsPost
 	{

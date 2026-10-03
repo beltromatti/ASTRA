@@ -221,6 +221,13 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::Load(FName ClassKey, FString& OutWhy
 	return P;
 }
 
+TSharedPtr<FBoardShipPlan> AstraBoardPlans::Peek(FName ClassKey)
+{
+	FScopeLock Lock(&BpLock);
+	const TSharedPtr<FBoardShipPlan>* Hit = BpCache.Find(FName(*ClassKey.ToString().ToLower()));
+	return Hit ? *Hit : nullptr;
+}
+
 void AstraBoardPlans::ClassesWithPlans(TArray<FName>& Out)
 {
 	Out.Reset();

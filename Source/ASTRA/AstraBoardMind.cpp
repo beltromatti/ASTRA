@@ -86,10 +86,22 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 	{
 		return J;
 	}
+	if (Mode == EMode::Remote && !Assault.bRoster)
+	{
+		return J;                                          // a fight on another ship that is not the marines' (the Mandate on a consort): not theirs to command
+	}
 	const auto CompId = [this](int32 C) { return Dmg->Comps.IsValidIndex(C) ? Dmg->Comps[C].Id.ToString() : FString(); };
 	const UAstraShipSubsystem* ShipS = ShipSub();
 	const TArray<FAstraCrewman>* Crew = ShipS ? &ShipS->GetRoster().Get() : nullptr;
+	const bool bWeAttack = Fight.IsAttacker(ESide::Aquila);
 	J->SetNumberField(TEXT("elapsed_s"), FMath::RoundToInt(Since));
+	// who is attacking whom and where: the marines defend their own ship (a Mandate boarding party in the Aquila) or attack a ship that is not (their boats at her hatches)
+	J->SetStringField(TEXT("role"), bWeAttack ? TEXT("attacking") : TEXT("defending"));
+	J->SetStringField(TEXT("ship"), Mode == EMode::Remote ? Assault.TargetName : FString(TEXT("the Aquila")));
+	if (Mode == EMode::Remote)
+	{
+		J->SetStringField(TEXT("ship_class"), Assault.TargetClassText);
+	}
 	J->SetStringField(TEXT("breach"), BreachText);
 	J->SetStringField(TEXT("objective"), Map->Describe(Fight.Mission().Objective));
 	J->SetStringField(TEXT("objective_id"), CompId(Fight.Mission().Objective));
@@ -144,7 +156,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 		Squads.Add(MakeShared<FJsonValueObject>(O));
 	}
 	J->SetArrayField(TEXT("squads"), Squads);
-	// what is known of the boarders (the ship's internal sensors in the corridors and what the marines have seen)
+	// what is known of the enemy (the ship's own sensors in the corridors when she has them, and what the marines have seen)
 	TArray<FSeen> Seen;
 	Fight.Intel(ESide::Aquila, Seen);
 	TMap<int32, int32> ByComp;
@@ -169,7 +181,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 	J->SetArrayField(TEXT("hostiles_known"), Hostiles);
 	// the pressure bulkheads round the breach
 	TArray<TSharedPtr<FJsonValue>> Doors;
-	const int32 Deck = Map->GetComps()[Fight.Mission().Breach].Deck;
+	const int32 Deck = Map->GetComps().IsValidIndex(Fight.Mission().Breach) ? Map->GetComps()[Fight.Mission().Breach].Deck : 0;
 	for (const FBoardPortal& P : Map->GetPortals())
 	{
 		if (P.Kind == FBoardPortal::EKind::Blast && Map->GetComps()[P.A].Deck == Deck && FVector::Dist2D(P.Pos, BreachAt) < 12000.0 && Dmg->Doors.IsValidIndex(P.Door))
@@ -267,12 +279,19 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 TSharedRef<FJsonObject> UAstraBoardSubsystem::Snapshot() const
 {
 	TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+	if (Assault.bOn)
+	{
+		J->SetObjectField(TEXT("assault"), AssaultJson());           // the boats: where each is, what it carries (also while no fight is on yet)
+	}
 	if (Phase != EPhase::Active || !Map.IsValid())
 	{
 		return J;
 	}
 	const FBook& B = Fight.Book();
+	const bool bWeAttack = Fight.IsAttacker(ESide::Aquila);
 	J->SetBoolField(TEXT("active"), true);
+	J->SetStringField(TEXT("direction"), Mode == EMode::Observed ? TEXT("in") : (Assault.bRoster ? TEXT("out") : TEXT("other")));
+	J->SetStringField(TEXT("ship"), Mode == EMode::Observed ? FString(TEXT("the Aquila")) : Assault.TargetName);
 	J->SetNumberField(TEXT("elapsed_s"), FMath::RoundToInt(Since));
 	if (!Source.IsEmpty())
 	{
@@ -283,14 +302,14 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::Snapshot() const
 	J->SetStringField(TEXT("objective"), Map->Describe(Fight.Mission().Objective));
 	J->SetStringField(TEXT("hostiles"), Fight.HostileSummary());
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
-	M->SetNumberField(TEXT("able"), Fight.CountAble(ESide::Aquila) - 1);
+	M->SetNumberField(TEXT("able"), Fight.CountAble(ESide::Aquila) - (Fight.CaptainId() != INDEX_NONE ? 1 : 0));
 	M->SetNumberField(TEXT("down"), B.Down[0]);
 	M->SetNumberField(TEXT("dead"), B.Killed[0]);
 	J->SetObjectField(TEXT("marines"), M);
 	TSharedRef<FJsonObject> E = MakeShared<FJsonObject>();
 	E->SetNumberField(TEXT("down_or_dead"), B.Down[1] + B.Killed[1]);
 	E->SetNumberField(TEXT("left_ship"), B.Exited[1]);
-	J->SetObjectField(TEXT("boarders_known_losses"), E);
+	J->SetObjectField(bWeAttack ? TEXT("defenders_known_losses") : TEXT("boarders_known_losses"), E);
 	int32 Sealed = 0;
 	for (const FBoardPortal& P : Map->GetPortals())
 	{
@@ -336,15 +355,16 @@ FString UAstraBoardSubsystem::InfoText() const
 	}
 	if (Phase == EPhase::Idle)
 	{
-		return FString::Printf(TEXT("boarding: ready (%d compartments, %d portals); none on"), Map->GetComps().Num(), Map->GetPortals().Num());
+		return FString::Printf(TEXT("boarding: ready (%d compartments, %d portals); none on; assault %s"), Map->GetComps().Num(), Map->GetPortals().Num(), *AssaultText());
 	}
 	const FBook& B = Fight.Book();
-	return FString::Printf(TEXT("boarding %s at %.0f s: marines %d able, %d down, %d dead; boarders %d able, %d down, %d dead, %d left the ship; Captain %d%%%s; %d bodies; "
-	                            "%.2f ms a step (sensing %.2f, plans %.2f, men %.2f); outcome %d"),
-	                       Phase == EPhase::Active ? TEXT("ON") : TEXT("over"), Since, Fight.CountAble(ESide::Aquila) - 1, B.Down[0], B.Killed[0], Fight.CountAble(ESide::Mandate),
+	return FString::Printf(TEXT("boarding %s%s at %.0f s: marines %d able, %d down, %d dead; boarders %d able, %d down, %d dead, %d left the ship; Captain %d%%%s; %d bodies; "
+	                            "%.2f ms a step (sensing %.2f, plans %.2f, men %.2f); outcome %d%s%s"),
+	                       Phase == EPhase::Active ? TEXT("ON") : TEXT("over"), Mode == EMode::Remote ? TEXT(" (on another ship)") : TEXT(""), Since,
+	                       Fight.CountAble(ESide::Aquila) - (Fight.CaptainId() != INDEX_NONE ? 1 : 0), B.Down[0], B.Killed[0], Fight.CountAble(ESide::Mandate),
 	                       B.Down[1], B.Killed[1], B.Exited[1], FMath::RoundToInt(CaptainStrength() * 100.f), bCapDown ? TEXT(" (down)") : TEXT(""), BodyOf.Num(),
 	                       (B.Ms[0] + B.Ms[1] + B.Ms[2]) / FMath::Max(1.0, Since * 10.0), B.Ms[0] / FMath::Max(1.0, Since * 10.0), B.Ms[1] / FMath::Max(1.0, Since * 10.0),
-	                       B.Ms[2] / FMath::Max(1.0, Since * 10.0), (int32)Fight.Mission().Outcome);
+	                       B.Ms[2] / FMath::Max(1.0, Since * 10.0), (int32)Fight.Mission().Outcome, Assault.bOn ? TEXT("; assault ") : TEXT(""), Assault.bOn ? *AssaultText() : TEXT(""));
 }
 
 // ================================================================================================================== the orders
