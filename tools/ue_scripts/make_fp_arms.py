@@ -1,9 +1,11 @@
 """ABBORDAGGI: the Captain's arms for the weapons, /Game/ASTRA/Weapons/SKM_ASTRA_Arms.
 
 The mannequin's mesh is a whole body. Held in front of a camera that rides on the Captain's eyes (and that places the arms so that the weapon sits where it should on the
-screen), its head, shoulders and chest fill the view and the arms hang from them. What the weapons need is the arms alone: this cuts the mannequin down to the lower half of the
-upper arm, the forearm and the hand with its fingers (every bone stays, so the mannequin's animations play on it unchanged and the hand sockets, which are the skeleton's,
-are there), with the mannequin's own two materials. Idempotent: the asset is made again each time.
+screen), its head, shoulders and chest fill the view and the arms hang from them. What the weapons need is the arms alone: this cuts the mannequin down to the arms: the upper arm (to the shoulder joint),
+the forearm and the hand with its fingers (every bone stays, so the mannequin's animations play on it unchanged and the hand sockets, which are the skeleton's,
+are there), with the mannequin's own two materials. The arms are moved about on their own (UAstraFpsComponent solves them to the weapon from shoulders that stand below the picture),
+so the vertices near the shoulder must follow the arm's bones alone: the few per cent of weight that the chest and the clavicles held there would drag them, once the arm is moved away from
+them, into long spikes; their weight is given to the arm's own bones. Idempotent: the asset is made again each time.
 
 Run in the editor: tools/ue.py pyfile tools/ue_scripts/make_fp_arms.py
 """
@@ -12,8 +14,8 @@ import unreal
 SRC = "/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"
 DST_DIR = "/Game/ASTRA/Weapons"
 DST_NAME = "SKM_ASTRA_Arms"
-# the bones whose skin stays (by their name's start): the elbow end of the upper arm (its second twist segment), the forearm with its twists, the hand and the fingers
-KEEP = ("upperarm_twist_02", "lowerarm", "hand", "index", "middle", "ring", "pinky", "thumb")
+# the bones whose skin stays (by their name's start): the whole upper arm (it ends at the shoulder joint: the clavicle and the chest stay out), the forearm with its twists, the hand and the fingers
+KEEP = ("upperarm", "lowerarm", "hand", "index", "middle", "ring", "pinky", "thumb")
 
 eal = unreal.EditorAssetLibrary
 Assets = unreal.GeometryScript_AssetUtils
@@ -51,6 +53,26 @@ def main():
     dm, removed = dm.delete_triangles_from_mesh(Lists.convert_array_to_index_list(drop, unreal.GeometryScriptIndexType.TRIANGLE))
     dm = dm.remove_unused_vertices()
     dm = dm.compact_mesh()
+
+    # the skin follows the arm's bones alone: what the chest and the clavicles held on the vertices left goes to the arm's own bones (renormalised)
+    dm, plist2, _gaps = Queries.get_all_vertex_positions(dm, False)
+    nv2 = len(Lists.convert_vector_list_to_array(plist2))
+    foreign = set()
+    for v in range(nv2):
+        dm, ws, ok = Bones.get_vertex_bone_weights(dm, v)
+        for w in ws:
+            if w.weight > 0.0 and not names.get(w.bone_index, "").startswith(KEEP):
+                foreign.add(names.get(w.bone_index, ""))
+    log("bones other than the arm's that held weight on the arms:", sorted(foreign))
+    if foreign:
+        dm = dm.prune_bone_weights([unreal.Name(n) for n in sorted(foreign)], unreal.GeometryScriptPruneBoneWeightsOptions())
+    left = 0
+    for v in range(nv2):
+        dm, ws, ok = Bones.get_vertex_bone_weights(dm, v)
+        left += 1 if (not ws or any(w.weight > 0.0 and not names.get(w.bone_index, "").startswith(KEEP) for w in ws)) else 0
+    log("vertices whose skin is not the arm's alone after the fix:", left, "of", nv2)
+    if left:
+        raise RuntimeError("the arms' skin still holds weight on other bones")
 
     # the new asset: same skeleton, same two materials (by slot name)
     mats = {}

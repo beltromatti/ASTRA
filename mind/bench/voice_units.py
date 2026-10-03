@@ -214,6 +214,10 @@ async def recogniser() -> None:
     fast.conf = 0.62
     fast.text = "Kancho, Harimichinihakujna na Zensoku"
     tr = await r.recognise(speech_pcm())
+    check("recogniser: the first unsure phrase does not wait for the second engine to start (it goes with the first's words)",
+          not tr.escalated and slow.calls == 0, f"escalated={tr.escalated} calls={slow.calls}")
+    await asyncio.sleep(0.05)                                      # (the second engine comes up in the background)
+    tr = await r.recognise(speech_pcm())
     check("recogniser: an unsure fast engine asks the other, whose language is not the fast one's", tr.escalated and tr.backend == "whisperkit" and "217" in tr.text and tr.lang != "")
 
     r2 = Recognizer(backends=[Fake("parakeet", frozenset({"it", "en"}), "x", 0.9), Fake("whisperkit", None, "Timoniere, rotta due uno sette", None, lang="it")], prior="ja")
@@ -260,6 +264,7 @@ async def recogniser() -> None:
     garbage = "Kancho, Harimichinihakujna na Zensoku"
     r2b = Recognizer(backends=[Fake("parakeet", frozenset({"it", "en"}), garbage, 0.7, fast=True),
                                Fake("whisperkit", None, "Thanks for watching!", None, lang="en")], prior="it")
+    await r2b._usable(r2b.fallback, True)                         # (the second engine already up)
     tr = await r2b.recognise(speech_pcm())
     check("recogniser: a second opinion that is a subtitle credit is ignored", tr.text == garbage and tr.escalated, f"{tr.text!r}")
     crew_word = Fake("parakeet", frozenset({"it"}), "Avanti tutta?", 0.7, fast=True)
@@ -317,6 +322,7 @@ async def recogniser() -> None:
     second = Fake("whisperkit", None, "Avanti tutta.", None, lang="it", delay=0.05)
     r9 = Recognizer(backends=[fast_unsure, second], prior="it")
     await r9.ready()
+    await r9._usable(second, True)                                # (the second engine already up)
     s4 = r9.session(partial_every_s=0.5)
     for i in range(0, len(pcm), 640):
         s4.feed(pcm[i:i + 640])

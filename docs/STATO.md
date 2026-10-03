@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-02 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
+**Ultimo aggiornamento:** 2026-10-03 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
 ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano e rifinisce; **principio delle intelligenze**
 ([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
@@ -21,6 +21,58 @@ ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano 
 pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo del Falcon, corridoi del Ponte 1 e alloggi del Capitano al
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
+
+**3/10 sera — DA RIPRENDERE QUI (limite di sessione; aiutanti fermati, i loro worktree restano con il lavoro salvato):**
+- **Aiutanti da riprendere con SendMessage** (o rilanciare): **ABBORDAGGI** (F5.2: simulazione per ruoli e caricatore dei piani fatti, scheda dei tasti
+  in alto a sinistra `70c4c49` da provare; stava scrivendo il banco delle navette), **ARTE-INTERNI** (12+ commit: bagni, osservatorio, Flight Deck,
+  stava rendendo games room/quarantena/uffici; da unire e importare quando riferisce), **FLOTTA-VIVA** (generatore dei piani di classe in
+  `data/ship/plans/`, coordinato con ABBORDAGGI: un solo caricatore, `FAstraDamageMap::Load(Path, Error)` + `OriginInHullM`).
+- **Fatto oggi (oltre a quanto sopra)**: tavolo olografico con la guerra della March nella vista del settore (scritte leggibili dalla poltrona),
+  telecamera dello schermo adattiva (cede il passo quando il fotogramma sfora), le frasi di una stessa risposta non si ripensano, le chiamate
+  sono di Martin, luce degli strumenti nell'abitacolo, play.py `--args` con le virgolette, 4 worktree conclusi rimossi (84 GB liberi).
+- **Prestazioni** (editor -game 1600x900, 3/10): plancia tranquilla 60 fps (GPU 12,4 ms, dynres 58 %), corridoio Ponte 5 59 fps, Concourse 58,5,
+  Flight Deck 59,8, plancia in battaglia 52 fps (render 24,7 ms); **la Mess Hall scende a 30 fps con il game thread a 159 ms: da indagare**
+  (VITA nella mensa? lo streaming del ponte?). **App impacchettata** (30 fps, RETINA FULL): dopo il riscaldamento degli shader la plancia è al
+  100 % della risoluzione Retina (GPU 23 ms, render 4 ms): l'immagine dovrebbe essere nitida.
+- **Da fare**: rifare il pacchetto (l'ultimo non ha tavolo/schermo adattivo/ultime correzioni della mente); indagare la Mess Hall; poi SPAZIO-VIVO
+  (traffico civile, stazioni, relitti e detriti che restano) come prossimo modulo; le richieste all'utente: autorizzazione Epic per i MetaHuman,
+  parere su RETINA.
+- **Credito AI**: ~11,9 $ spesi su 20 (stima dopo le prove di oggi: verificare su OpenRouter).
+
+**3/10 pomeriggio — CAMPAGNA e le braccia nel gioco, FLOTTA-VIVA avviato (il lead):**
+- **CAMPAGNA unito** (la guerra della March, [GUERRA.md §10](GUERRA.md)): le forze arrivano da 85–120 km dal Gate e si vedono venire (Keeper Station
+  vede le rotte del Gate a 60 km, ogni ondata dice se arriva al buio), la March gioca l'apertura (comando `opening {script:false}`): **provato nel gioco**
+  — Gate in ciclo e Rourke a 208–214 s, il gruppo d'attacco a 85 km a 266 s, il suo comandante sul canale, il grosso della 7ª Flotta e Constance da
+  85 km a 373 s, primo fuoco a ~390 s, poi l'avanguardia (8 navi) dal Gate. Corretti nel gioco: una forza che si riorganizza o tiene per ordine resta
+  nella guerra (il gioco aveva dichiarato vittoria e Rourke si congratulava); decolli, ingaggi e rientri delle squadriglie delle altre navi non sono
+  più rapporti per la plancia (aprivano turni vuoti che il tattico riempiva di telecronaca).
+- **Le braccia di ABBORDAGGI** (cinematica inversa, tabella dell'arma dal motore): provate, all'anca e in mira sono giuste (tacca sull'asse a 32 cm).
+  Da sistemare (mandato): la scheda dei tasti sta sotto i sottotitoli.
+- **La mente**: chi parla vede le battute in coda («Waiting to be said»: la crisi del 2/10 aveva cinquanta battute urgenti in quattro minuti); il prompt
+  dell'equipaggio ordinato per volatilità (la cache dal 56 al 64 %: le note del regista non rompono più la conversazione in cache).
+- **Costi**: le due partite dell'utente del 2/10 sono costate 2,64 $ in 2,2 ore (1,20 $/ora: equipaggio 1,62, guardia 0,42, comandanti 0,32);
+  **credito: 11,46 $ spesi su 20, 8,54 residui** (al 3/10 pomeriggio).
+- **Aiutanti**: ABBORDAGGI (F5.2: abbordare le navi nemiche con navette vere; scheda dei tasti), ARTE-INTERNI, **FLOTTA-VIVA** (avviato: i piani delle
+  classi in `data/ship/plans/` sono suoi, ABBORDAGGI li legge).
+- App rifatta dopo queste modifiche (~/Applications/ASTRA.app).
+
+**3/10 — le partite dell'utente (2/10 sera, app impacchettata) lette come analisi, e corrette (il lead):**
+- **Ordini persi**: una seconda pressione del tasto (anche vuota) annullava il turno che stava eseguendo l'ordine precedente («Timoniere, ritirata» mai
+  arrivato al timone, l'Aquila poi persa): ora la pressione ferma le voci e i rapporti dell'equipaggio, mai l'esecuzione di un ordine del Capitano.
+- **Voce**: una frase incerta («Allarme rosso» sentito «Alarmeros») aspettava 12 s l'avvio di Whisper: ora parte subito e Whisper si accende in
+  sottofondo; il router dei canali lascia finire il suo secondo tentativo (le parole al capitano dello Styx non erano uscite).
+- **In volo**: due schianti contro lo scafo cercando la bocca del tubo a vista → **guida di recupero del ponte** (F entro 8 km, o Flight Control e la rete
+  di volo con `eagle_recover`): fuori dallo scafo, porta davanti alla prua, dentro il tubo; provato, 17 s da 3,7 km. Il localizzatore cercava «captain» e
+  trovava i plane captain (15 minuti di teletrasporti rifiutati): ora trova il Capitano. Il conto dei Falcon sul ponte non supera più il totale.
+- **Una ritirata non è una tregua**: sparare a chi si ritira per ordine non è più «una tregua infranta» (Thale accusava l'Aquila di una tregua mai fatta).
+- I camminatori del ponte di volo non restano più incastrati nella gente di VITA (il log ne scriveva uno al secondo).
+- **ARTE-PLANCIA-2 nel gioco** (unito, importato, Ponte 1 ricostruito, provato a vista): plancia con ottone e luce calda, corridoi blu e avorio, alloggi
+  del Capitano in noce con la galleria di poppa, abitacolo del Falcon nuovo (livrea sabbia come lo scafo).
+- **App rifatta** (~/Applications/ASTRA.app, 2,6 GB, fino al recupero in volo).
+- **Aiutanti**: ABBORDAGGI (correzioni delle braccia, poi F5.2) e CAMPAGNA (con il ritmo della guerra visto nelle partite: un'ondata comparsa già a
+  distanza di coltello ha distrutto l'Aquila in 5 minuti) ripresi; ARTE-INTERNI rilanciato (la sua cartella era stata pulita).
+- Visto nelle partite e ancora da fare: lo scontro vinto in 6 minuti e poi perso in 5 (CAMPAGNA); molte battute tagliate e ricominciate; il nome delle navi
+  storpiato dal riconoscimento (l'equipaggio capisce lo stesso).
 
 **2/10 pomeriggio — DA RIPRENDERE QUI (limite di sessione raggiunto; aiutanti fermati, i loro worktree restano):**
 - **Fatto dal lead:** il harness preme i tasti del mouse dall'input del giocatore (mira e fuoco provabili); **`AstraFallGuard`**: se il Capitano cade

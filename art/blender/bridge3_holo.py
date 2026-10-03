@@ -48,6 +48,14 @@ def panel_basis(kind: str, n: int):
     return c, facing, right, up
 
 
+SURF = {"fan": (0.80, 0.50, 0.22), "tactical": (1.0, 0.46, 0.24)}      # work surface of the consoles: z at r0, r0, slope (bridge3_consoles.Fan)
+
+
+def surface_z(kind: str, r: float) -> float:
+    z0, r0, sl = SURF["tactical" if kind == "tactical" else "fan"]
+    return z0 + (r - r0) * sl
+
+
 def build_holo_panels(kind: str, name: str):
     """Translucent hover panels of one console kind: planes with lit corner brackets."""
     fb = FB()
@@ -69,5 +77,22 @@ def build_holo_panels(kind: str, name: str):
                     t = 0.006
                     d = cross_ax * (-cross_sgn * t)
                     fb.lamp_face([tuple(a0), tuple(a1), tuple(a1 + d), tuple(a0 + d)], dept, front, L.LAMP)
+        # a hairline border all round (dim), a tab above the top left corner (the page's title tag) and two beams from the emitter to the lower corners
+        for (p0, p1, dd) in ((c - right * (w / 2) + up * (h / 2), c + right * (w / 2) + up * (h / 2), -up), (c - right * (w / 2) - up * (h / 2), c + right * (w / 2) - up * (h / 2), up),
+                             (c - right * (w / 2) - up * (h / 2), c - right * (w / 2) + up * (h / 2), right), (c + right * (w / 2) - up * (h / 2), c + right * (w / 2) + up * (h / 2), -right)):
+            p0, p1 = p0 + facing * 0.002, p1 + facing * 0.002
+            fb.lamp_face([tuple(p0), tuple(p1), tuple(p1 + dd * 0.0022), tuple(p0 + dd * 0.0022)], dept + "_dim", front, L.LAMP_DIM)
+        tl = c - right * (w / 2) + up * (h / 2) + facing * 0.002
+        fb.lamp_face([tuple(tl + up * 0.006), tuple(tl + up * 0.006 + right * 0.11), tuple(tl + up * 0.016 + right * 0.1), tuple(tl + up * 0.016)], dept, front, L.LAMP)
+        r_e, th_e, mount_e = _r, _th, _mount
+        if mount_e == "puck":
+            ex, ey = polar(0, 0, r_e, th_e)
+            emit = Vector((ex, ey, surface_z(kind, r_e) + 0.026))
+        else:
+            ex, ey = polar(0, 0, 1.18, 0.0)
+            emit = Vector((ex, ey, surface_z(kind, 1.18) + 0.122 + 0.0775))
+        for sx in (-1, 1):
+            corner = c + right * (sx * w / 2) - up * (h / 2)
+            fb.lamp_cyl(emit, corner, 0.0012, dept + "_dim", L.LAMP_DIM, seg=4)
         infos.append({"screen": slot, "size_m": [round(w, 3), round(h, 3)], "surface": "hover", "center": [round(v, 3) for v in c]})
     return A.finish(fb.to_object(name), bevel=0.0), infos

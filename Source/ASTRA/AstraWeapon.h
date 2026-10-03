@@ -71,14 +71,25 @@ struct FAstraWeaponDef
 	float EquipAnimS = 1.6f;               // their lengths, which the handling's times are fitted to
 	float ReloadAnimS = 2.2f;
 	float DryAnimS = 0.8f;
-	// where the weapon's rear sight stands against the camera (cm; x ahead, y right, z up) and how the weapon is turned about it (pitch, yaw, roll): at the hip, through the sights
-	// and carried low (running, being put away). Fitted on offline renders of the arms with the weapon as the first-person camera (70 degrees) sees them: the weapon in the lower
-	// part of the view with the left hand and the right forearm in it, the notch of the rear sight at the middle of the screen when aimed (tools/ue_scripts/make_fp_arms.py).
-	FVector HipPlace = FVector(28.0, 6.0, -3.0);
-	FRotator HipTurn = FRotator(0.0, -5.0, 0.0);
-	FVector AdsPlace = FVector(20.0, 0.0, -1.1);
-	FVector LowPlace = FVector(26.0, 12.0, -6.5);
-	FRotator LowTurn = FRotator(-16.0, 15.0, -5.0);
+	// Where the weapon's rear sight (the notch the line of sight goes over, its Sight above) stands against the camera (cm; x ahead, y right, z up) and how the weapon is turned
+	// about it (pitch, yaw, roll): at the hip, through the sights and carried low (running, being put away). The weapon is far enough from the camera and small enough on the
+	// screen for the arms that hold it to be in the picture: the left hand on the hand-guard and the right on the grip, both forearms coming up from its lower edge; fitted on
+	// the bench (tools/boarding.py run --scenario fps, which also checks them) and on offline renders of the arms and the weapon seen with the first-person camera
+	// (tools/ue_scripts/make_fp_arms.py, docs/ABBORDAGGI.md §4).
+	FVector HipPlace = FVector(76.0, 15.4, -4.0);
+	FRotator HipTurn = FRotator(-3.0, -12.0, 0.0);
+	FVector AdsPlace = FVector(32.0, 0.0, 0.0);
+	FVector LowPlace = FVector(70.0, 30.0, -24.0);
+	FRotator LowTurn = FRotator(12.0, -30.0, -20.0);
+	float FpFov = 90.f;                     // the first-person camera's field of view while it is in his hands (the arms and the weapon are drawn with it; empty-handed it is the character's)
+	FVector GripLHand = FVector::ZeroVector;    // where the left palm goes on the weapon (its own frame, cm): the arm is solved to put the animation's left grip socket there
+	// Where the Captain's shoulders stand against the camera (cm; right, left), at the hip and carried low and through the sights, and every place between as the weapon comes up: a body
+	// has them near the eye, but the weapon is held far from it so that it is not a third of the picture, and the arms are made to reach it from shoulders that stand as far ahead as the
+	// weapon does, below the picture (the cut ends of the arms must not show: the bench checks that, in every state and on the way between them).
+	FVector ShoulderHipR = FVector(40.0, 30.0, -55.0);
+	FVector ShoulderHipL = FVector(70.0, -18.0, -58.0);
+	FVector ShoulderAdsR = FVector(-9.0, 4.0, -32.0);
+	FVector ShoulderAdsL = FVector(16.0, -22.0, -30.0);
 
 	// --- the sounds (Content/ASTRA/Audio, synthesised by tools/art/weapon_sounds.py)
 	const TCHAR* ShotSound = TEXT("");

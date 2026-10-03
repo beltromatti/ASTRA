@@ -893,6 +893,13 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 				Best = FMath::Max(Best, Sense(A.Pos, (A.bCraft ? 10.f : 30.f) * (Jammed(A.Pos, S.Pos) ? 0.45f : 1.f), A.bCraft));
 			}
 		}
+		if (Landmarks.IsValidIndex(GateLandmark) && S.Side == EAstraSide::Mandate)
+		{
+			// Keeper Station's traffic radar watches the Gate's approaches (~60 km) and shares its tracks with the fleet by datalink: a force that comes
+			// through is seen crossing towards the Aquila for minutes (CAMPAGNA: a force spawned dark was found only at 15-20 km, whatever its distance)
+			const FVector GatePos = Landmarks[GateLandmark].Pos;
+			Best = FMath::Max(Best, Sense(GatePos, 60.f * (Jammed(GatePos, S.Pos) ? 0.45f : 1.f), false));
+		}
 		bool bCrossFix = false;
 		if (S.bJamming)
 		{
@@ -1038,6 +1045,20 @@ void UAstraBattleSubsystem::TickPlayer(float Dt)
 	}
 }
 
+bool UAstraBattleSubsystem::SetOpeningScript(bool bScript, FString& OutDetail)
+{
+	if (!bScript && StageDone >= 2)
+	{
+		OutDetail = TEXT("the opening's strike group is already in the fight: the script stays");
+		return false;
+	}
+	bOpeningScript = bScript;
+	OutDetail = bScript ? TEXT("the opening plays its own script (the strike group, the vanguard, the relief)")
+	                    : TEXT("the opening's script is off after the Lethe and the freighter: the March sends the strike group, the vanguard and the relief");
+	UE_LOG(LogASTRA, Log, TEXT("[Battle] %s"), *OutDetail);
+	return true;
+}
+
 void UAstraBattleSubsystem::TickScenario(float Dt)
 {
 	if (bSandbox)
@@ -1068,8 +1089,8 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		Report(TEXT("sensors: contact T-11 has lit its drive and is accelerating towards the freighter Brightwater (T-07); "
 		            "drive signature matches a Kharon Mandate frigate, Lethe class"));
 	}
-	// stage 2: the strike group arrives from the Janus Gate side
-	if (StageDone == 1 && Time > 170.f)
+	// stage 2: the strike group arrives from the Janus Gate side (unless the March plays the opening: `opening {"script": false}`)
+	if (bOpeningScript && StageDone == 1 && Time > 170.f)
 	{
 		StageDone = 2;
 		StageTwoAt = Time;
@@ -1126,7 +1147,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	// stage 3: the strike group was the Interdiction Fleet's probe; its vanguard comes through the Janus Gate, and the 7th Fleet's relief
 	// from New Ravenna follows it — the opening grows into a fleet battle. Not after a surrender or under a truce (the war's director
 	// takes the story from there)
-	if (StageDone == 2 && StageTwoAt >= 0.f && Time > StageTwoAt + VanguardAfterS && !bSurrenderAccepted && TruceSince < 0.f && Landmarks.IsValidIndex(GateLandmark))
+	if (bOpeningScript && StageDone == 2 && StageTwoAt >= 0.f && Time > StageTwoAt + VanguardAfterS && !bSurrenderAccepted && TruceSince < 0.f && Landmarks.IsValidIndex(GateLandmark))
 	{
 		StageDone = 3;
 		Report(TEXT("sensors: the Janus Gate is cycling — a transit wake with many drives behind it: a Mandate force is coming through; Keeper "
@@ -1195,9 +1216,13 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		{
 			if (S.bAlive && S.bHostile && !S.bDisabled)
 			{
-				Fighting += (!S.bFleeing && !S.bHoldFire) ? 1 : 0;
+				// a group its commander told to regroup or hold is pausing in the fight, not leaving it: a strike group that arrived at 85 km and
+				// reformed before closing ended the "engagement" in a victory that never was (3 Oct)
+				const FAstraBattleGroup* SG = S.GroupId >= 0 ? FindGroup(S.GroupId) : nullptr;
+				const bool bOrderedPause = SG && (SG->Order == EAstraGroupOrder::Regroup || SG->Order == EAstraGroupOrder::Hold) && !S.bNegotiated;
+				Fighting += ((!S.bFleeing || bOrderedPause) && !S.bHoldFire) ? 1 : 0;
 				Holding += (S.bHoldFire && !S.bFleeing) ? 1 : 0;
-				Withdrawing += S.bFleeing ? 1 : 0;
+				Withdrawing += (S.bFleeing && !bOrderedPause) ? 1 : 0;
 				AgreedWithdraw += (S.bFleeing && S.bNegotiated) ? 1 : 0;
 			}
 		}
@@ -1680,9 +1705,17 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 			                       "EMCON full, a recon flight, or closing in)"), *T->ContactId);
 		return false;
 	}
-	if (T->Side == EAstraSide::Mandate && T->bNegotiated)
+	if (T->Side == EAstraSide::Mandate && T->bNegotiated && T->bHoldFire && !T->bFleeing)
 	{
-		BreakCeasefire(*T);
+		BreakCeasefire(*T);                       // a ship holding fire under terms agreed on the channel: that is a broken word
+	}
+	else if (T->Side == EAstraSide::Mandate && T->bNegotiated && T->bFleeing)
+	{
+		// a ship withdrawing on her commander's order is still at war: firing on her is a pursuit, not a broken truce (no truce was agreed: Thale
+		// accused the Aquila of one when a standing "engage until they fall" fired on the Hypnos as the Mandate pulled back, 2 Oct). She is in the
+		// fight again and may turn on us
+		T->bNegotiated = false;
+		Report(FString::Printf(TEXT("tactical: we are firing on the withdrawing %s (%s): she is fair game, and she may turn and fight"), *T->Name, *T->ContactId));
 	}
 	FAstraBattleShip& P = Ships[0];
 	const double Dist = FVector::Dist(P.Pos, T->Pos);
@@ -2863,6 +2896,7 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 	if (S.bPiloted)
 	{
 		bPilotDown = true;
+		bPilotAuto = false;
 		if (Squadrons.IsValidIndex(S.Squadron))
 		{
 			--Squadrons[S.Squadron].Total;
@@ -3921,9 +3955,20 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		{
 			Q.bAirborneReported = true;
 			const FAstraBattleShip* Cr = FindById(Q.CarrierId);
-			Report(bOurs ? FString::Printf(TEXT("flight: %s squadron airborne, %d %ss on %s"), *Q.Name, Q.Launched, *Q.CallSign, *Q.Mission.ToUpper())
-			             : FString::Printf(TEXT("sensors: %s has launched strike fighters — %d Harpies inbound on the Aquila"),
-			                               Cr ? *KnownLabel(*Cr) : TEXT("an enemy cruiser"), Q.Launched));
+			const bool bAquilas = Cr && Cr->bPlayer;
+			if (bOurs && !bAquilas)
+			{
+				// another ship's wing (an arriving battle group's): fleet news on the plot, not a report for the Aquila's bridge — each one opened a
+				// report turn with nothing in it for the Captain, and Tactical filled it with the range of her target (3 Oct)
+				Report(FString::Printf(TEXT("flight: the %s's %s are airborne, %d on %s"), Cr ? *Cr->Name : TEXT("fleet"),
+				                       Q.Kind == 1 ? TEXT("bombers") : (Q.Kind == 2 ? TEXT("drones") : TEXT("fighters")), Q.Launched, *Q.Mission.ToLower()), false);
+			}
+			else
+			{
+				Report(bOurs ? FString::Printf(TEXT("flight: %s squadron airborne, %d %ss on %s"), *Q.Name, Q.Launched, *Q.CallSign, *Q.Mission.ToUpper())
+				             : FString::Printf(TEXT("sensors: %s has launched strike fighters — %d Harpies inbound on the Aquila"),
+				                               Cr ? *KnownLabel(*Cr) : TEXT("an enemy cruiser"), Q.Launched));
+			}
 		}
 	}
 }
@@ -4337,7 +4382,7 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 	double Bearing = FMath::FRandRange(0.f, 360.f), Range = 25.0;
 	Beat->TryGetNumberField(TEXT("bearing_deg"), Bearing);
 	Beat->TryGetNumberField(TEXT("range_km"), Range);
-	Range = FMath::Clamp(Range, 6.0, 120.0);
+	Range = FMath::Clamp(Range, 6.0, 250.0);         // (the March sends forces from beyond the Gate: up to 120 km and more)
 	TArray<FString> Ids;
 	const TArray<TSharedPtr<FJsonValue>>* IdList = nullptr;
 	if (Beat->TryGetArrayField(TEXT("_ids"), IdList))
@@ -4414,9 +4459,12 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			}
 			if (Type == TEXT("raid"))
 			{
-				// the fog of war: they come through dark; what the Aquila knows of them grows with her sensors (TickSensors)
+				// the fog of war: they come through dark (unless the beat says they come with their drives lit: a force the March sends openly, seen
+				// approaching for minutes); what the Aquila knows of them grows with her sensors (TickSensors)
+				bool bDarkBeat = true;
+				Beat->TryGetBoolField(TEXT("dark"), bDarkBeat);
 				Ships[I].bFog = true;
-				Ships[I].bDark = true;
+				Ships[I].bDark = bDarkBeat;
 				Ships[I].Track = 0;
 				Ships[I].bClassified = false;
 				Ships[I].bIdentified = false;
@@ -4706,8 +4754,10 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 			}
 			if (bRaid)
 			{
+				bool bDarkBeat = true;                    // (the beat's "dark": a force that comes with its drives lit is seen from much farther)
+				Beat->TryGetBoolField(TEXT("dark"), bDarkBeat);
 				S.bFog = true;
-				S.bDark = true;
+				S.bDark = bDarkBeat;
 				S.Track = 0;
 				S.bClassified = false;
 				S.bIdentified = false;
@@ -5539,6 +5589,89 @@ FVector UAstraBattleSubsystem::PilotMouth() const
 	return Ships[0].Pos + Ships[0].Att.RotateVector(FVector(420.0, -14.9, -4.3));
 }
 
+namespace
+{
+	constexpr double PilotRecoverReachM = 8000.0;   // the deck's recovery guidance picks a Falcon up within this of the Aquila
+	constexpr double PilotClearM = 450.0;           // off the Aquila's long axis: clear of her hull, her island and her guns
+	constexpr double PilotGateM = 1500.0;           // the approach gate: this far out in front of the tube's mouth, on its axis
+}
+
+bool UAstraBattleSubsystem::StartPilotRecovery(const FString& By)
+{
+	FAstraBattleShip* S = PilotedId >= 0 ? FindById(PilotedId) : nullptr;
+	if (!S || !S->bAlive || bPilotDown || !Ships.Num() || !Ships[0].bAlive || FVector::Dist(S->Pos, Ships[0].Pos) > PilotRecoverReachM)
+	{
+		return false;
+	}
+	if (!bPilotAuto)
+	{
+		bPilotAuto = true;
+		PilotAutoLeg = 0;
+		PilotTakeBackT = 0.f;
+		Report(FString::Printf(TEXT("flight: the deck has Eagle — the recovery guidance is flying the Captain's Falcon in through the port tube (asked by %s); "
+		                            "pushing the stick hard gives her back to him"), *By), true);
+	}
+	return true;
+}
+
+void UAstraBattleSubsystem::StopPilotRecovery(const FString& Why)
+{
+	if (!bPilotAuto)
+	{
+		return;
+	}
+	bPilotAuto = false;
+	Report(FString::Printf(TEXT("flight: Eagle's recovery guidance is off — %s"), *Why), true);
+}
+
+void UAstraBattleSubsystem::TickPilotRecovery(FAstraBattleShip& S, float Dt)
+{
+	// an automatic carrier landing: first out of the way of the hull (straight out from the Aquila's long axis), then to the gate a kilometre and a
+	// half in front of the tube's mouth, then down the axis into the mouth, slowing; the pawn takes her in when she is there (bRecovered)
+	const FAstraBattleShip& A = Ships[0];
+	const FVector Fwd = A.Att.GetForwardVector();
+	const FVector Mouth = PilotMouth();
+	const FVector Gate = Mouth + Fwd * PilotGateM;
+	const FVector Rel = S.Pos - A.Pos;
+	const FVector Out = Rel - Fwd * FVector::DotProduct(Rel, Fwd);
+	const double OutM = Out.Size();
+	const double Ahead = FVector::DotProduct(S.Pos - Mouth, Fwd);
+	if (PilotAutoLeg == 0 && (OutM >= PilotClearM || Ahead > 300.0))
+	{
+		PilotAutoLeg = 1;
+	}
+	if (PilotAutoLeg == 1 && FVector::Dist(S.Pos, Gate) < 250.0)
+	{
+		PilotAutoLeg = 2;
+	}
+	FVector Goal;
+	double Speed;
+	if (PilotAutoLeg == 0)
+	{
+		const FVector Away = OutM > 1.0 ? Out / OutM : A.Att.GetUpVector();
+		Goal = S.Pos + Away * (PilotClearM - OutM + 100.0) + Fwd * 60.0;
+		Speed = 260.0;
+	}
+	else if (PilotAutoLeg == 1)
+	{
+		Goal = Gate;
+		Speed = FMath::Clamp(FVector::Dist(S.Pos, Gate) * 0.35, 220.0, 650.0);
+	}
+	else
+	{
+		Goal = Mouth;
+		Speed = FMath::Clamp(FVector::Dist(S.Pos, Mouth) * 0.18, 110.0, 260.0);
+	}
+	const FVector Dir = (Goal - S.Pos).GetSafeNormal();
+	S.Vel += (A.Vel + Dir * Speed - S.Vel).GetClampedToMaxSize(180.0 * Dt);
+	S.Pos += S.Vel * Dt;
+	// the nose along her path through the Aquila's frame; down the axis, facing aft into the tube
+	const FVector RelVel = S.Vel - A.Vel;
+	const FVector Look = PilotAutoLeg == 2 ? -Fwd : (RelVel.SizeSquared() > 1.0 ? RelVel.GetSafeNormal() : Dir);
+	const FQuat WantAtt = FRotationMatrix::MakeFromXZ(Look, A.Att.GetUpVector()).ToQuat();
+	S.Att = FQuat::Slerp(S.Att, WantAtt, FMath::Clamp(1.6f * Dt, 0.f, 1.f)).GetNormalized();
+}
+
 bool UAstraBattleSubsystem::TakeFalcon()
 {
 	for (FAstraSquadron& Q : Squadrons)
@@ -5569,6 +5702,7 @@ bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos,
 	{
 		return false;
 	}
+	bPilotAuto = false;
 	const FVector Pos = FromWorld(WorldPos);
 	const FQuat Att = Ships[0].Att * WorldRot;
 	const int32 I = AddShip(TEXT("EAGLE"), TEXT("Eagle (the Captain's Falcon)"), TEXT("ASTRA fighter (Falcon)"), TEXT(""), EAstraSide::Astra,
@@ -5580,6 +5714,10 @@ bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos,
 	C.bPiloted = true;
 	C.CraftKind = 0;
 	C.Squadron = Squadrons.IndexOfByPredicate([](const FAstraSquadron& Q) { return Q.Side == EAstraSide::Astra && Q.Name == TEXT("alpha"); });
+	if (Squadrons.IsValidIndex(C.Squadron) && !bFromPlanet)
+	{
+		Squadrons[C.Squadron].OnDeck = FMath::Max(0, Squadrons[C.Squadron].OnDeck - 1);   // his Falcon has left the deck (ReturnFalcon gives it back)
+	}
 	C.Missiles = 4;
 	C.RailDamage = 0.f;
 	C.PDRange = 0.f;
@@ -5638,6 +5776,7 @@ void UAstraBattleSubsystem::LeavePiloted()
 void UAstraBattleSubsystem::EndPiloted(bool bLanded)
 {
 	EndEagleWing();
+	bPilotAuto = false;
 	if (FAstraBattleShip* S = FindById(PilotedId))
 	{
 		S->bAlive = false;
@@ -5732,6 +5871,22 @@ void UAstraBattleSubsystem::TickPiloted(FAstraBattleShip& S, float Dt)
 			}
 		}
 		GFaceRequest.Reset();
+	}
+	if (bPilotAuto)
+	{
+		// the deck's recovery guidance flies her; the stick pushed hard for half a second gives her back to the Captain
+		const float Push = FMath::Max3(FMath::Abs(Pilot.Pitch), FMath::Abs(Pilot.Yaw), FMath::Abs(Pilot.Roll));
+		PilotTakeBackT = Push > 0.6f ? PilotTakeBackT + Dt : 0.f;
+		if (PilotTakeBackT > 0.5f)
+		{
+			StopPilotRecovery(TEXT("the Captain has the stick again"));
+		}
+		else
+		{
+			TickPilotRecovery(S, Dt);
+			S.Shield = FMath::Min(S.ShieldMax, S.Shield + S.ShieldRegen * Dt);
+			return;                               // (no guns, no lock, no hull to fly into: the deck is flying her along a clear path)
+		}
 	}
 	// the stick: rates in the craft's own frame (pitch 75, yaw 55, roll 140 deg/s at full deflection)
 	const float Boost = Pilot.bBoost ? 1.f : 0.f;
@@ -5907,6 +6062,9 @@ void UAstraBattleSubsystem::GetPilotStatus(FAstraPilotStatus& Out) const
 	Out.HomeWorld = ToWorld(Mouth);
 	Out.HomeRangeKm = FVector::Dist(Mouth, S->Pos) / OneKm;
 	Out.bCanLand = FVector::Dist(Mouth, S->Pos) < 600.0 && (S->Vel - Ships[0].Vel).Size() < 220.f;
+	Out.bRecovering = bPilotAuto;
+	Out.bCanRecover = !bPilotAuto && S->bAlive && Ships[0].bAlive && FVector::Dist(S->Pos, Ships[0].Pos) < PilotRecoverReachM;
+	Out.bRecovered = bPilotAuto && PilotAutoLeg == 2 && Out.bCanLand;
 	for (const FAstraProjectile& Pr : Projectiles)
 	{
 		Out.Incoming += (!Pr.bDead && Pr.Kind == EAstraProjKind::Missile && Pr.Target == S->Id) ? 1 : 0;

@@ -165,6 +165,7 @@ def palette_lamp(name: str, strength: float) -> bpy.types.Material:
     em = mt.node("ShaderNodeEmission", 300, 0)
     em.inputs["Strength"].default_value = strength
     t = mt.image(path, interp="Closest", x=-300, y=0)
+    t.image.alpha_mode = "CHANNEL_PACKED"          # the alpha is the alert weight: it must not darken the colour (weight 0 = black otherwise)
     mt.link(t, "Color", em, "Color")
     mt.link(em, "Emission", mt.out, "Surface")
     return mt.m
@@ -223,6 +224,23 @@ def glass(name: str, tint=(0.02, 0.03, 0.035), alpha: float = 0.10) -> bpy.types
     return mt.m
 
 
+def grate_mat(name: str) -> bpy.types.Material:
+    """The walkway grate (a masked material in Unreal): dark steel with a square perforation (a checker drives the alpha)."""
+    mt = Mat(name)
+    bsdf = mt.node("ShaderNodeBsdfPrincipled", 500, 0)
+    bsdf.inputs["Base Color"].default_value = (0.05, 0.055, 0.06, 1)
+    bsdf.inputs["Metallic"].default_value = 0.8
+    bsdf.inputs["Roughness"].default_value = 0.45
+    uv = mt.node("ShaderNodeTexCoord", -600, 0)
+    ck = mt.node("ShaderNodeTexChecker", -300, 0)
+    ck.inputs["Scale"].default_value = 36.0
+    mt.link(uv, "UV", ck, "Vector")
+    mt.link(ck, "Fac", bsdf, "Alpha")
+    mt.link(bsdf, "BSDF", mt.out, "Surface")
+    mt.m.surface_render_method = "DITHERED"
+    return mt.m
+
+
 def label_mat(name: str, strength: float = 1.6) -> bpy.types.Material:
     mt = Mat(name)
     path = find([L.CACHE], "T_BRG3_Labels.png")
@@ -233,6 +251,20 @@ def label_mat(name: str, strength: float = 1.6) -> bpy.types.Material:
     t = mt.image(path, x=-300, y=0)
     mt.link(t, "Color", bsdf, "Emission Color")
     mt.link(t, "Color", bsdf, "Base Color")
+    mt.link(bsdf, "BSDF", mt.out, "Surface")
+    return mt.m
+
+
+def decor_mat(name: str, strength: float = 1.8) -> bpy.types.Material:
+    """The decor atlas (static display pages, soft glows): dark glass that emits the page (the instance is a M_ASTRA_Screen)."""
+    mt = Mat(name)
+    path = find([L.CACHE], "T_BRG3_Decor.png")
+    bsdf = mt.node("ShaderNodeBsdfPrincipled", 500, 0)
+    bsdf.inputs["Base Color"].default_value = (0.01, 0.012, 0.015, 1)
+    bsdf.inputs["Roughness"].default_value = 0.30
+    bsdf.inputs["Emission Strength"].default_value = strength
+    t = mt.image(path, x=-300, y=0)
+    mt.link(t, "Color", bsdf, "Emission Color")
     mt.link(bsdf, "BSDF", mt.out, "Surface")
     return mt.m
 
@@ -253,7 +285,18 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     palette_lamp(L.LAMP_DIM, 2.4)
     palette_lamp(L.LAMP_HOT, 22.0)
     label_mat(L.LABEL, 1.4)
+    decor_mat(L.DECOR, float(os.environ.get("BRG3_DECOR", "1.8")))
+    pbr(L.BRASS, srgb_to_linear("#B89A4E"), "Brushed", 1.0, (0.24, 0.42), 1.0, 0.0, 0.15, 0.5)
+    pbr("MI_BRG3_Navy", srgb_to_linear("#16294F"), "PanelPaint", 1.0, (0.28, 0.45), 0.0, 0.0, 0.3, 0.3)         # navy paint: the wainscot of the command deck
+    # the Falcon's own hull instances (ship3_palette.PAINT["A"]): the nose and wings of the cockpit mesh are the hull seen from inside
+    pbr("MI_HULL_A_Plate", srgb_to_linear("#D6D2C7"), "PanelPaint", 1.0, (0.30, 0.55), 0.0, 0.0, 0.25, 0.3)
+    pbr("MI_HULL_A_Frame", srgb_to_linear("#4A4F55"), "Gunmetal", 1.0, (0.28, 0.55), 0.35, 0.0, 0.5, 0.5)
+    pbr("MI_HULL_A_Livery", srgb_to_linear("#1F3A6B"), "PanelPaint", 1.0, (0.28, 0.50), 0.0, 0.0, 0.25, 0.3)
+    pbr("MI_SHIP_Leaf", (0.045, 0.20, 0.04), "Linen", 4.0, (0.45, 0.65), 0.0, 0.0, 0.5, 0.6)            # the ship kit's instances that the props share
+    pbr("MI_SHIP_Soil", (0.035, 0.022, 0.014), "Linen", 4.0, (0.7, 0.9), 0.0, 0.0, 0.5, 0.8)
+    pbr("MI_SHIP_CrateBlue", (0.045, 0.09, 0.20), "PanelPaint", 1.0, (0.5, 0.7), 0.0, 0.0, 0.25, 0.3)
     glass(L.GLASS)
+    grate_mat("MI_ASTRA_Grate")
     for slot, info in screen_pages.items():
         surf = info.get("surface")
         if slot in bpy.data.materials:
@@ -267,6 +310,23 @@ def make_materials(screen_pages: dict[str, dict]) -> None:
     for m in bpy.data.materials:
         if not m.use_nodes or not m.node_tree.nodes:
             pbr(m.name, (0.3, 0.3, 0.3))
+
+
+def make_cabin_materials() -> None:
+    """The Captain's quarters' instances (tools/ue_scripts/build_quarters.py) and the medbay's linen, as the preview knows them: dark walnut, a navy carpet, a warm wall paint,
+    cognac leather, the pillow linen and the navy blanket, red book cloth, the white strips of the cabin's light, the two screens."""
+    pbr("MI_QTR_Wood", (1.0, 0.92, 0.86), "WoodDark", 1.2, (0.28, 0.46), 0.0, 0.0, 1.0, 0.6)
+    pbr("MI_QTR_Carpet", (0.17, 0.23, 0.44), "Carpet", 2.5, (0.85, 0.96), 0.0, 0.0, 1.0, 0.8)
+    pbr("MI_QTR_Rug", (0.22, 0.045, 0.040), "Carpet", 3.0, (0.85, 0.96), 0.0, 0.0, 1.0, 0.8)
+    pbr("MI_QTR_Wall", (0.58, 0.54, 0.48), "PanelPaint", 1.0, (0.5, 0.65), 0.0, 0.0, 0.3, 0.3)
+    pbr("MI_QTR_Leather", (0.40, 0.17, 0.075), "LeatherBlack", 2.0, (0.30, 0.50), 0.0, 0.0, 0.9, 0.7, coat=0.12, coat_rough=0.3)
+    pbr("MI_MED_Linen", (0.8, 0.82, 0.84), "Cotton", 3.0, (0.72, 0.9), 0.0, 0.0, 0.4, 0.7)
+    pbr("MI_MED_Blanket", (0.1, 0.16, 0.27), "Linen", 2.5, (0.8, 0.95), 0.0, 0.0, 0.5, 0.9)
+    pbr("MI_MED_Red", (0.42, 0.03, 0.025), None, 1.0, (0.3, 0.42), 0.0, 0.0, 0.0, 0.2)
+    pbr("MI_ASTRA_Leather", (0.05, 0.055, 0.075), "LeatherBlack", 2.0, (0.3, 0.5), 0.0, 0.0, 0.9, 0.7, coat=0.15, coat_rough=0.25)
+    emissive("MI_ASTRA_Light", (1.0, 0.92, 0.78), 5.0)
+    for slot, page in (("MI_QTR_Map", "Quarters_Map"), ("MI_QTR_Log", "Quarters_Log")):
+        screen_mat(slot, page, strength=2.2)
 
 
 # ------------------------------------------------------------------------------------------------------------- scene

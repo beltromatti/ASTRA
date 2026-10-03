@@ -1146,9 +1146,36 @@ async def s30_reply_replaces_the_rest() -> list[str]:
         return bad
 
 
+async def s31_one_answer_in_three_lines() -> list[str]:
+    """One officer's answer in three lines (one turn's speak calls): the second and the third wait behind the first, not behind the news — they are
+    said as written, never thought again for having waited for their own officer (the XO's "Aggiorno i numeri...", 3 Oct)."""
+    async with Bridge() as b:
+        asked: list[str] = []
+
+        def hook():
+            async def rethink(text: str, waited: float, cut_after: str) -> str | None:
+                asked.append(text)
+                return "Rewritten: " + text
+            return rethink
+
+        await b.say("one", "xo", LONG + " " + LONG, rethink=hook())
+        await b.say("two", "xo", "Second sentence of the same report, with its numbers.", rethink=hook())
+        await b.say("three", "xo", "Third sentence: what it means for the Captain.", rethink=hook())
+        await b.settle()
+        tr = b.trace()
+        bad = check(tr, b.enq)
+        spoken = tr.spoken_texts()
+        if asked:
+            bad.append(f"the continuation of the answer was thought again: {asked}")
+        said = " ".join(spoken)                                  # (the floor may join an officer's consecutive lines into one)
+        if "Second sentence of the same report, with its numbers." not in said or "Third sentence: what it means for the Captain." not in said or "Rewritten" in said:
+            bad.append(f"the answer's lines were not said as written: {spoken}")
+        return bad
+
+
 SCENARIOS = [s01_turns, s02_barge_in, s03_typed_order, s04_no_speech, s05_floor_timeout, s06_topic, s07_expiry, s08_overflow, s09_merge,
              s10_rethink, s11_urgent, s12_synth_failure, s13_slow_synthesis, s14_burst, s15_double_press, s16_answer_interrupted,
-             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio, s24_startup_delay, s25_hook, s26_first_version_engine, s27_live_replay, s28_typed_order_over_an_answer, s29_report_age, s30_reply_replaces_the_rest]
+             s17_flags, s18_compat, s19_stuck_key, s20_new_session, s21_late_answer, s22_turn_with_two_answers, s23_no_audio, s24_startup_delay, s25_hook, s26_first_version_engine, s27_live_replay, s28_typed_order_over_an_answer, s29_report_age, s30_reply_replaces_the_rest, s31_one_answer_in_three_lines]
 
 
 def main() -> int:

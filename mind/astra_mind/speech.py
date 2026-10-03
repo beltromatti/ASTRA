@@ -223,6 +223,11 @@ class Voice:
         # again before it was said is here as it was said, one cut off as far as it went: the officers' sense of what the Captain has heard
         self._heard: deque[tuple[float, str, str, bool]] = deque(maxlen=60)
 
+    def waiting(self, limit: int = 8) -> list[tuple[str, str, str]]:
+        """What is waiting to be said, in the order it would be said: (who, the words, how urgent). The line being said now is not here."""
+        order = sorted((l for l in self._queue if l.state == "queued"), key=lambda l: (l.prio, l.enq, l.id))
+        return [(l.name or self.who(l.speaker)[0], l.text, PRIO_NAMES[l.prio]) for l in order[:limit]]
+
     def heard_since(self, seconds: float) -> list[tuple[float, str, str, bool]]:
         """What was said aloud in the last `seconds`, oldest first: (seconds ago, who said it, the words heard, whether it was said to the end)."""
         now = self._now()
@@ -668,7 +673,9 @@ class Voice:
             line = min((l for l in pool if l.rethinking is None), key=lambda l: (l.prio, l.enq, l.id), default=None)
             if line is None:
                 return None
-            if due and line.rethink is not None and (line.cut_after or self._now() - line.thought_t > RETHINK_AFTER_S):
+            # the rest of the answer being said now (the same officer, the same turn's lines) is not old news: it is never thought again for waiting
+            cont = cur is not None and cur.speaker == line.speaker and abs(cur.enq - line.enq) < 3.0 and not line.cut_after
+            if due and line.rethink is not None and not cont and (line.cut_after or self._now() - line.thought_t > RETHINK_AFTER_S):
                 # its turn has come but it has waited (or was cut off): whoever says it thinks again first — just in time, once —
                 # and meanwhile the next line may go. One re-think at a time: the lines behind it are thought again when their own
                 # turn comes (all of them at once, in a busy battle, were a dozen model calls for lines that then waited again)
@@ -936,6 +943,13 @@ class Voice:
         words = line.text if reason == "done" else line.text[:int(played * len(line.text))].strip()
         if words and sent > 0.2:
             self._heard.append((now, line.name or self.who(line.speaker)[0], words, reason == "done"))
+        if reason == "done":
+            # the rest of the same answer (the same officer's lines queued with this one, one turn's speak calls) waited behind it, not behind
+            # the news: it is not old, and goes on without being thought again (the XO's report in three sentences came out as "Aggiorno i
+            # numeri..." for the second, re-thought after waiting for the first, 3 Oct)
+            for l in self._queue:
+                if l.speaker == line.speaker and abs(l.enq - line.enq) < 3.0 and not l.cut_after:
+                    l.thought_t = max(l.thought_t, now)
         if line.stream is not None:
             line.stream.stop()
         if reason == "cut":

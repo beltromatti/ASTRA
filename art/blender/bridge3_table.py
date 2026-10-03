@@ -41,10 +41,11 @@ def build_holo_table(D: dict, name: str = "SM_BRG3_HoloTable"):
     rev([(1.12, 0.795), (1.30, 0.815), (1.30, 0.86), (1.12, 0.845)], L.IVORY, seg=72)
     em.lamp_arc([(0.98, 0.0), (1.06, 0.0), (1.06, 0.004), (0.98, 0.004)], 0, 0, 0, 0, 360, "command", L.LAMP, seg=72, z0=0.783, loop=True)
     # the rim ring: brushed metal, a stepped outer band, an inner chamfer towards the glass
-    rev([(plot_r + 0.02, 0.86), (R, 0.86), (R, 0.955), (plot_r + 0.02, 0.955)], L.TRIM, seg=72)
-    rev([(R, 0.84), (R + 0.02, 0.84), (R + 0.02, 0.94), (R, 0.94)], L.STRUCT, seg=72)
-    # the matte projection plate and a lit line at its edge
-    rev([(0.001, 0.93), (plot_r + 0.02, 0.93), (plot_r + 0.02, 0.945), (0.001, 0.945)], L.RUBBER, seg=72)             # matte black projection plate: no mirror of the ceiling
+    rev([(plot_r + 0.02, 0.86), (R, 0.86), (R, 0.955), (plot_r + 0.02, 0.955)], L.STRUCT, seg=72)
+    rev([(plot_r + 0.02, 0.953), (R - 0.004, 0.953), (R - 0.004, 0.962), (plot_r + 0.02, 0.962)], L.BRASS, seg=72)    # the brass bezel
+    rev([(R, 0.84), (R + 0.02, 0.84), (R + 0.02, 0.94), (R, 0.94)], L.TRIM, seg=72)
+    # the dark glass projection plate (satin: no mirror of the ceiling) and a lit line at its edge
+    rev([(0.001, 0.93), (plot_r + 0.02, 0.93), (plot_r + 0.02, 0.945), (0.001, 0.945)], L.DGLASS, seg=72)
     em.lamp_arc([(plot_r + 0.004, 0.0), (plot_r + 0.02, 0.0), (plot_r + 0.02, 0.003), (plot_r + 0.004, 0.003)], 0, 0, 0, 0, 360, "cyan", L.LAMP_DIM,
                 seg=96, z0=0.9455, loop=True)
     # range ticks on the rim (every 5 degrees, a longer one every 30) and the crown of emitter lenses
@@ -58,6 +59,21 @@ def build_holo_table(D: dict, name: str = "SM_BRG3_HoloTable"):
         a = 7.5 * k + 3.75
         px, py = polar(0, 0, plot_r + 0.055, a)
         em.lamp_cyl((px, py, 0.955), (px, py, 0.962), 0.0105, "cyan" if k % 4 else "white", L.LAMP, seg=8)
+    # the bearing numerals on the brass bezel, every 30 degrees (the same dial as the floor's), read from outside
+    for k in range(12):
+        a = 30.0 * k
+        px, py = polar(0, 0, rim_mid + 0.012, a)
+        out = (math.cos(math.radians(a)), math.sin(math.radians(a)), 0.0)
+        em.text(f"{int(a):03d}", (px, py, 0.9632), 0.026, (0, 0, 1), L.LAMP_DIM, up=out, cell="warm_dim", tracking=0.004)
+    # the underside of the dish: a ring of light dashes and the pedestal's slits between the fins
+    for k in range(36):
+        a = 10.0 * k + 5.0
+        p0, p1 = polar(0, 0, 1.18, a - 3.0), polar(0, 0, 1.18, a + 3.0)
+        em.lamp_cbox((0.5 * (p0[0] + p1[0]), 0.5 * (p0[1] + p1[1]), 0.776), (0.1, 0.012, 0.004), "command_dim", L.LAMP_DIM, Rz(a))
+    for k in range(16):
+        a = 360.0 * k / 16 + 11.25
+        px, py = polar(0, 0, 0.44, a)
+        em.lamp_cbox((px, py, 0.27), (0.012, 0.010, 0.36), "command_dim", L.LAMP_DIM, Rz(a))
     # the bow marker: a lit chevron and the word FWD on the far side (+x)
     px, py = polar(0, 0, rim_mid, 0.0)
     em.lamp_face([(px - 0.03, py - 0.03, 0.9572), (px + 0.03, py, 0.9572), (px - 0.03, py + 0.03, 0.9572), (px - 0.012, py, 0.9572)], "amber", (0, 0, 1))

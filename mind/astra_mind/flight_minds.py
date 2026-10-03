@@ -208,11 +208,19 @@ REMEMBER = _fn("remember", "Keep one lasting memory of one of the people: what t
     "memory": {"type": "string", "description": "in English, in the third person about that person, one short sentence (under 35 words), the Captain named each time"}},
     ["speaker", "kind", "memory"])
 
+RECOVER_EAGLE = _fn("recover_eagle", "Bring the Captain's Falcon (Eagle) aboard with the deck's recovery guidance: an automatic carrier landing that flies her clear of the "
+                                     "hull, to the gate in front of the bow and in through the port tube. For when the Captain asks to be brought home or must be "
+                                     "(his Falcon hurt, missiles on him, the fight over), and he is within 8 km of the Aquila; he can take the stick back at any time. "
+                                     "The answer says whether the deck has her.", {
+    "by": {"type": "string", "enum": ["cag", "deck_chief"], "description": "who calls the recovery"},
+    "reason": {"type": "string", "description": "one sentence, for the log"}},
+    ["by"])
+
 STAY_QUIET = _fn("stay_quiet", "Nothing here needs a voice or an order: the net stays quiet. This is the usual answer to news that changes nothing the Captain must know or decide. "
                              "Say in a few words why (it goes in the log).", {"reason": {"type": "string"}}, ["reason"])
 
-TOOLS = [SAY, MISSION, REMEMBER, STAY_QUIET]
-TOOLS_MUST = [SAY, MISSION, REMEMBER]               # a look that holds news that must be called (Kind.call): there is no tool for silence in it
+TOOLS = [SAY, MISSION, RECOVER_EAGLE, REMEMBER, STAY_QUIET]
+TOOLS_MUST = [SAY, MISSION, RECOVER_EAGLE, REMEMBER]   # a look that holds news that must be called (Kind.call): there is no tool for silence in it
 
 
 # ------------------------------------------------------------------------------------------------ the prompt
@@ -386,6 +394,7 @@ class FlightMinds:
         self.standing = standing
         self.path = path
         self.trace = trace
+        self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []   # the speech floor's backlog (speech.Voice.waiting, set by the server)
         self.system = system_prompt()
         self.disabled = False
         self.state: dict[str, Any] = {}
@@ -777,6 +786,11 @@ class FlightMinds:
             parts.append("NEW SINCE YOUR LAST LOOK (newest last)\n" + "\n".join(
                 f" - {max(0, now - e.t):.0f} s ago · {e.text}" + ("" if e.take else "  [the bridge's news: its officers have it; say something only if it touches your own people or your own deck]")
                 for e in events))
+        queued = self.waiting()
+        if queued:
+            # what is queued on the Captain's ears (the bridge's officers, the net, the other ships): a crisis on the net is a few clear calls, not every call
+            parts.append("WAITING TO BE SAID on the Captain's speakers (queued behind whoever is speaking: a new call is worth adding only if it matters more "
+                         "to him than these, and nothing here is said again)\n" + "\n".join(f" - {who} ({how}): \"{words}\"" for who, words, how in queued))
         if inbox:
             parts.append("THE CAPTAIN SAYS (over the net)\n" + "\n".join(
                 f" - {max(0, now - m.t):.0f} s ago{', relayed by Comms, who opened the net for him' if m.src == 'hail' else ''}: \"{m.text}\"" for m in inbox))
@@ -814,6 +828,8 @@ class FlightMinds:
                 await self._say(a, lang, by_captain, present, rec)
             elif call.name == "mission":
                 pending.append(("mission", a, asyncio.ensure_future(self._mission(a, by_captain, state))))
+            elif call.name == "recover_eagle":
+                pending.append(("recover_eagle", a, asyncio.ensure_future(self.execute("eagle_recover", {"by": self.radio(str(a.get("by") or "cag"))}, "flight"))))
             elif call.name == "remember":
                 self._remember(a)
             elif call.name == "stay_quiet":
@@ -922,6 +938,9 @@ class FlightMinds:
             ok = bool(res.get("ok"))
             rec["ok" if ok else "failed"] += 1
             who = self.radio(a.get("by", "cag")) if a.get("by") in CAST else "?"
+            if _name == "recover_eagle":
+                self._note("(order)", f"{who} called Eagle's recovery => {'ok' if ok else 'FAILED'}: {str(res.get('detail', ''))[:140]}")
+                continue
             self._note("(order)", f"{who} ordered {a.get('squadron')}: {a.get('type')}" + (f" on {a['target']}" if a.get("target") else "")
                        + f" => {'ok' if ok else 'FAILED'}: {str(res.get('detail', ''))[:140]}")
 

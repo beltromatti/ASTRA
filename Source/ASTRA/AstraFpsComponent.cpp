@@ -11,12 +11,14 @@
 #include "AstraShipSubsystem.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PoseableMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "ReferenceSkeleton.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
@@ -45,6 +47,13 @@ namespace
 	FAutoConsoleVariableRef FpsCvLowY(TEXT("astra.fps.low_y"), GLowY, TEXT("Tuning: cm added to the lowered weapon's place, to the right of the camera"));
 	FAutoConsoleVariableRef FpsCvLowZ(TEXT("astra.fps.low_z"), GLowZ, TEXT("Tuning: cm added to the lowered weapon's place, above the camera (negative: below)"));
 	FAutoConsoleVariableRef FpsCvArms(TEXT("astra.fps.arms"), GArmsOn, TEXT("1: the mannequin's arms hold the weapon (applies when the weapon is next drawn); 0: the weapon alone (the fallback)"));
+	// the shoulders' places are the weapon table's (ShoulderHipR/L: below the picture); these move them (cm; x ahead, y to the right for the right one and to the left for the left, z up)
+	float GShoulderX = 0.f, GShoulderY = 0.f, GShoulderZ = 0.f;
+	float GFpFov = 0.f;
+	FAutoConsoleVariableRef FpsCvShX(TEXT("astra.fps.shoulder_x"), GShoulderX, TEXT("Tuning: cm added to how far ahead of the camera the shoulders stand: they decide how bent the arms are"));
+	FAutoConsoleVariableRef FpsCvShY(TEXT("astra.fps.shoulder_y"), GShoulderY, TEXT("Tuning: cm added to how far each shoulder is from the middle (outwards)"));
+	FAutoConsoleVariableRef FpsCvShZ(TEXT("astra.fps.shoulder_z"), GShoulderZ, TEXT("Tuning: cm added to the shoulders' height (negative: lower, further below the picture)"));
+	FAutoConsoleVariableRef FpsCvFov(TEXT("astra.fps.fp_fov"), GFpFov, TEXT("Tuning: the first-person field of view while a weapon is in his hands (degrees; 0: the weapon table's)"));
 
 	// the arms: the mannequin cut down to the lower half of the upper arm, the forearm and the hand (tools/ue_scripts/make_fp_arms.py)
 	const TCHAR* const FpsArmsPath = TEXT("/Game/ASTRA/Weapons/SKM_ASTRA_Arms.SKM_ASTRA_Arms");
@@ -56,7 +65,6 @@ namespace
 	}
 
 	constexpr float FpsKeysShownS = 24.f;
-	const TCHAR* const FpsKeysLine = TEXT("LMB fire   RMB aim   R reload   1 rifle   2 sidearm   Q last weapon   H holster   Shift run   C crouch · hold C: prone   F1 all keys");
 
 	UAnimSequence* FpsLoadAnim(const TCHAR* Path)
 	{
@@ -96,6 +104,8 @@ void UAstraFpsComponent::BeginPlay()
 
 void UAstraFpsComponent::EndPlay(const EEndPlayReason::Type Reason)
 {
+	RestoreFov();
+	RestoreFpFov();
 	RemoveHud();
 	Super::EndPlay(Reason);
 }
@@ -118,6 +128,7 @@ void UAstraFpsComponent::SetKit(bool bTake)
 		Pistol.Mag = P.Mag;
 		Pistol.Reserve = P.Mag * P.SpareMags;
 		KeysT = FpsKeysShownS;
+		KeysShownAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 		Last = EAstraWeapon::Pistol;
 		StartDraw(EAstraWeapon::Rifle);
 	}
@@ -335,9 +346,12 @@ void UAstraFpsComponent::StartDraw(EAstraWeapon W)
 	DressArms(W);
 	PlayArms(AnimEquip, false, AnimEquip && D.DrawS > 0.f ? D.EquipAnimS / D.DrawS : 1.f);
 	Sound(D.DrawSound, 0.8f);
-	if (KeysT <= 0.f && KeysAlpha <= 0.f)
+	// the card of keys comes up for a moment when he draws, unless it was up not long ago
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (KeysT <= 0.f && KeysAlpha <= 0.f && Now - KeysShownAt > 90.0)
 	{
 		KeysT = 6.f;
+		KeysShownAt = Now;
 	}
 }
 
@@ -715,6 +729,7 @@ void UAstraFpsComponent::EnsureArms()
 	}
 	if (Mesh && GArmsOn)
 	{
+		// the animation plays on a mesh nobody sees (the weapon rides its right-hand socket); the arms that are seen are a poseable copy of it, solved to the weapon every frame
 		Arms = NewObject<USkeletalMeshComponent>(C, TEXT("WeaponArms"));
 		Arms->SetupAttachment(Cam);
 		Arms->SetSkeletalMeshAsset(Mesh);
@@ -722,22 +737,32 @@ void UAstraFpsComponent::EnsureArms()
 		Arms->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 		Arms->bEnableUpdateRateOptimizations = false;
 		Arms->SetReceivesDecals(false);
-		Arms->SetBoundsScale(4.f);                    // the pose stands far from where the mesh does (the weapon code moves it): never culled
+		Arms->SetBoundsScale(4.f);
 		Common(Arms);
+		Arms->RegisterComponent();
+		Arms->SetVisibility(false);
+		Pose = NewObject<UPoseableMeshComponent>(C, TEXT("WeaponArmsPose"));
+		Pose->SetupAttachment(Cam);
+		Pose->SetSkinnedAssetAndUpdate(Mesh);
+		Pose->SetReceivesDecals(false);
+		Pose->SetBoundsScale(4.f);                    // the pose stands far from where the mesh does (the weapon code moves it): never culled
+		Common(Pose);
 		if (C->GetFirstPersonMesh())
 		{
 			// the mesh's own materials follow the character's arms (its colourway)
-			for (int32 i = 0; i < C->GetFirstPersonMesh()->GetNumMaterials() && i < Arms->GetNumMaterials(); ++i)
+			for (int32 i = 0; i < C->GetFirstPersonMesh()->GetNumMaterials() && i < Pose->GetNumMaterials(); ++i)
 			{
-				Arms->SetMaterial(i, C->GetFirstPersonMesh()->GetMaterial(i));
+				Pose->SetMaterial(i, C->GetFirstPersonMesh()->GetMaterial(i));
 			}
 		}
-		Arms->RegisterComponent();
+		Pose->RegisterComponent();
 		if (!bArmsOnly)
 		{
-			Arms->HideBoneByName(TEXT("neck_01"), EPhysBodyOp::PBO_None);     // (the head would sit at the camera)
+			Pose->HideBoneByName(TEXT("neck_01"), EPhysBodyOp::PBO_None);     // (the head would sit at the camera)
 		}
-		Arms->SetVisibility(false);
+		Pose->SetVisibility(false);
+		AstraArms::FindBones(Mesh->GetRefSkeleton(), ArmBones);
+		AddTickPrerequisiteComponent(Arms);           // the pose is read after the animation has made it
 	}
 	Gun = NewObject<UStaticMeshComponent>(C, TEXT("WeaponGun"));
 	Mag = NewObject<UStaticMeshComponent>(C, TEXT("WeaponMag"));
@@ -757,11 +782,15 @@ void UAstraFpsComponent::ShowArms(bool bOn)
 		return;
 	}
 	bShown = bOn;
+	if (!bOn)
+	{
+		RestoreFpFov();
+	}
 	EnsureArms();
 	AASTRACharacter* C = Owner();
-	if (Arms)
+	if (Pose)
 	{
-		Arms->SetVisibility(bOn);
+		Pose->SetVisibility(bOn);
 	}
 	if (Gun)
 	{
@@ -774,7 +803,7 @@ void UAstraFpsComponent::ShowArms(bool bOn)
 	// the character's own arms (empty hands) rest while the weapon is out
 	if (C && C->GetFirstPersonMesh())
 	{
-		C->GetFirstPersonMesh()->SetVisibility(!(bOn && Arms));
+		C->GetFirstPersonMesh()->SetVisibility(!(bOn && Pose));
 	}
 }
 
@@ -835,18 +864,17 @@ void UAstraFpsComponent::Calibrate(const FAstraWeaponDef& W)
 		SocketLoc = W.PoseGripLoc;
 		SocketQ = FpsPoseQuat(W);
 	}
-	const FVector B = SocketQ.RotateVector(FVector(0, 1, 0)), U = SocketQ.RotateVector(FVector(0, 0, 1)), Ex = SocketQ.RotateVector(FVector(1, 0, 0));
-	const FQuat Inv = FMatrix(B, -Ex, U, FVector::ZeroVector).ToQuat();       // columns: where the camera's x, y, z go in the mesh
-	const FQuat Base = Inv.Inverse();
-	SightInMesh = SocketLoc + SocketQ.RotateVector(W.Sight);
-	const auto Place = [&](const FVector& Target, const FRotator& Extra, FVector& OutLoc, FQuat& OutRot)
-	{
-		OutRot = FQuat(Extra) * Base;
-		OutLoc = Target - OutRot.RotateVector(SightInMesh);
-	};
-	Place(W.HipPlace + FVector(GHipX, GHipY, GHipZ), W.HipTurn, HipLoc, HipRot);
-	Place(W.AdsPlace + FVector(GAdsX, GAdsY, GAdsZ), FRotator::ZeroRotator, AdsLoc, AdsRot);
-	Place(W.LowPlace + FVector(GLowX, GLowY, GLowZ), W.LowTurn, LowLoc, LowRot);
+	FVector LocHip, LocAds, LocLow;
+	FQuat RotHip, RotAds, RotLow;
+	AstraArms::PlaceWeapon(SocketLoc, SocketQ, W.Sight, W.HipPlace + FVector(GHipX, GHipY, GHipZ), W.HipTurn, LocHip, RotHip, SightInMesh);
+	AstraArms::PlaceWeapon(SocketLoc, SocketQ, W.Sight, W.AdsPlace + FVector(GAdsX, GAdsY, GAdsZ), FRotator::ZeroRotator, LocAds, RotAds, SightInMesh);
+	AstraArms::PlaceWeapon(SocketLoc, SocketQ, W.Sight, W.LowPlace + FVector(GLowX, GLowY, GLowZ), W.LowTurn, LocLow, RotLow, SightInMesh);
+	HipLoc = LocHip;
+	HipRot = RotHip;
+	AdsLoc = LocAds;
+	AdsRot = RotAds;
+	LowLoc = LocLow;
+	LowRot = RotLow;
 	TuneStamp = FpsNudgeStamp();
 	bCalibrated = true;
 	UE_LOG(LogASTRA, Log, TEXT("[Fps] %s: the arms' place at the hip %s, through the sights %s, lowered %s (%s)"), W.Name, *HipLoc.ToString(), *AdsLoc.ToString(), *LowLoc.ToString(),
@@ -867,7 +895,9 @@ void UAstraFpsComponent::PlayArms(UAnimSequence* A, bool bLoop, float Rate)
 	if (Arms && A)
 	{
 		Arms->PlayAnimation(A, bLoop);
-		Arms->SetPlayRate(FMath::Clamp(Rate, 0.2f, 4.f));
+		// the ready pose is held at its first frame: the sights stay where the weapon table puts them (the loop's breathing moved them by up to a centimetre and a half); the weapon's
+		// own life is the bob, the sway and the kick
+		Arms->SetPlayRate(A == AnimIdle ? 0.f : FMath::Clamp(Rate, 0.2f, 4.f));
 	}
 }
 
@@ -917,6 +947,14 @@ void UAstraFpsComponent::TickArms(float Dt)
 	const FVector LF = L + Off - (QF.RotateVector(SightInMesh) - Q.RotateVector(SightInMesh));      // the kick turns the weapon about its sight
 	USceneComponent* Root = Arms ? static_cast<USceneComponent*>(Arms) : static_cast<USceneComponent*>(Gun);
 	Root->SetRelativeLocationAndRotation(LF, QF);
+	MeshQ = QF;
+	MeshLoc = LF;
+	if (Pose)
+	{
+		Pose->SetRelativeLocationAndRotation(LF, QF);
+		SolveArms(W, Dt);
+	}
+	TickFpFov(Dt);
 	// the magazine rides the weapon (a hand's reload takes it away; the animation shows the hand, the magazine drops and returns with it)
 	if (Mag && Mag->GetStaticMesh())
 	{
@@ -957,6 +995,79 @@ void UAstraFpsComponent::RestoreFov()
 			Cam->SetFieldOfView(BaseFov);
 		}
 		bFovTaken = false;
+	}
+}
+
+void UAstraFpsComponent::SolveArms(const FAstraWeaponDef& W, float Dt)
+{
+	if (!Pose || !Arms || !ArmBones.IsValid() || !Arms->GetSkeletalMeshAsset())
+	{
+		return;
+	}
+	const FReferenceSkeleton& Ref = Arms->GetSkeletalMeshAsset()->GetRefSkeleton();
+	const TArray<FTransform>& Local = Arms->GetBoneSpaceTransforms();
+	if (Local.Num() != Ref.GetNum() || Pose->GetNumComponentSpaceTransforms() != Ref.GetNum())
+	{
+		return;
+	}
+	// the animation's pose, copied; the arms are solved over it
+	Pose->CopyPoseFromSkeletalComponent(Arms);
+	TArray<FTransform> CS;
+	AstraArms::ComponentSpace(Ref, Local, CS);
+	// the left hand: the animation's left grip socket goes to the weapon's own, as far as it is on the weapon (not while the animation changes the magazine or draws it)
+	const bool bOnWeapon = State == EState::Ready || State == EState::Holstering;
+	LeftIk = FMath::FInterpConstantTo(LeftIk, bOnWeapon ? 1.f : 0.f, Dt, 4.f);
+	FVector LeftDelta = FVector::ZeroVector;
+	if (LeftIk > 0.001f && Arms->DoesSocketExist(TEXT("HandGrip_R")) && Arms->DoesSocketExist(TEXT("HandGrip_L")))
+	{
+		const FTransform SockR = Arms->GetSocketTransform(TEXT("HandGrip_R"), RTS_Component);      // the weapon's frame: the gun's origin is on it
+		const FTransform SockL = Arms->GetSocketTransform(TEXT("HandGrip_L"), RTS_Component);
+		LeftDelta = (SockR.TransformPosition(W.GripLHand) - SockL.GetLocation()) * LeftIk;
+	}
+	// the shoulders: where the table puts them at the hip (and carried low) and through the sights, and between them as the weapon comes up (the same ease as its place)
+	const float AdsEase = FMath::InterpEaseInOut(0.f, 1.f, Ads, 2.f);
+	AstraArms::FSetup Setup;
+	Setup.Shoulder[AstraArms::Left] = FMath::Lerp(W.ShoulderHipL, W.ShoulderAdsL, (double)AdsEase) + FVector(GShoulderX, -GShoulderY, GShoulderZ);
+	Setup.Shoulder[AstraArms::Right] = FMath::Lerp(W.ShoulderHipR, W.ShoulderAdsR, (double)AdsEase) + FVector(GShoulderX, GShoulderY, GShoulderZ);
+	Setup.LeftHandDelta = LeftDelta;
+	FTransform Solved[6];
+	AstraArms::SolveBoth(ArmBones, CS, MeshQ, MeshLoc, Setup, Solved);
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		Pose->SetBoneTransformByName(Ref.GetBoneName(ArmBones.Upper[Side]), Solved[Side * 3 + 0], EBoneSpaces::ComponentSpace);
+		Pose->SetBoneTransformByName(Ref.GetBoneName(ArmBones.Lower[Side]), Solved[Side * 3 + 1], EBoneSpaces::ComponentSpace);
+		Pose->SetBoneTransformByName(Ref.GetBoneName(ArmBones.Hand[Side]), Solved[Side * 3 + 2], EBoneSpaces::ComponentSpace);
+	}
+	Pose->RefreshBoneTransforms(nullptr);
+}
+
+void UAstraFpsComponent::TickFpFov(float Dt)
+{
+	// with a weapon in his hands the arms and the weapon are drawn with a wider first-person field than the empty hands': the weapon is held far enough for the arms that hold it to show
+	UCameraComponent* Cam = Camera();
+	if (!Cam)
+	{
+		return;
+	}
+	const FAstraWeaponDef& W = AstraWeapons::Get(Cur);
+	const float Want = GFpFov > 1.f ? GFpFov : W.FpFov;
+	if (!bFpFovTaken)
+	{
+		BaseFpFov = Cam->FirstPersonFieldOfView;
+		bFpFovTaken = true;
+	}
+	Cam->FirstPersonFieldOfView = FMath::FInterpTo(Cam->FirstPersonFieldOfView, Want, Dt, 10.f);
+}
+
+void UAstraFpsComponent::RestoreFpFov()
+{
+	if (bFpFovTaken)
+	{
+		if (UCameraComponent* Cam = Camera())
+		{
+			Cam->FirstPersonFieldOfView = BaseFpFov;
+		}
+		bFpFovTaken = false;
 	}
 }
 
@@ -1091,7 +1202,6 @@ void UAstraFpsComponent::TickHud(float Dt)
 	S.Prompt = PromptText;
 	S.PromptAlpha = FMath::Clamp(PromptT / 0.4f, 0.f, 1.f);
 	S.KeysAlpha = KeysAlpha;
-	S.Keys = FpsKeysLine;
 	S.bLowHint = bArmed && State == EState::Ready && A.Mag <= FMath::Max(2, D.Mag / 6) && A.Reserve > 0 && FMath::Frac(GetWorld()->GetTimeSeconds() * 1.6) < 0.7;
 }
 
@@ -1160,13 +1270,34 @@ void UAstraFpsComponent::Describe(FOutputDevice& Ar) const
 	const FTransform GunT = Gun->GetComponentTransform();
 	Where(TEXT("rear sight"), GunT.TransformPosition(W.Sight));
 	Where(TEXT("muzzle"), GunT.TransformPosition(W.Muzzle));
-	Where(TEXT("left grip"), GunT.TransformPosition(W.GripL));
-	if (Arms)
+	Where(TEXT("left palm"), GunT.TransformPosition(W.GripLHand));       // (where the left hand is asked to go on the weapon)
+	if (Pose)
 	{
-		Where(TEXT("hand_r"), Arms->GetBoneLocation(TEXT("hand_r"), EBoneSpaces::WorldSpace));
-		Where(TEXT("hand_l"), Arms->GetBoneLocation(TEXT("hand_l"), EBoneSpaces::WorldSpace));
-		Where(TEXT("lowerarm_r"), Arms->GetBoneLocation(TEXT("lowerarm_r"), EBoneSpaces::WorldSpace));
-		Where(TEXT("lowerarm_l"), Arms->GetBoneLocation(TEXT("lowerarm_l"), EBoneSpaces::WorldSpace));
+		Where(TEXT("hand_r"), Pose->GetBoneLocationByName(TEXT("hand_r"), EBoneSpaces::WorldSpace));
+		Where(TEXT("hand_l"), Pose->GetBoneLocationByName(TEXT("hand_l"), EBoneSpaces::WorldSpace));
+		Where(TEXT("lowerarm_r"), Pose->GetBoneLocationByName(TEXT("lowerarm_r"), EBoneSpaces::WorldSpace));
+		Where(TEXT("lowerarm_l"), Pose->GetBoneLocationByName(TEXT("lowerarm_l"), EBoneSpaces::WorldSpace));
+		Where(TEXT("upperarm_r"), Pose->GetBoneLocationByName(TEXT("upperarm_r"), EBoneSpaces::WorldSpace));
+		Where(TEXT("upperarm_l"), Pose->GetBoneLocationByName(TEXT("upperarm_l"), EBoneSpaces::WorldSpace));
+		// how well the hands hold it: the grip sockets of the hands (the animation's, on the solved arms) against the weapon's own places (the left one's hold is LeftIk)
+		if (Arms && Arms->DoesSocketExist(TEXT("HandGrip_R")) && Arms->DoesSocketExist(TEXT("HandGrip_L")) && Pose->GetNumComponentSpaceTransforms() > 0)
+		{
+			// the socket of the animation's mesh, moved with the hand it is on in the solved pose: the offset of the hand's grip from the weapon's
+			const FTransform GunNow = Gun->GetComponentTransform();
+			const FTransform HandL = Pose->GetBoneTransformByName(TEXT("hand_l"), EBoneSpaces::WorldSpace);
+			const FTransform HandLAnim = Arms->GetSocketTransform(TEXT("hand_l"), RTS_World);
+			const FTransform SockLAnim = Arms->GetSocketTransform(TEXT("HandGrip_L"), RTS_World);
+			const FVector SockLNow = HandL.TransformPosition(HandLAnim.InverseTransformPosition(SockLAnim.GetLocation()));
+			const FVector Wanted = GunNow.TransformPosition(W.GripLHand);
+			Ar.Logf(TEXT("the left hand's grip is %.1f cm from the weapon's (held %.0f%%); the right hand's grip is on the weapon's origin (%.1f cm)"), (float)FVector::Dist(SockLNow, Wanted), LeftIk * 100.f,
+				(float)FVector::Dist(Pose->GetBoneLocationByName(TEXT("hand_r"), EBoneSpaces::WorldSpace), Arms->GetBoneLocation(TEXT("hand_r"), EBoneSpaces::WorldSpace)));
+			// the ready pose is held at its first frame: the right-hand socket must be where the weapon table says (the sights are placed from it)
+			if (State == EState::Ready)
+			{
+				const FVector Live = Arms->GetSocketTransform(TEXT("HandGrip_R"), RTS_Component).GetLocation();
+				Ar.Logf(TEXT("the right-hand socket in the ready pose is %.2f cm from the weapon table's (0: the weapon stands where the table puts it)"), (float)FVector::Dist(Live, W.PoseGripLoc));
+			}
+		}
 	}
 }
 
