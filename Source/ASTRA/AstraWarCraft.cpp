@@ -409,6 +409,11 @@ FVector UAstraBattleSubsystem::EnvelopeWall(const FAstraBattleShip& S, const FVe
 // ---------------------------------------------------------------------------------------------- the craft
 void UAstraBattleSubsystem::TickCraft(FAstraBattleShip& S, float Dt)
 {
+	if (S.CraftKind == 3)
+	{
+		TickBoardingCraft(S, Dt);                                   // ABBORDAGGI-2: a boarding craft flies its own flight to a hatch (AstraBoardFlight.cpp), not a mission of a squadron
+		return;
+	}
 	if (S.Squadron < 0 || !Squadrons.IsValidIndex(S.Squadron))
 	{
 		S.bAlive = false;
