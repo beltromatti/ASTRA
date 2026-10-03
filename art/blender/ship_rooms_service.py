@@ -314,37 +314,9 @@ def _loader(b: SParts) -> None:
 
 # ------------------------------------------------------------------------------------------------------------ heads, laundry
 def heads(name: str = "SM_SHIP_Heads"):
-    spec, L, D, H = _dims("heads")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=TILE, floor_mode="covering", wall_lo=TILE, wall_hi=TILE, wain_h=2.2, ceil=IVORY, accent="cyan_dim", strip="white_cool", ribs=False)
-    build_shell(b, spec, st)
-    # stalls along both side walls (partitions, a toilet and a door leaf each), washbasins on islands in the middle, showers at the far end
-    for side in (0, 1):
-        sgn = 1 if side == 0 else -1
-        xw = WS + WF if side == 0 else L - WS - WF
-        xa, xb = sorted((xw, xw + sgn * 1.6))
-        for k in range(5):
-            b.body.box((xa, 3.2 + k - 0.02, 0.0), (xb, 3.2 + k + 0.02, 1.9), IVORY)
-        for k in range(4):
-            y0 = 3.2 + k
-            place(b, xw + sgn * 0.42, y0 + 0.5, 0.0 if side == 0 else 180.0, _toilet)
-            xd = xw + sgn * 1.6
-            b.body.box((xd - 0.02, y0 + 0.03, 0.15), (xd + 0.02, y0 + 0.97, 1.85), IVORY)
-            b.fine.box((xd - 0.03, y0 + 0.08, 0.15), (xd + 0.03, y0 + 0.11, 1.85), TRIM)
-            b.emit.lamp_box((xd - 0.03 * sgn - 0.005, y0 + 0.85, 1.4), (xd - 0.03 * sgn + 0.005, y0 + 0.9, 1.45), "green", LAMP_DIM)
-    for i, y in enumerate((6.4, 9.4)):
-        place(b, 6.0, y, 0, _basin_island)
-    for k in range(3):
-        x = WS + WF + 0.9 + k * 3.6
-        b.body.box((x - 1.0, D - WS - WF - 1.3, 0.0), (x + 1.0, D - WS - WF - 1.26, 2.1), IVORY)
-        b.fine.box((x - 1.0, D - WS - WF - 1.3, 0.0), (x - 0.96, D - WS - WF, 2.1), IVORY)
-        b.fine.box((x + 0.96, D - WS - WF - 1.3, 0.0), (x + 1.0, D - WS - WF, 2.1), IVORY)
-        b.fine.cyl((x, D - WS - WF - 0.05, 2.0), (x, D - WS - WF - 0.05, 2.4), 0.02, STEEL, seg=8)
-        b.fine.cyl((x, D - WS - WF - 0.05, 2.4), (x, D - WS - WF - 0.4, 2.4), 0.02, STEEL, seg=8)
-        b.fine.cyl((x, D - WS - WF - 0.4, 2.4), (x, D - WS - WF - 0.4, 2.36), 0.11, STEEL, seg=14)
-    wall_label(b, 6.0, WF + 0.02, 2.05, (0, 1, 0), "pict_heads", 0.3, 0.3)
-    ceiling_panels(b, L, D, H, 3, 4, "white_cool", 1.4, 1.0, 0.5)
-    return b.build(name)
+    """12 x 16 x 3.4: the heads and showers (ship_wet.py)."""
+    import ship_wet
+    return ship_wet.heads(name)
 
 
 def _toilet(b: SParts) -> None:
@@ -367,23 +339,9 @@ def _basin_island(b: SParts) -> None:
 
 
 def laundry(name: str = "SM_SHIP_Laundry"):
-    spec, L, D, H = _dims("laundry")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=DECK, floor_mode="plates", wall_lo=TILE, wall_hi=COMPOSITE, wain_h=1.4, ceil=IVORY, accent="cool_dim", strip="white_cool", ribs=False)
-    build_shell(b, spec, st)
-    for k in range(6):
-        y = 3.2 + k * 1.05
-        place(b, WS + WF + 0.5, y, 0, _washer, "MI_SHIP_Steel")
-        place(b, L - WS - WF - 0.5, y, 180, _washer, IVORY)
-    place(b, 6.0, 6.5, 0, F.table, 2.6, 0.9, 0.9, STEEL, STEEL, False)
-    place(b, 6.0, 9.5, 0, F.table, 2.6, 0.9, 0.9, STEEL, STEEL, False)
-    for k in range(3):
-        place(b, 5.0 + k, 13.5, 90, cart)
-    for k in range(3):
-        place(b, 2.5 + 1.2 * k, D - WS - WF - 0.6, -90, F.shelf, 1.1, 0.5, 2.0, 4, STEEL, False, k, False)
-    wall_label(b, 6.0, WF + 0.02, 2.05, (0, 1, 0), "room_laundry", 0.9)
-    ceiling_panels(b, L, D, H, 3, 4, "white_cool", 1.4, 1.0, 0.5)
-    return b.build(name)
+    """12 x 16 x 3.4: the laundry (ship_wet.py)."""
+    import ship_wet
+    return ship_wet.laundry(name)
 
 
 def _washer(b: SParts, mat: str = STEEL) -> None:
