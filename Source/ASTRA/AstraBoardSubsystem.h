@@ -98,6 +98,8 @@ public:
 	/** The Captain rides in a boat (in its troop bay, flying), or is aboard the other ship, or is coming home: he is not on the Aquila's decks. */
 	bool CaptainAway() const { return Ride != ERide::None; }
 	bool CaptainAboardOther() const { return bCaptainAboard; }
+	/** Where the Captain is, in the words the crew is told (the ship's state and the Captain's badge): in the troop bay of a boat, or aboard the other ship in the fight. */
+	FString CaptainWhereText() const;
 	/** The tests: a Captain with no pawn (the war bench): where his feet are, which way he faces. The ride and the fight use him as they use the pawn. */
 	void SetTestCaptain(bool bOn, const FVector& Feet = FVector::ZeroVector, float Yaw = 0.f);
 	/** The Aquila's own boats and the marines fit to go in them (ship_state.boarding_boats: the crew's tool `board_ship` exists where this does). Empty when the battle has no Aquila yet. */

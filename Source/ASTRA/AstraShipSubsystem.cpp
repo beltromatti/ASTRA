@@ -1729,6 +1729,10 @@ void UAstraShipSubsystem::SyncWard()
 
 FString UAstraShipSubsystem::CaptainAboard() const
 {
+	if (const UAstraBoardSubsystem* Boarding = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Boarding && Boarding->CaptainAway())
+	{
+		return Boarding->CaptainWhereText();               // ABBORDAGGI: he went with the marines in a boat (the troop bay, or the other ship's decks): not on the Aquila's
+	}
 	if (!CaptainPlanetside.IsEmpty())
 	{
 		return CaptainPlanetside;
@@ -1808,6 +1812,10 @@ FString UAstraShipSubsystem::CaptainAboard() const
 
 FString UAstraShipSubsystem::CaptainLocatorText() const
 {
+	if (const UAstraBoardSubsystem* Boarding = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Boarding && Boarding->CaptainAway())
+	{
+		return FString::Printf(TEXT("the Captain's badge: %s"), *Boarding->CaptainWhereText());
+	}
 	if (!CaptainPlanetside.IsEmpty())
 	{
 		return FString::Printf(TEXT("the Captain's badge: planetside (%s), on the surface link"), *CaptainPlanetside);
@@ -1826,6 +1834,10 @@ FString UAstraShipSubsystem::CaptainLocatorText() const
 
 FString UAstraShipSubsystem::CaptainPlace() const
 {
+	if (const UAstraBoardSubsystem* Boarding = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Boarding && Boarding->CaptainAway())
+	{
+		return TEXT("AWAY · WITH THE MARINES");
+	}
 	if (!CaptainPlanetside.IsEmpty())
 	{
 		return TEXT("PLANETSIDE");

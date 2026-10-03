@@ -44,6 +44,38 @@ void UAstraBoardSubsystem::SetTestCaptain(bool bOn, const FVector& Feet, float Y
 	TestYaw = Yaw;
 }
 
+FString UAstraBoardSubsystem::CaptainWhereText() const
+{
+	const FLeg* L = Assault.Legs.IsValidIndex(RideLeg) ? &Assault.Legs[RideLeg] : nullptr;
+	const FString Boat = L && !L->CraftName.IsEmpty() ? L->CraftName : FString(TEXT("a Kestrel"));
+	switch (Ride)
+	{
+	case ERide::Out:
+	{
+		const int32 Eta = FMath::Max(0, FMath::RoundToInt(Assault.EtaS - (Assault.T - Assault.LaunchT)));
+		return FString::Printf(TEXT("away from the ship with the marines, in the troop bay of %s, flying to %s (the hull in about %d s); the XO has the conn of the Aquila and the Captain speaks to the bridge over his comm"),
+		                       *Boat, *Assault.TargetName, Eta);
+	}
+	case ERide::Aboard:
+	{
+		FString Room = TEXT("her boarding lock");
+		if (Map.IsValid() && Fight.CaptainId() != INDEX_NONE)
+		{
+			if (const FUnit* C = Fight.Unit(Fight.CaptainId()))
+			{
+				Room = Map->Describe(C->Comp);
+			}
+		}
+		return FString::Printf(TEXT("aboard %s with the marines, in %s, in the fight for %s: the Marine Detachment fights round him and Major Reyes has the net; the XO has the conn of the Aquila and the Captain speaks to the bridge over his comm"),
+		                       *Assault.TargetName, *Room, Map.IsValid() ? *Map->Describe(Fight.Mission().Objective) : TEXT("her command deck"));
+	}
+	case ERide::Home:
+		return FString::Printf(TEXT("away from the ship, in the troop bay of %s, coming home from %s; the XO has the conn of the Aquila and the Captain speaks to the bridge over his comm"), *Boat, *Assault.TargetName);
+	default:
+		return FString();
+	}
+}
+
 APawn* UAstraBoardSubsystem::CaptainPawn() const
 {
 	APlayerController* PC = GetWorld() ? UGameplayStatics::GetPlayerController(GetWorld(), 0) : nullptr;
