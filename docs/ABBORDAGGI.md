@@ -321,3 +321,83 @@ a faccia a faccia con il sergente 7 su 8 (l'ottavo: «teniamo qui» senza l'ordi
   sarebbe un `lockdown` esteso al loro sistema: se lo si vuole, è un comando in più che la mente già potrebbe dare.
 - **STATO.md / ARCHITETTURA.md**: la rete dei marine come terza rete di persone (§1bis), le chiavi `ASTRA_MARINE_MINDS`, il ruolo `marines`.
 - **Il cognome Reyes** è uscito dal pool di VITA (`AstraCrewRoster.cpp`, stessa posizione, `Reynoso`): i ruolini già salvati con quel cognome non cambiano.
+
+## 13. F5.2 — le navette: abbordare e farsi abbordare (3/10)
+
+*Il brief è [brief/ABBORDAGGI-2.md](brief/ABBORDAGGI-2.md). Dopo F5.1 l'abbordaggio parte da un comando di prova; qui parte dalla guerra, in tutti e due i versi, con navette vere.*
+
+### 13.1 Le navette (`AstraBoardCraft.*`, `AstraBoardFlight.cpp`, ganci in `AstraBattleSubsystem.*`, `AstraWarCraft.cpp`, `AstraWarShipAI.cpp`, `AstraWarDraw.cpp`)
+
+Due velivoli della battaglia (`CraftKind 3`, volo proprio, nessuna squadriglia): lo **Skiff** del Mandato (10 abbordatori, scafo 140, 220 m/s) e il **Kestrel** dell'Aquila (12 marine, scafo
+200, 180 m/s). Hanno uno scafo, si vedono (mesh `SM_CRAFT_MANDATE_Skiff`, `SM_CRAFT_ASTRA_Kestrel`, fatte in Blender: `art/blender/ship3_boarding.py`), la difesa puntuale e i caccia
+sparano loro come a ogni velivolo. Quante ne porta ogni classe: Acheron 4 Skiff, Styx 2, Lethe 1; Aquila 2 Kestrel (dal portello del Ponte 8, sul fianco sinistro, sulla pelle dello scafo),
+Praetorian 2, Vigilant 1.
+
+Il volo: uscita dal portello, traversata fino a un punto davanti al boccaporto (nel sistema di riferimento del bersaglio: lo segue se gira), avvicinamento lungo l'asse, aggancio (il bersaglio non
+può più sparargli: è parte dello scafo), dopo il «tempo di presa» (12 s lo Skiff, 9 il Kestrel) la breccia si apre; a combattimento finito la navetta si stacca e torna. **Regole del mondo,
+in codice**: passa la difesa puntuale (non la evita) e ne è colpita (una navetta isolata contro 4 canali arriva 1 volta su 3; contro 2 canali 2 su 5; i caccia in pattuglia le abbattono tutte:
+`tools/boarding.py craft`), **non aggancia dove lo scudo di quella faccia regge** (aspetta 18 s fuori dallo scafo e torna indietro), aggancia dove lo scudo è sotto l'8% o la nave non ha energia.
+Una navetta abbattuta porta con sé i suoi uomini (i marine sono caduti, con il nome). Gli eventi (`Launched`, `Docked`, `Destroyed`, `Aborted`, `Departed`, `Recovered`, `Lost`) li legge l'ospite.
+
+### 13.2 L'ospite: una scena sola alla volta (`AstraBoardAssault.cpp`, `AstraBoardSubsystem.*`)
+
+`UAstraBoardSubsystem::StartAssault` (il comando esteso `boarding`, §13.4) dà l'ordine; `TickAssault` legge ciò che le navette fanno e ne fa il combattimento. **Un ordine alla volta** (un
+secondo è rifiutato con la ragione), su **una scena** (la mappa e la pianta in cui si combatte):
+
+- **In entrata** (le navette del Mandato sull'Aquila): la scena sono i **suoi ponti** (la mappa dei soldati della sua pianta, i corpi, il Capitano, le paratie: il combattimento di F5.1).
+  Parte al **primo Skiff uscito** (allarme: i marine chiamati, le paratie di sezione chiuse intorno ai portelli, allarme rosso); ogni Skiff che aggancia apre **la sua breccia** (un anello
+  luminoso, la scintilla, il suono) in un **airlock** dell'Aquila (i suoi portelli sono i suoi 40 airlock sui due fianchi: il muro esterno della pianta sta ~4,5 m dentro la pelle della mesh,
+  misurata con la mesh generata: la navetta si aggancia alla pelle, la breccia è nella stanza); gli abbordatori entrano da lì. Uno Skiff abbattuto porta con sé i suoi dieci (`LoseParty`),
+  uno rimandato indietro dallo scudo no (`RecallParty`); se nessuno arriva, la scena finisce con «not one boarder reached the ship». A fine combattimento le navette si staccano e tornano.
+- **In uscita** (i marine dell'Aquila su una nave): i marine del ruolino che vanno (i più vicini al portello, svegli, i sergenti a capo di ogni squadra; il Maggiore resta alla rete) escono
+  dalla vita della nave (`SetAway`), i Kestrel partono dopo ~25 s, e la scena è la **pianta della classe della nave abbordata** (`AstraBoardPlans::Load`, in lavoro su un worker la prima volta),
+  fatta girare dalla sola simulazione: i difensori della sua guarnigione (`AstraBoardScene::Build`: posti di guardia, equipaggio che accorre, paratie chiuse), i nostri a squadre di sei da ogni
+  portello. Niente corpi né Capitano (finché non va: §13.6). I caduti sono nominati e vanno al ruolino (`HarmPerson`), i feriti in Medbay; a fine scena i marine tornano nell'hangar con il loro Kestrel
+  (`PlaceTransported`). Se la nave cade: `CaptureShip` (è nostra, un relitto con un equipaggio di preda) e la riga «her commander and the survivors of her crew are in custody».
+- Le navi dell'Aquila abbordate dal Mandato (una consorte) seguono la stessa strada remota (attaccanti del Mandato, difensori dell'equipaggio della classe).
+
+Il mondo dentro la simulazione (`AstraBoardSim.*`): le **squadre per navetta** (`LandParty`: gli uomini aspettano nella navetta, entrano al `ReleaseParty` dell'aggancio, muoiono con lei
+(`LoseParty`) o non entrano mai (`RecallParty`)), un portello per squadra (`FSquad::BreachComp`: il ritiro e la colonna), i tempi limite contati dal primo uomo a bordo (`Mission.StartedS`).
+
+### 13.3 La guerra decide: gli strumenti e il contesto (nessun filtro sulle parole)
+
+- **Mandato**: `board` (ammiraglio e comandanti di gruppo, `war_minds.py`): `{target, carrier, boats, face, objective, action: launch|call_off, reason}`. Nel quadro «YOUR BOARDING BOATS»: i
+  suoi portatori con gli Skiff liberi, le navi a cui una barca potrebbe agganciarsi **ora** (nessuna energia, o le facce a scudo giù, i canali della difesa puntuale, i caccia intorno, la distanza)
+  e quante altre sono a scudi alzati; durante un assalto: dove sta ogni barca, e quanti dei suoi uomini combattono. La dottrina (testo stabile) dice come si perdono le navette.
+- **Aquila**: `board_ship` (l'XO, solo su ordine del Capitano): `{target, boats, face, objective, marines, action: launch|call_off}`; nello stato `boarding_boats` (i Kestrel liberi, i marine
+  pronti), `boarding_options` (le navi agganciabili ora, e perché), `boarding` (`.assault`: le barche, dove sono). La risposta del gioco porta i fatti (a quali portelli, in quanto tempo, se lo
+  scudo di quella faccia regge, la difesa puntuale, i caccia): l'XO li dice, non promette.
+- **Rete dei marine** (`marines.py`): il ruolo `attacking` (il quadro dice `role`), il compito `withdraw` (l'uscita dal portello alla barca), le frasi nuove del gioco, il prompt stabile con
+  la sezione dell'assalto. I banchi: `marines_unit` (77), `war_minds_unit` (63), `assault_unit` (10), tutta la suite offline verde.
+
+### 13.4 L'interfaccia per CAMPAGNA e per le menti
+
+`await self._director_command("boarding", {...})` (la stessa porta di prima): `{direction: "in"|"out", target, source, craft (1..4), boarders, objective: engineering|bridge|captain|armory|medbay|brig|comms|hangar|<id>,
+face: port|starboard|dorsal|ventral|bow|stern, breach: <id di un portello>, lockdown, captain, by, instant}`. Senza `direction` (o con `instant`) è l'abbordaggio di F5.1, che «semplicemente
+accade». `{"action":"end"}` lo chiude. Le navi si dicono come i contatti: id (T-30), nome, o `aquila`. Risponde con i fatti: partito (ordine, portatore, portelli, tempo, avvertimenti), o rifiutato
+con la ragione. L'esito è un evento `boarding: ...` (i testi di `Tell`, letti dalla rete dei marine e dal regista): «X is ours: ... her commander and the survivors of her crew are in custody»,
+«the boarding of X has failed», «the boarders are beaten», «the boarders hold Main Engineering», «not one boarder reached the ship».
+
+### 13.5 Come si prova
+
+| Cosa | Come |
+|---|---|
+| Il banco delle navette (volo, difesa, aggancio) | `python3.13 tools/boarding.py craft [--setup out\|shield\|pd\|pd2\|cap] [--seeds N] [--trace]` (senza grafica: la battaglia di GUERRA a testa bassa) |
+| Il banco degli assalti (l'ospite, le scene, gli esiti) | `python3.13 tools/boarding.py assault [--setup in\|in_shield\|out\|out_pd\|all]`: il mondo del banco ha la vita (i marine del ruolino) e la guerra; le piante si leggono su un worker, i comandi si danno tardi (11 000 s) |
+| In entrata nel gioco | `astra.cmd set_shields {'mode':'off'}` (o aprire un settore con il fuoco), `astra.board.pd aquila 0` (la difesa puntuale altrimenti abbatte gli Skiff), `astra.board.assault in [portatore] [bersaglio] [barche] [faccia] [obiettivo]` (il portatore migliore si sceglie da solo); `astra.board.end` |
+| In uscita nel gioco | `astra.board.disable <nave>` (un relitto), `astra.board.assault out <nave> [portatore] [barche] [faccia] [obiettivo]` (o all'XO: «abborda l'Acheron», `board_ship`) |
+| Dal comando | `astra.board.cmd boarding {"direction":"in","target":"aquila","source":"T-30","craft":2,"face":"port","objective":"engineering"}` |
+| Le navette a mano | `astra.board.craft <portatore> <bersaglio> [n] [faccia] [uomini]`, `astra.board.depart <ordine>`, `astra.board.assess <portatore> <bersaglio>`, `astra.board.strip\|shield\|disable\|pd <nave>` (gli stati dei bersagli) |
+| Il quadro | `astra.board.info` (anche l'assalto), `astra.board.picture` (la lavagna dei marine) |
+
+### 13.6 Limiti noti (F5.2, consegna 2 e 3)
+
+- **Non provato nel gioco**: come F5.1, il banco prova il codice (volo, scene, esiti, strumenti); il colpo d'occhio (anello della breccia su un airlock, i Kestrel che escono dal fianco, la
+  navetta che si posa sulla pelle) si vede solo lì. Le mesh delle navette sono le prime: nessun portello vero nella mesh dell'Aquila (la navetta esce e rientra attraverso il fasciame).
+- **Le piante delle altre classi sono quelle di ripiego** (`data/ship/plans/stopgap/`) finché FLOTTA-VIVA non porta le sue (`data/ship/plans/<classe>.json`, scelte da sole): i portelli di ripiego
+  stanno dentro la mesh (fino a 16 m sull'Acheron), le sue sono sulla pelle (controllate con la mesh). Le sue voci `mouth_*` (la bocca delle barche) non sono portelli e si ignorano;
+  `BerthsOf` potrebbe leggerle.
+- **Un abbordaggio alla volta**; se i nostri marine sono su una nave il Mandato non può abbordare l'Aquila nello stesso momento (rifiutato con la ragione).
+- I feriti dei marine su una nave nemica sanguinano in ~2 min se nessuno li porta via (la squadra non porta ancora i suoi feriti alla navetta): le perdite di uno sbarco sono alte (24 marine su
+  un relitto di 19 difensori: 11 caduti in una prova).
+- La memoria di VITA dice «beamed away by the transporter» anche per un Kestrel (`FAstraLifeSim::SetAway`): una variante col testo sarebbe d'aiuto (richiesta).
