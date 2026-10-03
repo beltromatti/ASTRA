@@ -41,8 +41,40 @@ LEAF = "MI_SHIP_Leaf"                # plants
 TILE = "MI_SHIP_Tile"                # white wall / floor tile (galley, heads, lab)
 PAINT_RED = "MI_SHIP_PaintRed"       # red fire-safety paint (hydrants, extinguishers), hazard yellow is in the labels
 SOIL = "MI_SHIP_Soil"                # planters
+# ARTE-INTERNI: textured finishes. The table of their parameters is data/ship/room_materials.json (the Blender previews below and the Unreal instances made by
+# tools/ue_scripts/ship_room_materials.py read the same entries); the texture sets are packed by tools/art/interior_textures.py and tools/art/polyhaven_models.py.
+CARPET_SLATE, CARPET_SAND, CARPET_RUST, CARPET_MOSS = "MI_SHIP_CarpetSlate", "MI_SHIP_CarpetSand", "MI_SHIP_CarpetRust", "MI_SHIP_CarpetMoss"    # cut-pile wool carpet
+TEAK = "MI_SHIP_Teak"                    # plank deck, dark teak
+OAK, WALNUT = "MI_SHIP_Oak", "MI_SHIP_Walnut"                  # smooth wood grain: honey oak (tables, slats), walnut (panelling, bar fronts)
+TERRAZZO = "MI_SHIP_Terrazzo"            # pale speckled floor
+TILE_FLOOR, TILE_HEX, TILE_WALL = "MI_SHIP_TileFloor", "MI_SHIP_TileHex", "MI_SHIP_TileWall"          # glossy tiles: floors, hex mosaic, wall tiles
+TREAD, PLATING = "MI_SHIP_Tread", "MI_SHIP_Plating"             # diamond tread plate; octagonal plating
+PLASTER_IVORY, PLASTER_SAGE, PLASTER_SLATE, PLASTER_TEAL = "MI_SHIP_PlasterIvory", "MI_SHIP_PlasterSage", "MI_SHIP_PlasterSlate", "MI_SHIP_PlasterTeal"   # painted walls
+PERF = "MI_SHIP_Perf"                    # perforated acoustic panel
+CORK = "MI_SHIP_Cork"                    # notice boards
+LEATHER_TAN, LEATHER_NAVY, LEATHER_OX, LEATHER_CREAM = "MI_SHIP_LeatherTan", "MI_SHIP_LeatherNavy", "MI_SHIP_LeatherOx", "MI_SHIP_LeatherCream"
+TUFT_NAVY, TUFT_SAND = "MI_SHIP_TuftNavy", "MI_SHIP_TuftSand"   # button-tufted leather
+WEAVE_TEAL, WEAVE_SAND, WEAVE_SLATE, WEAVE_RUST = "MI_SHIP_WeaveTeal", "MI_SHIP_WeaveSand", "MI_SHIP_WeaveSlate", "MI_SHIP_WeaveRust"        # woven upholstery
+BRASS, COPPER = "MI_SHIP_Brass", "MI_SHIP_Copper"               # warm metals (lamps, rails, kitchen)
+WHITE_GLOSS, CERAMIC = "MI_SHIP_WhiteGloss", "MI_SHIP_CeramicWhite"   # appliance plastic; pots, crockery, sanitaryware
+TERRACOTTA = "MI_SHIP_Terracotta"
+PAPER = "MI_SHIP_Paper"
+STEM, BARK = "MI_SHIP_Stem", "MI_SHIP_Bark"                     # plants
+LEAF_GREEN, LETTUCE, FRUIT = "MI_SHIP_LeafGreen", "MI_SHIP_Lettuce", "MI_SHIP_Fruit"
+ROOM_MATERIAL_FILE = os.path.join(ROOT, "data", "ship", "room_materials.json")
+ROOM_MATERIALS: dict = {}               # name -> the entry of room_materials.json (read once)
+
+
+def _load_room_materials() -> dict:
+    if not ROOM_MATERIALS:
+        with open(ROOM_MATERIAL_FILE, encoding="utf-8") as fh:
+            ROOM_MATERIALS.update(json.load(fh)["materials"])
+    return ROOM_MATERIALS
+
+
+ROOM_SLOTS = list(_load_room_materials())
 NEW_SLOTS = [LABEL, LAMINATE, STEEL, FABRIC_NAVY, FABRIC_RUST, FABRIC_GREY, FABRIC_SAND, BEDDING, WOOD, CRATE_OLIVE, CRATE_ORANGE,
-             CRATE_BLUE, CRATE_GREY, LEAF, TILE, PAINT_RED, SOIL]
+             CRATE_BLUE, CRATE_GREY, LEAF, TILE, PAINT_RED, SOIL] + ROOM_SLOTS
 
 # ------------------------------------------------------------------------------------------------------------ the atlas
 LABELS: dict[str, tuple[float, float, float, float]] = {}
@@ -194,6 +226,10 @@ def make_preview_materials() -> None:
     pbr(TILE, (0.62, 0.64, 0.62), "PanelPaint", 1.0, (0.12, 0.25), 0.0, 0.0, 0.2, 0.3, coat=0.3, coat_rough=0.1)
     pbr(PAINT_RED, (0.46, 0.035, 0.025), "PanelPaint", 1.0, (0.3, 0.5), 0.0, 0.0, 0.2, 0.3)
     pbr(SOIL, (0.035, 0.022, 0.014), "Linen", 4.0, (0.7, 0.9), 0.0, 0.0, 0.5, 0.8)
+    for name, e in _load_room_materials().items():                 # ARTE-INTERNI: the finishes of data/ship/room_materials.json
+        tint = tuple(c * e.get("k", 1.0) for c in PV.srgb_to_linear(e["tint"]))
+        pbr(name, tint, e["set"], e.get("uv", 1.0), tuple(e.get("rough", (0.4, 0.7))), e.get("metal_bias", 0.0), e.get("metal_map", 0.0),
+            e.get("influence", 1.0), e.get("normal", 0.6), e.get("coat", 0.0), e.get("coat_rough", 0.12), 0.5)
     _label_mat(1.4)
     for m in bpy.data.materials:                                  # anything else the scene uses gets a neutral grey
         if not m.use_nodes or not m.node_tree.nodes:
