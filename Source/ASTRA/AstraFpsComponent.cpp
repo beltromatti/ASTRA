@@ -65,7 +65,6 @@ namespace
 	}
 
 	constexpr float FpsKeysShownS = 24.f;
-	const TCHAR* const FpsKeysLine = TEXT("LMB fire   RMB aim   R reload   1 rifle   2 sidearm   Q last weapon   H holster   Shift run   C crouch · hold C: prone   F1 all keys");
 
 	UAnimSequence* FpsLoadAnim(const TCHAR* Path)
 	{
@@ -129,6 +128,7 @@ void UAstraFpsComponent::SetKit(bool bTake)
 		Pistol.Mag = P.Mag;
 		Pistol.Reserve = P.Mag * P.SpareMags;
 		KeysT = FpsKeysShownS;
+		KeysShownAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 		Last = EAstraWeapon::Pistol;
 		StartDraw(EAstraWeapon::Rifle);
 	}
@@ -346,9 +346,12 @@ void UAstraFpsComponent::StartDraw(EAstraWeapon W)
 	DressArms(W);
 	PlayArms(AnimEquip, false, AnimEquip && D.DrawS > 0.f ? D.EquipAnimS / D.DrawS : 1.f);
 	Sound(D.DrawSound, 0.8f);
-	if (KeysT <= 0.f && KeysAlpha <= 0.f)
+	// the card of keys comes up for a moment when he draws, unless it was up not long ago
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (KeysT <= 0.f && KeysAlpha <= 0.f && Now - KeysShownAt > 90.0)
 	{
 		KeysT = 6.f;
+		KeysShownAt = Now;
 	}
 }
 
@@ -1199,7 +1202,6 @@ void UAstraFpsComponent::TickHud(float Dt)
 	S.Prompt = PromptText;
 	S.PromptAlpha = FMath::Clamp(PromptT / 0.4f, 0.f, 1.f);
 	S.KeysAlpha = KeysAlpha;
-	S.Keys = FpsKeysLine;
 	S.bLowHint = bArmed && State == EState::Ready && A.Mag <= FMath::Max(2, D.Mag / 6) && A.Reserve > 0 && FMath::Frac(GetWorld()->GetTimeSeconds() * 1.6) < 0.7;
 }
 

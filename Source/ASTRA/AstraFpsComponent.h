@@ -119,6 +119,7 @@ private:
 	bool bHitWasHead = false;
 	float KeysAlpha = 0.f;                       // the strip that tells the keys, up for a while when he arms
 	float KeysT = 0.f;
+	double KeysShownAt = -1000.0;                // when the card of keys was last put up (it does not come again at every draw)
 	FString PromptText;
 	float PromptT = 0.f;
 	TSharedPtr<class SAstraCombatHud> Hud;
