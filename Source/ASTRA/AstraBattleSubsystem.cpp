@@ -1680,9 +1680,17 @@ bool UAstraBattleSubsystem::PlayerFire(const FString& Weapon, const FString& Con
 			                       "EMCON full, a recon flight, or closing in)"), *T->ContactId);
 		return false;
 	}
-	if (T->Side == EAstraSide::Mandate && T->bNegotiated)
+	if (T->Side == EAstraSide::Mandate && T->bNegotiated && T->bHoldFire && !T->bFleeing)
 	{
-		BreakCeasefire(*T);
+		BreakCeasefire(*T);                       // a ship holding fire under terms agreed on the channel: that is a broken word
+	}
+	else if (T->Side == EAstraSide::Mandate && T->bNegotiated && T->bFleeing)
+	{
+		// a ship withdrawing on her commander's order is still at war: firing on her is a pursuit, not a broken truce (no truce was agreed: Thale
+		// accused the Aquila of one when a standing "engage until they fall" fired on the Hypnos as the Mandate pulled back, 2 Oct). She is in the
+		// fight again and may turn on us
+		T->bNegotiated = false;
+		Report(FString::Printf(TEXT("tactical: we are firing on the withdrawing %s (%s): she is fair game, and she may turn and fight"), *T->Name, *T->ContactId));
 	}
 	FAstraBattleShip& P = Ships[0];
 	const double Dist = FVector::Dist(P.Pos, T->Pos);

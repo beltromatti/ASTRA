@@ -68,6 +68,8 @@ class BridgeAgent:
         self.memories = lambda: ""       # what each officer remembers of the Captain (memory.py, set by the server)
         # what the room heard aloud lately (the speech floor's record: speech.Voice.heard_since, set by the server): (seconds ago, who, words, said to the end)
         self.heard: Callable[[float], list[tuple[float, str, str, bool]]] = lambda seconds: []
+        # what is queued on the speech floor and not said yet (speech.Voice.waiting, set by the server): (who, words, how urgent)
+        self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []
         self.titles = {k: v.title for k, v in CREW.items()}
         self._active: set[Turn] = set()  # turns being worked on (what preempt() reaches)
 
@@ -126,7 +128,12 @@ class BridgeAgent:
     def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None) -> str:
         """The bridge this moment (crew.bridge_now), for the head of a turn's last message."""
         hearing = context_model.describe(ctx, self.titles) if ctx else ""
-        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud())
+        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting())
+
+    def _waiting(self) -> str:
+        """The lines queued on the floor behind whoever is speaking: the officers see the backlog (a crisis made fifty urgent lines in four minutes, 2 Oct,
+        and most were dropped unsaid)."""
+        return "\n".join(f"- {who} ({how}): «{words}»" for who, words, how in self.waiting())
 
     def _said_aloud(self) -> str:
         """What the Captain has heard on the bridge in the last minute, as it was said (a line thought again is here in its new words, one
@@ -477,7 +484,9 @@ EVENT_ASK = ("The Captain should hear this: the responsible officer reports it n
              "what was really said, in the words it was said) and nothing has changed since "
              "(a victory, a retreat, a distance said once is said; the same picture again is noise), or it is news that has "
              "grown old while the bridge was busy ([happened N s ago]) and no longer matters as it stands — then say nothing, or "
-             "say what it means now. When several things happened at once (they are joined by |), the officers report the one or "
+             "say what it means now. When lines are already waiting to be said («Waiting to be said» in the bridge now), a new line is "
+             "worth adding only if it matters more to the Captain than all of them, and nothing waiting is said again in other words: in a "
+             "crisis a good bridge is a few clear voices, not every voice at once. When several things happened at once (they are joined by |), the officers report the one or "
              "two that matter most to the Captain right now, the most dangerous first, one short line each: the rest stays on "
              "the boards and the datapad, where the Captain can ask for it; in a battle the Captain hears many voices, and a "
              "report that changes nothing the Captain must decide is better left unsaid. Ranges, shield percentages and countdowns "

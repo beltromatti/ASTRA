@@ -238,6 +238,9 @@ class Mind:
         self.march_glue: MarchGlue | None = None
         self.agent.say = self._crew_say
         self.agent.heard = self.voice.heard_since          # what the bridge heard aloud, as it was said (the officers' «Said aloud»)
+        self.agent.waiting = self.voice.waiting            # and what is queued behind the speaker (their «Waiting to be said»)
+        self.flight.waiting = self.voice.waiting           # (the flight net sees the same backlog)
+        self.war.waiting = self.voice.waiting              # (and the allied captains)
         # the Captain's log is private: the story reads it, the crew does not
         self.agent.campaign = lambda: [c for c in self.director.campaign if not c.startswith("captain's log:")]
         self.agent.war = lambda: self.director.war.crew_view()
