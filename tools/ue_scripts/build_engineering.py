@@ -44,6 +44,13 @@ mi("MI_ENG_Coolant", "/Game/ASTRA/Materials/M_ASTRA_Hard", {"RoughnessMin": 0.35
                                                              "BaseColorMapInfluence": 0.3}, {"Tint": (0.03, 0.09, 0.28)})
 log.append("materials")
 
+# the finishes of the rooms (the detail uses the ship's steel, trim and crates): created when they are missing
+import sys
+if ROOT + "/tools/ue_scripts" not in sys.path:
+    sys.path.insert(0, ROOT + "/tools/ue_scripts")
+import ship_room_materials as RM
+RM.build(log)
+
 SRC = os.path.join(ROOT, "art", "export", "engineering")
 DST = KIT
 NANITE = True
@@ -67,6 +74,7 @@ def place(path, x, y, z, yaw=0.0, label=None, folder="Engineering"):
 
 
 place(f"{KIT}/SM_ENG_Hall", 0, 0, 0, label="Engineering_Hall")
+place(f"{KIT}/SM_ENG_Detail", 0, 0, 0, label="Engineering_Detail")             # ARTE-INTERNI: machines, wall bays, crane, luminaires (art/blender/ship_engineering.py)
 R = D["reactor"]
 place(f"{KIT}/SM_ENG_Core", R["x"], R["y"], 0, label="Engineering_Core")
 
@@ -93,12 +101,19 @@ for k in range(4):
     ang = 2 * math.pi * (k + 0.25) / 4
     light(unreal.PointLight, R["x"] + math.cos(ang) * (R["radius"] + 2.2), R["y"] + math.sin(ang) * (R["radius"] + 2.2), 4.0 + 4 * (k % 2),
           f"Engineering_CoreGlow_{k}", 30000, (60, 140, 255), 2800, shadows=(k == 0))
+# (ARTE-INTERNI: the hall was black, twelve lamps of 5200 lm twelve metres over a deck of 1176 m2: the high-bay luminaires hung from the trusses (the meshes of SM_ENG_Detail) carry the light now,
+# the old ceiling lamps stay as a soft top light, and a row of work lights hangs under each gallery)
 for k in range(6):
     x = -3 - k * 6.5
     for yy in (-8.0, 8.0):
-        light(unreal.RectLight, x, yy, D["height"] - 1.5, f"Engineering_Lamp_{k}_{yy:+.0f}", 5200, (235, 242, 255), 1800, size=(3.4, 1.4))
+        light(unreal.RectLight, x, yy, D["height"] - 1.5, f"Engineering_Lamp_{k}_{yy:+.0f}", 6000, (235, 242, 255), 1800, size=(3.4, 1.4))
+        light(unreal.RectLight, x, yy, D["height"] - 4.3, f"Engineering_HighBay_{k}_{yy:+.0f}", 18000, (235, 242, 255), 2400, size=(1.4, 1.4))
+for k in range(8):
+    x = -9.0 - k * 4.0
+    for yy in (-11.2, 11.2):
+        light(unreal.RectLight, x, yy, D["gallery"]["z"] - 0.7, f"Engineering_GalleryLamp_{k}_{yy:+.0f}", 7000, (255, 232, 200), 1100, size=(3.0, 0.4))
 mc = D["master_console"]
-light(unreal.PointLight, mc["x"], mc["y"], 3.2, "Engineering_ConsoleGlow", 1800, (120, 200, 255), 700)
+light(unreal.PointLight, mc["x"], mc["y"], 3.2, "Engineering_ConsoleGlow", 3500, (120, 200, 255), 900)
 log.append("lights")
 
 # ---- the Chief and the watch
