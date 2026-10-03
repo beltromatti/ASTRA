@@ -4,6 +4,7 @@
                  with panels, catwalks, the aft wall with the lift and the control booth, the front wall with the
                  tubes, a ceiling of trusses, crane rails and light fixtures, pipes along the walls
   SM_HGR_Glass   the booth's window
+  SM_HGR_Detail  (ARTE-INTERNI, ship_hangar.py) the deck's markings, the ground crew's equipment along the walls, the dressed wall bays, the bridge crane, the tubes' beacons
 
 Coordinates in the data are Unreal's (X forward, Y starboard, Z up); U() flips Y for Blender so the meshes land right.
 blender -b --factory-startup --python-exit-code 1 -P art/blender/hangar.py -- art/export/hangar [--preview <dir>]
@@ -144,6 +145,12 @@ def main():
     A.box_uv(deck, texel_m=2.0)
     A.export_fbx(deck, os.path.join(out, "SM_HGR_Deck.fbx"))
     report = [A.stats(deck)]
+    A.clear_objects()
+    # ARTE-INTERNI: what a working flight deck has and the hall lacks (art/blender/ship_hangar.py): the deck's markings, the ground crew's equipment, the dressed wall bays, the crane and the beacons
+    import ship_hangar
+    det = ship_hangar.detail("SM_HGR_Detail")
+    A.export_fbx(det, os.path.join(out, "SM_HGR_Detail.fbx"))
+    report.append(A.stats(det))
     A.clear_objects()
     g = A.Builder()
     box(g, -0.05, 0.05, -bo["half_width"], bo["half_width"], bo["window_bottom"], bo["window_top"], A.MAT_GLASS)

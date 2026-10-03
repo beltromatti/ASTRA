@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import random
 
+import ship_furn4 as MD
 import ship_furniture as F
 import ship_furniture2 as G
 import ship_spec as SPEC
@@ -28,62 +29,23 @@ def _dims(key: str):
 
 # ---------------------------------------------------------------------------------------------------------------- pieces
 def op_table(b: SParts) -> None:
-    """An operating table, its long axis along x (the head at -x), origin on the floor under its column: base, column, frame, pad, arm boards, rails."""
-    b.body.cyl((0, 0, 0.0), (0, 0, 0.06), 0.34, STRUCT, seg=16)
-    b.body.cyl((0, 0, 0.06), (0, 0, 0.78), 0.09, STEEL, seg=12)
-    b.body.box((-1.0, -0.32, 0.78), (1.0, 0.32, 0.86), STEEL)
-    b.soft.box((-0.98, -0.30, 0.86), (0.98, 0.30, 0.93), FABRIC_NAVY)
-    b.soft.box((-1.12, -0.13, 0.80), (-0.98, 0.13, 0.92), FABRIC_NAVY)
-    for sy in (-0.50, 0.50):
-        b.body.box((-0.55, sy - 0.11, 0.86), (-0.05, sy + 0.11, 0.89), STEEL)
-        b.fine.cyl((-0.30, sy * 0.66, 0.86), (-0.30, sy - 0.0, 0.86), 0.012, TRIM, seg=6)
-    for sy in (-0.335, 0.335):
-        b.fine.cyl((-0.85, sy, 0.845), (0.85, sy, 0.845), 0.012, TRIM, seg=6)
-    b.emit.lamp_box((0.98, -0.1, 0.80), (1.0, 0.1, 0.82), "medical", LAMP_DIM)
+    """An operating table, its long axis along x (the head at -x), origin on the floor under its column (ship_furn4.op_table)."""
+    MD.op_table(b)
 
 
 def surgical_lamp(b: SParts, z_ceil: float = 3.6) -> None:
-    """A ceiling-hung surgical lamp centred over the origin: a mount, a stem, a jointed arm, a broad lit head over the table (z 2.3)."""
-    b.body.cyl((0, 0, z_ceil - 0.06), (0, 0, z_ceil - 0.05), 0.16, STRUCT, seg=16)
-    b.body.cyl((0, 0, z_ceil - 0.5), (0, 0, z_ceil - 0.05), 0.035, TRIM, seg=8)
-    b.body.sphere((0, 0, z_ceil - 0.5), 0.05, STEEL, seg=10, rings=6)
-    b.body.cyl((0, 0, z_ceil - 0.5), (0.55, 0.0, z_ceil - 0.72), 0.028, TRIM, seg=8)
-    b.body.sphere((0.55, 0, z_ceil - 0.72), 0.045, STEEL, seg=10, rings=6)
-    b.body.cyl((0.55, 0, z_ceil - 0.72), (0.55, 0, 2.55), 0.028, TRIM, seg=8)
-    b.body.cyl((0.55, 0, 2.55), (0.55, 0, 2.42), 0.09, STEEL, seg=12)
-    b.body.cyl((0.55, 0, 2.42), (0.55, 0, 2.34), 0.42, COMPOSITE, seg=24, r2=0.36)
-    b.emit.lamp_cyl((0.55, 0, 2.341), (0.55, 0, 2.337), 0.33, "white_cool", LAMP_HOT, seg=24)
-    for k in range(8):                                     # the ring of small lights
-        a = k * math.pi / 4
-        b.emit.lamp_cyl((0.55 + 0.20 * math.cos(a), 0.20 * math.sin(a), 2.343), (0.55 + 0.20 * math.cos(a), 0.20 * math.sin(a), 2.338), 0.04, "ice", LAMP_HOT, seg=8)
+    """A twin surgical lamp hung from the ceiling over the origin (ship_furn4.surgical_lamp): two jointed arms, two broad lit heads of seven lenses over the table (z 2.3)."""
+    MD.surgical_lamp(b, z_ceil, 0.6, 2.3)
 
 
 def anesthesia_cart(b: SParts) -> None:
-    """An anaesthesia machine on wheels facing +x: a cabinet, a lit screen, gas lines."""
-    b.body.box((-0.3, -0.35, 0.12), (0.3, 0.35, 1.0), COMPOSITE)
-    b.body.box((-0.32, -0.37, 1.0), (0.32, 0.37, 1.03), STEEL)
-    b.fine.box((0.3, -0.3, 0.2), (0.32, 0.3, 0.8), IVORY)
-    b.fine.box((0.32, -0.26, 0.55), (0.325, 0.26, 0.75), DGLASS)
-    b.emit.lamp_box((0.325, -0.22, 0.6), (0.33, 0.22, 0.62), "cyan", LAMP_DIM)
-    b.fine.cyl((-0.15, 0.0, 1.03), (-0.15, 0.0, 1.5), 0.02, TRIM, seg=8)
-    b.body.box((-0.22, -0.22, 1.5), (0.1, 0.22, 1.78), STEEL)
-    b.fine.box((0.1, -0.2, 1.55), (0.115, 0.2, 1.75), DGLASS)
-    b.emit.label((0.1165, 0.0, 1.65), 0.38, 0.19, (1, 0, 0), "scr_lab")
-    for sx in (-0.24, 0.24):
-        for sy in (-0.3, 0.3):
-            b.fine.cyl((sx, sy, 0.0), (sx, sy, 0.10), 0.04, RUBBER, seg=8)
+    """An anaesthesia machine on wheels facing +x (ship_furn4.anesthesia_machine)."""
+    MD.anesthesia_machine(b)
 
 
 def instrument_tray(b: SParts) -> None:
-    """A tall instrument table: a steel tray on a pole, laid with instruments (thin boxes)."""
-    b.body.cyl((0, 0, 0.0), (0, 0, 0.05), 0.28, STRUCT, seg=14)
-    b.body.cyl((0, 0, 0.05), (0, 0, 0.9), 0.03, TRIM, seg=8)
-    b.body.box((-0.35, -0.5, 0.9), (0.35, 0.5, 0.93), STEEL)
-    rng = random.Random(4)
-    for k in range(9):
-        y = -0.42 + k * 0.105
-        b.fine.box((-0.28 + rng.uniform(0, 0.1), y, 0.93), (0.05 + rng.uniform(0, 0.2), y + 0.012, 0.945), STEEL)
-    b.soft.box((-0.3, -0.48, 0.93), (-0.15, -0.3, 0.955), FABRIC_NAVY)
+    """An instrument trolley (ship_furn4.instrument_trolley): two steel trays, the upper one laid with instruments."""
+    MD.instrument_trolley(b, 3)
 
 
 # ------------------------------------------------------------------------------------------------------------------ surgery
@@ -108,9 +70,9 @@ def surgery(name: str = "SM_SHIP_Surgery"):
     # the far wall: counters with glass-fronted cabinets above, monitors
     for x in (2.6, 6.2, 9.8, 13.4):
         place(b, x, yf - 0.36, -90, F.counter, 3.5, 0.7, 0.92, LAMINATE, COMPOSITE, True, False)
-    b.body.box((0.8, yf - 0.42, 1.55), (L - 0.8, yf, 2.5), COMPOSITE)
+    b.body.box((0.8, yf - 0.42, 1.55), (L - 0.8, yf, 2.5), IVORY)
     for k in range(int((L - 1.6) / 1.2)):
-        b.fine.box((0.82 + k * 1.2, yf - 0.435, 1.58), (0.82 + (k + 1) * 1.2 - 0.05, yf - 0.42, 2.47), DGLASS)
+        b.fine.box((0.82 + k * 1.2, yf - 0.435, 1.58), (0.82 + (k + 1) * 1.2 - 0.05, yf - 0.42, 2.47), LAMINATE)
     b.emit.lamp_box((0.8, yf - 0.44, 1.50), (L - 0.8, yf - 0.40, 1.53), "medical", LAMP)
     place(b, 4.6, yf - 0.55, -90, F.monitor, 0.6, 0.34, "scr_lab", True, z=0.92)
     place(b, 11.4, yf - 0.55, -90, F.monitor, 0.6, 0.34, "scr_map", True, z=0.92)
@@ -147,7 +109,9 @@ def quarantine(name: str = "SM_SHIP_Quarantine"):
         b.fine.box((xm - 0.5, yc0 - 0.05, 0.0), (xm - 0.45, yc0 + 0.05, 2.55), TRIM)      # the door frame (an opening 1.0 m wide)
         b.fine.box((xm + 0.45, yc0 - 0.05, 0.0), (xm + 0.5, yc0 + 0.05, 2.55), TRIM)
         b.emit.lamp_box((xm - 0.12, yc0 - 0.055, 2.62), (xm + 0.12, yc0 - 0.05, 2.7), "red" if k in (1, 4) else "green", LAMP)
-        place(b, xm - 0.55, yf - 1.16, -90, G.bunk_bed, 2.05, 0.95, 1, [FABRIC_NAVY, FABRIC_GREY, FABRIC_SAND][k % 3], 20 + k)
+        place(b, xm - 0.55, yf - 1.16, -90, MD.hospital_bed, 20 + k, [FABRIC_NAVY, FABRIC_GREY, FABRIC_SAND][k % 3])
+        place(b, xm + 0.35, yf - 0.55, 0, MD.iv_stand, k)
+        place(b, xm - 0.55 - 0.85, yf - 0.3, -90, MD.bedside_cabinet, k)
         place(b, xm + 1.2, yf - 0.02, -90, F.wall_screen, 0.7, 0.4, "scr_lab", z=1.5)
         place(b, xm + 1.1, yc0 + 1.6, 0, F.chair, FABRIC_GREY)
         b.emit.lamp_box((xa + 0.2, yc0 + 0.3, H - 0.08), (xb - 0.2, yc0 + 0.36, H - 0.05), "medical_dim", LAMP_DIM)
