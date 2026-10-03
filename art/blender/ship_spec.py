@@ -115,6 +115,10 @@ _reg("hydro", name="Hydroponics Bay", kind="hydroponics", dept="science", L=24.0
      doors=[door("near", 10.0)], systems=["life_support", "potable_water", "food_service"],
      spots=[spot("botanist", "work", 8.0, 7.2, 0, "science"), spot("botanist", "work", 16.0, 7.2, 180, "science")],
      lights=[light(12.0, 8.0, 3.3, 3500, 7000, (20.0, 12.0), 1100)])
+_reg("garden", name="Garden", kind="hydroponics", dept="science", L=24.0, D=16.0, h=3.4, plate="hydro",
+     doors=[door("near", 10.0)], systems=["life_support", "potable_water", "food_service"],
+     spots=[spot("botanist", "work", 8.0, 7.2, 0, "science"), spot("botanist", "work", 16.0, 7.2, 180, "science")],
+     lights=[light(12.0, 8.0, 3.3, 3500, 7000, (20.0, 12.0), 1100)])
 _reg("quiet", name="Quiet Room", kind="chapel", dept="services", L=12.0, D=16.0, h=3.6, plate="chapel",
      doors=[door("near", 6.0)], systems=["power_bus"],
      spots=[spot("crew", "sit", 3.6, 7.6, 90), spot("crew", "sit", 8.4, 7.6, 90), spot("crew", "sit", 3.6, 9.8, 90), spot("crew", "sit", 8.4, 9.8, 90)],
@@ -558,7 +562,7 @@ DENSITY_KIND = {"galley": 105, "lounge": 80, "library": 80, "observation": 45, "
                 "magazine": 70, "weapons_control": 75, "weapons": 70, "sensors": 85, "transporter": 70, "archive": 75, "machinery": 85, "power": 85, "range": 85, "hangar": 95,
                 "flight_ops": 78, "fabrication": 95, "tank": 60, "crawlway": 70, "wardroom": 80, "gym": 90, "shop": 90, "simulator": 60, "brig": 75, "security": 80, "dental": 100,
                 "morgue": 90, "counselling": 70, "computer": 70, "damage_control": 80, "transit": 80, "airlock": 95, "lifepod": 95, "ready_room": 70, "lobby": 80, "lift": 70}
-DENSITY_KEY = {"lab_astro": 45, "bow_obs": 55, "quiet": 50, "bar": 70, "games": 75, "sim_bay": 55, "pilot_ready": 75, "reaction_mass": 55, "dc_central": 80, "ready_room": 80}
+DENSITY_KEY = {"berthing": 55, "barracks": 55, "lab_astro": 45, "bow_obs": 55, "quiet": 50, "bar": 70, "games": 75, "sim_bay": 55, "pilot_ready": 75, "reaction_mass": 55, "dc_central": 80, "ready_room": 80}
 TEMP_KIND = {"galley": 4800, "lounge": 3300, "library": 3300, "observation": 4200, "storage": 4600, "heads": 4400, "laundry": 4400, "hydroponics": 5600, "chapel": 2900, "lab": 5200,
              "workshop": 5000, "armory": 4800, "cabins": 3600, "surgery": 5400, "quarantine": 5400, "pharmacy": 5400, "concourse": 3600, "cic": 5600, "briefing": 4200, "comms": 5000,
              "offices": 4400, "magazine": 4800, "weapons_control": 5000, "weapons": 4800, "sensors": 5400, "transporter": 5400, "archive": 5000, "machinery": 4600, "power": 4600,

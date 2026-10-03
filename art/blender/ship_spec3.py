@@ -96,10 +96,14 @@ _reg("sim_bay", name="Simulator Bay", kind="simulator", dept="flight", L=24.0, D
      spots=[spot("simulator_operator", "sit", 22.4, 4.0, 0, "flight"), spot("pilot", "sit", 4.0, 8.1, 90, "flight", 0.4), spot("pilot", "sit", 8.2, 8.1, 90, "flight", 0.4),
             spot("pilot", "sit", 12.4, 8.1, 90, "flight", 0.4), spot("pilot", "sit", 16.6, 8.1, 90, "flight", 0.4), spot("crew", "stand", 18.0, 7.0, 90)],
      lights=[light(8.0, 8.0, 3.6, 2200, 5600, (12.0, 4.0), 900), light(18.0, 8.0, 3.6, 3200, 5200, (8.0, 6.0), 900)])
+# the berthing bay's bunks (ship_rooms_life.berthing places them at yaw 90: head at the near-wall end, so the sleeper lies with the head towards -y): columns across the room (a 3 m
+# aisle in the middle, where the table is) and the two rows; every bunk is two places, the lower at the mattress (0.60 m above the station) and the upper 0.96 m higher
+BERTH_X = (1.8, 4.6, 7.4, 12.6, 15.4, 18.2, 21.0)
+BERTH_Y = (4.4, 9.6)
 # ---- quarters ------------------------------------------------------------------------------------------------------------------------------------------------------------------
 _reg("berthing", name="Crew Berthing Bay", kind="cabins", dept="services", L=24.0, D=16.0, h=3.4, plate="berthing_bay",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
-     spots=[spot("sleeper", "sleep", 2.0 + 3.0 * k, 3.0 + 3.2 * j, 90 if j % 2 == 0 else -90, "services") for k in range(7) for j in range(4)],
+     spots=[spot("sleeper", "sleep", x, y, -90, "services", dz) for x in BERTH_X for y in BERTH_Y for dz in (0.0, 0.96)],
      lights=[light(6.0, 4.0, 3.2, 1500, 3000, (10.0, 0.6), 600), light(18.0, 4.0, 3.2, 1500, 3000, (8.0, 0.6), 600), light(6.0, 12.0, 3.2, 1500, 3000, (10.0, 0.6), 600),
              light(18.0, 12.0, 3.2, 1500, 3000, (8.0, 0.6), 600)])
 _reg("suites", name="Senior Officers' Quarters", kind="cabins", dept="command", L=24.0, D=12.0, h=3.2, plate="suites",

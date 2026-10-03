@@ -141,7 +141,7 @@ def deck4(D) -> None:
     D.anchor("PO0", -1, -128.0, ("galley",))                  # the Main Galley, across the Port Passage from its pass (its door 10 m in: clear of the Concourse's gates)
     # ---- A: the high street. Starboard: learning and quiet at the bow, then the shops, the bar and the lounge towards the Concourse. Port: the garden, the games, the simulators.
     lane(D, fwd.pid, +1, {"A": "library:Main_Library chapel store_s shop barber bar lounge games:Card_Room? store_s offices:Crew_Services_Office?"})
-    lane(D, fwd.pid, -1, {"A": "hydro:Forward_Garden games sim_bay library:Technical_Library store_s gym quiet heads store_s? quiet?"})
+    lane(D, fwd.pid, -1, {"A": "garden:Forward_Garden games sim_bay library:Technical_Library store_s gym quiet heads store_s? quiet?"})
     # ---- C-E, the Spine's middle piece (aft of the Berthing): heads and laundry at the Berthing's door, the lounge, the games rooms and the bar further aft
     # (the damage bench strikes d4_games_D2 and its neighbour d4_games_D1 and walks the Captain 80 m forward: the neighbour's forward edge must be within 45 m of D2's middle, hence the gap)
     lane(D, mid.pid, +1, {"C": "heads laundry store_s", "D": "gap:4 games games"}, FILL)
@@ -189,7 +189,7 @@ def deck6(D) -> None:
     sp = pieces(D)
     fwd, p3, aft = sp[0], sp[1], sp[2]
     FILL = ["store_s", "tech_s", "locker_s"]
-    lane(D, fwd.pid, +1, {"A": "store_s tech_s", "B": "gym:Rehabilitation_Gym hydro:Medicinal_Garden lab:Medical_Research records store_s cabins:Medical_Staff_Quarters heads laundry?",
+    lane(D, fwd.pid, +1, {"A": "store_s tech_s", "B": "gym:Rehabilitation_Gym garden:Medicinal_Garden lab:Medical_Research records store_s cabins:Medical_Staff_Quarters heads laundry?",
                           "C": "surgery surgery:Surgery_2 pharmacy dentist records:Medical_Records"}, FILL)
     lane(D, fwd.pid, -1, {"A": "store_s", "B": "store_cold:Medical_Cold_Store offices:Medical_Administration lab:Pathology_Lab heads",
                           "C": "quarantine:Isolation_Ward morgue lab:Medical_Laboratory? counselling:Counselling_&_Chaplaincy"}, FILL)
@@ -197,7 +197,7 @@ def deck6(D) -> None:
     lane(D, p3.pid, -1, {"C": "lab:Blood_&_Tissue_Lab", "D": "store_s heads"}, FILL)
     lane(D, aft.pid, +1, {"E": "berthing", "F": "berthing", "G": "heads", "H": "gym:Engineers'_Gym"}, FILL)
     lane(D, aft.pid, -1, {"E": "berthing", "F": "heads laundry", "G": "lounge:Engineers'_Lounge", "H": "berthing"}, FILL)
-    lane(D, "PO0", -1, {"B": "hydro store_cold", "C": "pool lab store_dry heads", "D": "cabins:Petty_Officers'_Quarters_2 laundry", "E": "library:Engineers'_Library hydro:Aft_Garden?",
+    lane(D, "PO0", -1, {"B": "hydro store_cold", "C": "pool lab store_dry heads", "D": "cabins:Petty_Officers'_Quarters_2 laundry", "E": "library:Engineers'_Library garden:Aft_Garden?",
                         "F": "pool heads laundry store_dry", "G": "pool lounge:Petty_Officers'_Mess heads", "H": "pool store_s heads"}, FILL)
     lane(D, "SB0", +1, {"B": "pool lab hydro store_cold", "C": "pool lab store_cold records", "D": "cabins:Petty_Officers'_Quarters_1 heads", "E": "lounge:Engineers'_Mess gym?",
                         "F": "pool heads laundry store_dry", "G": "pool heads laundry", "H": "pool store_s"}, FILL)

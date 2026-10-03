@@ -27,14 +27,15 @@ class Style:
     """The look of a room: materials of the floor, the wainscot, the upper wall, the trim and the ceiling, the accent lamp colour.
     ARTE-INTERNI (`v2`, the default; ship_shell.py): `floor2` / `border` / `inlay` = a border of a second finish round the floor with a lit line between; `wall_acc` (cloth) + `wall_slat` + `wall_pattern`
     = the materials and the order of the treatments of the wall bays (panel, cloth, slats, perf); `bay` = the target width of a bay (m); `wall_wash` = a slot of light on every pilaster;
-    `ceiling` = bands | cove | grid | exposed | flat; `light_cell` = the colour of the ceiling's luminous parts; `downlights`, `bands` (how many), `beam_light`."""
+    `ceiling` = bands | cove | grid | exposed | flat; `light_cell` = the colour of the ceiling's luminous parts; `downlights`, `bands` (how many) or `band_ys` (where), `band_w`, `beam_pitch`, `beam_light`."""
 
     def __init__(self, floor: str = DECK, floor_mode: str = "plates", wall_lo: str = COMPOSITE, wall_hi: str = COMPOSITE, trim: str = TRIM,
                  ceil: str = COMPOSITE, accent: str = "cool_dim", strip: str = "white_cool", wain_h: float = 1.05, ribs: bool = True,
                  rib_mat: str = TRIM, skirt: str = STRUCT, light_mode: str = "strips", rail: bool = True, cove: str | None = None,
                  seams: bool = True, cove_on: bool = True, v2: bool = True, floor2: str | None = None, border: float = 0.0, inlay: str | None = None,
                  wall_acc: str = COMPOSITE, wall_slat: str = "MI_SHIP_Oak", wall_pattern: tuple | None = None, bay: float = 2.0, wall_wash: bool = True, ceiling: str = "bands",
-                 light_cell: str | None = None, downlights: bool = True, bands: int = 0, beam_light: bool = True) -> None:
+                 light_cell: str | None = None, downlights: bool = True, bands: int = 0, beam_light: bool = True, band_ys: tuple | None = None, band_w: float = 0.42,
+                 beam_pitch: float = 4.0) -> None:
         self.__dict__.update(locals())
         del self.__dict__["self"]
         if self.light_cell is None:
@@ -147,6 +148,8 @@ def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far
     """Floor, ceiling and the four walls of a room. `skip`: walls not built here (the caller builds them: window walls); `bare`: walls that
     belong to a corridor (a finish layer only, no structure of their own); `ceil_t`, `floor_t`: the ceiling's and the floor's structure thickness (a room inside a shell that leaves no more than that)."""
     L, D, H = spec["L"], spec["D"], spec["h"]
+    import ship_themes as TH
+    st = TH.resolve(st, spec)                                         # ARTE-INTERNI: a room that chose no theme gets the one of its prefab (ship_themes.THEME_TABLE)
     doors = doors if doors is not None else spec["doors"]
     b._doors = doors                                                  # (dress_wall keeps clear of them)
     b._style = st                                                     # (ceiling_panels reads it)

@@ -184,19 +184,9 @@ def railgun_breech(b: SParts) -> None:
 
 # ---------------------------------------------------------------------------------------------------------------------- the officers' deck
 def officer_bed(b: SParts, w: float = 1.0, l: float = 2.1, blanket: str = FABRIC_NAVY) -> None:
-    """A single bed with a headboard at -x (its foot towards +x): a frame, a mattress with sheets, a folded blanket, two pillows, a reading lamp on the wall behind, a drawer
-    under the foot."""
-    b.body.box((-l / 2, -w / 2, 0.12), (l / 2, w / 2, 0.36), WOOD)
-    b.soft.box((-l / 2 + 0.04, -w / 2 + 0.04, 0.36), (l / 2 - 0.04, w / 2 - 0.04, 0.5), BEDDING)
-    b.soft.box((-l / 2 + 0.7, -w / 2 + 0.03, 0.5), (l / 2 - 0.03, w / 2 - 0.03, 0.56), blanket)
-    b.soft.box((-l / 2 + 0.05, -w / 2 + 0.1, 0.5), (-l / 2 + 0.45, -0.03, 0.6), BEDDING)
-    b.soft.box((-l / 2 + 0.05, 0.03, 0.5), (-l / 2 + 0.45, w / 2 - 0.1, 0.6), BEDDING)
-    b.body.box((-l / 2 - 0.06, -w / 2 - 0.03, 0.0), (-l / 2, w / 2 + 0.03, 1.0), WOOD)
-    b.body.box((l / 2, -w / 2, 0.12), (l / 2 + 0.04, w / 2, 0.55), WOOD)
-    for sy in (-w / 2 + 0.05, w / 2 - 0.1):
-        b.body.box((-l / 2, sy, 0.0), (-l / 2 + 0.06, sy + 0.05, 0.12), TRIM)
-        b.body.box((l / 2 - 0.06, sy, 0.0), (l / 2, sy + 0.05, 0.12), TRIM)
-    b.emit.lamp_box((-l / 2 - 0.07, w / 2 - 0.3, 0.9), (-l / 2 - 0.064, w / 2 - 0.15, 0.95), "white_warm", LAMP)
+    """An officer's bed with a headboard at -x (ship_furn2.officer_bed): the mattress top at 0.52 m."""
+    import ship_furn2 as N
+    N.officer_bed(b, w, l, blanket)
 
 
 def treadmill(b: SParts) -> None:

@@ -47,6 +47,7 @@ CARPET_SLATE, CARPET_SAND, CARPET_RUST, CARPET_MOSS = "MI_SHIP_CarpetSlate", "MI
 TEAK = "MI_SHIP_Teak"                    # plank deck, dark teak
 OAK, WALNUT = "MI_SHIP_Oak", "MI_SHIP_Walnut"                  # smooth wood grain: honey oak (tables, slats), walnut (panelling, bar fronts)
 TERRAZZO = "MI_SHIP_Terrazzo"            # pale speckled floor
+TERRAZZO_DARK = "MI_SHIP_TerrazzoDark"   # the same in mid grey (the mess hall)
 TILE_FLOOR, TILE_HEX, TILE_WALL = "MI_SHIP_TileFloor", "MI_SHIP_TileHex", "MI_SHIP_TileWall"          # glossy tiles: floors, hex mosaic, wall tiles
 TREAD, PLATING = "MI_SHIP_Tread", "MI_SHIP_Plating"             # diamond tread plate; octagonal plating
 PLASTER_IVORY, PLASTER_SAGE, PLASTER_SLATE, PLASTER_TEAL = "MI_SHIP_PlasterIvory", "MI_SHIP_PlasterSage", "MI_SHIP_PlasterSlate", "MI_SHIP_PlasterTeal"   # painted walls

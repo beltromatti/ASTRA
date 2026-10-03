@@ -10,7 +10,7 @@ import random
 
 import ship_mk as MK
 from bridge3_lib import Rx, Ry, Rz, T
-from ship_lib import (BOOK_COLORS, SWATCH, BEDDING, BRASS, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP, LAMP_DIM, LEATHER_CREAM,
+from ship_lib import (DGLASS as SL_DGLASS, TUFT_SAND, CERAMIC, WHITE_GLOSS, BOOK_COLORS, SWATCH, BEDDING, BRASS, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP, LAMP_DIM, LEATHER_CREAM,
                       LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, PAPER, RUBBER, STEEL, STRUCT, TRIM, WALNUT, WOOD, SParts)
 
 
@@ -198,3 +198,109 @@ def shelf(b: SParts, w: float, d: float, h: float, shelves: int, mat: str, books
                             break
                         b.soft.swatch_box((-d / 2 + 0.035, y, z + 0.025 + t * 0.03), (-d / 2 + 0.035 + 0.2, y + bw2, z + 0.025 + (t + 1) * 0.03), rng.choice(colors))
                     y += 0.2
+
+
+# ---------------------------------------------------------------------------------------------------------------------------- beds
+def bunk_bed(b: SParts, l: float, w: float, levels: int, blanket: str, seed: int) -> None:
+    """A crew bunk, head at -x, open side +y (the ladder). Steel tube posts and rails, a slatted base, a 12 cm mattress with a sheet, a rounded pillow and a blanket folded back at the
+    head; a privacy curtain hanging from the rail of the open side, drawn back at one end; a reading lamp with its switch, a net pocket with a book and a photograph, a number plate.
+    The mattress tops are at 0.50 m and 1.46 m: the height the sleepers lie at (AstraLifeData: 60 cm above the station for the lower bunk, +0.96 for the upper)."""
+    rng = random.Random(seed)
+    hl, hw = l / 2, w / 2
+    zs = [0.36, 1.32][:levels] if levels == 2 else [0.40]
+    top = 1.90 if levels == 2 else 1.0
+    for sx in (-hl, hl - 0.05):
+        for sy in (-hw, hw - 0.05):
+            MK.rbox(b.body, (sx, sy, 0.0), (sx + 0.05, sy + 0.05, top), 0.012, TRIM, 1)
+    for k, z in enumerate(zs):
+        b.body.box((-hl, -hw, z - 0.07), (hl, hw, z - 0.03), STRUCT)
+        for sx in (-hl + 0.05, hl - 0.07):
+            b.body.box((sx, -hw + 0.04, z - 0.09), (sx + 0.02, hw - 0.04, z - 0.03), TRIM)
+        for j in range(6):                                                                    # the slats
+            b.fine.box((-hl + 0.12 + j * (l - 0.24) / 5 - 0.03, -hw + 0.03, z - 0.03), (-hl + 0.12 + j * (l - 0.24) / 5 + 0.03, hw - 0.03, z - 0.012), COMPOSITE)
+        MK.rbox(b.soft, (-hl + 0.035, -hw + 0.035, z - 0.012), (hl - 0.035, hw - 0.035, z + 0.12), 0.04, BEDDING, 2)                                         # mattress and sheet
+        MK.rbox(b.soft, (-hl + 0.60, -hw + 0.03, z + 0.09), (hl - 0.03, hw - 0.03, z + 0.165), 0.03, blanket, 2)                                       # blanket
+        MK.rbox(b.soft, (-hl + 0.545, -hw + 0.03, z + 0.10), (-hl + 0.62, hw - 0.03, z + 0.17), 0.025, BEDDING, 2)                                       # the fold
+        MK.puff(b.soft, (-hl + 0.27, 0.0, z + 0.19), (0.2, w * 0.3, 0.07), BEDDING, e=0.6)                                                               # the pillow
+        # the reading lamp on the wall end, with its switch
+        b.fine.box((-hl + 0.055, hw - 0.30, z + 0.58), (-hl + 0.085, hw - 0.18, z + 0.64), TRIM)
+        b.emit.lamp_box((-hl + 0.085, hw - 0.285, z + 0.595), (-hl + 0.095, hw - 0.195, z + 0.625), "white_warm" if rng.random() > 0.3 else "warm_dim", LAMP_DIM)
+        # the net pocket: a book and a photograph
+        b.soft.box((-hl + 0.06, -hw + 0.12, z + 0.30), (-hl + 0.09, -hw + 0.46, z + 0.44), FABRIC_GREY)
+        b.soft.swatch_box((-hl + 0.09, -hw + 0.16, z + 0.32), (-hl + 0.105, -hw + 0.28, z + 0.40), BOOK_COLORS[(seed * 3 + k) % len(BOOK_COLORS)])
+        b.fine.swatch_box((-hl + 0.09, -hw + 0.32, z + 0.38), (-hl + 0.095, -hw + 0.40, z + 0.46), "paper")
+    if levels == 2:
+        b.body.box((-hl + 0.1, -hw, zs[1] + 0.12), (hl - 0.1, -hw + 0.025, zs[1] + 0.40), TRIM)               # the guard on the wall side
+        b.body.box((-hl + 0.1, hw - 0.025, zs[1] + 0.12), (-hl + 0.9, hw, zs[1] + 0.34), TRIM)                # a short guard on the open side
+        for k in range(5):                                                                                       # the ladder
+            z = 0.30 + k * 0.28
+            b.fine.cyl((hl - 0.42, hw + 0.02, z), (hl - 0.22, hw + 0.02, z), 0.013, TRIM, seg=6)
+        b.fine.cyl((hl - 0.42, hw + 0.02, 0.2), (hl - 0.42, hw + 0.02, 1.55), 0.012, TRIM, seg=6)
+        b.fine.cyl((hl - 0.22, hw + 0.02, 0.2), (hl - 0.22, hw + 0.02, 1.55), 0.012, TRIM, seg=6)
+    # the privacy curtains along the open side: pleated panels hanging from the frame, drawn over the foot half of each bunk
+    pleats = 8
+    cw = 0.95 / pleats
+    for k, z in enumerate(zs):
+        z_top = (zs[1] - 0.04) if (levels == 2 and k == 0) else (top - 0.08)
+        z_bot = z + 0.02
+        for j in range(pleats):
+            x0 = hl - 1.1 + j * cw
+            off = 0.012 * (1 if j % 2 else -1)
+            b.soft.box((x0, hw + 0.012 + off, z_bot), (x0 + cw * 0.96, hw + 0.03 + off, z_top), (FABRIC_GREY, FABRIC_NAVY, FABRIC_SAND)[(seed + k) % 3])
+        b.fine.cyl((hl - 1.12, hw + 0.01, z_top), (hl - 0.12, hw + 0.01, z_top), 0.007, TRIM, seg=6)
+    # a number plate on the post
+    b.emit.lamp_box((hl - 0.056, -hw + 0.012, 1.55), (hl - 0.05, -hw + 0.036, 1.62), "cool_dim", LAMP_DIM)
+
+
+def officer_bed(b: SParts, w: float, l: float, blanket: str) -> None:
+    """An officer's bed, head at -x, foot at +x: a walnut platform on a recessed plinth, a mattress with a turned-down duvet draped over the sides, a throw across the foot, two pillows and a
+    bolster, an upholstered headboard in a walnut frame with two reading lights, a drawer front under the foot. The mattress top is at 0.52 m (the sleeper lies 0.60 m above the floor)."""
+    b.body.box((-l / 2 + 0.06, -w / 2 + 0.05, 0.0), (l / 2 - 0.06, w / 2 - 0.05, 0.10), STRUCT)
+    MK.rbox(b.body, (-l / 2, -w / 2, 0.10), (l / 2, w / 2, 0.36), 0.02, WALNUT, 2)
+    MK.rbox(b.soft, (-l / 2 + 0.03, -w / 2 + 0.03, 0.36), (l / 2 - 0.03, w / 2 - 0.03, 0.53), 0.05, BEDDING, 2)                                  # the mattress
+    MK.rbox(b.soft, (-l / 2 + 0.72, -w / 2 - 0.015, 0.40), (l / 2 + 0.01, w / 2 + 0.015, 0.575), 0.04, blanket, 2)                                # the duvet, hanging over the sides
+    MK.rbox(b.soft, (-l / 2 + 0.66, -w / 2 - 0.01, 0.50), (-l / 2 + 0.78, w / 2 + 0.01, 0.585), 0.03, BEDDING, 2)                                  # the turn-down
+    b.soft.swatch_box((l / 2 - 0.62, -w / 2 - 0.016, 0.572), (l / 2 - 0.40, w / 2 + 0.016, 0.585), ("mustard", "rust", "teal", "cream")[int(w * 7) % 4])   # a throw across the foot
+    for k, yc in enumerate((-w * 0.22, w * 0.22)):
+        MK.puff(b.soft, (-l / 2 + 0.3, yc, 0.60), (0.22, 0.28, 0.075), BEDDING, e=0.6, rot=Ry(-6.0))
+    MK.puff(b.soft, (-l / 2 + 0.17, 0.0, 0.67), (0.09, w * 0.4, 0.075), FABRIC_SAND, e=0.8, rot=Ry(-6.0))
+    MK.rbox(b.body, (-l / 2 - 0.09, -w / 2 - 0.03, 0.0), (-l / 2 - 0.02, w / 2 + 0.03, 1.05), 0.02, WALNUT, 2)                                       # the headboard frame
+    MK.rbox(b.soft, (-l / 2 - 0.02, -w / 2 + 0.04, 0.46), (-l / 2 + 0.035, w / 2 - 0.04, 0.98), 0.02, TUFT_SAND, 2)
+    for sy in (-w * 0.3, w * 0.3):
+        b.fine.box((-l / 2 - 0.0, sy - 0.07, 0.86), (-l / 2 + 0.07, sy + 0.07, 0.9), BRASS)
+        b.emit.lamp_box((-l / 2 + 0.07, sy - 0.05, 0.862), (-l / 2 + 0.072, sy + 0.05, 0.897), "white_warm", LAMP_DIM)
+    b.fine.box((l / 2 - 0.02, -w / 2 + 0.1, 0.16), (l / 2 + 0.01, w / 2 - 0.1, 0.32), STRUCT)                                                      # a drawer under the foot
+    b.fine.box((l / 2 + 0.01, -0.1, 0.25), (l / 2 + 0.03, 0.1, 0.265), BRASS)
+
+
+def wardrobe(b: SParts, w: float, d: float, h: float, mat: str) -> None:
+    """A tall wardrobe facing +x: walnut carcass on a recessed plinth, two flush doors with a recessed panel and a slim brass pull, a lit slot above, a crown."""
+    b.body.box((-d / 2 + 0.03, -w / 2 + 0.03, 0.0), (d / 2 - 0.03, w / 2 - 0.03, 0.08), STRUCT)
+    MK.rbox(b.body, (-d / 2, -w / 2, 0.08), (d / 2, w / 2, h), 0.012, mat if mat != COMPOSITE else WALNUT, 2)
+    for k, y0 in enumerate((-w / 2, 0.0)):
+        b.fine.box((d / 2, y0 + 0.012, 0.14), (d / 2 + 0.012, y0 + w / 2 - 0.012, h - 0.18), IVORY if mat == COMPOSITE else OAK)
+        b.fine.box((d / 2 + 0.012, y0 + 0.05, 0.2), (d / 2 + 0.018, y0 + w / 2 - 0.05, h - 0.24), STRUCT)
+        yp = y0 + (w / 2 - 0.07 if k == 0 else 0.07)
+        b.fine.box((d / 2 + 0.012, yp - 0.008, h * 0.45), (d / 2 + 0.035, yp + 0.008, h * 0.45 + 0.28), BRASS)
+    b.emit.lamp_box((d / 2 + 0.012, -w / 2 + 0.06, h - 0.14), (d / 2 + 0.016, w / 2 - 0.06, h - 0.12), "warm_dim", LAMP_DIM)
+
+
+def vanity(b: SParts, w: float, d: float) -> None:
+    """A washbasin unit facing +x: a walnut cabinet with two drawers, a white top with a ceramic basin sunk in it, a brass tap, a framed mirror with a lit edge, a cup with a toothbrush, a rail
+    with a towel."""
+    MK.rbox(b.body, (-d / 2, -w / 2, 0.06), (d / 2, w / 2, 0.82), 0.01, WALNUT, 2)
+    b.body.box((-d / 2 + 0.03, -w / 2 + 0.03, 0.0), (d / 2 - 0.03, w / 2 - 0.03, 0.06), STRUCT)
+    MK.rbox(b.body, (-d / 2 - 0.015, -w / 2 - 0.015, 0.82), (d / 2 + 0.015, w / 2 + 0.015, 0.855), 0.008, WHITE_GLOSS, 2)
+    MK.lathe(b.fine, [(0.12, 0.84), (0.19, 0.855), (0.2, 0.86), (0.17, 0.86), (0.1, 0.80), (0.09, 0.80)], (0.0, 0.0, 0.0), CERAMIC, seg=20)
+    b.fine.cyl((-0.2, 0.0, 0.855), (-0.2, 0.0, 1.0), 0.012, BRASS, seg=8)
+    b.fine.cyl((-0.2, 0.0, 1.0), (-0.1, 0.0, 1.0), 0.012, BRASS, seg=8)
+    for z in (0.18, 0.5):
+        b.fine.box((d / 2, -w / 2 + 0.03, z), (d / 2 + 0.012, w / 2 - 0.03, z + 0.28), OAK)
+        b.fine.box((d / 2 + 0.012, -0.1, z + 0.22), (d / 2 + 0.03, 0.1, z + 0.235), BRASS)
+    b.fine.box((-d / 2 - 0.0, -w / 2 + 0.06, 1.28), (-d / 2 + 0.03, w / 2 - 0.06, 1.98), TRIM)
+    b.fine.box((-d / 2 + 0.03, -w / 2 + 0.08, 1.30), (-d / 2 + 0.035, w / 2 - 0.08, 1.96), SL_DGLASS)
+    b.emit.lamp_box((-d / 2 + 0.03, -w / 2 + 0.06, 1.97), (-d / 2 + 0.05, w / 2 - 0.06, 2.0), "white_warm", LAMP)
+    b.fine.cyl((-d / 2 + 0.1, w / 2 - 0.1, 0.855), (-d / 2 + 0.1, w / 2 - 0.1, 0.93), 0.03, CERAMIC, seg=10)
+    b.fine.cyl((-d / 2 + 0.1, w / 2 - 0.1, 0.9), (-d / 2 + 0.11, w / 2 - 0.09, 1.0), 0.004, STEEL, seg=5)
+    b.fine.cyl((-d / 2 + 0.02, -w / 2 + 0.05, 1.05), (-d / 2 + 0.02, -w / 2 + 0.4, 1.05), 0.008, BRASS, seg=6)
+    b.soft.box((-d / 2 + 0.005, -w / 2 + 0.06, 0.78 + 0.28), (-d / 2 + 0.03, -w / 2 + 0.38, 1.06), BEDDING)

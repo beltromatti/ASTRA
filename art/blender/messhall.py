@@ -53,6 +53,13 @@ RIBS = [-4.75 * k for k in range(1, 8)]          # the ship's frames along the h
 
 # ------------------------------------------------------------------------------------------------ the hall
 def hall():
+    """The Mess Hall's mesh: ARTE-INTERNI rebuilt it in the kit's language (art/blender/ship_mess.py: same frame, same tables and benches, the serving line, the drinks station, the
+    screens; the shell, light and dressing of the rooms of the plan). hall_v1 below is the M1 hall it replaces."""
+    import ship_mess
+    return ship_mess.hall("SM_MESS_Hall")
+
+
+def hall_v1():
     b = A.Builder()
     rng = random.Random(4)
     lift = D["lift"]

@@ -150,8 +150,27 @@ def wall_v2(b: SParts, name: str, L: float, D: float, H: float, st, doors: list,
                     em.lamp_box((xe - 0.007, -WF - POST_D - 0.012, 0.5), (xe + 0.007, -WF - POST_D - 0.006, H - 0.4), st.accent, LAMP_DIM)
             fb.box((a, -WF - 0.02, st.wain_h - 0.03), (c, -WF + 0.0, st.wain_h + 0.03), st.trim)         # the rail between wainscot and upper wall
             fb.box((a, -WF - 0.012, 0.0), (c, -WF, 0.10), st.skirt)                                       # the skirting
+        sills = {}
+        for d in doors:                                                         # an opening with a sill (a serving pass, a window): the wall under it
+            z0 = d.get("z0", 0.0)
+            if d["wall"] != name or z0 <= 0.0:
+                continue
+            s_mid = (L - d["x"]) if name == "near" else d["x"]
+            a, c = s_mid - d["w"] / 2, s_mid + d["w"] / 2
+            sills[(round(a, 3), round(c, 3))] = z0
+            if structure:
+                fb.box((a, 0.0, 0.0), (c, WS, z0), STRUCT)
+            fb.box((a, -WF, 0.0), (c, 0.0, z0), st.wall_lo)
+            fb.box((a - 0.02, -WF - 0.03, z0 - 0.04), (c + 0.02, -WF + 0.0, z0), st.trim)
         for (a, c, hb) in spans:
-            door_trim(fine, a, c, hb, -WF, WS if structure else 0.0)
+            z0 = sills.get((round(a, 3), round(c, 3)))
+            if z0 is None:
+                door_trim(fine, a, c, hb, -WF, WS if structure else 0.0)
+            else:                                                               # a window's reveal: jambs between the sill and the head, a header
+                t_out = WS if structure else 0.0
+                fine.box((a - 0.05, -WF - 0.03, z0), (a, t_out, hb + 0.05), st.trim)
+                fine.box((c, -WF - 0.03, z0), (c + 0.05, t_out, hb + 0.05), st.trim)
+                fine.box((a - 0.05, -WF - 0.03, hb), (c + 0.05, t_out, hb + 0.05), st.trim)
         fb.box((0.0, -WF - 0.05, H - 0.06), (sl, 0.0, H), st.trim)                                       # the cornice
 
 
@@ -215,8 +234,8 @@ def ceiling_v2(b: SParts, spec: dict, st, rng: random.Random, ceil_t: float) -> 
     x0, x1, y0, y1 = WS + WF, L - WS - WF, FIN + WF, D - WS - WF
     mode = st.ceiling
     cell = st.light_cell
-    nb = max(1, int(L // 4.0))
-    beam_xs = [k * 4.0 for k in range(1, int(L // 4.0) + 1) if k * 4.0 < L - 0.5]
+    pitch = getattr(st, "beam_pitch", 4.0)
+    beam_xs = [k * pitch for k in range(1, int(L // pitch) + 1) if k * pitch < L - 0.5]
     if mode == "cove":
         # a raised centre and a lowered rim: the soffit (0.55 m wide, 14 cm lower) round the room, a lit cove in the step facing up, downlights in the rim
         rim, drop = 0.55, 0.14
@@ -282,13 +301,13 @@ def ceiling_v2(b: SParts, spec: dict, st, rng: random.Random, ceil_t: float) -> 
         tile_joints(b, spec, st, 1.2)
         beams(b, spec, st, beam_xs, 0.16)
         nbands = st.bands or max(1, int(round((y1 - y0) / 4.5)))
-        ys = [y0 + (j + 0.5) * (y1 - y0) / nbands for j in range(nbands)]
+        ys = list(st.band_ys) if getattr(st, "band_ys", None) else [y0 + (j + 0.5) * (y1 - y0) / nbands for j in range(nbands)]
         for yc in ys:
             for k in range(len(beam_xs) + 1):
                 xa = (beam_xs[k - 1] + 0.35) if k > 0 else x0 + 0.5
                 xb = (beam_xs[k] - 0.35) if k < len(beam_xs) else x1 - 0.5
                 if xb - xa > 1.2:
-                    band(b, xa, xb, yc, 0.42, H - 0.05, cell, LAMP_HOT)
+                    band(b, xa, xb, yc, getattr(st, "band_w", 0.42), H - 0.05, cell, LAMP_HOT)
         if st.downlights:
             for j in range(nbands + 1):
                 yy = y0 + j * (y1 - y0) / nbands

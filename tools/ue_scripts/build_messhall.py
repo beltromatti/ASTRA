@@ -174,11 +174,17 @@ log.append(f"{len(D['diners'])} diners, a cook")
 
 # ---- the light: warm white troffers over the tables, the counter's bright field, the kitchen, the screens' picture
 #      lights, the greens' grow light; all off until the Captain comes down
+# ARTE-INTERNI (2 Oct tour: "the Mess Hall is almost black"): these lights are actors, so the ship's astra.lamps.gain (x6 on the plan's lamps) does not reach them; a corridor
+# lamp is ~106 plan lumens per m2 (x6 in the game), the hall's lights gave 100 in all: LIGHT_GAIN brings them to the 90 plan lm/m2 x 6 that the rooms of the plan are tuned to
+# (art/blender/ship_spec.retune_lights: a canteen)
+LIGHT_GAIN = 5.0
+
+
 def light(cls, x, y, z, label, intensity, color, radius, shadows=False, pitch=-90.0, yaw=0.0, size=None):
     a = eas.spawn_actor_from_class(cls, V(x, y, z), unreal.Rotator(roll=0, pitch=pitch, yaw=yaw))
     lc = a.get_component_by_class(unreal.LocalLightComponent)
     lc.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
-    lc.set_editor_property("intensity", intensity)
+    lc.set_editor_property("intensity", intensity * LIGHT_GAIN)
     lc.set_editor_property("attenuation_radius", radius)
     lc.set_editor_property("light_color", unreal.Color(r=color[0], g=color[1], b=color[2], a=255))
     lc.set_editor_property("cast_shadows", shadows)

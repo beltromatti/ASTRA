@@ -9,6 +9,7 @@
     "MI_SHIP_Oak":          {"set": "WoodAsh",       "tint": "#B58A5A", "k": 1.25, "uv": 0.9, "rough": [0.35, 0.6], "normal": 0.8, "coat": 0.2},
     "MI_SHIP_Walnut":       {"set": "WoodAsh",       "tint": "#5A3A25", "k": 1.25, "uv": 0.9, "rough": [0.35, 0.6], "normal": 0.8, "coat": 0.25},
     "MI_SHIP_Terrazzo":     {"set": "Terrazzo",      "tint": "#C9C7C0", "k": 1.25, "uv": 0.8, "rough": [0.2, 0.45], "normal": 0.6, "coat": 0.3},
+    "MI_SHIP_TerrazzoDark": {"set": "Terrazzo",      "tint": "#8D8B86", "k": 1.25, "uv": 0.8, "rough": [0.2, 0.45], "normal": 0.6, "coat": 0.3},
     "MI_SHIP_TileFloor":    {"set": "TileBig",       "tint": "#B9C4C4", "k": 1.0,  "uv": 0.9, "rough": [0.06, 0.3], "normal": 0.6, "coat": 0.4},
     "MI_SHIP_TileHex":      {"set": "TileHex",       "tint": "#C9D2D0", "k": 1.0,  "uv": 1.6, "rough": [0.15, 0.5], "normal": 0.7, "coat": 0.3},
     "MI_SHIP_TileWall":     {"set": "TileSmall",     "tint": "#D8E2E0", "k": 1.0,  "uv": 0.8, "rough": [0.08, 0.3], "normal": 0.7, "coat": 0.5},

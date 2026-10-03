@@ -3,6 +3,9 @@ redesign adds (the crew's berthing bays, the senior officers' suites, the office
 from __future__ import annotations
 
 import ship_furniture as F
+import ship_decor as DC
+import ship_spec3 as SPEC3
+import ship_themes as TH
 import ship_furniture2 as G
 import ship_furniture3 as H3
 import ship_furniture4 as F4
@@ -10,7 +13,7 @@ import ship_furniture8 as K8
 import ship_furniture9 as N
 import ship_spec as SPEC
 from bridge3_lib import T
-from ship_lib import (BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP,
+from ship_lib import (CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, OAK, PLASTER_IVORY, PLASTER_SLATE, WALNUT, WEAVE_SLATE, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP,
                       LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL, STRUCT, TILE, TRIM, WOOD, SParts)
 from ship_rooms import Style, WF, WS, build_shell, ceiling_panels, ceiling_services, dress_wall, luminaire_strips, place, wall_label
 
@@ -173,32 +176,38 @@ def sim_bay(name: str = "SM_SHIP_SimBay"):
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- quarters
-BERTH_X = (1.8, 4.6, 7.4, 12.6, 15.4, 18.2, 21.0)           # the bunk columns of a berthing bay (a 4 m aisle in the middle, where the door is)
-BERTH_Y = (4.4, 9.6)
-
-
 def berthing(name: str = "SM_SHIP_BerthingBay"):
-    """24 x 16 x 3.4: a crew berthing bay — fourteen double bunks in two rows either side of a central aisle (twenty-eight sleepers), a locker for each bunk against the far wall, a
-    table and benches at the aisle's end, a notice board; low warm light."""
+    """24 x 16 x 3.4: a crew berthing bay — fourteen double bunks in two rows either side of a central aisle (twenty-eight sleepers: the places are at the bunks, the lower ones at the
+    mattress and the upper ones 0.96 m higher), each bunk with its curtain, reading lamp and net pocket and a locker at its foot against the far wall; at the aisle's end a table with
+    benches and a rug, a notice board and the watch roster on the wall, hooks with jackets by the door, a few plants; the light is low and warm (somebody is always asleep)."""
     spec, L, D, H = _dims("berthing")
     b = SParts(bevel=0.005, fine_bevel=0.0)
-    build_shell(b, spec, _warm_style(FABRIC_GREY, COMPOSITE, "warm_dim"))
+    st = TH.crew(floor=CARPET_SLATE, floor2=CARPET_SAND, wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=WEAVE_SLATE, wall_pattern=("panel", "cloth", "panel"), ceiling="bands",
+                 accent="warm_dim", strip="white_warm", light_cell="white_warm", bands=2, bay=2.0, wain_h=1.0)
+    build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
     blankets = (FABRIC_NAVY, FABRIC_GREY, FABRIC_RUST, FABRIC_SAND)
-    for i, x in enumerate(BERTH_X):
-        for j, y in enumerate(BERTH_Y):
+    for i, x in enumerate(SPEC3.BERTH_X):
+        for j, y in enumerate(SPEC3.BERTH_Y):
             place(b, x, y, 90, G.bunk_bed, 2.05, 0.95, 2, blankets[(i + j) % 4], 3 * i + j)
         place(b, x, yf - 0.3, -90, G.wardrobe, 0.9, 0.55, 2.0)
-    place(b, 10.0, 12.6, 0, F.table, 2.6, 1.0, 0.74, WOOD, TRIM, False)
+    place(b, 9.9, 7.0, 0, DC.rug, 3.0, 5.0, CARPET_SLATE, CARPET_SAND)
+    place(b, 10.0, 12.6, 0, F.table, 2.6, 1.0, 0.74, OAK, TRIM, False)
     for dy in (-0.75, 0.75):
-        place(b, 10.0, 12.6 + dy, 90 if dy < 0 else -90, F.bench, 2.4, 0.4, 0.46, FABRIC_GREY)
-    place(b, 9.9, 7.0, 0, G.rug, 3.0, 5.0, FABRIC_GREY, FABRIC_SAND)
-    b.body.box((xr - 0.05, 6.0, 1.1), (xr, 9.0, 1.9), WOOD)                                    # the notice board
+        place(b, 10.0, 12.6 + dy, 90 if dy < 0 else -90, F.bench, 2.4, 0.4, 0.46, LEATHER_NAVY)
+    for k, (dx, dy) in enumerate(((-0.9, -0.2), (-0.2, 0.25), (0.7, -0.3), (1.1, 0.2))):
+        place(b, 10.0 + dx, 12.6 + dy, 0, DC.mug, (CERAMIC, LAMINATE, LEATHER_NAVY, CERAMIC)[k], z=0.74)
+    place(b, 9.4, 12.5, 12, DC.book_stack, 2, 5, z=0.74)
+    place(b, xr - 0.04, 7.5, 180, DC.notice_board, 2.4, 1.0, 2, z=1.45)
+    place(b, xr - 0.04, 12.0, 180, F.wall_screen, 1.6, 0.9, "scr_sched", z=1.7)
+    place(b, 4.6, WF + 0.05, 90, DC.coat_hooks, 5, 0.2, z=1.7)
+    place(b, 15.4, WF + 0.05, 90, DC.coat_hooks, 5, 0.2, z=1.7)
+    for x in (8.6, 11.4):
+        place(b, x, 1.2, 0, F.potted_plant, 1.2, int(x))
     wall_label(b, 2.0, WF + 0.02, 2.2, (0, 1, 0), "eq_bunk", 0.7)
-    for y in (3.0, 7.0, 11.0, 14.5):
-        for x in (4.5, 10.0, 15.5, 21.0):
-            F.ceiling_light_panel(b, x - 0.4, x + 0.4, y - 0.25, y + 0.25, H - 0.05, "white_warm", LAMP_DIM)
+    for x in (7.0, 13.0):                                                                          # picture rail: the squadron prints
+        place(b, x, yf - 0.02, -90, DC.picture, 1.2, 0.8, int(x), WALNUT, ("squares", "bands")[int(x) % 2], z=1.9)
     return b.build(name)
 
 
