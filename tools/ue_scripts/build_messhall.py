@@ -109,6 +109,13 @@ mi("MI_SIGN_Room_Mess", SCREEN, {"Intensity": 8.0, "Roughness": 0.4, "FlipU": 0.
    {"ScreenTexture": f"{SIGN_TEX}/T_SIGN_Room_Mess"})
 log.append("materials")
 
+# the finishes of the rooms (the hall of ARTE-INTERNI uses them: terrazzo, plaster, walnut, oak, the swatch palette): created when they are missing
+import sys
+if ROOT + "/tools/ue_scripts" not in sys.path:
+    sys.path.insert(0, ROOT + "/tools/ue_scripts")
+import ship_room_materials as RM
+RM.build(log)
+
 for a in eas.get_all_level_actors():
     if str(a.get_folder_path()).startswith("Mess"):
         eas.destroy_actor(a)

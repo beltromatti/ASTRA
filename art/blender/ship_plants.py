@@ -251,7 +251,7 @@ def grow_rack(b: SParts, length: float = 4.8, tiers: int = 4, depth: float = 0.6
         b.body.box((-hl, -depth / 2 + 0.02, z - 0.05), (hl, depth / 2 - 0.02, z), STEEL)                    # the tray's floor
         b.fine.box((-hl + 0.02, -depth / 2 + 0.03, z), (hl - 0.02, -depth / 2 + 0.05, z + 0.085), STEEL)     # tray walls
         b.fine.box((-hl + 0.02, depth / 2 - 0.05, z), (hl - 0.02, depth / 2 - 0.03, z + 0.085), STEEL)
-        b.soft.box((-hl + 0.025, -depth / 2 + 0.05, z + 0.0), (hl - 0.025, depth / 2 - 0.05, z + 0.03), "MI_SHIP_Terracotta" if False else SOIL)   # the nutrient bath
+        b.soft.box((-hl + 0.025, -depth / 2 + 0.05, z + 0.0), (hl - 0.025, depth / 2 - 0.05, z + 0.03), SOIL)   # the nutrient bath
         b.soft.box((-hl + 0.03, -depth / 2 + 0.055, z + 0.03), (hl - 0.03, depth / 2 - 0.055, z + 0.05), WHITE_GLOSS)                    # the foam board the plants stand in
         kind = crop if crop != "mix" else ("lettuce", "herb", "grain", "seedling")[(t + seed) % 4]
         if kind == "seedling":

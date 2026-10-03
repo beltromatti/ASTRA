@@ -57,7 +57,6 @@ def floor_v2(b: SParts, spec: dict, st, rng: random.Random, floor_t: float, plat
             fb.box((d["x"] - d["w"] / 2 - 0.2, 0.0, -0.012), (d["x"] + d["w"] / 2 + 0.2, bd, 0.0), st.floor)
         if st.inlay:                                                        # a thin lit line between the field and the border
             e = 0.012
-            em.lamp_box((x0 - e, y0 - e, 0.0), (x1 + e, y0, 0.004), st.inlay, LAMP_DIM) if False else None
             em.lamp_box((x0, y1, 0.0), (x1, y1 + e, 0.004), st.inlay, LAMP_DIM)
             em.lamp_box((x0 - e, y0, 0.0), (x0, y1 + e, 0.004), st.inlay, LAMP_DIM)
             em.lamp_box((x1, y0, 0.0), (x1 + e, y1 + e, 0.004), st.inlay, LAMP_DIM)
@@ -131,6 +130,9 @@ def wall_v2(b: SParts, name: str, L: float, D: float, H: float, st, doors: list,
                 fb.box((a, -WF, hb), (c, 0.0, H), st.wall_hi)
                 continue
             edges = _bay_edges(a, c, st.bay)
+            custom = (getattr(st, "bay_edges", None) or {}).get(name)
+            if custom:                                                       # the pilasters where the room's furniture wants them
+                edges = [a] + sorted(e for e in custom if a + 0.3 < e < c - 0.3) + [c]
             for k in range(len(edges) - 1):
                 x0, x1 = edges[k], edges[k + 1]
                 xa, xb = x0 + POST_W / 2 + 0.01, x1 - POST_W / 2 - 0.01
@@ -248,7 +250,6 @@ def ceiling_v2(b: SParts, spec: dict, st, rng: random.Random, ceil_t: float) -> 
         fb.box((x0 + rim, y0 + rim, H - 0.05 - 0.002), (x1 - rim, y1 - rim, H - 0.05), st.ceil)
         z = H - 0.05 - drop
         e = 0.045
-        em.lamp_box((x0 + rim, y0 + rim - e, z), (x1 - rim, y0 + rim, z + 0.01), cell, LAMP_HOT) if False else None
         # the step's inner faces carry the strip: a thin lamp box on the ledge, facing the centre
         em.lamp_box((x0 + rim, y0 + rim - 0.03, z - 0.012), (x1 - rim, y0 + rim, z), cell, LAMP_HOT)
         em.lamp_box((x0 + rim, y1 - rim, z - 0.012), (x1 - rim, y1 - rim + 0.03, z), cell, LAMP_HOT)
