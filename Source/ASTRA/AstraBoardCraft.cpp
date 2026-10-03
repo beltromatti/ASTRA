@@ -14,6 +14,8 @@
 #include "ASTRA.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshActor.h"
+#include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
 
 namespace AstraBoardCraft
 {
@@ -414,6 +416,8 @@ void UAstraBattleSubsystem::EmitBoardEvent(EEventKind Kind, const FAstraBattleSh
 	{
 		E.TargetName = T->Name;
 	}
+	UE_LOG(LogASTRA, Display, TEXT("[Boarding] %7.1f %s %s (order %d leg %d, %d men%s) %s -> %s%s%s"), Time, EventName(E.Kind), *E.CraftName, E.Order, E.Leg, E.Men, E.bMenAboard ? TEXT(", aboard") : TEXT(""),
+	       *E.CarrierName, *E.TargetName, E.Cause.IsEmpty() ? TEXT("") : TEXT(": "), *E.Cause);
 	BoardEvents.Add(MoveTemp(E));
 	if (BoardEvents.Num() > 128)
 	{
@@ -545,8 +549,54 @@ bool UAstraBattleSubsystem::LaunchBoarding(const FLaunch& Req, FLaunchResult& Ou
 	return true;
 }
 
+namespace
+{
+	/** What the bench asks of a ship (astra.board.strip / shield / disable / pd): kept until the battle's next tick makes it (the console is not the battle's thread of work). */
+	struct FBenchOp
+	{
+		FString What;
+		FString Key;
+		float Value = 0.f;
+	};
+	TArray<FBenchOp> GBenchOps;
+	int32 GBenchOrder = 9000;
+}
+
 void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
 {
+	for (const FBenchOp& Op : GBenchOps)
+	{
+		const int32 Id = ResolveShip(Op.Key);
+		FAstraBattleShip* S = Id >= 0 ? FindById(Id) : nullptr;
+		if (!S)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: no ship '%s'"), *Op.Key);
+			continue;
+		}
+		if (Op.What == TEXT("strip") || Op.What == TEXT("shield"))
+		{
+			const float F = Op.What == TEXT("strip") ? 0.f : Op.Value;
+			for (int32 f = 0; f < AstraWar::NumFacings; ++f)
+			{
+				S->Dmg.Sector[f] = S->Dmg.SectorMax[f] * F;
+			}
+			if (S->Dmg.bModel)
+			{
+				SyncTotals(*S);
+			}
+			S->bShieldsUp = F > 0.f;
+		}
+		else if (Op.What == TEXT("disable"))
+		{
+			DisableShip(*S, TEXT("test"));
+		}
+		else if (Op.What == TEXT("pd"))
+		{
+			S->PDChannels = FMath::RoundToInt(Op.Value);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: %s %s %g"), *Op.What, *S->Name, Op.Value);
+	}
+	GBenchOps.Reset();
 	if (BoardLaunches.IsEmpty())
 	{
 		return;
@@ -754,3 +804,124 @@ int32 UAstraBattleSubsystem::AbortBoardingOrder(int32 Order, const FString& Why)
 	return N;
 }
 
+
+
+// ---------------------------------------------------------------------------------------------------------- the bench's console
+namespace
+{
+	UAstraBattleSubsystem* BcBattle(UWorld* W)
+	{
+		return W ? W->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	}
+
+	FAutoConsoleCommandWithWorldAndArgs BcCmdCraft(TEXT("astra.board.craft"),
+		TEXT("Testing: boarding craft from a carrier to a target: astra.board.craft <carrier> <target> [n] [port|starboard|bow|stern|dorsal|ventral] [men]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			UAstraBattleSubsystem* B = BcBattle(W);
+			if (!B || A.Num() < 2)
+			{
+				return;
+			}
+			FString Why;
+			const int32 Cid = B->ResolveShip(A[0], &Why);
+			const int32 Tid = B->ResolveShip(A[1], &Why);
+			FShipFacts C, T;
+			if (Cid < 0 || Tid < 0 || !B->ShipFacts(Cid, C) || !B->ShipFacts(Tid, T))
+			{
+				UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: %s"), *Why);
+				return;
+			}
+			const int32 N = A.Num() > 2 ? FMath::Clamp(FCString::Atoi(*A[2]), 1, 8) : 2;
+			int32 Facing = AstraFacingOf(T.Att.UnrotateVector(C.Pos - T.Pos).GetSafeNormal());
+			if (A.Num() > 3)
+			{
+				static const TCHAR* const Names[] = {TEXT("bow"), TEXT("stern"), TEXT("port"), TEXT("starboard"), TEXT("dorsal"), TEXT("ventral")};
+				for (int32 f = 0; f < 6; ++f)
+				{
+					Facing = A[3].Equals(Names[f], ESearchCase::IgnoreCase) ? f : Facing;
+				}
+			}
+			const FVector Nrm = AstraWar::FacingVector(Facing);
+			const FVector Half = T.BoxHalf.IsNearlyZero() ? FVector(T.Radius) : T.BoxHalf;
+			FLaunch Req;
+			Req.CarrierId = Cid;
+			Req.TargetId = Tid;
+			Req.Order = GBenchOrder++;
+			for (int32 i = 0; i < N; ++i)
+			{
+				const double S = N > 1 ? ((double)i / (N - 1) - 0.5) * 2.0 : 0.0;                  // -1 .. 1 along the face
+				FDockPoint D;
+				D.Normal = Nrm;
+				D.Id = FName(*FString::Printf(TEXT("bench_%d"), i));
+				FVector L(T.BoxMid + Nrm.X * Half.X, Nrm.Y * Half.Y, Nrm.Z * Half.Z);
+				if (FMath::Abs(Nrm.X) < 0.5)
+				{
+					L.X = T.BoxMid + S * Half.X * 0.3;
+				}
+				else
+				{
+					L.Y = S * Half.Y * 0.4;
+				}
+				D.Local = L;
+				Req.Docks.Add(D);
+				if (A.Num() > 4)
+				{
+					Req.Men.Add(FCString::Atoi(*A[4]));
+				}
+			}
+			FLaunchResult R;
+			const bool bOk = B->LaunchBoarding(Req, R);
+			UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: %s: %d craft (%d men), the first flies ~%.0f s%s%s"), bOk ? TEXT("launched") : TEXT("refused"), R.Craft, R.Men, R.EtaS, R.Why.IsEmpty() ? TEXT("") : TEXT(" — "), *R.Why);
+			UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: order %d"), Req.Order);
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs BcCmdDepart(TEXT("astra.board.depart"), TEXT("Testing: the craft of an order let go of the hull and go home: astra.board.depart <order>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			if (UAstraBattleSubsystem* B = BcBattle(W); B && A.Num() >= 1)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: %d craft let go"), B->DepartBoardingOrder(FCString::Atoi(*A[0])));
+			}
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs BcCmdAssess(TEXT("astra.board.assess"), TEXT("Testing: what a decision to board rests on: astra.board.assess <carrier> <target>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			UAstraBattleSubsystem* B = BcBattle(W);
+			if (!B || A.Num() < 2)
+			{
+				return;
+			}
+			FAssess F;
+			if (!B->AssessBoarding(B->ResolveShip(A[0]), B->ResolveShip(A[1]), F))
+			{
+				UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: no such ship"));
+				return;
+			}
+			UE_LOG(LogASTRA, Display, TEXT("[Boarding] assess: carrier %s %s%s; berths %d free of %d (%s, %d men each); target %s %s%s; %.1f km, flight ~%.0f s; point defence %d channels to %.1f km; shields bow %.0f%% stern %.0f%% port %.0f%% starboard %.0f%% dorsal %.0f%% ventral %.0f%%; %d fighters near; hull %.0f%%%s"),
+			       *F.CarrierName, F.bCarrierOk ? TEXT("can launch") : TEXT("cannot"), *(F.bCarrierOk ? FString() : TEXT(": ") + F.CarrierWhy), F.BerthsFree, F.BerthsTotal, *F.KindKey, F.MenPerCraft, *F.TargetName,
+			       F.bTargetOk ? TEXT("can be boarded") : TEXT("cannot be boarded"), *(F.bTargetOk ? FString() : TEXT(": ") + F.TargetWhy), F.DistKm, F.EtaS, F.PdChannels, F.PdRangeKm, F.ShieldFrac[0] * 100.f, F.ShieldFrac[1] * 100.f,
+			       F.ShieldFrac[2] * 100.f, F.ShieldFrac[3] * 100.f, F.ShieldFrac[4] * 100.f, F.ShieldFrac[5] * 100.f, F.EnemyCraftNear, F.HullFrac * 100.f, F.bTargetDisabled ? TEXT(", no power") : TEXT(""));
+		}));
+
+#define BC_OP_COMMAND(NAME, HELP, NEEDS_VALUE) \
+	FAutoConsoleCommandWithWorldAndArgs BcCmdOp_##NAME(TEXT("astra.board." #NAME), TEXT(HELP), \
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W) \
+		{ \
+			if (A.Num() >= (NEEDS_VALUE ? 2 : 1)) \
+			{ \
+				FBenchOp Op; \
+				Op.What = TEXT(#NAME); \
+				Op.Key = A[0]; \
+				Op.Value = NEEDS_VALUE ? FCString::Atof(*A[1]) : 0.f; \
+				GBenchOps.Add(Op); \
+			} \
+			(void)W; \
+		}))
+	BC_OP_COMMAND(strip, "Testing: a ship's shields to nothing: astra.board.strip <ship>", false);
+	BC_OP_COMMAND(shield, "Testing: a ship's shield sectors to a share of their capacity: astra.board.shield <ship> <0..1>", true);
+	BC_OP_COMMAND(disable, "Testing: a ship loses all power (a hulk): astra.board.disable <ship>", false);
+	BC_OP_COMMAND(pd, "Testing: a ship's point-defence channels: astra.board.pd <ship> <n>", true);
+#undef BC_OP_COMMAND
+}
