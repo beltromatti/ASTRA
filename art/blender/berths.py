@@ -53,6 +53,13 @@ def group_x(g: int) -> float:
 
 # ------------------------------------------------------------------------------------------------ the compartment
 def room():
+    """The compartment's mesh: ARTE-INTERNI rebuilt it in the kit's language (art/blender/ship_berths.py: the same frame, the lift, the washroom door, the lounge with its four stools; the
+    shell, the pilasters at the locker columns, the beams, the aisle lights and the night lights of the rooms of the plan). room_v1 below is the M1 compartment it replaces."""
+    import ship_berths
+    return ship_berths.room("SM_BERTH_Room")
+
+
+def room_v1():
     b = A.Builder()
     rng = random.Random(3)
     lift, hd, lo = D["lift"], D["head_door"], D["lounge"]
