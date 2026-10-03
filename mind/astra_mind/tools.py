@@ -162,6 +162,12 @@ TRANSPORTER = _fn("transporter", "Operations or the XO: hand the Captain's order
     "id": {"type": "string", "description": "the transport's id (X3) for energize or abort; leave out for the one waiting or under way"},
     "question": {"type": "string", "description": "ask only: what the Captain wants to know, in his words"}}, ["action"])
 SHIP_TOOLS.append(TRANSPORTER)
+# Flight Control: the Captain flying a Falcon (Eagle) is brought aboard by the deck's recovery guidance (an automatic carrier landing)
+EAGLE_RECOVER = _fn("eagle_recover", "Flight: bring the Captain's Falcon (Eagle) aboard with the deck's recovery guidance — it flies her clear of the hull, to the gate "
+                                     "in front of the bow and in through the port tube (about half a minute). Only while the Captain is flying and within 8 km; for when "
+                                     "he asks to be brought home, or must be. He can take the stick back at any time.", {
+    "by": {"type": "string", "description": "who calls it, for the log (Flight Control)"}}, [])
+SHIP_TOOLS.append(EAGLE_RECOVER)
 
 DEPARTMENTS = ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"]
 # what a standing order lets each department do by itself when an event calls for it
@@ -249,7 +255,7 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "dispatch_damage_control": "ops", "hail": "comms", "set_emcon": "sensors", "active_scan": "sensors",
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
-          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "transporter": "ops", "lift_go": "computer"}
+          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "transporter": "ops", "lift_go": "computer", "eagle_recover": "flight"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 

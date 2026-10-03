@@ -167,6 +167,8 @@ public:
 	FString CaptainAboard() const;
 	/** The same, as the Captain's datapad writes it ("DECK 4 · MESS HALL"). */
 	FString CaptainPlace() const;
+	/** The personnel locator's line for the Captain's own badge: aboard and where, in a Falcon's cockpit, or planetside. */
+	FString CaptainLocatorText() const;
 	/** Where the Captain's words go (protocol v2 `context`, docs/ARCHITETTURA.md §3): the place, the crew who hear them
 	 *  (distance and walls), the one the Captain is looking at, the open channel, how the Captain is (on foot, seated...). */
 	TSharedRef<FJsonObject> CaptainContext() const;

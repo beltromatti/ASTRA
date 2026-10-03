@@ -2863,6 +2863,7 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 	if (S.bPiloted)
 	{
 		bPilotDown = true;
+		bPilotAuto = false;
 		if (Squadrons.IsValidIndex(S.Squadron))
 		{
 			--Squadrons[S.Squadron].Total;
@@ -5539,6 +5540,89 @@ FVector UAstraBattleSubsystem::PilotMouth() const
 	return Ships[0].Pos + Ships[0].Att.RotateVector(FVector(420.0, -14.9, -4.3));
 }
 
+namespace
+{
+	constexpr double PilotRecoverReachM = 8000.0;   // the deck's recovery guidance picks a Falcon up within this of the Aquila
+	constexpr double PilotClearM = 450.0;           // off the Aquila's long axis: clear of her hull, her island and her guns
+	constexpr double PilotGateM = 1500.0;           // the approach gate: this far out in front of the tube's mouth, on its axis
+}
+
+bool UAstraBattleSubsystem::StartPilotRecovery(const FString& By)
+{
+	FAstraBattleShip* S = PilotedId >= 0 ? FindById(PilotedId) : nullptr;
+	if (!S || !S->bAlive || bPilotDown || !Ships.Num() || !Ships[0].bAlive || FVector::Dist(S->Pos, Ships[0].Pos) > PilotRecoverReachM)
+	{
+		return false;
+	}
+	if (!bPilotAuto)
+	{
+		bPilotAuto = true;
+		PilotAutoLeg = 0;
+		PilotTakeBackT = 0.f;
+		Report(FString::Printf(TEXT("flight: the deck has Eagle — the recovery guidance is flying the Captain's Falcon in through the port tube (asked by %s); "
+		                            "pushing the stick hard gives her back to him"), *By), true);
+	}
+	return true;
+}
+
+void UAstraBattleSubsystem::StopPilotRecovery(const FString& Why)
+{
+	if (!bPilotAuto)
+	{
+		return;
+	}
+	bPilotAuto = false;
+	Report(FString::Printf(TEXT("flight: Eagle's recovery guidance is off — %s"), *Why), true);
+}
+
+void UAstraBattleSubsystem::TickPilotRecovery(FAstraBattleShip& S, float Dt)
+{
+	// an automatic carrier landing: first out of the way of the hull (straight out from the Aquila's long axis), then to the gate a kilometre and a
+	// half in front of the tube's mouth, then down the axis into the mouth, slowing; the pawn takes her in when she is there (bRecovered)
+	const FAstraBattleShip& A = Ships[0];
+	const FVector Fwd = A.Att.GetForwardVector();
+	const FVector Mouth = PilotMouth();
+	const FVector Gate = Mouth + Fwd * PilotGateM;
+	const FVector Rel = S.Pos - A.Pos;
+	const FVector Out = Rel - Fwd * FVector::DotProduct(Rel, Fwd);
+	const double OutM = Out.Size();
+	const double Ahead = FVector::DotProduct(S.Pos - Mouth, Fwd);
+	if (PilotAutoLeg == 0 && (OutM >= PilotClearM || Ahead > 300.0))
+	{
+		PilotAutoLeg = 1;
+	}
+	if (PilotAutoLeg == 1 && FVector::Dist(S.Pos, Gate) < 250.0)
+	{
+		PilotAutoLeg = 2;
+	}
+	FVector Goal;
+	double Speed;
+	if (PilotAutoLeg == 0)
+	{
+		const FVector Away = OutM > 1.0 ? Out / OutM : A.Att.GetUpVector();
+		Goal = S.Pos + Away * (PilotClearM - OutM + 100.0) + Fwd * 60.0;
+		Speed = 260.0;
+	}
+	else if (PilotAutoLeg == 1)
+	{
+		Goal = Gate;
+		Speed = FMath::Clamp(FVector::Dist(S.Pos, Gate) * 0.35, 220.0, 650.0);
+	}
+	else
+	{
+		Goal = Mouth;
+		Speed = FMath::Clamp(FVector::Dist(S.Pos, Mouth) * 0.18, 110.0, 260.0);
+	}
+	const FVector Dir = (Goal - S.Pos).GetSafeNormal();
+	S.Vel += (A.Vel + Dir * Speed - S.Vel).GetClampedToMaxSize(180.0 * Dt);
+	S.Pos += S.Vel * Dt;
+	// the nose along her path through the Aquila's frame; down the axis, facing aft into the tube
+	const FVector RelVel = S.Vel - A.Vel;
+	const FVector Look = PilotAutoLeg == 2 ? -Fwd : (RelVel.SizeSquared() > 1.0 ? RelVel.GetSafeNormal() : Dir);
+	const FQuat WantAtt = FRotationMatrix::MakeFromXZ(Look, A.Att.GetUpVector()).ToQuat();
+	S.Att = FQuat::Slerp(S.Att, WantAtt, FMath::Clamp(1.6f * Dt, 0.f, 1.f)).GetNormalized();
+}
+
 bool UAstraBattleSubsystem::TakeFalcon()
 {
 	for (FAstraSquadron& Q : Squadrons)
@@ -5569,6 +5653,7 @@ bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos,
 	{
 		return false;
 	}
+	bPilotAuto = false;
 	const FVector Pos = FromWorld(WorldPos);
 	const FQuat Att = Ships[0].Att * WorldRot;
 	const int32 I = AddShip(TEXT("EAGLE"), TEXT("Eagle (the Captain's Falcon)"), TEXT("ASTRA fighter (Falcon)"), TEXT(""), EAstraSide::Astra,
@@ -5580,6 +5665,10 @@ bool UAstraBattleSubsystem::LaunchPiloted(AActor* Pawn, const FVector& WorldPos,
 	C.bPiloted = true;
 	C.CraftKind = 0;
 	C.Squadron = Squadrons.IndexOfByPredicate([](const FAstraSquadron& Q) { return Q.Side == EAstraSide::Astra && Q.Name == TEXT("alpha"); });
+	if (Squadrons.IsValidIndex(C.Squadron) && !bFromPlanet)
+	{
+		Squadrons[C.Squadron].OnDeck = FMath::Max(0, Squadrons[C.Squadron].OnDeck - 1);   // his Falcon has left the deck (ReturnFalcon gives it back)
+	}
 	C.Missiles = 4;
 	C.RailDamage = 0.f;
 	C.PDRange = 0.f;
@@ -5638,6 +5727,7 @@ void UAstraBattleSubsystem::LeavePiloted()
 void UAstraBattleSubsystem::EndPiloted(bool bLanded)
 {
 	EndEagleWing();
+	bPilotAuto = false;
 	if (FAstraBattleShip* S = FindById(PilotedId))
 	{
 		S->bAlive = false;
@@ -5732,6 +5822,22 @@ void UAstraBattleSubsystem::TickPiloted(FAstraBattleShip& S, float Dt)
 			}
 		}
 		GFaceRequest.Reset();
+	}
+	if (bPilotAuto)
+	{
+		// the deck's recovery guidance flies her; the stick pushed hard for half a second gives her back to the Captain
+		const float Push = FMath::Max3(FMath::Abs(Pilot.Pitch), FMath::Abs(Pilot.Yaw), FMath::Abs(Pilot.Roll));
+		PilotTakeBackT = Push > 0.6f ? PilotTakeBackT + Dt : 0.f;
+		if (PilotTakeBackT > 0.5f)
+		{
+			StopPilotRecovery(TEXT("the Captain has the stick again"));
+		}
+		else
+		{
+			TickPilotRecovery(S, Dt);
+			S.Shield = FMath::Min(S.ShieldMax, S.Shield + S.ShieldRegen * Dt);
+			return;                               // (no guns, no lock, no hull to fly into: the deck is flying her along a clear path)
+		}
 	}
 	// the stick: rates in the craft's own frame (pitch 75, yaw 55, roll 140 deg/s at full deflection)
 	const float Boost = Pilot.bBoost ? 1.f : 0.f;
@@ -5907,6 +6013,9 @@ void UAstraBattleSubsystem::GetPilotStatus(FAstraPilotStatus& Out) const
 	Out.HomeWorld = ToWorld(Mouth);
 	Out.HomeRangeKm = FVector::Dist(Mouth, S->Pos) / OneKm;
 	Out.bCanLand = FVector::Dist(Mouth, S->Pos) < 600.0 && (S->Vel - Ships[0].Vel).Size() < 220.f;
+	Out.bRecovering = bPilotAuto;
+	Out.bCanRecover = !bPilotAuto && S->bAlive && Ships[0].bAlive && FVector::Dist(S->Pos, Ships[0].Pos) < PilotRecoverReachM;
+	Out.bRecovered = bPilotAuto && PilotAutoLeg == 2 && Out.bCanLand;
 	for (const FAstraProjectile& Pr : Projectiles)
 	{
 		Out.Incoming += (!Pr.bDead && Pr.Kind == EAstraProjKind::Missile && Pr.Target == S->Id) ? 1 : 0;
