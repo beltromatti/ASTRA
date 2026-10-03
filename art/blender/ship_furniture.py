@@ -11,6 +11,7 @@ import random
 
 from bridge3_lib import Rx, Ry, Rz, T, frame
 import ship_lib as SL
+import ship_furn2 as N
 from ship_lib import (BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DGLASS, DECK, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
                       FABRIC_SAND, IVORY, LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, LEAF, LEATHER, PAINT_RED, RUBBER, SOIL, STEEL, STRUCT, TILE, TRIM, WOOD,
                       SParts)
@@ -20,118 +21,47 @@ CRATES = [CRATE_OLIVE, CRATE_ORANGE, CRATE_BLUE, CRATE_GREY]
 
 # ---------------------------------------------------------------------------------------------------------------- seating
 def stool(b: SParts, r: float = 0.19, h: float = 0.46, mat: str = FABRIC_NAVY) -> None:
-    b.body.cyl((0, 0, 0.02), (0, 0, h - 0.06), 0.028, TRIM, seg=8)
-    b.body.cyl((0, 0, 0.0), (0, 0, 0.02), 0.16, STRUCT, seg=14)
-    b.soft.cyl((0, 0, h - 0.06), (0, 0, h), r, mat, seg=18)
+    N.stool(b, r, h, mat)
 
 
 def chair(b: SParts, seat: str = FABRIC_NAVY, frame_mat: str = TRIM, h: float = 0.46, w: float = 0.46) -> None:
-    """A ship's chair facing +x: a tubular frame, a pad seat, a shaped back."""
-    hw = w / 2
-    for sx in (-0.19, 0.19):
-        for sy in (-hw + 0.03, hw - 0.03):
-            b.fine.cyl((sx, sy, 0.0), (sx, sy, h - 0.05), 0.016, frame_mat, seg=8)
-    b.body.box((-0.21, -hw, h - 0.05), (0.21, hw, h - 0.03), frame_mat)
-    b.soft.box((-0.20, -hw + 0.015, h - 0.03), (0.20, hw - 0.015, h + 0.03), seat)
-    b.body.box((-0.22, -hw + 0.02, h + 0.02), (-0.19, hw - 0.02, h + 0.44), frame_mat)
-    b.soft.box((-0.19, -hw + 0.04, h + 0.12), (-0.155, hw - 0.04, h + 0.40), seat)
+    """A ship's chair facing +x: a padded seat and back on four tapered steel legs (ship_furn2)."""
+    N.chair(b, seat, frame_mat, h, w)
 
 
 def armchair(b: SParts, mat: str = FABRIC_GREY) -> None:
-    b.body.box((-0.42, -0.42, 0.06), (0.42, 0.42, 0.24), STRUCT)
-    b.soft.box((-0.40, -0.40, 0.24), (0.36, 0.40, 0.44), mat)
-    b.soft.box((-0.42, -0.42, 0.24), (-0.28, 0.42, 0.86), mat)
-    for sy in (-0.42, 0.42):
-        b.soft.box((-0.40, sy - 0.05 if sy < 0 else sy - 0.03, 0.24), (0.38, sy + 0.03 if sy < 0 else sy + 0.05, 0.62), mat)
-    for sx in (-0.36, 0.36):
-        for sy in (-0.36, 0.36):
-            b.fine.cyl((sx, sy, 0.0), (sx, sy, 0.06), 0.03, TRIM, seg=8)
+    N.armchair(b, mat)
 
 
 def sofa(b: SParts, w: float = 2.0, mat: str = FABRIC_NAVY, arms: bool = True) -> None:
-    """A sofa facing +x, w long along y."""
-    hw = w / 2
-    b.body.box((-0.42, -hw, 0.06), (0.40, hw, 0.22), STRUCT)
-    b.soft.box((-0.36, -hw + 0.06, 0.22), (0.40, hw - 0.06, 0.44), mat)
-    b.soft.box((-0.44, -hw, 0.22), (-0.30, hw, 0.84), mat)
-    if arms:
-        for sy in (-hw, hw - 0.10):
-            b.soft.box((-0.40, sy, 0.22), (0.40, sy + 0.10, 0.60), mat)
-    n = max(2, int(w / 0.65))
-    for k in range(1, n):
-        yv = -hw + 0.06 + k * (w - 0.12) / n
-        b.fine.box((-0.30, yv - 0.004, 0.44), (0.40, yv + 0.004, 0.445), RUBBER)
-    for sx in (-0.36, 0.34):
-        for sy in (-hw + 0.08, hw - 0.08):
-            b.fine.cyl((sx, sy, 0.0), (sx, sy, 0.06), 0.03, TRIM, seg=8)
+    """A sofa facing +x, w long along y (ship_furn2)."""
+    N.sofa(b, w, mat, arms)
 
 
 def bench(b: SParts, w: float = 1.8, d: float = 0.42, h: float = 0.46, mat: str = FABRIC_GREY) -> None:
-    b.soft.box((-d / 2, -w / 2, h - 0.08), (d / 2, w / 2, h), mat)
-    b.body.box((-d / 2 + 0.03, -w / 2 + 0.04, h - 0.12), (d / 2 - 0.03, w / 2 - 0.04, h - 0.08), TRIM)
-    for sy in (-w / 2 + 0.12, w / 2 - 0.12):
-        b.body.box((-d / 2 + 0.05, sy - 0.02, 0.0), (d / 2 - 0.05, sy + 0.02, h - 0.12), TRIM)
+    N.bench(b, w, d, h, mat)
 
 
 # ---------------------------------------------------------------------------------------------------------------- tables
 def table(b: SParts, w: float = 1.4, d: float = 0.8, h: float = 0.74, top: str = LAMINATE, base: str = TRIM, pedestal: bool = False) -> None:
-    """A table centred on the origin, w along x, d along y."""
-    b.body.box((-w / 2, -d / 2, h - 0.04), (w / 2, d / 2, h), top)
-    b.fine.box((-w / 2 + 0.01, -d / 2 + 0.01, h - 0.06), (w / 2 - 0.01, d / 2 - 0.01, h - 0.04), base)
-    if pedestal:
-        b.body.cyl((0, 0, 0.02), (0, 0, h - 0.06), 0.05, base, seg=12)
-        b.body.box((-0.28, -0.28, 0.0), (0.28, 0.28, 0.03), STRUCT)
-    else:
-        for sx in (-w / 2 + 0.07, w / 2 - 0.07):
-            for sy in (-d / 2 + 0.07, d / 2 - 0.07):
-                b.body.box((sx - 0.025, sy - 0.025, 0.0), (sx + 0.025, sy + 0.025, h - 0.06), base)
+    """A table centred on the origin, w along x, d along y (ship_furn2)."""
+    N.table(b, w, d, h, top, base, pedestal)
 
 
 def low_table(b: SParts, w: float = 1.1, d: float = 0.6, h: float = 0.38, mat: str = WOOD) -> None:
-    b.body.box((-w / 2, -d / 2, h - 0.04), (w / 2, d / 2, h), mat)
-    for sx in (-w / 2 + 0.05, w / 2 - 0.05):
-        for sy in (-d / 2 + 0.05, d / 2 - 0.05):
-            b.body.box((sx - 0.02, sy - 0.02, 0.0), (sx + 0.02, sy + 0.02, h - 0.04), TRIM)
+    N.low_table(b, w, d, h, mat)
 
 
 def desk(b: SParts, w: float = 1.4, d: float = 0.7, h: float = 0.74, top: str = WOOD, drawers: bool = True) -> None:
-    """A desk, its front (the sitter's side) towards -x... centred, kneehole toward -x."""
-    b.body.box((-d / 2, -w / 2, h - 0.04), (d / 2, w / 2, h), top)
-    b.body.box((-d / 2 + 0.03, -w / 2 + 0.02, 0.0), (d / 2 - 0.03, -w / 2 + 0.05, h - 0.04), STRUCT)
-    if drawers:
-        b.body.box((-d / 2 + 0.03, w / 2 - 0.44, 0.0), (d / 2 - 0.03, w / 2 - 0.02, h - 0.04), COMPOSITE)
-        for k in range(3):
-            z = 0.12 + k * 0.2
-            b.fine.box((-d / 2 + 0.025, w / 2 - 0.40, z), (-d / 2 + 0.03, w / 2 - 0.06, z + 0.17), TRIM)
-            b.fine.box((-d / 2 + 0.005, w / 2 - 0.30, z + 0.12), (-d / 2 + 0.025, w / 2 - 0.16, z + 0.135), TRIM)
-    else:
-        b.body.box((-d / 2 + 0.03, w / 2 - 0.05, 0.0), (d / 2 - 0.03, w / 2 - 0.02, h - 0.04), STRUCT)
+    """A desk, its front (the sitter's side) towards -x... centred, kneehole toward -x (ship_furn2)."""
+    N.desk(b, w, d, h, top, drawers)
 
 
 # ---------------------------------------------------------------------------------------------------------------- storage
 def shelf(b: SParts, w: float = 1.0, d: float = 0.34, h: float = 2.0, shelves: int = 5, mat: str = WOOD, books: bool = True, seed: int = 1,
           back: bool = True) -> None:
-    """A shelving unit facing +x (its back at -d/2), w along y. Books, boxes or nothing on the shelves."""
-    rng = random.Random(seed)
-    if back:
-        b.body.box((-d / 2, -w / 2, 0.0), (-d / 2 + 0.02, w / 2, h), STRUCT)
-    for sy in (-w / 2, w / 2 - 0.03):
-        b.body.box((-d / 2, sy, 0.0), (d / 2, sy + 0.03, h), mat)
-    zs = [0.05 + k * (h - 0.1) / (shelves - 1) for k in range(shelves)]
-    for z in zs:
-        b.body.box((-d / 2, -w / 2, z), (d / 2, w / 2, z + 0.025), mat)
-    if books:
-        colors = [FABRIC_NAVY, FABRIC_RUST, FABRIC_GREY, BEDDING, FABRIC_SAND, CRATE_OLIVE]
-        for i, z in enumerate(zs[:-1]):
-            y = -w / 2 + 0.05
-            while y < w / 2 - 0.08:
-                bw = rng.uniform(0.035, 0.10)                              # a run of two or three books is one box (the soft group: no bevel)
-                bh = rng.uniform(0.18, min(0.30, zs[i + 1] - z - 0.05))
-                if rng.random() < 0.12:
-                    y += rng.uniform(0.05, 0.12)
-                    continue
-                b.soft.box((-d / 2 + 0.03, y, z + 0.025), (-d / 2 + 0.03 + rng.uniform(0.17, 0.24), y + bw, z + 0.025 + bh), rng.choice(colors))
-                y += bw + 0.004
+    """A shelving unit facing +x (its back at -d/2), w along y; books and small things on the shelves (ship_furn2)."""
+    N.shelf(b, w, d, h, shelves, mat, books, seed, back)
 
 
 def crate(b: SParts, w: float = 0.6, d: float = 0.4, h: float = 0.4, mat: str = CRATE_OLIVE, label: str | None = None, lite: bool = False) -> None:
@@ -290,36 +220,29 @@ def wall_screen(b: SParts, w: float, h: float, tile: str, frame_w: float = 0.05)
 
 # ---------------------------------------------------------------------------------------------------------------- plants, decor
 def planter(b: SParts, w: float = 1.0, d: float = 0.5, h: float = 0.45, plants: int = 3, seed: int = 5, tall: bool = False) -> None:
-    """A planter box with bushes (soft blobs): origin at its centre on the floor."""
-    rng = random.Random(seed)
-    b.body.box((-d / 2, -w / 2, 0.0), (d / 2, w / 2, h), STRUCT)
-    b.fine.box((-d / 2 - 0.01, -w / 2 - 0.01, h - 0.03), (d / 2 + 0.01, w / 2 + 0.01, h), TRIM)
-    b.soft.box((-d / 2 + 0.03, -w / 2 + 0.03, h - 0.03), (d / 2 - 0.03, w / 2 - 0.03, h - 0.005), SOIL)
-    for k in range(plants):
-        y = -w / 2 + (k + 0.5) * w / plants + rng.uniform(-0.05, 0.05)
-        r = rng.uniform(0.16, 0.26)
-        hh = rng.uniform(0.35, 0.6) * (2.4 if tall else 1.0)
-        b.soft.sphere((rng.uniform(-0.05, 0.05), y, h + hh * 0.55), r, LEAF, seg=10, rings=7, squash=(1.0, 1.0, hh / (r * 2.2)))
-        if tall:
-            b.fine.cyl((0, y, h), (0, y, h + hh * 0.5), 0.02, WOOD, seg=6)
+    """A planter box with real plants (ship_plants.planter_bed): origin at its centre on the floor, w along y."""
+    import ship_plants as PL
+    PL.planter_bed(b, w, d, h, seed, tall, density=0.45 + 0.2 * plants)
 
 
 def potted_plant(b: SParts, h: float = 1.1, seed: int = 2) -> None:
-    rng = random.Random(seed)
-    b.body.cyl((0, 0, 0.0), (0, 0, 0.32), 0.19, STRUCT, seg=14, r2=0.15)
-    b.fine.cyl((0, 0, 0.32), (0, 0, 0.34), 0.20, TRIM, seg=14)
-    b.fine.cyl((0, 0, 0.32), (0, 0, 0.60), 0.012, WOOD, seg=6)
-    for k in range(5):
-        a = k * 72.0 + rng.uniform(-10, 10)
-        r = rng.uniform(0.18, 0.26)
-        x, y = 0.09 * math.cos(math.radians(a)), 0.09 * math.sin(math.radians(a))
-        b.soft.sphere((x, y, 0.55 + k * 0.10), r, LEAF, seg=10, rings=7, squash=(1.0, 1.0, 0.7))
+    """A potted plant of about height h (a scanned plant in a pot of the ship: ship_plants): a palm for the tallest, a money tree, a syngonium, a snake plant, a zebra plant on a desk."""
+    import ship_plants as PL
+    if h >= 1.7:
+        PL.floor_tree(b, "pachira_c", 0.3, scale=1.1, yaw=seed * 47.0)
+    elif h >= 1.3:
+        PL.floor_tree(b, "pachira_c" if seed % 2 else "ficus", 0.28, scale=0.95, yaw=seed * 53.0) if seed % 2 else PL.potted(b, "ficus", "tub", 0.28, 0.45, yaw=seed * 53.0)
+    elif h >= 0.85:
+        if seed % 3 == 0:
+            PL.snake_plant(b, seed=seed)
+        else:
+            PL.potted(b, "syngonium", "bowl", 0.25, 0.34, yaw=seed * 61.0)
+    else:
+        PL.haworthia(b, yaw=seed * 40.0)
 
 
 def lamp_standard(b: SParts, h: float = 1.5, cell: str = "white_warm") -> None:
-    b.fine.cyl((0, 0, 0.0), (0, 0, 0.02), 0.14, STRUCT, seg=14)
-    b.fine.cyl((0, 0, 0.02), (0, 0, h), 0.012, TRIM, seg=8)
-    b.emit.lamp_cyl((0, 0, h), (0, 0, h + 0.28), 0.10, cell, LAMP, seg=14, r2=0.13)
+    N.lamp_standard(b, h, cell)
 
 
 def ceiling_light_panel(b: SParts, x0: float, x1: float, y0: float, y1: float, z: float, cell: str = "white_cool", mat: str = LAMP_HOT) -> None:

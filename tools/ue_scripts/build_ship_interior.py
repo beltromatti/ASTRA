@@ -186,6 +186,8 @@ def build_materials():
         made.append(name)
     make_mi(MI_DIR, "MI_SHIP_Labels", screen, {"Intensity": 4.0, "Roughness": 0.4, "FlipU": 0.0, "FlipV": 0.0}, textures={"ScreenTexture": labels})
     made.append("MI_SHIP_Labels")
+    import ship_room_materials as RM                         # ARTE-INTERNI: the finishes of the rooms (textures + instances from data/ship/room_materials.json)
+    made += RM.build(log)
     have = set(made)
     for slot in MANIFEST.get("new_slots", []):
         if slot not in have:

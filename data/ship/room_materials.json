@@ -41,6 +41,7 @@
     "MI_SHIP_LeafGreen":    {"two_sided": true, "set": "LeafAtlas",     "tint": "#FFFFFF", "k": 1.0,  "uv": 1.0, "rough": [0.35, 0.6], "normal": 0.5, "influence": 1.0, "uv_mode": "mesh"},
     "MI_SHIP_Lettuce":      {"two_sided": true, "set": "LeafAtlas",     "tint": "#B8D58A", "k": 1.0,  "uv": 1.0, "rough": [0.35, 0.6], "normal": 0.5, "influence": 1.0, "uv_mode": "mesh"},
     "MI_SHIP_Fruit":        {"set": "PanelPaint",    "tint": "#B8231B", "k": 1.0,  "uv": 1.0, "rough": [0.2, 0.4], "normal": 0.1, "influence": 0.1, "coat": 0.5},
+    "MI_SHIP_Swatch":       {"set": "Swatch",       "tint": "#FFFFFF", "k": 1.0,  "uv": 1.0, "rough": [0.55, 0.75], "normal": 0.0, "influence": 1.0, "uv_mode": "mesh"},
     "MI_SHIP_PH_Syngonium": {"two_sided": true, "set": "PH_Syngonium",  "tint": "#FFFFFF", "k": 1.0,  "uv": 1.0, "rough": [0.0, 1.0], "normal": 0.8, "influence": 1.0, "uv_mode": "mesh"},
     "MI_SHIP_PH_Haworthia": {"two_sided": true, "set": "PH_Haworthia",  "tint": "#FFFFFF", "k": 1.0,  "uv": 1.0, "rough": [0.0, 1.0], "normal": 0.8, "influence": 1.0, "uv_mode": "mesh"},
     "MI_SHIP_PH_FicusLeaf": {"two_sided": true, "set": "PH_FicusLeaf",  "tint": "#FFFFFF", "k": 1.0,  "uv": 1.0, "rough": [0.0, 1.0], "normal": 0.8, "influence": 1.0, "uv_mode": "mesh"},

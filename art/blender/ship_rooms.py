@@ -24,14 +24,21 @@ FIN = 0.0
 
 
 class Style:
-    """The look of a room: materials of the floor, the wainscot, the upper wall, the trim and the ceiling, the accent lamp colour."""
+    """The look of a room: materials of the floor, the wainscot, the upper wall, the trim and the ceiling, the accent lamp colour.
+    ARTE-INTERNI (`v2`, the default; ship_shell.py): `floor2` / `border` / `inlay` = a border of a second finish round the floor with a lit line between; `wall_acc` (cloth) + `wall_slat` + `wall_pattern`
+    = the materials and the order of the treatments of the wall bays (panel, cloth, slats, perf); `bay` = the target width of a bay (m); `wall_wash` = a slot of light on every pilaster;
+    `ceiling` = bands | cove | grid | exposed | flat; `light_cell` = the colour of the ceiling's luminous parts; `downlights`, `bands` (how many), `beam_light`."""
 
     def __init__(self, floor: str = DECK, floor_mode: str = "plates", wall_lo: str = COMPOSITE, wall_hi: str = COMPOSITE, trim: str = TRIM,
                  ceil: str = COMPOSITE, accent: str = "cool_dim", strip: str = "white_cool", wain_h: float = 1.05, ribs: bool = True,
                  rib_mat: str = TRIM, skirt: str = STRUCT, light_mode: str = "strips", rail: bool = True, cove: str | None = None,
-                 seams: bool = True, cove_on: bool = True) -> None:
+                 seams: bool = True, cove_on: bool = True, v2: bool = True, floor2: str | None = None, border: float = 0.0, inlay: str | None = None,
+                 wall_acc: str = COMPOSITE, wall_slat: str = "MI_SHIP_Oak", wall_pattern: tuple | None = None, bay: float = 2.0, wall_wash: bool = True, ceiling: str = "bands",
+                 light_cell: str | None = None, downlights: bool = True, bands: int = 0, beam_light: bool = True) -> None:
         self.__dict__.update(locals())
         del self.__dict__["self"]
+        if self.light_cell is None:
+            self.light_cell = self.strip
 
 
 def wall_matrix(name: str, L: float, D: float) -> Matrix:
@@ -142,8 +149,15 @@ def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far
     L, D, H = spec["L"], spec["D"], spec["h"]
     doors = doors if doors is not None else spec["doors"]
     b._doors = doors                                                  # (dress_wall keeps clear of them)
+    b._style = st                                                     # (ceiling_panels reads it)
     fb, fine, em = b.body, b.fine, b.emit
     rng = random.Random(seed)
+    if st.v2:
+        import ship_shell as SH
+        SH.floor_v2(b, spec, st, rng, floor_t, _plate_uv)
+        SH.ceiling_v2(b, spec, st, rng, ceil_t)
+        SH.walls_v2(b, spec, st, doors, far_door, skip, bare, wall_matrix, door_spans, wall_segments, door_trim, rng)
+        return
     # floor: structure and covering
     fb.box((0.0, 0.0, -floor_t), (L, D, -0.012), STRUCT)
     if st.floor_mode == "plates":
@@ -189,8 +203,6 @@ def build_shell(b: SParts, spec: dict, st: Style, doors: list | None = None, far
     em.lamp_box((x0, y1 - 0.05, z), (x1, y1, z + 0.012), cell, LAMP)
     em.lamp_box((x0, y0 + 0.05, z), (x0 + 0.05, y1 - 0.05, z + 0.012), cell, LAMP)
     em.lamp_box((x1 - 0.05, y0 + 0.05, z), (x1, y1 - 0.05, z + 0.012), cell, LAMP)
-    for k in (0.0,):
-        pass
 
 
 def _plate_uv(fb, faces, rng):
@@ -235,7 +247,9 @@ def wall_label(b: SParts, x: float, y: float, z: float, facing, cell: str, w: fl
 
 def ceiling_panels(b: SParts, L: float, D: float, H: float, nx: int, ny: int, cell: str = "white_cool", margin: float = 1.4, w: float = 1.2, d: float = 0.6,
                    mat: str = LAMP_HOT) -> None:
-    """A grid of luminous ceiling panels (brushed frame, a bright lamp face)."""
+    """A grid of luminous ceiling panels (brushed frame, a bright lamp face). In a v2 shell (ship_shell.py) the ceiling is its own architecture (bands, cove, grid): nothing is added."""
+    if getattr(getattr(b, "_style", None), "v2", False):
+        return
     for i in range(nx):
         for j in range(ny):
             cx = margin + (i + 0.5) * (L - 2 * margin) / nx

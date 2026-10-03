@@ -61,6 +61,18 @@ TERRACOTTA = "MI_SHIP_Terracotta"
 PAPER = "MI_SHIP_Paper"
 STEM, BARK = "MI_SHIP_Stem", "MI_SHIP_Bark"                     # plants
 LEAF_GREEN, LETTUCE, FRUIT = "MI_SHIP_LeafGreen", "MI_SHIP_Lettuce", "MI_SHIP_Fruit"
+SWATCH = "MI_SHIP_Swatch"                # every small coloured thing (books, crockery, boxes, food, toys): ONE slot, the colour is picked from a 64-colour palette by UV cell
+# palette of T_Swatch_BC (8 x 8 cells, row-major from the top-left); tools/art/interior_textures.SWATCH_COLORS paints the same order
+SWATCH_NAMES = ["navy", "oxblood", "forest", "mustard", "slate", "teal", "rust", "cream",
+                "charcoal", "tan", "denim", "olive", "plum", "rose", "sand", "white",
+                "red", "orange", "yellow", "green", "cyan", "blue", "purple", "magenta",
+                "grey1", "grey2", "grey3", "grey4", "grey5", "grey6", "grey7", "grey8",
+                "w_oak", "w_honey", "w_walnut", "w_ebony", "w_birch", "w_cherry", "w_teak", "w_pine",
+                "f_apple", "f_orange", "f_banana", "f_lettuce", "f_tomato", "f_carrot", "f_bread", "f_cheese",
+                "m_teal", "m_white", "m_blood", "m_saline", "m_purple", "m_yellow", "m_orange", "m_green",
+                "brass", "copper", "steel", "rubber", "glass", "paper", "cork", "leather"]
+SWATCH_INDEX = {n: i for i, n in enumerate(SWATCH_NAMES)}
+BOOK_COLORS = ["navy", "oxblood", "forest", "mustard", "slate", "teal", "rust", "cream", "charcoal", "tan", "denim", "olive", "plum", "sand", "white"]
 ROOM_MATERIAL_FILE = os.path.join(ROOT, "data", "ship", "room_materials.json")
 ROOM_MATERIALS: dict = {}               # name -> the entry of room_materials.json (read once)
 
@@ -124,15 +136,59 @@ class SFB(FB):
         aspect = ((u1 - u0) * ATLAS_PX[0]) / ((v1 - v0) * ATLAS_PX[1])
         return self.label(center, w, w / aspect, facing, cell, up=up)
 
+    # -- the colour swatch: one material for every small coloured thing (the palette cell is the UV of every face)
+    def paint(self, faces, color):
+        """Give already built faces (a box, a rounded box, a lathe) a palette colour (a name of SWATCH_NAMES or a cell index) and the swatch material."""
+        uv = swatch_uv(color)
+        idx = self.mi(SWATCH)
+        for f in faces:
+            f.material_index = idx
+        self._paint(faces, uv)
+        return faces
+
+    def swatch_box(self, lo, hi, color):
+        return self.paint(self.box(lo, hi, SWATCH), color)
+
+    def swatch_cyl(self, p0, p1, r: float, color, seg: int = 12, r2: float | None = None):
+        return self.paint(self.cyl(p0, p1, r, SWATCH, seg=seg, r2=r2), color)
+
+
+def swatch_uv(color) -> tuple[float, float]:
+    i = SWATCH_INDEX[color] if isinstance(color, str) else int(color)
+    return ((i % 8 + 0.5) / 8.0, 1.0 - (i // 8 + 0.5) / 8.0)
+
 
 class SParts(L.Parts):
     """Parts (body / fine / emissive / soft groups) built with SFB."""
+
+    BEVEL_SEGMENTS = {"body": 2, "fine": 1}              # ARTE-INTERNI: one segment on the fine parts (a 3 mm chamfer): a bevelled box was ~120 triangles, now ~50
 
     def __init__(self, bevel: float = 0.006, fine_bevel: float = 0.003, angle: float = 35.0) -> None:
         super().__init__(bevel, fine_bevel, angle)
         for name in ("body", "fine", "emit", "soft"):
             getattr(self, name).bm.free()
             setattr(self, name, SFB())
+
+    def build(self, name: str, uv_meter: float = 1.0):
+        """Parts.build with the bevel segments of BEVEL_SEGMENTS per group."""
+        objs = []
+        for tag, fb, bev in (("body", self.body, self.bevel), ("fine", self.fine, self.fine_bevel), ("soft", self.soft, self.soft_bevel), ("emit", self.emit, 0.0)):
+            if len(fb.bm.faces) == 0:
+                fb.bm.free()
+                continue
+            o = fb.to_object(f"{name}_{tag}")
+            if bev > 0:
+                A.bevel_and_normals(o, width=bev, segments=self.BEVEL_SEGMENTS.get(tag, 2), angle_deg=self.angle)
+            A.box_uv(o, texel_m=uv_meter)
+            if tag == "soft":                                      # cushions and other organic parts: smooth shading
+                bpy.ops.object.select_all(action="DESELECT")
+                o.select_set(True)
+                bpy.context.view_layer.objects.active = o
+                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(50))
+            objs.append(o)
+        if not objs:
+            raise RuntimeError(f"{name}: empty mesh")
+        return A.join(objs, name)
 
 
 # ---------------------------------------------------------------------------------------------------- small builders

@@ -14,7 +14,6 @@ from __future__ import annotations
 import math
 import random
 
-import bmesh
 from mathutils import Matrix, Vector
 
 from bridge3_lib import FB
@@ -24,20 +23,74 @@ def sgnpow(x: float, p: float) -> float:
     return math.copysign(abs(x) ** p, x) if x else 0.0
 
 
+# ------------------------------------------------------------------------------------------------------------------- stacked rings
+def stack(fb: FB, rings, mat: str, cap_bottom: bool = True, cap_top: bool = True, closed: bool = True):
+    """Faces between consecutive rings of local points (every ring lists its points counter-clockwise seen from above, the rings go upwards): outward-facing quads, flat caps. The
+    winding is set here (reversed when the builder's frame mirrors), so no normal recalculation is needed. Returns the faces."""
+    vr = [[fb.bm.verts.new(fb.P(p)) for p in ring] for ring in rings]
+    idx = fb.mi(mat)
+    flip = fb.frame.determinant() < 0
+    faces = []
+
+    def face(vs):
+        vs = list(reversed(vs)) if flip else vs
+        try:
+            f = fb.bm.faces.new(vs)
+        except ValueError:
+            return
+        f.material_index = idx
+        faces.append(f)
+    n = len(rings[0])
+    span = n if closed else n - 1
+    for k in range(len(vr) - 1):
+        for i in range(span):
+            j = (i + 1) % n
+            face((vr[k][i], vr[k][j], vr[k + 1][j], vr[k + 1][i]))
+    if cap_bottom:
+        face(list(reversed(vr[0])))
+    if cap_top:
+        face(list(vr[-1]))
+    return faces
+
+
 # ------------------------------------------------------------------------------------------------------------------- rounded box
+def _rounded_rect(hx: float, hy: float, rho: float, seg: int, cx: float = 0.0, cy: float = 0.0):
+    """Points of a rounded rectangle (half-sizes hx, hy, corner radius rho, seg + 1 points per corner), counter-clockwise from the +x side, centred at (cx, cy)."""
+    rho = max(min(rho, hx - 1e-5, hy - 1e-5), 1e-5)
+    pts = []
+    for (sx, sy, a0) in ((1, 1, 0.0), (-1, 1, 90.0), (-1, -1, 180.0), (1, -1, 270.0)):
+        ccx, ccy = sx * (hx - rho), sy * (hy - rho)
+        for k in range(seg + 1):
+            a = math.radians(a0 + 90.0 * k / seg)
+            pts.append((cx + ccx + rho * math.cos(a), cy + ccy + rho * math.sin(a)))
+    return pts
+
+
 def rbox(fb: FB, lo, hi, r: float, mat: str, seg: int = 3, rot: Matrix | None = None):
-    """A box lo..hi with all twelve edges rounded to radius `r` (clamped to a third of the shortest side), `seg` segments per edge. Returns the faces."""
+    """A box lo..hi with all twelve edges rounded to radius `r` (clamped to a third of the shortest side), `seg` segments per edge: rings of rounded rectangles stepped up the
+    sides (the Minkowski sum of a smaller box and a sphere). A closed solid. `rot` turns it about its own centre."""
     size = [abs(b - a) for a, b in zip(lo, hi)]
     r = max(0.0005, min(r, min(size) / 2.2))
     c = [(a + b) / 2 for a, b in zip(lo, hi)]
-    m = fb.frame @ Matrix.Translation(c) @ (rot if rot is not None else Matrix.Identity(4)) @ Matrix.Diagonal((size[0], size[1], size[2], 1.0))
-    geom = bmesh.ops.create_cube(fb.bm, size=1.0, matrix=m)
-    edges = list({e for v in geom["verts"] for e in v.link_edges})
-    res = bmesh.ops.bevel(fb.bm, geom=edges, offset=r, offset_type="OFFSET", segments=max(1, seg), profile=0.5, affect="EDGES")
-    faces = res["faces"]
-    verts = {v for f in faces for v in f.verts}
-    faces = list({f for v in verts for f in v.link_faces})
-    return fb._tag(faces, mat)
+    hx, hy, hz = size[0] / 2, size[1] / 2, size[2] / 2
+    th_max = math.radians(84.0)
+    rings = []
+    angles = [th_max * k / seg for k in range(seg, -1, -1)]               # bottom arc: from the cap upwards to the equator
+    for sgn in (-1, 1):
+        for th in (angles if sgn < 0 else list(reversed(angles))):
+            e = r * math.cos(th)
+            ring = _rounded_rect(hx - r + e, hy - r + e, e if e > 1e-4 else 1e-4, seg)
+            z = sgn * (hz - r + r * math.sin(th) / math.sin(th_max))
+            rings.append((ring, z))
+    rot3 = rot if rot is not None else Matrix.Identity(4)
+    pts = []
+    for ring, z in rings:
+        q = []
+        for (x, y) in ring:
+            p = rot3 @ Vector((x, y, z))
+            q.append((c[0] + p.x, c[1] + p.y, c[2] + p.z))
+        pts.append(q)
+    return stack(fb, pts, mat)
 
 
 def cbox_r(fb: FB, center, size, r: float, mat: str, seg: int = 3, rot: Matrix | None = None):
@@ -50,27 +103,23 @@ def cbox_r(fb: FB, center, size, r: float, mat: str, seg: int = 3, rot: Matrix |
 # --------------------------------------------------------------------------------------------------------------------------- puff
 def puff(fb: FB, center, half, mat: str, e: float = 0.45, nu: int = 16, nv: int = 9, rot: Matrix | None = None, flat_bottom: float = 0.0):
     """A superellipsoid centred at `center` with half-extents `half` = (hx, hy, hz): the shape of a seat pad, a pillow, a bean bag. `e` is the exponent of the roundness
-    (1 = ellipsoid, small = box-like with rounded edges). `flat_bottom` (0..1) flattens the underside (a cushion that sits on something). The result is a closed solid."""
+    (1 = ellipsoid, small = box-like with rounded edges). `flat_bottom` (0..1) flattens the underside (a cushion that sits on something). A closed solid."""
     hx, hy, hz = half
     rings = []
     rot3 = rot if rot is not None else Matrix.Identity(4)
     for k in range(1, nv):
         v = -math.pi / 2 + math.pi * k / nv
-        sv = math.sin(v)
-        cv = abs(math.cos(v))
-        zz = sgnpow(sv, e) * hz
+        zz = sgnpow(math.sin(v), e) * hz
         if flat_bottom > 0.0 and zz < 0.0:
             zz *= (1.0 - flat_bottom)
-        rr = cv ** e
+        rr = abs(math.cos(v)) ** e
         ring = []
         for j in range(nu):
             u = 2 * math.pi * j / nu
-            x = sgnpow(math.cos(u), e) * rr * hx
-            y = sgnpow(math.sin(u), e) * rr * hy
-            p = rot3 @ Vector((x, y, zz))
+            p = rot3 @ Vector((sgnpow(math.cos(u), e) * rr * hx, sgnpow(math.sin(u), e) * rr * hy, zz))
             ring.append((center[0] + p.x, center[1] + p.y, center[2] + p.z))
         rings.append(ring)
-    return fb.loft(rings, mat, caps=True, closed=True)
+    return stack(fb, rings, mat)
 
 
 # ---------------------------------------------------------------------------------------------------------------------- lathe
@@ -80,12 +129,8 @@ def lathe(fb: FB, profile, center, mat: str, seg: int = 18, caps: bool = True, s
     rings = []
     cx, cy, cz = center
     for (r, z) in profile:
-        ring = []
-        for j in range(seg):
-            a = 2 * math.pi * j / seg
-            ring.append((cx + math.cos(a) * r * scale[0], cy + math.sin(a) * r * scale[1], cz + z))
-        rings.append(ring)
-    return fb.loft(rings, mat, caps=caps, closed=True)
+        rings.append([(cx + math.cos(2 * math.pi * j / seg) * r * scale[0], cy + math.sin(2 * math.pi * j / seg) * r * scale[1], cz + z) for j in range(seg)])
+    return stack(fb, rings, mat, caps, caps)
 
 
 # ----------------------------------------------------------------------------------------------------------------------- rods

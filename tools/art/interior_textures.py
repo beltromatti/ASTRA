@@ -46,6 +46,7 @@ SETS: dict[str, tuple[str, float]] = {
     "LeatherTufted": ("Leather012", 1.0),     # button-tufted leather (the buttons are in the normal map): sofa backs, headboards
     "Cork": ("Cork004", 0.0),                 # notice boards
     "FabricWoven": ("Fabric062", 1.0),        # coarse woven upholstery / wall cloth, tinted
+    "Swatch": ("", 0.0),                      # (procedural, swatch) the 64-colour palette of every small coloured thing (ship_lib.SWATCH_NAMES, the same order)
     "LeafAtlas": ("", 0.0),                   # (procedural, leaf_atlas) the surface of the leaves of the procedural plants: four kinds in a 2 x 2 atlas
 }
 
@@ -129,6 +130,8 @@ def pack(name: str, acg: str, neutral: float) -> None:
         return perforated(name)
     if name == "LeafAtlas":
         return leaf_atlas(name)
+    if name == "Swatch":
+        return swatch(name)
     folder = fetch(acg)
     bc = load(find(folder, "_Color.jpg"))
     nm_path = find(folder, "_NormalDX.jpg") or find(folder, "_NormalGL.jpg")
@@ -231,6 +234,34 @@ def leaf_atlas(name: str = "LeafAtlas") -> None:
     save(atlas_n, os.path.join(OUT, f"T_{name}_N.png"))
     save(atlas_orm, os.path.join(OUT, f"T_{name}_ORM.png"))
     print(f"  {name:14s} <- procedural leaf atlas (4 kinds)")
+
+
+# the palette of MI_SHIP_Swatch, row-major from the top-left, 8 x 8 cells (ship_lib.SWATCH_NAMES is the same order)
+SWATCH_COLORS = [
+    "#24344F", "#6B2B2A", "#2F4A38", "#B88A2E", "#55657A", "#3E7C80", "#97503A", "#D8CCB4",     # books and cloth: navy oxblood forest mustard slate teal rust cream
+    "#2A2D31", "#9C6B43", "#3B5B80", "#6B7240", "#5A3B58", "#B07A78", "#B39A78", "#E8E6E0",     # charcoal tan denim olive plum rose sand white
+    "#C0392B", "#D9822B", "#E3B93C", "#4FA05A", "#3AA6B9", "#3E6FC4", "#7A55B8", "#B8457A",     # bright accents
+    "#1B1D20", "#33363A", "#4F5358", "#6E7378", "#8E9296", "#ABAEB1", "#C6C8CA", "#E1E2E2",     # greys
+    "#C79B63", "#B07C43", "#5A3A25", "#2A1D16", "#D9C39A", "#7A3B26", "#7C5535", "#C9A66B",     # woods
+    "#B8231B", "#E08A22", "#E3C440", "#8BB752", "#C33A2A", "#D9731F", "#C79A5A", "#E0B84C",     # food
+    "#2EC4B6", "#F0F2F0", "#8B1A1A", "#9FC6D8", "#6A4DA0", "#F2C200", "#E8731A", "#2F9E5A",     # medical and safety colours
+    "#B79B52", "#B87355", "#8C9299", "#1E1E1F", "#202A30", "#D9D5C8", "#A8793F", "#1F1B18",     # brass copper steel rubber dark-glass paper cork black-leather
+]
+
+
+def swatch(name: str = "Swatch") -> None:
+    cell = 16
+    n = 8 * cell
+    bc = np.zeros((n, n, 3), np.float32)
+    for i, h in enumerate(SWATCH_COLORS):
+        c = np.array([int(h[k:k + 2], 16) / 255.0 for k in (1, 3, 5)], np.float32)
+        col, row = i % 8, i // 8
+        bc[row * cell:(row + 1) * cell, col * cell:(col + 1) * cell] = c
+    nm = np.dstack([np.full((n, n), 0.5, np.float32), np.full((n, n), 0.5, np.float32), np.ones((n, n), np.float32)])
+    orm = np.dstack([np.ones((n, n), np.float32), np.full((n, n), 0.6, np.float32), np.zeros((n, n), np.float32)])
+    for suffix, a in (("BC", bc), ("N", nm), ("ORM", orm)):
+        Image.fromarray((np.clip(a, 0, 1) * 255.0 + 0.5).astype(np.uint8)).save(os.path.join(OUT, f"T_{name}_{suffix}.png"), optimize=True)
+    print(f"  {name:14s} <- procedural palette (64 colours, 128 px)")
 
 
 def sheet() -> None:
