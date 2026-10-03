@@ -118,6 +118,18 @@ class Pictures(unittest.TestCase):
         a03 = [p for p in text.split("; ") if p.startswith("A-03") or "A-03" in p][0]
         self.assertNotIn("aboard", a03)
 
+    def test_the_bridge_watch_reads_them_too(self) -> None:
+        from astra_mind import initiative
+        state = {"hull_pct": 100, "contacts": [
+            {"id": "A-02", "status": "friendly", "name": "ASN Tarn", "range_km": 6.0, "bearing_deg": 30, "hull_pct": 55, "aboard": {"fires": 2}},
+            {"id": "A-03", "status": "friendly", "name": "ASN Ness", "range_km": 7.0, "bearing_deg": 40, "hull_pct": 100},
+            {"id": "M-01", "status": "hostile", "class": "acheron", "range_km": 5.0, "bearing_deg": 90, "hull_pct": 40, "seen_aboard": SEEN_EYE},
+            {"id": "M-02", "status": "hostile", "class": "styx", "range_km": 8.0, "bearing_deg": 95, "hull_pct": 100}]}
+        text = initiative.Watch()._facts(state, [], None)
+        self.assertIn("A-02 ASN Tarn 6.0 km hull 55% [aboard: 2 fires]", text)
+        self.assertIn("M-01 acheron 5.0 km brg 090 hull 40% shields ?% [seen aboard: 2 breaches venting atmosphere, windows dark in the bow, mid]", text)
+        self.assertEqual(text.count("aboard"), 2)                                     # (the ships not hit: as they were)
+
     def test_the_mandate_admiral_reads_the_astra_ships_it_holds(self) -> None:
         view = {"your_ships": [{"id": "M-01", "ew_officer": "x"}], "astra_ships": [{"id": "A-01", "hull_pct": 70, "shields_pct": 20, "seen_aboard": SEEN_EYE},
                                                                                   {"id": "A-02", "hull_pct": 90, "shields_pct": 90}],

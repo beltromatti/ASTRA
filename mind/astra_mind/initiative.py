@@ -22,6 +22,7 @@ from typing import Any
 
 from . import stations as station_model
 from .crew import CAPTAIN_WORD, CREW, DUTIES_V2, LANG_NAMES
+from .war_minds import aboard_line, seen_line
 
 log = logging.getLogger("astra.watch")
 
@@ -190,12 +191,14 @@ class Watch:
         if hostile:
             lines.append("Hostiles: " + "; ".join(
                 f"{c.get('id')} {c.get('name') or c.get('class')} {c.get('range_km')} km brg {int(c.get('bearing_deg', 0)):03d} "
-                f"hull {c.get('hull_pct', '?')}% shields {c.get('shields_pct', '?')}%" for c in hostile[:6]))
+                f"hull {c.get('hull_pct', '?')}% shields {c.get('shields_pct', '?')}%"
+                + (f" [seen aboard: {seen}]" if (seen := seen_line(c.get("seen_aboard"))) else "") for c in hostile[:6]))   # (venting, dark windows, fires: FLOTTA-VIVA)
         if blind:
             lines.append("Bearings only (no range): " + ", ".join(f"{c.get('id')} brg {int(c.get('bearing_deg', 0)):03d}"
                                                                  f"{' jamming' if str(c.get('status', '')).startswith('JAM') else ''}" for c in blind[:5]))
         if friends:
             lines.append("Friends: " + "; ".join(f"{c.get('id')} {c.get('name')} {c.get('range_km')} km hull {c.get('hull_pct', '?')}%"
+                                                  + (f" [aboard: {inside}]" if (inside := aboard_line(c.get("aboard"))) else "")   # (her losses, fires, conn: the datalink)
                                                   for c in friends[:4]))
         sh = (state.get("shields") or {})
         w = state.get("weapons") or {}

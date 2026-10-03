@@ -629,6 +629,23 @@ class AstraTests(Fixture):
         self.assertEqual(self.cmds[0][1]["by"], "commander")
         self.assertEqual(self.cmds[0][1]["side"], "astra")
 
+    async def test_every_ship_s_interior_is_given_the_captain_who_speaks_for_her_once(self) -> None:
+        told: list[tuple[str, str, str]] = []
+
+        async def captain(ship: str, rank: str, name: str) -> None:
+            told.append((ship, rank, name))
+        self.minds = self.make(captain=captain)
+        await self.feed(self.state(enemies=[]))
+        await self.feed(self.state(enemies=[]), 9)
+        self.assertEqual(sorted(told), [("T-01", "Captain", "Rhea Castellan"), ("T-02", "Commander", "Daniel Okoro")])
+        self.assertEqual(self.cmds, [])                                                     # (not an order: no command of the war)
+        self.minds.persona_of("mandate", "M-01")
+        await self.settle()
+        self.assertEqual(told[-1], ("M-01", "Archon", "Varek Solm"))                        # the rank without its gloss, the name without its rank
+        self.minds.persona_of("mandate", "M-07")
+        await self.settle()
+        self.assertEqual(len(told), 3)                                                      # a Mandate ship without a persona keeps the game's own captain
+
     async def test_another_captain_of_the_group_may_speak_but_an_unknown_one_is_the_commander(self) -> None:
         self.llm.policy = ScriptPolicy([("say", {"speaker": "okoro", "to": "castellan", "text": "Praetorian, Vigilant: our port shield is gone, falling in behind you.", "tone": "tense"}),
                                         ("say", {"speaker": "ghost", "text": "Hello.", "tone": "calm"})])

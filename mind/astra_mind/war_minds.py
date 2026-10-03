@@ -826,7 +826,8 @@ class WarMinds:
                  channel: Callable[[str], bool] = lambda c: False, register_voice: Callable[[str, str, str], None] | None = None,
                  transmit: SayFn | None = None, intel: Callable[[], str] = lambda: "", sides: tuple[str, ...] = ("mandate", "astra"), astra_admiral: bool = False,
                  ops: bool = True, where: Callable[[dict[str, Any]], str] | None = None, note: Callable[[str], None] | None = None,
-                 trace: Callable[[dict[str, Any]], None] | None = None) -> None:
+                 trace: Callable[[dict[str, Any]], None] | None = None,
+                 captain: Callable[[str, str, str], Awaitable[Any]] | None = None) -> None:
         self.llm = llm
         self.say = say
         self.transmit = transmit or say
@@ -843,9 +844,11 @@ class WarMinds:
         self.where = where or (lambda st: _place(st))
         self.note_story = note or (lambda text: None)    # the campaign log of the story (director.note)
         self.trace = trace                               # the bench keeps every pulse with its prompts
+        self.captain = captain                           # (ship, rank, name): the game's interior of that ship takes the persona as her captain (FLOTTA-VIVA)
         self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []   # the Aquila's speech backlog (speech.Voice.waiting, set by the server)
         self.minds: dict[str, Mind] = {}
         self.allies: dict[str, Commander] = {}           # ASTRA captains by ship contact id
+        self.told_captains: dict[str, str] = {}          # contact -> the captain's name the game's interior of that ship was given (FLOTTA-VIVA)
         self.pool_used = 0
         self.logs: dict[str, deque[tuple[float, str]]] = {"mandate": deque(maxlen=LOG_KEEP), "astra": deque(maxlen=LOG_KEEP)}
         self.pulses: list[dict[str, Any]] = []           # one record per pulse (the bench's costs and latencies)
@@ -866,6 +869,7 @@ class WarMinds:
         for side in self.logs:
             self.logs[side].clear()
         self.allies = {c: p for c, p in self.allies.items() if c in ALLIES_FIXED}
+        self.told_captains.clear()
         self.pool_used = 0
         self.admiral_contact.clear()
         self.pulses.clear()
@@ -885,20 +889,45 @@ class WarMinds:
         """Who commands the ship `contact` (a Mandate captain from enemy.py; an ASTRA captain registered, fixed or drawn from the pool)."""
         if side == "mandate":
             p = self.mandate_persona(contact) or {}
-            return Commander(key=p.get("key", "cmdr_" + re.sub(r"\W", "", contact.lower())), contact=contact,
-                             name=p.get("name", f"the commander of {contact}"), rank=p.get("rank", "Ferryman (ship captain)"),
-                             ship=p.get("ship", "a Mandate warship"), bio=p.get("bio", "A hard, tired officer of the Outer Worlds."),
-                             voice=p.get("voice", "stuart_bell"), side="mandate", mission=p.get("mission", ""))
+            c = Commander(key=p.get("key", "cmdr_" + re.sub(r"\W", "", contact.lower())), contact=contact,
+                          name=p.get("name", f"the commander of {contact}"), rank=p.get("rank", "Ferryman (ship captain)"),
+                          ship=p.get("ship", "a Mandate warship"), bio=p.get("bio", "A hard, tired officer of the Outer Worlds."),
+                          voice=p.get("voice", "stuart_bell"), side="mandate", mission=p.get("mission", ""))
+            if p.get("name"):
+                self._tell_captain(c)                               # (a captain without a persona keeps the name the game's interior gave him)
+            return c
         if contact in self.allies:
             return self.allies[contact]
         fixed = ALLIES.get(contact)
         if fixed is not None:
-            return self.register_ally(contact, fixed)
+            return self._tell_captain(self.register_ally(contact, fixed))
         p = dict(ALLY_POOL[self.pool_used % len(ALLY_POOL)])         # a ship the story has not named a captain for: one from the pool
         self.pool_used += 1
         p["ship"] = f"the {cls or 'warship'} {contact}"
         p["key"] = "ally_" + re.sub(r"\W", "", contact.lower())
-        return self.register_ally(contact, p)
+        return self._tell_captain(self.register_ally(contact, p))
+
+    def _tell_captain(self, c: Commander) -> Commander:
+        """The game's interior of that ship (FLOTTA-VIVA: her officers, who is wounded, who has the conn) takes its captain from the persona who speaks
+        for her, so that "her captain is dead" is about the same person; once per ship and name."""
+        if self.captain is None or not c.contact or self.told_captains.get(c.contact) == c.name:
+            return c
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return c                                                # (no game loop: nobody to tell)
+        self.told_captains[c.contact] = c.name
+        rank = re.sub(r"\s*\(.*\)\s*$", "", c.rank) or c.rank            # "Ferryman (ship captain)" -> "Ferryman"
+        name = c.name[len(rank) + 1:] if c.name.startswith(rank + " ") else c.name   # "Captain Rhea Castellan" -> "Rhea Castellan"
+        tell = self.captain
+
+        async def told() -> None:
+            try:
+                await tell(c.contact, rank, name)
+            except Exception:  # noqa: BLE001
+                log.exception("war minds: could not give %s her captain", c.contact)
+        asyncio.ensure_future(told())
+        return c
 
     # ------------------------------------------------------------------------------------------------ the log (a side's memory of orders, words and news)
     def journal(self, side: str, who: str, text: str) -> None:
