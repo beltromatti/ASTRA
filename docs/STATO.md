@@ -22,6 +22,23 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**3/10 sera — DA RIPRENDERE QUI (limite di sessione; aiutanti fermati, i loro worktree restano con il lavoro salvato):**
+- **Aiutanti da riprendere con SendMessage** (o rilanciare): **ABBORDAGGI** (F5.2: simulazione per ruoli e caricatore dei piani fatti, scheda dei tasti
+  in alto a sinistra `70c4c49` da provare; stava scrivendo il banco delle navette), **ARTE-INTERNI** (12+ commit: bagni, osservatorio, Flight Deck,
+  stava rendendo games room/quarantena/uffici; da unire e importare quando riferisce), **FLOTTA-VIVA** (generatore dei piani di classe in
+  `data/ship/plans/`, coordinato con ABBORDAGGI: un solo caricatore, `FAstraDamageMap::Load(Path, Error)` + `OriginInHullM`).
+- **Fatto oggi (oltre a quanto sopra)**: tavolo olografico con la guerra della March nella vista del settore (scritte leggibili dalla poltrona),
+  telecamera dello schermo adattiva (cede il passo quando il fotogramma sfora), le frasi di una stessa risposta non si ripensano, le chiamate
+  sono di Martin, luce degli strumenti nell'abitacolo, play.py `--args` con le virgolette, 4 worktree conclusi rimossi (84 GB liberi).
+- **Prestazioni** (editor -game 1600x900, 3/10): plancia tranquilla 60 fps (GPU 12,4 ms, dynres 58 %), corridoio Ponte 5 59 fps, Concourse 58,5,
+  Flight Deck 59,8, plancia in battaglia 52 fps (render 24,7 ms); **la Mess Hall scende a 30 fps con il game thread a 159 ms: da indagare**
+  (VITA nella mensa? lo streaming del ponte?). **App impacchettata** (30 fps, RETINA FULL): dopo il riscaldamento degli shader la plancia è al
+  100 % della risoluzione Retina (GPU 23 ms, render 4 ms): l'immagine dovrebbe essere nitida.
+- **Da fare**: rifare il pacchetto (l'ultimo non ha tavolo/schermo adattivo/ultime correzioni della mente); indagare la Mess Hall; poi SPAZIO-VIVO
+  (traffico civile, stazioni, relitti e detriti che restano) come prossimo modulo; le richieste all'utente: autorizzazione Epic per i MetaHuman,
+  parere su RETINA.
+- **Credito AI**: ~11,9 $ spesi su 20 (stima dopo le prove di oggi: verificare su OpenRouter).
+
 **3/10 pomeriggio — CAMPAGNA e le braccia nel gioco, FLOTTA-VIVA avviato (il lead):**
 - **CAMPAGNA unito** (la guerra della March, [GUERRA.md §10](GUERRA.md)): le forze arrivano da 85–120 km dal Gate e si vedono venire (Keeper Station
   vede le rotte del Gate a 60 km, ogni ondata dice se arriva al buio), la March gioca l'apertura (comando `opening {script:false}`): **provato nel gioco**
