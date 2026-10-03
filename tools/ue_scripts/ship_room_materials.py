@@ -112,10 +112,13 @@ def build(log=None):
                 raise RuntimeError(f"{name}: texture T_{e['set']}_{suffix} missing")
             mel.set_material_instance_texture_parameter_value(mi, param, tx)
         if e.get("two_sided"):
-            ov = mi.get_editor_property("base_property_overrides")
-            ov.set_editor_property("override_two_sided", True)
-            ov.set_editor_property("two_sided", True)
-            mi.set_editor_property("base_property_overrides", ov)
+            try:
+                ov = mi.get_editor_property("base_property_overrides")
+                ov.set_editor_property("override_two_sided", True)
+                ov.set_editor_property("two_sided", True)
+                mi.set_editor_property("base_property_overrides", ov)
+            except Exception as ex:                                                   # a leaf seen from behind would be invisible: say so, do not stop the build
+                log.append(f"{name}: could not set two-sided ({ex}); tick 'Two Sided' in the instance's Material Property Overrides")
         mel.update_material_instance(mi)
         eal.save_loaded_asset(mi, only_if_is_dirty=False)
         made.append(name)
