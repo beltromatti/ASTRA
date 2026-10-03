@@ -176,6 +176,79 @@ def cmd_craft(a: argparse.Namespace) -> int:
     return 0 if bad == 0 else 1
 
 
+# ---------------------------------------------------------------------------------------------------------------- the assaults: boats, scenes and what becomes of the men (the host's side)
+# The war bench's world has the battle and the board host but no life aboard (no roster marines: the boarders' enemies are nameless men, the Aquila's marines of an outbound assault are
+# nameless too) and runs the game's clock about two thousand times too fast for the plans the host reads on a worker: the commands are given late (11 000 s), when they are read.
+_AQ = "astra.war.scenario aquila_only aquila"
+_NOFATE = "astra.board.takeover_fatal 0"
+ASSAULT_SETUPS = {
+    # the Mandate's two skiffs from a raider at the Aquila's port beam (shields down, point defence off): the scene begins when the first boat is out, each hatch cuts open as its boat latches
+    "in": dict(doc="two skiffs from a raider at the Aquila: the alarm, the hatches (her airlocks), the boarders in", seconds=11600,
+               exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
+               at="11000=astra.cmd set_shields {'mode':'off'}|11000=astra.board.pd aquila 0|11001=astra.board.assault in M1 - 2 port",
+               expect=[r"order \d+: Raider launches 2 Skiffs", r"launched Skiff 1", r"has launched 2 assault craft at the Aquila", r"docked Skiff 1", r"the hull is cut open at", r"Boarding Alpha|Ferry Guard Alpha|boarders hold|boarders are beaten"]),
+    # the same, one boat: a lone skiff against a shield that is up on that face: it holds off and turns back; nobody comes aboard
+    "in_shield": dict(doc="a skiff at a shield that holds: it turns back, no boarder comes", seconds=11400,
+                      exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
+                      at="11000=astra.board.pd aquila 0|11001=astra.board.assault in M1 - 1 port",
+                      expect=[r"order \d+: Raider launches 1 Skiff", r"aborted Skiff 1", r"not one boarder reached the ship"]),
+    # our marines (nameless, in a world without life) in two Kestrels from the Aquila at a Mandate hulk: the scene is the hulk's own plan, run by the simulation alone
+    "out": dict(doc="two Kestrels from the Aquila at a hulk of the Mandate: the marines cut in, the fight on her decks, the boats home", seconds=11800,
+                exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port",
+                expect=[r"order \d+: the Aquila launches 2 Kestrels", r"docked Kestrel 1", r"has latched to Hulk", r"has cut in at", r"Hulk is ours|boarding of Hulk has failed|have broken off|has gone quiet"]),
+    # an Acheron with her power and her point defence up: the marines' boats are shot at on the way in
+    "out_pd": dict(doc="the marines' boats against a ship that shoots back: how many get through", seconds=11600,
+                   exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
+                   at="11000=astra.board.strip M1|11001=astra.board.assault out M1 - 2 port",
+                   expect=[r"order \d+: the Aquila launches 2 Kestrels"]),
+}
+
+
+def _assault_run(a, name: str, setup: dict) -> dict:
+    import re
+    OUT.mkdir(parents=True, exist_ok=True)
+    log = OUT / f"assault_{name}.log"
+    out = OUT / f"assault_{name}.json"
+    args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraWarSim", f"-seconds={setup['seconds']}", "-step=0.1", "-every=50", f"-out={out}", f"-seed={a.seed}", f"-seeds=1",
+            f"-exec={setup['exec']}", f"-at={setup['at']}", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
+    with open(log, "w") as f:
+        p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
+        try:
+            p.wait(timeout=a.timeout)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait()
+    if sys.platform != "win32":
+        subprocess.run(["pkill", "-f", f"CrashReportClient.*pid-{p.pid}"], check=False)
+    lines = []
+    for l in log.read_text(errors="replace").splitlines():
+        for tag in ("[Boarding]", "[Board]"):
+            if tag in l:
+                lines.append(l[l.find(tag):].strip())
+                break
+    return {"log": log, "lines": lines, "code": p.returncode, "re": re}
+
+
+def cmd_assault(a: argparse.Namespace) -> int:
+    names = list(ASSAULT_SETUPS) if a.setup == "all" else [a.setup]
+    bad = 0
+    for name in names:
+        setup = ASSAULT_SETUPS[name]
+        r = _assault_run(a, name, setup)
+        print(f"== {name}: {setup['doc']}  (log {r['log']}, exit {r['code']})")
+        keep = [l for l in r["lines"] if not any(w in l for w in ("[Board] ready", "plan of the", "corner slots", "the Aquila's hatches", "bench: pd", "bench: strip"))]
+        for l in keep[-(a.lines):]:
+            print("   " + l[:230])
+        text = "\n".join(r["lines"])
+        for rx in setup["expect"]:
+            ok = bool(r["re"].search(rx, text))
+            print(f"   {'ok  ' if ok else 'FAIL'} /{rx}/")
+            bad += 0 if ok else 1
+    print("ASSAULT VERDICT:", "PASS" if bad == 0 else "FAIL")
+    return 0 if bad == 0 else 1
+
+
 def cmd_report(a: argparse.Namespace) -> int:
     d = json.loads(Path(a.path).read_bytes().decode("utf-8-sig"))
     print(json.dumps(d, indent=1)[:12000])
@@ -206,6 +279,12 @@ def main() -> int:
     c.add_argument("--trace", action="store_true", help="print the first run's events")
     c.add_argument("--timeout", type=int, default=900)
     c.set_defaults(fn=cmd_craft)
+    s = sub.add_parser("assault", help="the boats' boardings in the war bench (the host's side: the order, the scene, the outcome)")
+    s.add_argument("--setup", default="all", choices=list(ASSAULT_SETUPS) + ["all"])
+    s.add_argument("--seed", type=int, default=1)
+    s.add_argument("--lines", type=int, default=60, help="how many of the last log lines to print")
+    s.add_argument("--timeout", type=int, default=900)
+    s.set_defaults(fn=cmd_assault)
     p = sub.add_parser("report")
     p.add_argument("path", nargs="?", default="Saved/Boarding/run.json")
     p.set_defaults(fn=cmd_report)

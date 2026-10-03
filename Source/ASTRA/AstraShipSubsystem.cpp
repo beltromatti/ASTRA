@@ -2043,7 +2043,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		return St ? St->SetMode(Args, By.IsEmpty() ? TEXT("officer") : By, OutDetail) : false;
 	}
 	// ABBORDAGGI: a boarding and the marines' orders are the board subsystem's
-	if (Name == TEXT("boarding") || Name == TEXT("marine_order") || Name == TEXT("lockdown") || Name == TEXT("issue_weapon"))
+	if (Name == TEXT("boarding") || Name == TEXT("board_ship") || Name == TEXT("marine_order") || Name == TEXT("lockdown") || Name == TEXT("issue_weapon"))
 	{
 		UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr;
 		if (!Board)
@@ -2827,7 +2827,16 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	{
 		S->SetArrayField(TEXT("contacts"), Battle->ContactsJson());
 		S->SetStringField(TEXT("enemy_small_craft"), Battle->EnemyCraftSummary());
-		S->SetObjectField(TEXT("_mandate"), Battle->MandateViewJson());   // for the enemy minds only
+		TSharedRef<FJsonObject> MandateView = Battle->MandateViewJson();
+		if (const UAstraBoardSubsystem* BoardOpts = GetWorld()->GetSubsystem<UAstraBoardSubsystem>(); BoardOpts && BoardOpts->IsReady())
+		{
+			const TSharedRef<FJsonObject> Opts = BoardOpts->BoardingOptionsJson(1);          // ABBORDAGGI: what the Mandate's boats could dock at now (empty when nothing)
+			if (Opts->Values.Num())
+			{
+				MandateView->SetObjectField(TEXT("boarding"), Opts);
+			}
+		}
+		S->SetObjectField(TEXT("_mandate"), MandateView);   // for the enemy minds only
 		S->SetObjectField(TEXT("_astra_groups"), Battle->SideGroupsJson(0));   // the ASTRA groups, for the allied commanders (docs/GUERRA.md)
 		// where the Captain is: in a Falcon the XO has the conn and the Captain speaks by radio
 		const FString Flying = Battle->PilotSummary();
@@ -2989,14 +2998,29 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	{
 		S->SetObjectField(TEXT("transporter"), Xport->SnapshotJson());   // TELETRASPORTO: the Transporter Room's console, as the Chief reads it
 	}
-	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && Board->IsActive())
+	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && (Board->IsFightOn() || Board->IsAssaultOn()))
 	{
-		S->SetObjectField(TEXT("boarding"), Board->Snapshot());  // ABBORDAGGI: boarders aboard: the fight as the bridge knows it
-		S->SetObjectField(TEXT("_marines"), Board->MarinesPicture());   // (and as the marines' net reads it: squads, places, bulkheads; the `_` keeps it out of the bridge crew's board)
+		S->SetObjectField(TEXT("boarding"), Board->Snapshot());  // ABBORDAGGI: a boarding (boats in flight, or a fight aboard the Aquila or another ship): as the bridge knows it
+		if (Board->IsFightOn())
+		{
+			S->SetObjectField(TEXT("_marines"), Board->MarinesPicture());   // (and as the marines' net reads it: squads, places, bulkheads; the `_` keeps it out of the bridge crew's board)
+		}
+	}
+	else if (const UAstraBoardSubsystem* BoardOpts2 = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; BoardOpts2 && BoardOpts2->IsReady())
+	{
+		const TSharedRef<FJsonObject> Opts = BoardOpts2->BoardingOptionsJson(0);            // what the Aquila's own boats could dock at now (empty when nothing: no tokens)
+		if (Opts->Values.Num())
+		{
+			S->SetObjectField(TEXT("boarding_options"), Opts);
+		}
 	}
 	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && Board->IsReady())
 	{
 		S->SetObjectField(TEXT("arms"), Board->ArmsJson());      // ABBORDAGGI: where the Captain's weapons are, what he carries, the armourer's errand (the crew's tool: issue_weapon)
+		if (const TSharedRef<FJsonObject> Boats = Board->BoatsJson(); Boats->Values.Num())
+		{
+			S->SetObjectField(TEXT("boarding_boats"), Boats);   // (and the Aquila's own boats and the marines fit to go in them: the crew's tool board_ship)
+		}
 	}
 	return S;
 }

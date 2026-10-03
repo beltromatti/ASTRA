@@ -651,8 +651,10 @@ public:
 	int32 ResolveShip(const FString& Key, FString* OutWhy = nullptr) const;
 	/** The truth about one ship, for the host (never for the crew). */
 	bool ShipFacts(int32 Id, AstraBoardCraft::FShipFacts& Out) const;
-	/** The boarders took her: she is ours now (her side, her stance), a hulk with a prize crew. */
-	bool CaptureShip(int32 Id, const FString& By, FString& OutDetail);
+	/** The ships of the battle that are not craft and are not destroyed, as the host of the boarding sees them (to choose a carrier, to list what each side may board). */
+	void ListShipFacts(TArray<AstraBoardCraft::FShipFacts>& Out) const;
+	/** The boarders took her: she is theirs now (her side, her stance), a hulk with a prize crew. ForSide: 0 ASTRA's (the Aquila's marines took a Mandate ship), 1 the Mandate's (they took a consort). */
+	bool CaptureShip(int32 Id, const FString& By, FString& OutDetail, int32 ForSide = 0);
 	/** The Aquila's engines as the helm should feel them (0 = dead, 1 = sound), her damage control's help to the systems. */
 	float PlayerEngineFactor() const;
 	void RepairPlayerSystems(float Amount);

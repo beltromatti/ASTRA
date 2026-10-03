@@ -12,6 +12,7 @@ namespace
 	constexpr float CloseSenseCm = 700.f;        // within this he knows what is round him
 	constexpr float ForgetS = 9.f;
 	constexpr double TimeLimitS = 1500.0;
+	constexpr double PreLandingLimitS = 900.0;     // a boarding whose craft have not touched yet (they are still flying, or hold off a shield) is given this much longer
 
 	const TCHAR* MandateFirst[] = {TEXT("Ilya"), TEXT("Rustam"), TEXT("Nadezhda"), TEXT("Imre"), TEXT("Katarina"), TEXT("Daro"), TEXT("Anselm"), TEXT("Marek"), TEXT("Isolde"),
 	                               TEXT("Corvin"), TEXT("Tamsin"), TEXT("Bram"), TEXT("Odalys"), TEXT("Jurek"), TEXT("Vesna"), TEXT("Lazar"), TEXT("Mirela"), TEXT("Casimir"),
@@ -199,6 +200,10 @@ TArray<int32> FAstraBoardSim::SpawnAttackers(ESide Side, int32 BreachComp, const
 {
 	TArray<int32> Out;
 	SetMission(Side, BreachComp, BreachPos, ObjectiveComp, Mis.bSweep);
+	if (Count <= 0)
+	{
+		return Out;
+	}
 	PerSquad = FMath::Max(2, PerSquad);
 	const int32 NumSquads = FMath::Max(1, FMath::DivideAndRoundUp(Count, PerSquad));
 	static const TCHAR* MandateSquads[] = {TEXT("Ferry Guard Alpha"), TEXT("Ferry Guard Bravo"), TEXT("Ferry Guard Charlie"), TEXT("Ferry Guard Delta"), TEXT("Ferry Guard Echo"), TEXT("Ferry Guard Foxtrot")};
@@ -235,6 +240,129 @@ TArray<int32> FAstraBoardSim::SpawnAttackers(ESide Side, int32 BreachComp, const
 	return Out;
 }
 
+TArray<int32> FAstraBoardSim::LandParty(ESide Side, int32 Party, const TArray<FArrival>& Men, int32 BreachComp, const FVector& BreachPos, float EtaS, int32 PerSquad, const FString& SquadBase)
+{
+	TArray<int32> Out;
+	if (Men.IsEmpty() || !Map->GetComps().IsValidIndex(BreachComp))
+	{
+		return Out;
+	}
+	static const TCHAR* Letters[] = {TEXT("Alpha"), TEXT("Bravo"), TEXT("Charlie"), TEXT("Delta"), TEXT("Echo"), TEXT("Foxtrot"), TEXT("Golf"), TEXT("Hotel"), TEXT("India"), TEXT("Juliet")};
+	const FString Base = SquadBase.IsEmpty() ? (Side == ESide::Mandate ? FString(TEXT("Ferry Guard")) : FString(TEXT("Boarding"))) : SquadBase;
+	PerSquad = FMath::Max(2, PerSquad);
+	int32 Lettered = 0;
+	for (const FSquad& S : Teams)
+	{
+		Lettered += (S.Side == Side && S.Name.StartsWith(Base + TEXT(" "))) ? 1 : 0;      // the letters go on from the party before
+	}
+	const int32 Count = Men.Num();
+	const int32 NumSquads = FMath::DivideAndRoundUp(Count, PerSquad);
+	int32 Made = 0;
+	float At = (float)Clock + FMath::Max(0.f, EtaS);
+	for (int32 s = 0; s < NumSquads && Made < Count; ++s)
+	{
+		const int32 Sq = AddSquad(Side, FString::Printf(TEXT("%s %s"), *Base, Lettered < UE_ARRAY_COUNT(Letters) ? Letters[Lettered] : *FString::FromInt(Lettered + 1)));
+		++Lettered;
+		Out.Add(Sq);
+		Teams[Sq].BreachComp = BreachComp;
+		Teams[Sq].BreachPos = BreachPos;
+		const int32 Here = FMath::Min(PerSquad, Count - Made);
+		for (int32 k = 0; k < Here; ++k)
+		{
+			const FArrival& A = Men[Made];
+			const ERole Role = k == 0 ? ERole::Leader : (k == Here - 1 && Here >= 4 ? ERole::Heavy : ERole::Rifleman);
+			FString Name = A.Name;
+			if (Name.IsEmpty())
+			{
+				Name = Side == ESide::Mandate ? (Role == ERole::Leader ? FString(TEXT("Warden ")) : FString(TEXT("Oarsman "))) + MandateName(Made + Party * 13)
+				                              : FString::Printf(TEXT("%sMarine %d"), Role == ERole::Leader ? TEXT("Sgt. ") : TEXT(""), Made + 1 + Party * 20);
+			}
+			const FVector Spot = Map->Inset(BreachComp, BreachPos + FVector(Rng.FRandRange(-120.f, 120.f), Rng.FRandRange(-120.f, 120.f), 0.f), 60.f);
+			FUnit& U = Spawn(Side, Role, Name, Spot, Sq);
+			U.Roster = A.Roster;
+			U.Party = Party;
+			if (A.Skill > 0.f)
+			{
+				U.Skill = A.Skill;
+			}
+			U.Act = EAct::Waiting;
+			Pending.Add({U.Id, At});
+			At += 0.9f + Rng.FRand() * 0.5f;
+			++Made;
+		}
+		BriefAttackers(Sq);
+	}
+	return Out;
+}
+
+void FAstraBoardSim::ReleaseParty(int32 Party, float DelayS)
+{
+	float At = (float)Clock + FMath::Max(0.f, DelayS);
+	for (FPending& P : Pending)
+	{
+		if (People.IsValidIndex(P.Unit) && People[P.Unit].Party == Party)
+		{
+			P.At = At;
+			At += 0.9f + Rng.FRand() * 0.5f;
+		}
+	}
+}
+
+int32 FAstraBoardSim::LoseParty(int32 Party, const FString& Cause)
+{
+	int32 N = 0;
+	for (int32 i = Pending.Num() - 1; i >= 0; --i)
+	{
+		FUnit& U = People[Pending[i].Unit];
+		if (U.Party != Party || U.Act != EAct::Waiting)
+		{
+			continue;
+		}
+		U.Act = EAct::Dead;
+		U.Hp = 0.f;
+		U.FellTo = Cause;
+		++Stats.Killed[(int32)U.Side];
+		if (Teams.IsValidIndex(U.Squad))
+		{
+			++Teams[U.Squad].Lost;
+		}
+		Pending.RemoveAt(i);
+		++N;
+	}
+	return N;
+}
+
+int32 FAstraBoardSim::RecallParty(int32 Party)
+{
+	int32 N = 0;
+	for (int32 i = Pending.Num() - 1; i >= 0; --i)
+	{
+		FUnit& U = People[Pending[i].Unit];
+		if (U.Party != Party || U.Act != EAct::Waiting)
+		{
+			continue;
+		}
+		U.Act = EAct::Gone;
+		Stats.Spawned[(int32)U.Side] = FMath::Max(0, Stats.Spawned[(int32)U.Side] - 1);       // never came aboard: not a man of this fight
+		if (Teams.IsValidIndex(U.Squad))
+		{
+			Teams[U.Squad].StartStrength = FMath::Max(0.f, Teams[U.Squad].StartStrength - 1.f);
+		}
+		Pending.RemoveAt(i);
+		++N;
+	}
+	return N;
+}
+
+int32 FAstraBoardSim::PartyWaiting(int32 Party) const
+{
+	int32 N = 0;
+	for (const FPending& P : Pending)
+	{
+		N += (People.IsValidIndex(P.Unit) && People[P.Unit].Party == Party) ? 1 : 0;
+	}
+	return N;
+}
 int32 FAstraBoardSim::AddMarine(const FString& Name, int32 Roster, const FVector& Pos, bool bLeader, int32 SquadId, float Skill)
 {
 	FUnit& U = Spawn(ESide::Aquila, bLeader ? ERole::Leader : ERole::Rifleman, Name, Pos, SquadId);
@@ -358,6 +486,10 @@ void FAstraBoardSim::Step(float Dt)
 			FUnit& U = People[Pending[i].Unit];
 			U.Act = EAct::Idle;
 			U.Pos = Map->Inset(U.Comp, U.Pos, 50.f);
+			if (Mis.StartedS < 0.0 && U.Side == Mis.Attacker)
+			{
+				Mis.StartedS = Clock;
+			}
 			Emit(EEvent::Spawn, U.Id, INDEX_NONE, U.Pos, U.Pos, 0.f, false, U.Name);
 			Pending.RemoveAt(i);
 		}
@@ -1438,7 +1570,7 @@ void FAstraBoardSim::StepMission(float Dt)
 	{
 		Mis.Outcome = EOutcome::AttackerTakes;
 	}
-	else if (Mis.bSweep && DefAble == 0 && Stats.Spawned[(int32)Defender()] > 0 && AttAtObjective + AttStill > 0 && Clock > 20.0)
+	else if (Mis.bSweep && DefAble == 0 && Stats.Spawned[(int32)Defender()] > 0 && AttAtObjective + AttStill > 0 && Mis.StartedS >= 0.0 && Clock - Mis.StartedS > 20.0)
 	{
 		Mis.Outcome = EOutcome::AttackerTakes;                   // nobody is left to hold the ship
 	}
@@ -1446,7 +1578,7 @@ void FAstraBoardSim::StepMission(float Dt)
 	{
 		Mis.Outcome = Stats.Exited[(int32)Att] > 0 && Stats.Killed[(int32)Att] + Stats.Down[(int32)Att] < Stats.Spawned[(int32)Att] ? EOutcome::AttackerRepelled : EOutcome::DefenderHolds;
 	}
-	else if (Clock > TimeLimitS)
+	else if (Mis.StartedS >= 0.0 ? Clock - Mis.StartedS > TimeLimitS : Clock > TimeLimitS + PreLandingLimitS)
 	{
 		Mis.Outcome = EOutcome::TimedOut;
 	}

@@ -46,6 +46,25 @@ namespace AstraBoardCraft
 		return nullptr;
 	}
 
+	double AquilaSkinM(double HullXm)
+	{
+		// the half beam of her plating at the decks of the airlocks (z about 0 to 14 m), sampled on the mesh: constant along the middle, narrowing towards the bow
+		static const double X[] = {170.0, 188.0, 212.0, 236.0, 260.0};
+		static const double Y[] = {50.6, 49.5, 47.35, 45.2, 43.2};
+		if (HullXm <= X[0])
+		{
+			return 50.7;
+		}
+		for (int32 i = 1; i < UE_ARRAY_COUNT(X); ++i)
+		{
+			if (HullXm <= X[i])
+			{
+				return Y[i - 1] + (Y[i] - Y[i - 1]) * (HullXm - X[i - 1]) / (X[i] - X[i - 1]);
+			}
+		}
+		return Y[UE_ARRAY_COUNT(Y) - 1];
+	}
+
 	FBerths BerthsOf(FName ClassKey, const FVector& HullHalfM, float HullMidM)
 	{
 		FBerths B;
@@ -54,7 +73,7 @@ namespace AstraBoardCraft
 		{
 			B.Kind = &Kestrel();
 			B.Count = 2;
-			B.Bay = FVector(212.0, -46.0, 2.0);       // Deck 8's assault-shuttle bay (d8_shuttle_bay_B1: the plan's x 24..56, y -38..-22, with the hull's origin 172 m ahead of the bridge) opens on the port side
+			B.Bay = FVector(212.0, -AquilaSkinM(212.0), 2.0);       // Deck 8's assault-shuttle bay (d8_shuttle_bay_B1: the plan's x 24..56, y -38..-22, with the hull's origin 172 m ahead of the bridge) opens on the port side, on her plating
 			B.BayNormal = FVector(0.0, -1.0, 0.0);
 			return B;
 		}
@@ -338,7 +357,22 @@ bool UAstraBattleSubsystem::ShipFacts(int32 Id, FShipFacts& Out) const
 	return true;
 }
 
-bool UAstraBattleSubsystem::CaptureShip(int32 Id, const FString& By, FString& OutDetail)
+void UAstraBattleSubsystem::ListShipFacts(TArray<FShipFacts>& Out) const
+{
+	for (const FAstraBattleShip& S : Ships)
+	{
+		if (S.bAlive && !S.bCraft && !S.bGhost)
+		{
+			FShipFacts F;
+			if (ShipFacts(S.Id, F))
+			{
+				Out.Add(MoveTemp(F));
+			}
+		}
+	}
+}
+
+bool UAstraBattleSubsystem::CaptureShip(int32 Id, const FString& By, FString& OutDetail, int32 ForSide)
 {
 	FAstraBattleShip* S = FindById(Id);
 	if (!S || !S->bAlive || S->bCraft || S->bPlayer)
@@ -346,13 +380,14 @@ bool UAstraBattleSubsystem::CaptureShip(int32 Id, const FString& By, FString& Ou
 		OutDetail = TEXT("there is no such ship to take");
 		return false;
 	}
-	if (S->Side == EAstraSide::Astra)
+	const EAstraSide To = ForSide == 1 ? EAstraSide::Mandate : EAstraSide::Astra;
+	if (S->Side == To)
 	{
-		OutDetail = TEXT("she is ours already");
+		OutDetail = To == EAstraSide::Astra ? TEXT("she is ours already") : TEXT("she is theirs already");
 		return false;
 	}
-	S->Side = EAstraSide::Astra;
-	S->bHostile = false;
+	S->Side = To;
+	S->bHostile = To != EAstraSide::Astra;
 	S->bHoldFire = true;
 	S->bFleeing = false;
 	S->bFog = false;
@@ -363,8 +398,9 @@ bool UAstraBattleSubsystem::CaptureShip(int32 Id, const FString& By, FString& Ou
 	S->TargetId = -1;
 	S->OrderTarget = -1;
 	++PlotStamp;
-	Report(FString::Printf(TEXT("tactical: %s is ours — taken by %s; she has no power and a prize crew aboard"), *S->Name, *By), true);
-	OutDetail = FString::Printf(TEXT("%s is ours"), *S->Name);
+	Report(To == EAstraSide::Astra ? FString::Printf(TEXT("tactical: %s is ours — taken by %s; she has no power and a prize crew aboard"), *S->Name, *By)
+	                               : FString::Printf(TEXT("tactical: %s has been taken by the Mandate (%s); she has no power and a prize crew aboard"), *S->Name, *By), true);
+	OutDetail = FString::Printf(TEXT("%s is %s"), *S->Name, To == EAstraSide::Astra ? TEXT("ours") : TEXT("the Mandate's"));
 	return true;
 }
 

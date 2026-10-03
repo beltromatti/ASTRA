@@ -54,15 +54,20 @@ void UAstraBoardSubsystem::OpenBreach()
 	const int32 C = Fight.Mission().Breach;
 	const FBox& B = Map->GetComps()[C].Box;
 	BreachNormal = FVector(0.0, B.Max.Y > 0.0 ? -1.0 : 1.0, 0.0);
-	if (!Breach && GetWorld())
+	AAstraBoardBreach* Actor = Breaches.Num() ? Breaches[0].Get() : nullptr;
+	if (!Actor && GetWorld())
 	{
 		FActorSpawnParameters P;
 		P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		Breach = GetWorld()->SpawnActor<AAstraBoardBreach>(BreachAt, FRotator::ZeroRotator, P);
+		Actor = GetWorld()->SpawnActor<AAstraBoardBreach>(BreachAt, FRotator::ZeroRotator, P);
+		if (Actor)
+		{
+			Breaches.Add(Actor);
+		}
 	}
-	if (Breach)
+	if (Actor)
 	{
-		Breach->Open(BreachAt, BreachNormal);
+		Actor->Open(BreachAt, BreachNormal);
 	}
 	if (UAstraCombatFx* X = FxSub())
 	{
@@ -80,15 +85,23 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 	{
 		LastShotSound.SetNumZeroed(Fight.Units().Num() + 16);
 	}
+	const bool bObserved = Mode == EMode::Observed;           // the fight is on the Aquila's decks: rounds, wounds and breaches are seen and heard (else only told)
+	const bool bWeAttack = Fight.IsAttacker(ESide::Aquila);
 	for (const FBoardEvent& E : Evs)
 	{
 		switch (E.Type)
 		{
 		case EEvent::Shot:
-			OnShot(E);
+			if (bObserved)
+			{
+				OnShot(E);
+			}
 			break;
 		case EEvent::Hit:
-			OnHit(E);
+			if (bObserved)
+			{
+				OnHit(E);
+			}
 			break;
 		case EEvent::Down:
 			OnFall(E, false);
@@ -99,9 +112,9 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 		case EEvent::Spawn:
 		{
 			const FUnit* U = Fight.Unit(E.Unit);
-			if (U && U->Side == ESide::Mandate)
+			if (U && U->Side == ESide::Mandate && bObserved && !Assault.bOn)
 			{
-				OpenBreach();
+				OpenBreach();                                  // (a boarding by boats opens each hatch as its boat cuts in: AstraBoardAssault.cpp)
 			}
 			break;
 		}
@@ -112,14 +125,14 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 			if (!bToldContact && Seer && Seen && Seer->Side == ESide::Aquila && Seen->Side == ESide::Mandate)
 			{
 				bToldContact = true;
-				Tell(FString::Printf(TEXT("contact: %s sees the boarders at %s"), *Seer->Name, *PlaceOf(*Seen)), true);
+				Tell(FString::Printf(TEXT("contact: %s sees %s at %s"), *Seer->Name, bWeAttack ? TEXT("the ship's defenders") : TEXT("the boarders"), *PlaceOf(*Seen)), true);
 			}
 			break;
 		}
 		case EEvent::Retreat:
 		{
 			const FUnit* U = Fight.Unit(E.Unit);
-			if (U && U->Side == ESide::Mandate)
+			if (U && (U->Side == ESide::Mandate || bWeAttack))
 			{
 				Tell(FString::Printf(TEXT("%s is breaking off and falling back to the breach"), *E.Text), false);
 			}
@@ -147,7 +160,7 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 			{
 				SealDoor(Door, false);
 			}
-			if (UAstraCombatFx* X = FxSub())
+			if (UAstraCombatFx* X = bObserved ? FxSub() : nullptr)
 			{
 				X->Impact(E.Start + FVector(0.0, 0.0, 110.0), FVector(0.0, 0.0, 1.0), UAstraCombatFx::ESurface::Metal);
 				X->PlaySoundAt(TEXT("/Game/ASTRA/Audio/SW_Sparks.SW_Sparks"), E.Start + FVector(0.0, 0.0, 110.0), 1.f, 0.9f);
@@ -172,7 +185,8 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 		{
 			ToldMarinesLost = Lost;
 			ToldMandateLost = Hostile;
-			Tell(FString::Printf(TEXT("marines: %d dead, %d down; boarders: %d dead or down, %d still fighting"), B.Killed[0], B.Down[0], Hostile, Fight.CountAble(ESide::Mandate)), false);
+			Tell(FString::Printf(TEXT("marines: %d dead, %d down; %s: %d dead or down, %d still fighting"), B.Killed[0], B.Down[0], bWeAttack ? TEXT("her crew") : TEXT("boarders"), Hostile,
+			                     Fight.CountAble(ESide::Mandate)), false);
 		}
 	}
 }

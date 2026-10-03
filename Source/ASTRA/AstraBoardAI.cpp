@@ -398,7 +398,7 @@ void FAstraBoardSim::WithdrawSquad(FSquad& S, const TArray<int32>& Able)
 for (const int32 M : Able)
 {
 FUnit& U = People[M];
-if (U.Comp == Mis.Breach && FVector::Dist2D(U.Pos, Mis.BreachPos) < 420.f)
+if (U.Comp == BreachCompOf(S) && FVector::Dist2D(U.Pos, BreachPosOf(S)) < 420.f)
 {
 U.Act = EAct::Gone;
 U.Path.Reset();
@@ -406,13 +406,12 @@ U.Path.Reset();
 Emit(EEvent::Exit, U.Id, INDEX_NONE, U.Pos, U.Pos, 0.f, false, U.Name);
 continue;
 }
-if (U.Act != EAct::Reload && (U.Path.IsEmpty() || FVector::Dist2D(U.Dest, Mis.BreachPos) > 200.f))
+if (U.Act != EAct::Reload && (U.Path.IsEmpty() || FVector::Dist2D(U.Dest, BreachPosOf(S)) > 200.f))
 {
 U.Slot = INDEX_NONE;
-GoTo(U, Mis.BreachPos, Tuning.JogCmS * 1.05f, true);
+GoTo(U, BreachPosOf(S), Tuning.JogCmS * 1.05f, true);
 }
 }
-(void)S;
 }
 
 void FAstraBoardSim::PlanAttack(FSquad& S)
