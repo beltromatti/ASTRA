@@ -11,8 +11,8 @@ namespace
 {
 	/** A key and what it does, for the card that is up when he arms. */
 	struct FKeyHint { const TCHAR* Key; const TCHAR* What; };
-	const FKeyHint FpsKeyRowWeapon[] = {{TEXT("LMB"), TEXT("fire")}, {TEXT("RMB"), TEXT("aim")}, {TEXT("R"), TEXT("reload")}, {TEXT("1"), TEXT("rifle")}, {TEXT("2"), TEXT("sidearm")}, {TEXT("Q"), TEXT("last weapon")}, {TEXT("H"), TEXT("holster")}};
-	const FKeyHint FpsKeyRowMove[] = {{TEXT("W A S D"), TEXT("move")}, {TEXT("Shift"), TEXT("run")}, {TEXT("C"), TEXT("crouch")}, {TEXT("hold C"), TEXT("prone")}, {TEXT("Space"), TEXT("jump")}, {TEXT("E"), TEXT("use")}, {TEXT("F1"), TEXT("all keys")}};
+	const FKeyHint FpsKeysWeapon[] = {{TEXT("LMB"), TEXT("fire")}, {TEXT("RMB"), TEXT("aim")}, {TEXT("R"), TEXT("reload")}, {TEXT("1"), TEXT("rifle")}, {TEXT("2"), TEXT("sidearm")}, {TEXT("Q"), TEXT("last weapon")}, {TEXT("H"), TEXT("holster")}};
+	const FKeyHint FpsKeysMove[] = {{TEXT("W A S D"), TEXT("move")}, {TEXT("Shift"), TEXT("run")}, {TEXT("C"), TEXT("crouch")}, {TEXT("hold C"), TEXT("prone")}, {TEXT("Space"), TEXT("jump")}, {TEXT("E"), TEXT("use")}, {TEXT("F1"), TEXT("all keys")}};
 }
 
 void SAstraCombatHud::Construct(const FArguments&)
@@ -148,40 +148,41 @@ int32 SAstraCombatHud::OnPaint(const FPaintArgs&, const FGeometry& G, const FSla
 	}
 	if (State.KeysAlpha > 0.02f)
 	{
-		// the card: two rows of keys on caps, lower middle, above the corner where the controller's walking notice stands (the two never meet)
+		// the card: two columns of keys on caps (the weapon's and the walking ones), at the top left. Not at the bottom: the lower middle is where the crew's subtitles stand (the
+		// controller's: up to three rows of up to three lines, from 60 px above the edge to some 310 px) and the lower right has the walking notice and the rounds
 		const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
 		const float A = State.KeysAlpha;
-		const float RowH = 26.f * U, Pad = 12.f * U, CapPad = 7.f * U, Gap = 18.f * U, After = 6.f * U;
-		const auto RowWidth = [&](const FKeyHint* Row, int32 N)
+		const float RowH = 26.f * U, HeadH = 24.f * U, Pad = 12.f * U, CapPad = 7.f * U, After = 8.f * U, ColGap = 28.f * U;
+		const auto ColWidth = [&](const FKeyHint* Col, int32 N)
 		{
 			float W = 0.f;
 			for (int32 i = 0; i < N; ++i)
 			{
-				W += Measure->Measure(FString(Row[i].Key), Cap).X + 2.f * CapPad + After + Measure->Measure(FString(Row[i].What), Cap).X + (i + 1 < N ? Gap : 0.f);
+				W = FMath::Max(W, Measure->Measure(FString(Col[i].Key), Cap).X + 2.f * CapPad + After + Measure->Measure(FString(Col[i].What), Cap).X);
 			}
 			return W;
 		};
-		constexpr int32 NW = UE_ARRAY_COUNT(FpsKeyRowWeapon), NM = UE_ARRAY_COUNT(FpsKeyRowMove);
-		const float W = FMath::Max(RowWidth(FpsKeyRowWeapon, NW), RowWidth(FpsKeyRowMove, NM)) + 2.f * Pad;
-		const float H = 2.f * RowH + 3.f * Pad * 0.75f;
-		const FVector2D Origin(C.X - W * 0.5f, Size.Y - 100.f * U - H);
+		constexpr int32 NW = UE_ARRAY_COUNT(FpsKeysWeapon), NM = UE_ARRAY_COUNT(FpsKeysMove);
+		const float W1 = ColWidth(FpsKeysWeapon, NW), W2 = ColWidth(FpsKeysMove, NM);
+		const float W = 2.f * Pad + W1 + ColGap + W2;
+		const float H = 1.5f * Pad + HeadH + FMath::Max(NW, NM) * RowH;
+		const FVector2D Origin(24.f * U, 24.f * U);
 		Box(Origin, FVector2D(W, H), FLinearColor(0.004f, 0.006f, 0.01f, 0.62f * A), L + 1);
-		const auto DrawRow = [&](const FKeyHint* Row, int32 N, float Y)
+		const auto DrawColumn = [&](const TCHAR* Head, const FKeyHint* Col, int32 N, float X0)
 		{
-			float X = Origin.X + Pad;
-			for (int32 i = 0; i < N; ++i)
+			Text(Head, FVector2D(X0, Origin.Y + 0.75f * Pad), Small, FLinearColor(0.62f, 0.7f, 0.8f, 0.9f * A), L + 3);
+			float Y = Origin.Y + 0.75f * Pad + HeadH;
+			for (int32 i = 0; i < N; ++i, Y += RowH)
 			{
-				const float KW = Measure->Measure(FString(Row[i].Key), Cap).X;
-				Box(FVector2D(X, Y + 1.f * U), FVector2D(KW + 2.f * CapPad, RowH - 2.f * U), FLinearColor(0.46f, 0.52f, 0.6f, 0.9f * A), L + 2);
-				Box(FVector2D(X + 1.f * U, Y + 2.f * U), FVector2D(KW + 2.f * CapPad - 2.f * U, RowH - 4.f * U), FLinearColor(0.1f, 0.125f, 0.16f, 0.96f * A), L + 2);
-				Text(Row[i].Key, FVector2D(X + CapPad, Y + 5.f * U), Cap, FLinearColor(0.96f, 0.98f, 1.f, A), L + 3);
-				X += KW + 2.f * CapPad + After;
-				Text(Row[i].What, FVector2D(X, Y + 5.f * U), Cap, FLinearColor(0.7f, 0.78f, 0.88f, 0.95f * A), L + 3);
-				X += Measure->Measure(FString(Row[i].What), Cap).X + Gap;
+				const float KW = Measure->Measure(FString(Col[i].Key), Cap).X;
+				Box(FVector2D(X0, Y + 1.f * U), FVector2D(KW + 2.f * CapPad, RowH - 2.f * U), FLinearColor(0.46f, 0.52f, 0.6f, 0.9f * A), L + 2);
+				Box(FVector2D(X0 + 1.f * U, Y + 2.f * U), FVector2D(KW + 2.f * CapPad - 2.f * U, RowH - 4.f * U), FLinearColor(0.1f, 0.125f, 0.16f, 0.96f * A), L + 2);
+				Text(Col[i].Key, FVector2D(X0 + CapPad, Y + 5.f * U), Cap, FLinearColor(0.96f, 0.98f, 1.f, A), L + 3);
+				Text(Col[i].What, FVector2D(X0 + KW + 2.f * CapPad + After, Y + 5.f * U), Cap, FLinearColor(0.7f, 0.78f, 0.88f, 0.95f * A), L + 3);
 			}
 		};
-		DrawRow(FpsKeyRowWeapon, NW, Origin.Y + Pad * 0.75f);
-		DrawRow(FpsKeyRowMove, NM, Origin.Y + Pad * 0.75f * 2.f + RowH);
+		DrawColumn(TEXT("WEAPON"), FpsKeysWeapon, NW, Origin.X + Pad);
+		DrawColumn(TEXT("MOVING"), FpsKeysMove, NM, Origin.X + Pad + W1 + ColGap);
 	}
 	return L + 4;
 }

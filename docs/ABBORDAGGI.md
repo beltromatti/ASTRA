@@ -123,9 +123,9 @@ sintetizzati (`tools/art/weapon_sounds.py`: colpo, scatto a vuoto, ricariche, im
   per chi lo sente passare, il suono; il rinculo alza il mirino e lo fa vagare, l'arma scalcia sulla spalla (molla), poi il mirino ricade in parte.
 - **Lo schermo**: mirino che si apre con il cono, colpi, forza (quando ferito o in un combattimento), rosso ai bordi e archi di provenienza di un colpo ricevuto, la croce
   bianca di un colpo a segno (rossa-bianca alla testa), il suggerimento del tasto a portata («E TAKE THE RIFLE AND THE SIDEARM»), il **cartoncino dei tasti** quando si arma (24 s la prima volta,
-  6 s ai richiami, non più di uno ogni 90 s): due righe di tasti su cappucci, l'arma (LMB fuoco, RMB mira, R ricarica, 1 fucile, 2 pistola, Q l'arma di prima, H in fondina) e il movimento
-  (WASD, Shift corsa, C accucciato, C tenuto sdraiato, Spazio salto, E usa, F1 la scheda); sta in basso al centro, **sopra** l'avviso del cammino del controller (in basso a destra: le due
-  cose si sovrapponevano), così i due non si incontrano.
+  6 s ai richiami, non più di uno ogni 90 s): due colonne di tasti su cappucci, l'arma (LMB fuoco, RMB mira, R ricarica, 1 fucile, 2 pistola, Q l'arma di prima, H in fondina) e il movimento
+  (WASD, Shift corsa, C accucciato, C tenuto sdraiato, Spazio salto, E usa, F1 la scheda); sta **in alto a sinistra**, fuori da tutto ciò che il controller disegna in basso: i sottotitoli dell'equipaggio
+  (fino a tre righe di fino a tre linee: da 60 px dal bordo a circa 310) e l'avviso del cammino (in basso a destra); la prima versione stava in basso al centro e un sottotitolo la copriva.
 - **Il costo**: con l'arma in mano il passo cala (0,9; 0,6 dal mirino), il giro dal mirino segue il campo; da seduto, con il tablet alzato, nella lista di un ascensore, a terra
   o morto l'arma non c'è.
 
