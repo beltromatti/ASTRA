@@ -1013,6 +1013,8 @@ private:
 	// --- the physical model (AstraWarDamage.cpp)
 	// --- the inside of the other ships (AstraFleetHooks.cpp, docs/FLOTTA-VIVA.md): the Aquila's damage model on the plan of their class
 	bool FleetOn() const;
+	/** The ship has an inside and the insides are on: what the war leaves to it (the fires, the venting, the people) and what it asks of it. */
+	bool FleetActive(const FAstraBattleShip& S) const { return S.Interior.IsValid() && FleetOn(); }
 	FAstraShipInterior* FleetEnsure(FAstraBattleShip& S);
 	void FleetOnHit(FAstraBattleShip& To, const FAstraHullHit& Hit);
 	void FleetOnGutted(FAstraBattleShip& S, int32 Section);

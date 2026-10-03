@@ -116,17 +116,17 @@ FAstraShipInterior* UAstraBattleSubsystem::FleetEnsure(FAstraBattleShip& S)
 
 float UAstraBattleSubsystem::FleetFactor(const FAstraBattleShip& S, int32 Category) const
 {
-	return S.Interior.IsValid() ? 1.f - GFleetPowerK * (1.f - S.Interior->Factor((EAstraDmgCategory)Category)) : 1.f;
+	return S.Interior.IsValid() && FleetOn() ? 1.f - GFleetPowerK * (1.f - S.Interior->Factor((EAstraDmgCategory)Category)) : 1.f;
 }
 
 float UAstraBattleSubsystem::FleetSys(const FAstraBattleShip& S, int32 WarSystem) const
 {
-	return S.Interior.IsValid() ? 1.f - GFleetPowerK * (1.f - S.Interior->SysFit(WarSystem)) : 1.f;
+	return S.Interior.IsValid() && FleetOn() ? 1.f - GFleetPowerK * (1.f - S.Interior->SysFit(WarSystem)) : 1.f;
 }
 
 void UAstraBattleSubsystem::FleetOnHit(FAstraBattleShip& To, const FAstraHullHit& Hit)
 {
-	FAstraShipInterior* I = FleetEnsure(To);
+	FAstraShipInterior* I = FleetOn() ? FleetEnsure(To) : nullptr;
 	if (!I)
 	{
 		return;
@@ -170,6 +170,17 @@ void UAstraBattleSubsystem::FleetTick(FAstraBattleShip& S, float Dt)
 	FAstraShipInterior* I = S.Interior.Get();
 	if (!I)
 	{
+		return;
+	}
+	if (!FleetOn())
+	{
+		// switched off in the middle of a battle: the war goes back to what it was (the inside stays as it is, silent, for when it is switched on again)
+		S.ShieldPower = 1.f;
+		S.WeaponPower = 1.f;
+		for (FAstraMount& M : S.Mounts)
+		{
+			M.Feed = 1.f;
+		}
 		return;
 	}
 	const double T0 = FPlatformTime::Seconds();
@@ -305,6 +316,16 @@ FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FS
 			}
 		}
 		return FString::Printf(TEXT("fleet interiors (%s): %d ships have one; %d blows, %.2f ms in all (worst call %.2f ms)"), FleetOn() ? TEXT("on") : TEXT("off"), N, FleetBlows, FleetMs, FleetMsMax);
+	}
+	if (What == TEXT("selftest"))
+	{
+		TArray<FString> Lines;
+		const int32 Failed = AstraFleetSelfTest(Lines);
+		for (const FString& L : Lines)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[FleetTest] %s"), *L);
+		}
+		return FString::Printf(TEXT("the checks of the insides: %s"), Failed == 0 ? TEXT("PASS") : TEXT("FAIL"));
 	}
 	if (Args.Num() < (What == TEXT("snapshot") ? 1 : 2))
 	{

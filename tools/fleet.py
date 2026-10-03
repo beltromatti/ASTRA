@@ -2,6 +2,10 @@
 """FLOTTA-VIVA's bench: the insides of the other ships (Source/ASTRA/AstraFleet*.cpp, docs/FLOTTA-VIVA.md), headless, through the war bench (tools/war.py: -nullrhi,
 no window, no GPU, no AI calls: it spends nothing). Needs the editor target built for this checkout (Build.sh ASTRAEditor Mac Development -Project=... -WaitMutex).
 
+  tools/fleet.py check
+                                  the insides of every class on its plan, with no battle: the plan agrees with the class, the crew and the officers and the damage parties, a barrage and four
+                                  minutes of battle (the counts stay whole, what comes out stays in its range), every view builds, a section gutted loses its rooms and only those, the people lost
+                                  with the ship, the same seed gives the same books, what it costs. Ends with a verdict (exit 1 if one check failed)
   tools/fleet.py trace  [--class acheron] [--side mandate] [--faces bow,port,dorsal] [--damage 400] [--kind rail]
                                   a shot traced into a ship: where it entered, the rooms it crossed, who was in them, what burned and what was lost, face by face
   tools/fleet.py breaks [--class acheron] [--face bow] [--damage 150] [--blows 6] [--rounds 5] [--every 4] [--seconds 60] [--seeds 3]
@@ -45,6 +49,19 @@ def run_exec(cmds: list[str], seconds: float, seed: int, tag: str, step: float =
     out, log = WAR / f"{tag}.json", WAR / f"{tag}.log"
     war.run_once(ns, out, log)
     return out, log
+
+
+# ------------------------------------------------------------------------------------------------ the checks
+def cmd_check(a: argparse.Namespace) -> None:
+    _, log = run_exec(["astra.war.sandbox", "astra.war.fleet selftest"], 1.0, 1, "fleet_check")
+    lines = log_lines(log, "[FleetTest]")
+    if not lines:
+        print("no answer from the checks (is the editor target built for this checkout?): log", log)
+        sys.exit(1)
+    for ln in lines:
+        print("  " + ln.replace("[FleetTest] ", "").replace("LogASTRA: Display: ", ""))
+    bad = [ln for ln in lines if " FAIL " in ln or "VERDICT: FAIL" in ln]
+    sys.exit(1 if bad else 0)
 
 
 # ------------------------------------------------------------------------------------------------ a shot traced
@@ -221,6 +238,8 @@ def cmd_plans(a: argparse.Namespace) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(prog="fleet.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("check")
+    p.set_defaults(fn=cmd_check)
     p = sub.add_parser("trace")
     p.add_argument("--class", dest="cls", default="acheron")
     p.add_argument("--side", default="mandate")

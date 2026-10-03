@@ -178,6 +178,9 @@ public:
 	const FFleetClassPlan& GetPlan() const { return *Plan; }
 	const TArray<FFleetPerson>& GetPeople() const { return People; }
 	const TArray<FFleetNamed>& GetNamed() const { return Named; }
+	/** The damage-control parties, and how many of each are on their feet. */
+	int32 PartiesCount() const { return Parties.Num(); }
+	int32 PartyMembersNow(int32 Party) const { return Parties.IsValidIndex(Party) ? Parties[Party].Members.Num() : 0; }
 
 	// ---------------------------------------------------------------------------------------------------------------- what is said of it (AstraFleetViews.cpp)
 	/** Everything a ship's own captain knows of the inside, for the minds of her side: the people, the fires and breaches, the power, the parties. Keys only where there is something to say. */
@@ -239,3 +242,6 @@ private:
 	FString RoomWord(int32 Comp) const;
 	friend struct FFleetTestAccess;
 };
+
+/** The checks of the insides on every class's plan, with no battle and no world (AstraFleetTest.cpp, tools/fleet.py check): a line per check, "PASS" or "FAIL" first, and a verdict last. Returns how many failed. */
+ASTRA_API int32 AstraFleetSelfTest(TArray<FString>& Lines);

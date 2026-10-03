@@ -716,7 +716,7 @@ float UAstraBattleSubsystem::StructureDamage(FAstraBattleShip& S, int32 Sec, flo
 		}
 	}
 	// fire and venting where it hit (a ship with an inside has real fires and real holes in its rooms instead: they set these flags, FleetTick)
-	if (Taken > 0.f && !S.Interior.IsValid())
+	if (Taken > 0.f && !FleetActive(S))
 	{
 		const float Frac = Taken / FMath::Max(1.f, D.StructureMax[Sec]);
 		if (FMath::FRand() < FMath::Clamp(Frac / 0.05f, 0.f, 1.f) * P.FireK * 0.5f)
@@ -1027,7 +1027,7 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 		if (D.Burn[s] > 0.f)
 		{
 			D.Burn[s] = FMath::Max(0.f, D.Burn[s] - Dt);
-			if (!S.bPlayer && !S.bDisabled && D.Structure[s] > 0.f && !S.Interior.IsValid())     // (a ship with an inside loses its structure to the fires the model burns: FleetTick)
+			if (!S.bPlayer && !S.bDisabled && D.Structure[s] > 0.f && !FleetActive(S))     // (a ship with an inside loses its structure to the fires the model burns: FleetTick)
 			{
 				D.Structure[s] = FMath::Max(0.f, D.Structure[s] - KFire.Get() * D.StructureMax[s] * Dt);
 				if (D.Structure[s] <= 0.f)

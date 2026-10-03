@@ -47,7 +47,7 @@ e le perdite di persone sono credibili.
 | **Gli agganci con GUERRA**: nascita dell'interno, tick, cosa torna (`FleetFactor`, `FleetSys`), le statistiche, la console `astra.fleet.*` | `Source/ASTRA/AstraFleetHooks.cpp` (metodi di `UAstraBattleSubsystem`) |
 | **Le piante delle sette classi** (`acheron styx lethe praetorian vigilant freighter station`) e le sonde degli scafi da cui nascono | `data/ship/plans/<classe>.json`, `data/ship/plans/hulls/<classe>.json` (copie per il gioco impacchettato: `Content/ASTRA/Data/plans/`) |
 | **Il generatore delle piante** (Python puro; Blender serve solo per ripetere le sonde) | `art/blender/ship_hull_probe.py`, `ship_class_hull.py`, `ship_class_engine.py`, `ship_class_build.py`, `ship_class_wire.py`, `ship_class_finish.py`, `ship_class_checks.py`, `ship_class_plans.py`; le specifiche per classe in `ship_class_specs.py`, `_b.py`, `_c.py`; il disegno di una pianta: `tools/art/fleet_planview.py` |
-| **Il banco** | `tools/fleet.py` (`trace`, `breaks`, `cost`, `ab`, `plans`), sopra `tools/war.py` |
+| **Il banco** | `tools/fleet.py` (`check`, `trace`, `breaks`, `cost`, `ab`, `plans`), sopra `tools/war.py`; i controlli in C++: `Source/ASTRA/AstraFleetTest.cpp` |
 | **Le menti**: come si leggono `aboard` e `seen_aboard`, e la dottrina | `mind/astra_mind/war_minds.py` (`aboard_line`, `seen_line`, `_member_line`, `render_enemy`, `render_astra_extras`, `mandate_extras`), prove in `mind/bench/fleet_views_unit.py` |
 
 Cambiamenti in file di altri moduli (tutti **additivi**, elencati in §10): `AstraDamageMap/Model` (il caricatore per percorso, l'origine
@@ -200,6 +200,15 @@ laterale e una riga («3 FIRES · 2 BREACHES · LIFE SIGNS ~65% · 18 ROOMS DARK
 
 Senza testa (`-nullrhi`), niente finestra, niente GPU, **nessuna chiamata a modelli**: non costa nulla. Serve la compilazione dell'editor di questo checkout.
 
+### 7.0 I controlli (`tools/fleet.py check`)
+
+Per ogni classe di `data/war/classes.json` che non sia l'Aquila, senza battaglia e senza mondo (`astra.war.fleet selftest`, `AstraFleetSelfTest`): la pianta si carica e concorda con la classe (il garrison è l'equipaggio,
+ogni arma ha la sua stanza, la pianta sta nello scafo di GUERRA); si fa l'interno con la gente che dice, gli ufficiali (tutti in piedi, uno ha il comando) e le squadre (tutte con qualcuno, e ogni stanza a portata di una);
+una nave non colpita non dice nulla di sé; **60 colpi nelle stanze e quattro minuti di battaglia**: i conti restano interi (in piedi + feriti + morti + persi con la nave = l'equipaggio), ciò che esce resta nel suo campo e
+nessun numero è un non-numero, i morti e i feriti ci sono, tutte le viste si costruiscono (`aboard`, `seen_aboard`, `FillView`, `Snapshot`, `FxPoints`, i libri), le notizie sono dette una volta sola; una sezione gutted
+perde **tutte** le sue stanze e **nessuna** delle altre; la nave che salta perde tutti, una volta sola; lo stesso seme e gli stessi colpi danno gli stessi libri; e quanto costa (si fa in 0,00-0,08 ms, un tick di 0,1 s
+mentre brucia 0,004-0,04 ms). **119 controlli, 0 falliti**, finisce con un verdetto (esce con 1 se ne fallisce uno).
+
 ### 7.1 Un colpo tracciato
 
 `tools/fleet.py trace --class acheron --faces bow,port,dorsal,ventral --damage 400`: spara un colpo da 400 su ciascuna faccia di un Acheron fermo e racconta l'interno: dove entra, le stanze che
@@ -208,7 +217,7 @@ attraversa, chi c'era, cosa brucia e cosa si perde. Un esempio (dorsale):
 > dorsal (mid section) enters at deck 1 section D (Laser Battery (port)); crosses 5 room(s): deck 1 section D (Laser Battery (port)) -> deck 2 section D (Stores) -> deck 3 section D (Gymnasium) -> deck 4 section D (Stores) -> deck 5 section D (Machine Shop); 0 killed, 2 wounded, a breach, a fire, a conduit cut
 
 Dalla console, in gioco: `astra.fleet.hit <contatto> <faccia> [danno] [rail|laser|missile]` (stampa il cammino), `astra.fleet.pound` (molti colpi), `astra.fleet.strike <contatto> <stanza>` (un colpo in una stanza),
-`astra.fleet.info [contatto]`; nel banco `astra.war.fleet <...>` li mette in coda dietro ai `spawn`.
+`astra.fleet.info [contatto]`, `astra.fleet.snapshot <contatto>`; nel banco `astra.war.fleet <...>` li mette in coda dietro ai `spawn` (e `astra.war.fleet selftest` fa i controlli).
 
 ### 7.2 Una nave che si spezza dove la struttura ha ceduto
 
@@ -268,7 +277,7 @@ colpo, quindi i passi delle navi non cadono tutti nello stesso fotogramma.
 1. `git merge worktree-agent-afc317b58aa5f3fa7` (il ramo di FLOTTA-VIVA ha già `main` dentro).
 2. Ricompilare l'editor (`tools/ricompila.sh`): nuovi file `AstraFleet*.cpp/.h`, modifiche additive in altri; nessuna nuova dipendenza, nessun asset.
 3. Le piante per il gioco impacchettato sono già copiate in `Content/ASTRA/Data/plans/` (la cartella `ASTRA/Data` è già in `DirectoriesToAlwaysStageAsNonUFS`); il gioco le cerca lì per prime, poi in `data/ship/plans/`.
-4. Prova: `python3 tools/fleet.py trace`, `python3 tools/fleet.py breaks`, `python3 tools/damage.py run --scenario all` (46 su 46), `python3 tools/boarding.py run --scenario plans`, `cd mind && .venv/bin/python -m unittest bench.fleet_views_unit bench.war_minds_unit`.
+4. Prova: `python3 tools/fleet.py check` (119 controlli), `python3 tools/fleet.py trace`, `python3 tools/fleet.py breaks`, `python3 tools/damage.py run --scenario all` (46 su 46), `python3 tools/boarding.py run --scenario plans`, `cd mind && .venv/bin/python -m unittest bench.fleet_views_unit bench.war_minds_unit`.
 5. In gioco: `astra.fleet.info` elenca le navi che hanno un interno e cosa ne è; `astra.fleet.interior 0` lo spegne (GUERRA com'era).
 
 ## 10. Cambiamenti in file di altri moduli (tutti additivi)
