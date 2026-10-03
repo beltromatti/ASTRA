@@ -64,6 +64,17 @@ struct FAstraSectorSystem
 	float PopM = 0.f;           // millions of people on its main world (a city grows by the field)
 };
 
+/** A fleet of the March (CAMPAGNA) as ASTRA's high command holds it (the mind's `march` in the sector message): ours exactly, the enemy's as tracks. */
+struct FAstraMarchFleet
+{
+	FString Id, Side, Name, System, To;   // side: astra | mandate; To: the system it is bound for ("" when it stays)
+	float EtaS = -1.f;                    // seconds to its arrival (-1: not under way, or unknown)
+	int32 Ships = 0;
+	bool bKnown = true;                   // our own fleet (false: an enemy track, as old as AgeS)
+	float AgeS = 0.f;
+	FString State;                        // the March's word: moving, holding, sieging, tracked ...
+};
+
 DECLARE_MULTICAST_DELEGATE_TwoParams(FAstraShipEvent, const FString& /*Text*/, bool /*bReport: worth telling the Captain*/);
 DECLARE_MULTICAST_DELEGATE_OneParam(FAstraAlertChanged, EAstraAlert /*NewAlert*/);
 
@@ -140,6 +151,9 @@ public:
 	FString KnownSystemsLine() const;
 	/** The sector at war (from the mind): gate links for the helm, the plot for the holo table. */
 	const TArray<FAstraSectorSystem>& GetSector() const { return Sector; }
+	/** The March's fleets and battles for the holo table's sector view (empty without CAMPAGNA). */
+	const TArray<FAstraMarchFleet>& GetMarchFleets() const { return MarchFleets; }
+	const TArray<FString>& GetMarchBattles() const { return MarchBattles; }
 	const TArray<FString>& GetSectorNews() const { return SectorNews; }
 	/** The Captain is in the Mess Hall (Deck 4). */
 	bool IsCaptainInMess() const;
@@ -434,6 +448,8 @@ private:
 	bool bPlanetside = false;
 	float SpaceEV = 6.6f;
 	FString CaptainPlanetside;
+	TArray<FAstraMarchFleet> MarchFleets;
+	TArray<FString> MarchBattles;          // systems where the March has a battle the high command knows of
 	FString ChannelParty;             // the channel open now (a hail, ours or theirs, until it is closed)
 	FVector PlanetDirNow = FVector::DownVector;
 	FLinearColor PlanetFill = FLinearColor(0.42f, 0.6f, 1.f);

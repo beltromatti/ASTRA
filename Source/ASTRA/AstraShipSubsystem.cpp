@@ -2322,7 +2322,58 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 			ApplySystem(Systems.FindChecked(FindSector(SystemName)->Name));   // a resumed campaign: the sector's own look
 			LocationName = Keep;
 		}
-		OutDetail = FString::Printf(TEXT("sector charted: %d systems"), Sector.Num());
+		// the March (CAMPAGNA): the fleets and battles as our high command holds them, for the holo table's sector view
+		MarchFleets.Reset();
+		MarchBattles.Reset();
+		const TSharedPtr<FJsonObject>* March = nullptr;
+		if (Args->TryGetObjectField(TEXT("march"), March) && March && March->IsValid())
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Fleets = nullptr;
+			if ((*March)->TryGetArrayField(TEXT("fleets"), Fleets))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *Fleets)
+				{
+					const TSharedPtr<FJsonObject> O = V.IsValid() ? V->AsObject() : nullptr;
+					if (!O.IsValid())
+					{
+						continue;
+					}
+					FAstraMarchFleet F;
+					O->TryGetStringField(TEXT("id"), F.Id);
+					O->TryGetStringField(TEXT("side"), F.Side);
+					O->TryGetStringField(TEXT("name"), F.Name);
+					O->TryGetStringField(TEXT("system"), F.System);
+					O->TryGetStringField(TEXT("to"), F.To);
+					O->TryGetStringField(TEXT("state"), F.State);
+					double Eta = -1.0, N = 0.0, Age = 0.0;
+					if (O->TryGetNumberField(TEXT("eta_s"), Eta)) { F.EtaS = (float)Eta; }
+					O->TryGetNumberField(TEXT("ships"), N);
+					O->TryGetNumberField(TEXT("age_s"), Age);
+					F.Ships = (int32)N;
+					F.AgeS = (float)Age;
+					O->TryGetBoolField(TEXT("known"), F.bKnown);
+					if (!F.System.IsEmpty())
+					{
+						MarchFleets.Add(F);
+					}
+				}
+			}
+			const TArray<TSharedPtr<FJsonValue>>* Battles = nullptr;
+			if ((*March)->TryGetArrayField(TEXT("battles"), Battles))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *Battles)
+				{
+					const TSharedPtr<FJsonObject> O = V.IsValid() ? V->AsObject() : nullptr;
+					FString Sys;
+					if (O.IsValid() && O->TryGetStringField(TEXT("system"), Sys))
+					{
+						MarchBattles.AddUnique(Sys);
+					}
+				}
+			}
+		}
+		OutDetail = FString::Printf(TEXT("sector charted: %d systems%s"), Sector.Num(),
+		                            MarchFleets.Num() ? *FString::Printf(TEXT(", %d fleets of the March"), MarchFleets.Num()) : TEXT(""));
 		return true;
 	}
 	if ((Name == TEXT("intercept") || Name == TEXT("set_course")) && Battle && Battle->IsInLane())

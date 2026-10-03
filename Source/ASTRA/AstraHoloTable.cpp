@@ -382,11 +382,12 @@ void AAstraHoloTable::TickBearings(const UAstraBattleSubsystem* Battle, const FV
 
 void AAstraHoloTable::HideSector()
 {
-	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&SectorNodes, &SectorLinks, &SectorMarks})
+	for (TArray<TObjectPtr<UStaticMeshComponent>>* Pool : {&SectorNodes, &SectorLinks, &SectorMarks, &MarchMarks, &MarchCourses})
 	{
 		HideFrom(*Pool, 0);
 	}
 	HideTextFrom(SectorLabels, 0);
+	HideTextFrom(MarchLabels, 0);
 }
 
 void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, float Fade)
@@ -469,6 +470,74 @@ void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, fl
 		T->SetRelativeLocation(P + FVector(0, 0, 3.2f));
 		FaceViewer(T, ViewerLocal);
 	}
+	// the March (CAMPAGNA): our fleets as they are, the enemy's as tracks (dimmer, older), each beside its system with its course to the next one and its
+	// arrival; the battles our high command knows of, as a red ring breathing round their system
+	int32 NF = 0, NC = 0, NFL = 0;
+	TMap<FString, int32> AtSystem;               // how many markers a system has already: the next one goes round it
+	for (const FAstraMarchFleet& F : Ship->GetMarchFleets())
+	{
+		const FAstraSectorSystem* From = Sector.FindByPredicate([&F](const FAstraSectorSystem& X) { return X.Name == F.System; });
+		if (!From)
+		{
+			continue;
+		}
+		const bool bOurs = F.Side == TEXT("astra");
+		const FLinearColor Col = bOurs ? ColAstra : ColHostile;
+		const float Seen = F.bKnown ? 1.f : FMath::Clamp(1.f - F.AgeS / 1800.f, 0.35f, 0.8f);   // a track fades as it ages
+		const FAstraSectorSystem* To = F.To.IsEmpty() ? nullptr : Sector.FindByPredicate([&F](const FAstraSectorSystem& X) { return X.Name == F.To; });
+		const FVector P0 = Where(*From);
+		int32& K = AtSystem.FindOrAdd(F.System);
+		FVector P = P0 + (North * FMath::Cos(0.9f + 1.25f * K) + East * FMath::Sin(0.9f + 1.25f * K)) * 6.5f + FVector(0.f, 0.f, 2.f);
+		++K;
+		if (To && To != From && F.EtaS >= 0.f)
+		{
+			// under way: on the gate lane, a third of the way out, the course drawn on to the system it is bound for
+			const FVector P1 = Where(*To);
+			P = FMath::Lerp(P0, P1, 0.33f) + FVector(0.f, 0.f, 2.f);
+			UStaticMeshComponent* C = Pooled(MarchCourses, NC++, LineMesh);
+			C->SetRelativeLocationAndRotation(P, (P1 + FVector(0.f, 0.f, 2.f) - P).Rotation());
+			C->SetRelativeScale3D(FVector((P1 - P).Size() / 100.f, 0.22f, 0.22f));
+			SetColor(C, Col, Fade * Seen * (7.f + 5.f * Pulse));
+		}
+		UStaticMeshComponent* M = Pooled(MarchMarks, NF++, SphereMesh);
+		M->SetRelativeLocation(P);
+		const float Size = FMath::Clamp(1.4f + 0.18f * F.Ships, 1.6f, 4.0f);
+		M->SetRelativeScale3D(FVector(Size, Size, Size * 0.45f) / 100.f);
+		SetColor(M, Col, Fade * Seen * (bOurs ? 40.f : 30.f));
+		UTextRenderComponent* T = PooledText(MarchLabels, NFL++);
+		FString Line = F.bKnown ? F.Name.ToUpper() : TEXT("MANDATE FORCE");
+		Line += F.bKnown ? FString::Printf(TEXT("  ·  %d"), F.Ships) : FString::Printf(TEXT("  ·  ~%d"), F.Ships);
+		if (To && F.EtaS >= 0.f)
+		{
+			Line += FString::Printf(TEXT("<br>→ %s  %d:%02d"), *To->Name.ToUpper(), (int32)F.EtaS / 60, (int32)F.EtaS % 60);
+		}
+		else if (!F.bKnown)
+		{
+			Line += FString::Printf(TEXT("<br>SEEN %d MIN AGO"), FMath::Max(0, (int32)(F.AgeS / 60.f)));
+		}
+		HoloSetText(T, Line);
+		HoloSetColor(T, (Col * FMath::Max(0.25f, Fade * Seen)).ToFColor(true));
+		HoloSetSize(T, 3.2f);
+		T->SetRelativeLocation(P + FVector(0, 0, 2.6f));
+		FaceViewer(T, ViewerLocal);
+	}
+	for (const FString& B : Ship->GetMarchBattles())
+	{
+		const FAstraSectorSystem* S = Sector.FindByPredicate([&B](const FAstraSectorSystem& X) { return X.Name == B; });
+		if (!S)
+		{
+			continue;
+		}
+		UStaticMeshComponent* Mark = Pooled(SectorMarks, NM++, RingMesh);
+		Mark->SetRelativeLocationAndRotation(Where(*S), FRotator::ZeroRotator);
+		const float Ph = FMath::Frac(Time * 1.1f);
+		const float R = 4.f + 6.f * Ph;
+		Mark->SetRelativeScale3D(FVector(R / 100.f, R / 100.f, 1.f));
+		SetColor(Mark, ColHostile, Fade * 20.f * (1.f - Ph));
+	}
+	HideFrom(MarchMarks, NF);
+	HideFrom(MarchCourses, NC);
+	HideTextFrom(MarchLabels, NFL);
 	HideFrom(SectorLinks, NL);
 	HideFrom(SectorNodes, NN);
 	HideFrom(SectorMarks, NM);
