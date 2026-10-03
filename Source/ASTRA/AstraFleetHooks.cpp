@@ -354,6 +354,35 @@ FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FS
 		}
 		return FleetSetCaptain(Args[0], Args[1].Replace(TEXT("_"), TEXT(" ")), Args[2].Replace(TEXT("_"), TEXT(" "))) ? FString::Printf(TEXT("%s: captain %s %s"), *Args[0].ToUpper(), *Args[1], *Args[2]) : FString::Printf(TEXT("no ship %s"), *Args[0]);
 	}
+	if (What == TEXT("viewcost"))
+	{
+		// what the views the minds are given cost to build, with the insides in them (the bench's: the game builds them when its minds ask)
+		const int32 Reps = 40;
+		const double T0 = FPlatformTime::Seconds();
+		for (int32 i = 0; i < Reps; ++i)
+		{
+			(void)ContactsJson();
+		}
+		const double T1 = FPlatformTime::Seconds();
+		for (int32 i = 0; i < Reps; ++i)
+		{
+			(void)MandateViewJson();
+		}
+		const double T2 = FPlatformTime::Seconds();
+		for (int32 i = 0; i < Reps; ++i)
+		{
+			(void)SideGroupsJson(0);
+			(void)SideGroupsJson(1);
+		}
+		const double T3 = FPlatformTime::Seconds();
+		int32 With = 0;
+		for (const FAstraBattleShip& S : Ships)
+		{
+			With += S.Interior.IsValid() ? 1 : 0;
+		}
+		return FString::Printf(TEXT("views with %d insides among %d ships: the contacts %.3f ms, the Mandate's view %.3f ms, the two sides' groups %.3f ms (each built once per ask)"), With, Ships.Num(),
+		                       (T1 - T0) * 1000.0 / Reps, (T2 - T1) * 1000.0 / Reps, (T3 - T2) * 1000.0 / Reps);
+	}
 	if (What == TEXT("selftest"))
 	{
 		TArray<FString> Lines;

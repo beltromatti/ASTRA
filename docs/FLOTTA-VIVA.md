@@ -263,6 +263,9 @@ decisiva fra navi da guerra, non di una scaramuccia.
 la prima nave della classe (21-70 ms a classe, una volta): nel banco, che combatte 900 s di battaglia in 3,6 s di orologio, il primo colpo deve aspettarla (27 ms al massimo: `plan_wait_ms_max`, per avere la stessa risposta a
 ogni prova); **nel gioco non aspetta mai** (`Find` senza attesa: la nave resta senza interno finché il thread non ha finito, al colpo dopo ce l'ha).
 
+**Le viste per le menti** (il gioco le costruisce una volta al secondo, e su ogni rapporto al più ogni 0,1 s; `astra.war.fleet viewcost` le misura) con 50 interni su 60 navi da guerra e 126 contatti: i contatti 0,22 ms (senza interni 0,11), la vista
+del Mandate 0,48 ms (0,26), i gruppi dei due lati 0,41 ms (0,21): **+0,5 ms ogni volta che le chiedono**, una al secondo.
+
 Il passo di fisica degli interni (ogni 0,5 s per nave) è la spesa maggiore: la chiamata peggiore dura 0,28 ms con 60 navi. Il costo cresce con le navi **colpite**, non con quelle in campo: ogni interno parte dal suo primo
 colpo, quindi i passi delle navi non cadono tutti nello stesso fotogramma.
 
