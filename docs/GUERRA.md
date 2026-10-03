@@ -1283,7 +1283,7 @@ Le guerre durano ore (p10 4,2 h, p90 7,0 h) e nessuna resta aperta oltre le 12.
 
 ### 10.10 Il banco e i risultati (3/10; tutto senza motore, senza rete tranne dove indicato)
 
-- **Test** (`tools/march.py test`): 133 della March (46 + 29 + 42 + 13 + 1 + 2) e **460** della suite offline completa (`unittest discover -s bench -p "*_unit.py"`), tutti verdi.
+- **Test** (`tools/march.py test`): 133 della March (46 + 29 + 42 + 13 + 1 + 2) e **461** della suite offline completa (`unittest discover -s bench -p "*_unit.py"`), tutti verdi.
 - **Soak** (`bench/march_soak.py`: la colla contro un gioco finto che combatte, due menti a riflessi, l'Aquila che viaggia, 6 semi × 3 ore): **zero violazioni** (nessuna nave
   due volte o in due posti, nessuna del gioco ignota alla mappa, nessuna giocata mentre l'Aquila è in una corsia, perdite uguali nei due mondi), zero errori della colla.
 - **Il ritmo** (`bench/march_pace.py`, 6 semi × 3 ore, riflessi: il pavimento; il gioco finto con l'avvicinamento e i danni adattati alle durate del banco):
