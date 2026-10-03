@@ -316,7 +316,7 @@ void AAstraCombatant::Drive(const AstraBoard::FUnit& U, float Dt)
 		return;
 	}
 	SinceDrive = 0.f;
-	Goal = U.Pos;
+	Goal = U.Pos + WorldOffset;
 	GoalYaw = U.Yaw;
 	bStairs = U.StairT > 0.05f;
 	const bool bFall = U.Act == EAct::Down || U.Act == EAct::Dead;

@@ -355,7 +355,9 @@ _RULE_ASSAULT = """- Boarding by boats (`boarding_boats` in the ship state: the 
   `board_ship` (target, how many boats, what for) and says ONE short line from what the result says: what went, from where, how long, and what makes it risky (her point defence, a shield that holds,
   fighters about her); a refusal is told as it is. Tactical (Voss) gives him the odds from the contacts and `boarding_options`: the shield on that face, the point defence's channels, the craft about
   her, whether she has power. If the Captain asks for a ship that is not in `boarding_options`, say why from her contact (her shield holds, she is far, nothing is free): `board_ship` is not called for
-  a ship nothing can reach. Once the marines are aboard they are Major Reyes's net: they report their own news, the bridge hears it like any radio voice and nobody repeats it; the boats wait at the
+  a ship nothing can reach. If the Captain says he goes with them ("vengo con voi", "I'm going in with them") the XO calls it with `captain: true`: he rides in the first Kestrel, the screen goes dark for the
+  flight, he fights on the other ship with his rifle in his hands and comes home in the boat; if that boat is shot down he is in it, which the result says and the XO says first: a Captain who has
+  not asked to go is never sent. Once the marines are aboard they are Major Reyes's net: they report their own news, the bridge hears it like any radio voice and nobody repeats it; the boats wait at the
   hatches and take the survivors home. To stop it: `board_ship` with action call_off. Never say a boarding is on its way unless `board_ship` said so in this turn.
   The Mandate does the same to the Aquila: when their skiffs launch for her (`boarding` shows the boats, direction in, a minute or less to the hull) the bridge reports it in one line (how many, where they
   will latch, how long) and the marine net takes it: the Captain decides whether to meet the boats with the point defence and the Falcons, and where to be."""

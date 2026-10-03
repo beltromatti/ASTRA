@@ -24,6 +24,7 @@
 
 class AAstraArmoryRack;
 class AAstraBoardBreach;
+class AAstraBoardInterior;
 class AAstraCombatant;
 class APawn;
 class UAstraBattleSubsystem;
@@ -46,8 +47,8 @@ public:
 
 	/** The plan is read and the tactical map built (a few hundred milliseconds on a worker after the world begins). */
 	bool IsReady() const { return Phase != EPhase::Loading && Phase != EPhase::Failed; }
-	/** A boarding is on on the Aquila's own decks (from the alarm to the end, the cleaning up after it not counted): the Captain's fight. */
-	bool IsActive() const { return Phase == EPhase::Active && Mode == EMode::Observed; }
+	/** A boarding is on where the Captain is in it: on the Aquila's own decks, or on another ship where he went with his marines (from the alarm to the end, the cleaning up after it not counted). */
+	bool IsActive() const { return Phase == EPhase::Active && (Mode == EMode::Observed || bCaptainAboard); }
 	/** Any boarding is on: on the Aquila's decks, or on another ship (her marines aboard a hulk, a consort taken by the Mandate), where the Captain is not. */
 	bool IsFightOn() const { return Phase == EPhase::Active; }
 	const FAstraBoardSim& Sim() const { return Fight; }
@@ -94,6 +95,11 @@ public:
 	TSharedRef<FJsonObject> BoardingOptionsJson(int32 SideIdx) const;
 	/** True while an assault is flying, fighting or coming home (a new order is refused). */
 	bool IsAssaultOn() const { return Assault.bOn; }
+	/** The Captain rides in a boat (in its troop bay, flying), or is aboard the other ship, or is coming home: he is not on the Aquila's decks. */
+	bool CaptainAway() const { return Ride != ERide::None; }
+	bool CaptainAboardOther() const { return bCaptainAboard; }
+	/** The tests: a Captain with no pawn (the war bench): where his feet are, which way he faces. The ride and the fight use him as they use the pawn. */
+	void SetTestCaptain(bool bOn, const FVector& Feet = FVector::ZeroVector, float Yaw = 0.f);
 	/** The Aquila's own boats and the marines fit to go in them (ship_state.boarding_boats: the crew's tool `board_ship` exists where this does). Empty when the battle has no Aquila yet. */
 	TSharedRef<FJsonObject> BoatsJson() const;
 
@@ -142,6 +148,8 @@ public:
 
 private:
 	enum class EPhase : uint8 { Loading, Failed, Idle, Active, Over };
+	/** Where the Captain is when he goes along: Out (in his boat's troop bay, the boat flying to the other ship), Aboard (in the fight on her decks, made solid round him), Home (in the bay again, the boat flying home). */
+	enum class ERide : uint8 { None, Out, Aboard, Home };
 	/** Where the fight is: on the Aquila's own decks (bodies, the Captain, her bulkheads), or on another ship (the simulation alone: reports and casualties, the Captain not in it). */
 	enum class EMode : uint8 { Observed, Remote };
 
@@ -291,6 +299,40 @@ private:
 	FString AssaultText() const;
 	void ResetScene(EMode NewMode);
 	void EnterObserved(const FString& SourceText, int32 BreachComp, const FVector& At, bool bLockdown, float WarnS = 0.f);
+	// --- the Captain goes along (AstraBoardRide.cpp): he rides in the first Kestrel, fights on the boarded ship's own decks (made solid round him) and comes home in the boat
+	ERide Ride = ERide::None;
+	float RideT = 0.f;                               // seconds in this stage of the ride
+	int32 RideLeg = INDEX_NONE;                      // his boat
+	int32 RideStep = 0;                              // what has been done in this stage (the fade out, the teleport, the fade in)
+	bool bCaptainAboard = false;                     // he is in the fight on the other ship: the bodies, the rounds and the wounds are seen, as on the Aquila's decks
+	FVector RemoteOffset = FVector::ZeroVector;      // where the other ship's plan stands in the world while he is on it
+	float RideProbeT = 0.f;
+	float PadDwellS = 0.f;                           // how long he has stood on a stair's pad
+	bool bPadArmed = true;                           // (he must step off the pad he arrived on before it takes him again)
+	float RidePromptT = 0.f;
+	bool bTestCaptain = false;
+	FVector TestFeet = FVector::ZeroVector;
+	float TestYaw = 0.f;
+	UPROPERTY() TObjectPtr<AAstraBoardInterior> Interior;      // the other ship's decks, made solid
+	UPROPERTY() TObjectPtr<AAstraBoardInterior> Cabin;         // the troop bay of the boat
+	FVector CabinSpot = FVector::ZeroVector;                   // where he stands in it (feet)
+	bool bMoveLocked = false, bLookLocked = false;
+	void TickRide(float Dt);
+	void RideBegin(FLeg& L);
+	void RideArrive(FLeg& L);
+	void RideHome(const TCHAR* Why);
+	void RideLanded();
+	void CaptainLeftScene(const TCHAR* Why);
+	void CaptainLostInBoat(const FString& Cause);
+	void TickAboard(float Dt);
+	bool CaptainOnFoot() const;
+	APawn* CaptainPawn() const;
+	void TeleportCaptain(const FVector& FeetWorld, float Yaw, bool bFloat);
+	void FadeCaptain(bool bToBlack, float Seconds);
+	void LockCaptain(bool bMove, bool bLook);
+	void CaptainPrompt(const FString& Text, float Seconds);
+	void MakeCabin();
+	FVector WorldOffset() const { return Mode == EMode::Remote && bCaptainAboard ? RemoteOffset : FVector::ZeroVector; }
 	// --- the weapons: the places the Captain's are kept (the posts, the stock of each), their pictures while he is near, and the armourer's delivery (AstraBoardArms.cpp)
 	struct FArmsPost
 	{

@@ -508,6 +508,24 @@ bool UAstraBoardSubsystem::StartAssault(const FAssaultSpec& Spec, FString& OutDe
 		OutDetail = TEXT("the Aquila does not board herself");
 		return false;
 	}
+	if (Spec.bCaptain)
+	{
+		if (!A.bRoster)
+		{
+			OutDetail = TEXT("the Captain rides only in the Aquila's own boats, with her marines");
+			return false;
+		}
+		if (!CaptainOnFoot())
+		{
+			OutDetail = TEXT("the Captain is not on foot aboard (in a Falcon, a pod, or planetside): he cannot go with the marines");
+			return false;
+		}
+		if (Ride != ERide::None)
+		{
+			OutDetail = TEXT("the Captain is already away with the marines");
+			return false;
+		}
+	}
 	// her plan: the Aquila's is read; any other ship's is read on a worker (a second or two the first time) before the boats are sent
 	if (T.bPlayer)
 	{
@@ -716,6 +734,10 @@ bool UAstraBoardSubsystem::LaunchAssault(FString& OutDetail)
 	{
 		Warn += FString::Printf(TEXT(" %d of her craft are about her and will fire on the boats."), Ass.EnemyCraftNear);
 	}
+	if (Assault.bCaptain)
+	{
+		Warn += FString::Printf(TEXT(" The Captain goes with the marines in the first boat: if it is shot down, he is in it."));
+	}
 	const FString Face = AsFaceOfNormal(Assault.Legs[0].OutNormal);
 	if (Ass.bShieldsKnown && Ass.ShieldFrac[AstraBoardCraft::FacingOfNormal(Assault.Legs[0].OutNormal)] > AstraBoardCraft::ShieldDownFrac)
 	{
@@ -880,6 +902,10 @@ void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
 	{
 		L->State = FLeg::EState::Flying;
 		L->bSailing = true;
+		if (E.bCaptain && Assault.bCaptain)
+		{
+			RideBegin(*L);                               // the Captain is in this boat: the screen goes dark, he is in its troop bay
+		}
 		if (Assault.bObserved && !Assault.bSceneBegun)
 		{
 			BeginObservedScene();
@@ -923,14 +949,47 @@ void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
 				break;
 			}
 			LandLeg(*L);
-		}
-		break;
-	}
-	case AstraBoardCraft::EEventKind::Destroyed:
-	{
-		const bool bAboard = E.bMenAboard && !L->bLanded;
-		L->State = FLeg::EState::Lost;
-		L->bSailing = false;
+			if (E.bCaptain && Ride == ERide::Out)
+			{
+				RideArrive(*L);                          // his boat has cut in: he goes onto the other ship's decks
+			}
+			}
+			break;
+			}
+			case AstraBoardCraft::EEventKind::Destroyed:
+			{
+			const bool bAboard = E.bMenAboard && !L->bLanded;
+			L->State = FLeg::EState::Lost;
+			L->bSailing = false;
+			if (L->Index == RideLeg && Ride == ERide::Out)
+			{
+			CaptainLostInBoat(E.Cause);                  // he was in it
+			}
+			else if (L->Index == RideLeg && Ride == ERide::Aboard)
+			{
+			// his boat is gone with him on the other ship: another boat that is still there takes him off, or nothing does
+			int32 Other = INDEX_NONE;
+			for (const FLeg& O : Assault.Legs)
+			{
+				if (O.Index != L->Index && (O.State == FLeg::EState::Through || O.State == FLeg::EState::Latched))
+				{
+					Other = O.Index;
+					break;
+				}
+			}
+			if (Other != INDEX_NONE)
+			{
+				RideLeg = Other;
+			}
+			else
+			{
+				CaptainLeftScene(TEXT("his boat is gone"));
+				if (UAstraShipSubsystem* S = ShipSub())
+				{
+					S->GetInterior().CaptainDied(TEXT("stranded on a ship with no boat left to take him off"));
+				}
+			}
+			}
 		if (bAboard)
 		{
 			if (Assault.bObserved && Phase == EPhase::Active)
@@ -957,6 +1016,12 @@ void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
 	case AstraBoardCraft::EEventKind::Aborted:
 	{
 		L->State = FLeg::EState::TurnedBack;
+		if (L->Index == RideLeg && Ride == ERide::Out)
+		{
+			Ride = ERide::Home;                          // his boat turned back: he rides home in it
+			RideStep = 31;
+			RideT = 0.f;
+		}
 		if (Assault.bObserved && Phase == EPhase::Active)
 		{
 			Fight.RecallParty(L->Index);

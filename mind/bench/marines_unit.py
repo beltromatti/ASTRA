@@ -68,6 +68,12 @@ FAILED = "boarding: the boarding of Hulk has failed: every marine on her decks i
 PULLED_OUT = "boarding: the marines have broken off and are back in their boats: Hulk still holds out. marines: 5 dead, 1 wounded; her crew: 3 dead, 0 wounded, 0 got away"
 SENDING = "boarding: the Aquila is sending 2 Kestrels with 24 marines to board Hulk"
 HOME = "boarding: Kestrel 2 is back in the boat bay: 12 marines aboard"
+CAPTAIN_RIDES = "boarding: the Captain rides with the marines in Kestrel 1"
+CAPTAIN_IN = "boarding: the Captain is aboard Hulk with the marines, in deck 5 section A (Boarding Lock): going for deck 1 section B (Archon's Suite)"
+CAPTAIN_BACK = "boarding: the Captain is called back to the boat (the fight is over)"
+CAPTAIN_OFF = "boarding: the Captain is off the other ship's decks (carried out): the marines fight on without him"
+CAPTAIN_HOME = "boarding: the Captain is back aboard the Aquila: the boat bay on Deck 8"
+CAPTAIN_BOAT = "boarding: the Captain was in the boat: it was destroyed (shot down by the point defence of Hulk)"
 
 PICTURE: dict[str, Any] = {
     "elapsed_s": 74, "breach": PLACE, "breach_open": True, "objective": "deck 7 section B (Main Engineering)", "objective_id": "engineering",
@@ -189,7 +195,9 @@ class Classification(unittest.TestCase):
         for text, kind, take, wake, call in ((LAUNCHED, "docked", False, True, False), (LATCHED, "docked", False, True, False), (CUT_IN, "breach", False, True, False),
                                              (SKIFF_LOST, "boat_lost", False, True, False), (KESTREL_LOST, "boat_lost", True, True, True), (TURNED_BACK, "boat_back", False, True, False),
                                              (NOT_ONE, "outcome", True, True, True), (OURS, "outcome", True, True, True), (FAILED, "outcome", True, True, True),
-                                             (PULLED_OUT, "outcome", True, True, True), (SENDING, "assault_log", False, False, False), (HOME, "home", False, False, False)):
+                                             (PULLED_OUT, "outcome", True, True, True), (SENDING, "assault_log", False, False, False), (HOME, "home", False, False, False),
+                                             (CAPTAIN_RIDES, "assault_log", False, False, False), (CAPTAIN_IN, "captain_in", False, True, False), (CAPTAIN_BACK, "assault_log", False, False, False),
+                                             (CAPTAIN_OFF, "captain_off", False, True, False), (CAPTAIN_HOME, "assault_log", False, False, False), (CAPTAIN_BOAT, "assault_log", False, False, False)):
             k = mm.classify(text)
             self.assertIsNotNone(k, text)
             self.assertEqual((k.name, k.take, k.wake, k.call), (kind, take, wake, call), text)
@@ -253,7 +261,7 @@ class GameContract(unittest.TestCase):
 
     def test_every_event_the_game_tells_is_one_the_table_knows(self) -> None:
         texts = []
-        for name in ("AstraBoardEvents.cpp", "AstraBoardSubsystem.cpp", "AstraBoardMind.cpp", "AstraBoardAssault.cpp"):
+        for name in ("AstraBoardEvents.cpp", "AstraBoardSubsystem.cpp", "AstraBoardMind.cpp", "AstraBoardAssault.cpp", "AstraBoardRide.cpp"):
             texts += _templates(SRC / name)
         texts += re.findall(r'TEXT\("(the Mandate cut through the bulkhead[^"]*)"\)', (SRC / "AstraBoardSim.cpp").read_text(encoding="utf-8"))       # (told as `Tell(E.Text)`)
         self.assertGreaterEqual(len(texts), 14)                                  # (the regex did find them: a rename in the C++ must not make this test pass on nothing)
@@ -382,7 +390,7 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
 
     def test_the_prompt_teaches_the_assault_and_the_withdrawal(self) -> None:
         s = mm.system_prompt()
-        for needle in ("WHEN THE MARINES BOARD A SHIP", "role: attacking", "`withdraw`", "another ship's are not yours to seal", "bleeds out in about two minutes"):
+        for needle in ("WHEN THE MARINES BOARD A SHIP", "role: attacking", "`withdraw`", "another ship's are not yours to seal", "bleeds out in about two minutes", "The Captain may have come with the marines"):
             self.assertIn(needle, s)
         self.assertIn("withdraw", mm.TASKS)
         bulk = next(t for t in mm.TOOLS if t["function"]["name"] == "bulkheads")["function"]["description"]

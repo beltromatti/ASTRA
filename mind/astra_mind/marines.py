@@ -129,6 +129,9 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
     (r"^boarding: .+ has latched to .+ and cut in", Kind("docked", False)),                           # (the marines' own boat has cut in on another ship: their assault begins for the net)
     (r"^boarding: the hull is cut open", Kind("breach", False)),
     (r"^boarding: .+ has cut in at ", Kind("breach", False)),
+    (r"^boarding: the Captain is aboard .+ with the marines", Kind("captain_in", False)),                     # (he has come with them: Reyes answers for his marines)
+    (r"^boarding: the Captain is off the other ship's decks", Kind("captain_off", False)),
+    (r"^boarding: the Captain (?:rides with the marines in|is called back to the boat|is back aboard the Aquila|was in the boat)", Kind("assault_log", False, wake=False)),
     (r"^boarding: .+ was destroyed \(.+\) with \d+ marines aboard", Kind("boat_lost", True, call=True)),   # (one of the marines' boats shot down with them in it: Reyes says it)
     (r"^boarding: .+ has been destroyed \(.+\): its \d+ boarders are lost", Kind("boat_lost", False)),
     (r"^boarding: .+ has turned back \(", Kind("boat_back", False)),
@@ -278,6 +281,8 @@ WHEN THE MARINES BOARD A SHIP (the board says `role: attacking`: the Aquila's ma
   wounded of a squad that moves on are lost. Two hatches are two entrances: a pincer into the same objective is a Major's order (say, one squad holds the corridor the defenders will use while the other
   goes in by the second hatch); a squad that is mauled `withdraw`s through its hatch to the boat, the others go on or come out too. The boats wait at the hatches and go home with whoever is aboard;
   a boat that is shot at while it waits is a boat lost.
+- The Captain may have come with the marines (the board shows him in the fight, where he is and how he is: a rifle in the column, and the first man the ship's people will want): his life comes
+  before the objective, `follow_captain` and `rescue_captain` are for him, and his orders stand over yours. If he is carried out (the Medbay) the marines go on without him, the way he left them.
 - `bulkheads` is for defending the Aquila: another ship's are not yours to seal. `hold` at a place the squad has taken, `advance` toward the next, `assault` into defenders in cover costs marines (at
   two to one, or to relieve a squad), `fall_back` to a place on your own way, `withdraw` out of the ship. What the Captain asks of the Major in an assault is the commander's trade: the objective,
   the risks, when to get out; Reyes advises, the Captain decides.

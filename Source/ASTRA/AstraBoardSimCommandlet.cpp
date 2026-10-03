@@ -2,6 +2,7 @@
 
 #include "ASTRA.h"
 #include "AstraArmsRig.h"
+#include "AstraBoardInterior.h"
 #include "AstraBoardMap.h"
 #include "AstraBoardPlans.h"
 #include "AstraBoardScene.h"
@@ -1704,6 +1705,157 @@ static void BoardScenarioPlans(const FString& Only)
 	}
 }
 
+// ================================================================================================================== the inside of a boarded ship as solid geometry (F5.2: the Captain goes along)
+
+/** Every room of a class's plan made solid, and the simulation's own routes walked through it: a way a marine runs that meets a wall (a door whose gap is not where the plan puts it) is a fault of the builder. */
+static void BoardScenarioInterior(const FString& Only, const FString& DumpDir, int32 Seed)
+{
+	TArray<FName> Classes;
+	AstraBoardPlans::ClassesWithPlans(Classes);
+	if (!Only.IsEmpty())
+	{
+		Classes = {FName(*Only)};
+	}
+	for (const FName& K : Classes)
+	{
+		FString Why;
+		const TSharedPtr<FBoardShipPlan> P = AstraBoardPlans::Load(K, Why);
+		if (!P.IsValid())
+		{
+			BCheck("interior of a class", false, FString::Printf(TEXT("%s: %s"), *K.ToString(), *Why));
+			continue;
+		}
+		const FAstraBoardMap& M = *P->Map;
+		const double T0 = FPlatformTime::Seconds();
+		TArray<AstraBoardInterior::FSlab> Slabs;
+		int32 PerKind[6] = {0, 0, 0, 0, 0, 0};
+		for (int32 i = 0; i < M.GetComps().Num(); ++i)
+		{
+			AstraBoardInterior::BuildComp(M, i, Slabs);
+		}
+		for (const AstraBoardInterior::FSlab& S : Slabs)
+		{
+			++PerKind[(int32)S.Kind];
+		}
+		const double BuildMs = (FPlatformTime::Seconds() - T0) * 1000.0;
+		TSet<int32> OpenDoors;                                         // the doors the fight opens or cuts: their leaves are not walls to a route that goes through them
+		for (int32 d = 0; d < P->Dmg->Doors.Num(); ++d)
+		{
+			OpenDoors.Add(d);
+		}
+		// the ways: each portal of the plan, walked from the middle of one room through its middle to the middle of the other, at a man's knee and at his chest: a gap that is not where the
+		// plan puts its door, or too narrow for a man, or a second wall in the way, shows here (the legs end on the doorway's own face: nothing along a wall is tried)
+		int32 Ways = 0, Blocked = 0, Narrow = 0;
+		FString First;
+		for (const FBoardPortal& Po : M.GetPortals())
+		{
+			if (Po.bVertical())
+			{
+				continue;
+			}
+			++Ways;
+			Narrow += Po.Half * 2.f < 90.f ? 1 : 0;
+			const FVector Mid(Po.Pos.X, Po.Pos.Y, FMath::Max(M.GetComps()[Po.A].FloorZ(), M.GetComps()[Po.B].FloorZ()));
+			// a point a step either side of the doorway, on the line through its middle along its normal
+			const FVector2D N = Po.Normal;
+			const FVector SideA = Mid - FVector(N.X, N.Y, 0.0) * 130.0, SideB = Mid + FVector(N.X, N.Y, 0.0) * 130.0;
+			// a way through within the doorway's width: five lines side by side along it, one must be free at a man's knee and chest
+			const FVector Al(Po.Along.X, Po.Along.Y, 0.0);
+			bool bBlock = true;
+			for (int32 k = -2; k <= 2 && bBlock; ++k)
+			{
+				const FVector Shift = Al * (Po.Half * 0.9 * k / 2.0);
+				bool bThis = false;
+				for (const double Up : {40.0, 120.0})
+				{
+					bThis |= AstraBoardInterior::SegmentBlocked(Slabs, SideA + Shift + FVector(0, 0, Up), SideB + Shift + FVector(0, 0, Up), &OpenDoors);
+				}
+				bBlock = bThis;
+			}
+			if (bBlock)
+			{
+				++Blocked;
+				if (First.IsEmpty())
+				{
+					First = FString::Printf(TEXT("the way between %s and %s at (%.0f, %.0f)"), *M.Describe(Po.A), *M.Describe(Po.B), Po.Pos.X, Po.Pos.Y);
+				}
+			}
+		}
+		// and a wall is a wall: from the middle of a room to a point outside its box through a side with no portal is stopped
+		int32 Leaks = 0, Tried = 0;
+		FRandomStream Rng(Seed);
+		for (int32 n = 0; n < 400 && M.GetComps().Num() > 2; ++n)
+		{
+			const int32 Ci = Rng.RandHelper(M.GetComps().Num());
+			const FBox& B = M.GetComps()[Ci].Box;
+			if (B.GetSize().X < 200.0 || B.GetSize().Y < 200.0)
+			{
+				continue;
+			}
+			const int32 Side = Rng.RandHelper(4);
+			const double Along = Rng.FRandRange(0.15f, 0.85f);
+			const FVector C = B.GetCenter();
+			FVector Out;
+			bool bHasPortal = false;
+			for (const int32 Pi : M.GetComps()[Ci].Portals)
+			{
+				const FBoardPortal& Po = M.GetPortals()[Pi];
+				if (Po.bVertical())
+				{
+					continue;
+				}
+				const double Dx = Side < 2 ? FMath::Abs(Po.Pos.X - (Side == 0 ? B.Max.X : B.Min.X)) : 1.0e9, Dy = Side >= 2 ? FMath::Abs(Po.Pos.Y - (Side == 2 ? B.Max.Y : B.Min.Y)) : 1.0e9;
+				bHasPortal |= FMath::Min(Dx, Dy) < 120.0;
+			}
+			if (bHasPortal)
+			{
+				continue;                                            // (a side with a doorway is not solid all along)
+			}
+			const FVector A(C.X, C.Y, B.Min.Z + 90.0);
+			Out = Side < 2 ? FVector(Side == 0 ? B.Max.X + 60.0 : B.Min.X - 60.0, FMath::Lerp(B.Min.Y, B.Max.Y, Along), A.Z) : FVector(FMath::Lerp(B.Min.X, B.Max.X, Along), Side == 2 ? B.Max.Y + 60.0 : B.Min.Y - 60.0, A.Z);
+			++Tried;
+			Leaks += AstraBoardInterior::SegmentBlocked(Slabs, A, Out, &OpenDoors) ? 0 : 1;
+		}
+		BCheck("interior of a class", Blocked == 0 && Leaks == 0 && Ways > 20 && PerKind[(int32)AstraBoardInterior::ESlab::Wall] > M.GetComps().Num(),
+		       FString::Printf(TEXT("%s%s: %d rooms made solid in %.0f ms: %d solids (%d walls, %d floors and ceilings, %d frames, %d bulkhead leaves, %d strips of light); %d doorways and openings walked through: %d meet a wall (%d too narrow for a man); %d walls tried: %d leak%s%s"),
+		                       *K.ToString(), P->bStopgap ? TEXT(" (stopgap)") : TEXT(""), M.GetComps().Num(), BuildMs, Slabs.Num(), PerKind[0], PerKind[1] + PerKind[2], PerKind[3], PerKind[4], PerKind[5], Ways, Blocked, Narrow, Tried, Leaks,
+		                       First.IsEmpty() ? TEXT("") : TEXT(": "), *First));
+		if (!DumpDir.IsEmpty())
+		{
+			// the solids as numbers, for the offline view (Saved/scratch/interior_view.py): kind, centre, half sizes (cm)
+			TArray<TSharedPtr<FJsonValue>> List;
+			for (const AstraBoardInterior::FSlab& S : Slabs)
+			{
+				TArray<TSharedPtr<FJsonValue>> Row;
+				Row.Add(MakeShared<FJsonValueNumber>((int32)S.Kind));
+				for (const double V : {S.Centre.X, S.Centre.Y, S.Centre.Z, S.Half.X, S.Half.Y, S.Half.Z})
+				{
+					Row.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 10.0) / 10.0));
+				}
+				Row.Add(MakeShared<FJsonValueNumber>(S.Comp));
+				List.Add(MakeShared<FJsonValueArray>(Row));
+			}
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetStringField(TEXT("class"), K.ToString());
+			O->SetArrayField(TEXT("slabs"), List);
+			TArray<TSharedPtr<FJsonValue>> Docks;
+			for (const FBoardShipPlan::FDock& D : P->Docks)
+			{
+				TArray<TSharedPtr<FJsonValue>> Row;
+				for (const double V : {D.Pos.X, D.Pos.Y, D.Pos.Z})
+				{
+					Row.Add(MakeShared<FJsonValueNumber>(V));
+				}
+				Docks.Add(MakeShared<FJsonValueArray>(Row));
+			}
+			O->SetArrayField(TEXT("docks"), Docks);
+			const FString Path = FPaths::IsRelative(DumpDir) ? FPaths::Combine(FPaths::ProjectDir(), DumpDir) : DumpDir;
+			IFileManager::Get().MakeDirectory(*Path, true);
+			FFileHelper::SaveStringToFile(Json(O), *FPaths::Combine(Path, FString::Printf(TEXT("interior_%s.json"), *K.ToString())));
+		}
+	}
+}
+
 /** One fight on a plan, from a scene's spec: the people placed, the fight run to its end. */
 static FRunResult RunScene(const FBoardShipPlan& Plan, const FTuning& Tuning, const AstraBoardScene::FSpec& Spec, int32 Seed, AstraBoardScene::FResult* OutScene = nullptr)
 {
@@ -1825,7 +1977,7 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("-setup="), GSetup);
 	Scenario = Scenario.ToLower();
 	FRig Rig;
-	if (Scenario == TEXT("plans") || Scenario == TEXT("attack"))      // (on request only: other ships' plans, and the marines going aboard one; no plan of the Aquila needed)
+	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid; no plan of the Aquila needed)
 	{
 	FString Class;
 	FParse::Value(*Params, TEXT("-class="), Class);
@@ -1834,6 +1986,12 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	if (Scenario == TEXT("plans"))
 	{
 	BoardScenarioPlans(Class);
+	}
+	else if (Scenario == TEXT("interior"))
+	{
+	FString Dump;
+	FParse::Value(*Params, TEXT("-dump="), Dump);
+	BoardScenarioInterior(Class, Dump, Seed);
 	}
 	else
 	{
