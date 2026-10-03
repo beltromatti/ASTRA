@@ -44,10 +44,15 @@ class FightingWorld(FakeWorld):
     def __init__(self, now, rng: random.Random) -> None:
         super().__init__(now)
         self.rng = rng
+        self.scale = 45.0                              # the damage a ship of weight 1 does a second, in hull points (the pace bench fits it to the war bench's engagements)
+
+    def in_fight(self, s: dict[str, Any]) -> bool:
+        """Is this ship in the fight yet (the pace bench's stand-in: a ship that has just come through the Gate is still closing)?"""
+        return True
 
     def tick(self) -> None:
         super().tick()
-        alive = [s for s in self.ships.values() if s["state"] not in DEAD]
+        alive = [s for s in self.ships.values() if s["state"] not in DEAD and self.in_fight(s)]
         sides = {sd: [s for s in alive if s["side"] == sd] for sd in SIDES}
         if not (sides["astra"] and sides["mandate"]):
             return
@@ -57,7 +62,7 @@ class FightingWorld(FakeWorld):
             hits[foe["id"]] = hits.get(foe["id"], 0.0) + WEIGHT[s["class"]] * self.rng.uniform(0.3, 1.0)
         for cid, dmg in hits.items():
             s = self.ships[cid]
-            s["hull_pct"] = max(0.0, s["hull_pct"] - 100.0 * dmg * 45.0 / HULL[s["class"]])
+            s["hull_pct"] = max(0.0, s["hull_pct"] - 100.0 * dmg * self.scale / HULL[s["class"]])
             if s["hull_pct"] <= 0.0:
                 s["state"] = "destroyed with all hands"
             elif s["hull_pct"] < 27.0 and self.rng.random() < 0.08:
@@ -65,6 +70,8 @@ class FightingWorld(FakeWorld):
 
 
 class Soak:
+    world_class = FightingWorld                       # (the pace bench's stand-in has the approach)
+
     def __init__(self, seed: int, hours: float) -> None:
         self.seed, self.hours = seed, hours
         self.rng = random.Random(seed)
@@ -72,7 +79,7 @@ class Soak:
         self.wm.persist = False
         self.m = March(self.wm, seed=seed)
         self.clock = Clock()
-        self.world = FightingWorld(lambda: self.m.t, self.rng)
+        self.world = self.world_class(lambda: self.m.t, self.rng)
         self.errors: list[str] = []
         self.lanes = 0
         self.announced: list[str] = []
