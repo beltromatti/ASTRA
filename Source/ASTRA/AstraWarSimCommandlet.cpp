@@ -547,6 +547,7 @@ namespace
 			Stats->SetObjectField(TEXT("world_tick"), WJ);
 		}
 		Stats->SetObjectField(TEXT("draw"), B->DrawStatsJson());      // the craft and lamps staged as instances: what it costs, what it would have been as actors (docs/SCALA.md)
+		Stats->SetObjectField(TEXT("fleet"), B->FleetStatsJson());    // the insides of the other ships: how many, who was lost, what it cost (docs/FLOTTA-VIVA.md)
 		if (PlotJson.IsValid())
 		{
 			Stats->SetObjectField(TEXT("plot"), PlotJson.ToSharedRef());

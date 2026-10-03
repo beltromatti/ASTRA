@@ -14,6 +14,7 @@
 //   a derelict. What the visuals and the crew may read of it (fog of war applied) is GetDamageView / ConsumeDeathEvents.
 
 #include "AstraBattleSubsystem.h"
+#include "AstraFleetInterior.h"
 #include "AstraWarClasses.h"
 #include "AstraWarFX.h"
 #include "ASTRA.h"
@@ -163,6 +164,10 @@ void UAstraBattleSubsystem::InitShipModel(FAstraBattleShip& S)
 		return;                                   // craft, decoys, anything with no class: hull and shield stay lumps
 	}
 	S.ClassKey = Key;
+	if (Key != FName(TEXT("aquila")))
+	{
+		FAstraFleetPlans::Prefetch(Key);       // FLOTTA-VIVA: its class's plan is read on a worker now, not at the first blow
+	}
 	S.Radius = C->Radius;                      // the class's measures, not the caller's guess: the game draws the mesh at true scale
 	S.Box = C->Box;
 	S.SizeTier = (uint8)FMath::Clamp(C->Tier, 0, 3);
@@ -307,8 +312,9 @@ float UAstraBattleSubsystem::EngineFactor(const FAstraBattleShip& S) const
 	{
 		return 1.f;
 	}
-	const float E = S.Dmg.Sys[AstraWar::SysEngines];
-	return E <= 0.05f ? 0.f : 0.15f + 0.85f * E;
+	// (FLOTTA-VIVA: the drive room and its people, and the conduits that feed the drive, as the Aquila's helm feels them: 0.6 + 0.4 of the allocation, as hers)
+	const float E = S.Dmg.Sys[AstraWar::SysEngines] * FleetSys(S, AstraWar::SysEngines);
+	return E <= 0.05f ? 0.f : (0.15f + 0.85f * E) * (0.6f + 0.4f * FleetFactor(S, (int32)EAstraDmgCategory::Engines));
 }
 
 float UAstraBattleSubsystem::PowerFactorOf(const FAstraBattleShip& S) const
@@ -317,7 +323,7 @@ float UAstraBattleSubsystem::PowerFactorOf(const FAstraBattleShip& S) const
 	{
 		return 0.f;
 	}
-	return S.Dmg.bModel ? 0.15f + 0.85f * S.Dmg.Sys[AstraWar::SysReactor] : 1.f;
+	return S.Dmg.bModel ? 0.15f + 0.85f * S.Dmg.Sys[AstraWar::SysReactor] * FleetSys(S, AstraWar::SysReactor) : 1.f;
 }
 
 float UAstraBattleSubsystem::SensorFactor(const FAstraBattleShip& S) const
@@ -326,7 +332,7 @@ float UAstraBattleSubsystem::SensorFactor(const FAstraBattleShip& S) const
 	{
 		return 0.f;
 	}
-	return S.Dmg.bModel ? 0.3f + 0.7f * S.Dmg.Sys[AstraWar::SysSensors] : 1.f;
+	return S.Dmg.bModel ? (0.3f + 0.7f * S.Dmg.Sys[AstraWar::SysSensors] * FleetSys(S, AstraWar::SysSensors)) * FleetFactor(S, (int32)EAstraDmgCategory::Sensors) : 1.f;
 }
 
 float UAstraBattleSubsystem::HangarFactor(const FAstraBattleShip& S) const
@@ -339,8 +345,8 @@ float UAstraBattleSubsystem::HangarFactor(const FAstraBattleShip& S) const
 	{
 		return 1.f;
 	}
-	const float H = S.Dmg.Sys[AstraWar::SysHangar];
-	return H < 0.2f ? 0.f : H;
+	const float H = S.Dmg.Sys[AstraWar::SysHangar] * FleetSys(S, AstraWar::SysHangar);
+	return H < 0.2f ? 0.f : H * FleetFactor(S, (int32)EAstraDmgCategory::FlightDeck);
 }
 
 float UAstraBattleSubsystem::PlayerEngineFactor() const
@@ -531,6 +537,10 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 	float StructTook = 0.f;
 	if (Rem > 0.f)
 	{
+		if (!To.bPlayer)
+		{
+			FleetEnsure(To);                       // a blow that gets through the plating gives the ship its inside (FLOTTA-VIVA: the war's fires and breaches are then the inside's)
+		}
 		StructTook = StructureDamage(To, Sec, Rem, Type, N, F);
 	}
 	SyncTotals(To);
@@ -550,6 +560,24 @@ void UAstraBattleSubsystem::ApplyHitModel(FAstraBattleShip& To, const FVector& F
 	}
 	// --- what it looks like
 	const float Felt = StructTook + 0.25f * PlateTook;            // what the hull feels of it (the crew's incidents, the scars, the shudder)
+	if (!To.bPlayer && To.Interior.IsValid() && bHitBox)
+	{
+		// the same record the Aquila's inside takes (docs/DISTRUZIONE.md), into the inside of the ship that was hit (docs/FLOTTA-VIVA.md)
+		FAstraHullHit Hit;
+		Hit.HullM = HitHull;
+		Hit.Box = HitBox;
+		Hit.Dir = To.Att.UnrotateVector(FromDir.GetSafeNormal());
+		Hit.Facing = F;
+		Hit.Section = Sec;
+		Hit.Type = (uint8)Type;
+		Hit.Kind = (uint8)Kind;
+		Hit.Damage = Damage;
+		Hit.ShieldTook = ShieldTook;
+		Hit.PlateTook = PlateTook;
+		Hit.StructTook = StructTook;
+		Hit.Felt = Felt;
+		FleetOnHit(To, Hit);
+	}
 	if (FxOn())
 	{
 		FAstraFxHit H;                                              // the war's effects: the shield's ripple, the flash and sparks, the scar
@@ -687,8 +715,8 @@ float UAstraBattleSubsystem::StructureDamage(FAstraBattleShip& S, int32 Sec, flo
 			}
 		}
 	}
-	// fire and venting where it hit
-	if (Taken > 0.f)
+	// fire and venting where it hit (a ship with an inside has real fires and real holes in its rooms instead: they set these flags, FleetTick)
+	if (Taken > 0.f && !FleetActive(S))
 	{
 		const float Frac = Taken / FMath::Max(1.f, D.StructureMax[Sec]);
 		if (FMath::FRand() < FMath::Clamp(Frac / 0.05f, 0.f, 1.f) * P.FireK * 0.5f)
@@ -773,6 +801,7 @@ void UAstraBattleSubsystem::OnSectionGutted(FAstraBattleShip& S, int32 Sec)
 	D.GuttedT[Sec] = 0.f;
 	D.Burn[Sec] = 90.f;
 	D.Breach[Sec] = 90.f;
+	FleetOnGutted(S, Sec);                                          // what lived in its rooms is lost, and so are the people in them (FLOTTA-VIVA)
 	for (int32 k = 0; k < AstraWar::NumSystems; ++k)
 	{
 		if (k == AstraWar::SysPointDefence)
@@ -988,6 +1017,7 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 		}
 		SetShieldFocus(S, Threat.IsNearlyZero() ? -1 : AstraFacingOf(S.Att.UnrotateVector(Threat.GetSafeNormal())), 0.5f);
 	}
+	FleetTick(S, Dt);                          // the inside of a ship that is not the Aquila: its power, its fires and breaches, its crew (before the section flags are read below)
 	TickShields(S, Dt);
 	// fire and venting; the crews put fires out in time (the Aquila's are the incident system's, not this one's)
 	static AstraWar::FTuneVar KFire(TEXT("fire_dps"), 0.0015f);
@@ -997,7 +1027,7 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 		if (D.Burn[s] > 0.f)
 		{
 			D.Burn[s] = FMath::Max(0.f, D.Burn[s] - Dt);
-			if (!S.bPlayer && !S.bDisabled && D.Structure[s] > 0.f)
+			if (!S.bPlayer && !S.bDisabled && D.Structure[s] > 0.f && !FleetActive(S))     // (a ship with an inside loses its structure to the fires the model burns: FleetTick)
 			{
 				D.Structure[s] = FMath::Max(0.f, D.Structure[s] - KFire.Get() * D.StructureMax[s] * Dt);
 				if (D.Structure[s] <= 0.f)
@@ -1017,8 +1047,9 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 	{
 		RepairPlayerSystems(0.004f * Dt);
 	}
-	D.bReactorCritical = D.Sys[AstraWar::SysReactor] < 0.3f;
-	D.ThinkDelay = 3.f * (1.f - D.Sys[AstraWar::SysBridge]);
+	const float ReactorNow = D.Sys[AstraWar::SysReactor] * FleetSys(S, AstraWar::SysReactor);
+	D.bReactorCritical = ReactorNow < 0.3f;
+	D.ThinkDelay = 3.f * (1.f - D.Sys[AstraWar::SysBridge] * FleetSys(S, AstraWar::SysBridge));
 	if (S.bPlayer)
 	{
 		return;
@@ -1031,7 +1062,7 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 	}
 	if (!S.bDisabled)
 	{
-		if (D.Sys[AstraWar::SysReactor] <= 0.02f)
+		if (ReactorNow <= 0.02f)
 		{
 			// the reactor is gone: a breach takes the ship, or it scrams and she is left without power
 			if (FMath::FRand() < (S.Hull < 0.5f * S.HullMax ? 0.5f : 0.3f))
@@ -1073,7 +1104,7 @@ void UAstraBattleSubsystem::FireMounts(FAstraBattleShip& S, FAstraBattleShip& T,
 	const FVector Local = S.Att.UnrotateVector(T.Pos + T.Vel * Tof - S.Pos).GetSafeNormal();
 	for (FAstraMount& M : S.Mounts)
 	{
-		if (M.T > 0.f || M.Health < 0.2f || !M.CanBear(Local))
+		if (M.T > 0.f || M.Fit() < 0.2f || !M.CanBear(Local))
 		{
 			continue;
 		}
@@ -1182,11 +1213,17 @@ bool UAstraBattleSubsystem::GetDamageViewById(int32 ShipId, FDamageView& Out) co
 			V.Dir = M.Dir;
 			V.ArcDeg = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(M.ArcCos, -1.f, 1.f)));
 			V.Section = M.Section;
-			V.Health = M.Health;
-			V.bReady = M.Health >= 0.2f && M.T <= 0.f;
+			V.Health = M.Fit();
+			V.bReady = M.Fit() >= 0.2f && M.T <= 0.f;
 			Out.Mounts.Add(V);
 		}
 		Out.bReactorCritical = D.bReactorCritical;
+	}
+	if (S->Interior.IsValid())
+	{
+		// the inside as these sensors tell it (FLOTTA-VIVA): the same detail as the rest of the view
+		Out.Fleet = MakeShared<FAstraFleetView>();
+		S->Interior->FillView(*Out.Fleet, Out.Detail);
 	}
 	return true;
 }

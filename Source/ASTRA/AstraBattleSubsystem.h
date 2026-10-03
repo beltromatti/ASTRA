@@ -20,6 +20,9 @@ class UStaticMesh;
 class USoundBase;
 class UAstraWarFX;
 class UAstraWarDraw;
+class FAstraShipInterior;            // FLOTTA-VIVA: the inside of a ship that is not the Aquila (AstraFleetInterior.h)
+struct FAstraFleetView;
+struct FAstraHullHit;
 class UPrimitiveComponent;
 struct FAstraWarFXTest;
 enum class EAstraFxFlash : uint8;
@@ -146,6 +149,12 @@ struct FAstraBattleShip
 	FVector ShieldFacing = FVector::ZeroVector;   // reinforced sector in the ship's frame (zero = balanced)
 	float ShieldPower = 1.f;                       // power factor (the player's allocation and damage)
 	float WeaponPower = 1.f;
+	/** FLOTTA-VIVA (docs/FLOTTA-VIVA.md): the inside of a warship that is not the Aquila: its class's plan, its crew, the Aquila's damage model run on them. Made at the first
+	 *  blow that gets through the plating (none before it, none for the Aquila: she has her own); null when the class has no plan or the switch (astra.fleet.interior) is off.
+	 *  What it says goes back into the fields above (ShieldPower, WeaponPower) and into the engines', sensors' and hangar's factors; what burns and vents sets the war's sections' flags. */
+	TSharedPtr<FAstraShipInterior> Interior;
+	float FleetNewsT = -100.f;                     // when its interior last told the war something (the war is told at most so often)
+	FString CaptainRank, CaptainName;              // who commands her, when the minds have given her a captain (FleetSetCaptain): her inside's captain is that person
 	// --- the physical model of a warship (AstraWarDamage.cpp): its class, shield sectors, armour plates, structure by
 	// section, subsystems and weapon mounts with their fields of fire. Hull and Shield above stay the sums (what the rest of
 	// the game reads); craft and decoys have no model (Dmg.bModel false) and keep the lumps.
@@ -628,9 +637,19 @@ public:
 		FVector LastHitLocal = FVector::ZeroVector; // unit vector, ship frame, out of the ship: where the last blow struck
 		float LastHitAge = 1e9f;
 		int32 LastHitFacing = 0;
+		/** FLOTTA-VIVA: the inside as the sensors tell it, by the same detail (the holo table draws what burns and vents where, and who is left); null: it has none (the Aquila's is her own). */
+		TSharedPtr<FAstraFleetView> Fleet;
 	};
 	bool GetDamageView(const FString& ContactId, FDamageView& Out) const;
 	bool GetDamageViewById(int32 ShipId, FDamageView& Out) const;
+	/** FLOTTA-VIVA (AstraFleetHooks.cpp, docs/FLOTTA-VIVA.md): the inside of a warship that is not the Aquila (null before the first blow that gets through the plating, and for the Aquila). */
+	FAstraShipInterior* FleetInterior(int32 ShipId) const;
+	/** What the interiors cost and did (the bench's record): ships with one, blows, casualties, the time they took. */
+	TSharedRef<FJsonObject> FleetStatsJson() const;
+	/** One ship's inside in a line (the console: astra.fleet.info <contact id>). */
+	FString FleetInfo(const FString& ContactId) const;
+	/** The console's astra.fleet.<what> <args>: info [contact] | strike <contact> <room> [energy] [kinetic|energy|explosive] | hit <contact> <face> [damage] (a blow through the war's own path). */
+	FString FleetConsole(const FString& What, const TArray<FString>& Args);
 	/** Deaths since the last call (a reactor breach, a breakup with its section and axis, a ship left disabled): for the
 	 *  effects and the splitting of the mesh. */
 	void ConsumeDeathEvents(TArray<FAstraDeathEvent>& Out);
@@ -995,6 +1014,27 @@ private:
 	void TickScenarioWaves();
 
 	// --- the physical model (AstraWarDamage.cpp)
+	// --- the inside of the other ships (AstraFleetHooks.cpp, docs/FLOTTA-VIVA.md): the Aquila's damage model on the plan of their class
+	bool FleetOn() const;
+	/** The ship has an inside and the insides are on: what the war leaves to it (the fires, the venting, the people) and what it asks of it. */
+	bool FleetActive(const FAstraBattleShip& S) const { return S.Interior.IsValid() && FleetOn(); }
+	FAstraShipInterior* FleetEnsure(FAstraBattleShip& S);
+	void FleetOnHit(FAstraBattleShip& To, const FAstraHullHit& Hit);
+	void FleetOnGutted(FAstraBattleShip& S, int32 Section);
+	/** The captain of a ship, by the name and the rank the minds know them by: her inside's captain is that person (so "the captain is dead" is about the same person who speaks for her). */
+	bool FleetSetCaptain(const FString& ContactId, const FString& Rank, const FString& Name);
+	/** The inside of a ship as it stands (for a boarding: ABBORDAGGI): false when she has none (never hit through her plating, or her class has no plan). */
+	bool FleetSnapshot(int32 ShipId, struct FFleetSnapshot& Out) const;
+	/** The ship is destroyed: the people aboard are lost with her. */
+	void FleetOnDestroyed(FAstraBattleShip& S);
+	void FleetTick(FAstraBattleShip& S, float Dt);
+	/** What a side's mind (or an observer's sensors) may read of a ship's inside, added to its entry in a view: bOwn the ship's own side (everything), else by Detail (1 the eye, 2 a classified track). */
+	void FleetBriefInto(const FAstraBattleShip& S, const TSharedRef<FJsonObject>& Into, bool bOwn, int32 Detail) const;
+	float FleetFactor(const FAstraBattleShip& S, int32 Category) const;
+	/** How much of a war system (AstraWar::ESystem) the ship's inside still gives it: its room, its power, its people (1 when it has no inside). */
+	float FleetSys(const FAstraBattleShip& S, int32 WarSystem) const;
+	mutable double FleetMs = 0.0, FleetMsMax = 0.0, FleetMakeMsMax = 0.0, FleetWaitMsMax = 0.0;
+	mutable int32 FleetBlows = 0, FleetTicks = 0, FleetMade = 0;
 	void InitShipModel(FAstraBattleShip& S);
 	/** (Re)build a ship's sections, plates and shield sectors for a hull and a shield total (full health). */
 	void BuildDurability(FAstraBattleShip& S, float Hull, float Shield);

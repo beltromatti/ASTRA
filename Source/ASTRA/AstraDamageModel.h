@@ -229,6 +229,9 @@ public:
 	/** The ids the incidents take (the ship's other incidents, a radiator wing, use the same counter). */
 	int32 NewIncidentId() { return NextIncident++; }
 	int32 MaxIncidents = 28;
+	/** The physics' step (s): 0.2 for the Aquila; the inside of another ship runs a coarser one (FLOTTA-VIVA: a lower resolution at a fraction of the cost: the air, the
+	 *  fields and the people are exponential or per second, the fire's growth is stable well past this). */
+	void SetStep(float Seconds) { StepS = FMath::Clamp(Seconds, 0.1f, 1.0f); }
 
 	/** The way a person leaves: the nearest way out of a compartment from a point (metres), 0 when there is none. */
 	float ExitDistanceM(int32 Comp, const FVector& PosCm) const;
@@ -254,6 +257,7 @@ private:
 	int32 NextIncident = 1;
 	int32 AlertNow = 0;
 	mutable TArray<int32> HeatRooms;
+	float StepS = 0.2f;
 	float Acc = 0.f, PeopleT = 0.f, SyncT = 0.f, SystemsT = 0.f, Clock = 0.f;
 	bool bDoorsChanged = false;
 	bool bImpactOccupied = false;

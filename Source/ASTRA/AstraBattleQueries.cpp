@@ -2,6 +2,7 @@
 // of war applied (a bearing-only contact has no range, no speed, no damage state).
 
 #include "AstraBattleSubsystem.h"
+#include "AstraFleetInterior.h"
 #include "AstraWarClasses.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -204,6 +205,10 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 		J->SetBoolField(TEXT("craft"), S.bCraft);
 		J->SetBoolField(TEXT("alive"), S.bAlive);
 		J->SetStringField(TEXT("fate"), S.bAlive ? (S.bDisabled ? TEXT("disabled") : TEXT("alive")) : ((S.Mode == EAstraShipMode::Dead && !(S.bPlayer && bSandbox)) ? TEXT("destroyed") : TEXT("gone")));   // gone: left the theatre, or a craft that landed
+		if (S.Interior.IsValid())
+		{
+			J->SetObjectField(TEXT("interior"), S.Interior->BooksJson());       // FLOTTA-VIVA: its inside's books, a dead ship's too (who was lost with her)
+		}
 		if (!S.bAlive)
 		{
 			Arr.Add(MakeShared<FJsonValueObject>(J));

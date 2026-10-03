@@ -114,7 +114,9 @@ struct FAstraMount
 	float Cd = 1.f;                     // multiplier on the ship's cooldown for this weapon (1: the ship's own cadence)
 	float T = 0.f;                      // cooldown left
 	float Health = 1.f;                 // 0 = destroyed (below 0.2 it will not fire)
-	bool CanBear(const FVector& LocalAim) const { return Health >= 0.2f && FVector::DotProduct(Dir, LocalAim) >= ArcCos; }
+	float Feed = 1.f;                   // FLOTTA-VIVA: what the room that serves it (its barbette, its magazine) still gives it: power and fabric (1 as built); Health * Feed is what counts
+	float Fit() const { return Health * Feed; }
+	bool CanBear(const FVector& LocalAim) const { return Fit() >= 0.2f && FVector::DotProduct(Dir, LocalAim) >= ArcCos; }
 };
 
 /** What a warship is made of, as damage sees it. Craft and decoys have none (bModel false): hull and shield lumps. */

@@ -1,6 +1,7 @@
 // ASTRA — battle simulation.
 
 #include "AstraBattleSubsystem.h"
+#include "AstraFleetInterior.h"
 #include "AstraHullName.h"
 #include "AstraWarFX.h"
 #include "AstraWarDraw.h"
@@ -2825,6 +2826,7 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 	S.bAlive = false;
 	S.Mode = EAstraShipMode::Dead;
 	S.DeathHow = How;
+	FleetOnDestroyed(S);                                                      // (FLOTTA-VIVA: the people aboard are lost with her)
 	if (!S.bCraft && !S.bGhost && !S.bPlayer && !S.bDisabled)                 // (a hulk shot to pieces was reported when it went dark)
 	{
 		NoteGroupLoss(S, How == EAstraFate::ReactorBreach ? TEXT("the reactor went") : (How == EAstraFate::Breakup ? TEXT("the hull broke apart") : TEXT("destroyed")));
@@ -3435,6 +3437,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 				O->SetNumberField(TEXT("hull_pct"), Pct(S.Hull, S.HullMax));
 				O->SetNumberField(TEXT("shields_pct"), Pct(S.Shield, S.ShieldMax));
 				O->SetNumberField(TEXT("missiles_left"), S.Missiles);
+				FleetBriefInto(S, O, true, 3);                         // FLOTTA-VIVA: its own captain's picture of the inside
 				O->SetNumberField(TEXT("range_to_aquila_km"), FMath::RoundToDouble(FVector::Dist(S.Pos, Aquila) / 100.0) / 10.0);
 				if (const FAstraBattleShip* T = FindById(S.TargetId); T && T->bAlive && !S.bFleeing)
 				{
@@ -3493,6 +3496,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::MandateViewJson() const
 			{
 				O->SetNumberField(TEXT("range_from_your_flagship_km"), FMath::RoundToDouble(FVector::Dist(S.Pos, Flag->Pos) / 100.0) / 10.0);
 			}
+			FleetBriefInto(S, O, false, 2);                         // FLOTTA-VIVA: what its sensors and its eye make of her inside
 			Foe.Add(MakeShared<FJsonValueObject>(O));
 		}
 	}
@@ -3633,6 +3637,7 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 			O->SetNumberField(TEXT("speed_mps"), FMath::RoundToDouble(S.Vel.Size()));
 			O->SetNumberField(TEXT("shields_pct"), Pct(S.Shield, S.ShieldMax));
 			O->SetNumberField(TEXT("hull_pct"), Pct(S.Hull, S.HullMax));
+			FleetBriefInto(S, O, S.Side == EAstraSide::Astra, (S.bFog ? S.bClassified : S.bIdentified) ? 2 : 1);   // FLOTTA-VIVA: our own by the datalink, the rest as the sensors see them
 		}
 		Out.Add(MakeShared<FJsonValueObject>(O));
 	}
