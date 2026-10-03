@@ -341,7 +341,7 @@ void FAstraFleetPlans::Prefetch(FName ClassKey)
 	GFleetPending.Add(ClassKey, Async(EAsyncExecution::ThreadPool, [ClassKey]() { return FleetLoadClass(ClassKey); }).Share());
 }
 
-TSharedPtr<const FFleetClassPlan> FAstraFleetPlans::Find(FName ClassKey)
+TSharedPtr<const FFleetClassPlan> FAstraFleetPlans::Find(FName ClassKey, bool bWait)
 {
 	if (ClassKey.IsNone())
 	{
@@ -362,7 +362,16 @@ TSharedPtr<const FFleetClassPlan> FAstraFleetPlans::Find(FName ClassKey)
 	TSharedPtr<const FFleetClassPlan> Got;
 	if (Wait.IsValid())
 	{
-		Got = Wait.Get();                                            // (the worker started it: a few milliseconds more)
+		if (!bWait && !Wait.IsReady())
+		{
+			return nullptr;                                          // (the worker has not finished: not now, at the next blow)
+		}
+		Got = Wait.Get();
+	}
+	else if (!bWait)
+	{
+		Prefetch(ClassKey);
+		return nullptr;
 	}
 	else
 	{

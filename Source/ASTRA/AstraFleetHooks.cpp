@@ -97,12 +97,20 @@ FAstraShipInterior* UAstraBattleSubsystem::FleetEnsure(FAstraBattleShip& S)
 	{
 		return nullptr;
 	}
-	TSharedPtr<const FFleetClassPlan> Plan = FAstraFleetPlans::Find(S.ClassKey);
+	const double T0 = FPlatformTime::Seconds();
+	// (the plan was read on a worker when the first ship of the class was born: in play it is long ready, and a blow never waits for it; a bench, which fights a battle in a second and must
+	// give the same answer every time, waits)
+	TSharedPtr<const FFleetClassPlan> Plan = FAstraFleetPlans::Find(S.ClassKey, GAstraDeterministic);
 	if (!Plan.IsValid())
 	{
 		return nullptr;
 	}
+	const double T1 = FPlatformTime::Seconds();
 	S.Interior = MakeShared<FAstraShipInterior>(Plan.ToSharedRef(), S.Id, S.Name, 7001 + S.Id * 7919 + (GAstraDeterministic ? 0 : (int32)(FPlatformTime::Cycles64() & 0xffff)));
+	const double T2 = FPlatformTime::Seconds();
+	++FleetMade;
+	FleetWaitMsMax = FMath::Max(FleetWaitMsMax, (T1 - T0) * 1000.0);
+	FleetMakeMsMax = FMath::Max(FleetMakeMsMax, (T2 - T1) * 1000.0);
 	return S.Interior.Get();
 }
 
@@ -259,6 +267,9 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::FleetStatsJson() const
 	J->SetNumberField(TEXT("wounded_mandate"), Wounded[1]);
 	J->SetNumberField(TEXT("crew_astra"), Crew[0]);
 	J->SetNumberField(TEXT("crew_mandate"), Crew[1]);
+	J->SetNumberField(TEXT("made"), FleetMade);                                                               // the insides built (one at the first blow through a ship's plating)
+	J->SetNumberField(TEXT("make_ms_max"), FMath::RoundToDouble(FleetMakeMsMax * 1000.0) / 1000.0);         // the dearest one: the crew, the model
+	J->SetNumberField(TEXT("plan_wait_ms_max"), FMath::RoundToDouble(FleetWaitMsMax * 1000.0) / 1000.0);    // the wait for a class's plan (a worker reads it when the first ship of the class is born: in real time it is long ready)
 	J->SetNumberField(TEXT("blows"), FleetBlows);
 	J->SetNumberField(TEXT("ticks"), FleetTicks);
 	J->SetNumberField(TEXT("ms_total"), FMath::RoundToDouble(FleetMs * 1000.0) / 1000.0);

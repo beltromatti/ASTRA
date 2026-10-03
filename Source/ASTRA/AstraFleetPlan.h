@@ -77,8 +77,9 @@ struct FFleetClassPlan
 class ASTRA_API FAstraFleetPlans
 {
 public:
-	/** The plan of a class (the key of data/war/classes.json); null when it has none. Loads it on first use (a worker may have started it: Prefetch). */
-	static TSharedPtr<const FFleetClassPlan> Find(FName ClassKey);
+	/** The plan of a class (the key of data/war/classes.json); null when it has none. With bWait it loads it on first use, or waits for the worker that started it (Prefetch); without, it never makes the
+	 *  caller wait: it returns null while the worker is still reading (and starts one if none is), and the caller asks again at the next blow. */
+	static TSharedPtr<const FFleetClassPlan> Find(FName ClassKey, bool bWait = true);
 	/** Starts loading a class's plan on a worker: a ship of the class is about to be hit. */
 	static void Prefetch(FName ClassKey);
 	/** Where a class's plan is read from (Content/ASTRA/Data/plans first: packaged as a loose file; then the repository's), "" when neither exists. */

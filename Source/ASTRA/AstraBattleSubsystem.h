@@ -1030,8 +1030,8 @@ private:
 	float FleetFactor(const FAstraBattleShip& S, int32 Category) const;
 	/** How much of a war system (AstraWar::ESystem) the ship's inside still gives it: its room, its power, its people (1 when it has no inside). */
 	float FleetSys(const FAstraBattleShip& S, int32 WarSystem) const;
-	mutable double FleetMs = 0.0, FleetMsMax = 0.0;
-	mutable int32 FleetBlows = 0, FleetTicks = 0;
+	mutable double FleetMs = 0.0, FleetMsMax = 0.0, FleetMakeMsMax = 0.0, FleetWaitMsMax = 0.0;
+	mutable int32 FleetBlows = 0, FleetTicks = 0, FleetMade = 0;
 	void InitShipModel(FAstraBattleShip& S);
 	/** (Re)build a ship's sections, plates and shield sectors for a hull and a shield total (full health). */
 	void BuildDurability(FAstraBattleShip& S, float Hull, float Shield);
