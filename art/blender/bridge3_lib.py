@@ -43,8 +43,10 @@ LAMP = "MI_BRG3_Lamps"              # emissive palette lamps (normal)
 LAMP_DIM = "MI_BRG3_LampsDim"       # ... dim (floor channels, rails)
 LAMP_HOT = "MI_BRG3_LampsHot"       # ... bright (cove strips, big light bars)
 LABEL = "MI_BRG3_Labels"            # backlit label atlas
+BRASS = "MI_BRG3_Brass"             # brushed brass: the warm accent line of the command deck (console rims, floor inlays, rails)  [ARTE-PLANCIA-2]
+DECOR = "MI_BRG3_Decor"             # static display pages and soft glows (T_BRG3_Decor, tools/art/bridge3_decor.py)               [ARTE-PLANCIA-2]
 
-SHARED_SLOTS = [STRUCT, TRIM, RUBBER, LEATHER, GLASS, COMPOSITE, IVORY, DECK, DGLASS, LAMP, LAMP_DIM, LAMP_HOT, LABEL]
+SHARED_SLOTS = [STRUCT, TRIM, RUBBER, LEATHER, GLASS, COMPOSITE, IVORY, DECK, DGLASS, LAMP, LAMP_DIM, LAMP_HOT, LABEL, BRASS, DECOR]
 
 # palette cells of T_BRG3_Lamps (8 x 8 cells of 8 x 8 px; image rows count from the top): name -> (col, row, sRGB, alert weight)
 PALETTE = [
@@ -426,6 +428,100 @@ class FB:
         u0, v0, u1, v1 = r
         return self.screen(center, w, h, LABEL, facing, up=up, u_range=(u0, u1), v_range=(v0, v1))
 
+    def decor(self, center, w: float, h: float, facing, page: str, up=(0, 0, 1)):
+        """A quad showing one tile of the decor atlas (a static display page or a soft glow), w x h centred at `center`, front towards
+        `facing`. The UV rect is pulled in by a texel so a neighbour's pixels never bleed in."""
+        r = DECOR_RECTS.get(page)
+        if r is None:
+            raise KeyError(f"decor tile {page!r} is not in the atlas (tools/art/bridge3_decor.py)")
+        u0, v0, u1, v1 = r
+        du, dv = 0.75 / DECOR_SIZE[0], 0.75 / DECOR_SIZE[1]
+        return self.screen(center, w, h, DECOR, facing, up=up, u_range=(u0 + du, u1 - du), v_range=(v0 + dv, v1 - dv))
+
+    def decor_polar(self, F, page: str, r0: float, r1: float, a0: float, a1: float, lift: float = 0.0012, seg: int = 26, tile_a: float = 58.0,
+                    tile_r=(0.50, 1.08)):
+        """The silkscreen of a fan console's glass top: the polar tile `page` (tools/art/bridge3_decor.Polar: u = the angle from -tile_a to +tile_a,
+        v = the radius from tile_r[0] to tile_r[1]) laid on the cone of the fan F between the radii r0..r1 and the angles a0..a1, `lift` m above it."""
+        R = DECOR_RECTS[page]
+        du0, dv0 = 0.75 / DECOR_SIZE[0], 0.75 / DECOR_SIZE[1]
+        ua, ub, va, vb = R[0] + du0, R[2] - du0, R[1] + dv0, R[3] - dv0
+
+        def uv(th, r):
+            return (ua + (th + tile_a) / (2 * tile_a) * (ub - ua), va + (r - tile_r[0]) / (tile_r[1] - tile_r[0]) * (vb - va))
+
+        faces = []
+        front = self.N((0, 0, 1))
+        for k in range(seg):
+            t0, t1 = lerp(a0, a1, k / seg), lerp(a0, a1, (k + 1) / seg)
+            pts = [self.P(F.pos(r0, t0, lift)), self.P(F.pos(r0, t1, lift)), self.P(F.pos(r1, t1, lift)), self.P(F.pos(r1, t0, lift))]
+            faces.append(self._quad_b(pts, DECOR, front, [uv(t0, r0), uv(t1, r0), uv(t1, r1), uv(t0, r1)]))
+        return faces
+
+    def decor_strip(self, A, B, a0: float, a1: float, page: str, seg: int = 20, up_hint=(0, 0, 1), lift_out: float = 0.0):
+        """A decor tile on a band that follows an arc: A and B are polar anchors (r, z) of the band's bottom and top edge, the band runs from the
+        angle a0 to a1 (about the local vertical axis), its normal pointing at the axis side (towards the officer). The tile is stretched over the
+        whole band, u left -> right as the officer sees it."""
+        R = DECOR_RECTS[page]
+        du, dv = 0.75 / DECOR_SIZE[0], 0.75 / DECOR_SIZE[1]
+        ua, ub, va, vb = R[0] + du, R[2] - du, R[1] + dv, R[3] - dv
+        faces = []
+        for k in range(seg):
+            t0, t1 = lerp(a0, a1, k / seg), lerp(a0, a1, (k + 1) / seg)
+            c0, s0, c1, s1 = math.cos(math.radians(t0)), math.sin(math.radians(t0)), math.cos(math.radians(t1)), math.sin(math.radians(t1))
+            ra, za, rb, zb = A[0] - lift_out, A[1], B[0] - lift_out, B[1]
+            pts = [self.P((ra * c0, ra * s0, za)), self.P((ra * c1, ra * s1, za)), self.P((rb * c1, rb * s1, zb)), self.P((rb * c0, rb * s0, zb))]
+            dr, dz = rb - ra, zb - za
+            n_local = (-dz * math.cos(math.radians((t0 + t1) / 2)), -dz * math.sin(math.radians((t0 + t1) / 2)), dr)
+            if n_local[0] * math.cos(math.radians((t0 + t1) / 2)) + n_local[1] * math.sin(math.radians((t0 + t1) / 2)) > 0:
+                n_local = (-n_local[0], -n_local[1], -n_local[2])           # the face looks at the axis (the officer), whichever way A -> B runs
+            faces.append(self._quad_b(pts, DECOR, self.N(n_local), [(ua + (ub - ua) * k / seg, va), (ua + (ub - ua) * (k + 1) / seg, va),
+                                                                      (ua + (ub - ua) * (k + 1) / seg, vb), (ua + (ub - ua) * k / seg, vb)]))
+        return faces
+
+    def decor_fit(self, center, w: float, facing, page: str, up=(0, 0, 1)):
+        """A decor tile of width w with its own aspect ratio (height = w / aspect)."""
+        return self.decor(center, w, w / DECOR_ASPECT[page], facing, page, up=up)
+
+    def text(self, text: str, center, height: float, facing, mat: str, up=(0, 0, 1), cell: str | None = None, tracking: float = 0.0,
+             lift: float = 0.0, align: str = "center"):
+        """Lettering as crisp flat geometry (Barlow Condensed turned into a mesh by Blender's own text object, cached per string): `height`
+        is the cap height in metres, `center` the middle of the text (local frame), the letters face `facing` and read left to right as the
+        viewer sees them (`up` is their up direction). With `cell` the faces are painted as a lamp (palette cell). Returns the width."""
+        proto = text_proto(text)
+        sc = height / proto["cap"]
+        w = proto["width"] * sc + tracking * max(0, len(text) - 1)
+        f, r, u = self._basis_b(facing, up)
+        c = self.P(center) + f * lift
+        if align == "left":
+            c = c + r * (w / 2)
+        elif align == "right":
+            c = c - r * (w / 2)
+        idx = self.mi(mat)
+        faces = []
+        # glyph positions: the proto is one string; tracking spreads the letters by shifting each vertex proportionally to its x
+        x0, x1 = proto["x0"], proto["x1"]
+        span = max(1e-6, x1 - x0)
+        verts = []
+        for (vx, vy, _vz) in proto["V"]:
+            spread = tracking * (vx - x0) / span * max(0, len(text) - 1) if tracking else 0.0
+            px = (vx - (x0 + x1) / 2) * sc + spread - (tracking * max(0, len(text) - 1)) / 2
+            py = vy * sc
+            verts.append(self.bm.verts.new(c + r * px + u * py))
+        for a, b, d in proto["F"]:
+            tri = [verts[a], verts[b], verts[d]]
+            n = (tri[1].co - tri[0].co).cross(tri[2].co - tri[0].co)
+            if n.dot(f) < 0:
+                tri = [tri[0], tri[2], tri[1]]
+            try:
+                fc = self.bm.faces.new(tri)
+            except ValueError:
+                continue
+            fc.material_index = idx
+            faces.append(fc)
+        if cell:
+            self._paint(faces, cell_uv(cell))
+        return w
+
     # -- output --------------------------------------------------------------------------------------------------------
     def to_object(self, name: str) -> bpy.types.Object:
         mesh = bpy.data.meshes.new(name)
@@ -460,6 +556,66 @@ def load_label_atlas() -> dict:
     return LABELS
 
 
+FONT_CANDIDATES = [os.path.join(ROOT, "art", "_downloads", "fonts", "BarlowCondensed-SemiBold.ttf"),
+                   "/Users/beltromatti/Desktop/ASTRA/art/_downloads/fonts/BarlowCondensed-SemiBold.ttf"]
+_TEXT_CACHE: dict = {}
+
+
+def text_proto(text: str) -> dict:
+    """The mesh of a string in Barlow Condensed SemiBold (cap height ~0.7 of the font size; flat, one side): vertices (x right, y up, z 0),
+    triangles, the width of the string in 'font size' units and the cap height of the font. Cached."""
+    if text in _TEXT_CACHE:
+        return _TEXT_CACHE[text]
+    fc = bpy.data.curves.new("b3_txt", "FONT")
+    fc.body = text
+    for pth in FONT_CANDIDATES:
+        if os.path.exists(pth):
+            fc.font = bpy.data.fonts.load(pth)
+            break
+    fc.size = 1.0
+    fc.extrude = 0.0
+    fc.resolution_u = 3
+    fc.align_x = "CENTER"
+    fc.align_y = "CENTER"
+    ob = bpy.data.objects.new("b3_txt", fc)
+    bpy.context.scene.collection.objects.link(ob)
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg))
+    me.calc_loop_triangles()
+    V = [(v.co.x, v.co.y, v.co.z) for v in me.vertices]
+    F = [tuple(t.vertices) for t in me.loop_triangles]
+    bpy.data.objects.remove(ob, do_unlink=True)
+    bpy.data.curves.remove(fc)
+    bpy.data.meshes.remove(me)
+    if not V:
+        raise RuntimeError(f"text {text!r} produced no geometry")
+    xs = [v[0] for v in V]
+    ys = [v[1] for v in V]
+    proto = {"V": V, "F": F, "width": max(xs) - min(xs), "height": max(ys) - min(ys), "cap": 0.70, "x0": min(xs), "x1": max(xs)}
+    _TEXT_CACHE[text] = proto
+    return proto
+
+
+DECOR_RECTS: dict[str, tuple[float, float, float, float]] = {}
+DECOR_ASPECT: dict[str, float] = {}
+DECOR_SIZE = [2048.0, 4096.0]
+
+
+def load_decor_atlas() -> dict:
+    """Decor tile rects (u0, v0, u1, v1) from art/_cache/bridge3/decor.json (tools/art/bridge3_decor.py)."""
+    path = os.path.join(CACHE, "decor.json")
+    DECOR_RECTS.clear()
+    DECOR_ASPECT.clear()
+    if not os.path.exists(path):
+        raise RuntimeError(f"{path} missing: run  uv run --with pillow --with numpy python tools/art/bridge3_textures.py --atlas-only")
+    data = json.load(open(path, encoding="utf-8"))
+    for k, v in data["rects"].items():
+        DECOR_RECTS[k] = tuple(v)
+    DECOR_ASPECT.update(data["aspect"])
+    DECOR_SIZE[:] = [float(v) for v in data["size"]]
+    return DECOR_RECTS
+
+
 # ------------------------------------------------------------------------------------------------------ finishing helpers
 class Parts:
     """A mesh made of several finishing groups (hard-surface body, fine detail, emissive/screens, soft parts).
@@ -474,6 +630,7 @@ class Parts:
         self.bevel = bevel
         self.fine_bevel = fine_bevel
         self.soft_bevel = 0.0
+        self.bevel_segments = 2
 
     @contextmanager
     def at(self, m: Matrix):
@@ -481,19 +638,23 @@ class Parts:
         with self.body.at(m), self.fine.at(m), self.soft.at(m), self.emit.at(m):
             yield self
 
-    def build(self, name: str, uv_meter: float = 1.0) -> bpy.types.Object:
-        """Bevel and shade each group, box-project the UVs (1 UV unit = `uv_meter` metres: 1.0 walls, 0.5 consoles, 0.25 seats),
-        join. Faces with their own UVs (lamps, labels, screens) are left alone."""
+    def build(self, name: str, uv_meter: float = 1.0, small_uv_meter: float | None = None) -> bpy.types.Object:
+        """Bevel and shade each group, box-project the UVs (1 UV unit = `uv_meter` metres: 1.0 walls, 0.5 consoles, 0.25 seats; the `fine` and `soft`
+        groups, the small hardware, use `small_uv_meter` when it is given: the materials' grain is then finer on small parts), join. Faces with their own UVs
+        (lamps, labels, screens) are left alone."""
         objs = []
         for tag, fb, bev in (("body", self.body, self.bevel), ("fine", self.fine, self.fine_bevel), ("soft", self.soft, self.soft_bevel),
                              ("emit", self.emit, 0.0)):
             if len(fb.bm.faces) == 0:
                 fb.bm.free()
                 continue
+            n_faces = len(fb.bm.faces)
             o = fb.to_object(f"{name}_{tag}")
             if bev > 0:
-                A.bevel_and_normals(o, width=bev, angle_deg=self.angle)
-            A.box_uv(o, texel_m=uv_meter)
+                A.bevel_and_normals(o, width=bev, segments=self.bevel_segments, angle_deg=self.angle)
+            if os.environ.get("BRG3_DEBUG_TRIS"):
+                print(f"    [{name}_{tag}] {n_faces} faces authored -> {tri_count(o)} tris after finishing")
+            A.box_uv(o, texel_m=small_uv_meter if (small_uv_meter and tag in ("fine", "soft")) else uv_meter)
             if tag == "soft":                                      # cushions and other organic parts: smooth shading
                 bpy.ops.object.select_all(action="DESELECT")
                 o.select_set(True)

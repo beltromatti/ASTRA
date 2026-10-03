@@ -1806,6 +1806,24 @@ FString UAstraShipSubsystem::CaptainAboard() const
 	return TEXT("on the bridge");
 }
 
+FString UAstraShipSubsystem::CaptainLocatorText() const
+{
+	if (!CaptainPlanetside.IsEmpty())
+	{
+		return FString::Printf(TEXT("the Captain's badge: planetside (%s), on the surface link"), *CaptainPlanetside);
+	}
+	const APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (P && !P->IsA<ACharacter>())
+	{
+		const UAstraBattleSubsystem* B = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+		const FString Fly = B ? B->PilotSummary() : FString();
+		return FString::Printf(TEXT("the Captain's badge: in the cockpit of a Falcon (Eagle), off the ship's internal net%s. The beam does not lock through a "
+		                            "cockpit in flight: the deck's recovery guidance brings her aboard (Flight Control, eagle_recover), then he is on the flight deck"),
+		                       Fly.IsEmpty() ? TEXT("") : *(TEXT(": ") + Fly));
+	}
+	return FString::Printf(TEXT("the Captain's badge: %s, on foot, on the ship's internal net"), *CaptainPlace());
+}
+
 FString UAstraShipSubsystem::CaptainPlace() const
 {
 	if (!CaptainPlanetside.IsEmpty())
@@ -2112,8 +2130,36 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		                                : FString(TEXT("holo table: tactical plot"));
 		return true;
 	}
+	if (Name == TEXT("eagle_recover"))
+	{
+		// the deck's recovery guidance takes the Captain's Falcon (an automatic carrier landing): Flight Control on the bridge or the flight net calls it
+		UAstraBattleSubsystem* B = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+		if (!B || !B->IsPiloting())
+		{
+			OutDetail = TEXT("the Captain is not flying: there is no Falcon to bring in");
+			return false;
+		}
+		const FString By = Str(TEXT("by")).TrimStartAndEnd();
+		if (!B->StartPilotRecovery(By.IsEmpty() ? FString(TEXT("Flight Control")) : By))
+		{
+			OutDetail = TEXT("Eagle is beyond the recovery guidance's reach (8 km of the Aquila) or down: she must close on the Aquila first");
+			return false;
+		}
+		OutDetail = TEXT("the deck has Eagle: the recovery guidance is flying her clear of the hull, to the gate in front of the bow and in through the port tube "
+		                 "(about half a minute); the Captain can take the stick back at any time");
+		return true;
+	}
 	if (Name == TEXT("crew_locate"))
 	{
+		// the Captain is no entry of the personnel file: his badge, wherever he is. A job with the word in it is not him: the Transporter Chief once
+		// looked for "captain" on the flight deck, found the plane captains and told him three times he was not there (2 Oct)
+		const FString WhoLower = Str(TEXT("who")).TrimStartAndEnd().ToLower();
+		if (WhoLower == TEXT("captain") || WhoLower == TEXT("the captain") || WhoLower == TEXT("the ship's captain") || WhoLower == TEXT("commanding officer")
+		    || WhoLower == TEXT("the commanding officer") || WhoLower == TEXT("me") || WhoLower == TEXT("the captain's badge"))
+		{
+			OutDetail = CaptainLocatorText();
+			return true;
+		}
 		// the personnel file and the internal locator (VITA): who someone is, where they are, what they are doing
 		const UAstraLifeSubsystem* Life = GetWorld()->GetSubsystem<UAstraLifeSubsystem>();
 		if (!Life || !Life->IsRunning())

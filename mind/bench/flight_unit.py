@@ -430,27 +430,27 @@ class Pulses(unittest.IsolatedAsyncioTestCase):
             return {t["function"]["name"] for t in self.bed.llm.requests[i]["tools"]}
         self.bed.llm.say(("say", {"speaker": "alpha_lead", "text": "Due Falcon a terra.", "tone": "grim"}))
         await self.news(LOSS)
-        self.assertEqual(tools(0), {"say", "mission", "remember"})
+        self.assertEqual(tools(0), {"say", "mission", "recover_eagle", "remember"})
         user = self.bed.llm.requests[0]["messages"][-1]["content"]
         self.assertIn("holds news that is called aloud", user)
         self.assertNotIn("call `stay_quiet`", user)
         for k, text in enumerate((TORPEDO, RECOVERED, "flight: bravo squadron rearmed, 7 Hammers ready on the flight deck"), start=1):
             self.bed.at(fm.MIN_GAP_S)
             await self.news(text)
-            self.assertEqual(tools(k), {"say", "mission", "remember"}, text)
+            self.assertEqual(tools(k), {"say", "mission", "recover_eagle", "remember"}, text)
         self.bed.at(fm.MIN_GAP_S)
         await self.news(AIRBORNE)                                                         # a launch may go without a voice
-        self.assertEqual(tools(4), {"say", "mission", "remember", "stay_quiet"})
+        self.assertEqual(tools(4), {"say", "mission", "recover_eagle", "remember", "stay_quiet"})
         self.assertNotIn("holds news that is called aloud", self.bed.llm.requests[4]["messages"][-1]["content"])
         self.assertIn("call `stay_quiet`", self.bed.llm.requests[4]["messages"][-1]["content"])
 
     async def test_the_kills_are_called_on_the_bridge_and_left_to_the_wingman_with_a_wing(self) -> None:
         self.bed.llm.say(("say", {"speaker": "alpha_lead", "text": "Splash tre, ne resta uno.", "tone": "focused"}))
         await self.news(SPLASH)
-        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[0]["tools"]}, {"say", "mission", "remember"})        # nobody else could have called them
+        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[0]["tools"]}, {"say", "mission", "recover_eagle", "remember"})        # nobody else could have called them
         self.bed.at(fm.MIN_GAP_S)
         await self.news(WING)                                                              # the wing checks in (called aloud: they say they are there)
-        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[1]["tools"]}, {"say", "mission", "remember"})
+        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[1]["tools"]}, {"say", "mission", "recover_eagle", "remember"})
         self.bed.at(fm.MIN_GAP_S)
         await self.news(SPLASH)                                                            # in a cockpit the wingman's own "splash one" may have said it already
         self.assertIn("stay_quiet", {t["function"]["name"] for t in self.bed.llm.requests[2]["tools"]})
@@ -459,7 +459,7 @@ class Pulses(unittest.IsolatedAsyncioTestCase):
         self.f.on_event(WING)
         self.bed.llm.say(("say", {"speaker": "alpha_3", "text": "Eagle 2 è a terra, la capsula è fuori.", "tone": "urgent"}))
         await self.news("flight: Eagle 2 is down — the pilot ejected, search and rescue is on the way")
-        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[0]["tools"]}, {"say", "mission", "remember"})
+        self.assertEqual({t["function"]["name"] for t in self.bed.llm.requests[0]["tools"]}, {"say", "mission", "recover_eagle", "remember"})
         await self.news("flight: Eagle 3 engaged a Harpy at 2.4 km", wait_s=fm.WING_GAP_S + 0.1)
         self.assertIn("stay_quiet", {t["function"]["name"] for t in self.bed.llm.requests[1]["tools"]})
 

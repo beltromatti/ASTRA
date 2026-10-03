@@ -90,7 +90,11 @@ def footprints(D: dict, fans: dict) -> dict:
         if st["kind"] in ("xo_chair", "captain_chair"):
             out[f"{sid}_chair"] = place(rect_local(-0.30, 0.36, -0.46, 0.46), pos, yaw)
     for p in D.get("props", []):
-        out[f"{p['id']}"] = place(rect_local(-0.30, 0.36, -0.46, 0.46), p["pos"], p.get("yaw", 0.0))
+        fp = p.get("footprint", {})
+        if "radius" in fp:
+            out[f"{p['id']}"] = place(circle(0.0, 0.0, fp["radius"], 24), p["pos"], p.get("yaw", 0.0))
+        else:
+            out[f"{p['id']}"] = place(rect_local(*(fp.get("rect") or (-0.30, 0.36, -0.46, 0.46))), p["pos"], p.get("yaw", 0.0))
     sw = D["well"]["stair_width"]
     for i, y in enumerate(D["well"]["stairs_y"]):
         out[f"stairs_{'port' if y < 0 else 'starboard'}"] = rect_local(D["well"]["edge_x"], D["well"]["edge_x"] + 0.75, y - sw / 2, y + sw / 2)

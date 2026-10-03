@@ -73,10 +73,15 @@ class BridgeAgent:
 
     # ------------------------------------------------------------------------------------------------ priority
     def preempt(self) -> int:
-        """The Captain speaks: whatever the crew was doing stops now — the model calls in flight are dropped and nothing more is
-        voiced for those turns (what was already sent to the ship stays done). Returns how many turns were cut off."""
+        """The Captain speaks: whatever the crew was doing on its own stops now — the model calls in flight for a report, a watch check or
+        a chat are dropped and nothing more is voiced for those turns (what was already sent to the ship stays done). A turn that is
+        carrying out the Captain's own words goes on: his next words come after it, and a second press of the key (or one that said
+        nothing) cancelled an order before any of it had reached the ship ("Timoniere, ritirata" lost to an empty press, 2 Oct). Returns how
+        many turns were cut off."""
         n = 0
         for turn in list(self._active):
+            if turn.kind == "captain":
+                continue
             turn.cancelled = True
             if turn.task and not turn.task.done():
                 turn.task.cancel()

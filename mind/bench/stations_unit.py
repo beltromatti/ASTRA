@@ -262,18 +262,29 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(c.said, [])
         self.assertEqual(c.ship.lane("ops", "viewscreen")["mode"], "viewscreen_auto")
 
-    async def test_preempted_captain_turn_keeps_what_had_gone_out(self) -> None:
-        # the helm call went out, the model was still writing the read-back when the Captain spoke again
+    async def test_the_captain_speaking_again_keeps_his_own_order(self) -> None:
+        # the helm call went out, the model was still writing the read-back when the Captain pressed the key again: his order stands
         c = Crew(Script([station("helm", "keep_on_bow", target="T-23"), speak("Prua sul Cocytus.", "helm")], between=0.4))
         task = asyncio.create_task(c.agent.handle("tienilo di prua", "it"))
         await asyncio.sleep(0.15)
-        c.agent.preempt()
+        self.assertEqual(c.agent.preempt(), 0)
         turn = await task
-        self.assertTrue(turn.cancelled)
+        self.assertFalse(turn.cancelled)
         self.assertEqual(c.ship.lane("helm", "course")["mode"], "keep_on_bow")                 # it was done
-        self.assertEqual(c.said, [])                                                       # nothing was said
-        self.assertTrue(any(m.get("tool_calls") for m in c.agent.history))                   # and the crew remembers doing it
+        self.assertEqual(c.said, [("helm", "Prua sul Cocytus.")])                            # and read back
         self.assertFalse(c.agent.busy())
+
+    async def test_an_order_not_yet_sent_survives_a_second_press(self) -> None:
+        # 2 Oct, the user's game: "Timoniere ritirata, subito ritirata" and, two seconds later, a press that said nothing; the model had not
+        # called any tool yet, the press cancelled the turn and the retreat never reached the helm
+        c = Crew(Script([station("helm", "retreat", toward="gate"), speak("Ritirata verso il Gate.", "helm")], before=0.5))
+        task = asyncio.create_task(c.agent.handle("timoniere ritirata, subito", "it"))
+        await asyncio.sleep(0.1)
+        c.agent.preempt()                                                                  # the second press
+        turn = await task
+        self.assertFalse(turn.cancelled)
+        self.assertTrue(turn.actions and turn.actions[0][2]["ok"])
+        self.assertEqual(c.ship.lane("helm", "course")["mode"], "retreat")
 
     async def test_the_router_says_not_for_the_crew_and_the_started_turn_does_nothing(self) -> None:
         c = Crew(Script([station("tactical", "engage", targets=["T-23"]), speak("Fuoco sul Cocytus.", "tactical")], before=0.05))

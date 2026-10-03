@@ -300,6 +300,9 @@ struct FAstraPilotStatus
 	FVector HomeWorld = FVector::ZeroVector;     // the Aquila's recovery tube (Alpha's, port)
 	float HomeRangeKm = 0.f;
 	bool bCanLand = false;
+	bool bCanRecover = false;                    // within the deck's recovery guidance's reach: F (or the flight controller) and it flies her in
+	bool bRecovering = false;                    // the guidance has her: clear of the hull, the gate in front of the bow, down the tube's axis
+	bool bRecovered = false;                     // at the mouth, slow: into the tube
 	int32 Incoming = 0;                          // missiles homing on the Falcon
 	TArray<FVector> Hostiles, Friends;           // within 25 km
 	TArray<float> HostileSizes;                  // their radius (m): craft or warship
@@ -447,6 +450,12 @@ public:
 	void GetPilotStatus(FAstraPilotStatus& Out) const;
 	/** Recovered through the bow tube (bLanded) or the pod picked up after an ejection: the craft leaves the battle. */
 	void EndPiloted(bool bLanded);
+	/** The deck's recovery guidance takes the Captain's Falcon (an automatic carrier landing): out of the way of the hull, to the approach gate
+	 *  in front of the bow, down the tube's axis to its mouth. False when she is out of its reach (or not flying). By: who asked, for the report. */
+	bool StartPilotRecovery(const FString& By);
+	/** The Captain takes the stick back (or the guidance is no longer wanted). */
+	void StopPilotRecovery(const FString& Why);
+	bool IsPilotRecovering() const { return bPilotAuto; }
 	bool IsPiloting() const { return PilotedId >= 0; }
 	int32 GetPilotedId() const { return PilotedId; }
 	/** Where the Captain is, for the crew: flying (with range and state) or "" when aboard. */
@@ -804,7 +813,11 @@ private:
 	bool bPilotDecoyLatch = false;
 	int32 PilotDecoys = 4;
 	bool bPilotDown = false;
+	bool bPilotAuto = false;              // the recovery guidance flies the Falcon (StartPilotRecovery)
+	int32 PilotAutoLeg = 0;               // 0 clear of the hull, 1 to the approach gate, 2 down the axis to the mouth
+	float PilotTakeBackT = 0.f;           // how long the stick has been pushed hard against the guidance
 	void TickPiloted(FAstraBattleShip& S, float Dt);
+	void TickPilotRecovery(FAstraBattleShip& S, float Dt);
 	void FirePilotGuns(FAstraBattleShip& S);
 	FVector PilotMouth() const;           // Alpha's tube mouth, system frame
 

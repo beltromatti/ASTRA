@@ -818,7 +818,7 @@ namespace
 			       *Rel.ToString(), (int32)M->MovementMode);
 		}
 		Log.FallFrames += M->MovementMode != MOVE_Walking ? 1 : 0;
-		Log.UnbasedFrames += C->GetMovementBase() != Car->FloorComponent() ? 1 : 0;
+		Log.UnbasedFrames += C->GetMovementBaseObject() != Car->FloorComponent() ? 1 : 0;
 		Log.MaxSpeed = FMath::Max(Log.MaxSpeed, (float)FMath::Abs(Car->Brain.V()));
 		++Log.Frames;
 		LiftCheckDoors(W, Line, Log);
@@ -884,7 +884,7 @@ namespace
 		// ---- in
 		const bool bIn = LiftWalk(W, C, -S1.Out, 5.f, [&]() { return Car->Contains(C->GetActorLocation(), 40.f); });
 		W.Run(0.5f);
-		LiftCheck(TEXT("world: the Captain walks into the car"), bIn && C->GetMovementBase() == Car->FloorComponent(), FString::Printf(TEXT("inside %d, based on the car's floor %d"), bIn, C->GetMovementBase() == Car->FloorComponent()));
+		LiftCheck(TEXT("world: the Captain walks into the car"), bIn && C->GetMovementBaseObject() == Car->FloorComponent(), FString::Printf(TEXT("inside %d, based on the car's floor %d"), bIn, C->GetMovementBaseObject() == Car->FloorComponent()));
 
 		// ---- the ride, Deck 1 to Deck 9 (66 m down)
 		FLiftRideLog Log;
@@ -919,7 +919,7 @@ namespace
 		const FAstraLiftStop& S9 = L.Stops[Deck9];
 		const bool bOut = LiftWalk(W, C, S9.Out, 5.f, [&]() { return FVector::DotProduct(C->GetActorLocation() - S9.DoorCm, S9.Out) > 160.f; });
 		W.Run(0.4f);
-		LiftCheck(TEXT("world: out onto the lobby of Deck 9"), bOut && C->GetCharacterMovement()->MovementMode == MOVE_Walking && FMath::Abs(FeetZ() - S9.FloorZ) < 4.f && C->GetMovementBase() != Car->FloorComponent(),
+		LiftCheck(TEXT("world: out onto the lobby of Deck 9"), bOut && C->GetCharacterMovement()->MovementMode == MOVE_Walking && FMath::Abs(FeetZ() - S9.FloorZ) < 4.f && C->GetMovementBaseObject() != Car->FloorComponent(),
 		      FString::Printf(TEXT("out %d, feet %.2f cm from the floor, mode %d"), bOut, FeetZ() - S9.FloorZ, (int32)C->GetCharacterMovement()->MovementMode));
 
 		// ---- the way back, up to Deck 5 (16 m), at thirty frames a second (a hitch is no reason to fall)
@@ -1152,7 +1152,7 @@ namespace
 			{
 				UCharacterMovementComponent* M = Captain->GetCharacterMovement();
 				Out.CaptainFalls += M->MovementMode != MOVE_Walking ? 1 : 0;
-				Out.CaptainUnbased += Captain->GetMovementBase() != Car->FloorComponent() ? 1 : 0;
+				Out.CaptainUnbased += Captain->GetMovementBaseObject() != Car->FloorComponent() ? 1 : 0;
 			}
 			++Out.Frames;
 			if (Active == 0)
