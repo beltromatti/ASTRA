@@ -107,7 +107,7 @@ def build_ceiling(c: SH.Ctx, name: str = "SM_BRG3_Ceiling"):
 
     n_pan = 0
     for a in ang_ribs:
-        for r0, r1 in zip(rad_edges[:-1], rad_edges[1:]):
+        for bi, (r0, r1) in enumerate(zip(rad_edges[:-1], rad_edges[1:])):
             gap_a = math.degrees(0.15 / max(r0, 1.0))
             quad = wedge(r0 + 0.14, r1 - 0.14, a + gap_a, a + 10.0 - gap_a)
             cl = SH.clip_convex(quad, poly, 0.10)
@@ -125,6 +125,14 @@ def build_ceiling(c: SH.Ctx, name: str = "SM_BRG3_Ceiling"):
                         fb.box((-0.30, -0.17, -0.012), (0.30, 0.17, 0.0), L.RUBBER)
                         for k in range(7):
                             fb.cbox((0.0, -0.15 + k * 0.05, -0.014), (0.6, 0.012, 0.006), L.TRIM, Rx(28))
+            if bi in (1, 3, 4) and (int(a // 10) % 2 == 0) and SH.poly_area(cl) > 0.5:       # about a fifth of the panels are light panels: a soft warm field in a brass hairline
+                cx = sum(q[0] for q in cl) / len(cl)
+                cy = sum(q[1] for q in cl) / len(cl)
+                fld = [(cx + (q[0] - cx) * 0.66, cy + (q[1] - cy) * 0.66, CE - 0.0475) for q in cl]
+                em.lamp_face(fld, "white_warm", (0, 0, -1), L.LAMP_DIM)
+                for k in range(len(fld)):
+                    p0, p1 = fld[k], fld[(k + 1) % len(fld)]
+                    SH.line_lamp(em, (p0[0], p0[1]), (p1[0], p1[1]), CE - 0.0485, 0.008, 0.002, "warm_dim", L.LAMP_DIM)
 
     # ---- radial ribs from the dome to the walls (brushed metal, a warm line in the soffit)
     for a in ang_ribs:

@@ -1,5 +1,7 @@
 """Builds the Captain's quarters (Deck 1 · Section A) into the bridge level, from data/ship/aquila_quarters.json: the
-wood and carpet textures and the cabin's screens, the materials, the kit (art/export/quarters, art/blender/quarters.py),
+wood and carpet textures and the cabin's screens, the materials (walnut, a navy carpet, a warm wall paint, cognac leather; the cabin mesh
+art/blender/quarters_room.py also uses the medbay's linen / blanket / red, the bridge v3's brass / ivory / lamps / decor and, for the plants and
+the globe, the ship kit's MI_SHIP_Leaf / Soil / CrateBlue), the kit (art/export/quarters, art/blender/quarters.py),
 the bulkhead and door at the end of the starboard corridor, the cabin and its windows, the block outside (hull plates,
 the bridge lift's housing, the fairings under the corridors), the warm lights (tagged ASTRA.Zone.Quarters: on only
 while the Captain is there), the Aquila's model on the sideboard, the ship's plaque, and the AAstraQuarters actor (the
@@ -86,10 +88,17 @@ def hard(name, tint, rough, tex, uv=1.0, normal=0.5, influence=1.0, macro=0.04):
        {"BaseColorMap": f"{TEX}/T_{tex}_BC", "NormalMap": f"{TEX}/T_{tex}_N", "ORMMap": f"{TEX}/T_{tex}_ORM"})
 
 
-# a captain's cabin in a warship: dark polished wood, a navy carpet, warm pale walls
+# a captain's cabin in a warship: dark polished wood, a navy carpet (the grey carpet texture under a deep blue tint), warm pale walls, cognac leather
 hard("MI_QTR_Wood", (1.0, 0.92, 0.86), (0.28, 0.46), "WoodDark", uv=1.2, normal=0.6)
-hard("MI_QTR_Carpet", (0.62, 0.68, 0.9), (0.85, 0.96), "Carpet", uv=2.5, normal=0.8)
+hard("MI_QTR_Carpet", (0.17, 0.23, 0.44), (0.85, 0.96), "Carpet", uv=2.5, normal=0.8)
+hard("MI_QTR_Rug", (0.22, 0.045, 0.040), (0.85, 0.96), "Carpet", uv=3.0, normal=0.8)             # the wool rugs: the same weave in oxblood
 hard("MI_QTR_Wall", (0.58, 0.54, 0.48), (0.5, 0.65), "PanelPaint", uv=1.0, normal=0.3, influence=0.3)
+hard("MI_QTR_Leather", (0.40, 0.17, 0.075), (0.30, 0.50), "LeatherBlack", uv=2.0, normal=0.7, influence=0.9, macro=0.05)
+# the ship kit's instances that the plants and the globe of the props use (made by build_ship_interior.py; only made here if that has not run yet)
+for name, tset, tint, uvs, rough, infl, nrm in (("MI_SHIP_Leaf", "Linen", (0.045, 0.20, 0.04), 4.0, (0.45, 0.65), 0.5, 0.6), ("MI_SHIP_Soil", "Linen", (0.035, 0.022, 0.014), 4.0, (0.7, 0.9), 0.5, 0.8),
+                                                 ("MI_SHIP_CrateBlue", "PanelPaint", (0.045, 0.09, 0.20), 1.0, (0.5, 0.7), 0.25, 0.3)):
+    if not eal.does_asset_exist(f"{MI_DIR}/{name}"):
+        hard(name, tint, rough, tset, uv=uvs, normal=nrm, influence=infl)
 mi("MI_QTR_Map", SCREEN, {"Intensity": 9.0, "Roughness": 0.35, "FlipU": 0.0, "FlipV": 0.0}, None, {"ScreenTexture": f"{UI_TEX}/T_UI_Quarters_Map"})
 mi("MI_QTR_Log", SCREEN, {"Intensity": 9.0, "Roughness": 0.35, "FlipU": 0.0, "FlipV": 0.0}, None, {"ScreenTexture": f"{UI_TEX}/T_UI_Quarters_Log"})
 log.append("materials")

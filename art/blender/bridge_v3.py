@@ -42,12 +42,14 @@ import astra_bpy as A  # noqa: E402
 import bridge3_lib as L  # noqa: E402
 import bridge3_preview as PV  # noqa: E402
 import bridge3_shell as SH  # noqa: E402
+import bridge3_floor as FL  # noqa: E402
 import bridge3_walls as WL  # noqa: E402
 import bridge3_ceiling as CE  # noqa: E402
 import bridge3_checks as CK  # noqa: E402
 import bridge3_frame as FR  # noqa: E402
 import bridge3_consoles as CO  # noqa: E402
 import bridge3_holo as HO  # noqa: E402
+import bridge3_life as LF  # noqa: E402
 import bridge3_seats as SE  # noqa: E402
 import bridge3_table as TB  # noqa: E402
 
@@ -69,7 +71,7 @@ def load_data() -> dict:
 def parse_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out = {"out_dir": os.path.join(ROOT, "art", "export", "bridge_v3"), "only": None, "export": True, "preview": None,
-           "views": None, "samples": 48, "save_blend": None, "studio": False, "check_screens": False}
+           "views": None, "samples": 48, "save_blend": None, "studio": False, "check_screens": False, "extra_views": {}}
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -86,6 +88,15 @@ def parse_args() -> dict:
             i += 1
         elif a == "--samples":
             out["samples"] = int(argv[i + 1])
+            i += 1
+        elif a == "--view":                          # --view name:x,y,z,yaw,pitch,fov  (an extra camera, layout coordinates)
+            nm, vals = argv[i + 1].split(":")
+            v = [float(q) for q in vals.split(",")]
+            if len(v) == 7:                          # name:x,y,z,tx,ty,tz,fov  (looking at the point t)
+                dx, dy, dz = v[3] - v[0], v[4] - v[1], v[5] - v[2]
+                v = [v[0], v[1], v[2], math.degrees(math.atan2(dy, dx)), math.degrees(math.atan2(dz, math.hypot(dx, dy))), v[6]]
+            out["extra_views"][nm] = ((v[0], v[1], v[2]), v[3], v[4], v[5])
+            out["views"] = (out["views"] or []) + [nm]
             i += 1
         elif a == "--studio":
             out["studio"] = True
@@ -125,7 +136,7 @@ def builders(c: SH.Ctx) -> list[tuple[str, object]]:
 
     st = {x["id"]: x for x in c.D["stations"]}
     out = [
-        ("SM_BRG3_Deck", lambda n: SH.build_deck(c, n)),
+        ("SM_BRG3_Deck", lambda n: FL.build_deck(c, n)),
         ("SM_BRG3_WallPort", lambda n: _info(n, WL.build_side_wall(c, -1, n, c.D["stations"]))),
         ("SM_BRG3_WallStarboard", lambda n: _info(n, WL.build_side_wall(c, 1, n, c.D["stations"]))),
         ("SM_BRG3_WallBack", lambda n: FR.build_back_wall(c, n)),
@@ -141,6 +152,8 @@ def builders(c: SH.Ctx) -> list[tuple[str, object]]:
         ("SM_BRG3_ChairCrew", lambda n: SE.build_chair_crew(n)),
         ("SM_BRG3_ChairCaptain", lambda n: _info(n, SE.build_chair_command(n, True, ["SCREEN_captain_1", "SCREEN_captain_2"]))),
         ("SM_BRG3_ChairXO", lambda n: _info(n, SE.build_chair_command(n, False, ["SCREEN_xo_1"]))),
+        ("SM_BRG3_SideTable", lambda n: LF.build_side_table(n)),
+        ("SM_BRG3_Planter", lambda n: LF.build_planter(n)),
     ]
     for kind in ("helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"):
         cap = kind.capitalize()
@@ -243,6 +256,7 @@ def main() -> None:
     D = load_data()
     c = SH.Ctx(D)
     L.load_label_atlas()
+    L.load_decor_atlas()
     A.reset_scene()
     t0 = time.time()
     objs: dict[str, bpy.types.Object] = {}
@@ -404,6 +418,7 @@ VIEWS = {
     "chair_c": ((4.6, -2.2, 0.65), 0.0, -4.0, 42.0),
     "screen_top": ((3.0, 0.0, 1.5), 0.0, 18.0, 70.0),
     "master": ((-4.5, 0.0, 1.6), 180.0, 2.0, 60.0),
+    "aft_wall": ((-2.4, 0.0, 1.55), 180.0, 3.0, 78.0),
     "window_side": ((0.5, 6.0, 1.5), 40.0, 4.0, 75.0),
     "helm_console": ((3.6, -2.2, 1.3), 0.0, -12.0, 65.0),
     "tactical_close": ((-1.0, 1.4, 1.5), -140.0, -8.0, 62.0),
@@ -411,6 +426,7 @@ VIEWS = {
 
 
 def preview_scene(D, c, objs, args, views) -> None:
+    VIEWS.update(args.get("extra_views", {}))
     assemble(D, objs)
     PV.set_world((0.0, 0.0, 0.0), 0.0)
     PV.sky_dome(yaw_deg=float(os.environ.get("BRG3_SKYYAW", "0")))
