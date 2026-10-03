@@ -486,9 +486,11 @@ def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: st
     state_json = json.dumps(view, separators=(",", ":"), ensure_ascii=False)
     room = f"The room: {hearing}\n" if hearing else ""
     fleet = str(ship_state.get("_fleet_board") or "")           # the allied groups and their captains (the war minds' fleet board, set by the server)
+    front = str(ship_state.get("_march_board") or "")           # the front as Fleet knows it, beyond the Aquila's sky (the March's board, set by the server)
     said = f"Said aloud on the bridge in the last minute (what the Captain has heard, oldest first)\n{said_aloud}\n" if said_aloud else ""
     said += f"Waiting to be said (queued behind whoever is speaking, in the order it will be said)\n{waiting}\n" if waiting else ""
     return ((context + "\n\n" if context else "") + f"[The bridge now]\nRecent events\n{events}\n" + said
             + (("Consoles now (who runs what, since when, how it is going)\n" + board + "\n") if board else "")
             + (("The fleet: our battle groups and their captains, from the fleet datalink\n" + fleet + "\n") if fleet else "")
+            + (("The front, as Fleet knows it (what comms and the plot hold of the war beyond this sky; what is not here is not known)\n" + front + "\n") if front else "")
             + room + f"Current ship state (live telemetry, JSON)\n{state_json}\n[end of the bridge now]")

@@ -1,0 +1,2365 @@
+{
+ "vig3_sty3": {
+  "battles": 24,
+  "astra": {
+   "vigilant": {
+    "n": 3,
+    "left_mean": 1.9166666666666667,
+    "left_sd": 0.39965262694272663,
+    "dark": 0.625,
+    "hull_mean": 90.84782608695652
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 3,
+    "left_mean": 1.0833333333333333,
+    "left_sd": 0.2763853991962833,
+    "dark": 0.6666666666666666,
+    "hull_mean": 88.5
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 0.8333333333333334,
+  "edge_sd": 0.6236095644623235,
+  "astra_wins": 0.875,
+  "mandate_wins": 0.08333333333333333,
+  "decided_mean": 444.58559226989746,
+  "decided_sd": 184.68541221116524,
+  "edges": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   -1,
+   1,
+   -1,
+   1,
+   1,
+   2,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   0,
+   1,
+   1
+  ],
+  "astra_in": [
+   [
+    "vigilant",
+    3
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    3
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "vig4_sty3": {
+  "battles": 24,
+  "astra": {
+   "vigilant": {
+    "n": 4,
+    "left_mean": 3.3333333333333335,
+    "left_sd": 0.4714045207910317,
+    "dark": 0.2916666666666667,
+    "hull_mean": 93.6125
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 3,
+    "left_mean": 0.9583333333333334,
+    "left_sd": 0.19982631347136331,
+    "dark": 0.9166666666666666,
+    "hull_mean": 68.52173913043478
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 2.375,
+  "edge_sd": 0.5636562191028618,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 459.5009307861328,
+  "decided_sd": 198.9846298971059,
+  "edges": [
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   3,
+   2,
+   3,
+   2,
+   3,
+   2,
+   4,
+   3,
+   3,
+   2,
+   2,
+   2
+  ],
+  "astra_in": [
+   [
+    "vigilant",
+    4
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    3
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "vig5_sty3": {
+  "battles": 24,
+  "astra": {
+   "vigilant": {
+    "n": 5,
+    "left_mean": 4.875,
+    "left_sd": 0.33071891388307384,
+    "dark": 0.041666666666666664,
+    "hull_mean": 91.1880341880342
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 3,
+    "left_mean": 0.7916666666666666,
+    "left_sd": 0.4061164310337068,
+    "dark": 0.8333333333333334,
+    "hull_mean": 66.94736842105263
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 4.083333333333333,
+  "edge_sd": 0.5713045500334203,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 391.7084852854411,
+  "decided_sd": 226.55442768507382,
+  "edges": [
+   4,
+   4,
+   4,
+   3,
+   4,
+   5,
+   4,
+   4,
+   5,
+   4,
+   5,
+   3,
+   4,
+   4,
+   4,
+   4,
+   4,
+   5,
+   3,
+   4,
+   4,
+   4,
+   5,
+   4
+  ],
+  "astra_in": [
+   [
+    "vigilant",
+    5
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    3
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "vig6_sty4": {
+  "battles": 24,
+  "astra": {
+   "vigilant": {
+    "n": 6,
+    "left_mean": 4.916666666666667,
+    "left_sd": 0.2763853991962833,
+    "dark": 0.5,
+    "hull_mean": 96.38135593220339
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 4,
+    "left_mean": 1,
+    "left_sd": 0.0,
+    "dark": 1.4583333333333333,
+    "hull_mean": 80.33333333333333
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 3.9166666666666665,
+  "edge_sd": 0.2763853991962833,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 460.3343149820964,
+  "decided_sd": 197.62334320453553,
+  "edges": [
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   3,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   3,
+   4,
+   4,
+   4,
+   4,
+   4
+  ],
+  "astra_in": [
+   [
+    "vigilant",
+    6
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    4
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "sty6_sty4": {
+  "battles": 24,
+  "astra": {
+   "styx": {
+    "n": 6,
+    "left_mean": 5,
+    "left_sd": 0.0,
+    "dark": 0.3333333333333333,
+    "hull_mean": 96.83333333333333
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 4,
+    "left_mean": 0.9583333333333334,
+    "left_sd": 0.19982631347136331,
+    "dark": 1.5833333333333333,
+    "hull_mean": 66.1304347826087
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 4.041666666666667,
+  "edge_sd": 0.19982631347136331,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 531.8342005411783,
+  "decided_sd": 152.45192644682135,
+  "edges": [
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   5,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4,
+   4
+  ],
+  "astra_in": [
+   [
+    "styx",
+    6
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    4
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "leth6_sty3": {
+  "battles": 24,
+  "astra": {
+   "lethe": {
+    "n": 6,
+    "left_mean": 4.75,
+    "left_sd": 0.5204164998665332,
+    "dark": 0.4166666666666667,
+    "hull_mean": 94.08771929824562
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 3,
+    "left_mean": 0.9166666666666666,
+    "left_sd": 0.2763853991962833,
+    "dark": 0.75,
+    "hull_mean": 59.5
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 3.8333333333333335,
+  "edge_sd": 0.5527707983925666,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 398.3755588531494,
+  "decided_sd": 219.80562514542288,
+  "edges": [
+   4,
+   4,
+   4,
+   4,
+   4,
+   3,
+   4,
+   3,
+   5,
+   4,
+   4,
+   4,
+   3,
+   4,
+   4,
+   4,
+   4,
+   4,
+   2,
+   4,
+   4,
+   4,
+   4,
+   4
+  ],
+  "astra_in": [
+   [
+    "lethe",
+    6
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    3
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae1_ach1": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 1,
+    "left_mean": 0.7916666666666666,
+    "left_sd": 0.4061164310337068,
+    "dark": 0,
+    "hull_mean": 67.73684210526316
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0.875,
+    "left_sd": 0.33071891388307384,
+    "dark": 0,
+    "hull_mean": 50.42857142857143
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": -0.08333333333333333,
+  "edge_sd": 0.5713045500334203,
+  "astra_wins": 0.125,
+  "mandate_wins": 0.20833333333333334,
+  "decided_mean": 531.5458704630533,
+  "decided_sd": 119.6016585425334,
+  "edges": [
+   0,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   -1,
+   0,
+   1,
+   -1,
+   0,
+   0,
+   -1,
+   0,
+   1,
+   0,
+   -1,
+   0,
+   0,
+   0,
+   0,
+   -1
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    1
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    1
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae1_ach2": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 1,
+    "left_mean": 0,
+    "left_sd": 0.0,
+    "dark": 0.125,
+    "hull_mean": 0.0
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 2,
+    "left_mean": 1.9583333333333333,
+    "left_sd": 0.19982631347136331,
+    "dark": 0,
+    "hull_mean": 85.42553191489361
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": -1.9583333333333333,
+  "edge_sd": 0.19982631347136331,
+  "astra_wins": 0.0,
+  "mandate_wins": 1.0,
+  "decided_mean": 285.13207244873047,
+  "decided_sd": 81.99476419182331,
+  "edges": [
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -2,
+   -1,
+   -2
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    1
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    2
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae1_sty4": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 1,
+    "left_mean": 0.20833333333333334,
+    "left_sd": 0.4061164310337068,
+    "dark": 0.375,
+    "hull_mean": 44.4
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 4,
+    "left_mean": 2.5833333333333335,
+    "left_sd": 0.5713045500334203,
+    "dark": 0.5416666666666666,
+    "hull_mean": 83.93548387096774
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": -2.375,
+  "edge_sd": 0.9042722672587794,
+  "astra_wins": 0.0,
+  "mandate_wins": 0.9583333333333334,
+  "decided_mean": 479.74437014261883,
+  "decided_sd": 129.8793128758998,
+  "edges": [
+   -3,
+   -3,
+   -3,
+   -2,
+   -2,
+   -3,
+   0,
+   -3,
+   -3,
+   -1,
+   -3,
+   -3,
+   -3,
+   -3,
+   -3,
+   -1,
+   -3,
+   -3,
+   -3,
+   -2,
+   -3,
+   -1,
+   -1,
+   -2
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    1
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    4
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae1vig2_ach1sty2": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 1,
+    "left_mean": 0.9583333333333334,
+    "left_sd": 0.19982631347136331,
+    "dark": 0,
+    "hull_mean": 74.82608695652173
+   },
+   "vigilant": {
+    "n": 2,
+    "left_mean": 2,
+    "left_sd": 0.0,
+    "dark": 0,
+    "hull_mean": 99.20833333333333
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0,
+    "left_sd": 0.0,
+    "dark": 0.4166666666666667,
+    "hull_mean": 0.0
+   },
+   "styx": {
+    "n": 2,
+    "left_mean": 1.75,
+    "left_sd": 0.4330127018922193,
+    "dark": 0.041666666666666664,
+    "hull_mean": 76.73809523809524
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 1.2083333333333333,
+  "edge_sd": 0.49826086429589156,
+  "astra_wins": 0.9583333333333334,
+  "mandate_wins": 0.0,
+  "decided_mean": 393.0869248708089,
+  "decided_sd": 175.62804229701499,
+  "edges": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   2,
+   1,
+   1,
+   1,
+   2,
+   0,
+   1,
+   1,
+   2,
+   2,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   2,
+   2
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    1
+   ],
+   [
+    "vigilant",
+    2
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    1
+   ],
+   [
+    "styx",
+    2
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae1vig3_ach1sty3": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 1,
+    "left_mean": 0.75,
+    "left_sd": 0.4330127018922193,
+    "dark": 0,
+    "hull_mean": 43.05555555555556
+   },
+   "vigilant": {
+    "n": 3,
+    "left_mean": 2.9166666666666665,
+    "left_sd": 0.39965262694272663,
+    "dark": 0,
+    "hull_mean": 97.27142857142857
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0,
+    "left_sd": 0.0,
+    "dark": 0.5,
+    "hull_mean": 0.0
+   },
+   "styx": {
+    "n": 3,
+    "left_mean": 2,
+    "left_sd": 0.0,
+    "dark": 0.4583333333333333,
+    "hull_mean": 90.54166666666667
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 1.6666666666666667,
+  "edge_sd": 0.6871842709362768,
+  "astra_wins": 0.9583333333333334,
+  "mandate_wins": 0.041666666666666664,
+  "decided_mean": 530.6777884165446,
+  "decided_sd": 129.35376076066356,
+  "edges": [
+   1,
+   2,
+   2,
+   2,
+   -1,
+   2,
+   2,
+   2,
+   2,
+   1,
+   2,
+   2,
+   2,
+   1,
+   2,
+   2,
+   1,
+   2,
+   2,
+   2,
+   2,
+   1,
+   2,
+   2
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    1
+   ],
+   [
+    "vigilant",
+    3
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    1
+   ],
+   [
+    "styx",
+    3
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae2vig4_ach2sty4": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 2,
+    "left_mean": 1.8333333333333333,
+    "left_sd": 0.37267799624996495,
+    "dark": 0.041666666666666664,
+    "hull_mean": 80.13636363636364
+   },
+   "vigilant": {
+    "n": 4,
+    "left_mean": 4,
+    "left_sd": 0.0,
+    "dark": 0,
+    "hull_mean": 97.36458333333333
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 2,
+    "left_mean": 0,
+    "left_sd": 0.0,
+    "dark": 0.7916666666666666,
+    "hull_mean": 0.0
+   },
+   "styx": {
+    "n": 4,
+    "left_mean": 3.375,
+    "left_sd": 0.7534642216677135,
+    "dark": 0.20833333333333334,
+    "hull_mean": 87.03703703703704
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 2.4583333333333335,
+  "edge_sd": 0.6441510347391795,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 455.37679862976074,
+  "decided_sd": 186.77540475922575,
+  "edges": [
+   2,
+   2,
+   2,
+   3,
+   3,
+   2,
+   2,
+   2,
+   2,
+   2,
+   4,
+   2,
+   2,
+   3,
+   3,
+   2,
+   2,
+   3,
+   2,
+   3,
+   2,
+   3,
+   2,
+   4
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    2
+   ],
+   [
+    "vigilant",
+    4
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    2
+   ],
+   [
+    "styx",
+    4
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 2,
+  "seconds": 600.0
+ },
+ "prae2vig4_ach2sty6": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 2,
+    "left_mean": 0,
+    "left_sd": 0.0,
+    "dark": 0.625,
+    "hull_mean": 0.0
+   },
+   "vigilant": {
+    "n": 4,
+    "left_mean": 2.875,
+    "left_sd": 0.5253966755382705,
+    "dark": 0.2916666666666667,
+    "hull_mean": 73.7536231884058
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 2,
+    "left_mean": 0.9583333333333334,
+    "left_sd": 0.19982631347136331,
+    "dark": 0.4166666666666667,
+    "hull_mean": 89.78260869565217
+   },
+   "styx": {
+    "n": 6,
+    "left_mean": 5.791666666666667,
+    "left_sd": 0.4061164310337068,
+    "dark": 0.041666666666666664,
+    "hull_mean": 92.94964028776978
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": -3.875,
+  "edge_sd": 0.6653633092779714,
+  "astra_wins": 0.0,
+  "mandate_wins": 1.0,
+  "decided_mean": 404.7115166982015,
+  "decided_sd": 180.33080617757656,
+  "edges": [
+   -3,
+   -3,
+   -4,
+   -4,
+   -4,
+   -4,
+   -4,
+   -4,
+   -5,
+   -3,
+   -5,
+   -4,
+   -4,
+   -4,
+   -4,
+   -3,
+   -4,
+   -3,
+   -4,
+   -5,
+   -3,
+   -4,
+   -3,
+   -5
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    2
+   ],
+   [
+    "vigilant",
+    4
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    2
+   ],
+   [
+    "styx",
+    6
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 2,
+  "seconds": 600.0
+ },
+ "prae2vig6_ach3sty5": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 2,
+    "left_mean": 0.08333333333333333,
+    "left_sd": 0.2763853991962833,
+    "dark": 0.7083333333333334,
+    "hull_mean": 83.5
+   },
+   "vigilant": {
+    "n": 6,
+    "left_mean": 4.958333333333333,
+    "left_sd": 1.135751097536584,
+    "dark": 0.4583333333333333,
+    "hull_mean": 92.57142857142857
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 3,
+    "left_mean": 0.08333333333333333,
+    "left_sd": 0.2763853991962833,
+    "dark": 1.1666666666666667,
+    "hull_mean": 69.0
+   },
+   "styx": {
+    "n": 5,
+    "left_mean": 2.875,
+    "left_sd": 0.880932271327749,
+    "dark": 0.9166666666666666,
+    "hull_mean": 87.3913043478261
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 2.0833333333333335,
+  "edge_sd": 1.4409680388158819,
+  "astra_wins": 0.8333333333333334,
+  "mandate_wins": 0.08333333333333333,
+  "decided_mean": 600.0005493164062,
+  "decided_sd": 0.0,
+  "edges": [
+   3,
+   2,
+   3,
+   2,
+   3,
+   1,
+   3,
+   3,
+   0,
+   2,
+   3,
+   3,
+   2,
+   0,
+   2,
+   3,
+   3,
+   -1,
+   3,
+   4,
+   2,
+   3,
+   3,
+   -2
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    2
+   ],
+   [
+    "vigilant",
+    6
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    3
+   ],
+   [
+    "styx",
+    5
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 2,
+  "seconds": 600.0
+ },
+ "prae3vig9_ach4sty8": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 3,
+    "left_mean": 0.4583333333333333,
+    "left_sd": 0.6441510347391795,
+    "dark": 0.9166666666666666,
+    "hull_mean": 78.72727272727273
+   },
+   "vigilant": {
+    "n": 9,
+    "left_mean": 8.291666666666666,
+    "left_sd": 0.8887803753208976,
+    "dark": 0.25,
+    "hull_mean": 96.28643216080403
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 4,
+    "left_mean": 0.2916666666666667,
+    "left_sd": 0.45452967144315476,
+    "dark": 1.7916666666666667,
+    "hull_mean": 85.0
+   },
+   "styx": {
+    "n": 8,
+    "left_mean": 3.1666666666666665,
+    "left_sd": 0.6236095644623235,
+    "dark": 2.0833333333333335,
+    "hull_mean": 83.84210526315789
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 5.291666666666667,
+  "edge_sd": 1.059841445164742,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 585.0424226125082,
+  "decided_sd": 71.73665557626035,
+  "edges": [
+   4,
+   5,
+   7,
+   5,
+   4,
+   4,
+   4,
+   7,
+   6,
+   5,
+   7,
+   5,
+   7,
+   6,
+   4,
+   5,
+   6,
+   6,
+   6,
+   5,
+   4,
+   4,
+   6,
+   5
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    3
+   ],
+   [
+    "vigilant",
+    9
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    4
+   ],
+   [
+    "styx",
+    8
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 3,
+  "seconds": 600.0
+ },
+ "ach1w_ach1": {
+  "battles": 24,
+  "astra": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0.8333333333333334,
+    "left_sd": 0.37267799624996495,
+    "dark": 0,
+    "hull_mean": 63.3
+   }
+  },
+  "astra_craft_lost": 0.16666666666666666,
+  "mandate": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0.6666666666666666,
+    "left_sd": 0.4714045207910317,
+    "dark": 0,
+    "hull_mean": 46.9375
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 0.16666666666666666,
+  "edge_sd": 0.6871842709362768,
+  "astra_wins": 0.3333333333333333,
+  "mandate_wins": 0.16666666666666666,
+  "decided_mean": 421.0214589436849,
+  "decided_sd": 164.82243610538055,
+  "edges": [
+   0,
+   0,
+   0,
+   1,
+   1,
+   1,
+   0,
+   0,
+   0,
+   1,
+   -1,
+   0,
+   0,
+   0,
+   -1,
+   0,
+   0,
+   1,
+   1,
+   1,
+   0,
+   -1,
+   1,
+   -1
+  ],
+  "astra_in": [
+   [
+    "acheron",
+    1
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    1
+   ]
+  ],
+  "wings": [
+   true,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "ach1sty2w_ach1sty2": {
+  "battles": 24,
+  "astra": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0.5833333333333334,
+    "left_sd": 0.4930066485916347,
+    "dark": 0.125,
+    "hull_mean": 60.357142857142854
+   },
+   "styx": {
+    "n": 2,
+    "left_mean": 1.875,
+    "left_sd": 0.33071891388307384,
+    "dark": 0.08333333333333333,
+    "hull_mean": 94.02222222222223
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0.20833333333333334,
+    "left_sd": 0.4061164310337068,
+    "dark": 0.2916666666666667,
+    "hull_mean": 46.6
+   },
+   "styx": {
+    "n": 2,
+    "left_mean": 1.8333333333333333,
+    "left_sd": 0.37267799624996495,
+    "dark": 0,
+    "hull_mean": 71.5
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 0.4166666666666667,
+  "edge_sd": 1.1516895800904379,
+  "astra_wins": 0.5833333333333334,
+  "mandate_wins": 0.2916666666666667,
+  "decided_mean": 369.0043601989746,
+  "decided_sd": 169.04343822614965,
+  "edges": [
+   2,
+   0,
+   1,
+   -1,
+   -1,
+   -1,
+   -1,
+   1,
+   -2,
+   2,
+   -1,
+   1,
+   1,
+   1,
+   0,
+   2,
+   1,
+   2,
+   0,
+   1,
+   1,
+   -1,
+   1,
+   1
+  ],
+  "astra_in": [
+   [
+    "acheron",
+    1
+   ],
+   [
+    "styx",
+    2
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    1
+   ],
+   [
+    "styx",
+    2
+   ]
+  ],
+  "wings": [
+   true,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae2vig4w_ach2sty4w": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 2,
+    "left_mean": 1.625,
+    "left_sd": 0.4841229182759271,
+    "dark": 0.16666666666666666,
+    "hull_mean": 75.38461538461539
+   },
+   "vigilant": {
+    "n": 4,
+    "left_mean": 4,
+    "left_sd": 0.0,
+    "dark": 0,
+    "hull_mean": 94.88541666666667
+   }
+  },
+  "astra_craft_lost": 16.75,
+  "mandate": {
+   "acheron": {
+    "n": 2,
+    "left_mean": 0,
+    "left_sd": 0.0,
+    "dark": 1,
+    "hull_mean": 0.0
+   },
+   "styx": {
+    "n": 4,
+    "left_mean": 3.4583333333333335,
+    "left_sd": 0.6441510347391795,
+    "dark": 0.3333333333333333,
+    "hull_mean": 85.43373493975903
+   }
+  },
+  "mandate_craft_lost": 9.708333333333334,
+  "edge_mean": 2.1666666666666665,
+  "edge_sd": 0.4714045207910317,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 535.5844294230143,
+  "decided_sd": 144.04967161392833,
+  "edges": [
+   2,
+   2,
+   3,
+   3,
+   2,
+   1,
+   3,
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    2
+   ],
+   [
+    "vigilant",
+    4
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    2
+   ],
+   [
+    "styx",
+    4
+   ]
+  ],
+  "wings": [
+   true,
+   true
+  ],
+  "groups": 2,
+  "seconds": 600.0
+ },
+ "prae3vig9_ach5sty10": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 3,
+    "left_mean": 0.375,
+    "left_sd": 0.4841229182759271,
+    "dark": 0.875,
+    "hull_mean": 66.55555555555556
+   },
+   "vigilant": {
+    "n": 9,
+    "left_mean": 5.208333333333333,
+    "left_sd": 1.9995659251169713,
+    "dark": 1.75,
+    "hull_mean": 87.256
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 5,
+    "left_mean": 0.6666666666666666,
+    "left_sd": 0.7453559924999299,
+    "dark": 1.5416666666666667,
+    "hull_mean": 85.4375
+   },
+   "styx": {
+    "n": 10,
+    "left_mean": 8.208333333333334,
+    "left_sd": 1.8925108248626274,
+    "dark": 0.6666666666666666,
+    "hull_mean": 91.02030456852792
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": -3.2916666666666665,
+  "edge_sd": 3.541176436659935,
+  "astra_wins": 0.20833333333333334,
+  "mandate_wins": 0.7916666666666666,
+  "decided_mean": 590.4594192504883,
+  "decided_sd": 45.75765233815616,
+  "edges": [
+   2,
+   -4,
+   -3,
+   -7,
+   -7,
+   -4,
+   1,
+   -7,
+   -5,
+   -2,
+   -4,
+   -2,
+   1,
+   5,
+   -4,
+   4,
+   -5,
+   -1,
+   -6,
+   -5,
+   -6,
+   -8,
+   -5,
+   -7
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    3
+   ],
+   [
+    "vigilant",
+    9
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    5
+   ],
+   [
+    "styx",
+    10
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 3,
+  "seconds": 600.0
+ },
+ "prae4vig12_ach5sty11lt4": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 4,
+    "left_mean": 0.6666666666666666,
+    "left_sd": 0.8498365855987975,
+    "dark": 1.1666666666666667,
+    "hull_mean": 83.0625
+   },
+   "vigilant": {
+    "n": 12,
+    "left_mean": 9.125,
+    "left_sd": 2.9341736485763756,
+    "dark": 1.125,
+    "hull_mean": 90.38812785388127
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 5,
+    "left_mean": 0.041666666666666664,
+    "left_sd": 0.19982631347136331,
+    "dark": 2.0416666666666665,
+    "hull_mean": 99.0
+   },
+   "lethe": {
+    "n": 4,
+    "left_mean": 2.3333333333333335,
+    "left_sd": 1.247219128924647,
+    "dark": 0.5416666666666666,
+    "hull_mean": 86.78571428571429
+   },
+   "styx": {
+    "n": 11,
+    "left_mean": 4.083333333333333,
+    "left_sd": 1.7539637649874324,
+    "dark": 2.875,
+    "hull_mean": 87.86734693877551
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 3.3333333333333335,
+  "edge_sd": 4.346134936801766,
+  "astra_wins": 0.8333333333333334,
+  "mandate_wins": 0.16666666666666666,
+  "decided_mean": 899.9273071289062,
+  "decided_sd": 0.0,
+  "edges": [
+   5,
+   11,
+   5,
+   5,
+   2,
+   4,
+   10,
+   6,
+   5,
+   4,
+   5,
+   1,
+   3,
+   1,
+   -5,
+   5,
+   7,
+   3,
+   -3,
+   -4,
+   8,
+   -7,
+   6,
+   3
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    4
+   ],
+   [
+    "vigilant",
+    12
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    5
+   ],
+   [
+    "styx",
+    11
+   ],
+   [
+    "lethe",
+    4
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 4,
+  "seconds": 900.0
+ },
+ "ach2sty3w_ach2sty3w": {
+  "battles": 24,
+  "astra": {
+   "acheron": {
+    "n": 2,
+    "left_mean": 0.3333333333333333,
+    "left_sd": 0.4714045207910317,
+    "dark": 0.7083333333333334,
+    "hull_mean": 63.75
+   },
+   "styx": {
+    "n": 3,
+    "left_mean": 2.9166666666666665,
+    "left_sd": 0.2763853991962833,
+    "dark": 0,
+    "hull_mean": 91.3
+   }
+  },
+  "astra_craft_lost": 15.208333333333334,
+  "mandate": {
+   "acheron": {
+    "n": 2,
+    "left_mean": 0.5416666666666666,
+    "left_sd": 0.49826086429589156,
+    "dark": 0.7083333333333334,
+    "hull_mean": 61.76923076923077
+   },
+   "styx": {
+    "n": 3,
+    "left_mean": 2.9166666666666665,
+    "left_sd": 0.2763853991962833,
+    "dark": 0,
+    "hull_mean": 93.94285714285714
+   }
+  },
+  "mandate_craft_lost": 17.625,
+  "edge_mean": -0.20833333333333334,
+  "edge_sd": 1.039998664529057,
+  "astra_wins": 0.3333333333333333,
+  "mandate_wins": 0.5416666666666666,
+  "decided_mean": 466.67026964823407,
+  "decided_sd": 160.59766188967484,
+  "edges": [
+   1,
+   -1,
+   0,
+   -1,
+   2,
+   -1,
+   1,
+   -1,
+   -1,
+   -1,
+   -1,
+   1,
+   -1,
+   1,
+   -1,
+   -1,
+   -2,
+   0,
+   1,
+   1,
+   -1,
+   1,
+   -1,
+   0
+  ],
+  "astra_in": [
+   [
+    "acheron",
+    2
+   ],
+   [
+    "styx",
+    3
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    2
+   ],
+   [
+    "styx",
+    3
+   ]
+  ],
+  "wings": [
+   true,
+   true
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae2vig6w_ach3sty6w": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 2,
+    "left_mean": 0,
+    "left_sd": 0.0,
+    "dark": 0.7916666666666666,
+    "hull_mean": 0.0
+   },
+   "vigilant": {
+    "n": 6,
+    "left_mean": 3.6666666666666665,
+    "left_sd": 0.8498365855987975,
+    "dark": 1,
+    "hull_mean": 86.23863636363636
+   }
+  },
+  "astra_craft_lost": 36.625,
+  "mandate": {
+   "acheron": {
+    "n": 3,
+    "left_mean": 1.125,
+    "left_sd": 0.6653633092779714,
+    "dark": 0.6666666666666666,
+    "hull_mean": 84.4074074074074
+   },
+   "styx": {
+    "n": 6,
+    "left_mean": 5.541666666666667,
+    "left_sd": 1.039998664529057,
+    "dark": 0.125,
+    "hull_mean": 94.86466165413533
+   }
+  },
+  "mandate_craft_lost": 9.416666666666666,
+  "edge_mean": -3,
+  "edge_sd": 1.7320508075688772,
+  "astra_wins": 0.08333333333333333,
+  "mandate_wins": 0.9166666666666666,
+  "decided_mean": 702.324785232544,
+  "decided_sd": 308.1364801115976,
+  "edges": [
+   -5,
+   -4,
+   -3,
+   -3,
+   -1,
+   -1,
+   -4,
+   -4,
+   -2,
+   -4,
+   -4,
+   -1,
+   2,
+   1,
+   -4,
+   -4,
+   -4,
+   -4,
+   -4,
+   -4,
+   -4,
+   -4,
+   -4,
+   -3
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    2
+   ],
+   [
+    "vigilant",
+    6
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    3
+   ],
+   [
+    "styx",
+    6
+   ]
+  ],
+  "wings": [
+   true,
+   true
+  ],
+  "groups": 2,
+  "seconds": 900.0
+ },
+ "vig4_sty4": {
+  "battles": 24,
+  "astra": {
+   "vigilant": {
+    "n": 4,
+    "left_mean": 2,
+    "left_sd": 0.408248290463863,
+    "dark": 0.5833333333333334,
+    "hull_mean": 87.29166666666667
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 4,
+    "left_mean": 1.25,
+    "left_sd": 0.4330127018922193,
+    "dark": 0.9583333333333334,
+    "hull_mean": 83.1
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 0.75,
+  "edge_sd": 0.7216878364870322,
+  "astra_wins": 0.75,
+  "mandate_wins": 0.08333333333333333,
+  "decided_mean": 488.2954686482747,
+  "decided_sd": 148.71866044683995,
+  "edges": [
+   1,
+   1,
+   1,
+   1,
+   0,
+   1,
+   -1,
+   1,
+   -1,
+   1,
+   1,
+   1,
+   2,
+   1,
+   1,
+   0,
+   1,
+   1,
+   0,
+   0,
+   1,
+   1,
+   2,
+   1
+  ],
+  "astra_in": [
+   [
+    "vigilant",
+    4
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    4
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "sty5_sty5": {
+  "battles": 24,
+  "astra": {
+   "styx": {
+    "n": 5,
+    "left_mean": 2.5416666666666665,
+    "left_sd": 0.5758447900452189,
+    "dark": 0.7916666666666666,
+    "hull_mean": 86.88524590163935
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "styx": {
+    "n": 5,
+    "left_mean": 2.2083333333333335,
+    "left_sd": 0.5758447900452189,
+    "dark": 1.125,
+    "hull_mean": 88.58490566037736
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 0.3333333333333333,
+  "edge_sd": 0.9428090415820634,
+  "astra_wins": 0.6666666666666666,
+  "mandate_wins": 0.3333333333333333,
+  "decided_mean": 536.507438659668,
+  "decided_sd": 121.73246364248018,
+  "edges": [
+   -1,
+   1,
+   1,
+   -1,
+   1,
+   1,
+   1,
+   -1,
+   -1,
+   1,
+   -1,
+   1,
+   -1,
+   1,
+   -1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   -1,
+   1
+  ],
+  "astra_in": [
+   [
+    "styx",
+    5
+   ]
+  ],
+  "mandate_in": [
+   [
+    "styx",
+    5
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae2_ach2": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 2,
+    "left_mean": 1.7916666666666667,
+    "left_sd": 0.4061164310337068,
+    "dark": 0,
+    "hull_mean": 74.51162790697674
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 2,
+    "left_mean": 0.875,
+    "left_sd": 0.33071891388307384,
+    "dark": 0.4583333333333333,
+    "hull_mean": 60.285714285714285
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 0.9166666666666666,
+  "edge_sd": 0.4930066485916347,
+  "astra_wins": 0.8333333333333334,
+  "mandate_wins": 0.0,
+  "decided_mean": 482.17750358581543,
+  "decided_sd": 132.2059870471214,
+  "edges": [
+   0,
+   1,
+   1,
+   0,
+   0,
+   1,
+   1,
+   2,
+   1,
+   2,
+   1,
+   1,
+   1,
+   1,
+   0,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    2
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    2
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "leth8_vig3": {
+  "battles": 24,
+  "astra": {
+   "lethe": {
+    "n": 8,
+    "left_mean": 7.041666666666667,
+    "left_sd": 0.5384519993050035,
+    "dark": 0.25,
+    "hull_mean": 96.11242603550296
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "vigilant": {
+    "n": 3,
+    "left_mean": 0.5833333333333334,
+    "left_sd": 0.4930066485916347,
+    "dark": 0.75,
+    "hull_mean": 59.785714285714285
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 6.458333333333333,
+  "edge_sd": 0.7626252174051302,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 320.9621623357137,
+  "decided_sd": 236.1416140796707,
+  "edges": [
+   6,
+   7,
+   8,
+   7,
+   6,
+   8,
+   6,
+   7,
+   6,
+   6,
+   6,
+   5,
+   6,
+   6,
+   7,
+   7,
+   6,
+   7,
+   6,
+   6,
+   6,
+   6,
+   8,
+   6
+  ],
+  "astra_in": [
+   [
+    "lethe",
+    8
+   ]
+  ],
+  "mandate_in": [
+   [
+    "vigilant",
+    3
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae1vig4_ach1sty3": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 1,
+    "left_mean": 0.75,
+    "left_sd": 0.4330127018922193,
+    "dark": 0,
+    "hull_mean": 65.33333333333333
+   },
+   "vigilant": {
+    "n": 4,
+    "left_mean": 4,
+    "left_sd": 0.0,
+    "dark": 0,
+    "hull_mean": 99.67708333333333
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0,
+    "left_sd": 0.0,
+    "dark": 0.375,
+    "hull_mean": 0.0
+   },
+   "styx": {
+    "n": 3,
+    "left_mean": 1.9583333333333333,
+    "left_sd": 0.19982631347136331,
+    "dark": 0.2916666666666667,
+    "hull_mean": 87.59574468085107
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": 2.7916666666666665,
+  "edge_sd": 0.49826086429589156,
+  "astra_wins": 1.0,
+  "mandate_wins": 0.0,
+  "decided_mean": 423.37708473205566,
+  "decided_sd": 192.53601758864983,
+  "edges": [
+   3,
+   3,
+   3,
+   2,
+   2,
+   3,
+   2,
+   3,
+   3,
+   3,
+   2,
+   3,
+   3,
+   3,
+   3,
+   2,
+   3,
+   3,
+   2,
+   4,
+   3,
+   3,
+   3,
+   3
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    1
+   ],
+   [
+    "vigilant",
+    4
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    1
+   ],
+   [
+    "styx",
+    3
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ },
+ "prae1vig2_ach1sty3": {
+  "battles": 24,
+  "astra": {
+   "praetorian": {
+    "n": 1,
+    "left_mean": 0.375,
+    "left_sd": 0.4841229182759271,
+    "dark": 0.2916666666666667,
+    "hull_mean": 38.22222222222222
+   },
+   "vigilant": {
+    "n": 2,
+    "left_mean": 2,
+    "left_sd": 0.0,
+    "dark": 0,
+    "hull_mean": 88.39583333333333
+   }
+  },
+  "astra_craft_lost": 0,
+  "mandate": {
+   "acheron": {
+    "n": 1,
+    "left_mean": 0.16666666666666666,
+    "left_sd": 0.37267799624996495,
+    "dark": 0.25,
+    "hull_mean": 51.0
+   },
+   "styx": {
+    "n": 3,
+    "left_mean": 2.4166666666666665,
+    "left_sd": 0.6400954789890507,
+    "dark": 0.125,
+    "hull_mean": 93.82758620689656
+   }
+  },
+  "mandate_craft_lost": 0,
+  "edge_mean": -0.20833333333333334,
+  "edge_sd": 1.1895085353016832,
+  "astra_wins": 0.4583333333333333,
+  "mandate_wins": 0.5,
+  "decided_mean": 412.68761825561523,
+  "decided_sd": 170.92100551194522,
+  "edges": [
+   -2,
+   1,
+   -2,
+   -1,
+   1,
+   -2,
+   1,
+   1,
+   1,
+   -1,
+   1,
+   1,
+   0,
+   1,
+   -1,
+   -1,
+   -1,
+   1,
+   -1,
+   -1,
+   -1,
+   -2,
+   1,
+   1
+  ],
+  "astra_in": [
+   [
+    "praetorian",
+    1
+   ],
+   [
+    "vigilant",
+    2
+   ]
+  ],
+  "mandate_in": [
+   [
+    "acheron",
+    1
+   ],
+   [
+    "styx",
+    3
+   ]
+  ],
+  "wings": [
+   false,
+   false
+  ],
+  "groups": 1,
+  "seconds": 600.0
+ }
+}
