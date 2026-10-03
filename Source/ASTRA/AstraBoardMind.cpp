@@ -246,7 +246,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 			Doors2.Add(MakeShared<FJsonValueObject>(O));
 		}
 		J->SetArrayField(TEXT("objective_entrances"), Doors2);
-		const int32 Amb = Fight.AmbushPortal();
+		const int32 Amb = bWeAttack ? INDEX_NONE : Fight.AmbushPortal();               // (the holders' plan is theirs: an attacker does not know it)
 		if (Amb != INDEX_NONE && Map->GetPortals().IsValidIndex(Amb))
 		{
 			const FBoardPortal& P = Map->GetPortals()[Amb];
@@ -309,7 +309,14 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::Snapshot() const
 	TSharedRef<FJsonObject> E = MakeShared<FJsonObject>();
 	E->SetNumberField(TEXT("down_or_dead"), B.Down[1] + B.Killed[1]);
 	E->SetNumberField(TEXT("left_ship"), B.Exited[1]);
-	J->SetObjectField(bWeAttack ? TEXT("defenders_known_losses") : TEXT("boarders_known_losses"), E);
+	if (bWeAttack)
+	{
+		J->SetObjectField(TEXT("defenders_known_losses"), E);       // (the marines attack: it is the ship's people who fall)
+	}
+	else
+	{
+		J->SetObjectField(TEXT("boarders_known_losses"), E);
+	}
 	int32 Sealed = 0;
 	for (const FBoardPortal& P : Map->GetPortals())
 	{
@@ -374,6 +381,42 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 	if (Name == TEXT("issue_weapon"))
 	{
 		return IssueWeapon(BdStr(Args, TEXT("kind")), BdStr(Args, TEXT("who")), OutDetail);       // the armourer sends a weapon up to the Captain (AstraBoardArms.cpp)
+	}
+	if (Name == TEXT("board_ship"))
+	{
+		// the crew's tool: the Aquila's marines in her Kestrels board a ship (`boats` is `craft`); `call_off` turns the boats back
+		TSharedPtr<FJsonObject> Out = MakeShared<FJsonObject>();
+		if (Args.IsValid())
+		{
+			Out->Values = Args->Values;
+		}
+		const FString Act = BdStr(Args, TEXT("action")).ToLower();
+		if (Act == TEXT("call_off"))
+		{
+			Out->SetStringField(TEXT("action"), TEXT("end"));
+		}
+		else
+		{
+			if (BdStr(Args, TEXT("target")).IsEmpty())
+			{
+				OutDetail = TEXT("name the ship to board (target: her contact id or name)");
+				return false;
+			}
+			Out->SetStringField(TEXT("direction"), TEXT("out"));
+			if (!Out->HasField(TEXT("craft")) && Out->HasField(TEXT("boats")))
+			{
+				Out->SetNumberField(TEXT("craft"), BdNum(Args, TEXT("boats"), 0.0));
+			}
+			if (!Out->HasField(TEXT("boarders")) && Out->HasField(TEXT("marines")))
+			{
+				Out->SetNumberField(TEXT("boarders"), BdNum(Args, TEXT("marines"), 0.0));
+			}
+			if (!Out->HasField(TEXT("by")))
+			{
+				Out->SetStringField(TEXT("by"), TEXT("the Captain's order"));
+			}
+		}
+		return HandleCommand(TEXT("boarding"), Out, OutDetail);
 	}
 	if (Name == TEXT("boarding"))
 	{

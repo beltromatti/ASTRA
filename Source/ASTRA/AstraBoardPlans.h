@@ -28,7 +28,8 @@ struct ASTRA_API FBoardShipPlan
 		FName Id;
 		int32 Comp = INDEX_NONE;
 		FName Face;                                 // port | starboard | dorsal | ventral | bow | stern
-		FVector Pos = FVector::ZeroVector;          // on the skin
+		FName Kind;                                 // hatch (a boat latches to it and the boarders cut in) | mouth (where the ship's own boats leave: not a way in)
+		FVector Pos = FVector::ZeroVector;          // on the skin (the room it opens into may stand a little inside it)
 		FVector Normal = FVector::ZeroVector;       // out of the hull
 		int32 Deck = 0;
 	};

@@ -94,6 +94,8 @@ public:
 	TSharedRef<FJsonObject> BoardingOptionsJson(int32 SideIdx) const;
 	/** True while an assault is flying, fighting or coming home (a new order is refused). */
 	bool IsAssaultOn() const { return Assault.bOn; }
+	/** The Aquila's own boats and the marines fit to go in them (ship_state.boarding_boats: the crew's tool `board_ship` exists where this does). Empty when the battle has no Aquila yet. */
+	TSharedRef<FJsonObject> BoatsJson() const;
 
 	// ------------------------------------------------------------------------------------------------ the Captain
 	/** A round of the Captain's struck a soldier (Damage: what it does after the range, Head: it hit the head). The soldier's wound; false when it did not count (a marine of

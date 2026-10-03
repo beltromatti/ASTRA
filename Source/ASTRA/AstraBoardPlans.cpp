@@ -128,10 +128,12 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::LoadFile(const FString& Path, FName 
 				}
 				FBoardShipPlan::FDock D;
 				D.Id = FName(*O->GetStringField(TEXT("id")));
-				FString CompId, Face;
+				FString CompId, Face, Kind;
 				O->TryGetStringField(TEXT("comp"), CompId);
 				O->TryGetStringField(TEXT("face"), Face);
+				O->TryGetStringField(TEXT("kind"), Kind);
 				D.Face = FName(*Face);
+				D.Kind = Kind.IsEmpty() ? FName(TEXT("hatch")) : FName(*Kind.ToLower());
 				if (const int32* C = P->Dmg->CompByName.Find(FName(*CompId)))
 				{
 					D.Comp = *C;

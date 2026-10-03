@@ -117,7 +117,9 @@ void UAstraBoardSubsystem::BuildAquilaPlan()
 		D.Id = C.Id;
 		D.Comp = i;
 		D.Face = bPort ? FName(TEXT("port")) : FName(TEXT("starboard"));
-		D.Pos = FVector(Mid.X, bPort ? C.Box.Min.Y : C.Box.Max.Y, Mid.Z);
+		D.Kind = FName(TEXT("hatch"));
+		const double HullX = Mid.X / 100.0 + AqPlan->OriginInHullM().X;
+		D.Pos = FVector(Mid.X, (bPort ? -1.0 : 1.0) * AstraBoardCraft::AquilaSkinM(HullX) * 100.0, Mid.Z);
 		D.Normal = FVector(0.0, bPort ? -1.0 : 1.0, 0.0);
 		D.Deck = C.Deck;
 		AqPlan->Docks.Add(D);
@@ -137,7 +139,22 @@ void UAstraBoardSubsystem::FillLeg(FLeg& L, const FBoardShipPlan& Plan, int32 Do
 	L.OutNormal = D.Normal.GetSafeNormal();
 	L.Into = -L.OutNormal;
 	L.HullM = Plan.PlanToHullM(D.Pos);
-	FVector In = D.Pos + L.Into * 90.0;
+	// the boat latches to the skin (D.Pos); the way in is the room's own outer wall, which may stand a little inside it: the breach is a step in from that wall
+	const FBox& Room = M.GetComps()[D.Comp].Box;
+	FVector Wall = D.Pos;
+	if (FMath::Abs(L.OutNormal.Y) > 0.5)
+	{
+		Wall.Y = L.OutNormal.Y > 0.0 ? Room.Max.Y : Room.Min.Y;
+	}
+	else if (FMath::Abs(L.OutNormal.X) > 0.5)
+	{
+		Wall.X = L.OutNormal.X > 0.0 ? Room.Max.X : Room.Min.X;
+	}
+	else
+	{
+		Wall.Z = L.OutNormal.Z > 0.0 ? Room.Max.Z : Room.Min.Z;
+	}
+	FVector In = Wall + L.Into * 90.0;
 	In.Z = M.GetComps()[D.Comp].FloorZ();
 	L.InCm = M.Inset(D.Comp, In, 60.f);
 	L.PlaceText = M.Describe(D.Comp);
@@ -183,6 +200,10 @@ bool UAstraBoardSubsystem::ChooseHatches(const FBoardShipPlan& Plan, const FStri
 	for (int32 i = 0; i < Plan.Docks.Num(); ++i)
 	{
 		const FBoardShipPlan::FDock& D = Plan.Docks[i];
+		if (D.Kind == FName(TEXT("mouth")) && i != First)
+		{
+			continue;                                    // (a boat's mouth is no way in)
+		}
 		const bool bFaceOk = WantFace.IsEmpty() || WantFace == TEXT("any") ? FVector::DotProduct(D.Normal.GetSafeNormal(), Dir) > -0.2 : D.Face.ToString().Equals(WantFace, ESearchCase::IgnoreCase);
 		if (bFaceOk || i == First)
 		{
@@ -1316,18 +1337,36 @@ void UAstraBoardSubsystem::OnRemoteOutcome()
 		{
 			Bat->CaptureShip(Assault.TargetId, bUs ? FString(TEXT("the Aquila's marines")) : FString(TEXT("Mandate boarders")), Detail, bUs ? 0 : 1);
 		}
-		Tell(bUs ? FString::Printf(TEXT("%s is ours: the marines hold %s and her people have laid down their arms; her commander and the survivors of her crew are in custody. %s"), *Assault.TargetName,
-		                           *Map->Describe(M.Objective), *Tally)
-		         : FString::Printf(TEXT("the Mandate's boarders hold %s on %s: she is theirs. %s"), *Map->Describe(M.Objective), *Assault.TargetName, *Tally), true);
+		if (bUs)
+		{
+			Tell(FString::Printf(TEXT("%s is ours: the marines hold %s and her people have laid down their arms; her commander and the survivors of her crew are in custody. %s"), *Assault.TargetName,
+			                     *Map->Describe(M.Objective), *Tally), true);
+		}
+		else
+		{
+			Tell(FString::Printf(TEXT("the Mandate's boarders hold %s on %s: she is theirs. %s"), *Map->Describe(M.Objective), *Assault.TargetName, *Tally), true);
+		}
 		break;
-	}
-	case EOutcome::DefenderHolds:
-		Tell(bUs ? FString::Printf(TEXT("the boarding of %s has failed: every marine on her decks is down or out, and she holds. %s"), *Assault.TargetName, *Tally)
-		         : FString::Printf(TEXT("the boarders on %s are beaten: she holds. %s"), *Assault.TargetName, *Tally), true);
+		}
+		case EOutcome::DefenderHolds:
+		if (bUs)
+		{
+			Tell(FString::Printf(TEXT("the boarding of %s has failed: every marine on her decks is down or out, and she holds. %s"), *Assault.TargetName, *Tally), true);
+		}
+		else
+		{
+			Tell(FString::Printf(TEXT("the boarders on %s are beaten: she holds. %s"), *Assault.TargetName, *Tally), true);
+		}
 		break;
-	case EOutcome::AttackerRepelled:
-		Tell(bUs ? FString::Printf(TEXT("the marines have broken off and are back in their boats: %s still holds out. %s"), *Assault.TargetName, *Tally)
-		         : FString::Printf(TEXT("the boarders have broken off from %s. %s"), *Assault.TargetName, *Tally), true);
+		case EOutcome::AttackerRepelled:
+		if (bUs)
+		{
+			Tell(FString::Printf(TEXT("the marines have broken off and are back in their boats: %s still holds out. %s"), *Assault.TargetName, *Tally), true);
+		}
+		else
+		{
+			Tell(FString::Printf(TEXT("the boarders have broken off from %s. %s"), *Assault.TargetName, *Tally), true);
+		}
 		break;
 	case EOutcome::TimedOut:
 		Tell(FString::Printf(TEXT("the fight on %s has gone quiet: the objective is not taken. %s"), *Assault.TargetName, *Tally), true);
@@ -1373,11 +1412,80 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::AssaultJson() const
 	return J;
 }
 
+TSharedRef<FJsonObject> UAstraBoardSubsystem::BoatsJson() const
+{
+	TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+	const UAstraBattleSubsystem* B = Battle();
+	const int32 Me = B ? B->ResolveShip(TEXT("aquila")) : -1;
+	if (Me < 0)
+	{
+		return J;
+	}
+	const AstraBoardCraft::FBay Bay = B->BoardBayOf(Me);
+	J->SetNumberField(TEXT("kestrels_free"), Bay.Free());
+	J->SetNumberField(TEXT("kestrels_in_all"), Bay.Total - Bay.Lost);
+	J->SetNumberField(TEXT("marines_in_a_kestrel"), AstraBoardCraft::Kestrel().Men);
+	J->SetStringField(TEXT("bay"), TEXT("the assault-shuttle bay on Deck 8 (port side)"));
+	// the marines fit to go: awake or not, on their feet, aboard, not in a fight (the commander stays on the net)
+	const UAstraLifeSubsystem* L = LifeSub();
+	const UAstraShipSubsystem* S = ShipSub();
+	if (L && L->IsRunning() && S)
+	{
+		const FAstraLifeSim& LS = L->Sim();
+		const TArray<FAstraCrewman>& Crew = S->GetRoster().Get();
+		int32 Fit = 0, Away = 0;
+		for (int32 p = 0; p < LS.NumPeople(); ++p)
+		{
+			const FAstraLifePerson& P = LS.Person(p);
+			if (!Crew.IsValidIndex(P.Roster) || !Crew[P.Roster].Dept.Equals(TEXT("marines"), ESearchCase::IgnoreCase) || Crew[P.Roster].Rank.Equals(TEXT("Captain")))
+			{
+				continue;
+			}
+			if (LS.IsOffShip(p))
+			{
+				++Away;
+			}
+			else if (P.Status == 0 && P.Act != EAstraLifeAct::Dead && P.Act != EAstraLifeAct::Patient && P.Act != EAstraLifeAct::Repair && !P.bCommandeered)
+			{
+				++Fit;
+			}
+		}
+		J->SetNumberField(TEXT("marines_fit_to_go"), Fit);
+		if (Away > 0)
+		{
+			J->SetNumberField(TEXT("marines_away_from_the_ship"), Away);
+		}
+	}
+	return J;
+}
+
 TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx) const
 {
 	TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
 	const UAstraBattleSubsystem* B = Battle();
-	if (!B || Assault.bOn)
+	if (Assault.bOn)
+	{
+		// the side that sent the boats follows them: where each is and, once they are in, how many of its men fight and what they hold (its officers hear its own men on the radio)
+		if ((SideIdx == 1) == (Assault.Attacker == ESide::Mandate))
+		{
+			J->SetObjectField(TEXT("assault"), AssaultJson());
+			if (Phase == EPhase::Active && Map.IsValid())
+			{
+				TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+				const ESide Mine = Assault.Attacker;
+				const FBook& Bk = Fight.Book();
+				F->SetNumberField(TEXT("your_men_able"), Fight.CountAble(Mine));
+				F->SetNumberField(TEXT("your_men_down_or_dead"), Bk.Down[(int32)Mine] + Bk.Killed[(int32)Mine]);
+				F->SetNumberField(TEXT("your_men_back_in_the_boats"), Bk.Exited[(int32)Mine]);
+				F->SetStringField(TEXT("objective"), Map->Describe(Fight.Mission().Objective));
+				F->SetNumberField(TEXT("objective_held_s"), FMath::RoundToInt(Fight.Mission().HeldS));
+				F->SetNumberField(TEXT("fight_s"), FMath::RoundToInt(Since));
+				J->SetObjectField(TEXT("fight"), F);
+			}
+		}
+		return J;
+	}
+	if (!B)
 	{
 		return J;
 	}

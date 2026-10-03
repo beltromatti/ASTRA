@@ -46,6 +46,25 @@ namespace AstraBoardCraft
 		return nullptr;
 	}
 
+	double AquilaSkinM(double HullXm)
+	{
+		// the half beam of her plating at the decks of the airlocks (z about 0 to 14 m), sampled on the mesh: constant along the middle, narrowing towards the bow
+		static const double X[] = {170.0, 188.0, 212.0, 236.0, 260.0};
+		static const double Y[] = {50.6, 49.5, 47.35, 45.2, 43.2};
+		if (HullXm <= X[0])
+		{
+			return 50.7;
+		}
+		for (int32 i = 1; i < UE_ARRAY_COUNT(X); ++i)
+		{
+			if (HullXm <= X[i])
+			{
+				return Y[i - 1] + (Y[i] - Y[i - 1]) * (HullXm - X[i - 1]) / (X[i] - X[i - 1]);
+			}
+		}
+		return Y[UE_ARRAY_COUNT(Y) - 1];
+	}
+
 	FBerths BerthsOf(FName ClassKey, const FVector& HullHalfM, float HullMidM)
 	{
 		FBerths B;
@@ -54,7 +73,7 @@ namespace AstraBoardCraft
 		{
 			B.Kind = &Kestrel();
 			B.Count = 2;
-			B.Bay = FVector(212.0, -46.0, 2.0);       // Deck 8's assault-shuttle bay (d8_shuttle_bay_B1: the plan's x 24..56, y -38..-22, with the hull's origin 172 m ahead of the bridge) opens on the port side
+			B.Bay = FVector(212.0, -AquilaSkinM(212.0), 2.0);       // Deck 8's assault-shuttle bay (d8_shuttle_bay_B1: the plan's x 24..56, y -38..-22, with the hull's origin 172 m ahead of the bridge) opens on the port side, on her plating
 			B.BayNormal = FVector(0.0, -1.0, 0.0);
 			return B;
 		}

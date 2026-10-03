@@ -58,7 +58,7 @@ EXCHANGE_S = 25.0               # somebody on the net called the Captain this lo
 AFTERMATH_S = 75.0              # the net stays open this long after the fight (the Captain asks for the count, thanks them)
 
 TONES = ("calm", "focused", "urgent", "tense", "dry", "warm", "grim")
-TASKS = ("hold", "advance", "assault", "fall_back", "follow_captain", "rescue_captain", "stand_down")
+TASKS = ("hold", "advance", "assault", "fall_back", "withdraw", "follow_captain", "rescue_captain", "stand_down")
 
 
 # ------------------------------------------------------------------------------------------------ the people
@@ -125,7 +125,16 @@ class Kind:
 # it wakes a pulse and is not taken (the bridge has it). A new template is one line here.
 _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k) for p, k in (
     (r"^boarding: .+ has docked \d+ assault craft", Kind("docked", False)),
+    (r"^boarding: .+ has launched \d+ assault craft at the Aquila", Kind("docked", False)),            # (the Mandate's boats are out: the alarm, the fight begins for the net)
+    (r"^boarding: .+ has latched to .+ and cut in", Kind("docked", False)),                           # (the marines' own boat has cut in on another ship: their assault begins for the net)
     (r"^boarding: the hull is cut open", Kind("breach", False)),
+    (r"^boarding: .+ has cut in at ", Kind("breach", False)),
+    (r"^boarding: .+ was destroyed \(.+\) with \d+ marines aboard", Kind("boat_lost", True, call=True)),   # (one of the marines' boats shot down with them in it: Reyes says it)
+    (r"^boarding: .+ has been destroyed \(.+\): its \d+ boarders are lost", Kind("boat_lost", False)),
+    (r"^boarding: .+ has turned back \(", Kind("boat_back", False)),
+    (r"^boarding: .+ is back in the boat bay", Kind("home", False, wake=False)),
+    (r"^boarding: (?:.+ is sending \d+ .+ to board |the boarding of .+ (?:is off|could not be set up)|the boats of .+ never left|.+ is latched to .+ but the fight|.+ could not cut in at|"
+     r".+ could not come home|the boarders have nothing to go for|.+ was destroyed \()", Kind("assault_log", False, wake=False)),
     (r"^boarding: contact: ", Kind("contact", True, call=True)),
     (r"^boarding: .+ is dead at ", Kind("dead", True, call=True)),
     (r"^boarding: .+ is down, wounded, at ", Kind("down", True)),
@@ -137,6 +146,13 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
     (r"^boarding: Main Engineering is lost", Kind("lost", False)),
     (r"^boarding: the boarders hold Main Engineering", Kind("takeover", False)),
     (r"^boarding: the (?:boarders are beaten|boarders have broken off|fight has gone quiet)", Kind("outcome", True, call=True)),
+    (r"^boarding: not one boarder reached the ship", Kind("outcome", True, call=True)),
+    (r"^boarding: .+ is ours: the marines hold ", Kind("outcome", True, call=True)),                  # (the marines' assault: the ship is taken)
+    (r"^boarding: the boarding of .+ has failed", Kind("outcome", True, call=True)),
+    (r"^boarding: the marines have broken off and are back in their boats", Kind("outcome", True, call=True)),
+    (r"^boarding: the fight on .+ has gone quiet", Kind("outcome", True, call=True)),
+    (r"^boarding: the Mandate's boarders hold .+: she is theirs", Kind("takeover", False)),
+    (r"^boarding: the boarders (?:on .+ are beaten|have broken off from)", Kind("assault_log", False, wake=False)),                  # (a consort's fight: the bridge's news, not the marines')
     (r"^boarding: marines: \d+ dead", Kind("tally", False, wake=False)),
     (r"^boarding: the boarding is called off", Kind("off", False, wake=False)),
 ))
@@ -185,9 +201,10 @@ SAY = _fn("say", "Say one line on the marine net: the Captain and the bridge hea
 
 ORDER = _fn("order", "Give a squad (or several) an order: it takes effect at once and stands until changed; the answer says what the squads will do, or why they cannot. Major "
                      "Reyes orders any squad, a squad leader only his own. hold: take the corners of the place and hold it · advance: go there in column, taking cover if "
-                     "they meet the enemy on the way · assault: rush there and fight at it (fast, and costly) · fall_back: pull back there and hold · follow_captain: stay with the "
+                     "they meet the enemy on the way · assault: rush there and fight at it (fast, and costly) · fall_back: pull back there and hold · withdraw: (the marines are "
+                     "boarding a ship) leave her by the hatch the squad came in by, back into the boat · follow_captain: stay with the "
                      "Captain wherever he goes · rescue_captain: go to the Captain, cover him and carry him out if he is down · stand_down: back to their own drill (the default "
-                     "ambush), the order is lifted.", {
+                     "ambush when defending, the way to the objective when attacking), the order is lifted.", {
     "by": {"type": "string", "description": "who gives the order: `reyes`, or the key of a squad from the board (marine_reaction_1)"},
     "squad": {"type": "string", "description": "a squad's name from the board (Reaction 1), or `all`, `reaction`, `watch`, `reserve`"},
     "task": {"type": "string", "enum": list(TASKS)},
@@ -197,9 +214,9 @@ ORDER = _fn("order", "Give a squad (or several) an order: it takes effect at onc
     "reason": {"type": "string", "description": "one sentence in English, for the log"}},
     ["by", "squad", "task"])
 
-BULKHEADS = _fn("bulkheads", "Security console (Major Reyes): seal or open pressure bulkheads. A sealed bulkhead splits the section: the boarders must cut through it (about twenty "
+BULKHEADS = _fn("bulkheads", "Security console (Major Reyes), only while the marines DEFEND the Aquila: seal or open pressure bulkheads. A sealed bulkhead splits the section: the boarders must cut through it (about twenty "
                              "seconds each) and nobody else passes, the marines included; an opened one lets everyone through. `doors`: ids from the board's bulkheads; leave it "
-                             "out for every bulkhead round the breach.", {
+                             "out for every bulkhead round the breach. (Another ship's bulkheads are not yours to seal.)", {
     "action": {"type": "string", "enum": ["seal", "open"]},
     "doors": {"type": "array", "items": {"type": "string"}, "description": "bulkhead ids from the board"},
     "reason": {"type": "string", "description": "one sentence in English, for the log"}},
@@ -250,6 +267,20 @@ THE FIGHT, AS EVERYONE IN THE DETACHMENT KNOWS IT
   squads inside his orders.
 - The bridge has its own officers (the XO, Tactical, Operations...): they report the ship's side of it and run the ship. You are the marines: their news is yours, the ship's
   is theirs. What the bridge said on the net is in the log; do not say it again.
+
+WHEN THE MARINES BOARD A SHIP (the board says `role: attacking`: the Aquila's marines are the boarders)
+- The Aquila's assault shuttles (Kestrels, twelve marines each) docked at hatches on another ship's hull and the marines cut in. The board names the ship, where each squad came in, the objective
+  (her commander's suite, her bridge, her engineering...) and the ways to it. The ship's own people hold it: posts at the bridge, engineering, the commander's guard, the armoury, a few roaming
+  from the berthing decks who arm and answer the alarm. A ship that has lost her power has her corridors dark, no sensors, and fewer of her people on their feet; one with power sees the marines
+  on her own. You see only what your people see (the board's `defenders as they are known`): never invent what is behind a door.
+- The drill is the attackers': left alone the squads go for the objective along the best way in column, take cover where they meet fire and send a pair round, cut through a sealed bulkhead in
+  about twenty seconds, and they never break off by themselves. A marine who goes down bleeds out in about two minutes unless the fight reaches him: pushing hard costs marines, and the
+  wounded of a squad that moves on are lost. Two hatches are two entrances: a pincer into the same objective is a Major's order (say, one squad holds the corridor the defenders will use while the other
+  goes in by the second hatch); a squad that is mauled `withdraw`s through its hatch to the boat, the others go on or come out too. The boats wait at the hatches and go home with whoever is aboard;
+  a boat that is shot at while it waits is a boat lost.
+- `bulkheads` is for defending the Aquila: another ship's are not yours to seal. `hold` at a place the squad has taken, `advance` toward the next, `assault` into defenders in cover costs marines (at
+  two to one, or to relieve a squad), `fall_back` to a place on your own way, `withdraw` out of the ship. What the Captain asks of the Major in an assault is the commander's trade: the objective,
+  the risks, when to get out; Reyes advises, the Captain decides.
 
 WHEN YOU SPEAK
 - Only when something happens to your marines or to the fight, or when the Captain speaks to you. Silence is normal: when the board shows what the Captain can see and nothing needs
@@ -645,13 +676,21 @@ class MarineMinds:
         cap = str(state.get("captain") or "")
         if cap:
             lines.append(f" where the Captain is: {cap[:260]}")
-        lines.append(f" the fight: {_n(pic.get('elapsed_s'))} s since the alarm; the boarders came in at {pic.get('breach', '?')} (the hull is {'open' if pic.get('breach_open') else 'not cut yet'}); "
-                     f"they go for {pic.get('objective', 'Main Engineering')} [id {pic.get('objective_id', '?')}]")
+        attack = str(pic.get("role") or "defending") == "attacking"
+        ship = str(pic.get("ship") or "the Aquila")
+        if attack:
+            lines.append(f" the assault: your marines are boarding {ship}" + (f" ({pic['ship_class']})" if pic.get("ship_class") else "")
+                         + f"; {_n(pic.get('elapsed_s'))} s since the first boat cut in; they came in at {pic.get('breach', '?')}; the objective is {pic.get('objective', '?')} "
+                         f"[id {pic.get('objective_id', '?')}]")
+        else:
+            lines.append(f" the fight: {_n(pic.get('elapsed_s'))} s since the alarm; the boarders came in at {pic.get('breach', '?')} (the hull is {'open' if pic.get('breach_open') else 'not cut yet'}); "
+                         f"they go for {pic.get('objective', 'Main Engineering')} [id {pic.get('objective_id', '?')}]")
         b = boarding_of(state)
         if b:
-            m, e = b.get("marines") or {}, b.get("boarders_known_losses") or {}
-            lines.append(f" the count: marines {_n(m.get('able'))} able, {_n(m.get('down'))} down, {_n(m.get('dead'))} dead; of the boarders {_n(e.get('down_or_dead'))} known down or dead, "
-                         f"{_n(e.get('left_ship'))} gone back through the breach")
+            m, e = b.get("marines") or {}, b.get("defenders_known_losses" if attack else "boarders_known_losses") or {}
+            lines.append(f" the count: marines {_n(m.get('able'))} able, {_n(m.get('down'))} down, {_n(m.get('dead'))} dead; "
+                         + (f"of the ship's people {_n(e.get('down_or_dead'))} known down or dead, {_n(e.get('left_ship'))} out of the fight" if attack
+                            else f"of the boarders {_n(e.get('down_or_dead'))} known down or dead, {_n(e.get('left_ship'))} gone back through the breach"))
         lines.append(" your squads (speaker key — name; leader):")
         cap_at = ((pic.get("captain") or {}).get("where_id") or "")
         for key, s in self.squads.items():
@@ -669,20 +708,23 @@ class MarineMinds:
         if not self.squads:
             lines.append("  (none yet)")
         hs = pic.get("hostiles_known") or []
-        lines.append(" the boarders as they are known (the corridors' sensors and what the marines have seen; it can be old): "
+        lines.append((" the ship's people as they are known (only what your marines have seen: it can be old): " if attack
+                      else " the boarders as they are known (the corridors' sensors and what the marines have seen; it can be old): ")
                      + ("; ".join(f"{_n(h.get('count'))} at {h.get('where')} [id {h.get('where_id')}], {_n(h.get('age_s'))} s ago" for h in hs) if hs else "none in sight"))
         ap = pic.get("likely_approach") or []
         if ap:
-            lines.append(" the boarders' likely way from the breach to Main Engineering: " + " > ".join(f"{a.get('name')} [id {a.get('id')}]" for a in ap))
+            lines.append((" your likely way from the hatch to the objective: " if attack else " the boarders' likely way from the breach to Main Engineering: ")
+                         + " > ".join(f"{a.get('name')} [id {a.get('id')}]" for a in ap))
         en = pic.get("objective_entrances") or []
         if en:
-            lines.append(" the ways into Main Engineering: " + "; ".join(f"{a.get('name')} [id {a.get('id')}]" for a in en))
+            lines.append((" the ways into the objective: " if attack else " the ways into Main Engineering: ") + "; ".join(f"{a.get('name')} [id {a.get('id')}]" for a in en))
         am = pic.get("default_ambush")
         if isinstance(am, dict):
             lines.append(f" the default ambush (where the drill sends the squads): {am.get('between')} [ids {am.get('id_a')}, {am.get('id_b')}]")
         bk = pic.get("bulkheads") or []
         if bk:
-            lines.append(" the pressure bulkheads round the breach: " + "; ".join(f"{d.get('id')} between {d.get('between')}: {'SEALED' if d.get('sealed') else 'open'}" for d in bk))
+            lines.append((" the pressure bulkheads near your hatch (your marines cut through a sealed one in about twenty seconds): " if attack else " the pressure bulkheads round the breach: ")
+                         + "; ".join(f"{d.get('id')} between {d.get('between')}: {'SEALED' if d.get('sealed') else 'open'}" for d in bk))
         c = pic.get("captain")
         if isinstance(c, dict):
             armed = (b.get("captain") or {}).get("armed") if b else ""

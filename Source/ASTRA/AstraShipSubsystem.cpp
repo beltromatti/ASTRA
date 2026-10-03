@@ -2043,7 +2043,7 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		return St ? St->SetMode(Args, By.IsEmpty() ? TEXT("officer") : By, OutDetail) : false;
 	}
 	// ABBORDAGGI: a boarding and the marines' orders are the board subsystem's
-	if (Name == TEXT("boarding") || Name == TEXT("marine_order") || Name == TEXT("lockdown") || Name == TEXT("issue_weapon"))
+	if (Name == TEXT("boarding") || Name == TEXT("board_ship") || Name == TEXT("marine_order") || Name == TEXT("lockdown") || Name == TEXT("issue_weapon"))
 	{
 		UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr;
 		if (!Board)
@@ -3017,6 +3017,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && Board->IsReady())
 	{
 		S->SetObjectField(TEXT("arms"), Board->ArmsJson());      // ABBORDAGGI: where the Captain's weapons are, what he carries, the armourer's errand (the crew's tool: issue_weapon)
+		if (const TSharedRef<FJsonObject> Boats = Board->BoatsJson(); Boats->Values.Num())
+		{
+			S->SetObjectField(TEXT("boarding_boats"), Boats);   // (and the Aquila's own boats and the marines fit to go in them: the crew's tool board_ship)
+		}
 	}
 	return S;
 }
