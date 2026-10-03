@@ -226,13 +226,20 @@ namespace AstraSpace
 
 	struct FSlot
 	{
-		FVector Pos = FVector::ZeroVector;                      // system frame
+		FVector Pos = FVector::ZeroVector;                      // system frame: the centre of a hull as long as MaxLen (its bow at the pier's collar)
 		FQuat Att = FQuat::Identity;
 		FVector Approach = FVector::ZeroVector;
 		float MaxLen = 400.f;
 		uint32 Roles = 0;
 		int32 Occupant = INDEX_NONE;                            // a vessel's id: it lies here
 		int32 Reserved = INDEX_NONE;                            // a vessel's id: it is coming
+
+		/** Where the centre of a hull of this length lies in the berth: every hull comes in bow first and its bow always meets the pier's collar, so a shorter hull lies
+		 *  further out along the berth's axis than a long one. */
+		FVector CentreFor(float Length) const
+		{
+			return Pos + Att.GetForwardVector() * (double)(FMath::Max(0.f, MaxLen - Length) * 0.5f);
+		}
 	};
 
 	/** A place as the traffic knows it. */

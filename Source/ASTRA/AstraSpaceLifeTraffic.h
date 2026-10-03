@@ -226,6 +226,8 @@ namespace AstraSpace
 		void TickPatrols(float Dt, double Now, const FWorldView& View);
 		void Avoid(FVessel& V, const FWorldView& View, FVector& InOutAccel) const;
 		const FHullDef* HullOf(const FVessel& V) const { return Set->Hull(V.Hull); }
+		/** The length of a vessel's hull (what a berth needs to place it: its bow meets the pier's collar). */
+		float HullLen(const FVessel& V) const { const FHullDef* H = HullOf(V); return H ? H->Length : 0.f; }
 		FString Where(const FVector& From, const FVector& P) const;
 		void RebuildStats();
 	};

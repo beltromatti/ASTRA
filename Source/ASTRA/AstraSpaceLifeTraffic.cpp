@@ -141,7 +141,7 @@ namespace AstraSpace
 				Sl.Occupant = V.Id;
 				V.Slot = S;
 				V.State = EVState::Docked;
-				V.Pos = Sl.Pos;
+				V.Pos = Sl.CentreFor(HullLen(V));
 				V.Att = Sl.Att;
 				V.DwellLeft = Rng.FRandRange((float)V.Dwell.X, (float)V.Dwell.Y) * Rng.FRand();
 				return true;
@@ -453,7 +453,7 @@ namespace AstraSpace
 		if (V.Slot != INDEX_NONE && From.Slots.IsValidIndex(V.Slot))
 		{
 			const FSlot& S = From.Slots[V.Slot];
-			V.DockPos = S.Pos;
+			V.DockPos = S.CentreFor(HullLen(V));
 			V.DockBack = (S.Approach - S.Pos).GetSafeNormal();
 		}
 		const int32 FromNode = V.Node;
@@ -505,7 +505,7 @@ namespace AstraSpace
 			{
 				V.Route.Reset();
 				V.Route.Add(N.Slots[S].Approach);
-				V.Route.Add(N.Slots[S].Pos);
+				V.Route.Add(N.Slots[S].CentreFor(HullLen(V)));
 				V.RouteIdx = 0;
 				SetState(V, EVState::Docking);
 				return;
@@ -741,7 +741,7 @@ namespace AstraSpace
 				FSlot& S = L->Nodes[V.Node].Slots[V.Slot];
 				S.Reserved = INDEX_NONE;
 				S.Occupant = V.Id;
-				V.Pos = S.Pos;
+				V.Pos = S.CentreFor(HullLen(V));
 				V.Vel = FVector::ZeroVector;
 				V.Att = S.Att;
 				V.Thrust = 0.f;
@@ -784,7 +784,7 @@ namespace AstraSpace
 					const FNode& N = L->Nodes[V.Node];
 					V.Route.Reset();
 					V.Route.Add(N.Slots[S].Approach);
-					V.Route.Add(N.Slots[S].Pos);
+					V.Route.Add(N.Slots[S].CentreFor(HullLen(V)));
 					V.RouteIdx = 0;
 					SetState(V, EVState::Docking);
 				}
