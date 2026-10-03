@@ -456,6 +456,9 @@ public:
 	/** The Captain takes the stick back (or the guidance is no longer wanted). */
 	void StopPilotRecovery(const FString& Why);
 	bool IsPilotRecovering() const { return bPilotAuto; }
+	/** The opening's own script for the strike group, the vanguard and the relief (stages 2-3), or the March playing them (CAMPAGNA): false when
+	 *  the strike group is already in. */
+	bool SetOpeningScript(bool bScript, FString& OutDetail);
 	bool IsPiloting() const { return PilotedId >= 0; }
 	int32 GetPilotedId() const { return PilotedId; }
 	/** Where the Captain is, for the crew: flying (with range and state) or "" when aboard. */
@@ -713,6 +716,7 @@ private:
 	TSharedPtr<FJsonObject> TransitBeat; // the destination of the Janus transit under way (system name and look)
 	EAstraGateRun GateRun = EAstraGateRun::None;
 	int32 GateLandmark = INDEX_NONE;    // the system's Janus Gate in Landmarks
+	bool bOpeningScript = true;         // the opening's stages 2 and 3 (strike group, vanguard, relief): off when the March plays them
 	float GateSide = 1.f;               // the face of the ring we approach (+1 = along the gate's axis)
 	float GateSteerT = 0.f;
 	FString GateDest;                   // destination of the run under way

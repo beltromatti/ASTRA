@@ -2130,6 +2130,19 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 		                                : FString(TEXT("holo table: tactical plot"));
 		return true;
 	}
+	if (Name == TEXT("opening"))
+	{
+		// the March (CAMPAGNA) asks once, on a new campaign, to play the opening's forces itself
+		UAstraBattleSubsystem* B = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+		bool bScript = true;
+		Args->TryGetBoolField(TEXT("script"), bScript);
+		if (!B)
+		{
+			OutDetail = TEXT("no battle");
+			return false;
+		}
+		return B->SetOpeningScript(bScript, OutDetail);
+	}
 	if (Name == TEXT("eagle_recover"))
 	{
 		// the deck's recovery guidance takes the Captain's Falcon (an automatic carrier landing): Flight Control on the bridge or the flight net calls it

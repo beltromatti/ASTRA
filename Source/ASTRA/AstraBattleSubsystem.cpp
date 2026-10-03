@@ -893,6 +893,13 @@ void UAstraBattleSubsystem::TickSensors(float Dt)
 				Best = FMath::Max(Best, Sense(A.Pos, (A.bCraft ? 10.f : 30.f) * (Jammed(A.Pos, S.Pos) ? 0.45f : 1.f), A.bCraft));
 			}
 		}
+		if (Landmarks.IsValidIndex(GateLandmark) && S.Side == EAstraSide::Mandate)
+		{
+			// Keeper Station's traffic radar watches the Gate's approaches (~60 km) and shares its tracks with the fleet by datalink: a force that comes
+			// through is seen crossing towards the Aquila for minutes (CAMPAGNA: a force spawned dark was found only at 15-20 km, whatever its distance)
+			const FVector GatePos = Landmarks[GateLandmark].Pos;
+			Best = FMath::Max(Best, Sense(GatePos, 60.f * (Jammed(GatePos, S.Pos) ? 0.45f : 1.f), false));
+		}
 		bool bCrossFix = false;
 		if (S.bJamming)
 		{
@@ -1038,6 +1045,20 @@ void UAstraBattleSubsystem::TickPlayer(float Dt)
 	}
 }
 
+bool UAstraBattleSubsystem::SetOpeningScript(bool bScript, FString& OutDetail)
+{
+	if (!bScript && StageDone >= 2)
+	{
+		OutDetail = TEXT("the opening's strike group is already in the fight: the script stays");
+		return false;
+	}
+	bOpeningScript = bScript;
+	OutDetail = bScript ? TEXT("the opening plays its own script (the strike group, the vanguard, the relief)")
+	                    : TEXT("the opening's script is off after the Lethe and the freighter: the March sends the strike group, the vanguard and the relief");
+	UE_LOG(LogASTRA, Log, TEXT("[Battle] %s"), *OutDetail);
+	return true;
+}
+
 void UAstraBattleSubsystem::TickScenario(float Dt)
 {
 	if (bSandbox)
@@ -1068,8 +1089,8 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 		Report(TEXT("sensors: contact T-11 has lit its drive and is accelerating towards the freighter Brightwater (T-07); "
 		            "drive signature matches a Kharon Mandate frigate, Lethe class"));
 	}
-	// stage 2: the strike group arrives from the Janus Gate side
-	if (StageDone == 1 && Time > 170.f)
+	// stage 2: the strike group arrives from the Janus Gate side (unless the March plays the opening: `opening {"script": false}`)
+	if (bOpeningScript && StageDone == 1 && Time > 170.f)
 	{
 		StageDone = 2;
 		StageTwoAt = Time;
@@ -1126,7 +1147,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	// stage 3: the strike group was the Interdiction Fleet's probe; its vanguard comes through the Janus Gate, and the 7th Fleet's relief
 	// from New Ravenna follows it — the opening grows into a fleet battle. Not after a surrender or under a truce (the war's director
 	// takes the story from there)
-	if (StageDone == 2 && StageTwoAt >= 0.f && Time > StageTwoAt + VanguardAfterS && !bSurrenderAccepted && TruceSince < 0.f && Landmarks.IsValidIndex(GateLandmark))
+	if (bOpeningScript && StageDone == 2 && StageTwoAt >= 0.f && Time > StageTwoAt + VanguardAfterS && !bSurrenderAccepted && TruceSince < 0.f && Landmarks.IsValidIndex(GateLandmark))
 	{
 		StageDone = 3;
 		Report(TEXT("sensors: the Janus Gate is cycling — a transit wake with many drives behind it: a Mandate force is coming through; Keeper "
@@ -4346,7 +4367,7 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 	double Bearing = FMath::FRandRange(0.f, 360.f), Range = 25.0;
 	Beat->TryGetNumberField(TEXT("bearing_deg"), Bearing);
 	Beat->TryGetNumberField(TEXT("range_km"), Range);
-	Range = FMath::Clamp(Range, 6.0, 120.0);
+	Range = FMath::Clamp(Range, 6.0, 250.0);         // (the March sends forces from beyond the Gate: up to 120 km and more)
 	TArray<FString> Ids;
 	const TArray<TSharedPtr<FJsonValue>>* IdList = nullptr;
 	if (Beat->TryGetArrayField(TEXT("_ids"), IdList))
@@ -4423,9 +4444,12 @@ void UAstraBattleSubsystem::ArriveBeat(const TSharedPtr<FJsonObject>& Beat)
 			}
 			if (Type == TEXT("raid"))
 			{
-				// the fog of war: they come through dark; what the Aquila knows of them grows with her sensors (TickSensors)
+				// the fog of war: they come through dark (unless the beat says they come with their drives lit: a force the March sends openly, seen
+				// approaching for minutes); what the Aquila knows of them grows with her sensors (TickSensors)
+				bool bDarkBeat = true;
+				Beat->TryGetBoolField(TEXT("dark"), bDarkBeat);
 				Ships[I].bFog = true;
-				Ships[I].bDark = true;
+				Ships[I].bDark = bDarkBeat;
 				Ships[I].Track = 0;
 				Ships[I].bClassified = false;
 				Ships[I].bIdentified = false;
@@ -4715,8 +4739,10 @@ void UAstraBattleSubsystem::ArriveGroups(const TSharedPtr<FJsonObject>& Beat, co
 			}
 			if (bRaid)
 			{
+				bool bDarkBeat = true;                    // (the beat's "dark": a force that comes with its drives lit is seen from much farther)
+				Beat->TryGetBoolField(TEXT("dark"), bDarkBeat);
 				S.bFog = true;
-				S.bDark = true;
+				S.bDark = bDarkBeat;
 				S.Track = 0;
 				S.bClassified = false;
 				S.bIdentified = false;
