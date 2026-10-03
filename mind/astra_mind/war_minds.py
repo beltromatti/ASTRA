@@ -239,6 +239,74 @@ def _km(v: Any) -> str:
 FACES = ("bow", "stern", "port", "stbd", "dorsal", "ventral")
 
 
+def _plural(n: Any, one: str, many: str) -> str:
+    try:
+        return f"{int(n)} {one if int(n) == 1 else many}"
+    except (TypeError, ValueError):
+        return f"{n} {many}"
+
+
+def _power_bits(power: Any, approx: bool = False) -> str:
+    if not isinstance(power, dict) or not power:
+        return ""
+    return ", ".join(f"{str(k).replace('_', ' ')} {'about ' if approx else ''}{v}%" for k, v in power.items())
+
+
+def aboard_line(a: Any) -> str:
+    """What a ship's own captain knows of her inside (the game's `aboard`, FLOTTA-VIVA): the hands lost, who has the conn when the captain is down, what burns and
+    vents, which rooms have no power, how much of each allocation the ship's distribution still carries, which rooms are failing, the damage parties and the worst
+    of what they have on their hands. Empty when the inside is as built (the game says nothing then)."""
+    if not isinstance(a, dict) or not a:
+        return ""
+    bits: list[str] = []
+    crew = a.get("crew")
+    if isinstance(crew, dict):
+        bits.append(f"crew {crew.get('fit', '?')} fit, {crew.get('wounded', 0)} wounded, {crew.get('killed', 0)} killed of {crew.get('of', '?')}")
+    if a.get("command"):
+        bits.append(str(a["command"]))
+    hazards = []
+    if a.get("fires"):
+        hazards.append(_plural(a["fires"], "fire", "fires"))
+    if a.get("breaches"):
+        hazards.append(_plural(a["breaches"], "breach venting", "breaches venting"))
+    if a.get("rooms_without_power"):
+        hazards.append(_plural(a["rooms_without_power"], "room without power", "rooms without power"))
+    if a.get("pressure_bulkheads_shut"):
+        hazards.append(_plural(a["pressure_bulkheads_shut"], "pressure bulkhead shut", "pressure bulkheads shut"))
+    if hazards:
+        bits.append(", ".join(hazards))
+    if power := _power_bits(a.get("power_pct")):
+        bits.append("power left: " + power)
+    rooms = a.get("rooms")
+    if isinstance(rooms, dict) and rooms:
+        bits.append("rooms: " + ", ".join(f"{k} {v}" for k, v in rooms.items()))
+    if a.get("damage_parties"):
+        bits.append(f"damage parties {a['damage_parties']}")
+    worst = a.get("worst")
+    if isinstance(worst, list) and worst:
+        bits.append("on their hands: " + " | ".join(str(x) for x in worst[:2]))
+    return "; ".join(bits)
+
+
+def seen_line(s: Any) -> str:
+    """What the eye and the sensors make of another ship's inside (the game's `seen_aboard`): atmosphere streaming from a breach, windows gone dark in a section,
+    hot spots, the life signs (a classified track only), the power the emissions show. Empty when nothing shows."""
+    if not isinstance(s, dict) or not s:
+        return ""
+    bits: list[str] = []
+    if s.get("breaches_venting"):
+        bits.append(_plural(s["breaches_venting"], "breach venting atmosphere", "breaches venting atmosphere"))
+    if s.get("windows_dark_in"):
+        bits.append(f"windows dark in the {s['windows_dark_in']}")
+    if s.get("fires_aboard"):
+        bits.append(_plural(s["fires_aboard"], "hot spot", "hot spots"))
+    if s.get("life_signs_pct") is not None:
+        bits.append(f"life signs about {s['life_signs_pct']}%")
+    if power := _power_bits(s.get("power_pct"), approx=True):
+        bits.append("power " + power)
+    return ", ".join(bits)
+
+
 def _member_line(m: dict[str, Any], ew: dict[str, Any] | None = None) -> str:
     bits = [f"{m.get('id', '?')} {m.get('class', '?')} hull {_pct(m.get('hull_pct'))} shields {_pct(m.get('shields_pct'))}"]
     faces = m.get("shield_faces_pct")
@@ -248,6 +316,8 @@ def _member_line(m: dict[str, Any], ew: dict[str, Any] | None = None) -> str:
         bits.append(f"{m['missiles']} missiles")
     if m.get("status"):
         bits.append(str(m["status"]))
+    if inside := aboard_line(m.get("aboard")):
+        bits.append("aboard: " + inside)
     if ew:
         if ew.get("conserving_missiles"):
             bits.append("conserving missiles")
@@ -288,7 +358,8 @@ def render_enemy(view: dict[str, Any]) -> str:
     for g in view.get("enemy_groups") or []:
         ships = "; ".join(f"{s.get('id')} {s.get('class', 'unknown')}"
                           + (f" hull {_pct(s['hull_pct'])} shields {_pct(s.get('shields_pct'))}" if s.get("hull_pct") is not None else "")
-                          + (f" ({s['status']})" if s.get("status") else "") for s in g.get("ships") or [])
+                          + (f" ({s['status']})" if s.get("status") else "")
+                          + (f" [seen aboard: {seen}]" if (seen := seen_line(s.get("seen_aboard"))) else "") for s in g.get("ships") or [])
         lines.append(f" {g.get('label')} — {len(g.get('ships') or [])} ship(s) at {_km(g.get('range_km'))} (nearest {_km(g.get('nearest_ship_km'))}), "
                      f"bearing {g.get('bearing_deg', '?')}°: {ships}")
     return "\n".join(lines) or " (nothing on your sensors)"
@@ -318,7 +389,8 @@ def mandate_extras(view: dict[str, Any]) -> tuple[str, dict[str, dict[str, Any]]
             astra.append(f"{sid}: {s['track']}")
         else:
             astra.append(f"{sid} hull {_pct(s.get('hull_pct'))} shields {_pct(s.get('shields_pct'))}"
-                         + (f", {s['shields']}" if s.get("shields") and s["shields"] != "balanced" else ""))
+                         + (f", {s['shields']}" if s.get("shields") and s["shields"] != "balanced" else "")
+                         + (f" [seen aboard: {seen}]" if (seen := seen_line(s.get("seen_aboard"))) else ""))
     if astra:
         lines.append(" ASTRA ships on your plot: " + "; ".join(astra))
     return "\n".join(lines), ew_by_id
@@ -372,7 +444,8 @@ def render_astra_extras(state: dict[str, Any], seen: Levels | None = None, now: 
         st = str(c.get("status", ""))
         if st == "friendly":
             friends.append(f"{c.get('id')} {str(c.get('name') or c.get('class') or '').split(' (')[0]} {_km(c.get('range_km'))} from the Aquila, "
-                           f"bearing {c.get('bearing_deg', '?')}°, hull {_pct(c.get('hull_pct'))}")
+                           f"bearing {c.get('bearing_deg', '?')}°, hull {_pct(c.get('hull_pct'))}"
+                           + (f" (aboard: {inside})" if (inside := aboard_line(c.get("aboard"))) else ""))
         elif st.startswith(("bearing only", "JAMMING")):
             bearings.append(f"{c.get('id')} bearing {c.get('bearing_deg', '?')}°" + (" (jamming)" if st.startswith("JAMMING") else ""))
         elif st.startswith("hostile") and isinstance(c.get("range_km"), (int, float)):
@@ -381,7 +454,8 @@ def render_astra_extras(state: dict[str, Any], seen: Levels | None = None, now: 
         out.append(" Friendly ships about the Aquila: " + "; ".join(friends))
     if hostile:
         hostile.sort(key=lambda c: float(c["range_km"]))
-        near = [f"{c.get('id')} {str(c.get('class') or c.get('name') or '').split(' (')[0]} {_km(c.get('range_km'))} (hull {_pct(c.get('hull_pct'))})" for c in hostile[:4]]
+        near = [f"{c.get('id')} {str(c.get('class') or c.get('name') or '').split(' (')[0]} {_km(c.get('range_km'))} (hull {_pct(c.get('hull_pct'))}"
+                + (f"; seen aboard: {seen}" if (seen := seen_line(c.get("seen_aboard"))) else "") + ")" for c in hostile[:4]]
         inside = [str(c.get("id")) for c in hostile if float(c["range_km"]) <= LASER_KM]
         out.append(" Hostile ships nearest the Aquila: " + "; ".join(near)
                    + (f" — inside laser reach ({LASER_KM:g} km) of her: {', '.join(inside)}" if inside else ""))
@@ -471,6 +545,13 @@ _DOCTRINE_TAIL = """- Concentrate fire: shots spread over several ships lose one
 - A flank sends one or two agile ships to the enemy's beam; the whole enemy line then fires on them. It pays with clear superiority, or as bait;
   against equals it costs ships. `screen` rings a friend (the Aquila) with the group's ships on the enemy's side; `pin` holds the enemy at long range
   without closing; `reinforce` sends the group to another; `regroup` stops and reforms; `hold` keeps the position.
+- Ships have insides. Under one of your own ships a line `aboard` is her captain's report of it: the hands fit, wounded and lost; who has the conn when
+  the captain is down; what burns and what vents; the rooms with no power; how much of the guns' and of the drive's power is left; the damage parties
+  and what is on their hands. A ship whose crew is half gone, whose guns are down to a third, or whose magazine is on fire cannot fight as her hull
+  says: save her, or take her out of the line; one that burns in a corner while her parties are on it is not in danger yet. The enemy's inside you
+  read only from outside (`seen aboard`): atmosphere venting from a breach, windows gone dark, hot spots, life signs, the power the emissions give
+  away. A ship with half her hull left and her windows dark and her life signs falling is crippled, and a target to finish; a ship that shows nothing
+  is as sound as she looks.
 - An order stands until you change it or its time runs out; do not repeat an order that already stands (the picture shows `order in force`).
   Change the plan when the battle gives a reason: a target crippled or about to fall, a group's morale breaking, a ship or a group lost, a new
   enemy on the plot, the order run out, the balance of strength moved, the enemy breaking off. Otherwise keep what works.

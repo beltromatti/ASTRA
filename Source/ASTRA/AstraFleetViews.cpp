@@ -35,14 +35,20 @@ void FAstraShipInterior::FillView(FAstraFleetView& Out, int32 Detail) const
 {
 	Out = FAstraFleetView();
 	Out.Detail = Detail;
-	if (Detail >= 2)
+	if (Detail >= 3)
 	{
 		Out.CrewTotal = People.Num();
 		Out.CrewFit = Fit;
 		Out.CrewWounded = Wounded;
 		Out.CrewDead = Dead;
 	}
+	else if (Detail == 2 && People.Num() && (Dead || Wounded))
+	{
+		Out.LifeSignsPct = 5 * FMath::RoundToInt(100.f * (float)(Fit + Wounded) / (float)People.Num() / 5.f);
+	}
 	const FAstraDamageMap& M = *Plan->Map;
+	Out.HullCentreM = FVector(M.Hull.GetCenter()) / 100.0 + M.OriginInHullM;
+	Out.HullHalfM = FVector(M.Hull.GetExtent()) / 100.0;
 	for (const auto& KV : Model.States())
 	{
 		const FAstraDmgState& S = KV.Value;
@@ -77,6 +83,35 @@ void FAstraShipInterior::FillView(FAstraFleetView& Out, int32 Detail) const
 			Out.Command = FString::Printf(TEXT("%s %s (%s)"), *C->Rank, *C->Name, AstraFleetBilletWord(C->Role));
 		}
 	}
+}
+
+void FAstraShipInterior::FxPoints(FFleetFxPoints& Out, int32 MaxPerSection) const
+{
+	Out = FFleetFxPoints();
+	const FAstraDamageMap& M = *Plan->Map;
+	int32 Dark = 0;
+	for (const auto& KV : Model.States())
+	{
+		const FAstraDmgState& S = KV.Value;
+		Dark += (S.Power < 0.5f || S.Wreck >= 1.f || S.bGutted) ? 1 : 0;
+		const bool bFire = S.Fire >= 0.10f, bHole = S.Hole >= 0.12f && !S.bGutted;
+		if (!bFire && !bHole)
+		{
+			continue;
+		}
+		const int32 Sec = FMath::Clamp(WarSectionOf(KV.Key), 0, 2);
+		const FVector Centre = M.Comps[KV.Key].Box.GetCenter();
+		if (bFire && Out.Fire[Sec].Num() < MaxPerSection)
+		{
+			Out.Fire[Sec].Add((S.FireAt.IsNearlyZero() ? Centre : FVector(S.FireAt)) / 100.0 + M.OriginInHullM);
+		}
+		if (bHole && Out.Vent[Sec].Num() < MaxPerSection)
+		{
+			Out.Vent[Sec].Add((S.HoleAt.IsNearlyZero() ? Centre : FVector(S.HoleAt)) / 100.0 + M.OriginInHullM);
+		}
+	}
+	// the windows of the rooms that have lost their power are dark: a ship's lit share is the share of her rooms that still have it (a little more than the share, a lit ship being a dim one at a glance)
+	Out.Lit = FMath::Clamp(1.f - 1.25f * (float)Dark / (float)FMath::Max(1, M.Comps.Num()), 0.f, 1.f);
 }
 
 TSharedRef<FJsonObject> FAstraShipInterior::BriefJson() const
@@ -338,7 +373,32 @@ TSharedRef<FJsonObject> FAstraShipInterior::BooksJson() const
 	J->SetNumberField(TEXT("fit"), Fit);
 	J->SetNumberField(TEXT("wounded"), Wounded);
 	J->SetNumberField(TEXT("killed"), Dead);
+	J->SetNumberField(TEXT("lost_with_ship"), Lost);
 	J->SetNumberField(TEXT("rescued"), B.Rescued);
+	// what each of the war's three sections has lost of its rooms (a section the war guts loses them all; a fire or a breach loses some)
+	{
+		int32 RoomsLost[3] = {0, 0, 0}, Total[3] = {0, 0, 0}, Burning[3] = {0, 0, 0};
+		for (int32 Ci = 0; Ci < Plan->Map->Comps.Num(); ++Ci)
+		{
+			++Total[FMath::Clamp(WarSectionOf(Ci), 0, 2)];
+		}
+		for (const auto& KV : Model.States())
+		{
+			const int32 Sec = FMath::Clamp(WarSectionOf(KV.Key), 0, 2);
+			RoomsLost[Sec] += (KV.Value.bGutted || KV.Value.Wreck >= 1.f) ? 1 : 0;
+			Burning[Sec] += KV.Value.Fire >= 0.10f ? 1 : 0;
+		}
+		TArray<TSharedPtr<FJsonValue>> L, T, Bn;
+		for (int32 s = 0; s < 3; ++s)
+		{
+			L.Add(Num(RoomsLost[s]));
+			T.Add(Num(Total[s]));
+			Bn.Add(Num(Burning[s]));
+		}
+		J->SetArrayField(TEXT("rooms_lost_by_section"), L);          // bow, mid, stern
+		J->SetArrayField(TEXT("rooms_by_section"), T);
+		J->SetArrayField(TEXT("rooms_burning_by_section"), Bn);
+	}
 	J->SetNumberField(TEXT("active_rooms"), Model.States().Num());
 	J->SetNumberField(TEXT("max_active_rooms"), B.MaxActive);
 	J->SetNumberField(TEXT("incidents"), Incidents.Num());

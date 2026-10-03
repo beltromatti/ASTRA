@@ -2842,6 +2842,7 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 	S.bAlive = false;
 	S.Mode = EAstraShipMode::Dead;
 	S.DeathHow = How;
+	FleetOnDestroyed(S);                                                      // (FLOTTA-VIVA: the people aboard are lost with her)
 	if (!S.bCraft && !S.bGhost && !S.bPlayer && !S.bDisabled)                 // (a hulk shot to pieces was reported when it went dark)
 	{
 		NoteGroupLoss(S, How == EAstraFate::ReactorBreach ? TEXT("the reactor went") : (How == EAstraFate::Breakup ? TEXT("the hull broke apart") : TEXT("destroyed")));

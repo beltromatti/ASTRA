@@ -283,6 +283,27 @@ FString FAstraShipInterior::HarmPerson(int32 Who, bool bKill, EAstraDmgHarm Caus
 	return TEXT("crew");
 }
 
+int32 FAstraShipInterior::LoseWithShip()
+{
+	if (Lost > 0)
+	{
+		return 0;
+	}
+	Lost = Fit + Wounded;
+	for (FFleetPerson& P : People)
+	{
+		P.State = 2;
+	}
+	Fit = Wounded = 0;
+	WoundedWaiting.Reset();
+	for (int32 r = 0; r < (int32)EFleetRole::Num; ++r)
+	{
+		RoleFit[r] = RoleHurt[r] = 0;
+	}
+	Note(FString::Printf(TEXT("%s: lost with all hands (%d aboard)"), *ShipName, Lost), true);
+	return Lost;
+}
+
 int32 FAstraShipInterior::WarSectionOf(int32 Comp) const
 {
 	const float X = (float)Plan->Map->Comps[Comp].Box.GetCenter().X;
@@ -313,6 +334,19 @@ void FAstraShipInterior::Impact(const FAstraHullHit& Hit)
 	}
 	++HitsInside;
 	LastEntryCm = R.EntryCm;
+	if (bTrace)
+	{
+		FString Path;
+		for (const int32 Ci : R.Comps)
+		{
+			Path += (Path.IsEmpty() ? TEXT("") : TEXT(" -> ")) + RoomWord(Ci);
+		}
+		LastTrace = FString::Printf(TEXT("%s: a blow of %.0f at the hull (%s face, %s, %.0f m from the plan's origin) entered at %s and spent itself in %d rooms: %s | %d killed, %d wounded%s%s%s%s | %s"),
+		                            *ShipName, Hit.Damage, Hit.Facing == 0 ? TEXT("bow") : (Hit.Facing == 1 ? TEXT("stern") : (Hit.Facing == 2 ? TEXT("port") : (Hit.Facing == 3 ? TEXT("starboard") : (Hit.Facing == 4 ? TEXT("dorsal") : TEXT("ventral"))))),
+		                            Hit.Section == 0 ? TEXT("bow section") : (Hit.Section == 1 ? TEXT("mid section") : TEXT("stern section")), FVector(R.EntryCm).Size() / 100.0, *RoomWord(R.Comps[0]), R.Comps.Num(), *Path,
+		                            R.Killed, R.Wounded, R.bBreach ? TEXT(", a breach") : TEXT(""), R.bFire ? TEXT(", a fire") : TEXT(""), R.bPower ? TEXT(", a conduit cut") : TEXT(""), R.bWreck ? TEXT(", a room wrecked") : TEXT(""),
+		                            *FString::Join(R.Lines, TEXT("; ")));
+	}
 	// what it did, in the ship's own words: told when it hurts (people, a breach, a fire, a room lost)
 	if (R.Killed || R.Wounded || R.bBreach || R.bFire || R.bWreck || R.bPower)
 	{

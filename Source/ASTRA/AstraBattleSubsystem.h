@@ -1020,6 +1020,8 @@ private:
 	FAstraShipInterior* FleetEnsure(FAstraBattleShip& S);
 	void FleetOnHit(FAstraBattleShip& To, const FAstraHullHit& Hit);
 	void FleetOnGutted(FAstraBattleShip& S, int32 Section);
+	/** The ship is destroyed: the people aboard are lost with her. */
+	void FleetOnDestroyed(FAstraBattleShip& S);
 	void FleetTick(FAstraBattleShip& S, float Dt);
 	/** What a side's mind (or an observer's sensors) may read of a ship's inside, added to its entry in a view: bOwn the ship's own side (everything), else by Detail (1 the eye, 2 a classified track). */
 	void FleetBriefInto(const FAstraBattleShip& S, const TSharedRef<FJsonObject>& Into, bool bOwn, int32 Detail) const;

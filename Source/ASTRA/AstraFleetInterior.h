@@ -74,14 +74,23 @@ struct FFleetEvent
 struct FAstraFleetView
 {
 	int32 Detail = 0;
-	int32 CrewTotal = 0, CrewFit = 0, CrewWounded = 0, CrewDead = 0;
+	int32 CrewTotal = 0, CrewFit = 0, CrewWounded = 0, CrewDead = 0;   // (the ship's own side: Detail 3)
+	int32 LifeSignsPct = -1;                        // what a classified track's emissions give away of the crew, to the nearest five per cent (Detail 2); -1 where nothing shows
 	int32 Fires = 0, Breaches = 0, Dark = 0;
 	TArray<FVector> FireM, BreachM;                 // hull frame, metres (the ship's mesh frame)
+	FVector HullCentreM = FVector::ZeroVector, HullHalfM = FVector(1.0);   // the plan's hull volume in the same frame: where the points lie in it (for a diagram)
 	float Power[6] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
 	int32 PartiesBusy = 0, Parties = 0;
 	int32 BulkheadsShut = 0;
 	bool bCaptainDown = false, bCaptainDead = false;
 	FString Command;
+};
+
+/** Where an inside shows on the hull: the effects draw fires and streaming atmosphere there, and light the windows by what is still powered. */
+struct FFleetFxPoints
+{
+	TArray<FVector> Fire[3], Vent[3];               // by the war's three sections (bow, mid, stern): hull frame, metres
+	float Lit = 1.f;                                // the share of the windows still lit (1 as built)
 };
 
 class ASTRA_API FAstraShipInterior
@@ -120,6 +129,10 @@ public:
 	int32 CrewFit() const { return Fit; }
 	int32 CrewWounded() const { return Wounded; }
 	int32 CrewDead() const { return Dead; }
+	/** The ship is gone (her reactor breached, her hull broke apart, she was shot to pieces): those still aboard, fit or wounded, are lost with her ("destroyed with all hands").
+	 *  Returns how many. They are counted apart from the people the blows killed. */
+	int32 LoseWithShip();
+	int32 CrewLostWithShip() const { return Lost; }
 	/** Fit crew and half the wounded, over the complement: how much of a crew is left to fight the ship. */
 	float CrewStrength() const { return People.Num() ? (Fit + 0.5f * Wounded) / (float)People.Num() : 0.f; }
 	int32 Fires() const;
@@ -146,8 +159,13 @@ public:
 	/** What an observer's sensors tell of her from outside, by how well they know her (Detail 1, 2). */
 	TSharedRef<FJsonObject> SeenJson(int32 Detail) const;
 	void FillView(FAstraFleetView& Out, int32 Detail) const;
+	/** Where it burns and vents, by section, and how much of the ship is still lit: for the effects (a few points per section). */
+	void FxPoints(FFleetFxPoints& Out, int32 MaxPerSection = 12) const;
 	/** A line for the bench and the console. */
 	FString InfoText() const;
+	/** The path of the last blow through the rooms, in words (kept only while KeepTrace is on: the bench and the console). */
+	void KeepTrace(bool bOn) { bTrace = bOn; }
+	const FString& TraceText() const { return LastTrace; }
 	/** The books of a ship's interior: what the war and the bench ask. */
 	TSharedRef<FJsonObject> BooksJson() const;
 
@@ -165,9 +183,11 @@ private:
 	TArray<int32> WoundedWaiting;                        // people hurt and not yet carried to the medbay
 	TArray<FFleetEvent> Outbox, Log;
 	float Clock = 0.f, SlowT = 0.f, BurnPending = 0.f;
-	int32 Fit = 0, Wounded = 0, Dead = 0;
+	int32 Fit = 0, Wounded = 0, Dead = 0, Lost = 0;
 	bool bCalm = true, bFlush = false;
 	int32 Hits = 0, HitsInside = 0;
+	bool bTrace = false;
+	FString LastTrace;
 	FVector LastEntryCm = FVector::ZeroVector;
 	float SysFitV[6] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
 	float WeaponCrewV = 1.f;
@@ -187,7 +207,6 @@ private:
 	void Note(const FString& Text, bool bGrave);
 	void TickParties(float Dt);
 	void TickMedevac(float Dt);
-	void CountCrew();
 	int32 WarSectionOf(int32 Comp) const;
 	FString RoomWord(int32 Comp) const;
 	friend struct FFleetTestAccess;

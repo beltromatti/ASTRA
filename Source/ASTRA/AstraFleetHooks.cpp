@@ -44,6 +44,14 @@ namespace
 				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("strike"), Args));
 			}
 		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdFleetPound(TEXT("astra.fleet.pound"), TEXT("FLOTTA-VIVA: many blows on a face of a ship (astra.fleet.pound <contact id> <face> [damage 150] [count 20] [rail|laser|missile]): the bench's way to break a ship at a section"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UAstraBattleSubsystem* B = World ? World->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("pound"), Args));
+			}
+		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdFleetHit(TEXT("astra.fleet.hit"), TEXT("FLOTTA-VIVA: a blow on a face of a ship, through the war's own path (astra.fleet.hit <contact id> <bow|stern|port|starboard|dorsal|ventral> [damage 120] [rail|laser|missile])"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
@@ -113,6 +121,14 @@ void UAstraBattleSubsystem::FleetOnHit(FAstraBattleShip& To, const FAstraHullHit
 	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
 	FleetMs += Ms;
 	FleetMsMax = FMath::Max(FleetMsMax, Ms);
+}
+
+void UAstraBattleSubsystem::FleetOnDestroyed(FAstraBattleShip& S)
+{
+	if (FAstraShipInterior* I = S.Interior.Get())
+	{
+		I->LoseWithShip();
+	}
 }
 
 void UAstraBattleSubsystem::FleetOnGutted(FAstraBattleShip& S, int32 Section)
@@ -197,7 +213,7 @@ void UAstraBattleSubsystem::FleetBriefInto(const FAstraBattleShip& S, const TSha
 TSharedRef<FJsonObject> UAstraBattleSubsystem::FleetStatsJson() const
 {
 	TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
-	int32 With[2] = {0, 0}, Killed[2] = {0, 0}, Wounded[2] = {0, 0}, Crew[2] = {0, 0}, Calm = 0;
+	int32 With[2] = {0, 0}, Killed[2] = {0, 0}, Wounded[2] = {0, 0}, Crew[2] = {0, 0}, LostShip[2] = {0, 0}, Calm = 0;
 	for (const FAstraBattleShip& S : Ships)
 	{
 		const FAstraShipInterior* I = S.Interior.Get();
@@ -208,6 +224,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::FleetStatsJson() const
 		}
 		++With[Side];
 		Killed[Side] += I->CrewDead();
+		LostShip[Side] += I->CrewLostWithShip();
 		Wounded[Side] += I->CrewWounded();
 		Crew[Side] += I->CrewTotal();
 		Calm += I->IsCalm() ? 1 : 0;
@@ -218,6 +235,8 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::FleetStatsJson() const
 	J->SetNumberField(TEXT("calm_now"), Calm);
 	J->SetNumberField(TEXT("killed_astra"), Killed[0]);
 	J->SetNumberField(TEXT("killed_mandate"), Killed[1]);
+	J->SetNumberField(TEXT("lost_with_ships_astra"), LostShip[0]);
+	J->SetNumberField(TEXT("lost_with_ships_mandate"), LostShip[1]);
 	J->SetNumberField(TEXT("wounded_astra"), Wounded[0]);
 	J->SetNumberField(TEXT("wounded_mandate"), Wounded[1]);
 	J->SetNumberField(TEXT("crew_astra"), Crew[0]);
@@ -299,9 +318,10 @@ FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FS
 		I->Strike(Comp, Energy, Type, true);
 		return FString::Printf(TEXT("struck %s in %s: %s"), *S->ContactId, *M.Describe(Comp), *I->InfoText());
 	}
-	if (What == TEXT("hit"))
+	if (What == TEXT("hit") || What == TEXT("pound"))
 	{
-		// a blow on a face of the box, aimed at the middle of the ship: through the war's own path (shield, plate, structure, then the inside)
+		// blows on a face of the box, aimed about the middle of the ship: through the war's own path (shield, plate, structure, then the inside)
+		const bool bPound = What == TEXT("pound");
 		const FString Face = Args[1].ToLower();
 		int32 F = AstraWar::Ventral;
 		if (Face.StartsWith(TEXT("bow"))) { F = AstraWar::Bow; }
@@ -314,16 +334,47 @@ FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FS
 		{
 			return TEXT("that ship has no hull box");
 		}
-		const double R1 = FMath::FRandRange(-0.6f, 0.6f), R2 = FMath::FRandRange(-0.6f, 0.6f);
+		const float Damage = Args.IsValidIndex(2) ? FCString::Atof(*Args[2]) : (bPound ? 150.f : 120.f);
+		const int32 Count = bPound ? FMath::Clamp(Args.IsValidIndex(3) ? FCString::Atoi(*Args[3]) : 20, 1, 5000) : 1;
+		const int32 KindArg = bPound ? 4 : 3;
+		const EAstraHitKind Kind = Args.IsValidIndex(KindArg) ? (Args[KindArg].StartsWith(TEXT("m")) ? EAstraHitKind::Missile : (Args[KindArg].StartsWith(TEXT("l")) ? EAstraHitKind::Laser : EAstraHitKind::Rail)) : EAstraHitKind::Rail;
+		if (FAstraShipInterior* I = FleetEnsure(*S))
+		{
+			I->KeepTrace(!bPound);
+		}
 		const AstraWar::FHullBox& Bx = S->Box;
-		FVector LocalPoint = F <= AstraWar::Stern ? FVector(Out.X * Bx.Hx, R1 * Bx.Hy, R2 * Bx.Hz) : (F <= AstraWar::Starboard ? FVector(R1 * Bx.Hx, Out.Y * Bx.Hy, R2 * Bx.Hz) : FVector(R1 * Bx.Hx, R2 * Bx.Hy, Out.Z * Bx.Hz));
-		LocalPoint.X += Bx.Mid;
-		const FVector Pos = S->Pos + S->Att.RotateVector(LocalPoint);
-		const FVector Dir = S->Att.RotateVector(-Out);
-		const float Damage = Args.IsValidIndex(2) ? FCString::Atof(*Args[2]) : 120.f;
-		const EAstraHitKind Kind = Args.IsValidIndex(3) ? (Args[3].StartsWith(TEXT("m")) ? EAstraHitKind::Missile : (Args[3].StartsWith(TEXT("l")) ? EAstraHitKind::Laser : EAstraHitKind::Rail)) : EAstraHitKind::Rail;
-		ApplyHit(*S, Dir, Damage, Pos, Kind, -1);
-		return S->Interior.IsValid() ? S->Interior->InfoText() : FString::Printf(TEXT("hit %s: no inside (yet)"), *S->ContactId);
+		int32 Landed = 0;
+		for (int32 n = 0; n < Count && S->bAlive; ++n)
+		{
+			const double R1 = FMath::FRandRange(-0.6f, 0.6f), R2 = FMath::FRandRange(-0.6f, 0.6f);
+			FVector LocalPoint = F <= AstraWar::Stern ? FVector(Out.X * Bx.Hx, R1 * Bx.Hy, R2 * Bx.Hz) : (F <= AstraWar::Starboard ? FVector(R1 * Bx.Hx, Out.Y * Bx.Hy, R2 * Bx.Hz) : FVector(R1 * Bx.Hx, R2 * Bx.Hy, Out.Z * Bx.Hz));
+			LocalPoint.X += Bx.Mid;
+			const FVector Pos = S->Pos + S->Att.RotateVector(LocalPoint);
+			const FVector Dir = S->Att.RotateVector(-Out);
+			ApplyHit(*S, Dir, Damage, Pos, Kind, -1);
+			++Landed;
+		}
+		FString Text;
+		if (!bPound && S->Interior.IsValid() && !S->Interior->TraceText().IsEmpty())
+		{
+			Text = S->Interior->TraceText();
+		}
+		else if (S->Interior.IsValid())
+		{
+			Text = S->Interior->InfoText();
+		}
+		else
+		{
+			Text = FString::Printf(TEXT("%s: no inside (yet)"), *S->ContactId);
+		}
+		if (bPound)
+		{
+			const FAstraShipDamage& D = S->Dmg;
+			Text = FString::Printf(TEXT("%d blows of %.0f on the %s of %s: hull %.0f%%, structure bow/mid/stern %.0f/%.0f/%.0f%%, %s | %s"), Landed, Damage, *Face, *S->ContactId, 100.f * S->Hull / FMath::Max(1.f, S->HullMax),
+			                       100.f * D.Structure[0] / FMath::Max(1.f, D.StructureMax[0]), 100.f * D.Structure[1] / FMath::Max(1.f, D.StructureMax[1]), 100.f * D.Structure[2] / FMath::Max(1.f, D.StructureMax[2]),
+			                       S->bAlive ? TEXT("alive") : TEXT("destroyed"), *Text);
+		}
+		return Text;
 	}
-	return TEXT("astra.fleet.info | strike | hit");
+	return TEXT("astra.fleet.info | strike | hit | pound");
 }
