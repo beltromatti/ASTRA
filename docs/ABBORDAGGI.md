@@ -123,11 +123,39 @@ sintetizzati (`tools/art/weapon_sounds.py`: colpo, scatto a vuoto, ricariche, im
   per chi lo sente passare, il suono; il rinculo alza il mirino e lo fa vagare, l'arma scalcia sulla spalla (molla), poi il mirino ricade in parte.
 - **Lo schermo**: mirino che si apre con il cono, colpi, forza (quando ferito o in un combattimento), rosso ai bordi e archi di provenienza di un colpo ricevuto, la croce
   bianca di un colpo a segno (rossa-bianca alla testa), il suggerimento del tasto a portata («E TAKE THE RIFLE AND THE SIDEARM»), il **cartoncino dei tasti** quando si arma (24 s la prima volta,
-  6 s ai richiami, non più di uno ogni 90 s): due righe di tasti su cappucci, l'arma (LMB fuoco, RMB mira, R ricarica, 1 fucile, 2 pistola, Q l'arma di prima, H in fondina) e il movimento
-  (WASD, Shift corsa, C accucciato, C tenuto sdraiato, Spazio salto, E usa, F1 la scheda); sta in basso al centro, **sopra** l'avviso del cammino del controller (in basso a destra: le due
-  cose si sovrapponevano), così i due non si incontrano.
+  6 s ai richiami, non più di uno ogni 90 s): due colonne di tasti su cappucci, l'arma (LMB fuoco, RMB mira, R ricarica, 1 fucile, 2 pistola, Q l'arma di prima, H in fondina) e il movimento
+  (WASD, Shift corsa, C accucciato, C tenuto sdraiato, Spazio salto, E usa, F1 la scheda); sta **in alto a sinistra**, fuori da tutto ciò che il controller disegna in basso: i sottotitoli dell'equipaggio
+  (fino a tre righe di fino a tre linee: da 60 px dal bordo a circa 310) e l'avviso del cammino (in basso a destra); la prima versione stava in basso al centro e un sottotitolo la copriva.
 - **Il costo**: con l'arma in mano il passo cala (0,9; 0,6 dal mirino), il giro dal mirino segue il campo; da seduto, con il tablet alzato, nella lista di un ascensore, a terra
   o morto l'arma non c'è.
+
+### Dove stanno le armi del Capitano e chi gliele porta (`AstraArmory.*`, `AstraBoardArms.cpp`, `AstraFpsComponent.*`; 3/10, dalle partite dell'utente)
+
+Nelle partite dell'utente il Capitano chiese al ponte «l'arma del Capitano» e nessuno poté dargliela: l'ufficiale cercò nel personale e finì per dire che l'armaiolo avrebbe portato
+una pistola, ma nulla nel gioco lo faceva (il rack c'era solo in mezzo all'armeria, e l'equipaggio non sapeva dove fosse). Ora ci sono due posti, uno strumento e una riga di contesto.
+
+- **Due posti**, la cui scorta è della nave (`UAstraBoardSubsystem::ArmsPosts`) e di cui il rack e l'armadietto (`AAstraArmoryRack`, che fa vedere ciò che c'è) sono l'immagine mentre il Capitano
+  è vicino (nel suo ponte, entro 60 m):
+  - il **rack del Marine Armory** (Ponte 8, `d8_armory_B1`): il fucile AR-181 e la pistola M27S. Sta nel corridoio davanti al bancone di consegna dell'armaiolo, a destra del bancone, con la
+    schiena alle sbarre della gabbia e la faccia alla porta. Il punto è calcolato dal riquadro della stanza (l'angolo accanto al corridoio, 3 m dentro e 3,6 m di traverso) e **controllato sulla mesh
+    vera** (`SM_SHIP_Armory` messa dove la mette il piano, vista dall'alto con il rack disegnato): fuori dall'asse della porta e libero dal panchetto;
+  - l'**armadietto del Ready Room** (Ponte 1, `ready_room`, dietro la plancia): una M27S. Sta sulla parete a babordo (la «vicina»), nel tratto di 66 cm tra la seconda carta incorniciata e la porta
+    del corridoio, 18 cm di profondità, lo sportello aperto, la pistola appesa a una barra. Anche questo controllato sulla mesh vera (`SM_SHIP_ReadyRoom`).
+- **E**: prende ciò che il posto ha e che lui non porta (rack: fucile e pistola; armadietto: la pistola), e se non c'è nulla da prendere rimette ciò che il posto accetta e lui ha. Il suggerimento
+  dice quale («E TAKE THE SIDEARM», «E PUT THE WEAPONS BACK»), a vuoto E è di altri (la scala, il letto). Un'arma sola è un **kit parziale** (`UAstraFpsComponent::GiveWeapon`, `Carries`): con la sola
+  pistola il tasto 1 dice «NO RIFLE», Q e la rotella non cambiano arma, e il cartoncino dei tasti non ha la riga del fucile. `astra.weapons.givepistol [0]` la dà (o la toglie) dalla console.
+- **L'armaiolo** (`issue_weapon {kind: pistol|rifle|kit, who: captain}`): lo strumento dell'XO (`tools.py`) è il comando della nave (`UAstraBoardSubsystem::IssueWeapon`, la porta è quella di
+  `boarding`/`marine_order`). L'arma **esce dal rack del Marine Armory all'istante** (il rack la mostra mancante), un marine dell'armeria (l'armaiolo del ruolino: il suo nome sta nell'avviso) la
+  porta su di corsa e allo scadere del tempo gli è **in mano**, dove sta, con la riga a schermo («PETTY OFFICER … HANDS YOU THE SIDEARM»), il suono e un evento per l'equipaggio. Il tempo è quello
+  della strada: 14 s per firmare l'uscita più il percorso dall'armeria al punto dove il Capitano sta (la mappa dei portali, a 3 m/s), tra 18 e 200 s. Rifiuti con la loro ragione, che il crew
+  dice com'è: la porta già, il rack non ne ha (è del Capitano o è nell'armadietto), il Capitano è nell'armeria davanti al rack (E), non è a piedi (Falcon, capsula), una consegna è già in strada.
+  Se nel frattempo se la prende da sé, l'arma torna sul rack; se non è a piedi per quattro minuti, anche. Da seduto la consegna arriva ma l'arma sale quando si alza.
+- **L'equipaggio lo sa**: `arms` nello stato della nave (cosa porta, dove stanno le armi e cosa tengono, l'armaiolo, la consegna in corso) e una regola nel prompt (`crew.py`, `_RULE_ARMS`: dove stanno,
+  l'XO chiama `issue_weapon` e dice UNA riga dal risultato, mai promettere un'arma che lo strumento non ha mandato). Prova offline: `mind/bench/arms_unit.py` (8 test).
+- **Provarlo nel gioco**: (1) Ponte 1, Ready Room (dietro la plancia, porta sul corridoio di babordo): entrando, l'armadietto è sulla stessa parete della porta, subito a poppa di essa (tra la porta e la seconda carta incorniciata), a un metro da terra: «E TAKE THE SIDEARM» → pistola in mano e
+  cartoncino dei tasti senza il fucile; di nuovo E → rimessa. (2) Dire all'XO «portatemi un'arma» (o «a sidearm»): «<nome> is bringing the sidearm from the Marine Armory…» con i secondi; allo scadere la
+  riga a schermo e l'arma in mano. (3) Ponte 8, Marine Armory: il rack a destra del bancone (con la schiena alle sbarre): E → fucile e pistola. Console: `astra.arms.issue pistol|rifle|kit`,
+  `astra.weapons.give`, `astra.weapons.givepistol`, `astra.weapons.stow`, `astra.fps.info`.
 
 ## 5. Il danno alle persone e il destino del Capitano
 

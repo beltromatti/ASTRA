@@ -1,5 +1,8 @@
-// ASTRA — ABBORDAGGI: the armory's rack on Deck 8: the rifle and the sidearm hang on it, and E takes them (or puts them back). One stands in the middle of the armory
-// when the level has none (UAstraBoardSubsystem makes it while the Captain is near, from the plan's armory); the level may place its own where the kit has a rack.
+// ASTRA — ABBORDAGGI: the places the Captain's weapons hang (docs/ABBORDAGGI.md): the rack of the Marine Armory on Deck 8 (the rifle and the sidearm) and the locker of the Captain's Ready Room on
+// Deck 1 (a sidearm), and E takes what is there (or puts it back). What a post holds is the ship's (UAstraBoardSubsystem keeps the stock: the armourer's delivery takes from the armory's);
+// the actor is its picture, made while the Captain is near, and the key's.
+//
+// A rack the level has placed itself (no post) gives and takes the whole kit, as the first one did.
 
 #pragma once
 
@@ -15,7 +18,14 @@ class ASTRA_API AAstraArmoryRack : public AActor
 	GENERATED_BODY()
 
 public:
+	/** A freestanding rack (the rifle and the sidearm on its bars) or a small wall locker (the sidearm on a hook inside it). */
+	enum class EKind : uint8 { Rack, Locker };
+
 	AAstraArmoryRack();
+
+	/** Made for a post of the board subsystem's (call it before the actor begins play: SpawnActor's pre-spawn function): its stock is the subsystem's and the rack only shows it. */
+	void MakePost(FName InPostId, EKind InKind);
+	FName GetPostId() const { return PostId; }
 
 	/** E: the Captain takes the weapons, or puts them back. True when he was in reach of the rack (the key was its). */
 	bool TryUse(APawn* Me);
@@ -30,6 +40,8 @@ private:
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Rifle;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Pistol;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Parts;
-	bool bShowingWeapons = true;
-	void Show(bool bWeaponsThere);
+	EKind Kind = EKind::Rack;
+	FName PostId;                            // NAME_None: a rack of the level's, which gives and takes the whole kit
+	bool bShowRifle = true, bShowPistol = true;
+	void Show(bool bRifleThere, bool bPistolThere);
 };

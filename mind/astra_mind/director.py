@@ -244,6 +244,8 @@ Rules
 - Call `start_beat` exactly once (`none` when the story needs nothing), `war_news` at most once, `reveal` and `pressure` as the story asks (at most two of them in all).
 - A `negotiation` caller must be a hostile ship on the plot (a contact), with a reason to talk (his group is hurt, or winning and wishing to spare lives); it changes no number.
 - `investigate`: where the Aquila is, a silent station, a drifting warship, a dead freighter. Its findings are the story (what happened, who, a clue that leads on).
+- A beat the Captain has not taken up (a place to search he has not gone to) is never given again: the place stays on his plot, he knows of it, and the story moves on
+  with something else that is true (the war's next move, a reveal, news, a commander who calls) or with `none`. Read the campaign log's "beat:" lines before choosing.
 - `threads`: keep the war's open threads (what each side is doing or gathering, promises, mysteries, grudges): at most five short lines, rewritten each time you give a beat. The open
   threads now: {threads}
 - `crew_mood`: the people aboard live this war: losses, close calls, victories, the Captain's choices and long waits change how they feel; carry it from beat to beat (the mood before

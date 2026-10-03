@@ -289,13 +289,13 @@ void UAstraBoardSubsystem::OnOutcome()
 	const FString Tally = FString::Printf(TEXT("marines: %d dead, %d wounded; boarders: %d dead, %d wounded, %d got away"), B.Killed[0], B.Down[0], B.Killed[1], B.Down[1], B.Exited[1]);
 	switch (M.Outcome)
 	{
-	case EOutcome::AquilaHolds:
+	case EOutcome::DefenderHolds:
 		Tell(FString::Printf(TEXT("the boarders are beaten: Main Engineering is secure and the deck is ours. %s"), *Tally), true);
 		break;
-	case EOutcome::MandateRepelled:
+	case EOutcome::AttackerRepelled:
 		Tell(FString::Printf(TEXT("the boarders have broken off and gone back through the breach; the deck is ours. %s"), *Tally), true);
 		break;
-	case EOutcome::MandateTakes:
+	case EOutcome::AttackerTakes:
 		bToldTakeover = true;
 		if (BdCVarTakeoverFatal.GetValueOnGameThread() != 0)
 		{

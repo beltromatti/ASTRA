@@ -22,6 +22,21 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**3/10 sera (2) — le tre partite dell'utente con la guerra della March (17:31–19:03, app impacchettata), lette e corrette (il lead):**
+- **Com'è andata**: la March ha giocato l'apertura in tutte e tre; l'utente ha comandato tre gruppi di battaglia, risparmiato la Nemesis
+  senza energia, respinto Solm, catturato l'Acheron come relitto, poi è passato da solo a Thule, nel sistema nemico, contro otto navi (la XO
+  lo avvertiva): una guerra strategica vera. Costo: **1,93 $ in 1,58 ore (1,22 $/ora)**.
+- **Corretti**: la frase da console «nessun ordine nuovo da eseguire» (era un esempio nel prompt, il tattico e il timone la copiavano);
+  una nave alleata senza mente sua (il Bulwark) ora risponde attraverso il comandante del suo gruppo (quattro chiamate senza risposta);
+  la conversazione dell'equipaggio si taglia solo dall'inizio (la cache del fornitore si rompeva quasi a ogni chiamata: dal 55 al **68 %**,
+  ~0,0016 $ a chiamata invece di 0,003) con gli ultimi ordini del Capitano in una lista loro; le persone di VITA oltre 6 m non fanno ombra
+  (nella Mess Hall le ombre della folla valevano 5 ms di GPU su 15: -2,2 ms); gli ordini scritti del Capitano finiscono nei registri.
+- **Mancava**: l'arma del Capitano (l'ha chiesta, l'equipaggio non poteva dargliela): affidata ad ABBORDAGGI (rastrelliere con E e un
+  ordine vero «portatemi un'arma»).
+- **App**: rifatta alle 19:3x e la mente aggiornata copiata dentro (rsync dei sorgenti in Contents/Resources/mind: basta per le correzioni
+  della mente, senza ricompilare).
+- **Aiutanti ripresi**: ABBORDAGGI (F5.2 + arma del Capitano), ARTE-INTERNI (primo traguardo da integrare), FLOTTA-VIVA.
+
 **3/10 sera — DA RIPRENDERE QUI (limite di sessione; aiutanti fermati, i loro worktree restano con il lavoro salvato):**
 - **Aiutanti da riprendere con SendMessage** (o rilanciare): **ABBORDAGGI** (F5.2: simulazione per ruoli e caricatore dei piani fatti, scheda dei tasti
   in alto a sinistra `70c4c49` da provare; stava scrivendo il banco delle navette), **ARTE-INTERNI** (12+ commit: bagni, osservatorio, Flight Deck,

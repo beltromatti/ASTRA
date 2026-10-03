@@ -143,7 +143,7 @@ void UAstraWarDraw::Prewarm()
 	{
 		return;
 	}
-	for (const TCHAR* M : {TEXT("SM_CRAFT_ASTRA_Falcon"), TEXT("SM_CRAFT_ASTRA_Hammer"), TEXT("SM_CRAFT_ASTRA_Wasp"), TEXT("SM_CRAFT_MANDATE_Harpy")})
+	for (const TCHAR* M : {TEXT("SM_CRAFT_ASTRA_Falcon"), TEXT("SM_CRAFT_ASTRA_Hammer"), TEXT("SM_CRAFT_ASTRA_Wasp"), TEXT("SM_CRAFT_MANDATE_Harpy"), TEXT("SM_CRAFT_MANDATE_Skiff"), TEXT("SM_CRAFT_ASTRA_Kestrel")})
 	{
 		KindFor(M);
 	}

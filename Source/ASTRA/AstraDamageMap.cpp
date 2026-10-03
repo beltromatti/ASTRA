@@ -156,12 +156,21 @@ float FAstraDmgDeck::HalfWidthAt(float X) const
 
 bool FAstraDamageMap::Load(FString& OutError, bool bRepoFirst)
 {
+	return Load(DmFindPlan(bRepoFirst), OutError);
+}
+
+bool FAstraDamageMap::Load(const FString& Path, FString& OutError)
+{
 	const double T0 = FPlatformTime::Seconds();
 	TSharedPtr<FJsonObject> Plan;
-	if (!DmReadJson(DmFindPlan(bRepoFirst), Plan))
+	if (!DmReadJson(Path, Plan))
 	{
-		OutError = TEXT("no ship's plan (aquila_plan.json)");
+		OutError = FString::Printf(TEXT("no ship's plan (%s)"), *FPaths::GetCleanFilename(Path));
 		return false;
+	}
+	if (const TArray<TSharedPtr<FJsonValue>>* Origin = nullptr; Plan->TryGetArrayField(TEXT("origin_in_hull"), Origin) && Origin->Num() >= 3)
+	{
+		OriginInHullM = FVector((*Origin)[0]->AsNumber(), (*Origin)[1]->AsNumber(), (*Origin)[2]->AsNumber());
 	}
 	for (int32 c = 0; c < DmClassNum; ++c)
 	{
