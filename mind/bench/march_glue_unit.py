@@ -401,11 +401,11 @@ class MarchOpeningTest(Fixture):
     async def test_a_new_campaign_asks_and_a_saved_war_or_the_scripts_own_switch_does_not(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             self.m.war.save_path = os.path.join(d, "war.json")
-            self.glue.march_opening = False                                             # (ASTRA_OPENING=script)
+            self.glue.opening_wanted = False                                             # (ASTRA_OPENING=script)
             self.glue.start(True)
             await self.step(3)
             self.assertEqual((self.world.asked, self.glue.opening_mode), ([], "script"))
-            self.glue.march_opening = True
+            self.glue.opening_wanted = True
             self.glue.start(False)                                                      # (a saved war: the game has resumed it, its opening is over)
             await self.step(3)
             self.assertEqual((self.world.asked, self.glue.opening_mode), ([], "script"))

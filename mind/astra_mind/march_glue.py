@@ -128,7 +128,7 @@ class MarchGlue:
         self.sending: set[str] = set()
         self.reserve: dict[str, float] = {}             # fleet -> when it may try the Gate again (the game's sky was full)
         self.opening: set[str] = set()                  # the fleets the game's opening brings in itself: the map leaves them to it until they show (or the grace is out)
-        self.march_opening = opening                    # a new campaign asks the game to switch its opening script off (the March plays the opening's fleets: ASTRA_OPENING)
+        self.opening_wanted = opening                    # a new campaign asks the game to switch its opening script off (the March plays the opening's fleets: ASTRA_OPENING)
         self.opening_mode = "script"                    # script: the game's own opening | march: the game has switched it off and the war's fleets play it
         self._ask = False                               # the question is still to be put to the game
         self.due: dict[str, float] = {}                 # contact id -> when the ship should have shown in the game's views by (a ship that never came is dropped)
@@ -157,7 +157,7 @@ class MarchGlue:
         m = self.m
         m.live_scripts = True                           # (the game brings its own fleets in: the clock of the bench does not)
         m.save_path = m.default_path()
-        self._ask = bool(new and self.march_opening)
+        self._ask = bool(new and self.opening_wanted)
         self.opening_mode = "asking" if self._ask else "script"
         if new:
             m.reset(random.randrange(1, 10 ** 6))
