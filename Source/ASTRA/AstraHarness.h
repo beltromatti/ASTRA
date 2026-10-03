@@ -54,6 +54,7 @@ private:
 	FDelegateHandle ShipEventHandle;
 	struct FPendingRelease { FString Key; double At; };
 	TArray<FPendingRelease> Releases;
+	double HoverUntil = 0.0;              // /teleport: the Captain floats where he was put until a floor is under him (a deck still streaming in)
 	double FpsAvg = 0.0;
 	int32 Port = 8770;
 	bool bStarted = false;

@@ -2632,6 +2632,13 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	{
 		return Battle ? Battle->FleetRequest(Str(TEXT("ship")), Str(TEXT("request")), Str(TEXT("target")), OutDetail) : false;
 	}
+	if (Name == TEXT("fleet_captain"))
+	{
+		// the persona the minds give a ship commands her inside too (FLOTTA-VIVA): "her captain is dead" is about the one who spoke on the channel
+		const bool bOk = Battle && Battle->FleetSetCaptain(Str(TEXT("ship")), Str(TEXT("rank")), Str(TEXT("name")));
+		OutDetail = bOk ? FString::Printf(TEXT("%s commands %s"), *Str(TEXT("name")), *Str(TEXT("ship"))) : FString::Printf(TEXT("no ship %s"), *Str(TEXT("ship")));
+		return bOk;
+	}
 	if (Name == TEXT("mandate_tactics"))
 	{
 		return Battle ? Battle->EnemyTactics(Args, OutDetail) : false;

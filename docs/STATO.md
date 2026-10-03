@@ -22,6 +22,42 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**3/10 notte — schermo principale pulito, armi del Capitano provate, interni nuovi in importazione, SPAZIO-VIVO avviato (il lead):**
+- **Schermo principale** (`2edcc3c`): zoomato su un bersaglio lontano (x100–x180) mostrava a volte lo scafo di una scorta, un caccia o una salva di
+  proiettili che passava davanti all'obiettivo come un enorme piano sfocato, e le stelle del cielo come grosse macchie azzurre. Ora il piano vicino
+  della telecamera lascia fuori tutto ciò che sta a meno di metà strada dal soggetto (di entrambe le parti: scafi, luci, colpi, fumo; sostituisce
+  l'«insieme dell'obiettivo» di AstraWarDraw, che nascondeva solo i nostri caccia ed è stato tolto); le stelle e la nebulosa sfumano fra 30 e 12
+  gradi di campo (`make_sky.py`: una telecamera esposta per uno scafo al sole non vede stelle), il sole e il pianeta restano nitidi. Provato in
+  battaglia: 14 catture, nessuna macchia, le navi sempre inquadrate.
+- **ABBORDAGGI unito e provato** (armi del Capitano): l'armadietto del Ready Room (E prende e rimette la pistola, cartoncino dei tasti senza la riga
+  del fucile), «Serra, fammi portare un'arma» → l'XO chiama `issue_weapon` in 2,6 s, il soldato Qureshi la porta dalla Marine Armory in 67 s.
+  Con lo stesso ramo: le navette d'abbordaggio Skiff e Kestrel nella battaglia, la simulazione di squadra per ruoli, i piani provvisori delle classi.
+- **ARTE-INTERNI unito** (22 commit: guscio, temi, materiali e luci per ~97 tipi di stanza, giardini veri con piante CC0 di Poly Haven, le cinque
+  stanze M1 rifatte). Kit riesportato e **importato nell'editor ma NON ancora committato** (~430 MB in `Content/`, lasciati nel working tree):
+  le stanze del kit nel gioco sono belle (Officers' Wardroom provata: parquet, doghe, quadri, tavoli apparecchiati, bar, acquario), ma **la Mess
+  Hall M1 nel gioco non c'è**: niente modello e niente pavimento (il Capitano cade, il FallGuard lo riporta in plancia), anche con `r.Nanite 0`;
+  nell'editor l'attore `Mess_Hall` (folder Mess, SM_MESS_Hall, 91.762 triangoli Nanite) esiste ed è visibile. **DA RIPRENDERE QUI**: capire perché
+  il gioco non carica gli attori M1 di L_Bridge (provare anche Berths/Medbay/Engineering/Hangar), poi committare il contenuto (escludendo i
+  risalvataggi senza modifiche). Nota: le foto dell'editor via MCP (CaptureViewport) mostrano le mesh Nanite grandi come frammenti
+  (sembra la fallback mesh): non sono affidabili per giudicare le stanze, fa fede il gioco. Ordine giusto: i builder M1 PRIMA di
+  `build_ship_interior.py`, oppure dopo un passaggio con `BUILD_MAPS = False` (nuovo) che riapre gli ingressi senza ricostruire i ponti.
+- **Kit riesportabile senza reimportare tutto**: l'FBX di Blender cambiava a ogni esportazione (data di scrittura e numeri interni presi da `hash()`
+  di Python, diverso a ogni processo) e le stanze escono con vertici in ordine diverso a ogni giro: ogni esportazione reimportava 446 modelli
+  (~330 MB di LFS). Ora l'esportatore ha un orologio fisso e un hash stabile (`astra_bpy.export_fbx`), e il manifesto porta un'impronta della
+  geometria indipendente dall'ordine (`astra_bpy.geometry_signature`: triangoli, UV, normali, nomi dei materiali) che `build_ship_interior.py`
+  usa al posto dell'hash del file: due esportazioni dello stesso kit danno 446 impronte uguali su 446 (una sola falsa differenza, sulle normali, tolta
+  arrotondando al decimo).
+- **Banco di prova**: il gioco lanciato con `-astra_harness` non si mette più a riposo dietro altre finestre (`t.IdleWhenNotForeground 0`).
+- **Teletrasporto del banco** (`/teleport`): il Capitano resta sospeso finché sotto i piedi c'è un pavimento (un ponte ancora in streaming), al massimo
+  20 s. **FLOTTA-VIVA unito** (interni delle sette classi; banchi: flotta 119/119, piani 7/7, danni, abbordaggi 16/16) e **ABBORDAGGI F5.2 unito**
+  (navette d'abbordaggio nella guerra, `board`/`board_ship`): da provare nel gioco. Le menti danno il nome del comandante all'interno di ogni nave
+  (`fleet_captain`). **SPAZIO-VIVO M1 pronto da unire** (ramo `worktree-agent-a7d3df7e6454139e6`, luoghi e traffico civile; passi nel suo rapporto:
+  merge, ricompila, `spacegen3.py`, `import_space_v3.py`). Aiutanti ABBORDAGGI e SPAZIO-VIVO fermati per il limite di sessione (lavoro salvato nei rami).
+- **Credito OpenRouter (verificato via API)**: 13,92 $ usati su 20, **6,08 $ residui**.
+- **Aiutanti**: ABBORDAGGI (F5.2: la guerra che lancia le navette, abbordare e farsi abbordare), FLOTTA-VIVA, **SPAZIO-VIVO avviato** (traffico
+  civile, luoghi veri, relitti e detriti che restano, scala cinematica; brief `docs/brief/SPAZIO-VIVO.md`). ARTE-INTERNI fermo al traguardo
+  (prossimi: armadietti delle tute, osservatorio di prua, barbiere, ponte di comando; i letti a castello vecchi e i letti dell'infermeria).
+
 **3/10 sera (2) — le tre partite dell'utente con la guerra della March (17:31–19:03, app impacchettata), lette e corrette (il lead):**
 - **Com'è andata**: la March ha giocato l'apertura in tutte e tre; l'utente ha comandato tre gruppi di battaglia, risparmiato la Nemesis
   senza energia, respinto Solm, catturato l'Acheron come relitto, poi è passato da solo a Thule, nel sistema nemico, contro otto navi (la XO

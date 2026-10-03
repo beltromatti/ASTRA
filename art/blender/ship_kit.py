@@ -275,7 +275,8 @@ def mesh_checks(name: str, item: tuple, obj, st: dict) -> list[str]:
 def manifest_entry(name: str, item: tuple, obj, st: dict) -> dict:
     slots = st["materials"]
     e = {"kind": item[0], "tris": st["tris"], "size_m": st["size_m"], "bounds_m": layout_bounds(obj), "slots": slots,
-         "nanite": not any(s in TRANSLUCENT_SLOTS for s in slots)}
+         "nanite": not any(s in TRANSLUCENT_SLOTS for s in slots),
+         "sig": A.geometry_signature(obj)}                  # what build_ship_interior.py compares to re-import only the meshes that changed
     if item[0] == "room":
         spec = SPEC.PREFABS[item[1]]
         e["prefab"] = item[1]
