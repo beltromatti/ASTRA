@@ -190,31 +190,12 @@ def officer_bed(b: SParts, w: float = 1.0, l: float = 2.1, blanket: str = FABRIC
 
 
 def treadmill(b: SParts) -> None:
-    """A treadmill facing +x: a belt on a steel frame, side rails, an upright with a console screen and a handlebar, a lit speed strip."""
-    b.body.box((-0.9, -0.38, 0.1), (0.7, 0.38, 0.22), CRATE_GREY)
-    b.soft.box((-0.85, -0.3, 0.22), (0.62, 0.3, 0.235), RUBBER)
-    for sy in (-0.38, 0.32):
-        b.body.box((-0.9, sy, 0.1), (0.7, sy + 0.06, 0.32), STRUCT)
-    b.body.box((0.62, -0.34, 0.0), (0.76, 0.34, 0.12), STRUCT)
-    for sy in (-0.36, 0.36):
-        b.body.box((0.6, sy - 0.03, 0.2), (0.7, sy + 0.03, 1.2), TRIM)
-    b.body.box((0.58, -0.3, 1.05), (0.72, 0.3, 1.45), STRUCT)
-    b.soft.box((0.5, -0.25, 1.1), (0.58, 0.25, 1.4), DGLASS)
-    b.emit.label((0.499, 0.0, 1.25), 0.5, 0.26, (-1, 0, 0), "scr_data")
-    b.soft.cyl((0.6, -0.36, 1.2), (0.6, 0.36, 1.2), 0.025, RUBBER, seg=8)
-    b.emit.lamp_box((-0.8, -0.395, 0.18), (0.6, -0.385, 0.2), "cyan_dim", LAMP_DIM)
+    """A treadmill facing +x (ship_furn3.treadmill)."""
+    import ship_furn3 as N3
+    N3.treadmill(b)
 
 
 def weight_bench(b: SParts) -> None:
-    """A weight bench with a bar rack, facing +x: a padded flat bench, two uprights holding a barbell with rubber plates, a plate tree and a mirror-side rail."""
-    b.body.box((-0.4, -0.15, 0.0), (0.9, 0.15, 0.4), STRUCT)
-    b.soft.box((-0.4, -0.18, 0.4), (0.9, 0.18, 0.47), FABRIC_GREY)
-    for sx in (0.0, 0.7):
-        for sy in (-0.45, 0.45):
-            b.body.box((sx - 0.03, sy - 0.03, 0.0), (sx + 0.03, sy + 0.03, 1.15), TRIM)
-    b.body.cyl((0.35, -0.7, 1.1), (0.35, 0.7, 1.1), 0.016, STEEL, seg=8)
-    for sy in (-0.55, 0.55):
-        b.soft.cyl((0.35, sy - 0.04, 1.1), (0.35, sy + 0.04, 1.1), 0.2, RUBBER, seg=14)
-    b.body.cyl((1.2, 0.0, 0.0), (1.2, 0.0, 1.3), 0.025, TRIM, seg=8)
-    for k in range(4):
-        b.soft.cyl((1.2, -0.08, 0.3 + k * 0.28), (1.2, 0.08, 0.3 + k * 0.28), 0.14 - k * 0.012, RUBBER, seg=10)
+    """A weight bench with its bar rack (ship_furn3.bench_press)."""
+    import ship_furn3 as N3
+    N3.bench_press(b)

@@ -3,6 +3,8 @@ redesign adds (the crew's berthing bays, the senior officers' suites, the office
 from __future__ import annotations
 
 import ship_cabin as SC
+import ship_furn3 as N3
+import ship_mess as MS
 import ship_furniture as F
 import ship_decor as DC
 import ship_spec3 as SPEC3
@@ -96,26 +98,35 @@ def bar(name: str = "SM_SHIP_Bar"):
 
 # --------------------------------------------------------------------------------------------------------------------------------------------------------------------- the chapel
 def chapel(name: str = "SM_SHIP_Chapel"):
-    """16 x 16 x 3.7: a nave with five rows of pews either side of a central aisle, an altar (a plain stone table, two candles) at the far end under a lit panel of stars, a few plants,
-    soft light from the cove; for all faiths."""
+    """16 x 16 x 3.7: a nave with five rows of pews either side of a central aisle with a runner on it, an altar of pale stone with two candlesticks and a lectern at the far end under a
+    stained-glass window of the ship's colours between two narrow ones, candelabras at the front, banners, plants; soft warm light from the cove; for all faiths."""
     spec, L, D, H = _dims("chapel")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
+    b = SParts(bevel=0.005, fine_bevel=0.0)
     st = Style(floor=FABRIC_GREY, floor_mode="covering", seams=False, wall_lo=WOOD, wall_hi=COMPOSITE, wain_h=1.4, ceil=COMPOSITE, accent="warm_dim", cove="white_warm", ribs=True, skirt=WOOD)
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
+    b.soft.swatch_box((7.1, 1.2, 0.0), (8.9, yf - 2.6, 0.012), "oxblood")                                       # the runner down the aisle
+    b.soft.swatch_box((7.1, 1.2, 0.0), (7.16, yf - 2.6, 0.014), "mustard")
+    b.soft.swatch_box((8.84, 1.2, 0.0), (8.9, yf - 2.6, 0.014), "mustard")
     for k in range(5):
         for xc in (4.8, 11.2):
-            place(b, xc, 4.2 + k * 1.5, 90, N.pew, 2.6)
-    place(b, 8.0, yf - 1.6, -90, N.altar)
-    b.emit.label((8.0, yf - 0.003, 2.2), 5.0, 2.8, (0, -1, 0), "scr_star")
+            place(b, xc, 4.2 + k * 1.5, 90, N3.pew, 2.6)
+    b.soft.swatch_box((5.0, yf - 2.6, 0.0), (11.0, yf - 0.1, 0.12), "w_walnut")                                    # the chancel: a low platform, the altar and its lectern on it
+    place(b, 8.0, yf - 1.6, -90, N3.altar)
+    place(b, 10.2, yf - 1.2, -110, N3.lectern, z=0.12)
+    for x in (5.6, 10.4):
+        place(b, x, yf - 0.9, 0, N3.candle_stand, 1, z=0.12)
+    place(b, 8.0, yf, -90, N3.mosaic_window, 2.4, 3.0, 3, z=1.75)                                                  # the window and its two companions
+    for x in (5.6, 10.4):
+        place(b, x, yf, -90, N3.mosaic_window, 0.8, 2.4, int(x), z=1.65)
     b.body.box((5.3, yf - 0.1, 0.0), (5.45, yf, 3.6), TRIM)
     b.body.box((10.55, yf - 0.1, 0.0), (10.7, yf, 3.6), TRIM)
-    b.body.box((5.3, yf - 0.1, 3.6), (10.7, yf, 3.7), TRIM)
+    for x in (2.0, 14.0):
+        place(b, x, yf, -90, MS.banner, 0.7, 2.1, z=3.0)
     for (x, y) in ((1.0, 14.6), (15.0, 14.6), (1.0, 1.2)):
         place(b, x, y, 0, F.potted_plant, 1.5, int(x + y))
     wall_label(b, 8.0, WF + 0.02, 2.6, (0, 1, 0), "eq_silence", 0.7)
-    ceiling_panels(b, L, D, H, 2, 3, "white_warm", 2.0, 0.9, 0.5, LAMP_DIM)
     return b.build(name)
 
 
