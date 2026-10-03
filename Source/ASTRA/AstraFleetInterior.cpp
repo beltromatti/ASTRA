@@ -341,9 +341,10 @@ void FAstraShipInterior::Impact(const FAstraHullHit& Hit)
 		{
 			Path += (Path.IsEmpty() ? TEXT("") : TEXT(" -> ")) + RoomWord(Ci);
 		}
-		LastTrace = FString::Printf(TEXT("%s: a blow of %.0f at the hull (%s face, %s, %.0f m from the plan's origin) entered at %s and spent itself in %d rooms: %s | %d killed, %d wounded%s%s%s%s | %s"),
+		const FVector Entry = R.EntryCm / 100.0 + Plan->Map->OriginInHullM;          // (the hull's frame, metres: X to the bow, Y to starboard, Z up)
+		LastTrace = FString::Printf(TEXT("%s: a blow of %.0f at the hull (%s face, %s, struck at x %.0f y %.0f z %.0f m) entered at %s (x %.0f y %.0f z %.0f m) and spent itself in %d rooms: %s | %d killed, %d wounded%s%s%s%s | %s"),
 		                            *ShipName, Hit.Damage, Hit.Facing == 0 ? TEXT("bow") : (Hit.Facing == 1 ? TEXT("stern") : (Hit.Facing == 2 ? TEXT("port") : (Hit.Facing == 3 ? TEXT("starboard") : (Hit.Facing == 4 ? TEXT("dorsal") : TEXT("ventral"))))),
-		                            Hit.Section == 0 ? TEXT("bow section") : (Hit.Section == 1 ? TEXT("mid section") : TEXT("stern section")), FVector(R.EntryCm).Size() / 100.0, *RoomWord(R.Comps[0]), R.Comps.Num(), *Path,
+		                            Hit.Section == 0 ? TEXT("bow section") : (Hit.Section == 1 ? TEXT("mid section") : TEXT("stern section")), Hit.HullM.X, Hit.HullM.Y, Hit.HullM.Z, *RoomWord(R.Comps[0]), Entry.X, Entry.Y, Entry.Z, R.Comps.Num(), *Path,
 		                            R.Killed, R.Wounded, R.bBreach ? TEXT(", a breach") : TEXT(""), R.bFire ? TEXT(", a fire") : TEXT(""), R.bPower ? TEXT(", a conduit cut") : TEXT(""), R.bWreck ? TEXT(", a room wrecked") : TEXT(""),
 		                            *FString::Join(R.Lines, TEXT("; ")));
 	}

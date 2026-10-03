@@ -61,12 +61,12 @@ def cmd_trace(a: argparse.Namespace) -> None:
         if "the plan of the" in ln:
             continue
         # [Fleet] acheron TGT: a blow of 400 at the hull (port face, mid section, 101 m from the plan's origin) entered at <room> and spent itself in N rooms: <path> | k killed, w wounded, ... | what
-        m = re.match(r"\[Fleet\] (?:Display: )?(.*?): a blow of ([\d.]+) at the hull \((\w+) face, (\w+) section, ([\d.]+) m.*?\) entered at (.*?) and spent itself in (\d+) rooms: (.*?) \| (.*?) \| ?(.*)$", ln)
+        m = re.match(r"\[Fleet\] (?:Display: )?(.*?): a blow of ([\d.]+) at the hull \((\w+) face, (\w+) section, struck at ([^)]*) m\) entered at (.*?) \(([^)]*) m\) and spent itself in (\d+) rooms: (.*?) \| (.*?) \| ?(.*)$", ln)
         if not m:
             print("  " + ln)
             continue
-        _, dmg, face, sec, _, entry, n, path, people, what = m.groups()
-        print(f"  {face:9} ({sec} section) enters at {entry}")
+        _, dmg, face, sec, struck, entry, at, n, path, people, what = m.groups()
+        print(f"  {face:9} ({sec} section) struck at {struck} m, enters at {entry} ({at} m)")
         print(f"            crosses {n} room(s): {path}")
         print(f"            {people}")
         if what.strip():
