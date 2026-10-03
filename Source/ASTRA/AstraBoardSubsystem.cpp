@@ -569,11 +569,11 @@ void UAstraBoardSubsystem::Finish(const TCHAR* Why)
 		{
 			L->Sim().Commandeer(*P, false, Un->Pos);          // (the marines of a fight on another ship are away: they come home with their boats)
 		}
-		}
-		if (Phase == EPhase::Active && Mode == EMode::Observed)
-		{
+	}
+	if (Phase == EPhase::Active && Mode == EMode::Observed)
+	{
 		OpenSections();
-		}
+	}
 	if (S && bRaisedAlert && S->GetAlert() == EAstraAlert::Red)
 	{
 		FString D;
@@ -860,7 +860,7 @@ void UAstraBoardSubsystem::Step(float Dt)
 			OnOutcome();
 		}
 	}
-	}
+}
 
 void UAstraBoardSubsystem::SyncLife()
 {
@@ -940,7 +940,7 @@ void UAstraBoardSubsystem::ManageBodies(float Dt)
 	TArray<FCand> Cand;
 	for (const FUnit& U : Fight.Units())
 	{
-		if (U.bExternal || U.Act == EAct::Waiting || U.Act == EAct::Gone)
+		if (U.bExternal || U.Act == EAct::Waiting || U.Act == EAct::Gone || U.CarriedBy != INDEX_NONE)       // (a wounded man on a comrade's shoulders is not on the floor)
 		{
 			continue;
 		}

@@ -273,6 +273,8 @@ private:
 		double PlanSinceS = 0.0;                     // (the wall clock when the reading began: a bench runs the game's clock a thousand times too fast for it)
 		FAssaultSpec Spec;
 		FString PlanWhy;
+		TMap<int32, FBoardRoomMood> Moods;           // (a fight on a ship the war has shot at) how her rooms are: no power, fire, no air
+		bool bFromWar = false;                       // her people and bulkheads are the war's picture of her inside
 	};
 	FAssault Assault;
 	int32 NextOrder = 1;

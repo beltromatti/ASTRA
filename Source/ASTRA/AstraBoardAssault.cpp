@@ -18,6 +18,8 @@
 #include "AstraBoardScene.h"
 #include "AstraCombatFx.h"
 #include "AstraCrewRoster.h"
+#include "AstraFleetInterior.h"
+#include "AstraFleetPlan.h"
 #include "AstraLifeSubsystem.h"
 #include "AstraShipSubsystem.h"
 #include "Async/Async.h"
@@ -76,6 +78,47 @@ namespace
 			}
 		}
 		return INDEX_NONE;
+	}
+
+	/** The war's picture of a ship's inside is of this plan: the rooms and the people it names are rooms of it, and her class's own plan (FLOTTA-VIVA's loader) is the same file (the same rooms in the same
+	 *  order: the indices of the one are the indices of the other). */
+	bool AsSnapshotFits(const FFleetSnapshot& Snap, const FBoardShipPlan& Plan, FName ClassKey)
+	{
+		if (!Plan.Dmg.IsValid())
+		{
+			return false;
+		}
+		const int32 N = Plan.Dmg->Comps.Num();
+		for (const FFleetSnapshot::FRoom& R : Snap.Rooms)
+		{
+			if (R.Comp < 0 || R.Comp >= N)
+			{
+				return false;
+			}
+		}
+		for (const FFleetSnapshot::FHand& H : Snap.Hands)
+		{
+			if (H.Comp < 0 || H.Comp >= N)
+			{
+				return false;
+			}
+		}
+		if (const TSharedPtr<const FFleetClassPlan> Theirs = FAstraFleetPlans::Find(ClassKey, false); Theirs.IsValid() && Theirs->Map.IsValid())
+		{
+			const FAstraDamageMap& M = *Theirs->Map;
+			if (M.Comps.Num() != N)
+			{
+				return false;
+			}
+			for (const int32 i : {0, N / 3, N / 2, N - 1})
+			{
+				if (M.Comps[i].Id != Plan.Dmg->Comps[i].Id)
+				{
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 }
 
@@ -539,14 +582,13 @@ bool UAstraBoardSubsystem::StartAssault(const FAssaultSpec& Spec, FString& OutDe
 		OutDetail = FString::Printf(TEXT("%s is not a ship with a plan of her decks"), *AsShipLabel(T));
 		return false;
 	}
-	bool bStop = false;
 	if (AstraBoardPlans::Peek(Class).IsValid())
 	{
 		A.PlanKey = Class.ToString();
 		Assault = MoveTemp(A);
 		return LaunchAssault(OutDetail);
 	}
-	if (AstraBoardPlans::PathFor(Class, bStop).IsEmpty())
+	if (AstraBoardPlans::PathFor(Class).IsEmpty())
 	{
 		OutDetail = FString::Printf(TEXT("there is no plan of the %s class: nobody knows her decks"), *Class.ToString());
 		return false;
@@ -711,7 +753,8 @@ bool UAstraBoardSubsystem::LaunchAssault(FString& OutDetail)
 					if (P != INDEX_NONE)
 					{
 						L->ReleaseBodyOf(P);
-						L->Sim().SetAway(P, FString::Printf(TEXT("aboard a Kestrel on its way to board %s"), *Assault.TargetName));
+						L->Sim().SetAway(P, FString::Printf(TEXT("aboard a Kestrel on its way to board %s"), *Assault.TargetName),
+						                 FString::Printf(TEXT("Flew with the marines in a Kestrel from the boat bay to board %s"), *Assault.TargetName));
 					}
 				}
 			}
@@ -953,20 +996,20 @@ void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
 			{
 				RideArrive(*L);                          // his boat has cut in: he goes onto the other ship's decks
 			}
-			}
-			break;
-			}
-			case AstraBoardCraft::EEventKind::Destroyed:
-			{
-			const bool bAboard = E.bMenAboard && !L->bLanded;
-			L->State = FLeg::EState::Lost;
-			L->bSailing = false;
-			if (L->Index == RideLeg && Ride == ERide::Out)
-			{
+		}
+		break;
+	}
+	case AstraBoardCraft::EEventKind::Destroyed:
+	{
+		const bool bAboard = E.bMenAboard && !L->bLanded;
+		L->State = FLeg::EState::Lost;
+		L->bSailing = false;
+		if (L->Index == RideLeg && Ride == ERide::Out)
+		{
 			CaptainLostInBoat(E.Cause);                  // he was in it
-			}
-			else if (L->Index == RideLeg && Ride == ERide::Aboard)
-			{
+		}
+		else if (L->Index == RideLeg && Ride == ERide::Aboard)
+		{
 			// his boat is gone with him on the other ship: another boat that is still there takes him off, or nothing does
 			int32 Other = INDEX_NONE;
 			for (const FLeg& O : Assault.Legs)
@@ -989,7 +1032,7 @@ void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
 					S->GetInterior().CaptainDied(TEXT("stranded on a ship with no boat left to take him off"));
 				}
 			}
-			}
+		}
 		if (bAboard)
 		{
 			if (Assault.bObserved && Phase == EPhase::Active)
@@ -1113,6 +1156,7 @@ void UAstraBoardSubsystem::BeginObservedScene()
 	}
 	ResetScene(EMode::Observed);
 	Fight.Init(Map.ToSharedRef(), GAstraDeterministic ? 7001 : (int32)(FDateTime::Now().GetTicks() & 0x7fffffff));
+	Fight.Tuning.bEvacuate = true;                                       // (the boats wait at the hatches: the wounded are carried out to them)
 	Fight.SetMission(ESide::Mandate, L0.BreachComp, L0.InCm, Obj, false);
 	int32 Men = 0;
 	for (FLeg& L : Assault.Legs)
@@ -1167,6 +1211,7 @@ bool UAstraBoardSubsystem::BeginRemoteScene()
 	Map = Plan->Map;
 	Dmg = Plan->Dmg;
 	Fight.Init(Map.ToSharedRef(), GAstraDeterministic ? 7001 : (int32)(FDateTime::Now().GetTicks() & 0x7fffffff));
+	Fight.Tuning.bEvacuate = true;
 	FShipFacts T;
 	const UAstraBattleSubsystem* B = Battle();
 	const bool bFacts = B && B->ShipFacts(Assault.TargetId, T);
@@ -1178,11 +1223,42 @@ bool UAstraBoardSubsystem::BeginRemoteScene()
 	S.bSweep = bFacts && T.bDisabled;
 	S.bShipSensors = bFacts && !T.bDisabled;
 	S.Seed = GAstraDeterministic ? 7 : (int32)(FDateTime::Now().GetTicks() & 0xffff);
-	// a ship that has lost her power is a poor place to defend: fewer on their feet, the bulkheads that are shut stay shut
-	if (bFacts && T.bDisabled)
+	// what the war has left of her inside (a ship that has been hit through her plating has one): her people alive where they are, the bulkheads she has shut, the rooms with no power or on fire
+	FFleetSnapshot Snap;
+	const bool bWar = B && B->InsideOf(Assault.TargetId, Snap) && AsSnapshotFits(Snap, *Plan, Plan->Class);
+	if (bWar)
 	{
-		S.PostShare = 0.55f;
-		S.Roaming = 3;
+		S.Inside = &Snap;
+		if (bFacts && T.bDisabled)
+		{
+			// a ship that has lost her power and her fight: her marines and a few of her crew resist; the rest, at dead consoles in the dark, have nothing left to fight for
+			S.PostShare = 0.12f;
+			S.GuardShare = 0.6f;
+		}
+		else
+		{
+			S.PostShare = 0.8f;
+		}
+		Assault.bFromWar = true;
+		Assault.Moods.Reset();
+		for (const FFleetSnapshot::FRoom& Rm : Snap.Rooms)
+		{
+			FBoardRoomMood M;
+			M.Power = Rm.Power;
+			M.Fire = Rm.Fire;
+			M.Smoke = Rm.Smoke;
+			M.Air = Rm.Air;
+			M.bGutted = Rm.bGutted;
+			Assault.Moods.Add(Rm.Comp, M);
+		}
+	}
+	else if (bFacts && T.bDisabled)
+	{
+		// a ship that has lost her power and was never fought through (no record of her crew): a derelict. Her marines are at their stations, a few more of her crew with them; the rest have no fight in them
+		S.PostShare = 0.06f;
+		S.GuardShare = 0.5f;
+		S.MinPerPost = 0;
+		S.Roaming = 0;
 	}
 	const AstraBoardScene::FResult R = AstraBoardScene::Build(Fight, *Plan, S);
 	if (!R.bOk)
@@ -1204,8 +1280,23 @@ bool UAstraBoardSubsystem::BeginRemoteScene()
 	Assault.bSceneBegun = true;
 	Assault.bFightSeen = true;
 	Phase = EPhase::Active;
-	Tell(FString::Printf(TEXT("%s's %s has latched to %s at %s and cut in: %d %s are through, going for %s; she holds about %d of her people at their posts"), *Assault.CarrierName,
-	                     *First->CraftName, *Assault.TargetName, *BreachText, First->Men, Assault.bRoster ? TEXT("marines") : TEXT("boarders"), *R.ObjectiveName, R.Defenders), true);
+	FString Holds;
+	if (R.bFromWar)
+	{
+		// the war's picture of her: who is left, who lies hurt, who commands (the same words her own side's minds are given of her)
+		Holds = FString::Printf(TEXT("the war has left her %d of her people under arms (%d more at their stations, %d lying wounded) with %d of her crew already dead; %s"), R.Defenders, R.Unarmed, R.Wounded,
+		                        Snap.Killed + Snap.LostWithShip, Snap.Command.IsEmpty() ? TEXT("no officer of her chain of command is on his feet") : *FString::Printf(TEXT("%s has the conn"), *Snap.Command));
+		if (R.ShutBulkheads > 0)
+		{
+			Holds += FString::Printf(TEXT("; %d of her pressure bulkheads are shut"), R.ShutBulkheads);
+		}
+	}
+	else
+	{
+		Holds = FString::Printf(TEXT("she holds about %d of her people at their posts"), R.Defenders);
+	}
+	Tell(FString::Printf(TEXT("%s's %s has latched to %s at %s and cut in: %d %s are through, going for %s; %s"), *Assault.CarrierName, *First->CraftName, *Assault.TargetName, *BreachText, First->Men,
+	                     Assault.bRoster ? TEXT("marines") : TEXT("boarders"), *R.ObjectiveName, *Holds), true);
 	return true;
 }
 
@@ -1304,7 +1395,8 @@ void UAstraBoardSubsystem::ReturnMarines(FLeg& L, bool bAlive)
 		{
 			continue;
 		}
-		Life2->Sim().PlaceTransported(P, Bay + FVector(FMath::FRandRange(-250.f, 250.f), FMath::FRandRange(-250.f, 250.f), 0.f), 0.f, 4.f);
+		Life2->Sim().PlaceTransported(P, Bay + FVector(FMath::FRandRange(-250.f, 250.f), FMath::FRandRange(-250.f, 250.f), 0.f), 0.f, 4.f,
+		                              FString::Printf(TEXT("Came home in %s from the boarding of %s"), L.CraftName.IsEmpty() ? TEXT("a Kestrel") : *L.CraftName, *Assault.TargetName));
 		++Home;
 	}
 	if (Home > 0)
@@ -1390,8 +1482,8 @@ void UAstraBoardSubsystem::OnRemoteOutcome()
 	const FBook& B = Fight.Book();
 	const bool bUs = Assault.bRoster;                        // the Aquila's marines attack
 	const int32 Mine = bUs ? 0 : 1, Theirs = bUs ? 1 : 0;
-	const FString Tally = FString::Printf(TEXT("%s: %d dead, %d wounded; %s: %d dead, %d wounded, %d got away"), bUs ? TEXT("marines") : TEXT("the boarders"), B.Killed[Mine], B.Down[Mine],
-	                                      bUs ? TEXT("her crew") : TEXT("her defenders"), B.Killed[Theirs], B.Down[Theirs], B.Exited[Theirs]);
+	const FString Tally = FString::Printf(TEXT("%s: %d dead, %d wounded; %s: %d dead, %d wounded, %d got away"), bUs ? TEXT("marines") : TEXT("the boarders"), B.Killed[Mine], B.Down[Mine] + B.Carried[Mine],
+	                                      bUs ? TEXT("her crew") : TEXT("her defenders"), B.Killed[Theirs], B.Down[Theirs] + B.Carried[Theirs], B.Exited[Theirs]);
 	UAstraBattleSubsystem* Bat = Battle();
 	FString Detail;
 	switch (M.Outcome)
@@ -1412,8 +1504,8 @@ void UAstraBoardSubsystem::OnRemoteOutcome()
 			Tell(FString::Printf(TEXT("the Mandate's boarders hold %s on %s: she is theirs. %s"), *Map->Describe(M.Objective), *Assault.TargetName, *Tally), true);
 		}
 		break;
-		}
-		case EOutcome::DefenderHolds:
+	}
+	case EOutcome::DefenderHolds:
 		if (bUs)
 		{
 			Tell(FString::Printf(TEXT("the boarding of %s has failed: every marine on her decks is down or out, and she holds. %s"), *Assault.TargetName, *Tally), true);
@@ -1423,7 +1515,7 @@ void UAstraBoardSubsystem::OnRemoteOutcome()
 			Tell(FString::Printf(TEXT("the boarders on %s are beaten: she holds. %s"), *Assault.TargetName, *Tally), true);
 		}
 		break;
-		case EOutcome::AttackerRepelled:
+	case EOutcome::AttackerRepelled:
 		if (bUs)
 		{
 			Tell(FString::Printf(TEXT("the marines have broken off and are back in their boats: %s still holds out. %s"), *Assault.TargetName, *Tally), true);
@@ -1541,7 +1633,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx)
 				const FBook& Bk = Fight.Book();
 				F->SetNumberField(TEXT("your_men_able"), Fight.CountAble(Mine));
 				F->SetNumberField(TEXT("your_men_down_or_dead"), Bk.Down[(int32)Mine] + Bk.Killed[(int32)Mine]);
-				F->SetNumberField(TEXT("your_men_back_in_the_boats"), Bk.Exited[(int32)Mine]);
+				F->SetNumberField(TEXT("your_men_back_in_the_boats"), Bk.Exited[(int32)Mine] + Bk.Carried[(int32)Mine]);
 				F->SetStringField(TEXT("objective"), Map->Describe(Fight.Mission().Objective));
 				F->SetNumberField(TEXT("objective_held_s"), FMath::RoundToInt(Fight.Mission().HeldS));
 				F->SetNumberField(TEXT("fight_s"), FMath::RoundToInt(Since));

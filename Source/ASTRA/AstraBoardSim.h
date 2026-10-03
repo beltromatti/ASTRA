@@ -73,6 +73,13 @@ namespace AstraBoard
 		float CutS = 22.f;                                      // how long the Mandate need to cut through a sealed bulkhead
 		float PushS = 40.f;                                     // how long the Mandate sit in contact without getting nearer before they press the attack
 		bool bShipSensors = true;                               // the holders' ship has its internal sensors (the Aquila's: a few seconds stale picture of the corridors); a dead hulk has none
+		bool bEvacuate = false;                                 // the attackers' wounded are carried out to their boats by their own men (a boarding by boats: nobody is left to bleed where he fell while the way is clear)
+		float EvacPickupS = 2.5f;                               // seconds to get a man up and on his bearer's shoulders
+		float EvacCmS = 115.f;                                  // the pace of a man who carries one
+		float EvacReachCm = 2400.f;                             // how far from the casualty a man may be called to carry him
+		float EvacClearCm = 1500.f;                             // nobody comes for a casualty while an enemy who can see him is this near (the fight comes first)
+		float EvacBleedBonusS = 45.f;                           // first aid on the spot: the seconds it gives a man who is down
+		float LethalScale[2] = {0.75f, 1.f};                    // by side (Aquila, Mandate): how much of a beaten man's chance of dying outright is his (1: the base rule; a marine's armour and field surgery make it less)
 		bool bFlank = true;                                     // squads go round (the bench turns it off to see what it is worth)
 		bool bCover = true;                                     // men look for corners (the bench turns it off for the duels in the open)
 	};
@@ -108,6 +115,10 @@ namespace AstraBoard
 		bool bLow = false;               // crouched or prone (a harder target)
 		EAct Act = EAct::Idle;
 		float Bleed = 0.f;               // seconds he has left when he is down
+		int32 Bearer = INDEX_NONE;       // down: the man called to carry him out
+		int32 CarriedBy = INDEX_NONE;    // down: the man who has him on his shoulders now (he does not bleed, and his body is not seen on the floor)
+		int32 Carrying = INDEX_NONE;     // the man he has been called to carry out, or carries (he does not fight meanwhile)
+		float CarryT = 0.f;              // seconds spent getting the casualty up
 		// weapon
 		FWeapon Weapon;
 		int32 Rounds = 30;
@@ -188,7 +199,8 @@ namespace AstraBoard
 		Spawn,       // Unit came into the fight
 		Order,       // a squad's task changed
 		Outcome,
-		Cut          // the Mandate cut through a sealed bulkhead: Target is the door (the damage map's index), Start where it is
+		Cut,         // the Mandate cut through a sealed bulkhead: Target is the door (the damage map's index), Start where it is
+		Carried      // Unit, who was down, has been carried out to the boats by Target: he is alive and off the ship
 	};
 	struct FBoardEvent
 	{
@@ -285,11 +297,13 @@ public:
 	/** Any man of either side (the bench's duels, a scenario's hand-made squads). */
 	int32 AddUnit(AstraBoard::ESide Side, AstraBoard::ERole Role, const FString& Name, const FVector& Pos, int32 SquadId);
 	int32 AddSquad(AstraBoard::ESide Side, const FString& Name);
-	/** The Captain joins the fight as a man the game moves. */
+	/** A man of the ship's own who was hurt before the fight began (a ship the war has shot up): he lies where he is, alive, and is counted among the wounded; he does not bleed out within the fight (his own medics have him). */
+	int32 AddWounded(AstraBoard::ESide Side, const FString& Name, const FVector& Pos);
 	/** A unit that is not in the fight yet: it joins where it stands Seconds from now (a marine roused from his bunk who has to dress and arm). */
 	void DelayUnit(int32 UnitId, float Seconds);
 	/** A squad by its name ("Watch 1", "Reaction 2", "Ferry Guard Alpha"), exactly as the fight names it (INDEX_NONE when there is none). */
 	int32 FindSquad(const FString& Name) const;
+	/** The Captain joins the fight as a man the game moves. */
 	int32 AddCaptain(const FVector& Pos);
 	/** A name for a man a scene or the bench makes (the Mandate's: a first and a last name of the Kharon; ASTRA's: Marine and a number). */
 	FString MakeName(AstraBoard::ESide Side, int32 N) { return Side == AstraBoard::ESide::Mandate ? MandateName(N) : FString::Printf(TEXT("Marine %d"), N); }
@@ -384,6 +398,7 @@ private:
 	int32 AmbushIdx = INDEX_NONE;
 	FMarineCommand Cmd;
 	float CmdT = 0.f;
+	float EvacT = 0.f;
 	void StepMarineCommand(float Dt);
 	double AmbushAge = -1.0e9;
 	/** The search for the ambush opening, done in slices of a few routes a step (a long search in one go would be a hitch in the game). */
@@ -410,6 +425,8 @@ private:
 	void StepUnit(FUnit& U, float Dt);
 	void StepSquad(FSquad& S, float Dt);
 	void StepMission(float Dt);
+	void StepEvacuation(float Dt);               // the wounded of the attackers: a free man is called, gets him up, carries him to the breach
+	void StepCarry(FUnit& Bearer, float Dt);
 	// --- the unit
 	void Perceive(FUnit& U, float Dt);
 	void Fight(FUnit& U, float Dt);
@@ -430,7 +447,7 @@ private:
 	void PlanDefend(FSquad& S);                  // the holders' drill (and any squad that has an order): the ambush, the corners, the orders' tasks
 	void WithdrawSquad(FSquad& S, const TArray<int32>& Able);
 	void ColumnTo(FSquad& S, const FVector& To, float Speed);
-	void HoldAround(FSquad& S, const FVector& At, float Radius);
+	void HoldAround(FSquad& S, const FVector& At, float Radius, bool bInside = false);   // bInside: the corners of the room itself only (the attackers' objective)
 	bool FlankFor(FSquad& S, const FVector& Enemy);
 	void Emit(AstraBoard::EEvent Type, int32 Unit, int32 Target = INDEX_NONE, const FVector& Start = FVector::ZeroVector, const FVector& End = FVector::ZeroVector,
 	          float Dmg = 0.f, bool bHit = false, const FString& Text = FString());

@@ -141,6 +141,7 @@ _KINDS: tuple[tuple[re.Pattern[str], Kind], ...] = tuple((re.compile(p, re.I), k
     (r"^boarding: contact: ", Kind("contact", True, call=True)),
     (r"^boarding: .+ is dead at ", Kind("dead", True, call=True)),
     (r"^boarding: .+ is down, wounded, at ", Kind("down", True)),
+    (r"^boarding: .+, wounded, has been carried back to the boat by ", Kind("casualty_out", False, wake=False)),      # (a wounded marine carried out to his boat: he is alive and off the ship; the log only)
     (r"^boarding: the Mandate cut through the bulkhead", Kind("cut", True)),
     (r"^boarding: .+ is breaking off", Kind("retreat", True)),
     (r"^boarding: the marines have reached the Captain", Kind("rescue", True)),
@@ -277,8 +278,9 @@ WHEN THE MARINES BOARD A SHIP (the board says `role: attacking`: the Aquila's ma
   from the berthing decks who arm and answer the alarm. A ship that has lost her power has her corridors dark, no sensors, and fewer of her people on their feet; one with power sees the marines
   on her own. You see only what your people see (the board's `defenders as they are known`): never invent what is behind a door.
 - The drill is the attackers': left alone the squads go for the objective along the best way in column, take cover where they meet fire and send a pair round, cut through a sealed bulkhead in
-  about twenty seconds, and they never break off by themselves. A marine who goes down bleeds out in about two minutes unless the fight reaches him: pushing hard costs marines, and the
-  wounded of a squad that moves on are lost. Two hatches are two entrances: a pincer into the same objective is a Major's order (say, one squad holds the corridor the defenders will use while the other
+  about twenty seconds, and they never break off by themselves. A marine who goes down bleeds out in about two minutes; where no enemy can see him a free comrade of his own squad (never the
+  leader, never when it would leave the squad with fewer than three) gets him up and carries him to the hatch and the boat, and he does not bleed while he is carried: under fire nobody
+  comes for him, so pushing hard costs marines, and a squad that is held in the open loses its wounded. Two hatches are two entrances: a pincer into the same objective is a Major's order (say, one squad holds the corridor the defenders will use while the other
   goes in by the second hatch); a squad that is mauled `withdraw`s through its hatch to the boat, the others go on or come out too. The boats wait at the hatches and go home with whoever is aboard;
   a boat that is shot at while it waits is a boat lost.
 - The Captain may have come with the marines (the board shows him in the fight, where he is and how he is: a rifle in the column, and the first man the ship's people will want): his life comes

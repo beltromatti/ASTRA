@@ -10,6 +10,8 @@
 #include "AstraBoardPlans.h"
 #include "AstraBoardSim.h"
 
+struct FFleetSnapshot;                // FLOTTA-VIVA (AstraFleetInterior.h): what the war has left of a ship's inside
+
 namespace AstraBoardScene
 {
 	struct FSpec
@@ -26,6 +28,12 @@ namespace AstraBoardScene
 		float SealedShare = 0.3f;                                   // the share of the pressure bulkheads shut when they come
 		bool bSweep = true;                                         // they also win by putting the holders down
 		bool bShipSensors = false;                                  // the holders' ship sees her own corridors (a ship with power)
+		/** What the war has left of the ship's inside: her people alive and where they stand (the fit who take up arms, the wounded who lie), the pressure bulkheads she has shut. With it the holders are
+		 *  those people, and the bulkheads those; without it (a ship the war never hit through her plating) the plan's garrison and a share of the bulkheads at random. */
+		const FFleetSnapshot* Inside = nullptr;
+		float GuardShare = -1.f;                                    // the share of the ship's marines and the guard of her hatches (posts of role marines, marines_dock) who are on their feet and armed: -1 is PostShare's; with Inside 0.9
+		int32 MinPerPost = 1;                                       // a post is manned by at least this many (0: a post may be left empty: a derelict)
+		int32 MaxDefenders = 340;                                   // (with Inside) the most who fight: a crew of a thousand does not all take up arms (and the simulation's step grows with the men in it)
 		int32 Seed = 1;
 	};
 	struct FResult
@@ -38,6 +46,12 @@ namespace AstraBoardScene
 		TArray<int32> AttackSquads, DefendSquads;
 		int32 Defenders = 0;
 		FString ObjectiveName;
+		// (with Inside) what the war's picture of her inside gave the scene
+		bool bFromWar = false;
+		int32 Wounded = 0;                                          // lying on her decks, alive
+		int32 Unarmed = 0;                                          // fit, and not among those who fight (they keep to their stations or hide)
+		int32 ShutBulkheads = 0;
+		bool bCaptainAlive = false;
 	};
 
 	/** Fills a sim (made with Init on the plan's map) with the holders at their posts and the attackers at the dock. */

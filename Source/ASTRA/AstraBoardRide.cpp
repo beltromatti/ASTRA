@@ -372,8 +372,18 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 			RemoteOffset = AAstraBoardInterior::ZoneOrigin();
 			FShipFacts T;
 			const UAstraBattleSubsystem* B = Battle();
-			const bool bHulk = !B || !B->ShipFacts(Assault.TargetId, T) || T.bDisabled;
-			Interior->Begin(ScenePlan, RemoteOffset, bHulk ? EAstraInteriorStyle::Emergency : EAstraInteriorStyle::Lit);
+			bool bHulk = !B || !B->ShipFacts(Assault.TargetId, T) || T.bDisabled;
+			if (Assault.bFromWar && ScenePlan.IsValid() && ScenePlan->Dmg.IsValid())
+			{
+				// the war's picture of her rooms: the strips of the rooms with no power are the red of the emergency lighting, and the whole is lit as the ship is (more than half her rooms dark: a hulk)
+				int32 Dark = 0;
+				for (const TPair<int32, FBoardRoomMood>& KV : Assault.Moods)
+				{
+					Dark += KV.Value.Dark() ? 1 : 0;
+				}
+				bHulk = Dark * 2 > ScenePlan->Dmg->Comps.Num();
+			}
+			Interior->Begin(ScenePlan, RemoteOffset, bHulk ? EAstraInteriorStyle::Emergency : EAstraInteriorStyle::Lit, Assault.bFromWar ? &Assault.Moods : nullptr);
 			Interior->EnsureAround(Leg->InCm, 60);
 			if (Cabin)
 			{

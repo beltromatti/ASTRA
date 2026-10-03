@@ -168,6 +168,27 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 			Tell(E.Text, true);
 			break;
 		}
+		case EEvent::Carried:
+		{
+			// a wounded man has been carried out to his boat: alive, off the ship (his bearer has gone back to the fight)
+			const FUnit* U = Fight.Unit(E.Unit);
+			const FUnit* Bearer = Fight.Unit(E.Target);
+			if (U && U->Side == ESide::Aquila)
+			{
+				if (const int32* R = RosterOfUnit.Find(E.Unit))
+				{
+					UAstraShipSubsystem* S = ShipSub();
+					if (S && !HarmTold.Contains(*R))
+					{
+						HarmTold.Add(*R);
+						S->HarmPerson(*R, false, TEXT("gunfire"));
+					}
+				}
+				Tell(FString::Printf(TEXT("%s, wounded, has been carried back to the boat by %s"), *U->Name, Bearer ? *Bearer->Name : TEXT("his comrades")), false);
+			}
+			ReleaseBody(E.Unit);
+			break;
+		}
 		case EEvent::Exit:
 		case EEvent::Outcome:
 		default:
@@ -304,7 +325,7 @@ void UAstraBoardSubsystem::OnOutcome()
 {
 	const FMission& M = Fight.Mission();
 	const FBook& B = Fight.Book();
-	const FString Tally = FString::Printf(TEXT("marines: %d dead, %d wounded; boarders: %d dead, %d wounded, %d got away"), B.Killed[0], B.Down[0], B.Killed[1], B.Down[1], B.Exited[1]);
+	const FString Tally = FString::Printf(TEXT("marines: %d dead, %d wounded; boarders: %d dead, %d wounded, %d got away"), B.Killed[0], B.Down[0] + B.Carried[0], B.Killed[1], B.Down[1] + B.Carried[1], B.Exited[1]);
 	switch (M.Outcome)
 	{
 	case EOutcome::DefenderHolds:

@@ -6,9 +6,11 @@
                                        squad fights in a corridor (who wins, how fast, with corners and without, with the flank and without), and whole
                                        boardings of the real ship (a Mandate boarding party through a breach, the marines on watch and the reaction
                                        team: who holds, at what cost, how long); checks the invariants and prints the verdict.
-                                       --scenario plans (on request): the plan of every class (data/ship/plans, else the stopgap's): it loads, every dock has a way to the bridge, the
+                                       --scenario plans (on request): the plan of every class (data/ship/plans, FLOTTA-VIVA's): it loads, every dock has a way to the bridge, the
                                        engineering hall and the commander's suite; --scenario attack [--class acheron]: the marines go aboard a Mandate ship by two Kestrels (24 men)
                                        and the same plan with the roles turned (who wins, how fast, at what cost)
+                                       --scenario war [--class acheron] (on request): FLOTTA-VIVA's inside of a class's ship is shot at (none, a few, many, a great many blows) and the marines go
+                                       aboard with the people the war left (the host's own way: AstraBoardScene with the snapshot): who holds her, who lies hurt, what it costs the marines
                                        --scenario fps (on request, no plan needed): the Captain's arms on the weapons against the mannequin's own
                                        animations (the sight on its place, the hands on the grips, what the picture holds at 16:9 and 16:10);
                                        --fpsposes FILE writes the engine's poses for the offline preview
@@ -267,7 +269,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")

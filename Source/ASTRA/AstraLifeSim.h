@@ -221,9 +221,10 @@ public:
 	void SetTransit(int32 Person, bool bOn);
 	/** The pattern is set down aboard: the person stands at Where (world cm, feet) facing Yaw, stays there HoldGameS seconds of the ship's clock (the reason they were sent: a chat, a repair)
 	 *  and then goes on with their day from there (the way to their post is made again). */
-	void PlaceTransported(int32 Person, const FVector& Where, float YawDeg, float HoldGameS = 1.5f);
-	/** The person is off the ship (a world, another ship) until the transporter brings them back: Text says where. */
-	void SetAway(int32 Person, const FString& Text);
+	void PlaceTransported(int32 Person, const FVector& Where, float YawDeg, float HoldGameS = 1.5f, const FString& Memory = FString());
+	/** The person is off the ship (a world, another ship) until the transporter brings them back: Text says where. Memory: what the person remembers of how they went (or came back), in a phrase without the hour (the
+	 *  hour is added); empty: the transporter's own line (a boat's marines remember the boat, not a beam). */
+	void SetAway(int32 Person, const FString& Text, const FString& Memory = FString());
 	bool IsOffShip(int32 Person) const { return People.IsValidIndex(Person) && (People[Person].bTransit || People[Person].bAway); }
 	FString AwayText(int32 Person) const { return People.IsValidIndex(Person) ? People[Person].AwayText : FString(); }
 

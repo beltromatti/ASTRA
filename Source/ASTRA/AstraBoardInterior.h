@@ -48,8 +48,8 @@ namespace AstraBoardInterior
 	/** The solids of one compartment: its floor and ceiling, its four walls with the gaps of its portals (the doors, the open ways: the whole stretch the two rooms share), a frame round each door, a
 	 *  leaf in each pressure bulkhead that this room is the first side of, and a strip of light. */
 	ASTRA_API void BuildComp(const FAstraBoardMap& Map, int32 Comp, TArray<FSlab>& Out);
-	/** Whether a segment (cm) passes through a slab of the set (the walls and the leaves that are shut: ShutDoors, the damage map's door indices, may be null: every leaf is shut). */
-	ASTRA_API bool SegmentBlocked(const TArray<FSlab>& Slabs, const FVector& A, const FVector& B, const TSet<int32>* OpenDoors = nullptr);
+	/** Whether a segment (cm) passes through a slab of the set (the walls and the leaves that are shut: ShutDoors, the damage map's door indices, may be null: every leaf is shut). OutHit: the first slab in the way, for the bench's report. */
+	ASTRA_API bool SegmentBlocked(const TArray<FSlab>& Slabs, const FVector& A, const FVector& B, const TSet<int32>* OpenDoors = nullptr, const FSlab** OutHit = nullptr);
 }
 
 /** What the walls, the floors and the lights are made of: a ship that has power has its lights on, a hulk is in the red of its emergency strips. */
@@ -68,8 +68,9 @@ public:
 	/** The zone of the little cabin of a boat the Captain rides in. */
 	static FVector CabinOrigin();
 
-	/** The plan to make solid, where in the world it stands (ZoneOrigin), and how it is lit. */
-	void Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector& InOffset, EAstraInteriorStyle InStyle);
+	/** The plan to make solid, where in the world it stands (ZoneOrigin), and how it is lit. InMoods: how the rooms are that the war has left not as built (rooms without power are dark, rooms that burn
+	 *  have their fire's light); null: all as built, lit by the style alone. */
+	void Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector& InOffset, EAstraInteriorStyle InStyle, const TMap<int32, FBoardRoomMood>* InMoods = nullptr);
 	/** A small room of a boat (benches, red light): where a Captain waits while the boat flies. Returns where to put him (feet, cm). */
 	FVector BuildCabin();
 	/** The rooms round a point of the plan (cm) are made solid (a few at each call). Returns true while there is more to build there. */
@@ -97,7 +98,10 @@ private:
 	TMap<int32, FTransform> LeafHome;                          // door -> where its leaf stands when shut
 	TSet<int32> ShutNow;
 	int32 NumInstances = 0;
+	TMap<int32, FBoardRoomMood> Moods;                         // the rooms the war has left not as built
 	TArray<FVector> StripAt;                                   // the strips of light (plan frame, cm), for the lights that follow the Captain
+	TArray<FVector> FireAt;                                    // the rooms that burn (plan frame, cm)
+	bool bTorchOn = false;
 	struct FPad { FVector Here; FVector To; int32 Comp = INDEX_NONE; FString Text; };
 	TArray<FPad> Pads;
 	TSet<int32> PadDone;
@@ -108,9 +112,12 @@ private:
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> Frames;
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> Leaves;
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> Strips;
+	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> DeadStrips;       // the strips of the rooms with no power: the red of the emergency lighting, low
 	UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> Lights;
+	UPROPERTY() TArray<TObjectPtr<UPointLightComponent>> FireLights;
 	UPROPERTY() TObjectPtr<USpotLightComponent> Torch;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> StripMat;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> DeadStripMat;
 	float LightT = 0.f;
 	FVector LastEye = FVector::ZeroVector;
 	FVector LastLook = FVector::ForwardVector;
