@@ -555,6 +555,18 @@ class AstraTests(Fixture):
             self.assertEqual(len(self.minds.deliver("astra", to, Message(0.0, "captain", "x"))), 1, to)
         self.assertEqual(len(self.minds.deliver("astra", "Meridian", Message(0.0, "captain", "x"))), 0)
 
+    async def test_a_ship_of_the_group_answers_through_its_commander(self) -> None:
+        # the Captain hailed the Bulwark four times and nobody answered: her commander read the words as not hers (3 Oct)
+        await self.feed(self.state())
+        [m] = self.minds.deliver("astra", "T-02", Message(0.0, "captain", "Vigilant, situation?"))
+        note = m.inbox[-1].text
+        self.assertIn("Vigilant", note)
+        self.assertIn("answers him through you", note)
+        okoro = self.minds.allies["T-02"].key
+        self.assertIn(f"speaker {okoro}", note)
+        [m2] = self.minds.deliver("astra", "castellan", Message(0.0, "captain", "Praetorian, situation?"))
+        self.assertNotIn("through you", m2.inbox[-1].text)                                   # (her own ship: no note)
+
     async def test_a_group_that_is_gone_has_no_commander_to_wake(self) -> None:
         g2 = group("Resolute", 4, [member("T-43", "vigilant")], leader="T-43")
         await self.feed(astra_state([self.picket(), g2], ENEMIES(), contacts=[]))
