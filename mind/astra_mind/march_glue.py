@@ -26,9 +26,11 @@ import time
 from typing import Any, Awaitable, Callable
 
 from .march import STEP_S, STRAGGLERS, Fleet, March, SIDES, Ship
+from .enemy import COMMANDERS
 from .march_auto import AutoAdmiral
 from .march_data import ASTRA_PEOPLE, CARRIERS, CLASSES, MANDATE_PEOPLE
 from .strategy import StrategicMinds
+from .war_minds import ALLIES
 
 log = logging.getLogger("astra.march_glue")
 
@@ -37,7 +39,9 @@ PRESENT_DELAY_S = 12.0          # a fleet that is there when she arrives comes i
 MAX_REAL_SHIPS = 36             # warships the game plays at once (docs/SCALA.md: 30 capital ships and 150 craft hold 60 fps); a fleet that would overflow waits in the Gate
 GATE_WAIT_S = 90.0              # ... for this long, and then tries again
 GROUP_SHIPS = 8                 # ships in one battle group when the fleet has none of its own
-MAX_GROUPS = 4                  # battle groups in one beat (the game takes 40 ships, ten a group)
+ARRIVAL_MIN_KM = 85.0           # a fleet that comes into her sky comes from far out (a Gate's mouth, a jump point beyond the sensors), never at knife range: at least this far from her ...
+ARRIVAL_MAX_KM = 120.0          # ... and no farther than the game's beat takes (`range_km` is clamped there)
+WORLD_KM = 70.0                 # a fleet that was over the world when she arrived is in the system's far side: this far from her
 GRACE_S = 1800.0                # a fleet the game's script was to bring that has not come this long after its time is the map's
 RETRIES = 3
 LANE_TIMEOUT_S = 90.0           # a Gate lane lasts well under this: past it, with no lane in the game's Gate status, the Aquila has arrived
@@ -62,6 +66,19 @@ def parse_gate(text: str) -> tuple[float, float] | None:
     """(bearing, km) of the Janus Gate from the Aquila, from the game's Gate status."""
     m = GATE_RE.search(text or "")
     return (float(m.group(1)), float(m.group(3))) if m else None
+
+
+def person_of(p: dict[str, Any]) -> dict[str, Any]:
+    """A person of the pools as the beat's `captain` and `commander` carry it."""
+    return {"name": p["name"], "rank": p.get("rank", ""), "bio": p.get("bio", ""), "gender": p.get("gender", "m"), "voice": p.get("voice", "")}
+
+
+def key_person(key: str) -> dict[str, Any]:
+    """The person the game's opening gave a key (Solm, Thale, Aldana: enemy.COMMANDERS, war_minds.ALLIES): the order of battle names them by it."""
+    for c in list(COMMANDERS.values()) + list(ALLIES.values()):
+        if c.get("key") == key:
+            return {"name": c["name"], "rank": c.get("rank", ""), "bio": c.get("bio", ""), "gender": c.get("gender", "m"), "voice": c.get("voice", "")}
+    return {}
 
 
 def ships_of(state: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
@@ -215,6 +232,7 @@ class MarchGlue:
         g = parse_gate(text)
         if g:
             self.gate = g
+            self.m.aquila_gate_km = g[1]
         lane = LANE_RE.search(text)
         if lane:
             dest = self.m.war.find(lane.group(1))
@@ -283,7 +301,7 @@ class MarchGlue:
             at_gate = bool(coming or f.zone == "gate")
             m.real_adopt(f, rs)
             self.sending.add(f.id)
-            asyncio.ensure_future(self._send(f, delay, at_gate))
+            asyncio.ensure_future(self._send(f, delay, at_gate, bool(coming)))
 
     def _passing(self, f: Fleet) -> bool:
         """An ASTRA fleet that only passes through her system on its way (its route goes on) is not in the game: it is among friends and nothing is to be played. The
@@ -312,16 +330,22 @@ class MarchGlue:
         if f.id in m.fleets:
             m._retreat(f, where)
 
-    async def _send(self, f: Fleet, delay: float, at_gate: bool) -> None:
-        """The fleet's ships go to the game as beats (one for each four battle groups), each ship as damaged as it is."""
+    async def _send(self, f: Fleet, delay: float, at_gate: bool, through: bool = False) -> None:
+        """The fleet's ships go to the game as beats, one for each battle group, each ship as damaged as it is. A fleet that comes through the Gate comes as the Gate passes it,
+        the ships one after another (the March's own `hop_per_ship_s`): its groups arrive in a column, the first group first, not all at once."""
         try:
             groups_all = self.groups_for(f)
+            leaders = self.leaders_for(f, groups_all)
             kind = "raid" if f.side == "mandate" else "reinforcements"
+            per_ship = self.m.pace["hop_per_ship_s"] if through else 0.0
             ok_any = False
-            for i in range(0, len(groups_all), MAX_GROUPS):
-                chunk = groups_all[i:i + MAX_GROUPS]
-                groups, order = self.beat_groups(f, chunk, i == 0)
-                beat = {"type": kind, "granted": True, "hail": False, "delay_s": round(delay + 2.0 * (i // MAX_GROUPS), 1), "groups": groups, "why": f"{f.name} comes to the Aquila's system"}
+            before = 0
+            for gi, idxs in enumerate(groups_all):
+                group, order = self.beat_group(f, groups_all, gi, leaders)
+                late = per_ship * before
+                before += len(idxs)
+                beat = {"type": kind, "granted": True, "hail": False, "dark": bool(f.dark), "delay_s": round(delay + late, 1), "groups": [group],
+                        "why": f"{f.name} comes to the Aquila's system"}
                 beat.update(self.where_beat(f, at_gate))
                 res = await self.command("director_beat", {"beat": {k: v for k, v in beat.items() if k not in ("why", "commander")}})
                 if not res.get("ok"):
@@ -332,10 +356,10 @@ class MarchGlue:
                 for idx, cid in zip(order, ids):
                     if 0 <= idx < len(f.ships):
                         f.ships[idx].cid = cid
-                        self.due[cid] = self.m.t + delay + 90.0
+                        self.due[cid] = self.m.t + delay + late + 90.0
                 if self.register_groups is not None:
                     try:
-                        self.register_groups(ids, groups, kind, groups[0].get("commander") or {}, beat["why"])
+                        self.register_groups(ids, [group], kind, group.get("commander") or {}, beat["why"])
                     except Exception:  # noqa: BLE001
                         log.exception("the new commanders of %s could not be registered", f.name)
                 self.stats["sent"] += 1
@@ -364,40 +388,35 @@ class MarchGlue:
             out[j % k].append(i)                                     # (each group gets its share of the capital ships and of the screen)
         return [g for g in out if g]
 
-    def beat_groups(self, f: Fleet, chunk: list[list[int]], first: bool) -> tuple[list[dict[str, Any]], list[int]]:
-        """The beat's groups for these groups of the fleet, and the fleet's ship index of each ship in the order the game will number them."""
-        order: list[int] = []
-        groups: list[dict[str, Any]] = []
-        names = f.groups if f.groups and len(f.groups) == len(chunk) else None
-        for gi, idxs in enumerate(chunk):
-            ships = []
-            wings = []
-            for k, i in enumerate(idxs):
-                s = f.ships[i]
-                spec: dict[str, Any] = {"class": s.cls, "name": s.name}
-                if s.hull < 0.97:
-                    spec["hull_pct"] = max(5, int(round(100.0 * s.hull)))
-                if f.supply < 0.85:
-                    spec["missiles"] = max(0, int(CLASSES[s.cls]["missiles"] * min(1.0, 0.1 + f.supply)))
-                if f.side == "astra":
-                    cap = self.person(f, s)
-                    if cap:
-                        spec["captain"] = cap
-                ships.append(spec)
-                order.append(i)
-                for kind, n, mission in (("fighter", s.fighters, "strike" if f.side == "mandate" else "cap"), ("bomber", s.bombers, "strike"), ("drone", s.drones, "cap")):
-                    if n >= 1 and s.cls in CARRIERS:
-                        wings.append({"carrier": k, "kind": kind, "n": int(round(n)), "mission": mission})
-            name = names[gi][0] if names else (f.name if len(chunk) == 1 else f"{f.name} {gi + 1}")
-            g: dict[str, Any] = {"name": name, "formation": (names[gi][1] if names else ("wedge" if f.side == "mandate" else "line")), "ships": ships, "wings": wings,
+    def beat_group(self, f: Fleet, groups_all: list[list[int]], gi: int, leaders: list[dict[str, Any]]) -> tuple[dict[str, Any], list[int]]:
+        """The beat's group number `gi` of the fleet, and the fleet's ship index of each of its ships in the order the game will number them."""
+        fits = bool(f.groups) and [list(g[2]) for g in f.groups] == groups_all
+        idxs = groups_all[gi]
+        ships: list[dict[str, Any]] = []
+        wings: list[dict[str, Any]] = []
+        for k, i in enumerate(idxs):
+            s = f.ships[i]
+            spec: dict[str, Any] = {"class": s.cls, "name": s.name}
+            if s.hull < 0.97:
+                spec["hull_pct"] = max(5, int(round(100.0 * s.hull)))
+            if f.supply < 0.85:
+                spec["missiles"] = max(0, int(CLASSES[s.cls]["missiles"] * min(1.0, 0.1 + f.supply)))
+            if f.side == "astra":
+                cap = self.person(f, s, first=(i == 0))
+                if cap:
+                    spec["captain"] = cap
+            ships.append(spec)
+            for kind, n, mission in (("fighter", s.fighters, "strike" if f.side == "mandate" else "cap"), ("bomber", s.bombers, "strike"), ("drone", s.drones, "cap")):
+                if n >= 1 and s.cls in CARRIERS:
+                    wings.append({"carrier": k, "kind": kind, "n": int(round(n)), "mission": mission})
+        name = f.groups[gi][0] if fits else (f.name if len(groups_all) == 1 else f"{f.name} {gi + 1}")
+        group: dict[str, Any] = {"name": name, "formation": (f.groups[gi][1] if fits else ("wedge" if f.side == "mandate" else "line")), "ships": ships, "wings": wings,
                                  "offset_km": [[0, 0], [2, -6], [2, 6], [-4, 0]][gi % 4]}
-            if f.side == "mandate":
-                g["goes_for"] = self.goes_for(f, gi if first else gi + 1)
-                lead = self.leader(f, gi if first else gi + 1)
-                if lead:
-                    g["commander"] = {**lead, "orders": f.order.reason or f"{f.order.kind} {f.order.target}".strip()}
-            groups.append(g)
-        return groups, order
+        if f.side == "mandate":
+            group["goes_for"] = self.goes_for(f, gi)
+            if leaders[gi]:
+                group["commander"] = {**leaders[gi], "orders": f.order.reason or f"{f.order.kind} {f.order.target}".strip()}
+        return group, list(idxs)
 
     @staticmethod
     def goes_for(f: Fleet, gi: int) -> str:
@@ -407,20 +426,35 @@ class MarchGlue:
             return "gate"
         return "aquila" if gi == 0 else "escorts"
 
-    def leader(self, f: Fleet, gi: int) -> dict[str, Any]:
-        """The person who leads a Mandate group: the fleet's commander for the first, the next free person of the pool for the others."""
-        if gi == 0 and f.commander.get("name"):
-            c = f.commander
-            return {"name": c["name"], "rank": c.get("rank", "Ferryman (ship captain)"), "bio": c.get("bio", ""), "voice": c.get("voice", ""), "gender": c.get("gender", "m")}
+    def leaders_for(self, f: Fleet, groups_all: list[list[int]]) -> list[dict[str, Any]]:
+        """The person who leads each of a Mandate fleet's groups (an ASTRA ship's captain is `person`): the one the order of battle names for the group, the fleet's own commander
+        for the first, else the next free person of the pool, never the same twice."""
+        if f.side != "mandate":
+            return [{} for _ in groups_all]
+        fits = bool(f.groups) and [list(g[2]) for g in f.groups] == groups_all
         used = {g.commander.get("name") for g in self.m.fleets.values() if g.commander.get("name")}
-        free = [p for p in MANDATE_PEOPLE if p["name"] not in used]
-        if not free:
-            return {}
-        p = free[(sum(map(ord, f.id)) + gi) % len(free)]
-        return {"name": p["name"], "rank": p["rank"], "bio": p["bio"], "voice": p.get("voice", ""), "gender": p.get("gender", "m")}
+        pool = [p for p in MANDATE_PEOPLE if p["name"] not in used]
+        out: list[dict[str, Any]] = []
+        for gi in range(len(groups_all)):
+            who: dict[str, Any] = {}
+            if fits and len(f.groups[gi]) > 3 and f.groups[gi][3]:
+                who = key_person(str(f.groups[gi][3]))
+            elif gi == 0 and f.commander:
+                c = f.commander
+                who = key_person(str(c["key"])) if (c.get("key") and not c.get("name")) else {k: c.get(k, "") for k in ("name", "rank", "bio", "voice", "gender")} if c.get("name") else {}
+            if not who.get("name") and pool:
+                who = person_of(pool.pop((sum(map(ord, f.id)) + gi) % len(pool)))
+            out.append(who)
+        return out
 
-    def person(self, f: Fleet, ship: Ship) -> dict[str, Any]:
-        """An ASTRA ship's captain: the one it has had (the same ship, the same person), else the next free one of the pool; none when the pool is out (the war minds draw)."""
+    def person(self, f: Fleet, ship: Ship, first: bool = False) -> dict[str, Any]:
+        """An ASTRA ship's captain: the person the order of battle names for the fleet's lead ship, else the one it has had (the same ship, the same person), else the next free
+        one of the pool; none when the pool is out (the war minds draw)."""
+        if first and f.commander.get("key") and not f.commander.get("name"):
+            who = key_person(str(f.commander["key"]))
+            if who.get("name"):
+                ship.captain = who["name"]
+                return who
         pool = {p["name"]: p for p in ASTRA_PEOPLE}
         name = ship.captain if ship.captain in pool else ""
         if not name:
@@ -430,17 +464,17 @@ class MarchGlue:
                 return {}
             name = free[sum(map(ord, ship.name)) % len(free)]
             ship.captain = name
-        p = pool[name]
-        return {"name": p["name"], "rank": p["rank"], "bio": p["bio"], "gender": p.get("gender", "m"), "voice": p.get("voice", "")}
+        return person_of(pool[name])
 
     def where_beat(self, f: Fleet, at_gate: bool) -> dict[str, Any]:
-        """Where in the game's sky the fleet appears: at the Gate's mouth when it comes through (or stands there), on the far side over the world otherwise."""
+        """Where in the game's sky the fleet appears: far out, never at knife range: at the Gate's mouth when it comes through (as far from her as the Gate is, at least
+        ARRIVAL_MIN_KM: a force that comes through a Gate she sits by comes from the lane's far end), on the far side of the system otherwise."""
         if self.gate:
             bearing, km = self.gate
             if at_gate:
-                return {"bearing_deg": round(bearing, 1), "range_km": round(max(8.0, km - 4.0), 1)}
-            return {"bearing_deg": round((bearing + 180.0) % 360.0, 1), "range_km": 30.0}
-        return {"bearing_deg": float(sum(map(ord, f.id)) * 37 % 360), "range_km": 40.0 if f.side == "mandate" else 20.0}
+                return {"bearing_deg": round(bearing, 1), "range_km": round(min(ARRIVAL_MAX_KM, max(ARRIVAL_MIN_KM, km - 4.0)), 1)}
+            return {"bearing_deg": round((bearing + 180.0) % 360.0, 1), "range_km": WORLD_KM}
+        return {"bearing_deg": float(sum(map(ord, f.id)) * 37 % 360), "range_km": 100.0}
 
     # ------------------------------------------------------------------------------------------------ out: what became of the ships
     def _read_back(self, state: dict[str, Any]) -> None:

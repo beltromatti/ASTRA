@@ -173,7 +173,8 @@ class BringInTest(Fixture):
         beat = self.world.beats[0]
         self.assertEqual((beat["type"], beat["granted"], beat["hail"]), ("raid", True, False))
         self.assertLessEqual(beat["delay_s"], mg.LEAD_S + 1)
-        self.assertEqual((beat["bearing_deg"], beat["range_km"]), (87.0, 48.3))        # the Gate's mouth: 4 km before the Gate, on its bearing
+        self.assertEqual((beat["bearing_deg"], beat["range_km"]), (87.0, mg.ARRIVAL_MIN_KM))    # from the Gate's bearing, from far out: never at knife range
+        self.assertFalse(beat["dark"])                                                  # (the fleet does not run dark: the game is told, it shows from afar)
         ships = [sp for g in beat["groups"] for sp in g["ships"]]
         self.assertEqual(sorted(s["name"] for s in ships), sorted(s.name for s in f.ships))
         hurt = next(s for s in ships if s["name"] == f.ships[1].name)
@@ -191,6 +192,57 @@ class BringInTest(Fixture):
         self.assertEqual({c for c in self.world.ships}, ids)                          # the game has them, and nobody else
         self.assertEqual(len(self.groups), 1)                                         # (the new commanders were given to the director to register)
         self.assertEqual(self.groups[0][2], "raid")
+
+    async def test_a_far_gate_is_the_arrival_a_near_one_is_pushed_out(self) -> None:
+        self.world.gate = (200.0, 110.0)                                                  # (the opening's Gate: 110 km out)
+        self.glue.gate = (200.0, 110.0)
+        a = put(self.m, "astra", "Aurelia", [("vigilant", 2)], name="Near Gate A")
+        await self.step(mg.PRESENT_DELAY_S + 5)
+        self.assertEqual((self.world.beats[-1]["bearing_deg"], self.world.beats[-1]["range_km"]), (200.0, 106.0))     # the Gate's mouth, 4 km before the Gate
+        self.assertEqual(a.status, "real")
+        self.world.gate = (200.0, 1.5)                                                    # (a system she has just come into: the Gate right behind her)
+        b = put(self.m, "mandate", "Aurelia", [("styx", 2)], name="Near Gate B", order=Order("assault", "Aurelia", "bold", False, "default", "", 0.0))
+        b.zone = "gate"
+        await self.step(mg.PRESENT_DELAY_S + 5)
+        raid = [x for x in self.world.beats if x["type"] == "raid"][-1]
+        self.assertEqual(raid["range_km"], mg.ARRIVAL_MIN_KM)                              # (it comes from the lane's far end)
+        self.assertGreaterEqual(min(x["range_km"] for x in self.world.beats), mg.WORLD_KM)  # (and nothing ever came nearer than the far side of the system)
+
+    async def test_a_big_fleet_that_comes_through_the_gate_comes_in_a_column(self) -> None:
+        f = put(self.m, "mandate", "Thule", [("acheron", 2), ("styx", 10)], name="Column Test")
+        self.m.order("mandate", f.id, "assault", "Aurelia", by="admiral", reason="take the Gate")
+        while f.status != "real" and self.m.t < 600:
+            await self.step(1)
+        beats = [b for b in self.world.beats if b["type"] == "raid"]
+        self.assertGreaterEqual(len(beats), 2)                                              # (one beat a group)
+        delays = [b["delay_s"] for b in beats]
+        self.assertEqual(delays, sorted(delays))
+        self.assertGreater(delays[-1] - delays[0], 20.0)                                    # (the ships go through one after another: 4 s a ship)
+        self.assertAlmostEqual(delays[1] - delays[0], self.m.pace["hop_per_ship_s"] * len(beats[0]["groups"][0]["ships"]), delta=0.2)
+        names = [sp["name"] for b in beats for g in b["groups"] for sp in g["ships"]]
+        self.assertEqual(sorted(names), sorted(s.name for s in f.ships))
+        self.assertTrue(all(len(b["groups"]) == 1 for b in beats))
+        # a fleet that was already there does not come in a column
+        g = put(self.m, "astra", "Aurelia", [("vigilant", 12)], name="Already There")
+        await self.step(mg.PRESENT_DELAY_S + 5)
+        there = [b for b in self.world.beats if b["type"] == "reinforcements"]
+        self.assertEqual(len({b["delay_s"] for b in there}), 1, [b["delay_s"] for b in there])
+        self.assertEqual(g.status, "real")
+
+    async def test_the_openings_own_people_are_found_by_their_keys(self) -> None:
+        f = put(self.m, "mandate", "Thule", [("acheron", 1), ("styx", 2)], name="Vanguard Keyed")
+        f.commander = {"key": "thale"}
+        f.groups = [["Interdiction Vanguard", "column", [0, 1], "thale"], ["Styx Line Dorn", "line", [2], "dorn"]]
+        leaders = self.glue.leaders_for(f, self.glue.groups_for(f))
+        self.assertEqual([x["name"] for x in leaders], ["Warden Sabine Thale", "Ferryman Ilse Dorn"])
+        self.assertTrue(leaders[0]["bio"] and leaders[0]["voice"])
+        astra = put(self.m, "astra", "Aurelia", [("praetorian", 1), ("vigilant", 3)], name="Keyed Relief")
+        astra.commander = {"key": "aldana"}
+        who = self.glue.person(astra, astra.ships[0], first=True)
+        self.assertEqual(who["name"], "Captain Ines Aldana")
+        self.assertEqual(astra.ships[0].captain, "Captain Ines Aldana")
+        other = self.glue.person(astra, astra.ships[1])
+        self.assertNotEqual(other["name"], "Captain Ines Aldana")
 
     async def test_an_astra_fleet_standing_there_when_the_aquila_arrives_comes_in_as_reinforcements(self) -> None:
         f = put(self.m, "astra", "Cassia", [("praetorian", 1), ("vigilant", 2)], name="Cassia Squadron")
@@ -512,6 +564,22 @@ class StoryTest(Fixture):
         self.assertEqual(len(told), 1)
         self.assertIn("the Mandate's capital has fallen", told[0])
         self.assertIn("ASTRA has won", told[0])
+
+    async def test_the_gates_warning_says_how_long_they_need_to_reach_her(self) -> None:
+        self.world.gate = (87.0, 106.0)
+        put(self.m, "astra", "Aurelia", [("vigilant", 2)], name="Picket")
+        await self.step(3)
+        self.assertEqual(self.m.aquila_gate_km, 106.0)
+        f = put(self.m, "mandate", "Thule", [("styx", 8)], name="Wake Test")
+        self.m.order("mandate", f.id, "assault", "Aurelia", by="admiral", reason="x")
+        await self.step(200)
+        wake = [e for e in self.m.events if e.kind == "wake" and e.system == "Aurelia"]
+        self.assertTrue(wake)
+        self.assertIn("the Gate is 106 km from the Aquila", wake[0].text["astra"])
+        self.assertIn("450 m/s", wake[0].text["astra"])
+        self.assertIn("they need about 3 min 56 s after it to reach her", wake[0].text["astra"])
+        self.assertIn("106 km from the Janus Gate there", self.m.picture("astra"))
+        self.assertNotIn("106 km", self.m.picture("mandate"))                                # (what the Mandate does not know of her sky it is not told)
 
     async def test_the_holo_table_is_drawn_again_every_so_often(self) -> None:
         await self.step(int(mg.HOLO_EVERY_S * 3) + 2)

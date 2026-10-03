@@ -319,6 +319,7 @@ class March:
         self.real_fight: bool = False                                                # ... and whether a fight is on in it right now
         self.real_tally: dict[str, dict[str, Any]] = {s: {"lost": 0, "names": [], "points": 0.0} for s in SIDES}   # what the real fight has cost each side since it began
         self.real_t0: float = 0.0
+        self.aquila_gate_km: float | None = None                                     # how far the Janus Gate is from the Aquila in the real simulation (the glue reads it from the game): the minutes a force needs
         self.captain_skill: float = 1.0                                              # the bench's stand-in for how well the Captain fights the fleet he commands
         self.aquila_fleet: str = ""                                                  # (bench) the fleet the Aquila is in: the real game has her in the real simulation
         self.free_classes = False                                                    # (bench) a world where both sides build and field the same classes
@@ -865,8 +866,17 @@ class March:
             return
         txt = {}
         for s in sides:
-            txt[s] = f"The Gate at {dest} is cycling: a force of {self._estimate(s, f, max(1, self.sees(s, dest) - 1))} is coming through in about {fmt_s(max(0.0, f.arrive_at - self.t))}."
+            txt[s] = (f"The Gate at {dest} is cycling: a force of {self._estimate(s, f, max(1, self.sees(s, dest) - 1))} is coming through in about {fmt_s(max(0.0, f.arrive_at - self.t))}"
+                      + (self.reach_note(f) if (dest == self.real_system and s == "astra") else "") + ".")
         self.say("wake", dest, txt, tuple(sides), 2 if f.n >= 6 or self.value(dest) >= 6 else 1, (f.id,), eta=round(f.arrive_at - self.t, 1))
+
+    def reach_note(self, f: Fleet) -> str:
+        """What a force that comes through the Gate into the Aquila's system needs to reach her: the Gate's distance from her and the fleet's cruise speed (a fact of the real
+        simulation's geometry: minutes, not seconds, when the Gate is far)."""
+        km = self.aquila_gate_km
+        if not km or km < 20.0:
+            return ""
+        return f"; the Gate is {km:.0f} km from the Aquila, and at {f.speed:.0f} m/s they need about {fmt_s(km * 1000.0 / max(100.0, f.speed))} after it to reach her"
 
     def _estimate(self, side: str, f: Fleet, lvl: int) -> str:
         """How `side` would describe the fleet `f` at detection level `lvl` ("about 8 ships", "about 12 ships: 3 acheron, 9 styx")."""
@@ -1690,7 +1700,8 @@ class March:
             f = self.fleets.get(tr.fid)
             if f is None:
                 continue
-            fleets.append({"id": tr.fid, "side": f.side, "name": f"enemy force {tr.fid}", "system": tr.system, "to": tr.moving_to, "eta_s": None, "ships": tr.n,
+            eta = round(max(0.0, tr.seen_t + self.pace["hop_base_s"] + self.pace["hop_per_ship_s"] * tr.n - self.t)) if tr.moving_to else None
+            fleets.append({"id": tr.fid, "side": f.side, "name": f"enemy force {tr.fid}", "system": tr.system, "to": tr.moving_to, "eta_s": eta, "ships": tr.n,
                            "classes": tr.classes or {}, "strength": round(self.track_power(tr), 1), "order": "", "state": "tracked", "known": False,
                            "age_s": round(self.t - tr.seen_t), "level": tr.level})
         battles = [{"system": b.system, "age_s": round(self.t - b.t0)} for b in self.battles.values() if self.known_threat(side, b.system) >= 2 or self.sees(side, b.system) >= 1]
@@ -1766,7 +1777,8 @@ class March:
             out.append("BATTLES UNDER WAY")
             out.extend(fights)
         if side == "astra":
-            out.append("THE AQUILA: " + (f"in the Gate's lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + (f" (since {fmt_s(self.t - self.aquila['since'])})" if self.aquila["since"] else ""))
+            out.append("THE AQUILA: " + (f"in the Gate's lane to {self.aquila['lane']}" if self.aquila["lane"] else f"at {self.aquila['where']}") + (f" (since {fmt_s(self.t - self.aquila['since'])})" if self.aquila["since"] else "")
+                       + (f"; {self.aquila_gate_km:.0f} km from the Janus Gate there (a force that comes through needs minutes to reach her)" if (self.aquila_gate_km and self.aquila_gate_km >= 20.0 and self.real_system and not self.aquila["lane"]) else ""))
         else:
             if self.aquila_seen[0]:
                 out.append(f"THE AQUILA (the ASTRA carrier cruiser, the Captain's ship): last seen at {self.aquila_seen[0]}, {fmt_s(self.t - self.aquila_seen[1])} ago.")
@@ -1899,7 +1911,7 @@ class March:
             if dest == system or (f.in_gate and f.route and f.route[0] == system):
                 eta = self.eta(f, system)
                 if eta is not None:
-                    coming.append((eta, f"{f.name} ({f.n} ships: {f.composition()}) is on its way to you: about {fmt_s(eta)}"))
+                    coming.append((eta, f"{f.name} ({f.n} ships: {f.composition()}) is on its way to you: about {fmt_s(eta)}" + (self.reach_note(f).replace("; the Gate", " (the Gate", 1) + ")" if (system == self.real_system and self.reach_note(f)) else "")))
         for _, text in sorted(coming):
             out.append(text)
         for tr in sorted(v.tracks.values(), key=lambda t: -self.track_power(t)):
