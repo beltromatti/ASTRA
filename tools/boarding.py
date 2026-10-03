@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """ABBORDAGGI, fighting inside the ASN Aquila (Source/ASTRA/AstraBoard*.cpp, docs/ABBORDAGGI.md): the headless bench.
 
-  tools/boarding.py run [--scenario all|map|rules|duel|squad|flank|board|orders|fps] [--seed 1] [--seeds 20] [--boarders 10] [--set "MandateSkill=0.8,HoldS=60"]
+  tools/boarding.py run [--scenario all|map|rules|duel|squad|flank|board|orders|fps|plans|attack] [--seed 1] [--seeds 20] [--boarders 10] [--set "MandateSkill=0.8,HoldS=60"]
                                        the commandlet AstraBoardSim: the plan as the soldiers see it (portals, corners, lines of sight, routes), duels and
                                        squad fights in a corridor (who wins, how fast, with corners and without, with the flank and without), and whole
                                        boardings of the real ship (a Mandate boarding party through a breach, the marines on watch and the reaction
                                        team: who holds, at what cost, how long); checks the invariants and prints the verdict.
+                                       --scenario plans (on request): the plan of every class (data/ship/plans, else the stopgap's): it loads, every dock has a way to the bridge, the
+                                       engineering hall and the commander's suite; --scenario attack [--class acheron]: the marines go aboard a Mandate ship by two Kestrels (24 men)
+                                       and the same plan with the roles turned (who wins, how fast, at what cost)
                                        --scenario fps (on request, no plan needed): the Captain's arms on the weapons against the mannequin's own
                                        animations (the sight on its place, the hands on the grips, what the picture holds at 16:9 and 16:10);
                                        --fpsposes FILE writes the engine's poses for the offline preview
@@ -41,6 +44,8 @@ def cmd_run(a: argparse.Namespace) -> int:
         args.append(f"-set={a.set}")
     if a.trace:
         args.append("-trace")
+    if a.klass:
+        args.append(f"-class={a.klass}")
     if a.fpsset:
         args.append(f"-fpsset={a.fpsset}")
     if a.fpsposes:
@@ -78,7 +83,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")
@@ -86,6 +91,7 @@ def main() -> int:
     r.add_argument("--setup", type=int, default=-1, help="board: run only this setup (0..5)")
     r.add_argument("--trace", action="store_true", help="print the fights' events and a line a squad every five seconds (use with --seeds 1)")
     r.add_argument("--out", default="Saved/Boarding/run.json")
+    r.add_argument("--class", dest="klass", default="", help="plans/attack: the ship's class (acheron, styx, lethe, praetorian, vigilant)")
     r.add_argument("--fpsset", default="", help="fps: try other places and anchors without touching the table, \"rifle.hip=84,17,-10;rifle.hipturn=-3,-13,0;rifle.shoulder_l=62,-20,-42\" (keys: rifle./pistol. hip hipturn ads low lowturn gripl fov shoulder_r shoulder_l; pole_r pole_l for both)")
     r.add_argument("--fpsposes", default="", help="fps: write the engine's poses (idle, draw, reload, dry fire) to this JSON file, for the offline preview")
     r.add_argument("--timeout", type=int, default=1500)
