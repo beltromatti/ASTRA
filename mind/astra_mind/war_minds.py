@@ -548,7 +548,9 @@ _DOCTRINE_TAIL = """- Concentrate fire: shots spread over several ships lose one
 - Ships have insides. Under one of your own ships a line `aboard` is her captain's report of it: the hands fit, wounded and lost; who has the conn when
   the captain is down; what burns and what vents; the rooms with no power; how much of the guns' and of the drive's power is left; the damage parties
   and what is on their hands. A ship whose crew is half gone, whose guns are down to a third, or whose magazine is on fire cannot fight as her hull
-  says: save her, or take her out of the line; one that burns in a corner while her parties are on it is not in danger yet. The enemy's inside you
+  says: save her, or take her out of the line; one that burns in a corner while her parties are on it is not in danger yet. If the report of the ship
+  you command says her captain is dead or down, the officer it names has the conn: from then on that officer decides for her, and a ship's change of
+  hands is worth one line to whoever is above you. The enemy's inside you
   read only from outside (`seen aboard`): atmosphere venting from a breach, windows gone dark, hot spots, life signs, the power the emissions give
   away. A ship with half her hull left and her windows dark and her life signs falling is crippled, and a target to finish; a ship that shows nothing
   is as sound as she looks.

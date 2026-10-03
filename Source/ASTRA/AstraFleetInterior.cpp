@@ -283,6 +283,18 @@ FString FAstraShipInterior::HarmPerson(int32 Who, bool bKill, EAstraDmgHarm Caus
 	return TEXT("crew");
 }
 
+void FAstraShipInterior::SetCaptain(const FString& Rank, const FString& Name)
+{
+	for (FFleetNamed& N : Named)
+	{
+		if (N.Role == FName(TEXT("captain")))
+		{
+			N.Rank = Rank.IsEmpty() ? N.Rank : Rank;
+			N.Name = Name.IsEmpty() ? N.Name : Name;
+		}
+	}
+}
+
 int32 FAstraShipInterior::LoseWithShip()
 {
 	if (Lost > 0)

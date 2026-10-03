@@ -176,6 +176,10 @@ perde torna a GUERRA: 1 tutto, 0 niente: l'interno si legge soltanto), `astra.fl
   `life_signs_pct` al cinque per cento, `power_pct` al dieci per cento).
 - Dove stanno: `your_groups[].members[].aboard`, `enemy_groups[].ships[].seen_aboard` (le viste dei gruppi), `your_ships[].aboard` e `astra_ships[].seen_aboard` (la vista dell'ammiraglio del Mandate),
   `contacts[]` (la lista dei contatti del Capitano: `aboard` per le navi di ASTRA via collegamento dati, `seen_aboard` per le altre).
+- **Il capitano è la persona che parla**: gli ufficiali di una nave hanno nomi che il piano e un generatore danno (due liste, una per lato; nessuno del cast dell'Aquila), ma la persona che la mente interpreta come capitano di una
+  nave (Python: `persona_of`) ha un nome suo. Perché «il capitano è morto» riguardi la stessa persona, il gioco ha `UAstraBattleSubsystem::FleetSetCaptain(contatto, grado, nome)` (console: `astra.fleet.captain <contatto> <grado> <nome>`,
+  trattini bassi per gli spazi): l'interno ne prende il nome (anche se è già nato). **Da collegare** (§11): quando le menti danno una persona a una nave, mandarla al gioco con un comando. Finché non c'è, il capitano dell'interno
+  ha un nome qualsiasi; la dottrina dice alle menti che se il rapporto della propria nave dice che il capitano è morto o a terra, **comanda l'ufficiale che nomina**.
 - **Python**: `war_minds.py` rende queste chiavi in una riga («aboard: crew 182 fit, 31 wounded, 17 killed of 230; Commander ... is dead; Lieutenant Commander ... has the conn; 2 fires, 1 breach venting, ...») e
   la dottrina dice come si leggono: **un prompt, non un filtro** (una nave con metà dell'equipaggio perso, i cannoni a un terzo o il deposito in fiamme non combatte come dice il suo scafo; di un nemico si vede solo l'esterno).
   Prove senza rete: `mind/bench/fleet_views_unit.py` (16 prove, due delle quali fanno tutto il cammino: una vista come la manda il gioco, un impulso di una mente, il prompt che il modello riceve) e
@@ -305,4 +309,6 @@ colpo, quindi i passi delle navi non cadono tutti nello stesso fotogramma.
 - **Una nave distrutta perde tutti** («with all hands»): niente capsule di salvataggio per le altre navi.
 - **Il passo di 0,5 s** perde un po' di dettaglio nei fuochi molto veloci (un deposito che salta): le prove dell'Aquila restano a 0,2 s.
 - **Le piante hanno stanze plausibili, non progetti**: nomi, arredi e luci per camminarle sono un lavoro dell'arte interna (ARTE-INTERNI) quando servirà.
+- **Il nome del capitano**: vedi §5.1: il gioco sa prendere dalle menti il nome e il grado del capitano di una nave (`FleetSetCaptain`), ma nessuno glielo manda ancora; serve un comando dal Python al gioco quando una persona prende una nave
+  (`persona_of`), e, se si vuole che alla morte del capitano parli l'ufficiale che ha il comando con il suo nome e la sua voce, una successione dentro la nave (le chiavi `aboard.command` hanno già il nome e il grado di chi comanda ora).
 - **Taratura**: `power_k`, `crew_min`, la soglia delle notizie sono scelte mie, misurate sul banco (§7.3); il lead le ritocca dopo averle viste in gioco.

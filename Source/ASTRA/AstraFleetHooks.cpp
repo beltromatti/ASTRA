@@ -60,6 +60,14 @@ namespace
 				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("snapshot"), Args));
 			}
 		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdFleetCaptain(TEXT("astra.fleet.captain"), TEXT("FLOTTA-VIVA: who commands a ship, by the name and the rank the minds know them by (astra.fleet.captain <contact id> <rank> <name>, underscores for spaces)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UAstraBattleSubsystem* B = World ? World->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("captain"), Args));
+			}
+		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdFleetHit(TEXT("astra.fleet.hit"), TEXT("FLOTTA-VIVA: a blow on a face of a ship, through the war's own path (astra.fleet.hit <contact id> <bow|stern|port|starboard|dorsal|ventral> [damage 120] [rail|laser|missile])"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
@@ -107,6 +115,10 @@ FAstraShipInterior* UAstraBattleSubsystem::FleetEnsure(FAstraBattleShip& S)
 	}
 	const double T1 = FPlatformTime::Seconds();
 	S.Interior = MakeShared<FAstraShipInterior>(Plan.ToSharedRef(), S.Id, S.Name, 7001 + S.Id * 7919 + (GAstraDeterministic ? 0 : (int32)(FPlatformTime::Cycles64() & 0xffff)));
+	if (!S.CaptainName.IsEmpty())
+	{
+		S.Interior->SetCaptain(S.CaptainRank, S.CaptainName);
+	}
 	const double T2 = FPlatformTime::Seconds();
 	++FleetMade;
 	FleetWaitMsMax = FMath::Max(FleetWaitMsMax, (T1 - T0) * 1000.0);
@@ -137,6 +149,22 @@ void UAstraBattleSubsystem::FleetOnHit(FAstraBattleShip& To, const FAstraHullHit
 	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
 	FleetMs += Ms;
 	FleetMsMax = FMath::Max(FleetMsMax, Ms);
+}
+
+bool UAstraBattleSubsystem::FleetSetCaptain(const FString& ContactId, const FString& Rank, const FString& Name)
+{
+	FAstraBattleShip* S = FindByContact(ContactId.ToUpper());
+	if (!S || Name.IsEmpty())
+	{
+		return false;
+	}
+	S->CaptainRank = Rank;
+	S->CaptainName = Name;
+	if (S->Interior.IsValid())
+	{
+		S->Interior->SetCaptain(Rank, Name);
+	}
+	return true;
 }
 
 bool UAstraBattleSubsystem::FleetSnapshot(int32 ShipId, FFleetSnapshot& Out) const
@@ -316,6 +344,15 @@ FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FS
 			}
 		}
 		return FString::Printf(TEXT("fleet interiors (%s): %d ships have one; %d blows, %.2f ms in all (worst call %.2f ms)"), FleetOn() ? TEXT("on") : TEXT("off"), N, FleetBlows, FleetMs, FleetMsMax);
+	}
+	if (What == TEXT("captain"))
+	{
+		// astra.fleet.captain <contact> <rank> <name>: underscores stand for spaces ("Lieutenant_Commander", "Rhea_Castellan")
+		if (Args.Num() < 3)
+		{
+			return TEXT("astra.fleet.captain <contact id> <rank> <name>  (underscores for spaces)");
+		}
+		return FleetSetCaptain(Args[0], Args[1].Replace(TEXT("_"), TEXT(" ")), Args[2].Replace(TEXT("_"), TEXT(" "))) ? FString::Printf(TEXT("%s: captain %s %s"), *Args[0].ToUpper(), *Args[1], *Args[2]) : FString::Printf(TEXT("no ship %s"), *Args[0]);
 	}
 	if (What == TEXT("selftest"))
 	{

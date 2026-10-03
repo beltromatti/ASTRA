@@ -178,6 +178,8 @@ public:
 	const FFleetClassPlan& GetPlan() const { return *Plan; }
 	const TArray<FFleetPerson>& GetPeople() const { return People; }
 	const TArray<FFleetNamed>& GetNamed() const { return Named; }
+	/** The captain's name and rank (the minds' persona of the ship's commander): what the war and the minds say of the captain from then on. */
+	void SetCaptain(const FString& Rank, const FString& Name);
 	/** The damage-control parties, and how many of each are on their feet. */
 	int32 PartiesCount() const { return Parties.Num(); }
 	int32 PartyMembersNow(int32 Party) const { return Parties.IsValidIndex(Party) ? Parties[Party].Members.Num() : 0; }

@@ -154,6 +154,7 @@ struct FAstraBattleShip
 	 *  What it says goes back into the fields above (ShieldPower, WeaponPower) and into the engines', sensors' and hangar's factors; what burns and vents sets the war's sections' flags. */
 	TSharedPtr<FAstraShipInterior> Interior;
 	float FleetNewsT = -100.f;                     // when its interior last told the war something (the war is told at most so often)
+	FString CaptainRank, CaptainName;              // who commands her, when the minds have given her a captain (FleetSetCaptain): her inside's captain is that person
 	// --- the physical model of a warship (AstraWarDamage.cpp): its class, shield sectors, armour plates, structure by
 	// section, subsystems and weapon mounts with their fields of fire. Hull and Shield above stay the sums (what the rest of
 	// the game reads); craft and decoys have no model (Dmg.bModel false) and keep the lumps.
@@ -1018,6 +1019,8 @@ private:
 	FAstraShipInterior* FleetEnsure(FAstraBattleShip& S);
 	void FleetOnHit(FAstraBattleShip& To, const FAstraHullHit& Hit);
 	void FleetOnGutted(FAstraBattleShip& S, int32 Section);
+	/** The captain of a ship, by the name and the rank the minds know them by: her inside's captain is that person (so "the captain is dead" is about the same person who speaks for her). */
+	bool FleetSetCaptain(const FString& ContactId, const FString& Rank, const FString& Name);
 	/** The inside of a ship as it stands (for a boarding: ABBORDAGGI): false when she has none (never hit through her plating, or her class has no plan). */
 	bool FleetSnapshot(int32 ShipId, struct FFleetSnapshot& Out) const;
 	/** The ship is destroyed: the people aboard are lost with her. */
