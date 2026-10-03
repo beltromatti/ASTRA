@@ -36,21 +36,9 @@ def conference_table(b: SParts, l: float = 6.4, w: float = 1.6, seats: int = 6) 
 
 
 def desk_pod(b: SParts, w: float = 1.4, d: float = 0.8) -> None:
-    """A desk with its low partition, facing +x (the sitter's side is -x... facing the partition): a laminate top on two pedestals, a monitor and a keyboard, a tray, a lamp,
-    a fabric partition behind with a pin board and a pair of photographs."""
-    b.body.box((-d / 2, -w / 2, 0.72), (d / 2, w / 2, 0.76), LAMINATE)
-    for sy in (-w / 2 + 0.1, w / 2 - 0.4):
-        b.body.box((-d / 2 + 0.05, sy, 0.0), (d / 2 - 0.05, sy + 0.3, 0.72), COMPOSITE)
-        for k in range(3):
-            b.soft.box((d / 2 - 0.05, sy + 0.03, 0.08 + k * 0.2), (d / 2 - 0.04, sy + 0.27, 0.24 + k * 0.2), CRATE_GREY)
-    b.body.box((d / 2 - 0.02, -w / 2 - 0.1, 0.0), (d / 2 + 0.02, w / 2 + 0.1, 1.45), STRUCT)
-    b.soft.box((d / 2 + 0.02, -w / 2 - 0.08, 0.5), (d / 2 + 0.06, w / 2 + 0.08, 1.4), FABRIC_GREY)               # fabric on both faces of the partition
-    b.soft.box((d / 2 - 0.06, -w / 2 - 0.08, 0.5), (d / 2 - 0.02, w / 2 + 0.08, 1.4), FABRIC_GREY)
-    b.soft.box((d / 2 - 0.065, -0.4, 1.0), (d / 2 - 0.06, 0.3, 1.3), CRATE_OLIVE)                                  # the pin board and two photographs on the sitter's side
-    b.soft.box((d / 2 - 0.065, 0.35, 1.0), (d / 2 - 0.06, 0.5, 1.15), BEDDING)
-    b.soft.box((0.1, -0.2, 0.76), (0.22, 0.2, 0.78), STRUCT)
-    b.soft.box((0.3, -0.25, 0.76), (0.32, 0.25, 1.18), DGLASS)
-    b.emit.label((0.299, 0.0, 0.97), 0.48, 0.28, (-1, 0, 0), "scr_data")
+    """A desk with its screen and its partition, facing +x (ship_furn3.workstation): the sitter at -x, the partition behind at +x."""
+    import ship_furn3 as N3
+    N3.workstation(b, w, d, int(w * 10 + d * 7))
 
 
 def filing_cabinet(b: SParts, n: int = 3, w: float = 0.5, h: float = 1.35) -> None:

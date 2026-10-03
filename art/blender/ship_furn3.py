@@ -9,8 +9,8 @@ import math
 import random
 
 import ship_mk as MK
-from bridge3_lib import Rx, Ry, Rz, T
-from ship_lib import (BRASS, COMPOSITE, LEAF_GREEN, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, LAMP, LAMP_DIM, LEATHER_NAVY, LEATHER_OX, OAK, PAINT_RED, RUBBER, STEEL, STRUCT, SWATCH, TRIM,
+from bridge3_lib import Ry, Rz, T
+from ship_lib import (BRASS, CERAMIC, COMPOSITE, CORK, DGLASS, LAMINATE, LEAF_GREEN, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, LAMP, LAMP_DIM, LEATHER_NAVY, LEATHER_OX, OAK, PAINT_RED, RUBBER, STEEL, STRUCT, SWATCH, TRIM,
                       WALNUT, WHITE_GLOSS, SParts)
 
 MAT_COLORS = ["teal", "navy", "rust", "mustard", "forest", "plum", "slate", "denim"]
@@ -151,7 +151,6 @@ def squat_rack(b: SParts, seed: int = 1) -> None:
 def dumbbell_rack(b: SParts, pairs: int = 6, seed: int = 1) -> None:
     """A two-tier dumbbell rack facing +x, 2.0 m long: a steel frame with two sloped shelves, a row of rubber hex dumbbells on each, the weights painted on their ends. Origin on the floor at
     the middle of the rack."""
-    rng = random.Random(seed)
     hl = 1.0
     for sy in (-hl + 0.05, 0.0, hl - 0.05):
         b.body.box((-0.22, sy - 0.025, 0.0), (-0.18, sy + 0.025, 0.95), STRUCT)
@@ -197,7 +196,6 @@ def medicine_balls(b: SParts, n: int = 6, seed: int = 1) -> None:
 
 def yoga_mat(b: SParts, seed: int = 1, rolled: bool = False) -> None:
     """A yoga mat lying along x (0.6 x 1.8 m, origin at its centre on the floor), or rolled up; with a foam roller or a block at its head on some."""
-    rng = random.Random(seed)
     col = MAT_COLORS[seed % len(MAT_COLORS)]
     if rolled:
         b.soft.paint(MK.puff(b.soft, (0.0, 0.0, 0.08), (0.3, 0.08, 0.08), SWATCH, e=1.0, nu=10, nv=6), col)
@@ -242,7 +240,6 @@ def wall_bars(b: SParts, w: float = 0.9, h: float = 2.6) -> None:
 
 def battle_ropes(b: SParts, seed: int = 1) -> None:
     """Two heavy ropes lying in loose waves along +x from an anchor post (origin at the post's base): a steel post with a ring, each rope a thick cord with a taped end."""
-    rng = random.Random(seed)
     b.body.box((-0.05, -0.05, 0.0), (0.05, 0.05, 0.9), STRUCT)
     b.body.box((-0.2, -0.2, 0.0), (0.2, 0.2, 0.03), STRUCT)
     for sy in (-0.08, 0.08):
@@ -437,3 +434,138 @@ def mosaic_window(b: SParts, w: float = 2.4, h: float = 3.0, seed: int = 1) -> N
             y0 = -w / 2 + t + i * cw
             z0 = -h / 2 + t + j * ch
             b.emit.lamp_box((0.02, y0 + 0.012, z0 + 0.012), (0.03, y0 + cw - 0.012, z0 + ch - 0.012), cell, LAMP_DIM)
+
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------ the games room
+def foosball_table(b: SParts, seed: int = 1) -> None:
+    """A table-football table, its long side along y (origin: its middle on the floor, 1.4 x 0.75 x 0.9): a wooden cabinet on four turned legs, a green field with its lines and two goals,
+    eight rods across it with the players on them (red and blue), a handle at each rod's end, a score counter on a bar."""
+    hx, hy = 0.375, 0.7
+    for sx in (-hx + 0.05, hx - 0.05):
+        for sy in (-hy + 0.08, hy - 0.08):
+            MK.rod(b.soft, (sx, sy, 0.0), (sx, sy, 0.82), 0.035, 0.04, WALNUT, 8)
+    MK.rbox(b.soft, (-hx, -hy, 0.78), (hx, hy, 0.9), 0.012, WALNUT, 1)
+    b.soft.swatch_box((-hx + 0.04, -hy + 0.04, 0.84), (hx - 0.04, hy - 0.04, 0.855), "forest")
+    b.soft.swatch_box((-0.003, -hy + 0.04, 0.855), (0.003, hy - 0.04, 0.858), "white")
+    b.soft.swatch_cyl((0.0, 0.0, 0.855), (0.0, 0.0, 0.858), 0.08, "white", seg=14)
+    for sy in (-hy + 0.04, hy - 0.08):
+        b.soft.swatch_box((-0.1, sy, 0.855), (0.1, sy + 0.04, 0.9), "charcoal")
+    for k in range(8):                                                                                           # the rods: 8 across the length, players 3-1-2-5 for each side
+        y = -hy + 0.14 + k * (2 * hy - 0.28) / 7
+        col = "red" if k in (0, 2, 4, 6) else "blue"
+        b.fine.cyl((-hx - 0.12, y, 0.93), (hx + 0.14, y, 0.93), 0.008, STEEL, seg=6)
+        b.soft.cyl((hx + 0.08, y, 0.93), (hx + 0.2, y, 0.93), 0.017, RUBBER, seg=8)
+        for j in range(3 if k in (0, 7) else 2 if k in (2, 5) else 3):
+            x = (j - 1) * 0.16 if k not in (1, 3) else (j - 1) * 0.12
+            b.soft.swatch_box((x - 0.02, y - 0.015, 0.855), (x + 0.02, y + 0.015, 0.95), col)
+    b.soft.swatch_box((-hx - 0.02, -0.1, 0.9), (-hx + 0.02, 0.1, 0.96), "charcoal")
+
+
+def pinball(b: SParts, seed: int = 1, screen: str = "scr_wave") -> None:
+    """A pinball machine facing +x (the player stands at the +x end; origin: its middle on the floor): a cabinet on four legs with a playfield tilted 6 degrees under steel side rails,
+    bumpers and ramps in lit colours, two flippers near the player, a back box 1.95 m high at -x with a lit screen and a lit header."""
+    for sx in (-0.55, 0.7):
+        for sy in (-0.26, 0.26):
+            MK.rod(b.fine, (sx, sy, 0.0), (sx, sy, 0.8), 0.02, 0.028, STEEL, 8)
+    MK.rbox(b.soft, (-0.65, -0.3, 0.8), (0.8, 0.3, 0.92), 0.015, WALNUT, 1, rot=Ry(6.0))
+    b.soft.swatch_box((-0.6, -0.27, 0.93), (0.76, 0.27, 0.945), "navy")
+    b.fine.box((-0.65, -0.3, 0.945), (0.8, -0.28, 1.0), STEEL)
+    b.fine.box((-0.65, 0.28, 0.945), (0.8, 0.3, 1.0), STEEL)
+    rng = random.Random(seed)
+    for k in range(5):
+        x, y = rng.uniform(-0.35, 0.3), rng.uniform(-0.18, 0.18)
+        b.emit.lamp_cyl((x, y, 0.945), (x, y, 0.985), 0.035, rng.choice(("red", "amber", "cyan", "green", "violet")), LAMP, seg=10)
+    for sy in (-0.1, 0.1):
+        b.soft.swatch_box((0.5, sy - 0.05, 0.945), (0.62, sy + 0.05, 0.96), "orange")
+    b.body.box((-0.7, -0.34, 0.9), (-0.45, 0.34, 1.95), COMPOSITE)
+    b.emit.label((-0.449, 0.0, 1.5), 0.6, 0.5, (1, 0, 0), screen)
+    b.emit.lamp_box((-0.449, -0.3, 1.75), (-0.446, 0.3, 1.9), "violet", LAMP)
+    b.fine.box((0.8, -0.12, 0.7), (0.82, 0.12, 0.8), STRUCT)
+
+
+def jukebox(b: SParts) -> None:
+    """A jukebox facing +x (0.9 wide, 1.65 high): a rounded-top cabinet with a lit arch of colours, a window with a stack of records, a speaker grille, a brass trim."""
+    prof = [(-0.3, 0.0), (0.3, 0.0), (0.32, 1.05), (0.26, 1.4), (0.12, 1.6), (-0.1, 1.65), (-0.3, 1.5)]
+    b.body.extrude_y(prof, -0.45, 0.45, WALNUT)
+    b.fine.box((0.3, -0.38, 0.1), (0.322, 0.38, 0.6), STRUCT)
+    for k in range(10):
+        b.fine.box((0.322, -0.34 + k * 0.068, 0.12), (0.327, -0.34 + k * 0.068 + 0.045, 0.58), STEEL if k % 2 else TRIM)
+    b.fine.box((0.31, -0.36, 0.7), (0.325, 0.36, 1.2), DGLASS)
+    for k in range(7):
+        b.soft.swatch_cyl((0.32, -0.3 + k * 0.1, 0.85), (0.325, -0.3 + k * 0.1, 0.85), 0.045, "charcoal", seg=12)
+    b.emit.lamp_box((0.26, -0.4, 1.38), (0.3, 0.4, 1.42), "amber", LAMP)
+    b.emit.lamp_box((0.26, -0.44, 0.1), (0.3, -0.4, 1.3), "red", LAMP_DIM)
+    b.emit.lamp_box((0.26, 0.4, 0.1), (0.3, 0.44, 1.3), "cyan", LAMP_DIM)
+    b.fine.box((0.32, -0.3, 1.26), (0.335, 0.3, 1.29), BRASS)
+
+
+def dart_board(b: SParts) -> None:
+    """A dartboard on the wall in an oak cabinet (origin: the middle of its back, facing +x): a round board in rings of black, cream, red and green, a bullseye, a cabinet with a rounded
+    frame, a chalk slate under it."""
+    MK.rbox(b.soft, (0.0, -0.3, -0.3), (0.06, 0.3, 0.3), 0.04, OAK, 1)
+    for r, col in ((0.225, "charcoal"), (0.2, "cream"), (0.18, "red"), (0.12, "cream"), (0.1, "green"), (0.05, "red"), (0.02, "green")):
+        b.soft.swatch_cyl((0.06, 0.0, 0.0), (0.0605 + (0.225 - r) * 0.02, 0.0, 0.0), r, col, seg=18)
+    b.soft.swatch_box((0.0, -0.18, -0.52), (0.04, 0.18, -0.34), "charcoal")
+
+
+def bean_bag(b: SParts, mat: str = FABRIC_RUST, seed: int = 1) -> None:
+    """A bean bag on the floor (origin at its middle): a slumped teardrop of cloth with a seam and a carrying loop."""
+    MK.puff(b.soft, (0.0, 0.0, 0.22), (0.4, 0.38, 0.22), mat, e=0.8, nu=24, nv=14, flat_bottom=0.5)
+    MK.puff(b.soft, (-0.22, 0.0, 0.4), (0.18, 0.34, 0.3), mat, e=0.8, nu=16, nv=10, rot=Ry(-30.0))
+
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------ the offices
+def office_chair(b: SParts, mat: str = FABRIC_NAVY) -> None:
+    """An operator's swivel chair on a column, facing +x (origin on the floor under the column): a round weighted foot, a chromed gas column, a rounded seat on a plate, a shaped back leaning
+    a few degrees with a lumbar pad and a head rest on two posts, two arms with pads, all in `mat` over a dark shell."""
+    MK.lathe(b.body, [(0.001, 0.0), (0.29, 0.0), (0.3, 0.015), (0.27, 0.045), (0.09, 0.06), (0.06, 0.12)], (0, 0, 0.0), STRUCT, seg=20)
+    b.body.cyl((0, 0, 0.06), (0, 0, 0.43), 0.035, STEEL, seg=10)
+    b.fine.cyl((0, 0, 0.2), (0, 0, 0.3), 0.05, TRIM, seg=10)
+    b.fine.box((-0.17, -0.14, 0.41), (0.17, 0.14, 0.44), STRUCT)
+    MK.rbox(b.soft, (-0.235, -0.245, 0.44), (0.245, 0.245, 0.52), 0.035, mat, 2)
+    MK.rbox(b.soft, (-0.30, -0.23, 0.52), (-0.24, 0.23, 1.0), 0.03, mat, 2, rot=Ry(-6.0))
+    MK.rbox(b.soft, (-0.27, -0.2, 0.56), (-0.235, 0.2, 0.68), 0.015, STRUCT, 1, rot=Ry(-6.0))
+    for sy in (-0.1, 0.1):
+        MK.rod(b.fine, (-0.28, sy, 1.0), (-0.31, sy, 1.08), 0.012, 0.012, STEEL, 6)
+    MK.rbox(b.soft, (-0.34, -0.12, 1.06), (-0.27, 0.12, 1.2), 0.025, mat, 2, rot=Ry(-8.0))
+    for sy in (-1, 1):
+        y = sy * 0.255
+        MK.rod(b.fine, (-0.12, y, 0.52), (-0.12, y, 0.64), 0.012, 0.012, STEEL, 6)
+        MK.rbox(b.soft, (-0.2, y - 0.025, 0.64), (0.14, y + 0.025, 0.68), 0.015, STRUCT, 1)
+
+
+def workstation(b: SParts, w: float = 1.4, d: float = 0.8, seed: int = 1) -> None:
+    """A desk with its screen and its partition, facing +x (the sitter at -x; the partition at +x: the clerks sit back to back): a laminate top with a rounded front on a steel panel leg and a
+    drawer pedestal, a flat screen on an arm with a keyboard and a mouse, a desk lamp, a telephone, a mug, papers and a clipboard, a small plant, a nameplate; behind it a partition of grey
+    cloth in a steel frame with a pin board and notes on the sitter's side."""
+    rng = random.Random(seed)
+    MK.rbox(b.soft, (-d / 2, -w / 2, 0.715), (d / 2 - 0.03, w / 2, 0.76), 0.012, LAMINATE, 1)
+    b.body.box((-d / 2 + 0.05, -w / 2 + 0.03, 0.0), (-d / 2 + 0.08, -w / 2 + 0.06, 0.715), STEEL)               # a panel leg on the open side
+    b.body.box((-d / 2 + 0.05, -w / 2 + 0.03, 0.0), (d / 2 - 0.08, -w / 2 + 0.05, 0.715), STEEL)
+    b.body.box((-d / 2 + 0.05, w / 2 - 0.45, 0.04), (d / 2 - 0.08, w / 2 - 0.05, 0.715), WHITE_GLOSS)           # the drawer pedestal
+    for k in range(3):
+        z = 0.08 + k * 0.21
+        b.fine.box((-d / 2 + 0.045, w / 2 - 0.43, z), (-d / 2 + 0.05, w / 2 - 0.07, z + 0.18), STRUCT)
+        b.fine.box((-d / 2 + 0.03, w / 2 - 0.3, z + 0.14), (-d / 2 + 0.045, w / 2 - 0.16, z + 0.155), STEEL)
+    b.body.box((d / 2 - 0.03, -w / 2 - 0.12, 0.0), (d / 2 + 0.03, w / 2 + 0.12, 1.45), STEEL)                    # the partition: a steel frame with cloth on both faces
+    b.soft.box((d / 2 + 0.03, -w / 2 - 0.1, 0.55), (d / 2 + 0.06, w / 2 + 0.1, 1.4), FABRIC_GREY)
+    b.soft.box((d / 2 - 0.06, -w / 2 - 0.1, 0.55), (d / 2 - 0.03, w / 2 + 0.1, 1.4), FABRIC_GREY)
+    b.fine.box((d / 2 - 0.08, -w / 2 - 0.12, 1.4), (d / 2 + 0.08, w / 2 + 0.12, 1.45), TRIM)
+    b.soft.box((d / 2 - 0.063, -0.45, 1.0), (d / 2 - 0.06, 0.25, 1.3), CORK)                            # the pin board with notes and two photographs
+    for k in range(6):
+        b.soft.swatch_box((d / 2 - 0.061, -0.4 + k * 0.1 + rng.uniform(-0.01, 0.01), 1.05 + rng.uniform(0, 0.15)), (d / 2 - 0.058, -0.4 + k * 0.1 + 0.07, 1.05 + 0.1 + rng.uniform(0, 0.15)),
+                          rng.choice(("white", "cream", "yellow", "rose", "teal")))
+    b.fine.box((d / 2 - 0.063, 0.32, 1.0), (d / 2 - 0.058, 0.46, 1.14), WALNUT)
+    b.fine.cyl((0.25, 0.0, 0.76), (0.25, 0.0, 0.86), 0.025, STEEL, seg=8)                                         # the screen on its arm
+    b.fine.cyl((0.25, 0.0, 0.86), (0.22, 0.0, 0.99), 0.015, STEEL, seg=6)
+    b.body.box((0.19, -0.27, 0.93), (0.23, 0.27, 1.24), STRUCT)
+    b.emit.label((0.188, 0.0, 1.085), 0.5, 0.28, (-1, 0, 0), rng.choice(("scr_data", "scr_ship", "scr_dir", "scr_data")))
+    b.soft.box((-0.02, -0.2, 0.76), (0.14, 0.2, 0.775), STRUCT)                                                   # keyboard and mouse
+    b.soft.box((0.0, 0.26, 0.76), (0.07, 0.31, 0.775), STRUCT)
+    b.fine.cyl((0.28, -0.5, 0.76), (0.34, -0.45, 1.02), 0.007, STEEL, seg=6)                                      # a desk lamp
+    b.emit.lamp_cyl((0.34, -0.45, 1.02), (0.3, -0.38, 0.98), 0.025, "white_warm", LAMP, seg=10, r2=0.05)
+    b.soft.box((-0.1, -0.55, 0.76), (0.0, -0.45, 0.78), STRUCT)
+    b.soft.swatch_box((0.0, 0.34, 0.76), (0.2, 0.55, 0.764), "paper")                                             # papers, a clipboard, a mug
+    b.soft.swatch_box((-0.05, 0.38, 0.764), (0.12, 0.5, 0.78), "charcoal")
+    b.fine.cyl((0.1, -0.16, 0.76), (0.1, -0.16, 0.85), 0.035, CERAMIC, seg=10)
+    b.fine.box((-0.13, -0.05, 0.76), (-0.06, 0.1, 0.775), BRASS)

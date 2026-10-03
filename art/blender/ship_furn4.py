@@ -9,8 +9,8 @@ import math
 import random
 
 import ship_mk as MK
-from bridge3_lib import Rx, Ry, Rz, T
-from ship_lib import (BEDDING, BRASS, COMPOSITE, DGLASS, FABRIC_GREY, FABRIC_NAVY, IVORY, LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, PLASTER_TEAL, RUBBER, STEEL, STRUCT, SWATCH, TRIM,
+from bridge3_lib import Ry, T
+from ship_lib import (BEDDING, BRASS, COMPOSITE, FABRIC_GREY, FABRIC_NAVY, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, PLASTER_TEAL, RUBBER, STEEL, STRUCT, SWATCH, TRIM,
                       WHITE_GLOSS, SParts)
 
 TEAL = PLASTER_TEAL
@@ -20,7 +20,6 @@ TEAL = PLASTER_TEAL
 def bedside_cabinet(b: SParts, seed: int = 1) -> None:
     """A bedside cabinet 0.5 x 0.45 x 0.78 on four castors, facing +x: a white carcase, a drawer and a cupboard behind a teal door with steel pulls, on top a cup, a jug, a tissue box and a
     tablet on its charger."""
-    rng = random.Random(seed)
     for sx in (-0.17, 0.17):
         for sy in (-0.2, 0.2):
             b.fine.cyl((sx, sy, 0.0), (sx, sy, 0.07), 0.025, RUBBER, seg=8)
@@ -304,3 +303,36 @@ def hospital_bed_light(b: SParts) -> None:
     MK.rod(b.fine, (0.45, 0.2, 0.05), (0.75, -0.05, -0.1), 0.014, 0.014, STEEL, 6)
     b.fine.cyl((0.75, -0.05, -0.1), (0.75, -0.05, -0.2), 0.12, WHITE_GLOSS, seg=16, r2=0.14)
     b.emit.lamp_cyl((0.75, -0.05, -0.2), (0.75, -0.05, -0.204), 0.12, "white_cool", LAMP, seg=16)
+
+
+def hospital_bed(b: SParts, seed: int = 1, blanket: str = FABRIC_NAVY) -> None:
+    """A hospital bed, the head at -x, 2.1 x 1.0 m (origin: its middle on the floor; the mattress top 0.6 m up, where a patient lies: the sleeper's place is on it): four braked castors, a
+    base and two lifting columns, a steel platform, a mattress in two parts — the back section raised 20 degrees — a pillow, a sheet and a blanket folded back, white head and foot boards with
+    a teal panel, two side rails on the leg section, a push handle, a controller on a lead, a net with a book."""
+    for sx in (-0.85, 0.8):
+        for sy in (-0.4, 0.4):
+            b.fine.cyl((sx, sy, 0.0), (sx, sy, 0.1), 0.045, RUBBER, seg=8)
+    b.body.box((-0.9, -0.38, 0.1), (0.85, 0.38, 0.17), STEEL)
+    for sx in (-0.5, 0.4):
+        b.body.box((sx - 0.06, -0.12, 0.17), (sx + 0.06, 0.12, 0.4), STRUCT)
+    b.body.box((-1.0, -0.46, 0.4), (1.0, 0.46, 0.46), STEEL)
+    MK.rbox(b.soft, (-0.2, -0.45, 0.46), (0.97, 0.45, 0.58), 0.03, WHITE_GLOSS, 1)                                   # the leg section
+    with b.at(T(-0.2, 0.0, 0.52) @ Ry(-20.0)):                                                                      # the raised back section, hinged at the hip
+        MK.rbox(b.soft, (-0.8, -0.45, 0.0), (0.0, 0.45, 0.12), 0.03, WHITE_GLOSS, 1)
+        MK.puff(b.soft, (-0.62, 0.0, 0.17), (0.2, 0.3, 0.07), BEDDING, e=0.6)
+    MK.rbox(b.soft, (-0.18, -0.465, 0.52), (0.97, 0.465, 0.64), 0.04, blanket, 2)
+    MK.rbox(b.soft, (-0.2, -0.46, 0.6), (-0.04, 0.46, 0.665), 0.03, BEDDING, 1)                                       # the fold of the sheet
+    b.body.box((-1.06, -0.47, 0.34), (-1.0, 0.47, 1.05), WHITE_GLOSS)                                               # the head board with a teal panel
+    b.fine.box((-1.065, -0.4, 0.5), (-1.06, 0.4, 0.95), TEAL)
+    b.body.box((0.99, -0.47, 0.34), (1.05, 0.47, 0.9), WHITE_GLOSS)                                                 # the foot board
+    b.fine.box((1.05, -0.4, 0.45), (1.055, 0.4, 0.85), TEAL)
+    for sy in (-0.49, 0.49):                                                                                         # side rails on the leg section, raised
+        b.fine.cyl((-0.1, sy, 0.8), (0.8, sy, 0.8), 0.014, STEEL, seg=8)
+        b.fine.cyl((-0.1, sy, 0.68), (0.8, sy, 0.68), 0.012, STEEL, seg=8)
+        for sx in (-0.1, 0.35, 0.8):
+            b.fine.cyl((sx, sy, 0.46), (sx, sy, 0.8), 0.012, STEEL, seg=6)
+    b.fine.cyl((1.05, -0.3, 0.9), (1.05, 0.3, 0.9), 0.016, STEEL, seg=8)                                              # the push handle
+    b.soft.tube([(0.95, 0.49, 0.78), (0.98, 0.52, 0.55), (0.9, 0.5, 0.35)], 0.006, STRUCT, seg=5)                   # the controller on its lead
+    b.fine.box((0.86, 0.485, 0.34), (0.94, 0.515, 0.42), STRUCT)
+    b.soft.box((0.1, 0.46, 0.2), (0.4, 0.485, 0.4), FABRIC_GREY)                                                     # a net with a book
+    b.soft.swatch_box((0.15, 0.462, 0.25), (0.3, 0.48, 0.34), "denim")

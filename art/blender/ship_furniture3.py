@@ -94,16 +94,9 @@ def work_console(b: SParts, w: float = 3.2, accent: str = "science", screens: in
 
 
 def chair_op(b: SParts, mat: str = FABRIC_NAVY) -> None:
-    """An operator's swivel chair on a column (not a wheeled office chair): facing +x, a shaped shell back with a head rest and arms."""
-    b.body.cyl((0, 0, 0.0), (0, 0, 0.04), 0.30, STRUCT, seg=16)
-    b.body.cyl((0, 0, 0.04), (0, 0, 0.42), 0.04, TRIM, seg=8)
-    b.soft.box((-0.22, -0.23, 0.42), (0.22, 0.23, 0.50), mat)
-    b.body.box((-0.26, -0.22, 0.50), (-0.20, 0.22, 1.02), COMPOSITE)
-    b.soft.box((-0.20, -0.20, 0.52), (-0.14, 0.20, 0.96), mat)
-    b.soft.box((-0.24, -0.12, 1.02), (-0.16, 0.12, 1.16), mat)
-    for sy in (-0.25, 0.22):
-        b.body.box((-0.18, sy, 0.62), (0.18, sy + 0.03, 0.66), TRIM)
-        b.fine.box((-0.02, sy, 0.50), (0.02, sy + 0.03, 0.62), TRIM)
+    """An operator's swivel chair on a column, facing +x (ship_furn3.office_chair)."""
+    import ship_furn3 as N3
+    N3.office_chair(b, mat)
 
 
 # --------------------------------------------------------------------------------------------------------------------- racks, data

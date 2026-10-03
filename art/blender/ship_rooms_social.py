@@ -7,6 +7,7 @@ import math
 import random
 
 import ship_cabin as SC
+import ship_furn3 as N3
 import ship_furniture as F
 import ship_decor as DC
 import ship_plants as PL
@@ -102,13 +103,17 @@ def lounge(name: str = "SM_SHIP_Lounge"):
 
 # -------------------------------------------------------------------------------------------------------------------- games
 def games(name: str = "SM_SHIP_Games"):
+    """24 x 16 x 3.6: the games room. Three card tables under their lamps (chips, cards, mugs), a billiard table with its long lamp, six arcade cabinets along the far wall, three pinball
+    machines down the left wall, a table-football table, a jukebox, a dartboard with its throwing line on the right wall, a corner of bean bags and a sofa on a rug, a shelf of board games,
+    pictures, plants; the crew's places (cards, pool, the arcade) where they were."""
     spec, L, D, H = _dims("games")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
+    b = SParts(bevel=0.005, fine_bevel=0.0)
     st = Style(floor=FABRIC_NAVY, floor_mode="covering", seams=False, wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.05, ceil=COMPOSITE, accent="violet",
                cove="violet", rib_mat=TRIM, skirt=STRUCT)
     build_shell(b, spec, st)
     yf = D - WS - WF
-    # card tables (felt tops, four chairs, a pendant lamp)
+    xl, xr = WS + WF, L - WS - WF
+    # card tables (felt tops, four chairs, a pendant lamp, cards, chips and mugs)
     for k, (xt, yt) in enumerate(((6.0, 5.0), (6.0, 11.0), (13.0, 4.0))):
         place(b, xt, yt, 0, F.table, 1.3, 1.3, 0.74, LEAF, TRIM, True)
         for dx, dy, yaw in ((-1.0, 0, 0), (1.0, 0, 180), (0, -1.0, 90), (0, 1.0, -90)):
@@ -117,22 +122,44 @@ def games(name: str = "SM_SHIP_Games"):
         rng = random.Random(k)
         for j in range(5):
             place(b, xt + rng.uniform(-0.4, 0.4), yt + rng.uniform(-0.4, 0.4), rng.uniform(0, 360), _card, z=0.74)
-    # the billiard table with its long lamp
+        for j in range(4):                                                                                       # a stack of chips and a mug at every seat
+            ang = j * 90.0
+            cx, cy = xt + 0.5 * math.cos(math.radians(ang)), yt + 0.5 * math.sin(math.radians(ang))
+            b.soft.swatch_cyl((cx, cy, 0.74), (cx, cy, 0.74 + 0.012 * (2 + (j + k) % 4)), 0.025, ("red", "navy", "white", "mustard")[j], seg=8)
+            place(b, xt + 0.3 * math.cos(math.radians(ang + 40)), yt + 0.3 * math.sin(math.radians(ang + 40)), 0, DC.mug, z=0.74)
+    # the billiard table with its long lamp and a rack of cues
     place(b, 17.0, 8.0, 0, G.billiard_table, 2.7, 1.5, 0.84)
     place(b, 17.0, 8.0, 0, G.pendant_bar, 2.4, 0.3, 2.3, H - 0.05, "white_warm", LAMP)
     for y in (5.2, 10.8):
         place(b, 17.0, y, 0, F.chair, FABRIC_GREY)
+    for k in range(4):
+        b.soft.cyl((xr - 0.12, 6.0 + k * 0.12, 0.2), (xr - 0.12, 6.0 + k * 0.12, 1.7), 0.011, WALNUT, seg=6)
+    b.fine.box((xr - 0.16, 5.9, 0.0), (xr - 0.04, 6.6, 0.2), WALNUT)
     # a row of arcade cabinets along the far wall
     screens = ["scr_map", "scr_lab", "scr_news", "scr_dir", "scr_sched", "scr_menu"]
     accents = ["violet", "cyan", "amber", "green", "red", "ice"]
     for i in range(6):
         place(b, 16.5 + 1.0 * i, yf - 0.36, -90, G.arcade_cabinet, screens[i], accents[i])
+    # pinball down the left wall, table football and the jukebox
+    for k, y in enumerate((3.2, 4.6, 6.0)):
+        place(b, xl + 0.78, y, 0, N3.pinball, k, ("scr_wave", "scr_map", "scr_lab")[k])
+    place(b, 12.0, 10.6, 0, N3.foosball_table, 1)
+    place(b, 3.0, yf - 0.5, -90, N3.jukebox)
+    # the dartboard on the right wall with its throwing line, and the shelf of board games by the door
+    place(b, xr, 12.0, 180, N3.dart_board, z=1.7)
+    b.soft.swatch_box((xr - 2.75, 11.4, 0.0), (xr - 2.7, 12.6, 0.012), "yellow")
+    place(b, 3.5, WF + 0.19, 90, F.shelf, 2.4, 0.34, 2.0, 5, WOOD, True, 6, True)
+    # the corner of bean bags, a sofa on a rug and plants
+    place(b, 22.0, 4.0, 0, DC.rug, 3.6, 3.6, CARPET_RUST, FABRIC_SAND)
+    place(b, 23.2, 5.6, 180, F.sofa, 2.4, FABRIC_RUST)
+    place(b, 21.9, 5.6, 0, DC.coffee_table_set, 0.9, 0.6, 0.4, WOOD, 12)
+    for k, (x, y, c) in enumerate(((21.2, 2.6, FABRIC_NAVY), (22.4, 2.2, FABRIC_RUST), (21.6, 3.8, FABRIC_SAND))):
+        place(b, x, y, 40.0 * k, N3.bean_bag, c, k)
     place(b, 0.32, 8.0, 0, F.wall_screen, 3.0, 1.2, "scr_sched", z=2.0)
     place(b, 0.9, 13.6, 0, F.potted_plant, 1.5, 3)
     place(b, 22.9, 2.4, 0, F.potted_plant, 1.5, 4)
-    place(b, 23.2, 5.6, 180, F.sofa, 2.4, FABRIC_RUST)
-    place(b, 21.9, 5.6, 0, F.low_table, 0.9, 0.6, 0.4, WOOD)
-    ceiling_panels(b, L, D, H, 4, 3, "white_warm", 2.5, 0.5, 0.5, LAMP)
+    for k, x in enumerate((8.0, 13.0, 18.0)):
+        place(b, x, WF + 0.02, 90, DC.picture, 1.0, 0.7, 20 + k, WALNUT, ("bands", "sun", "squares")[k], z=1.9)
     for y in (3.0, 13.0):
         lamp_strip(b.emit, (2.0, y, H - 0.06), (L - 2.0, y, H - 0.06), 0.06, 0.006, "violet", LAMP_DIM)
     return b.build(name)
