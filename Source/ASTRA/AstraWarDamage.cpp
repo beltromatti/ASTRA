@@ -164,6 +164,10 @@ void UAstraBattleSubsystem::InitShipModel(FAstraBattleShip& S)
 		return;                                   // craft, decoys, anything with no class: hull and shield stay lumps
 	}
 	S.ClassKey = Key;
+	if (Key != FName(TEXT("aquila")))
+	{
+		FAstraFleetPlans::Prefetch(Key);       // FLOTTA-VIVA: its class's plan is read on a worker now, not at the first blow
+	}
 	S.Radius = C->Radius;                      // the class's measures, not the caller's guess: the game draws the mesh at true scale
 	S.Box = C->Box;
 	S.SizeTier = (uint8)FMath::Clamp(C->Tier, 0, 3);
@@ -308,8 +312,8 @@ float UAstraBattleSubsystem::EngineFactor(const FAstraBattleShip& S) const
 	{
 		return 1.f;
 	}
-	const float E = S.Dmg.Sys[AstraWar::SysEngines];
-	// (FLOTTA-VIVA: the engine rooms and the conduits to them, as the Aquila's helm feels them: a fifth of the drive's work is the plant's power)
+	// (FLOTTA-VIVA: the drive room and its people, and the conduits that feed the drive, as the Aquila's helm feels them: 0.6 + 0.4 of the allocation, as hers)
+	const float E = S.Dmg.Sys[AstraWar::SysEngines] * FleetSys(S, AstraWar::SysEngines);
 	return E <= 0.05f ? 0.f : (0.15f + 0.85f * E) * (0.6f + 0.4f * FleetFactor(S, (int32)EAstraDmgCategory::Engines));
 }
 
@@ -319,7 +323,7 @@ float UAstraBattleSubsystem::PowerFactorOf(const FAstraBattleShip& S) const
 	{
 		return 0.f;
 	}
-	return S.Dmg.bModel ? 0.15f + 0.85f * S.Dmg.Sys[AstraWar::SysReactor] : 1.f;
+	return S.Dmg.bModel ? 0.15f + 0.85f * S.Dmg.Sys[AstraWar::SysReactor] * FleetSys(S, AstraWar::SysReactor) : 1.f;
 }
 
 float UAstraBattleSubsystem::SensorFactor(const FAstraBattleShip& S) const
@@ -328,7 +332,7 @@ float UAstraBattleSubsystem::SensorFactor(const FAstraBattleShip& S) const
 	{
 		return 0.f;
 	}
-	return S.Dmg.bModel ? (0.3f + 0.7f * S.Dmg.Sys[AstraWar::SysSensors]) * FleetFactor(S, (int32)EAstraDmgCategory::Sensors) : 1.f;
+	return S.Dmg.bModel ? (0.3f + 0.7f * S.Dmg.Sys[AstraWar::SysSensors] * FleetSys(S, AstraWar::SysSensors)) * FleetFactor(S, (int32)EAstraDmgCategory::Sensors) : 1.f;
 }
 
 float UAstraBattleSubsystem::HangarFactor(const FAstraBattleShip& S) const
@@ -341,7 +345,7 @@ float UAstraBattleSubsystem::HangarFactor(const FAstraBattleShip& S) const
 	{
 		return 1.f;
 	}
-	const float H = S.Dmg.Sys[AstraWar::SysHangar];
+	const float H = S.Dmg.Sys[AstraWar::SysHangar] * FleetSys(S, AstraWar::SysHangar);
 	return H < 0.2f ? 0.f : H * FleetFactor(S, (int32)EAstraDmgCategory::FlightDeck);
 }
 
@@ -1023,7 +1027,7 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 		if (D.Burn[s] > 0.f)
 		{
 			D.Burn[s] = FMath::Max(0.f, D.Burn[s] - Dt);
-			if (!S.bPlayer && !S.bDisabled && D.Structure[s] > 0.f)
+			if (!S.bPlayer && !S.bDisabled && D.Structure[s] > 0.f && !S.Interior.IsValid())     // (a ship with an inside loses its structure to the fires the model burns: FleetTick)
 			{
 				D.Structure[s] = FMath::Max(0.f, D.Structure[s] - KFire.Get() * D.StructureMax[s] * Dt);
 				if (D.Structure[s] <= 0.f)
@@ -1043,8 +1047,9 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 	{
 		RepairPlayerSystems(0.004f * Dt);
 	}
-	D.bReactorCritical = D.Sys[AstraWar::SysReactor] < 0.3f;
-	D.ThinkDelay = 3.f * (1.f - D.Sys[AstraWar::SysBridge]);
+	const float ReactorNow = D.Sys[AstraWar::SysReactor] * FleetSys(S, AstraWar::SysReactor);
+	D.bReactorCritical = ReactorNow < 0.3f;
+	D.ThinkDelay = 3.f * (1.f - D.Sys[AstraWar::SysBridge] * FleetSys(S, AstraWar::SysBridge));
 	if (S.bPlayer)
 	{
 		return;
@@ -1057,7 +1062,7 @@ void UAstraBattleSubsystem::TickDamageState(FAstraBattleShip& S, float Dt)
 	}
 	if (!S.bDisabled)
 	{
-		if (D.Sys[AstraWar::SysReactor] <= 0.02f)
+		if (ReactorNow <= 0.02f)
 		{
 			// the reactor is gone: a breach takes the ship, or it scrams and she is left without power
 			if (FMath::FRand() < (S.Hull < 0.5f * S.HullMax ? 0.5f : 0.3f))
@@ -1099,7 +1104,7 @@ void UAstraBattleSubsystem::FireMounts(FAstraBattleShip& S, FAstraBattleShip& T,
 	const FVector Local = S.Att.UnrotateVector(T.Pos + T.Vel * Tof - S.Pos).GetSafeNormal();
 	for (FAstraMount& M : S.Mounts)
 	{
-		if (M.T > 0.f || M.Health < 0.2f || !M.CanBear(Local))
+		if (M.T > 0.f || M.Fit() < 0.2f || !M.CanBear(Local))
 		{
 			continue;
 		}
@@ -1208,8 +1213,8 @@ bool UAstraBattleSubsystem::GetDamageViewById(int32 ShipId, FDamageView& Out) co
 			V.Dir = M.Dir;
 			V.ArcDeg = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(M.ArcCos, -1.f, 1.f)));
 			V.Section = M.Section;
-			V.Health = M.Health;
-			V.bReady = M.Health >= 0.2f && M.T <= 0.f;
+			V.Health = M.Fit();
+			V.bReady = M.Fit() >= 0.2f && M.T <= 0.f;
 			Out.Mounts.Add(V);
 		}
 		Out.bReactorCritical = D.bReactorCritical;

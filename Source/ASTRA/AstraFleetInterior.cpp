@@ -3,6 +3,7 @@
 #include "AstraFleetInterior.h"
 
 #include "ASTRA.h"
+#include "AstraWarTypes.h"
 
 namespace
 {
@@ -65,6 +66,7 @@ FAstraShipInterior::FAstraShipInterior(TSharedRef<const FFleetClassPlan> InPlan,
 	H.Alert = []() { return 2; };                        // a ship that is being shot at is at action stations: the doors are shut
 	Model.Init(Plan->Map.ToSharedRef(), H, Seed);
 	Model.MaxIncidents = 10;
+	Model.SetStep(0.5f);                                  // a coarser physics than the Aquila's 0.2 s: a lower resolution at a fraction of the cost
 	BuildCrew();
 }
 
@@ -195,6 +197,11 @@ void FAstraShipInterior::BuildCrew()
 	}
 	Fit = People.Num();
 	Wounded = Dead = 0;
+	for (const FFleetPerson& P : People)
+	{
+		++RoleTotal[(int32)P.Role];
+		++RoleFit[(int32)P.Role];
+	}
 }
 
 // ====================================================================================================================== the model's world
@@ -253,6 +260,11 @@ FString FAstraShipInterior::HarmPerson(int32 Who, bool bKill, EAstraDmgHarm Caus
 	P.State = bKill ? 2 : 1;
 	P.Cause = (uint8)Cause;
 	P.HarmAt = Clock;
+	--RoleFit[(int32)P.Role];
+	if (!bKill)
+	{
+		++RoleHurt[(int32)P.Role];
+	}
 	--Fit;
 	if (bKill)
 	{
@@ -364,6 +376,7 @@ void FAstraShipInterior::Tick(float Dt)
 		if (bFlush)
 		{
 			Model.Tick(0.6f, Incidents);                   // (the distribution's last accounts: the allocations come back to what they were)
+			RefreshFit();
 			bFlush = false;
 		}
 		bCalm = true;
@@ -377,8 +390,58 @@ void FAstraShipInterior::Tick(float Dt)
 	if (SlowT >= 1.f)
 	{
 		TickMedevac(SlowT);
+		RefreshFit();
 		SlowT = 0.f;
 	}
+}
+
+float FAstraShipInterior::RoomFit(int32 Comp) const
+{
+	const FAstraDmgState* S = Comp != INDEX_NONE ? Model.Find(Comp) : nullptr;
+	if (!S)
+	{
+		return 1.f;
+	}
+	if (S->bGutted || S->Wreck >= 1.f)
+	{
+		return 0.f;
+	}
+	return (1.f - S->Wreck) * FMath::SmoothStep(0.10f, 0.55f, S->Power);
+}
+
+float FAstraShipInterior::MountFit(int32 MountIndex) const
+{
+	return Plan->MountComp.IsValidIndex(MountIndex) && Plan->MountComp[MountIndex] != INDEX_NONE ? RoomFit(Plan->MountComp[MountIndex]) : 1.f;
+}
+
+void FAstraShipInterior::RefreshFit()
+{
+	using namespace AstraWar;
+	const FAstraDamageMap& M = *Plan->Map;
+	auto RoomOrOne = [this](const TCHAR* Role, bool bFabricOnly) -> float
+	{
+		const int32 C = Plan->Role(Role);
+		if (C == INDEX_NONE)
+		{
+			return 1.f;
+		}
+		const FAstraDmgState* S = Model.Find(C);
+		if (!S)
+		{
+			return 1.f;
+		}
+		return bFabricOnly ? ((S->bGutted || S->Wreck >= 1.f) ? 0.f : 1.f - S->Wreck) : RoomFit(C);
+	};
+	// the drives and their plant, the sensors' room, the hangar: fabric and power; the reactor and the bridge: the fabric alone (a conduit cut leaves them running on their own supply)
+	const float Eng = RoleStrength(EFleetRole::Engineering), Brg = RoleStrength(EFleetRole::Bridge), Fly = RoleStrength(EFleetRole::Flight), Sns = RoleStrength(EFleetRole::Sensors);
+	SysFitV[SysEngines] = RoomOrOne(TEXT("drives"), false) * (0.7f + 0.3f * Eng);
+	SysFitV[SysSensors] = RoomOrOne(TEXT("sensors"), false) * (0.5f + 0.5f * Sns);
+	SysFitV[SysHangar] = RoomOrOne(TEXT("hangar"), false) * (0.5f + 0.5f * Fly);
+	SysFitV[SysBridge] = RoomOrOne(TEXT("bridge"), true) * (0.35f + 0.65f * Brg);
+	SysFitV[SysReactor] = RoomOrOne(TEXT("engineering"), true) * (0.6f + 0.4f * Eng);
+	SysFitV[SysPointDefence] = 1.f;
+	WeaponCrewV = 0.4f + 0.6f * FMath::Sqrt(0.5f * (RoleStrength(EFleetRole::Gunnery) + RoleStrength(EFleetRole::Magazine)));
+	(void)M;
 }
 
 void FAstraShipInterior::TickMedevac(float)

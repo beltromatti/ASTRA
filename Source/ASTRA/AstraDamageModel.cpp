@@ -37,7 +37,7 @@ namespace
 	FAutoConsoleVariableRef DmCVarBurn(TEXT("astra.damage.burn"), GDmBurn, TEXT("DISTRUZIONE: scale of the hull structure the fires eat"));
 	FAutoConsoleVariableRef DmCVarDoctrine(TEXT("astra.damage.auto_seal"), GDmDoctrine, TEXT("DISTRUZIONE: 1 pressure bulkheads and lockdowns close by themselves, 0 they do not"));
 
-	constexpr float DmStep = 0.2f;                 // s: the physics' step
+	constexpr float DmStep = 0.2f;                 // s: the physics' step (the Aquila's: FAstraDamageModel::StepS, which a fleet ship's inside sets longer)
 	constexpr float DmHoleMin = 0.12f;             // m2: a hole big enough to be an incident (the smaller ones are sealed by the plating itself)
 	constexpr float DmFireMin = 0.10f;
 	constexpr float DmPowerMin = 0.85f;
@@ -819,13 +819,13 @@ void FAstraDamageModel::Tick(float Dt, TArray<FAstraDamage>& Incidents)
 	}
 	Clock += Dt;
 	Acc += Dt;
-	for (int32 Steps = 0; Acc >= DmStep && Steps < 8; ++Steps)
+	for (int32 Steps = 0; Acc >= StepS && Steps < 8; ++Steps)
 	{
-		Step(DmStep);
-		Acc -= DmStep;
-		PeopleT += DmStep;
-		SyncT += DmStep;
-		SystemsT += DmStep;
+		Step(StepS);
+		Acc -= StepS;
+		PeopleT += StepS;
+		SyncT += StepS;
+		SystemsT += StepS;
 	}
 	if (Acc > 2.f)
 	{

@@ -223,6 +223,36 @@ TSharedPtr<FFleetClassPlan> FAstraFleetPlans::LoadFile(FName ClassKey, const FSt
 			}
 		}
 	}
+	// the roles the rooms play (the first room of each), and the room that serves each of the war's weapon mounts
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Comps = nullptr;
+		if (Root->TryGetArrayField(TEXT("compartments"), Comps))
+		{
+			for (const TSharedPtr<FJsonValue>& CV : *Comps)
+			{
+				const TSharedPtr<FJsonObject> Co = CV.IsValid() ? CV->AsObject() : nullptr;
+				FString Role, Id;
+				if (Co.IsValid() && Co->TryGetStringField(TEXT("role"), Role) && Co->TryGetStringField(TEXT("id"), Id) && Role != TEXT("spine") && Role != TEXT("passage") && Role != TEXT("cross"))
+				{
+					const int32 Ci = FleetComp(M, Id);
+					if (Ci != INDEX_NONE && !P->Roles.Contains(FName(*Role)))
+					{
+						P->Roles.Add(FName(*Role), Ci);
+					}
+				}
+			}
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Mounts = nullptr;
+		if (Root->TryGetArrayField(TEXT("mounts"), Mounts))
+		{
+			for (const TSharedPtr<FJsonValue>& MV : *Mounts)
+			{
+				const TSharedPtr<FJsonObject> Mo = MV.IsValid() ? MV->AsObject() : nullptr;
+				FString CompId;
+				P->MountComp.Add(Mo.IsValid() && Mo->TryGetStringField(TEXT("comp"), CompId) ? FleetComp(M, CompId) : INDEX_NONE);
+			}
+		}
+	}
 	const TSharedPtr<FJsonObject>* Dc = nullptr;
 	if (Root->TryGetObjectField(TEXT("damage_control"), Dc))
 	{

@@ -95,6 +95,11 @@ float UAstraBattleSubsystem::FleetFactor(const FAstraBattleShip& S, int32 Catego
 	return S.Interior.IsValid() ? 1.f - GFleetPowerK * (1.f - S.Interior->Factor((EAstraDmgCategory)Category)) : 1.f;
 }
 
+float UAstraBattleSubsystem::FleetSys(const FAstraBattleShip& S, int32 WarSystem) const
+{
+	return S.Interior.IsValid() ? 1.f - GFleetPowerK * (1.f - S.Interior->SysFit(WarSystem)) : 1.f;
+}
+
 void UAstraBattleSubsystem::FleetOnHit(FAstraBattleShip& To, const FAstraHullHit& Hit)
 {
 	FAstraShipInterior* I = FleetEnsure(To);
@@ -127,10 +132,15 @@ void UAstraBattleSubsystem::FleetTick(FAstraBattleShip& S, float Dt)
 	}
 	const double T0 = FPlatformTime::Seconds();
 	I->Tick(Dt);
-	// what comes out of it, into the war's own fields: the power each allocation still carries (as the Aquila's does through the ship subsystem)
+	// what comes out of it, into the war's own fields: the power each allocation still carries (as the Aquila's does through the ship subsystem), and the people who work the guns
 	S.ShieldPower = FleetFactor(S, (int32)EAstraDmgCategory::Shields);
-	S.WeaponPower = FleetFactor(S, (int32)EAstraDmgCategory::Weapons);
-	// what burns and vents sets the war's sections' flags (the effects draw them; a section that burns eats its own structure at the war's calibrated rate)
+	S.WeaponPower = FleetFactor(S, (int32)EAstraDmgCategory::Weapons) * (1.f - GFleetPowerK * (1.f - I->WeaponCrew()));
+	// each weapon mount is served by a room of the plan: its barbette, its magazine; what that room gives (fabric and power) is the mount's feed
+	for (int32 m = 0; m < S.Mounts.Num(); ++m)
+	{
+		S.Mounts[m].Feed = 1.f - GFleetPowerK * (1.f - I->MountFit(m));
+	}
+	// what burns and vents sets the war's sections' flags (the effects draw them); the structure the fires eat is the model's (as the Aquila's: the war's own flat rate is not applied to a ship with an inside)
 	FAstraShipDamage& D = S.Dmg;
 	for (int32 Sec = 0; Sec < AstraWar::NumSections; ++Sec)
 	{
@@ -143,7 +153,10 @@ void UAstraBattleSubsystem::FleetTick(FAstraBattleShip& S, float Dt)
 			D.Breach[Sec] = FMath::Max(D.Breach[Sec], 3.f);
 		}
 	}
-	I->TakeBurn();                                                    // (the war's rate for a burning section stands: the model's own is not added to it)
+	if (const float Burnt = I->TakeBurn(); Burnt > 0.f && !S.bDisabled)
+	{
+		AddHullDelta(S, -Burnt);
+	}
 	// a ship with nobody left to fight her is a hulk
 	if (S.bAlive && !S.bDisabled && I->CrewTotal() >= 6 && I->CrewStrength() < GFleetCrewDisable)
 	{

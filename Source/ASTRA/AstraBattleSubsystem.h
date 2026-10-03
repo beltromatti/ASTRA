@@ -991,6 +991,8 @@ private:
 	/** What a side's mind (or an observer's sensors) may read of a ship's inside, added to its entry in a view: bOwn the ship's own side (everything), else by Detail (1 the eye, 2 a classified track). */
 	void FleetBriefInto(const FAstraBattleShip& S, const TSharedRef<FJsonObject>& Into, bool bOwn, int32 Detail) const;
 	float FleetFactor(const FAstraBattleShip& S, int32 Category) const;
+	/** How much of a war system (AstraWar::ESystem) the ship's inside still gives it: its room, its power, its people (1 when it has no inside). */
+	float FleetSys(const FAstraBattleShip& S, int32 WarSystem) const;
 	mutable double FleetMs = 0.0, FleetMsMax = 0.0;
 	mutable int32 FleetBlows = 0, FleetTicks = 0;
 	void InitShipModel(FAstraBattleShip& S);

@@ -63,11 +63,14 @@ struct FFleetClassPlan
 	TArray<FFleetParty> Parties;
 	TArray<FFleetDock> Docks;
 	TMap<FName, int32> Objectives;    // bridge, engineering, captain, armory, medbay, brig, comms, hangar ... -> compartment
+	TMap<FName, int32> Roles;         // every role a room plays in the plan (bridge, engineering, drives, sensors, hangar, magazine, gun_bow, laser_port...) -> its compartment
+	TArray<int32> MountComp;          // the war's weapon mounts of the class, in the order of data/war/classes.json: the room that serves each (INDEX_NONE: none)
 	int32 DcCentral = INDEX_NONE;
 	float CutBowCm = 0.f, CutSternCm = 0.f;   // the class's two cut planes in the plan's frame (cm): the war's sections are bow beyond the first, stern beyond the second
 	bool bMandate = false;
 
 	int32 Objective(const TCHAR* Name) const { const int32* I = Objectives.Find(FName(Name)); return I ? *I : INDEX_NONE; }
+	int32 Role(const TCHAR* Name) const { const int32* I = Roles.Find(FName(Name)); return I ? *I : INDEX_NONE; }
 };
 
 /** The plans of the classes, loaded once and shared. Thread-safe. */

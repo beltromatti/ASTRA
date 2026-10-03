@@ -107,6 +107,15 @@ public:
 	float Factor(EAstraDmgCategory C) const { return Model.Power().Factor[(int32)C]; }
 	/** The structure the fires have eaten since this was last asked (hull points of the Aquila's scale). */
 	float TakeBurn() { const float B = BurnPending; BurnPending = 0.f; return B; }
+	/** How much of what a room gives is left: its fabric and its power (1 as built, 0 lost or gutted). */
+	float RoomFit(int32 Comp) const;
+	/** How much each of the war's six systems (engines, sensors, hangar, bridge, reactor, point defence) still has of what the inside gives it: its room's fabric and power,
+	 *  and the people who work it (1 as built). The war multiplies its own, hull-level state by it (it is never written into it: a room that is mended gives it back). */
+	float SysFit(int32 WarSystem) const { return SysFitV[FMath::Clamp(WarSystem, 0, 5)]; }
+	/** What the room that serves a weapon mount (the class's mount list, in order) gives it: 1 as built; 1 too where no room serves it. */
+	float MountFit(int32 MountIndex) const;
+	/** How many of the gunners and the magazine hands are left, as a share of the guns' work (0.4..1). */
+	float WeaponCrew() const { return WeaponCrewV; }
 	int32 CrewTotal() const { return People.Num(); }
 	int32 CrewFit() const { return Fit; }
 	int32 CrewWounded() const { return Wounded; }
@@ -160,6 +169,11 @@ private:
 	bool bCalm = true, bFlush = false;
 	int32 Hits = 0, HitsInside = 0;
 	FVector LastEntryCm = FVector::ZeroVector;
+	float SysFitV[6] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
+	float WeaponCrewV = 1.f;
+	int32 RoleTotal[(int32)EFleetRole::Num] = {}, RoleFit[(int32)EFleetRole::Num] = {}, RoleHurt[(int32)EFleetRole::Num] = {};
+	float RoleStrength(EFleetRole R) const { return RoleTotal[(int32)R] > 0 ? (RoleFit[(int32)R] + 0.5f * RoleHurt[(int32)R]) / (float)RoleTotal[(int32)R] : 1.f; }
+	void RefreshFit();
 	int32 ToldCrewBand = 0, ToldCaptain = 0;             // what the war has been told (CollectNews)
 	bool bToldWeapons = false, bToldEngines = false;
 	float ToldMagazineAt = -100.f;
