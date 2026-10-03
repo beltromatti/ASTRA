@@ -1,0 +1,316 @@
+// ASTRA — FLOTTA-VIVA: where the war and the insides of its ships meet (docs/FLOTTA-VIVA.md).
+//
+// A warship that is not the Aquila gets, at the first blow that gets through its shield and its plating, an interior: its class's plan and the
+// Aquila's damage model run on it (AstraFleetInterior.*). From then on every blow the war lands on it also enters the interior, where it struck, and
+// the interior goes on beside the war's own model: what comes out is the power each allocation still carries (shields, weapons, engines, sensors,
+// flight deck), what burns and vents (the war's sections' flags, which the effects draw), how many are left and who commands, and the news the
+// ship's side is told.
+//
+// Here: the switch and the tuning (astra.fleet.*), the interior's birth and its tick, what it gives back, the views, the bench's counters and the console.
+
+#include "AstraBattleSubsystem.h"
+
+#include "ASTRA.h"
+#include "AstraFleetInterior.h"
+#include "AstraWarClasses.h"
+#include "HAL/IConsoleManager.h"
+#include "Misc/DefaultValueHelper.h"
+
+namespace
+{
+	int32 GFleetInterior = 1;           // 1: the other ships have an inside; 0: they have not (the war's section model alone, as before FLOTTA-VIVA)
+	float GFleetPowerK = 1.f;           // how much of what the inside loses goes back to the war: 1 all of it, 0 none (the war is as before, the inside is only read)
+	float GFleetCrewDisable = 0.12f;    // the share of a crew that must be left to fight a ship: under it she is a hulk
+	float GFleetNewsGap = 10.f;         // the war is told news of one ship at most every so many seconds
+
+	FAutoConsoleVariableRef CVarFleetInterior(TEXT("astra.fleet.interior"), GFleetInterior, TEXT("FLOTTA-VIVA: 1 the other ships of the war have an inside (their class's plan, the Aquila's damage model), 0 they have not"));
+	FAutoConsoleVariableRef CVarFleetPowerK(TEXT("astra.fleet.power_k"), GFleetPowerK, TEXT("FLOTTA-VIVA: how much of what a ship's inside loses of its power goes back into the war (1 all, 0 none)"));
+	FAutoConsoleVariableRef CVarFleetCrew(TEXT("astra.fleet.crew_min"), GFleetCrewDisable, TEXT("FLOTTA-VIVA: the share of a crew (fit and half the wounded) under which a ship can no longer be fought"));
+	FAutoConsoleVariableRef CVarFleetNews(TEXT("astra.fleet.news_gap"), GFleetNewsGap, TEXT("FLOTTA-VIVA: seconds between two pieces of news of one ship"));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdFleetInfo(TEXT("astra.fleet.info"), TEXT("FLOTTA-VIVA: a ship's inside in a line (astra.fleet.info [contact id]), or every ship that has one"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UAstraBattleSubsystem* B = World ? World->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("info"), Args));
+			}
+		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdFleetStrike(TEXT("astra.fleet.strike"), TEXT("FLOTTA-VIVA: a blow into a room of a ship (astra.fleet.strike <contact id> <room id or part of a name> [energy 40] [kinetic|energy|explosive])"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UAstraBattleSubsystem* B = World ? World->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("strike"), Args));
+			}
+		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdFleetHit(TEXT("astra.fleet.hit"), TEXT("FLOTTA-VIVA: a blow on a face of a ship, through the war's own path (astra.fleet.hit <contact id> <bow|stern|port|starboard|dorsal|ventral> [damage 120] [rail|laser|missile])"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UAstraBattleSubsystem* B = World ? World->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("hit"), Args));
+			}
+		}));
+
+	/** A class's key as the war names it ("praetorian"), or none (craft, decoys, the Aquila). */
+	bool FleetClassHasInterior(const FAstraBattleShip& S)
+	{
+		return !S.bPlayer && !S.bCraft && !S.bGhost && S.Dmg.bModel && !S.ClassKey.IsNone() && S.ClassKey != FName(TEXT("aquila"));
+	}
+}
+
+bool UAstraBattleSubsystem::FleetOn() const
+{
+	return GFleetInterior != 0;
+}
+
+FAstraShipInterior* UAstraBattleSubsystem::FleetInterior(int32 ShipId) const
+{
+	const FAstraBattleShip* S = FindById(ShipId);
+	return S ? S->Interior.Get() : nullptr;
+}
+
+FAstraShipInterior* UAstraBattleSubsystem::FleetEnsure(FAstraBattleShip& S)
+{
+	if (S.Interior.IsValid())
+	{
+		return S.Interior.Get();
+	}
+	if (!FleetOn() || !FleetClassHasInterior(S))
+	{
+		return nullptr;
+	}
+	TSharedPtr<const FFleetClassPlan> Plan = FAstraFleetPlans::Find(S.ClassKey);
+	if (!Plan.IsValid())
+	{
+		return nullptr;
+	}
+	S.Interior = MakeShared<FAstraShipInterior>(Plan.ToSharedRef(), S.Id, S.Name, 7001 + S.Id * 7919 + (GAstraDeterministic ? 0 : (int32)(FPlatformTime::Cycles64() & 0xffff)));
+	return S.Interior.Get();
+}
+
+float UAstraBattleSubsystem::FleetFactor(const FAstraBattleShip& S, int32 Category) const
+{
+	return S.Interior.IsValid() ? 1.f - GFleetPowerK * (1.f - S.Interior->Factor((EAstraDmgCategory)Category)) : 1.f;
+}
+
+void UAstraBattleSubsystem::FleetOnHit(FAstraBattleShip& To, const FAstraHullHit& Hit)
+{
+	FAstraShipInterior* I = FleetEnsure(To);
+	if (!I)
+	{
+		return;
+	}
+	const double T0 = FPlatformTime::Seconds();
+	I->Impact(Hit);
+	++FleetBlows;
+	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+	FleetMs += Ms;
+	FleetMsMax = FMath::Max(FleetMsMax, Ms);
+}
+
+void UAstraBattleSubsystem::FleetOnGutted(FAstraBattleShip& S, int32 Section)
+{
+	if (FAstraShipInterior* I = S.Interior.Get())
+	{
+		I->GutSection(Section);
+	}
+}
+
+void UAstraBattleSubsystem::FleetTick(FAstraBattleShip& S, float Dt)
+{
+	FAstraShipInterior* I = S.Interior.Get();
+	if (!I)
+	{
+		return;
+	}
+	const double T0 = FPlatformTime::Seconds();
+	I->Tick(Dt);
+	// what comes out of it, into the war's own fields: the power each allocation still carries (as the Aquila's does through the ship subsystem)
+	S.ShieldPower = FleetFactor(S, (int32)EAstraDmgCategory::Shields);
+	S.WeaponPower = FleetFactor(S, (int32)EAstraDmgCategory::Weapons);
+	// what burns and vents sets the war's sections' flags (the effects draw them; a section that burns eats its own structure at the war's calibrated rate)
+	FAstraShipDamage& D = S.Dmg;
+	for (int32 Sec = 0; Sec < AstraWar::NumSections; ++Sec)
+	{
+		if (I->SectionBurning(Sec))
+		{
+			D.Burn[Sec] = FMath::Max(D.Burn[Sec], 3.f);
+		}
+		if (I->SectionVenting(Sec))
+		{
+			D.Breach[Sec] = FMath::Max(D.Breach[Sec], 3.f);
+		}
+	}
+	I->TakeBurn();                                                    // (the war's rate for a burning section stands: the model's own is not added to it)
+	// a ship with nobody left to fight her is a hulk
+	if (S.bAlive && !S.bDisabled && I->CrewTotal() >= 6 && I->CrewStrength() < GFleetCrewDisable)
+	{
+		DisableShip(S, TEXT("her crew is dead"));
+	}
+	// the news, to the ship's own side (the Mandate's stays private to its minds, as the war's other group events do)
+	TArray<FString> News;
+	I->CollectNews(News);
+	if (News.Num() && Time - S.FleetNewsT >= GFleetNewsGap && !S.bCraft)
+	{
+		S.FleetNewsT = Time;
+		const int32 Side = AstraSideIdx(S.Side);
+		for (const FString& N : News)
+		{
+			NoteGroupEvent(Side, N);
+		}
+	}
+	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+	FleetMs += Ms;
+	FleetMsMax = FMath::Max(FleetMsMax, Ms);
+	++FleetTicks;
+}
+
+void UAstraBattleSubsystem::FleetBriefInto(const FAstraBattleShip& S, const TSharedRef<FJsonObject>& Into, bool bOwn, int32 Detail) const
+{
+	const FAstraShipInterior* I = S.Interior.Get();
+	if (!I)
+	{
+		return;
+	}
+	TSharedRef<FJsonObject> J = bOwn ? I->BriefJson() : I->SeenJson(Detail);
+	if (J->Values.Num())
+	{
+		Into->SetObjectField(bOwn ? TEXT("aboard") : TEXT("seen_aboard"), J);
+	}
+}
+
+TSharedRef<FJsonObject> UAstraBattleSubsystem::FleetStatsJson() const
+{
+	TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+	int32 With[2] = {0, 0}, Killed[2] = {0, 0}, Wounded[2] = {0, 0}, Crew[2] = {0, 0}, Calm = 0;
+	for (const FAstraBattleShip& S : Ships)
+	{
+		const FAstraShipInterior* I = S.Interior.Get();
+		const int32 Side = AstraSideIdx(S.Side);
+		if (!I || Side < 0)
+		{
+			continue;
+		}
+		++With[Side];
+		Killed[Side] += I->CrewDead();
+		Wounded[Side] += I->CrewWounded();
+		Crew[Side] += I->CrewTotal();
+		Calm += I->IsCalm() ? 1 : 0;
+	}
+	J->SetBoolField(TEXT("on"), FleetOn());
+	J->SetNumberField(TEXT("ships_with_interior_astra"), With[0]);
+	J->SetNumberField(TEXT("ships_with_interior_mandate"), With[1]);
+	J->SetNumberField(TEXT("calm_now"), Calm);
+	J->SetNumberField(TEXT("killed_astra"), Killed[0]);
+	J->SetNumberField(TEXT("killed_mandate"), Killed[1]);
+	J->SetNumberField(TEXT("wounded_astra"), Wounded[0]);
+	J->SetNumberField(TEXT("wounded_mandate"), Wounded[1]);
+	J->SetNumberField(TEXT("crew_astra"), Crew[0]);
+	J->SetNumberField(TEXT("crew_mandate"), Crew[1]);
+	J->SetNumberField(TEXT("blows"), FleetBlows);
+	J->SetNumberField(TEXT("ticks"), FleetTicks);
+	J->SetNumberField(TEXT("ms_total"), FMath::RoundToDouble(FleetMs * 1000.0) / 1000.0);
+	J->SetNumberField(TEXT("ms_worst_call"), FMath::RoundToDouble(FleetMsMax * 1000.0) / 1000.0);
+	return J;
+}
+
+FString UAstraBattleSubsystem::FleetInfo(const FString& ContactId) const
+{
+	const FAstraBattleShip* S = FindByContact(ContactId.ToUpper());
+	if (!S)
+	{
+		return FString::Printf(TEXT("no ship %s"), *ContactId);
+	}
+	return S->Interior.IsValid() ? S->Interior->InfoText() : FString::Printf(TEXT("%s (%s): no inside yet (not hit through the plating, or its class has no plan)"), *S->Name, *S->ClassKey.ToString());
+}
+
+FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FString>& Args)
+{
+	if (What == TEXT("info"))
+	{
+		if (Args.Num())
+		{
+			return FleetInfo(Args[0]);
+		}
+		int32 N = 0;
+		for (const FAstraBattleShip& S : Ships)
+		{
+			if (S.Interior.IsValid())
+			{
+				UE_LOG(LogASTRA, Display, TEXT("  %s %s"), *S.ContactId, *S.Interior->InfoText());
+				++N;
+			}
+		}
+		return FString::Printf(TEXT("fleet interiors (%s): %d ships have one; %d blows, %.2f ms in all (worst call %.2f ms)"), FleetOn() ? TEXT("on") : TEXT("off"), N, FleetBlows, FleetMs, FleetMsMax);
+	}
+	if (Args.Num() < 2)
+	{
+		return TEXT("astra.fleet.strike <contact> <room> [energy] [type] | astra.fleet.hit <contact> <face> [damage] [rail|laser|missile]");
+	}
+	FAstraBattleShip* S = FindByContact(Args[0].ToUpper());
+	if (!S || !S->bAlive)
+	{
+		return FString::Printf(TEXT("no live ship %s"), *Args[0]);
+	}
+	if (What == TEXT("strike"))
+	{
+		FAstraShipInterior* I = FleetEnsure(*S);
+		if (!I)
+		{
+			return TEXT("that ship has no plan");
+		}
+		const FAstraDamageMap& M = I->GetPlan().Map.ToSharedRef().Get();
+		int32 Comp = INDEX_NONE;
+		if (const int32* Exact = M.CompByName.Find(FName(*Args[1])))
+		{
+			Comp = *Exact;
+		}
+		else
+		{
+			for (int32 i = 0; i < M.Comps.Num() && Comp == INDEX_NONE; ++i)
+			{
+				if (M.Comps[i].Name.Contains(Args[1]) || M.Comps[i].Kind.ToString().Contains(Args[1]))
+				{
+					Comp = i;
+				}
+			}
+		}
+		if (Comp == INDEX_NONE)
+		{
+			return FString::Printf(TEXT("no room like %s"), *Args[1]);
+		}
+		const float Energy = Args.IsValidIndex(2) ? FCString::Atof(*Args[2]) : 40.f;
+		const uint8 Type = Args.IsValidIndex(3) ? (Args[3].StartsWith(TEXT("e")) ? 1 : (Args[3].StartsWith(TEXT("x")) ? 2 : 0)) : 0;
+		I->Strike(Comp, Energy, Type, true);
+		return FString::Printf(TEXT("struck %s in %s: %s"), *S->ContactId, *M.Describe(Comp), *I->InfoText());
+	}
+	if (What == TEXT("hit"))
+	{
+		// a blow on a face of the box, aimed at the middle of the ship: through the war's own path (shield, plate, structure, then the inside)
+		const FString Face = Args[1].ToLower();
+		int32 F = AstraWar::Ventral;
+		if (Face.StartsWith(TEXT("bow"))) { F = AstraWar::Bow; }
+		else if (Face.StartsWith(TEXT("stern"))) { F = AstraWar::Stern; }
+		else if (Face.StartsWith(TEXT("port"))) { F = AstraWar::Port; }
+		else if (Face.StartsWith(TEXT("star"))) { F = AstraWar::Starboard; }
+		else if (Face.StartsWith(TEXT("dor"))) { F = AstraWar::Dorsal; }
+		const FVector Out = AstraWar::FacingVector(F);
+		if (!S->Box.Valid())
+		{
+			return TEXT("that ship has no hull box");
+		}
+		const double R1 = FMath::FRandRange(-0.6f, 0.6f), R2 = FMath::FRandRange(-0.6f, 0.6f);
+		const AstraWar::FHullBox& Bx = S->Box;
+		FVector LocalPoint = F <= AstraWar::Stern ? FVector(Out.X * Bx.Hx, R1 * Bx.Hy, R2 * Bx.Hz) : (F <= AstraWar::Starboard ? FVector(R1 * Bx.Hx, Out.Y * Bx.Hy, R2 * Bx.Hz) : FVector(R1 * Bx.Hx, R2 * Bx.Hy, Out.Z * Bx.Hz));
+		LocalPoint.X += Bx.Mid;
+		const FVector Pos = S->Pos + S->Att.RotateVector(LocalPoint);
+		const FVector Dir = S->Att.RotateVector(-Out);
+		const float Damage = Args.IsValidIndex(2) ? FCString::Atof(*Args[2]) : 120.f;
+		const EAstraHitKind Kind = Args.IsValidIndex(3) ? (Args[3].StartsWith(TEXT("m")) ? EAstraHitKind::Missile : (Args[3].StartsWith(TEXT("l")) ? EAstraHitKind::Laser : EAstraHitKind::Rail)) : EAstraHitKind::Rail;
+		ApplyHit(*S, Dir, Damage, Pos, Kind, -1);
+		return S->Interior.IsValid() ? S->Interior->InfoText() : FString::Printf(TEXT("hit %s: no inside (yet)"), *S->ContactId);
+	}
+	return TEXT("astra.fleet.info | strike | hit");
+}

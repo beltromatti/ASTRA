@@ -109,6 +109,7 @@ class Deck:
         self.layout = spec.get("layout", "full")           # full (spine, passages, rows) | spine (a spine and rows)
         self.volume = spec.get("volume", "lower hull" if self.body else "superstructure")
         self.hw_cap = spec.get("hw_cap")                     # a cap on the half width (a hull whose skin is not where its habitable part is)
+        self.pass_range = spec.get("pass_range")             # where passages may run at all (a freighter's are in its two blocks, not along its truss)
         step = 2.0
         foot = spec.get("foot")
         if foot:
@@ -200,6 +201,8 @@ class Deck:
         need = yp + PASS_HW + lo
         best, cur = None, None
         for x, h in zip(self.ex, self.ehw):
+            if self.pass_range and not (self.pass_range[0] <= x <= self.pass_range[1]):
+                h = 0.0
             if h >= need - 1e-6:
                 cur = (cur[0], x) if cur else (x, x)
             else:
