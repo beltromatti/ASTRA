@@ -472,7 +472,8 @@ an unasked question, loyalty under fire; never announce it)
 [end of what the crew carries]"""
 
 
-def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: str = "", said_aloud: str = "", waiting: str = "", context: str = "") -> str:
+def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: str = "", said_aloud: str = "", waiting: str = "", context: str = "",
+               orders: str = "") -> str:
     """The bridge as it is this moment, for the last message of a crew turn: the recent events, the consoles, the room, the live
     telemetry. Kept out of the system prompt so that the system prompt and the conversation before this turn are the same from one call
     to the next: the provider's prompt cache then covers them (with the telemetry inside the system prompt the cache stopped at it, and a
@@ -489,6 +490,7 @@ def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: st
     front = str(ship_state.get("_march_board") or "")           # the front as Fleet knows it, beyond the Aquila's sky (the March's board, set by the server)
     said = f"Said aloud on the bridge in the last minute (what the Captain has heard, oldest first)\n{said_aloud}\n" if said_aloud else ""
     said += f"Waiting to be said (queued behind whoever is speaking, in the order it will be said)\n{waiting}\n" if waiting else ""
+    said = (f"The Captain's last words to the bridge (newest last; an order still stands unless he changed it)\n{orders}\n" if orders else "") + said
     return ((context + "\n\n" if context else "") + f"[The bridge now]\nRecent events\n{events}\n" + said
             + (("Consoles now (who runs what, since when, how it is going)\n" + board + "\n") if board else "")
             + (("The fleet: our battle groups and their captains, from the fleet datalink\n" + fleet + "\n") if fleet else "")
