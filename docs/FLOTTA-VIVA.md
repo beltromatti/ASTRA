@@ -178,7 +178,8 @@ perde torna a GUERRA: 1 tutto, 0 niente: l'interno si legge soltanto), `astra.fl
   `contacts[]` (la lista dei contatti del Capitano: `aboard` per le navi di ASTRA via collegamento dati, `seen_aboard` per le altre).
 - **Python**: `war_minds.py` rende queste chiavi in una riga («aboard: crew 182 fit, 31 wounded, 17 killed of 230; Commander ... is dead; Lieutenant Commander ... has the conn; 2 fires, 1 breach venting, ...») e
   la dottrina dice come si leggono: **un prompt, non un filtro** (una nave con metà dell'equipaggio perso, i cannoni a un terzo o il deposito in fiamme non combatte come dice il suo scafo; di un nemico si vede solo l'esterno).
-  Prove senza rete: `mind/bench/fleet_views_unit.py` (14 prove) e `bench.war_minds_unit` (53, invariate).
+  Prove senza rete: `mind/bench/fleet_views_unit.py` (16 prove, due delle quali fanno tutto il cammino: una vista come la manda il gioco, un impulso di una mente, il prompt che il modello riceve) e
+  `bench.war_minds_unit` (53, invariate); tutte le 484 prove unitarie della mente passano. Nessuna chiamata a un modello: 0 $ spesi.
 
 ### 5.2 Ai sensori e al tavolo olografico
 
@@ -244,6 +245,12 @@ decisiva fra navi da guerra, non di una scaramuccia.
 | `scale_60x300`, 300 s | 60 | 50 | 3636 | 0,406 → 0,567 ms / 0,977 → 1,074 ms (**+0,161 ms, +40 %**) | 372 ms in tutto: 1,24 ms ogni secondo di battaglia (0,025 ms per nave) | 0,28 ms |
 
 (Il tick del banco è di 0,1 s di battaglia: i +0,161 ms sono 1,6 ms ogni secondo di battaglia, **0,027 ms di un fotogramma a 60 fps in media**, lo 0,16 % di un core.)
+
+**Prova di resistenza**: `scale_60x300` per 900 s di battaglia (31 navi di ASTRA contro 30 del Mandate, 296 velivoli al picco): 53 interni costruiti (il più caro 0,05 ms: l'equipaggio e il modello), 5123 colpi,
+292 652 tick di nave, **1044 ms in tutto = 1,16 ms ogni secondo di battaglia**, la chiamata peggiore 0,17 ms, il tick di GUERRA 0,29 ms in media e al massimo 1,0 ms; nessun avviso né errore nel registro; le perdite
+(ASTRA 1178 morti e 1391 persi con le navi su 6170 a bordo delle navi colpite, Mandate 1649 e 2355 su 6558) sono di una guerra, non di una scaramuccia. La pianta di una classe si legge su un thread di lavoro quando nasce
+la prima nave della classe (21-70 ms a classe, una volta): nel banco, che combatte 900 s di battaglia in 3,6 s di orologio, il primo colpo deve aspettarla (27 ms al massimo: `plan_wait_ms_max`, per avere la stessa risposta a
+ogni prova); **nel gioco non aspetta mai** (`Find` senza attesa: la nave resta senza interno finché il thread non ha finito, al colpo dopo ce l'ha).
 
 Il passo di fisica degli interni (ogni 0,5 s per nave) è la spesa maggiore: la chiamata peggiore dura 0,28 ms con 60 navi. Il costo cresce con le navi **colpite**, non con quelle in campo: ogni interno parte dal suo primo
 colpo, quindi i passi delle navi non cadono tutti nello stesso fotogramma.

@@ -12,8 +12,12 @@ from __future__ import annotations
 import unittest
 from typing import Any
 
-from astra_mind import war_minds
+from astra_mind import models, war_minds
 from astra_mind.war_minds import aboard_line, render_astra_extras, render_enemy, render_groups, seen_line
+from bench.war_minds_unit import Fixture, astra_state, ev, foe, group, mandate_state
+from bench.war_minds_unit import member
+
+models.LEDGER.write_file = False
 
 # What FleetBriefInto writes under one's own ship (AstraFleetViews.cpp, BriefJson): the keys only where there is something to say.
 HURT = {
@@ -32,7 +36,7 @@ SEEN_EYE = {"breaches_venting": 2, "windows_dark_in": "bow, mid"}
 SEEN_TRACK = {**SEEN_EYE, "fires_aboard": 3, "life_signs_pct": 65, "power_pct": {"weapons": 30, "engines": 50}}
 
 
-def member(i: str, **kw: Any) -> dict[str, Any]:
+def mine(i: str, **kw: Any) -> dict[str, Any]:
     return {"id": i, "class": "acheron", "hull_pct": 64, "shields_pct": 12, "missiles": 8, **kw}
 
 
@@ -85,19 +89,19 @@ class Pictures(unittest.TestCase):
                 "enemy_groups": [{"label": "group of M-01", "ships": ships, "range_km": 22.0, "nearest_ship_km": 20.5, "bearing_deg": 240}]}
 
     def test_own_ship_line(self) -> None:
-        text = render_groups(self.view([member("A-01", aboard=HURT), member("A-02")], []))
+        text = render_groups(self.view([mine("A-01", aboard=HURT), mine("A-02")], []))
         a01, a02 = [ln for ln in text.splitlines() if ln.strip().startswith(("A-01", "A-02"))]
         self.assertIn("aboard: crew 182 fit", a01)
         self.assertNotIn("aboard", a02)
         self.assertTrue(a01.startswith("   A-01 acheron hull 64% shields 12%"))
 
     def test_a_ship_not_hit_is_as_it_was(self) -> None:
-        with_key = render_groups(self.view([member("A-01", aboard={})], []))
-        without = render_groups(self.view([member("A-01")], []))
+        with_key = render_groups(self.view([mine("A-01", aboard={})], []))
+        without = render_groups(self.view([mine("A-01")], []))
         self.assertEqual(with_key, without)
 
     def test_the_enemy_as_seen(self) -> None:
-        text = render_enemy(self.view([member("A-01")], [{"id": "M-01", "class": "acheron", "hull_pct": 51, "shields_pct": 0, "seen_aboard": SEEN_TRACK},
+        text = render_enemy(self.view([mine("A-01")], [{"id": "M-01", "class": "acheron", "hull_pct": 51, "shields_pct": 0, "seen_aboard": SEEN_TRACK},
                                                          {"id": "M-02", "class": "styx", "hull_pct": 100, "shields_pct": 100}]))
         self.assertIn("M-01 acheron hull 51% shields 0% [seen aboard: 2 breaches venting atmosphere", text)
         self.assertIn("M-02 styx hull 100% shields 100%", text)
@@ -121,6 +125,39 @@ class Pictures(unittest.TestCase):
         text, _ = war_minds.mandate_extras(view)
         self.assertIn("A-01 hull 70% shields 20% [seen aboard: 2 breaches venting atmosphere, windows dark in the bow, mid]", text)
         self.assertNotIn("A-02 hull 90% shields 90% [", text)
+
+
+class InThePrompt(Fixture):
+    """The whole path: a view as the game sends it, a pulse of a mind, the prompt the model is given."""
+    sides = ("mandate", "astra")
+
+    async def test_the_mandate_admiral_is_given_the_insides_of_its_ships_and_the_enemys_hull(self) -> None:
+        vanguard = group("Vanguard", 2, [member("M-01", "acheron", missiles=32, aboard=HURT), member("M-02"), member("M-03")])
+        enemies = [foe("group of A-01", [{"id": "A-01", "class": "acheron", "hull_pct": 51, "shields_pct": 0, "seen_aboard": SEEN_TRACK},
+                                         {"id": "A-02", "class": "styx", "hull_pct": 100, "shields_pct": 100}])]
+        st = mandate_state([vanguard], enemies)
+        await self.feed(st)
+        await self.feed(st, 9)
+        call = self.calls("mandate/admiral")[0]
+        self.assertIn("aboard: crew 182 fit, 31 wounded, 17 killed of 230", call["user"])
+        self.assertIn("fire in the magazine B", call["user"])
+        self.assertIn("A-01 acheron hull 51% shields 0% [seen aboard: 2 breaches venting atmosphere, windows dark in the bow, mid, 3 hot spots, life signs about 65%", call["user"])
+        self.assertNotIn("seen aboard", call["user"].split("A-02")[1].split("\n")[0])
+        self.assertIn("`aboard`", call["system"])                           # and the doctrine that says how to read it
+
+    async def test_a_group_commander_of_astra_reads_its_own_members_only_in_full(self) -> None:
+        vig = group("Vanguard", 2, [member("A-01", "acheron", aboard=HURT), member("A-02")])
+        pick = group("Picket", 3, [member("A-03", "styx", aboard={"fires": 1})])
+        st = astra_state([vig, pick], [foe("group of M-01", [{"id": "M-01", "class": "acheron", "hull_pct": 70, "shields_pct": 40, "seen_aboard": SEEN_EYE}])],
+                         [ev(1, "Vanguard: A-01 crew down to 75% (17 killed, 31 wounded of 230)")])
+        await self.feed(st)
+        await self.feed(st, 9)
+        calls = self.calls("astra/group/Vanguard")
+        self.assertTrue(calls)
+        user = calls[0]["user"]
+        self.assertIn("aboard: crew 182 fit", user)
+        self.assertIn("[seen aboard: 2 breaches venting atmosphere", user)
+        self.assertNotIn("1 fire", user)                                     # the other group's ship is a line, not in full
 
 
 class Doctrine(unittest.TestCase):
