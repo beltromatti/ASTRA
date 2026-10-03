@@ -6,6 +6,7 @@
 #include "AstraBoardSubsystem.h"
 #include "AstraHarness.h"
 #include "AstraStations.h"
+#include "AstraTransporterSubsystem.h"
 #include "AstraViewscreen.h"
 
 #include "ASTRA.h"
@@ -2585,6 +2586,17 @@ bool UAstraShipSubsystem::ApplyCommand(const FString& Name, const TSharedPtr<FJs
 	{
 		return Battle ? Battle->PlayerScan(Str(TEXT("contact_id")), OutDetail) : false;
 	}
+	if (UAstraTransporterSubsystem::IsTransportCommand(Name))
+	{
+		// TELETRASPORTO (docs/TELETRASPORTO.md): the Transporter Room's orders: transport, transport_energize, transport_abort
+		UAstraTransporterSubsystem* Xport = GetWorld()->GetSubsystem<UAstraTransporterSubsystem>();
+		if (!Xport)
+		{
+			OutDetail = TEXT("the Transporter Room does not answer");
+			return false;
+		}
+		return Xport->ApplyCommand(Name, Args, OutDetail);
+	}
 	OutDetail = FString::Printf(TEXT("unknown command %s"), *Name);
 	return false;
 }
@@ -2862,6 +2874,10 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (const UAstraLifeSubsystem* Life = GetWorld() ? GetWorld()->GetSubsystem<UAstraLifeSubsystem>() : nullptr; Life && Life->IsRunning())
 	{
 		S->SetObjectField(TEXT("life"), Life->SnapshotJson());   // the ship's clock, who does what, the teams, the people near the Captain
+	}
+	if (const UAstraTransporterSubsystem* Xport = GetWorld() ? GetWorld()->GetSubsystem<UAstraTransporterSubsystem>() : nullptr; Xport && Xport->IsReady())
+	{
+		S->SetObjectField(TEXT("transporter"), Xport->SnapshotJson());   // TELETRASPORTO: the Transporter Room's console, as the Chief reads it
 	}
 	if (const UAstraBoardSubsystem* Board = GetWorld() ? GetWorld()->GetSubsystem<UAstraBoardSubsystem>() : nullptr; Board && Board->IsActive())
 	{
@@ -3909,7 +3925,16 @@ float UAstraShipSubsystem::PowerFactor(const FString& System) const
 	// (docs/DISTRUZIONE.md; the backup ring keeps half of an allocation even when every one of them is lost)
 	const float* P = PowerPct.Find(System);
 	const float F = (P ? *P : 100.f) / 100.f;
-	return F * Interior.CategoryFactor(System);
+	float Load = 1.f;
+	if (System == TEXT("shields"))
+	{
+		// TELETRASPORTO: a transporter cycle's 40 MW come out of the shields (BIBBIA §4)
+		if (const UAstraTransporterSubsystem* Xport = GetWorld() ? GetWorld()->GetSubsystem<UAstraTransporterSubsystem>() : nullptr)
+		{
+			Load = Xport->ShieldLoadFactor();
+		}
+	}
+	return F * Interior.CategoryFactor(System) * Load;
 }
 
 int32 UAstraShipSubsystem::FreeDamageTeam() const

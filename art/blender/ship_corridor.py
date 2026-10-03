@@ -24,7 +24,8 @@ from mathutils import Matrix
 import ship_lib as SL
 import ship_walls as SW
 from bridge3_lib import Rz
-from ship_catalog import (BLAST_H, BLAST_W, CLEAR_H, CORRIDOR_SPECS, CRAWL_H, CRAWL_HW, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONES, WALL_T)
+from ship_catalog import (BLAST_H, BLAST_W, CLEAR_H, CORRIDOR_SPECS, CRAWL_H, CRAWL_HW, DOOR_H, DOOR_W, GATE_H, GATE_W, HW, MOD, SLOT_HW, TONES, TRUNK_NICHE, TRUNK_RAIL_GAP, TRUNK_RUNG_PITCH,
+                          TRUNK_RUNG_Z0, WALL_T)
 from ship_lib import (COMPOSITE, CRATE_BLUE, CRATE_ORANGE, DECK, IVORY, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, SParts)
 
 H = CLEAR_H
@@ -284,7 +285,7 @@ def blast_frame(b: SParts, tn: dict) -> None:
 
 
 # -------------------------------------------------------------------------------------------------------------- the keel's crawlways
-ALCOVE = (1.45, 2.55)                                       # a trunk cell's ladder niche: its extent along x (the niche is 1.1 m deep, from the walkway's side wall to the slot's edge)
+ALCOVE = TRUNK_NICHE                                        # a trunk cell's ladder niche: its extent along x (the niche is 1.1 m deep, from the walkway's side wall to the slot's edge)
 
 
 def slab(fb, z0: float, z1: float, hole=None) -> None:
@@ -301,7 +302,7 @@ def slab(fb, z0: float, z1: float, hole=None) -> None:
 
 def trunk_alcove(b: SParts, tw: float, kh: float, variant: str, tn: dict) -> None:
     """The inside of a Jefferies trunk's niche (wall-local frame of the starboard wall: s along the cell, t from the walkway's wall face (0) into the wall, to 1.1): two ladder rails on the
-    back wall with rungs every 0.3 m that run up through the roof and down through the floor, a safety cage of hoops over the deck, a lamp, the labels; the top of the column has its roof
+    back wall with rungs (14 to a deck, so that they run unbroken up through the roof and down through the floor), a safety cage of hoops over the deck, a lamp, the labels; the top of the column has its roof
     closed with a hatch plate, the bottom its floor closed and a toe plate."""
     fb, fine, em = b.body, b.fine, b.emit
     a, c = ALCOVE
@@ -310,14 +311,15 @@ def trunk_alcove(b: SParts, tw: float, kh: float, variant: str, tn: dict) -> Non
     fb.box((a - 0.02, tb, 0.0), (c + 0.02, tw, kh), STRUCT)         # the niche's back wall (the slot's edge)
     fb.box((a - 0.02, tb, kh), (c + 0.02, tw, kh + 1.2), STRUCT)    # ... and the shaft's, up through the roof's thickness
     fb.box((a - 0.02, tb, -FLOOR_T), (c + 0.02, tw, 0.0), STRUCT)   # ... and down through the floor's
-    for sx in (sc - 0.22, sc + 0.22):                                # the rails
+    half = TRUNK_RAIL_GAP / 2
+    for sx in (sc - half, sc + half):                                # the rails
         fine.box((sx - 0.02, tb - 0.1, -0.30 if variant != "TrunkBottom" else 0.0), (sx + 0.02, tb - 0.06, kh + 1.2 if variant != "TrunkTop" else kh), TRIM)
     z_lo = 0.0 if variant == "TrunkBottom" else -0.28
     z_hi = kh if variant == "TrunkTop" else kh + 1.15
-    z = z_lo + 0.15
+    z = TRUNK_RUNG_Z0 + math.ceil((z_lo + 0.02 - TRUNK_RUNG_Z0) / TRUNK_RUNG_PITCH) * TRUNK_RUNG_PITCH      # (the pattern is the plan's: rung k of every deck at z0 + k * pitch)
     while z < z_hi:
-        fine.cyl((sc - 0.22, tb - 0.08, z), (sc + 0.22, tb - 0.08, z), 0.014, STRUCT, seg=6)
-        z += 0.30
+        fine.cyl((sc - half, tb - 0.08, z), (sc + half, tb - 0.08, z), 0.014, STRUCT, seg=6)
+        z += TRUNK_RUNG_PITCH
     for zc in (2.15, 3.0, 3.85):                                     # the safety cage
         if variant == "TrunkTop" and zc > kh - 0.2:
             continue

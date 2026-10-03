@@ -16,6 +16,7 @@
 #include "AstraCampaign.h"
 #include "AstraFighterPawn.h"
 #include "AstraHangar.h"
+#include "AstraLadderSubsystem.h"
 #include "AstraLiftSubsystem.h"
 #include "AstraLifepod.h"
 #include "AstraQuarters.h"
@@ -314,6 +315,22 @@ void AASTRAPlayerController::ToggleSeat()
 			if (It->IsParkedPlanetside() && FVector::Dist(It->GetActorLocation(), Me->GetActorLocation()) < 900.f)
 			{
 				It->Reboard(Me);
+				return;
+			}
+		}
+	}
+	// a Jefferies trunk's ladder (docs/NAVE.md §8): by a niche E takes it, on it E steps off at a deck
+	if (APawn* Me = GetPawn())
+	{
+		if (UAstraLadderSubsystem* Ladders = GetWorld() ? GetWorld()->GetSubsystem<UAstraLadderSubsystem>() : nullptr)
+		{
+			FString Notice;
+			if (Ladders->Use(Me, Notice))
+			{
+				if (!Notice.IsEmpty())
+				{
+					ShowNotice(Notice, 3.f);
+				}
 				return;
 			}
 		}

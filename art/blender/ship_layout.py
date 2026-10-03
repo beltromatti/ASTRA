@@ -585,7 +585,7 @@ class Deck:
         for i, s in enumerate(spec["spots"]):
             w = P.place_local(o3, yaw, s["x"], s["y"])
             stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0 + s.get("dz", 0.0))],
-                             "yaw": rnd((s["yaw"] + yaw) % 360.0, 1), "dept": s["dept"]})
+                             "yaw": rnd((s["yaw"] + yaw) % 360.0, 1), "dept": s["dept"], **({"station": s["station"]} if s.get("station") else {})})
         lights = []
         for i, l in enumerate(spec["lights"]):
             w = P.place_local(o3, yaw, l["pos"][0], l["pos"][1], l["pos"][2])
@@ -773,7 +773,7 @@ class Deck:
         for i, s in enumerate(spec["spots"]):
             w = self.local(r, s["x"], s["y"])
             stations.append({"id": f"{cid}.s{i}", "role": s["role"], "kind": s["kind"], "pos": [rnd(w[0]), rnd(w[1]), rnd(self.z0 + s.get("dz", 0.0))],
-                             "yaw": rnd((s["yaw"] + r["yaw"]) % 360.0, 1), "dept": s["dept"]})
+                             "yaw": rnd((s["yaw"] + r["yaw"]) % 360.0, 1), "dept": s["dept"], **({"station": s["station"]} if s.get("station") else {})})
         lights = []
         for i, l in enumerate(spec["lights"]):
             w = self.local(r, l["pos"][0], l["pos"][1], l["pos"][2])

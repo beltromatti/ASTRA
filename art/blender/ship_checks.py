@@ -358,8 +358,9 @@ def check(plan: dict, verbose: bool = True) -> dict:
     # ---- 8. the programme: every room of the kit stands somewhere, and what the generator could not place is a problem, not a note -------------------------
     import ship_spec as SP
     placed_keys = {c.get("prefab") for c in comps.values() if c.get("status") == "built" and c.get("prefab")}
+    placed_meshes = {p["mesh"] for pl in plan.get("placements", {}).values() for p in pl}                    # (the Deck 1 lift housing: an existing compartment that has a mesh now)
     for key, spec in SP.PREFABS.items():
-        if spec.get("mesh") and key not in placed_keys:
+        if spec.get("mesh") and key not in placed_keys and spec["mesh"] not in placed_meshes:
             problems.append(f"programme: the room {key} of the kit stands nowhere in the plan (its programme or its fixed place does not fit)")
     for n in plan.get("notes", []):
         if " cannot stand at " in n:

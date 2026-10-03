@@ -21,6 +21,10 @@ Set globals before running to change the defaults:
   OPEN_READY_ROOM = True      the Captain's ready room (Deck 1) opens on the bridge's port corridor: the window module the bridge builder placed there (label "CorrPort_Window") and
                               the two panels of its first inner-wall bay ("CorrPort1_0_*_R") are destroyed in L_Bridge; the deck's map holds SM_SHIP_BridgeCorridorDoor in their place.
                               Run this script after build_bridge_v3.py (which would place them again)
+  OPEN_BRIDGE_LIFT = True     the bridge's port corridor ends in the housing of the two command lifts (SM_SHIP_LiftHousingBridge, in Deck 1's map): the corridor's end cap (label
+                              "CorrPort_EndCap"), the old lift's static leaves and sign (folder "Hangar/Lift", labels "Lift_Bridge_*") are destroyed in L_Bridge, and the block
+                              outside the housing (label "Aquila_BridgeBlock": a closed shell on a pedestal whose top is a floor 0.3 m under Deck 1) loses its collision: the housing's
+                              own mesh has the walls, the floor and the shafts' tubes. Run this script after build_bridge_v3.py and build_hangar.py / build_quarters.py (which place them again)
   SAVE_LEVEL = True
   ROOT, LEVEL, DECK_DIR       the checkout, the persistent level and the folder of the decks' sub-levels (the tests of the support agents point them at a copy)
 
@@ -70,6 +74,7 @@ CHUNK_M = float(globals().get("CHUNK_M", 160.0))
 LOCK_STAIRS = globals().get("LOCK_STAIRS", True)
 REMOVE_LIFT_LEAVES = globals().get("REMOVE_LIFT_LEAVES", True)
 OPEN_READY_ROOM = globals().get("OPEN_READY_ROOM", True)
+OPEN_BRIDGE_LIFT = globals().get("OPEN_BRIDGE_LIFT", True)
 SAVE_LEVEL = globals().get("SAVE_LEVEL", True)
 
 eal = unreal.EditorAssetLibrary
@@ -417,6 +422,48 @@ def open_ready_room_wall():
     log.append(f"ready room: {len(gone)} actors of the port corridor removed {sorted(gone)}" + ("" if gone else " (already open, or the corridor was built differently)"))
 
 
+# the old pieces of the bridge lift's housing in L_Bridge (build_bridge_v3.py: the corridor's end cap; build_hangar.py: the old lift's leaves and sign; build_quarters.py: the block outside)
+OLD_CORRIDOR_CAP = "CorrPort_EndCap"
+OLD_LIFT_FOLDER, OLD_LIFT_PREFIX = "Hangar/Lift", "Lift_Bridge"
+BRIDGE_BLOCK = "Aquila_BridgeBlock"
+SHAFTS_BOX = (-25.8, -8.2, -22.8, -2.2)                 # the command shafts' footprint (x0, y0, x1, y1; m)
+
+
+def open_bridge_lift_housing():
+    """Deck 1: the bridge's port corridor ends in the housing of the two command lifts (SM_SHIP_LiftHousingBridge, in Deck 1's map). What the old geometry of L_Bridge left there goes: the
+    corridor's end cap (the 0.2 m wall at x -20.8 .. -21.0 that closed it), the static leaves and the sign of the old bridge lift (folder Hangar/Lift, labels Lift_Bridge_*), and the collision of
+    the block outside (a closed shell on a pedestal: its top is an up-facing floor 0.3 m under Deck 1 inside the shafts' footprint, where a rider stayed behind when the car left; the block is
+    only an outside, the housing's own mesh has the walls, the floor and the tubes). What else of the level stands in the shafts' footprint at the deck's floor is listed in the log."""
+    if 1 not in DECKS:
+        log.append("bridge lift housing: Deck 1 is not built here, the old lift is left as it is")
+        return
+    gone, quiet = [], []
+    for a in list(eas.get_all_level_actors()):
+        label = a.get_actor_label()
+        if label == OLD_CORRIDOR_CAP or (str(a.get_folder_path()) == OLD_LIFT_FOLDER and label.startswith(OLD_LIFT_PREFIX)):
+            gone.append(label)
+            eas.destroy_actor(a)
+        elif label == BRIDGE_BLOCK:
+            smc = a.get_component_by_class(unreal.StaticMeshComponent)
+            if smc is not None:
+                smc.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+                quiet.append(label)
+    x0, y0, x1, y1 = (v * M for v in SHAFTS_BOX)
+    others = []
+    for a in eas.get_all_level_actors():
+        try:                                                                       # (only a list for the log: it must not stop the run)
+            if a.get_component_by_class(unreal.StaticMeshComponent) is None:
+                continue
+            origin, ext = a.get_actor_bounds(False)
+            if origin.x + ext.x > x0 and origin.x - ext.x < x1 and origin.y + ext.y > y0 and origin.y - ext.y < y1 and origin.z - ext.z < 50.0 and origin.z + ext.z > -100.0:
+                others.append(f"{a.get_actor_label()} ({a.get_folder_path()})")
+        except Exception as ex:
+            others.append(f"(the bounds of {a.get_actor_label()} could not be read: {ex})")
+            break
+    log.append(f"bridge lift housing: {len(gone)} old actors removed {sorted(gone)}, collision off on {quiet}" + ("" if gone else " (nothing to remove: already open, or built differently)"))
+    log.append(f"bridge lift housing: other actors in the shafts' footprint at the deck's floor (their collision may still hold a rider): {others[:16]}")
+
+
 # ------------------------------------------------------------------------------------------------------------------------ run
 if not eal.does_asset_exist(LEVEL):
     raise RuntimeError(f"{LEVEL} missing: build the bridge level first (build_bridge.py)")
@@ -437,7 +484,9 @@ if REMOVE_LIFT_LEAVES:
     open_existing_entrances()
 if OPEN_READY_ROOM:
     open_ready_room_wall()
-wire_streaming(world, DECKS)                                               # last: the persistent level is still the current level for the actors above
+if OPEN_BRIDGE_LIFT:
+    open_bridge_lift_housing()
+wire_streaming(world, DECKS)                                              # last: the persistent level is still the current level for the actors above
 if SAVE_LEVEL:
     saved = unreal.EditorLoadingAndSavingUtils.save_map(world, LEVEL)
     saved_rest = unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)     # the actors' own files (one file per actor) and the assets

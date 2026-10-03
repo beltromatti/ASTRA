@@ -179,7 +179,9 @@ def _build() -> dict[str, Station]:
           "order", native="forward"),
         m("ops", "viewscreen", "viewscreen_target", "the camera on a contact, with the zoom; released when it is lost; with target `action` "
           "the screen follows the fight from one target to the next by itself",
-          (_action_target(), P("zoom", ZOOM, "close | max | wide, or a factor 0.25-8 on the natural framing (default 1: the subject fills the frame)",
+          (_action_target(), P("zoom", ZOOM, "close | max | wide, or a factor 0.25-8 on the natural framing. The default (1) is the whole ship filling the "
+                                             "frame: what «on screen», «magnified», «zoom in on it» ask for. close (2x) and max (4x) show a part of its hull, "
+                                             "for when the Captain wants a detail (the damage, the bridge, a hangar); wide puts it among its consorts",
                         lo=0.25, hi=8)), "target_lost", native="target"),
         m("ops", "viewscreen", "viewscreen_tactical", "the tactical plot on the main screen", (), "order", native="tactical"),
         m("ops", "viewscreen", "viewscreen_fleet", "the fleet: friendly ships and their status", (), "order", native="fleet"),

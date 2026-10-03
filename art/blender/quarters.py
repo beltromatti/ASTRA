@@ -23,6 +23,8 @@ import os
 import random
 import sys
 
+import bmesh
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import astra_bpy as A  # noqa: E402
 import hullkit as K  # noqa: E402
@@ -284,6 +286,44 @@ def glass():
 
 
 # ------------------------------------------------------------------------------------------------ outside
+def housing_block(b, xa: float, xf: float, yc: float, zc: float, sy: float, sz: float, c: float, mat: str, mouth) -> None:
+    """hullkit.block's chamfered box (an octagonal section along x, in Blender's frame: yc is the centre's y as Blender has it) with the fore
+    face (x = xf, the one that looks at the corridor) cut open on `mouth` = (y0, y1, z0, z1), also Blender's y: the corridor's clear opening,
+    so that the corridor runs into the housing of the lift instead of ending on a patterned wall. The section is a tube from xa to xf, closed
+    at the aft end, and the fore face is four convex plates round the opening (the opening lies inside the section's flat parts)."""
+    bm = b.bm
+    sec = K.chamfer_rect(sy / 2, sz / 2, c)
+    ra = [bm.verts.new((xa, yc + y, zc + z)) for y, z in sec]
+    rf = [bm.verts.new((xf, yc + y, zc + z)) for y, z in sec]
+    my0, my1, mz0, mz1 = mouth
+    hy0, hy1, hz0, hz1 = my0 - yc, my1 - yc, mz0 - zc, mz1 - zc
+    assert sec[0][0] < hy0 < hy1 < sec[1][0] and sec[0][1] < hz0 < hz1 < sec[4][1], "the mouth must lie inside the flat parts of the section"
+    va, vb = bm.verts.new((xf, yc + hy0, zc + hz0)), bm.verts.new((xf, yc + hy1, zc + hz0))
+    vc, vd = bm.verts.new((xf, yc + hy1, zc + hz1)), bm.verts.new((xf, yc + hy0, zc + hz1))
+    n = len(sec)
+    polys = [[ra[i], ra[(i + 1) % n], rf[(i + 1) % n], rf[i]] for i in range(n)]
+    polys.append(list(reversed(ra)))
+    polys += [[rf[0], rf[1], vb, va], [rf[1], rf[2], rf[3], rf[4], vc, vb], [rf[4], rf[5], vd, vc], [rf[5], rf[6], rf[7], rf[0], va, vd]]
+    centre = ((xa + xf) / 2, yc, zc)
+    idx = b.mi(mat)
+    for vs in polys:
+        f = bm.faces.new(vs)
+        f.material_index = idx
+        mid = [sum(v.co[k] for v in vs) / len(vs) for k in range(3)]
+        if f.normal.dot((mid[0] - centre[0], mid[1] - centre[1], mid[2] - centre[2])) < 0:        # every plate looks outwards
+            f.normal_flip()
+
+
+def drop_up_faces(b, first: int, z: float) -> int:
+    """Delete, among the faces made since index `first`, the ones that look up and lie on the plane z (the top of a slab: under the lift's housing
+    it would be a floor in the middle of the shaft). Returns how many went."""
+    bm = b.bm
+    bm.faces.ensure_lookup_table()
+    gone = [f for f in list(bm.faces)[first:] if f.normal.z > 0.9 and all(abs(v.co.z - z) < 1e-4 for v in f.verts)]
+    bmesh.ops.delete(bm, geom=gone, context="FACES_ONLY")
+    return len(gone)
+
+
 def exterior():
     b = A.Builder()
     wa, ws = D["window_aft"], D["window_side"]
@@ -322,10 +362,16 @@ def exterior():
     _, py0, _ = L(0, pb["y0"], 0)
     _, py1, _ = L(0, pb["y1"], 0)
     pc = ((px0 + px1) / 2, (py0 + py1) / 2)
-    # (hullkit builds in Blender's frame: its y is flipped by hand)
-    K.block(b, (pc[0], -pc[1], zt - 1.95), (px0 - px1, py1 - py0, 3.9), PLATE, c=0.18)
+    # (hullkit builds in Blender's frame: its y is flipped by hand). The fore face of the block has the corridor's mouth cut out (pb["mouth"], world
+    # coordinates: the corridor's clear opening, 3.2 x 2.5 like the mouth of the housing mesh SM_SHIP_LiftHousingBridge), and the pedestal has no top
+    # face under the block (the shafts of the lifts run down through it).
+    _, mouth_y0, mouth_z0 = L(0, pb["mouth"]["y0"], pb["mouth"]["z0"])
+    _, mouth_y1, mouth_z1 = L(0, pb["mouth"]["y1"], pb["mouth"]["z1"])
+    housing_block(b, px1, px0, -pc[1], zt - 1.95, py1 - py0, 3.9, 0.18, PLATE, (-mouth_y1, -mouth_y0, mouth_z0, mouth_z1))
+    n_before = len(b.bm.faces)
     K.slab(b, px1, px0, K.chamfer_rect((py1 - py0) / 2, 7.0, 0.06, top=1.0, bottom=0.8),
            K.chamfer_rect((py1 - py0) / 2, 7.0, 0.06, top=1.0, bottom=0.8), PLATE, -7.3, -7.3, -pc[1], -pc[1])
+    assert drop_up_faces(b, n_before, -0.3) == 1, "the pedestal's top face was not found"
     box(b, px1 - 0.1, px1, pc[1] - 1.2, pc[1] + 1.2, 0.6, 2.4, FRAME)
     box(b, px1 - 0.12, px1 - 0.1, pc[1] - 1.0, pc[1] + 1.0, 2.1, 2.2, LIGHTS)
     # the fairings under the two corridors behind the bridge (from their floor down into the island's top)

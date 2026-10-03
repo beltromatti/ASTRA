@@ -114,6 +114,11 @@ namespace
 		W.EquipAnimS = 1.4f;
 		W.ReloadAnimS = 2.0f;
 		W.DryAnimS = 0.8f;
+		W.HipPlace = FVector(30.0, 9.0, -4.0);
+		W.HipTurn = FRotator(0.0, -4.0, 0.0);
+		W.AdsPlace = FVector(24.0, 0.0, -0.3);
+		W.LowPlace = FVector(32.0, 11.0, -12.0);
+		W.LowTurn = FRotator(-20.0, 10.0, -4.0);
 		W.ShotSound = TEXT("/Game/ASTRA/Audio/SW_Pistol_Shot.SW_Pistol_Shot");
 		W.DrySound = TEXT("/Game/ASTRA/Audio/SW_Gun_Dry.SW_Gun_Dry");
 		W.ReloadSound = TEXT("/Game/ASTRA/Audio/SW_Pistol_Reload.SW_Pistol_Reload");

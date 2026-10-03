@@ -3,14 +3,17 @@ ship_design_shuttle.py).
 
 The line runs the whole length of Deck 5 in a tunnel along the middle of the starboard outer lane (y = 30 in the ship's frame) and stops in eight halls, one for every section. A stop is a
 lane room of the plan, 24 x 16 x 3.7, built against the Starboard Passage's wall: the platform (6.4 m deep, with its tactile strip and yellow line at the edge, benches, route boards, two
-columns), the track bed behind it (the line's axis is y = 8 in the hall's frame: two rails, sleepers, a guide line) that disappears into a tunnel mouth in either end wall, and a service
-ledge with the track's equipment bays on the far wall. The car is not part of the hall: it arrives and stops (ASCENSORI; the mesh SM_SHIP_SpineCar). The terminals (bow and stern) have one
-mouth; the track ends in a pair of buffers against the closed wall. Frame and sizes: ship_rooms.py / ship_spec.py."""
+columns), the track bed behind it (the line's axis is y = 8 in the hall's frame: two rails, sleepers, a guide line) that goes on through a tunnel mouth in either end wall, and a service
+ledge with the track's equipment bays on the far wall. A mouth is a real opening, 3.5 x 3.25 m like the tunnel's section, cut through the end wall (the car's body passes through anything, but
+the people in it do not); the hall and the tunnel leave the car's envelope clear (14 x 2.8 x 2.9 m, its floor at 0.16 m, on the axis: ship_kit.py checks it). The car is not part of the hall:
+it arrives and stops (ASCENSORI; the mesh SM_SHIP_SpineCar). The terminals (bow and stern) have one mouth; the track ends in a pair of buffers against the closed wall. Frame and sizes:
+ship_rooms.py / ship_spec.py."""
 from __future__ import annotations
 
 import ship_furniture as F
 import ship_spec as SPEC
-from ship_lib import (COMPOSITE, DECK, DGLASS, FABRIC_NAVY, LAMP_DIM, PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, SParts)
+from ship_catalog import TUNNEL_H, TUNNEL_HW
+from ship_lib import (COMPOSITE, DECK, FABRIC_NAVY, LAMP_DIM, PAINT_RED, RUBBER, STEEL, STRUCT, TRIM, SParts)
 from ship_rooms import Style, WF, WS, build_shell, ceiling_services, dress_wall, luminaire_strips, place, wall_label
 
 TRACK_Y0, TRACK_Y1 = 6.40, 9.60                  # the track bed across the hall (the platform ends at 6.4)
@@ -23,22 +26,20 @@ def _dims(key: str):
     return s, s["L"], s["D"], s["h"]
 
 
-def tunnel_mouth(b: SParts, x_face: float, sx: int, yc: float = CAR_Y, w: float = 3.5, h: float = 3.25) -> None:
-    """A tunnel mouth on an end wall (sx = +1 on the left wall facing +x, -1 on the right wall): a dark opening in a heavy brushed frame with a signal lamp and a hazard stripe."""
+def tunnel_mouth(b: SParts, x_face: float, sx: int, yc: float = CAR_Y, w: float = 2 * TUNNEL_HW, h: float = TUNNEL_H) -> None:
+    """A tunnel mouth on an end wall (sx = +1 on the left wall facing +x, -1 on the right wall). The opening itself is the wall's (build_shell cuts it: a real hole, w x h like the tunnel's
+    section); here is its heavy brushed frame, proud of the finish by 14 cm, a hazard stripe up each jamb and the signal lamps over it."""
     y0, y1 = yc - w / 2, yc + w / 2
     xa, xb = (x_face, x_face + sx * 0.14)
     lo, hi = min(xa, xb), max(xa, xb)
     b.body.box((lo, y0 - 0.18, 0.0), (hi, y0, h + 0.18), TRIM)
     b.body.box((lo, y1, 0.0), (hi, y1 + 0.18, h + 0.18), TRIM)
     b.body.box((lo, y0, h), (hi, y1, h + 0.18), TRIM)
-    xd0, xd1 = (x_face, x_face + sx * 0.03)
-    b.body.box((min(xd0, xd1), y0, 0.0), (max(xd0, xd1), y1, h), DGLASS)
-    for yy in RAILS:                                                  # the rails run on into the dark
-        b.fine.box((min(xd0, xd1), yy - 0.035, 0.0), (max(xd0, xd1), yy + 0.035, 0.026), TRIM)
+    for yj in (y0 - 0.09, y1 + 0.09):
+        b.emit.label((x_face + sx * 0.142, yj, h / 2), 0.1, h - 0.1, (sx, 0, 0), "hazard_h", up=(0, 0, 1))
     xs0, xs1 = x_face + sx * 0.14, x_face + sx * 0.152
     b.emit.lamp_box((min(xs0, xs1), yc - 0.12, h + 0.26), (max(xs0, xs1), yc + 0.12, h + 0.38), "red", LAMP_DIM)
     b.emit.lamp_box((min(xs0, xs1), yc - 0.12 - 0.34, h + 0.26), (max(xs0, xs1), yc + 0.12 - 0.34, h + 0.38), "green", LAMP_DIM)
-    b.emit.label((x_face + sx * 0.142, yc, 0.9), 3.0, 0.12, (sx, 0, 0), "hazard_h", up=(0, 0, 1))
 
 
 def buffers(b: SParts, x_face: float, sx: int) -> None:
@@ -56,7 +57,8 @@ def _stop(name: str, key: str):
     mouth_aft, mouth_fwd = spec["mouths"]
     b = SParts(bevel=0.005, fine_bevel=0.003)
     st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.2, ceil=COMPOSITE, accent="cyan_dim", cove="white_cool", rib_mat=TRIM, skirt=STRUCT)
-    build_shell(b, spec, st)
+    mouths = ([{"wall": "left", "x": CAR_Y, "w": 2 * TUNNEL_HW, "h": TUNNEL_H}] if mouth_aft else []) + ([{"wall": "right", "x": D - CAR_Y, "w": 2 * TUNNEL_HW, "h": TUNNEL_H}] if mouth_fwd else [])
+    build_shell(b, spec, st, doors=list(spec["doors"]) + mouths)                                 # (the mouths are holes through the end walls)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
     # the track: a dark bed, two rails on sleepers, a guide line; the platform's edge: a tactile strip, a yellow line, hazard stripes

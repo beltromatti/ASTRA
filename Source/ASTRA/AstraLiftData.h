@@ -64,9 +64,30 @@ struct FAstraLiftLine
 	bool IsVertical() const { return !bShuttle; }
 };
 
+/** A deck of a Jefferies trunk's ladder (NAVE-3's `vertical[]` of kind `trunk`, docs/NAVE.md): where the climber's feet stand level with it, where to step off. */
+struct FAstraLadderStop
+{
+	int32 Deck = 0;
+	float FloorZ = 0.f;                       // the deck's floor (world cm)
+	FVector2D Step = FVector2D::ZeroVector;   // the walkway's point the climber steps off to
+	FBox2D Hole = FBox2D(ForceInit);          // the niche's footprint: open in the floor, unless the toe plate closes the column's bottom
+	bool bTop = false;                        // the column's top deck: a hatch closes the niche's roof
+	bool bBottom = false;                     // its bottom deck: a toe plate closes the floor
+};
+
+/** A Jefferies trunk: a ladder through the floors of the decks it serves, climbed by hand. */
+struct FAstraLadder
+{
+	FString Id, Name;
+	FVector2D Spot = FVector2D::ZeroVector;   // where the climber's body goes, in front of the rungs (world cm)
+	float FacingYaw = 0.f;                    // the climber faces the rungs
+	TArray<FAstraLadderStop> Stops;           // low to high
+};
+
 struct FAstraLiftNetwork
 {
 	TArray<FAstraLiftLine> Lines;
+	TArray<FAstraLadder> Ladders;             // the Jefferies trunks (not lifts: ladders the Captain climbs; AstraLadderSubsystem)
 	TArray<FString> Problems;                 // what the plan got wrong: a door off its shaft's wall, a car that does not fit
 	TArray<FString> Notes;
 	FString Source;

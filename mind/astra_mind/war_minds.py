@@ -202,14 +202,14 @@ POSTURE = _fn("weapons_posture", "Your group's weapons posture. hold_fire: every
     "reason": {"type": "string"}}, ["posture", "reason"])
 
 
-def say_tool(speakers: list[str]) -> dict[str, Any]:
+def say_tool(speakers: list[str], lang_name: str = "the Captain's language") -> dict[str, Any]:
     return _fn("say", "Say something over the fleet net: the Aquila's Captain, and every allied ship, hear it. Radio speech: one or two short sentences, "
-                      "in the language of the Captain (names in English). Silence is normal: speak when it helps (a warning the Captain may have "
+                      f"in {lang_name} (names in English). Silence is normal: speak when it helps (a warning the Captain may have "
                       "missed, a request you need answered, what you are doing that concerns the Aquila, an answer to what was said to you).", {
         "speaker": {"type": "string", "enum": speakers, "description": "which captain of your group speaks (default: the group's commander)"},
         "to": {"type": "string", "description": "who it is for: \"aquila\" (the Captain), \"fleet\" (everyone), or the id of an allied commander; only an "
                                                 "addressed allied commander is woken by it"},
-        "text": {"type": "string"},
+        "text": {"type": "string", "description": f"what you say aloud, in {lang_name} (the Captain's language: never another one, whatever the log is written in)"},
         "tone": {"type": "string", "enum": ["calm", "focused", "urgent", "tense", "dry", "warm", "grim"]},
         "urgent": {"type": "boolean", "description": "true only for danger now (a loss, a missile salvo, a collapse); it goes before other talk"}},
         ["text", "tone"])
@@ -1150,7 +1150,7 @@ class WarMinds:
         elif side == "mandate":
             tools = [group_order_tool("commander"), REPORT, NO_CHANGE]
         else:
-            tools = [group_order_tool("commander"), say_tool(speakers), POSTURE, NO_CHANGE]
+            tools = [group_order_tool("commander"), say_tool(speakers, LANG_NAMES.get(lang, lang)), POSTURE, NO_CHANGE]
         return system, user, tools
 
     @staticmethod
@@ -1434,7 +1434,7 @@ class WarMinds:
                 said.append(str(call.arguments()["text"]).strip())
 
         comp = await models.chat(self.llm, COMMANDER_ROLE, messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                                 tools=[say_tool([cmd.key]), NO_CHANGE], tool_choice="auto", on_tool_call=on_call, max_tokens=140)
+                                 tools=[say_tool([cmd.key], LANG_NAMES.get(self.lang(), self.lang())), NO_CHANGE], tool_choice="auto", on_tool_call=on_call, max_tokens=140)
         mind.stats["cost"] += comp.cost
         return " ".join(said) if said else None
 

@@ -556,6 +556,10 @@ async def s10_rethink() -> list[str]:
             bad.append("the re-thought line was not said as it stands now")
         if any("holding the bearing" in t for t in spoken) or tr.dropped.get(b.ids["gone"]) != "rethought":
             bad.append(f"the line its speaker let go was said or not declared ({tr.dropped.get(b.ids['gone'])!r})")
+        # what the room heard is what was said: the re-thought words, not the first ones, and nothing of the line let go
+        heard = [w for _, _, w, _ in b.voice.heard_since(3600.0)]
+        if "Operations: the fire in D is out." not in heard or any("section D" in w or "holding the bearing" in w for w in heard):
+            bad.append(f"the record of what was heard is not what was said: {heard}")
         return bad
 
 

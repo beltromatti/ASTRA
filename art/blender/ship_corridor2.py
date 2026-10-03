@@ -173,7 +173,8 @@ def build_service_module(name: str, suffix: str) -> "bpy.types.Object":
 
 # ======================================================================================================================================================= T: the shuttle's tunnel
 RAIL_Y = 0.65                       # the rails' gauge: 1.3 m
-LEDGE_Y = 1.10                      # the service ledge on the starboard side: y 1.10 .. 1.75, 0.22 m above the track bed
+LEDGE_Y = 1.10                      # the service ledge on the starboard side: y 1.10 .. 1.75, 0.11 m above the track bed (the car's floor, 0.16 m up, passes over it)
+LEDGE_H = 0.11
 
 
 def _tunnel_floor(b: SParts, tn: dict, rng: random.Random) -> None:
@@ -190,10 +191,10 @@ def _tunnel_floor(b: SParts, tn: dict, rng: random.Random) -> None:
         fine.box((-OV, y - 0.045, 0.13), (MOD + OV, y + 0.045, 0.16), STEEL)
     em.lamp_box((-OV, -0.014, 0.036), (MOD + OV, 0.014, 0.046), tn["accent_dim"], LAMP_DIM)         # the guide line in the middle of the track
     fine.box((-OV, -0.18, 0.036), (MOD + OV, -0.1, 0.07), TRIM)                                  # the power rail's cover
-    fb.box((-OV, LEDGE_Y, 0.0), (MOD + OV, hw, 0.22), STRUCT)                                    # the service ledge, a tread on top, a yellow edge and a low lamp line
-    fine.box((-OV, LEDGE_Y + 0.02, 0.22), (MOD + OV, hw - 0.02, 0.232), TRIM)
-    fb.label((2.0, LEDGE_Y - 0.001, 0.12), MOD, 0.14, (0, -1, 0), "hazard_h")
-    em.lamp_box((0.15, LEDGE_Y + 0.05, 0.234), (MOD - 0.15, LEDGE_Y + 0.07, 0.24), tn["accent"], LAMP_DIM)
+    fb.box((-OV, LEDGE_Y, 0.0), (MOD + OV, hw, LEDGE_H), STRUCT)                                 # the service ledge, a tread on top, a yellow edge and a low lamp line
+    fine.box((-OV, LEDGE_Y + 0.02, LEDGE_H), (MOD + OV, hw - 0.02, LEDGE_H + 0.012), TRIM)
+    fb.label((2.0, LEDGE_Y - 0.001, LEDGE_H / 2), MOD, 0.09, (0, -1, 0), "hazard_h")
+    em.lamp_box((0.15, LEDGE_Y + 0.05, LEDGE_H + 0.014), (MOD - 0.15, LEDGE_Y + 0.07, LEDGE_H + 0.02), tn["accent"], LAMP_DIM)
     for y0, y1 in ((-hw, -1.2),):                                                                # a cable trench cover on the other side
         fine.box((-OV, y0, 0.0), (MOD + OV, y1, 0.018), TRIM)
 
@@ -227,11 +228,11 @@ def _tunnel_walls(b: SParts, tn: dict, rng: random.Random) -> None:
         fb.box((0.12, y - 0.17, kh - 0.07), (MOD - 0.12, y - 0.13, kh - 0.01), TRIM)
         fb.box((0.12, y + 0.13, kh - 0.07), (MOD - 0.12, y + 0.17, kh - 0.01), TRIM)
         em.lamp_box((0.2, y - 0.13, kh - 0.04), (MOD - 0.2, y + 0.13, kh - 0.032), tn["strip"], LAMP)
-    soft.box((-OV, -0.3, kh - 0.34), (MOD + OV, 0.3, kh - 0.04), COMPOSITE)
+    soft.box((-OV, -0.3, kh - 0.17), (MOD + OV, 0.3, kh - 0.04), COMPOSITE)                      # (the duct hangs no lower than 3.08 m: the car's roof is at 3.06)
     for k in range(3):
-        soft.box((0.4 + k * 1.3, -0.25, kh - 0.345), (0.8 + k * 1.3, 0.25, kh - 0.34), RUBBER)
+        soft.box((0.4 + k * 1.3, -0.25, kh - 0.175), (0.8 + k * 1.3, 0.25, kh - 0.17), RUBBER)
     for s in (0.6, 2.6):
-        fine.box((s - 0.03, -0.34, kh - 0.4), (s + 0.03, 0.34, kh), TRIM)
+        fine.box((s - 0.03, -0.34, kh - 0.17), (s + 0.03, 0.34, kh), TRIM)
 
 
 def build_tunnel_module(name: str, suffix: str) -> "bpy.types.Object":
@@ -242,9 +243,9 @@ def build_tunnel_module(name: str, suffix: str) -> "bpy.types.Object":
     hw, kh = TUNNEL_HW, TUNNEL_H
     _tunnel_floor(b, tn, rng)
     _tunnel_walls(b, tn, rng)
-    if suffix == "Bulkhead":                                                                    # the section's blast gate: the car's opening 2.9 x 3.0, two leaves parked in the pillars
+    if suffix == "Bulkhead":                                                                    # the section's blast gate: the car's opening 2.9 x 3.15 (the car is 2.8 x 3.06), two leaves parked in the pillars
         x0, x1 = 3.30, MOD + OV
-        ho, oh = 1.45, 3.0
+        ho, oh = 1.45, 3.15
         fb.box((x0, -hw - 0.02, 0.0), (x1, -ho, kh + 0.45), STRUCT)
         fb.box((x0, ho, 0.0), (x1, hw + 0.02, kh + 0.45), STRUCT)
         fb.box((x0, -ho, oh), (x1, ho, kh + 0.45), STRUCT)
@@ -258,7 +259,7 @@ def build_tunnel_module(name: str, suffix: str) -> "bpy.types.Object":
         fb.label((x0 - 0.1, 0.0, oh + 0.24), 2 * ho + 0.3, 0.12, (-1, 0, 0), "hazard")
         em.lamp_box((x0 - 0.14, -0.14, oh + 0.04), (x0 - 0.12, 0.14, oh + 0.1), "green", LAMP)
         fb.box((x0 - 0.06, -ho - 0.15, oh + 0.18), (x0, ho + 0.15, kh + 0.3), COMPOSITE)
-        fb.box((x0 - 0.04, -1.0, oh + 0.3), (x0 - 0.02, 1.0, kh + 0.2), DGLASS)                  # the sign field over the opening
+        fb.box((x0 - 0.066, -1.0, oh + 0.28), (x0 - 0.06, 1.0, kh + 0.38), DGLASS)               # the sign field over the opening
     elif suffix == "End":                                                                       # the end of the line: a wall and two buffers
         fb.box((MOD - 0.5, -hw - 0.02, 0.0), (MOD + OV, hw + 0.02, kh + 0.45), STRUCT)
         fb.box((MOD - 0.55, -hw, 0.0), (MOD - 0.5, hw, kh), COMPOSITE)

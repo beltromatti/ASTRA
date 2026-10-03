@@ -66,6 +66,8 @@ class BridgeAgent:
         self.style: Callable[[], str] = lambda: ""   # the XO's read of how the Captain commands (style.py)
         self.home: Callable[[], str] = lambda: ""    # the officers' own lives: news from home (the director)
         self.memories = lambda: ""       # what each officer remembers of the Captain (memory.py, set by the server)
+        # what the room heard aloud lately (the speech floor's record: speech.Voice.heard_since, set by the server): (seconds ago, who, words, said to the end)
+        self.heard: Callable[[float], list[tuple[float, str, str, bool]]] = lambda seconds: []
         self.titles = {k: v.title for k, v in CREW.items()}
         self._active: set[Turn] = set()  # turns being worked on (what preempt() reaches)
 
@@ -119,7 +121,13 @@ class BridgeAgent:
     def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None) -> str:
         """The bridge this moment (crew.bridge_now), for the head of a turn's last message."""
         hearing = context_model.describe(ctx, self.titles) if ctx else ""
-        return bridge_now(state, self.ship.recent_events(), hearing)
+        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud())
+
+    def _said_aloud(self) -> str:
+        """What the Captain has heard on the bridge in the last minute, as it was said (a line thought again is here in its new words, one
+        cut off as far as it went, one never said is not here): the officers' sense of what is already known."""
+        return "\n".join(f"- {ago:.0f} s ago, {who}: «{words}»" + ("" if full else " (cut off there)")
+                         for ago, who, words, full in self.heard(HEARD_WINDOW_S))
 
     def _messages(self, text: str, lang: str, state: dict[str, Any], ctx: context_model.Context | None = None,
                   note: str = "") -> list[dict[str, Any]]:
@@ -268,10 +276,12 @@ class BridgeAgent:
         who = self.titles.get(speaker, speaker)
         cut = f" They had said only «{cut_after}» when the Captain spoke over them." if cut_after else ""
         ask = (f"[Before speaking] {waited_s:.0f} seconds ago {who} was about to tell the Captain: «{text}».{cut} The ship has moved on "
-               "since (the state above is now). If it still matters to the Captain, they say it now as it stands — updated, short, "
-               "in character — with speak. If it no longer matters, they say nothing: do not call speak. A line that answers an order "
-               "of the Captain's (what was done about it, what the other ship or console said) always still matters: the Captain is "
-               "waiting for it — say it, updated if things changed, and add only what is new and pressing.")
+               "since (the state above is now), and the bridge has heard what «Said aloud» lists. If it still matters to the Captain, they "
+               "say it now as it stands — updated, short, in character — with speak. If it no longer matters, or the Captain has already "
+               "heard it (from them or from anyone, in other words too) and nothing has changed since that he must act on, they say "
+               "nothing: do not call speak. A line that answers an order of the Captain's (what was done about it, what the other ship or "
+               "console said) still matters unless it has been said already: the Captain is waiting for it — say it, updated if things "
+               "changed, and add only what is new and pressing.")
         msgs = [self._system(lang, state)] + self._last_turns(4) + [{"role": "user", "content": self._now(state) + "\n\n" + ask}]
         said: list[str] = []
 
@@ -455,8 +465,11 @@ class BridgeAgent:
             self.history.append({"role": "tool", "tool_call_id": cid, "content": result})
 
 
+HEARD_WINDOW_S = 60.0       # how far back the officers' «Said aloud» goes
+
 EVENT_ASK = ("The Captain should hear this: the responsible officer reports it now, in one short line with speak (in the "
-             "Captain's language), unless the Captain has already heard it from anyone on the bridge and nothing has changed since "
+             "Captain's language), unless the Captain has already heard it from anyone on the bridge («Said aloud» in the bridge now: "
+             "what was really said, in the words it was said) and nothing has changed since "
              "(a victory, a retreat, a distance said once is said; the same picture again is noise), or it is news that has "
              "grown old while the bridge was busy ([happened N s ago]) and no longer matters as it stands — then say nothing, or "
              "say what it means now. When several things happened at once (they are joined by |), the officers report the one or "

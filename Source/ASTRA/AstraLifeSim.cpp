@@ -1192,9 +1192,9 @@ void FAstraLifeSim::StepPerson(int32 Idx)
 	FAstraLifePerson& P = People[Idx];
 	const float Dt = (float)FMath::Clamp(GameT - P.LastStep, 0.0, 900.0);
 	P.LastStep = GameT;
-	if (P.Status == 2 || P.bCommandeered)
+	if (P.Status == 2 || P.bCommandeered || P.bTransit || P.bAway)
 	{
-		return;
+		return;                                       // (the dead; the ones the marines have taken for a fight; the ones the transporter holds or has sent away)
 	}
 	++Counters.Steps;
 	if (P.Phase == FAstraLifePerson::EPhase::Walking && !P.bBody)
@@ -1230,7 +1230,7 @@ bool FAstraLifeSim::RouteOne()
 	{
 		const int32 I = Queue[k];
 		const FAstraLifePerson& P = People[I];
-		if (P.Phase != FAstraLifePerson::EPhase::WaitRoute || P.Status == 2)
+		if (P.Phase != FAstraLifePerson::EPhase::WaitRoute || P.Status == 2 || P.bTransit || P.bAway)
 		{
 			Queued[I] = 0;
 			Queue.RemoveAtSwap(k);
@@ -1324,6 +1324,69 @@ void FAstraLifeSim::Tick(float DtGame, float TimeScale, double RouteBudgetS, con
 		}
 		++Done;
 	}
+}
+
+// ====================================================================================================== the transporter
+
+void FAstraLifeSim::SetTransit(int32 Idx, bool bOn)
+{
+	if (!People.IsValidIndex(Idx))
+	{
+		return;
+	}
+	FAstraLifePerson& P = People[Idx];
+	P.bTransit = bOn;
+	if (bOn)
+	{
+		// the pattern has left the ship: what they were doing is forgotten for now (the route, the claim on a place stay as they are until they are set down)
+		P.Route.Clear();
+		P.Phase = FAstraLifePerson::EPhase::Settled;
+		P.bBody = false;
+	}
+	P.LastStep = GameT;
+}
+
+void FAstraLifeSim::PlaceTransported(int32 Idx, const FVector& Where, float YawDeg, float HoldGameS)
+{
+	if (!People.IsValidIndex(Idx))
+	{
+		return;
+	}
+	FAstraLifePerson& P = People[Idx];
+	P.bTransit = false;
+	P.bAway = false;
+	P.AwayText.Reset();
+	P.Pos = Where;
+	P.Route.Clear();
+	P.LastStep = GameT;
+	if (P.Status == 2)
+	{
+		return;
+	}
+	// they stand where the beam set them down and go on with their day from there: the way to wherever they were going is made again
+	P.Phase = FAstraLifePerson::EPhase::WaitRoute;
+	P.ReadyAt = GameT + FMath::Max(0.f, HoldGameS);
+	P.RetryAt = 0.0;
+	Enqueue(Idx);
+	Remember(Idx, 2, FString::Printf(TEXT("Beamed to %s by the transporter at %s"), *Map->Describe(Map->CompartmentAt(Where + FVector(0, 0, 30))), *HourText(Clock)));
+	(void)YawDeg;
+}
+
+void FAstraLifeSim::SetAway(int32 Idx, const FString& Text)
+{
+	if (!People.IsValidIndex(Idx))
+	{
+		return;
+	}
+	FAstraLifePerson& P = People[Idx];
+	P.bTransit = false;
+	P.bAway = true;
+	P.AwayText = Text;
+	P.Route.Clear();
+	P.Phase = FAstraLifePerson::EPhase::Settled;
+	P.bBody = false;
+	P.LastStep = GameT;
+	Remember(Idx, 3, FString::Printf(TEXT("Beamed away from the ship by the transporter (%s) at %s"), *Text, *HourText(Clock)));
 }
 
 // ====================================================================================================== the ship speaks
@@ -1504,7 +1567,7 @@ void FAstraLifeSim::PeopleIn(int32 Deck, TCHAR Section, TArray<int32>& Out) cons
 	for (int32 i = 0; i < People.Num(); ++i)
 	{
 		const FAstraLifePerson& P = People[i];
-		if (P.Status == 0 && P.Act != EAstraLifeAct::Patient && FMath::Abs(P.Pos.Z - B.Min.Z) < 450.f && P.Pos.X >= B.Min.X && P.Pos.X <= B.Max.X
+		if (P.Status == 0 && !P.bTransit && !P.bAway && P.Act != EAstraLifeAct::Patient && FMath::Abs(P.Pos.Z - B.Min.Z) < 450.f && P.Pos.X >= B.Min.X && P.Pos.X <= B.Max.X
 		    && P.Pos.Y >= B.Min.Y && P.Pos.Y <= B.Max.Y)
 		{
 			Out.Add(i);
@@ -1523,7 +1586,7 @@ void FAstraLifeSim::PeopleInComp(int32 CompIdx, TArray<int32>& Out) const
 	for (int32 i = 0; i < People.Num(); ++i)
 	{
 		const FAstraLifePerson& P = People[i];
-		if (P.Status == 0 && P.Act != EAstraLifeAct::Patient && B.IsInsideOrOn(P.Pos + FVector(0, 0, 30)))
+		if (P.Status == 0 && !P.bTransit && !P.bAway && P.Act != EAstraLifeAct::Patient && B.IsInsideOrOn(P.Pos + FVector(0, 0, 30)))
 		{
 			Out.Add(i);
 		}
@@ -1813,6 +1876,10 @@ int32 FAstraLifeSim::WhoIsAt(FName ExternalStation) const
 FString FAstraLifeSim::Doing(int32 Person) const
 {
 	const FAstraLifePerson& P = People[Person];
+	if (P.bTransit || P.bAway)
+	{
+		return P.bTransit ? FString(TEXT("in the transporter's buffer")) : (P.AwayText.IsEmpty() ? FString(TEXT("away from the ship")) : P.AwayText);
+	}
 	if (P.bCommandeered)
 	{
 		return FString::Printf(TEXT("fighting the boarders with their squad (%s)"), *Map->Describe(CompOf(Person)));
