@@ -179,6 +179,26 @@ ISSUE_WEAPON = _fn("issue_weapon", "The XO (or any officer the Captain asks): se
     "who": {"type": "string", "enum": ["captain"], "description": "who is issued the weapon: the Captain (the only one)"}}, ["kind"])
 SHIP_TOOLS.append(ISSUE_WEAPON)
 
+# Boarding an enemy ship with the Aquila's marines (docs/ABBORDAGGI.md, F5.2): the game has the boats (the Kestrels of the shuttle bay on Deck 8), the hatches, the shields that hold the boats
+# off, the point defence and the fighters that shoot at them, and the fight; the tool is the order. `boarding_boats` in the ship state (the boats free, the marines fit to go) is what says this
+# build has them; `boarding_options` lists what a boat could dock at now.
+BOARD_FACES = ["port", "starboard", "dorsal", "ventral", "bow", "stern"]
+BOARD_OBJECTIVES = ["captain", "bridge", "engineering", "armory", "medbay", "brig", "comms", "hangar"]
+BOARD_SHIP = _fn("board_ship", "The XO (or any officer the Captain asks): board an enemy ship with the Aquila's marines. They go in the Aquila's assault shuttles (Kestrels, twelve marines each, from the "
+                               "shuttle bay on Deck 8): the boats leave the bay, cross to the target and dock at a hatch on her hull, and the marines cut in and fight their way to the objective. The "
+                               "boats are shot at by the target's point defence and her fighters on the way in, and cannot dock through a shield that holds on the face they come to (they wait off the "
+                               "hull and turn back): `boarding_options` in the ship state lists the ships a boat could dock at now and what each has to stop them. The result says what was launched, "
+                               "from where, at which hatches and how long it takes, and the facts that make it risky, or why not: say that, never a promise of your own. Only on the Captain's order. "
+                               "`call_off` turns the boats back and tells the marines to come out.", {
+    "action": {"type": "string", "enum": ["launch", "call_off"], "description": "launch (the default) or call_off"},
+    "target": {"type": "string", "description": "launch: the ship to board: her contact id (T-30) or name from the plot"},
+    "boats": {"type": "integer", "minimum": 1, "maximum": 2, "description": "how many Kestrels (twelve marines each); leave out for both"},
+    "face": {"type": "string", "enum": BOARD_FACES, "description": "the side of the target the boats dock on; leave out for the side nearest the Aquila"},
+    "objective": {"type": "string", "enum": BOARD_OBJECTIVES, "description": "what the marines fight for: captain (the commander's suite: a ship's commander is taken there) · bridge · engineering (her reactor) · "
+                                                                              "armory · medbay · brig · comms · hangar; leave out for the commander's suite"},
+    "marines": {"type": "integer", "minimum": 4, "maximum": 24, "description": "how many marines in all (the boats' full loads when left out)"}}, [])
+SHIP_TOOLS.append(BOARD_SHIP)
+
 DEPARTMENTS = ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"]
 # what a standing order lets each department do by itself when an event calls for it
 DEPT_TOOLS = {"tactical": {"set_target", "fire_weapons", "cease_fire", "set_shields", "set_point_defense", "launch_decoys"},
@@ -266,7 +286,7 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
           "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "transporter": "ops", "lift_go": "computer", "eagle_recover": "flight",
-          "issue_weapon": "xo"}
+          "issue_weapon": "xo", "board_ship": "xo"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
@@ -298,6 +318,9 @@ def tools_for(state: dict[str, Any] | None, ctx: Any = None) -> ToolSet:
         ts = ToolSet(tools, {t["function"]["name"] for t in tools}, ts.available)
     if not (state or {}).get("arms"):                      # (a game without the Captain's weapons has no armourer to call)
         tools = [t for t in ts.tools if t["function"]["name"] != "issue_weapon"]
+        ts = ToolSet(tools, {t["function"]["name"] for t in tools}, ts.available)
+    if not (state or {}).get("boarding_boats"):            # (nor boats to send marines in)
+        tools = [t for t in ts.tools if t["function"]["name"] != "board_ship"]
         ts = ToolSet(tools, {t["function"]["name"] for t in tools}, ts.available)
     lift = getattr(ctx, "lift", None)
     if lift is not None and lift.stops:

@@ -272,6 +272,9 @@ colpo, quindi i passi delle navi non cadono tutti nello stesso fotogramma.
 ## 8. Per gli abbordaggi (F5.2)
 
 - Le **piante** hanno già tutto ciò che chiedevano (sette punti: frame e origine, `docks`, scale e porte con paratie e fianco, `objectives`, `garrison`, sale su più ponti, stile): vedi §2 e `tools/boarding.py run --scenario plans`.
+- La **simulazione d'assalto** di ABBORDAGGI (`tools/boarding.py run --scenario attack --class <classe>`: ventiquattro marine in due Kestrel contro l'equipaggio, sul mio piano) gira sulle piante: Acheron (246 difensori: la suite del comandante
+  presa 20 volte su 20 con 9 marine perse su 24; l'ingegneria tenuta 19 su 20), Styx e Lethe passano il loro controllo; sul Vigilant con il seme 1 un combattimento su 20 non finisce nel tempo (il controllo ne vuole zero; con il seme 21 passa 20 su 20):
+  è il caso, non la pianta (l'ingegneria del Vigilant sta a 70 m dai portelli e lì i tempi lunghi sono giusti).
 - Lo **stato dell'interno** quando una squadra entra: `UAstraBattleSubsystem::FleetSnapshot(ShipId, FFleetSnapshot&)` dà le stanze che non sono a posto (aria, foro, fuoco, fumo, calore, potenza, rottami, perduta, sigillata),
   le paratie chiuse (id delle porte della pianta), le persone vive con stanza, posizione, ruolo e ferite, i nominati (capitano, ufficiali) e chi ha il comando. Una stanza non elencata è com'è nella pianta.
   Quando una squadra entra davvero, la scena si costruisce dalla pianta (come per l'Aquila) con quello stato: l'aria, il fuoco, le luci, i morti.

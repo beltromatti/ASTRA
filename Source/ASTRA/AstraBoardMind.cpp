@@ -86,10 +86,22 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 	{
 		return J;
 	}
+	if (Mode == EMode::Remote && !Assault.bRoster)
+	{
+		return J;                                          // a fight on another ship that is not the marines' (the Mandate on a consort): not theirs to command
+	}
 	const auto CompId = [this](int32 C) { return Dmg->Comps.IsValidIndex(C) ? Dmg->Comps[C].Id.ToString() : FString(); };
 	const UAstraShipSubsystem* ShipS = ShipSub();
 	const TArray<FAstraCrewman>* Crew = ShipS ? &ShipS->GetRoster().Get() : nullptr;
+	const bool bWeAttack = Fight.IsAttacker(ESide::Aquila);
 	J->SetNumberField(TEXT("elapsed_s"), FMath::RoundToInt(Since));
+	// who is attacking whom and where: the marines defend their own ship (a Mandate boarding party in the Aquila) or attack a ship that is not (their boats at her hatches)
+	J->SetStringField(TEXT("role"), bWeAttack ? TEXT("attacking") : TEXT("defending"));
+	J->SetStringField(TEXT("ship"), Mode == EMode::Remote ? Assault.TargetName : FString(TEXT("the Aquila")));
+	if (Mode == EMode::Remote)
+	{
+		J->SetStringField(TEXT("ship_class"), Assault.TargetClassText);
+	}
 	J->SetStringField(TEXT("breach"), BreachText);
 	J->SetStringField(TEXT("objective"), Map->Describe(Fight.Mission().Objective));
 	J->SetStringField(TEXT("objective_id"), CompId(Fight.Mission().Objective));
@@ -144,7 +156,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 		Squads.Add(MakeShared<FJsonValueObject>(O));
 	}
 	J->SetArrayField(TEXT("squads"), Squads);
-	// what is known of the boarders (the ship's internal sensors in the corridors and what the marines have seen)
+	// what is known of the enemy (the ship's own sensors in the corridors when she has them, and what the marines have seen)
 	TArray<FSeen> Seen;
 	Fight.Intel(ESide::Aquila, Seen);
 	TMap<int32, int32> ByComp;
@@ -169,7 +181,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 	J->SetArrayField(TEXT("hostiles_known"), Hostiles);
 	// the pressure bulkheads round the breach
 	TArray<TSharedPtr<FJsonValue>> Doors;
-	const int32 Deck = Map->GetComps()[Fight.Mission().Breach].Deck;
+	const int32 Deck = Map->GetComps().IsValidIndex(Fight.Mission().Breach) ? Map->GetComps()[Fight.Mission().Breach].Deck : 0;
 	for (const FBoardPortal& P : Map->GetPortals())
 	{
 		if (P.Kind == FBoardPortal::EKind::Blast && Map->GetComps()[P.A].Deck == Deck && FVector::Dist2D(P.Pos, BreachAt) < 12000.0 && Dmg->Doors.IsValidIndex(P.Door))
@@ -234,7 +246,7 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 			Doors2.Add(MakeShared<FJsonValueObject>(O));
 		}
 		J->SetArrayField(TEXT("objective_entrances"), Doors2);
-		const int32 Amb = Fight.AmbushPortal();
+		const int32 Amb = bWeAttack ? INDEX_NONE : Fight.AmbushPortal();               // (the holders' plan is theirs: an attacker does not know it)
 		if (Amb != INDEX_NONE && Map->GetPortals().IsValidIndex(Amb))
 		{
 			const FBoardPortal& P = Map->GetPortals()[Amb];
@@ -267,12 +279,19 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::MarinesPicture() const
 TSharedRef<FJsonObject> UAstraBoardSubsystem::Snapshot() const
 {
 	TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+	if (Assault.bOn)
+	{
+		J->SetObjectField(TEXT("assault"), AssaultJson());           // the boats: where each is, what it carries (also while no fight is on yet)
+	}
 	if (Phase != EPhase::Active || !Map.IsValid())
 	{
 		return J;
 	}
 	const FBook& B = Fight.Book();
+	const bool bWeAttack = Fight.IsAttacker(ESide::Aquila);
 	J->SetBoolField(TEXT("active"), true);
+	J->SetStringField(TEXT("direction"), Mode == EMode::Observed ? TEXT("in") : (Assault.bRoster ? TEXT("out") : TEXT("other")));
+	J->SetStringField(TEXT("ship"), Mode == EMode::Observed ? FString(TEXT("the Aquila")) : Assault.TargetName);
 	J->SetNumberField(TEXT("elapsed_s"), FMath::RoundToInt(Since));
 	if (!Source.IsEmpty())
 	{
@@ -283,14 +302,21 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::Snapshot() const
 	J->SetStringField(TEXT("objective"), Map->Describe(Fight.Mission().Objective));
 	J->SetStringField(TEXT("hostiles"), Fight.HostileSummary());
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
-	M->SetNumberField(TEXT("able"), Fight.CountAble(ESide::Aquila) - 1);
+	M->SetNumberField(TEXT("able"), Fight.CountAble(ESide::Aquila) - (Fight.CaptainId() != INDEX_NONE ? 1 : 0));
 	M->SetNumberField(TEXT("down"), B.Down[0]);
 	M->SetNumberField(TEXT("dead"), B.Killed[0]);
 	J->SetObjectField(TEXT("marines"), M);
 	TSharedRef<FJsonObject> E = MakeShared<FJsonObject>();
 	E->SetNumberField(TEXT("down_or_dead"), B.Down[1] + B.Killed[1]);
 	E->SetNumberField(TEXT("left_ship"), B.Exited[1]);
-	J->SetObjectField(TEXT("boarders_known_losses"), E);
+	if (bWeAttack)
+	{
+		J->SetObjectField(TEXT("defenders_known_losses"), E);       // (the marines attack: it is the ship's people who fall)
+	}
+	else
+	{
+		J->SetObjectField(TEXT("boarders_known_losses"), E);
+	}
 	int32 Sealed = 0;
 	for (const FBoardPortal& P : Map->GetPortals())
 	{
@@ -336,15 +362,16 @@ FString UAstraBoardSubsystem::InfoText() const
 	}
 	if (Phase == EPhase::Idle)
 	{
-		return FString::Printf(TEXT("boarding: ready (%d compartments, %d portals); none on"), Map->GetComps().Num(), Map->GetPortals().Num());
+		return FString::Printf(TEXT("boarding: ready (%d compartments, %d portals); none on; assault %s"), Map->GetComps().Num(), Map->GetPortals().Num(), *AssaultText());
 	}
 	const FBook& B = Fight.Book();
-	return FString::Printf(TEXT("boarding %s at %.0f s: marines %d able, %d down, %d dead; boarders %d able, %d down, %d dead, %d left the ship; Captain %d%%%s; %d bodies; "
-	                            "%.2f ms a step (sensing %.2f, plans %.2f, men %.2f); outcome %d"),
-	                       Phase == EPhase::Active ? TEXT("ON") : TEXT("over"), Since, Fight.CountAble(ESide::Aquila) - 1, B.Down[0], B.Killed[0], Fight.CountAble(ESide::Mandate),
+	return FString::Printf(TEXT("boarding %s%s at %.0f s: marines %d able, %d down, %d dead; boarders %d able, %d down, %d dead, %d left the ship; Captain %d%%%s; %d bodies; "
+	                            "%.2f ms a step (sensing %.2f, plans %.2f, men %.2f); outcome %d%s%s"),
+	                       Phase == EPhase::Active ? TEXT("ON") : TEXT("over"), Mode == EMode::Remote ? TEXT(" (on another ship)") : TEXT(""), Since,
+	                       Fight.CountAble(ESide::Aquila) - (Fight.CaptainId() != INDEX_NONE ? 1 : 0), B.Down[0], B.Killed[0], Fight.CountAble(ESide::Mandate),
 	                       B.Down[1], B.Killed[1], B.Exited[1], FMath::RoundToInt(CaptainStrength() * 100.f), bCapDown ? TEXT(" (down)") : TEXT(""), BodyOf.Num(),
 	                       (B.Ms[0] + B.Ms[1] + B.Ms[2]) / FMath::Max(1.0, Since * 10.0), B.Ms[0] / FMath::Max(1.0, Since * 10.0), B.Ms[1] / FMath::Max(1.0, Since * 10.0),
-	                       B.Ms[2] / FMath::Max(1.0, Since * 10.0), (int32)Fight.Mission().Outcome);
+	                       B.Ms[2] / FMath::Max(1.0, Since * 10.0), (int32)Fight.Mission().Outcome, Assault.bOn ? TEXT("; assault ") : TEXT(""), Assault.bOn ? *AssaultText() : TEXT(""));
 }
 
 // ================================================================================================================== the orders
@@ -355,19 +382,96 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 	{
 		return IssueWeapon(BdStr(Args, TEXT("kind")), BdStr(Args, TEXT("who")), OutDetail);       // the armourer sends a weapon up to the Captain (AstraBoardArms.cpp)
 	}
+	if (Name == TEXT("board_ship"))
+	{
+		// the crew's tool: the Aquila's marines in her Kestrels board a ship (`boats` is `craft`); `call_off` turns the boats back
+		TSharedPtr<FJsonObject> Out = MakeShared<FJsonObject>();
+		if (Args.IsValid())
+		{
+			Out->Values = Args->Values;
+		}
+		const FString Act = BdStr(Args, TEXT("action")).ToLower();
+		if (Act == TEXT("call_off"))
+		{
+			Out->SetStringField(TEXT("action"), TEXT("end"));
+		}
+		else
+		{
+			if (BdStr(Args, TEXT("target")).IsEmpty())
+			{
+				OutDetail = TEXT("name the ship to board (target: her contact id or name)");
+				return false;
+			}
+			Out->SetStringField(TEXT("direction"), TEXT("out"));
+			if (!Out->HasField(TEXT("craft")) && Out->HasField(TEXT("boats")))
+			{
+				Out->SetNumberField(TEXT("craft"), BdNum(Args, TEXT("boats"), 0.0));
+			}
+			if (!Out->HasField(TEXT("boarders")) && Out->HasField(TEXT("marines")))
+			{
+				Out->SetNumberField(TEXT("boarders"), BdNum(Args, TEXT("marines"), 0.0));
+			}
+			if (!Out->HasField(TEXT("by")))
+			{
+				Out->SetStringField(TEXT("by"), TEXT("the Captain's order"));
+			}
+		}
+		return HandleCommand(TEXT("boarding"), Out, OutDetail);
+	}
 	if (Name == TEXT("boarding"))
 	{
 		const FString Action = BdStr(Args, TEXT("action")).ToLower();
 		if (Action == TEXT("end") || Action == TEXT("stop") || Action == TEXT("cancel"))
 		{
-			if (Phase != EPhase::Active)
+			if (Phase != EPhase::Active && !Assault.bOn)
 			{
 				OutDetail = TEXT("no boarding is on");
 				return false;
 			}
 			EndBoarding(TEXT("ordered"));
-			OutDetail = TEXT("the boarding is called off");
+			OutDetail = TEXT("the boarding is called off: the boats turn back or let go");
 			return true;
+		}
+		// with a direction (and not `instant`) the boats fly it: in (the Aquila, or a ship of hers, is boarded) or out (her marines board a ship); without one it is the old boarding that
+		// is simply there (the boarders cut in after the warning)
+		const FString Direction = BdStr(Args, TEXT("direction")).ToLower();
+		bool bInstant = false;
+		if (Args.IsValid())
+		{
+			Args->TryGetBoolField(TEXT("instant"), bInstant);
+		}
+		if (!Direction.IsEmpty() && !bInstant)
+		{
+			FAssaultSpec A;
+			A.Source = BdStr(Args, TEXT("source"));
+			A.Target = BdStr(Args, TEXT("target"));
+			if (Direction == TEXT("out") || Direction == TEXT("outbound"))
+			{
+				if (A.Source.IsEmpty())
+				{
+					A.Source = TEXT("aquila");
+				}
+			}
+			else if (Direction != TEXT("in") && Direction != TEXT("inbound"))
+			{
+				OutDetail = FString::Printf(TEXT("unknown direction '%s' (in: the Aquila or a ship of hers is boarded; out: her marines board a ship)"), *Direction);
+				return false;
+			}
+			A.Face = BdStr(Args, TEXT("face"));
+			A.Objective = BdStr(Args, TEXT("objective"));
+			A.Breach = BdStr(Args, TEXT("breach"));
+			A.Craft = FMath::Clamp((int32)BdNum(Args, TEXT("craft"), BdNum(Args, TEXT("skiffs"), 0.0)), 0, 4);
+			A.Boarders = FMath::Clamp((int32)BdNum(Args, TEXT("boarders"), 0.0), 0, 48);
+			bool bLockAssault = true, bCap = false;
+			if (Args.IsValid())
+			{
+				Args->TryGetBoolField(TEXT("lockdown"), bLockAssault);
+				Args->TryGetBoolField(TEXT("captain"), bCap);
+			}
+			A.bLockdown = bLockAssault;
+			A.bCaptain = bCap;
+			A.By = BdStr(Args, TEXT("by"));
+			return StartAssault(A, OutDetail);
 		}
 		FSpec Spec;
 		Spec.Breach = BdStr(Args, TEXT("breach"));
@@ -386,6 +490,11 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 	if (Phase != EPhase::Active)
 	{
 		OutDetail = TEXT("no boarding is on");
+		return false;
+	}
+	if (Mode == EMode::Remote && (Name == TEXT("lockdown") || !Assault.bRoster))
+	{
+		OutDetail = Name == TEXT("lockdown") ? FString(TEXT("the bulkheads of another ship are not ours to seal")) : FString(TEXT("the marines are not in this fight"));
 		return false;
 	}
 	if (Name == TEXT("lockdown"))
@@ -484,13 +593,14 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 		if (Task == TEXT("hold")) { T = ETask::Hold; }
 		else if (Task == TEXT("advance") || Task == TEXT("move")) { T = ETask::Advance; }
 		else if (Task == TEXT("assault") || Task == TEXT("attack")) { T = ETask::Assault; }
-		else if (Task == TEXT("fall_back") || Task == TEXT("withdraw")) { T = ETask::FallBack; }
+		else if (Task == TEXT("fall_back")) { T = ETask::FallBack; }
+		else if (Task == TEXT("withdraw")) { T = Fight.IsAttacker(ESide::Aquila) ? ETask::Withdraw : ETask::FallBack; }       // (attacking: out by the hatch, to the boats; defending: back to a place)
 		else if (Task == TEXT("follow_captain") || Task == TEXT("follow")) { T = ETask::Follow; }
 		else if (Task == TEXT("rescue_captain") || Task == TEXT("rescue")) { T = ETask::Rescue; }
 		else if (Task == TEXT("stand_down") || Task == TEXT("free")) { bRespond = true; }
 		else
 		{
-			OutDetail = FString::Printf(TEXT("unknown task '%s' (hold, advance, assault, fall_back, follow_captain, rescue_captain, stand_down)"), *Task);
+			OutDetail = FString::Printf(TEXT("unknown task '%s' (hold, advance, assault, fall_back, withdraw, follow_captain, rescue_captain, stand_down)"), *Task);
 			return false;
 		}
 		FString Said;
@@ -591,6 +701,27 @@ namespace
 			const bool bOk = B->StartBoarding(S, D);
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("started") : TEXT("not started"), *D);
 			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 6.f, bOk ? FColor::Green : FColor::Red, D); }
+		}));
+	FAutoConsoleCommandWithWorldAndArgs BdCmdAssault(TEXT("astra.board.assault"), TEXT("Testing: boats fly a boarding. astra.board.assault in [carrier] [target] [boats 1..4] [face] [objective]  (the Mandate's skiffs board the Aquila, or the target named) | astra.board.assault out [target] [carrier] [boats] [face] [objective]  (the Aquila's marines go in Kestrels; ships by contact id or name; - for the default)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			UAstraBoardSubsystem* B = BdBoard(W);
+			if (!B || A.Num() < 1)
+			{
+				return;
+			}
+			UAstraBoardSubsystem::FAssaultSpec S;
+			const bool bOut = A[0].StartsWith(TEXT("out"));
+			(bOut ? S.Target : S.Source) = A.Num() > 1 && !A[1].Equals(TEXT("-")) ? A[1] : FString();
+			(bOut ? S.Source : S.Target) = A.Num() > 2 && !A[2].Equals(TEXT("-")) ? A[2] : FString();
+			S.Craft = A.Num() > 3 ? FCString::Atoi(*A[3]) : 0;
+			S.Face = A.Num() > 4 && !A[4].Equals(TEXT("-")) ? A[4] : FString();
+			S.Objective = A.Num() > 5 ? A[5] : FString();
+			S.By = TEXT("the console");
+			FString D;
+			const bool bOk = B->StartAssault(S, D);
+			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("assault ordered") : TEXT("assault refused"), *D);
+			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 8.f, bOk ? FColor::Green : FColor::Red, D); }
 		}));
 	FAutoConsoleCommandWithWorld BdCmdEnd(TEXT("astra.board.end"), TEXT("Testing: calls the boarding off (bulkheads open, marines back to duty)"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraBoardSubsystem* B = BdBoard(W)) { B->EndBoarding(TEXT("console")); } }));
