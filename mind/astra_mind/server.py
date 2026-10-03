@@ -276,7 +276,7 @@ class Mind:
             strategy = StrategicMinds(self.llm, march, self._rourke_say, lang=lambda: self.lang, intel=self.style.mandate_line, note=self.director.note)
             strategy.disabled = os.environ.get("ASTRA_STRATEGY_MINDS", "1") == "0"
             glue = MarchGlue(march, strategy, command=self._director_command, register_groups=self.director._register_groups, announce=self._march_news,
-                             note=self.director.note, send_sector=self._send_sector, lang=lambda: self.lang)
+                             note=self.director.note, send_sector=self._send_sector)
             self.war.strategic = lambda side: strategy.field_brief(side, march.real_system)
             glue.on_war_over = lambda text: asyncio.create_task(self.director._end_arc(text, self.lang, self._battle_state()))
             self.director.march = glue

@@ -25,7 +25,7 @@ import re
 import time
 from typing import Any, Awaitable, Callable
 
-from .march import STRAGGLERS, Fleet, March, SIDES, Ship
+from .march import STEP_S, STRAGGLERS, Fleet, March, SIDES, Ship
 from .march_auto import AutoAdmiral
 from .march_data import ASTRA_PEOPLE, CARRIERS, CLASSES, MANDATE_PEOPLE
 from .strategy import StrategicMinds
@@ -94,7 +94,7 @@ class MarchGlue:
     def __init__(self, march: March, minds: StrategicMinds | None, *, command: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]],
                  register_groups: Callable[[list[str], list[dict[str, Any]], str, dict[str, Any], str], None] | None = None,
                  announce: Callable[[str], Awaitable[None]] | None = None, note: Callable[[str], None] | None = None,
-                 send_sector: Callable[[], Awaitable[None]] | None = None, lang: Callable[[], str] = lambda: "en", clock: Callable[[], float] = time.monotonic) -> None:
+                 send_sector: Callable[[], Awaitable[None]] | None = None, clock: Callable[[], float] = time.monotonic) -> None:
         self.m = march
         self.minds = minds
         self.command = command                          # (name, args) -> the game's result: `director_beat`
@@ -102,19 +102,16 @@ class MarchGlue:
         self.announce = announce                        # (text): the fleet net reports it on the bridge
         self.note = note or (lambda text: None)         # the campaign log
         self.send_sector = send_sector                  # (): the holo table is drawn again
-        self.lang = lang
         self.clock = clock
         self.active = False
-        self.disabled_reflexes = False
         self.gate: tuple[float, float] | None = None
-        self.state: dict[str, Any] = {}
         self.seen: set[str] = set()                     # the contact ids of the March's ships that the game has shown alive
         self.fate: dict[str, str] = {}                  # contact id -> destroyed | fled (what the game's events said)
-        self.tries: dict[str, int] = {}
         self.sending: set[str] = set()
         self.reserve: dict[str, float] = {}             # fleet -> when it may try the Gate again (the game's sky was full)
         self.opening: set[str] = set()                  # the fleets the game's opening brings in itself: the map leaves them to it until they show (or the grace is out)
         self.due: dict[str, float] = {}                 # contact id -> when the ship should have shown in the game's views by (a ship that never came is dropped)
+        self._acc = 0.0                                 # war time that has passed and the world has not yet been advanced by (a fraction of a step)
         self.ff = False                                 # the war is being run without the Aquila: the game's state does not move it
         self.on_war_over: Callable[[str], None] | None = None   # (text): the war has ended (a capital fell, a people's will is gone, an armistice): the story tells its end
         self._over_told = False
@@ -158,7 +155,6 @@ class MarchGlue:
         system in a saved one (the game builds its picket whenever it starts)."""
         self.seen.clear()
         self.fate.clear()
-        self.tries.clear()
         self.sending.clear()
         self.reserve.clear()
         self.due.clear()
@@ -187,12 +183,14 @@ class MarchGlue:
         dt = 0.0 if self._last is None else min(MAX_DT_S, max(0.0, now - self._last))
         self._last = now
         m = self.m
-        self.state = state
         try:
             self._place(state)
             self._adopt(state)
-            if dt > 0.0:
-                m.run(dt)
+            self._acc += dt
+            if self._acc >= STEP_S - 1e-6:                      # (the world advances in its own steps, whatever the rate the game's states come at: the battle model's luck is a draw a step)
+                n = int(self._acc // STEP_S)
+                self._acc -= n * STEP_S
+                m.run(n * STEP_S)
             if m.over and not self._over_told:
                 self._over_told = True
                 self._tell_the_end()
@@ -343,7 +341,6 @@ class MarchGlue:
                 self.stats["sent"] += 1
             if not ok_any:
                 self.stats["refused"] += 1
-                self.tries[f.id] = self.tries.get(f.id, 0) + 1
                 if f.id in self.m.fleets:
                     self._bounce(f)
         except Exception:  # noqa: BLE001

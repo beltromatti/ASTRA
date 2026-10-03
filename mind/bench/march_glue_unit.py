@@ -475,12 +475,12 @@ class StoryTest(Fixture):
 
     async def test_bulletins_come_at_most_so_often(self) -> None:
         self.m.say("system_taken", "Cassia", "one", ("astra",), 3)
-        await self.step(5)
+        await self.step(15)
         self.m.say("system_taken", "Thule", "two", ("astra",), 3)
-        await self.step(25)
-        self.assertEqual(len(self.said), 1)
-        await self.step(10)
-        self.assertEqual(len(self.said), 1)                                              # (the second waits for the fleet net's quiet)
+        await self.step(20)
+        self.assertEqual(len(self.said), 1)                                              # (the first has come, at +28 s)
+        await self.step(15)
+        self.assertEqual(len(self.said), 1)                                              # (the second has come, at +43 s, and waits for the fleet net's quiet)
         await self.step(mg.BULLETIN_GAP_S)
         self.assertEqual(len(self.said), 2)
 
