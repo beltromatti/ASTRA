@@ -186,21 +186,21 @@ int32 UAstraWarDraw::KindFor(const FString& Mesh)
 		}
 		Kinds[Idx].StaticMesh = M;
 		Meshes.Add(M);
-		MakePage(Idx, 0);                               // the first page of the main set, ready before the first craft needs it
+		MakePage(Idx);                                  // the first page, ready before the first craft needs it
 	}
 	return Idx;
 }
 
-FPage* UAstraWarDraw::MakePage(int32 KindIdx, int32 SetIdx)
+FPage* UAstraWarDraw::MakePage(int32 KindIdx)
 {
 	FKind& Kd = Kinds[KindIdx];
-	FPage& P = Kd.Sets[SetIdx].Pages.AddDefaulted_GetRef();
+	FPage& P = Kd.Set.Pages.AddDefaulted_GetRef();
 	P.Xf.Init(DrawHiddenXf(), PageSize);
 	P.PrevXf.Init(DrawHiddenXf(), PageSize);
 	P.Owner.Init(-1, PageSize);
 	if (bLive && Kd.StaticMesh && Host)
 	{
-		const FString Name = FString::Printf(TEXT("Draw_%s_%d_%d"), *Kd.Mesh, SetIdx, Kd.Sets[SetIdx].Pages.Num());
+		const FString Name = FString::Printf(TEXT("Draw_%s_%d"), *Kd.Mesh, Kd.Set.Pages.Num());
 		P.Comp = MakeComp(Host, Host->GetRootComponent(), *Name, Kd.StaticMesh, nullptr, PageSize, 0, true, true);
 	}
 	return &P;
@@ -250,25 +250,24 @@ bool UAstraWarDraw::Claim(FAstraBattleShip& S)
 }
 
 // ------------------------------------------------------------------------------------------------------------------ slots
-bool UAstraWarDraw::Alloc(int32 KindIdx, int32 SetIdx, int32 ShipId, FRef& OutRef)
+bool UAstraWarDraw::Alloc(int32 KindIdx, int32 ShipId, FRef& OutRef)
 {
-	FSet& St = Kinds[KindIdx].Sets[SetIdx];
+	FSet& St = Kinds[KindIdx].Set;
 	const int32 Slot = St.FreeSlots.Num() ? St.FreeSlots.Pop(EAllowShrinking::No) : St.NextSlot++;
 	const int32 PageI = Slot / PageSize;
-	while (Kinds[KindIdx].Sets[SetIdx].Pages.Num() <= PageI)
+	while (Kinds[KindIdx].Set.Pages.Num() <= PageI)
 	{
-		MakePage(KindIdx, SetIdx);
+		MakePage(KindIdx);
 	}
-	FPage& P = Kinds[KindIdx].Sets[SetIdx].Pages[PageI];
+	FPage& P = Kinds[KindIdx].Set.Pages[PageI];
 	const int32 L = Slot % PageSize;
 	P.Owner[L] = ShipId;
 	++P.Live;
 	P.High = FMath::Max(P.High, L + 1);
-	FSet& St2 = Kinds[KindIdx].Sets[SetIdx];
+	FSet& St2 = Kinds[KindIdx].Set;
 	++St2.Live;
 	St2.Peak = FMath::Max(St2.Peak, St2.Live);
 	OutRef.Kind = (int16)KindIdx;
-	OutRef.Set = (uint8)SetIdx;
 	OutRef.Slot = Slot;
 	return true;
 }
@@ -279,7 +278,7 @@ void UAstraWarDraw::Release(const FRef& R)
 	{
 		return;
 	}
-	FSet& St = Kinds[R.Kind].Sets[R.Set];
+	FSet& St = Kinds[R.Kind].Set;
 	FPage& P = St.Pages[R.Slot / PageSize];
 	const int32 L = R.Slot % PageSize;
 	P.Xf[L] = DrawHiddenXf();
@@ -297,29 +296,20 @@ void UAstraWarDraw::StageHull(FAstraBattleShip& S, double Dist2)
 	{
 		return;                                         // too far to be more than a speck: its glow stays, its hull is let go (Sweep)
 	}
-	const bool bNear = bLens && S.Side == EAstraSide::Astra && S.Id != LensExempt && Dist2 < FMath::Square(LensKm * 1000.0);
-	const int32 SetIdx = bNear ? 1 : 0;
-	if (R && R->Set != SetIdx)
-	{
-		Release(*R);                                    // it crossed the lens range: it changes component (once)
-		Where.Remove(S.Id);
-		R = nullptr;
-	}
 	const bool bFresh = R == nullptr;
 	if (!R)
 	{
 		FRef N;
-		Alloc(S.DrawKind, SetIdx, S.Id, N);
+		Alloc(S.DrawKind, S.Id, N);
 		R = &Where.Add(S.Id, N);
 	}
 	R->Frame = Frame;
-	FPage& P = Kinds[R->Kind].Sets[R->Set].Pages[R->Slot / PageSize];
+	FPage& P = Kinds[R->Kind].Set.Pages[R->Slot / PageSize];
 	const int32 L = R->Slot % PageSize;
 	const FTransform Now(F.ToWorldRot(S.Att), F.ToWorld(S.Pos), FVector::OneVector);
 	P.PrevXf[L] = bFresh ? Now : P.Xf[L];                 // (a craft that has just appeared has no past: it is not smeared across the sky from where its slot was last)
 	P.Xf[L] = Now;
 	++Hulls;
-	NearNow += SetIdx;
 }
 
 void UAstraWarDraw::StageLamps(const FAstraBattleShip& S, double Dist2)
@@ -390,26 +380,24 @@ void UAstraWarDraw::Flush()
 {
 	for (FKind& Kd : Kinds)
 	{
-		for (FSet& St : Kd.Sets)
+		FSet& St = Kd.Set;
+		for (FPage& P : St.Pages)
 		{
-			for (FPage& P : St.Pages)
+			if (P.Live == 0 && !P.bWritten)
 			{
-				if (P.Live == 0 && !P.bWritten)
+				continue;                           // empty and already written hidden: nothing to send
+			}
+			if (UInstancedStaticMeshComponent* C = P.Comp.Get())
+			{
+				if (P.High > 0)
 				{
-					continue;                           // empty and already written hidden: nothing to send
+					C->BatchUpdateInstancesTransforms(0, P.Xf, P.PrevXf, false, false, false);   // (the page whole: the two lists must match in length)
 				}
-				if (UInstancedStaticMeshComponent* C = P.Comp.Get())
-				{
-					if (P.High > 0)
-					{
-						C->BatchUpdateInstancesTransforms(0, P.Xf, P.PrevXf, false, false, false);   // (the page whole: the two lists must match in length)
-					}
-				}
-				P.bWritten = P.Live > 0;
-				if (P.Live == 0)
-				{
-					P.High = 0;
-				}
+			}
+			P.bWritten = P.Live > 0;
+			if (P.Live == 0)
+			{
+				P.High = 0;
 			}
 		}
 	}
@@ -421,28 +409,26 @@ void UAstraWarDraw::HideAll()
 	Where.Reset();
 	for (FKind& Kd : Kinds)
 	{
-		for (FSet& St : Kd.Sets)
+		FSet& St = Kd.Set;
+		St.FreeSlots.Reset();
+		St.NextSlot = 0;
+		St.Live = 0;
+		for (FPage& P : St.Pages)
 		{
-			St.FreeSlots.Reset();
-			St.NextSlot = 0;
-			St.Live = 0;
-			for (FPage& P : St.Pages)
+			for (FTransform& X : P.Xf)
 			{
-				for (FTransform& X : P.Xf)
-				{
-					X = DrawHiddenXf();
-				}
-				for (FTransform& X : P.PrevXf)
-				{
-					X = DrawHiddenXf();
-				}
-				for (int32& O : P.Owner)
-				{
-					O = -1;
-				}
-				P.Live = 0;
-				P.bWritten = P.High > 0;                // one more write, all hidden
+				X = DrawHiddenXf();
 			}
+			for (FTransform& X : P.PrevXf)
+			{
+				X = DrawHiddenXf();
+			}
+			for (int32& O : P.Owner)
+			{
+				O = -1;
+			}
+			P.Live = 0;
+			P.bWritten = P.High > 0;                // one more write, all hidden
 		}
 	}
 	Lamps.Begin();
@@ -479,7 +465,6 @@ void UAstraWarDraw::Tick(float InDt)
 	CraftLampKm = FMath::Max(2.f, CVarWarLampsCraftKm.GetValueOnGameThread());
 	Lamps.Begin();
 	Hulls = 0;
-	NearNow = 0;
 	int32 Actors = 0, Comps = 0;
 	for (int32 i = 1; i < Owner->Ships.Num(); ++i)
 	{
@@ -516,43 +501,18 @@ void UAstraWarDraw::Tick(float InDt)
 	++TickCount;
 }
 
-// ------------------------------------------------------------------------------------------------------------------ the lens
-void UAstraWarDraw::SetLensHint(bool bActive, double WithinKm, int32 ExemptId)
-{
-	bLens = bActive;
-	LensKm = WithinKm;
-	LensExempt = ExemptId;
-}
-
-void UAstraWarDraw::GetNearLensComponents(TArray<UPrimitiveComponent*>& Out) const
-{
-	for (const FKind& Kd : Kinds)
-	{
-		for (const FPage& P : Kd.Sets[1].Pages)
-		{
-			if (UInstancedStaticMeshComponent* C = P.Comp.Get())
-			{
-				Out.Add(C);
-			}
-		}
-	}
-}
-
 // ------------------------------------------------------------------------------------------------------------------ what it holds
 void UAstraWarDraw::Stats(FString& Out) const
 {
 	int32 Pages = 0;
 	for (const FKind& Kd : Kinds)
 	{
-		for (const FSet& St : Kd.Sets)
-		{
-			Pages += St.Pages.Num();
-		}
+		Pages += Kd.Set.Pages.Num();
 	}
-	Out = FString::Printf(TEXT("%s | %.3f ms/frame (max %.2f) over %d frames | craft hulls %d now / %d peak in %d pages of %d (%d in the lens set), lamps %d now / %d peak (%d dropped) | "
+	Out = FString::Printf(TEXT("%s | %.3f ms/frame (max %.2f) over %d frames | craft hulls %d now / %d peak in %d pages of %d, lamps %d now / %d peak (%d dropped) | "
 	                           "what the actor path would be: %d actors, %d components (peak %d, %d)"),
 	                      bLive ? TEXT("drawing") : (bSim ? TEXT("bench (not drawn)") : TEXT("off")), TickCount ? TickMs / TickCount : 0.0, TickMsMax, TickCount,
-	                      Hulls, HullsPeak, Pages, PageSize, NearNow, LampsNow, LampsPeak, LampsDropped, LegacyActors, LegacyComps, LegacyActorsPeak, LegacyCompsPeak);
+	                      Hulls, HullsPeak, Pages, PageSize, LampsNow, LampsPeak, LampsDropped, LegacyActors, LegacyComps, LegacyActorsPeak, LegacyCompsPeak);
 }
 
 TSharedRef<FJsonObject> UAstraWarDraw::StatsJson() const
@@ -569,7 +529,7 @@ TSharedRef<FJsonObject> UAstraWarDraw::StatsJson() const
 	int32 Pages = 0;
 	for (const FKind& Kd : Kinds)
 	{
-		Pages += Kd.Sets[0].Pages.Num() + Kd.Sets[1].Pages.Num();
+		Pages += Kd.Set.Pages.Num();
 	}
 	J->SetNumberField(TEXT("pages"), Pages);
 	return J;

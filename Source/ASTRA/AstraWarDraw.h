@@ -56,7 +56,7 @@ namespace AstraDraw
 		bool bWritten = false;                                  // the last flush left live instances (an empty page is written once, hidden, and then let be)
 	};
 
-	/** All the pages of one set of one kind of hull. Set 1 holds our own craft that the main viewscreen's camera must not see (they cross its lens). */
+	/** All the pages of one kind of hull. */
 	struct FSet
 	{
 		TArray<FPage> Pages;
@@ -65,12 +65,12 @@ namespace AstraDraw
 		int32 Live = 0, Peak = 0;
 	};
 
-	/** A kind of craft hull: its mesh and its two sets of pages. */
+	/** A kind of craft hull: its mesh and its pages. */
 	struct FKind
 	{
 		FString Mesh;
 		TObjectPtr<UStaticMesh> StaticMesh;
-		FSet Sets[2];
+		FSet Set;
 		bool bFailed = false;                                   // its mesh did not load: its craft are drawn as actors
 	};
 
@@ -78,7 +78,6 @@ namespace AstraDraw
 	struct FRef
 	{
 		int16 Kind = -1;
-		uint8 Set = 0;
 		int32 Slot = -1;
 		uint32 Frame = 0;                                       // the last frame it was staged: a ship not staged is gone
 	};
@@ -109,11 +108,6 @@ public:
 	/** Everything goes (a transit, a new system). */
 	void ClearAll();
 
-	/** The main viewscreen's camera is zoomed far out on a target: our own craft nearer than this (km) to the Aquila would cross its lens as huge blurred
-	 *  shapes, so they are drawn in a set the camera is told to leave out (GetNearLensComponents). The craft ExemptId (the one it shows) is not. */
-	void SetLensHint(bool bActive, double WithinKm, int32 ExemptId);
-	void GetNearLensComponents(TArray<UPrimitiveComponent*>& Out) const;
-
 	/** What it holds and what it costs (astra.war.stat), and the same as JSON for the bench's record. */
 	void Stats(FString& Out) const;
 	TSharedRef<class FJsonObject> StatsJson() const;
@@ -138,11 +132,6 @@ private:
 	TArray<TArray<FAstraNavLamp>> LampSets;                  // by (mesh, side)
 	TMap<FString, int32> LampSetByKey;
 
-	// ---- the lens hint (the main viewscreen)
-	bool bLens = false;
-	double LensKm = 0.0;
-	int32 LensExempt = -1;
-
 	// ---- the frame
 	struct FFrame
 	{
@@ -163,17 +152,16 @@ private:
 	double TickMs = 0.0, TickMsMax = 0.0;
 	int32 TickCount = 0;
 	int32 Hulls = 0, HullsPeak = 0, LampsNow = 0, LampsPeak = 0, LampsDropped = 0;
-	int32 NearNow = 0;
 	int32 LegacyActors = 0, LegacyComps = 0, LegacyActorsPeak = 0, LegacyCompsPeak = 0;   // what the actor path would have made of the same ships (the bench's "before")
 
 	// ---- internals (AstraWarDraw.cpp)
 	bool LoadAssets();
 	int32 KindFor(const FString& Mesh);
 	int32 LampSetFor(const FAstraBattleShip& S);
-	AstraDraw::FPage* MakePage(int32 KindIdx, int32 SetIdx);
+	AstraDraw::FPage* MakePage(int32 KindIdx);
 	void StageHull(FAstraBattleShip& S, double Dist2);
 	void StageLamps(const FAstraBattleShip& S, double Dist2);
-	bool Alloc(int32 KindIdx, int32 SetIdx, int32 ShipId, AstraDraw::FRef& OutRef);
+	bool Alloc(int32 KindIdx, int32 ShipId, AstraDraw::FRef& OutRef);
 	void Release(const AstraDraw::FRef& R);
 	void Sweep();
 	void Flush();

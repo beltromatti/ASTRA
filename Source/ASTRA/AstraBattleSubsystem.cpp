@@ -632,22 +632,6 @@ void UAstraBattleSubsystem::StartCampaign()
 	}
 }
 
-void UAstraBattleSubsystem::SetLensHint(bool bActive, double WithinKm, int32 ExemptId)
-{
-	if (WarDraw)
-	{
-		WarDraw->SetLensHint(bActive, WithinKm, ExemptId);
-	}
-}
-
-void UAstraBattleSubsystem::GetNearLensComponents(TArray<UPrimitiveComponent*>& Out) const
-{
-	if (WarDraw)
-	{
-		WarDraw->GetNearLensComponents(Out);
-	}
-}
-
 FString UAstraBattleSubsystem::DrawStats() const
 {
 	FString S;
