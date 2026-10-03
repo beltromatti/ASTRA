@@ -25,7 +25,9 @@ namespace
 	TAutoConsoleVariable<float> CVarWalkNatural(TEXT("astra.life.walk_natural"), 147.f, TEXT("VITA: the walk cycle's own speed (cm/s) at play rate 1"));
 	TAutoConsoleVariable<float> CVarJogNatural(TEXT("astra.life.jog_natural"), 344.f, TEXT("VITA: the jog cycle's own speed (cm/s) at play rate 1"));
 	TAutoConsoleVariable<float> CVarLane(TEXT("astra.life.lane_cm"), 26.f, TEXT("VITA: how far to the right of the way people keep in a corridor (cm)"));
-	TAutoConsoleVariable<float> CVarShadowM(TEXT("astra.life.shadow_m"), 14.f, TEXT("VITA: bodies farther than this from the camera cast no shadow (m)"));
+	// 6 m: in the Mess Hall's crowd the bodies' shadows were 5 ms of the GPU's 15 (every moving body redraws the virtual shadow pages of the lamps
+	// it stands under); within 6 m a shadow is what grounds a person, beyond it nobody misses it (3 Oct: 14 m -> 5 m, -2.2 ms)
+	TAutoConsoleVariable<float> CVarShadowM(TEXT("astra.life.shadow_m"), 6.f, TEXT("VITA: bodies farther than this from the camera cast no shadow (m)"));
 	constexpr float JogFrom = 220.f;     // faster than this (cm/s) they jog
 }
 
