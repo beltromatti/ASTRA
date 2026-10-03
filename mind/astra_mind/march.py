@@ -321,6 +321,7 @@ class March:
         self.real_t0: float = 0.0
         self.aquila_gate_km: float | None = None                                     # how far the Janus Gate is from the Aquila in the real simulation (the glue reads it from the game): the minutes a force needs
         self.opening_plan: list[dict[str, Any]] = []                                 # the scenario's first moves not yet made (the March-driven opening: `march_opening`)
+        self.hail_fleets: set[str] = set()                                           # the fleets whose commander opens a channel to the Aquila when they come into her system (once)
         self.captain_skill: float = 1.0                                              # the bench's stand-in for how well the Captain fights the fleet he commands
         self.aquila_fleet: str = ""                                                  # (bench) the fleet the Aquila is in: the real game has her in the real simulation
         self.free_classes = False                                                    # (bench) a world where both sides build and field the same classes
@@ -634,6 +635,7 @@ class March:
                 f.order = Order(o.get("kind", "hold"), o.get("target", f.where), o.get("stance", "steady"), False, str(o.get("by", "default")), o.get("reason", ""), self.t, None, "gate")
             taken.append(fid)
         self.opening_plan = [dict(p) for p in MARCH_OPENING["plan"] if p["fleet"] in taken]
+        self.hail_fleets = {fid for fid in taken if MARCH_OPENING["fleets"][fid].get("hail")}
         self.dirty = True
         return taken
 
@@ -2080,7 +2082,7 @@ class March:
         return {"t": round(self.t, 1), "seed": self.seed, "owners": {k: self.owner(k) for k in self.sys}, "fleets": [f.to_dict() for f in self.fleets.values()], "sys": {k: v.to_dict() for k, v in self.sys.items()},
                 "events": [e.to_dict() for e in self.events[-120:]], "event_n": self.event_n, "will": self.will, "plans": self.plans, "plan_t": self.plan_t, "score": self.score,
                 "over": self.over, "guilds_open": self.guilds_open, "home_orders": self.home_orders, "tender_free_at": self.tender_free_at, "aquila_task": self.aquila_task, "truce": self.truce, "proposals": self.proposals, "aquila": self.aquila, "aquila_seen": list(self.aquila_seen), "next_id": self.next_id,
-                "used_names": sorted(self.used_names), "opening_plan": self.opening_plan, "tracks": {s: {k: v.to_dict() for k, v in self.tracks[s].items()} for s in SIDES},
+                "used_names": sorted(self.used_names), "opening_plan": self.opening_plan, "hail_fleets": sorted(self.hail_fleets), "tracks": {s: {k: v.to_dict() for k, v in self.tracks[s].items()} for s in SIDES},
                 "log": {s: [e.to_dict() for e in self.log[s]] for s in SIDES}, "rcv": self.rcv, "inbox": {s: [[round(w, 1), e.n] for w, e in self.inbox[s]] for s in SIDES}}
 
     def save(self, path: str | None = None) -> None:
@@ -2141,6 +2143,7 @@ class March:
         self.next_id = d.get("next_id") or self.next_id
         self.used_names = set(d.get("used_names") or [])
         self.opening_plan = [dict(p) for p in d.get("opening_plan") or []]
+        self.hail_fleets = set(d.get("hail_fleets") or [])
         self.tracks = {s: {k: Track.from_dict(v) for k, v in (d.get("tracks", {}).get(s) or {}).items()} for s in SIDES}
         by_n = {e.n: e for e in self.events}
         self.log = {s: deque([Event.from_dict(e) for e in d.get("log", {}).get(s, [])], maxlen=60) for s in SIDES}

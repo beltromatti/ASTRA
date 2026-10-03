@@ -438,6 +438,8 @@ class MarchOpeningTest(Fixture):
         self.assertEqual(names, ["Acheron", "Cocytus", "Phlegethon", "Styx"])
         self.assertEqual(beat["groups"][0]["commander"]["name"], "Archon Varek Solm")
         self.assertFalse(beat["dark"])
+        self.assertTrue(beat["hail"])                                                      # (Archon Solm opens a channel as the group comes through, as he does in the script)
+        self.assertEqual(self.m.hail_fleets, set())                                         # (once)
         self.assertGreaterEqual(beat["range_km"], mg.ARRIVAL_MIN_KM)                      # (from far out: never at knife range)
         self.assertEqual(beat["bearing_deg"], 200.0)
         # the vanguard waits at Thule and the relief at Meridian: the war's, nobody has told them anything
@@ -452,6 +454,7 @@ class MarchOpeningTest(Fixture):
         m2 = world(2)
         m2._from_dict(d)
         self.assertEqual(m2.opening_plan, self.m.opening_plan)
+        self.assertEqual(m2.hail_fleets, {"F-M1"})
         self.assertEqual(m2.fleets["F-M1"].where, "Thule")
 
 

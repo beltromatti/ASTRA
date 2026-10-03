@@ -377,7 +377,7 @@ class MarchGlue:
                 group, order = self.beat_group(f, groups_all, gi, leaders)
                 late = per_ship * before
                 before += len(idxs)
-                beat = {"type": kind, "granted": True, "hail": False, "dark": bool(f.dark), "delay_s": round(delay + late, 1), "groups": [group],
+                beat = {"type": kind, "granted": True, "hail": bool(gi == 0 and f.id in self.m.hail_fleets), "dark": bool(f.dark), "delay_s": round(delay + late, 1), "groups": [group],
                         "why": f"{f.name} comes to the Aquila's system"}
                 beat.update(self.where_beat(f, at_gate))
                 res = await self.command("director_beat", {"beat": {k: v for k, v in beat.items() if k not in ("why", "commander")}})
@@ -385,6 +385,8 @@ class MarchGlue:
                     log.warning("the game refused %s: %s", f.name, res.get("detail"))
                     break
                 ok_any = True
+                if beat["hail"]:
+                    self.m.hail_fleets.discard(f.id)                        # (the commander opens his channel once)
                 ids = IDS_RE.findall(str(res.get("detail", "")))
                 for idx, cid in zip(order, ids):
                     if 0 <= idx < len(f.ships):

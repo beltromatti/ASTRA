@@ -227,7 +227,7 @@ PEOPLE_FOR_FLEET = {"F-M4": "Warden Zefir Dacosta"}
 # The vanguard waits at Thule for the Archon's word and the relief at Meridian for the Admiral's: what they do next is the war's (the minds', and the Captain's words to Rourke).
 MARCH_OPENING: dict[str, Any] = dict(
     fleets={
-        "F-M1": dict(where="Thule", dark=False,
+        "F-M1": dict(where="Thule", dark=False, hail=True,       # (Archon Solm opens a channel to the Aquila when he comes through, as he does in the script: she has the approach to talk)
                      order=dict(kind="hold", target="Thule", stance="bold", by="story", reason="the strike group waits at Thule for the hour the Archon has set")),
         "F-M3": dict(where="Thule", dark=False,
                      order=dict(kind="hold", target="Thule", stance="steady", reason="the vanguard waits at Thule for the strike group's work and the Archon's word")),
