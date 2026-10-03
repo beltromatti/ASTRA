@@ -101,17 +101,16 @@ for k in range(4):
     ang = 2 * math.pi * (k + 0.25) / 4
     light(unreal.PointLight, R["x"] + math.cos(ang) * (R["radius"] + 2.2), R["y"] + math.sin(ang) * (R["radius"] + 2.2), 4.0 + 4 * (k % 2),
           f"Engineering_CoreGlow_{k}", 30000, (60, 140, 255), 2800, shadows=(k == 0))
-# (ARTE-INTERNI: the hall was black, twelve lamps of 5200 lm twelve metres over a deck of 1176 m2: the high-bay luminaires hung from the trusses (the meshes of SM_ENG_Detail) carry the light now,
-# the old ceiling lamps stay as a soft top light, and a row of work lights hangs under each gallery)
+# (ARTE-INTERNI: the hall was black, twelve lamps of 5200 lm twelve metres over a deck of 1176 m2: the twelve lights now hang where the high-bay luminaires of SM_ENG_Detail hang from the trusses,
+# 24000 lm each, and a row of work lights hangs under each gallery: 8 lights more than before, not 28: every light of a hall this size covers the whole picture)
 for k in range(6):
     x = -3 - k * 6.5
     for yy in (-8.0, 8.0):
-        light(unreal.RectLight, x, yy, D["height"] - 1.5, f"Engineering_Lamp_{k}_{yy:+.0f}", 6000, (235, 242, 255), 1800, size=(3.4, 1.4))
-        light(unreal.RectLight, x, yy, D["height"] - 4.3, f"Engineering_HighBay_{k}_{yy:+.0f}", 18000, (235, 242, 255), 2400, size=(1.4, 1.4))
-for k in range(8):
-    x = -9.0 - k * 4.0
+        light(unreal.RectLight, x, yy, D["height"] - 4.3, f"Engineering_HighBay_{k}_{yy:+.0f}", 24000, (235, 242, 255), 2200, size=(2.4, 1.4))
+for k in range(4):
+    x = -9.0 - k * 8.0
     for yy in (-11.2, 11.2):
-        light(unreal.RectLight, x, yy, D["gallery"]["z"] - 0.7, f"Engineering_GalleryLamp_{k}_{yy:+.0f}", 7000, (255, 232, 200), 1100, size=(3.0, 0.4))
+        light(unreal.RectLight, x, yy, D["gallery"]["z"] - 0.7, f"Engineering_GalleryLamp_{k}_{yy:+.0f}", 14000, (255, 232, 200), 1300, size=(6.0, 0.4))
 mc = D["master_console"]
 light(unreal.PointLight, mc["x"], mc["y"], 3.2, "Engineering_ConsoleGlow", 3500, (120, 200, 255), 900)
 log.append("lights")

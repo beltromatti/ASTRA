@@ -79,16 +79,16 @@ def rect(x, y, z, w, h, lumens, temp, label, shadows=False, pitch=-90.0, yaw=0.0
 
 
 HGT, LEN = D["height"], D["length"]
-# (ARTE-INTERNI: the deck read as a grey warehouse with the lights off — 468000 lm over 8120 m2, 58 lm/m2 twenty metres up; the big fixtures are 2.3 times stronger and a row of wall washers
-# hangs at the catwalk's height on each side)
+# (ARTE-INTERNI: the deck read as a grey warehouse with the lights off — 468000 lm over 8120 m2, 58 lm/m2 twenty metres up; the big fixtures are 2.3 times stronger and five wall washers
+# hang at the catwalk's height on each side: 10 lights more than before, each one covers a great part of the picture)
 for k in range(6):
     x = 12 + k * 22.0
     for j, yy in enumerate((-16.0, 0.0, 16.0)):
         rect(x, yy, HGT - 1.9, 6.0, 2.4, 60000, 5600, f"Hangar_Light_{k}_{j}", shadows=(j == 1 and k % 2 == 0))
-for k in range(9):
-    x = 10.0 + k * 16.0
+for k in range(5):
+    x = 14.0 + k * 28.0
     for sy in (-1, 1):
-        rect(x, sy * (D["half_width"] - 3.0), D["catwalk"]["z"] - 0.4, 6.0, 1.0, 18000, 5200, f"Hangar_WallWash_{k}_{'P' if sy < 0 else 'S'}", radius=2600.0)
+        rect(x, sy * (D["half_width"] - 3.0), D["catwalk"]["z"] - 0.4, 10.0, 1.0, 32000, 5200, f"Hangar_WallWash_{k}_{'P' if sy < 0 else 'S'}", radius=3200.0)
 for tb in D["tubes"]:
     rect(LEN + tb["length"] / 2, tb["y"], tb["height"] - 0.6, tb["length"] - 1, tb["width"] - 2, 9000, 6500, f"Hangar_TubeLight_{tb['y']:+.0f}")
 bo = D["booth"]
