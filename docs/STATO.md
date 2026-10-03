@@ -22,6 +22,23 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**3/10 pomeriggio — CAMPAGNA e le braccia nel gioco, FLOTTA-VIVA avviato (il lead):**
+- **CAMPAGNA unito** (la guerra della March, [GUERRA.md §10](GUERRA.md)): le forze arrivano da 85–120 km dal Gate e si vedono venire (Keeper Station
+  vede le rotte del Gate a 60 km, ogni ondata dice se arriva al buio), la March gioca l'apertura (comando `opening {script:false}`): **provato nel gioco**
+  — Gate in ciclo e Rourke a 208–214 s, il gruppo d'attacco a 85 km a 266 s, il suo comandante sul canale, il grosso della 7ª Flotta e Constance da
+  85 km a 373 s, primo fuoco a ~390 s, poi l'avanguardia (8 navi) dal Gate. Corretti nel gioco: una forza che si riorganizza o tiene per ordine resta
+  nella guerra (il gioco aveva dichiarato vittoria e Rourke si congratulava); decolli, ingaggi e rientri delle squadriglie delle altre navi non sono
+  più rapporti per la plancia (aprivano turni vuoti che il tattico riempiva di telecronaca).
+- **Le braccia di ABBORDAGGI** (cinematica inversa, tabella dell'arma dal motore): provate, all'anca e in mira sono giuste (tacca sull'asse a 32 cm).
+  Da sistemare (mandato): la scheda dei tasti sta sotto i sottotitoli.
+- **La mente**: chi parla vede le battute in coda («Waiting to be said»: la crisi del 2/10 aveva cinquanta battute urgenti in quattro minuti); il prompt
+  dell'equipaggio ordinato per volatilità (la cache dal 56 al 64 %: le note del regista non rompono più la conversazione in cache).
+- **Costi**: le due partite dell'utente del 2/10 sono costate 2,64 $ in 2,2 ore (1,20 $/ora: equipaggio 1,62, guardia 0,42, comandanti 0,32);
+  **credito: 11,46 $ spesi su 20, 8,54 residui** (al 3/10 pomeriggio).
+- **Aiutanti**: ABBORDAGGI (F5.2: abbordare le navi nemiche con navette vere; scheda dei tasti), ARTE-INTERNI, **FLOTTA-VIVA** (avviato: i piani delle
+  classi in `data/ship/plans/` sono suoi, ABBORDAGGI li legge).
+- App rifatta dopo queste modifiche (~/Applications/ASTRA.app).
+
 **3/10 — le partite dell'utente (2/10 sera, app impacchettata) lette come analisi, e corrette (il lead):**
 - **Ordini persi**: una seconda pressione del tasto (anche vuota) annullava il turno che stava eseguendo l'ordine precedente («Timoniere, ritirata» mai
   arrivato al timone, l'Aquila poi persa): ora la pressione ferma le voci e i rapporti dell'equipaggio, mai l'esecuzione di un ordine del Capitano.
