@@ -403,7 +403,7 @@ void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, fl
 	}
 	const FVector2D Centre = Box.GetCenter();
 	const float Half = FMath::Max(1.f, 0.5f * (float)FMath::Max(Box.GetSize().X, Box.GetSize().Y));
-	const float Scale = PlotRadius * 0.84f / Half;
+	const float Scale = PlotRadius * 0.95f / Half;   // (the war map read from the Captain's chair, 4 m away: as wide as the plot allows)
 	// the map turns (slowly) so that its south faces the viewer: east to their right, north away from them
 	const float WantYaw = FMath::RadiansToDegrees(FMath::Atan2(ViewerLocal.Y, ViewerLocal.X));
 	SectorYaw = SectorBlend < 0.05f ? WantYaw : SectorYaw + FMath::Clamp(FMath::FindDeltaAngleDegrees(SectorYaw, WantYaw), -60.f * DeltaTime, 60.f * DeltaTime);
@@ -466,8 +466,8 @@ void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, fl
 		if (S.Name == Dest) { Sub += TEXT("  ·  TRANSIT"); }
 		HoloSetText(T, S.Name.ToUpper() + TEXT("<br>") + Sub);
 		HoloSetColor(T, (Col * FMath::Max(0.25f, Fade)).ToFColor(true));
-		HoloSetSize(T, bHere ? 5.6f : 4.6f);
-		T->SetRelativeLocation(P + FVector(0, 0, 3.2f));
+		HoloSetSize(T, bHere ? 10.5f : 9.f);     // (4.6 cm letters were nine pixels tall from the chair, 3 Oct)
+		T->SetRelativeLocation(P + FVector(0, 0, 4.5f));
 		FaceViewer(T, ViewerLocal);
 	}
 	// the March (CAMPAGNA): our fleets as they are, the enemy's as tracks (dimmer, older), each beside its system with its course to the next one and its
@@ -517,8 +517,8 @@ void AAstraHoloTable::TickSector(float DeltaTime, const FVector& ViewerLocal, fl
 		}
 		HoloSetText(T, Line);
 		HoloSetColor(T, (Col * FMath::Max(0.25f, Fade * Seen)).ToFColor(true));
-		HoloSetSize(T, 3.2f);
-		T->SetRelativeLocation(P + FVector(0, 0, 2.6f));
+		HoloSetSize(T, 6.5f);
+		T->SetRelativeLocation(P + FVector(0, 0, 3.5f));
 		FaceViewer(T, ViewerLocal);
 	}
 	for (const FString& B : Ship->GetMarchBattles())
