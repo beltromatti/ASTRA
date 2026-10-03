@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-02 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
+**Ultimo aggiornamento:** 2026-10-03 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
 ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano e rifinisce; **principio delle intelligenze**
 ([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
@@ -21,6 +21,24 @@ ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano 
 pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo del Falcon, corridoi del Ponte 1 e alloggi del Capitano al
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
+
+**3/10 — le partite dell'utente (2/10 sera, app impacchettata) lette come analisi, e corrette (il lead):**
+- **Ordini persi**: una seconda pressione del tasto (anche vuota) annullava il turno che stava eseguendo l'ordine precedente («Timoniere, ritirata» mai
+  arrivato al timone, l'Aquila poi persa): ora la pressione ferma le voci e i rapporti dell'equipaggio, mai l'esecuzione di un ordine del Capitano.
+- **Voce**: una frase incerta («Allarme rosso» sentito «Alarmeros») aspettava 12 s l'avvio di Whisper: ora parte subito e Whisper si accende in
+  sottofondo; il router dei canali lascia finire il suo secondo tentativo (le parole al capitano dello Styx non erano uscite).
+- **In volo**: due schianti contro lo scafo cercando la bocca del tubo a vista → **guida di recupero del ponte** (F entro 8 km, o Flight Control e la rete
+  di volo con `eagle_recover`): fuori dallo scafo, porta davanti alla prua, dentro il tubo; provato, 17 s da 3,7 km. Il localizzatore cercava «captain» e
+  trovava i plane captain (15 minuti di teletrasporti rifiutati): ora trova il Capitano. Il conto dei Falcon sul ponte non supera più il totale.
+- **Una ritirata non è una tregua**: sparare a chi si ritira per ordine non è più «una tregua infranta» (Thale accusava l'Aquila di una tregua mai fatta).
+- I camminatori del ponte di volo non restano più incastrati nella gente di VITA (il log ne scriveva uno al secondo).
+- **ARTE-PLANCIA-2 nel gioco** (unito, importato, Ponte 1 ricostruito, provato a vista): plancia con ottone e luce calda, corridoi blu e avorio, alloggi
+  del Capitano in noce con la galleria di poppa, abitacolo del Falcon nuovo (livrea sabbia come lo scafo).
+- **App rifatta** (~/Applications/ASTRA.app, 2,6 GB, fino al recupero in volo).
+- **Aiutanti**: ABBORDAGGI (correzioni delle braccia, poi F5.2) e CAMPAGNA (con il ritmo della guerra visto nelle partite: un'ondata comparsa già a
+  distanza di coltello ha distrutto l'Aquila in 5 minuti) ripresi; ARTE-INTERNI rilanciato (la sua cartella era stata pulita).
+- Visto nelle partite e ancora da fare: lo scontro vinto in 6 minuti e poi perso in 5 (CAMPAGNA); molte battute tagliate e ricominciate; il nome delle navi
+  storpiato dal riconoscimento (l'equipaggio capisce lo stesso).
 
 **2/10 pomeriggio — DA RIPRENDERE QUI (limite di sessione raggiunto; aiutanti fermati, i loro worktree restano):**
 - **Fatto dal lead:** il harness preme i tasti del mouse dall'input del giocatore (mira e fuoco provabili); **`AstraFallGuard`**: se il Capitano cade
