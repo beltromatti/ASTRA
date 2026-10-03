@@ -252,6 +252,15 @@ namespace AstraSpace
 					Part.PeriodS = (float)SpNum(P, TEXT("period_s"), 600.0);
 					Part.Phase = (float)SpNum(P, TEXT("phase"), 0.0);
 					Part.SwingDeg = (float)SpNum(P, TEXT("swing_deg"), 0.0);
+					if (const TArray<TSharedPtr<FJsonValue>>* La = SpArr(P, TEXT("lamps")))
+					{
+						for (const TSharedPtr<FJsonValue>& LV : *La)
+						{
+							FLamp L;
+							ParseLamp(LV->AsObject(), L);
+							Part.Lamps.Add(L);
+						}
+					}
 					M.Parts.Add(Part);
 				}
 			}
@@ -553,6 +562,11 @@ namespace AstraSpace
 			if (P.Face.Equals(TEXT("gate_axis"), ESearchCase::IgnoreCase) && A.bGate)
 			{
 				Q = A.GateAtt;
+			}
+			else if (P.Face.Equals(TEXT("gate_look"), ESearchCase::IgnoreCase) && A.bGate)
+			{
+				// its -X end (the tuning array) looks at the Gate, wherever the Gate lies from it; its up is the Gate's
+				Q = FRotationMatrix::MakeFromXZ((Pos - A.GatePos).GetSafeNormal(), A.GateAtt.GetUpVector()).ToQuat();
 			}
 			else if (P.Face.Equals(TEXT("toward_origin"), ESearchCase::IgnoreCase))
 			{

@@ -67,6 +67,7 @@ namespace AstraSpace
 		float PeriodS = 600.f;                   // a full turn (negative: the other way); 0: it does not turn
 		float Phase = 0.f;                       // fraction of a turn at the start
 		float SwingDeg = 0.f;                    // > 0: it swings this far either way (a crane's slew) instead of turning round
+		TArray<FLamp> Lamps;                     // its own lamps (the part's mesh frame: they turn with it)
 	};
 
 	/** What the generator says of a mesh, per mesh name (data/space/meshes.json: written by art/blender/spacegen3.py and copied by tools/space.py sync). */

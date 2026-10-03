@@ -258,22 +258,26 @@ void UAstraSpaceLife::DrawPlaces()
 			continue;
 		}
 		const AstraSpace::FNode& N = Layout.Nodes[P.Node];
+		TArray<FQuat, TInlineAllocator<8>> PartQ;                // where each turning part is now (its lamps turn with it)
 		for (FSpaceLifePlace::FTurning& T : P.Parts)
 		{
+			FQuat Q = FQuat::Identity;
+			const AstraSpace::FPart& D = T.Def;
+			float Ang = D.Phase * 2.f * PI;
+			if (D.SwingDeg > 0.f)
+			{
+				Ang += FMath::DegreesToRadians(D.SwingDeg) * FMath::Sin(Clock * 2.f * PI / FMath::Max(1.f, FMath::Abs(D.PeriodS)));
+			}
+			else if (FMath::Abs(D.PeriodS) > 0.1f)
+			{
+				Ang += Clock * 2.f * PI / D.PeriodS;
+			}
+			Q = FQuat(D.Axis, Ang);
 			if (UStaticMeshComponent* C = T.Comp.Get())
 			{
-				const AstraSpace::FPart& D = T.Def;
-				float Ang = D.Phase * 2.f * PI;
-				if (D.SwingDeg > 0.f)
-				{
-					Ang += FMath::DegreesToRadians(D.SwingDeg) * FMath::Sin(Clock * 2.f * PI / FMath::Max(1.f, FMath::Abs(D.PeriodS)));
-				}
-				else if (FMath::Abs(D.PeriodS) > 0.1f)
-				{
-					Ang += Clock * 2.f * PI / D.PeriodS;
-				}
-				C->SetRelativeRotation(FQuat(D.Axis, Ang));
+				C->SetRelativeRotation(Q);
 			}
+			PartQ.Add(Q);
 		}
 		if (!N.Mesh)
 		{
@@ -287,6 +291,14 @@ void UAstraSpaceLife::DrawPlaces()
 		}
 		const uint32 H = SpMix((uint32)GetTypeHash(P.Id));
 		DrawLamps(N.Mesh->Lamps, N.Pos, N.Att, H, D2, SpLampFade(Km), false);
+		for (int32 k = 0; k < P.Parts.Num(); ++k)
+		{
+			const AstraSpace::FPart& D = P.Parts[k].Def;
+			if (D.Lamps.Num())
+			{
+				DrawLamps(D.Lamps, N.Pos + N.Att.RotateVector(D.Pivot), N.Att * PartQ[k], H ^ (uint32)(k * 40503), D2, SpLampFade(Km), false);
+			}
+		}
 		// a refinery's flare: a torch of burning gas on its stack, flickering
 		if (N.Mesh->FlareLenM > 1.f && Km < 160.0)
 		{
