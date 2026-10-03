@@ -697,6 +697,7 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 	FVector WantPos = CamPos;
 	FovWant = Fov;
 	bool bOrbit = false;
+	TArray<FVector> Subject;                         // where what is shown is (world): nothing nearer than half the way to it is drawn
 	// the zoom that makes a set of points fill about 60% of the frame, seen from 1 km out along Dir
 	auto FitFov = [&](const FVector& Dir, const TArray<FVector>& Pts, double Margin) -> float
 	{
@@ -723,7 +724,8 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 				FVector Ctr = FVector::ZeroVector;
 				for (const FVector& P : Corners) { Ctr += P; }
 				WantDir = (Ctr / 8.0).GetSafeNormal();
-				FovWant = FMath::Clamp(FitFov(WantDir, TArray<FVector>(Corners, 8), 1.7) / Zoom, 0.12f, 60.f);
+				Subject.Append(Corners, 8);
+				FovWant = FMath::Clamp(FitFov(WantDir, Subject, 1.7) / Zoom, 0.12f, 60.f);
 			}
 			else
 			{
@@ -737,6 +739,7 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 	{
 		const FVector P = B->WorldOf(ShotPoint);
 		WantDir = P.GetSafeNormal();
+		Subject.Add(P);
 		const double D = FMath::Max(P.Size() - StandOff, 1000.0);
 		FovWant = FMath::Clamp((float)FMath::RadiansToDegrees(2.0 * FMath::Atan(45000.0 / D * 1.8)) / Zoom, 0.4f, 60.f);
 		break;
@@ -757,6 +760,7 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 		{
 			WantDir = Sum.GetSafeNormal();
 			FovWant = FMath::Clamp(FitFov(WantDir, Pts, 1.3) + 2.f, 3.f, 75.f) / Zoom;
+			Subject = MoveTemp(Pts);
 		}
 		break;
 	}
@@ -813,40 +817,18 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 			}
 		}
 	}
-	// zoomed far out on a target, our own fighters crossing close in front of the lens would fill the frame as huge blurred
-	// shapes: the screen is a composite of the sensors, and leaves them out (never the ship it is showing). Craft that are actors are
-	// hidden one by one; the instanced ones (AstraWarDraw.cpp) are drawn, while this is on, in a set of components the camera leaves out
-	bool bLens = false;
-	double LensKm = 0.0;
-	int32 LensExempt = -1;
-	if (Fov < 12.f)
+	// the screen is a composite of the sensors, not a lens anything can cross: zoomed on a subject, whatever is nearer than half the way
+	// to it is left out of the picture by the camera's near plane, of either side, hull, lamp or shot alike (3 Oct: at x130 an escort, a
+	// fighter or a salvo of our own rounds a few kilometres out filled the frame as a huge blurred plane). The subject itself never is.
+	double Nearest = 0.0;
+	for (const FVector& P : Subject)
 	{
-		const FContact* Shown = ShotId.IsEmpty() ? nullptr : FindC(Plot(), ShotId);
-		const double Far = Shown && Shown->RangeKm > 0.0 ? Shown->RangeKm : 0.0;
-		bLens = Far > 0.0;
-		LensKm = 0.5 * Far;
-		LensExempt = Shown ? Shown->Id : -1;
-		for (const FContact& C : Plot())
-		{
-			if (C.bCraft && C.Side == EAstraSide::Astra && C.Actor && &C != Shown && Far > 0.0 && C.RangeKm > 0.0 && C.RangeKm < 0.5 * Far)
-			{
-				Capture->HiddenActors.Add(const_cast<AStaticMeshActor*>(C.Actor));
-			}
-		}
+		const double D = FVector::Dist(P, CamPos);
+		Nearest = Nearest > 0.0 ? FMath::Min(Nearest, D) : D;
 	}
-	if (UAstraBattleSubsystem* BM = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
-	{
-		BM->SetLensHint(bLens, LensKm, LensExempt);
-		if (bLens)
-		{
-			TArray<UPrimitiveComponent*> Near;
-			BM->GetNearLensComponents(Near);
-			for (UPrimitiveComponent* Comp : Near)
-			{
-				Capture->HiddenComponents.Add(Comp);
-			}
-		}
-	}
+	const bool bClip = !bOrbit && Fov < 12.f && Nearest > 2000.0;
+	Capture->bOverride_CustomNearClippingPlane = bClip;
+	Capture->CustomNearClippingPlane = bClip ? (float)(0.5 * Nearest) : 0.f;
 }
 
 bool AAstraViewscreen::Project(const FVector& World, int32 W, int32 H, FVector2D& Out) const
@@ -889,10 +871,6 @@ void AAstraViewscreen::Tick(float DeltaSeconds)
 	}
 	if (Fade <= 0.001f)
 	{
-		if (UAstraBattleSubsystem* BM = W->GetSubsystem<UAstraBattleSubsystem>())
-		{
-			BM->SetLensHint(false, 0.0, -1);   // (no camera, no lens to keep craft away from)
-		}
 		return;                           // off: nothing drawn, nothing captured
 	}
 	Aim(DeltaSeconds);

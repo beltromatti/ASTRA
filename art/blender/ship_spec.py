@@ -115,6 +115,10 @@ _reg("hydro", name="Hydroponics Bay", kind="hydroponics", dept="science", L=24.0
      doors=[door("near", 10.0)], systems=["life_support", "potable_water", "food_service"],
      spots=[spot("botanist", "work", 8.0, 7.2, 0, "science"), spot("botanist", "work", 16.0, 7.2, 180, "science")],
      lights=[light(12.0, 8.0, 3.3, 3500, 7000, (20.0, 12.0), 1100)])
+_reg("garden", name="Garden", kind="hydroponics", dept="science", L=24.0, D=16.0, h=3.4, plate="hydro",
+     doors=[door("near", 10.0)], systems=["life_support", "potable_water", "food_service"],
+     spots=[spot("botanist", "work", 8.0, 7.2, 0, "science"), spot("botanist", "work", 16.0, 7.2, 180, "science")],
+     lights=[light(12.0, 8.0, 3.3, 3500, 7000, (20.0, 12.0), 1100)])
 _reg("quiet", name="Quiet Room", kind="chapel", dept="services", L=12.0, D=16.0, h=3.6, plate="chapel",
      doors=[door("near", 6.0)], systems=["power_bus"],
      spots=[spot("crew", "sit", 3.6, 7.6, 90), spot("crew", "sit", 8.4, 7.6, 90), spot("crew", "sit", 3.6, 9.8, 90), spot("crew", "sit", 8.4, 9.8, 90)],
@@ -141,7 +145,7 @@ _reg("armory", name="Armory", kind="armory", dept="security", L=16.0, D=16.0, h=
 _reg("cabins", name="Crew Cabins", kind="cabins", dept="services", L=20.0, D=16.0, h=3.2, plate="cabins",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
      spots=[spot("sleeper", "sleep", 1.34, y, 180) for y in (0.56, 4.56, 8.56, 12.56)] + [spot("sleeper", "sleep", 18.66, y, 0) for y in (0.56, 4.56, 8.56, 12.56)],
-     lights=[light(10.0, 8.0, 3.1, 2500, 3400, (14.0, 0.6))])
+     lights=[light(10.0, 8.0, 3.1, 2500, 3400, (14.0, 0.6))] + [light(xc, yc, 3.0, 900, 3400, (1.4, 1.4), 480) for xc in (2.6, 17.4) for yc in (2.0, 6.0, 10.0, 14.0)])
 
 # ---- Deck 6: the medical rooms around the Medbay (docs/BIBBIA.md §6: Medbay, surgery, quarantine, pharmacy) ---------------------
 _reg("surgery", name="Surgery", kind="surgery", dept="medical", L=16.0, D=16.0, h=3.6, plate="surgery",
@@ -544,3 +548,44 @@ def door_world_offsets(key: str) -> list[float]:
 
 
 import ship_spec3  # noqa: E402,F401  (NAVE-3: the rooms the redesign adds register themselves here)
+
+
+# ================================================================================================================ ARTE-INTERNI: the light of the rooms
+# The game multiplies every plan lamp's lumens by astra.lamps.gain (6) and shades at most ten of them (AstraLampPool); a corridor lamp (3400 lm over a 4 x 8 m cell) is ~106
+# plan lumens per square metre, the rooms of NAVE-2 had 10-45 (the Mess Hall, whose lights are actors with no gain, 86: a canteen wants 4x that): a corridor's brightness was never
+# reached inside a room. Each prefab is scaled here to a target density (plan lm per m2 of floor) with a colour temperature chosen for what the room is; the positions and sizes of
+# the lamps stay as the room's author put them. LIGHT_LEVEL scales everything at once (the lead's knob: change it and regenerate the plan with ship_plan_gen.py).
+LIGHT_LEVEL = 1.0
+LIGHT_KEEP = {"ready_room", "lift_housing_bridge", "lift_bank", "lift_bank_o", "lift_bank_b", "stair_tower"}      # not this module's: Deck 1 (ARTE-PLANCIA-2), the lifts and the stairs (engine)
+DENSITY_KIND = {"galley": 105, "lounge": 80, "library": 80, "observation": 45, "storage": 70, "heads": 80, "laundry": 80, "hydroponics": 120, "chapel": 58, "lab": 100, "workshop": 95,
+                "armory": 85, "cabins": 70, "surgery": 105, "quarantine": 100, "pharmacy": 105, "concourse": 85, "stairs": 60, "cic": 65, "briefing": 75, "comms": 75, "offices": 80,
+                "magazine": 70, "weapons_control": 75, "weapons": 70, "sensors": 85, "transporter": 70, "archive": 75, "machinery": 85, "power": 85, "range": 85, "hangar": 95,
+                "flight_ops": 78, "fabrication": 95, "tank": 60, "crawlway": 70, "wardroom": 80, "gym": 90, "shop": 90, "simulator": 60, "brig": 75, "security": 80, "dental": 100,
+                "morgue": 90, "counselling": 70, "computer": 70, "damage_control": 80, "transit": 80, "airlock": 95, "lifepod": 95, "ready_room": 70, "lobby": 80, "lift": 70}
+DENSITY_KEY = {"berthing": 55, "barracks": 55, "lab_astro": 45, "bow_obs": 55, "quiet": 50, "bar": 70, "games": 75, "sim_bay": 55, "pilot_ready": 75, "reaction_mass": 55, "dc_central": 80, "ready_room": 80}
+TEMP_KIND = {"galley": 4800, "lounge": 3300, "library": 3300, "observation": 4200, "storage": 4600, "heads": 4400, "laundry": 4400, "hydroponics": 5600, "chapel": 2900, "lab": 5200,
+             "workshop": 5000, "armory": 4800, "cabins": 3600, "surgery": 5400, "quarantine": 5400, "pharmacy": 5400, "concourse": 3600, "cic": 5600, "briefing": 4200, "comms": 5000,
+             "offices": 4400, "magazine": 4800, "weapons_control": 5000, "weapons": 4800, "sensors": 5400, "transporter": 5400, "archive": 5000, "machinery": 4600, "power": 4600,
+             "range": 5000, "hangar": 5000, "flight_ops": 4800, "fabrication": 5000, "wardroom": 3400, "gym": 4600, "shop": 4000, "simulator": 5200, "brig": 4600, "security": 4600,
+             "dental": 5400, "morgue": 5600, "counselling": 3300, "computer": 5200, "damage_control": 4800, "lobby": 4200, "airlock": 5000, "lifepod": 5000}
+TEMP_KEY = {"bar": 2900, "games": 3600, "lab_astro": 6500, "quiet": 2700, "stair_tower": 4200, "staterooms": 3400, "suites": 3400, "berthing": 3700, "barracks": 3700,
+            "single_cabins": 3400, "barber": 3600, "bow_obs": 5200}
+
+
+def retune_lights() -> None:
+    """Scale the lamps of every built prefab to its target density and set its colour temperature (the rooms' own lumens are read from the registrations above)."""
+    for key, sp in PREFABS.items():
+        if sp.get("planned") or not sp.get("lights") or sp.get("mesh") is None or key in LIGHT_KEEP:
+            continue
+        area = sp["L"] * sp["D"]
+        total = sum(l["lumens"] for l in sp["lights"])
+        target = DENSITY_KEY.get(key, DENSITY_KIND.get(sp.get("kind"), 70)) * LIGHT_LEVEL
+        k = target * area / max(total, 1.0)
+        temp = TEMP_KEY.get(key, TEMP_KIND.get(sp.get("kind")))
+        for l in sp["lights"]:
+            l["lumens"] = round(l["lumens"] * k, -1)
+            if temp is not None and not (key == "staterooms" and l["size"][0] < 2.0):
+                l["temperature"] = float(temp)
+
+
+retune_lights()

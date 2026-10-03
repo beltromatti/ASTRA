@@ -182,6 +182,15 @@ def track(b, p0, p1, z):
 
 # ------------------------------------------------------------------------------------------------ the ward
 def ward():
+    """The ward's mesh: ARTE-INTERNI rebuilt it in the kit's language (art/blender/ship_medbay.py: the same frame, the same twelve bays, the nurses' station, the supply wall, the console and
+    the theatre where they were; the shell, the light, the curtains and the dressing of the rooms of the plan). The glass of its cabinets goes to GLASS_BOXES (SM_MED_Glass). ward_v1 below
+    is the M1 ward it replaces."""
+    import ship_medbay
+    GLASS_BOXES.clear()
+    return ship_medbay.ward("SM_MED_Ward", GLASS_BOXES)
+
+
+def ward_v1():
     b = A.Builder()
     b.defer_glass = True
     GLASS_BOXES.clear()

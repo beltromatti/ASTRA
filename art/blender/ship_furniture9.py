@@ -131,24 +131,15 @@ def counter_desk(b: SParts, w: float = 3.2, d: float = 0.9, h: float = 1.1) -> N
 
 # ---------------------------------------------------------------------------------------------------------------------------------------------------------------- recreation
 def pew(b: SParts, w: float = 2.6) -> None:
-    """A chapel pew facing +x: a plain bench of dark wood with a high back, a kneeler, a hymn-book shelf."""
-    b.body.box((-0.28, -w / 2, 0.0), (0.28, w / 2, 0.06), WOOD)
-    b.body.box((-0.28, -w / 2, 0.06), (0.22, -w / 2 + 0.06, 0.45), WOOD)
-    b.body.box((-0.28, w / 2 - 0.06, 0.06), (0.22, w / 2, 0.45), WOOD)
-    b.soft.box((-0.2, -w / 2 + 0.06, 0.42), (0.22, w / 2 - 0.06, 0.48), FABRIC_NAVY)
-    b.body.box((-0.30, -w / 2, 0.42), (-0.24, w / 2, 1.0), WOOD)
-    b.soft.box((0.24, -w / 2 + 0.1, 0.0), (0.4, w / 2 - 0.1, 0.12), FABRIC_NAVY)
+    """A chapel pew facing +x (ship_furn3.pew): walnut cheeks, a padded seat, a leaning back, a hymn-book shelf and a kneeler for the row behind."""
+    import ship_furn3 as N3
+    N3.pew(b, w)
 
 
 def altar(b: SParts) -> None:
-    """A plain stone table facing +x with a white cloth, two candles (lit), a bowl; the wall behind it carries a ring of soft light."""
-    b.body.box((-0.4, -0.9, 0.0), (0.4, 0.9, 0.9), STRUCT)
-    b.body.box((-0.45, -0.95, 0.9), (0.45, 0.95, 0.96), IVORY)
-    b.soft.box((-0.4, -0.7, 0.96), (0.4, 0.7, 0.975), BEDDING)
-    for sy in (-0.5, 0.5):
-        b.fine.cyl((0.0, sy, 0.975), (0.0, sy, 1.12), 0.025, IVORY, seg=8)
-        b.emit.lamp_box((-0.01, sy - 0.01, 1.12), (0.01, sy + 0.01, 1.15), "amber", LAMP)
-    b.fine.cyl((0.0, 0.0, 0.975), (0.0, 0.0, 1.03), 0.12, STEEL, seg=14)
+    """An altar facing +x (ship_furn3.altar): pale stone, a cloth, two brass candlesticks with lit candles, a bowl and a book."""
+    import ship_furn3 as N3
+    N3.altar(b)
 
 
 def barber_chair(b: SParts) -> None:

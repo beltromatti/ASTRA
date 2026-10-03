@@ -481,10 +481,6 @@ public:
 	void AquilaBlasts(const FVector& HullCentreW, const FVector& HullExtentW);
 	/** After the loss, when the story moves on (hours, days): the fight stops where it was, no more reports. */
 	void Freeze() { bFrozen = true; }
-	/** The main viewscreen tells the drawing that its camera is zoomed far out on a target: our own craft nearer than WithinKm to the Aquila would cross its lens
-	 *  as huge blurred shapes, so they are drawn in a set the camera is told to leave out (ExemptId, the craft it is showing, is not). */
-	void SetLensHint(bool bActive, double WithinKm, int32 ExemptId);
-	void GetNearLensComponents(TArray<UPrimitiveComponent*>& Out) const;
 	/** What the instanced drawing of the craft and the lamps holds and costs (astra.war.stat), as text and as JSON for the bench's record. */
 	FString DrawStats() const;
 	TSharedRef<FJsonObject> DrawStatsJson() const;

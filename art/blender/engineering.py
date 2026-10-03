@@ -5,6 +5,8 @@
                  the master systems display (a long table), wall consoles, coolant lines, the ceiling's trusses and lights
   SM_ENG_Core    the reactor core: a dark housing with slots, containment coils, and the plasma behind (its own slot,
                  MI_ENG_Plasma, pulses in Unreal)
+  SM_ENG_Detail  (ARTE-INTERNI, ship_engineering.py) the bays of the walls dressed, the machines under the galleries, the pit's ring
+                 of light and control pedestals, the bridge crane, the high-bay luminaires, ducts and cable trays
 
 Coordinates in the data are Unreal's (X forward, Y starboard, Z up); U() flips Y for Blender.
 blender -b --factory-startup --python-exit-code 1 -P art/blender/engineering.py -- art/export/engineering
@@ -201,13 +203,20 @@ def core():
     return obj
 
 
+def detail():
+    """What the hall lacks (ARTE-INTERNI: art/blender/ship_engineering.py): dressed wall bays, machines under the galleries, the pit's ring of light and its control pedestals, the bridge crane,
+    high-bay luminaires, ducts and cable trays. One more mesh over the hall in the same frame."""
+    import ship_engineering
+    return ship_engineering.detail("SM_ENG_Detail")
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out = argv[0] if argv else "art/export/engineering"
     os.makedirs(out, exist_ok=True)
     A.reset_scene()
     report = []
-    for fn in (hall, core):
+    for fn in (hall, core, detail):
         A.clear_objects()
         obj = fn()
         A.export_fbx(obj, os.path.join(out, obj.name + ".fbx"))
