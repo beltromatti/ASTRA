@@ -226,7 +226,7 @@ def swatch_uv(color) -> tuple[float, float]:
 class SParts(L.Parts):
     """Parts (body / fine / emissive / soft groups) built with SFB."""
 
-    BEVEL_SEGMENTS = {"body": 2, "fine": 1}              # ARTE-INTERNI: one segment on the fine parts (a 3 mm chamfer): a bevelled box was ~120 triangles, now ~50
+    BEVEL_SEGMENTS = {"body": 1, "fine": 1}              # ARTE-INTERNI: one segment (a chamfer): a bevelled box was ~120 triangles with two, now ~45; at 5 mm nobody sees the difference
 
     def __init__(self, bevel: float = 0.006, fine_bevel: float = 0.003, angle: float = 35.0) -> None:
         super().__init__(bevel, fine_bevel, angle)

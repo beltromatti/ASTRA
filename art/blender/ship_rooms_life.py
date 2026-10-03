@@ -2,6 +2,7 @@
 redesign adds (the crew's berthing bays, the senior officers' suites, the officers' single cabins) and the drone bay. Frames and sizes: ship_rooms.py / ship_spec.py / ship_spec3.py."""
 from __future__ import annotations
 
+import ship_cabin as SC
 import ship_furniture as F
 import ship_decor as DC
 import ship_spec3 as SPEC3
@@ -212,66 +213,26 @@ def berthing(name: str = "SM_SHIP_BerthingBay"):
 
 
 def suites(name: str = "SM_SHIP_Suites"):
-    """24 x 12 x 3.2: four senior officers' suites off a hall that runs the length of the block (the door from the passage is at x 10): each a bedroom-sitting room — a double bed under
-    a viewport screen, a desk, a sofa and a low table on a rug, a wardrobe, a basin with a lit mirror; the hall has plants and a wall screen."""
+    """24 x 12 x 3.2: four senior officers' suites off a hall that runs the length of the block (the door from the passage is at x 10): each a bedroom and a sitting room of 6 x 9 m — a
+    coat cupboard, a sofa, a coffee table and an armchair on a rug, a desk with its screen, a shelf; a double bed under a wide window with its nightstands, a bench, a wardrobe, a basin
+    with its mirror; two lights (ship_cabin.py)."""
     spec, L, D, H = _dims("suites")
     b = SParts(bevel=0.005, fine_bevel=0.0)
     build_shell(b, spec, _warm_style(FABRIC_GREY, WOOD, "warm_dim"))
-    yf = D - WS - WF
-    xl, xr = WS + WF, L - WS - WF
-    yh = 2.6                                                                                  # the hall's far wall (y 0.3 .. 2.6)
-    for k in range(4):
-        xa, xb = 6.0 * k, 6.0 * (k + 1)
-        xc = (xa + xb) / 2
-        if k > 0:                                                                              # the partition between two suites
-            b.body.box((xa - 0.06, yh, 0.0), (xa + 0.06, yf, H), COMPOSITE)
-            b.soft.box((xa - 0.075, yh, 0.0), (xa + 0.075, yf, 1.05), WOOD)
-        # the suite's hatch off the hall, and the hall's wall with it
-        b.body.box((max(xa, xl), yh - 0.06, 0.0), (xc - _DW / 2, yh + 0.06, H), COMPOSITE)
-        b.body.box((xc + _DW / 2, yh - 0.06, 0.0), (min(xb, xr), yh + 0.06, H), COMPOSITE)
-        b.body.box((xc - _DW / 2, yh - 0.06, _DH), (xc + _DW / 2, yh + 0.06, H), COMPOSITE)
-        for yy in (xc - _DW / 2 - 0.04, xc + _DW / 2):
-            b.soft.box((yy, yh - 0.09, 0.0), (yy + 0.04, yh + 0.09, _DH + 0.04), TRIM)
-        b.soft.box((xc - _DW / 2 - 0.04, yh - 0.09, _DH), (xc + _DW / 2 + 0.04, yh + 0.09, _DH + 0.04), TRIM)
-        b.emit.lamp_box((xc + _DW / 2 + 0.06, yh - 0.095, 1.55), (xc + _DW / 2 + 0.12, yh - 0.09, 1.62), "green", LAMP_DIM)
-        place(b, xc, yf - 1.14, -90, K8.officer_bed, 1.4, 2.1, (FABRIC_NAVY, FABRIC_RUST, FABRIC_GREY, FABRIC_SAND)[k])
-        place(b, xc, yf - 0.02, -90, F.wall_screen, 1.5, 0.84, "scr_star", z=1.5)
-        place(b, xa + 0.45, 6.0, 180, F.desk, 1.2, 0.6, 0.75, WOOD, True)
-        place(b, xa + 1.2, 6.0, 180, F.chair, FABRIC_GREY)
-        place(b, xc + 0.6, 4.4, 90, F.sofa, 1.8, FABRIC_NAVY)
-        place(b, xc + 0.6, 5.2, 90, F.low_table, 0.8, 0.5, 0.4, WOOD)
-        place(b, xb - 0.5, 8.4, 180, G.wardrobe, 0.9, 0.55, 2.0)
-        place(b, xa + 0.45, 9.6, 0, G.vanity, 0.9, 0.5)
-        place(b, xc, 6.8, 0, G.rug, 2.8, 2.6, (FABRIC_SAND, FABRIC_GREY, FABRIC_RUST, FABRIC_NAVY)[k], FABRIC_SAND)
-        F.ceiling_light_panel(b, xc - 0.5, xc + 0.5, 6.0, 6.6, H - 0.05, "white_warm", LAMP)
+    SC.suites_block(b, spec)
     for x in (4.0, 14.0, 20.0):
-        place(b, x, 0.9, 0, F.potted_plant, 1.2, int(x))
+        place(b, x, 1.0, 0, F.potted_plant, 1.0, int(x))
     place(b, 12.0, WF + 0.02, 90, F.wall_screen, 1.6, 0.9, "scr_news", z=1.8)
-    for x in (3.0, 9.0, 15.0, 21.0):
-        F.ceiling_light_panel(b, x - 0.4, x + 0.4, 1.2, 1.6, H - 0.05, "white_warm", LAMP)
     return b.build(name)
 
 
 def single_cabins(name: str = "SM_SHIP_SingleCabins"):
-    """24 x 4 x 3.2: a row of six officers' cabins, 4 x 4 m each, a hatch apiece on the passage's side: a bed under a viewport screen, a desk, a wardrobe, a basin; the partitions are
-    wood-faced and the rugs differ."""
+    """24 x 4 x 3.2: a row of six officers' cabins, each 4 x 2.8 m, behind a gallery along the passage's wall with a hatch apiece (ship_cabin.py): a bed along the far wall under a window,
+    a nightstand, a desk with its screen and its lamp, a wardrobe and a basin, a rug and a light of its own; the partitions are plaster and oak and the rugs and blankets differ."""
     spec, L, D, H = _dims("single_cabins")
     b = SParts(bevel=0.005, fine_bevel=0.0)
     build_shell(b, spec, _warm_style(FABRIC_GREY, WOOD, "warm_dim"))
-    yf = D - WS - WF
-    for k in range(6):
-        xa, xc = 4.0 * k, 4.0 * k + 2.0
-        if k > 0:
-            b.body.box((xa - 0.06, WF, 0.0), (xa + 0.06, yf, H), COMPOSITE)
-            b.soft.box((xa - 0.075, WF, 0.0), (xa + 0.075, yf, 1.05), WOOD)
-        place(b, xa + 1.25, 2.4, 0, K8.officer_bed, 0.9, 2.0, (FABRIC_NAVY, FABRIC_RUST, FABRIC_GREY, FABRIC_SAND)[k % 4])
-        place(b, xa + 0.3, 3.0, 0, F.wall_screen, 1.0, 0.56, "scr_star", z=1.5)
-        place(b, xa + 3.6, 1.4, 0, F.desk, 0.9, 0.5, 0.75, WOOD, True)
-        place(b, xa + 2.9, 1.4, 0, F.chair, FABRIC_GREY)
-        place(b, xa + 3.6, 3.3, 180, G.wardrobe, 0.8, 0.5, 2.0)
-        place(b, xa + 2.4, 3.7, -90, G.vanity, 0.7, 0.45)
-        place(b, xa + 2.0, 2.0, 0, G.rug, 1.6, 1.4, (FABRIC_SAND, FABRIC_GREY, FABRIC_RUST, FABRIC_NAVY)[k % 4], FABRIC_SAND)
-        F.ceiling_light_panel(b, xc - 0.4, xc + 0.4, 1.7, 2.3, H - 0.05, "white_warm", LAMP)
+    SC.single_row(b, spec)
     return b.build(name)
 
 

@@ -52,7 +52,7 @@ def style():
 # ------------------------------------------------------------------------------------------------------------------------------ the tables
 def mess_table(b: SParts, length: float = 7.0, width: float = 1.0, h: float = 0.74) -> None:
     """A long mess table (origin at its centre): an oak top 4 cm thick with a rolled edge and a steel band, on two pedestal feet, with a caddy of condiments and a napkin dispenser."""
-    MK.rbox(b.body, (-length / 2, -width / 2, h - 0.04), (length / 2, width / 2, h), 0.014, OAK, 2)
+    MK.rbox(b.soft, (-length / 2, -width / 2, h - 0.04), (length / 2, width / 2, h), 0.014, OAK, 2)
     b.fine.box((-length / 2 + 0.02, -width / 2 + 0.02, h - 0.065), (length / 2 - 0.02, width / 2 - 0.02, h - 0.04), STEEL)
     for lx in (-length / 2 + 0.9, length / 2 - 0.9):
         b.body.cyl((lx, 0, 0.03), (lx, 0, h - 0.065), 0.055, TRIM, seg=12, r2=0.065)
@@ -79,7 +79,7 @@ def serving_line(b: SParts, x0: float, x1: float, y_wall: float, y_front: float,
     kick plate, six pans of food in the top with their serving spoons, the tray rail on brackets, stacks of trays, a cutlery bin, a heat lamp bar overhead."""
     w = x1 - x0
     b.body.box((x0, y_front, 0.0), (x1, y_front + 0.06, 0.1), STRUCT)
-    MK.rbox(b.body, (x0, y_front + 0.02, 0.1), (x1, y_wall - 0.05, zc - 0.04), 0.01, STEEL, 2)
+    MK.rbox(b.soft, (x0, y_front + 0.02, 0.1), (x1, y_wall - 0.05, zc - 0.04), 0.01, STEEL, 2)
     b.body.box((x0 - 0.03, y_front - 0.03, zc - 0.04), (x1 + 0.03, y_wall - 0.05, zc), STEEL)
     for k in range(5):                                                                                # panels in the front
         xa = x0 + 0.2 + k * (w - 0.4) / 5

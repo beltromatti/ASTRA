@@ -19,23 +19,23 @@ from ship_lib import (BARK, BRASS, CERAMIC, COMPOSITE, LAMP, LAMP_HOT, LEAF_GREE
 
 PH = "MI_SHIP_PH_"
 # the Poly Haven models used (ship_assets.register: name, glTF id, material map, objects picked, decimation); every one is in docs/licenze.csv
-SA.register("syngonium", "potted_plant_02", {"potted_plant_02_leaves": PH + "Syngonium"}, pick=["potted_plant_02_leaves"], decimate=0.55, two_sided=["potted_plant_02_leaves"])
-SA.register("haworthia", "potted_plant_04", {"potted_plant_04": PH + "Haworthia"}, two_sided=["potted_plant_04"], drop=())
+SA.register("syngonium", "potted_plant_02", {"potted_plant_02_leaves": PH + "Syngonium"}, pick=["potted_plant_02_leaves"], decimate=0.4, two_sided=["potted_plant_02_leaves"])
+SA.register("haworthia", "potted_plant_04", {"potted_plant_04": PH + "Haworthia"}, decimate=0.35, two_sided=["potted_plant_04"], drop=())
 SA.register("ficus", "potted_plant_01", {"potted_plant_01_leaves": PH + "FicusLeaf", "potted_plant_01_pot": PH + "FicusWood"}, pick=["potted_plant_01_leaves", "potted_plant_01_stem"],
-            decimate=0.2, two_sided=["potted_plant_01_leaves"])
+            decimate=0.12, two_sided=["potted_plant_01_leaves"])
 SA.register("pachira_d", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
-            pick=["pachira_aquatica_01_bark_d", "pachira_aquatica_01_leaves_d"], decimate=0.5, two_sided=["pachira_aquatica_01_leaves"])
+            pick=["pachira_aquatica_01_bark_d", "pachira_aquatica_01_leaves_d"], decimate=0.35, two_sided=["pachira_aquatica_01_leaves"])
 SA.register("pachira_c", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
-            pick=["pachira_aquatica_01_bark_c", "pachira_aquatica_01_leaves_c"], decimate=0.6, two_sided=["pachira_aquatica_01_leaves"])
+            pick=["pachira_aquatica_01_bark_c", "pachira_aquatica_01_leaves_c"], decimate=0.4, two_sided=["pachira_aquatica_01_leaves"])
 SA.register("pachira_a", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
-            pick=["pachira_aquatica_01_bark_a", "pachira_aquatica_01_leaves_a"], decimate=0.6, two_sided=["pachira_aquatica_01_leaves"])
+            pick=["pachira_aquatica_01_bark_a", "pachira_aquatica_01_leaves_a"], decimate=0.4, two_sided=["pachira_aquatica_01_leaves"])
 for k in "bc":
-    SA.register(f"fern_{k}", "fern_02", {"fern_02": PH + "Fern"}, pick=[f"fern_02_{k}"], decimate=0.75, two_sided=["fern_02"])
+    SA.register(f"fern_{k}", "fern_02", {"fern_02": PH + "Fern"}, pick=[f"fern_02_{k}"], decimate=0.6, two_sided=["fern_02"])
 for k in "abc":
-    SA.register(f"calathea_{k}", "calathea_orbifolia_01", {"calathea_orbifolia_01": PH + "Calathea"}, pick=[f"calathea_orbifolia_01_{k}"], decimate=0.75 if k == "a" else 0.85,
+    SA.register(f"calathea_{k}", "calathea_orbifolia_01", {"calathea_orbifolia_01": PH + "Calathea"}, pick=[f"calathea_orbifolia_01_{k}"], decimate=0.6 if k == "a" else 0.7,
                 two_sided=["calathea_orbifolia_01"])
 for k in "bc":
-    SA.register(f"anthurium_{k}", "anthurium_botany_01", {"anthurium_botany_01": PH + "Anthurium"}, pick=[f"anthurium_botany_01_{k}"], decimate=0.6, two_sided=["anthurium_botany_01"])
+    SA.register(f"anthurium_{k}", "anthurium_botany_01", {"anthurium_botany_01": PH + "Anthurium"}, pick=[f"anthurium_botany_01_{k}"], decimate=0.45, two_sided=["anthurium_botany_01"])
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------ pots
@@ -87,7 +87,7 @@ def planter_bed(b: SParts, w: float = 2.0, d: float = 0.7, h: float = 0.45, seed
     """A long planter: a rounded tray in `skin` on a recessed foot with a brushed rim and a mound of soil standing proud of it, planted with ferns, calatheas and anthuriums in a row (a
     money tree at one end when `tall`). Centred on the origin, `w` along y (the long side), `d` along x. Returns the height of the plantation."""
     rng = random.Random(seed)
-    MK.rbox(b.body, (-d / 2, -w / 2, 0.07), (d / 2, w / 2, h), 0.02, skin, 2)
+    MK.rbox(b.soft, (-d / 2, -w / 2, 0.07), (d / 2, w / 2, h), 0.02, skin, 2)
     b.fine.box((-d / 2 + 0.05, -w / 2 + 0.05, 0.0), (d / 2 - 0.05, w / 2 - 0.05, 0.07), STRUCT)
     b.fine.box((-d / 2 - 0.006, -w / 2 - 0.006, h - 0.03), (d / 2 + 0.006, w / 2 + 0.006, h - 0.012), TRIM)                      # the rim line
     MK.rbox(b.soft, (-d / 2 + 0.05, -w / 2 + 0.05, h - 0.02), (d / 2 - 0.05, w / 2 - 0.05, h + 0.055), 0.03, SOIL, 2)           # the soil, heaped a little
@@ -166,6 +166,20 @@ def lettuce_head(b: SParts, r: float = 0.11, leaves: int = 9, seed: int = 1, til
         d = (math.cos(a) * math.cos(pitch), math.sin(a) * math.cos(pitch), math.sin(pitch))
         MK.leaf(b.soft, (0.0, 0.0, 0.01), d, (0, 0, 1), r * (0.65 + 0.5 * t) * rng.uniform(0.9, 1.1), r * (0.55 + 0.45 * t), mat, tile=tile, droop=0.35 + 0.3 * t, fold=0.25, cup=0.5,
                 nu=3, nv=1, wave=0.01 if t > 0.4 else 0.0, shape=0.9, seed=k + seed)
+
+
+def desk_plant(b: SParts, seed: int = 1) -> None:
+    """A small plant for a desk or a shelf (origin at the middle of the pot's base): a twelve-sided pot, wider at the rim, in ceramic or terracotta, with a rosette of fleshy leaves or a
+    sprig of herbs in it; about 250 triangles (a scanned plant of that size costs three thousand)."""
+    rng = random.Random(seed)
+    r, h = rng.uniform(0.045, 0.06), rng.uniform(0.07, 0.1)
+    b.fine.cyl((0, 0, 0.0), (0, 0, h), r * 0.8, rng.choice((CERAMIC, TERRACOTTA, WHITE_GLOSS)), seg=12, r2=r)
+    b.soft.cyl((0, 0, h - 0.01), (0, 0, h), r * 0.96, SOIL, seg=12)
+    with b.at(T(0.0, 0.0, h)):
+        if seed % 2:
+            lettuce_head(b, 0.075, 8, seed, 1, LEAF_GREEN)
+        else:
+            herb_bush(b, 0.15, seed)
 
 
 def herb_bush(b: SParts, h: float = 0.28, seed: int = 1, mat: str = LEAF_GREEN, tile: int = 3) -> None:

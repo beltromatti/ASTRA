@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import random
 
+import ship_cabin as SC
 import ship_furniture as F
 import ship_furniture2 as G
 import ship_spec as SPEC
@@ -166,72 +167,13 @@ CAB_XL, CAB_XR = 5.0, 15.0              # the hall's walls (x)
 
 
 def cabins(name: str = "SM_SHIP_Cabins"):
-    """20 x 16: a commons hall in the middle (x 5..15), four crew cabins on each side (each 4.75 x 4 m with a bunk, a desk, a wardrobe, a basin)."""
+    """20 x 16: a commons hall in the middle (x 5..15), four crew cabins on each side (each 4.75 x 4 m: a bunk with its nightstand and lamp, a desk with a screen and a plant under a window
+    with curtains, a wardrobe, a basin, a rug, a light of its own: ship_cabin.py); the hall is the same as the officers' (a seating group, a table laid for dinner, a coffee corner)."""
     spec, L, D, H = _dims("cabins")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
+    b = SParts(bevel=0.005, fine_bevel=0.0)
     st = Style(floor=FABRIC_GREY, floor_mode="covering", seams=False, wall_lo=WOOD, wall_hi=COMPOSITE, wain_h=1.05, ceil=IVORY, accent="warm_dim", cove="white_warm",
                ribs=False, skirt=WOOD)
     build_shell(b, spec, st)
-    yf = D - WS - WF
-    xl, xr = WS + WF, L - WS - WF
-    dw, dh = 0.95, 2.1
-    # the hall's two walls (a door per cabin) and the walls between the cabins
-    for side, xw in ((0, CAB_XL), (1, CAB_XR)):
-        for k, yc in enumerate(CAB_Y):
-            ya, yb = max(yc - 2.0, WF), min(yc + 2.0, yf)
-            b.body.box((xw - 0.06, ya, 0.0), (xw + 0.06, yc - dw / 2, H), COMPOSITE)
-            b.body.box((xw - 0.06, yc + dw / 2, 0.0), (xw + 0.06, yb, H), COMPOSITE)
-            b.body.box((xw - 0.06, yc - dw / 2, dh), (xw + 0.06, yc + dw / 2, H), COMPOSITE)
-            for s_ in (-1, 1):
-                xs0, xs1 = xw + s_ * 0.06, xw + s_ * 0.075
-                b.fine.box((min(xs0, xs1), ya, 0.0), (max(xs0, xs1), yc - dw / 2, 1.05), WOOD)
-                b.fine.box((min(xs0, xs1), yc + dw / 2, 0.0), (max(xs0, xs1), yb, 1.05), WOOD)
-            for yy in (yc - dw / 2 - 0.04, yc + dw / 2):
-                b.fine.box((xw - 0.09, yy, 0.0), (xw + 0.09, yy + 0.04, dh + 0.04), TRIM)
-            b.fine.box((xw - 0.09, yc - dw / 2 - 0.04, dh), (xw + 0.09, yc + dw / 2 + 0.04, dh + 0.04), TRIM)
-            xh = xw + (0.09 if side == 0 else -0.09)                                                  # the hall side of the wall
-            b.emit.lamp_box((min(xh, xh + (0.006 if side == 0 else -0.006)), yc + dw / 2 + 0.06, 1.55),
-                            (max(xh, xh + (0.006 if side == 0 else -0.006)), yc + dw / 2 + 0.12, 1.62), "green", LAMP_DIM)
-            b.emit.label_fit((xh + (0.0005 if side == 0 else -0.0005), yc, 2.3), 0.30, f"cabin_{k + 1 + 4 * side:02d}", (1 if side == 0 else -1, 0, 0))
-        for yw in (4.0, 8.0, 12.0):
-            x0, x1 = (xl, xw) if side == 0 else (xw, xr)
-            b.body.box((x0, yw - 0.06, 0.0), (x1, yw + 0.06, H), COMPOSITE)
-            b.fine.box((x0, yw - 0.075, 0.0), (x1, yw - 0.06, 1.05), WOOD)
-            b.fine.box((x0, yw + 0.06, 0.0), (x1, yw + 0.075, 1.05), WOOD)
-    # inside each cabin: the bunk against the outer wall and a side wall, a desk at the outer wall, a wardrobe, a basin, a rug
-    for side in (0, 1):
-        sgn = 1 if side == 0 else -1
-        xo = xl if side == 0 else xr                       # the outer wall's finished face
-        yaw = 0 if side == 0 else 180
-        for k, yc in enumerate(CAB_Y):
-            y_lo = 0.06 if k == 0 else yc - 2.0 + 0.06
-            y_hi = yf if k == 3 else yc + 2.0 - 0.06
-            place(b, xo + sgn * 1.09, y_lo + 0.5, yaw, G.bunk_bed, 2.05, 0.95, 2, [FABRIC_NAVY, FABRIC_RUST, FABRIC_GREY, FABRIC_SAND][k], k + side * 4)
-            place(b, xo + sgn * 0.35, y_hi - 0.75, 180 if side == 0 else 0, F.desk, 1.0, 0.6, 0.75, WOOD, True)
-            place(b, xo + sgn * 1.05, y_hi - 0.75, 180 if side == 0 else 0, F.chair, FABRIC_GREY)
-            place(b, xo + sgn * 3.6, y_lo + 0.29, 90, G.wardrobe, 0.9, 0.55, 2.0)
-            place(b, xo + sgn * 2.4, y_hi - 0.27, -90, G.vanity, 0.9, 0.5)
-            place(b, xo + sgn * 2.6, (y_lo + y_hi) / 2, yaw, G.rug, 1.8, 1.6, [FABRIC_SAND, FABRIC_GREY, FABRIC_RUST, FABRIC_NAVY][k], FABRIC_SAND)
-    # the hall: sofas around a low table in the middle, a dining table at the far wall, plants, screens on the corridor wall
-    place(b, 10.0, 9.9, 0, F.low_table, 1.4, 0.8, 0.4, WOOD)
-    place(b, 10.0, 11.3, -90, F.sofa, 2.6, FABRIC_NAVY)
-    place(b, 10.0, 8.5, 90, F.sofa, 2.6, FABRIC_NAVY)
-    place(b, 12.1, 9.9, 180, F.armchair, FABRIC_SAND)
-    place(b, 7.9, 9.9, 0, F.armchair, FABRIC_SAND)
-    place(b, 10.0, 9.9, 0, G.rug, 4.6, 4.2, FABRIC_RUST, FABRIC_SAND)
-    place(b, 10.0, 14.0, 0, F.table, 3.0, 0.9, 0.75, LAMINATE, TRIM, False)
-    for x in (9.0, 10.0, 11.0):
-        place(b, x, 13.0, 90, F.chair, FABRIC_RUST)
-        place(b, x, 15.0, -90, F.chair, FABRIC_RUST)
-    place(b, 10.0, yf - 0.02, -90, F.wall_screen, 2.4, 1.3, "scr_news", z=2.0)
-    place(b, 12.6, 0.08, 90, F.wall_screen, 2.2, 1.2, "scr_sched", z=1.8)
-    place(b, 7.4, 0.08, 90, F.wall_screen, 2.2, 1.2, "scr_map", z=1.8)
-    for (x, y) in ((5.8, 0.9), (14.2, 0.9), (5.8, 7.9), (14.2, 7.9), (5.8, 15.0), (14.2, 15.0)):
-        place(b, x, y, 0, F.potted_plant, 1.3, int(x + y))
-    for x in (7.5, 12.5):
-        for y in (3.0, 6.5, 10.0, 13.5):
-            F.ceiling_light_panel(b, x - 0.5, x + 0.5, y - 0.25, y + 0.25, H - 0.05, "white_warm", LAMP)
-    for k, yc in enumerate(CAB_Y):
-        for xc in (2.6, 17.4):
-            F.ceiling_light_panel(b, xc - 0.4, xc + 0.4, yc - 0.3, yc + 0.3, H - 0.05, "white_warm", LAMP)
+    SC.quarters_block(b, spec, False, CAB_Y, CAB_XL, CAB_XR, 0)
+    SC.hall_dress(b, spec, False, CAB_Y, CAB_XL, CAB_XR)
     return b.build(name)

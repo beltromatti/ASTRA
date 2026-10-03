@@ -108,13 +108,12 @@ _reg("berthing", name="Crew Berthing Bay", kind="cabins", dept="services", L=24.
              light(18.0, 12.0, 3.2, 1500, 3000, (8.0, 0.6), 600)])
 _reg("suites", name="Senior Officers' Quarters", kind="cabins", dept="command", L=24.0, D=12.0, h=3.2, plate="suites",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
-     spots=[spot("officer", "sleep", 2.6 + 6.0 * k, 9.0, 90, "command") for k in range(4)] + [spot("officer", "sit", 3.4 + 6.0 * k, 5.0, 90, "command") for k in range(4)],
-     lights=[light(3.0, 6.0, 3.1, 1100, 3200, (4.0, 3.0), 500), light(9.0, 6.0, 3.1, 1100, 3200, (4.0, 3.0), 500), light(15.0, 6.0, 3.1, 1100, 3200, (4.0, 3.0), 500),
-             light(21.0, 6.0, 3.1, 1100, 3200, (4.0, 3.0), 500), light(12.0, 1.4, 3.1, 900, 3600, (20.0, 0.6), 500)])
+     spots=[spot("officer", "sleep", 3.0 + 6.0 * k, 10.61, 90, "command") for k in range(4)] + [spot("officer", "sit", 3.23 + 6.0 * k, 4.45, 90, "command") for k in range(4)],
+     lights=[light(3.0 + 6.0 * k, y, 3.1, 600, 3200, (3.0, 2.4), 500) for k in range(4) for y in (5.2, 9.8)] + [light(12.0, 1.4, 3.1, 900, 3600, (20.0, 0.6), 500)])
 _reg("single_cabins", name="Officers' Cabins", kind="cabins", dept="services", L=24.0, D=4.0, h=3.2, plate="cabins_row",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
-     spots=[spot("officer", "sleep", 2.0 + 4.0 * k, 2.4, 90, "services") for k in range(6)],
-     lights=[light(4.0, 2.0, 3.1, 1000, 3200, (6.0, 0.6), 500), light(12.0, 2.0, 3.1, 1000, 3200, (6.0, 0.6), 500), light(20.0, 2.0, 3.1, 1000, 3200, (6.0, 0.6), 500)])
+     spots=[spot("officer", "sleep", (1.39 if k == 0 else 4.0 * k + 1.215), 3.2, 180, "services") for k in range(6)],
+     lights=[light(2.0 + 4.0 * k, 2.36, 3.1, 700, 3200, (1.1, 0.52), 480) for k in range(6)] + [light(12.0, 0.5, 3.1, 1600, 3200, (22.0, 0.4), 700)])
 
 # ---- flight (Deck 9) -------------------------------------------------------------------------------------------------------------------------------------------------------------
 _reg("drone_bay", name="Drone Bay", kind="hangar", dept="flight", L=32.0, D=16.0, h=3.7, plate="drone_bay",

@@ -145,7 +145,7 @@ _reg("armory", name="Armory", kind="armory", dept="security", L=16.0, D=16.0, h=
 _reg("cabins", name="Crew Cabins", kind="cabins", dept="services", L=20.0, D=16.0, h=3.2, plate="cabins",
      doors=[door("near", 10.0)], systems=["power_bus", "life_support"],
      spots=[spot("sleeper", "sleep", 1.34, y, 180) for y in (0.56, 4.56, 8.56, 12.56)] + [spot("sleeper", "sleep", 18.66, y, 0) for y in (0.56, 4.56, 8.56, 12.56)],
-     lights=[light(10.0, 8.0, 3.1, 2500, 3400, (14.0, 0.6))])
+     lights=[light(10.0, 8.0, 3.1, 2500, 3400, (14.0, 0.6))] + [light(xc, yc, 3.0, 900, 3400, (1.4, 1.4), 480) for xc in (2.6, 17.4) for yc in (2.0, 6.0, 10.0, 14.0)])
 
 # ---- Deck 6: the medical rooms around the Medbay (docs/BIBBIA.md §6: Medbay, surgery, quarantine, pharmacy) ---------------------
 _reg("surgery", name="Surgery", kind="surgery", dept="medical", L=16.0, D=16.0, h=3.6, plate="surgery",

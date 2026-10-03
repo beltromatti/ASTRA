@@ -32,7 +32,7 @@ def picture(b: SParts, w: float, h: float, seed: int = 1, frame: str = WALNUT, k
     grid of squares — in the ship's own tints."""
     rng = random.Random(seed)
     t = 0.03
-    MK.rbox(b.body, (0.0, -w / 2, -h / 2), (t, w / 2, h / 2), 0.006, frame, 2)
+    MK.rbox(b.soft, (0.0, -w / 2, -h / 2), (t, w / 2, h / 2), 0.006, frame, 2)
     b.fine.swatch_box((t - 0.004, -w / 2 + 0.03, -h / 2 + 0.03), (t, w / 2 - 0.03, h / 2 - 0.03), "paper")
     iw, ih = w - 0.12, h - 0.12
     x = t - 0.002
@@ -142,7 +142,7 @@ def side_table(b: SParts, r: float = 0.24, h: float = 0.52, top: str = OAK, lamp
     """A round side table on a steel column and foot, with a small table lamp (a glowing shade) or a mug and a book."""
     b.body.cyl((0, 0, 0.0), (0, 0, 0.02), r * 0.75, STRUCT, seg=20)
     b.body.cyl((0, 0, 0.02), (0, 0, h - 0.04), 0.025, TRIM, seg=10)
-    MK.rbox(b.body, (-r, -r, h - 0.04), (r, r, h), 0.014, top, 2)
+    MK.rbox(b.soft, (-r, -r, h - 0.04), (r, r, h), 0.014, top, 2)
     if lamp:
         b.fine.cyl((0, 0, h), (0, 0, h + 0.015), 0.07, STRUCT, seg=14)
         b.fine.cyl((0, 0, h + 0.015), (0, 0, h + 0.2), 0.01, BRASS, seg=8)
