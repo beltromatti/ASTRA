@@ -145,6 +145,12 @@ void UAstraHarness::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	FParse::Value(FCommandLine::Get(), TEXT("astra_harness_port="), Port);
+	// a game driven from outside keeps its pace behind other windows (3 Oct: the packaged app idled in the background and left the
+	// harness waiting, until t.IdleWhenNotForeground was set by hand)
+	if (IConsoleVariable* Idle = IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground")))
+	{
+		Idle->Set(0, ECVF_SetByCode);
+	}
 	TSharedPtr<IHttpRouter> Router = FHttpServerModule::Get().GetHttpRouter(Port, true);
 	if (!Router.IsValid())
 	{
