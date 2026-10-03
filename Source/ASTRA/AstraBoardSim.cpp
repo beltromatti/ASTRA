@@ -1,4 +1,4 @@
-// ASTRA — ABBORDAGGI: the fight inside the Aquila: the men, their senses, their guns (the squad drill is in AstraBoardAI.cpp). See AstraBoardSim.h.
+// ASTRA — ABBORDAGGI: the fight inside a ship: the men, their senses, their guns (the squad drill is in AstraBoardAI.cpp). See AstraBoardSim.h.
 
 #include "AstraBoardSim.h"
 
@@ -170,45 +170,67 @@ void FAstraBoardSim::ArmUnit(FUnit& U)
 
 TArray<int32> FAstraBoardSim::SpawnBoarders(int32 BreachComp, const FVector& BreachPos, int32 ObjectiveComp, int32 Count, float FirstAtS)
 {
-	TArray<int32> Out;
-	Mis.Objective = ObjectiveComp;
+	return SpawnAttackers(ESide::Mandate, BreachComp, BreachPos, ObjectiveComp, Count, FirstAtS, 5);
+}
+
+void FAstraBoardSim::SetMission(ESide Attacker, int32 BreachComp, const FVector& BreachPos, int32 ObjectiveComp, bool bSweep)
+{
+	Mis.Attacker = Attacker;
 	Mis.Breach = BreachComp;
 	Mis.BreachPos = BreachPos;
-	const int32 PerSquad = 5;
+	Mis.Objective = ObjectiveComp;
+	Mis.bSweep = bSweep;
+}
+
+void FAstraBoardSim::BriefAttackers(int32 SquadId)
+{
+	if (!Teams.IsValidIndex(SquadId))
+	{
+		return;
+	}
+	FSquad& S = Teams[SquadId];
+	S.Task = ETask::Advance;
+	S.TargetComp = Mis.Objective;
+	S.TargetPos = Mis.Objective != INDEX_NONE ? Map->CentreOf(Mis.Objective) : Mis.BreachPos;
+	S.Note = TEXT("to the objective");
+}
+
+TArray<int32> FAstraBoardSim::SpawnAttackers(ESide Side, int32 BreachComp, const FVector& BreachPos, int32 ObjectiveComp, int32 Count, float FirstAtS, int32 PerSquad)
+{
+	TArray<int32> Out;
+	SetMission(Side, BreachComp, BreachPos, ObjectiveComp, Mis.bSweep);
+	PerSquad = FMath::Max(2, PerSquad);
 	const int32 NumSquads = FMath::Max(1, FMath::DivideAndRoundUp(Count, PerSquad));
-	static const TCHAR* Names[] = {TEXT("Ferry Guard Alpha"), TEXT("Ferry Guard Bravo"), TEXT("Ferry Guard Charlie"), TEXT("Ferry Guard Delta"), TEXT("Ferry Guard Echo"), TEXT("Ferry Guard Foxtrot")};
+	static const TCHAR* MandateSquads[] = {TEXT("Ferry Guard Alpha"), TEXT("Ferry Guard Bravo"), TEXT("Ferry Guard Charlie"), TEXT("Ferry Guard Delta"), TEXT("Ferry Guard Echo"), TEXT("Ferry Guard Foxtrot")};
+	static const TCHAR* MarineSquads[] = {TEXT("Boarding Alpha"), TEXT("Boarding Bravo"), TEXT("Boarding Charlie"), TEXT("Boarding Delta"), TEXT("Boarding Echo"), TEXT("Boarding Foxtrot")};
 	int32 Made = 0;
 	float At = FirstAtS;
 	for (int32 s = 0; s < NumSquads && Made < Count; ++s)
 	{
-		const int32 Sq = AddSquad(ESide::Mandate, Names[s % UE_ARRAY_COUNT(Names)]);
+		const int32 Sq = AddSquad(Side, Side == ESide::Mandate ? MandateSquads[s % UE_ARRAY_COUNT(MandateSquads)] : MarineSquads[s % UE_ARRAY_COUNT(MarineSquads)]);
 		Out.Add(Sq);
 		const int32 Here = FMath::Min(PerSquad, Count - Made);
 		for (int32 k = 0; k < Here; ++k)
 		{
 			const ERole Role = k == 0 ? ERole::Leader : (k == Here - 1 && Here >= 4 ? ERole::Heavy : ERole::Rifleman);
-			FString Name = MandateName(Made);
-			if (Role == ERole::Leader)
+			FString Name;
+			if (Side == ESide::Mandate)
 			{
-				Name = TEXT("Warden ") + Name;
+				Name = (Role == ERole::Leader ? FString(TEXT("Warden ")) : FString(TEXT("Oarsman "))) + MandateName(Made);
 			}
 			else
 			{
-				Name = TEXT("Oarsman ") + Name;
+				Name = FString::Printf(TEXT("%sMarine %d"), Role == ERole::Leader ? TEXT("Sgt. ") : TEXT(""), Made + 1);
 			}
 			// they come in a few steps apart from the cut in the wall
 			const FVector Spot = Map->Inset(BreachComp, BreachPos + FVector(Rng.FRandRange(-120.f, 120.f), Rng.FRandRange(-120.f, 120.f), 0.f), 60.f);
-			FUnit& U = Spawn(ESide::Mandate, Role, Name, Spot, Sq);
+			FUnit& U = Spawn(Side, Role, Name, Spot, Sq);
 			U.Act = EAct::Waiting;
 			Pending.Add({U.Id, At});
 			At += 0.9f + Rng.FRand() * 0.5f;
 			++Made;
 		}
-		FSquad& S = Teams[Sq];
-		S.Task = ETask::Advance;
-		S.TargetComp = ObjectiveComp;
-		S.TargetPos = Map->CentreOf(ObjectiveComp);
-		S.Note = TEXT("to the objective");
+		BriefAttackers(Sq);
 	}
 	return Out;
 }
@@ -420,8 +442,8 @@ void FAstraBoardSim::StepDoors()
 			const double D = FVector::Dist2D(U.Pos, P.Pos);
 			if (Doors.IsSealed(P.Door))
 			{
-				// the Mandate at a sealed bulkhead cut through it
-				if (U.Side == ESide::Mandate && U.Able() && D < 260.0 && !Cutting.Contains(P.Door))
+				// the attackers at a sealed bulkhead cut through it
+				if (IsAttacker(U.Side) && U.Able() && D < 260.0 && !Cutting.Contains(P.Door))
 				{
 					Cutting.Add(P.Door);
 				}
@@ -444,7 +466,7 @@ void FAstraBoardSim::StepDoors()
 				Doors.Sealed[d] = false;
 				const int32 Pi = Map->PortalOfDoor(d);
 				Emit(EEvent::Cut, INDEX_NONE, d, Pi != INDEX_NONE ? Map->GetPortals()[Pi].Pos : FVector::ZeroVector, FVector::ZeroVector, 0.f, false,
-				     FString::Printf(TEXT("the Mandate cut through the bulkhead at %s"), Pi != INDEX_NONE ? *Map->Describe(Map->GetPortals()[Pi].A) : TEXT("?")));
+				     FString::Printf(TEXT("%s cut through the bulkhead at %s"), Mis.Attacker == ESide::Mandate ? TEXT("the Mandate") : TEXT("the marines"), Pi != INDEX_NONE ? *Map->Describe(Map->GetPortals()[Pi].A) : TEXT("?")));
 			}
 		}
 		else if (CutT[d] > 0.f)
@@ -486,7 +508,7 @@ float FAstraBoardSim::Strength(const FSquad& S) const
 
 // ================================================================================================================== the ship's own eyes
 
-/** The internal sensors of the ship see the corridors and the halls (not the rooms): the marines' picture of the Mandate's men, a couple of seconds stale. */
+/** The internal sensors of a ship that has power see the corridors and the halls (not the rooms): its people's picture of the boarders, a couple of seconds stale. */
 void FAstraBoardSim::StepSensors(float Dt)
 {
 	SensorT += Dt;
@@ -495,14 +517,18 @@ void FAstraBoardSim::StepSensors(float Dt)
 		return;
 	}
 	SensorT = 0.f;
-	TArray<FSeen>& Pic = SensorPicture[(int32)ESide::Aquila];
+	if (!Tuning.bShipSensors)
+	{
+		return;                                                // a dead ship: nobody sees through its walls
+	}
+	TArray<FSeen>& Pic = SensorPicture[(int32)Defender()];
 	for (FSeen& S : Pic)
 	{
 		S.AgeS += 1.f;
 	}
 	for (const FUnit& U : People)
 	{
-		if (U.Side != ESide::Mandate || !U.Able() || !Map->GetComps().IsValidIndex(U.Comp))
+		if (!IsAttacker(U.Side) || !U.Able() || !Map->GetComps().IsValidIndex(U.Comp))
 		{
 			continue;
 		}
@@ -527,44 +553,28 @@ void FAstraBoardSim::StepSensors(float Dt)
 void FAstraBoardSim::Intel(ESide Side, TArray<FSeen>& Out) const
 {
 	Out.Reset();
-	if (Side == ESide::Aquila)
+	const ESide Enemy = Side == ESide::Aquila ? ESide::Mandate : ESide::Aquila;
+	if (Side == Defender() && Tuning.bShipSensors)
 	{
-		for (const FSeen& S : SensorPicture[(int32)ESide::Aquila])
+		for (const FSeen& S : SensorPicture[(int32)Side])
 		{
 			if (People.IsValidIndex(S.Unit) && People[S.Unit].Able())
 			{
 				Out.Add(S);
 			}
 		}
-		for (const FUnit& U : People)
-		{
-			if (U.Side != ESide::Aquila || !U.Able())
-			{
-				continue;
-			}
-			for (const FSeen& S : U.Seen)
-			{
-				if (People.IsValidIndex(S.Unit) && People[S.Unit].Side == ESide::Mandate && People[S.Unit].Able() && !Out.ContainsByPredicate([&S](const FSeen& O) { return O.Unit == S.Unit; }))
-				{
-					Out.Add(S);
-				}
-			}
-		}
 	}
-	else
+	for (const FUnit& U : People)
 	{
-		for (const FUnit& U : People)
+		if (U.Side != Side || !U.Able())
 		{
-			if (U.Side != ESide::Mandate || !U.Able())
+			continue;
+		}
+		for (const FSeen& S : U.Seen)
+		{
+			if (People.IsValidIndex(S.Unit) && People[S.Unit].Side == Enemy && People[S.Unit].Able() && !Out.ContainsByPredicate([&S](const FSeen& O) { return O.Unit == S.Unit; }))
 			{
-				continue;
-			}
-			for (const FSeen& S : U.Seen)
-			{
-				if (People.IsValidIndex(S.Unit) && People[S.Unit].Side == ESide::Aquila && People[S.Unit].Able() && !Out.ContainsByPredicate([&S](const FSeen& O) { return O.Unit == S.Unit; }))
-				{
-					Out.Add(S);
-				}
+				Out.Add(S);
 			}
 		}
 	}
@@ -1261,7 +1271,7 @@ void FAstraBoardSim::GoTo(FUnit& U, const FVector& To, float Speed, bool bThroug
 {
 	FBoardRouteOptions Opt;
 	Opt.Doors = &Doors;
-	Opt.bThroughSealed = bThroughSealed || U.Side == ESide::Mandate;     // the Mandate cut through what is shut; the marines go the way that is open
+	Opt.bThroughSealed = bThroughSealed || IsAttacker(U.Side);           // the attackers cut through what is shut; the holders go the way that is open
 	TArray<FVector> Pts;
 	if (!Map->Route(U.Pos, To, Pts, Opt) || Pts.Num() < 2)
 	{
@@ -1304,7 +1314,7 @@ void FAstraBoardSim::Move(FUnit& U, float Dt)
 	while (Left > 0.f && U.PathI < U.Path.Num())
 	{
 		const FVector Next = U.Path[U.PathI];
-		// a sealed bulkhead ahead: they wait at it (the Mandate are cutting through)
+		// a sealed bulkhead ahead: they wait at it (the attackers are cutting through)
 		if (Map->GetComps().IsValidIndex(U.Comp))
 		{
 			bool bShut = false;
@@ -1384,25 +1394,39 @@ void FAstraBoardSim::StepMission(float Dt)
 	{
 		return;
 	}
-	int32 Mandate = 0, Aquila = 0, Still = 0;
+	const ESide Att = Mis.Attacker;
+	int32 AttAtObjective = 0, DefAtObjective = 0, AttStill = 0, DefAble = 0;
 	for (const FUnit& U : People)
 	{
 		if (U.bExternal)
 		{
 			continue;
 		}
-		if (U.Side == ESide::Mandate)
+		if (U.Side == Att)
 		{
-			Still += (U.Able() || U.Act == EAct::Waiting) ? 1 : 0;
-			Mandate += (U.Able() && U.Comp == Mis.Objective) ? 1 : 0;
+			AttStill += (U.Able() || U.Act == EAct::Waiting) ? 1 : 0;
+			AttAtObjective += (U.Able() && U.Comp == Mis.Objective) ? 1 : 0;
 		}
 		else
 		{
-			Aquila += (U.Able() && U.Comp == Mis.Objective) ? 1 : 0;
+			DefAtObjective += (U.Able() && U.Comp == Mis.Objective) ? 1 : 0;
+			DefAble += U.Able() ? 1 : 0;
 		}
 	}
-	const bool bCaptainThere = People.IsValidIndex(CaptainUnit) && People[CaptainUnit].Comp == Mis.Objective && People[CaptainUnit].Act != EAct::Down && People[CaptainUnit].Act != EAct::Gone;
-	if (Mis.Objective != INDEX_NONE && Mandate >= 2 && Aquila == 0 && !bCaptainThere)
+	// the Captain stands with his own side: in the objective he holds it against the Mandate's boarders, and with his marines he helps take it
+	const bool bCaptainThere = People.IsValidIndex(CaptainUnit) && People[CaptainUnit].Comp == Mis.Objective && People[CaptainUnit].Act != EAct::Down && People[CaptainUnit].Act != EAct::Gone && People[CaptainUnit].Act != EAct::Dead;
+	if (bCaptainThere)
+	{
+		if (Att == ESide::Aquila)
+		{
+			++AttAtObjective;
+		}
+		else
+		{
+			++DefAtObjective;
+		}
+	}
+	if (Mis.Objective != INDEX_NONE && AttAtObjective >= 2 && DefAtObjective == 0)
 	{
 		Mis.HeldS += Dt;
 	}
@@ -1412,11 +1436,15 @@ void FAstraBoardSim::StepMission(float Dt)
 	}
 	if (Mis.HeldS >= Tuning.HoldS)
 	{
-		Mis.Outcome = EOutcome::MandateTakes;
+		Mis.Outcome = EOutcome::AttackerTakes;
 	}
-	else if (Still == 0 && Pending.Num() == 0 && Stats.Spawned[1] > 0)
+	else if (Mis.bSweep && DefAble == 0 && Stats.Spawned[(int32)Defender()] > 0 && AttAtObjective + AttStill > 0 && Clock > 20.0)
 	{
-		Mis.Outcome = Stats.Exited[1] > 0 && Stats.Killed[1] + Stats.Down[1] < Stats.Spawned[1] ? EOutcome::MandateRepelled : EOutcome::AquilaHolds;
+		Mis.Outcome = EOutcome::AttackerTakes;                   // nobody is left to hold the ship
+	}
+	else if (AttStill == 0 && Pending.Num() == 0 && Stats.Spawned[(int32)Att] > 0)
+	{
+		Mis.Outcome = Stats.Exited[(int32)Att] > 0 && Stats.Killed[(int32)Att] + Stats.Down[(int32)Att] < Stats.Spawned[(int32)Att] ? EOutcome::AttackerRepelled : EOutcome::DefenderHolds;
 	}
 	else if (Clock > TimeLimitS)
 	{
@@ -1432,10 +1460,10 @@ void FAstraBoardSim::StepMission(float Dt)
 FString FAstraBoardSim::HostileSummary() const
 {
 	TArray<FSeen> Seen;
-	Intel(ESide::Aquila, Seen);
+	Intel(Defender(), Seen);
 	if (Seen.IsEmpty())
 	{
-		return TEXT("no hostile contact on the internal sensors");
+	return TEXT("no hostile contact on the internal sensors");
 	}
 	TMap<FString, int32> By;
 	for (const FSeen& S : Seen)

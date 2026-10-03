@@ -106,7 +106,8 @@ public:
 
 	/** Reads the plan (the staged copy first, the repository's when bRepoFirst is false and there is none: the bench passes true). False (and a reason) when it is missing or does not parse. Safe on a worker thread. */
 	bool Load(FString& OutError, bool bRepoFirst = false);
-	/** Reads the plan in a file: the Aquila's (data/ship/aquila_plan.json) or a class's (data/ship/plans/<class>.json). Safe on a worker thread. */
+	/** Reads a plan from a path: the Aquila's (data/ship/aquila_plan.json) or a class's (data/ship/plans/<class>.json, FLOTTA-VIVA). The real body of the loader; the one above is the Aquila's path with this.
+	 *  Safe on a worker thread. */
 	bool Load(const FString& Path, FString& OutError);
 
 	/** The smallest compartment containing a point (world cm), within Slack cm of its walls; INDEX_NONE outside every one. */

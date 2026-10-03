@@ -525,6 +525,7 @@ void UAstraBattleSubsystem::Tick(float DeltaTime)
 	TickScenario(Dt);
 	TickSquadrons(Dt);
 	TickEagleWing(Dt);
+	TickBoardingLaunches(Dt);                                   // the assault craft that leave their carriers (AstraBoardCraft.cpp)
 	EndPhase(2);
 	for (FAstraBattleShip& S : Ships)
 	{
@@ -1926,7 +1927,16 @@ void UAstraBattleSubsystem::BuildHoloBlips(TArray<FAstraHoloBlip>& Out, FPlotCou
 			B.Size = 0.7f;
 			B.Rot = FQuat::Identity;
 		}
-		if (S.bCraft && Squadrons.IsValidIndex(S.Squadron))
+		if (S.bCraft && S.CraftKind == 3)
+		{
+			B.bCraft = true;                                          // ABBORDAGGI-2: a boarding craft: a craft of no flight group, labelled by what it is
+			B.Squadron = -1;
+			B.Size = 0.3f;
+			B.Name = S.Name.ToUpper();
+			B.Contact = TEXT("BOARDING");
+			B.bNoLabel = false;
+		}
+		else if (S.bCraft && Squadrons.IsValidIndex(S.Squadron))
 		{
 			B.bCraft = true;
 			B.Squadron = S.Squadron;
@@ -2825,6 +2835,10 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 		}
 	}
 	const bool bWasCommander = S.Side == EAstraSide::Mandate && S.bHostile && MandateCommander() == S.ContactId;
+	if (S.CraftKind == 3 && S.bCraft)
+	{
+		NoteBoardingCraftLost(S, Cause);                            // ABBORDAGGI-2: the men aboard go with it, the carrier's berth is lost, the host is told (AstraBoardCraft.cpp)
+	}
 	S.bAlive = false;
 	S.Mode = EAstraShipMode::Dead;
 	S.DeathHow = How;
@@ -2913,7 +2927,7 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 			const FAstraBattleShip* Killer = S.LastHitBy >= 0 ? FindById(S.LastHitBy) : nullptr;
 			if (Killer && Killer->bCraft && Killer->Side == EAstraSide::Astra && !Killer->Radio.IsEmpty())
 			{
-				Report(FString::Printf(TEXT("flight: %s splashed a Harpy"), *Killer->Radio));
+				Report(FString::Printf(TEXT("flight: %s splashed %s"), *Killer->Radio, S.CraftKind == 3 ? TEXT("a boarding skiff") : TEXT("a Harpy")));
 			}
 		}
 		if (Squadrons.IsValidIndex(S.Squadron))
@@ -3672,18 +3686,28 @@ void UAstraBattleSubsystem::AddEnemyWing(int32 CarrierIdx, int32 Count, float De
 
 FString UAstraBattleSubsystem::EnemyCraftSummary() const
 {
-	int32 N = 0;
-	double Nearest = 1e18;
+	int32 N = 0, Boats = 0;
+	double Nearest = 1e18, NearestBoat = 1e18;
 	for (const FAstraBattleShip& S : Ships)
 	{
 		if (S.bAlive && S.bCraft && S.Side == EAstraSide::Mandate)
 		{
+			if (S.CraftKind == 3)
+			{
+				++Boats;                                                // ABBORDAGGI-2: boarding skiffs are told apart from the strike fighters
+				NearestBoat = FMath::Min(NearestBoat, (double)FVector::Dist(S.Pos, Ships[0].Pos));
+				continue;
+			}
 			++N;
 			Nearest = FMath::Min(Nearest, (double)FVector::Dist(S.Pos, Ships[0].Pos));
 		}
 	}
-	return N ? FString::Printf(TEXT("%d Harpy strike fighters airborne (rockets and guns), the nearest %.1f km from us"), N, Nearest / OneKm)
-	         : FString(TEXT("none"));
+	FString Out = N ? FString::Printf(TEXT("%d Harpy strike fighters airborne (rockets and guns), the nearest %.1f km from us"), N, Nearest / OneKm) : FString();
+	if (Boats)
+	{
+		Out += FString::Printf(TEXT("%s%d Mandate boarding skiffs in flight (they carry boarders, not guns), the nearest %.1f km from us"), Out.IsEmpty() ? TEXT("") : TEXT("; "), Boats, NearestBoat / OneKm);
+	}
+	return Out.IsEmpty() ? FString(TEXT("none")) : Out;
 }
 
 int32 UAstraBattleSubsystem::AirborneCount(int32 Squadron) const
@@ -3959,9 +3983,20 @@ void UAstraBattleSubsystem::TickSquadrons(float Dt)
 		{
 			Q.bAirborneReported = true;
 			const FAstraBattleShip* Cr = FindById(Q.CarrierId);
-			Report(bOurs ? FString::Printf(TEXT("flight: %s squadron airborne, %d %ss on %s"), *Q.Name, Q.Launched, *Q.CallSign, *Q.Mission.ToUpper())
-			             : FString::Printf(TEXT("sensors: %s has launched strike fighters — %d Harpies inbound on the Aquila"),
-			                               Cr ? *KnownLabel(*Cr) : TEXT("an enemy cruiser"), Q.Launched));
+			const bool bAquilas = Cr && Cr->bPlayer;
+			if (bOurs && !bAquilas)
+			{
+				// another ship's wing (an arriving battle group's): fleet news on the plot, not a report for the Aquila's bridge — each one opened a
+				// report turn with nothing in it for the Captain, and Tactical filled it with the range of her target (3 Oct)
+				Report(FString::Printf(TEXT("flight: the %s's %s are airborne, %d on %s"), Cr ? *Cr->Name : TEXT("fleet"),
+				                       Q.Kind == 1 ? TEXT("bombers") : (Q.Kind == 2 ? TEXT("drones") : TEXT("fighters")), Q.Launched, *Q.Mission.ToLower()), false);
+			}
+			else
+			{
+				Report(bOurs ? FString::Printf(TEXT("flight: %s squadron airborne, %d %ss on %s"), *Q.Name, Q.Launched, *Q.CallSign, *Q.Mission.ToUpper())
+				             : FString::Printf(TEXT("sensors: %s has launched strike fighters — %d Harpies inbound on the Aquila"),
+				                               Cr ? *KnownLabel(*Cr) : TEXT("an enemy cruiser"), Q.Launched));
+			}
 		}
 	}
 }

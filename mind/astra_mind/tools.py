@@ -169,6 +169,16 @@ EAGLE_RECOVER = _fn("eagle_recover", "Flight: bring the Captain's Falcon (Eagle)
     "by": {"type": "string", "description": "who calls it, for the log (Flight Control)"}}, [])
 SHIP_TOOLS.append(EAGLE_RECOVER)
 
+# The Captain's weapons (docs/ABBORDAGGI.md): the armourer of the Marine Armory takes one up to him; the game has the rack, the locker and the delivery, and tells the crew where the weapons are
+# (`arms` in the ship state: a build without it does not have the tool)
+ISSUE_WEAPON = _fn("issue_weapon", "The XO (or any officer the Captain asks): send the armourer of the Marine Armory (Deck 8) up with a weapon for the Captain. The weapon really leaves the "
+                                   "rack, a marine takes it up the ship at a run, and after the time the result gives it is in the Captain's hands wherever he is on foot. kind: `pistol` "
+                                   "(the M27S sidearm), `rifle` (the AR-181) or `kit` (both). Only for the Captain, when he asks for a weapon or an officer is told to arm him; the result "
+                                   "says who is bringing it and how long, or why not (he carries it already, the rack has none, he is flying): say that, never a promise of your own.", {
+    "kind": {"type": "string", "enum": ["pistol", "rifle", "kit"]},
+    "who": {"type": "string", "enum": ["captain"], "description": "who is issued the weapon: the Captain (the only one)"}}, ["kind"])
+SHIP_TOOLS.append(ISSUE_WEAPON)
+
 DEPARTMENTS = ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"]
 # what a standing order lets each department do by itself when an event calls for it
 DEPT_TOOLS = {"tactical": {"set_target", "fire_weapons", "cease_fire", "set_shields", "set_point_defense", "launch_decoys"},
@@ -255,7 +265,8 @@ _OWNER = {"set_course": "helm", "set_throttle": "helm", "intercept": "helm", "tr
           "dispatch_damage_control": "ops", "hail": "comms", "set_emcon": "sensors", "active_scan": "sensors",
           "launch_decoys": "tactical", "holo_display": "sensors", "end_transmission": "comms", "cease_fire": "tactical",
           "fleet_request": "comms", "set_radiators": "engineering", "vent_heat": "engineering",
-          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "transporter": "ops", "lift_go": "computer", "eagle_recover": "flight"}
+          "dismiss_visitor": "captain", "abandon_ship": "xo", "group_order": "xo", "crew_locate": "ops", "transporter": "ops", "lift_go": "computer", "eagle_recover": "flight",
+          "issue_weapon": "xo"}
 LEGACY_INITIATIVE = {"dispatch_damage_control", "set_shields", "set_point_defense", "set_radiators", "launch_decoys"}
 
 
@@ -284,6 +295,9 @@ def tools_for(state: dict[str, Any] | None, ctx: Any = None) -> ToolSet:
     ts = _tools_for_build(state)
     if not (state or {}).get("transporter"):
         tools = [t for t in ts.tools if t["function"]["name"] != "transporter"]
+        ts = ToolSet(tools, {t["function"]["name"] for t in tools}, ts.available)
+    if not (state or {}).get("arms"):                      # (a game without the Captain's weapons has no armourer to call)
+        tools = [t for t in ts.tools if t["function"]["name"] != "issue_weapon"]
         ts = ToolSet(tools, {t["function"]["name"] for t in tools}, ts.available)
     lift = getattr(ctx, "lift", None)
     if lift is not None and lift.stops:

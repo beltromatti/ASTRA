@@ -972,15 +972,24 @@ class WarMinds:
             if m.seat.side != side or c is None:
                 continue
             hit = want == "all" or want in (c.key.lower(), c.contact.lower()) or (m.seat.kind == "group" and want in m.seat.group.lower())
+            through = None                                   # the ship of the group the words were for, when they were not for the commander herself
             if not hit:
                 for g in v.get("your_groups") or []:
                     if m.seat.kind == "admiral" or g.get("name") == m.seat.group:
                         for x in g.get("members") or []:
                             cap = self.allies.get(str(x.get("id")))
                             names = [str(x.get("id")).lower()] + ([cap.key.lower(), cap.ship.lower(), cap.name.lower()] if cap else [])
-                            hit = hit or any(want == n or (len(want) > 3 and want in n) for n in names)
+                            if not hit and any(want == n or (len(want) > 3 and want in n) for n in names):
+                                hit, through = True, cap
             if hit:
-                m.inbox.append(msg)
+                mine = msg
+                if through is not None and through.key != c.key and msg.src in ("captain", "comms"):
+                    # the Captain called one of her ships: its captain has no voice of his own on the net, he speaks through the group's mind (the Captain
+                    # hailed the Bulwark four times and nobody answered: her commander read the words as not hers, 3 Oct)
+                    note = (f" [The Captain is calling the {through.ship}, a ship of your group: her captain, {through.name}, answers him through you — "
+                            f"`say` with speaker {through.key}, to \"aquila\" — with what the {through.ship} sees and does.]")
+                    mine = Message(msg.t, msg.src, msg.text + note, urgent=msg.urgent, answer=msg.answer, lang=msg.lang, data=msg.data)
+                m.inbox.append(mine)
                 out.append(m)
         return out
 

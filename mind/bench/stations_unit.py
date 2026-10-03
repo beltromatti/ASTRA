@@ -195,16 +195,25 @@ class CrewTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([t for _, t in c.said], ["Sì, Capitano."])
 
     async def test_a_fight_full_of_checks_does_not_push_the_captains_orders_out_of_the_history(self) -> None:
-        c = Crew(*[Script([speak(f"Ordine {i} eseguito, Capitano.", "helm")]) for i in range(3)], *[Script([speak(f"Controllo {i}.", "tactical")]) for i in range(20)])
+        c = Crew(*[Script([speak(f"Ordine {i} eseguito, Capitano.", "helm")]) for i in range(3)], *[Script([speak(f"Controllo {i}.", "tactical")]) for i in range(40)])
         for i in range(3):
             await c.agent.handle(f"ordine {i}", "it")
-        for i in range(20):
+        prefixes = []
+        for i in range(40):
             await c.agent.handle_event(f"tactical: something {i}", "it")
-        said = [m["content"] for m in c.agent.history if m["role"] == "user"]
-        self.assertEqual(sum(1 for m in said if m.startswith("Captain:")), 3)                      # all three orders are still there
-        checks = sum(1 for m in said if not m.startswith("Captain:"))
-        self.assertLessEqual(checks, 2 * c.agent.history_turns - 3)                                # the checks are capped (cut back to six
-        self.assertLess(checks, 20)                                                                 # when the history passes twice its limit)
+            prefixes.append(json.dumps(c.agent.history, ensure_ascii=False))
+        # the history is append-only between cuts, and a cut only takes the oldest turns (the provider's cache keeps the unchanged prefix)
+        cuts = 0
+        for a, b in zip(prefixes, prefixes[1:]):
+            if not b.startswith(a[:-1]):
+                cuts += 1
+        self.assertLessEqual(cuts, 3)
+        turns = sum(1 for m in c.agent.history if m["role"] == "user")
+        self.assertLessEqual(turns, 2 * (c.agent.history_turns + 6))                                # capped
+        # the Captain's orders cut from the history are still known: they head the bridge now
+        now = c.agent._now(c.ship.snapshot())
+        for i in range(3):
+            self.assertIn(f"ordine {i}", now)
 
     async def test_initiative_needs_auto_delegation(self) -> None:
         c = Crew(Script([station("tactical", "engage", targets=["T-24"]), speak("Cocytus giù: passo al Phlegethon.", "tactical")]))

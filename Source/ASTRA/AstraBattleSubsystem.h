@@ -10,6 +10,7 @@
 #include "AstraWarStats.h"
 #include "AstraWarTypes.h"
 #include "AstraWarAI.h"
+#include "AstraBoardCraft.h"
 #include "AstraBattleSubsystem.generated.h"
 
 class AStaticMeshActor;
@@ -114,8 +115,8 @@ struct FAstraBattleShip
 	// small craft (fighters, bombers, drones) launched from a carrier
 	bool bCraft = false;
 	int32 Squadron = -1;                 // index in Squadrons
-	int32 CraftKind = 0;                 // 0 fighter, 1 bomber, 2 drone
-	FString Mission;                     // cap | strike | escort | ew | recon | recall
+	int32 CraftKind = 0;                 // 0 fighter, 1 bomber, 2 drone, 3 boarding craft (AstraBoardCraft.*: it flies its own flight, in Board, and belongs to no squadron)
+	FString Mission;                     // cap | strike | escort | ew | recon | recall | board
 	int32 MissionTarget = -1;            // ship id (strike/escort/ew/recon)
 	int32 Torpedoes = 0;
 	float GunT = 0.f;
@@ -199,6 +200,8 @@ struct FAstraBattleShip
 	int32 RadioHullStep = 0;             // how far its hull has been called on the radio (0 sound, 1 under 70 %, 2 under 35 %)
 	int32 RadioTarget = -1;              // the bandit it last called as engaged
 	float RadioT = -100.f;               // when it last called an engagement
+	// a boarding craft's flight (AstraBoardCraft.cpp, CraftKind 3): where it is going, whom it carries, what phase it is in
+	AstraBoardCraft::FFlight Board;
 };
 
 UENUM()
@@ -653,6 +656,25 @@ public:
 	/** Deaths since the last call (a reactor breach, a breakup with its section and axis, a ship left disabled): for the
 	 *  effects and the splitting of the mesh. */
 	void ConsumeDeathEvents(TArray<FAstraDeathEvent>& Out);
+	// --- ABBORDAGGI-2 (AstraBoardCraft.cpp, docs/brief/ABBORDAGGI-2.md): the boarding craft are craft of the battle; the host of the boarding (UAstraBoardSubsystem) asks for them and reads what happens
+	/** Boats leave a carrier for a target, each for its hatch (Req.Docks are in the target's frame). False, and why, when it cannot be (the carrier has no boat free, her hangar is out, the target is gone). */
+	bool LaunchBoarding(const AstraBoardCraft::FLaunch& Req, AstraBoardCraft::FLaunchResult& Out);
+	/** The facts a decision to board rests on (the shield on the hatch's face, the target's point defence, the fighters about it, the carrier's boats, the flight's time). False when there is no such ship. */
+	bool AssessBoarding(int32 CarrierId, int32 TargetId, AstraBoardCraft::FAssess& Out) const;
+	/** What the boarding craft did since the last call (launched, docked, shot down, home). */
+	void ConsumeBoardEvents(TArray<AstraBoardCraft::FCraftEvent>& Out);
+	/** The fight is over: the craft that are latched let go and go home. How many. */
+	int32 DepartBoardingOrder(int32 Order);
+	/** An order is withdrawn: the craft that are flying turn back (the latched ones stay for DepartBoardingOrder); the ones not yet launched are cancelled. How many were called back. */
+	int32 AbortBoardingOrder(int32 Order, const FString& Why);
+	/** The boats of a carrier (total, away, lost, free). */
+	AstraBoardCraft::FBay BoardBayOf(int32 CarrierId) const;
+	/** A ship of the battle by what a command calls it: a contact id (T-30), a name (ASN Praetorian, "Acheron"), "aquila". -1 when there is none or the name fits several. */
+	int32 ResolveShip(const FString& Key, FString* OutWhy = nullptr) const;
+	/** The truth about one ship, for the host (never for the crew). */
+	bool ShipFacts(int32 Id, AstraBoardCraft::FShipFacts& Out) const;
+	/** The boarders took her: she is ours now (her side, her stance), a hulk with a prize crew. */
+	bool CaptureShip(int32 Id, const FString& By, FString& OutDetail);
 	/** The Aquila's engines as the helm should feel them (0 = dead, 1 = sound), her damage control's help to the systems. */
 	float PlayerEngineFactor() const;
 	void RepairPlayerSystems(float Amount);
@@ -864,6 +886,17 @@ private:
 	void FireCraft(FAstraBattleShip& S, float Dt);
 	void LandCraft(FAstraBattleShip& S, FAstraBattleShip& Carrier, FAstraSquadron& Q);
 	int32 AirborneCount(int32 Squadron) const;
+	// --- the boarding craft (AstraBoardCraft.cpp): their flights, their launches, the berths of their carriers, what they report
+	void TickBoardingCraft(FAstraBattleShip& S, float Dt);
+	void TickBoardingLaunches(float Dt);
+	void NoteBoardingCraftLost(FAstraBattleShip& S, EAstraHitKind Cause);
+	void EmitBoardEvent(AstraBoardCraft::EEventKind Kind, const FAstraBattleShip& S, const FString& Cause = FString());
+	void RemoveBoardingCraft(FAstraBattleShip& S);
+	bool BoardingDockOpen(const FAstraBattleShip& T, const FVector& LocalNormal, float* OutFrac = nullptr) const;
+	TArray<AstraBoardCraft::FCraftEvent> BoardEvents;
+	TArray<AstraBoardCraft::FPendingLaunch> BoardLaunches;
+	TMap<int32, AstraBoardCraft::FBay> BoardBays;
+	int32 NextBoardCraft[2] = {1, 1};
 	// --- the Captain's wing (AstraWarCraft.cpp, docs/VOLO.md): when he leaves the catapult in a Falcon, two more of Alpha's Falcons follow from the tubes and fly his
 	// wing as Eagle 2 and Eagle 3 (an escort flight that he leads); what happens to them is told as `flight: Eagle 2 ...` for the flight net's people to speak
 	int32 WingToLaunch = 0;              // Falcons still to come off the deck

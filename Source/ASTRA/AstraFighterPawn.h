@@ -74,6 +74,7 @@ private:
 	bool bFreeLook = false;
 
 	// the cockpit's sounds: the engines through the airframe, the seeker's tones, the missile warning
+	UPROPERTY() TObjectPtr<class UPointLightComponent> CockpitFill;   // the instruments' glow (a faint warm fill, no shadows)
 	UPROPERTY() TObjectPtr<class UAudioComponent> EngineAudio;
 	UPROPERTY() TObjectPtr<class UAudioComponent> LockAudio;
 	UPROPERTY() TObjectPtr<class UAudioComponent> WarnAudio;

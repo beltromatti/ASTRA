@@ -1,6 +1,8 @@
-// ASTRA — ABBORDAGGI: the fight inside the Aquila, as code (docs/ABBORDAGGI.md).
+// ASTRA — ABBORDAGGI: the fight inside a ship, as code (docs/ABBORDAGGI.md, docs/brief/ABBORDAGGI-2.md).
 //
-// A boarding party of the Kharon Mandate comes through a breach and goes for an objective; the Aquila's marines meet it. Both sides are squads of
+// A boarding party comes through a breach and goes for an objective; the ship's own people meet it. In F5.1 the party is the Kharon Mandate's and the ship the Aquila; in F5.2 it
+// goes both ways: the Mandate boards the Aquila (or her consorts) and the Aquila's marines board a Mandate ship. The sides stay the factions (Aquila: the marines and the Captain;
+// Mandate: the Mandate's soldiers); who attacks and who holds is the mission's (FMission::Attacker), and the squad drill is by that role. Both sides are squads of
 // men on the ship's plan (AstraBoardMap.*): they move through doors and along corridors, see each other only where the line of sight is open, take
 // the corners beside the doorways, step out to shoot and back in to reload, are suppressed by the fire that misses them, flank a position the
 // enemy covers by a way he does not, and break off when the cost is more than they will pay. The Captain is one more man on it (his position and
@@ -64,11 +66,13 @@ namespace AstraBoard
 		float RangeFullCm = 450.f, RangeFarCm = 2000.f, RangeMaxCm = 3800.f;
 		float DownBleedMinS = 70.f, DownBleedMaxS = 130.f;      // how long a man who is down lasts without help
 		float MandateRetreatLoss = 0.55f;                       // the share of a squad lost at which the Mandate breaks off
+		float MarineRetreatLoss = 1.1f;                         // and the marines (never on their own: they break off when they are told to)
 		float HoldS = 70.f;                                     // how long the objective must be held to be taken
 		float HearCm = 2600.f;                                  // a shot is heard this far (through the open ways)
 		float SensorDelayS = 2.0f;                              // the ship's internal sensors: how stale the marines' picture of the corridors is
 		float CutS = 22.f;                                      // how long the Mandate need to cut through a sealed bulkhead
 		float PushS = 40.f;                                     // how long the Mandate sit in contact without getting nearer before they press the attack
+		bool bShipSensors = true;                               // the holders' ship has its internal sensors (the Aquila's: a few seconds stale picture of the corridors); a dead hulk has none
 		bool bFlank = true;                                     // squads go round (the bench turns it off to see what it is worth)
 		bool bCover = true;                                     // men look for corners (the bench turns it off for the duels in the open)
 	};
@@ -197,13 +201,16 @@ namespace AstraBoard
 		FString Text;
 	};
 
-	enum class EOutcome : uint8 { Running, AquilaHolds, MandateTakes, MandateRepelled, TimedOut };
+	/** How a boarding ended, by role: the defenders held (every attacker was put down or got off the ship), the attackers took the objective, the attackers broke off and left, or the time ran out. */
+	enum class EOutcome : uint8 { Running, DefenderHolds, AttackerTakes, AttackerRepelled, TimedOut };
 
 	struct FMission
 	{
-		int32 Objective = INDEX_NONE;    // the compartment the Mandate wants
+		ESide Attacker = ESide::Mandate; // the side that came aboard (the other holds the ship)
+		int32 Objective = INDEX_NONE;    // the compartment the attackers want
 		int32 Breach = INDEX_NONE;       // the compartment they came in by
 		FVector BreachPos = FVector::ZeroVector;
+		bool bSweep = false;             // the attackers also win when no defender is left on his feet (a derelict: nothing to hold but the ship)
 		float HeldS = 0.f;
 		EOutcome Outcome = EOutcome::Running;
 	};
@@ -234,8 +241,18 @@ public:
 
 	// ------------------------------------------------------------------------------------------------ the people
 	/** The boarding party: Count men of the Mandate come in at the breach (a compartment of the hull's wall) and go for the objective. They come in a few
-	 *  at a time. Returns the squads' ids. */
+	 *  at a time. Returns the squads' ids. (The Mandate attacks: SetAttacker(ESide::Mandate), the default.) */
 	TArray<int32> SpawnBoarders(int32 BreachComp, const FVector& BreachPos, int32 ObjectiveComp, int32 Count, float FirstAtS = 0.f);
+	/** The same for either side: the attackers (Side) come in at the breach in squads of PerSquad, a few at a time, and go for the objective. Marines of the bench are named
+	 *  "Marine n" (the game's own are made with AddMarine from the roster and briefed with BriefAttackers). Sets the mission's attacker. */
+	TArray<int32> SpawnAttackers(AstraBoard::ESide Side, int32 BreachComp, const FVector& BreachPos, int32 ObjectiveComp, int32 Count, float FirstAtS = 0.f, int32 PerSquad = 5);
+	/** Sets the mission: who attacks, where they came in, what they want. */
+	void SetMission(AstraBoard::ESide Attacker, int32 BreachComp, const FVector& BreachPos, int32 ObjectiveComp, bool bSweep = false);
+	/** An attack squad's standing order: go to the objective and take it. */
+	void BriefAttackers(int32 SquadId);
+	AstraBoard::ESide Attacker() const { return Mis.Attacker; }
+	AstraBoard::ESide Defender() const { return Mis.Attacker == AstraBoard::ESide::Mandate ? AstraBoard::ESide::Aquila : AstraBoard::ESide::Mandate; }
+	bool IsAttacker(AstraBoard::ESide S) const { return S == Mis.Attacker; }
 	/** A marine of the Aquila, at a place: Roster is VITA's roster index (INDEX_NONE: a man of the bench). */
 	int32 AddMarine(const FString& Name, int32 Roster, const FVector& Pos, bool bLeader, int32 SquadId, float Skill = 0.f);
 	/** Any man of either side (the bench's duels, a scenario's hand-made squads). */
@@ -247,6 +264,8 @@ public:
 	/** A squad by its name ("Watch 1", "Reaction 2", "Ferry Guard Alpha"), exactly as the fight names it (INDEX_NONE when there is none). */
 	int32 FindSquad(const FString& Name) const;
 	int32 AddCaptain(const FVector& Pos);
+	/** A name for a man a scene or the bench makes (the Mandate's: a first and a last name of the Kharon; ASTRA's: Marine and a number). */
+	FString MakeName(AstraBoard::ESide Side, int32 N) { return Side == AstraBoard::ESide::Mandate ? MandateName(N) : FString::Printf(TEXT("Marine %d"), N); }
 	void SetCaptain(const FVector& Pos, float Yaw, bool bLow, float Speed, bool bDown);
 	int32 CaptainId() const { return CaptainUnit; }
 
@@ -284,7 +303,7 @@ public:
 	bool Over() const { return Mis.Outcome != AstraBoard::EOutcome::Running; }
 	int32 CountAble(AstraBoard::ESide S) const;
 	int32 CountDown(AstraBoard::ESide S) const;
-	/** What the Aquila knows of the Mandate's men (the ship's internal sensors in the corridors and what the marines have seen): unit ids and where they were
+	/** What a side knows of the enemy's men (the holders' ship's internal sensors in the corridors, when it has them, and what its own men have seen): unit ids and where they were
 	 *  last seen (cm). */
 	void Intel(AstraBoard::ESide Side, TArray<AstraBoard::FSeen>& Out) const;
 	/** How strong a squad is (able men / men it began with). */
@@ -298,8 +317,8 @@ public:
 	 *  can be with time to spare before the boarders arrive (the sealed bulkheads they must cut count), else the way into the objective. INDEX_NONE until there is a breach
 	 *  and the first search has finished (a search takes a second or two: it goes on in slices of the step). */
 	int32 AmbushPortal() const { return AmbushIdx; }
-	/** The marines' default response, when nobody has given an order: from the alarm they go (the watch at once, the reaction team after it has armed) to the
-	 *  opening that wins the race against the boarders and take its corners (AmbushPortal). */
+	/** The holders' default response, when nobody has given an order (the marines': in the Aquila; the Mandate's guard: in a ship of theirs): from the alarm they go (the watch at once,
+	 *  the reaction team after it has armed) to the opening that wins the race against the boarders and take its corners (AmbushPortal). */
 	struct FMarineCommand
 	{
 		bool bActive = false;                // the alarm has sounded
@@ -380,8 +399,9 @@ private:
 	void Hear(const FUnit& Shooter);
 	// --- the squad
 	void Plan(FSquad& S);
-	void PlanMandate(FSquad& S);
-	void PlanMarines(FSquad& S);
+	void PlanAttack(FSquad& S);                  // the attackers' own drill: to the objective, round the enemy, away when the cost is too high
+	void PlanDefend(FSquad& S);                  // the holders' drill (and any squad that has an order): the ambush, the corners, the orders' tasks
+	void WithdrawSquad(FSquad& S, const TArray<int32>& Able);
 	void ColumnTo(FSquad& S, const FVector& To, float Speed);
 	void HoldAround(FSquad& S, const FVector& At, float Radius);
 	bool FlankFor(FSquad& S, const FVector& Enemy);

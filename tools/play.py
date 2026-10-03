@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import os
 import subprocess
 import sys
@@ -122,7 +123,7 @@ def cmd_launch(a: argparse.Namespace) -> None:
     if not a.sound:
         args.append("-nosound")
     if a.args:
-        args += a.args.split()
+        args += shlex.split(a.args)                     # (quoted values keep their spaces: --args '-ExecCmds="t.IdleWhenNotForeground 0"')
     log = open(PLAY_DIR / "game_stdout.log", "w")
     subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, cwd=str(ROOT), start_new_session=True)
     t0 = time.time()

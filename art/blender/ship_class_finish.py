@@ -229,7 +229,7 @@ class Finish:
             "compartments": self.comps, "doors": self.doors, "vertical": self.vertical, "transit": [],
             "graph": {"nodes": self.nodes, "edges": self.edges},
             "systems": self.make_systems(), "placements": {},
-            "docks": self.docks, "mounts": mounts, "objectives": self.make_objectives(), "garrison": self.garrison, "crew": self.crew_rec, "damage_control": self.parties,
+            "docks": self.docks, "mounts": mounts, "objectives": self.make_objectives(), "garrison": self.garrison, "crew": self.crew_rec["complement"], "roster": self.crew_rec, "damage_control": self.parties,
             "notes": self.notes + list(self.spec.get("notes", [])),
         }
         return plan

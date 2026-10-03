@@ -1278,6 +1278,7 @@ class Mind:
                     self.last_activity = self.captain_t = time.monotonic()
                     text = msg.get("text", "").strip()
                     if text:
+                        log.info("the Captain types: %s", text)           # (as the spoken ones are: "STT ... [lang] words")
                         self.voice.captain_input()             # a typed order takes the floor like a spoken one
                         self._captain_speaks()                 # (priority: the crew's model calls stop, and the line in flight)
                         await self.turns.put((text, msg.get("lang") or resolve_language(text, self.lang)[0], msg.get("context")))

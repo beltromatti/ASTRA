@@ -23,7 +23,7 @@ sys.path.insert(0, HERE)
 
 import ship_class_engine as E  # noqa: E402
 
-REQUIRED = ("id", "version", "class", "origin_in_hull", "decks", "compartments", "doors", "graph", "systems", "docks", "objectives", "garrison", "crew", "damage_control")
+REQUIRED = ("id", "version", "class", "origin_in_hull", "decks", "compartments", "doors", "graph", "systems", "docks", "objectives", "garrison", "crew", "roster", "damage_control")
 OBJECTIVE_KINDS = {"bridge": ("bridge",), "engineering": ("engineering",), "armory": ("armory",), "medbay": ("medbay",), "brig": ("brig",), "comms": ("comms",),
                    "hangar": ("hangar",), "captain": ("quarters",)}
 
@@ -204,12 +204,12 @@ def check(plan: dict, spec: dict | None = None) -> list:
             P(f"between sections {b[1]} and {b[0]} only the spine crosses the bulkhead")
     # ---------------------------------------------------------------------------------------------------------- the people
     total = sum(g["n"] for g in plan["garrison"])
-    if total != plan["crew"]["complement"]:
-        P(f"the garrison is {total}, the complement {plan['crew']['complement']}")
+    if total != plan["roster"]["complement"] or plan["crew"] != plan["roster"]["complement"]:
+        P(f"the garrison is {total}, the complement {plan['roster']['complement']} (crew {plan['crew']})")
     for g in plan["garrison"]:
         if g["comp"] not in by_id:
             P(f"garrison: no compartment {g['comp']}")
-    for b in plan["crew"]["billets"]:
+    for b in plan["roster"]["billets"]:
         if b["post"] not in by_id:
             P(f"billet {b['role']}: no compartment {b['post']}")
     for p in plan["damage_control"]["parties"]:

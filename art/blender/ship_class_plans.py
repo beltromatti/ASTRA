@@ -56,7 +56,7 @@ def build_class(key: str, stage: bool = True, check: bool = True) -> dict:
         dump(plan, os.path.join(STAGE_DIR, key + ".json"))
     docks, nodes = len(plan["docks"]), len(plan["graph"]["nodes"])
     print(f"[plans] {key}: {len(plan['decks'])} decks, {len(plan['compartments'])} compartments, {len(plan['doors'])} doors, {nodes} nodes, "
-          f"{len(plan['graph']['edges'])} edges, {docks} docks, crew {plan['crew']['complement']} -> {size // 1024} KB ({time.time() - t0:.1f} s)")
+          f"{len(plan['graph']['edges'])} edges, {docks} docks, crew {plan['crew']} -> {size // 1024} KB ({time.time() - t0:.1f} s)")
     for n in plan["notes"]:
         print(f"   note: {n}")
     if check:

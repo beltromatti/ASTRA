@@ -285,6 +285,7 @@ void UAstraMindSubsystem::Send(const TSharedRef<FJsonObject>& Msg)
 void UAstraMindSubsystem::SayText(const FString& Text)
 {
 	FAstraTimeline::Record(TEXT("captain"), Text);
+	UE_LOG(LogASTRA, Log, TEXT("[Captain] %s"), *Text);   // (the typed orders in the log too: a played session can be read back afterwards)
 	Screen(FString::Printf(TEXT("Captain: %s"), *Text), FColor(255, 214, 120));
 	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
 	M->SetStringField(TEXT("type"), TEXT("player_text"));

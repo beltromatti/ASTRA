@@ -9,6 +9,7 @@ in the middle of when the Captain speaks. A game build without consoles keeps th
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 import json
 import logging
 import time
@@ -71,6 +72,7 @@ class BridgeAgent:
         # what is queued on the speech floor and not said yet (speech.Voice.waiting, set by the server): (who, words, how urgent)
         self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []
         self.titles = {k: v.title for k, v in CREW.items()}
+        self.orders: deque[tuple[float, str]] = deque(maxlen=12)   # the Captain's last words to the bridge (they outlive the history's cuts)
         self._active: set[Turn] = set()  # turns being worked on (what preempt() reaches)
 
     # ------------------------------------------------------------------------------------------------ priority
@@ -95,25 +97,15 @@ class BridgeAgent:
 
     # ------------------------------------------------------------------------------------------------ prompts
     def _trim_history(self) -> None:
-        """Keep the last `history_turns` of the Captain's turns (a turn starts at a user message), and of the crew's own (reports,
-        watch checks, chatter: at most the last six since then) — a fight full of checks must not push the Captain's orders out."""
+        """The conversation stays append-only between cuts and is cut only from the front, in one go: the provider caches a prompt's unchanged
+        prefix, and a history edited in the middle (the old reports dropped between the Captain's orders) broke that prefix at almost every call
+        of a battle (3 Oct: 55 % cached, the same 13k-token boundary call after call). When it passes twice its size, the oldest turns go, back to
+        `history_turns` + 6 turns. The Captain's orders older than that are not lost: they stay in their own list (`orders`, in the bridge now)."""
         starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
-        captain = [i for i in starts if str(self.history[i].get("content", "")).startswith("Captain:")]
-        # the history grows append-only up to twice the limit, then is cut back to it: the provider caches a prompt's unchanged
-        # prefix, and a trim at every turn (a battle's reports come every few seconds) left only the system prompt cached — the
-        # crew's turns paid for ~10k fresh tokens each instead of ~2k
-        if len(starts) <= 2 * self.history_turns and len(captain) <= self.history_turns:
+        limit = self.history_turns + 6
+        if len(starts) <= 2 * limit:
             return
-        first = captain[-self.history_turns] if len(captain) > self.history_turns else (captain[0] if captain else starts[0])
-        keep = [i for i in starts if i >= first]
-        events = [i for i in keep if i not in captain]
-        drop_events = set(events[:-6]) if len(events) > 6 else set()
-        ends = {s: (starts[k + 1] if k + 1 < len(starts) else len(self.history)) for k, s in enumerate(starts)}
-        kept: list[dict[str, Any]] = []
-        for i in keep:
-            if i not in drop_events:
-                kept += self.history[i:ends[i]]
-        self.history = kept
+        self.history = self.history[starts[-limit]:]
 
     def _last_turns(self, n: int) -> list[dict[str, Any]]:
         starts = [i for i, m in enumerate(self.history) if m["role"] == "user"]
@@ -131,7 +123,7 @@ class BridgeAgent:
     def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None) -> str:
         """The bridge this moment (crew.bridge_now), for the head of a turn's last message."""
         hearing = context_model.describe(ctx, self.titles) if ctx else ""
-        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting(), self._context())
+        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting(), self._context(), self._orders())
 
     def _waiting(self) -> str:
         """The lines queued on the floor behind whoever is speaking: the officers see the backlog (a crisis made fifty urgent lines in four minutes, 2 Oct,
@@ -453,10 +445,17 @@ class BridgeAgent:
                                self._on_call(turn, lang, t0, [], ts or tools_for(state), state, [], captain=True), max_tokens=260)   # (the turn's own tools: in a lift car the computer may speak)
         turn.cost += comp.cost
 
+    def _orders(self) -> str:
+        """The Captain's last words to the bridge, newest last, with how long ago (the conversation above may have been cut before them)."""
+        now = time.monotonic()
+        return "\n".join(f"- {max(0.0, now - t) / 60:.0f} min ago: «{w}»" for t, w in self.orders)
+
     def _record(self, user: str, calls: list[ToolCall], results: dict[int, dict[str, Any]], turn: Turn, main_lines: int) -> None:
         """History in the native tool-calling format: the model keeps answering through tools (a text summary of past
         turns made it drift into prose after a few turns). Lines voiced outside tool calls become synthetic speak calls."""
         self.history.append({"role": "user", "content": user})
+        if user.startswith("Captain: "):
+            self.orders.append((time.monotonic(), user[len("Captain: "):].splitlines()[0][:240]))
         calls = [c for c in calls if c.name]
         extra = turn.lines[main_lines:] if calls else turn.lines
         if calls:
@@ -494,9 +493,12 @@ EVENT_ASK = ("The Captain should hear this: the responsible officer reports it n
              "the boards and the datapad, where the Captain can ask for it; in a battle the Captain hears many voices, and a "
              "report that changes nothing the Captain must decide is better left unsaid. Ranges, shield percentages and countdowns "
              "that move every few seconds are on the screens: say them when they cross a line that matters (into or out of our guns, "
-             "shields failing, a section gone), never as a running commentary of the same target. A voice over the radio (an enemy "
+             "shields failing, a section gone), never as a running commentary of the same target — and news that is about someone else's "
+             "post is no occasion for an officer to restate their own fight (the target's range and shields again, the next salvo). A voice over the radio (an enemy "
              "commander, an allied captain, a pilot) was heard by the Captain himself: nobody repeats or sums up what it said; an "
-             "officer speaks after it only to add what the bridge knows and it did not say. Within "
+             "officer speaks after it only to add what the bridge knows and it did not say. A hail and a channel are Communications' "
+             "(Martin): he alone says who is calling, if the Captain did not hear it, and keeps the channel; no other officer relays a "
+             "call or offers to answer it for the Captain. Within "
              "their own authority an officer may also act at once: with live consoles, set a mode on their own console when their "
              "delegation is auto and it keeps the Captain's intent alive; on an older build, damage control, shield facing, point "
              "defense and the radiators. To act, CALL the tool in this same turn, then say what was done — saying it without the "

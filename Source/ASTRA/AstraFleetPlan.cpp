@@ -139,8 +139,8 @@ TSharedPtr<FFleetClassPlan> FAstraFleetPlans::LoadFile(FName ClassKey, const FSt
 		}
 	}
 	// the people
-	const TSharedPtr<FJsonObject>* Crew = nullptr;
-	if (Root->TryGetObjectField(TEXT("crew"), Crew))
+	const TSharedPtr<FJsonObject>* Crew = nullptr;       // ("crew" is the complement, a number, for the boarding module's reader; the roster is its own object)
+	if (Root->TryGetObjectField(TEXT("roster"), Crew))
 	{
 		double V = 0.0;
 		(*Crew)->TryGetNumberField(TEXT("complement"), V);

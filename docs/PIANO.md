@@ -39,16 +39,16 @@ Il 30/9 sera questo principio è stato applicato:
 - ai messaggi del nemico: la brevità è della persona;
 - al palco della voce (1/10): le battute che hanno aspettato o sono state interrotte le ripensa chi le doveva dire (§4.2).
 
-## 2. Dove siamo (2/10 sera)
+## 2. Dove siamo (3/10 pomeriggio)
 
 | Area | Stato |
 |---|---|
 | **Controlli in prima persona**, banco di prova da terminale | fatto; strumenti del lead: `tools/play.py`, `tools/soak.py` (costo e tempi di un'ora), `tools/perf_ab.py` (A/B di prestazioni), `astra.debug.under/lookat` |
-| **Plancia viva** (F1) | quasi fatta: postazioni vere, schermo principale intelligente, tavolo olografico, datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente, plancia v3, voce v2 col palco che ripensa. **In corso ARTE-PLANCIA-2** (plancia, abitacolo, corridoi del Ponte 1 al livello di un film). Mancano: le persone vere (F3), l'immagine più nitida (prestazioni GPU) |
-| **Guerra grande** (F2) | fatta la battaglia a scala di flotte (gruppi di battaglia fino a 40 navi, comandanti con mente e voce, avanguardia dal Gate, retro-spinta). **In corso CAMPAGNA** (la guerra della March dove l'Aquila non c'è: flotte, Gate, rifornimenti, due menti strategiche). Costo misurato di una partita: **0,87 $/ora** |
+| **Plancia viva** (F1) | quasi fatta: postazioni vere, schermo principale intelligente (la sua telecamera cede il passo quando il fotogramma sfora), tavolo olografico (anche la guerra della March nella vista del settore), datapad, finestrone in realtà aumentata, HUD del caccia, equipaggio agente che vede ciò che è stato detto e ciò che aspetta di esserlo, plancia v3 **rifinita da ARTE-PLANCIA-2** (ottone, luce calda, corridoi del Ponte 1, alloggi del Capitano, abitacolo del Falcon), voce v2 col palco che ripensa, ordini del Capitano che non si perdono più. Mancano: le persone vere (F3), l'immagine più nitida (RETINA da provare) |
+| **Guerra grande** (F2) | fatta la battaglia a scala di flotte; **fatta CAMPAGNA** (la guerra della March: flotte, Gate, rifornimenti, due menti strategiche, Rourke; le forze arrivano da 85–120 km e si vedono venire, la March gioca anche l'apertura; [GUERRA.md §10](GUERRA.md)). Costo misurato delle partite dell'utente: **1,20 $/ora** (prompt dell'equipaggio riordinato: ~15 % in meno) |
 | **Persone vere** (F3) | ferma: serve l'autorizzazione Epic per i MetaHuman (RICHIESTE) |
-| **La nave intera** (F4) | fatta: la pianta di NAVE-3 nel gioco (3234 compartimenti, 34 turboascensori e la navetta che portano davvero il Capitano, tubi di Jefferies scalabili, atrio della plancia), 560 persone (VITA), danni interni veri (DISTRUZIONE). Poi: FLOTTA-VIVA (gli interni delle altre navi) |
-| **Abbordaggi e prima persona** (F5) | F5.1 unito e provato (armi, marine con Reyes, abbordaggio ricevuto); **in corso** le correzioni (braccia) e **F5.2** (abbordare le navi nemiche, navette d'assalto vere, la guerra che decide) |
+| **La nave intera** (F4) | fatta: la pianta di NAVE-3 nel gioco (3234 compartimenti, 34 turboascensori e la navetta, tubi di Jefferies, atrio della plancia; nessun buco nei pavimenti, e una rete contro le cadute), 560 persone (VITA), danni interni veri (DISTRUZIONE). **In corso ARTE-INTERNI** (le stanze al livello dei corridoi: oggi sono un greybox ammobiliato) e **FLOTTA-VIVA** (le altre navi con piano, equipaggio e modello dei danni; i piani delle classi servono anche agli abbordaggi) |
+| **Abbordaggi e prima persona** (F5) | F5.1 unito e provato; **braccia giuste** (cinematica inversa, tacca sull'asse in mira); in volo il Capitano torna a bordo con la guida di recupero (F o Flight Control); **in corso F5.2** (abbordare le navi nemiche, navette d'assalto vere, la guerra che decide) |
 | **Teletrasporto** (F6) | fatto e provato: sala, Capo con la sua mente, regole alla Star Trek, effetti |
 | Pianeta (F7) · Rete e Windows (F8) | dopo |
 
