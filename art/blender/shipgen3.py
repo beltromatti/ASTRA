@@ -93,6 +93,14 @@ def registry() -> dict:
         })
     except ImportError:
         pass
+    try:
+        import ship3_boarding as BD      # ABBORDAGGI-2: the boarding craft (the Mandate's skiff, ASTRA's Kestrel)
+        reg.update({
+            "SM_CRAFT_MANDATE_Skiff": dict(fac="M", seed=33, cls="craft", build=BD.build_skiff, sections=False),
+            "SM_CRAFT_ASTRA_Kestrel": dict(fac="A", seed=35, cls="craft", build=BD.build_kestrel, sections=False),
+        })
+    except ImportError:
+        pass
     return reg
 
 
