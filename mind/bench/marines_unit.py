@@ -52,6 +52,23 @@ LOST = "boarding: Main Engineering is lost: the reactor's containment is failing
 BEATEN = "boarding: the boarders are beaten: Main Engineering is secure and the deck is ours. marines: 2 dead, 3 wounded; boarders: 9 dead, 4 wounded, 3 got away"
 TAKEOVER = "boarding: the boarders hold Main Engineering and are working on the reactor: its containment will fail in about half a minute. marines: 6 dead, 4 wounded"
 
+# the boats' boardings (AstraBoardAssault.cpp): the Mandate's skiffs at the Aquila, the Aquila's Kestrels at another ship
+LAUNCHED = ("boarding: the Mandate raider Charon has launched 2 assault craft at the Aquila (about 20 boarders): they will be at her hull in about 48 seconds, at deck 9 section E (EVA Airlock), "
+            "deck 6 section C (EVA Airlock), going for Main Engineering; the section bulkheads are closing and the marines are being called to arms")
+LATCHED = ("boarding: the Aquila's Kestrel 1 has latched to Hulk at deck 5 section A (Boarding Lock) and cut in: 12 marines are through, going for the commander's suite; "
+           "she holds about 19 of her people at their posts")
+CUT_IN = "boarding: Kestrel 2 has cut in at deck 5 section E (Boarding Lock): 12 marines are through"
+SKIFF_LOST = "boarding: Skiff 2 has been destroyed (shot down by the point defence of the Aquila): its 10 boarders are lost with it"
+KESTREL_LOST = "boarding: Kestrel 2 was destroyed (shot down by the point defence of Hulk) with 12 marines aboard"
+TURNED_BACK = "boarding: Skiff 1 has turned back (the shield on her port face held (100%): the craft cannot dock through it)"
+NOT_ONE = "boarding: not one boarder reached the ship: every boat was destroyed or turned back; the marines stand down"
+OURS = ("boarding: Hulk is ours: the marines hold deck 1 section B (Archon's Suite) and her people have laid down their arms; her commander and the survivors of her crew are in custody. "
+        "marines: 11 dead, 0 wounded; her crew: 8 dead, 0 wounded, 0 got away")
+FAILED = "boarding: the boarding of Hulk has failed: every marine on her decks is down or out, and she holds. marines: 12 dead, 0 wounded; her crew: 4 dead, 2 wounded, 0 got away"
+PULLED_OUT = "boarding: the marines have broken off and are back in their boats: Hulk still holds out. marines: 5 dead, 1 wounded; her crew: 3 dead, 0 wounded, 0 got away"
+SENDING = "boarding: the Aquila is sending 2 Kestrels with 24 marines to board Hulk"
+HOME = "boarding: Kestrel 2 is back in the boat bay: 12 marines aboard"
+
 PICTURE: dict[str, Any] = {
     "elapsed_s": 74, "breach": PLACE, "breach_open": True, "objective": "deck 7 section B (Main Engineering)", "objective_id": "engineering",
     "squads": [
@@ -77,6 +94,29 @@ BOARDING: dict[str, Any] = {
     "active": True, "elapsed_s": 74, "source": "the Mandate raider Lethe", "breach": PLACE, "breach_open": True, "objective": "deck 7 section B (Main Engineering)",
     "hostiles": f"6 at {PLACE}; 2 at deck 5 section B (Corridor 5-B)", "marines": {"able": 13, "down": 3, "dead": 2}, "boarders_known_losses": {"down_or_dead": 7, "left_ship": 0},
     "bulkheads_sealed": 3, "captain": {"strength_pct": 100, "down": False}, "recent": ["61s: Mandate Squad One is cutting the bulkhead"],
+}
+
+
+# the marines attacking a ship (role: attacking): the picture the game writes then (the holders' default ambush is not in it: it is the other side's plan)
+ATTACK_PICTURE: dict[str, Any] = {
+    "elapsed_s": 52, "role": "attacking", "ship": "Hulk", "ship_class": "Kharon Mandate cruiser, Acheron class", "breach": "deck 5 section A (Boarding Lock)", "breach_open": True,
+    "objective": "deck 1 section B (Archon's Suite)", "objective_id": "d1_quarters_B1",
+    "squads": [
+        {"name": "Boarding Alpha", "able": 6, "down": 0, "dead": 0, "doing": "advance", "under_orders": False, "in_contact": True, "leader": "Sergeant Keiko Tahir",
+         "leader_id": "npc301", "leader_rank": "Sergeant", "leader_gender": "f", "where": "deck 4 section A (Stair Tower)", "where_id": "d4_stairs_A1"},
+        {"name": "Boarding Bravo", "able": 5, "down": 1, "dead": 0, "doing": "hold", "under_orders": True, "in_contact": False, "leader": "Sergeant Jonas Vasilyev",
+         "leader_id": "npc302", "leader_rank": "Sergeant", "leader_gender": "m", "where": "deck 1 section A (Spine)", "where_id": "d1_corridor_A1"},
+    ],
+    "hostiles_known": [{"where": "deck 1 section B (Spine)", "where_id": "d1_corridor_B1", "count": 4, "age_s": 9}],
+    "bulkheads": [{"id": "door_0117", "between": "deck 1 section A (Spine) | deck 1 section B (Spine)", "sealed": True}],
+    "likely_approach": [{"id": "d5_lock_A1", "name": "deck 5 section A (Boarding Lock)"}, {"id": "d1_corridor_B1", "name": "deck 1 section B (Spine)"}],
+    "objective_entrances": [{"id": "d1_corridor_B1", "name": "deck 1 section B (Spine)"}],
+    "recent": ["12s: Boarding Alpha: advance"],
+}
+ATTACK_BOARDING: dict[str, Any] = {
+    "active": True, "direction": "out", "ship": "Hulk", "elapsed_s": 52, "source": "ASN Aquila", "breach": "deck 5 section A (Boarding Lock)", "breach_open": True,
+    "objective": "deck 1 section B (Archon's Suite)", "hostiles": "no hostile contact on the internal sensors", "marines": {"able": 11, "down": 1, "dead": 0},
+    "defenders_known_losses": {"down_or_dead": 3, "left_ship": 0}, "bulkheads_sealed": 1, "recent": ["12s: Boarding Alpha: advance"],
 }
 
 
@@ -144,6 +184,16 @@ class Classification(unittest.TestCase):
             self.assertIsNotNone(k, text)
             self.assertEqual((k.name, k.take), (kind, take), text)
 
+    def test_the_boats_boardings_are_known_too(self) -> None:
+        # a fight begins for the net at the Mandate's launch, or at the first of the marines' boats to cut in; the boats' own news is the bridge's, except the marines lost in their boat
+        for text, kind, take, wake, call in ((LAUNCHED, "docked", False, True, False), (LATCHED, "docked", False, True, False), (CUT_IN, "breach", False, True, False),
+                                             (SKIFF_LOST, "boat_lost", False, True, False), (KESTREL_LOST, "boat_lost", True, True, True), (TURNED_BACK, "boat_back", False, True, False),
+                                             (NOT_ONE, "outcome", True, True, True), (OURS, "outcome", True, True, True), (FAILED, "outcome", True, True, True),
+                                             (PULLED_OUT, "outcome", True, True, True), (SENDING, "assault_log", False, False, False), (HOME, "home", False, False, False)):
+            k = mm.classify(text)
+            self.assertIsNotNone(k, text)
+            self.assertEqual((k.name, k.take, k.wake, k.call), (kind, take, wake, call), text)
+
     def test_what_must_be_called_aloud(self) -> None:
         for text in (CONTACT, DEAD, BEATEN):
             self.assertTrue(mm.classify(text).call, text)
@@ -203,7 +253,7 @@ class GameContract(unittest.TestCase):
 
     def test_every_event_the_game_tells_is_one_the_table_knows(self) -> None:
         texts = []
-        for name in ("AstraBoardEvents.cpp", "AstraBoardSubsystem.cpp", "AstraBoardMind.cpp"):
+        for name in ("AstraBoardEvents.cpp", "AstraBoardSubsystem.cpp", "AstraBoardMind.cpp", "AstraBoardAssault.cpp"):
             texts += _templates(SRC / name)
         texts += re.findall(r'TEXT\("(the Mandate cut through the bulkhead[^"]*)"\)', (SRC / "AstraBoardSim.cpp").read_text(encoding="utf-8"))       # (told as `Tell(E.Text)`)
         self.assertGreaterEqual(len(texts), 14)                                  # (the regex did find them: a rename in the C++ must not make this test pass on nothing)
@@ -219,12 +269,16 @@ class GameContract(unittest.TestCase):
         read = {"elapsed_s", "breach", "breach_open", "objective", "objective_id", "squads", "name", "able", "down", "dead", "still_arming_or_waking", "doing", "under_orders", "in_contact",
                 "leader", "leader_id", "leader_gender", "where", "where_id", "note", "hostiles_known", "count", "age_s", "bulkheads", "id", "between", "sealed", "likely_approach",
                 "objective_entrances", "default_ambush", "id_a", "id_b", "captain", "strength_pct", "recent", "active", "marines", "boarders_known_losses", "down_or_dead",
-                "left_ship", "hostiles", "armed"}
+                "left_ship", "hostiles", "armed", "role", "ship", "ship_class", "defenders_known_losses", "direction"}
         self.assertEqual(read - fields, set())
         for row in PICTURE["squads"]:                                              # the fixture has what the game writes, nothing it does not
             self.assertLessEqual(set(row), fields)
         self.assertEqual(set(PICTURE) - fields, set())
         self.assertEqual(set(BOARDING) - fields, {"source"} - fields)
+        for row in ATTACK_PICTURE["squads"]:
+            self.assertLessEqual(set(row), fields)
+        self.assertEqual(set(ATTACK_PICTURE) - fields, set())
+        self.assertEqual(set(ATTACK_BOARDING) - fields, {"source"} - fields)
 
     def test_the_ship_state_carries_the_picture_where_the_net_reads_it(self) -> None:
         src = (SRC / "AstraShipSubsystem.cpp").read_text(encoding="utf-8")
@@ -326,6 +380,40 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("flank the Aquila", user)
             self.assertNotIn("_mandate", user)
 
+    def test_the_prompt_teaches_the_assault_and_the_withdrawal(self) -> None:
+        s = mm.system_prompt()
+        for needle in ("WHEN THE MARINES BOARD A SHIP", "role: attacking", "`withdraw`", "another ship's are not yours to seal", "bleeds out in about two minutes"):
+            self.assertIn(needle, s)
+        self.assertIn("withdraw", mm.TASKS)
+        bulk = next(t for t in mm.TOOLS if t["function"]["name"] == "bulkheads")["function"]["description"]
+        self.assertIn("only while the marines DEFEND", bulk)
+
+    def test_the_marines_attacking_read_the_assault_not_the_defence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bed = Bed(tmp)
+            st = ship_state(fight=False)
+            st["boarding"] = json.loads(json.dumps(ATTACK_BOARDING))
+            st["_marines"] = json.loads(json.dumps(ATTACK_PICTURE))
+            bed.m.feed(st)
+            board = bed.m._board(st, "en")
+            for needle in ("the assault: your marines are boarding Hulk (Kharon Mandate cruiser, Acheron class)", "52 s since the first boat cut in", "the objective is deck 1 section B (Archon's Suite)",
+                           "[id d1_quarters_B1]", "of the ship's people 3 known down or dead", "the ship's people as they are known", "4 at deck 1 section B (Spine) [id d1_corridor_B1], 9 s ago",
+                           "your likely way from the hatch to the objective", "the ways into the objective", "the pressure bulkheads near your hatch", "marine_boarding_alpha — Boarding Alpha",
+                           "leader Sergeant Keiko Tahir: 6 able"):
+                self.assertIn(needle, board)
+            for hidden in ("default ambush", "the boarders as they are known", "Main Engineering", "boarders' likely way", "the alarm"):
+                self.assertNotIn(hidden, board)
+            self.assertEqual(bed.m.present(), ["reyes", "marine_boarding_alpha", "marine_boarding_bravo"])
+
+    def test_the_marines_defending_still_read_the_defence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bed = Bed(tmp)
+            bed.m.feed(ship_state())
+            board = bed.m._board(ship_state(), "en")
+            self.assertIn("the boarders as they are known", board)
+            self.assertIn("the default ambush", board)
+            self.assertNotIn("the assault: your marines", board)
+
     def test_the_squad_in_the_captains_room_is_said_so(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bed = Bed(tmp)
@@ -399,6 +487,39 @@ class Prompts(unittest.IsolatedAsyncioTestCase):
 
 
 # ------------------------------------------------------------------------------------------------ the fight's life
+class Assault(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.bed = Bed(self.tmp.name)
+        self.m = self.bed.m
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_the_net_begins_at_the_launch_or_at_the_first_cut_in(self) -> None:
+        self.m.on_event(LAUNCHED)
+        self.assertTrue(self.m.active)
+        self.m.reset()
+        self.assertFalse(self.m.active)
+        self.m.on_event(SENDING)                                                     # (the order alone: the marines are not in a fight yet)
+        self.assertFalse(self.m.active)
+        self.m.on_event(LATCHED)
+        self.assertTrue(self.m.active)
+
+    async def test_a_withdrawal_goes_to_the_game_as_the_marines_order(self) -> None:
+        st = ship_state(fight=False)
+        st["boarding"] = json.loads(json.dumps(ATTACK_BOARDING))
+        st["_marines"] = json.loads(json.dumps(ATTACK_PICTURE))
+        self.m.feed(st)
+        self.bed.llm.say(("order", {"by": "reyes", "squad": "Boarding Bravo", "task": "withdraw", "reason": "one down, the objective is two corridors away"}),
+                         ("say", {"speaker": "reyes", "text": "Bravo, out through the lock.", "tone": "focused"}))
+        self.m.captain_to_net("Reyes, tira fuori Bravo", "it")
+        await self.bed.settle()
+        orders = [c for c in self.bed.commands if c[0] == "marine_order"]
+        self.assertEqual(orders[0][1]["task"], "withdraw")
+        self.assertEqual(orders[0][1]["squad"], "Boarding Bravo")
+
+
 class Lifecycle(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()

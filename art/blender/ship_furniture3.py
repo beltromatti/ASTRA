@@ -94,16 +94,9 @@ def work_console(b: SParts, w: float = 3.2, accent: str = "science", screens: in
 
 
 def chair_op(b: SParts, mat: str = FABRIC_NAVY) -> None:
-    """An operator's swivel chair on a column (not a wheeled office chair): facing +x, a shaped shell back with a head rest and arms."""
-    b.body.cyl((0, 0, 0.0), (0, 0, 0.04), 0.30, STRUCT, seg=16)
-    b.body.cyl((0, 0, 0.04), (0, 0, 0.42), 0.04, TRIM, seg=8)
-    b.soft.box((-0.22, -0.23, 0.42), (0.22, 0.23, 0.50), mat)
-    b.body.box((-0.26, -0.22, 0.50), (-0.20, 0.22, 1.02), COMPOSITE)
-    b.soft.box((-0.20, -0.20, 0.52), (-0.14, 0.20, 0.96), mat)
-    b.soft.box((-0.24, -0.12, 1.02), (-0.16, 0.12, 1.16), mat)
-    for sy in (-0.25, 0.22):
-        b.body.box((-0.18, sy, 0.62), (0.18, sy + 0.03, 0.66), TRIM)
-        b.fine.box((-0.02, sy, 0.50), (0.02, sy + 0.03, 0.62), TRIM)
+    """An operator's swivel chair on a column, facing +x (ship_furn3.office_chair)."""
+    import ship_furn3 as N3
+    N3.office_chair(b, mat)
 
 
 # --------------------------------------------------------------------------------------------------------------------- racks, data
@@ -401,23 +394,9 @@ def bench_grow(b: SParts, l: float = 5.0, d: float = 1.1, tiers: int = 2, seed: 
 
 
 def aquarium(b: SParts, w: float = 3.2, d: float = 0.8, h: float = 2.1, seed: int = 1, water: str = "cyan_dim") -> None:
-    """A wall tank facing +x: a dark base cabinet, a glowing water body between a frame of brushed bars, plants and a few drifting lights, a lamp hood on top."""
-    rng = random.Random(seed)
-    hw = w / 2
-    b.body.box((-d / 2, -hw, 0.0), (d / 2, hw, 0.62), COMPOSITE)
-    b.body.box((-d / 2 - 0.02, -hw - 0.02, 0.62), (d / 2 + 0.02, hw + 0.02, 0.68), STEEL)
-    b.body.box((-d / 2, -hw, h - 0.16), (d / 2, hw, h), COMPOSITE)
-    for sy in (-hw, hw - 0.06):
-        b.body.box((-d / 2, sy, 0.68), (d / 2, sy + 0.06, h - 0.16), TRIM)
-    b.emit.lamp_box((-d / 2 + 0.04, -hw + 0.06, 0.74), (d / 2 - 0.1, hw - 0.06, h - 0.2), water, LAMP_DIM)                # the water
-    b.fine.box((d / 2 - 0.1, -hw + 0.06, 0.68), (d / 2 - 0.08, hw - 0.06, h - 0.16), TRIM)             # the front frame line
-    for k in range(int(w / 0.5)):
-        y = -hw + 0.3 + k * 0.5 + rng.uniform(-0.1, 0.1)
-        hh = rng.uniform(0.5, 1.3)
-        b.soft.sphere((d / 2 - 0.22, y, 0.74 + hh * 0.5), rng.uniform(0.1, 0.17), LEAF, seg=8, rings=6, squash=(1, 1, hh / 0.2))
-    b.body.box((-d / 2 + 0.02, -hw + 0.1, 0.68), (-d / 2 + 0.2, hw - 0.1, 0.9), SOIL)
-    b.emit.lamp_box((-d / 2 + 0.1, -hw + 0.1, h - 0.18), (d / 2 - 0.1, hw - 0.1, h - 0.165), "white_cool", LAMP)
-    b.emit.label((d / 2 + 0.002, 0.0, 0.34), 0.5, 0.125, (1, 0, 0), "eq_water")
+    """A wall tank facing +x (ship_furn3.aquarium): a walnut cabinet, a frame, glowing water, gravel, rocks, plants of real leaf geometry, a shoal of fish, a lamp hood."""
+    import ship_furn3 as N3
+    N3.aquarium(b, w, d, h, seed, water)
 
 
 def glovebox(b: SParts, w: float = 1.6, d: float = 0.9, h: float = 1.5) -> None:

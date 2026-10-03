@@ -36,21 +36,9 @@ def conference_table(b: SParts, l: float = 6.4, w: float = 1.6, seats: int = 6) 
 
 
 def desk_pod(b: SParts, w: float = 1.4, d: float = 0.8) -> None:
-    """A desk with its low partition, facing +x (the sitter's side is -x... facing the partition): a laminate top on two pedestals, a monitor and a keyboard, a tray, a lamp,
-    a fabric partition behind with a pin board and a pair of photographs."""
-    b.body.box((-d / 2, -w / 2, 0.72), (d / 2, w / 2, 0.76), LAMINATE)
-    for sy in (-w / 2 + 0.1, w / 2 - 0.4):
-        b.body.box((-d / 2 + 0.05, sy, 0.0), (d / 2 - 0.05, sy + 0.3, 0.72), COMPOSITE)
-        for k in range(3):
-            b.soft.box((d / 2 - 0.05, sy + 0.03, 0.08 + k * 0.2), (d / 2 - 0.04, sy + 0.27, 0.24 + k * 0.2), CRATE_GREY)
-    b.body.box((d / 2 - 0.02, -w / 2 - 0.1, 0.0), (d / 2 + 0.02, w / 2 + 0.1, 1.45), STRUCT)
-    b.soft.box((d / 2 + 0.02, -w / 2 - 0.08, 0.5), (d / 2 + 0.06, w / 2 + 0.08, 1.4), FABRIC_GREY)               # fabric on both faces of the partition
-    b.soft.box((d / 2 - 0.06, -w / 2 - 0.08, 0.5), (d / 2 - 0.02, w / 2 + 0.08, 1.4), FABRIC_GREY)
-    b.soft.box((d / 2 - 0.065, -0.4, 1.0), (d / 2 - 0.06, 0.3, 1.3), CRATE_OLIVE)                                  # the pin board and two photographs on the sitter's side
-    b.soft.box((d / 2 - 0.065, 0.35, 1.0), (d / 2 - 0.06, 0.5, 1.15), BEDDING)
-    b.soft.box((0.1, -0.2, 0.76), (0.22, 0.2, 0.78), STRUCT)
-    b.soft.box((0.3, -0.25, 0.76), (0.32, 0.25, 1.18), DGLASS)
-    b.emit.label((0.299, 0.0, 0.97), 0.48, 0.28, (-1, 0, 0), "scr_data")
+    """A desk with its screen and its partition, facing +x (ship_furn3.workstation): the sitter at -x, the partition behind at +x."""
+    import ship_furn3 as N3
+    N3.workstation(b, w, d, int(w * 10 + d * 7))
 
 
 def filing_cabinet(b: SParts, n: int = 3, w: float = 0.5, h: float = 1.35) -> None:
@@ -184,47 +172,18 @@ def railgun_breech(b: SParts) -> None:
 
 # ---------------------------------------------------------------------------------------------------------------------- the officers' deck
 def officer_bed(b: SParts, w: float = 1.0, l: float = 2.1, blanket: str = FABRIC_NAVY) -> None:
-    """A single bed with a headboard at -x (its foot towards +x): a frame, a mattress with sheets, a folded blanket, two pillows, a reading lamp on the wall behind, a drawer
-    under the foot."""
-    b.body.box((-l / 2, -w / 2, 0.12), (l / 2, w / 2, 0.36), WOOD)
-    b.soft.box((-l / 2 + 0.04, -w / 2 + 0.04, 0.36), (l / 2 - 0.04, w / 2 - 0.04, 0.5), BEDDING)
-    b.soft.box((-l / 2 + 0.7, -w / 2 + 0.03, 0.5), (l / 2 - 0.03, w / 2 - 0.03, 0.56), blanket)
-    b.soft.box((-l / 2 + 0.05, -w / 2 + 0.1, 0.5), (-l / 2 + 0.45, -0.03, 0.6), BEDDING)
-    b.soft.box((-l / 2 + 0.05, 0.03, 0.5), (-l / 2 + 0.45, w / 2 - 0.1, 0.6), BEDDING)
-    b.body.box((-l / 2 - 0.06, -w / 2 - 0.03, 0.0), (-l / 2, w / 2 + 0.03, 1.0), WOOD)
-    b.body.box((l / 2, -w / 2, 0.12), (l / 2 + 0.04, w / 2, 0.55), WOOD)
-    for sy in (-w / 2 + 0.05, w / 2 - 0.1):
-        b.body.box((-l / 2, sy, 0.0), (-l / 2 + 0.06, sy + 0.05, 0.12), TRIM)
-        b.body.box((l / 2 - 0.06, sy, 0.0), (l / 2, sy + 0.05, 0.12), TRIM)
-    b.emit.lamp_box((-l / 2 - 0.07, w / 2 - 0.3, 0.9), (-l / 2 - 0.064, w / 2 - 0.15, 0.95), "white_warm", LAMP)
+    """An officer's bed with a headboard at -x (ship_furn2.officer_bed): the mattress top at 0.52 m."""
+    import ship_furn2 as N
+    N.officer_bed(b, w, l, blanket)
 
 
 def treadmill(b: SParts) -> None:
-    """A treadmill facing +x: a belt on a steel frame, side rails, an upright with a console screen and a handlebar, a lit speed strip."""
-    b.body.box((-0.9, -0.38, 0.1), (0.7, 0.38, 0.22), CRATE_GREY)
-    b.soft.box((-0.85, -0.3, 0.22), (0.62, 0.3, 0.235), RUBBER)
-    for sy in (-0.38, 0.32):
-        b.body.box((-0.9, sy, 0.1), (0.7, sy + 0.06, 0.32), STRUCT)
-    b.body.box((0.62, -0.34, 0.0), (0.76, 0.34, 0.12), STRUCT)
-    for sy in (-0.36, 0.36):
-        b.body.box((0.6, sy - 0.03, 0.2), (0.7, sy + 0.03, 1.2), TRIM)
-    b.body.box((0.58, -0.3, 1.05), (0.72, 0.3, 1.45), STRUCT)
-    b.soft.box((0.5, -0.25, 1.1), (0.58, 0.25, 1.4), DGLASS)
-    b.emit.label((0.499, 0.0, 1.25), 0.5, 0.26, (-1, 0, 0), "scr_data")
-    b.soft.cyl((0.6, -0.36, 1.2), (0.6, 0.36, 1.2), 0.025, RUBBER, seg=8)
-    b.emit.lamp_box((-0.8, -0.395, 0.18), (0.6, -0.385, 0.2), "cyan_dim", LAMP_DIM)
+    """A treadmill facing +x (ship_furn3.treadmill)."""
+    import ship_furn3 as N3
+    N3.treadmill(b)
 
 
 def weight_bench(b: SParts) -> None:
-    """A weight bench with a bar rack, facing +x: a padded flat bench, two uprights holding a barbell with rubber plates, a plate tree and a mirror-side rail."""
-    b.body.box((-0.4, -0.15, 0.0), (0.9, 0.15, 0.4), STRUCT)
-    b.soft.box((-0.4, -0.18, 0.4), (0.9, 0.18, 0.47), FABRIC_GREY)
-    for sx in (0.0, 0.7):
-        for sy in (-0.45, 0.45):
-            b.body.box((sx - 0.03, sy - 0.03, 0.0), (sx + 0.03, sy + 0.03, 1.15), TRIM)
-    b.body.cyl((0.35, -0.7, 1.1), (0.35, 0.7, 1.1), 0.016, STEEL, seg=8)
-    for sy in (-0.55, 0.55):
-        b.soft.cyl((0.35, sy - 0.04, 1.1), (0.35, sy + 0.04, 1.1), 0.2, RUBBER, seg=14)
-    b.body.cyl((1.2, 0.0, 0.0), (1.2, 0.0, 1.3), 0.025, TRIM, seg=8)
-    for k in range(4):
-        b.soft.cyl((1.2, -0.08, 0.3 + k * 0.28), (1.2, 0.08, 0.3 + k * 0.28), 0.14 - k * 0.012, RUBBER, seg=10)
+    """A weight bench with its bar rack (ship_furn3.bench_press)."""
+    import ship_furn3 as N3
+    N3.bench_press(b)

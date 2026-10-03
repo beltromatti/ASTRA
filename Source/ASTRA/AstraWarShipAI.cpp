@@ -25,17 +25,17 @@ double UAstraBattleSubsystem::ShipDps(const FAstraBattleShip& S, double RangeM) 
 	const float Power = FMath::Clamp(PowerFactorOf(S), 0.f, 1.5f);
 	for (const FAstraMount& M : S.Mounts)
 	{
-		if (M.Health < 0.2f)
+		if (M.Fit() < 0.2f)
 		{
 			continue;
 		}
 		if (M.Kind == EAstraMountKind::Rail && S.RailDamage > 0.f && RangeM < S.RailRange)
 		{
-			Dps += M.Barrels * S.RailDamage / FMath::Max(1.f, S.RailCd) * M.Health;
+			Dps += M.Barrels * S.RailDamage / FMath::Max(1.f, S.RailCd) * M.Fit();
 		}
 		else if (M.Kind == EAstraMountKind::Laser && S.LaserDamage > 0.f && RangeM < S.LaserRange)
 		{
-			Dps += M.Barrels * S.LaserDamage / FMath::Max(1.f, S.LaserCd) * M.Health;
+			Dps += M.Barrels * S.LaserDamage / FMath::Max(1.f, S.LaserCd) * M.Fit();
 		}
 	}
 	if (S.Missiles > 0 && RangeM > 2500.0 && RangeM < S.MissileRange)
@@ -59,7 +59,7 @@ float UAstraBattleSubsystem::Readiness(const FAstraBattleShip& S) const
 	for (const FAstraMount& M : S.Mounts)
 	{
 		Total += 1.f;
-		Guns += M.Health >= 0.2f ? M.Health : 0.f;
+		Guns += M.Fit() >= 0.2f ? M.Fit() : 0.f;
 	}
 	const float GunF = Total > 0.f ? Guns / Total : 1.f;
 	const float ShieldF = S.ShieldMax > 0.f ? S.Shield / S.ShieldMax : 1.f;
@@ -163,11 +163,11 @@ FVector UAstraBattleSubsystem::ChooseFacing(const FAstraBattleShip& S, const FVe
 			}
 			if (M.Kind == EAstraMountKind::Rail && Dist < S.RailRange)
 			{
-				Guns += M.Barrels * S.RailDamage / FMath::Max(1.f, S.RailCd) * M.Health;
+				Guns += M.Barrels * S.RailDamage / FMath::Max(1.f, S.RailCd) * M.Fit();
 			}
 			else if (M.Kind == EAstraMountKind::Laser && Dist < S.LaserRange)
 			{
-				Guns += M.Barrels * S.LaserDamage / FMath::Max(1.f, S.LaserCd) * M.Health;
+				Guns += M.Barrels * S.LaserDamage / FMath::Max(1.f, S.LaserCd) * M.Fit();
 			}
 		}
 		float Guard = 1.f;

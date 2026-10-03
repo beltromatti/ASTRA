@@ -75,6 +75,7 @@ struct FAstraDmgComp
 struct FAstraDmgDeck
 {
 	int32 Id = 0;
+	bool bBody = true;             // a deck of the hull's body (the Aquila's 2..12); not one of the tower or the block that stands on it (her Deck 1)
 	float FloorCm = 0.f;
 	float ClearCm = 380.f;
 	float XFwdCm = 0.f, XAftCm = 0.f;
@@ -96,13 +97,18 @@ public:
 	TArray<int32> Hosts[(int32)EAstraDmgSystem::Num];
 	/** The ship's volume in the plan's frame (cm): where the decks lie. */
 	FBox Hull = FBox(ForceInit);
+	/** Where the plan's origin is in the hull mesh's frame (m): hull = plan + OriginInHullM. The Aquila's plan has the bridge's floor point under the Captain's chair
+	 *  for its origin (172, 0, 62: the default); a class plan (data/ship/plans/<class>.json, FLOTTA-VIVA) is in the mesh's own frame and says [0, 0, 0] (`origin_in_hull`). */
+	FVector OriginInHullM = FVector(172.0, 0.0, 62.0);
+	/** The lowest and the highest-up decks of the hull's body (the Aquila's 12 and 2; the decks above them, a tower or a block, are not the body: Deck 1 is her island). */
+	int32 FirstBodyDeck = 2, LastBodyDeck = 12;
+	bool IsBody(int32 Deck) const { return Decks.IsValidIndex(Deck - 1) && Decks[Deck - 1].bBody; }
 
 	/** Reads the plan (the staged copy first, the repository's when bRepoFirst is false and there is none: the bench passes true). False (and a reason) when it is missing or does not parse. Safe on a worker thread. */
 	bool Load(FString& OutError, bool bRepoFirst = false);
-	/** Reads a plan from a path (the Aquila's, or a class's: data/ship/plans/<class>.json). The real body of the loader; the one above is the Aquila's path with this. (Same as FLOTTA-VIVA's: one loader.) */
+	/** Reads a plan from a path: the Aquila's (data/ship/aquila_plan.json) or a class's (data/ship/plans/<class>.json, FLOTTA-VIVA). The real body of the loader; the one above is the Aquila's path with this.
+	 *  Safe on a worker thread. */
 	bool Load(const FString& Path, FString& OutError);
-	/** Where the plan's origin is in the hull's frame (m): the Aquila's is the bridge floor (172, 0, 62 in her mesh's frame); a class plan written in its hull frame says (0, 0, 0) with "origin_in_hull". */
-	FVector OriginInHullM = FVector(172.0, 0.0, 62.0);
 
 	/** The smallest compartment containing a point (world cm), within Slack cm of its walls; INDEX_NONE outside every one. */
 	int32 CompartmentAt(const FVector& Cm, float SlackCm = 0.f) const;

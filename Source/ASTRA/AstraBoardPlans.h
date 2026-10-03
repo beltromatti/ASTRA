@@ -28,7 +28,8 @@ struct ASTRA_API FBoardShipPlan
 		FName Id;
 		int32 Comp = INDEX_NONE;
 		FName Face;                                 // port | starboard | dorsal | ventral | bow | stern
-		FVector Pos = FVector::ZeroVector;          // on the skin
+		FName Kind;                                 // hatch (a boat latches to it and the boarders cut in) | mouth (where the ship's own boats leave: not a way in)
+		FVector Pos = FVector::ZeroVector;          // on the skin (the room it opens into may stand a little inside it)
 		FVector Normal = FVector::ZeroVector;       // out of the hull
 		int32 Deck = 0;
 	};
@@ -61,6 +62,8 @@ namespace AstraBoardPlans
 	ASTRA_API FString PathFor(FName ClassKey, bool& bOutStopgap);
 	/** Reads and builds the plan of a class (kept: the second boarding of the same class costs nothing). Safe on a worker thread. */
 	ASTRA_API TSharedPtr<FBoardShipPlan> Load(FName ClassKey, FString& OutWhy);
+	/** The plan of a class if it has been read already (nothing is read: the game thread asks this before it hands the reading to a worker). */
+	ASTRA_API TSharedPtr<FBoardShipPlan> Peek(FName ClassKey);
 	/** The same for a file (the bench's; not kept). */
 	ASTRA_API TSharedPtr<FBoardShipPlan> LoadFile(const FString& Path, FName ClassKey, FString& OutWhy);
 	/** The classes the stopgap and the real plans know (the file names in the plan directories). */

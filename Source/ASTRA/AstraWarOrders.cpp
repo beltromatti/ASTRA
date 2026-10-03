@@ -680,6 +680,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::SideGroupsJson(int32 SideIdx) con
 				}
 			}
 			M->SetNumberField(TEXT("missiles"), S->Missiles);
+			FleetBriefInto(*S, M, true, 3);                                // FLOTTA-VIVA: what burns aboard, how many are left, what power the guns and the drive still have
 			if (S->bDisabled)
 			{
 				M->SetStringField(TEXT("status"), TEXT("disabled"));
@@ -745,6 +746,7 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::SideGroupsJson(int32 SideIdx) con
 			{
 				M->SetNumberField(TEXT("hull_pct"), OrdPct(X->Hull, X->HullMax));
 				M->SetNumberField(TEXT("shields_pct"), OrdPct(X->Shield, X->ShieldMax));
+				FleetBriefInto(*X, M, false, bClass ? 2 : 1);              // FLOTTA-VIVA: what the sensors and the eye make of her inside (a breach venting, windows dark, hot spots)
 			}
 			if (X->bFleeing)
 			{

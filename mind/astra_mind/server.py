@@ -211,7 +211,7 @@ class Mind:
         # the minds that command the war: the Mandate's admiral and group commanders, the allied captains (war_minds.py)
         self.war = WarMinds(self.llm, self._ally_say, self._war_execute, lang=lambda: self.lang, mandate_persona=COMMANDERS.get,
                             channel=lambda c: self.enemy.open and self.enemy.contact == c, register_voice=self._register_voice,
-                            transmit=self._say_external, intel=self.style.mandate_line, note=self.director.note)
+                            transmit=self._say_external, intel=self.style.mandate_line, note=self.director.note, captain=self._war_captain)
         self.war.disabled = os.environ.get("ASTRA_WAR_MINDS", "1") == "0"        # (ASTRA_WAR_MINDS=0: the groups fight on their reflexes, as before)
         self.war.formation_doctrine = os.environ.get("ASTRA_WAR_FORMATION", "0") == "1"   # (ASTRA_WAR_FORMATION=1: the doctrine also teaches the formation lever)
         # the flight net: the CAG, the squadron leaders and their wingmen, the Chief of the Deck (flight_minds.py)
@@ -338,6 +338,11 @@ class Mind:
         if ship is None:
             return {"ok": True, "detail": "(no game)"}
         return await ship.execute(name, args, by, direct=True)
+
+    async def _war_captain(self, ship: str, rank: str, name: str) -> None:
+        """A persona now speaks for a ship of the war: her interior in the game (FLOTTA-VIVA) takes the same captain."""
+        res = await self._war_execute("fleet_captain", {"ship": ship, "rank": rank, "name": name}, "director")
+        log.info("war: %s", res.get("detail", res))
 
     async def _flight_say(self, speaker: str, text: str, lang: str, tone: str, *, urgent: bool = False, answer: bool = False) -> None:
         """Someone on the flight net speaks (flight_minds.py): the bridge hears it like any radio voice, the crew reads it in its next events, whoever answers the Captain's

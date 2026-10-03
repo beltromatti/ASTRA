@@ -205,6 +205,9 @@ namespace AstraFx
 		bool bDark = false;                    // its lights have been put out (disabled)
 		float DarkT = 0.f;
 		TWeakObjectPtr<UMaterialInstanceDynamic> LightsMid;   // the windows
+		// the inside of a ship that has one (FLOTTA-VIVA): where it burns and vents, by section, in the hull's frame (m), refreshed a few times a second; how lit its windows are
+		TArray<FVector> InFire[3], InVent[3];
+		float InT = 0.f, InLit = 1.f;
 	};
 
 	/** A piece of a broken hull. */
@@ -449,6 +452,10 @@ private:
 	void AddScar(const FAstraBattleShip& S, const FAstraFxHit& Hit);
 	void HullEmitters(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
 	void PowerDown(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
+	/** The inside of a ship that has one (FLOTTA-VIVA): where it burns and vents, and how lit its windows are (refreshed a few times a second). */
+	void FleetFxRefresh(const FAstraBattleShip& S, AstraFx::FShipFx& Fx);
+	/** A point on the hull where one of the inside's fires or breaches shows (the face of the hull's box nearest the point), in the war's space. */
+	FVector FleetFxPoint(const FAstraBattleShip& S, const TArray<FVector>& Points) const;
 	bool MakePieces(FAstraBattleShip& S, const FAstraDeathEvent& E, AActor* Hull, bool bReactor);
 	FVector HullPoint(const FAstraBattleShip& S, int32 Section, float Along, float SideA, float SideB, bool bSurface) const;
 	FVector MuzzleOf(const FAstraBattleShip& S, EAstraMountKind Kind, const FVector& AimDir, int32 Salt);

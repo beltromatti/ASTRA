@@ -4,7 +4,7 @@ Il "DNA" della nave (`data/ship/aquila_plan.json`), il kit di moduli e stanze de
 NAVE-3 ha **ripensato l'interno come lo pianificherebbe una nave vera**: un programma ragionato (§5: ogni spazio sta dove sta per una ragione), un labirinto credibile con corridoi di servizio, gallerie dello scafo e tubi di Jefferies (§6), **34 pozzi di turboascensore** con 291 approdi (§7: il contratto con ASCENSORI), la **navetta della Spine** in un tunnel sul Ponte 5
 con otto fermate (§8) e una segnaletica calcolata sul grafo (§9). Sul lato del gioco la nave non è un livello di attori: **istanze** al posto dei moduli, **lampade come dati** con un pool di luci vere, **un sotto-livello per ponte** in streaming (§11bis). Tutto ciò che è scritto nel gioco è in inglese; questa pagina è in italiano con i nomi ufficiali.
 
-Stato (piano versione 2): **3 234 compartimenti** (1 065 stanze del programma), 2 028 porte, 13 730 nodi e 15 298 archi del grafo (un solo componente connesso), 4 418 lampade, 4 096 posti (`stations`), 746 posti letto; **0 problemi, 0 avvisi** in `ship_checks.py`;
+Stato (piano versione 2): **3 234 compartimenti** (1 065 stanze del programma), 2 028 porte, 13 730 nodi e 15 298 archi del grafo (un solo componente connesso), 4 538 lampade, 4 096 posti (`stations`), 746 posti letto; **0 problemi, 0 avvisi** in `ship_checks.py`;
 `tools/life.py check` OK; `tools/damage.py run --scenario all` **46/46**; kit con prove a raggi lungo tutti gli archi di corridoio e di porta dei 12 ponti: **0 bloccati**, e controllo dei posti (con il sedile sotto chi siede): **0 sul mobilio**.
 **Non provato in Unreal** (l'editor è del lead): vedi §14 e §11bis per cosa guardare camminando.
 
@@ -12,13 +12,17 @@ Stato (piano versione 2): **3 234 compartimenti** (1 065 stanze del programma), 
 
 ```
 uv run --python /opt/homebrew/bin/python3.13 --with pillow --with numpy python tools/art/ship_textures.py          # atlante delle etichette: art/_cache/ship/
+uv run --python /opt/homebrew/bin/python3.13 --with pillow --with numpy python tools/art/interior_textures.py      # ARTE-INTERNI: le texture 1K ambientCG delle stanze (CC0, senza account): art/_cache/textures/
+uv run --python /opt/homebrew/bin/python3.13 --with pillow --with numpy python tools/art/polyhaven_models.py --all # i modelli Poly Haven delle piante (CC0) e le loro texture
 python3 art/blender/ship_plan_gen.py                                                                              # piano: data/ship/aquila_plan.json + la copia sottile Content/ASTRA/Data/aquila_plan.json
 python3 art/blender/ship_checks.py                                                                                # controlli del piano (0 problemi attesi)
 python3 tools/life.py check && python3 tools/life.py stage                                                        # VITA: posti, stanze, case; copia il file della vita accanto al piano
 python3 tools/damage.py run --scenario all                                                                        # DISTRUZIONE: 46/46 sul piano vero (serve l'editor compilato per questa copia)
 /Applications/Blender.app/Contents/MacOS/Blender -b --factory-startup --python-exit-code 1 -P art/blender/ship_kit.py   # FBX + manifest in art/export/ship (una decina di minuti)
 python3 art/blender/ship_budget.py                                                                                # il budget per ponte (legge il manifest o --stats)
-tools/ue.py pyfile tools/ue_scripts/build_ship_interior.py                                                        # il lead: materiali, kit, un sotto-livello per ponte, L_Bridge
+tools/ue.py pyfile tools/ue_scripts/build_ship_interior.py                                                        # il lead: materiali (anche MI_SHIP_* di room_materials.json), kit, un sotto-livello per ponte, L_Bridge
+blender -b --factory-startup --python-exit-code 1 -P art/blender/<messhall|berths|medbay|engineering|hangar>.py   # le cinque stanze M1 (FBX in art/export/<nome>), poi nell'editor:
+tools/ue.py pyfile tools/ue_scripts/build_<messhall|berths|medbay|engineering|hangar>.py                          # idempotenti: sostituiscono la loro cartella e rifanno le luci
 UnrealEditor-Cmd ASTRA.uproject -run=AstraNave -nullrhi -unattended -nosound                                      # il banco senza grafica: lampade, streaming, ponti attorno al Capitano
 ```
 
@@ -206,7 +210,7 @@ Numeri: 969 facce in 508 appese, 504 ordinate, 134 elenchi; **29 mesh** dicono t
 ## 10. Il kit (`art/blender/ship_*.py`)
 
 Linguaggio della plancia v3: composito scuro in cornici di metallo spazzolato, nervature con linee di luce, lampade a palette (`MI_BRG3_Lamps*`: la cella dice il colore), un solo slot per tutte le etichette (`MI_SHIP_Labels`, atlante `T_SHIP_Labels`, 4096 × 6144: 425 tile). Ogni mesh è chiusa alla luce, Nanite (quelle con un vetro restano classiche),
-collisione complessa come semplice, UV a 1 m e per cella per lampade e etichette. Budget: **444 mesh, 7,46 M triangoli in tutto, la più pesante 138 k** (i triangoli in Nanite non sono il costo; il costo è la memoria: FBX su disco, non in git).
+collisione complessa come semplice, UV a 1 m e per cella per lampade e etichette. Budget (dopo ARTE-INTERNI, §10.4): **446 mesh, 6,61 M triangoli in tutto, la più pesante 149 k** (i triangoli in Nanite non sono il costo; il costo è la memoria: FBX su disco, non in git).
 Come "più futuro e meno ufficio" (NAVE-3): corridoi con strisce di luce, pannelli tecnici, condotti, schermi e segnaletica; **l'atrio dell'Aquila non è più una sala vuota** (il Mess Concourse e l'atrio del Berthing sono stati rifatti, §10.2).
 
 | Gruppo | Mesh | Note |
@@ -221,7 +225,7 @@ Come "più futuro e meno ufficio" (NAVE-3): corridoi con strisce di luce, pannel
 | Navetta | ShuttleStop, ShuttleStopBow, ShuttleStopStern (`ship_rooms_transit.py`); SpineCar (`ship_craft.py`) | 24 × 16: banchina, binari, bocche del tunnel, respingenti; la vettura da 14 m (bianca con fascia blu, porte aperte sul lato banchina) è una mesh a parte |
 | Segnaletica | WayBlade_1..3, WayRow_<meta><freccia> (26), Frame_<n>, Directory_<ponte> (`ship_signs.py`) | §9 |
 | Snodi | Concourse, BerthLobby (rifatti), StairTower(+Top, Bottom, 53, Cap), LadderTrunk | §10.2 |
-| Il resto | tutte le stanze di NAVE-2 (laboratori, officine, armi, volo, chiglia, social, servizi: `ship_rooms_*.py`) | invariate salvo i posti a sedere |
+| Il resto | tutte le stanze di NAVE-2 (laboratori, officine, armi, volo, chiglia, social, servizi: `ship_rooms_*.py`) | guscio v2, temi, materiali e luci nuovi per tutte; arredi e dettagli rifatti per le sale comuni, gli alloggi, i giardini, i locali medici e quelli umidi (§10.4) |
 
 L'arredo vive in `ship_furniture.py` … `ship_furniture9.py` (nove biblioteche; la nuova: poltrona del dentista, parete dell'obitorio, cella, banco di guardia, panche delle cappelle, sedia del barbiere, simulatore, capsula di salvataggio, scrubber, elettrolizzatore, reattore ausiliario, chiosco…); ogni funzione costruisce un pezzo (origine a terra, fronte +x) e le stanze lo piazzano con `place(b, x, y, yaw, funzione, …)`.
 Gruppi di una mesh (`SParts`): `body` (smussato), `fine`, `soft` (senza smusso: cuscini, libri, piante, **le doghe di una parete**), `emit` (lampade e etichette). Limiti controllati a ogni esportazione: 150 k triangoli a mesh, altezza ≤ 3,7 (struttura compresa ≤ 4,0), ingombro dentro la pianta.
@@ -271,7 +275,59 @@ Misure interne (lunghezza × profondità × altezza, m); ogni stanza ha il suo a
 | `ship_catalog.py`, `ship_corridor.py`, `ship_corridor2.py`, `ship_walls.py`, `ship_signs.py` | i toni S P K V T e le misure; i moduli di corridoio (K e le celle dei tubi in `ship_corridor`, V e T in `ship_corridor2`); i pannelli di parete; targhe, segnali, cartelli |
 | `ship_rooms.py` (conchiglie e `place`), `ship_rooms_*.py` | le stanze per tema; di NAVE-3: `_care`, `_plants`, `_life`, `_hull`, `_lifts`, `_transit` (rifatto), `_hub` (Concourse e Berthing) |
 | `ship_furniture.py` … `ship_furniture9.py`, `ship_craft.py`, `ship_lib.py` | l'arredo; i velivoli (Kestrel, vettura della navetta); i materiali, la palette, le etichette, `SParts` |
+| `ship_shell.py`, `ship_themes.py`, `ship_mk.py`, `ship_decor.py` (ARTE-INTERNI) | il guscio v2; i temi per tipo di stanza; le forme (scatola arrotondata, cuscino, tornio, foglia, rilievo); i tappeti, i quadri e il resto di ciò che fa vivere una stanza |
+| `ship_furn2.py`, `ship_furn3.py`, `ship_furn4.py`, `ship_cabin.py`, `ship_wet.py`, `ship_plants.py`, `ship_assets.py` | arredi di seconda e terza generazione (le funzioni vecchie delegano); palestra, cappella, sala giochi, uffici; attrezzatura medica; cabine; bagni e lavanderie; le piante; i modelli Poly Haven |
+| `ship_mess.py`, `ship_berths.py`, `ship_medbay.py`, `ship_engineering.py`, `ship_hangar.py` | le cinque stanze M1 nel linguaggio del kit (i generatori vecchi li chiamano; `*_v1` restano) |
+| `data/ship/room_materials.json`, `tools/ue_scripts/ship_room_materials.py` | la tabella dei 54 materiali delle stanze, per le anteprime e per Unreal |
 | `ship_kit.py`, `ship_kit_preview.py`, `ship_preview.py`, `ship_budget.py` | il generatore del kit e dei controlli; le anteprime (`rooms`, `modules`, `modules3`, `car`, `signs`, `d1`, `d4`, `d6`, con i posti nella vista `plan`); il budget per ponte |
+
+### 10.4 L'arte degli interni (ARTE-INTERNI)
+
+Dopo il giro del 2/10 le stanze erano «un greybox ammobiliato» sotto corridoi che reggevano ([brief/ARTE-INTERNI.md](brief/ARTE-INTERNI.md)). Questo lavoro porta **tutti i tipi di stanza al linguaggio dei corridoi** (guscio, luce, materiali veri, piante vere) e **rifà da zero**, nell'ordine in cui il Capitano le vede: la mensa e la cucina, gli alloggi (cabine, suite, camerate, cuccette), le sale comuni (wardroom, lounge, biblioteca, cappella, palestra, sala giochi, osservatorio), i giardini e l'idroponica, l'infermeria e i locali medici, i bagni e le lavanderie; e **le cinque stanze dell'era M1** (Mess Hall, Crew Berthing, Medbay, Main Engineering, Flight Deck), sempre allo stesso posto, con le stesse porte e gli stessi posti. Anteprime guardate stanza per stanza in `docs/progressi/interni_2026-10-03/`.
+
+**Gli strati** (cosa c'è di nuovo e dove ritoccarlo):
+
+| Strato | File | Cosa |
+|---|---|---|
+| Guscio v2 | `ship_shell.py`, `ship_rooms.Style` | pavimento con bordo e intarsio; pareti a campate con pilastri e fessura di luce sui frame (`bay`, `bay_edges`: dove cadono i pilastri, parete per parete) e un trattamento per campata (pannelli, tessuto, doghe di legno, lamiera forata, piastrelle); soffitti veri: strisce luminose tra le travi, gola attorno a un soffitto rialzato, griglia acustica, struttura a vista |
+| Temi | `ship_themes.py` (`THEME_TABLE`) | l'aspetto per tipo di stanza, come lo vuole STILE.md: *living* (moquette di lana, legno, intonaco, gola calda 3200 K), *mess*, *crew*, *medical* (piastrelle bianche, verde acqua, 5200 K), *lab*, *command* (blu-grigio), *security* (canna di fucile e rosso), *flight*, *tech* (lamiera mandorlata, ambra, struttura a vista), *store*. **Per cambiare una stanza si cambia la sua riga della tabella**, non il generatore |
+| Materiali | `data/ship/room_materials.json` → `ship_lib.py` (anteprime) e `tools/ue_scripts/ship_room_materials.py` (Unreal) | **54 istanze di `M_ASTRA_Hard`** (tinta, scala delle UV, rugosità, normale) da 29 set di texture; una tabella sola per Blender e per Unreal; i set della plancia (`Brushed`, `PanelPaint`, `Cotton`, `Linen`, `WoodDark`) restano quelli del progetto |
+| Texture | `tools/art/interior_textures.py`, `tools/art/polyhaven_models.py` | 17 set 1K da ambientCG (CC0: moquette di lana, legni, piastrelle bianche piccole/grandi/esagonali, terrazzo, lamiera mandorlata, piastre ottagonali, intonaco, pelle liscia e capitonné, sughero, tessuto grosso, prato, muschio, terra), 9 set delle piante Poly Haven (CC0), 3 procedurali (pannello forato, atlante delle foglie, **tavolozza di 64 colori**: libri, stoviglie, cibo, giocattoli, tutto ciò che è piccolo e colorato ha **un solo slot**). Fonti e licenze in `licenze.csv` |
+| Piante | `ship_assets.py`, `ship_plants.py` | 7 modelli Poly Haven (felce, calatea, antúrio, albero della fortuna, ficus, singonio, haworthia: 12 varianti, più 4 a un quinto dei triangoli per le aiuole) decimati e versati nella mesh della stanza; piante procedurali con **foglie vere** (`ship_mk.leaf`: sansevieria, palma, lattughe, erbe, pomodori, rampicanti, ciuffi d'erba, fiori, parete verde); i **giardini** hanno aiuole di muschio e prato con rilievi (`ship_mk.terrain`), un albero della fortuna per aiuola, sassi di fiume, rampicanti dalla pergola e tre pareti verdi |
+| Arredi | `ship_mk.py` (forme: scatola arrotondata, cuscino, tornio, foglia, rilievo), `ship_furn2.py` (sedute, tavoli, scaffali, lampade, cucina), `ship_furn3.py` (palestra con ring e pedana, acquario, modellino della nave, cappella, sala giochi, sedia e postazione d'ufficio), `ship_furn4.py` (attrezzatura medica), `ship_cabin.py` (cabine con finestra sullo spazio: stelle e il bordo di Aurelia, boiserie, lampada, comodino, scrivania), `ship_wet.py` (bagni, docce, lavanderie), `ship_decor.py` (tappeti, quadri, bacheche, tazze, libri), `ship_themes.py` | gli arredi vecchi (`ship_furniture*.py`) **delegano** ai nuovi con gli stessi ingombri e lo stesso fronte, quindi le stanze e i posti non si spostano |
+| Luce | `ship_spec.retune_lights()` (e `LIGHT_LEVEL`) | le lampade del piano (`lights[]`) hanno una **densità per tipo di stanza** (lumen del piano per m²: cucina 105, idroponica 120, lounge e biblioteca 80, cabine 70, cappella 58, osservatorio 45, medico 100–105, officine 85–95, depositi 70…) e una temperatura (cucina 4800 K, lounge 3300, cappella 2900, medico 5400…): prima una stanza aveva 10–45 contro i ~106 di un corridoio. **`LIGHT_LEVEL` (1.0) in `ship_spec.py` scala tutto**: cambiarlo e rigenerare il piano. Ogni cabina ha la sua lampada. In più c'è luce d'architettura che non costa luci dinamiche: strisce, gole, zoccoli di luce per reparto, schermi |
+
+**Le cinque stanze M1** (`ship_mess.py`, `ship_berths.py`, `ship_medbay.py`, `ship_engineering.py`, `ship_hangar.py`; i vecchi generatori `messhall.py`, `berths.py`, `medbay.py`, `engineering.py`, `hangar.py` li chiamano, le versioni vecchie restano come `*_v1`; frame, porte e posti invariati). Le luci di queste stanze sono **attori** (non lampade del piano, quindi senza il guadagno `astra.lamps.gain`) e si regolano in `tools/ue_scripts/build_*.py`:
+
+| Stanza | Cosa | Triangoli prima → dopo | Luci |
+|---|---|---|---|
+| Mess Hall | pavimento di terrazzo con corsia ardesia, pareti di noce e intonaco a campate con pilastri luminosi, soffitto a strisce tra le travi sui frame della nave, tavoli di rovere con bordo d'acciaio su piede a colonna e panche imbottite, banco di servizio con il cibo, cucina visibile oltre il passaplatti (forni, cappa, pentole appese, scaffali), parete delle erbe, stendardi, piante | 54 k → 92 k (22 → 37 slot) | quattro file, `LIGHT_GAIN = 5` (la sala era quasi nera: 100 lm per tutto il locale) |
+| Crew Berthing | campate con pilastri sui frame dei portelli, corsia chiara, travi sui frame, vassoi e tubo sopra la corsia, salottino con tavolo, sgabelli, mensola e angolo caffè, luci calde smorzate e luci rosse di notte | sala 22 k → 16 k (le cuccette `SM_BERTH_Stack_*` sono quelle di prima) | corsia da 14 000 a 26 000 lm |
+| Medbay | corsia a campate con pilastri dove si dividono i letti, tende plissettate su binari, comodino e sedia per ogni letto, banco infermieri, parete dei rifornimenti, console centrale, **sala operatoria** (tavolo, lampade gemelle, anestesia, scanner, carrello d'emergenza, armadi sterili) | 117 k → 82 k (17 → 27 slot) | invariate |
+| Main Engineering | campate rivestite, macchine sotto i ballatoi, anello di luce e console attorno alla fossa del reattore, carroponte, lampade a campana sui tralicci, condotti e passerelle: la mesh nuova `SM_ENG_Detail` sta sopra la sala vecchia | 80 k → 139 k | 12 luci alte da 24 000 lm e 8 di ballatoio da 14 000 lm (erano 12 da 5200 lm: la sala era nera) |
+| Flight Deck | segni sul ponte, linee di sicurezza, contorno degli stalli, attrezzatura di terra lungo le pareti, campate rivestite, carroponte, fari dei tubi: la mesh nuova `SM_HGR_Detail` sta sopra il ponte | 40 k → 208 k (una mesh da 168 k: Nanite) | 18 fari da 60 000 lm (erano 26 000) e 10 fari di parete da 32 000 lm |
+
+**Numeri** (kit completo, `ship_kit.py --stats`; "prima" = la base `c0a9c36`):
+
+| | Prima | Dopo |
+|---|---|---|
+| mesh del kit / triangoli in tutto | 445 / 7,54 M | 446 / **6,61 M** (il calo viene dai corridoi alleggeriti di ARTE-PLANCIA-2, già in `main`; le sole stanze: 96 mesh e 5,95 M → 97 mesh e 5,91 M, media 61 k, la più pesante `hydro` 149 k, prima 138 k) |
+| triangoli delle sole stanze di tutti i ponti se tutto fosse in vista (istanze) | 54,1 M | **48,6 M** (−10 %) |
+| slot di materiale per mesh di stanza (media / massima) | 16 / 25 | **21 / 44** (`lounge`; poi `games` 39, `cabins` e `staterooms` 38, `wardroom` 36, `concourse` 35) |
+| materiali diversi usati dalle stanze | 30 | 75 |
+| texture nuove | — | 29 set a 1K ≈ **74 MB** se fossero tutti residenti (BC1/BC5, mip compresi); un ponte ne usa 8–28 (il Ponte 4, 28: 71 MB) |
+
+Per ponte (triangoli delle sole stanze, mesh distinte, prima → dopo; il resto del kit è dei corridoi): Ponte 2 0,74 → 0,84 M · 3 0,73 → 1,06 · 4 1,52 → 1,99 · 5 1,72 → 1,43 · 6 1,40 → 1,71 · 7 1,54 → 1,32 · 8 1,97 → 1,68 · 9 1,46 → 1,38 · 10 0,67 → 0,50 · 11 0,95 → 0,76 · 12 0,34 → 0,29. **Gli slot salgono del 30 %** (da 4 067 a 5 284 sulle mesh distinte): è il prezzo dell'aspetto; con Nanite i materiali visibili insieme pesano meno degli slot, ma è la prima cosa da misurare nel `lounge` (44) e nei giardini.
+
+**Prove** (offline, il lead prova il resto): kit completo con prove — 12 ponti, **0 rotte bloccate, 0 posti sul mobilio**, nessun problema di mesh; `ship_checks.py` **0 problemi, 0 avvisi**; `tools/life.py check` OK; `tools/lift.py check` OK; piano rigenerato (`LIGHT_LEVEL = 1.0`: 4 538 lampade, 120 in più per le cabine). Anteprime Eevee di ogni tipo di stanza dalla porta e da due angoli all'altezza degli occhi (1,68 m), con la vista dall'alto dei posti; prova senza Unreal di `ship_room_materials.py` contro un modulo `unreal` finto (54 istanze, 162 texture legate, i file delle texture presenti).
+
+**Limiti e cose da guardare nel gioco**
+- **Non provato in Unreal** (l'editor è del lead): l'importazione delle texture, le istanze, le mesh Nanite con 40 e più slot (`lounge`), la resa di prato, muschio e foglie a due facce sotto Lumen, le luci attori delle stanze M1 (hanno più luce di prima: se una stanza costa troppo, le manopole sono i numeri in `build_*.py`; se il locale è troppo chiaro o scuro, `LIGHT_LEVEL`).
+- **Restano com'erano** (generatori vecchi, non toccati): le cuccette `SM_BERTH_Stack_*` (12–13 k triangoli l'una, 28 per sala: sono quasi tutti i ~390 k triangoli del Crew Berthing, e il primo candidato a un rifacimento più leggero e più bello), `SM_MED_Bed` e le coperte dei pazienti, gli armadietti; i loro materiali `MI_MED_*`, `MI_MESS_*`, `MI_BERTH_*`, `MI_ENG_*` sono del progetto (nelle anteprime offline escono bianchi: nel gioco avranno i colori che hanno sempre avuto).
+- **Rifinite meno** (guscio v2, tema, materiali e luce nuovi, arredo dei generatori precedenti salvo dove detto): CIC, briefing, comunicazioni, uffici (solo sedia e postazione), archivi, laboratori, officine, impianti, armeria, poligono, sale volo, depositi, brig, teletrasporto, hangar delle navette, capsule di salvataggio, camere stagne. Sono il prossimo lavoro naturale.
+- Le sale grandi dell'era M1 non sono mesh del kit: il controllo dei 150 k triangoli per mesh non le riguarda (`SM_HGR_Detail` ne ha 168 k).
+
+**Ricostruire** (nell'ordine; i primi due solo la prima volta e quando cambiano le texture): `interior_textures.py` e `polyhaven_models.py --all` (§1) → `ship_plan_gen.py` (il piano porta le luci e i posti nuovi) → `ship_kit.py` (FBX in `art/export/ship`) → `tools/ue.py pyfile tools/ue_scripts/build_ship_interior.py` (importa il kit, fa le istanze `MI_SHIP_*` da `room_materials.json`, rimette i ponti) → le cinque M1: generatore Blender e `build_<stanza>.py` (§1).
 
 ## 11. Il gioco: cosa legge il piano
 
@@ -330,6 +386,7 @@ Il Capitano su un ponte di mezzo ha caricato il suo e i due vicini: **~850–1 0
 | `tools/life.py check` | OK; 644 posti letto in 46 stanze, nessuno senza una casa |
 | `tools/damage.py run --scenario all` | **46/46 PASS** (con l'editor compilato di `main` e il piano nuovo) |
 | `ship_kit.py` (kit completo con prove) | 0 problemi di mesh; **0 rotte bloccate, 0 posti sul mobilio** su 12 ponti; **l'ingombro della vettura della navetta libero** (celle del tunnel e sale: `car_clearance`, che sulle vecchie versioni trova la banchina, il condotto, il cancello e le pareti di testata) |
+| ARTE-INTERNI (§10.4) | kit completo: 446 mesh, 6,61 M triangoli, **0 rotte bloccate, 0 posti sul mobilio**; piano rigenerato: `ship_checks.py` **0 problemi, 0 avvisi**, `tools/life.py check` OK, `tools/lift.py check` OK; anteprime di ogni stanza in `docs/progressi/interni_2026-10-03/` |
 | Anteprime Eevee | guardate davvero, stanza per stanza (le critiche: sedili senza nessuno, sguardi contro il muro, caschi nel varco di una porta, pozzi chiusi sulle porte, specchi neri, partizione del dentista, atrio vuoto, frecce a specchio: tutte corrette) |
 
 **Distanza dall'ascensore più vicino** (§7) e **programma** (§5.1) sono i numeri di progetto: la mediana a piedi dall'ascensore è di 32–48 m su tutti i ponti d'equipaggio, il 90° percentile 56–92 m.
@@ -354,6 +411,7 @@ Il Capitano su un ponte di mezzo ha caricato il suo e i due vicini: **~850–1 0
 
 ## 14. Limiti noti
 
+- **Gli interni di ARTE-INTERNI** (§10.4): non provati in Unreal; 21 slot di materiale per stanza in media (massimo 44 nel `lounge`); restano meno rifinite le sale di comando, i laboratori, le officine, gli impianti, l'armeria, le sale volo e i depositi.
 - **Non provato nell'editor.** Il kit e le anteprime sono verificati in Blender (Eevee) e con i raggi; il piano con i controlli, `tools/life.py` e il banco dei danni; ciò che è GPU (tempo di fotogramma, memoria, il carico di un ponte con 1 400 istanze) va provato dal lead.
 - **I pozzi e le vetture** non sono mie: il kit ha le lobby e i pozzi (pareti), non le vetture né le ante d'approdo; **la vettura della navetta** è una mesh a parte e la sua corsa è di ASCENSORI.
 - **Le altre navi** (fase C: un piano per ogni classe di `data/war/classes.json`): non ancora, quando il lead lo chiede.

@@ -77,7 +77,9 @@ namespace
 			{TEXT("magazine"), DmMagazine}, {TEXT("armory"), DmArmoury}, {TEXT("weapons"), DmArmoury},
 			{TEXT("tank"), DmTank}, {TEXT("hangar"), DmHangar}, {TEXT("workshop"), DmWorkshop}, {TEXT("fabrication"), DmWorkshop},
 			{TEXT("medbay"), DmMedical}, {TEXT("surgery"), DmMedical}, {TEXT("pharmacy"), DmMedical}, {TEXT("quarantine"), DmMedical},
-			{TEXT("crawlway"), DmCrawl}, {TEXT("engineering"), DmEngineering}};
+			{TEXT("crawlway"), DmCrawl}, {TEXT("engineering"), DmEngineering},
+			// (FLOTTA-VIVA: the kinds of the class plans that the Aquila's plan has none of)
+			{TEXT("engines"), DmMachinery}, {TEXT("coolant"), DmMachinery}, {TEXT("air_plant"), DmMachinery}, {TEXT("cargo"), DmStore}};
 		const EDmClass* C = Table.Find(K);
 		return C ? *C : DmDefault;
 	}
@@ -168,13 +170,18 @@ bool FAstraDamageMap::Load(const FString& Path, FString& OutError)
 		OutError = FString::Printf(TEXT("no ship's plan (%s)"), *FPaths::GetCleanFilename(Path));
 		return false;
 	}
-	if (const TArray<TSharedPtr<FJsonValue>>* Origin = nullptr; Plan->TryGetArrayField(TEXT("origin_in_hull"), Origin) && Origin->Num() >= 3)
-	{
-		OriginInHullM = FVector((*Origin)[0]->AsNumber(), (*Origin)[1]->AsNumber(), (*Origin)[2]->AsNumber());
-	}
+	Profiles.Reset();
 	for (int32 c = 0; c < DmClassNum; ++c)
 	{
 		Profiles.Add(DmProfileOf((EDmClass)c));
+	}
+	// where the plan's origin is in the hull mesh's frame: the Aquila's plan says nothing (her default stands), a class plan says [0, 0, 0]
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Origin = nullptr;
+		if (Plan->TryGetArrayField(TEXT("origin_in_hull"), Origin) && Origin->Num() >= 3)
+		{
+			OriginInHullM = FVector((*Origin)[0]->AsNumber(), (*Origin)[1]->AsNumber(), (*Origin)[2]->AsNumber());
+		}
 	}
 	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
 	// ---- the decks
@@ -189,6 +196,10 @@ bool FAstraDamageMap::Load(const FString& Path, FString& OutError)
 			}
 			FAstraDmgDeck D;
 			D.Id = (int32)DmNum(O, TEXT("id"), 0);
+			if (!O->TryGetBoolField(TEXT("body"), D.bBody))
+			{
+				D.bBody = D.Id >= 2;                          // (the Aquila's plan: Deck 1 is the bridge's island, the rest is the hull)
+			}
 			D.FloorCm = (float)(DmNum(O, TEXT("z"), 0.0) * 100.0);
 			D.ClearCm = (float)(DmNum(O, TEXT("clear"), 3.8) * 100.0);
 			const TSharedPtr<FJsonObject>* Env = nullptr;
@@ -419,13 +430,23 @@ bool FAstraDamageMap::Load(const FString& Path, FString& OutError)
 	// the decks' extremes of the body (the bridge's island is not the body of the hull)
 	TopCm = -1.0e9f;
 	KeelFloorCm = 1.0e9f;
+	FirstBodyDeck = 0;
+	LastBodyDeck = 0;
 	for (const FAstraDmgDeck& D : Decks)
 	{
-		if (D.Id >= 2)
+		if (D.bBody)
 		{
 			TopCm = FMath::Max(TopCm, D.FloorCm + D.ClearCm);
 			KeelFloorCm = FMath::Min(KeelFloorCm, D.FloorCm);
+			FirstBodyDeck = FirstBodyDeck == 0 ? D.Id : FMath::Min(FirstBodyDeck, D.Id);
+			LastBodyDeck = FMath::Max(LastBodyDeck, D.Id);
 		}
+	}
+	if (FirstBodyDeck == 0)
+	{
+		FirstBodyDeck = LastBodyDeck = Decks.Num() ? Decks[0].Id : 1;
+		TopCm = Decks.Num() ? Decks[0].FloorCm + Decks[0].ClearCm : 0.f;
+		KeelFloorCm = Decks.Num() ? Decks[0].FloorCm : 0.f;
 	}
 	BuildGrid();
 	int32 NumLinks = 0;

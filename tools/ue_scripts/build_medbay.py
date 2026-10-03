@@ -8,6 +8,7 @@ PIE, after the C++ module that has AAstraPatient is built:
 """
 import json
 import os
+import sys
 
 import unreal
 
@@ -121,6 +122,12 @@ for base in ("M_ASTRA_Screen", "M_ASTRA_Hard", "M_ASTRA_Emissive"):
         mel.set_material_usage(m, unreal.MaterialUsage.MATUSAGE_NANITE)
         eal.save_loaded_asset(m, only_if_is_dirty=False)
         log.append(f"{base}: Nanite usage")
+
+# the finishes of the rooms (the ward of ARTE-INTERNI uses them: tile, plaster, steel, the swatch palette): created when they are missing
+if ROOT + "/tools/ue_scripts" not in sys.path:
+    sys.path.insert(0, ROOT + "/tools/ue_scripts")
+import ship_room_materials as RM
+RM.build(log)
 
 for a in eas.get_all_level_actors():
     if str(a.get_folder_path()).startswith("Medbay"):

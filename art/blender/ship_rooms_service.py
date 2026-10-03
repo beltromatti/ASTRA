@@ -6,9 +6,13 @@ import math
 import random
 
 import ship_furniture as F
+import ship_decor as DC
+import ship_mk as MK
+import ship_plants as PL
+import ship_themes as TH
 import ship_spec as SPEC
 from bridge3_lib import T, frame
-from ship_lib import (BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DGLASS, DECK, FABRIC_GREY, FABRIC_NAVY, IVORY, LAMINATE,
+from ship_lib import (BRASS, CARPET_MOSS, CERAMIC, GRASS, LEATHER_TAN, MOSS, OAK, PERF, PLASTER_IVORY, PLASTER_SAGE, TERRAZZO, TILE_FLOOR, TILE_HEX, WEAVE_SAND, WHITE_GLOSS, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DGLASS, DECK, FABRIC_GREY, FABRIC_NAVY, IVORY, LAMINATE,
                       LAMP, LAMP_DIM, LAMP_HOT, LEAF, PAINT_RED, RUBBER, SOIL, STEEL, STRUCT, TILE, TRIM, WOOD, SParts)
 from ship_rooms import Style, WF, WS, build_shell, ceiling_panels, luminaire_strips, place, wall_label
 
@@ -50,6 +54,8 @@ def cart(b: SParts, w: float = 0.9, d: float = 0.55, h: float = 1.0, tiers: int 
 
 
 def prep_island(b: SParts, w: float = 3.0, d: float = 1.0, seed: int = 1) -> None:
+    """A stainless prep island: a steel top with a lower shelf of gastronorm trays, a cutting board with chopped vegetables and a knife, a mixing bowl, a stack of plates, a tray of food and a
+    pot with its lid; origin at its centre."""
     rng = random.Random(seed)
     h = 0.92
     b.body.box((-d / 2, -w / 2, h - 0.05), (d / 2, w / 2, h), STEEL)
@@ -58,13 +64,23 @@ def prep_island(b: SParts, w: float = 3.0, d: float = 1.0, seed: int = 1) -> Non
         for sy in (-w / 2 + 0.07, 0.0, w / 2 - 0.07):
             b.body.box((sx - 0.025, sy - 0.025, 0.0), (sx + 0.025, sy + 0.025, h - 0.05), STEEL)
     b.body.box((-d / 2 + 0.05, -w / 2 + 0.05, 0.20), (d / 2 - 0.05, w / 2 - 0.05, 0.23), STEEL)
-    for k in range(3):                                                # things on the lower shelf
-        b.fine.box((-0.3, -w / 2 + 0.2 + k * 0.9, 0.23), (0.3, -w / 2 + 0.75 + k * 0.9, 0.42), rng.choice([CRATE_GREY, STEEL, CRATE_BLUE]))
-    for k in range(3):                                                # cutting boards, a bowl, knives
+    for k in range(3):                                                # trays on the lower shelf
+        with b.at(T(0.0, -w / 2 + 0.45 + k * 0.95, 0.23)):
+            DC.gastro_tray(b, 0.5, 0.32, 0.1, rng.choice(("f_lettuce", "f_carrot", "f_tomato", "f_cheese", "f_bread")), 0.8)
+    for k in range(3):                                                # on the top: a board, a bowl, plates, a tray, a pot
         y = -w / 2 + 0.45 + k * 0.95
-        b.fine.box((-0.28, y - 0.22, h), (0.22, y + 0.22, h + 0.02), BEDDING if k != 1 else WOOD)
-        b.fine.cyl((0.25, y - 0.1, h), (0.25, y - 0.1, h + 0.10), 0.13, STEEL, seg=14, r2=0.16)
-        b.fine.box((-0.10, y + 0.18, h + 0.02), (0.05, y + 0.22, h + 0.03), TRIM)
+        with b.at(T(-0.02, y, h)):
+            if k == 0:
+                DC.cutting_board(b, 0.42, 0.3, seed)
+            elif k == 1:
+                DC.stock_pot(b, 0.15, 0.2, True)
+                with b.at(T(0.0, 0.34, 0.0)):
+                    DC.plate_stack(b, 7)
+            else:
+                with b.at(T(0.0, -0.1, 0.0)):
+                    DC.mixing_bowl(b, 0.17)
+                with b.at(T(0.0, 0.28, 0.0)):
+                    DC.gastro_tray(b, 0.5, 0.3, 0.06, "f_orange", 0.6)
     b.emit.label((d / 2 - 0.0, 0.0, 0.5), 0.5, 0.125, (1, 0, 0), "eq_food")
 
 
@@ -82,6 +98,7 @@ def dishwasher(b: SParts, w: float = 1.8, d: float = 0.9, h: float = 1.55) -> No
 
 
 def pot_rack(b: SParts, L: float, seed: int = 4) -> None:
+    """Two rails hung from the ceiling over the prep islands with pots, pans and utensils hanging from them."""
     rng = random.Random(seed)
     for y in (-0.5, 0.5):
         b.fine.cyl((0, y, 2.55), (L, y, 2.55), 0.012, STEEL, seg=6)
@@ -93,8 +110,11 @@ def pot_rack(b: SParts, L: float, seed: int = 4) -> None:
         y = rng.choice((-0.5, 0.5))
         r = rng.uniform(0.09, 0.15)
         b.fine.cyl((x, y, 2.55), (x, y, 2.42), 0.006, STEEL, seg=6)
-        with b.at(T(x, y, 2.16)):
-            F.pot(b, r, rng.uniform(0.08, 0.18))
+        with b.at(T(x, y, 2.2)):
+            if rng.random() < 0.5:
+                DC.stock_pot(b, r, rng.uniform(0.08, 0.16), False)
+            else:
+                DC.saucepan(b, r * 0.8, 0.07)
         x += rng.uniform(0.22, 0.42)
 
 
@@ -294,37 +314,9 @@ def _loader(b: SParts) -> None:
 
 # ------------------------------------------------------------------------------------------------------------ heads, laundry
 def heads(name: str = "SM_SHIP_Heads"):
-    spec, L, D, H = _dims("heads")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=TILE, floor_mode="covering", wall_lo=TILE, wall_hi=TILE, wain_h=2.2, ceil=IVORY, accent="cyan_dim", strip="white_cool", ribs=False)
-    build_shell(b, spec, st)
-    # stalls along both side walls (partitions, a toilet and a door leaf each), washbasins on islands in the middle, showers at the far end
-    for side in (0, 1):
-        sgn = 1 if side == 0 else -1
-        xw = WS + WF if side == 0 else L - WS - WF
-        xa, xb = sorted((xw, xw + sgn * 1.6))
-        for k in range(5):
-            b.body.box((xa, 3.2 + k - 0.02, 0.0), (xb, 3.2 + k + 0.02, 1.9), IVORY)
-        for k in range(4):
-            y0 = 3.2 + k
-            place(b, xw + sgn * 0.42, y0 + 0.5, 0.0 if side == 0 else 180.0, _toilet)
-            xd = xw + sgn * 1.6
-            b.body.box((xd - 0.02, y0 + 0.03, 0.15), (xd + 0.02, y0 + 0.97, 1.85), IVORY)
-            b.fine.box((xd - 0.03, y0 + 0.08, 0.15), (xd + 0.03, y0 + 0.11, 1.85), TRIM)
-            b.emit.lamp_box((xd - 0.03 * sgn - 0.005, y0 + 0.85, 1.4), (xd - 0.03 * sgn + 0.005, y0 + 0.9, 1.45), "green", LAMP_DIM)
-    for i, y in enumerate((6.4, 9.4)):
-        place(b, 6.0, y, 0, _basin_island)
-    for k in range(3):
-        x = WS + WF + 0.9 + k * 3.6
-        b.body.box((x - 1.0, D - WS - WF - 1.3, 0.0), (x + 1.0, D - WS - WF - 1.26, 2.1), IVORY)
-        b.fine.box((x - 1.0, D - WS - WF - 1.3, 0.0), (x - 0.96, D - WS - WF, 2.1), IVORY)
-        b.fine.box((x + 0.96, D - WS - WF - 1.3, 0.0), (x + 1.0, D - WS - WF, 2.1), IVORY)
-        b.fine.cyl((x, D - WS - WF - 0.05, 2.0), (x, D - WS - WF - 0.05, 2.4), 0.02, STEEL, seg=8)
-        b.fine.cyl((x, D - WS - WF - 0.05, 2.4), (x, D - WS - WF - 0.4, 2.4), 0.02, STEEL, seg=8)
-        b.fine.cyl((x, D - WS - WF - 0.4, 2.4), (x, D - WS - WF - 0.4, 2.36), 0.11, STEEL, seg=14)
-    wall_label(b, 6.0, WF + 0.02, 2.05, (0, 1, 0), "pict_heads", 0.3, 0.3)
-    ceiling_panels(b, L, D, H, 3, 4, "white_cool", 1.4, 1.0, 0.5)
-    return b.build(name)
+    """12 x 16 x 3.4: the heads and showers (ship_wet.py)."""
+    import ship_wet
+    return ship_wet.heads(name)
 
 
 def _toilet(b: SParts) -> None:
@@ -347,23 +339,9 @@ def _basin_island(b: SParts) -> None:
 
 
 def laundry(name: str = "SM_SHIP_Laundry"):
-    spec, L, D, H = _dims("laundry")
-    b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=DECK, floor_mode="plates", wall_lo=TILE, wall_hi=COMPOSITE, wain_h=1.4, ceil=IVORY, accent="cool_dim", strip="white_cool", ribs=False)
-    build_shell(b, spec, st)
-    for k in range(6):
-        y = 3.2 + k * 1.05
-        place(b, WS + WF + 0.5, y, 0, _washer, "MI_SHIP_Steel")
-        place(b, L - WS - WF - 0.5, y, 180, _washer, IVORY)
-    place(b, 6.0, 6.5, 0, F.table, 2.6, 0.9, 0.9, STEEL, STEEL, False)
-    place(b, 6.0, 9.5, 0, F.table, 2.6, 0.9, 0.9, STEEL, STEEL, False)
-    for k in range(3):
-        place(b, 5.0 + k, 13.5, 90, cart)
-    for k in range(3):
-        place(b, 2.5 + 1.2 * k, D - WS - WF - 0.6, -90, F.shelf, 1.1, 0.5, 2.0, 4, STEEL, False, k, False)
-    wall_label(b, 6.0, WF + 0.02, 2.05, (0, 1, 0), "room_laundry", 0.9)
-    ceiling_panels(b, L, D, H, 3, 4, "white_cool", 1.4, 1.0, 0.5)
-    return b.build(name)
+    """12 x 16 x 3.4: the laundry (ship_wet.py)."""
+    import ship_wet
+    return ship_wet.laundry(name)
 
 
 def _washer(b: SParts, mat: str = STEEL) -> None:
@@ -375,40 +353,98 @@ def _washer(b: SParts, mat: str = STEEL) -> None:
 
 
 # -------------------------------------------------------------------------------------------------------------- hydroponics
+def _nutrient_tank(b: SParts, r: float = 0.55, h: float = 2.1) -> None:
+    """A nutrient tank: a white vessel with a domed head, a level gauge (a lit slot), a pump and two feed lines going up into the ceiling (origin on the floor at its centre)."""
+    MK.lathe(b.body, [(r * 0.9, 0.0), (r, 0.06), (r, h - 0.2), (r * 0.8, h - 0.06), (r * 0.35, h), (r * 0.3, h), (r * 0.3, h - 0.02), (r * 0.74, h - 0.1), (r * 0.94, h - 0.24), (r * 0.94, 0.1)],
+             (0, 0, 0), WHITE_GLOSS, seg=24)
+    b.fine.cyl((0, 0, 0.0), (0, 0, 0.1), r * 1.04, STEEL, seg=24)
+    b.fine.cyl((0, 0, h * 0.5 - 0.02), (0, 0, h * 0.5 + 0.02), r * 1.012, STEEL, seg=24)
+    b.emit.lamp_box((r * 0.96, -0.03, 0.4), (r * 0.99, 0.03, h - 0.5), "green", LAMP_DIM)
+    b.body.cyl((0, 0, h), (0, 0, 3.4), 0.035, STEEL, seg=8)
+    b.body.cyl((0.2, 0, h - 0.08), (0.2, 0, 3.4), 0.025, BRASS, seg=8)
+
+
 def hydro(name: str = "SM_SHIP_Hydro"):
+    """24 x 16 x 3.4: a hydroponics bay — four rows of vertical-farm racks (two 9 m runs each, three tiers of trays with lettuce, herbs, wheat and seedlings growing under bars of light),
+    an aisle between the rows where the botanists work, the nutrient tanks along the left wall, the controller and the seed cabinet by the door; the ceiling is a grid of luminous panels
+    and the floor is tile with a drain channel. The racks and aisles are where they were (the botanists' places are in the aisle)."""
     spec, L, D, H = _dims("hydro")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, accent="green_dim", strip="white_cool", light_mode="grow")
+    st = TH.lab(floor=TILE_FLOOR, floor2=TILE_HEX, wall_lo=PLASTER_SAGE, wall_hi=PLASTER_IVORY, wall_acc=PERF, wain_h=1.2, accent="green_dim", strip="white_cool", light_cell="white_cool",
+                wall_pattern=("panel", "perf", "panel"), ceiling="grid", skirt=STEEL)
     build_shell(b, spec, st)
     rng = random.Random(31)
     dx = spec["doors"][0]["x"]
-    # grow racks: three tiers of trays under LED bars, four rows across the room (a central aisle to the door)
+    crops = ("lettuce", "herb", "grain", "mix")
     for r, y in enumerate((5.0, 8.0, 11.0, 14.0)):
-        for seg_x0 in (2.0, 13.8):
-            for t in range(3):
-                z = 0.5 + t * 0.9
-                for sx in (seg_x0, seg_x0 + 9.0):
-                    b.body.box((sx, y - 0.6, 0.0), (sx + 0.05, y - 0.55, 2.9), TRIM)
-                    b.body.box((sx, y + 0.55, 0.0), (sx + 0.05, y + 0.6, 2.9), TRIM)
-                b.body.box((seg_x0, y - 0.55, z - 0.05), (seg_x0 + 9.05, y + 0.55, z), STEEL)
-                b.fine.box((seg_x0 + 0.05, y - 0.5, z), (seg_x0 + 9.0, y + 0.5, z + 0.11), STRUCT)
-                b.soft.box((seg_x0 + 0.08, y - 0.46, z + 0.09), (seg_x0 + 8.97, y + 0.46, z + 0.11), SOIL)
-                for k in range(11):
-                    px = seg_x0 + 0.5 + k * 0.8
-                    for j in (-0.25, 0.25):
-                        s = rng.uniform(0.12, 0.22)
-                        b.soft.sphere((px + rng.uniform(-0.05, 0.05), y + j, z + 0.11 + s * 0.6), s, LEAF, seg=8, rings=6, squash=(1, 1, 0.8))
-                b.fine.box((seg_x0 + 0.1, y - 0.5, z + 0.62), (seg_x0 + 8.95, y + 0.5, z + 0.67), TRIM)
-                b.emit.lamp_box((seg_x0 + 0.2, y - 0.42, z + 0.615), (seg_x0 + 8.85, y + 0.42, z + 0.62), "violet", LAMP)
-                b.emit.lamp_box((seg_x0 + 0.2, y - 0.08, z + 0.615), (seg_x0 + 8.85, y + 0.08, z + 0.62), "white_cool", LAMP)
-    # water tanks and the nutrient controller at the far end and along the left wall
+        for k, seg_x0 in enumerate((2.0, 13.8)):
+            place(b, seg_x0 + 4.5, y, 0, PL.grow_rack, 9.0, 3, 1.1, crops[(r + k) % 4], 3 * r + k, 2.9, "white_cool")
+    # a drain channel down the aisle, with a grate
+    for y in (6.5, 9.5, 12.5):
+        b.fine.box((WS + WF + 1.0, y - 0.07, -0.004), (L - WS - WF - 1.0, y + 0.07, 0.0), STRUCT)
+        b.fine.box((WS + WF + 1.0, y - 0.05, 0.0), (L - WS - WF - 1.0, y + 0.05, 0.004), STEEL)
+    # the nutrient tanks along the left wall, the controller and the seed cabinet near the door, a botanist's bench
     for k in range(3):
-        b.body.cyl((WS + WF + 0.7, 3.0 + k * 2.0, 0.0), (WS + WF + 0.7, 3.0 + k * 2.0, 2.4), 0.65, IVORY, seg=20)
+        place(b, WS + WF + 0.7, 3.0 + k * 2.0, 0, _nutrient_tank, 0.62, 2.1)
     b.body.box((L - WS - WF - 1.0, 2.0, 0.0), (L - WS - WF, 3.4, 1.9), COMPOSITE)
     b.emit.label((L - WS - WF - 1.005, 2.7, 1.5), 0.9, 0.5, (-1, 0, 0), "scr_lab")
     place(b, dx, 2.4, 90, F.desk, 1.4, 0.7, 0.8, LAMINATE, True)
+    place(b, dx - 0.4, 2.1, 90, DC.mug, CERAMIC, z=0.8)
+    place(b, dx + 0.4, 2.0, 90, PL.haworthia, 1.0, 20.0, z=0.8)
+    place(b, dx + 3.0, WF + 0.3, 90, F.shelf, 1.8, 0.4, 2.1, 5, STEEL, True, 7, True)
+    place(b, dx + 5.0, WF + 0.3, 90, F.shelf, 1.8, 0.4, 2.1, 5, STEEL, True, 8, True)
     F.pipe_run(b, (1.0, 1.0, H - 0.4), (L - 1.0, 1.0, H - 0.4), 0.09)
     F.pipe_run(b, (1.0, 1.4, H - 0.6), (L - 1.0, 1.4, H - 0.6), 0.05, STEEL)
     wall_label(b, 8.0, WF + 0.02, 2.1, (0, 1, 0), "room_hydro", 0.9)
-    luminaire_strips(b, L, D, H, [3.0], "white_cool", 2.0, L - 2.0, LAMP_HOT)
+    return b.build(name)
+
+
+def garden(name: str = "SM_SHIP_Garden"):
+    """24 x 16 x 3.4: a garden — the park of the ship: a terrazzo path down the middle with a bench every few metres, long planting beds either side of it with ferns, calatheas,
+    anthuriums and money trees, a lantern on a post at the bends, vines hanging from a pergola of oak beams, and a ceiling that is the sky (a wide pale-blue luminous panel with a warm
+    sun lamp). The places are those of the hydroponics bay (the botanists work on the path)."""
+    spec, L, D, H = _dims("hydro")
+    b = SParts(bevel=0.005, fine_bevel=0.003)
+    st = TH.living(floor=TERRAZZO, floor2=CARPET_MOSS, border=0.0, inlay=None, wall_lo=PLASTER_SAGE, wall_hi=PLASTER_IVORY, wall_acc=WEAVE_SAND, wain_h=0.9, accent="green_dim",
+                   wall_pattern=("panel", "slats", "panel"), ceiling="flat", skirt=OAK, strip="white_warm", light_cell="ice")
+    build_shell(b, spec, st)
+    rng = random.Random(57)
+    x0, x1, y0, y1 = WS + WF, L - WS - WF, WF, D - WS - WF
+    # the sky: a luminous panel over most of the ceiling in a pale daylight white-blue, with a warm "sun" strip along one side
+    b.emit.lamp_box((x0 + 1.0, y0 + 1.5, H - 0.056), (x1 - 1.0, y1 - 1.5, H - 0.05), "ice", LAMP)
+    b.body.box((x0 + 0.9, y0 + 1.4, H - 0.09), (x1 - 0.9, y0 + 1.5, H - 0.05), TRIM)
+    b.body.box((x0 + 0.9, y1 - 1.5, H - 0.09), (x1 - 0.9, y1 - 1.4, H - 0.05), TRIM)
+    b.body.box((x0 + 0.9, y0 + 1.5, H - 0.09), (x0 + 1.0, y1 - 1.5, H - 0.05), TRIM)
+    b.body.box((x1 - 1.0, y0 + 1.5, H - 0.09), (x1 - 0.9, y1 - 1.5, H - 0.05), TRIM)
+    # the pergola: oak beams across the path with vines hanging from them
+    for xb in (4.0, 9.0, 14.0, 19.0):
+        b.body.box((xb - 0.07, y0 + 0.4, H - 0.5), (xb + 0.07, y1 - 0.4, H - 0.3), OAK)
+    # the path (a terrazzo strip that the field of the floor already is) edged in oak, the cross path from the door
+    for ya, yb in ((6.2, 6.28), (9.72, 9.8)):
+        b.body.box((x0, ya, 0.0), (x1, yb, 0.03), OAK)
+    dx_ = spec["doors"][0]["x"] - 1.1
+    b.body.box((dx_, y0, 0.0), (dx_ + 0.08, 6.2, 0.03), OAK)
+    b.body.box((dx_ + 2.12, y0, 0.0), (dx_ + 2.2, 6.2, 0.03), OAK)
+    # the planting beds: four beds of moss and lawn with mounds, ferns, calatheas, hostas, tufts of grass, flowers and stones, and a money tree in each
+    for (xa, xb, ya, yb, seed) in ((x0 + 0.4, 8.6, y0 + 1.2, 6.0, 1), (11.4, x1 - 0.4, y0 + 1.2, 6.0, 2), (x0 + 0.4, 11.0, 10.0, y1 - 0.5, 3), (13.0, x1 - 0.4, 10.0, y1 - 0.5, 4)):
+        w_, d_ = yb - ya, xb - xa
+        with b.at(frame((xa + xb) / 2, (ya + yb) / 2, 0.0, 90.0)):
+            PL.garden_bed(b, d_, w_, 0.42, seed, tree="pachira_a" if seed == 3 else "pachira_d", cover=MOSS if seed % 2 else GRASS)
+    # vines hanging from the pergola beams
+    for xb in (4.0, 9.0, 14.0, 19.0):
+        y = y0 + 0.9
+        while y < y1 - 0.8:
+            with b.at(T(xb, y, H - 0.5)):
+                PL.hanging_vine(b, rng.uniform(0.5, 1.4), int(xb * 10 + y * 3))
+            y += rng.uniform(1.1, 2.1)
+    # benches along the path, lanterns on posts, a drinking fountain
+    for xb in (6.5, 11.8, 17.0):
+        place(b, xb, 9.45, -90, F.bench, 2.0, 0.5, 0.46, LEATHER_TAN)
+        place(b, xb, 6.5, 90, F.bench, 2.0, 0.5, 0.46, LEATHER_TAN)
+    for (xp, yp) in ((3.0, 7.9), (21.0, 7.9), (12.0, 7.9)):
+        place(b, xp, yp, 0, F.lamp_standard, 2.0)
+    place(b, x1 - 0.4, 8.0, 180, DC.picture, 1.8, 1.0, 5, OAK, "sun", z=1.9)
+    for k, xw in enumerate((5.0, 12.0, 19.0)):                                                                    # green walls on the far wall
+        place(b, xw, y1 - 0.1, -90, PL.living_wall, 2.8, 2.5, 0.25, 20 + k)
+    wall_label(b, 8.0, WF + 0.02, 2.1, (0, 1, 0), "room_hydro", 0.9)
     return b.build(name)

@@ -45,6 +45,10 @@ namespace AstraBoardCraft
 	ASTRA_API const FKind& Kestrel();
 	ASTRA_API const FKind* KindByKey(FName Key);
 
+	/** How far from her keel line the Aquila's plating stands at a station of her hull (m along her mesh's x): the boats latch to it, and the bay's mouth is on it. Measured on the generated mesh
+	 *  (the plan's outer wall stands about four metres inside it: it is the airlocks' wall, not the skin). */
+	ASTRA_API double AquilaSkinM(double HullXm);
+
 	/** What a class carries: how many boats of which kind (skiffs for the Mandate's ships, Kestrels for ASTRA's), and where they leave and come home. Count 0: none. */
 	struct FBerths
 	{

@@ -414,6 +414,125 @@ class ToolsTests(Fixture):
         self.assertEqual(s["by_seat"]["mandate/admiral"]["pulses"], 1)
 
 
+# what the game gives the Mandate of its boats (AstraBoardAssault.cpp: BoardingOptionsJson(1)): the carriers with a skiff free and the ships a boat could dock at now
+BOATS = {"carriers": [{"ship": "Charon", "id": "M-01", "boat": "skiff", "boats_free": 3, "men_per_boat": 10}, {"ship": "Styx Two", "id": "M-07", "boat": "skiff", "boats_free": 2, "men_per_boat": 10}],
+         "boardable_now": [{"ship": "the Aquila", "id": "aquila", "class": "ASTRA carrier", "no_power": False, "faces_open": "port, ventral", "hull_pct": 58, "point_defence_channels": 1,
+                            "her_craft_about_her": 0, "distance_km": 3.2}],
+         "other_enemy_ships_shielded": 2}
+ASSAULT = {"assault": {"order": 1, "direction": "in", "attacker": "the Mandate", "carrier": "Charon", "target": "the Aquila", "objective": "engineering", "elapsed_s": 40,
+                       "boats": [{"boat": "Skiff 1", "men": 10, "state": "in flight", "hatch": "d9_airlock_E4 (deck 9 section E (EVA Airlock))"},
+                                 {"boat": "Skiff 2", "men": 10, "state": "latched to the hull, cutting in", "hatch": "d6_airlock_C2 (deck 6 section C (EVA Airlock))"}]},
+           "fight": {"your_men_able": 14, "your_men_down_or_dead": 3, "your_men_back_in_the_boats": 0, "objective": "deck 7 section F (Main Engineering)", "objective_held_s": 12, "fight_s": 61}}
+
+
+class BoardingTests(Fixture):
+    sides = ("mandate",)
+
+    @staticmethod
+    def boats_state(opts: dict[str, Any] | None, groups: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        st = mandate_state(groups or [VANGUARD()], ENEMIES())
+        if opts is not None:
+            st["_mandate"]["boarding"] = opts
+        return st
+
+    async def look(self, st: dict[str, Any]) -> None:
+        await self.feed(st)
+        await self.feed(st, 9)
+        await asyncio.sleep(0.01)
+
+    def tools_of(self, seat: str) -> list[str]:
+        return [name for c in self.llm.calls if c["seat"] == seat for name in c["tools"]]
+
+    def test_the_picture_lists_the_boats_and_what_each_target_has_to_stop_them(self) -> None:
+        text = war_minds.render_boarding({"boarding": BOATS})
+        for needle in ("Carrier M-01 Charon: 3 skiff(s) free, 10 boarders each", "Carrier M-07 Styx Two: 2 skiff(s) free", "Could be boarded now: aquila the Aquila (ASTRA carrier)",
+                       "faces open: port, ventral; point defence 1 channels", "hull 58%", "2 other enemy ship(s): shields up on every face"):
+            self.assertIn(needle, text)
+        self.assertEqual(war_minds.render_boarding({}), "")                                  # nothing to say: nothing is said
+        self.assertEqual(war_minds.render_boarding({"boarding": {}}), "")
+
+    def test_a_hulk_is_said_to_have_no_power(self) -> None:
+        text = war_minds.render_boarding({"boarding": {"carriers": BOATS["carriers"], "boardable_now": [{"ship": "Hulk", "id": "A-03", "class": "ASTRA destroyer", "no_power": True, "faces_open": "all (no power)",
+                                                                                                      "hull_pct": 31, "point_defence_channels": 0, "her_craft_about_her": 0, "distance_km": 5.0}]}})
+        self.assertIn("NO POWER (no shield, no point defence)", text)
+
+    def test_an_assault_under_way_is_followed_boat_by_boat_and_man_by_man(self) -> None:
+        text = war_minds.render_boarding({"boarding": ASSAULT})
+        for needle in ("Assault 1 under way for 40 s: Charon boards the Aquila, objective engineering", "- Skiff 1: 10 men, in flight; hatch d9_airlock_E4", "Skiff 2: 10 men, latched to the hull, cutting in",
+                       "your men 14 on their feet, 3 down or dead, 0 back in the boats", "held for 12 s"):
+            self.assertIn(needle, text)
+
+    async def test_the_boats_are_in_the_picture_and_the_tool_only_when_there_is_something_to_send(self) -> None:
+        await self.look(self.boats_state(None))
+        self.assertNotIn("YOUR BOARDING BOATS", self.llm.calls[-1]["user"])
+        self.assertNotIn("board", self.tools_of("mandate/admiral"))
+        await self.feed(self.boats_state(BOATS), 90)
+        await asyncio.sleep(0.01)
+        self.assertIn("YOUR BOARDING BOATS (the `board` tool)", self.llm.calls[-1]["user"])
+        self.assertIn("Could be boarded now: aquila the Aquila", self.llm.calls[-1]["user"])
+        self.assertIn("board", self.llm.calls[-1]["tools"])
+
+    async def test_the_mandate_prompt_teaches_how_boats_are_lost(self) -> None:
+        await self.look(self.boats_state(BOATS))
+        system = self.llm.calls[0]["system"]
+        for needle in ("Boarding (`board`", "cannot dock through a shield that holds", "fighters flying cover kill them all", "against a hulk it is a prize"):
+            self.assertIn(needle, system)
+
+    async def test_the_admiral_boards_through_the_game_as_a_boarding_in(self) -> None:
+        await self.start_boats(ScriptPolicy([("board", {"target": "AQUILA", "boats": 3, "face": "port", "objective": "engineering", "reason": "her port shield is down"})]))
+        sent = [c for c in self.cmds if c[0] == "boarding"]
+        self.assertEqual(sent, [("boarding", {"direction": "in", "target": "AQUILA", "craft": 3, "face": "port", "objective": "engineering", "by": "Archon Varek Solm"}, "admiral")])
+        self.assertIn("boarding AQUILA with 3 skiff(s)", self.minds.recall("mandate"))
+
+    async def test_a_boarding_is_called_off_with_the_same_tool(self) -> None:
+        await self.start_boats(ScriptPolicy([("board", {"action": "call_off", "reason": "the boarders are losing"})]))
+        self.assertEqual([c for c in self.cmds if c[0] == "boarding"], [("boarding", {"action": "end"}, "admiral")])
+        self.assertIn("called the boats off", self.minds.recall("mandate"))
+
+    async def test_a_boarding_with_no_target_is_refused_before_it_reaches_the_game(self) -> None:
+        await self.start_boats(ScriptPolicy([("board", {"reason": "go"})]))
+        self.assertEqual([c for c in self.cmds if c[0] == "boarding"], [])
+        self.assertIn("name the ship to board", self.minds.recall("mandate"))
+
+    async def start_boats(self, policy: Any) -> None:
+        self.llm.policy = policy
+        st = self.boats_state(BOATS)
+        await self.feed(st)
+        await self.feed(st, 9)
+        await asyncio.sleep(0.01)
+
+    async def test_a_group_commander_sends_only_the_boats_of_their_own_group(self) -> None:
+        g1 = group("Vanguard", 2, [member("M-01", "acheron"), member("M-02")])
+        g2 = group("Interdiction Squadron", 3, [member("M-07"), member("M-08")])
+        calls = [0]
+
+        def policy(mind: Any, view: dict[str, Any], state: dict[str, Any], tools: list[str]):
+            if mind.seat.kind != "group" or mind.seat.group != "Interdiction Squadron":
+                return [("no_change", {"reason": "ok"})]
+            calls[0] += 1
+            return ([("board", {"target": "AQUILA", "carrier": "M-01", "reason": "not mine"}), ("board", {"target": "AQUILA", "boats": 2, "reason": "mine"})] if calls[0] == 1 else [])
+        self.llm.policy = policy
+        st = self.boats_state(BOATS, [g1, g2])
+        await self.feed(st)
+        await self.feed(st, 9)
+        await asyncio.sleep(0.01)
+        sent = [c for c in self.cmds if c[0] == "boarding"]
+        self.assertEqual(len(sent), 1)                                                        # the Charon (M-01) is the Vanguard's: refused; the Styx Two (M-07) is the squadron's own
+        self.assertEqual((sent[0][1]["source"], sent[0][1]["craft"], sent[0][1]["direction"], sent[0][2]), ("M-07", 2, "in", "commander"))
+        self.assertIn("is not a ship of your group", self.minds.recall("mandate"))
+
+    async def test_a_group_with_no_skiff_free_cannot_board(self) -> None:
+        g1 = group("Vanguard", 2, [member("M-01", "acheron"), member("M-02")])
+        g3 = group("Picket", 4, [member("M-11"), member("M-12")])
+        self.llm.policy = lambda mind, view, state, tools: ([("board", {"target": "AQUILA", "reason": "try"})] if mind.seat.kind == "group" and mind.seat.group == "Picket" else [("no_change", {"reason": "ok"})])
+        st = self.boats_state(BOATS, [g1, g3])
+        await self.feed(st)
+        await self.feed(st, 9)
+        await asyncio.sleep(0.01)
+        self.assertEqual([c for c in self.cmds if c[0] == "boarding"], [])
+        self.assertIn("no ship of Picket has a skiff free", self.minds.recall("mandate"))
+
+
 class AstraTests(Fixture):
     sides = ("astra",)
 
@@ -509,6 +628,23 @@ class AstraTests(Fixture):
         self.assertEqual(self.cmds[0][2], "commander")
         self.assertEqual(self.cmds[0][1]["by"], "commander")
         self.assertEqual(self.cmds[0][1]["side"], "astra")
+
+    async def test_every_ship_s_interior_is_given_the_captain_who_speaks_for_her_once(self) -> None:
+        told: list[tuple[str, str, str]] = []
+
+        async def captain(ship: str, rank: str, name: str) -> None:
+            told.append((ship, rank, name))
+        self.minds = self.make(captain=captain)
+        await self.feed(self.state(enemies=[]))
+        await self.feed(self.state(enemies=[]), 9)
+        self.assertEqual(sorted(told), [("T-01", "Captain", "Rhea Castellan"), ("T-02", "Commander", "Daniel Okoro")])
+        self.assertEqual(self.cmds, [])                                                     # (not an order: no command of the war)
+        self.minds.persona_of("mandate", "M-01")
+        await self.settle()
+        self.assertEqual(told[-1], ("M-01", "Archon", "Varek Solm"))                        # the rank without its gloss, the name without its rank
+        self.minds.persona_of("mandate", "M-07")
+        await self.settle()
+        self.assertEqual(len(told), 3)                                                      # a Mandate ship without a persona keeps the game's own captain
 
     async def test_another_captain_of_the_group_may_speak_but_an_unknown_one_is_the_commander(self) -> None:
         self.llm.policy = ScriptPolicy([("say", {"speaker": "okoro", "to": "castellan", "text": "Praetorian, Vigilant: our port shield is gone, falling in behind you.", "tone": "tense"}),

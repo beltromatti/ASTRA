@@ -71,6 +71,8 @@ void UAstraBoardSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Fx = InWorld.GetSubsystem<UAstraCombatFx>();
 	// the plan's rooms and doors, and the soldiers' map of them, are made on a worker: the game does not wait for them (the first boarding comes minutes later)
 	Dmg = MakeShared<FAstraDamageMap>();
+	AqDmg = Dmg;
+	Mode = EMode::Observed;
 	const TSharedPtr<FAstraDamageMap> D = Dmg;
 	MapFuture = Async(EAsyncExecution::ThreadPool, [D]() -> TSharedPtr<FAstraBoardMap>
 	{
@@ -93,11 +95,15 @@ void UAstraBoardSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 void UAstraBoardSubsystem::Deinitialize()
 {
 	ClearBodies();
-	if (Breach)
+	for (AAstraBoardBreach* B : Breaches)
 	{
-		Breach->Destroy();
+		if (B)
+		{
+			B->Destroy();
+		}
 	}
-	Breach = nullptr;
+	Breaches.Reset();
+	Assault = FAssault();
 	Super::Deinitialize();
 }
 
@@ -115,6 +121,8 @@ void UAstraBoardSubsystem::TryFinishLoading()
 		return;
 	}
 	Phase = EPhase::Idle;
+	AqMap = Map;
+	BuildAquilaPlan();
 	BuildArmsPosts();
 	UE_LOG(LogASTRA, Log, TEXT("[Board] ready: %d compartments, %d portals, %d corner slots"), Map->GetComps().Num(), Map->GetPortals().Num(), Map->GetSlots().Num());
 }
@@ -133,12 +141,12 @@ double UAstraBoardSubsystem::SinceCaptainHurt() const
 
 bool UAstraBoardSubsystem::PickBreach(const FString& Id, int32& OutComp, FVector& OutAt, FString& OutWhy) const
 {
-	if (!Dmg.IsValid() || !Map.IsValid())
+	if (!AqDmg.IsValid() || !AqMap.IsValid())
 	{
 		OutWhy = TEXT("the ship's plan is not read yet");
 		return false;
 	}
-	const FAstraDamageMap& D = *Dmg;
+	const FAstraDamageMap& D = *AqDmg;
 	int32 C = INDEX_NONE;
 	if (!Id.IsEmpty())
 	{
@@ -176,12 +184,12 @@ bool UAstraBoardSubsystem::PickBreach(const FString& Id, int32& OutComp, FVector
 			}
 		}
 	}
-	if (!Map->GetComps().IsValidIndex(C))
+	if (!AqMap->GetComps().IsValidIndex(C))
 	{
 		OutWhy = TEXT("no room to cut into");
 		return false;
 	}
-	const FBox& B = Map->GetComps()[C].Box;
+	const FBox& B = AqMap->GetComps()[C].Box;
 	OutComp = C;
 	OutAt = FVector(0.5 * (B.Min.X + B.Max.X), B.Max.Y > 0.0 ? B.Max.Y - 80.0 : B.Min.Y + 80.0, B.Min.Z);
 	return true;
@@ -194,6 +202,10 @@ void UAstraBoardSubsystem::SealDoor(int32 Door, bool bSealed)
 		return;
 	}
 	Fight.SealDoor(Door, bSealed);
+	if (Mode != EMode::Observed)
+	{
+		return;                                       // another ship's bulkhead is not a door of the Aquila's
+	}
 	if (UAstraShipSubsystem* S = ShipSub())
 	{
 		S->SealBulkhead(Dmg->Doors[Door].Id, bSealed);
@@ -403,6 +415,11 @@ bool UAstraBoardSubsystem::StartBoarding(const FSpec& Spec, FString& OutDetail)
 		OutDetail = TEXT("a boarding is already on");
 		return false;
 	}
+	if (Assault.bOn)
+	{
+		OutDetail = FString::Printf(TEXT("a boarding is already under way (%s)"), *AssaultText());
+		return false;
+	}
 	int32 BreachComp = INDEX_NONE;
 	FVector At;
 	FString Why;
@@ -411,21 +428,28 @@ bool UAstraBoardSubsystem::StartBoarding(const FSpec& Spec, FString& OutDetail)
 		OutDetail = Why;
 		return false;
 	}
-	const int32* Obj = Dmg->CompByName.Find(FName(TEXT("engineering")));
+	const int32* Obj = AqDmg->CompByName.Find(FName(TEXT("engineering")));
 	if (!Obj)
 	{
 		OutDetail = TEXT("the plan has no Main Engineering for the boarders to go for");
 		return false;
 	}
 	// a clean slate (the last boarding's bodies, seals, marines)
-	if (Phase == EPhase::Over)
-	{
-		Finish(TEXT("a new boarding begins"));
-	}
-	ClearBodies();
+	ResetScene(EMode::Observed);
 	Fight.Init(Map.ToSharedRef(), GAstraDeterministic ? 7001 : (int32)(FDateTime::Now().GetTicks() & 0x7fffffff));
 	const int32 Count = FMath::Clamp(Spec.Boarders > 0 ? Spec.Boarders : FMath::Max(1, Spec.Skiffs) * 10, 4, 40);
 	Fight.SpawnBoarders(BreachComp, At, *Obj, Count, FMath::Max(5.f, Spec.WarnS));
+	EnterObserved(Spec.Source, BreachComp, At, Spec.bLockdown, Spec.WarnS);
+	const int32 Skiffs = FMath::Max(1, FMath::DivideAndRoundUp(Count, 10));
+	Tell(FString::Printf(TEXT("%s has docked %d assault craft on the hull at %s: about %d boarders, going for Main Engineering; the section bulkheads are %s and the marines are being called to arms"),
+	                     Source.IsEmpty() ? TEXT("an enemy ship") : *Source, Skiffs, *BreachText, Count, Spec.bLockdown ? TEXT("closing") : TEXT("open")), true);
+	OutDetail = FString::Printf(TEXT("boarding: %d boarders at %s, the marines called (%d)"), Count, *BreachText, MarineUnits.Num());
+	UE_LOG(LogASTRA, Log, TEXT("[Board] %s"), *OutDetail);
+	return true;
+}
+
+void UAstraBoardSubsystem::EnterObserved(const FString& SourceText, int32 BreachComp, const FVector& At, bool bLockdown, float WarnS)
+{
 	MobiliseMarines();
 	FVector Feet;
 	float Yaw = 0.f, Speed = 0.f;
@@ -436,13 +460,13 @@ bool UAstraBoardSubsystem::StartBoarding(const FSpec& Spec, FString& OutDetail)
 	}
 	Fight.AddCaptain(Feet);
 	MakeSightOverride();
-	Source = Spec.Source;
+	Source = SourceText;
 	BreachAt = At;
 	BreachText = Map->Describe(BreachComp);
 	Since = 0.f;
 	AfterEnd = 0.f;
 	bBreachOpen = false;
-	WarnLeft = FMath::Max(5.f, Spec.WarnS);
+	WarnLeft = FMath::Max(5.f, WarnS);
 	CapHp = 100.f;
 	bCapDown = false;
 	bChainDown = false;
@@ -463,7 +487,7 @@ bool UAstraBoardSubsystem::StartBoarding(const FSpec& Spec, FString& OutDetail)
 		bWarmed = true;
 		AAstraCombatant::PreloadAssets(Warm);
 	}
-	if (Spec.bLockdown)
+	if (bLockdown)
 	{
 		SealSections(BreachComp, At);
 	}
@@ -483,13 +507,8 @@ bool UAstraBoardSubsystem::StartBoarding(const FSpec& Spec, FString& OutDetail)
 			bRaisedAlert = false;
 		}
 	}
-	const int32 Skiffs = FMath::Max(1, FMath::DivideAndRoundUp(Count, 10));
+	Mode = EMode::Observed;
 	Phase = EPhase::Active;
-	Tell(FString::Printf(TEXT("%s has docked %d assault craft on the hull at %s: about %d boarders, going for Main Engineering; the section bulkheads are %s and the marines are being called to arms"),
-	                     Source.IsEmpty() ? TEXT("an enemy ship") : *Source, Skiffs, *BreachText, Count, Spec.bLockdown ? TEXT("closing") : TEXT("open")), true);
-	OutDetail = FString::Printf(TEXT("boarding: %d boarders at %s, the marines called (%d)"), Count, *BreachText, MarineUnits.Num());
-	UE_LOG(LogASTRA, Log, TEXT("[Board] %s"), *OutDetail);
-	return true;
 }
 
 void UAstraBoardSubsystem::EndBoarding(const TCHAR* Why)
@@ -498,6 +517,11 @@ void UAstraBoardSubsystem::EndBoarding(const TCHAR* Why)
 	{
 		Tell(FString::Printf(TEXT("the boarding is called off (%s)"), Why), false);
 		Finish(Why);
+	}
+	else if (Assault.bOn)
+	{
+		Tell(FString::Printf(TEXT("the boarding is called off (%s): the boats turn back"), Why), false);
+		EndAssaultFight(Why);
 	}
 }
 
@@ -529,29 +553,32 @@ void UAstraBoardSubsystem::Finish(const TCHAR* Why)
 			}
 			HarmTold.Add(*R);
 		}
-		if (L && P)
+		if (L && P && Mode == EMode::Observed)
 		{
-			L->Sim().Commandeer(*P, false, Un->Pos);
+			L->Sim().Commandeer(*P, false, Un->Pos);          // (the marines of a fight on another ship are away: they come home with their boats)
 		}
-	}
-	if (Phase == EPhase::Active)
-	{
+		}
+		if (Phase == EPhase::Active && Mode == EMode::Observed)
+		{
 		OpenSections();
-	}
+		}
 	if (S && bRaisedAlert && S->GetAlert() == EAstraAlert::Red)
 	{
 		FString D;
 		S->ApplyCommand(TEXT("set_alert"), BdArgs1(TEXT("level"), PriorAlert == (int32)EAstraAlert::Green ? TEXT("green") : TEXT("yellow")), D);
 	}
 	bRaisedAlert = false;
-	if (Breach && Breach->IsOpen())
+	for (AAstraBoardBreach* B : Breaches)
 	{
-		Breach->Close();
+		if (B && B->IsOpen())
+		{
+			B->Close();
+		}
 	}
 	// the Captain is whole again for the next one (the wound he carried is the damage model's; the weapon's screen has nothing to say)
 	CapHp = FMath::Max(CapHp, 35.f);
 	Phase = EPhase::Over;
-	AfterEnd = 0.f;
+	AfterEnd = 0.f;                                          // (the boats of an assault are told to let go by the next step of TickAssault: it sees the fight is over)
 }
 
 void UAstraBoardSubsystem::ClearBodies()
@@ -713,6 +740,7 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 		return;
 	}
 	TickArms(DeltaTime);                                     // the weapons: the posts' pictures near the Captain, the armourer's delivery (AstraBoardArms.cpp)
+	TickAssault(DeltaTime);                                  // the boats of an assault: what they do becomes the fight (AstraBoardAssault.cpp)
 	if (Phase != EPhase::Active && Phase != EPhase::Over)
 	{
 		return;
@@ -749,16 +777,28 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 			}
 		}
 		ManageBodies(Dt);
-		if (AfterEnd > BdCleanUpS)
+		if (AfterEnd > (Mode == EMode::Remote ? 6.f : BdCleanUpS))
 		{
 			ClearBodies();
 			Phase = EPhase::Idle;
+			if (Mode == EMode::Remote)
+			{
+				Mode = EMode::Observed;                          // (the Aquila's own map is the one the arms and the next alarm want)
+				Map = AqMap;
+				Dmg = AqDmg;
+				ScenePlan.Reset();
+			}
 		}
 	}
 }
 
 void UAstraBoardSubsystem::Step(float Dt)
 {
+	if (Mode == EMode::Remote)
+	{
+		RemoteStep(Dt);                                   // a fight on another ship: the simulation alone (no bodies, no Captain)
+		return;
+	}
 	Since += Dt;
 	SyncCaptain(Dt);
 	Fight.Tick(Dt);

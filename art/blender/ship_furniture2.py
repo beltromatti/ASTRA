@@ -151,57 +151,30 @@ def telescope(b: SParts) -> None:
 
 # ---------------------------------------------------------------------------------------------------------------- berthing
 def bunk_bed(b: SParts, l: float = 2.05, w: float = 0.95, levels: int = 2, blanket: str = FABRIC_NAVY, seed: int = 1) -> None:
-    """A bunk bed with its head at -x: posts, frames, mattresses, sheets, a blanket, pillows, a ladder on the +y side, a reading lamp per bunk."""
-    rng = random.Random(seed)
-    hl, hw = l / 2, w / 2
-    zs = [0.34, 1.30][:levels] if levels == 2 else [0.40]
-    top = 1.86 if levels == 2 else 1.0
-    for sx in (-hl, hl - 0.06):
-        for sy in (-hw, hw - 0.06):
-            b.body.box((sx, sy, 0.0), (sx + 0.06, sy + 0.06, top), TRIM)
-    for z in zs:
-        b.body.box((-hl, -hw, z - 0.06), (hl, hw, z), COMPOSITE)
-        b.soft.box((-hl + 0.04, -hw + 0.04, z), (hl - 0.04, hw - 0.04, z + 0.14), BEDDING)
-        b.soft.box((-hl + 0.62, -hw + 0.03, z + 0.14), (hl - 0.03, hw - 0.03, z + 0.20), blanket)
-        b.soft.box((-hl + 0.06, -hw + 0.12, z + 0.14), (-hl + 0.42, hw - 0.12, z + 0.24), BEDDING)
-        b.emit.lamp_box((-hl + 0.07, hw - 0.30, z + 0.62), (-hl + 0.10, hw - 0.20, z + 0.66), "warm_dim" if rng.random() > 0.3 else "white_warm", LAMP_DIM)
-        b.fine.box((-hl + 0.06, hw - 0.05, z + 0.55), (-hl + 0.12, hw - 0.02, z + 0.7), TRIM)
-    if levels == 2:
-        b.body.box((-hl + 0.1, -hw - 0.0, 1.30 + 0.14), (hl - 0.1, -hw + 0.02, 1.30 + 0.42), TRIM)          # guard rail (open side is +y: the ladder)
-        for k in range(5):
-            z = 0.28 + k * 0.28
-            b.fine.box((hl - 0.45, hw - 0.02, z), (hl - 0.20, hw + 0.03, z + 0.03), TRIM)
-        b.fine.box((hl - 0.47, hw - 0.02, 0.2), (hl - 0.43, hw + 0.03, 1.5), TRIM)
-        b.fine.box((hl - 0.22, hw - 0.02, 0.2), (hl - 0.18, hw + 0.03, 1.5), TRIM)
+    """A crew bunk (ship_furn2.bunk_bed): head at -x, the ladder and the curtains on the +y side."""
+    import ship_furn2 as N
+    N.bunk_bed(b, l, w, levels, blanket, seed)
 
 
 def wardrobe(b: SParts, w: float = 0.9, d: float = 0.55, h: float = 2.0, mat: str = COMPOSITE) -> None:
-    b.body.box((-d / 2, -w / 2, 0.0), (d / 2, w / 2, h), mat)
-    for sy in (-w / 2, 0.0):
-        b.fine.box((d / 2, sy + 0.012, 0.06), (d / 2 + 0.012, sy + w / 2 - 0.012, h - 0.06), IVORY)
-        b.fine.box((d / 2 + 0.012, sy + w / 2 - 0.07, h * 0.5 - 0.12), (d / 2 + 0.03, sy + w / 2 - 0.05, h * 0.5 + 0.12), TRIM)
-    b.emit.lamp_box((d / 2 + 0.012, -0.012, h - 0.12), (d / 2 + 0.018, 0.012, h - 0.06), "green", LAMP_DIM)
+    import ship_furn2 as N
+    N.wardrobe(b, w, d, h, mat)
 
 
 def vanity(b: SParts, w: float = 1.0, d: float = 0.5) -> None:
-    """A small washbasin unit facing +x: a cabinet, a basin, a tap, a lit mirror above it."""
-    b.body.box((-d / 2, -w / 2, 0.0), (d / 2, w / 2, 0.85), COMPOSITE)
-    b.body.box((-d / 2 - 0.01, -w / 2 - 0.01, 0.85), (d / 2 + 0.01, w / 2 + 0.01, 0.88), STEEL)
-    b.fine.box((-0.16, -0.22, 0.875), (0.16, 0.22, 0.882), DGLASS)
-    b.fine.cyl((-0.20, 0.0, 0.88), (-0.20, 0.0, 1.02), 0.012, TRIM, seg=6)
-    b.fine.cyl((-0.20, 0.0, 1.02), (-0.10, 0.0, 1.02), 0.012, TRIM, seg=6)
-    b.fine.box((-d / 2 - 0.0, -w / 2 + 0.06, 1.28), (-d / 2 + 0.03, w / 2 - 0.06, 1.98), TRIM)
-    b.fine.box((-d / 2 + 0.03, -w / 2 + 0.08, 1.30), (-d / 2 + 0.035, w / 2 - 0.08, 1.96), DGLASS)
-    b.emit.lamp_box((-d / 2 + 0.03, -w / 2 + 0.06, 1.97), (-d / 2 + 0.05, w / 2 - 0.06, 2.0), "white_warm", LAMP)
+    """A small washbasin unit facing +x (ship_furn2.vanity)."""
+    import ship_furn2 as N
+    N.vanity(b, w, d)
 
 
 def rug(b: SParts, w: float, d: float, mat: str = FABRIC_RUST, edge: str = FABRIC_SAND) -> None:
-    """A rug centred on the origin (x = w, y = d), 1.2 cm thick, with a border."""
-    b.soft.box((-w / 2, -d / 2, 0.0), (w / 2, d / 2, 0.012), edge)
-    b.soft.box((-w / 2 + 0.06, -d / 2 + 0.06, 0.012), (w / 2 - 0.06, d / 2 - 0.06, 0.016), mat)
+    """A rug centred on the origin (x = w, y = d), 1.4 cm thick with a border (ship_decor.rug: wool carpet; the old linen tints map to carpets of the same colour)."""
+    import ship_decor as DC
+    from ship_lib import CARPET_MOSS, CARPET_RUST, CARPET_SAND, CARPET_SLATE
+    carpets = {FABRIC_RUST: CARPET_RUST, FABRIC_NAVY: CARPET_SLATE, FABRIC_GREY: CARPET_SLATE, FABRIC_SAND: CARPET_SAND}
+    DC.rug(b, w, d, carpets.get(mat, CARPET_SLATE), carpets.get(edge, CARPET_SAND))
 
 
-# ---------------------------------------------------------------------------------------------------------------- science
 def lab_island(b: SParts, w: float = 4.0, d: float = 1.3, h: float = 0.92, seed: int = 1, sink: bool = True) -> None:
     """A lab island facing +x on both sides (w along y): a worktop, cabinets, a central reagent shelf with bottles, taps, a hanging lamp bar."""
     rng = random.Random(seed)

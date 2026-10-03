@@ -93,6 +93,7 @@ namespace AstraBoard
 		FString Name;
 		int32 Roster = INDEX_NONE;       // an Aquila marine of the ship's roster (VITA): INDEX_NONE for the rest
 		int32 Squad = INDEX_NONE;
+		int32 Party = INDEX_NONE;        // the craft he came in (the host's number for it): what happens to the craft happens to him until he is through
 		bool bExternal = false;          // the Captain: the game moves him
 		// body
 		FVector Pos = FVector::ZeroVector;
@@ -167,6 +168,8 @@ namespace AstraBoard
 		float StartStrength = 0.f;
 		int32 Lost = 0;
 		bool bOrdered = false;           // an order of the Captain's or the marines' commander's stands (the squad does not re-plan its place)
+		int32 BreachComp = INDEX_NONE;   // the hatch an attack squad came in by (INDEX_NONE: the mission's): a boarding by several craft has several
+		FVector BreachPos = FVector::ZeroVector;
 		bool bStand = false;             // stand fast where they are and shoot (no corners, no moves: the bench's duels)
 		FString Note;                    // what it was last told or decided, for the reports
 	};
@@ -212,7 +215,16 @@ namespace AstraBoard
 		FVector BreachPos = FVector::ZeroVector;
 		bool bSweep = false;             // the attackers also win when no defender is left on his feet (a derelict: nothing to hold but the ship)
 		float HeldS = 0.f;
+		double StartedS = -1.0;          // the clock when the first attacker came aboard (the time limits count from it: a craft's flight is not the fight's time)
 		EOutcome Outcome = EOutcome::Running;
+	};
+
+	/** One man who comes aboard from a craft: a name (the Mandate's are made when it is empty), the roster place of one of the Aquila's marines (VITA's), the skill that is his own (0: his side's). */
+	struct FArrival
+	{
+		FString Name;
+		int32 Roster = INDEX_NONE;
+		float Skill = 0.f;
 	};
 
 	struct FBook
@@ -248,6 +260,21 @@ public:
 	TArray<int32> SpawnAttackers(AstraBoard::ESide Side, int32 BreachComp, const FVector& BreachPos, int32 ObjectiveComp, int32 Count, float FirstAtS = 0.f, int32 PerSquad = 5);
 	/** Sets the mission: who attacks, where they came in, what they want. */
 	void SetMission(AstraBoard::ESide Attacker, int32 BreachComp, const FVector& BreachPos, int32 ObjectiveComp, bool bSweep = false);
+	/** The men of one craft (Party: the host's number for it) wait to come in at a hatch (BreachComp, BreachPos): they are made now, not yet in the fight, in squads of PerSquad (named
+	 *  SquadBase and the next letter of the alphabet: "Ferry Guard Alpha"), and cut in when the party is released (the craft has latched) or, if that is never told, EtaS seconds from now (what the
+	 *  holders' ambush reckons against). The mission is SetMission's. Returns the squads' ids. The first man of a squad leads it. */
+	TArray<int32> LandParty(AstraBoard::ESide Side, int32 Party, const TArray<AstraBoard::FArrival>& Men, int32 BreachComp, const FVector& BreachPos, float EtaS, int32 PerSquad = 5, const FString& SquadBase = FString());
+	/** The craft has cut in: the party's men come aboard, a few at a time, DelayS from now. */
+	void ReleaseParty(int32 Party, float DelayS = 0.f);
+	/** The craft was shot down with them in it: they die with it (Cause: how, for the story). Men who have already come aboard are not touched. How many died. */
+	int32 LoseParty(int32 Party, const FString& Cause);
+	/** The craft turned back with them in it: they never came aboard (nobody died). How many. */
+	int32 RecallParty(int32 Party);
+	/** The men of a party still in their craft (not yet through the breach). */
+	int32 PartyWaiting(int32 Party) const;
+	/** Where a squad came in: its own hatch, else the mission's. */
+	FVector BreachPosOf(const AstraBoard::FSquad& S) const { return S.BreachComp != INDEX_NONE ? S.BreachPos : Mis.BreachPos; }
+	int32 BreachCompOf(const AstraBoard::FSquad& S) const { return S.BreachComp != INDEX_NONE ? S.BreachComp : Mis.Breach; }
 	/** An attack squad's standing order: go to the objective and take it. */
 	void BriefAttackers(int32 SquadId);
 	AstraBoard::ESide Attacker() const { return Mis.Attacker; }

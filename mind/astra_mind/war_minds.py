@@ -192,6 +192,22 @@ REPORT = _fn("report", "A short word to your admiral, by datalink: what you cann
     "text": {"type": "string", "description": "one or two sentences"},
     "urgent": {"type": "boolean", "description": "true only if the admiral must decide now"}}, ["text"])
 
+BOARD_FACES = ("port", "starboard", "dorsal", "ventral", "bow", "stern")
+BOARD_OBJECTIVES = ("engineering", "bridge", "captain", "armory", "medbay", "brig", "comms", "hangar")
+BOARD = _fn("board", "Send assault skiffs to board an enemy ship. The game flies them: they leave a carrier of yours, cross to the target, line up with a hatch on her skin, latch, and the "
+                     "boarders cut in and fight their way to the objective. The answer says what was launched, from which carrier, at which hatches and how long it takes, plus the facts "
+                     "that bear on it (her shield on that face, her point defence, her fighters), or why it cannot be done. A skiff is shot at by the target's point defence and by "
+                     "her fighters on the way in, and cannot dock through a shield that holds on the face it comes to (it waits twenty seconds off the hull and turns back): "
+                     "`boarding` in your picture lists the ships a boat could dock at now, and what she has to stop them. One assault at a time. `call_off` turns the boats "
+                     "back and brings the boarders who are aboard out (the survivors go home in the skiffs).", {
+    "action": {"type": "string", "enum": ["launch", "call_off"], "description": "launch (the default) or call_off"},
+    "target": {"type": "string", "description": "launch: the ship to board: her contact id from your plot (or AQUILA)"},
+    "carrier": {"type": "string", "description": "optional: the ship of yours whose skiffs go (an id from `boarding.carriers`); leave out for the one with the most free"},
+    "boats": {"type": "integer", "minimum": 1, "maximum": 4, "description": "how many skiffs (ten boarders each): several at once saturate point defence; leave out for as many as the carrier has free, at most two"},
+    "face": {"type": "string", "enum": list(BOARD_FACES), "description": "the side of the target the skiffs dock on (leave out: the side nearest your carrier); her hatches are where her airlocks are"},
+    "objective": {"type": "string", "enum": list(BOARD_OBJECTIVES), "description": "what the boarders fight for: engineering (her reactor: the ship dies or is taken) · bridge (her command) · captain (the commander's suite) · armory · medbay · brig · comms · hangar"},
+    "reason": {"type": "string", "description": "one sentence: why, and what you expect (your log, and what your subordinates read as intent)"}}, ["reason"])
+
 NO_CHANGE = _fn("no_change", "You have looked at the picture and nothing needs changing: the orders that stand, or the group's own judgement, serve. "
                              "Say in one sentence why (it goes in your log). Call this instead of inventing an order.", {
     "reason": {"type": "string"}}, ["reason"])
@@ -239,6 +255,74 @@ def _km(v: Any) -> str:
 FACES = ("bow", "stern", "port", "stbd", "dorsal", "ventral")
 
 
+def _plural(n: Any, one: str, many: str) -> str:
+    try:
+        return f"{int(n)} {one if int(n) == 1 else many}"
+    except (TypeError, ValueError):
+        return f"{n} {many}"
+
+
+def _power_bits(power: Any, approx: bool = False) -> str:
+    if not isinstance(power, dict) or not power:
+        return ""
+    return ", ".join(f"{str(k).replace('_', ' ')} {'about ' if approx else ''}{v}%" for k, v in power.items())
+
+
+def aboard_line(a: Any) -> str:
+    """What a ship's own captain knows of her inside (the game's `aboard`, FLOTTA-VIVA): the hands lost, who has the conn when the captain is down, what burns and
+    vents, which rooms have no power, how much of each allocation the ship's distribution still carries, which rooms are failing, the damage parties and the worst
+    of what they have on their hands. Empty when the inside is as built (the game says nothing then)."""
+    if not isinstance(a, dict) or not a:
+        return ""
+    bits: list[str] = []
+    crew = a.get("crew")
+    if isinstance(crew, dict):
+        bits.append(f"crew {crew.get('fit', '?')} fit, {crew.get('wounded', 0)} wounded, {crew.get('killed', 0)} killed of {crew.get('of', '?')}")
+    if a.get("command"):
+        bits.append(str(a["command"]))
+    hazards = []
+    if a.get("fires"):
+        hazards.append(_plural(a["fires"], "fire", "fires"))
+    if a.get("breaches"):
+        hazards.append(_plural(a["breaches"], "breach venting", "breaches venting"))
+    if a.get("rooms_without_power"):
+        hazards.append(_plural(a["rooms_without_power"], "room without power", "rooms without power"))
+    if a.get("pressure_bulkheads_shut"):
+        hazards.append(_plural(a["pressure_bulkheads_shut"], "pressure bulkhead shut", "pressure bulkheads shut"))
+    if hazards:
+        bits.append(", ".join(hazards))
+    if power := _power_bits(a.get("power_pct")):
+        bits.append("power left: " + power)
+    rooms = a.get("rooms")
+    if isinstance(rooms, dict) and rooms:
+        bits.append("rooms: " + ", ".join(f"{k} {v}" for k, v in rooms.items()))
+    if a.get("damage_parties"):
+        bits.append(f"damage parties {a['damage_parties']}")
+    worst = a.get("worst")
+    if isinstance(worst, list) and worst:
+        bits.append("on their hands: " + " | ".join(str(x) for x in worst[:2]))
+    return "; ".join(bits)
+
+
+def seen_line(s: Any) -> str:
+    """What the eye and the sensors make of another ship's inside (the game's `seen_aboard`): atmosphere streaming from a breach, windows gone dark in a section,
+    hot spots, the life signs (a classified track only), the power the emissions show. Empty when nothing shows."""
+    if not isinstance(s, dict) or not s:
+        return ""
+    bits: list[str] = []
+    if s.get("breaches_venting"):
+        bits.append(_plural(s["breaches_venting"], "breach venting atmosphere", "breaches venting atmosphere"))
+    if s.get("windows_dark_in"):
+        bits.append(f"windows dark in the {s['windows_dark_in']}")
+    if s.get("fires_aboard"):
+        bits.append(_plural(s["fires_aboard"], "hot spot", "hot spots"))
+    if s.get("life_signs_pct") is not None:
+        bits.append(f"life signs about {s['life_signs_pct']}%")
+    if power := _power_bits(s.get("power_pct"), approx=True):
+        bits.append("power " + power)
+    return ", ".join(bits)
+
+
 def _member_line(m: dict[str, Any], ew: dict[str, Any] | None = None) -> str:
     bits = [f"{m.get('id', '?')} {m.get('class', '?')} hull {_pct(m.get('hull_pct'))} shields {_pct(m.get('shields_pct'))}"]
     faces = m.get("shield_faces_pct")
@@ -248,6 +332,8 @@ def _member_line(m: dict[str, Any], ew: dict[str, Any] | None = None) -> str:
         bits.append(f"{m['missiles']} missiles")
     if m.get("status"):
         bits.append(str(m["status"]))
+    if inside := aboard_line(m.get("aboard")):
+        bits.append("aboard: " + inside)
     if ew:
         if ew.get("conserving_missiles"):
             bits.append("conserving missiles")
@@ -288,7 +374,8 @@ def render_enemy(view: dict[str, Any]) -> str:
     for g in view.get("enemy_groups") or []:
         ships = "; ".join(f"{s.get('id')} {s.get('class', 'unknown')}"
                           + (f" hull {_pct(s['hull_pct'])} shields {_pct(s.get('shields_pct'))}" if s.get("hull_pct") is not None else "")
-                          + (f" ({s['status']})" if s.get("status") else "") for s in g.get("ships") or [])
+                          + (f" ({s['status']})" if s.get("status") else "")
+                          + (f" [seen aboard: {seen}]" if (seen := seen_line(s.get("seen_aboard"))) else "") for s in g.get("ships") or [])
         lines.append(f" {g.get('label')} — {len(g.get('ships') or [])} ship(s) at {_km(g.get('range_km'))} (nearest {_km(g.get('nearest_ship_km'))}), "
                      f"bearing {g.get('bearing_deg', '?')}°: {ships}")
     return "\n".join(lines) or " (nothing on your sensors)"
@@ -318,10 +405,40 @@ def mandate_extras(view: dict[str, Any]) -> tuple[str, dict[str, dict[str, Any]]
             astra.append(f"{sid}: {s['track']}")
         else:
             astra.append(f"{sid} hull {_pct(s.get('hull_pct'))} shields {_pct(s.get('shields_pct'))}"
-                         + (f", {s['shields']}" if s.get("shields") and s["shields"] != "balanced" else ""))
+                         + (f", {s['shields']}" if s.get("shields") and s["shields"] != "balanced" else "")
+                         + (f" [seen aboard: {seen}]" if (seen := seen_line(s.get("seen_aboard"))) else ""))
     if astra:
         lines.append(" ASTRA ships on your plot: " + "; ".join(astra))
     return "\n".join(lines), ew_by_id
+
+
+def render_boarding(view: dict[str, Any]) -> str:
+    """YOUR BOARDING BOATS: the skiffs your carriers have, the ships a boat could dock at now and what each has to stop them, or (an assault under way) where each boat is and how the fight
+    aboard goes. Empty when there is nothing to say (no boat free, nothing boardable): a commander is told only what bears on a decision."""
+    b = view.get("boarding")
+    if not isinstance(b, dict) or not b:
+        return ""
+    lines = []
+    a = b.get("assault")
+    if isinstance(a, dict) and a:
+        lines.append(f" Assault {a.get('order')} under way for {a.get('elapsed_s', 0)} s: {a.get('carrier')} boards {a.get('target')}, objective {a.get('objective')}"
+                     + (f", ordered by {a['ordered_by']}" if a.get("ordered_by") else ""))
+        for boat in a.get("boats") or []:
+            lines.append(f"   - {boat.get('boat')}: {boat.get('men')} men, {boat.get('state')}; hatch {boat.get('hatch')}")
+        f = b.get("fight")
+        if isinstance(f, dict) and f:
+            lines.append(f" The fight aboard ({f.get('fight_s', 0)} s): your men {f.get('your_men_able', 0)} on their feet, {f.get('your_men_down_or_dead', 0)} down or dead, "
+                         f"{f.get('your_men_back_in_the_boats', 0)} back in the boats; the objective ({f.get('objective')}) held for {f.get('objective_held_s', 0)} s")
+        return "\n".join(lines)
+    for c in b.get("carriers") or []:
+        lines.append(f" Carrier {c.get('id')} {c.get('ship')}: {c.get('boats_free')} {c.get('boat')}(s) free, {c.get('men_per_boat')} boarders each")
+    for t in b.get("boardable_now") or []:
+        lines.append(f" Could be boarded now: {t.get('id')} {t.get('ship')} ({t.get('class')}) — "
+                     + ("NO POWER (no shield, no point defence), " if t.get("no_power") else f"faces open: {t.get('faces_open')}; point defence {t.get('point_defence_channels')} channels; ")
+                     + f"hull {t.get('hull_pct')}%, her craft about her {t.get('her_craft_about_her')}, {t.get('distance_km')} km from your carrier")
+    if b.get("other_enemy_ships_shielded"):
+        lines.append(f" {b['other_enemy_ships_shielded']} other enemy ship(s): shields up on every face (a boat cannot dock through them)")
+    return "\n".join(lines)
 
 
 Levels = tuple[float | None, float | None, float]          # (hull %, shield strength %, when): what the Aquila was at a captain's look
@@ -372,7 +489,8 @@ def render_astra_extras(state: dict[str, Any], seen: Levels | None = None, now: 
         st = str(c.get("status", ""))
         if st == "friendly":
             friends.append(f"{c.get('id')} {str(c.get('name') or c.get('class') or '').split(' (')[0]} {_km(c.get('range_km'))} from the Aquila, "
-                           f"bearing {c.get('bearing_deg', '?')}°, hull {_pct(c.get('hull_pct'))}")
+                           f"bearing {c.get('bearing_deg', '?')}°, hull {_pct(c.get('hull_pct'))}"
+                           + (f" (aboard: {inside})" if (inside := aboard_line(c.get("aboard"))) else ""))
         elif st.startswith(("bearing only", "JAMMING")):
             bearings.append(f"{c.get('id')} bearing {c.get('bearing_deg', '?')}°" + (" (jamming)" if st.startswith("JAMMING") else ""))
         elif st.startswith("hostile") and isinstance(c.get("range_km"), (int, float)):
@@ -381,7 +499,8 @@ def render_astra_extras(state: dict[str, Any], seen: Levels | None = None, now: 
         out.append(" Friendly ships about the Aquila: " + "; ".join(friends))
     if hostile:
         hostile.sort(key=lambda c: float(c["range_km"]))
-        near = [f"{c.get('id')} {str(c.get('class') or c.get('name') or '').split(' (')[0]} {_km(c.get('range_km'))} (hull {_pct(c.get('hull_pct'))})" for c in hostile[:4]]
+        near = [f"{c.get('id')} {str(c.get('class') or c.get('name') or '').split(' (')[0]} {_km(c.get('range_km'))} (hull {_pct(c.get('hull_pct'))}"
+                + (f"; seen aboard: {seen}" if (seen := seen_line(c.get("seen_aboard"))) else "") + ")" for c in hostile[:4]]
         inside = [str(c.get("id")) for c in hostile if float(c["range_km"]) <= LASER_KM]
         out.append(" Hostile ships nearest the Aquila: " + "; ".join(near)
                    + (f" — inside laser reach ({LASER_KM:g} km) of her: {', '.join(inside)}" if inside else ""))
@@ -397,7 +516,8 @@ def picture(side: str, kind: str, group: str, view: dict[str, Any], state: dict[
     if side == "mandate":
         extra, ew = mandate_extras(view)
         text = (f"YOUR GROUPS\n{render_groups(view, only=only, ew_by_id=ew)}\nENEMY GROUPS (ASTRA, as your sensors hold them)\n{render_enemy(view)}")
-        return text + (f"\nYOUR FLEET OPERATIONS\n{extra}" if kind == "admiral" else "")
+        boats = render_boarding(view)
+        return text + (f"\nYOUR FLEET OPERATIONS\n{extra}" if kind == "admiral" else "") + (f"\nYOUR BOARDING BOATS (the `board` tool)\n{boats}" if boats else "")
     text = f"YOUR GROUPS\n{render_groups(view, only=only)}\nENEMY GROUPS (as the fleet's sensors hold them)\n{render_enemy(view)}"
     ex = render_astra_extras(state, seen, now)
     return text + (f"\nTHE AQUILA AND THE SHIPS ABOUT\n{ex}" if ex else "")
@@ -420,7 +540,11 @@ def view_digest(view: dict[str, Any]) -> tuple:
     own = tuple((g.get("name"), g.get("order_in_force"), g.get("state"), tuple(b(m.get("hull_pct"), 20) for m in g.get("members") or ()))
                 for g in view.get("your_groups") or [])
     foe = tuple((len(g.get("ships") or ()), b(g.get("range_km"), 4)) for g in view.get("enemy_groups") or [])
-    return own, foe
+    # the boats: a ship a boat could dock at now, a carrier's skiffs free, a boat's state (a boarding chance, or an assault in motion, is something to think about)
+    bd = view.get("boarding") if isinstance(view.get("boarding"), dict) else {}
+    boats = (tuple(str(x.get("id")) for x in bd.get("boardable_now") or ()), tuple((str(c.get("id")), c.get("boats_free")) for c in bd.get("carriers") or ()),
+             tuple(str(x.get("state")) for x in (bd.get("assault") or {}).get("boats") or ()))
+    return own, foe, boats
 
 
 # ------------------------------------------------------------------------------------------------ the prompts
@@ -471,6 +595,15 @@ _DOCTRINE_TAIL = """- Concentrate fire: shots spread over several ships lose one
 - A flank sends one or two agile ships to the enemy's beam; the whole enemy line then fires on them. It pays with clear superiority, or as bait;
   against equals it costs ships. `screen` rings a friend (the Aquila) with the group's ships on the enemy's side; `pin` holds the enemy at long range
   without closing; `reinforce` sends the group to another; `regroup` stops and reforms; `hold` keeps the position.
+- Ships have insides. Under one of your own ships a line `aboard` is her captain's report of it: the hands fit, wounded and lost; who has the conn when
+  the captain is down; what burns and what vents; the rooms with no power; how much of the guns' and of the drive's power is left; the damage parties
+  and what is on their hands. A ship whose crew is half gone, whose guns are down to a third, or whose magazine is on fire cannot fight as her hull
+  says: save her, or take her out of the line; one that burns in a corner while her parties are on it is not in danger yet. If the report of the ship
+  you command says her captain is dead or down, the officer it names has the conn: from then on that officer decides for her, and a ship's change of
+  hands is worth one line to whoever is above you. The enemy's inside you
+  read only from outside (`seen aboard`): atmosphere venting from a breach, windows gone dark, hot spots, life signs, the power the emissions give
+  away. A ship with half her hull left and her windows dark and her life signs falling is crippled, and a target to finish; a ship that shows nothing
+  is as sound as she looks.
 - An order stands until you change it or its time runs out; do not repeat an order that already stands (the picture shows `order in force`).
   Change the plan when the battle gives a reason: a target crippled or about to fall, a group's morale breaking, a ship or a group lost, a new
   enemy on the plot, the order run out, the balance of strength moved, the enemy breaking off. Otherwise keep what works.
@@ -488,6 +621,15 @@ def doctrine(formation: bool = False) -> str:
 
 DOCTRINE = doctrine()
 
+MANDATE_BOARDING = """Boarding (`board`, when your picture lists boats): the Mandate takes ships by boarding, and your carriers carry assault skiffs for it (an Acheron four, a Styx two, a Lethe one;
+ten boarders in each). A skiff crosses to the target, latches to a hatch on her skin and the boarders cut in and fight their way to the objective you name: engineering (her reactor: the ship dies or
+is taken), the bridge, the commander's suite, the armoury. The world is not kind to boats: a skiff is shot at by the target's point defence and by her fighters on the way in (about one in three gets
+through a battleship's four channels; fighters flying cover kill them all), and it cannot dock through a shield that holds on the face it comes to (it waits off the hull twenty seconds and turns back).
+So you board what cannot stop the boats: a ship with no power, a ship whose shield is down on a face and whose point defence your skiffs outnumber (three or four at once, not one), a ship that has
+struck. The Aquila carries eighty marines who arm in half a minute and meet the boarders at the corridors to her engineering: a handful of skiffs against her is a raid that costs men and buys a
+fright, or the end of her if her marines are asleep or elsewhere; against a hulk it is a prize. `call_off` brings the boats home. One assault at a time; the picture says where each boat is and how the
+fight aboard goes."""
+
 MANDATE_ADMIRAL = """You are {name}, {rank} of the Kharon Mandate, aboard {ship}, commanding the Mandate's forces in {where}. {bio}
 {mission}
 
@@ -502,6 +644,8 @@ lasers at 4 km: a battered group is a kill if you close) and the information war
 {commands}
 Your group commanders are the leaders of the other groups: they think about their own group inside your intent, and `report` to you. Your orders
 carry a `reason`: your subordinates read it as your intent.
+
+{boarding}
 Each time you are called you read the picture, think (at most four short sentences: what it means, what you will do, why), and then act with the
 tools: orders, or `no_change`. Always end with a tool call. A word is spoken only on the open channel (below); orders and datalink are silent."""
 
@@ -518,7 +662,9 @@ MANDATE_COMMANDER = """You are {name}, {rank} of the Kharon Mandate, aboard {shi
 You think when something concerns your group: a loss, your morale breaking, your order run out, a new enemy near, a word from the admiral. If you
 cannot do what the admiral wants, or you see what they do not, `report` it (urgent only if they must decide now). Otherwise act for your group
 or call `no_change`. A report is two sentences at most. Your orders carry a `reason`. Think briefly (at most four short sentences), then act with
-the tools; always end with a tool call."""
+the tools; always end with a tool call.
+
+{boarding}"""
 
 ASTRA_COMMANDER = """You are {name} of the ASTRA Navy, commanding {ship}. {bio}
 You command {group}: {ships}. You are an officer of the 7th Fleet defending {where}, and you fight beside the ASN Aquila, the first of her class,
@@ -572,7 +718,7 @@ def system_prompt(seat: "Seat", cmd: "Commander", where: str, mission: str, chai
                   channel_open: bool = False, ops: bool = True, formation: bool = False) -> str:
     if seat.kind == "admiral" and seat.side == "mandate":
         s = MANDATE_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, where=where, bio=cmd.bio, mission=mission, doctrine=doctrine(formation),
-                                   commands=COMMANDS_OPS if ops else COMMANDS_PLAIN)
+                                   commands=COMMANDS_OPS if ops else COMMANDS_PLAIN, boarding=MANDATE_BOARDING)
         if channel_open:
             s += ("\n\nA channel with the ASTRA captain is OPEN: they hear what you `transmit`. Silence is the usual: speak only when the picture "
                   "changed what you would say to them (a demand, a warning, an answer); one to three short sentences, formal military radio, cold "
@@ -582,7 +728,7 @@ def system_prompt(seat: "Seat", cmd: "Commander", where: str, mission: str, chai
         return ASTRA_BENCH_ADMIRAL.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, doctrine=doctrine(formation))
     if seat.side == "mandate":
         return MANDATE_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, mission=mission, doctrine=doctrine(formation), where=where,
-                                        group=seat.group, admiral_name=admiral_name or "the admiral")
+                                        group=seat.group, admiral_name=admiral_name or "the admiral", boarding=MANDATE_BOARDING)
     return ASTRA_COMMANDER.format(name=cmd.name, rank=cmd.rank, ship=cmd.ship, bio=cmd.bio, group=seat.group, ships=ships, where=where, mission=mission,
                                   world=WORLD, doctrine=doctrine(formation), chain=chain, voices=voices)
 
@@ -680,7 +826,8 @@ class WarMinds:
                  channel: Callable[[str], bool] = lambda c: False, register_voice: Callable[[str, str, str], None] | None = None,
                  transmit: SayFn | None = None, intel: Callable[[], str] = lambda: "", sides: tuple[str, ...] = ("mandate", "astra"), astra_admiral: bool = False,
                  ops: bool = True, where: Callable[[dict[str, Any]], str] | None = None, note: Callable[[str], None] | None = None,
-                 trace: Callable[[dict[str, Any]], None] | None = None) -> None:
+                 trace: Callable[[dict[str, Any]], None] | None = None,
+                 captain: Callable[[str, str, str], Awaitable[Any]] | None = None) -> None:
         self.llm = llm
         self.say = say
         self.transmit = transmit or say
@@ -697,9 +844,11 @@ class WarMinds:
         self.where = where or (lambda st: _place(st))
         self.note_story = note or (lambda text: None)    # the campaign log of the story (director.note)
         self.trace = trace                               # the bench keeps every pulse with its prompts
+        self.captain = captain                           # (ship, rank, name): the game's interior of that ship takes the persona as her captain (FLOTTA-VIVA)
         self.waiting: Callable[[], list[tuple[str, str, str]]] = lambda: []   # the Aquila's speech backlog (speech.Voice.waiting, set by the server)
         self.minds: dict[str, Mind] = {}
         self.allies: dict[str, Commander] = {}           # ASTRA captains by ship contact id
+        self.told_captains: dict[str, str] = {}          # contact -> the captain's name the game's interior of that ship was given (FLOTTA-VIVA)
         self.pool_used = 0
         self.logs: dict[str, deque[tuple[float, str]]] = {"mandate": deque(maxlen=LOG_KEEP), "astra": deque(maxlen=LOG_KEEP)}
         self.pulses: list[dict[str, Any]] = []           # one record per pulse (the bench's costs and latencies)
@@ -720,6 +869,7 @@ class WarMinds:
         for side in self.logs:
             self.logs[side].clear()
         self.allies = {c: p for c, p in self.allies.items() if c in ALLIES_FIXED}
+        self.told_captains.clear()
         self.pool_used = 0
         self.admiral_contact.clear()
         self.pulses.clear()
@@ -739,20 +889,45 @@ class WarMinds:
         """Who commands the ship `contact` (a Mandate captain from enemy.py; an ASTRA captain registered, fixed or drawn from the pool)."""
         if side == "mandate":
             p = self.mandate_persona(contact) or {}
-            return Commander(key=p.get("key", "cmdr_" + re.sub(r"\W", "", contact.lower())), contact=contact,
-                             name=p.get("name", f"the commander of {contact}"), rank=p.get("rank", "Ferryman (ship captain)"),
-                             ship=p.get("ship", "a Mandate warship"), bio=p.get("bio", "A hard, tired officer of the Outer Worlds."),
-                             voice=p.get("voice", "stuart_bell"), side="mandate", mission=p.get("mission", ""))
+            c = Commander(key=p.get("key", "cmdr_" + re.sub(r"\W", "", contact.lower())), contact=contact,
+                          name=p.get("name", f"the commander of {contact}"), rank=p.get("rank", "Ferryman (ship captain)"),
+                          ship=p.get("ship", "a Mandate warship"), bio=p.get("bio", "A hard, tired officer of the Outer Worlds."),
+                          voice=p.get("voice", "stuart_bell"), side="mandate", mission=p.get("mission", ""))
+            if p.get("name"):
+                self._tell_captain(c)                               # (a captain without a persona keeps the name the game's interior gave him)
+            return c
         if contact in self.allies:
             return self.allies[contact]
         fixed = ALLIES.get(contact)
         if fixed is not None:
-            return self.register_ally(contact, fixed)
+            return self._tell_captain(self.register_ally(contact, fixed))
         p = dict(ALLY_POOL[self.pool_used % len(ALLY_POOL)])         # a ship the story has not named a captain for: one from the pool
         self.pool_used += 1
         p["ship"] = f"the {cls or 'warship'} {contact}"
         p["key"] = "ally_" + re.sub(r"\W", "", contact.lower())
-        return self.register_ally(contact, p)
+        return self._tell_captain(self.register_ally(contact, p))
+
+    def _tell_captain(self, c: Commander) -> Commander:
+        """The game's interior of that ship (FLOTTA-VIVA: her officers, who is wounded, who has the conn) takes its captain from the persona who speaks
+        for her, so that "her captain is dead" is about the same person; once per ship and name."""
+        if self.captain is None or not c.contact or self.told_captains.get(c.contact) == c.name:
+            return c
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return c                                                # (no game loop: nobody to tell)
+        self.told_captains[c.contact] = c.name
+        rank = re.sub(r"\s*\(.*\)\s*$", "", c.rank) or c.rank            # "Ferryman (ship captain)" -> "Ferryman"
+        name = c.name[len(rank) + 1:] if c.name.startswith(rank + " ") else c.name   # "Captain Rhea Castellan" -> "Rhea Castellan"
+        tell = self.captain
+
+        async def told() -> None:
+            try:
+                await tell(c.contact, rank, name)
+            except Exception:  # noqa: BLE001
+                log.exception("war minds: could not give %s her captain", c.contact)
+        asyncio.ensure_future(told())
+        return c
 
     # ------------------------------------------------------------------------------------------------ the log (a side's memory of orders, words and news)
     def journal(self, side: str, who: str, text: str) -> None:
@@ -1157,12 +1332,13 @@ class WarMinds:
                 f"You are looking now because: {'; '.join(why)}. The Captain's language is {LANG_NAMES.get(lang, lang)} (what you say aloud is in it).\n"
                 "Decide: give your orders with the tools, or call no_change.")
         tools: list[dict[str, Any]] = []
+        boats = side == "mandate" and bool(render_boarding(view))             # (boats to send, or an assault to follow: else the tool is not on the list)
         if seat.kind == "admiral":
-            tools = [group_order_tool("admiral")] + ([FLEET_OPS, DECIDE] if side == "mandate" and self.ops else []) + [NO_CHANGE]
+            tools = [group_order_tool("admiral")] + ([FLEET_OPS, DECIDE] if side == "mandate" and self.ops else []) + ([BOARD] if boats else []) + [NO_CHANGE]
             if channel_open:
                 tools.append(TRANSMIT)
         elif side == "mandate":
-            tools = [group_order_tool("commander"), REPORT, NO_CHANGE]
+            tools = [group_order_tool("commander"), REPORT] + ([BOARD] if boats else []) + [NO_CHANGE]
         else:
             tools = [group_order_tool("commander"), say_tool(speakers, LANG_NAMES.get(lang, lang)), POSTURE, NO_CHANGE]
         return system, user, tools
@@ -1301,7 +1477,7 @@ class WarMinds:
         async def on_call(call: ToolCall) -> None:
             a = call.arguments() or {}
             rec["tools"].append("again:" + call.name + (f":{a.get('order')}" if call.name == "group_order" else ""))
-            if call.name in ("group_order", "fleet_ops", "decide", "weapons_posture"):
+            if call.name in ("group_order", "fleet_ops", "decide", "weapons_posture", "board"):
                 pending.append((call.name, a, asyncio.ensure_future(self._tool(mind, call.name, a))))
 
         comp = await models.chat(self.llm, mind.seat.role, messages=msgs, tools=[t for t in tools if t["function"]["name"] != "say"], tool_choice="auto",
@@ -1346,6 +1522,8 @@ class WarMinds:
             return f"decided: {a.get('order')}"
         if name == "weapons_posture":
             return f"posture: {a.get('posture')}"
+        if name == "board":
+            return "called the boats off" if str(a.get("action") or "").lower() == "call_off" else f"boarding {a.get('target')} with {a.get('boats') or 'the free'} skiff(s) from {a.get('carrier') or 'the best carrier'}"
         return name
 
     async def _tool(self, mind: Mind, name: str, a: dict[str, Any]) -> dict[str, Any]:
@@ -1371,6 +1549,24 @@ class WarMinds:
                                           cmd.key)
             if name == "weapons_posture":
                 return await self._posture(mind, str(a.get("posture", "")))
+            if name == "board" and seat.side == "mandate":
+                action = str(a.get("action") or "launch").lower()
+                if action == "call_off":
+                    return await self.execute("boarding", {"action": "end"}, "admiral" if seat.kind == "admiral" else "commander")
+                carrier = str(a.get("carrier") or "").strip()
+                if seat.kind == "group" and carrier and not self._is_ship_of(seat, carrier):
+                    return {"ok": False, "detail": f"{carrier} is not a ship of your group: you send the boats of {seat.group}'s ships"}
+                args = {k: v for k, v in {"direction": "in", "target": str(a.get("target") or "").strip(), "source": carrier, "craft": a.get("boats"), "face": a.get("face"),
+                                          "objective": a.get("objective"), "by": cmd.name}.items() if v not in (None, "", [])}
+                if not args.get("target"):
+                    return {"ok": False, "detail": "name the ship to board (`target`: her contact id)"}
+                if seat.kind == "group" and not carrier:
+                    # a group commander's boats are his group's: the first ship of it that has skiffs free (the picture lists the carriers)
+                    mine = [str(c.get("id")) for c in ((self._view(seat.side, self.state) or {}).get("boarding") or {}).get("carriers") or [] if self._is_ship_of(seat, c.get("id"))]
+                    if not mine:
+                        return {"ok": False, "detail": f"no ship of {seat.group} has a skiff free"}
+                    args["source"] = mine[0]
+                return await self.execute("boarding", args, "admiral" if seat.kind == "admiral" else "commander")
         except Exception as exc:  # noqa: BLE001
             log.exception("tool %s failed", name)
             return {"ok": False, "detail": f"{type(exc).__name__}: {exc}"[:160]}
