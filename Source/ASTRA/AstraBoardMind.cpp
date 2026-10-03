@@ -380,14 +380,55 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 		const FString Action = BdStr(Args, TEXT("action")).ToLower();
 		if (Action == TEXT("end") || Action == TEXT("stop") || Action == TEXT("cancel"))
 		{
-			if (Phase != EPhase::Active)
+			if (Phase != EPhase::Active && !Assault.bOn)
 			{
 				OutDetail = TEXT("no boarding is on");
 				return false;
 			}
 			EndBoarding(TEXT("ordered"));
-			OutDetail = TEXT("the boarding is called off");
+			OutDetail = TEXT("the boarding is called off: the boats turn back or let go");
 			return true;
+		}
+		// with a direction (and not `instant`) the boats fly it: in (the Aquila, or a ship of hers, is boarded) or out (her marines board a ship); without one it is the old boarding that
+		// is simply there (the boarders cut in after the warning)
+		const FString Direction = BdStr(Args, TEXT("direction")).ToLower();
+		bool bInstant = false;
+		if (Args.IsValid())
+		{
+			Args->TryGetBoolField(TEXT("instant"), bInstant);
+		}
+		if (!Direction.IsEmpty() && !bInstant)
+		{
+			FAssaultSpec A;
+			A.Source = BdStr(Args, TEXT("source"));
+			A.Target = BdStr(Args, TEXT("target"));
+			if (Direction == TEXT("out") || Direction == TEXT("outbound"))
+			{
+				if (A.Source.IsEmpty())
+				{
+					A.Source = TEXT("aquila");
+				}
+			}
+			else if (Direction != TEXT("in") && Direction != TEXT("inbound"))
+			{
+				OutDetail = FString::Printf(TEXT("unknown direction '%s' (in: the Aquila or a ship of hers is boarded; out: her marines board a ship)"), *Direction);
+				return false;
+			}
+			A.Face = BdStr(Args, TEXT("face"));
+			A.Objective = BdStr(Args, TEXT("objective"));
+			A.Breach = BdStr(Args, TEXT("breach"));
+			A.Craft = FMath::Clamp((int32)BdNum(Args, TEXT("craft"), BdNum(Args, TEXT("skiffs"), 0.0)), 0, 4);
+			A.Boarders = FMath::Clamp((int32)BdNum(Args, TEXT("boarders"), 0.0), 0, 48);
+			bool bLockAssault = true, bCap = false;
+			if (Args.IsValid())
+			{
+				Args->TryGetBoolField(TEXT("lockdown"), bLockAssault);
+				Args->TryGetBoolField(TEXT("captain"), bCap);
+			}
+			A.bLockdown = bLockAssault;
+			A.bCaptain = bCap;
+			A.By = BdStr(Args, TEXT("by"));
+			return StartAssault(A, OutDetail);
 		}
 		FSpec Spec;
 		Spec.Breach = BdStr(Args, TEXT("breach"));
@@ -406,6 +447,11 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 	if (Phase != EPhase::Active)
 	{
 		OutDetail = TEXT("no boarding is on");
+		return false;
+	}
+	if (Mode == EMode::Remote && (Name == TEXT("lockdown") || !Assault.bRoster))
+	{
+		OutDetail = Name == TEXT("lockdown") ? FString(TEXT("the bulkheads of another ship are not ours to seal")) : FString(TEXT("the marines are not in this fight"));
 		return false;
 	}
 	if (Name == TEXT("lockdown"))
@@ -504,13 +550,14 @@ bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<F
 		if (Task == TEXT("hold")) { T = ETask::Hold; }
 		else if (Task == TEXT("advance") || Task == TEXT("move")) { T = ETask::Advance; }
 		else if (Task == TEXT("assault") || Task == TEXT("attack")) { T = ETask::Assault; }
-		else if (Task == TEXT("fall_back") || Task == TEXT("withdraw")) { T = ETask::FallBack; }
+		else if (Task == TEXT("fall_back")) { T = ETask::FallBack; }
+		else if (Task == TEXT("withdraw")) { T = Fight.IsAttacker(ESide::Aquila) ? ETask::Withdraw : ETask::FallBack; }       // (attacking: out by the hatch, to the boats; defending: back to a place)
 		else if (Task == TEXT("follow_captain") || Task == TEXT("follow")) { T = ETask::Follow; }
 		else if (Task == TEXT("rescue_captain") || Task == TEXT("rescue")) { T = ETask::Rescue; }
 		else if (Task == TEXT("stand_down") || Task == TEXT("free")) { bRespond = true; }
 		else
 		{
-			OutDetail = FString::Printf(TEXT("unknown task '%s' (hold, advance, assault, fall_back, follow_captain, rescue_captain, stand_down)"), *Task);
+			OutDetail = FString::Printf(TEXT("unknown task '%s' (hold, advance, assault, fall_back, withdraw, follow_captain, rescue_captain, stand_down)"), *Task);
 			return false;
 		}
 		FString Said;
@@ -611,6 +658,27 @@ namespace
 			const bool bOk = B->StartBoarding(S, D);
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("started") : TEXT("not started"), *D);
 			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 6.f, bOk ? FColor::Green : FColor::Red, D); }
+		}));
+	FAutoConsoleCommandWithWorldAndArgs BdCmdAssault(TEXT("astra.board.assault"), TEXT("Testing: boats fly a boarding. astra.board.assault in [carrier] [target] [boats 1..4] [face] [objective]  (the Mandate's skiffs board the Aquila, or the target named) | astra.board.assault out [target] [carrier] [boats] [face] [objective]  (the Aquila's marines go in Kestrels; ships by contact id or name; - for the default)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			UAstraBoardSubsystem* B = BdBoard(W);
+			if (!B || A.Num() < 1)
+			{
+				return;
+			}
+			UAstraBoardSubsystem::FAssaultSpec S;
+			const bool bOut = A[0].StartsWith(TEXT("out"));
+			(bOut ? S.Target : S.Source) = A.Num() > 1 && !A[1].Equals(TEXT("-")) ? A[1] : FString();
+			(bOut ? S.Source : S.Target) = A.Num() > 2 && !A[2].Equals(TEXT("-")) ? A[2] : FString();
+			S.Craft = A.Num() > 3 ? FCString::Atoi(*A[3]) : 0;
+			S.Face = A.Num() > 4 && !A[4].Equals(TEXT("-")) ? A[4] : FString();
+			S.Objective = A.Num() > 5 ? A[5] : FString();
+			S.By = TEXT("the console");
+			FString D;
+			const bool bOk = B->StartAssault(S, D);
+			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("assault ordered") : TEXT("assault refused"), *D);
+			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 8.f, bOk ? FColor::Green : FColor::Red, D); }
 		}));
 	FAutoConsoleCommandWithWorld BdCmdEnd(TEXT("astra.board.end"), TEXT("Testing: calls the boarding off (bulkheads open, marines back to duty)"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraBoardSubsystem* B = BdBoard(W)) { B->EndBoarding(TEXT("console")); } }));

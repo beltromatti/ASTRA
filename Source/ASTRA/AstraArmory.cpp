@@ -8,12 +8,15 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
 #include "HAL/IConsoleManager.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Misc/App.h"
 
 namespace
 {
@@ -100,14 +103,59 @@ void AAstraArmoryRack::BeginPlay()
 	}
 	else if (Cube)
 	{
-		// a small steel locker on the wall (the actor stands on the floor under it, its front along +X): a body with an inner back, the door swung wide, a hook bar and the sidearm hanging
-		// on it; a green lamp over the door says it is the Captain's
+		// a small steel locker on the wall (the actor stands on the floor under it, its front along +X): a body with a bezel, an inner back, the door swung wide on two hinges with a pull, a hook bar
+		// and the sidearm hanging on it; over it a plate with its name and a lamp (green: the sidearm is there; amber: the hook is empty), under the mouth a vent
+		UMaterialInterface* Grate = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/Instances/MI_ASTRA_Grate.MI_ASTRA_Grate"));
+		UMaterialInterface* Accent = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/Instances/MI_ASTRA_Accent.MI_ASTRA_Accent"));
 		Piece(FVector(-9, 0, 144), FVector(18, 40, 80), Steel);                                   // the cabinet (40 cm wide: it stands in a 66 cm stretch of wall)
 		Frame = Piece(FVector(-0.5, 0, 144), FVector(1.2, 34, 74), Trim);                         // its inner back (inside the mouth)
 		Piece(FVector(3.0, 0, 119), FVector(5, 32, 3), Steel);                                   // the shelf under the weapon
 		Piece(FVector(1.5, 0, 168), FVector(3, 30, 3), Steel);                                   // the hook bar
-		Piece(FVector(14.7, -16.9, 144), FVector(1.8, 30, 74), Steel, FRotator(0.f, -78.f, 0.f)); // the door, open on its hinge at the left
-		Piece(FVector(3.0, 0, 188), FVector(2, 14, 1.4), Trim);                                  // the lamp's plate
+		Piece(FVector(0.9, 0, 184.6), FVector(1.8, 43, 1.6), Trim);                              // the bezel: top, bottom and the two sides
+		Piece(FVector(0.9, 0, 103.6), FVector(1.8, 43, 1.6), Trim);
+		Piece(FVector(0.9, -20.8, 144), FVector(1.8, 1.6, 83), Trim);
+		Piece(FVector(0.9, 20.8, 144), FVector(1.8, 1.6, 83), Trim);
+		Piece(FVector(0.3, 0, 106.2), FVector(0.8, 30, 2.4), Grate);                             // the vent in the bezel's foot
+		Piece(FVector(1.2, -20.9, 166), FVector(2.4, 2.2, 8), Steel);                            // the two hinges
+		Piece(FVector(1.2, -20.9, 122), FVector(2.4, 2.2, 8), Steel);
+		const FTransform DoorXf(FRotator(0.f, -78.f, 0.f), FVector(14.7, -16.9, 144));
+		Piece(DoorXf.GetLocation(), FVector(1.8, 30, 74), Steel, DoorXf.Rotator());              // the door, open on its hinge at the left
+		Piece(DoorXf.TransformPosition(FVector(1.8, 11.0, 0.0)), FVector(2.4, 1.4, 16), Trim, DoorXf.Rotator());      // its pull, on the outer face
+		Piece(DoorXf.TransformPosition(FVector(-1.1, 0.0, 6.0)), FVector(0.5, 22, 30), Trim, DoorXf.Rotator());      // and on the inner face the card of what the locker holds
+		Piece(FVector(0.8, 0, 191.8), FVector(1.6, 40, 9.6), Trim);                              // the name plate over the mouth
+		Piece(FVector(1.0, 0, 185.9), FVector(0.6, 38, 0.8), Accent ? Accent : Trim);            // and its stripe along the bezel
+		UStaticMeshComponent* Led = Piece(FVector(1.5, 15.2, 191.8), FVector(0.8, 3.4, 3.4), nullptr);
+		if (UMaterialInterface* Glow = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_FX_Glow.M_FX_Glow")))
+		{
+			LedMat = UMaterialInstanceDynamic::Create(Glow, this);
+			Led->SetMaterial(0, LedMat);
+		}
+		if (FApp::CanEverRender())
+		{
+			if (UMaterialInterface* TextMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_HoloText.M_ASTRA_HoloText"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			{
+				UMaterialInstanceDynamic* TextMid = UMaterialInstanceDynamic::Create(TextMat, this);
+				if (TextMid)
+				{
+					TextMid->SetScalarParameterValue(TEXT("Intensity"), 4.f);
+				}
+				UTextRenderComponent* T = NewObject<UTextRenderComponent>(this, TEXT("Label"));
+				T->SetupAttachment(GetRootComponent());
+				T->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				T->SetCastShadow(false);
+				if (TextMid)
+				{
+					T->SetTextMaterial(TextMid);
+				}
+				T->SetHorizontalAlignment(EHTA_Center);
+				T->SetVerticalAlignment(EVRTA_TextCenter);
+				T->SetWorldSize(3.6f);
+				T->SetTextRenderColor(FColor(200, 226, 255));
+				T->SetText(FText::FromString(TEXT("SIDEARM")));
+				T->SetRelativeLocation(FVector(1.7, -2.5, 191.8));
+				T->RegisterComponent();
+			}
+		}
 		if (UStaticMesh* PM = LoadObject<UStaticMesh>(nullptr, P.MeshPath))
 		{
 			Pistol = NewObject<UStaticMeshComponent>(this);
@@ -126,6 +174,11 @@ void AAstraArmoryRack::Show(bool bRifleThere, bool bPistolThere)
 {
 	bShowRifle = bRifleThere;
 	bShowPistol = bPistolThere;
+	if (LedMat)
+	{
+		LedMat->SetVectorParameterValue(TEXT("Color"), bPistolThere ? FLinearColor(0.1f, 1.f, 0.25f) : FLinearColor(1.f, 0.55f, 0.08f));
+		LedMat->SetScalarParameterValue(TEXT("Intensity"), 22.f);
+	}
 	if (Rifle)
 	{
 		Rifle->SetVisibility(bRifleThere, true);

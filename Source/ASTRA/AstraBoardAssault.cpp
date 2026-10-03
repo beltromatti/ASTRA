@@ -41,11 +41,6 @@ namespace
 		return Names[FMath::Clamp(F, 0, 5)];
 	}
 
-	FString AsSideName(int32 S)
-	{
-		return S == 0 ? FString(TEXT("ASTRA")) : (S == 1 ? FString(TEXT("the Mandate")) : FString(TEXT("neutral")));
-	}
-
 	/** "port" from a hatch's outward normal in the target's frame. */
 	FString AsFaceOfNormal(const FVector& N)
 	{
@@ -519,6 +514,7 @@ bool UAstraBoardSubsystem::StartAssault(const FAssaultSpec& Spec, FString& OutDe
 	}
 	A.PlanKey = Class.ToString();
 	A.bPlanWait = true;
+	A.PlanSinceS = FPlatformTime::Seconds();
 	A.PlanFuture = Async(EAsyncExecution::ThreadPool, [Class]() -> TSharedPtr<FBoardShipPlan>
 	{
 		FString W;
@@ -660,6 +656,7 @@ bool UAstraBoardSubsystem::LaunchAssault(FString& OutDetail)
 	}
 	Assault.Legs.SetNum(FMath::Min(Assault.Legs.Num(), R.Craft));
 	Assault.EtaS = R.EtaS;
+	Assault.LaunchT = Assault.T;
 	Assault.bLaunched = true;
 	// the marines who go leave the ship's life (they are in the boats)
 	if (Assault.bRoster)
@@ -751,7 +748,7 @@ void UAstraBoardSubsystem::TickAssault(float Dt)
 	{
 		if (!Assault.PlanFuture.IsReady())
 		{
-			if (Assault.T > 40.f)
+			if (FPlatformTime::Seconds() - Assault.PlanSinceS > 40.0)
 			{
 				Tell(FString::Printf(TEXT("the boarding of %s could not be set up: her decks could not be read in time"), *Assault.TargetName), false);
 				CloseAssault(TEXT("plan too slow"));
@@ -790,7 +787,7 @@ void UAstraBoardSubsystem::TickAssault(float Dt)
 		return;
 	}
 	// a launch the battle never made
-	if (Assault.T > AsLaunchLimitS)
+	if (Assault.T - Assault.LaunchT > AsLaunchLimitS)
 	{
 		bool bAny = false;
 		for (const FLeg& L : Assault.Legs) { bAny |= L.State != FLeg::EState::Ordered; }
@@ -893,6 +890,10 @@ void UAstraBoardSubsystem::OnCraftEvent(const AstraBoardCraft::FCraftEvent& E)
 				// another fight holds the scene (the Mandate are on the Aquila's decks): the marines wait in their boat at the hatch
 				Tell(FString::Printf(TEXT("%s is latched to %s but the fight on the Aquila's decks comes first: the marines wait in their boat"), *L->CraftName, *Assault.TargetName), false);
 				break;
+			}
+			if (Assault.bSceneBegun && Phase != EPhase::Active)
+			{
+				break;                                   // (the fight is over: the boat only waits to be told to let go)
 			}
 			if (!Assault.bSceneBegun && !BeginRemoteScene())
 			{
@@ -1376,15 +1377,15 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx)
 {
 	TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
 	const UAstraBattleSubsystem* B = Battle();
-	if (!B)
+	if (!B || Assault.bOn)
 	{
 		return J;
 	}
 	TArray<FShipFacts> All;
 	B->ListShipFacts(All);
-	TArray<TSharedPtr<FJsonValue>> Carriers, Targets;
-	// the side's carriers with a boat free, and what each enemy ship would meet
-	TArray<const FShipFacts*> Mine;
+	// the side's carriers with a boat free
+	TArray<TSharedPtr<FJsonValue>> Carriers;
+	int32 First = INDEX_NONE;
 	for (const FShipFacts& F : All)
 	{
 		if (F.Side != SideIdx || F.bDisabled)
@@ -1392,29 +1393,29 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx)
 			continue;
 		}
 		FAssess A;
-		if (!B->AssessBoarding(F.Id, F.Id, A) || A.BerthsTotal <= 0)
+		if (!B->AssessBoarding(F.Id, F.Id, A) || !A.bCarrierOk || A.BerthsFree <= 0)
 		{
 			continue;                                    // (a carrier's own boats do not depend on the target)
 		}
 		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 		O->SetStringField(TEXT("ship"), AsShipLabel(F));
-		O->SetStringField(TEXT("id"), F.ContactId);
+		O->SetStringField(TEXT("id"), F.bPlayer ? FString(TEXT("aquila")) : F.ContactId);
 		O->SetStringField(TEXT("boat"), A.KindKey);
 		O->SetNumberField(TEXT("boats_free"), A.BerthsFree);
-		O->SetNumberField(TEXT("boats_in_all"), A.BerthsTotal);
 		O->SetNumberField(TEXT("men_per_boat"), A.MenPerCraft);
-		if (!A.bCarrierOk)
-		{
-			O->SetStringField(TEXT("cannot_launch_because"), A.CarrierWhy);
-		}
 		Carriers.Add(MakeShared<FJsonValueObject>(O));
-		Mine.Add(&F);
+		if (First == INDEX_NONE || F.bPlayer)
+		{
+			First = F.Id;
+		}
 	}
-	J->SetArrayField(TEXT("carriers"), Carriers);
-	if (Mine.IsEmpty())
+	if (Carriers.IsEmpty())
 	{
 		return J;
 	}
+	// the enemy ships a boat could dock at now: no power, or a face whose shield is down (the others are only counted: nobody docks through a shield)
+	TArray<TSharedPtr<FJsonValue>> Targets;
+	int32 Shielded = 0;
 	for (const FShipFacts& T : All)
 	{
 		if (T.Side == SideIdx || T.Side == 2 || !T.bHasModel)
@@ -1422,31 +1423,48 @@ TSharedRef<FJsonObject> UAstraBoardSubsystem::BoardingOptionsJson(int32 SideIdx)
 			continue;
 		}
 		FAssess A;
-		if (!B->AssessBoarding(Mine[0]->Id, T.Id, A) || !A.bTargetOk)
+		if (!B->AssessBoarding(First, T.Id, A) || !A.bTargetOk)
+		{
+			continue;
+		}
+		TArray<FString> Open;
+		for (int32 f = 0; f < 6; ++f)
+		{
+			if (A.bTargetDisabled || A.ShieldFrac[f] <= AstraBoardCraft::ShieldDownFrac)
+			{
+				Open.Add(AsFaceName(f));
+			}
+		}
+		if (Open.IsEmpty())
+		{
+			++Shielded;
+			continue;
+		}
+		if (Targets.Num() >= 5)
 		{
 			continue;
 		}
 		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 		O->SetStringField(TEXT("ship"), AsShipLabel(T));
-		O->SetStringField(TEXT("id"), T.ContactId);
+		O->SetStringField(TEXT("id"), T.bPlayer ? FString(TEXT("aquila")) : T.ContactId);
 		O->SetStringField(TEXT("class"), T.ClassText);
 		O->SetBoolField(TEXT("no_power"), A.bTargetDisabled);
+		O->SetStringField(TEXT("faces_open"), A.bTargetDisabled ? FString(TEXT("all (no power)")) : FString::Join(Open, TEXT(", ")));
 		O->SetNumberField(TEXT("hull_pct"), FMath::RoundToInt(A.HullFrac * 100.f));
 		O->SetNumberField(TEXT("point_defence_channels"), A.PdChannels);
-		O->SetNumberField(TEXT("distance_km"), FMath::RoundToInt(A.DistKm * 10.f) / 10.0);
 		O->SetNumberField(TEXT("her_craft_about_her"), A.EnemyCraftNear);
-		FString Shields;
-		for (int32 f = 0; f < 6; ++f)
-		{
-			Shields += FString::Printf(TEXT("%s%s %.0f%%"), f ? TEXT(", ") : TEXT(""), AsFaceName(f), A.ShieldFrac[f] * 100.f);
-		}
-		O->SetStringField(TEXT("shield_by_face"), A.bTargetDisabled ? FString(TEXT("none: she has no power")) : Shields);
+		O->SetNumberField(TEXT("distance_km"), FMath::RoundToInt(A.DistKm * 10.f) / 10.0);
 		Targets.Add(MakeShared<FJsonValueObject>(O));
-		if (Targets.Num() >= 8)
-		{
-			break;
-		}
 	}
-	J->SetArrayField(TEXT("targets"), Targets);
+	if (Targets.IsEmpty())
+	{
+		return J;                                        // nothing to board now: nothing is said (the tokens are the war's)
+	}
+	J->SetArrayField(TEXT("carriers"), Carriers);
+	J->SetArrayField(TEXT("boardable_now"), Targets);
+	if (Shielded > 0)
+	{
+		J->SetNumberField(TEXT("other_enemy_ships_shielded"), Shielded);
+	}
 	return J;
 }

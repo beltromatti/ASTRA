@@ -248,6 +248,7 @@ private:
 		bool bCaptain = false;
 		TArray<FLeg> Legs;
 		float T = 0.f;                               // seconds since the order
+		float LaunchT = 0.f;                         // ... when the battle was given the boats
 		float EtaS = 0.f;                            // the first boat's flight, as the battle gave it
 		bool bLaunched = false;                      // the battle has the boats
 		bool bSceneBegun = false;
@@ -257,6 +258,7 @@ private:
 		FString PlanKey;
 		TFuture<TSharedPtr<FBoardShipPlan>> PlanFuture;   // the target's plan is being read before the boats go
 		bool bPlanWait = false;
+		double PlanSinceS = 0.0;                     // (the wall clock when the reading began: a bench runs the game's clock a thousand times too fast for it)
 		FAssaultSpec Spec;
 		FString PlanWhy;
 	};

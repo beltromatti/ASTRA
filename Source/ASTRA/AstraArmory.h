@@ -10,6 +10,7 @@
 #include "GameFramework/Actor.h"
 #include "AstraArmory.generated.h"
 
+class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 
 UCLASS()
@@ -40,6 +41,7 @@ private:
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Rifle;
 	UPROPERTY() TObjectPtr<UStaticMeshComponent> Pistol;
 	UPROPERTY() TArray<TObjectPtr<UStaticMeshComponent>> Parts;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> LedMat;     // the locker's lamp: green while the sidearm hangs there, amber when the hook is empty
 	EKind Kind = EKind::Rack;
 	FName PostId;                            // NAME_None: a rack of the level's, which gives and takes the whole kit
 	bool bShowRifle = true, bShowPistol = true;

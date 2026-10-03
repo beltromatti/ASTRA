@@ -578,12 +578,8 @@ void UAstraBoardSubsystem::Finish(const TCHAR* Why)
 	// the Captain is whole again for the next one (the wound he carried is the damage model's; the weapon's screen has nothing to say)
 	CapHp = FMath::Max(CapHp, 35.f);
 	Phase = EPhase::Over;
-	AfterEnd = 0.f;
-	if (Assault.bOn)
-	{
-		EndAssaultFight(Why);                                // the boats that are latched let go, the ones that fly turn back
-	}
-	}
+	AfterEnd = 0.f;                                          // (the boats of an assault are told to let go by the next step of TickAssault: it sees the fight is over)
+}
 
 void UAstraBoardSubsystem::ClearBodies()
 {
