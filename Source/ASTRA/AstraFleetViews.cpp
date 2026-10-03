@@ -85,6 +85,59 @@ void FAstraShipInterior::FillView(FAstraFleetView& Out, int32 Detail) const
 	}
 }
 
+void FAstraShipInterior::Snapshot(FFleetSnapshot& Out) const
+{
+	Out = FFleetSnapshot();
+	const FAstraDamageMap& M = *Plan->Map;
+	for (const auto& KV : Model.States())
+	{
+		const FAstraDmgState& S = KV.Value;
+		FFleetSnapshot::FRoom R;
+		R.Comp = KV.Key;
+		R.Air = S.Air;
+		R.Hole = S.Hole;
+		R.Fire = S.Fire;
+		R.Smoke = S.Smoke;
+		R.Heat = S.Heat;
+		R.Power = S.Power;
+		R.Wreck = S.Wreck;
+		R.bGutted = S.bGutted;
+		R.bLocked = S.bLocked;
+		Out.Rooms.Add(R);
+	}
+	for (const int32 D : Model.SealedDoors())
+	{
+		if (M.Doors.IsValidIndex(D))
+		{
+			Out.SealedDoors.Add(M.Doors[D].Id);
+		}
+	}
+	for (const FFleetPerson& P : People)
+	{
+		if (P.State == 2)
+		{
+			continue;
+		}
+		FFleetSnapshot::FHand H;
+		H.Comp = P.Comp;
+		H.PosCm = FVector(P.PosCm);
+		H.Role = (uint8)P.Role;
+		H.bWounded = P.State == 1;
+		if (P.Named >= 0 && Named.IsValidIndex(P.Named))
+		{
+			H.Billet = Named[P.Named].Role.ToString();
+			H.Name = FString::Printf(TEXT("%s %s"), *Named[P.Named].Rank, *Named[P.Named].Name);
+		}
+		Out.Hands.Add(H);
+	}
+	Out.Killed = Dead;
+	Out.LostWithShip = Lost;
+	if (const FFleetNamed* C = Commander())
+	{
+		Out.Command = FString::Printf(TEXT("%s %s (%s)"), *C->Rank, *C->Name, AstraFleetBilletWord(C->Role));
+	}
+}
+
 void FAstraShipInterior::FxPoints(FFleetFxPoints& Out, int32 MaxPerSection) const
 {
 	Out = FFleetFxPoints();

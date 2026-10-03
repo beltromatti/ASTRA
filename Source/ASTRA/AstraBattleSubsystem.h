@@ -1020,6 +1020,8 @@ private:
 	FAstraShipInterior* FleetEnsure(FAstraBattleShip& S);
 	void FleetOnHit(FAstraBattleShip& To, const FAstraHullHit& Hit);
 	void FleetOnGutted(FAstraBattleShip& S, int32 Section);
+	/** The inside of a ship as it stands (for a boarding: ABBORDAGGI): false when she has none (never hit through her plating, or her class has no plan). */
+	bool FleetSnapshot(int32 ShipId, struct FFleetSnapshot& Out) const;
 	/** The ship is destroyed: the people aboard are lost with her. */
 	void FleetOnDestroyed(FAstraBattleShip& S);
 	void FleetTick(FAstraBattleShip& S, float Dt);

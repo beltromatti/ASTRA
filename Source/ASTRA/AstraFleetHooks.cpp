@@ -52,6 +52,14 @@ namespace
 				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("pound"), Args));
 			}
 		}));
+	FAutoConsoleCommandWithWorldAndArgs CmdFleetSnapshot(TEXT("astra.fleet.snapshot"), TEXT("FLOTTA-VIVA: what a boarding would be given of a ship's inside, in a line of counts (astra.fleet.snapshot <contact id>)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UAstraBattleSubsystem* B = World ? World->GetSubsystem<UAstraBattleSubsystem>() : nullptr)
+			{
+				UE_LOG(LogASTRA, Display, TEXT("%s"), *B->FleetConsole(TEXT("snapshot"), Args));
+			}
+		}));
 	FAutoConsoleCommandWithWorldAndArgs CmdFleetHit(TEXT("astra.fleet.hit"), TEXT("FLOTTA-VIVA: a blow on a face of a ship, through the war's own path (astra.fleet.hit <contact id> <bow|stern|port|starboard|dorsal|ventral> [damage 120] [rail|laser|missile])"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
@@ -121,6 +129,16 @@ void UAstraBattleSubsystem::FleetOnHit(FAstraBattleShip& To, const FAstraHullHit
 	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
 	FleetMs += Ms;
 	FleetMsMax = FMath::Max(FleetMsMax, Ms);
+}
+
+bool UAstraBattleSubsystem::FleetSnapshot(int32 ShipId, FFleetSnapshot& Out) const
+{
+	if (const FAstraShipInterior* I = FleetInterior(ShipId))
+	{
+		I->Snapshot(Out);
+		return true;
+	}
+	return false;
 }
 
 void UAstraBattleSubsystem::FleetOnDestroyed(FAstraBattleShip& S)
@@ -277,9 +295,9 @@ FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FS
 		}
 		return FString::Printf(TEXT("fleet interiors (%s): %d ships have one; %d blows, %.2f ms in all (worst call %.2f ms)"), FleetOn() ? TEXT("on") : TEXT("off"), N, FleetBlows, FleetMs, FleetMsMax);
 	}
-	if (Args.Num() < 2)
+	if (Args.Num() < (What == TEXT("snapshot") ? 1 : 2))
 	{
-		return TEXT("astra.fleet.strike <contact> <room> [energy] [type] | astra.fleet.hit <contact> <face> [damage] [rail|laser|missile]");
+		return TEXT("astra.fleet.strike <contact> <room> [energy] [type] | astra.fleet.hit <contact> <face> [damage] [rail|laser|missile] | astra.fleet.pound <contact> <face> [damage] [count] [kind] | snapshot <contact>");
 	}
 	FAstraBattleShip* S = FindByContact(Args[0].ToUpper());
 	if (!S || !S->bAlive)
@@ -317,6 +335,31 @@ FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FS
 		const uint8 Type = Args.IsValidIndex(3) ? (Args[3].StartsWith(TEXT("e")) ? 1 : (Args[3].StartsWith(TEXT("x")) ? 2 : 0)) : 0;
 		I->Strike(Comp, Energy, Type, true);
 		return FString::Printf(TEXT("struck %s in %s: %s"), *S->ContactId, *M.Describe(Comp), *I->InfoText());
+	}
+	if (What == TEXT("snapshot"))
+	{
+		// what a boarding would be given of her inside (ABBORDAGGI): a line of counts
+		FFleetSnapshot Snap;
+		if (!FleetSnapshot(S->Id, Snap))
+		{
+			return FString::Printf(TEXT("%s: no inside (yet)"), *S->ContactId);
+		}
+		int32 Gutted = 0, Burning = 0, Venting = 0, Dark = 0, Locked = 0, Wounded = 0, Named = 0;
+		for (const FFleetSnapshot::FRoom& R : Snap.Rooms)
+		{
+			Gutted += R.bGutted ? 1 : 0;
+			Burning += R.Fire >= 0.10f ? 1 : 0;
+			Venting += R.Hole >= 0.12f ? 1 : 0;
+			Dark += R.Power < 0.5f ? 1 : 0;
+			Locked += R.bLocked ? 1 : 0;
+		}
+		for (const FFleetSnapshot::FHand& H : Snap.Hands)
+		{
+			Wounded += H.bWounded ? 1 : 0;
+			Named += H.Billet.IsEmpty() ? 0 : 1;
+		}
+		return FString::Printf(TEXT("%s snapshot: %d rooms not as built (%d gutted, %d burning, %d venting, %d dark, %d locked down), %d pressure bulkheads shut, %d alive (%d wounded, %d named), %d killed, %d lost with the ship; command: %s"),
+		                       *S->ContactId, Snap.Rooms.Num(), Gutted, Burning, Venting, Dark, Locked, Snap.SealedDoors.Num(), Snap.Hands.Num(), Wounded, Named, Snap.Killed, Snap.LostWithShip, Snap.Command.IsEmpty() ? TEXT("none") : *Snap.Command);
 	}
 	if (What == TEXT("hit") || What == TEXT("pound"))
 	{
@@ -376,5 +419,5 @@ FString UAstraBattleSubsystem::FleetConsole(const FString& What, const TArray<FS
 		}
 		return Text;
 	}
-	return TEXT("astra.fleet.info | strike | hit | pound");
+	return TEXT("astra.fleet.info | strike | hit | pound | snapshot");
 }

@@ -86,6 +86,32 @@ struct FAstraFleetView
 	FString Command;
 };
 
+/** What an inside is at this moment, for a boarding (ABBORDAGGI): the rooms that are not as the plan built them, the pressure bulkheads shut, and who is alive and where. A room that is not
+ *  listed is as built: full air, no fire, full power. The rooms are the plan's (the compartments of FFleetClassPlan::Map), by index. */
+struct FFleetSnapshot
+{
+	struct FRoom
+	{
+		int32 Comp = INDEX_NONE;
+		float Air = 1.f, Hole = 0.f, Fire = 0.f, Smoke = 0.f, Heat = 0.f, Power = 1.f, Wreck = 0.f;
+		bool bGutted = false, bLocked = false;
+	};
+	struct FHand
+	{
+		int32 Comp = INDEX_NONE;
+		FVector PosCm = FVector::ZeroVector;
+		uint8 Role = 0;                  // EFleetRole
+		bool bWounded = false;
+		FString Billet;                  // "captain", "chief_engineer"... for the named; empty for the rest
+		FString Name;                    // "Commander Idris Haldane" for the named
+	};
+	TArray<FRoom> Rooms;
+	TArray<FName> SealedDoors;           // the pressure bulkheads that are shut (door ids of the plan)
+	TArray<FHand> Hands;                 // the people alive (fit or wounded), where they are now
+	int32 Killed = 0, LostWithShip = 0;
+	FString Command;                     // who has the conn
+};
+
 /** Where an inside shows on the hull: the effects draw fires and streaming atmosphere there, and light the windows by what is still powered. */
 struct FFleetFxPoints
 {
@@ -159,6 +185,8 @@ public:
 	/** What an observer's sensors tell of her from outside, by how well they know her (Detail 1, 2). */
 	TSharedRef<FJsonObject> SeenJson(int32 Detail) const;
 	void FillView(FAstraFleetView& Out, int32 Detail) const;
+	/** The inside as it stands, for a boarding: the rooms that are not as built, the bulkheads shut, the people alive and where (ABBORDAGGI). */
+	void Snapshot(FFleetSnapshot& Out) const;
 	/** Where it burns and vents, by section, and how much of the ship is still lit: for the effects (a few points per section). */
 	void FxPoints(FFleetFxPoints& Out, int32 MaxPerSection = 12) const;
 	/** A line for the bench and the console. */

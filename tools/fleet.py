@@ -53,6 +53,7 @@ def cmd_trace(a: argparse.Namespace) -> None:
     for f in a.faces.split(","):
         cmds.append(f"astra.war.fleet hit TGT {f} {a.damage} {a.kind}")
     cmds.append("astra.war.fleet info TGT")
+    cmds.append("astra.war.fleet snapshot TGT")
     _, log = run_exec(cmds, 3.0, a.seed, "fleet_trace")
     lines = log_lines(log, "[Fleet]")
     print(f"== {a.cls} ({a.side}), a {a.kind} blow of {a.damage} on each of: {a.faces}")
@@ -148,8 +149,9 @@ def cmd_cost(a: argparse.Namespace) -> None:
     if rows["with"] and rows["without"]:
         w, wo = rows["with"][0], rows["without"][0]
         d_ms = w["perf"].get("ms_avg", 0) - wo["perf"].get("ms_avg", 0)
-        print(f"  the battle's tick costs {d_ms:+.3f} ms on average with the insides ({100 * d_ms / max(1e-9, wo['perf'].get('ms_avg', 1e-9)):+.0f}%): "
-              f"at 60 frames a second that is {d_ms * 60:.1f} ms of every second of play ({d_ms / 16.7 * 100:.1f}% of a 16.7 ms frame)")
+        per_s = d_ms * 10.0                                  # (the commandlet's tick is 0.1 s of battle)
+        print(f"  the battle's tick (0.1 s) costs {d_ms:+.3f} ms on average with the insides ({100 * d_ms / max(1e-9, wo['perf'].get('ms_avg', 1e-9)):+.0f}%): "
+              f"{per_s:.2f} ms of every second of battle, {per_s / 60:.3f} ms of a frame at 60 fps on average ({per_s / 1000 * 100:.2f}% of a core)")
 
 
 # ------------------------------------------------------------------------------------------------ the war with and without
