@@ -351,6 +351,10 @@ FString UAstraBoardSubsystem::InfoText() const
 
 bool UAstraBoardSubsystem::HandleCommand(const FString& Name, const TSharedPtr<FJsonObject>& Args, FString& OutDetail)
 {
+	if (Name == TEXT("issue_weapon"))
+	{
+		return IssueWeapon(BdStr(Args, TEXT("kind")), BdStr(Args, TEXT("who")), OutDetail);       // the armourer sends a weapon up to the Captain (AstraBoardArms.cpp)
+	}
 	if (Name == TEXT("boarding"))
 	{
 		const FString Action = BdStr(Args, TEXT("action")).ToLower();

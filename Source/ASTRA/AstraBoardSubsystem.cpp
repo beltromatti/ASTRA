@@ -115,6 +115,7 @@ void UAstraBoardSubsystem::TryFinishLoading()
 		return;
 	}
 	Phase = EPhase::Idle;
+	BuildArmsPosts();
 	UE_LOG(LogASTRA, Log, TEXT("[Board] ready: %d compartments, %d portals, %d corner slots"), Map->GetComps().Num(), Map->GetPortals().Num(), Map->GetSlots().Num());
 }
 
@@ -129,69 +130,6 @@ double UAstraBoardSubsystem::SinceCaptainHurt() const
 }
 
 // ================================================================================================================== the beginning
-
-void UAstraBoardSubsystem::EnsureRack(float Dt)
-{
-	RackT -= Dt;
-	if (RackT > 0.f || !Map.IsValid() || !GetWorld())
-	{
-		return;
-	}
-	RackT = 1.f;
-	const APawn* Me = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
-	if (!Me)
-	{
-		return;
-	}
-	if (ArmoryComp == INDEX_NONE)
-	{
-		for (int32 i = 0; i < Map->GetComps().Num(); ++i)
-		{
-			if (Map->GetComps()[i].Kind == TEXT("armory"))
-			{
-				ArmoryComp = i;
-				ArmoryAt = Map->CentreOf(i);
-				break;
-			}
-		}
-		if (ArmoryComp == INDEX_NONE)
-		{
-			ArmoryComp = -2;                           // the plan has no armory: not asked again
-		}
-	}
-	if (ArmoryComp < 0)
-	{
-		return;
-	}
-	const FVector P = Me->GetActorLocation();
-	const bool bNear = FVector::Dist2D(P, ArmoryAt) < 4200.0 && FMath::Abs(P.Z - ArmoryAt.Z) < 380.0;
-	if (Rack && bOwnRack)
-	{
-		if (!bNear)
-		{
-			Rack->Destroy();
-			Rack = nullptr;
-			bOwnRack = false;
-		}
-		return;
-	}
-	if (!bNear)
-	{
-		return;
-	}
-	if (TActorIterator<AAstraArmoryRack>(GetWorld()))
-	{
-		return;                                       // the level has a rack of its own (the kit's): this one is not needed
-	}
-	FActorSpawnParameters Sp;
-	Sp.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	Rack = GetWorld()->SpawnActor<AAstraArmoryRack>(ArmoryAt, FRotator::ZeroRotator, Sp);
-	bOwnRack = Rack != nullptr;
-	if (Rack)
-	{
-		UE_LOG(LogASTRA, Log, TEXT("[Board] an armory rack set up in %s"), *Map->Describe(ArmoryComp));
-	}
-}
 
 bool UAstraBoardSubsystem::PickBreach(const FString& Id, int32& OutComp, FVector& OutAt, FString& OutWhy) const
 {
@@ -774,7 +712,7 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 		TryFinishLoading();
 		return;
 	}
-	EnsureRack(DeltaTime);
+	TickArms(DeltaTime);                                     // the weapons: the posts' pictures near the Captain, the armourer's delivery (AstraBoardArms.cpp)
 	if (Phase != EPhase::Active && Phase != EPhase::Over)
 	{
 		return;

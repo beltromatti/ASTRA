@@ -114,36 +114,85 @@ void UAstraFpsComponent::EndPlay(const EEndPlayReason::Type Reason)
 
 void UAstraFpsComponent::SetKit(bool bTake)
 {
-	if (bTake == bHasKit)
-	{
-		return;
-	}
-	bHasKit = bTake;
 	if (bTake)
 	{
-		const FAstraWeaponDef& R = AstraWeapons::Get(EAstraWeapon::Rifle);
-		const FAstraWeaponDef& P = AstraWeapons::Get(EAstraWeapon::Pistol);
-		Rifle.Mag = R.Mag;
-		Rifle.Reserve = R.Mag * R.SpareMags;
-		Pistol.Mag = P.Mag;
-		Pistol.Reserve = P.Mag * P.SpareMags;
-		KeysT = FpsKeysShownS;
-		KeysShownAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+		if (bHasRifle && bHasPistol)
+		{
+			return;
+		}
+		GiveWeapon(EAstraWeapon::Pistol, true, false);
+		GiveWeapon(EAstraWeapon::Rifle, true, true);              // (the rifle comes up, the sidearm is the one he changes to)
 		Last = EAstraWeapon::Pistol;
-		StartDraw(EAstraWeapon::Rifle);
 	}
 	else
 	{
-		// back in the rack: the weapons are put away (their rounds stay with them)
-		if (State != EState::Holstered)
+		GiveWeapon(EAstraWeapon::Rifle, false);
+		GiveWeapon(EAstraWeapon::Pistol, false);
+	}
+}
+
+void UAstraFpsComponent::GiveWeapon(EAstraWeapon W, bool bTake, bool bDraw)
+{
+	if (W == EAstraWeapon::None)
+	{
+		return;
+	}
+	bool& bHas = W == EAstraWeapon::Rifle ? bHasRifle : bHasPistol;
+	if (bHas == bTake)
+	{
+		return;
+	}
+	bHas = bTake;
+	bHasKit = bHasRifle || bHasPistol;
+	if (bTake)
+	{
+		// from a rack or a locker a weapon comes loaded, with all its spare magazines
+		const FAstraWeaponDef& D = AstraWeapons::Get(W);
+		FAmmo& A = AmmoOf(W);
+		A.Mag = D.Mag;
+		A.Reserve = D.Mag * D.SpareMags;
+		KeysT = FpsKeysShownS;
+		KeysShownAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+		if (Last == EAstraWeapon::None || !Carries(Last))
+		{
+			Last = W;
+		}
+		if (bDraw && (State == EState::Holstered || State == EState::Holstering))
+		{
+			StartDraw(W);
+		}
+	}
+	else
+	{
+		// back in its place: it is put away (its rounds stay with it)
+		if (Cur == W)
 		{
 			State = EState::Holstered;
 			Cur = EAstraWeapon::None;
+			Next = EAstraWeapon::None;
 			ShowArms(false);
+			Ads = 0.f;
+		}
+		if (Next == W)
+		{
+			Next = EAstraWeapon::None;
+		}
+		if (Last == W)
+		{
+			Last = Carries(W == EAstraWeapon::Rifle ? EAstraWeapon::Pistol : EAstraWeapon::Rifle) ? (W == EAstraWeapon::Rifle ? EAstraWeapon::Pistol : EAstraWeapon::Rifle) : EAstraWeapon::None;
 		}
 		bFireHeld = false;
 		bAimHeld = false;
 	}
+}
+
+EAstraWeapon UAstraFpsComponent::DefaultWeapon() const
+{
+	if (Last != EAstraWeapon::None && Carries(Last))
+	{
+		return Last;
+	}
+	return bHasRifle ? EAstraWeapon::Rifle : (bHasPistol ? EAstraWeapon::Pistol : EAstraWeapon::None);
 }
 
 FString UAstraFpsComponent::StatusText() const
@@ -152,9 +201,15 @@ FString UAstraFpsComponent::StatusText() const
 	{
 		return FString();
 	}
-	const FAstraWeaponDef& W = AstraWeapons::Get(Cur != EAstraWeapon::None ? Cur : EAstraWeapon::Rifle);
+	const FAstraWeaponDef& W = AstraWeapons::Get(Cur != EAstraWeapon::None ? Cur : DefaultWeapon());
 	const FAmmo& A = AmmoOf(W.Id);
-	return FString::Printf(TEXT("%s %s: %d in the magazine, %d spare%s"), W.Name, W.Role, A.Mag, A.Reserve, IsArmed() ? TEXT(", in his hands") : TEXT(", holstered"));
+	FString Out = FString::Printf(TEXT("%s %s: %d in the magazine, %d spare%s"), W.Name, W.Role, A.Mag, A.Reserve, IsArmed() ? TEXT(", in his hands") : TEXT(", holstered"));
+	if (bHasRifle && bHasPistol)
+	{
+		const FAstraWeaponDef& O = AstraWeapons::Get(W.Id == EAstraWeapon::Rifle ? EAstraWeapon::Pistol : EAstraWeapon::Rifle);
+		Out += FString::Printf(TEXT("; and the %s %s (%d/%d)"), O.Name, O.Role, AmmoOf(O.Id).Mag, AmmoOf(O.Id).Reserve);
+	}
+	return Out;
 }
 
 bool UAstraFpsComponent::Locked() const
@@ -193,7 +248,7 @@ void UAstraFpsComponent::FirePressed()
 	// with nothing in the hands, the button draws the last weapon
 	if (bHasKit && State == EState::Holstered && !Locked())
 	{
-		StartDraw(Last != EAstraWeapon::None ? Last : EAstraWeapon::Rifle);
+		StartDraw(DefaultWeapon());
 	}
 }
 
@@ -230,6 +285,11 @@ void UAstraFpsComponent::SelectWeapon(EAstraWeapon W)
 	{
 		return;
 	}
+	if (!Carries(W))
+	{
+		Prompt(W == EAstraWeapon::Rifle ? TEXT("NO RIFLE: only the sidearm (the Marine Armory has one)") : TEXT("NO SIDEARM: only the rifle"), 2.2f);
+		return;
+	}
 	if (State == EState::Holstered)
 	{
 		StartDraw(W);
@@ -250,9 +310,9 @@ void UAstraFpsComponent::SelectWeapon(EAstraWeapon W)
 
 void UAstraFpsComponent::CycleWeapon(float Direction)
 {
-	if (!bHasKit || FMath::IsNearlyZero(Direction))
+	if (!bHasKit || FMath::IsNearlyZero(Direction) || !(bHasRifle && bHasPistol))
 	{
-		return;
+		return;                                       // (one weapon: nothing to change to)
 	}
 	SelectWeapon(Cur == EAstraWeapon::Rifle ? EAstraWeapon::Pistol : EAstraWeapon::Rifle);
 }
@@ -265,9 +325,9 @@ void UAstraFpsComponent::QuickSwitch()
 	}
 	if (State == EState::Holstered)
 	{
-		SelectWeapon(Last != EAstraWeapon::None ? Last : EAstraWeapon::Rifle);
+		SelectWeapon(DefaultWeapon());
 	}
-	else
+	else if (bHasRifle && bHasPistol)
 	{
 		SelectWeapon(Cur == EAstraWeapon::Rifle ? EAstraWeapon::Pistol : EAstraWeapon::Rifle);
 	}
@@ -281,7 +341,7 @@ void UAstraFpsComponent::ToggleHolster()
 	}
 	if (State == EState::Holstered)
 	{
-		StartDraw(Last != EAstraWeapon::None ? Last : EAstraWeapon::Rifle);
+		StartDraw(DefaultWeapon());
 	}
 	else if (State != EState::Holstering)
 	{
@@ -1179,6 +1239,7 @@ void UAstraFpsComponent::TickHud(float Dt)
 	const float Fov = Cam ? Cam->FieldOfView : 90.f;
 	S.SpreadPx = FMath::Clamp((float)(FMath::Tan(FMath::DegreesToRadians(SpreadDeg(D))) / FMath::Tan(FMath::DegreesToRadians(Fov * 0.5f)) * 540.f), 4.f, 120.f);
 	S.WeaponName = bArmed ? FString(D.Name) : FString();
+	S.bRifle = bHasRifle;
 	const FAmmo& A = AmmoOf(D.Id);
 	S.Mag = A.Mag;
 	S.Reserve = A.Reserve;
@@ -1234,7 +1295,7 @@ void UAstraFpsComponent::Describe(FOutputDevice& Ar) const
 	const AASTRACharacter* C = Owner();
 	const AASTRAPlayerController* PC = C ? Cast<AASTRAPlayerController>(C->GetController()) : nullptr;
 	const UAstraShipSubsystem* Ship = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
-	Ar.Logf(TEXT("kit %s, %s, weapon %s, rounds %d in the magazine and %d spare"), bHasKit ? TEXT("yes") : TEXT("no"), StateName[(int32)State], Cur != EAstraWeapon::None ? AstraWeapons::Get(Cur).Name : TEXT("none"),
+	Ar.Logf(TEXT("kit %s (rifle %d, sidearm %d), %s, weapon %s, rounds %d in the magazine and %d spare"), bHasKit ? TEXT("yes") : TEXT("no"), bHasRifle ? 1 : 0, bHasPistol ? 1 : 0, StateName[(int32)State], Cur != EAstraWeapon::None ? AstraWeapons::Get(Cur).Name : TEXT("none"),
 		Cur != EAstraWeapon::None ? AmmoOf(Cur).Mag : 0, Cur != EAstraWeapon::None ? AmmoOf(Cur).Reserve : 0);
 	Ar.Logf(TEXT("aim held %d (the action arrived %d times), through the sights %.2f, trigger held %d (arrived %d times), running %d"), bAimHeld ? 1 : 0, AimEvents, Ads, bFireHeld ? 1 : 0, FireEvents, bSprint ? 1 : 0);
 	Ar.Logf(TEXT("locked %d: seated %d, datapad up %d, movement ignored %d, captain's fate %d"), Locked() ? 1 : 0, PC && PC->IsSeated() ? 1 : 0, PC && PC->IsPadUp() ? 1 : 0, PC && PC->IsMoveInputIgnored() ? 1 : 0, Ship ? Ship->GetCaptainFate() : -1);
@@ -1333,6 +1394,8 @@ namespace
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraFpsComponent* F = FpsPlayer(W)) { F->SetKit(true); } }));
 	FAutoConsoleCommandWithWorld FpsCmdStow(TEXT("astra.weapons.stow"), TEXT("Testing: the Captain puts the weapons back"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraFpsComponent* F = FpsPlayer(W)) { F->SetKit(false); } }));
+	FAutoConsoleCommandWithWorldAndArgs FpsCmdGiveOne(TEXT("astra.weapons.givepistol"), TEXT("Testing: the Captain takes the sidearm only (as from the ready room's locker): astra.weapons.givepistol [0 to put it back]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W) { if (UAstraFpsComponent* F = FpsPlayer(W)) { F->GiveWeapon(EAstraWeapon::Pistol, A.Num() == 0 || A[0] != TEXT("0")); } }));
 
 	FAutoConsoleCommandWithWorldArgsAndOutputDevice FpsCmdAim(TEXT("astra.fps.aim"),
 		TEXT("Testing: astra.fps.aim 1 holds the right mouse button down (through the input system, the road of the real one: mapping, action, binding), 0 lets it go; add 'direct' to set the sights without the input system"),

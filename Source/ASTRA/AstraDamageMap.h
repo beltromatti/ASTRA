@@ -99,6 +99,10 @@ public:
 
 	/** Reads the plan (the staged copy first, the repository's when bRepoFirst is false and there is none: the bench passes true). False (and a reason) when it is missing or does not parse. Safe on a worker thread. */
 	bool Load(FString& OutError, bool bRepoFirst = false);
+	/** Reads a plan from a path (the Aquila's, or a class's: data/ship/plans/<class>.json). The real body of the loader; the one above is the Aquila's path with this. (Same as FLOTTA-VIVA's: one loader.) */
+	bool Load(const FString& Path, FString& OutError);
+	/** Where the plan's origin is in the hull's frame (m): the Aquila's is the bridge floor (172, 0, 62 in her mesh's frame); a class plan written in its hull frame says (0, 0, 0) with "origin_in_hull". */
+	FVector OriginInHullM = FVector(172.0, 0.0, 62.0);
 
 	/** The smallest compartment containing a point (world cm), within Slack cm of its walls; INDEX_NONE outside every one. */
 	int32 CompartmentAt(const FVector& Cm, float SlackCm = 0.f) const;

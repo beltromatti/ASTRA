@@ -23,7 +23,9 @@
 class AAstraArmoryRack;
 class AAstraBoardBreach;
 class AAstraCombatant;
+class APawn;
 class UAstraCombatFx;
+class UAstraFpsComponent;
 class UAstraLifeSubsystem;
 class UAstraShipSubsystem;
 
@@ -92,6 +94,18 @@ public:
 	/** The tests: what the bodies are doing. */
 	int32 NumBodies() const;
 
+	// ------------------------------------------------------------------------------------------------ the Captain's weapons (AstraBoardArms.cpp)
+	/** E at a post of the weapons (the Marine Armory's rack, the Ready Room's locker): he takes what it holds that he lacks (the rifle, the sidearm), else puts back what it takes. The words for
+	 *  his screen; false when there was nothing to do. */
+	bool UseArmsPost(FName Id, APawn* Me, FString& OutNotice);
+	/** What a post shows now (what hangs on it) and the key's words for the Captain who stands at it ("" when there is nothing for him to do there). False for a post that is not known. */
+	bool ArmsPostView(FName Id, const UAstraFpsComponent* F, bool& bOutRifle, bool& bOutPistol, FString& OutPrompt) const;
+	/** The armourer sends a weapon up to the Captain (`issue_weapon`): Kind rifle | pistol | kit; Who must be the Captain. It takes the time of the way from the armory to where he stands, and
+	 *  at the end it is in his hands. False, and why, when it cannot be (he has it, the rack has none, he is flying, one is on its way already). */
+	bool IssueWeapon(const FString& Kind, const FString& Who, FString& OutDetail);
+	/** Where the weapons are kept, what the Captain carries, the armourer, what is on its way (ship_state.arms: the crew's picture of the arms). */
+	TSharedRef<FJsonObject> ArmsJson() const;
+
 private:
 	enum class EPhase : uint8 { Loading, Failed, Idle, Active, Over };
 
@@ -156,13 +170,38 @@ private:
 	bool bWarmed = false;
 
 	void TryFinishLoading();
-	// --- the armory's rack: made while the Captain is near the armory, unless the level has placed its own
-	void EnsureRack(float Dt);
-	UPROPERTY() TObjectPtr<AAstraArmoryRack> Rack;
-	bool bOwnRack = false;
-	float RackT = 0.f;
-	int32 ArmoryComp = INDEX_NONE;
-	FVector ArmoryAt = FVector::ZeroVector;
+	// --- the weapons: the places the Captain's are kept (the posts, the stock of each), their pictures while he is near, and the armourer's delivery (AstraBoardArms.cpp)
+	struct FArmsPost
+	{
+		FName Id;
+		FString Label;                               // "the Marine Armory's rack"
+		FString Where;                               // in words, for the crew
+		FVector Pos = FVector::ZeroVector;           // on the floor under it (cm)
+		float Yaw = 0.f;                             // its front (degrees)
+		bool bLocker = false;
+		bool bRifle = false, bPistol = false;        // what is on it now
+		bool bTakesRifle = false;                    // what it takes back
+		TWeakObjectPtr<AAstraArmoryRack> Actor;
+	};
+	struct FDelivery
+	{
+		bool bActive = false;
+		bool bRifle = false, bPistol = false;
+		float T = 0.f, EtaS = 0.f;
+		float HandsWaitS = 0.f;                      // how long it has waited for his hands to be free
+		FString By;                                  // "Petty Officer Dara Okafor"
+	};
+	TArray<FArmsPost> ArmsPosts;
+	FDelivery Delivery;
+	float ArmsT = 0.f;
+	FString Armourer;                                // the armourer of the roster (looked up every little while)
+	float ArmourerT = 0.f;
+	bool bArmsBuilt = false;
+	void BuildArmsPosts();
+	void TickArms(float Dt);
+	FArmsPost* FindPost(FName Id);
+	const FArmsPost* FindPost(FName Id) const;
+	FString ArmourerName(const FVector& Near) const;
 	// --- the beginning
 	bool PickBreach(const FString& Id, int32& OutComp, FVector& OutAt, FString& OutWhy) const;
 	void MobiliseMarines();

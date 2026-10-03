@@ -602,9 +602,10 @@ void UAstraBattleSubsystem::TickPointDefence(FAstraBattleShip& S)
 		Grid.Query(S.Pos, CraftReach, [&](int32 J)
 		{
 			const FAstraBattleShip& C = Ships[J];
-			if (C.bCraft && C.bAlive && AstraSideIdx(C.Side) == 1 - Me && FVector::DistSquared(C.Pos, S.Pos) < CraftReach * CraftReach)
+			if (C.bCraft && C.bAlive && AstraSideIdx(C.Side) == 1 - Me && FVector::DistSquared(C.Pos, S.Pos) < CraftReach * CraftReach && !(C.CraftKind == 3 && !C.Board.bAllowPd))
 			{
-				Craft.Add({J, (C.CraftKind == 1 ? 2.f : 1.f) + (C.bPiloted ? 0.5f : 0.f) - (float)(FVector::Dist(C.Pos, S.Pos) / 5000.0)});
+				// (ABBORDAGGI-2: a boarding craft is the threat a hull is in the most danger from: shot first; one latched on the hull cannot be borne on)
+				Craft.Add({J, (C.CraftKind == 1 ? 2.f : 1.f) + (C.bPiloted ? 0.5f : 0.f) + (C.CraftKind == 3 ? 1.5f : 0.f) - (float)(FVector::Dist(C.Pos, S.Pos) / 5000.0)});
 			}
 		});
 		Craft.Sort([](const FCraftCand& A, const FCraftCand& B) { return A.Score > B.Score; });
@@ -623,6 +624,14 @@ void UAstraBattleSubsystem::TickPointDefence(FAstraBattleShip& S)
 				if (FMath::FRand() < 0.22f)
 				{
 					ApplyHit(C, (C.Pos - S.Pos).GetSafeNormal(), 14.f, C.Pos, EAstraHitKind::PointDefence, S.Id);   // the Captain's Falcon: hurt, not erased
+				}
+			}
+			else if (const AstraBoardCraft::FKind* BoatKind = C.CraftKind == 3 ? AstraBoardCraft::KindByKey(C.Board.Kind) : nullptr)
+			{
+				// (ABBORDAGGI-2) an assault craft is armoured: a hit does what it does to a hull of 140 or 200, not a kill; the chance is the kind's own
+				if (FMath::FRand() < BoatKind->PdHit)
+				{
+					ApplyHit(C, (C.Pos - S.Pos).GetSafeNormal(), BoatKind->PdDamage, C.Pos, EAstraHitKind::PointDefence, S.Id);
 				}
 			}
 			else if (FMath::FRand() < (C.CraftKind == 0 ? 0.07f : (C.CraftKind == 1 ? 0.1f : 0.14f)))
