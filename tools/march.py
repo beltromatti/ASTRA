@@ -9,11 +9,14 @@ and the offline tests. Never starts the editor or the game: the March is Python,
   tools/march.py live [--hours 1 --seed 3 --cap 0.05 --mock --journal --trace FILE]
                                        a war played by the two high commands' minds (the real model, its cost counted; --mock: a scripted model, no cost): the layer's cost an
                                        hour, the latency of a look, what they decided (mind/bench/march_live.py)
+  tools/march.py pace [--hours 3 --seeds 1-6 --modes script,march] [--live --cap 0.04]
+                                       the war's pace as the Captain lives it: the warning before the first guns, the time to the first contact, the fights' length, the losses an
+                                       hour, her decision points; the opening as the game's script plays it and as the March plays it (mind/bench/march_pace.py)
   tools/march.py cal  cpp|model|fit|list ...
                                        the battle model against the war bench's own battles (tools/march_calibrate.py)
   tools/march.py test                  the March's, the minds', the join's and the server's offline tests (no network, no cost)
 
-`live` needs the OpenRouter key: it is read from the main checkout's .env and handed to the process through its environment, never printed."""
+`live` (and `pace --live`) needs the OpenRouter key: it is read from the main checkout's .env and handed to the process through its environment, never printed."""
 from __future__ import annotations
 
 import os
@@ -63,10 +66,12 @@ def main() -> int:
         return run(["-m", "bench.march_sim", *rest])
     if cmd == "live":
         return run(["-m", "bench.march_live", *rest], env=key_env() if "--mock" not in rest else None)
+    if cmd == "pace":
+        return run(["-m", "bench.march_pace", *rest], env=key_env() if "--live" in rest else None)
     if cmd == "cal":
         return subprocess.run([python(), str(ROOT / "tools" / "march_calibrate.py"), *rest], cwd=MIND).returncode
     if cmd == "test":
-        return run(["-m", "unittest", "bench.march_unit", "bench.strategy_unit", "bench.march_glue_unit", "bench.march_server", "bench.march_soak", *rest])
+        return run(["-m", "unittest", "bench.march_unit", "bench.strategy_unit", "bench.march_glue_unit", "bench.march_server", "bench.march_soak", "bench.march_pace", *rest])
     print(f"unknown command '{cmd}'\n{__doc__}")
     return 2
 
