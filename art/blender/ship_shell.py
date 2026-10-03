@@ -150,6 +150,8 @@ def wall_v2(b: SParts, name: str, L: float, D: float, H: float, st, doors: list,
                     em.lamp_box((xe - 0.007, -WF - POST_D - 0.012, 0.5), (xe + 0.007, -WF - POST_D - 0.006, H - 0.4), st.accent, LAMP_DIM)
             fb.box((a, -WF - 0.02, st.wain_h - 0.03), (c, -WF + 0.0, st.wain_h + 0.03), st.trim)         # the rail between wainscot and upper wall
             fb.box((a, -WF - 0.012, 0.0), (c, -WF, 0.10), st.skirt)                                       # the skirting
+            if getattr(st, "baseboard_light", False):
+                em.lamp_box((a + 0.05, -WF - 0.016, 0.115), (c - 0.05, -WF - 0.011, 0.13), st.accent, LAMP_DIM)
         sills = {}
         for d in doors:                                                         # an opening with a sill (a serving pass, a window): the wall under it
             z0 = d.get("z0", 0.0)

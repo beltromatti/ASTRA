@@ -160,10 +160,14 @@ def range_cooker(b: SParts, w: float = 0.9, d: float = 0.75, h: float = 0.92, ki
         b.fine.box((d / 2 + 0.03, -w / 2 + 0.10, 0.24), (d / 2 + 0.035, w / 2 - 0.10, 0.5), DGLASS)
     b.fine.cyl((d / 2 + 0.06, -w / 2 + 0.06, 0.66), (d / 2 + 0.06, w / 2 - 0.06, 0.66), 0.014, TRIM, seg=8)
     if kind == "range":
-        for sy in (-0.22, 0.22):
-            for sx in (-0.19, 0.19):
+        import ship_decor as DC
+        for ib, sy in enumerate((-0.22, 0.22)):
+            for ia, sx in enumerate((-0.19, 0.19)):
                 b.fine.cyl((sx, sy, h), (sx, sy, h + 0.012), 0.10, RUBBER, seg=16)
                 b.fine.cyl((sx, sy, h + 0.012), (sx, sy, h + 0.02), 0.05, TRIM, seg=12)
+                if (ia + ib + int(w * 10)) % 3 == 0:                             # a pot or a pan on some of the burners
+                    with b.at(T(sx, sy, h + 0.02)):
+                        DC.stock_pot(b, 0.1, 0.12, ia == 1) if ib == 0 else DC.saucepan(b, 0.075, 0.07)
     elif kind == "griddle":
         b.fine.box((-d / 2 + 0.03, -w / 2 + 0.03, h), (d / 2 - 0.03, w / 2 - 0.03, h + 0.012), TRIM)
         b.fine.box((-d / 2 + 0.03, -w / 2 + 0.03, h + 0.012), (d / 2 - 0.03, -w / 2 + 0.06, h + 0.06), STEEL)
@@ -247,6 +251,8 @@ def lamp_standard(b: SParts, h: float = 1.5, cell: str = "white_warm") -> None:
 
 def ceiling_light_panel(b: SParts, x0: float, x1: float, y0: float, y1: float, z: float, cell: str = "white_cool", mat: str = LAMP_HOT) -> None:
     """A luminous ceiling panel: a brushed ring frame (4 cm bars, 6 cm deep) with a bright lamp face recessed 2 cm inside it, flush at height z."""
+    if getattr(getattr(b, "_style", None), "v2", False):             # ARTE-INTERNI: the v2 shells carry their own luminaires (ship_shell.ceiling_v2)
+        return
     t = 0.04
     b.body.box((x0, y0, z - 0.06), (x1, y0 + t, z), TRIM)
     b.body.box((x0, y1 - t, z - 0.06), (x1, y1, z), TRIM)

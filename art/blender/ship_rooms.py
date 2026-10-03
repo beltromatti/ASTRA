@@ -27,7 +27,7 @@ class Style:
     """The look of a room: materials of the floor, the wainscot, the upper wall, the trim and the ceiling, the accent lamp colour.
     ARTE-INTERNI (`v2`, the default; ship_shell.py): `floor2` / `border` / `inlay` = a border of a second finish round the floor with a lit line between; `wall_acc` (cloth) + `wall_slat` + `wall_pattern`
     = the materials and the order of the treatments of the wall bays (panel, cloth, slats, perf); `bay` = the target width of a bay (m); `wall_wash` = a slot of light on every pilaster;
-    `ceiling` = bands | cove | grid | exposed | flat; `light_cell` = the colour of the ceiling's luminous parts; `downlights`, `bands` (how many) or `band_ys` (where), `band_w`, `beam_pitch`, `beam_light`."""
+    `ceiling` = bands | cove | grid | exposed | flat; `light_cell` = the colour of the ceiling's luminous parts; `downlights`, `bands` (how many) or `band_ys` (where), `band_w`, `beam_pitch`, `beam_light`, `baseboard_light` (a dim strip of the accent colour at skirting height: the department's colour at your feet)."""
 
     def __init__(self, floor: str = DECK, floor_mode: str = "plates", wall_lo: str = COMPOSITE, wall_hi: str = COMPOSITE, trim: str = TRIM,
                  ceil: str = COMPOSITE, accent: str = "cool_dim", strip: str = "white_cool", wain_h: float = 1.05, ribs: bool = True,
@@ -35,7 +35,7 @@ class Style:
                  seams: bool = True, cove_on: bool = True, v2: bool = True, floor2: str | None = None, border: float = 0.0, inlay: str | None = None,
                  wall_acc: str = COMPOSITE, wall_slat: str = "MI_SHIP_Oak", wall_pattern: tuple | None = None, bay: float = 2.0, wall_wash: bool = True, ceiling: str = "bands",
                  light_cell: str | None = None, downlights: bool = True, bands: int = 0, beam_light: bool = True, band_ys: tuple | None = None, band_w: float = 0.42,
-                 beam_pitch: float = 4.0) -> None:
+                 beam_pitch: float = 4.0, baseboard_light: bool = False) -> None:
         self.__dict__.update(locals())
         del self.__dict__["self"]
         if self.light_cell is None:

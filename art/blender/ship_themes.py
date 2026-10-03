@@ -42,14 +42,14 @@ def mess(**kw) -> Style:
 
 
 def crew(**kw) -> Style:
-    d = dict(floor=CARPET_SLATE, floor_mode="covering", floor2=CARPET_SAND, border=0.0, wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=WEAVE_SLATE, wain_h=1.0,
+    d = dict(baseboard_light=True, floor=CARPET_SLATE, floor_mode="covering", floor2=CARPET_SAND, border=0.0, wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=WEAVE_SLATE, wain_h=1.0,
              wall_pattern=("panel", "cloth", "panel"), bay=2.0, ceil=PLASTER_IVORY, accent="cyan_dim", strip="white_warm", light_cell="white_warm", skirt=STEEL, seams=False, ceiling="bands")
     d.update(kw)
     return _themed(Style(**d))
 
 
 def medical(**kw) -> Style:
-    d = dict(floor=TILE_FLOOR, floor_mode="covering", floor2=TILE_HEX, border=0.0, wall_lo=TILE_WALL, wall_hi=PLASTER_IVORY, wall_acc=PLASTER_TEAL, wain_h=1.25,
+    d = dict(baseboard_light=True, floor=TILE_FLOOR, floor_mode="covering", floor2=TILE_HEX, border=0.0, wall_lo=TILE_WALL, wall_hi=PLASTER_IVORY, wall_acc=PLASTER_TEAL, wain_h=1.25,
              wall_pattern=("panel", "panel", "cloth"), bay=2.0, ceil=PLASTER_IVORY, accent="medical_dim", strip="white_cool", light_cell="white_cool", skirt=STEEL, seams=False, ceiling="grid",
              trim=STEEL, rib_mat=STEEL)
     d.update(kw)
@@ -57,35 +57,35 @@ def medical(**kw) -> Style:
 
 
 def lab(**kw) -> Style:
-    d = dict(floor=TILE_FLOOR, floor_mode="covering", wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=PERF, wain_h=1.1, wall_pattern=("panel", "perf", "panel"), bay=2.0,
+    d = dict(baseboard_light=True, floor=TILE_FLOOR, floor_mode="covering", wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=PERF, wain_h=1.1, wall_pattern=("panel", "perf", "panel"), bay=2.0,
              ceil=PLASTER_IVORY, accent="science_dim", strip="white_cool", light_cell="white_cool", skirt=STEEL, seams=False, ceiling="grid")
     d.update(kw)
     return _themed(Style(**d))
 
 
 def command(**kw) -> Style:
-    d = dict(floor=CARPET_SLATE, floor_mode="covering", wall_lo=PLASTER_SLATE, wall_hi=PLASTER_SLATE, wall_acc=WEAVE_SLATE, wain_h=1.05, wall_pattern=("panel", "cloth", "panel", "perf"),
+    d = dict(baseboard_light=True, floor=CARPET_SLATE, floor_mode="covering", wall_lo=PLASTER_SLATE, wall_hi=PLASTER_SLATE, wall_acc=WEAVE_SLATE, wain_h=1.05, wall_pattern=("panel", "cloth", "panel", "perf"),
              bay=2.0, ceil=COMPOSITE, accent="command_dim", strip="white_cool", light_cell="white_cool", skirt=STRUCT, seams=False, ceiling="bands")
     d.update(kw)
     return _themed(Style(**d))
 
 
 def security(**kw) -> Style:
-    d = dict(floor=PLATING, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=PLASTER_SLATE, wall_acc=PERF, wain_h=1.1, wall_pattern=("panel", "perf", "panel"), bay=2.0, ceil=COMPOSITE,
+    d = dict(baseboard_light=True, floor=PLATING, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=PLASTER_SLATE, wall_acc=PERF, wain_h=1.1, wall_pattern=("panel", "perf", "panel"), bay=2.0, ceil=COMPOSITE,
              accent="security_dim", strip="white_cool", light_cell="white_cool", skirt=STRUCT, ceiling="bands")
     d.update(kw)
     return _themed(Style(**d))
 
 
 def flight(**kw) -> Style:
-    d = dict(floor=PLATING, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=PLASTER_SLATE, wall_acc=PERF, wain_h=1.1, wall_pattern=("panel", "perf", "panel"), bay=2.0, ceil=COMPOSITE,
+    d = dict(baseboard_light=True, floor=PLATING, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=PLASTER_SLATE, wall_acc=PERF, wain_h=1.1, wall_pattern=("panel", "perf", "panel"), bay=2.0, ceil=COMPOSITE,
              accent="flight_dim", strip="white_cool", light_cell="white_cool", skirt=STRUCT, ceiling="bands")
     d.update(kw)
     return _themed(Style(**d))
 
 
 def tech(**kw) -> Style:
-    d = dict(floor=TREAD, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=PLASTER_SLATE, wall_acc=PERF, wain_h=1.2, wall_pattern=("panel", "panel", "perf"), bay=2.0, ceil=COMPOSITE,
+    d = dict(baseboard_light=True, floor=TREAD, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=PLASTER_SLATE, wall_acc=PERF, wain_h=1.2, wall_pattern=("panel", "panel", "perf"), bay=2.0, ceil=COMPOSITE,
              accent="engineering_dim", strip="white_cool", light_cell="white_cool", skirt=STRUCT, ceiling="exposed", rib_mat=TRIM)
     d.update(kw)
     return _themed(Style(**d))
@@ -99,7 +99,7 @@ def store(**kw) -> Style:
 
 
 def galley(**kw) -> Style:
-    d = dict(floor=TILE_FLOOR, floor_mode="covering", wall_lo=TILE_WALL, wall_hi=PLASTER_IVORY, wall_acc=PERF, wain_h=1.9, wall_pattern=("panel", "panel", "perf"), bay=2.0, ceil=IVORY,
+    d = dict(baseboard_light=True, floor=TILE_FLOOR, floor_mode="covering", wall_lo=TILE_WALL, wall_hi=PLASTER_IVORY, wall_acc=PERF, wain_h=1.9, wall_pattern=("panel", "panel", "perf"), bay=2.0, ceil=IVORY,
              accent="warm_dim", strip="white_warm", light_cell="white_warm", skirt=STEEL, seams=False, ceiling="grid", trim=STEEL, rib_mat=STEEL)
     d.update(kw)
     return _themed(Style(**d))
@@ -125,6 +125,10 @@ THEME_TABLE: dict[str, tuple] = {
     "chapel": ("living", dict(floor=TEAK, floor2=CARPET_SLATE, border=0.0, wall_lo=PLASTER_IVORY, wall_hi=PLASTER_IVORY, accent="warm_dim", wall_pattern=("panel", "cloth"), ceiling="cove")),
     "observation": ("living", dict(floor=CARPET_SLATE, floor2=CARPET_SLATE, border=0.0, wall_hi=PLASTER_SLATE, wall_lo=PLASTER_SLATE, accent="cool_dim", strip="white_cool", light_cell="white_cool",
                                    ceiling="flat")),
+    "concourse": ("mess", dict(ceiling="flat", accent="warm_dim", wall_pattern=("panel", "slats", "panel"))),
+    "berth_lobby": ("living", dict(ceiling="flat", floor=CARPET_SLATE, floor2=CARPET_SAND, border=0.0)),
+    "bow_obs": ("living", dict(floor=CARPET_SLATE, floor2=CARPET_SLATE, border=0.0, wall_hi=PLASTER_SLATE, wall_lo=PLASTER_SLATE, accent="cool_dim", strip="white_cool", light_cell="white_cool",
+                               ceiling="flat")),
     "shop": ("mess", dict(accent="warm_dim")),
     "barber": ("mess", dict(floor=TILE_FLOOR, accent="warm_dim")),
     "wardroom": ("living", dict(floor=TEAK, floor2=CARPET_SLATE, border=0.0, accent="warm_dim", wall_pattern=("panel", "slats", "cloth", "panel"))),

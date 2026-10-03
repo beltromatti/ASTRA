@@ -54,6 +54,8 @@ def cart(b: SParts, w: float = 0.9, d: float = 0.55, h: float = 1.0, tiers: int 
 
 
 def prep_island(b: SParts, w: float = 3.0, d: float = 1.0, seed: int = 1) -> None:
+    """A stainless prep island: a steel top with a lower shelf of gastronorm trays, a cutting board with chopped vegetables and a knife, a mixing bowl, a stack of plates, a tray of food and a
+    pot with its lid; origin at its centre."""
     rng = random.Random(seed)
     h = 0.92
     b.body.box((-d / 2, -w / 2, h - 0.05), (d / 2, w / 2, h), STEEL)
@@ -62,13 +64,23 @@ def prep_island(b: SParts, w: float = 3.0, d: float = 1.0, seed: int = 1) -> Non
         for sy in (-w / 2 + 0.07, 0.0, w / 2 - 0.07):
             b.body.box((sx - 0.025, sy - 0.025, 0.0), (sx + 0.025, sy + 0.025, h - 0.05), STEEL)
     b.body.box((-d / 2 + 0.05, -w / 2 + 0.05, 0.20), (d / 2 - 0.05, w / 2 - 0.05, 0.23), STEEL)
-    for k in range(3):                                                # things on the lower shelf
-        b.fine.box((-0.3, -w / 2 + 0.2 + k * 0.9, 0.23), (0.3, -w / 2 + 0.75 + k * 0.9, 0.42), rng.choice([CRATE_GREY, STEEL, CRATE_BLUE]))
-    for k in range(3):                                                # cutting boards, a bowl, knives
+    for k in range(3):                                                # trays on the lower shelf
+        with b.at(T(0.0, -w / 2 + 0.45 + k * 0.95, 0.23)):
+            DC.gastro_tray(b, 0.5, 0.32, 0.1, rng.choice(("f_lettuce", "f_carrot", "f_tomato", "f_cheese", "f_bread")), 0.8)
+    for k in range(3):                                                # on the top: a board, a bowl, plates, a tray, a pot
         y = -w / 2 + 0.45 + k * 0.95
-        b.fine.box((-0.28, y - 0.22, h), (0.22, y + 0.22, h + 0.02), BEDDING if k != 1 else WOOD)
-        b.fine.cyl((0.25, y - 0.1, h), (0.25, y - 0.1, h + 0.10), 0.13, STEEL, seg=14, r2=0.16)
-        b.fine.box((-0.10, y + 0.18, h + 0.02), (0.05, y + 0.22, h + 0.03), TRIM)
+        with b.at(T(-0.02, y, h)):
+            if k == 0:
+                DC.cutting_board(b, 0.42, 0.3, seed)
+            elif k == 1:
+                DC.stock_pot(b, 0.15, 0.2, True)
+                with b.at(T(0.0, 0.34, 0.0)):
+                    DC.plate_stack(b, 7)
+            else:
+                with b.at(T(0.0, -0.1, 0.0)):
+                    DC.mixing_bowl(b, 0.17)
+                with b.at(T(0.0, 0.28, 0.0)):
+                    DC.gastro_tray(b, 0.5, 0.3, 0.06, "f_orange", 0.6)
     b.emit.label((d / 2 - 0.0, 0.0, 0.5), 0.5, 0.125, (1, 0, 0), "eq_food")
 
 
@@ -86,6 +98,7 @@ def dishwasher(b: SParts, w: float = 1.8, d: float = 0.9, h: float = 1.55) -> No
 
 
 def pot_rack(b: SParts, L: float, seed: int = 4) -> None:
+    """Two rails hung from the ceiling over the prep islands with pots, pans and utensils hanging from them."""
     rng = random.Random(seed)
     for y in (-0.5, 0.5):
         b.fine.cyl((0, y, 2.55), (L, y, 2.55), 0.012, STEEL, seg=6)
@@ -97,8 +110,11 @@ def pot_rack(b: SParts, L: float, seed: int = 4) -> None:
         y = rng.choice((-0.5, 0.5))
         r = rng.uniform(0.09, 0.15)
         b.fine.cyl((x, y, 2.55), (x, y, 2.42), 0.006, STEEL, seg=6)
-        with b.at(T(x, y, 2.16)):
-            F.pot(b, r, rng.uniform(0.08, 0.18))
+        with b.at(T(x, y, 2.2)):
+            if rng.random() < 0.5:
+                DC.stock_pot(b, r, rng.uniform(0.08, 0.16), False)
+            else:
+                DC.saucepan(b, r * 0.8, 0.07)
         x += rng.uniform(0.22, 0.42)
 
 

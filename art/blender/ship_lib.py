@@ -13,6 +13,7 @@ import math
 import os
 import sys
 
+import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
@@ -136,6 +137,69 @@ class SFB(FB):
         u0, v0, u1, v1 = LABELS[cell]
         aspect = ((u1 - u0) * ATLAS_PX[0]) / ((v1 - v0) * ATLAS_PX[1])
         return self.label(center, w, w / aspect, facing, cell, up=up)
+
+    # -- primitives without the whole-mesh normal recalculation (bmesh.ops.recalc_face_normals costs time proportional to the whole mesh: a room with two thousand boxes took a minute):
+    #    a cube, a cone or a sphere made by bmesh is outward-facing in its own matrix; a matrix that mirrors (the builder's frame always does) turns it inside out, so reverse it
+    def _fast(self, faces, mat: str, m: Matrix):
+        idx = self.mi(mat)
+        for f in faces:
+            f.material_index = idx
+        if m.determinant() < 0:
+            bmesh.ops.reverse_faces(self.bm, faces=faces)
+        return faces
+
+    _CUBE = [(-0.5, -0.5, -0.5), (0.5, -0.5, -0.5), (0.5, 0.5, -0.5), (-0.5, 0.5, -0.5), (-0.5, -0.5, 0.5), (0.5, -0.5, 0.5), (0.5, 0.5, 0.5), (-0.5, 0.5, 0.5)]
+    _CUBE_FACES = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]       # outward-facing when the matrix does not mirror
+
+    def cbox(self, center, size, mat: str, rot: Matrix | None = None):
+        """A box: eight vertices and six quads made directly (no bmesh operator: those cost time proportional to the whole mesh)."""
+        m = self.frame @ T(*center) @ (rot if rot is not None else Matrix.Identity(4)) @ Matrix.Diagonal((size[0], size[1], size[2], 1.0))
+        vs = [self.bm.verts.new(m @ Vector(c)) for c in self._CUBE]
+        flip = m.determinant() < 0
+        idx = self.mi(mat)
+        faces = []
+        for q in self._CUBE_FACES:
+            f = self.bm.faces.new([vs[i] for i in (reversed(q) if flip else q)])
+            f.material_index = idx
+            faces.append(f)
+        return faces
+
+    def cyl(self, p0, p1, r: float, mat: str, seg: int = 16, r2: float | None = None, caps: bool = True):
+        """A cylinder or cone frustum from p0 (radius r) to p1 (radius r2), made directly."""
+        a, b = Vector(p0), Vector(p1)
+        d = b - a
+        if d.length < 1e-9:
+            return []
+        rot = Vector((0.0, 0.0, 1.0)).rotation_difference(d.normalized()).to_matrix().to_4x4()
+        m = self.frame @ T(*a) @ rot
+        ln = d.length
+        r2 = r if r2 is None else r2
+        ring0, ring1 = [], []
+        for j in range(seg):
+            ang = 2.0 * math.pi * j / seg
+            c, s_ = math.cos(ang), math.sin(ang)
+            ring0.append(self.bm.verts.new(m @ Vector((r * c, r * s_, 0.0))))
+            ring1.append(self.bm.verts.new(m @ Vector((r2 * c, r2 * s_, ln))))
+        flip = m.determinant() < 0
+        idx = self.mi(mat)
+        faces = []
+
+        def face(vs):
+            f = self.bm.faces.new(list(reversed(vs)) if flip else vs)
+            f.material_index = idx
+            faces.append(f)
+        for j in range(seg):
+            k = (j + 1) % seg
+            face([ring0[j], ring0[k], ring1[k], ring1[j]])
+        if caps:
+            face(list(reversed(ring0)))
+            face(list(ring1))
+        return faces
+
+    def sphere(self, center, r: float, mat: str, seg: int = 16, rings: int = 10, squash=(1.0, 1.0, 1.0)):
+        m = self.frame @ T(*center) @ Matrix.Diagonal((r * squash[0], r * squash[1], r * squash[2], 1.0))
+        geom = bmesh.ops.create_uvsphere(self.bm, u_segments=seg, v_segments=rings, radius=1.0, matrix=m)
+        return self._fast(self._faces_of(geom["verts"]), mat, m)
 
     # -- the colour swatch: one material for every small coloured thing (the palette cell is the UV of every face)
     def paint(self, faces, color):

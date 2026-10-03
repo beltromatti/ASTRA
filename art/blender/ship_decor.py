@@ -9,7 +9,7 @@ import random
 
 import ship_mk as MK
 from bridge3_lib import Rx, Ry, Rz, T
-from ship_lib import (SWATCH, BEDDING, BRASS, CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, COMPOSITE, CORK, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, FRUIT, IVORY, LAMP, LAMP_DIM,
+from ship_lib import (RUBBER as SL_RUBBER, DGLASS as SL_DGLASS, SWATCH, BEDDING, BRASS, CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, COMPOSITE, CORK, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, FRUIT, IVORY, LAMP, LAMP_DIM,
                       LAMINATE, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, PAPER, PLASTER_IVORY, STEEL, STRUCT, TRIM, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_SLATE, WEAVE_TEAL, SParts)
 
 PICTURE_COLORS = ["navy", "teal", "mustard", "rust", "cream", "slate", "denim", "forest", "tan", "white", "oxblood"]
@@ -170,3 +170,74 @@ def wall_sconce(b: SParts, cell: str = "white_warm") -> None:
     b.emit.lamp_box((0.07, -0.03, -0.065), (0.072, 0.03, 0.065), cell, LAMP_DIM)
     b.emit.lamp_box((0.02, -0.03, 0.09), (0.07, 0.03, 0.093), cell, LAMP_DIM)
     b.emit.lamp_box((0.02, -0.03, -0.093), (0.07, 0.03, -0.09), cell, LAMP_DIM)
+
+
+# ------------------------------------------------------------------------------------------------------------------------------- the kitchen
+def stock_pot(b: SParts, r: float = 0.16, h: float = 0.2, lid: bool = True, mat: str = STEEL) -> None:
+    """A steel pot with a rolled rim, two loop handles and (with `lid`) a domed lid with a knob; origin at its base centre."""
+    MK.lathe(b.fine, [(r * 0.92, 0.0), (r, 0.012), (r, h), (r * 1.04, h + 0.004), (r * 1.04, h + 0.012), (r * 0.96, h + 0.012), (r * 0.94, h - 0.01), (r * 0.9, 0.02)], (0, 0, 0), mat, seg=18)
+    for sy in (-1, 1):
+        b.fine.cyl((0, sy * r, h * 0.8), (0, sy * (r + 0.05), h * 0.8), 0.009, STEEL, seg=6)
+    if lid:
+        MK.lathe(b.fine, [(r * 1.05, h + 0.012), (r * 1.0, h + 0.03), (r * 0.6, h + 0.06), (r * 0.12, h + 0.07), (r * 0.12, h + 0.062), (r * 0.58, h + 0.05), (r * 0.98, h + 0.022)], (0, 0, 0), mat, seg=18)
+        b.fine.cyl((0, 0, h + 0.07), (0, 0, h + 0.1), 0.014, SL_RUBBER, seg=8)
+
+
+def saucepan(b: SParts, r: float = 0.09, h: float = 0.1) -> None:
+    """A small saucepan with a long handle towards -x."""
+    MK.lathe(b.fine, [(r * 0.95, 0.0), (r, 0.01), (r, h), (r * 0.9, h), (r * 0.88, 0.02)], (0, 0, 0), STEEL, seg=14)
+    b.fine.box((-r - 0.17, -0.014, h - 0.03), (-r + 0.02, 0.014, h - 0.012), SL_RUBBER)
+
+
+def gastro_tray(b: SParts, w: float = 0.53, d: float = 0.325, h: float = 0.06, food: str = "f_lettuce", level: float = 0.7) -> None:
+    """A stainless gastronorm tray (origin at its base centre, w along y) with food heaped in it."""
+    b.fine.box((-d / 2, -w / 2, 0.0), (d / 2, w / 2, h), STEEL)
+    b.fine.box((-d / 2 + 0.012, -w / 2 + 0.012, 0.01), (d / 2 - 0.012, w / 2 - 0.012, h + 0.002), SL_DGLASS)
+    b.soft.paint(MK.puff(b.soft, (0, 0, h * 0.7), (d / 2 - 0.02, w / 2 - 0.02, 0.05 + 0.04 * level), SWATCH, e=0.6, nu=12, nv=6), food)
+
+
+def cutting_board(b: SParts, w: float = 0.4, d: float = 0.28, seed: int = 1) -> None:
+    """A wooden cutting board with chopped vegetables and a knife (origin at its base centre)."""
+    rng = random.Random(seed)
+    MK.rbox(b.fine, (-d / 2, -w / 2, 0.0), (d / 2, w / 2, 0.025), 0.006, OAK, 1)
+    for k in range(7):
+        c = rng.choice(("f_carrot", "f_tomato", "f_lettuce", "f_bread", "f_orange"))
+        b.soft.paint(MK.puff(b.soft, (rng.uniform(-d * 0.3, d * 0.3), rng.uniform(-w * 0.35, w * 0.35), 0.035), (0.03, 0.025, 0.014), SWATCH, e=0.8, nu=8, nv=5), c)
+    b.fine.box((d / 2 - 0.06, -0.012, 0.025), (d / 2 + 0.1, 0.012, 0.028), STEEL)
+    b.fine.box((d / 2 + 0.1, -0.014, 0.025), (d / 2 + 0.2, 0.014, 0.034), SL_RUBBER)
+
+
+def mixing_bowl(b: SParts, r: float = 0.17) -> None:
+    """A stainless mixing bowl (origin at its base)."""
+    MK.lathe(b.fine, [(r * 0.35, 0.0), (r * 0.4, 0.01), (r * 0.9, r * 0.45), (r, r * 0.9), (r * 0.96, r * 0.92), (r * 0.86, r * 0.46), (r * 0.3, 0.02)], (0, 0, 0), STEEL, seg=18)
+
+
+def plate_stack(b: SParts, n: int = 8, r: float = 0.12) -> None:
+    """A stack of white plates (origin at the base centre)."""
+    for k in range(n):
+        MK.lathe(b.fine, [(r * 0.55, k * 0.016), (r, k * 0.016 + 0.01), (r, k * 0.016 + 0.014), (r * 0.6, k * 0.016 + 0.004)], (0, 0, 0), CERAMIC, seg=18)
+
+
+def utensil_rail(b: SParts, w: float = 1.2) -> None:
+    """A wall rail (centre at the origin, along y, facing +x) with ladles, a whisk, tongs and a spatula hanging from it."""
+    b.fine.cyl((0.06, -w / 2, 0.0), (0.06, w / 2, 0.0), 0.009, STEEL, seg=6)
+    for sy in (-w / 2, w / 2):
+        b.fine.box((0.0, sy - 0.01, -0.02), (0.06, sy + 0.01, 0.02), STEEL)
+    for k in range(6):
+        y = -w / 2 + 0.12 + k * (w - 0.24) / 5
+        b.fine.cyl((0.06, y, 0.0), (0.06, y, -0.03), 0.004, STEEL, seg=5)
+        ln = 0.24 + 0.04 * (k % 3)
+        b.fine.cyl((0.06, y, -0.03), (0.075, y, -ln), 0.006, STEEL, seg=6)
+        if k % 2 == 0:
+            MK.lathe(b.fine, [(0.001, -ln - 0.05), (0.04, -ln - 0.04), (0.045, -ln), (0.001, -ln + 0.005)], (0.075, y, 0.0), STEEL, seg=10)
+
+
+def table_setting(b: SParts, seed: int = 1) -> None:
+    """A diner's place on a table (origin at the middle of the place, +x across the table): a plate with food, a cup, a fork and a knife, a napkin."""
+    rng = random.Random(seed)
+    MK.lathe(b.fine, [(0.04, 0.0), (0.11, 0.008), (0.115, 0.014), (0.05, 0.006)], (0, 0, 0), CERAMIC, seg=16)
+    b.soft.paint(MK.puff(b.soft, (0.0, 0.0, 0.012), (0.07, 0.06, 0.025), SWATCH, e=0.7, nu=10, nv=5), rng.choice(("f_bread", "f_carrot", "f_lettuce", "f_cheese", "f_tomato")))
+    MK.lathe(b.fine, [(0.026, 0.0), (0.034, 0.002), (0.038, 0.09), (0.034, 0.09), (0.03, 0.01)], (0.0, -0.17, 0.0), CERAMIC, seg=12)
+    b.fine.box((-0.02, 0.13, 0.0), (0.12, 0.145, 0.003), STEEL)
+    b.fine.box((-0.02, -0.145, 0.0), (0.12, -0.13, 0.003), STEEL)
+    b.soft.swatch_box((-0.1, 0.1, 0.0), (-0.02, 0.2, 0.004), "white")
