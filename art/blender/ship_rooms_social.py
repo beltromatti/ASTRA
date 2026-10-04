@@ -17,7 +17,7 @@ import ship_themes as TH
 import ship_furniture2 as G
 import ship_spec as SPEC
 from bridge3_lib import T, frame
-from ship_lib import (BRASS, PLASTER_IVORY, PLASTER_SLATE, SWATCH, TEAK, TERRAZZO_DARK, CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, TUFT_SAND, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_TEAL, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
+from ship_lib import (CARPET_MOSS, TILE_BLACK, TILE_FLOOR, TERRAZZO, BRASS, PLASTER_IVORY, PLASTER_SLATE, SWATCH, TEAK, TERRAZZO_DARK, CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, TUFT_SAND, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_TEAL, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
                       FABRIC_SAND, GLASS, IVORY, LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, LEAF, PAINT_RED, RUBBER, SOIL, STEEL, STRUCT, TILE, TRIM, WOOD,
                       SParts, lamp_strip)
 from ship_rooms import (Style, WF, WS, build_shell, ceiling_panels, luminaire_strips, place, wall_label, window_wall)
@@ -52,10 +52,14 @@ def lounge(name: str = "SM_SHIP_Lounge"):
     the bar's stools stand where the crew sits."""
     spec, L, D, H = _dims("lounge")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = TH.living(wall_pattern=("panel", "cloth", "slats", "panel"), wall_acc=WEAVE_SAND)
+    cafe = (13.0, 24.0, 0.0, 16.0)
+    st = TH.living(wall_pattern=("panel", "cloth", "slats", "panel"), wall_acc=WEAVE_SAND,
+                   floor_fn=SU.zoned_floor(SU.planks_floor(OAK, 0.2, 2.2, "x", 7, None, BRASS, 0.95, holes=[cafe]),
+                                           [cafe + (lambda b_, x0, x1, y0, y1: SU.tiles(b_, x0, x1, y0, y1, 0.8, TERRAZZO, TERRAZZO_DARK, "checker", 5),)]))
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
+    SU.border_line(b, 13.0, 13.02, 0.0, 16.0, 0.02, BRASS)                                                              # the brass strip between the wood and the café's tiles
     # two conversation groups on rugs: armchairs turned in, a low table, a sofa, side tables with lamps, a floor lamp, a plant
     for k, yc in enumerate((5.3, 12.7)):
         place(b, 5.9, yc, 0, DC.rug, 6.6, 4.6, CARPET_RUST if k == 0 else CARPET_SLATE, CARPET_SAND)
@@ -100,6 +104,8 @@ def lounge(name: str = "SM_SHIP_Lounge"):
     place(b, xr - 0.04, 9.0, 180, DC.picture, 1.6, 0.9, 11, WALNUT, "sun", z=1.8)
     # a floor tree by the café, planters under the bar's screen
     place(b, xr - 1.0, 9.0, 0, PL.floor_tree, "pachira_c", 0.3, CERAMIC, 1.1, 20.0)
+    # ARTE-INTERNI-2: acoustic clouds hung over the two conversation groups and the café tables (the ceiling was one plane)
+    SU.clouds(b, [(2.2, 2.6, 9.8, 8.0), (2.2, 10.0, 9.8, 15.4), (13.6, 2.6, 22.2, 8.4)], H - 0.05, 0.42, PLASTER_IVORY, "warm_dim")
     return b.build(name)
 
 
@@ -164,6 +170,14 @@ def games(name: str = "SM_SHIP_Games"):
         place(b, x, WF + 0.02, 90, DC.picture, 1.0, 0.7, 20 + k, WALNUT, ("bands", "sun", "squares")[k], z=1.9)
     for y in (3.0, 13.0):
         lamp_strip(b.emit, (2.0, y, H - 0.06), (L - 2.0, y, H - 0.06), 0.06, 0.006, "violet", LAMP_DIM)
+    # ARTE-INTERNI-2: the floor was one navy plane. A green wool rug under the billiard table, a rust one under every card table, black tiles with a violet line under the arcade row, and clouds
+    # of acoustic panel over the tables and the pool
+    place(b, 17.0, 8.0, 0, SU.rug_ornate, 5.4, 3.8, CARPET_MOSS, CARPET_SLATE, ("oxblood", "cream", "mustard"), 4, 0.2)
+    for (xt, yt) in ((6.0, 5.0), (6.0, 11.0), (13.0, 4.0)):
+        place(b, xt, yt, 0, SU.rug_ornate, 3.6, 3.6, CARPET_RUST, CARPET_SLATE, ("navy", "cream", "mustard"), int(xt + yt), 0.18)
+    SU.tiles(b, 15.4, 22.8, 12.4, 15.55, 0.6, TILE_BLACK, TILE_FLOOR, "checker", 2, 0.004)
+    b.emit.lamp_box((15.4, 12.37, 0.004), (22.8, 12.4, 0.01), "violet", LAMP_DIM)
+    SU.clouds(b, [(3.6, 3.2, 8.4, 6.8), (3.6, 9.2, 8.4, 12.8), (14.8, 6.0, 19.2, 10.0), (11.0, 2.2, 15.0, 5.8)], H - 0.05, 0.42, COMPOSITE, "violet")
     return b.build(name)
 
 
@@ -282,11 +296,24 @@ def _star_field(b: SParts, L: float, D: float, H: float, n: int = 140, seed: int
         b.emit.lamp_box((x, y, H - 0.062), (x + s, y + s, H - 0.05), rng.choice(["white_cool", "ice", "cool_dim", "white_dim"]), LAMP_DIM)
 
 
+def _obs_ceiling(b: SParts, spec: dict, st, rng) -> None:
+    """The observation deck's ceiling: a dark plane with a field of stars, a beam over every ship's frame with a thread of light, a ring of light over the star table."""
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    zc = H - 0.05
+    b.body.box((WS + WF, WF, zc), (L - WS - WF, D - WS - WF, H), COMPOSITE)
+    SU.stars(b, 1.0, L - 1.0, 1.0, D - 2.5, zc - 0.003, 170, 5)
+    for x in (4.0, 8.0, 12.0, 16.0, 20.0):
+        b.body.box((x - 0.12, WF, zc - 0.16), (x + 0.12, D - WS - WF, zc), STRUCT)
+        b.emit.lamp_box((x - 0.125, 0.6, zc - 0.1), (x - 0.12, D - 0.6, zc - 0.08), "cool_dim", LAMP_DIM)
+        b.emit.lamp_box((x + 0.12, 0.6, zc - 0.1), (x + 0.125, D - 0.6, zc - 0.08), "cool_dim", LAMP_DIM)
+    _ring(b.emit, 12.0, 7.0, zc - 0.012, 3.0, "white_cool", 56, 0.06, LAMP_DIM)
+
+
 def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
     spec, L, D, H = _dims(key)
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.05, ceil=COMPOSITE, accent="cool_dim", cove="cool_dim",
-               rib_mat=TRIM, skirt=STRUCT)
+    st = TH.living(floor=WALNUT, floor_mode="covering", floor2=WALNUT, border=0.0, wall_hi=PLASTER_SLATE, wall_lo=PLASTER_SLATE, accent="cool_dim", strip="white_cool", light_cell="white_cool",
+                   ceiling="none", floor_fn=SU.planks_floor(WALNUT, 0.2, 2.4, "y", 11, None, BRASS, 0.9), ceiling_fn=_obs_ceiling)
     build_shell(b, spec, st, skip=("far",))
     spans = window_wall(b, "far", L, D, H, st, 5, glass=False)
     yf = D - WS - WF
@@ -297,12 +324,13 @@ def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
         place(b, xc, yf - 0.4, 90, F.bench, w, 0.6, 0.45, FABRIC_NAVY)
     for x in (8.0, 16.0):
         place(b, x, yf - 0.9, 90, G.telescope)
-    # the star table at the centre with stools, two conversation nooks
+    # the star table at the centre on a stone medallion, with stools, two conversation nooks
+    SU.compass_rose(b, 12.0, 7.0, 2.6, 0.0, 12, TERRAZZO_DARK)
     place(b, 12.0, 7.0, 0, G.holo_table, 0.9, 0.9)
     for a in (45, 135, 225, 315):
         place(b, 12.0 + 1.55 * math.cos(math.radians(a)), 7.0 + 1.55 * math.sin(math.radians(a)), 0, F.stool, 0.19, 0.46, FABRIC_NAVY)
     for (xa, xb, xt) in ((6.0, 9.2, 7.6), (18.0, 14.8, 16.4)):
-        place(b, xt, 7.0, 0, DC.rug, 4.6, 3.6, CARPET_SLATE, FABRIC_SAND)
+        place(b, xt, 7.0, 0, SU.rug_ornate, 4.6, 3.6, CARPET_SLATE, CARPET_SAND, ("navy", "cream", "oxblood"), int(xt), 0.2)
         place(b, xa, 7.0, 0 if xa < xb else 180, F.armchair, FABRIC_GREY)
         place(b, xb, 7.0, 180 if xa < xb else 0, F.armchair, FABRIC_GREY)
         place(b, xt, 7.0, 0, DC.coffee_table_set, 0.9, 0.6, 0.4, WALNUT, int(xt))
@@ -310,10 +338,13 @@ def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
         place(b, xt, 5.1, 0, DC.side_table, 0.22, 0.52, WALNUT, True, int(xt) + 1)
     place(b, 0.32, 8.0, 0, F.wall_screen, 3.2, 1.8, "scr_map", z=1.9)
     place(b, L - 0.32, 8.0, 180, F.wall_screen, 3.2, 1.8, "scr_lab", z=1.9)
+    # a sofa group facing each wall screen (the map on the left, the lab feed on the right)
+    for (xr_, xs, yaw_) in ((3.2, 3.6, 180), (L - 3.2, L - 3.6, 0)):
+        place(b, xr_, 8.0, 0, SU.rug_ornate, 3.4, 5.4, CARPET_SLATE, CARPET_SAND, ("oxblood", "cream", "navy"), int(xr_) + 3, 0.18)
+        place(b, xs, 8.0, yaw_, F.sofa, 2.8, LEATHER_NAVY)
+        place(b, xs + (-1.6 if yaw_ == 180 else 1.6), 8.0, 0, DC.coffee_table_set, 0.9, 0.6, 0.4, WALNUT, int(xr_) + 7)
     place(b, 1.2, 14.0, 0, F.potted_plant, 1.4, 9)
     place(b, 22.8, 14.0, 0, F.potted_plant, 1.4, 10)
-    _star_field(b, L, D, H)
-    lamp_strip(b.emit, (2.0, 3.4, H - 0.06), (L - 2.0, 3.4, H - 0.06), 0.05, 0.006, "cool_dim", LAMP_DIM)
     return b.build(name)
 
 

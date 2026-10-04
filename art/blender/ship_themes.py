@@ -164,7 +164,7 @@ THEME_TABLE: dict[str, tuple] = {
     "armory": ("security", dict()), "kit_room": ("security", dict()), "firing_range": ("security", dict(ceiling="exposed")), "brig": ("security", dict()),
     "security_office": ("command", dict(accent="security_dim", floor=CARPET_SLATE)), "shuttle_bay": ("flight", dict(ceiling="exposed")), "magazine": ("security", dict(ceiling="exposed")),
     # flight
-    "flight_ops": ("flight", dict(floor=CARPET_SLATE, floor_mode="covering", wall_hi=PLASTER_SLATE)), "pilot_ready": ("flight", dict(floor=CARPET_SLATE, floor_mode="covering")),
+    "flight_ops": ("flight", dict(floor=CARPET_SLATE, floor_mode="covering", wall_hi=PLASTER_SLATE, floor_grid=1.2)), "pilot_ready": ("flight", dict(floor=CARPET_SLATE, floor_mode="covering", floor_grid=1.2)),
     "aircraft_shop": ("tech", dict(accent="flight_dim")), "drone_bay": ("tech", dict(accent="flight_dim")), "sim_bay": ("flight", dict(accent="cyan_dim")),
     # engineering and the hull
     "workshop": ("tech", dict()), "fab_shop": ("tech", dict(floor=PLATING)), "repair_bay": ("tech", dict()), "machinery": ("tech", dict()), "machinery_b": ("tech", dict()),

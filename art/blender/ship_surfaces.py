@@ -256,18 +256,21 @@ def _top_quad(fb, x0: float, x1: float, y0: float, y1: float, z: float, mat: str
 
 
 def planks(b: SParts, x0: float, x1: float, y0: float, y1: float, mat: str, plank_w: float = 0.16, plank_l: float = 1.9, along: str = "x", seed: int = 1, z: float = 0.0,
-          gap: float = 0.003, mats=None) -> None:
+          gap: float = 0.003, mats=None, holes=()) -> None:
     """A floor of single planks (`plank_w` wide, `plank_l` long, a 3 mm joint: the structure under shows dark in it) in staggered rows, the grain along `along` ('x' or 'y');
     `mats` (a tuple of finishes) is picked from at random per plank. One flat face a plank (a 16 x 16 m room is ~900 of them, 1.8 k triangles). Lay it on a floor built without a
-    covering (`floor_fn`), or over one with `z` a little above it."""
+    covering (`floor_fn`), or over one with `z` a little above it. `holes` = [(x0, x1, y0, y1)] rectangles left bare (another finish is laid there): rows that lie inside a hole's
+    width lose the stretch of plank inside it, so give the holes edges on the rows' boundaries (multiples of plank_w from the room's edge)."""
     rng = random.Random(seed)
     along_x = along == "x"
     a0, a1, c0, c1 = (x0, x1, y0, y1) if along_x else (y0, y1, x0, x1)           # a: along the grain, c: across it
+    hl = [((h[0], h[1], h[2], h[3]) if along_x else (h[2], h[3], h[0], h[1])) for h in holes]     # (a0, a1, c0, c1) of every hole
     nrows = max(1, int(round((c1 - c0) / plank_w)))
     pw = (c1 - c0) / nrows
     for r in range(nrows):
         ca, cb = c0 + r * pw + gap / 2, c0 + (r + 1) * pw - gap / 2
         cut = a0 - rng.uniform(0.0, plank_l)
+        gaps_a = [(h[0], h[1]) for h in hl if h[2] - 1e-4 <= ca and cb <= h[3] + 1e-4]       # the stretches of this row that are not planked
         while cut < a1 - 0.02:
             ln = plank_l * rng.uniform(0.55, 1.0)
             pa, pb = max(a0, cut) + gap / 2, min(a1, cut + ln) - gap / 2
@@ -275,10 +278,23 @@ def planks(b: SParts, x0: float, x1: float, y0: float, y1: float, mat: str, plan
             if pb - pa < 0.12:
                 continue
             m = mats[rng.randrange(len(mats))] if mats else mat
-            if along_x:
-                _top_quad(b.body, pa, pb, ca, cb, z, m, rng)
-            else:
-                _top_quad(b.body, ca, cb, pa, pb, z, m, rng, flip_uv=True)
+            pieces = [(pa, pb)]
+            for (ga, gb) in gaps_a:
+                nxt = []
+                for (qa, qb) in pieces:
+                    if gb <= qa or ga >= qb:
+                        nxt.append((qa, qb))
+                        continue
+                    if ga - qa > 0.12:
+                        nxt.append((qa, ga - gap / 2))
+                    if qb - gb > 0.12:
+                        nxt.append((gb + gap / 2, qb))
+                pieces = nxt
+            for (qa, qb) in pieces:
+                if along_x:
+                    _top_quad(b.body, qa, qb, ca, cb, z, m, rng)
+                else:
+                    _top_quad(b.body, ca, cb, qa, qb, z, m, rng, flip_uv=True)
 
 
 def tiles(b: SParts, x0: float, x1: float, y0: float, y1: float, tile: float, mat_a: str, mat_b: str | None = None, pattern: str = "checker", seed: int = 1, z: float = 0.0,
@@ -381,3 +397,31 @@ def stars(b: SParts, x0: float, x1: float, y0: float, y1: float, z: float, n: in
         s = rng.choice((0.025, 0.03, 0.04, 0.05))
         cell = rng.choice(("white_cool", "ice", "cool_dim", "white_dim", "white_cool"))
         b.emit.lamp_face([(x, y, z), (x + s, y, z), (x + s, y + s, z), (x, y + s, z)], cell, (0, 0, -1), LAMP_DIM)
+
+
+# ----------------------------------------------------------------------------------------------------------------------------- floor factories
+def planks_floor(mat: str, plank_w: float = 0.2, plank_l: float = 2.0, along: str = "x", seed: int = 1, mats=None, line: str | None = None, line_inset: float = 0.95, holes=()):
+    """A `floor_fn` for a Style: planks over the whole room (`holes` left bare), optionally a brass line `line_inset` m inside the walls."""
+    def fn(b: SParts, spec: dict, st, rng) -> None:
+        L, D = spec["L"], spec["D"]
+        planks(b, 0.0, L, 0.0, D, mat, plank_w, plank_l, along, seed, 0.0, 0.003, mats, holes)
+        if line:
+            border_line(b, line_inset, L - line_inset, line_inset, D - line_inset, 0.02, line)
+    return fn
+
+
+def tiles_floor(mat_a: str, mat_b: str | None = None, tile: float = 0.6, pattern: str = "checker", seed: int = 1):
+    """A `floor_fn` for a Style: single tiles over the whole room (a chequerboard, or one finish with every tile its own part of the texture)."""
+    def fn(b: SParts, spec: dict, st, rng) -> None:
+        tiles(b, 0.0, spec["L"], 0.0, spec["D"], tile, mat_a, mat_b, pattern, seed)
+    return fn
+
+
+def zoned_floor(base, zones):
+    """A `floor_fn` that lays `base` (a floor_fn from planks_floor with `holes` for the zones) and then every zone: `zones` = [(x0, x1, y0, y1, fn)] where fn(b, x0, x1, y0, y1) builds that
+    rectangle (a lambda over `tiles`, `planks`, `field`...)."""
+    def fn(b: SParts, spec: dict, st, rng) -> None:
+        base(b, spec, st, rng)
+        for (x0, x1, y0, y1, zf) in zones:
+            zf(b, x0, x1, y0, y1)
+    return fn

@@ -10,6 +10,7 @@ import math
 import random
 
 import ship_decor as DC
+import ship_decor2 as D2
 import ship_furniture as F
 import ship_furniture2 as G
 import ship_furniture4 as F4
@@ -224,6 +225,17 @@ def fit_cabin(b: SParts, side: int, k: int, xo: float, y_lo: float, y_hi: float,
     if not officer:
         place(b, xo + sgn * 1.7, wall_lo, 90, DC.picture, 0.55, 0.42, seed, WALNUT, ("bands", "sun", "squares")[seed % 3], z=1.45)
         place(b, xo + sgn * 2.2, y_lo + 1.5, rng.uniform(80, 100), F4.duffel, 0.8, 0.18, pick((FABRIC_SAND, FABRIC_GREY, FABRIC_NAVY), k))
+    # ARTE-INTERNI-2: what the person keeps: photographs on the desk, an armchair and a lamp in the free corner, and in an officer's cabin a shelf over the bed (books, a photograph, the ship in
+    # miniature) and, in some, a guitar by the wardrobe or a shadow box of medals
+    place(b, xo + sgn * 0.2, y_hi - 0.38, yaw_in, D2.photo_frames, 3, seed, z=0.75)
+    place(b, xo + sgn * 3.15, y_hi - 0.85, yaw_in + sgn * 38.0, F.armchair, pick((FABRIC_SAND, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST), k + 1))
+    place(b, xo + sgn * 3.72, y_hi - 0.3, 0, F.lamp_standard, 1.45)
+    if officer:
+        place(b, xo + sgn * 1.3, wall_lo, 90, D2.wall_shelf, 1.4, seed + 9, z=1.5)
+        if seed % 3 == 0:
+            place(b, xo + sgn * 3.0, wall_lo + 0.12, 90 + rng.uniform(-6, 6), D2.guitar)
+        elif seed % 3 == 1:
+            place(b, xo + sgn * 2.65, wall_lo, 90, D2.medal_frame, 0.5, 0.35, seed, z=1.75)
 
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------ the block

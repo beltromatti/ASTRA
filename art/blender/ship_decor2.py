@@ -100,3 +100,78 @@ def plinth(b: SParts, w: float = 0.7, d: float = 0.5, h: float = 0.95, plate: bo
     if plate:
         b.fine.box((d / 2 - 0.028, -0.09, 0.45), (d / 2 - 0.02, 0.09, 0.5), BRASS)
     return h
+
+
+# ------------------------------------------------------------------------------------------------------------------------------ personal things
+def wall_shelf(b: SParts, w: float = 1.2, seed: int = 1) -> None:
+    """A floating wall shelf (origin at the middle of its back plate, facing +x): an oak board on two brass brackets with what a person keeps on it — a row of books held by a bookend, a framed
+    photograph, a mug, a small plant, a model of the ship; picked from `seed`."""
+    rng = random.Random(seed)
+    b.body.box((0.0, -w / 2, 0.0), (0.2, w / 2, 0.03), OAK)
+    for sy in (-w / 2 + 0.1, w / 2 - 0.1):
+        b.fine.box((0.0, sy - 0.012, -0.1), (0.016, sy + 0.012, 0.0), BRASS)
+        b.fine.box((0.016, sy - 0.012, -0.012), (0.17, sy + 0.012, 0.0), BRASS)
+    y = -w / 2 + 0.06
+    colors = ("navy", "oxblood", "forest", "mustard", "slate", "teal", "rust", "denim", "plum", "cream")
+    n_books = rng.randint(5, 9)
+    for k in range(n_books):
+        bw, bh = rng.uniform(0.022, 0.045), rng.uniform(0.16, 0.26)
+        b.soft.swatch_slab((0.03, y, 0.03), (0.03 + rng.uniform(0.12, 0.16), y + bw, 0.03 + bh), rng.choice(colors), sides=(k in (0, n_books - 1)))
+        y += bw + 0.003
+    b.fine.box((0.03, y, 0.03), (0.15, y + 0.008, 0.2), STEEL)                                                         # the bookend
+    y += 0.05
+    kind = rng.randrange(3)
+    if kind == 0:                                                                                                       # a framed photograph, standing
+        fw, fh = 0.15, 0.19
+        b.soft.swatch_box((0.07, y, 0.03), (0.09, y + fw, 0.03 + fh), "w_walnut")
+        b.soft.swatch_box((0.09, y + 0.012, 0.045), (0.092, y + fw - 0.012, 0.03 + fh - 0.014), rng.choice(("sand", "teal", "cream", "denim")))
+        y += fw + 0.04
+    elif kind == 1:                                                                                                     # a small plant in a pot
+        b.fine.cyl((0.1, y + 0.05, 0.03), (0.1, y + 0.05, 0.1), 0.04, CERAMIC, seg=10, r2=0.05)
+        b.soft.paint(MK.puff(b.soft, (0.1, y + 0.05, 0.14), (0.065, 0.065, 0.06), SWATCH, e=0.9, nu=8, nv=5), "forest")
+        y += 0.14
+    else:                                                                                                               # a mug and a small box
+        b.fine.cyl((0.1, y + 0.04, 0.03), (0.1, y + 0.04, 0.12), 0.04, CERAMIC, seg=10)
+        b.soft.swatch_slab((0.05, y + 0.1, 0.03), (0.15, y + 0.2, 0.09), rng.choice(colors))
+        y += 0.24
+    if y < w / 2 - 0.2:                                                                                                 # the ship on a little stand
+        b.fine.box((0.06, y, 0.03), (0.16, y + 0.16, 0.045), WALNUT)
+        MK.puff(b.soft, (0.11, y + 0.08, 0.075), (0.07, 0.07, 0.025), CERAMIC, e=0.6, nu=10, nv=5)
+
+
+def guitar(b: SParts) -> None:
+    """An acoustic guitar leaning against a wall (origin on the floor at its foot; the back of the body towards -x, the neck up and a little towards -x): a waisted body of two lobes,
+    a sound hole, a neck with a headstock, a bridge."""
+    lean = 0.14
+    with b.at(T(0.0, 0.0, 0.0) @ Ry(-8.0)):
+        # the two lobes of the body, a lower bout and an upper bout, in honey wood
+        b.soft.paint(MK.puff(b.soft, (0.04, 0.0, 0.2), (0.045, 0.17, 0.17), SWATCH, e=0.9, nu=14, nv=8), "w_honey")
+        b.soft.paint(MK.puff(b.soft, (0.04, 0.0, 0.46), (0.04, 0.13, 0.13), SWATCH, e=0.9, nu=14, nv=8), "w_honey")
+        b.fine.cyl((0.09, 0.0, 0.2), (0.093, 0.0, 0.2), 0.05, STRUCT, seg=14)
+        b.soft.paint(b.soft.box((0.03, -0.022, 0.55), (0.06, 0.022, 1.1), SWATCH), "w_ebony")
+        b.soft.paint(b.soft.box((0.025, -0.035, 1.1), (0.065, 0.035, 1.2), SWATCH), "w_ebony")
+    b.fine.box((-0.02, -0.12, 0.0), (0.02, 0.12, 0.02), STRUCT)
+
+
+def medal_frame(b: SParts, w: float = 0.5, h: float = 0.35, seed: int = 1) -> None:
+    """A shadow box of medals and a ribbon on a wall (origin: the middle of its back, facing +x): a dark wood frame, a navy velvet back, a row of brass and silver medals on coloured ribbons."""
+    rng = random.Random(seed)
+    b.body.box((0.0, -w / 2, -h / 2), (0.045, w / 2, h / 2), WALNUT)
+    b.soft.swatch_box((0.04, -w / 2 + 0.03, -h / 2 + 0.03), (0.043, w / 2 - 0.03, h / 2 - 0.03), "navy")
+    n = 4
+    for k in range(n):
+        y = -w / 2 + 0.07 + k * (w - 0.14) / (n - 1)
+        b.soft.swatch_box((0.043, y - 0.015, 0.0), (0.045, y + 0.015, h / 2 - 0.05), rng.choice(("red", "blue", "mustard", "forest", "cream")))
+        b.fine.cyl((0.045, y, -0.03), (0.052, y, -0.03), 0.032, rng.choice((BRASS, STEEL)), seg=14)
+        b.fine.cyl((0.052, y, -0.03), (0.054, y, -0.03), 0.02, TRIM, seg=10)
+
+
+def photo_frames(b: SParts, n: int = 3, seed: int = 1) -> None:
+    """A few framed photographs standing on a desk or a shelf (origin at the middle of the group, facing +x), turned a little each, each with a pale print."""
+    rng = random.Random(seed)
+    for k in range(n):
+        fw, fh = rng.uniform(0.09, 0.14), rng.uniform(0.11, 0.17)
+        y = (k - (n - 1) / 2) * 0.17
+        with b.at(T(0.0, y, 0.0) @ Rz(rng.uniform(-14, 14))):
+            b.soft.swatch_box((-0.01, -fw / 2, 0.0), (0.01, fw / 2, fh), rng.choice(("w_walnut", "w_oak", "brass", "charcoal")))
+            b.soft.swatch_box((0.01, -fw / 2 + 0.012, 0.012), (0.012, fw / 2 - 0.012, fh - 0.012), rng.choice(("sand", "teal", "cream", "denim", "olive", "rose")))
