@@ -42,6 +42,12 @@ abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 - **Uniti**: ABBORDAGGI-3 tappa 1 (`astra.board.drill`, le perdite degli sbarchi nei registri di FLOTTA-VIVA) e SPAZIO-VIVO-2 tappa 1 (i pezzi dei
   relitti come contatti W-02B/M/S, scafi solidi, relitti ritrovati al ritorno, i blocchi di propulsori del Mandato: navi rigenerate e reimportate,
   `WRECK_CONTACTS_OK` nel gioco).
+- **Rami degli aiutanti pronti, DA UNIRE (prossima sessione, in quest'ordine)**: ARTE-INTERNI-2 `worktree-agent-ad87795a9cc721503` @ `19e8351`
+  (giardino, biblioteca, cabine, rastrelliere e letti dell'infermeria rifatti, kit da 6,61 a 5,42 M triangoli; passi: unire, Blender `ship_kit.py`,
+  `berths.py -- art/export/berths`, `medbay.py -- art/export/medbay`, poi nell'editor `build_berths.py`, `build_medbay.py`, `build_ship_interior.py`;
+  dettagli in NAVE.md §10.5); ABBORDAGGI-3 `worktree-agent-a51a2df52e826c576` @ `4ba52a4` (i ponti nemici vestiti: kit Mandato di 48 pezzi,
+  `AstraBoardDress`; passi: unire, compilare, Blender `board_kit.py`, editor `make_board_materials.py` e `import_board_kit.py`, prova con
+  `astra.board.assault out ...` come in ABBORDAGGI.md §14). SPAZIO-VIVO-2 si stava fermando: controllare il suo ramo `worktree-agent-a56b88eaae19a3600`.
 - **Da fare**: il Capitano che usa una console con le sue mani (E alla postazione, il cursore sul touch, gli stessi modi degli ufficiali); le altre
   stanze con finestre (mensa, alloggi, giardini) nel filtro del sole; i conti delle prestazioni con la macchina scarica (con tre aiutanti il carico
   è 19 e le misure non valgono).
