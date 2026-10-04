@@ -99,6 +99,7 @@ namespace AstraBoard
 		ERole Role = ERole::Rifleman;
 		FString Name;
 		int32 Roster = INDEX_NONE;       // an Aquila marine of the ship's roster (VITA): INDEX_NONE for the rest
+		int32 Person = INDEX_NONE;       // a person of a boarded ship's crew in the war's books (FLOTTA-VIVA: FFleetSnapshot::FHand::Person), so that what the fight does to him is written back
 		int32 Squad = INDEX_NONE;
 		int32 Party = INDEX_NONE;        // the craft he came in (the host's number for it): what happens to the craft happens to him until he is through
 		bool bExternal = false;          // the Captain: the game moves him

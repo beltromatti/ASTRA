@@ -104,12 +104,32 @@ struct FFleetSnapshot
 		bool bWounded = false;
 		FString Billet;                  // "captain", "chief_engineer"... for the named; empty for the rest
 		FString Name;                    // "Commander Idris Haldane" for the named
+		int32 Person = INDEX_NONE;       // who this is in the interior (ABBORDAGGI-3: a landing writes its dead and wounded back to the same people: FAstraShipInterior::ApplyBoarding)
 	};
 	TArray<FRoom> Rooms;
 	TArray<FName> SealedDoors;           // the pressure bulkheads that are shut (door ids of the plan)
 	TArray<FHand> Hands;                 // the people alive (fit or wounded), where they are now
+	TArray<FHand> Fallen;                // the dead of the war (ABBORDAGGI-3), where they fell: the decks of a boarded ship show them (never those lost with the ship: she is gone)
 	int32 Killed = 0, LostWithShip = 0;
 	FString Command;                     // who has the conn
+};
+
+/** What a landing did to one person of a ship's crew (ABBORDAGGI-3): the people of the ship the marines boarded who were put down, and the boarders of the ship that sent boats (they are her marines). */
+struct FFleetCasualty
+{
+	int32 Person = INDEX_NONE;           // who (FFleetSnapshot::FHand::Person), or INDEX_NONE: whoever of the right kind was where the fighting was
+	int32 Comp = INDEX_NONE;             // where he fell (the plan's room), or INDEX_NONE for a man who fell on another ship's decks
+	FVector PosCm = FVector::ZeroVector; // and the place in it
+	int32 Role = -1;                     // EFleetRole when the person is not known (a boarder is a marine of the carrier: EFleetRole::Marine)
+	bool bKilled = false;                // dead; else hurt (alive: carried off, or lying)
+};
+
+/** What ApplyBoarding made of a list of casualties. */
+struct FFleetBoardingTally
+{
+	int32 Killed = 0, Wounded = 0;
+	int32 Unmatched = 0;                 // casualties for whom no one of the crew was left to take their place (the crew has been put down already, or the list is longer than the people there)
+	bool bCaptainFell = false;           // the ship's captain is among them (dead or down: the conn passes down the chain)
 };
 
 /** Where an inside shows on the hull: the effects draw fires and streaming atmosphere there, and light the windows by what is still powered. */
@@ -129,6 +149,10 @@ public:
 	void Impact(const FAstraHullHit& Hit);
 	/** One of the war's three lengthwise sections (0 bow, 1 mid, 2 stern) has no structure left: what lived in its rooms is lost. */
 	void GutSection(int32 WarSection);
+	/** A landing's casualties are written into the books (ABBORDAGGI-3): each is a person of the crew, dead or hurt, where he fell; the counts, the roles' strengths, what the ship can still do (her guns' crews,
+	 *  her bridge, her engineering) and the chain of command follow, as if the blow had been the war's. A person who is hurt or dead already is not taken twice. A casualty who is no named person is the nearest fit
+	 *  one of the right kind in the room where he fell (else in the nearest room that has one); a ship taken keeps her books exactly as the landing left them. */
+	FFleetBoardingTally ApplyBoarding(const TArray<FFleetCasualty>& Casualties);
 	/** A room takes a blow directly (the bench and the console): an energy as a hit's, spent there. */
 	void Strike(int32 Comp, float Energy, uint8 Type, bool bHole);
 	/** What the war should be told, once each: the crew falling to three quarters, half, a quarter; the captain down or dead; weapons or engines

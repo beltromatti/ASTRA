@@ -208,7 +208,7 @@ void UAstraBattleSubsystem::TickBoardingCraft(FAstraBattleShip& S, float Dt)
 	}
 	if (B.Phase == EPhase::Undocking)
 	{
-		B.bAllowPd = true;
+		B.bAllowPd = !B.bPdSilenced;
 		const FVector NW = T ? T->Att.RotateVector(B.DockNormal).GetSafeNormal() : (Cr ? (S.Pos - Cr->Pos).GetSafeNormal() : -S.Att.GetForwardVector());
 		const FVector Base = T ? T->Vel : S.Vel;
 		Steer(Base + NW * (6.0 + 5.0 * B.T), -NW, T ? T->Att.GetUpVector() : FVector::UpVector, K->Accel, 40.f);
@@ -224,7 +224,7 @@ void UAstraBattleSubsystem::TickBoardingCraft(FAstraBattleShip& S, float Dt)
 	if (!Anchor)
 	{
 		// no ship to come home to: it drifts away from where it was, and is gone after a while
-		B.bAllowPd = true;
+		B.bAllowPd = !B.bPdSilenced;
 		B.GoneT += Dt;
 		const FVector Out = T ? (S.Pos - T->Pos).GetSafeNormal() : S.Att.GetForwardVector();
 		Steer(Out * K->Cruise * 0.6, FVector::ZeroVector, FVector::UpVector, K->Accel, 20.f);
@@ -240,7 +240,7 @@ void UAstraBattleSubsystem::TickBoardingCraft(FAstraBattleShip& S, float Dt)
 	const FVector LocalN = (bHome ? B.BayNormal : B.DockNormal).GetSafeNormal();
 	const auto HatchWorld = [&]() { return Anchor->Pos + Anchor->Att.RotateVector(Local); };
 	const auto NormalWorld = [&]() { return Anchor->Att.RotateVector(LocalN).GetSafeNormal(); };
-	B.bAllowPd = true;
+	B.bAllowPd = !B.bPdSilenced;
 	switch (B.Phase)
 	{
 	case EPhase::Idle:

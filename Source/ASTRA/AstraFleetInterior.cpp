@@ -39,6 +39,7 @@ namespace
 	                                     TEXT("Nettle"), TEXT("Oakes"), TEXT("Penhale"), TEXT("Ravel"), TEXT("Stroud")};
 
 	constexpr float MedevacDelayS = 25.f;
+	constexpr uint8 FleetCauseGunfire = 100;                  // (FFleetPerson::Cause beyond EAstraDmgHarm: a person put down by a landing's small arms)
 }
 
 const TCHAR* AstraFleetBilletWord(FName Role)
@@ -281,6 +282,128 @@ FString FAstraShipInterior::HarmPerson(int32 Who, bool bKill, EAstraDmgHarm Caus
 		return FString::Printf(TEXT("%s %s (%s)"), *N.Rank, *N.Name, AstraFleetBilletWord(N.Role));
 	}
 	return TEXT("crew");
+}
+
+FFleetBoardingTally FAstraShipInterior::ApplyBoarding(const TArray<FFleetCasualty>& Casualties)
+{
+	FFleetBoardingTally Tally;
+	const FAstraDamageMap& M = *Plan->Map;
+	for (const FFleetCasualty& C : Casualties)
+	{
+		// who: the person named, else the nearest fit one of the right kind where he fell (a boarder is one of the carrier's marines: the first fit marine in the books)
+		int32 Who = INDEX_NONE;
+		if (People.IsValidIndex(C.Person))
+		{
+			if (People[C.Person].State != 0)
+			{
+				continue;                                       // hurt or fallen already (a man who lay wounded when the marines came): the books have him
+			}
+			Who = C.Person;
+		}
+		else if (C.Comp != INDEX_NONE && M.Comps.IsValidIndex(C.Comp))
+		{
+			float Best = 1.0e18f;
+			const auto Consider = [&](int32 Comp)
+			{
+				const TArray<int32>* L = ByComp.Find(Comp);
+				if (!L)
+				{
+					return;
+				}
+				for (const int32 I : *L)
+				{
+					const FFleetPerson& P = People[I];
+					if (P.State != 0)
+					{
+						continue;
+					}
+					const float D = FVector::DistSquared(FVector(P.PosCm), C.PosCm) + (C.Role >= 0 && (int32)P.Role != C.Role ? 4.0e6f : 0.f);
+					if (D < Best)
+					{
+						Best = D;
+						Who = I;
+					}
+				}
+			};
+			Consider(C.Comp);
+			if (Who == INDEX_NONE)
+			{
+				// nobody of his is left in that room: the nearest room of the deck that has someone on his feet
+				float BestRoom = 1.0e18f;
+				int32 Room = INDEX_NONE;
+				for (const TPair<int32, TArray<int32>>& KV : ByComp)
+				{
+					if (KV.Key == C.Comp || !M.Comps.IsValidIndex(KV.Key) || M.Comps[KV.Key].Deck != M.Comps[C.Comp].Deck)
+					{
+						continue;
+					}
+					bool bAny = false;
+					for (const int32 I : KV.Value)
+					{
+						bAny |= People[I].State == 0;
+					}
+					const float D = (float)FVector::DistSquared(M.Comps[KV.Key].Box.GetCenter(), C.PosCm);
+					if (bAny && D < BestRoom)
+					{
+						BestRoom = D;
+						Room = KV.Key;
+					}
+				}
+				if (Room != INDEX_NONE)
+				{
+					Consider(Room);
+				}
+			}
+		}
+		else if (C.Role >= 0)
+		{
+			for (int32 I = 0; I < People.Num() && Who == INDEX_NONE; ++I)
+			{
+				if (People[I].State == 0 && (int32)People[I].Role == C.Role && People[I].Named < 0)
+				{
+					Who = I;
+				}
+			}
+			for (int32 I = 0; I < People.Num() && Who == INDEX_NONE && C.Role == (int32)EFleetRole::Marine; ++I)
+			{
+				if (People[I].State == 0 && People[I].Role == EFleetRole::MarineDock && People[I].Named < 0)
+				{
+					Who = I;                                    // (the guard of her hatches go in her boats too)
+				}
+			}
+		}
+		if (Who == INDEX_NONE)
+		{
+			++Tally.Unmatched;
+			continue;
+		}
+		FFleetPerson& P = People[Who];
+		const bool bNamedCaptain = P.Named >= 0 && Named[P.Named].Role == FName(TEXT("captain"));
+		if (C.Comp != INDEX_NONE && M.Comps.IsValidIndex(C.Comp) && P.Comp != C.Comp)
+		{
+			if (TArray<int32>* L = ByComp.Find(P.Comp))
+			{
+				L->RemoveSingleSwap(Who);
+			}
+			ByComp.FindOrAdd(C.Comp).Add(Who);
+			P.Comp = C.Comp;
+		}
+		if (C.Comp != INDEX_NONE)
+		{
+			P.PosCm = FVector3f(C.PosCm);                           // where he fell: a boarded ship's decks show him there the next time
+		}
+		HarmPerson(Who, C.bKilled, EAstraDmgHarm::Blast);
+		P.Cause = FleetCauseGunfire;
+		++(C.bKilled ? Tally.Killed : Tally.Wounded);
+		Tally.bCaptainFell |= bNamedCaptain;
+	}
+	if (Tally.Killed || Tally.Wounded)
+	{
+		RefreshFit();                                               // (what the ship can still do: her guns' crews, her bridge, her engineering)
+		bCalm = false;                                              // (the wounded are carried to her medbay a while after: the next tick sees to it)
+		Note(FString::Printf(TEXT("%s: a landing left %d of her crew dead and %d hurt%s"), *ShipName, Tally.Killed, Tally.Wounded, Tally.bCaptainFell ? TEXT(", her captain among them") : TEXT("")), false);
+	}
+	return Tally;
 }
 
 void FAstraShipInterior::SetCaptain(const FString& Rank, const FString& Name)

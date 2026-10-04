@@ -99,6 +99,7 @@ namespace AstraBoardCraft
 		bool bAbort = false;             // the host: turn back
 		FVector DockWorldPrev = FVector::ZeroVector;   // (where the hatch was a step ago: its velocity)
 		bool bAllowPd = true;            // may point defence fire at it (not while it is latched on the hull)
+		bool bPdSilenced = false;        // the boarding drill: no point defence of anybody's fires at this boat (FLaunch::bSilencePd)
 	};
 
 	enum class EEventKind : uint8
@@ -154,6 +155,7 @@ namespace AstraBoardCraft
 		float FirstS = 3.f;              // when the first leaves
 		float GapS = 3.f;                // and how long after each one the next
 		bool bCaptain = false;           // the Captain is in the first craft
+		bool bSilencePd = false;         // the boarding drill: point defence does not fire at these boats (they are flown through it)
 	};
 	struct FLaunchResult
 	{
@@ -223,4 +225,21 @@ namespace AstraBoardCraft
 
 	/** The facing (0 bow, 1 stern, 2 port, 3 starboard, 4 dorsal, 5 ventral) a hatch looks out of. */
 	ASTRA_API int32 FacingOfNormal(const FVector& LocalNormal);
+
+	/** A boarding of the Aquila staged as a drill (ABBORDAGGI-3, `astra.board.drill`): what in today's play stops every boat (the Falcons, the Praetorian's point defence, the shield the crew raises again) is
+	 *  held off for the length of one assault so that the lead can watch the boats latch at her airlocks and the fight in her corridors. Plain play is untouched: with no drill every rule is the war's. */
+	struct FDrill
+	{
+		bool bOn = false;
+		int32 TargetId = -1;             // the ship whose face is held (the Aquila's)
+		int32 Face = -1;                 // the face of her shield that is held at nothing (0 bow, 1 stern, 2 port, 3 starboard, 4 dorsal, 5 ventral); -1: none
+		bool bSilencePd = true;          // point defence fires at no boat of the drill, from any ship
+		bool bShutDecks = true;          // the flight decks are shut: the squadrons are recalled, none launches
+		int32 CarrierId = -1;            // a carrier kept abeam of the target (ParkM from her, on the face's side) with her guns held: the boats' flight is short and the same every time
+		double ParkM = 0.0;
+		FVector ParkLocal = FVector::ZeroVector;     // where she is kept, in the target's frame (m)
+		FQuat ParkRel = FQuat::Identity;             // and how she lies against the target (her boat bay faces the target)
+		bool bCarrierHeldFire = false;   // (what the carrier's ceasefire was before: given back at the end)
+		float AgeS = 0.f;
+	};
 }

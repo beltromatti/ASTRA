@@ -3767,6 +3767,11 @@ bool UAstraBattleSubsystem::LaunchSquadron(const FString& Name, const FString& M
 		return false;
 	}
 	FAstraSquadron& Q = Squadrons[Qi];
+	if (BoardDrill.bOn && BoardDrill.bShutDecks)
+	{
+		OutDetail = TEXT("the flight decks are shut for the boarding drill (the Captain's: astra.board.drill off ends it): nothing launches");     // ABBORDAGGI-3
+		return false;
+	}
 	const FString M = Mission.ToLower();
 	FAstraBattleShip* T = ContactId.IsEmpty() ? nullptr : FindByContact(ContactId);
 	if (T && (!T->bAlive || T->bCraft))

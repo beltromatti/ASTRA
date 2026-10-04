@@ -112,23 +112,25 @@ void FAstraShipInterior::Snapshot(FFleetSnapshot& Out) const
 			Out.SealedDoors.Add(M.Doors[D].Id);
 		}
 	}
-	for (const FFleetPerson& P : People)
+	for (int32 I = 0; I < People.Num(); ++I)
 	{
-		if (P.State == 2)
+		const FFleetPerson& P = People[I];
+		if (P.State == 2 && Lost > 0)
 		{
-			continue;
+			continue;                                      // lost with the ship: she is gone, nobody lies on her decks
 		}
 		FFleetSnapshot::FHand H;
 		H.Comp = P.Comp;
 		H.PosCm = FVector(P.PosCm);
 		H.Role = (uint8)P.Role;
 		H.bWounded = P.State == 1;
+		H.Person = I;
 		if (P.Named >= 0 && Named.IsValidIndex(P.Named))
 		{
 			H.Billet = Named[P.Named].Role.ToString();
 			H.Name = FString::Printf(TEXT("%s %s"), *Named[P.Named].Rank, *Named[P.Named].Name);
 		}
-		Out.Hands.Add(H);
+		(P.State == 2 ? Out.Fallen : Out.Hands).Add(H);
 	}
 	Out.Killed = Dead;
 	Out.LostWithShip = Lost;
