@@ -601,6 +601,7 @@ namespace
 	};
 	TArray<FBenchOp> GBenchOps;
 	int32 GBenchOrder = 9000;
+	TWeakObjectPtr<UWorld> GBenchOrderWorld;           // (the world the count above is for: a run of several seeds is several worlds, one after the other)
 }
 
 void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
@@ -906,6 +907,11 @@ namespace
 			FLaunch Req;
 			Req.CarrierId = Cid;
 			Req.TargetId = Tid;
+			if (GBenchOrderWorld.Get() != W)
+			{
+				GBenchOrderWorld = W;
+				GBenchOrder = 9000;                                                                  // (`astra.board.depart 9000` is about the first order of THIS world, in every seed)
+			}
 			Req.Order = GBenchOrder++;
 			for (int32 i = 0; i < N; ++i)
 			{
