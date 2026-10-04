@@ -189,6 +189,28 @@ void UAstraBattleSubsystem::GetInboundMissiles(TArray<FVector>& Out) const
 	}
 }
 
+int32 UAstraBattleSubsystem::GuidedArriving(const FString& Contact, double WithinS, int8 FromSide, TArray<FVector>& OutWorld) const
+{
+	OutWorld.Reset();
+	const FAstraBattleShip* T = Contact.IsEmpty() ? (Ships.Num() ? &Ships[0] : nullptr) : FindByContact(Contact);
+	if (!T || !T->bAlive)
+	{
+		return 0;
+	}
+	for (const FAstraProjectile& Pr : Projectiles)
+	{
+		if (Pr.bDead || Pr.Kind != EAstraProjKind::Missile || Pr.Target != T->Id || (FromSide >= 0 && Pr.OwnerSide != FromSide))
+		{
+			continue;
+		}
+		if (FVector::Dist(Pr.Pos, T->Pos) <= FMath::Max(Pr.Vel.Size(), 1.0) * WithinS)
+		{
+			OutWorld.Add(WorldOf(Pr.Pos));
+		}
+	}
+	return OutWorld.Num();
+}
+
 TSharedRef<FJsonObject> UAstraBattleSubsystem::DebugState() const
 {
 	TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();

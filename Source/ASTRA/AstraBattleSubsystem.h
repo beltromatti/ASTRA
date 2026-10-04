@@ -708,6 +708,9 @@ public:
 	bool WasDestroyed(const FString& ContactId) const;
 	/** Missiles flying at the Aquila now (system frame). */
 	void GetInboundMissiles(TArray<FVector>& Out) const;
+	/** The guided weapons (missiles, torpedoes) of side FromSide (0 ASTRA, 1 Mandate, -1 either) in flight at the ship with this contact id (empty: the
+	 *  Aquila) that reach her within WithinS seconds at their speed: where they are (world, cm). The main viewscreen frames a salvo coming in, or ours landing. */
+	int32 GuidedArriving(const FString& Contact, double WithinS, int8 FromSide, TArray<FVector>& OutWorld) const;
 	/** Where a point of the system frame is drawn in the level (cm, the bridge at the origin). */
 	FVector WorldOf(const FVector& SystemPos) const { return Ships.Num() ? ToWorld(SystemPos) : FVector::ZeroVector; }
 	/** Bearing and mark (degrees, the helm's convention) from the Aquila to a point of the system frame. */

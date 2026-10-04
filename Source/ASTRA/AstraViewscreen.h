@@ -62,11 +62,12 @@ private:
 	UPROPERTY() TObjectPtr<UFont> Title;
 
 	// the shot: what the camera frames, where it is, how wide
-	enum class EShot : uint8 { Forward, Contact, Group, Point, Ship, Off };
+	enum class EShot : uint8 { Forward, Contact, Group, Point, Ship, Swarm, Off };
 	EShot Shot = EShot::Forward;
 	FString ShotId;                    // the contact (Contact)
 	FString ShotName;                  // how the caption calls it
 	TArray<FString> GroupIds;          // the contacts to frame together (Group)
+	double SwarmShotAt = -100.0;       // the last time a salvo coming in had the screen (Swarm: the missiles at the Aquila, framed as they come)
 	FVector ShotPoint = FVector::ZeroVector;   // system frame (Point: where a ship died)
 	FString ShotWhy;                   // "TARGET", "FIRING ON US", "DESTROYED", "ORDERED", …
 	int32 ShotPri = 0;                 // the director's priority of the shot on screen

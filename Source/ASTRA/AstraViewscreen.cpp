@@ -330,6 +330,7 @@ FString AAstraViewscreen::Describe() const
 	case EShot::Group: What = ShotName.ToLower(); break;
 	case EShot::Point: What = FString::Printf(TEXT("where %s was destroyed"), *ShotName); break;
 	case EShot::Ship: What = TEXT("the Aquila from outside"); break;
+	case EShot::Swarm: What = FString::Printf(TEXT("%s coming at the Aquila"), *ShotName); break;
 	default: What = TEXT("the view ahead"); break;
 	}
 	return FString::Printf(TEXT("%s: %s, %s, zoom x%.0f"), *Mode, *ShotWhy.ToLower(), *What, 58.f / FMath::Max(Fov, 0.05f));
@@ -551,9 +552,24 @@ void AAstraViewscreen::Direct(float Dt)
 		const FDeath& D = Deaths.Last();
 		Best = {EShot::Point, D.Id, D.Name, TEXT("DESTROYED"), 6, 5.0, D.Pos, {}};
 	}
+	else if (TArray<FVector> In; B->GuidedArriving(FString(), 7.0, 1, In) >= 2 && (Shot == EShot::Swarm || Now - SwarmShotAt > 20.0))
+	{
+		// a salvo coming in: the screen turns to it for its last seconds, the missiles marked, and the point defence's work seen (an incoming
+		// salvo at 10 km was a list of numbers on the plot, 4 Oct); not again for twenty seconds, so the fight is not all missiles
+		if (Shot != EShot::Swarm)
+		{
+			SwarmShotAt = Now;
+		}
+		Best = {EShot::Swarm, TEXT("salvo"), FString::Printf(TEXT("%d missiles"), In.Num()), TEXT("INCOMING"), 5, 3.0, FVector::ZeroVector, {}};
+	}
 	else if (!HitId.IsEmpty())
 	{
 		Best = {EShot::Contact, HitId, HitName, TEXT("HEAVY HIT"), 5, 4.0, FVector::ZeroVector, {}};
+	}
+	else if (const FContact* Hit = FindC(Cs, Engaged); Hit && Hit->Track >= 2 && B->GuidedArriving(Hit->ContactId, 3.0, 0, In) >= 2)
+	{
+		// our own salvo about to land on the target: the target, as the missiles get there
+		Best = {EShot::Contact, Hit->ContactId, Hit->Label, TEXT("SALVO"), 5, 4.0, FVector::ZeroVector, {}};
 	}
 	else if (Arrivals.Num() >= 2 && Now - ArrivalShotAt[Arrivals[0].bHostile ? 1 : 0] > 30.0)
 	{
@@ -760,6 +776,20 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 		{
 			WantDir = Sum.GetSafeNormal();
 			FovWant = FMath::Clamp(FitFov(WantDir, Pts, 1.3) + 2.f, 3.f, 75.f) / Zoom;
+			Subject = MoveTemp(Pts);
+		}
+		break;
+	}
+	case EShot::Swarm:
+	{
+		// a salvo coming at the Aquila: the missiles framed together as they come (wider as they close), until the last is down or home
+		TArray<FVector> Pts;
+		if (B->GuidedArriving(FString(), 9.0, 1, Pts))
+		{
+			FVector Sum = FVector::ZeroVector;
+			for (const FVector& P : Pts) { Sum += P.GetSafeNormal(); }
+			WantDir = Sum.GetSafeNormal();
+			FovWant = FMath::Clamp(FitFov(WantDir, Pts, 1.4) + 4.f, 8.f, 75.f) / Zoom;
 			Subject = MoveTemp(Pts);
 		}
 		break;
@@ -1268,6 +1298,7 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	{
 	case EShot::Contact: Caption = FString::Printf(TEXT("%s  ·  %s"), *ShotWhy, *ShotName.ToUpper()); break;
 	case EShot::Group: Caption = FString::Printf(TEXT("%s  ·  %s"), *ShotWhy, *ShotName.ToUpper()); break;
+	case EShot::Swarm: Caption = FString::Printf(TEXT("%s  ·  %s"), *ShotWhy, *ShotName.ToUpper()); break;
 	case EShot::Point: Caption = FString::Printf(TEXT("%s DESTROYED"), *ShotName.ToUpper()); break;
 	case EShot::Ship: Caption = FString::Printf(TEXT("ASN AQUILA  ·  HULL %.0f%%"), 100.f * B->PlayerHullFraction()); break;
 	default: Caption = ShotWhy; break;
