@@ -42,7 +42,10 @@ import shipgen3 as SG  # noqa: E402
 CLASS_OF = {
     "SM_SHIP_ASTRA_Aquila": "aquila", "SM_SHIP_ASTRA_Praetorian": "praetorian", "SM_SHIP_ASTRA_Vigilant": "vigilant",
     "SM_SHIP_MANDATE_Acheron": "acheron", "SM_SHIP_MANDATE_Styx": "styx", "SM_SHIP_MANDATE_Lethe": "lethe", "SM_SHIP_GUILD_Freighter": "freighter",
+    # the craft (round two): the fighters, the bomber, the drones and the Mandate's strike fighter turn and brake on jets too
+    "SM_CRAFT_ASTRA_Falcon": "falcon", "SM_CRAFT_ASTRA_Hammer": "hammer", "SM_CRAFT_ASTRA_Wasp": "wasp", "SM_CRAFT_MANDATE_Harpy": "harpy",
 }
+SMALL_M = 40.0                                                  # a hull shorter than this is a craft: its nozzles, its flat patches and its stand-off from the skin are a few centimetres, not metres
 KIND_COL = {"quad": (1.0, 1.0, 1.0), "yaw": (0.2, 0.9, 1.0), "pitch": (0.3, 1.0, 0.35), "brake": (1.0, 0.55, 0.12)}
 BELL_LIP = 2.14
 EPS = 1e-9
@@ -99,7 +102,7 @@ def find_site(hull: Hull, axis: int, sgn: int, x_nom: float, lat_nom: float, lat
     """The nozzle's place on the hull near (x_nom, lat_nom): a ray along -sgn on `axis` (1 a flank, 2 the deck or the keel) from outside, on the flattest patch near the nominal point
     (within x_span of the length along the ship and lat_span across). The lateral coordinate is the other of y and z."""
     lt = 2 if axis == 1 else 1
-    flat = float(np.clip(0.012 * length, 2.5, 10.0))
+    flat = float(np.clip(0.012 * length, 2.5 if length >= SMALL_M else 0.25, 10.0))
     best = None
     for dx in (np.linspace(-x_span, x_span, 5) if x_span > 0 else np.zeros(1)) * length:
         for dl in (np.linspace(-1.0, 1.0, 9) * lat_span if lat_span > 0 else np.zeros(1)):
@@ -134,7 +137,7 @@ def find_site(hull: Hull, axis: int, sgn: int, x_nom: float, lat_nom: float, lat
 def find_pair(hull: Hull, axis: int, sgn: int, x_nom: float, lat_nom: float, lat_span: float, length: float, far: float) -> list[dict]:
     """A site on the starboard side (a flank: the +y one; the deck or the keel: the half with y > 0) and its mirror on the other side where the hull is as good there, else the best found
     independently: a ship's jets come in pairs, and a pair that is not the same on both sides would make one side of a turn look unlike the other."""
-    flat = float(np.clip(0.012 * length, 2.5, 10.0))
+    flat = float(np.clip(0.012 * length, 2.5 if length >= SMALL_M else 0.25, 10.0))
     if axis == 1:
         a = find_site(hull, 1, +1, x_nom, lat_nom, lat_span, length, far)
         if a is None:
@@ -160,7 +163,8 @@ def site_set(hull: Hull, with_stern: bool) -> list[dict]:
     hw = float(hi[1] - lo[1]) / 2
     zc = float(lo[2] + hi[2]) / 2
     far = max(hw, hh) * 3 + 50.0
-    r = float(np.clip(0.0016 * L, 0.35, 1.6))
+    small = L < SMALL_M
+    r = float(np.clip(0.004 * L, 0.05, 0.2)) if small else float(np.clip(0.0016 * L, 0.35, 1.6))
     out: list[dict] = []
 
     def add(kind: str, site: dict | None, exhaust: np.ndarray | None = None) -> None:
@@ -169,7 +173,7 @@ def site_set(hull: Hull, with_stern: bool) -> list[dict]:
         n = site["n"]
         d = (n * 0.5 + site["out"] * 0.5) if exhaust is None else exhaust          # (a jet leaves along the way out of the hull; the slab's slope tilts it a little, not a lot)
         d = d / max(np.linalg.norm(d), 1e-9)
-        out.append({"k": kind, "p": site["p"] + n * 0.4, "d": d, "r": r, "q": round(site["spread"], 2)})
+        out.append({"k": kind, "p": site["p"] + n * (0.05 if small else 0.4), "d": d, "r": r, "q": round(site["spread"], 2)})
 
     def width_at(x: float) -> float:
         """Half the hull's width at a station (the farthest vertices on either side within a band of the length)."""

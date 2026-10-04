@@ -35,6 +35,7 @@ class UStaticMesh;
 class UStaticMeshComponent;
 struct FAstraBattleShip;
 struct FAstraDeathEvent;
+struct FAstraPilotStatus;
 class FAstraShipInterior;
 
 namespace AstraSpaceDraw
@@ -42,7 +43,7 @@ namespace AstraSpaceDraw
 	constexpr int32 CapLamps = 3200;               // lamps in the one layer of them
 	constexpr int32 CapPlumes = 200;
 	constexpr int32 CapGlints = 400;
-	constexpr int32 CapJets = 192;                  // manoeuvring jets (a plume each; their glows are lamps)
+	constexpr int32 CapJets = 384;                  // manoeuvring jets (a plume each; their glows are lamps): the capital ships' and, near an eye, the craft's
 	constexpr int32 CapWake = 640;                  // pieces of engine wakes
 	constexpr int32 PageSize = AstraDraw::PageSize;   // instances in one component of a hull layer (a busier system grows another page)
 
@@ -192,6 +193,46 @@ public:
 	 *  spokes are found where the turn puts them and the open quarters stay open). OutDetail has the lines; true when all hold. */
 	bool DebugSolidsTest(FString& OutDetail);
 
+	// ---- the Captain's Falcon: what lies near her (AstraSpaceLifeFalcon.cpp, docs/SPAZIO.md §13)
+	/** What the Falcon's displays carry of the living space (the battle's GetPilotStatus asks for the piloted craft): the lifepods adrift near her and the one within reach of her grapples (R takes it aboard), and
+	 *  the hull she is flying at or lies close to (a place, a piece of a wreck, a ship, the Aquila: the hulls the crash test knows, warned of a little before it). Fills its own fields of the status only; reads, changes nothing. */
+	void FillPilotStatus(const FAstraBattleShip& Falcon, FAstraPilotStatus& Out) const;
+	/** R in the cockpit: the lifepods adrift within reach of the Falcon's grapples (astra.space.pod.reach, m) are taken aboard and the crew is told (the flight net's search-and-rescue line, by "Eagle").
+	 *  Returns what was taken (Pods 0: nothing in reach). */
+	AstraSpace::FRescued PilotRescue(const FAstraBattleShip& Falcon);
+	AstraSpace::FRescued PilotRescue(int32 PilotedShipId);
+	/** How near (m) the Falcon must be to a lifepod to take it aboard (astra.space.pod.reach). */
+	static double PodReachM();
+	/** Testing (the bench): Falcons are made where the world has something to meet (a place's hull, a piece of a wreck, a ship, a lifepod) and flown at it and parked beside it: the cue is what it must be, the pods are
+	 *  listed, the pickup takes the pod in reach and no other. OutDetail has the lines; true when all hold. */
+	bool DebugFalcon(FString& OutDetail);
+
+	// ---- the traffic's own life: convoys with escorts, vessels that slow to look at a wreck, a tug sent to a hulk, patrols the war can take (AstraSpaceLifeLife.cpp, docs/SPAZIO.md §14)
+	/** A patrol of the system's traffic, for whoever may pull it into the plot (the war). */
+	struct FPatrolInfo
+	{
+		int32 Id = 0;
+		FString Where;                           // the place it flies from ("Keeper Station"), or "the escort of convoy GC-1"
+		FString Mesh;                            // the craft (SM_CRAFT_ASTRA_Falcon)
+		int32 Craft = 0;
+		FVector Pos = FVector::ZeroVector;       // the flight's middle, system frame (m)
+		double RangeM = 0.0;                     // from the point asked
+		uint8 State = 0;                         // 0 flying, 1 running for the berths (scrambled), 2 away, 3 taken by the war
+		bool bEscort = false;
+	};
+	/** The flights of the traffic that are flying within RadiusM of a point (those in port and those the war has are not listed): the war may pull one in as reinforcements. */
+	void PatrolsNear(const FVector& Pos, double RadiusM, TArray<FPatrolInfo>& Out) const;
+	/** The war takes a flight: it leaves the traffic and its craft are handed over as they fly (position, velocity, attitude in the system frame), so that real craft of the plot can be made of them without a jump. The crew
+	 *  is told it has been released. False, and why, when it cannot be taken. */
+	bool PullPatrol(int32 PatrolId, TArray<AstraSpace::FPatrolCraft>& OutCraft, FString& OutMesh, FString& OutWhy);
+	/** The war gives it back: Survivors craft (0: none) come home and the flight is made whole again after a rest (fifteen minutes; twenty when it lost all). */
+	void ReturnPatrol(int32 PatrolId, int32 Survivors);
+	/** The convoys, one to a line, and each hull of them: where she is, what she is doing, how fast, how far behind the one ahead (astra.space.convoys). */
+	FString ConvoyList() const;
+	/** Testing (the bench): what the traffic does with its own life, on a quiet system with something to look at. What: look (a wreck is put on a lane and the vessels that pass slow to look at it), tug (a hulk is put near
+	 *  the yards and a tug is sent), convoys (they come out of the Gate, keep a column, are escorted), patrol (a flight is taken by the war and given back). OutDetail has the lines; true when all hold. */
+	bool DebugLife(const FString& What, FString& OutDetail);
+
 	const AstraSpace::FLayout& GetLayout() const { return Layout; }
 	const AstraSpace::FTraffic& GetTraffic() const { return Traffic; }
 	const FString& GetSystem() const { return SystemName; }
@@ -277,6 +318,9 @@ private:
 	double MotionClock = 0.0;                      // the battle's own time, summed here (s): the wakes' clock
 	float MotionSweepT = 0.f;
 	int32 MotionShips = 0, JetsNow = 0, JetsPeak = 0, JetsLitNow = 0, WakeNow = 0, WakePeak = 0, JetsDropped = 0, WakeDropped = 0;
+	int32 MotionCraft = 0, MotionCraftPeak = 0;    // of MotionShips, the craft (read only within astra.space.craftjets.km of an eye), now and at the most
+	FVector MotionEye2 = FVector::ZeroVector;      // the Captain's Falcon when she flies: the second eye the craft's jets are drawn for (the first is the Aquila's bridge)
+	bool bMotionEye2 = false;
 	double MotionMs = 0.0;
 	int32 MotionTicks = 0;
 
@@ -306,6 +350,12 @@ private:
 	void RestoreDerelicts(double Now);
 	int32 MakeDerelict(const AstraSpace::FDerelict& D, double Now);
 	void TickDerelicts(double Now, float SimDt);
+
+	// ---- the traffic's own life
+	TArray<AstraSpace::FInterest> TestInterests;   // (the bench's: something to look at that the war did not make)
+	float InterestT = 0.f;                         // seconds to the next making of View.Interests
+	/** What the traffic may slow to look at: the wrecks of the war (a ship lost not long ago, the lifepods near her), the hulks nobody has in tow. Appends to View.Interests; the wreck contacts are obstacles. */
+	void ReadInterests();
 
 	// ---- cost
 	double TickMs = 0.0, TickMsMax = 0.0;

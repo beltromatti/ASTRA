@@ -166,6 +166,22 @@ namespace AstraSpace
 		FString Formation = TEXT("wedge");       // wedge | echelon | diamond | line
 	};
 
+	/** A convoy: hulls of one kind that run a tour together (they come out of the Gate one after the other, close up into a column on the lane and call at the same places), with craft that fly cover round them while
+	 *  they are under way. Beyond the Gate for a period, then back together. */
+	struct FConvoySpec
+	{
+		FString Id;                              // "GC": its convoys are called GC-1, GC-2...
+		FName Hull;                              // the hull key
+		int32 Count = 3;                         // hulls in it
+		TArray<FName> Nodes;                     // the places it calls at, in turn (it begins at the Gate)
+		FVector2D DwellMin = FVector2D(150.0, 360.0);    // seconds docked at each call: min, max
+		FVector2D PeriodS = FVector2D(900.0, 1500.0);    // seconds beyond the Gate before it comes back: min, max
+		float GapKm = 1.4f;                      // the spacing of the column
+		FString EscortMesh;                      // the craft that fly cover (empty: no escort)
+		int32 Escort = 0;
+		float EscortSpeedMps = 190.f;
+	};
+
 	struct FRockSpec
 	{
 		bool bOn = false;
@@ -185,6 +201,7 @@ namespace AstraSpace
 		TArray<FLaneSpec> Lanes;
 		TArray<FTourSpec> Tours;
 		TArray<FPatrolSpec> Patrols;
+		TArray<FConvoySpec> Convoys;
 		FRockSpec Rocks;
 		float Density = 1.f;                     // traffic scale (1 = as listed)
 	};

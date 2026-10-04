@@ -337,6 +337,23 @@ namespace AstraSpace
 			{
 				Expect(FVector::Dist(Bs[i - 1].Pos, Aquila) <= FVector::Dist(Bs[i].Pos, Aquila) + 1e-6, TEXT("the beacons are not nearest first"));
 			}
+			// the Falcon's eyes (bAdrift): a pod just launched has not begun to call, and a pilot who is there sees it all the same; once they all call the two lists are one
+			{
+				TArray<FBeacon> Early, Eyes, Late;
+				W.Beacons(TEXT("Aurelia"), 100.0 + 6.0, Frame, Aquila, 0.0, Early);
+				W.Beacons(TEXT("Aurelia"), 100.0 + 6.0, Frame, Aquila, 0.0, Eyes, true);
+				W.Beacons(TEXT("Aurelia"), 100.0 + 80.0, Frame, Aquila, 0.0, Late, true);
+				Expect(Early.Num() == 0, TEXT("a beacon called 6 s after the loss"));
+				Expect(Eyes.Num() == S0.Pods.Num(), FString::Printf(TEXT("%d pods seen of %d, 6 s after the loss"), Eyes.Num(), S0.Pods.Num()));
+				bool bAnyCalling = false;
+				for (const FBeacon& B : Eyes) { bAnyCalling |= B.bCalling; }
+				Expect(!bAnyCalling, TEXT("a pod seen 6 s after the loss is said to call"));
+				bool bAllCalling = Late.Num() == Bs.Num();
+				for (const FBeacon& B : Late) { bAllCalling = bAllCalling && B.bCalling; }
+				Expect(bAllCalling, TEXT("the pods seen and the beacons heard are not the same when they all call"));
+			}
+			Expect(FWrecks::BareName(TEXT("ASN Vigilant (T-02)")) == TEXT("ASN Vigilant") && FWrecks::BareName(TEXT("Brightwater")) == TEXT("Brightwater") && FWrecks::BareName(TEXT("Kharon frigate (hull 4)")) == TEXT("Kharon frigate (hull 4)")
+			       && FWrecks::BareName(TEXT("ASN Praetorian (T-1)")) == TEXT("ASN Praetorian"), TEXT("BareName does not take the contact number off and leave the rest"));
 			FRescued Got;
 			if (Bs.Num())
 			{
@@ -507,6 +524,25 @@ namespace AstraSpace
 			// a piece whose inside no sensor saw says so, and a whole hull has no torn end
 			const FSite& Bare = W.AddLoss(TEXT("Aurelia"), TestLoss(901, Rng, EHowLost::Destroyed, false), TArray<FPieceIn>(), 100.0, 78u, Frame);
 			Expect(W.Findings(Bare, 0, 2, 400.0).Contains(TEXT("burnt through")) && W.Findings(Bare, 0, 2, 400.0).Contains(TEXT("no sensor")), FString::Printf(TEXT("a hull with no inside is told badly: %s"), *W.Findings(Bare, 0, 2, 400.0)));
+			// several pieces of one wreck seen together are one account: their names listed, her rooms and dead said of all of them; one piece is what Findings says
+			{
+				TArray<int32> All;
+				for (int32 pi = 0; pi < S.Pieces.Num(); ++pi)
+				{
+					All.Add(pi);
+				}
+				Expect(FWrecks::PieceList(S, TArray<int32>({2})) == FString::Printf(TEXT("the %s"), *FWrecks::PieceName(S, 2)), FString::Printf(TEXT("the list of one piece is %s"), *FWrecks::PieceList(S, TArray<int32>({2}))));
+				Expect(W.FindingsOfPieces(S, TArray<int32>({2}), 2, 400.0) == F2 && W.FindingsOfPieces(S, TArray<int32>({2}), 3, 400.0) == F3 && W.FindingsOfPieces(S, TArray<int32>({2}), 1, 400.0) == F1, TEXT("the findings of one piece are not Findings"));
+				if (All.Num() == 3 && S.Pieces[0].Section == 0 && S.Pieces[1].Section == 1 && S.Pieces[2].Section == 2)
+				{
+					const FString List = FWrecks::PieceList(S, All);
+					Expect(List.StartsWith(TEXT("the bow, middle and stern sections of ")) && List.Contains(S.Name) && !List.Contains(TEXT("(T-")), FString::Printf(TEXT("the three pieces are listed as: %s"), *List));
+					Expect(FWrecks::PieceList(S, TArray<int32>({0, 1})).StartsWith(TEXT("the bow and middle sections of ")), FString::Printf(TEXT("two pieces are listed as: %s"), *FWrecks::PieceList(S, TArray<int32>({0, 1}))));
+					const FString G2 = W.FindingsOfPieces(S, All, 2, 400.0), G3 = W.FindingsOfPieces(S, All, 3, 400.0);
+					Expect(G2.Contains(TEXT("open to space at the torn ends")) && G2.Contains(TEXT("these pieces are about 100% of her")) && G2.Contains(TEXT("2 gutted")), FString::Printf(TEXT("her rooms are told badly for three pieces: %s"), *G2));
+					Expect(G3.Contains(TEXT("these pieces")) && G3.Contains(TEXT("12 lie dead")) && !G3.Contains(TEXT("this piece")), FString::Printf(TEXT("her dead are told badly for three pieces: %s"), *G3));
+				}
+			}
 			// the table of shares agrees with the war's classes
 			{
 				const FString Path = FPaths::ProjectDir() / TEXT("data/war/classes.json");

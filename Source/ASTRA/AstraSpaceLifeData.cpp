@@ -371,6 +371,35 @@ namespace AstraSpace
 					S.Patrols.Add(MoveTemp(Pt));
 				}
 			}
+			if (const TArray<TSharedPtr<FJsonValue>>* A = SpArr(J, TEXT("convoys")))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *A)
+				{
+					const FObj C = V->AsObject();
+					FConvoySpec Cv;
+					Cv.Id = SpStr(C, TEXT("id"), TEXT("C"));
+					Cv.Hull = FName(*SpStr(C, TEXT("hull")));
+					Cv.Count = FMath::Clamp((int32)SpNum(C, TEXT("count"), 3.0), 2, 8);
+					Cv.Nodes = SpNames(C, TEXT("nodes"));
+					Cv.GapKm = (float)SpNum(C, TEXT("gap_km"), 1.4);
+					if (const TArray<TSharedPtr<FJsonValue>>* D = SpArr(C, TEXT("dwell_s")); D && D->Num() >= 2)
+					{
+						Cv.DwellMin = FVector2D((*D)[0]->AsNumber(), (*D)[1]->AsNumber());
+					}
+					if (const TArray<TSharedPtr<FJsonValue>>* D = SpArr(C, TEXT("period_s")); D && D->Num() >= 2)
+					{
+						Cv.PeriodS = FVector2D((*D)[0]->AsNumber(), (*D)[1]->AsNumber());
+					}
+					const TSharedPtr<FJsonObject>* EscP = nullptr;
+					if (C.IsValid() && C->TryGetObjectField(TEXT("escort"), EscP) && EscP)
+					{
+						Cv.EscortMesh = SpStr(*EscP, TEXT("mesh"), TEXT("SM_CRAFT_ASTRA_Falcon"));
+						Cv.Escort = FMath::Clamp((int32)SpNum(*EscP, TEXT("count"), 2.0), 0, 6);
+						Cv.EscortSpeedMps = (float)SpNum(*EscP, TEXT("speed"), 190.0);
+					}
+					S.Convoys.Add(MoveTemp(Cv));
+				}
+			}
 			const TSharedPtr<FJsonObject>* RocksP = nullptr;
 			if (J.IsValid() && J->TryGetObjectField(TEXT("rocks"), RocksP) && RocksP)
 			{

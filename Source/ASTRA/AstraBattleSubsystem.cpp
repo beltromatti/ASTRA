@@ -6191,4 +6191,8 @@ void UAstraBattleSubsystem::GetPilotStatus(FAstraPilotStatus& Out) const
 			Out.Friends.Add(ToWorld(O.Pos));
 		}
 	}
+	if (Space && Space->IsActive() && S->bAlive && !bPilotDown)
+	{
+		Space->FillPilotStatus(*S, Out);      // the lifepods near her and the hull she is flying at (SPAZIO-VIVO, AstraSpaceLifeFalcon.cpp)
+	}
 }

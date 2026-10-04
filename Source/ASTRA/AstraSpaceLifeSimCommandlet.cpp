@@ -69,6 +69,37 @@ namespace
 					Fails.Add({TEXT("berth"), false, FString::Printf(TEXT("t=%.0f vessel %d (%s) is docked but its berth does not say so"), Now, V.Id, *V.Name)});
 				}
 			}
+			// the traffic's own life (docs/SPAZIO.md section 14): a convoy's hulls are the vessels that say so; a tug's errand is only in the states an errand has
+			if (V.Convoy != INDEX_NONE)
+			{
+				const bool bOk = T.Convoys().IsValidIndex(V.Convoy) && T.Convoys()[V.Convoy].Members.IsValidIndex(V.ConvoyRank) && T.Convoys()[V.Convoy].Members[V.ConvoyRank] == V.Id;
+				if (!bOk)
+				{
+					Fails.Add({TEXT("convoy"), false, FString::Printf(TEXT("t=%.0f vessel %d (%s) is of convoy %d, rank %d, which does not list her"), Now, V.Id, *V.Name, V.Convoy, V.ConvoyRank)});
+				}
+			}
+			if ((V.State == EVState::Tending && V.TendKey == INDEX_NONE) || (V.TendKey != INDEX_NONE && V.State != EVState::Tending && V.State != EVState::Cruise && V.State != EVState::Departing))
+			{
+				Fails.Add({TEXT("tug"), false, FString::Printf(TEXT("t=%.0f vessel %d (%s) is %s with an errand %d"), Now, V.Id, *V.Name, StateName(V.State), V.TendKey)});
+			}
+			if (V.GapScale < 0.5f || V.GapScale > 1.5f || !FMath::IsFinite(V.GapScale))
+			{
+				Fails.Add({TEXT("gap_scale"), false, FString::Printf(TEXT("t=%.0f vessel %d (%s) flies at %.2f of her class's speed to keep a column"), Now, V.Id, *V.Name, V.GapScale)});
+			}
+		}
+		for (const FPatrol& P : T.Patrols())
+		{
+			if ((P.Convoy != INDEX_NONE && !T.Convoys().IsValidIndex(P.Convoy)) || (P.State == 0 && P.Craft.Num() == 0))
+			{
+				Fails.Add({TEXT("patrol"), false, FString::Printf(TEXT("t=%.0f patrol %d (%s) is flying with %d craft, of convoy %d"), Now, P.Id, *P.NodeName, P.Craft.Num(), P.Convoy)});
+			}
+			for (const FPatrolCraft& C : P.Craft)
+			{
+				if (C.Pos.ContainsNaN() || C.Vel.ContainsNaN() || C.Att.ContainsNaN())
+				{
+					Fails.Add({TEXT("patrol_finite"), false, FString::Printf(TEXT("t=%.0f a craft of patrol %d (%s) has a NaN in its state"), Now, P.Id, *P.NodeName)});
+				}
+			}
 		}
 		// berths: every occupant exists, is docked there, and holds the berth; every reservation belongs to someone who is on the way
 		for (int32 n = 0; n < L.Nodes.Num(); ++n)

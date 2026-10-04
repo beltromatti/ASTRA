@@ -44,6 +44,87 @@ namespace AstraSpace
 		return false;
 	}
 
+	double FSolids::FirstHit(const FVector& A, const FVector& B) const
+	{
+		const FVector D = B - A;
+		const double L = D.Size();
+		if (L < 1.0e-6)
+		{
+			return Inside(A) ? 0.0 : -1.0;
+		}
+		// the part of the path inside the extent of the boxes (a cell of margin): nothing outside it is solid, so nothing outside it is sampled
+		double T0 = 0.0, T1 = 1.0;
+		for (int32 k = 0; k < 3; ++k)
+		{
+			const double Lo = (double)Min[k] - Cell, Hi = (double)Max[k] + Cell;
+			if (FMath::Abs(D[k]) < 1.0e-9)
+			{
+				if (A[k] < Lo || A[k] > Hi)
+				{
+					return -1.0;
+				}
+				continue;
+			}
+			double Ta = (Lo - A[k]) / D[k], Tb = (Hi - A[k]) / D[k];
+			if (Ta > Tb)
+			{
+				Swap(Ta, Tb);
+			}
+			T0 = FMath::Max(T0, Ta);
+			T1 = FMath::Min(T1, Tb);
+			if (T0 > T1)
+			{
+				return -1.0;
+			}
+		}
+		const int32 N = FMath::Clamp(FMath::CeilToInt((T1 - T0) * L / (0.5 * (double)Cell)), 1, 8000);
+		for (int32 i = 0; i <= N; ++i)
+		{
+			const double T = T0 + (T1 - T0) * (double)i / (double)N;
+			if (Inside(A + D * T))
+			{
+				return T;
+			}
+		}
+		return -1.0;
+	}
+
+	double FSolids::ShellDistance(const FVector& P, double MaxM) const
+	{
+		if (Inside(P))
+		{
+			return 0.0;
+		}
+		for (int32 k = 0; k < 3; ++k)
+		{
+			if (P[k] < (double)Min[k] - MaxM || P[k] > (double)Max[k] + MaxM)
+			{
+				return -1.0;                                      // (farther from the boxes' extent than we look)
+			}
+		}
+		static const FVector Dirs[14] =
+		{
+			FVector(1, 0, 0), FVector(-1, 0, 0), FVector(0, 1, 0), FVector(0, -1, 0), FVector(0, 0, 1), FVector(0, 0, -1),
+			FVector(1, 1, 1).GetSafeNormal(), FVector(1, 1, -1).GetSafeNormal(), FVector(1, -1, 1).GetSafeNormal(), FVector(1, -1, -1).GetSafeNormal(),
+			FVector(-1, 1, 1).GetSafeNormal(), FVector(-1, 1, -1).GetSafeNormal(), FVector(-1, -1, 1).GetSafeNormal(), FVector(-1, -1, -1).GetSafeNormal()
+		};
+		const double Step = FMath::Max(0.5 * (double)Cell, 1.5);
+		double Best = -1.0;
+		for (const FVector& Dir : Dirs)
+		{
+			const double Reach = Best > 0.0 ? Best : MaxM;       // (no use looking past what has been found)
+			for (double T = Step; T <= Reach; T += Step)
+			{
+				if (Inside(P + Dir * T))
+				{
+					Best = Best < 0.0 ? T : FMath::Min(Best, T);
+					break;
+				}
+			}
+		}
+		return Best;
+	}
+
 	// ------------------------------------------------------------------------------------------------------------------ the data
 	bool FSolidData::Parse(const FString& Json, FString& OutError)
 	{
@@ -232,6 +313,23 @@ namespace AstraSpace
 			Expect(!R->Crosses(FVector(Mid.X, RimOuter + 60.0, Mid.Z), FVector(Mid.X, RimOuter + R->Cell, Mid.Z)), TEXT("a path ending a cell outside the rim hits it"));
 			Expect(R->Crosses(FVector(Mid.X, RimOuter + 60.0, Mid.Z), FVector(Mid.X, RimOuter - 2.0 * R->Cell, Mid.Z)), TEXT("a path ending in the rim does not hit it"));
 			(void)Dir;
+			// the Falcon's cue (AstraSpaceLifeFalcon.cpp): how soon along a path, how near a point. Through a spoke along the axis the first cell is where the ring's thickness begins; through the open quarter, none
+			{
+				const double Half = 0.5 * (R->Max.X - R->Min.X);
+				const double TSpoke = R->FirstHit(At(0.55, 45.0, -300.0), At(0.55, 45.0, 300.0));
+				Expect(TSpoke > 0.0 && TSpoke * 600.0 > 300.0 - Half - R->Cell && TSpoke * 600.0 < 300.0 + R->Cell, FString::Printf(TEXT("the first cell of a path through a spoke is %.1f m along it (the ring's thickness begins at %.1f)"), TSpoke * 600.0, 300.0 - Half));
+				Expect(R->FirstHit(At(0.55, 0.0, -300.0), At(0.55, 0.0, 300.0)) < 0.0, TEXT("a path through the ring's open quarter has a first cell"));
+				Expect(R->FirstHit(At(0.55, 45.0, -300.0), At(0.55, 45.0, -200.0)) < 0.0, TEXT("a path that stops short of the ring has a first cell"));
+				Expect(FMath::IsNearlyEqual(R->FirstHit(At(0.55, 45.0, 0.0), At(0.55, 45.0, 100.0)), 0.0), TEXT("a path that begins in a cell has its first one anywhere but at its start"));
+				// a point 50 m out from the rim: the nearest cell is 50 m away (a cell more or less); in a cell: 0; at 400 m: none within 250 m
+				const double Out50 = R->ShellDistance(FVector(Mid.X, RimOuter + 50.0, Mid.Z), 250.0);
+				Expect(Out50 > 50.0 - R->Cell && Out50 < 50.0 + 2.0 * R->Cell, FString::Printf(TEXT("a point 50 m outside the rim reads %.1f m from it"), Out50));
+				Expect(R->ShellDistance(Mid, 250.0) == 0.0, TEXT("the hub's point is not in a cell"));
+				Expect(R->ShellDistance(FVector(Mid.X, RimOuter + 400.0, Mid.Z), 250.0) < 0.0, TEXT("a point 400 m out finds a cell within 250 m"));
+				// never nearer than the truth: a point in the open quarter midway between hub and rim, nothing nearer than the spokes' flanks, whatever the estimate
+				const double Mid55 = R->ShellDistance(At(0.55, 0.0), 250.0);
+				Expect(Mid55 > 0.0, FString::Printf(TEXT("a point in the open quarter reads %.1f m from a cell"), Mid55));
+			}
 		}
 		// ---- the Arsenal and the rest are mostly air: a place's hull is a small part of its bounding box
 		for (const TCHAR* Name : {TEXT("SM_PLACE_Arsenal"), TEXT("SM_PLACE_Keeper"), TEXT("SM_PLACE_Refinery"), TEXT("SM_PLACE_Mine")})

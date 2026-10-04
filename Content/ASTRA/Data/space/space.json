@@ -74,6 +74,12 @@
     {"node": "keeper", "craft": 3, "radius_km": 5, "speed": 150, "mesh": "SM_CRAFT_ASTRA_Falcon", "formation": "echelon"},
     {"node": "arsenal", "craft": 2, "radius_km": 2.4, "speed": 38, "mesh": "SM_VESSEL_Tug_A", "formation": "line"}
    ],
+   "convoys": [
+    {"id": "GC", "hull": "freighter", "count": 4, "nodes": ["gate", "keeper", "arsenal", "keeper"], "dwell_s": [150, 360], "period_s": [600, 1000], "gap_km": 1.4,
+     "escort": {"mesh": "SM_CRAFT_ASTRA_Falcon", "count": 2, "speed": 190}},
+    {"id": "TD", "hull": "tanker", "count": 3, "nodes": ["gate", "keeper", "arsenal", "tiberius", "arsenal", "keeper"], "dwell_s": [240, 480], "period_s": [800, 1300], "gap_km": 1.8,
+     "escort": {"mesh": "SM_CRAFT_ASTRA_Falcon", "count": 2, "speed": 190}}
+   ],
    "rocks": {"on": true, "bearing_min_deg": 118, "bearing_max_deg": 218, "range_min_km": 190, "range_max_km": 250, "mark_spread_deg": 5, "count": 520,
              "meshes": ["SM_ROCK_A", "SM_ROCK_B", "SM_ROCK_C", "SM_ROCK_D", "SM_ROCK_E"], "size_m": [90, 2200]}
   },
