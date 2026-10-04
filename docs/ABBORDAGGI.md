@@ -242,9 +242,9 @@ filo del server).
 ## 9. Le prove e le misure
 
 **Il banco senza grafica** (`python3.13 tools/boarding.py run --scenario all|map|rules|duel|squad|flank|board|orders --seeds N [--setup 0..5] [--trace] [--set "MarineSkill=0.8"]`;
-usa `UnrealEditor-Cmd -nullrhi`): 16 verifiche, verdetto PASS su **entrambe le piante** (la v1 di 2270 stanze, la v2 di 3234; il banco sceglie breccia e armeria per ciò che sono):
-la mappa si costruisce in 141-198 ms, 400 percorsi su 400, i portali sono sulle pareti, le tacche nelle stanze, una parete è una parete, i colpi (nove colpi: 160 morti e 240 a terra
-su 400), la morte per dissanguamento a 85 s, la paratia tagliata dopo 24 s, il combattimento è identico dal seme, un duello alla pari 60/40, una squadra in campo aperto e con gli
+usa `UnrealEditor-Cmd -nullrhi`): 17 verifiche, verdetto PASS su **entrambe le piante** (la v1 di 2270 stanze, la v2 di 3234; il banco sceglie breccia e armeria per ciò che sono):
+la mappa si costruisce in 141-198 ms, 400 percorsi su 400, i portali sono sulle pareti, le tacche nelle stanze, una parete è una parete, i colpi (nove colpi: 121 morti e 279 a terra
+su 400: un marine muore meno, §13.7), la morte per dissanguamento a 85 s, la paratia tagliata dopo 24 s, il combattimento è identico dal seme, un duello alla pari 60/40, una squadra in campo aperto e con gli
 angoli, l'aggiramento, i combattimenti sulla nave (§3), 0,02-0,07 ms a passo. `orders` aggiunge: nessuno esce dalla pianta sotto qualunque ordine, ogni combattimento finisce, «follow»
 raduna, un Capitano a terra è raggiunto dalle due squadre più vicine (10 marine entro 8 m dopo 50 s, 8 combattimenti su 8).
 
@@ -351,9 +351,10 @@ secondo è rifiutato con la ragione), su **una scena** (la mappa e la pianta in 
   uno rimandato indietro dallo scudo no (`RecallParty`); se nessuno arriva, la scena finisce con «not one boarder reached the ship». A fine combattimento le navette si staccano e tornano.
 - **In uscita** (i marine dell'Aquila su una nave): i marine del ruolino che vanno (i più vicini al portello, svegli, i sergenti a capo di ogni squadra; il Maggiore resta alla rete) escono
   dalla vita della nave (`SetAway`), i Kestrel partono dopo ~25 s, e la scena è la **pianta della classe della nave abbordata** (`AstraBoardPlans::Load`, in lavoro su un worker la prima volta),
-  fatta girare dalla sola simulazione: i difensori della sua guarnigione (`AstraBoardScene::Build`: posti di guardia, equipaggio che accorre, paratie chiuse), i nostri a squadre di sei da ogni
-  portello. Niente corpi né Capitano (finché non va: §13.6). I caduti sono nominati e vanno al ruolino (`HarmPerson`), i feriti in Medbay; a fine scena i marine tornano nell'hangar con il loro Kestrel
-  (`PlaceTransported`). Se la nave cade: `CaptureShip` (è nostra, un relitto con un equipaggio di preda) e la riga «her commander and the survivors of her crew are in custody».
+  fatta girare dalla sola simulazione: i difensori sono la gente che la guerra ha lasciato alla nave dove la tiene (§13.6: `FleetSnapshot`; senza un interno, la guarnigione del piano:
+  posti di guardia, equipaggio che accorre, paratie chiuse), i nostri a squadre di sei da ogni portello. Niente corpi né Capitano (finché non va: §13.5). I caduti sono nominati e vanno al ruolino
+  (`HarmPerson`), i feriti sono portati alla navetta (§13.7) e in Medbay; a fine scena i marine tornano nell'hangar con il loro Kestrel (`PlaceTransported`, e VITA ricorda la navetta, non un
+  teletrasporto). Se la nave cade: `CaptureShip` (è nostra, un relitto con un equipaggio di preda) e la riga «her commander and the survivors of her crew are in custody».
 - Le navi dell'Aquila abbordate dal Mandato (una consorte) seguono la stessa strada remota (attaccanti del Mandato, difensori dell'equipaggio della classe).
 
 Il mondo dentro la simulazione (`AstraBoardSim.*`): le **squadre per navetta** (`LandParty`: gli uomini aspettano nella navetta, entrano al `ReleaseParty` dell'aggancio, muoiono con lei
@@ -378,26 +379,101 @@ accade». `{"action":"end"}` lo chiude. Le navi si dicono come i contatti: id (T
 con la ragione. L'esito è un evento `boarding: ...` (i testi di `Tell`, letti dalla rete dei marine e dal regista): «X is ours: ... her commander and the survivors of her crew are in custody»,
 «the boarding of X has failed», «the boarders are beaten», «the boarders hold Main Engineering», «not one boarder reached the ship».
 
-### 13.5 Come si prova
+### 13.5 Il Capitano che va (`AstraBoardRide.cpp`, `AstraBoardInterior.*`; 3/10)
+
+Con `captain: true` (all'XO: «vengo anch'io»; il comando `boarding`; in console la parola `ride`) il Capitano sale nel **primo Kestrel** con i suoi marine. Solo se è a piedi (non in un Falcon,
+in una capsula, sul pianeta) e nessun altro giro è in corso; l'avvertimento nella risposta del gioco dice che se la navetta è abbattuta, lui è dentro. Nessuna navigazione: il giro è un titolo di
+velivolo e la dissolvenza.
+
+| Tempo | Che cosa succede |
+|---|---|
+| **Out** (la barca vola) | dissolvenza (0,9 s); è nella **stiva truppe** del Kestrel (una stanza sua: 6 x 3 x 2,5 m, una panca per lato, una lampada rossa, in una zona del mondo a z = -1,7e8); guarda intorno, non cammina; una riga lo avverte («KESTREL 1 · 12 MARINES · THE HULL IN 1:09», poi «CLOSING ON THE HATCH»). Se la barca è abbattuta: «the Captain was in it» (la fine che la nave già conosce: abbandono, inchiesta) |
+| **Aboard** (la barca ha aggancio e breccia) | dissolvenza: è nel **portello d'abbordaggio** della nave nemica, il fucile in mano e i marine intorno. L'interno è **geometria vera** fatta sul momento dal piano della classe (pavimenti, soffitti, pareti con i varchi delle porte e dei passaggi aperti, cornici, un'anta in ogni paratia stagna che si chiude come nel combattimento, strisce di luce; istanze di cubi con i materiali di ASTRA, `MI_ASTRA_Structure/Floor/Trim/Light`), qualche stanza alla volta intorno a lui, in una zona del mondo sua (z = -1,6e8) con sei luci che lo seguono. I corpi dei difensori, i colpi e le ferite come sui ponti dell'Aquila. **Scale e ascensori**: ci si ferma ~1 s su una piastra illuminata e si passa al ponte vicino. Se cade e la catena della nave lo porta via, si risveglia in Medbay e i ponti spariscono; se è perduto è la fine che la nave già conosce |
+| **Home** (finita la lotta, o richiamo) | «the Captain is called back to the boat»: dissolvenza, i ponti spariscono, è di nuovo nella stiva per il volo di ritorno e, a navetta rientrata, nell'hangar del Ponte 8 |
+
+L'equipaggio sa dove sta (`CaptainWhereText`: nello stato della nave, nel suo badge e nel «posto» del cruscotto: «AWAY · WITH THE MARINES»); l'XO ha il comando dell'Aquila e il Capitano parla alla
+plancia con il suo comunicatore. Il Maggiore Reyes ha la rete dei marine.
+
+**Il teletrasporto.** TELETRASPORTO dice che il Capitano **non** si teletrasporta su un'altra nave («her pads are not in the pattern library: a world below, yes; a ship, send a shuttle»), ed è
+giusto così: la strada del Capitano su una nave nemica è la navetta (la risposta della plancia a chi lo chiede già dice «send a shuttle»). Nessun gancio nel teletrasporto è stato necessario; far
+passare dal teletrasporto anche i soli marine (una persona «away» su una nave) sarebbe una richiesta a parte.
+
+**Le piante vere.** Le sette classi di FLOTTA-VIVA hanno sale che coprono più ponti (cannoni, sale macchine, hangar) con **due porte una sopra l'altra** sullo stesso muro: il primo costruttore
+(muri interi con un buco per porta) chiudeva una porta con il pezzo di muro dell'altra. Ora un muro si fa per tratti tra i bordi delle aperture, con l'altezza meno i vuoti che vi sono, e una porta
+in una sala alta sta dove sta il pavimento più alto (`FIbOpening::Bot`): `tools/boarding.py run --scenario interior` cammina ogni passaggio di ogni piano (a ginocchio e a petto, cinque linee nella
+larghezza della porta) e prova a uscire da ogni parete senza porta: **sette classi su sette, 0 passaggi chiusi, 0 pareti che perdono** (la Praetorian: 12 639 solidi, costruiti in 1 ms). Una
+porta alta nel muro di una sala più bassa è una porta in aria: si entra cadendo, non si risale (c'è l'altra porta, a livello del suolo, e le scale).
+
+### 13.6 La nave com'è stata lasciata dalla guerra (richiesta di FLOTTA-VIVA)
+
+All'inizio di uno sbarco su una nave che ha un interno (`UAstraBattleSubsystem::InsideOf`, che è `FleetSnapshot` di FLOTTA-VIVA reso pubblico: le stanze non com'erano costruite, le paratie chiuse, le
+persone vive con stanza, posto, ruolo e ferite, i nominati e chi comanda) la scena parte dallo **stato in cui la guerra l'ha lasciata**, non da una nave nuova (`AstraBoardScene::Build` con
+`FSpec::Inside`):
+
+- **Chi tiene la nave** sono quelle persone dove la guerra le tiene: i marine della nave (ruolo `Marine`, `MarineDock`) tutti armati (90%), gli altri in piedi per quota (80%, al più 340 in tutto: un
+  equipaggio di mille non combatte tutto, e il passo della simulazione cresce con gli uomini), gli ufficiali sempre armati e con il loro nome e grado (il capitano è chi dice la guerra; se è caduto, chi ha il
+  comando lo dice il rapporto). Squadre di sei per stanza che tengono la stanza; i marine della nave vanno incontro all'allarme.
+- **I feriti** giacciono dove sono (vivi, contati tra i feriti, non muoiono nel combattimento: i loro medici li hanno), le **paratie chiuse** sono quelle che la guerra ha chiuso (non il 30% a caso).
+- **Le stanze**: senza corrente (< 45%) le strisce sono il rosso delle luci d'emergenza e la torcia del fucile si accende dove manca la luce; dove brucia, tre luci arancioni che tremano sulle più
+  vicine. Più della metà delle stanze al buio: la nave è un relitto (stile «Emergency» anche nei corridoi con corrente).
+- **Una nave disabilitata** (senza energia) resiste solo con i suoi marine (50%) e con l'8% degli altri: quelli ai quadri spenti non hanno più nulla per cui combattere. Senza un interno (mai colpita
+  attraverso le piastre; il caso dei relitti fatti con `astra.board.disable`): la guarnigione del piano al 80% e le paratie a caso; se è disabilitata, i marine di bordo al 50% e il 6% degli altri.
+- Il rapporto della prima riga dice la verità: «the war has left her 75 of her people under arms (298 more at their stations, 12 lying wounded) with 31 of her crew already dead; Commander X (executive
+  officer) has the conn; 4 of her pressure bulkheads are shut».
+- **Lo stesso file**: il caricatore del piano usa il risolutore di FLOTTA-VIVA (`FAstraFleetPlans::PathFor`: Content/ASTRA/Data/plans, poi data/ship/plans), le stanze della guerra e quelle dello sbarco
+  sono le stesse nello stesso ordine (controllato a ogni scena: numero e id di alcune stanze; se non coincidono si ricade sulla guarnigione). Le **piante di ripiego sono tolte**.
+- **Non scritto indietro**: i morti dello sbarco non tornano nell'interno della nave in guerra (la nave abbordata resta con i suoi in guerra finché `CaptureShip` non la rende nostra). Una richiesta a
+  FLOTTA-VIVA: `FleetBoardingResult(ShipId, killed, wounded)`.
+
+Il banco: `python3.13 tools/boarding.py run --scenario war [--class acheron] [--seeds 20]` spara a un interno di FLOTTA-VIVA (0, 14, 60, 220 colpi, e 220 colpi con la nave disabilitata), ne prende
+la fotografia come il gioco e manda i marine: Acheron intera 308 armati, 17,9 marine su 24 persi (6,8 morti); disabilitata 35 armati, **3,4 persi (0,9 morti)**; Styx e Vigilant disabilitate 0-0,2.
+La Praetorian disabilitata ha ancora 811 persone in piedi e 107 armati: 24 marine non la prendono (28 su 30 tenuta).
+
+### 13.7 I feriti, e gli sbarchi che non finivano
+
+- **I feriti sono portati alla navetta** (`FTuning::bEvacuate`, acceso dall'ospite per gli sbarchi con le navette, da una parte e dall'altra): un uomo a terra che nessun nemico vede (a meno di 15 m) è
+  raggiunto dal compagno libero più vicino (mai il capo squadra, mai se la squadra resterebbe con meno di tre), che lo alza (2,5 s), lo porta al portello da cui la squadra è entrata (1,15 m/s) e
+  alla navetta; **non sanguina mentre è portato** (e il primo soccorso gli dà 45 s); il suo corpo non è sul pavimento. Chi porta non combatte. Se chi porta cade, il ferito è posato dove cadde. Sotto
+  il fuoco nessuno viene, e un uomo che cade nel campo di una lotta che non finisce può morire dissanguato. Gli eventi (`Carried`) arrivano all'ospite: il ruolino ha il ferito
+  (`HarmPerson`), il rapporto dice «X, wounded, has been carried back to the boat by Y», la rete dei marine lo ha nel registro. Nei bilanci i feriti sono quelli a terra più i portati via
+  («marines: 5 dead, 8 wounded»). Il prompt dei marine lo dice.
+- **Un marine muore meno** (`LethalScale[Aquila] = 0,75`: l'armatura e la chirurgia da campo): nove colpi su 400 marine ora lasciano 121 morti e 279 a terra (erano 160 e 240).
+- **Un relitto costa pochi feriti, uno sbarco contrastato perdite vere**: Acheron disabilitata (dalla guerra) 3,4 persi su 24, di cui 0,9 morti; una nave con la sua gente tutta ai posti 17,9 persi (6,8 morti),
+  e per ingegneria (a 90 m dai portelli) 23,6 su 24: gli sbarchi sono una scelta, non una passeggiata.
+- **Gli sbarchi che non finivano** (1 su 20 sul Vigilant con il seme 1; con le altre mete fino a 8 su 20): non era la pianta, era la simulazione, tre cose che le piante a più ponti hanno
+  fatto vedere: (1) le squadre d'attacco **tenevano il vicinato** dell'obiettivo (gli angoli della stanza *e delle stanze vicine*) e restavano nel corridoio fuori dalla porta senza mai entrare:
+  la presa dell'obiettivo (due uomini dentro per 70 s) non scattava, ora l'obiettivo si tiene **da dentro** (`HoldAround(..., bInside)`); (2) le distanze verso il bersaglio erano in 2D: su una
+  nave a più ponti chi sta sopra l'obiettivo si crede arrivato e smette di muoversi, ora sono in 3D; (3) l'ultimo uomo di una squadra non poteva tenere da solo (servivano due): ora uno basta se
+  non ne restano altri. Esito: Vigilant, i sei scenari 20 su 20 finiti (un seme su 120 non finisce); Acheron un solo scenario (ingegneria, a 90 m) ne lascia 3 su 20, e li perde.
+
+### 13.8 Come si prova
 
 | Cosa | Come |
 |---|---|
 | Il banco delle navette (volo, difesa, aggancio) | `python3.13 tools/boarding.py craft [--setup out\|shield\|pd\|pd2\|cap] [--seeds N] [--trace]` (senza grafica: la battaglia di GUERRA a testa bassa) |
-| Il banco degli assalti (l'ospite, le scene, gli esiti) | `python3.13 tools/boarding.py assault [--setup in\|in_shield\|out\|out_pd\|all]`: il mondo del banco ha la vita (i marine del ruolino) e la guerra; le piante si leggono su un worker, i comandi si danno tardi (11 000 s) |
+| Il banco degli assalti (l'ospite, le scene, gli esiti) | `python3.13 tools/boarding.py assault [--setup in\|in_shield\|out\|out_ride\|out_war\|out_pd\|all]`: il mondo del banco ha la vita (i marine del ruolino) e la guerra; le piante si leggono su un worker, i comandi si danno tardi (11 000 s). `out_ride`: il Capitano (di prova, senza pawn) sale, i ponti si fanno solidi, torna; `out_war`: una nave presa a colpi (`astra.war.fleet pound`), la scena dallo stato della guerra e il Capitano dentro |
+| Le piante di FLOTTA-VIVA come i soldati le vedono | `python3.13 tools/boarding.py run --scenario plans` (7 su 7: ogni portello ha una strada al ponte, all'ingegneria, all'alloggio, all'armeria, all'infermeria, alla prigione, alle comunicazioni e all'hangar) |
+| Lo sbarco su una pianta di classe (24 marine in due Kestrel, sei scenari, i morti e i feriti, i semi che non finiscono) | `python3.13 tools/boarding.py run --scenario attack --class acheron\|styx\|lethe\|vigilant\|praetorian [--seeds 20]` |
+| Lo sbarco su una nave presa a colpi | `python3.13 tools/boarding.py run --scenario war --class acheron [--setup 0..4]` |
+| L'interno solido di ogni classe | `python3.13 tools/boarding.py run --scenario interior [--class X] [--dump DIR]`; l'anteprima: `blender -b -P Saved/scratch/interior_view.py -- DIR/interior_X.json prefisso [portello]` (non nel repo) |
 | In entrata nel gioco | `astra.cmd set_shields {'mode':'off'}` (o aprire un settore con il fuoco), `astra.board.pd aquila 0` (la difesa puntuale altrimenti abbatte gli Skiff), `astra.board.assault in [portatore] [bersaglio] [barche] [faccia] [obiettivo]` (il portatore migliore si sceglie da solo); `astra.board.end` |
-| In uscita nel gioco | `astra.board.disable <nave>` (un relitto), `astra.board.assault out <nave> [portatore] [barche] [faccia] [obiettivo]` (o all'XO: «abborda l'Acheron», `board_ship`) |
-| Dal comando | `astra.board.cmd boarding {"direction":"in","target":"aquila","source":"T-30","craft":2,"face":"port","objective":"engineering"}` |
+| In uscita nel gioco | `astra.board.disable <nave>` (un relitto) o i cannoni sulla sua faccia, poi `astra.board.assault out <nave> [portatore] [barche] [faccia] [obiettivo] [ride]` (o all'XO: «abborda l'Acheron», `board_ship`, e «vengo anch'io» per il Capitano) |
+| Il Capitano nel gioco | `astra.board.assault out <nave> - 2 port - ride` (a piedi, sul ponte o dove si sta: la dissolvenza, la stiva, i ponti nemici); `astra.board.testcaptain <x> <y> <z> [yaw] \| off` per le prove senza pawn |
+| Dal comando | `astra.board.cmd boarding {"direction":"out","target":"T-30","craft":2,"face":"port","objective":"captain","captain":true}` |
 | Le navette a mano | `astra.board.craft <portatore> <bersaglio> [n] [faccia] [uomini]`, `astra.board.depart <ordine>`, `astra.board.assess <portatore> <bersaglio>`, `astra.board.strip\|shield\|disable\|pd <nave>` (gli stati dei bersagli) |
 | Il quadro | `astra.board.info` (anche l'assalto), `astra.board.picture` (la lavagna dei marine) |
 
-### 13.6 Limiti noti (F5.2, consegna 2 e 3)
+### 13.9 Limiti noti (F5.2) e richieste
 
-- **Non provato nel gioco**: come F5.1, il banco prova il codice (volo, scene, esiti, strumenti); il colpo d'occhio (anello della breccia su un airlock, i Kestrel che escono dal fianco, la
-  navetta che si posa sulla pelle) si vede solo lì. Le mesh delle navette sono le prime: nessun portello vero nella mesh dell'Aquila (la navetta esce e rientra attraverso il fasciame).
-- **Le piante delle altre classi sono quelle di ripiego** (`data/ship/plans/stopgap/`) finché FLOTTA-VIVA non porta le sue (`data/ship/plans/<classe>.json`, scelte da sole): i portelli di ripiego
-  stanno dentro la mesh (fino a 16 m sull'Acheron), le sue sono sulla pelle (controllate con la mesh). Le sue voci `mouth_*` (la bocca delle barche) non sono portelli e si ignorano;
-  `BerthsOf` potrebbe leggerle.
+- **Non provato nel gioco**: come F5.1, il banco prova il codice (volo, scene, esiti, strumenti, il Capitano di prova senza pawn, la geometria camminata dalle rotte della simulazione); il colpo
+  d'occhio (anello della breccia su un airlock, i Kestrel che escono dal fianco, la dissolvenza, la stiva, i ponti solidi con i loro materiali e le loro luci) si vede solo lì. I materiali sono quelli
+  dei cubi di ASTRA (`MI_ASTRA_*`): nessuna mesh di corridoio, nessuna porta che si apre (le porte sono varchi con la loro cornice).
+- **Zone del mondo**: i ponti nemici stanno a z = -1,6e8 cm, la stiva a -1,7e8 (il pianeta a -1e8); come il pianeta, dipende dalla doppia precisione del mondo; il KillZ del livello è -1e10.
+- **Una porta alta in una sala che copre più ponti è una porta in aria** (si cade dentro, non si risale); le scale e gli ascensori sono piastre che portano al ponte vicino con una sosta di ~1 s, non
+  rampe.
 - **Un abbordaggio alla volta**; se i nostri marine sono su una nave il Mandato non può abbordare l'Aquila nello stesso momento (rifiutato con la ragione).
-- I feriti dei marine su una nave nemica sanguinano in ~2 min se nessuno li porta via (la squadra non porta ancora i suoi feriti alla navetta): le perdite di uno sbarco sono alte (24 marine su
-  un relitto di 19 difensori: 11 caduti in una prova).
-- La memoria di VITA dice «beamed away by the transporter» anche per un Kestrel (`FAstraLifeSim::SetAway`): una variante col testo sarebbe d'aiuto (richiesta).
+- **I morti dello sbarco non tornano all'interno della nave in guerra** (richiesta a FLOTTA-VIVA: `FleetBoardingResult`); a fine sbarco la nave è nostra (`CaptureShip`) o resta com'era.
+- **Il teletrasporto non porta il Capitano su un'altra nave** (regola di TELETRASPORTO); non è stato toccato il suo codice.
+- **Il Capitano che cade a bordo di un'altra nave** ha la fine già nota; non c'è un salvataggio con una navetta che torni a prenderlo (se nessuna barca resta, è perduto).
+- **Richieste fuori dai miei file** (fatte da me, additive): `UAstraBattleSubsystem::InsideOf` (AstraBattleSubsystem.h) per leggere lo stato della guerra; `FAstraLifeSim::SetAway/PlaceTransported`
+  con la frase di memoria opzionale (i marine ricordano la navetta); `Source/ASTRA/AstraShipSubsystem.cpp` (tre ritorni anticipati per dove sta il Capitano e `board_ship`).

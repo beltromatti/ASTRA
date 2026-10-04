@@ -207,6 +207,11 @@ ASSAULT_SETUPS = {
                      at="11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride",
                      expect=[r"the Captain rides with the marines in Kestrel 1", r"the Captain is aboard Hulk with the marines", r"Hulk is ours|boarding of Hulk has failed|have broken off|has gone quiet",
                              r"the Captain is called back to the boat", r"the Captain is back aboard the Aquila"]),
+    # a ship the war has shot at (FLOTTA-VIVA's inside, made by the blows that get through): the scene starts from the state it left her in, and the Captain rides along into her dark and burning rooms
+    "out_war": dict(doc="the marines (and the Captain) aboard a ship the war has shot up: her people alive where they are, the bulkheads she shut, her rooms without power and on fire", seconds=12000,
+                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive;{_NOFATE}",
+                    at="2=astra.board.strip M1|3=astra.war.fleet pound M1 port 70 12 kinetic|60=astra.war.fleet pound M1 port 70 10 explosive|11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride",
+                    expect=[r"the war has left her \d+ of her people under arms", r"the Captain is aboard Wreck with the marines", r"Wreck is ours|boarding of Wreck has failed|have broken off|has gone quiet", r"the Captain is back aboard the Aquila"]),
     # an Acheron with her power and her point defence up: the marines' boats are shot at on the way in
     "out_pd": dict(doc="the marines' boats against a ship that shoots back: how many get through", seconds=11600,
                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",

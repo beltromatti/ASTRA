@@ -405,6 +405,7 @@ void UAstraBoardSubsystem::TickRide(float Dt)
 			RideStep = 0;
 			bPadArmed = false;
 			PadDwellS = 0.f;
+			bHomeHintShown = false;
 			Tell(FString::Printf(TEXT("the Captain is aboard %s with the marines, in %s: going for %s"), *Assault.TargetName, *Leg->PlaceText, *Map->Describe(Fight.Mission().Objective)), true);
 			CaptainPrompt(FString::Printf(TEXT("ABOARD %s  ·  %s"), *Assault.TargetName.ToUpper(), *Map->Describe(Fight.Mission().Objective).ToUpper()), 6.f);
 		}
@@ -492,6 +493,11 @@ void UAstraBoardSubsystem::TickAboard(float Dt)
 		// the ship's own chain carried him out (the Medbay) or the world has him elsewhere: the decks round him go
 		CaptainLeftScene(TEXT("carried out"));
 		return;
+	}
+	if (!bHomeHintShown && RideT > 7.f)
+	{
+		bHomeHintShown = true;                           // (the first thing he reads is where he is; then how he gets out)
+		CaptainPrompt(TEXT("TO COME HOME: TELL THE XO TO CALL OFF THE BOARDING  ·  THE BOAT WAITS AT THE HATCH"), 7.f);
 	}
 	if (RideT > 0.6f && RideStep == 0)
 	{

@@ -1565,6 +1565,37 @@ static void BoardScenarioRules(FRig& Rig, int32 Seed)
 		}
 		BCheck("wounds: bleeding", Fallen != INDEX_NONE && DiedAt > 60.0 && DiedAt < 140.0, FString::Printf(TEXT("a man down and alone died after %.0f s"), DiedAt));
 	}
+	// a boarding by boats carries its wounded out: a free comrade comes, gets him up (he stops bleeding), takes him to the hatch and the boat; the same man with nobody to come bled out above
+	{
+		FAstraBoardSim Sim;
+		Sim.Init(Rig.Map.ToSharedRef(), Seed);
+		Sim.Tuning = Rig.Tuning;
+		Sim.Tuning.bEvacuate = true;
+		const FVector Hatch(Lane.Start.X + 300.0, 0.0, Lane.Start.Z);
+		Sim.SetMission(ESide::Aquila, Lane.FirstComp, Hatch, INDEX_NONE);
+		const int32 Sq = Sim.AddSquad(ESide::Aquila, TEXT("A"));
+		TArray<int32> Men;
+		for (int32 k = 0; k < 8; ++k)
+		{
+			Men.Add(Sim.AddMarine(TEXT("M"), INDEX_NONE, FVector(Lane.Start.X + 600.0 + 120.0 * k, 0, Lane.Start.Z), k == 0, Sq));
+		}
+		int32 Fallen = INDEX_NONE;
+		for (int32 k = 1; k < Men.Num() && Fallen == INDEX_NONE; ++k)
+		{
+			for (int32 h = 0; h < 9; ++h) { Sim.HitUnit(Men[k], 17.f, false); }
+			Fallen = Sim.Unit(Men[k])->Act == EAct::Down ? Men[k] : INDEX_NONE;
+		}
+		double OutAt = -1.0;
+		bool bDied = false;
+		while (Fallen != INDEX_NONE && Sim.Time() < 240.0 && OutAt < 0.0)
+		{
+			Sim.Tick(0.5f);
+			bDied |= Sim.Unit(Fallen)->Act == EAct::Dead;
+			OutAt = Sim.Unit(Fallen)->Act == EAct::Gone ? Sim.Time() : -1.0;
+		}
+		BCheck("wounds: carried out", Fallen != INDEX_NONE && !bDied && OutAt > 0.0 && Sim.Book().Carried[0] == 1 && Sim.Book().Down[0] == 0,
+		       FString::Printf(TEXT("a man down with comrades about was carried to the hatch and out in %.0f s (%d carried, %d still down)"), OutAt, Sim.Book().Carried[0], Sim.Book().Down[0]));
+	}
 	// a sealed bulkhead: the Mandate cut through it (a pressure bulkhead of Deck 8 with a room each side, every pressure bulkhead of the deck sealed: the nearest is the cheapest way through)
 	{
 		const FAstraBoardMap& M = *Rig.Map;
@@ -2040,8 +2071,8 @@ static void BoardScenarioWar(const FString& Class, int32 Seed, int32 Seeds, cons
 		Spec.bSweep = States[si].bDisabled;
 		if (States[si].bDisabled)
 		{
-			Spec.PostShare = 0.12f;                              // (what the host does with a ship that has lost her power: UAstraBoardSubsystem::BeginRemoteScene)
-			Spec.GuardShare = 0.6f;
+			Spec.PostShare = 0.08f;                              // (what the host does with a ship that has lost her power: UAstraBoardSubsystem::BeginRemoteScene)
+			Spec.GuardShare = 0.5f;
 		}
 		int32 Wins[4] = {0, 0, 0, 0};
 		double Def = 0.0, Wounded = 0.0, Unarmed = 0.0, Shut = 0.0, T = 0.0, LossAtt = 0.0, DeadAtt = 0.0, LossDef = 0.0;

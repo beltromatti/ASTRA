@@ -312,6 +312,7 @@ private:
 	FVector RemoteOffset = FVector::ZeroVector;      // where the other ship's plan stands in the world while he is on it
 	float RideProbeT = 0.f;
 	float PadDwellS = 0.f;                           // how long he has stood on a stair's pad
+	bool bHomeHintShown = false;                     // (aboard) the line that says how to come home has been put on his screen
 	bool bPadArmed = true;                           // (he must step off the pad he arrived on before it takes him again)
 	float RidePromptT = 0.f;
 	bool bTestCaptain = false;

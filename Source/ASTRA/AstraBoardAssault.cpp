@@ -1232,8 +1232,8 @@ bool UAstraBoardSubsystem::BeginRemoteScene()
 		if (bFacts && T.bDisabled)
 		{
 			// a ship that has lost her power and her fight: her marines and a few of her crew resist; the rest, at dead consoles in the dark, have nothing left to fight for
-			S.PostShare = 0.12f;
-			S.GuardShare = 0.6f;
+			S.PostShare = 0.08f;
+			S.GuardShare = 0.5f;
 		}
 		else
 		{
