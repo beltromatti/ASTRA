@@ -1,9 +1,9 @@
 // ASTRA — ABBORDAGGI-2: the plan of a ship that is boarded (docs/brief/ABBORDAGGI-2.md §3).
 //
 // The Aquila's plan (data/ship/aquila_plan.json) is read by the damage model and the soldiers' map is built from it (UAstraBoardSubsystem). Any other ship is fought over on the plan of
-// her class: data/ship/plans/<class>.json (FLOTTA-VIVA's, the format of the Aquila's), or, until a class has one, the small stopgap this module's tools/ship_plan_stopgap.py writes
-// (data/ship/plans/stopgap/<class>.json, "stopgap": true). One loader reads either: FAstraDamageMap::Load(Path) (the same as FLOTTA-VIVA's), then the soldiers' map is built on it, and the
-// parts of the file that only boarding reads (the docks on the skin, where the crew stands, the named places) are kept beside it.
+// her class: data/ship/plans/<class>.json (FLOTTA-VIVA's, the format of the Aquila's, the same file their insides stand on: the war's rooms and the boarding's are the same rooms in the same
+// order). One loader reads it: FAstraDamageMap::Load(Path) (the same as FLOTTA-VIVA's), then the soldiers' map is built on it, and the parts of the file that only boarding reads (the docks on
+// the skin, where the crew stands, the named places) are kept beside it.
 //
 // Plain code (no actors, no world): the bench loads every class and fights over it headless.
 
@@ -13,13 +13,21 @@
 #include "AstraBoardMap.h"
 #include "AstraDamageMap.h"
 
+/** How a room is as the war left it (a ship that has been fought over): its power, its fire and smoke, its air, whether its structure is gone. A room that is not listed is as built. */
+struct FBoardRoomMood
+{
+	float Power = 1.f, Fire = 0.f, Smoke = 0.f, Air = 1.f;
+	bool bGutted = false;
+	bool Dark() const { return Power < 0.45f || bGutted; }
+	bool Burns() const { return Fire >= 0.10f && !bGutted; }
+};
+
 /** A ship's plan as boarding uses it. */
 struct ASTRA_API FBoardShipPlan
 {
 	FName Class;
 	FString Label;
 	FString Path;
-	bool bStopgap = false;
 	TSharedPtr<FAstraDamageMap> Dmg;
 	TSharedPtr<FAstraBoardMap> Map;
 	/** A hatch on the skin where a craft latches and the breach opens into Comp: in the plan's frame (cm). */
@@ -58,14 +66,15 @@ struct ASTRA_API FBoardShipPlan
 
 namespace AstraBoardPlans
 {
-	/** Where a class's plan is: the staged copy (Content/ASTRA/Data/plans/<class>.json), the repository's (data/ship/plans/<class>.json), else the stopgap's. Empty when there is none. */
-	ASTRA_API FString PathFor(FName ClassKey, bool& bOutStopgap);
+	/** Where a class's plan is: the staged copy (Content/ASTRA/Data/plans/<class>.json), else the repository's (data/ship/plans/<class>.json): FLOTTA-VIVA's resolver, so the war's picture of a ship and the
+	 *  boarding's plan are the same file. Empty when there is none. */
+	ASTRA_API FString PathFor(FName ClassKey);
 	/** Reads and builds the plan of a class (kept: the second boarding of the same class costs nothing). Safe on a worker thread. */
 	ASTRA_API TSharedPtr<FBoardShipPlan> Load(FName ClassKey, FString& OutWhy);
 	/** The plan of a class if it has been read already (nothing is read: the game thread asks this before it hands the reading to a worker). */
 	ASTRA_API TSharedPtr<FBoardShipPlan> Peek(FName ClassKey);
 	/** The same for a file (the bench's; not kept). */
 	ASTRA_API TSharedPtr<FBoardShipPlan> LoadFile(const FString& Path, FName ClassKey, FString& OutWhy);
-	/** The classes the stopgap and the real plans know (the file names in the plan directories). */
+	/** The classes that have a plan (the file names in the plan directory). */
 	ASTRA_API void ClassesWithPlans(TArray<FName>& Out);
 }

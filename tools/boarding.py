@@ -6,9 +6,11 @@
                                        squad fights in a corridor (who wins, how fast, with corners and without, with the flank and without), and whole
                                        boardings of the real ship (a Mandate boarding party through a breach, the marines on watch and the reaction
                                        team: who holds, at what cost, how long); checks the invariants and prints the verdict.
-                                       --scenario plans (on request): the plan of every class (data/ship/plans, else the stopgap's): it loads, every dock has a way to the bridge, the
+                                       --scenario plans (on request): the plan of every class (data/ship/plans, FLOTTA-VIVA's): it loads, every dock has a way to the bridge, the
                                        engineering hall and the commander's suite; --scenario attack [--class acheron]: the marines go aboard a Mandate ship by two Kestrels (24 men)
                                        and the same plan with the roles turned (who wins, how fast, at what cost)
+                                       --scenario war [--class acheron] (on request): FLOTTA-VIVA's inside of a class's ship is shot at (none, a few, many, a great many blows) and the marines go
+                                       aboard with the people the war left (the host's own way: AstraBoardScene with the snapshot): who holds her, who lies hurt, what it costs the marines
                                        --scenario fps (on request, no plan needed): the Captain's arms on the weapons against the mannequin's own
                                        animations (the sight on its place, the hands on the grips, what the picture holds at 16:9 and 16:10);
                                        --fpsposes FILE writes the engine's poses for the offline preview
@@ -56,6 +58,8 @@ def cmd_run(a: argparse.Namespace) -> int:
         args.append(f"-fpsposes={(ROOT / a.fpsposes).resolve()}")
     if a.setup >= 0:
         args.append(f"-setup={a.setup}")
+    if getattr(a, "dump", ""):
+        args.append(f"-dump={(ROOT / a.dump).resolve()}")
     t0 = time.time()
     with open(log, "w") as f:
         p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
@@ -197,6 +201,12 @@ ASSAULT_SETUPS = {
                 exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
                 at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port",
                 expect=[r"order \d+: the Aquila launches 2 Kestrels", r"docked Kestrel 1", r"has latched to Hulk", r"has cut in at", r"Hulk is ours|boarding of Hulk has failed|have broken off|has gone quiet"]),
+    # the same, with the Captain in the first Kestrel (a test Captain with no pawn: the ride, the other ship's decks made solid round him, the way home)
+    "out_ride": dict(doc="the Captain rides with the marines: the troop bay, the lock of the hulk, her decks made solid, the boat home, the bay of Deck 8", seconds=12000,
+                     exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                     at="11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride",
+                     expect=[r"the Captain rides with the marines in Kestrel 1", r"the Captain is aboard Hulk with the marines", r"Hulk is ours|boarding of Hulk has failed|have broken off|has gone quiet",
+                             r"the Captain is called back to the boat", r"the Captain is back aboard the Aquila"]),
     # an Acheron with her power and her point defence up: the marines' boats are shot at on the way in
     "out_pd": dict(doc="the marines' boats against a ship that shoots back: how many get through", seconds=11600,
                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
@@ -259,7 +269,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")
@@ -270,6 +280,7 @@ def main() -> int:
     r.add_argument("--class", dest="klass", default="", help="plans/attack: the ship's class (acheron, styx, lethe, praetorian, vigilant)")
     r.add_argument("--fpsset", default="", help="fps: try other places and anchors without touching the table, \"rifle.hip=84,17,-10;rifle.hipturn=-3,-13,0;rifle.shoulder_l=62,-20,-42\" (keys: rifle./pistol. hip hipturn ads low lowturn gripl fov shoulder_r shoulder_l; pole_r pole_l for both)")
     r.add_argument("--fpsposes", default="", help="fps: write the engine's poses (idle, draw, reload, dry fire) to this JSON file, for the offline preview")
+    r.add_argument("--dump", default="", help="interior: write the solids of each class's plan (JSON, for the offline view) into this directory")
     r.add_argument("--timeout", type=int, default=1500)
     r.set_defaults(fn=cmd_run)
     c = sub.add_parser("craft")

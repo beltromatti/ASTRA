@@ -670,6 +670,9 @@ public:
 	int32 ResolveShip(const FString& Key, FString* OutWhy = nullptr) const;
 	/** The truth about one ship, for the host (never for the crew). */
 	bool ShipFacts(int32 Id, AstraBoardCraft::FShipFacts& Out) const;
+	/** What the war has left of a ship's inside (FLOTTA-VIVA's snapshot: her people alive and where, the rooms not as built, the pressure bulkheads shut), for a boarding that goes into her; false when she
+	 *  has none (never hit through her plating, or her class has no plan). The same as FleetSnapshot, which is not public. */
+	bool InsideOf(int32 ShipId, struct FFleetSnapshot& Out) const { return FleetSnapshot(ShipId, Out); }
 	/** The ships of the battle that are not craft and are not destroyed, as the host of the boarding sees them (to choose a carrier, to list what each side may board). */
 	void ListShipFacts(TArray<AstraBoardCraft::FShipFacts>& Out) const;
 	/** The boarders took her: she is theirs now (her side, her stance), a hulk with a prize crew. ForSide: 0 ASTRA's (the Aquila's marines took a Mandate ship), 1 the Mandate's (they took a consort). */

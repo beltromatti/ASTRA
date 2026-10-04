@@ -702,7 +702,7 @@ namespace
 			UE_LOG(LogASTRA, Log, TEXT("[Board] %s: %s"), bOk ? TEXT("started") : TEXT("not started"), *D);
 			if (GEngine) { GEngine->AddOnScreenDebugMessage(-1, 6.f, bOk ? FColor::Green : FColor::Red, D); }
 		}));
-	FAutoConsoleCommandWithWorldAndArgs BdCmdAssault(TEXT("astra.board.assault"), TEXT("Testing: boats fly a boarding. astra.board.assault in [carrier] [target] [boats 1..4] [face] [objective]  (the Mandate's skiffs board the Aquila, or the target named) | astra.board.assault out [target] [carrier] [boats] [face] [objective]  (the Aquila's marines go in Kestrels; ships by contact id or name; - for the default)"),
+	FAutoConsoleCommandWithWorldAndArgs BdCmdAssault(TEXT("astra.board.assault"), TEXT("Testing: boats fly a boarding. astra.board.assault in [carrier] [target] [boats 1..4] [face] [objective]  (the Mandate's skiffs board the Aquila, or the target named) | astra.board.assault out [target] [carrier] [boats] [face] [objective] [ride]  (the Aquila's marines go in Kestrels, and the Captain with them when the word ride is there; ships by contact id or name; - for the default)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			UAstraBoardSubsystem* B = BdBoard(W);
@@ -716,7 +716,11 @@ namespace
 			(bOut ? S.Source : S.Target) = A.Num() > 2 && !A[2].Equals(TEXT("-")) ? A[2] : FString();
 			S.Craft = A.Num() > 3 ? FCString::Atoi(*A[3]) : 0;
 			S.Face = A.Num() > 4 && !A[4].Equals(TEXT("-")) ? A[4] : FString();
-			S.Objective = A.Num() > 5 ? A[5] : FString();
+			S.Objective = A.Num() > 5 && !A[5].Equals(TEXT("ride")) && !A[5].Equals(TEXT("-")) ? A[5] : FString();
+			for (const FString& Word : A)
+			{
+				S.bCaptain |= Word.Equals(TEXT("ride"));                       // (the Captain goes with the marines: the word ride anywhere after the verb)
+			}
 			S.By = TEXT("the console");
 			FString D;
 			const bool bOk = B->StartAssault(S, D);

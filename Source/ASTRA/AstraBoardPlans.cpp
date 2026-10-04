@@ -1,6 +1,7 @@
 #include "AstraBoardPlans.h"
 
 #include "ASTRA.h"
+#include "AstraFleetPlan.h"
 #include "Dom/JsonObject.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
@@ -61,32 +62,15 @@ int32 FBoardShipPlan::NearestDock(const FVector& HullM) const
 	return Best;
 }
 
-FString AstraBoardPlans::PathFor(FName ClassKey, bool& bOutStopgap)
+FString AstraBoardPlans::PathFor(FName ClassKey)
 {
-	bOutStopgap = false;
 	const FString K = ClassKey.ToString().ToLower();
 	if (K == TEXT("aquila"))
 	{
 		const FString Staged = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("ASTRA/Data/aquila_plan.json"));
 		return FPaths::FileExists(Staged) ? Staged : FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/aquila_plan.json"));
 	}
-	const FString Staged = FPaths::Combine(FPaths::ProjectContentDir(), FString::Printf(TEXT("ASTRA/Data/plans/%s.json"), *K));
-	const FString Repo = FPaths::Combine(FPaths::ProjectDir(), FString::Printf(TEXT("data/ship/plans/%s.json"), *K));
-	const FString Stop = FPaths::Combine(FPaths::ProjectDir(), FString::Printf(TEXT("data/ship/plans/stopgap/%s.json"), *K));
-	if (FPaths::FileExists(Staged))
-	{
-		return Staged;
-	}
-	if (FPaths::FileExists(Repo))
-	{
-		return Repo;
-	}
-	if (FPaths::FileExists(Stop))
-	{
-		bOutStopgap = true;
-		return Stop;
-	}
-	return FString();
+	return FAstraFleetPlans::PathFor(FName(*K));
 }
 
 TSharedPtr<FBoardShipPlan> AstraBoardPlans::LoadFile(const FString& Path, FName ClassKey, FString& OutWhy)
@@ -111,7 +95,6 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::LoadFile(const FString& Path, FName 
 	TSharedPtr<FJsonObject> Plan;
 	if (FFileHelper::LoadFileToString(Text, *Path) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Plan) && Plan.IsValid())
 	{
-		Plan->TryGetBoolField(TEXT("stopgap"), P->bStopgap);
 		Plan->TryGetStringField(TEXT("label"), P->Label);
 		double Crew = 0.0;
 		Plan->TryGetNumberField(TEXT("crew"), Crew);
@@ -191,8 +174,8 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::LoadFile(const FString& Path, FName 
 			}
 		}
 	}
-	UE_LOG(LogASTRA, Log, TEXT("[Board] plan of the %s%s: %d compartments, %d portals, %d docks, %d posts (%.0f ms)"), *ClassKey.ToString(), P->bStopgap ? TEXT(" (a stopgap)") : TEXT(""), P->Dmg->Comps.Num(),
-	       P->Map->GetPortals().Num(), P->Docks.Num(), P->Garrison.Num(), (FPlatformTime::Seconds() - T0) * 1000.0);
+	UE_LOG(LogASTRA, Log, TEXT("[Board] plan of the %s: %d compartments, %d portals, %d docks, %d posts (%.0f ms)"), *ClassKey.ToString(), P->Dmg->Comps.Num(), P->Map->GetPortals().Num(), P->Docks.Num(),
+	       P->Garrison.Num(), (FPlatformTime::Seconds() - T0) * 1000.0);
 	return P;
 }
 
@@ -206,8 +189,7 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::Load(FName ClassKey, FString& OutWhy
 			return *Hit;
 		}
 	}
-	bool bStop = false;
-	const FString Path = PathFor(Key, bStop);
+	const FString Path = PathFor(Key);
 	if (Path.IsEmpty())
 	{
 		OutWhy = FString::Printf(TEXT("no plan of the %s class (data/ship/plans/%s.json)"), *Key.ToString(), *Key.ToString());
@@ -216,7 +198,6 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::Load(FName ClassKey, FString& OutWhy
 	TSharedPtr<FBoardShipPlan> P = LoadFile(Path, Key, OutWhy);
 	if (P.IsValid())
 	{
-		P->bStopgap |= bStop;
 		FScopeLock Lock(&BpLock);
 		BpCache.Add(Key, P);
 	}
@@ -233,13 +214,10 @@ TSharedPtr<FBoardShipPlan> AstraBoardPlans::Peek(FName ClassKey)
 void AstraBoardPlans::ClassesWithPlans(TArray<FName>& Out)
 {
 	Out.Reset();
-	for (const FString& Dir : {FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/plans")), FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/plans/stopgap"))})
+	TArray<FString> Files;
+	IFileManager::Get().FindFiles(Files, *FPaths::Combine(FPaths::ProjectDir(), TEXT("data/ship/plans/*.json")), true, false);
+	for (const FString& F : Files)
 	{
-		TArray<FString> Files;
-		IFileManager::Get().FindFiles(Files, *FPaths::Combine(Dir, TEXT("*.json")), true, false);
-		for (const FString& F : Files)
-		{
-			Out.AddUnique(FName(*FPaths::GetBaseFilename(F)));
-		}
+		Out.AddUnique(FName(*FPaths::GetBaseFilename(F)));
 	}
 }

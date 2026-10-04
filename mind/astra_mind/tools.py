@@ -196,7 +196,9 @@ BOARD_SHIP = _fn("board_ship", "The XO (or any officer the Captain asks): board 
     "face": {"type": "string", "enum": BOARD_FACES, "description": "the side of the target the boats dock on; leave out for the side nearest the Aquila"},
     "objective": {"type": "string", "enum": BOARD_OBJECTIVES, "description": "what the marines fight for: captain (the commander's suite: a ship's commander is taken there) · bridge · engineering (her reactor) · "
                                                                               "armory · medbay · brig · comms · hangar; leave out for the commander's suite"},
-    "marines": {"type": "integer", "minimum": 4, "maximum": 24, "description": "how many marines in all (the boats' full loads when left out)"}}, [])
+    "marines": {"type": "integer", "minimum": 4, "maximum": 24, "description": "how many marines in all (the boats' full loads when left out)"},
+    "captain": {"type": "boolean", "description": "true only when the Captain himself says he goes with the marines: he rides in the first Kestrel (the screen goes dark for the flight), fights on the other "
+                                                  "ship with his rifle and comes home in the boat; if that boat is shot down he is in it. Never on your own initiative"}}, [])
 SHIP_TOOLS.append(BOARD_SHIP)
 
 DEPARTMENTS = ["xo", "helm", "ops", "tactical", "comms", "sensors", "engineering", "flight"]

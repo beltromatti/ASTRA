@@ -85,7 +85,7 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 	{
 		LastShotSound.SetNumZeroed(Fight.Units().Num() + 16);
 	}
-	const bool bObserved = Mode == EMode::Observed;           // the fight is on the Aquila's decks: rounds, wounds and breaches are seen and heard (else only told)
+	const bool bObserved = Mode == EMode::Observed || bCaptainAboard;      // the Captain is in the fight (on the Aquila's decks, or on another ship with his marines): rounds, wounds and breaches are seen and heard (else only told)
 	const bool bWeAttack = Fight.IsAttacker(ESide::Aquila);
 	for (const FBoardEvent& E : Evs)
 	{
@@ -168,6 +168,27 @@ void UAstraBoardSubsystem::ProcessEvents(float Dt)
 			Tell(E.Text, true);
 			break;
 		}
+		case EEvent::Carried:
+		{
+			// a wounded man has been carried out to his boat: alive, off the ship (his bearer has gone back to the fight)
+			const FUnit* U = Fight.Unit(E.Unit);
+			const FUnit* Bearer = Fight.Unit(E.Target);
+			if (U && U->Side == ESide::Aquila)
+			{
+				if (const int32* R = RosterOfUnit.Find(E.Unit))
+				{
+					UAstraShipSubsystem* S = ShipSub();
+					if (S && !HarmTold.Contains(*R))
+					{
+						HarmTold.Add(*R);
+						S->HarmPerson(*R, false, TEXT("gunfire"));
+					}
+				}
+				Tell(FString::Printf(TEXT("%s, wounded, has been carried back to the boat by %s"), *U->Name, Bearer ? *Bearer->Name : TEXT("his comrades")), false);
+			}
+			ReleaseBody(E.Unit);
+			break;
+		}
 		case EEvent::Exit:
 		case EEvent::Outcome:
 		default:
@@ -202,16 +223,19 @@ void UAstraBoardSubsystem::OnShot(const FBoardEvent& E)
 		return;
 	}
 	const FVector Eye = Cam->GetCameraLocation();
-	if (FVector::Dist(Shooter->Pos, Eye) > BdFxReachCm || FMath::Abs(Shooter->Pos.Z - Eye.Z) > 800.f)
+	const FVector Off = WorldOffset();
+	const FVector At = Shooter->Pos + Off;
+	if (FVector::Dist(At, Eye) > BdFxReachCm || FMath::Abs(At.Z - Eye.Z) > 800.f)
 	{
 		return;                                       // out of sight and out of hearing
 	}
 	AAstraCombatant* B = BodyOf.FindRef(E.Unit);
-	const FVector Muzzle = B ? B->MuzzleAt() : E.Start;
-	const FVector Dir = (E.End - Muzzle).GetSafeNormal();
-	X->Tracer(Muzzle, E.End, Shooter->Side == ESide::Mandate ? BdMandateTracer : BdMarineTracer);
+	const FVector Muzzle = B ? B->MuzzleAt() : E.Start + Off;
+	const FVector End = E.End + Off;
+	const FVector Dir = (End - Muzzle).GetSafeNormal();
+	X->Tracer(Muzzle, End, Shooter->Side == ESide::Mandate ? BdMandateTracer : BdMarineTracer);
 	X->MuzzleFlash(Muzzle, Dir, B ? 1.f : 0.7f);
-	X->Whiz(Muzzle, E.End);
+	X->Whiz(Muzzle, End);
 	if (B)
 	{
 		B->NoteShot();
@@ -229,13 +253,13 @@ void UAstraBoardSubsystem::OnShot(const FBoardEvent& E)
 		--TracesLeft;
 		FHitResult H;
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraBoardMiss), false);
-		if (W->LineTraceSingleByChannel(H, Muzzle, E.End + Dir * 400.f, ECC_Camera, Q))
+		if (W->LineTraceSingleByChannel(H, Muzzle, End + Dir * 400.f, ECC_Camera, Q))
 		{
 			X->Impact(H.Location, H.ImpactNormal, UAstraCombatFx::ESurface::Metal);
 		}
-		else if (FVector::Dist(E.End, Muzzle) < 6000.0)
+		else if (FVector::Dist(End, Muzzle) < 6000.0)
 		{
-			X->Impact(E.End, -Dir, UAstraCombatFx::ESurface::Metal);
+			X->Impact(End, -Dir, UAstraCombatFx::ESurface::Metal);
 		}
 	}
 }
@@ -253,17 +277,18 @@ void UAstraBoardSubsystem::OnHit(const FBoardEvent& E)
 		return;
 	}
 	const FUnit* Shooter = Fight.Unit(E.Target);
+	const FVector Off = WorldOffset();
 	if (AAstraCombatant* B = BodyOf.FindRef(E.Unit))
 	{
-		B->NoteHit(Shooter ? Shooter->Pos : E.End);
+		B->NoteHit(Shooter ? Shooter->Pos + Off : E.End + Off);
 	}
 	if (UAstraCombatFx* X = FxSub())
 	{
 		const APlayerCameraManager* Cam = GetWorld() ? UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0) : nullptr;
-		if (Cam && FVector::Dist(E.End, Cam->GetCameraLocation()) < BdFxReachCm)
+		if (Cam && FVector::Dist(E.End + Off, Cam->GetCameraLocation()) < BdFxReachCm)
 		{
 			const FVector N = Shooter ? (Shooter->Pos - E.End).GetSafeNormal() : FVector::UpVector;
-			X->Impact(E.End, N, UAstraCombatFx::ESurface::Flesh);
+			X->Impact(E.End + Off, N, UAstraCombatFx::ESurface::Flesh);
 		}
 	}
 }
@@ -300,7 +325,7 @@ void UAstraBoardSubsystem::OnOutcome()
 {
 	const FMission& M = Fight.Mission();
 	const FBook& B = Fight.Book();
-	const FString Tally = FString::Printf(TEXT("marines: %d dead, %d wounded; boarders: %d dead, %d wounded, %d got away"), B.Killed[0], B.Down[0], B.Killed[1], B.Down[1], B.Exited[1]);
+	const FString Tally = FString::Printf(TEXT("marines: %d dead, %d wounded; boarders: %d dead, %d wounded, %d got away"), B.Killed[0], B.Down[0] + B.Carried[0], B.Killed[1], B.Down[1] + B.Carried[1], B.Exited[1]);
 	switch (M.Outcome)
 	{
 	case EOutcome::DefenderHolds:
