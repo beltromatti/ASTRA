@@ -355,6 +355,25 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 		                     FString::Printf(TEXT("%s | %s"), *D2, *D));
 	}
 
+	// ---- the places as the crew names them (the games of 5/10: "Deck 8 hangar" found nothing, "the Marine Armory on Deck 8" was not read, the Kestrels' bay had no name)
+	{
+		struct FCase { const TCHAR* Said; const TCHAR* Want; bool bShielded; };
+		const FCase Cases[] = {{TEXT("Deck 8 hangar"), TEXT("Assault-Shuttle Bay"), false}, {TEXT("the Kestrel bay"), TEXT("Assault-Shuttle Bay"), false},
+		                       {TEXT("kestrels"), TEXT("Assault-Shuttle Bay"), false}, {TEXT("my quarters"), TEXT("Captain's Quarters"), false},
+		                       {TEXT("the Marine Armory on Deck 8"), TEXT("Marine Armory"), true}, {TEXT("Main Engineering"), TEXT("Main Engineering"), false},
+		                       {TEXT("the flight deck"), TEXT("Flight Deck"), false}, {TEXT("sickbay"), TEXT("Medbay"), false}};
+		for (const FCase& C : Cases)
+		{
+			FString Label, Err, Open;
+			const bool bOk = X->ResolvePlace(C.Said, Label, Err, &Open);
+			AstraXportBenchCheck(*FString::Printf(TEXT("places: \"%s\" is the %s"), C.Said, C.Want), bOk && Label.Contains(C.Want) && C.bShielded == !Open.IsEmpty(),
+			                     bOk ? Label + (Open.IsEmpty() ? FString() : FString::Printf(TEXT(" (shielded; the nearest open room: %s)"), *Open)) : Err);
+		}
+		FString Label, Err;
+		const bool bNone = X->ResolvePlace(TEXT("the shuttle hall"), Label, Err);
+		AstraXportBenchCheck(TEXT("places: a name that is not on the plan is answered with the nearest ones"), !bNone && Err.Contains(TEXT("nearest names")), Err);
+	}
+
 	// ======================================================================================================== inside the ship
 	{
 		FString Detail;

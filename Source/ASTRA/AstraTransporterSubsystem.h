@@ -250,6 +250,9 @@ public:
 
 	/** What the console would answer to a plain request right now (the chief's pre-flight; the card's `options` are made of these). OutWhy: why it could not even be read. */
 	AstraXport::FVerdict Preflight(const FAstraXportOrder& O, FString& OutWhy) const;
+	/** What a place said in words is on this ship, as an order's `to` reads it ("Deck 8 hangar" -> the Assault-Shuttle Bay), for the world bench and the console:
+	 *  false and OutErr (with the nearest names) when nothing is called so; OutOpenNear: for a pattern-shielded room, the nearest one the beam reaches. */
+	bool ResolvePlace(const FString& Text, FString& OutLabel, FString& OutErr, FString* OutOpenNear = nullptr) const;
 
 	FString InfoText() const;
 	/** The fx, for the console and the tests (null where nothing is drawn: a headless world). */

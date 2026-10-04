@@ -137,6 +137,7 @@ namespace AstraXport
 		bool bPadOccupied = false;
 		FName CompKind, CompId;
 		bool bInhibited = false;
+		FString OpenNear;                  // a shielded room: the nearest one on its deck that the beam reaches (what the refusal offers instead)
 		FRoomState Room;                      // the compartment
 		bool bHazard = false;                 // (filled by Evaluate from Room)
 		// a ship

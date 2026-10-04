@@ -97,9 +97,10 @@ WHO_HELP = ("who goes: 'captain'; 'npc17' (the number the personnel locator give
             "'pad 3' (whoever stands on pad 3); 'away team' (everyone sent away and not yet brought back); 'marines 6' (six fit marines); "
             "'cargo 300 kg medical supplies'. The Captain on the decks of a ship the marines are fighting aboard is 'captain' too, and so is a marine there by name or number")
 TO_HELP = ("where to: 'pad 2' (a pad of your room; 'a pad' for any free one; 'the pads' for as many free pads as there are people: where a team comes home to; 'med1' and 'med2' "
-           "are the Medbay's emergency pads, for the wounded only); 'surface' (the world below, the landing field); a ship by contact id ('T-02'); a room of the Aquila by name "
-           "('Main Engineering', 'the Medbay', 'the armory', 'Deck 8 hangar', 'the bridge'). To bring someone home from a ship, `to` is "
-           "'a pad' (or 'the pads' for a team); `from` can stay out: the console knows where they are")
+           "are the Medbay's emergency pads, for the wounded only); 'surface' (the world below, the landing field); a ship by contact id ('T-40') or by name ('Acheron'); a room of "
+           "the Aquila by the plan's name or as the crew says it, with its deck when it helps ('Main Engineering', 'the Medbay', 'the Assault-Shuttle Bay' — the Kestrels' bay, "
+           "deck 8 —, 'the Captain's quarters', 'the Marine Barracks on deck 8', 'the bridge'). When a room is not found the console answers with the nearest names: "
+           "take one of them. To bring someone home from a ship, `to` is 'a pad' (or 'the pads' for a team); `from` can stay out: the console knows where they are")
 
 SAY = _fn("say", "You speak aloud, in the Captain's language: one call per line, in speaking order. One or two short sentences; what you did or found, with the numbers that matter.",
           {"text": {"type": "string", "description": "the spoken line"},
@@ -121,8 +122,8 @@ TRANSPORT = _fn("transport", "Carry out a transport on your console: it is check
 ENERGIZE = _fn("energize", "Release a lock you are holding: the cycle begins.", {"id": {"type": "string", "description": "the transport's id (X3); empty for the one waiting"}}, [])
 ABORT = _fn("abort", "Cancel a transport: before the cycle it is free; mid-cycle the pattern is brought back to its pad if it can be, and held in the buffer if it cannot.",
             {"id": {"type": "string", "description": "the transport's id; empty for the one under way"}}, [])
-LOCATE = _fn("locate", "The personnel locator at your console (the badges' signals): who someone aboard is and where they are right now. Call it on its own, before speaking: what it finds "
-                       "comes back to you.", {"who": {"type": "string", "description": "a surname, a rank and name, a call sign or a job, in English"}}, ["who"])
+LOCATE = _fn("locate", "The personnel locator at your console (the badges' signals): who a PERSON aboard is and where they are right now (people only: a ship is a contact "
+                       "for `transport`, a room is a place for `transport`'s `to`). Call it on its own, before speaking: what it finds comes back to you.", {"who": {"type": "string", "description": "a surname, a rank and name, a call sign or a job, in English"}}, ["who"])
 PASS = _fn("pass", "The Captain's words were not for you (they were for the bridge, an operator, someone else, or he was thinking aloud): say nothing, do nothing. Call it alone.",
            {"for_whom": {"type": "string", "description": "who the words were for, in a few words"}}, ["for_whom"])
 ACTION_TOOLS = {"transport": "transport", "energize": "transport_energize", "abort": "transport_abort"}   # her tools -> the game's commands

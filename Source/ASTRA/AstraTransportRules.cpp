@@ -616,7 +616,8 @@ namespace AstraXport
 			}
 			if (E.bInhibited)
 			{
-				Block(TEXT("inhibit"), FString::Printf(TEXT("%s is pattern-shielded: no beam goes into or out of it"), *E.Label), TEXT("use the nearest room that is not shielded"), true, false);
+				Block(TEXT("inhibit"), FString::Printf(TEXT("%s is pattern-shielded: no beam goes into or out of it"), *E.Label),
+				      E.OpenNear.IsEmpty() ? FString(TEXT("use the nearest room that is not shielded")) : FString::Printf(TEXT("the nearest room the beam reaches is %s"), *E.OpenNear), true, false);
 			}
 			if (bDestination)
 			{
