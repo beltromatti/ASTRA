@@ -594,9 +594,9 @@ void AAstraViewscreen::Direct(float Dt)
 			Arrivals.RemoveAll([bHostile](const FArrival& A) { return A.bHostile == bHostile; });
 		}
 	}
-	else if (const FContact* E = FindC(Cs, Engaged))
+	else if (const FContact* E = FindC(Cs, Engaged); E && E->Track >= 2)
 	{
-		Best = {EShot::Contact, E->ContactId, E->Label, E->Track >= 2 ? TEXT("TARGET") : TEXT("BEARING"), 4, 8.0, FVector::ZeroVector, {}};
+		Best = {EShot::Contact, E->ContactId, E->Label, TEXT("TARGET"), 4, 8.0, FVector::ZeroVector, {}};
 		if (Shot == EShot::Contact && ShotId == E->ContactId && Now - ShotSince > 16.0)
 		{
 			// a long fight: now and then the wider picture — the target's group, the hostile warships within 20 km of
@@ -647,6 +647,12 @@ void AAstraViewscreen::Direct(float Dt)
 		else if (Near)
 		{
 			Best = {EShot::Contact, Near->ContactId, Near->Label, TEXT("HOSTILE"), 2, 7.0, FVector::ZeroVector, {}};
+		}
+		else if (const FContact* Brg = FindC(Cs, Engaged))
+		{
+			// the action is a bearing with no range: a picture of almost nothing, so the last choice, held long (the screen hopped from one
+			// passive bearing to the next every few seconds in a March battle, 4 Oct)
+			Best = {EShot::Contact, Brg->ContactId, Brg->Label, TEXT("BEARING"), 1, 12.0, FVector::ZeroVector, {}};
 		}
 	}
 	if (Best.Pri == 0)
@@ -1017,6 +1023,7 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	struct FLabelReq { const FContact* C; FBox2D Box; FLinearColor Col; int32 Order; };
 	TArray<FLabelReq> Pending;
 	TArray<FVector2D> ArrowTags;
+	TArray<TPair<FVector2D, const FContact*>> Bearings;   // bearing-only contacts in frame: labelled together where they crowd (below)
 	for (const FContact& C : Plot())
 	{
 		const FVector World = B->WorldOf(C.Pos);
@@ -1066,7 +1073,7 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 			{
 				D.Line(FVector2D(P.X, y), FVector2D(P.X, y + 8.f * S), Col, 1.2f);
 			}
-			D.Text(P.X + 8.f * S, P.Y - 70.f * S, FString::Printf(TEXT("%s  BRG %03.0f  NO RANGE%s"), *C.ContactId, C.BearingDeg, C.bJamming ? TEXT("  JAMMING") : TEXT("")), true, PxData, Col);
+			Bearings.Add({P, &C});
 			continue;
 		}
 		if (C.bCraft && bCrowd)
@@ -1246,6 +1253,47 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		const FLinearColor Col = KV.Key == EAstraSide::Astra ? ColAstra : KV.Key == EAstraSide::Mandate ? ColMandate : ColNeutral;
 		D.Text(At.X, FMath::Min(At.Y + 18.f * S, Bottom - PxData * 1.2f), FString::Printf(TEXT("%s CRAFT x%d"), KV.Key == EAstraSide::Astra ? TEXT("ASTRA") : KV.Key == EAstraSide::Mandate ? TEXT("MANDATE") : TEXT("UNKNOWN"), KV.Value.Value),
 		       true, PxData, Dimmed(Col, 0.85f), 1);
+	}
+	// the bearings' words: one label for each crowd of them across the frame (a March battle's eleven passive bearings, each with its own
+	// "T-72 BRG 080 NO RANGE", piled into one unreadable block, 4 Oct); the subject's own bearing always keeps its own
+	Bearings.Sort([](const TPair<FVector2D, const FContact*>& X, const TPair<FVector2D, const FContact*>& Y) { return X.Key.X < Y.Key.X; });
+	TArray<FBox2D> BearingTags;
+	for (int32 i = 0; i < Bearings.Num();)
+	{
+		int32 j = i + 1;
+		while (j < Bearings.Num() && Bearings[j].Key.X - Bearings[j - 1].Key.X < 90.f * S && Bearings[j].Value->ContactId != ShotId && Bearings[i].Value->ContactId != ShotId)
+		{
+			++j;
+		}
+		const FContact& First = *Bearings[i].Value;
+		FString Tag;
+		bool bJam = false;
+		float MinY = Bottom;
+		double Lo = 360.0, Hi = 0.0;
+		for (int32 k = i; k < j; ++k)
+		{
+			const FContact& C = *Bearings[k].Value;
+			bJam |= C.bJamming;
+			MinY = FMath::Min(MinY, Bearings[k].Key.Y);
+			Lo = FMath::Min(Lo, C.BearingDeg);
+			Hi = FMath::Max(Hi, C.BearingDeg);
+		}
+		if (j - i == 1)
+		{
+			Tag = FString::Printf(TEXT("%s  BRG %03.0f  NO RANGE%s"), *First.ContactId, First.BearingDeg, First.bJamming ? TEXT("  JAMMING") : TEXT(""));
+		}
+		else
+		{
+			Tag = FString::Printf(TEXT("%d BEARINGS  %03.0f-%03.0f  NO RANGE%s"), j - i, Lo, Hi, bJam ? TEXT("  JAMMING") : TEXT(""));
+		}
+		FVector2D At(Bearings[i].Key.X + 8.f * S, FMath::Max(Top + PxData, MinY - 70.f * S));
+		for (int32 Try = 0; Try < 6 && BearingTags.ContainsByPredicate([&](const FBox2D& Q) { return Q.Intersect(FBox2D(At, At + FVector2D(Tag.Len() * PxData * 0.55f, PxData))); }); ++Try)
+		{
+			At.Y += PxData * 1.2f;
+		}
+		BearingTags.Add(FBox2D(At, At + FVector2D(Tag.Len() * PxData * 0.55f, PxData)));
+		D.Text(At.X, At.Y, Tag, true, PxData, First.ContactId == Engaged ? ColAlarm : SideColor(First));
+		i = j;
 	}
 	// missiles coming at us
 	TArray<FVector> Missiles;
