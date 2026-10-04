@@ -360,6 +360,15 @@ void UAstraBattleSubsystem::Report(const FString& Text, bool bReport)
 	}
 }
 
+void UAstraBattleSubsystem::Cue(const FString& Text)
+{
+	UE_LOG(LogASTRA, Log, TEXT("[Battle] (cue) %s"), *Text);
+	if (UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>())
+	{
+		Ship->PublishCue(Text, true);
+	}
+}
+
 // ------------------------------------------------------------------------------------------------------ tick
 void UAstraBattleSubsystem::Tick(float DeltaTime)
 {
@@ -1087,7 +1096,7 @@ void UAstraBattleSubsystem::TickScenario(float Dt)
 	if (!bBriefed && Time > 6.f)
 	{
 		bBriefed = true;
-		Report(TEXT("bridge: the Captain has just come onto the bridge — the XO greets them and briefs the situation in two or "
+		Cue(TEXT("bridge: the Captain has just come onto the bridge — the XO greets them and briefs the situation in two or "
 		            "three short lines (where we are, the patrol with the 7th Fleet, anything on the sensors worth their attention)"));
 	}
 	// stage 1: the drifting contact wakes up and goes for the freighter (earlier if we poked it with an active scan)
@@ -2134,6 +2143,10 @@ bool UAstraBattleSubsystem::PlayerScan(const FString& ContactId, FString& OutDet
 		OutDetail = FString::Printf(TEXT("full active sweep: %d contact(s) now tracked and classified%s — and every sensor out there heard our ping"),
 		                            Found, *DecoyNote);
 		return true;
+	}
+	if (T && T->bWreck && T->bAlive && Space)
+	{
+		return Space->ScanWreck(*T, OutDetail);        // a piece of a ship the war broke (SPAZIO-VIVO): what an active look learns of it, by the range (AstraWrecks.h: Findings)
 	}
 	if (T && T->ContactId == TEXT("T-11") && StageDone == 0)
 	{
@@ -3629,6 +3642,16 @@ TArray<TSharedPtr<FJsonValue>> UAstraBattleSubsystem::ContactsJson() const
 	{
 		if (S.bPlayer || !S.bAlive || S.bCraft)
 		{
+			continue;
+		}
+		if (S.bWreck)
+		{
+			// a piece of a ship the war broke (SPAZIO-VIVO): the living space says what the crew knows of it, and lists only the few nearest (the rest are on the plot for the screens)
+			TSharedRef<FJsonObject> W = MakeShared<FJsonObject>();
+			if (Space && Space->WreckContactJson(S, W))
+			{
+				Out.Add(MakeShared<FJsonValueObject>(W));
+			}
 			continue;
 		}
 		if (S.bFog && S.Track == 0)
@@ -5194,7 +5217,7 @@ void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 	}
 	SyncVisuals();
 	bStarted = true;
-	Report(TEXT("bridge: the Captain returns to the bridge after the watch change — the XO welcomes them back and sums up in two or "
+	Cue(TEXT("bridge: the Captain returns to the bridge after the watch change — the XO welcomes them back and sums up in two or "
 	            "three short lines where the Aquila is, her state, and what the war needs from her now"));
 }
 

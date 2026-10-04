@@ -42,7 +42,7 @@ log.append("MPC ok")
 
 # --- emissive master with alert response
 m = eal.load_asset(f"{MAT}/M_ASTRA_Emissive")
-mel.delete_all_material_expressions(m)
+for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy of the list. NB: the materials of meshes C++ constructors load - lifepods, doors - are rooted, and rebuilding them here crashes the editor)
 
 
 def E(cls, x, y, **p):

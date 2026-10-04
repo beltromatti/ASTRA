@@ -341,11 +341,9 @@ AAstraFighterPawn::AAstraFighterPawn()
 	Cockpit->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Cockpit->SetCastShadow(true);                       // the canopy frame's shadow sweeps the cockpit as she rolls
 	Cockpit->bCastDynamicShadow = true;
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Mesh(TEXT("/Game/ASTRA/Ships/Cockpit/SM_CRAFT_ASTRA_Falcon_Cockpit.SM_CRAFT_ASTRA_Falcon_Cockpit"));
-	if (Mesh.Succeeded())
-	{
-		Cockpit->SetStaticMesh(Mesh.Object);
-	}
+	// (the cockpit's mesh is loaded when she launches, BeginOnCatapult, not here: a mesh the class default object loads stays loaded for the
+	// whole session with every material it uses, and those are rooted for good - the editor could no longer rebuild M_ASTRA_Screen,
+	// DeleteMaterialExpression asserts on a rooted expression)
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(Root);
 	Camera->bUsePawnControlRotation = false;
@@ -366,6 +364,10 @@ AAstraFighterPawn::AAstraFighterPawn()
 
 void AAstraFighterPawn::BeginOnCatapult(AAstraHangar* InHangar, APawn* InWalker)
 {
+	if (!Cockpit->GetStaticMesh())
+	{
+		Cockpit->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ASTRA/Ships/Cockpit/SM_CRAFT_ASTRA_Falcon_Cockpit.SM_CRAFT_ASTRA_Falcon_Cockpit")));
+	}
 	Hangar = InHangar;
 	Walker = InWalker;
 	Phase = EPhase::Catapult;

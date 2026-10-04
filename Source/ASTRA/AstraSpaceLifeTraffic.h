@@ -136,7 +136,8 @@ namespace AstraSpace
 		Beacon,        // the beacons of lifepods are heard
 		BeaconSilent,  // the beacons of a wreck's lifepods have gone silent (the air ran out)
 		WreckLook,     // a close look at a wreck
-		Rescue         // lifepods taken aboard
+		Rescue,        // lifepods taken aboard
+		Derelict       // a hulk left behind is found again
 	};
 
 	struct FEvent

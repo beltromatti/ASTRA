@@ -22,6 +22,30 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**4/10 notte — le console vere e la luce della plancia (il lead):**
+- **Perché le console sembravano finte**: gli schermi vivi erano a ~22 nit contro l'esposizione fissa della plancia (EV100 6,6), un decimo di un
+  monitor vero, e il sole dal finestrone rendeva una console bianca ~25 volte più luminosa di uno schermo: i pannelli sospesi sparivano, il touch
+  dei banchi sembrava vetro spento, il registro delle comunicazioni era illeggibile. Ora: **schermi ×8** (`astra.screens.gain 8`, pannelli sospesi
+  `astra.screens.hologain 4`, regolabili dalla console), i pannelli sospesi sono un foglio di luce fumé con i segni opachi (non più additivi), il
+  vetro nero dei piani di lavoro è antiriflesso, e **il finestrone è elettrocromico** (`M_ASTRA_SunFilter`, funzione di luce della stella: dentro la
+  plancia passa un decimo della luce, `astra.light.window 0.1`; fuori la stella resta intera). Le chiazze di sole sono pozze calde con le ombre dei
+  montanti; nessun costo misurabile.
+- **Corretti**: il pannello destro del timone era vuoto (la pittura della pagina usciva dopo quella dei sensori e la copriva); la striscia di stato
+  delle console diceva «CONDITION GREEN · 7TH FLEET HOLDING» anche in battaglia (ora è viva: `RT_ASTRA_Ticker` con condizione, contatti, scudi e
+  scafo, danni, rotta, ultimo evento, ora di bordo); i suggerimenti per le menti («il Capitano è entrato: l'XO lo saluta e fa il punto») finivano nel
+  registro delle console (ora `PublishCue`); le superfici di comando parlano da console («STANDING · SHIP'S ROUTINE, 5 MIN AGO», gli ordini del
+  Capitano in ambra); `astra.screens.where` dice su quali superfici sta ogni pagina.
+- **Attenzione per chi ricostruisce materiali**: l'editor cadeva (`!IsRooted`) ricostruendo `M_ASTRA_Screen`: i materiali delle mesh caricate dai
+  costruttori C++ (capsule, porte; il Falcon ora carica l'abitacolo al decollo) sono radicati e non si possono ricostruire in posto
+  (`M_ASTRA_Screen`, `M_ASTRA_Hard`, `M_ASTRA_Emissive`, `M_ASTRA_Glass`, `M_BRG3_Lamps`); gli script cancellano il grafo da una copia della lista e
+  `make_bridge_v3_materials.py` ha i passi `ONLY`. Dopo un crash dell'editor il CrashReportClient tiene la porta 8000 dell'MCP: va chiuso.
+- **Uniti**: ABBORDAGGI-3 tappa 1 (`astra.board.drill`, le perdite degli sbarchi nei registri di FLOTTA-VIVA) e SPAZIO-VIVO-2 tappa 1 (i pezzi dei
+  relitti come contatti W-02B/M/S, scafi solidi, relitti ritrovati al ritorno, i blocchi di propulsori del Mandato: navi rigenerate e reimportate,
+  `WRECK_CONTACTS_OK` nel gioco).
+- **Da fare**: il Capitano che usa una console con le sue mani (E alla postazione, il cursore sul touch, gli stessi modi degli ufficiali); le altre
+  stanze con finestre (mensa, alloggi, giardini) nel filtro del sole; i conti delle prestazioni con la macchina scarica (con tre aiutanti il carico
+  è 19 e le misure non valgono).
+
 **4/10 sera — una partita vera da Capitano nell'app, e ciò che ne è uscito (il lead):**
 - **La partita** (app impacchettata, mente accesa, apertura della March): l'XO fa il briefing; «mostrami quel contatto freddo» → Ops lo mette
   sullo schermo in 0,86 s; Nair propone la scelta vera («con EMCON restricted non lo classifica nessuno: un ping lo identifica, ma dice a tutto il

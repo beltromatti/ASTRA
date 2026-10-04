@@ -14,6 +14,8 @@
 #include "CanvasItem.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Canvas.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Engine/CanvasRenderTarget2D.h"
 #include "Engine/Font.h"
 #include "EngineUtils.h"
@@ -26,6 +28,7 @@
 #include "Engine/StaticMesh.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetRenderingLibrary.h"
 #include "ASTRAPlayerController.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Misc/Paths.h"
@@ -50,6 +53,20 @@ namespace
 			}
 		}));
 	TAutoConsoleVariable<FString> CVarScreensSkip(TEXT("astra.screens.skip"), TEXT(""), TEXT("Diagnostics: pages never redrawn (comma-separated names, e.g. Master,Tactical)"));
+	// the screens' brightness against the bridge's fixed exposure (EV100 6.6), a multiplier on the Intensity their materials set: at 1 a
+	// wall display was ~22 nits, a tenth of a real one, and a console's touch screen in the sun read as bare glass; x8 (x4 for the hover
+	// panels, which also darken what is behind them) they read like displays in shade and in the sun (seen on the bridge, 4/10)
+	TAutoConsoleVariable<float> CVarScreensGain(TEXT("astra.screens.gain"), 8.f, TEXT("The live screens' brightness: x the Intensity of their material (1 = as the materials set it)"));
+	TAutoConsoleVariable<float> CVarHoloGain(TEXT("astra.screens.hologain"), 4.f, TEXT("The hover panels' brightness: x the Intensity of their material (1 = as the materials set it)"));
+	FAutoConsoleCommandWithWorldAndArgs CmdScreensWhere(TEXT("astra.screens.where"),
+		TEXT("Testing: astra.screens.where [Page] - the surfaces each live page is on (actor, mesh, material slot, where)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* World)
+		{
+			if (UAstraScreensSubsystem* S = World ? World->GetSubsystem<UAstraScreensSubsystem>() : nullptr)
+			{
+				S->LogSurfaces(A.Num() ? A[0] : FString());
+			}
+		}));
 	FLinearColor RGB(uint8 R, uint8 G, uint8 B, float A = 1.f)
 	{
 		FLinearColor C(FColor(R, G, B));
@@ -327,12 +344,18 @@ void UAstraScreensSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 				if (UMaterialInstanceDynamic* MID = SMC->CreateDynamicMaterialInstance(i, M))
 				{
 					MID->SetTextureParameterValue(TEXT("ScreenTexture"), P->Target);
+					float Base = 0.f;
+					MID->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Intensity")), Base);
+					Bound_.Add({MID, Base, MID->GetBlendMode() != BLEND_Opaque, SMC, i, Page});
 					++Bound;
 				}
 			}
 		}
 	}
-	UE_LOG(LogASTRA, Log, TEXT("[Screens] %d live pages on %d screen surfaces"), Pages.Num(), Bound);
+	// the status ticker: the decor material reads this render target where the atlas has its ticker tile (make_bridge_v3_materials.py)
+	TickerTarget = LoadObject<UTextureRenderTarget2D>(nullptr, TEXT("/Game/ASTRA/UI/RT_ASTRA_Ticker.RT_ASTRA_Ticker"));
+	UE_LOG(LogASTRA, Log, TEXT("[Screens] %d live pages on %d screen surfaces%s"), Pages.Num(), Bound,
+	       TickerTarget ? TEXT(", the status ticker live") : TEXT(" (no RT_ASTRA_Ticker: the tickers stay static)"));
 }
 
 void UAstraScreensSubsystem::Tick(float DeltaTime)
@@ -357,6 +380,34 @@ void UAstraScreensSubsystem::Tick(float DeltaTime)
 		{
 			Due = P;
 		}
+	}
+	// the brightness the console asks for, when it changes
+	const float Gain = CVarScreensGain.GetValueOnGameThread(), HoloGain = CVarHoloGain.GetValueOnGameThread();
+	if (Gain != AppliedGain || HoloGain != AppliedHoloGain)
+	{
+		AppliedGain = Gain;
+		AppliedHoloGain = HoloGain;
+		for (const FBoundSurface& B : Bound_)
+		{
+			if (UMaterialInstanceDynamic* MID = B.Mid.Get())
+			{
+				MID->SetScalarParameterValue(TEXT("Intensity"), B.BaseIntensity * (B.bHolo ? HoloGain : Gain));
+			}
+		}
+	}
+	TickerWait -= DeltaTime;
+	if (TickerTarget && TickerWait <= 0.f)          // (besides the page due: one line of text is nothing to the frame)
+	{
+		TickerWait = 1.f;
+		UCanvas* Canvas = nullptr;
+		FVector2D Size;
+		FDrawToRenderTargetContext Ctx;
+		UKismetRenderingLibrary::BeginDrawCanvasToRenderTarget(this, TickerTarget, Canvas, Size, Ctx);
+		if (Canvas)
+		{
+			DrawTicker(Canvas, int32(Size.X), int32(Size.Y));
+		}
+		UKismetRenderingLibrary::EndDrawCanvasToRenderTarget(this, Ctx);
 	}
 	if (Due)
 	{
@@ -839,6 +890,57 @@ void UAstraScreensSubsystem::DrawTactical(UCanvas* C, int32 W, int32 H)
 	}
 }
 
+void UAstraScreensSubsystem::DrawTicker(UCanvas* C, int32 W, int32 H)
+{
+	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
+	const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
+	if (!Ship)
+	{
+		return;
+	}
+	// the condition, always there (painted once a second: no pulse)
+	const EAstraAlert Alert = Ship->GetAlert();
+	const FLinearColor AC = AlertColor(Alert);
+	P.Rect(0, 0, 12, H, AC);
+	P.Text(30, H * 0.5f - 18, FString::Printf(TEXT("CONDITION %s"), *AlertText(Alert)), false, 32, AC);
+	P.Line(300, 10, 300, H - 10, DIM);
+	// then what is true now: one line at a time, the next every four seconds (every console and wall shows the same)
+	TArray<TPair<FString, FLinearColor>> Lines;
+	if (Battle)
+	{
+		const UAstraBattleSubsystem::FPlotCounts& Pc = Battle->PlotCounts();
+		const int32 Hostiles = Pc.HostileShips + Pc.HostileCraft;
+		Lines.Add({Hostiles + Pc.FriendlyShips == 0 ? FString(TEXT("NO CONTACTS IN RANGE"))
+		           : FString::Printf(TEXT("%d HOSTILE  ·  %d FRIENDLY  ·  %d MISSILES"), Hostiles, Pc.FriendlyShips, Pc.Missiles), Hostiles ? RED : CYAN});
+		const float Sh = Battle->PlayerShieldFraction(), Hu = Battle->PlayerHullFraction();
+		Lines.Add({FString::Printf(TEXT("SHIELDS %s %.0f %%  ·  HULL %.0f %%"), Ship->AreShieldsUp() ? TEXT("UP") : TEXT("DOWN"), 100.f * Sh, 100.f * Hu),
+		           Hu < 0.5f ? RED : (Sh < 0.5f || !Ship->AreShieldsUp() ? AMBER : CYAN)});
+	}
+	int32 Fires = 0, Breaches = 0, Busy = 0;
+	for (const FAstraDamage& D : Ship->GetDamage())
+	{
+		Fires += D.Kind.Contains(TEXT("fire")) ? 1 : 0;
+		Breaches += D.Kind.Contains(TEXT("breach")) ? 1 : 0;
+		Busy += D.Team >= 0 ? 1 : 0;
+	}
+	Lines.Add({Ship->GetDamage().Num() == 0 ? FString(TEXT("ALL DECKS PRESSURIZED  ·  NO DAMAGE REPORTED"))
+	           : FString::Printf(TEXT("%d FIRES  ·  %d BREACHES  ·  %d OF %d TEAMS OUT"), Fires, Breaches, Busy, Ship->GetNumDamageTeams()),
+	           Ship->GetDamage().Num() ? AMBER : GREEN});
+	Lines.Add({!Ship->GetInterceptId().IsEmpty() ? FString::Printf(TEXT("INTERCEPT %s  ·  HDG %03.0f  ·  %.0f M/S"), *Ship->GetInterceptId(), Ship->GetHeadingDeg(), Ship->GetSpeedMps())
+	           : FString::Printf(TEXT("HDG %03.0f MK %+.0f  ·  %.0f M/S  ·  THROTTLE %.0f %%"), Ship->GetHeadingDeg(), Ship->GetMarkDeg(), Ship->GetSpeedMps(), Ship->GetThrottlePct()),
+	           CYAN});
+	const TArray<FString>& Ev = Ship->GetRecentEvents();
+	if (Ev.Num())
+	{
+		Lines.Add({Ev.Last().ToUpper(), TEXTC});
+	}
+	Lines.Add({ShipClock(Time), DIM});
+	const int32 Pick = FMath::FloorToInt(Time / 4.f) % Lines.Num();
+	P.Text(324, H * 0.5f - 15, Lines[Pick].Key.Left(int32((W - 340) / 14.5f)), true, 25, Lines[Pick].Value, 0, true);
+}
+
 void UAstraScreensSubsystem::DrawHelm(UCanvas* C, int32 W, int32 H, const FString& Slot)
 {
 	const UAstraShipSubsystem* Ship = GetWorld()->GetSubsystem<UAstraShipSubsystem>();
@@ -846,13 +948,14 @@ void UAstraScreensSubsystem::DrawHelm(UCanvas* C, int32 W, int32 H, const FStrin
 	{
 		return;
 	}
-	FPaint P{C, TitleFont, MonoFont, Time};
-	P.Rect(0, 0, W, H, BG);
 	if (Slot == TEXT("B"))
 	{
+		// (before this page's own paint: a paint draws what it holds when it goes, and a background held here would cover the plot)
 		DrawSensors(C, W, H, TEXT("B"));
 		return;
 	}
+	FPaint P{C, TitleFont, MonoFont, Time};
+	P.Rect(0, 0, W, H, BG);
 	P.Header(W, TEXT("Helm · Navigation"), TEXT("HELM · DECK 1"), COMMAND);
 	// heading tape
 	const float Hd = Ship->GetHeadingDeg();
@@ -1127,11 +1230,13 @@ void UAstraScreensSubsystem::DrawEngineering(UCanvas* C, int32 W, int32 H, const
 		{
 			continue;
 		}
-		const float Y = 64.f + Row++ * 60.f;
-		P.Rect(20, Y, W - 40, 50, PANEL);
-		P.Rect(20, Y, 8, 50, YELLOW);
-		P.Text(40, Y + 12, FString::Printf(TEXT("%s · %s"), *D.Where().ToUpper(), *ConduitText(D)), true, 20, TEXTC, 0, true);
-		P.Text(W - 36, Y + 14, D.Team < 0 ? FString(TEXT("NO TEAM")) : FString::Printf(TEXT("TEAM %d"), D.Team + 1), true, 18, D.Team < 0 ? YELLOW : CYAN, 2);
+		// two lines: where the conduit is hit (and who is on it), then what it feeds and the power it has left
+		const float Y = 64.f + Row++ * 62.f;
+		P.Rect(20, Y, W - 40, 56, PANEL);
+		P.Rect(20, Y, 8, 56, YELLOW);
+		P.Text(40, Y + 6, D.Where().ToUpper().Left(int32((W - 220) / 11.f)), true, 19, TEXTC, 0, true);
+		P.Text(40, Y + 31, ConduitText(D), true, 16, D.Severity > 0.5f ? AMBER : CYAN);
+		P.Text(W - 36, Y + 8, D.Team < 0 ? FString(TEXT("NO TEAM")) : FString::Printf(TEXT("TEAM %d"), D.Team + 1), true, 18, D.Team < 0 ? YELLOW : CYAN, 2);
 	}
 	if (Row == 0)
 	{
@@ -1284,25 +1389,49 @@ void UAstraScreensSubsystem::DrawControls(UCanvas* C, int32 W, int32 H, const FS
 		}
 		if (A)
 		{
-			// what the mode is about, when it ends, who set it
+			// what the mode is about, how long it holds and whose order it is, as a console words it
 			FString Detail;
 			if (A->Params.IsValid())
 			{
 				for (const auto& KV : A->Params->Values)
 				{
-					FString V;
-					if (KV.Value.IsValid() && KV.Value->TryGetString(V) && !V.IsEmpty())
+					if (!KV.Value.IsValid())
 					{
-						Detail += FString::Printf(TEXT("%s %s  "), *FString(*KV.Key).Replace(TEXT("_"), TEXT(" ")), *V);
+						continue;
 					}
-					else if (double D = 0.0; KV.Value.IsValid() && KV.Value->TryGetNumber(D))
+					const FString Key = FString(*KV.Key).Replace(TEXT("_"), TEXT(" ")).ToUpper();
+					if (KV.Value->Type == EJson::Boolean)
 					{
-						Detail += FString::Printf(TEXT("%s %g  "), *FString(*KV.Key).Replace(TEXT("_"), TEXT(" ")), D);
+						Detail += FString::Printf(TEXT("%s %s  ·  "), *Key, KV.Value->AsBool() ? TEXT("ON") : TEXT("OFF"));
+					}
+					else if (KV.Value->Type == EJson::Number)
+					{
+						Detail += FString::Printf(TEXT("%s %g  ·  "), *Key, KV.Value->AsNumber());
+					}
+					else if (FString V; KV.Value->TryGetString(V) && !V.IsEmpty())
+					{
+						Detail += FString::Printf(TEXT("%s %s  ·  "), *Key, *V.Replace(TEXT("_"), TEXT(" ")).ToUpper());
 					}
 				}
 			}
-			Detail += FString::Printf(TEXT("until %s · set by %s %.0f s ago"), *A->Until.Replace(TEXT("_"), TEXT(" ")), *A->SetBy, FMath::Max(0.f, Now - (float)A->Since));
-			P.Text(W - 32, Y + RowH - 34, Detail.Left(int32((W - 64) / 8.4f)), true, 14, CYAN, 2);
+			const float Age = FMath::Max(0.f, Now - (float)A->Since);
+			FString Hold = TEXT("STANDING");
+			if (A->Until.StartsWith(TEXT("time:")))
+			{
+				const int32 Left = FMath::Max(0, FMath::CeilToInt(FCString::Atof(*A->Until.Mid(5)) - Age));
+				Hold = FString::Printf(TEXT("%d:%02d LEFT"), Left / 60, Left % 60);
+			}
+			else if (A->Until != TEXT("order"))
+			{
+				Hold = TEXT("UNTIL ") + A->Until.Replace(TEXT("_"), TEXT(" ")).ToUpper();
+			}
+			static const TMap<FString, FString> Whose = {{TEXT("captain"), TEXT("CAPTAIN'S ORDER")}, {TEXT("xo"), TEXT("XO'S ORDER")},
+			                                             {TEXT("officer"), TEXT("OFFICER'S CALL")}, {TEXT("auto"), TEXT("AUTOMATIC")},
+			                                             {TEXT("default"), TEXT("SHIP'S ROUTINE")}};
+			const FString* Who = Whose.Find(A->SetBy);
+			Detail += FString::Printf(TEXT("%s  ·  %s, %s"), *Hold, Who ? **Who : *A->SetBy.ToUpper(),
+			                          Age < 60.f ? *FString::Printf(TEXT("%.0f S AGO"), Age) : *FString::Printf(TEXT("%.0f MIN AGO"), FMath::FloorToFloat(Age / 60.f)));
+			P.Text(W - 32, Y + RowH - 34, Detail.Left(int32((W - 64) / 8.4f)), true, 14, A->SetBy == TEXT("captain") ? AMBER : CYAN, 2);
 		}
 	}
 	// the officer's own words for the station, and the last things done
@@ -1311,6 +1440,21 @@ void UAstraScreensSubsystem::DrawControls(UCanvas* C, int32 W, int32 H, const FS
 	for (int32 k = 0; k < 2 && k < S->Actions.Num(); ++k)
 	{
 		P.Text(32, Bottom + 60 + k * 22, (TEXT("› ") + S->Actions[S->Actions.Num() - 1 - k]).Left(int32((W - 64) / 8.4f)), true, 14, k == 0 ? CYAN : DIM);
+	}
+}
+
+void UAstraScreensSubsystem::LogSurfaces(const FString& Only) const
+{
+	for (const FBoundSurface& B : Bound_)
+	{
+		const UStaticMeshComponent* SMC = B.Component.Get();
+		if (!SMC || (!Only.IsEmpty() && B.Page != Only))
+		{
+			continue;
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Screens] %s on %s (%s) slot %d '%s' at %s m, intensity %.0f x %.1f"), *B.Page, *GetNameSafe(SMC->GetOwner()),
+		       *GetNameSafe(SMC->GetStaticMesh()), B.Slot, SMC->GetMaterialSlotNames().IsValidIndex(B.Slot) ? *SMC->GetMaterialSlotNames()[B.Slot].ToString() : TEXT("?"),
+		       *(SMC->GetComponentLocation() / 100.0).ToString(), B.BaseIntensity, B.bHolo ? AppliedHoloGain : AppliedGain);
 	}
 }
 

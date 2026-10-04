@@ -54,7 +54,7 @@ def vector(mat, name, rgba, x, y):
 path = f"{MAT}/M_ASTRA_Lava"
 if eal.does_asset_exist(path):
     m = eal.load_asset(path)
-    mel.delete_all_material_expressions(m)
+    for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy of the list. NB: the materials of meshes C++ constructors load - lifepods, doors - are rooted, and rebuilding them here crashes the editor)
     for e in mel.get_material_expressions(m):
         mel.delete_material_expression(m, e)
 else:

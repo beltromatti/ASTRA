@@ -177,6 +177,9 @@ public:
 
 	/** Anything that happens to or around the ship; bReport = worth telling the Captain (the crew decides the words). */
 	void PublishEvent(const FString& Text, bool bReport) { Event(Text, bReport); }
+	/** A cue for the crew's minds (what just happened to the Captain, what the moment asks of them), not a line of the ship's log:
+	 *  the minds hear it like an event, the consoles' logs and the status ticker do not show it. */
+	void PublishCue(const FString& Text, bool bReport) { Event(Text, bReport, false); }
 	/** Where the Captain is aboard, for the crew ("on the bridge", "on the flight deck"...). */
 	FString CaptainAboard() const;
 	/** The same, as the Captain's datapad writes it ("DECK 4 · MESS HALL"). */
@@ -426,7 +429,7 @@ private:
 	bool bBroadside = false;
 	double InterceptRangeKm = 0.0;
 
-	void Event(const FString& Text, bool bReport = false);
+	void Event(const FString& Text, bool bReport = false, bool bLog = true);
 	const FAstraContact* FindContact(const FString& Id) const;
 	void SetAlert(EAstraAlert NewAlert);
 	void TickDamage(float DeltaTime);
@@ -437,6 +440,8 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialParameterCollection> ShipMPC;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> SkyMID;
 	UPROPERTY() TObjectPtr<ADirectionalLight> Sun;
+	UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> SunFilter;   // the bridge window's tint on the star (astra.light.window)
+	float SunFilterApplied = -1.f;
 	// the star's light thrown back by the planet (earthshine): a soft fill from the planet on everything outside the
 	// hull (lighting channel 1: it casts no shadow, so it must never reach inside)
 	UPROPERTY() TObjectPtr<ADirectionalLight> PlanetLight;

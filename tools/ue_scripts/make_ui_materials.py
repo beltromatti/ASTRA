@@ -38,7 +38,7 @@ log.append(f"ui textures: {len(tasks)}")
 path = f"{MAT}/M_ASTRA_Screen"
 if eal.does_asset_exist(path):
     m = eal.load_asset(path)
-    mel.delete_all_material_expressions(m)
+    for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy of the list. NB: the materials of meshes C++ constructors load - lifepods, doors - are rooted, and rebuilding them here crashes the editor)
 else:
     m = tools.create_asset("M_ASTRA_Screen", MAT, unreal.Material, unreal.MaterialFactoryNew())
 

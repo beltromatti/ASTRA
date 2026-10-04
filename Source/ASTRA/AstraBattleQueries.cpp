@@ -83,6 +83,7 @@ void UAstraBattleSubsystem::BuildContacts(TArray<FContactView>& Out) const
 		V.Track = S.Track;
 		V.bCraft = S.bCraft;
 		V.bDerelict = S.bDerelict || S.bDisabled;      // a ship without power is a hulk: no threat, no target
+		V.bWreck = S.bWreck;                           // (SPAZIO-VIVO: a piece of a ship the war broke)
 		if (S.bDisabled && V.Side == EAstraSide::Mandate)
 		{
 			V.Side = EAstraSide::Neutral;

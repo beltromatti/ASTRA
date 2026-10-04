@@ -134,12 +134,21 @@ void UAstraSpaceLife::Arrive(const FString& InSystem)
 
 void UAstraSpaceLife::Leave()
 {
+	if (bLaidOut)
+	{
+		// the hulks of the system she is leaving stay in it: recorded where they are and as they are, found again when she comes back (docs/SPAZIO.md 3ter)
+		TArray<AstraSpace::FDerelict> Here;
+		CaptureDerelicts(Here);
+		Derelicts.Replace(SystemKey, Here);
+	}
 	ClearScene();
 	bPending = false;
 }
 
 void UAstraSpaceLife::ClearScene()
 {
+	RemoveWreckContacts();                           // (the pieces on the plot go with the system: they are made again, from their records, where the Aquila comes to be near them)
+	FoundHulks.Reset();                                   // (and the hulks made again in this visit: the plot is cleared with the system)
 	HideSets();
 	for (FRigid& R : Rigids)
 	{
@@ -247,6 +256,7 @@ void UAstraSpaceLife::DoArrive(const FString& InSystem)
 	AstraSpace::BuildLayout(*Spec, D, A, Seed, Layout);
 	MakePlaces();
 	MakeRocksAndBuoys();
+	RestoreDerelicts(WreckClock());                 // the hulks left in this system, where the arithmetic puts them now (docs/SPAZIO.md 3ter)
 	const double Now = Owner->GetBattleTime();
 	const uint32 TrafficSeed = GAstraDeterministic ? Seed : (uint32)(FDateTime::Now().GetTicks() & 0x7fffffff);
 	Traffic.Init(D, Layout, TrafficSeed, Now, FMath::Max(0.f, CVarSpaceDensity.GetValueOnGameThread()));
@@ -597,6 +607,7 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 	const double T1 = FPlatformTime::Seconds();
 	Traffic.Tick(Owner->GetBattleTime() + 0.0, SimDt, View, Events);
 	TickWrecks(SimDt);                              // what the war left: the effects' pieces handed over, the beacons heard, a close look (their events join the traffic's)
+	TickDerelicts(WreckClock(), SimDt);             // the hulks left behind that are found again are told
 	TickMotion(SimDt);                              // the capital ships' motion read: what asks for jets, where the wakes are noted
 	FlushEvents();
 	const double T2 = FPlatformTime::Seconds();
@@ -908,6 +919,11 @@ bool UAstraSpaceLife::LookAt(const FString& Key, double Km, FString& OutDetail)
 			OutDetail = bPod ? TEXT("no lifepod adrift here (astra.space.lose, then astra.space.wrecks.list)") : TEXT("no wreck here (astra.space.lose <contact> breakup, then astra.space.wrecks.list)");
 			return false;
 		}
+	}
+	else if (const FAstraBattleShip* Wc = Owner->FindByContact(Key); Wc && Wc->bWreck && Wc->bAlive)
+	{
+		Target = Wc->Pos;                               // (a piece of a wreck by its number on the plot: astra.space.look W-02S 1.5)
+		Name = Wc->Name;
 	}
 	else
 	{
