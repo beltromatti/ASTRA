@@ -108,8 +108,10 @@ namespace AstraSpace
 		double T0 = 0.0;                         // the wrecks' clock at which Pos0 and Att0 hold
 		float Radius = 50.f;                     // m
 		bool bBurnt = false;                     // charred by a reactor breach
+		uint8 Seen = 0;                          // how much of what is aboard the crew has learned of this piece (saved: the minds remember it): 0 nothing, 1 the first look, 2 her rooms, 3 her dead
 		bool bInFx = false;                      // (not saved) the war's effects still hold it as an actor, burning at the cut: this module draws it once they let go
 		int32 SetIdx = -1;                       // (not saved) which set of instances draws it (-1 not asked yet, -2 its mesh is not there)
+		int32 PlotId = -1;                       // (not saved) its contact on the plot (the battle's ship id), -1 while it is not on it: what is near the Aquila is a contact the crew can name and target
 	};
 
 	/** A lifepod. */
@@ -231,6 +233,10 @@ namespace AstraSpace
 		static constexpr int32 RoomSites = 12;                   // the newest this many keep the rooms of their plan in the file (what a boarding of a wreck would use); the rest keep their counts
 		static constexpr int32 MaxPods = 9;
 		static constexpr int32 MaxChunks = 240;
+		static constexpr double ContactKm = 60.0;                // a piece within this of the Aquila is a contact on the plot (and stays one to +10 km: no flicker at the edge)
+		static constexpr int32 MaxContacts = 16;                 // the most wreck contacts on the plot at once, the nearest first (the plot's lists are read every frame by a dozen readers)
+		static constexpr int32 ListedContacts = 4;               // and the most the crew's own state lists (the nearest, within ListedKm: the rest are on the plot for the screens)
+		static constexpr double ListedKm = 40.0;
 
 		// ---- the life of the sites
 		void Reset();
@@ -279,6 +285,22 @@ namespace AstraSpace
 		void Of(const FString& System, TArray<int32>& OutIndices) const;
 		/** What a loss was, in the crew's words (facts only): what it was, how it went, how long ago, what is known of it now. Piece: an index into the site's pieces, or -1 for the site as a whole. */
 		FString Describe(const FSite& S, int32 Piece, double Now) const;
+		// ---- a piece as a contact of the plot (docs/SPAZIO.md §3bis): what the crew calls it, its number, the mesh that is drawn for it
+		/** "stern section of ASN Vigilant", "wreck of ASN Vigilant": what the crew names (the name she was known by when she went, without the contact number). */
+		static FString PieceName(const FSite& S, int32 Piece);
+		/** "W-02S": the dead ship's own number (T-02) with a W for the wreck and a letter for the piece (B bow, M middle, S stern; none for a whole hull). A ship that had no number: "W-<site>". */
+		static FString PieceContactId(const FSite& S, int32 Piece);
+		/** The mesh a piece is drawn as (SM_SHIP_ASTRA_Vigilant_SecStern; her whole hull for a piece that is not a section): its solids (art/blender/space3_solids.py) are under the same name. */
+		static FString PieceMesh(const FSite& S, int32 Piece);
+		/** How much of what is inside a piece a look from this range can make out: 0 nothing, 1 the hull (the first look), 2 the rooms (4 km), 3 the dead (800 m: alongside). */
+		static int32 StageForRange(double RangeM);
+		/** What an investigation of a piece learns at a stage (1..3), in the crew's words (facts only: what was aboard when she went, from her inside's own books where she had one). Stage 1 is Describe's
+		 *  account of the piece; 2 and 3 carry no name (the caller says whose they are). */
+		FString Findings(const FSite& S, int32 Piece, int32 Stage, double Now) const;
+		/** A piece's status for the crew's list of contacts: lost when and how, no power, tumbling, how much has been looked into. */
+		FString Status(const FSite& S, int32 Piece, double Now) const;
+		/** The share of a class's structure that is in a section (0 bow, 1 middle, 2 stern): about the share of her people and rooms that were in that piece of her (data/war/classes.json: sections). */
+		static float SectionShare(FName ClassKey, uint8 Section);
 		/** The beacons that call in a system now (the sensors' reach is the caller's: From and RangeKm; RangeKm <= 0: all). Nearest first. */
 		void Beacons(const FString& System, double Now, const FSkyFrame& Frame, const FVector& From, double RangeKm, TArray<FBeacon>& Out) const;
 		/** Lifepods within RadiusM of a point (system frame) that are adrift are taken aboard by `By`. Returns what was taken. */

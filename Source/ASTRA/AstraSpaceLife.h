@@ -129,6 +129,23 @@ public:
 	AstraSpace::FRescued RescueTake(const FVector& At, double RadiusM, const FString& By);
 	/** Some beacon calls within the Aquila's hearing: a rescue order has someone to look for. */
 	bool HasBeacons() const;
+	// ---- the pieces of the wrecks as contacts of the plot (docs/SPAZIO.md §3bis): the crew names them (W-02S: "the Vigilant's stern section"), puts them on the screen, sends a flight to look, scans them
+	/** The crew's view of a wreck contact for the state they read (the battle's ContactsJson): id, name, what it is, where it is, what has been learned of it. False for all but the few nearest (ListedContacts):
+	 *  the rest are on the plot for the screens, not in the crew's list. */
+	bool WreckContactJson(const FAstraBattleShip& S, TSharedRef<FJsonObject>& Out) const;
+	/** An active look at a wreck contact (the battle's PlayerScan): what the range allows, stage by stage (the first look, her rooms, her dead); the text is the scan's detail. */
+	bool ScanWreck(const FAstraBattleShip& S, FString& OutDetail);
+	/** The record behind a wreck contact (null when it is not one, or her site has gone); OutSite: the site of the ship she was. */
+	const AstraSpace::FPieceRec* PieceOfContact(const FAstraBattleShip& S, const AstraSpace::FSite** OutSite = nullptr) const;
+	/** Where the mesh of a wreck contact's piece is now, in the system frame (for a boarding that docks at her hatches, or any caller that works in the frame of the ship she was): the ship's own origin
+	 *  (the section meshes share it) and the piece's attitude. The contact's own Pos is the piece's pivot (what it turns about): Origin = Pos - Att * PivotLocal. False when S is not a wreck contact. */
+	bool WreckMeshFrame(const FAstraBattleShip& S, FVector& OutOrigin, FQuat& OutAtt) const;
+	/** Testing (the bench): the wreck contacts on the plot are what the records say (one for each piece near, where its record puts it), the crew can name and scan them, the state lists the nearest, and they
+	 *  are as solid for the Falcon as the pieces they stand for. OutDetail has what was found; true when all hold. */
+	bool DebugWreckContacts(FString& OutDetail);
+	/** The wreck contacts on the plot, one to a line (astra.space.wrecks.contacts). */
+	FString WreckContactsList() const;
+
 	/** Testing: loses a warship the way the war would (astra.space.lose): by contact id or "nearest"; How breakup|reactor|destroyed; Section the one that lets go (0 bow, 1 mid, 2 stern). */
 	bool DebugLose(const FString& Which, const FString& How, int32 Section, FString& OutDetail);
 	/** What the war has left, in a line: the sites, the lifepods, what is drawn and what it costs. */
@@ -231,6 +248,9 @@ private:
 	float WreckThinkT = 0.f, WreckPruneT = 30.f;
 	int32 WreckHullsNow = 0, ChunksNow = 0, PodsNow = 0, EmbersNow = 0, WreckHullsPeak = 0, ChunksPeak = 0;
 	double WrecksMs = 0.0;
+	float WreckContactT = 0.f;                    // seconds to the next look at who is on the plot
+	TArray<int32> ListedWrecks;                   // the plot ids of the wreck contacts the crew's state lists (the nearest few)
+	int32 WreckContactsNow = 0, WreckContactsPeak = 0;
 	bool bResumeProbe = false;                    // a resume is under way (DebugResume): the wrecks as they were, in the Gate's frame, to be compared once the system is laid out again
 	TArray<TPair<int32, FVector>> ResumeProbe;    // (site id and piece index folded in: one entry for each piece and pod)
 	double ResumeClock = 0.0;
@@ -282,6 +302,14 @@ private:
 	void AddJet(const AstraSpace::FMotion& M, const AstraSpace::FJet& J, float Level, float Len, float Km);
 	// ---- what the war leaves (AstraSpaceLifeWrecks.cpp)
 	void TickWrecks(float SimDt);
+	/** The pieces near the Aquila are contacts of the plot: who is on it (every half second), where each is (every frame), what the eyes near them learn. */
+	void TickWreckContacts(double Now, float SimDt);
+	int32 MakeWreckContact(AstraSpace::FSite& Site, int32 Piece, double Now);
+	/** Takes every wreck contact off the plot (a campaign begins, the system is left or laid out again). */
+	void RemoveWreckContacts();
+	AstraSpace::FPieceRec* MutablePieceOfContact(const FAstraBattleShip& S, AstraSpace::FSite** OutSite = nullptr);
+	/** The wreck contacts' hull test for the Captain's Falcon (called by PilotHit): the solids of each piece where its record has it now. */
+	bool PilotHitWrecks(const FVector& Prev, const FVector& Now, FString& OutWhat) const;
 	void HandOver(double Now);
 	void DrawWrecks(double Now);
 	/** The wrecks the crew's eyes and sensors can pick out, and the lifepod beacons they hear (a small object for ship_state.state.space). */

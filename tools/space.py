@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import shutil
 import statistics
 import subprocess
@@ -280,6 +281,17 @@ def cmd_test(a: argparse.Namespace) -> int:
         expect("the rescue is told and counted", len(rescued) >= 1 and fin["pods_recovered"] >= 1 and fin["rescued"] >= 1, f"{fin['pods_recovered']} lifepods, {fin['rescued']} people taken aboard", results)
         expect("the file reads back as it was", "wrecks round trip: SAME" in text, "astra.space.wrecks.roundtrip", results)
         expect("the wrecks are cheap", fin["wreck_ms_avg"] < 0.05, f"{fin['wreck_ms_avg'] * 1000:.1f} us a tick", results)
+    print("-- the pieces as contacts of the plot (the same four losses, looked at at 130, 200 and 700 s): named, on the plot where their records put them, listed by the nearest few, scanned; their hulls where they are drawn")
+    ct = argparse.Namespace(**{**vars(base), "seconds": 760, "exec": quiet, "out": "Saved/Space/test_contacts.json",
+                               "at": losses.split("|420=")[0] + "|130=astra.space.wrecks.contacts|135=astra.space.wrecks.contacts.test|140=astra.space.solids.test|200=astra.space.wrecks.contacts.test|205=astra.space.solids.test|700=astra.space.wrecks.contacts.test"})
+    run_once(ct, ROOT / ct.out, SPACE / "test_contacts.log")
+    ctext = (SPACE / "test_contacts.log").read_text(errors="replace") if (SPACE / "test_contacts.log").exists() else ""
+    expect("selftest with the pieces as contacts", selftest_ok(SPACE / "test_contacts.log"), "the invariants held", results)
+    shown = re.findall(r"(\d+) wreck contacts on the plot", ctext)
+    expect("the pieces are on the plot", bool(shown) and int(shown[0]) >= 4, f"{shown[0] if shown else '?'} contacts at 130 s", results)
+    verdicts = re.findall(r"wreck contacts: (\d+) checks: (\d+) pieces here, (\d+) within reach, (\d+) on the plot.*?(WRECK_CONTACTS_OK|WRECK_CONTACTS_FAILED)", ctext)
+    expect("named, where their records put them, listed, scanned", len(verdicts) >= 3 and all(v[4] == "WRECK_CONTACTS_OK" for v in verdicts), "; ".join(f"{v[3]} on the plot of {v[2]} within reach: {v[4][15:]}" for v in verdicts) or "no verdict in the log", results)
+    expect("their hulls are where they are drawn", ctext.count("SOLIDS_WORLD_OK") >= 2 and "SOLIDS_WORLD_FAILED" not in ctext, f"{ctext.count('SOLIDS_WORLD_OK')} runs, pieces included", results)
     print("-- the campaign's save and a resume in the middle: every wreck where it was, relative to the (new) Gate")
     rs = argparse.Namespace(**{**vars(base), "seconds": 600, "exec": quiet, "at": losses.split("|420=")[0] + "|300=astra.space.wrecks.resume", "out": "Saved/Space/test_resume.json"})
     run_once(rs, ROOT / rs.out, SPACE / "test_resume.log")

@@ -140,6 +140,7 @@ void UAstraSpaceLife::Leave()
 
 void UAstraSpaceLife::ClearScene()
 {
+	RemoveWreckContacts();                           // (the pieces on the plot go with the system: they are made again, from their records, where the Aquila comes to be near them)
 	HideSets();
 	for (FRigid& R : Rigids)
 	{
@@ -908,6 +909,11 @@ bool UAstraSpaceLife::LookAt(const FString& Key, double Km, FString& OutDetail)
 			OutDetail = bPod ? TEXT("no lifepod adrift here (astra.space.lose, then astra.space.wrecks.list)") : TEXT("no wreck here (astra.space.lose <contact> breakup, then astra.space.wrecks.list)");
 			return false;
 		}
+	}
+	else if (const FAstraBattleShip* Wc = Owner->FindByContact(Key); Wc && Wc->bWreck && Wc->bAlive)
+	{
+		Target = Wc->Pos;                               // (a piece of a wreck by its number on the plot: astra.space.look W-02S 1.5)
+		Name = Wc->Name;
 	}
 	else
 	{

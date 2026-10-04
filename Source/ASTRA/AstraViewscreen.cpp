@@ -743,6 +743,16 @@ void AAstraViewscreen::Aim(float DeltaSeconds)
 				Subject.Append(Corners, 8);
 				FovWant = FMath::Clamp(FitFov(WantDir, Subject, 1.7) / Zoom, 0.12f, 60.f);
 			}
+			else if (C->Track >= 2 && !C->Actor && !C->bCraft && C->RadiusM > 1.f)
+			{
+				// no actor of its own (a piece of a wreck is an instance of the living space's, SPAZIO-VIVO): framed by its radius, as a ship is by the corners of her hull
+				const FVector Ctr = B->WorldOf(C->Pos);
+				WantDir = Ctr.GetSafeNormal();
+				const double Reach = (double)C->RadiusM * 100.0;
+				Subject.Add(Ctr);
+				Subject.Add(Ctr - WantDir * Reach);
+				FovWant = FMath::Clamp((float)FMath::RadiansToDegrees(2.0 * FMath::Atan(Reach * 1.7 / FMath::Max(Ctr.Size() - StandOff, 1000.0))) / Zoom, 0.12f, 60.f);
+			}
 			else
 			{
 				// a bearing, or nothing to see yet: a wide look down the bearing
