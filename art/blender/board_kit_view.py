@@ -96,9 +96,9 @@ def _group_keys(built: dict) -> list[tuple[str, str, list[str]]]:
         keys = by.get(fr, [])
         if not keys:
             continue
-        if fr == "prop" and len(keys) > 12:
-            for i in range(0, len(keys), 12):
-                out.append((f"props_{i // 12 + 1}", fr, keys[i:i + 12]))
+        if fr == "prop" and len(keys) > 4:
+            for i in range(0, len(keys), 4):
+                out.append((f"props_{i // 4 + 1}", fr, keys[i:i + 4]))
         else:
             out.append((nm, fr, keys))
     return out
@@ -125,6 +125,7 @@ def sheet(built: dict, base: str) -> None:
         total = sum((built[k]["max_cm"][0] - built[k]["min_cm"][0]) / 100.0 + gap for k in keys)
         if frame in ("opening", "prop", "body"):
             total = sum(max(built[k]["max_cm"][0] - built[k]["min_cm"][0], built[k]["max_cm"][1] - built[k]["min_cm"][1]) / 100.0 + gap for k in keys)
+        span_h = max((built[k]["max_cm"][2] for k in keys), default=100.0) / 100.0
         x = -total / 2
         wall = bpy.data.objects.new("StageWall", None)
         # the stage: a floor, a back wall, a ceiling slab
@@ -155,11 +156,11 @@ def sheet(built: dict, base: str) -> None:
             elif frame == "opening":
                 w = max(w, (hi[1] - lo[1]) / 100.0)
                 instance(o, (x + w / 2, 1.5, 0.0), 0.0)
-            else:                                    # props and bodies: the footprint's middle at x
-                w = max(w, (hi[1] - lo[1]) / 100.0)
-                instance(o, (x + w / 2, 1.8, 0.0), 0.0)
+            else:                                    # props and bodies: the footprint's middle at x, their front (+x) turned to the camera
+                w = max(w, (hi[1] - lo[1]) / 100.0, (hi[0] - lo[0]) / 100.0)
+                instance(o, (x + w / 2, 1.8, 0.0), 90.0 if frame == "prop" else 0.0)
             x += w + gap
-        span = total
+        span = max(total, 6.0)
         dist = max(5.0, span * 0.9) if frame != "ceiling" else max(5.0, span * 0.8)
         if frame == "wall":
             light("key", (-span * 0.2, dist * 0.5, 3.3), 2600, (1.0, 0.75, 0.45), size=1.0, shadow=True)
@@ -172,9 +173,9 @@ def sheet(built: dict, base: str) -> None:
             light("key", (0.0, 3.5, 3.0), 2200, (1.0, 0.75, 0.45), size=0.8, shadow=True)
             cam = camera("c", (0.0, dist * 0.8, 3.6), (0.0, 1.2, 0.0), 62)
         else:
-            light("key", (-span * 0.15, 5.0, 3.4), 2400, (1.0, 0.75, 0.45), size=1.0, shadow=True)
-            light("fill", (span * 0.3, 4.0, 2.0), 900, (1.0, 0.45, 0.2), size=1.0, shadow=False)
-            cam = camera("c", (0.0, dist * 0.85, 2.4), (0.0, 1.6, 0.9), 60)
+            light("key", (-span * 0.15, 1.8 + span * 0.5, 3.6), 2600, (1.0, 0.75, 0.45), size=1.0, shadow=True)
+            light("fill", (span * 0.3, 1.8 + span * 0.4, 2.0), 1100, (1.0, 0.45, 0.2), size=1.0, shadow=False)
+            cam = camera("c", (0.0, 1.8 + span * 0.7 + 1.0, 1.9 + span * 0.05), (0.0, 1.8, 0.8), 62)
         render(cam, f"{base}_{name}")
 
 

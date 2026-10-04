@@ -27,13 +27,14 @@ SOOT = "MI_BRD_Soot"              # black: soot, burnt plating
 STENCIL = "MI_BRD_Stencil"        # stencil paint: bronze-white, worn (their lettering)
 CLOTH = "MI_BRD_Cloth"            # rust-red cloth: banners, bedding
 UNIFORM = "MI_BRD_Uniform"        # dark uniform cloth (the fallen)
+SKIN = "MI_BRD_Skin"              # a face and hands (the fallen)
 RUBBER = "MI_ASTRA_Rubber"        # cable jackets (the Aquila's own)
 LAMP = "MI_BRG3_Lamps"            # the palette's emissive cells (amber, red...)
 LAMP_DIM = "MI_BRG3_LampsDim"
 LAMP_HOT = "MI_BRG3_LampsHot"
 SCREEN = "MI_BRD_Screen"          # a dead console's screen: dark glass with a trace of amber
 
-SLOTS = [PLATE, FRAME, IRON, COPPER, VERD, DECK, HAZARD, SOOT, STENCIL, CLOTH, UNIFORM, SCREEN]      # the ones the board kit makes (the rest are the Aquila's)
+SLOTS = [PLATE, FRAME, IRON, COPPER, VERD, DECK, HAZARD, SOOT, STENCIL, CLOTH, UNIFORM, SKIN, SCREEN]      # the ones the board kit makes (the rest are the Aquila's)
 
 # the sizes the game places by (metres): wall bays are modules of BAY_W; ceiling runs of RUN_L; floor plates of PLATE_M
 BAY_W = 2.0
@@ -85,7 +86,7 @@ PIECES = {
     "barrel": ("SM_BRD_Barrel", "prop", True, "drum"),
     "locker": ("SM_BRD_Locker", "prop", True, "locker"),
     "rack": ("SM_BRD_Rack", "prop", True, "storage rack"),
-    "bunk": ("SM_BRD_Bunk", "prop", True, "double bunk"),
+    "bunk": ("SM_BRD_Bunk", "prop", True, "double bunk (its length is along y)"),
     "table": ("SM_BRD_Table", "prop", True, "table"),
     "bench": ("SM_BRD_Bench", "prop", True, "bench"),
     "console": ("SM_BRD_Console", "prop", True, "console"),
@@ -96,7 +97,6 @@ PIECES = {
     "breech": ("SM_BRD_Breech", "prop", True, "gun breech"),
     "bed": ("SM_BRD_Bed", "prop", True, "ward bed"),
     "cell": ("SM_BRD_Cell", "prop", True, "cell"),
-    "barrier": ("SM_BRD_Barrier", "prop", True, "low barricade (cover)"),
     "banner": ("SM_BRD_Banner", "prop", False, "banner with the ferry mark"),
     # the fallen
     "body_a": ("SM_BRD_BodyA", "body", False, "a fallen man, on his back"),
