@@ -107,7 +107,7 @@ def fresh(name, blend, two_sided=False, instanced=True, unlit=True):
     path = f"{MAT}/{name}"
     if eal.does_asset_exist(path):
         m = eal.load_asset(path)
-        for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy: UE 5.8's delete_all walks the list it removes from, and crashed the editor)
+        for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy of the list. NB: the materials of meshes C++ constructors load - lifepods, doors - are rooted, and rebuilding them here crashes the editor)
         for e in mel.get_material_expressions(m):          # what delete_all leaves behind
             mel.delete_material_expression(m, e)
     else:

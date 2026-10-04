@@ -42,7 +42,7 @@ log.append(f"textures {names}")
 path = f"{MAT}/M_ASTRA_HullDecal"
 if eal.does_asset_exist(path):
     m = eal.load_asset(path)
-    for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy: UE 5.8's delete_all walks the list it removes from, and crashed the editor)
+    for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy of the list. NB: the materials of meshes C++ constructors load - lifepods, doors - are rooted, and rebuilding them here crashes the editor)
 else:
     m = tools.create_asset("M_ASTRA_HullDecal", MAT, unreal.Material, unreal.MaterialFactoryNew())
 m.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)

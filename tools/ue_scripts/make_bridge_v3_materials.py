@@ -14,12 +14,14 @@ Creates:
               them: MI_BRG3_Composite / Ivory / Brass / Navy / DeckPlate / DarkGlass / Leather / Lamps / LampsDim / LampsHot / Labels / Decor and one
               SCREEN_<station>_<n> per live screen (a static page until the game binds a live one); also, only if build_ship_interior.py has not made
               them yet (same values), the ship kit's MI_SHIP_Leaf / Soil / CrateBlue that the plants and globes on the consoles use
-  ticker      /Game/ASTRA/UI/RT_ASTRA_Ticker: the render target UAstraScreensSubsystem paints the status ticker into; MI_BRG3_Decor
-              (LiveTicker) shows it over the ticker tile of the decor atlas (art/_cache/bridge3/decor.json)
+  ticker      /Game/ASTRA/UI/RT_ASTRA_Ticker: the render target UAstraScreensSubsystem paints the status ticker into; MI_BRG3_Decor's
+              master M_BRG3_DecorLive shows it over the ticker tile of the decor atlas (art/_cache/bridge3/decor.json)
   hover UI    /Game/ASTRA/Kit/Bridge3/HoloUI/MI_UI_<Page>: the translucent twins of the MI_UI_* instances (same object names,
               so UAstraScreensSubsystem, which binds pages by material name, drives them like the opaque ones)
 
-ONLY = {"holo", "decor"} (set before exec) rebuilds just those: the hover panels' master, the decor instance and the ticker's target.
+ONLY = {"holo", "decor", "darkglass"} (set before exec) rebuilds just those: the hover panels' master, the decor instance and the
+ticker's target, the black glass. A full run rebuilds M_BRG3_Lamps too, which the doors' leaf (loaded by AAstraDoor's constructor)
+keeps rooted: it crashes the editor until that load moves out of the constructor.
 """
 import json
 import os
@@ -120,7 +122,7 @@ class Graph:
         p = f"{MAT_DST}/{name}"
         if eal.does_asset_exist(p):
             self.m = eal.load_asset(p)
-            for _e in list(mel.get_material_expressions(self.m)): mel.delete_material_expression(self.m, _e)   # (from a copy: UE 5.8's delete_all walks the list it removes from, and crashed the editor)
+            for _e in list(mel.get_material_expressions(self.m)): mel.delete_material_expression(self.m, _e)   # (from a copy of the list. NB: the materials of meshes C++ constructors load - lifepods, doors - are rooted, and rebuilding them here crashes the editor)
         else:
             self.m = tools.create_asset(name, MAT_DST, unreal.Material, unreal.MaterialFactoryNew())
         self.name = name
@@ -296,14 +298,69 @@ def build_ticker_target():
     return rt
 
 
-def decor_instance(screen, rt):
+def build_decor_live(rt):
+    """M_BRG3_DecorLive: M_ASTRA_Screen's look (emissive page behind glossy glass) for the decor atlas, with the ticker tile
+    (TickerU0,V0 - U1,V1 of the page) showing TickerTexture, the live status ticker, stretched over it. Its own master, not a switch
+    in M_ASTRA_Screen: the lifepods' meshes, loaded by C++ constructors, keep M_ASTRA_Screen rooted and it cannot be rebuilt in place."""
+    g = Graph("M_BRG3_DecorLive")
+    m = g.m
+    uv = flip_uv(g)
+    page = g.E(unreal.MaterialExpressionTextureSampleParameter2D, -700, 100, parameter_name="ScreenTexture",
+               texture=tex("T_BRG3_Decor"), sampler_type=ST.SAMPLERTYPE_COLOR, group="Screen")
+    g.L(uv, "", page, "UVs")
+    tick = g.E(unreal.MaterialExpressionCustom, -950, 500)
+    tick.set_editor_property("code", """
+float2 q = (UV - float2(U0, V0)) / max(float2(U1 - U0, V1 - V0), 1e-5);
+float inside = step(0.0, q.x) * step(q.x, 1.0) * step(0.0, q.y) * step(q.y, 1.0);
+return float3(saturate(q), inside);
+""")
+    tick.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    pins = []
+    for name in ("UV", "U0", "V0", "U1", "V1"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        pins.append(ci)
+    tick.set_editor_property("inputs", pins)
+    g.L(uv, "", tick, "UV")
+    for k, name in enumerate(("U0", "V0", "U1", "V1")):
+        g.L(g.S("Ticker" + name, 0.0, -1250, 480 + k * 70, "Screen"), "", tick, name)
+    q = g.E(unreal.MaterialExpressionComponentMask, -760, 480, r=True, g=True, b=False, a=False)
+    g.L(tick, "", q, "")
+    inside = g.E(unreal.MaterialExpressionComponentMask, -760, 560, r=False, g=False, b=True, a=False)
+    g.L(tick, "", inside, "")
+    live = g.E(unreal.MaterialExpressionTextureSampleParameter2D, -600, 450, parameter_name="TickerTexture", texture=rt,
+               sampler_type=ST.SAMPLERTYPE_COLOR, group="Screen")
+    g.L(q, "", live, "UVs")
+    gain = g.op(unreal.MaterialExpressionMultiply, live, "RGB", g.S("TickerGain", 2.0, -600, 620, "Screen"), "", -420, 450)
+    mix = g.E(unreal.MaterialExpressionLinearInterpolate, -300, 300)
+    g.L(page, "RGB", mix, "A")
+    g.L(gain, "", mix, "B")
+    g.L(inside, "", mix, "Alpha")
+    emis = g.op(unreal.MaterialExpressionMultiply, mix, "", g.S("Intensity", 8.0, -300, 450, "Screen"), "", -100, 200)
+    mel.connect_material_property(emis, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.connect_material_property(g.E(unreal.MaterialExpressionConstant3Vector, -300, -150, constant=unreal.LinearColor(0.01, 0.012, 0.015, 1)), "",
+                                  unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(g.S("Roughness", 0.35, -300, 550, "Screen"), "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.connect_material_property(g.S("Specular", 0.5, -300, 630, "Screen"), "", unreal.MaterialProperty.MP_SPECULAR)
+    # the decor sits on Nanite consoles and walls, and on the instanced props M_ASTRA_Screen serves: the same usages
+    base = eal.load_asset(f"{MAT_DST}/M_ASTRA_Screen")
+    for flag, usage in (("used_with_nanite", unreal.MaterialUsage.MATUSAGE_NANITE),
+                        ("used_with_instanced_static_meshes", unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES)):
+        if base is None or base.get_editor_property(flag):
+            mel.set_material_usage(m, usage)
+    g.finish()
+    log.append("M_BRG3_DecorLive")
+    return m
+
+
+def decor_instance(rt):
     """MI_BRG3_Decor: the decor atlas, dimmer than the live pages (their Intensity is 22, the hover panels' 10); its ticker tile live."""
     atlas = json.load(open(os.path.join(B3_SRC, "decor.json"), encoding="utf-8"))
     (aw, ah), (x, y, w, h) = atlas["size"], atlas["px"]["ticker"]
-    make_mi(MI_DST, "MI_BRG3_Decor", screen, {"Intensity": 8.0, "Roughness": 0.35, "FlipU": 0.0, "FlipV": 0.0,
-                                               "TickerU0": x / aw, "TickerV0": y / ah, "TickerU1": (x + w) / aw, "TickerV1": (y + h) / ah,
-                                               "TickerGain": 2.0},
-            textures={"ScreenTexture": tex("T_BRG3_Decor"), "TickerTexture": rt}, switches={"LiveTicker": True})
+    make_mi(MI_DST, "MI_BRG3_Decor", build_decor_live(rt), {"Intensity": 8.0, "Roughness": 0.35, "FlipU": 0.0, "FlipV": 0.0,
+                                                             "TickerU0": x / aw, "TickerV0": y / ah, "TickerU1": (x + w) / aw,
+                                                             "TickerV1": (y + h) / ah, "TickerGain": 16.0},
+            textures={"ScreenTexture": tex("T_BRG3_Decor"), "TickerTexture": rt})
     log.append(f"MI_BRG3_Decor: the ticker at {x / aw:.4f},{y / ah:.4f} - {(x + w) / aw:.4f},{(y + h) / ah:.4f}")
 
 
@@ -352,6 +409,17 @@ def make_mi(folder, name, parent, scalars=None, vectors=None, textures=None, swi
     return mi
 
 
+def dark_glass(hard):
+    """Opaque black glass: lenses and the work surfaces round the live screens, with an anti-glare finish (roughness 0.52-0.64, no
+    texture influence). Satin (0.30-0.38) it mirrored the sunlit bridge and the consoles' tops read as pale grey stone in the game."""
+    make_mi(MI_DST, "MI_BRG3_DarkGlass", hard,
+            scalars={"UVScale": 1.0, "RoughnessMin": 0.52, "RoughnessMax": 0.64, "MetallicFromMap": 0.0, "MetallicBias": 0.0,
+                     "BaseColorMapInfluence": 0.0, "NormalStrength": 0.0, "MacroBrightness": 0.0, "ScratchRoughness": 0.0,
+                     "RoughnessVariation": 0.08},
+            vectors={"Tint": (0.003, 0.004, 0.006)},
+            textures={"BaseColorMap": tex("T_PanelPaint_BC"), "NormalMap": tex("T_PanelPaint_N"), "ORMMap": tex("T_PanelPaint_ORM")})
+
+
 def build_instances(hard, lamps, screen, holo, viewscreen):
     def pbr(name, tset, tint, uvs, rough, metal_map, influence, normal, macro=0.05, scratch=0.05, bias=0.0):
         make_mi(MI_DST, name, hard,
@@ -367,8 +435,7 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     pbr("MI_BRG3_Ivory", "PanelPaint", srgb_to_linear("#A9AAA8"), 1.0, (0.16, 0.30), 0.0, 0.3, 0.3, macro=0.04)
     # gunmetal deck plating with a fine anti-slip knurl
     pbr("MI_BRG3_DeckPlate", "BRG3_DeckGrain", (0.11, 0.115, 0.13), 2.5, (0.34, 0.62), 0.9, 0.85, 1.0, macro=0.10, scratch=0.10)   # gunmetal: the sun through the window washed a lighter plate out
-    # opaque black glass: lenses and the work surfaces around the live screens (satin: roughness 0.3-0.38, no texture influence)
-    pbr("MI_BRG3_DarkGlass", "PanelPaint", (0.003, 0.004, 0.006), 1.0, (0.30, 0.38), 0.0, 0.0, 0.0, macro=0.0, scratch=0.0)
+    dark_glass(hard)
     # the seats: black leather
     pbr("MI_BRG3_Leather", "LeatherBlack", (0.05, 0.055, 0.075), 2.0, (0.30, 0.50), 0.0, 0.9, 0.7, macro=0.06)
     # brushed brass: the warm line of the command deck (a thin accent, never a big surface): metal, a hint of the brushed grain
@@ -385,7 +452,7 @@ def build_instances(hard, lamps, screen, holo, viewscreen):
     make_mi(MI_DST, "MI_BRG3_LampsDim", lamps, {"Intensity": 6.0, "LightDimWeight": 0.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_LampsHot", lamps, {"Intensity": 55.0, "LightDimWeight": 1.0}, textures={"PaletteMap": pal})
     make_mi(MI_DST, "MI_BRG3_Labels", screen, {"Intensity": 4.0, "Roughness": 0.4, "FlipU": 0.0, "FlipV": 0.0}, textures={"ScreenTexture": tex("T_BRG3_Labels")})
-    decor_instance(screen, build_ticker_target())
+    decor_instance(build_ticker_target())
     log.append("shared instances")
 
     # one default instance per live screen: a static page until the game binds a live one; the surface decides the parent
@@ -427,7 +494,9 @@ if ONLY:
     if "holo" in ONLY:
         build_screen_holo()
     if "decor" in ONLY:
-        decor_instance(screen, build_ticker_target())
+        decor_instance(build_ticker_target())
+    if "darkglass" in ONLY:
+        dark_glass(hard)
 else:
     lamps = build_lamps()
     holo = build_screen_holo()

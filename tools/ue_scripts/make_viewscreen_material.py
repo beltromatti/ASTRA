@@ -21,7 +21,7 @@ log = []
 p = f"{DIR}/{NAME}"
 if eal.does_asset_exist(p):
     m = eal.load_asset(p)
-    for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy: UE 5.8's delete_all walks the list it removes from, and crashed the editor)
+    for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy of the list. NB: the materials of meshes C++ constructors load - lifepods, doors - are rooted, and rebuilding them here crashes the editor)
 else:
     m = tools.create_asset(NAME, DIR, unreal.Material, unreal.MaterialFactoryNew())
 m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
