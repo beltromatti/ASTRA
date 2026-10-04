@@ -22,6 +22,24 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**4/10 sera — una partita vera da Capitano nell'app, e ciò che ne è uscito (il lead):**
+- **La partita** (app impacchettata, mente accesa, apertura della March): l'XO fa il briefing; «mostrami quel contatto freddo» → Ops lo mette
+  sullo schermo in 0,86 s; Nair propone la scelta vera («con EMCON restricted non lo classifica nessuno: un ping lo identifica, ma dice a tutto il
+  sistema dove siamo»); «fallo» → `active_scan`: è una Lethe, e il Mandato ci trova; il volo lancia Alpha e la sala macchine dà potenza da
+  combattimento da soli; tre ordini insieme (intercetto, armi libere, avviso alla Brightwater) eseguiti in 0,59 s; la Lethe distrutta; il Gate
+  cicla, l'XO mette il picket in schermo davanti a noi, il tattico prepara la saturazione; poi la battaglia grande della March (15 ostili, 14
+  amici, oltre 130 contatti, Harpy a decine).
+- **Corretti dopo la partita**: le etichette dei rilevamenti senza distanza si impilavano in un blocco illeggibile (ora una per gruppo: «7 BEARINGS
+  072-078 NO RANGE»); la regia saltava ogni pochi secondi da un rilevamento all'altro (ora un rilevamento nudo è l'ultima scelta); il feed dello
+  schermo prende i pixel che lo schermo copre (832 nell'app invece di 640).
+- **Attenzione, dati del giocatore**: il banco lanciava l'app con «nuova campagna» nella cartella dei salvataggi del giocatore, e l'autosave ha
+  riscritto la campagna di prova dell'utente del 3/10. Ora le prove dell'app usano `Saved_Harness` (copia delle sue impostazioni; `--player-save`
+  solo di proposito).
+- **Notato, da fare**: i pannelli olografici delle console hanno testo minuto, illeggibile dalla poltrona (un giro di ARTE-PLANCIA sulle loro
+  schermate); lo scontro con la Lethe da sola si chiude con «victory» quando lei rompe il contatto (corretto per una fregata sola, ma la parola è
+  grossa).
+- **Credito OpenRouter**: 14,35 $ usati su 20, **5,65 $ residui** (le prove di oggi ~0,45 $).
+
 **4/10 pomeriggio — tre moduli uniti e provati, regia dei missili, app rifatta (il lead):**
 - **App rifatta** (`tools/pacchetto.sh development`, 3 min): interni nuovi (la Mess Hall c'è anche nell'app), spazio vivo, schermo pulito, armi
   del Capitano, abbordaggi. Da rifare dopo questi ultimi merge.
