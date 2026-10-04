@@ -26,6 +26,7 @@ import argparse
 import json
 import shlex
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -110,6 +111,13 @@ def kill_game() -> None:
         subprocess.run(["pkill", "-f", f"astra_harness_port={PORT}"], check=False)
 
 
+def app_saved_dir() -> Path:
+    """The packaged game's own Saved folder (the player's campaign, settings and logs)."""
+    if WINDOWS:
+        return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "ASTRA" / "Saved"
+    return Path.home() / "Library" / "Application Support" / "Epic" / "ASTRA" / "Saved"
+
+
 def cmd_launch(a: argparse.Namespace) -> None:
     if alive():
         print("a harness game is already running; `tools/play.py quit` first")
@@ -142,6 +150,13 @@ def cmd_launch(a: argparse.Namespace) -> None:
             sys.exit(1)
         args = [str(exe), "-astra_harness", f"-astra_harness_port={PORT}", "-unattended",
                 "-astra_campaign=continue" if a.cont else "-astra_campaign=new"]
+        if not a.player_save:
+            # the tests keep their own Saved folder (Saved_Harness): a new campaign of the harness autosaved over the player's own war (4 Oct). Their
+            # settings are copied there once, so a test sees the game as they do; their files are only read
+            args.append("-saveddirsuffix=Harness")
+            harness_saved = app_saved_dir().with_name("Saved_Harness")
+            if not (harness_saved / "Config").exists() and (app_saved_dir() / "Config").exists():
+                shutil.copytree(app_saved_dir() / "Config", harness_saved / "Config")
     else:
         args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), a.map, "-game", "-windowed", f"-ResX={w}", f"-ResY={h}",
                 "-astra_harness", f"-astra_harness_port={PORT}", "-unattended", "-NoVerifyGC",
@@ -309,6 +324,7 @@ def main() -> None:
     p.add_argument("--nomind", action="store_true")
     p.add_argument("--sound", action="store_true")
     p.add_argument("--app", default=None, help="the packaged app (Packaged/Mac/ASTRA.app or ~/Applications/ASTRA.app) instead of the editor binary")
+    p.add_argument("--player-save", action="store_true", help="with --app: use the player's own Saved folder (their campaign!) instead of Saved_Harness")
     p.add_argument("--args", default="")
     p.set_defaults(fn=cmd_launch)
     sub.add_parser("state").set_defaults(fn=cmd_state)
