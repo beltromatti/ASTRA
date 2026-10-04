@@ -130,6 +130,7 @@ def room_views(key: str, spec: dict, names: list[str] | None) -> dict:
         "corner_a": ((1.0, 1.0, 1.7), (L * 0.6, D * 0.6, 1.0), 82),
         "corner_b": ((L - 1.0, 1.0, 1.7), (L * 0.35, D * 0.6, 1.0), 82),
         "far": ((L * 0.5, D - 1.0, 1.7), (L * 0.5, 0.0, 1.2), 84),
+        "entry": ((door_x, 0.45, 1.68), (door_x, D, 1.5), 80),                  # ARTE-INTERNI-2: what the Captain sees the moment he steps through the door (eye height 1.68 m, looking straight in)
     }
     if key in ROOM_VIEWS:
         views = dict(ROOM_VIEWS[key]) if not names else {**views, **ROOM_VIEWS[key]}

@@ -69,6 +69,30 @@ def floor_v2(b: SParts, spec: dict, st, rng: random.Random, floor_t: float, plat
     for k in range(1, int(L // step) + 1):
         if k * step < L and st.seams:
             fine.box((k * step - 0.01, 0.0, 0.0), (k * step + 0.01, D, 0.003), st.trim)
+    guide = getattr(st, "floor_guide", None)
+    if guide:                                                                               # ARTE-INTERNI-2: a painted way-line (a hospital's, a lab's): a line round the room at 0.55 m and one from each door straight in
+        lw, ins = 0.09, 0.55
+        doors = sorted((d for d in spec["doors"] if d["wall"] == "near"), key=lambda d: d["x"])
+        cuts = [ins] + [v for d in doors for v in (d["x"] - d["w"] / 2 - 0.1, d["x"] + d["w"] / 2 + 0.1)] + [L - ins]
+        for a, c in zip(cuts[0::2], cuts[1::2]):
+            if c - a > 0.2:
+                b.soft.swatch_box((a, ins, 0.0), (c, ins + lw, 0.0012), guide)
+        b.soft.swatch_box((ins, ins, 0.0), (ins + lw, D - ins, 0.0012), guide)
+        b.soft.swatch_box((L - ins - lw, ins, 0.0), (L - ins, D - ins, 0.0012), guide)
+        b.soft.swatch_box((ins, D - ins - lw, 0.0), (L - ins, D - ins, 0.0012), guide)
+        for d in doors:
+            b.soft.swatch_box((d["x"] - lw / 2, ins, 0.0), (d["x"] + lw / 2, D * 0.58, 0.0012), guide)
+    pitch = getattr(st, "floor_grid", 0.0)
+    if pitch > 0.0:                                                                         # ARTE-INTERNI-2: the joints of the floor panels (an access floor, carpet tiles): a 3 mm dark line every `pitch` m
+        gm = getattr(st, "grid_mat", None) or STRUCT
+        k = 1
+        while k * pitch < L - 0.3:
+            b.soft.box((k * pitch - 0.0015, 0.05, 0.0), (k * pitch + 0.0015, D - 0.25, 0.0012), gm)
+            k += 1
+        k = 1
+        while k * pitch < D - 0.3:
+            b.soft.box((0.25, k * pitch - 0.0015, 0.0), (L - 0.25, k * pitch + 0.0015, 0.0012), gm)
+            k += 1
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------- walls

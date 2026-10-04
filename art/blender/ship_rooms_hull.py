@@ -11,6 +11,7 @@ import ship_furniture5 as F5
 import ship_furniture7 as H7
 import ship_furniture9 as N
 import ship_spec as SPEC
+import ship_suits as SUI
 import ship_walls as W
 from bridge3_lib import T, frame
 from ship_lib import (COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, IVORY, LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER,
@@ -94,10 +95,8 @@ def suit_locker(name: str = "SM_SHIP_SuitLocker"):
     place(b, 6.6, 1.2, 0, F.bench, 2.0, 0.42, 0.46, FABRIC_GREY)
     place(b, xr - 0.2, 1.4, 180, F.locker_row, 2, 0.45, 1.95, 0.4, COMPOSITE)
     place(b, 4.0, 0.42, 90, F.shelf, 1.8, 0.3, 1.0, 2, STEEL, False, 3, False)                    # a shelf by the door's neighbour wall, the helmets on top of it (visor to the room)
-    for k in range(3):
-        hx = 3.4 + k * 0.6
-        b.soft.sphere((hx, 0.42, 1.15), 0.14, IVORY, seg=10, rings=6)
-        b.soft.box((hx - 0.09, 0.50, 1.10), (hx + 0.09, 0.59, 1.20), DGLASS)
+    for k in range(3):                                                                                                    # the helmets on the shelf, the visors to the room
+        place(b, 3.3 + k * 0.62, 0.45, 90, SUI.eva_helmet, z=1.0)
     b.emit.label((2.0, WF + 0.002, 2.2), 0.7, 0.175, (0, 1, 0), "eq_suit")
     ceiling_panels(b, L, D, H, 2, 1, "white_warm", 1.2, 1.4, 0.6, LAMP_HOT)
     return b.build(name)
