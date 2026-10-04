@@ -18,6 +18,7 @@ namespace
 	constexpr double kWall = AstraBoardInterior::WallCm;           // a wall's thickness: the visible face of a wall is this far in from the room's box
 	constexpr double kBay = 200.0;                                  // a wall bay's width, the ceiling run's length, the floor plate's side
 	constexpr double kBayH = 260.0;                                 // the bays' height: a taller wall has its upper part bare, a cornice capping the bays
+	constexpr double kTallHall = 650.0;                             // a room taller than this (a hangar) has no ceiling dressing: it is lit from its walls
 	constexpr double kRun = 400.0;                                  // the long pieces (a cornice, a guide light, a run of pipes or a cable tray) are made two metres and stand four: their clamps and rods are twice as far apart
 	constexpr double kPlate = 320.0;                                // a floor plate's side in a room (made two metres: the diamond plate is a little coarser)
 	constexpr double kRibW = 22.0, kRibD = 21.0, kRibH = 300.0;     // a rib: width along the wall, depth into the room, height
@@ -202,13 +203,13 @@ namespace
 	/** The bays that carry the Mandate's own words: another side's ships have the plain ones. */
 	bool IsMandateLettering(EPiece P) { return P == EPiece::WallA || P == EPiece::WallHold || P == EPiece::WallMotto; }
 
-	EPiece PickBay(EKc Kc, ESide Side, FRandomStream& Rng)
+	EPiece PickBay(EKc Kc, EDressSide Side, FRandomStream& Rng)
 	{
 		float W[kBayKinds];
 		float Sum = 0.f;
 		for (int32 i = 0; i < kBayKinds; ++i)
 		{
-			W[i] = GBayWeights[(int32)Kc][i] * ((Side != ESide::Mandate && IsMandateLettering(GBayPieces[i])) ? 0.f : 1.f);
+			W[i] = GBayWeights[(int32)Kc][i] * ((Side != EDressSide::Mandate && IsMandateLettering(GBayPieces[i])) ? 0.f : 1.f);
 			Sum += W[i];
 		}
 		float R = Rng.FRand() * Sum;
@@ -566,17 +567,17 @@ bool AstraBoardDress::FindPiece(const FString& Key, EPiece& Out)
 	return false;
 }
 
-ESide AstraBoardDress::SideOfStyle(const FString& PlanStyle)
+EDressSide AstraBoardDress::SideOfStyle(const FString& PlanStyle)
 {
 	if (PlanStyle.Equals(TEXT("mandate"), ESearchCase::IgnoreCase))
 	{
-		return ESide::Mandate;
+		return EDressSide::Mandate;
 	}
 	if (PlanStyle.Equals(TEXT("guild"), ESearchCase::IgnoreCase))
 	{
-		return ESide::Guild;
+		return EDressSide::Guild;
 	}
-	return ESide::Astra;
+	return EDressSide::Astra;
 }
 
 uint32 AstraBoardDress::SeedOf(FName Class)
@@ -758,7 +759,7 @@ namespace
 				}
 				return 0.0;
 			};
-			const bool bBanners = Ctx.Level >= 2 && Ctx.Side == ESide::Mandate && IsBannerKind(Kind);
+			const bool bBanners = Ctx.Level >= 2 && Ctx.Side == EDressSide::Mandate && IsBannerKind(Kind);
 			EPiece Last = EPiece::Count;
 			int32 WallLamps = 0;
 			for (const FWallRun& R : G.Runs)
@@ -842,7 +843,7 @@ namespace
 						}
 					}
 					// a tall hall (a hangar) is lit from its walls: caged lamps on their sides, at a gantry's height
-					if (H > 650.0)
+					if (H > kTallHall)
 					{
 						for (double T = S0 + 150.0; T < S1 - 100.0 && WallLamps < 8; T += 700.0, ++WallLamps)
 						{
@@ -918,7 +919,7 @@ namespace
 		// ------------------------------------------------------------------------------------------------------------------------ the ceiling
 		void Ceiling()
 		{
-			if (H > 700.0)
+			if (H > kTallHall)
 			{
 				return;                                                                     // (a hall that tall is lit from its walls; nothing hangs from a ceiling a gantry's reach away)
 			}
@@ -1077,7 +1078,7 @@ namespace
 				}
 			}
 			// cut cables hang from the ceilings of the rooms that have lost their power, and spit
-			if ((bDark || bGutted) && H <= 700.0)
+			if ((bDark || bGutted) && H <= kTallHall)
 			{
 				const int32 Nc = bGutted ? 3 : 2;
 				for (int32 i = 0; i < Nc; ++i)

@@ -233,6 +233,14 @@ ASSAULT_SETUPS = {
                     exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive;{_NOFATE}",
                     at="2=astra.board.strip M1|3=astra.war.fleet pound M1 port 70 12 kinetic|60=astra.war.fleet pound M1 port 70 10 explosive|11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride",
                     expect=[r"the war has left her \d+ of her people under arms", r"the Captain is aboard Wreck with the marines", r"Wreck is ours|boarding of Wreck has failed|have broken off|has gone quiet", r"the Captain is back aboard the Aquila"]),
+    # the decks dressed (ABBORDAGGI-3): in a headless run the content has none of the kit's meshes, so every piece is the engine's cube (astra.board.dress 3) and everything the dressing makes in the world is made
+    # and counted all the same: the instances of each kind, the boxes of the props, the lamps (and the lights that follow the Captain), the door signs, the fallen, the flames and sparks of the rooms the war burnt.
+    # (The Captain is aboard from about 11 220 s, or from about 11 600 s when the worker that reads the plan is slow: `astra.board.info` is asked all along, one of the answers is in the fight.)
+    "out_dress": dict(doc="the Captain aboard a ship the war has shot up with her decks dressed (the kit's pieces as cubes): what the dressing made, counted by the boarding's info", seconds=12000,
+                      exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive;{_NOFATE};astra.board.dress 3",
+                      at="2=astra.board.strip M1|3=astra.war.fleet pound M1 port 70 12 kinetic|60=astra.war.fleet pound M1 port 70 10 explosive|11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|"
+                         "11001=astra.board.assault out M1 - 2 port - ride|11230=astra.board.info|11250=astra.board.info|11270=astra.board.info|11290=astra.board.info|11630=astra.board.info|11650=astra.board.info|11670=astra.board.info|11690=astra.board.info|11710=astra.board.info|11730=astra.board.info",
+                      expect=[r"the Captain is aboard Wreck with the marines", r"decks dressed: \d+ rooms, \d+ kit instances \(\d+ wall, \d+ ceiling, \d+ floor, \d+ opening, \d+ prop, \d+ fallen\), \d+ lamps", r"the Captain is back aboard the Aquila"]),
     # a station is a place of the system (SPAZIO-VIVO's fixtures: Keeper Station, the Arsenal, a refinery, a mine), not a ship of this war: no boat is flown at it and none from it
     # (the war bench has no living space to make one: a ship is made a fixture, as the war sees them)
     "fixture": dict(doc="boats at a place of the system and from it: refused with the reason, nothing flies", seconds=11200,

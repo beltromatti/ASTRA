@@ -4,6 +4,7 @@
 #include "AstraBoardSubsystem.h"
 
 #include "ASTRA.h"
+#include "AstraBoardInterior.h"
 #include "AstraCombatant.h"
 #include "AstraCrewRoster.h"
 #include "AstraFpsComponent.h"
@@ -365,13 +366,14 @@ FString UAstraBoardSubsystem::InfoText() const
 		return FString::Printf(TEXT("boarding: ready (%d compartments, %d portals); none on; assault %s"), Map->GetComps().Num(), Map->GetPortals().Num(), *AssaultText());
 	}
 	const FBook& B = Fight.Book();
+	const FString Decks = Interior && Interior->IsBegun() ? Interior->DescribeDress() : FString();
 	return FString::Printf(TEXT("boarding %s%s at %.0f s: marines %d able, %d down, %d dead; boarders %d able, %d down, %d dead, %d left the ship; Captain %d%%%s; %d bodies; "
-	                            "%.2f ms a step (sensing %.2f, plans %.2f, men %.2f); outcome %d%s%s"),
+	                            "%.2f ms a step (sensing %.2f, plans %.2f, men %.2f); outcome %d%s%s%s%s"),
 	                       Phase == EPhase::Active ? TEXT("ON") : TEXT("over"), Mode == EMode::Remote ? TEXT(" (on another ship)") : TEXT(""), Since,
 	                       Fight.CountAble(ESide::Aquila) - (Fight.CaptainId() != INDEX_NONE ? 1 : 0), B.Down[0], B.Killed[0], Fight.CountAble(ESide::Mandate),
 	                       B.Down[1], B.Killed[1], B.Exited[1], FMath::RoundToInt(CaptainStrength() * 100.f), bCapDown ? TEXT(" (down)") : TEXT(""), BodyOf.Num(),
 	                       (B.Ms[0] + B.Ms[1] + B.Ms[2]) / FMath::Max(1.0, Since * 10.0), B.Ms[0] / FMath::Max(1.0, Since * 10.0), B.Ms[1] / FMath::Max(1.0, Since * 10.0),
-	                       B.Ms[2] / FMath::Max(1.0, Since * 10.0), (int32)Fight.Mission().Outcome, Assault.bOn ? TEXT("; assault ") : TEXT(""), Assault.bOn ? *AssaultText() : TEXT(""));
+	                       B.Ms[2] / FMath::Max(1.0, Since * 10.0), (int32)Fight.Mission().Outcome, Assault.bOn ? TEXT("; assault ") : TEXT(""), Assault.bOn ? *AssaultText() : TEXT(""), Decks.IsEmpty() ? TEXT("") : TEXT("; decks "), *Decks);
 }
 
 // ================================================================================================================== the orders

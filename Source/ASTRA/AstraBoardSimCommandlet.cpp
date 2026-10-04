@@ -2306,7 +2306,7 @@ static void BoardScenarioDress(const FString& Only, const FString& DumpDir, cons
 			                          PlainByDeck.FindRef(KV.Key), 12.0 * PlainByDeck.FindRef(KV.Key) / 1.0e6);
 		}
 		BNote(FString::Printf(TEXT("%s (%s): %d rooms dressed in %.0f ms (%.2f ms a room); as built %d instances (%d walls and bays, %d ceiling, %d floor, %d opening, %d prop, %d fallen) + %d boxes drawn: %.2fM triangles; before: %d boxes, %.3fM"),
-		                       *K.ToString(), Ctx.Side == AstraBoardDress::ESide::Mandate ? TEXT("Mandate") : (Ctx.Side == AstraBoardDress::ESide::Guild ? TEXT("Guild") : TEXT("Astra")), N, BuiltMs, BuiltMs / FMath::Max(1, N), All.TotalPieces(), All.Pieces[0], All.Pieces[1], All.Pieces[2], All.Pieces[3], All.Pieces[4], All.Pieces[5],
+		                       *K.ToString(), Ctx.Side == AstraBoardDress::EDressSide::Mandate ? TEXT("Mandate") : (Ctx.Side == AstraBoardDress::EDressSide::Guild ? TEXT("Guild") : TEXT("Astra")), N, BuiltMs, BuiltMs / FMath::Max(1, N), All.TotalPieces(), All.Pieces[0], All.Pieces[1], All.Pieces[2], All.Pieces[3], All.Pieces[4], All.Pieces[5],
 		                       SlabAll, (All.Tris + 12LL * SlabAll) / 1.0e6, PlainAll, PlainTris / 1.0e6));
 		BNote(FString::Printf(TEXT("  hurt by the war: %d instances %.2fM tris (%d flames, smoke and sparks, %d lamps); a hulk: %d instances, %d lamps in the red; %d props (%d rooms with props), %d solid boxes, %d lamps, %d door signs"),
 		                      AllWar.TotalPieces(), AllWar.Tris / 1.0e6, AllWar.Fx, AllWar.Lamps, AllCold.TotalPieces(), AllCold.Lamps, Props, Dressed, All.Blocks, All.Lamps, All.Signs));
@@ -2388,7 +2388,7 @@ static void BoardScenarioDress(const FString& Only, const FString& DumpDir, cons
 			}
 			TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 			Root->SetStringField(TEXT("class"), K.ToString());
-			Root->SetStringField(TEXT("side"), Ctx.Side == AstraBoardDress::ESide::Mandate ? TEXT("mandate") : (Ctx.Side == AstraBoardDress::ESide::Guild ? TEXT("guild") : TEXT("astra")));
+			Root->SetStringField(TEXT("side"), Ctx.Side == AstraBoardDress::EDressSide::Mandate ? TEXT("mandate") : (Ctx.Side == AstraBoardDress::EDressSide::Guild ? TEXT("guild") : TEXT("astra")));
 			Root->SetArrayField(TEXT("rooms"), RoomList);
 			Root->SetArrayField(TEXT("slabs"), SlabList);
 			TArray<TSharedPtr<FJsonValue>> Foc;

@@ -25,7 +25,8 @@
 using namespace AstraBoardDress;
 
 static TAutoConsoleVariable<int32> CVarBoardDress(TEXT("astra.board.dress"), 2,
-                                                  TEXT("The decks of a boarded ship: 0 plain boxes, 1 the structure of the kit (bays, ceilings, floors, frames, lamps), 2 also props, banners, signs, debris, the fallen, flames, smoke and sparks. Read when the decks are made."),
+                                                  TEXT("The decks of a boarded ship: 0 plain boxes, 1 the structure of the kit (bays, ceilings, floors, frames, lamps), 2 also props, banners, signs, debris, the fallen, flames, smoke and sparks; "
+                                                       "3 as 2 with the engine's cube for every piece (the bench's: the content of a headless run has none of the kit). Read when the decks are made."),
                                                   ECVF_Default);
 
 namespace
@@ -46,9 +47,9 @@ namespace
 	}
 
 	/** The tint a side gives a finish of the kit (the Mandate's are the instances' own). False: leave it as it is. */
-	bool SideTint(ESide Side, const FString& Slot, FLinearColor& Out)
+	bool SideTint(EDressSide Side, const FString& Slot, FLinearColor& Out)
 	{
-		if (Side == ESide::Astra)
+		if (Side == EDressSide::Astra)
 		{
 			static const TMap<FString, FLinearColor> M = {
 				{TEXT("MI_BRD_Plating"), FLinearColor(0.42f, 0.43f, 0.44f)}, {TEXT("MI_BRD_Frame"), FLinearColor(0.067f, 0.078f, 0.091f)}, {TEXT("MI_BRD_Iron"), FLinearColor(0.023f, 0.026f, 0.031f)},
@@ -61,7 +62,7 @@ namespace
 				return true;
 			}
 		}
-		else if (Side == ESide::Guild)
+		else if (Side == EDressSide::Guild)
 		{
 			static const TMap<FString, FLinearColor> M = {
 				{TEXT("MI_BRD_Plating"), FLinearColor(0.12f, 0.07f, 0.04f)}, {TEXT("MI_BRD_Frame"), FLinearColor(0.04f, 0.035f, 0.03f)}, {TEXT("MI_BRD_Deck"), FLinearColor(0.1f, 0.09f, 0.08f)},
@@ -77,7 +78,7 @@ namespace
 	}
 
 	/** How a lamp lights the room under it (colour, lumens, radius) by its state and its side's hand. */
-	void LampLook(ESide Side, ELamp State, FLinearColor& Col, float& Lumens, float& Radius)
+	void LampLook(EDressSide Side, ELamp State, FLinearColor& Col, float& Lumens, float& Radius)
 	{
 		if (State == ELamp::Red)
 		{
@@ -86,8 +87,8 @@ namespace
 			Radius = 950.f;
 			return;
 		}
-		Col = Side == ESide::Mandate ? FLinearColor(1.f, 0.74f, 0.42f) : (Side == ESide::Guild ? FLinearColor(1.f, 0.85f, 0.6f) : FLinearColor(1.f, 0.95f, 0.88f));
-		Lumens = Side == ESide::Astra ? 2600.f : 2300.f;
+		Col = Side == EDressSide::Mandate ? FLinearColor(1.f, 0.74f, 0.42f) : (Side == EDressSide::Guild ? FLinearColor(1.f, 0.85f, 0.6f) : FLinearColor(1.f, 0.95f, 0.88f));
+		Lumens = Side == EDressSide::Astra ? 2600.f : 2300.f;
 		Radius = 1100.f;
 	}
 }
@@ -124,6 +125,7 @@ struct AAstraBoardInterior::FKitState
 	int32 ByFrame[6] = {0, 0, 0, 0, 0, 0};
 	double Clock = 0.0;
 	bool bWarned = false;
+	bool bTest = false;                                                 // the bench's: every piece is the engine's cube
 
 	UInstancedStaticMeshComponent* Ism(AAstraBoardInterior* A, TArray<TObjectPtr<UObject>>& Keep, EPiece P)
 	{
@@ -135,7 +137,7 @@ struct AAstraBoardInterior::FKitState
 		{
 			return nullptr;
 		}
-		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *MeshPath(P));
+		UStaticMesh* Mesh = bTest ? A->Cube.Get() : LoadObject<UStaticMesh>(nullptr, *MeshPath(P));
 		if (!Mesh)
 		{
 			Missing.Add((int32)P);
@@ -154,7 +156,7 @@ struct AAstraBoardInterior::FKitState
 		C->SetCastShadow(false);
 		C->SetCullDistances(0, 9000);
 		// another side's ship: the same finishes in her colours
-		if (Ctx.Side != ESide::Mandate)
+		if (Ctx.Side != EDressSide::Mandate)
 		{
 			const TArray<FStaticMaterial>& Mats = Mesh->GetStaticMaterials();
 			for (int32 i = 0; i < Mats.Num(); ++i)
@@ -184,12 +186,14 @@ struct AAstraBoardInterior::FKitState
 
 bool AAstraBoardInterior::DressBegin(const TArray<FFallen>* InFallen)
 {
-	const int32 Level = CVarBoardDress.GetValueOnGameThread();
+	const int32 Setting = CVarBoardDress.GetValueOnGameThread();
+	const int32 Level = FMath::Min(Setting, 2);
 	if (Level <= 0 || !Plan.IsValid() || !Cube || !Walls)
 	{
 		return false;
 	}
 	TSharedRef<FKitState> K = MakeShared<FKitState>();
+	K->bTest = Setting >= 3;
 	K->Ctx.Plan = Plan.Get();
 	K->Ctx.Side = SideOfStyle(Plan->Style);
 	K->Ctx.Seed = SeedOf(Plan->Class);
@@ -234,12 +238,12 @@ bool AAstraBoardInterior::DressBegin(const TArray<FFallen>* InFallen)
 			KitKeep.Add(Mid);
 		}
 	};
-	if (K->Ctx.Side == ESide::Mandate)
+	if (K->Ctx.Side == EDressSide::Mandate)
 	{
 		Tinted(Walls, FLinearColor(0.045f, 0.040f, 0.034f), 0.3f);
 		Tinted(Floors, FLinearColor(0.035f, 0.035f, 0.038f), 0.4f);
 	}
-	else if (K->Ctx.Side == ESide::Guild)
+	else if (K->Ctx.Side == EDressSide::Guild)
 	{
 		Tinted(Walls, FLinearColor(0.06f, 0.045f, 0.035f), 0.3f);
 		Tinted(Floors, FLinearColor(0.05f, 0.045f, 0.04f), 0.4f);
@@ -286,7 +290,7 @@ bool AAstraBoardInterior::DressBegin(const TArray<FFallen>* InFallen)
 	K->LightLumens.Init(0.f, Lights.Num());
 	Kit = K;
 	UE_LOG(LogASTRA, Log, TEXT("[BoardDress] the decks of the %s are dressed (level %d, %s hand): %d fallen to lay"), *Plan->Class.ToString(), Level,
-	       Kit->Ctx.Side == ESide::Mandate ? TEXT("Mandate") : (Kit->Ctx.Side == ESide::Guild ? TEXT("Guild") : TEXT("Astra")), Kit->Fallen.Num());
+	       Kit->Ctx.Side == EDressSide::Mandate ? TEXT("Mandate") : (Kit->Ctx.Side == EDressSide::Guild ? TEXT("Guild") : TEXT("Astra")), Kit->Fallen.Num());
 	return true;
 }
 
@@ -429,7 +433,7 @@ void AAstraBoardInterior::DressLights(const FVector& Eye)
 		return;
 	}
 	FKitState& K = *Kit;
-	const ESide Side = K.Ctx.Side;
+	const EDressSide Side = K.Ctx.Side;
 	// the lamps that light: the nearest lit and red ones on his deck
 	struct FNear { int32 I; double D; };
 	TArray<FNear> Ns;
@@ -599,7 +603,7 @@ void AAstraBoardInterior::DressLights(const FVector& Eye)
 			}
 		}
 		Signs.Sort([](const FNear& A, const FNear& B) { return A.D < B.D; });
-		const FColor Ink = Side == ESide::Mandate ? FColor(255, 172, 64) : (Side == ESide::Guild ? FColor(236, 208, 150) : FColor(200, 232, 255));
+		const FColor Ink = Side == EDressSide::Mandate ? FColor(255, 172, 64) : (Side == EDressSide::Guild ? FColor(236, 208, 150) : FColor(200, 232, 255));
 		while (K.SignPool.Num() < FMath::Min(8, Signs.Num()))
 		{
 			UTextRenderComponent* T = NewObject<UTextRenderComponent>(this);

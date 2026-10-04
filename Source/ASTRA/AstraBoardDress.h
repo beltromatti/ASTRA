@@ -20,8 +20,8 @@
 namespace AstraBoardDress
 {
 	/** Whose ship she is, as her plan's style says (data/ship/plans/<class>.json "style": mandate | astra | guild). */
-	enum class ESide : uint8 { Mandate, Astra, Guild };
-	ASTRA_API ESide SideOfStyle(const FString& PlanStyle);
+	enum class EDressSide : uint8 { Mandate, Astra, Guild };
+	ASTRA_API EDressSide SideOfStyle(const FString& PlanStyle);
 
 	/** The frame a piece is made in (art/blender/board_kit_defs.py): wall pieces stand on a wall with their relief into the room, ceiling pieces hang, floor pieces lie, opening pieces straddle the plane between
 	 *  two rooms, props and bodies stand on the floor with their front towards +X. */
@@ -135,7 +135,7 @@ namespace AstraBoardDress
 	struct FDressContext
 	{
 		const FBoardShipPlan* Plan = nullptr;
-		ESide Side = ESide::Mandate;
+		EDressSide Side = EDressSide::Mandate;
 		uint32 Seed = 0;                                       // the plan's own seed (SeedOf)
 		bool bHulk = false;                                    // she has lost her power: the red of the emergency lamps
 		const TMap<int32, FBoardRoomMood>* Moods = nullptr;    // the rooms the war has left not as built (null: all as built)
