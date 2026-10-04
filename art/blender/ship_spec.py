@@ -190,7 +190,7 @@ _reg("stair_tower", name="Stair Tower", kind="stairs", dept="neutral", L=8.0, D=
      systems=["power_bus"], special=True, spots=[], lights=[light(4.0, 4.0, 3.3, 3000, 4500, (3.0, 3.0), 800)])
 _reg("bow_obs", name="Bow Observation", kind="observation", dept="command", L=20.0, D=32.0, h=3.7, plate="bow_obs", doors=[],
      systems=["power_bus"], special=True,
-     spots=[spot("crew", "watch", 17.45 if i == 5 else 17.6, 6.0 + 4.5 * i - (0.06 if i == 5 else 0.0), 0) for i in range(6)]
+     spots=[spot("crew", "watch", 17.3 if i == 5 else 17.6, 6.0 + 4.5 * i - (0.06 if i == 5 else 0.0), 0) for i in range(6)]
            + [spot("crew", "sit", 11.6, 5.5, 0), spot("crew", "sit", 11.6, 7.5, 0), spot("crew", "sit", 11.6, 24.5, 0), spot("crew", "sit", 11.6, 26.5, 0)],
      lights=[light(10.0, 16.0, 3.6, 3200, 6200, (12.0, 1.0), 1200)])
 # ---- planned rooms: typed compartments of the decks that are not modelled yet (no mesh), with real dimensions ------------------
