@@ -181,7 +181,9 @@ producibile se la scrittura non è latina (come sempre).
 
 ### 6.1 Cosa serve sul PC
 - Windows 10 21H2 o 11, 32 GB di RAM consigliati, una GPU DX12 con 8 GB, 150 GB liberi (repository con LFS + intermedi + pacchetto), in un disco **veloce**.
-- **Unreal Engine 5.8.3** dall'Epic Games Launcher (la stessa versione del Mac), con il componente "Visual Studio" se lo chiede.
+- **Unreal Engine 5.8.3** dall'Epic Games Launcher (la stessa versione del Mac), con l'opzione *Templates and Feature Packs* (da lì vengono i manichini, §6.2 passo 2) e il componente "Visual Studio" se lo chiede.
+  I plugin MetaHuman che `ASTRA.uproject` abilita stanno nel motore (`Engine\Plugins\MetaHuman`). Il codice del gioco di oggi non usa teste MetaHuman (l'equipaggio sono i manichini di Epic): l'opzione *Core Data*
+  di MetaHuman, installata sul Mac, serve solo agli script che le generano nell'editor.
 - **Visual Studio 2022 17.14** (MSVC 14.44.35207 o successivo) **oppure Visual Studio 2026 18.0** (MSVC 14.50.35723 o successivo: le precedenti 14.50 hanno errori interni del compilatore): carico di lavoro
   *Sviluppo di giochi con C++* (`Microsoft.VisualStudio.Workload.NativeGame`), SDK di Windows 11 `10.0.22621.0`, .NET Framework 4.6.2 targeting pack. L'elenco esatto sta in
   `Engine/Config/Windows/Windows_SDK.json` dell'installazione di Unreal. Le versioni vietate (17.9, 17.10…) fanno compilare codice che si schianta: non usarle.
