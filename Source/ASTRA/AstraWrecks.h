@@ -301,6 +301,8 @@ namespace AstraSpace
 		FString Status(const FSite& S, int32 Piece, double Now) const;
 		/** The share of a class's structure that is in a section (0 bow, 1 middle, 2 stern): about the share of her people and rooms that were in that piece of her (data/war/classes.json: sections). */
 		static float SectionShare(FName ClassKey, uint8 Section);
+		/** "2 h 40 min", "35 min", "50 s": how long a thing has been so, or has to go (the crew's way of saying it). */
+		static FString Span(double Seconds);
 		/** The beacons that call in a system now (the sensors' reach is the caller's: From and RangeKm; RangeKm <= 0: all). Nearest first. */
 		void Beacons(const FString& System, double Now, const FSkyFrame& Frame, const FVector& From, double RangeKm, TArray<FBeacon>& Out) const;
 		/** Lifepods within RadiusM of a point (system frame) that are adrift are taken aboard by `By`. Returns what was taken. */
@@ -312,6 +314,9 @@ namespace AstraSpace
 		void Prune(double Now);
 
 		// ---- the file
+		/** The people and the rooms aboard in the file's form (the rooms of her plan only when bRooms), and back: what a site keeps of her inside, shared with the hulks left behind (AstraDerelicts.h). */
+		static TSharedRef<FJsonObject> AboardToJson(const FAboard& Ab, bool bRooms);
+		static void AboardFromJson(const TSharedPtr<FJsonObject>& O, FAboard& Ab);
 		/** The sites as the campaign's save keeps them (a compact form: arrays of numbers, see docs/SPAZIO.md); Now is saved as the clock. */
 		TSharedRef<FJsonObject> ToJson(double Now);
 		/** Reads them back. OutClock: the clock at the save. False when the object is not a wrecks save. */

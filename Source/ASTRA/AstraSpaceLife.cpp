@@ -134,6 +134,13 @@ void UAstraSpaceLife::Arrive(const FString& InSystem)
 
 void UAstraSpaceLife::Leave()
 {
+	if (bLaidOut)
+	{
+		// the hulks of the system she is leaving stay in it: recorded where they are and as they are, found again when she comes back (docs/SPAZIO.md 3ter)
+		TArray<AstraSpace::FDerelict> Here;
+		CaptureDerelicts(Here);
+		Derelicts.Replace(SystemKey, Here);
+	}
 	ClearScene();
 	bPending = false;
 }
@@ -141,6 +148,7 @@ void UAstraSpaceLife::Leave()
 void UAstraSpaceLife::ClearScene()
 {
 	RemoveWreckContacts();                           // (the pieces on the plot go with the system: they are made again, from their records, where the Aquila comes to be near them)
+	FoundHulks.Reset();                                   // (and the hulks made again in this visit: the plot is cleared with the system)
 	HideSets();
 	for (FRigid& R : Rigids)
 	{
@@ -248,6 +256,7 @@ void UAstraSpaceLife::DoArrive(const FString& InSystem)
 	AstraSpace::BuildLayout(*Spec, D, A, Seed, Layout);
 	MakePlaces();
 	MakeRocksAndBuoys();
+	RestoreDerelicts(WreckClock());                 // the hulks left in this system, where the arithmetic puts them now (docs/SPAZIO.md 3ter)
 	const double Now = Owner->GetBattleTime();
 	const uint32 TrafficSeed = GAstraDeterministic ? Seed : (uint32)(FDateTime::Now().GetTicks() & 0x7fffffff);
 	Traffic.Init(D, Layout, TrafficSeed, Now, FMath::Max(0.f, CVarSpaceDensity.GetValueOnGameThread()));
@@ -598,6 +607,7 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 	const double T1 = FPlatformTime::Seconds();
 	Traffic.Tick(Owner->GetBattleTime() + 0.0, SimDt, View, Events);
 	TickWrecks(SimDt);                              // what the war left: the effects' pieces handed over, the beacons heard, a close look (their events join the traffic's)
+	TickDerelicts(WreckClock(), SimDt);             // the hulks left behind that are found again are told
 	TickMotion(SimDt);                              // the capital ships' motion read: what asks for jets, where the wakes are noted
 	FlushEvents();
 	const double T2 = FPlatformTime::Seconds();

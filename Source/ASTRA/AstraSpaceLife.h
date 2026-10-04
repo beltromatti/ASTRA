@@ -20,6 +20,7 @@
 #include "AstraSpaceLifeMotion.h"
 #include "AstraSpaceLifeSolids.h"
 #include "AstraWrecks.h"
+#include "AstraDerelicts.h"
 #include "AstraWarFX.h"
 #include "AstraWarDraw.h"
 #include "AstraSpaceLife.generated.h"
@@ -34,6 +35,7 @@ class UStaticMesh;
 class UStaticMeshComponent;
 struct FAstraBattleShip;
 struct FAstraDeathEvent;
+class FAstraShipInterior;
 
 namespace AstraSpaceDraw
 {
@@ -58,6 +60,10 @@ namespace AstraSpaceDraw
 		TArray<uint8> Dirty;                                 // by page: something in it moved, came or went since it was last sent (a page nothing touched is not sent again)
 	};
 }
+
+/** FLOTTA-VIVA's snapshot of a ship's inside (the rooms that are not as built, the pressure bulkheads shut) in the form the records keep (AstraWrecks.h: FAboard): what a site and a hulk left behind say of
+ *  what is aboard. (AstraSpaceLifeWrecks.cpp) */
+void AstraSpaceFillAboardRooms(const FAstraShipInterior& Interior, AstraSpace::FAboard& Out);
 
 /** A place of the system that stands in the plot: its fixture ship in the battle, its actor and what turns on it. */
 struct FSpaceLifePlace
@@ -145,6 +151,17 @@ public:
 	bool DebugWreckContacts(FString& OutDetail);
 	/** The wreck contacts on the plot, one to a line (astra.space.wrecks.contacts). */
 	FString WreckContactsList() const;
+
+	// ---- the hulks left behind (AstraSpaceLifeDerelicts.cpp, docs/SPAZIO.md §3ter; the records and their rules: AstraDerelicts.h)
+	/** The hulks the plot holds now (a ship the war disabled, a dead station or freighter a beat put in the system) as records in the Gate's frame: what the Aquila leaves behind when she goes, and what the
+	 *  campaign saves of the system she is in. */
+	void CaptureDerelicts(TArray<AstraSpace::FDerelict>& Out) const;
+	const AstraSpace::FDerelicts& GetDerelicts() const { return Derelicts; }
+	/** Testing: the hulks of the plot are noted (astra.space.derelicts.mark) and, after the Aquila has been away and come back (or a resume), found again where the arithmetic puts them, as hurt as they were
+	 *  (astra.space.derelicts.test). OutDetail has what was found; true when all hold. */
+	void DebugDerelictMark();
+	bool DebugDerelictTest(FString& OutDetail);
+	FString DerelictList() const;
 
 	/** Testing: loses a warship the way the war would (astra.space.lose): by contact id or "nearest"; How breakup|reactor|destroyed; Section the one that lets go (0 bow, 1 mid, 2 stern). */
 	bool DebugLose(const FString& Which, const FString& How, int32 Section, FString& OutDetail);
@@ -262,6 +279,33 @@ private:
 	int32 MotionShips = 0, JetsNow = 0, JetsPeak = 0, JetsLitNow = 0, WakeNow = 0, WakePeak = 0, JetsDropped = 0, WakeDropped = 0;
 	double MotionMs = 0.0;
 	int32 MotionTicks = 0;
+
+	// ---- the hulks left behind
+	AstraSpace::FDerelicts Derelicts;             // the records (of the systems the Aquila is not in, and what the save has of this one)
+	struct FFoundHulk
+	{
+		int32 PlotId = -1;                        // her ship in the plot (made again from a record in this visit)
+		FString Name, Contact;
+		double LeftAt = 0.0;                      // when she was recorded (the wrecks' clock)
+		double RestoredAt = 0.0;                  // when she was made again: from then on the war's own rules carry her (constant velocity)
+		bool bTold = false;
+	};
+	TArray<FFoundHulk> FoundHulks;
+	float DerelictT = 0.f;
+	struct FHulkMark
+	{
+		FString Name, Contact;
+		FVector Gate = FVector::ZeroVector;       // where she was, in the Gate's frame
+		FVector GateVel = FVector::ZeroVector;
+		float Structure[3] = {};
+		bool bDisabled = false, bModel = false;
+		uint8 Side = 2;
+		double At = 0.0;
+	};
+	TArray<FHulkMark> HulkMarks;
+	void RestoreDerelicts(double Now);
+	int32 MakeDerelict(const AstraSpace::FDerelict& D, double Now);
+	void TickDerelicts(double Now, float SimDt);
 
 	// ---- cost
 	double TickMs = 0.0, TickMsMax = 0.0;

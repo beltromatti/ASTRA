@@ -60,6 +60,39 @@ AstraSpace::FSkyFrame UAstraSpaceLife::SkyFrame() const
 	return Fr;
 }
 
+// ------------------------------------------------------------------------------------------------------------------ what is aboard
+void AstraSpaceFillAboardRooms(const FAstraShipInterior& Interior, AstraSpace::FAboard& Out)
+{
+	FFleetSnapshot Snap;
+	Interior.Snapshot(Snap);
+	for (const FFleetSnapshot::FRoom& R : Snap.Rooms)
+	{
+		if (Out.Rooms.Num() >= 400)
+		{
+			break;
+		}
+		AstraSpace::FAboardRoom Room;
+		Room.Comp = R.Comp;
+		Room.Air = R.Air;
+		Room.Hole = R.Hole;
+		Room.Fire = R.Fire;
+		Room.Smoke = R.Smoke;
+		Room.Heat = R.Heat;
+		Room.Power = R.Power;
+		Room.Wreck = R.Wreck;
+		Room.bGutted = R.bGutted;
+		Room.bLocked = R.bLocked;
+		Out.Rooms.Add(Room);
+	}
+	for (const FName& D : Snap.SealedDoors)
+	{
+		if (Out.SealedDoors.Num() < 120)
+		{
+			Out.SealedDoors.Add(D.ToString());
+		}
+	}
+}
+
 // ------------------------------------------------------------------------------------------------------------------ a ship is lost
 void UAstraSpaceLife::OnShipLost(const FAstraBattleShip& S, const FAstraDeathEvent& E, bool bFxPieces)
 {
@@ -104,34 +137,7 @@ void UAstraSpaceLife::OnShipLost(const FAstraBattleShip& S, const FAstraDeathEve
 		A.Complement = I->CrewTotal();
 		A.Killed = I->CrewDead();
 		A.Alive = I->CrewLostWithShip();
-		FFleetSnapshot Snap;
-		I->Snapshot(Snap);
-		for (const FFleetSnapshot::FRoom& R : Snap.Rooms)
-		{
-			if (A.Rooms.Num() >= 400)
-			{
-				break;
-			}
-			AstraSpace::FAboardRoom Room;
-			Room.Comp = R.Comp;
-			Room.Air = R.Air;
-			Room.Hole = R.Hole;
-			Room.Fire = R.Fire;
-			Room.Smoke = R.Smoke;
-			Room.Heat = R.Heat;
-			Room.Power = R.Power;
-			Room.Wreck = R.Wreck;
-			Room.bGutted = R.bGutted;
-			Room.bLocked = R.bLocked;
-			A.Rooms.Add(Room);
-		}
-		for (const FName& D : Snap.SealedDoors)
-		{
-			if (A.SealedDoors.Num() < 120)
-			{
-				A.SealedDoors.Add(D.ToString());
-			}
-		}
+		AstraSpaceFillAboardRooms(*I, A);
 	}
 	// her pieces, as the war's effects made them (they hold them as actors for the first minute)
 	TArray<AstraSpace::FPieceIn> Pieces;
@@ -801,7 +807,20 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 // ------------------------------------------------------------------------------------------------------------------ the campaign
 TSharedRef<FJsonObject> UAstraSpaceLife::SaveJson()
 {
-	return Wrecks.ToJson(WreckClock());
+	const TSharedRef<FJsonObject> J = Wrecks.ToJson(WreckClock());
+	// the hulks left behind: those of the system the Aquila is in as the plot has them now (they are made again from this when the campaign is resumed), the others' as they were recorded when she left
+	AstraSpace::FDerelicts Hulks = Derelicts;
+	if (bLaidOut)
+	{
+		TArray<AstraSpace::FDerelict> Here;
+		CaptureDerelicts(Here);
+		Hulks.Replace(SystemKey, Here);
+	}
+	if (Hulks.All().Num())
+	{
+		J->SetObjectField(TEXT("derelicts"), Hulks.ToJson());
+	}
+	return J;
 }
 
 void UAstraSpaceLife::LoadSaved(const TSharedPtr<FJsonObject>& J)
@@ -813,11 +832,18 @@ void UAstraSpaceLife::LoadSaved(const TSharedPtr<FJsonObject>& J)
 		Wrecks.Settle(WreckClock());
 		UE_LOG(LogASTRA, Log, TEXT("[Space] the campaign's wrecks are back: %d sites, clock %.0f s"), Wrecks.Sites().Num(), SavedClock);
 	}
+	const TSharedPtr<FJsonObject>* Hulks = nullptr;
+	if (J.IsValid() && J->TryGetObjectField(TEXT("derelicts"), Hulks) && Derelicts.FromJson(*Hulks))
+	{
+		UE_LOG(LogASTRA, Log, TEXT("[Space] the campaign's hulks left behind are back: %d"), Derelicts.All().Num());
+	}
 }
 
 void UAstraSpaceLife::NewCampaign()
 {
 	RemoveWreckContacts();                       // (their records go with the war: no contact stays on the plot for a wreck that is not)
+	Derelicts.Reset();
+	FoundHulks.Reset();
 	Wrecks.Reset();
 	ClockBase = 0.0;
 }

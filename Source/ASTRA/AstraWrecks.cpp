@@ -673,6 +673,11 @@ namespace AstraSpace
 		return S.HullMesh;
 	}
 
+	FString FWrecks::Span(double Seconds)
+	{
+		return WkSpan(Seconds);
+	}
+
 	int32 FWrecks::StageForRange(double RangeM)
 	{
 		return RangeM < 800.0 ? 3 : (RangeM < 4000.0 ? 2 : 1);
@@ -949,6 +954,90 @@ namespace AstraSpace
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------ the file
+	TSharedRef<FJsonObject> FWrecks::AboardToJson(const FAboard& Ab, bool bRooms)
+	{
+		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+		O->SetNumberField(TEXT("n"), Ab.Complement);
+		O->SetNumberField(TEXT("alive"), Ab.Alive);
+		O->SetNumberField(TEXT("killed"), Ab.Killed);
+		O->SetNumberField(TEXT("lost"), Ab.Lost);
+		O->SetNumberField(TEXT("escaped"), Ab.Escaped);
+		O->SetBoolField(TEXT("inside"), Ab.bInside);
+		if (bRooms && Ab.Rooms.Num())
+		{
+			TArray<TSharedPtr<FJsonValue>> Rooms;
+			for (const FAboardRoom& R : Ab.Rooms)
+			{
+				TArray<TSharedPtr<FJsonValue>> A;
+				A.Add(MakeShared<FJsonValueNumber>(R.Comp));
+				for (const float V : {R.Air, R.Hole, R.Fire, R.Smoke, R.Heat, R.Power, R.Wreck})
+				{
+					A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 100.f)));
+				}
+				A.Add(MakeShared<FJsonValueNumber>((R.bGutted ? 1 : 0) | (R.bLocked ? 2 : 0)));
+				Rooms.Add(MakeShared<FJsonValueArray>(A));
+			}
+			O->SetArrayField(TEXT("rooms"), Rooms);
+		}
+		if (bRooms && Ab.SealedDoors.Num())
+		{
+			TArray<TSharedPtr<FJsonValue>> D;
+			for (const FString& Id : Ab.SealedDoors)
+			{
+				D.Add(MakeShared<FJsonValueString>(Id));
+			}
+			O->SetArrayField(TEXT("doors"), D);
+		}
+		return O;
+	}
+
+	void FWrecks::AboardFromJson(const TSharedPtr<FJsonObject>& O, FAboard& Ab)
+	{
+		if (!O.IsValid())
+		{
+			return;
+		}
+		double D = 0.0;
+		Ab.Complement = O->TryGetNumberField(TEXT("n"), D) ? (int32)D : 0;
+		Ab.Alive = O->TryGetNumberField(TEXT("alive"), D) ? (int32)D : 0;
+		Ab.Killed = O->TryGetNumberField(TEXT("killed"), D) ? (int32)D : 0;
+		Ab.Lost = O->TryGetNumberField(TEXT("lost"), D) ? (int32)D : 0;
+		Ab.Escaped = O->TryGetNumberField(TEXT("escaped"), D) ? (int32)D : 0;
+		O->TryGetBoolField(TEXT("inside"), Ab.bInside);
+		const TArray<TSharedPtr<FJsonValue>>* Rooms = nullptr;
+		if (O->TryGetArrayField(TEXT("rooms"), Rooms))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Rooms)
+			{
+				const TArray<TSharedPtr<FJsonValue>>* R = nullptr;
+				if (V.IsValid() && V->TryGetArray(R) && R->Num() >= 9)
+				{
+					FAboardRoom Room;
+					Room.Comp = (int32)(*R)[0]->AsNumber();
+					Room.Air = (float)(*R)[1]->AsNumber() * 0.01f;
+					Room.Hole = (float)(*R)[2]->AsNumber() * 0.01f;
+					Room.Fire = (float)(*R)[3]->AsNumber() * 0.01f;
+					Room.Smoke = (float)(*R)[4]->AsNumber() * 0.01f;
+					Room.Heat = (float)(*R)[5]->AsNumber() * 0.01f;
+					Room.Power = (float)(*R)[6]->AsNumber() * 0.01f;
+					Room.Wreck = (float)(*R)[7]->AsNumber() * 0.01f;
+					const int32 Fl = (int32)(*R)[8]->AsNumber();
+					Room.bGutted = (Fl & 1) != 0;
+					Room.bLocked = (Fl & 2) != 0;
+					Ab.Rooms.Add(Room);
+				}
+			}
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Doors = nullptr;
+		if (O->TryGetArrayField(TEXT("doors"), Doors))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Doors)
+			{
+				Ab.SealedDoors.Add(V->AsString());
+			}
+		}
+	}
+
 	TSharedRef<FJsonObject> FWrecks::SiteJson(FSite& S, bool bRooms) const
 	{
 		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
@@ -972,42 +1061,7 @@ namespace AstraSpace
 			WkPutVec(A, S.Vel, KVel);
 			J->SetArrayField(TEXT("pv"), A);
 		}
-		{
-			const FAboard& Ab = S.Aboard;
-			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
-			O->SetNumberField(TEXT("n"), Ab.Complement);
-			O->SetNumberField(TEXT("alive"), Ab.Alive);
-			O->SetNumberField(TEXT("killed"), Ab.Killed);
-			O->SetNumberField(TEXT("lost"), Ab.Lost);
-			O->SetNumberField(TEXT("escaped"), Ab.Escaped);
-			O->SetBoolField(TEXT("inside"), Ab.bInside);
-			if (bRooms && Ab.Rooms.Num())
-			{
-				TArray<TSharedPtr<FJsonValue>> Rooms;
-				for (const FAboardRoom& R : Ab.Rooms)
-				{
-					TArray<TSharedPtr<FJsonValue>> A;
-					A.Add(MakeShared<FJsonValueNumber>(R.Comp));
-					for (const float V : {R.Air, R.Hole, R.Fire, R.Smoke, R.Heat, R.Power, R.Wreck})
-					{
-						A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 100.f)));
-					}
-					A.Add(MakeShared<FJsonValueNumber>((R.bGutted ? 1 : 0) | (R.bLocked ? 2 : 0)));
-					Rooms.Add(MakeShared<FJsonValueArray>(A));
-				}
-				O->SetArrayField(TEXT("rooms"), Rooms);
-			}
-			if (bRooms && Ab.SealedDoors.Num())
-			{
-				TArray<TSharedPtr<FJsonValue>> D;
-				for (const FString& Id : Ab.SealedDoors)
-				{
-					D.Add(MakeShared<FJsonValueString>(Id));
-				}
-				O->SetArrayField(TEXT("doors"), D);
-			}
-			J->SetObjectField(TEXT("ab"), O);
-		}
+		J->SetObjectField(TEXT("ab"), AboardToJson(S.Aboard, bRooms));
 		{
 			TArray<TSharedPtr<FJsonValue>> Pcs;
 			for (const FPieceRec& P : S.Pieces)
@@ -1143,45 +1197,7 @@ namespace AstraSpace
 		const TSharedPtr<FJsonObject>* O = nullptr;
 		if (J->TryGetObjectField(TEXT("ab"), O))
 		{
-			FAboard& Ab = S.Aboard;
-			Ab.Complement = (*O)->TryGetNumberField(TEXT("n"), D) ? (int32)D : 0;
-			Ab.Alive = (*O)->TryGetNumberField(TEXT("alive"), D) ? (int32)D : 0;
-			Ab.Killed = (*O)->TryGetNumberField(TEXT("killed"), D) ? (int32)D : 0;
-			Ab.Lost = (*O)->TryGetNumberField(TEXT("lost"), D) ? (int32)D : 0;
-			Ab.Escaped = (*O)->TryGetNumberField(TEXT("escaped"), D) ? (int32)D : 0;
-			(*O)->TryGetBoolField(TEXT("inside"), Ab.bInside);
-			const TArray<TSharedPtr<FJsonValue>>* Rooms = nullptr;
-			if ((*O)->TryGetArrayField(TEXT("rooms"), Rooms))
-			{
-				for (const TSharedPtr<FJsonValue>& V : *Rooms)
-				{
-					const TArray<TSharedPtr<FJsonValue>>* R = nullptr;
-					if (V.IsValid() && V->TryGetArray(R) && R->Num() >= 9)
-					{
-						FAboardRoom Room;
-						Room.Comp = (int32)(*R)[0]->AsNumber();
-						Room.Air = (float)(*R)[1]->AsNumber() * 0.01f;
-						Room.Hole = (float)(*R)[2]->AsNumber() * 0.01f;
-						Room.Fire = (float)(*R)[3]->AsNumber() * 0.01f;
-						Room.Smoke = (float)(*R)[4]->AsNumber() * 0.01f;
-						Room.Heat = (float)(*R)[5]->AsNumber() * 0.01f;
-						Room.Power = (float)(*R)[6]->AsNumber() * 0.01f;
-						Room.Wreck = (float)(*R)[7]->AsNumber() * 0.01f;
-						const int32 Fl = (int32)(*R)[8]->AsNumber();
-						Room.bGutted = (Fl & 1) != 0;
-						Room.bLocked = (Fl & 2) != 0;
-						Ab.Rooms.Add(Room);
-					}
-				}
-			}
-			const TArray<TSharedPtr<FJsonValue>>* Doors = nullptr;
-			if ((*O)->TryGetArrayField(TEXT("doors"), Doors))
-			{
-				for (const TSharedPtr<FJsonValue>& V : *Doors)
-				{
-					Ab.SealedDoors.Add(V->AsString());
-				}
-			}
+			AboardFromJson(*O, S.Aboard);
 		}
 		const TArray<TSharedPtr<FJsonValue>>* Pcs = nullptr;
 		if (J->TryGetArrayField(TEXT("pc"), Pcs))

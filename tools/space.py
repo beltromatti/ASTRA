@@ -292,6 +292,24 @@ def cmd_test(a: argparse.Namespace) -> int:
     verdicts = re.findall(r"wreck contacts: (\d+) checks: (\d+) pieces here, (\d+) within reach, (\d+) on the plot.*?(WRECK_CONTACTS_OK|WRECK_CONTACTS_FAILED)", ctext)
     expect("named, where their records put them, listed, scanned", len(verdicts) >= 3 and all(v[4] == "WRECK_CONTACTS_OK" for v in verdicts), "; ".join(f"{v[3]} on the plot of {v[2]} within reach: {v[4][15:]}" for v in verdicts) or "no verdict in the log", results)
     expect("their hulls are where they are drawn", ctext.count("SOLIDS_WORLD_OK") >= 2 and "SOLIDS_WORLD_FAILED" not in ctext, f"{ctext.count('SOLIDS_WORLD_OK')} runs, pieces included", results)
+    print("-- the hulks left behind: two ships disabled (the Lethe and the Brightwater), the Aquila goes through the Gate and comes back; they are found again where the arithmetic puts them, as hurt as they were")
+    dr = argparse.Namespace(**{**vars(base), "seconds": 430, "exec": quiet, "out": "Saved/Space/test_derelicts.json",
+                               "at": "20=astra.board.disable T-11|22=astra.board.disable T-07|60=astra.space.derelicts.mark|90=astra.battle.arrive Thule|200=astra.space.derelicts|400=astra.battle.arrive Aurelia|410=astra.space.derelicts|412=astra.space.derelicts.test"})
+    run_once(dr, ROOT / dr.out, SPACE / "test_derelicts.log")
+    dtext = (SPACE / "test_derelicts.log").read_text(errors="replace") if (SPACE / "test_derelicts.log").exists() else ""
+    expect("selftest with the hulks left behind", selftest_ok(SPACE / "test_derelicts.log"), "the invariants held across two transits", results)
+    expect("the hulks are recorded when she leaves", "hulks left behind: 2 recorded" in dtext, "2 recorded in Aurelia while she is away", results)
+    expect("they are found again, where they were and as they were", "DERELICTS_OK" in dtext and "DERELICTS_FAILED" not in dtext, ([l.split("[Space] derelicts:")[-1].strip()[:150] for l in dtext.splitlines() if "[Space] derelicts:" in l] or ["no verdict"])[0], results)
+    if (ROOT / dr.out).exists():
+        found = [e for e in load(str(ROOT / dr.out))["events"] if "found again" in e["text"]]
+        expect("the crew is told they are still here", len(found) >= 2 and all(e["text"].startswith("sensors:") for e in found), f"{len(found)} reports", results)
+    print("-- the same through the campaign's save and a resume: the hulks are in the save and come back")
+    dv = argparse.Namespace(**{**vars(base), "seconds": 160, "exec": quiet, "out": "Saved/Space/test_derelicts_resume.json",
+                               "at": "20=astra.board.disable T-11|22=astra.board.disable T-07|60=astra.space.derelicts.mark|100=astra.space.wrecks.resume|120=astra.space.derelicts.test"})
+    run_once(dv, ROOT / dv.out, SPACE / "test_derelicts_resume.log")
+    vtext = (SPACE / "test_derelicts_resume.log").read_text(errors="replace") if (SPACE / "test_derelicts_resume.log").exists() else ""
+    expect("selftest after a resume with hulks", selftest_ok(SPACE / "test_derelicts_resume.log"), "the invariants held", results)
+    expect("the hulks come back from the save", "DERELICTS_OK" in vtext and "DERELICTS_FAILED" not in vtext and "hulks left behind are back" in vtext, ([l.split("[Space] derelicts:")[-1].strip()[:150] for l in vtext.splitlines() if "[Space] derelicts:" in l] or ["no verdict"])[0], results)
     print("-- the campaign's save and a resume in the middle: every wreck where it was, relative to the (new) Gate")
     rs = argparse.Namespace(**{**vars(base), "seconds": 600, "exec": quiet, "at": losses.split("|420=")[0] + "|300=astra.space.wrecks.resume", "out": "Saved/Space/test_resume.json"})
     run_once(rs, ROOT / rs.out, SPACE / "test_resume.log")

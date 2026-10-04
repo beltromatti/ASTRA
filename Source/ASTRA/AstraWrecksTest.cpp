@@ -2,6 +2,7 @@
 // the rescue. Plain C++ on plain records: no world, no engine objects, a second or two (tools/space.py test runs it: the commandlet's -wrecktest).
 
 #include "AstraWrecks.h"
+#include "AstraDerelicts.h"
 #include "ASTRA.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
@@ -594,6 +595,9 @@ namespace AstraSpace
 				}
 			}
 		}
+
+		// ---- the hulks left behind (AstraDerelicts.h): the braking arithmetic, the records, the file
+		RunDerelictTests(Fails, Notes);
 		return Fails.Num() == 0;
 	}
 }
