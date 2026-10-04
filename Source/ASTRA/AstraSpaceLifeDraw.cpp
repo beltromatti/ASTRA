@@ -3,6 +3,7 @@
 // lamp (a few pixels of light) before it is a hull. Everything the system holds still in its own frame (the belt, the buoys) hangs under one component, moved once a frame.
 
 #include "AstraSpaceLife.h"
+#include "AstraSpaceLifeDrawUtil.h"
 #include "AstraBattleSubsystem.h"
 #include "AstraNavLights.h"
 #include "ASTRA.h"
@@ -12,41 +13,35 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
 using namespace AstraSpaceDraw;
 
-namespace
-{
-	const FTransform& SpHiddenXf()
-	{
-		static const FTransform X(FQuat::Identity, FVector::ZeroVector, FVector(0.0001));
-		return X;
-	}
-
-	uint32 SpMix(uint32 A)
-	{
-		A ^= A >> 16; A *= 0x7FEB352Du; A ^= A >> 15; A *= 0x846CA68Bu; A ^= A >> 16;
-		return A;
-	}
-
-	/** How much of a lamp shows at this distance (km): all of it near, a little less far, none at the edge of the system. */
-	float SpLampFade(double Km)
-	{
-		return 1.f - 0.7f * AstraFx::Ease((float)((Km - 60.0) / 190.0)) - 0.3f * AstraFx::Ease((float)((Km - 215.0) / 35.0));
-	}
-}
-
 // ------------------------------------------------------------------------------------------------------------------ the hulls' pages
-int32 UAstraSpaceLife::SetFor(const FString& Mesh)
+int32 UAstraSpaceLife::SetFor(const FString& Key)
 {
-	if (const int32* K = SetByMesh.Find(Mesh))
+	if (const int32* K = SetByMesh.Find(Key))
 	{
 		return Sets[*K].bFailed ? INDEX_NONE : *K;
 	}
+	// a wreck's hull is asked for as "<mesh>#dead" (dark windows, cold cut faces, no running lights) or "<mesh>#char" (charred as well, by a reactor breach)
+	FString Mesh = Key;
+	uint8 Variant = 0;
+	if (Key.EndsWith(TEXT("#dead")))
+	{
+		Mesh = Key.LeftChop(5);
+		Variant = 1;
+	}
+	else if (Key.EndsWith(TEXT("#char")))
+	{
+		Mesh = Key.LeftChop(5);
+		Variant = 2;
+	}
 	const int32 Idx = Sets.AddDefaulted();
 	Sets[Idx].Mesh = Mesh;
-	SetByMesh.Add(Mesh, Idx);
+	Sets[Idx].Variant = Variant;
+	SetByMesh.Add(Key, Idx);
 	if (!bLive)
 	{
 		return Idx;                                           // the bench: staged and counted, not drawn
@@ -58,8 +53,12 @@ int32 UAstraSpaceLife::SetFor(const FString& Mesh)
 	}
 	if (!M)
 	{
+		M = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/ASTRA/Ships/Sections/%s.%s"), *Mesh, *Mesh), nullptr, LOAD_Quiet | LOAD_NoWarn);   // (the three pieces of a broken hull)
+	}
+	if (!M)
+	{
 		Sets[Idx].bFailed = true;
-		UE_LOG(LogASTRA, Log, TEXT("[Space] no mesh %s yet (tools/ue_scripts/import_space_v3.py): its vessels are lamps only"), *Mesh);
+		UE_LOG(LogASTRA, Log, TEXT("[Space] no mesh %s yet (tools/ue_scripts/import_space_v3.py): what it would draw is lamps only"), *Mesh);
 		return INDEX_NONE;
 	}
 	FString Unflagged;
@@ -91,9 +90,58 @@ AstraDraw::FPage* UAstraSpaceLife::MakePage(int32 SetIdx)
 	P.Owner.Init(-1, PageSize);
 	if (bLive && S.StaticMesh && Host)
 	{
-		P.Comp = AstraDraw::MakeComp(Host, Host->GetRootComponent(), *FString::Printf(TEXT("Hull_%s_%d"), *S.Mesh, S.Set.Pages.Num()), S.StaticMesh, nullptr, PageSize, 0, true, true);
+		P.Comp = AstraDraw::MakeComp(Host, Host->GetRootComponent(), *FString::Printf(TEXT("Hull_%s_%d_%d"), *S.Mesh, (int32)S.Variant, S.Set.Pages.Num()), S.StaticMesh, nullptr, PageSize, 0, true, true);
+		if (S.Variant && P.Comp.IsValid())
+		{
+			ApplyWreckLook(P.Comp.Get(), S.Variant);
+		}
 	}
 	return &P;
+}
+
+void UAstraSpaceLife::ApplyWreckLook(UInstancedStaticMeshComponent* C, uint8 Variant)
+{
+	// the slots are the hull instances' (MI_HULL_<faction>_<part>: the war's effects name them the same way): the windows dark, the cut faces cold, the running lights out, and for a reactor's
+	// the paint charred (as the effects char the pieces they make). A dynamic material on the component is shared by all its instances: one for each slot, not one for each wreck.
+	const TArray<FStaticMaterial>* Slots = C->GetStaticMesh() ? &C->GetStaticMesh()->GetStaticMaterials() : nullptr;
+	for (int32 i = 0; i < C->GetNumMaterials(); ++i)
+	{
+		UMaterialInterface* Base = C->GetMaterial(i);
+		if (!Base)
+		{
+			continue;
+		}
+		const FString Slot = Slots && Slots->IsValidIndex(i) ? (*Slots)[i].MaterialSlotName.ToString() : Base->GetName();
+		const bool bLights = Slot.EndsWith(TEXT("_Lights"));
+		const bool bCut = Slot.EndsWith(TEXT("_Cut"));
+		const bool bNav = Slot.EndsWith(TEXT("_Nav")) || Slot.EndsWith(TEXT("_Glow"));
+		const bool bPaint = Slot.EndsWith(TEXT("_Plate")) || Slot.EndsWith(TEXT("_Frame")) || Slot.EndsWith(TEXT("_Livery")) || Slot.EndsWith(TEXT("_Trim")) || Slot.EndsWith(TEXT("_Marking"));
+		if (!bLights && !bCut && !bNav && !(bPaint && Variant == 2))
+		{
+			continue;
+		}
+		if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(i, Base))
+		{
+			if (bLights)
+			{
+				M->SetScalarParameterValue(TEXT("LitFraction"), 0.f);
+			}
+			else if (bCut)
+			{
+				M->SetScalarParameterValue(TEXT("Heat"), 0.f);
+			}
+			else if (bNav)
+			{
+				M->SetScalarParameterValue(TEXT("Intensity"), 0.f);
+			}
+			else
+			{
+				FLinearColor Tint(0.2f, 0.2f, 0.2f);
+				M->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("Tint")), Tint);
+				M->SetVectorParameterValue(TEXT("Tint"), Tint * 0.18f);
+			}
+		}
+	}
 }
 
 void UAstraSpaceLife::StageHull(int32 SetIdx, int32 Key, const FTransform& Now)

@@ -336,6 +336,12 @@ public:
 	/** A transit or a resumed campaign: the old system's effects are gone. */
 	void ClearAll();
 
+	// ---- hooks for what the war leaves behind (SPAZIO-VIVO, AstraWrecks.h)
+	/** The pieces of broken hulls the effects hold now (as actors, burning at the cut): the wrecks module records them as they are made, and takes them over when they have cooled. */
+	const TArray<AstraFx::FPiece>& GetPieces() const { return Pieces; }
+	/** Lets one ship's piece go (its actor is destroyed): the wrecks module draws it from its own record from this frame on. Nothing happens if the effects no longer hold it. */
+	void ReleasePiece(int32 ShipId, uint8 Section);
+
 	// ---- the console (AstraWarFXTest.cpp)
 	void Stats(FString& Out) const;
 	/** Runs what astra.fx.* asked for since the last frame. */

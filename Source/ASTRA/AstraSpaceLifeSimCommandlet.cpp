@@ -130,6 +130,47 @@ namespace
 		}
 	}
 
+	/** The invariants of what the war leaves: what must hold of the sites at every moment whatever the war does. */
+	void SpCheckWrecks(const UAstraSpaceLife& S, double Now, TArray<FSpaceCheck>& Fails)
+	{
+		for (const FSite& Si : S.GetWrecks().Sites())
+		{
+			if (Si.System != S.GetSystem().ToLower())
+			{
+				continue;
+			}
+			int32 Sum = 0;
+			for (const FPodRec& P : Si.Pods)
+			{
+				Sum += P.Survivors;
+				if (P.Pos0.ContainsNaN() || P.Vel.ContainsNaN())
+				{
+					Fails.Add({TEXT("wreck_finite"), false, FString::Printf(TEXT("t=%.0f site %d has a lifepod with a NaN"), Now, Si.Id)});
+				}
+				if (P.State == 1 && P.By.IsEmpty())
+				{
+					Fails.Add({TEXT("wreck_rescue"), false, FString::Printf(TEXT("t=%.0f site %d: a lifepod recovered by nobody"), Now, Si.Id)});
+				}
+			}
+			if (Sum != Si.Aboard.Escaped || Si.Aboard.Escaped + Si.Aboard.Lost != Si.Aboard.Alive)
+			{
+				Fails.Add({TEXT("wreck_people"), false, FString::Printf(TEXT("t=%.0f site %d (%s): %d in the pods, %d escaped, %d lost, %d alive"), Now, Si.Id, *Si.Name, Sum, Si.Aboard.Escaped, Si.Aboard.Lost, Si.Aboard.Alive)});
+			}
+			for (const FPieceRec& P : Si.Pieces)
+			{
+				const FVector Pos = FWrecks::PosAt(P, Now);
+				if (Pos.ContainsNaN() || FWrecks::AttAt(P, Now).ContainsNaN())
+				{
+					Fails.Add({TEXT("wreck_finite"), false, FString::Printf(TEXT("t=%.0f site %d has a piece with a NaN"), Now, Si.Id)});
+				}
+				if (P.bInFx && P.Section < 3 && Now - Si.DiedAt > FWrecks::HandOverS + 3.0)
+				{
+					Fails.Add({TEXT("wreck_handover"), false, FString::Printf(TEXT("t=%.0f site %d (%s): the effects still hold a piece %.0f s after she went"), Now, Si.Id, *Si.Name, Now - Si.DiedAt)});
+				}
+			}
+		}
+	}
+
 	TSharedRef<FJsonObject> SpNodeJson(const FNode& N)
 	{
 		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
@@ -157,6 +198,23 @@ int32 UAstraSpaceSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("exec="), Exec, false);
 	FParse::Value(*Params, TEXT("at="), At, false);
 	const bool bSelfTest = FParse::Param(*Params, TEXT("selftest"));
+	if (FParse::Param(*Params, TEXT("wrecktest")))
+	{
+		// the records of what the war leaves, on their own (no world): AstraWrecksTest.cpp
+		TArray<FString> TestFails, TestNotes;
+		const double W0 = FPlatformTime::Seconds();
+		const bool bOk = AstraSpace::RunWreckTests(TestFails, TestNotes);
+		for (const FString& N : TestNotes)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[WreckTest] %s"), *N);
+		}
+		for (const FString& F : TestFails)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[WreckTest] FAIL %s"), *F);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("%s (%d failures, %.2f s)"), bOk ? TEXT("WRECKS_SELFTEST_OK") : TEXT("WRECKS_SELFTEST_FAILED"), TestFails.Num(), FPlatformTime::Seconds() - W0);
+		return bOk ? 0 : 1;
+	}
 	Step = FMath::Clamp(Step, 0.02f, 0.25f);
 	FMath::RandInit(Seed);
 	FMath::SRandInit(Seed);
@@ -260,6 +318,7 @@ int32 UAstraSpaceSimCommandlet::Main(const FString& Params)
 			int32 Vessels = 0, Overlaps = 0;
 			TArray<FSpaceCheck> Found;
 			SpCheckInvariants(*S, Now, Found, Vessels, Overlaps);
+			SpCheckWrecks(*S, S->WreckClock(), Found);
 			++ChecksRun;
 			MaxOverlaps = FMath::Max(MaxOverlaps, Overlaps);
 			OverlapSum += Overlaps;

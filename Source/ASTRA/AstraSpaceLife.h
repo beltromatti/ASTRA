@@ -16,6 +16,7 @@
 #include "Dom/JsonObject.h"
 #include "AstraSpaceLifeData.h"
 #include "AstraSpaceLifeTraffic.h"
+#include "AstraWrecks.h"
 #include "AstraWarFX.h"
 #include "AstraWarDraw.h"
 #include "AstraSpaceLife.generated.h"
@@ -29,6 +30,7 @@ class USceneComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 struct FAstraBattleShip;
+struct FAstraDeathEvent;
 
 namespace AstraSpaceDraw
 {
@@ -46,6 +48,7 @@ namespace AstraSpaceDraw
 		AstraDraw::FSet Set;
 		TMap<int32, AstraDraw::FRef> Where;                  // key -> where it is among the pages
 		bool bFailed = false;                                // its mesh did not load (or its materials are not flagged for instancing): it is not drawn
+		uint8 Variant = 0;                                   // 0 as made; 1 a wreck's (dark windows, cold cut faces, no running lights); 2 charred by a reactor breach too
 	};
 }
 
@@ -96,6 +99,34 @@ public:
 	/** A hostile set by hand for the console's alert test (positions in the system frame): clears when empty. */
 	void SetTestHostile(bool bOn, const FVector& Pos);
 
+	// ---- what the war leaves (AstraSpaceLifeWrecks.cpp; the records and their rules: AstraWrecks.h)
+	/** A ship is lost (the battle's Destroy, after the effects have drawn her): her site is recorded in the Gate's frame, with her pieces, her field of debris, her lifepods and what was left aboard.
+	 *  bFxPieces: the effects made her pieces (they burn them as actors for a minute, then this module draws them). */
+	void OnShipLost(const FAstraBattleShip& S, const FAstraDeathEvent& E, bool bFxPieces);
+	/** The sites of every system visited: ABBORDAGGI and FLOTTA-VIVA read a wreck's class, her id, her pieces and what was left aboard from here. */
+	const AstraSpace::FWrecks& GetWrecks() const { return Wrecks; }
+	/** The wrecks' clock (s): the battle's, kept running through a save and a transit. */
+	double WreckClock() const;
+	/** The frame the sites are kept in for this system (its Janus Gate's). */
+	AstraSpace::FSkyFrame SkyFrame() const;
+	/** The campaign's save of the sites (the battle's SaveJson) and their return (its ResumeFrom, before the system is laid out); a new campaign starts with none. */
+	TSharedRef<FJsonObject> SaveJson();
+	void LoadSaved(const TSharedPtr<FJsonObject>& J);
+	void NewCampaign();
+	/** Time passes with the Aquila elsewhere or at rest (a campaign's jump of hours): the wrecks drift on, the lifepods' air goes. */
+	void AdvanceWrecks(double Seconds);
+	/** A rescue order (the flight network's sar mission): the beacon a craft should fly to (the Rank-th nearest the Aquila hears, so each craft of a flight has its own), where it is and how it moves;
+	 *  false when none calls. */
+	bool RescueGoal(int32 Rank, FVector& OutPos, FVector& OutVel, FString& OutOf, int32& OutSurvivors) const;
+	/** Takes aboard the lifepods within RadiusM of a point (a craft that has reached its beacon); By: who ("the Wasps of the Aquila"). Tells the crew what was taken. */
+	AstraSpace::FRescued RescueTake(const FVector& At, double RadiusM, const FString& By);
+	/** Some beacon calls within the Aquila's hearing: a rescue order has someone to look for. */
+	bool HasBeacons() const;
+	/** Testing: loses a warship the way the war would (astra.space.lose): by contact id or "nearest"; How breakup|reactor|destroyed; Section the one that lets go (0 bow, 1 mid, 2 stern). */
+	bool DebugLose(const FString& Which, const FString& How, int32 Section, FString& OutDetail);
+	/** What the war has left, in a line: the sites, the lifepods, what is drawn and what it costs. */
+	FString WreckStat() const;
+
 	const AstraSpace::FLayout& GetLayout() const { return Layout; }
 	const AstraSpace::FTraffic& GetTraffic() const { return Traffic; }
 	const FString& GetSystem() const { return SystemName; }
@@ -120,6 +151,7 @@ private:
 	bool bPending = false;                        // an arrival waits for the sky
 	FString PendingSystem;
 	FString SystemName;
+	FString SystemKey;                            // SystemName in lower case: what the wrecks are kept under
 	bool bLaidOut = false;
 	uint32 Seed = 1;
 
@@ -160,6 +192,14 @@ private:
 	TArray<FRigid> Rigids;                        // groups static in the system frame (rocks, buoys), under SystemRoot
 	int32 BuoyRigid = INDEX_NONE;
 
+	// ---- what the war leaves
+	AstraSpace::FWrecks Wrecks;
+	double ClockBase = 0.0;                       // the wrecks' clock is the battle's plus this (a resumed campaign carries on from its save)
+	AstraSpace::FSkyFrame Sky;                    // the Gate's frame of this system (set when it is laid out)
+	float WreckThinkT = 0.f, WreckPruneT = 30.f;
+	int32 WreckHullsNow = 0, ChunksNow = 0, PodsNow = 0, EmbersNow = 0, WreckHullsPeak = 0, ChunksPeak = 0;
+	double WrecksMs = 0.0;
+
 	// ---- cost
 	double TickMs = 0.0, TickMsMax = 0.0;
 	int32 TickCount = 0;
@@ -189,4 +229,12 @@ private:
 	void DrawLamps(const TArray<AstraSpace::FLamp>& Set, const FVector& Pos, const FQuat& Att, uint32 Hash, double Dist2, float Fade, bool bShipLamps);
 	void AddPlume(const FVector& Lip, const FVector& Dir, float RadiusM, float Thrust, bool bAmber, float Salt);
 	int32 RigidFor(const FString& Mesh);
+	/** A wreck's look for the instances of a mesh (dark windows, cold cut faces, no running lights; charred for a reactor's): a dynamic material on each slot of the component. */
+	void ApplyWreckLook(UInstancedStaticMeshComponent* C, uint8 Variant);
+	// ---- what the war leaves (AstraSpaceLifeWrecks.cpp)
+	void TickWrecks(float SimDt);
+	void HandOver(double Now);
+	void DrawWrecks(double Now);
+	/** The wrecks the crew's eyes and sensors can pick out, and the lifepod beacons they hear (a small object for ship_state.state.space). */
+	TSharedRef<FJsonObject> WreckSummaryJson() const;
 };

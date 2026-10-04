@@ -80,6 +80,32 @@ def run_once(a: argparse.Namespace, out: Path, log: Path) -> int:
         return p.returncode
 
 
+def run_wrecktest(log: Path) -> bool:
+    """The records of what the war leaves, on their own (no world; AstraWrecksTest.cpp): a second or two of engine start and the checks."""
+    log.parent.mkdir(parents=True, exist_ok=True)
+    args = [str(ENGINE), str(ROOT / "ASTRA.uproject"), "-run=AstraSpaceSim", "-wrecktest", "-nullrhi", "-unattended", "-nosound", "-nosplash", "-NoVerifyGC", "-stdout", "-FullStdOutLogOutput"]
+    with open(log, "w") as f:
+        try:
+            subprocess.run(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT), timeout=240)
+        except subprocess.TimeoutExpired:
+            print("   the wreck tests did not finish in time")
+            return False
+    text = log.read_text(errors="replace")
+    fails = 0
+    for l in text.splitlines():
+        if "[WreckTest]" in l or "WRECKS_SELFTEST" in l:
+            if "FAIL" in l:
+                fails += 1
+                if fails > 12:
+                    continue                                    # (a broken rule fails for every site: the first dozen say it)
+            print("   " + l.split("]", 1)[-1].strip() if "LogASTRA" in l else "   " + l)
+    return "WRECKS_SELFTEST_OK" in text
+
+
+def cmd_wrecktest(a: argparse.Namespace) -> int:
+    return 0 if run_wrecktest(SPACE / "wrecktest.log") else 1
+
+
 def cmd_run(a: argparse.Namespace) -> int:
     out = (ROOT / a.out).resolve()
     log = SPACE / "last_run.log"
@@ -253,6 +279,8 @@ def main() -> int:
     rp.set_defaults(fn=cmd_report)
     t = sub.add_parser("test")
     t.set_defaults(fn=cmd_test)
+    wt = sub.add_parser("wrecktest")
+    wt.set_defaults(fn=cmd_wrecktest)
     s = sub.add_parser("sync")
     s.set_defaults(fn=cmd_sync)
     m = sub.add_parser("meshes")

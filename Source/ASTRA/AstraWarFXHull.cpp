@@ -789,6 +789,28 @@ bool UAstraWarFX::MakePieces(FAstraBattleShip& S, const FAstraDeathEvent& E, AAc
 	return true;
 }
 
+void UAstraWarFX::ReleasePiece(int32 ShipId, uint8 Section)
+{
+	for (int32 i = 0; i < Pieces.Num(); ++i)
+	{
+		FPiece& P = Pieces[i];
+		if (P.ShipId != ShipId || P.Section != Section)
+		{
+			continue;
+		}
+		if (AStaticMeshActor* A = P.Actor.Get())
+		{
+			A->Destroy();
+		}
+		if (AActor* H = P.HullActor.Get())
+		{
+			H->Destroy();
+		}
+		Pieces.RemoveAtSwap(i, EAllowShrinking::No);
+		return;
+	}
+}
+
 void UAstraWarFX::TickPieces()
 {
 	const double Far2 = FMath::Square(250000.0);

@@ -131,7 +131,12 @@ namespace AstraSpace
 		GateOpen,
 		Mayday,        // a vessel calls for help
 		Scatter,       // the traffic is clearing the area
-		Resume         // the traffic goes back to its routes
+		Resume,        // the traffic goes back to its routes
+		// what the war leaves (AstraWrecks.h)
+		Beacon,        // the beacons of lifepods are heard
+		BeaconSilent,  // the beacons of a wreck's lifepods have gone silent (the air ran out)
+		WreckLook,     // a close look at a wreck
+		Rescue         // lifepods taken aboard
 	};
 
 	struct FEvent
