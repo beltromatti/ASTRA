@@ -10,6 +10,7 @@ with their own build).
                                                                      their own, four ships lost, one for each way a ship goes, with the lifepods found and rescued, the file, determinism, 40 wrecks at once)
   tools/space.py wrecktest                                           only the records of what the war leaves, no world (a second)
   tools/space.py motiontest                                          only the capital ships' jets and wakes (the allocation against physics, scripted turns, brakes, slides, the wake), no world
+  tools/space.py solidstest                                          only the places' hull boxes (a ring's hole and spokes, a swept path), no world
   tools/space.py sync                                               data/space/*.json -> Content/ASTRA/Data/space (the copy the game stages), after a change in the data
   tools/space.py meshes <manifest.json>                              art/export/space_v3/manifest.json -> data/space/meshes.json (lamps, bells, berths of each mesh), then sync
 
@@ -115,12 +116,21 @@ def run_motiontest(log: Path) -> bool:
     return run_unit("-motiontest", "[MotionTest]", "MOTION_SELFTEST", log, "motion tests")
 
 
+def run_solidstest(log: Path) -> bool:
+    """The places' hull boxes, on their own (AstraSpaceLifeSolids.cpp)."""
+    return run_unit("-solidstest", "[SolidsTest]", "SOLIDS_SELFTEST", log, "solids tests")
+
+
 def cmd_wrecktest(a: argparse.Namespace) -> int:
     return 0 if run_wrecktest(SPACE / "wrecktest.log") else 1
 
 
 def cmd_motiontest(a: argparse.Namespace) -> int:
     return 0 if run_motiontest(SPACE / "motiontest.log") else 1
+
+
+def cmd_solidstest(a: argparse.Namespace) -> int:
+    return 0 if run_solidstest(SPACE / "solidstest.log") else 1
 
 
 def cmd_run(a: argparse.Namespace) -> int:
@@ -298,9 +308,41 @@ def cmd_test(a: argparse.Namespace) -> int:
         fin = load(str(ROOT / st.out))["final"]
         expect("the stress is what it says", fin["wreck_sites_here"] >= 36, f"{fin['wreck_sites_here']} sites, {fin['wreck_chunks']} chunks, {fin['pods']} lifepods", results)
         expect("cheap with 40 wrecks", fin["wreck_ms_avg"] < 0.1, f"{fin['wreck_ms_avg'] * 1000:.1f} us a tick (peak {fin['wreck_hulls_peak']} hulls and {fin['wreck_chunks_peak']} chunks staged)", results)
+    # ---- the motion of the capital ships
+    print("-- the capital ships' motion: the model on its own (the allocation against physics, scripted turns, a brake, a boost, slides, the wake, a long random flight)")
+    expect("motion model", run_motiontest(SPACE / "motiontest.log"), "MOTION_SELFTEST_OK", results)
+    print("-- a battle of 12 warships for four minutes: their jets and wakes (what is read of each, what is staged, what it costs), the console's hand-fired jets")
+    mo = argparse.Namespace(**{**vars(base), "seconds": 240, "exec": quiet, "at": motion_script(12), "out": "Saved/Space/test_motion.json"})
+    run_once(mo, ROOT / mo.out, SPACE / "test_motion.log")
+    expect("selftest with jets and wakes", selftest_ok(SPACE / "test_motion.log"), "the invariants held", results)
+    if (ROOT / mo.out).exists():
+        fin = load(str(ROOT / mo.out))["final"]
+        mtext = (SPACE / "test_motion.log").read_text(errors="replace")
+        expect("the ships' motion is read", fin["motion_ships"] >= 12, f"{fin['motion_ships']} ships read", results)
+        expect("jets fire in a battle", fin["jets_peak"] >= 8, f"{fin['jets_peak']} jet plumes at the most at once", results)
+        expect("the ships leave wakes", fin["wake_peak"] >= 100, f"{fin['wake_peak']} wake pieces at the most at once", results)
+        expect("the layers are not overrun", fin["jets_dropped"] == 0 and fin["wake_dropped"] == 0, f"{fin['jets_dropped']} jets, {fin['wake_dropped']} wake pieces dropped", results)
+        expect("the motion is cheap", fin["motion_ms_avg"] < 0.05, f"{fin['motion_ms_avg'] * 1000:.1f} us a tick for the ships read", results)
+        expect("jets are fired by hand", "fires all for 10 s" in mtext, "astra.space.jets nearest all 10", results)
+    # ---- the places' hulls for the Captain's Falcon
+    print("-- the places' hulls (the Falcon is lost inside them): the boxes on their own, then in the laid-out world with the Keeper's ring turning")
+    expect("hull boxes", run_solidstest(SPACE / "solidstest.log"), "SOLIDS_SELFTEST_OK", results)
+    so = argparse.Namespace(**{**vars(base), "seconds": 60, "exec": quiet, "at": "20=astra.space.solids.test", "out": "Saved/Space/test_solids.json"})
+    run_once(so, ROOT / so.out, SPACE / "test_solids.log")
+    expect("hulls where they are drawn", "SOLIDS_WORLD_OK" in (SPACE / "test_solids.log").read_text(errors="replace"), "astra.space.solids.test", results)
     bad = [r for r in results if not r[1]]
     print(f"== {len(results) - len(bad)} of {len(results)} passed")
     return 1 if bad else 0
+
+
+def motion_script(n: int) -> str:
+    """n hostile warships spawned round the Aquila at the start and left to the AI; at 100 s the console fires every jet of the nearest for ten seconds (to see where they are)."""
+    at = []
+    for i in range(n):
+        at.append(f"3=astra.battle.spawn {'acheron' if i % 4 == 0 else ('lethe' if i % 4 == 3 else 'styx')} {6 + (i % 5) * 2} {int(360 * i / n)}")
+    at.append("100=astra.space.jets nearest all 10")
+    at.append("200=astra.space.motion.list")
+    return "|".join(at)
 
 
 def stress_script(n: int) -> str:
@@ -361,6 +403,8 @@ def main() -> int:
     wt.set_defaults(fn=cmd_wrecktest)
     mt = sub.add_parser("motiontest")
     mt.set_defaults(fn=cmd_motiontest)
+    st = sub.add_parser("solidstest")
+    st.set_defaults(fn=cmd_solidstest)
     s = sub.add_parser("sync")
     s.set_defaults(fn=cmd_sync)
     m = sub.add_parser("meshes")

@@ -18,6 +18,7 @@
 #include "AstraSpaceLifeData.h"
 #include "AstraSpaceLifeTraffic.h"
 #include "AstraSpaceLifeMotion.h"
+#include "AstraSpaceLifeSolids.h"
 #include "AstraWrecks.h"
 #include "AstraWarFX.h"
 #include "AstraWarDraw.h"
@@ -146,6 +147,16 @@ public:
 	/** Testing: fires a ship's jets by hand to see where they are and what they look like (astra.space.jets): Which a contact id, a class key or "nearest" (the nearest warship but the Aquila, or the
 	 *  Aquila when she is alone); What yaw+ yaw- pitch+ pitch- roll+ roll- brake left right up down all; Seconds how long it is held. */
 	bool DebugJets(const FString& Which, const FString& What, float Seconds, FString& OutDetail);
+
+	// ---- the places' hulls for the Captain's Falcon (AstraSpaceLifeSolids.cpp)
+	/** Has the Falcon, flying from Prev to Now (system frame, m), flown into the hull of a place (the boxes of art/blender/space3_solids.py, the turning parts where they are drawn now)? The battle's
+	 *  PilotCollision asks; OutWhat is then "the hull of <the place>", as the war says it of a ship. */
+	bool PilotHit(const FVector& Prev, const FVector& Now, FString& OutWhat) const;
+	/** Testing: draws the solid cells of the places within RadiusM of the eye for Seconds (astra.space.solids): where the Falcon is lost. */
+	bool DebugSolids(float Seconds, double RadiusM, FString& OutDetail);
+	/** Testing (the bench): the hit test in the world as it is laid out: the Keeper's hull is hit and the air a few km off is not; her ring, turning, is where the drawing has it (at three clocks the
+	 *  spokes are found where the turn puts them and the open quarters stay open). OutDetail has the lines; true when all hold. */
+	bool DebugSolidsTest(FString& OutDetail);
 
 	const AstraSpace::FLayout& GetLayout() const { return Layout; }
 	const AstraSpace::FTraffic& GetTraffic() const { return Traffic; }

@@ -232,6 +232,23 @@ int32 UAstraSpaceSimCommandlet::Main(const FString& Params)
 		UE_LOG(LogASTRA, Display, TEXT("%s (%d failures, %.2f s)"), bOk ? TEXT("MOTION_SELFTEST_OK") : TEXT("MOTION_SELFTEST_FAILED"), TestFails.Num(), FPlatformTime::Seconds() - M0);
 		return bOk ? 0 : 1;
 	}
+	if (FParse::Param(*Params, TEXT("solidstest")))
+	{
+		// the places' hull boxes, on their own (no world): AstraSpaceLifeSolids.cpp
+		TArray<FString> TestFails, TestNotes;
+		const double S0 = FPlatformTime::Seconds();
+		const bool bOk = AstraSpace::RunSolidsTests(TestFails, TestNotes);
+		for (const FString& N : TestNotes)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[SolidsTest] %s"), *N);
+		}
+		for (const FString& F : TestFails)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[SolidsTest] FAIL %s"), *F);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("%s (%d failures, %.2f s)"), bOk ? TEXT("SOLIDS_SELFTEST_OK") : TEXT("SOLIDS_SELFTEST_FAILED"), TestFails.Num(), FPlatformTime::Seconds() - S0);
+		return bOk ? 0 : 1;
+	}
 	Step = FMath::Clamp(Step, 0.02f, 0.25f);
 	FMath::RandInit(Seed);
 	FMath::SRandInit(Seed);

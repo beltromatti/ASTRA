@@ -5639,9 +5639,9 @@ bool UAstraBattleSubsystem::PilotCollision(FAstraBattleShip& S, const FVector& P
 		{
 			break;
 		}
-		if (O.bPlayer || O.bCraft || O.Id == S.Id || !O.bAlive || !O.Actor || FVector::Dist(S.Pos, O.Pos) > O.Radius * 2.5)
+		if (O.bPlayer || O.bCraft || O.bFixture || O.Id == S.Id || !O.bAlive || !O.Actor || FVector::Dist(S.Pos, O.Pos) > O.Radius * 2.5)
 		{
-			continue;
+			continue;                                 // (a place of the system is a fixture: its hull is the living space's boxes, below, not the mesh's bounding box, which is mostly air)
 		}
 		const UStaticMeshComponent* C = O.Actor->GetStaticMeshComponent();
 		if (!C || !C->GetStaticMesh())
@@ -5656,6 +5656,10 @@ bool UAstraBattleSubsystem::PilotCollision(FAstraBattleShip& S, const FVector& P
 		{
 			What = FString::Printf(TEXT("the hull of %s"), *O.Name);
 		}
+	}
+	if (What.IsEmpty() && Space && Space->IsActive())
+	{
+		Space->PilotHit(Prev, S.Pos, What);           // the places' hulls (Keeper Station, the Arsenal...): AstraSpaceLifeSolids.cpp
 	}
 	if (What.IsEmpty())
 	{
