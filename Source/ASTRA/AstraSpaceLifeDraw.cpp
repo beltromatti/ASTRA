@@ -509,7 +509,7 @@ void UAstraSpaceLife::DrawPatrols()
 {
 	for (const AstraSpace::FPatrol& P : Traffic.Patrols())
 	{
-		if (P.State == 2 || P.Mesh.IsEmpty())
+		if (P.State == 2 || P.State == 3 || P.Mesh.IsEmpty())      // (away, in port, or the war's own: it is drawn as a flight of the plot)
 		{
 			continue;
 		}

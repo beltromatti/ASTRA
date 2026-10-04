@@ -10,7 +10,9 @@ namespace AstraSpace
 {
 	namespace
 	{
-		const TCHAR* const MoClasses[] = {TEXT("aquila"), TEXT("praetorian"), TEXT("vigilant"), TEXT("acheron"), TEXT("styx"), TEXT("lethe"), TEXT("freighter")};
+		// the seven capital classes and the four craft (a fighter, a bomber, a drone, the Mandate's strike fighter: round two): the same laws for all
+		const TCHAR* const MoClasses[] = {TEXT("aquila"), TEXT("praetorian"), TEXT("vigilant"), TEXT("acheron"), TEXT("styx"), TEXT("lethe"), TEXT("freighter"), TEXT("falcon"), TEXT("hammer"), TEXT("wasp"), TEXT("harpy")};
+		const TCHAR* const MoCraftMeshes[] = {TEXT("SM_CRAFT_ASTRA_Falcon"), TEXT("SM_CRAFT_ASTRA_Hammer"), TEXT("SM_CRAFT_ASTRA_Wasp"), TEXT("SM_CRAFT_MANDATE_Harpy")};
 
 		/** The push and the torque (about the ship's middle) of a set of burning jets. */
 		void MoNet(const FJetClass& C, const TArray<float>& Level, FVector& OutPush, FVector& OutTorque, float& OutSum)
@@ -83,7 +85,14 @@ namespace AstraSpace
 				continue;
 			}
 			Expect(C->Jets.Num() >= 14 && C->Jets.Num() <= 40, FString::Printf(TEXT("%s has %d jets"), Key, C->Jets.Num()));
-			Expect(C->Len > 100.f && C->DriveW > 5.f && C->DriveR > 1.f, FString::Printf(TEXT("%s: length %.0f, drive width %.0f, bell %.1f"), Key, C->Len, C->DriveW, C->DriveR));
+			if (C->IsCraft())
+			{
+				Expect(C->Len > 5.f && C->DriveR > 0.1f && C->DriveR < 2.f, FString::Printf(TEXT("%s (a craft): length %.1f, bell %.2f"), Key, C->Len, C->DriveR));
+			}
+			else
+			{
+				Expect(C->Len > 100.f && C->DriveW > 5.f && C->DriveR > 1.f, FString::Printf(TEXT("%s: length %.0f, drive width %.0f, bell %.1f"), Key, C->Len, C->DriveW, C->DriveR));
+			}
 			FVector Best(0.0);
 			for (const FJet& J : C->Jets)
 			{
@@ -108,6 +117,18 @@ namespace AstraSpace
 				}
 				Expect(bHas, FString::Printf(TEXT("%s has no jet for %s"), Key, Names[d]));
 			}
+		}
+
+		// ---- a craft is found by her mesh (the war gives a fighter no class key), a capital ship too; she is small, a capital ship is not
+		for (const TCHAR* Mesh : MoCraftMeshes)
+		{
+			const FJetClass* C = Data.FindMesh(Mesh);
+			Expect(C != nullptr && C->IsCraft() && C->Mesh == Mesh, FString::Printf(TEXT("%s is not found as a craft by her mesh"), Mesh));
+		}
+		{
+			const FJetClass* Capital = Data.FindMesh(TEXT("SM_SHIP_ASTRA_Aquila"));
+			Expect(Capital != nullptr && !Capital->IsCraft() && Capital->Key == FName(TEXT("aquila")), TEXT("the Aquila is not found by her mesh, or is taken for a craft"));
+			Expect(Data.FindMesh(TEXT("SM_NO_SUCH_MESH")) == nullptr && Data.FindMesh(FString()) == nullptr, TEXT("a mesh that is no class's is found"));
 		}
 
 		// ---- the allocation against physics: what fires for a demand pushes and turns the ship that way
@@ -238,7 +259,7 @@ namespace AstraSpace
 					}
 				}
 			}
-			Notes.Add(FString::Printf(TEXT("turns: %d scripted turns (7 classes, 3 axes, both ways): burst %.2f, trim %.2f of the strongest jet, quiet after seven seconds"), Runs, SumOnset / Runs, SumHold / Runs));
+			Notes.Add(FString::Printf(TEXT("turns: %d scripted turns (%d classes, 3 axes, both ways): burst %.2f, trim %.2f of the strongest jet, quiet after seven seconds"), Runs, (int32)UE_ARRAY_COUNT(MoClasses), SumOnset / Runs, SumHold / Runs));
 		}
 
 		// ---- a brake, a boost, a slide to each side, a lift
@@ -464,7 +485,7 @@ namespace AstraSpace
 			const double Us = (FPlatformTime::Seconds() - T0) * 1.0e6 / Steps;
 			Expect(bFinite, TEXT("a NaN in the motion of a ship flown at random"));
 			Expect(bRange, TEXT("a jet's burn left 0..1 in a random flight"));
-			Notes.Add(FString::Printf(TEXT("random flights: %.0f ship-steps over 7 classes, the strongest burn %.2f, most jets lit at once %d, %.2f microseconds a ship a step (Observe + Fire)"), Steps, PeakSeen, MostLit, Us));
+			Notes.Add(FString::Printf(TEXT("random flights: %.0f ship-steps over %d classes, the strongest burn %.2f, most jets lit at once %d, %.2f microseconds a ship a step (Observe + Fire)"), Steps, (int32)UE_ARRAY_COUNT(MoClasses), PeakSeen, MostLit, Us));
 			Expect(Us < 40.0, FString::Printf(TEXT("a ship's step costs %.1f microseconds"), Us));
 		}
 		return Fails.Num() == 0;

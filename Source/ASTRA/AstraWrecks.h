@@ -203,6 +203,7 @@ namespace AstraSpace
 		double AirLeftS = 0.0;
 		FString Of;                              // what the beacon says it is from ("ASN Vigilant")
 		uint8 Faction = 0;
+		bool bCalling = true;                    // its beacon is on (a pod just launched has not called yet: a pilot who is there sees it all the same)
 	};
 
 	/** What a rescue took aboard. */
@@ -297,14 +298,22 @@ namespace AstraSpace
 		/** What an investigation of a piece learns at a stage (1..3), in the crew's words (facts only: what was aboard when she went, from her inside's own books where she had one). Stage 1 is Describe's
 		 *  account of the piece; 2 and 3 carry no name (the caller says whose they are). */
 		FString Findings(const FSite& S, int32 Piece, int32 Stage, double Now) const;
+		/** The same for several pieces of one wreck seen together (a flight that comes up on her bow, her middle and her stern): one account, the hull's torn ends, her rooms (all of her: the pieces are together about so much
+		 *  of her), her dead (about so many of them in these pieces). One piece: Findings. */
+		FString FindingsOfPieces(const FSite& S, const TArray<int32>& Pieces, int32 Stage, double Now) const;
+		/** "the bow, middle and stern sections of ASN Vigilant": what the crew names several pieces of one wreck together (one piece: "the stern section of ASN Vigilant"). */
+		static FString PieceList(const FSite& S, const TArray<int32>& Pieces);
 		/** A piece's status for the crew's list of contacts: lost when and how, no power, tumbling, how much has been looked into. */
 		FString Status(const FSite& S, int32 Piece, double Now) const;
 		/** The share of a class's structure that is in a section (0 bow, 1 middle, 2 stern): about the share of her people and rooms that were in that piece of her (data/war/classes.json: sections). */
 		static float SectionShare(FName ClassKey, uint8 Section);
 		/** "2 h 40 min", "35 min", "50 s": how long a thing has been so, or has to go (the crew's way of saying it). */
 		static FString Span(double Seconds);
-		/** The beacons that call in a system now (the sensors' reach is the caller's: From and RangeKm; RangeKm <= 0: all). Nearest first. */
-		void Beacons(const FString& System, double Now, const FSkyFrame& Frame, const FVector& From, double RangeKm, TArray<FBeacon>& Out) const;
+		/** The beacons that call in a system now (the sensors' reach is the caller's: From and RangeKm; RangeKm <= 0: all). Nearest first. bAdrift: every pod that is adrift with air, whether its beacon has
+		 *  begun to call or not (what the Captain's Falcon sees with her own eyes; FBeacon::bCalling says which). */
+		void Beacons(const FString& System, double Now, const FSkyFrame& Frame, const FVector& From, double RangeKm, TArray<FBeacon>& Out, bool bAdrift = false) const;
+		/** "ASN Vigilant" from "ASN Vigilant (T-02)": how the sensors called a ship at the end is not how the crew names her. */
+		static FString BareName(const FString& KnownAs);
 		/** Lifepods within RadiusM of a point (system frame) that are adrift are taken aboard by `By`. Returns what was taken. */
 		FRescued Recover(const FString& System, double Now, const FSkyFrame& Frame, const FVector& AtSystem, double RadiusM, const FString& By);
 		/** People in lifepods that still have air, in a system (the Captain's duty to know). */

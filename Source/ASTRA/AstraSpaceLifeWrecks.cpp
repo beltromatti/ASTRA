@@ -471,6 +471,17 @@ void UAstraSpaceLife::TickWreckContacts(double Now, float SimDt)
 				Eyes.Add({S.Pos, S.Squadron, S.bPiloted});
 			}
 		}
+		// what each eye newly learns of each piece is gathered first: a flight that comes up on several pieces of one wreck says so once, naming them all
+		struct FLook
+		{
+			FSite* Site;
+			int32 Piece;
+			int32 From, Stage;                           // how far the piece had been looked into, and how far the nearest eye reaches now (0: taken into an earlier group of this pass)
+			double D;
+			FString By;
+			FVector At;
+		};
+		TArray<FLook, TInlineAllocator<16>> Looks;
 		for (const FCand& C : Cands)
 		{
 			FPieceRec& P = C.Site->Pieces[C.Piece];
@@ -495,23 +506,61 @@ void UAstraSpaceLife::TickWreckContacts(double Now, float SimDt)
 			{
 				continue;
 			}
-			FString Told;
-			for (int32 St = FMath::Max<int32>(P.Seen + 1, 2); St <= Stage; ++St)
-			{
-				Told += (Told.IsEmpty() ? TEXT("") : TEXT("; ")) + Wrecks.Findings(*C.Site, C.Piece, St, Now);
-			}
-			P.Seen = (uint8)Stage;
-			C.Site->bDirty = true;
-			AstraSpace::FEvent E;
-			E.Kind = AstraSpace::EEventKind::WreckLook;
-			E.bReport = !Owner->bEngagementActive;
-			E.At = At;
 			FString By = TEXT("sensors");
 			if (Best->Squadron >= 0 || Best->bFalcon)
 			{
 				By = Best->bFalcon ? FString(TEXT("flight: Eagle")) : (Owner->Squadrons.IsValidIndex(Best->Squadron) ? FString::Printf(TEXT("flight: %s"), *Owner->Squadrons[Best->Squadron].CallSign) : FString(TEXT("flight")));
 			}
-			E.Text = FString::Printf(TEXT("%s: %.1f km from the %s (%s) — %s"), *By, BestD / WkKm, *FWrecks::PieceName(*C.Site, C.Piece), *FWrecks::PieceContactId(*C.Site, C.Piece), *Told);
+			Looks.Add({C.Site, C.Piece, (int32)P.Seen, Stage, BestD, By, At});
+			P.Seen = (uint8)Stage;
+			C.Site->bDirty = true;
+		}
+		for (int32 i = 0; i < Looks.Num(); ++i)
+		{
+			if (Looks[i].Stage == 0)
+			{
+				continue;
+			}
+			const FLook First = Looks[i];
+			TArray<int32> Group;                          // the pieces of the same wreck the same eye reaches at the same stage in this pass, the nearest first
+			Group.Add(First.Piece);
+			double Nearest = First.D;
+			FVector Where = First.At;
+			for (int32 j = i + 1; j < Looks.Num(); ++j)
+			{
+				if (Looks[j].Stage != 0 && Looks[j].Site == First.Site && Looks[j].By == First.By && Looks[j].From == First.From && Looks[j].Stage == First.Stage)
+				{
+					Group.Add(Looks[j].Piece);
+					if (Looks[j].D < Nearest)
+					{
+						Nearest = Looks[j].D;
+						Where = Looks[j].At;
+					}
+					Looks[j].Stage = 0;
+				}
+			}
+			FString Told;
+			for (int32 St = FMath::Max<int32>(First.From + 1, 2); St <= First.Stage; ++St)
+			{
+				Told += (Told.IsEmpty() ? TEXT("") : TEXT("; ")) + Wrecks.FindingsOfPieces(*First.Site, Group, St, Now);
+			}
+			AstraSpace::FEvent E;
+			E.Kind = AstraSpace::EEventKind::WreckLook;
+			E.bReport = !Owner->bEngagementActive;
+			E.At = Where;
+			if (Group.Num() == 1)
+			{
+				E.Text = FString::Printf(TEXT("%s: %.1f km from the %s (%s) — %s"), *First.By, Nearest / WkKm, *FWrecks::PieceName(*First.Site, First.Piece), *FWrecks::PieceContactId(*First.Site, First.Piece), *Told);
+			}
+			else
+			{
+				FString Ids;
+				for (const int32 Pc : Group)
+				{
+					Ids += (Ids.IsEmpty() ? TEXT("") : TEXT(", ")) + FWrecks::PieceContactId(*First.Site, Pc);
+				}
+				E.Text = FString::Printf(TEXT("%s: %.1f km from %s (%s) — %s"), *First.By, Nearest / WkKm, *FWrecks::PieceList(*First.Site, Group), *Ids, *Told);
+			}
 			Events.Add(E);
 		}
 	}

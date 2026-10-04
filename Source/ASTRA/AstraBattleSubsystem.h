@@ -323,6 +323,22 @@ struct FAstraPilotStatus
 	int32 Incoming = 0;                          // missiles homing on the Falcon
 	TArray<FVector> Hostiles, Friends;           // within 25 km
 	TArray<float> HostileSizes;                  // their radius (m): craft or warship
+	// what the living space says of what lies near her (UAstraSpaceLife::FillPilotStatus, SPAZIO-VIVO, docs/SPAZIO.md §13)
+	uint8 CueLevel = 0;                          // the hull she is flying at or lies close to: 0 nothing, 1 within a few hundred metres of one, 2 on a course into one within a few seconds
+	FString CueWhat;                             // "Keeper Station", "stern section of ASN Vigilant", "the Aquila"
+	float CueRangeM = 0.f, CueTtcS = 0.f;        // metres to its outline (level 1) or along her course to it (level 2), and the seconds to it at her speed (level 2)
+	/** A lifepod adrift near her with air left (a beacon calling or not): where, who is in it, for how long. */
+	struct FPod
+	{
+		FVector World = FVector::ZeroVector;     // cm, the world of the cockpit
+		float RangeM = 0.f, RelSpeedMps = 0.f;   // from the Falcon, and her speed against it
+		int32 Survivors = 0;
+		float AirMin = 0.f;
+		uint8 Faction = 0;                       // 0 ASTRA, 1 the Mandate, 2 civilian
+		FString Of;                              // "ASN Vigilant"
+	};
+	TArray<FPod> Pods;                           // within 12 km, nearest first, at most 4
+	int32 PodInReach = -1;                       // the index (in Pods) of the one within her grapples' reach: R takes it aboard; -1 none
 };
 
 /** What the tactical plot shows of one object (the holo table draws these; positions in the Aquila's frame). */

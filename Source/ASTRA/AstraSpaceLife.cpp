@@ -173,6 +173,9 @@ void UAstraSpaceLife::ClearScene()
 	Traffic.Reset();
 	Layout = AstraSpace::FLayout();
 	Events.Reset();
+	View.Interests.Reset();                               // (what was worth a look in the system left, and the bench's own)
+	TestInterests.Reset();
+	InterestT = 0.f;
 	bLaidOut = false;
 	for (AstraSpace::FSite& S : Wrecks.SitesMutable())
 	{
@@ -471,7 +474,9 @@ int32 UAstraSpaceLife::RigidFor(const FString& Mesh)
 // ------------------------------------------------------------------------------------------------------------------ the world, as the traffic sees it
 void UAstraSpaceLife::ReadWorld()
 {
+	TArray<AstraSpace::FInterest> KeepInterests = MoveTemp(View.Interests);       // (what is worth a look is made again twice a second, not every frame: ReadInterests)
 	View = AstraSpace::FWorldView();
+	View.Interests = MoveTemp(KeepInterests);
 	if (!Owner || Owner->Ships.Num() == 0)
 	{
 		return;
@@ -482,6 +487,14 @@ void UAstraSpaceLife::ReadWorld()
 	View.AquilaRadiusM = P.Radius;
 	for (const FAstraBattleShip& S : Owner->Ships)
 	{
+		if (S.bWreck && S.bAlive && S.Radius >= 30.f)
+		{
+			AstraSpace::FObstacle O;                    // (a piece of a wreck that is on the plot: the traffic keeps clear of it as of any hull)
+			O.Pos = S.Pos;
+			O.RadiusM = S.Radius;
+			View.Obstacles.Add(O);
+			continue;
+		}
 		if (!S.bAlive || S.bPlayer || S.bFixture || S.bGhost)
 		{
 			continue;
@@ -505,6 +518,7 @@ void UAstraSpaceLife::ReadWorld()
 			View.Obstacles.Add(O);
 		}
 	}
+	ReadInterests();
 	if (bTestHostile)
 	{
 		AstraSpace::FHostile H;
@@ -826,6 +840,7 @@ TSharedRef<FJsonObject> UAstraSpaceLife::BenchJson() const
 	O->SetNumberField(TEXT("lamps_peak"), LampsPeak);
 	O->SetNumberField(TEXT("hulls_peak"), HullsPeak);
 	O->SetNumberField(TEXT("motion_ships"), MotionShips);
+	O->SetNumberField(TEXT("motion_craft_peak"), MotionCraftPeak);
 	O->SetNumberField(TEXT("jets_peak"), JetsPeak);
 	O->SetNumberField(TEXT("jets_dropped"), JetsDropped);
 	O->SetNumberField(TEXT("wake_peak"), WakePeak);

@@ -30,6 +30,12 @@ namespace AstraSpace
 		bool Inside(const FVector& P) const;
 		/** Does the path from A to B (mesh frame) pass through a solid cell? Sampled every half cell, ends included. */
 		bool Crosses(const FVector& A, const FVector& B) const;
+		/** Where on the path from A to B (mesh frame) the first solid cell lies, as a share of the path's length (0..1); -1 when the path is clear. Sampled every half cell, and only inside the extent of the boxes
+		 *  (what the Falcon's cue asks of a hull she is flying at: how soon). */
+		double FirstHit(const FVector& A, const FVector& B) const;
+		/** How far from P (mesh frame) the nearest solid cell lies, looked for out to MaxM along the fourteen directions of a cube's faces and corners: an estimate that is never nearer than the truth (the nearest
+		 *  point of a flat hull is straight out from it, and one of the fourteen is within 36 degrees of that: it reads at most 1.24 times too far, a cell more or less); 0 inside a cell; -1 when none is within MaxM. */
+		double ShellDistance(const FVector& P, double MaxM) const;
 	};
 
 	struct FSolidData

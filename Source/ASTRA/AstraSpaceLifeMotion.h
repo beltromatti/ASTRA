@@ -35,6 +35,7 @@ namespace AstraSpace
 		constexpr float PushDead = 0.10f;        // of the class's full acceleration: less is the AI's noise (its steering never quite rests)
 		constexpr int32 WakeCap = 32;            // notes in a wake
 		constexpr float WakeStepS = 0.75f;       // s between notes
+		constexpr float CraftLenM = 40.f;        // a hull shorter than this is a craft (a fighter, a bomber, a drone): her jets are drawn as a craft's, she leaves no wake, she is read only near an eye
 	}
 
 	// ------------------------------------------------------------------------------------------------------------------ the jets of a class
@@ -63,6 +64,8 @@ namespace AstraSpace
 		float DriveR = 3.f;                      // its bells' radius
 		TArray<FJet> Jets;
 
+		/** A fighter, a bomber or a drone (not a capital ship): what is drawn of her is made for the few hundred metres to few kilometres she is seen from. */
+		bool IsCraft() const { return Len < Motion::CraftLenM; }
 		void Finish();
 		/** The index of the jet nearest a point of the ship's frame, or INDEX_NONE. */
 		int32 Nearest(const FVector& P) const;
@@ -71,9 +74,11 @@ namespace AstraSpace
 	struct FJetData
 	{
 		TMap<FName, FJetClass> Classes;
+		TMap<FString, FName> KeyOfMesh;          // a craft is known by her mesh (the war gives a fighter no class key): "SM_CRAFT_ASTRA_Falcon" -> falcon
 		bool bLoaded = false;
 		FString Source;
 		const FJetClass* Find(FName Key) const { return Classes.Find(Key); }
+		const FJetClass* FindMesh(const FString& Mesh) const { const FName* K = KeyOfMesh.Find(Mesh); return K ? Classes.Find(*K) : nullptr; }
 		bool Parse(const FString& Json, FString& OutError);
 	};
 

@@ -91,6 +91,10 @@ private:
 	void MouseX(float V);
 	void MouseY(float V);
 	void Land();
+	/** R (the pad's D-pad up): a lifepod within the grapples' reach is taken aboard (SPAZIO-VIVO: UAstraSpaceLife::PilotRescue); the crew hears the flight net's line, the cockpit says it for a few seconds. */
+	void TakePod();
+	FString Notice;                            // what the cockpit says for a few seconds (a lifepod taken aboard)
+	float NoticeT = 0.f;
 	// the gamepad
 	FVector PadAxes = FVector::ZeroVector;     // roll, pitch, yaw
 	FVector2D PadThr = FVector2D::ZeroVector;  // right trigger up, left trigger down

@@ -7,6 +7,7 @@
 #include "ASTRA.h"
 #include "AstraHangar.h"
 #include "AstraShipSubsystem.h"
+#include "AstraSpaceLife.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/AudioComponent.h"
@@ -61,6 +62,8 @@ public:
 			float Box = 10.f;                        // px at 1080p (half size)
 			FString Name, Sub;
 			bool bCraft = false, bCapital = false;
+			bool bPod = false;                       // a lifepod adrift (SPAZIO-VIVO): a ring and a cross, named before the craft
+			bool bReach = false;                     // ... and within her grapples' reach: a second ring (R takes it aboard)
 			int32 Side = 0;                          // 0 unknown, 1 friend, 2 foe, 3 neutral
 		};
 		TArray<FMark> Marks;
@@ -154,11 +157,12 @@ public:
 		}
 		if (!Data.Hint.IsEmpty())
 		{
-			const bool bAlarm = Data.Hint.StartsWith(TEXT("MISSILE")) || Data.Hint.StartsWith(TEXT("HULL"));
+			const bool bAlarm = Data.Hint.StartsWith(TEXT("MISSILE")) || Data.Hint.StartsWith(TEXT("HULL")) || Data.Hint.StartsWith(TEXT("COLLISION"));
+			const bool bCaution = Data.Hint.StartsWith(TEXT("PROXIMITY"));         // (a hull close: amber, steady)
 			const bool bBlink = !bAlarm || FMath::Fmod(FPlatformTime::Seconds(), 0.8) < 0.5;
 			if (bBlink)
 			{
-				Text(FVector2D(C.X - 300.f * U, Size.Y * 0.3f), Data.Hint, bAlarm ? Warn : Ink);
+				Text(FVector2D(C.X - 300.f * U, Size.Y * 0.3f), Data.Hint, (bAlarm || bCaution) ? Warn : Ink);
 			}
 		}
 		if (!Data.bFlying)
@@ -189,8 +193,19 @@ public:
 			const FData::FMark& M = Data.Marks[i];
 			const FLinearColor Col = M.Side == 2 ? Foe : (M.Side == 1 ? Friend : (M.Side == 3 ? Neutral : Unknown));
 			const FVector2D At = M.Pos * Size;
-			const float H = (M.bCraft ? 6.f : M.Box) * U;
-			if (M.bCraft)
+			const float H = (M.bPod ? 8.f : (M.bCraft ? 6.f : M.Box)) * U;
+			if (M.bPod)
+			{
+				// a lifepod: a ring with a cross in it (a second, larger ring when it is within the grapples' reach: R)
+				Circle(At, H, Col, 1.5f);
+				Lines({At + FVector2D(-H * 0.5f, 0.f), At + FVector2D(H * 0.5f, 0.f)}, Col, 1.5f);
+				Lines({At + FVector2D(0.f, -H * 0.5f), At + FVector2D(0.f, H * 0.5f)}, Col, 1.5f);
+				if (M.bReach)
+				{
+					Circle(At, H * 1.9f, Warn, 2.f);
+				}
+			}
+			else if (M.bCraft)
 			{
 				Lines({At + FVector2D(0, -H), At + FVector2D(H, 0), At + FVector2D(0, H), At + FVector2D(-H, 0), At + FVector2D(0, -H)}, Col, 1.5f);
 			}
@@ -208,7 +223,7 @@ public:
 		{
 			const FData::FMark& Ma = Data.Marks[A];
 			const FData::FMark& Mb = Data.Marks[B];
-			const int32 Ra = (Ma.Side == 2 ? 0 : 2) + (Ma.bCraft ? 1 : 0), Rb = (Mb.Side == 2 ? 0 : 2) + (Mb.bCraft ? 1 : 0);
+			const int32 Ra = Ma.bPod ? -1 : (Ma.Side == 2 ? 0 : 2) + (Ma.bCraft ? 1 : 0), Rb = Mb.bPod ? -1 : (Mb.Side == 2 ? 0 : 2) + (Mb.bCraft ? 1 : 0);   // (the lifepods first: someone is waiting in them)
 			return Ra != Rb ? Ra < Rb : Ma.Box > Mb.Box;
 		});
 		const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
@@ -497,6 +512,8 @@ void AAstraFighterPawn::SetupPlayerInputComponent(UInputComponent* IC)
 	IC->BindKey(EKeys::G, IE_Pressed, this, &AAstraFighterPawn::Descend);
 	Flag(EKeys::X, [this](bool b) { if (b) { In.Throttle = 0.f; } });   // X: cut the throttle
 	IC->BindKey(EKeys::F, IE_Pressed, this, &AAstraFighterPawn::Land);
+	IC->BindKey(EKeys::R, IE_Pressed, this, &AAstraFighterPawn::TakePod);                     // R: a lifepod within the grapples' reach comes aboard
+	IC->BindKey(EKeys::Gamepad_DPad_Up, IE_Pressed, this, &AAstraFighterPawn::TakePod);
 }
 
 bool AAstraFighterPawn::ClimbOut()
@@ -586,10 +603,25 @@ void AAstraFighterPawn::Land()
 	}
 }
 
+void AAstraFighterPawn::TakePod()
+{
+	UAstraBattleSubsystem* Battle = GetWorld() ? GetWorld()->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+	UAstraSpaceLife* Space = Battle ? Battle->GetSpace() : nullptr;
+	if (Phase != EPhase::Flying || !Space || !Space->IsActive())
+	{
+		return;
+	}
+	const AstraSpace::FRescued R = Space->PilotRescue(Battle->GetPilotedId());
+	NoticeT = 5.f;
+	Notice = R.Pods > 0 ? FString::Printf(TEXT("LIFEPOD ABOARD  ·  %d SURVIVOR%s  ·  %s"), R.Survivors, R.Survivors == 1 ? TEXT("") : TEXT("S"), *AstraSpace::FWrecks::BareName(R.Of).ToUpper())
+	                    : FString(TEXT("NO LIFEPOD IN REACH"));
+}
+
 void AAstraFighterPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	TickFlakFx(DeltaTime);
+	NoticeT = FMath::Max(0.f, NoticeT - DeltaTime);
 	UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>();
 	// the hands on the controls: the lever moves at 0.6 a second, the stick recentres when the mouse rests
 	In.Throttle = FMath::Clamp(In.Throttle + ((bThrUp ? 1.f : 0.f) - (bThrDown ? 1.f : 0.f) + PadThr.X - PadThr.Y) * 0.6f * DeltaTime, 0.f, 1.f);
@@ -957,6 +989,37 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 			}
 		}
 	}
+	// the lifepods near her (SPAZIO-VIVO): a ring and a cross where each is, the nearest named; one out of view is an arrow on the ring
+	{
+		const FVector Fwd = Camera->GetForwardVector();
+		for (int32 i = 0; i < St.Pods.Num(); ++i)
+		{
+			const FAstraPilotStatus::FPod& P = St.Pods[i];
+			const FString Air = P.AirMin >= 100.f ? FString::Printf(TEXT("AIR %d H %02d"), FMath::FloorToInt(P.AirMin / 60.f), FMath::FloorToInt(P.AirMin) % 60) : FString::Printf(TEXT("AIR %.0f MIN"), P.AirMin);
+			FVector2D N;
+			if (FVector::DotProduct(P.World - Eye, Fwd) > 0.f && Project(P.World, N))
+			{
+				SAstraFlightHud::FData::FMark M;
+				M.Pos = N;
+				M.bCraft = true;
+				M.bPod = true;
+				M.bReach = i == St.PodInReach;
+				M.Side = P.Faction == 0 ? 1 : 3;                 // (ours: the datalink's blue; theirs and the Guilds': a neutral amber, someone to bring in)
+				M.Name = M.bReach ? FString(TEXT("R: TAKE ABOARD")) : FString::Printf(TEXT("LIFEPOD %.1f km"), P.RangeM / 1000.f);
+				M.Sub = FString::Printf(TEXT("%d ALIVE  ·  %s"), P.Survivors, *Air);
+				D.Marks.Add(M);
+			}
+			else if (P.RangeM < 6000.f && D.Edges.Num() < 6)
+			{
+				const FVector L = Camera->GetComponentTransform().InverseTransformPosition(P.World);
+				SAstraFlightHud::FData::FEdge E;
+				E.Angle = FMath::Atan2(-L.Z, L.Y);
+				E.Text = FString::Printf(TEXT("POD %.1f"), P.RangeM / 1000.f);
+				E.bFoe = false;
+				D.Edges.Add(E);
+			}
+		}
+	}
 	if (St.bHasLock && Project(St.LockWorld, D.LockPos))
 	{
 		D.bLock = true;
@@ -987,9 +1050,23 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	{
 		D.Hint = FString::Printf(TEXT("MISSILE%s INBOUND  ·  C: DECOYS  ·  BREAK AND BOOST"), St.Incoming > 1 ? TEXT("S") : TEXT(""));
 	}
+	else if (St.CueLevel == 2)
+	{
+		// a hull on her course within five seconds (SPAZIO-VIVO: the places, the pieces of the wrecks, the ships, the Aquila): where, how far along her course, how soon
+		D.Hint = FString::Printf(TEXT("COLLISION COURSE  ·  %s  ·  %.0f m  ·  %.1f s"), *St.CueWhat.ToUpper(), St.CueRangeM, St.CueTtcS);
+	}
 	else if (St.bRecovering)
 	{
 		D.Hint = TEXT("RECOVERY GUIDANCE  ·  THE DECK IS FLYING YOU IN  ·  PUSH THE STICK OR F: TAKE HER BACK");
+	}
+	else if (NoticeT > 0.f && !Notice.IsEmpty())
+	{
+		D.Hint = Notice;
+	}
+	else if (St.PodInReach >= 0 && St.Pods.IsValidIndex(St.PodInReach))
+	{
+		const FAstraPilotStatus::FPod& P = St.Pods[St.PodInReach];
+		D.Hint = FString::Printf(TEXT("R: TAKE THE LIFEPOD ABOARD  ·  %d ALIVE  ·  %s"), P.Survivors, *P.Of.ToUpper());
 	}
 	else if (St.bCanLand)
 	{
@@ -998,6 +1075,15 @@ void AAstraFighterPawn::UpdateHud(const FAstraPilotStatus& St)
 	else if (St.bCanRecover && St.HullPct < 60.f)
 	{
 		D.Hint = TEXT("F: RECOVERY GUIDANCE  ·  THE DECK FLIES YOU HOME");
+	}
+	else if (St.CueLevel == 1)
+	{
+		D.Hint = FString::Printf(TEXT("PROXIMITY  ·  %s  ·  %.0f m"), *St.CueWhat.ToUpper(), St.CueRangeM);
+	}
+	else if (St.Pods.Num() > 0 && St.Pods[0].RangeM < 3000.f)
+	{
+		const FAstraPilotStatus::FPod& P = St.Pods[0];
+		D.Hint = FString::Printf(TEXT("LIFEPOD  ·  %.1f km  ·  %d ALIVE  ·  CLOSE TO WITHIN %.0f m, THEN R"), P.RangeM / 1000.f, P.Survivors, UAstraSpaceLife::PodReachM());
 	}
 	else if (St.HullPct < 30.f)
 	{

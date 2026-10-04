@@ -631,13 +631,8 @@ namespace AstraSpace
 	// ------------------------------------------------------------------------------------------------------------------ a piece as a contact of the plot
 	FString FWrecks::PieceName(const FSite& S, int32 Piece)
 	{
-		FString Who = S.KnownAs.IsEmpty() ? S.Name : S.KnownAs;
 		// "ASN Vigilant (T-02)" is how the sensors called her at the end: the number is the contact's own (W-02S), the name is what the crew says
-		int32 Open = INDEX_NONE;
-		if (Who.EndsWith(TEXT(")")) && Who.FindLastChar(TEXT('('), Open) && Open > 0 && Who.Mid(Open + 1).StartsWith(TEXT("T-")))
-		{
-			Who = Who.Left(Open).TrimEnd();
-		}
+		const FString Who = BareName(S.KnownAs.IsEmpty() ? S.Name : S.KnownAs);
 		if (Piece >= 0 && S.Pieces.IsValidIndex(Piece) && S.Pieces[Piece].Section < 3)
 		{
 			return FString::Printf(TEXT("%s of %s"), WkSectionWord(S.Pieces[Piece].Section), *Who);
@@ -706,12 +701,26 @@ namespace AstraSpace
 
 	FString FWrecks::Findings(const FSite& S, int32 Piece, int32 Stage, double Now) const
 	{
+		return FindingsOfPieces(S, TArray<int32>({Piece}), Stage, Now);
+	}
+
+	FString FWrecks::FindingsOfPieces(const FSite& S, const TArray<int32>& Pieces, int32 Stage, double Now) const
+	{
 		if (Stage <= 1)
 		{
-			return Describe(S, Piece, Now);
+			return Describe(S, Pieces.Num() == 1 ? Pieces[0] : -1, Now);
 		}
-		const bool bSection = Piece >= 0 && S.Pieces.IsValidIndex(Piece) && S.Pieces[Piece].Section < 3;
-		const float Share = bSection ? SectionShare(S.ClassKey, S.Pieces[Piece].Section) : 1.f;
+		// what the pieces are of her: their shares of her structure (her people and rooms are about so much in them) and how many torn ends they show
+		float Share = 0.f;
+		int32 Ends = 0;
+		for (const int32 Pc : Pieces)
+		{
+			const bool bSection = Pc >= 0 && S.Pieces.IsValidIndex(Pc) && S.Pieces[Pc].Section < 3;
+			Share += bSection ? SectionShare(S.ClassKey, S.Pieces[Pc].Section) : 1.f;
+			Ends += bSection ? (S.Pieces[Pc].Section == 1 ? 2 : 1) : 0;
+		}
+		Share = FMath::Min(Share, 1.f);
+		const bool bOne = Pieces.Num() == 1;
 		const FAboard& Ab = S.Aboard;
 		if (Stage == 2)
 		{
@@ -724,14 +733,13 @@ namespace AstraSpace
 				Burning += R.Fire > 0.15f ? 1 : 0;
 				Dark += R.Power < 0.2f ? 1 : 0;
 			}
-			const int32 Ends = bSection ? (S.Pieces[Piece].Section == 1 ? 2 : 1) : 0;
-			const FString Hull = Ends == 0 ? FString(TEXT("the hull is burnt through in places")) : FString::Printf(TEXT("the hull is open to space at the torn end%s"), Ends > 1 ? TEXT("s") : TEXT(""));
+			const FString Hull = Ends == 0 ? FString(TEXT("the hull is burnt through in places")) : FString::Printf(TEXT("the hull is open to space at the torn end%s"), (bOne ? Ends > 1 : true) ? TEXT("s") : TEXT(""));
 			if (Ab.Rooms.Num() == 0)
 			{
 				return FString::Printf(TEXT("%s; nothing is known of her rooms: her inside was on no sensor when she went"), *Hull);
 			}
-			return FString::Printf(TEXT("%s. Her rooms as they were when she went (all of her; this piece is about %d%% of her): %d gutted, %d open to space or without air, %d burning, %d without power%s"),
-			                       *Hull, FMath::RoundToInt(Share * 100.f), Gutted, Vented, Burning, Dark,
+			return FString::Printf(TEXT("%s. Her rooms as they were when she went (all of her; %s about %d%% of her): %d gutted, %d open to space or without air, %d burning, %d without power%s"),
+			                       *Hull, bOne ? TEXT("this piece is") : TEXT("these pieces are"), FMath::RoundToInt(Share * 100.f), Gutted, Vented, Burning, Dark,
 			                       Ab.SealedDoors.Num() ? *FString::Printf(TEXT("; %d pressure bulkheads were shut"), Ab.SealedDoors.Num()) : TEXT(""));
 		}
 		// alongside: her dead
@@ -741,9 +749,28 @@ namespace AstraSpace
 			Recovered += P.State == 1 ? P.Survivors : 0;
 		}
 		const int32 Dead = Ab.Killed + Ab.Lost;
-		return FString::Printf(TEXT("no life signs. Of the %d her class carries, %d lie dead where they fell before she went and %d more were lost with her (about %d of them in this piece); %d got away in %d lifepod%s%s"),
-		                       Ab.Complement, Ab.Killed, Ab.Lost, FMath::RoundToInt(Share * (float)Dead), Ab.Escaped, S.Pods.Num(), S.Pods.Num() == 1 ? TEXT("") : TEXT("s"),
+		return FString::Printf(TEXT("no life signs. Of the %d her class carries, %d lie dead where they fell before she went and %d more were lost with her (about %d of them in %s); %d got away in %d lifepod%s%s"),
+		                       Ab.Complement, Ab.Killed, Ab.Lost, FMath::RoundToInt(Share * (float)Dead), bOne ? TEXT("this piece") : TEXT("these pieces"), Ab.Escaped, S.Pods.Num(), S.Pods.Num() == 1 ? TEXT("") : TEXT("s"),
 		                       Recovered > 0 ? *FString::Printf(TEXT(" (%d taken aboard since)"), Recovered) : TEXT(""));
+	}
+
+	FString FWrecks::PieceList(const FSite& S, const TArray<int32>& Pieces)
+	{
+		if (Pieces.Num() <= 1)
+		{
+			return FString::Printf(TEXT("the %s"), *PieceName(S, Pieces.Num() ? Pieces[0] : -1));
+		}
+		// "the bow, middle and stern sections of ASN Vigilant": the sections' words in the order they were given, the wreck's name once
+		const FString Who = BareName(S.KnownAs.IsEmpty() ? S.Name : S.KnownAs);
+		FString Words;
+		for (int32 i = 0; i < Pieces.Num(); ++i)
+		{
+			const int32 Pc = Pieces[i];
+			FString W = S.Pieces.IsValidIndex(Pc) && S.Pieces[Pc].Section < 3 ? FString(WkSectionWord(S.Pieces[Pc].Section)) : FString(TEXT("hull"));
+			W.RemoveFromEnd(TEXT(" section"));
+			Words += (i == 0 ? TEXT("") : (i + 1 == Pieces.Num() ? TEXT(" and ") : TEXT(", "))) + W;
+		}
+		return FString::Printf(TEXT("the %s sections of %s"), *Words, *Who);
 	}
 
 	FString FWrecks::Status(const FSite& S, int32 Piece, double Now) const
@@ -800,7 +827,7 @@ namespace AstraSpace
 		}
 	}
 
-	void FWrecks::Beacons(const FString& System, double Now, const FSkyFrame& Frame, const FVector& From, double RangeKm, TArray<FBeacon>& Out) const
+	void FWrecks::Beacons(const FString& System, double Now, const FSkyFrame& Frame, const FVector& From, double RangeKm, TArray<FBeacon>& Out, bool bAdrift) const
 	{
 		const FString Sys = System.ToLower();
 		for (const FSite& S : Items)
@@ -812,7 +839,7 @@ namespace AstraSpace
 			for (int32 pi = 0; pi < S.Pods.Num(); ++pi)
 			{
 				const FPodRec& P = S.Pods[pi];
-				if (!BeaconOn(P, Now))
+				if (bAdrift ? !(Alive(P, Now) && Now >= P.T0) : !BeaconOn(P, Now))
 				{
 					continue;
 				}
@@ -829,10 +856,22 @@ namespace AstraSpace
 				B.AirLeftS = AirLeft(P, Now);
 				B.Of = S.KnownAs;
 				B.Faction = S.Faction;
+				B.bCalling = BeaconOn(P, Now);
 				Out.Add(B);
 			}
 		}
 		Out.Sort([&From](const FBeacon& A, const FBeacon& B) { return FVector::DistSquared(A.Pos, From) < FVector::DistSquared(B.Pos, From); });
+	}
+
+	FString FWrecks::BareName(const FString& KnownAs)
+	{
+		FString Who = KnownAs;
+		int32 Open = INDEX_NONE;
+		if (Who.EndsWith(TEXT(")")) && Who.FindLastChar(TEXT('('), Open) && Open > 0 && Who.Mid(Open + 1).StartsWith(TEXT("T-")))
+		{
+			Who = Who.Left(Open).TrimEnd();
+		}
+		return Who;
 	}
 
 	FRescued FWrecks::Recover(const FString& System, double Now, const FSkyFrame& Frame, const FVector& AtSystem, double RadiusM, const FString& By)

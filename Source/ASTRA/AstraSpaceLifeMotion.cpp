@@ -68,6 +68,7 @@ namespace AstraSpace
 	bool FJetData::Parse(const FString& Json, FString& OutError)
 	{
 		Classes.Reset();
+		KeyOfMesh.Reset();
 		TSharedPtr<FJsonObject> Root;
 		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
 		{
@@ -121,6 +122,10 @@ namespace AstraSpace
 				}
 			}
 			C.Finish();
+			if (!C.Mesh.IsEmpty())
+			{
+				KeyOfMesh.Add(C.Mesh, C.Key);
+			}
 			Classes.Add(C.Key, MoveTemp(C));
 		}
 		return Classes.Num() > 0;

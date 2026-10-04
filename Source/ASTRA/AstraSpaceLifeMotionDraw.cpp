@@ -20,9 +20,12 @@ namespace
 	TAutoConsoleVariable<float> CVarMoWakeGain(TEXT("astra.space.wakes.gain"), 1.f, TEXT("How bright the engine wakes are"));
 	TAutoConsoleVariable<float> CVarMoWakeKm(TEXT("astra.space.wakes.km"), 110.f, TEXT("A ship's wake is drawn out to this range from the Aquila (km)"));
 	TAutoConsoleVariable<float> CVarMoWakeLife(TEXT("astra.space.wakes.life"), 1.f, TEXT("How long the wakes last, as a multiple of the usual (10 to 24 s by the ship's length)"));
+	TAutoConsoleVariable<int32> CVarMoCraft(TEXT("astra.space.craftjets"), 1, TEXT("The craft's manoeuvring jets (fighters, bombers, drones) near an eye (the Aquila's bridge, the Captain's Falcon): 1 on, 0 off"));
+	TAutoConsoleVariable<float> CVarMoCraftKm(TEXT("astra.space.craftjets.km"), 3.f, TEXT("A craft's jets are read and drawn within this range of an eye (km)"));
 
 	constexpr double MoKm = 1000.0;
 	constexpr int32 MoJetsPerShip = 10;                      // the most jets drawn lit for one ship at an instant
+	constexpr int32 MoJetsPerCraft = 6;                      // ... and for one craft
 	const FLinearColor MoCoreAstra(0.78f, 0.9f, 1.f), MoCoreMandate(1.f, 0.62f, 0.3f);
 	const FLinearColor MoWakeAstra(0.45f, 0.72f, 1.f), MoWakeMandate(1.f, 0.52f, 0.26f);
 }
@@ -47,13 +50,40 @@ void UAstraSpaceLife::TickMotion(float SimDt)
 	const bool bWakes = CVarMoWakes.GetValueOnGameThread() != 0;
 	const float WakeKm = CVarMoWakeKm.GetValueOnGameThread();
 	const float Life = CVarMoWakeLife.GetValueOnGameThread();
+	// the craft are read only near an eye: the Aquila's bridge, and the Captain's Falcon when she flies (what a pilot sees of the craft round her)
+	const bool bCraftJets = CVarMoCraft.GetValueOnGameThread() != 0;
+	const double CraftM2 = FMath::Square((double)CVarMoCraftKm.GetValueOnGameThread() * MoKm * 1.25);
+	bMotionEye2 = false;
+	if (bCraftJets && Owner->IsPiloting())
+	{
+		if (const FAstraBattleShip* Fk = Owner->FindById(Owner->GetPilotedId()))
+		{
+			MotionEye2 = Fk->Pos;
+			bMotionEye2 = true;
+		}
+	}
+	int32 CraftRead = 0;
 	for (FAstraBattleShip& S : Owner->Ships)
 	{
-		if (!S.bAlive || S.bGhost || S.bCraft || S.bFixture || S.bDerelict || S.MaxAccel < 0.5f)
+		if (!S.bAlive || S.bGhost || S.bFixture || S.bDerelict || S.MaxAccel < 0.5f)
 		{
 			continue;
 		}
-		const AstraSpace::FJetClass* C = Data.Find(S.ClassKey);
+		const AstraSpace::FJetClass* C = nullptr;
+		if (S.bCraft)
+		{
+			// a fighter, a bomber, a drone: by her mesh; not the Captain's own Falcon (her jets are behind the cockpit) nor a boarding craft (she flies a flight of her own); and only near an eye
+			if (!bCraftJets || S.bPiloted || S.CraftKind == 3 || (FVector::DistSquared(S.Pos, F.Origin) > CraftM2 && !(bMotionEye2 && FVector::DistSquared(S.Pos, MotionEye2) <= CraftM2)))
+			{
+				continue;
+			}
+			C = Data.FindMesh(S.Mesh);
+			CraftRead += C ? 1 : 0;
+		}
+		else
+		{
+			C = Data.Find(S.ClassKey);
+		}
 		if (!C)
 		{
 			continue;
@@ -81,9 +111,9 @@ void UAstraSpaceLife::TickMotion(float SimDt)
 			}
 			M.Peak = 0.f;
 		}
-		M.Thrust = (Owner->WarFX && Owner->WarFX->IsActive()) ? Owner->WarFX->Throttle(S) : 0.f;
-		// the wake: noted where the drive burns while it does (a dead engine leaves nothing: the same test as the war's own plume)
-		if (bWakes && M.bPowered && M.Thrust > 0.1f && Owner->EngineFactor(S) > 0.01f && S.Vel.SizeSquared() > 64.0
+		M.Thrust = (!C->IsCraft() && Owner->WarFX && Owner->WarFX->IsActive()) ? Owner->WarFX->Throttle(S) : 0.f;
+		// the wake: noted where the drive burns while it does (a dead engine leaves nothing: the same test as the war's own plume); a craft leaves none
+		if (bWakes && !C->IsCraft() && M.bPowered && M.Thrust > 0.1f && Owner->EngineFactor(S) > 0.01f && S.Vel.SizeSquared() > 64.0
 		    && FVector::DistSquared(S.Pos, F.Origin) < FMath::Square((double)WakeKm * 1.25 * MoKm))
 		{
 			M.Wake.Offer(S.Pos + S.Att.RotateVector(C->DriveP), MotionClock, 0.35f + 0.65f * M.Thrust, 0.05 * C->Len);
@@ -105,19 +135,23 @@ void UAstraSpaceLife::TickMotion(float SimDt)
 		}
 	}
 	MotionShips = Motions.Num();
+	MotionCraft = CraftRead;
+	MotionCraftPeak = FMath::Max(MotionCraftPeak, MotionCraft);
 	MotionMs += (FPlatformTime::Seconds() - T0) * 1000.0;
 	++MotionTicks;
 }
 
 void UAstraSpaceLife::AddJet(const AstraSpace::FMotion& M, const AstraSpace::FJet& J, float Level, float Len, float Km)
 {
-	// a jet is a few per cent of the hull's length (a real nozzle would be a speck at the range a battle is fought at): drawn larger the farther it is, so it reads
-	const float DistK = FMath::Clamp(Km / 8.f, 1.f, 2.6f);
+	// a jet is a few per cent of the hull's length (a real nozzle would be a speck at the range a battle is fought at): drawn larger the farther it is, so it reads. A craft is seen from a few hundred
+	// metres to a few kilometres, so her jets are bigger for her size and grow sooner (from 500 m, to five times at 2.5 km)
+	const bool bCraft = Len < AstraSpace::Motion::CraftLenM;
+	const float DistK = bCraft ? FMath::Clamp(Km / 0.5f, 1.f, 5.f) : FMath::Clamp(Km / 8.f, 1.f, 2.6f);
 	const FVector Lip = M.PrevPos + M.PrevAtt.RotateVector(J.P);
 	const FVector DirW = F.InvAtt.RotateVector(M.PrevAtt.RotateVector(J.D));
 	const FVector LipW = F.ToWorld(Lip);
-	const float Width = FMath::Max(0.0062f * Len, J.R * 2.f) * DistK;
-	const float JetLen = 0.032f * Len * (0.45f + 0.55f * Level) * DistK;
+	const float Width = FMath::Max((bCraft ? 0.02f : 0.0062f) * Len, J.R * 2.f) * DistK;
+	const float JetLen = (bCraft ? 0.08f : 0.032f) * Len * (0.45f + 0.55f * Level) * DistK;
 	const FLinearColor Core = M.Faction == 0 ? MoCoreAstra : MoCoreMandate;
 	const float Gain = LampGain * CVarMoJetGain.GetValueOnGameThread();
 	FTransform* X;
@@ -132,7 +166,7 @@ void UAstraSpaceLife::AddJet(const AstraSpace::FMotion& M, const AstraSpace::FJe
 	}
 	if (float* D = Lamps.Next(X))
 	{
-		const float R = 0.0105f * Len * (0.55f + 0.45f * Level) * DistK * AstraFx::GlowK;
+		const float R = (bCraft ? 0.025f : 0.0105f) * Len * (0.55f + 0.45f * Level) * DistK * AstraFx::GlowK;
 		*X = FTransform(FQuat::Identity, LipW + DirW * (JetLen * 0.12), FVector(R * 2.f));
 		AstraFx::Fill(D, AstraFx::Mix(Core, FLinearColor::White, 0.3f), 150.f * Level * Gain, 0.f, 0.f, 0.f, M.Seed, R * 2.f, 0.f);
 	}
@@ -151,6 +185,7 @@ void UAstraSpaceLife::DrawMotion()
 	const AstraSpace::FJetData& Data = AstraSpace::JetData();
 	const bool bWakes = CVarMoWakes.GetValueOnGameThread() != 0;
 	const double JetKm = CVarMoJetKm.GetValueOnGameThread();
+	const double CraftKm = CVarMoCraftKm.GetValueOnGameThread();
 	const double WakeKm = CVarMoWakeKm.GetValueOnGameThread();
 	const float WakeGain = LampGain * CVarMoWakeGain.GetValueOnGameThread();
 	const float WakeLifeK = FMath::Max(0.1f, CVarMoWakeLife.GetValueOnGameThread());
@@ -166,7 +201,13 @@ void UAstraSpaceLife::DrawMotion()
 		AstraSpace::FMotion& M = KV.Value;
 		if (M.Class)
 		{
-			Items.Add({FVector::DistSquared(M.PrevPos, F.Origin), &M});
+			// (a craft is for the nearer of the two eyes: the Aquila's bridge, the Captain's Falcon)
+			double D2 = FVector::DistSquared(M.PrevPos, F.Origin);
+			if (M.Class->IsCraft() && bMotionEye2)
+			{
+				D2 = FMath::Min(D2, (double)FVector::DistSquared(M.PrevPos, MotionEye2));
+			}
+			Items.Add({D2, &M});
 		}
 	}
 	Items.Sort([](const FItem& A, const FItem& B) { return A.D2 < B.D2; });
@@ -176,7 +217,8 @@ void UAstraSpaceLife::DrawMotion()
 		const AstraSpace::FJetClass& C = *M.Class;
 		const double Km = FMath::Sqrt(It.D2) * 0.001;
 		const bool bAlive = M.Seen == Frame;
-		if (bAlive && M.bPowered && M.Peak > 0.04f && Km < JetKm)
+		const bool bCraftHull = C.IsCraft();
+		if (bAlive && M.bPowered && M.Peak > 0.04f && Km < (bCraftHull ? CraftKm : JetKm))
 		{
 			TArray<TPair<float, int32>, TInlineAllocator<32>> Lit;
 			for (int32 j = 0; j < C.Jets.Num() && j < M.Burn.Num(); ++j)
@@ -188,11 +230,12 @@ void UAstraSpaceLife::DrawMotion()
 				}
 			}
 			Lit.Sort([](const TPair<float, int32>& A, const TPair<float, int32>& B) { return A.Key > B.Key; });
-			for (int32 k = 0; k < FMath::Min(Lit.Num(), MoJetsPerShip); ++k)
+			const int32 Cap = bCraftHull ? MoJetsPerCraft : MoJetsPerShip;
+			for (int32 k = 0; k < FMath::Min(Lit.Num(), Cap); ++k)
 			{
 				AddJet(M, C.Jets[Lit[k].Value], Lit[k].Key, C.Len, (float)Km);
 			}
-			JetsLitNow += FMath::Min(Lit.Num(), MoJetsPerShip);
+			JetsLitNow += FMath::Min(Lit.Num(), Cap);
 		}
 		if (bWakes && Km < WakeKm && M.Wake.Num > 0)
 		{
@@ -239,8 +282,8 @@ void UAstraSpaceLife::DrawMotion()
 
 FString UAstraSpaceLife::MotionStat() const
 {
-	return FString::Printf(TEXT("motion: %d ships read, jets lit %d now (%d plumes now / %d peak, %d dropped), wake pieces %d now / %d peak (%d dropped), %.4f ms avg"),
-	                       MotionShips, JetsLitNow, JetsNow, JetsPeak, JetsDropped, WakeNow, WakePeak, WakeDropped, MotionTicks ? MotionMs / MotionTicks : 0.0);
+	return FString::Printf(TEXT("motion: %d ships read (%d of them craft), jets lit %d now (%d plumes now / %d peak, %d dropped), wake pieces %d now / %d peak (%d dropped), %.4f ms avg"),
+	                       MotionShips, MotionCraft, JetsLitNow, JetsNow, JetsPeak, JetsDropped, WakeNow, WakePeak, WakeDropped, MotionTicks ? MotionMs / MotionTicks : 0.0);
 }
 
 FString UAstraSpaceLife::MotionTable() const
@@ -278,7 +321,30 @@ bool UAstraSpaceLife::DebugJets(const FString& Which, const FString& What, float
 		return false;
 	}
 	FAstraBattleShip* Pick = nullptr;
-	if (Which.Equals(TEXT("nearest"), ESearchCase::IgnoreCase))
+	if (Which.Equals(TEXT("craft"), ESearchCase::IgnoreCase))
+	{
+		// the nearest fighter, bomber or drone the jets are read for (within astra.space.craftjets.km of an eye)
+		double Best = FMath::Square((double)CVarMoCraftKm.GetValueOnGameThread() * MoKm);
+		for (FAstraBattleShip& S : Owner->Ships)
+		{
+			if (!S.bAlive || !S.bCraft || S.bPiloted || S.CraftKind == 3 || !Data.FindMesh(S.Mesh))
+			{
+				continue;
+			}
+			const double D = FVector::DistSquared(S.Pos, Owner->Ships[0].Pos);
+			if (D < Best)
+			{
+				Best = D;
+				Pick = &S;
+			}
+		}
+		if (!Pick)
+		{
+			OutDetail = FString::Printf(TEXT("no craft within %.1f km of the Aquila (astra.space.craftjets.km): launch a flight and look again"), CVarMoCraftKm.GetValueOnGameThread());
+			return false;
+		}
+	}
+	else if (Which.Equals(TEXT("nearest"), ESearchCase::IgnoreCase))
 	{
 		double Best = 1e18;
 		for (FAstraBattleShip& S : Owner->Ships)
@@ -315,7 +381,7 @@ bool UAstraSpaceLife::DebugJets(const FString& Which, const FString& What, float
 		OutDetail = FString::Printf(TEXT("no warship called %s (a contact id, a class key, a name, or nearest)"), *Which);
 		return false;
 	}
-	const AstraSpace::FJetClass* C = Data.Find(Pick->ClassKey);
+	const AstraSpace::FJetClass* C = Pick->bCraft ? Data.FindMesh(Pick->Mesh) : Data.Find(Pick->ClassKey);
 	AstraSpace::FMotion& M = Motions.FindOrAdd(Pick->Id);
 	M.Bind(C);
 	AstraSpace::FDemand D;
@@ -357,12 +423,22 @@ namespace
 			UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *S->MotionStat());
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdSpaceJets(TEXT("astra.space.jets"), TEXT("Fire a warship's manoeuvring jets by hand, to see where they are: astra.space.jets <contact id | class | nearest> <yaw+|yaw-|pitch+|pitch-|roll+|roll-|brake|left|right|up|down|all> [seconds, default 8]"),
+	FAutoConsoleCommandWithWorldAndArgs CmdSpaceCraftLaunch(TEXT("astra.space.craft.launch"), TEXT("Testing: launch a flight of the Aquila (the crew's own order): astra.space.craft.launch <alpha|bravo|drones> [cap|recon|strike|escort|recall] [contact id], to see the craft's jets"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			UAstraBattleSubsystem* B = W ? W->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
+			if (!B || A.Num() < 1) { UE_LOG(LogASTRA, Display, TEXT("[Space] astra.space.craft.launch <alpha|bravo|drones> [mission] [contact id]")); return; }
+			FString Detail;
+			const bool bOk = B->LaunchSquadron(A[0], A.Num() > 1 ? A[1] : FString(TEXT("cap")), A.Num() > 2 ? A[2] : FString(), Detail);
+			UE_LOG(LogASTRA, Display, TEXT("[Space] launch %s: %s (%s)"), *A[0], bOk ? TEXT("ordered") : TEXT("refused"), *Detail);
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdSpaceJets(TEXT("astra.space.jets"), TEXT("Fire a warship's manoeuvring jets by hand, to see where they are: astra.space.jets <contact id | class | nearest | craft> <yaw+|yaw-|pitch+|pitch-|roll+|roll-|brake|left|right|up|down|all> [seconds, default 8]"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			UAstraBattleSubsystem* B = W ? W->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
 			UAstraSpaceLife* S = B ? B->GetSpace() : nullptr;
-			if (!S || A.Num() < 2) { UE_LOG(LogASTRA, Display, TEXT("[Space] astra.space.jets <contact id | class | nearest> <yaw+|yaw-|pitch+|pitch-|roll+|roll-|brake|left|right|up|down|all> [seconds]")); return; }
+			if (!S || A.Num() < 2) { UE_LOG(LogASTRA, Display, TEXT("[Space] astra.space.jets <contact id | class | nearest | craft> <yaw+|yaw-|pitch+|pitch-|roll+|roll-|brake|left|right|up|down|all> [seconds]")); return; }
 			FString Detail;
 			S->DebugJets(A[0], A[1], A.Num() > 2 ? (float)FCString::Atod(*A[2]) : 8.f, Detail);
 			UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *Detail);
