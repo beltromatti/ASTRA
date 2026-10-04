@@ -7,7 +7,7 @@ with their own build).
                      [--selftest] [--out Saved/Space/run.json]        the traffic for that long; --selftest ends with SPACE_SELFTEST_OK or the failures
   tools/space.py report Saved/Space/run.json                         the layout, the flow, the queue, the reactions, the cost
   tools/space.py test                                                the module's own tests: peace for an hour, a hostile on the lanes, determinism; what the war leaves (the records on
-                                                                     their own, three warships lost with the lifepods found and rescued, the file, determinism, 40 wrecks at once)
+                                                                     their own, four ships lost, one for each way a ship goes, with the lifepods found and rescued, the file, determinism, 40 wrecks at once)
   tools/space.py wrecktest                                           only the records of what the war leaves, no world (a second)
   tools/space.py sync                                               data/space/*.json -> Content/ASTRA/Data/space (the copy the game stages), after a change in the data
   tools/space.py meshes <manifest.json>                              art/export/space_v3/manifest.json -> data/space/meshes.json (lamps, bells, berths of each mesh), then sync
@@ -236,8 +236,8 @@ def cmd_test(a: argparse.Namespace) -> int:
     # ---- what the war leaves
     print("-- what the war leaves: the records on their own (accounting of 1800 losses, determinism, motion, the file, the limits, the crew's news, the rescue, the plans' rosters)")
     expect("wreck records", run_wrecktest(SPACE / "wrecktest.log"), "WRECKS_SELFTEST_OK", results)
-    losses = "30=astra.space.lose T-02 breakup 1|40=astra.space.lose T-11 reactor|50=astra.space.lose T-01 breakup 0|420=astra.space.rescue 60|430=astra.space.wrecks.roundtrip"
-    print("-- three warships lost (a break-up, a reactor breach, the battleship's break-up): wrecks, lifepods, beacons heard, a rescue, the file")
+    losses = "30=astra.space.lose T-02 breakup 1|40=astra.space.lose T-11 reactor|50=astra.space.lose T-01 breakup 0|60=astra.space.lose T-07 destroyed|420=astra.space.rescue 60|430=astra.space.wrecks.roundtrip"
+    print("-- four ships lost (a break-up, a reactor breach, the battleship's break-up, a freighter simply destroyed): wrecks, lifepods, beacons heard, a rescue, the file")
     wk = argparse.Namespace(**{**vars(base), "seconds": 900, "exec": quiet, "at": losses, "out": "Saved/Space/test_wrecks.json"})
     run_once(wk, ROOT / wk.out, SPACE / "test_wrecks.log")
     expect("selftest with wrecks", selftest_ok(SPACE / "test_wrecks.log"), "the invariants held, the people add up, the effects let every piece go", results)
@@ -245,7 +245,7 @@ def cmd_test(a: argparse.Namespace) -> int:
         d = load(str(ROOT / wk.out))
         fin = d["final"]
         text = (SPACE / "test_wrecks.log").read_text(errors="replace")
-        expect("the losses are recorded", fin["losses"] >= 3 and fin["wreck_sites_here"] >= 3, f"{fin['losses']} losses, {fin['wreck_sites_here']} sites here, {fin['wreck_pieces']} pieces", results)
+        expect("the losses are recorded", fin["losses"] >= 4 and fin["wreck_sites_here"] >= 4, f"{fin['losses']} losses, {fin['wreck_sites_here']} sites here, {fin['wreck_pieces']} pieces", results)
         expect("lifepods get away", fin["pods"] >= 8, f"{fin['pods']} lifepods", results)
         beacons = [e for e in d["events"] if "distress beacons" in e["text"]]
         expect("the beacons are heard, once for each wreck", 1 <= len(beacons) <= 3 and all(e["text"].startswith("sensors:") for e in beacons), f"{len(beacons)} reports", results)

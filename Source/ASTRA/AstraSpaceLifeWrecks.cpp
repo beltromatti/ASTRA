@@ -23,19 +23,19 @@ using AstraSpace::FPodRec;
 
 namespace
 {
-	TAutoConsoleVariable<int32> CVarSpaceWrecks(TEXT("astra.space.wrecks"), 1, TEXT("What the war leaves (wrecks, debris, lifepods): 1 on, 0 off (a loss is then not recorded; the war's own effects stand alone)"));
-	TAutoConsoleVariable<float> CVarSpaceWreckKm(TEXT("astra.space.wrecks.km"), 220.f, TEXT("A wreck's pieces are drawn out to this range from the Aquila (km)"));
-	TAutoConsoleVariable<int32> CVarSpaceChunks(TEXT("astra.space.wrecks.chunks"), 420, TEXT("The most chunks of debris drawn at once (the nearest fields first)"));
+	TAutoConsoleVariable<int32> CVarWkWrecks(TEXT("astra.space.wrecks"), 1, TEXT("What the war leaves (wrecks, debris, lifepods): 1 on, 0 off (a loss is then not recorded; the war's own effects stand alone)"));
+	TAutoConsoleVariable<float> CVarWkWreckKm(TEXT("astra.space.wrecks.km"), 220.f, TEXT("A wreck's pieces are drawn out to this range from the Aquila (km)"));
+	TAutoConsoleVariable<int32> CVarWkChunks(TEXT("astra.space.wrecks.chunks"), 420, TEXT("The most chunks of debris drawn at once (the nearest fields first)"));
 
-	constexpr double SpKm = 1000.0;
-	constexpr double ChunkFieldKm = 24.0;                  // a field is looked into when its edge is this near
-	constexpr double PodHullKm = 14.0;                     // a lifepod's hull is drawn out to this range (6 m long: a few pixels)
-	constexpr double PodLampKm = 170.0;                    // and its beacon to this
-	const TCHAR* const SecNames[3] = {TEXT("SecBow"), TEXT("SecMid"), TEXT("SecStern")};
-	const float ChunkMeshM[3] = {13.f, 24.f, 9.f};         // the debris meshes as made (art/blender/space3_props.py): a plate, a girder, a chunk
-	const TCHAR* const ChunkNames[3] = {TEXT("Plate"), TEXT("Girder"), TEXT("Chunk")};
+	constexpr double WkKm = 1000.0;
+	constexpr double WkChunkFieldKm = 24.0;                  // a field is looked into when its edge is this near
+	constexpr double WkPodHullKm = 14.0;                     // a lifepod's hull is drawn out to this range (6 m long: a few pixels)
+	constexpr double WkPodLampKm = 170.0;                    // and its beacon to this
+	const TCHAR* const WkSecNames[3] = {TEXT("SecBow"), TEXT("SecMid"), TEXT("SecStern")};
+	const float WkChunkMeshM[3] = {13.f, 24.f, 9.f};         // the debris meshes as made (art/blender/space3_props.py): a plate, a girder, a chunk
+	const TCHAR* const WkChunkNames[3] = {TEXT("Plate"), TEXT("Girder"), TEXT("Chunk")};
 
-	TCHAR FactionLetter(uint8 F) { return F == 0 ? TEXT('A') : (F == 1 ? TEXT('M') : TEXT('G')); }
+	TCHAR WkFactionLetter(uint8 F) { return F == 0 ? TEXT('A') : (F == 1 ? TEXT('M') : TEXT('G')); }
 }
 
 double UAstraSpaceLife::WreckClock() const
@@ -55,7 +55,7 @@ AstraSpace::FSkyFrame UAstraSpaceLife::SkyFrame() const
 // ------------------------------------------------------------------------------------------------------------------ a ship is lost
 void UAstraSpaceLife::OnShipLost(const FAstraBattleShip& S, const FAstraDeathEvent& E, bool bFxPieces)
 {
-	if (!IsActive() || !Owner || SystemName.IsEmpty() || CVarSpaceWrecks.GetValueOnGameThread() == 0)
+	if (!IsActive() || !Owner || SystemName.IsEmpty() || CVarWkWrecks.GetValueOnGameThread() == 0)
 	{
 		return;
 	}
@@ -248,8 +248,8 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 	}
 	const AstraSpace::FDataSet& D = AstraSpace::Data();
 	const FString& Key = SystemKey;
-	const double PieceKm = FMath::Clamp((double)CVarSpaceWreckKm.GetValueOnGameThread(), 20.0, 250.0);
-	const int32 ChunkCap = FMath::Clamp(CVarSpaceChunks.GetValueOnGameThread(), 0, 1200);
+	const double PieceKm = FMath::Clamp((double)CVarWkWreckKm.GetValueOnGameThread(), 20.0, 250.0);
+	const int32 ChunkCap = FMath::Clamp(CVarWkChunks.GetValueOnGameThread(), 0, 1200);
 	// What drifts is drawn in the system's frame, under the one component the belt and the buoys hang from: the Aquila's flight is one transform a frame (Tick) and not a transform for every
 	// wreck, and a wreck is written again only when it has moved enough to show. A chunk tumbling past the window is written every frame (within 3 km), one at the other end of the sky three
 	// times a second; a page nothing in it was written for is not sent at all (FlushSets).
@@ -281,13 +281,13 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 			}
 			const FVector Pivot = Sky.ToSystem(FWrecks::PosAt(P, Now));
 			const double D2 = FVector::DistSquared(Pivot, F.Origin);
-			if (D2 > FMath::Square(PieceKm * SpKm))
+			if (D2 > FMath::Square(PieceKm * WkKm))
 			{
 				continue;
 			}
 			if (P.SetIdx == -1)
 			{
-				const FString Name = P.Section < 3 ? FString::Printf(TEXT("%s_%s#%s"), *S.HullMesh, SecNames[P.Section], P.bBurnt ? TEXT("char") : TEXT("dead"))
+				const FString Name = P.Section < 3 ? FString::Printf(TEXT("%s_%s#%s"), *S.HullMesh, WkSecNames[P.Section], P.bBurnt ? TEXT("char") : TEXT("dead"))
 				                                   : FString::Printf(TEXT("%s#%s"), *S.HullMesh, P.bBurnt ? TEXT("char") : TEXT("dead"));
 				P.SetIdx = S.HullMesh.IsEmpty() ? INDEX_NONE : SetFor(Name);
 				if (P.SetIdx == INDEX_NONE)
@@ -315,7 +315,7 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 		{
 			const FVector Mid = Sky.ToSystem(S.Field.Pos0 + S.Field.Vel * (Now - S.Field.T0));
 			const double Edge = FVector::Dist(Mid, F.Origin) - (double)FWrecks::FieldRadiusAt(S.Field, Now) - (double)S.Field.R0;
-			if (Edge < ChunkFieldKm * SpKm)
+			if (Edge < WkChunkFieldKm * WkKm)
 			{
 				Fields.Add({&S, Edge});
 			}
@@ -331,11 +331,11 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 			const FVector Pos = Sky.ToSystem(FWrecks::PosAt(P, Now));
 			const double D2 = FVector::DistSquared(Pos, F.Origin);
 			const double Km = FMath::Sqrt(D2) * 0.001;
-			if (Km > PodLampKm)
+			if (Km > WkPodLampKm)
 			{
 				continue;
 			}
-			if (Km < PodHullKm)
+			if (Km < WkPodHullKm)
 			{
 				if (P.SetIdx == -1)
 				{
@@ -401,15 +401,15 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 			}
 			const FVector Pos = Sky.ToSystem(C.Pos);
 			const double D2 = FVector::DistSquared(Pos, F.Origin);
-			const double LimitKm = FMath::Clamp(0.9 * (double)(C.Size * ChunkMeshM[C.Shape]), 3.0, 22.0);        // each chunk goes out of the picture where it would be a speck
-			if (D2 > FMath::Square(LimitKm * SpKm))
+			const double LimitKm = FMath::Clamp(0.9 * (double)(C.Size * WkChunkMeshM[C.Shape]), 3.0, 22.0);        // each chunk goes out of the picture where it would be a speck
+			if (D2 > FMath::Square(LimitKm * WkKm))
 			{
 				continue;
 			}
 			int32& SI = S.Field.SetIdx[C.Shape];
 			if (SI == -1)
 			{
-				SI = SetFor(FString::Printf(TEXT("SM_DEBRIS_%c_%s#%s"), FactionLetter((uint8)Fac), ChunkNames[C.Shape], bChar ? TEXT("char") : TEXT("dead")));
+				SI = SetFor(FString::Printf(TEXT("SM_DEBRIS_%c_%s#%s"), WkFactionLetter((uint8)Fac), WkChunkNames[C.Shape], bChar ? TEXT("char") : TEXT("dead")));
 				if (SI == INDEX_NONE)
 				{
 					SI = -2;
@@ -430,7 +430,7 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 				FTransform* X;
 				if (float* Dd = Glints.Next(X))
 				{
-					const float Rm = FMath::Max(2.f, C.Size * ChunkMeshM[C.Shape] * 0.25f) * AstraFx::GlowK;
+					const float Rm = FMath::Max(2.f, C.Size * WkChunkMeshM[C.Shape] * 0.25f) * AstraFx::GlowK;
 					*X = FTransform(FQuat::Identity, F.ToWorld(Pos), FVector(Rm * 2.f));
 					AstraFx::Fill(Dd, FLinearColor(1.f, 0.46f, 0.15f), 170.f * C.Ember * LampGain, 0.f, 0.f, 0.f, (float)(i & 255) / 255.f, Rm * 2.f, 0.f);
 					++EmbersNow;
@@ -552,7 +552,7 @@ TSharedRef<FJsonObject> UAstraSpaceLife::WreckSummaryJson() const
 		for (int32 pi = 0; pi < S.Pieces.Num(); ++pi)
 		{
 			const FVector At = Sky.ToSystem(FWrecks::PosAt(S.Pieces[pi], Now));
-			const double Km = FVector::Dist(At, Me) / SpKm;
+			const double Km = FVector::Dist(At, Me) / WkKm;
 			if (Km < Best.Km)
 			{
 				Best = {&S, pi, Km, At};
@@ -698,7 +698,7 @@ bool UAstraSpaceLife::DebugLose(const FString& Which, const FString& How, int32 
 // ------------------------------------------------------------------------------------------------------------------ the console
 namespace
 {
-	UAstraSpaceLife* WreckSpaceOf(UWorld* World)
+	UAstraSpaceLife* WkSpaceOf(UWorld* World)
 	{
 		UAstraBattleSubsystem* B = World ? World->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
 		return B ? B->GetSpace() : nullptr;
@@ -707,7 +707,7 @@ namespace
 	FAutoConsoleCommandWithWorldAndArgs CmdSpaceLose(TEXT("astra.space.lose"), TEXT("Lose a warship the way the war would, to see what is left: astra.space.lose <contact id | nearest> [breakup|reactor|destroyed] [section 0 bow|1 mid|2 stern]"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
-			UAstraSpaceLife* S = WreckSpaceOf(W);
+			UAstraSpaceLife* S = WkSpaceOf(W);
 			if (!S || A.Num() < 1) { UE_LOG(LogASTRA, Display, TEXT("[Space] astra.space.lose <contact id | nearest> [breakup|reactor|destroyed] [section]")); return; }
 			FString Detail;
 			S->DebugLose(A[0], A.Num() > 1 ? A[1] : FString(TEXT("breakup")), A.Num() > 2 ? FCString::Atoi(*A[2]) : 1, Detail);
@@ -717,7 +717,7 @@ namespace
 	FAutoConsoleCommandWithWorld CmdSpaceWrecks(TEXT("astra.space.wrecks.list"), TEXT("What the war has left in this system: each loss, her pieces, her lifepods, what was left aboard"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
 		{
-			UAstraSpaceLife* S = WreckSpaceOf(W);
+			UAstraSpaceLife* S = WkSpaceOf(W);
 			if (!S) { UE_LOG(LogASTRA, Display, TEXT("[Space] none in this world")); return; }
 			const double Now = S->WreckClock();
 			UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *S->WreckStat());
@@ -743,14 +743,14 @@ namespace
 			UAstraBattleSubsystem* B = W ? W->GetSubsystem<UAstraBattleSubsystem>() : nullptr;
 			UAstraSpaceLife* S = B ? B->GetSpace() : nullptr;
 			if (!S) { return; }
-			const AstraSpace::FRescued R = S->RescueTake(B->PlayerPos(), (A.Num() ? FCString::Atod(*A[0]) : 5.0) * SpKm, TEXT("the Aquila's own boats"));
+			const AstraSpace::FRescued R = S->RescueTake(B->PlayerPos(), (A.Num() ? FCString::Atod(*A[0]) : 5.0) * WkKm, TEXT("the Aquila's own boats"));
 			UE_LOG(LogASTRA, Display, TEXT("[Space] rescue: %d lifepods, %d survivors%s"), R.Pods, R.Survivors, R.Pods ? *FString::Printf(TEXT(" (of %s)"), *R.Of) : TEXT(""));
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs CmdSpaceWrecksSave(TEXT("astra.space.wrecks.roundtrip"), TEXT("Write the wrecks as the campaign's save does, read them back into a copy and compare: size, time, sites"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
-			UAstraSpaceLife* S = WreckSpaceOf(W);
+			UAstraSpaceLife* S = WkSpaceOf(W);
 			if (!S) { return; }
 			const double T0 = FPlatformTime::Seconds();
 			const TSharedRef<FJsonObject> J = S->SaveJson();
@@ -779,7 +779,7 @@ namespace
 	FAutoConsoleCommandWithWorld CmdSpaceWrecksResume(TEXT("astra.space.wrecks.resume"), TEXT("TESTING, destructive: resume the battle from its own save as the campaign does (the plot is cleared, a new Gate); the log then says whether every wreck is where it was"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
 		{
-			UAstraSpaceLife* S = WreckSpaceOf(W);
+			UAstraSpaceLife* S = WkSpaceOf(W);
 			if (!S) { return; }
 			FString Detail;
 			S->DebugResume(Detail);
@@ -787,5 +787,5 @@ namespace
 		}));
 
 	FAutoConsoleCommandWithWorld CmdSpaceWrecksReset(TEXT("astra.space.wrecks.reset"), TEXT("Forget every wreck of every system (a new war)"),
-		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraSpaceLife* S = WreckSpaceOf(W)) { S->NewCampaign(); UE_LOG(LogASTRA, Display, TEXT("[Space] the wrecks are forgotten")); } }));
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W) { if (UAstraSpaceLife* S = WkSpaceOf(W)) { S->NewCampaign(); UE_LOG(LogASTRA, Display, TEXT("[Space] the wrecks are forgotten")); } }));
 }
