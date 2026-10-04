@@ -9,6 +9,10 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
+#if !PLATFORM_WINDOWS
+#include <stdlib.h>   // getenv, setenv: the environment of the systems where it is bytes (below)
+#endif
+
 namespace AstraMindLaunch
 {
 	namespace
@@ -47,6 +51,36 @@ namespace AstraMindLaunch
 			return A.Equals(B, Host == EHost::Linux ? ESearchCase::CaseSensitive : ESearchCase::IgnoreCase);
 		}
 
+		/** An environment variable's value. On the systems whose environment is bytes (macOS, Linux) it is read as UTF-8: FPlatformMisc reads it as Latin-1, and an accent in
+		 *  a user's folder name came out as two wrong characters, so that no file of that home was found. Windows' is wide characters: the engine's call is right. */
+		FString EnvGet(const FString& Name)
+		{
+#if PLATFORM_WINDOWS
+			return FPlatformMisc::GetEnvironmentVariable(*Name);
+#else
+			const char* Raw = getenv(TCHAR_TO_UTF8(*Name));    // portable-ok: POSIX environment bytes, read as UTF-8; Windows takes the branch above
+			return Raw ? FString(UTF8_TO_TCHAR(Raw)) : FString();
+#endif
+		}
+
+		/** Sets one (an empty value unsets it), in UTF-8 where the environment is bytes: FPlatformMisc writes it as Latin-1 there and the child saw a `?` for the accent of a folder
+		 *  name (the old launch put the paths in the command line, which the engine converts to UTF-8: it was right). */
+		void EnvSet(const FString& Name, const FString& Value)
+		{
+#if PLATFORM_WINDOWS
+			FPlatformMisc::SetEnvironmentVar(*Name, *Value);
+#else
+			if (Value.IsEmpty())
+			{
+				unsetenv(TCHAR_TO_UTF8(*Name));                // portable-ok: POSIX; Windows takes the branch above
+			}
+			else
+			{
+				setenv(TCHAR_TO_UTF8(*Name), TCHAR_TO_UTF8(*Value), 1);      // portable-ok: POSIX; Windows takes the branch above
+			}
+#endif
+		}
+
 		/** A set of variables in the game's own environment, for as long as this lives: the child inherits it (both CreateProcess and
 		 *  posix_spawn do), and the game's own is as it was when the launch is over. */
 		class FScopedEnvironment
@@ -56,15 +90,15 @@ namespace AstraMindLaunch
 			{
 				for (const TPair<FString, FString>& V : Vars)
 				{
-					Before.Emplace(V.Key, FPlatformMisc::GetEnvironmentVariable(*V.Key));
-					FPlatformMisc::SetEnvironmentVar(*V.Key, *V.Value);
+					Before.Emplace(V.Key, EnvGet(V.Key));
+					EnvSet(V.Key, V.Value);
 				}
 			}
 			~FScopedEnvironment()
 			{
 				for (int32 i = Before.Num() - 1; i >= 0; --i)
 				{
-					FPlatformMisc::SetEnvironmentVar(*Before[i].Key, *Before[i].Value);   // (an empty value unsets it, on every system)
+					EnvSet(Before[i].Key, Before[i].Value);   // (an empty value unsets it, on every system)
 				}
 			}
 
@@ -81,7 +115,7 @@ namespace AstraMindLaunch
 		M.RootDir = FPaths::ConvertRelativePathToFull(FPaths::RootDir());
 		M.ExeDir = FPaths::ConvertRelativePathToFull(FPaths::GetPath(FString(FPlatformProcess::ExecutablePath())));
 		M.SavedDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-		M.Env = [](const FString& Name) { return FPlatformMisc::GetEnvironmentVariable(*Name); };
+		M.Env = [](const FString& Name) { return EnvGet(Name); };
 		M.IsFile = [](const FString& Path) { return IFileManager::Get().FileExists(*Path); };
 		return M;
 	}

@@ -17,7 +17,7 @@ Contratti: [ARCHITETTURA.md §1, regola 4](ARCHITETTURA.md). Piano: [PIANO.md](P
 | Voci di sistema per le lingue senza Pocket TTS (SAPI) | scritto e provato con un PowerShell finto; **da sentire su un PC** | `bench/portable_unit.py` |
 | Impostazioni, plugin MetalFX, schermo intero, risoluzione dinamica | fatto (§5) | compilato, controllo di struttura |
 | Pacchetto Windows (`tools/windows/`) | scritto, analizzato con il parser di PowerShell e provato con un `uv.exe` finto; **da eseguire su un PC** | §6 |
-| Compilazione MSVC di `Source/ASTRA` (212 file) | **non verificabile qui** | il primo lavoro sul PC (§6) |
+| Compilazione MSVC di `Source/ASTRA` (più di 200 file) | **non verificabile qui** | il primo lavoro sul PC (§6) |
 
 Quello che resta non provato senza un PC è elencato in §7.3.
 
@@ -37,7 +37,7 @@ Quello che resta non provato senza un PC è elencato in §7.3.
 | `Config/Mac/MacEngine.ini` | risoluzione dinamica sempre accesa (`OperationMode=2`), TSR, ombre, Lumen, memoria dell'Air | `Config/Windows/WindowsEngine.ini`: gli stessi valori che servono al codice del gioco e all'immagine, **non** quelli di memoria; tutti da tarare sul primo PC (§9) | fatto |
 | `Config/DefaultDeviceProfiles.ini` | profilo Mac senza il volume di luce dei traslucidi | stessa riga per `[Windows DeviceProfile]` | fatto |
 | `DefaultEngine.ini` | RHI di Windows: DX12 con SM6 (Nanite, Lumen, VSM); sezioni Mac/Xcode | già pronto per Windows; le sezioni `MacTargetPlatform`/`XcodeProjectSettings` sono ignorate | già a posto |
-| `Build/Mac/Resources` | diritti, microfono, icona dell'app | niente da fare per Windows (il microfono è un'impostazione del sistema, §6.3); un'icona `.ico` è facoltativa | — |
+| `Build/Mac/Resources` | diritti, microfono, icona dell'app | niente da fare per Windows (il microfono è un'impostazione del sistema, §6.3); l'icona di `ASTRA.exe` è `Build/Windows/Application.ico`, fatta dalla stessa arte con `tools/art/app_icon_windows.py` (e `.gitignore` la lascia passare) | fatto |
 | `t.IdleWhenNotForeground 1` (`!WITH_EDITOR`) | l'app non disegna in secondo piano (batteria e calore di un Air) | vale anche su Windows: una finestra dietro le altre non disegna. **Da decidere** guardando un PC | invariato |
 | resto di `Source/ASTRA` | — | `grep` di `PLATFORM_*`, `FPlatformMisc::`, `/Users`, `/bin`, `HOME`, `NS*`, Metal: **nessun'altra** dipendenza dal Mac | verificato |
 
@@ -65,7 +65,7 @@ Quello che resta non provato senza un PC è elencato in §7.3.
 | Punto | Cosa fa | Risposta per Windows |
 |---|---|---|
 | `tools/pacchetto.sh` | `RunUAT BuildCookRun` per Mac, la mente in `Contents/Resources/mind`, dati in Application Support, `codesign`, `PlistBuddy`, `rsync`, `cp -c` | `tools/windows/Pacchetto-Windows.ps1` (§6) + `Setup-ASTRA.ps1`/`.bat` per la prima configurazione |
-| `tools/ricompila.sh`, `avvia_editor.sh`, `perf/*.sh`, `survive.sh` | strumenti dello sviluppatore Mac (zsh, `pgrep`, percorsi di Epic) | restano così: sono del Mac del lead. Per compilare su Windows vedi §6.2 |
+| `tools/ricompila.sh`, `avvia_editor.sh`, `perf/*.sh`, `survive.sh` | strumenti dello sviluppatore Mac (zsh, `pgrep`, percorsi di Epic) | restano così: sono del Mac del lead. Per compilare su Windows vedi §6.2; il `pkill -f astra-mind` di `ricompila.sh` ha il suo gemello in `tools/windows/Stop-Mind.ps1` |
 | `tools/play.py` | lancia il gioco col banco di prova | ora: `UE_ROOT`, `UnrealEditor.exe`, `ASTRA.exe` con `--app`, `Get-CimInstance`/`taskkill` al posto di `pgrep`/`pkill`, processo staccato di Windows |
 | `tools/damage.py`, `life.py`, `lift.py`, `boarding.py`, `transport.py` | lanciano i comandi senza grafica | già usano `UE_ROOT` e il percorso di Windows. **Non ancora**: `tools/war.py` e `tools/space.py` (una riga ciascuno, come in `damage.py`), `tools/soak.py` (`pgrep`) |
 | `tools/art/*`, `tools/ue_scripts/*`, Blender | arte e importazioni dentro l'editor o Blender | strumenti di sviluppo, nessun codice di gioco: invariati |
@@ -106,7 +106,10 @@ su Windows `CREATE_NO_WINDOW`, su Mac/Linux `stdin/stdout/stderr` su `/dev/null`
 
 - uv o la cartella della mente non si trovano: errore nel log del gioco (`[Mind] launched astra-mind (FAILED): …`) e una scritta a schermo che dice cosa cercare.
 - Prima partita su una macchina senza ambiente Python: una scritta avvisa che le menti si stanno installando (minuti, serve la rete); il gioco va avanti.
-- Se la mente che il gioco ha avviato si ferma (nessuna chiave, una libreria che non carica, un guasto): `[Mind] the mind stopped (exit code N)` nel log e a schermo, con il percorso del suo log.
+- Se la mente che il gioco ha avviato si ferma (nessuna chiave, una libreria che non carica, un guasto): `[Mind] the mind stopped (exit code N)` nel log del gioco e a schermo, con il percorso del
+  suo log (su Windows anche «Setup-ASTRA.bat shows what went wrong»); se intanto un'altra mente serve il gioco (una lasciata da una sessione precedente: la nuova ha trovato la porta presa) non si dice nulla.
+- Il gioco scrive **una sua riga** nel log della mente (`2026-10-04 05:26:58,207 astra.game starting the mind: …`, e `… the mind failed: its process exited with code N …` se si ferma): uv può cadere
+  prima che Python scriva qualcosa (niente rete al primo avvio, un lock rifiutato) e la storia sta così in un posto solo. Sullo stesso formato dei messaggi della mente (`tools/soak.py` li legge uguali).
 - Chiudere il gioco impacchettato termina la mente e i suoi figli (`TerminateProc(..., KillTree=true)`: su Windows percorre l'albero dei processi). Se il gioco cade, la mente
   resta ma si ferma da sola dopo 20 minuti senza nessuno (`idle_exit`).
 
@@ -114,7 +117,7 @@ su Windows `CREATE_NO_WINDOW`, su Mac/Linux `stdin/stdout/stderr` su `/dev/null`
 
 Uguale: gli argomenti, la cartella di lavoro, `ASTRA_SAVED`, `ASTRA_HOME`, `UV_PROJECT_ENVIRONMENT`, la cartella dei dati, il file di log, la durata di vita della mente, l'app nel
 suo bundle. **Diverso**: (1) niente shell di login: il PATH del figlio è quello del gioco più le cartelle note, non quello che il profilo dell'utente costruiva (Python.framework, nvm, …:
-alla mente servono `uv`, `whisperkit-cli` e `say`, che stanno in `/opt/homebrew/bin`, `~/.local/bin` e `/usr/bin`); (2) in più `ASTRA_MIND_LOG`; (3) una scritta se il Mac non ha uv.
+alla mente servono `uv`, `whisperkit-cli` e `say`, che stanno in `/opt/homebrew/bin`, `~/.local/bin` e `/usr/bin`); (2) in più `ASTRA_MIND_LOG`; (3) una scritta se il Mac non ha uv; (4) le righe `astra.game` del gioco nel log della mente.
 
 ## 4. La mente su Windows
 
@@ -203,7 +206,7 @@ producibile se la scrittura non è latina (come sempre).
 3. `Saved\Logs\astra-mind.log`: `astra-mind listening on ws://127.0.0.1:8765`, i motori (`parakeet-onnx`, `faster-whisper`), i modelli delle voci in caricamento, `game connected`.
 4. Il microfono: premere il tasto di parola e dire un ordine: `STT … [en] …` nel log della mente. Se il microfono è negato: la scritta a schermo e `Impostazioni → Privacy → Microfono`.
 5. Le voci: l'equipaggio parla (le battute passano dal gioco, `UAstraVoiceWave`); nei primi minuti, finché i modelli non sono scaricati, parlano le voci SAPI (se il PC ha una voce per la lingua).
-6. Chiudere il gioco: i processi `uv.exe`/`python.exe` della mente spariscono dal Task Manager (se non spariscono: la mente si ferma da sola dopo 20 minuti; si può chiudere a mano).
+6. Chiudere il gioco: i processi `uv.exe`/`python.exe` della mente spariscono dal Task Manager (se non spariscono: la mente si ferma da sola dopo 20 minuti; `tools\windows\Stop-Mind.ps1` la ferma subito, come il `pkill -f astra-mind` di `ricompila.sh`).
 7. Con `tools/play.py launch --app C:\...\Windows` (variabile `UE_ROOT` per il motore) si gioca da terminale come sul Mac.
 
 ### 6.4 Problemi probabili e dove guardare
@@ -267,7 +270,7 @@ Gira ovunque con il solo Python, in due secondi, e segnala il codice solo-Mac (o
 | `mac-path`, `shell`, `mac-tool`, `mac-say`, `mac-framework*` | cartelle del Mac nel codice, shell e programmi che hanno solo Mac o POSIX (`zsh`, `osascript`, `pgrep`, `say`), framework Apple |
 | `platform-macro`, `darwin-check` | `PLATFORM_MAC`/`Darwin`: ogni ramo Mac deve nominare la sua alternativa in un commento `portable-ok: …` |
 | `posix-only`, `rename`, `tmp-path`, `env-home` | `SIGHUP`, `add_signal_handler`, `fork`, `fcntl`…; `os.rename`; `/tmp`, `/dev/null`; `$HOME` |
-| `locale-text-io` | `open()`/`read_text()`/`write_text()` di testo senza `encoding=` (Windows legge in cp1252) |
+| `locale-text-io` | `open()`/`read_text()`/`write_text()` di testo senza `encoding=`, e `subprocess` con `text=True` senza `encoding=` (Windows legge in cp1252; provato anche forzando una codifica ASCII sulle 549 prove della mente: tutte passano) |
 | `posix-header`, `gcc-only`, `include-case` | intestazioni POSIX, costrutti solo GCC/clang, `#include` con le maiuscole sbagliate (Linux) |
 | `structure` | un plugin solo-Mac deve essere `PlatformAllowList: ["Mac"]` nel `.uproject` e nel `.uplugin` e nessun file di gioco può includerlo |
 | `config-parity` | ogni impostazione di `MacEngine.ini` ha il suo gemello in `WindowsEngine.ini`, o è dichiarata solo-Mac (`MAC_ONLY_ENGINE_KEYS`) |
@@ -282,6 +285,5 @@ plugin e l'helper). Gira anche da `bench.portable_unit`.
 - `bAllowHighDPIInGameMode` (§5) e una riga SETTINGS per l'uscita a metà risoluzione.
 - `t.IdleWhenNotForeground` su Windows (un gioco in secondo piano che si ferma: voluto?).
 - `tools/war.py`, `tools/space.py`, `tools/soak.py`: stesso `UE_ROOT` e la ricerca dei processi senza `pgrep` (una riga ciascuno, come in `damage.py`/`play.py`).
-- Windows su ARM: non è un obiettivo (`ctranslate2` non ha la ruota; PyTorch nemmeno per CPython 3.13 su PyPI).
+- Windows su ARM: non è un obiettivo (`ctranslate2` non ha la ruota per `win_arm64`, e nel lock la ruota di PyTorch per Windows c'è solo per x64).
 - Voci di sistema di Linux (`espeak-ng`) se mai servisse Linux.
-- L'icona `.ico` (`Build/Windows/Application.ico`; `.gitignore` oggi esclude `Build/*` salvo `Build/Mac/`).

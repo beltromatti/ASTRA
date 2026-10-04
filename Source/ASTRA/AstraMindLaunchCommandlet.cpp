@@ -303,12 +303,12 @@ namespace
 		if (M.Host == EHost::Windows)
 		{
 			P.Uv = TEXT("C:\\Windows\\System32\\cmd.exe");
-			P.Args = FString::Printf(TEXT("/c \"set > %s\""), *NativePath(M.Host, Out));
+			P.Args = FString::Printf(TEXT("/c set > \"%s\""), *NativePath(M.Host, Out));
 		}
 		else
 		{
 			P.Uv = TEXT("/bin/sh");
-			P.Args = FString::Printf(TEXT("-c \"env | sort > %s\""), *Out);
+			P.Args = FString::Printf(TEXT("-c \"env | sort > '%s'\""), *Out);
 		}
 		const FString SavedBefore = FPlatformMisc::GetEnvironmentVariable(TEXT("ASTRA_SAVED"));
 		const FString LogBefore = FPlatformMisc::GetEnvironmentVariable(TEXT("ASTRA_MIND_LOG"));
@@ -509,7 +509,8 @@ int32 UAstraMindLaunchCommandlet::Main(const FString& Params)
 	const bool bProbe = FParse::Param(*Params, TEXT("probe"));
 	if (bProbe || !LaunchMode.IsEmpty())
 	{
-		const FString Scratch = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()) / TEXT("AstraMindLaunchTest");
+		// (a folder with a space and an accented letter in its name, like the profile of a user with a first and a last name: every path of the test goes through them)
+		const FString Scratch = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()) / TEXT("Mind Launch Prova \u00e8");
 		IFileManager::Get().DeleteDirectory(*Scratch, false, true);
 		IFileManager::Get().MakeDirectory(*Scratch, true);
 		if (bProbe)

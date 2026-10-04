@@ -241,6 +241,12 @@ void UAstraMindSubsystem::WatchMindProcess(double Now)
 	FPlatformProcess::GetProcReturnCode(MindProc, &Code);
 	FPlatformProcess::CloseProc(MindProc);
 	bMindExitReported = true;
+	if (IsConnected())
+	{
+		// a mind that an earlier session left running is serving the game: the one this game started found its door taken and stood down
+		UE_LOG(LogASTRA, Log, TEXT("[Mind] the mind this game started is gone (exit code %d), but a mind is connected: nothing to report"), Code);
+		return;
+	}
 	UE_LOG(LogASTRA, Error, TEXT("[Mind] the mind stopped (exit code %d) %.0f s after it was started: its log is %s"), Code, Now - MindLaunchedAt, *MindLogFile);
 	AstraMindLaunch::AppendLog(MindLogFile, FString::Printf(TEXT("the mind failed: its process exited with code %d, %.0f s after it was started (uv or Python stopped before it could write here?)"),
 	                                                       Code, Now - MindLaunchedAt));

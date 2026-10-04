@@ -110,7 +110,7 @@ class _MacVoices:
         if self._have is None:
             self._have = set()
             try:
-                out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True, timeout=10).stdout       # portable-ok: macOS; _WindowsVoices does it on Windows
+                out = subprocess.run(["say", "-v", "?"], capture_output=True, timeout=10).stdout.decode("utf-8", errors="replace")       # portable-ok: macOS; _WindowsVoices does it on Windows
                 for line in out.splitlines():
                     head = line.split("#")[0].rstrip()
                     parts = head.rsplit(None, 1)

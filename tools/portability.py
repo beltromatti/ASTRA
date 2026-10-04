@@ -101,6 +101,8 @@ RULES: list[Rule] = [
          "HOME does not exist on Windows (USERPROFILE): Path.home(), FPlatformProcess::UserSettingsDir()"),
     rule("posix-header", "cpp", r"#\s*include\s*<(?:unistd|sys/[a-z_]+|pthread|dlfcn|dirent|mach/[a-z_/]+|libproc|fcntl|termios|arpa/inet|netinet/[a-z_]+|poll|signal)\.h>",
          "a POSIX header: the engine's own platform layer has what is needed"),
+    rule("posix-call", "cpp", r"\b(?:setenv|unsetenv|putenv|getenv|fork|execv|execvp|execl|waitpid|dup2|chdir|getcwd|opendir|readdir|mmap|munmap|dlopen|dlsym|getpid|getppid|getuid|geteuid|sigaction)\s*\(",
+         "a POSIX call that MSVC does not have: the engine's FPlatformProcess / FPlatformMisc / IFileManager, or a Windows branch next to it"),
     rule("gcc-only", "cpp", r"\b__attribute__\b|\b__builtin_[a-z_]+|\b__restrict__\b|\btypeof\s*\(|\b__asm__\b",
          "does not compile with MSVC"),
 ]
@@ -215,6 +217,10 @@ def locale_io(code: str) -> list[tuple[int, str]]:
         binary = re.search(r"""["'][rwaxt+]*b[rwaxt+]*["']""", args) is not None
         if not binary and "encoding" not in args:
             hits.append((m.start(), "open("))
+    for m in re.finditer(r"\bsubprocess\.(?:run|check_output|Popen|call|check_call)\(", code):
+        args = balanced_args(code, m.end() - 1)
+        if re.search(r"\b(?:text|universal_newlines)\s*=\s*True\b", args) and "encoding" not in args:
+            hits.append((m.start(), "subprocess text"))        # (its output is decoded in the system's code page: bytes and .decode("utf-8"), or encoding=)
     return hits
 
 
@@ -395,6 +401,8 @@ SAMPLES: list[tuple[str, str, str, bool]] = [
     ("cpp", '#if PLATFORM_MAC // portable-ok: Windows has WindowsGameUserSettings.ini\nint X;\n#endif', "platform-macro", True),
     ("cpp", '#include <unistd.h>', "posix-header", True),
     ("cpp", 'int X = __builtin_popcount(Y);', "gcc-only", True),
+    ("cpp", 'setenv(TCHAR_TO_UTF8(*Name), TCHAR_TO_UTF8(*Value), 1);', "posix-call", True),
+    ("cpp", 'FPlatformMisc::SetEnvironmentVar(*Name, *Value);', "posix-call", False),
     ("cpp", 'NSString* S = [NSString stringWithUTF8String:"x"];', "mac-framework", True),
     ("cpp", 'FString H = FPlatformMisc::GetEnvironmentVariable(TEXT("HOME")) / TEXT("x");', "env-home", True),
     ("cpp", 'FString H = FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA"));', "env-home", False),
@@ -415,6 +423,9 @@ SAMPLES: list[tuple[str, str, str, bool]] = [
     ("py", 'with open(path, "rb") as f:\n    data = f.read()', "locale-text-io", False),
     ("py", 'with open(\n    path, "w",\n    encoding="utf-8") as f:\n    pass', "locale-text-io", False),
     ("py", 'wave.open(name, "wb")', "locale-text-io", False),
+    ("py", 'out = subprocess.run(["x"], capture_output=True, text=True).stdout', "locale-text-io", True),
+    ("py", 'out = subprocess.run(["x"], capture_output=True, text=True, encoding="utf-8").stdout', "locale-text-io", False),
+    ("py", 'out = subprocess.run(["x"], capture_output=True).stdout.decode("utf-8", "replace")', "locale-text-io", False),
     ("py", 'os.rename(a, b)', "rename", True),
     ("py", 'os.replace(a, b)', "rename", False),
     ("py", 'out = "/tmp/astra/out.json"', "tmp-path", True),
