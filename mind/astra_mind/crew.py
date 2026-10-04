@@ -262,10 +262,13 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
 - A derelict on the plot (a dead station, a drifting hulk) is investigated in steps: an active scan, a flight group on recon to
   look at it up close, then the Aquila closing in (intercept with a short standoff, 1.5 km). Each step can reveal more; a dark
   place can also hide an ambush.
-- Where the Captain is: see `captain` in the ship state. Away from the bridge (the flight deck, or flying a Falcon as "Eagle")
-  the XO has the conn: the XO commands the ship on the Captain's behalf, keeps the Captain informed by intercom or radio (short
-  radio calls: "Eagle, Aquila actual..."), and still carries out the Captain's orders. Flight Control (Price) talks the
-  Captain's Falcon out and home; everyone worries a little.
+- Where the Captain is: the first lines of [The bridge now] say it («Where the Captain is NOW»): the ship's live reading of him, from
+  his badge and the sensors. It is the truth of this moment and it beats everything remembered: a transport that went through
+  minutes ago, an order you gave, a line of the talk above. Never tell him he is somewhere because it was said or done before, never
+  put two places in one sentence, and when he says he is not where you thought, the line settles it: he walked on. Away from the
+  bridge (the flight deck, or flying a Falcon as "Eagle") the XO has the conn: the XO commands the ship on the Captain's behalf,
+  keeps the Captain informed by intercom or radio (short radio calls: "Eagle, Aquila actual..."), and still carries out the
+  Captain's orders. Flight Control (Price) talks the Captain's Falcon out and home; everyone worries a little.
 - The Captain carries a datapad (a rugged slate raised in the left hand anywhere aboard): condition, hull, shields and heat, the
   contacts as the sensors know them, fire control, the flight groups, damage, the standing orders in force and the last words on
   the comms. "It's on your datapad, Captain" is fair when the Captain is off the bridge.
@@ -337,8 +340,13 @@ _RULE_TRANSPORTER = """- The Transporter Room (Deck 5, `transporter` in the ship
   boarding (the Captain too, beside them: the Chief's card says when), or the surface of the world below, or asks what can be reached, or asks to be brought back from
   where he is ("beam me up", from the decks of the ship our marines hold or from the ground), Operations (Tanaka) or the XO (Serra) hands it to her in the Captain's own terms (who, where to, from where if they are not where they
   stand) and says ONE short line in the Captain's language, what was handed over ("Chief, the Captain to the surface"): never what she will find, never her answer —
-  the Chief gives it, and the officers do not repeat it. Plain words for who and where: the Captain's names, "the Captain" for him, a room by its name, a ship by its
-  contact id. Every transport is the Captain's order: no officer beams anyone on their own initiative. The Captain's own word is what lowers our shields for a cycle
+  the Chief gives it, and the officers do not repeat it. Plain words for who and where: the Captain's names, "the Captain" for him, a ship by its
+  contact id, a room by the name the ship's plan gives it, whatever the Captain called it: the Kestrels' room is the «Assault-Shuttle Bay» (Deck 8, section B: «Kestrel bay»,
+  «the hangar on deck 8», «la baia dei Kestrel»), the marines' armoury the «Marine Armory» (Deck 8, B; the «Boarding Kit Room» is next to it, the «Security Armory» is in D),
+  then the «Brig» (Deck 8), the «Flight Deck» and the «Drone Bay» (Deck 9), «Main Engineering» (Deck 7), the «Medbay» (Deck 6), the «Transporter Room» (Deck 5), the «Mess
+  Hall» (Deck 4), the «Captain's Quarters» and the «Ready Room» (Deck 1), the «Bridge». Where the Captain is NOW is the live line of [The bridge now], never what a transport
+  or an order said before: the Chief beams him from where he really stands. Every transport is the Captain's order: no officer beams anyone on their own initiative.
+  The Captain's own word is what lowers our shields for a cycle
   (`shield_window`) with enemies about and what accepts a risk (`override`: a landing in fire or smoke, a weak lock): pass them only when he said so himself, and
   never put them in on a hunch — the Chief asks him once if she doubts. The bridge learns the room's state from the one line in the ship state and from what the
   Chief says. Before a Janus transit with people away from the ship (the line says who, and where) the XO reminds the Captain: the beam does not reach across the Gate."""
@@ -501,12 +509,16 @@ an unasked question, loyalty under fire; never announce it)
 [end of what the crew carries]"""
 
 
+WHERE_HEAD = ("Where the Captain is NOW (the ship's live reading of him, from his badge and the sensors: it beats everything remembered, a transport that went through "
+              "minutes ago, an order, a line of the talk above: he may have walked on since)")
+
+
 def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: str = "", said_aloud: str = "", waiting: str = "", context: str = "",
-               orders: str = "") -> str:
+               orders: str = "", where: str = "") -> str:
     """The bridge as it is this moment, for the last message of a crew turn: the recent events, the consoles, the room, the live
     telemetry. Kept out of the system prompt so that the system prompt and the conversation before this turn are the same from one call
     to the next: the provider's prompt cache then covers them (with the telemetry inside the system prompt the cache stopped at it, and a
-    battle cost twice as much)."""
+    battle cost twice as much). `where`: the Captain's live position (context.where_now), the first thing in it."""
     events = "\n".join(f"- {e}" for e in recent_events[-8:]) or "- (none)"
     board = station_model.board(ship_state, {k: v.title for k, v in CREW.items()})
     view = {k: v for k, v in ship_state.items() if not k.startswith("_") and (k not in ("stations", "sim_time_s") or not board)}
@@ -520,7 +532,8 @@ def bridge_now(ship_state: dict[str, Any], recent_events: list[str], hearing: st
     said = f"Said aloud on the bridge in the last minute (what the Captain has heard, oldest first)\n{said_aloud}\n" if said_aloud else ""
     said += f"Waiting to be said (queued behind whoever is speaking, in the order it will be said)\n{waiting}\n" if waiting else ""
     said = (f"The Captain's last words to the bridge (newest last; an order still stands unless he changed it)\n{orders}\n" if orders else "") + said
-    return ((context + "\n\n" if context else "") + f"[The bridge now]\nRecent events\n{events}\n" + said
+    here = f"{WHERE_HEAD}\n{where}\n" if where else ""
+    return ((context + "\n\n" if context else "") + f"[The bridge now]\n{here}Recent events\n{events}\n" + said
             + (("Consoles now (who runs what, since when, how it is going)\n" + board + "\n") if board else "")
             + (("The fleet: our battle groups and their captains, from the fleet datalink\n" + fleet + "\n") if fleet else "")
             + (("The front, as Fleet knows it (what comms and the plot hold of the war beyond this sky; what is not here is not known)\n" + front + "\n") if front else "")

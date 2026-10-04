@@ -123,7 +123,8 @@ class BridgeAgent:
     def _now(self, state: dict[str, Any], ctx: context_model.Context | None = None) -> str:
         """The bridge this moment (crew.bridge_now), for the head of a turn's last message."""
         hearing = context_model.describe(ctx, self.titles) if ctx else ""
-        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting(), self._context(), self._orders())
+        return bridge_now(state, self.ship.recent_events(), hearing, self._said_aloud(), self._waiting(), self._context(), self._orders(),
+                          where=context_model.where_now(ctx, state))
 
     def _waiting(self) -> str:
         """The lines queued on the floor behind whoever is speaking: the officers see the backlog (a crisis made fifty urgent lines in four minutes, 2 Oct,

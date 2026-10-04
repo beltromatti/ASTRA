@@ -32,7 +32,7 @@ from .crew import CREW
 from .enemy import COMMANDERS, EnemyAgent
 from .style import StyleKeeper
 from . import router as router_mod
-from .context import Exchange, parse as parse_context, parse_lift
+from .context import Exchange, badge_of_raw, parse as parse_context, parse_lift
 from .initiative import Watch, chatter_system, recent_orders, watch_ask, watch_system
 from .director import ADMIRAL, Director
 from .env import CACHE
@@ -1020,7 +1020,7 @@ class Mind:
         if people:
             gate = asyncio.get_running_loop().create_future()
             world = {"state": st, "war": self.director.war.crew_view(), "mood": self.director.mood, "clock": (st.get("life") or {}).get("clock")}
-            where = "at " + str((raw_ctx or {}).get("place_name") or (raw_ctx or {}).get("place") or "somewhere aboard")
+            where = "at " + (badge_of_raw(raw_ctx) or "somewhere aboard") + " (his badge, live: it beats anything remembered)"
             if lift := parse_lift((raw_ctx or {}).get("lift")):
                 # in a lift car with them: the ship's computer runs the lift, so what asks for a ride is its to answer (tools.lift_tool), never a rider's
                 where += (f", inside {lift.name}, a lift car: the ship's computer takes him wherever he asks, a deck, a place or a section, \"down\", \"one up\", in any language, so "
@@ -1034,7 +1034,7 @@ class Mind:
         if not self.xfer.disabled and self.xfer.in_earshot(raw_ctx):
             gate_x = asyncio.get_running_loop().create_future()
             place_x = str((raw_ctx or {}).get("place") or "")
-            where_x = "in the Transporter Room" if "transporter" in place_x else "at " + str((raw_ctx or {}).get("place_name") or place_x or "somewhere aboard")
+            where_x = "in the Transporter Room" if "transporter" in place_x else "at " + (badge_of_raw(raw_ctx) or place_x or "somewhere aboard") + " (his badge, live: it beats anything remembered)"
             asyncio.create_task(self.xfer.hear(text, lang, gate_x, where_x))
             gate = gate_x if gate is None else _both(gate, gate_x)
             if self.xfer.facing(raw_ctx):
