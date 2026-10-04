@@ -175,6 +175,13 @@ def rack_bedding(b, h, rng, top: bool):
 
 
 def stack(name: str, variant: str, seed: int):
+    """ARTE-INTERNI-2 rebuilt the racks in the kit's language (art/blender/ship_berth_racks.py: the same frame, the same sizes and heights: the sleepers' mattresses stay where they were, 4 000 triangles
+    instead of 12 500). stack_v1 below is the first generation."""
+    import ship_berth_racks
+    return ship_berth_racks.stack(name, variant, seed)
+
+
+def stack_v1(name: str, variant: str, seed: int):
     b = A.Builder()
     rng = random.Random(seed)
     top_z = LEVELS[-1] + 0.85
@@ -216,6 +223,12 @@ def stack(name: str, variant: str, seed: int):
 
 
 def lockers():
+    """The locker columns, rebuilt with the racks (art/blender/ship_berth_racks.py); lockers_v1 is the first generation."""
+    import ship_berth_racks
+    return ship_berth_racks.lockers("SM_BERTH_Lockers")
+
+
+def lockers_v1():
     b = A.Builder()
     w = LW
     d = 0.55
