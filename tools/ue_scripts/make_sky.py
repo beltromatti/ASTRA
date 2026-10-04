@@ -30,7 +30,7 @@ log.append(f"sky cubemap: {cube.get_class().get_name()}")
 path = f"{DST}/M_ASTRA_SpaceSky"
 if eal.does_asset_exist(path):
     m = eal.load_asset(path)                # rebuilt in place: levels keep their references
-    mel.delete_all_material_expressions(m)
+    for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy: UE 5.8's delete_all walks the list it removes from, and crashed the editor)
 else:
     m = tools.create_asset("M_ASTRA_SpaceSky", DST, unreal.Material, unreal.MaterialFactoryNew())
 m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)

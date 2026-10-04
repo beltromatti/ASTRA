@@ -23,7 +23,7 @@ def material(name, blend=unreal.BlendMode.BLEND_ADDITIVE):
     p = f"{DIR}/{name}"
     if eal.does_asset_exist(p):
         m = eal.load_asset(p)
-        mel.delete_all_material_expressions(m)
+        for _e in list(mel.get_material_expressions(m)): mel.delete_material_expression(m, _e)   # (from a copy: UE 5.8's delete_all walks the list it removes from, and crashed the editor)
     else:
         m = tools.create_asset(name, DIR, unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
