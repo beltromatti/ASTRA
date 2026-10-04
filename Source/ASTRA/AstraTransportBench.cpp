@@ -361,7 +361,9 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 		const FCase Cases[] = {{TEXT("Deck 8 hangar"), TEXT("Assault-Shuttle Bay"), false}, {TEXT("the Kestrel bay"), TEXT("Assault-Shuttle Bay"), false},
 		                       {TEXT("kestrels"), TEXT("Assault-Shuttle Bay"), false}, {TEXT("my quarters"), TEXT("Captain's Quarters"), false},
 		                       {TEXT("the Marine Armory on Deck 8"), TEXT("Marine Armory"), true}, {TEXT("Main Engineering"), TEXT("Main Engineering"), false},
-		                       {TEXT("the flight deck"), TEXT("Flight Deck"), false}, {TEXT("sickbay"), TEXT("Medbay"), false}};
+		                       {TEXT("the flight deck"), TEXT("Flight Deck"), false}, {TEXT("sickbay"), TEXT("Medbay"), false},
+		                       {TEXT("hangar dei Kestrel"), TEXT("Assault-Shuttle Bay"), false}, {TEXT("the Kestrel deck"), TEXT("Assault-Shuttle Bay"), false},
+		                       {TEXT("the Assault-Shuttle Bay (Deck 8, Port Passage section B)"), TEXT("Assault-Shuttle Bay"), false}};
 		for (const FCase& C : Cases)
 		{
 			FString Label, Err, Open;
