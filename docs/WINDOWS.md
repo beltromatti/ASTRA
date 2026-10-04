@@ -241,6 +241,7 @@ ASTRA_TEST_PORTABLE_REAL=1 ASTRA_VOICE_MODELS=<cartella> .venv/bin/python -m uni
 
 # progetto
 python tools/portability.py [--allowed] [--lock] [--selftest]
+python3 tools/shadow_audit.py [-j N] [--all]      # sul Mac, dopo una compilazione: ciò che MSVC chiama C4456/C4458 (errori qui) e il -Wshadow del Mac lascia passare; circa un minuto
 ```
 
 ### 7.2 Risultati (4/10/2026, MacBook Air M4)
@@ -268,6 +269,18 @@ irraggiungibile (C4702). Quest'ultimo è il rischio vero: MSVC può segnalare co
 `PRAGMA_DISABLE_UNREACHABLE_CODE_WARNINGS`), clang no. Ho tolto quei rami dal mio codice (le impostazioni e il comando di prova
 sceglievano con `constexpr bool bMac = PLATFORM_MAC`: ora scelgono il preprocessore) e la regola `constant-condition` di `tools/portability.py` li cerca (§8). Se il primo giro MSVC protesta ancora per
 C4702 in un file, si isola con `#pragma warning(disable: 4702)` (`PRAGMA_DISABLE_UNREACHABLE_CODE_WARNINGS` del motore) intorno a quel punto, o `if constexpr`.
+
+Le ombre (C4456/C4458) hanno un buco sul Mac: il `-Wshadow` di clang tace sul parametro di una lambda che ha il nome di una variabile locale, o di un membro della classe, che la lambda non cattura, e sul
+parametro di un costruttore che ha il nome di un campo; MSVC no. `tools/shadow_audit.py` rifà con `-Wshadow-all` i comandi di compilazione che UBT ha scritto (`.rsp`), senza codice e senza `-Werror`: 130 file in
+43 s. Nel mio codice: nulla. Negli altri moduli **6 punti in 4 file** (da rinominare, la rinomina non cambia nient'altro; ognuno è il parametro di una lambda):
+
+| File:riga | Il parametro | Nasconde | Su MSVC (probabile) |
+|---|---|---|---|
+| `AstraHoloTable.cpp:1286` | `Dots` | il campo `AAstraHoloTable::Dots` (`.h:63`) | C4458, errore |
+| `AstraNavLights.cpp:74` | `Glow` e `Pattern` | i campi `UAstraNavLights::Glow`, `::Pattern` (`.h:51-52`) | C4458, errore |
+| `AstraViewscreen.cpp:1068` | `B` | la variabile locale `B` di `.cpp:942` | C4456, errore |
+| `AstraLiftSimCommandlet.cpp:334, 352` | `L` | il parametro `L` di `LiftTestBrain` (`.cpp:254`) | C4457, solo avviso |
+
 
 ## 8. Il controllo di portabilità (`tools/portability.py`)
 
