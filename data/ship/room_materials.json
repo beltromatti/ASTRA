@@ -11,6 +11,7 @@
     "MI_SHIP_Terrazzo":     {"set": "Terrazzo",      "tint": "#C9C7C0", "k": 1.25, "uv": 0.8, "rough": [0.2, 0.45], "normal": 0.6, "coat": 0.3},
     "MI_SHIP_TerrazzoDark": {"set": "Terrazzo",      "tint": "#8D8B86", "k": 1.25, "uv": 0.8, "rough": [0.2, 0.45], "normal": 0.6, "coat": 0.3},
     "MI_SHIP_TileFloor":    {"set": "TileBig",       "tint": "#B9C4C4", "k": 1.0,  "uv": 0.9, "rough": [0.06, 0.3], "normal": 0.6, "coat": 0.4},
+    "MI_SHIP_TileBlack":    {"set": "TileBig",       "tint": "#25282C", "k": 1.0,  "uv": 0.9, "rough": [0.06, 0.3], "normal": 0.6, "coat": 0.4},
     "MI_SHIP_TileHex":      {"set": "TileHex",       "tint": "#C9D2D0", "k": 1.0,  "uv": 1.6, "rough": [0.15, 0.5], "normal": 0.7, "coat": 0.3},
     "MI_SHIP_TileWall":     {"set": "TileSmall",     "tint": "#D8E2E0", "k": 1.0,  "uv": 0.8, "rough": [0.08, 0.3], "normal": 0.7, "coat": 0.5},
     "MI_SHIP_Tread":        {"set": "DiamondPlate",  "tint": "#7A8088", "k": 1.0,  "uv": 1.2, "rough": [0.35, 0.7], "metal_map": 0.8, "normal": 1.0},

@@ -17,7 +17,7 @@ import ship_themes as TH
 import ship_furniture2 as G
 import ship_spec as SPEC
 from bridge3_lib import T, frame
-from ship_lib import (BRASS, PLASTER_IVORY, CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, TUFT_SAND, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_TEAL, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
+from ship_lib import (BRASS, PLASTER_IVORY, PLASTER_SLATE, SWATCH, TEAK, TERRAZZO_DARK, CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, TUFT_SAND, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_TEAL, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
                       FABRIC_SAND, GLASS, IVORY, LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, LEAF, PAINT_RED, RUBBER, SOIL, STEEL, STRUCT, TILE, TRIM, WOOD,
                       SParts, lamp_strip)
 from ship_rooms import (Style, WF, WS, build_shell, ceiling_panels, luminaire_strips, place, wall_label, window_wall)
@@ -318,36 +318,77 @@ def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
 
 
 # ------------------------------------------------------------------------------------------------------ bow observation deck
+def _bow_floor(b: SParts, spec: dict, st, rng) -> None:
+    """The bow deck's floor: walnut planks running to the window, a compass rose of stone and brass in the middle, a brass line round the hall."""
+    L, D = spec["L"], spec["D"]
+    SU.planks(b, 0.0, L, 0.0, D, WALNUT, 0.2, 2.6, "x", seed=9)
+    SU.compass_rose(b, 9.5, 16.0, 5.0, 0.0, 16, TERRAZZO_DARK)
+    SU.border_line(b, 1.4, L - 1.9, 1.4, D - 1.4, 0.02, BRASS)
+
+
+def _bow_ceiling(b: SParts, spec: dict, st, rng) -> None:
+    """The bow deck's ceiling: a dark plane with a field of stars, a beam over every ship's frame, and a ring of light over the compass rose."""
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    zc = H - 0.05
+    b.body.box((WS + WF, WF, zc), (L - WS - WF, D - WS - WF, H), COMPOSITE)
+    SU.stars(b, 1.0, L - 1.0, 1.0, D - 1.0, zc - 0.003, 240, 17)
+    for x in (4.0, 8.0, 12.0, 16.0):
+        b.body.box((x - 0.14, WF, zc - 0.2), (x + 0.14, D - WS - WF, zc), STRUCT)
+        b.emit.lamp_box((x - 0.145, 0.6, zc - 0.12), (x - 0.14, D - 0.6, zc - 0.1), "cool_dim", LAMP_DIM)
+        b.emit.lamp_box((x + 0.14, 0.6, zc - 0.12), (x + 0.145, D - 0.6, zc - 0.1), "cool_dim", LAMP_DIM)
+    _ring(b.emit, 9.5, 16.0, zc - 0.012, 5.8, "white_cool", 80, 0.07, LAMP_DIM)
+    _ring(b.emit, 9.5, 16.0, zc - 0.012, 4.2, "cool_dim", 64, 0.04)
+
+
 def bow_obs(name: str = "SM_SHIP_BowObs"):
-    """20 x 32: x is forward (0 = the aft wall the Spine runs into at y 16, 20 = the panoramic window), y across."""
+    """20 x 32: x is forward (0 = the aft wall the Spine runs into at y 16, 20 = the panoramic window), y across. The great room at the bow: teak planks with a compass rose, a star table in
+    the middle of its lit rings, a rail along the window with six places to stand at it and two telescopes between the piers, two pairs of benches with a rug each, a lounge corner, a bar
+    under the news screen, planters, portraits of the ship's ancestors on the side walls, and a ceiling of stars with a ring of light over the rose."""
     spec, L, D, H = _dims("bow_obs")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.05, ceil=COMPOSITE, accent="cool_dim", cove="cool_dim",
-               rib_mat=TRIM, skirt=STRUCT)
+    st = TH.living(floor=TEAK, floor_mode="covering", floor2=TEAK, border=0.0, wall_hi=PLASTER_SLATE, wall_lo=PLASTER_SLATE, accent="cool_dim", strip="white_cool", light_cell="white_cool",
+                   ceiling="none", floor_fn=_bow_floor, ceiling_fn=_bow_ceiling)
     doors = [{"wall": "left", "x": 16.0, "w": 3.2, "h": 3.2}]
     build_shell(b, spec, st, doors=doors, skip=("right",), bare=())
     spans = window_wall(b, "right", L, D, H, st, 5, pier=0.5)
     xw = L - WS - WF
-    # a floor inlay: a compass ring around the centre, guide lines to the window
-    _ring(b.emit, 9.5, 16.0, 0.004, 4.6, "cool_dim", 64, 0.05)
-    _ring(b.emit, 9.5, 16.0, 0.004, 3.4, "guide", 48, 0.03)
-    for y in (16.0,):
-        lamp_strip(b.emit, (1.2, y, 0.004), (xw - 3.0, y, 0.004), 0.05, 0.006, "guide", LAMP_DIM)
-    # a rail along the window (watchers lean on it), four benches in the middle, planters at both ends
+    # a rail along the window (watchers lean on it), the star table in the middle of the rose
     b.fine.cyl((xw - 1.3, 1.0, 1.05), (xw - 1.3, D - 1.0, 1.05), 0.024, TRIM, seg=10)
     for y in [1.0 + k * 2.0 for k in range(int((D - 2.0) / 2.0) + 1)]:
         b.fine.cyl((xw - 1.3, y, 0.0), (xw - 1.3, y, 1.05), 0.015, TRIM, seg=8)
+    place(b, 9.5, 16.0, 0, G.holo_table, 1.0, 0.95)
+    for a in (22.5, 112.5, 202.5, 292.5):                                                                         # four stools round it
+        place(b, 9.5 + 1.75 * math.cos(math.radians(a)), 16.0 + 1.75 * math.sin(math.radians(a)), 0, F.stool, 0.19, 0.46, FABRIC_NAVY)
+    for y in (3.9, 12.0, 20.0, 28.1):                                                                              # two telescopes between the piers
+        pass
+    for x_, y_ in ((xw - 2.4, 11.0), (xw - 2.4, 21.0)):
+        place(b, x_, y_, 0, G.telescope)
+    # two pairs of benches, each pair on a rug
     for y, w in ((6.5, 6.0), (25.5, 6.0)):
+        place(b, 12.6, y, 0, SU.rug_ornate, 4.6, 7.4, CARPET_SLATE, CARPET_SAND, ("oxblood", "cream", "mustard"), int(y), 0.2)
         place(b, 11.6, y, 0, F.bench, w, 0.6, 0.46, FABRIC_NAVY)
         place(b, 13.6, y, 0, F.bench, w, 0.6, 0.46, FABRIC_NAVY)
+    # the lounge corner (aft left): a sofa, two armchairs and a low table on a rug, a floor lamp
+    place(b, 4.2, 5.0, 0, SU.rug_ornate, 4.6, 3.8, CARPET_SLATE, CARPET_SAND, ("navy", "cream", "teal"), 31, 0.18)
+    place(b, 2.2, 5.0, 0, F.sofa, 2.6, LEATHER_NAVY)
+    place(b, 4.2, 3.0, 90, F.armchair, LEATHER_TAN)
+    place(b, 4.2, 7.0, -90, F.armchair, LEATHER_TAN)
+    place(b, 3.8, 5.0, 0, DC.coffee_table_set, 1.2, 0.7, 0.4, OAK, 8)
+    place(b, 1.6, 7.6, 0, F.lamp_standard, 1.6)
+    place(b, 1.5, 2.2, 0, F.potted_plant, 1.7, 5)
+    # the bar under the news screen: a counter, stools, a back bar (aft right)
+    place(b, 3.0, 27.0, 0, G.bar_counter, 4.4, 0.7, 1.08)
+    for k in range(4):
+        place(b, 4.2, 25.5 + 1.2 * k + 0.2, 0, G.bar_stool, 0.72, LEATHER_OX)
+    place(b, 0.32, 27.0, 0, G.back_bar, 4.4, 2.1, 0.34, 4)
+    place(b, 0.32, 24.0, 0, F.wall_screen, 2.4, 1.2, "scr_news", z=1.7)
+    place(b, 0.32, 7.0, 0, F.wall_screen, 3.0, 1.3, "scr_map", z=1.8)
+    b.emit.label_fit((0.27, 16.0, 3.05), 3.2, "room_bow_obs", (1, 0, 0))
+    # planters in the corners and by the window, portraits on the side walls
     for y in (2.2, D - 2.2):
         place(b, xw - 2.2, y, 0, F.planter, 2.2, 0.9, 0.5, 4, 7 + int(y), True)
-        place(b, 2.4, y, 0, F.planter, 2.2, 0.9, 0.5, 3, 5 + int(y), True)
-    place(b, 9.5, 16.0, 0, F.planter, 1.6, 1.6, 0.5, 5, 21, True)
-    b.emit.label_fit((0.27, 16.0, 3.05), 3.2, "room_bow_obs", (1, 0, 0))
-    place(b, 0.32, 7.0, 0, F.wall_screen, 3.0, 1.3, "scr_map", z=1.8)
-    place(b, 0.32, 25.0, 0, F.wall_screen, 3.0, 1.3, "scr_news", z=1.8)
-    ceiling_panels(b, L, D, H, 4, 5, "white_cool", 2.0, 0.6, 0.6, LAMP)
+    place(b, 1.4, 30.6, 0, F.potted_plant, 1.7, 9)
+    for k, x in enumerate((3.2, 7.4, 11.6, 15.8)):
+        place(b, x, WF + 0.065, 90, DC.picture, 1.5 if k % 2 == 0 else 1.1, 0.95, 40 + k, WALNUT, ("sun", "bands", "squares", "sun")[k], z=1.85)
+        place(b, x, D - WS - WF - 0.065, -90, DC.picture, 1.1 if k % 2 == 0 else 1.5, 0.95, 50 + k, WALNUT, ("squares", "sun", "bands", "squares")[k], z=1.85)
     return b.build(name)
-
-

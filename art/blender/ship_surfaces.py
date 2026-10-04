@@ -343,3 +343,41 @@ def rug_ornate(b: SParts, w: float, d: float, field: str, border: str, motif=("o
         for k in range(n):
             y = -d / 2 + 0.05 + (k + 0.5) * (d - 0.1) / n
             b.soft.swatch_box((min(xa + sx * 0.07, xa + sx * 0.12), y - 0.003, 0.0), (max(xa + sx * 0.07, xa + sx * 0.12), y + 0.003, 0.0035), "cream")
+
+
+def compass_rose(b: SParts, cx: float, cy: float, r: float, z: float = 0.0, points: int = 16, disk: str | None = None, colors=("cream", "brass", "navy")) -> None:
+    """A compass rose inlaid in the floor (centre cx, cy; radius r): a disc of stone (`disc`, a finish of the room's table) 1 cm proud, with a brass ring at its rim and one inside it, and
+    a star of `points` kites — the cardinal ones the longest and cream, the intercardinals two thirds and brass, the rest half and navy — each a flat prism pointing at its bearing from a
+    brass boss at the middle. The kites are convex quads (the Builder's `prism`), a few hundred triangles in all."""
+    th = 0.01
+    if disk:
+        b.soft.cyl((cx, cy, z), (cx, cy, z + th), r, disk, seg=64)
+    for rr, w in ((r - 0.03, 0.035), (r * 0.74, 0.02)):
+        n = 72
+        for k in range(n):
+            a0, a1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
+            p0, p1 = (cx + rr * math.cos(a0), cy + rr * math.sin(a0)), (cx + rr * math.cos(a1), cy + rr * math.sin(a1))
+            ln = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+            ang = math.degrees(math.atan2(p1[1] - p0[1], p1[0] - p0[0]))
+            mx, my = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
+            b.soft.paint(b.soft.box((mx - ln / 2 - 0.004, my - w / 2, z + th), (mx + ln / 2 + 0.004, my + w / 2, z + th + 0.004), SWATCH, Rz(ang)), "brass")
+    for k in range(points):
+        ang = math.radians(360.0 * k / points)
+        ln = r * 0.7 if k % 4 == 0 else r * 0.5 if k % 2 == 0 else r * 0.34
+        wd = r * 0.07 if k % 4 == 0 else r * 0.05
+        col = colors[0] if k % 4 == 0 else colors[1] if k % 2 == 0 else colors[2]
+        ca, sa = math.cos(ang), math.sin(ang)
+        pts = [(0.0, 0.0), (ln * 0.2, wd), (ln, 0.0), (ln * 0.2, -wd)]
+        poly = [(cx + x * ca - y * sa, cy + x * sa + y * ca) for (x, y) in pts]
+        b.soft.paint(b.soft.prism(poly, z + th, z + th + 0.006, SWATCH), col)
+    b.soft.paint(b.soft.cyl((cx, cy, z + th), (cx, cy, z + th + 0.012), r * 0.07, SWATCH, seg=20), "brass")
+
+
+def stars(b: SParts, x0: float, x1: float, y0: float, y1: float, z: float, n: int = 160, seed: int = 5) -> None:
+    """A starfield on a ceiling (a dark plane at z): `n` tiny lamp squares in the cool palette, a few bigger ones, flat faces facing down (one quad each)."""
+    rng = random.Random(seed)
+    for k in range(n):
+        x, y = rng.uniform(x0, x1), rng.uniform(y0, y1)
+        s = rng.choice((0.025, 0.03, 0.04, 0.05))
+        cell = rng.choice(("white_cool", "ice", "cool_dim", "white_dim", "white_cool"))
+        b.emit.lamp_face([(x, y, z), (x + s, y, z), (x + s, y + s, z), (x, y + s, z)], cell, (0, 0, -1), LAMP_DIM)

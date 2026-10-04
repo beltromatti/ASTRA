@@ -7,6 +7,8 @@ import ship_furn3 as N3
 import ship_mess as MS
 import ship_furniture as F
 import ship_decor as DC
+import ship_decor_salon as DS
+import ship_surfaces as SU
 import ship_spec3 as SPEC3
 import ship_themes as TH
 import ship_furniture2 as G
@@ -16,7 +18,7 @@ import ship_furniture8 as K8
 import ship_furniture9 as N
 import ship_spec as SPEC
 from bridge3_lib import T
-from ship_lib import (CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, OAK, PLASTER_IVORY, PLASTER_SLATE, WALNUT, WEAVE_SLATE, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP,
+from ship_lib import (CARPET_RUST, TILE_BLACK, TILE_FLOOR, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, OAK, PLASTER_IVORY, PLASTER_SLATE, WALNUT, WEAVE_SLATE, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, IVORY, LAMINATE, LAMP,
                       LAMP_DIM, LAMP_HOT, PAINT_RED, RUBBER, STEEL, STRUCT, TILE, TRIM, WOOD, SParts)
 from ship_rooms import Style, WF, WS, build_shell, ceiling_panels, ceiling_services, dress_wall, luminaire_strips, place, wall_label
 
@@ -33,12 +35,20 @@ def _warm_style(floor: str = FABRIC_GREY, wall_lo: str = WOOD, accent: str = "wa
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------- barber & tailor
+def _barber_floor(b: SParts, spec: dict, st, rng) -> None:
+    """The barber's floor: a chequerboard of big black and white tiles, a border of black tiles round it."""
+    L, D = spec["L"], spec["D"]
+    SU.tiles(b, 0.0, L, 0.0, D, 0.6, TILE_FLOOR, TILE_BLACK, "checker", seed=3)
+
+
 def barber(name: str = "SM_SHIP_Barber"):
-    """12 x 16: two barber's chairs in front of a lit mirror wall (the near wall, x 1-5 and 7-11), waiting benches along the right wall; at the far end the tailor's corner — a
-    cutting table, a sewing machine on a desk, a dress form, rolls of cloth on shelves, a fitting mirror."""
+    """12 x 16: the barber and the tailor — a chequerboard floor, two barber's chairs in front of a lit mirror wall (the near wall, x 1-5 and 7-11, a counter of tools under each), the barber's
+    pole by the door, a shampoo station and three dryer chairs down the left wall, a wall of bottles, the waiting corner on a rug at the right wall; at the far end the tailor's — a cutting table
+    with two sewing machines, a desk, rolls of cloth on shelves and a rack of bolts, dress forms and the fitting platform with its three-way mirror."""
     spec, L, D, H = _dims("barber")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    build_shell(b, spec, _warm_style(TILE, COMPOSITE, "warm_dim"))
+    st = TH.mess(floor=TILE_FLOOR, accent="warm_dim", floor_fn=_barber_floor)
+    build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
     for (xa, xb) in ((1.0, 5.0), (7.0, 11.0)):                                             # the mirrors: a lit frame, a dark glass, counters with tools beneath
@@ -48,24 +58,37 @@ def barber(name: str = "SM_SHIP_Barber"):
         place(b, (xa + xb) / 2, WF + 0.4, 90, F.counter, xb - xa, 0.6, 0.92, LAMINATE, COMPOSITE, True, False)
     for x in (3.0, 9.0):
         place(b, x, 2.8, -90, N.barber_chair)
+    place(b, 5.15, 1.05, 0, DS.barber_pole, 1.05)
+    # the waiting corner: three chairs at the right wall, a low table with magazines, a rug, a plant, a bottle shelf above
+    place(b, xr - 1.9, 7.9, 0, DC.rug, 2.6, 3.0, CARPET_RUST, CARPET_SAND)
     for k in range(3):
         place(b, xr - 0.4, 7.0 + k * 0.9, 180, F.chair, FABRIC_NAVY)
     place(b, xr - 1.4, 8.0, 180, F.low_table, 0.5, 1.4, 0.42, WOOD)
-    place(b, 7.0, 12.3, 0, F.table, 2.4, 1.2, 0.95, LAMINATE, TRIM, False)                    # the tailor's corner
+    place(b, xr - 1.4, 7.7, 20, DC.book_stack, 3, 3, z=0.42)
+    place(b, xr - 0.6, 5.2, 0, F.potted_plant, 1.2, 6)
+    place(b, xr - 0.02, 4.0, 180, DS.bottle_shelf, 2.0, 1.4, 3, 11, z=0.9)
+    # the shampoo station and the dryer chairs down the left wall
+    place(b, xl + 0.3, 7.6, 0, F.counter, 2.6, 0.55, 0.92, LAMINATE, COMPOSITE, True, True)
+    for y in (6.9, 8.3):
+        place(b, xl + 1.45, y, 180, N.barber_chair)
+    place(b, xl + 0.02, 7.6, 0, DS.bottle_shelf, 2.4, 1.2, 3, 12, z=1.2)
+    for k, y in enumerate((10.4, 11.5, 12.6)):
+        place(b, xl + 0.55, y, 0, DS.hood_dryer)
+    # the tailor's corner: the cutting table with two sewing machines, a desk, cloth on the shelves, a rack of bolts, dress forms, the fitting platform
+    place(b, 7.0, 12.3, 0, F.table, 2.4, 1.2, 0.95, LAMINATE, TRIM, False)
+    for k, y in enumerate((11.8, 12.8)):
+        place(b, 7.6, y, 90, DS.sewing_machine, z=0.95)
     place(b, 3.0, 13.2, 90, F.desk, 1.4, 0.7, 0.76, WOOD, True)
     place(b, 3.0, 12.2, 90, F.chair, FABRIC_GREY)
     place(b, 1.4, 11.0, 0, F.potted_plant, 1.2, 6)
-    for k in range(2):
-        place(b, 2.0 + 4.5 * k, yf - 0.2, -90, F.shelf, 2.4, 0.4, 2.1, 5, WOOD, False, 8 + k, True)
-    for k in range(5):                                                                     # rolls of cloth on the shelves
-        b.soft.cyl((1.0 + k * 0.4, yf - 0.4, 1.28), (1.0 + k * 0.4 + 0.3, yf - 0.4, 1.28), 0.07, (FABRIC_NAVY, FABRIC_RUST, FABRIC_SAND, FABRIC_GREY, BEDDING)[k], seg=10)
-    b.body.cyl((10.0, 12.6, 0.0), (10.0, 12.6, 1.0), 0.04, TRIM, seg=8)                    # the dress form
-    b.soft.cyl((10.0, 12.6, 1.0), (10.0, 12.6, 1.5), 0.17, FABRIC_SAND, seg=14, r2=0.13)
-    b.soft.sphere((10.0, 12.6, 1.58), 0.09, FABRIC_SAND, seg=10, rings=6)
-    b.body.box((xr - 0.05, 12.0, 0.5), (xr, 14.6, 2.1), TRIM)                              # the fitting mirror
-    b.fine.box((xr - 0.065, 12.1, 0.55), (xr - 0.05, 14.5, 2.05), DGLASS)
+    for k in range(2):                                                                     # the cloth, rolled, on two shelving units on the far wall
+        place(b, 2.2 + 4.2 * k, yf - 0.2, -90, DS.cloth_shelf, 2.4, 2.1, 4, 8 + k)
+    place(b, 10.2, yf - 0.4, -90, DS.fabric_bolts, 6, 4)
+    place(b, 10.0, 12.6, 0, DS.dress_form)
+    place(b, 5.4, 14.6, 0, DS.dress_form)
+    b.soft.cyl((xr - 1.5, 13.4, 0.0), (xr - 1.5, 13.4, 0.15), 0.8, WOOD, seg=24)             # the fitting platform and its mirror
+    place(b, xr - 0.1, 13.4, 180, DS.fitting_mirror, 0.9, 2.0)
     wall_label(b, 6.0, WF + 0.12, 2.75, (0, 1, 0), "eq_clippers", 0.6)
-    ceiling_panels(b, L, D, H, 2, 3, "white_warm", 1.6, 1.0, 0.6, LAMP)
     return b.build(name)
 
 

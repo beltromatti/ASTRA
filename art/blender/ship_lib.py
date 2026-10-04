@@ -50,6 +50,7 @@ OAK, WALNUT = "MI_SHIP_Oak", "MI_SHIP_Walnut"                  # smooth wood gra
 TERRAZZO = "MI_SHIP_Terrazzo"            # pale speckled floor
 TERRAZZO_DARK = "MI_SHIP_TerrazzoDark"   # the same in mid grey (the mess hall)
 TILE_FLOOR, TILE_HEX, TILE_WALL = "MI_SHIP_TileFloor", "MI_SHIP_TileHex", "MI_SHIP_TileWall"          # glossy tiles: floors, hex mosaic, wall tiles
+TILE_BLACK = "MI_SHIP_TileBlack"         # ARTE-INTERNI-2: the same big glossy tile in black (a barber's chequerboard, inlays)
 TREAD, PLATING = "MI_SHIP_Tread", "MI_SHIP_Plating"             # diamond tread plate; octagonal plating
 PLASTER_IVORY, PLASTER_SAGE, PLASTER_SLATE, PLASTER_TEAL = "MI_SHIP_PlasterIvory", "MI_SHIP_PlasterSage", "MI_SHIP_PlasterSlate", "MI_SHIP_PlasterTeal"   # painted walls
 PERF = "MI_SHIP_Perf"                    # perforated acoustic panel

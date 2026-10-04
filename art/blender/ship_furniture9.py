@@ -143,16 +143,10 @@ def altar(b: SParts) -> None:
 
 
 def barber_chair(b: SParts) -> None:
-    """A barber's chair facing +x on a chrome pedestal: a heavy base, a cushioned seat, a back with a headrest, arms and a footrest."""
-    b.body.cyl((0, 0, 0.0), (0, 0, 0.06), 0.36, STEEL, seg=18)
-    b.body.cyl((0, 0, 0.06), (0, 0, 0.42), 0.09, STEEL, seg=12)
-    b.soft.box((-0.26, -0.28, 0.42), (0.28, 0.28, 0.56), LEATHER)
-    b.soft.box((-0.32, -0.27, 0.5), (-0.2, 0.27, 1.1), LEATHER)
-    b.soft.box((-0.34, -0.14, 1.1), (-0.22, 0.14, 1.38), LEATHER)
-    for sy in (-0.3, 0.3):
-        b.body.box((-0.18, sy - 0.03, 0.62), (0.26, sy + 0.03, 0.66), STEEL)
-        b.fine.cyl((0.1, sy, 0.5), (0.1, sy, 0.62), 0.02, TRIM, seg=6)
-    b.body.box((0.3, -0.18, 0.14), (0.58, 0.18, 0.2), STEEL)
+    """A barber's chair facing +x (ARTE-INTERNI-2: ship_decor_salon.barber_chair): a chrome base and hydraulic column, a rolled leather seat, a tilted back with a headrest, padded arms on chrome
+    posts, a footrest."""
+    import ship_decor_salon as DS
+    DS.barber_chair(b)
 
 
 def sim_pod(b: SParts) -> None:
