@@ -95,7 +95,7 @@ private:
 	EAstraInteriorStyle Style = EAstraInteriorStyle::Emergency;
 	TSet<int32> Built;                                         // the rooms made solid
 	TMap<int32, int32> LeafInstance;                           // door -> its instance in the leaves
-	TMap<int32, FTransform> LeafHome;                          // door -> where its leaf stands when shut
+	TMap<int32, FTransform> LeafHome;                          // door -> where its leaf stands when shut (in the actor's frame: the actor stands at Offset)
 	TSet<int32> ShutNow;
 	int32 NumInstances = 0;
 	TMap<int32, FBoardRoomMood> Moods;                         // the rooms the war has left not as built
@@ -122,7 +122,7 @@ private:
 	FVector LastEye = FVector::ZeroVector;
 	FVector LastLook = FVector::ForwardVector;
 
-	UInstancedStaticMeshComponent* MakeIsm(const TCHAR* Name, UMaterialInterface* Mat);
+	UInstancedStaticMeshComponent* MakeIsm(const TCHAR* Name, UMaterialInterface* Mat, bool bShadow);
 	void AddSlabs(const TArray<AstraBoardInterior::FSlab>& Slabs);
 	void MakePads(int32 Comp);
 	void MoveLights();

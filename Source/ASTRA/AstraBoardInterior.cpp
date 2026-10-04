@@ -292,7 +292,9 @@ AAstraBoardInterior::AAstraBoardInterior()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.25f;
-	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
+	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	Root->SetMobility(EComponentMobility::Movable);                      // (it is moved to where the plan stands in the world)
+	SetRootComponent(Root);
 }
 
 FVector AAstraBoardInterior::ZoneOrigin()
@@ -305,7 +307,7 @@ FVector AAstraBoardInterior::CabinOrigin()
 	return FVector(0.0, 0.0, -1.7e8);
 }
 
-UInstancedStaticMeshComponent* AAstraBoardInterior::MakeIsm(const TCHAR* Name, UMaterialInterface* Mat)
+UInstancedStaticMeshComponent* AAstraBoardInterior::MakeIsm(const TCHAR* Name, UMaterialInterface* Mat, bool bShadow)
 {
 	UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(this, Name);
 	C->SetupAttachment(GetRootComponent());
@@ -315,7 +317,8 @@ UInstancedStaticMeshComponent* AAstraBoardInterior::MakeIsm(const TCHAR* Name, U
 		C->SetMaterial(0, Mat);
 	}
 	C->SetMobility(EComponentMobility::Movable);
-	C->SetCastShadow(false);
+	// the structure casts shadows: the star's light must not come in through a ceiling (there is no hull above these rooms to keep it out); the strips of light do not
+	C->SetCastShadow(bShadow);
 	C->RegisterComponent();
 	return C;
 }
@@ -326,6 +329,9 @@ void AAstraBoardInterior::Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector
 	Plan = InPlan;
 	Offset = InOffset;
 	Style = InStyle;
+	// the actor stands where the plan's frame stands in the world, and the boxes are placed in the plan's frame: the instances of an instanced mesh keep their transforms as floats relative to the
+	// component, and sixteen hundred kilometres from the origin a float has 16 cm to the step (the walls and the floors would not meet)
+	SetActorLocation(Offset, false, nullptr, ETeleportType::TeleportPhysics);
 	if (InMoods)
 	{
 		Moods = *InMoods;
@@ -340,10 +346,10 @@ void AAstraBoardInterior::Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector
 	{
 		return;
 	}
-	Walls = MakeIsm(TEXT("Walls"), Structure);
-	Floors = MakeIsm(TEXT("Floors"), Floor);
-	Frames = MakeIsm(TEXT("Frames"), Trim);
-	Leaves = MakeIsm(TEXT("Leaves"), Trim);
+	Walls = MakeIsm(TEXT("Walls"), Structure, true);
+	Floors = MakeIsm(TEXT("Floors"), Floor, true);
+	Frames = MakeIsm(TEXT("Frames"), Trim, true);
+	Leaves = MakeIsm(TEXT("Leaves"), Trim, true);
 	if (Light)
 	{
 		StripMat = UMaterialInstanceDynamic::Create(Light, this);
@@ -354,7 +360,7 @@ void AAstraBoardInterior::Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector
 			StripMat->SetScalarParameterValue(TEXT("Intensity"), Style == EAstraInteriorStyle::Lit ? 30.f : 9.f);
 		}
 	}
-	Strips = MakeIsm(TEXT("Strips"), StripMat ? static_cast<UMaterialInterface*>(StripMat) : Light);
+	Strips = MakeIsm(TEXT("Strips"), StripMat ? static_cast<UMaterialInterface*>(StripMat) : Light, false);
 	if (Light && !Moods.IsEmpty())
 	{
 		DeadStripMat = UMaterialInstanceDynamic::Create(Light, this);
@@ -363,7 +369,7 @@ void AAstraBoardInterior::Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector
 			DeadStripMat->SetVectorParameterValue(TEXT("EmissiveColor"), FLinearColor(1.f, 0.14f, 0.06f));
 			DeadStripMat->SetScalarParameterValue(TEXT("Intensity"), 3.f);
 		}
-		DeadStrips = MakeIsm(TEXT("DeadStrips"), DeadStripMat ? static_cast<UMaterialInterface*>(DeadStripMat) : Light);
+		DeadStrips = MakeIsm(TEXT("DeadStrips"), DeadStripMat ? static_cast<UMaterialInterface*>(DeadStripMat) : Light, false);
 		DeadStrips->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 	for (UInstancedStaticMeshComponent* S : {Walls.Get(), Floors.Get(), Frames.Get(), Leaves.Get()})
@@ -422,7 +428,6 @@ void AAstraBoardInterior::Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector
 		bTorchOn = Style == EAstraInteriorStyle::Emergency;
 		Torch->RegisterComponent();
 	}
-	SetActorLocation(FVector::ZeroVector);
 	SetActorTickEnabled(true);
 }
 
@@ -431,7 +436,7 @@ void AAstraBoardInterior::AddSlabs(const TArray<FSlab>& Slabs)
 	TArray<FTransform> W, F, Fr, St, Dead;
 	for (const FSlab& S : Slabs)
 	{
-		const FTransform Xf(FQuat::Identity, Offset + S.Centre, S.Half * 2.0 / 100.0);
+		const FTransform Xf(FQuat::Identity, S.Centre, S.Half * 2.0 / 100.0);               // (in the actor's frame: the actor stands at Offset)
 		switch (S.Kind)
 		{
 		case ESlab::Wall: W.Add(Xf); break;
@@ -461,9 +466,9 @@ void AAstraBoardInterior::AddSlabs(const TArray<FSlab>& Slabs)
 			{
 				// a leaf stands in its bulkhead while it is shut; open, it lies away under the deck (a body far from anyone)
 				const bool bShut = ShutNow.Contains(S.Door);
-				const FTransform Away(FQuat::Identity, Offset + S.Centre - FVector(0.0, 0.0, 6000.0), S.Half * 2.0 / 100.0);
+				const FTransform Away(FQuat::Identity, S.Centre - FVector(0.0, 0.0, 6000.0), S.Half * 2.0 / 100.0);
 				LeafHome.Add(S.Door, Xf);
-				LeafInstance.Add(S.Door, Leaves->AddInstance(bShut ? Xf : Away, true));
+				LeafInstance.Add(S.Door, Leaves->AddInstance(bShut ? Xf : Away, false));
 				++NumInstances;
 			}
 			break;
@@ -471,23 +476,23 @@ void AAstraBoardInterior::AddSlabs(const TArray<FSlab>& Slabs)
 	}
 	if (Walls && W.Num())
 	{
-		Walls->AddInstances(W, false, true);
+		Walls->AddInstances(W, false, false, false);
 	}
 	if (Floors && F.Num())
 	{
-		Floors->AddInstances(F, false, true);
+		Floors->AddInstances(F, false, false, false);
 	}
 	if (Frames && Fr.Num())
 	{
-		Frames->AddInstances(Fr, false, true);
+		Frames->AddInstances(Fr, false, false, false);
 	}
 	if (Strips && St.Num())
 	{
-		Strips->AddInstances(St, false, true);
+		Strips->AddInstances(St, false, false, false);
 	}
 	if (DeadStrips && Dead.Num())
 	{
-		DeadStrips->AddInstances(Dead, false, true);
+		DeadStrips->AddInstances(Dead, false, false, false);
 	}
 	NumInstances += W.Num() + F.Num() + Fr.Num() + St.Num() + Dead.Num();
 }
@@ -602,7 +607,7 @@ void AAstraBoardInterior::SetShut(const TSet<int32>& ShutDoors)
 		{
 			T.AddToTranslation(FVector(0.0, 0.0, -6000.0));
 		}
-		Leaves->UpdateInstanceTransform(KV.Value, T, true, true, true);
+		Leaves->UpdateInstanceTransform(KV.Value, T, false, true, true);
 	}
 	ShutNow = ShutDoors;
 }
@@ -740,6 +745,7 @@ FVector AAstraBoardInterior::BuildCabin()
 {
 	End();
 	Offset = CabinOrigin();
+	SetActorLocation(Offset, false, nullptr, ETeleportType::TeleportPhysics);
 	Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	UMaterialInterface* Structure = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/Instances/MI_ASTRA_Structure.MI_ASTRA_Structure"));
 	UMaterialInterface* Floor = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/Instances/MI_ASTRA_Floor.MI_ASTRA_Floor"));
@@ -748,9 +754,9 @@ FVector AAstraBoardInterior::BuildCabin()
 	{
 		return Offset;
 	}
-	Walls = MakeIsm(TEXT("Walls"), Structure);
-	Floors = MakeIsm(TEXT("Floors"), Floor);
-	Frames = MakeIsm(TEXT("Frames"), Trim);
+	Walls = MakeIsm(TEXT("Walls"), Structure, true);
+	Floors = MakeIsm(TEXT("Floors"), Floor, true);
+	Frames = MakeIsm(TEXT("Frames"), Trim, true);
 	for (UInstancedStaticMeshComponent* S : {Walls.Get(), Floors.Get(), Frames.Get()})
 	{
 		S->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
