@@ -419,6 +419,50 @@ int32 UAstraSpaceSimCommandlet::Main(const FString& Params)
 	Root->SetArrayField(TEXT("events"), Events);
 	Root->SetArrayField(TEXT("frames"), Frames);
 	Root->SetObjectField(TEXT("final"), S->BenchJson());
+	if (S->GetWrecks().Sites().Num())
+	{
+		// where the war's leavings are at the end (km, the system frame): for the map tools/art/wrecks_plot.py draws
+		const FSkyFrame Sky = S->SkyFrame();
+		const double Clock = S->WreckClock();
+		const auto Km = [](const FVector& V) { return TArray<TSharedPtr<FJsonValue>>({MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.X / 10.0) / 100.0), MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.Y / 10.0) / 100.0),
+		                                                                           MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.Z / 10.0) / 100.0)}); };
+		TSharedRef<FJsonObject> WJ = MakeShared<FJsonObject>();
+		WJ->SetNumberField(TEXT("clock"), Clock);
+		WJ->SetArrayField(TEXT("aquila_km"), Km(B->PlayerPos()));
+		WJ->SetArrayField(TEXT("gate_km"), Km(Sky.Origin));
+		WJ->SetNumberField(TEXT("beacon_km"), FWrecks::BeaconKm);
+		TArray<TSharedPtr<FJsonValue>> Sites;
+		for (const FSite& Si : S->GetWrecks().Sites())
+		{
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetNumberField(TEXT("id"), Si.Id);
+			J->SetStringField(TEXT("name"), Si.Name);
+			J->SetStringField(TEXT("how"), HowLostName(Si.How));
+			J->SetNumberField(TEXT("faction"), Si.Faction);
+			J->SetNumberField(TEXT("died"), Si.DiedAt);
+			TArray<TSharedPtr<FJsonValue>> Pc, Pd;
+			for (const FPieceRec& P : Si.Pieces)
+			{
+				Pc.Add(MakeShared<FJsonValueArray>(Km(Sky.ToSystem(FWrecks::PosAt(P, Clock)))));
+			}
+			for (const FPodRec& P : Si.Pods)
+			{
+				TSharedRef<FJsonObject> Q = MakeShared<FJsonObject>();
+				Q->SetArrayField(TEXT("p"), Km(Sky.ToSystem(FWrecks::PosAt(P, Clock))));
+				Q->SetBoolField(TEXT("beacon"), FWrecks::BeaconOn(P, Clock));
+				Q->SetNumberField(TEXT("state"), P.State);
+				Q->SetNumberField(TEXT("n"), P.Survivors);
+				Pd.Add(MakeShared<FJsonValueObject>(Q));
+			}
+			J->SetArrayField(TEXT("pieces"), Pc);
+			J->SetArrayField(TEXT("pods"), Pd);
+			J->SetArrayField(TEXT("field_mid"), Km(Sky.ToSystem(Si.Field.Pos0 + Si.Field.Vel * (Clock - Si.Field.T0))));
+			J->SetNumberField(TEXT("field_km"), FWrecks::FieldRadiusAt(Si.Field, Clock) / 1000.0);
+			Sites.Add(MakeShared<FJsonValueObject>(J));
+		}
+		WJ->SetArrayField(TEXT("sites"), Sites);
+		Root->SetObjectField(TEXT("wrecks"), WJ);
+	}
 	if (WorldMs.Num())
 	{
 		WorldMs.Sort();

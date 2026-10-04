@@ -816,24 +816,82 @@ bool UAstraSpaceLife::LookAt(const FString& Key, double Km, FString& OutDetail)
 		OutDetail = TEXT("no living space laid out here");
 		return false;
 	}
-	const AstraSpace::FNode* Hit = nullptr;
-	for (const AstraSpace::FNode& N : Layout.Nodes)
+	FVector Target = FVector::ZeroVector;
+	FString Name;
+	if (Key.Equals(TEXT("wreck"), ESearchCase::IgnoreCase) || Key.Equals(TEXT("pod"), ESearchCase::IgnoreCase))
 	{
-		if (N.Id.ToString().Equals(Key, ESearchCase::IgnoreCase) || N.Name.Contains(Key, ESearchCase::IgnoreCase) || (N.Spec && N.Spec->Contact.Equals(Key, ESearchCase::IgnoreCase)))
+		// what the war left: the nearest piece of a wreck (one the effects no longer burn: those are theirs for a minute), or the nearest lifepod still adrift
+		const bool bPod = Key.Equals(TEXT("pod"), ESearchCase::IgnoreCase);
+		const double Now = WreckClock();
+		double Best = 1e18;
+		for (const AstraSpace::FSite& S : Wrecks.Sites())
 		{
-			Hit = &N;
-			break;
+			if (S.System != SystemKey)
+			{
+				continue;
+			}
+			if (!bPod)
+			{
+				for (const AstraSpace::FPieceRec& P : S.Pieces)
+				{
+					const FVector At = Sky.ToSystem(AstraSpace::FWrecks::PosAt(P, Now));
+					const double D = FVector::DistSquared(At, Owner->Ships[0].Pos);
+					if (D < Best)
+					{
+						Best = D;
+						Target = At;
+						Name = FString::Printf(TEXT("%s of %s"), P.Section == 0 ? TEXT("the bow section") : (P.Section == 1 ? TEXT("the middle section") : (P.Section == 2 ? TEXT("the stern section") : TEXT("the hull"))), *S.Name);
+					}
+				}
+			}
+			else
+			{
+				for (const AstraSpace::FPodRec& P : S.Pods)
+				{
+					if (P.State != 0)
+					{
+						continue;
+					}
+					const FVector At = Sky.ToSystem(AstraSpace::FWrecks::PosAt(P, Now));
+					const double D = FVector::DistSquared(At, Owner->Ships[0].Pos);
+					if (D < Best)
+					{
+						Best = D;
+						Target = At;
+						Name = FString::Printf(TEXT("a lifepod of %s (%d aboard)"), *S.Name, P.Survivors);
+					}
+				}
+			}
+		}
+		if (Name.IsEmpty())
+		{
+			OutDetail = bPod ? TEXT("no lifepod adrift here (astra.space.lose, then astra.space.wrecks.list)") : TEXT("no wreck here (astra.space.lose <contact> breakup, then astra.space.wrecks.list)");
+			return false;
 		}
 	}
-	if (!Hit)
+	else
 	{
-		OutDetail = FString::Printf(TEXT("no place called %s (try astra.space.where)"), *Key);
-		return false;
+		const AstraSpace::FNode* Hit = nullptr;
+		for (const AstraSpace::FNode& N : Layout.Nodes)
+		{
+			if (N.Id.ToString().Equals(Key, ESearchCase::IgnoreCase) || N.Name.Contains(Key, ESearchCase::IgnoreCase) || (N.Spec && N.Spec->Contact.Equals(Key, ESearchCase::IgnoreCase)))
+			{
+				Hit = &N;
+				break;
+			}
+		}
+		if (!Hit)
+		{
+			OutDetail = FString::Printf(TEXT("no place called %s (try astra.space.where; wreck and pod look at what the war left)"), *Key);
+			return false;
+		}
+		Target = Hit->Pos;
+		Name = Hit->Name;
 	}
 	FAstraBattleShip& P = Owner->Ships[0];
-	FVector Out = P.Pos - Hit->Pos;
+	FVector Out = P.Pos - Target;
 	Out = Out.IsNearlyZero() ? FVector(1.0, 0.0, 0.0) : Out.GetSafeNormal();
-	P.Pos = Hit->Pos + Out * (Km * SpKm);
+	P.Pos = Target + Out * (Km * SpKm);
 	P.Vel = FVector::ZeroVector;
 	const FVector Dir = -Out;
 	if (UAstraShipSubsystem* Ship = Owner->GetWorld()->GetSubsystem<UAstraShipSubsystem>())
@@ -842,7 +900,7 @@ bool UAstraSpaceLife::LookAt(const FString& Key, double Km, FString& OutDetail)
 		Ship->SetSpeedMps(0.f);
 		Ship->SetThrottle(0.f);
 	}
-	OutDetail = FString::Printf(TEXT("the Aquila is %.1f km from %s, bow on it"), Km, *Hit->Name);
+	OutDetail = FString::Printf(TEXT("the Aquila is %.1f km from %s, bow on it"), Km, *Name);
 	return true;
 }
 
@@ -868,7 +926,7 @@ namespace
 			if (UAstraSpaceLife* S = SpaceOf(W)) { UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *S->WhereText()); }
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdSpaceLook(TEXT("astra.space.look"), TEXT("Put the Aquila a few km from a place, bow on it: astra.space.look <keeper|arsenal|tiberius|id|name> [km, default 12]"),
+	FAutoConsoleCommandWithWorldAndArgs CmdSpaceLook(TEXT("astra.space.look"), TEXT("Put the Aquila a few km from a place, bow on it: astra.space.look <keeper|arsenal|tiberius|id|name|wreck|pod> [km, default 12]: wreck and pod are the nearest piece of what the war left and the nearest lifepod adrift"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			UAstraSpaceLife* S = SpaceOf(W);

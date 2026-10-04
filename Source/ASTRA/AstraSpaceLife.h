@@ -131,6 +131,9 @@ public:
 	/** Testing: a real resume of the campaign from the battle's own save (the plot is cleared, the Gate stands in a new place, the system is laid out afresh); once it is, the log says whether every
 	 *  wreck is where it was relative to the Gate (astra.space.wrecks.resume). */
 	bool DebugResume(FString& OutDetail);
+	/** Writes a wreck site as the records place it AfterS seconds after she went (SiteId 0: the first with pieces here): her pieces, chunks, lifepods, relative to her middle, in the sky frame's axes
+	 *  (the Unreal frame, metres): what art/blender/space3_wreck_scene.py renders (astra.space.wrecks.dump). */
+	bool DebugDump(const FString& Path, int32 SiteId, double AfterS, FString& OutDetail);
 
 	const AstraSpace::FLayout& GetLayout() const { return Layout; }
 	const AstraSpace::FTraffic& GetTraffic() const { return Traffic; }

@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/DateTime.h"
+#include "Misc/FileHelper.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
@@ -655,6 +656,100 @@ bool UAstraSpaceLife::DebugResume(FString& OutDetail)
 	return true;
 }
 
+bool UAstraSpaceLife::DebugDump(const FString& Path, int32 SiteId, double AfterS, FString& OutDetail)
+{
+	const FSite* Found = nullptr;
+	for (const FSite& S : Wrecks.Sites())
+	{
+		if (S.System == SystemKey && ((SiteId > 0 && S.Id == SiteId) || (SiteId <= 0 && S.Pieces.Num() >= 1)))
+		{
+			Found = &S;
+			break;
+		}
+	}
+	if (!Found)
+	{
+		OutDetail = TEXT("no such wreck site here (astra.space.wrecks.list)");
+		return false;
+	}
+	FSite S = *Found;                                  // (a copy: its chunks' definitions are made on it)
+	const double T = S.DiedAt + AfterS;
+	FWrecks::MakeDefs(S);
+	const FVector Mid = Wrecks.Middle(S, T);
+	const auto Vec = [](const FVector& V) { return TArray<TSharedPtr<FJsonValue>>({MakeShared<FJsonValueNumber>(V.X), MakeShared<FJsonValueNumber>(V.Y), MakeShared<FJsonValueNumber>(V.Z)}); };
+	const auto Quat = [](const FQuat& Q) { return TArray<TSharedPtr<FJsonValue>>({MakeShared<FJsonValueNumber>(Q.X), MakeShared<FJsonValueNumber>(Q.Y), MakeShared<FJsonValueNumber>(Q.Z), MakeShared<FJsonValueNumber>(Q.W)}); };
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	{
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetNumberField(TEXT("id"), S.Id);
+		J->SetStringField(TEXT("name"), S.Name);
+		J->SetStringField(TEXT("class"), S.Class);
+		J->SetStringField(TEXT("key"), S.ClassKey.ToString());
+		J->SetStringField(TEXT("hull_mesh"), S.HullMesh);
+		J->SetNumberField(TEXT("faction"), S.Faction);
+		J->SetStringField(TEXT("how"), AstraSpace::HowLostName(S.How));
+		J->SetNumberField(TEXT("section"), S.Section);
+		J->SetNumberField(TEXT("age_s"), AfterS);
+		J->SetNumberField(TEXT("radius"), S.Radius);
+		J->SetStringField(TEXT("text"), Wrecks.Describe(S, -1, T));
+		Root->SetObjectField(TEXT("site"), J);
+	}
+	TArray<TSharedPtr<FJsonValue>> Pcs, Chs, Pds;
+	for (const FPieceRec& P : S.Pieces)
+	{
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		const FQuat Q = FWrecks::AttAt(P, T);
+		const FVector Pivot = FWrecks::PosAt(P, T);
+		J->SetNumberField(TEXT("section"), P.Section);
+		J->SetArrayField(TEXT("pivot"), Vec(Pivot - Mid));
+		J->SetArrayField(TEXT("pivot_local"), Vec(P.PivotLocal));
+		J->SetArrayField(TEXT("origin"), Vec(Pivot - Q.RotateVector(P.PivotLocal) - Mid));
+		J->SetArrayField(TEXT("quat"), Quat(Q));
+		J->SetNumberField(TEXT("radius"), P.Radius);
+		J->SetBoolField(TEXT("burnt"), P.bBurnt);
+		Pcs.Add(MakeShared<FJsonValueObject>(J));
+	}
+	for (int32 i = 0; i < S.Field.Count; ++i)
+	{
+		AstraSpace::FChunk C;
+		if (!FWrecks::ChunkAt(S, i, T, C))
+		{
+			continue;
+		}
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetArrayField(TEXT("pos"), Vec(C.Pos - Mid));
+		J->SetArrayField(TEXT("quat"), Quat(C.Att));
+		J->SetNumberField(TEXT("size"), C.Size);
+		J->SetNumberField(TEXT("shape"), C.Shape);
+		J->SetNumberField(TEXT("ember"), C.Ember);
+		Chs.Add(MakeShared<FJsonValueObject>(J));
+	}
+	for (const FPodRec& P : S.Pods)
+	{
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetArrayField(TEXT("pos"), Vec(FWrecks::PosAt(P, T) - Mid));
+		J->SetArrayField(TEXT("quat"), Quat(FWrecks::AttAt(P, T)));
+		J->SetBoolField(TEXT("beacon"), FWrecks::BeaconOn(P, T));
+		J->SetNumberField(TEXT("survivors"), P.Survivors);
+		J->SetNumberField(TEXT("state"), P.State);
+		Pds.Add(MakeShared<FJsonValueObject>(J));
+	}
+	Root->SetArrayField(TEXT("pieces"), Pcs);
+	Root->SetArrayField(TEXT("chunks"), Chs);
+	Root->SetArrayField(TEXT("pods"), Pds);
+	Root->SetNumberField(TEXT("field_radius"), FWrecks::FieldRadiusAt(S.Field, T));
+	FString Text;
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Wr = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Text);
+	FJsonSerializer::Serialize(Root, Wr);
+	if (!FFileHelper::SaveStringToFile(Text, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{
+		OutDetail = FString::Printf(TEXT("could not write %s"), *Path);
+		return false;
+	}
+	OutDetail = FString::Printf(TEXT("%s (site %d) %.0f s after she went: %d pieces, %d chunks, %d lifepods -> %s"), *S.Name, S.Id, AfterS, Pcs.Num(), Chs.Num(), Pds.Num(), *Path);
+	return true;
+}
+
 bool UAstraSpaceLife::DebugLose(const FString& Which, const FString& How, int32 Section, FString& OutDetail)
 {
 	if (!Owner || Owner->Ships.Num() == 0)
@@ -783,6 +878,16 @@ namespace
 			if (!S) { return; }
 			FString Detail;
 			S->DebugResume(Detail);
+			UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *Detail);
+		}));
+
+	FAutoConsoleCommandWithWorldAndArgs CmdSpaceWrecksDump(TEXT("astra.space.wrecks.dump"), TEXT("Write a wreck site as the records place it, for the preview renders: astra.space.wrecks.dump <path.json> [site id, 0 = the first] [seconds after she went, default 180]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
+		{
+			UAstraSpaceLife* S = WkSpaceOf(W);
+			if (!S || A.Num() < 1) { UE_LOG(LogASTRA, Display, TEXT("[Space] astra.space.wrecks.dump <path.json> [site id] [seconds]")); return; }
+			FString Detail;
+			S->DebugDump(A[0], A.Num() > 1 ? FCString::Atoi(*A[1]) : 0, A.Num() > 2 ? FCString::Atod(*A[2]) : 180.0, Detail);
 			UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *Detail);
 		}));
 
