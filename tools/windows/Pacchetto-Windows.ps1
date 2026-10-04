@@ -136,6 +136,9 @@ ASTRA for Windows
        Setup-ASTRA.bat -EnvFile C:\path\to\.env
 2. Start ASTRA.exe.
 
+If Windows says a DLL is missing (VCRUNTIME140.dll, MSVCP140.dll), run Engine\Extras\Redist\en-us\UEPrereqSetup_x64.exe once: it installs the
+Microsoft Visual C++ runtime that both the game and the crew's Python libraries need.
+
 The crew's data (their key, models, caches and Python environment) lives in %LOCALAPPDATA%\ASTRA. The game's saved games and logs are in
 ASTRA\Saved next to ASTRA.exe, so keep the folder somewhere you can write (not Program Files), or start the game with -SaveToUserDir to keep
 them in %LOCALAPPDATA%\ASTRA\Saved. The crew's own log is Saved\Logs\astra-mind.log there: if the crew is silent, read it
