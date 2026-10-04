@@ -38,6 +38,7 @@ name = "astra-mind"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "faster-whisper", marker = "platform_machine != 'arm64' or sys_platform != 'darwin'" },
     { name = "httpx", extra = ["http2"] },
     { name = "lingua-language-detector" },
     { name = "num2words" },
@@ -45,6 +46,8 @@ dependencies = [
     { name = "pocket-tts" },
     { name = "pydantic" },
     { name = "scipy" },
+    { name = "sherpa-onnx", marker = "platform_machine != 'arm64' or sys_platform != 'darwin'" },
+    { name = "sherpa-onnx-core", marker = "platform_machine != 'arm64' or sys_platform != 'darwin'" },
     { name = "sounddevice" },
     { name = "soundfile" },
     { name = "websockets" },
@@ -59,6 +62,7 @@ portable = [
 
 [package.metadata]
 requires-dist = [
+    { name = "faster-whisper", marker = "platform_machine != 'arm64' or sys_platform != 'darwin'", specifier = ">=1.1" },
     { name = "faster-whisper", marker = "extra == 'portable'", specifier = ">=1.1" },
     { name = "httpx", extras = ["http2"], specifier = ">=0.28" },
     { name = "lingua-language-detector", specifier = ">=2.0" },
@@ -67,7 +71,9 @@ requires-dist = [
     { name = "pocket-tts", specifier = ">=1.0" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "scipy", specifier = ">=1.13" },
+    { name = "sherpa-onnx", marker = "platform_machine != 'arm64' or sys_platform != 'darwin'", specifier = ">=1.12" },
     { name = "sherpa-onnx", marker = "extra == 'portable'", specifier = ">=1.12" },
+    { name = "sherpa-onnx-core", marker = "platform_machine != 'arm64' or sys_platform != 'darwin'", specifier = ">=1.12" },
     { name = "sherpa-onnx-core", marker = "extra == 'portable'", specifier = ">=1.12" },
     { name = "sounddevice", specifier = ">=0.5" },
     { name = "soundfile", specifier = ">=0.12" },

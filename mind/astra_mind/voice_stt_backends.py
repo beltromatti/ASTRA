@@ -392,10 +392,32 @@ class SherpaParakeetBackend(SttBackend):
         d = model_dir or Path(os.environ.get("ASTRA_SHERPA_MODEL") or VOICE_MODELS / "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8")
         return (d / "encoder.int8.onnx").exists()
 
+    @staticmethod
+    def usable() -> bool:
+        """Can this machine have the engine: the package is installed and its model is here, or may be downloaded when it is first needed
+        (a model folder chosen with ASTRA_SHERPA_MODEL is never replaced by a download)."""
+        try:
+            import sherpa_onnx  # noqa: F401
+        except Exception:  # noqa: BLE001
+            return False
+        return SherpaParakeetBackend.available() or (not os.environ.get("ASTRA_SHERPA_MODEL") and fetch_allowed())
+
+    async def _fetch(self) -> bool:
+        """The model is not here: download it once (about 490 MB) where the machine does that by itself, and say so in the log."""
+        if os.environ.get("ASTRA_SHERPA_MODEL") or not fetch_allowed():
+            return False
+        log.info("the Parakeet ONNX model is not on this machine: downloading it into %s (about 490 MB, once)", self.model_dir.parent)
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, fetch_sherpa_model, self.model_dir.parent)
+        except Exception:  # noqa: BLE001
+            log.exception("the Parakeet ONNX model could not be downloaded")
+            return False
+        return self.available(self.model_dir)
+
     async def start(self) -> bool:
         if self._rec is not None:
             return True
-        if not self.available(self.model_dir):
+        if not self.available(self.model_dir) and not await self._fetch():
             log.warning("sherpa-onnx Parakeet unavailable (package or model %s missing)", self.model_dir)
             return False
         import sherpa_onnx
@@ -431,6 +453,15 @@ SHERPA_MODEL_NAME = "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
 SHERPA_MODEL_URL = f"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/{SHERPA_MODEL_NAME}.tar.bz2"
 
 
+def fetch_allowed() -> bool:
+    """May the mind download a missing speech model by itself? Yes where there is no Neural Engine helper to do it (Windows, Linux, an
+    Intel Mac), as the Mac's helper does for its own model; ASTRA_STT_FETCH=1 or 0 decides it either way."""
+    forced = os.environ.get("ASTRA_STT_FETCH", "").strip()
+    if forced in ("0", "1"):
+        return forced == "1"
+    return platform.system() != "Darwin" or platform.machine() != "arm64"
+
+
 def fetch_sherpa_model(root: Path | None = None) -> Path:
     """Download and unpack the int8 ONNX export of Parakeet v3 (about 490 MB, from the k2-fsa release) into the voice models
     folder. Returns the model folder; a model already there is left alone."""
@@ -455,6 +486,23 @@ def fetch_sherpa_model(root: Path | None = None) -> Path:
     if not (out / "encoder.int8.onnx").exists():
         raise RuntimeError(f"the archive did not contain {SHERPA_MODEL_NAME}/encoder.int8.onnx")
     return out
+
+
+def fetch_faster_whisper_model(name: str | None = None) -> str:
+    """Download faster-whisper's model into the Hugging Face cache (`small`, about 480 MB, unless ASTRA_FW_MODEL says another); returns its folder.
+    A model already there is left alone."""
+    from faster_whisper.utils import download_model
+    return download_model(name or os.environ.get("ASTRA_FW_MODEL", "small"))
+
+
+def faster_whisper_cached(name: str | None = None) -> bool:
+    """Is faster-whisper's model already in the Hugging Face cache (no network is touched)?"""
+    try:
+        from faster_whisper.utils import download_model
+        download_model(name or os.environ.get("ASTRA_FW_MODEL", "small"), local_files_only=True)
+        return True
+    except Exception:  # noqa: BLE001 - not installed, or not there
+        return False
 
 
 # ================================================================================================ faster-whisper (CPU, portable)

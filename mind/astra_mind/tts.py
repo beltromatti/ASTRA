@@ -9,8 +9,8 @@ a look-ahead limiter keeps the peaks clean.
   (an offline machine, or a slow connection, used to freeze the whole crew for ~20 s while a model "checked for updates").
 - Generation runs in a worker thread that can be stopped at once (barge-in): `SpeechStream.stop()`.
 - A language Pocket TTS does not speak (Japanese, Russian...), or one it speaks whose model is not on the machine yet, is said
-  by macOS's own voices (`say`), mastered the same way; the line is never held up for a download and never dropped for want of
-  a model.
+  by the operating system's own voices (macOS `say`, Windows SAPI), mastered the same way; the line is never held up for a download
+  and never dropped for want of a model.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ import numpy as np
 import soundfile as sf
 
 from .env import CACHE
-from .voice_audio import Limiter, PauseCompressor, TimeStretcher, f32_to_pcm16, frame_rms_db, from_db, integrated_lufs
+from .voice_audio import Limiter, PauseCompressor, TimeStretcher, f32_to_pcm16, frame_rms_db, from_db, integrated_lufs, resample
 from .voice_qos import boost_thread
 from .voice_text import speakable
 
@@ -82,7 +82,8 @@ GENDER = {"alba": "f", "anna": "f", "azelma": "f", "bill_boerst": "m", "caro_dav
 VOICES = list(GENDER)
 
 # macOS's own voices, for the languages Pocket TTS does not speak (a Captain who speaks Japanese, Russian or Arabic to his crew
-# is answered in it, in a plainer voice, instead of by the English model reading foreign text): (woman, man) in order of preference
+# is answered in it, in a plainer voice, instead of by the English model reading foreign text): (woman, man) in order of preference.
+# Windows has no such table: its voices are whatever the machine has installed, chosen by language and sex (_WindowsVoices)
 SYSTEM_VOICES = {"it": (("Alice", "Federica"), ("Eddy (Italian (Italy))", "Reed (Italian (Italy))")),
                  "en": (("Samantha", "Karen"), ("Daniel", "Eddy (English (US))")),
                  "es": (("Mónica", "Paulina"), ("Eddy (Spanish (Spain))", "Jorge")),
@@ -99,9 +100,8 @@ SYSTEM_VOICES = {"it": (("Alice", "Federica"), ("Eddy (Italian (Italy))", "Reed 
                  "he": (("Carmit",), ("Carmit",)), "nb": (("Nora",), ("Henrik", "Nora"))}
 
 
-class SystemVoices:
-    """`say` (macOS) for the languages Pocket TTS lacks: the whole line is made at once (a fraction of a second), then mastered
-    like the others."""
+class _MacVoices:
+    """`say` (macOS): the whole line is made at once (a fraction of a second), then mastered like the others."""
 
     def __init__(self) -> None:
         self._have: set[str] | None = None
@@ -109,16 +109,15 @@ class SystemVoices:
     def installed(self) -> set[str]:
         if self._have is None:
             self._have = set()
-            if sys.platform == "darwin":
-                try:
-                    out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True, timeout=10).stdout
-                    for line in out.splitlines():
-                        head = line.split("#")[0].rstrip()
-                        parts = head.rsplit(None, 1)
-                        if parts:
-                            self._have.add(parts[0].strip())
-                except (OSError, subprocess.SubprocessError):
-                    pass
+            try:
+                out = subprocess.run(["say", "-v", "?"], capture_output=True, text=True, timeout=10).stdout
+                for line in out.splitlines():
+                    head = line.split("#")[0].rstrip()
+                    parts = head.rsplit(None, 1)
+                    if parts:
+                        self._have.add(parts[0].strip())
+            except (OSError, subprocess.SubprocessError):
+                pass
         return self._have
 
     def pick(self, lang: str, gender: str = "f") -> str | None:
@@ -136,6 +135,125 @@ class SystemVoices:
                 raise RuntimeError(f"say failed: {r.stderr.decode(errors='replace')[:120]}")
             x, rate = sf.read(f.name, dtype="float32")
         return x if x.ndim == 1 else x[:, 0]
+
+
+# Windows SAPI, through PowerShell's System.Speech (every Windows has both). The scripts reach PowerShell as -EncodedCommand (UTF-16 in base64:
+# no quoting to get wrong) and the line, the voice and the file travel in environment variables, so no text is ever part of a command line.
+_SAPI_LIST = r"""
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Speech
+$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+foreach ($v in $s.GetInstalledVoices()) {
+    if ($v.Enabled) { $i = $v.VoiceInfo; '{0}|{1}|{2}' -f $i.Name, $i.Culture.Name, $i.Gender }
+}
+$s.Dispose()
+"""
+_SAPI_SAY = r"""
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Speech
+$s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$s.SelectVoice($env:ASTRA_SAPI_VOICE)
+$s.SetOutputToWaveFile($env:ASTRA_SAPI_OUT)
+$s.Speak($env:ASTRA_SAPI_TEXT)
+$s.Dispose()
+"""
+
+
+def powershell_command(script: str) -> list[str]:
+    """The command line that runs a PowerShell script without a profile or a prompt and without any quoting of it (-EncodedCommand)."""
+    import base64
+    return ["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.b64encode(script.encode("utf-16-le")).decode("ascii")]
+
+
+def parse_sapi_listing(text: str) -> dict[str, tuple[str, str]]:
+    """`Name|culture|Gender` lines (the listing script's output) -> {voice name: (language code, 'f' | 'm' | '')}."""
+    voices: dict[str, tuple[str, str]] = {}
+    for line in text.splitlines():
+        parts = [p.strip() for p in line.strip().lstrip("\ufeff").split("|")]
+        if len(parts) == 3 and parts[0] and parts[1]:
+            g = parts[2].lower()
+            voices[parts[0]] = (parts[1].split("-")[0].lower(), "m" if g.startswith("m") else "f" if g.startswith("f") else "")
+    return voices
+
+
+class _WindowsVoices:
+    """SAPI (Windows): the voices the machine has, by language and sex. A line takes a second or two (a PowerShell to start): they are
+    the stand-in for a language Pocket TTS lacks and for one whose model is still being downloaded, not the voices of the game."""
+
+    def __init__(self) -> None:
+        self._voices: dict[str, tuple[str, str]] | None = None
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _run(script: str, env: dict[str, str] | None = None, timeout: float = 30.0) -> subprocess.CompletedProcess:
+        return subprocess.run(powershell_command(script), capture_output=True, timeout=timeout, env=env,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    def catalogue(self) -> dict[str, tuple[str, str]]:
+        with self._lock:
+            if self._voices is None:
+                self._voices = {}
+                try:
+                    r = self._run(_SAPI_LIST)
+                    if r.returncode == 0:
+                        self._voices = parse_sapi_listing(r.stdout.decode("utf-8", errors="replace"))
+                    else:
+                        log.warning("the Windows voices could not be listed: %s", r.stderr.decode(errors="replace")[:160])
+                except (OSError, subprocess.SubprocessError):
+                    log.warning("the Windows voices could not be listed (no PowerShell?)")
+            return self._voices
+
+    def installed(self) -> set[str]:
+        return set(self.catalogue())
+
+    def pick(self, lang: str, gender: str = "f") -> str | None:
+        voices = self.catalogue()
+        mine = [n for n, (lg, g) in voices.items() if lg == lang and g == gender]
+        other = [n for n, (lg, g) in voices.items() if lg == lang and g != gender]
+        return (mine or other or [None])[0]                                   # (a voice of the other sex beats none)
+
+    def render(self, text: str, voice: str, sr: int) -> np.ndarray:
+        fd, out = tempfile.mkstemp(suffix=".wav")                               # (a NamedTemporaryFile cannot be opened by PowerShell while this holds it)
+        os.close(fd)
+        try:
+            r = self._run(_SAPI_SAY, env={**os.environ, "ASTRA_SAPI_VOICE": voice, "ASTRA_SAPI_OUT": out, "ASTRA_SAPI_TEXT": text}, timeout=60.0)
+            if r.returncode != 0:
+                raise RuntimeError(f"SAPI failed: {r.stderr.decode(errors='replace')[:160]}")
+            x, rate = sf.read(out, dtype="float32")
+        finally:
+            try:
+                os.unlink(out)
+            except OSError:
+                pass
+        x = x if x.ndim == 1 else x[:, 0]
+        return resample(x, rate, sr) if rate != sr else x
+
+
+class SystemVoices:
+    """The operating system's own voices (macOS `say`, Windows SAPI) for the languages Pocket TTS lacks, and while a language's model is
+    still being downloaded. Other systems have none: a language Pocket does not speak then goes to the English model, or is reported
+    unmakeable when its script is not Latin."""
+
+    def __init__(self, platform: str | None = None) -> None:
+        platform = platform or sys.platform
+        self._impl = _MacVoices() if platform == "darwin" else _WindowsVoices() if platform == "win32" else None
+
+    def warm(self) -> None:
+        """List the voices in the background (Windows: a PowerShell, a second or more) so that the first line is not the one that waits."""
+        if isinstance(self._impl, _WindowsVoices):
+            threading.Thread(target=self._impl.catalogue, name="sapi-voices", daemon=True).start()
+
+    def installed(self) -> set[str]:
+        return self._impl.installed() if self._impl else set()
+
+    def pick(self, lang: str, gender: str = "f") -> str | None:
+        return self._impl.pick(lang, gender) if self._impl else None
+
+    def render(self, text: str, voice: str, sr: int) -> np.ndarray:
+        if self._impl is None:
+            raise RuntimeError("this system has no voices of its own for the mind to use")
+        return self._impl.render(text, voice, sr)
 
 
 def _hf_hub_dir() -> Path:
@@ -263,6 +381,7 @@ class TTSEngine:
         # (language, voice) -> the voice that speaks instead where the first is hard to understand (voice_casting.py)
         self.overrides: dict[tuple[str, str], str] = {tuple(k.split("/", 1)): v for k, v in self._read_gains(_OVERRIDES_FILE).items()}
         self.system = SystemVoices()
+        self.system.warm()
         self._cached: set[str] = set()                                       # languages whose model was found in the local cache
 
     # ------------------------------------------------------------------------------------------ facts
@@ -547,6 +666,17 @@ def cache_status() -> dict[str, tuple[bool, int]]:
     return out
 
 
+def fetch_models(langs: list[str], voices: list[str] | None = None) -> None:
+    """Download (or find in the cache) the model of each language and the voices of the catalogue (or `voices`): about 440 MB a language, plus a
+    few hundred kilobytes per voice."""
+    eng = TTSEngine(max_resident=1)
+    for lang in langs:
+        for v in (voices or VOICES):
+            eng._voice(lang, v)
+        eng._models.clear()
+        eng._voices.clear()
+
+
 def main() -> None:
     """python -m astra_mind.tts [--fetch it,en,...] [--voices alba,...]: what is cached, and download the rest (about 440 MB a
     language, plus a few hundred kilobytes per voice)."""
@@ -557,12 +687,7 @@ def main() -> None:
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.fetch:
-        eng = TTSEngine(max_resident=1)
-        for lang in args.fetch.split(","):
-            for v in (args.voices.split(",") if args.voices else VOICES):
-                eng._voice(lang, v)
-            eng._models.clear()
-            eng._voices.clear()
+        fetch_models(args.fetch.split(","), args.voices.split(",") if args.voices else None)
     for lang, (m, n) in cache_status().items():
         print(f"{lang}: model {'cached' if m else 'MISSING'}, {n}/27 voices")
 

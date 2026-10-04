@@ -1,6 +1,6 @@
 """astra-mind: the crew's minds and voices, next to the game.
 
-WebSocket ws://127.0.0.1:8765 — JSON text frames + binary audio frames.
+WebSocket ws://127.0.0.1:8765 (ASTRA_MIND_PORT moves it, for the game too) — JSON text frames + binary audio frames.
 Game -> mind:  hello · ship_state{state} · event{text} · player_text{text,lang?} · ptt{down} · command_result{id,ok,detail}
 Mind -> game:  status{...} · transcript{text,lang} · command{id,name,args,by} · turn_end{...}
                voice (docs/protocollo_voce.md): line{id,speaker,name,text,lang,tone,priority,est_s,hold_s,...} (sent when the
@@ -17,7 +17,6 @@ import asyncio
 import json
 import logging
 import os
-import signal
 import struct
 import sys
 import time
@@ -37,6 +36,7 @@ from .context import Exchange, parse as parse_context, parse_lift
 from .initiative import Watch, chatter_system, recent_orders, watch_ask, watch_system
 from .director import ADMIRAL, Director
 from .env import CACHE
+from .host import install_stop_handlers, mind_port
 from .local_ship import LocalShip
 from .openrouter import OpenRouter, credits
 from .stt import Recognizer
@@ -52,7 +52,7 @@ from .tts import TTSEngine
 from .voice_qos import boost_thread
 
 log = logging.getLogger("astra.mind")
-HOST, PORT = "127.0.0.1", 8765
+HOST, PORT = "127.0.0.1", mind_port()           # (ASTRA_MIND_PORT moves it, for the game too: host.py)
 
 _LANGS = {Language.ITALIAN: "it", Language.ENGLISH: "en", Language.SPANISH: "es", Language.FRENCH: "fr",
           Language.GERMAN: "de", Language.PORTUGUESE: "pt", Language.DUTCH: "nl"}
@@ -1341,9 +1341,8 @@ class Mind:
 
     async def serve(self) -> None:
         import websockets
-        # the game closing (or anyone stopping the mind) takes the speech server down with it
-        for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
-            asyncio.get_running_loop().add_signal_handler(sig, self._quit, sig)
+        # the game closing (or anyone stopping the mind) takes the speech server down with it (the signals each system has: host.py)
+        install_stop_handlers(asyncio.get_running_loop(), self._quit)
         await self.stt.start()
         asyncio.create_task(self.voice.run())
         asyncio.create_task(self.turn_worker())
@@ -1362,7 +1361,8 @@ class Mind:
             # start downloads the models: minutes), and a line said before they are ready is said by a system voice
             for lg in dict.fromkeys([self.lang, "en"]):
                 await loop.run_in_executor(None, self.tts.warm, lg, [o.voice for o in CREW.values()])
-        asyncio.create_task(warm_voices())
+        if os.environ.get("ASTRA_TTS_WARM", "1") != "0":      # (ASTRA_TTS_WARM=0: no voice is loaded before it is needed: tests of the door, the log and the launch)
+            asyncio.create_task(warm_voices())
         log.info("astra-mind listening on ws://%s:%d", HOST, PORT)
         # a game busy for a while (loading, compiling shaders) must not lose the crew: pings wait up to 90 s
         async with websockets.serve(self.handle_client, HOST, PORT, max_size=2 ** 22, ping_interval=20, ping_timeout=90):
