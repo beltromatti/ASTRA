@@ -22,6 +22,30 @@ pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo d
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
 
+**4/10 pomeriggio — tre moduli uniti e provati, regia dei missili, app rifatta (il lead):**
+- **App rifatta** (`tools/pacchetto.sh development`, 3 min): interni nuovi (la Mess Hall c'è anche nell'app), spazio vivo, schermo pulito, armi
+  del Capitano, abbordaggi. Da rifare dopo questi ultimi merge.
+- **Regia dello schermo principale**: una salva in arrivo ha lo schermo negli ultimi secondi («INCOMING · 15 MISSILES», le scie che convergono, la
+  difesa di punto), la nostra salva che sta per colpire porta lo schermo sul bersaglio («SALVO»); il piano vicino della telecamera ai tre quarti
+  della strada (il Gate copriva un bersaglio a 24 km). Le armi a 2–6 km si vedono bene (raggi, esagoni dello scudo che si accendono); a 10–25 km,
+  dove si combatte, solo lo schermo le mostra.
+- **ABBORDAGGI F5.2 unito e provato**: il Capitano va sull'Acheron col teletrasporto (rifiuto per i nostri scudi, finestra negli scudi, arrivo al
+  Ponte 4 accanto ai marine di Boarding Charlie; con le stanze ancora contese il raggio rifiuta: «every room our marines hold ... has the Mandate
+  in it»), torna con «beam me up». I ponti nemici sono costruiti dal piano della classe: bui, luci rosse d'emergenza, a blocchi semplici (da
+  vestire). L'ammiraglio ora possiede l'operazione e richiama con una ragione che il ponte sente.
+- **SPAZIO-VIVO M2+M3 unito e provato**: la Vigilant spezzata (`astra.space.lose T-02 breakup 1`) lascia 3 tronconi, 66 frammenti e 4 capsule con
+  22 sopravvissuti; i sensori lo dicono, poi i radiofari («aria per un'ora e 58 minuti»); «Volo, mandate una squadriglia a recuperare le capsule» →
+  Alpha in missione `sar` in 1,3 s, 22 sopravvissuti a bordo. Getti di manovra e scie delle capitali, stazioni solide per il Falcon: da guardare
+  in una battaglia vera.
+- **WINDOWS unito**: la mente parte senza zsh (provato sul Mac: `[Mind] launched astra-mind (ok): /opt/homebrew/bin/uv run --frozen astra-mind`);
+  docs/WINDOWS.md con la lista per il giorno del PC Windows; `tools/portability.py` a zero; fine riga in .gitattributes.
+- **Richieste degli aiutanti fatte dal lead**: FallGuard che dimentica i posti dopo un trasferimento lontano; «with all hands» tolto quando ci
+  sono capsule; la nuova Aquila eredita i relitti del sistema; sensori e volo sanno di relitti, radiofari e `sar`; le lambda che MSVC rifiuterebbe;
+  il teletrasporto trova una nave dall'identificativo esatto del contatto.
+- **Restano** (prossimi aiutanti): vestire i ponti nemici, la prova dello scontro dentro l'Aquila, i caduti degli abbordaggi scritti nella flotta,
+  i relitti come contatti con scafo solido, i getti dei caccia, il tasto del Falcon per raccogliere una capsula, i portelli dei motori di manovra sulle
+  navi del Mandato.
+
 **4/10 — interni nel gioco, spazio vivo nel gioco, abbordaggi e flotta provati in battaglia (il lead):**
 - **Interni di ARTE-INTERNI pubblicati** (`be4948b`, 446 MB LFS). Il guasto della notte era nel livello, non nelle mesh: dopo la ricostruzione dei
   ponti l'editor aveva come livello corrente un sotto-livello di ponte, e gli script delle cinque stanze M1 vi avevano salvato tutti i loro attori
