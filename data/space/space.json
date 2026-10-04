@@ -1,0 +1,103 @@
+{
+ "version": 1,
+ "note": "The living space of the systems (docs/SPAZIO.md): civilian hulls, and for each system its places, lanes, tours, patrols and belt. Positions: a place is anchored to the Janus Gate (axis out of the ring, to the right, up: km), to where the Aquila comes in (bearing, mark, range: km) or to the sky (a direction of the main world turned a little, and a range). Names are the game's (English).",
+ "hulls": [
+  {"key": "freighter", "class": "Free Guilds freighter", "role": "freight", "plume": "blue",
+   "meshes": ["SM_VESSEL_Freighter_A", "SM_VESSEL_Freighter_B", "SM_VESSEL_Freighter_C"],
+   "length": 352, "radius": 180, "cruise": 135, "accel": 2.4, "turn_deg": 1.4, "weight": 5,
+   "names": ["Orrery Dawn", "Halcyon Reach", "Brightwater Two", "Meridian Tally", "Sabel Lantern", "Nemet Deep", "Veyra Fortune", "Cobalt Margin", "Tiber Ledger", "Salt Wind", "Second Wind", "Long Haul", "Quiet Ledger", "Grain of Truth", "Winter Cargo", "Open Hand"],
+   "companies": ["BRIGHTWATER", "ORRERY", "HALCYON FREIGHT", "MERIDIAN CO-OP", "NEMET DEEP", "VEYRA GUILDHALL", "SABEL SALT"]},
+  {"key": "tanker", "class": "Tiberius D2 deuterium tanker", "role": "fuel", "plume": "amber",
+   "meshes": ["SM_VESSEL_Tanker_A", "SM_VESSEL_Tanker_B"],
+   "length": 540, "radius": 280, "cruise": 105, "accel": 1.8, "turn_deg": 1.0, "weight": 4,
+   "names": ["Deuterium Queen", "Gas Giant's Due", "Ring Skimmer", "Tiberius Pride", "Cold Well", "Long Burn", "Heavy Water", "Fuel of Aurelia", "Moonwell", "Slow Fire"],
+   "companies": ["TIBERIUS D2", "AURELIA FUEL"]},
+  {"key": "liner", "class": "Concord Line passenger shuttle", "role": "passenger", "plume": "blue",
+   "meshes": ["SM_VESSEL_Liner_A", "SM_VESSEL_Liner_B"],
+   "length": 260, "radius": 135, "cruise": 210, "accel": 5, "turn_deg": 3.0, "weight": 3,
+   "names": ["Port Aurelius Express", "Halcyon Clipper", "Evening Star", "New Ravenna Belle", "Concord Swift", "Teal Veil Runner", "Harbour Light", "Morning Tide"],
+   "companies": ["CONCORD LINE", "AURELIA TRANSIT"]},
+  {"key": "tug", "class": "Arsenal yard tug", "role": "tug", "plume": "blue",
+   "meshes": ["SM_VESSEL_Tug_A", "SM_VESSEL_Tug_B"],
+   "length": 78, "radius": 42, "cruise": 95, "accel": 6, "turn_deg": 8, "weight": 3,
+   "names": ["Yard Mule 7", "Yard Mule 12", "Tug Albatross", "Hardy", "Nudge", "Gantry Dog", "Pusher", "Yard Mule 3", "Persistence"],
+   "companies": ["ARSENAL YARDS"]},
+  {"key": "ore", "class": "Ceres ore barge", "role": "ore", "plume": "amber",
+   "meshes": ["SM_VESSEL_Ore_A", "SM_VESSEL_Ore_B"],
+   "length": 320, "radius": 165, "cruise": 95, "accel": 1.6, "turn_deg": 0.9, "weight": 2,
+   "names": ["Ceres Harvest", "Rockbreaker", "Slag Heap", "Belt Mother", "Pebble Run", "Deep Vein", "Lode Bearer"],
+   "companies": ["CERES MINING GUILD"]}
+ ],
+ "systems": [
+  {"name": "Aurelia", "density": 1.0,
+   "places": [
+    {"id": "gate", "name": "Janus Gate Aurelia", "kind": "gate", "anchor": "gate"},
+    {"id": "keeper", "name": "Keeper Station", "kind": "keeper", "mesh": "SM_PLACE_Keeper", "contact": "K-1",
+     "class": "ASTRA Janus Gate traffic-control station, Keeper class (infrastructure)", "radius_m": 800,
+     "anchor": "gate", "gate_pos_km": [15.0, 6.2, 1.0], "face": "gate_look",
+     "comms": "Keeper Station Control", "services": ["traffic control", "customs", "gate tuning"]},
+    {"id": "arsenal", "name": "Aurelia Arsenal", "kind": "arsenal", "mesh": "SM_PLACE_Arsenal", "contact": "A-1",
+     "class": "ASTRA orbital shipyard, Arsenal class (infrastructure)", "radius_m": 2300,
+     "anchor": "sky", "dir": "planet", "yaw_deg": 3.0, "pitch_deg": 3.0, "range_km": 78, "face": "broadside",
+     "comms": "Arsenal Control", "services": ["repairs", "new construction", "ordnance"]},
+    {"id": "tiberius", "name": "Tiberius Refinery", "kind": "refinery", "mesh": "SM_PLACE_Refinery", "contact": "R-1",
+     "class": "Free Guilds deuterium refinery, Tiberius (infrastructure)", "radius_m": 1200,
+     "anchor": "origin", "bearing_deg": 318, "mark_deg": 5, "range_km": 135, "face": "broadside",
+     "comms": "Tiberius Refinery Control", "services": ["deuterium", "fleet fuel"]},
+    {"id": "mine", "name": "Ceres Mining Station", "kind": "station", "mesh": "SM_PLACE_Mine", "contact": "C-1",
+     "class": "Free Guilds mining station, Ceres Belt (infrastructure)", "radius_m": 520,
+     "anchor": "origin", "bearing_deg": 165, "mark_deg": 1, "range_km": 205, "face": "broadside",
+     "comms": "Ceres Station", "services": ["ore", "water ice"]},
+    {"id": "orbit", "name": "New Ravenna high orbit", "kind": "orbit", "anchor": "sky", "dir": "planet", "range_km": 235},
+    {"id": "picket", "name": "7th Fleet picket station", "kind": "station", "anchor": "origin", "bearing_deg": 32, "mark_deg": 0, "range_km": 12, "radius_m": 1}
+   ],
+   "lanes": [
+    {"id": "gate-keeper", "from": "gate", "to": "keeper", "buoy_every_km": 0, "lateral_m": 500},
+    {"id": "keeper-arsenal", "from": "keeper", "to": "arsenal", "buoy_every_km": 14, "buoy_color": [1.0, 0.62, 0.15],
+     "via": [{"anchor": "origin", "bearing_deg": 55, "mark_deg": 1, "range_km": 28}]},
+    {"id": "arsenal-tiberius", "from": "arsenal", "to": "tiberius", "buoy_every_km": 24, "buoy_color": [0.35, 1.0, 0.6]},
+    {"id": "arsenal-orbit", "from": "arsenal", "to": "orbit", "buoy_every_km": 30, "buoy_color": [0.8, 0.9, 1.0]},
+    {"id": "arsenal-mine", "from": "arsenal", "to": "mine", "buoy_every_km": 22, "buoy_color": [1.0, 0.45, 0.2]}
+   ],
+   "tours": [
+    {"hull": "freighter", "count": 8, "nodes": ["gate", "keeper", "arsenal", "keeper"], "dwell_s": [120, 360]},
+    {"hull": "freighter", "count": 5, "nodes": ["arsenal", "tiberius", "arsenal", "keeper"], "dwell_s": [200, 520]},
+    {"hull": "tanker", "count": 6, "nodes": ["tiberius", "arsenal", "keeper", "arsenal"], "dwell_s": [240, 600]},
+    {"hull": "liner", "count": 8, "nodes": ["orbit", "arsenal", "keeper", "gate", "keeper", "arsenal"], "dwell_s": [120, 300]},
+    {"hull": "ore", "count": 4, "nodes": ["mine", "arsenal"], "dwell_s": [240, 600]},
+    {"hull": "tug", "count": 4, "nodes": ["arsenal"], "dwell_s": [600, 1800]},
+    {"hull": "tug", "count": 2, "nodes": ["keeper"], "dwell_s": [600, 1800]}
+   ],
+   "patrols": [
+    {"node": "picket", "craft": 4, "radius_km": 6.5, "speed": 150, "mesh": "SM_CRAFT_ASTRA_Falcon", "formation": "wedge"},
+    {"node": "arsenal", "craft": 4, "radius_km": 7, "speed": 170, "mesh": "SM_CRAFT_ASTRA_Falcon", "formation": "diamond"},
+    {"node": "keeper", "craft": 3, "radius_km": 5, "speed": 150, "mesh": "SM_CRAFT_ASTRA_Falcon", "formation": "echelon"},
+    {"node": "arsenal", "craft": 2, "radius_km": 2.4, "speed": 38, "mesh": "SM_VESSEL_Tug_A", "formation": "line"}
+   ],
+   "rocks": {"on": true, "bearing_min_deg": 118, "bearing_max_deg": 218, "range_min_km": 190, "range_max_km": 250, "mark_spread_deg": 5, "count": 520,
+             "meshes": ["SM_ROCK_A", "SM_ROCK_B", "SM_ROCK_C", "SM_ROCK_D", "SM_ROCK_E"], "size_m": [90, 2200]}
+  },
+  {"name": "_generic", "density": 0.5,
+   "places": [
+    {"id": "gate", "name": "Janus Gate", "kind": "gate", "anchor": "gate"},
+    {"id": "keeper", "name": "Keeper Station", "kind": "keeper", "mesh": "SM_PLACE_Keeper", "contact": "K-1",
+     "class": "ASTRA Janus Gate traffic-control station, Keeper class (infrastructure)", "radius_m": 800,
+     "anchor": "gate", "gate_pos_km": [15.0, 6.2, 1.0], "face": "gate_look", "comms": "Keeper Station Control", "services": ["traffic control", "customs", "gate tuning"]},
+    {"id": "orbit", "name": "high orbit", "kind": "orbit", "anchor": "sky", "dir": "planet", "range_km": 235}
+   ],
+   "lanes": [
+    {"id": "gate-keeper", "from": "gate", "to": "keeper", "buoy_every_km": 0, "lateral_m": 500},
+    {"id": "keeper-orbit", "from": "keeper", "to": "orbit", "buoy_every_km": 26, "buoy_color": [0.8, 0.9, 1.0],
+     "via": [{"anchor": "between", "fraction": 0.5, "aside_km": 14, "up_km": 3}]}
+   ],
+   "tours": [
+    {"hull": "freighter", "count": 3, "nodes": ["keeper", "gate", "keeper", "orbit"], "dwell_s": [200, 420]},
+    {"hull": "liner", "count": 2, "nodes": ["orbit", "keeper", "gate", "keeper"], "dwell_s": [120, 260]},
+    {"hull": "tug", "count": 2, "nodes": ["keeper"], "dwell_s": [600, 1800]}
+   ],
+   "patrols": [
+    {"node": "keeper", "craft": 3, "radius_km": 5, "speed": 150, "mesh": "SM_CRAFT_ASTRA_Falcon", "formation": "echelon"}
+   ]
+  }
+ ]
+}

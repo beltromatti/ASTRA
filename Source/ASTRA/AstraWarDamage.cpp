@@ -441,9 +441,9 @@ void UAstraBattleSubsystem::SetHullFraction(FAstraBattleShip& S, float Frac)
 // ---------------------------------------------------------------------------------------------- the blow
 void UAstraBattleSubsystem::ApplyHit(FAstraBattleShip& To, const FVector& FromDir, float Damage, const FVector& HitPos, EAstraHitKind Kind, int32 SourceId)
 {
-	if (!To.bAlive || Damage <= 0.f)
+	if (!To.bAlive || To.bFixture || Damage <= 0.f)
 	{
-		return;
+		return;                                                       // (a place of the system takes no blow: AstraSpaceLife.h)
 	}
 	if (To.Dmg.bModel)
 	{
