@@ -202,6 +202,7 @@ void UAstraMindSubsystem::LaunchMind()
 	if (Plan.IsValid())
 	{
 		UE_LOG(LogASTRA, Log, TEXT("[Mind] starting the mind from %s"), *Plan.MindDir);
+		MindLogFile = Plan.LogFile;
 		const bool bFirstStart = Plan.bPackaged && !IFileManager::Get().DirectoryExists(*(Plan.DataDir / TEXT("venv")));
 		FString Error;
 		if (AstraMindLaunch::Start(Plan, MindProc, Error))
@@ -240,9 +241,16 @@ void UAstraMindSubsystem::WatchMindProcess(double Now)
 	FPlatformProcess::GetProcReturnCode(MindProc, &Code);
 	FPlatformProcess::CloseProc(MindProc);
 	bMindExitReported = true;
-	const FString LogFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()) / TEXT("Logs/astra-mind.log");
-	UE_LOG(LogASTRA, Error, TEXT("[Mind] the mind stopped (exit code %d) %.0f s after it was started: its log is %s"), Code, Now - MindLaunchedAt, *LogFile);
-	Screen(FString::Printf(TEXT("SHIP: The crew's minds have stopped (code %d). Their log is %s"), Code, *LogFile), FColor::Orange, 20.f);
+	UE_LOG(LogASTRA, Error, TEXT("[Mind] the mind stopped (exit code %d) %.0f s after it was started: its log is %s"), Code, Now - MindLaunchedAt, *MindLogFile);
+	AstraMindLaunch::AppendLog(MindLogFile, FString::Printf(TEXT("the mind failed: its process exited with code %d, %.0f s after it was started (uv or Python stopped before it could write here?)"),
+	                                                       Code, Now - MindLaunchedAt));
+	// portable-ok: the hint names the setup program that exists on Windows
+#if PLATFORM_WINDOWS
+	const TCHAR* Hint = TEXT(" Setup-ASTRA.bat shows what went wrong.");
+#else
+	const TCHAR* Hint = TEXT("");
+#endif
+	Screen(FString::Printf(TEXT("SHIP: The crew's minds have stopped (code %d). Their log is %s.%s"), Code, *MindLogFile, Hint), FColor::Orange, 20.f);
 }
 
 namespace

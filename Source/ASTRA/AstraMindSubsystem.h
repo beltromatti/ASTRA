@@ -42,6 +42,7 @@ private:
 	bool bLaunchedMind = false;
 	FProcHandle MindProc;   // the mind this game started (a packaged game stops it when it quits)
 	FString MindUrl;        // ws://127.0.0.1:<port>: 8765 unless ASTRA_MIND_PORT says another (AstraMindLaunch.h)
+	FString MindLogFile;    // the file the mind writes its log to (the game adds a line to it when the mind it started is gone)
 	double MindLaunchedAt = 0.0;
 	double NextProcCheckTime = 0.0;
 	bool bMindExitReported = false;   // the mind this game started is gone, and the player was told where its log is

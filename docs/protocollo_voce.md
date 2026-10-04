@@ -214,7 +214,8 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 | `ASTRA_TTS_LUFS` | −19 | volume di ogni voce |
 | `ASTRA_TTS_PAUSE_MS` | 300 | pausa più lunga tenuta dentro una riga |
 | `ASTRA_TTS_RESIDENT` | 2 | modelli di lingua tenuti in memoria (~430 MB l'uno) |
-| `ASTRA_STT` | `parakeet` | motore provato per primo: `parakeet` (Neural Engine), `parakeet-onnx` (CPU), `whisperkit`, `faster-whisper` |
+| `ASTRA_STT` | `parakeet` | motore provato per primo: `parakeet` (Neural Engine), `parakeet-onnx` (CPU), `whisperkit`, `faster-whisper`; `portable` = solo i motori che girano ovunque (Parakeet ONNX, faster-whisper: il percorso di Windows, forzato su un Mac per provarlo); `off` = nessun motore (si scrive) |
+| `ASTRA_STT_FETCH` | `1` dove non c'è l'helper, `0` su Apple Silicon | `1`/`0`: la mente scarica da sola il modello Parakeet ONNX mancante (~490 MB) alla prima partita |
 | `ASTRA_STT_MODEL` | `ultra` | modello Parakeet: `ultra`, `v3`, `redux` |
 | `ASTRA_STT_BIN` | — | percorso dell'helper `astra-stt` |
 | `ASTRA_SHERPA_MODEL` | `<modelli>/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` | modello del Parakeet su CPU (`python -m astra_mind.stt --fetch-portable`) |
@@ -222,6 +223,7 @@ Colla nel server (le sole righe di `server.py` toccate, elenco nel rapporto): `p
 | `ASTRA_VOICE_MODELS` | `<home>/voice/models` | dove cercare i modelli di Whisper/Parakeet |
 | `ASTRA_MIC` | `auto` | `always` (microfono sempre aperto), `ptt` (aperto solo a tasto premuto), `off` (nessun dispositivo: il tasto prende la parola e registra silenzio; per le prove), `auto` |
 | `ASTRA_VOICE_QOS` | 1 | priorità dei thread della voce (macOS) |
+| `ASTRA_MIND_LOG`, `ASTRA_MIND_PORT`, `ASTRA_TTS_WARM` | — / 8765 / 1 | il file in cui la mente scrive il suo log (lo imposta il gioco); la porta (la legge anche il gioco); `0` = nessuna voce caricata in anticipo (prove). Vedi [WINDOWS.md](WINDOWS.md) §4.5 |
 
 ## 7. Come si prova (dalla cartella `mind/`)
 
@@ -236,6 +238,9 @@ uv run python -m bench.voice_e2e --lang it  # tutto il collegamento da capo a fo
                                              # veri, palco vero, modello di linguaggio finto (nessuna chiamata di rete): dal rilascio del tasto al testo, alla prima parola
                                              # della risposta, dalla pressione all'officer che tace
 uv run python -m astra_mind.stt               # quali motori di riconoscimento ci sono su questa macchina
+uv run python -m unittest bench.portable_unit -v   # il percorso portabile (Windows): scelta dei motori, log, porta, segnali, voci SAPI (docs/WINDOWS.md §7)
+ASTRA_TEST_PORTABLE_REAL=1 uv run python -m unittest bench.portable_unit.TestPortableEngines   # Pocket TTS parla, Parakeet ONNX e faster-whisper ascoltano
+uv run python -m astra_mind.firstrun --check  # lo sguardo alla macchina (chiave, microfono, librerie che caricano, modelli, voci di sistema)
 uv run python -m astra_mind.tts               # quali modelli e voci sono in cache
 ```
 
@@ -249,7 +254,7 @@ uv run python -m astra_mind.tts               # quali modelli e voci sono in cac
 | WhisperKit (riserva: le lingue oltre le 25 europee, e il caso in cui Parakeet non parta) | `whisperkit-cli` (Homebrew) e `<modelli>/models/argmaxinc/whisperkit-coreml/…turbo` | già presenti; su una macchina nuova la prima volta il Neural Engine compila il modello (minuti): `uv run python -m astra_mind.stt --warm-whisper` lo fa in anticipo | 1,6 GB, si carica solo se serve e si scarica dopo 10 minuti di inattività |
 | Pocket TTS, sette lingue | cache Hugging Face (`~/.cache/huggingface`, usata senza rete quando c'è tutto) | `uv run python -m astra_mind.tts --fetch` (~440 MB per lingua; due lingue restano in memoria). Finché il modello di una lingua non è sulla macchina (un'installazione nuova) la riga la dice una voce di sistema macOS invece di aspettare il download, che la mente fa in background all'avvio per la lingua del Capitano e per l'inglese | 3 GB |
 | Guadagni e sostituzioni delle voci | `mind/astra_mind/voice_gains.json`, `voice_overrides.json` | nel repository; si rigenerano con `uv run python -m astra_mind.voice_casting` (25 minuti) | 20 KB |
-| Windows / Linux / Mac senza il helper | Parakeet ONNX su CPU e faster-whisper | `uv sync --extra portable` e `uv run python -m astra_mind.stt --fetch-portable` (~490 MB) | — |
+| Windows / Linux / Mac senza il helper | Parakeet ONNX su CPU e faster-whisper | `uv sync` li prende da solo (dipendenze con marcatore di piattaforma; sul Mac con l'helper `--extra portable` per provarli); il modello Parakeet ONNX (~490 MB) si scarica alla prima partita o con `--fetch-portable`, quello di faster-whisper con `--fetch-whisper`; `python -m astra_mind.firstrun` fa tutto (`tools/windows/Setup-ASTRA.ps1`: [WINDOWS.md](WINDOWS.md)) | — |
 
 `tools/pacchetto.sh` copia `mind/` con `rsync`: la cartella di compilazione di Swift non deve finirci (900 MB); con `build.sh` com'è ora non si trova più dentro `mind/`, ma per le cartelle `.build` già esistenti conviene aggiungere `--exclude .build --exclude .swiftpm`.
 

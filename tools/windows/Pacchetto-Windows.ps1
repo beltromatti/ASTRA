@@ -136,9 +136,10 @@ ASTRA for Windows
        Setup-ASTRA.bat -EnvFile C:\path\to\.env
 2. Start ASTRA.exe.
 
-The crew's data (their key, models, caches) lives in %LOCALAPPDATA%\ASTRA; the game's own log and saved games in
-%LOCALAPPDATA%\ASTRA\Saved; the crew's log is %LOCALAPPDATA%\ASTRA\Saved\Logs\astra-mind.log.
-If the crew is silent: read that log, and see docs\WINDOWS.md in the project.
+The crew's data (their key, models, caches and Python environment) lives in %LOCALAPPDATA%\ASTRA. The game's saved games and logs are in
+ASTRA\Saved next to ASTRA.exe, so keep the folder somewhere you can write (not Program Files), or start the game with -SaveToUserDir to keep
+them in %LOCALAPPDATA%\ASTRA\Saved. The crew's own log is Saved\Logs\astra-mind.log there: if the crew is silent, read it
+(and see docs\WINDOWS.md in the project).
 "@
 Set-Content -Path (Join-Path $Stage "README-WINDOWS.txt") -Value $Readme -Encoding ASCII
 

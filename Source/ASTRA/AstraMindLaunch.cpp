@@ -5,6 +5,8 @@
 #include "ASTRA.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformMisc.h"
+#include "Misc/DateTime.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
 namespace AstraMindLaunch
@@ -311,6 +313,12 @@ namespace AstraMindLaunch
 		                       bPackaged ? *DataDir : TEXT(""), *LogFile);
 	}
 
+	void AppendLog(const FString& LogFile, const FString& Text)
+	{
+		const FString Line = FString::Printf(TEXT("%s astra.game %s\n"), *FDateTime::Now().ToString(TEXT("%Y-%m-%d %H:%M:%S,%s")), *Text);
+		FFileHelper::SaveStringToFile(Line, *LogFile, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM, &IFileManager::Get(), FILEWRITE_Append);
+	}
+
 	bool Start(const FPlan& Plan, FProcHandle& OutProc, FString& OutError)
 	{
 		if (!Plan.IsValid())
@@ -323,6 +331,7 @@ namespace AstraMindLaunch
 		{
 			IFileManager::Get().MakeDirectory(*Plan.DataDir, true);
 		}
+		AppendLog(Plan.LogFile, FString::Printf(TEXT("starting the mind: %s"), *Plan.Describe()));
 		FScopedEnvironment Environment(Plan.Env);
 		uint32 ProcessId = 0;
 		// detached and hidden (no console window on Windows, no terminal's signals on a Mac), in the mind's folder: uv finds its project there
@@ -330,6 +339,7 @@ namespace AstraMindLaunch
 		if (!OutProc.IsValid())
 		{
 			OutError = FString::Printf(TEXT("the system would not start %s"), *Plan.Uv);
+			AppendLog(Plan.LogFile, FString::Printf(TEXT("the mind failed to start: %s"), *OutError));
 			return false;
 		}
 		UE_LOG(LogASTRA, Verbose, TEXT("[Mind] process %u"), ProcessId);

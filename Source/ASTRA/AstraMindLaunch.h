@@ -65,6 +65,11 @@ namespace AstraMindLaunch
 	/** Where the mind lives, which uv starts it, and what the child sees. */
 	FPlan MakePlan(const FMachine& M);
 
+	/** One line of what the game did, in the mind's own log file and the mind's format (`2026-10-04 04:55:51,959 astra.game text`): the story of a start that
+	 *  failed before Python could write anything (no network for uv, a bad lock) is then in one place. Best effort; on Windows only while the mind is not running
+	 *  (the mind holds the file open without sharing it for writing: the line is written just before the mind starts and after it has stopped). */
+	void AppendLog(const FString& LogFile, const FString& Text);
+
 	/** Start it: `uv` with its arguments in the mind's folder, hidden, detached, its environment set for the instant of the launch and given back
 	 *  (the game's own is left as it was). False with a reason in `OutError` when the plan is not valid or the OS refuses. */
 	bool Start(const FPlan& Plan, FProcHandle& OutProc, FString& OutError);

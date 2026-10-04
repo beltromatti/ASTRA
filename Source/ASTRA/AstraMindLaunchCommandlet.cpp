@@ -288,8 +288,10 @@ namespace
 	// ----------------------------------------------------------------------------------------------------------------------------- this machine
 
 	/** The plan this machine would make, the game's own environment left as it is by a launch that only writes down what it was given. */
-	void MlProbeLaunch(const FMachine& M, const FString& Scratch)
+	void MlProbeLaunch(const FMachine& Live, const FString& Scratch)
 	{
+		FMachine M = Live;
+		M.SavedDir = Scratch / TEXT("ProbeSaved/");                                                      // (its log is the test's, not the game's)
 		FPlan P = MakePlan(M);
 		if (!P.IsValid())
 		{
@@ -314,6 +316,9 @@ namespace
 		FProcHandle Proc;
 		FString Error;
 		MlCheck(TEXT("probe: the program starts"), Start(P, Proc, Error), Error);
+		FString GameLine;
+		FFileHelper::LoadFileToString(GameLine, *P.LogFile);
+		MlCheck(TEXT("probe: the game wrote its own line in the mind's log before the start"), GameLine.Contains(TEXT(" astra.game starting the mind: ")) && GameLine.EndsWith(TEXT("\n")), P.LogFile);
 		MlCheck(TEXT("probe: the game's own environment is as it was"), FPlatformMisc::GetEnvironmentVariable(TEXT("ASTRA_SAVED")) == SavedBefore
 		                                                            && FPlatformMisc::GetEnvironmentVariable(TEXT("ASTRA_MIND_LOG")) == LogBefore
 		                                                            && FPlatformMisc::GetEnvironmentVariable(TEXT("PATH")) == PathBefore);
