@@ -211,6 +211,7 @@ namespace AstraBoardCraft
 		FName ClassKey;
 		int32 Side = 2;                  // 0 ASTRA, 1 Mandate, 2 neutral
 		bool bAlive = false, bDisabled = false, bCraft = false, bPlayer = false, bDerelict = false, bHasModel = false;
+		bool bFixture = false;           // a place of the system (a station, a refinery, a mine: SPAZIO-VIVO): not a ship that is fought over, boarded or boarded from
 		FVector Pos = FVector::ZeroVector;
 		FVector Vel = FVector::ZeroVector;
 		FQuat Att = FQuat::Identity;

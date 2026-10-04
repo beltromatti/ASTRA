@@ -212,6 +212,12 @@ ASSAULT_SETUPS = {
                     exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive;{_NOFATE}",
                     at="2=astra.board.strip M1|3=astra.war.fleet pound M1 port 70 12 kinetic|60=astra.war.fleet pound M1 port 70 10 explosive|11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride",
                     expect=[r"the war has left her \d+ of her people under arms", r"the Captain is aboard Wreck with the marines", r"Wreck is ours|boarding of Wreck has failed|have broken off|has gone quiet", r"the Captain is back aboard the Aquila"]),
+    # a station is a place of the system (SPAZIO-VIVO's fixtures: Keeper Station, the Arsenal, a refinery, a mine), not a ship of this war: no boat is flown at it and none from it
+    # (the war bench has no living space to make one: a ship is made a fixture, as the war sees them)
+    "fixture": dict(doc="boats at a place of the system and from it: refused with the reason, nothing flies", seconds=11200,
+                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Keeper static hold passive;{_NOFATE}",
+                    at="2=astra.board.fixture M1|11001=astra.board.assault out M1 - 2 port|11002=astra.board.assault in M1 - 1|11003=astra.board.assess aquila M1|11004=astra.board.assess M1 aquila",
+                    expect=[r"assault refused: Keeper is a place of the system \(a station\)", r"target Keeper cannot be boarded: she is a place of the system", r"carrier [^;]*cannot: there is no such carrier"]),
     # an Acheron with her power and her point defence up: the marines' boats are shot at on the way in
     "out_pd": dict(doc="the marines' boats against a ship that shoots back: how many get through", seconds=11600,
                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",

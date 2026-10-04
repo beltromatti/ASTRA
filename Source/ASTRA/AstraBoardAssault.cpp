@@ -500,6 +500,11 @@ bool UAstraBoardSubsystem::StartAssault(const FAssaultSpec& Spec, FString& OutDe
 		OutDetail = TEXT("no such carrier");
 		return false;
 	}
+	if (C.bFixture || T.bFixture)
+	{
+		OutDetail = FString::Printf(TEXT("%s is a place of the system (a station), not a ship in this war: nobody docks a boat at her or flies one from her"), *AsShipLabel(C.bFixture ? C : T));
+		return false;
+	}
 	if (C.Side == 2 || T.Side == 2)
 	{
 		OutDetail = FString::Printf(TEXT("%s takes no part in this war: nobody boards or sends boats from her"), *AsShipLabel(C.Side == 2 ? C : T));
