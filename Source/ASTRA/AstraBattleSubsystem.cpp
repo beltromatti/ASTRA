@@ -4029,8 +4029,16 @@ void UAstraBattleSubsystem::Explode(FAstraBattleShip& S)
 	for (int32 i = 0; i < 6; ++i)
 	{
 		const FVector P = S.Pos + Axis * FMath::FRandRange(-1.f, 1.f) * S.Radius + FMath::VRand() * S.Radius * 0.25f;
-		AddFlash(P, S.Radius * FMath::FRandRange(0.35f, 0.8f), FMath::FRandRange(1.f, 2.f), FLinearColor(1.f, FMath::FRandRange(0.45f, 0.7f), 0.2f), 220.f);
-		Flashes.Last().Age = -FMath::FRandRange(0.15f, 2.2f);
+		const float Size = S.Radius * FMath::FRandRange(0.35f, 0.8f), Life = FMath::FRandRange(1.f, 2.f), Delay = FMath::FRandRange(0.15f, 2.2f);
+		const FLinearColor Color(1.f, FMath::FRandRange(0.45f, 0.7f), 0.2f);
+		if (FxOn())
+		{
+			// (the war's effects take it with its delay and drift: AddFlash hands them a flash without keeping it, and the list here may be empty)
+			WarFX->OnFlash(EAstraFxFlash::Blast, P, Size, Life, Color, 220.f, Drift, Delay);
+			continue;
+		}
+		AddFlash(P, Size, Life, Color, 220.f);
+		Flashes.Last().Age = -Delay;
 		Flashes.Last().Vel = Drift;
 	}
 	// shockwave ring in the ship's plane
