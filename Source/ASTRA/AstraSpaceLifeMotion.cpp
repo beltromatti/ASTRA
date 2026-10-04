@@ -282,7 +282,6 @@ namespace AstraSpace
 
 	namespace
 	{
-		FORCEINLINE float MoClampF(float X, float Lim) { return FMath::Clamp(X, -Lim, Lim); }
 		FORCEINLINE FVector MoClampV(const FVector& V, double Lim) { return FVector(FMath::Clamp(V.X, -Lim, Lim), FMath::Clamp(V.Y, -Lim, Lim), FMath::Clamp(V.Z, -Lim, Lim)); }
 	}
 
