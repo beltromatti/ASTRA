@@ -4,14 +4,17 @@
 [brief/SPAZIO-VIVO.md](brief/SPAZIO-VIVO.md); la guerra che ci sta sopra è in [GUERRA.md](GUERRA.md), il modo di disegnare a istanze in [SCALA.md](SCALA.md)
 e [VFX.md](VFX.md), gli interni delle altre navi in [FLOTTA-VIVA.md](FLOTTA-VIVA.md), chi sale a bordo in [ABBORDAGGI.md](ABBORDAGGI.md).*
 
-**Stato.** Scritto, compilato e provato sul banco senza grafica (`tools/space.py test`: 41 prove su 41). **Mai visto nel motore da chi l'ha scritto** (le regole
+**Stato.** Scritto, compilato e provato sul banco senza grafica (`tools/space.py test`: 51 prove su 51). **Mai visto nel motore da chi l'ha scritto** (le regole
 dei moduli di supporto: nessun editor, nessuna GPU): il primo passo del lead è la lista del §10. Parti:
 
 | Parte | Stato |
 |---|---|
 | **M1** I luoghi veri (Keeper Station, Arsenal, raffineria di Tiberius, miniera di Ceres), il traffico civile, la cintura, le boe | unito e importato dal lead (3/10–4/10) |
-| **M2** Ciò che la guerra lascia: i relitti, i campi di detriti, le capsule di salvataggio con i fari, il salvataggio, la persistenza | questo documento, §3–§7 |
-| **M3** Il moto delle capitali reso leggibile (getti di manovra, scie) e gli scafi dei luoghi solidi per il Falcon del Capitano | questo documento, §8–§9 |
+| **M2** Ciò che la guerra lascia: i relitti, i campi di detriti, le capsule di salvataggio con i fari, il salvataggio, la persistenza | unito (4/10): §3–§7 |
+| **M3** Il moto delle capitali reso leggibile (getti di manovra, scie) e gli scafi dei luoghi solidi per il Falcon del Capitano | unito (4/10): §8–§9 |
+| **M4** (SPAZIO-VIVO-2) I pezzi dei relitti **sono contatti del plot** (W-02S «the stern section of ASN Vigilant»: l'equipaggio li nomina, li scandaglia, li mette sullo schermo) e hanno **scafi solidi** (il Falcon ci si schianta) | questo documento, §3bis e §9.1 |
+| **M5** (SPAZIO-VIVO-2) **Gli scafi lasciati indietro**: una nave disattivata quando l'Aquila lascia il sistema è ritrovata al ritorno, com'era | §3ter |
+| **M6** (SPAZIO-VIVO-2) **Ugelli visibili** sulle navi del Mandato e sul mercantile delle gilde | §8.1 |
 
 ## 1. Che cosa è
 
@@ -29,16 +32,18 @@ Tutto il codice di dati e di regole è C++ semplice (niente oggetti del motore),
 | `Source/ASTRA/AstraSpaceLife.h/.cpp` | **`UAstraSpaceLife`**: il sistema messo in piedi (luoghi come contatti fixture, traffico, cintura, boe), il mondo come lo vede il traffico, gli eventi per l'equipaggio, la console. Posseduto da `UAstraBattleSubsystem` (come `UAstraWarFX`) |
 | `Source/ASTRA/AstraSpaceLifeData.*`, `AstraSpaceLifeTraffic.*` | M1: i dati (`data/space/*.json`), il layout di un sistema, le rotte e il traffico (puro C++) |
 | `Source/ASTRA/AstraSpaceLifeDraw.cpp`, `AstraSpaceLifeDrawUtil.h` | il disegno a istanze: le pagine di scafi (slot stabili), le luci, i pennacchi; i tre piccoli aiuti condivisi |
-| **`Source/ASTRA/AstraWrecks.h/.cpp`** | **M2, il cuore**: i siti di ciò che la guerra lascia, il loro moto come aritmetica, le capsule e i loro fari, ciò che si dice all'equipaggio, il file (puro C++) |
-| **`Source/ASTRA/AstraSpaceLifeWrecks.cpp`** | M2, dal lato del gioco: la perdita di una nave registrata, la consegna dei pezzi dagli effetti, il disegno, il salvataggio, i ganci del soccorso, la console |
+| **`Source/ASTRA/AstraWrecks.h/.cpp`** | **M2, il cuore**: i siti di ciò che la guerra lascia, il loro moto come aritmetica, le capsule e i loro fari, ciò che si dice all'equipaggio, il file (puro C++). M4: il nome, il numero e la mesh di ogni pezzo, che cosa si impara a ogni distanza (`Findings`), lo stato per l'elenco dei contatti |
+| **`Source/ASTRA/AstraSpaceLifeWrecks.cpp`** | M2, dal lato del gioco: la perdita di una nave registrata, la consegna dei pezzi dagli effetti, il disegno, il salvataggio, i ganci del soccorso, la console. M4: i pezzi come contatti del plot (nascono, si muovono, escono), la scansione, gli occhi |
 | `Source/ASTRA/AstraWrecksTest.cpp` | le prove dei record da soli (nessun mondo: un decimo di secondo) |
+| **`Source/ASTRA/AstraDerelicts.h/.cpp`** | **M5**: i record degli scafi lasciati indietro (punto, velocità, danni, ciò che è a bordo, in cornice del Gate), la frenata come aritmetica, il file, le prove (puro C++) |
+| **`Source/ASTRA/AstraSpaceLifeDerelicts.cpp`** | M5, dal lato del gioco: registrare gli scafi quando l'Aquila parte, rifarli al ritorno (con il loro modello di danno), la notizia «found again», la console |
 | **`Source/ASTRA/AstraSpaceLifeMotion.h/.cpp`**, `AstraSpaceLifeMotionDraw.cpp`, `AstraSpaceLifeMotionTest.cpp` | **M3, i getti e le scie**: la tavola degli ugelli, l'assegnazione, la lettura del moto, la scia (puro C++); il disegno e la console (lato gioco); le prove |
-| **`Source/ASTRA/AstraSpaceLifeSolids.h/.cpp`** | **M3, gli scafi dei luoghi**: le scatole di `solids.json` come mappa di bit, la prova di un punto o di un percorso, `PilotHit` (il gancio del Falcon), `astra.space.solids`, le prove |
+| **`Source/ASTRA/AstraSpaceLifeSolids.h/.cpp`** | **M3, gli scafi dei luoghi**: le scatole di `solids.json` come mappa di bit, la prova di un punto o di un percorso, `PilotHit` (il gancio del Falcon), `astra.space.solids`, le prove. M4: anche i pezzi dei relitti (`PilotHitWrecks`) |
 | `Source/ASTRA/AstraSpaceLifeSimCommandlet.*` | il banco: `-run=AstraSpaceSim` (`-seconds`, `-at`, `-exec`, `-selftest`, `-wrecktest`, `-motiontest`, `-solidstest`) e i controlli di invarianti |
 | `tools/space.py` | `run`, `report`, `test`, `wrecktest`, `motiontest`, `solidstest`, `sync`, `meshes` |
 | `tools/art/space_plot.py`, `tools/art/wrecks_plot.py` | le mappe del traffico e di ciò che la guerra ha lasciato, da un record del banco |
 | **`art/blender/space3_thrusters.py`**, `space3_motion_scene.py`, `tools/art/motion_sheet.py` | M3: dove sono gli ugelli di ogni classe (sulle mesh vere, `data/space/thrusters.json`) e le anteprime dei getti e della scia |
-| **`art/blender/space3_solids.py`**, `tools/art/solids_plot.py` | M3: gli scafi dei luoghi come scatole (`data/space/solids.json`) e la loro figura |
+| **`art/blender/space3_solids.py`**, `tools/art/solids_plot.py` | M3: gli scafi dei luoghi come scatole (`data/space/solids.json`) e la loro figura. M4: anche lo scafo intero delle sette classi e i loro tre pezzi, dalle mesh dei generatori delle navi (`--ships`) |
 | `art/blender/spacegen3.py`, `space3_*.py` | i generatori Blender dei luoghi, degli scafi civili, delle rocce, dei detriti, delle capsule, delle boe |
 | `art/blender/space3_wreck_scene.py` | un sito di relitti **come lo mettono i dati**, reso con le mesh vere (le sezioni del generatore delle navi, i detriti, le capsule) |
 | `tools/ue_scripts/import_space_v3.py`, **`make_space_materials.py`** | l'importazione delle mesh; il flag «Used with Instanced Static Meshes» sui materiali degli scafi (da eseguire una volta, §10) |
@@ -158,6 +163,62 @@ Per salire su una sezione la pianta e il suo stato sono qui: le stanze della sez
 morti sono `Killed` + `Lost` (la posizione dei persi con la nave non è registrata: `FFleetSnapshot::Hands` è vuoto dopo `LoseWithShip`; il banco di ABBORDAGGI può metterli
 in modo deterministico nelle stanze rimaste). **Le stanze si salvano per i 12 siti più recenti** (`FWrecks::RoomSites`): i più vecchi tengono i conti.
 
+## 3bis. I pezzi dei relitti come contatti del plot (M4)
+
+Fino a M3 i relitti erano solo da vedere (dal finestrone, dallo schermo principale) e da sentire (i fari): non stavano nel plot, quindi l'equipaggio non poteva dire «la poppa del Vigilant», metterla sullo
+schermo, mandarci uno stormo a guardare, scandagliarla, abbordarla. Ora **ogni pezzo entro 60 km dall'Aquila è un contatto del plot** (`UAstraSpaceLife::TickWreckContacts`, ogni mezzo secondo la lista, ogni
+fotogramma la posizione).
+
+| Cosa | Com'è |
+|---|---|
+| **Il numero** | `W-02S`: il numero della nave morta (T-02), una W di relitto e una lettera per il pezzo (B prua, M centro, S poppa; nessuna per uno scafo intero bruciato: `W-02`). Una nave che non aveva numero: `W-<sito>`. Se il numero è già preso (una campagna che ricomincia con i vecchi) prende `-<sito>` |
+| **Il nome** | «stern section of ASN Vigilant», «wreck of ASN Vigilant» (come la chiamava la guerra a chi guardava: la nebbia di guerra vale: `KnownAs`) |
+| **Per la guerra** | una nave `bFixture` + `bDerelict` + `bWreck`, classe «wreck», mesh `SM_WRECK` (la guerra non ne fa un modello: `AstraWar::KeyFor` non la conosce), neutra, senza armi: nessuna IA la guida, nulla la colpisce, nessuno ci combatte; `WreckSite` e `WreckPiece` dicono quale record è. Il suo posto, la sua velocità e il suo assetto sono **riscritti dall'aritmetica del record a ogni fotogramma** |
+| **Chi c'è, quanti** | i più vicini entro 60 km (`astra.space.wrecks.plot.km`), **al più 16** (`.plot.max`: le liste del plot sono lette ogni fotogramma da una dozzina di lettori); chi è già nel plot ci resta fino a 70 km (niente lampeggio al bordo). I contatti nascono e escono con `Ships.RemoveAll` + indice e griglia rifatti (non con un flag di morto: `UAstraViewscreen` usa `WasDestroyed` per i lampi di morte, e ABBORDAGGI tiene indici di navi) |
+| **L'elenco dell'equipaggio** | `contacts` nello stato della nave porta **i 4 più vicini entro 40 km** (`.listed`): id, classe «wreck», nome, stato («wreck: lost 5 min ago when her hull broke apart; no power, no transponder, no life signs, tumbling at 1.8 deg/s; her rooms scanned»), distanza, rilevamento, quota, velocità. Gli altri sono nel plot per gli schermi (schermo principale, tavolo olografico, mira, scansione) ma non nell'elenco. `space.wrecks.nearest` dice per ogni pezzo vicino anche `piece` e `contact` |
+| **Lo schermo principale** | un contatto senza attore non ha scatola di contorno: l'inquadratura prende una toppa fatta dal suo raggio (`AstraViewscreen.cpp`, ramo `EShot::Contact`) |
+
+**Che cosa si impara, e da dove.** `scan` su un pezzo (`UAstraBattleSubsystem::PlayerScan` → `UAstraSpaceLife::ScanWreck`) dà ciò che la distanza permette, a tre gradini (`FWrecks::StageForRange`):
+
+1. **lo scafo** (oltre 4 km): l'account del pezzo, com'era già (`Describe`: che cosa fu, come andò, da quanto, a quanti gradi al secondo gira);
+2. **le stanze** (sotto 4 km): quante erano sventrate, aperte allo spazio, in fiamme, senza corrente (il piano della nave com'era un attimo dopo la perdita) e quante paratie erano chiuse; per un pezzo, la sua quota di loro;
+3. **i morti** (sotto 800 m: di fianco): quanti dei suoi ne cadde prima, quanti si persero con lei (e quanti in questo pezzo), quanti partirono in capsula e quanti sono stati presi dopo.
+
+I testi dei gradini 2 e 3 sono **fatti, senza nome** (chi chiede dice di chi sono): l'intelligenza è dell'equipaggio. Gli occhi sono quelli dell'Aquila, **degli stormi** che hanno raggiunto il pezzo (un Wasp a 800 m vede ciò che l'Aquila non vede) e del **Falcon del Capitano**, quando
+volano: il primo che arriva a un gradino lo dice una volta, come evento dei sensori («sensors: 3.2 km from the stern section of ASN Vigilant (W-02S) — …»; «flight: Wasp: …», «flight: Eagle: …»), notizia e non rapporto in battaglia. Quanto si è imparato (`FPieceRec::Seen`, 0..3) **si salva** (il ventiduesimo
+numero della riga `pc` del pezzo; un salvataggio vecchio si legge come 0): le menti lo ricordano, e una scansione ripetuta dalla stessa distanza dice «nothing new from this range» e che cosa servirebbe.
+
+**Per ABBORDAGGI** (`AstraBoard*`, di un altro modulo): un contatto con `bWreck` porta `WreckSite`/`WreckPiece`; `GetSpace()->GetWrecks().FindById(WreckSite)` dà il sito (§3.6: `ClassKey`, `ShipId`, `Aboard`, le sezioni) e
+`GetSpace()->WreckMeshFrame(Contatto, Origine, Assetto)` dà **dove sta ora la mesh della nave com'era** (l'origine della mesh della nave, cui tutte le sezioni sono riferite: i portelli del suo piano stanno lì), mentre `Pos` del contatto è il perno del pezzo (ciò attorno a cui gira). Il contatto **non ha `ClassKey`**: la classe è nel sito. ABBORDAGGI rifiuta oggi ogni
+`bFixture` («a place of the system»): per abbordare un pezzo va aggiunta a quel rifiuto l'eccezione `bWreck` (richiesta al lead, §11).
+
+**Costo.** Oltre alle istanze dei pezzi (§6): una scansione dei siti ogni mezzo secondo e, a ogni fotogramma, un aggiornamento per contatto (quattro righe). Misurato con 40 navi perse insieme: **27,5 µs a tick** in tutto (relitti, contatti e disegno).
+Console: `astra.space.wrecks.contacts` (l'elenco), `astra.space.wrecks.contacts.test` (le prove nel mondo: id unici, ogni pezzo vicino è un contatto dove il suo record lo mette, nominabile e scandagliabile, l'elenco ne ha al più 4, nessun orfano, due scansioni, i loro scafi dove sono disegnati: marcatore `WRECK_CONTACTS_OK`),
+`astra.space.look W-02S 1.5` (l'Aquila a 1,5 km dal pezzo).
+
+## 3ter. Gli scafi lasciati indietro (M5)
+
+Una nave che la guerra ha **disattivato** (`bDisabled`: senza corrente, alla deriva; la si può abbordare) o un guscio morto che una scena ha messo nel sistema (`bDerelict`) *spariva* quando l'Aquila lasciava il sistema: tornando, il sistema si rifaceva come
+da dati. Ora, **quando l'Aquila parte** (`UAstraSpaceLife::Leave`, prima di `ClearScene`) gli scafi del plot sono registrati (`CaptureDerelicts` → `FDerelicts::Replace`) e, **quando torna** (`DoArrive` → `RestoreDerelicts`), il plot li rifà dai record: l'equipaggio li ritrova dove li ha lasciati, **con il loro nome, la loro classe, i loro danni e ciò che c'era a bordo**.
+
+**Un record** (`AstraSpace::FDerelict`, 624 byte con le stanze; al più `MaxHulks` = 24 in tutto, via i più vecchi) tiene ciò che serve a rifarla: chi era (nome, classe, mesh, numero di contatto, `ClassKey`, schiera, ostile o no), che cosa ne sapevano i sensori (identificata,
+classificata, sotto nebbia di guerra: se lo era, va ritrovata), dov'era e come girava (cornice del Gate: punto, velocità, assetto, asse e velocità di spin), e per una nave da guerra **ciò che restava di lei** (struttura per sezione, piastre, sistemi, sventrata, missili e siluri: il modello della guerra, così torna ferita com'era andata) e delle persone a bordo
+(`FAboard`, quello di §3.6: i morti dove sono caduti, le stanze com'erano).
+
+**Dove sta al ritorno.** La guerra lascia a una nave disattivata la velocità che aveva (qualche centinaio di m/s): lasciata all'aritmetica sarebbe a mille chilometri in un'ora e nessuna Aquila la ritroverebbe. Quello che un sistema fa di uno scafo che nessuno ha a rimorchio è affare del suo
+traffico: i rimorchiatori della Keeper Station e il campo del Gate lo prendono e lo parcheggiano. Il record lo dice **come aritmetica**: la velocità si spegne come `e^(-t/BrakeS)` con `BrakeS` = **150 s** (`astra.space.derelicts.brake`; **0 dà la deriva della guerra**), quindi uno scafo lasciato a 300 m/s si ferma a 45 km da dov'era.
+È una scelta di modello, non una regola della guerra: finché l'Aquila è nel sistema, le regole della guerra valgono com'erano (velocità costante); la frenata è solo ciò che si racconta del tempo in cui l'Aquila era via.
+
+**Come torna.** `MakeDerelict`: se la guerra ne aveva un modello la rifà con `SpawnByKey` (le sezioni, le piastre e i sistemi tornano com'erano) e la **disattiva di nuovo senza la notizia** (nessun «we have disabled…» due volte); altrimenti un contatto derelitto e il suo disegno. Il numero di contatto è lo stesso se è libero, altrimenti ne prende uno nuovo.
+Una nave sotto nebbia di guerra torna a traccia 0: i sensori devono ritrovarla. L'equipaggio ne ha **una notizia, una volta**, quando la traccia è salda (almeno 2) e lo scafo sta entro 90 km: «sensors: found again — Brightwater (T-11), the hulk we left here 14 min ago: no power, no transponder, drifting at 12 m/s, tumbling at 0.8 deg/s; bearing 072, mark +3, 41 km».
+
+**Il salvataggio.** `SaveJson` porta una chiave `derelicts` (la copia del registro con la fotografia del sistema corrente, in unità intere come i relitti); `LoadSaved` la legge; una campagna nuova la azzera. Una ripresa dal salvataggio rifà gli scafi di quel sistema dove l'aritmetica li mette (il banco lo prova).
+
+**Console.** `astra.space.derelicts` (elenco: dove, come, quanto tempo), `astra.space.derelicts.mark` e `.test` (il banco: nota gli scafi del plot, e dopo un'assenza dell'Aquila o una ripresa controlla che siano dov'è l'aritmetica, con il loro danno: 19 controlli, marcatore `DERELICTS_OK`; la tolleranza è 40 m: dopo il ritorno la guerra li muove a velocità costante).
+
+**Limiti** (§12): l'interno FLOTTA-VIVA di uno scafo tornato non viene ripristinato (la guerra lo rifà vergine al primo colpo; i conti dei morti stanno nel record, ma `FAstraShipInterior` non ha ancora un modo di leggerli: richiesta al lead); le persone e i morti che il record porta (`Aboard`) sono
+quindi ciò che un abbordaggio dovrebbe trovare, non ciò che trova oggi.
+
 ## 4. Il soccorso
 
 **Un ordine di soccorso** è la missione `sar` della rete di volo (VOLO): `LaunchSquadron(..., "sar", ...)`. Ora cerca i fari veri.
@@ -188,7 +249,8 @@ Alla ripresa i siti tornano **dove erano rispetto al nuovo Gate** (provato: `ast
 | Cosa | Misura (banco, M-serie sotto carico di un editor aperto) |
 |---|---|
 | tre perdite, una battaglia piccola | **4 µs a tick** in media per i relitti |
-| **40 navi perse insieme** attorno all'Aquila, 15 minuti fra i rottami | **25 µs a tick** (picco 120 scafi e 420 pezzi istanziati; prima delle due ottimizzazioni sotto: 209 µs) |
+| **40 navi perse insieme** attorno all'Aquila, 15 minuti fra i rottami | **25 µs a tick** (picco 120 scafi e 420 pezzi istanziati; prima delle due ottimizzazioni sotto: 209 µs); con i pezzi come contatti del plot (§3bis, al più 16) **27,5 µs** |
+| gli scafi lasciati indietro (§3ter) | 624 byte a scafo, al più 24; nulla a ogni fotogramma finché non sono ritrovati, poi una scansione ogni mezzo secondo |
 | una perdita (`AddLoss`) | decine di µs; 40 insieme: l'impennata di un fotogramma, 1,5 ms |
 | i siti | 1,1 KB l'uno in memoria e nel file |
 
@@ -210,7 +272,9 @@ Console (`astra.space.*`):
 |---|---|
 | `lose <contatto\|nearest> [breakup\|reactor\|destroyed] [sezione 0\|1\|2]` | perde una nave da guerra come la guerra (prova: vedere cosa resta) |
 | `wrecks.list` | i siti di questo sistema: chi, come, da quanto, capsule (aria, stato), ciò che restava a bordo |
-| `look wreck\|pod [km]` | l'Aquila a qualche chilometro dal pezzo o dalla capsula più vicini, prua su di essi |
+| `look wreck\|pod [km]` | l'Aquila a qualche chilometro dal pezzo o dalla capsula più vicini, prua su di essi; **`look W-02S [km]`**: dal pezzo di cui il plot ha il contatto (M4) |
+| `wrecks.contacts`, `wrecks.contacts.test` | **M4**: i pezzi che sono contatti del plot, uno per riga (id, nome, dove, scandaglio); le prove nel mondo (marcatore `WRECK_CONTACTS_OK`) |
+| `derelicts`, `derelicts.mark`, `derelicts.test` | **M5**: gli scafi lasciati indietro e quelli ritrovati; il banco: nota gli scafi del plot e, dopo un'assenza dell'Aquila (`astra.battle.arrive`) o una ripresa, controlla che siano dov'è l'aritmetica e come erano (marcatore `DERELICTS_OK`) |
 | `rescue [km]` | prende a bordo le capsule vicine (le barche dell'Aquila) |
 | `stat` | (esteso) il conteggio dei relitti, cosa si disegna, cosa costa |
 | `skip <s>` | anche i relitti invecchiano |
@@ -221,11 +285,11 @@ Console (`astra.space.*`):
 | `jets <contatto\|classe\|nearest> <manovra> [s]`, `motion.list` | **M3**: spara i getti di una nave a mano; che cosa chiede il moto di ogni nave (§8.5) |
 | `solids [raggio] [s]`, `solids.test` | **M3**: disegna le celle piene dei luoghi vicini all'occhio; le prove nel mondo (§9) |
 
-Variabili: `astra.space.wrecks` (1/0: i relitti si registrano o no), `astra.space.wrecks.km` (220: fino a dove si disegnano i pezzi), `astra.space.wrecks.chunks` (420).
+Variabili: `astra.space.wrecks` (1/0: i relitti si registrano o no), `astra.space.wrecks.km` (220: fino a dove si disegnano i pezzi), `astra.space.wrecks.chunks` (420); **M4** `astra.space.wrecks.plot.km` (60: fino a dove un pezzo è un contatto), `astra.space.wrecks.plot.max` (16: al più quanti insieme), `astra.space.wrecks.listed` (4: quanti ne mostra l'elenco dell'equipaggio); **M5** `astra.space.derelicts.brake` (150 s; 0 = la deriva della guerra).
 `astra.space.reactions` resta com'era: **non è un riparo per il crash di `Explode`** (corretto su main), è l'interruttore di prova con cui il banco isola il traffico dalla guerra
 dell'apertura (0: il traffico non la sente; 2: sente solo l'ostile finto di `astra.space.alert`).
 
-**Il banco** (`tools/space.py test`, 41 prove, ~4 minuti):
+**Il banco** (`tools/space.py test`, 51 prove, ~4 minuti):
 - il traffico (M1): un'ora di pace, un ostile sulle corsie, la porta del Gate, determinismo;
 - **`wrecktest`** (nessun mondo, 0,1 s): 1800 perdite (le tre fini, sei classi, con e senza interno): le persone tornano, nessun faro senza sopravvissuti, nessun NaN; determinismo byte per
   byte; il moto è punto + velocità, i detriti restano nel raggio del campo più veloce, a un secondo come a quattro giorni; il file torna com'era e costa poco; i limiti; gli eventi (il faro
@@ -234,7 +298,11 @@ dell'apertura (0: il traffico non la sente; 2: sente solo l'ostile finto di `ast
 - **quattro navi perse in un mondo** (una per ogni fine): registrate, capsule, i fari sentiti, uno sguardo, il soccorso detto e contato, il salvataggio rileggibile, **il ripristino a metà**;
   lo stesso scenario due volte (stessi eventi); **40 relitti insieme**: le invarianti reggono e costa meno di 0,1 ms a tick;
 - **`motiontest`** (nessun mondo, 0,02 s) e **una battaglia di dodici navi** (M3: §8.6): i getti e le scie, il costo, la mano della console;
-- **`solidstest`** e **gli scafi nel mondo** (M3: §9): l'anello, i percorsi, le parti che girano dove le disegna il gioco.
+- **`solidstest`** e **gli scafi nel mondo** (M3: §9): l'anello, i percorsi, le parti che girano dove le disegna il gioco; **(M4) le sette navi e i loro diciotto pezzi** (lunghi quanto dice la classe, in ordine, che si toccano ai tagli);
+- **(M4) i pezzi come contatti**: le stesse quattro perdite guardate a 130, 200 e 700 s: ogni pezzo vicino è un contatto dove il suo record lo mette, nominabile, nell'elenco se è fra i più vicini, scandagliabile due volte (la seconda «nothing new»), con il suo scafo dove è disegnato;
+  nel `wrecktest`: id unici (94 pezzi di 40 perdite), nomi, mesh, la tavola delle quote di sezione contro `data/war/classes.json`, `Seen` salvato e riletto (anche dal formato vecchio);
+- **(M5) gli scafi lasciati indietro**: due navi disattivate (la Lethe e la Brightwater), l'Aquila passa il Gate (`astra.battle.arrive Thule`) e torna (`Aurelia`): registrate alla partenza, ritrovate dove l'aritmetica le mette e com'erano (19 controlli, la più lontana a 18 m), la notizia «found again»; **lo stesso attraverso il salvataggio e una ripresa** (0 m);
+  nel `wrecktest`: la frenata (uno scafo a 300 m/s si ferma a 45 km), 12 record = 7,3 KB, il file tiene 0,064 m e 0,00006 m/s.
 
 ## 8. Il moto delle capitali reso leggibile (M3)
 
@@ -246,19 +314,25 @@ di manovra e dove il suo motore lascia una scia. Niente di ciò che si disegna t
 ![i getti dell'Aquila](progressi/spazio/jets_aquila.jpg)
 
 *(anteprima: i getti dell'Aquila come il gioco li accende per sei manovre, poppa a sinistra, prua a destra, sullo scafo vero; l'aspetto dei coni è dell'anteprima, non dei materiali del
-gioco. `jets_acheron.jpg`: lo stesso per una nave del Mandato, che non ha blocchi di propulsori suoi.)*
+gioco. `jets_acheron.jpg`: lo stesso per una nave del Mandato **com'era prima di M6**, quando non aveva blocchi di propulsori suoi: i getti uscivano da bocchette al filo dello scafo; ora escono dai blocchi, sotto.)*
+
+![i blocchi di propulsori delle navi del Mandato e del mercantile](progressi/spazio/thrusters_mandate_guild.jpg)
+
+*(M6, anteprima Blender: la poppa di Acheron, Styx, Lethe e del mercantile delle gilde con i blocchi di propulsori nuovi; i materiali sono quelli dell'anteprima.)*
 
 ### 8.1 Dove sono gli ugelli
 
 `data/space/thrusters.json` (copia in `Content/ASTRA/Data/space`), fatto da `art/blender/space3_thrusters.py` (Blender senza finestra: le mesh vere, `tools/space.py sync`):
 
-- **le navi ASTRA** (Aquila, Praetorian, Vigilant) hanno già i **blocchi di propulsori** dei generatori (`thruster_cluster`: quattro piccoli ugelli ai quattro angoli della poppa): quelli sono gli
-  ugelli, nella posizione in cui il generatore li ha messi (16 per nave): **un getto esce da un ugello che si vede sullo scafo**;
+- **tutte le navi** hanno i **blocchi di propulsori** dei generatori (`thruster_cluster`: un blocco con quattro piccoli ugelli, uno per verso). Le ASTRA (Aquila, Praetorian, Vigilant) li avevano dal primo giorno; **dal M6 li hanno anche le navi del Mandato** (`MandateShip.rcs`
+  in `art/blender/ship3_mandate.py`: due blocchi per lato sui fianchi del blocco di poppa, uno alto e uno basso, su un basamento che li alza dalla placcatura di un metro; raggio dell'ugello 0,17 % della lunghezza della nave, fra 0,3 e 1 m) **e il mercantile delle gilde** (quattro blocchi
+  sui fianchi della sezione motori, sopra e sotto le cerniere delle ali dei radiatori: `ship3_misc.py`). Quelli sono gli ugelli, nella posizione in cui il generatore li ha messi (16 per nave): **un getto esce da un ugello che si vede sullo scafo**;
 - per il resto un **pacchetto standard trovato sullo scafo**: si lanciano raggi contro la mesh generata, dall'esterno, e l'ugello sta sulla prima superficie incontrata, **su un tratto piano**
   (un bordo di lastra o la canna di un cannone metterebbero il getto in aria) e su **placcatura** (non su radiatori, finestre, luci). Getti d'imbardata sui fianchi, d'assetto e di rollio su
   ponte e chiglia (fuori asse, così rollano anche), di frenata sulle spalle della prua (inclinati in fuori, così il getto libera lo scafo). Sempre in coppie speculari. Dove lo scafo si
   restringe (la lancia della Praetorian) la stazione di prua si sposta indietro, fino a dove è largo almeno la metà del massimo;
-- la **tavola**: Aquila 28 (16 dei blocchi + 2 + 6 + 4), Praetorian 26, Vigilant 26, Acheron 14, Styx 14, Lethe 16, Freighter 16. In più, per ogni classe, il **centro del propulsore principale** e la
+- la **tavola** (dal M6, con tutti i blocchi): Aquila 28 (16 dei blocchi + 2 d'imbardata + 6 d'assetto + 4 di frenata), Praetorian 26, Vigilant 26, **Acheron 26, Styx 26, Lethe 28, Freighter 28** (prima del M6: 14, 14, 16 e 16). Le campane «quad» dei blocchi hanno dettaglio 0 e non si confondono con le campane del propulsore principale
+  (`data/war/fx_nozzles.json`, dei plume della guerra, **non cambia**: le campane principali sono le stesse). In più, per ogni classe, il **centro del propulsore principale** e la
   sua larghezza (da dove parte la scia e quanto è larga), la lunghezza, e il punto attorno a cui la nave gira. Lo script controlla anche che **ogni spinta e ogni virata possibile abbia getti
   che la danno** (undici direzioni: la frenata, la spinta di lato e di quota, sei virate; la spinta in avanti è del motore).
 
@@ -371,9 +445,26 @@ Le prove da sole (`tools/space.py solidstest`, 0,02 s): i sei file di dati, il n
 (un Falcon ci passa), i raggi sulle diagonali sono pieni, l'aria attorno è aria; un percorso lungo l'asse nello spicchio libero non colpisce, in un raggio colpisce, fuori dall'anello non colpisce; un
 percorso che finisce una cella fuori dal bordo non colpisce e uno che finisce due celle dentro sì; punti a caso: la quota piena coincide con le celle; il costo (4 ns).
 
+### 9.1 Gli scafi delle navi e dei loro pezzi (M4)
+
+![gli scafi solidi delle navi](progressi/spazio/ship_solids.jpg)
+
+*(le classi intere, viste dall'alto, e i tre pezzi del Vigilant: la scatola arancione è il Falcon, 12 m; dove il disegno è vuoto lo scafo è aria, come nella forcella della prua dell'Acheron e fra i contenitori del mercantile.)*
+
+Un relitto è fatto di **pezzi che sono mesh di nave** (le sezioni del generatore delle navi: `SM_SHIP_ASTRA_Vigilant_SecStern`) e Falcon e pezzo devono potersi scontrare come con un luogo. `space3_solids.py --ships` fa le stesse celle dei luoghi dalle mesh dei generatori:
+lo scafo intero delle sette classi (la stazione Watch compresa) e **i tre pezzi di ogni nave tagliata** (`_SecBow`, `_SecMid`, `_SecStern`): **31 mesh in tutto** (6 luoghi e le due parti che girano, 7 scafi, 18 pezzi), 460 KB di `solids.json`. Le celle sono di 3 m (4,3 m la Praetorian, che è lunga 1,1 km). La cornice è quella della mesh (x avanti, y a dritta, z su: il
+Blender di questo script specchia y come l'FBX).
+
+`UAstraSpaceLife::PilotHit` prova ora **anche i pezzi** (`PilotHitWrecks`): per ogni pezzo dei siti di questo sistema entro `Raggio × 2,2 + 200 m` dal percorso, il percorso del Falcon è portato nella **cornice della mesh del pezzo com'è disegnato ora** (origine = perno − assetto × perno locale, la stessa
+dei contatti: `WreckMeshFrame`) e provato sulle sue celle; senza i dati di quel pezzo, una sfera di mezzo raggio attorno al perno. Il rapporto è con le stesse parole di una nave: **«flight: Eagle flew into the stern section of ASN Vigilant»**, poi la distruzione di sempre (`Destroy(S, Internal)`). Il perno del pezzo sta dentro la sua mesh
+(la prova nel mondo lo controlla: un perno fuori vorrebbe dire una cornice specchiata o spostata).
+
+`astra.space.solids` disegna ora anche i pezzi dei relitti vicini all'occhio. Le prove da sole (`solidstest`) controllano che le sette classi e i diciotto pezzi esistano, che ognuno sia **lungo quanto dice la sua classe** (`data/war/classes.json`: `hull_m.x`), che i pezzi siano in ordine lungo la nave e si tocchino ai tagli; le prove nel mondo
+(`astra.space.solids.test`), dopo una perdita, che una cella piena di un pezzo sia colpita dove il suo record lo mette e l'aria a 5 km no.
+
 ## 10. Messa in servizio (per il lead)
 
-1. `git merge worktree-agent-aa357b4b05aab282f` (il ramo prosegue quello di `worktree-agent-a7d3df7e6454139e6`: contiene M1 e ha già unito main), poi la solita ricompilazione. I file di dati nuovi
+1. Primo giro (M1–M3, già unito): `git merge worktree-agent-aa357b4b05aab282f`. **Secondo giro (M4–M6, SPAZIO-VIVO-2): `git merge worktree-agent-a56b88eaae19a3600`** (contiene il primo e ha già unito main), poi la solita ricompilazione (editor chiuso: su Mac niente Live Coding). I file di dati nuovi
    (`thrusters.json`, `solids.json`) sono **già** in `Content/ASTRA/Data/space` (copiati con `tools/space.py sync` e committati).
 2. **Una volta**, nell'editor: `tools/ue.py pyfile tools/ue_scripts/make_space_materials.py` (marca per le istanze i materiali di base delle sezioni delle navi, dei detriti e delle
    capsule; stampa `SPACE_MATERIALS_OK`), poi riavviare (gli shader della permutazione istanziata si compilano una volta).
@@ -392,10 +483,23 @@ percorso che finisce una cella fuori dal bordo non colpisce e uno che finisce du
 8. **Scafi dei luoghi** (M3). `astra.space.look keeper 2` (o `arsenal`, `tiberius`), poi `astra.space.solids 300 30`: le celle piene attorno all'occhio, in arancio, per trenta secondi. Poi in volo con il
    Falcon: nello spicchio libero dell'anello della Keeper si passa, in un raggio ci si schianta («flight: Eagle flew into the hull of Keeper Station»).
 
+9. **I pezzi come contatti** (M4). Dopo `astra.space.lose T-02 breakup 1`: `astra.space.wrecks.contacts` (un contatto per pezzo vicino: `W-02B`, `W-02M`, `W-02S`) e `astra.space.wrecks.contacts.test` (deve dire `WRECK_CONTACTS_OK`); poi, **a voce** (sono strumenti dell'equipaggio, non comandi di console):
+   «Nair, scan W-02S» (la scansione dice ciò che la distanza permette; una seconda volta dalla stessa distanza: «nothing new»), «main screen on W-02S» (nell'inquadratura va tutto il pezzo), «Price, send a flight to look at W-02S» (le squadriglie sono occhi: a 800 m si contano i morti); con
+   `astra.space.look W-02S 3` l'Aquila si mette a 3 km dal pezzo. Lo stato dell'equipaggio (`contacts`) deve elencare al più quattro pezzi con il loro stato. Poi in volo con il **Falcon**: puntare il naso su un pezzo e andargli addosso: «flight: Eagle flew into the stern section of ASN Vigilant»;
+   con `astra.space.solids 200 30` (arancio) si vedono le celle piene del pezzo dove il gioco le prova. Una passata a 30 m **di fianco** al pezzo non deve schiantare.
+10. **Gli scafi lasciati indietro** (M5). Con almeno una nave disattivata nel plot (`astra.board.disable T-11`), `astra.battle.arrive Thule` (l'Aquila passa il Gate), poi `astra.battle.arrive Aurelia`: la riga **«sensors: found again — … the hulk we left here … ago»**, il contatto di nuovo nel plot con il suo nome e i suoi danni, e `astra.space.derelicts`
+    che dice dove. Una campagna salvata e ripresa nel mezzo (`astra.space.wrecks.resume`, distruttivo) lo tiene. Se lo scafo si perde troppo lontano: `astra.space.derelicts.brake 300` (o 0 per la deriva della guerra).
+11. **Ugelli del Mandato e del mercantile** (M6, serve il giro dell'arte). Le mesh di Acheron, Styx, Lethe e del mercantile **sono cambiate** (blocchi di propulsori): vanno riesportate e reimportate (in questo ordine; l'editor può restare aperto per il solo passo b):
+    a. `blender -b --factory-startup --python-exit-code 1 -P art/blender/shipgen3.py -- art/export/ships_v3 --only Acheron,Styx,Lethe,Freighter` (le sezioni sono incluse: `_SecStern` cambia; nessuna opzione in più);
+    b. nell'editor, `tools/ue_scripts/import_ships_v3.py` con `ONLY = ["Acheron", "Styx", "Lethe", "Freighter"]` (vedi l'intestazione dello script), poi `tools/ue_scripts/extract_nav_lights.py` (le luci di posizione seguono gli scafi nuovi);
+    c. `python3 tools/art/war_fx_data.py` e `git diff Source/ASTRA/AstraWarFXData.inl`: **non dovrebbe cambiare** (le campane principali sono le stesse); se cambia, committarlo.
+    Poi `astra.space.jets nearest all 20` su un Acheron: i getti escono dai blocchi che ora si vedono sullo scafo.
+
 **Cosa guardare per primo**: (a) che le sezioni istanziate dei relitti abbiano il materiale giusto (scuro, non grigio) e tengano la posizione dopo il passaggio a 80 s; (b) che i detriti si vedano da
 vicino (3–22 km) e non pesino; (c) che i fari si vedano da lontano; (d) **che i getti si leggano alla distanza della battaglia (5–20 km)** e non facciano rumore (qualche nave in manovra ha sempre qualche
 getto che lampeggia; se è troppo, alzare `PushDead` in `AstraSpaceLifeMotion.h`); (e) **che la scia sia un nastro tenue e non un laser** (se è troppo viva: `astra.space.wakes.gain 0.4`); (f) la memoria del gioco
-(era a ~8 GB su 9): le mesh dei detriti e delle capsule sono poche migliaia di triangoli, i getti e le scie non portano mesh.
+(era a ~8 GB su 9): le mesh dei detriti e delle capsule sono poche migliaia di triangoli, i getti e le scie non portano mesh; **(secondo giro)** (g) che i contatti `W-xx` non ingombrino il tavolo olografico (fino a 16 etichette: `astra.space.wrecks.plot.max 6`), che lo schermo
+principale inquadri bene un pezzo lungo e ruotante, e che il Falcon non si schianti **di fianco** a un pezzo (le celle sono di 3 m); (h) che lo scafo lasciato indietro, ritrovato, sia dove l'aritmetica dice e **ferito com'era** (`astra.space.derelicts`).
 
 ## 11. Ganci in file di altri moduli (tutti piccoli, tutti commentati)
 
@@ -407,36 +511,40 @@ getto che lampeggia; se è troppo, alzare `PushDead` in `AstraSpaceLifeMotion.h`
 | `AstraWarCraft.cpp` ramo `sar` | un ramo nuovo prima del vecchio: ogni velivolo vola al suo faro e prende le capsule | il soccorso (M2) |
 | `AstraWarFX.h` / `AstraWarFXHull.cpp` | `GetPieces()` (una riga), `ReleasePiece(ShipId, Section)` (una funzione) | la consegna dei pezzi (M2) |
 | **`AstraBattleSubsystem.cpp` `PilotCollision`** | **(M3) due modifiche, nient'altro**: (1) nel giro sulle altre navi la condizione `if (O.bPlayer \|\| O.bCraft \|\| O.Id == S.Id \|\| …` ha in più `O.bFixture` (la scatola della mesh × 0,8 non vale per i luoghi); (2) subito prima del `if (What.IsEmpty()) return false;` finale: `if (What.IsEmpty() && Space && Space->IsActive()) { Space->PilotHit(Prev, S.Pos, What); }` | il Falcon si schianta contro gli scafi dei luoghi come contro una nave (stesse parole, stessa distruzione) |
+| **(M4)** `AstraBattleSubsystem.h` `FAstraBattleShip`, `FContactView`; `AstraBattleQueries.cpp` `BuildContacts` | `bWreck`, `WreckSite`, `WreckPiece` nella nave; `bWreck` nella vista del contatto, riempito da `BuildContacts` | un pezzo di relitto è un contatto derelitto del plot, e chi legge sa che è un relitto |
+| **(M4)** `AstraBattleSubsystem.cpp` `PlayerScan` | `if (T && T->bWreck && T->bAlive && Space) return Space->ScanWreck(*T, OutDetail);` (dopo il ramo dei ghost, prima di quello di T-11) | la scansione di un pezzo dice ciò che la distanza permette (§3bis) |
+| **(M4)** `AstraBattleSubsystem.cpp` `ContactsJson` | `if (S.bWreck) { …Space->WreckContactJson(S, W)… continue; }` | l'elenco dell'equipaggio ne ha i quattro più vicini, con il loro stato; gli altri restano nel plot per gli schermi |
+| **(M4)** `AstraViewscreen.cpp` `Aim` | un ramo `else if (C->Track >= 2 && !C->Actor && !C->bCraft && C->RadiusM > 1.f)` che inquadra dal raggio | un contatto senza attore (un pezzo istanziato) non ha spigoli per `HullCorners` |
 
 **Non ho toccato `TickPiloted`**: chiama `PilotCollision(S, S.Pos - S.Vel * Dt)` come prima e la modifica è là dentro, dove sta il giro sulle altre navi (con quel gancio il percorso dallo schianto al
 rapporto e alla distruzione è unico). Nel codice di `TickPiloted` e di `PilotCollision` **non c'è alcun segnale di «too close»** oltre allo schianto («flight: Eagle flew into …», `Destroy(S, Internal)`): se
 intendevi un avviso di prossimità (una voce dell'equipaggio quando il Falcon si avvicina a uno scafo), non esiste per nessuna nave e andrebbe fatto per tutte, con la stessa prova (`UAstraSpaceLife::PilotHit`
 risponde anche a un percorso breve: basta un segmento che finisce a qualche decina di metri dallo scafo, o una versione con un margine).
 
-Richieste al lead (non le ho fatte io, sono di altri moduli):
-1. **FLOTTA-VIVA**: `FAstraShipInterior::LoseWithShip` scrive «lost with all hands (N aboard)»; con le capsule non è vero. Suggerisco di togliere «with all hands» (e «N aboard» diventa «N aboard
-   when she went»): chi si è salvato lo dice il faro. Oggi l'equipaggio può sentire «lost with all hands» e poi «distress beacons … 19 survivors».
-2. **CAMPAGNA**: `UAstraCampaignSubsystem::NewCommand` scrive `battle` vuoto: il relitto dell'Aquila precedente (e tutto ciò che la guerra ha lasciato) non c'è nel nuovo comando. Se si vuole
+Richieste al lead (non le ho fatte io, sono di altri moduli; le prime tre sono del primo giro, le altre del secondo):
+1. ~~**FLOTTA-VIVA**: «lost with all hands»~~ fatto nell'integrazione del 4/10 (`LoseWithShip` non lo dice più se le capsule hanno salvato qualcuno).
+2. **CAMPAGNA**: `UAstraCampaignSubsystem::NewCommand` scrive `battle` vuoto: il relitto dell'Aquila precedente (e tutto ciò che la guerra ha lasciato, **e gli scafi lasciati indietro**) non c'è nel nuovo comando. Se si vuole
    che ci sia, basta copiare `battle.space` dal salvataggio vecchio nel nuovo.
-3. **MENTE-EQUIPAGGIO**: nei prompt dei sensori (Nair) e del volo (Price) due righe su `space.wrecks` e sulla missione `sar` (vedi §3.5 e §4): oggi lo leggono dallo stato senza che il prompt lo nomini.
-4. Il tasto del Falcon per prendere a bordo una capsula (`RescueTake` c'è: basta chiamarla): chi pilota il Falcon non può ancora raccogliere nessuno.
-5. **Ugelli propri per le navi del Mandato e delle gilde** (arte, non mia): non hanno blocchi di propulsori nei generatori, quindi i loro getti escono da bocchette al filo dello scafo (il pacchetto
-   standard: §8.1). Se si volesse un ugello visibile, basta mettere `thruster_cluster` in `ship3_mandate.py`/`ship3_misc.py` e rifare `space3_thrusters.py`: il resto segue.
+3. **MENTE-EQUIPAGGIO**: nei prompt dei sensori (Nair) e del volo (Price) due righe su `space.wrecks` e sulla missione `sar` (vedi §3.5 e §4), e **(secondo giro)** su tre cose nuove: i contatti **`W-xx`** («class wreck»: un pezzo di una nave persa; la scansione ne dice le stanze a 4 km e i morti a 800 m; una squadriglia mandata a guardare li
+   avvicina), le notizie **«found again — …»** (uno scafo lasciato in un altro sistema è tornato) e la riga **«… has taken N lifepods aboard»**. Oggi le leggono dallo stato senza che il prompt le nomini.
+4. **ABBORDAGGI** (M4): l'eccezione `bWreck` al rifiuto dei `bFixture` («a place of the system»): un contatto `W-xx` porta la sua classe, la sua nave, le sue sezioni e ciò che restava a bordo (§3bis, §3.6); `WreckMeshFrame` dà la cornice della mesh per i portelli.
+5. **FLOTTA-VIVA** (M5): `FAstraShipInterior::Restore(FFleetSnapshot)` (o un costruttore da un'istantanea): uno scafo ritrovato (§3ter) torna con le sue persone e le sue stanze com'erano; il record le ha già (`FDerelict::Aboard`, la stessa forma dei relitti).
+6. **Il tasto del Falcon** per prendere a bordo una capsula (`RescueTake` c'è: basta chiamarla): chi pilota il Falcon non può ancora raccogliere nessuno (in lavorazione).
+7. ~~**Ugelli propri per le navi del Mandato e delle gilde**~~ fatto (M6, §8.1): servono la riesportazione e il reimport del §10 passo 11.
 
 ## 12. Limiti noti e cosa farei dopo
 
 - **Mai visto nel motore**: l'aspetto dei pezzi morti (la copia dinamica dei materiali per slot), le dimensioni dei detriti e dei fari, **l'aspetto e la luminosità dei getti e delle scie** (le costanti sono
   tarate sul calcolo, sulle anteprime e sull'esposizione 6,6 della guerra, non a occhio), i costi di render. Il banco misura il costo di CPU del modulo (con le istanze contate, non scritte); il resto lo
   misura il lead. Tutto ciò che è da tarare ha una variabile (`astra.space.jets.gain`, `wakes.gain`, `wakes.life`, `wakes.km`, `jets.km`).
-- **Le navi disattivate** (`bDisabled`: derelitti abbordabili) non si registrano: spariscono con il sistema com'era. È il passo naturale dopo: registrarle quando il sistema si lascia e
-  rimetterle come contatti derelitti al ritorno (serve `SpawnClass` + lo stato spento della guerra: l'ho lasciato fuori perché tocca le regole).
-- I relitti **non sono contatti** del piano tattico né del tavolo olografico: si vedono dal finestrone e dallo schermo principale, si sentono dai fari, e `space.wrecks.nearest` li dice alle menti.
-- Nessun danno da detriti, nessuna collisione con i pezzi dei relitti (il Falcon ci passa attraverso): il gancio c'è (`PilotHit` per i luoghi); per i relitti basterebbe lo stesso con le scatole dei loro
-  pezzi, se il lead lo vuole.
+- **Gli scafi lasciati indietro** (M5, §3ter) tornano come erano **ma il loro interno FLOTTA-VIVA no**: il record porta le persone e le stanze (`Aboard`), la guerra rifà l'interno vergine al primo colpo. Serve un `FAstraShipInterior::Restore(FFleetSnapshot)` (di FLOTTA-VIVA: richiesta al lead).
+  La **frenata** (`BrakeS` 150 s) è una scelta di modello mia, non una regola della guerra: dice che il traffico del sistema ha messo a riposo lo scafo; se si vuole un'altra storia (lo scafo va via, lo prende il Mandato, un rimorchiatore lo porta all'Arsenal) basta un'altra funzione del record.
+- I pezzi dei relitti **sono contatti del plot** (M4, §3bis): nell'elenco dell'equipaggio solo i quattro più vicini entro 40 km (gli altri, fino a 16, sono nel plot per gli schermi e il tavolo olografico: se ingombrano, `astra.space.wrecks.plot.max`).
+  **I pezzi non sono ancora abbordabili**: ABBORDAGGI rifiuta ogni `bFixture` («a place of the system»): serve l'eccezione per `bWreck`, e per una nave che si sale a piedi i dati sono nel sito (§3.6, §3bis).
+- Nessun danno da detriti, nessuna collisione con i detriti (le 240 lastre, travi e pezzi di scafo sono scenografia) né con le capsule: il Falcon ci passa attraverso. **Contro i pezzi dei relitti si schianta** (§9.1).
 - **I getti sono una lettura del moto, non la sua causa**: la guerra non spende propellente né sa dei getti. Un cambio di rotta dell'IA a scatti (la sua `Steer` cambia a pezzi) li fa lampeggiare a
   scatti; la `PushDead` (10 %) e il `DeadBand` (0,15) tolgono il rumore, non lo eliminano. **Non ci sono getti per i velivoli** (Falcon, Wasp, Harpy…): sono «le capitali»; il file degli ugelli della guerra
   ha già i sedici dei Wasp se si vuole.
-- **I getti del Mandato escono dal filo dello scafo** (§8.1): da vicino (qualche centinaio di metri) si vede che non c'è un ugello. Le navi ASTRA hanno i blocchi.
 - La **scia** si fa solo dove il motore lavora (`Throttle` sopra 0,1: la crociera minima della guerra è 0,16, quindi una nave in moto ne fa sempre); le navi **disattivate o spente** non ne fanno più
   (quella già fatta svanisce); le navi oltre i 137 km non la cominciano. La scia dell'Aquila sta dietro il ponte: si vede dallo schermo principale e dal finestrone quando vira.
 - **Il Gate** non è tra i luoghi solidi (ha il suo trattamento nella battaglia); gli **scafi dei luoghi** sono veri a 3–12 m (il Falcon si perde se il suo *centro* entra in una cella piena: arriva a pochi

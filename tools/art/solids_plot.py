@@ -82,7 +82,7 @@ def main() -> None:
     H = sum(max(im.height for _, im in r) + 30 for r in rows) + 30
     sheet = Image.new("RGB", (colw * 2, H), (8, 10, 18))
     dr = ImageDraw.Draw(sheet)
-    dr.text((12, 6), "the solid parts of the hulls (the places, the wrecks of the war: a ship's whole hull and her three pieces), as the game tests them for the Captain's Falcon (the orange mark is the Falcon, 12 m)", fill=(230, 235, 245), font=big)
+    dr.text((12, 6), "the solid hulls as the game tests them for the Captain's Falcon (places; ships, whole and in three pieces); orange mark: the Falcon, 12 m", fill=(230, 235, 245), font=big)
     y = 30
     for r in rows:
         for c, (cap, im) in enumerate(r):
