@@ -28,6 +28,9 @@ def floor_v2(b: SParts, spec: dict, st, rng: random.Random, floor_t: float, plat
     L, D = spec["L"], spec["D"]
     fb, fine, em = b.body, b.fine, b.emit
     fb.box((0.0, 0.0, -floor_t), (L, D, -0.012), STRUCT)
+    if getattr(st, "floor_fn", None) is not None:                                           # ARTE-INTERNI-2: the room lays its own floor (planks, tiles, zones: ship_surfaces.py)
+        st.floor_fn(b, spec, st, rng)
+        return
     if st.floor_mode == "plates":
         rows = int(D // 1.0)
         for j in range(rows):
@@ -66,6 +69,30 @@ def floor_v2(b: SParts, spec: dict, st, rng: random.Random, floor_t: float, plat
     for k in range(1, int(L // step) + 1):
         if k * step < L and st.seams:
             fine.box((k * step - 0.01, 0.0, 0.0), (k * step + 0.01, D, 0.003), st.trim)
+    guide = getattr(st, "floor_guide", None)
+    if guide:                                                                               # ARTE-INTERNI-2: a painted way-line (a hospital's, a lab's): a line round the room at 0.55 m and one from each door straight in
+        lw, ins = 0.09, 0.55
+        doors = sorted((d for d in spec["doors"] if d["wall"] == "near"), key=lambda d: d["x"])
+        cuts = [ins] + [v for d in doors for v in (d["x"] - d["w"] / 2 - 0.1, d["x"] + d["w"] / 2 + 0.1)] + [L - ins]
+        for a, c in zip(cuts[0::2], cuts[1::2]):
+            if c - a > 0.2:
+                b.soft.swatch_box((a, ins, 0.0), (c, ins + lw, 0.0012), guide)
+        b.soft.swatch_box((ins, ins, 0.0), (ins + lw, D - ins, 0.0012), guide)
+        b.soft.swatch_box((L - ins - lw, ins, 0.0), (L - ins, D - ins, 0.0012), guide)
+        b.soft.swatch_box((ins, D - ins - lw, 0.0), (L - ins, D - ins, 0.0012), guide)
+        for d in doors:
+            b.soft.swatch_box((d["x"] - lw / 2, ins, 0.0), (d["x"] + lw / 2, D * 0.58, 0.0012), guide)
+    pitch = getattr(st, "floor_grid", 0.0)
+    if pitch > 0.0:                                                                         # ARTE-INTERNI-2: the joints of the floor panels (an access floor, carpet tiles): a 3 mm dark line every `pitch` m
+        gm = getattr(st, "grid_mat", None) or STRUCT
+        k = 1
+        while k * pitch < L - 0.3:
+            b.soft.box((k * pitch - 0.0015, 0.05, 0.0), (k * pitch + 0.0015, D - 0.25, 0.0012), gm)
+            k += 1
+        k = 1
+        while k * pitch < D - 0.3:
+            b.soft.box((0.25, k * pitch - 0.0015, 0.0), (L - 0.25, k * pitch + 0.0015, 0.0012), gm)
+            k += 1
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------- walls
@@ -235,6 +262,9 @@ def ceiling_v2(b: SParts, spec: dict, st, rng: random.Random, ceil_t: float) -> 
     L, D, H = spec["L"], spec["D"], spec["h"]
     fb, fine, em = b.body, b.fine, b.emit
     fb.box((0.0, 0.0, H), (L, D, H + ceil_t), STRUCT)                                    # the deck above
+    if getattr(st, "ceiling_fn", None) is not None:                                      # ARTE-INTERNI-2: the room builds its own ceiling (coffers, girders, clouds: ship_surfaces.py)
+        st.ceiling_fn(b, spec, st, rng)
+        return
     x0, x1, y0, y1 = WS + WF, L - WS - WF, FIN + WF, D - WS - WF
     mode = st.ceiling
     cell = st.light_cell
@@ -299,7 +329,9 @@ def ceiling_v2(b: SParts, spec: dict, st, rng: random.Random, ceil_t: float) -> 
                     fine.box((xb - 0.32, yc - 0.01, H - 0.05 - 0.2), (xb - 0.3, yc + 0.01, H - 0.05), TRIM)
     elif mode == "flat":
         fb.box((x0, y0, H - 0.05), (x1, y1, H), st.ceil)
-    else:                                                                                  # bands (the default): luminous bands between the beams, downlights between the bands
+    elif mode == "none":                                                                   # ARTE-INTERNI-2: only the deck above; the room builds its own ceiling (ship_surfaces.py)
+        pass
+    else:                                                                               # bands (the default): luminous bands between the beams, downlights between the bands
         fb.box((x0, y0, H - 0.05), (x1, y1, H - 0.05 + 0.001), st.ceil)
         tile_joints(b, spec, st, 1.2)
         beams(b, spec, st, beam_xs, 0.16)

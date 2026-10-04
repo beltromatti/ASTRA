@@ -43,13 +43,14 @@ def mess(**kw) -> Style:
 
 def crew(**kw) -> Style:
     d = dict(baseboard_light=True, floor=CARPET_SLATE, floor_mode="covering", floor2=CARPET_SAND, border=0.0, wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=WEAVE_SLATE, wain_h=1.0,
-             wall_pattern=("panel", "cloth", "panel"), bay=2.0, ceil=PLASTER_IVORY, accent="cyan_dim", strip="white_warm", light_cell="white_warm", skirt=STEEL, seams=False, ceiling="bands")
+             wall_pattern=("panel", "cloth", "panel"), bay=2.0, ceil=PLASTER_IVORY, accent="cyan_dim", strip="white_warm", light_cell="white_warm", skirt=STEEL, seams=False, ceiling="bands",
+             floor_grid=1.0)
     d.update(kw)
     return _themed(Style(**d))
 
 
 def medical(**kw) -> Style:
-    d = dict(baseboard_light=True, floor=TILE_FLOOR, floor_mode="covering", floor2=TILE_HEX, border=0.0, wall_lo=TILE_WALL, wall_hi=PLASTER_IVORY, wall_acc=PLASTER_TEAL, wain_h=1.25,
+    d = dict(baseboard_light=True, floor=TILE_FLOOR, floor_mode="covering", floor2=TILE_HEX, border=0.0, floor_guide="teal", wall_lo=TILE_WALL, wall_hi=PLASTER_IVORY, wall_acc=PLASTER_TEAL, wain_h=1.25,
              wall_pattern=("panel", "panel", "cloth"), bay=2.0, ceil=PLASTER_IVORY, accent="medical_dim", strip="white_cool", light_cell="white_cool", skirt=STEEL, seams=False, ceiling="grid",
              trim=STEEL, rib_mat=STEEL)
     d.update(kw)
@@ -57,15 +58,15 @@ def medical(**kw) -> Style:
 
 
 def lab(**kw) -> Style:
-    d = dict(baseboard_light=True, floor=TILE_FLOOR, floor_mode="covering", wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=PERF, wain_h=1.1, wall_pattern=("panel", "perf", "panel"), bay=2.0,
-             ceil=PLASTER_IVORY, accent="science_dim", strip="white_cool", light_cell="white_cool", skirt=STEEL, seams=False, ceiling="grid")
+    d = dict(baseboard_light=True, floor=TILE_FLOOR, floor_mode="covering", floor2=TILE_HEX, border=0.0, floor_guide="purple", wall_lo=PLASTER_SLATE, wall_hi=PLASTER_IVORY, wall_acc=PERF, wain_h=1.1,
+             wall_pattern=("panel", "perf", "panel"), bay=2.0, ceil=PLASTER_IVORY, accent="science_dim", strip="white_cool", light_cell="white_cool", skirt=STEEL, seams=False, ceiling="grid")
     d.update(kw)
     return _themed(Style(**d))
 
 
 def command(**kw) -> Style:
     d = dict(baseboard_light=True, floor=CARPET_SLATE, floor_mode="covering", wall_lo=PLASTER_SLATE, wall_hi=PLASTER_SLATE, wall_acc=WEAVE_SLATE, wain_h=1.05, wall_pattern=("panel", "cloth", "panel", "perf"),
-             bay=2.0, ceil=COMPOSITE, accent="command_dim", strip="white_cool", light_cell="white_cool", skirt=STRUCT, seams=False, ceiling="bands")
+             bay=2.0, ceil=COMPOSITE, accent="command_dim", strip="white_cool", light_cell="white_cool", skirt=STRUCT, seams=False, ceiling="bands", floor_grid=1.2)
     d.update(kw)
     return _themed(Style(**d))
 
@@ -163,7 +164,7 @@ THEME_TABLE: dict[str, tuple] = {
     "armory": ("security", dict()), "kit_room": ("security", dict()), "firing_range": ("security", dict(ceiling="exposed")), "brig": ("security", dict()),
     "security_office": ("command", dict(accent="security_dim", floor=CARPET_SLATE)), "shuttle_bay": ("flight", dict(ceiling="exposed")), "magazine": ("security", dict(ceiling="exposed")),
     # flight
-    "flight_ops": ("flight", dict(floor=CARPET_SLATE, floor_mode="covering", wall_hi=PLASTER_SLATE)), "pilot_ready": ("flight", dict(floor=CARPET_SLATE, floor_mode="covering")),
+    "flight_ops": ("flight", dict(floor=CARPET_SLATE, floor_mode="covering", wall_hi=PLASTER_SLATE, floor_grid=1.2)), "pilot_ready": ("flight", dict(floor=CARPET_SLATE, floor_mode="covering", floor_grid=1.2)),
     "aircraft_shop": ("tech", dict(accent="flight_dim")), "drone_bay": ("tech", dict(accent="flight_dim")), "sim_bay": ("flight", dict(accent="cyan_dim")),
     # engineering and the hull
     "workshop": ("tech", dict()), "fab_shop": ("tech", dict(floor=PLATING)), "repair_bay": ("tech", dict()), "machinery": ("tech", dict()), "machinery_b": ("tech", dict()),

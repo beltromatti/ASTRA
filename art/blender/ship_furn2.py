@@ -186,10 +186,12 @@ def shelf(b: SParts, w: float, d: float, h: float, shelves: int, mat: str, books
                         faces = b.soft.box((-d / 2 + 0.03, y, z + 0.025), (-d / 2 + 0.03 + bd, y + bw, z + 0.025 + bh), SWATCH, Rx(rng.uniform(8, 14)))
                         b.soft.paint(faces, tint)
                     else:
-                        b.soft.swatch_box((-d / 2 + 0.03, y, z + 0.025), (-d / 2 + 0.03 + bd, y + bw, z + 0.025 + bh), tint)
-                        if rng.random() < 0.5:                                  # a gilt line on the spine
-                            b.emit.lamp_box((-d / 2 + 0.03 + bd, y + 0.004, z + 0.025 + bh * 0.62), (-d / 2 + 0.03 + bd + 0.002, y + bw - 0.004, z + 0.025 + bh * 0.62 + 0.006),
-                                            "amber_dim", LAMP_DIM)
+                        b.soft.swatch_slab((-d / 2 + 0.03, y, z + 0.025), (-d / 2 + 0.03 + bd, y + bw, z + 0.025 + bh), tint, sides=(j == 0 or j == run - 1))     # (ARTE-INTERNI-2: only the faces that are seen)
+                        if rng.random() < 0.5:                                  # a gilt line on the spine: one flat quad of the palette's brass, not a lamp box
+                            gz = z + 0.025 + bh * 0.62
+                            gf = b.soft.face([(-d / 2 + 0.03 + bd + 0.0006, y + 0.004, gz), (-d / 2 + 0.03 + bd + 0.0006, y + bw - 0.004, gz), (-d / 2 + 0.03 + bd + 0.0006, y + bw - 0.004, gz + 0.006),
+                                              (-d / 2 + 0.03 + bd + 0.0006, y + 0.004, gz + 0.006)], SWATCH, (1, 0, 0))
+                            b.soft.paint([gf], "brass")
                     y += bw + 0.003
                 if rng.random() < 0.3 and gap > 0.2:                            # a pile lying flat at the end of the run
                     for t in range(rng.randint(2, 4)):

@@ -143,16 +143,10 @@ def altar(b: SParts) -> None:
 
 
 def barber_chair(b: SParts) -> None:
-    """A barber's chair facing +x on a chrome pedestal: a heavy base, a cushioned seat, a back with a headrest, arms and a footrest."""
-    b.body.cyl((0, 0, 0.0), (0, 0, 0.06), 0.36, STEEL, seg=18)
-    b.body.cyl((0, 0, 0.06), (0, 0, 0.42), 0.09, STEEL, seg=12)
-    b.soft.box((-0.26, -0.28, 0.42), (0.28, 0.28, 0.56), LEATHER)
-    b.soft.box((-0.32, -0.27, 0.5), (-0.2, 0.27, 1.1), LEATHER)
-    b.soft.box((-0.34, -0.14, 1.1), (-0.22, 0.14, 1.38), LEATHER)
-    for sy in (-0.3, 0.3):
-        b.body.box((-0.18, sy - 0.03, 0.62), (0.26, sy + 0.03, 0.66), STEEL)
-        b.fine.cyl((0.1, sy, 0.5), (0.1, sy, 0.62), 0.02, TRIM, seg=6)
-    b.body.box((0.3, -0.18, 0.14), (0.58, 0.18, 0.2), STEEL)
+    """A barber's chair facing +x (ARTE-INTERNI-2: ship_decor_salon.barber_chair): a chrome base and hydraulic column, a rolled leather seat, a tilted back with a headrest, padded arms on chrome
+    posts, a footrest."""
+    import ship_decor_salon as DS
+    DS.barber_chair(b)
 
 
 def sim_pod(b: SParts) -> None:
@@ -285,25 +279,11 @@ def kiosk(b: SParts, w: float = 1.2, h: float = 1.5, tile: str = "scr_dir") -> N
 
 
 def cell_wall_rack(b: SParts, w: float = 2.4, d: float = 0.5, h: float = 2.0, seed: int = 1) -> None:
-    """A set of shelves of stock (boxes, tins, folded cloth) facing +x, for a shop or a store."""
-    rng = random.Random(seed)
-    b.body.box((-d / 2, -w / 2, 0.0), (d / 2, w / 2, 0.05), STRUCT)
-    for sy in (-w / 2, w / 2 - 0.04):
-        b.body.box((-d / 2, sy, 0.0), (d / 2, sy + 0.04, h), TRIM)
-    levels = int(h / 0.5)
-    for k in range(levels):
-        z = 0.15 + k * (h - 0.2) / levels
-        b.body.box((-d / 2, -w / 2, z), (d / 2, w / 2, z + 0.03), STEEL)
-        y = -w / 2 + 0.1
-        while y < w / 2 - 0.25:
-            cw = rng.uniform(0.18, 0.4)
-            ch = rng.uniform(0.14, 0.34)
-            mat = rng.choice([CRATE_OLIVE, CRATE_ORANGE, CRATE_BLUE, CRATE_GREY, FABRIC_SAND, FABRIC_NAVY])
-            b.soft.box((-d / 2 + 0.06, y, z + 0.03), (d / 2 - 0.04, y + cw, z + 0.03 + ch), mat)
-            y += cw + 0.04
+    """A wall shelving unit of stock (origin on the floor at the middle of its back, front +x; ARTE-INTERNI-2: ship_stock.py): a steel frame, five decks of totes, cartons, sacks and tins."""
+    import ship_stock as ST
+    ST.cell_wall_rack(b, w, d, h, seed, "dry")
 
 
-# ---------------------------------------------------------------------------------------------------------------------------------------------------------------- drones
 def drone(b: SParts) -> None:
     """A small recon drone facing +x, origin on the floor under it (it rests on four skids at z 0.12): a flat fuselage with a sensor eye, four rotor arms with discs, orange tips."""
     b.body.box((-0.35, -0.2, 0.18), (0.4, 0.2, 0.34), IVORY)

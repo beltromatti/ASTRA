@@ -195,26 +195,10 @@ def plate_rack(b: SParts, w: float = 2.4, h: float = 2.2, n: int = 6) -> None:
 
 
 def eva_rack(b: SParts, n: int = 4) -> None:
-    """A wall rack of EVA suits, facing +x: n white suits with orange stripes and bright helmets hanging from hooks, a pair of boots under each, a pressure tag, a steel back
-    panel."""
-    pitch = 0.9
-    w = n * pitch
-    b.body.box((-0.1, -w / 2, 0.0), (-0.04, w / 2, 2.2), COMPOSITE)
-    b.body.box((-0.1, -w / 2, 2.2), (0.3, w / 2, 2.25), TRIM)
-    for k in range(n):
-        y = -w / 2 + pitch / 2 + k * pitch
-        b.soft.box((-0.02, y - 0.22, 1.1), (0.2, y + 0.22, 1.85), IVORY)                                                   # the torso and the life-support pack behind it
-        b.soft.box((-0.04, y - 0.18, 1.2), (-0.0, y + 0.18, 1.8), CRATE_GREY)
-        b.soft.box((0.0, y - 0.22, 1.5), (0.205, y + 0.22, 1.56), CRATE_ORANGE)
-        for sy in (-0.3, 0.3):
-            b.soft.cyl((0.08, y + sy, 1.8), (0.1, y + sy, 1.15), 0.07, IVORY, seg=8)                                       # the arms
-        for sy in (-0.1, 0.1):
-            b.soft.cyl((0.08, y + sy, 1.1), (0.1, y + sy, 0.3), 0.09, IVORY, seg=8)                                        # the legs
-            b.soft.box((0.0, y + sy - 0.07, 0.1), (0.24, y + sy + 0.07, 0.3), CRATE_GREY)                                  # the boots
-        b.soft.sphere((0.09, y, 2.0), 0.19, IVORY, seg=12, rings=8)
-        b.soft.box((0.2, y - 0.14, 1.94), (0.26, y + 0.14, 2.1), DGLASS)
-        b.emit.lamp_box((0.205, y - 0.04, 1.62), (0.215, y + 0.04, 1.66), "green", LAMP_DIM)
-    b.emit.label_fit((-0.039, 0.0, 2.35), min(1.6, w - 0.2), "eq_clean", (1, 0, 0))
+    """A wall rack of EVA suits, facing +x (ARTE-INTERNI-2: real suits, ship_suits.py): n suits hanging from a hook rail on a steel back panel, a boot tray, a pressure tag."""
+    import ship_suits as SU
+    SU.eva_rack(b, n)
+    b.emit.label_fit((-0.039, 0.0, 2.2), min(1.6, n * 0.9 - 0.2), "eq_clean", (1, 0, 0))
 
 
 def cable_drum(b: SParts, r: float = 0.6, w: float = 0.7, mat: str = CRATE_ORANGE) -> None:

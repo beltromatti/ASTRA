@@ -118,7 +118,8 @@ _reg("hydro", name="Hydroponics Bay", kind="hydroponics", dept="science", L=24.0
 _reg("garden", name="Garden", kind="hydroponics", dept="science", L=24.0, D=16.0, h=3.4, plate="hydro",
      doors=[door("near", 10.0)], systems=["life_support", "potable_water", "food_service"],
      spots=[spot("botanist", "work", 8.0, 7.2, 0, "science"), spot("botanist", "work", 16.0, 7.2, 180, "science")],
-     lights=[light(12.0, 8.0, 3.3, 3500, 7000, (20.0, 12.0), 1100)])
+     # ARTE-INTERNI-2: the lamps follow the ceiling (garden(): a sky of screens over the path, grow-light arrays over the beds): a cooler, wider light over the path, a warmer one over each pair of beds
+     lights=[light(12.0, 8.0, 3.3, 2400, 6200, (22.0, 5.0), 1100), light(12.0, 3.0, 3.0, 1600, 5000, (21.0, 4.4), 1000), light(12.0, 13.0, 3.0, 1600, 5000, (21.0, 4.4), 1000)])
 _reg("quiet", name="Quiet Room", kind="chapel", dept="services", L=12.0, D=16.0, h=3.6, plate="chapel",
      doors=[door("near", 6.0)], systems=["power_bus"],
      spots=[spot("crew", "sit", 3.6, 7.6, 90), spot("crew", "sit", 8.4, 7.6, 90), spot("crew", "sit", 3.6, 9.8, 90), spot("crew", "sit", 8.4, 9.8, 90)],
@@ -189,7 +190,7 @@ _reg("stair_tower", name="Stair Tower", kind="stairs", dept="neutral", L=8.0, D=
      systems=["power_bus"], special=True, spots=[], lights=[light(4.0, 4.0, 3.3, 3000, 4500, (3.0, 3.0), 800)])
 _reg("bow_obs", name="Bow Observation", kind="observation", dept="command", L=20.0, D=32.0, h=3.7, plate="bow_obs", doors=[],
      systems=["power_bus"], special=True,
-     spots=[spot("crew", "watch", 17.45 if i == 5 else 17.6, 6.0 + 4.5 * i - (0.06 if i == 5 else 0.0), 0) for i in range(6)]
+     spots=[spot("crew", "watch", 17.3 if i == 5 else 17.6, 6.0 + 4.5 * i - (0.06 if i == 5 else 0.0), 0) for i in range(6)]
            + [spot("crew", "sit", 11.6, 5.5, 0), spot("crew", "sit", 11.6, 7.5, 0), spot("crew", "sit", 11.6, 24.5, 0), spot("crew", "sit", 11.6, 26.5, 0)],
      lights=[light(10.0, 16.0, 3.6, 3200, 6200, (12.0, 1.0), 1200)])
 # ---- planned rooms: typed compartments of the decks that are not modelled yet (no mesh), with real dimensions ------------------
@@ -568,6 +569,7 @@ TEMP_KIND = {"galley": 4800, "lounge": 3300, "library": 3300, "observation": 420
              "offices": 4400, "magazine": 4800, "weapons_control": 5000, "weapons": 4800, "sensors": 5400, "transporter": 5400, "archive": 5000, "machinery": 4600, "power": 4600,
              "range": 5000, "hangar": 5000, "flight_ops": 4800, "fabrication": 5000, "wardroom": 3400, "gym": 4600, "shop": 4000, "simulator": 5200, "brig": 4600, "security": 4600,
              "dental": 5400, "morgue": 5600, "counselling": 3300, "computer": 5200, "damage_control": 4800, "lobby": 4200, "airlock": 5000, "lifepod": 5000}
+TEMP_LAMPS = {"garden": (6200, 5000, 5000)}      # prefab key -> the colour temperature of each lamp, in the order of its registration (the rooms whose lamps are not all one colour)
 TEMP_KEY = {"bar": 2900, "games": 3600, "lab_astro": 6500, "quiet": 2700, "stair_tower": 4200, "staterooms": 3400, "suites": 3400, "berthing": 3700, "barracks": 3700,
             "single_cabins": 3400, "barber": 3600, "bow_obs": 5200}
 
@@ -582,9 +584,11 @@ def retune_lights() -> None:
         target = DENSITY_KEY.get(key, DENSITY_KIND.get(sp.get("kind"), 70)) * LIGHT_LEVEL
         k = target * area / max(total, 1.0)
         temp = TEMP_KEY.get(key, TEMP_KIND.get(sp.get("kind")))
-        for l in sp["lights"]:
+        for i, l in enumerate(sp["lights"]):
             l["lumens"] = round(l["lumens"] * k, -1)
-            if temp is not None and not (key == "staterooms" and l["size"][0] < 2.0):
+            if key in TEMP_LAMPS:                                                        # a room whose lamps differ in colour (the garden's sky and its grow lights)
+                l["temperature"] = float(TEMP_LAMPS[key][i])
+            elif temp is not None and not (key == "staterooms" and l["size"][0] < 2.0):
                 l["temperature"] = float(temp)
 
 

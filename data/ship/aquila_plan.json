@@ -15594,7 +15594,7 @@
     {"id": "d4_bow_obs.s2", "role": "crew", "kind": "watch", "pos": [101.6, -1.0, -46.0], "yaw": 0.0, "dept": "services"},
     {"id": "d4_bow_obs.s3", "role": "crew", "kind": "watch", "pos": [101.6, 3.5, -46.0], "yaw": 0.0, "dept": "services"},
     {"id": "d4_bow_obs.s4", "role": "crew", "kind": "watch", "pos": [101.6, 8.0, -46.0], "yaw": 0.0, "dept": "services"},
-    {"id": "d4_bow_obs.s5", "role": "crew", "kind": "watch", "pos": [101.45, 12.44, -46.0], "yaw": 0.0, "dept": "services"},
+    {"id": "d4_bow_obs.s5", "role": "crew", "kind": "watch", "pos": [101.3, 12.44, -46.0], "yaw": 0.0, "dept": "services"},
     {"id": "d4_bow_obs.s6", "role": "crew", "kind": "sit", "pos": [95.6, -10.5, -46.0], "yaw": 0.0, "dept": "services"},
     {"id": "d4_bow_obs.s7", "role": "crew", "kind": "sit", "pos": [95.6, -8.5, -46.0], "yaw": 0.0, "dept": "services"},
     {"id": "d4_bow_obs.s8", "role": "crew", "kind": "sit", "pos": [95.6, 8.5, -46.0], "yaw": 0.0, "dept": "services"},
@@ -15891,12 +15891,32 @@
     {
      "type": "rect",
      "pos": [64.0, -10.0, -42.7],
-     "lumens": 46080.0,
-     "temperature": 5600.0,
-     "size": [20.0, 12.0],
+     "lumens": 19750.0,
+     "temperature": 6200.0,
+     "size": [22.0, 5.0],
      "radius": 1100,
      "shadows": false,
      "id": "d4_garden_A1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [64.0, -5.0, -43.0],
+     "lumens": 13170.0,
+     "temperature": 5000.0,
+     "size": [21.0, 4.4],
+     "radius": 1000,
+     "shadows": false,
+     "id": "d4_garden_A1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [64.0, -15.0, -43.0],
+     "lumens": 13170.0,
+     "temperature": 5000.0,
+     "size": [21.0, 4.4],
+     "radius": 1000,
+     "shadows": false,
+     "id": "d4_garden_A1.l2"
     }
    ],
    "plate": "hydro",
@@ -37549,12 +37569,32 @@
     {
      "type": "rect",
      "pos": [-24.0, 10.0, -50.7],
-     "lumens": 46080.0,
-     "temperature": 5600.0,
-     "size": [20.0, 12.0],
+     "lumens": 19750.0,
+     "temperature": 6200.0,
+     "size": [22.0, 5.0],
      "radius": 1100,
      "shadows": false,
      "id": "d6_garden_B1.l0"
+    },
+    {
+     "type": "rect",
+     "pos": [-24.0, 5.0, -51.0],
+     "lumens": 13170.0,
+     "temperature": 5000.0,
+     "size": [21.0, 4.4],
+     "radius": 1000,
+     "shadows": false,
+     "id": "d6_garden_B1.l1"
+    },
+    {
+     "type": "rect",
+     "pos": [-24.0, 15.0, -51.0],
+     "lumens": 13170.0,
+     "temperature": 5000.0,
+     "size": [21.0, 4.4],
+     "radius": 1000,
+     "shadows": false,
+     "id": "d6_garden_B1.l2"
     }
    ],
    "plate": "hydro",
@@ -157370,16 +157410,7 @@
    {"id": "d4_bow_obs.s2", "deck": 4, "p": [101.6, -1.0, -46.0], "kind": "station", "comp": "d4_bow_obs", "role": "crew", "act": "watch", "yaw": 0.0},
    {"id": "d4_bow_obs.s3", "deck": 4, "p": [101.6, 3.5, -46.0], "kind": "station", "comp": "d4_bow_obs", "role": "crew", "act": "watch", "yaw": 0.0},
    {"id": "d4_bow_obs.s4", "deck": 4, "p": [101.6, 8.0, -46.0], "kind": "station", "comp": "d4_bow_obs", "role": "crew", "act": "watch", "yaw": 0.0},
-   {
-    "id": "d4_bow_obs.s5",
-    "deck": 4,
-    "p": [101.45, 12.44, -46.0],
-    "kind": "station",
-    "comp": "d4_bow_obs",
-    "role": "crew",
-    "act": "watch",
-    "yaw": 0.0
-   },
+   {"id": "d4_bow_obs.s5", "deck": 4, "p": [101.3, 12.44, -46.0], "kind": "station", "comp": "d4_bow_obs", "role": "crew", "act": "watch", "yaw": 0.0},
    {"id": "d4_bow_obs.s6", "deck": 4, "p": [95.6, -10.5, -46.0], "kind": "station", "comp": "d4_bow_obs", "role": "crew", "act": "sit", "yaw": 0.0},
    {"id": "d4_bow_obs.s7", "deck": 4, "p": [95.6, -8.5, -46.0], "kind": "station", "comp": "d4_bow_obs", "role": "crew", "act": "sit", "yaw": 0.0},
    {"id": "d4_bow_obs.s8", "deck": 4, "p": [95.6, 8.5, -46.0], "kind": "station", "comp": "d4_bow_obs", "role": "crew", "act": "sit", "yaw": 0.0},
@@ -199488,7 +199519,7 @@
    {"a": "d4_bow_obs.hub", "b": "d4_bow_obs.s2", "len": 7.67, "kind": "walk", "w": 1.0},
    {"a": "d4_bow_obs.hub", "b": "d4_bow_obs.s3", "len": 8.37, "kind": "walk", "w": 1.0},
    {"a": "d4_bow_obs.hub", "b": "d4_bow_obs.s4", "len": 11.03, "kind": "walk", "w": 1.0},
-   {"a": "d4_bow_obs.hub", "b": "d4_bow_obs.s5", "len": 14.5, "kind": "walk", "w": 1.0},
+   {"a": "d4_bow_obs.hub", "b": "d4_bow_obs.s5", "len": 14.42, "kind": "walk", "w": 1.0},
    {"a": "d4_bow_obs.hub", "b": "d4_bow_obs.s6", "len": 10.62, "kind": "walk", "w": 1.0},
    {"a": "d4_bow_obs.hub", "b": "d4_bow_obs.s7", "len": 8.65, "kind": "walk", "w": 1.0},
    {"a": "d4_bow_obs.hub", "b": "d4_bow_obs.s8", "len": 8.65, "kind": "walk", "w": 1.0},

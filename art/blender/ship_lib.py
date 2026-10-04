@@ -50,6 +50,7 @@ OAK, WALNUT = "MI_SHIP_Oak", "MI_SHIP_Walnut"                  # smooth wood gra
 TERRAZZO = "MI_SHIP_Terrazzo"            # pale speckled floor
 TERRAZZO_DARK = "MI_SHIP_TerrazzoDark"   # the same in mid grey (the mess hall)
 TILE_FLOOR, TILE_HEX, TILE_WALL = "MI_SHIP_TileFloor", "MI_SHIP_TileHex", "MI_SHIP_TileWall"          # glossy tiles: floors, hex mosaic, wall tiles
+TILE_BLACK = "MI_SHIP_TileBlack"         # ARTE-INTERNI-2: the same big glossy tile in black (a barber's chequerboard, inlays)
 TREAD, PLATING = "MI_SHIP_Tread", "MI_SHIP_Plating"             # diamond tread plate; octagonal plating
 PLASTER_IVORY, PLASTER_SAGE, PLASTER_SLATE, PLASTER_TEAL = "MI_SHIP_PlasterIvory", "MI_SHIP_PlasterSage", "MI_SHIP_PlasterSlate", "MI_SHIP_PlasterTeal"   # painted walls
 PERF = "MI_SHIP_Perf"                    # perforated acoustic panel
@@ -215,6 +216,17 @@ class SFB(FB):
     def swatch_box(self, lo, hi, color):
         return self.paint(self.box(lo, hi, SWATCH), color)
 
+    def swatch_slab(self, lo, hi, color, sides: bool = True):
+        """The faces of a box that a person can see when it stands on a shelf with its +x face to the room: the front, the top and (`sides`) the two flanks along y; the back, the underside and
+        the ends are never seen. A book or a box of the colour swatch for 4 to 8 triangles instead of 12 (a library has five thousand)."""
+        (x0, y0, z0), (x1, y1, z1) = lo, hi
+        faces = [self.face([(x1, y0, z0), (x1, y1, z0), (x1, y1, z1), (x1, y0, z1)], SWATCH, (1, 0, 0)),
+                 self.face([(x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)], SWATCH, (0, 0, 1))]
+        if sides:
+            faces.append(self.face([(x0, y0, z0), (x1, y0, z0), (x1, y0, z1), (x0, y0, z1)], SWATCH, (0, -1, 0)))
+            faces.append(self.face([(x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1)], SWATCH, (0, 1, 0)))
+        return self.paint(faces, color)
+
     def swatch_cyl(self, p0, p1, r: float, color, seg: int = 12, r2: float | None = None):
         return self.paint(self.cyl(p0, p1, r, SWATCH, seg=seg, r2=r2), color)
 
@@ -228,6 +240,9 @@ class SParts(L.Parts):
     """Parts (body / fine / emissive / soft groups) built with SFB."""
 
     BEVEL_SEGMENTS = {"body": 1, "fine": 1}              # ARTE-INTERNI: one segment (a chamfer): a bevelled box was ~120 triangles with two, now ~45; at 5 mm nobody sees the difference
+    FINE_DIET = False                                    # ARTE-INTERNI-2: the small hardware (the `fine` group: handles, rails, taps, legs, pins) is not bevelled: a 3 mm chamfer is invisible from a metre and
+                                                         # costs 44 triangles a box and 92 a slim rod where 12 and 28 would do (a fifth of the kit's triangles); the group is smoothed by angle instead.
+                                                         # ship_kit.build_mesh switches it on for the rooms; the corridor modules keep their bevels
 
     def __init__(self, bevel: float = 0.006, fine_bevel: float = 0.003, angle: float = 35.0) -> None:
         super().__init__(bevel, fine_bevel, angle)
@@ -243,14 +258,15 @@ class SParts(L.Parts):
                 fb.bm.free()
                 continue
             o = fb.to_object(f"{name}_{tag}")
-            if bev > 0:
+            lean = tag == "fine" and self.FINE_DIET                     # the rooms' small hardware has no bevel: its round parts still shade round (the other meshes are left as they were)
+            if bev > 0 and not lean:
                 A.bevel_and_normals(o, width=bev, segments=self.BEVEL_SEGMENTS.get(tag, 2), angle_deg=self.angle)
             A.box_uv(o, texel_m=uv_meter)
-            if tag == "soft":                                      # cushions and other organic parts: smooth shading
+            if tag == "soft" or lean:                              # cushions and other organic parts (50 degrees), small hardware (the group's own angle): smooth shading
                 bpy.ops.object.select_all(action="DESELECT")
                 o.select_set(True)
                 bpy.context.view_layer.objects.active = o
-                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(50))
+                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(50 if tag == "soft" else self.angle))
             objs.append(o)
         if not objs:
             raise RuntimeError(f"{name}: empty mesh")

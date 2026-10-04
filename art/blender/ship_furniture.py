@@ -64,8 +64,23 @@ def shelf(b: SParts, w: float = 1.0, d: float = 0.34, h: float = 2.0, shelves: i
     N.shelf(b, w, d, h, shelves, mat, books, seed, back)
 
 
+CRATE_PAINT = {CRATE_OLIVE: "olive", CRATE_ORANGE: "orange", CRATE_BLUE: "blue", CRATE_GREY: "grey3"}      # the painted-crate finishes and their palette colours (ARTE-INTERNI-2)
+
+
 def crate(b: SParts, w: float = 0.6, d: float = 0.4, h: float = 0.4, mat: str = CRATE_OLIVE, label: str | None = None, lite: bool = False) -> None:
-    """A stores crate: shell, lid, corner posts, a tag. `lite` (racks, stacks): the shell and the lid only, in the soft group (no bevel)."""
+    """A stores crate: the shell and its lid (ARTE-INTERNI-2: in the palette's colour of the paint, the faces that are seen only), a strap round it, a label tile; the old build (a shell with
+    posts and a rim) stays for finishes outside the palette."""
+    col = CRATE_PAINT.get(mat)
+    if col is not None:
+        b.soft.swatch_slab((-d / 2, -w / 2, 0.0), (d / 2, w / 2, h - 0.03), col, sides=True)
+        b.soft.swatch_slab((-d / 2 - 0.006, -w / 2 - 0.006, h - 0.03), (d / 2 + 0.006, w / 2 + 0.006, h), "grey2", sides=True)
+        if not lite:
+            for sx in (-d / 2, d / 2 - 0.03):
+                for sy in (-w / 2, w / 2 - 0.03):
+                    b.soft.swatch_slab((sx, sy, 0.0), (sx + 0.03, sy + 0.03, h), "grey3", sides=True)
+        if label:
+            b.emit.label((d / 2 + 0.002, 0.0, h * 0.55), min(w * 0.7, 0.36), min(w * 0.7, 0.36) / 4, (1, 0, 0), label)
+        return
     if lite:
         b.soft.box((-d / 2, -w / 2, 0.0), (d / 2, w / 2, h - 0.03), mat)
         b.soft.box((-d / 2 - 0.006, -w / 2 - 0.006, h - 0.03), (d / 2 + 0.006, w / 2 + 0.006, h), TRIM)
@@ -80,45 +95,22 @@ def crate(b: SParts, w: float = 0.6, d: float = 0.4, h: float = 0.4, mat: str = 
 
 
 def pallet(b: SParts, w: float = 1.2, d: float = 0.8) -> None:
-    for sx in (-d / 2 + 0.06, 0.0, d / 2 - 0.06):
-        b.fine.box((sx - 0.05, -w / 2, 0.02), (sx + 0.05, w / 2, 0.12), WOOD)
-    b.body.box((-d / 2, -w / 2, 0.12), (d / 2, w / 2, 0.145), WOOD)
+    """A wooden pallet (ship_stock.pallet: runners and a deck of boards, the top at 0.145)."""
+    import ship_stock as ST
+    ST.pallet(b, w, d)
 
 
 def barrel(b: SParts, r: float = 0.28, h: float = 0.8, mat: str = CRATE_BLUE) -> None:
-    b.body.cyl((0, 0, 0.0), (0, 0, h), r, mat, seg=16)
-    for z in (0.15, h - 0.15):
-        b.fine.cyl((0, 0, z - 0.02), (0, 0, z + 0.02), r + 0.008, TRIM, seg=16)
-    b.fine.cyl((0, 0, h), (0, 0, h + 0.012), r * 0.9, TRIM, seg=16)
+    """A steel drum (ship_stock.drum) in the colour of `mat`."""
+    import ship_stock as ST
+    ST.drum(b, r, h, CRATE_PAINT.get(mat, "blue"))
 
 
 def rack(b: SParts, w: float = 2.4, d: float = 0.9, h: float = 2.6, levels: int = 4, seed: int = 3, load: float = 0.75, mats=None) -> None:
-    """Heavy stores rack facing +x: uprights, beams and crates / boxes on the levels."""
-    rng = random.Random(seed)
-    mats = mats or CRATES
-    for sx in (-d / 2, d / 2 - 0.06):
-        for sy in (-w / 2, w / 2 - 0.06):
-            b.body.box((sx, sy, 0.0), (sx + 0.06, sy + 0.06, h), STRUCT)
-    zs = [0.25 + k * (h - 0.3) / levels for k in range(levels)]
-    for z in zs:
-        for sx in (-d / 2, d / 2 - 0.05):
-            b.body.box((sx, -w / 2, z), (sx + 0.05, w / 2, z + 0.09), CRATE_ORANGE)
-        b.fine.box((-d / 2, -w / 2 + 0.06, z + 0.09), (d / 2, w / 2 - 0.06, z + 0.105), STEEL)
-    for i, z in enumerate(zs):
-        y = -w / 2 + 0.1
-        zc = z + 0.105
-        top = (zs[i + 1] if i + 1 < len(zs) else h) - 0.02
-        while y < w / 2 - 0.3:
-            if rng.random() > load:
-                y += rng.uniform(0.3, 0.6)
-                continue
-            cw = rng.choice([0.5, 0.6, 0.8])
-            ch = min(rng.choice([0.3, 0.4, 0.5]), top - zc - 0.05)
-            if ch < 0.2 or y + cw > w / 2 - 0.08:
-                break
-            with b.at(T(0.0, y + cw / 2, zc)):
-                crate(b, cw, min(d - 0.12, rng.choice([0.5, 0.6, 0.7])), ch, rng.choice(mats), None, True)
-            y += cw + rng.uniform(0.02, 0.08)
+    """Heavy stores rack facing +x (ARTE-INTERNI-2: ship_stock.py): uprights on foot plates, orange beams, steel decks and real stock — cartons with tape and labels, totes, sacks, tins, cases,
+    drums, gas bottles; `mats` containing the ivory finish (the cold stores' colours) makes it a cold store's."""
+    import ship_stock as ST
+    ST.rack(b, w, d, h, levels, seed, max(load, 0.8), "cold" if mats and IVORY in mats else "dry")
 
 
 def locker_row(b: SParts, n: int = 4, w: float = 0.45, h: float = 1.95, d: float = 0.5, mat: str = COMPOSITE) -> None:
@@ -230,17 +222,17 @@ def planter(b: SParts, w: float = 1.0, d: float = 0.5, h: float = 0.45, plants: 
 
 
 def potted_plant(b: SParts, h: float = 1.1, seed: int = 2) -> None:
-    """A potted plant of about height h (a scanned plant in a pot of the ship: ship_plants): a palm for the tallest, a money tree, a syngonium, a snake plant, a zebra plant on a desk."""
+    """A potted plant of about height h (a scanned plant in a pot of the ship: ship_plants): a money tree for the tallest, a syngonium, a snake plant, a small syngonium on a desk."""
     import ship_plants as PL
-    if h >= 1.7:
-        PL.floor_tree(b, "pachira_c", 0.3, scale=1.1, yaw=seed * 47.0)
+    if h >= 1.7:                                                                       # ARTE-INTERNI-2: the light scans (half the triangles, the same look from a metre and more)
+        PL.floor_tree(b, "pachira_c_lo", 0.3, scale=1.1, yaw=seed * 47.0)
     elif h >= 1.3:
-        PL.floor_tree(b, "pachira_c" if seed % 2 else "ficus", 0.28, scale=0.95, yaw=seed * 53.0) if seed % 2 else PL.potted(b, "ficus", "tub", 0.28, 0.45, yaw=seed * 53.0)
+        PL.floor_tree(b, "pachira_c_lo", 0.28, scale=0.95, yaw=seed * 53.0)
     elif h >= 0.85:
         if seed % 3 == 0:
             PL.snake_plant(b, seed=seed)
         else:
-            PL.potted(b, "syngonium", "bowl", 0.25, 0.34, yaw=seed * 61.0)
+            PL.potted(b, "syngonium_lo", "bowl", 0.25, 0.34, yaw=seed * 61.0)
     else:
         PL.haworthia(b, yaw=seed * 40.0)
 

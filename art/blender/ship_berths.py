@@ -144,7 +144,8 @@ def preview(out: str, samples: int = 24) -> None:
     SP.rect_light("aisle", (-10.0, -0.07, H - 0.1), (18.0, 0.3), 24000 * 0.03 * gain, (1.0, 0.84, 0.67))
     SP.rect_light("lounge", (D["lounge"]["table"]["x"], D["lounge"]["table"]["y"], H - 0.1), (2.0, 1.2), 8000 * 0.03 * gain, (1.0, 0.88, 0.75))
     views = {"aisle": ((-0.8, 0.0, 1.62), (-20.0, 0.0, 1.5), 84), "stacks": ((-6.0, 0.9, 1.6), (-9.0, 3.5, 1.2), 82), "lounge": ((-15.0, 1.2, 1.65), (-23.0, -0.8, 1.3), 84),
-             "lift": ((-6.0, -1.0, 1.65), (0.0, 0.6, 1.8), 84)}
+             "lift": ((-6.0, -1.0, 1.65), (0.0, 0.6, 1.8), 84),
+             "rack": ((-6.9, -0.3, 1.68), (-7.75, 2.2, 1.1), 74), "rack_far": ((-3.0, -0.5, 1.68), (-12.0, 2.4, 1.2), 70), "lockers": ((-9.9, 0.4, 1.68), (-10.0, 3.0, 1.6), 70)}
     for n, (eye, tgt, fov) in views.items():
         cam = SP.look_camera(n, eye, tgt, fov)
         SP.render(cam, os.path.join(out, f"berths_{n}.jpg"))

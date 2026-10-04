@@ -11,11 +11,13 @@ import ship_furn3 as N3
 import ship_furniture as F
 import ship_decor as DC
 import ship_plants as PL
+import ship_decor2 as D2
+import ship_surfaces as SU
 import ship_themes as TH
 import ship_furniture2 as G
 import ship_spec as SPEC
 from bridge3_lib import T, frame
-from ship_lib import (CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, TUFT_SAND, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_TEAL, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
+from ship_lib import (CARPET_MOSS, TILE_BLACK, TILE_FLOOR, TERRAZZO, BRASS, PLASTER_IVORY, PLASTER_SLATE, SWATCH, TEAK, TERRAZZO_DARK, CARPET_RUST, CARPET_SAND, CARPET_SLATE, CERAMIC, LEATHER_NAVY, LEATHER_OX, LEATHER_TAN, OAK, TUFT_SAND, WALNUT, WEAVE_RUST, WEAVE_SAND, WEAVE_TEAL, BEDDING, COMPOSITE, CRATE_BLUE, CRATE_GREY, CRATE_OLIVE, CRATE_ORANGE, DECK, DGLASS, FABRIC_GREY, FABRIC_NAVY, FABRIC_RUST,
                       FABRIC_SAND, GLASS, IVORY, LAMINATE, LAMP, LAMP_DIM, LAMP_HOT, LEAF, PAINT_RED, RUBBER, SOIL, STEEL, STRUCT, TILE, TRIM, WOOD,
                       SParts, lamp_strip)
 from ship_rooms import (Style, WF, WS, build_shell, ceiling_panels, luminaire_strips, place, wall_label, window_wall)
@@ -50,10 +52,14 @@ def lounge(name: str = "SM_SHIP_Lounge"):
     the bar's stools stand where the crew sits."""
     spec, L, D, H = _dims("lounge")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = TH.living(wall_pattern=("panel", "cloth", "slats", "panel"), wall_acc=WEAVE_SAND)
+    cafe = (13.0, 24.0, 0.0, 16.0)
+    st = TH.living(wall_pattern=("panel", "cloth", "slats", "panel"), wall_acc=WEAVE_SAND,
+                   floor_fn=SU.zoned_floor(SU.planks_floor(OAK, 0.2, 2.2, "x", 7, None, BRASS, 0.95, holes=[cafe]),
+                                           [cafe + (lambda b_, x0, x1, y0, y1: SU.tiles(b_, x0, x1, y0, y1, 0.8, TERRAZZO, TERRAZZO_DARK, "checker", 5),)]))
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF, L - WS - WF
+    SU.border_line(b, 13.0, 13.02, 0.0, 16.0, 0.02, BRASS)                                                              # the brass strip between the wood and the café's tiles
     # two conversation groups on rugs: armchairs turned in, a low table, a sofa, side tables with lamps, a floor lamp, a plant
     for k, yc in enumerate((5.3, 12.7)):
         place(b, 5.9, yc, 0, DC.rug, 6.6, 4.6, CARPET_RUST if k == 0 else CARPET_SLATE, CARPET_SAND)
@@ -97,7 +103,9 @@ def lounge(name: str = "SM_SHIP_Lounge"):
     place(b, 12.6, WF + 0.065, 90, DC.notice_board, 1.1, 0.75, 4, z=1.6)
     place(b, xr - 0.04, 9.0, 180, DC.picture, 1.6, 0.9, 11, WALNUT, "sun", z=1.8)
     # a floor tree by the café, planters under the bar's screen
-    place(b, xr - 1.0, 9.0, 0, PL.floor_tree, "pachira_c", 0.3, CERAMIC, 1.1, 20.0)
+    place(b, xr - 1.0, 9.0, 0, PL.floor_tree, "pachira_c_lo", 0.3, CERAMIC, 1.1, 20.0)
+    # ARTE-INTERNI-2: acoustic clouds hung over the two conversation groups and the café tables (the ceiling was one plane)
+    SU.clouds(b, [(2.2, 2.6, 9.8, 8.0), (2.2, 10.0, 9.8, 15.4), (13.6, 2.6, 22.2, 8.4)], H - 0.05, 0.42, PLASTER_IVORY, "warm_dim")
     return b.build(name)
 
 
@@ -162,15 +170,42 @@ def games(name: str = "SM_SHIP_Games"):
         place(b, x, WF + 0.02, 90, DC.picture, 1.0, 0.7, 20 + k, WALNUT, ("bands", "sun", "squares")[k], z=1.9)
     for y in (3.0, 13.0):
         lamp_strip(b.emit, (2.0, y, H - 0.06), (L - 2.0, y, H - 0.06), 0.06, 0.006, "violet", LAMP_DIM)
+    # ARTE-INTERNI-2: the floor was one navy plane. A green wool rug under the billiard table, a rust one under every card table, black tiles with a violet line under the arcade row, and clouds
+    # of acoustic panel over the tables and the pool
+    place(b, 17.0, 8.0, 0, SU.rug_ornate, 5.4, 3.8, CARPET_MOSS, CARPET_SLATE, ("oxblood", "cream", "mustard"), 4, 0.2)
+    for (xt, yt) in ((6.0, 5.0), (6.0, 11.0), (13.0, 4.0)):
+        place(b, xt, yt, 0, SU.rug_ornate, 3.6, 3.6, CARPET_RUST, CARPET_SLATE, ("navy", "cream", "mustard"), int(xt + yt), 0.18)
+    SU.tiles(b, 15.4, 22.8, 12.4, 15.55, 0.6, TILE_BLACK, TILE_FLOOR, "checker", 2, 0.004)
+    b.emit.lamp_box((15.4, 12.37, 0.004), (22.8, 12.4, 0.01), "violet", LAMP_DIM)
+    SU.clouds(b, [(3.6, 3.2, 8.4, 6.8), (3.6, 9.2, 8.4, 12.8), (14.8, 6.0, 19.2, 10.0), (11.0, 2.2, 15.0, 5.8)], H - 0.05, 0.42, COMPOSITE, "violet")
     return b.build(name)
 
 
 # ------------------------------------------------------------------------------------------------------------------ library
+def _library_floor(b: SParts, spec: dict, st, rng) -> None:
+    """The library's floor: oak planks the long way down the room, a brass line round the central hall (the shelves stand outside it)."""
+    L, D = spec["L"], spec["D"]
+    SU.planks(b, 0.0, L, 0.0, D, OAK, 0.17, 2.0, "x", seed=5)
+    SU.border_line(b, 0.95, L - 0.95, 0.95, D - 0.95, 0.02, BRASS)
+    SU.border_line(b, 1.1, L - 1.1, 1.1, D - 1.1, 0.008, BRASS)
+
+
+def _library_ceiling(b: SParts, spec: dict, st, rng) -> None:
+    """The library's ceiling: a plaster soffit with oak beams every 4 m both ways (sixteen coffers, each with its lit panel in a brushed rim), a lit line round the foot of the walls."""
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    zc = H - 0.05
+    b.body.box((WS + WF, WF, zc), (L - WS - WF, D - WS - WF, H), PLASTER_IVORY)
+    SU.coffers(b, spec, (4.0, 8.0, 12.0), (4.0, 8.0, 12.0), zc, OAK, 0.22, 0.24, "white_warm", 0.95)
+    b.emit.lamp_box((WS + WF + 0.02, WF + 0.02, zc - 0.012), (L - WS - WF - 0.02, WF + 0.05, zc - 0.006), "warm_dim", LAMP_DIM)
+
+
 def library(name: str = "SM_SHIP_Library"):
+    """16 x 16 x 3.6: the library — shelves of books on three walls, an oak plank floor with a brass line round the central hall and three rugs (a big one under the reading table, a small
+    one in the armchair nook, a runner from the door), a coffered ceiling, the reading table with its four chairs, its lamps and an open book, the nook with its armchair, a side table and a
+    floor lamp, a second armchair by the door side, the librarian's desk by the door with a terminal. The places are those of ship_spec (the table's chairs, the nook, the desk)."""
     spec, L, D, H = _dims("library")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=FABRIC_GREY, floor_mode="covering", seams=False, wall_lo=WOOD, wall_hi=COMPOSITE, wain_h=0.9, ceil=COMPOSITE, accent="warm_dim",
-               cove="warm_dim", ribs=False, skirt=WOOD)
+    st = TH.living(wall_pattern=("slats", "panel", "cloth", "slats"), floor_fn=_library_floor, ceiling_fn=_library_ceiling)
     build_shell(b, spec, st)
     yf = D - WS - WF
     xl, xr = WS + WF + 0.17, L - WS - WF - 0.17
@@ -180,6 +215,10 @@ def library(name: str = "SM_SHIP_Library"):
         place(b, xr, 1.95 + 2.9 * k, 180, F.shelf, 2.9, 0.34, 2.6, 7, WOOD, True, 21 + k, True)
     for k in range(5):
         place(b, 1.9 + 2.85 * k, yf - 0.17, -90, F.shelf, 2.8, 0.34, 2.6, 7, WOOD, True, 31 + k, True)
+    # the rugs: a big one under the reading table, a small one in the nook, a runner from the door
+    place(b, 6.5, 9.0, 0, SU.rug_ornate, 4.6, 3.1, CARPET_RUST, CARPET_SLATE, ("navy", "cream", "mustard"), 3)
+    place(b, 11.0, 5.5, 0, SU.rug_ornate, 2.8, 2.1, CARPET_SLATE, CARPET_SAND, ("oxblood", "cream", "teal"), 5, 0.16)
+    place(b, 6.0, 3.95, 90, SU.rug_ornate, 7.1, 1.15, CARPET_SLATE, CARPET_SAND, ("oxblood", "cream", "mustard"), 7, 0.14, 0.014, "chain")
     # the reading table: four chairs, a lamp, an open book; a pendant bar above
     place(b, 6.5, 9.0, 0, F.table, 3.0, 0.9, 0.74, WOOD, TRIM, False)
     for x in (5.0, 8.0):
@@ -199,7 +238,23 @@ def library(name: str = "SM_SHIP_Library"):
     place(b, 14.4, 3.0, 0, F.monitor, 0.5, 0.3, "scr_dir", False, z=0.75)
     place(b, 15.4, 4.2, -100, F.chair, FABRIC_GREY)                                                  # the librarian's chair is pushed aside: she stands at the desk (the place at 13.15, 3.0)
     place(b, 10.0, 12.2, 0, F.potted_plant, 1.3, 7)
-    ceiling_panels(b, L, D, H, 3, 3, "white_warm", 2.2, 0.5, 0.5, LAMP)
+    # the table's lamps and what is on it, the globe, the card catalogues, the ladder, the ship's model on its plinth, a second corner for reading
+    for k, (dx, yaw_) in enumerate(((-1.0, 90.0), (1.0, -90.0))):
+        place(b, 6.5 + dx, 9.0, yaw_, D2.banker_lamp, z=0.74)
+    place(b, 7.6, 9.2, 15, DC.book_stack, 3, 11, z=0.74)
+    place(b, 6.2, 8.75, 0, DC.mug, CERAMIC, z=0.74)
+    place(b, 2.6, 9.4, 40, D2.globe, 0.22, 3)
+    place(b, xl + 0.52, 12.3, 0, D2.library_ladder, 2.6, 0.32, 0.42)
+    for k, x in enumerate((1.6, 3.0)):
+        place(b, x, WF + 0.26, 90, D2.card_catalog, 1.2, 0.5, 1.05, 5, 20 + k)
+    top = 0.95
+    place(b, 9.4, 12.9, 90, D2.plinth, 0.7, 0.5, top)
+    place(b, 9.4, 12.9, 90, N3.ship_model, 0.62, z=top)
+    place(b, 12.6, 11.6, 0, DC.rug, 3.0, 2.4, CARPET_SLATE, CARPET_SAND)
+    place(b, 12.0, 11.0, -45, F.armchair, FABRIC_NAVY)
+    place(b, 13.4, 12.4, 135, F.armchair, FABRIC_RUST)
+    place(b, 12.7, 11.8, 0, F.low_table, 0.55, 0.55, 0.45, WOOD)
+    place(b, 14.1, 10.8, 0, F.lamp_standard, 1.5)
     return b.build(name)
 
 
@@ -241,11 +296,24 @@ def _star_field(b: SParts, L: float, D: float, H: float, n: int = 140, seed: int
         b.emit.lamp_box((x, y, H - 0.062), (x + s, y + s, H - 0.05), rng.choice(["white_cool", "ice", "cool_dim", "white_dim"]), LAMP_DIM)
 
 
+def _obs_ceiling(b: SParts, spec: dict, st, rng) -> None:
+    """The observation deck's ceiling: a dark plane with a field of stars, a beam over every ship's frame with a thread of light, a ring of light over the star table."""
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    zc = H - 0.05
+    b.body.box((WS + WF, WF, zc), (L - WS - WF, D - WS - WF, H), COMPOSITE)
+    SU.stars(b, 1.0, L - 1.0, 1.0, D - 2.5, zc - 0.003, 170, 5)
+    for x in (4.0, 8.0, 12.0, 16.0, 20.0):
+        b.body.box((x - 0.12, WF, zc - 0.16), (x + 0.12, D - WS - WF, zc), STRUCT)
+        b.emit.lamp_box((x - 0.125, 0.6, zc - 0.1), (x - 0.12, D - 0.6, zc - 0.08), "cool_dim", LAMP_DIM)
+        b.emit.lamp_box((x + 0.12, 0.6, zc - 0.1), (x + 0.125, D - 0.6, zc - 0.08), "cool_dim", LAMP_DIM)
+    _ring(b.emit, 12.0, 7.0, zc - 0.012, 3.0, "white_cool", 56, 0.06, LAMP_DIM)
+
+
 def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
     spec, L, D, H = _dims(key)
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.05, ceil=COMPOSITE, accent="cool_dim", cove="cool_dim",
-               rib_mat=TRIM, skirt=STRUCT)
+    st = TH.living(floor=WALNUT, floor_mode="covering", floor2=WALNUT, border=0.0, wall_hi=PLASTER_SLATE, wall_lo=PLASTER_SLATE, accent="cool_dim", strip="white_cool", light_cell="white_cool",
+                   ceiling="none", floor_fn=SU.planks_floor(WALNUT, 0.2, 2.4, "y", 11, None, BRASS, 0.9), ceiling_fn=_obs_ceiling)
     build_shell(b, spec, st, skip=("far",))
     spans = window_wall(b, "far", L, D, H, st, 5, glass=False)
     yf = D - WS - WF
@@ -256,12 +324,13 @@ def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
         place(b, xc, yf - 0.4, 90, F.bench, w, 0.6, 0.45, FABRIC_NAVY)
     for x in (8.0, 16.0):
         place(b, x, yf - 0.9, 90, G.telescope)
-    # the star table at the centre with stools, two conversation nooks
+    # the star table at the centre on a stone medallion, with stools, two conversation nooks
+    SU.compass_rose(b, 12.0, 7.0, 2.6, 0.0, 12, TERRAZZO_DARK)
     place(b, 12.0, 7.0, 0, G.holo_table, 0.9, 0.9)
     for a in (45, 135, 225, 315):
         place(b, 12.0 + 1.55 * math.cos(math.radians(a)), 7.0 + 1.55 * math.sin(math.radians(a)), 0, F.stool, 0.19, 0.46, FABRIC_NAVY)
     for (xa, xb, xt) in ((6.0, 9.2, 7.6), (18.0, 14.8, 16.4)):
-        place(b, xt, 7.0, 0, DC.rug, 4.6, 3.6, CARPET_SLATE, FABRIC_SAND)
+        place(b, xt, 7.0, 0, SU.rug_ornate, 4.6, 3.6, CARPET_SLATE, CARPET_SAND, ("navy", "cream", "oxblood"), int(xt), 0.2)
         place(b, xa, 7.0, 0 if xa < xb else 180, F.armchair, FABRIC_GREY)
         place(b, xb, 7.0, 180 if xa < xb else 0, F.armchair, FABRIC_GREY)
         place(b, xt, 7.0, 0, DC.coffee_table_set, 0.9, 0.6, 0.4, WALNUT, int(xt))
@@ -269,44 +338,88 @@ def observation(name: str = "SM_SHIP_Observation", key: str = "observation"):
         place(b, xt, 5.1, 0, DC.side_table, 0.22, 0.52, WALNUT, True, int(xt) + 1)
     place(b, 0.32, 8.0, 0, F.wall_screen, 3.2, 1.8, "scr_map", z=1.9)
     place(b, L - 0.32, 8.0, 180, F.wall_screen, 3.2, 1.8, "scr_lab", z=1.9)
+    # a sofa group facing each wall screen (the map on the left, the lab feed on the right)
+    for (xr_, xs, yaw_) in ((3.2, 3.6, 180), (L - 3.2, L - 3.6, 0)):
+        place(b, xr_, 8.0, 0, SU.rug_ornate, 3.4, 5.4, CARPET_SLATE, CARPET_SAND, ("oxblood", "cream", "navy"), int(xr_) + 3, 0.18)
+        place(b, xs, 8.0, yaw_, F.sofa, 2.8, LEATHER_NAVY)
+        place(b, xs + (-1.6 if yaw_ == 180 else 1.6), 8.0, 0, DC.coffee_table_set, 0.9, 0.6, 0.4, WALNUT, int(xr_) + 7)
     place(b, 1.2, 14.0, 0, F.potted_plant, 1.4, 9)
     place(b, 22.8, 14.0, 0, F.potted_plant, 1.4, 10)
-    _star_field(b, L, D, H)
-    lamp_strip(b.emit, (2.0, 3.4, H - 0.06), (L - 2.0, 3.4, H - 0.06), 0.05, 0.006, "cool_dim", LAMP_DIM)
     return b.build(name)
 
 
 # ------------------------------------------------------------------------------------------------------ bow observation deck
+def _bow_floor(b: SParts, spec: dict, st, rng) -> None:
+    """The bow deck's floor: walnut planks running to the window, a compass rose of stone and brass in the middle, a brass line round the hall."""
+    L, D = spec["L"], spec["D"]
+    SU.planks(b, 0.0, L, 0.0, D, WALNUT, 0.2, 2.6, "x", seed=9)
+    SU.compass_rose(b, 9.5, 16.0, 5.0, 0.0, 16, TERRAZZO_DARK)
+    SU.border_line(b, 1.4, L - 1.9, 1.4, D - 1.4, 0.02, BRASS)
+
+
+def _bow_ceiling(b: SParts, spec: dict, st, rng) -> None:
+    """The bow deck's ceiling: a dark plane with a field of stars, a beam over every ship's frame, and a ring of light over the compass rose."""
+    L, D, H = spec["L"], spec["D"], spec["h"]
+    zc = H - 0.05
+    b.body.box((WS + WF, WF, zc), (L - WS - WF, D - WS - WF, H), COMPOSITE)
+    SU.stars(b, 1.0, L - 1.0, 1.0, D - 1.0, zc - 0.003, 240, 17)
+    for x in (4.0, 8.0, 12.0, 16.0):
+        b.body.box((x - 0.14, WF, zc - 0.2), (x + 0.14, D - WS - WF, zc), STRUCT)
+        b.emit.lamp_box((x - 0.145, 0.6, zc - 0.12), (x - 0.14, D - 0.6, zc - 0.1), "cool_dim", LAMP_DIM)
+        b.emit.lamp_box((x + 0.14, 0.6, zc - 0.12), (x + 0.145, D - 0.6, zc - 0.1), "cool_dim", LAMP_DIM)
+    _ring(b.emit, 9.5, 16.0, zc - 0.012, 5.8, "white_cool", 80, 0.07, LAMP_DIM)
+    _ring(b.emit, 9.5, 16.0, zc - 0.012, 4.2, "cool_dim", 64, 0.04)
+
+
 def bow_obs(name: str = "SM_SHIP_BowObs"):
-    """20 x 32: x is forward (0 = the aft wall the Spine runs into at y 16, 20 = the panoramic window), y across."""
+    """20 x 32: x is forward (0 = the aft wall the Spine runs into at y 16, 20 = the panoramic window), y across. The great room at the bow: teak planks with a compass rose, a star table in
+    the middle of its lit rings, a rail along the window with six places to stand at it and two telescopes between the piers, two pairs of benches with a rug each, a lounge corner, a bar
+    under the news screen, planters, portraits of the ship's ancestors on the side walls, and a ceiling of stars with a ring of light over the rose."""
     spec, L, D, H = _dims("bow_obs")
     b = SParts(bevel=0.005, fine_bevel=0.003)
-    st = Style(floor=DECK, floor_mode="plates", wall_lo=COMPOSITE, wall_hi=COMPOSITE, wain_h=1.05, ceil=COMPOSITE, accent="cool_dim", cove="cool_dim",
-               rib_mat=TRIM, skirt=STRUCT)
+    st = TH.living(floor=TEAK, floor_mode="covering", floor2=TEAK, border=0.0, wall_hi=PLASTER_SLATE, wall_lo=PLASTER_SLATE, accent="cool_dim", strip="white_cool", light_cell="white_cool",
+                   ceiling="none", floor_fn=_bow_floor, ceiling_fn=_bow_ceiling)
     doors = [{"wall": "left", "x": 16.0, "w": 3.2, "h": 3.2}]
     build_shell(b, spec, st, doors=doors, skip=("right",), bare=())
     spans = window_wall(b, "right", L, D, H, st, 5, pier=0.5)
     xw = L - WS - WF
-    # a floor inlay: a compass ring around the centre, guide lines to the window
-    _ring(b.emit, 9.5, 16.0, 0.004, 4.6, "cool_dim", 64, 0.05)
-    _ring(b.emit, 9.5, 16.0, 0.004, 3.4, "guide", 48, 0.03)
-    for y in (16.0,):
-        lamp_strip(b.emit, (1.2, y, 0.004), (xw - 3.0, y, 0.004), 0.05, 0.006, "guide", LAMP_DIM)
-    # a rail along the window (watchers lean on it), four benches in the middle, planters at both ends
+    # a rail along the window (watchers lean on it), the star table in the middle of the rose
     b.fine.cyl((xw - 1.3, 1.0, 1.05), (xw - 1.3, D - 1.0, 1.05), 0.024, TRIM, seg=10)
     for y in [1.0 + k * 2.0 for k in range(int((D - 2.0) / 2.0) + 1)]:
         b.fine.cyl((xw - 1.3, y, 0.0), (xw - 1.3, y, 1.05), 0.015, TRIM, seg=8)
+    place(b, 9.5, 16.0, 0, G.holo_table, 1.0, 0.95)
+    for a in (22.5, 112.5, 202.5, 292.5):                                                                         # four stools round it
+        place(b, 9.5 + 1.75 * math.cos(math.radians(a)), 16.0 + 1.75 * math.sin(math.radians(a)), 0, F.stool, 0.19, 0.46, FABRIC_NAVY)
+    for y in (3.9, 12.0, 20.0, 28.1):                                                                              # two telescopes between the piers
+        pass
+    for x_, y_ in ((xw - 2.4, 11.0), (xw - 2.4, 21.0)):
+        place(b, x_, y_, 0, G.telescope)
+    # two pairs of benches, each pair on a rug
     for y, w in ((6.5, 6.0), (25.5, 6.0)):
+        place(b, 12.6, y, 0, SU.rug_ornate, 4.6, 7.4, CARPET_SLATE, CARPET_SAND, ("oxblood", "cream", "mustard"), int(y), 0.2)
         place(b, 11.6, y, 0, F.bench, w, 0.6, 0.46, FABRIC_NAVY)
         place(b, 13.6, y, 0, F.bench, w, 0.6, 0.46, FABRIC_NAVY)
+    # the lounge corner (aft left): a sofa, two armchairs and a low table on a rug, a floor lamp
+    place(b, 4.2, 5.0, 0, SU.rug_ornate, 4.6, 3.8, CARPET_SLATE, CARPET_SAND, ("navy", "cream", "teal"), 31, 0.18)
+    place(b, 2.2, 5.0, 0, F.sofa, 2.6, LEATHER_NAVY)
+    place(b, 4.2, 3.0, 90, F.armchair, LEATHER_TAN)
+    place(b, 4.2, 7.0, -90, F.armchair, LEATHER_TAN)
+    place(b, 3.8, 5.0, 0, DC.coffee_table_set, 1.2, 0.7, 0.4, OAK, 8)
+    place(b, 1.6, 7.6, 0, F.lamp_standard, 1.6)
+    place(b, 1.5, 2.2, 0, F.potted_plant, 1.7, 5)
+    # the bar under the news screen: a counter, stools, a back bar (aft right)
+    place(b, 3.0, 27.0, 0, G.bar_counter, 4.4, 0.7, 1.08)
+    for k in range(4):
+        place(b, 4.2, 25.5 + 1.2 * k + 0.2, 0, G.bar_stool, 0.72, LEATHER_OX)
+    place(b, 0.32, 27.0, 0, G.back_bar, 4.4, 2.1, 0.34, 4)
+    place(b, 0.32, 24.0, 0, F.wall_screen, 2.4, 1.2, "scr_news", z=1.7)
+    place(b, 0.32, 7.0, 0, F.wall_screen, 3.0, 1.3, "scr_map", z=1.8)
+    b.emit.label_fit((0.27, 16.0, 3.05), 3.2, "room_bow_obs", (1, 0, 0))
+    # planters in the corners and by the window, portraits on the side walls
     for y in (2.2, D - 2.2):
         place(b, xw - 2.2, y, 0, F.planter, 2.2, 0.9, 0.5, 4, 7 + int(y), True)
-        place(b, 2.4, y, 0, F.planter, 2.2, 0.9, 0.5, 3, 5 + int(y), True)
-    place(b, 9.5, 16.0, 0, F.planter, 1.6, 1.6, 0.5, 5, 21, True)
-    b.emit.label_fit((0.27, 16.0, 3.05), 3.2, "room_bow_obs", (1, 0, 0))
-    place(b, 0.32, 7.0, 0, F.wall_screen, 3.0, 1.3, "scr_map", z=1.8)
-    place(b, 0.32, 25.0, 0, F.wall_screen, 3.0, 1.3, "scr_news", z=1.8)
-    ceiling_panels(b, L, D, H, 4, 5, "white_cool", 2.0, 0.6, 0.6, LAMP)
+    place(b, 1.4, 30.6, 0, F.potted_plant, 1.7, 9)
+    for k, x in enumerate((3.2, 7.4, 11.6, 15.8)):
+        place(b, x, WF + 0.065, 90, DC.picture, 1.5 if k % 2 == 0 else 1.1, 0.95, 40 + k, WALNUT, ("sun", "bands", "squares", "sun")[k], z=1.85)
+        place(b, x, D - WS - WF - 0.065, -90, DC.picture, 1.1 if k % 2 == 0 else 1.5, 0.95, 50 + k, WALNUT, ("squares", "sun", "bands", "squares")[k], z=1.85)
     return b.build(name)
-
-

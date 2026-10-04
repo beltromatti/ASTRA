@@ -8,7 +8,9 @@ import random
 import ship_furniture as F
 import ship_decor as DC
 import ship_mk as MK
+import ship_furniture3 as H3
 import ship_plants as PL
+import ship_surfaces as SU
 import ship_themes as TH
 import ship_spec as SPEC
 from bridge3_lib import T, frame
@@ -401,24 +403,33 @@ def hydro(name: str = "SM_SHIP_Hydro"):
 
 def garden(name: str = "SM_SHIP_Garden"):
     """24 x 16 x 3.4: a garden — the park of the ship: a terrazzo path down the middle with a bench every few metres, long planting beds either side of it with ferns, calatheas,
-    anthuriums and money trees, a lantern on a post at the bends, vines hanging from a pergola of oak beams, and a ceiling that is the sky (a wide pale-blue luminous panel with a warm
-    sun lamp). The places are those of the hydroponics bay (the botanists work on the path)."""
-    spec, L, D, H = _dims("hydro")
+    anthuriums and money trees, a lantern on a post at the bends, vines trailing from the girders, and a real ceiling: a plaster soffit under the deck with a girder every 4 m (the ship's
+    frames, lattice trusses with a thread of warm light), over the path a sky that is a screen (six framed panels of square pixels, a gradient with clouds and a glare of sun), over the beds
+    the grow lights (arrays of LED bars hung between the girders), the irrigation lines with their drip nozzles and a duct along the far wall. The places are those of the hydroponics bay
+    (the botanists work on the path)."""
+    spec, L, D, H = _dims("garden")
     b = SParts(bevel=0.005, fine_bevel=0.003)
     st = TH.living(floor=TERRAZZO, floor2=CARPET_MOSS, border=0.0, inlay=None, wall_lo=PLASTER_SAGE, wall_hi=PLASTER_IVORY, wall_acc=WEAVE_SAND, wain_h=0.9, accent="green_dim",
-                   wall_pattern=("panel", "slats", "panel"), ceiling="flat", skirt=OAK, strip="white_warm", light_cell="ice")
+                   wall_pattern=("panel", "slats", "panel"), ceiling="none", skirt=OAK, strip="white_warm", light_cell="white_warm")
     build_shell(b, spec, st)
     rng = random.Random(57)
     x0, x1, y0, y1 = WS + WF, L - WS - WF, WF, D - WS - WF
-    # the sky: a luminous panel over most of the ceiling in a pale daylight white-blue, with a warm "sun" strip along one side
-    b.emit.lamp_box((x0 + 1.0, y0 + 1.5, H - 0.056), (x1 - 1.0, y1 - 1.5, H - 0.05), "ice", LAMP)
-    b.body.box((x0 + 0.9, y0 + 1.4, H - 0.09), (x1 - 0.9, y0 + 1.5, H - 0.05), TRIM)
-    b.body.box((x0 + 0.9, y1 - 1.5, H - 0.09), (x1 - 0.9, y1 - 1.4, H - 0.05), TRIM)
-    b.body.box((x0 + 0.9, y0 + 1.5, H - 0.09), (x0 + 1.0, y1 - 1.5, H - 0.05), TRIM)
-    b.body.box((x1 - 1.0, y0 + 1.5, H - 0.09), (x1 - 0.9, y1 - 1.5, H - 0.05), TRIM)
-    # the pergola: oak beams across the path with vines hanging from them
-    for xb in (4.0, 9.0, 14.0, 19.0):
-        b.body.box((xb - 0.07, y0 + 0.4, H - 0.5), (xb + 0.07, y1 - 0.4, H - 0.3), OAK)
+    zc = H - 0.05                                                                                   # the ceiling plane
+    # ---- the ceiling: a plaster soffit, a girder over every frame, the sky over the path, the grow lights over the beds
+    b.body.box((x0, y0, zc), (x1, y1, H), PLASTER_IVORY)
+    frames = (4.0, 8.0, 12.0, 16.0, 20.0)
+    SU.truss_row(b, frames, y0 + 0.02, y1 - 0.02, zc, 0.5, 1.0, glow="white_warm")
+    edges = [x0] + list(frames) + [x1]
+    for k in range(len(edges) - 1):
+        xa, xb = edges[k] + (0.45 if k else 0.4), edges[k + 1] - (0.45 if k < len(edges) - 2 else 0.4)
+        SU.sky_screen(b, xa, xb, 5.5, 10.5, zc, seed=11 + k, cell=0.2, sun=(22.0, 8.0) if k == len(edges) - 2 else None)
+        for (ya, yb) in ((0.95, 5.05), (10.95, 15.05)):
+            if k == 2 and ya < 1.0:
+                continue                                                                           # the door's side of the middle bay: the cross path comes in under it
+            SU.grow_array(b, xa, xb, ya, yb, zc, 0.34, 12, "white_cool" if (k + int(ya)) % 2 else "white_warm", "violet")
+    for y in (3.0, 13.0):
+        SU.irrigation_line(b, x0 + 0.3, x1 - 0.3, y, zc - 0.22, 1.4)
+    H3.duct_run(b, (x0 + 0.4, y1 - 0.34, zc - 0.28), (x1 - 0.4, y1 - 0.34, zc - 0.28), 0.5, 0.32, STEEL, 1.5)
     # the path (a terrazzo strip that the field of the floor already is) edged in oak, the cross path from the door
     for ya, yb in ((6.2, 6.28), (9.72, 9.8)):
         b.body.box((x0, ya, 0.0), (x1, yb, 0.03), OAK)
@@ -429,14 +440,14 @@ def garden(name: str = "SM_SHIP_Garden"):
     for (xa, xb, ya, yb, seed) in ((x0 + 0.4, 8.6, y0 + 1.2, 6.0, 1), (11.4, x1 - 0.4, y0 + 1.2, 6.0, 2), (x0 + 0.4, 11.0, 10.0, y1 - 0.5, 3), (13.0, x1 - 0.4, 10.0, y1 - 0.5, 4)):
         w_, d_ = yb - ya, xb - xa
         with b.at(frame((xa + xb) / 2, (ya + yb) / 2, 0.0, 90.0)):
-            PL.garden_bed(b, d_, w_, 0.42, seed, tree="pachira_a" if seed == 3 else "pachira_d", cover=MOSS if seed % 2 else GRASS)
-    # vines hanging from the pergola beams
-    for xb in (4.0, 9.0, 14.0, 19.0):
+            PL.garden_bed(b, d_, w_, 0.42, seed, tree="pachira_a_lo" if seed == 3 else "pachira_d_lo", cover=MOSS if seed % 2 else GRASS, density=0.75)
+    # vines trailing from the girders (over the path and its edges)
+    for xb in frames:
         y = y0 + 0.9
         while y < y1 - 0.8:
-            with b.at(T(xb, y, H - 0.5)):
-                PL.hanging_vine(b, rng.uniform(0.5, 1.4), int(xb * 10 + y * 3))
-            y += rng.uniform(1.1, 2.1)
+            with b.at(T(xb, y, zc - 0.5)):
+                PL.hanging_vine(b, rng.uniform(0.5, 1.2), int(xb * 10 + y * 3))
+            y += rng.uniform(1.3, 2.4)
     # benches along the path, lanterns on posts, a drinking fountain
     for xb in (6.5, 11.8, 17.0):
         place(b, xb, 9.45, -90, F.bench, 2.0, 0.5, 0.46, LEATHER_TAN)
