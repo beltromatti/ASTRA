@@ -411,8 +411,8 @@ velivolo e la dissolvenza.
 L'equipaggio sa dove sta (`CaptainWhereText`: nello stato della nave, nel suo badge e nel «posto» del cruscotto: «AWAY · WITH THE MARINES»); l'XO ha il comando dell'Aquila e il Capitano parla alla
 plancia con il suo comunicatore. Il Maggiore Reyes ha la rete dei marine.
 
-**Il teletrasporto** è l'altra strada, dentro e fuori, con tutte le sue regole: §13.10. La navetta resta la strada di casa quando il fascio è bloccato («Chief, beam me up» rifiutata per uno scudo o un
-disturbo: il Capo dice perché e il Kestrel al portello è lì), e per andare chi non ha una nave a cui puntare.
+**Il teletrasporto** è l'altra strada, dentro e fuori, con tutte le sue regole: §13.10. La navetta resta la strada di andata e di ritorno quando il fascio è bloccato («Chief, beam me up» rifiutata per uno
+scudo o un disturbo: il Capo dice perché e il Kestrel al portello è lì) o quando nessuna stanza dei marine è libera dal Mandato, e resta l'unica strada su una nave che i marine non stanno abbordando.
 
 **Le piante vere.** Le sette classi di FLOTTA-VIVA hanno sale che coprono più ponti (cannoni, sale macchine, hangar) con **due porte una sopra l'altra** sullo stesso muro: il primo costruttore
 (muri interi con un buco per porta) chiudeva una porta con il pezzo di muro dell'altra. Ora un muro si fa per tratti tra i bordi delle aperture, con l'altezza meno i vuoti che vi sono, e una porta
