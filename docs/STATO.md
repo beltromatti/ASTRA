@@ -2,7 +2,7 @@
 
 *Questo file è la memoria operativa del progetto: lo aggiorno a ogni passo. Chi riprende il lavoro (io in una nuova sessione) parte da qui.*
 
-**Ultimo aggiornamento:** 2026-10-03 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
+**Ultimo aggiornamento:** 2026-10-04 · **Traguardo corrente:** Piano v0.5 ([PIANO.md](PIANO.md)): la nave come una nave vera (NAVE-3,
 ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano e rifinisce; **principio delle intelligenze**
 ([ARCHITETTURA §1bis](ARCHITETTURA.md))
 
@@ -21,6 +21,31 @@ ASCENSORI), gli abbordaggi (F5.1), il lead che gioca partite intere da Capitano 
 pezzi della pianta), **TELETRASPORTO**, **ARTE-PLANCIA-2** (plancia, abitacolo del Falcon, corridoi del Ponte 1 e alloggi del Capitano al
 livello di un film; avviato). Pronti: CAMPAGNA (lo strato strategico), FLOTTA-VIVA, F5.2 (abbordare le navi nemiche; con la guerra che lancia gli
 abbordaggi contro l'Aquila, chiesto da ABBORDAGGI).
+
+**4/10 — interni nel gioco, spazio vivo nel gioco, abbordaggi e flotta provati in battaglia (il lead):**
+- **Interni di ARTE-INTERNI pubblicati** (`be4948b`, 446 MB LFS). Il guasto della notte era nel livello, non nelle mesh: dopo la ricostruzione dei
+  ponti l'editor aveva come livello corrente un sotto-livello di ponte, e gli script delle cinque stanze M1 vi avevano salvato tutti i loro attori
+  (269, compreso il controllore del ponte di volo e i camminatori) dentro `L_Deck12`, che il gioco non carica intorno a loro. Riportati in L_Bridge;
+  ogni script di L_Bridge ora rende corrente L_Bridge prima di creare attori, e `build_ship_interior.py` lo rimette corrente alla fine;
+  `build_hangar.py`, ricostruito per ultimo, non perde più gli approdi delle altre stanze (le luci della mensa non si accendevano).
+  **Visti nel gioco**: Mess Hall, Medbay, Main Engineering (la colonna del reattore, le gallerie), Flight Deck, Crew Berthing, Officers' Wardroom,
+  Forward Garden, Crew Lounge, Chapel, Officers' Library, Officers' Gym; 54–59 fps. Note per il prossimo giro di ARTE-INTERNI: il soffitto del
+  giardino sembra cielo aperto, il pavimento della biblioteca è piatto, le cabine da guardare meglio. **Attenzione**: le foto dell'editor via MCP
+  (CaptureViewport) mostrano le mesh Nanite grandi a frammenti: non servono a giudicare le stanze; i pavimenti percorribili delle stanze M1 sono
+  all'origine del loro file dati (la sala macchine a -58 m, non al -61 della pianta che è il fondo dello scafo).
+- **SPAZIO-VIVO M1 nel gioco** (`3a0d779`): la Keeper Station con l'anello che gira e le navi ai moli, l'Arsenal, la raffineria, la miniera, il
+  traffico civile (37 scafi), i luoghi sul tavolo olografico; `astra.space.look keeper 2.5` per vederla. Lo stato della nave dà alle menti il
+  blocco `space`. Corretti: le luci di posizione a componenti (M_FX_Flare ora tiene due pixel per vista: allo zoom erano dischi rossi di 70 m);
+  `Explode` toccava l'ultimo lampo della lista anche quando gli effetti nuovi lo prendevano (crash a lista vuota).
+- **Prove in battaglia (apertura)**: F5.2 funziona come meccanica: le navette Skiff dell'Acheron partono, i 80 marine si mobilitano, le paratie del
+  Ponte 11 si chiudono; poi i Falcon di pattuglia le abbattono, o la difesa di punto della Praetorian, o lo scudo rialzato le respinge (tutto vero e
+  realistico). Con la mente accesa l'ammiraglio Varek Solm ha richiamato in 3 s un assalto lanciato dalla console (segnalato ad ABBORDAGGI: il
+  quadro deve dirgli che l'operazione è sua). FLOTTA-VIVA si vede: l'Acheron perde il 39 % dell'equipaggio, il comandante cade e il tattico
+  prende il comando, la sezione centrale è sventrata, poi il reattore. Da vedere nel gioco: lo scontro dentro l'Aquila (serve un comando di prova
+  che tenga giù scudi, difesa e caccia) e la corsa del Capitano sulla navetta (ABBORDAGGI la sta finendo).
+- **Aiutanti** (le sessioni dei vecchi non si riprendono: ripartiti nuovi, sui loro rami): **ABBORDAGGI** (ramo `worktree-agent-a97f275d708192e32`,
+  contiene il vecchio: corsa del Capitano, teletrasporto sul ponte abbordato con le regole di Star Trek, perdite, i luoghi fixture), **SPAZIO-VIVO**
+  (relitti, detriti, capsule, moto leggibile delle capitali, docs/SPAZIO.md).
 
 **3/10 notte — schermo principale pulito, armi del Capitano provate, interni nuovi in importazione, SPAZIO-VIVO avviato (il lead):**
 - **Schermo principale** (`2edcc3c`): zoomato su un bersaglio lontano (x100–x180) mostrava a volte lo scafo di una scorta, un caccia o una salva di

@@ -23,6 +23,7 @@ ROOT = "/Users/beltromatti/Desktop/ASTRA"
 sys.path.insert(0, ROOT + "/tools/ue_scripts")
 import bridge3_layout as LAY  # noqa: E402
 
+
 importlib.reload(LAY)
 
 LEVEL = "/Game/ASTRA/Maps/L_Bridge"
@@ -75,6 +76,7 @@ if eal.does_asset_exist(LEVEL):
             eas.destroy_actor(a)
 else:
     les.new_level(LEVEL)
+les.set_current_level_by_name("L_Bridge")      # (the persistent level, not a deck's sub-level the editor may have had current)
 
 
 # ------------------------------------------------------------------------------------------------------------------ helpers

@@ -3,11 +3,9 @@
 #include "AstraNavLights.h"
 
 #include "ASTRA.h"
-#include "Camera/PlayerCameraManager.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "Engine/StaticMesh.h"
-#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -158,6 +156,9 @@ void UAstraNavLights::AddLamp(const FVector& Local, const FLinearColor& Color, f
 	C->SetupAttachment(this);
 	C->SetUsingAbsoluteScale(true);          // the hull may be scaled; a lamp keeps its own size
 	C->SetRelativeLocation(Local);
+	// its own size: M_FX_Flare keeps it two pixels wide however far, in each view by that view's own zoom (a size worked out here from the
+	// bridge's eye made the running lights red discs 70 m across through the main viewscreen's x35 zoom, 4 Oct)
+	C->SetWorldScale3D(FVector(SizeM));
 	C->RegisterComponent();
 	UMaterialInstanceDynamic* M = C->CreateAndSetMaterialInstanceDynamicFromMaterial(0, Mat);
 	M->SetVectorParameterValue(TEXT("Color"), Color);
@@ -175,21 +176,11 @@ void UAstraNavLights::TickComponent(float DeltaTime, ELevelTick TickType, FActor
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	T += DeltaTime;
-	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(this, 0);
-	const FVector Eye = Cam ? Cam->GetCameraLocation() : FVector::ZeroVector;
 	for (int32 i = 0; i < Lamps.Num(); ++i)
 	{
-		UStaticMeshComponent* C = Lamps[i];
-		if (!C)
+		if (!Lamps[i] || Pattern[i] == 0)
 		{
-			continue;
-		}
-		// a few pixels however far: up close its own size, far off a fixed share of the distance
-		const float Dist = float(FVector::Dist(C->GetComponentLocation(), Eye)) / 100.f;
-		C->SetWorldScale3D(FVector(FMath::Max(Size[i], Dist * 0.0012f)));
-		if (Pattern[i] == 0)
-		{
-			continue;
+			continue;                            // a steady lamp has nothing to do
 		}
 		Mids[i]->SetScalarParameterValue(TEXT("Intensity"), Glow[i] * PatternOn(Pattern[i], T, Phase[i]));
 	}

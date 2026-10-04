@@ -2833,6 +2833,7 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 	if (Battle)
 	{
 		S->SetArrayField(TEXT("contacts"), Battle->ContactsJson());
+		S->SetObjectField(TEXT("space"), Battle->SpaceJson());               // SPAZIO-VIVO: the system's places (bearing, range), its traffic in short, any alarm
 		S->SetStringField(TEXT("enemy_small_craft"), Battle->EnemyCraftSummary());
 		TSharedRef<FJsonObject> MandateView = Battle->MandateViewJson();
 		if (const UAstraBoardSubsystem* BoardOpts = GetWorld()->GetSubsystem<UAstraBoardSubsystem>(); BoardOpts && BoardOpts->IsReady())
