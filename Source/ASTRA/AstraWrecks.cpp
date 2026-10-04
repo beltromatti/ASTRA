@@ -242,7 +242,13 @@ namespace AstraSpace
 		}
 	}
 
-	bool FWrecks::ChunkAt(const FSite& S, int32 Index, double Now, FChunk& Out)
+	FQuat FWrecks::ChunkAttitude(const FSite& S, int32 Index, double Now)
+	{
+		const FChunkDef& D = S.Defs[Index];
+		return (FQuat(FVector(D.SpinAxis), WkWrap((double)D.SpinRate * (Now - S.Field.T0))) * FQuat(D.Att0)).GetNormalized();
+	}
+
+	bool FWrecks::ChunkAt(const FSite& S, int32 Index, double Now, FChunk& Out, bool bAtt)
 	{
 		const FFieldRec& F = S.Field;
 		if (!S.Defs.IsValidIndex(Index) || Now < F.T0)
@@ -252,7 +258,10 @@ namespace AstraSpace
 		const double T = Now - F.T0;
 		const FChunkDef& D = S.Defs[Index];
 		Out.Pos = F.Pos0 + F.Vel * T + FVector(D.Dir) * ((double)D.Off + (double)D.Speed * T);
-		Out.Att = (FQuat(FVector(D.SpinAxis), WkWrap((double)D.SpinRate * T)) * FQuat(D.Att0)).GetNormalized();
+		if (bAtt)
+		{
+			Out.Att = ChunkAttitude(S, Index, Now);
+		}
 		Out.Size = D.Size;
 		Out.Shape = D.Shape;
 		const float E = D.Heat * (float)FMath::Exp(-T / (double)FMath::Max(1.f, F.EmberTauS));

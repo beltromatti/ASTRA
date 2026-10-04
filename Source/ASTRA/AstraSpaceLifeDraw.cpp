@@ -41,6 +41,7 @@ int32 UAstraSpaceLife::SetFor(const FString& Key)
 	const int32 Idx = Sets.AddDefaulted();
 	Sets[Idx].Mesh = Mesh;
 	Sets[Idx].Variant = Variant;
+	Sets[Idx].bRooted = Variant != 0;                          // (a wreck's pieces, debris and lifepods drift: they hang under the system's frame like the belt and the buoys, whatever the Aquila does)
 	SetByMesh.Add(Key, Idx);
 	if (!bLive)
 	{
@@ -85,12 +86,14 @@ AstraDraw::FPage* UAstraSpaceLife::MakePage(int32 SetIdx)
 {
 	FInstSet& S = Sets[SetIdx];
 	AstraDraw::FPage& P = S.Set.Pages.AddDefaulted_GetRef();
+	S.Dirty.Add(1);
 	P.Xf.Init(SpHiddenXf(), PageSize);
 	P.PrevXf.Init(SpHiddenXf(), PageSize);
 	P.Owner.Init(-1, PageSize);
 	if (bLive && S.StaticMesh && Host)
 	{
-		P.Comp = AstraDraw::MakeComp(Host, Host->GetRootComponent(), *FString::Printf(TEXT("Hull_%s_%d_%d"), *S.Mesh, (int32)S.Variant, S.Set.Pages.Num()), S.StaticMesh, nullptr, PageSize, 0, true, true);
+		USceneComponent* Parent = S.bRooted && SystemRoot ? SystemRoot.Get() : Host->GetRootComponent();
+		P.Comp = AstraDraw::MakeComp(Host, Parent, *FString::Printf(TEXT("Hull_%s_%d_%d"), *S.Mesh, (int32)S.Variant, S.Set.Pages.Num()), S.StaticMesh, nullptr, PageSize, 0, true, true);
 		if (S.Variant && P.Comp.IsValid())
 		{
 			ApplyWreckLook(P.Comp.Get(), S.Variant);
@@ -174,7 +177,24 @@ void UAstraSpaceLife::StageHull(int32 SetIdx, int32 Key, const FTransform& Now)
 	const int32 L = R->Slot % PageSize;
 	P.PrevXf[L] = bFresh ? Now : P.Xf[L];                  // (a hull that has just appeared has no past: it is not smeared across the sky from where its slot was last)
 	P.Xf[L] = Now;
+	S.Dirty[R->Slot / PageSize] = 1;
 	++HullsNow;
+}
+
+bool UAstraSpaceLife::KeepHull(int32 SetIdx, int32 Key)
+{
+	FInstSet& S = Sets[SetIdx];
+	AstraDraw::FRef* R = S.Where.Find(Key);
+	if (!R)
+	{
+		return false;
+	}
+	R->Frame = Frame;
+	AstraDraw::FPage& P = S.Set.Pages[R->Slot / PageSize];
+	const int32 L = R->Slot % PageSize;
+	P.PrevXf[L] = P.Xf[L];                                 // (it did not move this frame: if the page is sent for another's sake, the temporal upscaler is told so)
+	++HullsNow;
+	return true;
 }
 
 void UAstraSpaceLife::FlushSets()
@@ -195,11 +215,18 @@ void UAstraSpaceLife::FlushSets()
 				--P.Live;
 				--S.Set.Live;
 				S.Set.FreeSlots.Add(R.Slot);
+				S.Dirty[R.Slot / PageSize] = 1;
 				It.RemoveCurrent();
 			}
 		}
-		for (AstraDraw::FPage& P : S.Set.Pages)
+		for (int32 pi = 0; pi < S.Set.Pages.Num(); ++pi)
 		{
+			AstraDraw::FPage& P = S.Set.Pages[pi];
+			if (!S.Dirty[pi])
+			{
+				continue;                                    // nothing in it moved, came or went since it was last sent: what the render thread holds is right
+			}
+			S.Dirty[pi] = 0;
 			if (P.Live == 0 && !P.bWritten)
 			{
 				continue;                                    // empty and already written hidden: nothing to send
@@ -236,6 +263,7 @@ void UAstraSpaceLife::HideSets()
 			P.Live = 0;
 			P.bWritten = P.High > 0;                    // one more write, all hidden
 		}
+		for (uint8& D : S.Dirty) { D = 1; }
 	}
 	FlushSets();
 }

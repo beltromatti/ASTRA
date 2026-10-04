@@ -573,7 +573,11 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 		DrawPlaces();
 		DrawVessels();
 		DrawPatrols();
-		DrawWrecks(WreckClock());
+		{
+			const double W0 = FPlatformTime::Seconds();
+			DrawWrecks(WreckClock());
+			WrecksMs += (FPlatformTime::Seconds() - W0) * 1000.0;
+		}
 		FlushSets();
 		Lamps.Flush();
 		Plumes.Flush();

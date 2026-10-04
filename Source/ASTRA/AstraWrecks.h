@@ -140,6 +140,7 @@ namespace AstraSpace
 		float Slow = 0.8f, Fast = 20.f;          // m/s: the slowest and the fastest chunk away from the middle
 		float SizeK = 1.f;                       // the chunks' scale (1 = the meshes as made: 13 m a plate, 24 m a girder, 9 m a chunk)
 		float EmberTauS = 70.f;                  // how fast the glow of the hot ones dies
+		int32 SetIdx[3] = {-1, -1, -1};          // (not saved) which set of instances draws each shape (-1 not asked yet, -2 its mesh is not there)
 	};
 
 	/** A chunk of a field, evaluated: where it is, how it lies, how big, which shape (0 plate, 1 girder, 2 chunk), how much it still glows (0..1). */
@@ -257,8 +258,10 @@ namespace AstraSpace
 		static void PodPose(uint32 SiteSeed, int32 Index, const FVector& Vel, FQuat& Att0, FVector& SpinAxis, float& SpinRate);
 		/** Makes a site's chunk definitions (once). */
 		static void MakeDefs(FSite& S);
-		/** One chunk (deterministic for the seed): false for an index out of range or a field not yet begun. MakeDefs first. */
-		static bool ChunkAt(const FSite& S, int32 Index, double Now, FChunk& Out);
+		/** One chunk (deterministic for the seed): false for an index out of range or a field not yet begun. MakeDefs first. bAtt false leaves Att alone (how it lies is the dearer half of it:
+		 *  the drawing asks for it only for the chunks it is about to send). */
+		static bool ChunkAt(const FSite& S, int32 Index, double Now, FChunk& Out, bool bAtt = true);
+		static FQuat ChunkAttitude(const FSite& S, int32 Index, double Now);
 		/** A lifepod's beacon calls: launched, its beacon started, air left, not recovered. */
 		static bool BeaconOn(const FPodRec& P, double Now) { return P.State == 0 && Now >= P.T0 + P.BeaconDelayS && Now < P.T0 + P.AirS; }
 		static double AirLeft(const FPodRec& P, double Now) { return FMath::Max(0.0, P.T0 + P.AirS - Now); }

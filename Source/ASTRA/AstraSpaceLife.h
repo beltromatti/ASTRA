@@ -49,6 +49,8 @@ namespace AstraSpaceDraw
 		TMap<int32, AstraDraw::FRef> Where;                  // key -> where it is among the pages
 		bool bFailed = false;                                // its mesh did not load (or its materials are not flagged for instancing): it is not drawn
 		uint8 Variant = 0;                                   // 0 as made; 1 a wreck's (dark windows, cold cut faces, no running lights); 2 charred by a reactor breach too
+		bool bRooted = false;                                // its pages hang under the system's frame (transforms in the system frame, moved by one transform a frame): what drifts slowly, not what flies
+		TArray<uint8> Dirty;                                 // by page: something in it moved, came or went since it was last sent (a page nothing touched is not sent again)
 	};
 }
 
@@ -221,6 +223,8 @@ private:
 	int32 SetFor(const FString& Mesh);
 	AstraDraw::FPage* MakePage(int32 SetIdx);
 	void StageHull(int32 SetIdx, int32 Key, const FTransform& Now);
+	/** The hull of a key is still where it was last sent (a slow thing far away is moved every few frames, not every one): it keeps its slot this frame. False when it has none (stage it). */
+	bool KeepHull(int32 SetIdx, int32 Key);
 	void FlushSets();
 	void HideSets();
 	void DrawPlaces();

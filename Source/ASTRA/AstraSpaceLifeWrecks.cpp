@@ -238,6 +238,16 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 	const FString& Key = SystemKey;
 	const double PieceKm = FMath::Clamp((double)CVarSpaceWreckKm.GetValueOnGameThread(), 20.0, 250.0);
 	const int32 ChunkCap = FMath::Clamp(CVarSpaceChunks.GetValueOnGameThread(), 0, 1200);
+	// What drifts is drawn in the system's frame, under the one component the belt and the buoys hang from: the Aquila's flight is one transform a frame (Tick) and not a transform for every
+	// wreck, and a wreck is written again only when it has moved enough to show. A chunk tumbling past the window is written every frame (within 3 km), one at the other end of the sky three
+	// times a second; a page nothing in it was written for is not sent at all (FlushSets).
+	const auto Due = [this](double Km) -> bool
+	{
+		const uint32 Every = Km < 3.0 ? 1u : (Km < 10.0 ? 2u : (Km < 40.0 ? 6u : 20u));
+		return Every == 1u || (Frame % Every) == 0u;
+	};
+	static const FString PodMeshes[3] = {TEXT("SM_POD_A"), TEXT("SM_POD_M"), TEXT("SM_POD_G")};
+	static const FString PodKeys[3] = {TEXT("SM_POD_A#dead"), TEXT("SM_POD_M#dead"), TEXT("SM_POD_G#dead")};
 	// the fields near the Aquila, nearest first (a cap on the chunks drawn must keep the ones she can see)
 	struct FNearField { FSite* Site; double Edge; };
 	TArray<FNearField, TInlineAllocator<16>> Fields;
@@ -248,6 +258,7 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 			continue;
 		}
 		const uint32 SH = SpMix((uint32)S.Id * 2654435761u);
+		const int32 Fac = FMath::Clamp((int32)S.Faction, 0, 2);
 		// ---- the pieces: instances of the section meshes, dark (the effects hold the first minute's burning ones as actors)
 		for (int32 pi = 0; pi < S.Pieces.Num(); ++pi)
 		{
@@ -257,7 +268,8 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 				continue;
 			}
 			const FVector Pivot = Sky.ToSystem(FWrecks::PosAt(P, Now));
-			if (FVector::DistSquared(Pivot, F.Origin) > FMath::Square(PieceKm * SpKm))
+			const double D2 = FVector::DistSquared(Pivot, F.Origin);
+			if (D2 > FMath::Square(PieceKm * SpKm))
 			{
 				continue;
 			}
@@ -275,9 +287,15 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 			{
 				continue;
 			}
+			const int32 HKey = S.Id * 4 + (P.Section < 3 ? P.Section : 3);
+			if (!Due(FMath::Sqrt(D2) * 0.001) && KeepHull(P.SetIdx, HKey))
+			{
+				++WreckHullsNow;
+				continue;
+			}
 			const FQuat Q = Sky.ToSystem(FWrecks::AttAt(P, Now));
 			const FVector Origin = Pivot - Q.RotateVector(P.PivotLocal);
-			StageHull(P.SetIdx, S.Id * 4 + (P.Section < 3 ? P.Section : 3), FTransform(F.ToWorldRot(Q), F.ToWorld(Origin), FVector::OneVector));
+			StageHull(P.SetIdx, HKey, FTransform(Q, Origin * 100.0, FVector::OneVector));
 			++WreckHullsNow;
 		}
 		// ---- the field: looked into when the Aquila is within its reach
@@ -305,13 +323,11 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 			{
 				continue;
 			}
-			const FQuat Q = Sky.ToSystem(FWrecks::AttAt(P, Now));
-			const FString PodMesh = FString::Printf(TEXT("SM_POD_%c"), FactionLetter(S.Faction));
 			if (Km < PodHullKm)
 			{
 				if (P.SetIdx == -1)
 				{
-					P.SetIdx = SetFor(PodMesh + TEXT("#dead"));
+					P.SetIdx = SetFor(PodKeys[Fac]);
 					if (P.SetIdx == INDEX_NONE)
 					{
 						P.SetIdx = -2;
@@ -319,20 +335,24 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 				}
 				if (P.SetIdx >= 0)
 				{
-					StageHull(P.SetIdx, S.Id * 16 + qi, FTransform(F.ToWorldRot(Q), F.ToWorld(Pos), FVector::OneVector));
+					const int32 HKey = S.Id * 16 + qi;
+					if (Due(Km) || !KeepHull(P.SetIdx, HKey))
+					{
+						StageHull(P.SetIdx, HKey, FTransform(Sky.ToSystem(FWrecks::AttAt(P, Now)), Pos * 100.0, FVector::OneVector));
+					}
 					++PodsNow;
 				}
 			}
 			if (FWrecks::BeaconOn(P, Now))
 			{
-				const AstraSpace::FMeshData* MD = D.Mesh(PodMesh);
+				const AstraSpace::FMeshData* MD = D.Mesh(PodMeshes[Fac]);
 				if (MD && MD->Lamps.Num())
 				{
-					DrawLamps(MD->Lamps, Pos, Q, SpMix(SH + (uint32)qi * 40503u), D2, SpLampFade(Km), true);
+					DrawLamps(MD->Lamps, Pos, Sky.ToSystem(FWrecks::AttAt(P, Now)), SpMix(SH + (uint32)qi * 40503u), D2, SpLampFade(Km), true);
 				}
 				else
 				{
-					// no table for the pod's mesh yet: a beacon on its own (white, a slow double blink)
+					// no table for the pod's mesh yet: a beacon on its own (white, a slow blink)
 					static const TArray<AstraSpace::FLamp> Generic = []()
 					{
 						AstraSpace::FLamp L;
@@ -343,7 +363,7 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 						L.Pattern = 5;
 						return TArray<AstraSpace::FLamp>({L});
 					}();
-					DrawLamps(Generic, Pos, Q, SpMix(SH + (uint32)qi * 40503u), D2, SpLampFade(Km), true);
+					DrawLamps(Generic, Pos, FQuat::Identity, SpMix(SH + (uint32)qi * 40503u), D2, SpLampFade(Km), true);
 				}
 			}
 		}
@@ -359,10 +379,11 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 		FSite& S = *NF.Site;
 		FWrecks::MakeDefs(S);
 		const bool bChar = S.How == AstraSpace::EHowLost::Reactor;
+		const int32 Fac = FMath::Clamp((int32)S.Faction, 0, 2);
 		for (int32 i = 0; i < S.Field.Count && ChunksNow < ChunkCap; ++i)
 		{
 			AstraSpace::FChunk C;
-			if (!FWrecks::ChunkAt(S, i, Now, C))
+			if (!FWrecks::ChunkAt(S, i, Now, C, false))
 			{
 				break;
 			}
@@ -373,15 +394,26 @@ void UAstraSpaceLife::DrawWrecks(double Now)
 			{
 				continue;
 			}
-			const FQuat Q = Sky.ToSystem(C.Att);
-			const int32 SI = SetFor(FString::Printf(TEXT("SM_DEBRIS_%c_%s#%s"), FactionLetter(S.Faction), ChunkNames[C.Shape], bChar ? TEXT("char") : TEXT("dead")));
-			if (SI != INDEX_NONE)
+			int32& SI = S.Field.SetIdx[C.Shape];
+			if (SI == -1)
 			{
-				StageHull(SI, S.Id * 256 + i, FTransform(F.ToWorldRot(Q), F.ToWorld(Pos), FVector((double)C.Size)));
+				SI = SetFor(FString::Printf(TEXT("SM_DEBRIS_%c_%s#%s"), FactionLetter((uint8)Fac), ChunkNames[C.Shape], bChar ? TEXT("char") : TEXT("dead")));
+				if (SI == INDEX_NONE)
+				{
+					SI = -2;
+				}
+			}
+			if (SI >= 0)
+			{
+				const int32 HKey = S.Id * 256 + i;
+				if (Due(FMath::Sqrt(D2) * 0.001) || !KeepHull(SI, HKey))
+				{
+					StageHull(SI, HKey, FTransform(Sky.ToSystem(FWrecks::ChunkAttitude(S, i, Now)), Pos * 100.0, FVector((double)C.Size)));
+				}
 				++ChunksNow;
 			}
-			// a hot one still glows: a point of ember on it (the glints' layer), as long as it is anywhere near
-			if (C.Ember > 0.06f && D2 < FMath::Square(30.0 * SpKm))
+			// a hot one still glows: a point of ember on it (the glints' layer, written afresh each frame in the Aquila's frame), as long as it is anywhere near
+			if (C.Ember > 0.06f)
 			{
 				FTransform* X;
 				if (float* Dd = Glints.Next(X))
