@@ -316,6 +316,8 @@ si scrivono ogni fotogramma come le altre, le navi più vicine per prime (se uno
 | `astra.space.motion.list` | per ogni nave: velocità, velocità di virata, calcio e spinta chiesti, quanti getti accesi, quante note ha la scia |
 | `astra.space.stat` | (esteso) la riga `motion:` con gli strati e il costo |
 
+`astra.space.reload` rilegge anche `thrusters.json` e `solids.json` (si cambia un dato, `tools/space.py sync`, reload: senza riavviare).
+
 Variabili: `astra.space.motion` (1/0: tutto), `astra.space.jets.gain` (1: la luminosità dei getti; viene da `astra.fx.intensity` in più), `astra.space.jets.km` (45), `astra.space.wakes` (1/0),
 `astra.space.wakes.gain` (1), `astra.space.wakes.km` (110), `astra.space.wakes.life` (1: moltiplica la durata).
 
