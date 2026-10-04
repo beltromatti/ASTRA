@@ -182,6 +182,17 @@ namespace
 	}
 }
 
+void AstraBoardScene::ForDisabledShip(FSpec& Spec, bool bFromWar)
+{
+	Spec.GuardShare = 0.5f;
+	Spec.PostShare = bFromWar ? 0.08f : 0.06f;
+	if (!bFromWar)
+	{
+		Spec.MinPerPost = 0;
+		Spec.Roaming = 0;
+	}
+}
+
 AstraBoardScene::FResult AstraBoardScene::Build(FAstraBoardSim& Sim, const FBoardShipPlan& Plan, const FSpec& Spec)
 {
 	FResult R;

@@ -2071,8 +2071,7 @@ static void BoardScenarioWar(const FString& Class, int32 Seed, int32 Seeds, cons
 		Spec.bSweep = States[si].bDisabled;
 		if (States[si].bDisabled)
 		{
-			Spec.PostShare = 0.08f;                              // (what the host does with a ship that has lost her power: UAstraBoardSubsystem::BeginRemoteScene)
-			Spec.GuardShare = 0.5f;
+			AstraBoardScene::ForDisabledShip(Spec, true);        // (what the host does with a ship that has lost her power: UAstraBoardSubsystem::BeginRemoteScene)
 		}
 		int32 Wins[4] = {0, 0, 0, 0};
 		double Def = 0.0, Wounded = 0.0, Unarmed = 0.0, Shut = 0.0, T = 0.0, LossAtt = 0.0, DeadAtt = 0.0, LossDef = 0.0;

@@ -1251,9 +1251,7 @@ bool UAstraBoardSubsystem::BeginRemoteScene()
 		S.Inside = &Snap;
 		if (bFacts && T.bDisabled)
 		{
-			// a ship that has lost her power and her fight: her marines and a few of her crew resist; the rest, at dead consoles in the dark, have nothing left to fight for
-			S.PostShare = 0.08f;
-			S.GuardShare = 0.5f;
+			AstraBoardScene::ForDisabledShip(S, true);          // (a ship that has lost her power and her fight: her marines and a few of her crew resist; the rest have nothing left to fight for)
 		}
 		else
 		{
@@ -1275,10 +1273,7 @@ bool UAstraBoardSubsystem::BeginRemoteScene()
 	else if (bFacts && T.bDisabled)
 	{
 		// a ship that has lost her power and was never fought through (no record of her crew): a derelict. Her marines are at their stations, a few more of her crew with them; the rest have no fight in them
-		S.PostShare = 0.06f;
-		S.GuardShare = 0.5f;
-		S.MinPerPost = 0;
-		S.Roaming = 0;
+		AstraBoardScene::ForDisabledShip(S, false);
 	}
 	const AstraBoardScene::FResult R = AstraBoardScene::Build(Fight, *Plan, S);
 	if (!R.bOk)

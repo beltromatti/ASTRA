@@ -56,4 +56,8 @@ namespace AstraBoardScene
 
 	/** Fills a sim (made with Init on the plan's map) with the holders at their posts and the attackers at the dock. */
 	ASTRA_API FResult Build(FAstraBoardSim& Sim, const FBoardShipPlan& Plan, const FSpec& Spec);
+	/** A ship that has lost her power (and her fight): her marines and the guard of her hatches stand to (half of them), a few of the rest take up arms; the people at dead consoles in the dark have nothing left to
+	 *  fight for. bFromWar: the war's own picture of her inside is the scene (her people are where the war left them); without it she is a derelict nobody fought through (no record of her crew: a post may be left
+	 *  empty, nobody roams). The host and the bench come to this one place for the numbers, so that what the bench measures is what the game does. */
+	ASTRA_API void ForDisabledShip(FSpec& Spec, bool bFromWar);
 }
