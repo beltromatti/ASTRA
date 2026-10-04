@@ -144,7 +144,7 @@ ASTRA\Saved next to ASTRA.exe, so keep the folder somewhere you can write (not P
 them in %LOCALAPPDATA%\ASTRA\Saved. The crew's own log is Saved\Logs\astra-mind.log there: if the crew is silent, read it
 (and see docs\WINDOWS.md in the project).
 "@
-Set-Content -Path (Join-Path $Stage "README-WINDOWS.txt") -Value $Readme -Encoding ASCII
+Set-Content -Path (Join-Path $Stage "README-WINDOWS.txt") -Value ($Readme -replace "`r?`n", "`r`n") -Encoding ASCII    # (Windows line endings: every Notepad shows lines)
 
 if ($Zip) {
     Step "Archivio"
