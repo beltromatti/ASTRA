@@ -198,7 +198,7 @@ producibile se la scrittura non è latina (come sempre).
    poi mette in `Packaged\Windows\` la mente (`mind\`: sorgenti, `uv.lock`, **non** l'helper del Mac), un `uv.exe` in `mind\bin\`, `Setup-ASTRA.ps1`/`.bat` e un `README-WINDOWS.txt`. La cottura degli shader
    la prima volta dura ore. Se `UAT` fallisce: `Saved\Logs\package_last_windows.log`.
 6. Sul PC di prova (il proprio o un altro): copiare `Packaged\Windows` in una cartella scrivibile e lanciare **`Setup-ASTRA.bat`** una volta (rete accesa; `-EnvFile C:\percorso\.env` per la chiave
-   delle menti, che finisce in `%LOCALAPPDATA%\ASTRA\.env` e non viene mai stampata). Poi `ASTRA.exe`.
+   delle menti, che finisce in `%LOCALAPPDATA%\ASTRA\.env`, o nella cartella di `ASTRA_HOME` se c'è, e non viene mai stampata). Poi `ASTRA.exe`.
 
 ### 6.3 Cosa guardare nella prima partita
 1. Finestra a schermo intero senza bordi alla risoluzione del desktop; la pagina SETTINGS senza RETINA; il gioco a 60 fps (o la risoluzione dinamica che scende).
@@ -220,6 +220,7 @@ producibile se la scrittura non è latina (come sempre).
 | `uv sync` fallisce | rete assente o filtrata; antivirus che mette in quarantena `uv.exe`/`python.exe` | rilanciare `Setup-ASTRA.bat`: ciò che è scaricato resta; escludere la cartella di `%LOCALAPPDATA%\ASTRA` dall'antivirus |
 | `Setup-ASTRA.ps1` "l'esecuzione di script è disabilitata" | criterio di esecuzione di PowerShell | usare `Setup-ASTRA.bat` (passa `-ExecutionPolicy Bypass` per quella sola esecuzione: non cambia nessuna impostazione del sistema) |
 | il gioco cuoce con "path too long" | repository in un percorso lungo | clonare in `C:\ASTRA` |
+| `uv sync` si ferma con un percorso troppo lungo dentro `%LOCALAPPDATA%\ASTRA\venv` | un profilo utente dal nome lungo più le cartelle profonde dei pacchetti Python | variabile di sistema `ASTRA_HOME=C:\ASTRA-data` (la leggono il gioco, la mente e `Setup-ASTRA.bat`, e il venv nasce lì) |
 | il gioco salva in un posto in cui non può scrivere | pacchetto sotto Program Files | una cartella scrivibile, o `-SaveToUserDir` |
 | voce robotica per una lingua di Pocket TTS | il modello non è ancora scaricato: parla SAPI | attendere (o `Setup-ASTRA.bat -Langs en,it`) |
 

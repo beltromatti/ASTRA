@@ -8,7 +8,8 @@ environment and its voice and listening models have to be downloaded once: a few
 background on its first start (the crew is silent for some minutes); doing it here shows you what is happening and anything that goes wrong.
 
 What it does, in order:
-  1. makes the data folder  %LOCALAPPDATA%\ASTRA  and, if you give it a key file, keeps the crew's key there (it is never printed);
+  1. makes the data folder  %LOCALAPPDATA%\ASTRA  (or the one in the ASTRA_HOME variable, if you set it) and, if you give it a key file, keeps the crew's key there
+     (it is never printed);
   2. makes the Python environment with uv (the program that comes in mind\bin\uv.exe, or the one on your PATH);
   3. downloads the speech models (Parakeet and faster-whisper for listening, Pocket TTS for the crew's voices in -Langs) and checks the machine:
      the key, the microphone, the libraries, the voices.
@@ -53,7 +54,13 @@ if (-not (Test-Path $Uv)) {
 if (-not (Test-Path $Uv)) { Fail "uv (the program that makes the Python environment) is missing. Install it with:  winget install --id astral-sh.uv -e   and run this again." }
 Write-Host ("uv: " + (& $Uv --version))
 
-$Data = Join-Path $env:LOCALAPPDATA "ASTRA"
+# the folder the game itself chooses (AstraMindLaunch::DataDirFor): ASTRA_HOME if that is set (a short path, if the user's profile is a deep one), else %LOCALAPPDATA%\ASTRA
+$Data = $env:ASTRA_HOME
+if (-not $Data) {
+    $LocalData = $env:LOCALAPPDATA
+    if (-not $LocalData) { $LocalData = Join-Path $env:USERPROFILE "AppData\Local" }
+    $Data = Join-Path $LocalData "ASTRA"
+}
 if ($Packaged) {
     New-Item -ItemType Directory -Force -Path $Data | Out-Null
     $env:ASTRA_HOME = $Data
