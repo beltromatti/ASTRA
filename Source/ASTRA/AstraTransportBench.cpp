@@ -6,6 +6,8 @@
 
 #include "ASTRA.h"
 #include "AstraBattleSubsystem.h"
+#include "AstraBoardInterior.h"
+#include "AstraBoardSubsystem.h"
 #include "AstraDamageModel.h"
 #include "AstraLifeSubsystem.h"
 #include "AstraShipPlan.h"
@@ -36,6 +38,7 @@ namespace
 		UAstraShipPlan* Plan = nullptr;
 		UAstraBattleSubsystem* Battle = nullptr;
 		UAstraTransporterSubsystem* Xp = nullptr;
+		UAstraBoardSubsystem* Board = nullptr;
 		double T = 0.0;
 		TArray<FString> Events;
 
@@ -51,6 +54,7 @@ namespace
 			Plan = World->GetSubsystem<UAstraShipPlan>();
 			Battle = World->GetSubsystem<UAstraBattleSubsystem>();
 			Xp = World->GetSubsystem<UAstraTransporterSubsystem>();
+			Board = World->GetSubsystem<UAstraBoardSubsystem>();
 			if (!Ship || !Life || !Plan || !Battle || !Xp)
 			{
 				UE_LOG(LogASTRA, Error, TEXT("[Transport] the ship, her plan, the life, the battle or the transporter are not in the world"));
@@ -103,6 +107,21 @@ namespace
 					return true;
 				}
 				Tick(Dt);
+			}
+			return Pred();
+		}
+
+		/** Ticks until the predicate holds (game seconds at most), letting the workers have the wall clock a little (the plans are read on them): true when it did. */
+		bool RunUntilWall(TFunctionRef<bool()> Pred, float Max, float Dt = 0.1f)
+		{
+			for (float t = 0.f; t < Max; t += Dt)
+			{
+				if (Pred())
+				{
+					return true;
+				}
+				Tick(Dt);
+				FPlatformProcess::Sleep(0.001f);
 			}
 			return Pred();
 		}
@@ -669,6 +688,245 @@ void AstraXportRunWorldBench(const FString& Fixtures)
 			AstraXportBenchCheck(TEXT("shields: with the window the party is across, aboard her, and the Aquila's shields are back up"), bZW && JZ && JZ->Phase == EAstraXportPhase::Done && W.Xp->GetAway().Num() == 4 &&
 			                     W.Xp->GetAway()[0].WhereText.Contains(TEXT("Shieldless")) && W.Ship->AreShieldsUp(), FString::Printf(TEXT("%s | %s"), *DZW.Left(100), JZ ? *JZ->Outcome.Left(120) : TEXT("?")));
 			W.Save(Fixtures, TEXT("card_boarding.json"));
+		}
+	}
+
+	// ======================================================================================================== a ship our marines are fighting aboard: the Captain in and out by the beam
+	if (W.Board)
+	{
+		X->Reset();
+		W.Run(1.f);
+		UAstraBoardSubsystem* Bd = W.Board;
+		GEngine->Exec(W.World, TEXT("astra.war.tune shield_scale 0"));
+		GEngine->Exec(W.World, TEXT("astra.war.scenario aquila_only aquila at=0,0,0 hold"));
+		W.Battle->StartCampaign();
+		// a Mandate ship that has lost her power (nothing to stop the boats, her shield nothing) at three kilometres, and the Aquila with her shields up
+		GEngine->Exec(W.World, TEXT("astra.war.spawn acheron mandate 0 -3 0 90 id=B-01 name=Hulk static hold passive"));
+		GEngine->Exec(W.World, TEXT("astra.board.disable B-01"));
+		GEngine->Exec(W.World, TEXT("astra.board.takeover_fatal 0"));
+		W.Run(3.f);
+		const FVector PadSpot = X->GetPads()[1].PosCm;
+		X->SetTestCaptain(true, PadSpot);
+		Bd->SetTestCaptain(true, PadSpot, 0.f);
+		const bool bReady = W.RunUntilWall([&]() { return Bd->IsReady(); }, 120.f);
+		AstraXportBenchCheck(TEXT("boarded: the soldiers' map of the Aquila is read"), bReady, TEXT(""));
+		// a Captain may not go to a ship nobody is fighting aboard
+		{
+			FString D;
+			const bool bNo = W.Send({TEXT("captain")}, TEXT("B-01"), D, {TEXT("window")});
+			AstraXportBenchCheck(TEXT("boarded: the Captain is refused a ship no marine of ours is aboard, and told why"), !bNo && D.Contains(TEXT("no marine of ours is fighting aboard her")), D.Left(260));
+		}
+		UAstraBoardSubsystem::FAssaultSpec Spec;
+		Spec.Target = TEXT("B-01");
+		Spec.Craft = 2;
+		Spec.Objective = TEXT("captain");
+		Spec.By = TEXT("the bench");
+		FString Det;
+		const bool bStarted = bReady && Bd->StartAssault(Spec, Det);
+		AstraXportBenchCheck(TEXT("boarded: the marines are sent in two Kestrels at the hulk"), bStarted, Det.Left(220));
+		FString BContact, BName;
+		const bool bAboard = bStarted && W.RunUntilWall([&]() { return Bd->BoardedByUs(BContact, BName); }, 500.f);
+		AstraXportBenchCheck(TEXT("boarded: the boats latch and our marines are fighting aboard her"), bAboard, FString::Printf(TEXT("%s %s at t=%.0f s"), *BContact, *BName, W.T));
+		if (bAboard)
+		{
+			W.Run(8.f);
+			W.Save(Fixtures, TEXT("card_boarded.json"));
+			const FString Card = W.CardText();
+			AstraXportBenchCheck(TEXT("boarded: the card says our marines are aboard her and what the beam would do"), Card.Contains(TEXT("boarded_by_our_marines")) && Card.Contains(TEXT("beam_in")), Card.Mid(Card.Find(TEXT("boarded_by_our_marines")), 420));
+			// the Aquila's shields up, her window not asked for: the beam leaves through our shield (a shield on the face between the transporter and the target refuses it, and says which)
+			{
+				FString D;
+				const bool bShielded = W.Send({TEXT("captain")}, TEXT("B-01"), D);
+				AstraXportBenchCheck(TEXT("boarded: a shield of ours standing on the face the beam leaves through refuses it, with the reason"), W.Ship->AreShieldsUp() ? (!bShielded && D.Contains(TEXT("shields_own"))) : bShielded, D.Left(260));
+				if (bShielded)
+				{
+					W.Xp->Abort(FString(), TEXT("bench"), D);
+					W.Run(1.f);
+				}
+			}
+			// marines of the roster are beamed in too: men of the fight beside the others, and beamed out again they are out of it (the transporter's ordinary away list, and the fight has them while they are there)
+			{
+				const int32 AbleBefore = Bd->Sim().CountAble(AstraBoard::ESide::Aquila);
+				FString DM;
+				const bool bM = W.Send({TEXT("marines 2")}, TEXT("B-01"), DM, {TEXT("window")});
+				const FString TagM = FXWorld::TagOf(DM);
+				TSet<uint8> SeenM;
+				if (bM)
+				{
+					W.Finish(TagM, 90.f, SeenM);
+					W.Run(2.f);
+				}
+				const FAstraXportJob* JM = W.Job(TagM);
+				const int32 AbleAfter = Bd->Sim().CountAble(AstraBoard::ESide::Aquila);
+				int32 Beamed = 0;
+				for (const FAstraXportAway& A : X->GetAway())
+				{
+					FString C;
+					Beamed += A.Person != INDEX_NONE && Bd->PersonAboardOtherShip(W.Life->Sim().Person(A.Person).Roster, &C) && C == TEXT("B-01") ? 1 : 0;
+				}
+				AstraXportBenchCheck(TEXT("boarded: two marines of the roster are beamed in beside the others: away on the card, men of the fight, in a squad of their own"),
+				                     bM && JM && JM->Phase == EAstraXportPhase::Done && Beamed == 2 && AbleAfter >= AbleBefore + 1,
+				                     FString::Printf(TEXT("%s | %d beamed, able %d -> %d | %s"), *DM.Left(130), Beamed, AbleBefore, AbleAfter, JM ? *JM->Outcome.Left(100) : TEXT("?")));
+				FString DB;
+				const bool bB = W.Send({TEXT("away team")}, TEXT("the pads"), DB, {TEXT("window")});
+				const FString TagB = FXWorld::TagOf(DB);
+				TSet<uint8> SeenB;
+				if (bB)
+				{
+					W.Finish(TagB, 90.f, SeenB);
+					W.Run(2.f);
+				}
+				int32 StillThere = 0;
+				for (const AstraBoard::FUnit& U : Bd->Sim().Units())
+				{
+					const AstraBoard::FSquad* Q = Bd->Sim().Squad(U.Squad);
+					StillThere += (U.Roster != INDEX_NONE && Q && Q->Name.StartsWith(TEXT("Beamed Marines")) && U.Act != AstraBoard::EAct::Gone && U.Act != AstraBoard::EAct::Dead) ? 1 : 0;
+				}
+				AstraXportBenchCheck(TEXT("boarded: the away team is called back to the pads: the two are out of the fight and nobody of ours is left away"),
+				                     bB && W.Job(TagB) && W.Job(TagB)->Phase == EAstraXportPhase::Done && StillThere == 0 && X->GetAway().Num() == 0,
+				                     FString::Printf(TEXT("%s | still in the fight %d | away now %d"), *DB.Left(110), StillThere, X->GetAway().Num()));
+			}
+			// with the window: accepted, and the answer says where he will stand
+			FString DIn;
+			const bool bIn = W.Send({TEXT("captain")}, TEXT("B-01"), DIn, {TEXT("window")});
+			AstraXportBenchCheck(TEXT("boarded: the Captain to the hulk is accepted with a shield window, and the answer says he is set down beside the marines"), bIn && DIn.Contains(TEXT("beside")), DIn.Left(300));
+			const FString TagIn = FXWorld::TagOf(DIn);
+			TSet<uint8> SeenIn;
+			if (bIn)
+			{
+				W.Finish(TagIn, 90.f, SeenIn);
+				W.Run(2.f);
+			}
+			const FAstraXportJob* JIn = W.Job(TagIn);
+			FString Aboard;
+			const bool bHere = Bd->CaptainAboardOtherShip(&Aboard);
+			const FVector Zone = X->TestCaptainCm();
+			AstraXportBenchCheck(TEXT("boarded: he is set down on her decks, in the zone of the world her plan stands in, and the boarding has him in the fight"),
+			                     JIn && JIn->Phase == EAstraXportPhase::Done && bHere && Aboard == TEXT("B-01") && Zone.Z < -1.0e8 && Bd->Sim().CaptainId() != INDEX_NONE,
+			                     FString::Printf(TEXT("%s | %s | at (%.0f, %.0f, %.0f) cm | aboard %s"), *XPhases(SeenIn), JIn ? *JIn->Outcome.Left(120) : TEXT("?"), Zone.X, Zone.Y, Zone.Z, bHere ? *Aboard : TEXT("no")));
+			AstraXportBenchCheck(TEXT("boarded: the card says he is away, aboard her"), X->GetAway().Num() >= 1 && X->GetAway()[0].Id == TEXT("captain") && X->GetAway()[0].WhereText.Contains(TEXT("Hulk")),
+			                     FString::Printf(TEXT("%d away: %s"), X->GetAway().Num(), X->GetAway().Num() ? *X->GetAway()[0].WhereText : TEXT("")));
+			W.Save(Fixtures, TEXT("card_captain_aboard.json"));
+			// the way home: refused while a jammer stands on the line, accepted when it is quiet
+			GEngine->Exec(W.World, TEXT("astra.war.spawn acheron mandate 0 -15 0 90 id=J-01 name=Jammer static hold passive"));
+			GEngine->Exec(W.World, TEXT("astra.board.jammer J-01"));
+			TSharedPtr<FJsonObject> Ew = MakeShared<FJsonObject>();
+			Ew->SetStringField(TEXT("focus"), TEXT("AQUILA"));
+			Ew->SetStringField(TEXT("ew"), TEXT("jam"));
+			FString DEw;
+			W.Ship->ApplyCommand(TEXT("mandate_tactics"), Ew, DEw);
+			W.Run(4.f);
+			bool bJamSeen = false;
+			for (const UAstraBattleSubsystem::FContactView& C : W.Battle->Contacts())
+			{
+				bJamSeen |= C.bJamming && C.Side == EAstraSide::Mandate;
+			}
+			FString DJ;
+			const bool bJ = W.Send({TEXT("captain")}, TEXT("a pad"), DJ, {TEXT("window")});
+			AstraXportBenchCheck(TEXT("boarded: 'beam me up' through a jammer on the line is refused with the reason, and the Kestrel stays his way home"), bJamSeen ? (!bJ && DJ.Contains(TEXT("[jam]"))) : true,
+			                     FString::Printf(TEXT("%s; %s"), bJamSeen ? TEXT("a jammer is on the plot") : TEXT("no jammer on the plot"), *DJ.Left(260)));
+			if (bJ)
+			{
+				W.Xp->Abort(FString(), TEXT("bench"), DJ);
+				W.Run(1.f);
+			}
+			Ew->SetStringField(TEXT("ew"), TEXT("quiet"));
+			W.Ship->ApplyCommand(TEXT("mandate_tactics"), Ew, DEw);
+			W.Run(4.f);
+			FString DOut;
+			const bool bOut = W.Send({TEXT("captain")}, TEXT("a pad"), DOut, {TEXT("window")});
+			AstraXportBenchCheck(TEXT("boarded: 'beam me up' is accepted when nothing blocks the lock"), bOut, DOut.Left(300));
+			const FString TagOut = FXWorld::TagOf(DOut);
+			TSet<uint8> SeenOut;
+			if (bOut)
+			{
+				W.Finish(TagOut, 90.f, SeenOut);
+				W.Run(2.f);
+			}
+			const FAstraXportJob* JOut = W.Job(TagOut);
+			AstraXportBenchCheck(TEXT("boarded: he is back on a pad of the Transporter Room, out of her fight, and nobody is away"),
+			                     JOut && JOut->Phase == EAstraXportPhase::Done && !Bd->CaptainAboardOtherShip() && X->TestCaptainCm().Z > -1.0e7 && X->GetAway().Num() == 0 && !Bd->IsActive(),
+			                     FString::Printf(TEXT("%s | %s | at (%.0f, %.0f, %.0f) cm | %d away"), *XPhases(SeenOut), JOut ? *JOut->Outcome.Left(120) : TEXT("?"), X->TestCaptainCm().X, X->TestCaptainCm().Y, X->TestCaptainCm().Z, X->GetAway().Num()));
+			// ---- a ship with her power and her people: the Mandate holds rooms of her, and her shield is a shield
+			Bd->EndBoarding(TEXT("bench"));
+			W.RunUntilWall([&]() { return !Bd->IsAssaultOn(); }, 400.f);
+			GEngine->Exec(W.World, TEXT("astra.war.tune shield_scale 1"));                  // (a ship with a shield: the sectors have a capacity)
+			GEngine->Exec(W.World, TEXT("astra.war.spawn acheron mandate 0 3 0 270 id=B-02 name=Warship static hold passive"));
+			GEngine->Exec(W.World, TEXT("astra.board.strip B-02"));
+			GEngine->Exec(W.World, TEXT("astra.board.pd B-02 0"));
+			W.Run(2.f);
+			UAstraBoardSubsystem::FAssaultSpec Spec2;
+			Spec2.Target = TEXT("B-02");
+			Spec2.Craft = 2;
+			Spec2.Objective = TEXT("captain");
+			Spec2.By = TEXT("the bench");
+			FString Det2;
+			const bool bStarted2 = Bd->StartAssault(Spec2, Det2);
+			FString C2, N2;
+			const bool bAboard2 = bStarted2 && W.RunUntilWall([&]() { return Bd->BoardedByUs(C2, N2); }, 500.f);
+			AstraXportBenchCheck(TEXT("boarded: a second boarding, of a warship with her people at their posts, has our marines aboard her"), bAboard2, FString::Printf(TEXT("%s | %s %s at t=%.0f s"), *Det2.Left(100), *C2, *N2, W.T));
+			if (bAboard2)
+			{
+				// her shield comes up on the face the beam crosses: it is a shield, the reason says whose
+				GEngine->Exec(W.World, TEXT("astra.board.shield B-02 1"));
+				W.Run(1.5f);
+				FString DS;
+				const bool bS = W.Send({TEXT("captain")}, TEXT("B-02"), DS, {TEXT("window")});
+				AstraXportBenchCheck(TEXT("boarded: a shield standing on her face refuses the beam, with the reason"), !bS && (DS.Contains(TEXT("shields_theirs")) || DS.Contains(TEXT("[unknown]"))), DS.Left(300));
+				if (bS)
+				{
+					W.Xp->Abort(FString(), TEXT("bench"), DS);
+					W.Run(1.f);
+				}
+				GEngine->Exec(W.World, TEXT("astra.board.strip B-02"));
+				W.Run(1.5f);
+				// the fight goes on: wherever the beam would set the Captain down, every second of it, is a room with marines of ours in it, no Mandate soldier who can fight in it or see the spot (and when no such room is free
+				// the order is refused and says so)
+				int32 Asked = 0, Accepted = 0, Held = 0, Violations = 0;
+				FString DHot, DBad;
+				const FVector ZoneO = AAstraBoardInterior::ZoneOrigin();
+				for (int32 t = 0; t < 240 && Bd->BoardedByUs(C2, N2); ++t)
+				{
+					UAstraBoardSubsystem::FBeamLimits Lim;
+					UAstraBoardSubsystem::FBeamAboard Where;
+					++Asked;
+					if (Bd->BeamAboardQuery(C2, 1, false, Lim, Where))
+					{
+						++Accepted;
+						const FVector Plan = Where.Spots[0].FeetWorld - ZoneO;
+						const int32 Room = Bd->Sim().GetMap().CompAt(Plan);
+						int32 Ours = 0;
+						for (const AstraBoard::FUnit& U : Bd->Sim().Units())
+						{
+							if (U.bExternal || !U.Able() || U.Comp == INDEX_NONE)
+							{
+								continue;
+							}
+							Ours += U.Side == AstraBoard::ESide::Aquila && U.Comp == Room ? 1 : 0;
+							const bool bTheirs = U.Side == AstraBoard::ESide::Mandate && (U.Comp == Room || (FVector::Dist(U.Pos, Plan) < 3200.0 && FMath::Abs(U.Pos.Z - Plan.Z) < 300.0 && Bd->Sim().Sees(U.Eye(), Plan + FVector(0.0, 0.0, 152.0))));
+							if (bTheirs)
+							{
+								++Violations;
+								DBad = FString::Printf(TEXT("%s stands in or sees %s at t=%d"), *U.Name, *Bd->Sim().GetMap().Describe(Room), t);
+							}
+						}
+						if (Ours == 0)
+						{
+							++Violations;
+							DBad = FString::Printf(TEXT("no marine of ours in %s at t=%d"), *Bd->Sim().GetMap().Describe(Room), t);
+						}
+					}
+					else if (Where.Why.Contains(TEXT("the Mandate")))
+					{
+						++Held;
+						DHot = Where.Why;
+					}
+					W.Run(1.f);
+				}
+				AstraXportBenchCheck(TEXT("boarded: wherever the beam would set the Captain down while the fight goes on, it is a room with our marines in it and no Mandate soldier in it or in sight of the spot"),
+				                     Accepted >= 5 && Violations == 0,
+				                     FString::Printf(TEXT("%d asked, %d with a room, %d refused for the Mandate's presence, %d violations %s %s"), Asked, Accepted, Held, Violations, *DBad, *DHot.Left(120)));
+			}
 		}
 	}
 

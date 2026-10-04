@@ -107,7 +107,8 @@ class ToolTest(unittest.TestCase):
         self.assertEqual(owner_of("board_ship"), "xo")
         tool = next(t for t in tools_for(BoardShip(True).snapshot()).tools if t["function"]["name"] == "board_ship")["function"]
         props = tool["parameters"]["properties"]
-        self.assertEqual(set(props), {"action", "target", "boats", "face", "objective", "marines"})
+        self.assertEqual(set(props), {"action", "target", "boats", "face", "objective", "marines", "captain"})
+        self.assertEqual(props["captain"]["type"], "boolean")
         self.assertEqual(props["action"]["enum"], ["launch", "call_off"])
         self.assertEqual(props["face"]["enum"], ["port", "starboard", "dorsal", "ventral", "bow", "stern"])
         self.assertIn("engineering", props["objective"]["enum"])
@@ -135,7 +136,7 @@ class PromptTest(unittest.TestCase):
     def test_the_crew_is_told_how_the_marines_board_and_how_to_answer(self) -> None:
         text = system_prompt("it", BoardShip(True).snapshot(), [])
         for want in ("`board_ship`", "Kestrels, twelve marines each", "shuttle bay on Deck 8", "cannot dock through a shield", "ONE short line", "call_off", "Never say a boarding is on its way unless",
-                     "The Mandate does the same to the Aquila", "`boarding_options`"):
+                     "The Mandate does the same to the Aquila", "`boarding_options`", "`captain: true`", "if that boat is shot down he is in it"):
             self.assertIn(want, text)
 
     def test_no_boats_no_rule(self) -> None:

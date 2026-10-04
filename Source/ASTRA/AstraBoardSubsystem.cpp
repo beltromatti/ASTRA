@@ -3,6 +3,7 @@
 #include "ASTRA.h"
 #include "ASTRACharacter.h"
 #include "AstraArmory.h"
+#include "AstraBoardInterior.h"
 #include "AstraCombatFx.h"
 #include "AstraCombatant.h"
 #include "AstraCrewRoster.h"
@@ -104,6 +105,16 @@ void UAstraBoardSubsystem::Deinitialize()
 	}
 	Breaches.Reset();
 	Assault = FAssault();
+	if (Interior)
+	{
+		Interior->Destroy();
+	}
+	if (Cabin)
+	{
+		Cabin->Destroy();
+	}
+	Interior = nullptr;
+	Cabin = nullptr;
 	Super::Deinitialize();
 }
 
@@ -251,7 +262,7 @@ void UAstraBoardSubsystem::OpenSections()
 void UAstraBoardSubsystem::MakeSightOverride()
 {
 	// a round that reaches the Captain flies through the real level: the sim asks the world whether a man and the Captain see each other (a locker, a console is cover
-	// too); the bodies of the soldiers block the player's rounds (visibility) but not this (the camera channel)
+	// too); the bodies of the soldiers block the player's rounds (visibility) but not this (the camera channel). On another ship's decks the plan stands in its own zone of the world.
 	Fight.SightOverride = [this](const FVector& A, const FVector& B) -> bool
 	{
 		UWorld* W = GetWorld();
@@ -260,7 +271,8 @@ void UAstraBoardSubsystem::MakeSightOverride()
 			return true;
 		}
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(AstraBoardSight), false);
-		return !W->LineTraceTestByChannel(A, B, ECC_Camera, Q);
+		const FVector Off = WorldOffset();
+		return !W->LineTraceTestByChannel(A + Off, B + Off, ECC_Camera, Q);
 	};
 }
 
@@ -511,16 +523,16 @@ void UAstraBoardSubsystem::EnterObserved(const FString& SourceText, int32 Breach
 	Phase = EPhase::Active;
 }
 
-void UAstraBoardSubsystem::EndBoarding(const TCHAR* Why)
+void UAstraBoardSubsystem::EndBoarding(const TCHAR* Why, const FString& Told)
 {
 	if (Phase == EPhase::Active)
 	{
-		Tell(FString::Printf(TEXT("the boarding is called off (%s)"), Why), false);
+		Tell(Told.IsEmpty() ? FString::Printf(TEXT("the boarding is called off (%s)"), Why) : Told, !Told.IsEmpty());
 		Finish(Why);
 	}
 	else if (Assault.bOn)
 	{
-		Tell(FString::Printf(TEXT("the boarding is called off (%s): the boats turn back"), Why), false);
+		Tell(Told.IsEmpty() ? FString::Printf(TEXT("the boarding is called off (%s): the boats turn back"), Why) : Told, !Told.IsEmpty());
 		EndAssaultFight(Why);
 	}
 }
@@ -557,11 +569,11 @@ void UAstraBoardSubsystem::Finish(const TCHAR* Why)
 		{
 			L->Sim().Commandeer(*P, false, Un->Pos);          // (the marines of a fight on another ship are away: they come home with their boats)
 		}
-		}
-		if (Phase == EPhase::Active && Mode == EMode::Observed)
-		{
+	}
+	if (Phase == EPhase::Active && Mode == EMode::Observed)
+	{
 		OpenSections();
-		}
+	}
 	if (S && bRaisedAlert && S->GetAlert() == EAstraAlert::Red)
 	{
 		FString D;
@@ -596,6 +608,22 @@ void UAstraBoardSubsystem::ClearBodies()
 
 bool UAstraBoardSubsystem::CaptainFeet(FVector& OutFeet, float& OutYaw, bool& bOutLow, float& OutSpeed) const
 {
+	if (Ride != ERide::None && !(Ride == ERide::Aboard && bCaptainAboard))
+	{
+		return false;                                 // in a boat's troop bay: out of any fight
+	}
+	if (bCaptainInBeam)
+	{
+		return false;                                 // his pattern is in the beam: he is in no fight until it is set down
+	}
+	if (bTestCaptain)
+	{
+		OutFeet = TestFeet;
+		OutYaw = TestYaw;
+		bOutLow = false;
+		OutSpeed = 0.f;
+		return true;
+	}
 	APlayerController* PC = GetWorld() ? UGameplayStatics::GetPlayerController(GetWorld(), 0) : nullptr;
 	const ACharacter* Walker = PC ? Cast<ACharacter>(PC->GetPawn()) : nullptr;
 	if (!Walker || !Walker->GetCapsuleComponent())
@@ -603,6 +631,10 @@ bool UAstraBoardSubsystem::CaptainFeet(FVector& OutFeet, float& OutYaw, bool& bO
 		return false;                                 // in a Falcon, in a pod: out of the fight
 	}
 	OutFeet = Walker->GetActorLocation() - FVector(0.0, 0.0, Walker->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	if (Ride == ERide::Aboard && FMath::Abs(OutFeet.Z - RemoteOffset.Z) > 5.0e6)
+	{
+		return false;                                 // the ship's chain carried him out (to the Medbay): he is no longer on her decks
+	}
 	OutYaw = PC->GetControlRotation().Yaw;
 	const AASTRACharacter* AC = Cast<AASTRACharacter>(Walker);
 	bOutLow = AC && AC->GetPosture() != EAstraPosture::Standing;
@@ -622,7 +654,7 @@ void UAstraBoardSubsystem::SyncCaptain(float Dt)
 		ThreatCm = -1.f;
 		return;
 	}
-	Fight.SetCaptain(Feet, Yaw, bLow, Speed, bCapDown);
+	Fight.SetCaptain(Feet - WorldOffset(), Yaw, bLow, Speed, bCapDown);
 	// the nearest able boarder who sees the Captain (every quarter second)
 	ThreatT -= Dt;
 	if (ThreatT <= 0.f)
@@ -655,13 +687,17 @@ void UAstraBoardSubsystem::OnCaptainHit(const FBoardEvent& E)
 	{
 		return;
 	}
+	if (bTestCaptain)
+	{
+		return;                                       // (the bench's Captain has no pawn to wound and no end to reach)
+	}
 	const float Real = E.Dmg * BdCaptainArmor;
 	CapHp -= Real;
 	CapHurtAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 	CapHurtAmount = Real;
 	if (const FUnit* Shooter = Fight.Unit(E.Target))
 	{
-		CapHurtFrom = Shooter->Pos + FVector(0.f, 0.f, 150.f);
+		CapHurtFrom = Shooter->Pos + WorldOffset() + FVector(0.f, 0.f, 150.f);
 	}
 	if (const APlayerController* PC = GetWorld() ? UGameplayStatics::GetPlayerController(GetWorld(), 0) : nullptr)
 	{
@@ -741,6 +777,7 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 	}
 	TickArms(DeltaTime);                                     // the weapons: the posts' pictures near the Captain, the armourer's delivery (AstraBoardArms.cpp)
 	TickAssault(DeltaTime);                                  // the boats of an assault: what they do becomes the fight (AstraBoardAssault.cpp)
+	TickRide(DeltaTime);                                     // the Captain who goes along: the boat, the other ship's decks, the way home (AstraBoardRide.cpp)
 	if (Phase != EPhase::Active && Phase != EPhase::Over)
 	{
 		return;
@@ -794,7 +831,7 @@ void UAstraBoardSubsystem::Tick(float DeltaTime)
 
 void UAstraBoardSubsystem::Step(float Dt)
 {
-	if (Mode == EMode::Remote)
+	if (Mode == EMode::Remote && !bCaptainAboard)
 	{
 		RemoteStep(Dt);                                   // a fight on another ship: the simulation alone (no bodies, no Captain)
 		return;
@@ -802,7 +839,10 @@ void UAstraBoardSubsystem::Step(float Dt)
 	Since += Dt;
 	SyncCaptain(Dt);
 	Fight.Tick(Dt);
-	SyncLife();
+	if (Mode == EMode::Observed)
+	{
+		SyncLife();                                       // (the marines of a fight on another ship are away: VITA does not have them)
+	}
 	ProcessEvents(Dt);
 	CaptainFate(Dt);
 	for (const auto& KV : BodyOf)
@@ -815,7 +855,14 @@ void UAstraBoardSubsystem::Step(float Dt)
 	ManageBodies(Dt);
 	if (Fight.Over())
 	{
-		OnOutcome();
+		if (Mode == EMode::Remote)
+		{
+			OnRemoteOutcome();
+		}
+		else
+		{
+			OnOutcome();
+		}
 	}
 }
 
@@ -892,19 +939,20 @@ void UAstraBoardSubsystem::ManageBodies(float Dt)
 		return;
 	}
 	const FVector Eye = Cam->GetCameraLocation();
+	const FVector Off = WorldOffset();
 	struct FCand { int32 U; float Score; };
 	TArray<FCand> Cand;
 	for (const FUnit& U : Fight.Units())
 	{
-		if (U.bExternal || U.Act == EAct::Waiting || U.Act == EAct::Gone)
+		if (U.bExternal || U.Act == EAct::Waiting || U.Act == EAct::Gone || U.CarriedBy != INDEX_NONE)       // (a wounded man on a comrade's shoulders is not on the floor)
 		{
 			continue;
 		}
-		if (FMath::Abs(U.Pos.Z + 90.f - Eye.Z) > 520.f)
+		if (FMath::Abs(U.Pos.Z + Off.Z + 90.f - Eye.Z) > 520.f)
 		{
 			continue;                                  // another deck
 		}
-		const float D = (float)FVector::Dist2D(U.Pos, Eye);
+		const float D = (float)FVector::Dist2D(U.Pos + Off, Eye);
 		const bool bHas = BodyOf.Contains(U.Id);
 		if (D > (bHas ? BdBodyKeepCm : BdBodyReachCm) || ((U.Act == EAct::Dead || U.Act == EAct::Down) && D > 3800.f && !bHas))
 		{
@@ -956,7 +1004,8 @@ void UAstraBoardSubsystem::ManageBodies(float Dt)
 		{
 			bFemale = (Id % 5) == 2;                  // a few of the boarders are women
 		}
-		B->Bind(Id, U->Side == ESide::Mandate, U->Name, bFemale, U->Roster, U->Pos, U->Yaw);
+		B->SetWorldOffset(Off);
+		B->Bind(Id, U->Side == ESide::Mandate, U->Name, bFemale, U->Roster, U->Pos + Off, U->Yaw);
 		BodyOf.Add(Id, B);
 		B->Drive(*U, 0.f);
 		++Made;

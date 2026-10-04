@@ -54,7 +54,7 @@ void FAstraBoardSim::Respond(int32 SquadId)
 		Teams[SquadId].PlanT = 1.f;
 		if (IsAttacker(Teams[SquadId].Side))
 		{
-		BriefAttackers(SquadId);                           // (the attackers' standing order: the objective)
+			BriefAttackers(SquadId);                           // (the attackers' standing order: the objective)
 		}
 	}
 }
@@ -137,7 +137,7 @@ void FAstraBoardSim::StepSquad(FSquad& S, float Dt)
 			S.bContact = false;
 		}
 	}
-	if (S.Leader != INDEX_NONE && IsAttacker(S.Side) && (S.Trail.IsEmpty() || FVector::Dist2D(S.Trail.Last(), People[S.Leader].Pos) > 90.f))
+	if (S.Leader != INDEX_NONE && IsAttacker(S.Side) && (S.Trail.IsEmpty() || FVector::Dist(S.Trail.Last(), People[S.Leader].Pos) > 90.f))
 	{
 		S.Trail.Add(People[S.Leader].Pos);
 		if (S.Trail.Num() > 80)
@@ -157,15 +157,15 @@ void FAstraBoardSim::StepSquad(FSquad& S, float Dt)
 
 void FAstraBoardSim::Plan(FSquad& S)
 {
-// the attackers' own drill when nobody has told them anything; an order (the mind's) and the holders' defence are the other one
-if (IsAttacker(S.Side) && !S.bOrdered)
-{
-PlanAttack(S);
-}
-else
-{
-PlanDefend(S);
-}
+	// the attackers' own drill when nobody has told them anything; an order (the mind's) and the holders' defence are the other one
+	if (IsAttacker(S.Side) && !S.bOrdered)
+	{
+		PlanAttack(S);
+	}
+	else
+	{
+		PlanDefend(S);
+	}
 }
 
 // ================================================================================================================== moving a squad
@@ -178,7 +178,7 @@ void FAstraBoardSim::ColumnTo(FSquad& S, const FVector& To, float Speed)
 		return;
 	}
 	FUnit& L = People[S.Leader];
-	if (L.Act != EAct::Reload && (L.Path.IsEmpty() || FVector::Dist2D(L.Dest, To) > 150.f) && FVector::Dist2D(L.Pos, To) > 120.f)
+	if (L.Act != EAct::Reload && (L.Path.IsEmpty() || FVector::Dist(L.Dest, To) > 150.f) && FVector::Dist(L.Pos, To) > 120.f)
 	{
 		L.Slot = INDEX_NONE;
 		GoTo(L, To, Speed);
@@ -200,8 +200,8 @@ void FAstraBoardSim::ColumnTo(FSquad& S, const FVector& To, float Speed)
 		// the place in the file: where the leader was a couple of metres a man ago
 		const int32 Back = FMath::Min(S.Trail.Num() - 1, Slot * 2 + 1);
 		const FVector Want = Back >= 0 ? S.Trail[S.Trail.Num() - 1 - Back] : L.Pos;
-		const float Gap = (float)FVector::Dist2D(U.Pos, Want);
-		if (Gap > 130.f && (U.Path.IsEmpty() || FVector::Dist2D(U.Dest, Want) > 220.f))
+		const float Gap = (float)FVector::Dist(U.Pos, Want);
+		if (Gap > 130.f && (U.Path.IsEmpty() || FVector::Dist(U.Dest, Want) > 220.f))
 		{
 			GoTo(U, Want, FMath::Min(Speed * 1.12f, Tuning.JogCmS * 1.1f));
 		}
@@ -214,7 +214,7 @@ void FAstraBoardSim::ColumnTo(FSquad& S, const FVector& To, float Speed)
 }
 
 /** Fighting positions round a place: each man a corner of his own, the ones that cover the way the enemy comes first. */
-void FAstraBoardSim::HoldAround(FSquad& S, const FVector& At, float Radius)
+void FAstraBoardSim::HoldAround(FSquad& S, const FVector& At, float Radius, bool bInside)
 {
 	// the way the enemy comes from: what is known of them, else the planned route's start
 	FVector Approach = Mis.BreachPos;
@@ -240,7 +240,7 @@ void FAstraBoardSim::HoldAround(FSquad& S, const FVector& At, float Radius)
 	for (const int32 Pi : Map->GetComps()[HomeComp].Portals)
 	{
 		const FBoardPortal& P = Map->GetPortals()[Pi];
-		if (!P.bVertical() && FVector::Dist2D(P.Pos, At) < Radius + 300.f)
+		if (!bInside && !P.bVertical() && FVector::Dist2D(P.Pos, At) < Radius + 300.f)
 		{
 			Comps.AddUnique(P.Other(HomeComp));
 		}
@@ -286,7 +286,7 @@ void FAstraBoardSim::HoldAround(FSquad& S, const FVector& At, float Radius)
 		if (Pick == INDEX_NONE)
 		{
 			// no corner left: he stands near the place
-			if (U.Path.IsEmpty() && FVector::Dist2D(U.Pos, At) > 400.f)
+			if (U.Path.IsEmpty() && FVector::Dist(U.Pos, At) > 400.f)
 			{
 				GoTo(U, Map->Inset(HomeComp, At, 60.f), Tuning.JogCmS);
 			}
@@ -395,23 +395,23 @@ bool FAstraBoardSim::FlankFor(FSquad& S, const FVector& Enemy)
 /** The squad leaves the ship by the breach it came in by (the men who are there go; the others make for it). */
 void FAstraBoardSim::WithdrawSquad(FSquad& S, const TArray<int32>& Able)
 {
-for (const int32 M : Able)
-{
-FUnit& U = People[M];
-if (U.Comp == BreachCompOf(S) && FVector::Dist2D(U.Pos, BreachPosOf(S)) < 420.f)
-{
-U.Act = EAct::Gone;
-U.Path.Reset();
-++Stats.Exited[(int32)U.Side];
-Emit(EEvent::Exit, U.Id, INDEX_NONE, U.Pos, U.Pos, 0.f, false, U.Name);
-continue;
-}
-if (U.Act != EAct::Reload && (U.Path.IsEmpty() || FVector::Dist2D(U.Dest, BreachPosOf(S)) > 200.f))
-{
-U.Slot = INDEX_NONE;
-GoTo(U, BreachPosOf(S), Tuning.JogCmS * 1.05f, true);
-}
-}
+	for (const int32 M : Able)
+	{
+		FUnit& U = People[M];
+		if (U.Comp == BreachCompOf(S) && FVector::Dist2D(U.Pos, BreachPosOf(S)) < 420.f)
+		{
+			U.Act = EAct::Gone;
+			U.Path.Reset();
+			++Stats.Exited[(int32)U.Side];
+			Emit(EEvent::Exit, U.Id, INDEX_NONE, U.Pos, U.Pos, 0.f, false, U.Name);
+			continue;
+		}
+		if (U.Act != EAct::Reload && (U.Path.IsEmpty() || FVector::Dist(U.Dest, BreachPosOf(S)) > 200.f))
+		{
+			U.Slot = INDEX_NONE;
+			GoTo(U, BreachPosOf(S), Tuning.JogCmS * 1.05f, true);
+		}
+	}
 }
 
 void FAstraBoardSim::PlanAttack(FSquad& S)
@@ -423,7 +423,7 @@ void FAstraBoardSim::PlanAttack(FSquad& S)
 	TArray<int32> Able;
 	for (const int32 M : S.Members)
 	{
-		if (People[M].Able())
+		if (People[M].Able() && People[M].Carrying == INDEX_NONE)               // (a man who carries a casualty out is not the squad's to move)
 		{
 			Able.Add(M);
 		}
@@ -455,12 +455,12 @@ void FAstraBoardSim::PlanAttack(FSquad& S)
 	{
 	case ETask::Withdraw:
 	{
-	WithdrawSquad(S, Able);
-	break;
+		WithdrawSquad(S, Able);
+		break;
 	}
 	case ETask::Advance:
 	{
-	if (L.Comp == S.TargetComp || FVector::Dist2D(L.Pos, S.TargetPos) < 600.f)
+		if (L.Comp == S.TargetComp || FVector::Dist(L.Pos, S.TargetPos) < 600.f)
 		{
 			S.Task = ETask::Hold;                          // the objective: they hold it
 			S.TaskT = 0.f;
@@ -469,7 +469,7 @@ void FAstraBoardSim::PlanAttack(FSquad& S)
 		}
 		// the way in: not getting any nearer with the enemy about for long enough, the squad presses the attack (a boarding party that sits at a door loses the ship it came to take)
 		{
-			const float Dist = (float)FVector::Dist2D(L.Pos, S.TargetPos);
+			const float Dist = (float)FVector::Dist(L.Pos, S.TargetPos);
 			if (Dist < S.BestDist - 400.f)
 			{
 				S.BestDist = Dist;
@@ -573,7 +573,7 @@ void FAstraBoardSim::PlanAttack(FSquad& S)
 		{
 			FUnit& U = People[M];
 			U.Slot = INDEX_NONE;
-			if (U.Act != EAct::Reload && (U.Path.IsEmpty() || FVector::Dist2D(U.Dest, EnemyAt) > 300.f))
+			if (U.Act != EAct::Reload && (U.Path.IsEmpty() || FVector::Dist(U.Dest, EnemyAt) > 300.f))
 			{
 				GoTo(U, EnemyAt, Tuning.JogCmS);
 			}
@@ -583,8 +583,8 @@ void FAstraBoardSim::PlanAttack(FSquad& S)
 	case ETask::Hold:
 	default:
 	{
-		// holding the objective: corners round it, facing the ways in
-		HoldAround(S, S.TargetPos, 1100.f);
+		// holding the objective: corners in it, facing the ways in (the attackers hold it from inside: a squad that stands in the corridor outside its door holds nothing)
+		HoldAround(S, S.TargetPos, 1100.f, true);
 		break;
 	}
 	}
@@ -688,7 +688,7 @@ void FAstraBoardSim::StepAmbush()
 		{
 			if (IsAttacker(People[P.Unit].Side))
 			{
-			FirstIn = FMath::Min(FirstIn, P.At);
+				FirstIn = FMath::Min(FirstIn, P.At);
 			}
 		}
 		if (FirstIn > 1.0e8f)
@@ -771,7 +771,7 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 	TArray<int32> Able;
 	for (const int32 M : S.Members)
 	{
-		if (People[M].Able())
+		if (People[M].Able() && People[M].Carrying == INDEX_NONE)
 		{
 			Able.Add(M);
 		}
@@ -828,7 +828,7 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 			Task = ETask::Assault;
 			At = Enemy;
 		}
-		else if (FVector::Dist2D(L.Pos, Home) > 900.f)
+		else if (FVector::Dist(L.Pos, Home) > 900.f)
 		{
 			Task = ETask::Advance;
 			At = Home;
@@ -875,8 +875,8 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 			{
 				continue;
 			}
-			const float D = (float)FVector::Dist2D(U.Pos, C->Pos);
-			if (D > 650.f && (U.Path.IsEmpty() || FVector::Dist2D(U.Dest, C->Pos) > 300.f))
+			const float D = (float)FVector::Dist(U.Pos, C->Pos);
+			if (D > 650.f && (U.Path.IsEmpty() || FVector::Dist(U.Dest, C->Pos) > 300.f))
 			{
 				U.Slot = INDEX_NONE;
 				GoTo(U, C->Pos, Tuning.JogCmS);
@@ -904,7 +904,7 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 		{
 			FUnit& U = People[M];
 			bNear |= FVector::Dist(U.Pos, C->Pos) < 260.f;
-			if (U.Path.IsEmpty() && FVector::Dist2D(U.Pos, C->Pos) > 200.f)
+			if (U.Path.IsEmpty() && FVector::Dist(U.Pos, C->Pos) > 200.f)
 			{
 				U.Slot = INDEX_NONE;
 				GoTo(U, C->Pos, Tuning.JogCmS * 1.1f);
@@ -933,21 +933,21 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 	}
 	case ETask::Withdraw:
 	{
-	WithdrawSquad(S, Able);
-	break;
+		WithdrawSquad(S, Able);
+		break;
 	}
 	case ETask::Hold:
 	{
-	HoldAround(S, At, Radius);
-	break;
+		HoldAround(S, At, Radius);
+		break;
 	}
 	case ETask::Assault:
 	{
-	for (const int32 M : Able)
-	{
-	FUnit& U = People[M];
-	U.Slot = INDEX_NONE;
-	if (U.Act != EAct::Reload && (U.Path.IsEmpty() || FVector::Dist2D(U.Dest, At) > 300.f))
+		for (const int32 M : Able)
+		{
+			FUnit& U = People[M];
+			U.Slot = INDEX_NONE;
+			if (U.Act != EAct::Reload && (U.Path.IsEmpty() || FVector::Dist(U.Dest, At) > 300.f))
 			{
 				GoTo(U, At, Tuning.JogCmS);
 			}
@@ -957,9 +957,9 @@ void FAstraBoardSim::PlanDefend(FSquad& S)
 	case ETask::Advance:
 	case ETask::FallBack:
 	{
-			if (!S.bContact || Task == ETask::FallBack)
+		if (!S.bContact || Task == ETask::FallBack)
 		{
-			if (FVector::Dist2D(L.Pos, At) < 500.f)
+			if (FVector::Dist(L.Pos, At) < 500.f)
 			{
 				// there: they take the corners of the place
 				HoldAround(S, At, Radius);

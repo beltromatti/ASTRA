@@ -2,11 +2,14 @@
 
 #include "ASTRA.h"
 #include "AstraArmsRig.h"
+#include "AstraBoardInterior.h"
 #include "AstraBoardMap.h"
 #include "AstraBoardPlans.h"
 #include "AstraBoardScene.h"
 #include "AstraBoardSim.h"
 #include "AstraDamageMap.h"
+#include "AstraFleetInterior.h"
+#include "AstraFleetPlan.h"
 #include "AstraWeapon.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AttributesRuntime.h"
@@ -66,8 +69,12 @@ namespace
 			BSET(MarineSkill) BSET(MandateSkill) BSET(LeaderSkill) BSET(MarineArmor) BSET(MandateArmor) BSET(AcquireMinS) BSET(AcquireMaxS) BSET(HideMinS) BSET(HideMaxS)
 			BSET(PeekS) BSET(JogCmS) BSET(WalkCmS) BSET(CoverCmS) BSET(SuppressDecay) BSET(SuppressPerRound) BSET(SuppressMiss) BSET(CoverFactor) BSET(MoveFactor)
 			BSET(RangeFullCm) BSET(RangeFarCm) BSET(RangeMaxCm) BSET(DownBleedMinS) BSET(DownBleedMaxS) BSET(MandateRetreatLoss) BSET(MarineRetreatLoss) BSET(HoldS) BSET(HearCm) BSET(SensorDelayS) BSET(CutS)
+			BSET(EvacPickupS) BSET(EvacCmS) BSET(EvacReachCm) BSET(EvacClearCm) BSET(EvacBleedBonusS)
 #undef BSET
 			if (K.Equals(TEXT("bFlank"), ESearchCase::IgnoreCase)) { T.bFlank = F > 0.5f; continue; }
+			if (K.Equals(TEXT("bEvacuate"), ESearchCase::IgnoreCase)) { T.bEvacuate = F > 0.5f; continue; }
+			if (K.Equals(TEXT("LethalAquila"), ESearchCase::IgnoreCase)) { T.LethalScale[0] = F; continue; }
+			if (K.Equals(TEXT("LethalMandate"), ESearchCase::IgnoreCase)) { T.LethalScale[1] = F; continue; }
 			if (K.Equals(TEXT("bCover"), ESearchCase::IgnoreCase)) { T.bCover = F > 0.5f; continue; }
 			UE_LOG(LogASTRA, Warning, TEXT("[Board] no tuning named %s"), *K);
 		}
@@ -196,7 +203,7 @@ namespace
 						{
 							continue;
 						}
-						static const TCHAR* Names[] = {TEXT("shot"), TEXT("hit"), TEXT("DOWN"), TEXT("DIED"), TEXT("RETREAT"), TEXT("EXIT"), TEXT("contact"), TEXT("rescue"), TEXT("reload"), TEXT("spawn"), TEXT("ORDER"), TEXT("OUTCOME"), TEXT("CUT")};
+						static const TCHAR* Names[] = {TEXT("shot"), TEXT("hit"), TEXT("DOWN"), TEXT("DIED"), TEXT("RETREAT"), TEXT("EXIT"), TEXT("contact"), TEXT("rescue"), TEXT("reload"), TEXT("spawn"), TEXT("ORDER"), TEXT("OUTCOME"), TEXT("CUT"), TEXT("CARRIED")};
 						const FUnit* U = Sim.Unit(E.Unit);
 						const FUnit* T = Sim.Unit(E.Target);
 						BNote(FString::Printf(TEXT("t=%5.1f %-7s %s%s%s %s"), E.T, Names[(int32)E.Type], U ? *U->Name : TEXT(""), T ? *FString::Printf(TEXT(" -> %s"), *T->Name) : TEXT(""),
@@ -1558,6 +1565,37 @@ static void BoardScenarioRules(FRig& Rig, int32 Seed)
 		}
 		BCheck("wounds: bleeding", Fallen != INDEX_NONE && DiedAt > 60.0 && DiedAt < 140.0, FString::Printf(TEXT("a man down and alone died after %.0f s"), DiedAt));
 	}
+	// a boarding by boats carries its wounded out: a free comrade comes, gets him up (he stops bleeding), takes him to the hatch and the boat; the same man with nobody to come bled out above
+	{
+		FAstraBoardSim Sim;
+		Sim.Init(Rig.Map.ToSharedRef(), Seed);
+		Sim.Tuning = Rig.Tuning;
+		Sim.Tuning.bEvacuate = true;
+		const FVector Hatch(Lane.Start.X + 300.0, 0.0, Lane.Start.Z);
+		Sim.SetMission(ESide::Aquila, Lane.FirstComp, Hatch, INDEX_NONE);
+		const int32 Sq = Sim.AddSquad(ESide::Aquila, TEXT("A"));
+		TArray<int32> Men;
+		for (int32 k = 0; k < 8; ++k)
+		{
+			Men.Add(Sim.AddMarine(TEXT("M"), INDEX_NONE, FVector(Lane.Start.X + 600.0 + 120.0 * k, 0, Lane.Start.Z), k == 0, Sq));
+		}
+		int32 Fallen = INDEX_NONE;
+		for (int32 k = 1; k < Men.Num() && Fallen == INDEX_NONE; ++k)
+		{
+			for (int32 h = 0; h < 9; ++h) { Sim.HitUnit(Men[k], 17.f, false); }
+			Fallen = Sim.Unit(Men[k])->Act == EAct::Down ? Men[k] : INDEX_NONE;
+		}
+		double OutAt = -1.0;
+		bool bDied = false;
+		while (Fallen != INDEX_NONE && Sim.Time() < 240.0 && OutAt < 0.0)
+		{
+			Sim.Tick(0.5f);
+			bDied |= Sim.Unit(Fallen)->Act == EAct::Dead;
+			OutAt = Sim.Unit(Fallen)->Act == EAct::Gone ? Sim.Time() : -1.0;
+		}
+		BCheck("wounds: carried out", Fallen != INDEX_NONE && !bDied && OutAt > 0.0 && Sim.Book().Carried[0] == 1 && Sim.Book().Down[0] == 0,
+		       FString::Printf(TEXT("a man down with comrades about was carried to the hatch and out in %.0f s (%d carried, %d still down)"), OutAt, Sim.Book().Carried[0], Sim.Book().Down[0]));
+	}
 	// a sealed bulkhead: the Mandate cut through it (a pressure bulkhead of Deck 8 with a room each side, every pressure bulkhead of the deck sealed: the nearest is the cheapest way through)
 	{
 		const FAstraBoardMap& M = *Rig.Map;
@@ -1638,7 +1676,7 @@ static void BoardScenarioPlans(const FString& Only)
 	}
 	if (Classes.IsEmpty())
 	{
-		BCheck("plan of a class", false, TEXT("no plans in data/ship/plans (tools/ship_plan_stopgap.py, or FLOTTA-VIVA's)"));
+		BCheck("plan of a class", false, TEXT("no plans in data/ship/plans (FLOTTA-VIVA's: art/blender/ship_class_plans.py)"));
 		return;
 	}
 	for (const FName& K : Classes)
@@ -1697,10 +1735,168 @@ static void BoardScenarioPlans(const FString& Only)
 			BadPortal += (!A.IsInsideOrOn(Po.Pos + FVector(0, 0, 50)) || !B.IsInsideOrOn(Po.Pos + FVector(0, 0, 50))) ? 1 : 0;
 		}
 		const bool bOk = Missing == 0 && NoWay == 0 && P->Docks.Num() >= 2 && BadPortal <= M.GetPortals().Num() / 50;
-		BCheck("plan of a class", bOk, FString::Printf(TEXT("%s%s: %d compartments, %d portals (%d off their faces), %d docks, %d posts, crew %d; shortest way from a dock:%s the longest %.0f m (%d missing, %d without a way)"),
-			*K.ToString(), P->bStopgap ? TEXT(" (stopgap)") : TEXT(""), M.GetComps().Num(), M.GetPortals().Num(), BadPortal, P->Docks.Num(), P->Garrison.Num(), P->Crew, *Lines, MaxMetres, Missing, NoWay));
+		BCheck("plan of a class", bOk, FString::Printf(TEXT("%s: %d compartments, %d portals (%d off their faces), %d docks, %d posts, crew %d; shortest way from a dock:%s the longest %.0f m (%d missing, %d without a way)"),
+			*K.ToString(), M.GetComps().Num(), M.GetPortals().Num(), BadPortal, P->Docks.Num(), P->Garrison.Num(), P->Crew, *Lines, MaxMetres, Missing, NoWay));
 		(void)Metres;
 		(void)Routes;
+	}
+}
+
+// ================================================================================================================== the inside of a boarded ship as solid geometry (F5.2: the Captain goes along)
+
+/** Every room of a class's plan made solid, and the simulation's own routes walked through it: a way a marine runs that meets a wall (a door whose gap is not where the plan puts it) is a fault of the builder. */
+static void BoardScenarioInterior(const FString& Only, const FString& DumpDir, int32 Seed)
+{
+	TArray<FName> Classes;
+	AstraBoardPlans::ClassesWithPlans(Classes);
+	if (!Only.IsEmpty())
+	{
+		Classes = {FName(*Only)};
+	}
+	for (const FName& K : Classes)
+	{
+		FString Why;
+		const TSharedPtr<FBoardShipPlan> P = AstraBoardPlans::Load(K, Why);
+		if (!P.IsValid())
+		{
+			BCheck("interior of a class", false, FString::Printf(TEXT("%s: %s"), *K.ToString(), *Why));
+			continue;
+		}
+		const FAstraBoardMap& M = *P->Map;
+		const double T0 = FPlatformTime::Seconds();
+		TArray<AstraBoardInterior::FSlab> Slabs;
+		int32 PerKind[6] = {0, 0, 0, 0, 0, 0};
+		for (int32 i = 0; i < M.GetComps().Num(); ++i)
+		{
+			AstraBoardInterior::BuildComp(M, i, Slabs);
+		}
+		for (const AstraBoardInterior::FSlab& S : Slabs)
+		{
+			++PerKind[(int32)S.Kind];
+		}
+		const double BuildMs = (FPlatformTime::Seconds() - T0) * 1000.0;
+		TSet<int32> OpenDoors;                                         // the doors the fight opens or cuts: their leaves are not walls to a route that goes through them
+		for (int32 d = 0; d < P->Dmg->Doors.Num(); ++d)
+		{
+			OpenDoors.Add(d);
+		}
+		// the ways: each portal of the plan, walked from the middle of one room through its middle to the middle of the other, at a man's knee and at his chest: a gap that is not where the
+		// plan puts its door, or too narrow for a man, or a second wall in the way, shows here (the legs end on the doorway's own face: nothing along a wall is tried)
+		int32 Ways = 0, Blocked = 0, Narrow = 0;
+		FString First;
+		for (const FBoardPortal& Po : M.GetPortals())
+		{
+			if (Po.bVertical())
+			{
+				continue;
+			}
+			++Ways;
+			Narrow += Po.Half * 2.f < 90.f ? 1 : 0;
+			const FVector Mid(Po.Pos.X, Po.Pos.Y, FMath::Max(M.GetComps()[Po.A].FloorZ(), M.GetComps()[Po.B].FloorZ()));
+			// a point a step either side of the doorway, on the line through its middle along its normal
+			const FVector2D N = Po.Normal;
+			const FVector SideA = Mid - FVector(N.X, N.Y, 0.0) * 130.0, SideB = Mid + FVector(N.X, N.Y, 0.0) * 130.0;
+			// a way through within the doorway's width: five lines side by side along it, one must be free at a man's knee and chest
+			const FVector Al(Po.Along.X, Po.Along.Y, 0.0);
+			bool bBlock = true;
+			const AstraBoardInterior::FSlab* Hit = nullptr;
+			for (int32 k = -2; k <= 2 && bBlock; ++k)
+			{
+				const FVector Shift = Al * (Po.Half * 0.9 * k / 2.0);
+				bool bThis = false;
+				for (const double Up : {40.0, 120.0})
+				{
+					bThis |= AstraBoardInterior::SegmentBlocked(Slabs, SideA + Shift + FVector(0, 0, Up), SideB + Shift + FVector(0, 0, Up), &OpenDoors, &Hit);
+				}
+				bBlock = bThis;
+			}
+			if (bBlock)
+			{
+				++Blocked;
+				if (First.IsEmpty())
+				{
+					static const TCHAR* Kinds[] = {TEXT("wall"), TEXT("floor"), TEXT("ceiling"), TEXT("frame"), TEXT("bulkhead leaf"), TEXT("strip")};
+					First = FString::Printf(TEXT("the way between %s and %s at (%.0f, %.0f, %.0f), stopped by a %s of %s at (%.0f, %.0f, %.0f) half (%.0f, %.0f, %.0f)"), *M.Describe(Po.A), *M.Describe(Po.B), Po.Pos.X, Po.Pos.Y, Po.Pos.Z,
+					                        Hit ? Kinds[(int32)Hit->Kind] : TEXT("?"), Hit ? *M.Describe(Hit->Comp) : TEXT("?"), Hit ? Hit->Centre.X : 0.0, Hit ? Hit->Centre.Y : 0.0, Hit ? Hit->Centre.Z : 0.0,
+					                        Hit ? Hit->Half.X : 0.0, Hit ? Hit->Half.Y : 0.0, Hit ? Hit->Half.Z : 0.0);
+				}
+			}
+		}
+		// and a wall is a wall: from the middle of a room to a point outside its box through a side with no portal is stopped
+		int32 Leaks = 0, Tried = 0;
+		FRandomStream Rng(Seed);
+		for (int32 n = 0; n < 400 && M.GetComps().Num() > 2; ++n)
+		{
+			const int32 Ci = Rng.RandHelper(M.GetComps().Num());
+			const FBox& B = M.GetComps()[Ci].Box;
+			if (B.GetSize().X < 200.0 || B.GetSize().Y < 200.0)
+			{
+				continue;
+			}
+			const int32 Side = Rng.RandHelper(4);
+			const double Along = Rng.FRandRange(0.15f, 0.85f);
+			const FVector C = B.GetCenter();
+			FVector Out;
+			bool bHasPortal = false;
+			for (const int32 Pi : M.GetComps()[Ci].Portals)
+			{
+				const FBoardPortal& Po = M.GetPortals()[Pi];
+				if (Po.bVertical())
+				{
+					continue;
+				}
+				const double Dx = Side < 2 ? FMath::Abs(Po.Pos.X - (Side == 0 ? B.Max.X : B.Min.X)) : 1.0e9, Dy = Side >= 2 ? FMath::Abs(Po.Pos.Y - (Side == 2 ? B.Max.Y : B.Min.Y)) : 1.0e9;
+				bHasPortal |= FMath::Min(Dx, Dy) < 120.0;
+			}
+			if (bHasPortal)
+			{
+				continue;                                            // (a side with a doorway is not solid all along)
+			}
+			const FVector A(C.X, C.Y, B.Min.Z + 90.0);
+			Out = Side < 2 ? FVector(Side == 0 ? B.Max.X + 60.0 : B.Min.X - 60.0, FMath::Lerp(B.Min.Y, B.Max.Y, Along), A.Z) : FVector(FMath::Lerp(B.Min.X, B.Max.X, Along), Side == 2 ? B.Max.Y + 60.0 : B.Min.Y - 60.0, A.Z);
+			++Tried;
+			Leaks += AstraBoardInterior::SegmentBlocked(Slabs, A, Out, &OpenDoors) ? 0 : 1;
+		}
+		BCheck("interior of a class", Blocked == 0 && Leaks == 0 && Ways > 20 && PerKind[(int32)AstraBoardInterior::ESlab::Wall] > M.GetComps().Num(),
+		       FString::Printf(TEXT("%s: %d rooms made solid in %.0f ms: %d solids (%d walls, %d floors and ceilings, %d frames, %d bulkhead leaves, %d strips of light); %d doorways and openings walked through: %d meet a wall (%d too narrow for a man); %d walls tried: %d leak%s%s"),
+		                       *K.ToString(), M.GetComps().Num(), BuildMs, Slabs.Num(), PerKind[0], PerKind[1] + PerKind[2], PerKind[3], PerKind[4], PerKind[5], Ways, Blocked, Narrow, Tried, Leaks,
+		                       First.IsEmpty() ? TEXT("") : TEXT(": "), *First));
+		if (!DumpDir.IsEmpty())
+		{
+			// the solids as numbers, for the offline view (Saved/scratch/interior_view.py): kind, centre, half sizes (cm)
+			TArray<TSharedPtr<FJsonValue>> List;
+			for (const AstraBoardInterior::FSlab& S : Slabs)
+			{
+				TArray<TSharedPtr<FJsonValue>> Row;
+				Row.Add(MakeShared<FJsonValueNumber>((int32)S.Kind));
+				for (const double V : {S.Centre.X, S.Centre.Y, S.Centre.Z, S.Half.X, S.Half.Y, S.Half.Z})
+				{
+					Row.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 10.0) / 10.0));
+				}
+				Row.Add(MakeShared<FJsonValueNumber>(S.Comp));
+				List.Add(MakeShared<FJsonValueArray>(Row));
+			}
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetStringField(TEXT("class"), K.ToString());
+			O->SetArrayField(TEXT("slabs"), List);
+			TArray<TSharedPtr<FJsonValue>> Docks;
+			for (const FBoardShipPlan::FDock& D : P->Docks)
+			{
+				// where the boarders come in: the hatch's point on the skin put inside its room (the same the scene does)
+				FVector In = M.Inset(D.Comp, D.Pos, 70.f);
+				In.Z = M.GetComps()[D.Comp].FloorZ();
+				TArray<TSharedPtr<FJsonValue>> Row;
+				for (const double V : {In.X, In.Y, In.Z})
+				{
+					Row.Add(MakeShared<FJsonValueNumber>(V));
+				}
+				Docks.Add(MakeShared<FJsonValueArray>(Row));
+			}
+			O->SetArrayField(TEXT("docks"), Docks);
+			const FString Path = FPaths::IsRelative(DumpDir) ? FPaths::Combine(FPaths::ProjectDir(), DumpDir) : DumpDir;
+			IFileManager::Get().MakeDirectory(*Path, true);
+			FFileHelper::SaveStringToFile(Json(O), *FPaths::Combine(Path, FString::Printf(TEXT("interior_%s.json"), *K.ToString())));
+		}
 	}
 }
 
@@ -1759,9 +1955,9 @@ static void BoardScenarioAttack(const FString& Class, int32 Seed, int32 Seeds, c
 		Spec.Roaming = S.Roaming;
 		Spec.bSweep = S.bSweep;
 		int32 Wins[4] = {0, 0, 0, 0};             // the holders hold, the attackers repelled, take, timed out
-		double T = 0.0, LossAtt = 0.0, LossDef = 0.0, Contact = 0.0, Flanks = 0.0, Ms = 0.0, MsMax = 0.0, Defenders = 0.0;
+		double T = 0.0, LossAtt = 0.0, LossDef = 0.0, DeadAtt = 0.0, Contact = 0.0, Flanks = 0.0, Ms = 0.0, MsMax = 0.0, Defenders = 0.0;
 		int32 Ran = 0, Bad = 0;
-		FString Failed;
+		FString Failed, NoEnd;
 		for (int32 s = 0; s < Seeds; ++s)
 		{
 			AstraBoardScene::FResult Scene;
@@ -1774,9 +1970,14 @@ static void BoardScenarioAttack(const FString& Class, int32 Seed, int32 Seeds, c
 			++Ran;
 			const int32 A = (int32)S.Attacker, D = 1 - A;
 			Wins[R.Outcome == EOutcome::DefenderHolds ? 0 : R.Outcome == EOutcome::AttackerRepelled ? 1 : R.Outcome == EOutcome::AttackerTakes ? 2 : 3]++;
+			if (R.Outcome != EOutcome::DefenderHolds && R.Outcome != EOutcome::AttackerRepelled && R.Outcome != EOutcome::AttackerTakes)
+			{
+				NoEnd += FString::Printf(TEXT("%s%d"), NoEnd.IsEmpty() ? TEXT("") : TEXT(","), Seed + s);
+			}
 			T += R.T;
-			LossAtt += R.Book.Killed[A] + R.Book.Down[A];
-			LossDef += R.Book.Killed[D] + R.Book.Down[D];
+			LossAtt += R.Book.Killed[A] + R.Book.Down[A] + R.Book.Carried[A];
+			DeadAtt += R.Book.Killed[A];
+			LossDef += R.Book.Killed[D] + R.Book.Down[D] + R.Book.Carried[D];
 			Contact += R.Book.FirstContactT;
 			Flanks += R.Book.Flanks;
 			Bad += R.BadPos;
@@ -1790,8 +1991,9 @@ static void BoardScenarioAttack(const FString& Class, int32 Seed, int32 Seeds, c
 			return;
 		}
 		const double N = Ran;
-		BNote(FString::Printf(TEXT("%s: %d fights on the %s against %.0f defenders — attackers take it %d, defenders hold %d, attackers repelled %d, no end %d; ends at %.0f s, first contact %.0f s; attackers lost %.1f of %d, defenders lost %.1f; flanks %.1f; %.3f ms a step (worst %.1f)"),
-		                      S.Name, Ran, *Class, Defenders / N, Wins[2], Wins[0], Wins[1], Wins[3], T / N, Contact / N, LossAtt / N, S.Men, LossDef / N, Flanks / N, Ms / N, MsMax));
+		BNote(FString::Printf(TEXT("%s: %d fights on the %s against %.0f defenders — attackers take it %d, defenders hold %d, attackers repelled %d, no end %d; ends at %.0f s, first contact %.0f s; attackers lost %.1f of %d (%.1f dead, %.1f wounded), defenders lost %.1f; flanks %.1f; %.3f ms a step (worst %.1f)%s%s"),
+		                      S.Name, Ran, *Class, Defenders / N, Wins[2], Wins[0], Wins[1], Wins[3], T / N, Contact / N, LossAtt / N, S.Men, DeadAtt / N, (LossAtt - DeadAtt) / N, LossDef / N, Flanks / N, Ms / N, MsMax,
+		                      NoEnd.IsEmpty() ? TEXT("") : TEXT("; no end at seeds "), *NoEnd));
 		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 		O->SetStringField(TEXT("setup"), S.Name);
 		O->SetNumberField(TEXT("fights"), Ran);
@@ -1801,6 +2003,7 @@ static void BoardScenarioAttack(const FString& Class, int32 Seed, int32 Seeds, c
 		O->SetNumberField(TEXT("timed_out"), Wins[3]);
 		O->SetNumberField(TEXT("end_s"), T / N);
 		O->SetNumberField(TEXT("loss_attackers"), LossAtt / N);
+		O->SetNumberField(TEXT("dead_attackers"), DeadAtt / N);
 		O->SetNumberField(TEXT("loss_defenders"), LossDef / N);
 		Rec->SetObjectField(FString::Printf(TEXT("setup%d"), si), O);
 		if (si == 0)
@@ -1811,6 +2014,119 @@ static void BoardScenarioAttack(const FString& Class, int32 Seed, int32 Seeds, c
 	}
 	BRecord->SetObjectField(TEXT("attack"), Rec);
 }
+// ================================================================================================================== a ship the war has shot at (FLOTTA-VIVA's inside, then the marines)
+
+/** FLOTTA-VIVA's inside of a class's ship is shot at (so many blows, then a minute), its snapshot is taken as the host takes it, and the marines go aboard that ship: with the people the war left, where it
+ *  left them. The more she has been hit, the fewer hold her and the cheaper she is; a ship that is shot to pieces has a handful of wounded. Also: the war's rooms are the plan's rooms. */
+static void BoardScenarioWar(const FString& Class, int32 Seed, int32 Seeds, const FTuning& Tuning)
+{
+	FString Why;
+	const TSharedPtr<FBoardShipPlan> P = AstraBoardPlans::Load(FName(*Class), Why);
+	const TSharedPtr<const FFleetClassPlan> FP = FAstraFleetPlans::Find(FName(*Class), true);
+	if (!P.IsValid() || !FP.IsValid())
+	{
+		BCheck("war: the ship", false, FString::Printf(TEXT("%s: %s"), *Class, P.IsValid() ? TEXT("FLOTTA-VIVA has no plan of it") : *Why));
+		return;
+	}
+	bool bSame = FP->Map->Comps.Num() == P->Dmg->Comps.Num();
+	for (int32 i = 0; bSame && i < FP->Map->Comps.Num(); ++i)
+	{
+		bSame = FP->Map->Comps[i].Id == P->Dmg->Comps[i].Id;
+	}
+	BCheck("war: the plans agree", bSame, FString::Printf(TEXT("%s: the war's rooms and the boarding's are the same %d rooms in the same order"), *Class, FP->Map->Comps.Num()));
+	struct FState { const TCHAR* Name; int32 Blows; bool bDisabled; };
+	const FState States[] = {{TEXT("not hit (a full crew at her stations)"), 0, false}, {TEXT("hit a few times"), 14, false}, {TEXT("battered"), 60, false}, {TEXT("shot to pieces"), 220, false},
+	                         {TEXT("shot to pieces and disabled (no fight left in her)"), 220, true}};
+	int32 PrevDefenders = 1 << 30;
+	bool bFewer = true, bFits = true;
+	TSharedRef<FJsonObject> Rec = MakeShared<FJsonObject>();
+	for (int32 si = 0; si < UE_ARRAY_COUNT(States); ++si)
+	{
+		if (GSetup >= 0 && si != GSetup)
+		{
+			continue;
+		}
+		FAstraShipInterior I(FP.ToSharedRef(), 7, TEXT("Test"), 4242);
+		FRandomStream Shots(11);
+		const int32 NC = FP->Map->Comps.Num();
+		for (int32 b = 0; b < States[si].Blows; ++b)
+		{
+			I.Strike(Shots.RandRange(0, NC - 1), 60.f + 80.f * Shots.FRand(), (uint8)Shots.RandRange(0, 2), b % 4 == 0);
+		}
+		for (int32 k = 0; k < 600; ++k)
+		{
+			I.Tick(0.1f);
+		}
+		FFleetSnapshot Snap;
+		I.Snapshot(Snap);
+		for (const FFleetSnapshot::FHand& H : Snap.Hands)
+		{
+			bFits &= H.Comp >= 0 && H.Comp < P->Dmg->Comps.Num();
+		}
+		AstraBoardScene::FSpec Spec;
+		Spec.Attacker = ESide::Aquila;
+		Spec.Attackers = 24;
+		Spec.Objective = TEXT("captain");
+		Spec.Inside = &Snap;
+		Spec.bSweep = States[si].bDisabled;
+		if (States[si].bDisabled)
+		{
+			AstraBoardScene::ForDisabledShip(Spec, true);        // (what the host does with a ship that has lost her power: UAstraBoardSubsystem::BeginRemoteScene)
+		}
+		int32 Wins[4] = {0, 0, 0, 0};
+		double Def = 0.0, Wounded = 0.0, Unarmed = 0.0, Shut = 0.0, T = 0.0, LossAtt = 0.0, DeadAtt = 0.0, LossDef = 0.0;
+		int32 Ran = 0;
+		FString NoEnd;
+		for (int32 s = 0; s < Seeds; ++s)
+		{
+			AstraBoardScene::FResult Scene;
+			const FRunResult R = RunScene(*P, Tuning, Spec, Seed + s, &Scene);
+			if (!Scene.bOk)
+			{
+				break;
+			}
+			++Ran;
+			Wins[R.Outcome == EOutcome::DefenderHolds ? 0 : R.Outcome == EOutcome::AttackerRepelled ? 1 : R.Outcome == EOutcome::AttackerTakes ? 2 : 3]++;
+			Def += Scene.Defenders;
+			Wounded += Scene.Wounded;
+			Unarmed += Scene.Unarmed;
+			Shut += Scene.ShutBulkheads;
+			T += R.T;
+			LossAtt += R.Book.Killed[0] + R.Book.Down[0] + R.Book.Carried[0];
+			DeadAtt += R.Book.Killed[0];
+			LossDef += R.Book.Killed[1] + R.Book.Down[1] + R.Book.Carried[1];
+			if (R.Outcome == EOutcome::TimedOut)
+			{
+				NoEnd += FString::Printf(TEXT("%s%d"), NoEnd.IsEmpty() ? TEXT("") : TEXT(","), Seed + s);
+			}
+		}
+		if (!Ran)
+		{
+			BCheck("war: the scene", false, FString::Printf(TEXT("%s: the scene could not be made"), *Class));
+			return;
+		}
+		const double N = Ran;
+		BNote(FString::Printf(TEXT("%s, %s: the war left %d fit and %d wounded of %d (%d killed, %d fires, %d breaches, %d dark rooms, %d bulkheads shut); %d fights: %.0f under arms, %.0f at their stations, %.0f wounded lying; the marines take it %d, are held %d, no end %d; ends at %.0f s; marines lost %.1f of 24 (%.1f dead), her people lost %.1f%s%s"),
+		                      *Class, States[si].Name, I.CrewFit(), I.CrewWounded(), I.CrewTotal(), I.CrewDead(), I.Fires(), I.Breaches(), I.DarkRooms(), Snap.SealedDoors.Num(), Ran, Def / N, Unarmed / N, Wounded / N, Wins[2], Wins[0], Wins[3], T / N,
+		                      LossAtt / N, DeadAtt / N, LossDef / N, NoEnd.IsEmpty() ? TEXT("") : TEXT("; no end at seeds "), *NoEnd));
+		if (!States[si].bDisabled)
+		{
+			bFewer &= Def / N <= PrevDefenders + 1.0;
+			PrevDefenders = FMath::RoundToInt(Def / N);
+		}
+		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+		O->SetStringField(TEXT("state"), States[si].Name);
+		O->SetNumberField(TEXT("fit"), I.CrewFit());
+		O->SetNumberField(TEXT("wounded"), I.CrewWounded());
+		O->SetNumberField(TEXT("defenders"), Def / N);
+		O->SetNumberField(TEXT("takes"), Wins[2]);
+		O->SetNumberField(TEXT("loss_attackers"), LossAtt / N);
+		Rec->SetObjectField(FString::Printf(TEXT("state%d"), si), O);
+	}
+	BCheck("war: the people are the war's", bFits && bFewer, FString::Printf(TEXT("%s: every person the war has is in a room of the plan; the more she has been hit, the fewer fight"), *Class));
+	BRecord->SetObjectField(TEXT("war"), Rec);
+}
+
 int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 {
 	FString Scenario = TEXT("all"), OutPath = TEXT("Saved/Boarding/run.json"), Set;
@@ -1825,27 +2141,38 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("-setup="), GSetup);
 	Scenario = Scenario.ToLower();
 	FRig Rig;
-	if (Scenario == TEXT("plans") || Scenario == TEXT("attack"))      // (on request only: other ships' plans, and the marines going aboard one; no plan of the Aquila needed)
+	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid; no plan of the Aquila needed)
 	{
-	FString Class;
-	FParse::Value(*Params, TEXT("-class="), Class);
-	FTuning T;
-	ApplyTuning(T, Set);
-	if (Scenario == TEXT("plans"))
-	{
-	BoardScenarioPlans(Class);
-	}
-	else
-	{
-	BoardScenarioAttack(Class.IsEmpty() ? FString(TEXT("acheron")) : Class, Seed, Seeds, T);
-	}
-	int32 OtherFailed = 0;
-	for (const FBCheck& C : BChecks)
-	{
-	OtherFailed += C.bPass ? 0 : 1;
-	}
-	UE_LOG(LogASTRA, Display, TEXT("[Board] VERDICT: %s (%d checks, %d failed)"), OtherFailed ? TEXT("FAIL") : TEXT("PASS"), BChecks.Num(), OtherFailed);
-	return OtherFailed ? 1 : 0;
+		FString Class;
+		FParse::Value(*Params, TEXT("-class="), Class);
+		FTuning T;
+		T.bEvacuate = true;                                    // (a boarding by boats: the wounded are carried out to them, as the game does it)
+		ApplyTuning(T, Set);
+		if (Scenario == TEXT("plans"))
+		{
+			BoardScenarioPlans(Class);
+		}
+		else if (Scenario == TEXT("interior"))
+		{
+			FString Dump;
+			FParse::Value(*Params, TEXT("-dump="), Dump);
+			BoardScenarioInterior(Class, Dump, Seed);
+		}
+		else if (Scenario == TEXT("war"))
+		{
+			BoardScenarioWar(Class.IsEmpty() ? FString(TEXT("acheron")) : Class, Seed, Seeds, T);
+		}
+		else
+		{
+			BoardScenarioAttack(Class.IsEmpty() ? FString(TEXT("acheron")) : Class, Seed, Seeds, T);
+		}
+		int32 OtherFailed = 0;
+		for (const FBCheck& C : BChecks)
+		{
+			OtherFailed += C.bPass ? 0 : 1;
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Board] VERDICT: %s (%d checks, %d failed)"), OtherFailed ? TEXT("FAIL") : TEXT("PASS"), BChecks.Num(), OtherFailed);
+		return OtherFailed ? 1 : 0;
 	}
 	if (Scenario == TEXT("fps"))                       // (on request only: the Captain's arms against the mannequin's animations, no plan needed)
 	{

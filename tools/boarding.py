@@ -6,9 +6,11 @@
                                        squad fights in a corridor (who wins, how fast, with corners and without, with the flank and without), and whole
                                        boardings of the real ship (a Mandate boarding party through a breach, the marines on watch and the reaction
                                        team: who holds, at what cost, how long); checks the invariants and prints the verdict.
-                                       --scenario plans (on request): the plan of every class (data/ship/plans, else the stopgap's): it loads, every dock has a way to the bridge, the
+                                       --scenario plans (on request): the plan of every class (data/ship/plans, FLOTTA-VIVA's): it loads, every dock has a way to the bridge, the
                                        engineering hall and the commander's suite; --scenario attack [--class acheron]: the marines go aboard a Mandate ship by two Kestrels (24 men)
                                        and the same plan with the roles turned (who wins, how fast, at what cost)
+                                       --scenario war [--class acheron] (on request): FLOTTA-VIVA's inside of a class's ship is shot at (none, a few, many, a great many blows) and the marines go
+                                       aboard with the people the war left (the host's own way: AstraBoardScene with the snapshot): who holds her, who lies hurt, what it costs the marines
                                        --scenario fps (on request, no plan needed): the Captain's arms on the weapons against the mannequin's own
                                        animations (the sight on its place, the hands on the grips, what the picture holds at 16:9 and 16:10);
                                        --fpsposes FILE writes the engine's poses for the offline preview
@@ -56,6 +58,8 @@ def cmd_run(a: argparse.Namespace) -> int:
         args.append(f"-fpsposes={(ROOT / a.fpsposes).resolve()}")
     if a.setup >= 0:
         args.append(f"-setup={a.setup}")
+    if getattr(a, "dump", ""):
+        args.append(f"-dump={(ROOT / a.dump).resolve()}")
     t0 = time.time()
     with open(log, "w") as f:
         p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
@@ -187,6 +191,13 @@ ASSAULT_SETUPS = {
                exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
                at="11000=astra.cmd set_shields {'mode':'off'}|11000=astra.board.pd aquila 0|11001=astra.board.assault in M1 - 2 port",
                expect=[r"order \d+: Raider launches 2 Skiffs", r"launched Skiff 1", r"has launched 2 assault craft at the Aquila", r"docked Skiff 1", r"the hull is cut open at", r"Boarding Alpha|Ferry Guard Alpha|boarders hold|boarders are beaten"]),
+    # the operation as the Mandate's admiral reads it while it is under way, and his recall with its reason as the bridge hears it (the first in-game test: an admiral recalled a launch his staff had made, with nothing said)
+    "in_recall": dict(doc="a launch from the console is the Mandate's own operation (who sent it, what the boats met) and a recall says who recalled the boats and why", seconds=11300,
+                      exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
+                      at="11000=astra.cmd set_shields {'mode':'off'}|11000=astra.board.pd aquila 0|11001=astra.board.assault in M1 - 2 port|11012=astra.board.options 1|"
+                         "11014=astra.board.recall Archon_Varek_Solm the Aquila's marines are at the breach and I will not feed them skiffs",
+                      expect=[r"order \d+: Raider launches 2 Skiffs", r"options: .*\"ordered_by\":\"the Mandate's command staff\"", r"\"met_at_launch\":\{[^}]*\"her_shield_on_that_face_pct\":0[^}]*\"her_point_defence_channels\":0",
+                              r"Raider recalls her boats: the Aquila's marines are at the breach and I will not feed them skiffs", r"not one boarder reached the ship|the boats of order 1 are told to go home"]),
     # the same, one boat: a lone skiff against a shield that is up on that face: it holds off and turns back; nobody comes aboard
     "in_shield": dict(doc="a skiff at a shield that holds: it turns back, no boarder comes", seconds=11400,
                       exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
@@ -197,6 +208,23 @@ ASSAULT_SETUPS = {
                 exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
                 at="11000=astra.board.disable M1|11001=astra.board.assault out M1 - 2 port",
                 expect=[r"order \d+: the Aquila launches 2 Kestrels", r"docked Kestrel 1", r"has latched to Hulk", r"has cut in at", r"Hulk is ours|boarding of Hulk has failed|have broken off|has gone quiet"]),
+    # the same, with the Captain in the first Kestrel (a test Captain with no pawn: the ride, the other ship's decks made solid round him, the way home)
+    "out_ride": dict(doc="the Captain rides with the marines: the troop bay, the lock of the hulk, her decks made solid, the boat home, the bay of Deck 8", seconds=12000,
+                     exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Hulk static hold passive;{_NOFATE}",
+                     at="11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride",
+                     expect=[r"the Captain rides with the marines in Kestrel 1", r"the Captain is aboard Hulk with the marines", r"Hulk is ours|boarding of Hulk has failed|have broken off|has gone quiet",
+                             r"the Captain is called back to the boat", r"the Captain is back aboard the Aquila"]),
+    # a ship the war has shot at (FLOTTA-VIVA's inside, made by the blows that get through): the scene starts from the state it left her in, and the Captain rides along into her dark and burning rooms
+    "out_war": dict(doc="the marines (and the Captain) aboard a ship the war has shot up: her people alive where they are, the bulkheads she shut, her rooms without power and on fire", seconds=12000,
+                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive;{_NOFATE}",
+                    at="2=astra.board.strip M1|3=astra.war.fleet pound M1 port 70 12 kinetic|60=astra.war.fleet pound M1 port 70 10 explosive|11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride",
+                    expect=[r"the war has left her \d+ of her people under arms", r"the Captain is aboard Wreck with the marines", r"Wreck is ours|boarding of Wreck has failed|have broken off|has gone quiet", r"the Captain is back aboard the Aquila"]),
+    # a station is a place of the system (SPAZIO-VIVO's fixtures: Keeper Station, the Arsenal, a refinery, a mine), not a ship of this war: no boat is flown at it and none from it
+    # (the war bench has no living space to make one: a ship is made a fixture, as the war sees them)
+    "fixture": dict(doc="boats at a place of the system and from it: refused with the reason, nothing flies", seconds=11200,
+                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Keeper static hold passive;{_NOFATE}",
+                    at="2=astra.board.fixture M1|11001=astra.board.assault out M1 - 2 port|11002=astra.board.assault in M1 - 1|11003=astra.board.assess aquila M1|11004=astra.board.assess M1 aquila",
+                    expect=[r"assault refused: Keeper is a place of the system \(a station\)", r"target Keeper cannot be boarded: she is a place of the system", r"carrier [^;]*cannot: there is no such carrier"]),
     # an Acheron with her power and her point defence up: the marines' boats are shot at on the way in
     "out_pd": dict(doc="the marines' boats against a ship that shoots back: how many get through", seconds=11600,
                    exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Raider static hold passive;{_NOFATE}",
@@ -259,7 +287,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")
@@ -270,6 +298,7 @@ def main() -> int:
     r.add_argument("--class", dest="klass", default="", help="plans/attack: the ship's class (acheron, styx, lethe, praetorian, vigilant)")
     r.add_argument("--fpsset", default="", help="fps: try other places and anchors without touching the table, \"rifle.hip=84,17,-10;rifle.hipturn=-3,-13,0;rifle.shoulder_l=62,-20,-42\" (keys: rifle./pistol. hip hipturn ads low lowturn gripl fov shoulder_r shoulder_l; pole_r pole_l for both)")
     r.add_argument("--fpsposes", default="", help="fps: write the engine's poses (idle, draw, reload, dry fire) to this JSON file, for the offline preview")
+    r.add_argument("--dump", default="", help="interior: write the solids of each class's plan (JSON, for the offline view) into this directory")
     r.add_argument("--timeout", type=int, default=1500)
     r.set_defaults(fn=cmd_run)
     c = sub.add_parser("craft")

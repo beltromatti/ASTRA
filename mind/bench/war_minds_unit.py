@@ -446,7 +446,7 @@ class BoardingTests(Fixture):
     def test_the_picture_lists_the_boats_and_what_each_target_has_to_stop_them(self) -> None:
         text = war_minds.render_boarding({"boarding": BOATS})
         for needle in ("Carrier M-01 Charon: 3 skiff(s) free, 10 boarders each", "Carrier M-07 Styx Two: 2 skiff(s) free", "Could be boarded now: aquila the Aquila (ASTRA carrier)",
-                       "faces open: port, ventral; point defence 1 channels", "hull 58%", "2 other enemy ship(s): shields up on every face"):
+                       "faces open: port, ventral; point defence 1 channels", "hull 58%", "in the boats' way: 1 point-defence channel(s)", "2 other enemy ship(s): shields up on every face"):
             self.assertIn(needle, text)
         self.assertEqual(war_minds.render_boarding({}), "")                                  # nothing to say: nothing is said
         self.assertEqual(war_minds.render_boarding({"boarding": {}}), "")
@@ -455,12 +455,30 @@ class BoardingTests(Fixture):
         text = war_minds.render_boarding({"boarding": {"carriers": BOATS["carriers"], "boardable_now": [{"ship": "Hulk", "id": "A-03", "class": "ASTRA destroyer", "no_power": True, "faces_open": "all (no power)",
                                                                                                       "hull_pct": 31, "point_defence_channels": 0, "her_craft_about_her": 0, "distance_km": 5.0}]}})
         self.assertIn("NO POWER (no shield, no point defence)", text)
+        self.assertIn("nothing is in the boats' way (no shield on those faces, no point defence, no craft)", text)
 
     def test_an_assault_under_way_is_followed_boat_by_boat_and_man_by_man(self) -> None:
         text = war_minds.render_boarding({"boarding": ASSAULT})
-        for needle in ("Assault 1 under way for 40 s: Charon boards the Aquila, objective engineering", "- Skiff 1: 10 men, in flight; hatch d9_airlock_E4", "Skiff 2: 10 men, latched to the hull, cutting in",
+        for needle in ("YOUR OPERATION, assault 1, 40 s old: Charon (yours) is boarding the Aquila, objective engineering", "- Skiff 1: 10 men, in flight; hatch d9_airlock_E4", "Skiff 2: 10 men, latched to the hull, cutting in",
                        "your men 14 on their feet, 3 down or dead, 0 back in the boats", "held for 12 s"):
             self.assertIn(needle, text)
+
+    def test_an_operation_nobody_gave_a_reason_for_is_the_commands_standing_plan_not_news(self) -> None:
+        # the console's launch, a staff's plan: it reaches the admiral as his side's operation, who sent it and what the boats met, and says it stands until the picture gives a reason to stop it
+        op = dict(ASSAULT["assault"], ordered_by="the Mandate's command staff", met_at_launch={"dock_face": "port", "no_power": False, "her_shield_on_that_face_pct": 0, "her_point_defence_channels": 0,
+                                                                                                "her_craft_about_her": 0, "men_in_the_boats": 20})
+        text = war_minds.render_boarding({"boarding": dict(ASSAULT, assault=op)})
+        for needle in ("YOUR OPERATION", "sent by the Mandate's command staff on the standing plan", "no reason is recorded", "her shield on the port face 0%, her point defence 0 channels",
+                       "0 of her craft about her; 20 boarders in all"):
+            self.assertIn(needle, text)
+        self.assertNotIn("who gave this reason", text)
+
+    def test_an_operation_with_a_reason_says_who_sent_it_and_why(self) -> None:
+        op = dict(ASSAULT["assault"], ordered_by="Lieutenant Commander Isolde Brandt", reason="the port shield is down and her point defence is off",
+                  met_at_launch={"no_power": True, "dock_face": "port", "her_craft_about_her": 0, "men_in_the_boats": 20})
+        text = war_minds.render_boarding({"boarding": dict(ASSAULT, assault=op)})
+        self.assertIn('sent by Lieutenant Commander Isolde Brandt, who gave this reason: "the port shield is down and her point defence is off"', text)
+        self.assertIn("she had NO POWER (no shield, no point defence)", text)
 
     async def test_the_boats_are_in_the_picture_and_the_tool_only_when_there_is_something_to_send(self) -> None:
         await self.look(self.boats_state(None))
@@ -478,16 +496,26 @@ class BoardingTests(Fixture):
         for needle in ("Boarding (`board`", "cannot dock through a shield that holds", "fighters flying cover kill them all", "against a hulk it is a prize"):
             self.assertIn(needle, system)
 
+    async def test_the_prompt_says_an_assault_under_way_is_the_admirals_own_and_when_it_is_recalled(self) -> None:
+        # (the admiral of the first in-game test recalled, three seconds in, a launch his staff had made: the doctrine says whose operation it is and what a recall rests on)
+        await self.look(self.boats_state(BOATS))
+        system = self.llm.calls[0]["system"]
+        for needle in ("An assault under way is YOUR operation whoever sent the boats", "a doubt about the odds is not one", "never the moment to recall them", "A recall carries its reason"):
+            self.assertIn(needle, system)
+
     async def test_the_admiral_boards_through_the_game_as_a_boarding_in(self) -> None:
         await self.start_boats(ScriptPolicy([("board", {"target": "AQUILA", "boats": 3, "face": "port", "objective": "engineering", "reason": "her port shield is down"})]))
         sent = [c for c in self.cmds if c[0] == "boarding"]
-        self.assertEqual(sent, [("boarding", {"direction": "in", "target": "AQUILA", "craft": 3, "face": "port", "objective": "engineering", "by": "Archon Varek Solm"}, "admiral")])
+        self.assertEqual(sent, [("boarding", {"direction": "in", "target": "AQUILA", "craft": 3, "face": "port", "objective": "engineering", "by": "Archon Varek Solm",
+                                                      "reason": "her port shield is down"}, "admiral")])
         self.assertIn("boarding AQUILA with 3 skiff(s)", self.minds.recall("mandate"))
 
     async def test_a_boarding_is_called_off_with_the_same_tool(self) -> None:
         await self.start_boats(ScriptPolicy([("board", {"action": "call_off", "reason": "the boarders are losing"})]))
-        self.assertEqual([c for c in self.cmds if c[0] == "boarding"], [("boarding", {"action": "end"}, "admiral")])
+        # (the recall carries who gave it and why: the game's event for the bridge says the ship recalls her boats, and the reason)
+        self.assertEqual([c for c in self.cmds if c[0] == "boarding"], [("boarding", {"action": "end", "by": "Archon Varek Solm", "reason": "the boarders are losing"}, "admiral")])
         self.assertIn("called the boats off", self.minds.recall("mandate"))
+        self.assertIn("the boarders are losing", self.minds.recall("mandate"))
 
     async def test_a_boarding_with_no_target_is_refused_before_it_reaches_the_game(self) -> None:
         await self.start_boats(ScriptPolicy([("board", {"reason": "go"})]))

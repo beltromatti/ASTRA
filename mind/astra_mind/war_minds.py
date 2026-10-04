@@ -199,14 +199,15 @@ BOARD = _fn("board", "Send assault skiffs to board an enemy ship. The game flies
                      "that bear on it (her shield on that face, her point defence, her fighters), or why it cannot be done. A skiff is shot at by the target's point defence and by "
                      "her fighters on the way in, and cannot dock through a shield that holds on the face it comes to (it waits twenty seconds off the hull and turns back): "
                      "`boarding` in your picture lists the ships a boat could dock at now, and what she has to stop them. One assault at a time. `call_off` turns the boats "
-                     "back and brings the boarders who are aboard out (the survivors go home in the skiffs).", {
+                     "back and brings the boarders who are aboard out (the survivors go home in the skiffs): it is the recall of an operation that is yours, so it needs a reason that "
+                     "the picture gives, and the reason is heard (your log, your subordinates, and the bridge of the ship you are boarding, which hears the recall).", {
     "action": {"type": "string", "enum": ["launch", "call_off"], "description": "launch (the default) or call_off"},
     "target": {"type": "string", "description": "launch: the ship to board: her contact id from your plot (or AQUILA)"},
     "carrier": {"type": "string", "description": "optional: the ship of yours whose skiffs go (an id from `boarding.carriers`); leave out for the one with the most free"},
     "boats": {"type": "integer", "minimum": 1, "maximum": 4, "description": "how many skiffs (ten boarders each): several at once saturate point defence; leave out for as many as the carrier has free, at most two"},
     "face": {"type": "string", "enum": list(BOARD_FACES), "description": "the side of the target the skiffs dock on (leave out: the side nearest your carrier); her hatches are where her airlocks are"},
     "objective": {"type": "string", "enum": list(BOARD_OBJECTIVES), "description": "what the boarders fight for: engineering (her reactor: the ship dies or is taken) · bridge (her command) · captain (the commander's suite) · armory · medbay · brig · comms · hangar"},
-    "reason": {"type": "string", "description": "one sentence: why, and what you expect (your log, and what your subordinates read as intent)"}}, ["reason"])
+    "reason": {"type": "string", "description": "one sentence: why, and what you expect (your log, and what your subordinates read as intent); for `call_off`, what in the picture makes you recall the boats"}}, ["reason"])
 
 NO_CHANGE = _fn("no_change", "You have looked at the picture and nothing needs changing: the orders that stand, or the group's own judgement, serve. "
                              "Say in one sentence why (it goes in your log). Call this instead of inventing an order.", {
@@ -421,8 +422,15 @@ def render_boarding(view: dict[str, Any]) -> str:
     lines = []
     a = b.get("assault")
     if isinstance(a, dict) and a:
-        lines.append(f" Assault {a.get('order')} under way for {a.get('elapsed_s', 0)} s: {a.get('carrier')} boards {a.get('target')}, objective {a.get('objective')}"
-                     + (f", ordered by {a['ordered_by']}" if a.get("ordered_by") else ""))
+        # an operation of yours, whoever sent the boats (you, a group commander, your staff on the standing plan): who, why, and what the boats met at the hatch
+        why = str(a.get("reason") or "").strip()
+        lines.append(f" YOUR OPERATION, assault {a.get('order')}, {a.get('elapsed_s', 0)} s old: {a.get('carrier')} (yours) is boarding {a.get('target')}, objective {a.get('objective')}; "
+                     f"sent by {a.get('ordered_by') or 'your command'}" + (f", who gave this reason: \"{why}\"" if why else " on the standing plan (no reason is recorded: it stands until what you see below gives you one to stop it)"))
+        met = a.get("met_at_launch")
+        if isinstance(met, dict) and met:
+            lines.append(" What the boats met at the hatch when they were sent: " + ("she had NO POWER (no shield, no point defence), " if met.get("no_power")
+                         else f"her shield on the {met.get('dock_face')} face {met.get('her_shield_on_that_face_pct')}%, her point defence {met.get('her_point_defence_channels')} channels, ")
+                         + f"{met.get('her_craft_about_her', 0)} of her craft about her; {met.get('men_in_the_boats', 0)} boarders in all")
         for boat in a.get("boats") or []:
             lines.append(f"   - {boat.get('boat')}: {boat.get('men')} men, {boat.get('state')}; hatch {boat.get('hatch')}")
         f = b.get("fight")
@@ -433,9 +441,13 @@ def render_boarding(view: dict[str, Any]) -> str:
     for c in b.get("carriers") or []:
         lines.append(f" Carrier {c.get('id')} {c.get('ship')}: {c.get('boats_free')} {c.get('boat')}(s) free, {c.get('men_per_boat')} boarders each")
     for t in b.get("boardable_now") or []:
+        # what is in the boats' way, as a plain sum of the facts (her point defence, her fighters): a ship with none of it is the best a boat can be sent at
+        pd, craft = int(t.get("point_defence_channels") or 0), int(t.get("her_craft_about_her") or 0)
+        in_the_way = [x for x in ((f"{pd} point-defence channel(s)" if pd else ""), (f"{craft} of her craft about her" if craft else "")) if x]
         lines.append(f" Could be boarded now: {t.get('id')} {t.get('ship')} ({t.get('class')}) — "
                      + ("NO POWER (no shield, no point defence), " if t.get("no_power") else f"faces open: {t.get('faces_open')}; point defence {t.get('point_defence_channels')} channels; ")
-                     + f"hull {t.get('hull_pct')}%, her craft about her {t.get('her_craft_about_her')}, {t.get('distance_km')} km from your carrier")
+                     + f"hull {t.get('hull_pct')}%, her craft about her {t.get('her_craft_about_her')}, {t.get('distance_km')} km from your carrier; "
+                     + (f"in the boats' way: {', '.join(in_the_way)}" if in_the_way else "nothing is in the boats' way (no shield on those faces, no point defence, no craft)"))
     if b.get("other_enemy_ships_shielded"):
         lines.append(f" {b['other_enemy_ships_shielded']} other enemy ship(s): shields up on every face (a boat cannot dock through them)")
     return "\n".join(lines)
@@ -628,7 +640,14 @@ through a battleship's four channels; fighters flying cover kill them all), and 
 So you board what cannot stop the boats: a ship with no power, a ship whose shield is down on a face and whose point defence your skiffs outnumber (three or four at once, not one), a ship that has
 struck. The Aquila carries eighty marines who arm in half a minute and meet the boarders at the corridors to her engineering: a handful of skiffs against her is a raid that costs men and buys a
 fright, or the end of her if her marines are asleep or elsewhere; against a hulk it is a prize. `call_off` brings the boats home. One assault at a time; the picture says where each boat is and how the
-fight aboard goes."""
+fight aboard goes.
+
+An assault under way is YOUR operation whoever sent the boats (you, a group commander, your staff on the standing plan): the picture says who, why, and what the boats met at the hatch. Boats in the
+air are committed: a skiff turned back off the hatch has spent its crossing and bought nothing, and boarders recalled while the way in is open are boarders thrown away. You recall an operation for
+what the picture shows: boats shot down faster than they dock, a shield that has risen on the face they came to, boarders beaten or with no way forward, an objective the fight has made worthless;
+a doubt about the odds is not one, and an order you did not give is not one either. The best moment to board a ship is when she cannot stop the boats (no power, or her shield down on the face with her
+point defence silent or outnumbered): when the picture says so, it is the moment to let the boats go in, never the moment to recall them. A recall carries its reason, and the other side hears
+the recall."""
 
 MANDATE_ADMIRAL = """You are {name}, {rank} of the Kharon Mandate, aboard {ship}, commanding the Mandate's forces in {where}. {bio}
 {mission}
@@ -1551,13 +1570,16 @@ class WarMinds:
                 return await self._posture(mind, str(a.get("posture", "")))
             if name == "board" and seat.side == "mandate":
                 action = str(a.get("action") or "launch").lower()
+                reason = str(a.get("reason") or "").strip()
                 if action == "call_off":
-                    return await self.execute("boarding", {"action": "end"}, "admiral" if seat.kind == "admiral" else "commander")
+                    # the recall carries its reason and who gave it: the bridge of the ship that is boarded hears both (the game's event), and the picture of the operation keeps them
+                    return await self.execute("boarding", {k: v for k, v in {"action": "end", "by": cmd.name, "reason": reason}.items() if v not in (None, "", [])},
+                                              "admiral" if seat.kind == "admiral" else "commander")
                 carrier = str(a.get("carrier") or "").strip()
                 if seat.kind == "group" and carrier and not self._is_ship_of(seat, carrier):
                     return {"ok": False, "detail": f"{carrier} is not a ship of your group: you send the boats of {seat.group}'s ships"}
                 args = {k: v for k, v in {"direction": "in", "target": str(a.get("target") or "").strip(), "source": carrier, "craft": a.get("boats"), "face": a.get("face"),
-                                          "objective": a.get("objective"), "by": cmd.name}.items() if v not in (None, "", [])}
+                                          "objective": a.get("objective"), "by": cmd.name, "reason": reason}.items() if v not in (None, "", [])}
                 if not args.get("target"):
                     return {"ok": False, "detail": "name the ship to board (`target`: her contact id)"}
                 if seat.kind == "group" and not carrier:

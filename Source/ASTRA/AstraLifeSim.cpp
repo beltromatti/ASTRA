@@ -1346,7 +1346,7 @@ void FAstraLifeSim::SetTransit(int32 Idx, bool bOn)
 	P.LastStep = GameT;
 }
 
-void FAstraLifeSim::PlaceTransported(int32 Idx, const FVector& Where, float YawDeg, float HoldGameS)
+void FAstraLifeSim::PlaceTransported(int32 Idx, const FVector& Where, float YawDeg, float HoldGameS, const FString& Memory)
 {
 	if (!People.IsValidIndex(Idx))
 	{
@@ -1368,11 +1368,12 @@ void FAstraLifeSim::PlaceTransported(int32 Idx, const FVector& Where, float YawD
 	P.ReadyAt = GameT + FMath::Max(0.f, HoldGameS);
 	P.RetryAt = 0.0;
 	Enqueue(Idx);
-	Remember(Idx, 2, FString::Printf(TEXT("Beamed to %s by the transporter at %s"), *Map->Describe(Map->CompartmentAt(Where + FVector(0, 0, 30))), *HourText(Clock)));
+	Remember(Idx, 2, Memory.IsEmpty() ? FString::Printf(TEXT("Beamed to %s by the transporter at %s"), *Map->Describe(Map->CompartmentAt(Where + FVector(0, 0, 30))), *HourText(Clock))
+	                                  : FString::Printf(TEXT("%s, to %s, at %s"), *Memory, *Map->Describe(Map->CompartmentAt(Where + FVector(0, 0, 30))), *HourText(Clock)));
 	(void)YawDeg;
 }
 
-void FAstraLifeSim::SetAway(int32 Idx, const FString& Text)
+void FAstraLifeSim::SetAway(int32 Idx, const FString& Text, const FString& Memory)
 {
 	if (!People.IsValidIndex(Idx))
 	{
@@ -1386,7 +1387,7 @@ void FAstraLifeSim::SetAway(int32 Idx, const FString& Text)
 	P.Phase = FAstraLifePerson::EPhase::Settled;
 	P.bBody = false;
 	P.LastStep = GameT;
-	Remember(Idx, 3, FString::Printf(TEXT("Beamed away from the ship by the transporter (%s) at %s"), *Text, *HourText(Clock)));
+	Remember(Idx, 3, Memory.IsEmpty() ? FString::Printf(TEXT("Beamed away from the ship by the transporter (%s) at %s"), *Text, *HourText(Clock)) : FString::Printf(TEXT("%s at %s"), *Memory, *HourText(Clock)));
 }
 
 // ====================================================================================================== the ship speaks

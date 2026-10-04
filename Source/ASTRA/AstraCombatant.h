@@ -36,6 +36,8 @@ public:
 
 	/** This tick of the squad simulation's soldier: where he is (feet, cm), which way he faces, what he does. Dt: the game's frame. */
 	void Drive(const AstraBoard::FUnit& U, float Dt);
+	/** Where the plan he fights on stands in the world (the Captain on another ship: her plan is put in a zone of its own): added to what the simulation says. */
+	void SetWorldOffset(const FVector& Offset) { WorldOffset = Offset; }
 	/** Where his rifle's muzzle is now (world cm), and the way it points. */
 	FVector MuzzleAt() const;
 	FVector MuzzleDir() const;
@@ -67,6 +69,7 @@ private:
 	bool bFallen = false;
 	FString NameOf;
 	FVector Goal = FVector::ZeroVector;      // where the simulation puts his feet
+	FVector WorldOffset = FVector::ZeroVector;
 	float GoalYaw = 0.f;
 	float FaceYaw = 0.f;                     // the way he faces now (degrees)
 	FVector Vel = FVector::ZeroVector;       // his velocity, from his moves (cm/s)

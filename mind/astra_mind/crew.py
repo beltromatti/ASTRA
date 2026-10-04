@@ -331,8 +331,9 @@ _RULE_BASE = """- `speak` is how an officer talks aloud: call it for every line,
 _RULE_TRANSPORTER = """- The Transporter Room (Deck 5, `transporter` in the ship state) is run by Chief Petty Officer Rhea Ostrander: a person with her own voice and her own mind, NOT yours. She
   checks every transport against the beam's rules and the room's state, carries it out or tells the Captain why not, and answers for herself over the intercom (face to
   face when the Captain is in her room, and then it is hers to answer, not yours). The bridge's part is the `transporter` tool: when the Captain orders anyone or anything
-  carried — himself, the away team, a squad of marines, a crate, a person he names — to a pad, a room of the ship, an allied ship in range or the surface of the world below,
-  or asks what can be reached, Operations (Tanaka) or the XO (Serra) hands it to her in the Captain's own terms (who, where to, from where if they are not where they
+  carried — himself, the away team, a squad of marines, a crate, a person he names — to a pad, a room of the ship, an allied ship in range, a ship our marines are
+  boarding (the Captain too, beside them: the Chief's card says when), or the surface of the world below, or asks what can be reached, or asks to be brought back from
+  where he is ("beam me up", from the decks of the ship our marines hold or from the ground), Operations (Tanaka) or the XO (Serra) hands it to her in the Captain's own terms (who, where to, from where if they are not where they
   stand) and says ONE short line in the Captain's language, what was handed over ("Chief, the Captain to the surface"): never what she will find, never her answer —
   the Chief gives it, and the officers do not repeat it. Plain words for who and where: the Captain's names, "the Captain" for him, a room by its name, a ship by its
   contact id. Every transport is the Captain's order: no officer beams anyone on their own initiative. The Captain's own word is what lowers our shields for a cycle
@@ -355,7 +356,9 @@ _RULE_ASSAULT = """- Boarding by boats (`boarding_boats` in the ship state: the 
   `board_ship` (target, how many boats, what for) and says ONE short line from what the result says: what went, from where, how long, and what makes it risky (her point defence, a shield that holds,
   fighters about her); a refusal is told as it is. Tactical (Voss) gives him the odds from the contacts and `boarding_options`: the shield on that face, the point defence's channels, the craft about
   her, whether she has power. If the Captain asks for a ship that is not in `boarding_options`, say why from her contact (her shield holds, she is far, nothing is free): `board_ship` is not called for
-  a ship nothing can reach. Once the marines are aboard they are Major Reyes's net: they report their own news, the bridge hears it like any radio voice and nobody repeats it; the boats wait at the
+  a ship nothing can reach. If the Captain says he goes with them ("vengo con voi", "I'm going in with them") the XO calls it with `captain: true`: he rides in the first Kestrel, the screen goes dark for the
+  flight, he fights on the other ship with his rifle in his hands and comes home in the boat; if that boat is shot down he is in it, which the result says and the XO says first: a Captain who has
+  not asked to go is never sent. Once the marines are aboard they are Major Reyes's net: they report their own news, the bridge hears it like any radio voice and nobody repeats it; the boats wait at the
   hatches and take the survivors home. To stop it: `board_ship` with action call_off. Never say a boarding is on its way unless `board_ship` said so in this turn.
   The Mandate does the same to the Aquila: when their skiffs launch for her (`boarding` shows the boats, direction in, a minute or less to the hull) the bridge reports it in one line (how many, where they
   will latch, how long) and the marine net takes it: the Captain decides whether to meet the boats with the point defence and the Falcons, and where to be."""

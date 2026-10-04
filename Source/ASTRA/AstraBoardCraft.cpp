@@ -185,6 +185,10 @@ bool UAstraBattleSubsystem::AssessBoarding(int32 CarrierId, int32 TargetId, FAss
 	{
 		Out.TargetWhy = TEXT("she is destroyed");
 	}
+	else if (T->bFixture)
+	{
+		Out.TargetWhy = TEXT("she is a place of the system, not a ship in this war: nobody docks a boat at her");
+	}
 	else if (T->bCraft || T->bGhost)
 	{
 		Out.TargetWhy = TEXT("a craft cannot be boarded");
@@ -218,7 +222,7 @@ bool UAstraBattleSubsystem::AssessBoarding(int32 CarrierId, int32 TargetId, FAss
 			}
 		}
 	}
-	if (!C || !C->bAlive || C->bCraft)
+	if (!C || !C->bAlive || C->bCraft || C->bFixture)
 	{
 		Out.CarrierWhy = TEXT("there is no such carrier");
 		return true;
@@ -344,6 +348,7 @@ bool UAstraBattleSubsystem::ShipFacts(int32 Id, FShipFacts& Out) const
 	Out.bPlayer = S->bPlayer;
 	Out.bDerelict = S->bDerelict;
 	Out.bHasModel = S->Dmg.bModel;
+	Out.bFixture = S->bFixture;
 	Out.Pos = S->Pos;
 	Out.Vel = S->Vel;
 	Out.Att = S->Att;
@@ -361,7 +366,7 @@ void UAstraBattleSubsystem::ListShipFacts(TArray<FShipFacts>& Out) const
 {
 	for (const FAstraBattleShip& S : Ships)
 	{
-		if (S.bAlive && !S.bCraft && !S.bGhost)
+		if (S.bAlive && !S.bCraft && !S.bGhost && !S.bFixture)         // (a place of the system is neither a carrier nor a target: it is not listed)
 		{
 			FShipFacts F;
 			if (ShipFacts(S.Id, F))
@@ -510,14 +515,14 @@ bool UAstraBattleSubsystem::LaunchBoarding(const FLaunch& Req, FLaunchResult& Ou
 	Out = FLaunchResult();
 	const FAstraBattleShip* C = FindById(Req.CarrierId);
 	const FAstraBattleShip* T = FindById(Req.TargetId);
-	if (!C || !C->bAlive || C->bCraft)
+	if (!C || !C->bAlive || C->bCraft || C->bFixture)
 	{
 		Out.Why = TEXT("there is no such carrier");
 		return false;
 	}
-	if (!T || !T->bAlive || T->bCraft || T->bGhost || !T->Dmg.bModel)
+	if (!T || !T->bAlive || T->bCraft || T->bGhost || T->bFixture || !T->Dmg.bModel)
 	{
-		Out.Why = !T || !T->bAlive ? TEXT("the target is gone") : TEXT("that is not a ship with a hull to board");
+		Out.Why = !T || !T->bAlive ? TEXT("the target is gone") : (T->bFixture ? TEXT("that is a place of the system, not a ship to dock a boat at") : TEXT("that is not a ship with a hull to board"));
 		return false;
 	}
 	if (C->Id == T->Id)
@@ -596,6 +601,7 @@ namespace
 	};
 	TArray<FBenchOp> GBenchOps;
 	int32 GBenchOrder = 9000;
+	TWeakObjectPtr<UWorld> GBenchOrderWorld;           // (the world the count above is for: a run of several seeds is several worlds, one after the other)
 }
 
 void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
@@ -630,6 +636,20 @@ void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
 		{
 			S->PDChannels = FMath::RoundToInt(Op.Value);
 		}
+		else if (Op.What == TEXT("fixture"))
+		{
+			S->bFixture = true;                                      // (what SPAZIO-VIVO makes of a station: the war bench has no living space to ask it of)
+		}
+		else if (Op.What == TEXT("jammer"))
+		{
+			// a Mandate capital ship under the fog of war with her strobe on (12 to 55 km out, she floods the Aquila's radar along her bearing): the transporter's jamming is read off her
+			S->bFog = true;
+			S->bDark = false;
+			S->Track = 2;
+			S->bClassified = true;
+			S->bIdentified = true;
+			S->EwMode = 1;
+		}
 		UE_LOG(LogASTRA, Display, TEXT("[Boarding] bench: %s %s %g"), *Op.What, *S->Name, Op.Value);
 	}
 	GBenchOps.Reset();
@@ -652,6 +672,10 @@ void UAstraBattleSubsystem::TickBoardingLaunches(float Dt)
 		else if (!T || !T->bAlive)
 		{
 			Cancel = TEXT("the target is gone");
+		}
+		else if (T->bFixture || C->bFixture)
+		{
+			Cancel = TEXT("a place of the system is no ship to dock a boat at");
 		}
 		else if (C->bDisabled || HangarFactor(*C) <= 0.f)
 		{
@@ -883,6 +907,11 @@ namespace
 			FLaunch Req;
 			Req.CarrierId = Cid;
 			Req.TargetId = Tid;
+			if (GBenchOrderWorld.Get() != W)
+			{
+				GBenchOrderWorld = W;
+				GBenchOrder = 9000;                                                                  // (`astra.board.depart 9000` is about the first order of THIS world, in every seed)
+			}
 			Req.Order = GBenchOrder++;
 			for (int32 i = 0; i < N; ++i)
 			{
@@ -959,5 +988,7 @@ namespace
 	BC_OP_COMMAND(shield, "Testing: a ship's shield sectors to a share of their capacity: astra.board.shield <ship> <0..1>", true);
 	BC_OP_COMMAND(disable, "Testing: a ship loses all power (a hulk): astra.board.disable <ship>", false);
 	BC_OP_COMMAND(pd, "Testing: a ship's point-defence channels: astra.board.pd <ship> <n>", true);
+	BC_OP_COMMAND(fixture, "Testing: a ship becomes a place of the system, as a station is (nobody docks a boat at her or flies one from her): astra.board.fixture <ship>", false);
+	BC_OP_COMMAND(jammer, "Testing: a Mandate capital ship jams the Aquila's radar from where she is (12 to 55 km out): astra.board.jammer <ship>", false);
 #undef BC_OP_COMMAND
 }

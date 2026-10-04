@@ -23,7 +23,8 @@ visivo e sonoro (colonne di luce, fantasma del corpo, schermo del Capitano) è a
 
 ## 2. La fisica del fascio (regole nel codice)
 
-- **Chi e cosa**: il Capitano (non può essere portato su un'altra nave: non c'è interno in libreria, né da un Falcon o una capsula), una persona (nome, grado, mansione,
+- **Chi e cosa**: il Capitano (su un'altra nave solo se è una che i marine stanno abbordando: è la sola di cui c'è l'interno, §10; non da un Falcon o una capsula né dalla stiva di una barca
+  in volo), una persona (nome, grado, mansione,
   `npc17`, «marines 6», «pad 3», «away team»), un carico fino a 2 000 kg a pedana (pedana cargo). Sei persone per ciclo. Non si trasporta chi tiene un posto con un attore
   suo (le postazioni di plancia, i letti dell'infermeria) né chi sta in una stanza **schermata dallo schema** (`magazine`, `armory`, `quarantine`: né uscita né arrivo).
 - **Da dove a dove**: pedana ↔ pedana, da sito a sito dentro l'Aquila (da dove si sta, il fascio non esce dallo scafo: nessuno scudo conta), verso una nave alleata o
@@ -100,17 +101,17 @@ normale con la y in su il piano ha la x verso la SINISTRA di chi guarda).
 ## 6. I banchi e i risultati
 
 - `tools/transport.py run --scenario all` (senza finestra, `-nullrhi`, ~15-25 s): **67 prove delle regole** (le facce a entrambe le estremità, la portata, il disturbo lungo la linea, la
-  manovra, il Gate, lo stato della sala, l'aggancio, gli arrivi) e **38 del mondo** in un mondo senza grafica con la pianta vera (la v2 di NAVE-3, 3234 compartimenti), i 560 di VITA, il modello dei danni e la
+  manovra, il Gate, lo stato della sala, l'aggancio, gli arrivi) e **55 del mondo** (38 + le 17 «boarded» di §10) in un mondo senza grafica con la pianta vera (la v2 di NAVE-3, 3234 compartimenti), i 560 di VITA, il modello dei danni e la
   battaglia: ordini dentro la nave, il ciclo con le sue fasi, la coda, l'aggancio tenuto fino alla parola, l'annullo a metà, la finestra scudi (giù per il ciclo, su dopo), una
   squadra su una nave alleata e il richiamo, un abbordaggio su una nave senza scudi, la discesa sul pianeta e il ritorno, un carico, la manovra dell'Aquila (la scheda mostra virata e
   spinta, una spinta forte nega il fascio con `[motion]`), i disturbatori (la prova si fa solo se in plancia ce n'è uno: le regole coprono la strobo), la stanza senza energia, e il
   costo (il tick sotto il millisecondo; la scheda per la mente, una volta al secondo, 0,08 ms con i contatti di una battaglia). Le pedane si confrontano con le postazioni di
   pedana della pianta (le due «visitor» di NAVE-3 stanno sulle pedane 1 e 4), non con numeri fissi: la sala è passata da x −20..4 a x 0..24 nella pianta v2 e le pedane l'hanno seguita.
-  **105/105.** (Il processo del commandlet esce con codice 1 perché nella copia di lavoro i `.uasset` sono ancora puntatori LFS e il motore conta i loro errori di caricamento: il
+  **122/122.** (Il processo del commandlet esce con codice 1 perché nella copia di lavoro i `.uasset` sono ancora puntatori LFS e il motore conta i loro errori di caricamento: il
   verdetto è la riga `VERDICT: PASS`, e `tools/transport.py` lo legge da lì.)
 - `tools/transport.py run --scenario shapes`: sonda sulle forme base del motore, lette dai vertici (il piano è 100 × 100 cm in XY con la normale in su, cilindro, sfera e cubo ±50 cm):
   conferma le ipotesi dello schermo a parete e delle colonne di luce.
-- `mind/bench/transporter_unit.py` (modello finto, anche sulle carte vere scritte dal gioco): **34 prove**. Tutta la mente offline dopo l'unione con main (flight, lift, marines, npc,
+- `mind/bench/transporter_unit.py` (modello finto, anche sulle carte vere scritte dal gioco): **36 prove** (con le due carte di una nave abbordata). Tutta la mente offline dopo l'unione con main (flight, lift, marines, npc,
   stations, war, transporter: `python -m unittest bench.flight_server bench.flight_unit bench.lift_server bench.lift_unit bench.marines_server bench.marines_unit bench.npc_server
   bench.npc_unit bench.stations_server bench.stations_unit bench.transporter_unit bench.war_director_unit bench.war_minds_unit bench.war_server`): **412 prove verdi**.
 - `mind/bench/transporter_live.py` (modello vero, il Capo da sola): 8 scene, **~0,002 $ a giro**. `mind/bench/transporter_crew_live.py` (modello vero, **tutta la catena**: il Capitano
@@ -131,7 +132,8 @@ normale con la y in su il piano ha la x verso la SINISTRA di chi guarda).
    `astra.xport.send captain surface window`. Atterra al campo; `astra.xport.send captain "pad 3" window` o «Chief, one to beam up» (da terra: tramite Operations) per tornare.
 5. **Negato dagli scudi in battaglia**: con un nemico a portata (scenario di battaglia): `astra.xport.send "marines 4" T-xx`: rifiuto per scudi nostri e suoi, con cosa lo risolve.
    Abbattuto il settore sotto il 5 % e con `window` (la parola del Capitano) la squadra passa; la scheda dice chi è «away» e dove.
-6. Se qualcosa non torna: `astra.xport.info`, `astra.xport.fx 0`, `astra.xport.gain 2`, `astra.xport.reset`.
+6. **Il Capitano su una nave che i marine abbordano** (e a casa): i passi numerati sono in §10.
+7. Se qualcosa non torna: `astra.xport.info`, `astra.xport.fx 0`, `astra.xport.gain 2`, `astra.xport.reset`.
 
 Comandi: `astra.xport.send <chi> <dove> [from=…] [hold] [window] [hazard] [weak]`, `astra.xport.energize [X3]`, `astra.xport.abort [X3]`, `astra.xport.room`, `astra.xport.info`,
 `astra.xport.card`, `astra.xport.dump`, `astra.xport.reset`; variabili `astra.xport.fx`, `astra.xport.gain`.
@@ -146,6 +148,8 @@ e marine, `initiative.py` la scheda del Capo fuori dal prompt dell'ispezione); *
 resta libero); **abbordaggi** (`AstraBoardSubsystem.cpp`, una riga: i marine in transito o mandati fuori nave non entrano nelle squadre di un abbordaggio, `LS.IsOffShip(p)`). L'unione con main (ABBORDAGGI, ascensori, la pianta v2) ha avuto conflitti solo dove le due parti aggiungevano accanto: i marine presi da una lotta (`bCommandeered`) e
 le persone in transito o fuori nave non hanno corpo né passi (la condizione ha tutte e tre); la scheda ha insieme `transporter` e `boarding`; il server tiene la rete dei marine e il
 Capo; `tools_for(state, ctx)` tiene il filtro della sala e la vettura dell'ascensore. Chi i marine hanno preso per una lotta non si teletrasporta e non entra nelle squadre (`[subject]`).
+Il gancio del Capitano e dei marine su una nave abbordata (3/10) è elencato in §10: `AstraTransporterWorld.cpp`, `AstraTransporterSubsystem.h/.cpp`, `AstraTransporterCard.cpp`,
+`AstraTransportBench.cpp`, e in `AstraBoardBeam.cpp` (ABBORDAGGI) la parte che sa dove sbarcare.
 
 ## 9. Limiti noti e richieste
 
@@ -157,8 +161,37 @@ Capo; `tools_for(state, ctx)` tiene il filtro della sala e la vettura dell'ascen
   postazioni con un attore proprio, come per i tecnici di plancia) e il Capo è solo lei, in piedi alla console; una postazione `stand` con quel nome la sposta altrove.
 - Chi è fuori nave **non parla** (sulla superficie gli NPC trasportati non hanno un corpo né una mente: serve ABBORDAGGI/VITA); i carichi sono casse a terra, senza fisica.
 - Dove il Capitano sta salendo una scala di Jefferies il fascio lo prende dalla scala (`Release`): dematerializza sui pioli e riappare a destinazione, mai appeso.
-- Il Capitano **non può essere portato su un'altra nave** (nessun interno in libreria) né mentre è in un Falcon; se l'Aquila attraversa un Gate col Capitano a terra, il gioco
+- Il Capitano **si porta su un'altra nave solo se i marine la stanno abbordando** (§10: nessun altro interno in libreria) e non dalla stiva di una barca in volo né da un Falcon; se l'Aquila attraversa un Gate col Capitano a terra, il gioco
   non lo impedisce (richiesta al lead: il transito dovrebbe rifiutare con qualcuno fuori nave, o richiamarlo prima).
 - Una pedana in più, il carico oltre i 2 t, i trasporti fra due navi: fuori dal brief.
 - La lista dei fuori nave **non è salvata** nella campagna (si perde al riavvio: le persone «away» tornano a bordo); `SaveJson`/`ResumeFrom` della nave sono il posto.
 - Il «ferito» dello scatter (una forzatura sotto il 30 %) non esiste: nessuno si fa male; serve un `HarmCrew(roster, cause)` pubblico sulla nave (richiesta).
+
+## 10. Il Capitano e i marine su una nave che i marine stanno abbordando, e il ritorno (ABBORDAGGI F5.2, 3/10)
+
+Prima il Capitano non andava su un'altra nave («nessun interno in libreria»). Dove i marine dell'Aquila combattono a bordo di una nave, l'interno c'è (ABBORDAGGI fa solidi i suoi ponti dal piano
+della classe) e i marine tengono delle stanze: lì il fascio posa il Capitano, e lì lo riprende. **Le regole fisiche non cambiano e valgono per l'andata e per il ritorno**: lo scudo sulla faccia
+che il fascio attraversa (il nostro con la finestra scudi; il loro sotto il 5 % o la nave senza energia: `[shields_own]`, `[shields_theirs]`), la portata, il disturbo lungo la linea (`[jam]`), la manovra,
+il Gate, lo stato della sala. In più, ed è la regola dell'arrivo (`[arrival]`, che ha ABBORDAGGI nella simulazione dei soldati):
+
+- si sbarca **in una stanza che i marine tengono** (uno dei nostri in piedi dentro), **senza nemici che possano combattere dentro o vedere il punto**, con aria (60 %), senza fuoco né fumo
+  denso, **accanto ai marine**, su pavimento libero a più di 95 cm da chiunque. Mai in uno scompartimento del Mandate, mai nel vuoto: nessun `override` lo permette;
+- per il Capitano serve **una barca nostra al portello** (è la strada di casa se il fascio è bloccato); senza un abbordaggio dei marine su quella nave il Capitano è rifiutato con la ragione;
+- se nessuna stanza è libera, il rifiuto elenca **insieme** le ragioni del fascio e quella dell'arrivo; se lo schema è già nel buffer (la lotta si muove mentre aspetta, e l'arrivo si chiede di nuovo
+  ogni passo) **aspetta lì** (entro il limite del buffer, 90 s, poi è ricomposto sulle pedane) e il Capo lo dice; se l'abbordaggio è finito, è ricomposto subito;
+- «Chief, beam me up»: lo stesso fascio verso una pedana, con le stesse regole. Il Capo sa dov'è il Capitano (`from` può mancare); se qualcosa blocca l'aggancio dice cosa e cosa lo toglie, e la
+  barca al portello resta la strada di casa. Dalla stiva di una barca in volo non aggancia nessun fascio;
+- i marine del ruolino («marines 6» o per nome) entrano nella lotta come una squadra «Beamed Marines» e, richiamati, ne escono (i caduti sono portati via vivi). Chi non è un marine va via nave
+  come sempre.
+
+**Cosa è cambiato nei file di TELETRASPORTO** (additivo, su via libera del lead): `AstraTransporterWorld.cpp` (`CaptainFeet`: sui ponti dell'altra nave il Capitano è «via» come uno sul pianeta, e nella stiva
+di una barca nessun fascio; `ResolveSubjects`; `MakeRequest`: i punti dal gioco al posto del rifiuto del Capitano, o `ArrivalWhy`; `BoardedArrival`; `Preflight` con il blocco `arrival`),
+`AstraTransporterSubsystem.h/.cpp` (due campi del trasporto, `bBoarded` e `ArrivalWhy`; `Order`: il rifiuto unico con tutte le ragioni; il buffer; `Depart`, `SetSubjectAway`, `PlaceSubject`,
+`Finish`: le notizie a `UAstraBoardSubsystem` perché sposti i corpi della lotta), `AstraTransporterCard.cpp` (il blocco `boarded_by_our_marines` della scheda), `AstraTransportBench.cpp` (le 17
+prove «boarded»), `mind/astra_mind/transporter.py` e `crew.py` (il prompt del Capo, la regola di Operations e dell'XO, `from` facoltativo), `mind/bench/transporter_unit.py` e due schede vere in
+`mind/bench/fixtures/transporter/`. La parte che sa dove sbarcare e chi è dentro è in `Source/ASTRA/AstraBoardBeam.cpp` (ABBORDAGGI, `BeamAboardQuery`, `BeamedAboard`, `BeamedOff`).
+
+**Provarlo nel gioco**: (1) `astra.board.disable <contatto>` (o un bersaglio con lo scudo abbattuto); (2) `astra.board.assault out <contatto> - 2 port`: attendere «Kestrel 1 has latched»;
+(3) a piedi in plancia, `astra.xport.send captain <contatto>`: rifiutato per `[shields_own]` con la strada (`window`); `astra.xport.send captain <contatto> window`: il Capitano esce sui ponti dell'altra
+nave, accanto ai marine, nella riga a schermo ABOARD; (4) combattere; (5) «Chief, beam me up» o `astra.xport.send captain "pad 1" window`: ricomposto in sala, fuori dalla lotta; (6) per vedere il
+rifiuto di un disturbatore, tenerne uno sulla linea (un incrociatore del Mandate che disturba, a 12-55 km). Il banco: `tools/transport.py run --scenario world` (le «boarded»).

@@ -379,6 +379,19 @@ int32 FAstraBoardSim::AddUnit(ESide Side, ERole Role, const FString& Name, const
 	return Spawn(Side, Role, Name, Pos, SquadId).Id;
 }
 
+int32 FAstraBoardSim::AddWounded(ESide Side, const FString& Name, const FVector& Pos)
+{
+	FUnit& U = Spawn(Side, ERole::Rifleman, Name, Pos, INDEX_NONE);
+	U.Act = EAct::Down;
+	U.Hp = 15.f;
+	U.Bleed = 1800.f;                                                // his own medics have him: he does not die within the fight
+	U.FellTo = TEXT("the war");
+	U.Rounds = 0;
+	U.Path.Reset();
+	++Stats.Down[(int32)Side];
+	return U.Id;
+}
+
 void FAstraBoardSim::DelayUnit(int32 UnitId, float Seconds)
 {
 	if (!People.IsValidIndex(UnitId))
@@ -507,16 +520,20 @@ void FAstraBoardSim::Step(float Dt)
 	StepSensors(Dt);
 	StepMarineCommand(Dt);
 	StepAmbush();
+	StepEvacuation(Dt);
 	for (FUnit& U : People)
 	{
 		if (!U.bExternal && (U.Act != EAct::Dead && U.Act != EAct::Gone && U.Act != EAct::Waiting))
 		{
 			if (U.Act == EAct::Down)
 			{
-				U.Bleed -= Dt;
-				if (U.Bleed <= 0.f)
+				if (U.CarriedBy == INDEX_NONE)
 				{
-					Kill(U, INDEX_NONE, TEXT("bled out"));
+					U.Bleed -= Dt;                                   // (a man on a bearer's shoulders has help: he does not bleed)
+					if (U.Bleed <= 0.f)
+					{
+						Kill(U, INDEX_NONE, TEXT("bled out"));
+					}
 				}
 				continue;
 			}
@@ -606,6 +623,183 @@ void FAstraBoardSim::StepDoors()
 			CutT[d] = FMath::Max(0.f, CutT[d] - StepS);
 		}
 	}
+}
+
+/** The attackers' wounded go home: a man who is down and not under fire is reached by a free man of his own side (nearest first, never the one man a squad cannot spare), who gets him up and
+ *  carries him to the hatch the squad came in by, where the boat's people take him. While he is carried he does not bleed; if his bearer is hit he is put down where it happened. Nobody is called
+ *  while an enemy who can see the casualty is near: the fight comes first, and a man who falls in the open of a fight that does not end may bleed out. */
+void FAstraBoardSim::StepEvacuation(float Dt)
+{
+	if (!Tuning.bEvacuate)
+	{
+		return;
+	}
+	EvacT += Dt;
+	const bool bLook = EvacT >= 0.5f;
+	if (bLook)
+	{
+		EvacT = 0.f;
+	}
+	for (FUnit& C : People)
+	{
+		if (C.Act != EAct::Down || C.bExternal || !IsAttacker(C.Side))
+		{
+			continue;
+		}
+		if (C.CarriedBy != INDEX_NONE)
+		{
+			FUnit& B = People[C.CarriedBy];
+			if (B.Carrying != C.Id || !B.Able())
+			{
+				C.CarriedBy = INDEX_NONE;                                // his bearer fell: he is put down where it happened
+				C.Bearer = INDEX_NONE;
+				C.Pos = B.Pos;
+				if (B.Carrying == C.Id)
+				{
+					B.Carrying = INDEX_NONE;
+				}
+			}
+			continue;
+		}
+		if (C.Bearer != INDEX_NONE && (!People[C.Bearer].Able() || People[C.Bearer].Carrying != C.Id))
+		{
+			C.Bearer = INDEX_NONE;                                       // the man called to him is down or has other work: another is called
+		}
+		if (!bLook || C.Bearer != INDEX_NONE)
+		{
+			continue;
+		}
+		bool bHot = false;
+		for (const FUnit& E : People)
+		{
+			if (E.Side != C.Side && E.Able() && FMath::Abs(E.Pos.Z - C.Pos.Z) < 300.f && FVector::Dist(E.Pos, C.Pos) < Tuning.EvacClearCm && Map->Visible(E.Eye(), C.Eye(), &Doors))
+			{
+				bHot = true;
+				break;
+			}
+		}
+		if (bHot)
+		{
+			continue;
+		}
+		int32 Best = INDEX_NONE;
+		float BestD = Tuning.EvacReachCm;
+		for (const FUnit& F : People)
+		{
+			if (F.Side != C.Side || F.Id == C.Id || F.bExternal || !F.Able() || F.Carrying != INDEX_NONE || F.Act == EAct::Reload || FMath::Abs(F.Pos.Z - C.Pos.Z) > 300.f)
+			{
+				continue;
+			}
+			const FSquad* Sq = Teams.IsValidIndex(F.Squad) ? &Teams[F.Squad] : nullptr;
+			if (Sq && Sq->Leader == F.Id)
+			{
+				continue;                                                // (the leader leads)
+			}
+			if (Sq)
+			{
+				int32 Free = 0;
+				for (const int32 M : Sq->Members)
+				{
+					Free += (People[M].Able() && People[M].Carrying == INDEX_NONE) ? 1 : 0;
+				}
+				if (Free < 4)
+				{
+					continue;                                            // a squad does not give up a man when it would be left with fewer than three
+				}
+			}
+			const float D = (float)FVector::Dist(F.Pos, C.Pos);
+			if (D < BestD)
+			{
+				BestD = D;
+				Best = F.Id;
+			}
+		}
+		if (Best != INDEX_NONE)
+		{
+			FUnit& B = People[Best];
+			B.Carrying = C.Id;
+			B.CarryT = 0.f;
+			B.Path.Reset();
+			B.Slot = INDEX_NONE;
+			C.Bearer = Best;
+		}
+	}
+}
+
+void FAstraBoardSim::StepCarry(FUnit& B, float Dt)
+{
+	FUnit& C = People[B.Carrying];
+	if (C.Act != EAct::Down || (C.CarriedBy != INDEX_NONE && C.CarriedBy != B.Id))
+	{
+		B.Carrying = INDEX_NONE;                                         // he bled out, or someone else has him
+		B.Path.Reset();
+		return;
+	}
+	if (C.CarriedBy == INDEX_NONE)
+	{
+		// on his way to him, then down on a knee, then up with him
+		if (FVector::Dist(B.Pos, C.Pos) > 110.f)
+		{
+			if (B.Path.IsEmpty() || FVector::Dist(B.Dest, C.Pos) > 150.f)
+			{
+				GoTo(B, C.Pos, Tuning.JogCmS, true);
+				if (B.Path.IsEmpty())
+				{
+					B.Carrying = INDEX_NONE;                             // no way to him
+					C.Bearer = INDEX_NONE;
+					return;
+				}
+			}
+			Move(B, Dt);
+			return;
+		}
+		B.Path.Reset();
+		B.Speed = 0.f;
+		B.bLow = true;
+		B.CarryT += Dt;
+		if (B.CarryT >= Tuning.EvacPickupS)
+		{
+			B.CarryT = 0.f;
+			B.bLow = false;
+			C.CarriedBy = B.Id;
+			C.Bleed += Tuning.EvacBleedBonusS;
+		}
+		return;
+	}
+	// on his shoulders: out to the hatch his squad came in by
+	const FSquad* Sq = Teams.IsValidIndex(B.Squad) ? &Teams[B.Squad] : nullptr;
+	const FVector Out = Sq ? BreachPosOf(*Sq) : Mis.BreachPos;
+	const int32 OutComp = Sq ? BreachCompOf(*Sq) : Mis.Breach;
+	if (B.Comp == OutComp && FVector::Dist2D(B.Pos, Out) < 320.f)
+	{
+		const int32 Side = (int32)C.Side;
+		C.Act = EAct::Gone;
+		C.CarriedBy = INDEX_NONE;
+		C.Bearer = INDEX_NONE;
+		C.Pos = B.Pos;
+		Stats.Down[Side] = FMath::Max(0, Stats.Down[Side] - 1);
+		++Stats.Carried[Side];
+		Emit(EEvent::Carried, C.Id, B.Id, B.Pos, B.Pos, 0.f, false, B.Name);
+		B.Carrying = INDEX_NONE;
+		B.Path.Reset();
+		B.Speed = 0.f;
+		B.Act = EAct::Idle;
+		return;
+	}
+	if (B.Path.IsEmpty() || FVector::Dist(B.Dest, Out) > 200.f)
+	{
+		GoTo(B, Out, Tuning.EvacCmS, true);
+		if (B.Path.IsEmpty())
+		{
+			C.CarriedBy = INDEX_NONE;                                    // no way out: he is put down here
+			C.Bearer = INDEX_NONE;
+			B.Carrying = INDEX_NONE;
+			return;
+		}
+	}
+	Move(B, Dt);
+	C.Pos = B.Pos;
+	C.Comp = B.Comp;
 }
 
 int32 FAstraBoardSim::CountAble(ESide S) const
@@ -820,6 +1014,11 @@ void FAstraBoardSim::StepUnit(FUnit& U, float Dt)
 	U.FireT = FMath::Max(0.f, U.FireT - Dt);
 	U.AcquireT = FMath::Max(0.f, U.AcquireT - Dt);
 	U.CoverT = FMath::Max(0.f, U.CoverT - Dt);
+	if (U.Carrying != INDEX_NONE)
+	{
+		StepCarry(U, Dt);                                            // (called to a casualty, or carrying him out: the squad's drill does not move him, he does not shoot)
+		return;
+	}
 	if (U.Act == EAct::Reload)
 	{
 		U.ReloadT -= Dt;
@@ -1051,7 +1250,7 @@ void FAstraBoardSim::Damage(FUnit& T, float Dmg, bool bHead, int32 ByUnit, const
 	}
 	// beaten: dead, or down and alive (a wound that keeps him out of the fight and may be the end of him if nobody comes)
 	const float Over = FMath::Clamp(-T.Hp / 35.f, 0.f, 1.f);
-	const float Lethal = bHead ? 0.8f : 0.26f + 0.5f * Over;
+	const float Lethal = (bHead ? 0.8f : 0.26f + 0.5f * Over) * Tuning.LethalScale[(int32)T.Side];
 	if (Rng.FRand() < Lethal)
 	{
 		Kill(T, ByUnit, By);
@@ -1145,6 +1344,53 @@ void FAstraBoardSim::CarryOut(int32 UnitId)
 		++Stats.Carried[(int32)People[UnitId].Side];
 		++Stats.Rescues;
 	}
+}
+
+void FAstraBoardSim::LeaveShip(int32 UnitId)
+{
+	if (!People.IsValidIndex(UnitId))
+	{
+		return;
+	}
+	FUnit& U = People[UnitId];
+	if (U.Act == EAct::Dead || U.Act == EAct::Gone)
+	{
+		return;
+	}
+	if (U.Act == EAct::Down)
+	{
+		CarryOut(UnitId);
+		return;
+	}
+	if (U.Carrying != INDEX_NONE && People.IsValidIndex(U.Carrying))
+	{
+		People[U.Carrying].CarriedBy = INDEX_NONE;                   // (the man he was carrying is put down where he stands)
+		People[U.Carrying].Bearer = INDEX_NONE;
+		People[U.Carrying].Pos = U.Pos;
+	}
+	U.Carrying = INDEX_NONE;
+	if (U.Act == EAct::Waiting)
+	{
+		for (int32 i = Pending.Num() - 1; i >= 0; --i)
+		{
+			if (Pending[i].Unit == UnitId)
+			{
+				Pending.RemoveAt(i);
+			}
+		}
+		Stats.Spawned[(int32)U.Side] = FMath::Max(0, Stats.Spawned[(int32)U.Side] - 1);      // he was not in yet: not a man of this fight
+		if (Teams.IsValidIndex(U.Squad))
+		{
+			Teams[U.Squad].StartStrength = FMath::Max(0.f, Teams[U.Squad].StartStrength - 1.f);
+		}
+		U.Act = EAct::Gone;
+		return;
+	}
+	U.Act = EAct::Gone;
+	U.Path.Reset();
+	U.Speed = 0.f;
+	++Stats.Exited[(int32)U.Side];
+	Emit(EEvent::Exit, U.Id, INDEX_NONE, U.Pos, U.Pos, 0.f, false, U.Name);
 }
 
 // ================================================================================================================== fighting
@@ -1558,7 +1804,8 @@ void FAstraBoardSim::StepMission(float Dt)
 			++DefAtObjective;
 		}
 	}
-	if (Mis.Objective != INDEX_NONE && AttAtObjective >= 2 && DefAtObjective == 0)
+	// two men hold a place (the last man of a party that has lost the rest holds it alone: nobody else is left to come)
+	if (Mis.Objective != INDEX_NONE && AttAtObjective >= FMath::Clamp(AttStill, 1, 2) && DefAtObjective == 0)
 	{
 		Mis.HeldS += Dt;
 	}
@@ -1595,7 +1842,7 @@ FString FAstraBoardSim::HostileSummary() const
 	Intel(Defender(), Seen);
 	if (Seen.IsEmpty())
 	{
-	return TEXT("no hostile contact on the internal sensors");
+		return TEXT("no hostile contact on the internal sensors");
 	}
 	TMap<FString, int32> By;
 	for (const FSeen& S : Seen)

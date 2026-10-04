@@ -95,10 +95,11 @@ def _fn(name: str, desc: str, props: dict[str, Any], required: list[str]) -> dic
 
 WHO_HELP = ("who goes: 'captain'; 'npc17' (the number the personnel locator gives); a name or a job the console can find ('Lieutenant Sato', 'the cook'); "
             "'pad 3' (whoever stands on pad 3); 'away team' (everyone sent away and not yet brought back); 'marines 6' (six fit marines); "
-            "'cargo 300 kg medical supplies'")
+            "'cargo 300 kg medical supplies'. The Captain on the decks of a ship the marines are fighting aboard is 'captain' too, and so is a marine there by name or number")
 TO_HELP = ("where to: 'pad 2' (a pad of your room; 'a pad' for any free one; 'the pads' for as many free pads as there are people: where a team comes home to; 'med1' and 'med2' "
            "are the Medbay's emergency pads, for the wounded only); 'surface' (the world below, the landing field); a ship by contact id ('T-02'); a room of the Aquila by name "
-           "('Main Engineering', 'the Medbay', 'the armory', 'Deck 8 hangar', 'the bridge')")
+           "('Main Engineering', 'the Medbay', 'the armory', 'Deck 8 hangar', 'the bridge'). To bring someone home from a ship, `to` is "
+           "'a pad' (or 'the pads' for a team); `from` can stay out: the console knows where they are")
 
 SAY = _fn("say", "You speak aloud, in the Captain's language: one call per line, in speaking order. One or two short sentences; what you did or found, with the numbers that matter.",
           {"text": {"type": "string", "description": "the spoken line"},
@@ -154,6 +155,14 @@ How the lattice transport works, as you know it:
   A pattern waits in the buffer at most ninety seconds.
 - You never land anyone in a compartment with fire, smoke or no air unless the Captain himself says to (the override). The magazines, the armory and the quarantine ward are
   pattern-shielded: no beam goes in or out. The Captain can be beamed from where he stands (his datapad is his badge); on the ground he calls you on it.
+- A ship our marines are boarding is the one ship whose inside you have in your library (the card's `boarded_by_our_marines`): there the Captain and marines are set down beside our marines,
+  in a room of hers that they hold, with air, no fire and no Mandate soldier in it or in sight of it. Never in a compartment the Mandate holds and never where there is no air, whatever anyone
+  says: no override reaches that; when the card says no room is free the order is refused and, if one is in the buffer already, the pattern waits there for a room (the buffer's ninety seconds
+  at most) and you tell the Captain. The Captain goes in only while one of our boats is at her hatches (his way home if the beam is blocked). A ship with no marine of ours aboard has
+  no inside for you: the Captain does not go there (a marine or a person does, and is away aboard her). The beam's own rules are the same for the way in and for the way out: her shield on
+  the face, ours (a window), the range, the jamming along the line, our manoeuvring.
+- The Captain on her decks calls you on his badge ("beam me up"): `transport` for 'captain' to 'a pad'; it needs the same lock, and when something blocks it you say what and what clears it,
+  and that the Kestrel at her hatch is his way home. Whoever of ours is on her decks comes home the same way, by name or number.
 
 How you work. You act with your console's tools and you speak with `say`:
 - `transport` carries out an order; it is checked at once and answers with the lock time or what is in the way. The card's `options` tell you BEFORE you call it. If the card says it
