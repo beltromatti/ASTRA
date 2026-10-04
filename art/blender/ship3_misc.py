@@ -179,6 +179,10 @@ def build_freighter(c: Ctx) -> dict:
         g.box((x, 0.0, 15.2 + 4.5), (0.45, 5.4, 9.0), m("Radiator"), chamfer=0.03, kind="radiator")
     g.box((x_st + 2.0 + (dx0 + 1.0 - x_st - 2.0) / 2, 0, 0), (dx0 + 1.0 - x_st - 2.0, 30.0, 28.0), m("Frame"), chamfer=0.2, kind="engine")
     K2.engine_bank(c, x_st + 2.0, [-6.5, 6.5], [-6.5, 6.5], 5.4)
+    # manoeuvring-thruster quads on the drive section's flanks, above and below the radiator wings' hinges (SPAZIO-VIVO: the jets of a freighter that turns come out of nozzles that can be seen: art/blender/space3_thrusters.py)
+    for sz in (-1, 1):
+        for sy in (-1, 1):
+            K2.thruster_cluster(c, Xf((dx0 + 9.0, sy * 17.6, sz * 8.5), G.frame_z((0.0, sy, 0.0), (0.0, 0.0, float(sz))), 1.0), 0.6)
     K2.nav_light(c, np.array([x_st + 4.0, 0.0, 15.3]), np.array([-0.3, 0.0, 1.0]), K2.NAV_WHITE, 1.2)
     # ---------------------------------------------------------------------------------------------------- details and cuts
     H.panelize_plates(c, plates, st)

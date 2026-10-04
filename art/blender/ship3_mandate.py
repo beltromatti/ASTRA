@@ -318,6 +318,28 @@ class MandateShip:
         for R, ys, zs in e["banks"]:
             K2.engine_bank(c, xa, ys, [z + self.zat(b["x0"]) + e.get("dz", 0.0) for z in zs], R, style="mandate")
 
+    def rcs(self) -> None:
+        """Manoeuvring-thruster quads on the flanks of the stern block, two a side (high and low), the way the ASTRA ships carry theirs: the jets of a ship that turns or brakes come out of nozzles that can be
+        seen on the hull (SPAZIO-VIVO: art/blender/space3_thrusters.py reads them from here, docs/SPAZIO.md). The upper ones' pitch bell looks up, the lower ones' down, so that the pair turns her both ways."""
+        import ship3_cut as CT
+        c = self.c
+        e, b = self.sp["engines"], self.b
+        r = float(np.clip(0.0017 * self.sp["L"], 0.3, 1.0))
+        xa = b["x0"] - e["len"]
+        zc = self.zat(b["x0"]) + e.get("dz", 0.0)
+        sec = np.array(LF.blade(e["w"], e["h"], 0.0), np.float64)
+        x = xa + 0.7 * e["len"]                                          # toward the hull, clear of the bank of bells on the aft face
+        for fz in (0.5, -0.5):
+            ex = CT.slice_extent(sec, 1, fz * e["h"] - 0.05, fz * e["h"] + 0.05)           # the block's width at that height: the flank the quad stands on
+            if ex is None:
+                continue
+            for sy in (-1, 1):
+                y = ex[1] if sy > 0 else ex[0]
+                fr = G.frame_z((0.0, sy, 0.0), (0.0, 0.0, 1.0 if fz > 0 else -1.0))
+                xf = Xf((x, y + sy * (1.0 + 0.8 * r), zc + fz * e["h"]), fr, 1.0)                # (stood clear of the plating, which is a metre thick here)
+                xf.box(c.g, (0.0, 0.0, -(1.6 * r + 1.0)), (7.0 * r, 7.0 * r, 2.0), c.m("Frame"), ch=0.06, kind="rcs")      # a plinth under the quad, down into the plates
+                K2.thruster_cluster(c, xf, r)
+
     def lights(self) -> None:
         """A Mandate ship runs dark: one pulsing red light (amber slits are on the tower and the waist)."""
         pass
@@ -375,6 +397,7 @@ class MandateShip:
             fn(self)
         self.tower()
         self.engines()
+        self.rcs()
         self.radiators()
         self.weapons()
         self.hangars()
@@ -536,6 +559,7 @@ def _build(c: Ctx, spec: dict, name: str, extras, extra_info: dict) -> dict:
     _mandate_hooks(ship, name)
     ship.tower()
     ship.engines()
+    ship.rcs()
     ship.radiators()
     ship.weapons()
     ship.hangars()
