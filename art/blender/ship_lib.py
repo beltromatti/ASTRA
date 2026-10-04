@@ -240,6 +240,9 @@ class SParts(L.Parts):
     """Parts (body / fine / emissive / soft groups) built with SFB."""
 
     BEVEL_SEGMENTS = {"body": 1, "fine": 1}              # ARTE-INTERNI: one segment (a chamfer): a bevelled box was ~120 triangles with two, now ~45; at 5 mm nobody sees the difference
+    FINE_DIET = False                                    # ARTE-INTERNI-2: the small hardware (the `fine` group: handles, rails, taps, legs, pins) is not bevelled: a 3 mm chamfer is invisible from a metre and
+                                                         # costs 44 triangles a box and 92 a slim rod where 12 and 28 would do (a fifth of the kit's triangles); the group is smoothed by angle instead.
+                                                         # ship_kit.build_mesh switches it on for the rooms; the corridor modules keep their bevels
 
     def __init__(self, bevel: float = 0.006, fine_bevel: float = 0.003, angle: float = 35.0) -> None:
         super().__init__(bevel, fine_bevel, angle)
@@ -255,14 +258,15 @@ class SParts(L.Parts):
                 fb.bm.free()
                 continue
             o = fb.to_object(f"{name}_{tag}")
-            if bev > 0:
+            lean = tag == "fine" and (self.FINE_DIET or bev <= 0)       # small hardware without a bevel: its round parts still shade round
+            if bev > 0 and not lean:
                 A.bevel_and_normals(o, width=bev, segments=self.BEVEL_SEGMENTS.get(tag, 2), angle_deg=self.angle)
             A.box_uv(o, texel_m=uv_meter)
-            if tag == "soft":                                      # cushions and other organic parts: smooth shading
+            if tag == "soft" or lean:                              # cushions and other organic parts (50 degrees), small hardware (the group's own angle): smooth shading
                 bpy.ops.object.select_all(action="DESELECT")
                 o.select_set(True)
                 bpy.context.view_layer.objects.active = o
-                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(50))
+                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(50 if tag == "soft" else self.angle))
             objs.append(o)
         if not objs:
             raise RuntimeError(f"{name}: empty mesh")

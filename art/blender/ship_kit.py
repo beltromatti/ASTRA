@@ -158,7 +158,11 @@ def build_mesh(name: str, item: tuple):
         return SC.build_module(name, item[1], item[2])
     if kind in ("room", "vertical"):
         mod = importlib.import_module(item[2])
-        return getattr(mod, item[3])(name)
+        SL.SParts.FINE_DIET = kind == "room"                        # ARTE-INTERNI-2: the rooms' small hardware is not bevelled (ship_lib.SParts); the stair towers, lifts and cars keep theirs
+        try:
+            return getattr(mod, item[3])(name)
+        finally:
+            SL.SParts.FINE_DIET = False
     if kind == "stub":
         import ship_corridor as SC
         return SC.build_stub(name, item[1], item[2])

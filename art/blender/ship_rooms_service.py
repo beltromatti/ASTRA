@@ -440,7 +440,7 @@ def garden(name: str = "SM_SHIP_Garden"):
     for (xa, xb, ya, yb, seed) in ((x0 + 0.4, 8.6, y0 + 1.2, 6.0, 1), (11.4, x1 - 0.4, y0 + 1.2, 6.0, 2), (x0 + 0.4, 11.0, 10.0, y1 - 0.5, 3), (13.0, x1 - 0.4, 10.0, y1 - 0.5, 4)):
         w_, d_ = yb - ya, xb - xa
         with b.at(frame((xa + xb) / 2, (ya + yb) / 2, 0.0, 90.0)):
-            PL.garden_bed(b, d_, w_, 0.42, seed, tree="pachira_a" if seed == 3 else "pachira_d", cover=MOSS if seed % 2 else GRASS, density=0.85)
+            PL.garden_bed(b, d_, w_, 0.42, seed, tree="pachira_a_lo" if seed == 3 else "pachira_d_lo", cover=MOSS if seed % 2 else GRASS, density=0.75)
     # vines trailing from the girders (over the path and its edges)
     for xb in frames:
         y = y0 + 0.9

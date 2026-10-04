@@ -38,6 +38,14 @@ for k in "abc":
                 two_sided=["calathea_orbifolia_01"])
 for k in "bc":
     SA.register(f"anthurium_{k}", "anthurium_botany_01", {"anthurium_botany_01": PH + "Anthurium"}, pick=[f"anthurium_botany_01_{k}"], decimate=0.45, two_sided=["anthurium_botany_01"])
+# ARTE-INTERNI-2: the trees and pot plants of the rooms at half the triangles or less (a cabin block stands six of them in view at once; seen from a metre and more the leaves hold their shape)
+SA.register("pachira_c_lo", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
+            pick=["pachira_aquatica_01_bark_c", "pachira_aquatica_01_leaves_c"], decimate=0.2, two_sided=["pachira_aquatica_01_leaves"])
+SA.register("pachira_d_lo", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
+            pick=["pachira_aquatica_01_bark_d", "pachira_aquatica_01_leaves_d"], decimate=0.15, two_sided=["pachira_aquatica_01_leaves"])
+SA.register("pachira_a_lo", "pachira_aquatica_01", {"pachira_aquatica_01_bark": PH + "PachiraBark", "pachira_aquatica_01_leaves": PH + "PachiraLeaf"},
+            pick=["pachira_aquatica_01_bark_a", "pachira_aquatica_01_leaves_a"], decimate=0.14, two_sided=["pachira_aquatica_01_leaves"])
+SA.register("syngonium_lo", "potted_plant_02", {"potted_plant_02_leaves": PH + "Syngonium"}, pick=["potted_plant_02_leaves"], decimate=0.2, two_sided=["potted_plant_02_leaves"])
 # the same scans at a fifth of the triangles for the beds of the gardens, where dozens stand in view at once (seen from two metres and more)
 for k in "bc":
     SA.register(f"fern_lo_{k}", "fern_02", {"fern_02": PH + "Fern"}, pick=[f"fern_02_{k}"], decimate=0.2, two_sided=["fern_02"])
@@ -47,22 +55,22 @@ SA.register("anthurium_lo", "anthurium_botany_01", {"anthurium_botany_01": PH + 
 
 # ------------------------------------------------------------------------------------------------------------------------------------ pots
 def pot(b: SParts, kind: str = "cyl", r: float = 0.2, h: float = 0.4, mat: str = CERAMIC, soil: bool = True, soil_dz: float = 0.04) -> float:
-    """A pot centred on the origin; returns the height of the soil surface. kind: cyl (a straight ceramic cylinder with a rolled rim), bowl (a wide low bowl on a steel foot),
+    """A pot centred on the origin (ARTE-INTERNI-2: turned in the soft group, 24 segments: smooth, and a third of the triangles of a bevelled lathe); returns the height of the soil surface. kind: cyl (a straight ceramic cylinder with a rolled rim), bowl (a wide low bowl on a steel foot),
     cone (a tapered pot), tub (a big round tub for a tree)."""
     if kind == "bowl":
-        b.body.cyl((0, 0, 0.0), (0, 0, h * 0.2), r * 0.3, STEEL, seg=20, r2=r * 0.36)
-        MK.lathe(b.body, [(r * 0.34, h * 0.16), (r * 0.5, h * 0.2), (r * 0.78, h * 0.45), (r * 0.96, h * 0.82), (r, h), (r * 0.93, h), (r * 0.88, h * 0.78), (r * 0.62, h * 0.38),
-                          (r * 0.3, h * 0.26)], (0, 0, 0), mat, seg=28)
+        b.soft.cyl((0, 0, 0.0), (0, 0, h * 0.2), r * 0.3, STEEL, seg=16, r2=r * 0.36)
+        MK.lathe(b.soft, [(r * 0.34, h * 0.16), (r * 0.5, h * 0.2), (r * 0.78, h * 0.45), (r * 0.96, h * 0.82), (r, h), (r * 0.93, h), (r * 0.88, h * 0.78), (r * 0.62, h * 0.38),
+                          (r * 0.3, h * 0.26)], (0, 0, 0), mat, seg=20)
         top = h * 0.8
     elif kind == "cone":
-        MK.lathe(b.body, [(r * 0.62, 0.0), (r * 0.64, h * 0.04), (r * 0.9, h * 0.9), (r, h * 0.96), (r, h), (r * 0.9, h), (r * 0.84, h * 0.88), (r * 0.58, h * 0.07)], (0, 0, 0), mat, seg=28)
+        MK.lathe(b.soft, [(r * 0.62, 0.0), (r * 0.64, h * 0.04), (r * 0.9, h * 0.9), (r, h * 0.96), (r, h), (r * 0.9, h), (r * 0.84, h * 0.88), (r * 0.58, h * 0.07)], (0, 0, 0), mat, seg=20)
         top = h * 0.88
     elif kind == "tub":
-        MK.lathe(b.body, [(r * 0.86, 0.0), (r * 0.9, h * 0.04), (r, h * 0.12), (r * 1.0, h * 0.9), (r * 1.04, h), (r * 0.94, h), (r * 0.9, h * 0.9), (r * 0.82, h * 0.08)], (0, 0, 0), mat, seg=32)
-        b.fine.cyl((0, 0, h * 0.5 - 0.02), (0, 0, h * 0.5 + 0.02), r * 1.012, STEEL, seg=32)
+        MK.lathe(b.soft, [(r * 0.86, 0.0), (r * 0.9, h * 0.04), (r, h * 0.12), (r * 1.0, h * 0.9), (r * 1.04, h), (r * 0.94, h), (r * 0.9, h * 0.9), (r * 0.82, h * 0.08)], (0, 0, 0), mat, seg=24)
+        b.soft.cyl((0, 0, h * 0.5 - 0.02), (0, 0, h * 0.5 + 0.02), r * 1.012, STEEL, seg=24, caps=False)
         top = h * 0.9
     else:                                                                    # cyl
-        MK.lathe(b.body, [(r * 0.94, 0.0), (r * 0.98, h * 0.03), (r, h * 0.1), (r, h * 0.94), (r * 1.04, h * 0.97), (r * 1.04, h), (r * 0.94, h), (r * 0.92, h * 0.9), (r * 0.88, h * 0.06)], (0, 0, 0), mat, seg=28)
+        MK.lathe(b.soft, [(r * 0.94, 0.0), (r * 0.98, h * 0.03), (r, h * 0.1), (r, h * 0.94), (r * 1.04, h * 0.97), (r * 1.04, h), (r * 0.94, h), (r * 0.92, h * 0.9), (r * 0.88, h * 0.06)], (0, 0, 0), mat, seg=24)
         top = h * 0.9
     if soil:
         b.soft.cyl((0, 0, top - 0.01), (0, 0, top + soil_dz * 0.0), r * 0.9, SOIL, seg=24)
@@ -77,9 +85,9 @@ def potted(b: SParts, kind: str = "syngonium", pot_kind: str = "bowl", pot_r: fl
 
 
 def haworthia(b: SParts, scale: float = 1.0, yaw: float = 0.0) -> float:
-    """The scanned zebra plant in its white ceramic pot (a desk plant, 27 cm)."""
-    SA.add(b.soft, "haworthia", (0.0, 0.0, 0.0), yaw, scale)
-    return SA.get("haworthia")["size"][2] * scale
+    """The desk plant (about 25 cm): a small syngonium in a white ceramic cylinder. (ARTE-INTERNI-2: the zebra plant of the first scans had a texture set, a material slot and 3 000 triangles of its own for
+    one pot of leaves on a desk.)"""
+    return potted(b, "syngonium_lo", "cyl", 0.07, 0.12, scale=0.5 * scale, yaw=yaw)
 
 
 def floor_tree(b: SParts, kind: str = "pachira_d", tub_r: float = 0.34, mat: str = CERAMIC, scale: float = 1.0, yaw: float = 0.0, pot_h: float = 0.45) -> float:
@@ -91,14 +99,14 @@ def floor_tree(b: SParts, kind: str = "pachira_d", tub_r: float = 0.34, mat: str
 
 # --------------------------------------------------------------------------------------------------------------------------------- planters
 def planter_bed(b: SParts, w: float = 2.0, d: float = 0.7, h: float = 0.45, seed: int = 1, tall: bool = False, density: float = 1.0, skin=STEEL, kinds=None) -> float:
-    """A long planter: a rounded tray in `skin` on a recessed foot with a brushed rim and a mound of soil standing proud of it, planted with ferns, calatheas and anthuriums in a row (a
+    """A long planter: a rounded tray in `skin` on a recessed foot with a brushed rim and a mound of soil standing proud of it, planted with ferns and calatheas in a row (a
     money tree at one end when `tall`). Centred on the origin, `w` along y (the long side), `d` along x. Returns the height of the plantation."""
     rng = random.Random(seed)
     MK.rbox(b.soft, (-d / 2, -w / 2, 0.07), (d / 2, w / 2, h), 0.02, skin, 2)
     b.fine.box((-d / 2 + 0.05, -w / 2 + 0.05, 0.0), (d / 2 - 0.05, w / 2 - 0.05, 0.07), STRUCT)
     b.fine.box((-d / 2 - 0.006, -w / 2 - 0.006, h - 0.03), (d / 2 + 0.006, w / 2 + 0.006, h - 0.012), TRIM)                      # the rim line
     MK.rbox(b.soft, (-d / 2 + 0.05, -w / 2 + 0.05, h - 0.02), (d / 2 - 0.05, w / 2 - 0.05, h + 0.055), 0.03, SOIL, 2)           # the soil, heaped a little
-    kinds = kinds or ["fern_b", "calathea_b", "fern_c", "anthurium_c", "calathea_c", "fern_b", "calathea_c", "fern_c"]
+    kinds = kinds or ["fern_lo_b", "calathea_lo", "fern_lo_c", "calathea_lo", "fern_lo_b", "calathea_lo", "fern_lo_c", "calathea_lo"]       # ARTE-INTERNI-2: the light scans (a planter stands in view with its neighbours)
     n = max(2, int(round(w / 0.62 * density)))
     top = h
     for k in range(n):
@@ -108,8 +116,8 @@ def planter_bed(b: SParts, w: float = 2.0, d: float = 0.7, h: float = 0.45, seed
         SA.add(b.soft, kind, (rng.uniform(-d * 0.15, d * 0.15), y, h + 0.02), rng.uniform(0, 360), sc)
         top = max(top, h + SA.get(kind)["size"][2] * sc)
     if tall:
-        SA.add(b.soft, "pachira_c", (0.0, w / 2 - 0.45, h + 0.02), rng.uniform(0, 360), 0.9)
-        top = h + SA.get("pachira_c")["size"][2] * 0.9
+        SA.add(b.soft, "pachira_c_lo", (0.0, w / 2 - 0.45, h + 0.02), rng.uniform(0, 360), 0.9)
+        top = h + SA.get("pachira_c_lo")["size"][2] * 0.9
     return top
 
 
@@ -184,7 +192,7 @@ def living_wall(b: SParts, w: float = 2.8, h: float = 2.5, z0: float = 0.2, seed
 
 def garden_bed(b: SParts, length: float, width: float, h: float = 0.42, seed: int = 1, tree: str | None = "pachira_d", cover: str = MOSS, density: float = 1.0) -> None:
     """A planting bed of a garden (centred on the origin, `length` along y, `width` along x, `h` high): an oak frame round a ground of moss or lawn that swells into gentle mounds,
-    clumps of ferns, calatheas and anthuriums (Poly Haven scans), hostas, tufts of grass, patches of flowers, river stones, and a tree on a patch of earth if `tree`."""
+    clumps of ferns and calatheas (Poly Haven scans), hostas, tufts of grass, patches of flowers, river stones, and a tree on a patch of earth if `tree`."""
     rng = random.Random(seed)
     hw, hl, rim = width / 2, length / 2, 0.07
     for lo, hi in (((-hw, -hl, 0.0), (-hw + rim, hl, h)), ((hw - rim, -hl, 0.0), (hw, hl, h)), ((-hw + rim, -hl, 0.0), (hw - rim, -hl + rim, h)), ((-hw + rim, hl - rim, 0.0), (hw - rim, hl, h))):
@@ -225,7 +233,7 @@ def garden_bed(b: SParts, length: float, width: float, h: float = 0.42, seed: in
                 sx, sy_ = x + 0.62 * math.cos(a), y + 0.62 * math.sin(a)
                 with b.at(T(sx, sy_, ground(sx, sy_))):
                     river_stone(b, rng.uniform(0.07, 0.13), seed * 10 + k)
-    plan = [("fern_lo_b", 0.55, 1.3, 0.95), ("fern_lo_c", 0.5, 1.3, 1.15), ("calathea_lo", 0.3, 0.55, 1.35), ("anthurium_lo", 0.4, 0.5, 1.15)]
+    plan = [("fern_lo_b", 0.55, 1.4, 0.95), ("fern_lo_c", 0.5, 1.4, 1.15), ("calathea_lo", 0.3, 1.0, 1.35)]                      # (ARTE-INTERNI-2: no anthuriums: one texture set fewer in every deck)
     for kind, rad, per10, sc in plan:
         for k in range(max(1, round(area / 10.0 * per10 * density))):
             xy = spot(rad * sc)

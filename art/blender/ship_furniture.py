@@ -222,17 +222,17 @@ def planter(b: SParts, w: float = 1.0, d: float = 0.5, h: float = 0.45, plants: 
 
 
 def potted_plant(b: SParts, h: float = 1.1, seed: int = 2) -> None:
-    """A potted plant of about height h (a scanned plant in a pot of the ship: ship_plants): a palm for the tallest, a money tree, a syngonium, a snake plant, a zebra plant on a desk."""
+    """A potted plant of about height h (a scanned plant in a pot of the ship: ship_plants): a money tree for the tallest, a syngonium, a snake plant, a small syngonium on a desk."""
     import ship_plants as PL
-    if h >= 1.7:
-        PL.floor_tree(b, "pachira_c", 0.3, scale=1.1, yaw=seed * 47.0)
+    if h >= 1.7:                                                                       # ARTE-INTERNI-2: the light scans (half the triangles, the same look from a metre and more)
+        PL.floor_tree(b, "pachira_c_lo", 0.3, scale=1.1, yaw=seed * 47.0)
     elif h >= 1.3:
-        PL.floor_tree(b, "pachira_c" if seed % 2 else "ficus", 0.28, scale=0.95, yaw=seed * 53.0) if seed % 2 else PL.potted(b, "ficus", "tub", 0.28, 0.45, yaw=seed * 53.0)
+        PL.floor_tree(b, "pachira_c_lo", 0.28, scale=0.95, yaw=seed * 53.0)
     elif h >= 0.85:
         if seed % 3 == 0:
             PL.snake_plant(b, seed=seed)
         else:
-            PL.potted(b, "syngonium", "bowl", 0.25, 0.34, yaw=seed * 61.0)
+            PL.potted(b, "syngonium_lo", "bowl", 0.25, 0.34, yaw=seed * 61.0)
     else:
         PL.haworthia(b, yaw=seed * 40.0)
 

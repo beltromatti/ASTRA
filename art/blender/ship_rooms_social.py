@@ -103,7 +103,7 @@ def lounge(name: str = "SM_SHIP_Lounge"):
     place(b, 12.6, WF + 0.065, 90, DC.notice_board, 1.1, 0.75, 4, z=1.6)
     place(b, xr - 0.04, 9.0, 180, DC.picture, 1.6, 0.9, 11, WALNUT, "sun", z=1.8)
     # a floor tree by the café, planters under the bar's screen
-    place(b, xr - 1.0, 9.0, 0, PL.floor_tree, "pachira_c", 0.3, CERAMIC, 1.1, 20.0)
+    place(b, xr - 1.0, 9.0, 0, PL.floor_tree, "pachira_c_lo", 0.3, CERAMIC, 1.1, 20.0)
     # ARTE-INTERNI-2: acoustic clouds hung over the two conversation groups and the café tables (the ceiling was one plane)
     SU.clouds(b, [(2.2, 2.6, 9.8, 8.0), (2.2, 10.0, 9.8, 15.4), (13.6, 2.6, 22.2, 8.4)], H - 0.05, 0.42, PLASTER_IVORY, "warm_dim")
     return b.build(name)
