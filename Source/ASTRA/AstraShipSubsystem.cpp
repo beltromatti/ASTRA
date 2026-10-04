@@ -60,6 +60,8 @@ DECLARE_CYCLE_STAT(TEXT("Interior"), STAT_AstraInterior, STATGROUP_Astra);
 namespace
 {
 	TAutoConsoleVariable<float> CVarSpaceFill(TEXT("astra.light.fill"), 0.f, TEXT("The cool fill on hulls from the main viewscreen camera's side, as a share of the star's light (outside the hull only)"));
+	// the bridge's electrochromic window (M_ASTRA_SunFilter, the star's light function): the share of the star's light inside the bridge
+	TAutoConsoleVariable<float> CVarSunFilter(TEXT("astra.light.window"), 0.1f, TEXT("The star's light inside the bridge, as a share of it outside (the window's tint; 1 = clear glass, <0 = no filter)"));
 	const FName TagSky(TEXT("ASTRA.Sky"));
 	const FName TagSun(TEXT("ASTRA.Sun"));
 	const FName TagShipLight(TEXT("ASTRA.ShipLight"));
@@ -506,6 +508,19 @@ void UAstraShipSubsystem::CollectSceneRefs(UWorld& InWorld)
 		if (UDirectionalLightComponent* SD = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
 		{
 			SD->SetForwardShadingPriority(1);
+			// the bridge's window filters the star (tools/ue_scripts/make_sun_filter.py): the screens and the lamps hold the room, a
+			// sunlit patch on the deck is a pool of light and not a white-out; the hull, the ships and the view outside keep the full star
+			UMaterialInterface* Filter = CVarSunFilter.GetValueOnGameThread() >= 0.f
+			    ? LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_ASTRA_SunFilter.M_ASTRA_SunFilter"), nullptr, LOAD_NoWarn | LOAD_Quiet) : nullptr;
+			if (Filter)
+			{
+				SunFilter = UMaterialInstanceDynamic::Create(Filter, this);
+				SunFilter->SetScalarParameterValue(TEXT("Transmit"), CVarSunFilter.GetValueOnGameThread());
+				SD->LightFunctionFadeDistance = 1.0e9f;     // (a directional light's function fades out with distance: never here)
+				SD->DisabledBrightness = 1.f;
+				SD->SetLightFunctionMaterial(SunFilter);
+				SunFilterApplied = CVarSunFilter.GetValueOnGameThread();
+			}
 		}
 	}
 	// the planet's light: spawned here, aimed by UpdateAttitudeVisuals
@@ -3051,6 +3066,16 @@ TSharedRef<FJsonObject> UAstraShipSubsystem::Snapshot() const
 void UAstraShipSubsystem::Tick(float DeltaTime)
 {
 	SCOPE_CYCLE_COUNTER(STAT_AstraShip);
+	// the window's tint, when the console changes it (astra.light.window; below 0 the star has no filter)
+	if (const float Tint = CVarSunFilter.GetValueOnGameThread(); SunFilter && Tint != SunFilterApplied && Sun)
+	{
+		SunFilterApplied = Tint;
+		if (UDirectionalLightComponent* SD = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
+		{
+			SunFilter->SetScalarParameterValue(TEXT("Transmit"), FMath::Max(Tint, 0.f));
+			SD->SetLightFunctionMaterial(Tint >= 0.f ? SunFilter.Get() : nullptr);
+		}
+	}
 	if (bShipLost)
 	{
 		// a dead ship: no heat, no ward, no helm; only the pods drifting and the loss's own timing

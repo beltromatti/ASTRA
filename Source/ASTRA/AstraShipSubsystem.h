@@ -440,6 +440,8 @@ private:
 	UPROPERTY() TObjectPtr<UMaterialParameterCollection> ShipMPC;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> SkyMID;
 	UPROPERTY() TObjectPtr<ADirectionalLight> Sun;
+	UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> SunFilter;   // the bridge window's tint on the star (astra.light.window)
+	float SunFilterApplied = -1.f;
 	// the star's light thrown back by the planet (earthshine): a soft fill from the planet on everything outside the
 	// hull (lighting channel 1: it casts no shadow, so it must never reach inside)
 	UPROPERTY() TObjectPtr<ADirectionalLight> PlanetLight;
