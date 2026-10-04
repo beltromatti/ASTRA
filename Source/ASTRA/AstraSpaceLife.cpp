@@ -1013,10 +1013,12 @@ namespace
 			UE_LOG(LogASTRA, Display, TEXT("[Space] a test hostile %.0f km on the bow: watch astra.space.stat"), Km);
 		}));
 
-	FAutoConsoleCommandWithWorld CmdSpaceReload(TEXT("astra.space.reload"), TEXT("Read data/space again and lay the system out afresh (places, rocks, traffic)"),
+	FAutoConsoleCommandWithWorld CmdSpaceReload(TEXT("astra.space.reload"), TEXT("Read data/space again (the places, the jets of the capital ships, the places' hull boxes) and lay the system out afresh (places, rocks, traffic)"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
 		{
 			AstraSpace::ReloadData();
+			AstraSpace::ReloadJetData();                 // (the ships' motion is cleared when the system is laid out again, a frame on: nothing holds the old tables)
+			AstraSpace::ReloadSolidData();
 			if (UAstraSpaceLife* S = SpaceOf(W)) { S->Arrive(S->GetSystem().IsEmpty() ? FString(TEXT("Aurelia")) : S->GetSystem()); }
 		}));
 }
