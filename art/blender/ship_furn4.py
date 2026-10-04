@@ -317,7 +317,7 @@ def hospital_bed(b: SParts, seed: int = 1, blanket: str = FABRIC_NAVY) -> None:
         b.body.box((sx - 0.06, -0.12, 0.17), (sx + 0.06, 0.12, 0.4), STRUCT)
     b.body.box((-1.0, -0.46, 0.4), (1.0, 0.46, 0.46), STEEL)
     MK.rbox(b.soft, (-0.2, -0.45, 0.46), (0.97, 0.45, 0.58), 0.03, WHITE_GLOSS, 1)                                   # the leg section
-    with b.at(T(-0.2, 0.0, 0.52) @ Ry(-20.0)):                                                                      # the raised back section, hinged at the hip
+    with b.at(T(-0.2, 0.0, 0.52) @ Ry(20.0)):                                                                       # the raised back section, hinged at the hip (it rises towards the head, at -x)
         MK.rbox(b.soft, (-0.8, -0.45, 0.0), (0.0, 0.45, 0.12), 0.03, WHITE_GLOSS, 1)
         MK.puff(b.soft, (-0.62, 0.0, 0.17), (0.2, 0.3, 0.07), BEDDING, e=0.6)
     MK.rbox(b.soft, (-0.18, -0.465, 0.52), (0.97, 0.465, 0.64), 0.04, blanket, 2)

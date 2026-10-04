@@ -49,6 +49,7 @@ CURTAIN = "MI_MED_Curtain"
 PLASTIC = "MI_MED_Plastic"
 RED = "MI_MED_Red"
 CROSS = "MI_MED_Cross"
+PATIENT_BLANKET, PATIENT_SHEET = "MI_SHIP_FabricNavy", "MI_SHIP_Bedding"      # ARTE-INTERNI-2: the patients' blanket and sheet are the kit's cloth (the ward and its beds already are)
 STANDBY = "MI_MED_ScreenStandby"
 VITALS = "MI_MED_Vitals"
 WARD = "MI_MED_Ward"
@@ -429,7 +430,14 @@ def glass():
 
 # ------------------------------------------------------------------------------------------------ one bed
 def bed():
-    """Bed frame: origin on the floor under the backrest's hinge, +X towards the head (the wall is at +1.4)."""
+    """Bed frame: origin on the floor under the backrest's hinge, +X towards the head (the wall is at +1.4). ARTE-INTERNI-2 rebuilt it in the kit's language (art/blender/ship_med_bed.py: the same frame,
+    mattress, backrest and monitor); bed_v1 below is the first generation."""
+    import ship_med_bed
+    return ship_med_bed.bed("SM_MED_Bed")
+
+
+def bed_v1():
+    """The first generation's bed frame (origin on the floor under the backrest's hinge, +X towards the head)."""
     b = A.Builder()
     head, foot, hw = 0.95, -1.25, 0.5
     back_len = 0.92
@@ -526,7 +534,7 @@ def _section(s, lift=0.0):
     w_body = _interp(BODY_W, s)
     feet = max(0.0, 1.0 - abs(s - FEET_S) / 0.1)
     pts = []
-    n = 34
+    n = 26
     for i in range(n + 1):
         c = -0.47 + 0.94 * i / n
         one = _bump(c / w_body)
@@ -560,7 +568,7 @@ def blanket():
     b = A.Builder()
     thick = 0.012
     # up to the waist (the arms and the gown above it), the sheet folded over its edge
-    for (s0, s1, lift, mat, steps) in ((-1.22, 0.1, 0.0, BLANKET, 60), (0.02, 0.14, 0.014, LINEN, 6)):
+    for (s0, s1, lift, mat, steps) in ((-1.22, 0.1, 0.0, PATIENT_BLANKET, 38), (0.02, 0.14, 0.014, PATIENT_SHEET, 4)):
         outer, inner = [], []
         for k in range(steps + 1):
             s = s0 + (s1 - s0) * k / steps
@@ -574,8 +582,8 @@ def blanket():
 
 def folded():
     b = A.Builder()
-    blob(b, (-1.0, 0.0, 0.045), (0.36, 0.86, 0.09), BLANKET, e=0.3, ez=0.5)
-    blob(b, (-1.0, 0.0, 0.1), (0.3, 0.8, 0.035), BLANKET, e=0.3, ez=0.5)
+    blob(b, (-1.0, 0.0, 0.045), (0.36, 0.86, 0.09), PATIENT_BLANKET, e=0.3, ez=0.5, seg=(16, 8))
+    blob(b, (-1.0, 0.0, 0.1), (0.3, 0.8, 0.035), PATIENT_BLANKET, e=0.3, ez=0.5, seg=(16, 8))
     obj = b.to_object("SM_MED_BlanketFolded")
     return soft(obj, texel=0.5, angle=60.0)
 
