@@ -231,6 +231,10 @@ l'intervallo raddoppia) tiene anche un abbordaggio lunghissimo sotto 0,25 $ l'or
 | `mind/astra_mind/marines.py` | la rete dei marine |
 | `mind/bench/marines_unit.py` (71 prove), `marines_server.py` (19), `marines_live.py` (29 scene + un abbordaggio), `marines_router.py` (30 frasi) | prove offline e dal vivo |
 | `docs/licenze.csv` | AR-181 e M27S (CC-BY: attribuzione) |
+| `Source/ASTRA/AstraBoardCraft.h/.cpp`, `AstraBoardFlight.cpp` (F5.2) | le navette Skiff e Kestrel: i dati, il volo, l'aggancio, le regole del mondo (scudo, difesa puntuale, caccia), le sue prove (`astra.board.*`) |
+| `Source/ASTRA/AstraBoardAssault.cpp`, `AstraBoardScene.h/.cpp`, `AstraBoardPlans.h/.cpp` (F5.2) | l'ospite dell'assalto: l'ordine, le barche, la scena sulla pianta della classe (o sullo stato che la guerra ha lasciato alla nave), gli esiti, il quadro per le menti |
+| `Source/ASTRA/AstraBoardRide.cpp`, `AstraBoardInterior.h/.cpp` (F5.2) | il Capitano che va: la stiva della navetta, i ponti dell'altra nave fatti solidi dal piano, il ritorno |
+| `Source/ASTRA/AstraBoardBeam.cpp` (F5.2) | il teletrasporto visto dall'abbordaggio: dove si sbarca accanto ai marine (la domanda), i ponti pronti, chi e' sceso e chi e' stato portato via (§13.10) |
 
 **Ganci in file di altri** (piccoli e nominati, ABBORDAGGI): `ASTRACharacter.*` (il componente `Fps`, i legami dei tasti, il passo e il giro con l'arma),
 `ASTRAPlayerController.*` (E al rastrello; `IsPadUp()`; la scheda dei tasti «ARMED»), `AstraInput.*` (otto azioni), `AstraDamageModel.*` (`CaptainWounded`, `CaptainContested`),
@@ -338,6 +342,10 @@ può più sparargli: è parte dello scafo), dopo il «tempo di presa» (12 s lo 
 in codice**: passa la difesa puntuale (non la evita) e ne è colpita (una navetta isolata contro 4 canali arriva 1 volta su 3; contro 2 canali 2 su 5; i caccia in pattuglia le abbattono tutte:
 `tools/boarding.py craft`), **non aggancia dove lo scudo di quella faccia regge** (aspetta 18 s fuori dallo scafo e torna indietro), aggancia dove lo scudo è sotto l'8% o la nave non ha energia.
 Una navetta abbattuta porta con sé i suoi uomini (i marine sono caduti, con il nome). Gli eventi (`Launched`, `Docked`, `Destroyed`, `Aborted`, `Departed`, `Recovered`, `Lost`) li legge l'ospite.
+**Un luogo del sistema non è una nave di questa guerra** (i `bFixture` di SPAZIO-VIVO: Keeper Station, l'Arsenal, la raffineria di Tiberius, la miniera di Ceres): nessuna barca vola contro uno, nessuna
+parte da uno. `AssessBoarding`, `LaunchBoarding`, l'ordine in coda e `StartAssault` lo rifiutano con la ragione («X is a place of the system (a station), not a ship in this war: nobody docks a
+boat at her or flies one from her»); `ListShipFacts` non li elenca, e per questo non compaiono tra le navi abbordabili che le menti leggono. Provato dal banco (`tools/boarding.py assault --setup
+fixture`: una nave fatta luogo con `astra.board.fixture`, perché il banco della guerra non ha lo spazio vivo).
 
 ### 13.2 L'ospite: una scena sola alla volta (`AstraBoardAssault.cpp`, `AstraBoardSubsystem.*`)
 
@@ -365,6 +373,15 @@ Il mondo dentro la simulazione (`AstraBoardSim.*`): le **squadre per navetta** (
 - **Mandato**: `board` (ammiraglio e comandanti di gruppo, `war_minds.py`): `{target, carrier, boats, face, objective, action: launch|call_off, reason}`. Nel quadro «YOUR BOARDING BOATS»: i
   suoi portatori con gli Skiff liberi, le navi a cui una barca potrebbe agganciarsi **ora** (nessuna energia, o le facce a scudo giù, i canali della difesa puntuale, i caccia intorno, la distanza)
   e quante altre sono a scudi alzati; durante un assalto: dove sta ogni barca, e quanti dei suoi uomini combattono. La dottrina (testo stabile) dice come si perdono le navette.
+- **Un'operazione in corso è dell'ammiraglio, chiunque abbia mandato le barche** (3/10, dal primo giro nel gioco: l'ammiraglio richiamò dopo 3 s le barche di un assalto lanciato dalla console, senza dire
+  perché; la ragione dello strumento `board`, che lo schema esige, veniva scartata sulla strada del gioco). Ora il comando porta `by` e `reason` (anche per `call_off`); l'assalto ricorda chi l'ha
+  mandato e perché e che cosa le barche incontrano al portello com'era al lancio (`met_at_launch`: lo scudo sulla faccia, i canali della difesa puntuale, i caccia, gli uomini); il quadro
+  dell'ammiraglio dice «YOUR OPERATION, assault 1, 3 s old: Raider (yours) is boarding the Aquila; sent by <chi>, who gave this reason: "..."» (o, senza ragione, «on the standing plan: no
+  reason is recorded: it stands until what you see below gives you one to stop it»), cosa le barche hanno incontrato, e per ogni nave abbordabile cosa e' sulla strada delle barche («nothing is in
+  the boats' way (no shield on those faces, no point defence, no craft)»). La dottrina (stabile) dice di chi è l'operazione, su cosa la si richiama (barche abbattute più in fretta di come
+  agganciano, uno scudo salito sulla faccia, boarders battuti, un obiettivo reso inutile: mai un dubbio sulle probabilità né un ordine che non si è dato) e che il momento migliore per abbordare,
+  con lo scudo giù e la difesa muta, non è mai quello del richiamo. **Il richiamo porta chi e perché**: l'evento per il ponte è «X recalls her boats: <ragione>» (un rapporto: l'XO lo dice con le
+  parole dell'ammiraglio, non solo «le barche sono tornate»). `astra.board.options [0|1]` scrive nel log il JSON che l'ammiraglio legge; `astra.board.recall <chi> <ragione>` lo prova.
 - **Aquila**: `board_ship` (l'XO, solo su ordine del Capitano): `{target, boats, face, objective, marines, action: launch|call_off}`; nello stato `boarding_boats` (i Kestrel liberi, i marine
   pronti), `boarding_options` (le navi agganciabili ora, e perché), `boarding` (`.assault`: le barche, dove sono). La risposta del gioco porta i fatti (a quali portelli, in quanto tempo, se lo
   scudo di quella faccia regge, la difesa puntuale, i caccia): l'XO li dice, non promette.
@@ -388,15 +405,14 @@ velivolo e la dissolvenza.
 | Tempo | Che cosa succede |
 |---|---|
 | **Out** (la barca vola) | dissolvenza (0,9 s); è nella **stiva truppe** del Kestrel (una stanza sua: 6 x 3 x 2,5 m, una panca per lato, una lampada rossa, in una zona del mondo a z = -1,7e8); guarda intorno, non cammina; una riga lo avverte («KESTREL 1 · 12 MARINES · THE HULL IN 1:09», poi «CLOSING ON THE HATCH»). Se la barca è abbattuta: «the Captain was in it» (la fine che la nave già conosce: abbandono, inchiesta) |
-| **Aboard** (la barca ha aggancio e breccia) | dissolvenza: è nel **portello d'abbordaggio** della nave nemica, il fucile in mano e i marine intorno. L'interno è **geometria vera** fatta sul momento dal piano della classe (pavimenti, soffitti, pareti con i varchi delle porte e dei passaggi aperti, cornici, un'anta in ogni paratia stagna che si chiude come nel combattimento, strisce di luce; istanze di cubi con i materiali di ASTRA, `MI_ASTRA_Structure/Floor/Trim/Light`), qualche stanza alla volta intorno a lui, in una zona del mondo sua (z = -1,6e8) con sei luci che lo seguono. I corpi dei difensori, i colpi e le ferite come sui ponti dell'Aquila. **Scale e ascensori**: ci si ferma ~1 s su una piastra illuminata e si passa al ponte vicino. Se cade e la catena della nave lo porta via, si risveglia in Medbay e i ponti spariscono; se è perduto è la fine che la nave già conosce |
-| **Home** (finita la lotta, o richiamo) | «the Captain is called back to the boat»: dissolvenza, i ponti spariscono, è di nuovo nella stiva per il volo di ritorno e, a navetta rientrata, nell'hangar del Ponte 8 |
+| **Aboard** (la barca ha aggancio e breccia) | dissolvenza: è nel **portello d'abbordaggio** della nave nemica, il fucile in mano e i marine intorno. L'interno è **geometria vera** fatta sul momento dal piano della classe (pavimenti, soffitti, pareti con i varchi delle porte e dei passaggi aperti, cornici, un'anta in ogni paratia stagna che si chiude come nel combattimento, strisce di luce; istanze di cubi con i materiali di ASTRA, `MI_ASTRA_Structure/Floor/Trim/Light`), qualche stanza alla volta intorno a lui, in una zona del mondo sua (z = -1,6e8) con sei luci che lo seguono; l'attore sta alla zona e le istanze sono nel suo sistema (il piano in cm: le istanze di un ISM sono float rispetto al componente e a 1600 km dall'origine un float va a passi di 16 cm, pareti e pavimenti non si sarebbero toccati), pareti, pavimenti, soffitti, cornici e ante gettano ombra (sopra non c'è uno scafo che tenga fuori la luce della stella). I corpi dei difensori, i colpi e le ferite come sui ponti dell'Aquila. **Scale e ascensori**: ci si ferma ~1 s su una piastra illuminata e si passa al ponte vicino. Se cade e la catena della nave lo porta via, si risveglia in Medbay e i ponti spariscono; se è perduto è la fine che la nave già conosce |
+| **Home** (finita la lotta, o richiamo) | «the Captain is called back to the boat»: dissolvenza, i ponti spariscono, è di nuovo nella stiva per il volo di ritorno e, a navetta rientrata, nell'hangar del Ponte 8 (il ponte dell'hangar è chiesto allo streaming mentre la navetta vola e, se non c'è ancora, lui aspetta al buio fino a sei secondi e poi viene caricato di colpo: non lo si posa su un pavimento che non c'è) |
 
 L'equipaggio sa dove sta (`CaptainWhereText`: nello stato della nave, nel suo badge e nel «posto» del cruscotto: «AWAY · WITH THE MARINES»); l'XO ha il comando dell'Aquila e il Capitano parla alla
 plancia con il suo comunicatore. Il Maggiore Reyes ha la rete dei marine.
 
-**Il teletrasporto.** TELETRASPORTO dice che il Capitano **non** si teletrasporta su un'altra nave («her pads are not in the pattern library: a world below, yes; a ship, send a shuttle»), ed è
-giusto così: la strada del Capitano su una nave nemica è la navetta (la risposta della plancia a chi lo chiede già dice «send a shuttle»). Nessun gancio nel teletrasporto è stato necessario; far
-passare dal teletrasporto anche i soli marine (una persona «away» su una nave) sarebbe una richiesta a parte.
+**Il teletrasporto** è l'altra strada, dentro e fuori, con tutte le sue regole: §13.10. La navetta resta la strada di casa quando il fascio è bloccato («Chief, beam me up» rifiutata per uno scudo o un
+disturbo: il Capo dice perché e il Kestrel al portello è lì), e per andare chi non ha una nave a cui puntare.
 
 **Le piante vere.** Le sette classi di FLOTTA-VIVA hanno sale che coprono più ponti (cannoni, sale macchine, hangar) con **due porte una sopra l'altra** sullo stesso muro: il primo costruttore
 (muri interi con un buco per porta) chiudeva una porta con il pezzo di muro dell'altra. Ora un muro si fa per tratti tra i bordi delle aperture, con l'altezza meno i vuoti che vi sono, e una porta
@@ -451,11 +467,14 @@ La Praetorian disabilitata ha ancora 811 persone in piedi e 107 armati: 24 marin
 | Cosa | Come |
 |---|---|
 | Il banco delle navette (volo, difesa, aggancio) | `python3.13 tools/boarding.py craft [--setup out\|shield\|pd\|pd2\|cap] [--seeds N] [--trace]` (senza grafica: la battaglia di GUERRA a testa bassa) |
-| Il banco degli assalti (l'ospite, le scene, gli esiti) | `python3.13 tools/boarding.py assault [--setup in\|in_shield\|out\|out_ride\|out_war\|out_pd\|all]`: il mondo del banco ha la vita (i marine del ruolino) e la guerra; le piante si leggono su un worker, i comandi si danno tardi (11 000 s). `out_ride`: il Capitano (di prova, senza pawn) sale, i ponti si fanno solidi, torna; `out_war`: una nave presa a colpi (`astra.war.fleet pound`), la scena dallo stato della guerra e il Capitano dentro |
+| Il banco degli assalti (l'ospite, le scene, gli esiti) | `python3.13 tools/boarding.py assault [--setup in\|in_shield\|in_recall\|out\|out_ride\|out_war\|out_pd\|fixture\|all]`: il mondo del banco ha la vita (i marine del ruolino) e la guerra; le piante si leggono su un worker, i comandi si danno tardi (11 000 s). `out_ride`: il Capitano (di prova, senza pawn) sale, i ponti si fanno solidi, torna; `out_war`: una nave presa a colpi (`astra.war.fleet pound`), la scena dallo stato della guerra e il Capitano dentro |
 | Le piante di FLOTTA-VIVA come i soldati le vedono | `python3.13 tools/boarding.py run --scenario plans` (7 su 7: ogni portello ha una strada al ponte, all'ingegneria, all'alloggio, all'armeria, all'infermeria, alla prigione, alle comunicazioni e all'hangar) |
 | Lo sbarco su una pianta di classe (24 marine in due Kestrel, sei scenari, i morti e i feriti, i semi che non finiscono) | `python3.13 tools/boarding.py run --scenario attack --class acheron\|styx\|lethe\|vigilant\|praetorian [--seeds 20]` |
 | Lo sbarco su una nave presa a colpi | `python3.13 tools/boarding.py run --scenario war --class acheron [--setup 0..4]` |
 | L'interno solido di ogni classe | `python3.13 tools/boarding.py run --scenario interior [--class X] [--dump DIR]`; l'anteprima: `blender -b -P Saved/scratch/interior_view.py -- DIR/interior_X.json prefisso [portello]` (non nel repo) |
+| Il quadro dell'ammiraglio | `astra.board.options 1` (il JSON che il Mandato legge delle barche e dell'operazione in corso), `astra.board.recall Archon_Varek_Solm <la ragione a parole>` (il richiamo con chi e perché); banco `tools/boarding.py assault --setup in_recall` |
+| Un luogo del sistema non si abborda | `tools/boarding.py assault --setup fixture` (`astra.board.fixture <nave>` la fa luogo; nel gioco, con SPAZIO-VIVO, `astra.board.assault out K-1` risponde con la ragione) |
+| Il teletrasporto dentro e fuori | `python3.13 tools/transport.py run --scenario world` (le prove «boarded: ...»: i marine sbarcano con i Kestrel, poi il Capitano e due marine dentro e fuori col fascio; dentro rifiutato da uno scudo nostro e da uno loro, fuori rifiutato da un disturbatore, 168 interrogazioni durante la lotta (ogni secondo di una battaglia di 240 s) senza che una sola offra una stanza con un soldato del Mandato dentro o in vista del punto); nel gioco `astra.xport.send captain <contatto> window` e `astra.xport.send captain "pad 1" window` (§13.10) |
 | In entrata nel gioco | `astra.cmd set_shields {'mode':'off'}` (o aprire un settore con il fuoco), `astra.board.pd aquila 0` (la difesa puntuale altrimenti abbatte gli Skiff), `astra.board.assault in [portatore] [bersaglio] [barche] [faccia] [obiettivo]` (il portatore migliore si sceglie da solo); `astra.board.end` |
 | In uscita nel gioco | `astra.board.disable <nave>` (un relitto) o i cannoni sulla sua faccia, poi `astra.board.assault out <nave> [portatore] [barche] [faccia] [obiettivo] [ride]` (o all'XO: «abborda l'Acheron», `board_ship`, e «vengo anch'io» per il Capitano) |
 | Il Capitano nel gioco | `astra.board.assault out <nave> - 2 port - ride` (a piedi, sul ponte o dove si sta: la dissolvenza, la stiva, i ponti nemici); `astra.board.testcaptain <x> <y> <z> [yaw] \| off` per le prove senza pawn |
@@ -473,7 +492,55 @@ La Praetorian disabilitata ha ancora 811 persone in piedi e 107 armati: 24 marin
   rampe.
 - **Un abbordaggio alla volta**; se i nostri marine sono su una nave il Mandato non può abbordare l'Aquila nello stesso momento (rifiutato con la ragione).
 - **I morti dello sbarco non tornano all'interno della nave in guerra** (richiesta a FLOTTA-VIVA: `FleetBoardingResult`); a fine sbarco la nave è nostra (`CaptureShip`) o resta com'era.
-- **Il teletrasporto non porta il Capitano su un'altra nave** (regola di TELETRASPORTO); non è stato toccato il suo codice.
+- **Il teletrasporto porta il Capitano solo su una nave che i marine stanno abbordando** (la sola di cui c'è un interno in libreria) e solo mentre una barca nostra è al portello; su ogni altra nave il
+  Capitano resta rifiutato con la ragione. Un marine o una persona va su una nave qualunque come sempre (resta «away», senza un corpo); sulla nave abbordata un marine del ruolino entra nella lotta,
+  gli altri no (la simulazione non ha altri soldati). Le modifiche ai file del teletrasporto sono elencate in §13.10.
 - **Il Capitano che cade a bordo di un'altra nave** ha la fine già nota; non c'è un salvataggio con una navetta che torni a prenderlo (se nessuna barca resta, è perduto).
 - **Richieste fuori dai miei file** (fatte da me, additive): `UAstraBattleSubsystem::InsideOf` (AstraBattleSubsystem.h) per leggere lo stato della guerra; `FAstraLifeSim::SetAway/PlaceTransported`
-  con la frase di memoria opzionale (i marine ricordano la navetta); `Source/ASTRA/AstraShipSubsystem.cpp` (tre ritorni anticipati per dove sta il Capitano e `board_ship`).
+  con la frase di memoria opzionale (i marine ricordano la navetta); `Source/ASTRA/AstraShipSubsystem.cpp` (tre ritorni anticipati per dove sta il Capitano e `board_ship`); i file del teletrasporto
+  (§13.10, su via libera del lead: `AstraTransporterWorld.cpp`, `AstraTransporterSubsystem.h/.cpp`, `AstraTransporterCard.cpp`, `AstraTransportBench.cpp`, `mind/astra_mind/transporter.py`, `crew.py`,
+  `docs/TELETRASPORTO.md`).
+- **Il FallGuard** (`AstraFallGuard.cpp`, del lead): conserva i posti in cui il Capitano ha camminato negli ultimi ~6 s e, se cade più di 2,4 s, lo rimette lì: dopo un teletrasporto lontano (la zona dei ponti
+  nemici, la stiva, il pianeta) la lista ha i posti di prima, e una caduta rimetterebbe il Capitano là. Richiesta: svuotare la lista quando il Capitano si sposta di più di ~500 m tra due passi (un teletrasporto,
+  mai una camminata); tre righe. Non l'ho toccato.
+
+### 13.10 Il teletrasporto: il Capitano e i marine dentro e fuori (3/10, su richiesta del lead; `AstraBoardBeam.cpp`, e nei file di TELETRASPORTO le modifiche elencate qui sotto)
+
+TELETRASPORTO rifiutava il Capitano su un'altra nave perché «nessun interno in libreria». Dove i marine dell'Aquila combattono a bordo di una nave, l'interno c'è (i suoi ponti si fanno solidi sul momento
+dal piano della classe: §13.5) e i marine tengono una stanza: lì il fascio può posarlo. **Tutte le regole fisiche del fascio restano quelle di TELETRASPORTO** e valgono identiche per l'andata e il
+ritorno: lo scudo sulla faccia che il fascio attraversa (il nostro: una finestra scudi dell'ordine del Capitano; il loro: sotto il 5% o la nave senza energia, con la ragione «shields_theirs»), la portata, il
+disturbo lungo la linea (con la ragione `[jam]`), la manovra dell'Aquila, il campo del Gate, la stanza dei trasporti. Quello che il fascio non sa lo sa l'abbordaggio:
+
+- **Dove si sbarca** (`UAstraBoardSubsystem::BeamAboardQuery`): una stanza **che i marine tengono**: uno dei nostri in piedi dentro, **nessun nemico che possa combattere dentro o vedere il punto**
+  (un soldato del Mandato in vista entro 32 m, porte come sono), con aria (la soglia è quella del teletrasporto: 60%), senza fuoco né fumo, e i punti **accanto ai marine**, sul pavimento libero a più
+  di 95 cm da chiunque (anche da un caduto). **Mai in uno scompartimento che il Mandato tiene, mai senza aria**: nessuna parola del Capitano supera questa regola (non c'è un `override`). Per il Capitano in
+  più **una barca nostra al portello** (aggancio o uomini entrati): è la strada di casa se il fascio è bloccato. Senza un abbordaggio dei marine su quella nave il Capitano è rifiutato («no marine of ours
+  is fighting aboard her: her decks are not in the pattern library, and there is nobody to materialize beside; land the marines first»); una persona va sulla nave come sempre.
+- **L'ordine** (`MakeRequest`): i punti dal gioco al posto del rifiuto; se nessuna stanza è libera il rifiuto elenca **tutte** le ragioni insieme, quelle del fascio e `[arrival]` la propria. Nel
+  **buffer** l'arrivo è chiesto di nuovo ogni passo (la lotta si muove mentre lo schema aspetta): se non c'è una stanza lo schema **aspetta lì** (entro i 90 s del buffer, poi è ricomposto sulle pedane da
+  cui è partito) e il Capo lo dice; se l'abbordaggio è finito nel frattempo, è ricomposto subito. I ponti attorno al punto sono fatti solidi mentre lo schema è nel buffer (`BeamPrepare`): quando
+  arriva c'è un pavimento.
+- **Il Capitano a bordo** (`BeamedAboard`): è nel combattimento come chi è venuto in barca (stesso `Ride = Aboard`, stessi corpi, colpi e ferite, la catena della nave se cade), la barca al portello è
+  la sua strada di casa. La riga a schermo, dopo 7 s: «TO COME HOME: ASK THE CHIEF TO BEAM YOU UP, OR TELL THE XO TO CALL OFF THE BOARDING». Il teletrasporto lo sa **lontano dall'Aquila** (`CaptainFeet`:
+  «via» come uno sul pianeta), e «Chief, beam me up» è un `transport` di `captain` verso `a pad` (il Capo sa dov'è: `from` può mancare); mentre il suo schema è nel fascio che lo porta via è **fuori dalla
+  lotta** (`SetCaptainInBeam`) e i suoi ponti restano finché lo schema non è posato; un fascio fallito (schema ricomposto sul posto) lo rimette nella lotta. Nella stiva di una barca in volo il fascio
+  non aggancia («no beam locks through a boat's hull»).
+- **I marine del ruolino** (`BeamedAboard/BeamedOff`): «marines 6» o per nome, dentro: uomini della simulazione in una squadra «Beamed Marines» che va all'obiettivo con gli altri; fuori («away team»,
+  per nome o numero, anche chi è sbarcato dai Kestrel): escono dalla lotta (a terra sono portati via vivi e vanno in Medbay come i portati alla barca). Chi non è un marine del ruolino va via nave
+  come sempre (senza corpo).
+- **Quello che il Capo legge** (`ship_state.transporter.boarded_by_our_marines`): la nave, dove sta il Capitano, la strada dentro (cosa la ferma, cosa la libera, in che stanza sbarcherebbe e accanto a quanti
+  marine) e, con lui a bordo, la strada fuori. Il suo prompt (stabile) dice che questa è la sola nave di cui ha l'interno, che mai si sbarca in uno scompartimento del Mandato né senza aria, che il Capitano va
+  solo con una barca al portello, che «beam me up» è lo stesso fascio con le stesse regole e che, se è bloccato, il Kestrel è la strada di casa.
+
+**Cosa ho cambiato nei file di TELETRASPORTO** (additivo, su via libera del lead del 3/10): `AstraTransporterWorld.cpp` (`CaptainFeet`: «via» sui ponti dell'altra nave, nessun fascio nella stiva di una barca;
+`ResolveSubjects`: dove sta via il Capitano e un marine sbarcato; `MakeRequest`: i punti dal gioco al posto del rifiuto del Capitano; `BoardedArrival` nuova; `Preflight` con il blocco `arrival`),
+`AstraTransporterSubsystem.h/.cpp` (due campi del trasporto e `ArrivalWhy`; il buffer; `Depart`, `SetSubjectAway`, `PlaceSubject`, `Finish`: le notizie al gioco; `Order`: il rifiuto unico), `AstraTransporterCard.cpp`
+(`boarded_by_our_marines`), `AstraTransportBench.cpp` (le prove «boarded»), `mind/astra_mind/transporter.py` e `crew.py` (prompt e regola), `mind/bench/transporter_unit.py` e due schede vere in
+`mind/bench/fixtures/transporter/`, `docs/TELETRASPORTO.md`.
+
+**Provarlo nel gioco** (passi numerati, con le menti accese o spente): (1) un bersaglio senza energia: `astra.board.disable <contatto>` (o spararlo fino allo scudo giù); (2) `astra.board.assault out <contatto> - 2 port`
+(i due Kestrel dal Ponte 8): attendere «Kestrel 1 has latched ... 12 marines are through»; (3) dalla plancia, a piedi: `astra.xport.send captain <contatto>`: rifiutato per «shields_own» (i nostri scudi) con la strada
+(`window`); `astra.xport.send captain <contatto> window`: «X1 accepted: the Captain ... set down in deck N section X (...), beside N marines (...)»; il velo, la colonna, e il Capitano sui ponti dell'altra nave
+(la riga a schermo ABOARD); (4) combattere con i marine; (5) a voce «Chief, beam me up» o `astra.xport.send captain "pad 1" window`: il Capitano in Transporter Room, i ponti spariscono, i marine
+combattono senza di lui; (6) per vedere il rifiuto di un disturbatore: un incrociatore del Mandato che disturba (a 12-55 km) sulla linea; (7) le due marine: `astra.xport.send "marines 2" <contatto> window` e
+`astra.xport.send "away team" "the pads" window`.
