@@ -9,8 +9,9 @@ struct ASTRA_API FAstraSettings
 {
 	int32 Quality = -1;       // the engine's scalability: 0 low · 1 medium · 2 high · 3 epic; -1 as the engine found it
 	int32 Image = 2;          // how low the dynamic resolution may go: 0 sharp (70 %) · 1 balanced (55 %) · 2 smooth (40 %)
-	bool bRetina = true;      // the Mac's: the image out at the display's own pixels (a Retina Mac: twice the half the engine makes by default), upscaled by MetalFX;
-	                          // Windows and Linux have no such setting (no row in the page, the field is not read)
+	// the Mac's: the image out at the display's own pixels (a Retina Mac: twice the half the engine makes by default), upscaled by MetalFX; on by default there.
+	// Windows and Linux have no such setting: no row in the page, no key in the file, and the field stays false (portable-ok: the default is the platform's)
+	bool bRetina = PLATFORM_MAC;
 	int32 FrameRate = 60;     // 30 or 60
 	float Music = 1.f;        // 0..1 of the score's own level (it already sits under the dialogue)
 	float Voices = 1.f;       // 0..1 of the voices' level

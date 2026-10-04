@@ -28,31 +28,22 @@ namespace
 	static_assert(UE_ARRAY_COUNT(Rows) == NumRowIds, "a name for every row");
 
 	// RETINA (the 3D view at the display's own pixels instead of half of them, upscaled) is the Mac's: that is what the engine does on a Retina screen by
-	// default. A game on Windows or Linux renders at its window's pixels, and has neither the row nor the setting.
-	constexpr bool bMac = PLATFORM_MAC;   // portable-ok: the page and the settings of the other systems are the ones without RETINA
+	// default. A game on Windows or Linux renders at its window's pixels, and has neither the row nor the setting. The difference is the preprocessor's,
+	// not an `if` on a constant: MSVC may report the branch that cannot run as unreachable code (C4702), which this project's build settings make an error.
+	// portable-ok: the rows and the notes of the other systems are the ones without RETINA
+#if PLATFORM_MAC
+	constexpr int32 SettingsShownRows[] = {RowGraphics, RowImage, RowRetina, RowFrameRate, RowMusic, RowVoices, RowSubtitles, RowBack};
+	const TCHAR* const SettingsThirtyNote = TEXT("30 frames a second: twice the time for each image, much sharper and cooler on a fanless Mac");
+#else
+	constexpr int32 SettingsShownRows[] = {RowGraphics, RowImage, RowFrameRate, RowMusic, RowVoices, RowSubtitles, RowBack};
+	const TCHAR* const SettingsThirtyNote = TEXT("30 frames a second: twice the time for each image, much sharper and cooler running");
+#endif
 
 	/** The rows this system shows, in order (every one on the Mac). */
 	const TArray<int32>& VisibleRows()
 	{
-		static const TArray<int32> Visible = []()
-		{
-			TArray<int32> V;
-			for (int32 Id = 0; Id < NumRowIds; ++Id)
-			{
-				if (Id != RowRetina || bMac)
-				{
-					V.Add(Id);
-				}
-			}
-			return V;
-		}();
+		static const TArray<int32> Visible(SettingsShownRows, UE_ARRAY_COUNT(SettingsShownRows));
 		return Visible;
-	}
-
-	/** The Retina output is on: chosen, and a system that has it. */
-	bool RetinaOutput(const FAstraSettings& S)
-	{
-		return bMac && S.bRetina;
 	}
 
 	void SetCVar(const TCHAR* Name, float Value)
@@ -74,7 +65,10 @@ FAstraSettings& FAstraSettings::Get()
 		bLoaded = true;
 		GConfig->GetInt(SettingsSection, TEXT("Quality"), S.Quality, GGameUserSettingsIni);
 		GConfig->GetInt(SettingsSection, TEXT("Image"), S.Image, GGameUserSettingsIni);
+		// portable-ok: only the Mac has the Retina setting (the other systems' bRetina stays false: no row, no cvar, no key)
+#if PLATFORM_MAC
 		GConfig->GetBool(SettingsSection, TEXT("Retina"), S.bRetina, GGameUserSettingsIni);
+#endif
 		GConfig->GetInt(SettingsSection, TEXT("FrameRate"), S.FrameRate, GGameUserSettingsIni);
 		GConfig->GetFloat(SettingsSection, TEXT("Music"), S.Music, GGameUserSettingsIni);
 		GConfig->GetFloat(SettingsSection, TEXT("Voices"), S.Voices, GGameUserSettingsIni);
@@ -96,7 +90,10 @@ void FAstraSettings::Save() const
 	}
 	GConfig->SetInt(SettingsSection, TEXT("Quality"), Quality, GGameUserSettingsIni);
 	GConfig->SetInt(SettingsSection, TEXT("Image"), Image, GGameUserSettingsIni);
+	// portable-ok: only the Mac has the Retina setting
+#if PLATFORM_MAC
 	GConfig->SetBool(SettingsSection, TEXT("Retina"), bRetina, GGameUserSettingsIni);
+#endif
 	GConfig->SetInt(SettingsSection, TEXT("FrameRate"), FrameRate, GGameUserSettingsIni);
 	GConfig->SetFloat(SettingsSection, TEXT("Music"), Music, GGameUserSettingsIni);
 	GConfig->SetFloat(SettingsSection, TEXT("Voices"), Voices, GGameUserSettingsIni);
@@ -111,7 +108,7 @@ float FAstraSettings::FloorOf(int32 InImage)
 
 float FAstraSettings::EngineFloor() const
 {
-	return RetinaOutput(*this) ? FMath::Max(33.f, FloorOf(Image) * 0.5f) : FloorOf(Image);
+	return bRetina ? FMath::Max(33.f, FloorOf(Image) * 0.5f) : FloorOf(Image);
 }
 
 void FAstraSettings::Apply() const
@@ -130,13 +127,13 @@ void FAstraSettings::Apply() const
 	SetCVar(TEXT("r.DynamicRes.FrameTimeBudget"), 1000.f / (float)FrameRate);
 	// the upscaler's output (the Mac): the display's own pixels, or (0) the engine's default, half of them on a Retina screen, doubled by the window
 	// (the user saw the doubled image as pixelated: a 1710 x 1107 picture spread over a 3420 x 2214 panel)
-	if (bMac)
-	{
-		SetCVar(TEXT("r.SecondaryScreenPercentage.GameViewport"), bRetina ? 100.f : 0.f);
-	}
+	// portable-ok: the Mac's Retina output; the other systems keep the engine's own
+#if PLATFORM_MAC
+	SetCVar(TEXT("r.SecondaryScreenPercentage.GameViewport"), bRetina ? 100.f : 0.f);
+#endif
 	SetCVar(TEXT("r.DynamicRes.MinScreenPercentage"), EngineFloor());
 	UE_LOG(LogASTRA, Log, TEXT("[Settings] quality %d, image floor %.0f%%, retina output %s, %d fps, music %.0f%%, voices %.0f%%, subtitles %s"), Quality,
-	       EngineFloor(), !bMac ? TEXT("n/a") : bRetina ? TEXT("on") : TEXT("off"), FrameRate, Music * 100.f, Voices * 100.f, bSubtitles ? TEXT("on") : TEXT("off"));
+	       EngineFloor(), bRetina ? TEXT("on") : TEXT("off"), FrameRate, Music * 100.f, Voices * 100.f, bSubtitles ? TEXT("on") : TEXT("off"));
 }
 
 // --------------------------------------------------------------------------------------------------- the page
@@ -265,9 +262,7 @@ FString SAstraSettingsPage::NoteOf(int32 Row) const
 	                            : TEXT("down to 40% resolution when the battle is heavy: the frame rate first");
 	case RowRetina: return S.bRetina ? TEXT("the picture is rebuilt at your display's own pixels: the sharpest on a Retina Mac, a few milliseconds more")
 	                                 : TEXT("half the display's pixels, doubled by the window: softer, the frame rate first");
-	case RowFrameRate: return S.FrameRate == 30 ? (bMac ? TEXT("30 frames a second: twice the time for each image, much sharper and cooler on a fanless Mac")
-	                                                    : TEXT("30 frames a second: twice the time for each image, much sharper and cooler running"))
-	                                            : TEXT("60 frames a second: the smoothest motion; the resolution adapts to keep it");
+	case RowFrameRate: return S.FrameRate == 30 ? SettingsThirtyNote : TEXT("60 frames a second: the smoothest motion; the resolution adapts to keep it");
 	default: return FString();
 	}
 }

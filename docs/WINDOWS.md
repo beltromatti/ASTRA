@@ -9,7 +9,7 @@ Contratti: [ARCHITETTURA.md §1, regola 4](ARCHITETTURA.md). Piano: [PIANO.md](P
 
 | Cosa | Stato | Come lo so |
 |---|---|---|
-| Il gioco avvia la mente (Python) su Mac, Windows e Linux **senza una shell** | fatto, provato sul Mac con la mente vera | comando `AstraMindLaunch` (§7): 73 controlli, anche il lancio vero della mente di sviluppo e di un pacchetto finto |
+| Il gioco avvia la mente (Python) su Mac, Windows e Linux **senza una shell** | fatto, provato sul Mac con la mente vera | comando `AstraMindLaunch` (§7): 78 controlli, anche il lancio vero della mente di sviluppo e di un pacchetto finto |
 | Il log della mente lo scrive la mente (`ASTRA_MIND_LOG`), le sue uscite native comprese | fatto, provato | `bench/portable_unit.py` (processi veri) e il lancio vero |
 | La mente parte su Windows (`SIGHUP` e `add_signal_handler` non ci sono: prima il suo `serve()` cadeva subito) | corretto, provato con segnali e cicli finti | `bench/portable_unit.py` |
 | Ascolto portabile (Parakeet ONNX + faster-whisper), scelta e ripiego | provato **con i motori veri** su una frase di Pocket TTS | `ASTRA_TEST_PORTABLE_REAL=1`: `parakeet-onnx` 0,10 s, `faster-whisper` 1,7 s |
@@ -17,7 +17,7 @@ Contratti: [ARCHITETTURA.md §1, regola 4](ARCHITETTURA.md). Piano: [PIANO.md](P
 | Voci di sistema per le lingue senza Pocket TTS (SAPI) | scritto e provato con un PowerShell finto; **da sentire su un PC** | `bench/portable_unit.py` |
 | Impostazioni, plugin MetalFX, schermo intero, risoluzione dinamica | fatto (§5) | compilato, controllo di struttura |
 | Pacchetto Windows (`tools/windows/`) | scritto, analizzato con il parser di PowerShell e provato con un `uv.exe` finto; **da eseguire su un PC** | §6 |
-| Compilazione MSVC di `Source/ASTRA` (più di 200 file) | **non verificabile qui** | il primo lavoro sul PC (§6) |
+| Compilazione MSVC di `Source/ASTRA` (più di 200 file) | **non verificabile qui**; i rischi che MSVC ha e clang no (codice irraggiungibile, ombre) sono tolti o cercati dal controllo (§7.3, §8) | il primo lavoro sul PC (§6) |
 
 Quello che resta non provato senza un PC è elencato in §7.3.
 
@@ -244,7 +244,7 @@ python tools/portability.py [--allowed] [--lock] [--selftest]
 
 ### 7.2 Risultati (4/10/2026, MacBook Air M4)
 - Compilazione dell'editor: pulita (nessun avviso nei miei file), anche con `-DisableUnity` (ogni file da solo) e `-DisableAdaptiveUnity` (tutti nei blocchi).
-- `AstraMindLaunch`: **73/73**: 61 controlli di logica con macchine inventate (checkout Mac, app Mac, pacchetto Windows, checkout Windows, Linux, uv in ognuno dei suoi posti, PATH nella forma di
+- `AstraMindLaunch`: **78/78** con `-probe -launch=dev` e **73/73** con `-launch=packaged`: 61 controlli di logica con macchine inventate (checkout Mac, app Mac, pacchetto Windows, checkout Windows, Linux, uv in ognuno dei suoi posti, PATH nella forma di
   ciascun sistema, maiuscole e minuscole, variabili che cambiano mente/uv/dati, la porta), la macchina vera, `-probe` (un vero `CreateProc` che scrive il suo ambiente e il controllo che l'ambiente del gioco
   sia tornato com'era), `-launch=dev` (la mente vera dal venv del repository: il client WebSocket del gioco si connette dopo 4 s, la mente scrive "game connected" nel suo log, `TerminateProc` la ferma) e
   `-launch=packaged` (una copia della mente in un finto `ASTRA.app/Contents/Resources/mind`, dati propri, uv crea il venv nuovo in 20 s, stessi controlli).
@@ -261,6 +261,13 @@ La compilazione MSVC; `CreateProcess`/`SetEnvironmentVariable` veri (letto `Wind
 rispettata, `TerminateProc(KillTree)` percorre l'albero); PowerShell 5.1 vero e le voci SAPI; l'installazione vera di uv e delle ruote; DWM, la modalità finestra e il DPI; il microfono e
 WASAPI; l'antivirus. Tutto ciò sta nell'elenco della prima giornata (§6.3-6.4).
 
+Di MSVC si sa però che cosa è un **errore** in questo progetto (`DefaultBuildSettings = V7`, letto in `CppCompileWarnings.cs` del motore): ombre di variabili (C4456-C4459: la scansione `-Wshadow` di clang
+le prende tutte, e l'ho fatta passare anche sui blocchi di unità), macro non definita in un `#if` (C4668: i miei `#if` usano solo macro del motore), tipo di ritorno mancante (C4715) e codice
+irraggiungibile (C4702). Quest'ultimo è il rischio vero: MSVC può segnalare come irraggiungibile il ramo morto di un `if` su una costante di compilazione (il motore stesso lo silenzia in più punti con
+`PRAGMA_DISABLE_UNREACHABLE_CODE_WARNINGS`), clang no. Ho tolto quei rami dal mio codice (le impostazioni e il comando di prova
+sceglievano con `constexpr bool bMac = PLATFORM_MAC`: ora scelgono il preprocessore) e la regola `constant-condition` di `tools/portability.py` li cerca (§8). Se il primo giro MSVC protesta ancora per
+C4702 in un file, si isola con `#pragma warning(disable: 4702)` (`PRAGMA_DISABLE_UNREACHABLE_CODE_WARNINGS` del motore) intorno a quel punto, o `if constexpr`.
+
 ## 8. Il controllo di portabilità (`tools/portability.py`)
 
 Gira ovunque con il solo Python, in due secondi, e segnala il codice solo-Mac (o ostile a Windows) **nuovo** in `Source/`, `Plugins/` e `mind/`; le eccezioni volute sono dichiarate.
@@ -272,12 +279,13 @@ Gira ovunque con il solo Python, in due secondi, e segnala il codice solo-Mac (o
 | `posix-only`, `rename`, `tmp-path`, `env-home` | `SIGHUP`, `add_signal_handler`, `fork`, `fcntl`…; `os.rename`; `/tmp`, `/dev/null`; `$HOME` |
 | `locale-text-io` | `open()`/`read_text()`/`write_text()` di testo senza `encoding=`, e `subprocess` con `text=True` senza `encoding=` (Windows legge in cp1252; provato anche forzando una codifica ASCII sulle 549 prove della mente: tutte passano) |
 | `posix-header`, `gcc-only`, `include-case` | intestazioni POSIX, costrutti solo GCC/clang, `#include` con le maiuscole sbagliate (Linux) |
+| `constant-condition` | un `if` (o `?:`, `&&`, `\|\|`) su una costante di compilazione (`PLATFORM_*`, `WITH_*`, `UE_BUILD_*`, `ThisHost()`): per MSVC il ramo che non può girare può essere codice irraggiungibile (C4702), che con `BuildSettingsVersion.V7` è un **errore**; clang non lo dice e il Mac non lo mostrerebbe mai. Si sceglie con `#if`, con `if constexpr` o con un valore che il compilatore non può calcolare in anticipo |
 | `structure` | un plugin solo-Mac deve essere `PlatformAllowList: ["Mac"]` nel `.uproject` e nel `.uplugin` e nessun file di gioco può includerlo |
 | `config-parity` | ogni impostazione di `MacEngine.ini` ha il suo gemello in `WindowsEngine.ini`, o è dichiarata solo-Mac (`MAC_ONLY_ENGINE_KEYS`) |
 | `--lock` | ogni pacchetto del `uv.lock` si installa per Windows x64 (CPython 3.13) senza compilare |
 
 Commenti e docstring non sono codice. Un punto voluto porta `portable-ok: perché` su quella riga o sulla precedente; cartelle intere solo-Mac (il plugin MetalFX, l'helper Swift) stanno in `ALLOW_PATHS`
-nello script, con il motivo. `--selftest` prova le regole contro esempi che devono e non devono prendere (e le strutture contro alberi finti). Oggi: **0 risultati non ammessi**, 260 ammessi (quasi tutti il
+nello script, con il motivo. `--selftest` prova le regole contro esempi che devono e non devono prendere (e le strutture contro alberi finti). Oggi: **0 risultati non ammessi**, 274 ammessi (quasi tutti il
 plugin e l'helper). Gira anche da `bench.portable_unit`.
 
 ## 9. Dopo la prima partita: decisioni e tarature

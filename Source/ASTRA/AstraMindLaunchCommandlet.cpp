@@ -49,6 +49,16 @@ namespace
 		return P.Env.ContainsByPredicate([Name](const TPair<FString, FString>& V) { return V.Key == Name; });
 	}
 
+	const TCHAR* MlHostName(EHost Host)
+	{
+		switch (Host)
+		{
+		case EHost::Mac: return TEXT("Mac");
+		case EHost::Windows: return TEXT("Windows");
+		default: return TEXT("Linux");
+		}
+	}
+
 	/** A made-up machine: its folders, its files, its environment. */
 	struct FMlFake
 	{
@@ -352,7 +362,7 @@ namespace
 		{
 			// a copy of the mind laid out like a package, with a data folder of its own: what a first start on a new machine does
 			FString PackRoot, PackMind;
-			if (ThisHost() == EHost::Mac)
+			if (M.Host == EHost::Mac)     // (not ThisHost(): MSVC may call the branch a constant rules out unreachable code (C4702), an error in this project)
 			{
 				PackRoot = Scratch / TEXT("ASTRA.app/Contents");
 				PackMind = PackRoot / TEXT("Resources/mind");
@@ -499,8 +509,7 @@ int32 UAstraMindLaunchCommandlet::Main(const FString& Params)
 
 	const FMachine Live = FMachine::Live();
 	const FPlan Mine = MakePlan(Live);
-	UE_LOG(LogASTRA, Display, TEXT("[MindLaunch] this machine (%s): %s"), ThisHost() == EHost::Mac ? TEXT("Mac") : ThisHost() == EHost::Windows ? TEXT("Windows") : TEXT("Linux"),
-	       *Mine.Describe());
+	UE_LOG(LogASTRA, Display, TEXT("[MindLaunch] this machine (%s): %s"), MlHostName(Live.Host), *Mine.Describe());
 	UE_LOG(LogASTRA, Display, TEXT("[MindLaunch] its door: port %d"), Port(Live));
 	MlCheck(TEXT("this machine: a plan (a mind folder and a uv)"), Mine.IsValid(), Mine.Error);
 

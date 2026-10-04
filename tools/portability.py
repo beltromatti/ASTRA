@@ -15,7 +15,8 @@ docstrings are not code: a Mac path in one is not a finding.
 What it looks for (RULES): hard-coded Mac folders; shells and shell-only tools (zsh, osascript, pgrep...); Apple frameworks; PLATFORM_MAC and
 Darwin checks (each needs its alternative named); POSIX-only Python (SIGHUP, add_signal_handler, fork, fcntl...); text files opened without an
 encoding (Windows reads them in its code page); os.rename (fails over an existing file on Windows); POSIX roots (/tmp, /dev/null); $HOME;
-POSIX-only headers and GCC-only constructs in C++; an #include whose letter case is not the file's (Linux). And three structure checks:
+POSIX-only headers and GCC-only constructs in C++; an `if` on a build-time constant (PLATFORM_*, WITH_*: MSVC may report the side that cannot run as unreachable
+code, an error in this project, and clang never shows it); an #include whose letter case is not the file's (Linux). And three structure checks:
 Mac-only plugins are allow-listed to the Mac in the .uproject and the .uplugin and no game code includes them; every Mac engine setting has a
 Windows twin or is named Mac-only.
 """
@@ -69,6 +70,9 @@ def rule(id: str, langs: str, pattern: str, why: str, flags: int = 0) -> Rule:
     return Rule(id, frozenset(langs.split()), re.compile(pattern, flags), why)
 
 
+_BUILD_CONSTANT = r"(?:PLATFORM_\w+|WITH_\w+|UE_BUILD_\w+)"
+
+
 RULES: list[Rule] = [
     rule("mac-path", "cpp py swift sh",
          r"/Users/|/opt/homebrew|/System/Library|\.app/Contents|Contents/(?:MacOS|Resources)|~/Library|/Library/|Library/Application Support|/usr/local/(?:bin|lib)\b",
@@ -105,6 +109,12 @@ RULES: list[Rule] = [
          "a POSIX call that MSVC does not have: the engine's FPlatformProcess / FPlatformMisc / IFileManager, or a Windows branch next to it"),
     rule("gcc-only", "cpp", r"\b__attribute__\b|\b__builtin_[a-z_]+|\b__restrict__\b|\btypeof\s*\(|\b__asm__\b",
          "does not compile with MSVC"),
+    # a branch on a build-time constant (not a preprocessor line): the side that cannot run may be, to MSVC, unreachable code (C4702), and the project's build settings
+    # (BuildSettingsVersion V7) make that an error on Windows. Clang lets it pass, so the Mac never shows it. #if, `if constexpr`, or a value the compiler cannot fold
+    rule("constant-condition", "cpp",
+         r"^(?![ \t]*#)[^\n]*?(?:\bif\s*\(\s*!?\s*" + _BUILD_CONSTANT + r"\s*\)|\bconstexpr\s+bool\s+\w+\s*=\s*!?\s*" + _BUILD_CONSTANT + r"\s*;|"
+         r"(?:\?|&&|\|\|)\s*!?\s*" + _BUILD_CONSTANT + r"\b|\b" + _BUILD_CONSTANT + r"\s*(?:\?|&&|\|\|)|\bThisHost\(\)\s*[=!]=)",
+         "a branch on a build-time constant: MSVC may call the side that cannot run unreachable code (C4702, an error in this project): use #if, `if constexpr`, or a value the compiler cannot fold", re.M),
 ]
 
 
@@ -401,6 +411,16 @@ SAMPLES: list[tuple[str, str, str, bool]] = [
     ("cpp", '#if PLATFORM_MAC // portable-ok: Windows has WindowsGameUserSettings.ini\nint X;\n#endif', "platform-macro", True),
     ("cpp", '#include <unistd.h>', "posix-header", True),
     ("cpp", 'int X = __builtin_popcount(Y);', "gcc-only", True),
+    ("cpp", 'if (PLATFORM_WINDOWS)\n{\n    Go();\n}', "constant-condition", True),
+    ("cpp", 'constexpr bool bMac = PLATFORM_MAC;', "constant-condition", True),
+    ("cpp", 'return PLATFORM_MAC ? A : B;', "constant-condition", True),
+    ("cpp", 'const bool bOn = bWanted && WITH_EDITOR;', "constant-condition", True),
+    ("cpp", 'if (ThisHost() == EHost::Mac)', "constant-condition", True),
+    ("cpp", '#if !WITH_EDITOR && PLATFORM_MAC\nint X;\n#endif', "constant-condition", False),
+    ("cpp", 'if constexpr (PLATFORM_LITTLE_ENDIAN) { Swap(); }', "constant-condition", False),
+    ("cpp", 'bool bRetina = PLATFORM_MAC;', "constant-condition", False),
+    ("cpp", '// if (PLATFORM_MAC) is a constant condition\nint X;', "constant-condition", False),
+    ("cpp", 'if (Host == EHost::Mac) { Go(); }', "constant-condition", False),
     ("cpp", 'setenv(TCHAR_TO_UTF8(*Name), TCHAR_TO_UTF8(*Value), 1);', "posix-call", True),
     ("cpp", 'FPlatformMisc::SetEnvironmentVar(*Name, *Value);', "posix-call", False),
     ("cpp", 'NSString* S = [NSString stringWithUTF8String:"x"];', "mac-framework", True),
