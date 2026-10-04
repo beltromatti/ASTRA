@@ -14,6 +14,7 @@
 #include "CoreMinimal.h"
 #include "Async/Future.h"
 #include "AstraBoardCraft.h"
+#include "AstraBoardDress.h"
 #include "AstraBoardMap.h"
 #include "AstraBoardPlans.h"
 #include "AstraBoardSim.h"
@@ -341,6 +342,7 @@ private:
 			FString Face;
 		} Met;
 		TMap<int32, FBoardRoomMood> Moods;           // (a fight on a ship the war has shot at) how her rooms are: no power, fire, no air
+		TArray<AstraBoardDress::FFallen> Fallen;     // the crew she has lost, where they fell (her decks show them: AstraBoardDress)
 		bool bFromWar = false;                       // her people and bulkheads are the war's picture of her inside
 	};
 	FAssault Assault;

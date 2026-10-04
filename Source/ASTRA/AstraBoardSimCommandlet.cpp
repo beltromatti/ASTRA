@@ -2,6 +2,7 @@
 
 #include "ASTRA.h"
 #include "AstraArmsRig.h"
+#include "AstraBoardDress.h"
 #include "AstraBoardInterior.h"
 #include "AstraBoardMap.h"
 #include "AstraBoardPlans.h"
@@ -1766,7 +1767,7 @@ static void BoardScenarioInterior(const FString& Only, const FString& DumpDir, i
 		const FAstraBoardMap& M = *P->Map;
 		const double T0 = FPlatformTime::Seconds();
 		TArray<AstraBoardInterior::FSlab> Slabs;
-		int32 PerKind[6] = {0, 0, 0, 0, 0, 0};
+		int32 PerKind[AstraBoardInterior::NumSlabKinds] = {0, 0, 0, 0, 0, 0, 0};
 		for (int32 i = 0; i < M.GetComps().Num(); ++i)
 		{
 			AstraBoardInterior::BuildComp(M, i, Slabs);
@@ -1816,7 +1817,7 @@ static void BoardScenarioInterior(const FString& Only, const FString& DumpDir, i
 				++Blocked;
 				if (First.IsEmpty())
 				{
-					static const TCHAR* Kinds[] = {TEXT("wall"), TEXT("floor"), TEXT("ceiling"), TEXT("frame"), TEXT("bulkhead leaf"), TEXT("strip")};
+					static const TCHAR* Kinds[] = {TEXT("wall"), TEXT("floor"), TEXT("ceiling"), TEXT("frame"), TEXT("bulkhead leaf"), TEXT("strip"), TEXT("mark")};
 					First = FString::Printf(TEXT("the way between %s and %s at (%.0f, %.0f, %.0f), stopped by a %s of %s at (%.0f, %.0f, %.0f) half (%.0f, %.0f, %.0f)"), *M.Describe(Po.A), *M.Describe(Po.B), Po.Pos.X, Po.Pos.Y, Po.Pos.Z,
 					                        Hit ? Kinds[(int32)Hit->Kind] : TEXT("?"), Hit ? *M.Describe(Hit->Comp) : TEXT("?"), Hit ? Hit->Centre.X : 0.0, Hit ? Hit->Centre.Y : 0.0, Hit ? Hit->Centre.Z : 0.0,
 					                        Hit ? Hit->Half.X : 0.0, Hit ? Hit->Half.Y : 0.0, Hit ? Hit->Half.Z : 0.0);
@@ -1897,6 +1898,508 @@ static void BoardScenarioInterior(const FString& Only, const FString& DumpDir, i
 			const FString Path = FPaths::IsRelative(DumpDir) ? FPaths::Combine(FPaths::ProjectDir(), DumpDir) : DumpDir;
 			IFileManager::Get().MakeDirectory(*Path, true);
 			FFileHelper::SaveStringToFile(Json(O), *FPaths::Combine(Path, FString::Printf(TEXT("interior_%s.json"), *K.ToString())));
+		}
+	}
+}
+
+// ================================================================================================================== the dressing of the decks (ABBORDAGGI-3)
+
+namespace
+{
+	bool BDressSegHitsBox(const FVector2D& A, const FVector2D& B, const FBox2D& Box)
+	{
+		double T0 = 0.0, T1 = 1.0;
+		const FVector2D D = B - A;
+		for (int32 Axis = 0; Axis < 2; ++Axis)
+		{
+			const double Da = Axis == 0 ? D.X : D.Y, Aa = Axis == 0 ? A.X : A.Y, Lo = Axis == 0 ? Box.Min.X : Box.Min.Y, Hi = Axis == 0 ? Box.Max.X : Box.Max.Y;
+			if (FMath::Abs(Da) < 1.0e-9)
+			{
+				if (Aa < Lo || Aa > Hi)
+				{
+					return false;
+				}
+				continue;
+			}
+			double Ta = (Lo - Aa) / Da, Tb = (Hi - Aa) / Da;
+			if (Ta > Tb)
+			{
+				Swap(Ta, Tb);
+			}
+			T0 = FMath::Max(T0, Ta);
+			T1 = FMath::Min(T1, Tb);
+			if (T0 > T1)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** A rough hash of what a room's dressing is (positions to the centimetre, pieces, turns): two dressings of the same room must agree. */
+	uint32 BDressHash(const AstraBoardDress::FRoomDress& R)
+	{
+		uint32 H = 17u;
+		for (const AstraBoardDress::FPlacement& P : R.Pieces)
+		{
+			H = HashCombineFast(H, (uint32)P.Piece);
+			H = HashCombineFast(H, (uint32)FMath::RoundToInt(P.Pos.X) * 31u + (uint32)FMath::RoundToInt(P.Pos.Y) * 17u + (uint32)FMath::RoundToInt(P.Pos.Z));
+			H = HashCombineFast(H, (uint32)FMath::RoundToInt(P.Rot.Yaw * 4.f));
+			H = HashCombineFast(H, (uint32)FMath::RoundToInt(P.Scale.X * 100.0) * 7u + (uint32)FMath::RoundToInt(P.Scale.Z * 100.0));
+		}
+		H = HashCombineFast(H, (uint32)R.Lamps.Num() * 131u + (uint32)R.Blocks.Num() * 17u + (uint32)R.Fx.Num());
+		return H;
+	}
+}
+
+/** Every room of a class dressed: what it costs (instances and triangles for the ship, for each deck and in the ring of rooms round a Captain, against the plain boxes of before), that the soldiers' ways are
+ *  clear of every prop, that every door has its frame and its sign, that a room is always dressed the same, that nobody is placed in a prop. */
+static void BoardScenarioDress(const FString& Only, const FString& DumpDir, const FString& Focus, bool bDumpHurt, int32 Seed)
+{
+	using namespace AstraBoardDress;
+	const FString KitWhy = CheckKit();
+	BCheck("dress: the kit and the catalog", KitWhy.IsEmpty(), KitWhy.IsEmpty() ? FString(TEXT("every piece of the kit is in the catalog, with its footprint and its mesh's name")) : KitWhy);
+	TArray<int32> TrisOf;
+	FString TrisWhy;
+	const bool bTris = LoadKitTris(TrisOf, TrisWhy);
+	BCheck("dress: the kit's triangles", bTris, bTris ? FString(TEXT("known: the instances' triangles are counted")) : TrisWhy);
+	TArray<FName> Classes;
+	AstraBoardPlans::ClassesWithPlans(Classes);
+	if (!Only.IsEmpty())
+	{
+		Classes = {FName(*Only)};
+	}
+	for (const FName& K : Classes)
+	{
+		FString Why;
+		const TSharedPtr<FBoardShipPlan> P = AstraBoardPlans::Load(K, Why);
+		if (!P.IsValid() || !P->Layout.IsValid())
+		{
+			BCheck("dress of a class", false, FString::Printf(TEXT("%s: %s"), *K.ToString(), P.IsValid() ? TEXT("no layout of props") : *Why));
+			continue;
+		}
+		const FAstraBoardMap& M = *P->Map;
+		const FLayout& Lay = *P->Layout;
+		const int32 N = M.GetComps().Num();
+		FDressContext Ctx;
+		Ctx.Plan = P.Get();
+		Ctx.Side = SideOfStyle(P->Style);
+		Ctx.Seed = SeedOf(P->Class);
+		Ctx.Level = 2;
+		// the war's picture of her: a third of the rooms dark, an eighth burning, a few gutted (deterministic)
+		TMap<int32, FBoardRoomMood> Moods;
+		FRandomStream Rng(Seed + 91);
+		for (int32 c = 0; c < N; ++c)
+		{
+			const float R = Rng.FRand();
+			FBoardRoomMood Mo;
+			if (R < 0.05f)
+			{
+				Mo.bGutted = true;
+				Mo.Power = 0.f;
+				Mo.Smoke = 0.4f;
+			}
+			else if (R < 0.17f)
+			{
+				Mo.Fire = Rng.FRandRange(0.15f, 0.8f);
+				Mo.Smoke = Rng.FRandRange(0.3f, 0.9f);
+				Mo.Power = 0.5f;
+			}
+			else if (R < 0.4f)
+			{
+				Mo.Power = 0.2f;
+			}
+			else
+			{
+				continue;
+			}
+			Moods.Add(c, Mo);
+		}
+		FDressContext Hurt = Ctx;
+		Hurt.Moods = &Moods;
+		FDressContext Hulk = Ctx;
+		Hulk.bHulk = true;
+		// ---- every room dressed: as she is built, hurt by the war, a hulk
+		const double T0 = FPlatformTime::Seconds();
+		TArray<FRoomDress> Built, War, Cold;
+		Built.SetNum(N);
+		War.SetNum(N);
+		Cold.SetNum(N);
+		for (int32 c = 0; c < N; ++c)
+		{
+			DressRoom(Ctx, &Lay, c, Built[c]);
+		}
+		const double BuiltMs = (FPlatformTime::Seconds() - T0) * 1000.0;
+		for (int32 c = 0; c < N; ++c)
+		{
+			DressRoom(Hurt, &Lay, c, War[c]);
+			DressRoom(Hulk, &Lay, c, Cold[c]);
+		}
+		// ---- the plain boxes of before
+		TArray<AstraBoardInterior::FSlab> Slabs;
+		TArray<int32> SlabFirst;
+		for (int32 c = 0; c < N; ++c)
+		{
+			SlabFirst.Add(Slabs.Num());
+			AstraBoardInterior::BuildComp(M, c, Slabs);
+		}
+		SlabFirst.Add(Slabs.Num());
+		const auto PlainRendered = [&](int32 C) -> int32               // boxes that are drawn without the kit: walls, floors, ceilings, frames, leaves, strips
+		{
+			return SlabFirst[C + 1] - SlabFirst[C];
+		};
+		const auto SlabsDrawnAfter = [&](int32 C) -> int32             // ... and with it: the frames, the leaves and the strips are not drawn
+		{
+			int32 Drawn = 0;
+			for (int32 i = SlabFirst[C]; i < SlabFirst[C + 1]; ++i)
+			{
+				const AstraBoardInterior::ESlab Kd = Slabs[i].Kind;
+				Drawn += (Kd == AstraBoardInterior::ESlab::Wall || Kd == AstraBoardInterior::ESlab::Floor || Kd == AstraBoardInterior::ESlab::Ceiling) ? 1 : 0;
+			}
+			return Drawn;
+		};
+		// ---- the totals, by deck
+		FTally All, AllWar, AllCold;
+		TMap<int32, FTally> ByDeck;
+		TMap<int32, int32> PlainByDeck, SlabsByDeck;
+		int32 Props = 0, Rooms = 0, Dressed = 0;
+		for (int32 c = 0; c < N; ++c)
+		{
+			All.Add(Built[c], TrisOf);
+			AllWar.Add(War[c], TrisOf);
+			AllCold.Add(Cold[c], TrisOf);
+			ByDeck.FindOrAdd(P->Dmg->Comps[c].Deck).Add(Built[c], TrisOf);
+			PlainByDeck.FindOrAdd(P->Dmg->Comps[c].Deck) += PlainRendered(c);
+			SlabsByDeck.FindOrAdd(P->Dmg->Comps[c].Deck) += SlabsDrawnAfter(c);
+			Props += Lay.PropsOf(c).Num();
+			Rooms += M.GetComps()[c].bCorridor ? 0 : 1;
+			Dressed += Built[c].Pieces.Num() > 0 ? 1 : 0;
+		}
+		// ---- the ring round a Captain: the rooms EnsureAround would have built (the same deck, within 48 m), the worst and the mean over the ship's places
+		struct FRing { int32 Rooms = 0, Instances = 0, Plain = 0, Boxes = 0; int64 Tris = 0; };
+		FRing Worst, Sum;
+		int32 Samples = 0;
+		TArray<int32> Picks;
+		for (int32 c = 0; c < N; c += FMath::Max(1, N / 48))
+		{
+			Picks.Add(c);
+		}
+		for (const int32 Pc : Picks)
+		{
+			const FVector At = M.CentreOf(Pc);
+			FRing R;
+			for (int32 c = 0; c < N; ++c)
+			{
+				const FBox& B = M.GetComps()[c].Box;
+				if (FMath::Abs(B.Min.Z - At.Z) > 250.0 || FMath::Sqrt(B.ComputeSquaredDistanceToPoint(FVector(At.X, At.Y, B.GetCenter().Z))) >= 4800.0)
+				{
+					continue;
+				}
+				++R.Rooms;
+				FTally T;
+				T.Add(Built[c], TrisOf);
+				R.Instances += T.TotalPieces() + SlabsDrawnAfter(c);
+				R.Tris += T.Tris + 12LL * SlabsDrawnAfter(c);
+				R.Plain += PlainRendered(c);
+				R.Boxes += Built[c].Blocks.Num();
+			}
+			Sum.Rooms += R.Rooms;
+			Sum.Instances += R.Instances;
+			Sum.Tris += R.Tris;
+			Sum.Plain += R.Plain;
+			++Samples;
+			if (R.Tris > Worst.Tris)
+			{
+				Worst = R;
+			}
+		}
+		Samples = FMath::Max(1, Samples);
+		// ---- the soldiers' ways: nothing the dressing puts in a room is on the way between its doors or to its middle, nor in a doorway's mouth, nor in a corner beside a doorway
+		int32 LaneHits = 0, MouthHits = 0, SlotHits = 0, OutOfRoom = 0, Overlaps = 0, JambInProp = 0, BoxMismatch = 0;
+		FString FirstFault;
+		for (int32 c = 0; c < N; ++c)
+		{
+			const TArrayView<const FProp> Props2 = Lay.PropsOf(c);
+			if (Props2.Num() == 0)
+			{
+				continue;
+			}
+			const FBoardComp& Cp = M.GetComps()[c];
+			TArray<FVector2D> Pts;
+			for (const int32 Pi : Cp.Portals)
+			{
+				const FBoardPortal& Po = M.GetPortals()[Pi];
+				const FVector Q = Po.PosIn(c);
+				Pts.Add(FVector2D(Q.X, Q.Y));
+				for (const FProp& Pr : Props2)
+				{
+					if (Pr.Box.ExpandBy(55.0).IsInside(FVector2D(Q.X, Q.Y)))
+					{
+						++MouthHits;
+						if (FirstFault.IsEmpty())
+						{
+							FirstFault = FString::Printf(TEXT("a %s stands in the mouth of the way at (%.0f, %.0f) of %s"), AstraBoardDress::Def(Pr.Piece).Key, Q.X, Q.Y, *M.Describe(c));
+						}
+					}
+				}
+			}
+			const FVector Ctr = M.CentreOf(c);
+			Pts.Add(FVector2D(Ctr.X, Ctr.Y));
+			for (int32 i = 0; i < Pts.Num(); ++i)
+			{
+				for (int32 j = i + 1; j < Pts.Num(); ++j)
+				{
+					for (const FProp& Pr : Props2)
+					{
+						if (BDressSegHitsBox(Pts[i], Pts[j], Pr.Box.ExpandBy(45.0)))
+						{
+							++LaneHits;
+							if (FirstFault.IsEmpty())
+							{
+								FirstFault = FString::Printf(TEXT("a %s is on the lane between (%.0f, %.0f) and (%.0f, %.0f) in %s"), AstraBoardDress::Def(Pr.Piece).Key, Pts[i].X, Pts[i].Y, Pts[j].X, Pts[j].Y, *M.Describe(c));
+							}
+						}
+					}
+				}
+			}
+			for (const int32 Si : Cp.Slots)
+			{
+				const FBoardSlot& S = M.GetSlots()[Si];
+				for (const FProp& Pr : Props2)
+				{
+					SlotHits += (Pr.Box.ExpandBy(40.0).IsInside(FVector2D(S.Pos.X, S.Pos.Y)) || Pr.Box.ExpandBy(40.0).IsInside(FVector2D(S.Peek.X, S.Peek.Y))) ? 1 : 0;
+				}
+			}
+			for (int32 i = 0; i < Props2.Num(); ++i)
+			{
+				const FBox& B = Cp.Box;
+				const FBox2D& Bx = Props2[i].Box;
+				OutOfRoom += (Bx.Min.X < B.Min.X + 12.0 || Bx.Min.Y < B.Min.Y + 12.0 || Bx.Max.X > B.Max.X - 12.0 || Bx.Max.Y > B.Max.Y - 12.0) ? 1 : 0;
+				for (int32 j = i + 1; j < Props2.Num(); ++j)
+				{
+					Overlaps += Bx.Intersect(Props2[j].Box) ? 1 : 0;
+				}
+			}
+			// the same boxes are in the map, for those who pick a spot in the room
+			BoxMismatch += M.BlocksOf(c).Num() != Props2.Num() ? 1 : 0;
+			for (const FPlacement& Pl : Built[c].Pieces)
+			{
+				if (Pl.Piece == EPiece::Jamb || Pl.Piece == EPiece::BlastJamb)
+				{
+					for (const FProp& Pr : Props2)
+					{
+						JambInProp += Pr.Box.ExpandBy(4.0).IsInside(FVector2D(Pl.Pos.X, Pl.Pos.Y)) ? 1 : 0;
+					}
+				}
+			}
+		}
+		BCheck("dress: the soldiers' ways are clear", LaneHits == 0 && MouthHits == 0 && SlotHits == 0 && OutOfRoom == 0 && Overlaps == 0 && JambInProp == 0 && BoxMismatch == 0,
+		       FString::Printf(TEXT("%s: %d props in %d rooms: %d on the lanes between doors, %d in a doorway's mouth, %d on a corner beside one, %d not inside their room's walls, %d on another, %d on a frame, %d rooms whose map boxes differ%s%s"),
+		                       *K.ToString(), Props, Rooms, LaneHits, MouthHits, SlotHits, OutOfRoom, Overlaps, JambInProp, BoxMismatch, FirstFault.IsEmpty() ? TEXT("") : TEXT(": "), *FirstFault));
+		// ---- nobody is placed in a prop: spots picked with Inset, and the fallen
+		int32 InProp = 0, Tried = 0, FallenIn = 0, FallenOut = 0, Fell = 0;
+		FString FirstIn;
+		for (int32 n = 0; n < 4000; ++n)
+		{
+			const int32 c = Rng.RandHelper(N);
+			if (M.BlocksOf(c).Num() == 0)
+			{
+				continue;
+			}
+			const FBox& B = M.GetComps()[c].Box;
+			const FVector Raw(Rng.FRandRange(B.Min.X, B.Max.X), Rng.FRandRange(B.Min.Y, B.Max.Y), B.Min.Z);
+			const FVector Q = M.Inset(c, Raw, 60.f);
+			++Tried;
+			for (const FBox2D& Bx : M.BlocksOf(c))
+			{
+				if (Bx.ExpandBy(-8.0).IsInside(FVector2D(Q.X, Q.Y)))
+				{
+					++InProp;
+					if (FirstIn.IsEmpty())
+					{
+						FirstIn = FString::Printf(TEXT("%s: (%.0f, %.0f) went to (%.0f, %.0f) inside the box (%.0f, %.0f)-(%.0f, %.0f) of the room (%.0f, %.0f)-(%.0f, %.0f)"), *M.Describe(c), Raw.X, Raw.Y, Q.X, Q.Y, Bx.Min.X, Bx.Min.Y, Bx.Max.X, Bx.Max.Y,
+						                          B.Min.X, B.Min.Y, B.Max.X, B.Max.Y);
+					}
+				}
+			}
+		}
+		TArray<FFallen> Dead;
+		for (int32 n = 0; n < 400; ++n)
+		{
+			const int32 c = Rng.RandHelper(N);
+			const FBox& B = M.GetComps()[c].Box;
+			Dead.Add({c, FVector(Rng.FRandRange(B.Min.X, B.Max.X), Rng.FRandRange(B.Min.Y, B.Max.Y), B.Min.Z), n});
+		}
+		TArray<FPlacement> Bodies;
+		DressFallen(Ctx, Dead, Bodies);
+		for (const FPlacement& Pl : Bodies)
+		{
+			const FBox& B = M.GetComps()[Pl.Comp].Box;
+			FallenOut += (Pl.Pos.X < B.Min.X || Pl.Pos.X > B.Max.X || Pl.Pos.Y < B.Min.Y || Pl.Pos.Y > B.Max.Y) ? 1 : 0;
+			for (const FBox2D& Bx : M.BlocksOf(Pl.Comp))
+			{
+				FallenIn += Bx.ExpandBy(-8.0).IsInside(FVector2D(Pl.Pos.X, Pl.Pos.Y)) ? 1 : 0;
+			}
+			++Fell;
+		}
+		BCheck("dress: nobody is placed in a prop", InProp == 0 && FallenIn == 0 && FallenOut == 0 && Fell == Dead.Num(),
+		       FString::Printf(TEXT("%s: %d spots picked in dressed rooms (Inset): %d inside a prop; %d fallen laid: %d inside a prop, %d outside their room%s%s"), *K.ToString(), Tried, InProp, Fell, FallenIn, FallenOut,
+		                       FirstIn.IsEmpty() ? TEXT("") : TEXT(": "), *FirstIn));
+		// ---- the doors: a frame and a header over each door (the leaf in each bulkhead), and a sign in each room that gives on it
+		int32 Doors = 0, Frameless = 0, Blasts = 0, NoLeaf = 0, SignsWanted = 0;
+		for (const FBoardPortal& Po : M.GetPortals())
+		{
+			if (!Po.bDoor())
+			{
+				continue;
+			}
+			const bool bBlast = Po.Kind == FBoardPortal::EKind::Blast;
+			++Doors;
+			Blasts += bBlast ? 1 : 0;
+			bool bFrame = false, bLeaf = false;
+			for (const FPlacement& Pl : Built[Po.A].Pieces)
+			{
+				if ((Pl.Piece == (bBlast ? EPiece::BlastHeader : EPiece::DoorHeader)) && FVector2D::Distance(FVector2D(Pl.Pos.X, Pl.Pos.Y), FVector2D(Po.Pos.X, Po.Pos.Y)) < 160.0)
+				{
+					bFrame = true;
+				}
+				bLeaf |= Pl.Piece == EPiece::BlastLeaf && Pl.Door == Po.Door;
+			}
+			Frameless += bFrame ? 0 : 1;
+			NoLeaf += (bBlast && !bLeaf) ? 1 : 0;
+			SignsWanted += 2;
+		}
+		int32 Signs = 0;
+		for (const FRoomDress& R : Built)
+		{
+			Signs += R.Signs.Num();
+		}
+		BCheck("dress: the doors", Frameless == 0 && NoLeaf == 0 && Signs >= SignsWanted * 9 / 10,
+		       FString::Printf(TEXT("%s: %d doors (%d pressure bulkheads): %d without a frame, %d bulkheads without a leaf; %d signs for %d door faces"), *K.ToString(), Doors, Blasts, Frameless, NoLeaf, Signs, SignsWanted));
+		// ---- the same room, the same dressing; every placement inside its room
+		int32 Different = 0, Escaped = 0, Total = 0;
+		for (int32 c = 0; c < N; ++c)
+		{
+			FRoomDress Again;
+			DressRoom(Ctx, &Lay, c, Again);
+			Different += BDressHash(Again) != BDressHash(Built[c]) ? 1 : 0;
+			const FBox B = M.GetComps()[c].Box.ExpandBy(45.0);
+			for (const FPlacement& Pl : Built[c].Pieces)
+			{
+				++Total;
+				Escaped += (Pl.Pos.X < B.Min.X || Pl.Pos.Y < B.Min.Y || Pl.Pos.Z < B.Min.Z - 5.0 || Pl.Pos.X > B.Max.X || Pl.Pos.Y > B.Max.Y || Pl.Pos.Z > B.Max.Z + 5.0) ? 1 : 0;
+			}
+		}
+		BCheck("dress: deterministic, and in its room", Different == 0 && Escaped == 0, FString::Printf(TEXT("%s: %d rooms dressed twice: %d differ; %d of %d pieces outside their room's box"), *K.ToString(), N, Different, Escaped, Total));
+		// ---- the cost
+		int32 PlainAll = 0, SlabAll = 0;
+		for (int32 c = 0; c < N; ++c)
+		{
+			PlainAll += PlainRendered(c);
+			SlabAll += SlabsDrawnAfter(c);
+		}
+		const int64 PlainTris = 12LL * PlainAll;
+		FString Decks;
+		for (const TPair<int32, FTally>& KV : ByDeck)
+		{
+			Decks += FString::Printf(TEXT("%sdeck %d %d+%d inst %.1fM tris (before %d inst %.2fM)"), Decks.IsEmpty() ? TEXT("") : TEXT("; "), KV.Key, KV.Value.TotalPieces(), SlabsByDeck.FindRef(KV.Key), (KV.Value.Tris + 12LL * SlabsByDeck.FindRef(KV.Key)) / 1.0e6,
+			                          PlainByDeck.FindRef(KV.Key), 12.0 * PlainByDeck.FindRef(KV.Key) / 1.0e6);
+		}
+		BNote(FString::Printf(TEXT("%s (%s): %d rooms dressed in %.0f ms (%.2f ms a room); as built %d instances (%d walls and bays, %d ceiling, %d floor, %d opening, %d prop, %d fallen) + %d boxes drawn: %.2fM triangles; before: %d boxes, %.3fM"),
+		                       *K.ToString(), Ctx.Side == AstraBoardDress::EDressSide::Mandate ? TEXT("Mandate") : (Ctx.Side == AstraBoardDress::EDressSide::Guild ? TEXT("Guild") : TEXT("Astra")), N, BuiltMs, BuiltMs / FMath::Max(1, N), All.TotalPieces(), All.Pieces[0], All.Pieces[1], All.Pieces[2], All.Pieces[3], All.Pieces[4], All.Pieces[5],
+		                       SlabAll, (All.Tris + 12LL * SlabAll) / 1.0e6, PlainAll, PlainTris / 1.0e6));
+		BNote(FString::Printf(TEXT("  hurt by the war: %d instances %.2fM tris (%d flames, smoke and sparks, %d lamps); a hulk: %d instances, %d lamps in the red; %d props (%d rooms with props), %d solid boxes, %d lamps, %d door signs"),
+		                      AllWar.TotalPieces(), AllWar.Tris / 1.0e6, AllWar.Fx, AllWar.Lamps, AllCold.TotalPieces(), AllCold.Lamps, Props, Dressed, All.Blocks, All.Lamps, All.Signs));
+		BNote(FString::Printf(TEXT("  in the ring round a Captain (the rooms within 48 m on his deck): %.0f instances and %.2fM triangles on average over %d places, the worst %d rooms %d instances %.2fM triangles (before: %.0f boxes, %.3fM); %d solid boxes at the worst"),
+		                      (double)Sum.Instances / Samples, (double)Sum.Tris / Samples / 1.0e6, Samples, Worst.Rooms, Worst.Instances, Worst.Tris / 1.0e6, (double)Sum.Plain / Samples, 12.0 * Sum.Plain / Samples / 1.0e6, Worst.Boxes));
+		BNote(FString::Printf(TEXT("  by deck: %s"), *Decks));
+		// the budget a ring may cost on the target machine: the instances and triangles that a Nanite scene of small meshes takes without trouble
+		BCheck("dress: the ring's budget", Worst.Instances <= 9000 && Worst.Tris <= 6000000,
+		       FString::Printf(TEXT("%s: the worst place has %d rooms in its ring, %d instances (at most 9000) and %.2fM triangles (at most 6M)"), *K.ToString(), Worst.Rooms, Worst.Instances, Worst.Tris / 1.0e6));
+		// ---- the dump for the offline view (art/blender/board_kit_view.py --dump): the dressing of the rooms round a place
+		if (!DumpDir.IsEmpty())
+		{
+			FVector At = FVector::ZeroVector;
+			TArray<FString> Xyz;
+			if (Focus.ParseIntoArray(Xyz, TEXT(",")) == 3)
+			{
+				At = FVector(FCString::Atod(*Xyz[0]), FCString::Atod(*Xyz[1]), FCString::Atod(*Xyz[2]));
+			}
+			else if (P->Docks.Num() > 0)
+			{
+				At = M.CentreOf(P->Docks[0].Comp);
+			}
+			else
+			{
+				At = M.CentreOf(0);
+			}
+			TArray<TSharedPtr<FJsonValue>> RoomList, SlabList;
+			for (int32 c = 0; c < N; ++c)
+			{
+				const FBox& B = M.GetComps()[c].Box;
+				if (FMath::Abs(B.Min.Z - At.Z) > 250.0 || FMath::Sqrt(B.ComputeSquaredDistanceToPoint(FVector(At.X, At.Y, B.GetCenter().Z))) >= 2600.0)
+				{
+					continue;
+				}
+				const FRoomDress& R = bDumpHurt ? War[c] : Built[c];
+				TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+				O->SetNumberField(TEXT("comp"), c);
+				O->SetStringField(TEXT("name"), P->Dmg->Comps[c].Name);
+				O->SetStringField(TEXT("kind"), M.GetComps()[c].Kind.ToString());
+				TArray<TSharedPtr<FJsonValue>> Box, Pieces, Lamps;
+				for (const double V : {B.Min.X, B.Min.Y, B.Min.Z, B.Max.X, B.Max.Y, B.Max.Z})
+				{
+					Box.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 10.0) / 10.0));
+				}
+				O->SetArrayField(TEXT("box"), Box);
+				for (const FPlacement& Pl : R.Pieces)
+				{
+					TArray<TSharedPtr<FJsonValue>> Row;
+					Row.Add(MakeShared<FJsonValueString>(AstraBoardDress::Def(Pl.Piece).Key));
+					for (const double V : {Pl.Pos.X, Pl.Pos.Y, Pl.Pos.Z, (double)Pl.Rot.Pitch, (double)Pl.Rot.Yaw, (double)Pl.Rot.Roll, Pl.Scale.X, Pl.Scale.Y, Pl.Scale.Z})
+					{
+						Row.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 100.0) / 100.0));
+					}
+					Pieces.Add(MakeShared<FJsonValueArray>(Row));
+				}
+				O->SetArrayField(TEXT("pieces"), Pieces);
+				for (const FLamp& L : R.Lamps)
+				{
+					TArray<TSharedPtr<FJsonValue>> Row;
+					for (const double V : {L.Pos.X, L.Pos.Y, L.Pos.Z, (double)(int32)L.State})
+					{
+						Row.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 10.0) / 10.0));
+					}
+					Lamps.Add(MakeShared<FJsonValueArray>(Row));
+				}
+				O->SetArrayField(TEXT("lamps"), Lamps);
+				RoomList.Add(MakeShared<FJsonValueObject>(O));
+				for (int32 i = SlabFirst[c]; i < SlabFirst[c + 1]; ++i)
+				{
+					const AstraBoardInterior::FSlab& S = Slabs[i];
+					TArray<TSharedPtr<FJsonValue>> Row;
+					Row.Add(MakeShared<FJsonValueNumber>((int32)S.Kind));
+					for (const double V : {S.Centre.X, S.Centre.Y, S.Centre.Z, S.Half.X, S.Half.Y, S.Half.Z})
+					{
+						Row.Add(MakeShared<FJsonValueNumber>(FMath::RoundToInt(V * 10.0) / 10.0));
+					}
+					SlabList.Add(MakeShared<FJsonValueArray>(Row));
+				}
+			}
+			TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+			Root->SetStringField(TEXT("class"), K.ToString());
+			Root->SetStringField(TEXT("side"), Ctx.Side == AstraBoardDress::EDressSide::Mandate ? TEXT("mandate") : (Ctx.Side == AstraBoardDress::EDressSide::Guild ? TEXT("guild") : TEXT("astra")));
+			Root->SetArrayField(TEXT("rooms"), RoomList);
+			Root->SetArrayField(TEXT("slabs"), SlabList);
+			TArray<TSharedPtr<FJsonValue>> Foc;
+			for (const double V : {At.X, At.Y, At.Z})
+			{
+				Foc.Add(MakeShared<FJsonValueNumber>(V));
+			}
+			Root->SetArrayField(TEXT("focus"), Foc);
+			const FString Path = FPaths::IsRelative(DumpDir) ? FPaths::Combine(FPaths::ProjectDir(), DumpDir) : DumpDir;
+			IFileManager::Get().MakeDirectory(*Path, true);
+			FFileHelper::SaveStringToFile(Json(Root), *FPaths::Combine(Path, FString::Printf(TEXT("dress_%s.json"), *K.ToString())));
 		}
 	}
 }
@@ -2194,7 +2697,7 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("-setup="), GSetup);
 	Scenario = Scenario.ToLower();
 	FRig Rig;
-	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid; no plan of the Aquila needed)
+	if (Scenario == TEXT("plans") || Scenario == TEXT("attack") || Scenario == TEXT("interior") || Scenario == TEXT("war") || Scenario == TEXT("dress"))      // (on request only: other ships' plans, the marines going aboard one, the plans made solid and dressed; no plan of the Aquila needed)
 	{
 		FString Class;
 		FParse::Value(*Params, TEXT("-class="), Class);
@@ -2210,6 +2713,13 @@ int32 UAstraBoardSimCommandlet::Main(const FString& Params)
 			FString Dump;
 			FParse::Value(*Params, TEXT("-dump="), Dump);
 			BoardScenarioInterior(Class, Dump, Seed);
+		}
+		else if (Scenario == TEXT("dress"))
+		{
+			FString Dump, Focus;
+			FParse::Value(*Params, TEXT("-dump="), Dump);
+			FParse::Value(*Params, TEXT("-focus="), Focus);
+			BoardScenarioDress(Class, Dump, Focus, FParse::Param(*Params, TEXT("hurt")), Seed);
 		}
 		else if (Scenario == TEXT("war"))
 		{

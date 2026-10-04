@@ -60,6 +60,10 @@ def cmd_run(a: argparse.Namespace) -> int:
         args.append(f"-setup={a.setup}")
     if getattr(a, "dump", ""):
         args.append(f"-dump={(ROOT / a.dump).resolve()}")
+    if getattr(a, "focus", ""):
+        args.append(f"-focus={a.focus}")
+    if getattr(a, "hurt", False):
+        args.append("-hurt")
     t0 = time.time()
     with open(log, "w") as f:
         p = subprocess.Popen(args, stdout=f, stderr=subprocess.STDOUT, cwd=str(ROOT))
@@ -229,6 +233,14 @@ ASSAULT_SETUPS = {
                     exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive;{_NOFATE}",
                     at="2=astra.board.strip M1|3=astra.war.fleet pound M1 port 70 12 kinetic|60=astra.war.fleet pound M1 port 70 10 explosive|11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|11001=astra.board.assault out M1 - 2 port - ride",
                     expect=[r"the war has left her \d+ of her people under arms", r"the Captain is aboard Wreck with the marines", r"Wreck is ours|boarding of Wreck has failed|have broken off|has gone quiet", r"the Captain is back aboard the Aquila"]),
+    # the decks dressed (ABBORDAGGI-3): in a headless run the content has none of the kit's meshes, so every piece is the engine's cube (astra.board.dress 3) and everything the dressing makes in the world is made
+    # and counted all the same: the instances of each kind, the boxes of the props, the lamps (and the lights that follow the Captain), the door signs, the fallen, the flames and sparks of the rooms the war burnt.
+    # (The Captain is aboard from about 11 220 s, or from about 11 600 s when the worker that reads the plan is slow: `astra.board.info` is asked all along, one of the answers is in the fight.)
+    "out_dress": dict(doc="the Captain aboard a ship the war has shot up with her decks dressed (the kit's pieces as cubes): what the dressing made, counted by the boarding's info", seconds=12000,
+                      exec=f"{_AQ};astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive;{_NOFATE};astra.board.dress 3",
+                      at="2=astra.board.strip M1|3=astra.war.fleet pound M1 port 70 12 kinetic|60=astra.war.fleet pound M1 port 70 10 explosive|11000=astra.board.disable M1|11000=astra.board.testcaptain 0 0 0|"
+                         "11001=astra.board.assault out M1 - 2 port - ride|11230=astra.board.info|11250=astra.board.info|11270=astra.board.info|11290=astra.board.info|11630=astra.board.info|11650=astra.board.info|11670=astra.board.info|11690=astra.board.info|11710=astra.board.info|11730=astra.board.info",
+                      expect=[r"the Captain is aboard Wreck with the marines", r"decks dressed: \d+ rooms, \d+ kit instances \(\d+ wall, \d+ ceiling, \d+ floor, \d+ opening, \d+ prop, \d+ fallen\), \d+ lamps", r"the Captain is back aboard the Aquila"]),
     # a station is a place of the system (SPAZIO-VIVO's fixtures: Keeper Station, the Arsenal, a refinery, a mine), not a ship of this war: no boat is flown at it and none from it
     # (the war bench has no living space to make one: a ship is made a fixture, as the war sees them)
     "fixture": dict(doc="boats at a place of the system and from it: refused with the reason, nothing flies", seconds=11200,
@@ -297,7 +309,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only)")
+    r.add_argument("--scenario", default="all", help="all | map | rules | duel | squad | flank | board | orders (the marines' orders, on request only) | fps (the Captain's arms, on request only) | plans | attack (other ships' plans and the marines aboard one, on request only) | interior (every class's plan made solid and the simulation's routes walked through it, on request only) | war (a ship the war has shot at, boarded, on request only) | dress (every class's decks dressed: instances and triangles for the ship, each deck and the ring round a Captain against the plain boxes, the soldiers' ways clear of the props, the doors, no one placed in a prop; on request only)")
     r.add_argument("--seed", type=int, default=1)
     r.add_argument("--seeds", type=int, default=20, help="how many fights of each kind (seeds seed .. seed+seeds-1)")
     r.add_argument("--boarders", type=int, default=0, help="board: the size of the boarding party of the first setup (default 10, one skiff)")
@@ -308,7 +320,9 @@ def main() -> int:
     r.add_argument("--class", dest="klass", default="", help="plans/attack: the ship's class (acheron, styx, lethe, praetorian, vigilant)")
     r.add_argument("--fpsset", default="", help="fps: try other places and anchors without touching the table, \"rifle.hip=84,17,-10;rifle.hipturn=-3,-13,0;rifle.shoulder_l=62,-20,-42\" (keys: rifle./pistol. hip hipturn ads low lowturn gripl fov shoulder_r shoulder_l; pole_r pole_l for both)")
     r.add_argument("--fpsposes", default="", help="fps: write the engine's poses (idle, draw, reload, dry fire) to this JSON file, for the offline preview")
-    r.add_argument("--dump", default="", help="interior: write the solids of each class's plan (JSON, for the offline view) into this directory")
+    r.add_argument("--dump", default="", help="interior: write the solids of each class's plan (JSON, for the offline view) into this directory; dress: the dressing of the rooms round --focus (art/blender/board_kit.py --dump renders it)")
+    r.add_argument("--focus", default="", help="dress --dump: the place the dumped rooms are round, \"x,y,z\" in cm (default: where the first boat docks)")
+    r.add_argument("--hurt", action="store_true", help="dress --dump: dump the rooms as the war would leave them (dark, burning, gutted) instead of as built")
     r.add_argument("--timeout", type=int, default=1500)
     r.set_defaults(fn=cmd_run)
     c = sub.add_parser("craft")

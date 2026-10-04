@@ -606,5 +606,71 @@ FVector FAstraBoardMap::Inset(int32 Comp, const FVector& P, float MarginCm) cons
 	}
 	FVector Q = BoardClampIn(Comps[Comp].Box, P, MarginCm);
 	Q.Z = Comps[Comp].Box.Min.Z;
+	// and out of the props the room is dressed with: a man's width off their faces. A spot inside one is moved to the nearest spot that is in the room and clear of every prop: looked for on rings of growing
+	// size round it (twenty centimetres to a ring, three metres at most: a corner crowded with props still has its way out)
+	const TArrayView<const FBox2D> Blocks = BlocksOf(Comp);
+	if (Blocks.Num() > 0)
+	{
+		const FBox& Box = Comps[Comp].Box;
+		const double Pad = FMath::Min<double>(MarginCm, 40.0);
+		const auto Inside = [&](const FVector& V) -> bool
+		{
+			for (const FBox2D& K : Blocks)
+			{
+				if (V.X > K.Min.X - Pad && V.X < K.Max.X + Pad && V.Y > K.Min.Y - Pad && V.Y < K.Max.Y + Pad)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+		if (Inside(Q))
+		{
+			bool bFound = false;
+			FVector Best = Q;
+			for (int32 Ring = 1; Ring <= 15 && !bFound; ++Ring)
+			{
+				const double R = Ring * 20.0;
+				double BestD = TNumericLimits<double>::Max();
+				for (int32 i = -Ring; i <= Ring; ++i)
+				{
+					for (int32 k = 0; k < 4; ++k)
+					{
+						const double A = i * 20.0;
+						const FVector Cand = k == 0 ? FVector(Q.X + A, Q.Y - R, Q.Z) : (k == 1 ? FVector(Q.X + A, Q.Y + R, Q.Z) : (k == 2 ? FVector(Q.X - R, Q.Y + A, Q.Z) : FVector(Q.X + R, Q.Y + A, Q.Z)));
+						FVector C = BoardClampIn(Box, Cand, MarginCm);
+						C.Z = Box.Min.Z;
+						if (Inside(C))
+						{
+							continue;
+						}
+						const double D = FVector::DistSquared(C, Q);
+						if (D < BestD)
+						{
+							BestD = D;
+							Best = C;
+							bFound = true;
+						}
+					}
+				}
+			}
+			Q = Best;
+		}
+	}
 	return Q;
+}
+
+void FAstraBoardMap::SetBlocks(TArray<FBox2D>&& All, TArray<int32>&& First)
+{
+	BlockAll = MoveTemp(All);
+	BlockFirst = MoveTemp(First);
+}
+
+TArrayView<const FBox2D> FAstraBoardMap::BlocksOf(int32 Comp) const
+{
+	if (!BlockFirst.IsValidIndex(Comp + 1))
+	{
+		return TArrayView<const FBox2D>();
+	}
+	return TArrayView<const FBox2D>(BlockAll.GetData() + BlockFirst[Comp], BlockFirst[Comp + 1] - BlockFirst[Comp]);
 }

@@ -32,14 +32,134 @@ namespace
 		// the portal's normal runs from its first room to its second: leaving this room through this face means the normal points the way the face looks (out of A) or the other way (out of B)
 		return N * (P.A == Comp ? 1.0 : -1.0) * Sign > 0.5;
 	}
+}
 
-	/** A gap in a wall: along it from S0 to S1, up from Bot to Top (cm above this room's floor: a door between a tall hall and a room on a higher deck stands where the higher floor is). */
-	struct FIbOpening
+void AstraBoardInterior::FaceGeo(const FAstraBoardMap& Map, int32 Comp, int32 Face, FFaceGeo& G)
+{
+	G = FFaceGeo();
+	if (!Map.GetComps().IsValidIndex(Comp) || Face < 0 || Face > 3)
 	{
-		double S0 = 0.0, S1 = 0.0, Bot = 0.0, Top = 0.0;
-		int32 Portal = INDEX_NONE;
-		bool bFramed = false;
-	};
+		return;
+	}
+	const FBoardComp& C = Map.GetComps()[Comp];
+	const FBox& B = C.Box;
+	const double H = B.Max.Z - B.Min.Z;
+	G.Face = Face;
+	G.bX = Face < 2;
+	G.Sign = (Face % 2 == 0) ? 1.0 : -1.0;
+	G.Plane = G.bX ? (G.Sign > 0.0 ? B.Max.X : B.Min.X) : (G.Sign > 0.0 ? B.Max.Y : B.Min.Y);
+	G.T0 = G.bX ? B.Min.Y : B.Min.X;
+	G.T1 = G.bX ? B.Max.Y : B.Max.X;
+	const bool bX = G.bX;
+	const double Plane = G.Plane, Sign = G.Sign, T0 = G.T0, T1 = G.T1;
+	TArray<FOpening>& Opens = G.Opens;
+	for (const int32 Pi : C.Portals)
+	{
+		const FBoardPortal& P = Map.GetPortals()[Pi];
+		if (P.bVertical() || !IbOnFace(P, Comp, bX, Plane, Sign))
+		{
+			continue;
+		}
+		FOpening O;
+		O.Portal = Pi;
+		const double Along = bX ? P.Pos.Y : P.Pos.X;
+		O.S0 = Along - P.Half;
+		O.S1 = Along + P.Half;
+		// where the opening stands in height: on the higher of the two floors (the portal's own Z), up to the lower of the two ceilings for an open way; a hall that spans decks has doors at
+		// each deck's level, and the room beside it sees only the one that is at its own
+		const FBox& Other = Map.GetComps()[P.Other(Comp)].Box;
+		O.Bot = FMath::Clamp(P.Pos.Z - B.Min.Z, 0.0, H - 130.0);
+		if (P.Kind == FBoardPortal::EKind::Open)
+		{
+			// an open way: the whole stretch the two rooms share (a corridor going on is not a wall with a hole in it)
+			const double A0 = FMath::Max(T0, bX ? Other.Min.Y : Other.Min.X), A1 = FMath::Min(T1, bX ? Other.Max.Y : Other.Max.X);
+			if (A1 - A0 > 60.0)
+			{
+				O.S0 = A0;
+				O.S1 = A1;
+			}
+			O.Top = FMath::Clamp(FMath::Min(B.Max.Z, Other.Max.Z) - B.Min.Z, O.Bot + 130.0, H);
+		}
+		else
+		{
+			O.Top = O.Bot + FMath::Min<double>(P.Kind == FBoardPortal::EKind::Blast ? BlastHeightCm : DoorHeightCm, H - O.Bot - 10.0);
+			O.bFramed = true;
+			// a door stands in the stretch the two rooms share: one that the plan puts at the edge of it (the end of a corridor's segment, a room that runs on past it) is moved in until the
+			// whole gap is in front of both rooms (the same gap in both rooms' walls: nothing stands half in the way of a door)
+			const double Lo = FMath::Max(T0, bX ? Other.Min.Y : Other.Min.X), Hi = FMath::Min(T1, bX ? Other.Max.Y : Other.Max.X);
+			if (Hi - Lo > 60.0)
+			{
+				const double Half = FMath::Min<double>(P.Half, 0.5 * (Hi - Lo));
+				const double Centre = FMath::Clamp(Along, Lo + Half, Hi - Half);
+				O.S0 = Centre - Half;
+				O.S1 = Centre + Half;
+			}
+		}
+		O.S0 = FMath::Max(O.S0, T0 + 6.0);
+		O.S1 = FMath::Min(O.S1, T1 - 6.0);
+		if (O.S1 - O.S0 > 20.0)
+		{
+			Opens.Add(O);
+		}
+	}
+	Opens.Sort([](const FOpening& A, const FOpening& B2) { return A.S0 < B2.S0; });
+	// the wall itself: along the face, between every two of the openings' edges, what stands is the height less the gaps that are open there (a hall that spans decks has two doors one above
+	// the other at the same place: each is a gap in the other's wall); stretches that stand alike are one slab
+	TArray<double> Cuts;
+	Cuts.Add(T0);
+	Cuts.Add(T1);
+	for (const FOpening& O : Opens)
+	{
+		Cuts.Add(O.S0);
+		Cuts.Add(O.S1);
+	}
+	Cuts.Sort();
+	for (int32 i = 0; i + 1 < Cuts.Num(); ++i)
+	{
+		if (Cuts[i + 1] - Cuts[i] < 2.0)
+		{
+			continue;
+		}
+		const double At = 0.5 * (Cuts[i] + Cuts[i + 1]);
+		TArray<FVector2D, TInlineAllocator<3>> Gaps;
+		for (const FOpening& O : Opens)
+		{
+			if (O.S0 <= At && At <= O.S1)
+			{
+				Gaps.Add(FVector2D(O.Bot, O.Top));
+			}
+		}
+		Gaps.Sort([](const FVector2D& A, const FVector2D& B2) { return A.X < B2.X; });
+		FWallRun R;
+		R.S0 = Cuts[i];
+		R.S1 = Cuts[i + 1];
+		double Z = 0.0;
+		for (const FVector2D& Gp : Gaps)
+		{
+			if (Gp.X > Z + 6.0)
+			{
+				R.Solid.Add(FVector2D(Z, Gp.X));
+			}
+			Z = FMath::Max(Z, Gp.Y);
+		}
+		if (H > Z + 6.0)
+		{
+			R.Solid.Add(FVector2D(Z, H));
+		}
+		bool bSame = G.Runs.Num() > 0 && FMath::IsNearlyEqual(G.Runs.Last().S1, R.S0, 0.5) && G.Runs.Last().Solid.Num() == R.Solid.Num();
+		for (int32 k = 0; bSame && k < R.Solid.Num(); ++k)
+		{
+			bSame = FMath::IsNearlyEqual(G.Runs.Last().Solid[k].X, R.Solid[k].X, 0.5) && FMath::IsNearlyEqual(G.Runs.Last().Solid[k].Y, R.Solid[k].Y, 0.5);
+		}
+		if (bSame)
+		{
+			G.Runs.Last().S1 = R.S1;
+		}
+		else
+		{
+			G.Runs.Add(R);
+		}
+	}
 }
 
 void AstraBoardInterior::BuildComp(const FAstraBoardMap& Map, int32 Comp, TArray<FSlab>& Out)
@@ -72,61 +192,10 @@ void AstraBoardInterior::BuildComp(const FAstraBoardMap& Map, int32 Comp, TArray
 	// the walls, face by face: 0 +X, 1 -X, 2 +Y, 3 -Y
 	for (int32 f = 0; f < 4; ++f)
 	{
-		const bool bX = f < 2;
-		const double Sign = (f % 2 == 0) ? 1.0 : -1.0;
-		const double Plane = bX ? (Sign > 0.0 ? B.Max.X : B.Min.X) : (Sign > 0.0 ? B.Max.Y : B.Min.Y);
-		const double T0 = bX ? B.Min.Y : B.Min.X, T1 = bX ? B.Max.Y : B.Max.X;
-		TArray<FIbOpening> Opens;
-		for (const int32 Pi : C.Portals)
-		{
-			const FBoardPortal& P = Map.GetPortals()[Pi];
-			if (P.bVertical() || !IbOnFace(P, Comp, bX, Plane, Sign))
-			{
-				continue;
-			}
-			FIbOpening O;
-			O.Portal = Pi;
-			const double Along = bX ? P.Pos.Y : P.Pos.X;
-			O.S0 = Along - P.Half;
-			O.S1 = Along + P.Half;
-			// where the opening stands in height: on the higher of the two floors (the portal's own Z), up to the lower of the two ceilings for an open way; a hall that spans decks has doors at
-			// each deck's level, and the room beside it sees only the one that is at its own
-			const FBox& Other = Map.GetComps()[P.Other(Comp)].Box;
-			O.Bot = FMath::Clamp(P.Pos.Z - B.Min.Z, 0.0, H - 130.0);
-			if (P.Kind == FBoardPortal::EKind::Open)
-			{
-				// an open way: the whole stretch the two rooms share (a corridor going on is not a wall with a hole in it)
-				const double A0 = FMath::Max(T0, bX ? Other.Min.Y : Other.Min.X), A1 = FMath::Min(T1, bX ? Other.Max.Y : Other.Max.X);
-				if (A1 - A0 > 60.0)
-				{
-					O.S0 = A0;
-					O.S1 = A1;
-				}
-				O.Top = FMath::Clamp(FMath::Min(B.Max.Z, Other.Max.Z) - B.Min.Z, O.Bot + 130.0, H);
-			}
-			else
-			{
-				O.Top = O.Bot + FMath::Min<double>(P.Kind == FBoardPortal::EKind::Blast ? BlastHeightCm : DoorHeightCm, H - O.Bot - 10.0);
-				O.bFramed = true;
-				// a door stands in the stretch the two rooms share: one that the plan puts at the edge of it (the end of a corridor's segment, a room that runs on past it) is moved in until the
-				// whole gap is in front of both rooms (the same gap in both rooms' walls: nothing stands half in the way of a door)
-				const double Lo = FMath::Max(T0, bX ? Other.Min.Y : Other.Min.X), Hi = FMath::Min(T1, bX ? Other.Max.Y : Other.Max.X);
-				if (Hi - Lo > 60.0)
-				{
-					const double Half = FMath::Min<double>(P.Half, 0.5 * (Hi - Lo));
-					const double Centre = FMath::Clamp(Along, Lo + Half, Hi - Half);
-					O.S0 = Centre - Half;
-					O.S1 = Centre + Half;
-				}
-			}
-			O.S0 = FMath::Max(O.S0, T0 + 6.0);
-			O.S1 = FMath::Min(O.S1, T1 - 6.0);
-			if (O.S1 - O.S0 > 20.0)
-			{
-				Opens.Add(O);
-			}
-		}
-		Opens.Sort([](const FIbOpening& A, const FIbOpening& B2) { return A.S0 < B2.S0; });
+		FFaceGeo G;
+		FaceGeo(Map, Comp, f, G);
+		const bool bX = G.bX;
+		const double Plane = G.Plane, Sign = G.Sign;
 		// a wall stands inside the room's own box, its thickness in from the face's plane
 		const auto Wall = [&](ESlab Kind, double S0, double S1, double Z0, double Z1, double Thick, int32 Door = INDEX_NONE)
 		{
@@ -138,70 +207,7 @@ void AstraBoardInterior::BuildComp(const FAstraBoardMap& Map, int32 Comp, TArray
 			}
 			Add(Kind, bX ? FVector(AxisCenter, T, Zc) : FVector(T, AxisCenter, Zc), bX ? FVector(Thick * 0.5, L * 0.5, Zh) : FVector(L * 0.5, Thick * 0.5, Zh), Door);
 		};
-		// the wall itself: along the face, between every two of the openings' edges, what stands is the height less the gaps that are open there (a hall that spans decks has two doors one above
-		// the other at the same place: each is a gap in the other's wall); stretches that stand alike are one slab
-		TArray<double> Cuts;
-		Cuts.Add(T0);
-		Cuts.Add(T1);
-		for (const FIbOpening& O : Opens)
-		{
-			Cuts.Add(O.S0);
-			Cuts.Add(O.S1);
-		}
-		Cuts.Sort();
-		struct FRun
-		{
-			double S0 = 0.0, S1 = 0.0;
-			TArray<FVector2D, TInlineAllocator<3>> Solid;                    // (from, to) heights above the floor
-		};
-		TArray<FRun> Runs;
-		for (int32 i = 0; i + 1 < Cuts.Num(); ++i)
-		{
-			if (Cuts[i + 1] - Cuts[i] < 2.0)
-			{
-				continue;
-			}
-			const double At = 0.5 * (Cuts[i] + Cuts[i + 1]);
-			TArray<FVector2D, TInlineAllocator<3>> Gaps;
-			for (const FIbOpening& O : Opens)
-			{
-				if (O.S0 <= At && At <= O.S1)
-				{
-					Gaps.Add(FVector2D(O.Bot, O.Top));
-				}
-			}
-			Gaps.Sort([](const FVector2D& A, const FVector2D& B2) { return A.X < B2.X; });
-			FRun R;
-			R.S0 = Cuts[i];
-			R.S1 = Cuts[i + 1];
-			double Z = 0.0;
-			for (const FVector2D& G : Gaps)
-			{
-				if (G.X > Z + 6.0)
-				{
-					R.Solid.Add(FVector2D(Z, G.X));
-				}
-				Z = FMath::Max(Z, G.Y);
-			}
-			if (H > Z + 6.0)
-			{
-				R.Solid.Add(FVector2D(Z, H));
-			}
-			bool bSame = Runs.Num() > 0 && FMath::IsNearlyEqual(Runs.Last().S1, R.S0, 0.5) && Runs.Last().Solid.Num() == R.Solid.Num();
-			for (int32 k = 0; bSame && k < R.Solid.Num(); ++k)
-			{
-				bSame = FMath::IsNearlyEqual(Runs.Last().Solid[k].X, R.Solid[k].X, 0.5) && FMath::IsNearlyEqual(Runs.Last().Solid[k].Y, R.Solid[k].Y, 0.5);
-			}
-			if (bSame)
-			{
-				Runs.Last().S1 = R.S1;
-			}
-			else
-			{
-				Runs.Add(R);
-			}
-		}
-		for (const FRun& R : Runs)
+		for (const FWallRun& R : G.Runs)
 		{
 			for (const FVector2D& Piece : R.Solid)
 			{
@@ -209,7 +215,7 @@ void AstraBoardInterior::BuildComp(const FAstraBoardMap& Map, int32 Comp, TArray
 			}
 		}
 		// the frames round the doors, the leaves of the pressure bulkheads
-		for (const FIbOpening& O : Opens)
+		for (const FOpening& O : G.Opens)
 		{
 			if (O.bFramed)
 			{
@@ -241,7 +247,7 @@ bool AstraBoardInterior::SegmentBlocked(const TArray<FSlab>& Slabs, const FVecto
 	const FVector Dir = B - A;
 	for (const FSlab& S : Slabs)
 	{
-		if (S.Kind == ESlab::Floor || S.Kind == ESlab::Ceiling || S.Kind == ESlab::Strip)
+		if (S.Kind == ESlab::Floor || S.Kind == ESlab::Ceiling || S.Kind == ESlab::Strip || S.Kind == ESlab::Mark)
 		{
 			continue;
 		}
@@ -291,7 +297,7 @@ bool AstraBoardInterior::SegmentBlocked(const TArray<FSlab>& Slabs, const FVecto
 AAstraBoardInterior::AAstraBoardInterior()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.TickInterval = 0.25f;
+	PrimaryActorTick.TickInterval = 0.f;                                 // (every frame while the Captain is aboard: the flames; the lights are moved four times a second)
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	Root->SetMobility(EComponentMobility::Movable);                      // (it is moved to where the plan stands in the world)
 	SetRootComponent(Root);
@@ -323,7 +329,7 @@ UInstancedStaticMeshComponent* AAstraBoardInterior::MakeIsm(const TCHAR* Name, U
 	return C;
 }
 
-void AAstraBoardInterior::Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector& InOffset, EAstraInteriorStyle InStyle, const TMap<int32, FBoardRoomMood>* InMoods)
+void AAstraBoardInterior::Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector& InOffset, EAstraInteriorStyle InStyle, const TMap<int32, FBoardRoomMood>* InMoods, const TArray<AstraBoardDress::FFallen>* InFallen)
 {
 	End();
 	Plan = InPlan;
@@ -428,6 +434,7 @@ void AAstraBoardInterior::Begin(TSharedPtr<FBoardShipPlan> InPlan, const FVector
 		bTorchOn = Style == EAstraInteriorStyle::Emergency;
 		Torch->RegisterComponent();
 	}
+	DressBegin(InFallen);
 	SetActorTickEnabled(true);
 }
 
@@ -444,7 +451,12 @@ void AAstraBoardInterior::AddSlabs(const TArray<FSlab>& Slabs)
 		case ESlab::Ceiling: F.Add(Xf); break;
 		case ESlab::Frame: Fr.Add(Xf); break;
 		case ESlab::Strip:
+		case ESlab::Mark:
 		{
+			if (S.Kind == ESlab::Strip && Kit)
+			{
+				break;                                                   // (a dressed room is lit by the kit's lamps, not by a bar of light in its ceiling)
+			}
 			const FBoardRoomMood* Mood = Moods.Find(S.Comp);
 			if (Mood && Mood->Dark())
 			{
@@ -530,7 +542,7 @@ void AAstraBoardInterior::MakePads(int32 Comp)
 		for (const FPad* Pad : {&A, &B})
 		{
 			FSlab S;
-			S.Kind = ESlab::Strip;
+			S.Kind = ESlab::Mark;
 			S.Centre = Pad->Here + FVector(0.0, 0.0, 1.5);
 			S.Half = FVector(55.0, 55.0, 1.5);
 			S.Comp = Pad->Comp;
@@ -578,6 +590,7 @@ bool AAstraBoardInterior::EnsureAround(const FVector& PlanCm, int32 MaxRooms)
 		BuildComp(Map, W.Comp, Slabs);
 		AddSlabs(Slabs);
 		MakePads(W.Comp);
+		DressBuilt(W.Comp);
 		Built.Add(W.Comp);
 		++Made;
 	}
@@ -609,6 +622,7 @@ void AAstraBoardInterior::SetShut(const TSet<int32>& ShutDoors)
 		}
 		Leaves->UpdateInstanceTransform(KV.Value, T, false, true, true);
 	}
+	DressShut(ShutDoors);
 	ShutNow = ShutDoors;
 }
 
@@ -663,6 +677,12 @@ void AAstraBoardInterior::MoveLights()
 			bTorchOn = bOn;
 			Torch->SetVisibility(bOn);
 		}
+	}
+	// the dressed rooms have their own: the lamps, the flames, the signs
+	if (Kit)
+	{
+		DressLights(Eye);
+		return;
 	}
 	// the fires: the nearest rooms that burn, within sight of the sound of them
 	if (!FireLights.IsEmpty())
@@ -739,6 +759,7 @@ void AAstraBoardInterior::Tick(float DeltaSeconds)
 		LightT = 0.3f;
 		MoveLights();
 	}
+	DressTick(DeltaSeconds);
 }
 
 FVector AAstraBoardInterior::BuildCabin()
@@ -791,6 +812,7 @@ FVector AAstraBoardInterior::BuildCabin()
 void AAstraBoardInterior::End()
 {
 	SetActorTickEnabled(false);
+	DressEnd();
 	for (UInstancedStaticMeshComponent* S : {Walls.Get(), Floors.Get(), Frames.Get(), Leaves.Get(), Strips.Get(), DeadStrips.Get()})
 	{
 		if (S)

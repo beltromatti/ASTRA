@@ -544,3 +544,135 @@ disturbo lungo la linea (con la ragione `[jam]`), la manovra dell'Aquila, il cam
 (la riga a schermo ABOARD); (4) combattere con i marine; (5) a voce «Chief, beam me up» o `astra.xport.send captain "pad 1" window`: il Capitano in Transporter Room, i ponti spariscono, i marine
 combattono senza di lui; (6) per vedere il rifiuto di un disturbatore: un incrociatore del Mandato che disturba (a 12-55 km) sulla linea; (7) le due marine: `astra.xport.send "marines 2" <contatto> window` e
 `astra.xport.send "away team" "the pads" window`.
+
+## 14. ABBORDAGGI-3 — l'esercitazione, i libri, i ponti vestiti (4/10)
+
+Il terzo giro degli abbordaggi (brief del lead dopo F5.2): le cose che il lead ha visto nel gioco e vuole dopo. Questa sezione cresce a ogni traguardo; i ponti nemici vestiti (§14.2) sono il
+traguardo 2, l'esercitazione e i libri (§14.1) il traguardo 1 (già in `main`).
+
+### 14.1 L'esercitazione e i libri della nave (traguardo 1; `AstraBoardAssault.cpp`, `AstraBoardCraft.*`, `AstraFleetInterior.*`)
+
+**L'esercitazione** (`astra.board.drill [port|starboard] [skiffs 1..4] [carrier|-] [km]` · `astra.board.drill off`). In una partita ogni barca del Mandato è fermata da qualcosa di giusto (lo scudo che
+regge, la difesa puntuale della Praetorian, i Falcon di copertura, l'equipaggio che rialza lo scudo): chi vuole vedere le barche agganciare e la lotta nei corridoi non può aspettare il caso. L'esercitazione
+tiene quelle quattro cose ferme **per la durata di un solo abbordaggio**, e basta (le regole della partita normale sono intatte e provate: `assault --setup in_play`):
+
+- lo scudo di quella faccia dell'Aquila è tenuto a zero (`FDrill`, nella battaglia: `TickShields` lo rispetta e l'equipaggio non può rialzarlo mentre dura);
+- la difesa puntuale non spara alle barche (`bPdSilenced`, `FLaunch::bSilencePd`: le barche non sono bersagli di `TickPointDefence`; contro ogni altra cosa lavora);
+- i ponti di volo sono chiusi (`LaunchSquadron` rifiuta mentre dura: nessun Falcon esce a spazzare le barche);
+- la portaerei (`carrier`, o la migliore: `BestCarrier`) è tenuta di traverso a `km` con i cannoni fermi (`ParkForDrill`; senza `km` resta dov'è);
+- poi le barche volano come in ogni abbordaggio (lancio, transito, avvicinamento, aggancio, taglio dello scafo). Un richiamo dell'ammiraglio del Mandato non la interrompe (`HandleCommand`: «this is the
+  Captain's boarding drill»): solo il Capitano la chiude (`drill off`, o la sua parola all'XO). Finisce con l'abbordaggio (`CloseAssault` → `EndDrill`) e restituisce tutto quello che teneva.
+
+**I libri.** Gli sbarchi scrivono indietro nell'interno di FLOTTA-VIVA (`UAstraBattleSubsystem::FleetBoardingResult` → `FAstraShipInterior::ApplyBoarding`): i morti e i feriti dei difensori e dei marine del
+vettore sono **persone** dell'equipaggio (Causa 100, «gunfire»), ognuno dov'è caduto (le unità della simulazione portano la persona: `FUnit::Person`, assegnata dalla fotografia della nave, `FFleetSnapshot::FHand::Person`),
+e i conti, le forze dei ruoli, quello che la nave sa ancora fare (equipaggi dei cannoni, plancia, macchine) e la catena di comando seguono come se il colpo fosse stato della guerra. A fine sbarco
+(`WriteBooks`) il rapporto dice «her books: Hulk's crew lost 1 dead and 2 hurt to the landing»; una nave presa (`CaptureShip` cambia solo la parte) tiene i suoi libri com'erano; chi non ha ancora un
+interno ne riceve uno (l'equipaggio della classe ai posti). Le fotografie portano anche i **caduti** (`FFleetSnapshot::Fallen`, dove sono caduti: i ponti vestiti li mostrano, §14.2). Banco: `run --scenario war`
+(«the landing's books»).
+
+### 14.2 I ponti nemici vestiti (traguardo 2; `art/blender/board_kit*.py`, `AstraBoardDress.*`, `AstraBoardInteriorDress.cpp`)
+
+Il Capitano che va con i marine (§13.5) camminava in scatole: corridoi neri, strisce rosse, pareti nude. Ora una nave abbordata è una nave **del suo campo**: il Mandato nel suo stile (STILE.md §3: basalto e
+graffite, ferro nero, rame ossidato e verderame, ambra e rosso, «navi sopravvissute, rattoppate con orgoglio»), la sua scrittura in stencil (inglese: «FERRY GUARD», «HOLD FAST», «WE FERRY OUR PEOPLE BEYOND
+THE NIGHT», «COOLANT 2», «HATCH»), le luci d'emergenza che si leggono al buio, il fumo e le scintille dove la guerra è passata, i caduti dove sono caduti. Tutto a istanze (un componente istanziato per
+ogni pezzo che i ponti usano).
+
+**Il kit** (`art/blender/board_kit.py`, `board_kit_defs.py`, `_parts.py`, `_props.py`, `_view.py`; lo stesso linguaggio del kit del corridoio dell'Aquila: campate con nervature, mancorrenti, feritoie, tubi e vassoi
+sul soffitto, strisce-guida a terra, ma nella mano del Mandato). 48 pezzi: 12 di parete (campate da 2 m: piastre e mancorrente con il pannello di stencil, banco di tubi, feritoia e scatola di giunzione, armadietti,
+portello, la campata bruciata e strappata, la campata con il motto, con HOLD FAST, il filler da 1 m; la nervatura a tutta altezza, la cornice), 7 di soffitto (tubi su staffe, vassoio di cavi, lampada a gabbia accesa / rossa / spenta, griglia,
+cavi che pendono), 4 di pavimento (piastra 2×2 m di lamiera striata, soglia a strisce di pericolo, strisce-guida, detriti), 5 di apertura (stipite, architrave, stipiti, architrave e anta della paratia stagna), 17 mobili (casse, fusti, armadietti,
+scaffali, cuccette, tavoli, panche, console, pompa, motore-generatore, cisterna, pila del reattore, culatta, letto di infermeria, cella, stendardo del traghetto) e 3 pose di un caduto. Costi: pezzi di parete 400-1500 triangoli, mobili 300-2300, i caduti ~1000. `blender -b --factory-startup -P art/blender/board_kit.py`
+fa gli FBX (`art/export/board`, non in git) e `data/ship/board_kit.json` (misure, triangoli, materiali); `--sheet <dir>` le schede di prova, `--view corridor` un corridoio montato, `--dump <json> --cam x,y,z,yaw` il vestito vero
+del C++ (vedi sotto). Materiali: `tools/ue_scripts/make_board_materials.py` fa `MI_BRD_*` da `M_ASTRA_Hard`/`M_ASTRA_Emissive` con gli stessi numeri delle schede; le lampade sono quelle della plancia
+(`MI_BRG3_Lamps*`). Importazione: `tools/ue_scripts/import_board_kit.py` (Nanite, niente collisione, niente UV di lightmap, controlla misure e triangoli contro il json).
+
+**Chi vestire e come** (`AstraBoardDress.*`: codice semplice, senza mondo; lo stesso nel gioco e nel banco). Due strati:
+
+1. **La disposizione dei mobili** (`MakeLayout`, una volta per piano, sul worker: 2-7 ms): dal solo piano (classe, tipo e misura della stanza, sue porte), uguale su ogni nave della classe e prima di ogni
+   guerra, e **nota alla simulazione**: le scatole dei mobili sono nella mappa (`FAstraBoardMap::SetBlocks`) e `Inset` (che sceglie ogni posto di partenza, di attesa, di cadavere) tiene gli uomini fuori
+   dai mobili (nessuno nasce in una cassa: provato su 2500 posti per classe). I mobili stanno **solo lungo le pareti**, mai sulle corsie dei soldati (la retta tra ogni coppia di porte e dalle porte al
+   centro, 45 cm di margine), mai nella bocca di una porta (larghezza + 70 cm per lato, 150 cm di profondità), mai sull'angolo accanto a una porta (le «slot» dei ripari), mai al centro (110 cm), mai
+   sulle piastre di scale e ascensori; i corridoi sono liberi (sono corsie di fuoco). Per tipo di stanza: depositi, stive, riserve di munizioni, armerie (casse, fusti, scaffali, armadietti), macchine e motori (pompe,
+   motori-generatori, cisterne; la pila del reattore in Main Engineering, fuori dalle corsie), cuccette e armadietti nei dormitori, tavoli e panche nelle mense, console in plancia, CIC, trasmissioni e sensori, letti in
+   infermeria, celle nella prigione, la culatta in ogni sala cannoni.
+2. **Il vestito della stanza** (`DressRoom`, per stanza quando i ponti si fanno solidi): le pareti dalle stesse aperture e tratti di `BuildComp` (`AstraBoardInterior::FaceGeo`: la costruzione delle pareti è stata
+   divisa in due, la geometria dei lati e le lastre, con gli stessi 12 639 solidi della Praetorian di prima): campate da 2 m scelte per tipo di stanza (i corridoi con FERRY GUARD e HOLD FAST, le macchine con tubi e
+   feritoie, gli armadietti nelle stive e nelle cuccette, il motto nelle mense e nei dormitori, le campate bruciate dove la guerra ha bruciato), nervature ogni 4 m e negli angoli, una cornice sulle pareti più alte
+   di 2,9 m (le sale dei Mandati sono alte 4-6 m: sopra le campate resta la lastra scura), le luci-guida rosse a terra nei corridoi; il soffitto con due file di tubi, un vassoio per ogni ~3,3 m di larghezza e le
+   lampade sul vassoio ogni 3 m (al più 14 per stanza; le sale più alte di 6,5 m, gli hangar, sono illuminate da lampade a gabbia sul fianco dei muri); il pavimento in piastre (80 al più per stanza). **Le porte**:
+   i piani lasciano **30 cm tra due stanze** (40 le paratie) e le lastre dei muri stanno dentro le scatole: una porta è un tunnel di 54 cm. Lo stipite, l'architrave e la soglia sono fatti **una volta** per tutto il tunnel
+   (dalla prima stanza, scalati in profondità) e la soglia a strisce copre il vuoto tra i due pavimenti; l'anta della paratia sta dov'è la sua collisione e segue la lotta. Sopra ogni porta, in ogni stanza che ci dà,
+   un'insegna col nome della stanza di là (il nome del piano, in maiuscolo).
+3. **Com'è la nave** (`FDressContext`): la sua parte (`mandate`/`astra`/`guild` dallo stile del piano: la Praetorian, la Vigilant, la stazione sono Astra, il mercantile Guild: gli stessi pezzi con altri colori, tinta
+   per finitura, e senza le scritte del Mandato), l'energia (la nave con corrente: lampade accese ambra; un **relitto**: tutte rosse, di emergenza; una stanza senza corrente: lampade spente e ogni terza rossa; una stanza sventrata:
+   tutte spente), e quello che la guerra ha fatto alla stanza (`FBoardRoomMood`: campate bruciate in proporzione al fuoco e al fumo, detriti, cavi che pendono dal soffitto con le **scintille**, **fiamme** sui mobili e sul pavimento, **fumo** sotto il soffitto).
+   I **caduti** (`DressFallen`) giacciono dove sono caduti (tre pose, girati e specchiati a caso dal loro numero, mai in un mobile né in una parete).
+
+**Nel mondo** (`AstraBoardInteriorDress.cpp`, l'attore `AAstraBoardInterior`): un componente istanziato per pezzo usato (creato la prima volta), niente collisione sui pezzi (i **mobili solidi** hanno una scatola ciascuno
+in un componente nascosto che ferma il Capitano e i colpi), niente ombra, distanza di taglio a 90 m; le cornici e le ante di cubo restano per la collisione ma non si disegnano, le strisce di luce del soffitto non ci sono
+più (la luce è delle lampade); le lastre dei muri e dei pavimenti prendono la tinta della parte e meno rilievo. Le **luci** che seguono il Capitano sono otto (le lampade accese o rosse più vicine, ambra per il Mandato, rosse
+650 lumen per l'emergenza), più le luci dei fuochi e la torcia del fucile come prima. Le **insegne** sulle porte sono otto testi (`M_ASTRA_HoloText`), assegnati ogni 0,3 s alle porte vicine che lo guardano. **Fiamme** e **fumo** sono tre parti
+ciascuno degli effetti della distruzione (`M_FX_Blast`, `M_FX_Smoke`), le **scintille** i colpi di `UAstraCombatFx` con il loro suono, il **fuoco** ha il suo ruggito (`SW_Fire_Loop`). `astra.board.dress 0|1|2|3` (letta
+quando i ponti si fanno): 0 scatole come prima, 1 la struttura, 2 tutto (di default), 3 come 2 con un cubo per ogni pezzo (il banco). Se il kit non è nel contenuto, i ponti restano scatole e una riga di avviso dice che cosa
+lanciare. `astra.board.info` dice che cosa è stato vestito.
+
+**Misure** (`python3.13 tools/boarding.py run --scenario dress`; Nanite, un'istanza per pezzo; «prima» = le scatole di prima, «dopo» = pezzi + le scatole ancora disegnate; l'anello è l'insieme di stanze che il Capitano ha attorno,
+48 m sul suo ponte, come `EnsureAround`):
+
+| Classe (parte) | Stanze | Istanze nave intera | Triangoli nave | Anello medio: istanze · triangoli (prima) | Anello peggiore: stanze · istanze · triangoli |
+|---|---|---|---|---|---|
+| Acheron (Mandato) | 753 | 112 mila | 49 M | 4 225 · 1,71 M (447 · 0,005 M) | 38 · 6 633 · 2,62 M |
+| Styx (Mandato) | 394 | 40 mila | 18 M | 3 450 · 1,41 M (489 · 0,006 M) | 40 · 5 400 · 2,12 M |
+| Lethe (Mandato) | 270 | 20 mila | 9,6 M | 3 059 · 1,25 M (539 · 0,006 M) | 52 · 4 702 · 1,99 M |
+| Praetorian (Astra) | 761 | 196 mila | 85 M | 3 306 · 1,36 M (221 · 0,003 M) | 22 · 6 652 · 2,75 M |
+| Vigilant (Astra) | 187 | 15 mila | 7,0 M | 2 077 · 0,84 M (334 · 0,004 M) | 24 · 3 010 · 1,27 M |
+| Stazione (Astra) | 83 | 6 mila | 2,8 M | 1 056 · 0,44 M (184 · 0,002 M) | 21 · 1 911 · 0,80 M |
+| Mercantile (Guild) | 96 | 12,6 mila | 5,6 M | 1 563 · 0,65 M (161 · 0,002 M) | 10 · 2 533 · 1,06 M |
+
+Un ponte di una Acheron: 17-19 mila istanze e 7-8 M di triangoli, contro 2 mila scatole e 0,02 M. Vestire una stanza costa 0,01 ms (l'Acheron intera 5 ms); la disposizione dei mobili 2-7 ms alla lettura del piano. Il tetto del banco: anello
+peggiore ≤ 9 000 istanze e ≤ 6 M di triangoli (con Nanite le istanze piccole sono il caso comodo; senza, 48 componenti istanziati restano 48 disegni). Memoria: 48 mesh piccole (qualche MB) e ~100 B per istanza (un anello: mezzo MB). Le
+stanze fatte restano fino alla fine dello sbarco (non si disfano): una caccia lunga può arrivare a qualche decina di migliaia di istanze, ancora nulla per i trasformi.
+
+**Come si prova.**
+
+| Cosa | Come |
+|---|---|
+| Il banco del vestito (senza grafica) | `python3.13 tools/boarding.py run --scenario dress [--class acheron]`: il kit e il catalogo d'accordo (`CheckKit`), le corsie libere (0 mobili sulle rette tra le porte, nelle bocche, sugli angoli, fuori dalla stanza, uno sull'altro, su uno stipite), nessuno in un mobile (`Inset`, i caduti), ogni porta con stipite, architrave e (le paratie) anta, un'insegna per faccia di porta, lo stesso vestito a ogni giro, i costi e il tetto |
+| Il mondo con il Capitano dentro (senza grafica, i pezzi sono cubi) | `python3.13 tools/boarding.py assault --setup out_dress`: la nave presa a colpi, i marine e il Capitano dentro, `astra.board.info` dice le istanze, le lampade, le insegne; la prova che l'attore non cade (componenti, luci, parti) |
+| Il vestito visto (Blender, senza gioco) | `python3.13 tools/boarding.py run --scenario dress --class acheron --dump Saved/Boarding/dress [--focus x,y,z] [--hurt]` e `blender -b --factory-startup -P art/blender/board_kit.py -- <dir> --no-export --json - --sheet <dir> --dump Saved/Boarding/dress/dress_acheron.json --cam x,y,z,yaw` (le immagini `dress_a.jpg`...: il vero vestito del C++, con il kit, visto dal posto di un Capitano) |
+| Il gioco | vedi il messaggio del traguardo: kit da importare, poi `astra.board.assault out <nave> - 2 port - ride` su una nave presa a colpi, e `astra.board.info` |
+
+**Limiti noti.** Il Capitano vede il vestito solo dopo l'importazione del kit (script dell'editor da lanciare: l'agente non può). I pezzi non hanno LOD propri (Nanite li fa); le ombre dei pezzi sono spente (le luci non ne
+gettano). Le stanze alte più di 6,5 m (hangar) non hanno soffitto vestito (hanno le lampade sul fianco dei muri). La sala sventrata non ha un modello suo (campate bruciate, detriti, cavi). Le stanze fatte non si disfano
+(`EnsureAround` costruisce, `End` disfa tutto). Gli altri campi (Astra, Guild) hanno le tinte, non un kit proprio (nessuna scritta Astra: serve una variante dei pannelli con altro stencil). I mobili sono quadrati sulle pareti (nessun
+tavolo in mezzo a una mensa: le corsie e la «bocca» tolgono poco, ma il centro è sempre libero). Un uomo che va da un posto qualunque di una stanza a una porta può, per un tratto, passare
+per un mobile: i posti di partenza e di attesa sono fuori dai mobili (`Inset`) e le rotte vere (da porta a porta, dalle porte al centro) sono libere per costruzione e provate dal banco.
+
+### 14.3 Stato a fine giro (4/10) e che cosa viene dopo
+
+**Fatto e provato offline** (ramo `worktree-agent-a51a2df52e826c576`): (1) i ponti nemici vestiti (§14.2: il kit, `AstraBoardDress`, l'attore, il banco `dress`, `assault --setup out_dress`, la vista Blender del vestito vero); (2) l'esercitazione
+`astra.board.drill` e (3) i libri della nave (§14.1; già in `main`). Tutti i banchi del boarding sono verdi (`run --scenario all|war|attack|plans|interior|dress`, `assault --setup out_ride|out_war|out_dress`); le prove
+**nel gioco** sono del lead (l'aiutante non apre l'editor né il gioco).
+
+**Non fatto**: (4) lo strato di comando della fanteria (ordini complessi con meccaniche vere nella simulazione di squadra e nelle menti dei marine); (5) il Capitano in prima persona durante un abbordaggio (chiavetta e righe del
+HUD, movimento prono e accovacciato e riparo, le armi, la rete dei marine nelle sue orecchie); la richiesta di SPAZIO-VIVO-2 (i pezzi dei relitti, `bWreck`, come bersagli di un abbordaggio: oggi `StartAssault` rifiuta ogni
+`bFixture`: «a place of the system»). Nessuno dei tre è iniziato nel codice.
+
+**Per provare i ponti vestiti nel gioco** (dopo l'unione del ramo e la compilazione):
+1. Il kit: `blender -b --factory-startup -P art/blender/board_kit.py` (fa i 48 FBX in `art/export/board`, non in git; `data/ship/board_kit.json` è già in git) · editor aperto: `tools/ue.py pyfile tools/ue_scripts/make_board_materials.py`
+   poi `tools/ue.py pyfile tools/ue_scripts/import_board_kit.py` (il suo rapporto elenca i problemi: materiali mancanti, misure, triangoli). Senza il kit i ponti restano scatole e il log dice `[BoardDress] ... is not in the content`.
+2. Una nave nemica da abbordare con il Capitano a bordo (la stessa scena di `assault --setup out_war`: nella battaglia di prova o in una vera): `astra.war.scenario aquila_only aquila` · `astra.war.spawn acheron mandate 0 -3 0 90 id=M1 name=Wreck static hold passive` ·
+   `astra.board.strip M1` · `astra.war.fleet pound M1 port 70 12 kinetic` · `astra.war.fleet pound M1 port 70 10 explosive` · `astra.board.disable M1` · `astra.board.assault out M1 - 2 port - ride` (o all'XO: «prendi la Wreck, vengo anch'io»).
+3. Dentro: corridoi del Mandato (campate con FERRY GUARD e HOLD FAST, nervature, tubi e vassoi in alto, lampade a gabbia, strisce rosse a terra, piastre e soglie a strisce, ante delle paratie), le sale con i loro mobili (cuccette, casse, scaffali, pompe, console),
+   i mobili sono solidi (il Capitano ci si ferma, i colpi li trovano), i marine e i difensori non stanno dentro i mobili, le stanze senza corrente in rosso con cavi che pendono e scintille, dove la guerra ha bruciato fiamme e fumo, i caduti a terra, un'insegna col nome della stanza sopra ogni porta.
+4. `astra.board.info` → «decks dressed: N rooms, M kit instances (...), L lamps (...), S door signs ...»; riga di log `[BoardDress] the decks of the acheron are dressed (level 2, Mandate hand): N fallen to lay`.
+5. Confronto e costo: `astra.board.dress 0|1|2` (letta quando i ponti si fanno: finire e rifare lo sbarco) — 0 scatole, 1 struttura, 2 tutto —; `stat unit` in un anello di ~4 000 istanze (Acheron: 4 225 e 1,71 M triangoli in media, 6 633 e 2,62 M al peggio).
+Se qualcosa non va: `astra.board.dress 3` (ogni pezzo un cubo: prova la disposizione senza il kit), il banco `tools/boarding.py run --scenario dress --class acheron --dump Saved/Boarding/dress` e `blender ... board_kit.py -- ... --dump ... --cam x,y,z,yaw` per vedere il vestito vero del C++.
+
+**Per il punto 4 (note di progetto, per chi lo riprende).** Letto e deciso, non scritto: i compiti nuovi vanno in `ETask` (`Sweep`, `Breach`, `Ambush`, `HoldLine`, `Escort`) con una macchina a fasi per squadra (avvicinamento, **impilata** alla porta con la porta tenuta chiusa — `bStacked` nel
+`StepDoors` —, **entrata** a scaglioni sugli angoli della stanza, **pulizia**, rapporto), in un file nuovo (`AstraBoardDrills.cpp`), con meccaniche oneste e misurate dal banco: la sorpresa di un'entrata non vista (chi entra è svelto sul primo bersaglio, chi è nella stanza lento: `EntryT`/`StartleT`
+in `ChooseTarget`), l'imboscata con il fuoco trattenuto e gli uomini nascosti (visti solo da vicino: `bHidden` in `Perceive`; il fuoco si libera al primo ostile nella zona di tiro, a un colpo subìto o a un uomo scoperto), lo sbarramento di un settore o di un ponte (una coppia a ogni apertura che esce dal settore),
+il ripiegamento che chiude le paratie dietro di sé (l'ultimo uomo resta alla console 4 s, non chiude su chi è nel varco: `SealS`, `SealClearCm`; l'evento `Sealed` chiude la porta del gioco), la scorta in formazione (un uomo avanti che guarda oltre ogni varco, due ai lati, uno dietro) e l'entrata sincronizzata di più squadre da porte diverse (`take`).
+Il gioco: `marine_order` con `sweep`, `breach`, `take`, `ambush`, `hold_line`, `escort` e i modificatori `fire` (held|free), `seal_behind`, `cover` (il luogo che la squadra copre), `sync`; i luoghi anche come id di porta e come «deck N section X»; il quadro dei marine (`MarinesPicture`) con le fasi di ogni squadra, le stanze pulite e i varchi di ogni settore;
+gli eventi `Drill` (impilata, entrata, pulita, chiusa, imboscata, setacciato) come righe di rapporto. La mente (`marines.py`): i compiti nuovi e i modificatori nello strumento `order`, una sezione del prompt che dice che cosa fa ciascun ordine e quando paga (con i numeri del banco), il vocabolario radio corto, le classi di notizie nuove (`_KINDS`), e al XO uno strumento
+che passa le parole del Capitano alla rete. I Mandati usano gli stessi compiti come dottrina del codice (gli attaccanti impilano alla porta dell'obiettivo; i difensori ripiegano e chiudono). Banchi: scenari per ogni ordine (con e senza, sulla stessa pianta e gli stessi semi: l'ordine deve valere qualcosa) e prove delle menti senza modello (`marines_unit`).
