@@ -23,6 +23,7 @@ import sys
 import tempfile
 import time
 import tomllib
+import types
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -163,6 +164,12 @@ class TestHost(unittest.TestCase):
             self.assertEqual(host.install_stop_handlers(OffMainThreadLoop(), lambda s: None), [])    # type: ignore[arg-type]
 
 
+def PORTABLE_PACKAGES() -> dict[str, types.ModuleType]:
+    """The portable engines' packages as a machine that installs them has them (pyproject's markers: not on an Apple Silicon Mac, whose venv
+    lacks them; the engines only check that they import)."""
+    return {name: sys.modules.get(name) or types.ModuleType(name) for name in ("sherpa_onnx", "faster_whisper")}
+
+
 class TestSpeechEngineChoice(unittest.TestCase):
     """Which engines a machine gets (stt.default_backends), in the machines of the three systems."""
 
@@ -184,7 +191,8 @@ class TestSpeechEngineChoice(unittest.TestCase):
     def test_a_windows_pc_gets_the_portable_engines_and_nothing_else(self) -> None:
         # a Windows machine: no Apple Silicon, no whisperkit-cli on the path, a mind that may download what it lacks
         with mock.patch.object(platform, "system", return_value="Windows"), mock.patch.object(platform, "machine", return_value="AMD64"), \
-                mock.patch.object(shutil, "which", return_value=None), mock.patch.dict(os.environ, {"ASTRA_STT": "", "ASTRA_STT_FETCH": ""}):
+                mock.patch.object(shutil, "which", return_value=None), mock.patch.dict(os.environ, {"ASTRA_STT": "", "ASTRA_STT_FETCH": ""}), \
+                mock.patch.dict(sys.modules, PORTABLE_PACKAGES()):
             self.assertFalse(ParakeetBackend.available())
             self.assertFalse(WhisperKitBackend.available())
             self.assertTrue(backends_module.fetch_allowed())
@@ -219,7 +227,8 @@ class TestPortableModelFetch(unittest.IsolatedAsyncioTestCase):
                 folder.mkdir(parents=True)
                 (folder / "encoder.int8.onnx").write_bytes(b"x")
                 return folder
-            with mock.patch.dict(os.environ, {"ASTRA_STT_FETCH": "1"}), mock.patch.object(backends_module, "fetch_sherpa_model", fake_fetch):
+            with mock.patch.dict(os.environ, {"ASTRA_STT_FETCH": "1"}), mock.patch.object(backends_module, "fetch_sherpa_model", fake_fetch), \
+                    mock.patch.dict(sys.modules, PORTABLE_PACKAGES()):
                 os.environ.pop("ASTRA_SHERPA_MODEL", None)
                 b = SherpaParakeetBackend(model_dir=root / backends_module.SHERPA_MODEL_NAME)
                 self.assertFalse(SherpaParakeetBackend.available(b.model_dir))

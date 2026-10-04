@@ -71,14 +71,14 @@ void UAstraNavLights::LampsFor(const FString& MeshName, bool bMandate, bool bNoT
 	const bool bSmall = Length < 40.f;                               // a fighter or a drone
 	const float Clear = bSmall ? 15.f : 60.f;                         // cm clear of the plating
 	const float Lamp = bSmall ? 0.6f : FMath::Clamp(Length * 0.004f, 1.2f, 3.5f);   // m
-	const auto Add = [&Out](const FVector& Local, const FLinearColor& Color, float SizeM, float Glow, uint8 Pattern)
+	const auto Add = [&Out](const FVector& Local, const FLinearColor& Color, float SizeM, float InGlow, uint8 InPattern)
 	{
 		FAstraNavLamp& L = Out.AddDefaulted_GetRef();
 		L.Local = Local;
 		L.Color = Color;
 		L.SizeM = SizeM;
-		L.Glow = Glow;
-		L.Pattern = Pattern;
+		L.Glow = InGlow;
+		L.Pattern = InPattern;
 	};
 	FVector P;
 	if (bMandate)

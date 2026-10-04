@@ -1095,7 +1095,7 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 	}
 	// the labels, most important first (the target, who fires on us, then the nearest), each where it overlaps nothing
 	// already written: right of its box, left, below, above; else only its id; else nothing (the box says enough)
-	Pending.Sort([](const FLabelReq& A, const FLabelReq& B) { return A.Order < B.Order; });
+	Pending.Sort([](const FLabelReq& X, const FLabelReq& Y) { return X.Order < Y.Order; });
 	TArray<FBox2D> Taken;
 	const FString Party = Ship ? Ship->GetChannelParty() : FString();
 	const bool bCard = Mode == TEXT("comms") && !Party.IsEmpty();
@@ -1196,7 +1196,6 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		Taken.Add(FBox2D(Tries[Pick], Tries[Pick] + FVector2D(BlockW, BlockH)));
 		const float X = Tries[Pick].X;
 		const int32 Al = 0;
-		const bool bLeft = false;
 		float Y = Tries[Pick].Y;
 		D.Text(X, Y, Name, false, PxName, Col, Al);
 		Y += PxName * 1.08f;
@@ -1206,9 +1205,8 @@ void AAstraViewscreen::DrawOverlay(UCanvas* Canvas, int32 Width, int32 Height)
 		Y += PxData * 1.45f;
 		if (C.HullFrac >= 0.f)
 		{
-			const float Bx = bLeft ? X - Bw : X;
-			D.Bar(Bx, Y, Bw, C.HullFrac, C.HullFrac < 0.35f ? ColAlarm : Col);
-			D.Bar(Bx, Y + 7.f * S, Bw, FMath::Max(0.f, C.ShieldFrac), ColAstra);
+			D.Bar(X, Y, Bw, C.HullFrac, C.HullFrac < 0.35f ? ColAlarm : Col);
+			D.Bar(X, Y + 7.f * S, Bw, FMath::Max(0.f, C.ShieldFrac), ColAstra);
 			Y += 16.f * S;
 		}
 		if (!Tags.IsEmpty())

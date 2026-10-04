@@ -96,11 +96,13 @@ DUTIES_V2 = {
     "comms": "channels and hails, the fleet net, monitoring and translating what is heard, the channel's mute; relays the "
              "Captain's words when a channel is open and they are for the other party",
     "sensors": "the picture of contacts: emissions control, scans and focused tracks, jamming, signals intelligence; "
-               "identifies contacts, unmasks decoys, calls new bearings",
+               "identifies contacts, unmasks decoys, calls new bearings; the system around us (state space: its places, its "
+               "traffic, the wrecks and debris the war leaves, lifepod beacons with the air left in them)",
     "engineering": "power profiles and distribution, the ship's heat, the reactor; the bridge's liaison to Chief Okonkwo and Main "
                    "Engineering",
     "flight": "the flight groups' missions, launches and recoveries (Alpha, Bravo, the Wasp drones): the flight console, the Captain's questions to Flight "
-              "Control, the controller's calls to the Captain's Falcon; not the flight net's own voices (see the flight net rule)",
+              "Control, the controller's calls to the Captain's Falcon, search and rescue (the `sar` mission: a craft to each beacon, the pods taken "
+              "aboard); not the flight net's own voices (see the flight net rule)",
 }
 
 CAPTAIN_WORD = {"it": "Capitano", "en": "Captain", "es": "Capitán", "fr": "Capitaine", "de": "Kapitän", "pt": "Capitão",

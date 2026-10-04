@@ -331,7 +331,7 @@ namespace
 			double ReadyAt = 1.0e9;
 			int32 Forced = 0;
 			FAstraLiftBrain::FHooks H;
-			H.DeckReady = [&Sim, &ReadyAt](int32 L) { return L != 0 || Sim.T >= ReadyAt; };
+			H.DeckReady = [&Sim, &ReadyAt](int32 Landing) { return Landing != 0 || Sim.T >= ReadyAt; };
 			H.ForceDeck = [&Forced](int32) { ++Forced; };
 			Sim.Init(S, Top, H);
 			Sim.B.CarCall(0);
@@ -349,7 +349,7 @@ namespace
 			Never.Cfg = Cfg;
 			int32 Forced2 = 0;
 			FAstraLiftBrain::FHooks H2;
-			H2.DeckReady = [](int32 L) { return L != 0; };
+			H2.DeckReady = [](int32 Landing) { return Landing != 0; };
 			H2.ForceDeck = [&Forced2](int32) { ++Forced2; };
 			Never.Init(S, Top, H2);
 			Never.B.CarCall(0);

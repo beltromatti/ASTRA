@@ -514,7 +514,17 @@ void UAstraCampaignSubsystem::NewCommand(const FString& System)
 	S->RemoveField(TEXT("radiator_health"));
 	S->RemoveField(TEXT("coolant_vents"));
 	O->SetObjectField(TEXT("ship"), S);
-	O->SetObjectField(TEXT("battle"), MakeShared<FJsonObject>());   // a new hull: her defaults (full hull, magazine, air group)
+	TSharedRef<FJsonObject> Fresh = MakeShared<FJsonObject>();      // a new hull: her defaults (full hull, magazine, air group)...
+	if (const UAstraBattleSubsystem* Battle = GetWorld()->GetSubsystem<UAstraBattleSubsystem>())
+	{
+		// ...in the systems as the war left them: the wrecks, the debris, the pods still calling, the old Aquila's own (SPAZIO-VIVO)
+		const TSharedPtr<FJsonObject>* Space = nullptr;
+		if (const TSharedRef<FJsonObject> Was = Battle->SaveJson(); Was->TryGetObjectField(TEXT("space"), Space) && Space)
+		{
+			Fresh->SetObjectField(TEXT("space"), *Space);
+		}
+	}
+	O->SetObjectField(TEXT("battle"), Fresh);
 	FString Text;
 	TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Text);
 	FJsonSerializer::Serialize(O, W);

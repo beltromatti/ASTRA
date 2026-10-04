@@ -1283,9 +1283,9 @@ void AAstraHoloTable::TickTactical(float DeltaTime, const FVector& ViewerLocal, 
 		AstraFx::FLayer& L = *DotLayer;
 		L.Begin();
 		const float Gain = Fade * Brightness / 3.f * FMath::Max(0.f, CVarHoloDots.GetValueOnGameThread());
-		const auto Put = [&L, Gain](const TArray<AstraHoloPlan::FDot>& Dots, const FLinearColor& Col, float Inten)
+		const auto Put = [&L, Gain](const TArray<AstraHoloPlan::FDot>& List, const FLinearColor& Col, float Inten)
 		{
-			for (const AstraHoloPlan::FDot& D : Dots)
+			for (const AstraHoloPlan::FDot& D : List)
 			{
 				FTransform* X;
 				float* Dat = L.Next(X);

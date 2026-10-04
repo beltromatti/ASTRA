@@ -15,6 +15,7 @@ namespace
 	constexpr double StoodEvery = 0.2;       // s between the places remembered
 	constexpr int32 StoodKept = 30;          // ~6 s of them
 	constexpr float BackFromEdge = 150.f;    // cm: where he is put back, at least this far from the edge he went over
+	constexpr float FarMoveCm = 50000.f;     // cm between two steps: no walk, a transfer (a beam, a boat, a teleport)
 }
 
 TStatId UAstraFallGuard::GetStatId() const
@@ -36,6 +37,10 @@ void UAstraFallGuard::Tick(float DeltaTime)
 	if (M->MovementMode == MOVE_Walking || M->MovementMode == MOVE_NavWalking)
 	{
 		FallSince = -1.0;
+		if (Stood.Num() && FVector::DistSquared(Stood.Last().Loc, C->GetActorLocation()) > FMath::Square(FarMoveCm))
+		{
+			Stood.Reset();                       // put somewhere else (the enemy decks, the boat's bay, the planet): the old places are of another world
+		}
 		if (M->CurrentFloor.bBlockingHit && (Stood.Num() == 0 || Now - Stood.Last().At >= StoodEvery))
 		{
 			Stood.Add({C->GetActorLocation(), Now});

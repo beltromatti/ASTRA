@@ -312,7 +312,7 @@ int32 FAstraShipInterior::LoseWithShip()
 	{
 		RoleFit[r] = RoleHurt[r] = 0;
 	}
-	Note(FString::Printf(TEXT("%s: lost with all hands (%d aboard)"), *ShipName, Lost), true);
+	Note(FString::Printf(TEXT("%s is lost; %d were aboard (any who reached the lifepods will show on their beacons)"), *ShipName, Lost), true);
 	return Lost;
 }
 

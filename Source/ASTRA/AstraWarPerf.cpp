@@ -54,8 +54,8 @@ namespace
 						++MeshComps;
 					}
 					Texts += Cast<UTextRenderComponent>(P) ? 1 : 0;
-					Decals += Cast<UDecalComponent>(P) ? 1 : 0;
 				}
+				Decals += Cast<UDecalComponent>(C) ? 1 : 0;     // (a decal is a scene component, not a primitive: counted among all of them)
 				Lights += Cast<ULightComponent>(C) ? 1 : 0;
 			}
 		}
