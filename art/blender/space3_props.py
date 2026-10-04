@@ -255,7 +255,7 @@ def build_pod(c: Ctx) -> dict:
     stalk_top = np.array([0.2, 0.0, 2.7])
     g.cylinder(np.array([0.2, 0.0, 1.95]), stalk_top, 0.07, 0.05, m("Frame"), seg=6, kind="pod")
     g.box(stalk_top + UP * 0.12, (0.28, 0.28, 0.28), m("Nav"), chamfer=0.02, kind="pod", a1_all=(1.0, 0.0))
-    rec.lamp(stalk_top + UP * 0.3, WHITE, 1.4, 120.0, BEACON)
+    rec.lamp(stalk_top + UP * 0.3, WHITE, 2.2, 520.0, BEACON)
     rec.lamp((0.5, 0.0, 0.0), AMBERC, 0.5, 0.0, STEADY)
     return {"rec": rec, "length_m": 6.1, "cam": [-40.0, 25.0, 60.0], "margin": 0.12}
 

@@ -9,6 +9,8 @@ It imports one mesh at a time and checks what came through: triangles, the three
 the part after the second underscore) before running to do a few.
   tools/ue.py pyfile tools/ue_scripts/import_space_v3.py
 Afterwards: python3 tools/space.py meshes art/export/space_v3/manifest.json  (the table of lamps, bells and berths the game reads) -- already in the repo, only needed after a rebuild.
+Then, once, tools/ue.py pyfile tools/ue_scripts/make_space_materials.py: flags the hulls' base materials for instancing (what the war leaves is drawn as instances: the sections of broken ships,
+the debris, the lifepods, and the traffic's vessels and the belt's rocks).
 """
 import json
 import os

@@ -11,6 +11,7 @@
 //   return       a craft that is hurt, or empty, goes home; a hangar that cannot take it leaves it circling.
 
 #include "AstraBattleSubsystem.h"
+#include "AstraSpaceLife.h"
 #include "AstraWarFX.h"
 #include "AstraWarClasses.h"
 #include "AstraWarAI.h"
@@ -825,6 +826,29 @@ void UAstraBattleSubsystem::ThinkCraft(FAstraBattleShip& S, float DtT)
 		else
 		{
 			Goal = Carrier.Pos + Carrier.Att.GetForwardVector() * 9000.0 + FVector(FMath::Cos(Time * 0.22 + S.OrbitPhase), FMath::Sin(Time * 0.22 + S.OrbitPhase), 0.f) * 2000.0;
+		}
+	}
+	else if (M == TEXT("sar") && Space && Space->IsActive())
+	{
+		// SPAZIO-VIVO, the named hook: the lifepods are real (AstraWrecks.h). Each craft of the flight flies to a beacon the Aquila hears (the nearest first, craft by craft: the pods drift
+		// apart) and takes the people aboard; when nothing calls any more the flight comes home
+		FVector BeaconPos = FVector::ZeroVector, BeaconVel = FVector::ZeroVector;
+		FString Of;
+		int32 Survivors = 0;
+		if (Space->RescueGoal(S.CraftSlot, BeaconPos, BeaconVel, Of, Survivors))
+		{
+			Goal = BeaconPos;
+			GoalVel = BeaconVel;
+			if (FVector::Dist(S.Pos, BeaconPos) < 1200.0)
+			{
+				Space->RescueTake(BeaconPos, 1500.0, FString::Printf(TEXT("the %ss of the Aquila"), *Q.CallSign));
+			}
+		}
+		else
+		{
+			Goal = Carrier.Pos + Carrier.Att.GetForwardVector() * 3000.0;
+			GoalVel = Carrier.Vel;
+			S.Mission = TEXT("recall");
 		}
 	}
 	else if (M == TEXT("sar"))

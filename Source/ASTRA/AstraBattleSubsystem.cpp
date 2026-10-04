@@ -653,6 +653,10 @@ void UAstraBattleSubsystem::StartCampaign()
 	{
 		WarDraw->Prewarm();                        // the craft's kinds of hull ready before the first wing launches
 	}
+	if (Space)
+	{
+		Space->NewCampaign();                      // a new war: nothing of an old one is left in space
+	}
 }
 
 TSharedRef<FJsonObject> UAstraBattleSubsystem::SpaceJson() const
@@ -2920,6 +2924,10 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 		{
 			DeathEvents.RemoveAt(0);
 		}
+		if (Space)
+		{
+			Space->OnShipLost(S, E, bFxDone);        // SPAZIO-VIVO, the named hook: what she leaves (AstraWrecks.h): her pieces, her field of debris, her lifepods, what was left aboard
+		}
 	}
 	if (S.Actor) { S.Actor->Destroy(); S.Actor = nullptr; }
 	if (S.ShieldBubble) { S.ShieldBubble->Destroy(); S.ShieldBubble = nullptr; }
@@ -2978,7 +2986,7 @@ void UAstraBattleSubsystem::Destroy(FAstraBattleShip& S, EAstraHitKind Cause, EA
 			? *FString::Printf(TEXT("%s (%s, %s)"), *S.Name, *S.ContactId, *S.Class) : *KnownLabel(S),
 			How == EAstraFate::ReactorBreach ? TEXT("destroyed: her reactor breached")
 			: How == EAstraFate::Breakup ? *FString::Printf(TEXT("destroyed: the hull broke apart at the %s"), AstraWar::SectionName(Section)) : TEXT("destroyed")));
-		if (S.Side == EAstraSide::Astra)
+		if (S.Side == EAstraSide::Astra && !(Space && Space->IsActive()))     // (with the living space the lifepods are real and the search and rescue flights find them: AstraWrecks.h)
 		{
 			LastWreckPos = S.Pos;
 			LastWreckName = S.Name;
@@ -3771,7 +3779,7 @@ bool UAstraBattleSubsystem::LaunchSquadron(const FString& Name, const FString& M
 		OutDetail = TEXT("escort is for friendly or civilian ships");
 		return false;
 	}
-	if (M == TEXT("sar") && LastWreckName.IsEmpty())
+	if (M == TEXT("sar") && LastWreckName.IsEmpty() && !(Space && Space->HasBeacons()))
 	{
 		OutDetail = TEXT("no distress beacons on the plot: nobody to rescue");
 		return false;
@@ -5126,6 +5134,10 @@ TSharedRef<FJsonObject> UAstraBattleSubsystem::SaveJson() const
 		Q.Add(MakeShared<FJsonValueObject>(J));
 	}
 	O->SetArrayField(TEXT("squadrons"), Q);
+	if (Space)
+	{
+		O->SetObjectField(TEXT("space"), Space->SaveJson());           // SPAZIO-VIVO: what the war has left in the systems visited (AstraWrecks.h)
+	}
 	return O;
 }
 
@@ -5167,6 +5179,12 @@ void UAstraBattleSubsystem::ResumeFrom(const TSharedPtr<FJsonObject>& Save)
 	if (Space)
 	{
 		const UAstraShipSubsystem* ShipSys = GetWorld() ? GetWorld()->GetSubsystem<UAstraShipSubsystem>() : nullptr;
+		const TSharedPtr<FJsonObject>* SpaceSave = nullptr;
+		Space->NewCampaign();
+		if (Save->TryGetObjectField(TEXT("space"), SpaceSave))
+		{
+			Space->LoadSaved(*SpaceSave);                              // SPAZIO-VIVO: the wrecks of the war so far, where they were (kept in each Gate's frame)
+		}
 		Space->Arrive(ShipSys ? ShipSys->GetSystemName() : FString(TEXT("Aurelia")));
 	}
 	SyncVisuals();
@@ -5621,9 +5639,9 @@ bool UAstraBattleSubsystem::PilotCollision(FAstraBattleShip& S, const FVector& P
 		{
 			break;
 		}
-		if (O.bPlayer || O.bCraft || O.Id == S.Id || !O.bAlive || !O.Actor || FVector::Dist(S.Pos, O.Pos) > O.Radius * 2.5)
+		if (O.bPlayer || O.bCraft || O.bFixture || O.Id == S.Id || !O.bAlive || !O.Actor || FVector::Dist(S.Pos, O.Pos) > O.Radius * 2.5)
 		{
-			continue;
+			continue;                                 // (a place of the system is a fixture: its hull is the living space's boxes, below, not the mesh's bounding box, which is mostly air)
 		}
 		const UStaticMeshComponent* C = O.Actor->GetStaticMeshComponent();
 		if (!C || !C->GetStaticMesh())
@@ -5638,6 +5656,10 @@ bool UAstraBattleSubsystem::PilotCollision(FAstraBattleShip& S, const FVector& P
 		{
 			What = FString::Printf(TEXT("the hull of %s"), *O.Name);
 		}
+	}
+	if (What.IsEmpty() && Space && Space->IsActive())
+	{
+		Space->PilotHit(Prev, S.Pos, What);           // the places' hulls (Keeper Station, the Arsenal...): AstraSpaceLifeSolids.cpp
 	}
 	if (What.IsEmpty())
 	{

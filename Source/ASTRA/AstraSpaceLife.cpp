@@ -56,6 +56,7 @@ bool UAstraSpaceLife::LoadAssets()
 	CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	MatGlow = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_WAR_Glow.M_WAR_Glow"));
 	MatPlume = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_WAR_Plume.M_WAR_Plume"));
+	MatDart = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ASTRA/Materials/M_WAR_Dart.M_WAR_Dart"));            // (the engine wakes: optional, the rest does not need it)
 	if (!SphereMesh || !MatGlow)
 	{
 		UE_LOG(LogASTRA, Warning, TEXT("[Space] M_WAR_Glow missing (tools/ue_scripts/make_war_fx.py): the living space stays out of the sky"));
@@ -75,6 +76,8 @@ void UAstraSpaceLife::Init(UAstraBattleSubsystem* InOwner)
 	Lamps.Init(0);
 	Plumes.Init(0);
 	Glints.Init(0);
+	Jets.Init(0);
+	Wakes.Init(0);
 	if (!FApp::CanEverRender())
 	{
 		// the bench: the same traffic and the same staging, nothing drawn (its cost is part of the world's)
@@ -82,6 +85,8 @@ void UAstraSpaceLife::Init(UAstraBattleSubsystem* InOwner)
 		Lamps.Init(AstraSpaceDraw::CapLamps);
 		Plumes.Init(AstraSpaceDraw::CapPlumes);
 		Glints.Init(AstraSpaceDraw::CapGlints);
+		Jets.Init(AstraSpaceDraw::CapJets);
+		Wakes.Init(AstraSpaceDraw::CapWake);
 		return;
 	}
 	if (!LoadAssets())
@@ -108,8 +113,16 @@ void UAstraSpaceLife::Init(UAstraBattleSubsystem* InOwner)
 	MakeLayer(Plumes, TEXT("SpacePlumes"), CylinderMesh, MatPlume, AstraSpaceDraw::CapPlumes, 1);
 	MakeLayer(Lamps, TEXT("SpaceLamps"), SphereMesh, MatGlow, AstraSpaceDraw::CapLamps, 4);
 	MakeLayer(Glints, TEXT("SpaceGlints"), SphereMesh, MatGlow, AstraSpaceDraw::CapGlints, 4);
+	if (MatPlume)
+	{
+		MakeLayer(Jets, TEXT("SpaceJets"), CylinderMesh, MatPlume, AstraSpaceDraw::CapJets, 1);        // (the manoeuvring jets: short plumes; their glows are lamps)
+	}
+	if (MatDart)
+	{
+		MakeLayer(Wakes, TEXT("SpaceWakes"), SphereMesh, MatDart, AstraSpaceDraw::CapWake, 3);          // (the engine wakes: beads of a ribbon, as the war's missile trails are)
+	}
 	bLive = true;
-	UE_LOG(LogASTRA, Log, TEXT("[Space] ready: %d lamps, %d plumes, %d glints; hulls in pages of %d"), AstraSpaceDraw::CapLamps, AstraSpaceDraw::CapPlumes, AstraSpaceDraw::CapGlints, AstraSpaceDraw::PageSize);
+	UE_LOG(LogASTRA, Log, TEXT("[Space] ready: %d lamps, %d plumes, %d glints, %d jets, %d wake pieces; hulls in pages of %d"), AstraSpaceDraw::CapLamps, AstraSpaceDraw::CapPlumes, AstraSpaceDraw::CapGlints, AstraSpaceDraw::CapJets, AstraSpaceDraw::CapWake, AstraSpaceDraw::PageSize);
 }
 
 // ------------------------------------------------------------------------------------------------------------------ arriving and leaving
@@ -152,12 +165,25 @@ void UAstraSpaceLife::ClearScene()
 	Layout = AstraSpace::FLayout();
 	Events.Reset();
 	bLaidOut = false;
+	for (AstraSpace::FSite& S : Wrecks.SitesMutable())
+	{
+		for (AstraSpace::FPieceRec& P : S.Pieces)
+		{
+			P.bInFx = false;                         // (the war's effects have cleared their actors with the system: what is left of a wreck is its own record)
+		}
+	}
+	Motions.Reset();
+	MotionClock = 0.0;
 	Lamps.Begin();
 	Plumes.Begin();
 	Glints.Begin();
+	Jets.Begin();
+	Wakes.Begin();
 	Lamps.Flush();
 	Plumes.Flush();
 	Glints.Flush();
+	Jets.Flush();
+	Wakes.Flush();
 }
 
 AstraSpace::FAnchors UAstraSpaceLife::ReadAnchors() const
@@ -199,6 +225,7 @@ void UAstraSpaceLife::DoArrive(const FString& InSystem)
 {
 	ClearScene();
 	SystemName = InSystem;
+	SystemKey = InSystem.ToLower();
 	bPending = false;
 	if (!Owner || Owner->Ships.Num() == 0)
 	{
@@ -212,6 +239,9 @@ void UAstraSpaceLife::DoArrive(const FString& InSystem)
 		return;
 	}
 	const AstraSpace::FAnchors A = ReadAnchors();
+	Sky.Origin = A.bGate ? A.GatePos : A.Origin;                  // what the war left here is kept in the Gate's frame: it is where it was when the Captain comes back
+	Sky.Att = A.bGate ? A.GateAtt : FQuat::Identity;
+	Wrecks.Settle(WreckClock());
 	// the same system always lays out the same (its rocks, its lanes); its traffic is the day's
 	Seed = (uint32)GetTypeHash(InSystem.ToLower());
 	AstraSpace::BuildLayout(*Spec, D, A, Seed, Layout);
@@ -224,8 +254,10 @@ void UAstraSpaceLife::DoArrive(const FString& InSystem)
 	bLaidOut = true;
 	TickMs = TickMsMax = TrafficMs = DrawMs = 0.0;
 	TickCount = 0;
-	UE_LOG(LogASTRA, Log, TEXT("[Space] %s: %d places, %d lanes, %d rocks, %d vessels, %d patrols"), *InSystem, Layout.Nodes.Num(), Layout.Lanes.Num(), Layout.Rocks.Num(),
-	       Traffic.Vessels().Num(), Traffic.Patrols().Num());
+	TArray<int32> Left;
+	Wrecks.Of(SystemKey, Left);
+	UE_LOG(LogASTRA, Log, TEXT("[Space] %s: %d places, %d lanes, %d rocks, %d vessels, %d patrols, %d wrecks of the war"), *InSystem, Layout.Nodes.Num(), Layout.Lanes.Num(), Layout.Rocks.Num(),
+	       Traffic.Vessels().Num(), Traffic.Patrols().Num(), Left.Num());
 }
 
 FAstraBattleShip* UAstraSpaceLife::ShipOfPlace(const FSpaceLifePlace& P) const
@@ -535,6 +567,28 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 	{
 		return;
 	}
+	if (bResumeProbe)
+	{
+		// the system is laid out again after a resume (DebugResume): is every wreck where it was, relative to the Gate?
+		bResumeProbe = false;
+		double Farthest = 0.0;
+		int32 Missing = 0;
+		for (const TPair<int32, FVector>& P : ResumeProbe)
+		{
+			const AstraSpace::FSite* S = Wrecks.FindById(P.Key / 100);
+			const int32 K = P.Key % 100;
+			if (!S || (K < 50 ? !S->Pieces.IsValidIndex(K) : !S->Pods.IsValidIndex(K - 50)))
+			{
+				++Missing;
+				continue;
+			}
+			const FVector Now = K < 50 ? AstraSpace::FWrecks::PosAt(S->Pieces[K], ResumeClock) : AstraSpace::FWrecks::PosAt(S->Pods[K - 50], ResumeClock);
+			Farthest = FMath::Max(Farthest, FVector::Dist(Now, P.Value));
+		}
+		UE_LOG(LogASTRA, Display, TEXT("[Space] resume check: %s — %d parts of wrecks compared, the farthest is %.2f m from where it was in the Gate's frame, %d missing, the clock moved %+.2f s"),
+		       Missing == 0 && Farthest < 1.0 ? TEXT("SAME") : TEXT("DIFFERENT"), ResumeProbe.Num(), Farthest, Missing, WreckClock() - ResumeClock);
+		ResumeProbe.Reset();
+	}
 	if ((HostileScanT -= Dt) <= 0.0)
 	{
 		HostileScanT = 0.25;
@@ -542,6 +596,8 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 	}
 	const double T1 = FPlatformTime::Seconds();
 	Traffic.Tick(Owner->GetBattleTime() + 0.0, SimDt, View, Events);
+	TickWrecks(SimDt);                              // what the war left: the effects' pieces handed over, the beacons heard, a close look (their events join the traffic's)
+	TickMotion(SimDt);                              // the capital ships' motion read: what asks for jets, where the wakes are noted
 	FlushEvents();
 	const double T2 = FPlatformTime::Seconds();
 	if (CVarSpaceDraw.GetValueOnGameThread() != 0)
@@ -549,6 +605,9 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 		Lamps.Begin();
 		Plumes.Begin();
 		Glints.Begin();
+		Jets.Begin();
+		Wakes.Begin();
+		JetsLitNow = 0;
 		float Fx = 1.f;
 		if (const TConsoleVariableData<float>* V = IConsoleManager::Get().FindTConsoleVariableDataFloat(TEXT("astra.fx.intensity")))
 		{
@@ -559,12 +618,28 @@ void UAstraSpaceLife::Tick(float SimDt, float RealDt)
 		DrawPlaces();
 		DrawVessels();
 		DrawPatrols();
+		{
+			const double W0 = FPlatformTime::Seconds();
+			DrawWrecks(WreckClock());
+			WrecksMs += (FPlatformTime::Seconds() - W0) * 1000.0;
+		}
+		{
+			const double M0 = FPlatformTime::Seconds();
+			DrawMotion();
+			MotionMs += (FPlatformTime::Seconds() - M0) * 1000.0;
+		}
 		FlushSets();
 		Lamps.Flush();
 		Plumes.Flush();
 		Glints.Flush();
+		Jets.Flush();
+		Wakes.Flush();
 		LampsNow = Lamps.Prev;
 		PlumesNow = Plumes.Prev;
+		JetsNow = Jets.Prev;
+		WakeNow = Wakes.Prev;
+		JetsPeak = FMath::Max(JetsPeak, JetsNow);
+		WakePeak = FMath::Max(WakePeak, WakeNow);
 		LampsPeak = FMath::Max(LampsPeak, LampsNow);
 		HullsPeak = FMath::Max(HullsPeak, HullsNow);
 		if (SystemRoot)
@@ -587,6 +662,7 @@ void UAstraSpaceLife::Skip(double Seconds)
 	if (bLaidOut)
 	{
 		Traffic.Warmup(FMath::Clamp(Seconds, 0.0, 7200.0), 1.0);
+		AdvanceWrecks(Seconds);                     // (the wrecks drift on as well, and the lifepods' air goes)
 	}
 }
 
@@ -605,10 +681,10 @@ FString UAstraSpaceLife::Stat() const
 	{
 		Buoys += L.Buoys.Num();
 	}
-	return FString::Printf(TEXT("%s | %s | tick %.4f ms avg (max %.3f): traffic %.4f, drawing %.4f | drawn: hulls %d now / %d peak, lamps %d now / %d peak (%d dropped), plumes %d | places %d, lanes %d, buoys %d, rocks %d"),
+	return FString::Printf(TEXT("%s | %s | tick %.4f ms avg (max %.3f): traffic %.4f, drawing %.4f | drawn: hulls %d now / %d peak, lamps %d now / %d peak (%d dropped), plumes %d | places %d, lanes %d, buoys %d, rocks %d | %s | %s"),
 	                       bLive ? TEXT("drawing") : (bSim ? TEXT("bench (not drawn)") : TEXT("off")), *Traffic.Describe(), TickCount ? TickMs / TickCount : 0.0, TickMsMax,
 	                       TickCount ? TrafficMs / TickCount : 0.0, TickCount ? DrawMs / TickCount : 0.0, HullsNow, HullsPeak, LampsNow, LampsPeak, LampsDropped, PlumesNow, Places.Num(), Layout.Lanes.Num(),
-	                       Buoys, Layout.Rocks.Num());
+	                       Buoys, Layout.Rocks.Num(), *WreckStat(), *MotionStat());
 }
 
 FString UAstraSpaceLife::WhereText() const
@@ -705,6 +781,12 @@ TSharedRef<FJsonObject> UAstraSpaceLife::SummaryJson() const
 		T->SetArrayField(TEXT("nearest"), Nv);
 	}
 	O->SetObjectField(TEXT("traffic"), T);
+	// what the war has left here: the wrecks near enough to pick out and the lifepods whose beacons are heard
+	const TSharedRef<FJsonObject> W = WreckSummaryJson();
+	if (W->HasField(TEXT("here")) && (W->GetNumberField(TEXT("here")) > 0.0 || W->HasField(TEXT("lifepods"))))
+	{
+		O->SetObjectField(TEXT("wrecks"), W);
+	}
 	return O;
 }
 
@@ -732,6 +814,29 @@ TSharedRef<FJsonObject> UAstraSpaceLife::BenchJson() const
 	O->SetNumberField(TEXT("space_ms_max"), TickMsMax);
 	O->SetNumberField(TEXT("lamps_peak"), LampsPeak);
 	O->SetNumberField(TEXT("hulls_peak"), HullsPeak);
+	O->SetNumberField(TEXT("motion_ships"), MotionShips);
+	O->SetNumberField(TEXT("jets_peak"), JetsPeak);
+	O->SetNumberField(TEXT("jets_dropped"), JetsDropped);
+	O->SetNumberField(TEXT("wake_peak"), WakePeak);
+	O->SetNumberField(TEXT("wake_dropped"), WakeDropped);
+	O->SetNumberField(TEXT("motion_ms_avg"), MotionTicks ? MotionMs / MotionTicks : 0.0);
+	{
+		const AstraSpace::FWreckStats Ws = Wrecks.Stats(SystemName, WreckClock());
+		O->SetNumberField(TEXT("wreck_sites"), Ws.Sites);
+		O->SetNumberField(TEXT("wreck_sites_here"), Ws.SitesHere);
+		O->SetNumberField(TEXT("wreck_pieces"), Ws.Pieces);
+		O->SetNumberField(TEXT("wreck_chunks"), Ws.Chunks);
+		O->SetNumberField(TEXT("pods"), Ws.Pods);
+		O->SetNumberField(TEXT("pods_adrift"), Ws.PodsAdrift);
+		O->SetNumberField(TEXT("pods_recovered"), Ws.PodsRecovered);
+		O->SetNumberField(TEXT("pods_lost"), Ws.PodsLost);
+		O->SetNumberField(TEXT("pod_survivors_adrift"), Ws.Survivors);
+		O->SetNumberField(TEXT("rescued"), Ws.Rescued);
+		O->SetNumberField(TEXT("losses"), Ws.Losses);
+		O->SetNumberField(TEXT("wreck_ms_avg"), TickCount ? WrecksMs / TickCount : 0.0);
+		O->SetNumberField(TEXT("wreck_hulls_peak"), WreckHullsPeak);
+		O->SetNumberField(TEXT("wreck_chunks_peak"), ChunksPeak);
+	}
 	TArray<TSharedPtr<FJsonValue>> States;
 	for (int32 s = 0; s < (int32)AstraSpace::EVState::Num; ++s)
 	{
@@ -751,24 +856,82 @@ bool UAstraSpaceLife::LookAt(const FString& Key, double Km, FString& OutDetail)
 		OutDetail = TEXT("no living space laid out here");
 		return false;
 	}
-	const AstraSpace::FNode* Hit = nullptr;
-	for (const AstraSpace::FNode& N : Layout.Nodes)
+	FVector Target = FVector::ZeroVector;
+	FString Name;
+	if (Key.Equals(TEXT("wreck"), ESearchCase::IgnoreCase) || Key.Equals(TEXT("pod"), ESearchCase::IgnoreCase))
 	{
-		if (N.Id.ToString().Equals(Key, ESearchCase::IgnoreCase) || N.Name.Contains(Key, ESearchCase::IgnoreCase) || (N.Spec && N.Spec->Contact.Equals(Key, ESearchCase::IgnoreCase)))
+		// what the war left: the nearest piece of a wreck (one the effects no longer burn: those are theirs for a minute), or the nearest lifepod still adrift
+		const bool bPod = Key.Equals(TEXT("pod"), ESearchCase::IgnoreCase);
+		const double Now = WreckClock();
+		double Best = 1e18;
+		for (const AstraSpace::FSite& S : Wrecks.Sites())
 		{
-			Hit = &N;
-			break;
+			if (S.System != SystemKey)
+			{
+				continue;
+			}
+			if (!bPod)
+			{
+				for (const AstraSpace::FPieceRec& P : S.Pieces)
+				{
+					const FVector At = Sky.ToSystem(AstraSpace::FWrecks::PosAt(P, Now));
+					const double D = FVector::DistSquared(At, Owner->Ships[0].Pos);
+					if (D < Best)
+					{
+						Best = D;
+						Target = At;
+						Name = FString::Printf(TEXT("%s of %s"), P.Section == 0 ? TEXT("the bow section") : (P.Section == 1 ? TEXT("the middle section") : (P.Section == 2 ? TEXT("the stern section") : TEXT("the hull"))), *S.Name);
+					}
+				}
+			}
+			else
+			{
+				for (const AstraSpace::FPodRec& P : S.Pods)
+				{
+					if (P.State != 0)
+					{
+						continue;
+					}
+					const FVector At = Sky.ToSystem(AstraSpace::FWrecks::PosAt(P, Now));
+					const double D = FVector::DistSquared(At, Owner->Ships[0].Pos);
+					if (D < Best)
+					{
+						Best = D;
+						Target = At;
+						Name = FString::Printf(TEXT("a lifepod of %s (%d aboard)"), *S.Name, P.Survivors);
+					}
+				}
+			}
+		}
+		if (Name.IsEmpty())
+		{
+			OutDetail = bPod ? TEXT("no lifepod adrift here (astra.space.lose, then astra.space.wrecks.list)") : TEXT("no wreck here (astra.space.lose <contact> breakup, then astra.space.wrecks.list)");
+			return false;
 		}
 	}
-	if (!Hit)
+	else
 	{
-		OutDetail = FString::Printf(TEXT("no place called %s (try astra.space.where)"), *Key);
-		return false;
+		const AstraSpace::FNode* Hit = nullptr;
+		for (const AstraSpace::FNode& N : Layout.Nodes)
+		{
+			if (N.Id.ToString().Equals(Key, ESearchCase::IgnoreCase) || N.Name.Contains(Key, ESearchCase::IgnoreCase) || (N.Spec && N.Spec->Contact.Equals(Key, ESearchCase::IgnoreCase)))
+			{
+				Hit = &N;
+				break;
+			}
+		}
+		if (!Hit)
+		{
+			OutDetail = FString::Printf(TEXT("no place called %s (try astra.space.where; wreck and pod look at what the war left)"), *Key);
+			return false;
+		}
+		Target = Hit->Pos;
+		Name = Hit->Name;
 	}
 	FAstraBattleShip& P = Owner->Ships[0];
-	FVector Out = P.Pos - Hit->Pos;
+	FVector Out = P.Pos - Target;
 	Out = Out.IsNearlyZero() ? FVector(1.0, 0.0, 0.0) : Out.GetSafeNormal();
-	P.Pos = Hit->Pos + Out * (Km * SpKm);
+	P.Pos = Target + Out * (Km * SpKm);
 	P.Vel = FVector::ZeroVector;
 	const FVector Dir = -Out;
 	if (UAstraShipSubsystem* Ship = Owner->GetWorld()->GetSubsystem<UAstraShipSubsystem>())
@@ -777,7 +940,7 @@ bool UAstraSpaceLife::LookAt(const FString& Key, double Km, FString& OutDetail)
 		Ship->SetSpeedMps(0.f);
 		Ship->SetThrottle(0.f);
 	}
-	OutDetail = FString::Printf(TEXT("the Aquila is %.1f km from %s, bow on it"), Km, *Hit->Name);
+	OutDetail = FString::Printf(TEXT("the Aquila is %.1f km from %s, bow on it"), Km, *Name);
 	return true;
 }
 
@@ -803,7 +966,7 @@ namespace
 			if (UAstraSpaceLife* S = SpaceOf(W)) { UE_LOG(LogASTRA, Display, TEXT("[Space] %s"), *S->WhereText()); }
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs CmdSpaceLook(TEXT("astra.space.look"), TEXT("Put the Aquila a few km from a place, bow on it: astra.space.look <keeper|arsenal|tiberius|id|name> [km, default 12]"),
+	FAutoConsoleCommandWithWorldAndArgs CmdSpaceLook(TEXT("astra.space.look"), TEXT("Put the Aquila a few km from a place, bow on it: astra.space.look <keeper|arsenal|tiberius|id|name|wreck|pod> [km, default 12]: wreck and pod are the nearest piece of what the war left and the nearest lifepod adrift"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& A, UWorld* W)
 		{
 			UAstraSpaceLife* S = SpaceOf(W);
@@ -850,10 +1013,12 @@ namespace
 			UE_LOG(LogASTRA, Display, TEXT("[Space] a test hostile %.0f km on the bow: watch astra.space.stat"), Km);
 		}));
 
-	FAutoConsoleCommandWithWorld CmdSpaceReload(TEXT("astra.space.reload"), TEXT("Read data/space again and lay the system out afresh (places, rocks, traffic)"),
+	FAutoConsoleCommandWithWorld CmdSpaceReload(TEXT("astra.space.reload"), TEXT("Read data/space again (the places, the jets of the capital ships, the places' hull boxes) and lay the system out afresh (places, rocks, traffic)"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
 		{
 			AstraSpace::ReloadData();
+			AstraSpace::ReloadJetData();                 // (the ships' motion is cleared when the system is laid out again, a frame on: nothing holds the old tables)
+			AstraSpace::ReloadSolidData();
 			if (UAstraSpaceLife* S = SpaceOf(W)) { S->Arrive(S->GetSystem().IsEmpty() ? FString(TEXT("Aurelia")) : S->GetSystem()); }
 		}));
 }

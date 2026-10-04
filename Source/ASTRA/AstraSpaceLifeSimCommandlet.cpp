@@ -130,6 +130,47 @@ namespace
 		}
 	}
 
+	/** The invariants of what the war leaves: what must hold of the sites at every moment whatever the war does. */
+	void SpCheckWrecks(const UAstraSpaceLife& S, double Now, TArray<FSpaceCheck>& Fails)
+	{
+		for (const FSite& Si : S.GetWrecks().Sites())
+		{
+			if (Si.System != S.GetSystem().ToLower())
+			{
+				continue;
+			}
+			int32 Sum = 0;
+			for (const FPodRec& P : Si.Pods)
+			{
+				Sum += P.Survivors;
+				if (P.Pos0.ContainsNaN() || P.Vel.ContainsNaN())
+				{
+					Fails.Add({TEXT("wreck_finite"), false, FString::Printf(TEXT("t=%.0f site %d has a lifepod with a NaN"), Now, Si.Id)});
+				}
+				if (P.State == 1 && P.By.IsEmpty())
+				{
+					Fails.Add({TEXT("wreck_rescue"), false, FString::Printf(TEXT("t=%.0f site %d: a lifepod recovered by nobody"), Now, Si.Id)});
+				}
+			}
+			if (Sum != Si.Aboard.Escaped || Si.Aboard.Escaped + Si.Aboard.Lost != Si.Aboard.Alive)
+			{
+				Fails.Add({TEXT("wreck_people"), false, FString::Printf(TEXT("t=%.0f site %d (%s): %d in the pods, %d escaped, %d lost, %d alive"), Now, Si.Id, *Si.Name, Sum, Si.Aboard.Escaped, Si.Aboard.Lost, Si.Aboard.Alive)});
+			}
+			for (const FPieceRec& P : Si.Pieces)
+			{
+				const FVector Pos = FWrecks::PosAt(P, Now);
+				if (Pos.ContainsNaN() || FWrecks::AttAt(P, Now).ContainsNaN())
+				{
+					Fails.Add({TEXT("wreck_finite"), false, FString::Printf(TEXT("t=%.0f site %d has a piece with a NaN"), Now, Si.Id)});
+				}
+				if (P.bInFx && P.Section < 3 && Now - Si.DiedAt > FWrecks::HandOverS + 3.0)
+				{
+					Fails.Add({TEXT("wreck_handover"), false, FString::Printf(TEXT("t=%.0f site %d (%s): the effects still hold a piece %.0f s after she went"), Now, Si.Id, *Si.Name, Now - Si.DiedAt)});
+				}
+			}
+		}
+	}
+
 	TSharedRef<FJsonObject> SpNodeJson(const FNode& N)
 	{
 		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
@@ -157,6 +198,57 @@ int32 UAstraSpaceSimCommandlet::Main(const FString& Params)
 	FParse::Value(*Params, TEXT("exec="), Exec, false);
 	FParse::Value(*Params, TEXT("at="), At, false);
 	const bool bSelfTest = FParse::Param(*Params, TEXT("selftest"));
+	if (FParse::Param(*Params, TEXT("wrecktest")))
+	{
+		// the records of what the war leaves, on their own (no world): AstraWrecksTest.cpp
+		TArray<FString> TestFails, TestNotes;
+		const double W0 = FPlatformTime::Seconds();
+		const bool bOk = AstraSpace::RunWreckTests(TestFails, TestNotes);
+		for (const FString& N : TestNotes)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[WreckTest] %s"), *N);
+		}
+		for (const FString& F : TestFails)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[WreckTest] FAIL %s"), *F);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("%s (%d failures, %.2f s)"), bOk ? TEXT("WRECKS_SELFTEST_OK") : TEXT("WRECKS_SELFTEST_FAILED"), TestFails.Num(), FPlatformTime::Seconds() - W0);
+		return bOk ? 0 : 1;
+	}
+	if (FParse::Param(*Params, TEXT("motiontest")))
+	{
+		// the jets and the wakes of the capital ships, on their own (no world): AstraSpaceLifeMotionTest.cpp
+		TArray<FString> TestFails, TestNotes;
+		const double M0 = FPlatformTime::Seconds();
+		const bool bOk = AstraSpace::RunMotionTests(TestFails, TestNotes);
+		for (const FString& N : TestNotes)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[MotionTest] %s"), *N);
+		}
+		for (const FString& F : TestFails)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[MotionTest] FAIL %s"), *F);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("%s (%d failures, %.2f s)"), bOk ? TEXT("MOTION_SELFTEST_OK") : TEXT("MOTION_SELFTEST_FAILED"), TestFails.Num(), FPlatformTime::Seconds() - M0);
+		return bOk ? 0 : 1;
+	}
+	if (FParse::Param(*Params, TEXT("solidstest")))
+	{
+		// the places' hull boxes, on their own (no world): AstraSpaceLifeSolids.cpp
+		TArray<FString> TestFails, TestNotes;
+		const double S0 = FPlatformTime::Seconds();
+		const bool bOk = AstraSpace::RunSolidsTests(TestFails, TestNotes);
+		for (const FString& N : TestNotes)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[SolidsTest] %s"), *N);
+		}
+		for (const FString& F : TestFails)
+		{
+			UE_LOG(LogASTRA, Display, TEXT("[SolidsTest] FAIL %s"), *F);
+		}
+		UE_LOG(LogASTRA, Display, TEXT("%s (%d failures, %.2f s)"), bOk ? TEXT("SOLIDS_SELFTEST_OK") : TEXT("SOLIDS_SELFTEST_FAILED"), TestFails.Num(), FPlatformTime::Seconds() - S0);
+		return bOk ? 0 : 1;
+	}
 	Step = FMath::Clamp(Step, 0.02f, 0.25f);
 	FMath::RandInit(Seed);
 	FMath::SRandInit(Seed);
@@ -260,6 +352,7 @@ int32 UAstraSpaceSimCommandlet::Main(const FString& Params)
 			int32 Vessels = 0, Overlaps = 0;
 			TArray<FSpaceCheck> Found;
 			SpCheckInvariants(*S, Now, Found, Vessels, Overlaps);
+			SpCheckWrecks(*S, S->WreckClock(), Found);
 			++ChecksRun;
 			MaxOverlaps = FMath::Max(MaxOverlaps, Overlaps);
 			OverlapSum += Overlaps;
@@ -360,6 +453,50 @@ int32 UAstraSpaceSimCommandlet::Main(const FString& Params)
 	Root->SetArrayField(TEXT("events"), Events);
 	Root->SetArrayField(TEXT("frames"), Frames);
 	Root->SetObjectField(TEXT("final"), S->BenchJson());
+	if (S->GetWrecks().Sites().Num())
+	{
+		// where the war's leavings are at the end (km, the system frame): for the map tools/art/wrecks_plot.py draws
+		const FSkyFrame Sky = S->SkyFrame();
+		const double Clock = S->WreckClock();
+		const auto Km = [](const FVector& V) { return TArray<TSharedPtr<FJsonValue>>({MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.X / 10.0) / 100.0), MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.Y / 10.0) / 100.0),
+		                                                                           MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.Z / 10.0) / 100.0)}); };
+		TSharedRef<FJsonObject> WJ = MakeShared<FJsonObject>();
+		WJ->SetNumberField(TEXT("clock"), Clock);
+		WJ->SetArrayField(TEXT("aquila_km"), Km(B->PlayerPos()));
+		WJ->SetArrayField(TEXT("gate_km"), Km(Sky.Origin));
+		WJ->SetNumberField(TEXT("beacon_km"), FWrecks::BeaconKm);
+		TArray<TSharedPtr<FJsonValue>> Sites;
+		for (const FSite& Si : S->GetWrecks().Sites())
+		{
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetNumberField(TEXT("id"), Si.Id);
+			J->SetStringField(TEXT("name"), Si.Name);
+			J->SetStringField(TEXT("how"), HowLostName(Si.How));
+			J->SetNumberField(TEXT("faction"), Si.Faction);
+			J->SetNumberField(TEXT("died"), Si.DiedAt);
+			TArray<TSharedPtr<FJsonValue>> Pc, Pd;
+			for (const FPieceRec& P : Si.Pieces)
+			{
+				Pc.Add(MakeShared<FJsonValueArray>(Km(Sky.ToSystem(FWrecks::PosAt(P, Clock)))));
+			}
+			for (const FPodRec& P : Si.Pods)
+			{
+				TSharedRef<FJsonObject> Q = MakeShared<FJsonObject>();
+				Q->SetArrayField(TEXT("p"), Km(Sky.ToSystem(FWrecks::PosAt(P, Clock))));
+				Q->SetBoolField(TEXT("beacon"), FWrecks::BeaconOn(P, Clock));
+				Q->SetNumberField(TEXT("state"), P.State);
+				Q->SetNumberField(TEXT("n"), P.Survivors);
+				Pd.Add(MakeShared<FJsonValueObject>(Q));
+			}
+			J->SetArrayField(TEXT("pieces"), Pc);
+			J->SetArrayField(TEXT("pods"), Pd);
+			J->SetArrayField(TEXT("field_mid"), Km(Sky.ToSystem(Si.Field.Pos0 + Si.Field.Vel * (Clock - Si.Field.T0))));
+			J->SetNumberField(TEXT("field_km"), FWrecks::FieldRadiusAt(Si.Field, Clock) / 1000.0);
+			Sites.Add(MakeShared<FJsonValueObject>(J));
+		}
+		WJ->SetArrayField(TEXT("sites"), Sites);
+		Root->SetObjectField(TEXT("wrecks"), WJ);
+	}
 	if (WorldMs.Num())
 	{
 		WorldMs.Sort();

@@ -79,7 +79,7 @@ Quando i Gates si riaprirono, nel 2450, i Core Worlds tornarono a commerciare co
 
 | Luogo | Descrizione | Importanza |
 |---|---|---|
-| **Janus Gate Aurelia** | Anello nero di 12 km, con la stazione di controllo **Keeper Station** | Obiettivo principale del Mandate |
+| **Janus Gate Aurelia** | Anello nero di 16 km di diametro (8 km di raggio: la dimensione su cui sono costruiti il codice, la mesh, le corsie del traffico e la March), con la stazione di controllo **Keeper Station** | Obiettivo principale del Mandate |
 | **New Ravenna** (pianeta II) | Mondo oceanico ad arcipelaghi; la capitale **Port Aurelius** è una città di torri sul mare (tappa M7) | 30 milioni di civili |
 | **Aurelia Arsenal** | Cantieri orbitali attorno a New Ravenna | Riparazioni e navi nuove per la Navy |
 | **Tiberius** | Gigante gassoso con anelli e raffinerie di deuterio sulle lune | Carburante per le flotte |
