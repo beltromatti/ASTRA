@@ -86,10 +86,18 @@ public:
 		bool bCaptain = false;         // the Captain rides in the first boat (his marines')
 		FString By;                    // who ordered it ("Admiral Solm", "the Captain"), for the log and for the minds' picture of the operation
 		FString Reason;                // why, in the words of whoever ordered it (the minds' own: they give one with every order)
+		bool bDrill = false;           // the Captain's boarding drill (ABBORDAGGI-3): the war's drill state is held for the length of it (StartDrill), the boats are flown through the point defence unharmed and nobody recalls them
 	};
 	/** Boats leave a carrier for a target and the fight is theirs: the boarders cut in where the boats latch; whoever survives goes home. False, and why, when it cannot be (no boat free, a shield
 	 *  that holds the hatch, no hatch on that face, a boarding already on). The reply is the facts. */
 	bool StartAssault(const FAssaultSpec& Spec, FString& OutDetail);
+	/** The boarding drill (ABBORDAGGI-3, `astra.board.drill`): a boarding of the Aquila staged so that it can be watched. A face of her shield is held at nothing, point defence is silent against the boats, her flight decks
+	 *  are shut, and (Km > 0) the carrier is kept that far abeam on that face with her guns held; then the boats are sent as in any assault (the same hatches, the same fight). Nothing that stops a boat in play is
+	 *  changed: with no drill the Falcons, the Praetorian's point defence and the shield the crew raises again are as correct as ever. The drill ends with the assault (or with `astra.board.drill off`). Face: port | starboard. */
+	bool StartDrill(const FString& Face, int32 Skiffs, const FString& Carrier, double Km, FString& OutDetail);
+	/** The drill is over: everything it held is given back. */
+	void EndDrill(const TCHAR* Why);
+	bool IsDrill() const { return Assault.bOn && Assault.Spec.bDrill; }
 	/** The assault under way, as the minds read it (empty object when none): ships, boats and where each is, men, hatches. */
 	TSharedRef<FJsonObject> AssaultJson() const;
 	/** What each side may order, from what is true (the carriers' free boats and, for each enemy ship, what a boat would meet: shield on the face, point defence, fighters): the war minds' context.
@@ -342,6 +350,7 @@ private:
 	void BuildAquilaPlan();
 	void TickAssault(float Dt);
 	bool LaunchAssault(FString& OutDetail);
+	int32 BestCarrier(const AstraBoardCraft::FShipFacts& Target) const;       // the side's carrier with the most boats free (and the nearest) against a target, or -1
 	bool ChooseHatches(const FBoardShipPlan& Plan, const FString& Face, const FString& BreachId, const AstraBoardCraft::FShipFacts& Target, const AstraBoardCraft::FShipFacts& Carrier,
 	                   int32 Count, TArray<int32>& OutDocks, FString& OutWhy) const;
 	void FillLeg(FLeg& L, const FBoardShipPlan& Plan, int32 Dock, const TCHAR* Face) const;
@@ -460,6 +469,8 @@ private:
 	void ReleaseBody(int32 Unit);
 	void ClearBodies();
 	void Finish(const TCHAR* Why);
+	void WriteBooks();                               // (a landing's dead and wounded go back into the books of the ships it was between: AstraBoardAssault.cpp)
+	bool bBooksWritten = false;
 	FString NameOf(const AstraBoard::FUnit& U) const;
 	FString PlaceOf(const AstraBoard::FUnit& U) const;
 	UAstraShipSubsystem* ShipSub() const;

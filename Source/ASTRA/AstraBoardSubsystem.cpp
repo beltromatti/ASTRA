@@ -544,6 +544,7 @@ void UAstraBoardSubsystem::Finish(const TCHAR* Why)
 		return;
 	}
 	UE_LOG(LogASTRA, Log, TEXT("[Board] over: %s"), Why);
+	WriteBooks();                                                // (the ships' books: a landing's dead and wounded are theirs)
 	UAstraLifeSubsystem* L = LifeSub();
 	UAstraShipSubsystem* S = ShipSub();
 	// the wounded who are still alive are carried to the Medbay; the able go back to their duty; the fallen are told

@@ -177,6 +177,24 @@ bool UAstraBattleSubsystem::FleetSnapshot(int32 ShipId, FFleetSnapshot& Out) con
 	return false;
 }
 
+bool UAstraBattleSubsystem::FleetBoardingResult(int32 ShipId, const TArray<FFleetCasualty>& Casualties, FFleetBoardingTally& OutTally)
+{
+	OutTally = FFleetBoardingTally();
+	FAstraBattleShip* S = FindById(ShipId);
+	if (!S || !S->bAlive)
+	{
+		return false;
+	}
+	// a ship nobody has fought through has no inside yet: she has her class's crew at their posts all the same, and a landing's dead are among them (the plan was read when she joined the battle)
+	FAstraShipInterior* I = FleetEnsure(*S);
+	if (!I)
+	{
+		return false;
+	}
+	OutTally = I->ApplyBoarding(Casualties);
+	return true;
+}
+
 void UAstraBattleSubsystem::FleetOnDestroyed(FAstraBattleShip& S)
 {
 	if (FAstraShipInterior* I = S.Interior.Get())

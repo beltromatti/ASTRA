@@ -103,7 +103,11 @@ namespace
 			R.bCaptainAlive |= H.Billet == TEXT("captain");
 			if (H.bWounded)
 			{
-				Sim.AddWounded(Def, !H.Name.IsEmpty() ? H.Name : Sim.MakeName(Def, ++Counter), Spot);
+				const int32 W = Sim.AddWounded(Def, !H.Name.IsEmpty() ? H.Name : Sim.MakeName(Def, ++Counter), Spot);
+				if (FAstraBoardSim::FUnit* Wu = Sim.UnitMutable(W))
+				{
+					Wu->Person = H.Person;
+				}
 				++R.Wounded;
 				continue;
 			}
@@ -151,7 +155,11 @@ namespace
 					FVector Spot = Map.Inset(H.Comp, FVector(H.PosCm), 45.f);
 					Spot.Z = Map.GetComps()[H.Comp].FloorZ();
 					const ERole Role = k == Lead ? ERole::Leader : (k == N - 1 && N >= 5 && Roles[(int32)EFleetRole::Marine] > 2 ? ERole::Heavy : ERole::Rifleman);
-					Sim.AddUnit(Def, Role, !H.Name.IsEmpty() ? H.Name : Sim.MakeName(Def, ++Counter), Spot, Sq);       // (the first of a squad leads it; an officer, added later as its Leader, takes it over)
+					const int32 U = Sim.AddUnit(Def, Role, !H.Name.IsEmpty() ? H.Name : Sim.MakeName(Def, ++Counter), Spot, Sq);       // (the first of a squad leads it; an officer, added later as its Leader, takes it over)
+					if (FAstraBoardSim::FUnit* Du = Sim.UnitMutable(U))
+					{
+						Du->Person = H.Person;                       // (who he is in the war's books: what the fight does to him is written back to him)
+					}
 					++R.Defenders;
 				}
 				if (bReact)
@@ -190,6 +198,38 @@ void AstraBoardScene::ForDisabledShip(FSpec& Spec, bool bFromWar)
 	{
 		Spec.MinPerPost = 0;
 		Spec.Roaming = 0;
+	}
+}
+
+void AstraBoardScene::CasualtiesOf(const FAstraBoardSim& Sim, ESide Side, TArray<FFleetCasualty>& Out)
+{
+	const bool bDefenders = !Sim.IsAttacker(Side);
+	for (const FUnit& U : Sim.Units())
+	{
+		if (U.bExternal || U.Side != Side || U.Roster != INDEX_NONE)
+		{
+			continue;                                                  // (the Captain, and the Aquila's marines of the roster: their books are the roster's)
+		}
+		// dead; or hurt: down on the deck, or carried off alive (beaten, then taken out: his hit points are gone but he is not dead)
+		const bool bDead = U.Act == EAct::Dead;
+		const bool bHurt = U.Act == EAct::Down || (U.Act == EAct::Gone && U.Hp <= 0.f);
+		if (!bDead && !bHurt)
+		{
+			continue;
+		}
+		FFleetCasualty C;
+		C.bKilled = bDead;
+		C.Person = U.Person;
+		if (bDefenders)
+		{
+			C.Comp = U.Comp;
+			C.PosCm = U.Pos;
+		}
+		else
+		{
+			C.Role = (int32)EFleetRole::Marine;                         // (the boarders of a carrier: her marines)
+		}
+		Out.Add(C);
 	}
 }
 

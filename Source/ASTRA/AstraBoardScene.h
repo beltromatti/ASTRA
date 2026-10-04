@@ -11,6 +11,7 @@
 #include "AstraBoardSim.h"
 
 struct FFleetSnapshot;                // FLOTTA-VIVA (AstraFleetInterior.h): what the war has left of a ship's inside
+struct FFleetCasualty;                // ... and what a landing did to her people (the books)
 
 namespace AstraBoardScene
 {
@@ -60,4 +61,9 @@ namespace AstraBoardScene
 	 *  fight for. bFromWar: the war's own picture of her inside is the scene (her people are where the war left them); without it she is a derelict nobody fought through (no record of her crew: a post may be left
 	 *  empty, nobody roams). The host and the bench come to this one place for the numbers, so that what the bench measures is what the game does. */
 	ASTRA_API void ForDisabledShip(FSpec& Spec, bool bFromWar);
+
+	/** What a fight did to the people of one side (ABBORDAGGI-3), as the books of the ship that side belongs to want them: every man who is dead (killed, or lost with his boat), and every man who is hurt (down on the
+	 *  deck, or carried off alive). A defender who came from the war's picture of her carries his place in her books (FUnit::Person); any other is placed by the room where he fell. The attackers have no room on the ship
+	 *  they landed on: they are the carrier's marines. The Captain and the Aquila's roster marines are not here (the roster has its own books). The host writes them to the battle (FleetBoardingResult) and the bench to an interior. */
+	ASTRA_API void CasualtiesOf(const FAstraBoardSim& Sim, AstraBoard::ESide Side, TArray<FFleetCasualty>& Out);
 }

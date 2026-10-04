@@ -675,6 +675,13 @@ public:
 	int32 AbortBoardingOrder(int32 Order, const FString& Why);
 	/** The boats of a carrier (total, away, lost, free). */
 	AstraBoardCraft::FBay BoardBayOf(int32 CarrierId) const;
+	/** The boarding drill (ABBORDAGGI-3, AstraBoardCraft.cpp): for the length of one assault a face of the Aquila's shield is held at nothing, point defence fires at no boat, the flight decks are shut and a carrier is
+	 *  kept abeam with her guns held. Nothing else of the war changes. EndBoardingDrill gives everything back. */
+	void SetBoardingDrill(const AstraBoardCraft::FDrill& D);
+	void EndBoardingDrill();
+	const AstraBoardCraft::FDrill& BoardingDrill() const { return BoardDrill; }
+	/** The carrier is put abeam of the target on a face, Km from her, flying with her; false (and why) when it cannot be. */
+	bool ParkForDrill(int32 CarrierId, int32 TargetId, int32 Facing, double Km, FString& OutWhy);
 	/** A ship of the battle by what a command calls it: a contact id (T-30), a name (ASN Praetorian, "Acheron"), "aquila". -1 when there is none or the name fits several. */
 	int32 ResolveShip(const FString& Key, FString* OutWhy = nullptr) const;
 	/** The truth about one ship, for the host (never for the crew). */
@@ -682,6 +689,10 @@ public:
 	/** What the war has left of a ship's inside (FLOTTA-VIVA's snapshot: her people alive and where, the rooms not as built, the pressure bulkheads shut), for a boarding that goes into her; false when she
 	 *  has none (never hit through her plating, or her class has no plan). The same as FleetSnapshot, which is not public. */
 	bool InsideOf(int32 ShipId, struct FFleetSnapshot& Out) const { return FleetSnapshot(ShipId, Out); }
+	/** A landing's dead and wounded are written back into a ship's books (ABBORDAGGI-3; FLOTTA-VIVA's ApplyBoarding): the people of the ship that was boarded, and the boarders of the carrier that sent boats (her
+	 *  marines). The inside is made if she has none yet (a ship nobody fought through still has her class's crew at their posts). Her counts, her chain of command and what she can still do follow; a ship the
+	 *  boarders take keeps her books as the landing left them. False when she has no plan of her class or is no ship of this war. */
+	bool FleetBoardingResult(int32 ShipId, const TArray<struct FFleetCasualty>& Casualties, struct FFleetBoardingTally& OutTally);
 	/** The ships of the battle that are not craft and are not destroyed, as the host of the boarding sees them (to choose a carrier, to list what each side may board). */
 	void ListShipFacts(TArray<AstraBoardCraft::FShipFacts>& Out) const;
 	/** The boarders took her: she is theirs now (her side, her stance), a hulk with a prize crew. ForSide: 0 ASTRA's (the Aquila's marines took a Mandate ship), 1 the Mandate's (they took a consort). */
@@ -907,6 +918,8 @@ private:
 	void EmitBoardEvent(AstraBoardCraft::EEventKind Kind, const FAstraBattleShip& S, const FString& Cause = FString());
 	void RemoveBoardingCraft(FAstraBattleShip& S);
 	bool BoardingDockOpen(const FAstraBattleShip& T, const FVector& LocalNormal, float* OutFrac = nullptr) const;
+	void TickBoardingDrill(float Dt);
+	AstraBoardCraft::FDrill BoardDrill;
 	TArray<AstraBoardCraft::FCraftEvent> BoardEvents;
 	TArray<AstraBoardCraft::FPendingLaunch> BoardLaunches;
 	TMap<int32, AstraBoardCraft::FBay> BoardBays;
